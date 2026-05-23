@@ -39,8 +39,27 @@
 .p2o-result { background:#ecfdf5; border:1px solid #86efac; border-radius:10px;
   padding:14px 16px; margin-top:12px; }
 .p2o-result h3 { margin:0 0 10px; color:#064e3b; font-size:15px; }
-.p2o-result .meta { font-size:13px; color:#065f46; line-height:1.6; }
+.p2o-result .meta { font-size:13px; color:#065f46; line-height:1.6; margin-top:10px; }
 .p2o-result .meta b { color:#064e3b; }
+/* 結果列頂端 bar：下載鈕靠左，轉換完成 / 引擎 / 格式 靠右同一行 */
+.p2o-result-bar { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.p2o-result-summary { margin-left:auto; display:flex; align-items:center; gap:8px;
+  flex-wrap:wrap; font-size:12.5px; }
+/* 每個摘要項目做成標籤（chip）質感：圓角 + 邊框 + 淺底 */
+.p2o-result-summary .p2o-done,
+.p2o-result-summary .p2o-kv {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 11px; border-radius:999px; line-height:1.6;
+  background:#ffffff; border:1px solid #a7f3d0; color:#047857; white-space:nowrap;
+}
+.p2o-result-summary .p2o-done { background:#d1fae5; border-color:#6ee7b7;
+  color:#064e3b; font-weight:700; }
+.p2o-result-summary .p2o-kv b { color:#064e3b; font-weight:700; }
+/* 開始轉換列：按鈕靠左，進度條 + 文字接在右邊填滿 */
+.p2o-convert-row { display:flex; align-items:center; gap:16px; }
+.p2o-convert-row > .btn { flex:0 0 auto; }
+#p2oJob { flex:1 1 auto; min-width:0; margin:0; }
+#p2oJob .job-row { margin:0; }
 .p2o-result .meta-grid {
   display:grid;
   grid-template-columns: max-content 1fr;
@@ -98,7 +117,10 @@
 .btn:disabled, .btn[disabled] { opacity:.6; cursor:not-allowed; pointer-events:none; }
 /* JobProgress 預設「下載 PDF / 下載 PNG」按鈕跟 pdf-to-office 不適用（輸出是 docx/odt
    不是 pdf）— 完全藏起來，下載走我們綠色 result panel 內的「下載」按鈕。 */
-#p2oJob .job-download, #p2oJob .job-download-png { display: none !important; }
+/* 下載走綠色 result panel 的「下載」鈕；「處理新檔案」多餘（上傳新檔即自動
+   重設整個流程）— 一律藏掉 job_progress 預設的這三顆動作鈕。 */
+#p2oJob .job-download, #p2oJob .job-download-png, #p2oJob .job-reset { display: none !important; }
+#p2oJob .job-actions { display: none !important; }
 </style>
 {% endblock %}
 
@@ -149,16 +171,16 @@
     <input type="radio" name="engine" id="engJtdtReform" value="jtdt-reform">
     <label for="engJtdtReform">
       <div class="ttl"><b>jtdt-reform</b> <span style="background:#e5e7eb;color:#6b7280;padding:1px 6px;border-radius:4px;font-size:11px;margin-left:6px;">實驗</span></div>
-      <div class="desc">自家開發引擎：從 PDF 真值按幾何規則 re-form 出 docx / odt。某些 layout 細節仍在改善。</div>
+      <div class="desc">自家開發引擎：依 PDF 實際版面座標用幾何規則重組成 docx / odt。某些 layout 細節仍在改善。</div>
     </label>
   </div>
 </div>
 
 <div class="panel" id="advPanel" hidden>
   <h2>4. 進階選項</h2>
-  <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:13.5px;">
-    <input type="checkbox" id="enablePost">
-    用 <b>jtdt-refine</b> 後處理引擎（25 條 fixer：字型 / 段落 / 標題 / 清單 / 表格 / 雜訊 / bbox 版面校正）— 僅對 pdf2docx 引擎有效。預設不勾，需要時手動啟用。
+  <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13.5px;">
+    <input type="checkbox" id="enablePost" style="margin-top:3px;flex:0 0 auto;">
+    <span>用 <b style="white-space:nowrap;">jtdt-refine</b> 後處理引擎（25 條 fixer：字型 / 段落 / 標題 / 清單 / 表格 / 雜訊 / bbox 版面校正）— 僅對 pdf2docx 引擎有效。預設不勾，需要時手動啟用。</span>
   </label>
 
   <details class="p2o-fixers">
@@ -184,17 +206,23 @@
 </div>
 
 <div class="panel" id="convertPanel" hidden>
-  <button class="btn btn-primary" id="btnConvert">{{ icon('file-text', size=14) }} 開始轉換</button>
+  <div class="p2o-convert-row">
+    <button class="btn btn-primary" id="btnConvert">{{ icon('file-text', size=14) }} 開始轉換</button>
+    <button class="btn btn-danger" id="btnCancel" type="button" hidden>{{ icon('close', size=14) }} 停止轉換</button>
+    {% with progress_id='p2oJob' %}{% include "components/job_progress.html" %}{% endwith %}
+  </div>
 </div>
 
-{% with progress_id='p2oJob' %}{% include "components/job_progress.html" %}{% endwith %}
-
 <div class="panel p2o-result" id="resultPanel" hidden>
-  <h3>{{ icon('check', size=15) }} 轉換完成</h3>
-  <div class="meta" id="rMeta"></div>
-  <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+  <div class="p2o-result-bar">
     <a class="btn btn-primary" id="rDownload" download>{{ icon('download', size=14) }} 下載</a>
+    <div class="p2o-result-summary">
+      <span class="p2o-done">{{ icon('check', size=14) }} 轉換完成</span>
+      <span class="p2o-kv">引擎 <b id="rEngine">-</b></span>
+      <span class="p2o-kv">格式 <b id="rFormat">-</b></span>
+    </div>
   </div>
+  <div class="meta" id="rMeta"></div>
   <div class="p2o-preview" id="rPreview" hidden>
     <div class="preview-header" id="rPreviewHeader">前後對照（DPI 90）</div>
     <div id="rPreviewPages"></div>
@@ -289,7 +317,8 @@ const fu = new FileUpload($('p2oUpload'), async (f) => {
   $('enginePanel').hidden = true;
   $('advPanel').hidden = true;
   $('resultPanel').hidden = true;
-  // 重設前次轉換的 job progress 面板（進度條 / 完成狀態 / 處理新檔案 按鈕）
+  // 重設前次轉換的 job progress 面板 + 停止鈕（換新檔即重來）
+  if ($('btnCancel')) $('btnCancel').hidden = true;
   jp.hide();
   const fd = new FormData();
   fd.append('file', f);
@@ -345,10 +374,27 @@ $('btnConvert').addEventListener('click', async () => {
   }
   const j = await r.json();
   jp.track(j.job_id);
+  $('btnCancel').hidden = false;   // 轉換中顯示「停止轉換」
+});
+
+// 停止轉換：呼叫 cancel API + 停輪詢 + 還原 UI
+$('btnCancel').addEventListener('click', async () => {
+  $('btnCancel').disabled = true;
+  await jp.cancel();
+  $('btnCancel').disabled = false;
+  $('btnCancel').hidden = true;
+  setBtnBusy($('btnConvert'), false);
+  jp.hide();
+  $('resultPanel').hidden = true;
 });
 
 const jp = new JobProgress($('p2oJob'), {
+  onCancel: () => {
+    $('btnCancel').hidden = true;
+    setBtnBusy($('btnConvert'), false);
+  },
   onDone: (jobData) => {
+    $('btnCancel').hidden = true;
     setBtnBusy($('btnConvert'), false);
     const meta = jobData.meta || {};
     const sm = meta.summary || {};
@@ -361,8 +407,9 @@ const jp = new JobProgress($('p2oJob'), {
     $('rDownload').setAttribute('download', _fn);
     const rows = [];
     const primaryEng = rep.primary_engine || sm.engine || '-';
-    rows.push(['引擎', `<b>${primaryEng}</b>`]);
-    rows.push(['格式', `<b>${(sm.output_format||'').toUpperCase()}</b>`]);
+    // v1.10.1：引擎 / 格式 移到結果列頂端 bar（下載鈕右側），不再放進 rMeta 細表
+    $('rEngine').textContent = primaryEng;
+    $('rFormat').textContent = (sm.output_format || '').toUpperCase();
     if (rep.diagnosis && rep.diagnosis.summary) {
       const ds = rep.diagnosis.summary;
       rows.push(['語言', ds.language_guess || '-']);
@@ -415,10 +462,15 @@ const jp = new JobProgress($('p2oJob'), {
           : '<span style="color:#94a3b8;">無變動</span>'
       ]);
     }
-    const html = '<div class="meta-grid">' +
-      rows.map(([k, v]) => `<div class="lbl">${k}</div><div class="val">${v}</div>`).join('') +
-      '</div>';
-    $('rMeta').innerHTML = html;
+    if (rows.length) {
+      $('rMeta').innerHTML = '<div class="meta-grid">' +
+        rows.map(([k, v]) => `<div class="lbl">${k}</div><div class="val">${v}</div>`).join('') +
+        '</div>';
+      $('rMeta').hidden = false;
+    } else {
+      $('rMeta').innerHTML = '';
+      $('rMeta').hidden = true;
+    }
     // v1.9.36：多頁前後對照 — 一律顯示前 6 頁
     const previewWrap = $('rPreview');
     const pagesContainer = $('rPreviewPages');
@@ -475,8 +527,9 @@ const jp = new JobProgress($('p2oJob'), {
     $('resultPanel').hidden = false;
     $('resultPanel').scrollIntoView({behavior:'smooth', block:'end'});
   },
-  onError: () => { setBtnBusy($('btnConvert'), false); },
+  onError: () => { $('btnCancel').hidden = true; setBtnBusy($('btnConvert'), false); },
   onReset: () => {
+    $('btnCancel').hidden = true;
     setBtnBusy($('btnConvert'), false);
     $('resultPanel').hidden = true;
   },

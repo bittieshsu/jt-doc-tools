@@ -113,10 +113,20 @@ def test_analyze_returns_summary_and_pages(client):
     assert "freq" in j and "cjk_chars" in j["freq"]
 
 
-def test_analyze_rejects_non_pdf(client):
+def test_analyze_accepts_plain_text(client):
+    # v1.7.x：pdf-wordcount 已擴充支援 TXT / MD / CSV 等純文字檔
     r = client.post(
         "/tools/pdf-wordcount/analyze",
-        files={"file": ("note.txt", b"hello", "text/plain")},
+        files={"file": ("note.txt", b"hello world", "text/plain")},
+    )
+    assert r.status_code == 200
+
+
+def test_analyze_rejects_unsupported_type(client):
+    # 非支援副檔名（圖片等）仍應拒絕
+    r = client.post(
+        "/tools/pdf-wordcount/analyze",
+        files={"file": ("photo.png", b"\x89PNG\r\n", "image/png")},
     )
     assert r.status_code == 400
 

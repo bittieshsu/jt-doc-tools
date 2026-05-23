@@ -14,7 +14,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.10.0"
+VERSION = "1.10.1"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -791,6 +791,16 @@ async def api_job_status(job_id: str):
     if not job:
         return JSONResponse({"error": "job not found"}, status_code=404)
     return job.to_public()
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+async def api_job_cancel(job_id: str):
+    """停止執行中的 job（標記取消，背景執行緒在下一 checkpoint 中止並丟棄結果）。"""
+    job = job_manager.get(job_id)
+    if not job:
+        return JSONResponse({"error": "job not found"}, status_code=404)
+    ok = job_manager.cancel(job_id)
+    return {"ok": ok, "status": job.status}
 
 
 @app.get("/api/vat-lookup/{vat}")

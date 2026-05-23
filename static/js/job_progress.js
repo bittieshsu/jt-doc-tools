@@ -1,7 +1,7 @@
 // JobProgress: polls /api/jobs/{id} and shows status bar + download link(s).
 (function () {
   class JobProgress {
-    constructor(root, { downloadUrl, downloadPngUrl, onReset, onDone, onError } = {}) {
+    constructor(root, { downloadUrl, downloadPngUrl, onReset, onDone, onError, onCancel } = {}) {
       this.root = root;
       this.bar = root.querySelector('.job-bar-inner');
       this.status = root.querySelector('.job-status');
@@ -13,10 +13,21 @@
       this.onReset = onReset || (() => {});
       this.onDone = onDone || (() => {});
       this.onError = onError || (() => {});
+      this.onCancel = onCancel || (() => {});
       this._timer = null;
+      this.jobId = null;
       this.resetBtn.addEventListener('click', () => { this.hide(); this.onReset(); });
     }
     show() { this.root.hidden = false; }
+    stopPolling() { this._stop(); }
+    // 主動停止：呼叫 cancel API + 停輪詢（UI 端立即回饋）
+    async cancel() {
+      const jid = this.jobId;
+      this._stop();
+      if (jid) {
+        try { await fetch(`/api/jobs/${jid}/cancel`, { method: 'POST' }); } catch (_) {}
+      }
+    }
     hide() {
       this.root.hidden = true;
       this.bar.style.width = '0%';
@@ -27,6 +38,7 @@
     }
     _stop() { if (this._timer) { clearInterval(this._timer); this._timer = null; } }
     track(jobId) {
+      this.jobId = jobId;
       // 重設前次 run 的殘留狀態（進度條 / 下載按鈕 / 錯誤色），避免顯示 stale UI
       this.bar.style.width = '0%';
       this.bar.style.background = '';
@@ -60,6 +72,10 @@
             this.bar.style.background = '#dc2626';
             this._stop();
             try { this.onError(j); } catch (_) {}
+          } else if (j.status === 'cancelled') {
+            this.status.textContent = j.message || '已停止';
+            this._stop();
+            try { this.onCancel(j); } catch (_) {}
           }
         } catch (e) {
           this.status.textContent = '查詢狀態失敗';

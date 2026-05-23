@@ -275,7 +275,12 @@ async def submit(request: Request):
     def run(job):
         from .service import convert_pdf_to_office
 
-        engine_label = "jtdt-reform (Beta)" if engine == "jtdt-reform" else "pdf2docx + 後處理"
+        if engine == "jtdt-reform":
+            engine_label = "jtdt-reform (Beta)"
+        elif enable_postprocess:
+            engine_label = "pdf2docx + jtdt-refine 後處理"
+        else:
+            engine_label = "pdf2docx"
         job.message = f"PDF 轉換中…（{engine_label}）"
         job.progress = 0.1
         work_dir = settings.temp_dir / f"{_UPLOAD_PREFIX}_{uid}_work"
@@ -290,6 +295,10 @@ async def submit(request: Request):
         if not result.ok:
             raise RuntimeError(result.error or "轉換失敗")
 
+        # 使用者按了「停止轉換」→ 丟棄結果、不產 preview、不交付
+        if job.cancelled:
+            return
+
         # 結果搬到 stable 名稱
         ext = ".odt" if output_format == "odt" else ".docx"
         dst_name = f"{stem}{ext}"
@@ -298,6 +307,8 @@ async def submit(request: Request):
             import shutil
             shutil.move(str(result.output_path), str(dst))
 
+        if job.cancelled:
+            return
         job.result_path = dst
         job.result_filename = dst_name
 
