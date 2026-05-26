@@ -309,6 +309,7 @@ class LLMClient:
         max_tokens: Optional[int] = None,
         parse_json: bool = True,
         think: bool = False,
+        repeat_penalty: float = 1.0,  # > 1.0 抑制重複生成迴圈;OCR 場景建議 1.1-1.2
     ):
         """parse_json=True (預設，向後相容): 回 dict（會強行 JSON parse，
         失敗會 raise LLMError）。
@@ -375,6 +376,12 @@ class LLMClient:
         }
         if max_tokens is not None and max_tokens > 0:
             payload["max_tokens"] = int(max_tokens)
+        # 防 LLM 重複生成迴圈(qwen2.5vl 等在 temp=0 + OCR 任務常陷入重複)
+        # OpenAI-compat: 用 frequency_penalty;Ollama 透過 options.repeat_penalty
+        if repeat_penalty and repeat_penalty != 1.0:
+            # OpenAI frequency_penalty 範圍 -2.0~2.0,大致 (repeat_penalty - 1) * 2
+            payload["frequency_penalty"] = max(-2.0, min(2.0, (repeat_penalty - 1.0) * 2.0))
+            payload.setdefault("options", {})["repeat_penalty"] = float(repeat_penalty)
         # Ollama-specific knobs to disable thinking — 只對 thinking model 套用
         if suppress_thinking:
             payload["think"] = False
@@ -482,6 +489,8 @@ class LLMClient:
                     native_payload["options"]["think"] = False
                 if max_tokens is not None and max_tokens > 0:
                     native_payload["options"]["num_predict"] = int(max_tokens)
+                if repeat_penalty and repeat_penalty != 1.0:
+                    native_payload["options"]["repeat_penalty"] = float(repeat_penalty)
                 with httpx.Client(timeout=self.timeout) as cli:
                     r3 = cli.post(f"{ollama_base}/api/chat",
                                   headers={"Content-Type": "application/json"},

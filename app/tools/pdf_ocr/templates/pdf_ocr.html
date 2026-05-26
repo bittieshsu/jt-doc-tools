@@ -199,6 +199,14 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 .po-toggle-tag-vision { background:#fef3c7; color:#92400e; }
 .po-toggle-tag-text   { background:#dbeafe; color:#1e40af; }
 .po-toggle-tag-direct { background:#ede9fe; color:#5b21b6; }
+.po-toggle-tag-align  { background:#dcfce7; color:#166534; }
+.po-toggle-tag-full   { background:#fce7f3; color:#9f1239; }
+/* 識別結果全文摺疊區 */
+.po-fulltext { margin-top:10px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; }
+.po-fulltext > summary { cursor:pointer; padding:10px 14px; font-weight:600; color:#334155; font-size:14px; user-select:none; }
+.po-fulltext > summary:hover { background:#f1f5f9; }
+.po-fulltext-body { padding:0 14px 14px; }
+.po-fulltext-pre { background:#fff; border:1px solid var(--border); border-radius:6px; padding:12px; max-height:420px; overflow:auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.7; white-space:pre-wrap; word-break:break-word; color:#1e293b; margin:0; }
 
 /* 處理中 spinner（按鈕內） */
 @keyframes po-spin { to { transform: rotate(360deg); } }
@@ -381,8 +389,10 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
       <div class="po-langs-empty">未偵測到已安裝的語言（tesseract 不可用？請確認系統已安裝 tesseract 與訓練檔）</div>
       {% endif %}
     </div>
-    <div class="po-field" style="grid-column: 1 / -1;">
-      <label>渲染 DPI <span class="muted">（影像解析度，越高文字辨識越準但越慢；300 是平衡點）</span></label>
+    <div class="po-field" style="grid-column: 1 / -1;" id="poDpiSection">
+      <label>渲染 DPI <span class="muted">（影像解析度，越高文字辨識越準但越慢；300 是平衡點）</span>
+        <span id="poDpiDisabledNote" class="muted" style="display:none; color:#a16207; margin-left:8px;">（已勾選 LLM 辨識，影像會自動縮到 1568 px，DPI 主要影響 EasyOCR 失敗退回時的辨識精準度）</span>
+      </label>
       <div class="po-dpi-wrap">
         <div class="po-dpi-grid">
           <div class="po-dpi-card" data-dpi="150">
@@ -433,8 +443,10 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
       </div>
     </div>
     <div class="po-field" style="grid-column: 1 / -1;">
-      <!-- LLM 直接辨識：獨立選項（不放在 LLM 後處理 收納內,因為它是主辨識） -->
-      <div class="po-toggle-grid" style="margin-bottom:10px;">
+      <!-- LLM 主辨識選項：直接 / 對位 / 完整 三擇一（獨立於 LLM 後處理）
+           暫時隱藏（v1.11.22+）— LLM 重複生成迴圈與座標精度問題尚未完全穩定,
+           hide 但保留 checkbox 給 backend 邏輯,後端 API 仍可傳 use_llm_direct/align/full -->
+      <div class="po-toggle-grid" style="margin-bottom:10px; display:none;">
         <div class="po-toggle {% if not llm_vision_ok %}po-toggle-disabled{% endif %}">
           <input type="checkbox" id="poUseLlmDirect" {% if not llm_vision_ok %}disabled{% endif %}>
           <label for="poUseLlmDirect">
@@ -444,9 +456,39 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
               {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
             </span>
             {% if llm_vision_ok %}
-            <span class="po-toggle-hint">勾選後<b>跳過 EasyOCR / Tesseract</b>，直接交給 vision LLM 做 OCR。對複雜版面 / 手寫 / 特殊字型最準；較慢、耗 VRAM。<b style="color:#a16207;">⚠ 中文易「腦補」幻覺</b> — 公司名 / 人名 / 機關名 / 編號常被猜成「相似的常見詞」（例：原文「資安能量登錄」可能被改成「資安量測」），<b>務必對照原檔複核</b>。<b style="color:#a16207;">⚠ 輸出無逐字座標</b> — 拖選反白位置不對應圖上實際位置（要精準對位請改用 EasyOCR / Tesseract）。<b>若 LLM 連不上或回空白，會自動退回 EasyOCR</b>。需 vision 模型（gemma4:26b、qwen3-vl 等）。</span>
+            <span class="po-toggle-hint">跳過 OCR 引擎，LLM 直接做 OCR。<b style="color:#a16207;">無逐字座標</b>（拖選位置不對應原圖），中文易腦補。失敗自動退回 EasyOCR。</span>
             {% else %}
-            <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a> 為「OCR 文字辨識（LLM 視覺校對）」指派 vision 模型</span>
+            <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
+            {% endif %}
+          </label>
+        </div>
+        <div class="po-toggle {% if not llm_vision_ok %}po-toggle-disabled{% endif %}">
+          <input type="checkbox" id="poUseLlmAlign" {% if not llm_vision_ok %}disabled{% endif %}>
+          <label for="poUseLlmAlign">
+            <span class="po-toggle-name">
+              LLM 對位辨識
+              <span class="po-toggle-tag po-toggle-tag-align">對位混合</span>
+              {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
+            </span>
+            {% if llm_vision_ok %}
+            <span class="po-toggle-hint">EasyOCR 取座標 + LLM 取文字，行對齊。<b>拖選位置精準</b>；對齊失敗保留 EasyOCR 原字。較慢但最穩，任何 vision 模型都能用。</span>
+            {% else %}
+            <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
+            {% endif %}
+          </label>
+        </div>
+        <div class="po-toggle {% if not llm_vision_ok %}po-toggle-disabled{% endif %}">
+          <input type="checkbox" id="poUseLlmFull" {% if not llm_vision_ok %}disabled{% endif %}>
+          <label for="poUseLlmFull">
+            <span class="po-toggle-name">
+              LLM 完整辨識
+              <span class="po-toggle-tag po-toggle-tag-full">全自主</span>
+              {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
+            </span>
+            {% if llm_vision_ok %}
+            <span class="po-toggle-hint">LLM 同時回文字與座標，不跑 OCR 引擎。<b>建議用 <code>qwen2.5vl:7b</code></b>（grounding 能給座標、無 thinking mode、約 9GB VRAM）；qwen3-vl thinking mode 不穩、gemma 無 grounding 不可用。座標解析失敗自動退回 EasyOCR。</span>
+            {% else %}
+            <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
             {% endif %}
           </label>
         </div>
@@ -454,7 +496,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 
       <details class="po-llm-details">
         <summary style="cursor:pointer;font-size:13px;color:#475569;padding:8px 12px;background:#f1f5f9;border-radius:6px;user-select:none;font-weight:600;">
-          LLM 後處理 <span class="muted" style="font-weight:normal;">（選用 — 預設關閉；EasyOCR 中文已夠強，需要時點開；選了上面的「LLM 直接辨識」時以下不適用）</span>
+          LLM 後處理 <span class="muted" style="font-weight:normal;">（選用 — 預設關閉；EasyOCR 中文已夠強，需要時點開）</span>
         </summary>
         <div style="margin-top:10px;">
       <div style="background:#fef2f2; border-left:3px solid #ef4444; padding:8px 12px; margin-bottom:8px; font-size:12px; color:#991b1b; border-radius:4px; line-height:1.6;">
@@ -509,30 +551,39 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 
 {% block scripts %}
 <script src="/static/js/file_upload.js"></script>
+{# Pre-render icon SVGs into JS constants so JS-built innerHTML can use them #}
+<script>
+const PO_ICON_FILE = {{ icon('file-text', size=14) | tojson }};
+const PO_ICON_COPY = {{ icon('copy', size=12) | tojson }};
+const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
+</script>
 <script>
 (function(){
   const $ = (id) => document.getElementById(id);
   let uploadId = null;
 
-  // LLM 直接辨識 ↔ 後處理校對 互斥：選了主辨識,校對自動 disable+uncheck;
-  // 並把 OCR 語言區塊反灰（LLM 直接辨識用 vision 模型,引擎語言設定不會用到,
-  // 僅在 LLM 失敗自動退回 EasyOCR 時才會生效，留著但反灰提示）。
+  // 主辨識模式互斥規則:
+  //   - 直接辨識 / 對位辨識 / 完整辨識 三者互斥(只能擇一)
+  //   - 三者擇一勾選時, 校對 / 校正 自動 disable + uncheck (校對只能配 EasyOCR/Tesseract)
+  //   - OCR 語言區塊在「直接辨識」「完整辨識」時反灰(LLM 不用 OCR 引擎);
+  //     「對位辨識」時 OCR 還是會跑(取座標), 語言設定有意義 → 不反灰
   function syncLlmDirectMutex() {
     const direct = $('poUseLlmDirect');
+    const align = $('poUseLlmAlign');
+    const full = $('poUseLlmFull');
     const vision = $('poUseLlmVision');
     const text = $('poUseLlm');
-    if (!direct) return;
-    const on = direct.checked;
+    if (!direct || !align || !full) return;
+    const mainOn = direct.checked || align.checked || full.checked;
     [vision, text].forEach(cb => {
       if (!cb) return;
-      if (on) {
+      if (mainOn) {
         cb.checked = false;
         cb.dataset.savedDisabled = cb.disabled ? '1' : '0';
         cb.disabled = true;
         const wrap = cb.closest('.po-toggle');
         if (wrap) wrap.classList.add('po-toggle-disabled');
       } else {
-        // 還原原本的 disable 狀態（vision-only 模型沒設定時本來就 disabled）
         if (cb.dataset.savedDisabled === '0') {
           cb.disabled = false;
           const wrap = cb.closest('.po-toggle');
@@ -540,17 +591,40 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
         }
       }
     });
-    // 語言區塊反灰 / 還原
+    // OCR 語言區塊：「直接辨識」「完整辨識」反灰,「對位辨識」維持(EasyOCR 還是會跑)
     const langSection = $('poLangSection');
     const langNote = $('poLangDisabledNote');
     if (langSection) {
-      langSection.classList.toggle('po-field-disabled', on);
-      if (langNote) langNote.style.display = on ? 'inline' : 'none';
+      const greyLang = direct.checked || full.checked;
+      langSection.classList.toggle('po-field-disabled', greyLang);
+      if (langNote) langNote.style.display = greyLang ? 'inline' : 'none';
+    }
+    // 渲染 DPI 區塊:LLM 任一主模式勾選 → 灰掉(LLM shrink 到 1568px,DPI 對 LLM 影響很小)
+    // 但仍保留可選(失敗退回 EasyOCR 時 DPI 有用)
+    const dpiSection = $('poDpiSection');
+    const dpiNote = $('poDpiDisabledNote');
+    if (dpiSection) {
+      const greyDpi = direct.checked || align.checked || full.checked;
+      dpiSection.classList.toggle('po-field-disabled', greyDpi);
+      if (dpiNote) dpiNote.style.display = greyDpi ? 'inline' : 'none';
     }
   }
   document.addEventListener('DOMContentLoaded', () => {
     const d = document.getElementById('poUseLlmDirect');
-    if (d) d.addEventListener('change', syncLlmDirectMutex);
+    const a = document.getElementById('poUseLlmAlign');
+    const f = document.getElementById('poUseLlmFull');
+    if (d) d.addEventListener('change', () => {
+      if (d.checked) { if (a) a.checked = false; if (f) f.checked = false; }
+      syncLlmDirectMutex();
+    });
+    if (a) a.addEventListener('change', () => {
+      if (a.checked) { if (d) d.checked = false; if (f) f.checked = false; }
+      syncLlmDirectMutex();
+    });
+    if (f) f.addEventListener('change', () => {
+      if (f.checked) { if (d) d.checked = false; if (a) a.checked = false; }
+      syncLlmDirectMutex();
+    });
   });
 
   // PDF.js viewer 區塊：OCR 完成後直接在頁內預覽（可選取文字）
@@ -562,7 +636,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
     return ''
       + '<div class="po-viewer-wrap" id="poViewerWrap">'
       + '  <div class="po-viewer-head">'
-      + '    <span class="title">📄 預覽結果（直接拖選文字試試看）</span>'
+      + '    <span class="title"><span style="display:inline-flex; vertical-align:middle; margin-right:4px;">' + PO_ICON_FILE + '</span>預覽結果（直接拖選文字試試看）</span>'
       + '    <span class="actions">'
       + '      <a href="' + viewerSrc + '" target="_blank" rel="noopener">在新分頁開啟 ↗</a>'
       + '    </span>'
@@ -755,12 +829,39 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
     stageResults.forEach(p => {
       let pageHtml = '<div class="po-stage-page">'
         + '<div class="po-stage-page-head">頁 ' + p.page + '</div>';
+      // LLM 完整辨識（grounded）
+      if (p.llm_full) {
+        const f = p.llm_full;
+        const cls = f.used ? 'po-stage-status-ok' : 'po-stage-status-warn';
+        const lbl = f.used ? ((f.n_items || 0) + ' 段') : '未套用';
+        const status = '<span class="po-stage-status ' + cls + '">' + lbl + '</span>';
+        pageHtml += renderStageRow('LLM 完整辨識', 'po-stage-tag-vision', status,
+                                    f.note || '', f.text);
+      }
+      // LLM 直接辨識
+      if (p.llm_direct) {
+        const d = p.llm_direct;
+        const cls = d.used ? 'po-stage-status-ok' : 'po-stage-status-warn';
+        const lbl = d.used ? '已套用' : '未套用';
+        const status = '<span class="po-stage-status ' + cls + '">' + lbl + '</span>';
+        pageHtml += renderStageRow('LLM 直接辨識', 'po-stage-tag-vision', status,
+                                    d.note || '', d.text);
+      }
       // ① OCR raw
       if (p.ocr_raw) {
         const status = '<span class="po-stage-status po-stage-status-ok">'
                      + p.ocr_raw.word_count + ' 字</span>';
         pageHtml += renderStageRow('① OCR raw', 'po-stage-tag-ocr', status,
                                     p.ocr_raw.note || '', p.ocr_raw.text);
+      }
+      // LLM 對位辨識（hybrid）
+      if (p.llm_align) {
+        const a = p.llm_align;
+        const cls = a.used ? 'po-stage-status-ok' : 'po-stage-status-warn';
+        const lbl = a.used ? '已套用' : '未套用';
+        const status = '<span class="po-stage-status ' + cls + '">' + lbl + '</span>';
+        pageHtml += renderStageRow('LLM 對位辨識', 'po-stage-tag-vision', status,
+                                    a.note || '', a.text);
       }
       // ② vision
       if (p.llm_vision) {
@@ -820,11 +921,16 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
     fd.append('langs', getSelectedLangs());
     fd.append('dpi', $('poDpi').value);
     fd.append('skip_pages_with_text', $('poSkipText').checked ? 'true' : 'false');
-    // 直接辨識勝出：勾了就忽略後處理（後端也會強制清掉，前端先在 UI 反映）
-    const direct = $('poUseLlmDirect') && $('poUseLlmDirect').checked;
-    fd.append('use_llm', (!direct && $('poUseLlm').checked) ? 'true' : 'false');
-    fd.append('use_llm_vision', (!direct && $('poUseLlmVision').checked) ? 'true' : 'false');
+    // 主辨識模式優先：完整 / 對位 / 直接 三擇一；勾了就忽略後處理
+    const full = $('poUseLlmFull') && $('poUseLlmFull').checked;
+    const direct = $('poUseLlmDirect') && $('poUseLlmDirect').checked && !full;
+    const align = $('poUseLlmAlign') && $('poUseLlmAlign').checked && !full && !direct;
+    const mainOn = full || direct || align;
+    fd.append('use_llm', (!mainOn && $('poUseLlm').checked) ? 'true' : 'false');
+    fd.append('use_llm_vision', (!mainOn && $('poUseLlmVision').checked) ? 'true' : 'false');
     fd.append('use_llm_direct', direct ? 'true' : 'false');
+    fd.append('use_llm_align', align ? 'true' : 'false');
+    fd.append('use_llm_full', full ? 'true' : 'false');
     try {
       const r = await fetch('run/' + uploadId, { method:'POST', body: fd });
       if (!r.ok) throw new Error(await r.text());
@@ -857,35 +963,65 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
           const producer = stats.producer || 'jt-doc-tools pdf-ocr';
           const tessV = stats.tesseract_version || '';
           const marker = stats.marker || 'jtdt-pdf-ocr';
-          // LLM 直接辨識:從 stage_results 收集純文字,供「複製全文」按鈕用
-          let llmDirectText = '';
-          if (stats.llm_direct_used) {
-            const parts = [];
-            (stats.stage_results || []).forEach(s => {
-              if (s && s.llm_direct && s.llm_direct.text) parts.push(s.llm_direct.text);
-            });
-            llmDirectText = parts.join('\n\n');
+          // 聚合每頁最終文字 — 依優先序取最後處理過的階段
+          // (完整 > 對位 > 直接 > 文字校正 > 視覺校對 > raw)
+          function _pageText(s) {
+            if (!s) return '';
+            if (s.llm_full && s.llm_full.text) return s.llm_full.text;
+            if (s.llm_align && s.llm_align.text) return s.llm_align.text;
+            if (s.llm_direct && s.llm_direct.text) return s.llm_direct.text;
+            if (s.llm_text && s.llm_text.text) return s.llm_text.text;
+            if (s.llm_vision && s.llm_vision.text) return s.llm_vision.text;
+            if (s.ocr_raw && s.ocr_raw.text) return s.ocr_raw.text;
+            return '';
+          }
+          const stages = stats.stage_results || [];
+          const fullTextParts = stages.map((s, i) => {
+            const t = _pageText(s);
+            if (!t) return '';
+            return (stages.length > 1 ? `--- 第 ${s.page || i+1} 頁 ---\n` : '') + t;
+          }).filter(Boolean);
+          const fullText = fullTextParts.join('\n\n');
+          const fullCharCount = fullText.length;
+          // 模式 label + LLM 用時
+          let modeLabel = '';
+          if (stats.llm_full_used) {
+            const t = stats.llm_full_total_s || 0;
+            modeLabel = `（LLM 完整辨識,LLM 用時 ${t}s）`;
+          } else if (stats.llm_align_used) {
+            const t = stats.llm_align_total_s || 0;
+            modeLabel = `（LLM 對位辨識,LLM 用時 ${t}s）`;
+          } else if (stats.llm_direct_used) {
+            const t = stats.llm_direct_total_s || 0;
+            modeLabel = `（LLM 直接辨識,LLM 用時 ${t}s）`;
+          } else if (stats.llm_vision_used || stats.llm_used) {
+            modeLabel = '（含 ' + [stats.llm_vision_used ? 'LLM 視覺校對' : null,
+                                  stats.llm_used ? 'LLM 文字校正' : null].filter(Boolean).join(' + ') + '）';
           }
           resultBox.innerHTML =
             '<div class="po-result">'
             + '<b>完成！</b><br>'
             + '處理 ' + (stats.pages_ocrd || 0) + ' / ' + (stats.pages_total || 0) + ' 頁'
             + '（略過 ' + (stats.pages_skipped || 0) + ' 頁已有文字層）<br>'
-            + '插入文字 ' + (stats.words_inserted || 0) + ' 字'
-            + (stats.llm_direct_used
-               ? '（LLM 直接辨識）'
-               : (stats.llm_vision_used || stats.llm_used
-                  ? '（含 ' + [stats.llm_vision_used ? 'LLM 視覺校對' : null,
-                              stats.llm_used ? 'LLM 文字校正' : null].filter(Boolean).join(' + ') + '）'
-                  : ''))
+            + '插入文字 ' + (stats.words_inserted || 0) + ' 字' + modeLabel
             + '<br><br>'
             + '<a class="btn btn-primary" href="' + url + '" download>下載文字辨識後 PDF</a>'
-            + (stats.llm_direct_used && llmDirectText
-               ? ' <button type="button" class="btn" id="poCopyFullText" title="複製 LLM 識別出的完整純文字（避開拖選不精準的問題）">複製全文</button>'
-                 + '<div style="margin-top:8px; font-size:12px; color:#a16207;">⚠ LLM 直接辨識的拖選位置不對應圖上文字位置（無逐字座標）— 要拿完整內容請按上方「複製全文」。中文易腦補，務必對照原檔複核。</div>'
+            + (stats.llm_direct_used
+               ? '<div style="margin-top:8px; font-size:12px; color:#a16207;">⚠ LLM 直接辨識無逐字座標，拖選反白位置不對應圖上文字位置（要精準對位請改用「LLM 對位辨識」）；要拿完整內容請展開下方「識別結果全文」一次複製。中文易腦補，務必對照原檔複核。</div>'
+               : '')
+            + (stats.llm_full_used
+               ? '<div style="margin-top:8px; font-size:12px; color:#a16207;">⚠ LLM 完整辨識的座標由 vision 模型預測，typical 誤差 ±10-30px（grounded 模型本質限制，非引擎 bug）。如需 pixel-accurate 拖選位置，請改勾「LLM 對位辨識」(EasyOCR 拿像素級座標 + LLM 拿文字)。</div>'
                : '')
             + '</div>'
-            + renderStageDetails(stats.stage_results || [])
+            // 識別結果全文 — 預設摺疊,方便檢視 / 複製
+            + (fullText
+               ? '<details class="po-fulltext"><summary><span style="display:inline-flex; vertical-align:middle; margin-right:4px;">' + PO_ICON_FILE + '</span>識別結果全文（' + fullCharCount + ' 字' + (stages.length > 1 ? '，' + stages.length + ' 頁' : '') + '，點開檢視 / 複製）</summary>'
+                 + '<div class="po-fulltext-body">'
+                 + '<div style="margin-bottom:8px;"><button type="button" class="btn btn-small" id="poCopyFullText">📋 複製全文</button></div>'
+                 + '<pre id="poFullTextPre" class="po-fulltext-pre">' + fullText.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") + '</pre>'
+                 + '</div></details>'
+               : '')
+            + renderStageDetails(stages)
             + '<details class="po-stages">'
             + '<summary>怎麼確認是這個工具 OCR 的（不是 macOS 預覽程式自動 OCR）？</summary>'
             + '<div class="po-stages-body">'
@@ -900,22 +1036,20 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
             + renderViewer(uploadId);
           setBtnBusy(false);
           mountViewerEmbedCss();
-          // 複製全文按鈕（LLM 直接辨識才會出現）
+          // 複製全文按鈕 — 從 pre 元素拿文字（任何模式只要有結果都會出現）
           const copyBtn = document.getElementById('poCopyFullText');
-          if (copyBtn && llmDirectText) {
+          if (copyBtn && fullText) {
             copyBtn.addEventListener('click', async () => {
               try {
-                await navigator.clipboard.writeText(llmDirectText);
-                const orig = copyBtn.textContent;
-                copyBtn.textContent = '✓ 已複製 ' + llmDirectText.length + ' 字';
-                setTimeout(() => { copyBtn.textContent = orig; }, 2000);
+                await navigator.clipboard.writeText(fullText);
+                copyBtn.textContent = '✓ 已複製 ' + fullText.length + ' 字';
+                setTimeout(() => { copyBtn.textContent = ('<span style="display:inline-flex; vertical-align:middle; margin-right:4px;">' + PO_ICON_COPY + '</span>複製全文'); }, 2000);
               } catch (e) {
-                // 退回 textarea fallback
                 const ta = document.createElement('textarea');
-                ta.value = llmDirectText; document.body.appendChild(ta);
+                ta.value = fullText; document.body.appendChild(ta);
                 ta.select(); document.execCommand('copy'); ta.remove();
                 copyBtn.textContent = '✓ 已複製';
-                setTimeout(() => { copyBtn.textContent = '複製全文'; }, 2000);
+                setTimeout(() => { copyBtn.textContent = ('<span style="display:inline-flex; vertical-align:middle; margin-right:4px;">' + PO_ICON_COPY + '</span>複製全文'); }, 2000);
               }
             });
           }

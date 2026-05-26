@@ -224,6 +224,53 @@ def recognize_text(png_bytes: bytes, langs: str,
     return " ".join(w.get("text", "").strip() for w in words if w.get("text", "").strip()), used
 
 
+def _remote_easyocr_recognize(png_bytes: bytes, langs: str,
+                                preprocess: bool = True) -> list[dict]:
+    """呼叫遠端 GPU EasyOCR server。失敗 raise(讓 caller fallback 本機)。
+    langs 進來是 tesseract code (chi_tra+eng),要轉成 easyocr code (ch_tra+en)。"""
+    from . import ocr_remote_settings as _ors
+    import httpx
+    d = _ors.get()
+    url = (d.get("url") or "").rstrip("/")
+    token = d.get("token") or ""
+    timeout_s = d.get("timeout_s") or 60
+    if not url or not token:
+        raise RuntimeError("remote OCR url/token not configured")
+
+    # 把 tesseract lang code 轉 easyocr code(chi_tra->ch_tra, eng->en, ...)
+    raw_codes = [c.strip() for c in langs.replace(",", "+").split("+") if c.strip()]
+    easy_codes = [_TESS_TO_EASYOCR.get(c, c) for c in raw_codes]
+    easy_langs = "+".join(easy_codes)
+
+    log.info("remote OCR -> %s (langs=%s -> %s, %d KB)", url, langs, easy_langs, len(png_bytes) // 1024)
+    files = {"image": ("page.png", png_bytes, "image/png")}
+    data = {"langs": easy_langs, "preprocess": "true" if preprocess else "false"}
+    headers = {"Authorization": f"Bearer {token}"}
+    with httpx.Client(timeout=float(timeout_s)) as cli:
+        r = cli.post(f"{url}/ocr", files=files, data=data, headers=headers)
+        if r.status_code != 200:
+            raise RuntimeError(f"remote OCR HTTP {r.status_code}: {r.text[:200]}")
+        body = r.json()
+    raw_words = body.get("words") or []
+    words: list[dict] = []
+    for w in raw_words:
+        bbox = w.get("bbox") or []
+        if len(bbox) < 4:
+            continue
+        x0, y0, x1, y1 = bbox[0], bbox[1], bbox[2], bbox[3]
+        words.append({
+            "text": str(w.get("text") or ""),
+            "left": float(x0),
+            "top": float(y0),
+            "width": float(x1 - x0),
+            "height": float(y1 - y0),
+            "conf": int(round(float(w.get("conf") or 0.95) * 100)),
+        })
+    log.info("remote OCR <- %d words, %.2fs (device=%s)",
+             len(words), body.get("elapsed_s", 0), body.get("device", "?"))
+    return words
+
+
 def recognize_image(png_bytes: bytes, langs: str,
                      engine: Optional[str] = None,
                      preprocess: bool = True) -> tuple[list[dict], str]:
@@ -232,9 +279,26 @@ def recognize_image(png_bytes: bytes, langs: str,
     engine: 'easyocr' / 'tesseract' / None（用 admin 預設值）
     preprocess: 是否做影像預處理（grayscale + autocontrast）— 兩 engine 都受惠
 
+    遠端 GPU EasyOCR server: 若 admin 已設定 + enabled,優先使用,失敗自動退本機。
+
     回 (words_list, engine_used) — engine_used 紀錄實際用的 engine（可能是 fallback 後的）
     """
     chosen = engine or get_default_engine()
+
+    # 遠端 GPU EasyOCR — 優先使用,失敗 fallback 本機
+    if chosen == "easyocr":
+        try:
+            from . import ocr_remote_settings as _ors
+            if _ors.is_enabled_and_configured():
+                try:
+                    words = _remote_easyocr_recognize(png_bytes, langs, preprocess=preprocess)
+                    if words:
+                        return words, "easyocr-remote"
+                    log.info("remote EasyOCR returned 0 words, trying local")
+                except Exception as e:
+                    log.warning("remote EasyOCR failed (%s) — falling back to local", e)
+        except Exception as e:
+            log.warning("remote OCR settings check failed: %s", e)
 
     if chosen == "easyocr":
         if is_easyocr_available():

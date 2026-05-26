@@ -1136,6 +1136,10 @@ def build_router(templates) -> APIRouter:
     async def ocr_langs_page(request: Request):
         from ..core import tessdata_manager as _tm
         from ..core import ocr_engine as _oe
+        from ..core import ocr_remote_settings as _ors
+        def _ors_is_configured() -> bool:
+            d = _ors.get()
+            return bool(d.get("enabled")) or (bool(d.get("url")) and bool(d.get("token")))
         catalog = _tm.catalog_with_status()
         tessdata_dir = _tm.get_tessdata_dir()
         groups: dict[str, list] = {}
@@ -1170,6 +1174,7 @@ def build_router(templates) -> APIRouter:
                 "default_engine": _oe.get_default_engine(),
                 "easyocr_available": _oe.is_easyocr_available(),
                 "tesseract_available": _oe.is_tesseract_available(),
+                "external_ocr_configured": _ors_is_configured(),
             },
         )
 
@@ -1235,6 +1240,103 @@ def build_router(templates) -> APIRouter:
         result = _tm.uninstall_lang(code)
         return {"ok": result.ok, "code": result.code,
                 "error": result.error, "hint": result.hint}
+
+    # ─── 外部 GPU OCR Server 部署 (v1.11.22+) ────────────────────────
+    @router.get("/ocr-langs/deploy/install.sh")
+    async def ocr_langs_deploy_install_sh(request: Request):
+        """Generate + serve install.sh (path B: admin downloads + SCPs to GPU host)."""
+        from ..admin.ocr_remote_deploy import build_install_script
+        from ..main import VERSION
+        from fastapi.responses import PlainTextResponse
+        script = build_install_script(jtdt_version=VERSION)
+        return PlainTextResponse(
+            script,
+            headers={
+                "Content-Disposition": 'attachment; filename="jt-ocr-server-install.sh"',
+                "Content-Type": "text/x-sh; charset=utf-8",
+            },
+        )
+
+    @router.get("/ocr-langs/deploy/uninstall.sh")
+    async def ocr_langs_deploy_uninstall_sh(request: Request):
+        from ..admin.ocr_remote_deploy import build_uninstall_script
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(
+            build_uninstall_script(),
+            headers={
+                "Content-Disposition": 'attachment; filename="jt-ocr-server-uninstall.sh"',
+                "Content-Type": "text/x-sh; charset=utf-8",
+            },
+        )
+
+    @router.get("/api/ocr-langs/external/status")
+    async def ocr_external_status(request: Request):
+        """讀目前外部 OCR server 設定(token 已遮蔽)。"""
+        from ..core import ocr_remote_settings as _ors
+        d = _ors.get()
+        return {
+            "enabled": d.get("enabled", False),
+            "url": d.get("url", ""),
+            "token_set": bool(d.get("token")),
+            "token_masked": _ors.masked_token(d.get("token", "")),
+            "timeout_s": d.get("timeout_s", 30),
+            "last_test_ok": d.get("last_test_ok", False),
+            "last_test_at": d.get("last_test_at", ""),
+            "last_test_info": d.get("last_test_info", {}),
+        }
+
+    @router.post("/api/ocr-langs/external/save")
+    async def ocr_external_save(request: Request):
+        """儲存 URL / Token / timeout / enabled。"""
+        from ..core import ocr_remote_settings as _ors
+        body = await request.json()
+        url = body.get("url")
+        token = body.get("token")
+        enabled = body.get("enabled")
+        timeout_s = body.get("timeout_s")
+        # token=空字串 視為「保留現有 token」(避免 admin 重存表單把空 token 蓋掉)
+        if isinstance(token, str) and not token.strip():
+            token = None
+        d = _ors.update(
+            url=url if isinstance(url, str) else None,
+            token=token if isinstance(token, str) else None,
+            enabled=bool(enabled) if enabled is not None else None,
+            timeout_s=int(timeout_s) if timeout_s is not None else None,
+        )
+        return {"ok": True, "enabled": d["enabled"], "url": d["url"]}
+
+    @router.post("/api/ocr-langs/external/test")
+    async def ocr_external_test(request: Request):
+        """測試連接外部 OCR server — 呼叫 /healthz 取 GPU 資訊。
+        允許 body 傳 url + token override(讓 admin 還沒 save 就能 test)。"""
+        import httpx
+        from ..core import ocr_remote_settings as _ors
+        body = await request.json()
+        d = _ors.get()
+        url = (body.get("url") or d.get("url") or "").strip().rstrip("/")
+        token = (body.get("token") or d.get("token") or "").strip()
+        if not url:
+            raise HTTPException(400, "URL 未填")
+        try:
+            with httpx.Client(timeout=10.0) as cli:
+                r = cli.get(f"{url}/healthz")
+                if r.status_code != 200:
+                    raise HTTPException(502, f"healthz HTTP {r.status_code}")
+                info = r.json()
+                # 若 token 也填了,順便驗 /version(要 auth)
+                if token:
+                    rv = cli.get(f"{url}/version",
+                                  headers={"Authorization": f"Bearer {token}"})
+                    if rv.status_code == 401:
+                        _ors.update_test_result(ok=False, info={"error": "token invalid"})
+                        return {"ok": False, "error": "Token 無效(/version 401)", "healthz": info}
+                    if rv.status_code != 200:
+                        return {"ok": False, "error": f"/version HTTP {rv.status_code}", "healthz": info}
+                _ors.update_test_result(ok=True, info=info)
+                return {"ok": True, "healthz": info}
+        except httpx.RequestError as e:
+            _ors.update_test_result(ok=False, info={"error": str(e)})
+            return {"ok": False, "error": f"連線失敗: {e}"}
 
     # ─── 統編資料庫管理 (M4) ─────────────────────────────────────────
     @router.get("/vat-db", response_class=HTMLResponse)

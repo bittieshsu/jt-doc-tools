@@ -542,6 +542,26 @@ curl -X POST http://localhost:8765/tools/pdf-ocr/api/pdf-ocr \
 
 回應：加上文字層的 PDF。
 
+#### 外部 GPU OCR Server
+
+管理員可在 `admin/ocr-langs → 外部 GPU 識別伺服器` 部署 `jt-ocr-server` 到 GPU 主機，jtdt 透過 HTTP 呼叫遠端 EasyOCR，速度比 CPU 快 10× 以上。設定相關 admin endpoints：
+
+```text
+GET  /admin/ocr-langs/deploy/install.sh        # 下載安裝腳本
+GET  /admin/ocr-langs/deploy/uninstall.sh      # 下載解除安裝腳本
+GET  /admin/api/ocr-langs/external/status      # 讀取目前設定
+POST /admin/api/ocr-langs/external/save        # 儲存 URL / Token / Timeout / 啟用
+POST /admin/api/ocr-langs/external/test        # 測試連接
+```
+
+啟用後 `/tools/pdf-ocr/*` 與內部呼叫 EasyOCR 的工具會自動走遠端 GPU，連線失敗自動退回本機。`jt-ocr-server` 自身對外端點：
+
+```text
+GET  /healthz        # 不需 token,回 GPU/VRAM 資訊
+GET  /version        # 需 Bearer token
+POST /ocr            # 需 Bearer token,multipart image + langs form
+```
+
 ### PDF 註解整理
 
 列出 PDF 所有註解（頁碼、類型、作者、內容、座標、時間）。

@@ -4,6 +4,10 @@
 
 {% block head %}
 <style>
+/* Collapsible external OCR section arrow */
+details[open] > .po-ext-summary .po-ext-arrow { transform:rotate(90deg); }
+.po-ext-summary::-webkit-details-marker { display:none; }
+.po-ext-summary:hover .po-ext-arrow { color:#1e293b; }
 .ol-summary { display:flex; gap:16px; flex-wrap:wrap; padding:12px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:14px; }
 .ol-stat { font-size:13px; color:#475569; }
 .ol-stat b { color:#0f172a; font-size:15px; }
@@ -177,8 +181,246 @@
       </div>
     </div>
   </div>
+
+  {# ============== GPU 識別伺服器(外部加速) — 簡潔版,可折疊 ============== #}
+  <details style="margin-top:20px; background:#fff; border:1px solid #e2e8f0; border-radius:8px;" {% if external_ocr_configured %}open{% endif %}>
+  <summary class="po-ext-summary" style="cursor:pointer; padding:14px 18px; user-select:none; list-style:none; display:flex; align-items:center; gap:10px;">
+    <span class="po-ext-arrow" style="color:#475569; font-size:22px; line-height:1; transition:transform 0.15s; display:inline-block; width:18px; transform-origin:center;">▶</span>
+    <span style="color:#f59e0b; display:inline-flex;">{{ icon('sparkles', size=18) }}</span>
+    <span style="font-weight:600; font-size:14px; color:#1e293b;">外部 GPU 識別伺服器</span>
+    <span style="font-size:11px; font-weight:600; color:#065f46; background:#d1fae5; padding:3px 9px; border-radius:10px;">速度 10× 以上</span>
+    {% if external_ocr_configured %}
+    <span style="font-size:11px; font-weight:600; color:#0369a1; background:#e0f2fe; padding:3px 9px; border-radius:10px;">已設定</span>
+    {% else %}
+    <span style="font-size:11px; color:#94a3b8;">— 未設定（點開展開）</span>
+    {% endif %}
+  </summary>
+  <div style="padding:0 18px 18px;">
+    <p class="muted" style="font-size:13px; margin:4px 0 16px; line-height:1.6;">
+      把 EasyOCR 部署到 GPU 主機(DGX Spark / H100 / H200 / 4090 等),jtdt 透過 HTTP 呼叫遠端 OCR。每頁從 CPU 的 <b>8-15 秒</b> 降到 GPU 的 <b>0.3-0.8 秒</b>。連不上自動退回本機。
+    </p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; margin-bottom:14px;">
+      <div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; min-width:0; overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:#3b82f6; color:#fff; border-radius:50%; font-size:12px; font-weight:700;">1</span>
+          <span style="font-weight:600; font-size:13px; color:#1e293b;">下載安裝腳本</span>
+        </div>
+        <p style="font-size:12px; color:#64748b; margin:0 0 10px; line-height:1.5;">純 ASCII(無中文),可在無 CJK locale 的 GPU server 上跑。</p>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <a href="/admin/ocr-langs/deploy/install.sh" class="btn btn-primary" download="jt-ocr-server-install.sh" style="font-size:12px; padding:6px 10px; display:inline-flex; align-items:center; gap:4px;">{{ icon('download', size=12) }} install.sh</a>
+          <a href="/admin/ocr-langs/deploy/uninstall.sh" class="btn" download="jt-ocr-server-uninstall.sh" style="background:#fff; border:1px solid #d1d5db; font-size:12px; padding:6px 10px; display:inline-flex; align-items:center; gap:4px;">{{ icon('download', size=12) }} uninstall.sh</a>
+        </div>
+      </div>
+
+      <div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; min-width:0; overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:#3b82f6; color:#fff; border-radius:50%; font-size:12px; font-weight:700;">2</span>
+          <span style="font-weight:600; font-size:13px; color:#1e293b;">在 GPU 主機執行</span>
+        </div>
+<pre style="background:#1e293b; color:#e2e8f0; padding:8px 10px; border-radius:4px; font-size:11px; margin:0; overflow-x:auto; line-height:1.5; white-space:pre; word-break:normal; max-width:100%; box-sizing:border-box;">scp jt-ocr-server-install.sh root@GPUServer:/tmp/
+ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh --dry-run'
+ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
+        <p style="font-size:11px; color:#f59e0b; margin:6px 0 0; font-weight:600; display:flex; align-items:center; gap:4px;">{{ icon('warn', size=12) }} 把 <code style="background:#fffbeb; padding:1px 4px; border-radius:3px;">GPUServer</code> 換成實際 IP 或 hostname（例：<code style="background:#fffbeb; padding:1px 4px; border-radius:3px;">10.0.0.40</code>）</p>
+        <p style="font-size:11px; color:#94a3b8; margin:4px 0 0;">5-15 分鐘(含 PyTorch ~3GB)</p>
+      </div>
+
+      <div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; min-width:0; overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:#3b82f6; color:#fff; border-radius:50%; font-size:12px; font-weight:700;">3</span>
+          <span style="font-weight:600; font-size:13px; color:#1e293b;">填入 URL + Token</span>
+        </div>
+        <p style="font-size:12px; color:#64748b; margin:0; line-height:1.5;">jt-ocr-server-install.sh 跑完會印 URL + Token，貼到下方表單，測試通過後啟用即可。</p>
+      </div>
+    </div>
+
+    <div style="padding:16px 18px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px;">
+      <div style="display:flex; align-items:center; gap:6px; font-weight:600; font-size:14px; color:#1e293b; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid #e2e8f0;">
+        <span style="color:#64748b; display:inline-flex;">{{ icon('gear', size=16) }}</span>
+        <span>連線設定</span>
+      </div>
+      <div style="display:grid; grid-template-columns:110px 1fr; gap:10px 14px; align-items:center; max-width:720px;">
+        <label style="font-size:13px; color:#475569; text-align:right;">Server URL</label>
+        <input type="url" id="ocrExtUrl" placeholder="http://10.0.0.5:8766"
+               style="padding:7px 11px; border:1px solid #cbd5e1; border-radius:5px; font-size:13px; width:100%; box-sizing:border-box; font-family:'SF Mono', Menlo, monospace;">
+
+        <label style="font-size:13px; color:#475569; text-align:right;">Token</label>
+        <input type="password" id="ocrExtToken" placeholder="Bearer token"
+               style="padding:7px 11px; border:1px solid #cbd5e1; border-radius:5px; font-size:13px; width:100%; box-sizing:border-box; font-family:'SF Mono', Menlo, monospace;">
+
+        <label style="font-size:13px; color:#475569; text-align:right;">Timeout</label>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <input type="number" id="ocrExtTimeout" min="5" max="600" value="120"
+                 style="padding:7px 11px; border:1px solid #cbd5e1; border-radius:5px; font-size:13px; width:90px;">
+          <span class="muted" style="font-size:12px;">秒（建議 120，多語言 Reader 首次載入可能 30-60s）</span>
+        </div>
+
+        <label style="font-size:13px; color:#475569; text-align:right; padding-top:2px;">啟用</label>
+        <label style="font-size:13px; cursor:pointer; display:flex; align-items:flex-start; gap:6px;">
+          <input type="checkbox" id="ocrExtEnabled" style="margin-top:2px;">
+          <span style="color:#475569;">啟用後 OCR 工具會優先用遠端 GPU；連不上自動退回本機</span>
+        </label>
+      </div>
+      <div style="margin-top:18px; padding-top:14px; border-top:1px solid #e2e8f0; display:flex; gap:8px; flex-wrap:wrap;">
+        <button id="ocrExtTestBtn" class="btn" type="button" style="background:#fff; border:1px solid #cbd5e1; display:inline-flex; align-items:center; gap:5px;">
+          {{ icon('refresh', size=13) }} 測試連接
+        </button>
+        <button id="ocrExtSaveBtn" class="btn btn-primary" type="button" style="display:inline-flex; align-items:center; gap:5px;">
+          {{ icon('save', size=13) }} 儲存
+        </button>
+      </div>
+      <div id="ocrExtStatus" style="margin-top:10px; font-size:13px;"></div>
+    </div>
+
+    <details style="margin-top:12px;">
+      <summary style="cursor:pointer; font-size:12px; color:#64748b; user-select:none; padding:4px 0;">
+        ▸ 目標主機需求 / 不弄壞遠端環境的承諾 / DGX Spark 最佳化
+      </summary>
+      <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="padding:10px 12px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px;">
+          <div style="font-weight:600; color:#92400e; font-size:12px; margin-bottom:4px; display:flex; align-items:center; gap:4px;">{{ icon('warn', size=12) }} 目標主機需求</div>
+          <ul style="margin:0; padding-left:18px; font-size:11px; color:#78350f; line-height:1.7;">
+            <li>OS:Ubuntu 22.04+ / 24.04 / DGX OS</li>
+            <li>架構:x86_64 或 aarch64</li>
+            <li><code>nvidia-smi</code> 必須跑得起來</li>
+            <li>Python 3.10+ 與 <code>python3-venv</code></li>
+            <li>root / sudo 權限</li>
+            <li>磁碟 ~4 GB、對外網路</li>
+            <li>inbound TCP 8766(可換)</li>
+          </ul>
+        </div>
+        <div style="padding:10px 12px; background:#f0fdf4; border:1px solid #86efac; border-radius:6px;">
+          <div style="font-weight:600; color:#065f46; font-size:12px; margin-bottom:4px; display:flex; align-items:center; gap:4px;">{{ icon('shield', size=12) }} 不弄壞遠端環境的承諾</div>
+          <ul style="margin:0; padding-left:18px; font-size:11px; color:#065f46; line-height:1.7;">
+            <li>不動 system Python(獨立 venv)</li>
+            <li>不裝 GPU driver / kernel module</li>
+            <li>不改 PATH / shell rc / firewall</li>
+            <li>原子化安裝(staging → atomic mv)</li>
+            <li>既有目錄會 abort,須 <code>--force</code></li>
+            <li>同捆 uninstall.sh、<code>--dry-run</code> 可先驗證</li>
+          </ul>
+        </div>
+        <div style="grid-column:1 / -1; padding:10px 12px; background:#eff6ff; border:1px solid #93c5fd; border-radius:6px;">
+          <div style="font-weight:600; color:#1e40af; font-size:12px; margin-bottom:4px; display:flex; align-items:center; gap:4px;">{{ icon('tool', size=12) }} DGX Spark 最佳化(aarch64 + GB10 Blackwell)</div>
+          <div style="font-size:11px; color:#1e3a8a; line-height:1.6;">
+            script 偵測到 aarch64 + <code>/etc/dgx-release</code> 時自動用 <code>cu128</code> wheel 索引(支援 sm_120)。
+            其他 x86_64 NVIDIA GPU 用 <code>cu124</code>。已預裝 PyTorch 會自動重用,省 ~3GB 下載。
+          </div>
+        </div>
+      </div>
+    </details>
+  </div>
+
   </div> {# /padding-top wrap #}
 </details>
+
+{% raw %}
+<script>
+// 外部 OCR Server 設定 UI
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const urlEl = $('ocrExtUrl'), tokEl = $('ocrExtToken'),
+        toEl = $('ocrExtTimeout'), enEl = $('ocrExtEnabled'),
+        testBtn = $('ocrExtTestBtn'), saveBtn = $('ocrExtSaveBtn'),
+        statusEl = $('ocrExtStatus');
+  if (!urlEl) return;
+
+  function setStatus(html, kind) {
+    const colors = {ok:'#10b981', err:'#ef4444', info:'#3b82f6', warn:'#f59e0b'};
+    statusEl.innerHTML = '<div style="padding:8px 12px; background:#f8fafc; border-left:3px solid ' +
+      (colors[kind]||'#94a3b8') + '; border-radius:4px; font-size:13px;">' + html + '</div>';
+  }
+
+  async function loadStatus() {
+    try {
+      const r = await fetch('/admin/api/ocr-langs/external/status');
+      const j = await r.json();
+      urlEl.value = j.url || '';
+      enEl.checked = !!j.enabled;
+      toEl.value = j.timeout_s || 30;
+      if (j.token_set) {
+        tokEl.placeholder = '已設定 (' + j.token_masked + ') — 留空保留現有 token';
+      }
+      if (j.last_test_at) {
+        const ok = j.last_test_ok;
+        const info = j.last_test_info || {};
+        const gpu = info.gpu || info.device_name || '';
+        const vram = info.vram_free_mb ? ' (free ' + info.vram_free_mb + ' MB / ' + info.vram_total_mb + ' MB)' : '';
+        setStatus('上次測試 ' + j.last_test_at + '：<b style="color:' + (ok?'#10b981':'#ef4444') + '">' +
+                   (ok?'✓ 通過':'✗ 失敗') + '</b>' + (gpu ? '<br>GPU: ' + gpu + vram : ''),
+                   ok?'ok':'err');
+      }
+    } catch(e) {}
+  }
+
+  testBtn.addEventListener('click', async () => {
+    if (!urlEl.value.trim()) { setStatus('請先填 URL', 'warn'); return; }
+    testBtn.disabled = true;
+    const origText = testBtn.textContent;
+    testBtn.textContent = '測試中...';
+    setStatus('連接中...', 'info');
+    try {
+      const r = await fetch('/admin/api/ocr-langs/external/test', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url: urlEl.value, token: tokEl.value})
+      });
+      const j = await r.json();
+      if (j.ok) {
+        const h = j.healthz || {};
+        const gpu = h.gpu || '';
+        const vram = h.vram_free_mb ? ' (free ' + h.vram_free_mb + ' MB / ' + h.vram_total_mb + ' MB)' : '';
+        setStatus('✓ 連接成功<br>Server: ' + (h.server || '?') +
+                  '<br>EasyOCR: ' + (h.easyocr || '?') +
+                  '<br>PyTorch: ' + (h.torch || '?') +
+                  '<br>CUDA: ' + (h.cuda_available ? '✓' : '✗') +
+                   (gpu ? '<br>GPU: ' + gpu + vram : ''), 'ok');
+      } else {
+        setStatus('✗ ' + (j.error || '失敗'), 'err');
+      }
+    } catch(e) {
+      setStatus('✗ 請求失敗: ' + e, 'err');
+    } finally {
+      testBtn.disabled = false;
+      testBtn.textContent = origText;
+    }
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    saveBtn.disabled = true;
+    const origText = saveBtn.textContent;
+    saveBtn.textContent = '儲存中...';
+    try {
+      const r = await fetch('/admin/api/ocr-langs/external/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          url: urlEl.value,
+          token: tokEl.value,
+          timeout_s: parseInt(toEl.value) || 30,
+          enabled: enEl.checked
+        })
+      });
+      const j = await r.json();
+      if (j.ok) {
+        setStatus('✓ 已儲存(' + (j.enabled ? '已啟用' : '未啟用') + ')', 'ok');
+        tokEl.value = '';
+        loadStatus();
+      } else {
+        setStatus('✗ 儲存失敗', 'err');
+      }
+    } catch(e) {
+      setStatus('✗ 請求失敗: ' + e, 'err');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = origText;
+    }
+  });
+
+  loadStatus();
+})();
+</script>
+{% endraw %}
 
 <!-- ============== Tesseract Section (備用) ============== -->
 <details class="panel ocr-section" id="tesseractSection" style="border-left:4px solid #94a3b8;" {% if default_engine == 'tesseract' %}open{% endif %}>

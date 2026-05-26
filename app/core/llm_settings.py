@@ -120,8 +120,8 @@ class LLMSettingsManager:
          "use": "公司命名變體合併（○○ ↔ (brand)）+ 漏改範本進階推論", "kind": "text"},
         {"id": "pdf-ocr", "name": "OCR 文字辨識（LLM 文字校正）",
          "use": "純文字校正：抓 typo / 字元誤判（0/O、1/l、CJK 偏旁混淆），不看影像", "kind": "text"},
-        {"id": "pdf-ocr-vision", "name": "OCR 文字辨識（LLM 視覺校對）",
-         "use": "視覺校對：直接看頁面影像對照 OCR 結果，能修文字脫漏 / 排版亂；需 vision 模型（gemma4:26b、qwen3-vl 等）", "kind": "vision"},
+        {"id": "pdf-ocr-vision", "name": "OCR 文字辨識（LLM 視覺校對 / 直接 / 對位 / 完整辨識共用）",
+         "use": "視覺校對：直接看頁面影像對照 OCR 結果，能修文字脫漏 / 排版亂；直接 / 對位 / 完整辨識也走此設定。**完整辨識推薦 qwen2.5vl:7b**（grounding 能給座標、無 thinking mode、約 9GB VRAM）；qwen3-vl 因 thinking mode 在 Ollama 整合不穩、gemma4:26b 無 grounding 能力不可用於完整辨識", "kind": "vision"},
         {"id": "einvoice-scan", "name": "電子發票處理（LLM 判讀會計科目）",
          "use": "批次依賣方統編 / 名稱 / 行業，判斷對應會計科目（油料費 / 餐費 / 郵電費 等）", "kind": "text"},
     ]

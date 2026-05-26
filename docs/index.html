@@ -255,7 +255,7 @@
           </li>
           <li>
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h13l5 5v11a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M16 4v5h5"/><path d="m7 14 3 3 5-5"/></svg></span>
-            <div class="fl-text"><span class="fn">OCR 文字辨識</span><span class="fd">掃描 PDF / 圖片變可選取文字，雙引擎（EasyOCR 預設、Tesseract 備援），中日韓辨識準確度高，可選 LLM 校正 typo</span></div>
+            <div class="fl-text"><span class="fn">OCR 文字辨識</span><span class="fd">掃描 PDF / 圖片變可選取文字，雙引擎（EasyOCR 預設、Tesseract 備援），中日韓辨識準確度高，可選 LLM 校正 typo。<b>支援外部 GPU 識別伺服器</b>（DGX Spark / H100 / 4090 等），<b>速度 10× 以上</b></span></div>
           </li>
           <li>
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
@@ -507,11 +507,12 @@
         <div class="ss-text">
           <div class="ss-num">08</div>
           <h3>OCR 文字辨識（掃描檔變可選取）</h3>
-          <p>把<b>掃描 PDF / 圖片變成可以選取、可搜尋的文字 PDF</b> — 跟 macOS 預覽程式 Live Text 同概念，但跑在你自己機房。雙引擎（<b>EasyOCR</b> 預設 / <b>Tesseract</b> 備援），中日韓辨識準確度高；OCR 完直接在頁內預覽並用滑鼠拖選驗證；最終 PDF 可直接下載拿去 Adobe Reader / Preview / 任何 PDF 工具裡選字 / 複製 / 全文搜尋。</p>
+          <p>把<b>掃描 PDF / 圖片變成可以選取、可搜尋的文字 PDF</b> — 跟 macOS 預覽程式 Live Text 同概念，但跑在你自己機房。雙引擎（<b>EasyOCR</b> 預設 / <b>Tesseract</b> 備援），中日韓辨識準確度高；OCR 完直接在頁內預覽並用滑鼠拖選驗證；最終 PDF 可直接下載拿去 Adobe Reader / Preview / 任何 PDF 工具裡選字 / 複製 / 全文搜尋。<br><br><b>外部 GPU 識別伺服器（速度 10× 以上）</b>：把 EasyOCR 部署到 GPU 主機（DGX Spark / H100 / H200 / 4090 等），jtdt 透過 HTTP 呼叫遠端。每頁辨識時間從 CPU 上的 <b>8-15 秒</b>降到 GPU 上的 <b>0.3-0.8 秒</b>。管理介面下載 install.sh 一鍵部署，DGX Spark（aarch64 + Blackwell GB10）已實測通過。連不上自動退回本機。</p>
           <div class="ss-tags">
             <span class="tag">掃描檔變可選取</span>
             <span class="tag">EasyOCR + Tesseract 雙引擎</span>
             <span class="tag">中日韓準確度高</span>
+            <span class="tag">外部 GPU 加速 10× 以上</span>
             <span class="tag">頁內 PDF 預覽</span>
             <span class="tag">可選 LLM 校正</span>
           </div>

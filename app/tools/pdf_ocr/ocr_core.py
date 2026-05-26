@@ -233,6 +233,190 @@ def add_llm_search_layer_offpage(page: "fitz.Page", llm_text: str) -> int:
         return 0
 
 
+def _parse_llm_grounded_response(text: str, img_w: int, img_h: int) -> list[dict]:
+    """解析「LLM 完整辨識」回的 JSON,容忍各種封裝格式。
+
+    可接受的回應形式（依優先序試）:
+      1. 純 JSON array: [{"text": "...", "bbox": [x0,y0,x1,y1]}, ...]
+      2. 包在 ```json ... ``` fence 內
+      3. 物件 wrapper: {"items": [...]} 或 {"words": [...]}
+      4. qwen-vl 原生 grounding 格式: 「文字<box>x0 y0 x1 y1</box>」
+
+    bbox 可接受:
+      - [x0, y0, x1, y1] (左上 / 右下)
+      - [x, y, w, h] (左上 + 寬高,用啟發判定:第 3 / 4 值 < 第 1 / 2 的兩倍就當寬高)
+      - "x0 y0 x1 y1" 字串
+
+    座標假設是縮圖（送進 LLM 的影像）的像素值。回的每個 item:
+      {"text": str, "bbox": (x0,y0,x1,y1)}  — 已過濾無效項
+    """
+    import json
+    import re as _re
+    if not text or not text.strip():
+        return []
+    body = text.strip()
+
+    # qwen2.5-VL 自然語言格式（實測穩定）:
+    #   "文字內容" - (x1, y1, x2, y2)
+    # 或: "文字內容" – (x1, y1, x2, y2)  /  "文字內容": (x1, y1, x2, y2)
+    # 引號可為 " " 「 」 ' ', dash 可為 - – — :, 座標是絕對像素值
+    plain_pattern = _re.compile(
+        r'["「“‘]([^"」”’\n]+?)["」”’]'
+        r'\s*[-–—:：~]?\s*'
+        r'\(\s*(\d+(?:\.\d+)?)\s*[,，]\s*(\d+(?:\.\d+)?)\s*[,，]\s*'
+        r'(\d+(?:\.\d+)?)\s*[,，]\s*(\d+(?:\.\d+)?)\s*\)'
+    )
+    plain_hits = plain_pattern.findall(body)
+    if plain_hits:
+        # Qwen2.5-VL 對 plain-text grounding prompt 會用我們告訴它的影像尺寸回絕對像素,
+        # 不像原生 token 那樣強制 0-1000 正規化。直接當絕對像素處理。
+        items = []
+        for t, x0s, y0s, x1s, y1s in plain_hits:
+            t = t.strip()
+            if not t:
+                continue
+            x0, y0, x1, y1 = float(x0s), float(y0s), float(x1s), float(y1s)
+            # 若給的是 (x, y, w, h) 而非 (x0, y0, x1, y1) — 第 3 / 4 比第 1 / 2 小很多時當寬高
+            if x1 < x0 and y1 < y0:
+                x1, y1 = x0 + x1, y0 + y1
+            elif x1 <= x0 or y1 <= y0:
+                continue
+            # clamp 到影像範圍內(模型偶爾會超出 1-2 px)
+            if img_w > 0 and img_h > 0:
+                x0 = max(0, min(x0, img_w))
+                y0 = max(0, min(y0, img_h))
+                x1 = max(0, min(x1, img_w))
+                y1 = max(0, min(y1, img_h))
+                if x1 - x0 < 1 or y1 - y0 < 1:
+                    continue
+            items.append({"text": t, "bbox": (x0, y0, x1, y1)})
+        if items:
+            return items
+
+    # qwen2 / qwen3-VL 原生 token 格式:
+    #   <|object_ref_start|>文字<|object_ref_end|><|box_start|>(x1,y1),(x2,y2)<|box_end|>
+    # 座標通常是 0~1000 的正規化（相對影像 w / h）。若超過 1000 則當作絕對像素。
+    qwen3_pattern = _re.compile(
+        r"<\|object_ref_start\|>(?P<text>.*?)<\|object_ref_end\|>\s*"
+        r"<\|box_start\|>(?P<box>.*?)<\|box_end\|>",
+        _re.DOTALL,
+    )
+    qwen3_hits = qwen3_pattern.findall(body)
+    if qwen3_hits:
+        items = []
+        for t, coords in qwen3_hits:
+            t = t.strip().strip("，,。.;；:：")
+            if not t:
+                continue
+            nums = _re.findall(r"-?\d+(?:\.\d+)?", coords)
+            if len(nums) >= 4:
+                x0, y0, x1, y1 = map(float, nums[:4])
+                # 偵測是否 0-1000 正規化：四個數都 <= 1000 且至少一個 > image dim → 正規化
+                vals = (x0, y0, x1, y1)
+                if max(vals) <= 1000 and img_w > 0 and img_h > 0:
+                    # 假設正規化（最常見情況）。若 image 本身就 > 1000 像素則此判斷會誤殺，
+                    # 但我們的縮圖預設最大長邊 1568；max 1000 + img>1000 表示更可能是 normalized
+                    x0 = x0 * img_w / 1000.0
+                    x1 = x1 * img_w / 1000.0
+                    y0 = y0 * img_h / 1000.0
+                    y1 = y1 * img_h / 1000.0
+                items.append({"text": t, "bbox": (x0, y0, x1, y1)})
+        if items:
+            return items
+
+    # 較舊的 qwen-vl <box>x0 y0 x1 y1</box> 格式
+    qwen_pattern = _re.compile(r'(?P<text>[^<>\n]+?)\s*<\s*box\s*>\s*([\d.,\s]+)\s*<\s*/\s*box\s*>',
+                                _re.IGNORECASE)
+    qwen_hits = qwen_pattern.findall(body)
+    if qwen_hits:
+        items = []
+        for t, coords in qwen_hits:
+            t = t.strip().strip("，,。.;；:：")
+            if not t:
+                continue
+            nums = _re.findall(r"-?\d+(?:\.\d+)?", coords)
+            if len(nums) >= 4:
+                x0, y0, x1, y1 = map(float, nums[:4])
+                # 若 x1 / y1 像寬高,轉成右下
+                if x1 < x0 * 2 and y1 < y0 * 2 and x1 < img_w / 2 and y1 < img_h / 2:
+                    x1, y1 = x0 + x1, y0 + y1
+                items.append({"text": t, "bbox": (x0, y0, x1, y1)})
+        if items:
+            return items
+
+    # JSON 路徑（含 fence 處理）
+    # 移除 ```json ... ``` 或 ``` ... ``` 包裝
+    body = _re.sub(r"^```(?:json)?\s*", "", body, flags=_re.IGNORECASE)
+    body = _re.sub(r"\s*```\s*$", "", body)
+    # 找第一個 [ 或 { 起、最後一個 ] 或 } 止
+    first_bracket = min((p for p in (body.find("["), body.find("{")) if p >= 0), default=-1)
+    last_bracket = max(body.rfind("]"), body.rfind("}"))
+    if first_bracket < 0 or last_bracket <= first_bracket:
+        return []
+    body = body[first_bracket:last_bracket+1]
+    try:
+        data = json.loads(body)
+    except Exception:
+        return []
+    # 取 list
+    if isinstance(data, dict):
+        for key in ("items", "words", "regions", "results", "data"):
+            if key in data and isinstance(data[key], list):
+                data = data[key]
+                break
+        else:
+            return []
+    if not isinstance(data, list):
+        return []
+
+    items = []
+    for it in data:
+        if not isinstance(it, dict):
+            continue
+        # text 欄位
+        t = it.get("text") or it.get("content") or it.get("value") or ""
+        if not isinstance(t, str) or not t.strip():
+            continue
+        # bbox 欄位
+        bbox_raw = it.get("bbox") or it.get("box") or it.get("rect") or it.get("position")
+        if bbox_raw is None:
+            # 也接受 x, y, w, h 各自欄位
+            if all(k in it for k in ("x", "y", "w", "h")):
+                bbox_raw = [it["x"], it["y"], it["w"], it["h"]]
+            elif all(k in it for k in ("x0", "y0", "x1", "y1")):
+                bbox_raw = [it["x0"], it["y0"], it["x1"], it["y1"]]
+            else:
+                continue
+        # 解析 bbox 成 4 個 float
+        if isinstance(bbox_raw, str):
+            nums = _re.findall(r"-?\d+(?:\.\d+)?", bbox_raw)
+            if len(nums) < 4:
+                continue
+            bbox_raw = [float(n) for n in nums[:4]]
+        if not isinstance(bbox_raw, (list, tuple)) or len(bbox_raw) < 4:
+            continue
+        try:
+            x0, y0, x1, y1 = float(bbox_raw[0]), float(bbox_raw[1]), float(bbox_raw[2]), float(bbox_raw[3])
+        except Exception:
+            continue
+        # 若第 3 / 4 是寬高（不是右下座標），轉成 x1 / y1
+        if x1 <= 0 or y1 <= 0:
+            continue
+        # 啟發：右下小於左上 → 應該是寬高
+        if x1 < x0 or y1 < y0:
+            x1, y1 = x0 + x1, y0 + y1
+        # clamp 到影像範圍內
+        if img_w > 0 and img_h > 0:
+            x0 = max(0, min(x0, img_w))
+            y0 = max(0, min(y0, img_h))
+            x1 = max(0, min(x1, img_w))
+            y1 = max(0, min(y1, img_h))
+        if x1 - x0 < 1 or y1 - y0 < 1:
+            continue
+        items.append({"text": t.strip(), "bbox": (x0, y0, x1, y1)})
+    return items
+
+
 def add_llm_text_overlay_on_page(page: "fitz.Page", llm_text: str) -> int:
     """LLM 直接辨識用 — 把 LLM 回的文字以**透明文字層**覆蓋到頁面上(不是頁外)，
     這樣使用者用滑鼠拖選頁面任何區域,都能選到 OCR 出來的文字並複製。
@@ -479,6 +663,10 @@ def ocr_pdf_to_searchable(
     llm_vision_image_max: int = LLM_VISION_MAX_LONG_SIDE,  # 由 caller 依 profile 傳
     llm_direct_ocr: Optional[Callable[[bytes], str]] = None,
     llm_direct_model_name: str = "",
+    llm_align_ocr: Optional[Callable[[bytes], str]] = None,
+    llm_align_model_name: str = "",
+    llm_full_ocr: Optional[Callable[[bytes], str]] = None,
+    llm_full_model_name: str = "",
     app_version: str = "",
 ) -> dict:
     """主 entry — 開 src_pdf，逐頁 OCR + 加文字層，存到 dst_pdf。
@@ -497,6 +685,16 @@ def ocr_pdf_to_searchable(
     llm_used = False
     llm_vision_used = False
     llm_direct_used = False
+    llm_align_used = False
+    llm_full_used = False
+    # 累計各 LLM 路徑總耗時(秒) — 顯示「LLM 共用了 N 秒」給 user
+    llm_full_total_s = 0.0
+    llm_align_total_s = 0.0
+    llm_direct_total_s = 0.0
+    # OCR 引擎使用統計(顯示「跑遠端 GPU / 本機 CPU」+ 總耗時)
+    ocr_engine_pages: dict[str, int] = {}  # engine_used -> page count
+    ocr_engine_total_s = 0.0
+    ocr_remote_url = ""
     # 每頁各階段拿到的文字 — 給前端顯示「展開看每段成效」用
     stage_results: list[dict] = []
 
@@ -527,6 +725,93 @@ def ocr_pdf_to_searchable(
                 log.warning("render page %d failed: %s", pno, e)
                 _emit(cp, "渲染失敗，略過")
                 continue
+            # === LLM 完整辨識模式（grounded OCR：LLM 同時給文字 + 座標 JSON）===
+            # 適合 qwen-vl / internvl 等對 grounding 訓練充分的模型。失敗（JSON 解析錯 /
+            # bbox 不合理 / 無回應）→ fall through 到 LLM 直接辨識 或 原 OCR 引擎。
+            did_llm_full = False
+            if llm_full_ocr is not None:
+                mtag = f" {llm_full_model_name}" if llm_full_model_name else ""
+                small_png = _shrink_png_for_vision(png, max_long_side=llm_vision_image_max)
+                # 取縮圖實際尺寸（給座標換算用）
+                try:
+                    from PIL import Image as _PILImg
+                    import io as _io
+                    _img = _PILImg.open(_io.BytesIO(small_png))
+                    small_w, small_h = _img.size
+                except Exception:
+                    small_w = small_h = 0
+                _emit(cp, f"LLM 完整辨識中{mtag}（影像 {len(small_png)//1024}KB，{small_w}×{small_h}）…")
+                fstage: dict = {"used": False, "text": "", "note": "", "n_items": 0, "elapsed_s": 0.0}
+                import time as _t_full
+                _t_full_start = _t_full.time()
+                try:
+                    raw_resp = llm_full_ocr(small_png) or ""
+                    _t_full_elapsed = _t_full.time() - _t_full_start
+                    fstage["elapsed_s"] = round(_t_full_elapsed, 1)
+                    llm_full_total_s += _t_full_elapsed
+                    items = _parse_llm_grounded_response(raw_resp, small_w, small_h)
+                    log.info("llm-full page %d: %d chars response → %d items parsed in %.1fs; sample=%r",
+                             pno, len(raw_resp), len(items), _t_full_elapsed, raw_resp[:400])
+                    if items and small_w > 0 and small_h > 0:
+                        # 把 LLM 給的 bbox(縮圖像素座標)換算成「渲染影像 pixel 空間 @ dpi」,
+                        # 讓 add_text_layer_to_page 用一致的 px_to_pt = 72 / dpi 轉成 PDF pt。
+                        # 注意:不可直接乘 page.rect.width / small_w 給出 PDF pt — add_text_layer
+                        # 還會再乘 72/dpi 造成 dpi 倍縮放 bug(highlight 變很小擠左上)。
+                        try:
+                            from PIL import Image as _PILImg2
+                            import io as _io2
+                            _renderedimg = _PILImg2.open(_io2.BytesIO(png))
+                            rendered_w, rendered_h = _renderedimg.size
+                        except Exception:
+                            # fallback: 假設用 dpi 渲染,從 page.rect 算回
+                            rendered_w = int(page.rect.width * dpi / 72.0)
+                            rendered_h = int(page.rect.height * dpi / 72.0)
+                        sx = rendered_w / small_w
+                        sy = rendered_h / small_h
+                        words = []
+                        for it in items:
+                            x0, y0, x1, y1 = it["bbox"]
+                            left = float(x0) * sx
+                            top = float(y0) * sy
+                            width = float(x1 - x0) * sx
+                            height = float(y1 - y0) * sy
+                            if width <= 0 or height <= 0:
+                                continue
+                            words.append({
+                                "text": it["text"],
+                                "left": left, "top": top,
+                                "width": width, "height": height,
+                                "conf": 95,
+                            })
+                        if words:
+                            added = add_text_layer_to_page(page, words, dpi=dpi)
+                            if added > 0:
+                                pages_ocrd += 1
+                                words_inserted += added
+                                llm_full_used = True
+                                fstage["used"] = True
+                                fstage["n_items"] = len(words)
+                                fstage["text"] = "\n".join(w["text"] for w in words)
+                                fstage["note"] = f"成功（{added} 個 word 直接寫入，使用 LLM 座標；LLM 用時 {fstage['elapsed_s']}s）"
+                                _emit(cp, f"LLM 完整辨識完成（{added} 字 + 座標，{fstage['elapsed_s']}s）")
+                                did_llm_full = True
+                            else:
+                                fstage["note"] = "Word 全數無效，退回 LLM 直接辨識"
+                        else:
+                            fstage["note"] = "解析出 0 個有效 word，退回 LLM 直接辨識"
+                    else:
+                        fstage["note"] = "JSON 解析失敗或無 word，退回 LLM 直接辨識"
+                except Exception as e:
+                    _t_full_elapsed = _t_full.time() - _t_full_start
+                    fstage["elapsed_s"] = round(_t_full_elapsed, 1)
+                    llm_full_total_s += _t_full_elapsed
+                    fstage["note"] = f"LLM 完整辨識失敗（{e}, {fstage['elapsed_s']}s），退回 LLM 直接辨識"
+                    log.warning("llm-full page %d failed in %.1fs: %s", pno, _t_full_elapsed, e)
+                stage_results.append({"page": cp, "llm_full": fstage})
+                if did_llm_full:
+                    continue
+                _emit(cp, fstage["note"])
+                # 若有 llm_direct_ocr，自然 fall through 走那條；否則繼續往下走原 OCR
             # === LLM 直接辨識模式：跳過 EasyOCR/Tesseract，直接送 vision LLM ===
             # 沒有 word 級 bbox，直接拿純文字 → 用 off-page invisible text layer 收容
             # （可搜尋、可滑鼠選取複製整段，但位置不對應原版面）。
@@ -568,13 +853,30 @@ def ocr_pdf_to_searchable(
                 # fall through 到下面的 EasyOCR/Tesseract
                 if llm_direct_fallback_note:
                     _emit(cp, llm_direct_fallback_note)
-            # 用抽象 OCR engine：依 admin 設定（預設 easyocr），失敗自動 fallback tesseract
+            # 用抽象 OCR engine：依 admin 設定(預設 easyocr),失敗自動 fallback tesseract。
+            # 若 admin 已設定 + 啟用「外部 GPU OCR Server」會優先打遠端,失敗自動退本機。
             from app.core import ocr_engine as _oe
+            from app.core import ocr_remote_settings as _ors_check
             chosen_engine = _oe.get_default_engine()
-            _emit(cp, f"OCR 辨識中（{chosen_engine} {langs}）…")
+            remote_on = chosen_engine == "easyocr" and _ors_check.is_enabled_and_configured()
+            engine_label = f"{chosen_engine}-remote(GPU)" if remote_on else chosen_engine
+            _emit(cp, f"OCR 辨識中({engine_label} {langs})…")
+            import time as _t_ocr
+            _t_ocr_start = _t_ocr.time()
             words, engine_used = _oe.recognize_image(png, langs, preprocess=True)
+            _t_ocr_elapsed = _t_ocr.time() - _t_ocr_start
+            ocr_engine_total_s += _t_ocr_elapsed
+            ocr_engine_pages[engine_used] = ocr_engine_pages.get(engine_used, 0) + 1
+            if engine_used == "easyocr-remote":
+                ocr_remote_url = _ors_check.get().get("url", "")
             if engine_used != chosen_engine and words:
-                _emit(cp, f"OCR 完成（{chosen_engine} 失敗，自動切 {engine_used}）")
+                # 比對改用 engine_used (含 'easyocr-remote' / 'easyocr' / 'tesseract')
+                if engine_used == "easyocr-remote":
+                    _emit(cp, f"OCR 完成 (遠端 GPU EasyOCR @ {_ors_check.get().get('url', '')})")
+                else:
+                    _emit(cp, f"OCR 完成({chosen_engine} 失敗,自動切 {engine_used})")
+            elif engine_used == "easyocr-remote" and words:
+                _emit(cp, f"OCR 完成 (遠端 GPU EasyOCR @ {_ors_check.get().get('url', '')})")
             if not words:
                 _emit(cp, "未辨識到文字，略過")
                 stage_results.append({
@@ -584,10 +886,51 @@ def ocr_pdf_to_searchable(
                 continue
             # 記錄 tesseract 原始文字（給前端 collapsible 顯示）
             ocr_raw_text = " ".join(w["text"] for w in words)
+            ocr_raw_note = f"engine={engine_used}"
+            if engine_used == "easyocr-remote":
+                ocr_raw_note += f" @ {_ors_check.get().get('url','')}"
             page_stages: dict = {
                 "page": cp,
-                "ocr_raw": {"text": ocr_raw_text, "word_count": len(words)},
+                "ocr_raw": {"text": ocr_raw_text, "word_count": len(words), "note": ocr_raw_note},
             }
+            # === LLM 對位辨識（hybrid）===
+            # LLM 對影像獨立做一次 OCR（從零識別,不看 OCR 結果），把回的文字
+            # 透過行對齊映射到 EasyOCR 的 bbox 上。對齊失敗 → 保留 OCR 原字
+            # （避免把 LLM 腦補的文字塞到精準格子裡）。
+            if llm_align_ocr:
+                amodel_tag = f" {llm_align_model_name}" if llm_align_model_name else ""
+                small_png = _shrink_png_for_vision(png, max_long_side=llm_vision_image_max)
+                _emit(cp, f"LLM 對位辨識中{amodel_tag}（影像 {len(small_png)//1024}KB）…")
+                astage: dict = {"used": False, "text": "", "note": "", "fallback_to_ocr": False}
+                try:
+                    llm_fresh = llm_align_ocr(small_png) or ""
+                    llm_fresh = llm_fresh.strip()
+                    astage["text"] = llm_fresh
+                    if llm_fresh:
+                        aligned = _align_llm_per_line(llm_fresh, words)
+                        if aligned is not None:
+                            for new_w in aligned:
+                                for orig in words:
+                                    if (orig["left"], orig["top"]) == (new_w["left"], new_w["top"]):
+                                        orig["text"] = new_w["text"]
+                                        break
+                            astage["used"] = True
+                            astage["note"] = f"成功對位（{len(words)} bbox 套用 LLM 文字）"
+                            llm_align_used = True
+                            _emit(cp, "LLM 對位辨識完成（行對齊）")
+                        else:
+                            astage["note"] = "LLM 行數 / 字數對不上,保留 EasyOCR 原字（避免腦補）"
+                            astage["fallback_to_ocr"] = True
+                            _emit(cp, "LLM 行數對不上,保留 EasyOCR 原字")
+                    else:
+                        astage["note"] = "LLM 回空白,保留 EasyOCR 原字"
+                        astage["fallback_to_ocr"] = True
+                except Exception as e:
+                    astage["note"] = f"LLM 失敗（{e}）,保留 EasyOCR 原字"
+                    astage["fallback_to_ocr"] = True
+                    log.warning("llm-align page %d failed: %s", pno, e)
+                    _emit(cp, f"LLM 對位辨識失敗,保留 EasyOCR 原字: {e}")
+                page_stages["llm_align"] = astage
             # === LLM 視覺校對（先做）===
             # 看 PNG 影像對照 OCR 結果，能修純文字看不出來的字元錯誤。
             # 影像先縮到長邊 1568px，避免送 8MP 大圖白做工。
@@ -743,6 +1086,14 @@ def ocr_pdf_to_searchable(
         "llm_used": llm_used,
         "llm_vision_used": llm_vision_used,
         "llm_direct_used": llm_direct_used,
+        "llm_align_used": llm_align_used,
+        "llm_full_used": llm_full_used,
+        "llm_full_total_s": round(llm_full_total_s, 1),
+        "llm_align_total_s": round(llm_align_total_s, 1),
+        "llm_direct_total_s": round(llm_direct_total_s, 1),
+        "ocr_engine_pages": ocr_engine_pages,
+        "ocr_engine_total_s": round(ocr_engine_total_s, 1),
+        "ocr_remote_url": ocr_remote_url,
         "producer": producer,
         "tesseract_version": tess_v,
         "marker": MARKER_KEYWORD,

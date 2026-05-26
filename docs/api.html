@@ -517,6 +517,17 @@ curl <span class="hl-flag">-s</span> <span class="hl-url">http://localhost:8765/
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@scan.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;lang=chi_tra+eng&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;dpi=300&quot;</span> \
   <span class="hl-flag">--output</span> ocr.pdf</code></pre>
 <p>回應：加上文字層的 PDF。</p>
+<h5 id="外部-gpu-ocr-server">外部 GPU OCR Server</h5>
+<p>管理員可在 <code>admin/ocr-langs → 外部 GPU 識別伺服器</code> 部署 <code>jt-ocr-server</code> 到 GPU 主機，jtdt 透過 HTTP 呼叫遠端 EasyOCR，速度比 CPU 快 10× 以上。設定相關 admin endpoints：</p>
+<pre><code class="lang-text"><span class="hl-method">GET</span>  /admin/ocr-langs/deploy/install.sh        <span class="hl-cmt"># 下載安裝腳本</span>
+<span class="hl-method">GET</span>  /admin/ocr-langs/deploy/uninstall.sh      <span class="hl-cmt"># 下載解除安裝腳本</span>
+<span class="hl-method">GET</span>  /admin/api/ocr-langs/external/status      <span class="hl-cmt"># 讀取目前設定</span>
+<span class="hl-method">POST</span> /admin/api/ocr-langs/external/save        <span class="hl-cmt"># 儲存 URL / Token / Timeout / 啟用</span>
+<span class="hl-method">POST</span> /admin/api/ocr-langs/external/test        <span class="hl-cmt"># 測試連接</span></code></pre>
+<p>啟用後 <code>/tools/pdf-ocr/*</code> 與內部呼叫 EasyOCR 的工具會自動走遠端 GPU，連線失敗自動退回本機。<code>jt-ocr-server</code> 自身對外端點：</p>
+<pre><code class="lang-text"><span class="hl-method">GET</span>  /healthz        <span class="hl-cmt"># 不需 token,回 GPU/VRAM 資訊</span>
+<span class="hl-method">GET</span>  /version        <span class="hl-cmt"># 需 Bearer token</span>
+<span class="hl-method">POST</span> /ocr            <span class="hl-cmt"># 需 Bearer token,multipart image + langs form</span></code></pre>
       </section>
       <section class="doc-section" data-sec="pdf-註解整理" data-title="PDF 註解整理" hidden>
 <div class="doc-crumb">5. PDF 擷取與分析 API</div>
