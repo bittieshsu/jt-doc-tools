@@ -438,6 +438,8 @@ def ocr_pdf_to_searchable(
     llm_vision_postprocess: Optional[Callable[[bytes, str], str]] = None,
     llm_vision_model_name: str = "",
     llm_vision_image_max: int = LLM_VISION_MAX_LONG_SIDE,  # 由 caller 依 profile 傳
+    llm_direct_ocr: Optional[Callable[[bytes], str]] = None,
+    llm_direct_model_name: str = "",
     app_version: str = "",
 ) -> dict:
     """主 entry — 開 src_pdf，逐頁 OCR + 加文字層，存到 dst_pdf。
@@ -455,6 +457,7 @@ def ocr_pdf_to_searchable(
     words_inserted = 0
     llm_used = False
     llm_vision_used = False
+    llm_direct_used = False
     # 每頁各階段拿到的文字 — 給前端顯示「展開看每段成效」用
     stage_results: list[dict] = []
 
@@ -485,6 +488,47 @@ def ocr_pdf_to_searchable(
                 log.warning("render page %d failed: %s", pno, e)
                 _emit(cp, "渲染失敗，略過")
                 continue
+            # === LLM 直接辨識模式：跳過 EasyOCR/Tesseract，直接送 vision LLM ===
+            # 沒有 word 級 bbox，直接拿純文字 → 用 off-page invisible text layer 收容
+            # （可搜尋、可滑鼠選取複製整段，但位置不對應原版面）。
+            # **失敗時(LLM 連不上/超時/回空白) 自動退回原 OCR 引擎路徑**,確保本頁仍有文字層。
+            did_llm_direct = False
+            llm_direct_fallback_note = ""
+            if llm_direct_ocr is not None:
+                mtag = f" {llm_direct_model_name}" if llm_direct_model_name else ""
+                _emit(cp, f"LLM 直接辨識中{mtag}（影像 {len(png)//1024}KB）…")
+                small_png = _shrink_png_for_vision(png, max_long_side=llm_vision_image_max)
+                dstage: dict = {"used": False, "text": "", "note": ""}
+                try:
+                    text = llm_direct_ocr(small_png) or ""
+                    text = text.strip()
+                    if text:
+                        words_added = add_llm_search_layer_offpage(page, text)
+                        if words_added > 0:
+                            pages_ocrd += 1
+                            words_inserted += words_added
+                            llm_direct_used = True
+                            dstage["used"] = True
+                            dstage["text"] = text
+                            dstage["note"] = f"成功（{words_added} 字寫入頁外搜尋層）"
+                            _emit(cp, f"LLM 直接辨識完成（{words_added} 字）")
+                            did_llm_direct = True
+                        else:
+                            dstage["note"] = "LLM 回覆有文字但寫入搜尋層失敗"
+                            llm_direct_fallback_note = "LLM 寫入失敗,退回 OCR 引擎"
+                    else:
+                        dstage["note"] = "LLM 回覆空白"
+                        llm_direct_fallback_note = "LLM 回覆空白,退回 OCR 引擎"
+                except Exception as e:
+                    dstage["note"] = f"LLM 直接辨識呼叫失敗：{e}"
+                    log.warning("llm-direct page %d failed: %s", pno, e)
+                    llm_direct_fallback_note = f"LLM 失敗({e}),退回 OCR 引擎"
+                stage_results.append({"page": cp, "llm_direct": dstage})
+                if did_llm_direct:
+                    continue
+                # fall through 到下面的 EasyOCR/Tesseract
+                if llm_direct_fallback_note:
+                    _emit(cp, llm_direct_fallback_note)
             # 用抽象 OCR engine：依 admin 設定（預設 easyocr），失敗自動 fallback tesseract
             from app.core import ocr_engine as _oe
             chosen_engine = _oe.get_default_engine()
@@ -659,6 +703,7 @@ def ocr_pdf_to_searchable(
         "words_inserted": words_inserted,
         "llm_used": llm_used,
         "llm_vision_used": llm_vision_used,
+        "llm_direct_used": llm_direct_used,
         "producer": producer,
         "tesseract_version": tess_v,
         "marker": MARKER_KEYWORD,

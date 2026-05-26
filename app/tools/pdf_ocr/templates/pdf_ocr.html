@@ -195,6 +195,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 }
 .po-toggle-tag-vision { background:#fef3c7; color:#92400e; }
 .po-toggle-tag-text   { background:#dbeafe; color:#1e40af; }
+.po-toggle-tag-direct { background:#ede9fe; color:#5b21b6; }
 
 /* 處理中 spinner（按鈕內） */
 @keyframes po-spin { to { transform: rotate(360deg); } }
@@ -430,9 +431,30 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
     <div class="po-field" style="grid-column: 1 / -1;">
       <details class="po-llm-details">
         <summary style="cursor:pointer;font-size:13px;color:#475569;padding:8px 12px;background:#f1f5f9;border-radius:6px;user-select:none;font-weight:600;">
-          LLM 後處理 <span class="muted" style="font-weight:normal;">（選用 — 預設關閉；EasyOCR 中文已夠強，需要時點開）</span>
+          LLM 整合 <span class="muted" style="font-weight:normal;">（選用 — 預設關閉；EasyOCR 中文已夠強，需要時點開）</span>
         </summary>
         <div style="margin-top:10px;">
+
+      <div style="font-size:12px;color:#64748b;font-weight:600;margin:4px 0 6px;padding-left:4px;border-left:3px solid #6366f1;">主辨識（取代 EasyOCR / Tesseract）</div>
+      <div class="po-toggle-grid" style="margin-bottom:12px;">
+        <div class="po-toggle {% if not llm_vision_ok %}po-toggle-disabled{% endif %}">
+          <input type="checkbox" id="poUseLlmDirect" {% if not llm_vision_ok %}disabled{% endif %}>
+          <label for="poUseLlmDirect">
+            <span class="po-toggle-name">
+              LLM 直接辨識
+              <span class="po-toggle-tag po-toggle-tag-direct">主辨識</span>
+              {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
+            </span>
+            {% if llm_vision_ok %}
+            <span class="po-toggle-hint">勾選後**跳過 EasyOCR / Tesseract**，直接交給 vision LLM 做 OCR。對複雜版面 / 手寫 / 特殊字型最準；較慢、耗 VRAM。<b>若 LLM 連不上或回空白，會自動退回 EasyOCR</b>。需 vision 模型（gemma4:26b、qwen3-vl 等）。</span>
+            {% else %}
+            <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a> 為「OCR 文字辨識（LLM 視覺校對）」指派 vision 模型</span>
+            {% endif %}
+          </label>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:#64748b;font-weight:600;margin:4px 0 6px;padding-left:4px;border-left:3px solid #94a3b8;">後處理校對（配合 EasyOCR / Tesseract）<span style="font-weight:normal;color:#94a3b8;">— 主辨識選 LLM 直接辨識時以下不適用</span></div>
       <div style="background:#fef2f2; border-left:3px solid #ef4444; padding:8px 12px; margin-bottom:8px; font-size:12px; color:#991b1b; border-radius:4px; line-height:1.6;">
         <b>⚠ EasyOCR 中文辨識已夠強，多數場合不需 LLM</b>。若仍要用，LLM 可能會把看不清楚的字猜成「最像的常見詞」（例：原文 OCR 結果若被改成更常見的相似詞）— 公司名 / 人名 / 編號請對照原 PDF 複核，下方「各階段詳細結果」可比對。
       </div>
@@ -489,6 +511,36 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 (function(){
   const $ = (id) => document.getElementById(id);
   let uploadId = null;
+
+  // LLM 直接辨識 ↔ 後處理校對 互斥：選了主辨識,校對自動 disable+uncheck
+  function syncLlmDirectMutex() {
+    const direct = $('poUseLlmDirect');
+    const vision = $('poUseLlmVision');
+    const text = $('poUseLlm');
+    if (!direct) return;
+    const on = direct.checked;
+    [vision, text].forEach(cb => {
+      if (!cb) return;
+      if (on) {
+        cb.checked = false;
+        cb.dataset.savedDisabled = cb.disabled ? '1' : '0';
+        cb.disabled = true;
+        const wrap = cb.closest('.po-toggle');
+        if (wrap) wrap.classList.add('po-toggle-disabled');
+      } else {
+        // 還原原本的 disable 狀態（vision-only 模型沒設定時本來就 disabled）
+        if (cb.dataset.savedDisabled === '0') {
+          cb.disabled = false;
+          const wrap = cb.closest('.po-toggle');
+          if (wrap) wrap.classList.remove('po-toggle-disabled');
+        }
+      }
+    });
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const d = document.getElementById('poUseLlmDirect');
+    if (d) d.addEventListener('change', syncLlmDirectMutex);
+  });
 
   // PDF.js viewer 區塊：OCR 完成後直接在頁內預覽（可選取文字）
   function renderViewer(uid) {
@@ -757,8 +809,11 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
     fd.append('langs', getSelectedLangs());
     fd.append('dpi', $('poDpi').value);
     fd.append('skip_pages_with_text', $('poSkipText').checked ? 'true' : 'false');
-    fd.append('use_llm', $('poUseLlm').checked ? 'true' : 'false');
-    fd.append('use_llm_vision', $('poUseLlmVision').checked ? 'true' : 'false');
+    // 直接辨識勝出：勾了就忽略後處理（後端也會強制清掉，前端先在 UI 反映）
+    const direct = $('poUseLlmDirect') && $('poUseLlmDirect').checked;
+    fd.append('use_llm', (!direct && $('poUseLlm').checked) ? 'true' : 'false');
+    fd.append('use_llm_vision', (!direct && $('poUseLlmVision').checked) ? 'true' : 'false');
+    fd.append('use_llm_direct', direct ? 'true' : 'false');
     try {
       const r = await fetch('run/' + uploadId, { method:'POST', body: fd });
       if (!r.ok) throw new Error(await r.text());

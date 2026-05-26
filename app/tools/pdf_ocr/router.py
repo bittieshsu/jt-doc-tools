@@ -159,7 +159,8 @@ async def run_ocr(upload_id: str, request: Request,
                    dpi: int = Form(300),
                    skip_pages_with_text: bool = Form(True),
                    use_llm: bool = Form(False),
-                   use_llm_vision: bool = Form(False)):
+                   use_llm_vision: bool = Form(False),
+                   use_llm_direct: bool = Form(False)):
     require_uuid_hex(upload_id, "upload_id")
     _uo.require(upload_id, request)
     src = _work_dir() / f"po_{upload_id}_src.pdf"
@@ -175,11 +176,18 @@ async def run_ocr(upload_id: str, request: Request,
     # LLM 視覺校對 callback（吃 png_bytes + raw_text，回 corrected text）
     llm_vision_cb = None
     llm_vision_model_used = ""
+    # LLM 直接辨識 callback（吃 png_bytes，直接回 OCR 文字；失敗會自動退回 EasyOCR）
+    llm_direct_cb = None
+    llm_direct_model_used = ""
+    # 直接辨識模式下，校對 / 校正自動關掉（多了沒用,LLM 已經是主辨識）
+    if use_llm_direct:
+        use_llm = False
+        use_llm_vision = False
     # OCR 用獨立 LLM client，timeout 縮到 120s（避免單頁掛太久使用者沒回饋）
     OCR_LLM_TIMEOUT = 120.0
     try:
         from app.core.llm_settings import llm_settings
-        if (use_llm or use_llm_vision) and llm_settings.is_enabled():
+        if (use_llm or use_llm_vision or use_llm_direct) and llm_settings.is_enabled():
             # 重建 client：相同 base_url / api_key，但 timeout 縮到 OCR_LLM_TIMEOUT
             s = llm_settings.get()
             from app.core.llm_client import LLMClient as _LC
@@ -268,6 +276,40 @@ async def run_ocr(upload_id: str, request: Request,
                             # 「呼叫失敗：…」比預設「無回傳內容」更有資訊
                             raise
                     llm_vision_cb = _llm_vision_cb
+            if use_llm_direct and client:
+                # 直接辨識用 vision 模型（跟視覺校對共用 model 設定 key）
+                llm_direct_model_used = llm_settings.get_model_for("pdf-ocr-vision")
+                if llm_direct_model_used:
+                    import logging as _lg
+                    _ocrlog3 = _lg.getLogger("app.pdf_ocr.llm")
+                    def _llm_direct_cb(png_bytes: bytes) -> str:
+                        import time as _t
+                        prompt = (
+                            "你會看到一張掃描頁的影像。請以 OCR 方式逐字輸出影像中所有可讀的文字，"
+                            "**保持原順序與行結構**（每一行原本怎麼排就怎麼換行）。\n\n"
+                            "## 嚴格規則\n"
+                            "1. 只輸出影像中**實際看到的文字**，禁止憑想像補字 / 解釋 / 翻譯\n"
+                            "2. 公司名 / 人名 / 機關名 / 編號 / 統編 / 日期 / 金額 — 字面照抄\n"
+                            "3. 看不清楚的字用 `?` 代替，不要猜\n"
+                            "4. **不要 markdown / JSON / 程式碼框 / 註解** — 只輸出純文字\n"
+                            "5. **不要前言、結語**\n"
+                        )
+                        t0 = _t.time()
+                        _ocrlog3.info("direct LLM call start: model=%s img=%dB",
+                                      llm_direct_model_used, len(png_bytes))
+                        try:
+                            r = client.vision_query(png_bytes=png_bytes, prompt=prompt,
+                                                    model=llm_direct_model_used,
+                                                    temperature=0.0, max_tokens=4096,
+                                                    parse_json=False, think=False) or ""
+                            r = r.strip()
+                            _ocrlog3.info("direct LLM call done in %.1fs (got %d chars)",
+                                          _t.time()-t0, len(r))
+                            return r
+                        except Exception as e:
+                            _ocrlog3.warning("direct LLM call FAILED in %.1fs: %s", _t.time()-t0, e)
+                            raise
+                    llm_direct_cb = _llm_direct_cb
     except Exception:
         pass
 
@@ -290,6 +332,15 @@ async def run_ocr(upload_id: str, request: Request,
                     vis_img_max = _prof.preferred_image_max
                 except Exception:
                     pass
+            # 若 llm_direct 用 vision 模型且未抓到 vis_img_max，retry 一次
+            if llm_direct_model_used and vis_img_max == 1568:
+                try:
+                    from app.core.llm_model_profile import get_profile as _get_prof
+                    from app.core.llm_settings import llm_settings as _ls
+                    _prof = _get_prof(llm_direct_model_used, _ls.get().get("base_url", ""))
+                    vis_img_max = _prof.preferred_image_max
+                except Exception:
+                    pass
             stats = ocr_core.ocr_pdf_to_searchable(
                 src, out,
                 langs=active_langs, dpi=dpi,
@@ -300,9 +351,13 @@ async def run_ocr(upload_id: str, request: Request,
                 llm_vision_postprocess=llm_vision_cb,
                 llm_vision_model_name=llm_vision_model_used,
                 llm_vision_image_max=vis_img_max,
+                llm_direct_ocr=llm_direct_cb,
+                llm_direct_model_name=llm_direct_model_used,
                 app_version=_app_version,
             )
             extra = ""
+            if stats.get("llm_direct_used"):
+                extra += f"，LLM 直接辨識 ({llm_direct_model_used})"
             if stats.get("llm_vision_used"):
                 extra += f"，LLM 視覺校對 ({llm_vision_model_used})"
             if stats.get("llm_used"):
@@ -313,6 +368,7 @@ async def run_ocr(upload_id: str, request: Request,
                         "langs": active_langs,
                         "llm_model": llm_model_used,
                         "llm_vision_model": llm_vision_model_used,
+                        "llm_direct_model": llm_direct_model_used,
                         "download_url": f"/tools/pdf-ocr/download/{upload_id}"}
             job.result_path = out
             job.result_filename = (Path(src).stem.replace("_src", "") + "_searchable.pdf")
