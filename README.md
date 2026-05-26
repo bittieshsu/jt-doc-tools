@@ -1,4 +1,4 @@
-# Jason Tools 文件工具箱 v1.11.8
+# Jason Tools 文件工具箱 v1.11.9
 
 > 整合式 PDF / Office 文件處理平台，37 個工具一站式解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**...
 >
@@ -25,16 +25,19 @@
 | 項目 | 最低 | 建議 |
 |---|---|---|
 | 作業系統 | Ubuntu 20.04+ / Debian 11+ / macOS 12+ / Windows 10 1809+ | 任一最新版 |
-| 磁碟空間 | **8 GB** 可用（安裝期間峰值）| 12 GB+ |
+| 磁碟空間 | **12 GB** 整機 / VM / LXC 容量（最低）| **20 GB+**（含資料目錄成長空間） |
 | 記憶體 RAM | 2 GB 可用 | 4 GB+ |
 | CPU | x86_64 / arm64（Apple Silicon、Win11 ARM 都可）| 4 核心+ |
 | 網路 | 安裝時可連 GitHub / PyPI（之後純內網運作）| — |
 | Python | 3.10+（安裝腳本會自動處理 uv-managed Python） | — |
 
-> **磁碟用量大解析**：
-> - **安裝期間峰值 ~6-8 GB**：apt 暫存 .deb 套件 ~1 GB（OxOffice / LibreOffice 相依）+ uv wheel cache ~1-2 GB（PyTorch 700 MB + 其他）+ 解壓中間檔。LXC / 容器務必預留充足，**8 GB 是底線**。
-> - **安裝完成後常駐 ~3 GB**：Python 環境 ~1.5 GB（含 PyTorch / EasyOCR 主 OCR 引擎）+ tesseract trained data ~80 MB（chi_tra fast+best 雙變體 + eng）+ OxOffice/LibreOffice ~1 GB（Linux 自動裝 / macOS Win 提示安裝）。EasyOCR 模型首次 OCR 時下載 ~150 MB 到使用者目錄。
-> - **資料目錄成長**：使用者上傳檔案 + 稽核 / 歷史記錄會佔用空間。如資料路徑磁碟吃緊，可用 `JTDT_DATA_DIR=/path/with/space curl ... | sudo -E bash` 改裝到別處。
+> **磁碟用量大解析**（為什麼底線抓 12 GB 而非看似夠的 5-8 GB）：
+> - **OS 基底**：Debian / Ubuntu 最小裝 ~1.5-2 GB；其他 distro / 含桌面更大。
+> - **安裝期間峰值 ~6-8 GB**：apt 暫存 .deb 套件 ~1 GB（OxOffice / LibreOffice 相依）+ uv wheel cache ~1-2 GB（PyTorch 700 MB + 其他）+ 解壓中間檔。安裝腳本會自動 `apt-get clean` + `uv cache clean` 釋放,但**峰值期間**就是要這麼大。
+> - **安裝完成後常駐 ~3 GB**：Python 環境 ~1.5 GB（含 PyTorch / EasyOCR 主 OCR 引擎）+ tesseract trained data ~80 MB（chi_tra fast+best 雙變體 + eng）+ OxOffice/LibreOffice ~1 GB。EasyOCR 模型首次 OCR 時再下載 ~150 MB。
+> - **資料目錄成長**：使用者上傳檔案 + 稽核記錄 + 歷史會持續累積。如資料磁碟吃緊,可用 `JTDT_DATA_DIR=/mnt/big-disk/jtdt curl ... | sudo -E bash` 改裝到別處。
+>
+> **LXC / VM 配置建議**：12 GB 是會通過的底線(OS 2 GB + 峰值 8 GB + 緩衝 2 GB),正式使用至少給 20 GB 才不會 3 個月後再爆。**8 GB LXC 一定裝不下**(已有客戶踩到)。
 
 ### 一行指令
 
