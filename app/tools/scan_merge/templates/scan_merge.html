@@ -131,13 +131,21 @@
 .sm-item.selected .sm-del { display:flex; }
 .sm-item.selected .sm-resize { display:block; }
 
-/* 上傳檔名清單 */
-.sm-uploadList { margin-top:10px; display:flex; flex-direction:column; gap:5px; }
-.sm-upfile { display:flex; align-items:center; gap:8px; font-size:13px; color:#334155;
-  background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:6px 10px; }
-.sm-upfile svg { flex:0 0 auto; color:#64748b; }
-.sm-upfile .sm-upname { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.sm-upfile .sm-upcount { color:#94a3b8; font-size:12px; }
+/* 已載入內容的縮圖卡片網格 */
+.sm-uploadList { margin-top:14px; display:grid; gap:12px;
+  grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); }
+.sm-upcard { background:#fff; border:1px solid var(--border); border-radius:8px; padding:8px;
+  display:flex; flex-direction:column; gap:6px; cursor:pointer;
+  transition:border-color .12s, box-shadow .12s; }
+.sm-upcard:hover { border-color:var(--primary); box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.sm-upcard.selected { border-color:var(--primary); background:#eff6ff; box-shadow:0 0 0 2px rgba(59,130,246,0.25); }
+.sm-upcard .sm-upthumb { width:100%; aspect-ratio:1.4 / 1; background:#f8fafc;
+  border:1px solid #e5e7eb; border-radius:4px; display:flex; align-items:center; justify-content:center;
+  overflow:hidden; }
+.sm-upcard .sm-upthumb img { max-width:100%; max-height:100%; object-fit:contain; }
+.sm-upcard .sm-upcaption { font-size:12.5px; color:#334155; font-weight:500;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sm-upcard .sm-upmeta { font-size:11px; color:#94a3b8; }
 
 /* 縮放拉桿 */
 .sm-zoom-range { width:120px; max-width:34vw; accent-color:var(--primary); cursor:pointer; }
@@ -161,7 +169,6 @@ let crops = [];
 let selectedId = null;
 const A4_W = 595.276, A4_H = 841.890;
 const A4_RATIO = A4_W / A4_H;  // 寬/高
-const FILE_ICON = `{{ icon('file-text', size=16) }}`;
 
 const dz = document.getElementById('dropZone');
 const fi = document.getElementById('fileInput');
@@ -290,14 +297,20 @@ function render() {
       <span class="sm-resize" data-act="resize"></span>
     </div>`;
   }).join('');
-  // 上傳檔名清單（顯示在上傳區內）：依檔名聚合塊數
+  // 上傳區的縮圖卡片網格：每張偵測到的內容一張卡，點卡片即選取對應物件
+  const ul = document.getElementById('upload-list');
+  ul.hidden = crops.length === 0;
+  ul.innerHTML = crops.map(c => {
+    const cls = 'sm-upcard' + (c.crop_id === selectedId ? ' selected' : '');
+    const title = `${c.filename} · 第 ${c.page} 頁`;
+    return `<div class="${cls}" data-id="${c.crop_id}" title="${escapeHtml(title)}">
+      <div class="sm-upthumb"><img src="${cropSrc(c)}" alt=""></div>
+      <div class="sm-upcaption">${escapeHtml(c.filename)}</div>
+      <div class="sm-upmeta">第 ${c.page} 頁 · ${c.natural_w}×${c.natural_h} px</div>
+    </div>`;
+  }).join('');
   const byFile = new Map();
   crops.forEach(c => byFile.set(c.filename, (byFile.get(c.filename) || 0) + 1));
-  const ul = document.getElementById('upload-list');
-  ul.hidden = byFile.size === 0;
-  ul.innerHTML = [...byFile].map(([name, n]) =>
-    `<div class="sm-upfile">${FILE_ICON}<span class="sm-upname">${escapeHtml(name)}</span><span class="sm-upcount">${n} 塊</span></div>`
-  ).join('');
   document.getElementById('upload-count').textContent =
     byFile.size ? `已載入 ${byFile.size} 個檔、${crops.length} 塊` : '';
 }
@@ -368,6 +381,14 @@ async function removeCrop(id) {
 }
 
 document.getElementById('whitenToggle').addEventListener('change', render);
+
+// 點上傳區的縮圖卡 → 在預覽選取對應物件
+document.getElementById('upload-list').addEventListener('click', (e) => {
+  const card = e.target.closest('.sm-upcard');
+  if (!card) return;
+  selectedId = card.dataset.id;
+  render();
+});
 
 // 預覽結果：隱藏所有選取框 / 控點，看乾淨輸出
 let previewMode = false;
