@@ -444,7 +444,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
               {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
             </span>
             {% if llm_vision_ok %}
-            <span class="po-toggle-hint">勾選後<b>跳過 EasyOCR / Tesseract</b>,直接交給 vision LLM 做 OCR。對複雜版面 / 手寫 / 特殊字型最準；較慢、耗 VRAM。<b>若 LLM 連不上或回空白,會自動退回 EasyOCR</b>。需 vision 模型(gemma4:26b、qwen3-vl 等)。</span>
+            <span class="po-toggle-hint">勾選後<b>跳過 EasyOCR / Tesseract</b>，直接交給 vision LLM 做 OCR。對複雜版面 / 手寫 / 特殊字型最準；較慢、耗 VRAM。<b style="color:#a16207;">⚠ 中文易「腦補」幻覺</b> — 公司名 / 人名 / 機關名 / 編號常被猜成「相似的常見詞」（例：原文「資安能量登錄」可能被改成「資安量測」），<b>務必對照原檔複核</b>。<b style="color:#a16207;">⚠ 輸出無逐字座標</b> — 拖選反白位置不對應圖上實際位置（要精準對位請改用 EasyOCR / Tesseract）。<b>若 LLM 連不上或回空白，會自動退回 EasyOCR</b>。需 vision 模型（gemma4:26b、qwen3-vl 等）。</span>
             {% else %}
             <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a> 為「OCR 文字辨識（LLM 視覺校對）」指派 vision 模型</span>
             {% endif %}
@@ -857,18 +857,33 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
           const producer = stats.producer || 'jt-doc-tools pdf-ocr';
           const tessV = stats.tesseract_version || '';
           const marker = stats.marker || 'jtdt-pdf-ocr';
+          // LLM 直接辨識:從 stage_results 收集純文字,供「複製全文」按鈕用
+          let llmDirectText = '';
+          if (stats.llm_direct_used) {
+            const parts = [];
+            (stats.stage_results || []).forEach(s => {
+              if (s && s.llm_direct && s.llm_direct.text) parts.push(s.llm_direct.text);
+            });
+            llmDirectText = parts.join('\n\n');
+          }
           resultBox.innerHTML =
             '<div class="po-result">'
             + '<b>完成！</b><br>'
             + '處理 ' + (stats.pages_ocrd || 0) + ' / ' + (stats.pages_total || 0) + ' 頁'
             + '（略過 ' + (stats.pages_skipped || 0) + ' 頁已有文字層）<br>'
             + '插入文字 ' + (stats.words_inserted || 0) + ' 字'
-            + (stats.llm_vision_used || stats.llm_used
-               ? '（含 ' + [stats.llm_vision_used ? 'LLM 視覺校對' : null,
-                           stats.llm_used ? 'LLM 文字校正' : null].filter(Boolean).join(' + ') + '）'
-               : '')
+            + (stats.llm_direct_used
+               ? '（LLM 直接辨識）'
+               : (stats.llm_vision_used || stats.llm_used
+                  ? '（含 ' + [stats.llm_vision_used ? 'LLM 視覺校對' : null,
+                              stats.llm_used ? 'LLM 文字校正' : null].filter(Boolean).join(' + ') + '）'
+                  : ''))
             + '<br><br>'
             + '<a class="btn btn-primary" href="' + url + '" download>下載文字辨識後 PDF</a>'
+            + (stats.llm_direct_used && llmDirectText
+               ? ' <button type="button" class="btn" id="poCopyFullText" title="複製 LLM 識別出的完整純文字（避開拖選不精準的問題）">複製全文</button>'
+                 + '<div style="margin-top:8px; font-size:12px; color:#a16207;">⚠ LLM 直接辨識的拖選位置不對應圖上文字位置（無逐字座標）— 要拿完整內容請按上方「複製全文」。中文易腦補，務必對照原檔複核。</div>'
+               : '')
             + '</div>'
             + renderStageDetails(stats.stage_results || [])
             + '<details class="po-stages">'
@@ -885,6 +900,25 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
             + renderViewer(uploadId);
           setBtnBusy(false);
           mountViewerEmbedCss();
+          // 複製全文按鈕（LLM 直接辨識才會出現）
+          const copyBtn = document.getElementById('poCopyFullText');
+          if (copyBtn && llmDirectText) {
+            copyBtn.addEventListener('click', async () => {
+              try {
+                await navigator.clipboard.writeText(llmDirectText);
+                const orig = copyBtn.textContent;
+                copyBtn.textContent = '✓ 已複製 ' + llmDirectText.length + ' 字';
+                setTimeout(() => { copyBtn.textContent = orig; }, 2000);
+              } catch (e) {
+                // 退回 textarea fallback
+                const ta = document.createElement('textarea');
+                ta.value = llmDirectText; document.body.appendChild(ta);
+                ta.select(); document.execCommand('copy'); ta.remove();
+                copyBtn.textContent = '✓ 已複製';
+                setTimeout(() => { copyBtn.textContent = '複製全文'; }, 2000);
+              }
+            });
+          }
           return;
         }
         if (jj.status === 'error') {
