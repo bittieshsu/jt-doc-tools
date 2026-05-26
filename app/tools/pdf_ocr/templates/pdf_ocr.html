@@ -429,14 +429,8 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
       </div>
     </div>
     <div class="po-field" style="grid-column: 1 / -1;">
-      <details class="po-llm-details">
-        <summary style="cursor:pointer;font-size:13px;color:#475569;padding:8px 12px;background:#f1f5f9;border-radius:6px;user-select:none;font-weight:600;">
-          LLM 整合 <span class="muted" style="font-weight:normal;">（選用 — 預設關閉；EasyOCR 中文已夠強，需要時點開）</span>
-        </summary>
-        <div style="margin-top:10px;">
-
-      <div style="font-size:12px;color:#64748b;font-weight:600;margin:4px 0 6px;padding-left:4px;border-left:3px solid #6366f1;">主辨識（取代 EasyOCR / Tesseract）</div>
-      <div class="po-toggle-grid" style="margin-bottom:12px;">
+      <!-- LLM 直接辨識：獨立選項（不放在 LLM 後處理 收納內,因為它是主辨識） -->
+      <div class="po-toggle-grid" style="margin-bottom:10px;">
         <div class="po-toggle {% if not llm_vision_ok %}po-toggle-disabled{% endif %}">
           <input type="checkbox" id="poUseLlmDirect" {% if not llm_vision_ok %}disabled{% endif %}>
           <label for="poUseLlmDirect">
@@ -446,7 +440,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
               {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
             </span>
             {% if llm_vision_ok %}
-            <span class="po-toggle-hint">勾選後**跳過 EasyOCR / Tesseract**，直接交給 vision LLM 做 OCR。對複雜版面 / 手寫 / 特殊字型最準；較慢、耗 VRAM。<b>若 LLM 連不上或回空白，會自動退回 EasyOCR</b>。需 vision 模型（gemma4:26b、qwen3-vl 等）。</span>
+            <span class="po-toggle-hint">勾選後<b>跳過 EasyOCR / Tesseract</b>,直接交給 vision LLM 做 OCR。對複雜版面 / 手寫 / 特殊字型最準;較慢、耗 VRAM。<b>若 LLM 連不上或回空白,會自動退回 EasyOCR</b>。需 vision 模型(gemma4:26b、qwen3-vl 等)。</span>
             {% else %}
             <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a> 為「OCR 文字辨識（LLM 視覺校對）」指派 vision 模型</span>
             {% endif %}
@@ -454,7 +448,11 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
         </div>
       </div>
 
-      <div style="font-size:12px;color:#64748b;font-weight:600;margin:4px 0 6px;padding-left:4px;border-left:3px solid #94a3b8;">後處理校對（配合 EasyOCR / Tesseract）<span style="font-weight:normal;color:#94a3b8;">— 主辨識選 LLM 直接辨識時以下不適用</span></div>
+      <details class="po-llm-details">
+        <summary style="cursor:pointer;font-size:13px;color:#475569;padding:8px 12px;background:#f1f5f9;border-radius:6px;user-select:none;font-weight:600;">
+          LLM 後處理 <span class="muted" style="font-weight:normal;">（選用 — 預設關閉;EasyOCR 中文已夠強,需要時點開;選了上面的「LLM 直接辨識」時以下不適用）</span>
+        </summary>
+        <div style="margin-top:10px;">
       <div style="background:#fef2f2; border-left:3px solid #ef4444; padding:8px 12px; margin-bottom:8px; font-size:12px; color:#991b1b; border-radius:4px; line-height:1.6;">
         <b>⚠ EasyOCR 中文辨識已夠強，多數場合不需 LLM</b>。若仍要用，LLM 可能會把看不清楚的字猜成「最像的常見詞」（例：原文 OCR 結果若被改成更常見的相似詞）— 公司名 / 人名 / 編號請對照原 PDF 複核，下方「各階段詳細結果」可比對。
       </div>
