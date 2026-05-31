@@ -21,3 +21,9 @@ Thumbs.db
 
 # Original / backup screenshots — local-only, not for publish
 docs/screenshots-backup/
+
+# NSIS installer build output (CI rebuilds it; winsw.exe/nssm.exe stay tracked)
+packaging/windows/jt-doc-tools-*-setup.exe
+
+# Maintainer-internal code-signing application notes (not for public repo)
+packaging/windows/SIGNPATH-APPLICATION.md

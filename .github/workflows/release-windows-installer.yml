@@ -1,0 +1,98 @@
+name: Build Windows installer
+
+# Builds the NSIS GUI installer (jt-doc-tools-<ver>-setup.exe) on an Ubuntu
+# runner via makensis. The installer is a thin bootstrapper: it ships only
+# the PowerShell core scripts + LICENSE + icon and downloads everything else
+# at runtime, so the .exe stays small (~well under 1 MB).
+#
+# This workflow is NEW and isolated -- it does not touch the existing
+# install.ps1 / install.sh one-liner paths or the codeql workflow.
+#
+# Triggers:
+#   * push of a version tag (v*)        -> build + attach to the GitHub Release
+#   * manual run (workflow_dispatch)    -> build + upload as a workflow artifact
+#
+# Code signing is NOT wired up yet (unsigned-first strategy). When the
+# SignPath OSS application is approved, add a signing step after makensis
+# and before the upload -- see packaging/windows/INSTALLER.md.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string for the installer filename (blank = read app/main.py)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write   # needed by action-gh-release to attach assets
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install NSIS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nsis
+          makensis -VERSION
+
+      - name: Determine version
+        id: ver
+        run: |
+          V="${{ github.event.inputs.version }}"
+          if [ -z "$V" ] && [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          fi
+          if [ -z "$V" ]; then
+            V=$(grep -oP 'VERSION\s*=\s*"\K[^"]+' app/main.py | head -1)
+          fi
+          if [ -z "$V" ]; then
+            echo "Could not determine version" >&2
+            exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Building installer for version $V"
+
+      - name: Build installer
+        working-directory: packaging/windows
+        run: |
+          makensis -DVERSION=${{ steps.ver.outputs.version }} installer.nsi
+          ls -la jt-doc-tools-${{ steps.ver.outputs.version }}-setup.exe
+
+      - name: Upload as workflow artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: jt-doc-tools-${{ steps.ver.outputs.version }}-setup
+          path: packaging/windows/jt-doc-tools-${{ steps.ver.outputs.version }}-setup.exe
+          if-no-files-found: error
+
+      # --- code signing (unsigned-first; enable once SignPath OSS is approved) ---
+      # Add repo secrets SIGNPATH_API_TOKEN + SIGNPATH_ORG_ID, then uncomment.
+      # Full setup steps: packaging/windows/SIGNPATH-APPLICATION.md
+      #   - name: Sign installer (SignPath)
+      #     if: github.ref_type == 'tag'
+      #     uses: signpath/github-action-submit-signing-request@v1
+      #     with:
+      #       api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+      #       organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
+      #       project-slug: jt-doc-tools
+      #       signing-policy-slug: release-signing
+      #       artifact-configuration-slug: installer
+      #       github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      #       wait-for-completion: true
+      #       output-artifact-directory: packaging/windows/signed
+
+      - name: Attach to GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packaging/windows/jt-doc-tools-${{ steps.ver.outputs.version }}-setup.exe
+          fail_on_unmatched_files: true
