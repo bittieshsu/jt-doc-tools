@@ -28,6 +28,138 @@ def _try_psutil():
         return None
 
 
+# ---- 容器感知 CPU（LXC / Docker）------------------------------------------
+# LXC 容器的 /proc/stat 與 /proc/loadavg 沒有 namespace 化，psutil 會讀到
+# 「實體主機」的 CPU% 與 load average，導致系統狀態頁顯示的是整台主機的負載，
+# 不是這個容器自己的。改從 cgroup 讀容器『自己』的 CPU 用量。
+# （記憶體由 LXCFS 虛擬化 /proc/meminfo 已正確、磁碟是容器自己的 rootfs，
+#   網路是 namespaced 介面，都不需特別處理。）
+_CG_CPU_PREV: dict = {"usage_usec": None, "ts": None}
+_IS_CONTAINER_CACHE: Optional[bool] = None
+
+
+def _is_container() -> bool:
+    """偵測是否在 LXC / Docker / podman 容器內。VM 與實機回 False。
+
+    重點：服務以非 root 帳號（jtdt）執行，``/proc/1/environ`` 只有 root 能讀，
+    不能只靠它。改用非 root 也讀得到的訊號：docker/podman 標記檔、/proc/mounts
+    內的 LXCFS 掛載、以及 ``systemd-detect-virt --container``。結果固定不變 → 快取。"""
+    global _IS_CONTAINER_CACHE
+    if _IS_CONTAINER_CACHE is not None:
+        return _IS_CONTAINER_CACHE
+    result = False
+    # docker / podman 標記檔（世界可讀）
+    if os.path.exists("/run/.containerenv") or os.path.exists("/.dockerenv"):
+        result = True
+    # LXC：LXCFS 會把 /proc/* 掛成 fuse.lxcfs；/proc/mounts 非 root 可讀
+    if not result:
+        try:
+            with open("/proc/mounts", encoding="utf-8") as f:
+                if "lxcfs" in f.read():
+                    result = True
+        except Exception:
+            pass
+    # systemd-detect-virt：非 root 也能判斷容器（lxc / docker / nspawn 等）
+    if not result:
+        try:
+            import subprocess
+            r = subprocess.run(
+                ["systemd-detect-virt", "--container", "--quiet"],
+                timeout=2, capture_output=True)
+            if r.returncode == 0:
+                result = True
+        except Exception:
+            pass
+    # /proc/1/environ container=（需 root，有就當補強）
+    if not result:
+        try:
+            with open("/proc/1/environ", "rb") as f:
+                if b"container=" in f.read():
+                    result = True
+        except Exception:
+            pass
+    _IS_CONTAINER_CACHE = result
+    return result
+
+
+def _read_cgroup_cpu_usage_usec() -> Optional[int]:
+    """容器自開機以來累計 CPU 時間（微秒）。cgroup v2 優先，v1 fallback。"""
+    try:  # cgroup v2
+        with open("/sys/fs/cgroup/cpu.stat", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("usage_usec"):
+                    return int(line.split()[1])
+    except Exception:
+        pass
+    try:  # cgroup v1（ns → us）
+        with open("/sys/fs/cgroup/cpuacct/cpuacct.usage", encoding="utf-8") as f:
+            return int(f.read().strip()) // 1000
+    except Exception:
+        pass
+    return None
+
+
+def _count_cpuset(spec: str) -> int:
+    """'0-3,5' → 5。算 cpuset 列表的核心數。"""
+    n = 0
+    for part in (spec or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            a, b = part.split("-", 1)
+            try:
+                n += int(b) - int(a) + 1
+            except ValueError:
+                pass
+        else:
+            n += 1
+    return n
+
+
+def _cgroup_ncpu(fallback: Optional[int]) -> int:
+    """容器可用的核心數：cpu.max 配額優先，其次 cpuset，最後 fallback。"""
+    try:  # cgroup v2 cpu.max: "<quota> <period>" 或 "max <period>"
+        with open("/sys/fs/cgroup/cpu.max", encoding="utf-8") as f:
+            parts = f.read().split()
+        if len(parts) == 2 and parts[0] != "max":
+            q, p = int(parts[0]), int(parts[1])
+            if p > 0:
+                return max(1, round(q / p))
+    except Exception:
+        pass
+    for path in ("/sys/fs/cgroup/cpuset.cpus.effective",
+                 "/sys/fs/cgroup/cpuset/cpuset.effective_cpus"):
+        try:
+            with open(path, encoding="utf-8") as f:
+                c = _count_cpuset(f.read().strip())
+                if c:
+                    return c
+        except Exception:
+            pass
+    return fallback or 1
+
+
+def _container_cpu_percent(fallback_ncpu: Optional[int]) -> Optional[float]:
+    """以 cgroup 累計用量算容器自己的 CPU%（占可用核心的百分比）。
+    首次呼叫無前一筆樣本 → 回 0.0（與 psutil interval=None 行為一致）。"""
+    usage = _read_cgroup_cpu_usage_usec()
+    now = time.time()
+    prev = _CG_CPU_PREV
+    pct: Optional[float] = 0.0
+    if usage is not None and prev["usage_usec"] is not None and prev["ts"] is not None:
+        dt_us = (now - prev["ts"]) * 1_000_000.0
+        du = usage - prev["usage_usec"]
+        if dt_us > 0 and du >= 0:
+            cores_used = du / dt_us
+            ncpu = _cgroup_ncpu(fallback_ncpu) or 1
+            pct = max(0.0, min(100.0, cores_used / ncpu * 100.0))
+    if usage is not None:
+        _CG_CPU_PREV["usage_usec"] = usage
+        _CG_CPU_PREV["ts"] = now
+    return pct if usage is not None else None
+
+
 def _safe_disk_usage(path: str) -> Optional[dict]:
     """psutil.disk_usage 在 Windows 拒絕存取的盤符會炸，包起來。"""
     psutil = _try_psutil()
@@ -53,19 +185,35 @@ def get_host_stats() -> dict:
         return {"available": False,
                 "error": "psutil not installed — admin 頁無法顯示主機資源"}
     out: dict = {"available": True, "ts": time.time()}
+    in_container = _is_container()
     # CPU
     try:
-        # interval=None → 自上次呼叫的平均（首次呼叫回 0.0），避免阻塞 1 秒
-        out["cpu"] = {
-            "percent": psutil.cpu_percent(interval=None),
-            "count_logical": psutil.cpu_count(logical=True),
-            "count_physical": psutil.cpu_count(logical=False),
-        }
-        try:
-            la = psutil.getloadavg()
-            out["cpu"]["loadavg"] = list(la)  # (1min, 5min, 15min)
-        except (AttributeError, OSError):
-            out["cpu"]["loadavg"] = None
+        # 實機 / VM：/proc 是自己的，psutil 正確 → 直接用。
+        # LXC / Docker 容器：/proc/stat 與 /proc/loadavg 沒 namespace 化，會讀到
+        # 實體主機數值 → 改從 cgroup 算容器自己的 CPU%，且不顯示實體主機 loadavg。
+        host_percent = psutil.cpu_percent(interval=None)  # 仍呼叫以維持 psutil 內部狀態
+        if in_container:
+            cg_pct = _container_cpu_percent(psutil.cpu_count(logical=True))
+            ncpu = _cgroup_ncpu(psutil.cpu_count(logical=True))
+            out["cpu"] = {
+                "percent": cg_pct if cg_pct is not None else host_percent,
+                "count_logical": ncpu,
+                "count_physical": ncpu,
+                "loadavg": None,        # 實體主機 loadavg 對容器無意義 → 不顯示
+                "in_container": True,
+                "source": "cgroup" if cg_pct is not None else "psutil",
+            }
+        else:
+            out["cpu"] = {
+                "percent": host_percent,
+                "count_logical": psutil.cpu_count(logical=True),
+                "count_physical": psutil.cpu_count(logical=False),
+                "in_container": False,
+            }
+            try:
+                out["cpu"]["loadavg"] = list(psutil.getloadavg())  # (1,5,15 min)
+            except (AttributeError, OSError):
+                out["cpu"]["loadavg"] = None
     except Exception as e:
         out["cpu"] = {"error": str(e)}
     # RAM
@@ -85,7 +233,9 @@ def get_host_stats() -> dict:
         roots = []
         data_disk = _safe_disk_usage(str(_s.data_dir))
         if data_disk:
-            data_disk["label"] = "資料目錄 (data)"
+            # 標清楚這是「磁碟空間」(資料目錄所在的整顆盤)，不是資料目錄本身大小，
+            # 避免誤會成 jt-doc-tools 吃了那麼多空間。
+            data_disk["label"] = "磁碟空間（資料目錄所在）"
             roots.append(data_disk)
         # 系統根（Linux/macOS = /；Windows = C:\）
         sys_root = "C:\\" if os.name == "nt" else "/"

@@ -329,7 +329,7 @@ async def submit(
 
 # ===== 逐檔順序上傳（issue #27）=====
 # 大批次（數十~上百份）一次塞進單一 multipart 會撞反向代理 / 伺服器的 body
-# 上限而靜默失敗。改成：create → 逐檔 add（每請求只一個小 PDF）→ process。
+# 上限而失敗卻無任何提示。改成：create → 逐檔 add（每請求只一個小 PDF）→ process。
 # 每個請求 body 都很小，永遠不撞上限，也不靠使用者改 proxy。
 _BATCH_RE = re.compile(r"^[a-f0-9]{32}$")
 
