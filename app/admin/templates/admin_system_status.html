@@ -189,7 +189,9 @@ function renderHost(host) {
         </div>
         <div class="ss-bar ${barClass(m.percent)}"><i style="width:${Math.min(100,m.percent||0)}%"></i></div>
         <div class="ss-row"><span>可用</span><span>${fmtBytes(m.available)}</span></div>
-        <div class="ss-row"><span>Swap</span><span>${fmtBytes(m.swap_used)} / ${fmtBytes(m.swap_total)} (${fmtPercent(m.swap_percent)})</span></div>
+        <div class="ss-row"><span>Swap</span><span>${m.swap_total_known === false
+          ? `${fmtBytes(m.swap_used)} 已用（總量由主機端管理）`
+          : `${fmtBytes(m.swap_used)} / ${fmtBytes(m.swap_total)} (${fmtPercent(m.swap_percent)})`}</span></div>
       </div>`);
   }
 

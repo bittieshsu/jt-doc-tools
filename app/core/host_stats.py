@@ -241,12 +241,17 @@ def _container_mem(psutil_mod) -> Optional[dict]:
         total = int(lim) if (lim and lim != "max") else psutil_mod.virtual_memory().total
         sw_used = _cg_read_int("/sys/fs/cgroup/memory.swap.current") or 0
         sw_lim = _cg_read_str("/sys/fs/cgroup/memory.swap.max")
-        sw_total = int(sw_lim) if (sw_lim and sw_lim != "max") else 0
+        # memory.swap.max = "max" → swap 上限設在主機端父 cgroup，容器內讀不到
+        # （LXCFS 的 /proc/meminfo SwapTotal 也是 0）。標記總量未知，避免顯示
+        # 成「0 B / 0 B」誤以為沒設定 swap。
+        sw_known = bool(sw_lim and sw_lim != "max")
+        sw_total = int(sw_lim) if sw_known else 0
         return {
             "total": total, "used": used, "available": max(0, total - used),
             "percent": round(used / total * 100, 1) if total else 0.0,
             "swap_total": sw_total, "swap_used": sw_used,
             "swap_percent": round(sw_used / sw_total * 100, 1) if sw_total else 0.0,
+            "swap_total_known": sw_known,
         }
     # cgroup v1
     usage = _cg_read_int("/sys/fs/cgroup/memory/memory.usage_in_bytes")
