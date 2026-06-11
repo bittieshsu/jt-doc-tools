@@ -574,7 +574,7 @@ async def tool_preview(upload_id: str):
 
 
 @router.post("/preview")
-async def preview(file: UploadFile = File(...)):
+async def preview(request: Request, file: UploadFile = File(...)):
     """Render the first page of an uploaded PDF to PNG. Also returns per-page
     dimensions so the editor mode can offer page navigation (lazy-rendered via
     /preview-bg/{upload_id}/{page_idx})."""
@@ -582,6 +582,11 @@ async def preview(file: UploadFile = File(...)):
     if not data:
         raise HTTPException(400, "empty file")
     upload_id = uuid.uuid4().hex
+    # Record the uploader as owner so serve_preview() lets THEM (not just admins)
+    # fetch the background / preview PNGs. Without this, an authenticated
+    # non-admin gets a fail-secure 403 on their own preview (GitHub #28 part 2).
+    from ...core import upload_owner as _uo
+    _uo.record(upload_id, request)
     src = settings.temp_dir / f"{upload_id}.pdf"
     src.write_bytes(data)
     png = settings.temp_dir / f"{upload_id}_p1.png"
@@ -608,11 +613,14 @@ async def preview(file: UploadFile = File(...)):
 
 
 @router.get("/preview-bg/{upload_id}/{page_idx}")
-async def preview_bg(upload_id: str, page_idx: int):
+async def preview_bg(upload_id: str, page_idx: int, request: Request):
     """Lazily render any page of a previously-uploaded PDF (from /preview)
     so the editor mode can switch its background between pages."""
     if not upload_id.replace("_", "").isalnum():
         raise HTTPException(400, "bad upload_id")
+    # Only the uploader (or admin) may render pages of their upload.
+    from ...core import upload_owner as _uo
+    _uo.require(upload_id, request)
     src = settings.temp_dir / f"{upload_id}.pdf"
     if not src.exists():
         raise HTTPException(404, "upload expired")
@@ -653,6 +661,8 @@ async def preview_all_pages(
         raise HTTPException(400, "empty file")
 
     upload_id = uuid.uuid4().hex
+    from ...core import upload_owner as _uo
+    _uo.record(upload_id, request)  # let the non-admin uploader fetch results (#28)
     src = settings.temp_dir / f"{upload_id}_in.pdf"
     stamped = settings.temp_dir / f"{upload_id}_stamped.pdf"
     src.write_bytes(data)
@@ -782,6 +792,8 @@ async def preview_stamped(
         raise HTTPException(400, "empty file")
 
     upload_id = uuid.uuid4().hex
+    from ...core import upload_owner as _uo
+    _uo.record(upload_id, request)  # let the non-admin uploader fetch the result (#28)
     src = settings.temp_dir / f"{upload_id}_in.pdf"
     stamped = settings.temp_dir / f"{upload_id}_stamped.pdf"
     png = settings.temp_dir / f"{upload_id}_preview.png"

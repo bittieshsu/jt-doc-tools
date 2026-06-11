@@ -143,11 +143,13 @@ def _parse_params(payload: str) -> service.WatermarkParams:
 
 
 @router.post("/preview")
-async def preview(file: UploadFile = File(...)):
+async def preview(request: Request, file: UploadFile = File(...)):
     data = await file.read()
     if not data:
         raise HTTPException(400, "empty file")
     upload_id = uuid.uuid4().hex
+    from ...core import upload_owner as _uo
+    _uo.record(upload_id, request)  # owner can fetch their own preview (#28)
     src = settings.temp_dir / f"wm_{upload_id}.pdf"
     src.write_bytes(data)
     png = settings.temp_dir / f"wm_{upload_id}_p1.png"
@@ -158,12 +160,13 @@ async def preview(file: UploadFile = File(...)):
         r = doc[0].rect
         from ...core.unit_convert import pt_to_mm
         w_mm = pt_to_mm(r.width); h_mm = pt_to_mm(r.height)
+        page_count = doc.page_count  # read inside the with-block; doc is closed on exit
     return {
         "upload_id": upload_id,
         "preview_url": f"/tools/pdf-watermark/preview/{png.name}",
         "paper_w_mm": round(w_mm, 2),
         "paper_h_mm": round(h_mm, 2),
-        "page_count": doc.page_count,
+        "page_count": page_count,
     }
 
 
@@ -191,6 +194,8 @@ async def preview_watermarked(
         raise HTTPException(400, "empty file")
 
     upload_id = uuid.uuid4().hex
+    from ...core import upload_owner as _uo
+    _uo.record(upload_id, request)  # owner can fetch their own result (#28)
     src = settings.temp_dir / f"wm_{upload_id}_in.pdf"
     out = settings.temp_dir / f"wm_{upload_id}_marked.pdf"
     png = settings.temp_dir / f"wm_{upload_id}_preview.png"
@@ -444,7 +449,11 @@ async def serve_preview(name: str, request: Request):
     from app.core.safe_paths import safe_join
     from ...core import upload_owner
     p = safe_join(settings.temp_dir, name)
-    uid = upload_owner.extract_upload_id(name)
+    # Watermark temp files are named `wm_<uid>_...`; strip the `wm_` prefix so
+    # the uuid prefix is recognised (otherwise extract_upload_id sees "wm" and
+    # the ACL silently no-ops, leaking previews across users).
+    base = name[3:] if name.startswith("wm_") else name
+    uid = upload_owner.extract_upload_id(base)
     if uid:
         upload_owner.require(uid, request)
     if not p.exists():

@@ -4,6 +4,16 @@
 
 ---
 
+## [1.11.80] - 2026-06-11
+
+### 修正 — 啟用認證後，非管理員在「用印與簽名」/「浮水印」的編輯與合成模式看不到預覽（GitHub #28 第 2 點）
+
+- 接續 #28 第 1 點（資產縮圖）。第 2 點：非管理員帳號在用印與簽名的**編輯模式**（PDF 背景）與**合成模式**（蓋章結果）都無法預覽，但執行下載出來的檔案正常。
+- 原因：預覽圖服務端點 `/preview/{name}` 會用 `upload_owner.require()` 檢查擁有者，但**產生**這些預覽檔的端點（`/preview`、`/preview-all-pages`、`/preview-stamped`）**從未呼叫 `record()` 寫入擁有者**。於是非管理員拿自己的預覽會踢到 fail-secure 403（管理員因 admin override 而正常，所以只有非管理員看不到）。
+- 修法：在上述三個產生端點加 `upload_owner.record(upload_id, request)`；`/preview-bg` 也加 `require()` 確保只有上傳者本人能算繪自己上傳的頁面。認證關閉時 record/require 皆為 no-op，單機模式不受影響。
+- 浮水印工具同步修兩處：①`serve_preview` 的擁有者比對因檔名前綴 `wm_` 導致 `extract_upload_id` 取到 "wm" 而**靜默失效**（等於沒檢查，跨使用者可取他人預覽）—— 改為先去前綴再比對，並在 `/preview`、`/preview-watermarked` 補 `record()`，把漏洞補起來又不擋到本人。②修一個既有錯誤：`/preview` 在 `with fitz.open() as doc` 區塊**外**讀 `doc.page_count`，新版 PyMuPDF 會丟 `document closed`（500）——改到區塊內讀取。
+- 測試：`tests/test_stamp_watermark_preview_acl.py`（上傳者可取自己的預覽 / 他人取得回 403 / 認證關閉直通，涵蓋 stamp + watermark）。
+
 ## [1.11.79] - 2026-06-11
 
 ### 修正 — 單 GPU / 統一記憶體主機（如 DGX Spark GB10）不被自動挑卡邏輯誤退 CPU
