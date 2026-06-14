@@ -13,7 +13,8 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from ..core import (audit_db, audit_forward, auth_db, auth_settings,
-                    group_manager, permissions, roles, user_manager)
+                    group_manager, permissions, roles, sso_settings,
+                    user_manager)
 
 
 def _all_tool_ids() -> list[str]:
@@ -37,6 +38,94 @@ def _actor(r: Request) -> str:
 
 def build_auth_router(templates) -> APIRouter:
     router = APIRouter()
+
+    # ---------- /admin/sso (OIDC + SAML，附加登入) ----------
+
+    @router.get("/sso", response_class=HTMLResponse)
+    async def sso_page(request: Request):
+        from ..core import sso_provision  # noqa: F401 (ensure importable)
+        return templates.TemplateResponse("admin_sso.html", {
+            "request": request,
+            "sso": sso_settings.get(),          # secrets masked
+            "auth_enabled": auth_settings.is_enabled(),
+        })
+
+    @router.post("/sso/save")
+    async def sso_save(request: Request):
+        body = await request.json()
+        oidc_in = body.get("oidc") or {}
+        saml_in = body.get("saml") or {}
+        new = {
+            "base_url": (body.get("base_url") or "").strip().rstrip("/"),
+            "oidc": {
+                "enabled": bool(oidc_in.get("enabled")),
+                "display_name": (oidc_in.get("display_name") or "").strip()[:64],
+                "issuer": (oidc_in.get("issuer") or "").strip().rstrip("/"),
+                "client_id": (oidc_in.get("client_id") or "").strip(),
+                "client_secret_enc": oidc_in.get("client_secret_enc", sso_settings.SECRET_KEPT),
+                "scopes": (oidc_in.get("scopes") or "openid email profile").strip(),
+                "username_claim": (oidc_in.get("username_claim") or "preferred_username").strip(),
+                "email_claim": (oidc_in.get("email_claim") or "email").strip(),
+                "name_claim": (oidc_in.get("name_claim") or "name").strip(),
+                "groups_claim": (oidc_in.get("groups_claim") or "groups").strip(),
+                "admin_group": (oidc_in.get("admin_group") or "").strip(),
+            },
+            "saml": {
+                "enabled": bool(saml_in.get("enabled")),
+                "display_name": (saml_in.get("display_name") or "").strip()[:64],
+                "idp_entity_id": (saml_in.get("idp_entity_id") or "").strip(),
+                "idp_sso_url": (saml_in.get("idp_sso_url") or "").strip(),
+                "idp_x509cert": (saml_in.get("idp_x509cert") or "").strip(),
+                "sp_entity_id": (saml_in.get("sp_entity_id") or "").strip(),
+                "want_assertions_signed": bool(saml_in.get("want_assertions_signed", True)),
+                "username_attr": (saml_in.get("username_attr") or "").strip(),
+                "email_attr": (saml_in.get("email_attr") or "").strip(),
+                "name_attr": (saml_in.get("name_attr") or "").strip(),
+                "groups_attr": (saml_in.get("groups_attr") or "").strip(),
+                "admin_group": (saml_in.get("admin_group") or "").strip(),
+                "sp_private_key_enc": saml_in.get("sp_private_key_enc", sso_settings.SECRET_KEPT),
+                "sp_x509cert": (saml_in.get("sp_x509cert") or "").strip(),
+            },
+        }
+        # Guard: enabling SSO without a primary auth backend would let anyone the
+        # IdP authenticates in, but there'd be no break-glass admin. Require auth on.
+        if (new["oidc"]["enabled"] or new["saml"]["enabled"]) and not auth_settings.is_enabled():
+            raise HTTPException(409, "請先於「認證設定」啟用認證並建立管理員，再開啟 SSO（保留 break-glass 帳號）")
+        sso_settings.save(new)
+        sso_settings._invalidate_cache()
+        audit_db.log_event("settings_change", username=_actor(request),
+                           ip=_client_ip(request), target="sso",
+                           details={"oidc": new["oidc"]["enabled"],
+                                    "saml": new["saml"]["enabled"]})
+        return JSONResponse({"ok": True})
+
+    @router.post("/sso/test")
+    async def sso_test(request: Request):
+        """Validate OIDC discovery + SAML SP metadata against current saved
+        config (does not require enabling). Returns per-provider result."""
+        body = await request.json()
+        which = body.get("provider")
+        out: dict = {}
+        if which in (None, "oidc"):
+            try:
+                from ..core import oidc as _oidc
+                cfg = sso_settings.get_oidc(reveal=True)
+                doc = _oidc.discover(cfg)
+                out["oidc"] = {"ok": True,
+                               "authorization_endpoint": doc.get("authorization_endpoint"),
+                               "token_endpoint": doc.get("token_endpoint")}
+            except Exception as e:
+                out["oidc"] = {"ok": False, "error": str(e)[:200]}
+        if which in (None, "saml"):
+            try:
+                from ..core import saml as _saml
+                cfg = sso_settings.get_saml(reveal=True)
+                base = sso_settings.base_url()
+                _saml.sp_metadata(cfg, base)
+                out["saml"] = {"ok": True, "metadata_url": (base + "/auth/saml/metadata") if base else ""}
+            except Exception as e:
+                out["saml"] = {"ok": False, "error": str(e)[:200]}
+        return JSONResponse({"ok": True, "result": out})
 
     # ---------- /admin/auth-settings ----------
 

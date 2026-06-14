@@ -122,11 +122,13 @@ def build_router(templates) -> APIRouter:
             cur = sessions.lookup(request.cookies[sessions.COOKIE_NAME])
             if cur:
                 return RedirectResponse(safe_next(next), status_code=302)
+        from ..core import sso_settings as _sso
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "error": error, "next": safe_next(next),
              "realms": _auth.available_realms(),
-             "default_realm": _auth.default_realm()},
+             "default_realm": _auth.default_realm(),
+             "sso_buttons": _sso.login_buttons()},
         )
 
     @router.post("/login")

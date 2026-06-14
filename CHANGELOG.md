@@ -4,6 +4,19 @@
 
 ---
 
+## [1.12.0] - 2026-06-14
+
+### 新增 — SSO 單一登入（OIDC + SAML，與本機 / LDAP / AD 並存）
+
+- 新增 SSO 作為**附加**登入方式：啟用後登入頁多「以 OIDC / SAML 登入」按鈕，本機 `jtdt-admin` 仍可登入當 break-glass（IdP 故障時的後門）。設定在新頁 `/admin/sso`。
+- **OIDC（OpenID Connect）**：Authorization-Code flow，輕量實作（PyJWT + httpx，無 authlib）。discovery（.well-known）+ state/nonce 防 CSRF/重放 + JWKS 驗 aud/iss/exp/nonce。可接 Microsoft 365 / Entra ID、Google、Keycloak、Okta、Authentik。
+- **SAML 2.0**：以 python3-saml（OneLogin）實作 SP，預設要求 IdP 簽署 Assertion；SP metadata 由 `<base>/auth/saml/metadata` 提供。
+- **首次登入自動建帳號（JIT）**：以 OIDC `sub` / SAML `NameID` 為穩定識別建立本機 user（`source=oidc/saml`），預設「一般使用者」角色；IdP 群組同步成本站群組，於權限矩陣對應角色（同 AD 群組機制）。可設「管理員群組」讓其成員自動取得 admin。
+- **安全**：client secret / SP 私鑰以 Fernet 加密存（金鑰沿用 session secret，檔案 mode 600，admin UI 只顯示遮罩值）；discovery/token/JWKS 端點限 http/https 並封鎖 cloud metadata 位址；SSO 端點納入 auth gate 公開白名單但啟用守門（未啟用即回錯誤頁）。
+- **相依**：新增 `PyJWT`、`python3-saml`、`xmlsec`（三平台皆有預編 wheel，免系統函式庫）；pyproject / uv.lock / requirements / install.sh / setup-python.cmd / `jtdt update` 的 import smoke 全部同步。DB migration v8：`users` / `groups` 的 `source` 允許 `oidc` / `saml`（重建表保留所有現有欄位與資料）。
+- 反向代理：`/admin/sso` 的「對外 base URL」務必填對外 https；OIDC Redirect URI = `<base>/auth/oidc/callback`、SAML ACS = `<base>/auth/saml/acs`。詳見 AUTH.md。
+- 測試：`tests/test_sso.py`（設定加密遮罩 / SECRET_KEPT 保留、登入鈕 gating、OIDC claim 對應 + SSRF URL 檢查、JIT 建帳號冪等 + 群組→admin 對應 + 同名衝突、路由 state 驗證 / 停用 / 公開路徑、admin 頁 ACL，共 13 項）。
+
 ## [1.11.81] - 2026-06-11
 
 ### 資安 — 修補 GitHub CodeQL / Dependabot 告警一輪

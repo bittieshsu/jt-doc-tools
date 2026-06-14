@@ -268,12 +268,69 @@ def _m7_audit_seed_column(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _m8_sso_sources(conn: sqlite3.Connection) -> None:
+    """v8: allow `source` = 'oidc' / 'saml' on users + groups (SSO, v1.12 起).
+
+    SQLite can't alter a column-level CHECK in place, so rebuild both tables the
+    standard way (same approach as _m2). All current columns (incl. m6 totp +
+    m7 is_audit_seed) are preserved via INSERT ... SELECT. FK enforcement is off
+    during migrations, so group_members rows survive the table swap (proven by
+    _m2, which likewise dropped+recreated `users`)."""
+    conn.executescript("""
+    CREATE TABLE users_new (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        username        TEXT NOT NULL,
+        display_name    TEXT NOT NULL DEFAULT '',
+        password_hash   TEXT,
+        source          TEXT NOT NULL DEFAULT 'local'
+                            CHECK (source IN ('local','ldap','ad','oidc','saml')),
+        external_dn     TEXT,
+        enabled         INTEGER NOT NULL DEFAULT 1,
+        is_admin_seed   INTEGER NOT NULL DEFAULT 0,
+        created_at      REAL NOT NULL,
+        last_login_at   REAL DEFAULT 0,
+        totp_secret     TEXT,
+        totp_enabled    INTEGER NOT NULL DEFAULT 0,
+        totp_required   INTEGER NOT NULL DEFAULT 0,
+        is_audit_seed   INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(username, source)
+    );
+    INSERT INTO users_new
+        (id, username, display_name, password_hash, source, external_dn,
+         enabled, is_admin_seed, created_at, last_login_at,
+         totp_secret, totp_enabled, totp_required, is_audit_seed)
+    SELECT id, username, display_name, password_hash, source, external_dn,
+           enabled, is_admin_seed, created_at, last_login_at,
+           totp_secret, totp_enabled, totp_required, is_audit_seed
+    FROM users;
+    DROP TABLE users;
+    ALTER TABLE users_new RENAME TO users;
+    CREATE INDEX idx_users_username ON users(username);
+
+    CREATE TABLE groups_new (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        name            TEXT NOT NULL,
+        source          TEXT NOT NULL DEFAULT 'local'
+                            CHECK (source IN ('local','ldap','ad','oidc','saml')),
+        external_dn     TEXT,
+        description     TEXT NOT NULL DEFAULT '',
+        created_at      REAL NOT NULL,
+        UNIQUE(source, name)
+    );
+    INSERT INTO groups_new (id, name, source, external_dn, description, created_at)
+    SELECT id, name, source, external_dn, description, created_at FROM groups;
+    DROP TABLE groups;
+    ALTER TABLE groups_new RENAME TO groups;
+    """)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
               _m5_grant_translate_doc,
               _m6_totp_columns,
-              _m7_audit_seed_column]
+              _m7_audit_seed_column,
+              _m8_sso_sources]
 
 
 def auth_db_path() -> Path:

@@ -41,6 +41,16 @@
                  border:none; border-radius:6px; font-weight:600; font-size:14px;
                  cursor:pointer; }
     .login-btn:hover { background:#1d4ed8; }
+    .login-sso-sep { display:flex; align-items:center; text-align:center;
+                     margin:16px 0 12px; color:#9ca3af; font-size:12px; }
+    .login-sso-sep::before, .login-sso-sep::after { content:""; flex:1; height:1px;
+                     background:#e5e7eb; }
+    .login-sso-sep span { padding:0 12px; }
+    .login-sso-btn { display:block; width:100%; box-sizing:border-box; padding:11px;
+                     margin-top:8px; background:#fff; color:#1f2937; text-align:center;
+                     border:1px solid #d1d5db; border-radius:6px; font-weight:600;
+                     font-size:14px; text-decoration:none; }
+    .login-sso-btn:hover { background:#f3f4f6; border-color:#9ca3af; }
     .login-foot { text-align:center; margin-top:18px; font-size:11px; color:#9ca3af; }
   </style>
 </head>
@@ -86,6 +96,13 @@
       30 天內不用再登入
     </label>
     <button class="login-btn" type="submit">登入</button>
+
+    {% if sso_buttons %}
+    <div class="login-sso-sep"><span>或</span></div>
+    {% for b in sso_buttons %}
+    <a class="login-sso-btn" href="{{ b.url }}?next={{ next|urlencode }}">{{ b.label }}</a>
+    {% endfor %}
+    {% endif %}
 
     <div class="login-foot">{{ app_name }} · v{{ version }}</div>
   </form>

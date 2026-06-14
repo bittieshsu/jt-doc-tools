@@ -116,3 +116,18 @@ sudo jtdt reset-password jtdt-admin
 - GELF (Graylog/JSON)
 
 設定在 `/admin/log-forward`，多 destination 並行，失敗 retry 3 次後寫一筆 `audit_forward_failed` 進本機 audit。
+
+## SSO 單一登入（OIDC + SAML，v1.12+）
+
+SSO 是**附加**登入方式，與本機 / LDAP / AD **並存** —— 啟用後本機 `jtdt-admin` 仍可登入，當作 IdP 故障時的 break-glass。設定在 `/admin/sso`。
+
+- **OIDC**：適用 Microsoft 365 / Entra ID、Google Workspace、Keycloak、Okta、Authentik。填 Issuer（discovery 根）、Client ID / Secret 即可；驗證走 JWKS（aud / iss / exp / nonce）。
+- **SAML 2.0**：填 IdP EntityID / SSO URL / 簽章憑證；SP metadata 可從 `<base>/auth/saml/metadata` 取得餵給 IdP。預設要求 IdP 簽署 Assertion。
+
+**首次登入自動建帳號（JIT）**：以 OIDC `sub` / SAML `NameID` 為穩定識別，預設給「一般使用者」角色；IdP 群組會同步成本站群組（`source=oidc/saml`），於 `/admin/permissions` 對應到角色，跟 AD 群組一樣。也可在 `/admin/sso` 填「管理員群組」，該群組成員自動取得 admin 角色。
+
+**反向代理注意**：`/admin/sso` 的「對外網址 base URL」務必填**對外 https 網址**（例：`https://docs.example.com`），OIDC redirect URI 與 SAML ACS 都以此為準。在 IdP 端設定：
+- OIDC Redirect URI：`https://<你的網域>/auth/oidc/callback`
+- SAML ACS：`https://<你的網域>/auth/saml/acs`
+
+**安全**：client secret / SP 私鑰以 Fernet 加密存（金鑰沿用 session secret，檔案 mode 600）；OIDC 走 state + nonce 防 CSRF / 重放；discovery / token / JWKS 端點限 http/https 並封鎖 cloud metadata 位址。

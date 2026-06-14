@@ -1,6 +1,6 @@
 [project]
 name = "jt-doc-tools"
-version = "1.11.81"
+version = "1.12.0"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
@@ -62,6 +62,13 @@ dependencies = [
     # 原本靠 python-docx transitive 帶入，直接使用須顯式宣告。
     "lxml>=4.9,<7",
     "ldap3>=2.9.1,<3",
+    # SSO（OIDC + SAML，v1.12 起）— 與本機 / LDAP / AD 並存的附加登入方式。
+    #   PyJWT：純 Python，驗 OIDC id_token 的 JWKS 簽章（RS256 需 cryptography，已是依賴）。
+    #   python3-saml (onelogin)：SAML 2.0 SP；依賴 xmlsec 做 XML 簽章驗證。
+    #   xmlsec：1.3.x 起三平台（含 Windows）都有預編 wheel，pip 直接裝免系統函式庫。
+    "PyJWT>=2.8,<3",
+    "python3-saml>=1.16,<2",
+    "xmlsec>=1.3.14,<2",
     # OCR — soft optional. Used by pdf-editor when extracting text from
     # PDFs whose Identity-H subset font has a missing/identity ToUnicode CMap
     # (PyMuPDF returns garbage like 翕⊕ㄱ instead of 登入系統). pytesseract

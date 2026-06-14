@@ -14,7 +14,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.11.81"
+VERSION = "1.12.0"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -278,6 +278,9 @@ templates.env.globals["nav_settings"] = [
     {"icon": "lock", "name": "認證設定", "description": "啟用本機 / LDAP / AD 認證",
      "url": "/admin/auth-settings",
      "keywords": "auth authentication ldap ad active directory login 認證 登入"},
+    {"icon": "lock", "name": "SSO 單一登入", "description": "OIDC / SAML 附加登入（M365 / Google / Keycloak）",
+     "url": "/admin/sso", "requires_auth": True,
+     "keywords": "sso single sign-on oidc openid connect saml oauth entra azure microsoft 365 google keycloak okta authentik federation 單一登入 聯合身分 第三方登入"},
     # `requires_auth=True` items are filtered out from the sidebar nav when
     # auth is off (see _nav_settings_visible). The endpoints still exist;
     # admin can hit them directly via URL — but in the off state they're
@@ -399,6 +402,12 @@ app.state.job_manager = job_manager
 from .web.auth_routes import build_router as _build_auth_router  # noqa: E402
 
 app.include_router(_build_auth_router(templates))
+
+# SSO login routes (OIDC + SAML) — public, additional login method alongside
+# the password backend. No-op endpoints when SSO is disabled in settings.
+from .web.sso_routes import build_router as _build_sso_router  # noqa: E402
+
+app.include_router(_build_sso_router(templates))
 
 # Platform routes
 from .web.router import build_router as _build_web_router  # noqa: E402
@@ -531,7 +540,8 @@ from urllib.parse import quote as _qstr  # noqa: E402
 
 _PUBLIC_PREFIXES = ("/static/", "/login", "/logout", "/setup-admin",
                     "/healthz", "/favicon", "/api/", "/branding/",
-                    "/2fa-verify")  # 2FA 驗證頁不需要 session（pending 階段）
+                    "/2fa-verify",  # 2FA 驗證頁不需要 session（pending 階段）
+                    "/auth/oidc/", "/auth/saml/")  # SSO 登入 / 回呼端點（尚未有 session）
 _PUBLIC_EXACT = {"/login", "/logout", "/setup-admin", "/healthz", "/favicon.ico",
                  "/2fa-verify"}
 

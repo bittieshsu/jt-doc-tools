@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}SSO 單一登入 · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ icon('lock', size=22) }} SSO 單一登入（OIDC / SAML）</h1>
+
+<div class="panel" style="border-left:4px solid #3b82f6;">
+  <p style="margin:0;">SSO 是<b>附加</b>登入方式，與本機 / LDAP / AD 並存 —— 啟用後本機 <code>jtdt-admin</code> 仍可登入當作 break-glass。首次以 SSO 登入會自動建立帳號（預設「一般使用者」角色）；IdP 群組會同步成本站群組，可在「權限矩陣」對應到角色。</p>
+  {% if not auth_enabled %}
+  <p style="color:#b45309; margin:10px 0 0;">{{ icon('warn', size=14) }} 目前<b>未啟用認證</b>。請先到「認證設定」啟用並建立管理員，才能開啟 SSO。</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0;">共用設定</h2>
+  <label>對外網址 base URL（reverse proxy 的公開網址，OIDC redirect / SAML ACS 都以此為準）</label>
+  <input id="base_url" type="url" placeholder="https://docs.example.com" value="{{ sso.base_url }}" style="width:100%;" />
+  <p class="muted" style="font-size:12px;">留空則依進來的請求推導（直連 / 開發用）。有反向代理時<b>務必</b>填對外 https 網址。</p>
+  <div id="urlHints" class="muted" style="font-size:12px; margin-top:8px;"></div>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0;">OIDC（OpenID Connect）</h2>
+  <p class="muted" style="font-size:12px;">適用 Microsoft 365 / Entra ID、Google、Keycloak、Okta、Authentik 等。在 IdP 設定 Redirect URI 為 <code id="oidcRedirect">（先填 base URL）</code>。</p>
+  <label><input type="checkbox" id="o_enabled" {% if sso.oidc.enabled %}checked{% endif %}/> 啟用 OIDC 登入</label>
+  <div class="grid2">
+    <div><label>登入鈕文字</label><input id="o_display_name" value="{{ sso.oidc.display_name }}" placeholder="以 Microsoft 登入"/></div>
+    <div><label>Issuer（discovery 根）</label><input id="o_issuer" value="{{ sso.oidc.issuer }}" placeholder="https://login.microsoftonline.com/&lt;tenant&gt;/v2.0"/></div>
+    <div><label>Client ID</label><input id="o_client_id" value="{{ sso.oidc.client_id }}"/></div>
+    <div><label>Client Secret</label><input id="o_client_secret" type="password" value="{{ sso.oidc.client_secret_enc }}" placeholder="（保留現有請勿更動）"/></div>
+    <div><label>Scopes</label><input id="o_scopes" value="{{ sso.oidc.scopes }}"/></div>
+    <div><label>使用者名稱 claim</label><input id="o_username_claim" value="{{ sso.oidc.username_claim }}"/></div>
+    <div><label>Email claim</label><input id="o_email_claim" value="{{ sso.oidc.email_claim }}"/></div>
+    <div><label>顯示名稱 claim</label><input id="o_name_claim" value="{{ sso.oidc.name_claim }}"/></div>
+    <div><label>群組 claim</label><input id="o_groups_claim" value="{{ sso.oidc.groups_claim }}"/></div>
+    <div><label>管理員群組（選填，此群組成員自動為 admin）</label><input id="o_admin_group" value="{{ sso.oidc.admin_group }}"/></div>
+  </div>
+  <p><button class="btn" id="testOidc">測試 OIDC discovery</button> <span id="oidcResult" class="muted"></span></p>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0;">SAML 2.0</h2>
+  <p class="muted" style="font-size:12px;">SP metadata 網址：<code id="samlMeta">（先填 base URL）</code>；ACS（Assertion Consumer Service）：<code id="samlAcs">（先填 base URL）</code>。</p>
+  <label><input type="checkbox" id="s_enabled" {% if sso.saml.enabled %}checked{% endif %}/> 啟用 SAML 登入</label>
+  <div class="grid2">
+    <div><label>登入鈕文字</label><input id="s_display_name" value="{{ sso.saml.display_name }}"/></div>
+    <div><label>IdP EntityID</label><input id="s_idp_entity_id" value="{{ sso.saml.idp_entity_id }}"/></div>
+    <div><label>IdP SSO URL（HTTP-Redirect）</label><input id="s_idp_sso_url" value="{{ sso.saml.idp_sso_url }}"/></div>
+    <div><label>SP EntityID（留空 = metadata 網址）</label><input id="s_sp_entity_id" value="{{ sso.saml.sp_entity_id }}"/></div>
+    <div><label>使用者名稱屬性（留空用 NameID）</label><input id="s_username_attr" value="{{ sso.saml.username_attr }}"/></div>
+    <div><label>Email 屬性</label><input id="s_email_attr" value="{{ sso.saml.email_attr }}"/></div>
+    <div><label>顯示名稱屬性</label><input id="s_name_attr" value="{{ sso.saml.name_attr }}"/></div>
+    <div><label>群組屬性</label><input id="s_groups_attr" value="{{ sso.saml.groups_attr }}"/></div>
+    <div><label>管理員群組（選填）</label><input id="s_admin_group" value="{{ sso.saml.admin_group }}"/></div>
+  </div>
+  <label>IdP 簽章憑證 X.509（PEM 內容，不含 BEGIN/END 行）</label>
+  <textarea id="s_idp_x509cert" rows="4" style="width:100%; font-family:monospace; font-size:11px;">{{ sso.saml.idp_x509cert }}</textarea>
+  <label style="display:block; margin-top:8px;"><input type="checkbox" id="s_want_assertions_signed" {% if sso.saml.want_assertions_signed %}checked{% endif %}/> 要求 IdP 簽署 Assertion（建議開啟）</label>
+  <p><button class="btn" id="testSaml">驗證 SAML SP metadata</button> <span id="samlResult" class="muted"></span></p>
+</div>
+
+<div class="panel">
+  <button class="btn btn-primary btn-lg" id="saveBtn">{{ icon('check', size=14) }} 儲存 SSO 設定</button>
+  <span id="saveResult" class="muted" style="margin-left:10px;"></span>
+</div>
+
+<style>
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; margin:10px 0; }
+.grid2 input { width:100%; box-sizing:border-box; }
+.grid2 label, .panel > label { font-size:12px; font-weight:600; color:#374151; }
+</style>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  function refreshHints(){
+    const b = ($('base_url').value || '').trim().replace(/\/+$/, '');
+    const show = b || '（先填上方 base URL，或會依請求推導）';
+    $('oidcRedirect').textContent = b ? (b + '/auth/oidc/callback') : show;
+    $('samlMeta').textContent = b ? (b + '/auth/saml/metadata') : show;
+    $('samlAcs').textContent = b ? (b + '/auth/saml/acs') : show;
+  }
+  $('base_url').addEventListener('input', refreshHints);
+  refreshHints();
+
+  function collect(){
+    const SECRET_KEPT = '__JTDT_SECRET_KEPT__';
+    const oSecret = $('o_client_secret').value;
+    const sKey = '';  // SP private key 進階用途，UI 暫不提供輸入
+    return {
+      base_url: $('base_url').value,
+      oidc: {
+        enabled: $('o_enabled').checked,
+        display_name: $('o_display_name').value,
+        issuer: $('o_issuer').value,
+        client_id: $('o_client_id').value,
+        client_secret_enc: (oSecret === SECRET_KEPT || oSecret === '') ? SECRET_KEPT : oSecret,
+        scopes: $('o_scopes').value,
+        username_claim: $('o_username_claim').value,
+        email_claim: $('o_email_claim').value,
+        name_claim: $('o_name_claim').value,
+        groups_claim: $('o_groups_claim').value,
+        admin_group: $('o_admin_group').value,
+      },
+      saml: {
+        enabled: $('s_enabled').checked,
+        display_name: $('s_display_name').value,
+        idp_entity_id: $('s_idp_entity_id').value,
+        idp_sso_url: $('s_idp_sso_url').value,
+        idp_x509cert: $('s_idp_x509cert').value,
+        sp_entity_id: $('s_sp_entity_id').value,
+        want_assertions_signed: $('s_want_assertions_signed').checked,
+        username_attr: $('s_username_attr').value,
+        email_attr: $('s_email_attr').value,
+        name_attr: $('s_name_attr').value,
+        groups_attr: $('s_groups_attr').value,
+        admin_group: $('s_admin_group').value,
+      },
+    };
+  }
+
+  async function postJson(url, body){
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+                               body: JSON.stringify(body)});
+    return r;
+  }
+
+  $('saveBtn').addEventListener('click', async () => {
+    const btn = $('saveBtn'); btn.disabled = true;
+    $('saveResult').textContent = '儲存中…';
+    try {
+      const r = await postJson('/admin/sso/save', collect());
+      if (!r.ok) { $('saveResult').textContent = '✗ ' + await window.friendlyServerError(r, '儲存失敗'); }
+      else { $('saveResult').textContent = '✓ 已儲存'; }
+    } catch(e){ $('saveResult').textContent = '✗ ' + e; }
+    finally { btn.disabled = false; }
+  });
+
+  async function runTest(provider, resultEl){
+    resultEl.textContent = '測試中…';
+    try {
+      // Save first so the test runs against the latest values.
+      await postJson('/admin/sso/save', collect());
+      const r = await postJson('/admin/sso/test', {provider});
+      const j = await r.json();
+      const res = (j.result || {})[provider] || {};
+      resultEl.textContent = res.ok ? '✓ 通過' : ('✗ ' + (res.error || '失敗'));
+    } catch(e){ resultEl.textContent = '✗ ' + e; }
+  }
+  $('testOidc').addEventListener('click', () => runTest('oidc', $('oidcResult')));
+  $('testSaml').addEventListener('click', () => runTest('saml', $('samlResult')));
+})();
+</script>
+{% endblock %}
