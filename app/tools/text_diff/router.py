@@ -20,7 +20,7 @@ _MAX_BYTES = 1_048_576  # 1 MiB per side
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("text_diff.html", {"request": request})
+    return templates.TemplateResponse(request, "text_diff.html", {"request": request})
 
 
 def _split_lines(s: str) -> list[str]:

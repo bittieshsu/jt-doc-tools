@@ -19,7 +19,7 @@ router = APIRouter()
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_extract_images.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_extract_images.html", {"request": request})
 
 
 # ---------- input PDF preview (page thumbs after upload) ----------

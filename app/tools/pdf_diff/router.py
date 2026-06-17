@@ -27,7 +27,7 @@ router = APIRouter()
 async def index(request: Request):
     templates = request.app.state.templates
     from ...core.llm_settings import llm_settings
-    return templates.TemplateResponse("pdf_diff.html", {
+    return templates.TemplateResponse(request, "pdf_diff.html", {
         "request": request,
         "llm_enabled": llm_settings.is_enabled(),
         "llm_model": llm_settings.get_model_for("doc-diff") if llm_settings.is_enabled() else "",

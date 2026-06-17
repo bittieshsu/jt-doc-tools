@@ -390,7 +390,7 @@ def _preset_params(preset: str) -> dict:
 async def index(request: Request):
     gs_path = _find_ghostscript()
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(request, 
         "pdf_compress.html",
         {"request": request, "gs_available": bool(gs_path)},
     )

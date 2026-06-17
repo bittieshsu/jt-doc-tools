@@ -313,7 +313,7 @@ def _apply_pipeline(lines: list[str], ops: list[dict]) -> tuple[list[str], list[
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("text_list.html", {"request": request})
+    return templates.TemplateResponse(request, "text_list.html", {"request": request})
 
 
 @router.post("/process")

@@ -84,7 +84,7 @@ def _validate_fid(fid: str) -> str:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("image_to_pdf.html", {"request": request})
+    return templates.TemplateResponse(request, "image_to_pdf.html", {"request": request})
 
 
 @router.post("/upload")

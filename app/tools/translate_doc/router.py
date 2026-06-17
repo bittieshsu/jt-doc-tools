@@ -497,7 +497,7 @@ async def index(request: Request):
     templates = request.app.state.templates
     s = llm_settings.get()
     from ...core.office_convert import detect_engine
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(request, 
         "translate_doc.html",
         {
             "request": request,

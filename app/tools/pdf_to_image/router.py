@@ -26,7 +26,7 @@ def _work_dir() -> Path:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_to_image.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_to_image.html", {"request": request})
 
 
 @router.post("/convert")

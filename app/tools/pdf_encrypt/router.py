@@ -39,7 +39,7 @@ ALGO_MAP = {
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_encrypt.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_encrypt.html", {"request": request})
 
 
 @router.post("/submit")

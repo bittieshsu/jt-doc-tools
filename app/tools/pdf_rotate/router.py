@@ -38,7 +38,7 @@ def _parse_pages(text: str, n: int) -> set[int]:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_rotate.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_rotate.html", {"request": request})
 
 
 @router.post("/load")

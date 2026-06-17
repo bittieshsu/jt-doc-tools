@@ -146,7 +146,7 @@ def _orig_name(uid: str) -> str:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(request, 
         "pdf_to_office.html",
         {"request": request},
     )

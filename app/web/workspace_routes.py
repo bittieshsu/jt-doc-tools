@@ -52,7 +52,7 @@ def build_router(templates) -> APIRouter:
     @router.get("/workspace", response_class=HTMLResponse)
     async def workspace_page(request: Request):
         _require_enabled()
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "my_workspace.html", {"request": request})
 
     @router.get("/workspace/api/list")

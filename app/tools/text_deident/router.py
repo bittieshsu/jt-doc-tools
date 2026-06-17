@@ -379,7 +379,7 @@ async def index(request: Request):
         })
     from ...core.office_convert import detect_engine
     from ...core.llm_settings import llm_settings
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(request, 
         "text_deident.html",
         {
             "request": request,

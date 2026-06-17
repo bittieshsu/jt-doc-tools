@@ -149,7 +149,7 @@ def build_router(templates) -> APIRouter:
             if cur:
                 return RedirectResponse(safe_next(next), status_code=302)
         from ..core import sso_settings as _sso
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "login.html",
             {"request": request, "error": error, "next": safe_next(next),
              "realms": _auth.available_realms(),
@@ -176,7 +176,7 @@ def build_router(templates) -> APIRouter:
         except (_auth.AuthError, auth_local.AuthError) as e:
             # Re-render login form with error. Status 200 (form-style) — we
             # don't want POST→302→GET to lose the password field's flash.
-            return templates.TemplateResponse(
+            return templates.TemplateResponse(request, 
                 "login.html",
                 {"request": request,
                  "error": str(e),
@@ -347,7 +347,7 @@ def build_router(templates) -> APIRouter:
                 secret, urow["username"], branding.get_site_name(default="jt-doc-tools"),
             )
             qr_url = _totp.qr_png_data_url(uri)
-        return templates.TemplateResponse("twofa_verify.html", {
+        return templates.TemplateResponse(request, "twofa_verify.html", {
             "request": request,
             "username": urow["username"],
             "display_name": urow["display_name"] or urow["username"],
@@ -379,7 +379,7 @@ def build_router(templates) -> APIRouter:
                 _drop_pending_2fa(ptoken)
                 return RedirectResponse(
                     "/login?error=2FA+failed+too+many+times", status_code=302)
-            return templates.TemplateResponse("twofa_verify.html", {
+            return templates.TemplateResponse(request, "twofa_verify.html", {
                 "request": request, "error": "驗證碼錯誤，請再試一次",
                 "fails": entry["fails"],
                 "is_setup": False,  # 失敗時不重新顯示 QR（避免 secret 反覆暴露）
@@ -421,7 +421,7 @@ def build_router(templates) -> APIRouter:
         uid = user["user_id"]
         st = _totp.get_user_totp_state(uid)
         forced = st["required"] or _perm.is_auditor(uid)
-        return templates.TemplateResponse("me_2fa.html", {
+        return templates.TemplateResponse(request, "me_2fa.html", {
             "request": request,
             "username": user["username"],
             "enabled": st["enabled"],
@@ -545,7 +545,7 @@ def build_router(templates) -> APIRouter:
         # 報「已存在使用者，無法初始化（資料庫狀態異常）」這個誤導訊息），
         # 改提供「沿用既有 admin 直接啟用」的選項。詳見 v1.4.2 修法。
         existing = auth_settings.list_existing_users()
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "setup_admin.html",
             {"request": request, "error": error,
              "existing_users": existing,
@@ -573,7 +573,7 @@ def build_router(templates) -> APIRouter:
             )
         except auth_settings.BootstrapError as e:
             existing = auth_settings.list_existing_users()
-            return templates.TemplateResponse(
+            return templates.TemplateResponse(request, 
                 "setup_admin.html",
                 {"request": request, "error": str(e),
                  "username": (username or "")[:64],
@@ -604,7 +604,7 @@ def build_router(templates) -> APIRouter:
             n = auth_settings.reenable_local_with_existing(actor_ip=ip)
         except auth_settings.BootstrapError as e:
             existing = auth_settings.list_existing_users()
-            return templates.TemplateResponse(
+            return templates.TemplateResponse(request, 
                 "setup_admin.html",
                 {"request": request, "error": str(e),
                  "existing_users": existing,

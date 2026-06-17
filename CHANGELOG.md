@@ -4,6 +4,19 @@
 
 ---
 
+## [1.12.7] - 2026-06-17
+
+### 資安 — Starlette 0.52 → 1.3.1 升級（清掉一整批 Dependabot 告警，含 2 個 High，第二輪）
+
+- **Starlette 升到 1.3.1**，一次修掉這些 advisory：
+  - **Windows StaticFiles 經 UNC 路徑 SSRF + NTLM 憑證竊取（High）** —— 直接影響 Windows 部署（我們有掛 StaticFiles 且支援 Windows）。
+  - **`request.form()` 限制被忽略導致 DoS（High）**。
+  - Host header 污染 `request.url.path` 繞過路徑檢查（BADHOST，Moderate；本站早於 v1.11.81 已從程式面用 scope path 擋掉實際繞過，這次連同源頭一起修）。
+  - `getattr` 任意 HTTP method 分派到 `HTTPEndpoint` 屬性（Moderate）、`request.url.hostname` 污染（Low）。
+- **遷移**：Starlette 1.x 把 `TemplateResponse` 改為 `TemplateResponse(request, name, context)` 強制簽名 —— 全站 **81 處呼叫**（45 個檔）一次遷移到新簽名（新簽名在 0.52 與 1.x 都相容，故可先遷移再升版，零風險過渡）。fastapi 0.136 與 starlette 1.3.1 相容。
+- 全套 **906 passed**（先在 0.52 驗遷移、再在 1.3.1 驗升級皆綠）。三平台部署驗證。
+- 至此 Dependabot 僅剩 torch `jit.script`（Low，未使用該函式，監控）。CodeQL 待處理的 #108/#109/#92/#111/#112/#113 屬 admin-only / legacy 相容 / SSO 既定機制，建議於 GitHub dismiss（理由見 1.12.6 條目）。
+
 ## [1.12.6] - 2026-06-16
 
 ### 資安 — 相依套件 High CVE 升級 + SSO 程式 CodeQL 修補（第一輪）

@@ -21,7 +21,7 @@ router = APIRouter()
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("aes_zip.html", {"request": request})
+    return templates.TemplateResponse(request, "aes_zip.html", {"request": request})
 
 
 @router.post("/submit")

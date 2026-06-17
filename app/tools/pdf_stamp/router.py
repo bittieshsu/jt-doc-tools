@@ -335,7 +335,7 @@ async def index(request: Request):
         or asset_manager.get_default("logo")
     )
     stamps_dict = [a.to_dict() for a in items]
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(request, 
         "pdf_stamp.html",
         {
             "request": request,

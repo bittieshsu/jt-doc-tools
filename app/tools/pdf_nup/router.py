@@ -329,7 +329,7 @@ def impose(upload_id: str, opts: NupOptions, *, preview_only: bool = False) -> P
 async def index(request: Request):
     templates = request.app.state.templates
     paper_opts = [{"key": k, "label": k.upper()} for k in PAPER_SIZES_MM.keys()]
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(request, 
         "pdf_nup.html", {"request": request, "paper_opts": paper_opts},
     )
 

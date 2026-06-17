@@ -44,7 +44,7 @@ def _safe_stem(filename: str) -> str:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_to_markdown.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_to_markdown.html", {"request": request})
 
 
 _CN_DIGIT = {"零": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5,

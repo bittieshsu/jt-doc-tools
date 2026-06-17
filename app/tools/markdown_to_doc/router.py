@@ -97,7 +97,7 @@ def _render_pdf_previews(pdf_path: Path, out_dir: Path) -> list[Path]:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("markdown_to_doc.html", {
+    return templates.TemplateResponse(request, "markdown_to_doc.html", {
         "request": request,
         "themes": themes.theme_options(),
         "fonts": themes.font_options(),

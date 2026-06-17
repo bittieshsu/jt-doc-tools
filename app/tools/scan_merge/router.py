@@ -111,7 +111,7 @@ def _store_crop(cid: str, page_img: Image.Image, region, request: Request) -> di
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("scan_merge.html", {"request": request})
+    return templates.TemplateResponse(request, "scan_merge.html", {"request": request})
 
 
 @router.post("/upload")

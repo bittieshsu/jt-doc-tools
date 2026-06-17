@@ -103,7 +103,7 @@ async def index(request: Request):
     templates = request.app.state.templates
     items = _eligible_assets()
     default = asset_manager.get_default("watermark") or (items[0] if items else None)
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(request, 
         "pdf_watermark.html",
         {
             "request": request,

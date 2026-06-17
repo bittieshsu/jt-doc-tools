@@ -161,7 +161,7 @@ async def index(request: Request):
         {"title": g, "entries": items} for g, items in grouped.items() if g not in preferred
     ]
     from ...core.llm_settings import llm_settings
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(request, 
         "doc_deident.html",
         {"request": request, "pattern_groups": pattern_groups,
          "llm_enabled": llm_settings.is_enabled(),

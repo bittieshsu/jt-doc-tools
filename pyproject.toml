@@ -1,26 +1,27 @@
 [project]
 name = "jt-doc-tools"
-version = "1.12.6"
+version = "1.12.7"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
 readme = "README.md"
 license = "Apache-2.0"
 
-# 鎖定版本以避免 uv sync 抓到不相容的最新版（例如 starlette 1.0
-# 改了 TemplateResponse 簽名）。要升版請先在 dev 端驗證再放寬。
+# 升 starlette 1.x 前已把全站 81 處 TemplateResponse 改成新簽名
+# (TemplateResponse(request, name, ctx))，0.52 與 1.x 都相容。要再升大版請先在
+# dev 端跑完整 pytest 驗證再放寬。
 dependencies = [
-    # fastapi 0.124+ 才放寬 starlette 至 0.49+,我們需要 starlette>=0.49.3
-    # 修 Range DoS,所以 fastapi 也要一併往上推
     "fastapi>=0.124.0,<0.140",
     "uvicorn[standard]>=0.32.0,<0.40",
-    # CVE 補丁底線（v1.5.4 加嚴）：
-    # - starlette>=0.49.3：Range header O(n²) DoS in FileResponse
-    # - python-multipart>=0.0.18：arbitrary file write + DoS
+    # CVE 補丁底線：
+    # - starlette>=1.3.1（v1.12.7 升）：修 Windows StaticFiles UNC SSRF/NTLM 竊取
+    #   (High) + request.form() limit DoS (High) + Host header url.path 污染 BADHOST
+    #   + getattr method dispatch + url.hostname 污染。1.x 改 TemplateResponse 簽名，
+    #   已全站遷移。0.x 早期的 Range header O(n²) DoS 一併涵蓋。
     # - jinja2>=3.1.6：3 個 sandbox breakout (filename / format / attr filter)
     # - Pillow>=12.2.0：FITS GZIP bomb / PSD OOB / PSD Tile Integer Overflow /
     #   PDF Trailer InfLoop / Font Integer Overflow / Nested coords heap overflow
-    "starlette>=0.49.3,<0.53",
+    "starlette>=1.3.1,<2",
     # python-multipart>=0.0.32：querystring quadratic DoS (High) + semicolon
     # 分隔符 / Content-Disposition RFC2231 走私 / 負 Content-Length buffer 修補
     "python-multipart>=0.0.32,<0.1",

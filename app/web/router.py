@@ -49,7 +49,7 @@ def build_router(templates, tools, app_name: str, version: str) -> APIRouter:
             {"title": title, "tools": items}
             for title, items in groups_by_title.items()
         ]
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "home.html",
             {
                 "request": request,

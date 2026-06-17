@@ -35,7 +35,7 @@ def build_router(templates) -> APIRouter:
     @router.get("/assets", response_class=HTMLResponse)
     async def assets_page(request: Request, type: Optional[str] = None):
         items = asset_manager.list(type=type) if type else asset_manager.list()
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "asset_list.html",
             {"request": request, "assets": items, "type_filter": type},
         )
@@ -262,7 +262,7 @@ def build_router(templates) -> APIRouter:
                         asset = fixed
         except Exception:
             pass
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "asset_edit.html",
             {"request": request, "asset": asset, "preset": asset.preset},
         )
@@ -406,7 +406,7 @@ def build_router(templates) -> APIRouter:
         edit_id = cid or profile_manager.active_id()
         profile = profile_manager.get(edit_id)
         sections = profile_manager.get_sections_for_edit(edit_id)
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "profile_edit.html",
             {
                 "request": request,
@@ -516,7 +516,7 @@ def build_router(templates) -> APIRouter:
         for k, v in syns.items():
             if k not in profile_keys:
                 rows.append({"key": k, "synonyms": v})
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "synonyms_edit.html",
             {"request": request, "rows": rows},
         )
@@ -620,7 +620,7 @@ def build_router(templates) -> APIRouter:
     @router.get("/templates", response_class=HTMLResponse)
     async def templates_page(request: Request):
         items = template_manager.list_all()
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "templates_list.html",
             {"request": request, "templates": items},
         )
@@ -655,7 +655,7 @@ def build_router(templates) -> APIRouter:
                 if p["path"] == active:
                     active_version = p.get("version", "")
                     break
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "conversion_edit.html",
             {
                 "request": request,
@@ -682,7 +682,7 @@ def build_router(templates) -> APIRouter:
     @router.get("/llm-settings", response_class=HTMLResponse)
     async def llm_settings_page(request: Request):
         from ..core.llm_settings import llm_settings, DEFAULT_SETTINGS, LLMSettingsManager
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "llm_settings.html",
             {
                 "request": request,
@@ -823,7 +823,7 @@ def build_router(templates) -> APIRouter:
                 ordered.append({"key": key, "title": titles[key], "fonts": groups[key]})
         visible_count = sum(1 for f in fonts if not f.get("hidden"))
         hidden_count = sum(1 for f in fonts if f.get("hidden"))
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "fonts.html",
             {
                 "request": request,
@@ -950,7 +950,7 @@ def build_router(templates) -> APIRouter:
     @router.get("/api-tokens", response_class=HTMLResponse)
     async def api_tokens_page(request: Request):
         from ..core.api_tokens import api_tokens
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "api_tokens.html",
             {
                 "request": request,
@@ -988,7 +988,7 @@ def build_router(templates) -> APIRouter:
         # 不在這裡 collect — 改由前端載完頁面後 fetch /admin/api/sys-deps，避免
         # 探測 binaries / 跑 subprocess 阻塞首屏（之前進頁要等 ~1-2 秒）。
         from ..main import VERSION as _app_version
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "sys_deps.html",
             {
                 "request": request,
@@ -1089,7 +1089,7 @@ def build_router(templates) -> APIRouter:
     @router.get("/branding", response_class=HTMLResponse)
     async def branding_page(request: Request):
         from ..core import branding
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "admin_branding.html",
             {
                 "request": request,
@@ -1150,7 +1150,7 @@ def build_router(templates) -> APIRouter:
     @router.get("/settings-export", response_class=HTMLResponse)
     async def settings_export_page(request: Request):
         from ..core import settings_export
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "admin_settings_export.html",
             {
                 "request": request,
@@ -1239,7 +1239,7 @@ def build_router(templates) -> APIRouter:
         )
         catalog_codes = {c["code"] for c in catalog}
         extra_installed = sorted([c for c in _tm.get_installed_langs() if c not in catalog_codes])
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "admin_ocr_langs.html",
             {
                 "request": request,
@@ -1464,7 +1464,7 @@ def build_router(templates) -> APIRouter:
     @router.get("/vat-db", response_class=HTMLResponse)
     async def vat_db_page(request: Request):
         from ..core import vat_db as _vatdb
-        return templates.TemplateResponse("vat_db.html", {
+        return templates.TemplateResponse(request, "vat_db.html", {
             "request": request,
             "meta": _vatdb.get_meta(),
             "sources": _vatdb.SOURCE_URLS,

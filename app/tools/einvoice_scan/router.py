@@ -50,7 +50,7 @@ async def index(request: Request):
         llm_enabled = bool(_ls.llm_settings.is_enabled())
     except Exception:
         pass
-    return templates.TemplateResponse("einvoice_scan.html", {
+    return templates.TemplateResponse(request, "einvoice_scan.html", {
         "request": request,
         "qr_backend_available": qr_decoder.is_qr_backend_available(),
         "llm_enabled": llm_enabled,

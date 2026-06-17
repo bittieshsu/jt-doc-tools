@@ -76,7 +76,7 @@ async def page(request: Request) -> HTMLResponse:
             llm_vision_ok = bool(llm_vision_model)
     except Exception:
         pass
-    return templates.TemplateResponse("pdf_ocr.html", {
+    return templates.TemplateResponse(request, "pdf_ocr.html", {
         "request": request,
         "title": "PDF 文字層補建",
         "tesseract_ok": tess_ok,

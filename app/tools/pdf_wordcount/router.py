@@ -262,7 +262,7 @@ def _analyze_pdf(data: bytes, filename: str = "document.pdf") -> dict:
 async def index(request: Request):
     templates = request.app.state.templates
     from ...core.llm_settings import llm_settings
-    return templates.TemplateResponse("pdf_wordcount.html", {
+    return templates.TemplateResponse(request, "pdf_wordcount.html", {
         "request": request,
         "llm_enabled": llm_settings.is_enabled(),
         "llm_model": llm_settings.get_model_for("pdf-wordcount") if llm_settings.is_enabled() else "",

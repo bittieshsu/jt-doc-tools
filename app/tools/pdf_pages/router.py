@@ -55,7 +55,7 @@ def _parse_drop(text: str, n: int) -> set[int]:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_pages.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_pages.html", {"request": request})
 
 
 @router.post("/load")

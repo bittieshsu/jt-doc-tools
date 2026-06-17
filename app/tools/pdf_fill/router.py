@@ -61,7 +61,7 @@ async def index(request: Request, cid: Optional[str] = None):
         llm_enabled = llm_settings.is_enabled()
     except Exception:  # noqa: BLE001
         pass
-    return templates.TemplateResponse(
+    return templates.TemplateResponse(request, 
         "pdf_fill.html",
         {
             "request": request,

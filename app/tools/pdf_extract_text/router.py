@@ -25,7 +25,7 @@ router = APIRouter()
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_extract_text.html", {
+    return templates.TemplateResponse(request, "pdf_extract_text.html", {
         "request": request,
         # 只有在 admin 那邊勾「啟用 LLM」才顯示 LLM 重排功能；沒啟用的話
         # 整段 hint + 按鈕都不該出現，避免使用者點了發現要先去設定。

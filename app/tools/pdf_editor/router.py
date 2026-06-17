@@ -1155,7 +1155,7 @@ def _sample_path(path_str: str, ox: float, oy: float,
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_editor.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_editor.html", {"request": request})
 
 
 @router.post("/load")

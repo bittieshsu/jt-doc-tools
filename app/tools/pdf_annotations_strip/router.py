@@ -64,7 +64,7 @@ def _english_for(zh_label: str) -> str:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_annotations_strip.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_annotations_strip.html", {"request": request})
 
 
 @router.post("/analyze")

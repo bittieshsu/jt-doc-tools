@@ -148,7 +148,7 @@ def _scan(doc: "fitz.Document") -> dict:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_hidden_scan.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_hidden_scan.html", {"request": request})
 
 
 @router.post("/scan")

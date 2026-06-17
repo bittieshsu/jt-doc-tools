@@ -18,7 +18,7 @@ ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.csv,.txt"
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("office_to_pdf.html", {"request": request, "accept": ACCEPT})
+    return templates.TemplateResponse(request, "office_to_pdf.html", {"request": request, "accept": ACCEPT})
 
 
 @router.post("/submit")

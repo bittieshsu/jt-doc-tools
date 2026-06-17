@@ -58,7 +58,7 @@ router = APIRouter()
 async def page_root(request: Request) -> HTMLResponse:
     """上傳頁 — 拖檔 + ground truth 引導。"""
     templates = request.app.state.templates
-    return templates.TemplateResponse("sc_upload.html",
+    return templates.TemplateResponse(request, "sc_upload.html",
                                        {"request": request, "title": "送件前檢核"})
 
 
@@ -87,7 +87,7 @@ async def page_case_list(request: Request, q: str = "", status: str = "") -> HTM
         cases = [c for c in cases if _matches(c)]
     if status:
         cases = [c for c in cases if c.get("status") == status]
-    return templates.TemplateResponse("sc_case_list.html",
+    return templates.TemplateResponse(request, "sc_case_list.html",
                                        {"request": request, "title": "案件清單",
                                         "cases": cases, "q": q, "status_filter": status})
 
@@ -99,7 +99,7 @@ async def page_self_entities(request: Request) -> HTMLResponse:
     user = getattr(request.state, "user", None) if hasattr(request, "state") else None
     user_key = _self_ents._user_key(user)
     entities = _self_ents.load_entities(user_key)
-    return templates.TemplateResponse("sc_self_entities.html",
+    return templates.TemplateResponse(request, "sc_self_entities.html",
                                        {"request": request, "title": "我方資料管理",
                                         "entities": entities})
 
@@ -173,7 +173,7 @@ async def page_admin_stats(request: Request, days: int = 30) -> HTMLResponse:
     from . import stats as _stats
     s = _stats.gather_stats(days=max(1, min(days, 365)))
     templates = request.app.state.templates
-    return templates.TemplateResponse("sc_admin_stats.html",
+    return templates.TemplateResponse(request, "sc_admin_stats.html",
                                        {"request": request, "title": "送件檢核儀表板",
                                         "stats": s, "days": days})
 
@@ -215,7 +215,7 @@ async def page_case_detail(case_id: str, request: Request) -> HTMLResponse:
     for v in case.get("versions", []):
         rep = _cm.load_version_report(case_id, v)
         versions_with_reports.append({"version": v, "report": rep})
-    return templates.TemplateResponse("sc_case_detail.html",
+    return templates.TemplateResponse(request, "sc_case_detail.html",
                                        {"request": request,
                                         "title": f"案件 {case_id[:8]}",
                                         "case": case,

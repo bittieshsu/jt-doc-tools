@@ -26,7 +26,7 @@ _BATCH_MAX = 200
 async def index(request: Request):
     templates = request.app.state.templates
     meta = vat_db.get_meta()
-    return templates.TemplateResponse("vat_lookup.html", {
+    return templates.TemplateResponse(request, "vat_lookup.html", {
         "request": request,
         "meta": meta,
         "categories": vat_db.get_category_stats(),

@@ -254,7 +254,7 @@ def _load_cached(upload_id: str) -> dict[str, Any]:
 async def index(request: Request):
     templates = request.app.state.templates
     from ...core.llm_settings import llm_settings
-    return templates.TemplateResponse("pdf_annotations.html", {
+    return templates.TemplateResponse(request, "pdf_annotations.html", {
         "request": request,
         "llm_enabled": llm_settings.is_enabled(),
         "llm_model": llm_settings.get_model_for("pdf-annotations") if llm_settings.is_enabled() else "",

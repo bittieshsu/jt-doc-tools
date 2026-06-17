@@ -44,7 +44,7 @@ def build_auth_router(templates) -> APIRouter:
     @router.get("/sso", response_class=HTMLResponse)
     async def sso_page(request: Request):
         from ..core import sso_provision  # noqa: F401 (ensure importable)
-        return templates.TemplateResponse("admin_sso.html", {
+        return templates.TemplateResponse(request, "admin_sso.html", {
             "request": request,
             "sso": sso_settings.get(),          # secrets masked
             "auth_enabled": auth_settings.is_enabled(),
@@ -134,7 +134,7 @@ def build_auth_router(templates) -> APIRouter:
     @router.get("/auth-settings", response_class=HTMLResponse)
     async def auth_settings_page(request: Request):
         s = auth_settings.get()
-        return templates.TemplateResponse("admin_auth_settings.html", {
+        return templates.TemplateResponse(request, "admin_auth_settings.html", {
             "request": request,
             "settings": s,
             "is_enabled": auth_settings.is_enabled(),
@@ -304,7 +304,7 @@ def build_auth_router(templates) -> APIRouter:
                      or locked_by_username.get(u["username"]) or 0)
             u["locked"] = bool(until and until > now)
             u["locked_until"] = until or None
-        return templates.TemplateResponse("admin_users.html", {
+        return templates.TemplateResponse(request, "admin_users.html", {
             "request": request,
             "users": users,
             "all_roles": all_roles,
@@ -447,7 +447,7 @@ def build_auth_router(templates) -> APIRouter:
         groups = group_manager.list_groups()
         all_users = user_manager.list_users()
         all_roles = roles.list_roles()
-        return templates.TemplateResponse("admin_groups.html", {
+        return templates.TemplateResponse(request, "admin_groups.html", {
             "request": request,
             "groups": groups,
             "all_users": all_users,
@@ -509,7 +509,7 @@ def build_auth_router(templates) -> APIRouter:
         all_roles = roles.list_roles()
         # tool registry: id + display name
         tools_meta = [{"id": tid, "name": _tool_name(tid)} for tid in _all_tool_ids()]
-        return templates.TemplateResponse("admin_roles.html", {
+        return templates.TemplateResponse(request, "admin_roles.html", {
             "request": request,
             "roles": all_roles,
             "tools": tools_meta,
@@ -597,7 +597,7 @@ def build_auth_router(templates) -> APIRouter:
                 "direct_tools": permissions.list_direct_tools_for_subject("group", str(g["id"])),
             })
         tools_meta = [{"id": tid, "name": _tool_name(tid)} for tid in _all_tool_ids()]
-        return templates.TemplateResponse("admin_permissions.html", {
+        return templates.TemplateResponse(request, "admin_permissions.html", {
             "request": request,
             "subjects": subjects,
             "all_roles": all_roles,
@@ -706,7 +706,7 @@ def build_auth_router(templates) -> APIRouter:
         from . import router as _admin_router_mod  # noqa
         from ..core import db as _db
         size_bytes = _db.db_size_bytes(audit_db.audit_db_path())
-        return templates.TemplateResponse("admin_audit.html", {
+        return templates.TemplateResponse(request, "admin_audit.html", {
             "request": request,
             "events": events,
             "total": total,
@@ -850,7 +850,7 @@ def build_auth_router(templates) -> APIRouter:
             "WHERE event_type='tool_invoke' AND target != '' "
             "AND details_json LIKE '%\"filename\"%' ORDER BY target"
         ).fetchall()]
-        return templates.TemplateResponse("admin_uploads.html", {
+        return templates.TemplateResponse(request, "admin_uploads.html", {
             "request": request,
             "uploads": uploads,
             "total": total,
@@ -868,7 +868,7 @@ def build_auth_router(templates) -> APIRouter:
     @router.get("/log-forward", response_class=HTMLResponse)
     async def log_forward_page(request: Request):
         cfg = audit_forward.get()
-        return templates.TemplateResponse("admin_log_forward.html", {
+        return templates.TemplateResponse(request, "admin_log_forward.html", {
             "request": request,
             "destinations": cfg.get("destinations", []),
         })
@@ -937,7 +937,7 @@ def build_auth_router(templates) -> APIRouter:
         if q_user:
             entries = [e for e in entries if (e.get("username") or "") == q_user]
         users = sorted({e.get("username") or "(匿名)" for e in mgr.list_all()})
-        return templates.TemplateResponse("admin_history.html", {
+        return templates.TemplateResponse(request, "admin_history.html", {
             "request": request,
             "kind": kind, "title": title, "tool_url": tool_url,
             "entries": entries, "users": users, "q_user": q_user,
@@ -982,7 +982,7 @@ def build_auth_router(templates) -> APIRouter:
     @router.get("/retention", response_class=HTMLResponse)
     async def retention_page(request: Request):
         from ..core import retention as _ret
-        return templates.TemplateResponse("admin_retention.html", {
+        return templates.TemplateResponse(request, "admin_retention.html", {
             "request": request,
             "settings": _ret.get(),
             "stats": _ret.collect_stats(),
@@ -1017,7 +1017,7 @@ def build_auth_router(templates) -> APIRouter:
     @router.get("/workspace", response_class=HTMLResponse)
     async def workspace_admin_page(request: Request):
         from ..core import workspace as _ws
-        return templates.TemplateResponse("admin_workspace.html", {
+        return templates.TemplateResponse(request, "admin_workspace.html", {
             "request": request,
             "settings": _ws.get_settings(),
             "stats": _ws.collect_stats(),
@@ -1061,7 +1061,7 @@ def build_auth_router(templates) -> APIRouter:
 
     @router.get("/system-status", response_class=HTMLResponse)
     async def system_status_page(request: Request):
-        return templates.TemplateResponse(
+        return templates.TemplateResponse(request, 
             "admin_system_status.html", {"request": request},
         )
 

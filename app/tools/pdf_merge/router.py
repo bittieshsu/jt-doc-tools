@@ -15,7 +15,7 @@ router = APIRouter()
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_merge.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_merge.html", {"request": request})
 
 
 @router.post("/submit")

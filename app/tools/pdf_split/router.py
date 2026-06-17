@@ -17,7 +17,7 @@ router = APIRouter()
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse("pdf_split.html", {"request": request})
+    return templates.TemplateResponse(request, "pdf_split.html", {"request": request})
 
 
 def _parse_ranges(text: str, page_count: int) -> list[list[int]]:
