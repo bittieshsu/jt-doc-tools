@@ -43,6 +43,7 @@ extensions:
       extensible: barrierModel
     data:
       - ['app', 'Member[core].Member[url_safety].Method[validate_llm_base_url]', 'request-forgery']
+      - ['app', 'Member[core].Member[url_safety].Method[safe_remote_base_url]', 'request-forgery']
 
   # ----------------------------------------------------------------------
   # url-redirection sanitizer (app/core/url_safety.py)

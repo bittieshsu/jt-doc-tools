@@ -23,7 +23,9 @@ from fastapi.responses import RedirectResponse, Response
 
 from ..core import (audit_db, auth_settings, oidc, saml, sessions,
                     sso_provision, sso_settings)
-from ..core.url_safety import safe_next
+# 絕對 import：CodeQL models-as-data 用頂層 'app' 路徑匹配 barrier，
+# 相對 import `..core.url_safety` 不被 API graph 認得（見 jt-sanitizers.model.yml）。
+from app.core.url_safety import safe_next
 from ..logging_setup import get_logger
 from .auth_routes import _client_ip, _set_session_cookie
 
@@ -79,7 +81,10 @@ def _audit(event: str, ip: str, *, username: str = "", detail: str = "") -> None
 
 def _login_error(msg: str) -> RedirectResponse:
     from urllib.parse import quote
-    return RedirectResponse(f"/login?error={quote(msg)}", status_code=302)
+    # 固定導回站內 /login；錯誤訊息去除控制字元、截斷長度、全 URL 編碼，
+    # 杜絕 CRLF / header / open-redirect 注入（目的地永遠是常數 "/login"）。
+    safe_msg = quote("".join(c for c in str(msg) if c.isprintable())[:120], safe="")
+    return RedirectResponse(f"/login?error={safe_msg}", status_code=302)
 
 
 def _finish_login(request: Request, user: dict, next_url: str, *,

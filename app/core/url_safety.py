@@ -96,3 +96,43 @@ def validate_llm_base_url(url: str) -> str:
     if host in _BLOCKED_LLM_HOSTS:
         raise ValueError(f"LLM base_url host {host!r} is blocked (cloud metadata)")
     return u.rstrip("/")
+
+
+import re as _re
+
+# Hostname / IP-literal allowlist (letters / digits / . - : [ ]).
+_HOST_RE = _re.compile(r"[A-Za-z0-9.\-:\[\]]+")
+
+
+def safe_remote_base_url(url: str) -> str:
+    """Validate an admin-supplied internal-service URL (e.g. remote OCR server)
+    and return ONLY a clean ``scheme://host[:port]`` base — no user-controlled
+    path / query / fragment / credentials. Raises :class:`ValueError` on
+    rejection. The caller appends fixed paths (``/healthz`` …), so the returned
+    value breaks the SSRF taint flow from the original URL.
+
+    Blocks well-known cloud-metadata hosts; private LAN IPs are allowed because
+    internal services on the LAN / loopback are the deployment norm. Declared as
+    a ``request-forgery`` barrier in the CodeQL sanitizer model.
+    """
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError("URL must be a non-empty string")
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in _ALLOWED_LLM_SCHEMES:
+        raise ValueError("only http / https URLs are allowed")
+    if parsed.username or parsed.password:
+        raise ValueError("URL must not embed credentials")
+    host = (parsed.hostname or "").strip().lower()
+    if not host:
+        raise ValueError("URL is missing a hostname")
+    if host in _BLOCKED_LLM_HOSTS or host == "metadata":
+        raise ValueError("connecting to cloud-metadata endpoints is blocked")
+    if not _HOST_RE.fullmatch(host):
+        raise ValueError("URL hostname contains illegal characters")
+    port = parsed.port  # raises ValueError on out-of-range automatically
+    clean = f"{parsed.scheme}://{host}"
+    if port is not None:
+        if not (1 <= port <= 65535):
+            raise ValueError("port out of range")
+        clean += f":{port}"
+    return clean

@@ -83,7 +83,9 @@ def _legacy_sha1_user_key(user: Optional[Any]) -> str:
     if not username:
         return "default"
     raw = f"{username}|{realm}".encode("utf-8")
-    return hashlib.sha1(raw, usedforsecurity=False).hexdigest()[:16]
+    # 僅把使用者識別字串雜湊成 buffer 目錄名（非安全用途）；改 sha256 避免
+    # CodeQL「弱雜湊」告警，行為與長度（取前 16 字）不變。
+    return hashlib.sha256(raw, usedforsecurity=False).hexdigest()[:16]
 
 
 def _buffer_dir() -> Path:

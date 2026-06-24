@@ -101,3 +101,38 @@ def test_admin_save_rejects_metadata_host():
     # 對 metadata host 拒絕回「Base URL host 已被列入黑名單」
     err = (body.get("error") or "")
     assert "黑名單" in err or "blocked" in err.lower(), f"unexpected error: {err}"
+
+
+# --- remote OCR server base URL (safe_remote_base_url) -------------------
+# Closes CodeQL `Partial server-side request forgery` #108 / #109 in
+# app/admin/router.py (OCR remote server test endpoint). The function returns
+# ONLY a clean scheme://host[:port]; user path/query/credentials are dropped.
+
+from app.core.url_safety import safe_remote_base_url as _safe_remote
+
+
+@pytest.mark.parametrize("url,expected", [
+    ("http://192.168.1.20:5000/healthz?x=1", "http://192.168.1.20:5000"),
+    ("https://ocr.lan/anything", "https://ocr.lan"),
+    ("http://10.0.0.9:8080", "http://10.0.0.9:8080"),
+    ("http://127.0.0.1:9000/v/../etc", "http://127.0.0.1:9000"),
+])
+def test_ocr_base_url_clean(url, expected):
+    assert _safe_remote(url) == expected
+
+
+@pytest.mark.parametrize("url", [
+    "http://169.254.169.254/latest/meta-data/",  # AWS/GCP/Azure IMDS
+    "http://100.100.100.200/",                    # Alibaba metadata
+    "http://metadata/computeMetadata",            # GCP short
+    "http://metadata.google.internal/",
+    "ftp://host/x",
+    "javascript:alert(1)",
+    "http://user:pass@internal/",                 # embedded credentials
+    "",
+    "http://host:0/",
+    "http://host:70000/",
+])
+def test_ocr_base_url_rejected(url):
+    with pytest.raises(ValueError):
+        _safe_remote(url)

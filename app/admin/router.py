@@ -1400,40 +1400,15 @@ def build_router(templates) -> APIRouter:
         token = (body.get("token") or d.get("token") or "").strip()
         if not url:
             raise HTTPException(400, "URL 未填")
-        # SSRF 防護: 限定 http/https,拒絕 cloud metadata / 帶 credentials 的 URL
+        # SSRF 防護: 走 url_safety.safe_remote_base_url（CodeQL request-forgery barrier）。
+        # 只回乾淨 scheme://host[:port]，拋棄 user 的 path/query/credentials；
+        # 擋 cloud metadata；路徑寫死 /healthz /version，完全切斷 taint flow。
+        # 用「絕對 import」CodeQL API graph 才認得 barrier（見 jt-sanitizers.model.yml 註）。
+        from app.core.url_safety import safe_remote_base_url
         try:
-            parsed = urlparse(url)
-        except Exception:
-            raise HTTPException(400, "URL 格式錯誤")
-        if parsed.scheme not in ("http", "https"):
-            raise HTTPException(400, "僅支援 http / https URL")
-        if parsed.username or parsed.password:
-            raise HTTPException(400, "URL 不可內嵌帳密")
-        host = (parsed.hostname or "").strip().lower()
-        if not host:
-            raise HTTPException(400, "URL 缺 hostname")
-        # 拒絕 cloud metadata service IPs(避免 admin 帳號被滲透後從這跳板抓 metadata)
-        BLOCKED_HOSTS = {
-            "169.254.169.254",     # AWS / GCP / Azure IMDS
-            "100.100.100.200",     # Alibaba Cloud metadata
-            "metadata.google.internal",
-            "metadata",
-        }
-        if host in BLOCKED_HOSTS:
-            raise HTTPException(400, "禁止連到 cloud metadata 端點")
-        # 額外 host 驗證:hostname / IP literal 字元白名單(數字 / 字母 / `.` / `-` / `:`)
-        # 任何 fragment / query / path 從 user URL 一律拋棄,避免 path traversal / open redirect
-        import re as _re_host
-        if not _re_host.fullmatch(r"[A-Za-z0-9.\-:\[\]]+", host):
-            raise HTTPException(400, "URL hostname 含非法字元")
-        # 重組「乾淨 base URL」— 只用驗證過的 scheme + host + port,
-        # 路徑寫死 /healthz / /version,完全切斷 user-controlled URL 對 cli.get() 的 taint flow
-        port = parsed.port
-        clean_base = f"{parsed.scheme}://{host}"
-        if port:
-            if not (1 <= port <= 65535):
-                raise HTTPException(400, "port 超出合法範圍")
-            clean_base += f":{port}"
+            clean_base = safe_remote_base_url(url)
+        except ValueError as e:
+            raise HTTPException(400, f"URL 不合法: {e}")
         healthz_url = clean_base + "/healthz"
         version_url = clean_base + "/version"
         try:

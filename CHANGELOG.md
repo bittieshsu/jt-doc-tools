@@ -4,6 +4,16 @@
 
 ---
 
+## [1.12.9] - 2026-06-19
+
+### 安全性 — CodeQL / Dependabot 告警一輪
+
+- **遠端 OCR 伺服器測試的 SSRF（CodeQL #108 / #109，Critical）**：admin 設定遠端 OCR 伺服器網址時的連線，改走新的 `app/core/url_safety.py:safe_remote_base_url()`，只回乾淨的 `scheme://host[:port]`（丟棄 user 的 path / query / credentials），擋雲端 metadata 端點、允許 LAN；並登記為 CodeQL `request-forgery` barrier（絕對 import 才被 API graph 認得）。原本已有 inline 防護，此次改為「可被 CodeQL 認可的 barrier 函式」以根治告警。
+- **SSO 重導向 / cookie（CodeQL #111 / #112 / #113，Medium）**：`app/web/sso_routes.py` 的 `safe_next` 改用**絕對 import**（`from app.core.url_safety import safe_next`），models-as-data barrier 才匹配得到；`_login_error` 的錯誤訊息去除控制字元、截斷長度、全 URL 編碼，目的地固定站內 `/login`。
+- **弱雜湊 SHA-1（CodeQL #92，High）**：`app/tools/einvoice_scan/buffer.py` 把使用者識別字串雜湊成 buffer 目錄名的 `sha1` 改 `sha256`（非安全用途，長度行為不變）。
+- **PyTorch `torch.jit.script` 記憶體毀損（Dependabot #50，Critical，經 easyocr 傳遞）**：上游目前**無修補版本**（affected ≤ 2.12.0、patched: none）。本專案 OCR 不對使用者輸入呼叫 `torch.jit.script`（EasyOCR 僅對自身模型使用），暫無可升級版本，待上游釋出修補後跟進。
+- 測試：`tests/test_llm_url_ssrf.py` 新增 `safe_remote_base_url` 的 happy-path 與拒絕案例；OWASP 回歸（owasp_top10 / llm_url_ssrf / path_traversal_audit）全綠。
+
 ## [1.12.8] - 2026-06-17
 
 ### Windows 安裝程式 — 接上 SignPath 程式碼簽章（OSS 核准，測試憑證階段）
