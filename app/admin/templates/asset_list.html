@@ -124,7 +124,7 @@ document.addEventListener('click', async (e) => {
       await fetch(`/admin/assets/${id}/default`, { method: 'POST' });
       location.reload();
     } else if (btn.dataset.act === 'delete') {
-      if (!confirm('確定刪除這個資產？')) return;
+      if (!(await window.showConfirm('確定刪除這個資產？此動作無法復原。', { title: '刪除資產', kind: 'danger', okText: '刪除' }))) return;
       await fetch(`/admin/assets/${id}/delete`, { method: 'POST' });
       location.reload();
     }

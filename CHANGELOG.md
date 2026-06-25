@@ -4,6 +4,24 @@
 
 ---
 
+## [1.12.14] - 2026-06-25
+
+### 改善 — 相依套件檢查頁列出全部重大相依
+
+- `/admin/sys-deps`（相依套件檢查）原本只列系統 binary + OCR + 影像 + PyMuPDF（11 項）。新增 **22 項重大 Python 相依**，依分類顯示版本與用途：
+  - **核心框架**：FastAPI / Starlette / Uvicorn / Jinja2 / Pydantic
+  - **文書處理**：pdfplumber / pdf2docx / python-docx / odfpy / openpyxl / pymupdf4llm / markdown-it-py
+  - **認證 / SSO**：cryptography / ldap3 / PyJWT / python3-saml / xmlsec
+  - **其他**：httpx / psutil / pyotp / qrcode / pyzbar
+  - （底層內部相依 numpy / lxml / rapidfuzz 不列）
+- `_probe_python_pkg` 新增：模組沒有 `__version__` 時（python3-saml / PyJWT / odfpy 等）改從 distribution metadata 取版本，版本欄不再空白。
+
+### 修正 — 刪除資產改用內建對話框（不再用瀏覽器原生 confirm）
+
+- 資產管理頁刪除資產原本跳瀏覽器原生 `confirm()`（「doc.jason.tools 顯示」）。改用內建 `showConfirm`（danger 樣式、紅色「刪除」按鈕），與全站其他確認對話框一致。`app/admin/templates/asset_list.html`。
+
+---
+
 ## [1.12.13] - 2026-06-25
 
 ### 修正 — PDF 編輯器螢光筆顏色無法變更（GitHub issue #35）

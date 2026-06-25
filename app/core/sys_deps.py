@@ -307,6 +307,17 @@ def _probe_python_pkg(import_name: str, heavy: bool = False, dist_name: str = ""
     try:
         mod = __import__(import_name)
         version = getattr(mod, "__version__", "")
+        if not version:
+            # 有些套件（python3-saml / PyJWT / odfpy 等）模組沒有 __version__，
+            # 改從 distribution metadata 取版本。
+            try:
+                from importlib.metadata import version as _meta_version, PackageNotFoundError
+                try:
+                    version = _meta_version(dist_name or import_name.split(".")[0])
+                except PackageNotFoundError:
+                    version = ""
+            except Exception:
+                version = ""
         return {"installed": True, "version": str(version), "extra": "", "ok": True}
     except Exception as e:
         return {"installed": False, "version": "", "extra": str(e), "ok": False}
@@ -764,6 +775,120 @@ _DEPS = [
             "windows": "git pull (vendored under static/vendor/pdfjs/)",
         },
     },
+    # ---- 核心框架（缺則服務無法啟動）----
+    *[
+        {
+            "key": _k, "label": _lbl, "category": "核心框架",
+            "impact": _imp, "impact_en": _imp_en, "soft": False,
+            "probe": (lambda _i=_imp_name, _d=_dist: _probe_python_pkg(_i, dist_name=_d)),
+            "install_cmd": {"linux": "uv sync（一般會自動安裝）",
+                            "macos": "uv sync", "windows": "uv sync"},
+        }
+        for (_k, _lbl, _imp_name, _dist, _imp, _imp_en) in [
+            ("fastapi", "FastAPI", "fastapi", "fastapi",
+             "Web 框架核心 — 全站路由 / API / 中介層。缺則服務無法啟動。",
+             "Web framework core (routing / API / middleware)."),
+            ("starlette", "Starlette", "starlette", "starlette",
+             "FastAPI 底層 ASGI 框架（TemplateResponse / 中介層 / StaticFiles）。缺則無法啟動。",
+             "ASGI layer under FastAPI."),
+            ("uvicorn", "Uvicorn", "uvicorn", "uvicorn",
+             "ASGI 伺服器 — 實際跑起 web 服務的進程。缺則無法啟動。",
+             "ASGI server that runs the app."),
+            ("jinja2", "Jinja2", "jinja2", "Jinja2",
+             "HTML 模板引擎 — 所有頁面渲染。缺則頁面無法產生。",
+             "HTML template engine for all pages."),
+            ("pydantic", "Pydantic", "pydantic", "pydantic",
+             "資料驗證 / 設定模型 — FastAPI 請求與 app 設定。缺則無法啟動。",
+             "Data validation / settings models."),
+        ]
+    ],
+    # ---- 文書處理（各轉檔 / 輸出工具）----
+    *[
+        {
+            "key": _k, "label": _lbl, "category": "文書處理",
+            "impact": _imp, "impact_en": _imp_en, "soft": True,
+            "probe": (lambda _i=_imp_name, _d=_dist: _probe_python_pkg(_i, dist_name=_d)),
+            "install_cmd": {"linux": "uv sync（一般會自動安裝）",
+                            "macos": "uv sync", "windows": "uv sync"},
+        }
+        for (_k, _lbl, _imp_name, _dist, _imp, _imp_en) in [
+            ("pdfplumber", "pdfplumber", "pdfplumber", "pdfplumber",
+             "pdf-to-office 的表格 / 文字座標抽取。缺則 PDF 轉文書檔品質下降或失敗。",
+             "Table / text extraction for pdf-to-office."),
+            ("pdf2docx", "pdf2docx", "pdf2docx", "pdf2docx",
+             "PDF→Word(.docx) 主引擎（pdf-to-office）。缺則該工具無法運作。",
+             "Primary PDF→Word engine for pdf-to-office."),
+            ("python-docx", "python-docx", "docx", "python-docx",
+             "Word(.docx) 輸出 — 擷取文字 / markdown-to-doc / 逐句翻譯匯出。",
+             "Word (.docx) output (extract-text / markdown-to-doc / translate)."),
+            ("odfpy", "odfpy", "odf", "odfpy",
+             "OpenDocument(.odt/.ods) 輸出。缺則 ODF 匯出無法運作。",
+             "OpenDocument (.odt/.ods) output."),
+            ("openpyxl", "openpyxl", "openpyxl", "openpyxl",
+             "Excel(.xlsx) 匯出 — 逐句翻譯 / 清單處理 / 電子發票。",
+             "Excel (.xlsx) export (translate / text-list / einvoice)."),
+            ("pymupdf4llm", "pymupdf4llm", "pymupdf4llm", "pymupdf4llm",
+             "pdf-to-markdown 的版面感知 Markdown 輸出。缺則該工具無法運作。",
+             "Layout-aware Markdown output for pdf-to-markdown."),
+            ("markdown-it-py", "markdown-it-py", "markdown_it", "markdown-it-py",
+             "markdown-to-doc 的 Markdown 解析（CommonMark + GFM）。",
+             "Markdown parser for markdown-to-doc."),
+        ]
+    ],
+    # ---- 認證 / SSO（依啟用的後端而定）----
+    *[
+        {
+            "key": _k, "label": _lbl, "category": "認證 / SSO",
+            "impact": _imp, "impact_en": _imp_en, "soft": _soft,
+            "probe": (lambda _i=_imp_name, _d=_dist: _probe_python_pkg(_i, dist_name=_d)),
+            "install_cmd": {"linux": "uv sync（一般會自動安裝）",
+                            "macos": "uv sync", "windows": "uv sync"},
+        }
+        for (_k, _lbl, _imp_name, _dist, _soft, _imp, _imp_en) in [
+            ("cryptography", "cryptography", "cryptography", "cryptography", False,
+             "Session cookie / SSO secret 的 Fernet 加密、OIDC JWT 簽章驗證。缺則登入相關功能異常。",
+             "Fernet encryption for sessions / SSO secrets, OIDC JWT verify."),
+            ("ldap3", "ldap3", "ldap3", "ldap3", True,
+             "LDAP / AD 認證後端。啟用 LDAP/AD 登入時必要；缺則該後端無法用。",
+             "LDAP / AD auth backend."),
+            ("PyJWT", "PyJWT", "jwt", "PyJWT", True,
+             "SSO OIDC 的 id_token（JWKS / RS256）驗證。啟用 OIDC 時必要。",
+             "OIDC id_token (JWKS / RS256) verification."),
+            ("python3-saml", "python3-saml", "onelogin.saml2.auth", "python3-saml", True,
+             "SSO SAML 2.0 SP。啟用 SAML 登入時必要。",
+             "SAML 2.0 SP for SSO."),
+            ("xmlsec", "xmlsec", "xmlsec", "xmlsec", True,
+             "python3-saml 的 XML 簽章驗證底層。SAML 必要相依。",
+             "XML signature backend used by python3-saml (SAML)."),
+        ]
+    ],
+    # ---- 其他功能 ----
+    *[
+        {
+            "key": _k, "label": _lbl, "category": _cat,
+            "impact": _imp, "impact_en": _imp_en, "soft": True,
+            "probe": (lambda _i=_imp_name, _d=_dist, _h=_heavy: _probe_python_pkg(_i, heavy=_h, dist_name=_d)),
+            "install_cmd": {"linux": "uv sync（一般會自動安裝）",
+                            "macos": "uv sync", "windows": "uv sync"},
+        }
+        for (_k, _lbl, _imp_name, _dist, _cat, _heavy, _imp, _imp_en) in [
+            ("httpx", "httpx", "httpx", "httpx", "監控 / 其他", False,
+             "LLM 加值 / 遠端 GPU OCR 伺服器的 HTTP 連線。缺則這些連外功能停用。",
+             "HTTP client for LLM features / remote GPU OCR server."),
+            ("psutil", "psutil", "psutil", "psutil", "監控 / 其他", False,
+             "系統狀態頁 CPU / RAM / 磁碟 / 網路監控。缺則該頁顯示「未安裝」。",
+             "System status page metrics (CPU / RAM / disk / net)."),
+            ("pyotp", "pyotp", "pyotp", "pyotp", "監控 / 其他", False,
+             "TOTP 兩步驟驗證（2FA）。稽核員角色強制啟用；缺則 2FA 無法用。",
+             "TOTP 2FA (mandatory for auditor role)."),
+            ("qrcode", "qrcode", "qrcode", "qrcode", "監控 / 其他", False,
+             "2FA 設定頁產生 QR Code。缺則 2FA 綁定 QR 無法顯示。",
+             "QR code generation for 2FA setup."),
+            ("pyzbar", "pyzbar", "pyzbar", "pyzbar", "QR / 條碼", True,
+             "電子發票 QR Code 解析（einvoice-scan）的 Python wrapper（需系統 zbar）。",
+             "Python wrapper to decode invoice QR codes (needs system zbar)."),
+        ]
+    ],
 ]
 
 

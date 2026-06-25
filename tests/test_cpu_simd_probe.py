@@ -64,3 +64,21 @@ def test_sys_deps_includes_pymupdf():
     assert res["installed"] is True
     assert res["ok"] is True
     assert res["version"]  # 有版本字串
+
+
+def test_sys_deps_lists_major_python_packages():
+    keys = {d["key"] for d in sd._DEPS}
+    for k in ("fastapi", "starlette", "uvicorn", "jinja2", "pydantic",
+              "pdfplumber", "pdf2docx", "python-docx", "odfpy", "openpyxl",
+              "cryptography", "ldap3", "PyJWT", "python3-saml", "xmlsec",
+              "httpx", "psutil", "pyotp", "qrcode", "pyzbar"):
+        assert k in keys, f"{k} 應列入 sys-deps 相依檢查"
+    # 底層內部相依不列
+    for k in ("numpy", "lxml", "rapidfuzz"):
+        assert k not in keys, f"{k} 是底層內部相依，不應列入"
+
+
+def test_all_sys_deps_probes_run_without_error():
+    for d in sd._DEPS:
+        r = d["probe"]()
+        assert isinstance(r, dict) and "installed" in r, d["key"]
