@@ -99,6 +99,99 @@ def configure_pytesseract() -> str:
     return path
 
 
+_cpu_simd_cache: Optional[dict] = None
+
+
+def _windows_avx2_present() -> Optional[bool]:
+    """Windows best-effort：用 kernel32.IsProcessorFeaturePresent 查 AVX2。
+    回 True/False，查不到回 None（視為無法判定）。"""
+    try:
+        import ctypes
+        PF_AVX2_INSTRUCTIONS_AVAILABLE = 40  # winnt.h
+        return bool(ctypes.windll.kernel32.IsProcessorFeaturePresent(
+            PF_AVX2_INSTRUCTIONS_AVAILABLE))
+    except Exception:
+        return None
+
+
+def probe_cpu_simd() -> dict:
+    """偵測 x86 CPU 的 SIMD 指令集，給 EasyOCR / PyTorch 相容性檢查用。
+
+    EasyOCR 底層 PyTorch 在缺 AVX2 的 CPU（如 PVE VM 用 `x86-64-v2` CPU model）
+    上會執行非法指令（SIGILL）讓整個服務 core dump。**絕不 import torch**（壞 CPU
+    上 import 即可能 SIGILL），只讀 CPU flags 判定。
+
+    回 dict：{arch, system, avx, avx2, fma, ok, undetermined, missing, note}
+      ok           = EasyOCR 可安全執行（需 AVX2；非 x86 / 無法判定時保守視為 True）
+      undetermined = 無法取得 CPU flags（不誤判為壞）
+      missing      = 缺少且 EasyOCR 需要的指令集清單（如 ['AVX', 'AVX2', 'FMA']）
+    """
+    global _cpu_simd_cache
+    if _cpu_simd_cache is not None:
+        return _cpu_simd_cache
+    import platform
+    arch = platform.machine().lower()
+    system = platform.system()
+    res = {"arch": arch, "system": system, "avx": False, "avx2": False,
+           "fma": False, "ok": True, "undetermined": False,
+           "missing": [], "note": ""}
+    # 非 x86（ARM Apple Silicon / ARM 伺服器等）不適用 AVX；torch 走 ARM wheel
+    if arch not in ("x86_64", "amd64", "x64", "i386", "i686", "x86"):
+        res["note"] = "非 x86 架構（ARM 等），不受 AVX2 限制"
+        _cpu_simd_cache = res
+        return res
+    flags: set = set()
+    try:
+        if system == "Linux":
+            with open("/proc/cpuinfo", "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.startswith("flags") or line.startswith("Features"):
+                        flags = set(line.split(":", 1)[1].split())
+                        break
+        elif system == "Darwin":
+            import subprocess
+            out = subprocess.run(
+                ["sysctl", "-n", "machdep.cpu.features",
+                 "machdep.cpu.leaf7_features"],
+                capture_output=True, text=True, timeout=5).stdout.lower()
+            flags = set(out.replace("\n", " ").split())
+    except Exception:
+        flags = set()
+
+    if flags:
+        res["avx"] = "avx" in flags
+        res["avx2"] = "avx2" in flags
+        res["fma"] = ("fma" in flags) or ("fma3" in flags)
+    elif system == "Windows":
+        w = _windows_avx2_present()
+        if w is None:
+            res["undetermined"] = True
+        else:
+            res["avx2"] = w
+            res["avx"] = w   # AVX2 蘊含 AVX；無法單獨查 AVX 就同值
+            res["fma"] = w
+    else:
+        res["undetermined"] = True
+
+    if res["undetermined"]:
+        res["ok"] = True   # 測不到不誤判為壞（保守）
+        res["note"] = "無法判定 CPU 指令集；若 OCR 會讓服務崩潰，請參考下方指引"
+        _cpu_simd_cache = res
+        return res
+
+    res["ok"] = bool(res["avx2"])
+    if not res["avx2"]:
+        miss = []
+        if not res["avx"]:
+            miss.append("AVX")
+        miss.append("AVX2")          # 一定缺（判定門檻）
+        if not res["fma"]:
+            miss.append("FMA")
+        res["missing"] = miss
+    _cpu_simd_cache = res
+    return res
+
+
 def _probe_tesseract() -> dict:
     binary = _find_tesseract_binary()
     if not binary:
@@ -585,6 +678,20 @@ _DEPS = [
             "linux": "sudo apt install fonts-noto-cjk",
             "macos": "Built-in PingFang on macOS; usually no install needed",
             "windows": "Built-in Microsoft JhengHei on Windows; usually no install needed",
+        },
+    },
+    {
+        "key": "pymupdf",
+        "label": "PyMuPDF (fitz)",
+        "category": "PDF 引擎",
+        "impact": "PDF 讀寫 / 渲染 / 文字與圖片抽取 / 註解 / 加解密 / 浮水印 / 用印 / 頁面編輯等的核心引擎，幾乎所有 PDF 工具都依賴它。缺則服務無法啟動。",
+        "impact_en": "Core PDF engine (read/write, render, text & image extraction, annotations, encryption, stamping, page editing). Nearly every PDF tool depends on it; the service won't start without it.",
+        "soft": False,
+        "probe": lambda: _probe_python_pkg("fitz", dist_name="PyMuPDF"),
+        "install_cmd": {
+            "linux": "uv sync  (normally auto-installed)",
+            "macos": "uv sync",
+            "windows": "uv sync",
         },
     },
     {

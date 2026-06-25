@@ -25,6 +25,16 @@ if not exist "%UV_EXE%" (
     exit /b 1
 )
 
+REM 企業 TLS 檢查設備（MITM proxy）會把 HTTPS 憑證換成自家 CA；uv 預設用內建
+REM 根憑證不認那個 CA，下載 Python / 套件會失敗。改用作業系統信任庫（企業 CA
+REM 通常已裝在那裡）。新版 uv 用 UV_SYSTEM_CERTS、舊版用 UV_NATIVE_TLS，兩個都
+REM 設，uv 忽略不認得的那個。呼叫端 / 使用者已設定時不覆寫。
+if not defined UV_NATIVE_TLS set UV_NATIVE_TLS=true
+if not defined UV_SYSTEM_CERTS set UV_SYSTEM_CERTS=true
+if "%JTDT_TLS_INSECURE%"=="1" (
+    if not defined UV_INSECURE_HOST set UV_INSECURE_HOST=pypi.org files.pythonhosted.org github.com objects.githubusercontent.com astral.sh
+)
+
 REM uv may exit 1 saying "already installed" when Python 3.12 is present.
 REM That's not an error, ignore.
 echo ==^> Installing managed Python 3.12 via uv ...

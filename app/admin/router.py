@@ -1217,6 +1217,7 @@ def build_router(templates) -> APIRouter:
         from ..core import tessdata_manager as _tm
         from ..core import ocr_engine as _oe
         from ..core import ocr_remote_settings as _ors
+        from ..core import sys_deps as _sd
         def _ors_is_configured() -> bool:
             d = _ors.get()
             return bool(d.get("enabled")) or (bool(d.get("url")) and bool(d.get("token")))
@@ -1255,6 +1256,7 @@ def build_router(templates) -> APIRouter:
                 "easyocr_available": _oe.is_easyocr_available(),
                 "tesseract_available": _oe.is_tesseract_available(),
                 "external_ocr_configured": _ors_is_configured(),
+                "cpu_simd": _sd.probe_cpu_simd(),
             },
         )
 

@@ -212,6 +212,22 @@ require id
 HAS_GIT=0
 if command -v git >/dev/null 2>&1; then HAS_GIT=1; fi
 
+# uv TLS：企業 TLS 檢查設備（MITM proxy / 防火牆）會把 HTTPS 憑證換成自家 CA。
+# uv 預設用內建 webpki 根憑證、不認那個 CA → 下載 Python / 套件失敗（但 curl /
+# apt 用作業系統信任庫、企業 CA 通常已裝進去所以能動）。預設讓 uv 改用 OS 信任庫
+# （新版旗標 --system-certs / 舊版 --native-tls；env 兩個都設，uv 會忽略不認得的
+# 那個），安全且能解決多數企業代理情境。要關閉：UV_NATIVE_TLS=false 跑安裝。
+export UV_NATIVE_TLS="${UV_NATIVE_TLS:-true}"
+export UV_SYSTEM_CERTS="${UV_SYSTEM_CERTS:-true}"
+# 最後手段（企業 CA 不在 OS 信任庫時）：JTDT_TLS_INSECURE=1 停用憑證驗證。
+# 有 MITM 風險，僅在你信任的內網環境使用。正解仍是把企業 CA 裝進 OS 信任庫。
+CURL_TLS_OPT=""
+if [ "${JTDT_TLS_INSECURE:-0}" = "1" ]; then
+    warn "JTDT_TLS_INSECURE=1：已停用 TLS 憑證驗證（uv + curl）。僅限信任的內網/企業環境，有 MITM 風險。"
+    export UV_INSECURE_HOST="${UV_INSECURE_HOST:-pypi.org files.pythonhosted.org github.com objects.githubusercontent.com astral.sh}"
+    CURL_TLS_OPT="-k"
+fi
+
 # --------------------------------------------------------------------- Office
 
 detect_office() {
@@ -623,7 +639,7 @@ install_uv() {
     log "下載 uv (Astral Python 工具鏈) ..."
     mkdir -p "$INSTALL_DIR/bin"
     # uv 官方安裝腳本，限定安裝路徑避免污染使用者環境
-    curl -LsSf https://astral.sh/uv/install.sh | \
+    curl -LsSf $CURL_TLS_OPT https://astral.sh/uv/install.sh | \
         env UV_INSTALL_DIR="$INSTALL_DIR/bin" UV_NO_MODIFY_PATH=1 sh >/dev/null
     [ -x "$INSTALL_DIR/bin/uv" ] || die "uv 安裝失敗"
     ok "uv 安裝在 $INSTALL_DIR/bin/uv"

@@ -72,6 +72,36 @@ def _hex_to_rgb01(hex_color: str) -> tuple[float, float, float]:
         return (0.0, 0.0, 0.0)
 
 
+import re as _re
+# 含 CJK 統一 / 擴展 / 假名 / 全形標點的字元範圍
+_CJK_RE = _re.compile(
+    r"[　-〿぀-ヿ㐀-䶿一-鿿豈-﫿＀-￯]")
+
+
+def _pageno_font(text: str):
+    """選頁碼字型。含 CJK（如「第 N 頁」）時，PyMuPDF 內建 helv 沒有中文 glyph
+    會印成「·」缺字；改用真 CJK 字型。找不到系統 CJK 字型則退用 PyMuPDF 內建
+    china-t（繁中，glyph 至少會顯示）。回 (fontname, fontfile|None)。"""
+    if not _CJK_RE.search(text or ""):
+        return "helv", None
+    try:
+        from ...core import font_catalog
+        best = font_catalog.best_cjk_path("sans", "traditional")
+        if best:
+            return "jtcjk", str(best[0])
+    except Exception:
+        pass
+    return "china-t", None
+
+
+def _text_width_pt(text: str, font_size: float) -> float:
+    """估文字寬（pt）：CJK 全形 ≈ 1.0 em、半形 ≈ 0.55 em。給定位用。"""
+    w = 0.0
+    for c in text:
+        w += 1.0 if _CJK_RE.match(c) else 0.55
+    return font_size * w
+
+
 def _draw_pageno(
     page, *, page_index: int, total: int,
     position: str, fmt: str, start: int,
@@ -105,7 +135,8 @@ def _draw_pageno(
     import fitz
     rot = int(getattr(page, "rotation", 0)) % 360
     r = page.rect                                # visual rect(含旋轉)
-    tw = font_size * len(text) * 0.55
+    fontname, fontfile = _pageno_font(text)      # 含中文時用 CJK 字型避免缺字
+    tw = _text_width_pt(text, font_size)         # CJK 全形字寬納入定位
     th = font_size * 1.2
     if position == "tl":   x, y = m_pt, m_pt + th
     elif position == "tc": x, y = (r.width - tw) / 2, m_pt + th
@@ -119,14 +150,14 @@ def _draw_pageno(
         cp = fitz.Point(x, y) * page.derotation_matrix
         page.insert_text(
             cp, text,
-            fontsize=font_size, fontname="helv",
+            fontsize=font_size, fontname=fontname, fontfile=fontfile,
             color=_hex_to_rgb01(color_hex),
             rotate=rot,                          # 文字也跟著轉,才會朝向正確
         )
     else:
         page.insert_text(
             (x, y), text,
-            fontsize=font_size, fontname="helv",
+            fontsize=font_size, fontname=fontname, fontfile=fontfile,
             color=_hex_to_rgb01(color_hex),
         )
 
@@ -144,6 +175,7 @@ async def preview_thumb(
     color: str = Form("#000000"),
     from_page: int = Form(1),
     to_page: int = Form(0),  # 0 = until last page
+    large: bool = Form(False),  # lightbox 放大檢視用，渲較高 dpi
 ):
     """Apply the page-number to ONE page in-memory and return a PNG thumb so
     the user sees the *real* rendered output rather than a UI overlay."""
@@ -164,7 +196,7 @@ async def preview_thumb(
             font_size=font_size, margin_mm=margin_mm, color_hex=color,
             from_page=max(1, from_page), to_page=tp,
         )
-        pix = doc[page - 1].get_pixmap(dpi=64, alpha=False)
+        pix = doc[page - 1].get_pixmap(dpi=160 if large else 64, alpha=False)
         png = pix.tobytes("png")
     from fastapi.responses import Response as _Resp
     return _Resp(content=png, media_type="image/png",

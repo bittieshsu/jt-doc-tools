@@ -66,7 +66,7 @@
       <button type="button" class="pn-chip" data-fmt="Page {n} of {N}">Page {n} of {N}</button>
     </div>
     <input id="fmt" class="field pn-fmt-input" type="text" value="{n} / {N}" />
-    <small class="muted pn-fmt-hint"><code>{n}</code> = 當前頁碼　<code>{N}</code> = 會印頁碼的總頁數</small>
+    <small class="muted pn-fmt-hint"><code>{n}</code> = 目前頁碼　<code>{N}</code> = 會印頁碼的總頁數</small>
   </div>
 
   <div class="pn-card">
@@ -570,19 +570,34 @@ marginEl.addEventListener('input', refreshMarginUI);
 });
 
 // Lightbox: click thumb to enlarge.
-document.getElementById('thumb-grid').addEventListener('click', (e) => {
+document.getElementById('thumb-grid').addEventListener('click', async (e) => {
   const t = e.target.closest('.page-thumb[data-zoom-src]');
   if (!t) return;
   const lb = document.createElement('div');
   lb.className = 'page-lightbox';
-  // Add ?large=1 so the backend renders at higher dpi (regex-replacing the
-  // dpi value in-string was unreliable — upload_id can contain matching
-  // digits and silently break the URL).
-  const big = t.dataset.zoomSrc + (t.dataset.zoomSrc.includes('?') ? '&' : '?') + 'large=1';
+  // zoomSrc 是 blob: URL，不能直接接 ?large=1（會變無效 URL → 只剩黑遮罩、圖載不出）。
+  // 先用現有縮圖立即顯示避免黑屏，再向後端 POST 要高 dpi（含頁碼）版本換上。
   lb.innerHTML = `<button class="page-lightbox-close" type="button">×</button>
-                  <img src="${big}" alt="" />`;
+                  <img src="${t.dataset.zoomSrc}" alt="" />`;
   lb.addEventListener('click', () => lb.remove());
   document.body.appendChild(lb);
+  if (uploadId && t.dataset.page) {
+    try {
+      const fd = new FormData();
+      const args = {
+        upload_id: uploadId, page: t.dataset.page, position: getPos(), fmt: getFmt(),
+        start: getStart(), font_size: getSize(), margin_mm: getMargin(), color: getColor(),
+        from_page: getFromPage(), to_page: getToPageRaw(), large: '1',
+      };
+      for (const [k, v] of Object.entries(args)) fd.append(k, String(v));
+      const r = await fetch('/tools/pdf-pageno/preview-thumb', { method: 'POST', body: fd });
+      if (r.ok && document.body.contains(lb)) {
+        const url = URL.createObjectURL(await r.blob());
+        const img = lb.querySelector('img');
+        if (img) { img.src = url; img.addEventListener('load', () => URL.revokeObjectURL(url), { once: true }); }
+      }
+    } catch (_e) { /* 保留縮圖即可 */ }
+  }
 });
 
 document.getElementById('btn-submit').addEventListener('click', async () => {

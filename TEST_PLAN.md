@@ -716,3 +716,18 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 - [ ] 無真實內網 IP（test fixture 用 `10.0.0.x` / `192.168.1.10` placeholder OK）
 - [ ] 無「親測」「內部」之類用語
 
+### 6.14 v1.12.11 / v1.12.12（每次發版必過）
+
+**自動化測試**（`uv run pytest`）：
+- `test_pdf_attachments_strip.py` — 「產生無附件副本」清掉 EmbeddedFiles + catalog `/AF`（PDF/A-3 / 發票型）
+- `test_pdf_pageno_cjk.py` — 中文頁碼格式（「第 {n} / {N} 頁」）glyph 正常、純數字仍用 helv
+- `test_cpu_simd_probe.py` — `probe_cpu_simd` 對 AVX2 / x86-64-v2 / ARM / 無法判定 判定正確；sys-deps 含 PyMuPDF
+
+**手動 / 環境相關（自動化不易，發版前確認）**：
+- [ ] **無 git 的 Linux 安裝可更新**（v1.12.11）：在沒裝 git 的機器跑網站一行安裝（→ tarball）；之後 `jtdt update` 與重跑 install.sh 都不再卡死（會 ensure_git + 原地收編成 git repo；資料保留）
+- [ ] **OCR 引擎頁 CPU 指令集面板**：AVX2 CPU 顯示綠勾；缺 AVX2 顯示紅框 + 列出缺哪些 + 多平台指引（PVE / VMware / Hyper-V / VirtualBox / 實體機）
+- [ ] **OCR 在缺 AVX2 的 VM 不再悶掛服務的診斷已就位**（不自動退 tesseract，純診斷指引）
+- [ ] **企業 TLS 檢查環境 uv 可安裝**：MITM proxy 換憑證的網路，install / `jtdt update` 預設用 OS 信任庫（`UV_SYSTEM_CERTS`/`UV_NATIVE_TLS`）；必要時 `JTDT_TLS_INSECURE=1`
+- [ ] **插入頁碼縮圖放大可正常顯示**（GitHub issue #32）：點縮圖放大不再黑遮罩 / file not found
+- [ ] **中文頁碼輸出 PDF**：「第 1 / 20 頁」等格式中文不缺字（非「·」）
+

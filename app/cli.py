@@ -511,7 +511,18 @@ def svc_update() -> int:
         svc_start()
         return 1
     print("Syncing Python deps (uv sync) ...")
-    rc = subprocess.call([uv, "sync"], cwd=str(root))
+    # 企業 TLS 檢查設備（MITM proxy）會換掉 HTTPS 憑證；uv 預設用內建 webpki 根
+    # 憑證不認那個 CA → uv sync 失敗。預設讓 uv 改用 OS 信任庫（企業 CA 通常在
+    # 那裡），新版 UV_SYSTEM_CERTS / 舊版 UV_NATIVE_TLS 都設，uv 忽略不認得的那個。
+    # 使用者可用環境變數覆寫（含 JTDT_TLS_INSECURE=1 最後手段停用驗證）。
+    uv_env = os.environ.copy()
+    uv_env.setdefault("UV_NATIVE_TLS", "true")
+    uv_env.setdefault("UV_SYSTEM_CERTS", "true")
+    if os.environ.get("JTDT_TLS_INSECURE") == "1":
+        uv_env.setdefault("UV_INSECURE_HOST",
+                          "pypi.org files.pythonhosted.org github.com "
+                          "objects.githubusercontent.com astral.sh")
+    rc = subprocess.call([uv, "sync"], cwd=str(root), env=uv_env)
     if rc != 0:
         print("uv sync failed, restoring previous state", file=sys.stderr)
         _restore_ownership(root, owner)

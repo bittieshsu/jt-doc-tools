@@ -122,6 +122,37 @@ details[open] > .po-ext-summary .po-ext-arrow { transform:rotate(90deg); }
 <h1>{{ icon('text', size=22) }} OCR 引擎與訓練檔管理</h1>
 <p class="muted">雙 OCR 引擎並存。<b>EasyOCR</b>（主，預設）對 CJK 識別率明顯較高；<b>Tesseract</b>（備）輕量、per-char bbox 精準。可隨時切換。</p>
 
+<!-- CPU SIMD 相容性檢查（EasyOCR 底層 PyTorch 需要 AVX2，缺則辨識時 SIGILL 崩潰） -->
+{% if cpu_simd %}
+  {% if not cpu_simd.ok and not cpu_simd.undetermined %}
+  <div class="panel" style="margin-bottom:16px; border-left:4px solid #dc2626; background:#fef2f2; padding:16px 20px;">
+    <div style="font-weight:700; color:#b91c1c; font-size:15px;">此主機 CPU 不支援 EasyOCR 需要的指令集</div>
+    <div style="font-size:13px; color:#7f1d1d; margin-top:8px; line-height:1.7;">
+      缺少：<b>{{ cpu_simd.missing|join(' / ') }}</b>（偵測到 CPU 架構：<code>{{ cpu_simd.arch }}</code>）。
+      EasyOCR 底層的 PyTorch 會在<b>辨識時執行非法指令（SIGILL），讓整個服務崩潰重啟</b>，
+      造成工作中斷、Job 變成 404。請依你的環境擇一處理：
+      <ul style="margin:10px 0 0; padding-left:20px;">
+        <li><b>Proxmox VE</b>：VM →「硬體」→「處理器」→「類型」改成 <code>host</code>（透傳實體 CPU），或至少改 <code>x86-64-v3</code>。</li>
+        <li><b>VMware（ESXi / Workstation）</b>：確認實體 CPU 有 AVX2；若叢集啟用 EVC，把 EVC 基準調到 Haswell 以上，或關閉 EVC。</li>
+        <li><b>Hyper-V</b>：關閉該 VM 的「處理器相容性模式」，改用主機 CPU。</li>
+        <li><b>VirtualBox</b>：<code>VBoxManage modifyvm "&lt;VM 名稱&gt;" --cpu-profile host</code>，並確認未限制指令集。</li>
+        <li><b>實體機 / 雲端</b>：使用含 AVX2 的 CPU（Intel Haswell 2013 年後 / AMD Excavator 2015 年後）或對應雲端機型。</li>
+      </ul>
+      <div style="margin-top:10px; color:#92400e;">若暫時無法調整 CPU，可在下方「OCR 引擎」<b>手動</b>切換為 Tesseract（不需 AVX2，CJK 辨識較弱）—— 系統<b>不會</b>自動切換。</div>
+    </div>
+  </div>
+  {% elif cpu_simd.undetermined %}
+  <div class="panel" style="margin-bottom:16px; border-left:4px solid #f59e0b; background:#fffbeb; padding:14px 20px; font-size:13px; color:#92400e; line-height:1.65;">
+    無法判定此主機 CPU 是否支援 EasyOCR 需要的 <b>AVX2</b> 指令集（{{ cpu_simd.system }}）。
+    若使用 EasyOCR 時服務無預警崩潰重啟，多半是 CPU 缺 AVX2 —— 請把虛擬機 CPU 類型改為 <code>host</code> 或 <code>x86-64-v3</code>，或在下方手動改用 Tesseract 引擎。
+  </div>
+  {% elif cpu_simd.note %}
+  <div style="margin-bottom:12px; font-size:12px; color:#64748b;">{{ cpu_simd.note }}（CPU：<code>{{ cpu_simd.arch }}</code>）。</div>
+  {% else %}
+  <div style="margin-bottom:12px; font-size:12.5px; color:#15803d;">✓ 此主機 CPU 支援 AVX2，EasyOCR 可正常執行。</div>
+  {% endif %}
+{% endif %}
+
 <!-- Engine Selector -->
 <div class="panel" style="display:flex; align-items:center; gap:0; flex-wrap:wrap; padding:0; margin-bottom:16px; overflow:hidden;">
   <div style="flex:1; min-width:240px; padding:18px 22px; background:#f8fafc; border-right:1px solid #e2e8f0; align-self:stretch; display:flex; flex-direction:column; justify-content:center;">

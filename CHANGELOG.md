@@ -4,6 +4,28 @@
 
 ---
 
+## [1.12.12] - 2026-06-25
+
+### 新增 — OCR 引擎頁 CPU 指令集相容性檢查（EasyOCR 需要 AVX2）
+
+- **背景**：EasyOCR 底層 PyTorch 在缺 AVX2 的 CPU（如 PVE VM 用 `x86-64-v2` CPU model）上辨識時會執行非法指令（SIGILL），讓整個服務 core dump 重啟、Job 變 404。
+- 「OCR 引擎與訓練檔管理」頁頂部新增 **CPU 指令集相容性面板**：偵測 AVX / AVX2 / FMA，缺 AVX2 時以紅框列出缺哪些 + **多虛擬化平台指引**（Proxmox VE 改 `host` / `x86-64-v3`、VMware EVC、Hyper-V 處理器相容模式、VirtualBox `--cpu-profile host`、實體機 / 雲端機型）。
+- 偵測**不 import torch**（壞 CPU 上 import 即可能 SIGILL），只讀 CPU flags：Linux `/proc/cpuinfo`、macOS `sysctl`、Windows `IsProcessorFeaturePresent`（best-effort）；ARM / 無法判定一律保守不誤判。**純診斷指引，不會自動切換引擎**。`app/core/sys_deps.py:probe_cpu_simd()`。
+
+### 修正
+
+- **附件「產生無附件副本」仍含附件**：PDF/A-3 / Factur-X（發票型）把附件同時掛在 catalog 的 `/AF`（Associated Files）；舊版只清 EmbeddedFiles 名稱樹、沒清 `/AF`，副本在 PDF 檢視器中仍顯示附件。strip 改為一併移除 catalog 與頁面的 `/AF`，garbage 才能真正回收附件串流。`app/tools/pdf_attachments/router.py`。
+- **插入頁碼選中文格式（如「第 {n} / {N} 頁」）中文變缺字「·」**：頁碼一律用內建 helv 無 CJK glyph。改為含 CJK 時用真 CJK 字型（`font_catalog.best_cjk_path`），找不到則退用 PyMuPDF 內建 china-t；全形字寬納入定位計算。`app/tools/pdf_pageno/router.py`。
+- **插入頁碼縮圖「放大檢視」只剩黑遮罩、圖載不出（GitHub issue #32）**：lightbox 把 blob URL 接上 `?large=1` 變成無效 URL（net error file not found）。改為先顯示現有縮圖（避免黑屏）再向後端要高 dpi（含頁碼）版本；`/preview-thumb` 新增 `large` 參數。`app/tools/pdf_pageno/`。
+
+### 改善
+
+- **企業 TLS 檢查設備（MITM proxy）讓 uv 裝不了**：TLS 檢查設備會把 HTTPS 憑證換成自家 CA，uv 預設用內建 webpki 根憑證不認那個 CA → 下載 Python / 套件失敗。install.sh / setup-python.cmd / `jtdt update` 預設讓 uv 改用**作業系統信任庫**（企業 CA 通常已在那裡，安全），新版 `UV_SYSTEM_CERTS` / 舊版 `UV_NATIVE_TLS` 兩個都設；另提供 `JTDT_TLS_INSECURE=1` 最後手段（停用驗證，含警告）。
+- **相依套件檢查頁新增 PyMuPDF（fitz）**：最核心的 PDF 引擎原本不在 `/admin/sys-deps` 清單中，現一併顯示版本與狀態。
+- 用詞：OCR 引擎頁頁碼提示「當前」改「目前」。
+
+---
+
 ## [1.12.11] - 2026-06-25
 
 ### 修正 — 無 git 環境（網站一行安裝走 tarball）安裝的 Linux 無法更新

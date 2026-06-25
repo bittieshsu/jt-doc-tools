@@ -149,6 +149,22 @@ async def strip_attachments(request: Request):
                 removed += 1
             except Exception:
                 pass
+        # PDF/A-3 / Factur-X（發票型）會把附件同時掛在 catalog 與頁面的 /AF
+        # (Associated Files) 陣列；embfile_del 只清 EmbeddedFiles 名稱樹，不會動
+        # /AF，導致「無附件副本」在 PDF 檢視器中仍顯示附件。這裡一併移除 /AF，
+        # garbage=4 才能真正回收附件串流。
+        try:
+            cat = doc.pdf_catalog()
+            if "/AF" in doc.xref_object(cat):
+                doc.xref_set_key(cat, "AF", "null")
+        except Exception:
+            pass
+        for page in doc:
+            try:
+                if "/AF" in doc.xref_object(page.xref):
+                    doc.xref_set_key(page.xref, "AF", "null")
+            except Exception:
+                pass
         doc.save(str(out), garbage=4, deflate=True, clean=True)
     finally:
         doc.close()
