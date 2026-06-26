@@ -49,6 +49,14 @@ server {
     ssl_certificate     /etc/letsencrypt/live/docs.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/docs.example.com/privkey.pem;
 
+    # 不要外洩 nginx 版本號（ZAP「Server Leaks Version Information」）
+    server_tokens off;
+
+    # HSTS：jt-doc-tools 應用層已自動設 Strict-Transport-Security（會依
+    # X-Forwarded-Proto 判斷 https）。**不要在 nginx 再 add_header 一次**，
+    # 否則回應會出現兩個 HSTS 標頭（ZAP「Strict-Transport-Security Multiple
+    # Header Entries」）。要在 nginx 統一管也行，但只能擇一來源。
+
     # 必設：上傳大檔需要
     client_max_body_size 100M;
 
