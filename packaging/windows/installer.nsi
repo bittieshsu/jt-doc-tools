@@ -22,7 +22,7 @@ Unicode true
   !define VERSION "0.0.0"
 !endif
 
-!define APPNAME      "Jason Tools Document Toolbox"
+!define APPNAME      "Jason Tools 文件工具箱 (jt-doc-tools)"
 !define SHORTNAME    "jt-doc-tools"
 !define PUBLISHER    "Jason Cheng"
 !define WEBSITE      "https://jasoncheng7115.github.io/jt-doc-tools/"

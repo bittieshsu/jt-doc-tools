@@ -4,6 +4,17 @@
 
 ---
 
+## [1.12.24] - 2026-06-26
+
+### 變更 — Windows 安裝程式標題改中文
+
+- setup.exe 安裝精靈標題（含開始選單資料夾、新增/移除程式顯示名稱）從英文「Jason Tools Document Toolbox」改為「**Jason Tools 文件工具箱 (jt-doc-tools)**」。NSIS Unicode 編譯，makensis 驗證 caption 正確。
+
+### 資安 — 清 CodeQL / Dependabot 告警
+
+- **CodeQL 4 個 High「SQL query built from user-controlled sources」（vat_db.py）**：統編搜尋的下鑽 / 欄位 LIKE 片段原用 f-string 拼欄名，雖欄名來自白名單、值都走 `?` 參數，仍被 CodeQL 判為 user-controlled。改為**靜態常數片段查表**（`_DRILL_SQL` / `_FIELD_LIKE`）—— CodeQL clean + defense-in-depth。
+- **Dependabot pydantic-settings（Moderate, #68）**：升 2.14.0 → 2.14.2。（本專案未使用 `secrets_dir` / `NestedSecretsSettingsSource`，原不受影響，升版清告警。）
+
 ## [1.12.23] - 2026-06-26
 
 ### 改善 — 統編搜尋「台 / 臺」異體字自動互通 + 說明

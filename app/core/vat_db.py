@@ -204,6 +204,16 @@ def _fts_tokenize(s: str) -> str:
 # 可搜尋欄位（對應 FTS 欄名 + vat_registry 欄名）；UI 5 個開關。
 _FTS_FIELDS = ("name", "address", "owner", "org_type", "industries")
 
+# LIKE fallback 用的靜態 SQL 片段查表（欄名常數，避免 f-string 拼欄名觸發
+# CodeQL「SQL from user input」誤判 + defense-in-depth）。
+_FIELD_LIKE = {
+    "name":       "name LIKE ? ESCAPE '\\'",
+    "address":    "address LIKE ? ESCAPE '\\'",
+    "owner":      "owner LIKE ? ESCAPE '\\'",
+    "org_type":   "org_type LIKE ? ESCAPE '\\'",
+    "industries": "industries LIKE ? ESCAPE '\\'",
+}
+
 
 def _fts_match_query(q: str, fields=None) -> str:
     """使用者輸入 → FTS5 MATCH 字串。空格分多關鍵字 → 各自逐字 phrase →
@@ -673,23 +683,37 @@ def _esc_like(s: str) -> str:
     return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+# 下鑽 SQL 片段用「靜態常數查表」而非 f-string 拼欄名 —— 欄名永遠是常數，
+# 使用者值只走 ? 參數；既是 defense-in-depth，也避免 CodeQL 把「f-string 拼 SQL」
+# 誤判成 user-controlled SQL（city 一律用 2 個前綴比對台/臺，不足時填重複值）。
+_DRILL_SQL = {
+    "v": {
+        "org":  "v.org_type = ?",
+        "city": "(v.address LIKE ? ESCAPE '\\' OR v.address LIKE ? ESCAPE '\\')",
+        "ind":  "v.industries LIKE ? ESCAPE '\\'",
+    },
+    "": {
+        "org":  "org_type = ?",
+        "city": "(address LIKE ? ESCAPE '\\' OR address LIKE ? ESCAPE '\\')",
+        "ind":  "industries LIKE ? ESCAPE '\\'",
+    },
+}
+
+
 def _drill_where(alias: str, org_type=None, city=None, industry=None):
     """下鑽篩選（點搜尋結果統計圖用）：組織別 / 縣市（地址前綴）/ 行業。
     回 (sql_clause, params)。alias='v'（FTS JOIN）或 ''（LIKE 直查）。"""
-    a = (alias + ".") if alias else ""
+    sql = _DRILL_SQL["v"] if alias == "v" else _DRILL_SQL[""]
     clauses, params = [], []
     if org_type:
-        clauses.append(f"{a}org_type = ?"); params.append(org_type)
+        clauses.append(sql["org"]); params.append(org_type)
     if city:
-        # 統計把地址縣市正規化成「台」，但原始地址多用「臺」(政府資料)，兩種前綴
-        # 都要比對 —— 否則點「台北市」會查不到「臺北市…」的資料。
+        # 統計把地址縣市正規化成「台」，但原始地址多用「臺」(政府資料)，台/臺
+        # 兩種前綴都比對（否則點「台北市」查不到「臺北市…」）。固定 2 個參數。
         base = _esc_like(city)
-        alt = base.replace("台", "臺")
-        pats = [base + "%"] + ([alt + "%"] if alt != base else [])
-        clauses.append("(" + " OR ".join(f"{a}address LIKE ? ESCAPE '\\'" for _ in pats) + ")")
-        params.extend(pats)
+        clauses.append(sql["city"]); params.extend([base + "%", base.replace("台", "臺") + "%"])
     if industry:
-        clauses.append(f"{a}industries LIKE ? ESCAPE '\\'"); params.append("%" + _esc_like(industry) + "%")
+        clauses.append(sql["ind"]); params.append("%" + _esc_like(industry) + "%")
     return ("".join(" AND " + c for c in clauses), params)
 
 
@@ -750,7 +774,9 @@ def search_companies(query: str, fields=None, limit: int = 50,
         sel = [f for f in (fields or _FTS_FIELDS) if f in _FTS_FIELDS]
         if not sel:
             sel = list(_FTS_FIELDS)
-        field_where = "(" + " OR ".join(f"{f} LIKE ? ESCAPE '\\'" for f in sel) + ")"
+        # 用靜態常數片段查表（_FIELD_LIKE）而非 f-string 拼欄名 — CodeQL clean +
+        # defense-in-depth（欄名永遠常數，值走 ? 參數）。
+        field_where = "(" + " OR ".join(_FIELD_LIKE[f] for f in sel) + ")"
         params = [pattern] * len(sel)
         if cats:
             field_where += " AND category IN (%s)" % ",".join("?" * len(cats)); params.extend(cats)
