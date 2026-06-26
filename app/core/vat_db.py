@@ -174,11 +174,22 @@ def _init_schema(conn: sqlite3.Connection) -> None:
 _CJK_FTS_RE = re.compile(r"[぀-ヿ㐀-䶿一-鿿豈-﫿]")
 
 
+# 異體字正規化：索引與查詢兩邊都套同一套，讓「台/臺」等自動互相比對
+# （政府資料地名多用「臺」，使用者多打「台」）。要擴充就加進此 dict。
+_VARIANT_MAP = str.maketrans({"臺": "台"})
+
+
+def _normalize_variants(s: str) -> str:
+    return s.translate(_VARIANT_MAP) if s else s
+
+
 def _fts_tokenize(s: str) -> str:
     """把字串中的 CJK 每個字用空白隔開（unicode61 會逐字當 token），
-    非 CJK（英數）保留原樣成為整段 token。回正規化後的可索引字串。"""
+    非 CJK（英數）保留原樣成為整段 token。先做異體字正規化（台/臺）。
+    回正規化後的可索引字串。"""
     if not s:
         return ""
+    s = _normalize_variants(s)
     parts = []
     for ch in s:
         if _CJK_FTS_RE.match(ch):
@@ -227,7 +238,7 @@ def _fts5_available(conn: sqlite3.Connection) -> bool:
 # FTS schema 版本：1 = 舊單欄 doc；2 = 多欄（name/address/owner/org_type/
 # industries，支援欄位限定搜尋）。改 schema 一定要 bump，舊站台升版時 _fts_ready
 # 會因版本不符而視同未就緒 → 走 LIKE fallback + 背景自動重建成新 schema。
-_FTS_SCHEMA_VER = 2
+_FTS_SCHEMA_VER = 3   # v3：tokenize 加異體字正規化（台/臺）
 
 
 def _fts_ready(conn: sqlite3.Connection) -> bool:

@@ -324,3 +324,15 @@ def test_city_drill_matches_tai_variants(vat_tmp):
     assert city.get("台北市") == 2 and city.get("新北市") == 1
     r = sorted(x["name"] for x in vat_db.search_companies("北", city="台北市"))
     assert r == ["台北商行", "臺北銀行"]
+
+
+def test_search_tai_variant_normalized(vat_tmp):
+    """資料用「臺」，搜「台」也要查得到（索引+查詢都正規化臺→台）v1.12.23。"""
+    vat_db.init_db()
+    c = vat_db._connect()
+    c.execute("INSERT OR REPLACE INTO vat_registry(vat,name,address,category,status) "
+              "VALUES('11111111','臺灣銀行','臺北市','企業','營業中')")
+    c.commit(); vat_db.rebuild_fts(c); c.commit(); c.close()
+    assert [x["name"] for x in vat_db.search_companies("台灣")] == ["臺灣銀行"]
+    assert [x["name"] for x in vat_db.search_companies("臺灣")] == ["臺灣銀行"]
+    assert [x["name"] for x in vat_db.search_companies("台北")] == ["臺灣銀行"]
