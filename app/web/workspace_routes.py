@@ -10,7 +10,9 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+import base64
+
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 from ..core import workspace as ws
 from ..core.http_utils import content_disposition
@@ -157,13 +159,19 @@ def build_router(templates) -> APIRouter:
             headers={"Content-Disposition":
                      content_disposition(meta.get("name", fp.name), disposition)})
 
+    # 1x1 透明 PNG — 縮圖產不出來（檔案毀損 / 已過期 / 不可渲染）時回這個而非
+    # 拋 HTTP 錯誤,避免工作區清單出現破圖 icon（get_thumbnail docstring 的原意）。
+    _BLANK_PNG = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
+
     @router.get("/workspace/thumb/{file_id}")
     async def workspace_thumb(request: Request, file_id: str):
         _require_enabled()
         try:
             fp, mime = ws.get_thumbnail(request, file_id)
-        except ws.WorkspaceError as e:
-            raise _err_to_http(e)
+        except ws.WorkspaceError:
+            # 功能未啟用以外的失敗 → 回空白 placeholder（不破圖）
+            return Response(content=_BLANK_PNG, media_type="image/png")
         return FileResponse(str(fp), media_type=mime)
 
     @router.post("/workspace/delete")

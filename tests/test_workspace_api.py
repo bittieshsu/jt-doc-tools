@@ -165,3 +165,13 @@ def test_disabled_returns_404(client):
     finally:
         ws.save_settings({"enabled": True, "per_user_quota_mb": 500,
                           "max_file_mb": 50, "retention_hours": -1})
+
+def test_thumb_missing_returns_placeholder_not_broken(client):
+    """縮圖產不出來（檔案不存在 / 不可渲染）→ 回 200 空白 PNG placeholder,
+    不可 404/500 讓 <img> 破圖（回歸 2026-06-27 破圖類問題排查）。"""
+    ws.save_settings({"enabled": True, "per_user_quota_mb": 500,
+                      "max_file_mb": 50, "retention_hours": -1})
+    r = client.get("/workspace/thumb/deadbeefdeadbeefdeadbeefdeadbeef")
+    assert r.status_code == 200, f"破圖：thumb 回 {r.status_code} 而非 placeholder"
+    assert r.headers["content-type"] == "image/png"
+    assert r.content[:8] == b"\x89PNG\r\n\x1a\n"

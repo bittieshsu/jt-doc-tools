@@ -4,6 +4,16 @@
 
 ---
 
+## [1.12.40] - 2026-06-27
+
+### 強化 — 排查同類「靜默破圖 / key 不一致」問題並補強
+
+承 v1.12.39 簽名破圖,系統性排查同類問題:
+- **資產 self-heal**:`AssetManager` 載入時自動把 file_key/thumb_key 與磁碟不符者正規化成 `{id}.png`（永久修好既有資料,讓 crop/regenerate 等「直接組路徑」的程式也一致,不只靠 fallback）。
+- **資產 crop/edit 路徑**:原本直接 `_files_dir / asset.file_key` 繞過 fallback,經 self-heal 正規化後一致。
+- **工作區縮圖**:`/workspace/thumb` 對「不可渲染 / 已過期 / 毀損」檔案原本拋 HTTP 錯誤 → `<img>` 破圖;改回 **200 空白 PNG placeholder**（符合 get_thumbnail docstring 原意）。
+- **已查核安全的**:企業 logo（`custom_logo_url()` gate 在檔案存在,缺檔回空走預設,不破圖）、設定備份匯入（整個 `assets/` 目錄打包,不重配 id）、字型（以實際 path 為鍵,無 uuid 重配）。
+- 測試:工作區縮圖 placeholder + 資產 self-heal 正規化。
 ## [1.12.39] - 2026-06-27
 
 ### 修正 — 資產匯入後印章/簽名縮圖破圖（file_key/thumb_key 與磁碟檔名不一致）

@@ -67,6 +67,35 @@ class AssetManager:
         self._files_dir.mkdir(parents=True, exist_ok=True)
         if not self._meta_path.exists():
             self._write({"assets": []})
+        self._self_heal_keys()
+
+    def _self_heal_keys(self) -> None:
+        """正規化 file_key/thumb_key 與磁碟檔名的不一致（舊版資產匯入沒同步
+        file_key → 登錄指向不存在的 uuid 檔,只有 `{id}.png` 在磁碟上）。
+        若登錄 key 對應的檔不存在、但 `{id}.png` 在 → 改寫成 `{id}.png`。
+        永久修好既有資料,讓所有讀/寫路徑（含直接組路徑的 crop）都一致。"""
+        try:
+            with self._lock:
+                data = self._read()
+                changed = False
+                for a in data.get("assets", []):
+                    aid = a.get("id")
+                    if not aid:
+                        continue
+                    fk, tk = a.get("file_key", ""), a.get("thumb_key", "")
+                    if fk and not (self._files_dir / fk).exists() \
+                            and (self._files_dir / f"{aid}.png").exists():
+                        a["file_key"] = f"{aid}.png"
+                        changed = True
+                    if tk and not (self._files_dir / tk).exists() \
+                            and (self._files_dir / f"{aid}_thumb.png").exists():
+                        a["thumb_key"] = f"{aid}_thumb.png"
+                        changed = True
+                if changed:
+                    self._write(data)
+        except Exception:
+            # 自我修復是 best-effort，失敗不可擋啟動（路徑 fallback 仍會兜底）。
+            pass
 
     def _read(self) -> dict:
         if not self._meta_path.exists():
