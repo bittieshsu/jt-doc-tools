@@ -4,7 +4,7 @@
 {% block title %}送件前檢核 · {{ app_name }}{% endblock %}
 
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .sc-fields { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
 .sc-field label { display:block; font-size:13px; color:#475569; margin-bottom:4px; font-weight:500; }
 .sc-field label .muted { font-weight:400; color:#94a3b8; font-size:11px; }
@@ -49,9 +49,9 @@
 <h1>{{ icon('id-card', size=22) }} 送件前檢核</h1>
 <p class="muted">一批文件送出去前的最後一關自查 — 6 層檢核（規則 / 文字抽取 / 全頁 OCR / 嵌入圖 OCR / LLM 文字 / LLM 視覺）找出 metadata 殘留、漏改範本、章 / 簽缺漏、偽造痕跡等問題。</p>
 
-<div style="display:flex; gap:8px; margin:12px 0 16px;">
-  <a class="btn" href="cases" style="display:inline-flex; align-items:center; gap:6px;">{{ icon('archive', size=14) }} 查看歷史案件</a>
-  <a class="btn" href="self-entities" style="display:inline-flex; align-items:center; gap:6px;">{{ icon('id-card', size=14) }} 管理我方資料</a>
+<div data-s="s19e6ec71">
+  <a class="btn" href="cases" data-s="s7691c43d">{{ icon('archive', size=14) }} 查看歷史案件</a>
+  <a class="btn" href="self-entities" data-s="s7691c43d">{{ icon('id-card', size=14) }} 管理我方資料</a>
 </div>
 
 <details class="panel" open>
@@ -61,9 +61,9 @@
 </details>
 
 <details class="panel" open>
-  <summary>2. 案件基準資訊 <span class="muted" style="font-weight:normal; font-size:12px; margin-left:8px;">（選填，但填越多越準）</span></summary>
+  <summary>2. 案件基準資訊 <span class="muted" data-s="s5af60f7e">（選填，但填越多越準）</span></summary>
   <div class="sc-fields">
-    <div class="sc-field" style="grid-column: 1 / -1;">
+    <div class="sc-field" data-s="s493b1c85">
       <label>案件名稱 <span class="muted">（給這次案件取個易辨識的名稱）</span></label>
       <input type="text" id="caseName" placeholder="例：2026Q2 經濟部標案 / 某某客戶 KYC">
     </div>
@@ -92,9 +92,9 @@
 
 <div class="panel">
   <button class="btn btn-primary" id="btnRun" disabled>{{ icon('play', size=14) }} 開始檢核</button>
-  <span id="status" class="muted" style="margin-left:12px; font-size:13px;">請先上傳至少一個檔案</span>
-  <div class="sc-progress" style="display:none;" id="progressBar"><div></div></div>
-  <div class="sc-stations" id="stations" style="display:none;">
+  <span id="status" class="muted" data-s="sd70b636c">請先上傳至少一個檔案</span>
+  <div class="sc-progress" data-s="scb458930" id="progressBar"><div></div></div>
+  <div class="sc-stations" id="stations" data-s="scb458930">
     <div class="sc-st" data-layer="L1"><span class="dot"></span><b>L1</b><span class="lbl">規則</span><span class="extra"></span></div>
     <div class="sc-st-line"></div>
     <div class="sc-st" data-layer="L2"><span class="dot"></span><b>L2</b><span class="lbl">文字抽取</span><span class="extra"></span></div>

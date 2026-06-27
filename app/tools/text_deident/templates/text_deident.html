@@ -4,7 +4,7 @@
 {% block title %}文字去識別化 · {{ app_name }}{% endblock %}
 {% block head %}
 {{ llm_gate_styles() }}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .td-grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
 @media (max-width: 900px) { .td-grid { grid-template-columns: 1fr; } }
 
@@ -158,7 +158,7 @@
 <p class="muted">貼上文字，或上傳 .txt / .md / .docx / .doc / .odt / .pdf 等檔案，自動偵測敏感資料（身分證 / 手機 / Email / 統編 / 信用卡 / 銀行帳號 / 地址 …），可選擇<b>遮罩</b>（保留邊緣字元，例如「王*明」）、<b>編修</b>（整段塗黑「█」）或<b>替換假資料</b>（產生新的假姓名 / 假號碼，保留格式）後輸出。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 來源文字</h2>
+  <h2 data-s="s53896af7">1. 來源文字</h2>
   <div class="td-input-area">
     <label class="td-drop-zone" id="dropZone" for="fileInput">
       <input type="file" id="fileInput" accept=".txt,.md,.docx,.doc,.odt,.ods,.odp,.rtf,.pdf" hidden />
@@ -171,14 +171,14 @@
       <span class="td-drop-text"><b>點此挑選</b>或拖曳檔案到此
         <span class="hint">.txt / .md / .docx / .odt / .pdf …</span></span>
     </label>
-    {% if workspace_enabled(request) %}<div class="fu-ws-row" style="justify-content:flex-start;"><button type="button" class="ws-load-btn" id="wsLoadBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span>從工作區載入 PDF</span></button></div>{% endif %}
+    {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span>從工作區載入 PDF</span></button></div>{% endif %}
     <textarea id="srcText" placeholder="把要處理的文字貼上來，或從上方上傳檔案…"></textarea>
     <div class="td-help"><span id="srcCount">0</span> 字</div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">2. 設定要偵測的資料類型</h2>
+  <h2 data-s="s53896af7">2. 設定要偵測的資料類型</h2>
   <div class="td-pattern-cats">
     {% set cat_icons = {
       '個人身分': 'id-card',
@@ -253,11 +253,11 @@
       {% endfor %}
     </div>
   </div>
-  <details style="margin-top:10px;">
-    <summary style="cursor:pointer; font-size:12.5px; color:#475569;">
+  <details data-s="s5371db16">
+    <summary data-s="seccd2985">
       自訂 regex（一行一條，格式：<code>標籤 | 正則式</code>）
     </summary>
-    <textarea id="customRx" rows="4" style="width:100%; box-sizing:border-box; margin-top:6px;
+    <textarea id="customRx" rows="4" data-style="width:100%; box-sizing:border-box; margin-top:6px;
       font-family: ui-monospace, monospace; font-size:12px; padding:8px;
       border:1px solid var(--border); border-radius:6px;"
       placeholder="員工編號 | EMP-\d{6}&#10;客戶代號 | CUS-[A-Z0-9]{4,8}"></textarea>
@@ -270,7 +270,7 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">3. 處理方式</h2>
+  <h2 data-s="s53896af7">3. 處理方式</h2>
   <div class="td-modes" id="modeBar">
     <button type="button" class="td-mode-btn active" data-mode="mask">
       <span class="ic-wrap">{{ icon('shield', size=18) }}</span>
@@ -291,12 +291,12 @@
   <div class="td-actions">
     <button class="btn btn-primary" type="button" id="btnDetect">{{ icon('search', size=14) }} 偵測敏感資料</button>
   </div>
-  <div id="errBox" class="td-help" style="color:#b91c1c;" hidden></div>
+  <div id="errBox" class="td-help" data-s="s53875d1b" hidden></div>
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 style="margin-top:0;">4. 偵測結果
-    <span class="muted" id="resultMeta" style="font-size:12.5px; font-weight:400; margin-left:8px;"></span>
+  <h2 data-s="s53896af7">4. 偵測結果
+    <span class="muted" id="resultMeta" data-s="s9ca5dca5"></span>
   </h2>
   <div class="td-counts" id="counts"></div>
   <div class="td-finding-list" id="findings"></div>
@@ -304,7 +304,7 @@
 </div>
 
 <div class="panel" id="applyPanel" hidden>
-  <h2 style="margin-top:0;">5. 套用 / 輸出</h2>
+  <h2 data-s="s53896af7">5. 套用 / 輸出</h2>
   <div class="td-actions">
     <button class="btn btn-primary" type="button" id="btnApply">{{ icon('shield', size=14) }} 套用至全部</button>
     <button class="btn" type="button" id="btnDownload" disabled>{{ icon('download', size=14) }} 下載結果 (.txt)</button>
@@ -313,8 +313,8 @@
 </div>
 
 <div class="panel" id="outputPanel" hidden>
-  <h2 style="margin-top:0;">6. 處理後文字
-    <span class="muted" style="font-size:12.5px; font-weight:400; margin-left:8px;">
+  <h2 data-s="s53896af7">6. 處理後文字
+    <span class="muted" data-s="s9ca5dca5">
       <span id="outCount">0</span> 字
     </span>
   </h2>
@@ -491,7 +491,7 @@ function renderFindings(findings) {
     </div>`;
   });
   $('findings').innerHTML = lines.join('') ||
-    '<div class="td-help" style="text-align:center; padding:20px;">沒有偵測到敏感資料</div>';
+    '<div class="td-help" data-s="s3e0c5272">沒有偵測到敏感資料</div>';
   // checkbox toggles row state
   $('findings').querySelectorAll('input[type=checkbox]').forEach(cb => {
     cb.addEventListener('change', () => {

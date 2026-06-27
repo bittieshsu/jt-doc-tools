@@ -4,7 +4,7 @@
 {% block title %}文件去識別化 · {{ app_name }}{% endblock %}
 {% block head %}
 {{ llm_gate_styles() }}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .dd-hint { background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px;
   padding: 10px 14px; font-size: 13px; color:#075985; margin: 10px 0; }
 .dd-types {
@@ -144,7 +144,7 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳檔案</h2>
+  <h2 data-s="s53896af7">1. 上傳檔案</h2>
   {% with upload_id='ddUpload',
           accept='application/pdf,.pdf,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.csv',
           hint='支援 PDF 與 Office 檔；非 PDF 會先自動轉成 PDF。掃描檔需先 OCR。' %}
@@ -153,7 +153,7 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">2. 選擇要偵測的類型</h2>
+  <h2 data-s="s53896af7">2. 選擇要偵測的類型</h2>
   <div class="dd-pattern-cats" id="ddTypes">
     {% set cat_icons = {
       '個人身分': 'id-card', '聯絡方式': 'mail', '金融資訊': 'credit-card',
@@ -221,8 +221,8 @@
       {% endfor %}
     </div>
   </div>
-  <details class="dd-custom" style="margin-top:10px;">
-    <summary class="muted" style="cursor:pointer; font-size:13px;">+ 自訂 regex（一行一條，格式：<code>標籤|正則式</code>）</summary>
+  <details class="dd-custom" data-s="s5371db16">
+    <summary class="muted" data-s="sb96c3baa">+ 自訂 regex（一行一條，格式：<code>標籤|正則式</code>）</summary>
     <textarea id="ddCustom" placeholder="員編|EMP\d{5}&#10;合約號|CON-\d{4}-\d{3}"></textarea>
   </details>
 
@@ -231,20 +231,20 @@
               feature_desc='regex 只能抓「格式固定」的東西（身分證、電話、Email、銀行帳號…）。實務上更常漏掉的是「靠上下文判讀」的內容：人名（王小明、陳經理、林先生）、職稱（採購主管、業務副總）、自訂代號（客戶 C-2024-001、產品 SKU、合約編號）、口語化地址（台北南港分公司、總部三樓會議室）、其他公司 / 機構名稱等。搭配本機 LLM 跑，完全不出網路、不上雲、不留資料；經內部 4 份廠商表單 × 73 欄位實測，<b>gemma4:26b</b> 效果與效能兼具（100% 命中、平均 11 秒），為目前推薦模型。多花一次 LLM call 換來真正可用的去識別化效果，比單跑 regex 漏一堆要實在得多。',
               input_id='ddLlmAugment') }}
 
-  <div style="margin-top:10px;">
+  <div data-s="s5371db16">
     <button class="btn btn-primary" id="btnDetect">{{ icon('eye', size=14) }} 偵測敏感資料</button>
-    <span id="detectStatus" class="muted" style="margin-left:10px; font-size:12.5px;"></span>
+    <span id="detectStatus" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 style="margin-top:0;">3. 偵測結果</h2>
+  <h2 data-s="s53896af7">3. 偵測結果</h2>
   <div class="dd-stats" id="ddStats"></div>
   <div class="dd-findings">
     <table>
       <thead>
         <tr>
-          <th style="width:36px;"><input type="checkbox" id="selAll" checked></th>
+          <th data-s="sa4f3a333"><input type="checkbox" id="selAll" checked></th>
           <th>類型</th>
           <th>頁</th>
           <th>原值</th>
@@ -255,7 +255,7 @@
     </table>
   </div>
 
-  <h2 style="margin-top:16px;">4. 處理模式</h2>
+  <h2 data-s="sb0043ef4">4. 處理模式</h2>
   <div class="dd-mode-picker" id="ddModes">
     <div class="dd-mode mode-redact" data-mode="redact">
       <div class="ic">{{ icon('trash', size=18) }}</div>
@@ -273,19 +273,19 @@
     </div>
   </div>
 
-  <div style="margin-top:14px;">
+  <div data-s="s553a645f">
     <button class="btn btn-primary" id="btnProcess">{{ icon('shield', size=14) }} 產生處理後 PDF</button>
-    <span id="procStatus" class="muted" style="margin-left:10px; font-size:12.5px;"></span>
+    <span id="procStatus" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="dd-result" id="doneBox" hidden>
-  <h3 style="margin:0 0 8px; color:#064e3b;">處理完成</h3>
-  <div id="doneSummary" style="margin-bottom:10px; font-size:13px; color:#065f46;"></div>
+  <h3 data-s="s8b6172c3">處理完成</h3>
+  <div id="doneSummary" data-s="s5d5fcd83"></div>
   <a class="btn btn-primary" id="dlLink" href="#">{{ icon('download') }} 下載處理後的 PDF</a>
-  {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden style="margin-left:8px;">{{ icon('archive') }} 存至工作區</button>{% endif %}
-  <h4 style="margin:16px 0 4px; font-size:14px; color:#064e3b;">處理後預覽</h4>
-  <p class="muted" style="font-size:12px; margin:0 0 6px;">點縮圖可放大檢視。</p>
+  {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden data-s="sc3f83707">{{ icon('archive') }} 存至工作區</button>{% endif %}
+  <h4 data-s="s4fd43b62">處理後預覽</h4>
+  <p class="muted" data-s="s001d1537">點縮圖可放大檢視。</p>
   <div class="dd-preview-grid" id="ddPreviewGrid"></div>
 </div>
 
@@ -364,7 +364,7 @@ function renderDetect(d) {
   }
   const body = $('ddTable');
   if (!d.findings.length) {
-    body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">沒有偵測到敏感資料 🎉</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" data-s="s22a809a0">沒有偵測到敏感資料 🎉</td></tr>`;
     $('detectStatus').textContent = `完成 — 沒有偵測到敏感資料`;
     return;
   }

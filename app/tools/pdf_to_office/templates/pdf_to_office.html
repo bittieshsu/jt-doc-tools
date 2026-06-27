@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}PDF 轉文書檔 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .p2o-stat { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
   gap:10px; margin:10px 0; }
 .p2o-stat .item { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px;
@@ -127,7 +127,7 @@
 {% block content %}
 <h1>{{ icon('file-swap', size=22) }} PDF 轉文書檔</h1>
 <p class="muted">把 PDF 轉成 <b>Word (.docx)</b> 或 <b>OpenDocument (.odt)</b>，內含字型 / 段落 / 雜訊智慧校正。
-<br><span style="color:#94a3b8; font-size:12.5px;">⚠ 不會 100% 還原原 PDF 排版（PDF 是固定排版、Word 是流動排版，本質就無法精準還原）；掃描檔請先用「OCR 文字辨識」工具轉成可選取文字 PDF 再來。</span></p>
+<br><span data-s="s3a4c95a1">⚠ 不會 100% 還原原 PDF 排版（PDF 是固定排版、Word 是流動排版，本質就無法精準還原）；掃描檔請先用「OCR 文字辨識」工具轉成可選取文字 PDF 再來。</span></p>
 
 <div class="panel">
   <h2>1. 上傳 PDF</h2>
@@ -162,15 +162,15 @@
 
 <div class="panel" id="enginePanel" hidden>
   <h2>3. 轉換引擎</h2>
-  <div class="p2o-fmt" style="grid-template-columns: 1fr 1fr; display:grid; gap:10px;">
+  <div class="p2o-fmt" data-s="s4fa9496a">
     <input type="radio" name="engine" id="engPdf2docx" value="pdf2docx-refine" checked>
     <label for="engPdf2docx">
-      <div class="ttl"><b>pdf2docx</b> <span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;font-size:11px;margin-left:6px;">預設</span></div>
+      <div class="ttl"><b>pdf2docx</b> <span data-s="s3d90d78b">預設</span></div>
       <div class="desc">經典引擎：Artifex pdf2docx 抽結構，跨平台穩定相容性高。可在進階選項勾啟 jtdt-refine 後處理。</div>
     </label>
     <input type="radio" name="engine" id="engJtdtReform" value="jtdt-reform">
     <label for="engJtdtReform">
-      <div class="ttl"><b>jtdt-reform</b> <span style="background:#e5e7eb;color:#6b7280;padding:1px 6px;border-radius:4px;font-size:11px;margin-left:6px;">實驗</span></div>
+      <div class="ttl"><b>jtdt-reform</b> <span data-s="se94702da">實驗</span></div>
       <div class="desc">自家開發引擎：依 PDF 實際版面座標用幾何規則重組成 docx / odt。某些 layout 細節仍在改善。</div>
     </label>
   </div>
@@ -178,9 +178,9 @@
 
 <div class="panel" id="advPanel" hidden>
   <h2>4. 進階選項</h2>
-  <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13.5px;">
-    <input type="checkbox" id="enablePost" style="margin-top:3px;flex:0 0 auto;">
-    <span>用 <b style="white-space:nowrap;">jtdt-refine</b> 後處理引擎（25 條 fixer：字型 / 段落 / 標題 / 清單 / 表格 / 雜訊 / bbox 版面校正）— 僅對 pdf2docx 引擎有效。預設不勾，需要時手動啟用。</span>
+  <label data-s="sdd9b47b8">
+    <input type="checkbox" id="enablePost" data-s="sc69fd296">
+    <span>用 <b data-s="s4ddbe905">jtdt-refine</b> 後處理引擎（25 條 fixer：字型 / 段落 / 標題 / 清單 / 表格 / 雜訊 / bbox 版面校正）— 僅對 pdf2docx 引擎有效。預設不勾，需要時手動啟用。</span>
   </label>
 
   <details class="p2o-fixers">
@@ -459,7 +459,7 @@ const jp = new JobProgress($('p2oJob'), {
       rows.push(['修正',
         chips.length
           ? `<div class="fixer-chips">${chips.join('')}</div>`
-          : '<span style="color:#94a3b8;">無變動</span>'
+          : '<span data-s="s8cd4ae71">無變動</span>'
       ]);
     }
     if (rows.length) {
@@ -494,18 +494,18 @@ const jp = new JobProgress($('p2oJob'), {
       const rc = resultChars[String(pi)];
       // v1.9.79：左右標題顯示「擷取 N 字」幫助使用者驗證內容完整度
       const ocLabel = (oc !== undefined && oc !== null)
-        ? ` <span style="color:#475569;font-weight:normal;">— 擷取 ${oc} 字</span>` : '';
+        ? ` <span data-s="se93eb165">— 擷取 ${oc} 字</span>` : '';
       const rcLabel = (rc !== undefined && rc !== null)
-        ? ` <span style="color:#475569;font-weight:normal;">— 擷取 ${rc} 字</span>` : '';
+        ? ` <span data-s="se93eb165">— 擷取 ${rc} 字</span>` : '';
       // 若結果字數遠少於原始 (< 50% 且原始 > 50)，警示紅色
       let rcExtra = '';
       if (oc !== undefined && rc !== undefined && oc > 50 && rc < oc * 0.5) {
-        rcExtra = ` <span style="color:#dc2626;font-weight:normal;">⚠ 內容大量遺失</span>`;
+        rcExtra = ` <span data-s="s901fdc89">⚠ 內容大量遺失</span>`;
       }
       const block = document.createElement('div');
       block.style.marginBottom = '14px';
       block.innerHTML = `
-        <div class="preview-label" style="font-size:12px;font-weight:600;color:#065f46;margin-bottom:4px;">第 ${p1} 頁</div>
+        <div class="preview-label" data-s="sb3dfab28">第 ${p1} 頁</div>
         <div class="preview-grid">
           <div class="preview-cell">
             <div class="preview-label">原 PDF${ocLabel}</div>

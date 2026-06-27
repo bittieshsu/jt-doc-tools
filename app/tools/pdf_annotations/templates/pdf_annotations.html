@@ -4,7 +4,7 @@
 {% block title %}註解整理 · {{ app_name }}{% endblock %}
 {% block head %}
 {{ llm_gate_styles() }}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .an-llm-card { background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);
   border:1px solid #93c5fd; border-radius:10px; padding:14px 16px; margin-top:14px; }
 .an-llm-card h3 { margin:0 0 8px; font-size:14.5px; color:#1e3a8a;
@@ -86,7 +86,7 @@
 <p class="muted">擷取 PDF 中所有註解(螢光筆 / 文字註解 / 圖章 / 自由文字 / 手繪 …)，依需求輸出完整清單、審閱報告或待辦清單。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
   {% with upload_id='anUp', accept='application/pdf' %}{% include "components/file_upload.html" %}{% endwith %}
 
   {{ llm_gate('pdf-annotations', llm_enabled, llm_model, mode='augment',
@@ -94,7 +94,7 @@
               feature_desc='把所有註解送地端 LLM，依內容主題自動歸類（例：需修改文字 / 格式問題 / 詢問疑點 / 已確認）。註解內容會傳送給設定的 LLM server，請確認為內網地端服務。',
               input_id='anLlmGroup') }}
 
-  <div id="anLoading" class="muted" style="margin-top:10px; font-size:12.5px;" hidden>
+  <div id="anLoading" class="muted" data-s="s5d8b4b19" hidden>
     {{ icon('refresh', size=14) }} 分析中…
   </div>
   <div id="anError" class="an-warn" hidden></div>
@@ -103,7 +103,7 @@
 <div id="anResults" hidden>
 
 <div class="panel">
-  <h2 style="margin-top:0;">統計總覽 <span class="muted" style="font-size:13px; font-weight:400; margin-left:8px;" id="anFile"></span></h2>
+  <h2 data-s="s53896af7">統計總覽 <span class="muted" data-s="sbee7077a" id="anFile"></span></h2>
   <div class="an-stats">
     <div class="an-stat an-stat-1"><div class="lbl">註解總數</div><div class="val" id="sTotal">—</div></div>
     <div class="an-stat an-stat-2"><div class="lbl">頁數</div><div class="val" id="sPages">—</div></div>
@@ -122,7 +122,7 @@
     </div>
   </div>
 
-  <h4 style="margin: 14px 0 6px; font-size:13px; color:#475569;">分組顯示與報告</h4>
+  <h4 data-s="sb912b7d1">分組顯示與報告</h4>
   <div class="an-modes">
     <button class="an-mode active" data-group="page">依頁碼</button>
     <button class="an-mode" data-group="author">依作者</button>
@@ -139,7 +139,7 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">註解明細 <span class="muted" style="font-size:13px; font-weight:400; margin-left:8px;" id="anCount"></span></h2>
+  <h2 data-s="s53896af7">註解明細 <span class="muted" data-s="sbee7077a" id="anCount"></span></h2>
   <div id="anList" class="an-list"></div>
   <div id="anListEmpty" class="an-empty" hidden>沒有符合篩選的註解</div>
 </div>
@@ -249,7 +249,7 @@ function renderLlm(llm) {
   card.id = "anLlmPanel";
   card.className = "an-llm-card";
   let html = '<h3>' + '{{ icon("globe", size=14)|safe }} LLM 自動分組' +
-    (llm.model ? ' <span style="margin-left:auto;font-size:11.5px;color:#3b82f6;font-weight:normal;">模型 ' + escapeHtml(llm.model) + '</span>' : '') +
+    (llm.model ? ' <span data-s="sc3db4d65">模型 ' + escapeHtml(llm.model) + '</span>' : '') +
     '</h3>';
   if (llm.error) {
     html += '<div class="an-llm-err">LLM 處理失敗:' + escapeHtml(llm.error) + '</div>';
@@ -330,10 +330,10 @@ function redrawList() {
   let html = "";
   for (const [k, items] of buckets) {
     html += `<div class="an-group">`;
-    html += `<div class="an-group-h">${escapeHtml(k)} <span style="opacity:.6;font-weight:400;">(${items.length})</span></div>`;
+    html += `<div class="an-group-h">${escapeHtml(k)} <span data-s="s1efd9ac4">(${items.length})</span></div>`;
     for (const a of items) {
       const who = a.author || "(未署名)";
-      const body = a.content || a.subject || "<em style='color:#94a3b8'>(無文字內容)</em>";
+      const body = a.content || a.subject || "<em data-s='s8cd4ae71'>(無文字內容)</em>";
       const thumb = lastResult.upload_id
         ? `<div class="thumb"><img loading="lazy" class="loading" src="/tools/pdf-annotations/preview/${lastResult.upload_id}/${a.page}" alt="第 ${a.page} 頁預覽" data-page="${a.page}"></div>`
         : "";

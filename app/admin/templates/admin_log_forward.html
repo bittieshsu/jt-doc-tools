@@ -8,31 +8,31 @@
 失敗會 retry 3 次後放棄並寫入本地稽核（<code>audit_forward_failed</code>）。</p>
 
 <div class="panel">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2 style="margin:0;">轉發目的地</h2>
+  <div data-s="s3390deba">
+    <h2 data-s="s1386d503">轉發目的地</h2>
     <button class="btn btn-primary" id="addBtn" type="button">{{ icon('plus', size=14) }} 新增</button>
   </div>
 
-  <table id="destTable" style="margin-top:14px;">
+  <table id="destTable" data-s="s553a645f">
     <thead>
       <tr>
         <th>啟用</th>
         <th title="自訂識別名稱（多個 destination 時方便區分，例如 Splunk Prod / Graylog Backup）。留空會自動帶入 {format}://{host}:{port}。">名稱</th>
         <th>格式</th><th>傳輸</th>
-        <th>Host <span style="color:#dc2626" title="必填">*</span></th>
+        <th>Host <span data-s="sbc8099b4" title="必填">*</span></th>
         <th>Port</th><th></th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
 
-  <p style="margin-top:14px;">
+  <p data-s="s553a645f">
     <button class="btn btn-primary" id="saveBtn" type="button">{{ icon('save', size=14) }} 儲存所有變更</button>
-    <span class="muted" id="status" style="margin-left:10px; font-size:12px;"></span>
+    <span class="muted" id="status" data-s="sc57a38d4"></span>
   </p>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   #destTable { width:100%; border-collapse:collapse; font-size:13px; }
   #destTable th, #destTable td { padding:6px 8px; border-bottom:1px solid #e5e7eb; }
   #destTable th { background:#f9fafb; font-size:11px; color:#6b7280; text-align:left; }
@@ -65,7 +65,7 @@ function row(d) {
       </select>
     </td>
     <td><input class="field" type="text" data-k="host" value="${esc(d.host||'')}" placeholder="logserver.example.com" required></td>
-    <td><input class="field" type="number" data-k="port" value="${d.port||514}" min="1" max="65535" style="width:80px;"></td>
+    <td><input class="field" type="number" data-k="port" value="${d.port||514}" min="1" max="65535" data-s="s8db8d854"></td>
     <td>
       <input type="hidden" data-k="id" value="${esc(d.id||'')}">
       <button class="btn btn-small btn-danger" data-act="del" type="button">{{ icon('trash', size=11) }}</button>

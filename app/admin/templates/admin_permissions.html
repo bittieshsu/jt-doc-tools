@@ -3,7 +3,7 @@
 {% block title %}權限矩陣 · {{ app_name }}{% endblock %}
 {% block content %}
 <h1>{{ icon('gear', size=22) }} 權限矩陣</h1>
-<p class="muted" style="margin-top:0;">
+<p class="muted" data-s="s53896af7">
   每位使用者 / 群組可以指派多個角色（自動聯集權限）。
   進階：直接 grant 個別工具給特定 subject（少數客製情境用）。
   左側選 subject，右側即時編輯，存檔後生效。
@@ -65,13 +65,13 @@
           <div class="perm-detail-title" id="pdTitle"></div>
           <div class="perm-detail-sub" id="pdSub"></div>
         </div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <span id="pdDirty" class="muted" style="font-size:11.5px;" hidden>未儲存的變更</span>
+        <div data-s="s9586d088">
+          <span id="pdDirty" class="muted" data-s="sc73c4105" hidden>未儲存的變更</span>
           <button class="btn btn-primary" type="button" id="pdSave">{{ icon('save', size=14) }} 儲存</button>
         </div>
       </div>
 
-      <fieldset class="auth-section" style="margin-top:14px;">
+      <fieldset class="auth-section" data-s="s553a645f">
         <legend>{{ icon('shield', size=14) }} 角色</legend>
         <div class="picker">
           <div class="picker-toolbar">
@@ -86,8 +86,8 @@
         </div>
       </fieldset>
 
-      <fieldset class="auth-section" style="margin-top:12px;">
-        <legend>{{ icon('tool', size=14) }} 進階：直接 grant 工具 <span class="muted" style="font-weight:400;font-size:11px">（角色之外的客製授權）</span></legend>
+      <fieldset class="auth-section" data-s="s002535c2">
+        <legend>{{ icon('tool', size=14) }} 進階：直接 grant 工具 <span class="muted" data-s="s3cef0ca8">（角色之外的客製授權）</span></legend>
         <div class="picker">
           <div class="picker-toolbar">
             <input class="field picker-search" type="search" id="pdToolSearch" placeholder="搜尋工具…">
@@ -105,7 +105,7 @@
 </div>
 {% endif %}
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .perm-shell { display:grid; grid-template-columns: minmax(260px, 320px) 1fr; gap:0; padding:0; min-height:520px; }
   @media (max-width: 880px) { .perm-shell { grid-template-columns: 1fr; } }
   .perm-side { border-right:1px solid #e5e7eb; display:flex; flex-direction:column; min-width:0; }

@@ -4,7 +4,7 @@
 {% block title %}我方資料管理 · {{ app_name }}{% endblock %}
 
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .se-tbl { width:100%; border-collapse: collapse; font-size:13px; }
 .se-tbl th, .se-tbl td { padding:8px 10px; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align:top; }
 .se-tbl th { background:#f8fafc; color:#475569; font-weight:600; }
@@ -25,7 +25,7 @@
 {% endblock %}
 
 {% block content %}
-<p class="muted" style="font-size:12px; margin-bottom:4px;"><a href="." style="color:#64748b;">← 送件前檢核</a></p>
+<p class="muted" data-s="s730ec98e"><a href="." data-s="sd2abea56">← 送件前檢核</a></p>
 <h1>{{ icon('id-card', size=22) }} 我方資料管理</h1>
 <p class="muted">預先登錄自家公司、子公司、客戶等常用實體 — 跨檔檢核時系統自動排除（不再誤標「非預期主體」），同時偵測是否打錯（漏字 / 統編位錯）。<strong>支援多公司</strong>。</p>
 
@@ -64,14 +64,14 @@
       <label>備註</label>
       <input type="text" id="seNote" placeholder="例：母公司 / 海外子公司 / 常見客戶">
     </div>
-    <div class="full" style="display:flex; gap:8px;">
+    <div class="full" data-s="s38861b51">
       <button type="submit" class="btn btn-primary">{{ icon('save', size=14) }} <span id="seSubmitLabel">新增</span></button>
       <button type="button" class="btn" data-act="reset">清除</button>
     </div>
   </form>
 </details>
 
-<div class="panel" style="padding:0; overflow:hidden; margin-top:14px;">
+<div class="panel" data-s="sfbc940d3">
   {% if entities %}
   <table class="se-tbl">
     <thead><tr>
@@ -86,11 +86,11 @@
         <td class="aliases">{{ ', '.join(e.aliases) if e.aliases else '—' }}</td>
         <td>
           {% if e.address %}{{ e.address }}{% endif %}
-          {% if e.note %}<br><span style="color:#64748b; font-size:11px;">{{ e.note }}</span>{% endif %}
+          {% if e.note %}<br><span data-s="sb46e8ec6">{{ e.note }}</span>{% endif %}
         </td>
         <td class="actions">
           <button class="btn" data-act="edit" data-entity='{{ e|tojson }}'>編輯</button>
-          <button class="btn" data-act="del" data-id="{{ e.id }}" data-name="{{ e.name|e }}" style="color:#dc2626;">刪除</button>
+          <button class="btn" data-act="del" data-id="{{ e.id }}" data-name="{{ e.name|e }}" data-s="sbc8099b4">刪除</button>
         </td>
       </tr>
     {% endfor %}

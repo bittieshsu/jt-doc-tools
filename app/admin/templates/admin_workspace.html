@@ -5,9 +5,9 @@
 <h1>{{ icon('archive', size=22) }} 工作區設定</h1>
 <p class="muted">「我的工作區」讓使用者把各工具輸出的 PDF / PNG 存在伺服器上，只有自己的帳號看得到。容量額度對所有人統一適用（無個人特例）。</p>
 
-<div class="panel" style="border-left:4px solid #3b82f6; font-size:13px;">
+<div class="panel" data-s="s5fb956f2">
   <b>說明：</b>
-  <ul style="margin:6px 0 0 18px; padding:0; line-height:1.7;">
+  <ul data-s="saa3893fb">
     <li><b>停用</b>後整個功能完全隱藏：各工具的「存至工作區」「從工作區載入」按鈕與「我的工作區」頁面都不會出現。</li>
     <li>認證關閉（單機模式）時，工作區為單一共用（即該台機器的使用者）。</li>
     <li>只接受 PDF 與 PNG 檔。</li>
@@ -17,32 +17,32 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">設定</h2>
+  <h2 data-s="s53896af7">設定</h2>
   <div class="form-row">
     <label>啟用工作區</label>
     <label class="switch-label"><input type="checkbox" id="ws-enabled" {% if settings.enabled %}checked{% endif %}> 開啟此功能</label>
   </div>
   <div class="form-row">
     <label>每人容量額度</label>
-    <input class="field" type="number" id="ws-quota" value="{{ settings.per_user_quota_mb }}" min="0" max="1048576" style="width:110px;"> MB（0 = 不限）
+    <input class="field" type="number" id="ws-quota" value="{{ settings.per_user_quota_mb }}" min="0" max="1048576" data-s="s1a30558f"> MB（0 = 不限）
   </div>
   <div class="form-row">
     <label>單檔上限</label>
-    <input class="field" type="number" id="ws-maxfile" value="{{ settings.max_file_mb }}" min="0" max="1048576" style="width:110px;"> MB（0 = 不限）
+    <input class="field" type="number" id="ws-maxfile" value="{{ settings.max_file_mb }}" min="0" max="1048576" data-s="s1a30558f"> MB（0 = 不限）
   </div>
   <div class="form-row">
     <label>保留時數</label>
-    <input class="field" type="number" id="ws-retention" value="{{ settings.retention_hours }}" min="-1" max="876000" style="width:110px;"> 小時（-1 = 永久）
+    <input class="field" type="number" id="ws-retention" value="{{ settings.retention_hours }}" min="-1" max="876000" data-s="s1a30558f"> 小時（-1 = 永久）
   </div>
-  <p style="margin-top:14px;">
+  <p data-s="s553a645f">
     <button class="btn btn-primary" id="saveBtn">{{ icon('save', size=14) }} 儲存設定</button>
-    <span id="status" class="muted" style="font-size:12px; margin-left:10px;"></span>
+    <span id="status" class="muted" data-s="sf1fa4084"></span>
   </p>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">目前佔用</h2>
-  <p class="muted" style="font-size:13px;">總計 {{ stats.total_count }} 個檔案，{{ '%.1f'|format(stats.total_bytes / 1048576) }} MB。</p>
+  <h2 data-s="s53896af7">目前佔用</h2>
+  <p class="muted" data-s="s3044b600">總計 {{ stats.total_count }} 個檔案，{{ '%.1f'|format(stats.total_bytes / 1048576) }} MB。</p>
   {% if stats.users %}
   <table class="ws-table">
     <thead><tr><th>使用者</th><th>檔案數</th><th>佔用</th><th></th></tr></thead>
@@ -53,14 +53,14 @@
       {% endfor %}
     </tbody>
   </table>
-  <p style="margin-top:12px;"><button class="btn btn-small" id="ws-clear-all" type="button">清空所有人的工作區</button>
-    <span class="muted" style="font-size:12px; margin-left:8px;">（管理員僅能管理容量，無法瀏覽使用者檔案內容）</span></p>
+  <p data-s="s002535c2"><button class="btn btn-small" id="ws-clear-all" type="button">清空所有人的工作區</button>
+    <span class="muted" data-s="s1aa5e15b">（管理員僅能管理容量，無法瀏覽使用者檔案內容）</span></p>
   {% else %}
   <p class="muted">尚無任何使用者存檔。</p>
   {% endif %}
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .ws-table { width:100%; border-collapse:collapse; font-size:13px; }
   .ws-table th, .ws-table td { padding:6px 8px; border-bottom:1px solid #e5e7eb; text-align:left; }
   .ws-table th { background:#f9fafb; font-size:11px; color:#6b7280; }

@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}隱藏內容掃描 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .hs-cat { background:#fff; border:1px solid #e5e7eb; border-radius:8px;
   padding: 10px 14px; margin-top: 10px; }
 .hs-cat-head { display:flex; align-items:center; gap:8px;
@@ -31,26 +31,26 @@
 <p class="muted">找出 PDF 中可能造成資安風險的隱藏內容：JavaScript、嵌入檔、外部連結、白字文字、頁面外文字、3D / 多媒體、註解等。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
   {% with upload_id='hsUp', accept='application/pdf' %}{% include "components/file_upload.html" %}{% endwith %}
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 style="margin-top:0;">2. 掃描結果</h2>
-  <p class="muted" style="font-size:12px;">勾選要一併清除的類別，底下按鈕產生清除後的 PDF。</p>
+  <h2 data-s="s53896af7">2. 掃描結果</h2>
+  <p class="muted" data-s="s6b9c179a">勾選要一併清除的類別，底下按鈕產生清除後的 PDF。</p>
   <div id="hsCats"></div>
-  <div style="margin-top:12px;">
+  <div data-s="s002535c2">
     <button class="btn btn-primary" id="btnClean">{{ icon('trash', size=14) }} 清除勾選項目並下載</button>
-    <button class="btn" id="btnCleanAll" style="margin-left:6px;">全部清除</button>
-    <span id="cleanStatus" class="muted" style="margin-left:10px; font-size:12.5px;"></span>
+    <button class="btn" id="btnCleanAll" data-s="sda472840">全部清除</button>
+    <span id="cleanStatus" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
-<div class="panel" id="dlPanel" hidden style="background:#ecfdf5; border-color:#86efac;">
-  <h3 style="margin:0 0 8px; color:#064e3b;">清除完成</h3>
-  <div id="dlSummary" style="font-size:13px; color:#065f46; margin-bottom:10px;"></div>
+<div class="panel" id="dlPanel" hidden data-s="s611babd7">
+  <h3 data-s="s8b6172c3">清除完成</h3>
+  <div id="dlSummary" data-s="se51dd4d2"></div>
   <a class="btn btn-primary" id="dlLink" href="#">{{ icon('download') }} 下載清除後的 PDF</a>
-  {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden style="margin-left:8px;">{{ icon('archive') }} 存至工作區</button>{% endif %}
+  {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden data-s="sc3f83707">{{ icon('archive') }} 存至工作區</button>{% endif %}
 </div>
 
 {% endblock %}
@@ -94,7 +94,7 @@ const fu = new FileUpload($('hsUp'), async (f) => {
   $('hsCats').innerHTML = '<div class="muted">掃描中…</div>';
   const fd = new FormData(); fd.append('file', f);
   const r = await fu.upload('/tools/pdf-hidden-scan/scan', fd, {processingLabel: '掃描隱藏內容中…'});
-  if (!r.ok) { $('hsCats').innerHTML = '<span style="color:#b91c1c;">失敗：' + await r.text() + '</span>'; return; }
+  if (!r.ok) { $('hsCats').innerHTML = '<span data-s="s53875d1b">失敗：' + await r.text() + '</span>'; return; }
   const d = await r.json();
   uploadId = d.upload_id;
   lastFindings = d.findings;

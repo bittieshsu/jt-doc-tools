@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}清單處理 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .tl-input-area { width: 100%; min-height: 220px; max-height: 480px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px; line-height: 1.45;
@@ -184,14 +184,14 @@
 <p class="muted">把每行文字當一筆資料。可貼上文字或上傳 .txt / .csv / .xlsx / .docx / .pdf 等檔案，依序套用排序 / 去重 / 篩選等操作。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 輸入清單</h2>
+  <h2 data-s="s53896af7">1. 輸入清單</h2>
   <textarea class="tl-input-area" id="inputArea" spellcheck="false"
     placeholder="貼上文字（每行一筆），或把檔案拖進來 .txt .csv .tsv .md .log .xlsx .ods .docx .odt .pdf …"></textarea>
   <div class="tl-meta">
     <span id="inputMeta">0 行 · 0 字</span>
-    <span id="loadedFile" style="color:#059669;"></span>
-    <span style="display:flex; gap:6px; margin-left:auto;">
-      <label class="tl-mini-btn" style="cursor:pointer;">
+    <span id="loadedFile" data-s="sd4ac9708"></span>
+    <span data-s="s40992687">
+      <label class="tl-mini-btn" data-s="sb202c6d4">
         {{ icon('paperclip', size=12) }} 上傳檔案
         <input type="file" id="filePicker" hidden
           accept=".txt,.csv,.tsv,.md,.markdown,.log,.json,.yaml,.yml,.ini,.conf,.xlsx,.ods,.docx,.odt,.pdf">
@@ -203,7 +203,7 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">2. 操作（勾選會依序套用，拖曳可改變順序）</h2>
+  <h2 data-s="s53896af7">2. 操作（勾選會依序套用，拖曳可改變順序）</h2>
   <div class="tl-ops">
     <svg class="tl-connectors" xmlns="http://www.w3.org/2000/svg"></svg>
     <div class="tl-op" data-op="trim">
@@ -398,25 +398,25 @@
       </span>
     </div>
       <div class="sub">
-        <input type="text" data-param="prefix" placeholder="前綴" style="width:90px;">
-        <input type="text" data-param="suffix" placeholder="後綴" style="width:90px;">
+        <input type="text" data-param="prefix" placeholder="前綴" data-s="sc78f4943">
+        <input type="text" data-param="suffix" placeholder="後綴" data-s="sc78f4943">
       </div>
     </div>
   </div>
-  <div style="margin-top:10px;">
+  <div data-s="s5371db16">
     <button class="btn btn-primary" id="btnRun">{{ icon('play', size=14) }} 執行</button>
-    <span id="status" class="muted" style="margin-left:10px; font-size:12.5px;"></span>
+    <span id="status" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 style="margin-top:0;">3. 結果</h2>
+  <h2 data-s="s53896af7">3. 結果</h2>
   <div class="tl-result-toolbar">
     <div class="stats" id="resultStats">—</div>
     <div class="right">
       <button type="button" class="tl-copy-big" id="btnCopyAll">{{ icon('copy', size=14) }} 全部複製</button>
       <span class="tl-export-wrap">
-        <button type="button" class="tl-mini-btn" id="btnExport" style="padding:7px 12px; font-size:12.5px;">
+        <button type="button" class="tl-mini-btn" id="btnExport" data-s="sfd546464">
           {{ icon('download', size=12) }} 下載 ▾
         </button>
         <span class="tl-export-menu" id="exportMenu" hidden>
@@ -477,7 +477,7 @@ async function _uploadFile(f) {
     updateInputMeta();
     $('status').textContent = "";
   } catch (e) {
-    $('status').innerHTML = `<span style="color:#b91c1c;">錯誤：${escapeHtml(e.message)}</span>`;
+    $('status').innerHTML = `<span data-s="s53875d1b">錯誤：${escapeHtml(e.message)}</span>`;
   }
 }
 
@@ -759,7 +759,7 @@ function setStats(j) {
 $('btnRun').addEventListener('click', async () => {
   const text = $('inputArea').value || "";
   if (!text.trim()) {
-    $('status').innerHTML = '<span style="color:#b91c1c;">請先輸入或上傳清單</span>';
+    $('status').innerHTML = '<span data-s="s53875d1b">請先輸入或上傳清單</span>';
     return;
   }
   const ops = collectOps();
@@ -781,7 +781,7 @@ $('btnRun').addEventListener('click', async () => {
     // scroll to result
     $('resultPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (e) {
-    $('status').innerHTML = `<span style="color:#b91c1c;">錯誤：${escapeHtml(e.message)}</span>`;
+    $('status').innerHTML = `<span data-s="s53875d1b">錯誤：${escapeHtml(e.message)}</span>`;
   } finally {
     $('btnRun').disabled = false;
   }

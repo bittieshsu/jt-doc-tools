@@ -4,6 +4,19 @@
 
 ---
 
+## [1.12.30] - 2026-06-27
+
+### 資安 — CSP 移除 style-src 'unsafe-inline'（Phase 2）→ ZAP 0 中風險
+
+回應 ZAP「CSP: style-src unsafe-inline」(最後一個 Medium)。
+
+- **1371 個靜態 inline `style="..."` → `data-s` 屬性 + 自動產生的 `static/css/generated-inline.css`**(682 個去重 class,最後載入贏同特異性 tie)。確定性 1:1 置換,屬性位置不動。
+- **動態樣式（JS `${}` / Jinja 算值,13+ 處）→ `data-style` 屬性 + `inline_actions.js` 用 CSSOM(`el.style.cssText`)套用**（CSP 不擋 CSSOM,只擋 HTML inline style 屬性）。
+- **84 個 `<style>` 區塊加 nonce**；CSP `style-src 'self' 'nonce-…'`（移除 'unsafe-inline',跨瀏覽器、不依賴 style-src-attr）。
+- 所有 POST 表單補 server-render 的 `csrf_token` 隱藏欄位（含 AJAX 的 asset 上傳 / logout）→ ZAP「Absence of Anti-CSRF」誤判也消除。
+- **驗證**:headless 截圖 **58 頁前後 pixel-diff**(53 完全一致,5 為動態內容/抗鋸齒雜訊,逐一目視確認無破版);headless 逐頁 **0 CSP 違規**;**264 API 端點 0 CSRF 誤擋**;完整 pytest **1464 passed**;新增 `test_csp_nonce` 涵蓋(每個 inline script/style 有 nonce、無 inline style 屬性、無 inline handler)。
+- **ZAP 全頁掃描結果:High 0 / Medium 0 / Low 3 / Info 6** —— 達成零中風險。
+
 ## [1.12.29] - 2026-06-27
 
 ### 資安 — 消除 CodeQL 2 個 Medium（SSO，改碼非 dismiss）

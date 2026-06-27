@@ -4,7 +4,7 @@
 {% block title %}字數統計 · {{ app_name }}{% endblock %}
 {% block head %}
 {{ llm_gate_styles() }}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .wc-llm-card { background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);
   border:1px solid #93c5fd; border-radius:10px; padding:14px 16px; margin-top:14px; }
 .wc-llm-card h3 { margin:0 0 8px; font-size:14.5px; color:#1e3a8a;
@@ -96,11 +96,11 @@
 <p class="muted">統計 PDF 中的字數、字元、段落、句子，並繪製每頁字數直條圖、字元類型環圈、中文單字 / 中文雙字 / 英文 三類高頻詞圖表。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳檔案或貼文字</h2>
-  <p class="muted" style="margin:-4px 0 8px;">支援 PDF、純文字 (.txt / .md / .csv / .log / .json / .xml / .html 等)；或直接貼文字到下方文字框。</p>
-  <div class="wc-tabs" style="display:flex; gap:8px; margin-bottom:10px;">
-    <button type="button" id="wcTabFile" class="wc-tab-btn wc-tab-active" style="padding:6px 14px; border:1px solid #d1d5db; background:#fff; cursor:pointer; border-radius:6px;">上傳檔案</button>
-    <button type="button" id="wcTabPaste" class="wc-tab-btn" style="padding:6px 14px; border:1px solid #d1d5db; background:#f8fafc; cursor:pointer; border-radius:6px;">貼文字</button>
+  <h2 data-s="s53896af7">1. 上傳檔案或貼文字</h2>
+  <p class="muted" data-s="s9b38d59e">支援 PDF、純文字 (.txt / .md / .csv / .log / .json / .xml / .html 等)；或直接貼文字到下方文字框。</p>
+  <div class="wc-tabs" data-s="s840f7af1">
+    <button type="button" id="wcTabFile" class="wc-tab-btn wc-tab-active" data-s="s1052c80a">上傳檔案</button>
+    <button type="button" id="wcTabPaste" class="wc-tab-btn" data-s="s4c4dc256">貼文字</button>
   </div>
 
   <div id="wcPanelFile">
@@ -108,10 +108,10 @@
   </div>
 
   <div id="wcPanelPaste" hidden>
-    <textarea id="wcPasteText" rows="10" placeholder="貼上要統計的文字…" style="width:100%; padding:10px; font-family:inherit; font-size:14px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;"></textarea>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-      <span class="muted" id="wcPasteHint" style="font-size:12.5px;">0 字元</span>
-      <button type="button" id="wcPasteAnalyze" class="btn btn-primary" style="padding:8px 18px;">分析文字</button>
+    <textarea id="wcPasteText" rows="10" placeholder="貼上要統計的文字…" data-s="s9588a4ca"></textarea>
+    <div data-s="sd83b7ba6">
+      <span class="muted" id="wcPasteHint" data-s="sea8bbc82">0 字元</span>
+      <button type="button" id="wcPasteAnalyze" class="btn btn-primary" data-s="sdf3930f2">分析文字</button>
     </div>
   </div>
 
@@ -120,16 +120,16 @@
               feature_desc='額外呼叫地端 LLM，產出 3-5 句重點摘要與前 10 大關鍵字（會將內容送往設定的 LLM server，請確認為內網地端服務）。',
               input_id='wcLlmSum') }}
 
-  <div id="wcLoading" class="muted" style="margin-top:10px; font-size:12.5px;" hidden>
+  <div id="wcLoading" class="muted" data-s="s5d8b4b19" hidden>
     {{ icon('refresh', size=14) }} 分析中，請稍候…
   </div>
   <div id="wcError" class="wc-warn" hidden></div>
 </div>
 
-<div id="wcMulti" hidden style="margin-top:16px;">
+<div id="wcMulti" hidden data-s="sb0043ef4">
   <div class="panel">
-    <h2 style="margin-top:0;">多檔字數統計 <span class="muted" id="wcMultiCount" style="font-size:13px; font-weight:400; margin-left:8px;"></span></h2>
-    <div id="wcMultiSkipped" class="muted" style="margin-bottom:8px;" hidden></div>
+    <h2 data-s="s53896af7">多檔字數統計 <span class="muted" id="wcMultiCount" data-s="sbee7077a"></span></h2>
+    <div id="wcMultiSkipped" class="muted" data-s="sd51702bf" hidden></div>
     <div class="wc-stats">
       <div class="wc-stat wc-stat-1"><div class="lbl">跨檔總字數</div><div class="val" id="mWordTotal">0</div></div>
       <div class="wc-stat"><div class="lbl">總頁數</div><div class="val" id="mPages">0</div></div>
@@ -142,19 +142,19 @@
     </div>
   </div>
   <div class="panel">
-    <h2 style="margin-top:0;">各檔排行（依字數）</h2>
-    <div style="overflow-x:auto;">
-      <table style="width:100%; border-collapse:collapse; font-size:13.5px;">
+    <h2 data-s="s53896af7">各檔排行（依字數）</h2>
+    <div data-s="sdf74e8d8">
+      <table data-s="sdd1ab27d">
         <thead>
-          <tr style="background:#f1f5f9; border-bottom:2px solid #cbd5e1;">
-            <th style="padding:8px; text-align:left;">#</th>
-            <th style="padding:8px; text-align:left;">檔名</th>
-            <th style="padding:8px; text-align:right;">頁數</th>
-            <th style="padding:8px; text-align:right;">字數</th>
-            <th style="padding:8px; text-align:right;">字元</th>
-            <th style="padding:8px; text-align:right;">中文</th>
-            <th style="padding:8px; text-align:right;">英文</th>
-            <th style="padding:8px; text-align:right;">閱讀</th>
+          <tr data-s="s14e632eb">
+            <th data-s="see901b6b">#</th>
+            <th data-s="see901b6b">檔名</th>
+            <th data-s="se95c35b1">頁數</th>
+            <th data-s="se95c35b1">字數</th>
+            <th data-s="se95c35b1">字元</th>
+            <th data-s="se95c35b1">中文</th>
+            <th data-s="se95c35b1">英文</th>
+            <th data-s="se95c35b1">閱讀</th>
           </tr>
         </thead>
         <tbody id="mRankingBody"></tbody>
@@ -163,10 +163,10 @@
   </div>
 </div>
 
-<div id="wcResults" hidden style="margin-top:16px;">
+<div id="wcResults" hidden data-s="sb0043ef4">
 
 <div class="panel">
-  <h2 style="margin-top:0;">統計總覽 <span class="muted" style="font-size:13px; font-weight:400; margin-left:8px;" id="wcFile"></span></h2>
+  <h2 data-s="s53896af7">統計總覽 <span class="muted" data-s="sbee7077a" id="wcFile"></span></h2>
 
   <div class="wc-stats">
     <div class="wc-stat wc-stat-1">
@@ -220,7 +220,7 @@
 
 <div id="wcLlmPanel" class="wc-llm-card" hidden>
   <h3>{{ icon('globe', size=14) }} LLM 摘要與關鍵字
-    <span class="hint" id="wcLlmModel" style="font-size:11.5px; color:#3b82f6; margin-left:auto; font-weight:normal;"></span>
+    <span class="hint" id="wcLlmModel" data-s="sc6f332f2"></span>
   </h3>
   <div id="wcLlmErr" class="wc-llm-err" hidden></div>
   <div id="wcLlmSummary" class="wc-llm-summary" hidden></div>
@@ -431,14 +431,14 @@ function renderMulti(r) {
     const rd = row.reading_min;
     const rdTxt = rd < 1 ? '<1 分' : (rd >= 60 ? (Math.floor(rd/60)+'時'+Math.round(rd%60)+'分') : (rd + ' 分'));
     tr.innerHTML = `
-      <td style="padding:6px 8px;">${i+1}</td>
-      <td style="padding:6px 8px; word-break:break-all;">${row.filename.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</td>
-      <td style="padding:6px 8px; text-align:right;">${fmt(row.page_count)}</td>
-      <td style="padding:6px 8px; text-align:right; font-weight:600;">${fmt(row.word_total)}</td>
-      <td style="padding:6px 8px; text-align:right;">${fmt(row.char_total)}</td>
-      <td style="padding:6px 8px; text-align:right;">${fmt(row.cjk_chars)}</td>
-      <td style="padding:6px 8px; text-align:right;">${fmt(row.en_words)}</td>
-      <td style="padding:6px 8px; text-align:right;">${rdTxt}</td>
+      <td data-s="s01015751">${i+1}</td>
+      <td data-s="s607685be">${row.filename.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</td>
+      <td data-s="sba95a9d8">${fmt(row.page_count)}</td>
+      <td data-s="sbc6365ce">${fmt(row.word_total)}</td>
+      <td data-s="sba95a9d8">${fmt(row.char_total)}</td>
+      <td data-s="sba95a9d8">${fmt(row.cjk_chars)}</td>
+      <td data-s="sba95a9d8">${fmt(row.en_words)}</td>
+      <td data-s="sba95a9d8">${rdTxt}</td>
     `;
     tb.appendChild(tr);
   });
@@ -612,9 +612,9 @@ function drawDonut(b) {
   // center text
   svg.insertAdjacentHTML('beforeend',
     `<text x="${cx}" y="${cy-4}" text-anchor="middle" ` +
-    `style="fill:#0f172a;font-size:18px;font-weight:700;font-family:ui-sans-serif;">${fmt(total)}</text>` +
+    `data-style="fill:#0f172a;font-size:18px;font-weight:700;font-family:ui-sans-serif;">${fmt(total)}</text>` +
     `<text x="${cx}" y="${cy+14}" text-anchor="middle" ` +
-    `style="fill:#94a3b8;font-size:11px;font-family:ui-sans-serif;">字元數</text>`);
+    `data-style="fill:#94a3b8;font-size:11px;font-family:ui-sans-serif;">字元數</text>`);
 
   // legend
   const lg = $('donutLegend');
@@ -623,8 +623,8 @@ function drawDonut(b) {
     if (v <= 0) return;
     const pct = (v/total*100).toFixed(1);
     lg.insertAdjacentHTML('beforeend',
-      `<span><span class="sw" style="background:${DONUT_COLORS[k]}"></span>` +
-      `${DONUT_LABELS[k]} <b>${pct}%</b> <span style="color:#94a3b8;">(${fmt(v)})</span></span>`);
+      `<span><span class="sw" data-style="background:${DONUT_COLORS[k]}"></span>` +
+      `${DONUT_LABELS[k]} <b>${pct}%</b> <span data-s="s8cd4ae71">(${fmt(v)})</span></span>`);
   });
 
   svg.querySelectorAll('path.bar-rect').forEach(el => {

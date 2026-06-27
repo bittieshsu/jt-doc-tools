@@ -19,6 +19,10 @@ _TPL_DIRS += [str(p.relative_to(_ROOT)) for p in (_ROOT / "app/tools").glob("*/t
 _HTML = [p for d in _TPL_DIRS for p in (_ROOT / d).rglob("*.html")]
 
 _SCRIPT_OPEN = re.compile(r"<script\b([^>]*)>")
+_STYLE_OPEN = re.compile(r"<style\b([^>]*)>")
+# 獨立的 inline style="..." 屬性（前面不是 - 或字母 → 不含 data-*-style;
+# style= 緊接引號無空格 → 排除 JS 變數 `let style = '...'`）
+_INLINE_STYLE_ATTR = re.compile(r'(?<![-\w])style=["\']')
 _RAW_BLOCK = re.compile(r"\{%-?\s*raw\s*-?%\}(.*?)\{%-?\s*endraw\s*-?%\}", re.S)
 _INLINE_HANDLER = re.compile(
     r"\bon(click|submit|change|input|load|error|keyup|keydown|"
@@ -46,6 +50,34 @@ def test_no_nonce_script_inside_raw(path):
     for raw in _RAW_BLOCK.finditer(s):
         assert "<script nonce" not in raw.group(1), (
             f"{path.name}: <script nonce> 被包在 {{% raw %}} 內 → nonce 不會渲染")
+
+
+@pytest.mark.parametrize("path", _HTML, ids=lambda p: str(p.relative_to(_ROOT)))
+def test_style_blocks_have_nonce(path):
+    """每個 <style> 區塊必須帶 nonce（strict CSP style-src 'nonce-…'）。"""
+    s = path.read_text(encoding="utf-8")
+    for m in _STYLE_OPEN.finditer(s):
+        assert "nonce=" in m.group(1), (
+            f"{path.name}: <style{m.group(1)}> 缺 nonce → strict CSP 會擋")
+
+
+@pytest.mark.parametrize("path", _HTML, ids=lambda p: str(p.relative_to(_ROOT)))
+def test_no_inline_style_attr(path):
+    """模板不可有 inline style="..." 屬性（strict CSP style-src 不涵蓋；
+    動態樣式改 data-style + CSSOM，靜態改 data-s + 產生的 CSS）。"""
+    s = path.read_text(encoding="utf-8")
+    hits = _INLINE_STYLE_ATTR.findall(s)
+    assert not hits, (
+        f"{path.name}: 殘留 {len(hits)} 個 inline style 屬性 → 改 data-s / data-style")
+
+
+@pytest.mark.parametrize("path", _HTML, ids=lambda p: str(p.relative_to(_ROOT)))
+def test_no_nonce_style_inside_raw(path):
+    """<style nonce=...> 不可在 {% raw %} 內（同 script，nonce 不會渲染）。"""
+    s = path.read_text(encoding="utf-8")
+    for raw in _RAW_BLOCK.finditer(s):
+        assert "<style nonce" not in raw.group(1), (
+            f"{path.name}: <style nonce> 在 {{% raw %}} 內 → nonce 不渲染")
 
 
 @pytest.mark.parametrize("path", _HTML, ids=lambda p: str(p.relative_to(_ROOT)))

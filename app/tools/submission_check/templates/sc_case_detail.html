@@ -4,7 +4,7 @@
 {% block title %}案件 {{ case.case_id[:8] }} · {{ app_name }}{% endblock %}
 
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .scd-meta dl { display:grid; grid-template-columns: 110px 1fr; gap:6px 12px; margin:0; font-size:13px; }
 .scd-meta dt { color:#64748b; }
 .scd-meta dd { margin:0; color:#1e293b; }
@@ -83,15 +83,15 @@
 {% endblock %}
 
 {% block content %}
-<p class="muted" style="font-size:12px; margin-bottom:4px;"><a href="../cases" style="color:#64748b;">← 案件清單</a></p>
+<p class="muted" data-s="s730ec98e"><a href="../cases" data-s="sd2abea56">← 案件清單</a></p>
 <h1>{{ icon('id-card', size=22) }}
-  {% if case.name %}{{ case.name }}{% else %}<span style="color:#94a3b8;">(未命名案件)</span>{% endif %}
-  <span title="{{ case.case_id }}" style="font-family:ui-monospace,Menlo,monospace; font-weight:400; font-size:14px; color:#94a3b8; margin-left:8px;">{{ case.case_id[:8] }}</span>
+  {% if case.name %}{{ case.name }}{% else %}<span data-s="s8cd4ae71">(未命名案件)</span>{% endif %}
+  <span title="{{ case.case_id }}" data-s="sfa8a6633">{{ case.case_id[:8] }}</span>
 </h1>
 
 <div class="panel scd-meta">
   <dl>
-    <dt>狀態</dt><dd><span style="font-weight:500;">{{ case.status }}</span></dd>
+    <dt>狀態</dt><dd><span data-s="s1e29eefb">{{ case.status }}</span></dd>
     <dt>檔案數</dt><dd>{{ case.files|length }}</dd>
     <dt>主角</dt><dd>
       {% if case.ground_truth.main_entity %}
@@ -99,7 +99,7 @@
         {% if case.ground_truth.main_entity.identifier %}
           <span class="muted">（{{ case.ground_truth.main_entity.identifier }}）</span>
         {% endif %}
-      {% else %}<span style="color:#94a3b8;">(未設定)</span>{% endif %}
+      {% else %}<span data-s="s8cd4ae71">(未設定)</span>{% endif %}
     </dd>
     {% if case.ground_truth.counterparty %}
     <dt>對方</dt><dd>{{ case.ground_truth.counterparty.name }}</dd>
@@ -111,19 +111,19 @@
     <dt>截止日</dt><dd>{{ case.ground_truth.deadline }}</dd>
     {% endif %}
   </dl>
-  <div style="margin-top:12px;">
+  <div data-s="s002535c2">
     <button class="btn btn-primary" data-act="rerun">{{ icon('refresh', size=14) }} 重新檢核（新版本）</button>
-    <button class="btn" data-act="reload" style="margin-left:6px;">{{ icon('refresh', size=14) }} 重新整理</button>
+    <button class="btn" data-act="reload" data-s="sda472840">{{ icon('refresh', size=14) }} 重新整理</button>
   </div>
 </div>
 
 {# 進行中時顯示 inline 進度 + 6 層燈號，自動 poll #}
 {% if case.status == 'running' and case.current_job_id %}
-<div class="panel" id="runningPanel" data-job-id="{{ case.current_job_id }}" style="background:#fffbeb; border-color:#fcd34d;">
-  <h3 style="margin-top:0; font-size:15px; color:#92400e;">{{ icon('refresh', size=16) }} 正在檢核中…</h3>
-  <div class="muted" id="runningMsg" style="font-size:13px; margin:4px 0;">準備中…</div>
-  <div style="height:8px; background:#fef3c7; border-radius:4px; overflow:hidden; margin:8px 0;">
-    <div id="runningBar" style="height:100%; background:#f59e0b; width:5%; transition:width .3s;"></div>
+<div class="panel" id="runningPanel" data-job-id="{{ case.current_job_id }}" data-s="s952f79a6">
+  <h3 data-s="sbd49e862">{{ icon('refresh', size=16) }} 正在檢核中…</h3>
+  <div class="muted" id="runningMsg" data-s="s90d46ee8">準備中…</div>
+  <div data-s="s6c0b83a4">
+    <div id="runningBar" data-s="s83ed22de"></div>
   </div>
   <div class="scd-stations" id="runningStations">
     {% for L, lbl in [('L1','規則'), ('L2','文字抽取'), ('L3','全頁 OCR'), ('L4','嵌入圖 OCR'), ('L5','LLM 文字'), ('L6','LLM 視覺')] %}
@@ -133,12 +133,12 @@
     {% if not loop.last %}<div class="scd-st-line"></div>{% endif %}
     {% endfor %}
   </div>
-  <p class="muted" style="font-size:11px; margin:8px 0 0;">完成後本頁會自動更新。</p>
+  <p class="muted" data-s="s34ac9235">完成後本頁會自動更新。</p>
 </div>
 {% endif %}
 
 {% if not versions_with_reports %}
-  <div class="panel" style="text-align:center; color:#94a3b8;">
+  <div class="panel" data-s="s57599526">
     尚無檢核版本，按上方「重新檢核」開始第一次檢核。
   </div>
 {% endif %}
@@ -171,7 +171,7 @@
 
       {% if v.report.cross_findings %}
       <div class="scd-subsection cross">
-        <div class="scd-subsection-title">{{ icon('layers', size=14) }} 跨檔發現 <span class="muted" style="font-weight:normal; font-size:12px;">({{ v.report.cross_findings|length }} 項 — 多檔之間的一致性 / 重複 / 衝突)</span></div>
+        <div class="scd-subsection-title">{{ icon('layers', size=14) }} 跨檔發現 <span class="muted" data-s="s0c27a7ee">({{ v.report.cross_findings|length }} 項 — 多檔之間的一致性 / 重複 / 衝突)</span></div>
       {% for fd in v.report.cross_findings %}
         <div class="scd-finding {{ fd.severity }}{% if fd._override %} has-override{% endif %}">
           <span class="scd-layer">{{ fd.layer }}</span>
@@ -179,7 +179,7 @@
           <div class="scd-finding-detail">{{ fd.detail }}</div>
           {% if fd.evidence and fd.evidence|length > 0 %}
           <button class="scd-evidence-toggle" data-act="toggle">▸ 顯示細節</button>
-          <pre class="scd-evidence" style="display:none;">{{ fd.evidence|tojson(indent=2) }}</pre>
+          <pre class="scd-evidence" data-s="scb458930">{{ fd.evidence|tojson(indent=2) }}</pre>
           {% endif %}
           {% if fd._override %}
           <div class="scd-override-note">{{ fd._override.verdict }} — {{ fd._override.reason or '無註記' }} (by {{ fd._override.by_user or 'anonymous' }})</div>
@@ -214,7 +214,7 @@
       {% endif %}
 
       <div class="scd-subsection per-file">
-        <div class="scd-subsection-title">{{ icon('page', size=14) }} 逐檔結果 <span class="muted" style="font-weight:normal; font-size:12px;">({{ case.files|length }} 個檔案各自的 finding)</span></div>
+        <div class="scd-subsection-title">{{ icon('page', size=14) }} 逐檔結果 <span class="muted" data-s="s0c27a7ee">({{ case.files|length }} 個檔案各自的 finding)</span></div>
       {% for f in case.files %}
         {% set fds = v.report.findings_per_file.get(f.file_id, []) %}
         <div class="scd-file-name">{{ f.name }} <span class="sz">({{ (f.size/1024)|round(1) }} KB)</span></div>
@@ -223,7 +223,7 @@
           <div class="scd-finding {{ fd.severity }}{% if fd._override %} has-override{% endif %}">
             <span class="scd-layer">{{ fd.layer }}</span>
             <span class="scd-finding-title">{{ fd.title }}</span>
-            {% if fd.page %}<span class="muted" style="font-size:11px;">　p.{{ fd.page }}</span>{% endif %}
+            {% if fd.page %}<span class="muted" data-s="s8b685211">　p.{{ fd.page }}</span>{% endif %}
             <div class="scd-finding-detail">{{ fd.detail }}</div>
             {% if fd._override %}
             <div class="scd-override-note">{{ fd._override.verdict }} — {{ fd._override.reason or '無註記' }} (by {{ fd._override.by_user or 'anonymous' }})</div>

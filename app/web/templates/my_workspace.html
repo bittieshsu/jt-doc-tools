@@ -6,7 +6,7 @@
 <p class="muted">這裡存放你從各工具按「存至工作區」保留的 PDF / PNG 檔，只有你的帳號看得到。在任何工具的上傳區可按「從工作區載入」取回使用。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">容量</h2>
+  <h2 data-s="s53896af7">容量</h2>
   <div id="ws-usage-wrap">
     <div class="ws-usage-bar"><div class="ws-usage-fill" id="ws-usage-fill"></div></div>
     <div class="ws-usage-line">
@@ -17,8 +17,8 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">上傳到工作區</h2>
-  <p class="muted" style="font-size:12px; margin:0 0 8px;">直接把 PDF / PNG 拖進來，或點選挑選，存到自己的工作區。</p>
+  <h2 data-s="s53896af7">上傳到工作區</h2>
+  <p class="muted" data-s="se2907ccc">直接把 PDF / PNG 拖進來，或點選挑選，存到自己的工作區。</p>
   <div class="file-upload" id="wsUpload" data-accept="application/pdf,image/png">
     <label class="drop-zone" for="wsUpload-input">
       <div class="drop-zone-inner">
@@ -32,12 +32,12 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">檔案<span id="ws-count" class="ws-count"></span></h2>
+  <h2 data-s="s53896af7">檔案<span id="ws-count" class="ws-count"></span></h2>
   <div id="ws-bulk" class="ws-bulk" hidden>
     <label class="ws-bulk-all"><input type="checkbox" id="ws-select-all"> 全選</label>
     <button class="btn btn-small" id="ws-del-selected" type="button" disabled>刪除選取 <span id="ws-sel-count">0</span></button>
   </div>
-  <div id="ws-empty" class="muted" hidden style="padding:14px 2px;">目前沒有檔案。到任何工具產生 PDF / PNG 後，按「存至工作區」即可保留在這裡。</div>
+  <div id="ws-empty" class="muted" hidden data-s="s892883c7">目前沒有檔案。到任何工具產生 PDF / PNG 後，按「存至工作區」即可保留在這裡。</div>
   <div id="ws-grid" class="ws-grid"></div>
 </div>
 
@@ -49,7 +49,7 @@
   <a id="ws-lb-open" class="btn btn-primary" target="_blank" rel="noopener">開啟原檔</a>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .ws-usage-bar { height: 12px; background: #e5e7eb; border-radius: 7px; overflow: hidden; }
 .ws-usage-fill { height: 100%; width: 0; background: linear-gradient(to right, #2563eb, #3b82f6); transition: width .25s; }
 .ws-usage-fill.warn { background: linear-gradient(to right, #f59e0b, #f97316); }

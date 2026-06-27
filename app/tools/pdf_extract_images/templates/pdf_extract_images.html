@@ -4,21 +4,21 @@
 {% block content %}
 <h1>{{ icon('image', size=22) }} 擷取圖片</h1>
 <p class="muted">把 PDF 中<b>嵌入的圖片</b>（照片、Logo、圖示等）擷取出來，可勾選想要的下載成 ZIP 或單張下載。<br>
-  <span class="muted" style="font-size:12px;">注意：這不是把 PDF 每一頁轉成圖片，那是「<a href="/tools/pdf-to-image/">文書轉圖片</a>」工具。</span>
+  <span class="muted" data-s="s6b9c179a">注意：這不是把 PDF 每一頁轉成圖片，那是「<a href="/tools/pdf-to-image/">文書轉圖片</a>」工具。</span>
 </p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">上傳 PDF</h2>
+  <h2 data-s="s53896af7">上傳 PDF</h2>
   {% with upload_id='upE', accept='application/pdf' %}{% include "components/file_upload.html" %}{% endwith %}
-  <p class="muted" style="font-size:12px; margin-top:6px;">目前一次處理一份 PDF。上傳後會自動擷取所有嵌入圖片。</p>
+  <p class="muted" data-s="s168f2b58">目前一次處理一份 PDF。上傳後會自動擷取所有嵌入圖片。</p>
 </div>
 
 <div class="panel" id="extract-panel" hidden>
-  <h2 style="margin-top:0;">擷取結果</h2>
-  <div class="form-row" style="margin-bottom:8px;">
-    <span style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-      <span class="muted" id="extract-info" style="font-size:13px;">—</span>
-      <span style="flex:1;"></span>
+  <h2 data-s="s53896af7">擷取結果</h2>
+  <div class="form-row" data-s="sd51702bf">
+    <span data-s="sc8395ac5">
+      <span class="muted" id="extract-info" data-s="s3044b600">—</span>
+      <span data-s="sda5cd676"></span>
       <button class="btn btn-small" type="button" id="btn-select-all">全選</button>
       <button class="btn btn-small" type="button" id="btn-select-none">全不選</button>
       <button class="btn btn-primary btn-small" type="button" id="btn-zip">{{ icon('download', size=14) }}下載勾選 (ZIP)</button>
@@ -27,7 +27,7 @@
   <div class="img-grid" id="img-grid"></div>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .page-grid, .img-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:14px; margin-top: 8px; }
 .page-card, .img-card {
   position:relative; background:#fff; border:1px solid var(--border); border-radius:8px;
@@ -105,13 +105,13 @@ const fu = new FileUpload(document.getElementById('upE'), async (f) => {
   }
   document.getElementById('extract-panel').hidden = false;
   document.getElementById('img-grid').innerHTML =
-    '<div class="ext-loading" style="grid-column:1/-1;"><span class="ext-spinner ext-spinner-lg"></span><div>正在擷取嵌入圖片，請稍候…</div></div>';
+    '<div class="ext-loading" data-s="s1b9b41ec"><span class="ext-spinner ext-spinner-lg"></span><div>正在擷取嵌入圖片，請稍候…</div></div>';
   document.getElementById('extract-info').innerHTML = '<span class="ext-spinner"></span> 擷取中…';
   const fd = new FormData(); fd.append('file', f);
   const r = await fu.upload('/tools/pdf-extract-images/extract', fd, {processingLabel: '伺服器擷取圖片中…'});
   if (!r.ok) {
     document.getElementById('img-grid').innerHTML =
-      '<p class="muted" style="grid-column:1/-1;text-align:center;padding:24px;color:#dc2626;">擷取失敗：' +
+      '<p class="muted" data-s="s4a71db72">擷取失敗：' +
       escapeHtmlPx(await r.text()) + '</p>';
     return;
   }
@@ -132,7 +132,7 @@ function renderExtracted() {
   const info = document.getElementById('extract-info');
   info.textContent = `共 ${extractedItems.length} 張，已勾選 ${picked.size} 張`;
   if (!extractedItems.length) {
-    grid.innerHTML = '<p class="muted" style="grid-column:1/-1;text-align:center;padding:24px;">這份 PDF 沒有嵌入圖片。</p>';
+    grid.innerHTML = '<p class="muted" data-s="s2a9ed20f">這份 PDF 沒有嵌入圖片。</p>';
     return;
   }
   grid.innerHTML = extractedItems.map(it => {

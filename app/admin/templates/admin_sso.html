@@ -4,26 +4,26 @@
 {% block content %}
 <h1>{{ icon('lock', size=22) }} SSO 單一登入（OIDC / SAML）</h1>
 
-<div class="panel" style="border-left:4px solid #3b82f6;">
-  <p style="margin:0;">SSO 是<b>附加</b>登入方式，與本機 / LDAP / AD 並存 —— 啟用後本機 <code>jtdt-admin</code> 仍可登入當作 break-glass。首次以 SSO 登入會自動建立帳號（預設「一般使用者」角色）；IdP 群組會同步成本站群組，可在「權限矩陣」對應到角色。</p>
+<div class="panel" data-s="s05937742">
+  <p data-s="s1386d503">SSO 是<b>附加</b>登入方式，與本機 / LDAP / AD 並存 —— 啟用後本機 <code>jtdt-admin</code> 仍可登入當作 break-glass。首次以 SSO 登入會自動建立帳號（預設「一般使用者」角色）；IdP 群組會同步成本站群組，可在「權限矩陣」對應到角色。</p>
   {% if not auth_enabled %}
-  <p style="color:#b45309; margin:10px 0 0;">{{ icon('warn', size=14) }} 目前<b>未啟用認證</b>。請先到「認證設定」啟用並建立管理員，才能開啟 SSO。</p>
+  <p data-s="s53265c10">{{ icon('warn', size=14) }} 目前<b>未啟用認證</b>。請先到「認證設定」啟用並建立管理員，才能開啟 SSO。</p>
   {% endif %}
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">共用設定</h2>
+  <h2 data-s="s53896af7">共用設定</h2>
   <label>對外網址 base URL（reverse proxy 的公開網址，OIDC redirect / SAML ACS 都以此為準）</label>
-  <input id="base_url" type="url" placeholder="https://docs.example.com" value="{{ sso.base_url }}" style="width:100%;" />
-  <p class="muted" style="font-size:12px;">留空則依進來的請求推導（直連 / 開發用）。有反向代理時<b>務必</b>填對外 https 網址。</p>
-  <div id="urlHints" class="muted" style="font-size:12px; margin-top:8px;"></div>
+  <input id="base_url" type="url" placeholder="https://docs.example.com" value="{{ sso.base_url }}" data-s="s6d567387" />
+  <p class="muted" data-s="s6b9c179a">留空則依進來的請求推導（直連 / 開發用）。有反向代理時<b>務必</b>填對外 https 網址。</p>
+  <div id="urlHints" class="muted" data-s="s77a268ab"></div>
 </div>
 
 <details class="panel">
-  <summary style="cursor:pointer; font-weight:600; font-size:15px;">{{ icon('page', size=14) }} 常見 IdP 設定範例（點開）</summary>
-  <p class="muted" style="font-size:12px; margin-top:10px;">把 <code>&lt;...&gt;</code> 換成你的實際值。各家都要先在 IdP 端把 <b>Redirect URI</b>（OIDC）或 <b>ACS</b>（SAML）設成本站對外網址，見上方提示。</p>
+  <summary data-s="s35a6dee3">{{ icon('page', size=14) }} 常見 IdP 設定範例（點開）</summary>
+  <p class="muted" data-s="s5207ccf8">把 <code>&lt;...&gt;</code> 換成你的實際值。各家都要先在 IdP 端把 <b>Redirect URI</b>（OIDC）或 <b>ACS</b>（SAML）設成本站對外網址，見上方提示。</p>
 
-  <h3 style="margin:14px 0 6px;">OIDC</h3>
+  <h3 data-s="s21c252e2">OIDC</h3>
   <table class="kv sso-eg">
     <tr><th>欄位</th><th>Microsoft 365 / Entra ID</th><th>Google Workspace</th><th>Keycloak</th></tr>
     <tr><td>Issuer</td>
@@ -43,12 +43,12 @@
         <td>—（Google id_token 不含群組，留空，角色用權限矩陣手動指派）</td>
         <td><code>groups</code>（需加 Group Membership mapper）</td></tr>
   </table>
-  <p class="muted" style="font-size:11px; margin:6px 0 0;">
+  <p class="muted" data-s="s3bb8533d">
     ⚠ <b>Entra 群組</b>預設送的是群組 <b>GUID</b> 不是名稱；「管理員群組」與權限矩陣請填該 GUID，或在 Entra 設定送 group name。<br>
     ⚠ <b>Google</b> 沒有標準群組 claim；要群組對應需另接 Cloud Identity，否則留空、用權限矩陣手動給角色。
   </p>
 
-  <h3 style="margin:16px 0 6px;">SAML</h3>
+  <h3 data-s="s130604ce">SAML</h3>
   <table class="kv sso-eg">
     <tr><th>欄位</th><th>Entra ID（企業應用程式）</th><th>Keycloak</th></tr>
     <tr><td>IdP EntityID</td>
@@ -62,13 +62,13 @@
         <td><code>http://schemas.microsoft.com/ws/2008/06/identity/claims/groups</code></td>
         <td><code>groups</code>（需加 Group list mapper）</td></tr>
   </table>
-  <p class="muted" style="font-size:11px; margin:6px 0 0;">SAML 也是 Entra 送群組 GUID；Google Workspace SAML 不送群組屬性。把本站 SP metadata（<code>&lt;base&gt;/auth/saml/metadata</code>）餵給 IdP 最省事。</p>
-  <style>.sso-eg th, .sso-eg td { font-size:11px; vertical-align:top; padding:4px 8px; border:1px solid #e5e7eb; } .sso-eg code { font-size:10.5px; word-break:break-all; }</style>
+  <p class="muted" data-s="s3bb8533d">SAML 也是 Entra 送群組 GUID；Google Workspace SAML 不送群組屬性。把本站 SP metadata（<code>&lt;base&gt;/auth/saml/metadata</code>）餵給 IdP 最省事。</p>
+  <style nonce="{{ request.state.csp_nonce }}">.sso-eg th, .sso-eg td { font-size:11px; vertical-align:top; padding:4px 8px; border:1px solid #e5e7eb; } .sso-eg code { font-size:10.5px; word-break:break-all; }</style>
 </details>
 
 <div class="panel">
-  <h2 style="margin-top:0;">OIDC（OpenID Connect）</h2>
-  <p class="muted" style="font-size:12px;">適用 Microsoft 365 / Entra ID、Google、Keycloak、Okta、Authentik 等。在 IdP 設定 Redirect URI 為 <code id="oidcRedirect">（先填 base URL）</code>。</p>
+  <h2 data-s="s53896af7">OIDC（OpenID Connect）</h2>
+  <p class="muted" data-s="s6b9c179a">適用 Microsoft 365 / Entra ID、Google、Keycloak、Okta、Authentik 等。在 IdP 設定 Redirect URI 為 <code id="oidcRedirect">（先填 base URL）</code>。</p>
   <label><input type="checkbox" id="o_enabled" {% if sso.oidc.enabled %}checked{% endif %}/> 啟用 OIDC 登入</label>
   <div class="grid2">
     <div><label>登入鈕文字</label><input id="o_display_name" value="{{ sso.oidc.display_name }}" placeholder="以 Microsoft 登入"/></div>
@@ -82,13 +82,13 @@
     <div><label>群組 claim</label><input id="o_groups_claim" value="{{ sso.oidc.groups_claim }}"/></div>
     <div><label>管理員群組（選填，此群組成員自動為 admin）</label><input id="o_admin_group" value="{{ sso.oidc.admin_group }}"/></div>
   </div>
-  <label style="display:block; margin-top:6px;"><input type="checkbox" id="o_require_https" {% if sso.oidc.require_https %}checked{% endif %}/> 強制 HTTPS（建議開啟；內網 http IdP 才取消）</label>
+  <label data-s="saf23b8d4"><input type="checkbox" id="o_require_https" {% if sso.oidc.require_https %}checked{% endif %}/> 強制 HTTPS（建議開啟；內網 http IdP 才取消）</label>
   <p><button class="btn" id="testOidc">測試 OIDC discovery</button> <span id="oidcResult" class="muted"></span></p>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">SAML 2.0</h2>
-  <p class="muted" style="font-size:12px;">SP metadata 網址：<code id="samlMeta">（先填 base URL）</code>；ACS（Assertion Consumer Service）：<code id="samlAcs">（先填 base URL）</code>。</p>
+  <h2 data-s="s53896af7">SAML 2.0</h2>
+  <p class="muted" data-s="s6b9c179a">SP metadata 網址：<code id="samlMeta">（先填 base URL）</code>；ACS（Assertion Consumer Service）：<code id="samlAcs">（先填 base URL）</code>。</p>
   <label><input type="checkbox" id="s_enabled" {% if sso.saml.enabled %}checked{% endif %}/> 啟用 SAML 登入</label>
   <div class="grid2">
     <div><label>登入鈕文字</label><input id="s_display_name" value="{{ sso.saml.display_name }}"/></div>
@@ -103,17 +103,17 @@
     <div><label>管理員群組（選填）</label><input id="s_admin_group" value="{{ sso.saml.admin_group }}"/></div>
   </div>
   <label>IdP 簽章憑證 X.509（PEM 內容，不含 BEGIN/END 行）</label>
-  <textarea id="s_idp_x509cert" rows="4" style="width:100%; font-family:monospace; font-size:11px;">{{ sso.saml.idp_x509cert }}</textarea>
-  <label style="display:block; margin-top:8px;"><input type="checkbox" id="s_want_assertions_signed" {% if sso.saml.want_assertions_signed %}checked{% endif %}/> 要求 IdP 簽署 Assertion（建議開啟）</label>
+  <textarea id="s_idp_x509cert" rows="4" data-s="sa54bfe29">{{ sso.saml.idp_x509cert }}</textarea>
+  <label data-s="s0ca67867"><input type="checkbox" id="s_want_assertions_signed" {% if sso.saml.want_assertions_signed %}checked{% endif %}/> 要求 IdP 簽署 Assertion（建議開啟）</label>
   <p><button class="btn" id="testSaml">驗證 SAML SP metadata</button> <span id="samlResult" class="muted"></span></p>
 </div>
 
 <div class="panel">
   <button class="btn btn-primary btn-lg" id="saveBtn">{{ icon('check', size=14) }} 儲存 SSO 設定</button>
-  <span id="saveResult" class="muted" style="margin-left:10px;"></span>
+  <span id="saveResult" class="muted" data-s="s610601bf"></span>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; margin:10px 0; }
 .grid2 input { width:100%; box-sizing:border-box; }
 .grid2 label, .panel > label { font-size:12px; font-weight:600; color:#374151; }

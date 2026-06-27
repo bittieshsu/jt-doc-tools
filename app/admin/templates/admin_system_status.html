@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}系統狀態 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .ss-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:14px; }
 .ss-card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px;
   display:flex; flex-direction:column; gap:8px; }
@@ -61,7 +61,7 @@
 <p class="muted">主機資源用量 + 各使用者檔案佔用。資料每 5 秒自動刷新。</p>
 
 <div class="ss-controls">
-  <label style="font-size:12.5px; cursor:pointer; user-select:none;">
+  <label data-s="se6cd16ab">
     <input type="checkbox" id="ssAutoRefresh" checked>
     自動刷新（每 5 秒）
   </label>
@@ -73,27 +73,27 @@
 
 <div class="ss-grid" id="ssHostGrid"></div>
 
-<div class="panel" style="margin-top:16px;">
-  <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;">
+<div class="panel" data-s="sb0043ef4">
+  <div data-s="se0fca1a9">
     <div>
-      <h2 style="margin:0 0 6px;">使用者檔案用量</h2>
-      <p class="muted" style="font-size:12.5px; margin:0;">
+      <h2 data-s="s1f06255c">使用者檔案用量</h2>
+      <p class="muted" data-s="s51c48588">
         包含暫存上傳檔（owner ACL 紀錄追蹤）+ 表單填寫 / 用印 / 浮水印歷史目錄。
         匿名 / 未追蹤的檔案歸到「(匿名)」列。檔案多時統計約需數秒～數十秒，
         結果會 cache 60 秒。
       </p>
     </div>
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <span class="muted" id="ssUserAge" style="font-size:12px;"></span>
+    <div data-s="sc445ac64">
+      <span class="muted" id="ssUserAge" data-s="s6b9c179a"></span>
       <button class="btn" id="ssUserRefresh">{{ icon('refresh', size=14) }} 重新統計</button>
     </div>
   </div>
-  <div id="ssUserStats" style="margin-top:10px;">
+  <div id="ssUserStats" data-s="s5371db16">
     <div class="ss-skeleton">
       <div class="ss-skel-bar"></div>
       <div class="ss-skel-bar"></div>
-      <div class="ss-skel-bar" style="width: 60%;"></div>
-      <div style="margin-top:10px; color:#94a3b8; font-size:13px;">
+      <div class="ss-skel-bar" data-s="s6f982333"></div>
+      <div data-s="sb28d471e">
         正在掃描檔案系統… (檔案多時可能需要數秒)
       </div>
     </div>
@@ -167,13 +167,13 @@ function renderHost(host) {
     const ct = c.in_container;
     cards.push(`
       <div class="ss-card">
-        <h3>CPU${ct ? ' <span style="font-size:11px;font-weight:600;color:#4338ca;background:#eef2ff;border:1px solid #c7d2fe;border-radius:4px;padding:1px 6px;vertical-align:middle;">容器</span>' : ''}</h3>
+        <h3>CPU${ct ? ' <span data-s="s6c50edeb">容器</span>' : ''}</h3>
         <div class="ss-metric"><span class="num">${fmtPercent(c.percent)}</span></div>
-        <div class="ss-bar ${barClass(c.percent)}"><i style="width:${Math.min(100,c.percent||0)}%"></i></div>
+        <div class="ss-bar ${barClass(c.percent)}"><i data-style="width:${Math.min(100,c.percent||0)}%"></i></div>
         <div class="ss-row"><span>${ct ? '可用核心' : '邏輯核心'}</span><span>${c.count_logical || '—'}</span></div>
         ${ct ? '' : `<div class="ss-row"><span>實體核心</span><span>${c.count_physical || '—'}</span></div>`}
         ${la ? `<div class="ss-row"><span>Load avg</span><span>${la.map(v=>v.toFixed(2)).join(' / ')}</span></div>` : ''}
-        ${ct ? '<div class="ss-row" style="color:#94a3b8;font-size:11px;"><span>顯示本容器用量</span><span></span></div>' : ''}
+        ${ct ? '<div class="ss-row" data-s="sb071a446"><span>顯示本容器用量</span><span></span></div>' : ''}
       </div>`);
   }
 
@@ -187,7 +187,7 @@ function renderHost(host) {
           <span class="num">${fmtBytes(m.used)}</span>
           <span class="unit">/ ${fmtBytes(m.total)} (${fmtPercent(m.percent)})</span>
         </div>
-        <div class="ss-bar ${barClass(m.percent)}"><i style="width:${Math.min(100,m.percent||0)}%"></i></div>
+        <div class="ss-bar ${barClass(m.percent)}"><i data-style="width:${Math.min(100,m.percent||0)}%"></i></div>
         <div class="ss-row"><span>可用</span><span>${fmtBytes(m.available)}</span></div>
         <div class="ss-row"><span>Swap</span><span>${m.swap_total_known === false
           ? `${fmtBytes(m.swap_used)} 已用（總量由主機端管理）`
@@ -204,7 +204,7 @@ function renderHost(host) {
           <span class="num">${fmtBytes(d.used)}</span>
           <span class="unit">/ ${fmtBytes(d.total)} (${fmtPercent(d.percent)})</span>
         </div>
-        <div class="ss-bar ${barClass(d.percent)}"><i style="width:${Math.min(100,d.percent||0)}%"></i></div>
+        <div class="ss-bar ${barClass(d.percent)}"><i data-style="width:${Math.min(100,d.percent||0)}%"></i></div>
         <div class="ss-row"><span>剩餘</span><span>${fmtBytes(d.free)}</span></div>
         <div class="ss-sub">${escapeHTML(d.path)}</div>
       </div>`);
@@ -318,7 +318,7 @@ function renderUsers(users) {
     <th data-sort-key="bytes" class="num ${arrowFor('bytes')}" title="目前 disk 佔用">目前容量</th>
     <th data-sort-key="activity_30d_count" class="num ${arrowFor('activity_30d_count')}" title="近 30 天透過 audit_events 紀錄的工具呼叫次數">近 30 天上傳次數</th>
     <th data-sort-key="activity_30d_bytes" class="num ${arrowFor('activity_30d_bytes')}" title="近 30 天上傳總位元組（即使檔案已被排程清掉也會看到，自 audit 還原）">近 30 天上傳量</th>
-    <th data-sort-key="viz" class="${arrowFor('viz')}" style="width:200px;" title="按目前容量與近 30 天上傳量取最大值排序，與長條圖長度一致">活動量視覺化</th>
+    <th data-sort-key="viz" class="${arrowFor('viz')}" data-s="s8f77872c" title="按目前容量與近 30 天上傳量取最大值排序，與長條圖長度一致">活動量視覺化</th>
   </tr></thead><tbody>`;
   for (const r of rows) {
     const refBytes = Math.max(r.bytes || 0, r.activity_30d_bytes || 0);
@@ -333,11 +333,11 @@ function renderUsers(users) {
       <td class="num">${(r.activity_30d_count || 0).toLocaleString()}</td>
       <td class="num">${fmtBytes(r.activity_30d_bytes || 0)}</td>
       <td class="ss-bar-cell"><div class="bar-track">
-        <div class="bar-fill ${barCls}" style="width:${barPct.toFixed(1)}%"></div>
+        <div class="bar-fill ${barCls}" data-style="width:${barPct.toFixed(1)}%"></div>
       </div></td>
     </tr>`;
   }
-  html += `</tbody><tfoot><tr style="font-weight:600; background:#f8fafc;">
+  html += `</tbody><tfoot><tr data-s="s0365750c">
     <td>合計</td>
     <td class="num">${users.total_count.toLocaleString()}</td>
     <td class="num">${fmtBytes(users.total_bytes)}</td>
@@ -380,8 +380,8 @@ async function refreshUsers(force) {
   if (force) {
     $('ssUserStats').innerHTML = `<div class="ss-skeleton">
       <div class="ss-skel-bar"></div><div class="ss-skel-bar"></div>
-      <div class="ss-skel-bar" style="width:60%;"></div>
-      <div style="margin-top:10px; color:#94a3b8; font-size:13px;">
+      <div class="ss-skel-bar" data-s="s518cc756"></div>
+      <div data-s="sb28d471e">
         正在重新統計（檔案多時可能需要數秒）…</div></div>`;
     $('ssUserAge').textContent = '統計中…';
   }

@@ -12,35 +12,35 @@
   本機 / LAN 上需有運行中的 LLM backend (Ollama / vLLM / LM Studio / jan.ai 皆可)。
 </p>
 
-<div style="background:#fef2f2; border:2px solid #ef4444; border-left-width:6px; border-radius:6px; padding:12px 18px; margin:14px 0 18px; box-shadow:0 1px 3px rgba(239,68,68,0.1);">
-  <div style="display:flex; align-items:flex-start; gap:10px;">
-    <span style="font-size:22px; line-height:1;">⚠</span>
-    <div style="flex:1; font-size:13.5px; line-height:1.7; color:#7f1d1d;">
-      <b style="font-size:14.5px;">使用反向代理（nginx / Caddy）必看 — 504 Gateway Timeout 預防</b><br>
+<div data-s="s58ee086a">
+  <div data-s="s460ef344">
+    <span data-s="s1a13aaed">⚠</span>
+    <div data-s="s5d1fb75a">
+      <b data-s="se5c35fcd">使用反向代理（nginx / Caddy）必看 — 504 Gateway Timeout 預防</b><br>
       LLM 推理單筆常 <b>5-15 分鐘</b>（翻譯 / 視覺校驗 / 大模型）。若 jt-doc-tools 放在 nginx 後面，
       <b>nginx 預設 60 秒就會回 504</b>，本頁下方 Timeout 設多少都救不了。
-      <ul style="margin:6px 0 0 0; padding-left:22px; line-height:1.8;">
+      <ul data-s="sb0eb5b8d">
         <li>nginx 設 <code>proxy_read_timeout 900s;</code> + <code>proxy_send_timeout 900s;</code>（≥ 下方 Timeout 值 + 60s 緩衝）</li>
         <li><b>多層反向代理</b>（例：自架 LLM proxy 在前 + jt-doc-tools 在後，各自有 nginx）：<b>每一層 nginx 都要設</b>，任一層用預設就斷</li>
         <li>Caddy 對應加 <code>read_timeout 900s</code> / <code>write_timeout 900s</code></li>
       </ul>
-      <div style="margin-top:6px;">
-        詳見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md#504-gateway-timeout-排錯流程" target="_blank" style="color:#b91c1c; text-decoration:underline;">OPS.md 504 排錯流程</a>
+      <div data-s="s9e3c4ccb">
+        詳見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md#504-gateway-timeout-排錯流程" target="_blank" data-s="s37ab9c10">OPS.md 504 排錯流程</a>
       </div>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 啟用</h2>
+  <h2 data-s="s53896af7">1. 啟用</h2>
   <div class="form-row">
     <label>狀態</label>
     <div class="field">
-      <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:500;">
+      <label data-s="s32a6345d">
         <input type="checkbox" id="enabled" {% if settings.enabled %}checked{% endif %}>
         啟用 LLM AI 加值
       </label>
-      <div class="muted" style="font-size:12px; margin-top:4px;">
+      <div class="muted" data-s="s41f96333">
         關閉時，所有 LLM 邏輯不會執行，pdf-fill / doc-deident / translate-doc 等 10 個工具的 AI 加值會自動隱藏，純規則處理不受影響。
       </div>
     </div>
@@ -48,16 +48,16 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">2. 連線資訊</h2>
-  <div style="background:#fffbeb; border-left:4px solid #f59e0b; padding:10px 14px; border-radius:6px; margin-bottom:14px; font-size:12.5px; line-height:1.55;">
-    <b style="color:#92400e;">⚠ 隱私建議</b>：強烈建議接 <b>地端自架 LLM Server</b>（如 <a href="https://ollama.com/" target="_blank" rel="noopener">Ollama</a> / vLLM / LM Studio），讓檔案內容只在公司內網流動。
+  <h2 data-s="s53896af7">2. 連線資訊</h2>
+  <div data-s="sb4d92341">
+    <b data-s="s9a2b98e5">⚠ 隱私建議</b>：強烈建議接 <b>地端自架 LLM Server</b>（如 <a href="https://ollama.com/" target="_blank" rel="noopener">Ollama</a> / vLLM / LM Studio），讓檔案內容只在公司內網流動。
     若指向 OpenAI / Claude / Gemini 等雲端 API，所有送 LLM 校驗 / 翻譯 / 段落重排的<b>原始文件內容</b>都會離開公司網路，
     可能違反個資法、營業秘密或客戶 NDA。地端 LLM 才能符合本平台「資料留在自己手中」的設計初衷。
   </div>
   <div class="form-row">
     <label>Base URL</label>
-    <div class="field" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <input type="text" id="base_url" class="field field-wide" style="flex:1; min-width:280px;"
+    <div class="field" data-s="sc445ac64">
+      <input type="text" id="base_url" class="field field-wide" data-s="s03053c6a"
              value="{{ settings.base_url }}"
              placeholder="http://localhost:11434/v1" />
       <button class="btn btn-primary" id="btn-test" type="button">
@@ -68,7 +68,7 @@
   <div class="form-row" id="conn-status-row" hidden>
     <label></label>
     <div class="field">
-      <div id="conn-status" style="padding:8px 12px; border-radius:6px; font-size:13px;"></div>
+      <div id="conn-status" data-s="s524b7d3e"></div>
     </div>
   </div>
   <div class="form-row">
@@ -77,18 +77,18 @@
       <input type="password" id="api_key" class="field field-wide"
              value="{{ settings.api_key or '' }}"
              placeholder="(空白 — Ollama 不需要)" />
-      <div class="muted" style="font-size:12px; margin-top:4px;">
+      <div class="muted" data-s="s41f96333">
         雲端 OpenAI-compat 服務才需要；本地 Ollama / vLLM 留空。
       </div>
     </div>
   </div>
   <div class="form-row">
     <label>單次 Timeout</label>
-    <div class="field" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    <div class="field" data-s="sc445ac64">
       <input type="number" id="timeout_seconds" min="10" max="1800" step="5"
-             value="{{ settings.timeout_seconds }}" style="width:100px;" />
-      <span class="muted" style="font-size:12px;">秒（單次 HTTP call 上限；翻譯 / 視覺校驗 / 大模型推理常 5-15 分鐘）</span>
-      <div style="background:#fef3c7; border-left:3px solid #f59e0b; padding:8px 12px; margin-top:6px; font-size:12px; color:#78350f; border-radius:4px; line-height:1.6; flex:1 1 100%;">
+             value="{{ settings.timeout_seconds }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">秒（單次 HTTP call 上限；翻譯 / 視覺校驗 / 大模型推理常 5-15 分鐘）</span>
+      <div data-s="s9bc8e1b6">
         <b>⚠ 反向代理（nginx / Caddy）對應設定一定要一起改：</b><br>
         若 jt-doc-tools 在 nginx 後面，nginx 的 <code>proxy_read_timeout</code> + <code>proxy_send_timeout</code>
         必須 <b>≥ 此 Timeout 值 + 60s 緩衝</b>（建議 900s）。<br>
@@ -100,11 +100,11 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">3. 模型</h2>
+  <h2 data-s="s53896af7">3. 模型</h2>
   <div class="form-row">
     <label>模型</label>
-    <div class="field" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <select id="model" class="field" style="flex:1; min-width:280px; max-width:400px;">
+    <div class="field" data-s="sc445ac64">
+      <select id="model" class="field" data-s="s121317d5">
         <option value="{{ settings.model }}">{{ settings.model }}</option>
       </select>
       <button class="btn" id="btn-refresh-models" type="button">
@@ -158,8 +158,8 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">4. 各工具進階設定</h2>
-  <p class="muted" style="margin:-4px 0 14px 0; font-size:12px;">下列設定<b>各自只影響特定工具</b>。沒在用該工具的話可保留預設。</p>
+  <h2 data-s="s53896af7">4. 各工具進階設定</h2>
+  <p class="muted" data-s="sb035986c">下列設定<b>各自只影響特定工具</b>。沒在用該工具的話可保留預設。</p>
 
   <h3 class="tool-section-h">
     <span class="tool-section-tag tool-section-tag-vision">表單自動填寫 · LLM 校驗</span>
@@ -167,90 +167,90 @@
   </h3>
   <div class="form-row">
     <label>預設審查輪數</label>
-    <div class="field" style="display:flex; gap:8px; align-items:center;">
+    <div class="field" data-s="s9586d088">
       <input type="number" id="default_review_rounds" min="1" max="5" step="1"
-             value="{{ settings.default_review_rounds }}" style="width:100px;" />
-      <span class="muted" style="font-size:12px;">輪 (1-5)；每輪是一次 LLM 來回</span>
+             value="{{ settings.default_review_rounds }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">輪 (1-5)；每輪是一次 LLM 來回</span>
     </div>
   </div>
   <div class="form-row">
     <label>Confidence 門檻</label>
-    <div class="field" style="display:flex; gap:8px; align-items:center;">
+    <div class="field" data-s="s9586d088">
       <input type="number" id="confidence_threshold" min="0.5" max="1.0" step="0.05"
-             value="{{ settings.confidence_threshold }}" style="width:100px;" />
-      <span class="muted" style="font-size:12px;">(0.0-1.0) — 影響自動採納門檻（UI 顯示全部）</span>
+             value="{{ settings.confidence_threshold }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">(0.0-1.0) — 影響自動採納門檻（UI 顯示全部）</span>
     </div>
   </div>
   <div class="form-row">
     <label>連續 N 次同錯才接受</label>
-    <div class="field" style="display:flex; gap:8px; align-items:center;">
+    <div class="field" data-s="s9586d088">
       <input type="number" id="consecutive_required" min="1" max="3" step="1"
-             value="{{ settings.consecutive_required }}" style="width:100px;" />
-      <span class="muted" style="font-size:12px;">保守規則，避免 LLM 抖動造成誤改</span>
+             value="{{ settings.consecutive_required }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">保守規則，避免 LLM 抖動造成誤改</span>
     </div>
   </div>
   <div class="form-row">
     <label>整體 Timeout</label>
-    <div class="field" style="display:flex; gap:8px; align-items:center;">
+    <div class="field" data-s="s9586d088">
       <input type="number" id="overall_timeout_seconds" min="30" max="600" step="10"
-             value="{{ settings.overall_timeout_seconds }}" style="width:100px;" />
-      <span class="muted" style="font-size:12px;">秒 — review loop 上限，避免死循環</span>
+             value="{{ settings.overall_timeout_seconds }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">秒 — review loop 上限，避免死循環</span>
     </div>
   </div>
 
-  <h3 class="tool-section-h" style="margin-top:24px;">
+  <h3 class="tool-section-h" data-s="s062d4a88">
     <span class="tool-section-tag tool-section-tag-text">逐句翻譯</span>
     <code class="muted">translate-doc</code>
   </h3>
   <div class="form-row">
     <label>翻譯並行數</label>
-    <div class="field" style="display:flex; gap:8px; align-items:center;">
+    <div class="field" data-s="s9586d088">
       <input type="number" id="translate_concurrency" min="1" max="16" step="1"
-             value="{{ settings.translate_concurrency|default(4) }}" style="width:100px;" />
-      <span class="muted" style="font-size:12px;">逐句翻譯時同時送 LLM 的 worker 數（1-16，預設 4）。本機 Ollama 建議 4-8；高 VRAM 可拉到 12+；雲端 API 設小一點避免被 rate-limit</span>
+             value="{{ settings.translate_concurrency|default(4) }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">逐句翻譯時同時送 LLM 的 worker 數（1-16，預設 4）。本機 Ollama 建議 4-8；高 VRAM 可拉到 12+；雲端 API 設小一點避免被 rate-limit</span>
     </div>
   </div>
   <div class="form-row">
     <label>逐句翻譯最大句數</label>
-    <div class="field" style="display:flex; gap:8px; align-items:center;">
+    <div class="field" data-s="s9586d088">
       <input type="number" id="translate_max_sentences" min="100" max="200000" step="100"
-             value="{{ settings.translate_max_sentences|default(20000) }}" style="width:120px;" />
-      <span class="muted" style="font-size:12px;">逐句翻譯一次最多處理幾句（100-200000，預設 20000）。逐句並發不會單一 request timeout，但句數越多瀏覽器分頁要開越久（每千句約 2-3 分）。超過上限只取前 N 句</span>
+             value="{{ settings.translate_max_sentences|default(20000) }}" data-s="s088cf005" />
+      <span class="muted" data-s="s6b9c179a">逐句翻譯一次最多處理幾句（100-200000，預設 20000）。逐句並發不會單一 request timeout，但句數越多瀏覽器分頁要開越久（每千句約 2-3 分）。超過上限只取前 N 句</span>
     </div>
   </div>
   <div class="form-row">
     <label>對照表每頁筆數</label>
-    <div class="field" style="display:flex; gap:8px; align-items:center;">
+    <div class="field" data-s="s9586d088">
       <input type="number" id="translate_page_size" min="20" max="5000" step="10"
-             value="{{ settings.translate_page_size|default(200) }}" style="width:120px;" />
-      <span class="muted" style="font-size:12px;">逐句翻譯結果對照表每頁顯示幾列（20-5000，預設 200）。句數一大時全部塞進頁面會卡頓，故分頁顯示；數字越大每頁越長但翻頁越少</span>
+             value="{{ settings.translate_page_size|default(200) }}" data-s="s088cf005" />
+      <span class="muted" data-s="s6b9c179a">逐句翻譯結果對照表每頁顯示幾列（20-5000，預設 200）。句數一大時全部塞進頁面會卡頓，故分頁顯示；數字越大每頁越長但翻頁越少</span>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">5. 除錯</h2>
+  <h2 data-s="s53896af7">5. 除錯</h2>
   <div class="form-row">
     <label>Debug log</label>
     <div class="field">
-      <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+      <label data-s="s3199a011">
         <input type="checkbox" id="debug_log" {% if settings.debug_log %}checked{% endif %}>
         儲存送 LLM 的 PNG 與回應 JSON
       </label>
-      <div class="muted" style="font-size:12px; margin-top:4px;">
+      <div class="muted" data-s="s41f96333">
         儲存於 <code>data/llm_debug/</code>，方便排錯。會佔用磁碟空間，使用時記得手動清理。
       </div>
     </div>
   </div>
 </div>
 
-<div style="margin-top:16px; display:flex; gap:8px;">
+<div data-s="s37941ba4">
   <button class="btn btn-primary" id="btn-save">{{ icon('save') }}儲存</button>
   <a class="btn" href="/admin">{{ icon('back') }}回管理</a>
 </div>
 </div><!-- /.llm-page -->
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .addon-badge {
   display:inline-block; padding:2px 8px; margin-left:8px;
   background:#fef3c7; color:#92400e;

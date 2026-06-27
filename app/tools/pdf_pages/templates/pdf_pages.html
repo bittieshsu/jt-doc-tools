@@ -6,29 +6,29 @@
 <p class="muted">拖曳重新排序、點 ❌ 標記要刪除的頁面，按「輸出 PDF」就會依目前順序輸出。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">上傳 PDF</h2>
+  <h2 data-s="s53896af7">上傳 PDF</h2>
   {% with upload_id='upPg', accept='application/pdf' %}{% include "components/file_upload.html" %}{% endwith %}
-  <p class="muted" style="font-size:12px; margin-top:6px;">目前一次處理一份 PDF。</p>
+  <p class="muted" data-s="s168f2b58">目前一次處理一份 PDF。</p>
 </div>
 
 <details class="panel" id="pages-panel" hidden open>
-  <summary>頁面預覽 <span class="muted" id="pages-info" style="font-weight:normal; font-size:12px; margin-left:8px;">—</span></summary>
+  <summary>頁面預覽 <span class="muted" id="pages-info" data-s="s5af60f7e">—</span></summary>
   <div class="page-toolbar">
-    <span class="muted" style="font-size:12px;">拖曳卡片可重新排序；點 ❌ 標記要刪除的頁面。</span>
-    <span style="flex:1;"></span>
+    <span class="muted" data-s="s6b9c179a">拖曳卡片可重新排序；點 ❌ 標記要刪除的頁面。</span>
+    <span data-s="sda5cd676"></span>
     <button class="btn btn-small" id="btn-reset" type="button">{{ icon('refresh', size=14) }}重設順序</button>
     <button class="btn btn-small" id="btn-toggle-all" type="button">全部還原</button>
   </div>
   <div class="page-grid" id="page-grid"></div>
-  <div style="margin-top:12px;">
+  <div data-s="s002535c2">
     <button class="btn btn-primary" id="btn-submit">{{ icon('save') }}輸出 PDF</button>
   </div>
-  <div style="margin-top:10px;">
+  <div data-s="s5371db16">
     {% with progress_id='jp' %}{% include "components/job_progress.html" %}{% endwith %}
   </div>
 </details>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .page-toolbar { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
 .page-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:14px; }
 .page-card {
@@ -91,7 +91,7 @@ const fu = new FileUpload(document.getElementById('upPg'), async (f) => {
   filename = f.name;
   const fd = new FormData(); fd.append('file', f);
   document.getElementById('pages-panel').hidden = false;
-  document.getElementById('page-grid').innerHTML = '<p class="muted" style="grid-column:1/-1;text-align:center;padding:24px;">載入中…</p>';
+  document.getElementById('page-grid').innerHTML = '<p class="muted" data-s="s2a9ed20f">載入中…</p>';
   const r = await fu.upload('/tools/pdf-pages/load', fd, {processingLabel: '載入頁面中…'});
   if (!r.ok) { document.getElementById('page-grid').innerHTML = '<p class="muted">載入失敗</p>'; return; }
   const j = await r.json();

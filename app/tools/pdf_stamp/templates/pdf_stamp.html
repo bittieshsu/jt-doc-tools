@@ -6,13 +6,13 @@
 <p class="muted">上傳 PDF，選擇要用的印章、簽名或 Logo 圖片，平台會依照預設位置自動套用。需要微調時可以切到進階模式。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 選擇要蓋的圖片（印章 / 簽名 / Logo）</h2>
+  <h2 data-s="s53896af7">1. 選擇要蓋的圖片（印章 / 簽名 / Logo）</h2>
   {% if not stamps %}
     <div class="empty">還沒有共用印章 / 簽名 / Logo，可請管理員到「<a href="/admin/assets">資產管理</a>」上傳，或使用下方「臨時上傳」一張（僅本次有效，不存於伺服器）。</div>
   {% else %}
-  <div class="asset-list" id="stampAssetList" style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));">
+  <div class="asset-list" id="stampAssetList" data-s="sbc85c9de">
     {% for s in stamps %}
-    <label class="asset-item" style="cursor:pointer;">
+    <label class="asset-item" data-s="sb202c6d4">
       <div class="thumb"><img src="/assets/{{ s.id }}/thumb" /></div>
       <div class="name">
         <input type="radio" name="stamp" value="{{ s.id }}" {% if s.id == default_id %}checked{% endif %} />
@@ -22,37 +22,37 @@
       <div class="meta">{{ '%.0f'|format(s.preset.width_mm) }}×{{ '%.0f'|format(s.preset.height_mm) }}mm, Y={{ '%.0f'|format(s.preset.y_mm) }}</div>
     </label>
     {% endfor %}
-    <label class="asset-item" style="cursor:pointer;" id="noneStampCard">
-      <div class="thumb" style="display:flex; align-items:center; justify-content:center; color:#94a3b8; background:repeating-linear-gradient(45deg, #f1f5f9, #f1f5f9 6px, #e2e8f0 6px, #e2e8f0 12px);">
-        <div style="text-align:center; font-size:12px; line-height:1.6;">
+    <label class="asset-item" data-s="sb202c6d4" id="noneStampCard">
+      <div class="thumb" data-s="s20338d91">
+        <div data-s="sa7ecb24e">
           {{ icon('close', size=24) }}<br>不蓋章
         </div>
       </div>
       <div class="name">
         <input type="radio" name="stamp" value="__none__" id="noneStampRadio" />
         <span>不蓋印章 / 簽名</span>
-        <span class="type-chip" style="background:#fef3c7; color:#92400e;">無</span>
+        <span class="type-chip" data-s="s3f18db9a">無</span>
       </div>
       <div class="meta">只用下方日期 / 個資限用章</div>
     </label>
   </div>
   {% endif %}
-  <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--border);">
-    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+  <div data-s="s51512563">
+    <div data-s="s31c90b93">
       <input type="file" id="tempAssetFile" accept="image/png,image/jpeg,image/webp" hidden />
       <button class="btn btn-small" type="button" id="btnTempAsset">{{ icon('upload', size=12) }} 臨時上傳一張（僅本次）</button>
-      <span class="muted" style="font-size:12px;">圖片只放在你的瀏覽器，<b>不會存到伺服器</b>，別人也看不到；蓋章送出時才上傳。管理員會看到一筆「使用臨時資產」的稽核記錄（只記事件 + 檔名 hash，不留圖檔）。</span>
+      <span class="muted" data-s="s6b9c179a">圖片只放在你的瀏覽器，<b>不會存到伺服器</b>，別人也看不到；蓋章送出時才上傳。管理員會看到一筆「使用臨時資產」的稽核記錄（只記事件 + 檔名 hash，不留圖檔）。</span>
     </div>
-    <div id="tempAssetSlot" style="margin-top:10px; display:none;">
-      <div class="asset-item" style="max-width:200px; border:2px solid #16a34a; border-radius:8px; padding:8px;">
+    <div id="tempAssetSlot" data-s="s06ed15aa">
+      <div class="asset-item" data-s="s500d9a0e">
         <div class="thumb"><img id="tempAssetThumb" alt="臨時資產預覽" /></div>
         <div class="name">
           <input type="radio" name="stamp" value="__temp__" id="tempAssetRadio" />
           <span id="tempAssetName">（未選）</span>
-          <span class="type-chip" style="background:#dcfce7; color:#166534;">臨時</span>
+          <span class="type-chip" data-s="s53289da7">臨時</span>
         </div>
         <div class="meta">
-          <button type="button" class="btn btn-small" id="btnTempRemove" style="font-size:11px; padding:2px 6px;">移除</button>
+          <button type="button" class="btn btn-small" id="btnTempRemove" data-s="s0f8959df">移除</button>
         </div>
       </div>
     </div>
@@ -61,25 +61,25 @@
 
 <details class="panel" id="date-panel">
   <summary>1b. 插入日期
-    <span style="font-size:11px; font-weight:600; color:#065f46; background:#d1fae5; padding:2px 9px; border-radius:10px; margin-left:6px;">選用</span>
-    <span id="date-summary-status" style="font-size:13px; color:#94a3b8; font-weight:400;"> — 未啟用</span>
+    <span data-s="s719f3aa3">選用</span>
+    <span id="date-summary-status" data-s="s333a2780"> — 未啟用</span>
   </summary>
   <div>
-      <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:12px; cursor:pointer;">
+      <label data-s="s5decd72b">
         <input type="checkbox" id="date-enabled">
         <span><b>啟用日期蓋章</b>（會跟印章同步套用至每一頁設定）</span>
       </label>
 
-      <div id="date-form" style="display:none; padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px;">
-        <div style="display:grid; grid-template-columns:max-content 1fr; gap:10px 14px; align-items:center; max-width:780px;">
-          <label style="font-size:13px;">日期</label>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <input type="date" id="date-value" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:4px; font-size:13px;">
-            <button type="button" id="date-today" class="btn" style="background:#fff; border:1px solid #d1d5db; font-size:12px; padding:5px 12px;">今天</button>
+      <div id="date-form" data-s="s122900a0">
+        <div data-s="s27b0a0b0">
+          <label data-s="s3044b600">日期</label>
+          <div data-s="s07b81311">
+            <input type="date" id="date-value" data-s="s06320905">
+            <button type="button" id="date-today" class="btn" data-s="s7ea62d04">今天</button>
           </div>
 
-          <label style="font-size:13px;">格式</label>
-          <select id="date-format" class="jt-select" style="max-width:380px;">
+          <label data-s="s3044b600">格式</label>
+          <select id="date-format" class="jt-select" data-s="s757df271">
             <optgroup label="西元（ISO 風 / 中文）">
               <option value="iso">2026-05-26</option>
               <option value="iso-noz">2026-5-26</option>
@@ -99,14 +99,14 @@
             </optgroup>
           </select>
 
-          <label style="font-size:13px;">字型</label>
-          <select id="date-font" class="jt-select" style="max-width:280px;">
+          <label data-s="s3044b600">字型</label>
+          <select id="date-font" class="jt-select" data-s="s015ccf91">
             <option value="lxgw" selected>文楷 LXGW（毛筆手寫感）</option>
             <option value="klee">Klee One（鉛筆手寫感）</option>
           </select>
 
-          <label style="font-size:13px;">粗細</label>
-          <select id="date-weight" class="jt-select" style="max-width:160px;">
+          <label data-s="s3044b600">粗細</label>
+          <select id="date-weight" class="jt-select" data-s="s844e0595">
             <option value="light">細</option>
             <option value="regular" selected>標準</option>
             <option value="medium">中粗</option>
@@ -114,26 +114,26 @@
             <option value="heavy">特粗</option>
           </select>
 
-          <label style="font-size:13px;">字級</label>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <input type="number" id="date-fontsize" value="96" min="24" max="200" step="4" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:4px; font-size:13px; width:90px;">
-            <span class="muted" style="font-size:12px;">px（render 端；最終 PDF 看拖拉的 mm 寬度）</span>
+          <label data-s="s3044b600">字級</label>
+          <div data-s="s07b81311">
+            <input type="number" id="date-fontsize" value="96" min="24" max="200" step="4" data-s="se0c88f43">
+            <span class="muted" data-s="s6b9c179a">px（render 端；最終 PDF 看拖拉的 mm 寬度）</span>
           </div>
 
-          <label style="font-size:13px;">顏色</label>
-          <div style="display:flex; gap:10px; align-items:center;">
-            <input type="color" id="date-color" value="#1a1a2e" style="border:1px solid #d1d5db; border-radius:4px; width:48px; height:28px; padding:0;">
-            <span class="muted" style="font-size:12px;">建議深色（黑、藍墨水）</span>
+          <label data-s="s3044b600">顏色</label>
+          <div data-s="s5f11e4db">
+            <input type="color" id="date-color" value="#1a1a2e" data-s="se666a1a1">
+            <span class="muted" data-s="s6b9c179a">建議深色（黑、藍墨水）</span>
           </div>
 
-          <label style="font-size:13px;">手寫質感</label>
-          <label style="font-size:13px; cursor:pointer;">
-            <input type="checkbox" id="date-jitter" checked style="margin-right:6px;">
+          <label data-s="s3044b600">手寫質感</label>
+          <label data-s="sbd9a85c0">
+            <input type="checkbox" id="date-jitter" checked data-s="s487b71ac">
             隨機旋轉 / 字距 / 墨水深淺
           </label>
 
-          <label style="font-size:13px;">邊緣粗糙</label>
-          <select id="date-texture" class="jt-select" style="max-width:160px;">
+          <label data-s="s3044b600">邊緣粗糙</label>
+          <select id="date-texture" class="jt-select" data-s="s844e0595">
             <option value="none">無（乾淨）</option>
             <option value="light">輕（微毛邊）</option>
             <option value="medium" selected>中（毛邊 + 缺口）</option>
@@ -141,19 +141,19 @@
           </select>
         </div>
 
-        <div style="margin-top:14px; display:flex; gap:14px; align-items:flex-start;">
-          <button type="button" id="date-regen" class="btn btn-primary" style="font-size:12px; padding:6px 12px;">
+        <div data-s="sc8423af8">
+          <button type="button" id="date-regen" class="btn btn-primary" data-s="sd7345d1b">
             {{ icon('refresh', size=12) }} 重新生成
           </button>
-          <div style="flex:1; min-width:0;">
-            <div style="font-size:11px; color:#64748b; margin-bottom:4px;">預覽</div>
-            <div style="background:#fff; border:1px dashed #cbd5e1; border-radius:4px; padding:8px; min-height:60px; display:flex; align-items:center; justify-content:center;">
-              <img id="date-preview" style="max-width:100%; max-height:80px;" alt="日期預覽">
+          <div data-s="sbbf7159c">
+            <div data-s="sfd99a134">預覽</div>
+            <div data-s="s44d3eff8">
+              <img id="date-preview" data-s="sc2e9e4f9" alt="日期預覽">
             </div>
           </div>
         </div>
 
-        <div style="margin-top:10px; padding:8px 12px; background:#fffbeb; border-left:3px solid #f59e0b; font-size:12px; color:#78350f;">
+        <div data-s="s886f54c7">
           啟用後可在下方預覽區獨立拖拉日期（綠虛線框）+ 4 角縮放。預設位置：印章右側自動排。
         </div>
       </div>
@@ -162,45 +162,45 @@
 
 <details class="panel" id="restrict-panel">
   <summary>1c. 個資限用章
-    <span style="font-size:11px; font-weight:600; color:#7c2d12; background:#fed7aa; padding:2px 9px; border-radius:10px; margin-left:6px;">選用</span>
-    <span id="restrict-summary-status" style="font-size:13px; color:#94a3b8; font-weight:400;"> — 未啟用</span>
+    <span data-s="s25260053">選用</span>
+    <span id="restrict-summary-status" data-s="s333a2780"> — 未啟用</span>
   </summary>
   <div>
-    <p class="muted" style="font-size:12px; margin:0 0 12px;">把證件影本（身分證／護照／健保卡等）送銀行、政府、學校申辦時，蓋「僅供 [用途] 使用，他用無效」紅章防個資外流挪用。</p>
+    <p class="muted" data-s="sb9a12908">把證件影本（身分證／護照／健保卡等）送銀行、政府、學校申辦時，蓋「僅供 [用途] 使用，他用無效」紅章防個資外流挪用。</p>
 
-    <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:12px; cursor:pointer;">
+    <label data-s="s5decd72b">
       <input type="checkbox" id="restrict-enabled">
       <span><b>啟用個資限用章</b>（會跟印章同步套用至每一頁設定）</span>
     </label>
 
-    <div id="restrict-form" style="display:none; padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px;">
-      <div style="display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap:18px; align-items:start;">
+    <div id="restrict-form" data-s="s122900a0">
+      <div data-s="sce9eba7b">
         <!-- 左欄:表單 -->
-        <div style="display:grid; grid-template-columns:max-content 1fr; gap:10px 12px; align-items:center; min-width:0;">
+        <div data-s="sdd13290a">
 
-          <label style="font-size:13px;">用途範本</label>
-          <select id="restrict-template" class="jt-select" style="max-width:100%;">
+          <label data-s="s3044b600">用途範本</label>
+          <select id="restrict-template" class="jt-select" data-s="sa2937b9e">
             <option value="">（自訂用途，請在下方輸入）</option>
           </select>
 
-          <label style="font-size:13px;">用途</label>
-          <input type="text" id="restrict-purpose" placeholder="例如：申請台新銀行帳戶" maxlength="60" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:4px; font-size:13px; max-width:100%;">
+          <label data-s="s3044b600">用途</label>
+          <input type="text" id="restrict-purpose" placeholder="例如：申請台新銀行帳戶" maxlength="60" data-s="sd477c56e">
 
-          <label style="font-size:13px;">日期</label>
-          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-            <input type="date" id="restrict-date" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:4px; font-size:13px;">
-            <button type="button" id="restrict-today" class="btn" style="background:#fff; border:1px solid #d1d5db; font-size:12px; padding:5px 12px;">今天</button>
-            <label style="font-size:12px; cursor:pointer;">
-              <input type="checkbox" id="restrict-date-on" checked style="margin-right:4px;"> 章身含日期
+          <label data-s="s3044b600">日期</label>
+          <div data-s="scfaba5a6">
+            <input type="date" id="restrict-date" data-s="s06320905">
+            <button type="button" id="restrict-today" class="btn" data-s="s7ea62d04">今天</button>
+            <label data-s="se72b7744">
+              <input type="checkbox" id="restrict-date-on" checked data-s="s831b94f4"> 章身含日期
             </label>
           </div>
 
-          <label style="font-size:13px;">申請人</label>
-          <input type="text" id="restrict-applicant" placeholder="（選填）例：王小明" maxlength="20" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:4px; font-size:13px; max-width:240px;">
+          <label data-s="s3044b600">申請人</label>
+          <input type="text" id="restrict-applicant" placeholder="（選填）例：王小明" maxlength="20" data-s="s521eab31">
 
-          <label style="font-size:13px;">份數</label>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <select id="restrict-copy-total" class="jt-select" style="max-width:140px;">
+          <label data-s="s3044b600">份數</label>
+          <div data-s="s07b81311">
+            <select id="restrict-copy-total" class="jt-select" data-s="sa497ea78">
               <option value="">不顯示份數</option>
               <option value="1">共 1 份</option>
               <option value="2">共 2 份</option>
@@ -208,7 +208,7 @@
               <option value="4">共 4 份</option>
               <option value="5">共 5 份</option>
             </select>
-            <select id="restrict-copy-current" class="jt-select" style="max-width:120px;">
+            <select id="restrict-copy-current" class="jt-select" data-s="s8c92abea">
               <option value="1">第 1 份</option>
               <option value="2">第 2 份</option>
               <option value="3">第 3 份</option>
@@ -217,51 +217,51 @@
             </select>
           </div>
 
-          <label style="font-size:13px;">章型</label>
-          <select id="restrict-style" class="jt-select" style="max-width:260px;">
+          <label data-s="s3044b600">章型</label>
+          <select id="restrict-style" class="jt-select" data-s="sc3b421e0">
             <option value="rectangle" selected>長方形紅章（雙線框）</option>
             <option value="rectangle-single">長方形紅章（單線框）</option>
             <option value="diagonal">對角線斜印</option>
           </select>
 
-          <label style="font-size:13px;">字型</label>
-          <select id="restrict-font" class="jt-select" style="max-width:100%;">
+          <label data-s="s3044b600">字型</label>
+          <select id="restrict-font" class="jt-select" data-s="sa2937b9e">
             <option value="kaiti" selected>標楷體（自動找系統最佳）</option>
           </select>
 
-          <label style="font-size:13px;">顏色</label>
-          <div style="display:flex; gap:10px; align-items:center;">
-            <input type="color" id="restrict-color" value="#c00000" style="border:1px solid #d1d5db; border-radius:4px; width:48px; height:28px; padding:0;">
-            <span class="muted" style="font-size:12px;">傳統紅章 #c00000；可改藍 / 黑</span>
+          <label data-s="s3044b600">顏色</label>
+          <div data-s="s5f11e4db">
+            <input type="color" id="restrict-color" value="#c00000" data-s="se666a1a1">
+            <span class="muted" data-s="s6b9c179a">傳統紅章 #c00000；可改藍 / 黑</span>
           </div>
 
-          <label style="font-size:13px;">字級</label>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <input type="number" id="restrict-fontsize" value="64" min="32" max="120" step="4" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:4px; font-size:13px; width:90px;">
-            <span class="muted" style="font-size:12px;">px</span>
+          <label data-s="s3044b600">字級</label>
+          <div data-s="s07b81311">
+            <input type="number" id="restrict-fontsize" value="64" min="32" max="120" step="4" data-s="se0c88f43">
+            <span class="muted" data-s="s6b9c179a">px</span>
           </div>
 
           <div></div>
-          <button type="button" id="restrict-regen" class="btn btn-primary" style="font-size:12px; padding:6px 12px; justify-self:start; margin-top:4px;">
+          <button type="button" id="restrict-regen" class="btn btn-primary" data-s="s477e0231">
             {{ icon('refresh', size=12) }} 重新生成預覽
           </button>
         </div>
 
         <!-- 右欄:預覽 + 提示 -->
-        <div style="min-width:0;">
-          <div style="font-size:11px; color:#64748b; margin-bottom:4px;">預覽</div>
-          <div id="restrict-preview-box" style="background:#fff; border:1px dashed #cbd5e1; border-radius:4px; padding:14px 10px; min-height:160px; display:flex; align-items:center; justify-content:center; text-align:center;">
-            <div id="restrict-preview-placeholder" style="color:#94a3b8; font-size:12px; line-height:1.6;">
+        <div data-s="s3f9f96c6">
+          <div data-s="sfd99a134">預覽</div>
+          <div id="restrict-preview-box" data-s="sbe22b62b">
+            <div id="restrict-preview-placeholder" data-s="s5250697e">
               {{ icon('stamp', size=28) }}
-              <div style="margin-top:6px;">填入「用途」後<br>會自動產生章身預覽</div>
+              <div data-s="s9e3c4ccb">填入「用途」後<br>會自動產生章身預覽</div>
             </div>
-            <img id="restrict-preview" style="max-width:100%; max-height:200px; display:none;" alt="">
+            <img id="restrict-preview" data-s="sf2f6294f" alt="">
           </div>
-          <div style="margin-top:10px; padding:8px 12px; background:#fef3c7; border-left:3px solid #f59e0b; font-size:12px; color:#78350f;">
+          <div data-s="s77b02064">
             啟用後可在下方預覽區獨立拖拉限用章（橘虛線框）+ 4 角縮放。建議蓋在證件「個資欄位上方」但留得辨識。
           </div>
-          <div style="margin-top:8px; font-size:11px; color:#94a3b8;">
-            想加自己的字型？到 <a href="/admin/fonts" target="_blank" style="color:#3b82f6;">設定 → 字型管理</a> 上傳，會自動出現在字型下拉內。
+          <div data-s="sfc99145b">
+            想加自己的字型？到 <a href="/admin/fonts" target="_blank" data-s="sd294e9a2">設定 → 字型管理</a> 上傳，會自動出現在字型下拉內。
           </div>
         </div>
       </div>
@@ -270,14 +270,14 @@
 </details>
 
 <div class="panel">
-  <h2 style="margin-top:0;">2. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">2. 上傳 PDF</h2>
   {% with upload_id='pdfUpload', accept='application/pdf', multiple=True, hint='支援單/多檔；多檔會打包為 ZIP 下載' %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div id="batch-list" class="batch-list" hidden></div>
 
-  <div class="form-row" style="margin-top:12px; align-items:flex-start;">
-    <label style="padding-top:7px;">蓋章頁面</label>
+  <div class="form-row" data-s="sbe169e79">
+    <label data-s="s2c01dca4">蓋章頁面</label>
     <div id="page-pick" class="page-pick">
       <div class="page-pick-hint muted">上傳 PDF 後可逐頁選擇（預設全選）</div>
     </div>
@@ -286,18 +286,18 @@
 </div>
 
 <div class="panel" id="preview-panel" hidden>
-  <h2 class="panel-title" style="margin:0;">預覽</h2>
-  <div class="mode-switch" role="tablist" style="margin-bottom:8px;">
+  <h2 class="panel-title" data-s="s1386d503">預覽</h2>
+  <div class="mode-switch" role="tablist" data-s="sd51702bf">
     <button class="mode-btn active" type="button" data-mode="edit">編輯模式</button>
     <button class="mode-btn" type="button" data-mode="composite">合成模式</button>
   </div>
-  <p class="muted" style="font-size:12px; margin:6px 0 10px;">
+  <p class="muted" data-s="sbc8dda50">
     <b>編輯模式</b>：在 PDF 上拖曳藍框調整位置 / 大小 / 旋轉。可切換頁面驗證印章位置在每一頁都不衝突。
     <b>合成模式</b>：列出實際蓋章後的<strong>每一頁</strong>，所見即所得。
     任何調整只套用到這一次，不會改到印章預設值。
   </p>
   <div class="preview-controls">
-    <span id="sim-status" class="muted" style="font-size:12px; flex:1; min-width:0;"></span>
+    <span id="sim-status" class="muted" data-s="s5de6eafe"></span>
     <div id="edit-page-nav" hidden class="preview-nav">
       <button class="btn btn-small" type="button" id="edit-prev">‹ 上一頁</button>
       <span id="edit-page-info" class="page-info">— / —</span>
@@ -316,29 +316,29 @@
       <button class="zoom-btn" type="button" id="zoom-in" title="放大" aria-label="放大">+</button>
     </div>
   </div>
-  <div id="edit-mode" style="margin-top:8px;">
+  <div id="edit-mode" data-s="sd4316970">
     <div id="edit-deselected-hint" hidden>
       此頁未勾選蓋章 — 不會套用任何印章 / 日期 / 限用章。要蓋此頁請在上方「蓋章頁面」勾選第 <span id="edit-deselected-pg">—</span> 頁。
     </div>
     {% set editor_id='stampOverride' %}
     {% include "components/drag_position_editor.html" %}
   </div>
-  <div id="composite-mode" hidden style="margin-top:8px; background:#e5e7eb; border-radius:6px; padding:16px; overflow:auto; max-height:82vh;">
-    <div id="sim-single" style="display:flex; flex-direction:column; gap:6px; align-items:safe center;">
-      <img id="sim-image" alt="蓋章後預覽" style="max-width:100%; max-height:640px; box-shadow:0 4px 20px rgba(0,0,0,.15); background:#fff;" />
-      <div id="sim-cap" style="font-size:12px; color:#475569;"></div>
+  <div id="composite-mode" hidden data-s="s410c244f">
+    <div id="sim-single" data-s="s37e04321">
+      <img id="sim-image" alt="蓋章後預覽" data-s="s45bb712b" />
+      <div id="sim-cap" data-s="sefa9f1f9"></div>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">3. 執行</h2>
+  <h2 data-s="s53896af7">3. 執行</h2>
   <button class="btn btn-primary" id="btn-submit">{{ icon('stamp') }}開始蓋章</button>
   {% with progress_id='jobProgress' %}
     {% include "components/job_progress.html" %}
   {% endwith %}
 </div>
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .batch-list { margin-top: 10px; padding: 10px 12px; background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; }
 .batch-list ul { list-style: disc; font-size: 13px; color: #334155; }
 .batch-list li { margin: 2px 0; word-break: break-all; }
@@ -420,9 +420,9 @@ function renderBatchList() {
   if (!box) return;
   if (pickedFiles.length <= 1) { box.hidden = true; box.innerHTML = ''; return; }
   box.hidden = false;
-  box.innerHTML = '<div class="muted" style="font-size:12px; margin-bottom:6px;">共 '
+  box.innerHTML = '<div class="muted" data-s="scac3de05">共 '
     + pickedFiles.length + ' 份 PDF，將統一套用相同位置、尺寸、頁面模式，完成後打包為 ZIP。</div>'
-    + '<ul style="margin:0; padding-left:18px;">'
+    + '<ul data-s="s0eeb0191">'
     + pickedFiles.map(f => `<li>${escapeHTML(f.name)}</li>`).join('')
     + '</ul>';
 }

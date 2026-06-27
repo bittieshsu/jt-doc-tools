@@ -13,19 +13,19 @@
   </div>
   <div class="form-row">
     <label>類型</label>
-    <select id="asset-type" class="field" style="max-width:200px;">
+    <select id="asset-type" class="field" data-s="s3831ac5f">
       <option value="stamp"     {% if asset.type == 'stamp' %}selected{% endif %}>印章 stamp</option>
       <option value="signature" {% if asset.type == 'signature' %}selected{% endif %}>簽名 signature</option>
       <option value="watermark" {% if asset.type == 'watermark' %}selected{% endif %}>浮水印 watermark</option>
       <option value="logo"      {% if asset.type == 'logo' %}selected{% endif %}>Logo</option>
     </select>
-    <span class="muted" style="font-size:12px;">類型決定這個資產出現在哪個工具的選單裡</span>
+    <span class="muted" data-s="s6b9c179a">類型決定這個資產出現在哪個工具的選單裡</span>
   </div>
 </div>
 
-<details class="panel" style="margin-top:16px;">
+<details class="panel" data-s="sb0043ef4">
   <summary>裁剪圖片</summary>
-  <p class="muted" style="font-size:13px;">拖曳藍色框調整裁剪範圍；拖四角可縮放。確認後按「套用裁剪」。</p>
+  <p class="muted" data-s="s3044b600">拖曳藍色框調整裁剪範圍；拖四角可縮放。確認後按「套用裁剪」。</p>
   <div class="crop-wrap" id="cropWrap">
     <img id="cropImg" src="/admin/assets/{{ asset.id }}/file?v={{ asset.updated_at|default(0) }}" alt="{{ asset.name }}" />
     <div class="crop-sel" id="cropSel">
@@ -35,7 +35,7 @@
       <span class="crop-handle se"></span>
     </div>
   </div>
-  <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+  <div data-s="sa1540c58">
     <button class="btn btn-primary" id="btn-crop-apply" type="button">{{ icon('save') }}套用裁剪</button>
     <button class="btn" id="btn-crop-reset" type="button">{{ icon('refresh') }}重設範圍</button>
     <button class="btn" id="btn-crop-auto" type="button">{{ icon('crop') }}自動貼齊內容</button>
@@ -43,54 +43,54 @@
   </div>
 </details>
 
-<div class="panel" style="margin-top:16px;" id="panel-position" {% if asset.type == 'watermark' %}hidden{% endif %}>
+<div class="panel" data-s="sb0043ef4" id="panel-position" {% if asset.type == 'watermark' %}hidden{% endif %}>
   <h2>位置與預覽</h2>
   {% set editor_id='assetEditor' %}
   {% include "components/drag_position_editor.html" %}
 </div>
 
-<div class="panel" style="margin-top:16px;" id="panel-watermark" {% if asset.type != 'watermark' %}hidden{% endif %}>
+<div class="panel" data-s="sb0043ef4" id="panel-watermark" {% if asset.type != 'watermark' %}hidden{% endif %}>
   <h2>浮水印預覽</h2>
-  <p class="muted" style="font-size:13px;">這個資產會以「平鋪」方式蓋滿整頁。下方參數是預覽用的預設值，正式套用時可在「PDF 浮水印」工具裡再微調。</p>
+  <p class="muted" data-s="s3044b600">這個資產會以「平鋪」方式蓋滿整頁。下方參數是預覽用的預設值，正式套用時可在「PDF 浮水印」工具裡再微調。</p>
   <div class="form-row">
     <label>透明度</label>
-    <div class="field" style="display:flex; gap:10px; align-items:center;">
-      <input type="range" id="wm-opacity" min="5" max="100" value="25" style="flex:1; max-width:360px;" />
-      <span id="wm-opacity-label" style="width:48px; text-align:right; font-variant-numeric: tabular-nums;">25%</span>
+    <div class="field" data-s="s5f11e4db">
+      <input type="range" id="wm-opacity" min="5" max="100" value="25" data-s="s45d9430f" />
+      <span id="wm-opacity-label" data-s="s00e53546">25%</span>
     </div>
   </div>
   <div class="form-row">
     <label>旋轉角度</label>
-    <div class="field" style="display:flex; gap:10px; align-items:center;">
-      <input type="range" id="wm-rotation" min="-180" max="180" value="30" style="flex:1; max-width:360px;" />
-      <input type="number" id="wm-rotation-num" min="-180" max="180" value="30" step="5" style="width:80px;" />
-      <span class="muted" style="font-size:12px;">度</span>
+    <div class="field" data-s="s5f11e4db">
+      <input type="range" id="wm-rotation" min="-180" max="180" value="30" data-s="s45d9430f" />
+      <input type="number" id="wm-rotation-num" min="-180" max="180" value="30" step="5" data-s="s8db8d854" />
+      <span class="muted" data-s="s6b9c179a">度</span>
     </div>
   </div>
   <div class="form-row">
     <label>圖片尺寸</label>
-    <div class="field" style="display:flex; gap:10px; align-items:center;">
-      <input type="range" id="wm-size" min="10" max="200" value="60" style="flex:1; max-width:360px;" />
-      <input type="number" id="wm-size-num" min="10" max="200" value="60" style="width:80px;" />
-      <span class="muted" style="font-size:12px;">mm（依圖片自動維持比例）</span>
+    <div class="field" data-s="s5f11e4db">
+      <input type="range" id="wm-size" min="10" max="200" value="60" data-s="s45d9430f" />
+      <input type="number" id="wm-size-num" min="10" max="200" value="60" data-s="s8db8d854" />
+      <span class="muted" data-s="s6b9c179a">mm（依圖片自動維持比例）</span>
     </div>
   </div>
   <div class="form-row">
     <label>間距</label>
-    <div class="field" style="display:flex; gap:10px; align-items:center;">
-      <input type="range" id="wm-gap" min="0" max="200" value="30" style="flex:1; max-width:360px;" />
-      <input type="number" id="wm-gap-num" min="0" max="200" value="30" style="width:80px;" />
-      <span class="muted" style="font-size:12px;">mm</span>
+    <div class="field" data-s="s5f11e4db">
+      <input type="range" id="wm-gap" min="0" max="200" value="30" data-s="s45d9430f" />
+      <input type="number" id="wm-gap-num" min="0" max="200" value="30" data-s="s8db8d854" />
+      <span class="muted" data-s="s6b9c179a">mm</span>
     </div>
   </div>
-  <div style="margin-top:12px; background:#e5e7eb; border-radius:8px; padding:14px; display:flex; justify-content:center;">
+  <div data-s="s348bf521">
     <img id="wm-preview-img" alt="浮水印預覽"
-         style="max-width:100%; max-height:640px; box-shadow:0 4px 20px rgba(0,0,0,.15); background:#fff;" />
+         data-s="s45bb712b" />
   </div>
-  <p class="muted" id="wm-preview-status" style="font-size:12px; text-align:center; margin-top:6px;">產生預覽中…</p>
+  <p class="muted" id="wm-preview-status" data-s="s1cad5387">產生預覽中…</p>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .crop-wrap { position: relative; display: block; width: fit-content; max-width: 100%; background:
   linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
   linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
@@ -114,7 +114,7 @@
 .crop-handle.se { right: 2px; bottom: 2px; cursor: nwse-resize; }
 </style>
 
-<div style="margin-top:16px; display:flex; gap:8px;">
+<div data-s="s37941ba4">
   <button class="btn btn-primary" id="btn-save">{{ icon('save') }}儲存</button>
   <a class="btn" href="/admin/assets">{{ icon('back') }}回清單</a>
 </div>

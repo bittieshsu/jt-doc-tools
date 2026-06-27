@@ -6,7 +6,7 @@
 <p class="muted">事務機分次掃描證件正、反面會產生多個檔，內容各落在 A4 不同位置。拉入這些掃描，系統自動抓出每張「有內容的區塊」、保留原彩色，依原位置疊到同一張 A4 白底；可拖曳微調再產生 PDF。</p>
 
 <details class="panel" id="upload-panel" open>
-  <summary>上傳掃描檔 <span class="muted" id="upload-count" style="font-weight:normal; font-size:12px; margin-left:6px;"></span></summary>
+  <summary>上傳掃描檔 <span class="muted" id="upload-count" data-s="s5a8ca7b2"></span></summary>
   <div class="file-upload" id="dropZone">
     <label class="drop-zone" for="fileInput">
       <div class="drop-zone-inner">
@@ -16,7 +16,7 @@
       </div>
       <input type="file" id="fileInput" accept=".pdf,image/*,.tif,.tiff" multiple />
     </label>
-    {% if workspace_enabled(request) %}<div class="fu-ws-row" style="justify-content:flex-start;"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>從工作區載入</span></button></div>{% endif %}
+    {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>從工作區載入</span></button></div>{% endif %}
     <div id="upload-list" class="sm-uploadList" hidden></div>
     <div class="sm-uploadActions" id="upload-actions" hidden>
       <button type="button" class="btn btn-small" id="btn-clear-all">{{ icon('trash', size=14) }} 全部清除</button>
@@ -25,9 +25,9 @@
 </details>
 
 <details class="panel" id="stage-panel" hidden open>
-  <summary>預覽與微調 <span class="muted" id="stage-info" style="font-weight:normal; font-size:12px; margin-left:6px;">—</span></summary>
+  <summary>預覽與微調 <span class="muted" id="stage-info" data-s="s5a8ca7b2">—</span></summary>
   <div class="sm-toolbar">
-    <span style="flex:1;"></span>
+    <span data-s="sda5cd676"></span>
     <label class="sm-check" title="掃描常會帶一層淡灰 / 微黃的底色；勾選後把這層底色淨化成純白，不影響任何彩色內容">
       <input type="checkbox" id="whitenToggle"> 去除掃描灰底
     </label>
@@ -57,7 +57,7 @@
     <button type="button" class="btn btn-small sm-zbtn" id="zoom-in" title="放大">+</button>
     <span id="zoom-label" class="sm-zoom-label">100%</span>
     <button type="button" class="btn btn-small" id="zoom-fit" title="整張完整顯示在可見範圍">{{ icon('aspect-ratio', size=14) }} 符合</button>
-    <span style="flex:1;"></span>
+    <span data-s="sda5cd676"></span>
     <button type="button" class="btn btn-small" id="btn-preview-toggle" title="隱藏選取框，預覽實際輸出結果">{{ icon('eye', size=14) }} 預覽結果</button>
   </div>
   <div class="sm-stage-scroll">
@@ -69,7 +69,7 @@
   </div>
 </details>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .sm-toolbar { display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
 .sm-check { font-size:13px; color:#334155; display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none; }
 .sm-warn { background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:8px;
@@ -298,7 +298,7 @@ function render() {
     const cls = 'sm-item' + (c.crop_id === selectedId ? ' selected' : '') +
                 (over.has(c.crop_id) ? ' overlap' : '');
     return `<div class="${cls}" data-id="${c.crop_id}"
-      style="left:${c.x*100}%;top:${c.y*100}%;width:${c.w*100}%;height:${c.h*100}%;">
+      data-style="left:${c.x*100}%;top:${c.y*100}%;width:${c.w*100}%;height:${c.h*100}%;">
       <img src="${cropSrc(c)}" alt="${escapeHtml(c.filename)}">
       <button type="button" class="sm-del" data-act="del" title="移除這塊">×</button>
       <span class="sm-resize" data-act="resize"></span>
@@ -431,7 +431,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
   const btn = document.getElementById('btn-generate');
   const orig = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px;"></span>送出中…';
+  btn.innerHTML = '<span data-s="sc89ef25c"></span>送出中…';
   try {
     const r = await fetch('/tools/scan-merge/generate', {
       method: 'POST', headers: {'Content-Type': 'application/json'},

@@ -105,9 +105,9 @@
 
 {# ============ Styles (loaded once per page that includes this) ============ #}
 {# Caller does {% from "components/llm_gate.html" import llm_gate, llm_gate_styles %}
-   then puts {{ llm_gate_styles() }} in <style> or extra-head block. #}
+   then puts {{ llm_gate_styles() }} in <style nonce="{{ request.state.csp_nonce }}"> or extra-head block. #}
 {% macro llm_gate_styles() %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   /* ---- pattern A: LLM-only block ---- */
   .llm-gate-block {
     display: flex; gap: 18px; align-items: flex-start;

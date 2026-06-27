@@ -8,8 +8,8 @@
 按「眼睛」按鈕可隱藏不要在工具裡出現的字型；隱藏後檔案仍保留，隨時可取消隱藏。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">上傳自訂字型</h2>
-  <p class="muted" style="font-size:12.5px;">支援 .ttf / .otf / .ttc，可一次選多個檔。上傳後會自動加入字型清單並顯示在 PDF 編輯器的字型下拉選單最上方（分類：<b>自訂</b>）。字型存放於 <code>{{ '{data}/fonts' }}</code>。</p>
+  <h2 data-s="s53896af7">上傳自訂字型</h2>
+  <p class="muted" data-s="sea8bbc82">支援 .ttf / .otf / .ttc，可一次選多個檔。上傳後會自動加入字型清單並顯示在 PDF 編輯器的字型下拉選單最上方（分類：<b>自訂</b>）。字型存放於 <code>{{ '{data}/fonts' }}</code>。</p>
   <form id="fontUploadForm" enctype="multipart/form-data">
     <label class="fnt-drop-zone" id="fontDropZone" for="fontFile">
       <input type="file" id="fontFile" accept=".ttf,.otf,.ttc" multiple hidden />
@@ -21,23 +21,23 @@
     </label>
     <div class="fnt-upload-bar">
       <button class="btn btn-primary" type="submit" id="btnUploadFont" disabled>{{ icon('upload', size=14) }} 上傳</button>
-      <span id="uploadStatus" class="muted" style="font-size:12px;"></span>
+      <span id="uploadStatus" class="muted" data-s="s6b9c179a"></span>
     </div>
   </form>
 </div>
 
 <div class="panel">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-    <h2 style="margin:0;">可用字型</h2>
+  <div data-s="s38dc95a2">
+    <h2 data-s="s1386d503">可用字型</h2>
     <button class="btn" type="button" id="btnRefresh">{{ icon('refresh', size=14) }} 重新掃描</button>
   </div>
   {% for g in groups %}
   {% set group_ids = g.fonts|map(attribute='id')|list %}
-  <details open style="margin-bottom:16px; border:1px solid #e5e7eb; border-radius:6px; padding:8px 12px;">
-    <summary style="cursor:pointer; font-weight:600; color:#374151; padding:4px 0;">
+  <details open data-s="sbb471275">
+    <summary data-s="s9afb64c1">
       <span class="fnt-group-head">
         <span class="fnt-group-title">
-          {{ g.title }} <span class="muted" style="font-weight:normal; font-size:12px;">({{ g.fonts|length }})</span>
+          {{ g.title }} <span class="muted" data-s="s0c27a7ee">({{ g.fonts|length }})</span>
         </span>
         <span class="fnt-group-actions" data-stop-prop data-prevent-default>
           <button type="button" class="btn btn-sm fnt-bulk-show" data-ids='{{ group_ids|tojson }}'
@@ -51,39 +51,39 @@
         </span>
       </span>
     </summary>
-    <table style="width:100%; font-size:13px; margin-top:8px; border-collapse:collapse;">
+    <table data-s="s92143ca0">
       <thead>
-        <tr style="background:#f9fafb;">
-          <th style="text-align:left; padding:6px 8px; border-bottom:1px solid #e5e7eb;">字型名稱</th>
-          <th style="text-align:left; padding:6px 8px; border-bottom:1px solid #e5e7eb;">類型</th>
-          <th style="text-align:left; padding:6px 8px; border-bottom:1px solid #e5e7eb; width:45%;">路徑 / ID</th>
-          <th style="text-align:left; padding:6px 8px; border-bottom:1px solid #e5e7eb; width:160px;">在工具中</th>
+        <tr data-s="s98f358ac">
+          <th data-s="s45d3b42e">字型名稱</th>
+          <th data-s="s45d3b42e">類型</th>
+          <th data-s="sebbae7ba">路徑 / ID</th>
+          <th data-s="sd9ba85f5">在工具中</th>
         </tr>
       </thead>
       <tbody>
         {% for f in g.fonts %}
-        <tr style="{% if f.hidden %}opacity:0.55; background:#fafafa;{% endif %}">
-          <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6;">
+        <tr data-style="{% if f.hidden %}opacity:0.55; background:#fafafa;{% endif %}">
+          <td data-s="s769f6444">
             {{ f.label }}
-            {% if f.hidden %}<span style="background:#fee2e2; color:#991b1b; padding:1px 6px; border-radius:4px; font-size:11px; margin-left:6px;">隱藏</span>{% endif %}
+            {% if f.hidden %}<span data-s="s26857338">隱藏</span>{% endif %}
           </td>
-          <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6;">
-            {% if f.cjk == 'traditional' %}<span style="background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:4px; font-size:11px;">繁中</span>{% endif %}
-            {% if f.cjk == 'simplified' %}<span style="background:#dbeafe; color:#1e40af; padding:1px 6px; border-radius:4px; font-size:11px;">簡中</span>{% endif %}
+          <td data-s="s769f6444">
+            {% if f.cjk == 'traditional' %}<span data-s="s41d84831">繁中</span>{% endif %}
+            {% if f.cjk == 'simplified' %}<span data-s="s87b8dfbe">簡中</span>{% endif %}
             {% if f.style == 'sans' %}Sans{% elif f.style == 'serif' %}Serif{% elif f.style == 'mono' %}Mono{% elif f.style == 'script' %}楷書{% endif %}
           </td>
-          <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; font-family:ui-monospace, 'SF Mono', monospace; color:#6b7280; font-size:11px; word-break:break-all;">
+          <td data-s="s07e9d204">
             {{ f.get('path') or f.id }}
           </td>
-          <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; text-align:right; white-space:nowrap;">
+          <td data-s="s1cb2fec9">
             <button type="button" class="btn btn-sm toggle-hidden-font" data-id="{{ f.id }}"
-                    style="padding:3px 8px; font-size:11px;"
+                    data-s="s002c9579"
                     title="{% if f.hidden %}取消隱藏，讓工具的字型選單再次顯示這個字型{% else %}隱藏這個字型，工具的字型選單就不會出現它{% endif %}">
               {% if f.hidden %}{{ icon('eye', size=12) }} 顯示{% else %}{{ icon('eye-off', size=12) }} 隱藏{% endif %}
             </button>
             {% if f.category == 'custom' %}
               <button type="button" class="btn btn-danger btn-sm del-custom-font" data-id="{{ f.id }}"
-                      style="padding:3px 8px; font-size:11px;">{{ icon('trash', size=11) }} 刪除</button>
+                      data-s="s002c9579">{{ icon('trash', size=11) }} 刪除</button>
             {% endif %}
           </td>
         </tr>
@@ -95,8 +95,8 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">說明</h2>
-  <ul style="font-size:13px; color:#4b5563;">
+  <h2 data-s="s53896af7">說明</h2>
+  <ul data-s="s7b2bef78">
     <li><b>台灣系統字型</b>：macOS / Windows / Linux 預裝的繁體中文字型，如 PingFang TC、微軟正黑體、標楷體。</li>
     <li><b>開源 CJK 字型</b>：Noto Sans/Serif TC、思源黑體、cwTeX、TW-Kai/Sung 等符合開放字型授權 (OFL) 的字型。建議裝 Noto TC 可以獲得最佳的繁中顯示效果。</li>
     <li><b>PyMuPDF 內建</b>：`china-t / china-ts / china-s / china-ss / helv / tiro / cour` — 最輕量、100% 相容，但字體美感較差，只在系統沒有更好選擇時使用。</li>
@@ -104,7 +104,7 @@
   </ul>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   /* 美化的上傳拖曳區（與 admin/branding 同調性） */
   .fnt-drop-zone {
     display: flex; align-items: center; gap: 12px;

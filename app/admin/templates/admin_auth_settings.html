@@ -5,22 +5,22 @@
 <h1>{{ icon('lock', size=22) }} 認證設定</h1>
 
 {% if not is_enabled %}
-<div class="panel" style="border-left:4px solid #f59e0b;">
-  <h2 style="margin-top:0;">目前未啟用認證</h2>
+<div class="panel" data-s="s642302c7">
+  <h2 data-s="s53896af7">目前未啟用認證</h2>
   <p>所有人都可以使用本系統。如果你打算給多人使用、或部署在內網，建議啟用認證。</p>
   <p>啟用後會引導你建立第一個管理員帳號，避免之後無法登入。</p>
   <p>
     <a class="btn btn-primary btn-lg" href="/setup-admin">{{ icon('lock', size=14) }} 啟用認證</a>
   </p>
   <hr>
-  <p class="muted" style="font-size:12px;">
+  <p class="muted" data-s="s6b9c179a">
     <b>請先點上方「啟用認證」、設好管理員密碼後</b>，再回來設定 LDAP / AD backend 與連線測試。<br>
     啟用後可選 backend：<b>本機</b>（最簡單，所有帳號存在這台機器）、<b>LDAP / AD</b>（接外部目錄）。
   </p>
 </div>
 {% else %}
 <div class="panel">
-  <h2 style="margin-top:0;">✓ 認證已啟用</h2>
+  <h2 data-s="s53896af7">✓ 認證已啟用</h2>
   <table class="kv">
     <tr><th>Backend</th><td><b>{{ settings.backend }}</b></td></tr>
     <tr><th>Session 預設長度</th><td>{{ settings.session_max_age_days }} 天</td></tr>
@@ -28,11 +28,11 @@
     <tr><th>失敗鎖定次數</th><td>{{ settings.lockout_threshold }} 次</td></tr>
     <tr><th>鎖定時間</th><td>{{ settings.lockout_minutes }} 分</td></tr>
   </table>
-  <p style="margin-top:18px;">
+  <p data-s="s4a909ea7">
     <button class="btn" id="btnUnlockAll" type="button">{{ icon('unlock', size=14) }} 清除所有鎖定</button>
-    <button class="btn btn-danger" id="btnDisableAuth" type="button" style="margin-left:8px;">{{ icon('unlock', size=14) }} 停用認證</button>
+    <button class="btn btn-danger" id="btnDisableAuth" type="button" data-s="sc3f83707">{{ icon('unlock', size=14) }} 停用認證</button>
   </p>
-  <p class="muted" style="font-size:12px;">
+  <p class="muted" data-s="s6b9c179a">
     <b>清除所有鎖定</b>：清掉因為密碼錯誤次數過多而鎖住的帳號 / IP，緊急用（例如多人撞密碼把整個辦公室 IP 鎖死）。一般單一帳號鎖死可以從 <a href="/admin/users">使用者管理</a> 頁面點該帳號的「解鎖」即可，不必清全部。<br>
     <b>停用認證</b>會立刻讓所有人都能存取系統（恢復預設）；現有使用者 / 角色 / 權限資料保留，下次再啟用會繼續用。
     <b>所有現有 session 會立刻失效。</b>
@@ -58,7 +58,7 @@
   {% endif %}
 
   <h2>認證 backend / LDAP 設定</h2>
-  <p class="muted" style="font-size:12.5px; margin-top:0;">
+  <p class="muted" data-s="sd6ae432c">
     選擇驗證使用者的 backend。<b>切換會讓所有現有 session 立刻失效。</b>
     啟用外部目錄後，登入頁的「認證領域」下拉仍會保留<b>本機</b>選項，jtdt-admin 等本機帳號不會被鎖外。
   </p>
@@ -120,7 +120,7 @@
                placeholder="CN=jtdt-svc,OU=Service Accounts,DC=example,DC=com">
       </div>
 
-      <div class="auth-field" style="margin-bottom:0;">
+      <div class="auth-field" data-s="se7ec5403">
         <label class="af-label" for="af-svc-pw">Service Account 密碼</label>
         <input id="af-svc-pw" class="field" type="password" name="service_password"
                placeholder="{% if settings.ldap.service_password %}（已設定，留白不變更）{% else %}輸入密碼{% endif %}">
@@ -139,7 +139,7 @@
         <div class="af-hint">必須是純 DN，<b>不能</b>含 <code>(</code> <code>)</code>。要限制群組請寫到下方 filter。</div>
       </div>
 
-      <div class="auth-field" style="margin-bottom:0;">
+      <div class="auth-field" data-s="se7ec5403">
         <label class="af-label" for="af-filter">使用者搜尋 filter</label>
         <input id="af-filter" class="field" type="text" name="user_search_filter"
                value="{{ settings.ldap.user_search_filter }}"
@@ -151,7 +151,7 @@
           <span class="hint-ldap">📖 LDAP / UCS / FreeIPA filter 範例與語法</span>
         </summary>
         <div class="af-details-body">
-          <div style="margin-bottom:6px;">
+          <div data-s="s2937bfc9">
             <code>{username}</code> 會被換成登入帳號（系統自動 escape）。filter 比對到<b>剛好一筆</b> entry 才會做密碼 bind。
           </div>
           <table class="ldap-ex">
@@ -173,7 +173,7 @@
               <tr><th>限定 posixGroup</th><td><code>(&amp;(uid={username})(gidNumber=5050))</code></td></tr>
             </tbody>
           </table>
-          <div style="margin-top:8px; padding-top:6px; border-top:1px dashed #e5e7eb;">
+          <div data-s="s1d208eee">
             多條件：<code>&amp;</code> AND / <code>|</code> OR / <code>!</code> NOT，每條件都用 <code>(…)</code> 包。
           </div>
         </div>
@@ -185,7 +185,7 @@
     <fieldset class="auth-section">
       <legend>{{ icon('form', size=14) }} 屬性對應</legend>
 
-      <div class="auth-field af-attrs" style="margin-bottom:0;">
+      <div class="auth-field af-attrs" data-s="se7ec5403">
         <div class="af-attr-cell">
           <label class="af-label" for="af-attr-uname">username 屬性</label>
           <input id="af-attr-uname" class="field" type="text" name="username_attr"
@@ -218,13 +218,13 @@
 
     <p>
       <button class="btn btn-primary" type="button" id="ldapSaveBtn">{{ icon('save', size=14) }} 儲存設定</button>
-      <span id="ldapStatus" class="muted" style="margin-left:10px; font-size:12px;"></span>
+      <span id="ldapStatus" class="muted" data-s="sc57a38d4"></span>
     </p>
   </form>
 
-  <hr style="margin:20px 0;">
-  <h3 style="margin:0 0 6px;">驗證測試</h3>
-  <p class="muted" style="font-size:12.5px; margin:0 0 12px;">
+  <hr data-s="sb49ae34c">
+  <h3 data-s="s1f06255c">驗證測試</h3>
+  <p class="muted" data-s="sf2e36644">
     用上方表單目前的設定測試（不會自動儲存）。Service 密碼留空時走已儲存的密碼。
   </p>
 
@@ -265,7 +265,7 @@
   </div>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   /* ===== Auth-settings form layout (self-contained, doesn't borrow .form-row) ===== */
   .auth-form { max-width: 760px; }
   .auth-form .auth-field { margin-bottom: 14px; }
@@ -403,7 +403,7 @@
   .auth-locked-text a { color: #92400e; text-decoration: underline; }
 </style>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   table.kv { width:auto; border-collapse:collapse; }
   table.kv th { text-align:right; padding:4px 12px 4px 0; color:#6b7280; font-weight:normal; }
   table.kv td { padding:4px 0; }
@@ -576,14 +576,14 @@ if (tlBtn) tlBtn.addEventListener('click', async () => {
     });
     if (r.ok) {
       const j = await r.json();
-      let html = `<div style="color:#16a34a;font-weight:600">✓ 登入成功（${j.elapsed_ms} ms）</div>`;
-      html += `<div style="margin-top:4px"><b>DN：</b><code style="font-size:11.5px">${escapeHtml(j.user_dn)}</code></div>`;
+      let html = `<div data-s="s1b8eadeb">✓ 登入成功（${j.elapsed_ms} ms）</div>`;
+      html += `<div data-s="sa18ac805"><b>DN：</b><code data-s="sc73c4105">${escapeHtml(j.user_dn)}</code></div>`;
       html += `<div><b>顯示名稱：</b>${escapeHtml(j.display_name || '(無)')}</div>`;
       html += `<div><b>群組（${j.groups.length}）：</b>`;
       if (j.groups.length === 0) {
         html += '<span class="muted">(無)</span>';
       } else {
-        html += '<ul style="margin:4px 0 0 18px;padding:0;font-size:11.5px;color:#334155;max-height:140px;overflow:auto;">';
+        html += '<ul data-s="s2bc9add7">';
         j.groups.forEach(g => { html += `<li><code>${escapeHtml(g)}</code></li>`; });
         html += '</ul>';
       }
@@ -592,10 +592,10 @@ if (tlBtn) tlBtn.addEventListener('click', async () => {
     } else {
       let detail = '';
       try { detail = (await r.json()).detail || ''; } catch(e) { detail = await r.text(); }
-      status.innerHTML = `<span style="color:#dc2626">✗ ${escapeHtml(detail)}</span>`;
+      status.innerHTML = `<span data-s="sbc8099b4">✗ ${escapeHtml(detail)}</span>`;
     }
   } catch (e) {
-    status.innerHTML = `<span style="color:#dc2626">✗ ${escapeHtml(e.message)}</span>`;
+    status.innerHTML = `<span data-s="sbc8099b4">✗ ${escapeHtml(e.message)}</span>`;
   } finally {
     tlBtn.disabled = false;
   }

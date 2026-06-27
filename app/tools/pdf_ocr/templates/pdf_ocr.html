@@ -4,7 +4,7 @@
 {% block title %}OCR 文字辨識 · {{ app_name }}{% endblock %}
 
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .po-fields { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
 .po-field label { display:block; font-size:13px; color:#475569; margin-bottom:4px; font-weight:500; }
 .po-field label .muted { font-weight:400; color:#94a3b8; font-size:11px; }
@@ -305,16 +305,16 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 <details class="panel" open>
   <summary>1. 上傳 PDF 或圖片</summary>
   {% with upload_id='poUp', accept='.pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,application/pdf,image/*', hint='支援 .pdf / .jpg / .png / .tiff / .bmp / .webp；上限 200 MB；圖片會自動包成單頁 PDF' %}{% include "components/file_upload.html" %}{% endwith %}
-  <div id="uploadInfo" style="margin-top:8px; font-size:13px; color:#475569;"></div>
+  <div id="uploadInfo" data-s="sd1f2f617"></div>
 </details>
 
 <details class="panel" open>
   <summary>2. 設定</summary>
   <div class="po-fields">
-    <div class="po-field" style="grid-column: 1 / -1;" id="poLangSection">
+    <div class="po-field" data-s="s493b1c85" id="poLangSection">
       <label>OCR 語言
         <span class="muted">（點選要辨識的語言；多選會增加處理時間。{% if current_engine == 'easyocr' %}<b>目前引擎：EasyOCR</b>，首次使用某語言會自動下載 ~150MB 模型{% else %}<b>目前引擎：Tesseract</b>{% endif %}，引擎切換在 <a href="/admin/ocr-langs">OCR 引擎管理</a>）</span>
-        <span id="poLangDisabledNote" class="muted" style="display:none; color:#a16207; margin-left:8px;">（已勾選 LLM 直接辨識，OCR 引擎不會用到，語言設定僅在 LLM 失敗自動退回 EasyOCR 時生效）</span>
+        <span id="poLangDisabledNote" class="muted" data-s="s295d6c8e">（已勾選 LLM 直接辨識，OCR 引擎不會用到，語言設定僅在 LLM 失敗自動退回 EasyOCR 時生效）</span>
       </label>
       {% if installed_langs %}
       <div class="po-langs-wrap" id="poLangsBox">
@@ -393,16 +393,16 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 
         <div class="po-langs-summary" id="poLangsSummary"></div>
         {% if current_engine == 'easyocr' %}
-        <div class="muted" style="margin-top:8px; font-size:12px; color:#94a3b8;">提示：EasyOCR 非 Latin 系語言（中、日、韓、泰、俄、阿拉伯、希伯來、印地）同時只能載一個 model，選了其一其他會自動 disable；Latin 系（英、德、法、西、義、葡、荷）可多選並搭一個非 Latin。</div>
+        <div class="muted" data-s="s7384bffc">提示：EasyOCR 非 Latin 系語言（中、日、韓、泰、俄、阿拉伯、希伯來、印地）同時只能載一個 model，選了其一其他會自動 disable；Latin 系（英、德、法、西、義、葡、荷）可多選並搭一個非 Latin。</div>
         {% endif %}
       </div>
       {% else %}
       <div class="po-langs-empty">未偵測到已安裝的語言（tesseract 不可用？請確認系統已安裝 tesseract 與訓練檔）</div>
       {% endif %}
     </div>
-    <div class="po-field" style="grid-column: 1 / -1;" id="poDpiSection">
+    <div class="po-field" data-s="s493b1c85" id="poDpiSection">
       <label>渲染 DPI <span class="muted">（影像解析度，越高文字辨識越準但越慢；300 是平衡點）</span>
-        <span id="poDpiDisabledNote" class="muted" style="display:none; color:#a16207; margin-left:8px;">（已勾選 LLM 辨識，影像會自動縮到 1568 px，DPI 主要影響 EasyOCR 失敗退回時的辨識精準度）</span>
+        <span id="poDpiDisabledNote" class="muted" data-s="s295d6c8e">（已勾選 LLM 辨識，影像會自動縮到 1568 px，DPI 主要影響 EasyOCR 失敗退回時的辨識精準度）</span>
       </label>
       <div class="po-dpi-wrap">
         <div class="po-dpi-grid">
@@ -436,14 +436,14 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
         <div class="po-dpi-custom-row">
           <label for="poDpi">自訂值：</label>
           <input type="number" id="poDpi" min="72" max="600" value="300">
-          <span style="color:#94a3b8;">DPI（72-600）</span>
+          <span data-s="s8cd4ae71">DPI（72-600）</span>
           <span class="po-dpi-est" id="poDpiEst"></span>
         </div>
       </div>
     </div>
   </div>
-  <div class="po-fields" style="margin-top:12px;">
-    <div class="po-field" style="grid-column: 1 / -1;">
+  <div class="po-fields" data-s="s002535c2">
+    <div class="po-field" data-s="s493b1c85">
       <label>OCR 範圍 <span class="muted">（避免對已有文字層的 PDF 頁重複 OCR；多數混合 PDF 適用）</span></label>
       <div class="po-toggle">
         <input type="checkbox" id="poSkipText" checked>
@@ -453,11 +453,11 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
         </label>
       </div>
     </div>
-    <div class="po-field" style="grid-column: 1 / -1;">
+    <div class="po-field" data-s="s493b1c85">
       <!-- LLM 主辨識選項：直接 / 對位 / 完整 三擇一（獨立於 LLM 後處理）
            暫時隱藏（v1.11.22+）— LLM 重複生成迴圈與座標精度問題尚未完全穩定，
            hide 但保留 checkbox 給 backend 邏輯，後端 API 仍可傳 use_llm_direct/align/full -->
-      <div class="po-toggle-grid" style="margin-bottom:10px; display:none;">
+      <div class="po-toggle-grid" data-s="s1a09cfe9">
         <div class="po-toggle {% if not llm_vision_ok %}po-toggle-disabled{% endif %}">
           <input type="checkbox" id="poUseLlmDirect" {% if not llm_vision_ok %}disabled{% endif %}>
           <label for="poUseLlmDirect">
@@ -467,9 +467,9 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
               {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
             </span>
             {% if llm_vision_ok %}
-            <span class="po-toggle-hint">跳過 OCR 引擎，LLM 直接做 OCR。<b style="color:#a16207;">無逐字座標</b>（拖選位置不對應原圖），中文易腦補。失敗自動退回 EasyOCR。</span>
+            <span class="po-toggle-hint">跳過 OCR 引擎，LLM 直接做 OCR。<b data-s="s9e5caf70">無逐字座標</b>（拖選位置不對應原圖），中文易腦補。失敗自動退回 EasyOCR。</span>
             {% else %}
-            <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
+            <span class="po-toggle-hint" data-s="sc9e34862">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
             {% endif %}
           </label>
         </div>
@@ -484,7 +484,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
             {% if llm_vision_ok %}
             <span class="po-toggle-hint">EasyOCR 取座標 + LLM 取文字，行對齊。<b>拖選位置精準</b>；對齊失敗保留 EasyOCR 原字。較慢但最穩，任何 vision 模型都能用。</span>
             {% else %}
-            <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
+            <span class="po-toggle-hint" data-s="sc9e34862">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
             {% endif %}
           </label>
         </div>
@@ -499,18 +499,18 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
             {% if llm_vision_ok %}
             <span class="po-toggle-hint">LLM 同時回文字與座標，不跑 OCR 引擎。<b>建議用 <code>qwen2.5vl:7b</code></b>（grounding 能給座標、無 thinking mode、約 9GB VRAM）；qwen3-vl thinking mode 不穩、gemma 無 grounding 不可用。座標解析失敗自動退回 EasyOCR。</span>
             {% else %}
-            <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
+            <span class="po-toggle-hint" data-s="sc9e34862">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
             {% endif %}
           </label>
         </div>
       </div>
 
       <details class="po-llm-details">
-        <summary style="cursor:pointer;font-size:13px;color:#475569;padding:8px 12px;background:#f1f5f9;border-radius:6px;user-select:none;font-weight:600;">
-          LLM 後處理 <span class="muted" style="font-weight:normal;">（選用 — 預設關閉；EasyOCR 中文已夠強，需要時點開）</span>
+        <summary data-s="s9e0a843a">
+          LLM 後處理 <span class="muted" data-s="s9aa76ee8">（選用 — 預設關閉；EasyOCR 中文已夠強，需要時點開）</span>
         </summary>
-        <div style="margin-top:10px;">
-      <div style="background:#fef2f2; border-left:3px solid #ef4444; padding:8px 12px; margin-bottom:8px; font-size:12px; color:#991b1b; border-radius:4px; line-height:1.6;">
+        <div data-s="s5371db16">
+      <div data-s="s12dc63dc">
         <b>⚠ EasyOCR 中文辨識已夠強，多數場合不需 LLM</b>。若仍要用，LLM 可能會把看不清楚的字猜成「最像的常見詞」（例：原文 OCR 結果若被改成更常見的相似詞）— 公司名 / 人名 / 編號請對照原 PDF 複核，下方「各階段詳細結果」可比對。
       </div>
       <div class="po-toggle-grid">
@@ -525,7 +525,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
             {% if llm_vision_ok %}
             <span class="po-toggle-hint">直接看頁面影像對照 OCR 結果，能修純文字看不出來的字元錯誤、缺漏。<b>需 vision 模型</b>（gemma4:26b、qwen3-vl 等）。較慢但對掃描品質差的 PDF 最有效。</span>
             {% else %}
-            <span class="po-toggle-hint" style="color:#ef4444;">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a> 為「OCR 文字辨識（LLM 視覺校對）」指派 vision 模型</span>
+            <span class="po-toggle-hint" data-s="sc9e34862">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a> 為「OCR 文字辨識（LLM 視覺校對）」指派 vision 模型</span>
             {% endif %}
           </label>
         </div>
@@ -540,7 +540,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
             {% if llm_ok %}
             <span class="po-toggle-hint">純文字校正：抓 typo / 字元誤判（0/O、1/l、CJK 偏旁誤判）。任何 text 模型都可用，較省 VRAM 也較快。</span>
             {% else %}
-            <span class="po-toggle-hint" style="color:#ef4444;">LLM 未設定 — 請先至 <a href="/admin/llm-settings">LLM 設定</a> 啟用</span>
+            <span class="po-toggle-hint" data-s="sc9e34862">LLM 未設定 — 請先至 <a href="/admin/llm-settings">LLM 設定</a> 啟用</span>
             {% endif %}
           </label>
         </div>
@@ -553,9 +553,9 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 
 <div class="panel">
   <button class="btn btn-primary" id="btnRun" disabled>{{ icon('play', size=14) }} 開始 OCR</button>
-  <button class="btn btn-danger" id="btnStop" type="button" style="display:none; margin-left:8px;">{{ icon('close', size=14) }} 停止辨識</button>
-  <span id="status" class="muted" style="margin-left:12px; font-size:13px;">請先上傳 PDF 或圖片</span>
-  <div class="po-progress" style="display:none;" id="progressBar"><div></div></div>
+  <button class="btn btn-danger" id="btnStop" type="button" data-s="se2713b1e">{{ icon('close', size=14) }} 停止辨識</button>
+  <span id="status" class="muted" data-s="sd70b636c">請先上傳 PDF 或圖片</span>
+  <div class="po-progress" data-s="scb458930" id="progressBar"><div></div></div>
   <div id="resultBox"></div>
 </div>
 
@@ -568,7 +568,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 const PO_ICON_FILE = {{ icon('file-text', size=14) | tojson }};
 const PO_ICON_LAYERS = {{ icon('layers', size=14) | tojson }};
 const PO_ICON_INFO = {{ icon('info', size=14) | tojson }};
-const PO_ICON_WRAP = (svg) => '<span style="display:inline-flex; align-items:center;">' + svg + '</span>';
+const PO_ICON_WRAP = (svg) => '<span data-s="s4b237147">' + svg + '</span>';
 const PO_ICON_COPY = {{ icon('copy', size=12) | tojson }};
 const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
 </script>
@@ -651,7 +651,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
     return ''
       + '<div class="po-viewer-wrap" id="poViewerWrap">'
       + '  <div class="po-viewer-head">'
-      + '    <span class="title"><span style="display:inline-flex; vertical-align:middle; margin-right:4px;">' + PO_ICON_FILE + '</span>預覽結果（直接拖選文字試試看）</span>'
+      + '    <span class="title"><span data-s="se1b879c5">' + PO_ICON_FILE + '</span>預覽結果（直接拖選文字試試看）</span>'
       + '    <span class="actions">'
       + '      <a href="' + viewerSrc + '" target="_blank" rel="noopener">在新分頁開啟 ↗</a>'
       + '    </span>'
@@ -1077,19 +1077,19 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
             + '插入文字 ' + (stats.words_inserted || 0) + ' 字' + modeLabel
             + '<br><br>'
             + '<a class="btn btn-primary" href="' + url + '" download>下載文字辨識後 PDF</a>'
-            + (window.attachWorkspaceSave ? '<button id="ocrWsSave" class="btn" type="button" style="margin-left:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>存至工作區</button>' : '')
+            + (window.attachWorkspaceSave ? '<button id="ocrWsSave" class="btn" type="button" data-s="sc3f83707"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="sb4a65f0b"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>存至工作區</button>' : '')
             + (stats.llm_direct_used
-               ? '<div style="margin-top:8px; font-size:12px; color:#a16207;">⚠ LLM 直接辨識無逐字座標，拖選反白位置不對應圖上文字位置（要精準對位請改用「LLM 對位辨識」）；要拿完整內容請展開下方「識別結果全文」一次複製。中文易腦補，務必對照原檔複核。</div>'
+               ? '<div data-s="sf2fd7057">⚠ LLM 直接辨識無逐字座標，拖選反白位置不對應圖上文字位置（要精準對位請改用「LLM 對位辨識」）；要拿完整內容請展開下方「識別結果全文」一次複製。中文易腦補，務必對照原檔複核。</div>'
                : '')
             + (stats.llm_full_used
-               ? '<div style="margin-top:8px; font-size:12px; color:#a16207;">⚠ LLM 完整辨識的座標由 vision 模型預測，typical 誤差 ±10-30px（grounded 模型本質限制，非引擎 bug）。如需 pixel-accurate 拖選位置，請改勾「LLM 對位辨識」(EasyOCR 拿像素級座標 + LLM 拿文字)。</div>'
+               ? '<div data-s="sf2fd7057">⚠ LLM 完整辨識的座標由 vision 模型預測，typical 誤差 ±10-30px（grounded 模型本質限制，非引擎 bug）。如需 pixel-accurate 拖選位置，請改勾「LLM 對位辨識」(EasyOCR 拿像素級座標 + LLM 拿文字)。</div>'
                : '')
             + '</div>'
             // 識別結果全文 — 預設摺疊，方便檢視 / 複製
             + (fullText
                ? '<details class="po-fulltext"><summary>' + PO_ICON_WRAP(PO_ICON_FILE) + '識別結果全文（' + fullCharCount + ' 字' + (stages.length > 1 ? '，' + stages.length + ' 頁' : '') + '，點開檢視 / 複製）</summary>'
                  + '<div class="po-fulltext-body">'
-                 + '<div style="margin-bottom:8px;"><button type="button" class="btn btn-small" id="poCopyFullText">📋 複製全文</button></div>'
+                 + '<div data-s="sd51702bf"><button type="button" class="btn btn-small" id="poCopyFullText">📋 複製全文</button></div>'
                  + '<pre id="poFullTextPre" class="po-fulltext-pre">' + fullText.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") + '</pre>'
                  + '</div></details>'
                : '')
@@ -1097,7 +1097,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
             + '<details class="po-stages">'
             + '<summary>' + PO_ICON_WRAP(PO_ICON_INFO) + '怎麼確認是這個工具 OCR 的（不是 macOS 預覽程式自動 OCR）？</summary>'
             + '<div class="po-stages-body">'
-            + '<div style="padding-top:6px;font-size:13px;color:#475569;line-height:1.7;">'
+            + '<div data-s="s1382a0b4">'
             + '下載後用 Adobe Acrobat / Apple 預覽程式開啟，三個方法擇一：<br>'
             + '①「<b>檔案 → 簡介</b>」（Preview）或「<b>檔案 → 內容</b>」（Acrobat）— Producer 欄位顯示「<code>' + producer + '</code>」+ tesseract 版本「<code>' + tessV + '</code>」<br>'
             + '② Cmd+F 搜尋「<code>' + marker + '</code>」— 每頁右下角有此透明標記，能搜到代表是本工具產生的文字層<br>'
@@ -1118,13 +1118,13 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
               try {
                 await navigator.clipboard.writeText(fullText);
                 copyBtn.textContent = '✓ 已複製 ' + fullText.length + ' 字';
-                setTimeout(() => { copyBtn.textContent = ('<span style="display:inline-flex; vertical-align:middle; margin-right:4px;">' + PO_ICON_COPY + '</span>複製全文'); }, 2000);
+                setTimeout(() => { copyBtn.textContent = ('<span data-s="se1b879c5">' + PO_ICON_COPY + '</span>複製全文'); }, 2000);
               } catch (e) {
                 const ta = document.createElement('textarea');
                 ta.value = fullText; document.body.appendChild(ta);
                 ta.select(); document.execCommand('copy'); ta.remove();
                 copyBtn.textContent = '✓ 已複製';
-                setTimeout(() => { copyBtn.textContent = ('<span style="display:inline-flex; vertical-align:middle; margin-right:4px;">' + PO_ICON_COPY + '</span>複製全文'); }, 2000);
+                setTimeout(() => { copyBtn.textContent = ('<span data-s="se1b879c5">' + PO_ICON_COPY + '</span>複製全文'); }, 2000);
               }
             });
           }

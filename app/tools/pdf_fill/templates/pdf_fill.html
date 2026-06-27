@@ -2,14 +2,14 @@
 {% from "components/icons.html" import icon %}
 {% block title %}表單自動填寫 · {{ app_name }}{% endblock %}
 {% block content %}
-<h1 style="margin:0; display:flex; align-items:center; gap:8px;">{{ icon('edit', size=22) }} 表單自動填寫</h1>
+<h1 data-s="s6d2e9344">{{ icon('edit', size=22) }} 表單自動填寫</h1>
 <p class="muted">上傳○○資料表/匯款申請書（支援 PDF 及 Word/Excel/ODF，輸出為 PDF），自動偵測欄位並用公司基本資料填好。處理完成後上傳檔案會於數小時內自動刪除，不留存副本。</p>
 
 <details class="panel profile-panel" id="profilePanel">
   <summary>
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; width:100%;">
-      <div style="display:flex; gap:10px; align-items:center;">
-        <h2 style="margin:0;">公司資料</h2>
+    <div data-s="s2238b756">
+      <div data-s="s5f11e4db">
+        <h2 data-s="s1386d503">公司資料</h2>
         {% if companies|length > 1 %}
         <select id="companySwitch" data-stop-prop>
           {% for c in companies %}
@@ -23,7 +23,7 @@
       <a class="btn btn-small" href="/admin/profile?cid={{ selected_id }}" data-stop-prop>{{ icon('edit') }}編輯</a>
     </div>
   </summary>
-  <p class="muted" style="font-size:12px; margin:6px 0 8px;">這些欄位會被自動帶入偵測到的對應欄位。</p>
+  <p class="muted" data-s="s402978b9">這些欄位會被自動帶入偵測到的對應欄位。</p>
   {% for sec in sections %}
     {% set visible_rows = sec.rows|selectattr('value')|list %}
     {% if visible_rows %}
@@ -43,7 +43,7 @@
 </details>
 
 <div class="panel">
-  <h2 style="margin-top:0;">上傳檔案</h2>
+  <h2 data-s="s53896af7">上傳檔案</h2>
   <form id="uploadForm">
     {% with upload_id='pdfFileUpload', accept='.pdf,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.csv', hint='支援 PDF 及 Word/Excel/PowerPoint/ODF；非 PDF 會先轉 PDF 再填。<br><strong>一次只處理一份檔案</strong>，若選了多份會自動取第一份。' %}
       {% include "components/file_upload.html" %}
@@ -64,11 +64,11 @@
     </div>
     {% if llm_enabled %}
     <div class="llm-toggle-row">
-      <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+      <label data-s="s1f833120">
         <input type="checkbox" id="useLlmReview">
         啟用 LLM 校驗（會多花約 30-60 秒）
       </label>
-      <span class="muted" style="font-size:11px;">
+      <span class="muted" data-s="s8b685211">
         (附加功能；本地 / LAN LLM server 對填寫結果做品質檢查)
       </span>
     </div>
@@ -77,27 +77,27 @@
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 style="margin-top:0;">預覽結果</h2>
+  <h2 data-s="s53896af7">預覽結果</h2>
   <div id="reportBox"></div>
-  <div id="llmReviewBox" hidden style="margin-top:14px;"></div>
+  <div id="llmReviewBox" hidden data-s="s553a645f"></div>
   <details id="unmatchedBox" class="unmatched-box" hidden>
-    <summary style="cursor:pointer; user-select:none; margin:14px 0 6px; font-size:15px; font-weight:600;">
-      未對應的標籤（教系統認識）<span id="unmatchedCount" class="muted" style="font-weight:normal; font-size:12px; margin-left:6px;"></span>
+    <summary data-s="s6150e8f6">
+      未對應的標籤（教系統認識）<span id="unmatchedCount" class="muted" data-s="s5a8ca7b2"></span>
     </summary>
-    <p class="muted" style="font-size:12px;">下拉選對應的欄位後按「學起來」，下次遇到相同字串就會自動填。</p>
+    <p class="muted" data-s="s6b9c179a">下拉選對應的欄位後按「學起來」，下次遇到相同字串就會自動填。</p>
     <div id="unmatchedList"></div>
-    <button class="btn btn-small" id="rerunBtn" type="button" style="margin-top:6px;" hidden>{{ icon('refresh') }}重新識別</button>
+    <button class="btn btn-small" id="rerunBtn" type="button" data-s="s9e3c4ccb" hidden>{{ icon('refresh') }}重新識別</button>
   </details>
-  <div style="display:flex; gap:8px; margin:10px 0; align-items:center; flex-wrap:wrap;">
+  <div data-s="s0fb4a9c0">
     <a class="btn btn-primary" id="downloadBtn" href="#">{{ icon('download') }}下載填好的 PDF</a>
     {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden>{{ icon('archive') }}存至工作區</button>{% endif %}
     <button class="btn btn-small" id="regenBtn" type="button" hidden>{{ icon('refresh') }}套用新位置</button>
-    <span id="templateStatus" class="muted" style="font-size:13px;"></span>
+    <span id="templateStatus" class="muted" data-s="s3044b600"></span>
     <button class="btn btn-small" id="saveTplBtn" type="button" hidden>{{ icon('save') }}儲存為範本</button>
   </div>
   <div class="preview-note">
     <strong>💡 兩種檢視模式：</strong>
-    <b>編輯模式</b> 顯示原始 PDF 加上藍色可拖動框，用來調整欄位位置（滑鼠滑到框上出現 <span style="color:#dc2626; font-weight:700;">×</span> 可刪除，<b>右鍵</b>新增/覆寫）。
+    <b>編輯模式</b> 顯示原始 PDF 加上藍色可拖動框，用來調整欄位位置（滑鼠滑到框上出現 <span data-s="s43327cce">×</span> 可刪除，<b>右鍵</b>新增/覆寫）。
     <b>合成模式</b> 才是真正的填寫結果；調完位置請按「套用新位置」，切回合成模式就能看到實際效果。
   </div>
   <div class="preview-toolbar">
@@ -105,11 +105,11 @@
       <button class="mode-btn active" type="button" data-mode="edit">編輯模式</button>
       <button class="mode-btn" type="button" data-mode="composite">合成模式</button>
     </div>
-    <span style="flex:1;"></span>
+    <span data-s="sda5cd676"></span>
     <button class="btn btn-small" type="button" id="zoomOut">−</button>
     <input type="range" id="zoomSlider" min="25" max="300" step="5" value="100" class="zoom-slider" />
     <button class="btn btn-small" type="button" id="zoomIn">＋</button>
-    <span id="zoomLabel" class="muted" style="font-size:12px; min-width:48px; text-align:center; font-weight:600;">100%</span>
+    <span id="zoomLabel" class="muted" data-s="sa6476ff2">100%</span>
     <button class="btn btn-small" type="button" id="zoomReset">重設</button>
   </div>
   <div class="preview-scroll">
@@ -117,7 +117,7 @@
   </div>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .profile-panel > summary::marker { content: ''; }
   .profile-section { margin-top: 10px; }
   .profile-section-title { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 4px; padding: 0 0 3px; border-bottom: 1px solid var(--border); }
@@ -1231,11 +1231,11 @@ async function startAsyncLlmReview(uploadId) {
     box.innerHTML = `
       <div class="llm-progress-wrap">
         <div class="llm-progress-title">🤖 LLM 校驗中… ${modelTag}
-          <span class="muted" style="font-weight:normal; font-size:12px;">${sec}s</span>
+          <span class="muted" data-s="s0c27a7ee">${sec}s</span>
         </div>
-        <div class="llm-progress-bar"><div class="llm-progress-fill" style="width:${pct}%"></div></div>
+        <div class="llm-progress-bar"><div class="llm-progress-fill" data-style="width:${pct}%"></div></div>
         <div class="llm-progress-msg">${escapeHTML(msg || '啟動中…')}</div>
-        ${subtitle ? `<div class="muted" style="font-size:11px;">${escapeHTML(subtitle)}</div>` : ''}
+        ${subtitle ? `<div class="muted" data-s="s8b685211">${escapeHTML(subtitle)}</div>` : ''}
       </div>
     `;
   };
@@ -1368,7 +1368,7 @@ function renderLlmReview(rev) {
     ? `<span class="llm-model-tag">${escapeHTML(rev._model)}</span>` : '';
   let html = `<details open class="llm-review-details">
     <summary><b>🤖 LLM 校驗結果</b> ${modelTag}
-      <span class="muted" style="font-weight:normal; font-size:12px; margin-left:6px;">
+      <span class="muted" data-s="s5a8ca7b2">
         ${rev.rounds.length} 輪、共 ${rev.total_elapsed_s}s
       </span>
     </summary>`;
@@ -1380,7 +1380,7 @@ function renderLlmReview(rev) {
     const strong = allCorrections.filter(c => c.confidence >= 0.7).length;
     const med    = allCorrections.filter(c => c.confidence >= 0.4 && c.confidence < 0.7).length;
     const weak   = allCorrections.filter(c => c.confidence < 0.4).length;
-    html += `<div class="muted" style="font-size:12px; margin:6px 0;">
+    html += `<div class="muted" data-s="s3a9b5502">
       共 <b>${allCorrections.length}</b> 個建議
       ${strong ? `· <span class="conf-strong">高信心 ${strong}</span>` : ''}
       ${med ? `· <span class="conf-med">中信心 ${med}</span>` : ''}
@@ -1421,7 +1421,7 @@ function renderLlmReview(rev) {
     const highConf = allCorrections.filter(c => c.confidence >= 0.7);
     if (highConf.length || allCorrections.length) {
       const moveCandidates = allCorrections.filter(c => c.suggested_slot_pt).length;
-      html += `<div class="llm-apply-bar" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">`;
+      html += `<div class="llm-apply-bar" data-s="sb339be18">`;
       if (highConf.length) {
         html += `<button type="button" class="btn btn-primary" id="llmApplyHigh"
           data-count="${highConf.length}">
@@ -1434,11 +1434,11 @@ function renderLlmReview(rev) {
       </button>`;
       // Opt-in auto-move toggle (experimental). Default OFF because Q5
       // suggestions are unreliable on complex forms with overlapping text.
-      html += `<label class="muted" style="font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+      html += `<label class="muted" data-s="s7bc9e1ae">
         <input type="checkbox" id="llmTryMove" ${moveCandidates === 0 ? 'disabled' : ''}>
         嘗試搬到建議位置（實驗，${moveCandidates} 個有目標）
       </label>`;
-      html += `<span class="muted" style="font-size:12px;">
+      html += `<span class="muted" data-s="s6b9c179a">
         套用後會重新渲染 PDF，原版仍保留在 history
       </span>`;
       html += `</div>`;
@@ -1448,8 +1448,8 @@ function renderLlmReview(rev) {
     }
   }
   if (learned.length) {
-    html += `<div style="margin-top:10px;"><b>💡 已自動學習</b>
-      <ul style="margin:4px 0; font-size:13px;">`;
+    html += `<div data-s="s5371db16"><b>💡 已自動學習</b>
+      <ul data-s="sa4ba34c9">`;
     for (const l of learned) {
       html += `<li>${escapeHTML(l.detail)}</li>`;
     }
@@ -1537,7 +1537,7 @@ function renderReport(r) {
   reportBox.innerHTML = `
     <p>偵測到 <b>${r.detected}</b> 個欄位，已填入 <b>${r.filled}</b> 個。</p>
     ${matched ? `<div class="report-list">${matched}</div>` : ''}
-    ${missing ? `<p style="margin-top:10px;">以下偵測到了但公司資料是空的：</p><div class="report-list">${missing}</div>` : ''}
+    ${missing ? `<p data-s="s5371db16">以下偵測到了但公司資料是空的：</p><div class="report-list">${missing}</div>` : ''}
   `;
 }
 

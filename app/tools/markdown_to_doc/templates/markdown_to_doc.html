@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}Markdown 轉文書 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .md2-textarea {
   width: 100%; min-height: 280px; max-height: 60vh;
   padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 6px;
@@ -143,7 +143,7 @@
 <p class="muted">把 Markdown 內容套上主題樣式，輸出可下載的 <b>PDF / Word (DOCX) / OpenDocument (ODT)</b>。所有頁面自動產生預覽，下載前先看效果。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. Markdown 內容</h2>
+  <h2 data-s="s53896af7">1. Markdown 內容</h2>
   <label class="md2-drop" id="md2Drop" for="md2File">
     <input type="file" id="md2File" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6366f1"
@@ -173,16 +173,16 @@ def hello():
 | A    | 1    |
 | B    | 2    |
 "></textarea>
-  <div style="margin-top:12px; display:grid; grid-template-columns:max-content 1fr; gap:8px 12px; align-items:center; max-width:680px;">
-    <label style="font-size:13px;">標題（檔名用）</label>
+  <div data-s="sda8a1590">
+    <label data-s="s3044b600">標題（檔名用）</label>
     <input type="text" id="md2Title" placeholder="不填則用「document」或上傳檔名"
-           style="padding:6px 10px; border:1px solid #d1d5db; border-radius:5px; font-size:13px;">
+           data-s="seba1607b">
   </div>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">2. 配色主題</h2>
-  <p class="muted" style="font-size:12px; margin:0 0 8px;">影響 PDF / DOCX / ODT 輸出的視覺風格。</p>
+  <h2 data-s="s53896af7">2. 配色主題</h2>
+  <p class="muted" data-s="se2907ccc">影響 PDF / DOCX / ODT 輸出的視覺風格。</p>
   <div class="md2-themes" id="md2Themes">
     {% for t in themes %}
     <label class="md2-theme{% if loop.first %} selected{% endif %}" data-theme="{{ t.id }}">
@@ -192,10 +192,10 @@ def hello():
     </label>
     {% endfor %}
   </div>
-  <div style="margin-top:14px;">
-    <label for="md2Font" style="font-size:13px; font-weight:600; color:#0f172a;">字型</label>
-    <p class="muted" style="font-size:12px; margin:2px 0 6px;">主機上沒安裝的字型會自動 fallback 到下一個候選。</p>
-    <select class="jt-select" id="md2Font" name="font" style="max-width:420px;">
+  <div data-s="s553a645f">
+    <label for="md2Font" data-s="sc61a0132">字型</label>
+    <p class="muted" data-s="sa5418f35">主機上沒安裝的字型會自動 fallback 到下一個候選。</p>
+    <select class="jt-select" id="md2Font" name="font" data-s="sae18a06a">
       {% for f in fonts %}
       <option value="{{ f.id }}"
               {% if f.stack %}data-preview-style="font-family: {{ f.stack }};"{% endif %}
@@ -209,16 +209,16 @@ def hello():
 <div class="panel">
   <div class="md2-actions">
     <button class="btn btn-primary" id="md2Convert">{{ icon('refresh', size=12) }} 開始轉換</button>
-    <span id="md2Status" style="font-size:13px; color:#64748b;"></span>
+    <span id="md2Status" data-s="s1c9d3d97"></span>
   </div>
   <div id="md2Error" class="md2-error" hidden></div>
 </div>
 
 <div class="panel" id="md2ResultPanel" hidden>
-  <h2 style="margin-top:0;">3. 結果</h2>
+  <h2 data-s="s53896af7">3. 結果</h2>
   <div class="md2-stat-row" id="md2Stat"></div>
   <div class="md2-dl-row" id="md2Downloads"></div>
-  <div style="margin-top:14px; font-size:13px; color:#475569;">所有頁面預覽（PDF 渲染，可點圖放大）</div>
+  <div data-s="sf086dcc7">所有頁面預覽（PDF 渲染，可點圖放大）</div>
   <div class="md2-preview-grid" id="md2Previews"></div>
 </div>
 
@@ -408,7 +408,7 @@ def hello():
       if (f.id === 'pdf' && url && window.attachWorkspaceSave) {
         const wb = document.createElement('button');
         wb.className = 'btn'; wb.type = 'button';
-        wb.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>存至工作區';
+        wb.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="sb4a65f0b"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>存至工作區';
         dl.appendChild(wb);
         window.attachWorkspaceSave(wb, () => ({
           url: url, name: (url.split('/').pop() || 'document.pdf').split('?')[0],

@@ -4,7 +4,7 @@
 {% block content %}
 <h1>{{ icon('id-card', size=22) }} 使用者管理</h1>
 {% if not auth_on %}
-<div class="panel" style="border-left:4px solid #f59e0b;">
+<div class="panel" data-s="s642302c7">
   ⚠ 認證目前沒啟用。建立的使用者會被保留但要等
   <a href="/admin/auth-settings">啟用認證</a> 後才有作用。
 </div>
@@ -12,13 +12,13 @@
 
 <details class="panel" {% if not users %}open{% endif %}>
   <summary><b>新增使用者</b></summary>
-  <form id="newUserForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+  <form id="newUserForm" data-s="s23e0c196">
     <div><label>帳號<br><input class="field" name="username" required pattern="[A-Za-z0-9._\-]+" maxlength="64"></label></div>
     <div><label>顯示名稱<br><input class="field" name="display_name" maxlength="64"></label></div>
     <div><label>密碼<br><input class="field" name="password" type="password" minlength="8" maxlength="128" required></label></div>
     <div><label>初始角色
       <br>
-      <select class="field" name="role" style="min-width:140px;">
+      <select class="field" name="role" data-s="s4a93029a">
         {% for r in all_roles %}
         <option value="{{ r.id }}" {% if r.id == 'default-user' %}selected{% endif %}>{{ r.display_name }}</option>
         {% endfor %}
@@ -29,9 +29,9 @@
 </details>
 
 <div class="panel">
-  <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
-    <h2 style="margin:0;">使用者清單（共 <span id="userCount">{{ users|length }}</span> 人）</h2>
-    <span style="flex:1;"></span>
+  <div data-s="s5344c165">
+    <h2 data-s="s1386d503">使用者清單（共 <span id="userCount">{{ users|length }}</span> 人）</h2>
+    <span data-s="sda5cd676"></span>
     <div class="src-filter" id="srcFilter" role="group" aria-label="依來源篩選">
       <button type="button" class="sf-btn active" data-src="">全部</button>
       <button type="button" class="sf-btn" data-src="local"><span class="src-badge src-local">local</span></button>
@@ -39,7 +39,7 @@
       <button type="button" class="sf-btn" data-src="ad"><span class="src-badge src-ad">ad</span></button>
     </div>
     <input class="field" type="search" id="userSearch"
-           placeholder="搜尋帳號、顯示名稱、角色…" style="width:240px;">
+           placeholder="搜尋帳號、顯示名稱、角色…" data-s="s058cdc4e">
   </div>
   <table class="user-table" id="userTable">
     <thead>
@@ -65,8 +65,8 @@
           <span class="src-badge src-{{ u.source }}">{{ u.source }}</span>
         </td>
         <td data-sort-key="{{ '1' if u.enabled else '0' }}">
-          {% if u.enabled %}<span style="color:#16a34a;">● 啟用</span>
-          {% else %}<span style="color:#dc2626;">● 停用</span>{% endif %}
+          {% if u.enabled %}<span data-s="sdeccf9e7">● 啟用</span>
+          {% else %}<span data-s="sbc8099b4">● 停用</span>{% endif %}
         </td>
         <td data-sort-key="{{ u.roles|join(',') }}">
           {% if u.roles_display %}
@@ -81,7 +81,7 @@
           {% if u.locked %}
           <button class="btn btn-small" data-act="unlock" data-uid="{{ u.id }}" data-username="{{ u.username }}"
                   title="清除這個帳號的密碼錯誤次數鎖定"
-                  style="background:#fef3c7;border-color:#f59e0b;color:#92400e;">{{ icon('unlock', size=12) }} 解鎖</button>
+                  data-s="s0ad83627">{{ icon('unlock', size=12) }} 解鎖</button>
           {% endif %}
           {% if u.is_admin_seed %}
           <button class="btn btn-small" type="button" disabled
@@ -114,13 +114,13 @@
 <div id="editUserModal" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-card">
-    <h3 style="margin-top:0;">編輯使用者 <code id="emUsername"></code></h3>
+    <h3 data-s="s53896af7">編輯使用者 <code id="emUsername"></code></h3>
     <div class="form-row">
       <label>顯示名稱</label>
-      <input class="field" type="text" id="emDisplay" maxlength="64" style="width:100%; box-sizing:border-box;">
+      <input class="field" type="text" id="emDisplay" maxlength="64" data-s="s7631d717">
     </div>
     <div class="form-row">
-      <label class="field" style="font-weight:normal; display:inline-flex; align-items:center; gap:6px;">
+      <label class="field" data-s="sea37c3c1">
         <input type="checkbox" id="emEnabled"> 帳號啟用
       </label>
     </div>
@@ -146,7 +146,7 @@
         <div class="picker-list" id="emGroupGrid"></div>
       </div>
     </div>
-    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+    <div data-s="s9fa82b78">
       <button class="btn" type="button" id="emCancel">取消</button>
       <button class="btn btn-primary" type="button" id="emSave">{{ icon('save', size=14) }} 儲存</button>
     </div>
@@ -156,24 +156,24 @@
 <!-- ===== Reset password modal ===== -->
 <div id="resetPwdModal" hidden>
   <div class="modal-backdrop"></div>
-  <div class="modal-card" style="max-width:380px;">
-    <h3 style="margin-top:0;">重設密碼 <code id="rpUsername"></code></h3>
+  <div class="modal-card" data-s="s757df271">
+    <h3 data-s="s53896af7">重設密碼 <code id="rpUsername"></code></h3>
     <div class="form-row">
       <label>新密碼（至少 8 字元）</label>
-      <input class="field" type="password" id="rpPw" minlength="8" maxlength="128" style="width:100%; box-sizing:border-box;">
+      <input class="field" type="password" id="rpPw" minlength="8" maxlength="128" data-s="s7631d717">
     </div>
     <div class="form-row">
       <label>再輸入一次</label>
-      <input class="field" type="password" id="rpPw2" minlength="8" maxlength="128" style="width:100%; box-sizing:border-box;">
+      <input class="field" type="password" id="rpPw2" minlength="8" maxlength="128" data-s="s7631d717">
     </div>
-    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+    <div data-s="s9fa82b78">
       <button class="btn" type="button" id="rpCancel">取消</button>
       <button class="btn btn-primary" type="button" id="rpSave">{{ icon('lock', size=14) }} 重設</button>
     </div>
   </div>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .user-table { width:100%; border-collapse:collapse; font-size:13px; }
   .user-table th, .user-table td { padding:6px 8px; border-bottom:1px solid #e5e7eb; text-align:left; }
   .user-table th { background:#f9fafb; font-size:12px; color:#6b7280; }

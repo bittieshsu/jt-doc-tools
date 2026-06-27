@@ -3,9 +3,9 @@
 {% block title %}PDF 密碼解除 · {{ app_name }}{% endblock %}
 {% block content %}
 <h1>{{ icon('unlock', size=22) }} PDF 密碼解除</h1>
-<p class="muted">輸入已知密碼後，把 PDF 的保護解除。<b style="color:#b91c1c;">此工具僅解除你自己擁有的加密 PDF；不提供密碼破解。</b></p>
+<p class="muted">輸入已知密碼後，把 PDF 的保護解除。<b data-s="s53875d1b">此工具僅解除你自己擁有的加密 PDF；不提供密碼破解。</b></p>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   /* 選項卡片：勾選 + 標題 + 內縮說明文字（會自動 wrap，不溢出 panel） */
   .opt-card {
     display: flex; align-items: flex-start; gap: 8px; cursor: pointer;
@@ -25,12 +25,12 @@
 </style>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳加密 PDF</h2>
+  <h2 data-s="s53896af7">1. 上傳加密 PDF</h2>
   {% with upload_id='decUp', accept='application/pdf', multiple=True, hint='支援多檔批次。' %}{% include "components/file_upload.html" %}{% endwith %}
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">2. 解密模式 <span class="muted" style="font-weight:400; font-size:12.5px;">（可複選；多模式同時勾選時，解密會依序嘗試直到成功）</span></h2>
+  <h2 data-s="s53896af7">2. 解密模式 <span class="muted" data-s="sd4d75b5d">（可複選；多模式同時勾選時，解密會依序嘗試直到成功）</span></h2>
 
   <div class="mode-stack">
 
@@ -45,9 +45,9 @@
       <div class="mode-body">
         <div class="thsr-row">
           <span class="thsr-label">密碼</span>
-          <input id="pw" type="password" class="field" placeholder="開啟密碼或擁有者密碼都可以" style="flex:1; min-width:240px; max-width:400px;" />
+          <input id="pw" type="password" class="field" placeholder="開啟密碼或擁有者密碼都可以" data-s="s5a2ce77e" />
         </div>
-        <div class="thsr-row" style="margin-top:6px;">
+        <div class="thsr-row" data-s="s9e3c4ccb">
           <span class="thsr-label"></span>
           <span class="muted thsr-hint">如果 PDF 沒有開啟密碼但有權限限制（禁列印 / 禁複製），此處留空即可；工具會直接去掉權限限制。</span>
         </div>
@@ -77,8 +77,8 @@
         </span>
       </label>
       <div class="mode-body">
-        <div class="thsr-row" style="display:block;">
-          <div class="mr-summary">搜尋範圍：<b id="mrSummary">—</b> <span class="muted" id="mrCount" style="font-size:11.5px; margin-left:6px;"></span></div>
+        <div class="thsr-row" data-s="sfa9aeccc">
+          <div class="mr-summary">搜尋範圍：<b id="mrSummary">—</b> <span class="muted" id="mrCount" data-s="sf4fdd782"></span></div>
           <div class="month-range" id="monthRange">
             <div class="mr-handle-label" id="mrLabelFrom">—</div>
             <div class="mr-handle-label" id="mrLabelTo">—</div>
@@ -88,7 +88,7 @@
             <input type="range" class="mr-input mr-to"   id="mrTo"   min="0" max="13" step="1" />
             <div class="mr-ticks" id="mrTicks"></div>
           </div>
-          <div class="muted thsr-hint" style="margin-top:6px;">預設最近 3 個月。把左右兩端拖到想要的月份；範圍可橫跨整個時間軸。</div>
+          <div class="muted thsr-hint" data-s="s9e3c4ccb">預設最近 3 個月。把左右兩端拖到想要的月份；範圍可橫跨整個時間軸。</div>
         </div>
         <div class="thsr-row">
           <span class="thsr-label">日期格式</span>
@@ -102,7 +102,7 @@
             <option value="YYMMDD">YYMMDD</option>
             <option value="__custom__">自訂…</option>
           </select>
-          <input id="thsrFmtCustom" type="text" class="field thsr-input" placeholder="自訂 (Y/M/D 與 - / . _ 空白)" style="display:none; width:200px;" />
+          <input id="thsrFmtCustom" type="text" class="field thsr-input" placeholder="自訂 (Y/M/D 與 - / . _ 空白)" data-s="s63243d5a" />
           <span class="muted thsr-hint">預覽：<code id="thsrFmtSample">—</code></span>
         </div>
       </div>
@@ -111,7 +111,7 @@
   </div>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .mode-stack { display: flex; flex-direction: column; gap: 10px; }
   .mode-card {
     border: 1px solid var(--border, #e5e7eb); border-radius: 8px;
@@ -244,10 +244,10 @@
   .mr-tick.is-major { color: #475569; font-weight: 600; }
 </style>
 
-<div style="margin-top:12px;">
+<div data-s="s002535c2">
   <button class="btn btn-primary" id="btn-submit">{{ icon('unlock', size=14) }} 解除密碼</button>
 </div>
-<div style="margin-top:10px;">
+<div data-s="s5371db16">
   {% with progress_id='decJob' %}{% include "components/job_progress.html" %}{% endwith %}
 </div>
 

@@ -54,8 +54,8 @@
     </div>
     <div class="trd-form-cell trd-form-cell-wide">
       <label class="trd-label">或上傳檔案</label>
-      <div style="display:flex; gap:10px; align-items:stretch;">
-        <label class="trd-drop-zone" id="dropZone" for="fileInput" style="flex:1; min-width:0;">
+      <div data-s="s5ee7f1f8">
+        <label class="trd-drop-zone" id="dropZone" for="fileInput" data-s="sbbf7159c">
           <input type="file" id="fileInput" accept=".pdf,.docx,.odt,.ods,.odp,.txt,.md" hidden />
           <div class="trd-drop-icon">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -69,13 +69,13 @@
             <span class="trd-drop-hint">PDF / DOCX / ODT / ODS / ODP / TXT / MD</span>
           </div>
         </label>
-        {% if workspace_enabled(request) %}<button type="button" class="ws-load-btn" id="wsLoadBtn" style="align-self:center; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span>從工作區載入</span></button>{% endif %}
+        {% if workspace_enabled(request) %}<button type="button" class="ws-load-btn" id="wsLoadBtn" data-s="sfb3608b6"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span>從工作區載入</span></button>{% endif %}
       </div>
     </div>
   </div>
-  <div style="margin-top:14px;">
-    <label class="trd-label" for="domainHint">文件領域 <span class="muted" style="font-weight:400;">（選填，會送進 LLM prompt 提升專業用詞準確度；點下方常用領域可複選，下方輸入框可加上其他自填領域）</span></label>
-    <div class="trd-domain-chips" id="domainChips" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+  <div data-s="s553a645f">
+    <label class="trd-label" for="domainHint">文件領域 <span class="muted" data-s="sf1bde2c5">（選填，會送進 LLM prompt 提升專業用詞準確度；點下方常用領域可複選，下方輸入框可加上其他自填領域）</span></label>
+    <div class="trd-domain-chips" id="domainChips" data-s="s7405ba83">
       <button type="button" class="trd-chip" data-domain="法律合約">法律合約</button>
       <button type="button" class="trd-chip" data-domain="醫療報告">醫療報告</button>
       <button type="button" class="trd-chip" data-domain="軟體技術文件">軟體技術文件</button>
@@ -86,29 +86,29 @@
       <button type="button" class="trd-chip" data-domain="網路 / IT 維運文件">網路 / IT 維運文件</button>
     </div>
     <input type="text" class="field" id="domainHint" maxlength="200"
-           style="width:100%; margin-top:8px; box-sizing:border-box;"
+           data-s="se5007d97"
            placeholder="自填其他領域…（選填，會與上方點選的領域一起送進 prompt）">
   </div>
-  <div class="trd-srctext-wrap" style="position:relative; margin-top:14px;">
-    <textarea class="field" id="srcText" rows="10" style="width:100%; resize:vertical; font-family: -apple-system, 'PingFang TC', 'Microsoft JhengHei', sans-serif;" placeholder="貼上要翻譯的文字，或上傳檔案到上方欄位…"></textarea>
+  <div class="trd-srctext-wrap" data-s="se7325f84">
+    <textarea class="field" id="srcText" rows="10" data-s="s20808d80" placeholder="貼上要翻譯的文字，或上傳檔案到上方欄位…"></textarea>
     <div class="trd-parse-overlay" id="trdParseOverlay" hidden>
       <span class="trd-spinner"></span>
       <span class="trd-parse-label" id="trdParseLabel">解析中…</span>
     </div>
   </div>
-  <div style="margin-top:8px; display:flex; align-items:center; gap:14px;">
+  <div data-s="sa45f86c4">
     <button class="btn btn-primary" id="btnTranslate" {% if not llm_enabled %}disabled title="LLM 未啟用"{% endif %}>{{ icon('play', size=14) }} 開始翻譯</button>
-    <button class="btn" type="button" id="btnStop" hidden style="background:#fee2e2; color:#991b1b; border-color:#fca5a5;">■ 停止翻譯</button>
+    <button class="btn" type="button" id="btnStop" hidden data-s="s17cfb864">■ 停止翻譯</button>
     <button class="btn" type="button" id="btnClear">{{ icon('reset', size=14) }} 清空</button>
-    <span class="muted" style="font-size:12px;" id="charCounter">0 字 / 0 句</span>
+    <span class="muted" data-s="s6b9c179a" id="charCounter">0 字 / 0 句</span>
   </div>
 </details>
 
 <details class="panel" id="resultPanel" hidden open>
   <summary>2. 並排對照</summary>
   <div class="trd-result-toolbar">
-    <span class="muted" id="resultMeta" style="font-size:12px;"></span>
-    <span style="flex:1;"></span>
+    <span class="muted" id="resultMeta" data-s="s6b9c179a"></span>
+    <span data-s="sda5cd676"></span>
     <button class="btn btn-small" type="button" id="btnCopyTgt">{{ icon('paperclip', size=12) }} 複製譯文</button>
     <button class="btn btn-small" type="button" id="btnCopySxs">{{ icon('paperclip', size=12) }} 複製對照</button>
     <span class="trd-export-wrap">
@@ -141,13 +141,13 @@
   <div class="trd-progress-meta" id="trdProgressMeta" hidden></div>
   <div class="trd-grid" id="trdGrid"></div>
   <div class="trd-pager" id="trdPager" hidden></div>
-  <div style="margin-top:10px; font-size:11.5px; color:#94a3b8;">
+  <div data-s="s69e930b3">
     每一列對應一句。點 <b>↻</b> 可重新請 LLM 翻譯該句。空白列代表原文是空行。
     句數多時會自動分頁（每頁筆數由管理員在 LLM 設定調整）；翻譯在背景持續進行，翻頁不影響。
   </div>
 </details>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   /* === 結果面板內的工具列（v1.7.52）=== summary 只放標題，meta + 按鈕
      全進這條 toolbar，跟既有的「面板內第一條 row」style 一致。 */
   .trd-result-toolbar {
@@ -807,7 +807,7 @@ function renderRow(idx, src, translated, error) {
     `<button type="button" class="cell-copy" data-act="copy-cell" data-which="${which}" title="複製到剪貼簿">${COPY_ICON_SVG}</button>`;
   row.innerHTML = `
     <div class="num">${idx + 1}</div>
-    <div class="src">${escapeHTML(src) || '<span style="color:#cbd5e1;">（空行）</span>'}${copyBtn('src')}</div>
+    <div class="src">${escapeHTML(src) || '<span data-s="s15f0c2e8">（空行）</span>'}${copyBtn('src')}</div>
     <div class="tgt ${tgtCls}">${tgtHtml}${copyBtn('tgt')}</div>
     <div class="ctl"><button type="button" data-act="retry" title="重新翻譯本句">↻</button></div>
   `;

@@ -9,8 +9,8 @@
   <h2>選擇公司</h2>
   <div class="form-row">
     <label>編輯公司</label>
-    <div class="field" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-      <select id="companySelect" style="flex:1 1 220px; min-width:160px; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:#fff;">
+    <div class="field" data-s="sc8395ac5">
+      <select id="companySelect" data-s="sd7c87199">
         {% for c in companies %}
         <option value="{{ c.id }}" {% if c.id == edit_id %}selected{% endif %}>
           {{ c.name }}{% if c.is_active %} ★ 作用中{% endif %}
@@ -29,7 +29,7 @@
       {% endif %}
     </div>
   </div>
-  <div class="form-row" style="margin-top:10px;">
+  <div class="form-row" data-s="s5371db16">
     <label>公司顯示名稱</label>
     <input class="field" id="companyName" type="text" value="{{ profile.name }}" />
   </div>
@@ -65,7 +65,7 @@
   {% endfor %}
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .company-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .company-bar select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; }
   .profile-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }

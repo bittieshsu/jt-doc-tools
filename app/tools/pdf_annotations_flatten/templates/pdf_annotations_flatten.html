@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}註解平面化 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .af-stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr));
   gap:10px; margin-top:12px; }
 .af-stat { background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);
@@ -56,16 +56,16 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
   {% with upload_id='afUp', accept='application/pdf' %}{% include "components/file_upload.html" %}{% endwith %}
-  <div id="afLoading" class="muted" style="margin-top:10px; font-size:12.5px;" hidden>分析中…</div>
+  <div id="afLoading" class="muted" data-s="s5d8b4b19" hidden>分析中…</div>
   <div id="afError" class="af-warn" hidden></div>
 </div>
 
 <div id="afResults" hidden>
 
 <div class="panel">
-  <h2 style="margin-top:0;">註解總覽 <span class="muted" style="font-size:13px; font-weight:400; margin-left:8px;" id="afFile"></span></h2>
+  <h2 data-s="s53896af7">註解總覽 <span class="muted" data-s="sbee7077a" id="afFile"></span></h2>
   <div class="af-stats">
     <div class="af-stat"><div class="lbl">註解總數</div><div class="val" id="aTotal">—</div></div>
     <div class="af-stat"><div class="lbl">頁數</div><div class="val" id="aPages">—</div></div>
@@ -73,22 +73,22 @@
   </div>
   <div class="af-types" id="afTypes"></div>
 
-  <div style="margin-top:14px;">
+  <div data-s="s553a645f">
     <button class="btn btn-primary" id="btnFlatten">{{ icon('layers', size=14) }} 執行平面化</button>
-    <span id="flatStatus" class="muted" style="margin-left:10px; font-size:12.5px;"></span>
+    <span id="flatStatus" class="muted" data-s="s414be724"></span>
   </div>
-  <div class="af-warn" style="margin-top:10px;">
+  <div class="af-warn" data-s="s5371db16">
     <b>不可逆</b>：輸出檔的註解已寫入頁面內容流，無法再透過 PDF 工具編輯或移除。建議保留原檔。
   </div>
 </div>
 
 <div class="panel" id="bakedPanel" hidden>
-  <h2 style="margin-top:0;">平面化結果預覽 <span class="muted" style="font-size:13px; font-weight:400; margin-left:8px;" id="bakedSummary"></span></h2>
-  <p class="muted" style="font-size:12.5px; margin: 0 0 6px;">點任一頁可放大查看。確認結果無誤後，按下方按鈕下載。</p>
+  <h2 data-s="s53896af7">平面化結果預覽 <span class="muted" data-s="sbee7077a" id="bakedSummary"></span></h2>
+  <p class="muted" data-s="sbe559c35">點任一頁可放大查看。確認結果無誤後，按下方按鈕下載。</p>
   <div class="af-preview" id="bakedGrid"></div>
-  <div style="margin-top:14px;">
+  <div data-s="s553a645f">
     <button class="btn btn-primary" id="btnDownload">{{ icon('download', size=14) }} 下載平面化後的 PDF</button>
-    {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden style="margin-left:8px;">{{ icon('archive', size=14) }} 存至工作區</button>{% endif %}
+    {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden data-s="sc3f83707">{{ icon('archive', size=14) }} 存至工作區</button>{% endif %}
   </div>
 </div>
 

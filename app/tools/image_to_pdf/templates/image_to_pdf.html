@@ -6,20 +6,20 @@
 <p class="muted">拖入多張圖片（PNG / JPG / GIF / TIFF / WebP / HEIC），可隨時再加；拖曳縮圖重新排序、按 ↺ ↻ 旋轉每一頁、按 × 刪除。設定好頁面大小按「產生 PDF」。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">上傳圖片</h2>
+  <h2 data-s="s53896af7">上傳圖片</h2>
   <div id="dropZone" class="i2p-drop">
     <p class="i2p-drop-title">{{ icon('upload') }} 拖曳圖片到此，或點擊選擇檔案</p>
-    <p class="muted" style="font-size:12px;">可一次選多張；上傳後可繼續加。單檔上限 50 MB。</p>
-    <input type="file" id="fileInput" accept="image/*" multiple style="display:none;">
+    <p class="muted" data-s="s6b9c179a">可一次選多張；上傳後可繼續加。單檔上限 50 MB。</p>
+    <input type="file" id="fileInput" accept="image/*" multiple data-s="scb458930">
   </div>
-  {% if workspace_enabled(request) %}<div class="fu-ws-row" style="justify-content:flex-start;"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>從工作區載入</span></button></div>{% endif %}
+  {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>從工作區載入</span></button></div>{% endif %}
 </div>
 
 <details class="panel" id="grid-panel" hidden open>
-  <summary>圖片清單 <span class="muted" id="grid-info" style="font-weight:normal; font-size:12px; margin-left:8px;">—</span></summary>
+  <summary>圖片清單 <span class="muted" id="grid-info" data-s="s5af60f7e">—</span></summary>
   <div class="i2p-toolbar">
-    <span class="muted" style="font-size:12px;">拖曳卡片可重新排序。</span>
-    <span style="flex:1;"></span>
+    <span class="muted" data-s="s6b9c179a">拖曳卡片可重新排序。</span>
+    <span data-s="sda5cd676"></span>
     <button class="btn btn-small" id="btn-rotate-all-r" type="button" title="全部順時針 90°">↻ 全部</button>
     <button class="btn btn-small" id="btn-clear" type="button">{{ icon('trash', size=14) }} 全部清除</button>
   </div>
@@ -42,7 +42,7 @@
         <option value="legal">Legal (8.5 × 14 in)</option>
         <option value="tabloid">Tabloid (11 × 17 in)</option>
       </select>
-      <div class="muted" style="font-size:12px; margin-top:4px;">
+      <div class="muted" data-s="s41f96333">
         非「原始」時會自動依圖片比例旋轉頁面方向（橫圖 → 橫向頁面）；圖片置中、留白以背景色填滿。
       </div>
     </div>
@@ -63,25 +63,25 @@
     <div class="field">
       <div class="inline-row">
         <input type="color" id="bgColor" value="#ffffff">
-        <span class="muted" style="font-size:12px;">頁面大小非「原始」時，圖片置中後留白處的顏色。</span>
+        <span class="muted" data-s="s6b9c179a">頁面大小非「原始」時，圖片置中後留白處的顏色。</span>
       </div>
     </div>
   </div>
   <div class="form-row">
     <label>輸出檔名</label>
     <div class="field">
-      <input type="text" id="outName" value="images.pdf" style="width: 280px;">
+      <input type="text" id="outName" value="images.pdf" data-s="sa9e2535a">
     </div>
   </div>
-  <div style="margin-top:12px;">
+  <div data-s="s002535c2">
     <button class="btn btn-primary" id="btn-generate">{{ icon('save') }} 產生 PDF</button>
   </div>
-  <div style="margin-top:10px;">
+  <div data-s="s5371db16">
     {% with progress_id='jp' %}{% include "components/job_progress.html" %}{% endwith %}
   </div>
 </details>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .i2p-drop {
   border: 2px dashed #cbd5e1; border-radius: 12px;
   padding: 36px 24px; text-align: center; cursor: pointer;
@@ -266,9 +266,9 @@ function render() {
   info.textContent = `共 ${pages.length} 張圖片`;
   grid.innerHTML = pages.map((p, idx) => {
     if (p.uploading) {
-      return `<div class="i2p-card" style="cursor:default;">
-        <div class="i2p-thumb-wrap" style="cursor:default;">
-          <span class="muted" style="font-size:12px;">上傳中…</span>
+      return `<div class="i2p-card" data-s="sb1aca7e1">
+        <div class="i2p-thumb-wrap" data-s="sb1aca7e1">
+          <span class="muted" data-s="s6b9c179a">上傳中…</span>
         </div>
         <div class="i2p-num">第 ${idx + 1} 頁</div>
         <div class="i2p-fname" title="${escapeHtml(p.filename)}">${escapeHtml(p.filename)}</div>
@@ -279,7 +279,7 @@ function render() {
       <span class="drag-hint">⠿</span>
       <button type="button" class="del-corner" data-act="delete" title="刪除">×</button>
       <div class="i2p-thumb-wrap" data-act="zoom">
-        <img class="i2p-thumb" src="${p.thumb_url}" style="${rotStyle}" alt="${escapeHtml(p.filename)}" loading="lazy" />
+        <img class="i2p-thumb" src="${p.thumb_url}" data-style="${rotStyle}" alt="${escapeHtml(p.filename)}" loading="lazy" />
       </div>
       <div class="i2p-num">第 ${idx + 1} 頁</div>
       <div class="i2p-fname" title="${escapeHtml(p.filename)}">${escapeHtml(p.filename)}</div>
@@ -392,7 +392,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
   const btn = document.getElementById('btn-generate');
   const orig = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner" style="display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px;"></span>送出中…';
+  btn.innerHTML = '<span class="spinner" data-s="sc89ef25c"></span>送出中…';
   try {
     const r = await fetch('/tools/image-to-pdf/generate', {
       method: 'POST',
@@ -414,5 +414,5 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
   }
 });
 </script>
-<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+<style nonce="{{ request.state.csp_nonce }}">@keyframes spin { to { transform: rotate(360deg); } }</style>
 {% endblock %}

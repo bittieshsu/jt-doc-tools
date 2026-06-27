@@ -6,25 +6,25 @@
 <p class="muted">使用 Google Authenticator / Microsoft Authenticator / Authy / 1Password 等 TOTP App 在登入時提供 6 位數驗證碼，提升帳號安全。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">目前狀態</h2>
-  <p style="margin: 8px 0;">
+  <h2 data-s="s53896af7">目前狀態</h2>
+  <p data-s="s51f5d2c2">
     使用者：<b>{{ username }}</b>
   </p>
-  <p style="margin: 8px 0;">
+  <p data-s="s51f5d2c2">
     狀態：
     {% if enabled %}
-      <span style="color: #16a34a; font-weight: 600;">✓ 已啟用</span>
+      <span data-s="s2fad45eb">✓ 已啟用</span>
     {% else %}
-      <span style="color: #94a3b8;">○ 未啟用</span>
+      <span data-s="s97d7ced2">○ 未啟用</span>
     {% endif %}
     {% if required %}
-      <span style="background:#fef3c7; color:#92400e; padding: 2px 10px;
+      <span data-style="background:#fef3c7; color:#92400e; padding: 2px 10px;
                    border-radius: 999px; font-size: 12px; margin-left: 8px;">
         強制（您的角色強制使用 2FA，不可停用）
       </span>
     {% endif %}
   </p>
-  <div style="margin-top: 14px;">
+  <div data-s="s0dc91c47">
     {% if enabled %}
       <button class="btn" id="btnReenroll">{{ icon('refresh', size=14) }} 重新設定（換 secret）</button>
       {% if not required %}
@@ -34,38 +34,38 @@
       <button class="btn btn-primary" id="btnEnroll">{{ icon('plus', size=14) }} 啟用 TOTP</button>
     {% endif %}
   </div>
-  <div id="setupBox" hidden style="margin-top: 16px; padding: 16px;
+  <div id="setupBox" hidden data-style="margin-top: 16px; padding: 16px;
        background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;">
-    <p style="margin: 0 0 10px; font-size: 13px; color: #1e293b;">
+    <p data-s="s35424336">
       <b>步驟 1：</b>用 TOTP App 掃描下方 QR Code（或手動輸入 secret）
     </p>
-    <div style="text-align: center; margin: 10px 0;">
+    <div data-s="s869aa14b">
       <img id="qrImg" src="" alt="QR Code"
-           style="width: 220px; height: 220px; border: 1px solid #e5e7eb;
+           data-style="width: 220px; height: 220px; border: 1px solid #e5e7eb;
                   border-radius: 8px;">
     </div>
-    <details style="margin: 8px 0;">
-      <summary style="cursor: pointer; font-size: 12.5px; color: #475569;">
+    <details data-s="s51f5d2c2">
+      <summary data-s="s0346cbc1">
         無法掃描？點此手動輸入
       </summary>
-      <div id="secretText" style="margin-top: 8px; padding: 10px;
+      <div id="secretText" data-style="margin-top: 8px; padding: 10px;
            background: #fff; border-radius: 6px;
            font-family: ui-monospace, monospace; font-size: 12.5px;
            word-break: break-all;"></div>
     </details>
-    <p style="margin: 14px 0 8px; font-size: 13px; color: #1e293b;">
+    <p data-s="s4c90e441">
       <b>步驟 2：</b>輸入 App 顯示的 6 位數驗證碼確認
     </p>
-    <div style="display: flex; gap: 8px;">
+    <div data-s="s8ac55174">
       <input type="text" id="verifyCode" placeholder="6 位數字"
              inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-             style="flex: 1; padding: 10px 12px; font-size: 18px;
+             data-style="flex: 1; padding: 10px 12px; font-size: 18px;
                     text-align: center; letter-spacing: 4px;
                     font-family: ui-monospace, monospace;
                     border: 1px solid var(--border); border-radius: 6px;">
       <button class="btn btn-primary" id="btnVerify">驗證並啟用</button>
     </div>
-    <div id="verifyMsg" style="margin-top: 10px; font-size: 13px;"></div>
+    <div id="verifyMsg" data-s="s0f22b6fc"></div>
   </div>
 </div>
 
@@ -89,7 +89,7 @@ const vb = $('btnVerify');
 if (vb) vb.addEventListener('click', async () => {
   const code = $('verifyCode').value.trim();
   if (!/^\d{6}$/.test(code)) {
-    $('verifyMsg').innerHTML = '<span style="color:#dc2626;">請輸入 6 位數字</span>';
+    $('verifyMsg').innerHTML = '<span data-s="sbc8099b4">請輸入 6 位數字</span>';
     return;
   }
   vb.disabled = true;
@@ -100,14 +100,14 @@ if (vb) vb.addEventListener('click', async () => {
     });
     const j = await r.json();
     if (r.ok) {
-      $('verifyMsg').innerHTML = '<span style="color:#16a34a;">✓ ' + (j.detail || '已啟用') + '，重新整理頁面…</span>';
+      $('verifyMsg').innerHTML = '<span data-s="sdeccf9e7">✓ ' + (j.detail || '已啟用') + '，重新整理頁面…</span>';
       setTimeout(() => location.reload(), 800);
     } else {
-      $('verifyMsg').innerHTML = '<span style="color:#dc2626;">' + (j.detail || '驗證失敗') + '</span>';
+      $('verifyMsg').innerHTML = '<span data-s="sbc8099b4">' + (j.detail || '驗證失敗') + '</span>';
       vb.disabled = false;
     }
   } catch (e) {
-    $('verifyMsg').innerHTML = '<span style="color:#dc2626;">錯誤：' + e.message + '</span>';
+    $('verifyMsg').innerHTML = '<span data-s="sbc8099b4">錯誤：' + e.message + '</span>';
     vb.disabled = false;
   }
 });

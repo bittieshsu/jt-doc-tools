@@ -2,10 +2,10 @@
 {% from "components/icons.html" import icon %}
 {% block title %}API Token · {{ app_name }}{% endblock %}
 {% block content %}
-<h1 style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+<h1 data-s="s2ef66ac7">
   {{ icon('gear', size=22) }} API Token
   <a class="btn btn-small" href="https://jasoncheng7115.github.io/jt-doc-tools/api.html"
-     target="_blank" rel="noopener" style="font-weight:600;">
+     target="_blank" rel="noopener" data-s="se634e6da">
     {{ icon('book', size=14) }} API 使用說明
   </a>
 </h1>
@@ -17,15 +17,15 @@
 </p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">強制檢查</h2>
+  <h2 data-s="s53896af7">強制檢查</h2>
   <div class="form-row">
     <label>狀態</label>
     <div class="field">
-      <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+      <label data-s="s3199a011">
         <input type="checkbox" id="enforce" {% if enforce %}checked{% endif %}>
         <b>強制所有 API 呼叫必須帶 token</b>
       </label>
-      <div class="muted" style="font-size:12px; margin-top:4px;">
+      <div class="muted" data-s="s41f96333">
         關閉（預設）：寬限期，方便 web UI 與既有 script 無痛使用；不檢查 token。<br>
         開啟：沒帶有效 token 的 <code>/api/*</code> 呼叫一律拒絕 401；web UI 本身仍照常運作（不走 token）。
       </div>
@@ -34,9 +34,9 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0; display:flex; align-items:center; gap:8px;">
+  <h2 data-s="se2363aeb">
     現有 Token
-    <span class="muted" style="font-size:12px; font-weight:normal;">（{{ tokens|length }} 個）</span>
+    <span class="muted" data-s="s29406bf4">（{{ tokens|length }} 個）</span>
   </h2>
   {% if not tokens %}
     <p class="muted">（沒有任何 token，請新增一個）</p>
@@ -49,7 +49,7 @@
         <th>建立時間</th>
         <th>最近使用</th>
         <th>狀態</th>
-        <th style="width:140px;">動作</th>
+        <th data-s="s2f01efdd">動作</th>
       </tr>
     </thead>
     <tbody>
@@ -61,10 +61,10 @@
           <button class="btn btn-small btn-reveal" type="button" title="顯示完整 token">{{ icon('eye', size=12) }}顯示</button>
           <button class="btn btn-small btn-copy" type="button" title="複製到剪貼簿">複製</button>
         </td>
-        <td class="muted" style="font-size:12px;">
+        <td class="muted" data-s="s6b9c179a">
           <script nonce="{{ request.state.csp_nonce }}">document.write(new Date({{ t.created_at * 1000 | int }}).toLocaleString('zh-TW'));</script>
         </td>
-        <td class="muted" style="font-size:12px;">
+        <td class="muted" data-s="s6b9c179a">
           {% if t.last_used_at %}
             <script nonce="{{ request.state.csp_nonce }}">document.write(new Date({{ t.last_used_at * 1000 | int }}).toLocaleString('zh-TW'));</script>
           {% else %}—{% endif %}
@@ -73,7 +73,7 @@
           {% if t.enabled %}<span class="tag-ok">啟用</span>{% else %}<span class="tag-off">停用</span>{% endif %}
         </td>
         <td>
-          <button class="btn btn-small btn-revoke" type="button" style="background:#fee2e2; color:#991b1b;">撤銷</button>
+          <button class="btn btn-small btn-revoke" type="button" data-s="s7ea2ec11">撤銷</button>
         </td>
       </tr>
       {% endfor %}
@@ -81,16 +81,16 @@
   </table>
   {% endif %}
 
-  <div style="margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+  <div data-s="s5dc4cf38">
     <input type="text" id="new-label" class="field" placeholder="新 token 的 label（例：my-script）"
-           style="flex:1; min-width:220px; max-width:360px;" />
+           data-s="s8ebd14fe" />
     <button class="btn btn-primary" id="btn-create" type="button">{{ icon('save') }}產生新 Token</button>
   </div>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">使用範例</h2>
-  <pre style="background:#f1f5f9; padding:12px; border-radius:6px; font-size:12px; overflow-x:auto; line-height:1.5;"><code># cURL
+  <h2 data-s="s53896af7">使用範例</h2>
+  <pre data-s="s940b277c"><code># cURL
 curl -X POST http://localhost:8765/api/llm-review \
   -H "Authorization: Bearer &lt;YOUR_TOKEN&gt;" \
   -F file=@your.pdf
@@ -105,7 +105,7 @@ r = httpx.post(
 </code></pre>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .tokens-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tokens-table th, .tokens-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }
 .tokens-table th { background: #f1f5f9; font-weight: 600; }

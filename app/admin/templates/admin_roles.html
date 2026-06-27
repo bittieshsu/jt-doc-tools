@@ -8,22 +8,22 @@
 
 <details class="panel">
   <summary><b>新增角色</b></summary>
-  <form id="newRoleForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+  <form id="newRoleForm" data-s="s23e0c196">
     <div><label>id（英文）<br><input class="field" name="id" required pattern="[a-z][a-z0-9-]{1,30}" placeholder="例：accountant"></label></div>
     <div><label>顯示名稱<br><input class="field" name="display_name" required maxlength="64" placeholder="例：會計"></label></div>
-    <div style="flex:1;"><label>說明<br><input class="field" name="description" maxlength="500" style="width:100%;"></label></div>
+    <div data-s="sda5cd676"><label>說明<br><input class="field" name="description" maxlength="500" data-s="s6d567387"></label></div>
     <button class="btn btn-primary" type="submit">{{ icon('plus', size=14) }} 建立</button>
   </form>
 </details>
 
 {% for r in roles %}
-<div class="panel" data-role="{{ r.id }}" style="margin-bottom:14px;">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
+<div class="panel" data-role="{{ r.id }}" data-s="s6179637e">
+  <div data-s="s3390deba">
     <div>
-      <h2 style="margin:0; display:inline;">{{ r.display_name }}</h2>
-      <code style="margin-left:10px; font-size:12px; color:#6b7280;">{{ r.id }}</code>
+      <h2 data-s="sa36eac26">{{ r.display_name }}</h2>
+      <code data-s="sa9648fd5">{{ r.id }}</code>
       {% if r.is_builtin %}<span class="badge">預設</span>{% endif %}
-      {% if r.is_protected %}<span class="badge" style="background:#dbeafe; color:#1e40af;">受保護</span>{% endif %}
+      {% if r.is_protected %}<span class="badge" data-s="s5f951fed">受保護</span>{% endif %}
     </div>
     <div>
       {% if r.id not in ('admin', 'auditor') %}
@@ -37,13 +37,13 @@
       {% endif %}
     </div>
   </div>
-  {% if r.description %}<p class="muted" style="font-size:12.5px;">{{ r.description }}</p>{% endif %}
+  {% if r.description %}<p class="muted" data-s="sea8bbc82">{{ r.description }}</p>{% endif %}
   {% if r.id == 'admin' %}
-  <p style="background:#fef3c7; padding:8px 10px; border-radius:6px; font-size:12.5px;">
+  <p data-s="s28435393">
     🔒 admin 角色擁有所有工具與設定區的存取權，無需個別勾選。此角色不可刪、不可改名。
   </p>
   {% elif r.id == 'auditor' %}
-  <p style="background:#fef3c7; padding:8px 10px; border-radius:6px; font-size:12.5px;">
+  <p data-s="s28435393">
     🔒 auditor 角色僅可唯讀存取稽核紀錄與檔案歷史，**無工具權限**（職責分離原則）。此角色不可刪、不可改名、不可指派工具。
   </p>
   {% else %}
@@ -51,13 +51,13 @@
     <button type="button" class="btn btn-small" data-act="select-all">{{ icon('check', size=12) }} 全選</button>
     <button type="button" class="btn btn-small" data-act="clear-all">{{ icon('x', size=12) }} 取消全選</button>
     <button type="button" class="btn btn-small" data-act="invert">{{ icon('refresh-cw', size=12) }} 反向選取</button>
-    <span class="muted" style="font-size:11.5px;" data-counter>已選 0 / {{ tools|length }}</span>
+    <span class="muted" data-s="sc73c4105" data-counter>已選 0 / {{ tools|length }}</span>
   </div>
   <div class="tool-grid">
     {% for t in tools %}
     <label class="tool-chk">
       <input type="checkbox" data-tool="{{ t.id }}" {% if t.id in r.tools %}checked{% endif %}>
-      <span>{{ t.name }} <code class="muted" style="font-size:10px;">{{ t.id }}</code></span>
+      <span>{{ t.name }} <code class="muted" data-s="sbcf88ef7">{{ t.id }}</code></span>
     </label>
     {% endfor %}
   </div>
@@ -65,7 +65,7 @@
 </div>
 {% endfor %}
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .badge { background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:4px; font-size:10px; margin-left:6px; }
   .tool-toolbar { display:flex; align-items:center; gap:6px; margin-top:10px; padding:6px 8px; background:#f8fafc; border:1px solid var(--border); border-radius:6px; }
   .tool-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:6px; margin-top:8px; }

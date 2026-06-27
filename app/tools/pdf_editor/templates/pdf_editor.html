@@ -23,7 +23,7 @@
     });
   })();
 </script>
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .pe-wrap { display: flex; gap: 12px; height: calc(100vh - 220px); min-height: 500px; }
 /* 全視窗模式：撐滿側欄右側整個 main 區域（保留左側 nav）。
    body.pe-max-window 由 #btnMaxView 切換，整個 #editor-panel 變 flex column
@@ -445,11 +445,11 @@ body.pe-pan-active { cursor: grabbing !important; }
 <h1>{{ icon('edit', size=22) }} PDF 編輯器</h1>
 <p class="muted">
   疊加文字 / 圖片 / 形狀 / 標註，或用「選既有」工具直接搬動、改內容、刪除原 PDF 上的物件。
-  <span style="color:#b45309; display:inline-flex; align-items:center; gap:4px; vertical-align:middle;">{{ icon('warn', size=13) }} 不會自動斷行重排；字型為還原繪製，與原檔可能細微不同。</span>
+  <span data-s="s0c8f4b0b">{{ icon('warn', size=13) }} 不會自動斷行重排；字型為還原繪製，與原檔可能細微不同。</span>
 </p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
   {% with upload_id='peUpload', accept='application/pdf', hint='單檔、PDF only。' %}
     {% include "components/file_upload.html" %}
   {% endwith %}
@@ -458,7 +458,7 @@ body.pe-pan-active { cursor: grabbing !important; }
 <div class="panel" id="editor-panel" hidden>
   <div class="pe-top">
     <button class="btn btn-primary" type="button" id="btnSave">{{ icon('save') }} 儲存並預覽</button>
-    <a class="btn" id="btnDownload" href="#" style="display:none;">{{ icon('download') }} 下載</a>
+    <a class="btn" id="btnDownload" href="#" data-s="scb458930">{{ icon('download') }} 下載</a>
     {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden>{{ icon('archive') }} 存至工作區</button>{% endif %}
     <span class="pe-top-divider"></span>
     <button class="btn" type="button" id="btnUndo" title="復原 (Cmd/Ctrl+Z)" disabled>
@@ -471,12 +471,12 @@ body.pe-pan-active { cursor: grabbing !important; }
     </button>
     <span class="pe-top-divider"></span>
     <button class="btn" type="button" id="btnGlobalFont" data-tip="把整份 PDF 的文字換成同一個字型"
-      style="padding: 4px 10px; display:inline-flex; align-items:center; gap:4px;">
+      data-s="s9b9f561c">
       {{ icon('text', size=14) }} 整份換字型
     </button>
     <button class="btn" type="button" id="btnPrefs" data-tip="編輯器設定"
-      style="padding: 4px 8px; display:inline-flex; align-items:center; gap:4px; position:relative;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      data-s="sff9a0cfa">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s742e547d"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       設定
     </button>
     <span class="pe-top-divider"></span>
@@ -485,17 +485,17 @@ body.pe-pan-active { cursor: grabbing !important; }
       自動預覽<span class="hint">（改動後 ~1 秒自動重算）</span>
     </label>
     <div class="pe-zoom-ctl">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5M8 11h6M11 8v6"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s742e547d"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5M8 11h6M11 8v6"/></svg>
       <input type="range" id="zoomSlider" min="10" max="200" value="100" step="5">
-      <span class="muted" style="font-size:12px; min-width:3em;" id="zoomLabel">100%</span>
+      <span class="muted" data-s="se67b272a" id="zoomLabel">100%</span>
       <button class="btn" type="button" id="btnFitPage" title="縮放到剛好顯示整頁"
-        style="padding: 2px 8px; display:inline-flex; align-items:center; gap:4px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px;"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg>
+        data-s="se4fdde7a">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s16fc71ab"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg>
         符合視窗
       </button>
     </div>
     <div class="pe-page-ctl" title="輸入頁碼後按 Enter 直接跳到該頁">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s16fc71ab"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       頁碼
       <input type="number" id="pePageInput" min="1" value="1" step="1">
       <span class="pe-page-total">/ <span id="pePageTotal">—</span></span>
@@ -516,8 +516,8 @@ body.pe-pan-active { cursor: grabbing !important; }
     </div>
     <span class="pe-status" id="peStatus"></span>
     <button class="btn" type="button" id="btnMaxView" title="全視窗（編輯區擴到右側整個區域，Esc 退出）"
-      style="margin-left:auto; padding: 2px 10px; display:inline-flex; align-items:center; gap:4px; flex:0 0 auto;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px;"><path d="M3 7V3h4M21 7V3h-4M3 17v4h4M21 17v4h-4"/></svg>
+      data-s="sccfd3fa8">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s16fc71ab"><path d="M3 7V3h4M21 7V3h-4M3 17v4h4M21 17v4h-4"/></svg>
       <span id="btnMaxViewLabel">全視窗</span>
     </button>
   </div>
@@ -558,11 +558,11 @@ body.pe-pan-active { cursor: grabbing !important; }
     <button type="button" id="toolStickyNote" data-tip="便箋註解 (N)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4"/><path d="M8 12h6M8 16h4"/></svg>
     </button>
-    <div class="pe-shortcuts-trigger-wrap" style="margin-left:auto; margin-bottom:0;">
+    <div class="pe-shortcuts-trigger-wrap" data-s="s7ecd9b0b">
       <button type="button" id="btnShortcuts" data-tip="快捷鍵總覽">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h.01M11 14h.01M15 14h.01"/></svg>
       </button>
-      <div class="pe-shortcuts-pop" id="peShortcutsPop" hidden style="left:auto; right:0;">
+      <div class="pe-shortcuts-pop" id="peShortcutsPop" hidden data-s="sf675fd80">
         <div class="pe-shortcuts-pop-head">編輯快捷鍵</div>
         <div class="pe-shortcuts-pop-grid">
           <div><kbd>V</kbd> 選取</div>
@@ -608,28 +608,28 @@ body.pe-pan-active { cursor: grabbing !important; }
 </div>
 
 <!-- Preferences popover -->
-<div id="peSettings" style="display:none; position:absolute; z-index:8500; background:white; border:1px solid #e5e7eb; border-radius:8px; padding:14px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); min-width:260px;">
-  <h3 style="margin:0 0 10px; font-size:14px; font-weight:700; color:#111827;">編輯器設定</h3>
-  <div style="margin-bottom:10px;">
-    <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+<div id="peSettings" data-s="s1ee1820d">
+  <h3 data-s="sa424c125">編輯器設定</h3>
+  <div data-s="sa7409f75">
+    <label data-s="s6293e019">
       <input type="checkbox" id="prefShowGuides" checked>
       顯示對齊輔助線
     </label>
   </div>
-  <div style="margin-bottom:10px;">
-    <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+  <div data-s="sa7409f75">
+    <label data-s="s6293e019">
       <input type="checkbox" id="prefSnap" checked>
       拖曳時自動貼合其他物件
     </label>
   </div>
-  <div style="margin-bottom:10px;">
-    <label style="display:block; font-size:12px; color:#6b7280; margin-bottom:3px;">貼合距離</label>
-    <div style="display:flex; align-items:center; gap:8px;">
-      <input type="range" id="prefSnapDist" min="2" max="20" value="5" step="1" style="flex:1;">
-      <span id="prefSnapDistLabel" style="font-size:12px; min-width:3em;">5 px</span>
+  <div data-s="sa7409f75">
+    <label data-s="sa7a6f648">貼合距離</label>
+    <div data-s="s2761a6ad">
+      <input type="range" id="prefSnapDist" min="2" max="20" value="5" step="1" data-s="sda5cd676">
+      <span id="prefSnapDistLabel" data-s="se67b272a">5 px</span>
     </div>
   </div>
-  <div style="text-align:right; margin-top:10px;">
+  <div data-s="s8352c071">
     <button type="button" class="btn" id="prefsClose">關閉</button>
   </div>
 </div>
@@ -640,21 +640,21 @@ body.pe-pan-active { cursor: grabbing !important; }
 </div>
 
 <!-- Global-font-replace modal -->
-<div id="fontPicker" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9000; align-items:center; justify-content:center;">
-  <div style="background:white; padding:20px; border-radius:8px; max-width:520px; min-width:420px;">
-    <h3 style="margin-top:0;">把整份 PDF 文字換成同一個字型</h3>
-    <p class="muted" style="font-size:12.5px; margin:4px 0 12px;">
+<div id="fontPicker" data-s="se36205cc">
+  <div data-s="s59f4c184">
+    <h3 data-s="s53896af7">把整份 PDF 文字換成同一個字型</h3>
+    <p class="muted" data-s="s94adc1b1">
       這會把 PDF 裡每一頁、每一段文字都重繪成你選的字型（字級、顏色、粗體 / 斜體會保留）。
-      <b style="color:#b45309;">此動作不可 Undo；請先下載一份備份。</b>
+      <b data-s="s0c118ea4">此動作不可 Undo；請先下載一份備份。</b>
     </p>
-    <div class="row" style="margin:10px 0;">
-      <label style="font-size:13px; font-weight:500;">新字型</label>
-      <select id="gfFontSelect" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px; margin-top:4px;">
+    <div class="row" data-s="scca18063">
+      <label data-s="sfd395466">新字型</label>
+      <select id="gfFontSelect" data-s="s0b361cbf">
         <option value="pymupdf:default">載入字型清單中…</option>
       </select>
     </div>
-    <div id="gfStatus" class="muted" style="font-size:12px; margin-top:8px;"></div>
-    <div style="text-align:right; margin-top:16px;">
+    <div id="gfStatus" class="muted" data-s="s77a268ab"></div>
+    <div data-s="s2dd684bd">
       <button type="button" class="btn" id="gfCancel">取消</button>
       <button type="button" class="btn btn-primary" id="gfGo">{{ icon('play', size=12) }} 執行換字型</button>
     </div>
@@ -662,29 +662,29 @@ body.pe-pan-active { cursor: grabbing !important; }
 </div>
 
 <!-- Asset picker modal -->
-<div id="assetPicker" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9000; align-items:center; justify-content:center;">
-  <div style="background:white; padding:20px; border-radius:8px; max-width:640px; max-height:80vh; overflow:auto; min-width:420px;">
-    <h3 style="margin-top:0;">選擇圖片 / 印章 / 簽名</h3>
-    <div style="display:flex; gap:6px; margin-bottom:10px; border-bottom:1px solid #e5e7eb;">
+<div id="assetPicker" data-s="se36205cc">
+  <div data-s="s4a5c07d2">
+    <h3 data-s="s53896af7">選擇圖片 / 印章 / 簽名</h3>
+    <div data-s="s972ba3f0">
       <button type="button" class="ap-tab ap-tab-active" data-tab="asset"
-              style="padding:8px 14px; border:none; background:none; border-bottom:2px solid #2563eb; font-weight:600; color:#2563eb; cursor:pointer;">從資產庫</button>
+              data-s="s60440412">從資產庫</button>
       <button type="button" class="ap-tab" data-tab="upload"
-              style="padding:8px 14px; border:none; background:none; border-bottom:2px solid transparent; font-weight:500; color:#6b7280; cursor:pointer;">上傳新圖片</button>
+              data-s="s2f50d2cc">上傳新圖片</button>
     </div>
     <div id="apTabAsset">
-      <div id="assetGrid" style="display:grid; grid-template-columns: repeat(auto-fill,minmax(120px,1fr)); gap:10px; max-height:50vh; overflow:auto; padding:8px 0;">載入中…</div>
+      <div id="assetGrid" data-s="s294f0794">載入中…</div>
     </div>
-    <div id="apTabUpload" hidden style="padding:16px 8px;">
-      <p class="muted" style="margin:0 0 12px; font-size:12.5px;">支援 PNG / JPEG / WEBP / GIF。上傳的圖片只會嵌入這份 PDF，不會加到資產庫。如果要重複使用，請到「<a href="/admin/assets" target="_blank">管理資產</a>」上傳。</p>
-      <label style="display:flex; flex-direction:column; gap:10px; align-items:center; padding:32px; border:2px dashed #cbd5e1; border-radius:8px; cursor:pointer; background:#f8fafc;">
-        <div style="color:#64748b; font-size:14px;">點此挑選圖片檔，或拖放到此</div>
-        <input type="file" id="apUploadInput" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;" />
+    <div id="apTabUpload" hidden data-s="s14c65843">
+      <p class="muted" data-s="s1d962ad0">支援 PNG / JPEG / WEBP / GIF。上傳的圖片只會嵌入這份 PDF，不會加到資產庫。如果要重複使用，請到「<a href="/admin/assets" target="_blank">管理資產</a>」上傳。</p>
+      <label data-s="s2865cacb">
+        <div data-s="s3d7dec0f">點此挑選圖片檔，或拖放到此</div>
+        <input type="file" id="apUploadInput" accept="image/png,image/jpeg,image/webp,image/gif" data-s="scb458930" />
       </label>
-      <div id="apUploadStatus" class="muted" style="margin-top:8px; font-size:12px;"></div>
+      <div id="apUploadStatus" class="muted" data-s="sf14019df"></div>
     </div>
-    <div style="text-align:right; margin-top:12px;">
+    <div data-s="s5cb36e28">
       <button type="button" class="btn" id="assetCancel">取消</button>
-      <a href="/admin/assets" target="_blank" class="btn" style="margin-right:8px;">管理資產</a>
+      <a href="/admin/assets" target="_blank" class="btn" data-s="sd109945c">管理資產</a>
     </div>
   </div>
 </div>
@@ -1930,19 +1930,19 @@ function updatePropsPanel() {
       const curSize = Math.round(first.fontSize || 16);
       const curColor = colorToHex(first.fill, '#000000');
       html += `
-        <div class="muted" style="margin:4px 0 8px; font-size:12px;">其中 ${tCount} 個文字可批次變更屬性：</div>
+        <div class="muted" data-s="s84532722">其中 ${tCount} 個文字可批次變更屬性：</div>
         <div class="row"><label>字型</label><select id="pfBatchFont"><option value="${curFont}" selected>載入字型清單中…</option></select></div>
         <div class="row"><label>字級</label><input type="number" id="pfBatchSize" value="${curSize}" step="1" min="6" max="96"></div>
         <div class="row"><label>顏色</label><div class="inline">
           <input type="color" id="pfBatchColor" value="${curColor}">
-          <input type="text" id="pfBatchColorHex" value="${curColor}" style="flex:1;">
+          <input type="text" id="pfBatchColorHex" value="${curColor}" data-s="sda5cd676">
         </div></div>
         <div class="row chip-row">
           <button type="button" id="pfBatchBold"><b>B</b></button>
           <button type="button" id="pfBatchItalic"><i>I</i></button>
           <button type="button" id="pfBatchUnderline"><u>U</u></button>
         </div>
-        <div class="muted" style="font-size:11.5px;">改動會套用到這 ${tCount} 個文字，不影響其他物件。</div>`;
+        <div class="muted" data-s="sc73c4105">改動會套用到這 ${tCount} 個文字，不影響其他物件。</div>`;
     } else {
       html += `<div class="muted">選取的物件都不是文字，無可批次編輯的屬性。</div>`;
     }
@@ -1964,7 +1964,7 @@ function updatePropsPanel() {
       <div class="row"><label>字級</label><input type="number" id="pfSize" value="${Math.round(active.fontSize)}" step="1" min="6" max="96"></div>
       <div class="row"><label>顏色</label><div class="inline">
         <input type="color" id="pfColor" value="${colorToHex(active.fill, '#000000')}">
-        <input type="text" id="pfColorHex" value="${colorToHex(active.fill, '#000000')}" style="flex:1;">
+        <input type="text" id="pfColorHex" value="${colorToHex(active.fill, '#000000')}" data-s="sda5cd676">
       </div></div>
       <div class="row chip-row">
         <button type="button" id="pfBold" class="${active.fontWeight === 'bold' ? 'on':''}"><b>B</b></button>
@@ -1990,7 +1990,7 @@ function updatePropsPanel() {
       <div class="row"><label>線寬</label><input type="number" id="pfStrokeW" value="${active.strokeWidth || 1}" step="0.5" min="0" max="20"></div>`;
   } else if (t === 'image') {
     html = `<h3>圖片</h3>
-      <div class="row"><label>不透明度</label><input type="range" id="pfOpacity" min="0" max="100" value="${Math.round((active.opacity || 1)*100)}" style="width:100%;"></div>
+      <div class="row"><label>不透明度</label><input type="range" id="pfOpacity" min="0" max="100" value="${Math.round((active.opacity || 1)*100)}" data-s="s6d567387"></div>
       <div class="row"><label>旋轉</label><input type="number" id="pfAngle" value="${Math.round(active.angle || 0)}" step="15"></div>
       <div class="muted">比例：${active.scaleX.toFixed(2)} × ${active.scaleY.toFixed(2)}</div>`;
   } else if (t === 'pencil') {
@@ -2003,16 +2003,16 @@ function updatePropsPanel() {
       <div class="muted">拖拉 / 縮放調整框住要螢光的區域。</div>`;
   } else if (t === 'sticky') {
     html = `<h3>便箋註解</h3>
-      <div class="row"><label>備註內容</label><textarea id="pfNote" rows="4" style="width:100%; padding:6px 8px; border:1px solid #d1d5db; border-radius:5px; font-size:13px; resize:vertical; font-family:inherit;">${escapeHTML(active._noteText || '')}</textarea></div>
+      <div class="row"><label>備註內容</label><textarea id="pfNote" rows="4" data-s="s006f601d">${escapeHTML(active._noteText || '')}</textarea></div>
       <div class="muted">存檔後會變成 PDF 標準便箋 (text annotation)，點擊彈出內容。</div>`;
   } else {
     html = `<h3>物件</h3><div class="muted">未知類型</div>`;
   }
   // 層次（z-order）— 適用於所有實際物件，markers / covers 不在此面板出現
-  const _zsvg = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"';
+  const _zsvg = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-s="s12da9e4d"';
   html += `
-    <div class="row chip-row" style="margin-top:14px; border-top:1px solid #e5e7eb; padding-top:10px;">
-      <label style="min-width:48px;">層次</label>
+    <div class="row chip-row" data-s="s23c29730">
+      <label data-s="sfc2c3a92">層次</label>
       <button type="button" id="pfZTop"    title="置頂（Cmd+]）"><svg ${_zsvg}><path d="M4 4h16"/><polyline points="7 14 12 9 17 14"/><line x1="12" y1="9" x2="12" y2="20"/></svg></button>
       <button type="button" id="pfZUp"     title="上一層（]）"><svg ${_zsvg}><polyline points="6 15 12 9 18 15"/></svg></button>
       <button type="button" id="pfZDown"   title="下一層（[）"><svg ${_zsvg}><polyline points="6 9 12 15 18 9"/></svg></button>
@@ -2368,7 +2368,7 @@ function installFontPicker(selectEl, currentId) {
         const preview = fontFamilyForKey(f.id);
         row.innerHTML = `
           <span class="fp-item-name">${escapeHTML(f.label)}</span>
-          <span class="fp-item-preview" style="font-family:${preview};">字 Ag 1</span>`;
+          <span class="fp-item-preview" data-style="font-family:${preview};">字 Ag 1</span>`;
         if (f.id === selectEl.value) row.classList.add('fp-item-active');
         row.addEventListener('click', () => {
           selectEl.value = f.id;
@@ -2800,7 +2800,7 @@ function openAssetPicker(onPick) {
   grid.innerHTML = '載入中…';
   fetch('/tools/pdf-editor/assets').then(r => r.json()).then(data => {
     if (!data.assets?.length) {
-      grid.innerHTML = '<div class="muted" style="grid-column:1/-1;">尚無資產，請切到「上傳新圖片」或到「管理資產」新增印章 / 簽名 / Logo。</div>';
+      grid.innerHTML = '<div class="muted" data-s="s1b9b41ec">尚無資產，請切到「上傳新圖片」或到「管理資產」新增印章 / 簽名 / Logo。</div>';
       return;
     }
     grid.innerHTML = '';
@@ -2809,9 +2809,9 @@ function openAssetPicker(onPick) {
       div.style.cssText = 'border:1px solid #e5e7eb; border-radius:6px; padding:8px; cursor:pointer; text-align:center; background:#fff;';
       const typeMap = {stamp:'印章', signature:'簽名', logo:'Logo'};
       div.innerHTML = `
-        <img src="${a.thumb_url}" style="max-width:100px; max-height:100px; display:block; margin:0 auto 4px;" />
-        <div style="font-size:12px; font-weight:600;">${escapeHTML(a.name)}</div>
-        <div class="muted" style="font-size:11px;">${typeMap[a.type] || a.type}</div>`;
+        <img src="${a.thumb_url}" data-s="sc6d45a08" />
+        <div data-s="s4adf3392">${escapeHTML(a.name)}</div>
+        <div class="muted" data-s="s8b685211">${typeMap[a.type] || a.type}</div>`;
       div.addEventListener('click', () => {
         $('assetPicker').style.display = 'none';
         if (_assetPickerResolve) { _assetPickerResolve({kind:'asset', asset:a}); _assetPickerResolve = null; }

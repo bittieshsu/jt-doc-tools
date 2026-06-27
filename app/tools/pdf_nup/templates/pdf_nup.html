@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}多頁合併 · {{ app_name }}{% endblock %}
 {% block content %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .nup-hint { background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px;
   padding: 10px 14px; font-size: 13px; color:#075985; margin: 10px 0; }
 .nup-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; }
@@ -59,7 +59,7 @@ input.field { padding: 6px 10px; border: 1px solid var(--border); border-radius:
 <p class="muted">把多頁 PDF 縮小排在同一張紙上，適合列印草稿 / 講義 / 對照閱讀。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳檔案</h2>
+  <h2 data-s="s53896af7">1. 上傳檔案</h2>
   {% with upload_id='nupUpload', accept='.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp', multiple=True, hint='支援多檔；多檔會依上傳順序接續排入格子' %}
     {% include "components/file_upload.html" %}
   {% endwith %}
@@ -67,7 +67,7 @@ input.field { padding: 6px 10px; border: 1px solid var(--border); border-radius:
 </div>
 
 <div class="panel" id="nupPanel" hidden>
-  <h2 style="margin-top:0;">2. 設定版面</h2>
+  <h2 data-s="s53896af7">2. 設定版面</h2>
   <div class="nup-layout">
     <div>
       <div class="nup-section">
@@ -77,7 +77,7 @@ input.field { padding: 6px 10px; border: 1px solid var(--border); border-radius:
           <div class="nup-grid-card {% if preset[0]==2 and preset[1]==2 %}active{% endif %}"
                data-cols="{{ preset[0] }}" data-rows="{{ preset[1] }}">
             <div class="nup-grid-thumb"
-                 style="grid-template-columns: repeat({{ preset[0] }}, 1fr); grid-template-rows: repeat({{ preset[1] }}, 1fr);">
+                 data-style="grid-template-columns: repeat({{ preset[0] }}, 1fr); grid-template-rows: repeat({{ preset[1] }}, 1fr);">
               {% for _ in range(preset[0] * preset[1]) %}<div></div>{% endfor %}
             </div>
             <div class="nup-grid-label">{{ preset[2] }} 頁</div>
@@ -85,7 +85,7 @@ input.field { padding: 6px 10px; border: 1px solid var(--border); border-radius:
           </div>
           {% endfor %}
         </div>
-        <div style="margin-top:10px;" class="nup-num-group">
+        <div data-s="s5371db16" class="nup-num-group">
           自訂：
           <input id="cols" class="nup-num" type="number" min="1" max="10" value="2"> 欄
           ×
@@ -102,7 +102,7 @@ input.field { padding: 6px 10px; border: 1px solid var(--border); border-radius:
             <option value="custom">自訂</option>
           </select>
         </div>
-        <div class="nup-row" id="customPaperRow" style="display:none;">
+        <div class="nup-row" id="customPaperRow" data-s="scb458930">
           <label>自訂 (mm)</label>
           <div class="nup-num-group">
             <input id="paperW" class="nup-num" type="number" value="210"> ×
@@ -179,13 +179,13 @@ input.field { padding: 6px 10px; border: 1px solid var(--border); border-radius:
           <label><input type="checkbox" id="showBorder"> 顯示邊框</label>
           <div class="nup-num-group">
             <input id="borderW" class="nup-num" type="number" value="0.5" step="0.1" min="0"> pt
-            <input id="borderC" type="color" value="#94a3b8" style="width:32px; height:26px; border:1px solid #cbd5e1; border-radius:4px;">
+            <input id="borderC" type="color" value="#94a3b8" data-s="s91a3e648">
           </div>
         </div>
         <div class="nup-row">
           <label><input type="checkbox" id="showPageNum"> 顯示頁碼</label>
           <div class="nup-num-group">
-            格式 <input id="pageNumFmt" class="field" type="text" value="{n}" style="width:80px;">
+            格式 <input id="pageNumFmt" class="field" type="text" value="{n}" data-s="s8db8d854">
             <input id="pageNumSize" class="nup-num" type="number" value="8" step="1"> pt
           </div>
         </div>
@@ -201,16 +201,16 @@ input.field { padding: 6px 10px; border: 1px solid var(--border); border-radius:
     </div>
 
     <div>
-      <h3 style="margin:0 0 10px; font-size:13px; color:#334155; text-transform:uppercase; letter-spacing:0.05em;">即時預覽（第一張）</h3>
+      <h3 data-s="s013b8cb5">即時預覽（第一張）</h3>
       <div class="nup-preview-wrap" id="previewWrap">
         <div class="placeholder">上傳檔案後會自動預覽</div>
       </div>
-      <div style="margin-top:10px; display:flex; gap:10px;">
+      <div data-s="sb37ed874">
         <button class="btn" id="btnRefresh">{{ icon('refresh') }} 重新預覽</button>
         <button class="btn btn-primary" id="btnGenerate" disabled>{{ icon('download') }} 產生 PDF</button>
-        <span id="status" class="muted" style="align-self:center; font-size:12.5px;"></span>
+        <span id="status" class="muted" data-s="sf3f0ec24"></span>
       </div>
-      <div id="doneBox" class="muted" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;" hidden>
+      <div id="doneBox" class="muted" data-s="sa1540c58" hidden>
         <a id="dlLink" class="btn btn-primary" href="#">{{ icon('download') }} 下載結果</a>
         {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden>{{ icon('archive') }} 存至工作區</button>{% endif %}
       </div>

@@ -6,7 +6,8 @@
   <title>啟用認證 · {{ app_name }}</title>
   <link rel="icon" type="image/png" href="{{ branding_logo_url() or '/static/images/logo-on-light.png' }}" />
   <link rel="stylesheet" href="/static/css/platform.css" />
-  <style>
+  <link rel="stylesheet" href="/static/css/generated-inline.css" />
+  <style nonce="{{ request.state.csp_nonce }}">
     body { display:flex; align-items:center; justify-content:center;
            min-height:100vh; margin:0; background:#0f172a;
            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
@@ -49,7 +50,7 @@
 </head>
 <body>
   {% if has_existing %}
-  <div class="setup-card" style="max-width:520px;">
+  <div class="setup-card" data-s="se5bdc370">
     <h1>🔐 啟用認證</h1>
     <p class="lead">系統偵測到本機已有既有的管理員帳號（先前曾啟用後又停用）。可以直接恢復、不必重建。</p>
 
@@ -57,11 +58,11 @@
       <h2>偵測到 {{ existing_users|length }} 個既有帳號</h2>
       <ul>
         {% for u in existing_users[:5] %}
-        <li><code>{{ u.username }}</code>{% if u.is_admin_seed %}（admin{% if u.source != 'local' %}@{{ u.source }}{% endif %}）{% else %}（{{ u.source }}）{% endif %}{% if not u.enabled %} <span style="color:#dc2626;">已停用</span>{% endif %}</li>
+        <li><code>{{ u.username }}</code>{% if u.is_admin_seed %}（admin{% if u.source != 'local' %}@{{ u.source }}{% endif %}）{% else %}（{{ u.source }}）{% endif %}{% if not u.enabled %} <span data-s="sbc8099b4">已停用</span>{% endif %}</li>
         {% endfor %}
         {% if existing_users|length > 5 %}<li>… 共 {{ existing_users|length }} 個</li>{% endif %}
       </ul>
-      <p style="font-size:12px; color:#475569;">
+      <p data-s="sefa9f1f9">
         <b>建議</b>：直接恢復本機認證，沿用既有帳號 + 密碼登入。<br>
         如果忘記密碼，請以系統管理員身分在主機上跑 <code>sudo jtdt reset-password &lt;帳號&gt;</code> 重設。
       </p>
@@ -72,9 +73,9 @@
     </div>
 
     <div class="or-divider">或</div>
-    <details style="margin-bottom:14px;">
-      <summary style="cursor:pointer; font-size:13px; color:#374151; padding:8px 0;">建立新管理員帳號（會與既有帳號並存）</summary>
-      <form method="post" action="/setup-admin" autocomplete="off" style="margin-top:14px;">
+    <details data-s="s6179637e">
+      <summary data-s="s6a1058c8">建立新管理員帳號（會與既有帳號並存）</summary>
+      <form method="post" action="/setup-admin" autocomplete="off" data-s="s553a645f">
         <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
         {% if error %}<div class="setup-error">{{ error }}</div>{% endif %}
         <div class="form-row">

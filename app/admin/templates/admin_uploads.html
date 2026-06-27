@@ -19,7 +19,7 @@
     <option value="{{ t }}" {% if t == q_tool %}selected{% endif %}>{{ t }}</option>
     {% endfor %}
   </select>
-  <input class="field" type="search" name="q_filename" value="{{ q_filename }}" placeholder="檔名包含…" style="width:160px;">
+  <input class="field" type="search" name="q_filename" value="{{ q_filename }}" placeholder="檔名包含…" data-s="sdf7d1005">
   <input class="field" type="datetime-local" name="q_from" value="{{ q_from }}">
   <input class="field" type="datetime-local" name="q_to" value="{{ q_to }}">
   <button class="btn btn-primary" type="submit">{{ icon('search', size=14) }} 篩選</button>
@@ -27,19 +27,19 @@
 </form>
 
 <div class="panel">
-  <p class="muted" style="font-size:12.5px;">
+  <p class="muted" data-s="sea8bbc82">
     共 <b>{{ total }}</b> 筆（本頁累計大小 <b id="ulPageSize">—</b>）；第 {{ page }}/{{ pages }} 頁，每頁 {{ page_size }} 筆
   </p>
 
   <table class="uploads-table">
     <colgroup>
-      <col style="width:160px;"><!-- 時間 -->
-      <col style="width:110px;"><!-- 使用者 -->
-      <col style="width:110px;"><!-- IP -->
-      <col style="width:160px;"><!-- 工具 -->
+      <col data-s="sdf7d1005"><!-- 時間 -->
+      <col data-s="s1a30558f"><!-- 使用者 -->
+      <col data-s="s1a30558f"><!-- IP -->
+      <col data-s="sdf7d1005"><!-- 工具 -->
       <col><!-- 檔名 -->
-      <col style="width:90px;"><!-- 大小 -->
-      <col style="width:60px;"><!-- 狀態 -->
+      <col data-s="sc78f4943"><!-- 大小 -->
+      <col data-s="sc5ac9c43"><!-- 狀態 -->
     </colgroup>
     <thead>
       <tr>
@@ -52,23 +52,23 @@
       <tr>
         <td class="ul-time"><span data-ts="{{ (u.ts*1000)|int }}">—</span></td>
         <td>{{ u.username }}</td>
-        <td class="muted" style="font-size:11px;">{{ u.ip }}</td>
+        <td class="muted" data-s="s8b685211">{{ u.ip }}</td>
         <td><code class="tool-pill">{{ u.tool_id }}</code></td>
         <td class="ul-name" data-bytes="{{ u.size_bytes }}">
           {% if u.filenames %}
             {% for fn in u.filenames %}<div>📄 {{ fn }}</div>{% endfor %}
-            <div class="muted" style="font-size:10.5px;">{{ u.file_count }} 個檔案</div>
+            <div class="muted" data-s="s1ae8a3cd">{{ u.file_count }} 個檔案</div>
           {% else %}
             📄 {{ u.filename or '(空)' }}
           {% endif %}
-          {% if u.action %}<span class="muted" style="font-size:10.5px; margin-left:4px;">· {{ u.action }}</span>{% endif %}
+          {% if u.action %}<span class="muted" data-s="sd31567d8">· {{ u.action }}</span>{% endif %}
         </td>
         <td class="ul-bytes" data-bytes="{{ u.size_bytes }}">—</td>
         <td>
           {% if u.status >= 200 and u.status < 300 %}
-            <span style="color:#16a34a; font-weight:600;">{{ u.status }}</span>
+            <span data-s="s2dd82338">{{ u.status }}</span>
           {% elif u.status >= 400 %}
-            <span style="color:#dc2626; font-weight:600;">{{ u.status }}</span>
+            <span data-s="sf8fa4116">{{ u.status }}</span>
           {% else %}
             <span class="muted">{{ u.status or '—' }}</span>
           {% endif %}
@@ -79,11 +79,11 @@
   </table>
 
   {% if pages > 1 %}
-  <div class="pagination" style="margin-top:14px; display:flex; gap:6px; align-items:center;">
+  <div class="pagination" data-s="s827ff060">
     {% if page > 1 %}
     <a class="btn btn-small" href="?page={{ page-1 }}&q_user={{ q_user }}&q_tool={{ q_tool }}&q_filename={{ q_filename }}&q_from={{ q_from }}&q_to={{ q_to }}">‹ 上一頁</a>
     {% endif %}
-    <span style="font-size:12.5px;">{{ page }} / {{ pages }}</span>
+    <span data-s="sea8bbc82">{{ page }} / {{ pages }}</span>
     {% if page < pages %}
     <a class="btn btn-small" href="?page={{ page+1 }}&q_user={{ q_user }}&q_tool={{ q_tool }}&q_filename={{ q_filename }}&q_from={{ q_from }}&q_to={{ q_to }}">下一頁 ›</a>
     {% endif %}
@@ -120,7 +120,7 @@
 })();
 </script>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .uploads-filter { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
   .uploads-filter input, .uploads-filter select {
     padding:6px 8px; border:1px solid var(--border); border-radius:4px; font:inherit;

@@ -5,7 +5,7 @@
 
 
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .scl-tbl { width:100%; border-collapse: collapse; font-size:13px; }
 .scl-tbl th, .scl-tbl td { padding:8px 10px; border-bottom:1px solid #f1f5f9; text-align:left; }
 .scl-tbl th { background:#f8fafc; color:#475569; font-weight:600; }
@@ -39,9 +39,9 @@
 <h1>{{ icon('id-card', size=22) }} 送件前檢核 — 案件清單</h1>
 <p class="muted">您可以新建案件、回顧歷次檢核結果，或追蹤已歸檔案件。</p>
 
-<div style="display:flex; gap:8px; margin:12px 0 16px;">
-  <a class="btn btn-primary" href="." style="display:inline-flex; align-items:center; gap:6px;">{{ icon('plus', size=14) }} 新建案件</a>
-  <a class="btn" href="self-entities" style="display:inline-flex; align-items:center; gap:6px;">{{ icon('id-card', size=14) }} 管理我方資料</a>
+<div data-s="s19e6ec71">
+  <a class="btn btn-primary" href="." data-s="s7691c43d">{{ icon('plus', size=14) }} 新建案件</a>
+  <a class="btn" href="self-entities" data-s="s7691c43d">{{ icon('id-card', size=14) }} 管理我方資料</a>
 </div>
 
 <div class="panel">
@@ -57,12 +57,12 @@
     </select>
     <button type="submit" class="btn">{{ icon('search', size=14) }} 搜尋</button>
     {% if q or status_filter %}
-    <a href="cases" class="muted" style="font-size:12px;">清除</a>
+    <a href="cases" class="muted" data-s="s6b9c179a">清除</a>
     {% endif %}
   </form>
 </div>
 
-<div class="panel" style="padding:0; overflow:hidden;">
+<div class="panel" data-s="s1d70adcf">
   {% if cases %}
   <table class="scl-tbl">
     <thead><tr>
@@ -81,12 +81,12 @@
       <tr {% if c.deleted_at %}class="deleted-row"{% endif %}>
         <td><a href="case/{{ c.case_id }}" title="{{ c.case_id }}">{{ c.case_id[:8] }}</a></td>
         <td>
-          {% if c.name %}{{ c.name }}{% else %}<span style="color:#94a3b8;">(未命名)</span>{% endif %}
+          {% if c.name %}{{ c.name }}{% else %}<span data-s="s8cd4ae71">(未命名)</span>{% endif %}
         </td>
         <td>
-          {% if c.main_entity %}{{ c.main_entity.name }}{% else %}<span style="color:#94a3b8;">(未設定)</span>{% endif %}
+          {% if c.main_entity %}{{ c.main_entity.name }}{% else %}<span data-s="s8cd4ae71">(未設定)</span>{% endif %}
         </td>
-        <td><span style="font-size:12px; color:#475569;">{{ c.files_summary }}</span></td>
+        <td><span data-s="sefa9f1f9">{{ c.files_summary }}</span></td>
         <td>
           {% if c.deleted_at %}
             <span class="scl-status deleted" title="於 {{ c.deleted_at_str }} 由 {{ c.deleted_by or '?' }} 刪除">已刪除</span>
@@ -109,7 +109,7 @@
   {% else %}
   <div class="scl-empty">
     尚無案件。
-    <div style="margin-top:8px;"><a href="." style="color:#3b82f6;">＋ 新建第一個案件</a></div>
+    <div data-s="sd4316970"><a href="." data-s="sd294e9a2">＋ 新建第一個案件</a></div>
   </div>
   {% endif %}
 </div>

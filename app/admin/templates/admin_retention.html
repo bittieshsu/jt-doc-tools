@@ -6,9 +6,9 @@
 <p class="muted">設定每類資料保留多久，背景排程自動清理。
 保留天數填 <code>-1</code> 表示「永久保留」。</p>
 
-<div class="panel" style="border-left:4px solid #3b82f6; font-size:13px;">
+<div class="panel" data-s="s5fb956f2">
   <b>清理時機：</b>
-  <ul style="margin:6px 0 0 18px; padding:0; line-height:1.7;">
+  <ul data-s="saa3893fb">
     <li>服務啟動時跑一次（restart 後立刻補清）</li>
     <li>服務跑著的時候，每 <b>6 小時</b>自動跑一次（daemon thread）</li>
     <li>需要立刻清乾淨可按下方「立即清理一次」</li>
@@ -18,7 +18,7 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">保留設定</h2>
+  <h2 data-s="s53896af7">保留設定</h2>
   <table class="ret-table">
     <thead>
       <tr><th>項目</th><th>目前佔用</th><th>最舊一筆</th><th>保留期</th></tr>
@@ -44,27 +44,27 @@
         <td>
           <input class="field" type="number" data-key="{{ setting_key }}"
                  value="{{ settings[setting_key] }}" min="-1" max="36500"
-                 style="width:80px;"> {{ unit }}
+                 data-s="s8db8d854"> {{ unit }}
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  <p style="margin-top:14px;">
+  <p data-s="s553a645f">
     <button class="btn btn-primary" id="saveBtn">{{ icon('save', size=14) }} 儲存設定</button>
     <button class="btn" id="sweepNowBtn">{{ icon('refresh', size=14) }} 立即清理一次</button>
-    <span id="status" class="muted" style="font-size:12px; margin-left:10px;"></span>
+    <span id="status" class="muted" data-s="sf1fa4084"></span>
   </p>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .ret-table { width:100%; border-collapse:collapse; font-size:13px; }
   .ret-table th, .ret-table td { padding:6px 8px; border-bottom:1px solid #e5e7eb; }
   .ret-table th { background:#f9fafb; font-size:11px; color:#6b7280; text-align:left; }
 </style>
 
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   ul { color:#374151; }
 </style>
 {% endblock %}

@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}擷取文字 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .et-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
 @media (max-width: 900px) { .et-grid { grid-template-columns: 1fr; } }
 .et-stat { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color:#475569; margin:8px 0 12px; }
@@ -46,16 +46,16 @@
 <p class="muted">從 PDF 把文字取出來，輸出成 TXT / Markdown / Word / ODT。會依字級推估標題層級；段落換行也會盡量還原成自然段落。可選擇交給 LLM 進一步重排被 PDF 版面切斷的句子。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">上傳 PDF</h2>
+  <h2 data-s="s53896af7">上傳 PDF</h2>
   {% with upload_id='etUpload', accept='application/pdf', hint='單檔、PDF only。掃描檔需先 OCR 才能擷取。' %}
     {% include "components/file_upload.html" %}
   {% endwith %}
 </div>
 
 <div class="panel" id="result-panel" hidden>
-  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-    <h2 style="margin:0;">擷取結果</h2>
-    <span id="status" class="muted" style="font-size:13px;"></span>
+  <div data-s="s517f74ba">
+    <h2 data-s="s1386d503">擷取結果</h2>
+    <span id="status" class="muted" data-s="s3044b600"></span>
   </div>
   <div class="et-stat" id="statBar"></div>
 
@@ -68,24 +68,24 @@
     <button class="btn" type="button" id="btnLlmReflow">{{ icon('refresh', size=14) }} 交給 LLM 重排</button>
   </div>
   {% endif %}
-  <div id="llmProgressBox" hidden style="margin-top:10px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px;">
-    <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#475569; margin-bottom:6px;">
+  <div id="llmProgressBox" hidden data-s="s3853a7c5">
+    <div data-s="s8fbb3507">
       <span id="llmProgText">準備中…</span>
-      <span id="llmProgPct" style="font-family: ui-monospace, monospace;">0%</span>
+      <span id="llmProgPct" data-s="s7753d02e">0%</span>
     </div>
-    <div style="height:8px; background:#e5e7eb; border-radius:999px; overflow:hidden;">
-      <div id="llmProgBar" style="width:0%; height:100%; background:linear-gradient(90deg,#60a5fa,#2563eb); transition: width 0.2s;"></div>
+    <div data-s="s536246e3">
+      <div id="llmProgBar" data-s="sac8bd8b2"></div>
     </div>
-    <div class="muted" style="font-size:11.5px; margin-top:6px;">每個段落大約需要幾秒到十幾秒，依模型與段落長度而定。</div>
+    <div class="muted" data-s="s789d4caf">每個段落大約需要幾秒到十幾秒，依模型與段落長度而定。</div>
   </div>
 
-  <div style="display:flex; align-items:center; gap:10px; margin:16px 0 6px; flex-wrap:wrap;">
-    <h3 style="margin:0;">預覽（Markdown）</h3>
-    <div id="previewToggle" hidden style="display:flex; gap:0; border:1px solid var(--border); border-radius:6px; overflow:hidden; font-size:12px;">
-      <button type="button" class="pv-tab" data-view="original" style="padding:4px 10px; border:0; background:transparent; cursor:pointer;">原始</button>
-      <button type="button" class="pv-tab" data-view="reflowed" style="padding:4px 10px; border:0; background:#2563eb; color:#fff; cursor:pointer;">LLM 重排</button>
+  <div data-s="s777dab4f">
+    <h3 data-s="s1386d503">預覽（Markdown）</h3>
+    <div id="previewToggle" hidden data-s="s3dd663c1">
+      <button type="button" class="pv-tab" data-view="original" data-s="s9e958f59">原始</button>
+      <button type="button" class="pv-tab" data-view="reflowed" data-s="sbe8b86d6">LLM 重排</button>
     </div>
-    <span id="previewDiffHint" hidden class="muted" style="font-size:12px;"></span>
+    <span id="previewDiffHint" hidden class="muted" data-s="s6b9c179a"></span>
   </div>
   <div class="et-preview" id="preview"></div>
 </div>

@@ -6,7 +6,7 @@
 <p class="muted">把多份 PDF 依「下方清單順序」合併為一份。可拖曳卡片調整順序、再次拖入會追加更多檔案、按 ❌ 移除單一檔。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">上傳 PDF（多檔）</h2>
+  <h2 data-s="s53896af7">上傳 PDF（多檔）</h2>
   {% with upload_id='pdfMergeUpload', accept='application/pdf', multiple=True, hint='可分次拖入累加；至少 2 份才能合併。<br>輸出順序 = 下方清單順序，拖曳卡片可調整。' %}
     {% include "components/file_upload.html" %}
   {% endwith %}
@@ -14,12 +14,12 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">執行</h2>
+  <h2 data-s="s53896af7">執行</h2>
   <button class="btn btn-primary" id="btn-submit">{{ icon('save') }}開始合併</button>
   {% with progress_id='jp' %}{% include "components/job_progress.html" %}{% endwith %}
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .merge-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
 .merge-card {
   display: flex; align-items: center; gap: 10px;

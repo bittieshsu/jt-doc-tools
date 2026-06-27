@@ -31,7 +31,35 @@
     }
   }, true);
 
-  function init() { bindStopProp(document); }
+  // ④ data-style：動態 CSS（JS-built / Jinja 算出的值）用 CSSOM 套用。
+  //    CSP nonce 模式擋 HTML 的 inline style 屬性，但**不擋** element.style.cssText
+  //    這種 CSSOM 設定 → 把原本的動態 inline style 改走這條，CSP 仍可移除
+  //    style-src 'unsafe-inline'。初始載入 + 動態插入（MutationObserver）都套。
+  function applyDataStyle(root) {
+    var scope = (root && root.querySelectorAll) ? root : document;
+    scope.querySelectorAll('[data-style]').forEach(function (el) {
+      if (el._dsDone) return;
+      el._dsDone = 1;
+      el.style.cssText = el.getAttribute('data-style') || '';
+    });
+  }
+  if (window.MutationObserver) {
+    new MutationObserver(function (muts) {
+      for (var i = 0; i < muts.length; i++) {
+        var an = muts[i].addedNodes;
+        for (var j = 0; j < an.length; j++) {
+          var n = an[j];
+          if (n.nodeType !== 1) continue;
+          if (n.hasAttribute && n.hasAttribute('data-style') && !n._dsDone) {
+            n._dsDone = 1; n.style.cssText = n.getAttribute('data-style') || '';
+          }
+          if (n.querySelectorAll) applyDataStyle(n);
+        }
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  function init() { bindStopProp(document); applyDataStyle(document); }
   if (document.readyState !== 'loading') init();
   else document.addEventListener('DOMContentLoaded', init);
 })();

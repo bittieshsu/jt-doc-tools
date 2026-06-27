@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}文書轉圖片 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .p2i-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px; margin-top: 12px; }
 .p2i-card { border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; background: #fff; }
@@ -43,7 +43,7 @@
 <p class="muted">把 PDF 或 Office 文件（Word / Excel / PowerPoint / ODF）每一頁轉成 PNG 圖片。非 PDF 會先自動轉成 PDF 再轉圖。單頁直接下載 PNG、多頁自動打包 ZIP。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 設定</h2>
+  <h2 data-s="s53896af7">1. 設定</h2>
   <div class="form-row">
     <label>解析度（DPI）</label>
     <div class="field option-cards">
@@ -79,23 +79,23 @@
       </label>
     </div>
   </div>
-  <div class="muted" style="font-size:11.5px; margin-top:6px;">DPI 越高每張圖檔越大、轉檔越慢。100 約幾十 KB / 頁，400 可能達 5 MB / 頁。</div>
+  <div class="muted" data-s="s789d4caf">DPI 越高每張圖檔越大、轉檔越慢。100 約幾十 KB / 頁，400 可能達 5 MB / 頁。</div>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">2. 上傳檔案</h2>
+  <h2 data-s="s53896af7">2. 上傳檔案</h2>
   {% with upload_id='p2iUpload', accept='application/pdf,.pdf,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.csv', hint='支援 PDF、Word、Excel、PowerPoint、ODF；非 PDF 會先自動轉成 PDF。' %}{% include "components/file_upload.html" %}{% endwith %}
   <div id="p2iProgress" class="p2i-progress" hidden>
-    <span id="p2iProgressLabel" style="font-size:12.5px; color:#475569;">準備中…</span>
+    <span id="p2iProgressLabel" data-s="sf072decd">準備中…</span>
     <div class="p2i-progress-bar"><div class="p2i-progress-fill" id="p2iProgressFill"></div></div>
     <span class="p2i-progress-pct" id="p2iProgressPct">0%</span>
   </div>
 </div>
 
 <div class="panel" id="p2iResultPanel" hidden>
-  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-    <h2 style="margin:0;">預覽（<span id="p2iPageCount">0</span> 頁，總 <span id="p2iTotalSize">—</span>）</h2>
-    <div style="display:flex; gap:8px;">
+  <div data-s="s517f74ba">
+    <h2 data-s="s1386d503">預覽（<span id="p2iPageCount">0</span> 頁，總 <span id="p2iTotalSize">—</span>）</h2>
+    <div data-s="s38861b51">
       {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden>{{ icon('archive') }} 存至工作區</button>{% endif %}
       <a class="btn btn-primary" id="p2iBtnDownload" href="#">{{ icon('download') }} 下載</a>
     </div>
@@ -251,7 +251,7 @@
   });
 })();
 </script>
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 @keyframes p2i-stripes {
   0% { background-position: 0% 0%; }
   100% { background-position: -200% 0%; }

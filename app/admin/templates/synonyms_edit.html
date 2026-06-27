@@ -10,16 +10,16 @@
   <div class="profile-toolbar">
     <button class="btn" id="addRow" type="button">{{ icon('plus') }}新增 key</button>
     <button class="btn btn-primary" id="saveBtn" type="button">{{ icon('save') }}儲存</button>
-    <span style="flex:1;"></span>
+    <span data-s="sda5cd676"></span>
     <a class="btn" href="/admin/synonyms/export" download>{{ icon('download') }}匯出 JSON</a>
     <button class="btn" id="importMergeBtn" type="button" title="保留現有同義詞，新檔案的 key 補上去；同 key 兩邊的同義詞做聯集">{{ icon('upload') }}匯入（合併）</button>
     <button class="btn btn-danger" id="importReplaceBtn" type="button" title="清掉現有所有同義詞，只保留匯入檔內容（不可還原）">{{ icon('upload') }}匯入（取代）</button>
-    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+    <input type="file" id="importFile" accept="application/json,.json" data-s="scb458930">
     <span class="muted" id="status"></span>
   </div>
   <table class="profile-table">
     <thead>
-      <tr><th style="width:200px;">canonical key</th><th>同義詞（逗號分隔）</th><th style="width:60px;"></th></tr>
+      <tr><th data-s="s8f77872c">canonical key</th><th>同義詞（逗號分隔）</th><th data-s="sc5ac9c43"></th></tr>
     </thead>
     <tbody id="rows">
       {% for r in rows %}
@@ -33,7 +33,7 @@
   </table>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .profile-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
   .profile-table { width: 100%; border-collapse: collapse; }
   .profile-table th, .profile-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }

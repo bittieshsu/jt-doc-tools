@@ -25,7 +25,7 @@
 
 <div class="panel">
   <div class="dep-summary-bar">
-    <h2 style="margin:0;">總覽</h2>
+    <h2 data-s="s1386d503">總覽</h2>
     <div class="dep-stat-cards" id="depStatCards">
       <div class="dep-stat dep-stat-ok">
         <div class="dep-stat-num" id="statOk">—<span class="dep-stat-of" id="statTotal"></span></div>
@@ -57,16 +57,16 @@
     </thead>
     <tbody id="dep-tbody">
       <tr id="depLoadingRow">
-        <td colspan="5" style="padding:40px; text-align:center; color:#64748b;">
+        <td colspan="5" data-s="sea8a9570">
           <span class="dep-spinner" aria-hidden="true"></span>
-          <span style="margin-left:10px; font-size:13px;">正在檢查系統相依套件…</span>
+          <span data-s="s044eb717">正在檢查系統相依套件…</span>
         </td>
       </tr>
     </tbody>
   </table>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   /* ---- 總覽 bar ---- */
   .dep-summary-bar {
     display:flex; align-items:center; gap:18px; flex-wrap:wrap;
@@ -265,7 +265,7 @@
   function renderRows(deps) {
     const tbody = document.getElementById('dep-tbody');
     if (!deps || !deps.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="padding:30px; text-align:center; color:#94a3b8;">無資料</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" data-s="sae7f222f">無資料</td></tr>';
       return;
     }
     let html = '';
@@ -286,7 +286,7 @@
       const versionPart = d.version
         ? `<span class="dep-version">${escapeHtml(d.version)}</span>` : '';
       const extraPart = d.extra
-        ? `<div class="muted" style="font-size:12px; margin-top:6px;">${escapeHtml(d.extra)}</div>` : '';
+        ? `<div class="muted" data-s="s168f2b58">${escapeHtml(d.extra)}</div>` : '';
       let cmdPart = '';
       if (!d.ok && d.install_cmd) {
         cmdPart = `<div class="dep-cmd-block">
@@ -332,9 +332,9 @@
     const startedAt = Date.now();
     const renderWaiting = () => {
       const sec = Math.floor((Date.now() - startedAt) / 1000);
-      tbody.innerHTML = '<tr><td colspan="5" style="padding:40px; text-align:center; color:#64748b;">' +
+      tbody.innerHTML = '<tr><td colspan="5" data-s="sea8a9570">' +
         '<span class="dep-spinner" aria-hidden="true"></span>' +
-        '<span style="margin-left:10px; font-size:13px;">正在檢查系統相依套件…（已等 ' + sec + ' 秒，慢機器最多 60 秒）</span></td></tr>';
+        '<span data-s="s044eb717">正在檢查系統相依套件…（已等 ' + sec + ' 秒，慢機器最多 60 秒）</span></td></tr>';
     };
     renderWaiting();
     const tickerId = setInterval(renderWaiting, 1000);
@@ -365,7 +365,7 @@
       } else {
         msg = '檢查失敗：' + escapeHtml(e.message);
       }
-      tbody.innerHTML = '<tr><td colspan="5" style="padding:30px; text-align:center; color:#ef4444;">' + msg + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" data-s="s1c9be233">' + msg + '</td></tr>';
     } finally {
       clearInterval(tickerId);
       clearTimeout(timeoutId);
@@ -407,7 +407,7 @@
       if (!j.ok) {
         verEl.textContent = '查詢失敗';
         verEl.className = 'ver-num ver-num-pending';
-        if (hintEl) hintEl.innerHTML = '<span style="color:#ef4444;">' + (j.error || '未知錯誤') + '</span>';
+        if (hintEl) hintEl.innerHTML = '<span data-s="sc9e34862">' + (j.error || '未知錯誤') + '</span>';
         verBox.classList.remove('is-current', 'is-outdated', 'is-newer');
       } else {
         verEl.className = 'ver-num';  // reset pending style → bold mono
@@ -435,7 +435,7 @@
       }
     } catch (e) {
       verEl.textContent = '查詢失敗';
-      if (hintEl) hintEl.innerHTML = '<span style="color:#ef4444;">' + e.message + '</span>';
+      if (hintEl) hintEl.innerHTML = '<span data-s="sc9e34862">' + e.message + '</span>';
     } finally {
       btn.innerHTML = orig;
       btn.disabled = false;

@@ -18,7 +18,7 @@
 {# 釘選區 — 由 JS 依 localStorage 動態填入。沒釘選的工具就 hidden。 #}
 <section class="tool-group" id="homePinnedGroup" hidden>
   <h2 class="tool-group-title">
-    <span style="color:#fbbf24;">{{ icon('star', size=18) }}</span>
+    <span data-s="s38288887">{{ icon('star', size=18) }}</span>
     釘選 <span class="tool-count" id="homePinnedCount">0</span>
   </h2>
   <div class="tool-grid" id="homePinnedGrid"></div>
@@ -50,7 +50,7 @@
 <div class="empty">目前沒有可用的工具模組。</div>
 {% endfor %}
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .hero { text-align: center; padding: 40px 16px 28px; }
 .hero-logo {
   display: inline-block;

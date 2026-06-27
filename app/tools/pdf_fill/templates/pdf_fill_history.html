@@ -13,7 +13,7 @@
       <input type="checkbox" id="selAll" /> 全選
     </label>
     <span class="muted sel-count" id="selCount">未選取</span>
-    <span style="flex:1;"></span>
+    <span data-s="sda5cd676"></span>
     <button class="btn btn-small btn-danger" id="bulkDeleteBtn" type="button" disabled>{{ icon('trash') }}批次刪除</button>
   </div>
   <div class="history-list">
@@ -58,7 +58,7 @@
   {% endif %}
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .history-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: #f8fafc; }
   .history-toolbar label.sel-all { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
   .history-toolbar .sel-count { font-size: 12px; }

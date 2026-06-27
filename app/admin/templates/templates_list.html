@@ -34,7 +34,7 @@
   {% endif %}
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .tpl-table { width: 100%; border-collapse: collapse; }
   .tpl-table th, .tpl-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; }
   .tpl-table th { font-size: 12px; color: var(--muted); font-weight: 500; }

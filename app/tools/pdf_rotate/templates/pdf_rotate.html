@@ -7,17 +7,17 @@
 並選擇套用範圍 (所有頁 / 偶數頁 / 奇數頁 / 自訂)；每張縮圖也有獨立旋轉按鈕。完成後可下載 PDF 或 ZIP（每頁 PNG）。</p>
 
 <div class="panel" id="upload-panel">
-  <h2 style="margin-top:0;">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
   {% with upload_id='upR', accept='application/pdf', multiple=False, hint='單檔；如需批次處理多個檔案請每次上傳一個。' %}{% include "components/file_upload.html" %}{% endwith %}
-  <div id="loading" class="muted" style="margin-top:10px; font-size:12.5px;" hidden>
+  <div id="loading" class="muted" data-s="s5d8b4b19" hidden>
     {{ icon('refresh', size=14) }} 載入中…
   </div>
   <div id="upload-error" class="warn-box" hidden></div>
 </div>
 
 <div class="panel" id="work-panel" hidden>
-  <h2 style="margin-top:0;">2. 套用方式
-    <span class="muted" id="file-info" style="font-size:13px; font-weight:400; margin-left:8px;"></span>
+  <h2 data-s="s53896af7">2. 套用方式
+    <span class="muted" id="file-info" data-s="sbee7077a"></span>
   </h2>
 
   <div class="rt-toolbar">
@@ -56,7 +56,7 @@
       </div>
     </div>
   </div>
-  <div class="muted" style="font-size:11.5px; margin-top:6px;">
+  <div class="muted" data-s="s789d4caf">
     點上方按鈕 = 套用該轉向到「套用範圍」內的頁；每張縮圖下方也有獨立按鈕可單頁覆寫。
   </div>
 
@@ -64,7 +64,7 @@
 </div>
 
 <div class="panel" id="action-panel" hidden>
-  <h2 style="margin-top:0;">3. 完成</h2>
+  <h2 data-s="s53896af7">3. 完成</h2>
   <div class="rt-actions">
     <button class="btn btn-primary" type="button" id="btn-pdf">
       {{ icon('download', size=14) }} 下載 PDF</button>
@@ -73,11 +73,11 @@
     {% if workspace_enabled(request) %}<button class="btn" type="button" id="wsSaveBtn">{{ icon('archive', size=14) }} 存至工作區</button>{% endif %}
     <button class="btn" type="button" id="btn-reset">
       {{ icon('reset', size=14) }} 處理新檔案</button>
-    <span id="action-msg" class="muted" style="margin-left:10px; font-size:12.5px;"></span>
+    <span id="action-msg" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .warn-box { background:#fef3c7; border:1px solid #fde68a; color:#78350f;
   padding:8px 12px; border-radius:6px; font-size:13px; margin-top:8px; }
 

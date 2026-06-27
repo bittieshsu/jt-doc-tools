@@ -8,7 +8,7 @@
 目前資料庫大小：<b>{{ '%.1f'|format(size_mb) }} MB</b>。</p>
 
 {% if size_warn %}
-<div class="panel" style="border-left:4px solid #dc2626;">
+<div class="panel" data-s="s63e76a59">
   ⚠ 稽核資料庫超過 5 GB。建議：縮短保留天數 + 啟用外部 log 轉發（syslog / CEF / GELF）。
 </div>
 {% endif %}
@@ -30,23 +30,23 @@
   <input class="field" type="datetime-local" name="q_to" value="{{ q_to }}" placeholder="到">
   <button class="btn btn-primary" type="submit">{{ icon('search', size=14) }} 篩選</button>
   <a class="btn" href="/admin/audit">{{ icon('back', size=14) }} 清除</a>
-  <span style="flex:1;"></span>
+  <span data-s="sda5cd676"></span>
   <a class="btn" href="/admin/audit/export.csv?q_user={{ q_user }}&q_event={{ q_event }}&q_from={{ q_from }}&q_to={{ q_to }}">
     {{ icon('download', size=14) }} 匯出 CSV
   </a>
 </form>
 
 <div class="panel">
-  <p class="muted" style="font-size:12.5px;">
+  <p class="muted" data-s="sea8bbc82">
     共 <b>{{ total }}</b> 筆，第 {{ page }}/{{ pages }} 頁（每頁 {{ page_size }} 筆）
   </p>
   <table class="audit-table">
     <colgroup>
-      <col style="width:160px;"><!-- 時間 -->
-      <col style="width:110px;"><!-- 使用者 -->
-      <col style="width:120px;"><!-- IP -->
-      <col style="width:140px;"><!-- 事件 -->
-      <col style="width:160px;"><!-- 目標 -->
+      <col data-s="sdf7d1005"><!-- 時間 -->
+      <col data-s="s1a30558f"><!-- 使用者 -->
+      <col data-s="s088cf005"><!-- IP -->
+      <col data-s="s2f01efdd"><!-- 事件 -->
+      <col data-s="sdf7d1005"><!-- 目標 -->
       <col><!-- 詳細：吃剩餘寬度 -->
     </colgroup>
     <thead>
@@ -59,12 +59,12 @@
           <span data-ts="{{ (e.ts*1000)|int }}">—</span>
         </td>
         <td>{{ e.username or '(匿名)' }}</td>
-        <td class="muted" style="font-size:11px;">{{ e.ip }}</td>
+        <td class="muted" data-s="s8b685211">{{ e.ip }}</td>
         <td><code>{{ e.event_type }}</code></td>
         <td>{{ e.target }}</td>
         <td class="audit-detail">
           <details>
-            <summary class="muted" style="font-size:11px;">JSON</summary>
+            <summary class="muted" data-s="s8b685211">JSON</summary>
             <pre>{{ e.details_json }}</pre>
           </details>
         </td>
@@ -126,11 +126,11 @@
   </script>
 
   {% if pages > 1 %}
-  <div class="pagination" style="margin-top:14px; display:flex; gap:6px;">
+  <div class="pagination" data-s="s7b767013">
     {% if page > 1 %}
     <a class="btn btn-small" href="?page={{ page-1 }}&q_user={{ q_user }}&q_event={{ q_event }}&q_from={{ q_from }}&q_to={{ q_to }}">‹ 上一頁</a>
     {% endif %}
-    <span style="line-height:28px;">{{ page }} / {{ pages }}</span>
+    <span data-s="sb9ac7d92">{{ page }} / {{ pages }}</span>
     {% if page < pages %}
     <a class="btn btn-small" href="?page={{ page+1 }}&q_user={{ q_user }}&q_event={{ q_event }}&q_from={{ q_from }}&q_to={{ q_to }}">下一頁 ›</a>
     {% endif %}
@@ -138,7 +138,7 @@
   {% endif %}
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .audit-filter { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
   .audit-filter input, .audit-filter select { padding:6px 8px; border:1px solid var(--border); border-radius:4px; font:inherit; }
   .audit-table { width:100%; border-collapse:collapse; font-size:12.5px; table-layout:fixed; }

@@ -4,7 +4,7 @@
 {% block title %}文件差異比對 · {{ app_name }}{% endblock %}
 {% block head %}
 {{ llm_gate_styles() }}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .df-llm-card { background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);
   border:1px solid #93c5fd; border-radius:10px; padding:14px 16px; margin: 10px 0 16px; }
 .df-llm-card h3 { margin:0 0 8px; font-size:14.5px; color:#1e3a8a;
@@ -108,7 +108,7 @@
 <p class="muted">上傳兩份文件並排顯示文字差異 — 支援 <b>PDF</b>、<b>Word</b>、<b>Excel</b>、<b>PowerPoint</b>、<b>ODT / ODS / ODP</b>。非 PDF 檔會自動先轉成 PDF 再比對（需 OxOffice / LibreOffice）。紅 = 被刪 / 綠 = 新增 / 黃 = 修改。同時顯示 metadata 差異。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳兩份文件</h2>
+  <h2 data-s="s53896af7">1. 上傳兩份文件</h2>
   <div class="df-uploads">
     <div class="df-upload-slot">
       <h3>{{ icon('page', size=14) }} 舊版 (左)</h3>
@@ -125,17 +125,17 @@
               feature_desc='比對完成後額外呼叫地端 LLM，產出整體變動的中文摘要與重點清單（差異片段會送往設定的 LLM server，請確認為內網地端服務）。',
               input_id='dfLlmSum') }}
 
-  <div style="margin-top:12px;">
+  <div data-s="s002535c2">
     <button class="btn btn-primary" id="btnCompare">{{ icon('diff', size=14) }} 開始比對</button>
-    <span id="status" class="muted" style="margin-left:10px; font-size:12.5px;"></span>
+    <span id="status" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 style="margin-top:0;">2. 比對結果</h2>
+  <h2 data-s="s53896af7">2. 比對結果</h2>
   <div id="dfLlmPanel" class="df-llm-card" hidden>
     <h3>{{ icon('globe', size=14) }} LLM 變動摘要
-      <span id="dfLlmModel" style="margin-left:auto;font-size:11.5px;color:#3b82f6;font-weight:normal;"></span>
+      <span id="dfLlmModel" data-s="sc3db4d65"></span>
     </h3>
     <div id="dfLlmErr" class="df-llm-err" hidden></div>
     <div id="dfLlmSummary" class="df-llm-summary" hidden></div>
@@ -143,11 +143,11 @@
   </div>
   <div class="df-summary" id="sumBox"></div>
   <div class="df-meta" id="metaBox" hidden>
-    <h3 style="margin:10px 0 4px; font-size:14px;">Metadata 差異</h3>
+    <h3 data-s="s4af51d06">Metadata 差異</h3>
     <table><thead><tr><th>欄位</th><th>舊版</th><th>新版</th></tr></thead>
     <tbody id="metaBody"></tbody></table>
   </div>
-  <h3 style="margin:16px 0 6px; font-size:14px;">文字差異（逐頁）</h3>
+  <h3 data-s="s02ee6f6a">文字差異（逐頁）</h3>
   <div id="diffBox"></div>
   <div id="df-toast" class="df-toast" hidden></div>
 </div>
@@ -264,7 +264,7 @@ function renderResult(d) {
     return `<div class="df-page">
       <div class="df-page-head">
         <span>第 ${p.index} 頁 ${p.a_exists ? '' : '(新版才有)'} ${p.b_exists ? '' : '(舊版才有)'}</span>
-        <span class="muted" style="font-weight:normal; font-size:12px;">
+        <span class="muted" data-s="s0c27a7ee">
           <span class="add">+${p.diff.added}</span>　·
           <span class="rem">-${p.diff.removed}</span>　·
           <span class="chg">~${p.diff.changed}</span>

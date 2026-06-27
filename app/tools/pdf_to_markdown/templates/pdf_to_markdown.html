@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}PDF 轉 Markdown · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .pm-warn-box {
   background:#fffbeb; border:1px solid #fde68a; border-radius:8px;
   padding:10px 14px; margin:10px 0 14px; font-size:13px; color:#78350f;
@@ -102,7 +102,7 @@
 }
 .pm-splitcol.rail .pm-splitcol-head > span:last-child {
   /* hide the muted hint + collapse button container when collapsed.
-     !important because the inline style="display:flex" on this span would
+     !important because the inline data-s="sf7dbba7a" on this span would
      otherwise win specificity. */
   display:none !important;
 }
@@ -220,14 +220,14 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
   {% with upload_id='pmUpload', accept='application/pdf', hint='單檔、PDF only、上限 100 MB' %}
     {% include "components/file_upload.html" %}
   {% endwith %}
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">2. 選項</h2>
+  <h2 data-s="s53896af7">2. 選項</h2>
   <div class="pm-opts">
     <div class="pm-opt">
       <div class="pm-opt-head">
@@ -235,7 +235,7 @@
         <span>抽出圖片</span>
       </div>
       <div class="pm-opt-ctrl">
-        <label style="display:flex; align-items:center; gap:6px;">
+        <label data-s="sf84328fe">
           <input type="checkbox" id="pmIncludeImages">
           <span>同時抽出 PDF 圖片</span>
         </label>
@@ -249,7 +249,7 @@
         <span>圖片格式</span>
       </div>
       <div class="pm-opt-ctrl">
-        <select id="pmImageFormat" class="jt-select" style="max-width:160px;">
+        <select id="pmImageFormat" class="jt-select" data-s="s844e0595">
           <option value="png" selected>PNG（無損）</option>
           <option value="jpg">JPG（小檔）</option>
           <option value="webp">WebP</option>
@@ -264,7 +264,7 @@
         <span>頁分隔線</span>
       </div>
       <div class="pm-opt-ctrl">
-        <label style="display:flex; align-items:center; gap:6px;">
+        <label data-s="sf84328fe">
           <input type="checkbox" id="pmPageSeparator" checked>
           <span>頁間插入 <code>-----</code></span>
         </label>
@@ -273,28 +273,28 @@
     </div>
   </div>
 
-  <div class="pm-actions" style="margin-top:6px; padding-top:14px; border-top:1px solid #e2e8f0;">
+  <div class="pm-actions" data-s="s43843570">
     <button class="btn btn-primary" id="pmConvert">{{ icon('refresh', size=12) }} 開始轉換</button>
-    <span id="pmStatus" style="font-size:13px; color:#64748b; align-self:center;"></span>
+    <span id="pmStatus" data-s="s954fd00a"></span>
   </div>
-  <div id="pmError" class="pm-error" hidden style="margin-top:10px;"></div>
+  <div id="pmError" class="pm-error" hidden data-s="s5371db16"></div>
 </div>
 
 <div class="panel" id="pmResultPanel" hidden>
-  <h2 style="margin-top:0;">3. 結果（Markdown 原文 ↔ 渲染對照）</h2>
+  <h2 data-s="s53896af7">3. 結果（Markdown 原文 ↔ 渲染對照）</h2>
   <div class="pm-stat" id="pmStat"></div>
   <div class="pm-actions">
     <a class="btn btn-primary" id="pmDlMd" download href="#">{{ icon('download', size=12) }} 下載 .md</a>
-    <a class="btn" id="pmDlZip" download href="#" hidden style="background:#fff; border:1px solid #d1d5db;">{{ icon('download', size=12) }} 下載 ZIP（含圖片）</a>
-    <button class="btn" id="pmCopy" type="button" style="background:#fff; border:1px solid #d1d5db;">{{ icon('copy', size=12) }} 複製全文</button>
+    <a class="btn" id="pmDlZip" download href="#" hidden data-s="s14e64acc">{{ icon('download', size=12) }} 下載 ZIP（含圖片）</a>
+    <button class="btn" id="pmCopy" type="button" data-s="s14e64acc">{{ icon('copy', size=12) }} 複製全文</button>
   </div>
 
   <div class="pm-splitwrap" id="pmSplitWrap" data-mode="both">
     <div class="pm-splitcol" id="pmColLeft">
       <div class="pm-splitcol-head">
-        <span style="display:inline-flex; align-items:center; gap:6px;">{{ icon('file-text', size=14) }} Markdown 原始碼</span>
-        <span style="display:flex; align-items:center; gap:6px;">
-          <span class="muted" style="font-size:11px;">保留標記符號</span>
+        <span data-s="s7691c43d">{{ icon('file-text', size=14) }} Markdown 原始碼</span>
+        <span data-s="sf84328fe">
+          <span class="muted" data-s="s8b685211">保留標記符號</span>
           <button type="button" class="pm-collapse-btn" id="pmCollapseLeft" title="向左收折">◀ 收折</button>
         </span>
       </div>
@@ -304,9 +304,9 @@
     </div>
     <div class="pm-splitcol" id="pmColRight">
       <div class="pm-splitcol-head">
-        <span style="display:inline-flex; align-items:center; gap:6px;">{{ icon('paragraph', size=14) }} 渲染結果</span>
-        <span style="display:flex; align-items:center; gap:6px;">
-          <span class="muted" style="font-size:11px;">含標題 / 表格 / 粗體</span>
+        <span data-s="s7691c43d">{{ icon('paragraph', size=14) }} 渲染結果</span>
+        <span data-s="sf84328fe">
+          <span class="muted" data-s="s8b685211">含標題 / 表格 / 粗體</span>
           <button type="button" class="pm-collapse-btn" id="pmCollapseRight" title="向右收折">收折 ▶</button>
         </span>
       </div>

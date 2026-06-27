@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}文字差異比對 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .td-pastes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 800px) { .td-pastes { grid-template-columns: 1fr; } }
 .td-paste-slot h3 { margin: 0 0 6px; font-size: 13px; color:#475569; }
@@ -107,7 +107,7 @@
 <p class="muted">直接貼上兩組文字，立即並排比對 — 不用存檔上傳。適合 log 片段、code 片段、段落改稿前後的快速 diff。紅 = 被刪 / 綠 = 新增 / 黃 = 修改。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 貼上兩組文字</h2>
+  <h2 data-s="s53896af7">1. 貼上兩組文字</h2>
   <div class="td-pastes">
     <div class="td-paste-slot">
       <h3>{{ icon('edit', size=14) }} 舊版 (左)</h3>
@@ -131,14 +131,14 @@
       </div>
     </div>
   </div>
-  <div style="margin-top:12px;">
+  <div data-s="s002535c2">
     <button class="btn btn-primary" id="btnCompare">{{ icon('diff', size=14) }} 開始比對</button>
-    <span id="status" class="muted" style="margin-left:10px; font-size:12.5px;"></span>
+    <span id="status" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 style="margin-top:0;">2. 比對結果</h2>
+  <h2 data-s="s53896af7">2. 比對結果</h2>
   <div id="sumBox" class="df-summary"></div>
   <div id="diffBox"></div>
   <div id="td-toast" class="td-toast" hidden></div>

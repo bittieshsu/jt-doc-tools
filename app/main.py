@@ -14,7 +14,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.12.29"
+VERSION = "1.12.30"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -591,15 +591,17 @@ async def _security_headers(request: Request, call_next):
     # 'unsafe-inline'，注入的 inline <script> 不帶 nonce 無法執行（強化 XSS 防護）。
     # 模板的 90 個 inline <script> 已加 nonce，inline 事件處理器已改 addEventListener。
     # 萬一 nonce 缺失（理論上不會）退回 'unsafe-inline' 以免整站 JS 失效。
-    # style-src 仍 'unsafe-inline'：1500+ 個 inline style 屬性無法用 nonce 涵蓋，
-    # 且 CSS 注入風險遠低於 script，列為後續 hardening。
+    # style-src 也 nonce 化（Phase 2）：84 個 <style> 區塊加 nonce、1371 個 inline
+    # style 屬性改 data-s（CSS class）、動態的改 data-style + CSSOM 套用 →
+    # 移除 style-src 'unsafe-inline'（跨瀏覽器,不依賴 style-src-attr）。
     _nonce = getattr(getattr(request, "state", None), "csp_nonce", "") or ""
     _script_src = (f"script-src 'self' 'nonce-{_nonce}'; " if _nonce
                    else "script-src 'self' 'unsafe-inline'; ")
+    _style_src = (f"style-src 'self' 'nonce-{_nonce}'; " if _nonce
+                  else "style-src 'self' 'unsafe-inline'; ")
     h.setdefault("Content-Security-Policy", (
         "default-src 'self'; "
-        + _script_src +
-        "style-src 'self' 'unsafe-inline'; "
+        + _script_src + _style_src +
         # data: for QR PNGs (TOTP setup) + base64 thumbs; blob: for PDF.js
         "img-src 'self' data: blob:; "
         "font-src 'self' data:; "

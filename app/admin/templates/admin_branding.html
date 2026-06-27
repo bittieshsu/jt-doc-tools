@@ -6,22 +6,22 @@
 <p class="muted">上傳一張企業 Logo，自動套用到左側 sidebar、瀏覽器頁籤 favicon、首頁與登入頁。
 建議使用 PNG（含透明）/ JPG / WEBP，正方形或近正方形最佳；最大 {{ max_dim }} px、{{ max_mb }} MB。</p>
 
-<div class="panel" style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap;">
-  <div style="flex:0 0 auto;">
-    <h3 style="margin:0 0 8px 0;">目前 Logo</h3>
+<div class="panel" data-s="s714ca188">
+  <div data-s="s01551c63">
+    <h3 data-s="s4c672c49">目前 Logo</h3>
     <div id="logoBox" class="logo-preview">
       {% if has_custom %}
       <img id="logoImg" src="{{ logo_url }}?v={{ range(100000) | random }}" alt="目前 Logo" />
       {% else %}
       <img id="logoImg" src="/static/images/logo-on-light.png" alt="預設 Logo" />
-      <div class="muted" style="font-size:11px; margin-top:6px;">（使用內建預設）</div>
+      <div class="muted" data-s="s67fed56e">（使用內建預設）</div>
       {% endif %}
     </div>
-    <div style="margin-top:8px;" id="statusLine"></div>
+    <div data-s="sd4316970" id="statusLine"></div>
   </div>
 
-  <div style="flex:1 1 320px;">
-    <h3 style="margin:0 0 8px 0;">上傳新 Logo</h3>
+  <div data-s="s4b69465b">
+    <h3 data-s="s4c672c49">上傳新 Logo</h3>
     <label class="br-drop-zone" id="dropZone" for="logoFile">
       <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp" hidden />
       <span class="br-drop-icon">{{ icon('upload', size=22) }}</span>
@@ -32,9 +32,9 @@
     </label>
 
     <!-- 裁切 UI — 上傳非正方形圖片時自動出現 -->
-    <div id="cropPanel" hidden style="margin-top:12px;">
+    <div id="cropPanel" hidden data-s="s002535c2">
       <div class="crop-toolbar">
-        <span class="muted" style="font-size:12px;">拖曳方框與四角調整裁切範圍：</span>
+        <span class="muted" data-s="s6b9c179a">拖曳方框與四角調整裁切範圍：</span>
         <button class="btn btn-small" type="button" id="btnAspectSquare" title="鎖定 1:1">▢ 正方形</button>
         <button class="btn btn-small" type="button" id="btnAspectFree" title="自由比例">↔ 自由</button>
         <button class="btn btn-small" type="button" id="btnAspectFull" title="全圖（不裁切）">🗖 全圖</button>
@@ -52,23 +52,23 @@
           <span class="crop-handle se"></span>
         </div>
       </div>
-      <div class="muted" style="font-size:11.5px; margin-top:6px;">
+      <div class="muted" data-s="s789d4caf">
         裁切後尺寸：<span id="cropDim">—</span>
       </div>
     </div>
 
-    <div style="margin-top:12px;">
+    <div data-s="s002535c2">
       <button class="btn btn-primary" id="btnUpload" disabled>{{ icon('upload', size=14) }} 上傳並套用</button>
       <button class="btn" id="btnReset" {% if not has_custom %}disabled{% endif %}>{{ icon('refresh', size=14) }} 還原預設</button>
     </div>
-    <p class="muted" style="font-size:12px; margin-top:14px;">
+    <p class="muted" data-s="s3cce2c11">
       <b>套用範圍</b>：<br>
       • 左側 sidebar 上方品牌列<br>
       • 瀏覽器頁籤 favicon（重新整理頁籤後生效）<br>
       • 首頁 hero logo<br>
       • 登入頁 / 啟用認證頁
     </p>
-    <p class="muted" style="font-size:11.5px;">
+    <p class="muted" data-s="sc73c4105">
       Logo 存於 <code>data/branding/logo.png</code>，正規化為 PNG，超過 {{ max_dim }} px 會自動縮小。
       Sidebar 背景偏深色，建議使用透明背景或淺色 logo 才看得見。
     </p>
@@ -76,8 +76,8 @@
 </div>
 
 <div class="panel">
-  <h3 style="margin:0 0 10px 0;">{{ icon('edit', size=18) }} 站台名稱</h3>
-  <p class="muted" style="margin:0 0 10px 0; font-size:13px;">
+  <h3 data-s="sc56508cb">{{ icon('edit', size=18) }} 站台名稱</h3>
+  <p class="muted" data-s="sc56c652f">
     出現在左上 sidebar、瀏覽器分頁標題、首頁與登入頁。
     留空可還原預設「<code>{{ default_site_name }}</code>」。
   </p>
@@ -90,12 +90,12 @@
   </div>
   <div class="br-name-default">
     目前生效：<code id="curName">{{ current_site_name }}</code>
-    {% if has_custom_site_name %}<span style="color:#16a34a; margin-left:8px;">（自訂）</span>{% else %}<span style="color:#94a3b8; margin-left:8px;">（預設）</span>{% endif %}
+    {% if has_custom_site_name %}<span data-s="s2282d3a4">（自訂）</span>{% else %}<span data-s="s88652408">（預設）</span>{% endif %}
   </div>
-  <div id="nameStatus" style="margin-top:8px; font-size:12px;"></div>
+  <div id="nameStatus" data-s="sf14019df"></div>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   /* === Crop UI === */
   .crop-toolbar {
     display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;
@@ -502,15 +502,15 @@ btnUpload.addEventListener('click', async () => {
     const r = await fetch('/admin/branding/upload', {method: 'POST', body: fd});
     if (!r.ok) {
       const t = await r.text();
-      status.innerHTML = '<span style="color:#dc2626;">上傳失敗：' + t + '</span>';
+      status.innerHTML = '<span data-s="sbc8099b4">上傳失敗：' + t + '</span>';
       btnUpload.disabled = false;
       return;
     }
-    status.innerHTML = '<span style="color:#059669;">已套用！重整頁面後生效。</span>';
+    status.innerHTML = '<span data-s="sd4ac9708">已套用！重整頁面後生效。</span>';
     btnReset.disabled = false;
     setTimeout(() => location.reload(), 800);
   } catch (e) {
-    status.innerHTML = '<span style="color:#dc2626;">錯誤：' + e.message + '</span>';
+    status.innerHTML = '<span data-s="sbc8099b4">錯誤：' + e.message + '</span>';
     btnUpload.disabled = false;
   }
 });
@@ -521,13 +521,13 @@ btnReset.addEventListener('click', async () => {
   try {
     const r = await fetch('/admin/branding/reset', {method: 'POST'});
     if (!r.ok) {
-      status.innerHTML = '<span style="color:#dc2626;">還原失敗</span>';
+      status.innerHTML = '<span data-s="sbc8099b4">還原失敗</span>';
       return;
     }
-    status.innerHTML = '<span style="color:#059669;">已還原預設。</span>';
+    status.innerHTML = '<span data-s="sd4ac9708">已還原預設。</span>';
     setTimeout(() => location.reload(), 600);
   } catch (e) {
-    status.innerHTML = '<span style="color:#dc2626;">錯誤：' + e.message + '</span>';
+    status.innerHTML = '<span data-s="sbc8099b4">錯誤：' + e.message + '</span>';
   }
 });
 </script>

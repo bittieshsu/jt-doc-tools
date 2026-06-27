@@ -10,6 +10,8 @@
   <link rel="apple-touch-icon" href="{{ _brand_logo or '/static/images/logo-on-light.png' }}" />
   <link rel="stylesheet" href="/static/css/platform.css" />
   {% block head %}{% endblock %}
+  <!-- 取代 inline style 屬性的自動產生樣式;放最後載入,贏頁面 <style nonce="{{ request.state.csp_nonce }}"> 同特異性 tie -->
+  <link rel="stylesheet" href="/static/css/generated-inline.css" />
 </head>
 <body>
   <button class="sidebar-toggle" type="button" id="sidebarToggle" aria-label="展開側邊選單" title="展開側邊選單">☰</button>
@@ -24,16 +26,17 @@
       </div>
       {% set _cur = current_user(request) %}
       {% if _cur %}
-      <div class="user-bar" style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 8px; margin-bottom:8px; background:rgba(255,255,255,0.06); border-radius:6px; font-size:12.5px;">
+      <div class="user-bar" data-s="s332db6db">
         <button type="button" id="userInfoBtn"
-                style="background:transparent; border:0; color:inherit; padding:0; font:inherit; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left;"
+                data-s="s7de1fa5e"
                 title="查看角色與權限">
           {{ icon('user', size=14) }}
-          <b>{{ _cur.username }}</b>{% if _cur.source and _cur.source != 'off' %}<span style="opacity:0.7; font-weight:400; margin-left:2px;">@{{ _cur.source }}</span>{% endif %}
+          <b>{{ _cur.username }}</b>{% if _cur.source and _cur.source != 'off' %}<span data-s="s5bca4f8e">@{{ _cur.source }}</span>{% endif %}
         </button>
-        <form id="logoutForm" method="post" action="/logout" style="margin:0;">
+        <form id="logoutForm" method="post" action="/logout" data-s="s1386d503">
+          <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
           <button class="btn btn-small" type="button" id="logoutBtn"
-                  style="padding:2px 8px; font-size:11px;"
+                  data-s="s29201f78"
                   title="登出">{{ icon('back', size=11) }} 登出</button>
         </form>
         <script nonce="{{ request.state.csp_nonce }}">
@@ -73,40 +76,40 @@
               // 角色 badges
               var roleBadges;
               if (info.is_admin) {
-                roleBadges = '<span style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;gap:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>管理員</span>';
+                roleBadges = '<span data-s="sadc82c85"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>管理員</span>';
               } else if (info.roles && info.roles.length) {
                 roleBadges = info.roles.map(function(r){
-                  return '<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:600;margin-right:4px;display:inline-block">'
+                  return '<span data-s="s40dc5373">'
                     + esc(r.display_name) + '</span>';
                 }).join('');
               } else {
-                roleBadges = '<span style="color:#94a3b8;font-size:12px">（無指派角色）</span>';
+                roleBadges = '<span data-s="s1252f094">（無指派角色）</span>';
               }
               // 可用工具區
               var toolsHtml;
               if (info.tools_all) {
-                toolsHtml = '<div style="background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:10px 12px;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><b>全部工具</b><span style="color:#16a34a;font-size:11.5px">(管理員權限)</span></div>';
+                toolsHtml = '<div data-s="s6c5b6b1d"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><b>全部工具</b><span data-s="s55271b0d">(管理員權限)</span></div>';
               } else if (info.tools && info.tools.length) {
-                toolsHtml = '<div style="font-size:12px;color:#475569;margin-bottom:6px">共 <b style="color:#1e40af">'
+                toolsHtml = '<div data-s="s2f0aba1d">共 <b data-s="s31b18e60">'
                   + info.tools.length + '</b> 個工具可用</div>'
-                  + '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:6px 8px;max-height:200px;overflow:auto">'
-                  + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:3px 8px">'
+                  + '<div data-s="s435a2be1">'
+                  + '<div data-s="sc7865397">'
                   + info.tools.map(function(t){
-                      return '<div style="font-size:12.5px;padding:3px 4px;color:#1e293b;display:flex;align-items:center;gap:5px"><span style="color:#10b981">·</span>' + esc(t.name) + '</div>';
+                      return '<div data-s="se0b4d265"><span data-s="s29fb9df2">·</span>' + esc(t.name) + '</div>';
                     }).join('')
                   + '</div></div>';
               } else {
-                toolsHtml = '<div style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.6"><b>尚未取得任何工具權限</b><br>請聯絡管理員指派角色。</div>';
+                toolsHtml = '<div data-s="s857379a9"><b>尚未取得任何工具權限</b><br>請聯絡管理員指派角色。</div>';
               }
               // 變更密碼按鈕（only local 帳號；LDAP/AD 由目錄端管）
               var pwBtnHtml = '';
               if (info.source === 'local') {
-                pwBtnHtml = '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb">'
-                  + '<button type="button" id="meChangePwBtn" class="btn" style="font-size:12.5px;padding:6px 14px">'
-                  + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
+                pwBtnHtml = '<div data-s="s5239fcb7">'
+                  + '<button type="button" id="meChangePwBtn" class="btn" data-s="s1bddf699">'
+                  + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-s="sb4a65f0b"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
                   + '變更密碼</button></div>';
               } else if (info.source === 'ldap' || info.source === 'ad') {
-                pwBtnHtml = '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:11.5px;color:#94a3b8">'
+                pwBtnHtml = '<div data-s="s9daaf75f">'
                   + '密碼由 ' + esc(srcLabel) + ' 目錄端管理。</div>';
               }
               // 2FA 區塊 — 任何 source 都能用（含 LDAP/AD），TOTP 是本機 app 狀態
@@ -116,48 +119,48 @@
                 var totpRequired = !!info.totp.required;
                 var statusBadge;
                 if (totpEnabled) {
-                  statusBadge = '<span style="background:#dcfce7;color:#166534;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600">已啟用</span>';
+                  statusBadge = '<span data-s="s20d68bb7">已啟用</span>';
                 } else if (totpRequired) {
-                  statusBadge = '<span style="background:#fee2e2;color:#991b1b;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600">需設定</span>';
+                  statusBadge = '<span data-s="s6904fcd9">需設定</span>';
                 } else {
-                  statusBadge = '<span style="background:#e2e8f0;color:#475569;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600">未啟用</span>';
+                  statusBadge = '<span data-s="sc0499ae3">未啟用</span>';
                 }
                 var actionBtn = '';
                 if (!totpEnabled) {
-                  actionBtn = '<button type="button" id="meTotpEnableBtn" class="btn" style="font-size:12px;padding:5px 12px">啟用 2FA</button>';
+                  actionBtn = '<button type="button" id="meTotpEnableBtn" class="btn" data-s="s543893a7">啟用 2FA</button>';
                 } else if (totpRequired) {
-                  actionBtn = '<button type="button" id="meTotpReissueBtn" class="btn" style="font-size:12px;padding:5px 12px;margin-right:6px">重新生 secret</button>'
-                    + '<span style="font-size:11px;color:#94a3b8">您的角色強制使用 2FA，不可停用</span>';
+                  actionBtn = '<button type="button" id="meTotpReissueBtn" class="btn" data-s="s2215be2d">重新生 secret</button>'
+                    + '<span data-s="s48accde1">您的角色強制使用 2FA，不可停用</span>';
                 } else {
-                  actionBtn = '<button type="button" id="meTotpReissueBtn" class="btn" style="font-size:12px;padding:5px 12px;margin-right:6px">重新生 secret</button>'
-                    + '<button type="button" id="meTotpDisableBtn" class="btn btn-danger" style="font-size:12px;padding:5px 12px">停用 2FA</button>';
+                  actionBtn = '<button type="button" id="meTotpReissueBtn" class="btn" data-s="s2215be2d">重新生 secret</button>'
+                    + '<button type="button" id="meTotpDisableBtn" class="btn btn-danger" data-s="s543893a7">停用 2FA</button>';
                 }
-                totpHtml = '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb">'
-                  + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
-                  + '<span style="font-size:11.5px;color:#64748b;font-weight:500;text-transform:uppercase;letter-spacing:0.04em">兩步驟驗證 (TOTP)</span>'
+                totpHtml = '<div data-s="s5239fcb7">'
+                  + '<div data-s="s12db6719">'
+                  + '<span data-s="s89b3a6c5">兩步驟驗證 (TOTP)</span>'
                   + statusBadge + '</div>'
                   + '<div>' + actionBtn + '</div>'
                   + '</div>';
               }
               // 完整 modal HTML
               var html =
-                '<div style="display:flex;align-items:center;gap:14px;margin:-4px 0 18px">'
-                  + '<div style="background:' + avatarBg + ';color:#fff;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0">'
+                '<div data-s="s4e2f3a19">'
+                  + '<div data-s="s3ea515db">'
                     + esc(initials) + '</div>'
-                  + '<div style="min-width:0">'
-                    + '<div style="font-size:17px;font-weight:600;color:#0f172a;line-height:1.2">' + esc(displayName) + '</div>'
-                    + '<div style="font-size:12.5px;color:#64748b;margin-top:3px;font-family:ui-monospace,SFMono-Regular,monospace">'
-                      + esc(info.username) + '<span style="margin:0 5px;color:#cbd5e1">·</span>'
-                      + '<span style="background:#f1f5f9;color:#475569;padding:1px 7px;border-radius:8px;font-size:11px">' + srcLabel + '</span>'
+                  + '<div data-s="s3f9f96c6">'
+                    + '<div data-s="s538163da">' + esc(displayName) + '</div>'
+                    + '<div data-s="sb8ff32c9">'
+                      + esc(info.username) + '<span data-s="se8808817">·</span>'
+                      + '<span data-s="s90233dc1">' + srcLabel + '</span>'
                     + '</div>'
                   + '</div>'
                 + '</div>'
-                + '<div style="margin-bottom:14px">'
-                  + '<div style="font-size:11.5px;color:#64748b;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">角色</div>'
+                + '<div data-s="s6179637e">'
+                  + '<div data-s="s284968c1">角色</div>'
                   + '<div>' + roleBadges + '</div>'
                 + '</div>'
                 + '<div>'
-                  + '<div style="font-size:11.5px;color:#64748b;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">可用工具</div>'
+                  + '<div data-s="s284968c1">可用工具</div>'
                   + toolsHtml
                 + '</div>'
                 + totpHtml
@@ -197,14 +200,14 @@
                 var card = document.createElement('div');
                 card.style.cssText = 'background:#fff;border-radius:12px;padding:24px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.3);text-align:center';
                 card.innerHTML =
-                  '<div style="font-size:18px;font-weight:600;color:#0f172a;margin-bottom:8px">設定 兩步驟驗證 (TOTP)</div>'
-                  + '<div style="font-size:12.5px;color:#64748b;line-height:1.55;margin-bottom:14px;text-align:left">用 Google Authenticator / Microsoft Authenticator / Authy / 1Password 等 TOTP App 掃 QR，再輸入 6 碼確認。</div>'
-                  + '<div id="totpQrSlot" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px;display:flex;justify-content:center;align-items:center;min-height:140px">產生 QR 中…</div>'
-                  + '<div id="totpSecretSlot" style="font-size:11px;color:#94a3b8;font-family:ui-monospace,monospace;word-break:break-all;margin-bottom:12px"></div>'
-                  + '<div style="font-size:13px;text-align:left;margin-bottom:6px;color:#475569;font-weight:500">驗證碼（6 位數字）</div>'
-                  + '<input type="text" id="totpCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:18px;letter-spacing:6px;text-align:center;font-family:ui-monospace,monospace">'
-                  + '<div id="totpErr" style="color:#dc2626;font-size:12px;display:none;background:#fef2f2;padding:6px 10px;border-radius:5px;margin-top:8px"></div>'
-                  + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">'
+                  '<div data-s="s91d5729c">設定 兩步驟驗證 (TOTP)</div>'
+                  + '<div data-s="s9c282b45">用 Google Authenticator / Microsoft Authenticator / Authy / 1Password 等 TOTP App 掃 QR，再輸入 6 碼確認。</div>'
+                  + '<div id="totpQrSlot" data-s="s56c58191">產生 QR 中…</div>'
+                  + '<div id="totpSecretSlot" data-s="sfa76d0c9"></div>'
+                  + '<div data-s="sbaa63bc9">驗證碼（6 位數字）</div>'
+                  + '<input type="text" id="totpCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" data-s="s0c48f9a6">'
+                  + '<div id="totpErr" data-s="sfe5d9f44"></div>'
+                  + '<div data-s="sfd4168fe">'
                     + '<button type="button" class="btn" id="totpCancel">取消</button>'
                     + '<button type="button" class="btn btn-primary" id="totpOk">驗證並啟用</button>'
                   + '</div>';
@@ -222,7 +225,7 @@
                   .then(function(r){ return r.json(); })
                   .then(function(j){
                     if (!j.ok) { qrSlot.textContent = '建立 secret 失敗'; return; }
-                    qrSlot.innerHTML = '<img src="' + j.qr_url + '" style="max-width:220px;height:auto" alt="QR">';
+                    qrSlot.innerHTML = '<img src="' + j.qr_url + '" data-s="s69cda33d" alt="QR">';
                     secSlot.textContent = '若無法掃 QR，可手動輸入：' + j.secret;
                     codeEl.focus();
                   })
@@ -256,18 +259,18 @@
                 var card = document.createElement('div');
                 card.style.cssText = 'background:#fff;border-radius:12px;padding:24px;max-width:380px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.3)';
                 card.innerHTML =
-                  '<div style="font-size:18px;font-weight:600;color:#0f172a;margin-bottom:16px">變更密碼</div>'
-                  + '<div style="display:flex;flex-direction:column;gap:10px">'
-                    + '<label style="font-size:13px"><div style="margin-bottom:3px;color:#475569;font-weight:500">目前密碼</div>'
-                    + '<input type="password" id="pwOld" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13.5px"></label>'
-                    + '<label style="font-size:13px"><div style="margin-bottom:3px;color:#475569;font-weight:500">新密碼</div>'
-                    + '<input type="password" id="pwNew" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13.5px"></label>'
-                    + '<label style="font-size:13px"><div style="margin-bottom:3px;color:#475569;font-weight:500">再輸入新密碼</div>'
-                    + '<input type="password" id="pwNew2" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13.5px"></label>'
-                    + '<div id="pwErr" style="color:#dc2626;font-size:12px;display:none;background:#fef2f2;padding:6px 10px;border-radius:5px"></div>'
-                    + '<div style="font-size:11.5px;color:#94a3b8;line-height:1.5;margin-top:4px">變更後其他裝置 / 瀏覽器的登入 session 都會被登出；目前這個視窗會保留。</div>'
+                  '<div data-s="s1b0bfb70">變更密碼</div>'
+                  + '<div data-s="s459fe4b3">'
+                    + '<label data-s="s3044b600"><div data-s="s7565d359">目前密碼</div>'
+                    + '<input type="password" id="pwOld" autocomplete="current-password" data-s="se32e5c85"></label>'
+                    + '<label data-s="s3044b600"><div data-s="s7565d359">新密碼</div>'
+                    + '<input type="password" id="pwNew" autocomplete="new-password" data-s="se32e5c85"></label>'
+                    + '<label data-s="s3044b600"><div data-s="s7565d359">再輸入新密碼</div>'
+                    + '<input type="password" id="pwNew2" autocomplete="new-password" data-s="se32e5c85"></label>'
+                    + '<div id="pwErr" data-s="s2398bc57"></div>'
+                    + '<div data-s="s6b747d78">變更後其他裝置 / 瀏覽器的登入 session 都會被登出；目前這個視窗會保留。</div>'
                   + '</div>'
-                  + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">'
+                  + '<div data-s="s0178a8a2">'
                     + '<button type="button" class="btn" id="pwCancel">取消</button>'
                     + '<button type="button" class="btn btn-primary" id="pwOk">變更</button>'
                   + '</div>';
@@ -323,7 +326,7 @@
             <span class="sb-item-desc">存放各工具輸出的檔案</span>
           </span>
           {% set _wc = workspace_count(request) %}
-          {% if _wc %}<span class="sb-count" style="margin-left:auto; align-self:center;">{{ _wc }}</span>{% endif %}
+          {% if _wc %}<span class="sb-count" data-s="sace3ddd9">{{ _wc }}</span>{% endif %}
         </a>
       </div>
       {% endif %}
@@ -389,7 +392,7 @@
     </div>
     {% block content %}{% endblock %}
   </main>
-  <style>
+  <style nonce="{{ request.state.csp_nonce }}">
     .fab-row {
       position: fixed; top: 14px; right: 18px; z-index: 800;
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

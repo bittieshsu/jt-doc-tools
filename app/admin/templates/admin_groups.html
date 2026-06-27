@@ -6,15 +6,15 @@
 
 <details class="panel" {% if not groups %}open{% endif %}>
   <summary><b>新增本機群組</b></summary>
-  <form id="newGroupForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+  <form id="newGroupForm" data-s="s23e0c196">
     <div><label>群組名稱<br><input class="field" name="name" required maxlength="64"></label></div>
-    <div style="flex:1; min-width:200px;"><label>說明<br><input class="field" name="description" maxlength="500" style="width:100%;"></label></div>
+    <div data-s="se7333f54"><label>說明<br><input class="field" name="description" maxlength="500" data-s="s6d567387"></label></div>
     <button class="btn btn-primary" type="submit">{{ icon('plus', size=14) }} 建立</button>
   </form>
 </details>
 
 <div class="panel">
-  <h2 style="margin-top:0;">群組清單（{{ groups|length }}）</h2>
+  <h2 data-s="s53896af7">群組清單（{{ groups|length }}）</h2>
   <table class="grp-table">
     <thead>
       <tr><th>名稱</th><th>來源</th><th>說明</th><th>成員數</th><th>角色</th><th></th></tr>
@@ -54,7 +54,7 @@
 <div id="rolesModal" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-card">
-    <h3 style="margin-top:0;">指派角色給群組 <code id="rmGroupName"></code></h3>
+    <h3 data-s="s53896af7">指派角色給群組 <code id="rmGroupName"></code></h3>
     <div class="picker">
       <div class="picker-toolbar">
         <input class="field picker-search" type="search" id="rmSearch" placeholder="搜尋角色…">
@@ -63,7 +63,7 @@
       </div>
       <div class="picker-list" id="rmList"></div>
     </div>
-    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+    <div data-s="s9fa82b78">
       <button class="btn" type="button" id="rmCancel">取消</button>
       <button class="btn btn-primary" type="button" id="rmSave">{{ icon('save', size=14) }} 儲存</button>
     </div>
@@ -74,7 +74,7 @@
 <div id="membersModal" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-card">
-    <h3 style="margin-top:0;">編輯成員 <code id="mmGroupName"></code></h3>
+    <h3 data-s="s53896af7">編輯成員 <code id="mmGroupName"></code></h3>
     <div class="picker">
       <div class="picker-toolbar">
         <input class="field picker-search" type="search" id="mmSearch" placeholder="搜尋使用者（帳號或顯示名稱）…">
@@ -83,14 +83,14 @@
       </div>
       <div class="picker-list" id="mmList"></div>
     </div>
-    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+    <div data-s="s9fa82b78">
       <button class="btn" type="button" id="mmCancel">取消</button>
       <button class="btn btn-primary" type="button" id="mmSave">{{ icon('save', size=14) }} 儲存</button>
     </div>
   </div>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .grp-table { width:100%; border-collapse:collapse; font-size:13px; }
   .grp-table th, .grp-table td { padding:6px 8px; border-bottom:1px solid #e5e7eb; text-align:left; }
   .grp-table th { background:#f9fafb; font-size:12px; color:#6b7280; }
@@ -225,8 +225,8 @@ function openMembers(tr) {
     ? ALL_USERS.map(u => {
         const id = String(u.id);
         const name = u.display_name || u.username;
-        const sub = u.username !== name ? ` <code style="font-size:10px;color:#9ca3af;">${escapeHtml(u.username)}</code>` : '';
-        const realm = u.source && u.source !== 'local' ? ` <span class="src-badge src-${escapeHtml(u.source)}" style="font-size:10px">${escapeHtml(u.source)}</span>` : '';
+        const sub = u.username !== name ? ` <code data-s="s39473207">${escapeHtml(u.username)}</code>` : '';
+        const realm = u.source && u.source !== 'local' ? ` <span class="src-badge src-${escapeHtml(u.source)}" data-s="sbcf88ef7">${escapeHtml(u.source)}</span>` : '';
         return `<label class="picker-item" data-name="${escapeHtml(name)} ${escapeHtml(u.username)}">
           <input type="checkbox" data-uid="${id}" ${have.has(id)?'checked':''}>
           <span class="picker-name">${escapeHtml(name)}${sub}${realm}</span>

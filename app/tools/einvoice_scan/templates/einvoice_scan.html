@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}電子發票處理 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .es-warn {
   background: #fef3c7; border: 1px solid #fcd34d; color: #78350f;
   padding: 10px 14px; border-radius: 6px; margin-bottom: 12px;
@@ -568,11 +568,11 @@
 {% endif %}
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳發票</h2>
+  <h2 data-s="s53896af7">1. 上傳發票</h2>
   <div class="es-uploader">
-    <label class="es-drop" id="liveBtn" style="background:#eff6ff; border-color:#2563eb;">
+    <label class="es-drop" id="liveBtn" data-s="se2c971ff">
       <input type="button" hidden id="liveStartTrigger">
-      <span class="ic" style="color:#2563eb;">{{ icon('qr', size=32) }}</span>
+      <span class="ic" data-s="se987c5dc">{{ icon('qr', size=32) }}</span>
       <span class="ttl" id="liveBtnTitle">連續掃描（相機）</span>
       <span class="desc" id="liveBtnDesc">手機推薦 — 對著發票自動掃，不用一張一張按</span>
     </label>
@@ -589,11 +589,11 @@
       <span class="desc">支援 PNG / JPG / WebP / PDF</span>
     </label>
   </div>
-  {% if workspace_enabled(request) %}<div class="fu-ws-row" style="justify-content:flex-start;"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>從工作區載入</span></button></div>{% endif %}
+  {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>從工作區載入</span></button></div>{% endif %}
   <div class="es-status" id="status"></div>
 
   <!-- 連續掃描的 live preview 區，預設隱藏 -->
-  <div class="es-live" id="liveBox" hidden style="margin-top: 14px;">
+  <div class="es-live" id="liveBox" hidden data-s="s0dc91c47">
     <div class="video-wrap">
       <video id="liveVideo" autoplay playsinline muted></video>
       <div class="scan-box">
@@ -621,25 +621,25 @@
   </div>
 </div>
 
-<div class="panel" style="margin-top: 18px;">
+<div class="panel" data-s="sfc696d6c">
   <div class="es-buffer-toolbar">
-    <h2 style="margin: 0;">2. 已掃描清單</h2>
+    <h2 data-s="s1c244e6b">2. 已掃描清單</h2>
     <div class="info" id="bufferInfo">— / 1000</div>
     <div class="right">
-      <label style="font-size: 12px; color: #64748b; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">
+      <label data-s="s9061fe43">
         <input type="checkbox" id="autoRefresh" checked> 自動更新
       </label>
       <button type="button" class="es-mini-btn" id="btnSettings" title="欄位顯示設定">{{ icon('gear', size=12) }} 設定</button>
-      <span class="es-export-wrap" style="position:relative; display:inline-block;">
+      <span class="es-export-wrap" data-s="s5ce657fb">
         <button type="button" class="es-mini-btn" id="btnExport">{{ icon('download', size=12) }} 匯出 ▾</button>
-        <span id="exportMenu" hidden style="position:absolute; top:100%; right:0; margin-top:2px; background:#fff; border:1px solid #e5e7eb; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.1); padding:4px 0; z-index:100;">
-          <button type="button" data-fmt="xlsx" style="display:block; width:100%; text-align:left; padding:6px 12px; background:none; border:0; font-size:12.5px; cursor:pointer; color:#1e293b;">.xlsx</button>
-          <button type="button" data-fmt="ods"  style="display:block; width:100%; text-align:left; padding:6px 12px; background:none; border:0; font-size:12.5px; cursor:pointer; color:#1e293b;">.ods</button>
-          <button type="button" data-fmt="csv"  style="display:block; width:100%; text-align:left; padding:6px 12px; background:none; border:0; font-size:12.5px; cursor:pointer; color:#1e293b;">.csv</button>
-          <button type="button" data-fmt="json" style="display:block; width:100%; text-align:left; padding:6px 12px; background:none; border:0; font-size:12.5px; cursor:pointer; color:#1e293b;">.json</button>
-          <button type="button" data-fmt="xml"  style="display:block; width:100%; text-align:left; padding:6px 12px; background:none; border:0; font-size:12.5px; cursor:pointer; color:#1e293b;">.xml</button>
-          <button type="button" data-fmt="txt"  style="display:block; width:100%; text-align:left; padding:6px 12px; background:none; border:0; font-size:12.5px; cursor:pointer; color:#1e293b;">.txt</button>
-          <button type="button" data-fmt="md"   style="display:block; width:100%; text-align:left; padding:6px 12px; background:none; border:0; font-size:12.5px; cursor:pointer; color:#1e293b;">.md</button>
+        <span id="exportMenu" hidden data-s="sd0f0af67">
+          <button type="button" data-fmt="xlsx" data-s="s4e3a4431">.xlsx</button>
+          <button type="button" data-fmt="ods"  data-s="s4e3a4431">.ods</button>
+          <button type="button" data-fmt="csv"  data-s="s4e3a4431">.csv</button>
+          <button type="button" data-fmt="json" data-s="s4e3a4431">.json</button>
+          <button type="button" data-fmt="xml"  data-s="s4e3a4431">.xml</button>
+          <button type="button" data-fmt="txt"  data-s="s4e3a4431">.txt</button>
+          <button type="button" data-fmt="md"   data-s="s4e3a4431">.md</button>
         </span>
       </span>
       <button type="button" class="es-mini-btn" id="btnRefresh">{{ icon('refresh', size=12) }} 重新整理</button>
@@ -670,7 +670,7 @@
 
     <!-- Tab 1：欄位顯示 / 排序 -->
     <div data-tab-pane="display">
-      <p style="margin: 0 0 8px; font-size: 11.5px; color: #64748b;">勾選顯示哪些欄位；拖曳左側 ⋮⋮ 把手調整順序。設定變更立即套用，並同步到帳號（手機 / 電腦共用）。</p>
+      <p data-s="s83862576">勾選顯示哪些欄位；拖曳左側 ⋮⋮ 把手調整順序。設定變更立即套用，並同步到帳號（手機 / 電腦共用）。</p>
       <div class="es-fc-hdr">
         <span class="hdr-grab"></span>
         <span class="hdr-name">顯示欄位</span>
@@ -681,28 +681,28 @@
 
     <!-- Tab 2：欄位格式 -->
     <div data-tab-pane="format" hidden>
-      <p style="margin: 0 0 8px; font-size: 11.5px; color: #64748b;">選擇欄位的顯示樣式。設定立即套用到表格與匯出 (CSV / XLSX)；JSON 匯出永遠用內部標準格式。</p>
+      <p data-s="s83862576">選擇欄位的顯示樣式。設定立即套用到表格與匯出 (CSV / XLSX)；JSON 匯出永遠用內部標準格式。</p>
       <div id="settingsFormats"></div>
     </div>
 
     <!-- Tab 3：報帳檢查 (M3.5) -->
     <div data-tab-pane="check" hidden>
-      <p style="margin: 0 0 8px; font-size: 11.5px; color: #64748b;">設定我方公司統編後，發票買方統編不符或為空者會在表格中標註為「非報帳用」。</p>
+      <p data-s="s83862576">設定我方公司統編後，發票買方統編不符或為空者會在表格中標註為「非報帳用」。</p>
       <div class="es-my-vat-row">
         <span>我方公司統編：</span>
         <input type="text" id="myCompanyVat" maxlength="8" placeholder="8 位數字 / 留空關閉檢查">
         <span class="hint">必須是 8 位數字。空白 = 不檢查</span>
       </div>
 
-      <hr style="margin:14px 0; border:0; border-top:1px solid #e2e8f0;">
+      <hr data-s="s176e419f">
 
       <div class="es-period-block">
         <div class="es-period-title">
-          <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+          <label data-s="s729653e2">
             <input type="checkbox" id="periodCheckEnabled">
             <span><b>當期發票檢查</b></span>
           </label>
-          <span style="font-size:11.5px; color:#64748b; margin-left:10px;">
+          <span data-s="sd38208b1">
             開立日期不在期內 → 表格中標警告
           </span>
         </div>
@@ -722,7 +722,7 @@
             <p class="hint">自行指定日期區間（不限期別格式）。</p>
             <div class="es-period-custom">
               <label>起始 <input type="date" id="periodCustomStart"></label>
-              <span style="color:#94a3b8;">～</span>
+              <span data-s="s8cd4ae71">～</span>
               <label>結束 <input type="date" id="periodCustomEnd"></label>
             </div>
           </div>
@@ -734,14 +734,14 @@
 
     <!-- Tab 4：會計科目自訂規則 -->
     <div data-tab-pane="rules" hidden>
-      <p style="margin: 0 0 8px; font-size: 11.5px; color: #64748b;">
+      <p data-s="s83862576">
         加自訂規則：賣方<b>行業</b>或<b>名稱</b>包含 keyword 時，自動指定該會計科目。<b>自訂規則優先級高於內建</b>，可用來覆寫或補強。每筆規則可填多個 keyword（逗號分隔）。
       </p>
-      <div id="rulesList" style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;"></div>
+      <div id="rulesList" data-s="s4b7f350e"></div>
       <button type="button" class="es-mini-btn" id="btnAddRule">{{ icon('plus', size=12) }} 新增規則</button>
-      <details style="margin-top:14px;">
-        <summary style="font-size:12px; color:#64748b; cursor:pointer;">查看內建規則（共 <span id="builtinRuleCount">…</span> 條）</summary>
-        <div id="builtinRules" style="margin-top:8px; max-height:300px; overflow:auto; font-size:11.5px; color:#475569; border:1px solid #e2e8f0; border-radius:4px; padding:8px;"></div>
+      <details data-s="s553a645f">
+        <summary data-s="s2f6e60eb">查看內建規則（共 <span id="builtinRuleCount">…</span> 條）</summary>
+        <div id="builtinRules" data-s="s29df7e22"></div>
       </details>
     </div>
 
@@ -977,7 +977,7 @@ function renderSettingsPanel() {
     const isReq = REQUIRED_FIELDS.has(def.id);
     const checked = (isReq || _settings.visible_columns.includes(def.id)) ? 'checked' : '';
     const disabled = isReq ? 'disabled' : '';
-    const reqMark = isReq ? '<span style="color:#94a3b8; font-size:11px; margin-left:4px;" title="必選欄位">（必選）</span>' : '';
+    const reqMark = isReq ? '<span data-s="s7daab690" title="必選欄位">（必選）</span>' : '';
     const customLabel = _settings.export_labels[def.id] || '';
     return `<div class="es-field-card" data-field="${escapeHtml(def.id)}" draggable="false">
       <span class="grab" title="拖曳調整順序">⋮⋮</span>
@@ -1313,19 +1313,19 @@ function renderRulesPanel() {
   if (!wrap) return;
   const rules = _settings.accounting_rules || [];
   if (!rules.length) {
-    wrap.innerHTML = '<div style="font-size:11.5px; color:#94a3b8; padding:6px;">尚無自訂規則。內建規則已涵蓋常見公司類型；自訂規則優先級更高，可用於覆寫或補強。</div>';
+    wrap.innerHTML = '<div data-s="sd3a89e63">尚無自訂規則。內建規則已涵蓋常見公司類型；自訂規則優先級更高，可用於覆寫或補強。</div>';
     return;
   }
   wrap.innerHTML = rules.map((r, idx) => `
-    <div class="es-rule-row" data-idx="${idx}" style="display:grid; grid-template-columns: 80px 1fr 1fr 24px; gap:6px; align-items:center; padding:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px;">
-      <select class="rule-match" data-idx="${idx}" style="font-size:12px; padding:3px;">
+    <div class="es-rule-row" data-idx="${idx}" data-s="s057d0b4d">
+      <select class="rule-match" data-idx="${idx}" data-s="s68c9ff5d">
         <option value="any"${r.match==='any'?' selected':''}>任一</option>
         <option value="industries"${r.match==='industries'?' selected':''}>僅行業</option>
         <option value="name"${r.match==='name'?' selected':''}>僅名稱</option>
       </select>
-      <input type="text" class="rule-keywords" data-idx="${idx}" value="${escapeHtml((r.keywords||[]).join(', '))}" placeholder="keyword1, keyword2, ..." style="font-size:12px; padding:4px 6px;">
-      <input type="text" class="rule-subject" data-idx="${idx}" value="${escapeHtml(r.subject||'')}" placeholder="科目名稱 (例 油料費)" style="font-size:12px; padding:4px 6px;">
-      <button type="button" class="rule-del" data-idx="${idx}" title="刪除" style="background:none; border:0; color:#ef4444; cursor:pointer; font-size:16px;">×</button>
+      <input type="text" class="rule-keywords" data-idx="${idx}" value="${escapeHtml((r.keywords||[]).join(', '))}" placeholder="keyword1, keyword2, ..." data-s="s7f6005c9">
+      <input type="text" class="rule-subject" data-idx="${idx}" value="${escapeHtml(r.subject||'')}" placeholder="科目名稱 (例 油料費)" data-s="s7f6005c9">
+      <button type="button" class="rule-del" data-idx="${idx}" title="刪除" data-s="s1cde43fc">×</button>
     </div>`).join('');
   // 事件
   wrap.querySelectorAll('.rule-match, .rule-keywords, .rule-subject').forEach(el => {
@@ -1382,10 +1382,10 @@ if (_btnAddRule) {
     if (count) count.textContent = j.rules.length;
     wrap.innerHTML = j.rules.map(rule => {
       const matchLabel = rule.match === 'industries' ? '行業' : '名稱';
-      return `<div style="padding:4px 0; border-bottom:1px solid #f1f5f9; display:grid; grid-template-columns:50px 1fr 100px; gap:8px;">
-        <span style="color:#94a3b8;">[${matchLabel}]</span>
-        <span style="word-break:break-all;">${escapeHtml((rule.keywords||[]).join(' / '))}</span>
-        <span style="color:#2563eb; font-weight:600;">→ ${escapeHtml(rule.subject)}</span>
+      return `<div data-s="sdc4fdad0">
+        <span data-s="s8cd4ae71">[${matchLabel}]</span>
+        <span data-s="sbb1a72ac">${escapeHtml((rule.keywords||[]).join(' / '))}</span>
+        <span data-s="s10dd4edf">→ ${escapeHtml(rule.subject)}</span>
       </div>`;
     }).join('');
   } catch (_) {}
@@ -1577,23 +1577,23 @@ function renderBufferRows() {
       // 警告標籤：統編問題掛 buyer_vat 欄、不在期內掛 date 欄
       if (d.id === 'buyer_vat' && (warn === 'no-vat' || warn === 'mismatch')) {
         const tag = warn === 'no-vat' ? '無統編' : '統編不符';
-        val = (val || '<span style="color:#94a3b8">—</span>') + `<span class="warn-tag">${tag}</span>`;
+        val = (val || '<span data-s="s8cd4ae71">—</span>') + `<span class="warn-tag">${tag}</span>`;
         return `<td>${val}</td>`;
       }
       if (d.id === 'date' && warn === 'out-of-period') {
-        val = (val || '<span style="color:#94a3b8">—</span>') + `<span class="warn-tag">不在期內</span>`;
+        val = (val || '<span data-s="s8cd4ae71">—</span>') + `<span class="warn-tag">不在期內</span>`;
         return `<td>${val}</td>`;
       }
       // note 欄位用可編輯 input
       if (d.id === 'note') {
-        return `<td><input type="text" class="note-input" data-id="${escapeHtml(inv.id)}" value="${escapeHtml(val)}" maxlength="500" placeholder="—" style="width:100%; border:0; background:transparent; font-size:13px; padding:2px 4px;"></td>`;
+        return `<td><input type="text" class="note-input" data-id="${escapeHtml(inv.id)}" value="${escapeHtml(val)}" maxlength="500" placeholder="—" data-s="s81aa1fac"></td>`;
       }
       return `<td${cls}>${escapeHtml(val)}</td>`;
     }).join('');
     return `<tr${rowClass}>
       <td><input type="checkbox" class="sel-check" data-id="${escapeHtml(inv.id)}" ${selChecked}></td>
       ${cells}
-      <td style="white-space:nowrap;">
+      <td data-s="s4ddbe905">
         <button class="info-btn" data-id="${escapeHtml(inv.id)}" title="詳細資訊">{{ icon('info', size=14) }}</button>
         <button class="del-btn" data-id="${escapeHtml(inv.id)}" title="刪除">{{ icon('trash', size=14) }}</button>
       </td>
@@ -1673,7 +1673,7 @@ function showDetail(id) {
     } else {
       val = applyFormat(def.id, inv[def.id]);
     }
-    out.push(`<div class="es-detail-row"><span class="label">${escapeHtml(def.label)}</span><span class="val">${escapeHtml(val) || '<span style="color:#94a3b8">—</span>'}</span></div>`);
+    out.push(`<div class="es-detail-row"><span class="label">${escapeHtml(def.label)}</span><span class="val">${escapeHtml(val) || '<span data-s="s8cd4ae71">—</span>'}</span></div>`);
     // 在 seller_vat 之後插入反查到的補充欄
     if (def.id === 'seller_vat') {
       const supplemental = [
@@ -1685,7 +1685,7 @@ function showDetail(id) {
       for (const [fid, lbl] of supplemental) {
         const v = inv[fid];
         if (!v) continue;
-        out.push(`<div class="es-detail-row"><span class="label">${escapeHtml(lbl)}</span><span class="val" style="color:#475569; font-size:12.5px;">${escapeHtml(v)}</span></div>`);
+        out.push(`<div class="es-detail-row"><span class="label">${escapeHtml(lbl)}</span><span class="val" data-s="s59b3eccd">${escapeHtml(v)}</span></div>`);
       }
     }
   });
@@ -2170,7 +2170,7 @@ async function handleLiveScanResult(qrText) {
       }
     }
   } catch (e) {
-    liveStatusEl.innerHTML = `<span style="color:#fca5a5;">送出失敗：${escapeHtml(e.message)}</span>`;
+    liveStatusEl.innerHTML = `<span data-s="s578c7579">送出失敗：${escapeHtml(e.message)}</span>`;
   }
 }
 

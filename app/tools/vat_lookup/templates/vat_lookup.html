@@ -3,7 +3,7 @@
 {% block title %}統編查詢 · {{ app_name }}{% endblock %}
 
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .vl-wrap { max-width: 900px; }
 
 .vl-search-bar {
@@ -319,18 +319,18 @@ mark.vl-hl {
 
 <!-- 批次查詢（多筆統編） -->
 <div data-pane="batch" hidden>
-  <p style="font-size:12.5px; color:#64748b; margin: 0 0 6px;">
+  <p data-s="scd16eb0c">
     每行一個 8 位統編，最多 200 筆。可貼上 Excel 一整欄。
   </p>
   <textarea class="vl-batch-textarea" id="batchInput"
             placeholder="12345678&#10;87654321&#10;11223344&#10;..."></textarea>
-  <div style="display:flex; gap:8px; margin-top:8px;">
+  <div data-s="s229e47fc">
     <button type="button" id="btnBatch"
-            style="padding:8px 18px; background:#2563eb; color:#fff; border:0; border-radius:6px; cursor:pointer; font-size:13px;">
+            data-s="sefd385ed">
       {{ icon('search', size=14) }} 批次查詢
     </button>
     <button type="button" id="btnBatchExport" hidden
-            style="padding:8px 18px; background:#fff; color:#1e293b; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer; font-size:13px;">
+            data-s="s619f67b3">
       {{ icon('download', size=14) }} 下載 .csv
     </button>
   </div>
@@ -382,7 +382,7 @@ function _renderCard(r, isMiss, query) {
     return `<div class="vl-card miss">
       <div class="vl-card-head">
         <span class="vl-card-vat">${escapeHtml(r.vat)}</span>
-        <span style="color:#991b1b; font-size:14px;">✗ ${escapeHtml(r.error || '查無此統編')}</span>
+        <span data-s="saaeec3f3">✗ ${escapeHtml(r.error || '查無此統編')}</span>
       </div>
     </div>`;
   }
@@ -484,7 +484,7 @@ function _statCard(title, type, items, total) {
     const pct = Math.round(i.count / max * 100);
     const isA = activeVal === i.value;
     return `<div class="vl-stat-row${isA ? ' active' : ''}" data-stat-type="${type}" data-stat-value="${escapeHtml(i.value)}">
-      <span class="vl-stat-bar" style="width:${pct}%"></span>
+      <span class="vl-stat-bar" data-style="width:${pct}%"></span>
       <span class="vl-stat-name" title="${escapeHtml(i.value)}">${escapeHtml(i.value)}</span>
       <span class="vl-stat-n">${i.count.toLocaleString('en-US')}</span>
     </div>`;
@@ -611,7 +611,7 @@ async function smartQuery() {
       _loadStats(q);   // 非同步載入行業 / 縣市 / 組織統計圖（不擋結果顯示）
     }
   } catch (e) {
-    $('results').innerHTML = `<div class="vl-card miss"><div class="vl-card-head"><span style="color:#991b1b;">查詢失敗：${escapeHtml(e.message)}</span></div></div>`;
+    $('results').innerHTML = `<div class="vl-card miss"><div class="vl-card-head"><span data-s="s217480ed">查詢失敗：${escapeHtml(e.message)}</span></div></div>`;
   } finally {
     btn.disabled = false;
     btnText.textContent = '查詢';
@@ -730,7 +730,7 @@ async function doBatch() {
     _renderBatch(j);
     $('btnBatchExport').hidden = false;
   } catch (e) {
-    $('batchResult').innerHTML = `<div class="vl-card miss" style="margin-top:10px;"><div class="vl-card-head"><span style="color:#991b1b;">批次查詢失敗：${escapeHtml(e.message)}</span></div></div>`;
+    $('batchResult').innerHTML = `<div class="vl-card miss" data-s="s5371db16"><div class="vl-card-head"><span data-s="s217480ed">批次查詢失敗：${escapeHtml(e.message)}</span></div></div>`;
   } finally {
     btn.disabled = false;
   }
@@ -738,7 +738,7 @@ async function doBatch() {
 
 function _renderBatch(j) {
   const wrap = $('batchResult');
-  let html = `<p style="font-size:12.5px; color:#475569; margin:14px 0 6px;">
+  let html = `<p data-s="s83cf399e">
     共 ${j.count} 筆 · 查到 <b>${j.found_count}</b> · 查無 <b>${j.count - j.found_count}</b>
   </p>`;
   html += `<table class="vl-batch-table"><thead><tr>

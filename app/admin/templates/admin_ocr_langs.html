@@ -3,7 +3,7 @@
 {% block title %}OCR 訓練檔管理 · {{ app_name }}{% endblock %}
 
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 /* Collapsible external OCR section arrow */
 details[open] > .po-ext-summary .po-ext-arrow { transform:rotate(90deg); }
 .po-ext-summary::-webkit-details-marker { display:none; }
@@ -125,192 +125,192 @@ details[open] > .po-ext-summary .po-ext-arrow { transform:rotate(90deg); }
 <!-- CPU SIMD 相容性檢查（EasyOCR 底層 PyTorch 需要 AVX2，缺則辨識時 SIGILL 崩潰） -->
 {% if cpu_simd %}
   {% if not cpu_simd.ok and not cpu_simd.undetermined %}
-  <div class="panel" style="margin-bottom:16px; border-left:4px solid #dc2626; background:#fef2f2; padding:16px 20px;">
-    <div style="font-weight:700; color:#b91c1c; font-size:15px;">此主機 CPU 不支援 EasyOCR 需要的指令集</div>
-    <div style="font-size:13px; color:#7f1d1d; margin-top:8px; line-height:1.7;">
+  <div class="panel" data-s="s838c3601">
+    <div data-s="sfa5780ad">此主機 CPU 不支援 EasyOCR 需要的指令集</div>
+    <div data-s="se8e2f235">
       缺少：<b>{{ cpu_simd.missing|join(' / ') }}</b>（偵測到 CPU 架構：<code>{{ cpu_simd.arch }}</code>）。
       EasyOCR 底層的 PyTorch 會在<b>辨識時執行非法指令（SIGILL），讓整個服務崩潰重啟</b>，
       造成工作中斷、Job 變成 404。請依你的環境擇一處理：
-      <ul style="margin:10px 0 0; padding-left:20px;">
+      <ul data-s="s7851a1ba">
         <li><b>Proxmox VE</b>：VM →「硬體」→「處理器」→「類型」改成 <code>host</code>（透傳實體 CPU），或至少改 <code>x86-64-v3</code>。</li>
         <li><b>VMware（ESXi / Workstation）</b>：確認實體 CPU 有 AVX2；若叢集啟用 EVC，把 EVC 基準調到 Haswell 以上，或關閉 EVC。</li>
         <li><b>Hyper-V</b>：關閉該 VM 的「處理器相容性模式」，改用主機 CPU。</li>
         <li><b>VirtualBox</b>：<code>VBoxManage modifyvm "&lt;VM 名稱&gt;" --cpu-profile host</code>，並確認未限制指令集。</li>
         <li><b>實體機 / 雲端</b>：使用含 AVX2 的 CPU（Intel Haswell 2013 年後 / AMD Excavator 2015 年後）或對應雲端機型。</li>
       </ul>
-      <div style="margin-top:10px; color:#92400e;">若暫時無法調整 CPU，可在下方「OCR 引擎」<b>手動</b>切換為 Tesseract（不需 AVX2，CJK 辨識較弱）—— 系統<b>不會</b>自動切換。</div>
+      <div data-s="s80c94f87">若暫時無法調整 CPU，可在下方「OCR 引擎」<b>手動</b>切換為 Tesseract（不需 AVX2，CJK 辨識較弱）—— 系統<b>不會</b>自動切換。</div>
     </div>
   </div>
   {% elif cpu_simd.undetermined %}
-  <div class="panel" style="margin-bottom:16px; border-left:4px solid #f59e0b; background:#fffbeb; padding:14px 20px; font-size:13px; color:#92400e; line-height:1.65;">
+  <div class="panel" data-s="s4dd23eb2">
     無法判定此主機 CPU 是否支援 EasyOCR 需要的 <b>AVX2</b> 指令集（{{ cpu_simd.system }}）。
     若使用 EasyOCR 時服務無預警崩潰重啟，多半是 CPU 缺 AVX2 —— 請把虛擬機 CPU 類型改為 <code>host</code> 或 <code>x86-64-v3</code>，或在下方手動改用 Tesseract 引擎。
   </div>
   {% elif cpu_simd.note %}
-  <div style="margin-bottom:12px; font-size:12px; color:#64748b;">{{ cpu_simd.note }}（CPU：<code>{{ cpu_simd.arch }}</code>）。</div>
+  <div data-s="sfe8d00e3">{{ cpu_simd.note }}（CPU：<code>{{ cpu_simd.arch }}</code>）。</div>
   {% else %}
-  <div style="margin-bottom:12px; font-size:12.5px; color:#15803d;">✓ 此主機 CPU 支援 AVX2，EasyOCR 可正常執行。</div>
+  <div data-s="s6a9a85f8">✓ 此主機 CPU 支援 AVX2，EasyOCR 可正常執行。</div>
   {% endif %}
 {% endif %}
 
 <!-- Engine Selector -->
-<div class="panel" style="display:flex; align-items:center; gap:0; flex-wrap:wrap; padding:0; margin-bottom:16px; overflow:hidden;">
-  <div style="flex:1; min-width:240px; padding:18px 22px; background:#f8fafc; border-right:1px solid #e2e8f0; align-self:stretch; display:flex; flex-direction:column; justify-content:center;">
-    <div style="font-size:16px; color:#0f172a; font-weight:700; display:flex; align-items:center; gap:8px;">
+<div class="panel" data-s="sbd996c7e">
+  <div data-s="s36c1925a">
+    <div data-s="s82f704fa">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/></svg>
       OCR 引擎
     </div>
-    <div style="font-size:12px; color:#64748b; margin-top:6px; line-height:1.5;">所有 OCR 工具預設用此引擎；失敗會自動降回另一個</div>
+    <div data-s="s5e943487">所有 OCR 工具預設用此引擎；失敗會自動降回另一個</div>
   </div>
-  <div style="padding:18px 22px; display:flex; align-items:center;">
-    <div style="display:flex; gap:0; border:1.5px solid #e2e8f0; border-radius:6px; overflow:hidden; background:#fff;">
-    <label style="cursor:pointer; padding:8px 16px; font-size:13px; {% if default_engine == 'easyocr' %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#fff; color:#475569;{% endif %} border-right:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:8px;">
-      <input type="radio" name="enginePref" value="easyocr" {% if default_engine == 'easyocr' %}checked{% endif %} style="display:none;">
-      <span style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border:1.5px solid currentColor; border-radius:50%; font-size:11px; font-weight:bold;">{% if default_engine == 'easyocr' %}✓{% endif %}</span>
-      EasyOCR <span style="opacity:.8; font-size:11px;">— 主引擎、中日韓辨識準確度高</span>
+  <div data-s="sdd65706f">
+    <div data-s="s7c6e5230">
+    <label data-style="cursor:pointer; padding:8px 16px; font-size:13px; {% if default_engine == 'easyocr' %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#fff; color:#475569;{% endif %} border-right:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:8px;">
+      <input type="radio" name="enginePref" value="easyocr" {% if default_engine == 'easyocr' %}checked{% endif %} data-s="scb458930">
+      <span data-s="sa6d4a14d">{% if default_engine == 'easyocr' %}✓{% endif %}</span>
+      EasyOCR <span data-s="sb7c6348d">— 主引擎、中日韓辨識準確度高</span>
     </label>
-    <label style="cursor:pointer; padding:8px 16px; font-size:13px; {% if default_engine == 'tesseract' %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#fff; color:#475569;{% endif %} display:inline-flex; align-items:center; gap:8px;">
-      <input type="radio" name="enginePref" value="tesseract" {% if default_engine == 'tesseract' %}checked{% endif %} style="display:none;">
-      <span style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border:1.5px solid currentColor; border-radius:50%; font-size:11px; font-weight:bold;">{% if default_engine == 'tesseract' %}✓{% endif %}</span>
-      Tesseract <span style="opacity:.8; font-size:11px;">— 備用、輕量</span>
+    <label data-style="cursor:pointer; padding:8px 16px; font-size:13px; {% if default_engine == 'tesseract' %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#fff; color:#475569;{% endif %} display:inline-flex; align-items:center; gap:8px;">
+      <input type="radio" name="enginePref" value="tesseract" {% if default_engine == 'tesseract' %}checked{% endif %} data-s="scb458930">
+      <span data-s="sa6d4a14d">{% if default_engine == 'tesseract' %}✓{% endif %}</span>
+      Tesseract <span data-s="sb7c6348d">— 備用、輕量</span>
     </label>
     </div>
   </div>
-  <div id="engineMsg" style="display:none; font-size:13px; flex-basis:100%; padding:8px 12px; border-radius:6px; border-left:3px solid #10b981; background:#f0fdf4; color:#166534; margin:0 18px 18px;"></div>
+  <div id="engineMsg" data-s="se1c98e6f"></div>
 </div>
 
 <!-- ============== EasyOCR Section (主引擎) ============== -->
-<details class="panel ocr-section" id="easyocrSection" style="margin-bottom:16px; border-left:4px solid #3b82f6;" {% if default_engine == 'easyocr' %}open{% endif %}>
+<details class="panel ocr-section" id="easyocrSection" data-s="s4816a0eb" {% if default_engine == 'easyocr' %}open{% endif %}>
   <summary>
-    <h2>EasyOCR <span class="muted" style="font-size:13px; font-weight:normal;">— 主 OCR 引擎（v1.7.2 起預設）</span></h2>
+    <h2>EasyOCR <span class="muted" data-s="s70720a0e">— 主 OCR 引擎（v1.7.2 起預設）</span></h2>
   </summary>
   <div>
-  <p class="muted" style="font-size:13px;">JaidedAI（泰國公司）開源，Apache-2.0。基於 LSTM/CRNN，中日韓辨識準確度明顯優於 tesseract。<b>不需手動管理訓練檔</b> — 首次使用某語言時自動下載 ~150MB 模型到 <code>~/.EasyOCR/model/</code>。</p>
-  <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:10px;">
-    <div style="padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; min-width:200px;">
-      <div style="font-size:11px; color:#94a3b8; font-weight:600; letter-spacing:.4px; text-transform:uppercase;">引擎狀態</div>
-      <div style="margin-top:4px; font-size:14px;">
+  <p class="muted" data-s="s3044b600">JaidedAI（泰國公司）開源，Apache-2.0。基於 LSTM/CRNN，中日韓辨識準確度明顯優於 tesseract。<b>不需手動管理訓練檔</b> — 首次使用某語言時自動下載 ~150MB 模型到 <code>~/.EasyOCR/model/</code>。</p>
+  <div data-s="sfb1d3a34">
+    <div data-s="s576f2c81">
+      <div data-s="sa87beb2f">引擎狀態</div>
+      <div data-s="s4c2b5b43">
         {% if easyocr_available %}
-          <span style="color:#10b981; font-weight:600;">✓ 已安裝</span>
+          <span data-s="s7ca55a86">✓ 已安裝</span>
         {% else %}
-          <span style="color:#ef4444; font-weight:600;">✗ 未安裝</span>
-          <a href="/admin/sys-deps" style="margin-left:6px; font-size:12px;">看相依套件 →</a>
+          <span data-s="s82798ae2">✗ 未安裝</span>
+          <a href="/admin/sys-deps" data-s="sdff4faf7">看相依套件 →</a>
         {% endif %}
       </div>
     </div>
-    <div style="padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; min-width:200px;">
-      <div style="font-size:11px; color:#94a3b8; font-weight:600; letter-spacing:.4px; text-transform:uppercase;">內建支援語言</div>
-      <div style="margin-top:4px; font-size:13px; color:#475569;">
+    <div data-s="s576f2c81">
+      <div data-s="sa87beb2f">內建支援語言</div>
+      <div data-s="s1dada2c4">
         繁中 / 簡中 / 英 / 日 / 韓 / 越 / 泰 / 阿拉伯 / 80+ 種語言<br>
-        <span class="muted" style="font-size:11px;">首次使用時自動下載對應 model</span>
+        <span class="muted" data-s="s8b685211">首次使用時自動下載對應 model</span>
       </div>
     </div>
-    <div style="padding:10px 14px; background:#fef3c7; border:1px solid #fde68a; border-radius:6px; min-width:200px;">
-      <div style="font-size:11px; color:#92400e; font-weight:600; letter-spacing:.4px; text-transform:uppercase;">注意</div>
-      <div style="margin-top:4px; font-size:13px; color:#92400e;">
+    <div data-s="s4c9d76a0">
+      <div data-s="s30e0095b">注意</div>
+      <div data-s="s5399368f">
         首次 OCR 較慢（model download ~30-60s）；之後同 lang 重複使用快很多。CPU 跑可用，GPU 更快。
       </div>
     </div>
   </div>
 
   {# ============== GPU 識別伺服器(外部加速) — 簡潔版，可折疊 ============== #}
-  <details style="margin-top:20px; background:#fff; border:1px solid #e2e8f0; border-radius:8px;" {% if external_ocr_configured %}open{% endif %}>
-  <summary class="po-ext-summary" style="cursor:pointer; padding:14px 18px; user-select:none; list-style:none; display:flex; align-items:center; gap:10px;">
-    <span class="po-ext-arrow" style="color:#475569; font-size:22px; line-height:1; transition:transform 0.15s; display:inline-block; width:18px; transform-origin:center;">▶</span>
-    <span style="color:#f59e0b; display:inline-flex;">{{ icon('sparkles', size=18) }}</span>
-    <span style="font-weight:600; font-size:14px; color:#1e293b;">外部 GPU 識別伺服器</span>
-    <span style="font-size:11px; font-weight:600; color:#065f46; background:#d1fae5; padding:3px 9px; border-radius:10px;">速度 10× 以上</span>
+  <details data-s="s539c40ef" {% if external_ocr_configured %}open{% endif %}>
+  <summary class="po-ext-summary" data-s="sb54e9516">
+    <span class="po-ext-arrow" data-s="s5583eb53">▶</span>
+    <span data-s="sc3120c29">{{ icon('sparkles', size=18) }}</span>
+    <span data-s="s01519bb4">外部 GPU 識別伺服器</span>
+    <span data-s="s062773c3">速度 10× 以上</span>
     {% if external_ocr_configured %}
-    <span style="font-size:11px; font-weight:600; color:#0369a1; background:#e0f2fe; padding:3px 9px; border-radius:10px;">已設定</span>
+    <span data-s="sfbd4bd1a">已設定</span>
     {% else %}
-    <span style="font-size:11px; color:#94a3b8;">— 未設定（點開展開）</span>
+    <span data-s="s142fa9b1">— 未設定（點開展開）</span>
     {% endif %}
   </summary>
-  <div style="padding:0 18px 18px;">
-    <p class="muted" style="font-size:13px; margin:4px 0 16px; line-height:1.6;">
+  <div data-s="s44ad5734">
+    <p class="muted" data-s="s689c60ec">
       把 EasyOCR 部署到 GPU 主機(DGX Spark / H100 / H200 / 4090 等),jtdt 透過 HTTP 呼叫遠端 OCR。每頁從 CPU 的 <b>8-15 秒</b> 降到 GPU 的 <b>0.3-0.8 秒</b>。連不上自動退回本機。
     </p>
 
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; margin-bottom:14px;">
-      <div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; min-width:0; overflow:hidden;">
-        <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
-          <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:#3b82f6; color:#fff; border-radius:50%; font-size:12px; font-weight:700;">1</span>
-          <span style="font-weight:600; font-size:13px; color:#1e293b;">下載安裝腳本</span>
+    <div data-s="s60f5626a">
+      <div data-s="s89687f21">
+        <div data-s="s2ca806d3">
+          <span data-s="s7ffdc6ee">1</span>
+          <span data-s="s2327f5a2">下載安裝腳本</span>
         </div>
-        <p style="font-size:12px; color:#64748b; margin:0 0 10px; line-height:1.5;">純 ASCII（無中文），可在無 CJK locale 的 GPU server 上跑。</p>
-        <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          <a href="/admin/ocr-langs/deploy/install.sh" class="btn btn-primary" download="jt-ocr-server-install.sh" style="font-size:12px; padding:6px 10px; display:inline-flex; align-items:center; gap:4px;">{{ icon('download', size=12) }} install.sh</a>
-          <a href="/admin/ocr-langs/deploy/uninstall.sh" class="btn" download="jt-ocr-server-uninstall.sh" style="background:#fff; border:1px solid #d1d5db; font-size:12px; padding:6px 10px; display:inline-flex; align-items:center; gap:4px;">{{ icon('download', size=12) }} uninstall.sh</a>
+        <p data-s="s84e49415">純 ASCII（無中文），可在無 CJK locale 的 GPU server 上跑。</p>
+        <div data-s="sb47e13ec">
+          <a href="/admin/ocr-langs/deploy/install.sh" class="btn btn-primary" download="jt-ocr-server-install.sh" data-s="sc1ea6227">{{ icon('download', size=12) }} install.sh</a>
+          <a href="/admin/ocr-langs/deploy/uninstall.sh" class="btn" download="jt-ocr-server-uninstall.sh" data-s="s8163ef14">{{ icon('download', size=12) }} uninstall.sh</a>
         </div>
       </div>
 
-      <div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; min-width:0; overflow:hidden;">
-        <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
-          <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:#3b82f6; color:#fff; border-radius:50%; font-size:12px; font-weight:700;">2</span>
-          <span style="font-weight:600; font-size:13px; color:#1e293b;">在 GPU 主機執行</span>
+      <div data-s="s89687f21">
+        <div data-s="s2ca806d3">
+          <span data-s="s7ffdc6ee">2</span>
+          <span data-s="s2327f5a2">在 GPU 主機執行</span>
         </div>
-<pre style="background:#1e293b; color:#e2e8f0; padding:8px 10px; border-radius:4px; font-size:11px; margin:0; overflow-x:auto; line-height:1.5; white-space:pre; word-break:normal; max-width:100%; box-sizing:border-box;">scp jt-ocr-server-install.sh root@GPUServer:/tmp/
+<pre data-s="se69e5a84">scp jt-ocr-server-install.sh root@GPUServer:/tmp/
 ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh --dry-run'
 ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
-        <p style="font-size:11px; color:#f59e0b; margin:6px 0 0; font-weight:600; display:flex; align-items:center; gap:4px;">{{ icon('warn', size=12) }} 把 <code style="background:#fffbeb; padding:1px 4px; border-radius:3px;">GPUServer</code> 換成實際 IP 或 hostname（例：<code style="background:#fffbeb; padding:1px 4px; border-radius:3px;">10.0.0.40</code>）</p>
-        <p style="font-size:11px; color:#94a3b8; margin:4px 0 0;">5-15 分鐘(含 PyTorch ~3GB)</p>
+        <p data-s="s36aefc86">{{ icon('warn', size=12) }} 把 <code data-s="s1fcb9a2f">GPUServer</code> 換成實際 IP 或 hostname（例：<code data-s="s1fcb9a2f">10.0.0.40</code>）</p>
+        <p data-s="s2b2d9463">5-15 分鐘(含 PyTorch ~3GB)</p>
       </div>
 
-      <div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; min-width:0; overflow:hidden;">
-        <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
-          <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:#3b82f6; color:#fff; border-radius:50%; font-size:12px; font-weight:700;">3</span>
-          <span style="font-weight:600; font-size:13px; color:#1e293b;">填入 URL + Token</span>
+      <div data-s="s89687f21">
+        <div data-s="s2ca806d3">
+          <span data-s="s7ffdc6ee">3</span>
+          <span data-s="s2327f5a2">填入 URL + Token</span>
         </div>
-        <p style="font-size:12px; color:#64748b; margin:0; line-height:1.5;">jt-ocr-server-install.sh 跑完會印 URL + Token，貼到下方表單，測試通過後啟用即可。</p>
+        <p data-s="sef451c8b">jt-ocr-server-install.sh 跑完會印 URL + Token，貼到下方表單，測試通過後啟用即可。</p>
       </div>
     </div>
 
-    <div style="padding:16px 18px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px;">
-      <div style="display:flex; align-items:center; gap:6px; font-weight:600; font-size:14px; color:#1e293b; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid #e2e8f0;">
-        <span style="color:#64748b; display:inline-flex;">{{ icon('gear', size=16) }}</span>
+    <div data-s="s354a32f5">
+      <div data-s="s5590ac89">
+        <span data-s="s0ff7bb35">{{ icon('gear', size=16) }}</span>
         <span>連線設定</span>
       </div>
-      <div style="display:grid; grid-template-columns:110px 1fr; gap:10px 14px; align-items:center; max-width:720px;">
-        <label style="font-size:13px; color:#475569; text-align:right;">Server URL</label>
+      <div data-s="sb4ef7c78">
+        <label data-s="s931aa730">Server URL</label>
         <input type="url" id="ocrExtUrl" placeholder="http://10.0.0.5:8766"
-               style="padding:7px 11px; border:1px solid #cbd5e1; border-radius:5px; font-size:13px; width:100%; box-sizing:border-box; font-family:'SF Mono', Menlo, monospace;">
+               data-s="s530f0590">
 
-        <label style="font-size:13px; color:#475569; text-align:right;">Token</label>
+        <label data-s="s931aa730">Token</label>
         <input type="password" id="ocrExtToken" placeholder="Bearer token"
-               style="padding:7px 11px; border:1px solid #cbd5e1; border-radius:5px; font-size:13px; width:100%; box-sizing:border-box; font-family:'SF Mono', Menlo, monospace;">
+               data-s="s530f0590">
 
-        <label style="font-size:13px; color:#475569; text-align:right;">Timeout</label>
-        <div style="display:flex; align-items:center; gap:6px;">
+        <label data-s="s931aa730">Timeout</label>
+        <div data-s="sf84328fe">
           <input type="number" id="ocrExtTimeout" min="5" max="600" value="120"
-                 style="padding:7px 11px; border:1px solid #cbd5e1; border-radius:5px; font-size:13px; width:90px;">
-          <span class="muted" style="font-size:12px;">秒（建議 120，多語言 Reader 首次載入可能 30-60s）</span>
+                 data-s="s5809ec42">
+          <span class="muted" data-s="s6b9c179a">秒（建議 120，多語言 Reader 首次載入可能 30-60s）</span>
         </div>
 
-        <label style="font-size:13px; color:#475569; text-align:right; padding-top:2px;">啟用</label>
-        <label style="font-size:13px; cursor:pointer; display:flex; align-items:flex-start; gap:6px;">
-          <input type="checkbox" id="ocrExtEnabled" style="margin-top:2px;">
-          <span style="color:#475569;">啟用後 OCR 工具會優先用遠端 GPU；連不上自動退回本機</span>
+        <label data-s="s761bf724">啟用</label>
+        <label data-s="s5274beef">
+          <input type="checkbox" id="ocrExtEnabled" data-s="sf005b881">
+          <span data-s="s53deb6e3">啟用後 OCR 工具會優先用遠端 GPU；連不上自動退回本機</span>
         </label>
       </div>
-      <div style="margin-top:18px; padding-top:14px; border-top:1px solid #e2e8f0; display:flex; gap:8px; flex-wrap:wrap;">
-        <button id="ocrExtTestBtn" class="btn" type="button" style="background:#fff; border:1px solid #cbd5e1; display:inline-flex; align-items:center; gap:5px;">
+      <div data-s="s2a4e0d51">
+        <button id="ocrExtTestBtn" class="btn" type="button" data-s="sdfa71a37">
           {{ icon('refresh', size=13) }} 測試連接
         </button>
-        <button id="ocrExtSaveBtn" class="btn btn-primary" type="button" style="display:inline-flex; align-items:center; gap:5px;">
+        <button id="ocrExtSaveBtn" class="btn btn-primary" type="button" data-s="sda440b9a">
           {{ icon('save', size=13) }} 儲存
         </button>
       </div>
-      <div id="ocrExtStatus" style="margin-top:10px; font-size:13px;"></div>
+      <div id="ocrExtStatus" data-s="s409fc65d"></div>
     </div>
 
-    <details style="margin-top:12px;">
-      <summary style="cursor:pointer; font-size:12px; color:#64748b; user-select:none; padding:4px 0;">
+    <details data-s="s002535c2">
+      <summary data-s="sb19644bc">
         ▸ 目標主機需求 / 不弄壞遠端環境的承諾 / DGX Spark 最佳化
       </summary>
-      <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-        <div style="padding:10px 12px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px;">
-          <div style="font-weight:600; color:#92400e; font-size:12px; margin-bottom:4px; display:flex; align-items:center; gap:4px;">{{ icon('warn', size=12) }} 目標主機需求</div>
-          <ul style="margin:0; padding-left:18px; font-size:11px; color:#78350f; line-height:1.7;">
+      <div data-s="se422a38b">
+        <div data-s="sf08e0bfe">
+          <div data-s="s7c54bb03">{{ icon('warn', size=12) }} 目標主機需求</div>
+          <ul data-s="scecde2ae">
             <li>OS:Ubuntu 22.04+ / 24.04 / DGX OS</li>
             <li>架構:x86_64 或 aarch64</li>
             <li><code>nvidia-smi</code> 必須跑得起來</li>
@@ -320,9 +320,9 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
             <li>inbound TCP 8766(可換)</li>
           </ul>
         </div>
-        <div style="padding:10px 12px; background:#f0fdf4; border:1px solid #86efac; border-radius:6px;">
-          <div style="font-weight:600; color:#065f46; font-size:12px; margin-bottom:4px; display:flex; align-items:center; gap:4px;">{{ icon('shield', size=12) }} 不弄壞遠端環境的承諾</div>
-          <ul style="margin:0; padding-left:18px; font-size:11px; color:#065f46; line-height:1.7;">
+        <div data-s="s474db712">
+          <div data-s="sac95e4a8">{{ icon('shield', size=12) }} 不弄壞遠端環境的承諾</div>
+          <ul data-s="se42ef3de">
             <li>不動 system Python(獨立 venv)</li>
             <li>不裝 GPU driver / kernel module</li>
             <li>不改 PATH / shell rc / firewall</li>
@@ -331,9 +331,9 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
             <li>同捆 uninstall.sh、<code>--dry-run</code> 可先驗證</li>
           </ul>
         </div>
-        <div style="grid-column:1 / -1; padding:10px 12px; background:#eff6ff; border:1px solid #93c5fd; border-radius:6px;">
-          <div style="font-weight:600; color:#1e40af; font-size:12px; margin-bottom:4px; display:flex; align-items:center; gap:4px;">{{ icon('tool', size=12) }} DGX Spark 最佳化(aarch64 + GB10 Blackwell)</div>
-          <div style="font-size:11px; color:#1e3a8a; line-height:1.6;">
+        <div data-s="s8dddc341">
+          <div data-s="s631de63c">{{ icon('tool', size=12) }} DGX Spark 最佳化(aarch64 + GB10 Blackwell)</div>
+          <div data-s="s1b654cfc">
             script 偵測到 aarch64 + <code>/etc/dgx-release</code> 時自動用 <code>cu128</code> wheel 索引(支援 sm_120)。
             其他 x86_64 NVIDIA GPU 用 <code>cu124</code>。已預裝 PyTorch 會自動重用，省 ~3GB 下載。
           </div>
@@ -358,7 +358,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
 
   function setStatus(html, kind) {
     const colors = {ok:'#10b981', err:'#ef4444', info:'#3b82f6', warn:'#f59e0b'};
-    statusEl.innerHTML = '<div style="padding:8px 12px; background:#f8fafc; border-left:3px solid ' +
+    statusEl.innerHTML = '<div data-style="padding:8px 12px; background:#f8fafc; border-left:3px solid ' +
       (colors[kind]||'#94a3b8') + '; border-radius:4px; font-size:13px;">' + html + '</div>';
   }
 
@@ -378,7 +378,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
         const gpu = info.gpu || info.device_name || '';
         const sel = (info.selected_device && info.selected_device !== 'pending') ? ' [' + info.selected_device + ']' : '';
         const vram = info.vram_free_mb ? ' (free ' + info.vram_free_mb + ' MB / ' + info.vram_total_mb + ' MB)' : '';
-        setStatus('上次測試 ' + j.last_test_at + '：<b style="color:' + (ok?'#10b981':'#ef4444') + '">' +
+        setStatus('上次測試 ' + j.last_test_at + '：<b data-s="sd706e66c">' +
                    (ok?'✓ 通過':'✗ 失敗') + '</b>' + (gpu ? '<br>GPU: ' + gpu + sel + vram : ''),
                    ok?'ok':'err');
       }
@@ -459,9 +459,9 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
 </script>
 
 <!-- ============== Tesseract Section (備用) ============== -->
-<details class="panel ocr-section" id="tesseractSection" style="border-left:4px solid #94a3b8;" {% if default_engine == 'tesseract' %}open{% endif %}>
+<details class="panel ocr-section" id="tesseractSection" data-s="s497705de" {% if default_engine == 'tesseract' %}open{% endif %}>
 <summary>
-  <h2>Tesseract <span class="muted" style="font-size:13px; font-weight:normal;">— 備用 OCR 引擎</span></h2>
+  <h2>Tesseract <span class="muted" data-s="s70720a0e">— 備用 OCR 引擎</span></h2>
 </summary>
 <div>
 <p class="muted">管理 tesseract 的語言訓練檔（<code>.traineddata</code>）。EasyOCR 不可用時，OCR 工具會自動降回此引擎。安裝會同時下載兩個變體：<b>fast</b>（檔小、速度快）+ <b>best</b>（檔大、識別更準），可在下方「OCR 識別品質」切換。
@@ -473,30 +473,30 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
 <div class="ol-summary">
   <span class="ol-stat">已安裝 <b>{{ installed_count }}</b> / {{ total_count }} 種</span>
   <span class="ol-stat">合計 <b>{{ total_size_mb }}</b> MB（含 fast + best 變體）</span>
-  <span class="ol-stat" style="flex:1; min-width:200px;">tessdata 目錄：<span class="ol-path">{{ tessdata_dir }}</span>{% if tessdata_writable %} <span style="color:#10b981; font-size:11px;">（可寫入）</span>{% else %} <span style="color:#ef4444; font-size:11px;">（無寫入權限）</span>{% endif %}</span>
-  <button class="btn" type="button" id="btnRescan" title="重新跑 tesseract --list-langs，更新已安裝清單" style="font-size:12px; padding:5px 12px; flex-shrink:0;">{{ icon('refresh', size=13) }} 重新偵測</button>
+  <span class="ol-stat" data-s="se7333f54">tessdata 目錄：<span class="ol-path">{{ tessdata_dir }}</span>{% if tessdata_writable %} <span data-s="sd924ba51">（可寫入）</span>{% else %} <span data-s="seacff6c7">（無寫入權限）</span>{% endif %}</span>
+  <button class="btn" type="button" id="btnRescan" title="重新跑 tesseract --list-langs，更新已安裝清單" data-s="s644e2e03">{{ icon('refresh', size=13) }} 重新偵測</button>
 </div>
 
-<div class="panel" style="display:flex; align-items:center; gap:0; flex-wrap:wrap; padding:0; margin-bottom:16px; overflow:hidden;">
-  <div style="flex:1; min-width:240px; padding:18px 22px; background:#f8fafc; border-right:1px solid #e2e8f0; align-self:stretch; display:flex; flex-direction:column; justify-content:center;">
-    <div style="font-size:16px; color:#0f172a; font-weight:700;">OCR 識別品質</div>
-    <div style="font-size:12px; color:#64748b; margin-top:6px; line-height:1.5;">影響 OCR 跑出的字準度，所有「兩變體都已安裝」的語言會自動套用</div>
+<div class="panel" data-s="sbd996c7e">
+  <div data-s="s36c1925a">
+    <div data-s="sf090eb13">OCR 識別品質</div>
+    <div data-s="s5e943487">影響 OCR 跑出的字準度，所有「兩變體都已安裝」的語言會自動套用</div>
   </div>
-  <div style="padding:18px 22px; display:flex; align-items:center;">
-    <div style="display:flex; gap:0; border:1.5px solid #e2e8f0; border-radius:6px; overflow:hidden; background:#fff;">
-    <label style="cursor:pointer; padding:8px 16px; font-size:13px; {% if default_quality == 'best' %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#fff; color:#475569;{% endif %} border-right:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:8px;">
-      <input type="radio" name="qualPref" value="best" {% if default_quality == 'best' %}checked{% endif %} style="display:none;">
-      <span style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border:1.5px solid currentColor; border-radius:50%; font-size:11px; font-weight:bold;">{% if default_quality == 'best' %}✓{% endif %}</span>
-      精準 (best) <span style="opacity:.8; font-size:11px;">— 準確度高、慢 1.5-2x、檔大 ~3-4x</span>
+  <div data-s="sdd65706f">
+    <div data-s="s7c6e5230">
+    <label data-style="cursor:pointer; padding:8px 16px; font-size:13px; {% if default_quality == 'best' %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#fff; color:#475569;{% endif %} border-right:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:8px;">
+      <input type="radio" name="qualPref" value="best" {% if default_quality == 'best' %}checked{% endif %} data-s="scb458930">
+      <span data-s="sa6d4a14d">{% if default_quality == 'best' %}✓{% endif %}</span>
+      精準 (best) <span data-s="sb7c6348d">— 準確度高、慢 1.5-2x、檔大 ~3-4x</span>
     </label>
-    <label style="cursor:pointer; padding:8px 16px; font-size:13px; {% if default_quality == 'fast' %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#fff; color:#475569;{% endif %} display:inline-flex; align-items:center; gap:8px;">
-      <input type="radio" name="qualPref" value="fast" {% if default_quality == 'fast' %}checked{% endif %} style="display:none;">
-      <span style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border:1.5px solid currentColor; border-radius:50%; font-size:11px; font-weight:bold;">{% if default_quality == 'fast' %}✓{% endif %}</span>
-      快速 (fast) <span style="opacity:.8; font-size:11px;">— 速度快、檔小</span>
+    <label data-style="cursor:pointer; padding:8px 16px; font-size:13px; {% if default_quality == 'fast' %}background:#3b82f6; color:#fff; font-weight:600;{% else %}background:#fff; color:#475569;{% endif %} display:inline-flex; align-items:center; gap:8px;">
+      <input type="radio" name="qualPref" value="fast" {% if default_quality == 'fast' %}checked{% endif %} data-s="scb458930">
+      <span data-s="sa6d4a14d">{% if default_quality == 'fast' %}✓{% endif %}</span>
+      快速 (fast) <span data-s="sb7c6348d">— 速度快、檔小</span>
     </label>
     </div>
   </div>
-  <div id="qualMsg" style="display:none; font-size:13px; color:#10b981; flex-basis:100%; padding:8px 12px; background:#f0fdf4; border-radius:6px; border-left:3px solid #10b981; margin:0 18px 18px;"></div>
+  <div id="qualMsg" data-s="s08492239"></div>
 </div>
 {% if not tessdata_writable %}
 <div class="ol-warn">{{ icon('warn', size=14) }} <b>service 帳號對 tessdata 目錄無寫入權限</b> — 點「安裝」會跳出對應的 root / Administrator 手動指令；下載完手動放進去即可。Linux 通常用 <code>sudo apt install tesseract-ocr-&lt;lang&gt;</code> 或 <code>sudo curl ... -o &lt;tessdata&gt;/&lt;lang&gt;.traineddata</code>。</div>
@@ -505,7 +505,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
 
 {% for g in groups %}
 <div class="panel ol-group">
-  <h2 style="margin-top:0; font-size:16px;">{{ g.title }} <span class="muted" style="font-size:12px; font-weight:normal;">({{ g['items']|length }} 種)</span></h2>
+  <h2 data-s="sb9b6a2a1">{{ g.title }} <span class="muted" data-s="s29406bf4">({{ g['items']|length }} 種)</span></h2>
   <div class="ol-grid">
     {% for item in g['items'] %}
     <div class="ol-card {% if item.installed %}is-installed{% endif %}" data-code="{{ item.code }}">
@@ -514,11 +514,11 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
         <span class="ol-card-name">{{ item.name }}</span>
         <span class="ol-card-code">{{ item.code }}</span>
       </div>
-      <div class="ol-card-meta" style="flex-direction:column; align-items:flex-start; gap:3px;">
+      <div class="ol-card-meta" data-s="s167dc439">
         {% if item.fast_installed or item.best_installed %}
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            {% if item.fast_installed %}<span class="ol-size" style="background:#e0e7ff; color:#3730a3;">fast {{ item.fast_size_mb }} MB ✓</span>{% else %}<span class="ol-size" style="opacity:.5;">fast 未下</span>{% endif %}
-            {% if item.best_installed %}<span class="ol-size" style="background:#dcfce7; color:#166534;">best {{ item.best_size_mb }} MB ✓</span>{% else %}<span class="ol-size" style="opacity:.5;">best 未下（~{{ item.est_best_size_mb|int }} MB）</span>{% endif %}
+          <div data-s="sb47e13ec">
+            {% if item.fast_installed %}<span class="ol-size" data-s="s68c637ed">fast {{ item.fast_size_mb }} MB ✓</span>{% else %}<span class="ol-size" data-s="s6aadd840">fast 未下</span>{% endif %}
+            {% if item.best_installed %}<span class="ol-size" data-s="s53289da7">best {{ item.best_size_mb }} MB ✓</span>{% else %}<span class="ol-size" data-s="s6aadd840">best 未下（~{{ item.est_best_size_mb|int }} MB）</span>{% endif %}
           </div>
         {% else %}
           <span class="ol-size">~{{ item.size_mb }} MB（fast）+ ~{{ item.est_best_size_mb|int }} MB（best）</span>
@@ -546,7 +546,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
 
 {% if extra_installed %}
 <div class="panel ol-group">
-  <h2 style="margin-top:0; font-size:16px;">其他已安裝訓練檔 <span class="muted" style="font-size:12px; font-weight:normal;">({{ extra_installed|length }} 種，不在內建 catalog)</span></h2>
+  <h2 data-s="sb9b6a2a1">其他已安裝訓練檔 <span class="muted" data-s="s29406bf4">({{ extra_installed|length }} 種，不在內建 catalog)</span></h2>
   <div class="ol-grid">
     {% for code in extra_installed %}
     <div class="ol-card is-installed">
@@ -568,16 +568,16 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
 
 <!-- 通用確認對話框 -->
 <div id="olConfirmModal" class="ol-modal-bg" role="dialog" aria-modal="true">
-  <div class="ol-modal" style="max-width:440px;">
+  <div class="ol-modal" data-s="sc4cd9de6">
     <div class="ol-modal-head">
       <h3 class="ol-modal-title" id="olConfirmTitle">確認</h3>
       <button class="ol-modal-close" type="button" aria-label="關閉" data-confirm-action="cancel">{{ icon('close', size=20) }}</button>
     </div>
     <div class="ol-modal-body">
-      <p class="ol-modal-msg" id="olConfirmMsg" style="white-space:pre-line;"></p>
+      <p class="ol-modal-msg" id="olConfirmMsg" data-s="s11305aad"></p>
     </div>
     <div class="ol-modal-foot">
-      <span style="flex:1;"></span>
+      <span data-s="sda5cd676"></span>
       <button class="btn" type="button" data-confirm-action="cancel">{{ icon('close', size=14) }} 取消</button>
       <button class="btn btn-primary" type="button" data-confirm-action="ok" id="olConfirmOk">{{ icon('check', size=14) }} 確定</button>
     </div>

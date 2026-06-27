@@ -7,28 +7,28 @@
 匯入時會自動把現有設定備份成 <code>.bak.&lt;timestamp&gt;</code>，失敗可手動 rollback。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">{{ icon('download', size=18) }} 1. 匯出設定</h2>
-  <p class="muted" style="font-size:12.5px;">下表是目前 <code>data/</code> 目錄內會被打包的內容。匯出檔名格式：<code>jtdt-settings-YYYYMMDD-HHMMSS-vX.Y.Z.zip</code></p>
+  <h2 data-s="s53896af7">{{ icon('download', size=18) }} 1. 匯出設定</h2>
+  <p class="muted" data-s="sea8bbc82">下表是目前 <code>data/</code> 目錄內會被打包的內容。匯出檔名格式：<code>jtdt-settings-YYYYMMDD-HHMMSS-vX.Y.Z.zip</code></p>
 
-  <h3 style="margin:14px 0 6px 0;">必含設定（核心）</h3>
+  <h3 data-s="s3ee87f1b">必含設定（核心）</h3>
   <table class="exp-table">
-    <thead><tr><th>項目</th><th>說明</th><th style="text-align:right;">大小</th></tr></thead>
+    <thead><tr><th>項目</th><th>說明</th><th data-s="sf6e3d7fe">大小</th></tr></thead>
     <tbody>
       {% for f in summary.core_files %}
-      <tr><td><code>{{ f.name }}</code></td><td class="muted">JSON 設定檔</td><td style="text-align:right;">{{ '%.1f'|format(f.size/1024) }} KB</td></tr>
+      <tr><td><code>{{ f.name }}</code></td><td class="muted">JSON 設定檔</td><td data-s="sf6e3d7fe">{{ '%.1f'|format(f.size/1024) }} KB</td></tr>
       {% endfor %}
       {% for d in summary.core_dirs %}
-      <tr><td><code>{{ d.name }}/</code></td><td class="muted">{{ d.files }} 個檔案</td><td style="text-align:right;">{{ '%.2f'|format(d.size/1024/1024) }} MB</td></tr>
+      <tr><td><code>{{ d.name }}/</code></td><td class="muted">{{ d.files }} 個檔案</td><td data-s="sf6e3d7fe">{{ '%.2f'|format(d.size/1024/1024) }} MB</td></tr>
       {% endfor %}
     </tbody>
   </table>
 
   {% if summary.optional_dirs %}
-  <h3 style="margin:14px 0 6px 0;">可選擇匯出（歷史記錄）</h3>
-  <p class="muted" style="font-size:12px;">勾選才會包含；通常搬遷新機時不需要帶歷史。</p>
-  <div style="display:flex; flex-direction:column; gap:6px;">
+  <h3 data-s="s3ee87f1b">可選擇匯出（歷史記錄）</h3>
+  <p class="muted" data-s="s6b9c179a">勾選才會包含；通常搬遷新機時不需要帶歷史。</p>
+  <div data-s="s0adf588c">
     {% for d in summary.optional_dirs %}
-    <label style="display:flex; gap:10px; align-items:center; padding:6px 10px; background:#f8fafc; border-radius:6px;">
+    <label data-s="s17b671cf">
       <input type="checkbox" class="opt-include" data-name="{{ d.name }}" />
       <span><code>{{ d.name }}/</code> &nbsp; <span class="muted">{{ d.label }} — {{ d.files }} 個檔案 / {{ '%.2f'|format(d.size/1024/1024) }} MB</span></span>
     </label>
@@ -36,29 +36,29 @@
   </div>
   {% endif %}
 
-  <div style="margin-top:14px;">
+  <div data-s="s553a645f">
     <button class="btn btn-primary" id="btnExport">{{ icon('download', size=14) }} 下載備份壓縮檔</button>
-    <span id="exportStatus" class="muted" style="margin-left:10px; font-size:12px;"></span>
+    <span id="exportStatus" class="muted" data-s="sc57a38d4"></span>
   </div>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">{{ icon('upload', size=18) }} 2. 匯入備份</h2>
-  <p class="muted" style="font-size:12.5px;">
+  <h2 data-s="s53896af7">{{ icon('upload', size=18) }} 2. 匯入備份</h2>
+  <p class="muted" data-s="sea8bbc82">
     <b>注意</b>：匯入會覆蓋現有 admin 設定。系統會自動把現有檔案備份成 <code>.bak.&lt;時間&gt;</code>（在 <code>data/</code> 下），出錯可從那邊還原。
     建議先匯出當前設定當保險。
   </p>
   <input type="file" id="importFile" accept=".zip" />
-  <label style="display:block; margin-top:8px; font-size:12.5px;">
+  <label data-s="sd764113f">
     <input type="checkbox" id="overwriteOptional" /> 也覆寫歷史記錄目錄（<code>fill_history</code> / <code>stamp_history</code> / <code>watermark_history</code>，若備份檔內有的話）
   </label>
-  <div style="margin-top:12px;">
+  <div data-s="s002535c2">
     <button class="btn btn-danger" id="btnImport" disabled>{{ icon('upload', size=14) }} 開始匯入</button>
-    <span id="importStatus" class="muted" style="margin-left:10px; font-size:12px;"></span>
+    <span id="importStatus" class="muted" data-s="sc57a38d4"></span>
   </div>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
   .exp-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
   .exp-table th, .exp-table td { padding:6px 10px; border-bottom:1px solid #f1f5f9; text-align:left; }
   .exp-table th { background:#f8fafc; color:#475569; font-weight:600; }
@@ -92,7 +92,7 @@ $('btnExport').addEventListener('click', async () => {
     a.href = url; a.download = fname; document.body.appendChild(a);
     a.click(); a.remove();
     URL.revokeObjectURL(url);
-    $('exportStatus').innerHTML = '<span style="color:#059669;">已下載 ' + fname + '</span>';
+    $('exportStatus').innerHTML = '<span data-s="sd4ac9708">已下載 ' + fname + '</span>';
   } catch (e) {
     $('exportStatus').textContent = '錯誤：' + e.message;
   } finally {
@@ -120,13 +120,13 @@ $('btnImport').addEventListener('click', async () => {
   try {
     const r = await fetch('/admin/settings-export/import', {method:'POST', body: fd});
     if (!r.ok) {
-      $('importStatus').innerHTML = '<span style="color:#dc2626;">匯入失敗：' + await r.text() + '</span>';
+      $('importStatus').innerHTML = '<span data-s="sbc8099b4">匯入失敗：' + await r.text() + '</span>';
       return;
     }
     const j = await r.json();
-    $('importStatus').innerHTML = '<span style="color:#059669;">已匯入 ' + j.imported_files + ' 個檔案，原檔備份在 data/ 下。建議重啟服務以套用新設定。</span>';
+    $('importStatus').innerHTML = '<span data-s="sd4ac9708">已匯入 ' + j.imported_files + ' 個檔案，原檔備份在 data/ 下。建議重啟服務以套用新設定。</span>';
   } catch (e) {
-    $('importStatus').innerHTML = '<span style="color:#dc2626;">錯誤：' + e.message + '</span>';
+    $('importStatus').innerHTML = '<span data-s="sbc8099b4">錯誤：' + e.message + '</span>';
   } finally {
     $('btnImport').disabled = false;
   }

@@ -4,7 +4,7 @@
 {% block title %}送件檢核儀表板 · {{ app_name }}{% endblock %}
 
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .scs-cards { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
 .scs-card { background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:14px; text-align:center; }
 .scs-card .num { font-size:28px; font-weight:600; color:#1e40af; }
@@ -50,8 +50,8 @@
     <summary>狀態分布</summary>
     <table class="scs-tbl">
       {% for st, n in stats.by_status.items() %}
-      <tr><td style="width:120px;">{{ st }}</td><td>
-        <span class="scs-bar" style="width:{{ (n / stats.cases_total * 300)|int }}px;"></span>
+      <tr><td data-s="s088cf005">{{ st }}</td><td>
+        <span class="scs-bar" data-style="width:{{ (n / stats.cases_total * 300)|int }}px;"></span>
         {{ n }}
       </td></tr>
       {% endfor %}
@@ -62,7 +62,7 @@
     <summary>三層使用統計（已 done 案件中）</summary>
     <table class="scs-tbl">
       {% for layer, n in stats.layer_used.items() %}
-      <tr><td style="width:120px;">{{ layer }}</td><td>{{ n }} 個案件</td></tr>
+      <tr><td data-s="s088cf005">{{ layer }}</td><td>{{ n }} 個案件</td></tr>
       {% endfor %}
     </table>
   </details>
@@ -83,13 +83,13 @@
     <summary>嚴重度分布</summary>
     <table class="scs-tbl">
       {% for sev, n in stats.severity_breakdown.items() %}
-      <tr><td style="width:120px;">{{ sev }}</td><td>{{ n }}</td></tr>
+      <tr><td data-s="s088cf005">{{ sev }}</td><td>{{ n }}</td></tr>
       {% endfor %}
     </table>
   </details>
 {% endif %}
 
-<p class="muted" style="text-align:center; margin-top:16px;">
-  <a href="cases" style="color:#3b82f6;">→ 查看所有案件清單</a>
+<p class="muted" data-s="sc30c30a1">
+  <a href="cases" data-s="sd294e9a2">→ 查看所有案件清單</a>
 </p>
 {% endblock %}

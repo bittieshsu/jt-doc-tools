@@ -5,19 +5,19 @@
 <h1>{{ icon('gear', size=22) }} 轉檔引擎設定</h1>
 <p class="muted">設定文書轉 PDF（OxOffice / LibreOffice）的執行檔尋找順序。系統會由上往下測試，第一個存在且可執行的就會被使用。</p>
 
-<div class="panel" style="background:#fef3c7; border-color:#fcd34d;">
-  <p style="margin:0; font-size:13px; color:#78350f;">
+<div class="panel" data-s="s7ec2825b">
+  <p data-s="sa90b4271">
     💡 <strong>推薦優先採用 OxOffice</strong>：由台灣 OSSII 維護的 LibreOffice 繁中本地化分支，
     對 CJK 字型、CNS11643 字集、台灣版面慣例支援更完整。
     下載：<a href="https://github.com/OSSII/OxOffice/releases" target="_blank" rel="noopener"
-       style="color:#1e40af; font-weight:600;">github.com/OSSII/OxOffice</a>
+       data-s="s1b15b3d0">github.com/OSSII/OxOffice</a>
   </p>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">目前使用</h2>
+  <h2 data-s="s53896af7">目前使用</h2>
   {% if active %}
-    <p style="font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; word-break: break-all; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+    <p data-s="s7f8d1270">
       ✅ <strong>{{ active }}</strong>
       {% if active_version %}<span class="version-chip">{{ active_version }}</span>{% endif %}
     </p>
@@ -27,8 +27,8 @@
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">尋找順序</h2>
-  <p class="muted" style="font-size: 12px;">拖曳列首的「⠿」可調整順序。內建路徑無法刪除（仍可上下移動）；自訂路徑可新增、編輯、刪除。</p>
+  <h2 data-s="s53896af7">尋找順序</h2>
+  <p class="muted" data-s="scea31ec8">拖曳列首的「⠿」可調整順序。內建路徑無法刪除（仍可上下移動）；自訂路徑可新增、編輯、刪除。</p>
   <ul id="path-list" class="path-list">
     {% for p in paths %}
     <li class="path-item" data-id="{{ p.id }}" data-builtin="{{ 'true' if p.builtin else 'false' }}">
@@ -47,17 +47,17 @@
     </li>
     {% endfor %}
   </ul>
-  <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
-    <input type="text" id="new-path" placeholder="新增自訂路徑（例：D:\soffice\program\soffice.exe）" style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px;" />
+  <div data-s="sd478ce6a">
+    <input type="text" id="new-path" placeholder="新增自訂路徑（例：D:\soffice\program\soffice.exe）" data-s="sb9903bd5" />
     <button class="btn" type="button" id="btn-add">{{ icon('plus') }}新增</button>
   </div>
-  <div style="margin-top:14px; display:flex; gap:8px;">
+  <div data-s="s7b733630">
     <button class="btn btn-primary" type="button" id="btn-save">{{ icon('save') }}儲存設定</button>
     <a class="btn" href="/admin/conversion">{{ icon('refresh') }}重新整理</a>
   </div>
 </div>
 
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .path-list { list-style: none; padding: 0; margin: 0; }
 .path-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: #fff; margin-bottom: 6px; }
 .drag-handle { cursor: grab; color: var(--muted); font-size: 16px; user-select: none; }

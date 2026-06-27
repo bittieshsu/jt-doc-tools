@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}AES ZIP 加密 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .az-file-list { margin-top: 8px; font-size: 12.5px; color:#475569; }
 .az-file-list li { padding: 2px 0; }
 </style>
@@ -12,13 +12,13 @@
 <p class="muted">把多個檔案打包成密碼保護的 ZIP。採 WinZip AES-256 加密（不是過時的 ZipCrypto），跟 7-Zip / Keka / macOS Archive Utility 10.13+ / WinRAR 相容。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 選擇要打包的檔案</h2>
+  <h2 data-s="s53896af7">1. 選擇要打包的檔案</h2>
   {% with upload_id='azUp', accept='*', multiple=True, hint='任意檔案格式，多檔會打包成同一個 ZIP。' %}{% include "components/file_upload.html" %}{% endwith %}
   <ul class="az-file-list" id="fileList" hidden></ul>
 </div>
 
 <div class="panel">
-  <h2 style="margin-top:0;">2. 密碼與設定</h2>
+  <h2 data-s="s53896af7">2. 密碼與設定</h2>
   <div class="form-row">
     <label>密碼</label>
     <input id="pw" type="password" class="field" placeholder="解壓時要求的密碼" />
@@ -29,11 +29,11 @@
   </div>
   <div class="form-row">
     <label>ZIP 檔名</label>
-    <input id="zname" type="text" class="field" placeholder="留空則使用時間戳" style="max-width:320px;" />
+    <input id="zname" type="text" class="field" placeholder="留空則使用時間戳" data-s="sf758c5d0" />
   </div>
   <div class="form-row">
     <label>壓縮方式</label>
-    <select id="comp" class="field" style="max-width:220px;">
+    <select id="comp" class="field" data-s="sac5a4114">
       <option value="deflate" selected>Deflate（一般，速度快）</option>
       <option value="lzma">LZMA（壓縮率較高，較慢）</option>
       <option value="store">不壓縮（適合已壓縮過的檔案）</option>
@@ -41,9 +41,9 @@
   </div>
 </div>
 
-<div style="margin-top:12px;">
+<div data-s="s002535c2">
   <button class="btn btn-primary" id="btnZip">{{ icon('lock', size=14) }} 加密並下載</button>
-  <span id="status" class="muted" style="margin-left:10px; font-size:12.5px;"></span>
+  <span id="status" class="muted" data-s="s414be724"></span>
 </div>
 
 {% endblock %}

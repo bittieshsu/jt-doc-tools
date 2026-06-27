@@ -7,7 +7,7 @@
   {% set _brand_logo = branding_logo_url() %}
   <link rel="icon" type="image/png" href="{{ _brand_logo or '/static/images/logo-on-light.png' }}" />
   <link rel="stylesheet" href="/static/css/platform.css" />
-  <style>
+  <style nonce="{{ request.state.csp_nonce }}">
     body { display:flex; align-items:center; justify-content:center;
            min-height:100vh; margin:0; background:#0f172a;
            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',

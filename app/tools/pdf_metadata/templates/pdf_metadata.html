@@ -2,7 +2,7 @@
 {% from "components/icons.html" import icon %}
 {% block title %}中繼資料清除 · {{ app_name }}{% endblock %}
 {% block head %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
 .md-info { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px;
   padding: 12px 14px; margin-top: 10px; font-size: 13px; }
 .md-info dl { margin: 0; display: grid; grid-template-columns: 130px 1fr; gap: 4px 10px; }
@@ -24,13 +24,13 @@
 <p class="muted">檢視 PDF 中的 metadata（作者 / 標題 / 建立軟體 / XMP 等），選擇要清除的項目後輸出無痕副本。</p>
 
 <div class="panel">
-  <h2 style="margin-top:0;">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
   {% with upload_id='mdUp', accept='application/pdf' %}{% include "components/file_upload.html" %}{% endwith %}
   <div class="md-info" id="mdInfo" hidden></div>
 </div>
 
 <div class="panel" id="mdPanel" hidden>
-  <h2 style="margin-top:0;">2. 選擇要清除的項目</h2>
+  <h2 data-s="s53896af7">2. 選擇要清除的項目</h2>
   <div class="md-toggles">
     <label><input type="checkbox" id="cInfo" checked> 基本 metadata（作者 / 標題 / 建立軟體 …）</label>
     <label><input type="checkbox" id="cXmp" checked> XMP metadata（含修訂歷史）</label>
@@ -38,17 +38,17 @@
     <label><input type="checkbox" id="cAnn"> 註解 / 標記</label>
     <label><input type="checkbox" id="cFrm"> 表單欄位</label>
   </div>
-  <div style="margin-top:12px;">
+  <div data-s="s002535c2">
     <button class="btn btn-primary" id="btnClean">{{ icon('trash', size=14) }} 清除並產生副本</button>
-    <span id="cleanStatus" class="muted" style="margin-left:10px; font-size:12.5px;"></span>
+    <span id="cleanStatus" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
-<div class="panel" id="dlPanel" hidden style="background:#ecfdf5; border-color:#86efac;">
-  <h3 style="margin:0 0 8px; color:#064e3b;">完成</h3>
-  <div id="dlSummary" style="font-size:13px; color:#065f46; margin-bottom:10px;"></div>
+<div class="panel" id="dlPanel" hidden data-s="s611babd7">
+  <h3 data-s="s8b6172c3">完成</h3>
+  <div id="dlSummary" data-s="se51dd4d2"></div>
   <a class="btn btn-primary" id="dlLink" href="#">{{ icon('download') }} 下載清除後的 PDF</a>
-  {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden style="margin-left:8px;">{{ icon('archive') }} 存至工作區</button>{% endif %}
+  {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden data-s="sc3f83707">{{ icon('archive') }} 存至工作區</button>{% endif %}
 </div>
 
 {% endblock %}
@@ -101,7 +101,7 @@ const fu = new FileUpload($('mdUp'), async (f) => {
   html += `<dt>XMP</dt><dd>${d.xmp_present ? '<span class="warn">有（含修訂歷史等）</span>' : '無'}</dd>`;
   html += '</dl>';
   if (d.xmp_preview) {
-    html += `<div class="muted" style="margin-top:10px; font-size:11.5px;">XMP 前 800 字元預覽：</div>`;
+    html += `<div class="muted" data-s="sd27759c9">XMP 前 800 字元預覽：</div>`;
     html += `<div class="md-xmp">${escapeHTML(d.xmp_preview)}</div>`;
   }
   $('mdInfo').innerHTML = html;
