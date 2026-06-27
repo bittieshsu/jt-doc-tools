@@ -4,6 +4,11 @@
 
 ---
 
+## [1.12.38] - 2026-06-27
+
+### 資安 — modal.js 改用 DOMPurify 清洗（取代手刻 sanitizer,清 CodeQL modal.js 全部告警）
+
+- v1.12.37 的手刻 sanitizer CodeQL 不認得（#124 DOM text、#125 Exception text 仍開）,且自製的 `javascript:` 檢查被判 #126「Incomplete URL scheme check」。改用專案已內含的 **DOMPurify**（`bodyEl.innerHTML = DOMPurify.sanitize(body)`,CodeQL 認得的 sanitizer barrier）。DOMPurify 改於 base.html **全站載入**（modal.js 之前）。headless 實測:正常 HTML（帳號對話框）照常渲染、onerror/javascript:/script 全剝除、無 CSP 違規。
 ## [1.12.37] - 2026-06-27
 
 ### 資安 — modal.js html 模式加 sanitizer（CodeQL #121「Exception text reinterpreted as HTML」）

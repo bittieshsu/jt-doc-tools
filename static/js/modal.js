@@ -36,35 +36,15 @@
       const bodyEl = document.createElement('div');
       bodyEl.className = 'modal-body';
       if (html) {
-        // Caller opted into raw HTML; trust them. The `html=true` flag is
-        // only set by trusted internal callers (e.g. showAlert with our own
-        // server-controlled HTML for status messages) — never with user input.
-        // v1.5.8: 用 DOMParser 解析 HTML 後 import 進 DOM,即使是 trusted
-        // 內容也走解析路徑 — CodeQL js/xss-through-dom 會看見 sink 透過
-        // DOMParser document fragments 而非直接 innerHTML 而 OK。
-        const parsed = new DOMParser().parseFromString(
-          '<div>' + String(body) + '</div>', 'text/html');
-        // 縱深防禦：即使呼叫端宣告 trusted，仍剝除可執行內容 —— 移除
-        // script/style/iframe/object 等元素 + 所有 on* 事件處理器屬性 +
-        // javascript: URL,避免意外夾帶的內容（如例外文字含 <img onerror>）
-        // 被當 HTML 執行（CodeQL「Exception text reinterpreted as HTML」）。
-        parsed.querySelectorAll(
-          'script,style,iframe,object,embed,link,meta,base').forEach(
-          function (n) { n.parentNode && n.parentNode.removeChild(n); });
-        parsed.querySelectorAll('*').forEach(function (el) {
-          Array.prototype.slice.call(el.attributes).forEach(function (a) {
-            var nm = a.name.toLowerCase();
-            var val = (a.value || '').replace(/\s+/g, '').toLowerCase();
-            if (nm.indexOf('on') === 0 ||
-                ((nm === 'href' || nm === 'src' || nm === 'xlink:href') &&
-                 val.indexOf('javascript:') === 0)) {
-              el.removeAttribute(a.name);
-            }
-          });
-        });
-        const root = parsed.body.firstChild;
-        if (root) {
-          while (root.firstChild) bodyEl.appendChild(root.firstChild);
+        // 即使呼叫端宣告 trusted，仍以 DOMPurify 清洗（剝除 script / 事件處理器 /
+        // javascript: 等可執行內容）—— 防止意外夾帶的內容（如例外文字含
+        // <img onerror>）被當 HTML 執行。DOMPurify 於 base.html 全站載入,且是
+        // CodeQL 認得的 sanitizer（js/xss-through-dom、js/html-constructed-from-input
+        // 都認 barrier）。萬一未載入 → 退成純文字（安全）。
+        if (window.DOMPurify) {
+          bodyEl.innerHTML = window.DOMPurify.sanitize(String(body));
+        } else {
+          bodyEl.textContent = String(body);
         }
       } else {
         // Honour newlines as <br>: split + appendChild text + br nodes.
