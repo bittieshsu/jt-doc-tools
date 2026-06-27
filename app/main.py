@@ -14,7 +14,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.12.35"
+VERSION = "1.12.36"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -529,6 +529,16 @@ async def _friendly_http_exc(request: Request, exc: _HTTPException2):
 
 # Need HTMLResponse import for the handler above
 from fastapi.responses import HTMLResponse  # noqa: E402
+
+# 全域 JSON 解析錯誤處理：端點用 `await request.json()` 收到非 JSON / 壞掉的
+# body 時，json.JSONDecodeError 原本會冒成 500（不雅且像伺服器出錯）。統一改回
+# 400「Invalid JSON body」（客戶端錯誤）。涵蓋全部 ~80 個 request.json() 呼叫點，
+# 不需逐一加 try/except。UI 一律送合法 JSON → 正常流程不受影響。
+import json as _json  # noqa: E402
+
+@app.exception_handler(_json.JSONDecodeError)
+async def _json_decode_exc(request: Request, exc: _json.JSONDecodeError):
+    return _JSONResponse({"detail": "Invalid JSON body"}, status_code=400)
 
 
 # ---- Auth gate middleware ----

@@ -4,6 +4,12 @@
 
 ---
 
+## [1.12.36] - 2026-06-27
+
+### 修正 — 非 JSON / 壞掉的 request body 統一回 400（原 500）
+
+- 端點以 `await request.json()` 解析 body，收到非 JSON（如 multipart）或空 / 壞掉的 body 時，`json.JSONDecodeError` 原本會冒成 500（不雅且像伺服器出錯）。在 `app/main.py` 註冊**全域 JSONDecodeError 處理器**統一改回 **400「Invalid JSON body」**，一次涵蓋全部約 80 個 `request.json()` 呼叫點,不需逐一加 try/except。UI 一律送合法 JSON → 正常流程不受影響。
+- 測試 `tests/test_json_error_handling.py`（4 項：multipart/空/壞 JSON → 400、合法 JSON 照常）。
 ## [1.12.35] - 2026-06-27
 
 ### 資安 — HTML 頁加 Cache-Control: no-store（清 ZAP「Re-examine Cache-control」Info）
