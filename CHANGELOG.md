@@ -4,6 +4,11 @@
 
 ---
 
+## [1.12.37] - 2026-06-27
+
+### 資安 — modal.js html 模式加 sanitizer（CodeQL #121「Exception text reinterpreted as HTML」）
+
+- `static/js/modal.js` 的 `html:true` 路徑（DOMParser 後 appendChild）即使呼叫端宣告 trusted,仍**剝除可執行內容**:移除 `script/style/iframe/object/embed/link/meta/base` 元素 + 所有 `on*` 事件處理器屬性 + `javascript:` URL。縱深防禦,避免意外夾帶內容（如例外文字含 `<img onerror>`）被當 HTML 執行。headless 實測:正常 HTML 照常渲染,XSS payload（onerror / javascript: / script）全數被剝除不觸發。
 ## [1.12.36] - 2026-06-27
 
 ### 修正 — 非 JSON / 壞掉的 request body 統一回 400（原 500）

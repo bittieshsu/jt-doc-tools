@@ -44,6 +44,24 @@
         // DOMParser document fragments 而非直接 innerHTML 而 OK。
         const parsed = new DOMParser().parseFromString(
           '<div>' + String(body) + '</div>', 'text/html');
+        // 縱深防禦：即使呼叫端宣告 trusted，仍剝除可執行內容 —— 移除
+        // script/style/iframe/object 等元素 + 所有 on* 事件處理器屬性 +
+        // javascript: URL,避免意外夾帶的內容（如例外文字含 <img onerror>）
+        // 被當 HTML 執行（CodeQL「Exception text reinterpreted as HTML」）。
+        parsed.querySelectorAll(
+          'script,style,iframe,object,embed,link,meta,base').forEach(
+          function (n) { n.parentNode && n.parentNode.removeChild(n); });
+        parsed.querySelectorAll('*').forEach(function (el) {
+          Array.prototype.slice.call(el.attributes).forEach(function (a) {
+            var nm = a.name.toLowerCase();
+            var val = (a.value || '').replace(/\s+/g, '').toLowerCase();
+            if (nm.indexOf('on') === 0 ||
+                ((nm === 'href' || nm === 'src' || nm === 'xlink:href') &&
+                 val.indexOf('javascript:') === 0)) {
+              el.removeAttribute(a.name);
+            }
+          });
+        });
         const root = parsed.body.firstChild;
         if (root) {
           while (root.firstChild) bodyEl.appendChild(root.firstChild);
