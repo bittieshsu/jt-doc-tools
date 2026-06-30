@@ -4,6 +4,14 @@
 
 ---
 
+## [1.12.44] - 2026-06-30
+
+### 強化（企業環境）— TLS 攔截下「零設定」即可安裝 / 更新
+
+承 v1.12.43,讓企業 TLS 攔截環境**完全不需客戶手動設定**,照原本 install / update 跑就成功:
+- `install.sh` / `jtdt update` 自動偵測 OS 系統 CA bundle（`/etc/ssl/certs/ca-certificates.crt`、RHEL/SUSE/Alpine 路徑）並 `export SSL_CERT_FILE` → 連第一次更新（跑舊邏輯）的 Python 下載也吃企業 CA。
+- `net_ssl.install_os_trust()` 也自動指 `SSL_CERT_FILE`（Linux）+ `REQUESTS_CA_BUNDLE` → truststore 不在的環境也能認企業 CA。
+- 三層自動防護（uv 用 OS 信任庫 + SSL_CERT_FILE 指系統 bundle + truststore 接 OS 原生信任庫）→ 企業 CA 既已在 OS 信任庫（apt/curl/git 能動即代表有），全自動認得。OPS.md 更新為「零設定」說明。既有客戶卡舊版時重跑網站一行安裝指令最保險。
 ## [1.12.43] - 2026-06-30
 
 ### 修正（企業環境）— TLS 攔截下無法下載更新 / tessdata（CERTIFICATE_VERIFY_FAILED）

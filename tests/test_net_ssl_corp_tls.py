@@ -36,3 +36,17 @@ def test_tessdata_download_calls_install_os_trust():
     from app.core import tessdata_manager
     src = inspect.getsource(tessdata_manager._download_variant)
     assert "install_os_trust" in src
+
+
+def test_autoset_cert_file_points_to_os_bundle(monkeypatch, tmp_path):
+    """沒設 SSL_CERT_FILE 時自動指到 OS CA bundle；已設則不覆寫。"""
+    n = _fresh()
+    fake = tmp_path / "ca.crt"; fake.write_text("x")
+    monkeypatch.setattr(n, "_CA_BUNDLES", (str(fake),))
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    n._autoset_cert_file()
+    assert n.os.environ["SSL_CERT_FILE"] == str(fake)
+    # 已設不覆寫
+    monkeypatch.setenv("SSL_CERT_FILE", "/keep/me.pem")
+    n._autoset_cert_file()
+    assert n.os.environ["SSL_CERT_FILE"] == "/keep/me.pem"

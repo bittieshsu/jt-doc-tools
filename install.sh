@@ -219,6 +219,16 @@ if command -v git >/dev/null 2>&1; then HAS_GIT=1; fi
 # 那個），安全且能解決多數企業代理情境。要關閉：UV_NATIVE_TLS=false 跑安裝。
 export UV_NATIVE_TLS="${UV_NATIVE_TLS:-true}"
 export UV_SYSTEM_CERTS="${UV_SYSTEM_CERTS:-true}"
+# 程式執行時的 Python HTTPS（下載 tessdata 等）也吃企業 CA：自動把 SSL_CERT_FILE
+# 指到 OS 系統 CA bundle（企業 CA 通常已在裡面，apt/curl 能動即代表有）。這樣完全
+# 不用客戶手動設定，照原本 install/update 跑就能在 TLS 替換環境下載成功。
+if [ -z "${SSL_CERT_FILE:-}" ]; then
+    for _ca in /etc/ssl/certs/ca-certificates.crt \
+               /etc/pki/tls/certs/ca-bundle.crt \
+               /etc/ssl/ca-bundle.pem /etc/ssl/cert.pem; do
+        if [ -r "$_ca" ]; then export SSL_CERT_FILE="$_ca"; break; fi
+    done
+fi
 # 最後手段（企業 CA 不在 OS 信任庫時）：JTDT_TLS_INSECURE=1 停用憑證驗證。
 # 有 MITM 風險，僅在你信任的內網環境使用。正解仍是把企業 CA 裝進 OS 信任庫。
 CURL_TLS_OPT=""

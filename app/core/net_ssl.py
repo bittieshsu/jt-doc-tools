@@ -28,6 +28,31 @@ def _insecure() -> bool:
         "1", "true", "yes", "on")
 
 
+# Linux OS 系統 CA bundle 常見路徑（企業 CA 通常已在裡面）。
+_CA_BUNDLES = (
+    "/etc/ssl/certs/ca-certificates.crt",   # Debian / Ubuntu
+    "/etc/pki/tls/certs/ca-bundle.crt",     # RHEL / Fedora / CentOS
+    "/etc/ssl/ca-bundle.pem",               # SUSE
+    "/etc/ssl/cert.pem",                    # Alpine / 部分系統
+)
+
+
+def _autoset_cert_file() -> None:
+    """若使用者沒設 SSL_CERT_FILE，自動指到 OS 系統 CA bundle（Linux）。
+    讓 Python urllib / httpx 直接吃企業 CA，無需任何手動設定。"""
+    if os.environ.get("SSL_CERT_FILE"):
+        return
+    for p in _CA_BUNDLES:
+        try:
+            if os.path.isfile(p) and os.access(p, os.R_OK):
+                os.environ["SSL_CERT_FILE"] = p
+                # 同時設 requests/certifi 慣用變數,涵蓋更多函式庫。
+                os.environ.setdefault("REQUESTS_CA_BUNDLE", p)
+                return
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def install_os_trust() -> str:
     """讓 Python stdlib ssl 信任 OS 原生信任庫（含企業 CA）。冪等,可重複呼叫。
     回簡短狀態字串供 log。"""
@@ -41,6 +66,10 @@ def install_os_trust() -> str:
         ssl._create_default_https_context = ssl._create_unverified_context  # type: ignore[attr-defined]
         log.warning("JTDT_TLS_INSECURE 已設 — TLS 憑證驗證已停用（不建議,僅供企業攔截環境暫用）")
         return "insecure"
+
+    # 先自動指 SSL_CERT_FILE 到 OS CA bundle（Linux）—— 連 truststore 不在的舊
+    # 環境,Python urllib/httpx 也會吃企業 CA,完全免設定。
+    _autoset_cert_file()
 
     try:
         import truststore  # pure-python, 有通用 wheel

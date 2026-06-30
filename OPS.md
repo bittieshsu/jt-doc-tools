@@ -35,6 +35,41 @@
 
 降版會被拒（避免毀資料）。失敗會自動 rollback。
 
+## 企業 TLS 攔截環境（更新 / 下載出現 CERTIFICATE_VERIFY_FAILED）
+
+公司若有 **TLS 檢查代理 / 防火牆**會把外部 HTTPS 憑證換成自家 CA。徵狀：
+`jtdt update`、下載 OCR 語言檔（tessdata）、或 LLM / 遠端 OCR / SSO 連線時出現
+
+```
+SSL: CERTIFICATE_VERIFY_FAILED ... Missing Authority Key Identifier
+```
+
+原因：企業 CA 裝在 **OS 系統信任庫**，但 Python（程式內建的獨立 Python）用的是
+自帶的 certifi 憑證庫，**不認**那個企業 CA。
+
+**v1.12.43 起自動處理 — 不需任何設定。** 只要照原本方式安裝 / 更新即可：
+
+```bash
+# 既有安裝：直接更新（建議重跑網站一行安裝指令，確保拿到最新 install.sh）
+curl -fsSL https://raw.githubusercontent.com/jasoncheng7115/jt-doc-tools/main/install.sh | sudo bash
+# 或
+sudo jtdt update
+```
+
+install.sh / `jtdt update` / 程式啟動會**自動**：① 讓 uv 用 OS 信任庫
+（`UV_NATIVE_TLS` / `UV_SYSTEM_CERTS`）；② 把 `SSL_CERT_FILE` 指到 OS 系統 CA
+bundle（`/etc/ssl/certs/ca-certificates.crt` 等）；③ 用 **truststore** 把程式執行時的
+Python ssl 接到 OS 原生信任庫。企業 CA 既然已在 OS 信任庫（`apt` / `curl` / `git` 能動
+即代表有），上述三層就會自動認得，HTTPS 下載全部成功 —— **客戶端零設定**。
+
+> 註：既有客戶若卡在舊版,**重跑上面的網站一行安裝指令**最保險（會拿到含此修正的新
+> install.sh，第一次就成功）；若用 `jtdt update`,因更新當下跑的是舊版邏輯,可能需再跑一次。
+
+**例外 — 萬一企業 CA 還沒進 OS 信任庫**（少數情況，連 `apt`/`curl` 也失敗）：先把 CA
+裝進系統信任庫即可（Debian：`sudo cp 企業CA.crt /usr/local/share/ca-certificates/ &&
+sudo update-ca-certificates`；Windows 匯入「受信任的根憑證授權單位」；macOS 加入鑰匙圈並信任）。
+真的不便處理時，最後手段 `sudo JTDT_TLS_INSECURE=1 jtdt update`（停用驗證，有 MITM 風險，僅信任內網用）。
+
 ## 反向代理（HTTPS）— 非本機存取的**強制**安全要求
 
 > ⚠️ **只要不是「本機單人」使用（任何網路 / 多人 / 內網其他電腦 / 對外）→ 一律放在
