@@ -16,8 +16,13 @@
 {% if is_directory_backend %}
 <div class="panel">
   <b>從 {{ auth_backend|upper }} 目錄同步群組</b>
-  <p class="muted">預設只有「使用者登入時」才把該人所屬群組帶進來，所以一開始只看得到登入過的人所屬的少數群組。按這裡可一次列舉目錄內所有群組，方便先指派權限（不會更動成員）。</p>
-  <button class="btn" type="button" id="btnSyncDir">{{ icon('refresh', size=14) }} 同步目錄群組</button>
+  <p class="muted">預設只有「使用者登入時」才把該人所屬群組帶進來，所以一開始只看得到登入過的人所屬的少數群組。按這裡可列舉目錄群組鏡射進來，方便先指派權限（不會更動成員）。</p>
+  <div class="grp-sync-row">
+    <input class="field" type="text" id="syncNameFilter" maxlength="128"
+           placeholder="只同步名稱含此字（選填，避免帶入 Domain Users 等系統群組）例：UG_ / NTPD">
+    <button class="btn" type="button" id="btnSyncDir">{{ icon('refresh', size=14) }} 同步目錄群組</button>
+  </div>
+  <p class="muted">留空 = 同步全部。想更精準可在「認證設定」的 LDAP 進階填 <code>group_search_base</code>（限某個 OU）或 <code>group_search_filter</code>（自訂 filter）。</p>
   <span id="syncDirMsg" class="muted"></span>
 </div>
 {% endif %}
@@ -100,6 +105,8 @@
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
+  .grp-sync-row { display:flex; gap:8px; align-items:center; margin:6px 0; flex-wrap:wrap; }
+  .grp-sync-row .field { flex:1; min-width:240px; max-width:520px; }
   .grp-table { width:100%; border-collapse:collapse; font-size:13px; }
   .grp-table th, .grp-table td { padding:6px 8px; border-bottom:1px solid #e5e7eb; text-align:left; }
   .grp-table th { background:#f9fafb; font-size:12px; color:#6b7280; }
@@ -286,8 +293,13 @@ if (_btnSyncDir) {
     const msg = document.getElementById('syncDirMsg');
     _btnSyncDir.disabled = true;
     msg.textContent = ' 同步中…（目錄大時可能數秒）';
+    const nameContains = (document.getElementById('syncNameFilter') || {}).value || '';
     try {
-      const r = await fetch('/admin/groups/sync-ldap', { method: 'POST' });
+      const r = await fetch('/admin/groups/sync-ldap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name_contains: nameContains.trim() }),
+      });
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
       msg.textContent = ` ✓ 新增 ${j.synced}、更新 ${j.updated}，目錄共 ${j.total_seen} 個群組，頁面即將重整…`;

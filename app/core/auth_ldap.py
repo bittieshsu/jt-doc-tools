@@ -389,14 +389,21 @@ def get_ou_subjects_for_dn(dn: str) -> list[tuple[str, str]]:
     return out
 
 
-def sync_all_groups() -> dict:
-    """列舉目錄內**所有**群組,鏡射進本地 `groups` 表（不動成員關係）。
+def sync_all_groups(name_contains: str = "") -> dict:
+    """列舉目錄內群組,鏡射進本地 `groups` 表（不動成員關係）。
 
     解決「只看得到曾登入使用者所屬群組」的 JIT 限制 —— 讓 admin 在使用者登入前
     就能把權限指派給任何 AD / LDAP 群組。用 paged_search 處理 AD 1000 筆上限。
+
+    避免把不必要的群組（Domain Users、內建系統群組…）全帶進來,有三層過濾:
+      ① `name_contains`：只同步「名稱含此字串」的群組（本函式參數,UI 直接輸入,
+         轉成 `(cn=*xxx*)` 條件,效率高）。
+      ② `group_search_base`（cfg）：把搜尋範圍縮到某個 OU（只放要用的群組那層）。
+      ③ `group_search_filter`（cfg）：完全自訂 LDAP filter（進階）。
     回 {synced, updated, total_seen, sample}。
     """
     from ldap3 import Connection, SUBTREE
+    from ldap3.utils.conv import escape_filter_chars
 
     s = auth_settings.get()
     backend = s.get("backend", "ldap")
@@ -410,6 +417,10 @@ def sync_all_groups() -> dict:
                or "(|(objectClass=group)(objectClass=groupOfNames)"
                   "(objectClass=groupOfUniqueNames)(objectClass=posixGroup))")
     name_attr = cfg.get("group_name_attr", "cn")
+    # ① 名稱過濾：AND 進 `(cn=*xxx*)`（跳脫特殊字元防注入）。
+    nc = (name_contains or "").strip()
+    if nc:
+        gfilter = f"(&{gfilter}({name_attr}=*{escape_filter_chars(nc)}*))"
     if not svc_dn or not svc_pw or not base:
         raise AuthError("Service Account / 搜尋 base DN / Service 密碼 都需先填妥")
     if "(" in base or ")" in base:

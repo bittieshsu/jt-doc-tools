@@ -31,6 +31,17 @@
 .ss-table tr:hover td { background: #f8fafc; }
 /* 橫向長條圖：用獨立 column 容納，bar 寬度依 % 算 */
 .ss-bar-cell { width: 200px; padding: 6px 10px; }
+/* 特殊列（未追蹤暫存 / 匿名）的即時說明 tooltip — CSS :hover 立刻顯示,無原生 title 延遲 */
+.ss-hint-cell { position: relative; cursor: help; }
+.ss-hint-mark { display:inline-flex; align-items:center; justify-content:center;
+  margin-left:5px; width:15px; height:15px; border-radius:50%;
+  background:#e5e7eb; color:#6b7280; font-size:10px; font-weight:700; }
+.ss-hint-cell:hover .ss-hint-mark { background:#c7d2fe; color:#3730a3; }
+.ss-hint-pop { display:none; position:absolute; left:0; top:100%; z-index:30;
+  margin-top:5px; width:340px; max-width:70vw; padding:9px 12px;
+  background:#111827; color:#f9fafb; font-size:12px; line-height:1.6; font-weight:normal;
+  border-radius:7px; box-shadow:0 6px 20px rgba(0,0,0,.28); white-space:normal; text-align:left; }
+.ss-hint-cell:hover .ss-hint-pop { display:block; }
 .ss-bar-cell .bar-track {
   height: 14px; background: #f1f5f9; border-radius: 3px; overflow: hidden;
   position: relative;
@@ -293,6 +304,11 @@ function renderUsers(users) {
     $('ssUserStats').innerHTML = '<div class="muted">尚無使用者檔案紀錄</div>';
     return;
   }
+  // 特殊列的即時說明（hover 立刻彈出）
+  const SS_ROW_HINTS = {
+    '(未追蹤暫存)': '暫存目錄裡「沒有擁有者標記」的檔案 — 無法歸到特定使用者的暫存工作檔：某些工具處理時的中間檔、認證關閉時上傳的檔、蓋章/浮水印的臨時圖（stamp_temp_ / wm_temp_）、或擷取文字的過期暫存目錄。屬正常暫存，會由排程（暫存預設 2 小時）自動清理，不需處理。',
+    '(匿名)': '從稽核記錄還原的活動量，但操作當下的使用者是匿名（未登入 / 認證關閉時）。不是實體檔案佔用，只反映活動量。',
+  };
   // Sort copy of rows. 'viz' is a synthetic key that mirrors the bar
   // length so sorting by 「活動量視覺化」 column matches what user sees.
   const refOf = r => Math.max(r.bytes || 0, r.activity_30d_bytes || 0);
@@ -326,8 +342,12 @@ function renderUsers(users) {
     let barCls = '';
     if (barPct >= 80) barCls = 'crit';
     else if (barPct >= 50) barCls = 'warn';
+    const hint = SS_ROW_HINTS[r.username];
+    const nameCell = hint
+      ? `<td class="ss-hint-cell">${escapeHTML(r.username)}<span class="ss-hint-mark">?</span><span class="ss-hint-pop">${escapeHTML(hint)}</span></td>`
+      : `<td>${escapeHTML(r.username)}</td>`;
     html += `<tr>
-      <td>${escapeHTML(r.username)}</td>
+      ${nameCell}
       <td class="num">${(r.count || 0).toLocaleString()}</td>
       <td class="num">${fmtBytes(r.bytes || 0)}</td>
       <td class="num">${(r.activity_30d_count || 0).toLocaleString()}</td>

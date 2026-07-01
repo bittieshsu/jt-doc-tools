@@ -484,7 +484,12 @@ def build_auth_router(templates) -> APIRouter:
         if backend not in ("ldap", "ad"):
             raise HTTPException(400, "目前認證後端不是 LDAP / AD，無法同步目錄群組。")
         try:
-            result = auth_ldap.sync_all_groups()
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        name_contains = str((body or {}).get("name_contains") or "").strip()
+        try:
+            result = auth_ldap.sync_all_groups(name_contains=name_contains)
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001

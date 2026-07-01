@@ -36,3 +36,20 @@ def test_group_sync_ldap_requires_directory_backend(admin_session):
 def test_sync_all_groups_function_exists():
     from app.core import auth_ldap
     assert hasattr(auth_ldap, "sync_all_groups")
+
+
+def test_group_sync_accepts_name_filter(admin_session):
+    """同步端點接受 name_contains 過濾（非目錄後端仍 400，但不因參數而 500）。"""
+    c, _, _ = admin_session
+    r = c.post("/admin/groups/sync-ldap", json={"name_contains": "UG_"})
+    assert r.status_code == 400  # local backend
+    assert r.status_code != 500
+
+
+def test_sync_all_groups_escapes_filter_injection():
+    """name_contains 走 escape_filter_chars，防 LDAP filter 注入。"""
+    import inspect
+    from app.core import auth_ldap
+    src = inspect.getsource(auth_ldap.sync_all_groups)
+    assert "escape_filter_chars" in src
+    assert "name_contains" in inspect.signature(auth_ldap.sync_all_groups).parameters
