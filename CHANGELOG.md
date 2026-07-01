@@ -4,6 +4,13 @@
 
 ---
 
+## [1.12.50] - 2026-07-01
+
+### 修正 — 目錄瀏覽 non-AD schema 失敗 + 稽核使用者篩選改文字 + 群組成員數顯示目錄實際數
+
+- **目錄樹在 OpenLDAP 失敗**（`invalid class in objectClass attribute: container`）：`container` 是 AD 專屬 objectClass,ldap3 用 server schema 驗證 filter 時對非 AD 目錄直接拒。修：所有 LDAP Connection 加 `check_names=False`（關掉客戶端 class/attr 名驗證,未知 class 由 server 處理→回無結果不報錯）。
+- **稽核記錄「使用者」篩選**原為下拉清單,使用者上千時無法用 → 改**文字輸入 + datalist 自動完成**,後端改**模糊比對**（`username LIKE %x%`）,輸入部分帳號即可。
+- **群組清單「成員數」**原顯示本地登入過人數,與目錄實際不一致（客戶回報 1 vs N）→ 清單載入時**非同步查目錄成員數**（`count_group_members` 快取 5 分鐘）更新該欄,不阻塞頁面。
 ## [1.12.49] - 2026-07-01
 
 ### 新增 — 目錄瀏覽（AD/LDAP OU 樹狀 → 指派權限給 OU）

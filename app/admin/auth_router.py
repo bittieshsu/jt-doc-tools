@@ -544,6 +544,24 @@ def build_auth_router(templates) -> APIRouter:
                 "not_local_count": len(members) - local_count,
                 "members": members}
 
+    @router.get("/groups/{gid}/member-count")
+    async def groups_member_count(gid: int, request: Request):
+        """回某 AD/LDAP 群組的目錄成員數（快取 5 分鐘）。群組清單頁載入時非同步
+        呼叫,把「成員數」欄從本地登入數更新成目錄實際數。"""
+        from ..core import auth_settings, auth_ldap
+        if (auth_settings.get() or {}).get("backend", "off") not in ("ldap", "ad"):
+            raise HTTPException(400, "僅 LDAP / AD 群組")
+        g = group_manager.get(gid)
+        if not g or not (g.get("external_dn") or "").strip():
+            raise HTTPException(404, "群組不存在或無目錄 DN")
+        try:
+            n = auth_ldap.count_group_members(g["external_dn"])
+        except auth_ldap.AuthError as e:
+            raise HTTPException(400, str(e))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
+        return {"ok": True, "count": n}
+
     @router.post("/groups/{gid}/update")
     async def groups_update(gid: int, request: Request):
         body = await request.json()
@@ -818,8 +836,8 @@ def build_auth_router(templates) -> APIRouter:
         # Build SQL conditions
         conds, params = [], []
         if q_user:
-            conds.append("username = ?")
-            params.append(q_user)
+            conds.append("username LIKE ?")
+            params.append(f"%{q_user}%")
         if q_event:
             conds.append("event_type = ?")
             params.append(q_event)
@@ -939,8 +957,8 @@ def build_auth_router(templates) -> APIRouter:
         conds = ["event_type = 'tool_invoke'", "details_json LIKE '%\"filename\"%'"]
         params: list = []
         if q_user:
-            conds.append("username = ?")
-            params.append(q_user)
+            conds.append("username LIKE ?")
+            params.append(f"%{q_user}%")
         if q_tool:
             conds.append("target = ?")
             params.append(q_tool)

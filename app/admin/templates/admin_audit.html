@@ -14,12 +14,12 @@
 {% endif %}
 
 <form method="get" class="audit-filter">
-  <select class="field" name="q_user">
-    <option value="">所有使用者</option>
-    {% for u in distinct_users %}
-    <option value="{{ u }}" {% if u == q_user %}selected{% endif %}>{{ u }}</option>
-    {% endfor %}
-  </select>
+  <input class="field" type="text" name="q_user" list="auditUserSuggest"
+         value="{{ q_user }}" placeholder="使用者（可輸入部分，模糊比對；留空 = 全部）"
+         autocomplete="off">
+  <datalist id="auditUserSuggest">
+    {% for u in distinct_users %}<option value="{{ u }}"></option>{% endfor %}
+  </datalist>
   <select class="field" name="q_event">
     <option value="">所有事件類型</option>
     {% for e in distinct_events %}

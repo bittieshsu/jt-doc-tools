@@ -73,7 +73,7 @@ def test_connection(cfg: dict) -> dict:
     t0 = time.time()
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
             who = ""
             try:
                 who = conn.extend.standard.who_am_i() or ""
@@ -135,7 +135,7 @@ def test_user_login(cfg: dict, username: str, password: str) -> dict:
     # Step 1+2: service bind + search.
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True) as svc_conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False) as svc_conn:
             attrs = [
                 cfg.get("displayname_attr", "displayName"),
                 cfg.get("group_attr", "memberOf"),
@@ -163,7 +163,7 @@ def test_user_login(cfg: dict, username: str, password: str) -> dict:
     # Step 3: user bind.
     try:
         with Connection(server, user=user_dn, password=password,
-                        auto_bind=True, raise_exceptions=True):
+                        auto_bind=True, raise_exceptions=True, check_names=False):
             pass
     except Exception:
         raise AuthError("帳號或密碼錯誤（service search 找到使用者，但密碼 bind 失敗）")
@@ -209,7 +209,7 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
 
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True) as svc_conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False) as svc_conn:
             svc_conn.search(
                 search_base=base,
                 search_filter=user_filter,
@@ -251,7 +251,7 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
     # Step 3: try to bind as the discovered user → password check.
     try:
         with Connection(server, user=user_dn, password=password,
-                        auto_bind=True, raise_exceptions=True) as user_conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False) as user_conn:
             pass
     except Exception:
         audit_db.log_event("login_fail", username=username, ip=ip,
@@ -430,7 +430,7 @@ def sync_all_groups(name_contains: str = "") -> dict:
     seen: list[tuple[str, str]] = []
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
             entries = conn.extend.standard.paged_search(
                 search_base=base, search_filter=gfilter,
                 search_scope=SUBTREE, attributes=[name_attr],
@@ -501,7 +501,7 @@ def get_group_members(group_dn: str) -> list[dict]:
     out: list[dict] = []
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
             entries = conn.extend.standard.paged_search(
                 search_base=user_base, search_filter=filt,
                 search_scope=SUBTREE, attributes=[disp_attr, login_attr],
@@ -553,7 +553,7 @@ def list_ou_children(parent_dn: str = "") -> list[dict]:
     out: list[dict] = []
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
             entries = conn.extend.standard.paged_search(
                 search_base=base, search_filter=node_filter,
                 search_scope=LEVEL, attributes=["ou", "cn"],
@@ -595,7 +595,7 @@ def list_ou_users(ou_dn: str, recursive: bool = False) -> list[dict]:
     out: list[dict] = []
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
             entries = conn.extend.standard.paged_search(
                 search_base=ou_dn, search_filter=user_filter,
                 search_scope=(SUBTREE if recursive else LEVEL),
@@ -617,3 +617,24 @@ def list_ou_users(ou_dn: str, recursive: bool = False) -> list[dict]:
         raise AuthError(f"列 OU 使用者失敗：{type(exc).__name__}: {exc}")
     out.sort(key=lambda x: (x["name"] or "").lower())
     return out
+
+
+# 群組目錄成員數快取（LDAP 無便宜 COUNT,只能列舉 → 快取避免每次載入頁都重查）。
+import time as _time
+_member_count_cache: dict[str, tuple[int, float]] = {}
+_MEMBER_COUNT_TTL = 300.0  # 秒
+
+
+def count_group_members(group_dn: str) -> int:
+    """回某群組在目錄的直接成員數（快取 5 分鐘）。給群組清單頁的「成員數」用。"""
+    dn = (group_dn or "").strip()
+    if not dn:
+        return 0
+    key = dn.lower()
+    hit = _member_count_cache.get(key)
+    now = _time.time()
+    if hit and (now - hit[1]) < _MEMBER_COUNT_TTL:
+        return hit[0]
+    n = len(get_group_members(dn))
+    _member_count_cache[key] = (n, now)
+    return n

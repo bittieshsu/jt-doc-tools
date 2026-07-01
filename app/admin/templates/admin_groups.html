@@ -413,5 +413,21 @@ if (_btnSyncDir) {
     }
   });
 }
+
+// 群組清單載入時,為每個 AD/LDAP 群組非同步補上「目錄成員數」。
+// 原「成員數」欄顯示的是本地登入過人數,與目錄實際不一致（客戶回報 1 vs N）。
+// 快取 5 分鐘,不阻塞頁面;失敗就保留原本地數。
+document.querySelectorAll('.grp-table tbody tr').forEach(tr => {
+  const src = tr.dataset.source;
+  if (src !== 'ldap' && src !== 'ad') return;
+  const cell = tr.children[3];
+  if (!cell) return;
+  const local = (cell.textContent || '').trim();
+  cell.innerHTML = `<span class="muted" title="本地登入數 ${local}，查詢目錄成員數中…">${local} …</span>`;
+  fetch(`/admin/groups/${tr.dataset.gid}/member-count`)
+    .then(r => r.ok ? r.json() : null)
+    .then(j => { cell.textContent = (j && typeof j.count === 'number') ? j.count : local; })
+    .catch(() => { cell.textContent = local; });
+});
 </script>
 {% endblock %}
