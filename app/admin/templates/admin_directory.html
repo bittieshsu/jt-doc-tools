@@ -51,14 +51,18 @@
   .dir-dn { font-size:11px; color:#9ca3af; word-break:break-all; margin-bottom:8px; }
   .dir-roles-box { background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:8px 10px; margin:8px 0; }
   .dir-role-chk { display:inline-flex; align-items:center; gap:5px; margin:2px 10px 2px 0; font-size:13px; font-weight:normal; cursor:pointer; }
-  .dir-utable { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:8px; }
-  .dir-utable th, .dir-utable td { padding:6px 10px; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align:middle; }
+  .dir-utable { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:8px; table-layout:auto; }
+  .dir-utable th, .dir-utable td { padding:6px 12px; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align:middle; }
   .dir-utable th { background:#f9fafb; font-size:11px; color:#6b7280; font-weight:600; }
+  /* 姓名 + 帳號 收到內容寬度並靠左並排（避免短內容被 width:100% 撐開留大空隙）；
+     狀態欄吸收剩餘寬度、靠右，讓「已登入 / —」對齊右緣。 */
+  .dir-utable th:nth-child(1), .dir-utable td:nth-child(1) { width:1%; white-space:nowrap; padding-right:36px; }
+  .dir-utable th:nth-child(2), .dir-utable td:nth-child(2) { width:1%; white-space:nowrap; padding-right:36px; }
   .dir-utable tbody tr { cursor:pointer; }
   .dir-utable tbody tr:hover td { background:#f3f4f6; }
   .dir-utable tr.is-local td:first-child { box-shadow: inset 3px 0 0 #22c55e; }
   .dir-utable .du-login { color:#6b7280; font-family: ui-monospace, SFMono-Regular, monospace; font-size:12px; }
-  .dir-utable .du-st { text-align:center; white-space:nowrap; width:96px; }
+  .dir-utable .du-st { text-align:right; white-space:nowrap; }
   .dir-ubadge { font-size:11px; font-weight:600; padding:1px 8px; border-radius:10px; background:#dcfce7; color:#15803d; }
   .du-dim { color:#cbd5e1; }
   .dir-in-legend { background:#f0fdf4; box-shadow: inset 3px 0 0 #22c55e; padding:0 6px; border-radius:3px; }
