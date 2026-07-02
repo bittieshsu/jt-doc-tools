@@ -690,29 +690,61 @@ def test_seed_default_auditor_writes_audit_event(admin_session):
 # ---------- v1.5.0: admin web UI unlock + reset-totp endpoints ----------
 
 def test_admin_unlock_user_endpoint(admin_session):
-    """admin POST /admin/users/{uid}/unlock clears that user's lockouts."""
-    from app.core import auth_db, db
-    client, _, _ = admin_session
-    uid = _make_user("locked-user")
-    # Insert a fake lockout
+    """END-TO-END: lock a real local user via failed logins (so we exercise the
+    REAL key format `user:<lowercased-username>` that auth_local writes), then
+    admin POST /admin/users/{uid}/unlock actually clears it.
+
+    (The previous version of this test inserted a `user:{uid}:127.0.0.1` row —
+    a format auth_local never produces — so it passed while the real per-user
+    unlock button silently cleared nothing. Regression guard for that.)"""
     import time
-    with db.tx(auth_db.conn()):
-        auth_db.conn().execute(
-            "INSERT INTO lockouts(key, failed_count, locked_until, last_failed_at) "
-            "VALUES (?, 5, ?, ?)",
-            (f"user:{uid}:127.0.0.1", time.time() + 600, time.time()),
-        )
-    n_before = auth_db.conn().execute(
-        "SELECT COUNT(*) AS n FROM lockouts WHERE key LIKE ?",
-        (f"user:{uid}:%",)).fetchone()["n"]
-    assert n_before == 1
+    from app.core import auth_db, auth_local, auth_settings, user_manager
+    client, _, _ = admin_session
+    thr = int(auth_settings.get().get("lockout_threshold", 5))
+    user_manager.create_local("lockme", "Lock Me", "GoodPass1234")
+    uid = auth_db.conn().execute(
+        "SELECT id FROM users WHERE username='lockme' AND source='local'"
+    ).fetchone()["id"]
+    for _ in range(thr):
+        try:
+            auth_local.authenticate("lockme", "wrongpass", ip="10.0.0.9")
+        except auth_local.AuthError:
+            pass
+    # Real key present + actually locked.
+    assert auth_db.conn().execute(
+        "SELECT 1 FROM lockouts WHERE key='user:lockme' AND locked_until > ?",
+        (time.time(),)).fetchone(), "user should be locked (real key format)"
     r = client.post(f"/admin/users/{uid}/unlock")
-    assert r.status_code == 200
-    assert r.json()["ok"] is True
-    n_after = auth_db.conn().execute(
-        "SELECT COUNT(*) AS n FROM lockouts WHERE key LIKE ?",
-        (f"user:{uid}:%",)).fetchone()["n"]
-    assert n_after == 0
+    assert r.status_code == 200 and r.json()["ok"] is True
+    assert r.json()["cleared"] >= 1, "unlock must actually clear ≥1 row"
+    assert not auth_db.conn().execute(
+        "SELECT 1 FROM lockouts WHERE key='user:lockme'").fetchone()
+
+
+def test_account_locked_audit_event(admin_session):
+    """Crossing the failure threshold emits a distinct `account_locked` audit
+    event (so SIEM can alert on it directly, not just infer from login_fail)."""
+    import time
+    from app.core import auth_db, auth_local, auth_settings, user_manager, audit_db
+    _c, _, _ = admin_session
+    thr = int(auth_settings.get().get("lockout_threshold", 5))
+    user_manager.create_local("lockme2", "L2", "GoodPass1234")
+    for _ in range(thr):
+        try:
+            auth_local.authenticate("lockme2", "wrongpass", ip="10.0.0.8")
+        except auth_local.AuthError:
+            pass
+    deadline = time.time() + 3.0
+    n = 0
+    while time.time() < deadline:
+        n = audit_db.conn().execute(
+            "SELECT COUNT(*) FROM audit_events "
+            "WHERE event_type='account_locked' AND target='lockme2'"
+        ).fetchone()[0]
+        if n:
+            break
+        time.sleep(0.05)
+    assert n >= 1, "expected an account_locked audit event"
 
 
 def test_admin_unlock_all_endpoint(admin_session):

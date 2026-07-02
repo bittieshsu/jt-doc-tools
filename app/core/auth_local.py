@@ -34,29 +34,37 @@ def _check_lockout(conn, key: str, threshold: int) -> Optional[float]:
     return None
 
 
-def _record_fail(conn, key: str, threshold: int, lockout_minutes: int) -> None:
+def _record_fail(conn, key: str, threshold: int, lockout_minutes: int) -> bool:
+    """Increment the failure counter for `key`. Returns True iff THIS call is
+    what crossed the threshold (i.e. the lock was just triggered) — the caller
+    uses that to emit a single `account_locked` audit event."""
     now = time.time()
     row = conn.execute("SELECT failed_count, locked_until FROM lockouts WHERE key=?",
                        (key,)).fetchone()
     if row:
         new_count = row["failed_count"] + 1
         locked_until = row["locked_until"]
+        just_locked = False
         if new_count >= threshold:
             locked_until = now + lockout_minutes * 60
             new_count = 0   # reset counter once locked
+            just_locked = True
         conn.execute(
             "UPDATE lockouts SET failed_count=?, locked_until=?, last_failed_at=? "
             "WHERE key=?",
             (new_count, locked_until, now, key),
         )
+        return just_locked
     else:
         new_count = 1
-        locked_until = now + lockout_minutes * 60 if new_count >= threshold else 0.0
+        just_locked = new_count >= threshold
+        locked_until = now + lockout_minutes * 60 if just_locked else 0.0
         conn.execute(
             "INSERT INTO lockouts(key, failed_count, locked_until, last_failed_at) "
             "VALUES (?,?,?,?)",
             (key, 0 if locked_until else new_count, locked_until, now),
         )
+        return just_locked
 
 
 def _clear_lockout(conn, keys: list[str]) -> None:
@@ -111,13 +119,24 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
 
     if not ok or row is None:
         with db.tx(conn):
-            _record_fail(conn, user_key, threshold, lockout_minutes)
-            _record_fail(conn, ip_key, threshold, lockout_minutes)
+            user_just_locked = _record_fail(conn, user_key, threshold, lockout_minutes)
+            ip_just_locked = _record_fail(conn, ip_key, threshold, lockout_minutes)
         audit_db.log_event(
             "login_fail",
             username=username, ip=ip, target=username,
             details={"reason": "bad_credentials"},
         )
+        # 剛好在這次跨過門檻 → 送一筆專屬「帳號 / 來源已鎖定」事件，方便 SIEM
+        # 直接對它告警（不必自己累計 login_fail 次數）。
+        if user_just_locked or ip_just_locked:
+            audit_db.log_event(
+                "account_locked",
+                username=username, ip=ip, target=username,
+                details={"locked_user": bool(user_just_locked),
+                         "locked_ip": bool(ip_just_locked),
+                         "lockout_minutes": lockout_minutes,
+                         "threshold": threshold},
+            )
         raise AuthError("帳號或密碼錯誤")
 
     if not row["enabled"]:

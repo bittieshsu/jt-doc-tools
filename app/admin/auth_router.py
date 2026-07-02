@@ -453,18 +453,19 @@ def build_auth_router(templates) -> APIRouter:
                            (uid,)).fetchone()
         if not row:
             raise HTTPException(404, "使用者不存在")
+        uname = (row["username"] or "").strip()
         with db.tx(conn):
-            cur = conn.execute(
-                "DELETE FROM lockouts WHERE key LIKE ?",
-                (f"user:{uid}:%",),
-            )
-            n_user = cur.rowcount
-            # Older format may have used username — also clean
-            cur2 = conn.execute(
-                "DELETE FROM lockouts WHERE key LIKE ?",
-                (f"user:{row['username']}:%",),
-            )
-            n_user += cur2.rowcount
+            # auth_local 實際寫的 key 格式是 `user:<小寫帳號>`（見 auth_local
+            # _record_fail / user_key）——先精準清這個，否則解鎖等於沒作用。
+            n_user = conn.execute(
+                "DELETE FROM lockouts WHERE key=?",
+                (f"user:{uname.lower()}",),
+            ).rowcount
+            # 防禦：清掉可能存在的舊 / 其他格式（uid-based 或帶尾冒號）。
+            n_user += conn.execute(
+                "DELETE FROM lockouts WHERE key LIKE ? OR key LIKE ? OR key=?",
+                (f"user:{uid}:%", f"user:{uname}:%", f"user:{uname}"),
+            ).rowcount
         audit_db.log_event(
             "user_unlock", username=_actor(request), ip=_client_ip(request),
             target=str(uid), details={"cleared": n_user},
