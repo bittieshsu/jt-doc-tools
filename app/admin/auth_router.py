@@ -180,11 +180,71 @@ def build_auth_router(templates) -> APIRouter:
     @router.get("/auth-settings", response_class=HTMLResponse)
     async def auth_settings_page(request: Request):
         s = auth_settings.get()
+        # 目前仍在鎖定中的帳號 / IP（給「解鎖清單」用）。
+        import time as _t
+        now = _t.time()
+        rows = auth_db.conn().execute(
+            "SELECT key, locked_until FROM lockouts WHERE locked_until > ? "
+            "ORDER BY locked_until DESC", (now,)).fetchall()
+        locked_accounts, locked_ips = [], []
+        for r in rows:
+            key = r["key"] or ""
+            mins = max(1, int((r["locked_until"] - now + 59) // 60))
+            if key.startswith("user:"):
+                locked_accounts.append({"name": key[5:], "mins": mins})
+            elif key.startswith("ip:"):
+                locked_ips.append({"ip": key[3:], "mins": mins})
         return templates.TemplateResponse(request, "admin_auth_settings.html", {
             "request": request,
             "settings": s,
             "is_enabled": auth_settings.is_enabled(),
+            "locked_accounts": locked_accounts,
+            "locked_ips": locked_ips,
         })
+
+    @router.post("/auth-settings/policy-save")
+    async def auth_settings_policy_save(request: Request):
+        """儲存鎖定政策（啟用 / 視窗 / 帳號門檻 / IP 門檻 / 鎖定時間）。"""
+        body = await request.json()
+        def _int(name, default, lo, hi):
+            try:
+                v = int(body.get(name, default))
+            except (TypeError, ValueError):
+                raise HTTPException(400, f"{name} 必須是整數")
+            if v < lo or v > hi:
+                raise HTTPException(400, f"{name} 需在 {lo}–{hi} 之間")
+            return v
+        s = auth_settings.get()
+        s["lockout_enabled"] = bool(body.get("lockout_enabled", True))
+        s["lockout_window_minutes"] = _int("lockout_window_minutes", 10, 1, 1440)
+        s["lockout_threshold"] = _int("lockout_threshold", 5, 1, 1000)
+        s["lockout_ip_threshold"] = _int("lockout_ip_threshold", 20, 1, 10000)
+        s["lockout_minutes"] = _int("lockout_minutes", 15, 1, 10080)
+        auth_settings.save(s)
+        audit_db.log_event(
+            "settings_change", username=_actor(request), ip=_client_ip(request),
+            target="lockout_policy",
+            details={k: s[k] for k in ("lockout_enabled", "lockout_window_minutes",
+                                       "lockout_threshold", "lockout_ip_threshold",
+                                       "lockout_minutes")})
+        return JSONResponse({"ok": True})
+
+    @router.post("/auth-settings/unlock-key")
+    async def auth_settings_unlock_key(request: Request):
+        """解鎖單一鎖定項目（帳號 `user:<帳號>` 或 IP `ip:<addr>`），給「目前
+        鎖定中」清單的每列解鎖鈕用。只接受 user:/ip: 前綴，避免亂刪。"""
+        body = await request.json()
+        key = (body.get("key") or "").strip()
+        if not (key.startswith("user:") or key.startswith("ip:")):
+            raise HTTPException(400, "無效的鎖定鍵")
+        from ..core import db
+        conn = auth_db.conn()
+        with db.tx(conn):
+            n = conn.execute("DELETE FROM lockouts WHERE key=?", (key,)).rowcount
+        audit_db.log_event(
+            "lockout_unlock", username=_actor(request), ip=_client_ip(request),
+            target=key, details={"cleared": n})
+        return JSONResponse({"ok": True, "cleared": n})
 
     @router.post("/auth-settings/disable")
     async def auth_settings_disable(request: Request):

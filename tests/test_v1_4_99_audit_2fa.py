@@ -770,6 +770,47 @@ def test_admin_unlock_all_endpoint(admin_session):
     assert n == 0
 
 
+def test_lockout_policy_save_endpoint(admin_session):
+    """admin can edit the lockout policy (enable / window / dual thresholds /
+    duration) via /admin/auth-settings/policy-save."""
+    from app.core import auth_settings
+    client, _, _ = admin_session
+    r = client.post("/admin/auth-settings/policy-save", json={
+        "lockout_enabled": True, "lockout_window_minutes": 8,
+        "lockout_threshold": 4, "lockout_ip_threshold": 30,
+        "lockout_minutes": 20})
+    assert r.status_code == 200 and r.json()["ok"] is True
+    s = auth_settings.get()
+    assert s["lockout_window_minutes"] == 8 and s["lockout_threshold"] == 4
+    assert s["lockout_ip_threshold"] == 30 and s["lockout_minutes"] == 20
+    # out-of-range rejected
+    assert client.post("/admin/auth-settings/policy-save",
+                       json={"lockout_threshold": 0}).status_code == 400
+    # restore defaults so we don't leak into other tests
+    s = auth_settings.get()
+    s.update({"lockout_window_minutes": 10, "lockout_threshold": 5,
+              "lockout_ip_threshold": 20, "lockout_minutes": 15})
+    auth_settings.save(s)
+
+
+def test_unlock_key_endpoint(admin_session):
+    """Per-item unlock (account or IP) from the locked list."""
+    import time
+    from app.core import auth_db, db
+    client, _, _ = admin_session
+    with db.tx(auth_db.conn()):
+        auth_db.conn().execute(
+            "INSERT OR REPLACE INTO lockouts(key,failed_count,locked_until,last_failed_at)"
+            " VALUES('ip:203.0.113.5',0,?,?)", (time.time() + 600, time.time()))
+    r = client.post("/admin/auth-settings/unlock-key", json={"key": "ip:203.0.113.5"})
+    assert r.status_code == 200 and r.json()["cleared"] == 1
+    assert not auth_db.conn().execute(
+        "SELECT 1 FROM lockouts WHERE key='ip:203.0.113.5'").fetchone()
+    # reject keys without a valid prefix (can't delete arbitrary rows)
+    assert client.post("/admin/auth-settings/unlock-key",
+                       json={"key": "DELETE-ME"}).status_code == 400
+
+
 def test_admin_reset_totp_endpoint(admin_session):
     """admin POST /admin/users/{uid}/reset-totp clears secret + enabled +
     revokes sessions. Next login will go to forced setup again."""

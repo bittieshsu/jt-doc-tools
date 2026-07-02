@@ -29,8 +29,14 @@ _DEFAULTS: dict[str, Any] = {
     "backend": "off",                 # off | local | ldap | ad
     "session_max_age_days": 7,
     "remember_max_age_days": 30,
-    "lockout_threshold": 5,           # failed attempts before locking
-    "lockout_minutes": 15,
+    # 帳號 / IP 鎖定機制（本機認證）。預設啟用。模型：
+    #   在 lockout_window_minutes 分鐘內，同帳號失敗達 lockout_threshold 次 → 鎖帳號；
+    #   同來源 IP 失敗達 lockout_ip_threshold 次 → 鎖 IP；鎖定 lockout_minutes 分鐘。
+    "lockout_enabled": True,          # 預設啟用鎖定
+    "lockout_window_minutes": 10,     # 計數視窗：超過此時間沒再失敗就重新起算
+    "lockout_threshold": 5,           # 帳號：視窗內失敗幾次鎖帳號
+    "lockout_ip_threshold": 20,       # IP：視窗內失敗幾次鎖 IP（較寬，避免鎖死整個 NAT 出口）
+    "lockout_minutes": 15,            # 鎖多久
     "ldap": {
         # Filled in by admin; only consulted when backend ∈ {ldap, ad}
         "server_url": "",             # e.g. ldaps://ad.example.com:636

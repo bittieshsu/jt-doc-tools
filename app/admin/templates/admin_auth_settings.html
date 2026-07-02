@@ -25,18 +25,52 @@
     <tr><th>Backend</th><td><b>{{ settings.backend }}</b></td></tr>
     <tr><th>Session 預設長度</th><td>{{ settings.session_max_age_days }} 天</td></tr>
     <tr><th>「30 天免登入」長度</th><td>{{ settings.remember_max_age_days }} 天</td></tr>
-    <tr><th>失敗鎖定次數</th><td>{{ settings.lockout_threshold }} 次</td></tr>
-    <tr><th>鎖定時間</th><td>{{ settings.lockout_minutes }} 分</td></tr>
   </table>
   <p data-s="s4a909ea7">
-    <button class="btn" id="btnUnlockAll" type="button">{{ icon('unlock', size=14) }} 清除所有鎖定</button>
     <button class="btn btn-danger" id="btnDisableAuth" type="button" data-s="sc3f83707">{{ icon('unlock', size=14) }} 停用認證</button>
   </p>
   <p class="muted" data-s="s6b9c179a">
-    <b>清除所有鎖定</b>：清掉因為密碼錯誤次數過多而鎖住的帳號 / IP，緊急用（例如多人撞密碼把整個辦公室 IP 鎖死）。一般單一帳號鎖死可以從 <a href="/admin/users">使用者管理</a> 頁面點該帳號的「解鎖」即可，不必清全部。<br>
     <b>停用認證</b>會立刻讓所有人都能存取系統（恢復預設）；現有使用者 / 角色 / 權限資料保留，下次再啟用會繼續用。
     <b>所有現有 session 會立刻失效。</b>
   </p>
+</div>
+
+<div class="panel">
+  <h2 class="lk-h2">{{ icon('lock', size=18) }} 帳號 / IP 鎖定政策</h2>
+  <p class="muted">本機認證的暴力破解防護（預設<b>啟用</b>）。模型：在「計數視窗」內，同帳號失敗達「帳號門檻」→ 鎖該帳號；同來源 IP 失敗達「IP 門檻」→ 鎖該 IP；鎖定「鎖定時間」後自動解除。</p>
+  <label class="lk-enable"><input type="checkbox" id="lkEnabled" {% if settings.lockout_enabled %}checked{% endif %}> 啟用鎖定機制</label>
+  <div class="grid2">
+    <div><label>計數視窗（分鐘）— 這段時間內的失敗才累計</label><input class="field" id="lkWindow" type="number" min="1" max="1440" value="{{ settings.lockout_window_minutes }}"></div>
+    <div><label>鎖定時間（分鐘）</label><input class="field" id="lkMinutes" type="number" min="1" max="10080" value="{{ settings.lockout_minutes }}"></div>
+    <div><label>帳號鎖定門檻（視窗內失敗幾次鎖帳號）</label><input class="field" id="lkThreshold" type="number" min="1" max="1000" value="{{ settings.lockout_threshold }}"></div>
+    <div><label>IP 鎖定門檻（視窗內失敗幾次鎖 IP）</label><input class="field" id="lkIpThreshold" type="number" min="1" max="10000" value="{{ settings.lockout_ip_threshold }}"></div>
+  </div>
+  <p class="muted lk-hint">建議：IP 門檻設得比帳號門檻高（例如帳號 5 / IP 20），避免一個人把整個 NAT 出口 IP 鎖死。</p>
+  <p>
+    <button class="btn btn-primary" id="lkSave" type="button">{{ icon('save', size=14) }} 儲存鎖定政策</button>
+    <button class="btn" id="btnUnlockAll" type="button">{{ icon('unlock', size=14) }} 清除所有鎖定</button>
+    <span id="lkMsg" class="muted"></span>
+  </p>
+
+  <h3 class="lk-sub">目前鎖定中</h3>
+  {% if locked_accounts or locked_ips %}
+  <table class="kv lk-list">
+    <thead><tr><th>類型</th><th>對象</th><th>剩餘</th><th></th></tr></thead>
+    <tbody>
+      {% for a in locked_accounts %}
+      <tr><td>帳號</td><td><code>{{ a.name }}</code></td><td>約 {{ a.mins }} 分</td>
+          <td><button class="btn btn-small lk-unlock" type="button" data-key="user:{{ a.name }}">{{ icon('unlock', size=12) }} 解鎖</button></td></tr>
+      {% endfor %}
+      {% for i in locked_ips %}
+      <tr><td>IP</td><td><code>{{ i.ip }}</code></td><td>約 {{ i.mins }} 分</td>
+          <td><button class="btn btn-small lk-unlock" type="button" data-key="ip:{{ i.ip }}">{{ icon('unlock', size=12) }} 解鎖</button></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">目前沒有被鎖定的帳號或 IP。</p>
+  {% endif %}
+  <p class="muted" data-s="s6b9c179a"><b>清除所有鎖定</b>：一次清掉全部帳號 / IP 鎖定（緊急用，例如多人撞密碼把整個辦公室 IP 鎖死）；單一帳號 / IP 用上面清單的「解鎖」即可。</p>
 </div>
 
 {% endif %}
@@ -407,6 +441,16 @@
   table.kv { width:auto; border-collapse:collapse; }
   table.kv th { text-align:right; padding:4px 12px 4px 0; color:#6b7280; font-weight:normal; }
   table.kv td { padding:4px 0; }
+  .lk-h2 { display:flex; align-items:center; gap:6px; }
+  .lk-enable { display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:13px; margin:8px 0 4px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; margin:10px 0; }
+  .grid2 label { font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:3px; }
+  .grid2 input { width:100%; box-sizing:border-box; }
+  .lk-hint { font-size:11.5px; }
+  .lk-sub { font-size:13px; margin:16px 0 6px; }
+  table.lk-list { width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.lk-list thead th { text-align:left; padding:6px 10px; background:#f8fafc; color:#6b7280; font-size:11px; border-bottom:1px solid #e2e8f0; }
+  table.lk-list td { text-align:left; padding:6px 10px; border-bottom:1px solid #f1f5f9; }
 </style>
 {% endblock %}
 
@@ -433,6 +477,38 @@ if (unlockBtn) unlockBtn.addEventListener('click', async () => {
     showAlert('清除失敗：' + await r.text());
   }
 });
+
+// ---- 鎖定政策儲存 ----
+const lkSave = document.getElementById('lkSave');
+if (lkSave) lkSave.addEventListener('click', async () => {
+  const $ = id => document.getElementById(id);
+  lkSave.disabled = true; $('lkMsg').textContent = '儲存中…';
+  try {
+    const body = {
+      lockout_enabled: $('lkEnabled').checked,
+      lockout_window_minutes: parseInt($('lkWindow').value, 10),
+      lockout_minutes: parseInt($('lkMinutes').value, 10),
+      lockout_threshold: parseInt($('lkThreshold').value, 10),
+      lockout_ip_threshold: parseInt($('lkIpThreshold').value, 10),
+    };
+    const r = await fetch('/admin/auth-settings/policy-save', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)});
+    $('lkMsg').textContent = r.ok ? '✓ 已儲存' : ('✗ ' + await window.friendlyServerError(r, '儲存失敗'));
+  } catch(e){ $('lkMsg').textContent = '✗ ' + e; }
+  finally { lkSave.disabled = false; }
+});
+
+// ---- 單一帳號 / IP 解鎖 ----
+document.querySelectorAll('.lk-unlock').forEach(b => b.addEventListener('click', async () => {
+  const key = b.dataset.key;
+  b.disabled = true;
+  const r = await fetch('/admin/auth-settings/unlock-key', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({key})});
+  if (r.ok) { const tr = b.closest('tr'); if (tr) tr.remove(); }
+  else { b.disabled = false; showAlert('解鎖失敗：' + await window.friendlyServerError(r, '解鎖失敗')); }
+}));
 
 const CURRENT_BACKEND = {{ settings.backend|tojson }};
 

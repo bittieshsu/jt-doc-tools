@@ -1,15 +1,20 @@
 """Local-mode authentication: username + password against the auth DB.
 
-Lockout strategy:
-- Per-username row in `lockouts` (key='user:<username>')
+Lockout strategy (configurable in 認證設定, enabled by default):
+- Per-username row in `lockouts` (key='user:<lowercased-username>')
 - Per-IP row (key='ip:<addr>')
-- Failed attempt increments BOTH counters
-- Either reaching threshold locks for `lockout_minutes`
-- Successful login clears BOTH
+- A failed attempt increments BOTH counters, but only failures *within*
+  `lockout_window_minutes` count (an older last-fail resets the counter).
+- The username counter locks at `lockout_threshold`; the IP counter locks at
+  the separate, usually higher `lockout_ip_threshold`. Lock lasts
+  `lockout_minutes`, then auto-expires.
+- Successful login clears BOTH; `lockout_enabled=false` disables the whole
+  mechanism.
 
 Per-IP lockout protects against credential stuffing across many users from
-one source. Per-user lockout protects an individual account from being brute
-forced from many distributed sources.
+one source (hence a higher threshold so a shared NAT egress isn't locked by a
+single bad actor). Per-user lockout protects an individual account from being
+brute forced from many distributed sources.
 """
 from __future__ import annotations
 
@@ -34,15 +39,25 @@ def _check_lockout(conn, key: str, threshold: int) -> Optional[float]:
     return None
 
 
-def _record_fail(conn, key: str, threshold: int, lockout_minutes: int) -> bool:
-    """Increment the failure counter for `key`. Returns True iff THIS call is
-    what crossed the threshold (i.e. the lock was just triggered) — the caller
-    uses that to emit a single `account_locked` audit event."""
+def _record_fail(conn, key: str, threshold: int, lockout_minutes: int,
+                 window_seconds: float) -> bool:
+    """Increment the failure counter for `key` within a sliding window.
+
+    If the previous failure was longer than `window_seconds` ago, the counter
+    is reset first (only failures *within the window* count towards the
+    threshold). Returns True iff THIS call is what crossed the threshold (i.e.
+    the lock was just triggered) — the caller uses that to emit a single
+    `account_locked` audit event."""
     now = time.time()
-    row = conn.execute("SELECT failed_count, locked_until FROM lockouts WHERE key=?",
-                       (key,)).fetchone()
+    row = conn.execute(
+        "SELECT failed_count, locked_until, last_failed_at FROM lockouts WHERE key=?",
+        (key,)).fetchone()
     if row:
-        new_count = row["failed_count"] + 1
+        base = row["failed_count"]
+        # 視窗外的舊失敗不算 → 從 0 重新起算
+        if window_seconds > 0 and (now - (row["last_failed_at"] or 0)) > window_seconds:
+            base = 0
+        new_count = base + 1
         locked_until = row["locked_until"]
         just_locked = False
         if new_count >= threshold:
@@ -82,8 +97,11 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
     actionable info).
     """
     s = auth_settings.get()
-    threshold = int(s.get("lockout_threshold", 5))
+    lockout_enabled = bool(s.get("lockout_enabled", True))
+    user_threshold = int(s.get("lockout_threshold", 5))
+    ip_threshold = int(s.get("lockout_ip_threshold", 20))
     lockout_minutes = int(s.get("lockout_minutes", 15))
+    window_seconds = float(int(s.get("lockout_window_minutes", 10))) * 60.0
 
     user_key = f"user:{(username or '').lower().strip()}"
     ip_key = f"ip:{ip or ''}"
@@ -91,10 +109,12 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
     conn = auth_db.conn()
 
     # ---- pre-flight lockout check (don't even try the password) ----
-    locked_user_until = _check_lockout(conn, user_key, threshold)
-    locked_ip_until = _check_lockout(conn, ip_key, threshold)
-    locked_until = max(filter(None, [locked_user_until, locked_ip_until]),
-                       default=None)
+    locked_until = None
+    if lockout_enabled:
+        locked_user_until = _check_lockout(conn, user_key, user_threshold)
+        locked_ip_until = _check_lockout(conn, ip_key, ip_threshold)
+        locked_until = max(filter(None, [locked_user_until, locked_ip_until]),
+                           default=None)
     if locked_until:
         secs = int(locked_until - time.time())
         mins = max(1, (secs + 59) // 60)
@@ -118,9 +138,13 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
     ok = passwords.verify_password(password or "", pw_hash)
 
     if not ok or row is None:
-        with db.tx(conn):
-            user_just_locked = _record_fail(conn, user_key, threshold, lockout_minutes)
-            ip_just_locked = _record_fail(conn, ip_key, threshold, lockout_minutes)
+        user_just_locked = ip_just_locked = False
+        if lockout_enabled:
+            with db.tx(conn):
+                user_just_locked = _record_fail(
+                    conn, user_key, user_threshold, lockout_minutes, window_seconds)
+                ip_just_locked = _record_fail(
+                    conn, ip_key, ip_threshold, lockout_minutes, window_seconds)
         audit_db.log_event(
             "login_fail",
             username=username, ip=ip, target=username,
@@ -135,7 +159,8 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
                 details={"locked_user": bool(user_just_locked),
                          "locked_ip": bool(ip_just_locked),
                          "lockout_minutes": lockout_minutes,
-                         "threshold": threshold},
+                         "user_threshold": user_threshold,
+                         "ip_threshold": ip_threshold},
             )
         raise AuthError("帳號或密碼錯誤")
 
