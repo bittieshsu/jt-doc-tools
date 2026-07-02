@@ -381,7 +381,9 @@ function renderCategoryStats(cats) {
   const wrap = $('categoryStats');
   const rows = $('catRows');
   if (!cats || !cats.length) { wrap.style.display = 'none'; return; }
-  wrap.style.display = '';
+  // 用 'block' 而非 ''：這區的隱藏是 CSS 規則 [data-s]{display:none}（CSP data-s
+  // 化後），style.display='' 只是清掉 inline，CSS 的 none 仍生效 → 顯不出來。
+  wrap.style.display = 'block';
   rows.innerHTML = '';
   let total = 0;
   for (const c of cats) total += (c.count || 0);
@@ -403,7 +405,7 @@ function renderCategoryStats(cats) {
 function renderBreakdown(lr) {
   const wrap = $('breakdown');
   if (!lr) { wrap.style.display = 'none'; return; }
-  wrap.style.display = '';
+  wrap.style.display = 'block';  // 同 renderCategoryStats：CSS 隱藏須用具體值覆寫
   $('bdTime').textContent = lr.ts ? `（${_fmtTimestamp(lr.ts)}）` : '';
   const rows = $('bdRows');
   rows.innerHTML = '';
@@ -469,7 +471,7 @@ function _renderScheduleLast(sch) {
     el.style.display = 'none';
     return;
   }
-  el.style.display = '';
+  el.style.display = 'block';  // CSS [data-s] 隱藏須用具體值覆寫（非 ''）
   let cls = '';
   let text = `上次排程運行：${_fmtTimestamp(sch.last_run_at)}`;
   if (sch.last_run_status === 'ok') {

@@ -53,9 +53,12 @@
   /* 樹面板本身只當「有圓角、會裁切」的外框（overflow:hidden 讓內容貼合圓角），
      實際捲動放到內層 .dir-tree-scroll，捲軸就不會蓋到面板圓角。 */
   .dir-tree { flex:0 0 320px; max-width:44%; padding:8px; overflow:hidden; }
-  .dir-tree-scroll { max-height:544px; overflow-y:auto; }
-  .dir-detail { flex:1; min-width:0; min-height:200px; }
+  /* 讓樹隨視窗高度長高，用滿下方空間（而不是固定 544px 留一堆空白）。 */
+  .dir-tree-scroll { max-height:calc(100vh - 250px); min-height:320px; overflow-y:auto; }
+  .dir-detail { flex:1; min-width:0; min-height:320px; }
   .dir-loading, .dir-empty { color:#9ca3af; padding:12px; font-size:13px; }
+  /* 樹裡「（無子 OU）」等提示不要墊那麼高。 */
+  .tn-children .dir-empty, .tn-children .dir-loading { padding:2px 6px; font-size:12px; }
   .tn { }
   .tn-row { display:flex; align-items:center; gap:4px; padding:3px 4px; border-radius:5px; cursor:pointer; font-size:13px; white-space:nowrap; }
   .tn-row:hover { background:#f3f4f6; }
@@ -72,10 +75,15 @@
   .tree-legend .tn-ic, .tree-legend svg { color:inherit; }
   .tn-hasrole { margin-left:4px; font-size:10px; color:#4f46e5; }
   .tn-children { margin-left:14px; border-left:1px dashed #e5e7eb; padding-left:2px; }
-  .dir-detail h3 { margin:0 0 4px; font-size:15px; }
-  .dir-dn { font-size:11px; color:#9ca3af; word-break:break-all; margin-bottom:8px; }
-  .dir-roles-box { background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:8px 10px; margin:8px 0; }
-  .dir-role-chk { display:inline-flex; align-items:center; gap:5px; margin:2px 10px 2px 0; font-size:13px; font-weight:normal; cursor:pointer; }
+  .dir-detail-head { margin-bottom:12px; }
+  .dir-detail h3 { margin:0 0 3px; font-size:16px; }
+  .dir-dn { font-size:11px; color:#9ca3af; word-break:break-all; margin:0; }
+  .dir-roles-box { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:12px 14px; margin:0 0 14px; }
+  .dir-roles-title { font-size:13px; margin-bottom:10px; }
+  .dir-roles-title .muted { font-size:12px; font-weight:normal; }
+  .dir-roles-chks { display:flex; flex-wrap:wrap; gap:8px 18px; margin-bottom:12px; }
+  .dir-role-chk { display:inline-flex; align-items:center; gap:6px; margin:0; font-size:13px; font-weight:normal; cursor:pointer; }
+  .dir-roles-actions { display:flex; align-items:center; gap:10px; }
   .dir-utable { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:8px; table-layout:auto; }
   .dir-utable th, .dir-utable td { padding:6px 12px; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align:middle; }
   .dir-utable th { background:#f9fafb; font-size:11px; color:#6b7280; font-weight:600; }
@@ -93,8 +101,7 @@
   .dir-in-legend { background:#f0fdf4; box-shadow: inset 3px 0 0 #22c55e; padding:0 6px; border-radius:3px; }
   .dir-filters { display:flex; gap:6px; margin:8px 0 6px; flex-wrap:wrap; }
   .dir-fbtn.is-active { background:#4f46e5; color:#fff; border-color:#4f46e5; }
-  .dir-detail h3 { margin:0 0 2px; }
-  .dir-sec-title { font-weight:600; margin:14px 0 2px; font-size:13px; }
+  .dir-sec-title { font-weight:600; margin:16px 0 6px; font-size:13px; }
   /* user detail modal */
   #udModal[hidden] { display:none !important; }
   #udModal { position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; }
@@ -214,9 +221,12 @@ async function openOU(dn, name) {
     return `<label class="dir-role-chk"><input type="checkbox" class="du-role" value="${esc(rid)}" ${on?'checked':''}> ${esc(role.display_name||rid)}</label>`;
   }).join('');
   box.innerHTML =
-    `<h3>${esc(name)}</h3><div class="dir-dn">${esc(dn)}</div>` +
-    `<div class="dir-roles-box"><b>指派角色給此 OU</b>（含子 OU 全部使用者登入時生效）<br>${roleChks}<br>` +
-    `<button class="btn btn-primary btn-small" id="duSaveRoles" type="button">{{ icon('save', size=12) }} 儲存角色</button> <span class="muted" id="duRoleMsg"></span></div>` +
+    `<div class="dir-detail-head"><h3>${esc(name)}</h3><div class="dir-dn">${esc(dn)}</div></div>` +
+    `<div class="dir-roles-box">` +
+      `<div class="dir-roles-title"><b>指派角色給此 OU</b> <span class="muted">（含子 OU 全部使用者登入時生效）</span></div>` +
+      `<div class="dir-roles-chks">${roleChks}</div>` +
+      `<div class="dir-roles-actions"><button class="btn btn-primary btn-small" id="duSaveRoles" type="button">{{ icon('save', size=12) }} 儲存角色</button> <span class="muted" id="duRoleMsg"></span></div>` +
+    `</div>` +
     `<div class="dir-sec-title">此 OU 直屬使用者（共 ${j.count}，已登入 ${j.local_count} / 未登入 ${j.not_local_count}）</div>` +
     `<div class="dir-filters"><button class="btn btn-small dir-fbtn is-active" data-f="all" type="button">全部</button>` +
     `<button class="btn btn-small dir-fbtn" data-f="in" type="button">已登入</button>` +
