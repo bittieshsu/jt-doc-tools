@@ -120,6 +120,10 @@
   .ud-table td.ud-k { color:#6b7280; white-space:nowrap; width:150px; font-weight:600; }
   .ud-table td.ud-v { word-break:break-word; }
   .ud-table td.ud-v .ud-multi { display:block; }
+  /* 檢視屬性時滑過該列以光棒（高亮）標示 */
+  .ud-table tbody tr:hover td { background:#eef2ff; }
+  /* 篩選後維持原高度，避免視覺跳動（min-height 由 JS 於開啟時鎖定） */
+  #udBody { transition:none; }
 </style>
 {% endblock %}
 
@@ -290,6 +294,7 @@ function openUserDetail(dn, name) {
   $('udName').textContent = name || '';
   $('udDn').textContent = dn || '';
   $('udBody').innerHTML = '<p class="muted">查詢中…</p>';
+  $('udBody').style.minHeight = '';   // 清掉上一位使用者鎖定的高度
   const uf = $('udFilter'); if (uf) { uf.value = ''; uf.hidden = true; }
   $('udModal').hidden = false;
   fetch('/admin/directory/user?dn=' + encodeURIComponent(dn))
@@ -314,6 +319,8 @@ function openUserDetail(dn, name) {
       const badge = j.local ? '<span class="dir-ubadge">✓ 已登入過本系統</span> ' : '';
       $('udBody').innerHTML = badge + `<table class="ud-table"><tbody>${rows}</tbody></table>`;
       if (uf) uf.hidden = false;
+      // 鎖定目前高度 → 之後篩選隱藏列時高度維持不變（避免視覺跳動）。
+      const b = $('udBody'); b.style.minHeight = ''; b.style.minHeight = b.offsetHeight + 'px';
     })
     .catch(e => { $('udBody').innerHTML = '<p class="dir-empty">✗ ' + esc(e.message) + '</p>'; });
 }

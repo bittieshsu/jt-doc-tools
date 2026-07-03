@@ -14,7 +14,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.12.62"
+VERSION = "1.12.63"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -111,6 +111,20 @@ def _tpl_is_auditor(request) -> bool:
 
 templates.env.globals["is_admin"] = _tpl_is_admin
 templates.env.globals["is_auditor"] = _tpl_is_auditor
+
+
+def _tpl_net_exposed() -> bool:
+    """Jinja global: True 當服務綁在非 loopback 位址（0.0.0.0 / 區網 IP），代表
+    「已對網路開放」。用來對 admin 顯示外洩風險提醒（本工具處理公司內部文件）。"""
+    try:
+        h = (settings.host or "").strip().lower()
+        return h not in ("127.0.0.1", "localhost", "::1", "")
+    except Exception:
+        return False
+
+
+templates.env.globals["net_exposed"] = _tpl_net_exposed
+templates.env.globals["bind_host"] = lambda: settings.host
 
 
 def _tpl_workspace_enabled(request=None) -> bool:
