@@ -149,6 +149,9 @@ def _extract_text_from_odf(data: bytes, kind: str) -> str:
     from xml.etree import ElementTree as ET
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            # 解壓縮炸彈防護：content.xml 解壓後上限 200 MiB（正常文件遠小於此）。
+            if zf.getinfo("content.xml").file_size > 200 * 1024 * 1024:
+                raise HTTPException(400, "文件內容過大（疑似解壓縮炸彈），已中止")
             with zf.open("content.xml") as fp:
                 tree = ET.parse(fp)
     except (zipfile.BadZipFile, KeyError) as e:

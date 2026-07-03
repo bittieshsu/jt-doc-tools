@@ -1483,6 +1483,10 @@ def ingest_archive_or_csv(data: bytes, source: str, build_index: bool = True) ->
                 raise ValueError("ZIP 檔案內找不到 .csv")
             # 取最大那個（通常主要資料）
             csv_names.sort(key=lambda n: -z.getinfo(n).file_size)
+            # 解壓縮炸彈防護：170 萬筆主檔 CSV 約數百 MB，給 3 GiB 上限即可擋
+            # 掉「小 zip 膨脹成數十 GB」的 OOM 攻擊。
+            if z.getinfo(csv_names[0]).file_size > 3 * 1024 * 1024 * 1024:
+                raise ValueError("ZIP 內 CSV 解壓後過大（疑似解壓縮炸彈），已中止")
             csv_data = z.read(csv_names[0])
         return ingest_csv(csv_data, source=source, build_index=build_index)
     # 直接當 CSV
