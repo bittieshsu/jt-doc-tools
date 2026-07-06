@@ -1,4 +1,4 @@
-# Jason Tools 文件工具箱 v1.12.65
+# Jason Tools 文件工具箱 v1.12.66
 
 > 整合式 PDF / Office 文件處理平台，39 個工具一站式解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
 >
@@ -202,7 +202,8 @@ server {
 安全標頭（CSP / HSTS / X-Frame-Options / X-Content-Type-Options / Referrer-Policy）由
 **後端 app 自動設定**（HSTS 依 `X-Forwarded-Proto` 判斷 https）→ **nginx 不要再
 `add_header` 一次**,否則會出現重複標頭。三個常見地雷(必掛 root 路徑、`client_max_body_size`、
-逾時)與 Caddy 範例見 [OPS.md](OPS.md)。
+逾時)、七項共通要求、防 `X-Forwarded-For` 偽造，以及 **nginx / Caddy / Apache / HAProxy /
+Traefik / IIS(ARR) / F5 BIG-IP** 完整範例，都見 [OPS.md](OPS.md)。
 
 詳見 [SECURITY.md](SECURITY.md)。
 

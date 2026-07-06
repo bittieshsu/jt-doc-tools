@@ -930,7 +930,8 @@
       只要不是「本機單人」使用 —— <b>任何網路 / 多人 / 內網其他電腦 / 對外</b> —— 一律放在
       <b>nginx（或 Caddy）反向代理 + HTTPS</b> 後面，<b>絕不要把 <code>:8765</code> 直接對網路開放</b>。
       應用程式預設只綁 <code>127.0.0.1:8765</code>（純 HTTP、無 TLS）；直接對外等於明文傳輸帳號密碼與
-      文件內容。反向代理負責 TLS 終結、HSTS、憑證、隱藏版本、安全標頭。完整 nginx / Caddy 設定範例見
+      文件內容。反向代理負責 TLS 終結、HSTS、憑證、隱藏版本、安全標頭。完整範例（nginx / Caddy /
+      Apache / HAProxy / Traefik / IIS(ARR) / F5 BIG-IP）見
       <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener" style="color:#b91c1c;text-decoration:underline;">OPS.md 反向代理章節</a>。
     </div>
     <div class="privacy-points">
@@ -1057,7 +1058,7 @@
       </div>
       <div>
         <strong>反向代理</strong>
-        nginx / Caddy 範例見 <a href="https://github.com/jasoncheng7115/jt-doc-tools#%E5%8F%8D%E5%90%91%E4%BB%A3%E7%90%86https" target="_blank" rel="noopener">GitHub README</a>，三個常見地雷已標註。
+        nginx / Caddy / Apache / HAProxy / Traefik / IIS / F5 範例見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener">OPS.md</a>，三個常見地雷已標註。
       </div>
     </div>
   </div>

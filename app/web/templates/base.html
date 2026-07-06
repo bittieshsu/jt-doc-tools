@@ -338,7 +338,7 @@
         <div class="sb-items" id="sbPinnedItems"></div>
       </details>
       {% for g in nav_tool_groups(request) %}
-      <details class="sb-group" open>
+      <details class="sb-group" open data-sbkey="{{ g.title }}">
         <summary><span class="sb-group-icon">{{ icon('tool', size=15) }}</span>{{ g.title }}<span class="sb-count">{{ g.tools|length }}</span></summary>
         <div class="sb-items">
           {% for t in g.tools %}
@@ -363,7 +363,7 @@
         </div>
       </details>
       {% endfor %}
-      <details class="sb-group" open>
+      <details class="sb-group" open data-sbkey="設定">
         <summary><span class="sb-group-icon">{{ icon('gear', size=15) }}</span>設定<span class="sb-count">{{ nav_settings(request)|length }}</span></summary>
         <div class="sb-items">
           {% for s in nav_settings(request) %}
@@ -471,6 +471,18 @@
         if (localStorage.getItem(LS_KEY) === '1') {
           document.body.classList.add('sidebar-collapsed');
         }
+      } catch(e) {}
+      // 記住各分類群組（<details.sb-group>）的展開 / 收合狀態，跨頁保留
+      try {
+        document.querySelectorAll('#sidebar details.sb-group[data-sbkey]').forEach(function(d){
+          var gkey = 'jtdt:sbgroup:' + d.getAttribute('data-sbkey');
+          var saved = localStorage.getItem(gkey);
+          if (saved === '0') d.open = false;
+          else if (saved === '1') d.open = true;   // 無記錄則沿用伺服器預設（展開）
+          d.addEventListener('toggle', function(){
+            try { localStorage.setItem(gkey, d.open ? '1' : '0'); } catch(e) {}
+          });
+        });
       } catch(e) {}
       // 「展開」按鈕（左上 ☰）
       btn && btn.addEventListener('click', () => {
