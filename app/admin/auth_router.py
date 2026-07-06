@@ -623,6 +623,64 @@ def build_auth_router(templates) -> APIRouter:
         )
         return {"ok": True, **result}
 
+    @router.get("/groups/directory-sync/status")
+    async def groups_dirsync_status(request: Request):
+        """排程目錄同步的目前設定 + 上次結果（給群組管理頁顯示）。"""
+        from ..core import directory_sync
+        s = directory_sync.get_settings()
+        return {
+            "enabled": bool(s.get("enabled")),
+            "interval_hours": int(s.get("interval_hours", 6)),
+            "name_contains": s.get("name_contains", "") or "",
+            "last_run_at": s.get("last_run_at"),
+            "last_result": s.get("last_result"),
+            "last_error": s.get("last_error"),
+            "running": directory_sync.is_running(),
+            "is_directory_backend": directory_sync.is_directory_backend(),
+        }
+
+    @router.post("/groups/directory-sync/settings")
+    async def groups_dirsync_settings(request: Request):
+        """存排程目錄同步設定（啟用 / 間隔小時 / 名稱過濾）。"""
+        from ..core import directory_sync
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        s = directory_sync.save_settings(
+            enabled=bool(body.get("enabled", True)),
+            interval_hours=int(body.get("interval_hours", 6) or 6),
+            name_contains=str(body.get("name_contains", "") or ""),
+        )
+        audit_db.log_event(
+            "settings_change", username=_actor(request), ip=_client_ip(request),
+            target="directory_sync",
+            details={"enabled": s["enabled"], "interval_hours": s["interval_hours"]},
+        )
+        return {"ok": True, "enabled": s["enabled"],
+                "interval_hours": s["interval_hours"],
+                "name_contains": s["name_contains"]}
+
+    @router.post("/groups/directory-sync/run")
+    async def groups_dirsync_run(request: Request):
+        """手動「立即同步」：在背景執行一次目錄群組同步 + 成員數快取更新，立刻回
+        傳（頁面顯示同步中，重新整理即看到新結果）。"""
+        import threading
+        from ..core import auth_settings, directory_sync
+        backend = (auth_settings.get() or {}).get("backend", "off")
+        if backend not in ("ldap", "ad"):
+            raise HTTPException(400, "目前認證後端不是 LDAP / AD，無法同步目錄。")
+        if directory_sync.is_running():
+            return {"ok": True, "started": False, "running": True}
+        threading.Thread(
+            target=directory_sync.run_sync, name="directory-sync-manual",
+            daemon=True).start()
+        audit_db.log_event(
+            "group_sync_ldap", username=_actor(request), ip=_client_ip(request),
+            target="directory_sync_manual", details={"trigger": "manual"},
+        )
+        return {"ok": True, "started": True, "running": True}
+
     @router.get("/groups/{gid}/members-ldap")
     async def groups_members_ldap(gid: int, request: Request):
         """查某 AD/LDAP 群組在**目錄**裡的直接成員（含尚未登入過本系統的人）。"""

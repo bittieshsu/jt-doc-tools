@@ -365,6 +365,23 @@ def _m10_role_default_for_new(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _m11_group_sync_cache(conn: sqlite3.Connection) -> None:
+    """v11: groups 加 `member_count` / `member_count_synced_at` / `parent_dn`
+    快取欄位（v1.12.67 起）。
+
+    目錄（LDAP/AD）群組的「成員數」原本由群組管理頁**每一列**即時打一次 LDAP
+    查詢取得（幾千個群組 = 幾千次連線，頁面等很久）。改由背景排程同步一次寫進
+    本機快取，頁面直接讀欄位（毫秒）。`parent_dn` 存巢狀群組的上層群組 DN，供
+    呈現群組的上下從屬關係（v1.12.68 用）。
+
+    ALTER ADD COLUMN 皆帶預設值,不需重建表（避開 m8 那種 FK cascade 風險）。"""
+    conn.executescript("""
+    ALTER TABLE groups ADD COLUMN member_count INTEGER DEFAULT NULL;
+    ALTER TABLE groups ADD COLUMN member_count_synced_at REAL DEFAULT NULL;
+    ALTER TABLE groups ADD COLUMN parent_dn TEXT NOT NULL DEFAULT '';
+    """)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -373,7 +390,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m7_audit_seed_column,
               _m8_sso_sources,
               _m9_role_seed_snapshot,
-              _m10_role_default_for_new]
+              _m10_role_default_for_new,
+              _m11_group_sync_cache]
 
 
 def auth_db_path() -> Path:

@@ -17,30 +17,49 @@ logger = logging.getLogger(__name__)
 
 
 def list_groups(source: Optional[str] = None) -> list[dict]:
+    """List groups with member ids + role assignments.
+
+    Batched: one query for the rows, one for ALL group_members, one for ALL
+    role assignments — instead of the old 2N+1 (a members query AND a roles
+    query per group), which made 群組管理 slow with thousands of groups.
+
+    `member_count` = local group_members count (people who have logged in).
+    `dir_member_count` = the directory's real count, cached by the scheduled
+    sync (NULL until first synced); `dir_synced_at` = when. The page shows
+    `dir_member_count` when available so it never fires a live LDAP query
+    per row on load."""
     conn = auth_db.conn()
     if source:
         rows = conn.execute(
-            "SELECT id, name, source, external_dn, description, created_at "
+            "SELECT id, name, source, external_dn, description, created_at, "
+            "member_count, member_count_synced_at, parent_dn "
             "FROM groups WHERE source=? ORDER BY name", (source,)
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, name, source, external_dn, description, created_at "
+            "SELECT id, name, source, external_dn, description, created_at, "
+            "member_count, member_count_synced_at, parent_dn "
             "FROM groups ORDER BY source, name"
         ).fetchall()
+    # Batch: all members in one pass, all roles in one query.
+    members_by_group: dict[int, list[int]] = {}
+    for m in conn.execute("SELECT group_id, user_id FROM group_members").fetchall():
+        members_by_group.setdefault(m["group_id"], []).append(m["user_id"])
+    roles_by_group = permissions.list_roles_for_subjects(
+        "group", [str(r["id"]) for r in rows])
     out = []
     for r in rows:
-        member_rows = conn.execute(
-            "SELECT user_id FROM group_members WHERE group_id=?", (r["id"],)
-        ).fetchall()
-        member_ids = [m["user_id"] for m in member_rows]
+        member_ids = members_by_group.get(r["id"], [])
         out.append({
             "id": r["id"], "name": r["name"], "source": r["source"],
             "external_dn": r["external_dn"], "description": r["description"],
             "created_at": r["created_at"],
             "member_count": len(member_ids),
             "member_ids": member_ids,
-            "roles": permissions.list_roles_for_subject("group", str(r["id"])),
+            "dir_member_count": r["member_count"],
+            "dir_synced_at": r["member_count_synced_at"],
+            "parent_dn": r["parent_dn"] or "",
+            "roles": roles_by_group.get(str(r["id"]), []),
         })
     return out
 

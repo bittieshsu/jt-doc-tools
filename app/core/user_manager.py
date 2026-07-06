@@ -32,12 +32,18 @@ def _validate_username(username: str) -> str:
 
 
 def list_users() -> list[dict]:
+    """List all users with their role assignments.
+
+    Batched: roles for every user are loaded in one query instead of one query
+    per user (the N+1 that made 使用者管理 slow with thousands of users)."""
     conn = auth_db.conn()
     rows = conn.execute(
         "SELECT id, username, display_name, source, external_dn, enabled, "
         "is_admin_seed, is_audit_seed, password_hash, created_at, last_login_at "
         "FROM users ORDER BY username"
     ).fetchall()
+    roles_by_user = permissions.list_roles_for_subjects(
+        "user", [str(r["id"]) for r in rows])
     out = []
     for r in rows:
         out.append({
@@ -49,7 +55,7 @@ def list_users() -> list[dict]:
             "is_audit_seed": bool(r["is_audit_seed"]),
             "password_set": r["password_hash"] is not None,
             "created_at": r["created_at"], "last_login_at": r["last_login_at"],
-            "roles": permissions.list_roles_for_subject("user", str(r["id"])),
+            "roles": roles_by_user.get(str(r["id"]), []),
         })
     return out
 

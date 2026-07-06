@@ -14,7 +14,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.12.66"
+VERSION = "1.12.67"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -1310,6 +1310,15 @@ async def _startup():
             _vatdb.maybe_build_fts_background()
         except Exception:
             logger.exception("vat_db scheduler start failed")
+        # Start directory (AD/LDAP) sync — mirrors groups + caches member counts
+        # so 群組管理 reads the local cache instead of one live LDAP query per
+        # row. Runs shortly after boot + every N hours (default 6h; only active
+        # on ldap/ad backend).
+        try:
+            from .core import directory_sync as _dirsync
+            _dirsync.start_scheduler()
+        except Exception:
+            logger.exception("directory_sync scheduler start failed")
     except Exception as exc:
         logger.exception("auth/audit init failed: %s", exc)
     # Background sweeper for ephemeral uploads

@@ -261,6 +261,35 @@ def list_roles_for_subject(subject_type: str, subject_key: str) -> list[str]:
     return [r["role_id"] for r in rows]
 
 
+def list_roles_for_subjects(
+    subject_type: str, subject_keys: list[str]
+) -> dict[str, list[str]]:
+    """Batch version of list_roles_for_subject: one query for many subjects.
+
+    Returns {subject_key: [role_id, ...]} covering exactly the given keys
+    (keys with no roles map to []). Kills the N+1 that made the 群組管理 /
+    使用者管理 pages slow with thousands of rows (one SELECT per row → one
+    SELECT total). SQLite has a variable limit (~999/32766); we chunk to be
+    safe on very large directories."""
+    out: dict[str, list[str]] = {str(k): [] for k in subject_keys}
+    keys = [str(k) for k in subject_keys]
+    if not keys:
+        return out
+    conn = auth_db.conn()
+    CHUNK = 900
+    for i in range(0, len(keys), CHUNK):
+        chunk = keys[i:i + CHUNK]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = conn.execute(
+            f"SELECT subject_key, role_id FROM subject_roles "
+            f"WHERE subject_type=? AND subject_key IN ({placeholders})",
+            (subject_type, *chunk),
+        ).fetchall()
+        for r in rows:
+            out.setdefault(str(r["subject_key"]), []).append(r["role_id"])
+    return out
+
+
 def is_auditor(user_id: int) -> bool:
     """True iff user has the `auditor` role (direct or via local group).
     Used to gate audit / history / uploads / system-status admin pages

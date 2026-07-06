@@ -25,6 +25,18 @@
   <p class="muted">留空 = 同步全部。想更精準可在「認證設定」的 LDAP 進階填 <code>group_search_base</code>（限某個 OU）或 <code>group_search_filter</code>（自訂 filter）。</p>
   <span id="syncDirMsg" class="muted"></span>
 </div>
+
+<div class="panel">
+  <b>排程目錄同步（成員數快取）</b>
+  <p class="muted">群組的「目錄成員數」由背景排程<b>定期同步</b>寫進本機快取，本頁直接讀快取（毫秒），<b>不再每列即時查 LDAP</b>（群組數以千計時原本會很慢）。可設定間隔，或隨時「立即同步」。</p>
+  <div class="grp-sync-row">
+    <label class="chk"><input type="checkbox" id="dsEnabled"> 啟用排程同步</label>
+    <label>每 <input class="field field-narrow" type="number" id="dsInterval" min="1" max="168" value="6"> 小時</label>
+    <button class="btn" type="button" id="dsSave">{{ icon('gear', size=14) }} 儲存設定</button>
+    <button class="btn btn-primary" type="button" id="dsRun">{{ icon('refresh', size=14) }} 立即同步</button>
+  </div>
+  <p class="muted" id="dsStatus">載入同步狀態中…</p>
+</div>
 {% endif %}
 
 <div class="panel">
@@ -43,7 +55,13 @@
         <td><b>{{ g.name }}</b></td>
         <td><span class="src-badge src-{{ g.source }}">{{ g.source }}</span></td>
         <td class="muted">{{ g.description }}</td>
+        {% if g.source in ('ldap', 'ad') and g.dir_member_count is not none %}
+        <td title="目錄成員數（由排程同步快取；本機登入數 {{ g.member_count }}）">{{ g.dir_member_count }}</td>
+        {% elif g.source in ('ldap', 'ad') %}
+        <td class="muted" title="尚未同步；請按上方「立即同步」或等排程執行。本機登入數 {{ g.member_count }}">{{ g.member_count }} <span class="muted">（未同步）</span></td>
+        {% else %}
         <td>{{ g.member_count }}</td>
+        {% endif %}
         <td>
           {% if g.roles %}
             {% for rid in g.roles %}<span class="role-chip">{{ rid }}</span>{% endfor %}
@@ -414,22 +432,75 @@ if (_btnSyncDir) {
   });
 }
 
-// 群組清單載入時,為每個 AD/LDAP 群組非同步補上「目錄成員數」。
-// 原「成員數」欄顯示的是本地登入過人數,與目錄實際不一致（客戶回報 1 vs N）。
-// 快取 5 分鐘,不阻塞頁面;失敗就保留原本地數。
-document.querySelectorAll('.grp-table tbody tr').forEach(tr => {
-  const src = tr.dataset.source;
-  if (src !== 'ldap' && src !== 'ad') return;
-  const cell = tr.children[3];
-  if (!cell) return;
-  const local = (cell.textContent || '').trim();
-  // 用 textContent（非 innerHTML）避免把 DOM 文字重新當 HTML 解析（CodeQL #127）。
-  cell.textContent = local + ' …';
-  cell.title = '本地登入數 ' + local + '，查詢目錄成員數中…';
-  fetch(`/admin/groups/${tr.dataset.gid}/member-count`)
-    .then(r => r.ok ? r.json() : null)
-    .then(j => { cell.textContent = (j && typeof j.count === 'number') ? j.count : local; })
-    .catch(() => { cell.textContent = local; });
-});
+// 目錄成員數改由「背景排程同步」寫入本機快取,直接由伺服器端 render（見上表格）。
+// 不再於頁面載入時對每個 AD/LDAP 群組即時打一次 LDAP 查詢 —— 群組數以千計時,
+// 原本會發出上千個請求把頁面拖慢。要更新數字請按「立即同步」或等排程執行。
+
+// 排程目錄同步面板
+(function () {
+  const ena = document.getElementById('dsEnabled');
+  const itv = document.getElementById('dsInterval');
+  const save = document.getElementById('dsSave');
+  const run = document.getElementById('dsRun');
+  const st = document.getElementById('dsStatus');
+  if (!st) return;
+  function fmtAge(ts) {
+    if (!ts) return '尚未同步過';
+    const secs = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+    if (secs < 60) return secs + ' 秒前';
+    if (secs < 3600) return Math.floor(secs / 60) + ' 分鐘前';
+    if (secs < 86400) return Math.floor(secs / 3600) + ' 小時前';
+    return Math.floor(secs / 86400) + ' 天前';
+  }
+  async function load() {
+    try {
+      const r = await fetch('/admin/groups/directory-sync/status');
+      const j = await r.json();
+      if (ena) ena.checked = !!j.enabled;
+      if (itv) itv.value = j.interval_hours || 6;
+      let s = '排程：' + (j.enabled ? ('每 ' + (j.interval_hours || 6) + ' 小時') : '已停用')
+            + ' · 上次同步：' + fmtAge(j.last_run_at);
+      if (j.running) s += ' · 同步中…';
+      const lr = j.last_result || {};
+      if (typeof lr.counts_updated === 'number') {
+        s += ' · 更新 ' + lr.counts_updated + ' 個群組成員數'
+           + (lr.counts_failed ? ('（' + lr.counts_failed + ' 個失敗）') : '');
+      }
+      if (j.last_error) s += ' · 上次錯誤：' + j.last_error;
+      st.textContent = s;
+    } catch (e) { st.textContent = '無法讀取同步狀態'; }
+  }
+  if (save) save.addEventListener('click', async () => {
+    save.disabled = true;
+    try {
+      const r = await fetch('/admin/groups/directory-sync/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: !!(ena && ena.checked),
+          interval_hours: parseInt((itv && itv.value) || '6', 10) || 6,
+        }),
+      });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.detail || ('HTTP ' + r.status)); }
+      await load();
+    } catch (e) { st.textContent = '儲存失敗：' + e.message; }
+    finally { save.disabled = false; }
+  });
+  if (run) run.addEventListener('click', async () => {
+    run.disabled = true;
+    st.textContent = '已開始背景同步…（目錄大時可能數分鐘，完成後重新整理即看到新的成員數）';
+    try {
+      const r = await fetch('/admin/groups/directory-sync/run', { method: 'POST' });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.detail || ('HTTP ' + r.status)); }
+      // 輪詢狀態直到不再 running
+      const poll = setInterval(async () => {
+        try {
+          const s = await (await fetch('/admin/groups/directory-sync/status')).json();
+          if (!s.running) { clearInterval(poll); run.disabled = false; await load(); }
+        } catch (e) { clearInterval(poll); run.disabled = false; }
+      }, 3000);
+    } catch (e) { st.textContent = '同步失敗：' + e.message; run.disabled = false; }
+  });
+  load();
+})();
 </script>
 {% endblock %}
