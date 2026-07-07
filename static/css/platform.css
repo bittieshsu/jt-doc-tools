@@ -767,3 +767,6 @@ select.jt-select-native {
 /* 群組管理：巢狀群組（parent_dn）的樹狀縮排（見 admin_groups.html） */
 .grp-indent { display:inline-block; width:20px; }
 .grp-branch { color:#94a3b8; font-weight:400; }
+
+/* 群組管理分頁導覽（群組數多時，見 admin_groups.html） */
+.grp-pager { display:flex; gap:12px; align-items:center; justify-content:center; margin-top:14px; }

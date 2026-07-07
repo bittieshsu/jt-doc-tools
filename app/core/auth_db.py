@@ -382,6 +382,37 @@ def _m11_group_sync_cache(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _m12_unprovision_mirrored_users(conn: sqlite3.Connection) -> None:
+    """v12: 還原 v1.12.69 大量鏡射 AD/LDAP 使用者時的「誤開通」（v1.12.70 起）。
+
+    v1.12.69 的 `sync_all_users` 把目錄所有使用者以 `enabled=1` + **自動給預設角色**
+    灌進本機 `users` 表 —— 但「鏡射過來（可見、可指派）」不等於「已啟用（可登入
+    使用）」。此 migration 把**從未真正登入過**的鏡射帳號還原成「僅目錄可見、未
+    啟用」：
+
+      - 目標 = `source IN ('ldap','ad') AND COALESCE(last_login_at,0)=0`
+        （只有大量鏡射會產生 last_login=0 的目錄使用者；JIT / proxy 登入一定
+         會寫 last_login > 0，所以這條精準命中被灌入且從未登入者）。
+      - 移除這些人身上「當前預設角色」的指派（保留 admin 另外指派的其他角色）。
+      - 設 `enabled=0`（去啟用）。已驗證 LDAP 登入先 AD 綁定再同步、不 pre-check
+        enabled，所以這不擋他們日後真正登入（登入時 JIT 會重新設 enabled=1 並補
+        預設角色）。
+
+    **真正登入過（last_login>0）的使用者與所有本機帳號完全不動。** idempotent。"""
+    row = conn.execute(
+        "SELECT id FROM roles WHERE is_default_for_new=1 LIMIT 1").fetchone()
+    default_role = row[0] if row else "default-user"
+    conn.execute(
+        "DELETE FROM subject_roles "
+        "WHERE subject_type='user' AND role_id=? AND subject_key IN ("
+        "  SELECT CAST(id AS TEXT) FROM users "
+        "  WHERE source IN ('ldap','ad') AND COALESCE(last_login_at,0)=0)",
+        (default_role,))
+    conn.execute(
+        "UPDATE users SET enabled=0 "
+        "WHERE source IN ('ldap','ad') AND COALESCE(last_login_at,0)=0")
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -391,7 +422,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m8_sso_sources,
               _m9_role_seed_snapshot,
               _m10_role_default_for_new,
-              _m11_group_sync_cache]
+              _m11_group_sync_cache,
+              _m12_unprovision_mirrored_users]
 
 
 def auth_db_path() -> Path:

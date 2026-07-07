@@ -34,7 +34,8 @@ _DEFAULTS = {
     "enabled": True,
     "interval_hours": 6,
     "name_contains": "",              # optional filter to skip system groups
-    "sync_users": True,              # also mirror all directory users → local
+    "sync_users": False,             # also mirror all directory users → local
+                                     # (catalog only; opt-in — off by default)
     "last_run_at": None,              # epoch seconds
     "last_result": None,             # dict from the last run
     "last_error": None,

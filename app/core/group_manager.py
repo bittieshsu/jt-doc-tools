@@ -64,6 +64,72 @@ def list_groups(source: Optional[str] = None) -> list[dict]:
     return out
 
 
+def list_group_names(q: str = "", limit: int = 0) -> list[dict]:
+    """Lightweight group list for pickers: just id/name/source, no per-group
+    member/role queries. Avoids embedding thousands of groups *with member_ids
+    arrays* (which bloated the 使用者管理 page and OOM'd the browser). Optional
+    `q` (name LIKE) + `limit` for lazy search endpoints."""
+    conn = auth_db.conn()
+    sql = "SELECT id, name, source FROM groups"
+    params: list = []
+    if q:
+        sql += " WHERE name LIKE ?"
+        params.append(f"%{q}%")
+    sql += " ORDER BY source, name"
+    if limit and limit > 0:
+        sql += " LIMIT ?"
+        params.append(int(limit))
+    return [{"id": r["id"], "name": r["name"], "source": r["source"]}
+            for r in conn.execute(sql, params).fetchall()]
+
+
+def count_groups() -> int:
+    return auth_db.conn().execute("SELECT COUNT(*) AS c FROM groups").fetchone()["c"]
+
+
+def list_groups_page(offset: int = 0, limit: int = 100, q: str = "") -> dict:
+    """Server-side paginated + searchable group list (flat). Used by 群組管理
+    when there are too many groups to render the full tree at once (which OOM'd
+    the browser). Returns {rows, total}. Same row shape as list_groups (minus
+    the tree `depth`), member counts/roles batched for the page only."""
+    conn = auth_db.conn()
+    where, params = "", []
+    if q:
+        where = "WHERE name LIKE ?"
+        params.append(f"%{q}%")
+    total = conn.execute(
+        f"SELECT COUNT(*) AS c FROM groups {where}", params).fetchone()["c"]
+    rows = conn.execute(
+        "SELECT id, name, source, external_dn, description, created_at, "
+        "member_count, member_count_synced_at, parent_dn "
+        f"FROM groups {where} ORDER BY source, name LIMIT ? OFFSET ?",
+        (*params, int(limit), int(offset))).fetchall()
+    ids = [r["id"] for r in rows]
+    members_by_group: dict[int, list[int]] = {}
+    if ids:
+        ph = ",".join("?" for _ in ids)
+        for m in conn.execute(
+                f"SELECT group_id, user_id FROM group_members "
+                f"WHERE group_id IN ({ph})", ids).fetchall():
+            members_by_group.setdefault(m["group_id"], []).append(m["user_id"])
+    roles_by_group = permissions.list_roles_for_subjects(
+        "group", [str(i) for i in ids])
+    out = []
+    for r in rows:
+        member_ids = members_by_group.get(r["id"], [])
+        out.append({
+            "id": r["id"], "name": r["name"], "source": r["source"],
+            "external_dn": r["external_dn"], "description": r["description"],
+            "created_at": r["created_at"],
+            "member_count": len(member_ids), "member_ids": member_ids,
+            "dir_member_count": r["member_count"],
+            "dir_synced_at": r["member_count_synced_at"],
+            "parent_dn": r["parent_dn"] or "", "depth": 0,
+            "roles": roles_by_group.get(str(r["id"]), []),
+        })
+    return {"rows": out, "total": total}
+
+
 def order_groups_as_tree(groups: list[dict]) -> list[dict]:
     """Reorder a flat group list into parent-before-children tree order, adding
     a `depth` key to each (0 = root). Nesting comes from `parent_dn` pointing at

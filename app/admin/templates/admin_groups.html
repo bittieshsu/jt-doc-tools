@@ -42,8 +42,15 @@
 {% endif %}
 
 <div class="panel">
-  <h2 data-s="s53896af7">群組清單（{{ groups|length }}）</h2>
-  {% if is_directory_backend %}<p class="muted">有上下從屬關係的巢狀群組會以樹狀縮排呈現（子群組縮排在上層群組下方）。從屬關係由目錄的 <code>memberOf</code> 於同步時解析。</p>{% endif %}
+  <h2 data-s="s53896af7">群組清單（共 {{ total_groups }}）</h2>
+  {% if paged %}
+  <form method="get" action="/admin/groups" class="grp-sync-row">
+    <input class="field" type="search" name="q" value="{{ q }}" placeholder="搜尋群組名稱…">
+    <button class="btn" type="submit">{{ icon('search', size=14) }} 搜尋</button>
+    {% if q %}<a class="btn btn-small" href="/admin/groups">清除</a>{% endif %}
+    <span class="muted">群組數多，改為分頁顯示；第 {{ page }} / {{ pages }} 頁（符合 {{ page_total }} 筆）</span>
+  </form>
+  {% elif is_directory_backend %}<p class="muted">有上下從屬關係的巢狀群組會以樹狀縮排呈現（子群組縮排在上層群組下方）。從屬關係由目錄的 <code>memberOf</code> 於同步時解析。</p>{% endif %}
   <table class="grp-table">
     <thead>
       <tr><th>名稱</th><th>來源</th><th>說明</th><th>成員數</th><th>角色</th><th></th></tr>
@@ -85,6 +92,14 @@
       {% endfor %}
     </tbody>
   </table>
+  {% if paged and pages > 1 %}
+  <div class="grp-pager">
+    {% set qs = ('&q=' ~ q) if q else '' %}
+    {% if page > 1 %}<a class="btn btn-small" href="/admin/groups?page={{ page - 1 }}{{ qs }}">‹ 上一頁</a>{% endif %}
+    <span class="muted">第 {{ page }} / {{ pages }} 頁</span>
+    {% if page < pages %}<a class="btn btn-small" href="/admin/groups?page={{ page + 1 }}{{ qs }}">下一頁 ›</a>{% endif %}
+  </div>
+  {% endif %}
 </div>
 
 <!-- ===== Roles modal ===== -->

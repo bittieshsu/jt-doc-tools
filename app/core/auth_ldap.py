@@ -364,6 +364,14 @@ def _sync_user(username: str, display_name: str, dn: str, backend: str) -> dict:
                 "UPDATE users SET display_name=?, last_login_at=?, enabled=1 "
                 "WHERE id=?", (display_name, now, row["id"]),
             )
+        # Activation on real login: a mirrored-only user (pre-synced by
+        # directory sync with enabled=0 and NO role) gets the configured
+        # new-user default role on their first actual login. Users who already
+        # have any role keep exactly what they have (admin assignments intact).
+        if not permissions.list_roles_for_subject("user", str(row["id"])):
+            from . import roles as _roles
+            permissions.set_subject_roles(
+                "user", str(row["id"]), [_roles.get_default_role_id()])
         return {"user_id": row["id"], "username": username,
                 "display_name": display_name, "source": backend}
 
@@ -581,9 +589,12 @@ def sync_all_users(name_contains: str = "") -> dict:
     """列舉目錄**所有使用者**,鏡射進本地 `users` 表，讓「使用者管理」預先看到所有
     目錄使用者、可先指派權限，不必等對方登入過。
 
-    - 不設密碼（仍走 LDAP 驗證），不動 `last_login_at`（未登入者仍標示「從未登入」）。
-    - 新建的使用者給 admin 設定的「新使用者預設角色」（同 JIT 登入時的行為），否則
-      預先建立卻沒角色，登入時 JIT 只更新不再補角色 → 會變成無權限。
+    這是**目錄鏡射（可見、可指派）**，不是**啟用（可登入使用）**：新建的使用者一律
+    `enabled=0`、**不給任何角色**，只當「目錄名冊」讓 admin 看得到、可預先指派。真正
+    啟用只透過 ① 本人實際登入（JIT 會設 enabled=1、last_login 並補預設角色），或
+    ② admin 明確「啟用」。
+
+    - 不設密碼（仍走 LDAP 驗證），不動 `last_login_at`（未登入者標示「從未登入」）。
     - 同名不同 DN 衝突（同 backend 內）跳過不覆蓋（避免身分接管），計入 skipped_clash。
     回 {synced, updated, total_seen, skipped_clash}。
     """
@@ -637,7 +648,6 @@ def sync_all_users(name_contains: str = "") -> dict:
 
     conn_db = auth_db.conn()
     synced = updated = skipped = 0
-    new_uids: list[int] = []
     now = time.time()
     with db.tx(conn_db):
         for dn, login, disp in seen:
@@ -657,22 +667,13 @@ def sync_all_users(name_contains: str = "") -> dict:
             if clash:
                 skipped += 1
                 continue
-            cur = conn_db.execute(
+            # enabled=0 → 目錄可見但「未啟用」；不給角色。啟用由本人登入(JIT)或
+            # admin 明確操作。已驗證 enabled=0 不擋日後 LDAP 登入。
+            conn_db.execute(
                 "INSERT INTO users(username, display_name, source, external_dn, "
-                "enabled, is_admin_seed, created_at) VALUES (?,?,?,?,1,0,?)",
+                "enabled, is_admin_seed, created_at) VALUES (?,?,?,?,0,0,?)",
                 (login, disp, backend, dn, now))
-            new_uids.append(cur.lastrowid)
             synced += 1
-    # Give freshly-mirrored users the configured new-user default role (mirrors
-    # the JIT-at-login path; set_subject_roles manages its own transaction).
-    if new_uids:
-        from . import roles as _roles
-        default_role = _roles.get_default_role_id()
-        for uid in new_uids:
-            try:
-                permissions.set_subject_roles("user", str(uid), [default_role])
-            except Exception:  # noqa: BLE001
-                logger.warning("failed to set default role for synced user %s", uid)
     permissions.invalidate_cache()
     audit_db.log_event("ldap_user_sync",
                        details={"synced": synced, "updated": updated,

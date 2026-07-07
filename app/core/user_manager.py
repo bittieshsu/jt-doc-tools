@@ -31,16 +31,40 @@ def _validate_username(username: str) -> str:
     return username
 
 
-def list_users() -> list[dict]:
-    """List all users with their role assignments.
+def _view_where(view: str) -> str:
+    """SQL WHERE clause for the 使用者管理 view filter (see list_users)."""
+    mirror = ("source IN ('ldap','ad') AND enabled=0 "
+              "AND COALESCE(last_login_at,0)=0")
+    if view == "active":
+        return f"WHERE NOT ({mirror})"
+    if view == "directory":
+        return f"WHERE {mirror}"
+    return ""
 
-    Batched: roles for every user are loaded in one query instead of one query
-    per user (the N+1 that made 使用者管理 slow with thousands of users)."""
+
+def count_users(view: str = "all") -> int:
+    return auth_db.conn().execute(
+        f"SELECT COUNT(*) AS c FROM users {_view_where(view)}").fetchone()["c"]
+
+
+def list_users(view: str = "all") -> list[dict]:
+    """List users with their role assignments.
+
+    `view` filters the population so the 使用者管理 page doesn't render the
+    thousands of directory users mirrored as a catalog (which OOM'd the browser):
+      - 'active'    → everyone EXCEPT the never-activated mirror catalog
+                      (i.e. exclude source ldap/ad that is enabled=0 AND never
+                      logged in). This is the default 使用者管理 view.
+      - 'directory' → ONLY the never-activated mirror catalog.
+      - 'all'       → everyone (backward-compatible default of this function).
+
+    Batched: roles for every user load in one query, not N+1."""
+    where = _view_where(view)
     conn = auth_db.conn()
     rows = conn.execute(
         "SELECT id, username, display_name, source, external_dn, enabled, "
         "is_admin_seed, is_audit_seed, password_hash, created_at, last_login_at "
-        "FROM users ORDER BY username"
+        f"FROM users {where} ORDER BY username"
     ).fetchall()
     roles_by_user = permissions.list_roles_for_subjects(
         "user", [str(r["id"]) for r in rows])

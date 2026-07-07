@@ -142,6 +142,106 @@ def test_run_sync_noop_on_non_directory_backend(monkeypatch):
     assert "skipped" in rep
 
 
+# --------------------------- view filter + pagination (OOM fix) --------------
+
+def test_list_users_view_filter_excludes_mirror_catalog():
+    from app.core import user_manager
+    a = _mk_user("vf_active", "ad", "cn=va,dc=t", last_login=1700000000.0, enabled=1)
+    m = _mk_user("vf_mirror", "ad", "cn=vm,dc=t", last_login=None, enabled=0)
+    loc = _mk_user("vf_local", "local", "", last_login=None, enabled=1)
+    try:
+        active = {u["username"] for u in user_manager.list_users(view="active")}
+        directory = {u["username"] for u in user_manager.list_users(view="directory")}
+        assert "vf_active" in active and "vf_local" in active
+        assert "vf_mirror" not in active            # mirror catalog hidden
+        assert directory == {"vf_mirror"}
+        assert user_manager.count_users(view="directory") >= 1
+    finally:
+        for u in ("vf_active", "vf_mirror", "vf_local"):
+            _rm_user(u)
+
+
+def test_group_list_names_and_page():
+    from app.core import group_manager
+    ids = [_mk_group(f"pg_grp_{i}") for i in range(5)]
+    try:
+        names = group_manager.list_group_names(q="pg_grp_")
+        assert len(names) >= 5 and all("member_ids" not in n for n in names)
+        page = group_manager.list_groups_page(offset=0, limit=2, q="pg_grp_")
+        assert page["total"] >= 5 and len(page["rows"]) == 2
+        assert all(r.get("depth") == 0 for r in page["rows"])
+    finally:
+        for i in range(5):
+            _rm_group(f"pg_grp_{i}")
+
+
+# --------------------------- migration v12: unprovision mirrored users -------
+
+def _mk_user(username, source="ldap", dn="", last_login=None, enabled=1):
+    conn = auth_db.conn()
+    cur = conn.execute(
+        "INSERT INTO users(username, display_name, source, external_dn, enabled, "
+        "is_admin_seed, created_at, last_login_at) VALUES(?,?,?,?,?,0,?,?)",
+        (username, username, source, dn, enabled, "2026-01-01", last_login))
+    conn.commit()
+    return cur.lastrowid
+
+
+def _rm_user(username):
+    conn = auth_db.conn()
+    conn.execute("DELETE FROM users WHERE username=?", (username,))
+    conn.commit()
+
+
+def test_m12_unprovisions_only_never_logged_in_mirrors():
+    from app.core import auth_db as adb, permissions
+    conn = auth_db.conn()
+    # never-logged-in mirror (the v1.12.69 casualty) with the default role
+    u_mirror = _mk_user("m12_mirror", "ldap", "cn=mirror,dc=t", last_login=None, enabled=1)
+    permissions.set_subject_roles("user", str(u_mirror), ["default-user"])
+    # genuinely logged-in ldap user with a role — must stay untouched
+    u_active = _mk_user("m12_active", "ldap", "cn=active,dc=t", last_login=1700000000.0, enabled=1)
+    permissions.set_subject_roles("user", str(u_active), ["default-user"])
+    # local user — untouched
+    u_local = _mk_user("m12_local", "local", "", last_login=None, enabled=1)
+    # never-logged-in mirror that admin gave a CUSTOM role — keep custom, drop default
+    u_custom = _mk_user("m12_custom", "ad", "cn=custom,dc=t", last_login=None, enabled=1)
+    permissions.set_subject_roles("user", str(u_custom), ["clerk", "default-user"])
+    try:
+        adb._m12_unprovision_mirrored_users(conn)
+        conn.commit()
+
+        def _row(uid):
+            return conn.execute("SELECT enabled FROM users WHERE id=?", (uid,)).fetchone()
+
+        # mirror: de-activated + default role removed
+        assert _row(u_mirror)["enabled"] == 0
+        assert permissions.list_roles_for_subject("user", str(u_mirror)) == []
+        # active: fully untouched
+        assert _row(u_active)["enabled"] == 1
+        assert "default-user" in permissions.list_roles_for_subject("user", str(u_active))
+        # local: untouched
+        assert _row(u_local)["enabled"] == 1
+        # custom mirror: de-activated, default removed, custom kept
+        assert _row(u_custom)["enabled"] == 0
+        assert permissions.list_roles_for_subject("user", str(u_custom)) == ["clerk"]
+    finally:
+        for u in ("m12_mirror", "m12_active", "m12_local", "m12_custom"):
+            _rm_user(u)
+
+
+def test_m12_idempotent():
+    from app.core import auth_db as adb
+    conn = auth_db.conn()
+    u = _mk_user("m12_idem", "ldap", "cn=idem,dc=t", last_login=None, enabled=1)
+    try:
+        adb._m12_unprovision_mirrored_users(conn); conn.commit()
+        adb._m12_unprovision_mirrored_users(conn); conn.commit()   # 2nd run = no-op
+        assert conn.execute("SELECT enabled FROM users WHERE id=?", (u,)).fetchone()["enabled"] == 0
+    finally:
+        _rm_user("m12_idem")
+
+
 # --------------------------------------------------- group hierarchy (tree)
 
 def _g(gid, name, dn="", parent=""):

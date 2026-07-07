@@ -29,6 +29,30 @@ def _client_ip(r: Request) -> str:
     return _cip.real_client_ip(r)
 
 
+def _logged_in_identity_sets():
+    """(dns, logins) of directory users who have **actually logged in**
+    (`last_login_at>0`) — used to mark 目錄成員「已登入過本系統」。
+
+    Mere existence in the local `users` table no longer counts: directory sync
+    now mirrors ALL directory users as a catalog (enabled=0, never logged in),
+    so "in the table" ≠ "has used this system". Targeted query (only the
+    logged-in subset) so it stays cheap even with thousands of mirrored rows."""
+    from ..core import auth_db
+    dns, logins = set(), set()
+    rows = auth_db.conn().execute(
+        "SELECT external_dn, username FROM users "
+        "WHERE source IN ('ldap','ad') AND COALESCE(last_login_at,0)>0"
+    ).fetchall()
+    for r in rows:
+        if r["external_dn"]:
+            dns.add(str(r["external_dn"]).strip().lower())
+        if r["username"]:
+            un = str(r["username"]).strip().lower()
+            logins.add(un)
+            logins.add(un.split("@", 1)[0])
+    return dns, logins
+
+
 def _actor(r: Request) -> str:
     user = getattr(r.state, "user", None)
     return user["username"] if user else ""
@@ -390,9 +414,20 @@ def build_auth_router(templates) -> APIRouter:
 
     @router.get("/users", response_class=HTMLResponse)
     async def users_page(request: Request):
-        users = user_manager.list_users()
+        # Default view = 'active': excludes the (potentially thousands of)
+        # directory users mirrored as a catalog (enabled=0, never logged in) —
+        # those live in the directory browser. This is what stops the browser
+        # OOM the customer hit after bulk AD user sync.
+        view = (request.query_params.get("view") or "active").lower()
+        if view not in ("active", "directory", "all"):
+            view = "active"
+        users = user_manager.list_users(view=view)
+        dir_count = user_manager.count_users(view="directory")
         all_roles = roles.list_roles()
-        all_groups = group_manager.list_groups()
+        # Lightweight group list for the edit-modal picker: id/name/source only,
+        # NOT list_groups() (which carries per-group member_ids arrays — those
+        # bloated the page to the point of OOM and the picker never used them).
+        all_groups = group_manager.list_group_names()
         # Enrich each user with role display names so the table can show
         # human labels ("管理員") not just slugs ("admin"). Keep `roles` as
         # the slug list (backend contract) and add `roles_display`.
@@ -432,6 +467,8 @@ def build_auth_router(templates) -> APIRouter:
             "all_roles": all_roles,
             "all_groups": all_groups,
             "auth_on": auth_settings.is_enabled(),
+            "view": view,
+            "dir_count": dir_count,
         })
 
     @router.post("/users/create")
@@ -565,11 +602,36 @@ def build_auth_router(templates) -> APIRouter:
 
     # ---------- /admin/groups ----------
 
+    _GROUP_TREE_MAX = 300      # above this, switch to flat paginated + search
+
     @router.get("/groups", response_class=HTMLResponse)
     async def groups_page(request: Request):
         from ..core import auth_settings
-        groups = group_manager.order_groups_as_tree(group_manager.list_groups())
-        all_users = user_manager.list_users()
+        total = group_manager.count_groups()
+        q = (request.query_params.get("q") or "").strip()
+        size = 100
+        try:
+            page = max(1, int(request.query_params.get("page") or 1))
+        except ValueError:
+            page = 1
+        # Small directory → full tree (nice). Many groups (or searching) →
+        # flat, server-paginated, searchable list — otherwise rendering
+        # thousands of group rows OOMs the browser.
+        if total <= _GROUP_TREE_MAX and not q:
+            groups = group_manager.order_groups_as_tree(group_manager.list_groups())
+            paged = False
+            page_total = total
+            pages = 1
+        else:
+            data = group_manager.list_groups_page(
+                offset=(page - 1) * size, limit=size, q=q)
+            groups = data["rows"]
+            page_total = data["total"]
+            pages = max(1, (page_total + size - 1) // size)
+            paged = True
+        # Member picker only needs pickable users; use the 'active' view so we
+        # don't embed thousands of never-logged-in mirrored directory users.
+        all_users = user_manager.list_users(view="active")
         all_roles = roles.list_roles()
         backend = (auth_settings.get() or {}).get("backend", "off")
         return templates.TemplateResponse(request, "admin_groups.html", {
@@ -579,6 +641,12 @@ def build_auth_router(templates) -> APIRouter:
             "all_roles": all_roles,
             "auth_backend": backend,
             "is_directory_backend": backend in ("ldap", "ad"),
+            "total_groups": total,
+            "paged": paged,
+            "page": page,
+            "pages": pages,
+            "page_total": page_total,
+            "q": q,
         })
 
     @router.post("/groups/create")
@@ -704,18 +772,9 @@ def build_auth_router(templates) -> APIRouter:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
             raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
-        # 標註哪些目錄成員「已登入過本系統」（本地 users 表有對應列）。以
-        # external_dn（AD DN）為主鍵比對,退回 username（sAMAccountName）。
-        local_dns, local_logins = set(), set()
-        for u in user_manager.list_users():
-            if u.get("source") in ("ldap", "ad"):
-                if u.get("external_dn"):
-                    local_dns.add(str(u["external_dn"]).strip().lower())
-                if u.get("username"):
-                    # username 可能是 sAMAccountName 或 name@realm，取 @ 前段一起比
-                    un = str(u["username"]).strip().lower()
-                    local_logins.add(un)
-                    local_logins.add(un.split("@", 1)[0])
+        # 標註哪些目錄成員「已登入過本系統」= 真正登入過（last_login>0），不是
+        # 「本地表有列」（目錄同步會鏡射全部使用者，存在≠登入過）。
+        local_dns, local_logins = _logged_in_identity_sets()
         local_count = 0
         for m in members:
             is_local = (
@@ -826,14 +885,7 @@ def build_auth_router(templates) -> APIRouter:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
             raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
-        local_dns, local_logins = set(), set()
-        for u in user_manager.list_users():
-            if u.get("source") in ("ldap", "ad"):
-                if u.get("external_dn"):
-                    local_dns.add(str(u["external_dn"]).strip().lower())
-                if u.get("username"):
-                    un = str(u["username"]).strip().lower()
-                    local_logins.add(un); local_logins.add(un.split("@", 1)[0])
+        local_dns, local_logins = _logged_in_identity_sets()
         lc = 0
         for m in users:
             m["local"] = (m.get("dn", "").strip().lower() in local_dns
@@ -857,15 +909,9 @@ def build_auth_router(templates) -> APIRouter:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
             raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
-        # 是否已登入過本系統
-        local = False
-        dl = dn.strip().lower()
-        for u in user_manager.list_users():
-            if u.get("source") in ("ldap", "ad") and \
-                    str(u.get("external_dn") or "").strip().lower() == dl:
-                local = True
-                break
-        detail["local"] = local
+        # 是否已登入過本系統 = 真正登入過（last_login>0），非「本地表有列」。
+        local_dns, _ = _logged_in_identity_sets()
+        detail["local"] = dn.strip().lower() in local_dns
         return {"ok": True, **detail}
 
     @router.post("/directory/ou-roles")

@@ -41,6 +41,9 @@
     <input class="field" type="search" id="userSearch"
            placeholder="搜尋帳號、顯示名稱、角色…" data-s="s058cdc4e">
   </div>
+  {% if dir_count %}
+  <p class="muted">此清單顯示<b>已啟用 / 曾登入</b>的使用者。另有 <b>{{ dir_count }}</b> 位由目錄同步鏡射、<b>尚未登入（未啟用）</b>的使用者未列於此 —— 要檢視 / 指派權限 / 逐一啟用，請至 <a href="/admin/directory">目錄瀏覽</a>。他們一旦實際登入即自動啟用並取得預設角色。</p>
+  {% endif %}
   <table class="user-table" id="userTable">
     <thead>
       <tr>
