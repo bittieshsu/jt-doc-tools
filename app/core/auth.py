@@ -72,10 +72,20 @@ def authenticate(username: str, password: str, *,
         # otherwise an attacker could bypass local-only setups.
         if backend not in ("ldap", "ad"):
             raise AuthError("此認證領域未啟用")
-        from . import auth_ldap
+        from . import auth_ldap, auth_local
+        # 暴力破解鎖定：LDAP / AD 路徑重用本機同一套 lockout（per-user + per-IP，
+        # 失敗 N 次鎖 15 分）。先前只有 local 路徑有鎖定，目錄帳號可被無限嘗試
+        # （憑證填充 / 密碼噴灑）——已補上。
         try:
-            return auth_ldap.authenticate(username, password, ip=ip)
-        except auth_ldap.AuthError as e:
+            auth_local.lockout_precheck(username, ip)
+        except auth_local.AuthError as e:
             raise AuthError(str(e))
+        try:
+            user = auth_ldap.authenticate(username, password, ip=ip)
+        except auth_ldap.AuthError as e:
+            auth_local.lockout_record_fail(username, ip)
+            raise AuthError(str(e))
+        auth_local.lockout_clear(username, ip)
+        return user
 
     raise AuthError("無效的認證領域")

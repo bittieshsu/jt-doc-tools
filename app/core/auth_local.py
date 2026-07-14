@@ -87,6 +87,63 @@ def _clear_lockout(conn, keys: list[str]) -> None:
         conn.execute("DELETE FROM lockouts WHERE key=?", (k,))
 
 
+# ─── 共用暴力破解鎖定 API（給 LDAP / AD 登入路徑重用，與本機同一張 lockouts 表）───
+
+def _lockout_settings():
+    s = auth_settings.get()
+    return (bool(s.get("lockout_enabled", True)),
+            int(s.get("lockout_threshold", 5)),
+            int(s.get("lockout_ip_threshold", 20)),
+            int(s.get("lockout_minutes", 15)),
+            float(int(s.get("lockout_window_minutes", 10))) * 60.0)
+
+
+def _keys(username: str, ip: str) -> tuple[str, str]:
+    return (f"user:{(username or '').lower().strip()}", f"ip:{ip or ''}")
+
+
+def lockout_precheck(username: str, ip: str) -> None:
+    """鎖定中則 raise AuthError（不消耗一次嘗試）。lockout 關閉時 no-op。"""
+    enabled, uth, ith, _lmin, _win = _lockout_settings()
+    if not enabled:
+        return
+    conn = auth_db.conn()
+    uk, ik = _keys(username, ip)
+    locked_until = max(filter(None, [_check_lockout(conn, uk, uth),
+                                     _check_lockout(conn, ik, ith)]), default=None)
+    if locked_until:
+        secs = int(locked_until - time.time())
+        mins = max(1, (secs + 59) // 60)
+        audit_db.log_event("login_locked", username=username, ip=ip, target=username,
+                           details={"remaining_seconds": secs})
+        raise AuthError(f"嘗試次數過多，請於 {mins} 分鐘後再試")
+
+
+def lockout_record_fail(username: str, ip: str) -> None:
+    """記一次失敗（per-user + per-IP）；剛跨門檻時送 account_locked 稽核事件。"""
+    enabled, uth, ith, lmin, win = _lockout_settings()
+    if not enabled:
+        return
+    conn = auth_db.conn()
+    uk, ik = _keys(username, ip)
+    with db.tx(conn):
+        ujl = _record_fail(conn, uk, uth, lmin, win)
+        ijl = _record_fail(conn, ik, ith, lmin, win)
+    if ujl or ijl:
+        audit_db.log_event("account_locked", username=username, ip=ip, target=username,
+                           details={"locked_user": bool(ujl), "locked_ip": bool(ijl),
+                                    "lockout_minutes": lmin, "user_threshold": uth,
+                                    "ip_threshold": ith})
+
+
+def lockout_clear(username: str, ip: str) -> None:
+    """登入成功後清掉該 user + IP 的失敗計數。"""
+    conn = auth_db.conn()
+    uk, ik = _keys(username, ip)
+    with db.tx(conn):
+        _clear_lockout(conn, [uk, ik])
+
+
 def authenticate(username: str, password: str, *, ip: str = "") -> dict:
     """Verify credentials, return user dict on success.
 

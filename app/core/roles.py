@@ -554,6 +554,10 @@ def update(role_id: str, *, display_name: Optional[str] = None,
                 for t in tools:
                     conn.execute("INSERT OR IGNORE INTO role_perms(role_id, tool_id) "
                                  "VALUES (?,?)", (role_id, t))
+    # 權限快取失效收進變更函式本身（defense-in-depth）：不再只靠端點層記得呼叫，
+    # 未來任何 caller（CLI / 內部路徑）改角色工具都不會留下過度授權的 stale 視窗。
+    from . import permissions as _perm
+    _perm.invalidate_cache()
 
 
 def delete(role_id: str) -> None:
@@ -570,3 +574,5 @@ def delete(role_id: str) -> None:
     with db.tx(conn):
         # CASCADE removes role_perms rows; subject_roles also CASCADE.
         conn.execute("DELETE FROM roles WHERE id=?", (role_id,))
+    from . import permissions as _perm
+    _perm.invalidate_cache()   # 刪除角色後立即失效權限快取

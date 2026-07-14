@@ -294,6 +294,15 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
     except ImportError:
         raise AuthError("ldap3 套件未安裝；請聯絡管理員")
 
+    # 空密碼防護（CRITICAL）：帶合法 DN + 零長度密碼的 LDAP simple bind 在
+    # OpenLDAP / Univention 等後端會被當成「unauthenticated / 匿名 bind」回成功
+    # （RFC 4513 §5.1.2），造成認證繞過。務必在進 bind 前擋掉，與 test_user_login
+    # 的防護一致。帳號空一併擋（回同一訊息，不做使用者列舉）。
+    if not username or not password:
+        audit_db.log_event("login_fail", username=username or "", ip=ip,
+                           details={"reason": "empty_credentials"})
+        raise AuthError("帳號或密碼錯誤")
+
     backend, cfg = _resolve_backend_and_cfg()
 
     # Step 1+2: service bind + search (shared helper).
@@ -656,8 +665,12 @@ def sync_all_users(name_contains: str = "") -> dict:
                 (backend, dn)).fetchone()
             if row:
                 if disp and row["display_name"] != disp:
+                    # 只更新顯示名稱，**絕不動 enabled**（v1.12.70 不變量：鏡射 ≠
+                    # 啟用）。舊版此處會 enabled=1，導致「已去啟用的鏡射帳號」在目錄
+                    # 端改名後被靜默重新啟用而可登入——安全回歸，已修正。啟用只透過
+                    # 本人登入 JIT 或 admin 明確操作。
                     conn_db.execute(
-                        "UPDATE users SET display_name=?, enabled=1 WHERE id=?",
+                        "UPDATE users SET display_name=? WHERE id=?",
                         (disp, row["id"]))
                     updated += 1
                 continue
@@ -883,10 +896,13 @@ def search_selected_objects(rules: list[dict], cap: int = 3000) -> dict:
                 if not base or "(" in base or ")" in base:
                     continue
                 filt = _df.build_rule_filter(rule)
+                # generator=True → 逐筆串流，達 cap 即 break，不把整個結果集（可能
+                # 數十萬筆）一次拉進記憶體。generator=False 會在回傳前全部載入，讓
+                # 下方的 cap 檢查擋不住 LDAP fetch 造成 OOM（單 uvicorn worker）。
                 entries = conn.extend.standard.paged_search(
                     search_base=base, search_filter=filt, search_scope=SUBTREE,
                     attributes=["ou", "cn", disp_attr, login_attr, "objectClass"],
-                    paged_size=500, generator=False)
+                    paged_size=500, generator=True)
                 for e in entries:
                     dn = e.get("dn") or ""
                     if not dn or e.get("type") != "searchResEntry":
