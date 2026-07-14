@@ -65,12 +65,17 @@ async def render_date_endpoint(request: Request):
     texture = str(body.get("texture") or "medium").lower()
     if texture not in ("none", "light", "medium", "heavy"):
         texture = "medium"
+    # Supersample：日期戳是點陣圖，最終在 PDF 以實體 mm 尺寸呈現，且使用者可拖拉
+    # 放大。若 render 像素密度只綁「視覺字級」，放大時就會糊（使用者回報日期糊）。
+    # 因此以較高的絕對像素密度 render（下限 240px 高，確保任意合理拖拉尺寸下仍夠
+    # 清晰），mm 尺寸仍依「視覺字級」計算 → 視覺大小不變、只變清晰。
+    render_px = min(500, max(font_size_px * 4, 240))
     try:
         png_bytes, w, h = _date_render.render_date_png(
             text,
             font_style=font_style,
             weight=weight,
-            font_size_px=font_size_px,
+            font_size_px=render_px,
             color_hex=color_hex,
             jitter=jitter,
             texture=texture,
@@ -79,7 +84,7 @@ async def render_date_endpoint(request: Request):
         raise HTTPException(500, f"render failed: {e.__class__.__name__}") from e
     # Suggested mm size: ~6mm font height (typical handwriting on paper)
     # Convert px → mm: at 72 dpi, 72px = 25.4mm so 1px ≈ 0.353mm
-    # We choose target height_mm = font_size_px * 0.353 * 0.6 (compress for handwriting feel)
+    # 用「視覺字級」font_size_px（非 render_px）算 mm，確保放大解析度不改變視覺尺寸。
     target_height_mm = font_size_px * 0.353 * 0.55
     aspect = (w / h) if h else 1.0
     target_width_mm = target_height_mm * aspect

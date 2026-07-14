@@ -61,8 +61,11 @@
           data-gname="{{ g.name }}"
           data-source="{{ g.source }}"
           data-roles="{{ g.roles|join(',') }}"
-          data-members="{{ g.member_ids|join(',') }}">
-        <td>{% if g.depth %}{% for _ in range(g.depth) %}<span class="grp-indent"></span>{% endfor %}<span class="grp-branch">└</span> {% endif %}<b>{{ g.name }}</b></td>
+          data-members="{{ g.member_ids|join(',') }}"
+          data-depth="{{ g.depth or 0 }}"
+          data-dn="{{ (g.external_dn or '')|lower }}"
+          data-haschildren="{{ 1 if g.has_children else 0 }}">
+        <td>{% if g.depth %}{% for _ in range(g.depth) %}<span class="grp-indent"></span>{% endfor %}<span class="grp-branch">└</span> {% endif %}{% if g.has_children %}<button type="button" class="grp-toggle" aria-expanded="true" title="收折 / 展開子群組">▾</button>{% else %}<span class="grp-caret-spacer"></span>{% endif %}<b>{{ g.name }}</b></td>
         <td><span class="src-badge src-{{ g.source }}">{{ g.source }}</span></td>
         <td class="muted">{{ g.description }}</td>
         {% if g.source in ('ldap', 'ad') and g.dir_member_count is not none %}
@@ -179,6 +182,16 @@
   .grp-table { width:100%; border-collapse:collapse; font-size:13px; }
   .grp-table th, .grp-table td { padding:6px 8px; border-bottom:1px solid #e5e7eb; text-align:left; }
   .grp-table th { background:#f9fafb; font-size:12px; color:#6b7280; }
+
+  /* 巢狀群組收折 */
+  .grp-toggle { display:inline-flex; align-items:center; justify-content:center;
+    width:18px; height:18px; margin-right:4px; padding:0; vertical-align:middle;
+    border:1px solid #cbd5e1; border-radius:4px; background:#f8fafc; color:#475569;
+    font-size:11px; line-height:1; cursor:pointer; }
+  .grp-toggle:hover { background:#e2e8f0; }
+  .grp-toggle.is-collapsed { color:#334155; }
+  .grp-caret-spacer { display:inline-block; width:22px; vertical-align:middle; }
+  .grp-table tr.grp-row-hidden { display:none; }
 
   /* source + role chips (matches admin_users) */
   .src-badge { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; line-height:1.4; }
@@ -339,6 +352,7 @@ document.getElementById('mmSave').onclick = async () => {
 // ---------- row buttons dispatch ----------
 document.querySelectorAll('.grp-table button').forEach(btn => {
   btn.addEventListener('click', async () => {
+    if (btn.classList.contains('grp-toggle')) return;  // 收折鈕另行處理
     const tr = btn.closest('tr');
     const act = btn.dataset.act;
     if (act === 'delete') {
@@ -356,6 +370,60 @@ document.querySelectorAll('.grp-table button').forEach(btn => {
     }
   });
 });
+
+// ---------- 巢狀群組收折（樹狀）----------
+// 純前端：依每列的 data-depth（pre-order DFS 深度）以「連續深度區段」邏輯隱藏子樹，
+// 支援多層巢狀；收折狀態以群組 DN 記在 localStorage，跨頁 / 重新整理保留。
+(function () {
+  const table = document.querySelector('.grp-table');
+  if (!table) return;
+  const rows = Array.from(table.querySelectorAll('tbody tr'));
+  if (!rows.some(r => r.dataset.haschildren === '1')) return;  // 無巢狀 → 免處理
+  const KEY = 'jtdt.admin.groups.collapsed';
+  function loadSet() {
+    try { return new Set(JSON.parse(localStorage.getItem(KEY) || '[]')); }
+    catch (e) { return new Set(); }
+  }
+  function saveSet(s) {
+    try { localStorage.setItem(KEY, JSON.stringify(Array.from(s))); } catch (e) {}
+  }
+  const collapsed = loadSet();
+
+  function recompute() {
+    let cutoff = Infinity;  // 隱藏 depth > cutoff 的列；離開子樹時重設
+    for (const tr of rows) {
+      const d = parseInt(tr.dataset.depth || '0', 10);
+      if (d <= cutoff) cutoff = Infinity;
+      const hidden = d > cutoff;
+      tr.classList.toggle('grp-row-hidden', hidden);
+      const dn = tr.dataset.dn || '';
+      const btn = tr.querySelector('.grp-toggle');
+      if (btn) {
+        const isCol = !!dn && collapsed.has(dn);
+        btn.textContent = isCol ? '▸' : '▾';  // ▸ / ▾
+        btn.classList.toggle('is-collapsed', isCol);
+        btn.setAttribute('aria-expanded', isCol ? 'false' : 'true');
+      }
+      if (!hidden && tr.dataset.haschildren === '1' && dn && collapsed.has(dn)) {
+        cutoff = d;  // 此節點收折 → 隱藏其下所有更深的列
+      }
+    }
+  }
+
+  table.addEventListener('click', (e) => {
+    const btn = e.target.closest('.grp-toggle');
+    if (!btn || !table.contains(btn)) return;
+    e.preventDefault();
+    const tr = btn.closest('tr');
+    const dn = tr && tr.dataset.dn;
+    if (!dn) return;
+    if (collapsed.has(dn)) collapsed.delete(dn); else collapsed.add(dn);
+    saveSet(collapsed);
+    recompute();
+  });
+
+  recompute();
+})();
 
 // AD / LDAP 群組：向目錄查完整成員（唯讀）+ 標註已登入過本系統者
 let _dmAll = [];

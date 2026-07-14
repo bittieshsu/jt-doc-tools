@@ -366,8 +366,10 @@ async def export(request: Request):
     except Exception:
         raise HTTPException(400, "invalid JSON body")
     fmt = body.get("format", "")
-    if fmt not in ("csv", "xlsx", "json"):
-        raise HTTPException(400, "format 必須是 csv / xlsx / json")
+    # exporter 支援的全部格式（UI 下拉也是這 7 種）。之前只放 csv/xlsx/json，
+    # 讓 ods/xml/txt/md 被 400 擋掉（UI 有選項卻匯不出）。
+    if fmt not in ("csv", "xlsx", "json", "ods", "xml", "txt", "md"):
+        raise HTTPException(400, "format 必須是 csv / xlsx / json / ods / xml / txt / md")
     clear_after = bool(body.get("clear_after", False))
 
     user = _request_user(request)

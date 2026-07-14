@@ -333,7 +333,7 @@
       {% endif %}
       {# 釘選群組 — 預留 placeholder，由前端 JS 依 localStorage 動態填入。
          如果使用者有釘選工具，這裡會顯示在最上方便快速存取。 #}
-      <details class="sb-group sb-pinned" id="sbPinnedGroup" open hidden>
+      <details class="sb-group sb-pinned" id="sbPinnedGroup" open hidden data-sbkey="__pinned__">
         <summary><span class="sb-group-icon">{{ icon('star', size=15) }}</span>釘選<span class="sb-count" id="sbPinnedCount">0</span></summary>
         <div class="sb-items" id="sbPinnedItems"></div>
       </details>

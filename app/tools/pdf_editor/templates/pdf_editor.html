@@ -458,7 +458,7 @@ body.pe-pan-active { cursor: grabbing !important; }
 <div class="panel" id="editor-panel" hidden>
   <div class="pe-top">
     <button class="btn btn-primary" type="button" id="btnSave">{{ icon('save') }} 儲存並預覽</button>
-    <a class="btn" id="btnDownload" href="#" data-s="scb458930">{{ icon('download') }} 下載</a>
+    <a class="btn" id="btnDownload" href="#" hidden>{{ icon('download') }} 下載</a>
     {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden>{{ icon('archive') }} 存至工作區</button>{% endif %}
     <span class="pe-top-divider"></span>
     <button class="btn" type="button" id="btnUndo" title="復原 (Cmd/Ctrl+Z)" disabled>
@@ -3255,7 +3255,10 @@ async function savePdf(isAuto, opts) {
     if (window.attachWorkspaceSave) window.attachWorkspaceSave(
       document.getElementById('wsSaveBtn'),
       () => ({ url: data.download_url, name: suggestedFilename(), tool: 'pdf-editor' }));
-    dl.style.display = ''; dl.innerHTML = dl.innerHTML.includes('svg') ? dl.innerHTML : '下載 PDF';
+    // v1.12.71：用 hidden 屬性顯示（全域 [hidden]{display:none!important}）。
+    // 之前用 data-s CSS 規則隱藏 + `style.display=''` 清 inline style，蓋不過
+    // CSS 規則的 display:none → CSP 樣式重構後「下載 PDF」鈕存檔後一直不出現。
+    dl.hidden = false; dl.innerHTML = dl.innerHTML.includes('svg') ? dl.innerHTML : '下載 PDF';
     dl.setAttribute('download', suggestedFilename());
     // NOTE: intentionally NOT clearing _origBbox or markers. Each save
     // replays all edits on pristine SRC, so state must persist across

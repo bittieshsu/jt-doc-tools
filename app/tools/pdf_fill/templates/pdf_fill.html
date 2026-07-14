@@ -338,8 +338,14 @@ if (companySwitch) {
     currentProfileSections = data.profile_sections || [];
     currentUploadId = data.upload_id;
     currentFileBaseName = (data.filename || '').replace(/\.[^.]+$/i, '');
-    downloadBtn.href = `/tools/pdf-fill/download/${data.upload_id}`;
-    downloadBtn.setAttribute('download', (data.filename || 'refill.pdf').replace(/\.[^.]+$/i, '') + '_filled.pdf');
+    // 檔名 = 原上傳檔名（去副檔名）+ _filled.pdf。href 一定要帶 ?name=，否則
+    // 非 dirty 直接導覽時，伺服器 Content-Disposition 會用預設 filled.pdf 蓋掉
+    // download 屬性。
+    {
+      const _dlName = (data.filename || 'refill.pdf').replace(/\.[^.]+$/i, '') + '_filled.pdf';
+      downloadBtn.href = `/tools/pdf-fill/download/${data.upload_id}?name=` + encodeURIComponent(_dlName);
+      downloadBtn.setAttribute('download', _dlName);
+    }
     if (window.attachWorkspaceSave) window.attachWorkspaceSave(document.getElementById('wsSaveBtn'),
       () => ({ url: downloadBtn.href, name: (currentFileBaseName || 'filled') + '_filled.pdf', tool: 'pdf-fill' }));
     renderTemplateStatus(data.report.applied_template, data.upload_id, data.filename || 'refill.pdf');
@@ -411,8 +417,12 @@ form.addEventListener('submit', async (e) => {
       renderLlmReview(null);
     }
     renderUnmatched(data.report.unmatched_labels || [], data.profile_keys || []);
-    downloadBtn.href = `/tools/pdf-fill/download/${data.upload_id}`;
-    downloadBtn.setAttribute('download', file.name.replace(/\.[^.]+$/i, '') + '_filled.pdf');
+    // href 帶 ?name= 才能讓非 dirty 直接導覽時也用「原檔名_filled.pdf」下載。
+    {
+      const _dlName = file.name.replace(/\.[^.]+$/i, '') + '_filled.pdf';
+      downloadBtn.href = `/tools/pdf-fill/download/${data.upload_id}?name=` + encodeURIComponent(_dlName);
+      downloadBtn.setAttribute('download', _dlName);
+    }
     if (window.attachWorkspaceSave) window.attachWorkspaceSave(document.getElementById('wsSaveBtn'),
       () => ({ url: downloadBtn.href, name: file.name.replace(/\.[^.]+$/i, '') + '_filled.pdf', tool: 'pdf-fill' }));
     renderTemplateStatus(data.report.applied_template, data.upload_id, file.name);
@@ -971,7 +981,9 @@ downloadBtn.addEventListener('click', async (e) => {
   // Trigger the download with the (now-current) href.
   const href = downloadBtn.getAttribute('href');
   const dlName = downloadBtn.getAttribute('download') || '';
-  const url = href + (href.includes('?') ? '&' : '?') + 'name=' + encodeURIComponent(dlName);
+  // href 現在已帶 ?name=（341/414 設定）；若沒有才補上，避免重複參數。
+  const url = href.includes('name=') ? href
+    : href + (href.includes('?') ? '&' : '?') + 'name=' + encodeURIComponent(dlName);
   const a = document.createElement('a');
   a.href = url; a.download = dlName;
   document.body.appendChild(a); a.click();

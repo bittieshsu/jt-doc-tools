@@ -1896,7 +1896,8 @@ exportMenu.querySelectorAll('button[data-fmt]').forEach(b => {
       a.remove();
       URL.revokeObjectURL(url);
       showToast(`已下載 ${a.download}`, 'ok');
-      if (clearAfter) await loadBuffer();
+      // 注意：這裡沒有「匯出後清空」的 UI，不要引用未定義的 clearAfter —
+      // 之前那行會拋 ReferenceError，讓已成功下載的檔案誤報「匯出失敗」。
     } catch (e) {
       showToast(`匯出失敗：${e.message}`, 'err');
     }

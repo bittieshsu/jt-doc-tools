@@ -1,0 +1,590 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}乘車證明整理 · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ icon('car', size=22) }} 乘車證明整理</h1>
+<p class="tp-intro muted">拉一批台鐵「購票證明」或高鐵「電子車票證明」PDF 進來，自動抽出日期 / 交通工具 / 起訖 / 費用等欄位，整理成表格後可多格式匯出報帳（CSV / XLSX / ODS / JSON / XML / TXT / MD）。預設顯示日期、交通工具、來源-目的、費用，欄位可在「設定」自訂。</p>
+
+<div class="panel">
+  <h2 class="tp-panel-h2">{{ icon('upload', size=16) }} 上傳乘車證明</h2>
+  <div class="tp-drop" id="tpDrop" tabindex="0" role="button" aria-label="上傳 PDF">
+    <div class="tp-drop-inner">
+      {{ icon('upload', size=28) }}
+      <div class="tp-drop-main">拖曳 PDF 到此，或點選挑選</div>
+      <div class="tp-drop-sub muted">可一次多張 · 支援台鐵購票證明 / 高鐵電子車票證明 PDF</div>
+    </div>
+    <input type="file" id="tpFile" accept="application/pdf,.pdf" multiple hidden>
+  </div>
+  {% if workspace_enabled(request) %}<div class="fu-ws-row"><button type="button" class="ws-load-btn" id="tpWsLoad">{{ icon('archive', size=16) }}<span>從工作區載入</span></button></div>{% endif %}
+  <div class="tp-upmsg" id="tpUpMsg" hidden></div>
+</div>
+
+<div class="panel">
+  <h2 class="tp-panel-h2 tp-list-head">
+    <span class="tp-list-title">{{ icon('list', size=16) }} 已整理清單 <span class="tp-count" id="tpCount">0</span></span>
+    <span class="tp-toolbar">
+      <button type="button" class="btn btn-small btn-danger" id="tpBtnDelSel" hidden>{{ icon('trash', size=13) }} 刪除選取 (<span id="tpSelCount">0</span>)</button>
+      <button type="button" class="btn btn-small" id="tpBtnSettings">{{ icon('columns', size=13) }} 欄位</button>
+      <span class="tp-export-wrap">
+        <button type="button" class="btn btn-small" id="tpBtnExport">{{ icon('download', size=13) }} 匯出 ▾</button>
+        <span class="tp-export-menu" id="tpExportMenu" hidden>
+          <button type="button" data-fmt="xlsx">.xlsx</button>
+          <button type="button" data-fmt="ods">.ods</button>
+          <button type="button" data-fmt="csv">.csv</button>
+          <button type="button" data-fmt="json">.json</button>
+          <button type="button" data-fmt="xml">.xml</button>
+          <button type="button" data-fmt="txt">.txt</button>
+          <button type="button" data-fmt="md">.md</button>
+        </span>
+      </span>
+      <button type="button" class="btn btn-small" id="tpBtnRefresh">{{ icon('refresh', size=13) }} 重新整理</button>
+      <button type="button" class="btn btn-small btn-danger" id="tpBtnClear">{{ icon('trash', size=13) }} 全部清空</button>
+    </span>
+  </h2>
+  <div class="tp-table-wrap">
+    <table class="tp-table">
+      <thead><tr id="tpHead"></tr></thead>
+      <tbody id="tpBody"></tbody>
+      <tfoot><tr id="tpFoot" hidden></tr></tfoot>
+    </table>
+    <div class="tp-empty" id="tpEmpty">尚無資料。上傳乘車證明 PDF 後會出現在這裡。</div>
+  </div>
+</div>
+
+<!-- 列刪除鈕的垃圾桶 icon 來源（server-render 一次，JS clone；避免手刻 SVG） -->
+<span id="tpIconTrash" hidden>{{ icon('trash', size=15) }}</span>
+
+<div id="tpSettingsModal" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="modal-card">
+    <h3>欄位設定</h3>
+    <p class="muted tp-set-hint">勾選要顯示的欄位、調整順序與格式；「匯出標題」可覆寫匯出時的欄位名稱（留空 = 用左側名稱）。設定只影響你自己。</p>
+    <div class="tp-fieldlist" id="tpFieldList"></div>
+    <div class="tp-set-actions">
+      <button type="button" class="btn" id="tpSetReset">還原預設</button>
+      <span class="tp-set-spacer"></span>
+      <button type="button" class="btn" id="tpSetCancel">取消</button>
+      <button type="button" class="btn btn-primary" id="tpSetSave">{{ icon('save', size=14) }} 儲存</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style nonce="{{ request.state.csp_nonce }}">
+  .tp-intro { margin: 4px 0 16px; }
+  .tp-drop { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 26px 16px; text-align: center;
+    cursor: pointer; transition: border-color .15s, background .15s; }
+  .tp-drop:hover, .tp-drop.is-drag { border-color: #2563eb; background: #eff6ff; }
+  .tp-drop-inner { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #475569; }
+  .tp-drop-main { font-size: 14px; font-weight: 600; }
+  .tp-drop-sub { font-size: 12px; }
+  .tp-drop-actions { margin-top: 10px; }
+  .tp-upmsg { margin-top: 10px; font-size: 13px; border-radius: 8px; padding: 8px 12px; }
+  .tp-upmsg.ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+  .tp-upmsg.err { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .tp-upmsg .tp-fail-item { font-size: 12px; margin-top: 2px; }
+  /* 面板可收折的 h2（樣式對齊其它頁的 panel 標題，非預設大字）。 */
+  .tp-panel-h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; cursor: pointer; }
+  /* 箭頭(::before)+標題靠左成一組，工具列用 margin-left:auto 推到右邊，
+     避免 space-between 把箭頭 / 標題 / 工具列三者平均分散（標題被推到中間）。 */
+  .tp-list-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .tp-list-title { display: inline-flex; align-items: center; gap: 6px; }
+  .tp-list-head .tp-toolbar { margin-left: auto; }
+  .tp-count { display: inline-block; min-width: 20px; padding: 0 8px; border-radius: 10px; background: #e0e7ff; color: #3730a3; font-size: 12px; font-weight: 600; }
+  .tp-toolbar { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; font-weight: normal; }
+  /* 選取欄 */
+  .tp-table th.tp-selcol, .tp-table td.tp-selcol { width: 34px; text-align: center; padding-left: 10px; padding-right: 4px; }
+  .tp-table td.tp-selcol input, .tp-table th.tp-selcol input { cursor: pointer; margin: 0; vertical-align: middle; }
+  .tp-table tbody tr.tp-row-sel td { background: #eff6ff; }
+  /* 可排序表頭 */
+  .tp-table th.tp-sortable { cursor: pointer; user-select: none; }
+  .tp-table th.tp-sortable:hover { color: #2563eb; }
+  .tp-th-arrow { margin-left: 3px; font-size: 9px; color: #94a3b8; }
+  .tp-table th.tp-sort-active { color: #2563eb; }
+  .tp-table th.tp-sort-active .tp-th-arrow { color: #2563eb; }
+  .tp-export-wrap { position: relative; display: inline-block; }
+  .tp-export-menu { position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 20;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.14);
+    display: flex; flex-direction: column; min-width: 120px; overflow: hidden; }
+  .tp-export-menu[hidden] { display: none; }
+  .tp-export-menu button { border: none; background: none; text-align: left; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+  .tp-export-menu button:hover { background: #eff6ff; color: #1d4ed8; }
+  .tp-table-wrap { overflow-x: auto; }
+  .tp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tp-table th, .tp-table td { padding: 7px 12px; border-bottom: 1px solid #f1f5f9; text-align: left; white-space: nowrap; }
+  .tp-table th { background: #f9fafb; font-size: 11.5px; color: #6b7280; font-weight: 600; position: sticky; top: 0; }
+  .tp-table td.tp-num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tp-table td.tp-transport-hsr .tp-tag { background: #fef3c7; color: #92400e; }
+  .tp-table td.tp-transport-tra .tp-tag { background: #dbeafe; color: #1e40af; }
+  .tp-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  .tp-table tbody tr:hover td { background: #f8fafc; }
+  .tp-del { color: #9ca3af; cursor: pointer; background: none; border: none; padding: 2px 6px;
+    display: inline-flex; align-items: center; border-radius: 5px; }
+  .tp-del:hover { color: #dc2626; background: #fef2f2; }
+  .tp-table tfoot td { padding: 8px 12px; font-weight: 700; border-top: 2px solid #e5e7eb; }
+  .tp-empty { padding: 24px; text-align: center; color: #9ca3af; font-size: 13px; }
+  .tp-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 9999;
+    background: #1e293b; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.3); opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .tp-toast.show { opacity: 1; }
+  .tp-toast.ok { background: #15803d; }
+  .tp-toast.err { background: #b91c1c; }
+  #tpSettingsModal[hidden] { display: none; }
+  #tpSettingsModal { position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center; }
+  #tpSettingsModal .modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.55); }
+  #tpSettingsModal .modal-card { position: relative; background: #fff; border-radius: 10px; padding: 20px 22px;
+    width: 100%; max-width: 560px; max-height: 86vh; overflow: auto; box-shadow: 0 16px 48px rgba(0,0,0,.35); }
+  .tp-set-hint { font-size: 12px; margin: 2px 0 12px; }
+  .tp-fieldlist { display: flex; flex-direction: column; gap: 4px; }
+  /* 用 grid 讓每列欄位嚴格對齊：把手 / 勾選+名稱 / 格式 / 匯出標題。 */
+  .tp-field-row { display: grid; grid-template-columns: 20px 130px 148px 1fr;
+    align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid #eef2f7; border-radius: 7px; background: #fff; }
+  .tp-field-row.dragging { opacity: 0.4; }
+  .tp-field-row.drop-before { box-shadow: 0 -3px 0 #2563eb inset; }
+  .tp-field-row.drop-after  { box-shadow: 0  3px 0 #2563eb inset; }
+  .tp-field-row .tp-fr-grab { cursor: grab; color: #94a3b8; user-select: none; text-align: center; font-size: 13px; line-height: 1; }
+  .tp-field-row .tp-fr-grab:active { cursor: grabbing; }
+  .tp-field-row .tp-fr-name { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; min-width: 0; }
+  .tp-field-row .tp-fr-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tp-field-row .tp-fr-chk { flex: 0 0 auto; margin: 0; }
+  .tp-field-row .tp-fr-fmt { font-size: 12px; min-width: 0; }
+  .tp-field-row .tp-fr-label { min-width: 0; }
+  .tp-field-row .fc-input { padding: 4px 8px; font-size: 12.5px; border: 1px solid var(--border, #d1d5db); border-radius: 5px; width: 100%; box-sizing: border-box; }
+  .tp-field-row .tp-fr-fmt-empty { color: #cbd5e1; font-size: 11px; }
+  .tp-set-actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+  .tp-set-spacer { flex: 1; }
+</style>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const $ = id => document.getElementById(id);
+  let FIELDS = [], FIELD_BY_ID = {};
+  let SETTINGS = { visible_columns: [], column_order: [], field_formats: {}, export_labels: {} };
+  let ENTRIES = [];
+
+  let toastEl = null, toastTimer = null;
+  function toast(msg, kind) {
+    if (!toastEl) { toastEl = document.createElement('div'); toastEl.className = 'tp-toast'; document.body.appendChild(toastEl); }
+    toastEl.textContent = msg;
+    toastEl.className = 'tp-toast show' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.className = 'tp-toast'; }, 2600);
+  }
+  async function errMsg(r, fallback) {
+    if (window.friendlyServerError) { try { return await window.friendlyServerError(r, fallback); } catch (e) {} }
+    try { const j = await r.json(); return j.detail || fallback; } catch (e) { return fallback + ' (HTTP ' + r.status + ')'; }
+  }
+
+  function fmtAmount(v, fid) {
+    if (v === null || v === undefined || v === '') return '';
+    const n = parseInt(v, 10);
+    if (isNaN(n)) return String(v);
+    return fid === 'comma' ? n.toLocaleString('en-US') : String(n);
+  }
+  function fmtDate(v, fid) {
+    if (!v) return '';
+    const p = String(v).split('-');
+    if (p.length !== 3) return String(v);
+    const y = +p[0], m = +p[1], d = +p[2];
+    const mm = String(m).padStart(2, '0'), dd = String(d).padStart(2, '0');
+    if (fid === 'slash') return y + '/' + mm + '/' + dd;
+    if (fid === 'roc') return (y - 1911) + '/' + mm + '/' + dd;
+    if (fid === 'roc_chinese') return '民國' + (y - 1911) + '年' + mm + '月' + dd + '日';
+    return String(y).padStart(4, '0') + '-' + mm + '-' + dd;
+  }
+  const AMOUNT_FIELDS = { fare: 1, amount_untaxed: 1, tax: 1 };
+  const TRANSPORT_CLASS = { '高鐵': 'hsr', '台鐵': 'tra' };
+  function formatId(fid) {
+    const chosen = SETTINGS.field_formats[fid];
+    if (chosen) return chosen;
+    const def = FIELD_BY_ID[fid];
+    return (def && def.formats) ? def.formats.default : null;
+  }
+  function routeStr(e) {
+    const o = (e.origin || '').trim(), d = (e.destination || '').trim();
+    return (o && d) ? (o + ' → ' + d) : (o || d);
+  }
+  function cellValue(entry, fid) {
+    if (fid === 'route') return routeStr(entry);
+    if (fid === 'transport_route') {
+      const t = (entry.transport || '').trim(), r = routeStr(entry);
+      return (t + ' ' + r).trim();
+    }
+    if (AMOUNT_FIELDS[fid]) return fmtAmount(entry[fid], formatId(fid) || 'plain');
+    if (fid === 'date') return fmtDate(entry[fid], formatId(fid) || 'iso');
+    return entry[fid] == null ? '' : String(entry[fid]);
+  }
+  // 排序用「原始可比較值」：金額 / 序號用數字，其餘用字串（日期 ISO 可字典序）。
+  function sortValue(entry, fid, idx) {
+    if (fid === 'seq') return idx;
+    if (AMOUNT_FIELDS[fid]) { const n = parseInt(entry[fid], 10); return isNaN(n) ? -Infinity : n; }
+    if (fid === 'route') return routeStr(entry);
+    if (fid === 'transport_route') return ((entry.transport || '') + ' ' + routeStr(entry)).trim();
+    return entry[fid] == null ? '' : String(entry[fid]);
+  }
+  let _sort = { col: null, dir: 1 };   // dir: 1 asc, -1 desc
+  function sortedEntries() {
+    if (!_sort.col) return ENTRIES.slice();
+    const col = _sort.col, dir = _sort.dir;
+    return ENTRIES.map((e, i) => [e, i]).sort((a, b) => {
+      const va = sortValue(a[0], col, a[1]), vb = sortValue(b[0], col, b[1]);
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+      return String(va).localeCompare(String(vb), 'zh-Hant') * dir;
+    }).map(x => x[0]);
+  }
+  function orderedVisible() {
+    return SETTINGS.column_order.filter(c => SETTINGS.visible_columns.indexOf(c) >= 0 && FIELD_BY_ID[c]);
+  }
+
+  const _selected = new Set();   // 選取的 entry.id
+  function updateSelUI() {
+    // 清掉已不存在的選取
+    const ids = new Set(ENTRIES.map(e => e.id));
+    Array.from(_selected).forEach(id => { if (!ids.has(id)) _selected.delete(id); });
+    const n = _selected.size;
+    const btn = $('tpBtnDelSel');
+    if (btn) { btn.hidden = n === 0; $('tpSelCount').textContent = String(n); }
+    const selAll = document.getElementById('tpSelAll');
+    if (selAll) {
+      selAll.checked = n > 0 && n === ENTRIES.length;
+      selAll.indeterminate = n > 0 && n < ENTRIES.length;
+    }
+  }
+
+  function renderTable() {
+    const cols = orderedVisible();
+    const head = $('tpHead'); head.textContent = '';
+    // 全選 checkbox 欄
+    const thSel = document.createElement('th'); thSel.className = 'tp-selcol';
+    const selAll = document.createElement('input'); selAll.type = 'checkbox';
+    selAll.id = 'tpSelAll'; selAll.title = '全選';
+    selAll.addEventListener('click', e => e.stopPropagation());
+    selAll.addEventListener('change', () => {
+      if (selAll.checked) ENTRIES.forEach(e => _selected.add(e.id));
+      else _selected.clear();
+      renderTable();
+    });
+    thSel.appendChild(selAll); head.appendChild(thSel);
+    cols.forEach(c => {
+      const th = document.createElement('th');
+      th.className = 'tp-sortable' + (_sort.col === c ? ' tp-sort-active' : '');
+      const lbl = document.createElement('span');
+      lbl.textContent = (SETTINGS.export_labels[c] || FIELD_BY_ID[c].label);
+      th.appendChild(lbl);
+      const arrow = document.createElement('span'); arrow.className = 'tp-th-arrow';
+      arrow.textContent = _sort.col === c ? (_sort.dir === 1 ? '▲' : '▼') : '⇅';
+      th.appendChild(arrow);
+      th.addEventListener('click', () => {
+        if (_sort.col === c) _sort.dir = -_sort.dir;
+        else { _sort.col = c; _sort.dir = 1; }
+        renderTable();
+      });
+      head.appendChild(th);
+    });
+    head.appendChild(document.createElement('th'));
+
+    const rows = sortedEntries();
+    const body = $('tpBody'); body.textContent = '';
+    rows.forEach((e, i) => {
+      const tr = document.createElement('tr');
+      // 列選取 checkbox
+      const tdSel = document.createElement('td'); tdSel.className = 'tp-selcol';
+      const cb = document.createElement('input'); cb.type = 'checkbox';
+      cb.className = 'tp-rowchk'; cb.checked = _selected.has(e.id);
+      cb.addEventListener('change', () => {
+        if (cb.checked) _selected.add(e.id); else _selected.delete(e.id);
+        updateSelUI();
+        tr.classList.toggle('tp-row-sel', cb.checked);
+      });
+      tdSel.appendChild(cb); tr.appendChild(tdSel);
+      if (_selected.has(e.id)) tr.classList.add('tp-row-sel');
+      cols.forEach(c => {
+        const td = document.createElement('td');
+        if (c === 'seq') { td.textContent = String(i + 1); td.className = 'tp-num'; }
+        else if (AMOUNT_FIELDS[c]) { td.textContent = cellValue(e, c); td.className = 'tp-num'; }
+        else if (c === 'transport') {
+          td.className = 'tp-transport-' + (TRANSPORT_CLASS[e.transport] || '');
+          const tag = document.createElement('span'); tag.className = 'tp-tag';
+          tag.textContent = e.transport || ''; td.appendChild(tag);
+        } else { td.textContent = cellValue(e, c); }
+        tr.appendChild(td);
+      });
+      const tdAct = document.createElement('td');
+      const del = document.createElement('button');
+      del.className = 'tp-del'; del.type = 'button'; del.title = '刪除這筆';
+      const icSrc = document.getElementById('tpIconTrash');
+      if (icSrc && icSrc.firstElementChild) del.appendChild(icSrc.firstElementChild.cloneNode(true));
+      else del.textContent = '✕';
+      del.addEventListener('click', () => deleteEntry(e.id, e));
+      tdAct.appendChild(del); tr.appendChild(tdAct);
+      body.appendChild(tr);
+    });
+
+    const foot = $('tpFoot'); foot.textContent = '';
+    if (ENTRIES.length && cols.indexOf('fare') >= 0) {
+      let total = 0;
+      ENTRIES.forEach(e => { const n = parseInt(e.fare, 10); if (!isNaN(n)) total += n; });
+      foot.hidden = false;
+      foot.appendChild(document.createElement('td'));   // 對齊 checkbox 欄
+      cols.forEach((c, idx) => {
+        const td = document.createElement('td');
+        if (idx === 0) td.textContent = '合計 ' + ENTRIES.length + ' 筆';
+        else if (c === 'fare') { td.textContent = fmtAmount(total, formatId('fare') || 'comma'); td.className = 'tp-num'; }
+        else td.textContent = '';
+        foot.appendChild(td);
+      });
+      foot.appendChild(document.createElement('td'));
+    } else { foot.hidden = true; }
+
+    $('tpCount').textContent = String(ENTRIES.length);
+    $('tpEmpty').hidden = ENTRIES.length > 0;
+    updateSelUI();
+  }
+
+  async function loadSettings() {
+    const r = await fetch('/tools/transit-proof/settings');
+    if (!r.ok) return;
+    const j = await r.json();
+    FIELDS = j.fields || [];
+    FIELD_BY_ID = {}; FIELDS.forEach(f => FIELD_BY_ID[f.id] = f);
+    SETTINGS = j.settings;
+  }
+  async function loadBuffer() {
+    const r = await fetch('/tools/transit-proof/buffer');
+    if (!r.ok) { toast(await errMsg(r, '載入清單失敗'), 'err'); return; }
+    const j = await r.json();
+    ENTRIES = j.entries || [];
+    renderTable();
+  }
+
+  async function uploadFiles(fileList) {
+    const files = Array.from(fileList || []).filter(f => /\.pdf$/i.test(f.name));
+    if (!files.length) { toast('請選 PDF 檔', 'err'); return; }
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    const msg = $('tpUpMsg'); msg.hidden = false; msg.className = 'tp-upmsg'; msg.textContent = '解析中… (' + files.length + ' 檔)';
+    try {
+      const r = await fetch('/tools/transit-proof/upload', { method: 'POST', body: fd });
+      if (!r.ok) { msg.className = 'tp-upmsg err'; msg.textContent = await errMsg(r, '上傳失敗'); return; }
+      const j = await r.json();
+      ENTRIES = j.entries || [];
+      renderTable();
+      const failed = j.failed || [];
+      msg.className = 'tp-upmsg ' + (failed.length ? 'err' : 'ok');
+      msg.textContent = '';
+      const line = document.createElement('div');
+      line.textContent = '新增 ' + j.added + ' 筆' + (j.duplicates ? '，略過重複 ' + j.duplicates + ' 筆' : '') +
+        (j.cap_reached ? '（已達上限）' : '') + (failed.length ? '，' + failed.length + ' 檔無法解析：' : '');
+      msg.appendChild(line);
+      failed.forEach(f => {
+        const d = document.createElement('div'); d.className = 'tp-fail-item';
+        d.textContent = '• ' + f.file + '：' + f.error; msg.appendChild(d);
+      });
+      if (j.added) toast('已新增 ' + j.added + ' 筆', 'ok');
+    } catch (e) {
+      msg.className = 'tp-upmsg err'; msg.textContent = '上傳錯誤：' + e.message;
+    }
+  }
+
+  const drop = $('tpDrop'), fileInput = $('tpFile');
+  drop.addEventListener('click', () => fileInput.click());
+  drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+  fileInput.addEventListener('change', () => { if (fileInput.files.length) { uploadFiles(fileInput.files); fileInput.value = ''; } });
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('is-drag'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('is-drag'); }));
+  drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
+
+  // 「從工作區載入」用與電子發票頁相同的共用 helper：挑檔後塞進 tpFile 並
+  // 觸發 change → 走既有 uploadFiles 流程（多檔）。
+  if (window.attachWorkspaceLoadButton)
+    window.attachWorkspaceLoadButton($('tpWsLoad'), fileInput, { accept: ['pdf'] });
+
+  async function deleteEntry(id, entry) {
+    const desc = entry ? (entry.date + ' ' + (entry.transport || '') + ' ' + routeStr(entry)).trim() : '這筆';
+    if (!(await window.showConfirm('確定刪除「' + desc + '」？此動作不可復原。',
+        { title: '刪除乘車證明', kind: 'danger', okText: '刪除' }))) return;
+    const r = await fetch('/tools/transit-proof/entry/' + id, { method: 'DELETE' });
+    if (!r.ok) { toast(await errMsg(r, '刪除失敗'), 'err'); return; }
+    _selected.delete(id);
+    await loadBuffer();
+    toast('已刪除', 'ok');
+  }
+  $('tpBtnClear').addEventListener('click', async () => {
+    if (!ENTRIES.length) return;
+    if (!(await window.showConfirm('確定清空全部 ' + ENTRIES.length + ' 筆乘車證明？此動作不可復原。',
+        { title: '全部清空', kind: 'danger', okText: '清空' }))) return;
+    const r = await fetch('/tools/transit-proof/buffer', { method: 'DELETE' });
+    if (!r.ok) { toast(await errMsg(r, '清空失敗'), 'err'); return; }
+    await loadBuffer(); toast('已清空', 'ok');
+  });
+  $('tpBtnRefresh').addEventListener('click', loadBuffer);
+  $('tpBtnDelSel').addEventListener('click', async () => {
+    const ids = Array.from(_selected);
+    if (!ids.length) return;
+    if (!(await window.showConfirm('確定刪除選取的 ' + ids.length + ' 筆乘車證明？此動作不可復原。',
+        { title: '刪除選取', kind: 'danger', okText: '刪除' }))) return;
+    const r = await fetch('/tools/transit-proof/buffer/delete-batch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }) });
+    if (!r.ok) { toast(await errMsg(r, '刪除失敗'), 'err'); return; }
+    const j = await r.json();
+    _selected.clear();
+    ENTRIES = j.entries || [];
+    renderTable();
+    toast('已刪除 ' + j.deleted + ' 筆', 'ok');
+  });
+
+  const exMenu = $('tpExportMenu');
+  $('tpBtnExport').addEventListener('click', e => { e.stopPropagation(); exMenu.hidden = !exMenu.hidden; });
+  document.addEventListener('click', e => { if (!exMenu.contains(e.target) && e.target !== $('tpBtnExport')) exMenu.hidden = true; });
+  exMenu.querySelectorAll('button[data-fmt]').forEach(b => {
+    b.addEventListener('click', async () => {
+      const fmt = b.dataset.fmt; exMenu.hidden = true;
+      if (!ENTRIES.length) { toast('清單為空', 'err'); return; }
+      toast('產生 ' + fmt + ' 中…');
+      try {
+        const r = await fetch('/tools/transit-proof/export', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ format: fmt }) });
+        if (!r.ok) { toast(await errMsg(r, '匯出失敗'), 'err'); return; }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        const cd = r.headers.get('Content-Disposition') || '';
+        const m = cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)"?/i);
+        a.download = m ? decodeURIComponent(m[1]) : ('transit-proof.' + fmt);
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        toast('已下載 ' + a.download, 'ok');
+      } catch (e) { toast('匯出失敗：' + e.message, 'err'); }
+    });
+  });
+
+  const modal = $('tpSettingsModal');
+  function openSettings() { renderFieldList(); modal.hidden = false; }
+  function closeSettings() { modal.hidden = true; }
+  $('tpBtnSettings').addEventListener('click', openSettings);
+  $('tpSetCancel').addEventListener('click', closeSettings);
+  modal.querySelector('.modal-backdrop').addEventListener('click', closeSettings);
+
+  function renderFieldList() {
+    let order = SETTINGS.column_order.filter(c => FIELD_BY_ID[c]);
+    FIELDS.forEach(f => { if (order.indexOf(f.id) < 0) order.push(f.id); });
+    const box = $('tpFieldList'); box.textContent = '';
+    order.forEach((fid) => {
+      const f = FIELD_BY_ID[fid]; if (!f) return;
+      const row = document.createElement('div'); row.className = 'tp-field-row'; row.dataset.fid = fid;
+      row.setAttribute('draggable', 'false');
+      // 1) 拖曳把手
+      const grab = document.createElement('span'); grab.className = 'tp-fr-grab';
+      grab.textContent = '⋮⋮'; grab.title = '拖曳調整順序';
+      // 2) 勾選 + 名稱（同一格）
+      const nameCell = document.createElement('label'); nameCell.className = 'tp-fr-name';
+      const chk = document.createElement('input'); chk.type = 'checkbox'; chk.className = 'tp-fr-chk';
+      chk.checked = SETTINGS.visible_columns.indexOf(fid) >= 0;
+      const nm = document.createElement('span'); nm.textContent = f.label;
+      nameCell.appendChild(chk); nameCell.appendChild(nm);
+      // 3) 格式（有 formats 才給下拉）
+      let fmtCell;
+      if (f.formats) {
+        fmtCell = document.createElement('select'); fmtCell.className = 'fc-input tp-fr-fmt';
+        f.formats.options.forEach(o => {
+          const opt = document.createElement('option'); opt.value = o.id;
+          opt.textContent = o.label + '（' + o.example + '）'; fmtCell.appendChild(opt);
+        });
+        fmtCell.value = SETTINGS.field_formats[fid] || f.formats.default;
+        fmtCell.dataset.fmtFor = fid;
+      } else {
+        fmtCell = document.createElement('span'); fmtCell.className = 'tp-fr-fmt tp-fr-fmt-empty';
+        fmtCell.textContent = '—';
+      }
+      // 4) 匯出標題
+      const lbl = document.createElement('input'); lbl.type = 'text'; lbl.className = 'fc-input tp-fr-label';
+      lbl.placeholder = '匯出標題（留空 = ' + f.label + '）';
+      lbl.value = SETTINGS.export_labels[fid] || ''; lbl.dataset.lblFor = fid;
+      row.appendChild(grab); row.appendChild(nameCell); row.appendChild(fmtCell); row.appendChild(lbl);
+      box.appendChild(row);
+      wireRowDrag(row, grab, box);
+    });
+  }
+  // 拖曳排序：仿電子發票頁 — 只有按住 grab 把手才可拖（避免拖到輸入框），
+  // 依滑鼠落點上 / 下半決定插入位置，放開後從 DOM 順序回寫。
+  let _dragRow = null;
+  function wireRowDrag(row, handle, box) {
+    handle.addEventListener('mousedown', () => row.setAttribute('draggable', 'true'));
+    row.addEventListener('mousedown', e => {
+      if (!handle.contains(e.target)) row.setAttribute('draggable', 'false');
+    });
+    row.addEventListener('dragstart', e => {
+      _dragRow = row; row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', row.dataset.fid); } catch (err) {}
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging'); row.setAttribute('draggable', 'false');
+      box.querySelectorAll('.drop-before, .drop-after').forEach(c => c.classList.remove('drop-before', 'drop-after'));
+      _dragRow = null;
+      SETTINGS.column_order = Array.from(box.querySelectorAll('.tp-field-row')).map(c => c.dataset.fid);
+    });
+    row.addEventListener('dragover', e => {
+      if (!_dragRow || _dragRow === row) return;
+      e.preventDefault();
+      const rect = row.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      box.querySelectorAll('.drop-before, .drop-after').forEach(c => c.classList.remove('drop-before', 'drop-after'));
+      row.classList.add(after ? 'drop-after' : 'drop-before');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-before', 'drop-after'));
+    row.addEventListener('drop', e => {
+      if (!_dragRow || _dragRow === row) return;
+      e.preventDefault();
+      const rect = row.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      if (after) box.insertBefore(_dragRow, row.nextSibling);
+      else box.insertBefore(_dragRow, row);
+      row.classList.remove('drop-before', 'drop-after');
+    });
+  }
+  function captureDraft() {
+    const vis = [], fmts = {}, labels = {}, order = [];
+    $('tpFieldList').querySelectorAll('.tp-field-row').forEach(row => {
+      const fid = row.dataset.fid;
+      order.push(fid);
+      if (row.querySelector('.tp-fr-chk').checked) vis.push(fid);
+      const sel = row.querySelector('select[data-fmt-for]');
+      if (sel) fmts[fid] = sel.value;
+      const lbl = row.querySelector('input[data-lbl-for]');
+      if (lbl && lbl.value.trim()) labels[fid] = lbl.value.trim();
+    });
+    return { visible_columns: vis, field_formats: fmts, export_labels: labels, column_order: order };
+  }
+  $('tpSetReset').addEventListener('click', () => {
+    SETTINGS.visible_columns = FIELDS.filter(f => f.default_visible).map(f => f.id);
+    SETTINGS.field_formats = {}; SETTINGS.export_labels = {};
+    SETTINGS.column_order = FIELDS.slice().sort((a, b) => a.default_order - b.default_order).map(f => f.id);
+    renderFieldList();
+  });
+  $('tpSetSave').addEventListener('click', async () => {
+    const draft = captureDraft();
+    const payload = {
+      visible_columns: draft.visible_columns,
+      column_order: draft.column_order,
+      field_formats: draft.field_formats,
+      export_labels: draft.export_labels,
+    };
+    const r = await fetch('/tools/transit-proof/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload) });
+    if (!r.ok) { toast(await errMsg(r, '儲存失敗'), 'err'); return; }
+    const j = await r.json();
+    SETTINGS = j.settings;
+    closeSettings(); renderTable(); toast('已儲存', 'ok');
+  });
+
+  (async function init() {
+    await loadSettings();
+    await loadBuffer();
+  })();
+})();
+</script>
+{% endblock %}

@@ -850,6 +850,79 @@ def list_ou_users(ou_dn: str, recursive: bool = False) -> list[dict]:
     return out
 
 
+def search_selected_objects(rules: list[dict], cap: int = 3000) -> dict:
+    """目錄瀏覽「已選定」模式：依 filter 規則搜目錄，回符合的 ou / group / user。
+
+    規則清單見 dir_filter；每條規則各自 SUBTREE 搜一次（base 為規則 base_dn 或
+    目錄 root），結果以 DN 去重。回 {objects:[{dn,name,type,login}], count, capped}。
+    """
+    from ldap3 import Connection, SUBTREE
+    from . import dir_filter as _df
+    s = auth_settings.get()
+    cfg = s.get("ldap", {})
+    svc_dn = (cfg.get("service_dn") or "").strip()
+    svc_pw = cfg.get("service_password") or ""
+    if not svc_dn or not svc_pw:
+        raise AuthError("Service Account / 密碼 需先填妥")
+    root = _dir_root_base()
+    disp_attr = cfg.get("displayname_attr", "displayName")
+    login_attr = cfg.get("username_attr", "sAMAccountName")
+    server = _build_server(cfg)
+    seen: dict[str, dict] = {}
+    capped = False
+
+    def _one(v):
+        return (v[0] if isinstance(v, list) and v else (v if isinstance(v, str) else None))
+
+    try:
+        with Connection(server, user=svc_dn, password=svc_pw, auto_bind=True,
+                        raise_exceptions=True, check_names=False) as conn:
+            for rule in (rules or []):
+                base = _df.rule_base(rule, root)
+                # base 內含括號 = 不合法（防注入）；空 base 跳過
+                if not base or "(" in base or ")" in base:
+                    continue
+                filt = _df.build_rule_filter(rule)
+                entries = conn.extend.standard.paged_search(
+                    search_base=base, search_filter=filt, search_scope=SUBTREE,
+                    attributes=["ou", "cn", disp_attr, login_attr, "objectClass"],
+                    paged_size=500, generator=False)
+                for e in entries:
+                    dn = e.get("dn") or ""
+                    if not dn or e.get("type") != "searchResEntry":
+                        continue
+                    key = dn.strip().lower()
+                    if key in seen:
+                        continue
+                    a = e.get("attributes", {}) or {}
+                    ocs = a.get("objectClass") or []
+                    if isinstance(ocs, str):
+                        ocs = [ocs]
+                    ocl = {str(x).lower() for x in ocs}
+                    if "organizationalunit" in ocl:
+                        typ = "ou"
+                    elif ocl & {"group", "groupofnames", "groupofuniquenames", "posixgroup"}:
+                        typ = "group"
+                    elif (ocl & {"inetorgperson", "posixaccount", "user"}
+                          and "computer" not in ocl):
+                        typ = "user"
+                    else:
+                        typ = "node"
+                    nm = (_one(a.get(disp_attr)) or _one(a.get("ou"))
+                          or _one(a.get("cn")) or _cn_from_dn(dn) or dn)
+                    seen[key] = {"dn": dn, "name": str(nm), "type": typ,
+                                 "login": str(_one(a.get(login_attr)) or "")}
+                    if len(seen) >= cap:
+                        capped = True
+                        break
+                if capped:
+                    break
+    except Exception as exc:  # noqa: BLE001
+        raise AuthError(f"搜尋已選定物件失敗：{type(exc).__name__}: {exc}")
+    objs = sorted(seen.values(), key=lambda x: (x["type"], (x["name"] or "").lower()))
+    return {"objects": objs, "count": len(objs), "capped": capped}
+
+
 # 群組目錄成員數快取（LDAP 無便宜 COUNT,只能列舉 → 快取避免每次載入頁都重查）。
 import time as _time
 _member_count_cache: dict[str, tuple[int, float]] = {}

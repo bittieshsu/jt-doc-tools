@@ -263,6 +263,18 @@ def test_order_groups_as_tree_nesting_and_depth():
     order = [g["name"] for g in out]
     assert order.index("資訊處") < order.index("技術服務部") < order.index("網路組")
     assert len(out) == 4                       # every group emitted exactly once
+    # has_children drives the collapse toggle in the UI: only nodes with kids get it
+    has_kids = {g["name"]: g["has_children"] for g in out}
+    assert has_kids == {"資訊處": True, "技術服務部": True, "網路組": False, "人資處": False}
+
+
+def test_order_groups_as_tree_marks_has_children_false_for_all_roots():
+    groups = [
+        _g(1, "本機群組", ""),
+        _g(2, "孤兒", "cn=x,dc=t", "cn=missing,dc=t"),
+    ]
+    out = group_manager.order_groups_as_tree(groups)
+    assert all(g["has_children"] is False for g in out)
 
 
 def test_order_groups_as_tree_cycle_safe():

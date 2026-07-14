@@ -10,6 +10,31 @@
 <div class="panel">
   <p class="muted dir-intro">左側展開 OU 樹,點某個 OU 看它底下的使用者（<span class="dir-in-legend">綠底 = 已登入過本系統</span>）。把角色<b>指派給 OU</b> → 該 OU（含子 OU）下所有使用者登入時即生效,不必等他們先登入。</p>
 </div>
+
+<!-- 模式切換：已選定（依 filter 規則只留選定分支）/ 全部（完整目錄樹） -->
+<div class="dir-modebar">
+  <div class="dir-modes" role="tablist">
+    <button class="btn btn-small dir-mode-btn" data-mode="selected" type="button">已選定</button>
+    <button class="btn btn-small dir-mode-btn" data-mode="all" type="button">全部</button>
+  </div>
+  <button class="btn btn-small" id="dirFilterToggle" type="button">{{ icon('settings', size=13) }} 設定 filter</button>
+  <span class="muted dir-mode-hint" id="dirModeHint"></span>
+</div>
+
+<div class="panel dir-filter-panel" id="dirFilterPanel" hidden>
+  <div class="dff-head">
+    <b>「已選定」filter 規則</b>
+    <span class="muted">符合<b>任一</b>規則的 OU / 群組 / 使用者才會出現；樹只保留通往它們的分支。全域一份，所有管理員共用。</span>
+  </div>
+  <div id="dffRules"></div>
+  <button class="btn btn-small" id="dffAdd" type="button">＋ 新增規則</button>
+  <div class="dff-actions">
+    <label class="dir-role-chk"><input type="checkbox" id="dffDefaultSelected"> 進頁面預設用「已選定」模式</label>
+    <button class="btn btn-primary btn-small" id="dffSave" type="button">{{ icon('save', size=12) }} 儲存並套用</button>
+    <span class="muted" id="dffMsg"></span>
+  </div>
+</div>
+
 <div class="tree-legend muted">
   {{ icon('building', size=13) }} OU　{{ icon('layers', size=13) }} 容器 / 其他　{{ icon('user', size=13) }} 群組　{{ icon('id-card', size=13) }} 角色
 </div>
@@ -44,6 +69,30 @@
 
 <style nonce="{{ request.state.csp_nonce }}">
   .dir-intro { margin:0; }
+  /* 模式切換列 + filter 面板 */
+  .dir-modebar { display:flex; align-items:center; gap:12px; margin:14px 0 0; flex-wrap:wrap; }
+  .dir-modes { display:inline-flex; border:1px solid #d1d5db; border-radius:7px; overflow:hidden; }
+  .dir-modes .dir-mode-btn { border:none; border-radius:0; margin:0; }
+  .dir-modes .dir-mode-btn + .dir-mode-btn { border-left:1px solid #d1d5db; }
+  .dir-mode-btn.is-active { background:#4f46e5; color:#fff; }
+  .dir-mode-hint { font-size:12px; }
+  .dir-filter-panel { margin-top:12px; padding:14px 16px; }
+  .dff-head { margin-bottom:10px; display:flex; flex-direction:column; gap:2px; }
+  .dff-head .muted { font-size:12px; }
+  .dff-rule { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:8px; background:#f8fafc; }
+  .dff-rule .field { flex:1; min-width:150px; }
+  .dff-rule .dff-base { flex:2; min-width:200px; }
+  .dff-types { display:inline-flex; gap:10px; }
+  .dff-types label { display:inline-flex; align-items:center; gap:4px; font-size:12.5px; font-weight:normal; margin:0; cursor:pointer; }
+  .dff-del { color:#dc2626; flex:0 0 auto; }
+  .dff-actions { display:flex; align-items:center; gap:14px; margin-top:6px; flex-wrap:wrap; }
+  .dff-empty { color:#9ca3af; font-size:12.5px; padding:4px 0 8px; }
+  /* 已選定模式：命中節點加底色 + badge */
+  .tn-row.is-match { background:#eff6ff; }
+  .tn-row.is-match .tn-name { font-weight:600; }
+  .tn-match-badge { margin-left:6px; font-size:10px; color:#2563eb; border:1px solid #bfdbfe;
+    border-radius:8px; padding:0 6px; background:#eff6ff; }
   /* tree / detail 用標準 .panel 卡片樣式（邊框/圓角/陰影由 .panel 提供），這裡只
      設版面（並排、寬度、可捲動）+ 覆寫 padding。 */
   .dir-wrap { display:flex; gap:16px; align-items:flex-start; margin-top:16px; }
@@ -131,6 +180,9 @@
 {% if is_directory_backend %}
 <script nonce="{{ request.state.csp_nonce }}">
 const ALL_ROLES = {{ all_roles|tojson }};
+let DIR_MODE = {{ dir_default_mode|tojson }};        // 'selected' | 'all'
+let DIR_RULES = {{ dir_rules|tojson }};              // [{name_contains,types,base_dn}]
+let DIR_DEFAULT_MODE = {{ dir_default_mode|tojson }};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 const $ = id => document.getElementById(id);
 
@@ -185,14 +237,155 @@ function makeNode(node) {
   wrap.appendChild(row); wrap.appendChild(kids);
   return wrap;
 }
-(async function initTree() {
+// ---- 已選定模式：靜態剪枝樹（children 已由 server 附好，不 lazy load）----
+function makeNodeStatic(node) {
+  const wrap = document.createElement('div'); wrap.className = 'tn';
+  const row = document.createElement('div'); row.className = 'tn-row'; row.dataset.dn = node.dn;
+  if (node.matched) row.classList.add('is-match');
+  const hasKids = (node.children && node.children.length);
+  const tog = document.createElement('span'); tog.className = 'tn-toggle';
+  tog.textContent = hasKids ? '▾' : '·';
+  const nt = node.type || 'node';
+  const icSrc = document.getElementById('tnic-' + nt) || document.getElementById('tnic-node');
+  const nm = document.createElement('span'); nm.className = 'tn-name'; nm.textContent = node.name;
+  row.appendChild(tog);
+  if (icSrc && icSrc.firstElementChild) {
+    const ic = icSrc.firstElementChild.cloneNode(true);
+    ic.classList.add('tn-ic', 'tn-ic-' + nt);
+    ic.setAttribute('title', {ou:'OU', container:'容器', group:'群組', user:'使用者', role:'角色', node:'節點'}[nt] || '節點');
+    row.appendChild(ic);
+  }
+  row.appendChild(nm);
+  if (node.matched) {
+    const mb = document.createElement('span'); mb.className = 'tn-match-badge';
+    mb.textContent = {ou:'OU', group:'群組', user:'使用者'}[nt] || '已選';
+    row.appendChild(mb);
+  }
+  if (node.roles && node.roles.length) {
+    const b = document.createElement('span'); b.className = 'tn-hasrole'; b.textContent = '● 有權限'; row.appendChild(b);
+  }
+  const kids = document.createElement('div'); kids.className = 'tn-children';
+  if (hasKids) node.children.forEach(c => kids.appendChild(makeNodeStatic(c)));
+  if (hasKids) {
+    tog.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const shown = kids.style.display !== 'none';
+      kids.style.display = shown ? 'none' : 'block';
+      tog.textContent = shown ? '▸' : '▾';
+    });
+  }
+  row.addEventListener('click', () => {
+    document.querySelectorAll('.tn-row.is-sel').forEach(x => x.classList.remove('is-sel'));
+    row.classList.add('is-sel');
+    // OU → 使用者 + 指派角色；群組 / 使用者 → 屬性細節 modal
+    if (nt === 'ou') openOU(node.dn, node.name);
+    else openUserDetail(node.dn, node.name);
+  });
+  wrap.appendChild(row); wrap.appendChild(kids);
+  return wrap;
+}
+
+async function loadAllTree() {
+  const tree = $('dirTree'); tree.innerHTML = '<div class="dir-loading">載入目錄樹…</div>';
   try {
     const roots = await loadChildren('');
-    const tree = $('dirTree'); tree.innerHTML = '';
+    tree.innerHTML = '';
     if (!roots.length) { tree.innerHTML = '<div class="dir-empty">根節點下沒有 OU（可在認證設定填 directory_root_base）</div>'; return; }
     roots.forEach(n => tree.appendChild(makeNode(n)));
-  } catch (e) { $('dirTree').innerHTML = '<div class="dir-empty">✗ ' + esc(e.message) + '</div>'; }
-})();
+  } catch (e) { tree.innerHTML = '<div class="dir-empty">✗ ' + esc(e.message) + '</div>'; }
+}
+
+async function loadSelectedTree() {
+  const tree = $('dirTree'); tree.innerHTML = '<div class="dir-loading">依 filter 搜尋中…</div>';
+  let j;
+  try {
+    const r = await fetch('/admin/directory/selected');
+    j = await r.json();
+    if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
+  } catch (e) { tree.innerHTML = '<div class="dir-empty">✗ ' + esc(e.message) + '</div>'; return; }
+  tree.innerHTML = '';
+  if (j.empty_rules) {
+    tree.innerHTML = '<div class="dir-empty">尚未設定任何 filter 規則。<br>點上方「設定 filter」新增，或切到「全部」瀏覽完整目錄。</div>';
+    setHint('已選定：尚未設定規則');
+    return;
+  }
+  if (!j.tree || !j.tree.length) {
+    tree.innerHTML = '<div class="dir-empty">沒有符合 filter 的物件。調整規則或切到「全部」。</div>';
+    setHint('已選定：符合 0 筆');
+    return;
+  }
+  j.tree.forEach(n => tree.appendChild(makeNodeStatic(n)));
+  setHint(`已選定：符合 ${j.count} 筆${j.capped ? '（已達上限，可能不完整）' : ''}`);
+}
+
+function setHint(t) { const h = $('dirModeHint'); if (h) h.textContent = t || ''; }
+
+function setMode(mode) {
+  DIR_MODE = (mode === 'all') ? 'all' : 'selected';
+  document.querySelectorAll('.dir-mode-btn').forEach(b =>
+    b.classList.toggle('is-active', b.dataset.mode === DIR_MODE));
+  $('dirDetail').innerHTML = '<p class="muted">← 從左側點一個項目</p>';
+  if (DIR_MODE === 'all') { setHint('全部：完整目錄樹'); loadAllTree(); }
+  else loadSelectedTree();
+}
+document.querySelectorAll('.dir-mode-btn').forEach(b =>
+  b.addEventListener('click', () => setMode(b.dataset.mode)));
+
+// ---- filter 規則管理 ----
+const DFF_TYPES = [['ou','OU'],['group','群組'],['user','使用者']];
+function renderRules() {
+  const box = $('dffRules'); box.innerHTML = '';
+  if (!DIR_RULES.length) { box.innerHTML = '<div class="dff-empty">還沒有規則。新增一條後，只有符合的物件會出現在「已選定」。</div>'; }
+  DIR_RULES.forEach((rule, i) => {
+    const row = document.createElement('div'); row.className = 'dff-rule'; row.dataset.i = i;
+    const types = DFF_TYPES.map(([v,l]) =>
+      `<label><input type="checkbox" class="dff-t" value="${v}" ${(rule.types||[]).includes(v)?'checked':''}> ${l}</label>`).join('');
+    row.innerHTML =
+      `<input class="field dff-name" type="text" placeholder="名稱關鍵字（空=不限）" value="${esc(rule.name_contains||'')}">` +
+      `<span class="dff-types">${types}</span>` +
+      `<input class="field dff-base" type="text" placeholder="限定 OU 子樹 DN（空=整個目錄）" value="${esc(rule.base_dn||'')}">` +
+      `<button class="btn btn-small dff-del" type="button" title="刪除此規則">✕</button>`;
+    row.querySelector('.dff-del').addEventListener('click', () => { collectRules(); DIR_RULES.splice(i,1); renderRules(); });
+    box.appendChild(row);
+  });
+}
+function collectRules() {
+  const rules = [];
+  document.querySelectorAll('#dffRules .dff-rule').forEach(row => {
+    const name = (row.querySelector('.dff-name').value || '').trim();
+    const base = (row.querySelector('.dff-base').value || '').trim();
+    const types = Array.from(row.querySelectorAll('.dff-t:checked')).map(c => c.value);
+    rules.push({ name_contains: name, types, base_dn: base });
+  });
+  DIR_RULES = rules;
+  return rules;
+}
+$('dffAdd').addEventListener('click', () => { collectRules(); DIR_RULES.push({name_contains:'',types:[],base_dn:''}); renderRules(); });
+$('dirFilterToggle').addEventListener('click', () => {
+  const p = $('dirFilterPanel'); p.hidden = !p.hidden;
+});
+$('dffSave').addEventListener('click', async () => {
+  const rules = collectRules().filter(r => r.name_contains || r.types.length || r.base_dn);
+  const msg = $('dffMsg'); msg.textContent = '儲存中…';
+  const default_mode = $('dffDefaultSelected').checked ? 'selected' : 'all';
+  try {
+    const r = await fetch('/admin/directory/filter', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ default_mode, rules })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
+    DIR_RULES = j.rules || []; DIR_DEFAULT_MODE = j.default_mode; renderRules();
+    msg.textContent = '已儲存';
+    setTimeout(() => { msg.textContent = ''; }, 2000);
+    setMode('selected');   // 套用後切到已選定看結果
+  } catch (e) { msg.textContent = '✗ ' + e.message; }
+});
+
+// 初始化：依預設模式載入 + 準備 filter 面板
+$('dffDefaultSelected').checked = (DIR_DEFAULT_MODE === 'selected');
+renderRules();
+setMode(DIR_DEFAULT_MODE);
 
 // ---- OU detail: users + role assignment ----
 let _ouUsers = [], _ouFilter = 'all', _curDn = '', _curName = '';

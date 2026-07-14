@@ -425,6 +425,37 @@ def test_export_xlsx():
     client.delete("/tools/einvoice-scan/buffer")
 
 
+def test_export_all_formats_allowed():
+    """匯出白名單放行 7 種格式（v1.12.74 修：原本 ods/xml/txt/md 被 400 擋）。"""
+    qr = _build_qr_text(invoice_number="EX12345678")
+    client.post("/tools/einvoice-scan/scan-text", json={"qr_texts": [qr]})
+    for fmt in ("csv", "xlsx", "ods", "json", "xml", "txt", "md"):
+        r = client.post("/tools/einvoice-scan/export", json={"format": fmt})
+        assert r.status_code == 200, f"{fmt}: {r.text}"
+        assert len(r.content) > 0
+    client.delete("/tools/einvoice-scan/buffer")
+
+
+def test_export_amounts_have_no_comma():
+    """匯出金額欄一律純數字（無千分位逗號），即使顯示格式設成 comma
+    （v1.12.77：逗號會破壞 CSV 匯入 / 會計軟體讀取）。total=0x41A=1050。"""
+    qr = _build_qr_text(invoice_number="EX12345678")  # total 1050 / untaxed 1000 / tax 50
+    client.post("/tools/einvoice-scan/scan-text", json={"qr_texts": [qr]})
+    client.put("/tools/einvoice-scan/settings", json={
+        "visible_columns": ["invoice_number", "amount_total", "amount_untaxed", "tax"],
+        "field_formats": {"amount_total": "comma", "amount_untaxed": "comma", "tax": "comma"},
+    })
+    csv = client.post("/tools/einvoice-scan/export", json={"format": "csv"}).content.decode("utf-8-sig")
+    assert "1,050" not in csv and "1050" in csv   # 純數字，無逗號
+    # XLSX 金額存成數值格（非帶逗號字串）
+    import openpyxl, io as _io
+    x = client.post("/tools/einvoice-scan/export", json={"format": "xlsx"}).content
+    ws = openpyxl.load_workbook(_io.BytesIO(x)).active
+    vals = [ws.cell(2, c).value for c in range(1, ws.max_column + 1)]
+    assert 1050 in vals and all(not (isinstance(v, str) and "," in v) for v in vals if v is not None)
+    client.delete("/tools/einvoice-scan/buffer")
+
+
 def test_export_json_uses_internal_format():
     """JSON 永遠用 raw 內部格式（compact 號碼 / int 金額），ignore field_formats."""
     qr = _build_qr_text(invoice_number="EX12345678")

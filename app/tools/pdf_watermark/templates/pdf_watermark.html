@@ -651,7 +651,7 @@ function _wmTempRender() {
     if (r) r.checked = false;
     return;
   }
-  slot.style.display = '';
+  slot.style.display = 'block';  // 明確值：蓋過 data-s 的 display:none 規則（空字串蓋不過）
   document.getElementById('wmTempAssetThumb').src = t.dataUrl;
   document.getElementById('wmTempAssetName').textContent = t.filename || '臨時資產';
 }

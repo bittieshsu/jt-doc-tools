@@ -159,9 +159,11 @@ def order_groups_as_tree(groups: list[dict]) -> list[dict]:
         visited.add(g["id"])
         g2 = dict(g)
         g2["depth"] = depth
-        out.append(g2)
         own = (g.get("external_dn") or "").strip().lower()
-        for c in sorted(children.get(own, []), key=lambda x: (x.get("name") or "")):
+        kids = children.get(own, [])
+        g2["has_children"] = bool(kids)
+        out.append(g2)
+        for c in sorted(kids, key=lambda x: (x.get("name") or "")):
             emit(c, depth + 1)
 
     for r in sorted(roots, key=lambda x: (x.get("source") or "", x.get("name") or "")):
@@ -170,6 +172,7 @@ def order_groups_as_tree(groups: list[dict]) -> list[dict]:
         if g["id"] not in visited:
             g2 = dict(g)
             g2["depth"] = 0
+            g2["has_children"] = False
             out.append(g2)
             visited.add(g["id"])
     return out

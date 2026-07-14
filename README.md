@@ -1,6 +1,6 @@
-# Jason Tools 文件工具箱 v1.12.70
+# Jason Tools 文件工具箱 v1.12.79
 
-> 整合式 PDF / Office 文件處理平台，39 個工具一站式解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
+> 整合式 PDF / Office 文件處理平台，40 個工具一站式解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
 >
 > 企業功能：**本機 / LDAP / AD 多領域認證**、**SSO 單一登入**(OIDC + SAML，可接 M365 / Google / Keycloak)、**RBAC 角色權限**、**稽核記錄**、**SIEM 轉送**(syslog / CEF / GELF)、**字型管理**、**使用者工作區**、**REST API**。
 >
@@ -59,7 +59,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ---
 
-## 39 個工具速覽
+## 40 個工具速覽
 
 ### 填單用印
 - **表單自動填寫** — 自動偵測欄位 + 模板填值
@@ -80,6 +80,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 - **送件前檢核** — 批次驗收：頁面尺寸、字型嵌入、欄位完整、敏感資料殘留、隱藏內容
 - **清單處理** — 貼文字 / 上傳 .txt / .csv / .xlsx / .docx / .pdf 等檔案，一行一筆做排序 / 去重 / 篩選 / 取頭尾 / 大小寫轉換等，可組合多種操作；結果一鍵複製或下載 .txt / .csv / .xlsx
 - **電子發票處理** — 掃台灣電子發票 QR Code 解出發票號碼 / 日期 / 金額 / 統編，自動帶賣方公司名、行業、會計科目（規則 + 可選 LLM 判讀），支援報帳檢查 + 當期發票檢查，匯出 .xlsx / .ods / .csv / .json / .xml / .txt / .md（標題可自訂）
+- **乘車證明整理** — 拉一批台鐵購票證明 / 高鐵電子車票證明 PDF，自動整理日期 / 交通工具 / 來源-目的 / 費用成表格，欄位可自訂，匯出 .xlsx / .ods / .csv / .json / .xml / .txt / .md 報帳
 - **統編查詢** — 輸入 8 位統一編號反查，或公司 / 機關 / 學校名稱、地址、行業關鍵字模糊搜尋（高亮命中字）；含類別篩選 + 批次查詢 + CSV 匯出
 
 ### 格式轉換 [需 OxOffice/LibreOffice]
@@ -96,7 +97,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 - **逐句翻譯**
 - **壓縮**
 
-> 標 [需 OxOffice/LibreOffice] 的工具會用到 OxOffice / LibreOffice（OxOffice 優先，OSSII 維護的台灣本地化 fork，CJK 支援更好）。其他 27 個工具只處理 PDF / 純文字 / 圖片，不需要 Office 引擎。安裝腳本會自動處理。
+> 標 [需 OxOffice/LibreOffice] 的工具會用到 OxOffice / LibreOffice（OxOffice 優先，OSSII 維護的台灣本地化 fork，CJK 支援更好）。其他 28 個工具只處理 PDF / 純文字 / 圖片，不需要 Office 引擎。安裝腳本會自動處理。
 
 ---
 

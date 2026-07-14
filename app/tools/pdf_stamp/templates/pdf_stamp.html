@@ -941,7 +941,7 @@ function _tempAssetRender() {
     document.getElementById('tempAssetRadio').checked = false;
     return;
   }
-  slot.style.display = '';
+  slot.style.display = 'block';  // 明確值：蓋過 data-s 的 display:none 規則（空字串蓋不過）
   document.getElementById('tempAssetThumb').src = t.dataUrl;
   document.getElementById('tempAssetName').textContent = t.filename || '臨時資產';
 }
@@ -1234,7 +1234,7 @@ async function _restrictRegen({ silent } = {}) {
   restrictRenderedAspect = data.width_px / Math.max(1, data.height_px);
   const previewEl = document.getElementById('restrict-preview');
   const ph = document.getElementById('restrict-preview-placeholder');
-  if (previewEl) { previewEl.src = dataUri; previewEl.style.display = ''; }
+  if (previewEl) { previewEl.src = dataUri; previewEl.style.display = 'block'; }  // 明確值蓋過 data-s display:none
   if (ph) ph.style.display = 'none';
   if (restrictOverlay) {
     restrictOverlay.setPng(dataUri, { aspect: restrictRenderedAspect });

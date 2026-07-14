@@ -1,0 +1,512 @@
+{
+ "doc-deident": {
+  "buttons": [
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "‹",
+   "偵測敏感資料",
+   "從工作區載入"
+  ],
+  "inputCount": 44,
+  "hasDropzone": true,
+  "visibleControlCount": 65,
+  "title": "文件去識別化 · Jason Tools 文件工具箱"
+ },
+ "einvoice-scan": {
+  "buttons": [
+   "LLM 判讀科目",
+   "‹",
+   "全部清空",
+   "匯出 ▾",
+   "從工作區載入",
+   "手機掃描",
+   "設定",
+   "重抓科目",
+   "重新整理"
+  ],
+  "inputCount": 3,
+  "hasDropzone": false,
+  "visibleControlCount": 12,
+  "title": "電子發票處理 · Jason Tools 文件工具箱"
+ },
+ "image-to-pdf": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": false,
+  "visibleControlCount": 3,
+  "title": "圖片轉 PDF · Jason Tools 文件工具箱"
+ },
+ "markdown-to-doc": {
+  "buttons": [
+   "‹",
+   "開始轉換",
+   "預設(隨主題)"
+  ],
+  "inputCount": 3,
+  "hasDropzone": false,
+  "visibleControlCount": 6,
+  "title": "Markdown 轉文書 · Jason Tools 文件工具箱"
+ },
+ "office-to-pdf": {
+  "buttons": [
+   "‹",
+   "從工作區載入",
+   "開始轉檔"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 4,
+  "title": "文書轉 PDF · Jason Tools 文件工具箱"
+ },
+ "pdf-annotations": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 2,
+  "hasDropzone": true,
+  "visibleControlCount": 4,
+  "title": "註解整理 · Jason Tools 文件工具箱"
+ },
+ "pdf-annotations-flatten": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "註解平面化 · Jason Tools 文件工具箱"
+ },
+ "pdf-annotations-strip": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "註解清除 · Jason Tools 文件工具箱"
+ },
+ "pdf-attachments": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "PDF 附件萃取 · Jason Tools 文件工具箱"
+ },
+ "pdf-compress": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "PDF 壓縮 · Jason Tools 文件工具箱"
+ },
+ "pdf-decrypt": {
+  "buttons": [
+   "‹",
+   "從工作區載入",
+   "解除密碼"
+  ],
+  "inputCount": 5,
+  "hasDropzone": true,
+  "visibleControlCount": 8,
+  "title": "PDF 密碼解除 · Jason Tools 文件工具箱"
+ },
+ "doc-diff": {
+  "buttons": [
+   "‹",
+   "從工作區載入",
+   "從工作區載入",
+   "開始比對"
+  ],
+  "inputCount": 2,
+  "hasDropzone": true,
+  "visibleControlCount": 6,
+  "title": "文件差異比對 · Jason Tools 文件工具箱"
+ },
+ "pdf-editor": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "PDF 編輯器 · Jason Tools 文件工具箱"
+ },
+ "pdf-encrypt": {
+  "buttons": [
+   "‹",
+   "加密並下載",
+   "從工作區載入"
+  ],
+  "inputCount": 12,
+  "hasDropzone": true,
+  "visibleControlCount": 15,
+  "title": "PDF 密碼保護 · Jason Tools 文件工具箱"
+ },
+ "pdf-extract-images": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "擷取圖片 · Jason Tools 文件工具箱"
+ },
+ "pdf-extract-text": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "擷取文字 · Jason Tools 文件工具箱"
+ },
+ "pdf-fill": {
+  "buttons": [
+   "‹",
+   "從工作區載入",
+   "編輯",
+   "預覽填寫結果"
+  ],
+  "inputCount": 2,
+  "hasDropzone": true,
+  "visibleControlCount": 6,
+  "title": "表單自動填寫 · Jason Tools 文件工具箱"
+ },
+ "pdf-hidden-scan": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "隱藏內容掃描 · Jason Tools 文件工具箱"
+ },
+ "pdf-merge": {
+  "buttons": [
+   "‹",
+   "從工作區載入",
+   "開始合併"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 4,
+  "title": "檔案合併 · Jason Tools 文件工具箱"
+ },
+ "pdf-metadata": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "中繼資料清除 · Jason Tools 文件工具箱"
+ },
+ "pdf-nup": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "多頁合併 · Jason Tools 文件工具箱"
+ },
+ "pdf-ocr": {
+  "buttons": [
+   "‹",
+   "從工作區載入",
+   "開始 OCR"
+  ],
+  "inputCount": 5,
+  "hasDropzone": true,
+  "visibleControlCount": 8,
+  "title": "OCR 文字辨識 · Jason Tools 文件工具箱"
+ },
+ "pdf-pageno": {
+  "buttons": [
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "- {n} -",
+   "Page {n}",
+   "Page {n} of {N}",
+   "{n}",
+   "{n} / {N}",
+   "‹",
+   "從工作區載入",
+   "插入頁碼",
+   "第 {n} / {N} 頁",
+   "第 {n} 頁"
+  ],
+  "inputCount": 9,
+  "hasDropzone": true,
+  "visibleControlCount": 32,
+  "title": "插入頁碼 · Jason Tools 文件工具箱"
+ },
+ "pdf-pages": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "頁面整理 · Jason Tools 文件工具箱"
+ },
+ "pdf-rotate": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "頁面轉向 · Jason Tools 文件工具箱"
+ },
+ "pdf-split": {
+  "buttons": [
+   "‹",
+   "從工作區載入",
+   "開始分拆"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 4,
+  "title": "PDF 分拆 · Jason Tools 文件工具箱"
+ },
+ "pdf-stamp": {
+  "buttons": [
+   "‹",
+   "從工作區載入",
+   "臨時上傳一張（僅本次）",
+   "開始蓋章"
+  ],
+  "inputCount": 3,
+  "hasDropzone": true,
+  "visibleControlCount": 7,
+  "title": "PDF 用印與簽名 · Jason Tools 文件工具箱"
+ },
+ "pdf-to-image": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "文書轉圖片 · Jason Tools 文件工具箱"
+ },
+ "pdf-to-markdown": {
+  "buttons": [
+   "PNG（無損）",
+   "‹",
+   "從工作區載入",
+   "開始轉換"
+  ],
+  "inputCount": 3,
+  "hasDropzone": true,
+  "visibleControlCount": 7,
+  "title": "PDF 轉 Markdown · Jason Tools 文件工具箱"
+ },
+ "pdf-to-office": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "PDF 轉文書檔 · Jason Tools 文件工具箱"
+ },
+ "pdf-watermark": {
+  "buttons": [
+   "‹",
+   "從工作區載入",
+   "產製合併浮水印",
+   "臨時上傳一張（僅本次）"
+  ],
+  "inputCount": 9,
+  "hasDropzone": true,
+  "visibleControlCount": 13,
+  "title": "PDF 浮水印 · Jason Tools 文件工具箱"
+ },
+ "pdf-wordcount": {
+  "buttons": [
+   "‹",
+   "上傳檔案",
+   "從工作區載入",
+   "貼文字"
+  ],
+  "inputCount": 2,
+  "hasDropzone": true,
+  "visibleControlCount": 6,
+  "title": "字數統計 · Jason Tools 文件工具箱"
+ },
+ "scan-merge": {
+  "buttons": [
+   "‹",
+   "從工作區載入"
+  ],
+  "inputCount": 1,
+  "hasDropzone": true,
+  "visibleControlCount": 3,
+  "title": "掃描拼合 · Jason Tools 文件工具箱"
+ },
+ "submission-check": {
+  "buttons": [
+   "‹",
+   "從工作區載入",
+   "查看歷史案件",
+   "管理我方資料",
+   "開始檢核"
+  ],
+  "inputCount": 7,
+  "hasDropzone": true,
+  "visibleControlCount": 12,
+  "title": "送件前檢核 · Jason Tools 文件工具箱"
+ },
+ "text-deident": {
+  "buttons": [
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "#?",
+   "‹",
+   "偵測敏感資料",
+   "從工作區載入 PDF",
+   "替換假資料 置換成擬造資訊",
+   "編修 整段塗黑",
+   "遮罩 保留邊緣字元 · 例：王*明"
+  ],
+  "inputCount": 45,
+  "hasDropzone": false,
+  "visibleControlCount": 69,
+  "title": "文字去識別化 · Jason Tools 文件工具箱"
+ },
+ "text-diff": {
+  "buttons": [
+   "‹",
+   "交換左右",
+   "清空",
+   "清空",
+   "開始比對"
+  ],
+  "inputCount": 3,
+  "hasDropzone": false,
+  "visibleControlCount": 8,
+  "title": "文字差異比對 · Jason Tools 文件工具箱"
+ },
+ "text-list": {
+  "buttons": [
+   "‹",
+   "執行",
+   "從工作區載入",
+   "清空"
+  ],
+  "inputCount": 13,
+  "hasDropzone": false,
+  "visibleControlCount": 17,
+  "title": "清單處理 · Jason Tools 文件工具箱"
+ },
+ "translate-doc": {
+  "buttons": [
+   "‹",
+   "前往 LLM 設定"
+  ],
+  "inputCount": 1,
+  "hasDropzone": false,
+  "visibleControlCount": 3,
+  "title": "逐句翻譯 · Jason Tools 文件工具箱"
+ },
+ "vat-lookup": {
+  "buttons": [
+   "‹",
+   "批次查詢",
+   "查詢",
+   "查詢 / 搜尋"
+  ],
+  "inputCount": 7,
+  "hasDropzone": false,
+  "visibleControlCount": 11,
+  "title": "統編查詢 · Jason Tools 文件工具箱"
+ },
+ "home": {
+  "buttons": [
+   "‹"
+  ],
+  "inputCount": 1,
+  "hasDropzone": false,
+  "visibleControlCount": 2,
+  "title": "工具首頁 · Jason Tools 文件工具箱"
+ },
+ "workspace": {
+  "buttons": [
+   "‹",
+   "下載",
+   "刪除",
+   "刪除選取 0",
+   "重新命名"
+  ],
+  "inputCount": 3,
+  "hasDropzone": true,
+  "visibleControlCount": 8,
+  "title": "我的工作區 · Jason Tools 文件工具箱"
+ }
+}

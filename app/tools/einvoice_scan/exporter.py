@@ -21,6 +21,18 @@ from .settings import FIELD_DEFINITIONS
 
 _FIELD_DEF_BY_ID = {f["id"]: f for f in FIELD_DEFINITIONS}
 
+# 金額欄位匯出一律純數字（無千分位逗號，避免破壞 CSV / 會計軟體匯入）。
+_EXPORT_AMOUNT_IDS = {"amount_total", "amount_untaxed", "tax"}
+
+
+def _amount_raw(value):
+    if value is None or value == "":
+        return ""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return value
+
 
 def _resolve_columns(visible_columns: Optional[list[str]],
                      column_order: Optional[list[str]]) -> list[str]:
@@ -50,12 +62,14 @@ def _row_value(invoice: dict, field_id: str, row_index: int, field_formats: dict
         total = invoice.get("amount_total")
         untaxed = invoice.get("amount_untaxed")
         v = (total - untaxed) if (total is not None and untaxed is not None) else None
-        return apply_format("tax", v, field_formats)
+        return _amount_raw(v)                       # 匯出稅額純數字（無逗號）
     if field_id == "items":
         items = invoice.get("items")
         if isinstance(items, list):
             return " / ".join(items)
         return ""
+    if field_id in _EXPORT_AMOUNT_IDS:
+        return _amount_raw(invoice.get(field_id))   # 匯出金額純數字（無逗號）
     return apply_format(field_id, invoice.get(field_id), field_formats)
 
 

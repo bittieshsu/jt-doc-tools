@@ -842,13 +842,16 @@ def build_auth_router(templates) -> APIRouter:
 
     @router.get("/directory", response_class=HTMLResponse)
     async def directory_page(request: Request):
-        from ..core import auth_settings, roles as _roles
+        from ..core import auth_settings, roles as _roles, dir_filter
         backend = (auth_settings.get() or {}).get("backend", "off")
+        flt = dir_filter.get_settings()
         return templates.TemplateResponse(request, "admin_directory.html", {
             "request": request,
             "auth_backend": backend,
             "is_directory_backend": backend in ("ldap", "ad"),
             "all_roles": _roles.list_roles(),
+            "dir_default_mode": flt["default_mode"],
+            "dir_rules": flt["rules"],
         })
 
     def _require_dir_backend():
@@ -928,6 +931,59 @@ def build_auth_router(templates) -> APIRouter:
                            ip=_client_ip(request), target=dn,
                            details={"roles": role_ids})
         return {"ok": True, "dn": dn, "roles": role_ids}
+
+    # ----- 已選定 filter（全域一份，admin 共用）+ 剪枝樹 -----
+
+    @router.get("/directory/filter")
+    async def directory_filter_get(request: Request):
+        from ..core import dir_filter
+        return {"ok": True, **dir_filter.get_settings()}
+
+    @router.post("/directory/filter")
+    async def directory_filter_save(request: Request):
+        from ..core import dir_filter
+        body = await request.json()
+        data = dir_filter.save_settings(
+            default_mode=(body or {}).get("default_mode"),
+            rules=(body or {}).get("rules"),
+        )
+        audit_db.log_event("dir_filter_set", username=_actor(request),
+                           ip=_client_ip(request), target="directory",
+                           details={"default_mode": data["default_mode"],
+                                    "rule_count": len(data["rules"])})
+        return {"ok": True, **data}
+
+    @router.get("/directory/selected")
+    async def directory_selected(request: Request):
+        """依 filter 規則回「剪枝樹」（只留通往符合物件的分支）+ 統計。"""
+        from ..core import auth_ldap, dir_filter
+        _require_dir_backend()
+        settings = dir_filter.get_settings()
+        rules = settings.get("rules") or []
+        if not rules:
+            return {"ok": True, "tree": [], "count": 0, "capped": False,
+                    "matched_dns": [], "empty_rules": True}
+        try:
+            res = auth_ldap.search_selected_objects(rules)
+        except auth_ldap.AuthError as e:
+            raise HTTPException(400, str(e))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
+        tree = dir_filter.prune_tree(res["objects"], auth_ldap._dir_root_base())
+        # 附上符合的 OU 目前角色（樹上可看到哪些選定 OU 有權限）
+        matched = [o for o in res["objects"] if o["type"] == "ou"]
+
+        def _annotate(node):
+            if node.get("matched") and node.get("type") == "ou":
+                node["roles"] = permissions.list_roles_for_subject("ou", node["dn"])
+            for c in node.get("children", []):
+                _annotate(c)
+        for n in tree:
+            _annotate(n)
+        return {"ok": True, "tree": tree, "count": res["count"],
+                "capped": res["capped"],
+                "matched_dns": [o["dn"] for o in res["objects"]],
+                "matched_ou_count": len(matched)}
 
     # ---------- /admin/roles ----------
 
