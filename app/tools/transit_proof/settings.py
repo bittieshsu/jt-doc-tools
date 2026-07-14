@@ -47,7 +47,8 @@ FIELD_DEFINITIONS = [
     {"id": "transport",      "label": "交通工具",   "default_visible": True,  "default_order": 3},
     {"id": "route",          "label": "來源-目的",  "default_visible": True,  "default_order": 4},
     {"id": "transport_route", "label": "交通工具-來源-目的", "default_visible": False, "default_order": 4.5},
-    {"id": "fare",           "label": "費用",       "default_visible": True,  "default_order": 5, "formats": _FARE_FORMATS},
+    {"id": "fare",           "label": "費用",       "default_visible": True,  "default_order": 5},
+    {"id": "subject",        "label": "科目",       "default_visible": False, "default_order": 5.5},
     {"id": "depart_time",    "label": "出發時間",   "default_visible": False, "default_order": 6},
     {"id": "arrive_time",    "label": "到達時間",   "default_visible": False, "default_order": 7},
     {"id": "origin",         "label": "起站",       "default_visible": False, "default_order": 8},
@@ -55,12 +56,14 @@ FIELD_DEFINITIONS = [
     {"id": "train",          "label": "車種 / 車次", "default_visible": False, "default_order": 10},
     {"id": "ticket_type",    "label": "票種",       "default_visible": False, "default_order": 11},
     {"id": "ticket_no",      "label": "票號 / 卡號", "default_visible": False, "default_order": 12},
-    {"id": "amount_untaxed", "label": "銷售額",     "default_visible": False, "default_order": 13, "formats": _AMOUNT_FORMATS},
-    {"id": "tax",            "label": "營業稅額",   "default_visible": False, "default_order": 14, "formats": _AMOUNT_FORMATS},
+    {"id": "amount_untaxed", "label": "銷售額",     "default_visible": False, "default_order": 13},
+    {"id": "tax",            "label": "營業稅額",   "default_visible": False, "default_order": 14},
     {"id": "buyer_tax_id",   "label": "統一編號",   "default_visible": False, "default_order": 15},
     {"id": "source_file",    "label": "來源檔案",   "default_visible": False, "default_order": 16},
     {"id": "note",           "label": "備註",       "default_visible": False, "default_order": 17},
 ]
+# 金額欄位不再提供格式切換：畫面一律千分位（易讀）、匯出一律純數字（避免破壞
+# CSV 匯入 / 會計軟體）。_AMOUNT_FORMATS / _FARE_FORMATS 保留供相容不再掛到欄位。
 
 _FIELD_DEF_BY_ID = {f["id"]: f for f in FIELD_DEFINITIONS}
 VALID_FIELD_IDS = set(_FIELD_DEF_BY_ID)

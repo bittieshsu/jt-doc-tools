@@ -115,6 +115,11 @@
   .tp-table th, .tp-table td { padding: 7px 12px; border-bottom: 1px solid #f1f5f9; text-align: left; white-space: nowrap; }
   .tp-table th { background: #f9fafb; font-size: 11.5px; color: #6b7280; font-weight: 600; position: sticky; top: 0; }
   .tp-table td.tp-num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tp-table td.tp-editcell { padding: 3px 8px; }
+  .tp-cell-input { width: 100%; min-width: 72px; padding: 3px 6px; font-size: 12.5px;
+    border: 1px solid transparent; border-radius: 4px; background: transparent; box-sizing: border-box; }
+  .tp-cell-input:hover { border-color: #e5e7eb; }
+  .tp-cell-input:focus { outline: none; border-color: #2563eb; background: #fff; }
   .tp-table td.tp-transport-hsr .tp-tag { background: #fef3c7; color: #92400e; }
   .tp-table td.tp-transport-tra .tp-tag { background: #dbeafe; color: #1e40af; }
   .tp-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
@@ -210,7 +215,7 @@
       const t = (entry.transport || '').trim(), r = routeStr(entry);
       return (t + ' ' + r).trim();
     }
-    if (AMOUNT_FIELDS[fid]) return fmtAmount(entry[fid], formatId(fid) || 'plain');
+    if (AMOUNT_FIELDS[fid]) return fmtAmount(entry[fid], 'comma');   // 畫面一律千分位
     if (fid === 'date') return fmtDate(entry[fid], formatId(fid) || 'iso');
     return entry[fid] == null ? '' : String(entry[fid]);
   }
@@ -306,6 +311,14 @@
           td.className = 'tp-transport-' + (TRANSPORT_CLASS[e.transport] || '');
           const tag = document.createElement('span'); tag.className = 'tp-tag';
           tag.textContent = e.transport || ''; td.appendChild(tag);
+        } else if (c === 'subject') {
+          // 科目可直接在表格編輯，變更即存回該筆
+          td.className = 'tp-editcell';
+          const inp = document.createElement('input'); inp.type = 'text';
+          inp.className = 'tp-cell-input'; inp.value = e.subject == null ? '' : String(e.subject);
+          inp.placeholder = '科目';
+          inp.addEventListener('change', () => saveField(e.id, 'subject', inp.value));
+          td.appendChild(inp);
         } else { td.textContent = cellValue(e, c); }
         tr.appendChild(td);
       });
@@ -329,7 +342,7 @@
       cols.forEach((c, idx) => {
         const td = document.createElement('td');
         if (idx === 0) td.textContent = '合計 ' + ENTRIES.length + ' 筆';
-        else if (c === 'fare') { td.textContent = fmtAmount(total, formatId('fare') || 'comma'); td.className = 'tp-num'; }
+        else if (c === 'fare') { td.textContent = fmtAmount(total, 'comma'); td.className = 'tp-num'; }
         else td.textContent = '';
         foot.appendChild(td);
       });
@@ -408,6 +421,17 @@
     _selected.delete(id);
     await loadBuffer();
     toast('已刪除', 'ok');
+  }
+  // 表格內編輯欄位（科目等）→ 存回該筆；同步更新本地 ENTRIES 免整表重繪。
+  async function saveField(id, field, value) {
+    const body = {}; body[field] = value;
+    const r = await fetch('/tools/transit-proof/entry/' + id, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body) });
+    if (!r.ok) { toast(await errMsg(r, '儲存失敗'), 'err'); return; }
+    const ent = ENTRIES.find(x => x.id === id);
+    if (ent) ent[field] = value;
+    toast('已更新', 'ok');
   }
   $('tpBtnClear').addEventListener('click', async () => {
     if (!ENTRIES.length) return;

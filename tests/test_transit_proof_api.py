@@ -218,3 +218,28 @@ def test_api_endpoint_no_buffer(client):
     assert j["count"] == 1
     assert j["entries"][0]["transport"] == "高鐵"
     assert client.get("/tools/transit-proof/buffer").json()["entries"] == []
+
+
+def test_subject_field_default_hidden_and_旅費(client):
+    """科目欄：預設不在顯示欄位、解析預設值『旅費』、可編輯後匯出。"""
+    from app.tools.transit_proof import settings as s
+    fld = next(f for f in s.FIELD_DEFINITIONS if f["id"] == "subject")
+    assert fld["default_visible"] is False               # 預設不開
+    pdf = _make_pdf(_HSR_TEXT)
+    up = client.post("/tools/transit-proof/upload",
+                     files=[("files", ("h.pdf", pdf, "application/pdf"))]).json()
+    assert up["entries"][0]["subject"] == "旅費"          # 解析預設旅費
+    eid = up["entries"][0]["id"]
+    # 改科目 → 存回
+    r = client.post(f"/tools/transit-proof/entry/{eid}", json={"subject": "交通費"})
+    assert r.status_code == 200 and r.json()["entry"]["subject"] == "交通費"
+    # 顯示科目欄後匯出含之
+    client.post("/tools/transit-proof/settings", json={
+        "visible_columns": ["date", "subject", "fare"],
+        "column_order": ["date", "subject", "fare"]})
+    csv = client.post("/tools/transit-proof/export", json={"format": "csv"}).content.decode("utf-8-sig")
+    assert csv.splitlines()[0].split(",")[1] == "科目"
+    assert "交通費" in csv
+    client.post("/tools/transit-proof/settings", json={
+        "visible_columns": ["date", "transport", "route", "fare"],
+        "column_order": [], "field_formats": {}, "export_labels": {}})

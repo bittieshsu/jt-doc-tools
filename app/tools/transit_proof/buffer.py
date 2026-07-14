@@ -122,7 +122,7 @@ def update_entry(user: Optional[Any], entry_id: str, fields: dict) -> Optional[d
     """更新一筆的可編輯欄位。回更新後的 entry 或 None（找不到）。"""
     editable = {"transport", "date", "depart_time", "arrive_time", "origin",
                 "destination", "fare", "train", "ticket_type", "ticket_no",
-                "amount_untaxed", "tax", "buyer_tax_id", "note"}
+                "amount_untaxed", "tax", "buyer_tax_id", "note", "subject"}
     path = _buffer_path(user)
     with _get_lock(_user_key(user)):
         data = _read(path)

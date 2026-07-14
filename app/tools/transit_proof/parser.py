@@ -179,4 +179,6 @@ def parse_text(text: str) -> dict:
     # 至少要有日期或起訖或票價，否則視為解析失敗
     if not (d.get("date") or d.get("origin") or d.get("fare")):
         raise ParseError("辨識到憑證類型，但抽不到有效欄位（版面可能不同）")
+    # 會計科目預設「旅費」（交通票券報帳慣例）；可在表格內編輯調整。
+    d.setdefault("subject", "旅費")
     return d
