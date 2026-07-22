@@ -53,22 +53,25 @@ runner (cheaper + faster than a Windows runner for makensis):
 - Manual `workflow_dispatch` → builds and uploads as a **workflow artifact**
   (use this to validate the build without cutting a release).
 
-## Code signing (planned — currently UNSIGNED)
+## Code signing (SignPath OSS — production certificate issued 2026-07)
 
-The first builds are **unsigned**: Windows SmartScreen shows an
-"unknown publisher" prompt (the user clicks *More info → Run anyway*).
-This is expected and lets us validate the whole install/uninstall flow
-immediately.
+The Windows installer is code-signed through the **SignPath Foundation**'s
+free code-signing programme for open-source projects (production/release
+certificate issued 2026-07); the signing infrastructure is provided by
+**SignPath.io**. Attribution is stated on the download page (README + the
+GitHub Pages site) per the SignPath Foundation terms
+(<https://signpath.org/terms.html>).
 
-In parallel, apply for **SignPath OSS** free code signing
-(<https://signpath.io/foss>) — eligible because this repo is public and
-Apache-2.0. Once approved:
+CI wiring (`.github/workflows/release-windows-installer.yml`):
 
-1. Add `SIGNPATH_API_TOKEN` / `SIGNPATH_ORG_ID` as repo secrets.
-2. Insert the SignPath signing action into the workflow (placeholder is
-   already marked in the YAML) after `makensis`, before upload.
-3. For a fully-trusted uninstaller, use the **two-phase** NSIS build that
-   SignPath documents (sign `uninstall.exe` first, then embed + sign the
+1. Repo secrets: `SIGNPATH_API_TOKEN`, `SIGNPATH_ORG_ID` (the signing step is
+   gated on `SIGNPATH_ORG_ID` — auto-skips when absent, so builds still work
+   before secrets are added).
+2. `env:` slugs — `SIGNPATH_PROJECT_SLUG=jt-doc-tools`,
+   `SIGNPATH_ARTIFACT_SLUG=initial`, `SIGNPATH_POLICY_SLUG=release-signing`
+   (was `test-signing` during the test-certificate phase). Confirm the policy
+   slug matches the one in your SignPath console.
+3. Two-phase NSIS build (sign `uninstall.exe` first, then embed + sign the
    installer): <https://about.signpath.io/documentation/build-system-integration/nsis>
 
 SmartScreen reputation still accumulates over ~30 days / 1000+ downloads
