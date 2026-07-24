@@ -314,14 +314,33 @@ def _dedup_overprint(page) -> int:
     return removed
 
 
-def _render_pdf_page_png(pdf_path: Path, page_index: int) -> bytes | None:
-    """把原 PDF 第 page_index（0-based）頁 render 成 PNG bytes（設計頁 raster fallback 用）。"""
+def _render_pdf_page_png(pdf_path: Path, page_index: int,
+                         remove_text: bool = False) -> bytes | None:
+    """把原 PDF 第 page_index（0-based）頁 render 成 PNG bytes（設計頁 raster fallback）。
+
+    remove_text=True → 先把該頁「真實可抽取文字」移除（**保留圖形 / 圖片 / 外框字
+    路徑 / 漸層**）再 render → 這張圖只剩背景設計，真實文字改由上層可編輯 vector 呈現
+    （避免文字被烤進圖裡「移開圖才看得到文字」的困擾，且不會雙重文字）。外框化的標題
+    （非真實文字、是向量路徑）會留在圖裡，維持設計原貌。"""
     try:
         import fitz  # noqa: PLC0415
         with fitz.open(str(pdf_path)) as doc:
             if page_index >= doc.page_count:
                 return None
-            pix = doc[page_index].get_pixmap(dpi=_RASTER_DPI, alpha=False)
+            page = doc[page_index]
+            if remove_text:
+                try:
+                    for blk in page.get_text("dict").get("blocks", []):
+                        if blk.get("type") == 0:  # 文字 block
+                            page.add_redact_annot(fitz.Rect(blk["bbox"]), fill=None)
+                    # 只移除文字,保留 line-art（漸層 / 外框字路徑）與圖片
+                    page.apply_redactions(
+                        images=getattr(fitz, "PDF_REDACT_IMAGE_NONE", 0),
+                        graphics=getattr(fitz, "PDF_REDACT_LINE_ART_NONE", 0),
+                    )
+                except Exception:  # noqa: BLE001 — 移字失敗就用含字的整頁圖
+                    pass
+            pix = page.get_pixmap(dpi=_RASTER_DPI, alpha=False)
             return pix.tobytes("png")
     except Exception:  # noqa: BLE001 — render 失敗就退回向量搬移
         return None
@@ -383,11 +402,10 @@ def _page_has_transformed_image(page) -> bool:
 
 def _emit_raster_page(para, autostyles, pics: dict, png: bytes,
                       i: int, w: float, h: float) -> None:
-    """把整頁 PNG 以頁面錨定 frame 塞進段落（設計頁 raster fallback 用）。
-
-    raster 圖放在**最上層（高 z-index、不透明覆蓋）**——這樣底下若還保留原始文字框
-    （見 caller），視覺上只看到完美的 raster 圖，但文字仍在文件內可搜尋 / 可選取
-    （類似「可搜尋的掃描 PDF」）。"""
+    """把整頁 PNG 以頁面錨定 frame 塞進段落，放在**最底層（背景、低 z-index）**——
+    這張圖是「已移除真實文字、只剩漸層 / 圖形 / 外框字」的設計背景（見 remove_text）；
+    真實文字改由上層可編輯 vector 呈現。點頁面選到的是文字（圖在背景不礙事），視覺
+    仍保真、且不會雙重文字。"""
     pic_name = "Pictures/jtraster_%d.png" % i
     pics[pic_name] = png
     gstyle = etree.SubElement(autostyles, _q("style", "style"))
@@ -399,10 +417,10 @@ def _emit_raster_page(para, autostyles, pics: dict, png: bytes,
     ggp.set(_q("style", "vertical-pos"), "from-top")
     ggp.set(_q("style", "vertical-rel"), "page")
     ggp.set(_q("style", "wrap"), "run-through")
-    ggp.set(_q("style", "run-through"), "foreground")
+    ggp.set(_q("style", "run-through"), "background")
     frame = etree.SubElement(para, _q("draw", "frame"))
     frame.set(_q("draw", "style-name"), "JtRaster%d" % i)
-    frame.set(_q("draw", "z-index"), "10000")  # 蓋在所有原始文字框之上
+    frame.set(_q("draw", "z-index"), "0")  # 最底層背景,文字在其上
     frame.set(_q("text", "anchor-type"), "page")
     frame.set(_q("text", "anchor-page-number"), str(i))
     frame.set(_q("svg", "x"), "0cm")
@@ -416,10 +434,10 @@ def _emit_raster_page(para, autostyles, pics: dict, png: bytes,
     img.set(_q("xlink", "actuate"), "onLoad")
 
 
-def _move_text_frames_under_raster(page, para, i: int, page_w_cm: float) -> int:
-    """raster 頁：把原始「含文字」的框搬到段落（錨定第 i 頁、低 z-index，在 raster
-    圖底下）——保留文字可搜尋 / 可選取，但視覺被上層 raster 圖蓋住。不搬非文字形狀
-    （漸層色塊 / 失真向量），避免檔案肥大又不會露出。回搬移的文字框數。"""
+def _move_text_frames_over_raster(page, para, i: int, page_w_cm: float) -> int:
+    """raster 頁：把原始「含文字」的框搬到段落（錨定第 i 頁、**高 z-index 在背景圖
+    之上**）——文字直接可見 / 可選取 / 可編輯（背景圖已移除真實文字,不會雙重）。不搬
+    非文字形狀（漸層色塊 / 失真向量 / 外框字路徑,那些已在背景圖裡）。回搬移文字框數。"""
     n = 0
     for shape in list(page):
         if not isinstance(shape.tag, str):
@@ -430,7 +448,7 @@ def _move_text_frames_under_raster(page, para, i: int, page_w_cm: float) -> int:
         tag = etree.QName(shape).localname
         shape.set(_q("text", "anchor-type"), "page")
         shape.set(_q("text", "anchor-page-number"), str(i))
-        shape.set(_q("draw", "z-index"), "0")  # 壓低,確保在 raster 圖之下
+        shape.set(_q("draw", "z-index"), "10")  # 在背景 raster 圖(z=0)之上
         if tag == "frame":
             _pad_frame_width(shape, page_w_cm=page_w_cm)
         para.append(shape)
@@ -567,12 +585,13 @@ def _build_writer_odt(odg_path: Path, odt_out: Path,
                 gradient_heavy
                 or _page_has_large_image(page, w, h)
                 or _page_has_transformed_image(page)):
-            png = _render_pdf_page_png(pdf_path, i - 1)
+            png = _render_pdf_page_png(pdf_path, i - 1, remove_text=True)
             if png is not None:
                 _emit_raster_page(para, autostyles, pics, png, i, w, h)
-                # 保留原始文字框在 raster 圖底下 → 文字仍可搜尋 / 選取（視覺被圖蓋住）。
-                _move_text_frames_under_raster(page, para, i, w)
-                continue  # 非文字形狀（漸層色塊）不搬
+                # 真實文字框放在背景圖之上 → 直接可見 / 可選取 / 可編輯（背景圖已移
+                # 除真實文字,不會雙重;漸層 / 外框字標題留在背景圖裡保真）。
+                _move_text_frames_over_raster(page, para, i, w)
+                continue  # 非文字形狀（漸層色塊 / 外框路徑）不搬,已在背景圖
         # 先清掉 PDF 疊印假粗體造成的重複 / 被覆蓋文字框（見 _dedup_overprint）
         _dedup_overprint(page)
         # 搬移該頁所有頂層形狀（frame / line / rect / custom-shape / …）
