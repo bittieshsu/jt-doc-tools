@@ -699,6 +699,7 @@ POST /tools/pdf-stamp/api/pdf-stamp
 | `rotation_deg` | float | | 旋轉角度，預設 `0` |
 | `page_mode` | str | | `all`（每頁）/ `first` / `last`，預設 `all` |
 | `pages_json` | str | | 指定頁：JSON 陣列，0 起算頁碼（如 `[0,2,4]`）。提供時優先於 `page_mode`；超出範圍的頁碼會被忽略 |
+| `placements_json` | str | | **每頁獨立位置**（選用）。JSON 陣列，每個物件自帶頁碼與座標 → 不同頁可放不同位置、**同一頁可放多個**。提供時會忽略 `x_mm` / `y_mm` / `width_mm` / `height_mm` / `rotation_deg` / `page_mode` / `pages_json`；**未提供則行為與舊版完全相同** |
 
 ```bash
 curl -X POST http://localhost:8765/tools/pdf-stamp/api/pdf-stamp \
@@ -710,6 +711,28 @@ curl -X POST http://localhost:8765/tools/pdf-stamp/api/pdf-stamp \
 ```
 
 回應：蓋章後的 PDF。
+
+**每頁獨立位置（placements）**：適合多頁合約 / 續保單這種「每頁簽名位置不同、同一頁要簽好幾處」的情境。
+
+| placement 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `page` | int | ✓ | 0 起算頁碼；超過該 PDF 頁數者自動跳過 |
+| `x_mm` / `y_mm` | float | ✓ | 位置（mm） |
+| `width_mm` / `height_mm` | float | | 尺寸（mm），預設 30×30 |
+| `rotation_deg` | float | | 旋轉角度，預設 `0` |
+| `asset_id` | str | | 改用某個共用資產的圖（預設用上傳的 `stamp_image`） |
+
+```bash
+# 第 1 頁蓋 2 處、第 3 頁蓋 1 處，第 2 頁不蓋
+curl -X POST http://localhost:8765/tools/pdf-stamp/api/pdf-stamp \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@policy.pdf" -F "stamp_image=@sign.png" \
+  -F 'placements_json=[
+        {"page":0,"x_mm":40,"y_mm":250,"width_mm":20,"height_mm":20},
+        {"page":0,"x_mm":150,"y_mm":100,"width_mm":20,"height_mm":20},
+        {"page":2,"x_mm":100,"y_mm":150,"width_mm":25,"height_mm":25}]' \
+  --output stamped.pdf
+```
 
 ### PDF 浮水印
 

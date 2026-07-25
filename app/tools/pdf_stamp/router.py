@@ -351,6 +351,113 @@ async def index(request: Request):
     )
 
 
+# ---- 每頁獨立位置（placements，v1.12.93 / issue #38）--------------------
+# 一份 placement = 一個「要蓋在第 N 頁某座標」的物件。同一頁可以有多個。
+#   {"page":0,"kind":"stamp","x_mm":150,"y_mm":240,"width_mm":19,"height_mm":19,
+#    "rotation_deg":0, "asset_id":"...(選用,預設用主印章)", "png_b64":"...(date/restrict)"}
+# 這條路徑**完全獨立於**舊的「統一位置 + pages」流程：沒送 placements_json 時
+# 一行舊碼都不會走到 → 舊用法零回歸風險（issue #38 雙模式設計）。
+_MAX_PLACEMENTS = 500                 # 防惡意/誤送巨量物件
+_PLACEMENT_KINDS = ("stamp", "date", "restrict")
+
+
+def _parse_placements(placements_json: str, work_dir: Path,
+                      primary_png: Optional[Path]) -> list[dict]:
+    """把前端送來的 placements JSON 解析成可蓋章的 item 清單。
+
+    回 [{page:int, png_path:Path, x_mm, y_mm, width_mm, height_mm, rotation_deg}]。
+    `kind="stamp"` 用主印章圖；`date` / `restrict` 各自帶 png_b64（同既有 extras）。
+    也支援每個 placement 指定 `asset_id`（走 asset_manager + 型別檢查）。
+    任何格式問題一律 HTTPException(400)，不吞錯。"""
+    import base64
+    try:
+        raw = json.loads(placements_json)
+    except Exception:
+        raise HTTPException(400, "placements_json 不是合法 JSON")
+    if not isinstance(raw, list):
+        raise HTTPException(400, "placements_json 必須是陣列")
+    if len(raw) > _MAX_PLACEMENTS:
+        raise HTTPException(400, f"placements 最多 {_MAX_PLACEMENTS} 個")
+
+    asset_png_cache: dict[str, Path] = {}
+    items: list[dict] = []
+    for idx, it in enumerate(raw):
+        if not isinstance(it, dict):
+            raise HTTPException(400, f"placements[{idx}] 必須是物件")
+        kind = str(it.get("kind") or "stamp")
+        if kind not in _PLACEMENT_KINDS:
+            raise HTTPException(400, f"placements[{idx}].kind 必須是 {list(_PLACEMENT_KINDS)}")
+        try:
+            page = int(it.get("page", 0))
+        except Exception:
+            raise HTTPException(400, f"placements[{idx}].page 必須是整數")
+        if page < 0:
+            raise HTTPException(400, f"placements[{idx}].page 不可為負")
+
+        png_path: Optional[Path] = None
+        asset_id = it.get("asset_id")
+        if asset_id and isinstance(asset_id, str) and asset_id not in (
+                _TEMP_STAMP_SENTINEL, _NONE_STAMP_SENTINEL):
+            if asset_id not in asset_png_cache:
+                a = asset_manager.get(asset_id)
+                if not a or a.type not in ("stamp", "signature", "logo"):
+                    raise HTTPException(400, f"placements[{idx}].asset_id 不存在")
+                asset_png_cache[asset_id] = asset_manager.file_path(a)
+            png_path = asset_png_cache[asset_id]
+        elif it.get("png_b64"):
+            b64 = it.get("png_b64")
+            if not isinstance(b64, str) or len(b64) > 5_000_000:
+                raise HTTPException(400, f"placements[{idx}].png_b64 過大或格式錯誤")
+            try:
+                png_bytes = base64.b64decode(b64, validate=True)
+            except Exception:
+                raise HTTPException(400, f"placements[{idx}].png_b64 解碼失敗")
+            if not png_bytes.startswith(b"\x89PNG"):
+                raise HTTPException(400, f"placements[{idx}] 必須是 PNG")
+            png_path = work_dir / f"plc_{idx:03d}.png"
+            png_path.write_bytes(png_bytes)
+        else:
+            # 沒指定圖 → 用主印章（最常見：同一個簽名蓋到多頁多處）
+            if primary_png is None:
+                raise HTTPException(
+                    400, f"placements[{idx}] 需要 asset_id / png_b64（未選主印章）")
+            png_path = primary_png
+
+        items.append({
+            "page": page,
+            "png_path": png_path,
+            "x_mm": float(it.get("x_mm", 105)),
+            "y_mm": float(it.get("y_mm", 250)),
+            "width_mm": float(it.get("width_mm", 30)),
+            "height_mm": float(it.get("height_mm", 30)),
+            "rotation_deg": float(it.get("rotation_deg", 0)),
+        })
+    return items
+
+
+def _apply_placements(src: Path, dst: Path, items: list[dict],
+                      work_dir: Path, page_count: int) -> None:
+    """依 placements 逐一蓋章（鏈式：每次輸出成為下一次的輸入）。
+    超出該 PDF 頁數的 placement 直接跳過（多檔頁數不同時的保護）。"""
+    import shutil as _sh
+    _sh.copy(str(src), str(dst))
+    for k, it in enumerate(items):
+        if it["page"] >= page_count:
+            continue
+        tmp = work_dir / f"{dst.stem}_plc_{k:03d}_{uuid.uuid4().hex[:6]}.pdf"
+        params = service.StampParams(
+            x_mm=it["x_mm"], y_mm=it["y_mm"],
+            width_mm=it["width_mm"], height_mm=it["height_mm"],
+            rotation_deg=it["rotation_deg"], pages=[it["page"]],
+        )
+        service.stamp(dst, tmp, it["png_path"], params)
+        try:
+            dst.unlink()
+        except Exception:
+            pass
+        tmp.rename(dst)
+
+
 def _resolve_pages(page_mode: str, pages_json: Optional[str], n: int) -> Optional[List[int]]:
     """Resolve which 0-based page indices to stamp for an n-page PDF.
 
@@ -391,12 +498,18 @@ async def submit(
     pages_json: Optional[str] = Form(None),  # explicit 0-based indices (web UI)
     temp_asset_file: Optional[UploadFile] = File(None),
     extras_json: Optional[str] = Form(None),
+    placements_json: Optional[str] = Form(None),
 ):
     """Stamp one or many PDFs. Single-file result → PDF; multi → ZIP.
 
     extras_json: optional list of additional items to stamp on top of the
     primary stamp. Each item: {png_b64, x_mm, y_mm, width_mm, height_mm,
-    rotation_deg}. Used by the 日期插入 feature (1b)."""
+    rotation_deg}. Used by the 日期插入 feature (1b).
+
+    placements_json（選用，v1.12.93 / issue #38「每頁獨立位置」模式）：一份
+    placements 陣列，每個物件自帶 page + 座標 → 同一頁可放多個、不同頁可放不同
+    位置。**有帶就走 placements 路徑；沒帶則完全走原本的「統一位置 + pages」
+    流程**（舊行為零改動）。"""
     from ...core import sessions as _sessions
     actor = _sessions.user_label(getattr(request.state, "user", None))
     stamp_png, preset_dict = await _resolve_stamp_source(
@@ -426,9 +539,10 @@ async def submit(
         saved.append((src_path, safe))
 
     # Parse extras (date / future text items). Each saved to a temp PNG so
-    # the stamp pipeline can place them just like images.
+    # the stamp pipeline can place them just like images。
+    # placements 模式下 date / restrict 已在 placements 內自帶座標,跳過避免重疊。
     extra_items: list[dict] = []
-    if extras_json:
+    if extras_json and not placements_json:
         try:
             import base64
             raw_items = json.loads(extras_json)
@@ -482,6 +596,13 @@ async def submit(
         # Temp asset, no override — use sensible default (centered low)
         p_x, p_y, p_w, p_h, p_rot = 105.0, 250.0, 30.0, 30.0, 0.0
 
+    # 每頁獨立位置模式（issue #38）：有送 placements_json 才走這條，且與舊路徑
+    # 完全分離。UI 端限單檔使用；後端仍對多檔逐檔套用（超出頁數者自動跳過）。
+    placement_items = (
+        _parse_placements(placements_json, batch_dir, stamp_png)
+        if placements_json else None
+    )
+
     def run(job):
         total = len(saved)
         stamped_paths: list[tuple[Path, str]] = []
@@ -492,8 +613,12 @@ async def submit(
             # Per-file page selection depends on that file's page count.
             with fitz.open(str(src_path)) as doc:
                 n = doc.page_count
-            pages = _resolve_pages(page_mode, pages_json, n)
             dst = batch_dir / f"{src_path.stem}_stamped.pdf"
+            if placement_items is not None:
+                _apply_placements(src_path, dst, placement_items, batch_dir, n)
+                stamped_paths.append((dst, _result_filename(orig_name)))
+                continue
+            pages = _resolve_pages(page_mode, pages_json, n)
             if stamp_png is None:
                 # 「不蓋章」模式 → 直接複製原檔當基底，只跑 extras
                 import shutil as _sh
@@ -651,6 +776,7 @@ async def preview_all_pages(
     pages_json: Optional[str] = Form(None),
     temp_asset_file: Optional[UploadFile] = File(None),
     extras_json: Optional[str] = Form(None),
+    placements_json: Optional[str] = Form(None),
 ):
     """Render every page of the uploaded PDF with the stamp applied at the
     given position; return one PNG URL per page so the UI can stack them.
@@ -696,7 +822,11 @@ async def preview_all_pages(
     pages = _resolve_pages(page_mode, pages_json, n)
 
     from ...core import pdf_utils as pu
-    if stamp_png_path is None:
+    # 每頁獨立位置模式（issue #38）：合成預覽要逐頁反映各自位置。
+    if placements_json:
+        items = _parse_placements(placements_json, settings.temp_dir, stamp_png_path)
+        _apply_placements(src, stamped, items, settings.temp_dir, n)
+    elif stamp_png_path is None:
         # 「不蓋章」模式 → 複製原檔當基底
         import shutil as _sh
         _sh.copy(str(src), str(stamped))
@@ -708,9 +838,11 @@ async def preview_all_pages(
             pages=pages, rotation_deg=p_rot,
         )
 
-    # Apply extras (date / restrict) on top of primary stamp
+    # Apply extras (date / restrict) on top of primary stamp。
+    # placements 模式下 date / restrict 已由 placements 自帶座標處理,不再走這條
+    # （否則會重複疊加）。
     extra_tmp_files: list[Path] = []
-    if extras_json:
+    if extras_json and not placements_json:
         try:
             import base64
             raw_items = json.loads(extras_json)
@@ -938,8 +1070,14 @@ async def api_pdf_stamp(
     rotation_deg: float = Form(0.0),
     page_mode: str = Form("all"),  # all | first | last
     pages_json: Optional[str] = Form(None),  # 指定頁：JSON 陣列, 0-based index
+    placements_json: Optional[str] = Form(None),  # 每頁獨立位置（選用）
 ):
-    """單次上傳 PDF + 印章圖檔（PNG / JPG），蓋章後回 PDF。"""
+    """單次上傳 PDF + 印章圖檔（PNG / JPG），蓋章後回 PDF。
+
+    placements_json（選用）：每頁獨立位置模式。JSON 陣列，每個物件
+    `{"page":0,"x_mm":150,"y_mm":240,"width_mm":19,"height_mm":19,"rotation_deg":0}`
+    → 同一頁可放多個、不同頁可放不同位置，圖用上傳的 stamp_image。
+    **有帶就忽略 x_mm/y_mm/page_mode/pages_json；沒帶則行為與舊版完全相同。**"""
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(400, "只支援 PDF")
     img_ext = Path(stamp_image.filename or "stamp.png").suffix.lower()
@@ -965,11 +1103,16 @@ async def api_pdf_stamp(
     import fitz as _fitz
     with _fitz.open(str(src)) as d:
         n = d.page_count
-    pages_arg = _resolve_pages(page_mode, pages_json, n)
-    params = service.StampParams(
-        x_mm=x_mm, y_mm=y_mm, width_mm=width_mm, height_mm=height_mm,
-        rotation_deg=rotation_deg, pages=pages_arg,
-    )
-    await asyncio.to_thread(service.stamp, src, out, stamp_png, params)
+    if placements_json:
+        items = _parse_placements(placements_json, settings.temp_dir, stamp_png)
+        await asyncio.to_thread(
+            _apply_placements, src, out, items, settings.temp_dir, n)
+    else:
+        pages_arg = _resolve_pages(page_mode, pages_json, n)
+        params = service.StampParams(
+            x_mm=x_mm, y_mm=y_mm, width_mm=width_mm, height_mm=height_mm,
+            rotation_deg=rotation_deg, pages=pages_arg,
+        )
+        await asyncio.to_thread(service.stamp, src, out, stamp_png, params)
     return _FileResponse(str(out), media_type="application/pdf",
                          filename=f"{stem}_stamped.pdf")

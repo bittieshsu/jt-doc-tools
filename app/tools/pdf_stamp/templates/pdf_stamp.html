@@ -277,7 +277,7 @@
   {% endwith %}
   <div id="batch-list" class="batch-list" hidden></div>
 
-  <div class="form-row" data-s="sbe169e79">
+  <div class="form-row" id="pagePickRow" data-s="sbe169e79">
     <label data-s="s2c01dca4">蓋章頁面</label>
     <div id="page-pick" class="page-pick">
       <div class="page-pick-hint muted">上傳 PDF 後可逐頁選擇（預設全選）</div>
@@ -292,6 +292,14 @@
     <button class="mode-btn active" type="button" data-mode="edit">編輯模式</button>
     <button class="mode-btn" type="button" data-mode="composite">合成模式</button>
   </div>
+  {# 位置模式：統一位置（現行預設）↔ 每頁獨立（issue #38 新增）。
+     兩者走不同的送出路徑，舊模式行為完全不變。 #}
+  <div class="mode-switch pos-mode-switch" role="tablist" id="posModeSwitch">
+    <button class="mode-btn active" type="button" data-posmode="uniform">統一位置</button>
+    <button class="mode-btn" type="button" data-posmode="placements">每頁獨立
+      <span class="type-chip" data-s="se94702da">Beta</span></button>
+  </div>
+  <span id="posModeHint" class="muted spe-tip"></span>
   <p class="muted" data-s="sbc8dda50">
     <b>編輯模式</b>：在 PDF 上拖曳藍框調整位置 / 大小 / 旋轉。可切換頁面驗證印章位置在每一頁都不衝突。
     <b>合成模式</b>：列出實際蓋章後的<strong>每一頁</strong>，所見即所得。
@@ -324,6 +332,36 @@
     {% set editor_id='stampOverride' %}
     {% include "components/drag_position_editor.html" %}
   </div>
+  {# 每頁獨立位置模式（issue #38）— 與上面的單頁編輯器並存，預設隱藏。 #}
+  <div id="placement-mode" hidden>
+    <div class="spe-wrap" id="speRoot">
+      <div class="spe-canvas-wrap">
+        <div class="spe-paper">
+          <img class="spe-bg" alt="PDF 頁面" />
+          <div class="spe-layer"></div>
+          <div class="spe-guide v" hidden></div>
+          <div class="spe-guide h" hidden></div>
+        </div>
+      </div>
+      <div class="spe-side">
+        <div class="preview-nav">
+          <button class="btn btn-small spe-prev" type="button">‹</button>
+          <span class="page-info spe-page-label">— / —</span>
+          <button class="btn btn-small spe-next" type="button">›</button>
+        </div>
+        <div class="spe-thumbs"></div>
+        <div class="spe-count">0 個物件</div>
+        <button class="btn btn-small spe-del" type="button">{{ icon('trash', size=12) }} 刪除選取</button>
+        <button class="btn btn-small spe-clear-page" type="button">清空本頁</button>
+        <button class="btn btn-small spe-copy-all" type="button">複製本頁到所有頁</button>
+        <div class="spe-tip">
+          <b>點一下頁面空白處</b>即可放置簽名 / 印章；可拖曳移動、右下角圓點縮放。
+          選取後按 <b>Delete</b> 或 <b>Backspace</b> 刪除。
+          綠色底線的頁碼代表該頁已有物件。
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="composite-mode" hidden data-s="s410c244f">
     <div id="sim-single" data-s="s37e04321">
       <img id="sim-image" alt="蓋章後預覽" data-s="s45bb712b" />
@@ -351,6 +389,38 @@
 .mode-btn { background: transparent; border: none; padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #475569; font-weight: 500; }
 .mode-btn:hover { background: rgba(255,255,255,0.5); }
 .mode-btn.active { background: #fff; color: #1e293b; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+/* ===== 每頁獨立位置編輯器（issue #38 / StampPlacementEditor）=====
+   與舊的單頁 DragPositionEditor 並存，只在「每頁獨立」模式顯示。 */
+.spe-wrap { display:flex; gap:12px; align-items:flex-start; }
+.spe-canvas-wrap { flex:1 1 auto; min-width:0; min-height:420px; display:flex;
+  align-items:flex-start; justify-content:center; background:#f1f5f9;
+  border:1px solid #e2e8f0; border-radius:8px; padding:4px; overflow:auto; }
+.spe-paper { position:relative; background:#fff; box-shadow:0 1px 6px rgba(0,0,0,.15);
+  cursor:crosshair; flex:0 0 auto; }
+.spe-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:fill;
+  pointer-events:none; user-select:none; }
+.spe-layer { position:absolute; inset:0; }
+.spe-item { position:absolute; border:1.5px dashed #2563eb; background:rgba(37,99,235,.06);
+  cursor:move; box-sizing:border-box; }
+.spe-item.selected { border-style:solid; border-color:#1d4ed8; box-shadow:0 0 0 2px rgba(37,99,235,.25); }
+.spe-item img { width:100%; height:100%; object-fit:contain; pointer-events:none;
+  user-select:none; display:block; }
+.spe-item.kind-date { border-color:#10b981; background:rgba(16,185,129,.06); }
+.spe-item.kind-restrict { border-color:#f97316; background:rgba(249,115,22,.06); }
+.spe-handle { position:absolute; right:-6px; bottom:-6px; width:12px; height:12px;
+  background:#2563eb; border:2px solid #fff; border-radius:50%; cursor:nwse-resize; }
+.spe-guide { position:absolute; background:#f43f5e; pointer-events:none; }
+.spe-guide.v { top:0; bottom:0; width:1px; }
+.spe-guide.h { left:0; right:0; height:1px; }
+.spe-side { flex:0 0 168px; display:flex; flex-direction:column; gap:8px; }
+.spe-thumbs { display:flex; flex-wrap:wrap; gap:4px; max-height:180px; overflow:auto; }
+.spe-thumb { width:30px; height:30px; border:1px solid #cbd5e1; background:#fff;
+  border-radius:6px; cursor:pointer; font-size:12px; color:#475569; }
+.spe-thumb:hover { border-color:#93c5fd; }
+.spe-thumb.active { border-color:#2563eb; background:#dbeafe; color:#1e40af; font-weight:700; }
+.spe-thumb.has-items { box-shadow:inset 0 -3px 0 #10b981; }
+.spe-tip { font-size:11.5px; color:#64748b; line-height:1.5; }
+.spe-count { font-size:12px; color:#334155; font-weight:600; }
 .preview-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
 .preview-nav { display: flex; gap: 8px; align-items: center; }
 .preview-nav .page-info { font-size: 13px; color: #475569; font-family: ui-monospace, monospace; }
@@ -388,6 +458,7 @@
 <script src="/static/js/file_upload.js"></script>
 <script src="/static/js/job_progress.js"></script>
 <script src="/static/js/drag_position_editor.js"></script>
+<script src="/static/js/stamp_placement_editor.js"></script>
 <script src="/static/js/stamp_date_overlay.js"></script>
 <script src="/static/js/custom_select.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
@@ -435,9 +506,9 @@ const progress = new JobProgress(document.getElementById('jobProgress'), {
 });
 
 // Mode switch: 編輯 / 合成
-document.querySelectorAll('.mode-switch .mode-btn').forEach(btn => {
+document.querySelectorAll('.mode-switch:not(.pos-mode-switch) .mode-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.mode-switch .mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.mode-switch:not(.pos-mode-switch) .mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const m = btn.dataset.mode;
     document.getElementById('edit-mode').hidden = m !== 'edit';
@@ -445,6 +516,11 @@ document.querySelectorAll('.mode-switch .mode-btn').forEach(btn => {
     _updateZoomLabel();
     if (m === 'edit') {
       document.getElementById('sim-page-nav').hidden = true;
+      // 每頁獨立模式：顯示多頁編輯器而非單頁的（applyPosMode 內處理）
+      if (typeof isPlacementMode === 'function' && isPlacementMode()) {
+        applyPosMode();
+        return;
+      }
       _updateEditPageNav();
       _applyEditZoom(); _syncEditPageSelection();
     } else {
@@ -677,6 +753,81 @@ function tempAssetAsFile() {
   return new File([arr], t.filename || 'temp.png', {type: mime});
 }
 
+// ===== 位置模式：統一位置（現行）/ 每頁獨立（issue #38，Beta）=====
+// 兩條路徑完全分離：統一位置走 DragPositionEditor + override + pages（舊碼不動），
+// 每頁獨立走 StampPlacementEditor + placements_json。
+let placementEditor = null;
+
+function isPlacementMode() {
+  const b = document.querySelector('#posModeSwitch .mode-btn.active');
+  return !!b && b.dataset.posmode === 'placements';
+}
+
+function _placementDefaultSize() {
+  const p = getSelectedStampPreset() || {};
+  return { width_mm: p.width_mm || 30, height_mm: p.height_mm || 30 };
+}
+
+async function ensurePlacementEditor() {
+  const root = document.getElementById('speRoot');
+  if (!root) return;
+  await loadPreview();
+  if (!previewInfo) return;
+  if (placementEditor) placementEditor.destroy();
+  placementEditor = new StampPlacementEditor({
+    root,
+    pageCount: previewInfo.page_count || 1,
+    pagesDims: previewInfo.pages_dims || [],
+    bgUrlFor: (i) => `/tools/pdf-stamp/preview-bg/${previewInfo.upload_id}/${i}`,
+    assetUrl: getSelectedStampImageUrl(),
+    defaultSize: _placementDefaultSize(),
+    onChange: () => {},
+  });
+}
+
+function applyPosMode() {
+  const on = isPlacementMode();
+  const editEl = document.getElementById('edit-mode');
+  const plcEl = document.getElementById('placement-mode');
+  const hint = document.getElementById('posModeHint');
+  // 多檔批次時每頁獨立不適用（各檔頁數不同）→ 自動退回統一位置
+  if (on && pickedFiles.length > 1) {
+    _setPosMode('uniform');
+    if (window.showToast) window.showToast('多檔批次不支援「每頁獨立」，已切回統一位置', 'err');
+    return;
+  }
+  // 「編輯 / 合成」切換在兩種位置模式下都保留（新模式也要能看合成結果）。
+  // 差別只在「編輯」時要顯示哪一個編輯器：舊 = 單頁 DragPositionEditor，
+  // 新 = 多頁 StampPlacementEditor。
+  const inEdit = (_currentMode() === 'edit');
+  if (plcEl) plcEl.hidden = !(on && inEdit);
+  if (editEl) editEl.hidden = on || !inEdit;
+  const editNav = document.getElementById('edit-page-nav');
+  if (on && editNav) editNav.hidden = true;   // 新模式自帶頁面導覽
+  // 「蓋章頁面」在每頁獨立模式下由 placements 自身決定 → 收合並提示
+  const pagePick = document.getElementById('pagePickRow');
+  if (pagePick) pagePick.hidden = on;
+  if (hint) {
+    hint.textContent = on
+      ? '每頁獨立：蓋哪些頁由你放置的位置決定（上方「蓋章頁面」不適用）。'
+      : '';
+  }
+  if (on) ensurePlacementEditor();
+}
+
+function _setPosMode(mode) {
+  document.querySelectorAll('#posModeSwitch .mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.posmode === mode);
+  });
+}
+
+document.querySelectorAll('#posModeSwitch .mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _setPosMode(btn.dataset.posmode);
+    applyPosMode();
+  });
+});
+
 async function ensureEditor() {
   const id = getSelectedStamp();
   if (!id) return;
@@ -764,18 +915,25 @@ async function refreshSim() {
       fd.append('temp_asset_file', tf, tf.name);
     }
     fd.append('file', f);
-    appendPagesField(fd);
-    // Always send the live editor value so backend re-renders with the
-    // current dragged position. Without this the override would be stale
-    // (or absent) and the composite preview would keep showing the preset.
-    if (editor) fd.append('override', JSON.stringify(editor.getValue()));
-    // 合成模式也要看 date / restrict overlay
-    const simExtras = [];
-    const _d = window.__dateOverlayState__ ? window.__dateOverlayState__() : null;
-    if (_d) simExtras.push(_d);
-    const _r = window.__restrictOverlayState__ ? window.__restrictOverlayState__() : null;
-    if (_r) simExtras.push(_r);
-    if (simExtras.length) fd.append('extras_json', JSON.stringify(simExtras));
+    // 每頁獨立位置模式：改送 placements，讓合成預覽逐頁反映各自位置（issue #38）。
+    if (isPlacementMode() && placementEditor) {
+      const plc = placementEditor.getValue();
+      if (!plc.length) { status.textContent = '尚未放置任何簽名 / 印章'; return; }
+      fd.append('placements_json', JSON.stringify(plc));
+    } else {
+      appendPagesField(fd);
+      // Always send the live editor value so backend re-renders with the
+      // current dragged position. Without this the override would be stale
+      // (or absent) and the composite preview would keep showing the preset.
+      if (editor) fd.append('override', JSON.stringify(editor.getValue()));
+      // 合成模式也要看 date / restrict overlay
+      const simExtras = [];
+      const _d = window.__dateOverlayState__ ? window.__dateOverlayState__() : null;
+      if (_d) simExtras.push(_d);
+      const _r = window.__restrictOverlayState__ ? window.__restrictOverlayState__() : null;
+      if (_r) simExtras.push(_r);
+      if (simExtras.length) fd.append('extras_json', JSON.stringify(simExtras));
+    }
     try {
       const r = await fu.upload('/tools/pdf-stamp/preview-all-pages', fd, {processingLabel: '產生全頁預覽中…'});
       if (seq !== simSeq) return; // superseded
@@ -919,9 +1077,17 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   fd.append('stamp_id', stampId);
   if (!appendTempAssetIfNeeded(fd)) return;
   for (const f of pickedFiles) fd.append('file', f);
-  appendPagesField(fd);
-  if (editor) fd.append('override', JSON.stringify(editor.getValue()));
-  if (extras.length) fd.append('extras_json', JSON.stringify(extras));
+  // 每頁獨立位置模式（issue #38）：改送 placements_json，後端走另一條路徑；
+  // 統一位置模式一切照舊（override + pages + extras）。
+  if (isPlacementMode() && placementEditor) {
+    const plc = placementEditor.getValue();
+    if (!plc.length) return alert('請先在頁面上點一下放置簽名 / 印章，或切回「統一位置」模式。');
+    fd.append('placements_json', JSON.stringify(plc));
+  } else {
+    appendPagesField(fd);
+    if (editor) fd.append('override', JSON.stringify(editor.getValue()));
+    if (extras.length) fd.append('extras_json', JSON.stringify(extras));
+  }
   const r = await fu.upload('/tools/pdf-stamp/submit', fd, {processingLabel: '排隊用印中…'});
   if (!r.ok) {
     const txt = await r.text();

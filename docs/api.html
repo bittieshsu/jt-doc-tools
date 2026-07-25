@@ -602,7 +602,7 @@ curl <span class="hl-flag">-s</span> <span class="hl-url">http://localhost:8765/
 <h4 id="pdf-用印--簽名">PDF 用印 / 簽名</h4>
 <p>在 PDF 上疊加印章 / 簽名圖。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-stamp/api/pdf-stamp</code></pre>
-<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>stamp_image</code></td><td>file</td><td>✓</td><td>印章 / 簽名圖（透明 PNG 佳）</td></tr><tr><td><code>x_mm</code></td><td>float</td><td>✓</td><td>左下角 X 位置（mm）</td></tr><tr><td><code>y_mm</code></td><td>float</td><td>✓</td><td>左下角 Y 位置（mm）</td></tr><tr><td><code>width_mm</code></td><td>float</td><td>✓</td><td>寬度（mm）</td></tr><tr><td><code>height_mm</code></td><td>float</td><td>✓</td><td>高度（mm）</td></tr><tr><td><code>rotation_deg</code></td><td>float</td><td></td><td>旋轉角度，預設 <code>0</code></td></tr><tr><td><code>page_mode</code></td><td>str</td><td></td><td><code>all</code>（每頁）/ <code>first</code> / <code>last</code>，預設 <code>all</code></td></tr><tr><td><code>pages_json</code></td><td>str</td><td></td><td>指定頁：JSON 陣列，0 起算頁碼（如 <code>[0,2,4]</code>）。提供時優先於 <code>page_mode</code>；超出範圍的頁碼會被忽略</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>stamp_image</code></td><td>file</td><td>✓</td><td>印章 / 簽名圖（透明 PNG 佳）</td></tr><tr><td><code>x_mm</code></td><td>float</td><td>✓</td><td>左下角 X 位置（mm）</td></tr><tr><td><code>y_mm</code></td><td>float</td><td>✓</td><td>左下角 Y 位置（mm）</td></tr><tr><td><code>width_mm</code></td><td>float</td><td>✓</td><td>寬度（mm）</td></tr><tr><td><code>height_mm</code></td><td>float</td><td>✓</td><td>高度（mm）</td></tr><tr><td><code>rotation_deg</code></td><td>float</td><td></td><td>旋轉角度，預設 <code>0</code></td></tr><tr><td><code>page_mode</code></td><td>str</td><td></td><td><code>all</code>（每頁）/ <code>first</code> / <code>last</code>，預設 <code>all</code></td></tr><tr><td><code>pages_json</code></td><td>str</td><td></td><td>指定頁：JSON 陣列，0 起算頁碼（如 <code>[0,2,4]</code>）。提供時優先於 <code>page_mode</code>；超出範圍的頁碼會被忽略</td></tr><tr><td><code>placements_json</code></td><td>str</td><td></td><td><strong>每頁獨立位置</strong>（選用）。JSON 陣列，每個物件自帶頁碼與座標 → 不同頁可放不同位置、<strong>同一頁可放多個</strong>。提供時會忽略 <code>x_mm</code> / <code>y_mm</code> / <code>width_mm</code> / <code>height_mm</code> / <code>rotation_deg</code> / <code>page_mode</code> / <code>pages_json</code>；<strong>未提供則行為與舊版完全相同</strong></td></tr></tbody></table></div>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-stamp/api/pdf-stamp</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@contract.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;stamp_image=@chop.png&quot;</span> \
@@ -610,6 +610,17 @@ curl <span class="hl-flag">-s</span> <span class="hl-url">http://localhost:8765/
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;pages_json=[0,2]&quot;</span> \
   <span class="hl-flag">--output</span> stamped.pdf</code></pre>
 <p>回應：蓋章後的 PDF。</p>
+<p><strong>每頁獨立位置（placements）</strong>：適合多頁合約 / 續保單這種「每頁簽名位置不同、同一頁要簽好幾處」的情境。</p>
+<div class="table-wrap"><table><thead><tr><th>placement 欄位</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>page</code></td><td>int</td><td>✓</td><td>0 起算頁碼；超過該 PDF 頁數者自動跳過</td></tr><tr><td><code>x_mm</code> / <code>y_mm</code></td><td>float</td><td>✓</td><td>位置（mm）</td></tr><tr><td><code>width_mm</code> / <code>height_mm</code></td><td>float</td><td></td><td>尺寸（mm），預設 30×30</td></tr><tr><td><code>rotation_deg</code></td><td>float</td><td></td><td>旋轉角度，預設 <code>0</code></td></tr><tr><td><code>asset_id</code></td><td>str</td><td></td><td>改用某個共用資產的圖（預設用上傳的 <code>stamp_image</code>）</td></tr></tbody></table></div>
+<pre><code class="lang-bash"><span class="hl-cmt"># 第 1 頁蓋 2 處、第 3 頁蓋 1 處，第 2 頁不蓋</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-stamp/api/pdf-stamp</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@policy.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;stamp_image=@sign.png&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&#x27;placements_json=[
+        {&quot;page&quot;:0,&quot;x_mm&quot;:40,&quot;y_mm&quot;:250,&quot;width_mm&quot;:20,&quot;height_mm&quot;:20},
+        {&quot;page&quot;:0,&quot;x_mm&quot;:150,&quot;y_mm&quot;:100,&quot;width_mm&quot;:20,&quot;height_mm&quot;:20},
+        {&quot;page&quot;:2,&quot;x_mm&quot;:100,&quot;y_mm&quot;:150,&quot;width_mm&quot;:25,&quot;height_mm&quot;:25}]&#x27;</span> \
+  <span class="hl-flag">--output</span> stamped.pdf</code></pre>
       </section>
       <section class="doc-section" data-sec="pdf-浮水印" data-title="PDF 浮水印" hidden>
 <div class="doc-crumb">6. 表單與簽章 API</div>

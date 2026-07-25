@@ -321,18 +321,27 @@ function setBtnBusy(btn, busy, label) {
 }
 
 // 引擎切換時，「4. 進階選項」（jtdt-refine 後處理 + 個別 fixer）只對
-// pdf2docx 引擎有效；選 jtdt-reform 時整區灰掉不可互動。
+// pdf2docx 引擎有效；選其他引擎時整區灰掉不可互動 + **自動收合**（用不到的區塊
+// 不佔版面）。切回 pdf2docx 時自動展開回來。
 function syncAdvancedPanelEnabled() {
   const engine = document.querySelector('input[name="engine"]:checked')?.value || 'jtdt-reform';
   const panel = $('advPanel');
   if (!panel) return;
-  if (engine === 'pdf2docx-refine') {
-    panel.classList.remove('p2o-adv-disabled');
-    panel.querySelectorAll('input').forEach(el => { el.disabled = false; });
+  const usable = (engine === 'pdf2docx-refine');
+  panel.classList.toggle('p2o-adv-disabled', !usable);
+  if (!usable) {
+    panel.classList.add('collapsed');            // 用不到就折起來
   } else {
-    panel.classList.add('p2o-adv-disabled');
-    panel.querySelectorAll('input').forEach(el => { el.disabled = true; });
+    // 切回可用時，尊重使用者原本的手動收合偏好（toast.js 存的 localStorage）
+    const h2t = (panel.querySelector('h2')?.textContent || '').trim();
+    const key = 'panel-collapsed:' + location.pathname + ':' + h2t;
+    let pref = null;
+    try { pref = localStorage.getItem(key); } catch (_e) {}
+    panel.classList.toggle('collapsed', pref === '1');
   }
+  panel.querySelectorAll('input').forEach(el => { el.disabled = !usable; });
+  const h2 = panel.querySelector('h2');
+  if (h2) h2.title = usable ? '' : '此引擎不使用 jtdt-refine 後處理，選 pdf2docx 才會生效';
 }
 document.querySelectorAll('input[name="engine"]').forEach(r => {
   r.addEventListener('change', syncAdvancedPanelEnabled);
@@ -394,6 +403,8 @@ const fu = new FileUpload($('p2oUpload'), async (f) => {
   $('optsPanel').hidden = false;
   $('enginePanel').hidden = false;
   $('advPanel').hidden = false;
+  // 面板從隱藏變顯示時重跑一次：確保「用不到就灰掉 + 折起」的狀態正確
+  syncAdvancedPanelEnabled();
   $('convertPanel').hidden = false;
 });
 
