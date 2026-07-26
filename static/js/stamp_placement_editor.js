@@ -37,6 +37,9 @@
       // overlayFor(kind)：日期(1b) / 個資限用章(1c) 的圖與尺寸來源，
       // 回 {url, png_b64, width_mm, height_mm, assetKey} 或 null（未啟用）。
       this.overlayFor = opts.overlayFor || null;
+      // onKindUnavailable(kind)：使用者點了尚未啟用的種類時的引導動作
+      this.onKindUnavailable = opts.onKindUnavailable || null;
+      this._kindOk = { stamp: true };
       this.defaultSize = opts.defaultSize || { width_mm: 30, height_mm: 30 };
       this.onChange = opts.onChange || (() => {});
 
@@ -381,25 +384,42 @@
       });
     }
 
-    /** 依 1b / 1c 是否啟用，開關對應的種類鈕（停用時自動切回印章）。 */
+    /** 標記某個種類目前可不可用（1b / 1c 尚未啟用時）。
+
+     *  **刻意不用 disabled**：灰掉的按鈕按不下去、`title` 提示在多數瀏覽器也不會
+     *  顯示，使用者只看到「不能按」卻不知道要去哪啟用。改成仍可點擊，點下去直接
+     *  把對應的 1b / 1c 區塊展開並捲過去（由 onKindUnavailable 處理）。 */
     setKindAvailable(kind, ok) {
+      this._kindOk = this._kindOk || {};
+      this._kindOk[kind] = !!ok;
       let fellBack = false;
       (this.$kindBtns || []).forEach((b) => {
         if (b.dataset.kind !== kind) return;
-        b.disabled = !ok;
+        b.classList.toggle('needs-setup', !ok);
         b.title = ok ? '' : (kind === 'date'
-          ? '請先在上方「1b. 插入日期」啟用' : '請先在上方「1c. 個資限用章」啟用');
+          ? '尚未啟用 — 點一下前往「1b. 插入日期」設定'
+          : '尚未啟用 — 點一下前往「1c. 個資限用章」設定');
         if (!ok && this.kind === kind) fellBack = true;
       });
       if (fellBack) this.setKind('stamp');
+    }
+
+    kindAvailable(kind) {
+      if (kind === 'stamp') return true;
+      return !!(this._kindOk && this._kindOk[kind]);
     }
 
     _bind() {
       // 0) 種類切換（印章 / 簽名、插入日期、個資限用章）
       (this.$kindBtns || []).forEach((b) => {
         b.addEventListener('click', () => {
-          if (b.disabled) return;
-          this.setKind(b.dataset.kind);
+          const k = b.dataset.kind;
+          // 尚未啟用 → 不是「按不動」，而是帶使用者去啟用的地方
+          if (!this.kindAvailable(k)) {
+            if (typeof this.onKindUnavailable === 'function') this.onKindUnavailable(k);
+            return;
+          }
+          this.setKind(k);
         });
       });
       // 1) 點擊紙面空白處 → 在該點放置一個物件（issue #38 需求 2）

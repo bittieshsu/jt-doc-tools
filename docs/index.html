@@ -1024,7 +1024,22 @@
         <div class="install-os">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M0 3.45L9.75 2.1v9.45H0M10.95 1.95L24 0v11.55H10.95M0 12.6h9.75v9.45L0 20.7M10.95 12.6H24V24l-12.95-1.85"/></svg>
           Windows
+          <span class="install-os-sub">10 / 11（x64・ARM64）</span>
         </div>
+        <!-- 一鍵安裝檔：雙擊即可,不必開 PowerShell 貼指令（給非技術使用者） -->
+        <div class="install-dl">
+          <a class="install-dl-btn"
+             href="https://github.com/jasoncheng7115/jt-doc-tools/releases/latest"
+             rel="noopener">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+            下載安裝程式
+          </a>
+          <span class="install-dl-txt">
+            到 GitHub Releases 下載 <b>jt-doc-tools-x.y.z-setup.exe</b>，<b>雙擊安裝</b>，
+            不必開 PowerShell 貼指令。安裝精靈為繁體中文，含解除安裝功能。
+          </span>
+        </div>
+        <p class="install-or">或用 PowerShell 一行指令安裝（以系統管理員身分執行）：</p>
         <div class="install-cmd-wrap">
           <pre><code id="cmd-win">$f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.net/gh/jasoncheng7115/jt-doc-tools@main/install.ps1' -OutFile $f -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop; powershell -NoProfile -ExecutionPolicy Bypass -File $f } catch { Write-Host "[X] 下載安裝腳本失敗：$($_.Exception.Message)" -ForegroundColor Red; Write-Host "請檢查網路（VPN？防火牆？DNS？）後重試。" -ForegroundColor Yellow }; Read-Host '按 Enter 關閉'</code></pre>
           <button type="button" class="copy-btn" data-target="cmd-win" aria-label="複製指令">
@@ -1032,7 +1047,6 @@
             <span class="copy-label">複製</span>
           </button>
         </div>
-        <div class="install-note">10 / 11（以系統管理員身分執行 PowerShell）</div>
       </div>
     </div>
 

@@ -830,10 +830,12 @@ code {
 }
 
 /* ===== Install ===== */
+/* 三個平台改「上中下」堆疊而非左中右並排：安裝指令（特別是 Windows 那條
+   PowerShell）很長,三欄時每欄只剩三分之一寬,指令幾乎全被截掉要橫向捲。 */
 .install-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: 1fr;
+  gap: 16px;
   margin-bottom: 30px;
 }
 .install-card {
@@ -951,12 +953,17 @@ code {
 .install-card pre {
   background: #0f172a;
   color: #cbd5e1;
-  padding: 12px 14px;
+  /* 右側留白給複製鈕（不可用 padding 簡寫,會蓋掉 .install-cmd-wrap pre 的
+     padding-right,文字就會跑到鈕底下） */
+  padding: 12px 84px 12px 14px;
   border-radius: 8px;
   margin: 0;
   font-size: 12.5px;
-  line-height: 1.5;
-  overflow-x: auto;
+  line-height: 1.6;
+  /* 指令換行而不是橫向捲：Windows 那條 PowerShell 即使整頁寬也要三倍寬度,
+     用捲軸的話使用者永遠看不到全貌（複製鈕複製的是完整指令,不受換行影響）。 */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-family: var(--font-mono);
 }
 .install-card pre code {
@@ -965,6 +972,33 @@ code {
   padding: 0;
   font-size: inherit;
 }
+/* Windows 一鍵安裝檔下載（GitHub Release）*/
+.install-dl {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--indigo-light);
+}
+.install-dl-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  background: var(--indigo);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.install-dl-btn:hover { filter: brightness(1.08); }
+.install-dl-txt { font-size: 13px; color: var(--text-2); line-height: 1.6; }
+.install-or {
+  font-size: 12.5px; color: var(--muted);
+  margin: 0 0 8px;
+}
+
 .install-after {
   text-align: center;
   font-size: 14.5px;

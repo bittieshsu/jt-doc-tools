@@ -372,10 +372,10 @@
            上方 1b / 1c 啟用並設定內容，這裡才會亮起可選。 #}
         <div class="spe-kind" role="group" aria-label="要放置的種類">
           <button class="spe-kind-btn active" type="button" data-kind="stamp">印章 / 簽名</button>
-          <button class="spe-kind-btn" type="button" data-kind="date" disabled
-                  title="請先在上方「1b. 插入日期」啟用">日期</button>
-          <button class="spe-kind-btn" type="button" data-kind="restrict" disabled
-                  title="請先在上方「1c. 個資限用章」啟用">個資限用章</button>
+          <button class="spe-kind-btn needs-setup" type="button" data-kind="date"
+                  title="尚未啟用 — 點一下前往「1b. 插入日期」設定">日期</button>
+          <button class="spe-kind-btn needs-setup" type="button" data-kind="restrict"
+                  title="尚未啟用 — 點一下前往「1c. 個資限用章」設定">個資限用章</button>
         </div>
         <div class="spe-count">0 個物件</div>
         {# 旋轉：只作用在「目前選取的物件」，與每頁統一用印的旋轉功能對應 #}
@@ -559,7 +559,13 @@
 .spe-kind-btn.active { background:#dbeafe; border-color:#2563eb; color:#1d4ed8; font-weight:700; }
 .spe-kind-btn[data-kind="date"].active { background:#d1fae5; border-color:#10b981; color:#047857; }
 .spe-kind-btn[data-kind="restrict"].active { background:#ffedd5; border-color:#f97316; color:#c2410c; }
-.spe-kind-btn:disabled { opacity:.45; cursor:not-allowed; }
+/* 尚未啟用：淡化 + 虛線邊框表示「要先設定」，但**仍可點**（點了會帶去啟用處）。
+   刻意不用 disabled — 灰掉按不動時使用者不知道該去哪開啟。 */
+.spe-kind-btn.needs-setup { opacity:.6; border-style:dashed; }
+.spe-kind-btn.needs-setup:hover { opacity:.85; border-color:#f59e0b; color:#b45309; }
+/* 被引導過去時閃一下，讓使用者看到要在哪裡啟用 */
+@keyframes jtFlash { 0%,100% { box-shadow:none; } 30%,70% { box-shadow:0 0 0 3px #fbbf24; } }
+.jt-flash { animation:jtFlash 1.4s ease-in-out 1; border-radius:8px; }
 /* 旋轉控制（僅在選取物件時顯示） */
 .spe-rot { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
   padding:7px 9px; display:flex; flex-direction:column; gap:6px; }
@@ -1003,6 +1009,24 @@ async function ensurePlacementEditor() {
         height_mm: st.height_mm,
       };
     },
+    // 點了尚未啟用的種類 → 展開對應的 1b / 1c 區塊、捲過去並閃一下
+    onKindUnavailable: (kind) => {
+      const panel = document.getElementById(
+        kind === 'date' ? 'date-panel' : 'restrict-panel');
+      const label = kind === 'date' ? '1b. 插入日期' : '1c. 個資限用章';
+      if (window.showToast)
+        window.showToast(`請先在「${label}」勾選啟用並設定內容，才能放到頁面上`, 'err');
+      if (!panel) return;
+      panel.open = true;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      panel.classList.remove('jt-flash');
+      void panel.offsetWidth;                 // 強制 reflow，讓動畫可重播
+      panel.classList.add('jt-flash');
+      setTimeout(() => panel.classList.remove('jt-flash'), 1600);
+      const cb = document.getElementById(
+        kind === 'date' ? 'date-enabled' : 'restrict-enabled');
+      if (cb) setTimeout(() => cb.focus(), 400);
+    },
     onChange: () => {},
   });
   syncPlacementKinds();
@@ -1027,7 +1051,8 @@ function syncPlacementKinds() {
 document.addEventListener('change', (e) => {
   const id = e.target && e.target.id;
   if (id === 'date-enabled' || id === 'restrict-enabled') {
-    setTimeout(syncPlacementKinds, 400);
+    syncPlacementKinds();                       // 取消勾選要立刻反映
+    setTimeout(syncPlacementKinds, 600);        // 勾選後圖還在產生 → 補一次
   }
 });
 
@@ -1511,6 +1536,9 @@ async function _dateRegen({ silent } = {}) {
   if (!data) return;
   const dataUri = 'data:image/png;base64,' + data.png_b64;
   dateRenderedBase64 = data.png_b64;
+  // 圖產生好才算真的「可用」→ 立刻通知「頁面個別用印」的種類鈕解鎖
+  // （不能只靠勾選事件後固定延遲，產生預覽要打伺服器,時間不定）
+  if (typeof syncPlacementKinds === 'function') syncPlacementKinds();
   dateRenderedAspect = data.width_px / Math.max(1, data.height_px);
   const previewEl = document.getElementById('date-preview');
   if (previewEl) previewEl.src = dataUri;
@@ -1672,6 +1700,9 @@ async function _restrictRegen({ silent } = {}) {
   }
   const dataUri = 'data:image/png;base64,' + data.png_b64;
   restrictRenderedBase64 = data.png_b64;
+  // 圖產生好才算真的「可用」→ 立刻通知「頁面個別用印」的種類鈕解鎖
+  // （不能只靠勾選事件後固定延遲，產生預覽要打伺服器,時間不定）
+  if (typeof syncPlacementKinds === 'function') syncPlacementKinds();
   restrictRenderedAspect = data.width_px / Math.max(1, data.height_px);
   const previewEl = document.getElementById('restrict-preview');
   const ph = document.getElementById('restrict-preview-placeholder');
