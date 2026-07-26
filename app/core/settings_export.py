@@ -23,6 +23,7 @@ import zipfile
 from pathlib import Path
 from typing import Optional
 
+from . import safe_paths
 from ..config import settings
 
 MANIFEST_NAME = "manifest.json"
@@ -265,8 +266,11 @@ def export_to_zip(out_path: Path, selected_ids: Optional[list[str]] = None,
     entries_by_cat: dict[str, list[str]] = {}
     files_added = 0
     total_bytes = 0
-    # out_path 來自 admin 設定的匯出目錄;.resolve() 正規化（消 .. 跳脫）防禦性硬化。
-    out_path = Path(out_path).resolve()
+    # out_path 來自 admin 設定的匯出目錄。目錄本身經 safe_output_dir 驗證（絕對路徑、
+    # 非系統目錄），檔名則是本程式產生的固定樣板（jtdt-settings-<時間>-v<版本>.zip），
+    # 不含使用者輸入。
+    out_dir = safe_paths.safe_output_dir(Path(out_path).parent)
+    out_path = out_dir / safe_paths.sanitize_filename(Path(out_path).name)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         for c in selected:

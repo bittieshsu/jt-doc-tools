@@ -14,6 +14,7 @@ all generate names from `uuid4().hex` + a fixed suffix anyway.
 """
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -70,3 +71,50 @@ def require_uuid_hex(s: str, field: str = "id") -> str:
     if not is_uuid_hex(s):
         raise HTTPException(400, f"invalid {field}")
     return s
+
+
+# ── 管理者可設定的輸出目錄 ──────────────────────────────────────────────────
+# 設定匯出 / 排程備份的目標目錄由管理員自行填寫，把備份放到 /mnt/backup 這類外部
+# 路徑是**合理且常見**的用法，所以不能硬性限制在資料目錄底下（會讓既有客戶的設定
+# 失效）。但仍要擋住明顯危險或明顯是誤填的目標：寫進系統目錄可能覆蓋掉作業系統
+# 檔案，而相對路徑會隨行程工作目錄漂移、寫到預期外的地方。
+_FORBIDDEN_ROOTS_POSIX = (
+    "/etc", "/proc", "/sys", "/dev", "/boot", "/bin", "/sbin",
+    "/usr/bin", "/usr/sbin", "/lib", "/lib64", "/run",
+)
+_FORBIDDEN_PARTS_WINDOWS = ("windows", "system32", "syswow64", "program files",
+                            "program files (x86)")
+
+
+class UnsafeOutputDir(ValueError):
+    """管理員設定的輸出目錄不可接受（相對路徑 / 系統目錄 / 目標是檔案）。"""
+
+
+def safe_output_dir(raw: str | Path) -> Path:
+    """驗證並正規化「管理員設定的輸出目錄」。
+
+    通過條件：絕對路徑、正規化後不落在系統目錄、目標不是既有檔案。
+    不限制必須在資料目錄底下（外部備份路徑是合理用法）。
+
+    Raises:
+        UnsafeOutputDir: 不可接受時，訊息可直接顯示給管理員。
+    """
+    p = Path(raw)
+    if not p.is_absolute():
+        raise UnsafeOutputDir("匯出目錄必須是絕對路徑（避免隨執行位置漂移）")
+    resolved = p.resolve()
+    text = str(resolved)
+    parts_lower = [seg.lower() for seg in resolved.parts]
+    if os.name == "nt":
+        for bad in _FORBIDDEN_PARTS_WINDOWS:
+            if bad in parts_lower:
+                raise UnsafeOutputDir("不可匯出到系統目錄（%s）" % bad)
+    else:
+        for bad in _FORBIDDEN_ROOTS_POSIX:
+            if text == bad or text.startswith(bad + "/"):
+                raise UnsafeOutputDir("不可匯出到系統目錄（%s）" % bad)
+        if resolved == Path("/"):
+            raise UnsafeOutputDir("不可匯出到根目錄")
+    if resolved.exists() and not resolved.is_dir():
+        raise UnsafeOutputDir("匯出目錄路徑已存在同名檔案，請換一個位置")
+    return resolved

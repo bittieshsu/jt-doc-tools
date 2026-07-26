@@ -251,3 +251,70 @@ def test_a10_no_user_controlled_outbound_urls():
             if forbidden_pattern.search(line):
                 bad.append(f"{p.relative_to(src)}:{line_no}: {line.strip()[:80]}")
     assert not bad, "SSRF risk — user-controlled URL passed to outbound request:\n" + "\n".join(bad[:5])
+
+
+# ── 管理者可設定的匯出目錄（CodeQL py/path-injection 硬化）────────────────────
+def test_safe_output_dir_allows_external_backup_paths(tmp_path):
+    """外部備份路徑（/mnt/backup 這類）是合理用法，不可被擋掉。"""
+    from app.core.safe_paths import safe_output_dir
+
+    d = tmp_path / "backup"
+    assert safe_output_dir(d) == d.resolve()
+    assert safe_output_dir(str(d)) == d.resolve()
+
+
+@pytest.mark.parametrize("bad", ["/etc", "/etc/cron.d", "/proc/self", "/sys",
+                                 "/dev", "/boot", "/bin", "/usr/sbin", "/"])
+def test_safe_output_dir_rejects_system_dirs(bad):
+    """寫進系統目錄可能覆蓋作業系統檔案 → 一律擋。"""
+    import os
+
+    from app.core.safe_paths import UnsafeOutputDir, safe_output_dir
+
+    if os.name == "nt":
+        pytest.skip("POSIX 系統目錄清單")
+    with pytest.raises(UnsafeOutputDir):
+        safe_output_dir(bad)
+
+
+def test_safe_output_dir_rejects_relative_path():
+    """相對路徑會隨行程工作目錄漂移，寫到預期外的位置。"""
+    from app.core.safe_paths import UnsafeOutputDir, safe_output_dir
+
+    with pytest.raises(UnsafeOutputDir):
+        safe_output_dir("backups/settings")
+    with pytest.raises(UnsafeOutputDir):
+        safe_output_dir("../../etc")
+
+
+def test_safe_output_dir_rejects_traversal_into_system_dir(tmp_path):
+    """正規化後才判斷 → 用 .. 繞回系統目錄一樣擋得住。"""
+    from app.core.safe_paths import UnsafeOutputDir, safe_output_dir
+    import os
+
+    if os.name == "nt":
+        pytest.skip("POSIX 系統目錄清單")
+    with pytest.raises(UnsafeOutputDir):
+        safe_output_dir("/var/lib/../../etc/cron.d")
+
+
+def test_safe_output_dir_rejects_existing_file(tmp_path):
+    from app.core.safe_paths import UnsafeOutputDir, safe_output_dir
+
+    f = tmp_path / "afile"
+    f.write_text("x", encoding="utf-8")
+    with pytest.raises(UnsafeOutputDir):
+        safe_output_dir(f)
+
+
+def test_scheduled_export_save_rejects_system_target_dir(tmp_path, monkeypatch):
+    """管理員在設定頁填系統目錄 → 存檔當下就被擋（不是等排程跑到才失敗）。"""
+    import os
+
+    from app.core import scheduled_export
+
+    if os.name == "nt":
+        pytest.skip("POSIX 系統目錄清單")
+    with pytest.raises(ValueError):
+        scheduled_export.save_settings({"enabled": True, "interval": "daily",
+                                        "keep": 3, "target_dir": "/etc/cron.d"})

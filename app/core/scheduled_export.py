@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
+from . import safe_paths
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -86,6 +87,12 @@ def save_settings(new: dict[str, Any]) -> dict[str, Any]:
     if keep < 1 or keep > 500:
         raise ValueError("保留份數需在 1–500 之間")
     target_dir = (new.get("target_dir") or "").strip()
+    if target_dir:
+        # 存檔當下就驗，讓管理員立刻看到錯誤（而不是等排程跑到才失敗）
+        try:
+            target_dir = str(safe_paths.safe_output_dir(target_dir))
+        except safe_paths.UnsafeOutputDir as e:
+            raise ValueError(str(e))
     cats = new.get("categories")
     if cats is not None and not isinstance(cats, list):
         raise ValueError("categories 必須是清單或 null")
@@ -125,10 +132,10 @@ def _do_export(cfg: dict) -> dict:
         from ..main import VERSION
     except Exception:
         VERSION = "unknown"
-    # target_dir 為 admin 設定（by-design admin 有檔案系統權限）;
-    # .resolve() 正規化路徑（消掉 .. 相對跳脫）作防禦性硬化。
-    target = (Path(cfg.get("target_dir")).resolve()
-              if cfg.get("target_dir") else _default_target())
+    # target_dir 為 admin 設定。允許外部備份路徑（/mnt/backup 這類是合理用法），
+    # 但一律經 safe_output_dir 正規化並擋掉系統目錄 / 相對路徑（見該函式說明）。
+    raw = cfg.get("target_dir")
+    target = safe_paths.safe_output_dir(raw) if raw else _default_target()
     target.mkdir(parents=True, exist_ok=True)
     name = f"jtdt-settings-{time.strftime('%Y%m%d-%H%M%S')}-v{VERSION}.zip"
     out_path = target / name
