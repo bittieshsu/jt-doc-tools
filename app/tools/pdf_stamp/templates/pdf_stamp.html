@@ -288,18 +288,27 @@
 
 <div class="panel" id="preview-panel" hidden>
   <h2 class="panel-title" data-s="s1386d503">預覽</h2>
-  <div class="mode-switch" role="tablist" data-s="sd51702bf">
-    <button class="mode-btn active" type="button" data-mode="edit">編輯模式</button>
-    <button class="mode-btn" type="button" data-mode="composite">合成模式</button>
-  </div>
-  {# 位置模式：統一位置（現行預設）↔ 每頁獨立（issue #38 新增）。
+  {# 兩組切換器收在同一條工具列：標籤小字置上、中間細分隔線，比橫排整齊。
+     位置模式：每頁統一用印（現行預設）↔ 頁面個別用印（issue #38 新增），
      兩者走不同的送出路徑，舊模式行為完全不變。 #}
-  <div class="mode-switch pos-mode-switch" role="tablist" id="posModeSwitch">
-    <button class="mode-btn active" type="button" data-posmode="uniform">統一位置</button>
-    <button class="mode-btn" type="button" data-posmode="placements">每頁獨立
-      <span class="type-chip" data-s="se94702da">Beta</span></button>
+  <div class="switch-bar">
+    <span class="switch-group">
+      <span class="switch-label">檢視方式</span>
+      <span class="mode-switch" role="tablist">
+        <button class="mode-btn active" type="button" data-mode="edit">編輯模式</button>
+        <button class="mode-btn" type="button" data-mode="composite">合成模式</button>
+      </span>
+    </span>
+    <span class="switch-group">
+      <span class="switch-label">用印方式</span>
+      <span class="mode-switch pos-mode-switch" role="tablist" id="posModeSwitch">
+        <button class="mode-btn active" type="button" data-posmode="uniform">每頁統一用印</button>
+        <button class="mode-btn" type="button" data-posmode="placements">頁面個別用印
+          <span class="beta-chip">Beta</span></button>
+      </span>
+    </span>
   </div>
-  <span id="posModeHint" class="muted spe-tip"></span>
+  <p id="posModeHint" class="muted spe-tip"></p>
   <p class="muted" data-s="sbc8dda50">
     <b>編輯模式</b>：在 PDF 上拖曳藍框調整位置 / 大小 / 旋轉。可切換頁面驗證印章位置在每一頁都不衝突。
     <b>合成模式</b>：列出實際蓋章後的<strong>每一頁</strong>，所見即所得。
@@ -342,23 +351,54 @@
           <div class="spe-guide v" hidden></div>
           <div class="spe-guide h" hidden></div>
         </div>
+        {# 編輯區載入遮罩：剛切到此模式時要先取頁面資訊 / 背景圖，沒有提示會看到
+           一片空白，容易誤以為當掉。 #}
+        <div class="spe-busy" id="speBusy" hidden>
+          <div class="sim-busy-box">
+            <div class="sim-spinner"></div>
+            <div class="sim-busy-title">載入頁面中…</div>
+            <div class="sim-busy-sub">正在準備可編輯的頁面</div>
+          </div>
+        </div>
       </div>
       <div class="spe-side">
         <div class="preview-nav">
-          <button class="btn btn-small spe-prev" type="button">‹</button>
+          <button class="btn btn-small spe-prev" type="button" title="上一頁">‹</button>
           <span class="page-info spe-page-label">— / —</span>
-          <button class="btn btn-small spe-next" type="button">›</button>
+          <button class="btn btn-small spe-next" type="button" title="下一頁">›</button>
         </div>
         <div class="spe-thumbs"></div>
-        <div class="spe-count">0 個物件</div>
-        <button class="btn btn-small spe-del" type="button">{{ icon('trash', size=12) }} 刪除選取</button>
-        <button class="btn btn-small spe-clear-page" type="button">清空本頁</button>
-        <button class="btn btn-small spe-copy-all" type="button">複製本頁到所有頁</button>
-        <div class="spe-tip">
-          <b>點一下頁面空白處</b>即可放置簽名 / 印章；可拖曳移動、右下角圓點縮放。
-          選取後按 <b>Delete</b> 或 <b>Backspace</b> 刪除。
-          綠色底線的頁碼代表該頁已有物件。
+        {# 要放置的種類：主印章 / 日期(1b) / 個資限用章(1c)。日期與限用章要先在
+           上方 1b / 1c 啟用並設定內容，這裡才會亮起可選。 #}
+        <div class="spe-kind" role="group" aria-label="要放置的種類">
+          <button class="spe-kind-btn active" type="button" data-kind="stamp">印章 / 簽名</button>
+          <button class="spe-kind-btn" type="button" data-kind="date" disabled
+                  title="請先在上方「1b. 插入日期」啟用">日期</button>
+          <button class="spe-kind-btn" type="button" data-kind="restrict" disabled
+                  title="請先在上方「1c. 個資限用章」啟用">個資限用章</button>
         </div>
+        <div class="spe-count">0 個物件</div>
+        {# 旋轉：只作用在「目前選取的物件」，與每頁統一用印的旋轉功能對應 #}
+        <div class="spe-rot" hidden>
+          <label class="spe-rot-row">旋轉
+            <input type="number" class="spe-rot-input" step="0.5" value="0"> °
+          </label>
+          <div class="spe-rot-btns">
+            <button class="btn btn-small spe-rot-reset" type="button" title="歸零">{{ icon('reset', size=12) }}</button>
+            <button class="btn btn-small spe-rot-rand" type="button" data-range="3" title="隨機 ±3°">±3°</button>
+            <button class="btn btn-small spe-rot-rand" type="button" data-range="10" title="隨機 ±10°">±10°</button>
+          </div>
+        </div>
+        <button class="btn btn-small spe-del" type="button">{{ icon('trash', size=12) }} 刪除選取</button>
+        <button class="btn btn-small spe-clear-page" type="button">{{ icon('refresh', size=12) }} 清空本頁</button>
+        <button class="btn btn-small spe-copy-all" type="button">{{ icon('copy', size=12) }} 複製本頁到所有頁</button>
+        <ul class="spe-help">
+          <li>{{ icon('plus', size=13) }}<span><b>點一下</b>頁面空白處放置</span></li>
+          <li>{{ icon('swap', size=13) }}<span><b>拖曳</b>移動位置</span></li>
+          <li>{{ icon('aspect-ratio', size=13) }}<span>拉<b>右下圓點</b>縮放大小</span></li>
+          <li>{{ icon('trash', size=13) }}<span>選取後按 <kbd>Delete</kbd> / <kbd>Backspace</kbd></span></li>
+          <li><span class="spe-dot-demo"></span><span>頁碼有<b>紅點</b>＝該頁已用印</span></li>
+        </ul>
       </div>
     </div>
   </div>
@@ -366,6 +406,14 @@
     <div id="sim-single" data-s="s37e04321">
       <img id="sim-image" alt="蓋章後預覽" data-s="s45bb712b" />
       <div id="sim-cap" data-s="sefa9f1f9"></div>
+      {# 產生合成圖時的整頁遮罩：沒有回饋會讓人以為當機（頁數多時要幾秒） #}
+      <div id="sim-busy" class="sim-busy" hidden>
+        <div class="sim-busy-box">
+          <div class="sim-spinner"></div>
+          <div class="sim-busy-title">產生合成圖中…</div>
+          <div class="sim-busy-sub" id="sim-busy-sub">正在逐頁蓋章並產生預覽</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -385,16 +433,55 @@
 .type-stamp     { background: #fee2e2; color: #b91c1c; }
 .type-signature { background: #dbeafe; color: #1d4ed8; }
 .type-logo      { background: #dcfce7; color: #166534; }
-.mode-switch { display: inline-flex; background: #e5e7eb; padding: 3px; border-radius: 8px; gap: 0; }
-.mode-btn { background: transparent; border: none; padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #475569; font-weight: 500; }
-.mode-btn:hover { background: rgba(255,255,255,0.5); }
-.mode-btn.active { background: #fff; color: #1e293b; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+/* 分段切換控制（segmented control）：外框 + 內凹底色 + 選中白底浮起，
+   讓人一眼看出「這是可以左右切的開關」，而不是兩顆獨立按鈕。
+   版面：標籤改成小字置於開關上方（垂直排列），兩組之間用細分隔線區隔，
+   整排收在一條淺色工具列裡，比「標籤 + 開關」橫排更整齊好讀。 */
+/* 標籤放在開關「左側」（水平排列）。對齊關鍵：兩組的開關高度必須一致
+   （右組多了 Beta 標籤會撐高），因此固定 min-height + 垂直置中。 */
+.switch-bar { display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;
+  padding:8px 12px; margin-bottom:8px; }
+.switch-group { display:inline-flex; flex-direction:row; align-items:center; gap:8px; }
+.switch-group + .switch-group { border-left:1px solid #e2e8f0; padding-left:18px; }
+/* 兩組開關用**固定高度**（不是 min-height）：Beta 標籤會把該組撐高，只給
+   min-height 仍會差幾 px，視覺上就是一高一低。連按鈕也固定高度並壓掉標籤對
+   行高的影響，兩組才會完全等高、上下切齊。 */
+.switch-bar .mode-switch { height:34px; box-sizing:border-box; align-items:center; }
+.switch-bar .mode-btn { height:26px; box-sizing:border-box; padding-top:0;
+  padding-bottom:0; }
+.switch-bar .beta-chip { align-self:center; }
+.switch-label { font-size:12px; color:#64748b; white-space:nowrap; font-weight:600; }
+.mode-switch { display: inline-flex; background: #e2e8f0; padding: 3px; border-radius: 999px;
+  gap: 2px; border: 1px solid #cbd5e1; box-shadow: inset 0 1px 2px rgba(0,0,0,.06); }
+.mode-btn { background: transparent; border: none; padding: 5px 15px; border-radius: 999px;
+  cursor: pointer; font-size: 13px; color: #475569; font-weight: 500; transition: all .12s;
+  display:inline-flex; align-items:center; gap:5px; }
+.mode-btn:hover:not(.active) { background: rgba(255,255,255,0.65); color:#1e293b; }
+.mode-btn.active { background: #fff; color: #1d4ed8; font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.14); }
+/* 選中的圓點指示：更明確「目前在這一段」 */
+.mode-btn.active::before { content:''; width:6px; height:6px; border-radius:50%;
+  background:#2563eb; flex-shrink:0; }
+/* 兩組切換器高度必須一致：Beta 標籤原本會把第二組撐高 → 固定按鈕行高、
+   標籤用絕對行高不影響外框。 */
+.mode-btn { line-height:18px; min-height:18px; }
+.beta-chip { background:#fef3c7; color:#92400e; border:1px solid #fcd34d;
+  font-size:10px; font-weight:700; line-height:14px; padding:0 6px;
+  border-radius:999px; margin-left:5px; flex-shrink:0; }
 /* ===== 每頁獨立位置編輯器（issue #38 / StampPlacementEditor）=====
    與舊的單頁 DragPositionEditor 並存，只在「每頁獨立」模式顯示。 */
 .spe-wrap { display:flex; gap:12px; align-items:flex-start; }
-.spe-canvas-wrap { flex:1 1 auto; min-width:0; min-height:420px; display:flex;
-  align-items:flex-start; justify-content:center; background:#f1f5f9;
-  border:1px solid #e2e8f0; border-radius:8px; padding:4px; overflow:auto; }
+/* 畫布高度：用視窗高度的一大半，讓 A4 直式頁面能完整且夠大地顯示
+   （原本固定 420px 太矮，PDF 被壓得很小）。 */
+.spe-canvas-wrap { position:relative; flex:1 1 auto; min-width:0; height:78vh;
+  min-height:560px; display:flex; align-items:flex-start; justify-content:center;
+  background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:8px;
+  overflow:auto; }
+/* 編輯區載入遮罩（與合成模式的 .sim-busy 同款樣式） */
+.spe-busy { position:absolute; inset:0; z-index:15; display:flex;
+  align-items:center; justify-content:center;
+  background:rgba(241,245,249,.82); backdrop-filter:blur(1.5px); }
 .spe-paper { position:relative; background:#fff; box-shadow:0 1px 6px rgba(0,0,0,.15);
   cursor:crosshair; flex:0 0 auto; }
 .spe-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:fill;
@@ -407,8 +494,15 @@
   user-select:none; display:block; }
 .spe-item.kind-date { border-color:#10b981; background:rgba(16,185,129,.06); }
 .spe-item.kind-restrict { border-color:#f97316; background:rgba(249,115,22,.06); }
-.spe-handle { position:absolute; right:-6px; bottom:-6px; width:12px; height:12px;
-  background:#2563eb; border:2px solid #fff; border-radius:50%; cursor:nwse-resize; }
+/* 四角縮放把手（與「統一位置」編輯器一致的手感） */
+.spe-handle { position:absolute; width:12px; height:12px; background:#2563eb;
+  border:2px solid #fff; border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,.25); }
+.spe-handle.nw { left:-6px; top:-6px; cursor:nwse-resize; }
+.spe-handle.ne { right:-6px; top:-6px; cursor:nesw-resize; }
+.spe-handle.sw { left:-6px; bottom:-6px; cursor:nesw-resize; }
+.spe-handle.se { right:-6px; bottom:-6px; cursor:nwse-resize; }
+/* 未選取的物件不顯示把手，畫面才不會一堆點 */
+.spe-item:not(.selected) .spe-handle { display:none; }
 .spe-guide { position:absolute; background:#f43f5e; pointer-events:none; }
 .spe-guide.v { top:0; bottom:0; width:1px; }
 .spe-guide.h { left:0; right:0; height:1px; }
@@ -418,9 +512,62 @@
   border-radius:6px; cursor:pointer; font-size:12px; color:#475569; }
 .spe-thumb:hover { border-color:#93c5fd; }
 .spe-thumb.active { border-color:#2563eb; background:#dbeafe; color:#1e40af; font-weight:700; }
-.spe-thumb.has-items { box-shadow:inset 0 -3px 0 #10b981; }
+/* 已用印的頁：右上角紅點（仿 iOS 未讀標記），比底線更醒目 */
+.spe-thumb { position:relative; }
+.spe-thumb.has-items::after { content:''; position:absolute; top:-3px; right:-3px;
+  width:9px; height:9px; border-radius:50%; background:#ef4444;
+  border:1.5px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.06); }
+/* 側欄動作鈕加高，好按（原本太扁）——比照「每頁統一用印」的按鈕高度 */
+.spe-side .btn { min-height:32px; padding:6px 10px; justify-content:flex-start; }
+.spe-side .preview-nav .btn { min-height:28px; padding:4px 10px; justify-content:center; }
+/* 產生合成圖時的整頁遮罩（頁數多時要數秒，沒回饋會被誤以為當機） */
+#sim-single { position:relative; }
+.sim-busy { position:absolute; inset:0; z-index:20; display:flex;
+  align-items:center; justify-content:center;
+  background:rgba(248,250,252,.78); backdrop-filter:blur(1.5px); }
+.sim-busy-box { text-align:center; background:#fff; border:1px solid #e2e8f0;
+  border-radius:12px; padding:22px 30px; box-shadow:0 6px 24px rgba(0,0,0,.12); }
+.sim-busy-title { font-size:19px; font-weight:700; color:#1e293b; margin-top:12px; }
+.sim-busy-sub { font-size:13px; color:#64748b; margin-top:6px; }
+.sim-spinner { width:34px; height:34px; margin:0 auto; border-radius:50%;
+  border:3.5px solid #dbeafe; border-top-color:#2563eb;
+  animation:sim-spin .8s linear infinite; }
+@keyframes sim-spin { to { transform:rotate(360deg); } }
 .spe-tip { font-size:11.5px; color:#64748b; line-height:1.5; }
+/* 操作提示：改成有圖示的條列，一眼看懂能做什麼（原本一整段文字太糊） */
+.spe-help { list-style:none; margin:6px 0 0; padding:8px 10px; display:flex;
+  flex-direction:column; gap:7px; background:#f8fafc; border:1px solid #e2e8f0;
+  border-radius:8px; }
+.spe-help li { display:flex; align-items:flex-start; gap:7px;
+  font-size:11.5px; color:#475569; line-height:1.45; }
+.spe-help li .ic { flex-shrink:0; margin-top:1px; color:#2563eb; }
+.spe-help li b { color:#1e293b; }
+.spe-help kbd { font-family:ui-monospace, monospace; font-size:10.5px;
+  background:#fff; border:1px solid #cbd5e1; border-bottom-width:2px;
+  border-radius:4px; padding:0 4px; color:#334155; }
+.spe-dot-demo { flex-shrink:0; position:relative; width:13px; height:13px;
+  border:1px solid #cbd5e1; border-radius:3px; background:#fff; margin-top:1px; }
+.spe-dot-demo::after { content:''; position:absolute; top:-3px; right:-3px; width:8px;
+  height:8px; border-radius:50%; background:#ef4444; border:1.5px solid #fff; }
 .spe-count { font-size:12px; color:#334155; font-weight:600; }
+/* 要放置的種類切換（印章 / 日期 / 個資限用章）—— 顏色對應畫布上的物件外框：
+   印章藍、日期綠、限用章橘。未啟用的種類 disable 並說明去哪開啟。 */
+.spe-kind { display:flex; flex-wrap:wrap; gap:4px; }
+.spe-kind-btn { flex:1 1 auto; padding:5px 8px; font-size:11.5px; cursor:pointer;
+  border:1px solid #cbd5e1; border-radius:7px; background:#fff; color:#475569; }
+.spe-kind-btn:hover:not(:disabled) { border-color:#93c5fd; }
+.spe-kind-btn.active { background:#dbeafe; border-color:#2563eb; color:#1d4ed8; font-weight:700; }
+.spe-kind-btn[data-kind="date"].active { background:#d1fae5; border-color:#10b981; color:#047857; }
+.spe-kind-btn[data-kind="restrict"].active { background:#ffedd5; border-color:#f97316; color:#c2410c; }
+.spe-kind-btn:disabled { opacity:.45; cursor:not-allowed; }
+/* 旋轉控制（僅在選取物件時顯示） */
+.spe-rot { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
+  padding:7px 9px; display:flex; flex-direction:column; gap:6px; }
+.spe-rot-row { display:flex; align-items:center; gap:6px; font-size:12px; color:#334155; }
+.spe-rot-input { width:64px; padding:3px 6px; border:1px solid #cbd5e1;
+  border-radius:6px; font-size:12px; }
+.spe-rot-btns { display:flex; gap:4px; }
+.spe-rot-btns .btn { padding:3px 7px; min-height:24px; font-size:11px; }
 .preview-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
 .preview-nav { display: flex; gap: 8px; align-items: center; }
 .preview-nav .page-info { font-size: 13px; color: #475569; font-family: ui-monospace, monospace; }
@@ -525,6 +672,10 @@ document.querySelectorAll('.mode-switch:not(.pos-mode-switch) .mode-btn').forEac
       _applyEditZoom(); _syncEditPageSelection();
     } else {
       document.getElementById('edit-page-nav').hidden = true;
+      // 每頁獨立模式切到合成：**多頁編輯器要一起收起**（原地換成合成結果），
+      // 否則畫面會同時出現「編輯器 + 合成圖」兩塊（實測踩過）。
+      const plcEl = document.getElementById('placement-mode');
+      if (plcEl) plcEl.hidden = true;
       _applyCompositeZoom(); refreshSim();
     }
   });
@@ -729,13 +880,18 @@ function getSelectedStampPreset() {
 // 取得「印章圖片來源 URL」— 一般 asset 走 /assets/{id}/file（登入即可,非僅 admin）,
 // 臨時資產走 sessionStorage 內的 data URL。
 const _BLANK_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=';
+// 編輯器「預覽用」圖片一律走 **縮圖**（/assets/{id}/thumb）：印章原圖常是高解析
+// 掃描（實測 1~2 MB），而伺服器對資產圖送 no-store 不快取 → 每次切換印章都要重新
+// 下載好幾 MB，畫面要等 4~5 秒才出現圖。縮圖只有幾十 KB（實測 2MB → 98KB，小 20
+// 倍）且預覽尺寸只有幾公分，肉眼看不出差別。**實際蓋章仍用原圖**（後端讀原檔），
+// 輸出品質完全不受影響。
 function getSelectedStampImageUrl() {
   const id = getSelectedStamp();
   if (id === '__none__') return _BLANK_PNG;  // 透明 1x1,避免 broken image,CSS 也會 display:none
   if (id === '__temp__') {
     return window._tempAsset ? window._tempAsset.dataUrl : '';
   }
-  return id ? `/assets/${id}/file?t=${Date.now()}` : '';
+  return id ? `/assets/${id}/thumb` : '';
 }
 
 // 把 sessionStorage 的 data URL 還原成 File 物件，submit / preview 時上傳
@@ -753,10 +909,28 @@ function tempAssetAsFile() {
   return new File([arr], t.filename || 'temp.png', {type: mime});
 }
 
-// ===== 位置模式：統一位置（現行）/ 每頁獨立（issue #38，Beta）=====
-// 兩條路徑完全分離：統一位置走 DragPositionEditor + override + pages（舊碼不動），
-// 每頁獨立走 StampPlacementEditor + placements_json。
+// ===== 位置模式：每頁統一用印（現行）/ 頁面個別用印（issue #38，Beta）=====
+// 兩條路徑完全分離：每頁統一用印走 DragPositionEditor + override + pages（舊碼不動），
+// 頁面個別用印走 StampPlacementEditor + placements_json。
 let placementEditor = null;
+
+// 資產圖預載快取：伺服器對 /assets/*/file 送 no-store，每個 <img> 都會各自重新
+// 下載 → 放好幾個章時要等 5~10 秒才顯示。這裡每個資產只抓一次、轉成 objectURL
+// 讓所有 placement 共用（之後瞬間顯示）。
+const _assetObjUrl = new Map();      // assetKey → objectURL
+async function preloadAssetImage(key, url) {
+  if (!key || !url) return null;
+  if (_assetObjUrl.has(key)) return _assetObjUrl.get(key);
+  if (url.startsWith('data:')) { _assetObjUrl.set(key, url); return url; }
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const ou = URL.createObjectURL(await r.blob());
+    _assetObjUrl.set(key, ou);
+    if (placementEditor) placementEditor.refreshAssetUrl(key, ou);
+    return ou;
+  } catch (_e) { return null; }
+}
 
 function isPlacementMode() {
   const b = document.querySelector('#posModeSwitch .mode-btn.active');
@@ -771,7 +945,15 @@ function _placementDefaultSize() {
 async function ensurePlacementEditor() {
   const root = document.getElementById('speRoot');
   if (!root) return;
-  await loadPreview();
+  // 載入遮罩：取頁面資訊 / 背景圖要一點時間，沒提示會看到空白畫布以為當掉
+  const busy = document.getElementById('speBusy');
+  if (busy) busy.hidden = false;
+  try {
+    await loadPreview();
+  } finally {
+    // 編輯器建好後才收（背景圖由編輯器自己非同步載，不阻塞操作）
+    if (busy) setTimeout(() => { busy.hidden = true; }, 150);
+  }
   if (!previewInfo) return;
   if (placementEditor) placementEditor.destroy();
   placementEditor = new StampPlacementEditor({
@@ -781,9 +963,73 @@ async function ensurePlacementEditor() {
     bgUrlFor: (i) => `/tools/pdf-stamp/preview-bg/${previewInfo.upload_id}/${i}`,
     assetUrl: getSelectedStampImageUrl(),
     defaultSize: _placementDefaultSize(),
+    // 放置當下才問「現在選的是哪個章」→ 可先放大章、改選小章再放，混用多種印章。
+    currentAsset: () => {
+      const id = getSelectedStamp();
+      const pre = getSelectedStampPreset() || {};
+      // 去掉 ?t= 快取破壞參數（每次重繪都重抓 → 顯示成空框）
+      const rawUrl = (getSelectedStampImageUrl() || '').split('?')[0];
+      const key = id || '__cur__';
+      // 已預載好就直接用 objectURL（瞬間顯示）；還沒好就先用原 URL，
+      // 預載完成後 refreshAssetUrl() 會把這些 placement 一起換掉。
+      const cached = _assetObjUrl.get(key);
+      if (!cached) preloadAssetImage(key, rawUrl);
+      const a = {
+        url: cached || rawUrl,
+        assetKey: key,
+        width_mm: pre.width_mm || 30,
+        height_mm: pre.height_mm || 30,
+      };
+      if (id === '__temp__') {
+        // 臨時資產沒有 asset_id → 送 png_b64（後端會各自解碼）
+        const t = window._tempAsset;
+        const m = t && t.dataUrl && t.dataUrl.match(/^data:image\/[^;]+;base64,(.*)$/);
+        if (m) a.png_b64 = m[1];
+      } else if (id && id !== '__none__') {
+        a.asset_id = id;
+      }
+      return a;
+    },
+    // 日期(1b) / 個資限用章(1c)：圖與尺寸直接取用上方面板已渲染好的結果，
+    // 使用者在 1b / 1c 調字型 / 內容 → 之後放置的都會用新圖。
+    overlayFor: (kind) => {
+      const st = (kind === 'date') ? _dateOverlayState() : _restrictOverlayState();
+      if (!st || !st.png_b64) return null;
+      return {
+        url: 'data:image/png;base64,' + st.png_b64,
+        png_b64: st.png_b64,
+        assetKey: '__' + kind + '__',
+        width_mm: st.width_mm,
+        height_mm: st.height_mm,
+      };
+    },
     onChange: () => {},
   });
+  syncPlacementKinds();
 }
+
+function _dateOverlayState() {
+  return (typeof window.__dateOverlayState__ === 'function')
+    ? window.__dateOverlayState__() : null;
+}
+function _restrictOverlayState() {
+  return (typeof window.__restrictOverlayState__ === 'function')
+    ? window.__restrictOverlayState__() : null;
+}
+
+/** 依 1b / 1c 目前是否啟用（且已渲染出圖），開關「頁面個別用印」的種類鈕。 */
+function syncPlacementKinds() {
+  if (!placementEditor || typeof placementEditor.setKindAvailable !== 'function') return;
+  placementEditor.setKindAvailable('date', !!_dateOverlayState());
+  placementEditor.setKindAvailable('restrict', !!_restrictOverlayState());
+}
+// 1b / 1c 的啟用開關與內容變動 → 立刻反映到種類鈕（延遲一拍等該面板重繪完圖）
+document.addEventListener('change', (e) => {
+  const id = e.target && e.target.id;
+  if (id === 'date-enabled' || id === 'restrict-enabled') {
+    setTimeout(syncPlacementKinds, 400);
+  }
+});
 
 function applyPosMode() {
   const on = isPlacementMode();
@@ -793,7 +1039,7 @@ function applyPosMode() {
   // 多檔批次時每頁獨立不適用（各檔頁數不同）→ 自動退回統一位置
   if (on && pickedFiles.length > 1) {
     _setPosMode('uniform');
-    if (window.showToast) window.showToast('多檔批次不支援「每頁獨立」，已切回統一位置', 'err');
+    if (window.showToast) window.showToast('多檔批次不支援「頁面個別用印」，已切回每頁統一用印', 'err');
     return;
   }
   // 「編輯 / 合成」切換在兩種位置模式下都保留（新模式也要能看合成結果）。
@@ -809,10 +1055,20 @@ function applyPosMode() {
   if (pagePick) pagePick.hidden = on;
   if (hint) {
     hint.textContent = on
-      ? '每頁獨立：蓋哪些頁由你放置的位置決定（上方「蓋章頁面」不適用）。'
+      ? '頁面個別用印：蓋哪些頁由你放置的位置決定（上方「蓋章頁面」不適用）；每頁可放多個，也可換不同的章混用，並可放入日期與個資限用章（需先在 1b / 1c 啟用）。'
       : '';
   }
-  if (on) ensurePlacementEditor();
+  // 切換後一定要讓「剛顯示出來」的編輯器重算版面：元素在 hidden 狀態下
+  // clientWidth = 0，之前算出的 mmPerPx 會讓紙張縮成極小一塊（切回統一位置時
+  // PDF 變超小的原因）。用 rAF 等 layout 完成後再算。
+  requestAnimationFrame(() => {
+    if (on) {
+      ensurePlacementEditor();
+    } else if (editor && inEdit) {
+      _applyEditZoom();          // 內部呼叫 editor.setZoom() → _relayout()
+      _updateEditPageNav();
+    }
+  });
 }
 
 function _setPosMode(mode) {
@@ -907,6 +1163,16 @@ async function refreshSim() {
     const seq = ++simSeq;
     const status = document.getElementById('sim-status');
     status.textContent = '產生合成圖中…';
+    // 整頁遮罩 + 大字狀態：頁數多時要數秒，沒回饋會被誤以為當機
+    const busy = document.getElementById('sim-busy');
+    const busySub = document.getElementById('sim-busy-sub');
+    if (busy) {
+      const n = (previewInfo && previewInfo.page_count) || 0;
+      if (busySub) busySub.textContent = n
+        ? `正在逐頁蓋章並產生預覽（共 ${n} 頁）`
+        : '正在逐頁蓋章並產生預覽';
+      busy.hidden = false;
+    }
     const fd = new FormData();
     fd.append('stamp_id', stampId);
     if (stampId === '__temp__') {
@@ -953,6 +1219,9 @@ async function refreshSim() {
     } catch (e) {
       if (seq !== simSeq) return;
       status.textContent = '模擬圖產生失敗';
+    } finally {
+      // 只有「最新一次」請求負責收遮罩，避免被較早的請求提前關掉
+      if (seq === simSeq && busy) busy.hidden = true;
     }
   }, 250);
 }
@@ -1017,6 +1286,11 @@ document.addEventListener('keydown', (e) => {
 // first stamp they clicked).
 document.addEventListener('change', (e) => {
   if (e.target.matches('input[name=stamp]')) {
+    // 換章時就先把新章的圖預載好（頁面個別用印模式放置時才不會等）
+    try {
+      const _id = getSelectedStamp();
+      if (_id) preloadAssetImage(_id, (getSelectedStampImageUrl() || '').split('?')[0]);
+    } catch (_e) {}
     if (editor) {
       const id = getSelectedStamp();
       const preset = getSelectedStampPreset();
@@ -1081,7 +1355,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   // 統一位置模式一切照舊（override + pages + extras）。
   if (isPlacementMode() && placementEditor) {
     const plc = placementEditor.getValue();
-    if (!plc.length) return alert('請先在頁面上點一下放置簽名 / 印章，或切回「統一位置」模式。');
+    if (!plc.length) return alert('請先在頁面上點一下放置簽名 / 印章，或切回「每頁統一用印」模式。');
     fd.append('placements_json', JSON.stringify(plc));
   } else {
     appendPagesField(fd);

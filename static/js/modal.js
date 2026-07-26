@@ -17,6 +17,21 @@
     return host;
   }
 
+  // 對話框圖示（inline SVG）：不依賴字型 / emoji，跨平台一致；CSP 下也免外部資源。
+  const _SVG = 'xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24"'
+    + ' fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"'
+    + ' stroke-linejoin="round"';
+  function _kindIcon(kind) {
+    if (kind === 'danger')
+      return `<svg ${_SVG}><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
+    if (kind === 'warn')
+      return `<svg ${_SVG}><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>`;
+    return `<svg ${_SVG}><circle cx="12" cy="12" r="9"/><path d="M12 16v-5"/><path d="M12 8h.01"/></svg>`;
+  }
+  function _closeIcon() {
+    return `<svg ${_SVG} width="15" height="15"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+  }
+
   function _show({ title, body, kind, okText, cancelText, showCancel, prompt, defaultValue, placeholder, html }) {
     return new Promise((resolve) => {
       const host = ensureHost();
@@ -27,10 +42,26 @@
       // v1.5.4: 改用 createElement / textContent（不用 innerHTML 字串拼接）
       // 為了過 CodeQL `js/xss-through-dom`。html=true 是 caller 明示允許 raw HTML
       // 才走獨立分支（仍是 innerHTML，但 caller 自己負責安全性）。
+      // 標題列：左側依 kind 自動配圖示（info / warn / danger），右側關閉鈕也帶圖示
+      // —— 全站對話框一致。SVG 是本檔常數（非使用者輸入），標題文字仍走 textContent。
       if (title) {
         const titleEl = document.createElement('div');
         titleEl.className = 'modal-title';
-        titleEl.textContent = title;
+        const ic = document.createElement('span');
+        ic.className = 'modal-title-icon';
+        ic.innerHTML = _kindIcon(kind);
+        titleEl.appendChild(ic);
+        const tx = document.createElement('span');
+        tx.className = 'modal-title-text';
+        tx.textContent = title;
+        titleEl.appendChild(tx);
+        const xb = document.createElement('button');
+        xb.type = 'button';
+        xb.className = 'modal-x';
+        xb.setAttribute('aria-label', '關閉');
+        xb.title = '關閉';
+        xb.innerHTML = _closeIcon();
+        titleEl.appendChild(xb);
         card.appendChild(titleEl);
       }
       const bodyEl = document.createElement('div');
@@ -107,6 +138,10 @@
         else close(showCancel ? true : undefined);
       });
       if (cancelBtn) cancelBtn.addEventListener('click', () => close(prompt ? null : false));
+      // 標題列的關閉鈕 = 等同取消 / Esc
+      const xBtn = card.querySelector('.modal-x');
+      if (xBtn) xBtn.addEventListener('click',
+        () => close(prompt ? null : (showCancel ? false : undefined)));
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) close(prompt ? null : (showCancel ? false : undefined));
       });

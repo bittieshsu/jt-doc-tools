@@ -292,12 +292,20 @@ async def submit(request: Request):
         job.progress = 0.1
         work_dir = settings.temp_dir / f"{_UPLOAD_PREFIX}_{uid}_work"
         work_dir.mkdir(exist_ok=True)
+        def _progress(msg: str, frac: float) -> None:
+            """引擎回報的階段 / 分段進度 → job（UI 每秒輪詢顯示）。"""
+            if job.cancelled:
+                return
+            job.message = "%s（%s）" % (msg, engine_label)
+            job.progress = max(0.1, min(0.95, float(frac)))
+
         result = convert_pdf_to_office(
             src, work_dir, output_format,
             enable_postprocess=enable_postprocess,
             keep_intermediate=False,
             fixer_opts=fixer_opts,
             engine=engine,
+            progress_cb=_progress,
         )
         if not result.ok:
             raise RuntimeError(result.error or "轉換失敗")

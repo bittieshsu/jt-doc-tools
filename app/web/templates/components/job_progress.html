@@ -4,6 +4,8 @@
   <div class="job-row">
     <div class="job-bar"><div class="job-bar-inner"></div></div>
     <div class="job-status">準備中…</div>
+    {# 已過時間：轉檔可能要好幾分鐘，沒有計時使用者會以為當掉 #}
+    <div class="job-elapsed" hidden></div>
   </div>
   <div class="job-actions">
     <a class="btn btn-primary job-download" hidden>{{ icon('download') }}下載 PDF</a>

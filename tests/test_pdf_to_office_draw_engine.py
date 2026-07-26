@@ -71,7 +71,7 @@ def test_build_writer_odt_real_writer_mimetype(tmp_path):
     odg = tmp_path / "a.odg"
     _make_odg(odg, [[(2, 2, 5, 1, "hello")]])
     odt = tmp_path / "a.odt"
-    n_pages, n_imgs = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
+    n_pages, n_imgs, _ = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
     assert n_pages == 1
     with zipfile.ZipFile(odt) as z:
         # mimetype 必須是真 Writer（非 graphics）且為第一個且不壓縮
@@ -85,12 +85,13 @@ def test_build_writer_odt_multipage(tmp_path):
     odg = tmp_path / "m.odg"
     _make_odg(odg, [[(2, 2, 5, 1, "p1")], [(2, 2, 5, 1, "p2")], [(2, 2, 5, 1, "p3")]])
     odt = tmp_path / "m.odt"
-    n_pages, _ = de._build_writer_odt(odg, odt, [(21.0, 29.7)] * 3)
+    n_pages, _, _ = de._build_writer_odt(odg, odt, [(21.0, 29.7)] * 3)
     assert n_pages == 3
     content = zipfile.ZipFile(odt).read("content.xml").decode()
-    # 每頁一段落，形狀錨定到對應頁碼
-    assert 'text:anchor-type="page"' in content
-    assert 'text:anchor-page-number="3"' in content
+    # 每頁一段落；形狀用「段落錨定 + 位置相對頁面」（page 錨定在 .docx 沒有對應
+    # 概念，會讓所有頁的物件擠成一頁 —— 見 draw_engine 的說明）
+    assert 'text:anchor-type="paragraph"' in content
+    assert content.count('text:style-name="JtPg') >= 3
 
 
 def test_build_writer_odt_per_page_sizes(tmp_path):
@@ -100,8 +101,9 @@ def test_build_writer_odt_per_page_sizes(tmp_path):
     sizes = [(21.0, 29.7), (14.8, 21.0), (29.7, 21.0)]  # A4 / A5 / 橫向
     de._build_writer_odt(odg, odt, sizes)
     styles = zipfile.ZipFile(odt).read("styles.xml").decode()
-    # 三種不同尺寸 → 三個 page-layout
-    assert styles.count("<style:page-layout ") == 3
+    # 每頁一個 page-layout（每頁自己的 master page → docx 才會 section 分頁），
+    # 另加尺寸群組版（零頁 fallback 用）→ 3 頁 3 尺寸 = 3 + 3
+    assert styles.count("<style:page-layout ") == 6
     assert "14.800cm" in styles and "29.700cm" in styles
     # ODF 順序：office:styles → automatic-styles → master-styles
     assert styles.index("<office:styles") < styles.index("automatic-styles") \
@@ -114,15 +116,17 @@ def test_build_writer_odt_same_size_dedup(tmp_path):
     odt = tmp_path / "d.odt"
     de._build_writer_odt(odg, odt, [(21.0, 29.7), (21.0, 29.7)])
     styles = zipfile.ZipFile(odt).read("styles.xml").decode()
-    # 同尺寸兩頁 → 只 1 個 page-layout（去重）
-    assert styles.count("<style:page-layout ") == 1
+    # 尺寸群組仍去重成 1，但「每頁一個 master page」另各產生 1 個 → 2 + 1 = 3
+    assert styles.count("<style:page-layout ") == 3
+    assert styles.count('style:name="JtPL_p') == 2      # 每頁各一
+    assert styles.count('style:name="JtPL0"') == 1      # 尺寸群組去重後只 1 個
 
 
 def test_build_writer_odt_empty_pages(tmp_path):
     odg = tmp_path / "e.odg"
     _make_odg(odg, [])  # 零頁
     odt = tmp_path / "e.odt"
-    n_pages, _ = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
+    n_pages, _, _ = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
     assert n_pages == 0
     # 仍是合法非空 Writer body（至少一個空段落）
     content = zipfile.ZipFile(odt).read("content.xml").decode()
@@ -134,7 +138,7 @@ def test_build_writer_odt_keeps_images(tmp_path):
     odg = tmp_path / "i.odg"
     _make_odg(odg, [[(2, 2, 3, 3, "x")]], pics={"Pictures/1.png": b"\x89PNG_fake"})
     odt = tmp_path / "i.odt"
-    _, n_imgs = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
+    _, n_imgs, _ = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
     assert n_imgs == 1
     with zipfile.ZipFile(odt) as z:
         assert "Pictures/1.png" in z.namelist()
@@ -146,7 +150,7 @@ def test_build_writer_odt_zipslip_pictures_filtered(tmp_path):
     _make_odg(odg, [[(1, 1, 2, 2, "x")]],
               pics={"Pictures/../evil.png": b"bad", "Pictures/ok.png": b"good"})
     odt = tmp_path / "z.odt"
-    _, n_imgs = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
+    _, n_imgs, _ = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
     assert n_imgs == 1  # 惡意 ../ 名稱被濾掉
     names = zipfile.ZipFile(odt).namelist()
     assert "Pictures/ok.png" in names
@@ -175,7 +179,7 @@ def test_control_char_picture_rejected(tmp_path):
     _make_odg(odg, [[(1, 1, 2, 2, "x")]],
               pics={"Pictures/bad\x01.png": b"x", "Pictures/good.png": b"y"})
     odt = tmp_path / "ctl.odt"
-    _, n = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
+    _, n, _ = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
     assert n == 1  # 含控制字元的被拒
     assert "Pictures/good.png" in zipfile.ZipFile(odt).namelist()
 
@@ -201,7 +205,7 @@ def test_comment_node_in_page_skipped(tmp_path):
         z.writestr("mimetype", "application/vnd.oasis.opendocument.graphics")
         z.writestr("content.xml", content)
     odt = tmp_path / "c.odt"
-    n_pages, _ = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
+    n_pages, _, _ = de._build_writer_odt(odg, odt, [(21.0, 29.7)])
     assert n_pages == 1  # 沒 crash，正常產出
     assert zipfile.ZipFile(odt).read("mimetype").decode() == WRITER_MIME
 
@@ -719,3 +723,305 @@ def test_raster_trigger_skewed_image(tmp_path):
     frame.set("{%s}transform" % ns["draw"], "skewX(-0.4)")
     frame.remove(frame[0])
     assert de._page_has_transformed_image(page) is False
+
+
+@_gate
+def test_e2e_docx_pagination_not_shifted(tmp_path):
+    """多頁 → .docx 的內容必須落在正確的頁（不可整體位移）。
+
+    回歸守門：ODF 的「錨定到第 N 頁」在 OOXML 沒有對應概念，若用 fo:break-before
+    做分頁，分頁符會落在前一頁物件的同一段落內 → Word/Writer 把整批頁面錨定物件
+    歸到同一頁：第 1 頁空白、內容往後位移（實測 [0,5,10]）。改成「每頁一個
+    master page」才會匯出成 section break，分頁才正確。
+    """
+    import subprocess
+    import time
+
+    import fitz
+
+    src = tmp_path / "multi.pdf"
+    d = fitz.open()
+    for i in range(3):
+        d.new_page(width=595, height=842).insert_text(
+            (72, 100), f"PAGE{i + 1}", fontsize=24)
+    d.save(str(src))
+    d.close()
+
+    out = tmp_path / "multi.docx"
+    r = de.convert_via_draw(src, out, "docx", timeout=240)
+    assert r.get("ok"), r
+    # 轉回 PDF 檢查每頁文字（Writer 是 docx 的參考實作）
+    so = find_soffice()
+    subprocess.run(["pkill", "-9", "soffice.bin"], capture_output=True)
+    time.sleep(1)
+    subprocess.run([so, "--headless",
+                    f"-env:UserInstallation=file://{tmp_path}/_p",
+                    "--convert-to", "pdf", "--outdir", str(tmp_path), str(out)],
+                   capture_output=True, timeout=200)
+    rendered = tmp_path / "multi.pdf"          # 與來源同名，soffice 會覆蓋
+    assert rendered.exists()
+    d2 = fitz.open(str(rendered))
+    texts = [d2[i].get_text() for i in range(d2.page_count)]
+    d2.close()
+    assert len(texts) == 3, f"頁數應為 3，實得 {len(texts)}"
+    for i, t in enumerate(texts):
+        assert f"PAGE{i + 1}" in t, f"第 {i+1} 頁應含 PAGE{i+1}，實得 {t[:40]!r}"
+    assert texts[0].strip(), "第 1 頁不可空白（位移的典型症狀）"
+
+
+# ── .docx VML 疊放順序修正（表單底色不可蓋掉文字）────────────────────────────
+def _make_docx_with_vml(path, shapes):
+    """組一份最小 .docx：shapes = [(style, 內含文字)]，用 VML w:pict 表示。"""
+    import zipfile
+
+    body = "".join(
+        '<w:p><w:r><w:pict><v:rect style="%s">%s</v:rect></w:pict></w:r></w:p>'
+        % (st, ('<v:textbox><w:txbxContent><w:p><w:r><w:t>%s</w:t></w:r>'
+                '</w:p></w:txbxContent></v:textbox>' % txt) if txt else "")
+        for st, txt in shapes)
+    doc = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml'
+        '/2006/main" xmlns:v="urn:schemas-microsoft-com:vml">'
+        '<w:body>%s</w:body></w:document>' % body)
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("word/document.xml", doc)
+
+
+def test_fix_docx_vml_zorder_pushes_textless_shapes_behind(tmp_path):
+    """無文字的 VML 形狀要被壓到文字層之下（負 z-index），且保留相對順序。"""
+    import re
+    import zipfile
+
+    p = tmp_path / "a.docx"
+    _make_docx_with_vml(p, [
+        ("width:100pt;height:50pt", ""),        # 底色塊 → 應被壓到背景
+        ("width:80pt;height:20pt", "有字"),      # 含文字 → 不動
+        ("width:60pt;height:60pt", ""),         # 另一個底色塊
+    ])
+    n = de._fix_docx_vml_zorder(p)
+    assert n == 2, f"應只改 2 個無文字形狀，實得 {n}"
+    xml = zipfile.ZipFile(p).read("word/document.xml").decode()
+    zs = [int(m) for m in re.findall(r"z-index:(-?\d+)", xml)]
+    assert len(zs) == 2 and all(z < 0 for z in zs), zs
+    assert zs[0] < zs[1], "相對順序（文件順序）要保留"
+    assert "有字" in xml and 'style="width:80pt;height:20pt"' in xml, "含文字者不可被改"
+
+
+def test_fix_docx_vml_zorder_respects_existing_zindex(tmp_path):
+    """已有 z-index 的形狀不覆寫（尊重來源意圖）。"""
+    import zipfile
+
+    p = tmp_path / "b.docx"
+    _make_docx_with_vml(p, [("width:10pt;height:10pt;z-index:5", "")])
+    assert de._fix_docx_vml_zorder(p) == 0
+    xml = zipfile.ZipFile(p).read("word/document.xml").decode()
+    assert "z-index:5" in xml and "z-index:-" not in xml
+
+
+def test_fix_docx_vml_zorder_survives_broken_input(tmp_path):
+    """不是 zip / 沒有 document.xml → 安靜回 0，不可丟例外拖垮轉檔。"""
+    bad = tmp_path / "bad.docx"
+    bad.write_bytes(b"not a zip")
+    assert de._fix_docx_vml_zorder(bad) == 0
+    assert de._fix_docx_vml_zorder(tmp_path / "missing.docx") == 0
+
+
+def test_build_writer_odt_reports_object_count(tmp_path):
+    """引擎要回報物件數（UI 據此提示「開檔可能很慢」）。"""
+    odg = tmp_path / "a.odg"
+    _make_odg(odg, [[(2, 2, 5, 1, "甲"), (2, 5, 5, 1, "乙")],
+                    [(2, 2, 5, 1, "丙")]])
+    odt = tmp_path / "a.odt"
+    n_pages, _n_imgs, n_objs = de._build_writer_odt(
+        odg, odt, [(21.0, 29.7), (21.0, 29.7)])
+    assert n_pages == 2
+    assert n_objs == 3, f"三個形狀應回報 3，實得 {n_objs}"
+
+
+# ── 大型文件自動分段 ────────────────────────────────────────────────────────
+def test_plan_page_chunks_packs_by_density():
+    """依每頁密度貪婪打包，不是固定頁數（同一份文件密度差很大）。"""
+    # 前 4 頁很稀疏、後 2 頁很密
+    chunks = de.plan_page_chunks([100, 100, 100, 100, 2400, 2400], target=2500)
+    # 前 4 頁很稀疏併成一段；每頁 2400 的兩頁各自成段（併進去就超標）
+    assert chunks == [(0, 3), (4, 4), (5, 5)], chunks
+
+
+def test_plan_page_chunks_single_page_over_target_stands_alone():
+    """單頁就超過上限 → 自成一段（不可能再切更細），且不可漏頁。"""
+    chunks = de.plan_page_chunks([9000, 10, 9000], target=2500)
+    assert chunks == [(0, 0), (1, 1), (2, 2)], chunks
+
+
+def test_plan_page_chunks_small_doc_stays_one_chunk():
+    assert de.plan_page_chunks([100, 100, 100], target=2500) == [(0, 2)]
+    assert de.plan_page_chunks([]) == []
+
+
+def test_plan_page_chunks_covers_every_page():
+    """任何切法都要完整覆蓋所有頁、不重疊（漏頁 = 使用者內容遺失）。"""
+    import random
+    rnd = random.Random(1234)
+    for _ in range(50):
+        per = [rnd.randint(0, 4000) for _ in range(rnd.randint(1, 40))]
+        chunks = de.plan_page_chunks(per, target=2500)
+        seen = []
+        for a, b in chunks:
+            assert a <= b
+            seen.extend(range(a, b + 1))
+        assert seen == list(range(len(per))), (per, chunks)
+
+
+def test_estimate_page_objects_counts_per_page(tmp_path):
+    """估算要逐頁回報（分段計畫靠它）。"""
+    import fitz
+
+    pdf = tmp_path / "e.pdf"
+    d = fitz.open()
+    p1 = d.new_page(width=595, height=842)
+    for i in range(10):
+        p1.insert_text((72, 100 + i * 20), f"line {i}", fontsize=11)
+    d.new_page(width=595, height=842)          # 空白頁
+    d.save(str(pdf))
+    d.close()
+    est = de.estimate_page_objects(pdf)
+    assert len(est) == 2, est
+    assert est[0] > 0 and est[1] == 0, est
+
+
+def test_estimate_page_objects_bad_pdf_returns_empty(tmp_path):
+    bad = tmp_path / "bad.pdf"
+    bad.write_bytes(b"not a pdf")
+    assert de.estimate_page_objects(bad) == []
+
+
+def _pdf_text_pages(path: Path) -> list[str]:
+    import fitz
+    with fitz.open(str(path)) as d:
+        return [d[i].get_text() for i in range(d.page_count)]
+
+
+def _render_pdf(doc: Path, outdir: Path) -> Path:
+    import subprocess
+    import time
+
+    outdir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["pkill", "-9", "soffice.bin"], capture_output=True)
+    time.sleep(1)
+    subprocess.run([find_soffice(), "--headless",
+                    f"-env:UserInstallation=file://{outdir}/cfg",
+                    "--convert-to", "pdf", "--outdir", str(outdir), str(doc)],
+                   capture_output=True, timeout=300)
+    return outdir / (doc.stem + ".pdf")
+
+
+def _multipage_pdf(path: Path, n: int) -> None:
+    import fitz
+    d = fitz.open()
+    for i in range(n):
+        pg = d.new_page(width=595, height=842)
+        pg.insert_text((72, 100), f"PAGE{i + 1}", fontsize=24)
+        pg.insert_text((72, 200), f"body text for page {i + 1}", fontsize=12)
+    d.save(str(path))
+    d.close()
+
+
+@pytest.mark.parametrize("fmt", ["odt", "docx"])
+def test_chunked_merge_matches_unchunked_output(tmp_path, fmt):
+    """**核心驗證**：分段轉換再合併，要與「整份一次轉」結果等價（頁數 + 逐頁文字）。
+
+    分段只是為了繞開 soffice 的 O(n²) 匯出，使用者不該因此拿到不一樣的文件。
+    """
+    src = tmp_path / "多頁.pdf"
+    _multipage_pdf(src, 6)
+
+    whole = tmp_path / f"whole.{fmt}"
+    r1 = de.convert_via_draw(src, whole, fmt, timeout=300)
+    assert r1.get("ok"), r1
+
+    merged = tmp_path / f"merged.{fmt}"
+    # target=1 → 強制每頁一段（6 段），最嚴苛的合併情境
+    r2 = de.convert_via_draw_chunked(src, merged, fmt, timeout=300, target=1)
+    assert r2.get("ok"), r2
+    assert r2["parts"] == 6, r2
+    assert merged.exists() and merged.stat().st_size > 0
+
+    p_whole = _render_pdf(whole, tmp_path / "rw")
+    p_merged = _render_pdf(merged, tmp_path / "rm")
+    assert p_whole.exists() and p_merged.exists()
+    t_whole = _pdf_text_pages(p_whole)
+    t_merged = _pdf_text_pages(p_merged)
+    assert len(t_merged) == len(t_whole) == 6, (len(t_whole), len(t_merged))
+    for i in range(6):
+        assert f"PAGE{i + 1}" in t_merged[i], (i, t_merged[i][:60])
+        assert f"page {i + 1}" in t_merged[i], (i, t_merged[i][:60])
+
+
+def test_merge_single_part_is_passthrough(tmp_path):
+    """只有一段時直接複製，不做任何 XML 改寫（避免無謂風險）。"""
+    from app.tools.pdf_to_office.engines import doc_merge
+
+    src = tmp_path / "a.docx"
+    src.write_bytes(b"PK\x03\x04dummy")
+    out = tmp_path / "b.docx"
+    assert doc_merge.merge_docx([src], out) == 0
+    assert out.read_bytes() == src.read_bytes()
+
+
+def test_merge_rejects_empty_list(tmp_path):
+    from app.tools.pdf_to_office.engines import doc_merge
+
+    with pytest.raises(ValueError):
+        doc_merge.merge_docx([], tmp_path / "x.docx")
+    with pytest.raises(ValueError):
+        doc_merge.merge_odt([], tmp_path / "x.odt")
+
+
+def test_convert_via_draw_reports_progress(tmp_path):
+    """轉檔要逐階段回報進度（沒有回饋使用者會以為當掉）。"""
+    import fitz
+
+    src = tmp_path / "p.pdf"
+    d = fitz.open()
+    for i in range(3):
+        d.new_page(width=595, height=842).insert_text((72, 100), f"P{i}", fontsize=20)
+    d.save(str(src))
+    d.close()
+
+    seen: list[tuple[str, float]] = []
+    r = de.convert_via_draw(src, tmp_path / "p.docx", "docx", timeout=300,
+                            progress_cb=lambda m, f: seen.append((m, f)))
+    assert r.get("ok"), r
+    assert len(seen) >= 3, seen
+    msgs = " | ".join(m for m, _ in seen)
+    assert "匯入" in msgs and "重組" in msgs and "Word" in msgs, msgs
+    assert "共 3 頁" in msgs, msgs                    # 要帶總頁數
+    fracs = [f for _, f in seen]
+    assert fracs == sorted(fracs), fracs             # 進度只能往前
+    assert all(0 < f < 1 for f in fracs), fracs
+
+
+def test_chunked_progress_reports_part_and_pages(tmp_path):
+    """分段時要回報「第 N/M 段（第 a-b 頁）」，讓使用者知道還有多少。"""
+    import fitz
+
+    src = tmp_path / "c.pdf"
+    d = fitz.open()
+    for i in range(4):
+        d.new_page(width=595, height=842).insert_text((72, 100), f"P{i}", fontsize=20)
+    d.save(str(src))
+    d.close()
+
+    seen: list[tuple[str, float]] = []
+    r = de.convert_via_draw_chunked(src, tmp_path / "c.odt", "odt", timeout=300,
+                                    target=1,
+                                    progress_cb=lambda m, f: seen.append((m, f)))
+    assert r.get("ok"), r
+    msgs = " | ".join(m for m, _ in seen)
+    assert "第 1/4 段" in msgs and "第 4/4 段" in msgs, msgs
+    assert "第 1-1 頁" in msgs and "第 4-4 頁" in msgs, msgs
+    assert "合併 4 段" in msgs, msgs
+    fracs = [f for _, f in seen]
+    assert fracs == sorted(fracs), fracs

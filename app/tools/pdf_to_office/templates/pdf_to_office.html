@@ -108,6 +108,15 @@
 }
 .p2o-result .fixer-chip b { color:#047857; font-weight:700; }
 
+/* 物件量提示條：版面重現引擎會把每段文字變成獨立文字方塊，物件一多，Word /
+   Writer / Pages 開檔與捲動都會明顯變慢 → 依實測門檻分兩級提醒（見 JS）。 */
+.p2o-heavy { display:flex; gap:8px; align-items:flex-start; margin:10px 0 0;
+  padding:10px 12px; border-radius:8px; font-size:13px; line-height:1.65; }
+.p2o-heavy.warn { background:#fffbeb; border:1px solid #fcd34d; color:#92400e; }
+.p2o-heavy.bad  { background:#fef2f2; border:1px solid #fca5a5; color:#991b1b; }
+.p2o-heavy b { font-weight:700; }
+.p2o-heavy .p2o-heavy-ic { flex:0 0 auto; margin-top:1px; }
+
 /* 進階選項 disabled 狀態（jtdt-reform 引擎時整個 4. 進階選項區無作用） */
 .p2o-adv-disabled { opacity:0.45; pointer-events:none; user-select:none; }
 .p2o-adv-disabled summary { cursor:default; }
@@ -277,6 +286,7 @@
       <span class="p2o-kv">格式 <b id="rFormat">-</b></span>
     </div>
   </div>
+  <div class="p2o-heavy" id="rHeavy" hidden></div>
   <div class="meta" id="rMeta"></div>
   <div class="p2o-preview" id="rPreview" hidden>
     <div class="preview-header" id="rPreviewHeader">前後對照（DPI 90）</div>
@@ -291,6 +301,67 @@
 <script nonce="{{ request.state.csp_nonce }}">
 const $ = (id) => document.getElementById(id);
 let uploadId = null;
+
+// 物件量提示：版面重現（jtdt-layout）把 PDF 每段文字變成獨立文字方塊，物件數一多，
+// 使用者用 Word / Writer / Pages 開檔與捲動都會明顯變慢（伺服器實測開檔+排版：
+// 523 物件 5 秒、1607 物件 22 秒、6723 物件 61 秒、18882 物件超過 15 分鐘未完成；
+// 桌面 GUI 還會更慢好幾倍）。門檻取實測「開始有感」與「明顯痛」兩條線。
+const HEAVY_WARN_TOTAL = 800,  HEAVY_WARN_PER_PAGE = 250;
+const HEAVY_BAD_TOTAL  = 3000, HEAVY_BAD_PER_PAGE  = 500;
+
+function renderHeavyNotice(rep, sm) {
+  const box = $('rHeavy');
+  if (!box) return;
+  box.hidden = true;
+  box.textContent = '';
+  const st = (rep && rep.native_stats) || {};
+  const objs = +st.objects || 0;
+  const pages = Math.max(1, +st.pages || 0);
+  if (!objs) return;                       // 其他引擎沒有這個數字 → 不提示
+  const perPage = Math.round(objs / pages);
+  // 已自動分段轉換（內部實作，產出仍是單一檔）→ 讓使用者知道發生了什麼
+  if (rep.chunked) {
+    const parts = +st.parts || (st.chunks || []).length;
+    box.className = 'p2o-heavy warn';
+    const ic = document.createElement('span');
+    ic.className = 'p2o-heavy-ic';
+    ic.textContent = '\u2139';
+    box.appendChild(ic);
+    const tx = document.createElement('span');
+    const b = document.createElement('b');
+    b.textContent = '大型文件，已自動分段轉換後合併　';
+    tx.appendChild(b);
+    tx.appendChild(document.createTextNode(
+      `這份 PDF 共 ${pages} 頁、${objs.toLocaleString()} 個文字方塊 / 圖形。整份一次`
+      + `轉換會慢到不可用，因此自動分成 ${parts} 段轉換再合併回單一檔案 —— `
+      + `你下載到的仍是一份完整文件。物件這麼多的文件，用 Word / Writer / Pages `
+      + `開啟仍可能需要數分鐘；若只需要部分頁面，建議先用「PDF 頁面管理」取出需要的頁再轉。`));
+    box.appendChild(tx);
+    box.hidden = false;
+    return;
+  }
+  const bad = (objs >= HEAVY_BAD_TOTAL) || (perPage >= HEAVY_BAD_PER_PAGE);
+  const warn = (objs >= HEAVY_WARN_TOTAL) || (perPage >= HEAVY_WARN_PER_PAGE);
+  if (!warn && !bad) return;
+  box.className = 'p2o-heavy ' + (bad ? 'bad' : 'warn');
+  const ic = document.createElement('span');
+  ic.className = 'p2o-heavy-ic';
+  ic.textContent = bad ? '\u26A0' : '\u2139';
+  box.appendChild(ic);
+  const txt = document.createElement('span');
+  const head = document.createElement('b');
+  head.textContent = bad ? '這份檔案物件很多，開啟會很慢　' : '這份檔案物件較多　';
+  txt.appendChild(head);
+  txt.appendChild(document.createTextNode(
+    `共 ${objs.toLocaleString()} 個文字方塊 / 圖形（${pages} 頁，平均每頁 ${perPage} 個）。` +
+    (bad
+      ? '用 Word / Writer / Pages 開啟可能需要數分鐘，捲動也會卡頓。若只需要少數頁面，'
+        + '建議先用「PDF 頁面管理」取出需要的頁再轉；若要編輯內文或表格，改用 '
+        + 'pdf2docx-refine 引擎（流動排版、物件少很多）。'
+      : '用 Word / Writer / Pages 開啟時可能需要數十秒，屬正常現象。')));
+  box.appendChild(txt);
+  box.hidden = false;
+}
 
 function fmtBytes(n) {
   if (n < 1024) return n + ' B';
@@ -478,6 +549,7 @@ const jp = new JobProgress($('p2oJob'), {
         jobId: jobData.id, name: _fn, tool: 'pdf-to-office' }));
     }
     const rows = [];
+    renderHeavyNotice(rep, sm);
     const primaryEng = rep.primary_engine || sm.engine || '-';
     // v1.10.1：引擎 / 格式 移到結果列頂端 bar（下載鈕右側），不再放進 rMeta 細表
     $('rEngine').textContent = primaryEng;

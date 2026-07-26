@@ -16,6 +16,9 @@
       this.onError = onError || (() => {});
       this.onCancel = onCancel || (() => {});
       this._timer = null;
+      this._elapsedTimer = null;
+      this._startedAt = 0;
+      this.elapsed = root.querySelector('.job-elapsed');
       this.jobId = null;
       this.resetBtn.addEventListener('click', () => { this.hide(); this.onReset(); });
     }
@@ -33,12 +36,40 @@
       this.root.hidden = true;
       this.bar.style.width = '0%';
       this.status.textContent = '準備中…';
+      if (this.elapsed) { this.elapsed.hidden = true; this.elapsed.textContent = ''; }
       this.dlBtn.hidden = true;
       if (this.dlPngBtn) this.dlPngBtn.hidden = true;
       if (this.saveWsBtn) this.saveWsBtn.hidden = true;
       this._stop();
     }
-    _stop() { if (this._timer) { clearInterval(this._timer); this._timer = null; } }
+    _stop() {
+      if (this._timer) { clearInterval(this._timer); this._timer = null; }
+      if (this._elapsedTimer) { clearInterval(this._elapsedTimer); this._elapsedTimer = null; }
+    }
+
+    // 已過時間（分:秒）。轉檔動輒數分鐘，沒有這個使用者會以為當掉。
+    _fmtElapsed(ms) {
+      const s = Math.max(0, Math.floor(ms / 1000));
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    }
+    _startElapsed() {
+      if (!this.elapsed) return;
+      this._startedAt = Date.now();
+      this.elapsed.hidden = false;
+      const paint = () => {
+        this.elapsed.textContent = '已過 ' + this._fmtElapsed(Date.now() - this._startedAt);
+      };
+      paint();
+      this._elapsedTimer = setInterval(paint, 1000);
+    }
+    _finishElapsed(label) {
+      if (!this.elapsed) return;
+      if (this._elapsedTimer) { clearInterval(this._elapsedTimer); this._elapsedTimer = null; }
+      if (this._startedAt) {
+        this.elapsed.textContent = (label || '耗時 ')
+          + this._fmtElapsed(Date.now() - this._startedAt);
+      }
+    }
     // Show + wire 「存至工作區」 for a finished job whose result is a PDF/PNG.
     _wireSaveWs(j) {
       const btn = this.saveWsBtn;
@@ -74,6 +105,7 @@
       this.show();
       this.status.textContent = '處理中…';
       this._stop();
+      this._startElapsed();
       const tick = async () => {
         try {
           const r = await fetch(`/api/jobs/${jobId}`);
@@ -86,6 +118,7 @@
           else if (j.status === 'done') {
             this.bar.style.width = '100%';
             this.status.textContent = j.message || '完成';
+            this._finishElapsed('耗時 ');
             this.dlBtn.hidden = false;
             this.dlBtn.href = this.downloadUrl(jobId);
             if (this.dlPngBtn) {
@@ -97,11 +130,13 @@
             try { this.onDone(j); } catch (_) {}
           } else if (j.status === 'error') {
             this.status.textContent = '失敗：' + (j.error || '未知錯誤');
+            this._finishElapsed('已過 ');
             this.bar.style.background = '#dc2626';
             this._stop();
             try { this.onError(j); } catch (_) {}
           } else if (j.status === 'cancelled') {
             this.status.textContent = j.message || '已停止';
+            this._finishElapsed('已過 ');
             this._stop();
             try { this.onCancel(j); } catch (_) {}
           }

@@ -198,3 +198,32 @@ def test_placements_unknown_asset_id_rejected():
         data={"placements_json": json.dumps(plc)},
     )
     assert r.status_code == 400
+
+
+def test_placements_date_and_restrict_kinds_are_stamped():
+    """頁面個別用印可放「日期」「個資限用章」（各自帶 png_b64），且都真的畫進 PDF。"""
+    import base64
+    import fitz
+
+    date_png = _seal_png()
+    restrict_png = _seal_png()
+    plc = [
+        {"page": 0, "kind": "date", "png_b64": base64.b64encode(date_png).decode(),
+         "x_mm": 20, "y_mm": 20, "width_mm": 30, "height_mm": 12},
+        {"page": 1, "kind": "restrict",
+         "png_b64": base64.b64encode(restrict_png).decode(),
+         "x_mm": 60, "y_mm": 120, "width_mm": 40, "height_mm": 20},
+    ]
+    r = _c().post(
+        "/tools/pdf-stamp/api/pdf-stamp",
+        files={"file": ("d.pdf", _pdf(2), "application/pdf"),
+               "stamp_image": ("s.png", _seal_png(), "image/png")},
+        data={"placements_json": json.dumps(plc)},
+    )
+    assert r.status_code == 200, r.text
+    d = fitz.open(stream=r.content, filetype="pdf")
+    try:
+        assert len(d[0].get_images(full=True)) == 1, "第 1 頁應有日期圖"
+        assert len(d[1].get_images(full=True)) == 1, "第 2 頁應有個資限用章圖"
+    finally:
+        d.close()

@@ -188,7 +188,7 @@ def test_delete_batch(client):
 
 def test_page_ui_structure(client):
     """鎖住乘車證明頁的關鍵 UI 標記，抓「元素 / 功能被移除」的 regression。
-    純伺服器端渲染 + inline JS 斷言（不需瀏覽器）。"""
+    純伺服器端渲染 + inline JS 驗證（不需瀏覽器）。"""
     html = client.get("/tools/transit-proof/").text
     # 批次勾選：全選 / 列勾選 / 刪除選取鈕
     assert 'id="tpSelAll"' in html or "tpSelAll" in html

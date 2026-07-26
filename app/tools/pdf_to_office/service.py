@@ -37,6 +37,23 @@ class ConvertResult:
     error: str = ""
 
 
+# 自動分段門檻：估算物件數達此值時整份轉會慢到不可用（實測 ~5,000 估算物件的
+# 51 頁年報，整份匯出 .docx 要 11 分鐘）。頁數太少不分段——兩頁的表單就算物件
+# 很密，切成兩個檔對使用者只是困擾，那種情況靠結果頁的紅色提示說明即可。
+_CHUNK_MIN_TOTAL_OBJECTS = 4000
+_CHUNK_MIN_PAGES = 4
+
+
+def _should_chunk(per_page_estimate: list[int]) -> bool:
+    """依「估算物件總數 + 頁數」判斷要不要分段轉。"""
+    if not per_page_estimate or len(per_page_estimate) < _CHUNK_MIN_PAGES:
+        return False
+    if sum(per_page_estimate) < _CHUNK_MIN_TOTAL_OBJECTS:
+        return False
+    from .engines.draw_engine import plan_page_chunks
+    return len(plan_page_chunks(per_page_estimate)) > 1
+
+
 def convert_pdf_to_office(
     pdf_path: Path,
     work_dir: Path,
@@ -46,6 +63,7 @@ def convert_pdf_to_office(
     keep_intermediate: bool = False,
     fixer_opts: dict | None = None,
     engine: Literal["pdf2docx-refine", "jtdt-reform", "jtdt-layout"] = "jtdt-reform",
+    progress_cb=None,
 ) -> ConvertResult:
     """主入口。
 
@@ -150,7 +168,39 @@ def convert_pdf_to_office(
                 engine_used="jtdt-layout", postprocess_done=False, report={},
                 error=f"不支援的輸出格式：{output_format}",
             )
-        res = convert_via_draw(pdf_path, out, output_format, timeout=180.0)
+        # 大型文件自動分段：整份轉時 soffice 的匯出耗時隨物件數超線性成長，實測
+        # 152 頁年報整份轉 .docx 超過 15 分鐘仍未完成、78 頁 22MB 的年報連匯入都
+        # 逾時；同樣的檔案分段後每段幾秒到一分鐘就好。分段結果**刻意不合併回單檔**
+        # 分段是內部實作細節，轉完會在 Python 端合併回單一檔案，使用者拿到的仍是
+        # 一份完整文件。門檻與頁數下限見 _should_chunk。
+        from .engines.draw_engine import (convert_via_draw_chunked,
+                                          estimate_page_objects,
+                                          plan_page_chunks)
+        est = estimate_page_objects(pdf_path)
+        if _should_chunk(est):
+            res = convert_via_draw_chunked(pdf_path, out, output_format,
+                                           timeout=180.0,
+                                           progress_cb=progress_cb)
+            if not res.get("ok") or not out.exists():
+                return ConvertResult(
+                    ok=False, output_path=None, output_format=output_format,
+                    engine_used="jtdt-layout", postprocess_done=False, report=res,
+                    error=res.get("error") or "jtdt-layout 分段轉換失敗",
+                )
+            return ConvertResult(
+                ok=True, output_path=out, output_format=output_format,
+                engine_used="jtdt-layout", postprocess_done=False,
+                report={
+                    "primary_engine": "jtdt-layout",
+                    "postprocess_engine": "",
+                    "postprocess_engine_version": "",
+                    "postprocess_fixers_count": 0,
+                    "native_stats": res,
+                    "chunked": True,
+                },
+            )
+        res = convert_via_draw(pdf_path, out, output_format, timeout=180.0,
+                               progress_cb=progress_cb)
         if not res.get("ok") or not out.exists():
             return ConvertResult(
                 ok=False, output_path=None, output_format=output_format,

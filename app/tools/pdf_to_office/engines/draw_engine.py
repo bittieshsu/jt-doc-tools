@@ -171,6 +171,120 @@ def _remap_fonts(root) -> int:
     return n
 
 
+def _shape_has_text(shape) -> bool:
+    """該形狀是否含實際文字（draw:text-box 有非空白內容）。"""
+    for tb in shape.iter(_q("draw", "text-box")):
+        if "".join(tb.itertext()).strip():
+            return True
+    return False
+
+
+def _bg_style_name(autostyles, cache: dict, name: str) -> str | None:
+    """取得 ``name`` 的「背景層」變體樣式名（需要時才複製一份）。
+
+    為什麼要這個：ODF 的 ``style:run-through`` 分 foreground / background 兩層。
+    原本所有形狀都給 foreground，靠文件順序疊放——Writer(.odt) 沒問題，但
+    **匯出 .docx 時無文字的形狀走 VML(``w:pict``) 路徑、z-index 整個掉光**
+    （含文字的走 DrawingML ``wp:anchor`` 才保留 relativeHeight），結果表單底色
+    矩形跑到文字上面把整頁蓋掉（實測美國 IRS 1040 表單）。把「純裝飾形狀」
+    （底色塊 / 框線 / 圖片，即無文字者）改判到 **background 層**，兩種格式都
+    保證在文字之下，而形狀彼此之間的相對順序仍照文件順序，不受影響。
+    """
+    if not name:
+        return None
+    if name in cache:
+        return cache[name]
+    src = None
+    for st in autostyles.findall(_q("style", "style")):
+        if st.get(_q("style", "name")) == name:
+            src = st
+            break
+    if src is None:
+        cache[name] = None
+        return None
+    import copy
+    dup = copy.deepcopy(src)
+    new_name = name + "JtBg"
+    dup.set(_q("style", "name"), new_name)
+    gp = dup.find(_q("style", "graphic-properties"))
+    if gp is None:
+        gp = etree.SubElement(dup, _q("style", "graphic-properties"))
+    gp.set(_q("style", "run-through"), "background")
+    autostyles.append(dup)
+    cache[name] = new_name
+    return new_name
+
+
+_VML_NS = "urn:schemas-microsoft-com:vml"
+# VML 形狀的背景層起始 z-index（負值 = 在文字層之下，見 _fix_docx_vml_zorder）
+_VML_BG_Z_BASE = -30000
+
+
+def _fix_docx_vml_zorder(docx_path: Path) -> int:
+    """把 .docx 內「無文字的 VML 形狀」壓到文字層之下（回改動數）。
+
+    為什麼需要：soffice 的 Word 匯出對**含文字**的物件走 DrawingML
+    （``wp:anchor``，有 ``relativeHeight`` → 疊放順序完整保留），但對**純圖形**
+    （底色矩形、框線、圖片）走 VML ``w:pict``，而 **VML 的 ``z-index`` 在匯出時
+    整個不寫**。依 VML 規則，沒有 z-index 等同 ``auto`` → 一律疊在文字層**之上**，
+    於是表單底色塊會把整頁文字蓋掉（.odt 開起來正常、轉 .docx 就整頁看不到字，
+    實測美國 IRS 1040 表單；ODF 端設 ``draw:z-index`` / ``style:run-through``
+    都救不了，因為資訊在匯出時就掉了）。
+
+    修法（通用、與文件內容無關）：依**文件順序**給每個無文字的 VML 形狀一個遞增
+    的負 z-index → 全部落在文字層之下，且形狀彼此的相對順序原封不動。有文字的
+    VML 形狀不動（它可能本來就該在上層，例如標籤氣泡）。
+    """
+    import shutil, tempfile
+    try:
+        with zipfile.ZipFile(docx_path) as zin:
+            names = zin.namelist()
+            if "word/document.xml" not in names:
+                return 0
+            data = {n: zin.read(n) for n in names}
+    except (OSError, zipfile.BadZipFile):
+        return 0
+    try:
+        root = etree.fromstring(data["word/document.xml"], _safe_parser())
+    except etree.XMLSyntaxError:
+        return 0
+    n = 0
+    z = _VML_BG_Z_BASE
+    for el in root.iter():
+        if not isinstance(el.tag, str) or not el.tag.startswith("{" + _VML_NS + "}"):
+            continue
+        if etree.QName(el).localname not in ("rect", "shape", "roundrect", "oval",
+                                             "line", "polyline", "curve", "group"):
+            continue
+        if "".join(el.itertext()).strip():
+            continue                      # 含文字 → 不動（可能本來就該在上層）
+        style = el.get("style") or ""
+        if re.search(r"(?:^|;)\s*z-index\s*:", style):
+            continue                      # 已有 z-index → 尊重原值
+        el.set("style", (style.rstrip("; ") + ";" if style.strip() else "")
+                        + "z-index:%d" % z)
+        z += 1
+        n += 1
+    if not n:
+        return 0
+    data["word/document.xml"] = etree.tostring(
+        root, xml_declaration=True, encoding="UTF-8", standalone=True)
+    fd, tmp = tempfile.mkstemp(suffix=".docx", dir=str(docx_path.parent))
+    os.close(fd)
+    try:
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+            for name in names:
+                zout.writestr(name, data[name])
+        shutil.move(tmp, docx_path)
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        return 0
+    return n
+
+
 def _points_to_cm(pt: float) -> float:
     return pt / 28.3465
 
@@ -401,7 +515,7 @@ def _page_has_transformed_image(page) -> bool:
 
 
 def _emit_raster_page(para, autostyles, pics: dict, png: bytes,
-                      i: int, w: float, h: float) -> None:
+                      i: int, w: float, h: float, z: int = 0) -> None:
     """把整頁 PNG 以頁面錨定 frame 塞進段落，放在**最底層（背景、低 z-index）**——
     這張圖是「已移除真實文字、只剩漸層 / 圖形 / 外框字」的設計背景（見 remove_text）；
     真實文字改由上層可編輯 vector 呈現。點頁面選到的是文字（圖在背景不礙事），視覺
@@ -420,9 +534,12 @@ def _emit_raster_page(para, autostyles, pics: dict, png: bytes,
     ggp.set(_q("style", "run-through"), "background")
     frame = etree.SubElement(para, _q("draw", "frame"))
     frame.set(_q("draw", "style-name"), "JtRaster%d" % i)
-    frame.set(_q("draw", "z-index"), "0")  # 最底層背景,文字在其上
-    frame.set(_q("text", "anchor-type"), "page")
-    frame.set(_q("text", "anchor-page-number"), str(i))
+    frame.set(_q("draw", "z-index"), str(z))  # 背景層,文字框的 z 比它大
+    # 錨定：用「段落錨定 + 位置相對於頁面」而非 ODF 專有的「錨定到第 N 頁」——
+    # OOXML(.docx) **沒有 anchor-to-page-N 的概念**,匯出時會把頁面錨定物件全部
+    # 重新掛到同一個段落 → 所有頁的內容擠成一頁(實測任何多頁文件轉 docx 都踩)。
+    # 每頁本來就各自有一個段落,錨到該段落即可對到正確頁,座標仍相對頁面故視覺不變。
+    frame.set(_q("text", "anchor-type"), "paragraph")
     frame.set(_q("svg", "x"), "0cm")
     frame.set(_q("svg", "y"), "0cm")
     frame.set(_q("svg", "width"), "%.3fcm" % w)
@@ -434,7 +551,8 @@ def _emit_raster_page(para, autostyles, pics: dict, png: bytes,
     img.set(_q("xlink", "actuate"), "onLoad")
 
 
-def _move_text_frames_over_raster(page, para, i: int, page_w_cm: float) -> int:
+def _move_text_frames_over_raster(page, para, i: int, page_w_cm: float,
+                                  z_start: int = 1) -> int:
     """raster 頁：把原始「含文字」的框搬到段落（錨定第 i 頁、**高 z-index 在背景圖
     之上**）——文字直接可見 / 可選取 / 可編輯（背景圖已移除真實文字,不會雙重）。不搬
     非文字形狀（漸層色塊 / 失真向量 / 外框字路徑,那些已在背景圖裡）。回搬移文字框數。"""
@@ -446,9 +564,8 @@ def _move_text_frames_over_raster(page, para, i: int, page_w_cm: float) -> int:
         if tb is None or not "".join(tb.itertext()).strip():
             continue  # 只保留有文字的框
         tag = etree.QName(shape).localname
-        shape.set(_q("text", "anchor-type"), "page")
-        shape.set(_q("text", "anchor-page-number"), str(i))
-        shape.set(_q("draw", "z-index"), "10")  # 在背景 raster 圖(z=0)之上
+        shape.set(_q("text", "anchor-type"), "paragraph")  # 見 _emit_raster_page 註解
+        shape.set(_q("draw", "z-index"), str(z_start + n))  # 在背景 raster 圖之上
         if tag == "frame":
             _pad_frame_width(shape, page_w_cm=page_w_cm)
         para.append(shape)
@@ -555,8 +672,17 @@ def _build_writer_odt(odg_path: Path, odt_out: Path,
 
     size_groups: list[tuple[float, float]] = []
     size_index: dict[tuple[float, float], int] = {}
+    per_page_size: list[tuple[float, float]] = []   # 每頁實際尺寸（各頁一個 master page）
     text_el = etree.Element(_q("office", "text"))
     n_pages = 0
+    prev_group = -1          # 前一頁的尺寸群組（保留供空文件 fallback 用）
+    # 全域疊放順序計數器：**必須明確給每個形狀 draw:z-index**。odg 內的形狀本來
+    # 就照「繪製順序」排列（底色矩形在前、文字在後），Writer 依文件順序疊放沒問題，
+    # 但**匯出 .docx 時順序不保證**（實測 IRS 表單：薄荷綠底色矩形跑到文字上面，
+    # 整頁文字被蓋掉）。ODF 的 draw:z-index 會對應到 OOXML 的 relativeHeight，
+    # 明確編號後兩種格式的疊放才一致。
+    z_counter = 0
+    bg_style_cache: dict = {}   # 原樣式名 → 背景層變體名（見 _bg_style_name）
     for i, page in enumerate(pages, start=1):
         n_pages += 1
         w, h = _sz(i)
@@ -565,11 +691,22 @@ def _build_writer_odt(odg_path: Path, odt_out: Path,
             size_index[key] = len(size_groups)
             size_groups.append((w, h))
         g = size_index[key]
-        # 每頁一個段落樣式（帶 master-page-name），第 i 頁用群組 g 的頁型
+        # 分頁：**每一頁都用自己的 master page**（style:master-page-name），不論
+        # 尺寸是否與前頁相同。原因是 .docx 相容性：
+        #   * `fo:break-before` 會被匯出成「段落內的 <w:br w:type="page">」——分頁符
+        #     跟前一頁的物件擠在同一個段落裡，Word/Writer 算「頁面錨定物件屬於哪一
+        #     頁」時就會全部歸到同一頁 → 第 1 頁空白、內容整體位移（實測 odt 正確、
+        #     docx [0,5,10]）。
+        #   * 換 master page 則會匯出成 **section break**（Word 真正的分頁 / 換版單
+        #     位），每頁自成一個 section，錨定物件才會落在正確頁。
+        # 代價：styles.xml 多出「每頁一個 page-layout + master-page」（數十～數百個，
+        # 檔案略大但無妨）。任何多頁文件皆適用，非針對特定檔案。
         pstyle = etree.SubElement(autostyles, _q("style", "style"))
         pstyle.set(_q("style", "name"), "JtPg%d" % i)
         pstyle.set(_q("style", "family"), "paragraph")
-        pstyle.set(_q("style", "master-page-name"), "JtMP%d" % g)
+        pstyle.set(_q("style", "master-page-name"), "JtMP_p%d" % i)
+        per_page_size.append((w, h))
+        prev_group = g
         para = etree.SubElement(text_el, _q("text", "p"))
         para.set(_q("text", "style-name"), "JtPg%d" % i)
         # 設計感頁面 raster fallback → 改嵌原 PDF 整頁圖，像素級還原（該頁不可編輯，
@@ -587,10 +724,13 @@ def _build_writer_odt(odg_path: Path, odt_out: Path,
                 or _page_has_transformed_image(page)):
             png = _render_pdf_page_png(pdf_path, i - 1, remove_text=True)
             if png is not None:
-                _emit_raster_page(para, autostyles, pics, png, i, w, h)
+                _emit_raster_page(para, autostyles, pics, png, i, w, h,
+                                  z=z_counter)
+                z_counter += 1
                 # 真實文字框放在背景圖之上 → 直接可見 / 可選取 / 可編輯（背景圖已移
                 # 除真實文字,不會雙重;漸層 / 外框字標題留在背景圖裡保真）。
-                _move_text_frames_over_raster(page, para, i, w)
+                z_counter += _move_text_frames_over_raster(page, para, i, w,
+                                                          z_start=z_counter)
                 continue  # 非文字形狀（漸層色塊 / 外框路徑）不搬,已在背景圖
         # 先清掉 PDF 疊印假粗體造成的重複 / 被覆蓋文字框（見 _dedup_overprint）
         _dedup_overprint(page)
@@ -602,8 +742,18 @@ def _build_writer_odt(odg_path: Path, odt_out: Path,
             tag = etree.QName(shape).localname
             if not tag:
                 continue
-            shape.set(_q("text", "anchor-type"), "page")
-            shape.set(_q("text", "anchor-page-number"), str(i))
+            shape.set(_q("text", "anchor-type"), "paragraph")  # 見 _emit_raster_page 註解
+            # 明確編號疊放順序（沿用 odg 的繪製順序）→ 匯出 .docx 後底色矩形才不會
+            # 蓋到文字（見 z_counter 的說明）。
+            shape.set(_q("draw", "z-index"), str(z_counter))
+            z_counter += 1
+            # 無文字的純裝飾形狀 → 背景層（見 _bg_style_name 的說明：.docx 匯出
+            # 時這類形狀走 VML 會掉 z-index，不丟到背景層就會蓋掉整頁文字）。
+            if autostyles is not None and not _shape_has_text(shape):
+                _sn = shape.get(_q("draw", "style-name"))
+                _bg = _bg_style_name(autostyles, bg_style_cache, _sn)
+                if _bg:
+                    shape.set(_q("draw", "style-name"), _bg)
             # 文字方塊防裁尾：Draw 把 svg:width 定成剛好容納原字寬，Writer 重繪時
             # 字型 metric 略增就換行、再被矮高度垂直裁掉最後一字（auto-grow 對錨定
             # 框無效）。給含文字的 frame 加一點寬度餘裕（比例＋固定），防換行掉字。
@@ -629,12 +779,23 @@ def _build_writer_odt(odg_path: Path, odt_out: Path,
 
     content_out = etree.tostring(root, xml_declaration=True, encoding="UTF-8")
 
-    # 3) 自組乾淨的 Writer styles.xml（每個尺寸群組一個 master-page + page-layout）
+    # 3) 自組乾淨的 Writer styles.xml。
+    #    **每一頁一個 master-page + page-layout**（JtMP_p{i}）——換 master page 是
+    #    Writer 的換頁機制，且匯出 .docx 時會變成 section break（Word 的分頁單位），
+    #    頁面錨定物件才會落在正確的頁（見上方段落樣式處的說明）。
+    #    另保留尺寸群組版 JtMP{g}（零頁 fallback 用）。
     masters = "".join(
+        '<style:master-page style:name="JtMP_p%d" style:page-layout-name="JtPL_p%d"/>' % (i, i)
+        for i in range(1, len(per_page_size) + 1)
+    ) + "".join(
         '<style:master-page style:name="JtMP%d" style:page-layout-name="JtPL%d"/>' % (g, g)
         for g in range(len(size_groups))
     )
     layouts = "".join(
+        '<style:page-layout style:name="JtPL_p%d"><style:page-layout-properties '
+        'fo:page-width="%.3fcm" fo:page-height="%.3fcm" fo:margin="0cm"/></style:page-layout>'
+        % (i, w, h) for i, (w, h) in enumerate(per_page_size, start=1)
+    ) + "".join(
         '<style:page-layout style:name="JtPL%d"><style:page-layout-properties '
         'fo:page-width="%.3fcm" fo:page-height="%.3fcm" fo:margin="0cm"/></style:page-layout>'
         % (g, w, h) for g, (w, h) in enumerate(size_groups)
@@ -718,12 +879,168 @@ def _build_writer_odt(odg_path: Path, odt_out: Path,
             pass
         raise
 
-    return n_pages, len(safe_pics)
+    return n_pages, len(safe_pics), z_counter
+
+
+# ── 大型文件自動分段 ────────────────────────────────────────────────────────
+# 為什麼要分段：soffice 的 odt→docx 匯出耗時隨物件數 **超線性（約 O(n²)）** 成長。
+# 實測 berkshire 年報（152 頁）：整份 18,882 個物件 → 匯出超過 15 分鐘仍未完成；
+# 同一份切成 38 頁一段後，2,641 物件段只要 11 秒、7,208 物件段 45 秒、9,497 物件段
+# 88 秒，全部都轉得出來。tw_twsa（78 頁 / 22MB）更是連 PDF→Draw 匯入都逾時。
+#
+# 分段是**內部實作細節**：轉完之後在 Python 端把各段合併回單一檔案（見 doc_merge），
+# 使用者拿到的仍是一份完整 .odt / .docx。合併不經過 soffice，所以不會再踩 O(n²)。
+_CHUNK_OBJ_TARGET = 2500      # 每段估算物件數上限
+_CHUNK_EST_FACTOR = 2.0       # PyMuPDF 行數 → 實際物件數的保守倍率（實測 1.4~2.7）
+
+
+def estimate_page_objects(pdf_path: Path) -> list[int]:
+    """估每頁會產生多少物件（文字方塊 / 圖形）。**不呼叫 soffice**，只用 PyMuPDF
+    數文字行數再乘保守倍率，成本 0.1~3 秒，可在轉換前先跑來決定要不要分段。"""
+    import fitz
+
+    counts: list[int] = []
+    try:
+        with fitz.open(str(pdf_path)) as doc:
+            for page in doc:
+                lines = 0
+                try:
+                    for b in page.get_text("dict").get("blocks", []):
+                        lines += len(b.get("lines", []))
+                except Exception:  # noqa: BLE001 — 個別頁抽不出來就當 0，不影響整體估算
+                    pass
+                counts.append(int(lines * _CHUNK_EST_FACTOR))
+    except Exception as e:  # noqa: BLE001 — 估算失敗 → 回空，呼叫端退回不分段
+        log.warning("estimate_page_objects 失敗 %s: %s", pdf_path.name, e)
+        return []
+    return counts
+
+
+def plan_page_chunks(per_page: list[int],
+                     target: int = _CHUNK_OBJ_TARGET) -> list[tuple[int, int]]:
+    """依每頁估算物件數把頁面打包成 [(起頁, 迄頁)]（0-based、含迄頁）。
+
+    用貪婪打包而非固定頁數，因為**密度差很大**：同一份年報 38 頁一段可能是 2,641
+    物件，下一段同樣 38 頁卻是 9,497。單頁就超標時自成一段（不可能再切更細）。
+    """
+    if not per_page:
+        return []
+    chunks: list[tuple[int, int]] = []
+    start = 0
+    acc = 0
+    for i, n in enumerate(per_page):
+        if acc and acc + n > target:
+            chunks.append((start, i - 1))
+            start, acc = i, 0
+        acc += n
+    chunks.append((start, len(per_page) - 1))
+    return chunks
+
+
+def convert_via_draw_chunked(pdf_path: Path, out_path: Path,
+                             output_format: str = "odt",
+                             timeout: float = 180.0,
+                             target: int = _CHUNK_OBJ_TARGET,
+                             progress_cb=None) -> dict:
+    """把 PDF 分段轉換後**合併回單一** .odt / .docx。
+
+    分段只是為了繞開 soffice 的 O(n²) 匯出與匯入逾時，屬內部實作細節；使用者拿到
+    的仍是一份完整文件。合併在 Python 端做（見 doc_merge），不再經過 soffice。
+
+    Returns:
+        dict: {"ok", "pages", "images", "objects", "parts", "chunks":[{...}],
+               "engine": "draw-chunked", "error"}
+    """
+    import tempfile
+
+    import fitz
+
+    from .doc_merge import merge_docx, merge_odt
+
+    pdf_path, out_path = Path(pdf_path), Path(out_path)
+    ext = "odt" if output_format == "odt" else "docx"
+    per_page = estimate_page_objects(pdf_path)
+    ranges = plan_page_chunks(per_page, target)
+    if not ranges:
+        return {"ok": False, "pages": 0, "images": 0, "objects": 0, "parts": 0,
+                "chunks": [], "engine": "draw-chunked", "error": "無法讀取 PDF 頁面"}
+
+    stem = re.sub(r"[^\w.\-]", "_", pdf_path.stem)[:60] or "part"
+    total_pages = total_imgs = total_objs = 0
+    infos: list[dict] = []
+    with tempfile.TemporaryDirectory(prefix="jtdt-chunk-") as td:
+        tdp = Path(td)
+        with fitz.open(str(pdf_path)) as doc:
+            n_digits = max(3, len(str(doc.page_count)))
+            for idx, (a, b) in enumerate(ranges, 1):
+                part_pdf = tdp / f"src{idx}.pdf"
+                sub = fitz.open()
+                try:
+                    sub.insert_pdf(doc, from_page=a, to_page=b)
+                    sub.save(str(part_pdf))
+                finally:
+                    sub.close()
+                name = "%s_p%0*d-%0*d.%s" % (stem, n_digits, a + 1,
+                                             n_digits, b + 1, ext)
+                # 分段進度：整體 0.1~0.9 之間依段數平均分配，段內再細分階段
+                lo = 0.1 + 0.8 * (idx - 1) / len(ranges)
+                span = 0.8 / len(ranges)
+
+                def _sub(msg, frac, _lo=lo, _span=span, _i=idx,
+                         _a=a, _b=b):
+                    if progress_cb:
+                        try:
+                            progress_cb("第 %d/%d 段（第 %d-%d 頁）— %s"
+                                        % (_i, len(ranges), _a + 1, _b + 1, msg),
+                                        _lo + _span * max(0.0, min(1.0, frac)))
+                        except Exception:  # noqa: BLE001
+                            pass
+
+                res = convert_via_draw(part_pdf, tdp / name, output_format,
+                                       timeout=timeout, progress_cb=_sub)
+                if not res.get("ok"):
+                    return {"ok": False, "pages": total_pages, "images": total_imgs,
+                            "objects": total_objs, "parts": len(infos),
+                            "chunks": infos, "engine": "draw-chunked",
+                            "error": "第 %d-%d 頁轉換失敗：%s"
+                                     % (a + 1, b + 1, res.get("error") or "未知錯誤")}
+                total_pages += res.get("pages") or 0
+                total_imgs += res.get("images") or 0
+                total_objs += res.get("objects") or 0
+                infos.append({"name": name, "from_page": a + 1, "to_page": b + 1,
+                              "objects": res.get("objects") or 0})
+
+        # 合併回單一檔案（使用者要的是一份文件，不是一包分段檔）
+        if progress_cb:
+            try:
+                progress_cb("合併 %d 段為單一檔案…" % len(infos), 0.92)
+            except Exception:  # noqa: BLE001
+                pass
+        part_paths = [tdp / info["name"] for info in infos]
+        try:
+            if ext == "odt":
+                merge_odt(part_paths, out_path)
+            else:
+                merge_docx(part_paths, out_path)
+        except Exception as e:  # noqa: BLE001 — 合併失敗要能明確回報，不吞掉
+            log.warning("分段合併失敗 %s: %s", pdf_path.name, e)
+            return {"ok": False, "pages": total_pages, "images": total_imgs,
+                    "objects": total_objs, "parts": len(infos), "chunks": infos,
+                    "engine": "draw-chunked", "error": "分段合併失敗：%s" % e}
+        if not out_path.exists():
+            return {"ok": False, "pages": total_pages, "images": total_imgs,
+                    "objects": total_objs, "parts": len(infos), "chunks": infos,
+                    "engine": "draw-chunked", "error": "分段合併後沒有產出檔案"}
+
+    return {"ok": True, "pages": total_pages, "images": total_imgs,
+            "objects": total_objs, "parts": len(infos), "chunks": infos,
+            "engine": "draw-chunked", "error": ""}
 
 
 def convert_via_draw(pdf_path: Path, out_path: Path,
                      output_format: str = "odt",
-                     timeout: float = 180.0) -> dict:
+                     timeout: float = 180.0,
+                     progress_cb=None) -> dict:
     """PDF → Draw 版面重現的 .odt / .docx。
 
     Args:
@@ -731,6 +1048,8 @@ def convert_via_draw(pdf_path: Path, out_path: Path,
         out_path: 輸出檔（副檔名依 output_format）
         output_format: "odt" 或 "docx"
         timeout: 每次 soffice 呼叫的逾時秒數
+        progress_cb: ``cb(message, frac)`` — 回報目前階段給 UI。轉檔動輒數分鐘，
+            沒有階段回饋使用者會以為當掉（三個階段的耗時比例差很大，實測匯出最久）。
 
     Returns:
         dict: {"ok": bool, "pages": int, "images": int, "engine": "draw", "error": str}
@@ -744,8 +1063,16 @@ def convert_via_draw(pdf_path: Path, out_path: Path,
     odg = work / (pdf_path.stem + ".draw.%s.odg" % tag)
     odt = out_path if output_format == "odt" else work / (pdf_path.stem + ".draw.%s.odt" % tag)
 
+    def _tick(msg: str, frac: float) -> None:
+        if progress_cb:
+            try:
+                progress_cb(msg, frac)
+            except Exception:  # noqa: BLE001 — 進度回報失敗絕不可影響轉檔
+                pass
+
     try:
         # 1) PDF → odg（Draw 匯入）
+        _tick("匯入 PDF 版面…", 0.15)
         try:
             office_convert.convert_to_odg(pdf_path, odg, timeout=timeout)
         except RuntimeError as e:
@@ -758,15 +1085,21 @@ def convert_via_draw(pdf_path: Path, out_path: Path,
             return {"ok": False, "pages": 0, "images": 0, "engine": "draw", "error": msg}
         # 2) odg → 合法 Writer odt（每頁尺寸）
         page_sizes = _pdf_page_sizes_cm(pdf_path)
-        n_pages, n_imgs = _build_writer_odt(odg, odt, page_sizes, pdf_path=pdf_path)
+        _tick("重組版面（共 %d 頁）…" % len(page_sizes), 0.45)
+        n_pages, n_imgs, n_objs = _build_writer_odt(odg, odt, page_sizes,
+                                                    pdf_path=pdf_path)
         # 3) 要 docx 再走標準 Writer→Word
         if output_format == "docx":
+            _tick("產生 Word 檔（%d 頁 / %d 個物件）…" % (n_pages, n_objs), 0.7)
             office_convert.convert_to_docx(odt, out_path, timeout=timeout)
             if not out_path.exists():
                 return {"ok": False, "pages": n_pages, "images": n_imgs,
-                        "engine": "draw", "error": "Writer odt → docx 失敗"}
+                        "objects": n_objs, "engine": "draw",
+                        "error": "Writer odt → docx 失敗"}
+            # 修正 Word 匯出掉失的 VML 疊放順序（見 _fix_docx_vml_zorder）
+            _fix_docx_vml_zorder(out_path)
         return {"ok": True, "pages": n_pages, "images": n_imgs,
-                "engine": "draw", "error": ""}
+                "objects": n_objs, "engine": "draw", "error": ""}
     except Exception as e:  # noqa: BLE001 — 統一回報，不讓引擎例外炸掉 job
         log.warning("draw engine 失敗 %s: %s", pdf_path.name, e)
         return {"ok": False, "pages": 0, "images": 0, "engine": "draw", "error": str(e)}
