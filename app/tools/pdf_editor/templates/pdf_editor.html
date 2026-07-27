@@ -3,6 +3,8 @@
 {% block title %}PDF 編輯器 · {{ app_name }}{% endblock %}
 {% block head %}
 <script src="/static/vendor/fabric/fabric.min.js"></script>
+{# 修正 Fabric 文字編輯對焦把畫面捲走（issue #42）— 必須緊接在 fabric 之後 #}
+<script src="/static/js/fabric_no_focus_scroll.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
   // Monkey-patch Canvas API: Fabric 5.x 內部把 textBaseline 設為 'alphabetical'
   // (typo)，新版 Chrome 拒絕並噴 console warning，更糟的是寬度量測 / IText

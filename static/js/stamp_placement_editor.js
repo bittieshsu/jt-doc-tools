@@ -27,6 +27,8 @@
      */
     constructor(opts) {
       this.root = opts.root;
+      // 綁定來源檔案：切換模式時用來判斷可否沿用（見模板 ensurePlacementEditor）
+      this.uploadId = opts.uploadId || null;
       this.pageCount = Math.max(1, opts.pageCount || 1);
       this.pagesDims = opts.pagesDims || [];
       this.bgUrlFor = opts.bgUrlFor || (() => null);
@@ -536,8 +538,14 @@
       });
     }
 
+    /** 重新計算版面（切換顯示 / 視窗大小改變後呼叫）。物件與選取狀態都保留。 */
+    relayout() { this._relayout(); }
+
     destroy() {
       if (this._onKey) document.removeEventListener('keydown', this._onKey);
+      // 清掉自己畫在共用容器裡的物件，否則重建後舊 DOM 會留下變成空框
+      if (this.$layer) this.$layer.textContent = '';
+      if (this.$thumbs) this.$thumbs.textContent = '';
     }
   }
 
