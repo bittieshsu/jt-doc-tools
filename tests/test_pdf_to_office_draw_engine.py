@@ -1025,3 +1025,35 @@ def test_chunked_progress_reports_part_and_pages(tmp_path):
     assert "合併 4 段" in msgs, msgs
     fracs = [f for _, f in seen]
     assert fracs == sorted(fracs), fracs
+
+
+# ── CJK 字型風格對應（圓體 / 黑體 / 明體 / 楷體）─────────────────────────────
+@pytest.mark.parametrize("font,expect", [
+    # 台灣簡報常見的圓體 / 黑體 —— 認不出來就會原樣輸出，Linux 上 fontconfig
+    # 隨便挑，實測掉到明體，圓潤粗黑標題整個走樣（臺大圖書館簡報踩過）
+    ("BCDEEE+DFNYuan-W9-WIN-BF", "微軟正黑體"),      # 華康圓體
+    ("GenSenRoundedTW-H", "微軟正黑體"),             # 源泉圓體
+    ("DFLiKingHei-W8-WIN-BF", "微軟正黑體"),         # 華康儷金黑
+    ("BCDIEE+MicrosoftJhengHeiRegular", "微軟正黑體"),
+    # 明體系：GenRyuMin / GenWanMin 名稱裡沒有 "ming"，不特判就會被歸成黑體
+    ("MingLiU", "新細明體"),
+    ("GenRyuMinTW-B", "新細明體"),
+    ("GenWanMinTW", "新細明體"),
+    # 楷書
+    ("DFKai-SB", "標楷體"),
+    ("BiauKai", "標楷體"),
+])
+def test_cjk_font_style_mapping(font, expect):
+    assert de._classify_cjk_font(font)[0] == expect
+
+
+@pytest.mark.parametrize("font", [
+    "ArialMT", "Liberation Sans", "Noto Sans", "Times New Roman",
+    "DejaVu Serif", "Helvetica", "Courier New",
+])
+def test_latin_fonts_never_remapped_to_cjk(font):
+    """**關鍵護欄**：Latin 字型不可被判成 CJK，否則英數字會被塞中文字型。
+
+    加圓體 / 黑體 token 時特別容易誤傷（例如通用的 "gothic"、"rounded"）。
+    """
+    assert de._classify_cjk_font(font) == (None, None)

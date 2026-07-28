@@ -105,16 +105,35 @@ _CJK_TOKENS = (
     "ukai", "uming", "tw-kai", "tw-sung", "twkai", "twsung", "stkai", "stsong",
     "stheiti", "stsong", "lihei", "lisong", "mhei", "msung", "mkai", "batang",
     "gulim", "kozuka",
+    # 台灣簡報 / 文宣常見的圓體與黑體 —— 認不出來就會原樣輸出字型名，Linux 上
+    # 找不到該字型時 fontconfig 會隨便挑一個，實測落到明體，圓潤黑體標題整個走樣
+    # （實測臺大圖書館簡報：DFNYuan / GenSenRounded / DFLiKingHei 全部沒被認出）。
+    "yuan",          # 華康圓體 DFYuan / DFNYuan（圓體＝圓潤黑體）
+    "gensen",        # 源泉圓體 GenSenRounded（justfont / Adobe 開源）
+    "genyo",         # 源樣黑體 GenYoGothic
+    "genryu", "genwan",   # 源流明體 GenRyuMin / 源雲明體 GenWanMin（明體系）
+    "kinghei",       # 華康儷金黑 DFLiKingHei
+    "rounded", "gothic", "maru",   # 通用：圓體 / 黑體 / 丸ゴシック
+    "dfhei", "dfsong", "dfming", "dfli",
+    "cwtexyen",      # cwTeX 圓體
+    "genjyuu", "gensekigothic",
 )
 
 
 def _cjk_style_of_token(low: str) -> tuple[str, str]:
-    """romanized CJK token → (標準台灣字型名, generic)。"""
+    """romanized CJK token → (標準台灣字型名, generic)。
+
+    **圓體歸到黑體**：圓體是「圓潤化的黑體」，開源 CJK 字型沒有對應品項（我們預裝
+    的是 Noto Sans/Serif CJK），選黑體是最接近的；若照字面找不到就會 fallback 成
+    明體，那才是真的走樣。
+    """
     if "kai" in low or "fangsong" in low:
         return ("標楷體", "script")          # 楷書 / 仿宋
-    if any(t in low for t in ("ming", "sung", "song")):
+    # 明體系要先於通用判斷（GenRyuMin / GenWanMin 都是明體，名稱裡沒有 "ming"）
+    if any(t in low for t in ("ming", "sung", "song", "ryumin", "wanmin",
+                              "dfsong", "dfming")):
         return ("新細明體", "roman")         # 明體 / 宋體
-    return ("微軟正黑體", "swiss")            # 其餘（黑體 / 正黑 / pingfang…）
+    return ("微軟正黑體", "swiss")            # 其餘（黑體 / 正黑 / 圓體 / pingfang…）
 
 
 def _classify_cjk_font(name: str) -> tuple[str | None, str | None]:
