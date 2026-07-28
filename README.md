@@ -88,6 +88,8 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 ### 格式轉換 [需 OxOffice/LibreOffice]
 - **文書轉 PDF / 圖片** — Word / Excel / PowerPoint / ODF
 - **圖片轉 PDF**
+- **PDF 轉 Markdown** — PDF 轉結構化 Markdown，保留標題 / 表格 / 粗體，適合餵 LLM、RAG 預處理
+- **Markdown 轉文書** [需 OxOffice/LibreOffice] — 貼上或拖入 Markdown，套用主題後輸出 PDF / DOCX / ODT，含所有頁面預覽
 - **PDF 轉文書檔（Beta）** — PDF 反轉成 Word (.docx) / OpenDocument (.odt)，三引擎可選：pdf2docx（經典穩定）、自家 jtdt-reform（幾何規則重組成可編輯內文）、自家 jtdt-layout（版面最忠於原稿：頁面錨定文字方塊，位置 / 圖片 / 框線近 1:1 保留）
 - **PDF 轉簡報檔（Beta）** — PDF 反轉成 PowerPoint (.pptx) / OpenDocument 簡報 (.odp)，**一頁對一張投影片**，投影片尺寸沿用原稿（直向 PDF 也照樣還原）；用 jtdt-layout 版面重現引擎
 
