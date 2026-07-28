@@ -423,6 +423,160 @@ def _bbox_colocated(a, b, min_cover: float = 0.6) -> bool:
     return inter / min(area_a, area_b) >= min_cover
 
 
+
+# 低於此寬度的框線視為「PDF 匯入產生的幽靈邊框」而非真實框線。實測依據：某金管會
+# 簡報的內容區被畫上 0.004cm（≈0.11pt）的黑框——原 PDF 完全看不到，但 Impress /
+# Writer 會把它畫成 1px 可見線，整塊內容被框起來。同一批檔案裡**真實**的表格框線
+# 最細是 0.017cm（≈0.48pt），差了 4 倍以上，門檻取中間很安全。
+_HAIRLINE_MIN_CM = 0.01
+
+
+def _drop_hairline_strokes(autostyles) -> int:
+    """把細到看不見的框線關掉（回關閉數）。
+
+    只改 ``draw:stroke``，**不動形狀本身也不碰填色** —— 該形狀可能同時是色塊，
+    去掉框線就好，不能整個刪掉。
+    """
+    if autostyles is None:
+        return 0
+    n = 0
+    for st in autostyles.findall(_q("style", "style")):
+        if st.get(_q("style", "family")) != "graphic":
+            continue
+        gp = st.find(_q("style", "graphic-properties"))
+        if gp is None or gp.get(_q("draw", "stroke")) != "solid":
+            continue
+        raw = (gp.get(_q("svg", "stroke-width"))
+               or gp.get(_q("draw", "stroke-width")))
+        parsed = _parse_len_cm(raw) if raw else None
+        if parsed and 0 < parsed[0] < _HAIRLINE_MIN_CM:
+            gp.set(_q("draw", "stroke"), "none")
+            n += 1
+    return n
+
+
+
+# PDF 匯入把「漸層 / 半透明 / 特效圖」拆成一格格小圖塊時的收攏門檻。實測某金管會
+# 簡報：一個 3.8×1.4cm 的 ESG 標誌被拆成約 150 個 0.2×0.2cm 的小圖，拼起來變成
+# 一塊灰藍色塊蓋住標誌。整頁 raster 的門檻（形狀 > 400）對這種**局部**破圖不會
+# 觸發，所以另外偵測「小圖塊聚成一群」的情形，只把那一小塊換成原 PDF 的實際畫面。
+_TILE_MAX_CM = 0.8        # 多小才算「小圖塊」
+_TILE_MIN_COUNT = 12      # 聚成幾個才算破圖（正常文件不會有這麼多同尺寸小圖擠在一起）
+_TILE_GAP_FACTOR = 1.6    # 相鄰判定：距離小於 邊長×此值 視為同一群
+
+
+def _collapse_image_tiles(page, pdf_path: Path, page_index: int,
+                          page_w_cm: float, page_h_cm: float,
+                          autostyles, pics: dict) -> int:
+    """把「被拆成一格格小圖塊」的區域換成原 PDF 該區域的實際畫面。回收攏的群數。
+
+    只動「密集的小圖塊群」——正常文件的圖示 / 項目符號圖是零星分佈，不會有十幾個
+    同尺寸小圖緊貼成一片。收攏後該區域變成單一張圖（不可編輯），但**原本就已經
+    是破圖，換成正確畫面才有意義**。
+    """
+    tiles = []
+    for sh in page:
+        if not isinstance(sh.tag, str) or etree.QName(sh).localname != "frame":
+            continue
+        if sh.find(_q("draw", "image")) is None:
+            continue
+        b = _frame_bbox(sh)
+        if not b:
+            continue
+        w, h = b[2] - b[0], b[3] - b[1]
+        if 0 < w <= _TILE_MAX_CM and 0 < h <= _TILE_MAX_CM:
+            tiles.append((sh, b, max(w, h)))
+    if len(tiles) < _TILE_MIN_COUNT:
+        return 0
+
+    # 相鄰的小圖塊分群（BFS）
+    unvisited = set(range(len(tiles)))
+    groups = []
+    while unvisited:
+        seed = unvisited.pop()
+        comp, queue = [seed], [seed]
+        while queue:
+            i = queue.pop()
+            bi, si = tiles[i][1], tiles[i][2]
+            for j in list(unvisited):
+                bj, sj = tiles[j][1], tiles[j][2]
+                gap = max(si, sj) * _TILE_GAP_FACTOR
+                if (bi[0] - gap < bj[2] and bj[0] - gap < bi[2]
+                        and bi[1] - gap < bj[3] and bj[1] - gap < bi[3]):
+                    unvisited.discard(j)
+                    comp.append(j)
+                    queue.append(j)
+        groups.append(comp)
+
+    collapsed = 0
+    for comp in groups:
+        if len(comp) < _TILE_MIN_COUNT:
+            continue
+        xs0 = min(tiles[i][1][0] for i in comp)
+        ys0 = min(tiles[i][1][1] for i in comp)
+        xs1 = max(tiles[i][1][2] for i in comp)
+        ys1 = max(tiles[i][1][3] for i in comp)
+        png = _render_pdf_region_png(pdf_path, page_index,
+                                     (xs0, ys0, xs1, ys1),
+                                     page_w_cm, page_h_cm)
+        if png is None:
+            continue
+        collapsed += 1
+        name = "Pictures/jttile%dp%d.png" % (page_index, collapsed)
+        pics[name] = png
+        gname = "JtTile%dp%d" % (page_index, collapsed)
+        if autostyles is not None:
+            gp = etree.SubElement(autostyles, _q("style", "style"))
+            gp.set(_q("style", "name"), gname)
+            gp.set(_q("style", "family"), "graphic")
+            props = etree.SubElement(gp, _q("style", "graphic-properties"))
+            props.set(_q("draw", "stroke"), "none")
+            props.set(_q("draw", "fill"), "none")
+        frame = etree.Element(_q("draw", "frame"))
+        frame.set(_q("draw", "style-name"), gname)
+        frame.set(_q("svg", "x"), "%.3fcm" % xs0)
+        frame.set(_q("svg", "y"), "%.3fcm" % ys0)
+        frame.set(_q("svg", "width"), "%.3fcm" % (xs1 - xs0))
+        frame.set(_q("svg", "height"), "%.3fcm" % (ys1 - ys0))
+        img = etree.SubElement(frame, _q("draw", "image"))
+        for k, v in (("href", name), ("type", "simple"),
+                     ("show", "embed"), ("actuate", "onLoad")):
+            img.set("{http://www.w3.org/1999/xlink}%s" % k, v)
+        anchor = tiles[comp[0]][0]
+        idx = list(page).index(anchor)
+        page.insert(idx, frame)
+        for i in comp:
+            try:
+                page.remove(tiles[i][0])
+            except ValueError:
+                pass
+    return collapsed
+
+
+def _render_pdf_region_png(pdf_path: Path, page_index: int,
+                           bbox_cm, page_w_cm: float, page_h_cm: float,
+                           dpi: int = 300) -> bytes | None:
+    """把原 PDF 某頁的某個區域 render 成 PNG（座標單位 cm，原點左上）。"""
+    try:
+        import fitz
+
+        with fitz.open(str(pdf_path)) as doc:
+            if page_index < 0 or page_index >= doc.page_count:
+                return None
+            page = doc[page_index]
+            r = page.rect
+            sx = r.width / max(1e-6, page_w_cm)
+            sy = r.height / max(1e-6, page_h_cm)
+            clip = fitz.Rect(bbox_cm[0] * sx, bbox_cm[1] * sy,
+                             bbox_cm[2] * sx, bbox_cm[3] * sy) & r
+            if clip.is_empty:
+                return None
+            return page.get_pixmap(dpi=dpi, clip=clip).tobytes("png")
+    except Exception as e:  # noqa: BLE001 — 收攏失敗就維持原樣,不可中斷轉檔
+        log.warning("_render_pdf_region_png 失敗 p%d: %s", page_index, e)
+        return None
+
+
 def _dedup_overprint(page) -> int:
     """清掉 PDF「疊印假粗體」在 Draw 匯入後產生的重複 / 被覆蓋文字框。回移除數。
 
@@ -664,6 +818,8 @@ def _build_writer_odt(odg_path: Path, odt_out: Path,
     # 1) automatic-styles：把每個 graphic 樣式補上「頁面絕對定位」屬性。
     #    這一步同時修好文字方塊、線條、矩形（保留各自 stroke/fill 不動）。
     autostyles = root.find(_q("office", "automatic-styles"))
+    # PDF 匯入產生的幽靈邊框（細到原稿看不見）在 Writer 也會被畫出來 → 一併關掉
+    _drop_hairline_strokes(autostyles)
     if autostyles is not None:
         for st in autostyles.findall(_q("style", "style")):
             if st.get(_q("style", "family")) != "graphic":
@@ -779,6 +935,9 @@ def _build_writer_odt(odg_path: Path, odt_out: Path,
                 continue  # 非文字形狀（漸層色塊 / 外框路徑）不搬,已在背景圖
         # 先清掉 PDF 疊印假粗體造成的重複 / 被覆蓋文字框（見 _dedup_overprint）
         _dedup_overprint(page)
+        if pdf_path is not None:
+            # 局部破圖：漸層 / 半透明圖被拆成一格格小圖塊 → 換回原 PDF 該區域畫面
+            _collapse_image_tiles(page, pdf_path, i - 1, w, h, autostyles, pics)
         # 搬移該頁所有頂層形狀（frame / line / rect / custom-shape / …）
         for shape in list(page):
             # 跳過非元素節點（comment / PI）— 否則 etree.QName 會丟 ValueError

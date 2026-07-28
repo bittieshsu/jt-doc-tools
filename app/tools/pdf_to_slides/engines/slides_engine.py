@@ -40,7 +40,9 @@ from lxml import etree
 
 from ....core import office_convert
 from ...pdf_to_office.engines.draw_engine import (
+    _collapse_image_tiles,
     _dedup_overprint,
+    _drop_hairline_strokes,
     _emit_raster_page,
     _page_has_large_image,
     _page_has_transformed_image,
@@ -80,6 +82,8 @@ def _build_impress_odp(odg_path: Path, odp_out: Path,
         root.set(_q("office", "version"), "1.3")
 
     _remap_fonts(content)          # CJK 字型補標準台灣名 + generic
+    # Draw 與 Impress 對「未指定的框線 / 填色」預設不同 → 明確釘住（見該函式說明）
+    _pin_root_graphic_defaults(styles)
 
     body = content.find(_q("office", "body"))
     drawing = body.find(_q("office", "drawing")) if body is not None else None
@@ -87,6 +91,9 @@ def _build_impress_odp(odg_path: Path, odp_out: Path,
         raise RuntimeError("Draw 匯入結果沒有 office:drawing")
 
     autostyles = content.find(_q("office", "automatic-styles"))
+    # PDF 匯入常在內容區留下細到看不見的幽靈邊框（實測 0.004cm），Impress 會把它
+    # 畫成 1px 可見線，整塊內容被框住 → 關掉（見 _drop_hairline_strokes）。
+    _drop_hairline_strokes(autostyles)
     s_auto = styles.find(_q("office", "automatic-styles"))
     if s_auto is None:
         s_auto = etree.SubElement(styles, _q("office", "automatic-styles"))
@@ -139,6 +146,9 @@ def _build_impress_odp(odg_path: Path, odp_out: Path,
                 continue
 
         _dedup_overprint(page)      # 疊印假粗體造成的重複文字框
+        if pdf_path is not None:
+            # 局部破圖：漸層 / 半透明圖被拆成一格格小圖塊 → 換回原 PDF 該區域畫面
+            _collapse_image_tiles(page, pdf_path, i - 1, w, h, autostyles, pics)
         for shape in page:
             if isinstance(shape.tag, str):
                 n_objs += 1
@@ -164,6 +174,38 @@ def _build_impress_odp(odg_path: Path, odp_out: Path,
 
     _atomic_write_odf(odp_out, data)
     return len(pages), len(pics), n_objs
+
+
+
+def _pin_root_graphic_defaults(styles) -> int:
+    """把「沒有父樣式的根 graphic 樣式」缺少的 stroke / fill 明確釘成 none。
+
+    為什麼要這樣做：ODF 的 `standard` 等根樣式常常**不指定** ``draw:stroke`` /
+    ``draw:fill``，交給應用程式的內建預設。**Draw 的預設是沒有框線也沒有填色，
+    Impress 的預設卻是藍底加框線** —— 同一份內容換個模組開就多出方框（實測：把
+    一個沒指定框線的文字方塊放進 Impress，直接被塗成藍底黑框；使用者回報的簡報
+    多出灰色方框也是這個原因）。
+
+    只補「完全沒指定」的屬性，已明確寫了 stroke/fill 的樣式一律不動 —— 那些是
+    真正要畫的框線與填色（表格框線、色塊都靠它）。
+    """
+    os_ = styles.find(_q("office", "styles"))
+    if os_ is None:
+        return 0
+    n = 0
+    for st in os_.findall(_q("style", "style")):
+        if st.get(_q("style", "family")) != "graphic":
+            continue
+        if st.get(_q("style", "parent-style-name")):
+            continue                     # 有父樣式 → 沿著鏈子繼承，不必補
+        gp = st.find(_q("style", "graphic-properties"))
+        if gp is None:
+            gp = etree.SubElement(st, _q("style", "graphic-properties"))
+        for attr in ("stroke", "fill"):
+            if gp.get(_q("draw", attr)) is None:
+                gp.set(_q("draw", attr), "none")
+                n += 1
+    return n
 
 
 def _sync_manifest(data: dict) -> None:

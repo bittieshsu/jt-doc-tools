@@ -13,7 +13,7 @@ from .router import router
 
 metadata = ToolMetadata(
     id="pdf-to-slides",
-    name="PDF 轉簡報檔（Beta）",
+    name="PDF 轉簡報檔",
     description="PDF 轉成 PowerPoint (.pptx) 或 OpenDocument 簡報 (.odp)。",
     icon="presentation",
     category="格式轉換",
