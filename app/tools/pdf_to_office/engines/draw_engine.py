@@ -383,6 +383,27 @@ def _bbox_overlap(a, b, pad=0.05) -> bool:
             and a[1] < b[3] + pad and b[1] < a[3] + pad)
 
 
+def _bbox_colocated(a, b, min_cover: float = 0.6) -> bool:
+    """兩 bbox 是否「幾乎疊在同一處」（真正的疊印假粗體會這樣）。
+
+    與 `_bbox_overlap` 的差別很關鍵：疊印是**同一段文字重畫在同一位置**，兩框的
+    重疊面積會佔掉小框的絕大部分；而表格裡相鄰儲存格只是邊緣擦到一點點。先前
+    只用「有沒有重疊」判定，導致「74.98公頃」旁邊那個獨立的「公頃」被當成
+    「170.48公頃」的疊印重複刪掉（實測台北市都發局簡報，每頁少 3 個「公頃」）。
+    """
+    if not a or not b:
+        return False
+    ix = min(a[2], b[2]) - max(a[0], b[0])
+    iy = min(a[3], b[3]) - max(a[1], b[1])
+    if ix <= 0 or iy <= 0:
+        return False
+    inter = ix * iy
+    area_a = max(1e-9, (a[2] - a[0]) * (a[3] - a[1]))
+    area_b = max(1e-9, (b[2] - b[0]) * (b[3] - b[1]))
+    # 小框有多少比例被大框蓋住
+    return inter / min(area_a, area_b) >= min_cover
+
+
 def _dedup_overprint(page) -> int:
     """清掉 PDF「疊印假粗體」在 Draw 匯入後產生的重複 / 被覆蓋文字框。回移除數。
 
@@ -409,9 +430,14 @@ def _dedup_overprint(page) -> int:
                 continue
             if not _bbox_overlap(bi, bj):
                 continue
-            # ① 完全重複（留 i 刪 j）
-            if ti == tj:
+            # ① 完全重複（留 i 刪 j）。同樣要求幾乎同位置 —— 表格裡兩個相鄰
+            #    儲存格可能都是「-」或同一個數字，那是真實內容不是疊印。
+            if ti == tj and _bbox_colocated(bi, bj):
                 to_remove.add(id(fj))
+                continue
+            # ②③ 只在「兩框幾乎疊在同一處」時才動 —— 相鄰儲存格只是邊緣擦到，
+            #     不算疊印（見 _bbox_colocated）。
+            if not _bbox_colocated(bi, bj):
                 continue
             # ② j 是純單字重複（「鄉鄉」）且該字在 i 內 → 刪 j
             if len(set(tj)) == 1 and len(tj) >= 2 and tj[0] in ti:

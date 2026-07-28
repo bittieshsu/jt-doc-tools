@@ -105,6 +105,7 @@
             <span class="nav-ch nav-ch-toggle">4. PDF 編修 API</span>
           </div>
           <div class="nav-children">
+            <a class="nav-ep" href="#pdf-轉簡報檔">PDF 轉簡報檔</a>
             <a class="nav-ep" href="#pdf-合併">PDF 合併</a>
             <a class="nav-ep" href="#pdf-分割">PDF 分割</a>
             <a class="nav-ep" href="#pdf-頁面處理">PDF 頁面處理</a>
@@ -347,6 +348,30 @@ curl <span class="hl-flag">-s</span> <span class="hl-url">http://localhost:8765/
 curl <span class="hl-flag">-s</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-office/preview/$JOB/result/1</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">--output</span> after_p1.png</code></pre>
 <hr>
+      </section>
+      <section class="doc-section" data-sec="pdf-轉簡報檔" data-title="PDF 轉簡報檔" hidden>
+<div class="doc-crumb">4. PDF 編修 API</div>
+<h4 id="pdf-轉簡報檔">PDF 轉簡報檔</h4>
+<p>把 PDF 反轉成 PowerPoint（.pptx）或 OpenDocument 簡報（.odp），<strong>一頁對一張投影片</strong>， 投影片尺寸沿用原稿（直向 PDF 也照樣還原）。走 job 模式回 <code>job_id</code>。</p>
+<p>只有一顆引擎（jtdt-layout 版面重現），因此<strong>沒有</strong> <code>engine</code> 參數。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-to-slides/convert</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>output_format</code></td><td>str</td><td></td><td><code>pptx</code>（預設）/ <code>odp</code></td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-slides/convert</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@deck.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;output_format=pptx&quot;</span> \
+  | jq
+<span class="hl-cmt"># → {&quot;job_id&quot;: &quot;...&quot;, &quot;download_url&quot;: &quot;/api/jobs/.../download&quot;}</span>
+
+<span class="hl-cmt"># 輸出 OpenDocument 簡報（物件多時比 .pptx 快）</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-slides/convert</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@deck.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;output_format=odp&quot;</span> \
+  | jq</code></pre>
+<p>前後對照縮圖與 pdf-to-office 相同：</p>
+<pre><code class="lang-text"><span class="hl-method">GET</span> /tools/pdf-to-slides/preview/{job_id}/orig/{page}     <span class="hl-cmt"># 轉換前（原 PDF）</span>
+<span class="hl-method">GET</span> /tools/pdf-to-slides/preview/{job_id}/result/{page}   <span class="hl-cmt"># 轉換後（簡報渲染）</span></code></pre>
+<p>job 完成後 <code>GET /api/jobs/{job_id}</code> 的 <code>meta.stats</code> 內含 <code>pages</code>（投影片張數）、 <code>images</code>、<code>objects</code>（物件總數）。</p>
+<blockquote><p><strong>環境需求</strong>：需要 office 套件的 <strong>Impress 模組</strong>（<code>oxoffice-impress</code> / <code>libreoffice-impress</code>）。缺模組時只會看到「轉檔成功但找不到輸出」， 可在「設定 → 相依套件檢查」確認。</p></blockquote>
       </section>
       <section class="doc-section" data-sec="pdf-合併" data-title="PDF 合併" hidden>
 <div class="doc-crumb">4. PDF 編修 API</div>

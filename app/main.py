@@ -14,7 +14,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.13.4"
+VERSION = "1.14.1"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -195,6 +195,7 @@ _TOOL_ALIASES = {
     "einvoice-scan":      "einvoice e-invoice invoice scan qr qrcode receipt taiwan taipei vat tax 電子發票 發票 掃描 QR Code 條碼 二維碼 統編 統一發票 載具 銷售額 稅額 買方 賣方 報帳 記帳 對帳",
     "vat-lookup":         "vat lookup company business taiwan 統編 統一編號 查詢 反查 公司 行號 政府機關 學校 行業 名稱 地址 BGMOPEN 賣方 買方",
     "pdf-to-office":      "pdf2docx pdf-to-docx pdf-to-word pdf-to-odt convert reverse word document docx odt openoffice libreoffice oxoffice pdf word 轉 word 轉檔 反轉 反向 轉文書 轉成 word 轉成 odt PDF轉文書檔 PDF轉Word PDF轉ODT 文字方塊 可編輯",
+    "pdf-to-slides":      "pdf2pptx pdf-to-pptx pdf-to-odp pdf-to-slides pptx odp powerpoint impress keynote slide slides presentation deck convert reverse PDF轉簡報 PDF轉PPT PDF轉PPTX PDF轉ODP 簡報 投影片 簡報檔 轉簡報 轉投影片 轉成 ppt 轉成 pptx 版面重現 一頁一張投影片 可編輯",
     "pdf-to-markdown":    "pdf2md pdf-to-md pdf-to-markdown markdown md llm rag pymupdf4llm convert structured text 轉 markdown 轉成 markdown 結構化 標題層級 表格 餵 LLM RAG 預處理 chunking 文件轉換",
     "markdown-to-doc":    "md2doc md-to-doc markdown-to-doc markdown to pdf docx odt office convert export theme style commonmark gfm Markdown 轉 PDF 轉 Word 轉文書 轉換 主題 配色 渲染 報告 文件 預覽",
 }

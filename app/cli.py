@@ -859,6 +859,7 @@ def _ensure_system_deps_for_update() -> None:
     # OxOffice / LibreOffice X11 runtime libs — Linux only (自 v1.3.15 起)
     _ensure_oxoffice_x11_libs()
     # zbar — pyzbar (einvoice-scan QR code 解析) 的 native 依賴 (自 v1.7.78 起)
+    _ensure_office_impress()
     _ensure_zbar()
     # Java JRE — OxOffice/LibreOffice 部分匯入需要 (自 v1.4.40 起，客戶 v1.4.39 踩到)
     _ensure_java_runtime()
@@ -1133,6 +1134,55 @@ def _ensure_oxoffice_x11_libs() -> None:
         print("  WARNING: X11 libs install failed  "
               "(office-to-pdf may fail until installed manually)",
               file=sys.stderr)
+
+
+def _ensure_office_impress() -> None:
+    """確保 office 套件含 Impress 模組（「PDF 轉簡報檔」的必要條件）。
+
+    為什麼特別處理：缺這個模組時 soffice 只回一句 "source file could not be
+    loaded"，**連正常的 .odp 都載不進來**，訊息完全看不出是缺元件；而部分發行版的
+    `libreoffice` meta 套件並不含 Impress，既有客戶升級後就會突然不能用。
+    """
+    try:
+        from .core.sys_deps import _probe_office
+    except Exception:  # noqa: BLE001
+        return
+    info = _probe_office()
+    if not info.get("installed") or info.get("impress"):
+        return
+    flavor = info.get("flavor") or "LibreOffice"
+    if flavor == "OxOffice":
+        # OxOffice 的模組來自 OSSII 釋出的套件包，不在系統套件庫裡 → 無法自動補裝
+        print("  WARNING: OxOffice 缺 Impress 模組，PDF 轉簡報檔不可用。",
+              file=sys.stderr)
+        print("    重跑安裝程式即可補齊："
+              "https://github.com/OSSII/OxOffice/releases", file=sys.stderr)
+        return
+    if not _is_linux():
+        print("  WARNING: LibreOffice 缺 Impress 模組，PDF 轉簡報檔不可用。"
+              "請重新安裝 LibreOffice 並勾選 Impress。", file=sys.stderr)
+        return
+    print("Installing Impress module (needed by PDF to slides) ...")
+    rc = -1
+    try:
+        if shutil.which("apt-get"):
+            env = os.environ.copy()
+            env["DEBIAN_FRONTEND"] = "noninteractive"
+            rc = subprocess.call(["apt-get", "install", "-y",
+                                  "libreoffice-impress"], env=env)
+        elif shutil.which("dnf"):
+            rc = subprocess.call(["dnf", "install", "-y", "libreoffice-impress"])
+        else:
+            print("  WARNING: no apt-get or dnf; install libreoffice-impress "
+                  "manually", file=sys.stderr)
+            return
+    except Exception as e:  # noqa: BLE001
+        print(f"  WARNING: Impress module install errored: {e}", file=sys.stderr)
+        return
+    print("  OK: Impress module installed" if rc == 0
+          else "  WARNING: Impress module install failed "
+               "(PDF to slides unavailable until installed)",
+          file=sys.stderr if rc != 0 else sys.stdout)
 
 
 def _ensure_zbar() -> None:

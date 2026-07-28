@@ -406,10 +406,13 @@ install_oxoffice_linux() {
 
 install_libreoffice_linux() {
     log "改用 LibreOffice ..."
+    # 顯式列出 impress：有些發行版 / 精簡安裝的 libreoffice 這個 meta 套件不含
+    # Impress 模組，而「PDF 轉簡報檔」少了它就不能用 —— 且缺模組時 soffice 只回
+    # 一句 "source file could not be loaded"，訊息完全看不出是缺元件。
     if command -v apt-get >/dev/null 2>&1; then
-        DEBIAN_FRONTEND=noninteractive apt-get install -y libreoffice fonts-noto-cjk
+        DEBIAN_FRONTEND=noninteractive apt-get install -y libreoffice libreoffice-impress fonts-noto-cjk
     elif command -v dnf >/dev/null 2>&1; then
-        dnf install -y libreoffice google-noto-cjk-fonts
+        dnf install -y libreoffice libreoffice-impress google-noto-cjk-fonts
     else
         return 1
     fi

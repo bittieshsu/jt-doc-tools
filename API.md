@@ -210,6 +210,51 @@ curl -s http://localhost:8765/tools/pdf-to-office/preview/$JOB/result/1 \
 
 ## 4. PDF 編修 API
 
+
+### PDF 轉簡報檔
+
+把 PDF 反轉成 PowerPoint（.pptx）或 OpenDocument 簡報（.odp），**一頁對一張投影片**，
+投影片尺寸沿用原稿（直向 PDF 也照樣還原）。走 job 模式回 `job_id`。
+
+只有一顆引擎（jtdt-layout 版面重現），因此**沒有** `engine` 參數。
+
+```text
+POST /tools/pdf-to-slides/convert
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | ✓ | PDF |
+| `output_format` | str | | `pptx`（預設）/ `odp` |
+
+```bash
+curl -X POST http://localhost:8765/tools/pdf-to-slides/convert \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@deck.pdf" -F "output_format=pptx" \
+  | jq
+# → {"job_id": "...", "download_url": "/api/jobs/.../download"}
+
+# 輸出 OpenDocument 簡報（物件多時比 .pptx 快）
+curl -X POST http://localhost:8765/tools/pdf-to-slides/convert \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@deck.pdf" -F "output_format=odp" \
+  | jq
+```
+
+前後對照縮圖與 pdf-to-office 相同：
+
+```text
+GET /tools/pdf-to-slides/preview/{job_id}/orig/{page}     # 轉換前（原 PDF）
+GET /tools/pdf-to-slides/preview/{job_id}/result/{page}   # 轉換後（簡報渲染）
+```
+
+job 完成後 `GET /api/jobs/{job_id}` 的 `meta.stats` 內含 `pages`（投影片張數）、
+`images`、`objects`（物件總數）。
+
+> **環境需求**：需要 office 套件的 **Impress 模組**（`oxoffice-impress` /
+> `libreoffice-impress`）。缺模組時只會看到「轉檔成功但找不到輸出」，
+> 可在「設定 → 相依套件檢查」確認。
+
 ### PDF 合併
 
 把多份 PDF 依上傳順序合併為一份。

@@ -1,0 +1,570 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}PDF 轉簡報檔 · {{ app_name }}{% endblock %}
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+.p2o-stat { display:grid; grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr);
+  gap:10px; margin:10px 0; }
+@media (max-width:560px){ .p2o-stat { grid-template-columns:1fr; } }
+.p2o-stat .item { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px;
+  padding:10px 12px; min-width:0; }
+.p2o-stat #sName { word-break:break-all; }
+.p2o-stat .lbl { font-size:11.5px; color:#64748b; }
+.p2o-stat .val { font-size:18px; font-weight:700; color:#0f172a; margin-top:2px; }
+
+.p2o-fmt { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; }
+.p2o-fmt label {
+  flex:1; min-width:200px; cursor:pointer;
+  border:1.5px solid #e5e7eb; border-radius:10px; padding:14px;
+  display:flex; flex-direction:column; gap:4px; transition:all .12s;
+  background:#fff;
+}
+.p2o-fmt label:hover { border-color:#93c5fd; background:#eff6ff; }
+/* 引擎面板 3 張卡：預設 3 並列；≤820px 掉成 2 欄；≤520px 一行一個（響應式）。 */
+.p2o-fmt input[type=radio] { display:none; }
+.p2o-fmt input[type=radio]:checked + label,
+.p2o-fmt label.active { border-color:#2563eb; background:#dbeafe; }
+.p2o-fmt .ttl { font-weight:600; font-size:14px; color:#0f172a; display:flex; align-items:center; gap:8px; }
+.p2o-fmt .ttl .ic-doc {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:22px; height:22px; border-radius:4px; color:#fff;
+  font-size:11px; font-weight:800; letter-spacing:-0.5px; flex-shrink:0;
+}
+.p2o-fmt .ttl .ic-doc.pptx { background:linear-gradient(135deg,#1d4ed8,#2563eb); }
+.p2o-fmt .ttl .ic-doc.odp  { background:linear-gradient(135deg,#16a34a,#22c55e); }
+.p2o-fmt .desc { font-size:12px; color:#475569; line-height:1.5; }
+/* ── 引擎卡精緻版：識別色點 + 彩色重點句 + 網格對齊語意標籤 ── */
+.p2o-fmt .ttl .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+/* 標題徽章（分色）：預設=藍、實驗=琥珀、新=綠 */
+.p2o-fmt .ttl .bdg { font-size:10px; font-weight:700; padding:1px 8px; border-radius:999px; flex-shrink:0; }
+.p2o-fmt .ttl .bdg-def { background:#dbeafe; color:#1e40af; }
+.p2o-fmt .ttl .bdg-exp { background:#fef3c7; color:#92400e; }
+.p2o-fmt .ttl .bdg-new { background:#d1fae5; color:#065f46; }
+.p2o-fmt .desc .body { margin:4px 0 0; color:#475569; }
+/* 適合 / 限制：兩欄網格，標籤同寬，後續文字整齊對齊；換行不縮排到標籤下 */
+.p2o-fmt .desc .erows { margin-top:6px; display:grid; gap:4px; }
+.p2o-fmt .desc .erow { display:grid; grid-template-columns:2.8em 1fr; gap:7px; align-items:start; }
+.p2o-fmt .desc .etag { text-align:center; font-size:10px; font-weight:700;
+  padding:1px 0; border-radius:5px; line-height:1.5; }
+.p2o-fmt .desc .etag-fit { background:#dcfce7; color:#166534; }
+.p2o-fmt .desc .etag-limit { background:#ffedd5; color:#9a3412; }
+.p2o-fmt .desc .etxt { padding-top:1px; }
+.p2o-fmt .desc b { font-weight:700; }
+/* 引擎識別色（色點 + 粗體關鍵詞）：藍 / 紫 / 青 */
+.eng-c-blue   .dot { background:#2563eb; }  .eng-c-blue   .desc b { color:#1d4ed8; }
+.eng-c-violet .dot { background:#7c3aed; }  .eng-c-violet .desc b { color:#6d28d9; }
+.eng-c-teal   .dot { background:#0d9488; }  .eng-c-teal   .desc b { color:#0f766e; }
+
+.p2o-warn {
+  background:#fef2f2; border:1px solid #fca5a5; border-radius:8px;
+  padding:10px 12px; margin-top:10px; color:#991b1b; font-size:13px;
+}
+
+.p2o-result { background:#ecfdf5; border:1px solid #86efac; border-radius:10px;
+  padding:14px 16px; margin-top:12px; }
+.p2o-result h3 { margin:0 0 10px; color:#064e3b; font-size:15px; }
+.p2o-result .meta { font-size:13px; color:#065f46; line-height:1.6; margin-top:10px; }
+.p2o-result .meta b { color:#064e3b; }
+/* 結果列頂端 bar：下載鈕靠左，轉換完成 / 引擎 / 格式 靠右同一行 */
+.p2o-result-bar { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.p2o-result-summary { margin-left:auto; display:flex; align-items:center; gap:8px;
+  flex-wrap:wrap; font-size:12.5px; }
+/* 每個摘要項目做成標籤（chip）質感：圓角 + 邊框 + 淺底 */
+.p2o-result-summary .p2o-done,
+.p2o-result-summary .p2o-kv {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 11px; border-radius:999px; line-height:1.6;
+  background:#ffffff; border:1px solid #a7f3d0; color:#047857; white-space:nowrap;
+}
+.p2o-result-summary .p2o-done { background:#d1fae5; border-color:#6ee7b7;
+  color:#064e3b; font-weight:700; }
+.p2o-result-summary .p2o-kv b { color:#064e3b; font-weight:700; }
+/* 開始轉換列：按鈕靠左，進度條 + 文字接在右邊填滿 */
+.p2o-convert-row { display:flex; align-items:center; gap:16px; }
+.p2o-convert-row > .btn { flex:0 0 auto; }
+#p2sJob { flex:1 1 auto; min-width:0; margin:0; }
+#p2sJob .job-row { margin:0; }
+.p2o-result .meta-grid {
+  display:grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 16px; row-gap: 6px;
+  font-size:13px; color:#065f46; align-items:baseline;
+}
+.p2o-result .meta-grid .lbl { color:#047857; font-weight:600; white-space:nowrap; }
+.p2o-result .meta-grid .val { color:#064e3b; }
+.p2o-result .meta-grid .val b { color:#064e3b; }
+.p2o-result .fixer-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.p2o-result .fixer-chip {
+  display:inline-flex; align-items:center; gap:6px;
+  background:#fff; border:1px solid #86efac; border-radius:999px;
+  padding:2px 10px; font-size:12px; color:#065f46;
+}
+.p2o-result .fixer-chip b { color:#047857; font-weight:700; }
+
+/* 物件量提示條：版面重現引擎會把每段文字變成獨立文字方塊，物件一多，Word /
+   Writer / Pages 開檔與捲動都會明顯變慢 → 依實測門檻分兩級提醒（見 JS）。 */
+.p2o-heavy { display:flex; gap:8px; align-items:flex-start; margin:10px 0 0;
+  padding:10px 12px; border-radius:8px; font-size:13px; line-height:1.65; }
+.p2o-heavy.warn { background:#fffbeb; border:1px solid #fcd34d; color:#92400e; }
+.p2o-heavy.bad  { background:#fef2f2; border:1px solid #fca5a5; color:#991b1b; }
+.p2o-heavy b { font-weight:700; }
+.p2o-heavy .p2o-heavy-ic { flex:0 0 auto; margin-top:1px; }
+
+/* 進階選項 disabled 狀態（jtdt-reform 引擎時整個 4. 進階選項區無作用） */
+.p2o-adv-disabled { opacity:0.45; pointer-events:none; user-select:none; }
+.p2o-adv-disabled summary { cursor:default; }
+
+/* 前後對照 PNG 預覽（第 1 頁） */
+.p2o-preview { margin-top:14px; padding-top:12px; border-top:1px dashed #86efac; }
+.p2o-preview .preview-header { font-size:13px; font-weight:600; color:#047857; margin-bottom:8px; }
+.p2o-preview .preview-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+.p2o-preview .preview-cell { background:#fff; border:1px solid #86efac; border-radius:8px;
+  padding:8px; display:flex; flex-direction:column; gap:6px; }
+.p2o-preview .preview-label { font-size:11.5px; font-weight:600; color:#065f46; text-align:center; }
+/* 設計 / 圖片版面（jtdt-layout 整頁 raster）中性說明——非「內容遺失」紅字警示 */
+.p2o-raster-note { color:#0f766e; font-weight:400; font-size:11px; }
+.p2o-preview .preview-cell img { width:100%; height:auto; display:block;
+  border:1px solid #d1fae5; border-radius:4px; background:#fafafa; }
+@media (max-width: 720px) {
+  .p2o-preview .preview-grid { grid-template-columns: 1fr; }
+}
+
+/* per-fixer toggle 進階選項 */
+.p2o-fixers { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px;
+  padding:10px 12px; margin-top:10px; }
+.p2o-fixers summary { cursor:pointer; font-weight:600; font-size:13px; color:#334155; }
+.p2o-fixers .grid { display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+  gap:6px 14px; margin-top:10px; font-size:12.5px; color:#334155; }
+.p2o-fixers label { display:flex; align-items:center; gap:6px; cursor:pointer; }
+
+.p2o-report { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px;
+  padding:10px 12px; margin-top:10px; }
+.p2o-report summary { cursor:pointer; font-weight:600; font-size:13px; color:#334155; }
+.p2o-report pre { background:#f1f5f9; padding:10px; border-radius:6px;
+  font-size:11px; overflow-x:auto; max-height:300px; margin-top:8px; }
+
+@keyframes p2o-spin { to { transform: rotate(360deg); } }
+.p2o-spinner { display:inline-block; width:14px; height:14px;
+  border:2px solid currentColor; border-right-color:transparent;
+  border-radius:50%; animation:p2o-spin .7s linear infinite;
+  vertical-align:-3px; margin-right:6px; }
+.btn:disabled, .btn[disabled] { opacity:.6; cursor:not-allowed; pointer-events:none; }
+/* JobProgress 預設「下載 PDF / 下載 PNG」按鈕在此不適用（輸出是 pptx/odp
+   不是 pdf）— 完全藏起來，下載走我們綠色 result panel 內的「下載」按鈕。 */
+/* 下載走綠色 result panel 的「下載」鈕；「處理新檔案」多餘（上傳新檔即自動
+   重設整個流程）— 一律藏掉 job_progress 預設的這三顆動作鈕。 */
+#p2sJob .job-download, #p2sJob .job-download-png, #p2sJob .job-reset { display: none !important; }
+#p2sJob .job-actions { display: none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{{ icon('presentation', size=22) }} PDF 轉簡報檔</h1>
+<p class="muted">把 PDF 轉成 <b>PowerPoint (.pptx)</b> 或 <b>OpenDocument 簡報 (.odp)</b>，<b>一頁對一張投影片</b>，位置 / 圖片 / 框線依原始座標還原，投影片尺寸沿用原稿。
+<br><span data-s="s3a4c95a1">⚠ 還原的是版面不是簡報結構：文字與圖形是各自獨立的物件，沒有標題 / 內容版面配置，也沒有動畫與備忘稿；適合「拿到一份長得跟原簡報一樣、可以再微調」的情境。掃描檔請先用「OCR 文字辨識」工具轉成可選取文字 PDF 再來。</span></p>
+
+<div class="panel">
+  <h2>1. 上傳 PDF</h2>
+  {% with upload_id='p2sUpload', accept='application/pdf', hint='單檔、PDF only。掃描 PDF 請先用 OCR 工具轉成可選取文字 PDF 再來。' %}
+    {% include "components/file_upload.html" %}
+  {% endwith %}
+  <div id="warnZone"></div>
+  <div id="statBox" hidden>
+    <div class="p2o-stat">
+      <div class="item"><div class="lbl">檔案</div><div class="val" id="sName">-</div></div>
+      <div class="item"><div class="lbl">頁數</div><div class="val" id="sPages">-</div></div>
+      <div class="item"><div class="lbl">大小</div><div class="val" id="sSize">-</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="optsPanel" hidden>
+  <h2>2. 選擇輸出格式</h2>
+  <div class="p2o-fmt">
+    <input type="radio" name="fmt" id="fmtPptx" value="pptx" checked>
+    <label for="fmtPptx" data-fmt="pptx">
+      <div class="ttl"><span class="ic-doc pptx">P</span>PowerPoint (.pptx)</div>
+      <div class="desc">Microsoft PowerPoint 原生格式，使用率最廣。</div>
+    </label>
+    <input type="radio" name="fmt" id="fmtOdp" value="odp">
+    <label for="fmtOdp" data-fmt="odp">
+      <div class="ttl"><span class="ic-doc odp">O</span>OpenDocument 簡報 (.odp)</div>
+      <div class="desc">Impress 原生格式，開源開放；物件多時比 .pptx 快。</div>
+    </label>
+  </div>
+</div>
+
+<div class="panel" id="convertPanel" hidden>
+  <div class="p2o-convert-row">
+    <button class="btn btn-primary" id="btnConvert">{{ icon('file-text', size=14) }} 開始轉換</button>
+    <button class="btn btn-danger" id="btnCancel" type="button" hidden>{{ icon('close', size=14) }} 停止轉換</button>
+    {% with progress_id='p2sJob' %}{% include "components/job_progress.html" %}{% endwith %}
+  </div>
+</div>
+
+<div class="panel p2o-result" id="resultPanel" hidden>
+  <div class="p2o-result-bar">
+    <a class="btn btn-primary" id="rDownload" download>{{ icon('download', size=14) }} 下載</a>
+    {% if workspace_enabled(request) %}<button class="btn" type="button" id="rSaveWs" hidden>{{ icon('archive', size=14) }} 存至工作區</button>{% endif %}
+    <div class="p2o-result-summary">
+      <span class="p2o-done">{{ icon('check', size=14) }} 轉換完成</span>
+      <span class="p2o-kv">引擎 <b id="rEngine">-</b></span>
+      <span class="p2o-kv">格式 <b id="rFormat">-</b></span>
+    </div>
+  </div>
+  <div class="p2o-heavy" id="rHeavy" hidden></div>
+  <div class="meta" id="rMeta"></div>
+  <div class="p2o-preview" id="rPreview" hidden>
+    <div class="preview-header" id="rPreviewHeader">前後對照（DPI 90）</div>
+    <div id="rPreviewPages"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script>
+<script src="/static/js/job_progress.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+const $ = (id) => document.getElementById(id);
+let uploadId = null;
+
+// 物件量提示：版面重現（jtdt-layout）把 PDF 每段文字變成獨立文字方塊，物件數一多，
+// 使用者用 Word / Writer / Pages 開檔與捲動都會明顯變慢（伺服器實測開檔+排版：
+// 523 物件 5 秒、1607 物件 22 秒、6723 物件 61 秒、18882 物件超過 15 分鐘未完成；
+// 桌面 GUI 還會更慢好幾倍）。門檻取實測「開始有感」與「明顯痛」兩條線。
+const HEAVY_WARN_TOTAL = 800,  HEAVY_WARN_PER_PAGE = 250;
+const HEAVY_BAD_TOTAL  = 3000, HEAVY_BAD_PER_PAGE  = 500;
+
+function renderHeavyNotice(rep, sm) {
+  const box = $('rHeavy');
+  if (!box) return;
+  box.hidden = true;
+  box.textContent = '';
+  const st = (rep && rep.native_stats) || {};
+  const objs = +st.objects || 0;
+  const pages = Math.max(1, +st.pages || 0);
+  if (!objs) return;                       // 其他引擎沒有這個數字 → 不提示
+  const perPage = Math.round(objs / pages);
+  // 已自動分段轉換（內部實作，產出仍是單一檔）→ 讓使用者知道發生了什麼
+  if (rep.chunked) {
+    const parts = +st.parts || (st.chunks || []).length;
+    box.className = 'p2o-heavy warn';
+    const ic = document.createElement('span');
+    ic.className = 'p2o-heavy-ic';
+    ic.textContent = '\u2139';
+    box.appendChild(ic);
+    const tx = document.createElement('span');
+    const b = document.createElement('b');
+    b.textContent = '大型文件，已自動分段轉換後合併　';
+    tx.appendChild(b);
+    tx.appendChild(document.createTextNode(
+      `這份 PDF 共 ${pages} 頁、${objs.toLocaleString()} 個文字方塊 / 圖形。整份一次`
+      + `轉換會慢到不可用，因此自動分成 ${parts} 段轉換再合併回單一檔案 —— `
+      + `你下載到的仍是一份完整文件。物件這麼多的文件，用 Word / Writer / Pages `
+      + `開啟仍可能需要數分鐘；若只需要部分頁面，建議先用「PDF 頁面管理」取出需要的頁再轉。`));
+    box.appendChild(tx);
+    box.hidden = false;
+    return;
+  }
+  const bad = (objs >= HEAVY_BAD_TOTAL) || (perPage >= HEAVY_BAD_PER_PAGE);
+  const warn = (objs >= HEAVY_WARN_TOTAL) || (perPage >= HEAVY_WARN_PER_PAGE);
+  if (!warn && !bad) return;
+  box.className = 'p2o-heavy ' + (bad ? 'bad' : 'warn');
+  const ic = document.createElement('span');
+  ic.className = 'p2o-heavy-ic';
+  ic.textContent = bad ? '\u26A0' : '\u2139';
+  box.appendChild(ic);
+  const txt = document.createElement('span');
+  const head = document.createElement('b');
+  head.textContent = bad ? '這份檔案物件很多，開啟會很慢　' : '這份檔案物件較多　';
+  txt.appendChild(head);
+  txt.appendChild(document.createTextNode(
+    `共 ${objs.toLocaleString()} 個文字方塊 / 圖形（${pages} 張投影片，平均每張 ${perPage} 個）。` +
+    (bad
+      ? '用 PowerPoint / Impress / Keynote 開啟可能需要數分鐘，捲動也會卡頓。'
+        + '若只需要部分投影片，建議先用「PDF 頁面管理」取出需要的頁再轉。'
+      : '用 PowerPoint / Impress 開啟時可能需要數十秒，屬正常現象。')));
+  box.appendChild(txt);
+  box.hidden = false;
+}
+
+function fmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  return (n/1024/1024).toFixed(1) + ' MB';
+}
+
+async function readErr(r) {
+  // FastAPI HTTPException 回 {"detail":"..."}；其他情況可能純文字 — 兩者都解出乾淨訊息
+  const txt = await r.text();
+  try {
+    const j = JSON.parse(txt);
+    if (j && j.detail) return j.detail;
+    if (j && j.error) return j.error;
+  } catch (_) {}
+  return txt;
+}
+
+function setBtnBusy(btn, busy, label) {
+  if (busy) {
+    btn.dataset.origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="p2o-spinner"></span>${label}`;
+  } else {
+    btn.disabled = false;
+    if (btn.dataset.origHtml) btn.innerHTML = btn.dataset.origHtml;
+  }
+}
+
+
+// 記住「輸出格式」選擇 — 預設 .pptx，使用者改過就用 localStorage 記住
+(function rememberFormat() {
+  const KEY = 'pdf-to-slides.output_format';
+  const saved = (function(){ try { return localStorage.getItem(KEY); } catch(e) { return null; }})();
+  if (saved === 'pptx' || saved === 'odp') {
+    const r = document.querySelector(`input[name="fmt"][value="${saved}"]`);
+    if (r) r.checked = true;
+  }
+  document.querySelectorAll('input[name="fmt"]').forEach(r => {
+    r.addEventListener('change', () => {
+      try { localStorage.setItem(KEY, r.value); } catch(e) {}
+    });
+  });
+})();
+
+const fu = new FileUpload($('p2sUpload'), async (f) => {
+  if (!f) {
+    $('warnZone').innerHTML = '';
+    $('statBox').hidden = true;
+    $('optsPanel').hidden = true;
+    $('convertPanel').hidden = true;
+    $('resultPanel').hidden = true;
+    jp.hide();
+    return;
+  }
+  $('warnZone').innerHTML = '';
+  $('statBox').hidden = true;
+  $('optsPanel').hidden = true;
+  $('resultPanel').hidden = true;
+  // 重設前次轉換的 job progress 面板 + 停止鈕（換新檔即重來）
+  if ($('btnCancel')) $('btnCancel').hidden = true;
+  jp.hide();
+  const fd = new FormData();
+  fd.append('file', f);
+  const r = await fu.upload('/tools/pdf-to-slides/upload', fd, {processingLabel: '解析 PDF 中…'});
+  if (!r.ok) {
+    alert('上傳失敗：' + await readErr(r));
+    return;
+  }
+  const j = await r.json();
+  uploadId = j.upload_id;
+  $('sName').textContent = j.filename;
+  $('sPages').textContent = j.pages;
+  $('sSize').textContent = fmtBytes(j.size);
+  $('statBox').hidden = false;
+  if (j.is_scanned_likely) {
+    $('warnZone').innerHTML = `<div class="p2o-warn">⚠ 偵測到此 PDF 沒有文字層（多半是掃描檔）。轉檔結果會是空白的，請先用「OCR 文字辨識」工具把它變成可選取文字 PDF 後再回來。</div>`;
+  }
+  $('optsPanel').hidden = false;
+  $('convertPanel').hidden = false;
+});
+
+$('btnConvert').addEventListener('click', async () => {
+  if (!uploadId) return alert('請先上傳 PDF');
+  const btn = $('btnConvert');
+  if (btn.disabled) return;
+  const fmt = document.querySelector('input[name=fmt]:checked').value;
+  $('resultPanel').hidden = true;
+  setBtnBusy(btn, true, '轉換中…');
+  let r;
+  try {
+    r = await fetch('/tools/pdf-to-slides/submit', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({upload_id: uploadId, output_format: fmt}),
+    });
+  } catch (e) {
+    setBtnBusy(btn, false);
+    return alert('送出失敗：' + e.message);
+  }
+  if (!r.ok) {
+    setBtnBusy(btn, false);
+    return alert('送出失敗：' + await readErr(r));
+  }
+  const j = await r.json();
+  jp.track(j.job_id);
+  $('btnCancel').hidden = false;   // 轉換中顯示「停止轉換」
+});
+
+// 停止轉換：呼叫 cancel API + 停輪詢 + 還原 UI
+$('btnCancel').addEventListener('click', async () => {
+  $('btnCancel').disabled = true;
+  await jp.cancel();
+  $('btnCancel').disabled = false;
+  $('btnCancel').hidden = true;
+  setBtnBusy($('btnConvert'), false);
+  jp.hide();
+  $('resultPanel').hidden = true;
+});
+
+const jp = new JobProgress($('p2sJob'), {
+  onCancel: () => {
+    $('btnCancel').hidden = true;
+    setBtnBusy($('btnConvert'), false);
+  },
+  onDone: (jobData) => {
+    $('btnCancel').hidden = true;
+    setBtnBusy($('btnConvert'), false);
+    const meta = jobData.meta || {};
+    const sm = meta.summary || {};
+    const rep = sm.report || {};
+    // v1.9.15：把 result_filename 嵌進 URL（路徑最後一段）+ 同步 download
+    // attr — 避免 server 回 404 時 browser fallback 用 URL 末段「download」
+    // + Content-Type=json 取名為 "download.json"。
+    const _fn = jobData.result_filename || `${(sm.output_format||'pptx')}-result.${(sm.output_format||'pptx')}`;
+    $('rDownload').href = `/api/jobs/${jobData.id}/download/${encodeURIComponent(_fn)}`;
+    $('rDownload').setAttribute('download', _fn);
+    // 存至工作區（docx/odt）：走 job_id server 端複製，免重新下載
+    const _wsBtn = $('rSaveWs');
+    if (_wsBtn && window.attachWorkspaceSave) {
+      window.attachWorkspaceSave(_wsBtn, () => ({
+        jobId: jobData.id, name: _fn, tool: 'pdf-to-slides' }));
+    }
+    const rows = [];
+    renderHeavyNotice(rep, sm);
+    const primaryEng = 'jtdt-layout';   // 本工具只有一顆引擎
+    // v1.10.1：引擎 / 格式 移到結果列頂端 bar（下載鈕右側），不再放進 rMeta 細表
+    $('rEngine').textContent = primaryEng;
+    $('rFormat').textContent = (sm.output_format || '').toUpperCase();
+    if (rep.diagnosis && rep.diagnosis.summary) {
+      const ds = rep.diagnosis.summary;
+      rows.push(['語言', ds.language_guess || '-']);
+      rows.push(['頁數', ds.page_count]);
+      rows.push(['內文字型', `${ds.primary_body_font_pdf || '-'}　${ds.primary_body_font_size_pdf}pt`]);
+    }
+    if (rep.alignment) {
+      rows.push(['對齊率', `<b>${(rep.alignment.match_rate*100).toFixed(0)}%</b>　（已對齊段落 ${rep.alignment.matched}）`]);
+    }
+    if (rep.fixers && rep.fixers.length) {
+      const chips = rep.fixers.map(f => {
+        const map = {
+          fake_table_remove:   ['假表格移除', f.removed_tables],
+          font_normalize:      ['字型正規化', f.changes],
+          paragraph_merge:     ['合併段落',   f.merged],
+          paragraph_split:     ['段落拆分',   f.split],
+          heading_detect:      ['標題識別',   f.promoted],
+          list_detect:         ['清單識別',   f.converted_paragraphs],
+          header_footer:       ['頁首頁尾',   (f.moved_to_header||0) + (f.moved_to_footer||0)],
+          image_position_fix:  ['圖片位置',   f.adjusted],
+          cjk_typography:      ['中文排版',   f.inter_cjk_spaces_removed],
+          cleanup:             ['清雜訊',     (f.removed_empty_paragraphs||0) + (f.removed_tiny_images||0)],
+          table_autofit:       ['表格寬度',   f.tables_changed],
+          table_normalize:     ['表格樣式',   f.tables_styled],
+          table_cell_repair:   ['表格cell修復', f.filled],
+          table_dedup_cells:   ['表格合併cell', (f.horizontal_merges||0)+(f.vertical_merges||0)],
+          title_split:         ['標題拆段',   f.split],
+          bbox_layout:         ['版面分析',   (f.multi_column_pages?.length||0) + (f.out_of_order_paragraphs||0)],
+          page_geometry:       ['頁面幾何',   1],
+        };
+        const m = map[f.fixer];
+        if (!m) return null;
+        const [label, n] = m;
+        if (!n) return null;
+        // hover detail：把該 fixer 的所有非 trivial 欄位拼成 "k=v · k=v"
+        const detail = Object.entries(f)
+          .filter(([k, v]) => k !== 'fixer' && v !== 0 && v !== '' && v !== null && v !== undefined && (typeof v !== 'object' || (Array.isArray(v) && v.length > 0)))
+          .map(([k, v]) => {
+            if (Array.isArray(v)) return `${k}=${v.length}`;
+            if (typeof v === 'object') return `${k}=${JSON.stringify(v).slice(0,40)}`;
+            return `${k}=${String(v).slice(0,30)}`;
+          })
+          .join(' · ');
+        const titleAttr = detail ? ` title="${detail.replace(/"/g, '&quot;')}"` : '';
+        return `<span class="fixer-chip"${titleAttr}>${label}<b>${n}</b></span>`;
+      }).filter(Boolean);
+      rows.push(['修正',
+        chips.length
+          ? `<div class="fixer-chips">${chips.join('')}</div>`
+          : '<span data-s="s8cd4ae71">無變動</span>'
+      ]);
+    }
+    if (rows.length) {
+      $('rMeta').innerHTML = '<div class="meta-grid">' +
+        rows.map(([k, v]) => `<div class="lbl">${k}</div><div class="val">${v}</div>`).join('') +
+        '</div>';
+      $('rMeta').hidden = false;
+    } else {
+      $('rMeta').innerHTML = '';
+      $('rMeta').hidden = true;
+    }
+    // v1.9.36：多頁前後對照 — 一律顯示前 6 頁
+    const previewWrap = $('rPreview');
+    const pagesContainer = $('rPreviewPages');
+    const header = $('rPreviewHeader');
+    const pv = (meta.preview || {});
+    let pageIdxs = (pv.page_indices || []); // 0-based
+    if (!pageIdxs.length) pageIdxs = [0];
+    const nOrig = pv.orig_pages || pageIdxs.length;
+    if (header) {
+      header.textContent = (nOrig <= 6)
+        ? `全部 ${nOrig} 頁前後對照（DPI 90）`
+        : `前後對照（DPI 90）— 共 ${nOrig} 頁，顯示前 6 頁`;
+    }
+    const fmt = (sm.output_format||'').toLowerCase();
+    pagesContainer.innerHTML = '';
+    const origChars = pv.orig_chars || {};
+    const resultChars = pv.result_chars || {};
+    pageIdxs.forEach((pi) => {
+      const p1 = pi + 1;  // 1-based
+      const oc = origChars[String(pi)];
+      const rc = resultChars[String(pi)];
+      // v1.9.79：左右標題顯示「擷取 N 字」幫助使用者驗證內容完整度
+      const ocLabel = (oc !== undefined && oc !== null)
+        ? ` <span data-s="se93eb165">— 擷取 ${oc} 字</span>` : '';
+      const rcLabel = (rc !== undefined && rc !== null)
+        ? ` <span data-s="se93eb165">— 擷取 ${rc} 字</span>` : '';
+      // rc===0：此頁被 jtdt-layout 判為設計 / 圖片版面，已用整頁圖保真還原（無可
+      //   選取文字，屬正常，非遺失）→ 中性說明。
+      // 0<rc<oc*0.5 且 oc>50：結果字數遠少於原始 → 真的部分遺失，紅色警示。
+      let rcExtra = '';
+      if (oc !== undefined && rc !== undefined && oc > 50) {
+        if (rc === 0) {
+          rcExtra = ` <span class="p2o-raster-note">此頁為設計 / 圖片版面，已用整頁圖保真還原（無可選取文字）</span>`;
+        } else if (rc < oc * 0.5) {
+          rcExtra = ` <span data-s="s901fdc89">⚠ 內容部分遺失</span>`;
+        }
+      }
+      const block = document.createElement('div');
+      block.style.marginBottom = '14px';
+      block.innerHTML = `
+        <div class="preview-label" data-s="sb3dfab28">第 ${p1} 頁</div>
+        <div class="preview-grid">
+          <div class="preview-cell">
+            <div class="preview-label">原 PDF${ocLabel}</div>
+            <img alt="原 PDF 第 ${p1} 頁" data-kind="orig" data-page="${p1}" />
+          </div>
+          <div class="preview-cell">
+            <div class="preview-label">轉換結果（${fmt}）${rcLabel}${rcExtra}</div>
+            <img alt="轉換結果第 ${p1} 頁" data-kind="result" data-page="${p1}" />
+          </div>
+        </div>`;
+      pagesContainer.appendChild(block);
+    });
+    previewWrap.hidden = false;
+    // 等 unhide 後再設 src（避免 hidden 時 lazy load catch-22）
+    pagesContainer.querySelectorAll('img').forEach(img => {
+      img.onerror = () => { img.style.display = 'none'; };
+      img.src = `/tools/pdf-to-slides/preview/${jobData.id}/${img.dataset.kind}/${img.dataset.page}`;
+    });
+    $('resultPanel').hidden = false;
+    $('resultPanel').scrollIntoView({behavior:'smooth', block:'end'});
+  },
+  onError: () => { $('btnCancel').hidden = true; setBtnBusy($('btnConvert'), false); },
+  onReset: () => {
+    $('btnCancel').hidden = true;
+    setBtnBusy($('btnConvert'), false);
+    $('resultPanel').hidden = true;
+  },
+});
+</script>
+{% endblock %}

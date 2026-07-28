@@ -266,14 +266,43 @@ def _probe_office() -> dict:
     # binary path is shown and they can re-run --version manually.
     import re as _re
     version = _re.sub(r"\s+[0-9a-f]{20,}.*$", "", version_line)
+    # Impress 模組是「PDF 轉簡報檔」的必要條件，而且**缺它時的錯誤訊息極度誤導**：
+    # soffice 只會回一句 "source file could not be loaded"，連正常的 .odp 都載不進來，
+    # 看起來像我們產出的檔案壞掉（開發時在這上面卡了很久）→ 在相依檢查明確列出。
+    has_impress = _office_has_impress(binary)
+    extra = f"類型：{flavor}"
+    if not has_impress:
+        extra += "；**缺 Impress 模組**（PDF 轉簡報檔不可用，請安裝 " + (
+            "oxoffice-impress" if flavor == "OxOffice" else "libreoffice-impress") + "）"
     return {
         "installed": True,
         "version": version,
-        "extra": f"類型：{flavor}",
+        "extra": extra,
         "binary": binary,
         "ok": True,
         "flavor": flavor,
+        "impress": has_impress,
     }
+
+
+def _office_has_impress(binary: str) -> bool:
+    """office 套件是否含 Impress 模組（純檔案系統判定，不啟動 soffice）。"""
+    try:
+        prog = Path(binary).resolve().parent
+    except Exception:  # noqa: BLE001
+        return False
+    # Impress 的實作在 libsdlo（Linux/macOS）/ sdlo.dll（Windows）；
+    # 另有 simpress 相關資源檔。任一存在即視為已安裝。
+    for pat in ("libsdlo.so", "libsdlo.dylib", "sdlo.dll", "sdlo.so"):
+        if (prog / pat).exists():
+            return True
+    for base in (prog, prog.parent):
+        try:
+            if any(base.rglob("libsdlo.*")) or any(base.rglob("sdlo.dll")):
+                return True
+        except OSError:
+            continue
+    return False
 
 
 def _probe_python_pkg(import_name: str, heavy: bool = False, dist_name: str = "") -> dict:

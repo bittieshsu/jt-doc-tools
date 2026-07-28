@@ -314,6 +314,60 @@ def convert_to_docx(src: Path, dst_docx: Path, timeout: float = 60.0,
         shutil.move(str(produced), str(dst_docx))
 
 
+def convert_to_pptx(src: Path, dst_pptx: Path, timeout: float = 120.0) -> None:
+    """把 Impress 檔（.odp）轉成 PowerPoint .pptx。
+
+    與 convert_to_docx 同一套 lock / 獨立 profile / 逾時處理（理由見 convert_to_pdf
+    的說明）。**需要 office 套件的 Impress 模組**（oxoffice-impress /
+    libreoffice-impress）；缺模組時 soffice 會回一句誤導的「source file could not
+    be loaded」，因此這裡把訊息換成可行動的說明。
+    """
+    soffice = find_soffice()
+    if not soffice:
+        raise RuntimeError(
+            "找不到 LibreOffice / OxOffice。請先安裝其中一個再轉簡報檔。"
+        )
+
+    with tempfile.TemporaryDirectory() as td:
+        profile_path = Path(td) / "profile"
+        soffice_args = [
+            f"-env:UserInstallation={_profile_uri(profile_path)}",
+            "--safe-mode", "--headless", "--norestore", "--nologo",
+            "--nolockcheck", "--nodefault", "--nofirststartwizard",
+            "--convert-to", "pptx:Impress Office Open XML",
+            "--outdir", td,
+            str(src),
+        ]
+        cmd, popen_kwargs = _build_soffice_cmd(soffice, soffice_args)
+        with _soffice_lock:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE, **popen_kwargs)
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                try:
+                    proc.communicate(timeout=5)
+                except Exception:
+                    pass
+                raise RuntimeError(
+                    f"office 轉 .pptx 卡住（超過 {int(timeout)} 秒）。"
+                    "簡報物件過多時會發生,可改輸出 .odp。"
+                )
+            if proc.returncode != 0:
+                err = (stderr.decode("utf-8", "replace")
+                       or stdout.decode("utf-8", "replace"))
+                raise RuntimeError(f"office 轉 .pptx 失敗：{err}")
+        produced = Path(td) / (src.stem + ".pptx")
+        if not produced.exists():
+            raise RuntimeError(
+                "轉檔成功但找不到輸出 .pptx。多半是 office 套件缺少 Impress 模組"
+                "（請安裝 oxoffice-impress 或 libreoffice-impress）。"
+            )
+        dst_pptx.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(produced), str(dst_pptx))
+
+
 def convert_to_odt(src: Path, dst_odt: Path, timeout: float = 60.0,
                     input_filter: Optional[str] = None) -> None:
     """Run soffice headless to convert ``src`` (e.g. .docx) into .odt (writer8).
