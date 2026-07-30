@@ -11,6 +11,70 @@
   <link rel="apple-touch-icon" href="{{ _brand_logo or '/static/images/logo-on-light.png' }}" />
   <link rel="stylesheet" href="/static/css/platform.css" />
   {% block head %}{% endblock %}
+  <style nonce="{{ request.state.csp_nonce }}">
+    /* ---- 站內通知鈴鐺（側欄帳號列）---- */
+    .sb-bell-wrap { position: relative; display: inline-flex; margin-left: auto; }
+    .user-bar-anon { justify-content: space-between; }
+    .sb-anon-label { font-size: 12.5px; opacity: .85; }
+    .sb-bell { display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px;
+      background: rgba(255,255,255,0.10); color: inherit; cursor: pointer; }
+    .sb-bell:hover { background: rgba(255,255,255,0.20); }
+    .sb-bell svg { flex: none; }
+    /* 未讀用小紅點而不是數字 —— 側欄空間很窄，兩位數會把帳號那行擠爆；
+       真正的筆數在展開的清單裡看得到。 */
+    /* 未讀徽章：顯示數字而不是單純一個點 —— 資訊多一點，看起來也像是刻意設計
+       的元件。外圈用半透明白而不是寫死的底色：側欄是漸層（#7c6df0→#5b4bd9），
+       用固定色當外圈在任何位置都會對不上（第一版寫死 #4c1d95，深紫圈疊在淺紫
+       底上，看起來就是髒）。 */
+    .sb-bell-dot { position: absolute; top: -4px; right: -4px;
+      min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 999px; background: linear-gradient(180deg, #fb7185, #e11d48);
+      color: #fff; font-size: 9.5px; font-weight: 700; line-height: 1;
+      font-variant-numeric: tabular-nums; letter-spacing: 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,.35), 0 0 0 1.5px rgba(255,255,255,.6);
+      animation: sbBadgeIn .18s cubic-bezier(.2,.9,.3,1.4); }
+    @keyframes sbBadgeIn { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+    .sb-bell.has-unread { background: rgba(255,255,255,0.18); }
+    /* position:fixed 而不是 absolute —— 側欄本身會裁切溢出內容（它要捲動），
+       320px 的面板放在 268px 寬的側欄裡會被切掉右半邊。改用 fixed 並在開啟時
+       依鈴鐺的實際位置計算座標，就不受任何父層 overflow 影響。 */
+    .sb-inbox { position: fixed; z-index: 200;
+      width: 320px; max-width: calc(100vw - 24px); background: #fff;
+      color: #0f172a; border: 1px solid #e2e8f0; border-radius: 10px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.28); overflow: hidden; }
+    .sb-inbox-title { display: inline-flex; align-items: center; gap: 7px; }
+    .sb-inbox-title svg { color: #475569; }
+    .sb-inbox-head { display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+    .sb-inbox-clear { border: 0; background: none; color: #2563eb; font-size: 12px;
+      cursor: pointer; padding: 0; }
+    .sb-inbox-clear:hover { text-decoration: underline; }
+    .sb-inbox-list { max-height: 330px; overflow-y: auto; }
+    .sb-inbox-item { display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px; border-bottom: 1px solid #f8fafc;
+      text-decoration: none; color: inherit; }
+    .sb-inbox-body { flex: 1; min-width: 0; }   /* min-width:0 才截得斷長檔名 */
+    .sb-inbox-item:hover { background: #f8fafc; }
+    .sb-inbox-item.is-unread { background: #eff6ff; }
+    .sb-inbox-item.is-unread:hover { background: #dbeafe; }
+    .sb-inbox-t { font-size: 13px; font-weight: 600; line-height: 1.35; }
+    .jt-tile { flex: none; display: inline-flex; align-items: center;
+      justify-content: center; width: 28px; height: 28px; border-radius: 8px;
+      color: #fff; margin-top: 1px; }
+    .jt-tile svg { width: 15px; height: 15px; }
+    .sb-inbox-f { font-size: 12px; color: #64748b; line-height: 1.4;
+      margin-top: 1px; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; }
+    .sb-inbox-m { font-size: 11.5px; color: #94a3b8; line-height: 1.4;
+      margin-top: 3px; }
+    .sb-inbox-bad { color: #b91c1c; }
+    .sb-inbox-empty { padding: 22px 12px; text-align: center; color: #94a3b8; font-size: 12.5px; }
+    .sb-inbox-all { display: block; padding: 9px 12px; text-align: center;
+      font-size: 12.5px; color: #2563eb; text-decoration: none; background: #f8fafc; }
+    .sb-inbox-all:hover { text-decoration: underline; }
+  </style>
   <!-- 取代 inline style 屬性的自動產生樣式;放最後載入,贏頁面 <style nonce="{{ request.state.csp_nonce }}"> 同特異性 tie -->
   <link rel="stylesheet" href="/static/css/generated-inline.css" />
 </head>
@@ -25,7 +89,34 @@
         </div>
         <button class="sidebar-collapse" type="button" id="sidebarCollapse" aria-label="收起側邊選單" title="收起側邊選單">‹</button>
       </div>
+      {# 工具圖示來源（給鈴鐺清單複製用）—— 只有 icons.html 那個 macro 一份定義 #}
+      <div id="toolIconSprite" hidden aria-hidden="true">
+        {% for t in tool_tiles() %}
+        <span data-tool="{{ t.id }}" data-color="{{ t.color }}">{{ icon(t.icon, size=15) }}</span>
+        {% endfor %}
+      </div>
       {% set _cur = current_user(request) %}
+      {% if not _cur %}
+      {# 認證關閉時沒有帳號列，但單機使用者一樣需要看到作業完成通知 —— 給一列
+         只有鈴鐺的窄列，位置與有帳號時一致（都在側欄左上）。 #}
+      <div class="user-bar user-bar-anon" data-s="s332db6db">
+        <span class="sb-anon-label">通知</span>
+        <div class="sb-bell-wrap">
+          <button type="button" class="sb-bell" id="sbBell" title="作業完成通知" aria-label="通知">
+            {{ icon('bell', size=15) }}
+            <span class="sb-bell-dot" id="sbBellDot" hidden></span>
+          </button>
+          <div class="sb-inbox" id="sbInbox" hidden>
+            <div class="sb-inbox-head">
+              <b class="sb-inbox-title">{{ icon('bell', size=15) }} 通知</b>
+              <button type="button" class="sb-inbox-clear" id="sbInboxClear">全部標示為已讀</button>
+            </div>
+            <div class="sb-inbox-list" id="sbInboxList"></div>
+            <a class="sb-inbox-all" href="/my-jobs">查看我的作業 →</a>
+          </div>
+        </div>
+      </div>
+      {% endif %}
       {% if _cur %}
       <div class="user-bar" data-s="s332db6db">
         <button type="button" id="userInfoBtn"
@@ -34,6 +125,20 @@
           {{ icon('user', size=14) }}
           <b>{{ _cur.username }}</b>{% if _cur.source and _cur.source != 'off' %}<span data-s="s5bca4f8e">@{{ _cur.source }}</span>{% endif %}
         </button>
+        <div class="sb-bell-wrap">
+          <button type="button" class="sb-bell" id="sbBell" title="作業完成通知" aria-label="通知">
+            {{ icon('bell', size=15) }}
+            <span class="sb-bell-dot" id="sbBellDot" hidden></span>
+          </button>
+          <div class="sb-inbox" id="sbInbox" hidden>
+            <div class="sb-inbox-head">
+              <b>通知</b>
+              <button type="button" class="sb-inbox-clear" id="sbInboxClear">全部標示為已讀</button>
+            </div>
+            <div class="sb-inbox-list" id="sbInboxList"></div>
+            <a class="sb-inbox-all" href="/my-jobs">查看我的作業 →</a>
+          </div>
+        </div>
         <form id="logoutForm" method="post" action="/logout" data-s="s1386d503">
           <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
           <button class="btn btn-small" type="button" id="logoutBtn"
@@ -143,6 +248,34 @@
                   + '<div>' + actionBtn + '</div>'
                   + '</div>';
               }
+              // 信箱 —— 作業完成通知寄到這裡，所以卡片上要看得到「現在是哪一個」。
+              // 本機帳號可以自己改（與同一張卡片的「變更密碼」同一個道理）；
+              // 目錄帳號唯讀，並說明為什麼（改了也會被下次登入覆蓋）。
+              var emailVal = info.email || '';
+              var emailShown = emailVal
+                ? esc(emailVal)
+                : '<span data-s="s7e11a0c4">（尚未設定 — 作業完成通知會寄不出去）</span>';
+              var emailHtml = '<div data-s="s6179637e">'
+                + '<div data-s="s284968c1">信箱</div>'
+                + '<div id="meEmailRow" data-s="s12db6719">'
+                  + '<span id="meEmailText">' + emailShown + '</span>'
+                  + (info.email_editable
+                      ? '<button type="button" id="meEmailEditBtn" class="btn btn-small" data-s="s543893a7">修改</button>'
+                      : '')
+                + '</div>'
+                + (info.email_editable
+                    ? '<div id="meEmailEdit" hidden data-s="s12db6719">'
+                      + '<input type="text" id="meEmailInput" class="field" maxlength="200"'
+                      + ' placeholder="you@example.com" data-s="s7631d717">'
+                      + '<button type="button" id="meEmailSaveBtn" class="btn btn-primary btn-small" data-s="s543893a7">儲存</button>'
+                      + '<button type="button" id="meEmailCancelBtn" class="btn btn-small" data-s="s543893a7">取消</button>'
+                      + '</div>'
+                      + '<div data-s="s7e11a0c4">作業完成通知會寄到這裡。</div>'
+                    : '<div data-s="s7e11a0c4">信箱由 ' + esc(srcLabel)
+                      + ' 端管理，每次登入自動同步。要把通知收在別的信箱，'
+                      + '可到「我的作業 → 通知設定」指定。</div>')
+                + '</div>';
+
               // 完整 modal HTML
               var html =
                 '<div data-s="s4e2f3a19">'
@@ -156,6 +289,7 @@
                     + '</div>'
                   + '</div>'
                 + '</div>'
+                + emailHtml
                 + '<div data-s="s6179637e">'
                   + '<div data-s="s284968c1">角色</div>'
                   + '<div>' + roleBadges + '</div>'
@@ -172,6 +306,45 @@
               setTimeout(function(){
                 var pb = document.getElementById('meChangePwBtn');
                 if (pb) pb.addEventListener('click', function(){ openChangePasswordModal(); });
+                // 信箱：就地編輯（本機帳號才會有這些元素）
+                var eEdit = document.getElementById('meEmailEditBtn');
+                var eBox = document.getElementById('meEmailEdit');
+                var eRow = document.getElementById('meEmailRow');
+                var eInp = document.getElementById('meEmailInput');
+                if (eEdit && eBox && eRow && eInp) {
+                  eEdit.addEventListener('click', function(){
+                    eInp.value = info.email || '';
+                    eRow.hidden = true; eBox.hidden = false; eInp.focus();
+                  });
+                  var eCancel = document.getElementById('meEmailCancelBtn');
+                  if (eCancel) eCancel.addEventListener('click', function(){
+                    eBox.hidden = true; eRow.hidden = false;
+                  });
+                  var eSave = document.getElementById('meEmailSaveBtn');
+                  if (eSave) eSave.addEventListener('click', async function(){
+                    eSave.disabled = true;
+                    try {
+                      var r = await fetch('/me/email', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({email: eInp.value}),
+                      });
+                      if (!r.ok) {
+                        throw new Error(await window.friendlyServerError(r, '儲存失敗'));
+                      }
+                      var j = await r.json();
+                      info.email = j.email || '';
+                      var txt = document.getElementById('meEmailText');
+                      if (txt) txt.textContent = info.email || '（尚未設定）';
+                      eBox.hidden = true; eRow.hidden = false;
+                      if (window.showToast) window.showToast('信箱已更新', 'ok');
+                    } catch (err) {
+                      window.showAlert(err.message || '儲存失敗');
+                    } finally {
+                      eSave.disabled = false;
+                    }
+                  });
+                }
                 var enableBtn = document.getElementById('meTotpEnableBtn');
                 if (enableBtn) enableBtn.addEventListener('click', function(){ openTotpSetupModal(); });
                 var reissueBtn = document.getElementById('meTotpReissueBtn');
@@ -318,6 +491,15 @@
       <input class="sidebar-search" id="sidebarSearch" type="search" placeholder="搜尋工具… (例：填表 / form fill、用印 / stamp)" />
     </div>
     <div class="sidebar-scroll">
+      <div class="sb-solo">
+        <a class="sb-item sb-jobs-link" href="/my-jobs" data-name="我的作業 jobs job 作業 工作 進度 佇列 排隊 queue tasks 背景 轉換進度">
+          <span class="sb-item-icon">{{ icon('clock', size=18) }}</span>
+          <span class="sb-item-text">
+            <span class="sb-item-name">我的作業</span>
+            <span class="sb-item-desc">你送出的轉換進度與結果</span>
+          </span>
+        </a>
+      </div>
       {% if workspace_enabled(request) %}
       <div class="sb-solo">
         <a class="sb-item sb-workspace-link" href="/workspace" data-name="我的工作區 workspace 工作區 我的檔案 saved files 暫存">
@@ -559,9 +741,121 @@
             });
             g.style.display = (q && shown === 0) ? 'none' : '';
             if (q) g.setAttribute('open', '');
+            // 數字要跟著過濾走。過濾時仍顯示總數的話，「釘選 7」底下卻只剩
+            // 一項，看起來就像釘選突然掉了 —— 使用者會以為是壞掉而不是在搜尋。
+            const cnt = g.querySelector('.sb-count');
+            if (cnt) {
+              if (cnt.dataset.total === undefined) {
+                cnt.dataset.total = cnt.textContent.trim();
+              }
+              cnt.textContent = q ? String(shown) : cnt.dataset.total;
+              cnt.title = q ? `符合搜尋 ${shown} 項（共 ${cnt.dataset.total} 項）` : '';
+            }
           });
         });
       }
+      // ---------- 站內通知鈴鐺 ----------
+      // 資料直接由「我的作業」推導（見 /api/my/inbox）—— 沒有另一張通知表，
+      // 就不會有「通知說完成了、清單裡卻沒有」這種兩邊不同步的狀況。
+      (function () {
+        const bell = document.getElementById('sbBell');
+        const panel = document.getElementById('sbInbox');
+        const dot = document.getElementById('sbBellDot');
+        const list = document.getElementById('sbInboxList');
+        if (!bell || !panel) return;
+        const LABEL = { done: '已完成', error: '失敗', cancelled: '已取消',
+                        interrupted: '已中斷' };
+
+        function ago(ts) {
+          const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+          if (s < 60) return '剛剛';
+          if (s < 3600) return Math.floor(s / 60) + ' 分鐘前';
+          if (s < 86400) return Math.floor(s / 3600) + ' 小時前';
+          return Math.floor(s / 86400) + ' 天前';
+        }
+
+        function el(tag, cls, text) {
+          const n = document.createElement(tag);
+          if (cls) n.className = cls;
+          if (text != null) n.textContent = text;   // 檔名是使用者輸入
+          return n;
+        }
+
+        async function load() {
+          let d;
+          try {
+            const r = await fetch('/api/my/inbox');
+            if (!r.ok) return;                  // 未登入 / 未啟用 → 靜靜不顯示
+            d = await r.json();
+          } catch (e) { return; }
+          dot.hidden = !(d.unread > 0);
+          // 兩位數就夠了；再多用 9+，免得把帳號那一行擠開
+          dot.textContent = d.unread > 9 ? '9+' : String(d.unread || '');
+          bell.classList.toggle('has-unread', d.unread > 0);
+          list.textContent = '';
+          if (!(d.items || []).length) {
+            list.appendChild(el('div', 'sb-inbox-empty',
+              '還沒有已完成的作業。'));
+            return;
+          }
+          d.items.forEach((it) => {
+            const a = el('a', 'sb-inbox-item' + (it.unread ? ' is-unread' : ''));
+            a.href = '/my-jobs';
+            // 圖示一欄、文字一欄的 flex 結構。原本是「圖示與工具名同一行，
+            // 檔名與時間各自用 padding-left:34px 推進去」—— 那個縮排只是猜出來
+            // 的數字，跟圖示實際寬度＋間距對不齊，看起來就是歪的。
+            const src = document.querySelector(
+              '#toolIconSprite [data-tool="' + (it.tool_id || '').replace(/"/g, '') + '"]');
+            if (src) {
+              const tile = el('span', 'jt-tile tile-color-'
+                              + (src.dataset.color || '0'));
+              const svg = src.querySelector('svg');
+              if (svg) tile.appendChild(svg.cloneNode(true));
+              a.appendChild(tile);
+            }
+            const body = el('div', 'sb-inbox-body');
+            body.appendChild(el('div', 'sb-inbox-t', it.tool_name));
+            if (it.filename) body.appendChild(el('div', 'sb-inbox-f', it.filename));
+            const bad = it.status !== 'done';
+            body.appendChild(el('div', 'sb-inbox-m' + (bad ? ' sb-inbox-bad' : ''),
+              (LABEL[it.status] || it.status) + '・' + ago(it.finished_at)));
+            a.appendChild(body);
+            list.appendChild(a);
+          });
+        }
+
+        function place() {
+          const r = bell.getBoundingClientRect();
+          panel.style.top = Math.round(r.bottom + 6) + 'px';
+          // 靠左對齊鈴鐺，但不可超出視窗右緣
+          const left = Math.min(Math.round(r.left - 6),
+                                window.innerWidth - panel.offsetWidth - 12);
+          panel.style.left = Math.max(8, left) + 'px';
+        }
+
+        bell.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const opening = panel.hidden;
+          panel.hidden = !opening;
+          if (opening) { place(); await load(); place(); }
+        });
+        window.addEventListener('resize', () => { if (!panel.hidden) place(); });
+        window.addEventListener('scroll', () => { if (!panel.hidden) place(); },
+                                true);
+        document.addEventListener('click', (e) => {
+          if (!panel.hidden && !panel.contains(e.target)) panel.hidden = true;
+        });
+        document.getElementById('sbInboxClear').addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try { await fetch('/api/my/inbox/seen', { method: 'POST' }); } catch (_) {}
+          await load();
+        });
+
+        load();
+        // 只是個徽章，30 秒一次就夠 —— 不必像作業清單那樣 2 秒
+        setInterval(load, 30000);
+      })();
+
       // ---------- 釘選功能 (localStorage) ----------
       // 結構：localStorage['jtdt:pinned'] = JSON array of tool_id
       // 點工具卡片右上的星星按鈕 toggle，已釘選的會出現在最上方「釘選」群組。
@@ -589,6 +883,7 @@
         }
         grp.hidden = false;
         cnt.textContent = String(pins.length);
+        cnt.dataset.total = String(pins.length);   // 搜尋清空後要還原成這個
         // 依 pins 順序找對應的 sb-item，clone 到釘選群組
         for (const tid of pins) {
           // 找原本的 sb-item（避開 sb-pinned 群組內 cloned 的）

@@ -493,6 +493,46 @@ def build_router(templates) -> APIRouter:
         )
         return JSONResponse({"ok": True, "detail": "TOTP 已啟用"})
 
+    @router.post("/me/email")
+    async def my_email_update(request: Request):
+        """使用者改自己的信箱（**只有本機帳號**）。
+
+        為什麼要有自助路徑：這是「作業完成通知寄到哪」的欄位，本人最清楚，
+        不該每次都要找管理員。與同一張卡片上的「變更密碼」同一個道理。
+
+        為什麼目錄帳號不給改：AD / LDAP / SSO 的信箱在每次登入時都會由來源覆蓋，
+        給一個「改得動但下次登入就沒了」的欄位比唯讀更糟 —— 使用者會以為設定
+        沒存到。他們若想收在別的地方，走「我的作業 → 通知設定」的覆寫欄位
+        （那是另一個概念：不改帳號資料，只改通知寄到哪）。
+
+        擋在**伺服器端**，不是只把 UI 藏起來。
+        """
+        from ..core import auth_settings as _as
+        if not _as.is_enabled():
+            raise HTTPException(404)
+        token = request.cookies.get(sessions.COOKIE_NAME, "")
+        user = sessions.lookup(token) if token else None
+        if not user:
+            raise HTTPException(401)
+        if user.get("source") != "local":
+            return JSONResponse(
+                {"ok": False,
+                 "detail": "這個帳號的信箱由目錄端管理，無法在這裡修改。"
+                           "要把通知收在別的信箱，請到「我的作業 → 通知設定」設定。"},
+                status_code=403)
+        body = await request.json()
+        from ..core import user_manager as _um
+        email = _um.normalise_email(body.get("email", ""))
+        try:
+            _um.update(user["user_id"], email=email)
+        except ValueError as e:
+            return JSONResponse({"ok": False, "detail": str(e)}, status_code=400)
+        audit_db.log_event(
+            "user_update", username=user["username"], ip=_client_ip(request),
+            target=str(user["user_id"]), details={"self": True, "field": "email"},
+        )
+        return {"ok": True, "email": email}
+
     @router.post("/me/2fa/disable")
     async def my_2fa_disable(request: Request):
         from ..core import auth_settings as _as

@@ -19,6 +19,8 @@
 from __future__ import annotations
 
 import csv
+
+from ...core import csv_safe as _csv_safe
 import io
 import random
 import re
@@ -416,9 +418,9 @@ async def export(fmt: str, request: Request):
             # 若是 dedup-count 結果（"count\toriginal"），拆兩欄；否則單欄
             if "\t" in ln:
                 parts = ln.split("\t", 1)
-                writer.writerow(parts)
+                writer.writerow(_csv_safe.row(parts))
             else:
-                writer.writerow([ln])
+                writer.writerow(_csv_safe.row([ln]))
         data = ("﻿" + buf.getvalue()).encode("utf-8")  # BOM 給 Excel 開繁中正確
         return StreamingResponse(
             io.BytesIO(data),
@@ -447,10 +449,10 @@ async def export(fmt: str, request: Request):
             for i, ln in enumerate(lines, start=2):
                 count_str, content = ln.split("\t", 1)
                 try:
-                    ws.cell(row=i, column=1, value=int(count_str))
+                    _csv_safe.xlsx_cell(ws, i, 1, int(count_str))
                 except ValueError:
-                    ws.cell(row=i, column=1, value=count_str)
-                ws.cell(row=i, column=2, value=content)
+                    _csv_safe.xlsx_cell(ws, i, 1, count_str)
+                _csv_safe.xlsx_cell(ws, i, 2, content)
             ws.column_dimensions["A"].width = 10
             ws.column_dimensions["B"].width = 60
             ws.freeze_panes = "A2"
@@ -459,7 +461,7 @@ async def export(fmt: str, request: Request):
             ws.cell(row=1, column=1).fill = PatternFill("solid", fgColor="2563EB")
             ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
             for i, ln in enumerate(lines, start=2):
-                ws.cell(row=i, column=1, value=ln)
+                _csv_safe.xlsx_cell(ws, i, 1, ln)
             ws.column_dimensions["A"].width = 60
             ws.freeze_panes = "A2"
         out = io.BytesIO()

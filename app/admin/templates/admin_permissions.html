@@ -106,9 +106,37 @@
 {% endif %}
 
 <style nonce="{{ request.state.csp_nonce }}">
-  .perm-shell { display:grid; grid-template-columns: minmax(260px, 320px) 1fr; gap:0; padding:0; min-height:520px; }
-  @media (max-width: 880px) { .perm-shell { grid-template-columns: 1fr; } }
-  .perm-side { border-right:1px solid #e5e7eb; display:flex; flex-direction:column; min-width:0; }
+  /* 高度自動佔滿，不是算出來的固定值。
+     原本寫死 min-height:520px + 清單 max-height:560px，大螢幕上頁面下半部整片
+     空著，使用者卻只能在一個小框裡捲幾千筆帳號。中間也試過用 JS 量出頂端位置
+     再換算 —— 那仍然是「固定高度」，只是換個地方算，視窗一變、橫幅一關就又不對。
+     正解是讓版面自己撐開：把這頁的 <main> 變成滿版的 flex 直行，標題區取自然
+     高度，剩下的全部給 .perm-shell。`:has()` 讓這件事不必改動共用的 base.html，
+     只影響有權限矩陣的頁面。 */
+  main.container:has(.perm-shell) {
+    display: flex; flex-direction: column;
+    height: 100vh; height: 100dvh;   /* dvh：手機上扣掉浮動網址列 */
+    box-sizing: border-box; overflow: hidden;
+    /* 共用容器的下留白是 64px（給一般會捲動的頁面用）；這裡是滿版版面，
+       那 64px 會變成底部一條固定空白 */
+    padding-bottom: 20px;
+  }
+  .perm-shell { display:grid; grid-template-columns: minmax(260px, 320px) 1fr;
+                gap:0; padding:0;
+                flex: 1; min-height: 0; }
+  /* 窄螢幕改回一般文件流：直式堆疊時鎖滿版高度會讓人捲不動 */
+  @media (max-width: 880px) {
+    main.container:has(.perm-shell) { display:block; height:auto; overflow:visible; }
+    .perm-shell { grid-template-columns: 1fr; }
+    .perm-list { max-height:420px; }
+  }
+  /* :has() 不支援時（舊瀏覽器）退回原本的固定高度，至少不會塌成一條 */
+  @supports not selector(main:has(.perm-shell)) {
+    .perm-shell { min-height: 560px; }
+    .perm-list { max-height: 560px; }
+  }
+  .perm-side { border-right:1px solid #e5e7eb; display:flex; flex-direction:column; min-width:0; min-height:0; }
+  .perm-main { overflow-y:auto; min-height:0; }
   .perm-side-toolbar { padding:10px; border-bottom:1px solid #e5e7eb; background:#f9fafb; display:flex; flex-direction:column; gap:8px; }
   .perm-search { width:100%; padding:6px 10px; font-size:12.5px; box-sizing:border-box; }
   .perm-tabs { display:flex; gap:0; border:1px solid var(--border); border-radius:6px; overflow:hidden; background:#fff; font-size:11.5px; }
@@ -118,7 +146,9 @@
   .perm-tabs .pt-btn.active { background:#eef2ff; color:#3730a3; font-weight:600; }
   .perm-tabs .pt-cnt { display:inline-block; padding:0 5px; margin-left:2px; background:#e2e8f0; color:#475569; border-radius:8px; font-size:10.5px; min-width:14px; text-align:center; }
   .perm-tabs .pt-btn.active .pt-cnt { background:#c7d2fe; color:#3730a3; }
-  .perm-list { overflow-y:auto; max-height:560px; }
+  /* flex:1 讓清單吃掉側欄剩下的高度；min-height:0 是 flex 子項目要能捲動的
+     必要條件（少了它 overflow 不會生效，內容會把容器撐高）。 */
+  .perm-list { overflow-y:auto; flex:1; min-height:0; }
   .perm-row {
     display:flex; align-items:center; gap:10px; padding:8px 12px;
     border-bottom:1px solid #f3f4f6; cursor:pointer;
@@ -394,5 +424,6 @@ document.getElementById('pdSave').addEventListener('click', async () => {
     showAlert('儲存失敗：' + await r.text());
   }
 });
+
 </script>
 {% endblock %}

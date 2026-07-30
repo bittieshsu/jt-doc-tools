@@ -116,9 +116,64 @@ def require(upload_id: str, request: Request) -> None:
 
 
 def extract_upload_id(filename: str) -> str:
-    """Pull the leading uuid hex out of a temp filename like
-    `aabbcc..._p1.png`, returning empty string if no valid prefix found."""
+    """Pull the upload_id (32-hex) out of a temp filename.
+
+    Scans **every** `_`-separated segment, not just the first one. Temp names
+    are not all `<uuid>_...` — pdf-watermark uses `wm_<uuid>_p1.png`, the API
+    path uses `wm_api_<uuid>_out.pdf`. Looking only at the first segment made
+    `extract_upload_id("wm_<uuid>_p1.png")` return `""`, and callers that wrote
+    `if uid: require(...)` then skipped the ACL entirely.
+
+    The old behaviour was patched at one call site by stripping `"wm_"` there —
+    per-call-site workarounds don't survive the next tool that picks a new
+    prefix. Do the scan here, once.
+    """
     if not filename:
         return ""
-    cand = filename.split("_", 1)[0]
-    return cand if is_uuid_hex(cand) else ""
+    for seg in filename.replace(".", "_").split("_"):
+        if is_uuid_hex(seg):
+            return seg
+    return ""
+
+
+def record_uid(upload_id: str, user_id: int) -> None:
+    """Record ownership for a known user_id (no Request needed).
+
+    For background jobs and tests, where the owning user is known but there's
+    no live request to read it from.
+    """
+    if not is_uuid_hex(upload_id) or not user_id:
+        return
+    try:
+        f = _owners_dir() / f"{upload_id}.json"
+        f.write_text(json.dumps({"user_id": int(user_id), "ts": time.time()}),
+                     encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def require_by_filename(filename: str, request: Request) -> None:
+    """ACL for endpoints that serve a temp file **by name**. Fail-closed.
+
+    `if uid: require(uid, request)` is the wrong shape: an unrecognised name
+    silently means "no ACL at all". Temp dir really does hold files that don't
+    start with a uuid (`wm_temp_<uuid>.png` — a user-uploaded watermark image),
+    so this isn't hypothetical.
+
+    Deny when no upload_id can be found — admins excepted (support / triage),
+    and a no-op when auth is off (single-user mode).
+
+    Raises 404, not 403: 403 confirms "this file exists, you just can't have
+    it", which is itself information the caller shouldn't get.
+    """
+    if not _auth_enabled():
+        return
+    uid = extract_upload_id(filename)
+    if uid:
+        if not check(uid, request):
+            raise HTTPException(404)
+        return
+    cur = _user_id(request)
+    if cur is not None and _is_admin(cur):
+        return
+    raise HTTPException(404)

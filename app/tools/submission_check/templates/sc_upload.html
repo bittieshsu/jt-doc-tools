@@ -214,6 +214,9 @@
           return;
         }
         if (jj.status === 'error') throw new Error('檢核失敗：' + (jj.error || '未知錯誤'));
+        // 服務在檢核途中重新啟動（多半是升級）。少了這個分支會一直輪詢到逾時，
+        // 使用者看到的是「檢核超時」這種會誤導人的訊息。
+        if (jj.status === 'interrupted') throw new Error('服務已重新啟動，這個作業被中斷，請重新送出');
       }
       throw new Error('檢核超時');
     } catch (e) {

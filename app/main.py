@@ -1,20 +1,23 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import Depends, FastAPI, File, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader
 
 from .config import settings
+from .core import loop_watchdog as _loop_watchdog
 from .core.asset_manager import asset_manager
+from .web.deps import require_tool as _require_tool
 from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.5"
+VERSION = "1.14.6"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -66,6 +69,39 @@ class _DynamicAppName:
 
 templates.env.globals["app_name"] = _DynamicAppName()
 templates.env.globals["version"] = VERSION
+
+
+def _tpl_localdt(ts) -> str:
+    """把 Unix 時間戳格式化成當地時間字串（給模板用）。
+
+    模板不要直接印原始 epoch —— 掃描器會判為資訊洩漏（Timestamp Disclosure），
+    而使用者本來也看不懂那串數字。取不到就回 "—"，不可讓整頁因此爆掉。
+    """
+    try:
+        from datetime import datetime
+        return datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M")
+    except (TypeError, ValueError, OSError, OverflowError):
+        return "—"
+
+
+def _tpl_localiso(ts) -> str:
+    """Unix 時間戳 → ISO 8601（含時區偏移）。空值回空字串。
+
+    給「需要讓瀏覽器自己格式化 / 排序」的欄位用。ISO 字串照字典序排就是時間序，
+    所以不必為了排序而把裸 epoch 放進頁面（那會被掃描器判為資訊洩漏）。
+    """
+    if not ts:
+        return ""
+    try:
+        from datetime import datetime
+        return datetime.fromtimestamp(float(ts)).astimezone().isoformat(
+            timespec="seconds")
+    except (TypeError, ValueError, OSError, OverflowError):
+        return ""
+
+
+templates.env.filters["localdt"] = _tpl_localdt
+templates.env.filters["localiso"] = _tpl_localiso
 
 
 def _tpl_current_user(request) -> dict | None:
@@ -230,6 +266,21 @@ def _assign_unique_colors(ids: list[str]) -> dict[str, int]:
 
 _tool_color_map = _assign_unique_colors([t.metadata.id for t in tools])
 
+def _tpl_tool_tiles() -> list[dict]:
+    """每個工具的圖示名稱與配色索引，給「作業清單」在每一列前面畫工具圖示用。
+
+    圖示的 SVG 定義只在 `components/icons.html` 那個 macro 裡（單一事實來源），
+    所以由樣板先把用得到的圖示畫進隱藏區，JS 再複製對應的節點 —— 不要在 JS 裡
+    另外抄一份 path，那遲早會跟 macro 長得不一樣。
+    """
+    return [{"id": t.metadata.id, "name": t.metadata.name,
+             "icon": getattr(t.metadata, "icon", "tool") or "tool",
+             "color": _tool_color_map.get(t.metadata.id, 0)}
+            for t in tools]
+
+
+templates.env.globals["tool_tiles"] = _tpl_tool_tiles
+
 _nav_tool_items = [
     {
         "id": t.metadata.id,
@@ -335,9 +386,15 @@ templates.env.globals["nav_settings"] = [
     {"icon": "gear", "name": "記錄轉送", "description": "將稽核轉發到外部 syslog / CEF / GELF",
      "url": "/admin/log-forward", "requires_auth": True,
      "keywords": "syslog cef gelf forward log siem splunk graylog 轉發"},
+    {"icon": "mail", "name": "作業完成通知", "description": "完成時通知送出者：站內 / Email / 通訊軟體",
+     "url": "/admin/notify",
+     "keywords": "notify notification email smtp mail teams slack telegram discord zulip nextcloud talk line webhook 通知 提醒 完成 郵件 信件 訊息 推播"},
     {"icon": "archive", "name": "檔案保留 / 清理", "description": "歷史檔案保留天數與自動清理",
      "url": "/admin/retention",
      "keywords": "retention cleanup history sweep gc gdpr 保留 清理 歷史"},
+    {"icon": "clock", "name": "背景作業與併行度", "description": "背景作業監控、同時處理數、Office 轉檔併行上限",
+     "url": "/admin/jobs",
+     "keywords": "job jobs queue concurrency worker parallel pause cancel task background soffice memory oom 作業 工作 佇列 排隊 併行 同時 平行 暫停 取消 背景 記憶體 轉檔"},
     {"icon": "archive", "name": "工作區設定", "description": "啟用/停用使用者工作區、每人容量額度、保留時數",
      "url": "/admin/workspace",
      "keywords": "workspace quota storage user files save load disk 工作區 容量 額度 儲存 空間 啟用 停用 保留"},
@@ -714,9 +771,41 @@ async def _capture_upload_filename(request: Request, call_next):
 
 
 @app.middleware("http")
+async def _slow_request_log(request: Request, call_next):
+    """記錄慢請求。
+
+    原本的 access log 只有「請求發生了」，沒有耗時 —— 2026-07-30 正式機整站卡住
+    時，只能靠人工把時間戳相減才發現輪詢從 2 秒變成最長 226 秒才回應。加上耗時
+    之後，這種情況在 log 裡是一眼看得出來的。
+
+    **只記超過門檻的**：每個請求都記會把 log 淹掉，而正常請求的耗時沒有價值。
+    """
+    import time as _t
+    t0 = _t.perf_counter()
+    try:
+        return await call_next(request)
+    finally:
+        dt = _t.perf_counter() - t0
+        if dt >= _loop_watchdog.SLOW_REQUEST_SECONDS:
+            path = request.scope.get("path") or ""
+            busy = ""
+            try:
+                st = job_manager.stats()
+                busy = (f"（執行中 {st.get('running')}、排隊 {st.get('queued')}）")
+            except Exception:  # noqa: BLE001
+                pass
+            logger.warning("慢請求 %.1f 秒：%s %s%s",
+                           dt, request.scope.get("method", "?"), path, busy)
+
+
+@app.middleware("http")
 async def _auth_gate(request: Request, call_next):
     from .core import auth_settings, sessions, permissions
+    from .core.client_ip import real_client_ip
+    from .core.job_manager import set_current_actor
     if not auth_settings.is_enabled():
+        # 認證關閉時仍要記來源 IP —— 管理區的工作監控要看得出是誰送的
+        set_current_actor(None, real_client_ip(request))
         return await call_next(request)
     # Use the RAW ASGI scope path, not request.url.path: request.url is rebuilt
     # from the Host header, which a crafted "Host: x/../" can poison so url.path
@@ -774,6 +863,11 @@ async def _auth_gate(request: Request, call_next):
             return RedirectResponse("/login" + next_q, status_code=302)
         # Stash user on request.state for downstream handlers (audit context, etc).
         request.state.user = user
+
+    # 讓這個請求裡送出的背景工作知道歸屬。放在 contextvar 而不是要求 25 個工具
+    # 各自把 request 傳進 job_manager.submit()：那樣新工具很容易忘記傳，而少了
+    # 歸屬的作業就不會出現在「我的作業」裡（使用者會以為作業丟了）。
+    set_current_actor(user, real_client_ip(request))
 
     # Per-tool permission gating: any path under /tools/<tool_id>/... requires
     # the user to have that tool granted (via roles or direct grant). admin
@@ -850,9 +944,21 @@ async def _api_token_gate(request: Request, call_next):
     # pdf-to-office 的轉換前後對照縮圖 / 改善報告同時被「瀏覽器（session）」與
     # 「API 呼叫者（Bearer token）」使用，屬雙重存取路徑：帶 Bearer 就驗 token，
     # 沒帶就落回 session auth_gate（避免在 enforce 開時誤擋瀏覽器預覽）。
+    # `/admin/**` 屬「雙重存取路徑」：
+    #   * API.md 有記載可用 `Authorization: Bearer ADMIN_TOKEN` 呼叫
+    #     （/admin/api/llm/settings、/admin/api/sys-deps …）→ 帶 token 就要驗。
+    #   * 同一批路徑同時是管理區網頁自己用的（session cookie，沒有 Bearer）。
+    #     管理區有 22 個路徑含 `/api/`（含 `/admin/jobs/api/list`），如果把它們
+    #     當成純 API，「API token 強制驗證」一打開，管理員用瀏覽器開管理頁就會
+    #     拿到「需要有效的 API token」401 —— 管理區直接壞掉，而訊息看起來像設定
+    #     有問題，不像這個判斷寫錯。
+    # 所以：**沒帶 token 就落回 session + require_admin**，帶了就驗。
+    # 不可以只擋、也不可以只放 —— 兩條路徑都是真的有人在用。
+    is_admin_ui = path.startswith("/admin/") or path == "/admin"
     is_dual_access = (
         "/pdf-to-office/preview/" in path
         or "/pdf-to-office/report/" in path
+        or is_admin_ui
     )
     is_api = (
         path.startswith("/api/")
@@ -949,13 +1055,28 @@ async def _redirect_pdf_diff(rest: str = ""):
 # caller who knows/guesses a job_id could read/cancel another user's job
 # result. See _job_access below.
 def _job_access(job, request) -> bool:
-    """Access control for /api/jobs/*. Auth OFF → open (single-user install).
-    Auth ON → the caller must be the job's owner. An unclaimed job is claimed
-    by the first *authenticated* caller (normally the creator's own browser,
-    which polls status immediately after submit, over an unguessable uuid job
-    id). An unauthenticated caller is always denied when auth is on."""
+    """`/api/jobs/*` 的存取控制。
+
+    * 認證關閉 → 開放（單機模式沒有帳號可比對；`/my-jobs` 頁面已照實說明
+      「知道連結的人都能下載」，不要讓使用者誤以為清單按來源電腦分開等於隔離）。
+    * 認證開啟 → 必須是作業的擁有者；未登入一律拒絕。
+    * **沒有擁有者的作業（`owner_id is None`）只有管理員能碰。**
+
+    最後那條是修掉一個實際存在的漏洞：原本的邏輯是「無主作業由第一個登入者
+    認領」，但那行 `job.owner_id = uid` 改的是 `job_manager.get()` 從資料庫
+    重建出來的**臨時物件**，從來沒有寫回資料庫 —— 於是每個登入者查都「認領」
+    一次，結果是**任何登入者都拿得到無主作業**。註解與實際行為不符，是最難
+    發現的一類 bug（實測比對才抓到）。
+
+    無主作業的合法存取者無從判斷（可能是認證啟用前送出的），因此改為 fail-secure：
+    一般使用者拒絕、管理員放行（支援與排除問題需要）。這些作業本來也會在保留
+    期限內被清掉。
+
+    回 404 而不是 403 —— 不對非擁有者確認這個 id 是否存在。
+    """
     try:
-        from .core import auth_settings as _as, sessions as _se
+        from .core import auth_settings as _as, permissions as _perm, \
+            sessions as _se
         if not _as.is_enabled():
             return True
         u = getattr(request.state, "user", None)
@@ -966,11 +1087,232 @@ def _job_access(job, request) -> bool:
         if uid is None:
             return False
         if job.owner_id is None:
-            job.owner_id = int(uid)
-            return True
+            return bool(_perm.is_admin(int(uid)))
         return int(job.owner_id) == int(uid)
     except Exception:
         return False
+
+
+@app.get("/my-jobs", response_class=HTMLResponse)
+async def my_jobs_page(request: Request):
+    """「我的作業」—— 轉換在背景跑，關掉頁面後回來這裡找結果。"""
+    return templates.TemplateResponse(request, "my_jobs.html",
+                                      {"request": request})
+
+
+@app.get("/api/my/inbox")
+async def api_my_inbox(request: Request, limit: int = 10):
+    """站內鈴鐺：我最近完成的作業 + 未讀數。
+
+    **刻意不另外開一張通知表** —— 這裡的「通知」就是「我的作業結束了」，
+    jobs.sqlite 已經有全部資訊。另存一份就得雙寫，兩邊一旦不同步就會出現
+    「通知說完成了，作業清單裡卻沒有」；而且還要另外養一套保留期與清理排程。
+    改用「上次查看時間」推導未讀，作業被清掉時通知自動跟著消失，不會留下
+    點了 404 的項目。
+    """
+    from .core import job_store, notify_settings as _ns
+    scope = _job_scope(request)
+    if scope["mode"] == "user" and scope["owner_id"] is None:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    kw = ({"owner_id": scope["owner_id"]} if scope["mode"] == "user"
+          else {"client_ip": scope["client_ip"]})
+    rows = job_store.list_jobs(limit=max(1, min(int(limit or 10), 50)), **kw)
+    seen = float(_ns.get_prefs(_notify_key(request)).get("inbox_seen_at") or 0)
+    tool_names = {t.metadata.id: t.metadata.name for t in tools}
+    items, unread = [], 0
+    for r in rows:
+        if r["status"] not in ("done", "error", "cancelled", "interrupted"):
+            continue
+        fin = float(r["finished_at"] or r["updated_at"] or 0)
+        is_new = fin > seen
+        if is_new:
+            unread += 1
+        items.append({
+            "id": r["id"],
+            "tool_id": r["tool_id"],
+            "tool_name": tool_names.get(r["tool_id"], r["tool_id"]),
+            "filename": _job_display_name(r.get("meta") or {},
+                                          r["result_filename"]),
+            "status": r["status"],
+            "finished_at": fin,
+            "elapsed": round(max(0.0, fin - r["created_at"]), 1),
+            "unread": is_new,
+            "has_result": bool(r["result_path"]
+                               and Path(r["result_path"]).exists()),
+        })
+    return {"unread": unread, "items": items}
+
+
+@app.post("/api/my/inbox/seen")
+async def api_my_inbox_seen(request: Request):
+    """全部標示為已讀 —— 只記一個時間戳，不逐筆寫狀態。"""
+    from .core import notify_settings as _ns
+    scope = _job_scope(request)
+    if scope["mode"] == "user" and scope["owner_id"] is None:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    _ns.save_prefs(_notify_key(request), {"inbox_seen_at": time.time()})
+    return {"ok": True}
+
+
+def _notify_key(request) -> str:
+    """這位使用者的通知偏好儲存鍵（沿用工作區的鍵，兩者對象一致）。"""
+    from .core import workspace as _ws
+    scope = _job_scope(request)
+    if scope["mode"] == "user":
+        return _ws.key_for_user_id(scope["owner_id"])
+    return _ws.key_for_user_id(None)
+
+
+@app.get("/api/my/notify")
+async def api_my_notify(request: Request):
+    """我的通知偏好 + 管理員開了哪些管道。"""
+    from .core import notify_channels as _nc, notify_settings as _ns
+    scope = _job_scope(request)
+    if scope["mode"] == "user" and scope["owner_id"] is None:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    avail = _ns.enabled_channels()
+    return {
+        "system_enabled": _ns.is_enabled(),
+        "available": [{"id": c, "label": _nc.CHANNEL_INFO[c]["label"],
+                       # personal＝必須填目的地；dual＝填了就私訊、沒填走團隊頻道
+                       "personal": c in _ns.PERSONAL_CHANNELS,
+                       "dual": c in _ns.DUAL_CHANNELS}
+                      for c in avail],
+        "prefs": _ns.get_prefs(_notify_key(request)),
+        # 帳號上的信箱（AD / LDAP 的 mail、SSO 的 email claim，或本人 / 管理員
+        # 填的）。UI 用它告訴使用者「不填也會寄到這裡」—— 接目錄的環境本來就
+        # 不該再要求每個人手動輸入一次自己的信箱。
+        "account_email": _ns._account_email(_notify_key(request)),
+        # 本機帳號可自己改（側欄「我的帳號」）；目錄帳號要洽管理員。
+        # UI 要據此指路，不然使用者只會看到「沒有信箱」而不知道去哪設定。
+        "email_editable": (getattr(request.state, "user", None) or {}
+                           ).get("source") == "local",
+    }
+
+
+@app.post("/api/my/notify")
+async def api_my_notify_save(request: Request):
+    from .core import notify_settings as _ns
+    scope = _job_scope(request)
+    if scope["mode"] == "user" and scope["owner_id"] is None:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    body = await request.json()
+    # 使用者只能改自己的偏好；管道憑證在 admin 那層，這裡碰不到
+    return {"ok": True, "prefs": _ns.save_prefs(_notify_key(request), body)}
+
+
+def _safe_view_url(v) -> str:
+    """作業的「回到頁面」連結。只允許本站的相對路徑。
+
+    這個值來自建立作業時寫進 meta 的字串。今天全部由我們自己的程式寫入，但
+    meta 是個開放的欄位 —— 一旦哪天有使用者輸入流進去，沒有這道檢查就會變成
+    開放重導向 / `javascript:` 連結。共用 `safe_next` 的判斷（拒協定相對、
+    CRLF、百分比編碼變形）。
+    """
+    if not isinstance(v, str) or not v:
+        return ""
+    from .core.url_safety import safe_next
+    out = safe_next(v)
+    return "" if out == "/" and v != "/" else out
+
+
+def _job_display_name(meta: dict, result_filename: str | None) -> str:
+    """作業清單上顯示的名稱。
+
+    各工具塞進 job meta 的欄位長得不一樣（25 個呼叫點裡只有 5 個帶 filename，
+    其餘是 count / upload_id / asset_id …），所以名稱在這裡統一推導 —— 與其
+    要求每個工具都記得傳，不如集中處理，新工具也自動受惠。
+    """
+    name = meta.get("filename")
+    if name:
+        return str(name)
+    if result_filename:
+        return str(result_filename)
+    n = meta.get("count")
+    if isinstance(n, int) and n > 0:
+        return f"{n} 個檔案"
+    return ""
+
+
+def _job_scope(request) -> dict:
+    """「我的作業」的歸屬範圍。
+
+    認證開啟 → 綁使用者帳號。認證關閉 → 沒有「我」這個概念，退而用**來源 IP**：
+    單機自用只有 127.0.0.1（完全正確），辦公室內網至少不同電腦看不到彼此的。
+    NAT 後面會混在一起 —— UI 有標明，不可當成真正的權限（認證關閉時本來就沒有
+    權限可言，這只是避免把別人的作業攤在同一個列表上）。
+    """
+    from .core import auth_settings as _as, sessions as _se
+    from .core.client_ip import real_client_ip
+    if not _as.is_enabled():
+        return {"mode": "ip", "client_ip": real_client_ip(request)}
+    u = getattr(request.state, "user", None)
+    if not u:
+        tok = request.cookies.get(_se.COOKIE_NAME, "")
+        u = _se.lookup(tok) if tok else None
+    uid = u.get("user_id") if u else None
+    return {"mode": "user", "owner_id": int(uid) if uid is not None else None}
+
+
+@app.get("/api/jobs")
+async def api_job_list(request: Request, active: bool = False,
+                       limit: int = 50, offset: int = 0):
+    """列出「我的作業」—— 讓使用者關掉頁面之後還找得回自己的轉換結果。
+
+    在這之前 job_id 只活在該分頁的 JS 變數裡，關掉分頁就等於結果檔遺失（檔案還
+    在 temp，但沒有任何人知道它的 id）。
+    """
+    from .core import job_store
+    scope = _job_scope(request)
+    if scope["mode"] == "user" and scope["owner_id"] is None:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    kw = ({"owner_id": scope["owner_id"]} if scope["mode"] == "user"
+          else {"client_ip": scope["client_ip"]})
+    rows = job_store.list_jobs(active_only=bool(active), limit=limit,
+                               offset=offset, **kw)
+    tool_names = {t.metadata.id: t.metadata.name for t in tools}
+    # 疊上記憶體中的即時狀態：進度刻意不寫 DB（高頻寫入），只從 DB 讀的話
+    # 進度條永遠是 0
+    live = job_manager.live_snapshot()
+    qpos = job_manager.queue_positions()
+    out = []
+    for r in rows:
+        meta = r.get("meta") or {}
+        lv = live.get(r["id"]) or {}
+        out.append({
+            "id": r["id"],
+            "tool_id": r["tool_id"],
+            "tool_name": tool_names.get(r["tool_id"], r["tool_id"]),
+            "status": lv.get("status", r["status"]),
+            "progress": lv.get("progress", r["progress"]),
+            "message": lv.get("message") or r["message"],
+            "queue_pos": qpos.get(r["id"]),
+            "error": r["error"],
+            "filename": _job_display_name(meta, r["result_filename"]),
+            "result_filename": r["result_filename"],
+            "created_at": r["created_at"],
+            "updated_at": r["updated_at"],
+            "elapsed": round(max(0.0, (r["finished_at"] or time.time())
+                                 - r["created_at"]), 1),
+            # 結果檔可能已被 TTL 清掉 —— 一定要實際看檔案在不在，不能只看狀態，
+            # 否則使用者會點到一個 404 的下載鈕。
+            "has_result": bool(r["result_path"]
+                               and Path(r["result_path"]).exists()),
+            # 自動存入工作區的結果（成功 / 失敗原因）—— 失敗要看得見，
+            # 無聲失敗會讓使用者以為存好了，隔天檔案卻不在
+            "workspace": meta.get("workspace"),
+            # 有些工具的產出不是一個檔案，而是一頁對照表（逐句翻譯）——
+            # 那種作業要能點回原本那一頁看結果，而不是給一顆下載鈕。
+            "view_url": _safe_view_url(meta.get("view_url")),
+        })
+    # 工作區停用時不會自動存 → 告訴使用者結果還剩多久，讓他知道要在什麼時候
+    # 之前取走（而不是隔天回來才發現不見了）
+    from .core import retention as _ret, workspace as _ws
+    return {"jobs": out, "scope": scope["mode"],
+            "workspace_enabled": _ws.is_enabled(),
+            "result_ttl_hours": int(_ret.get().get("jobs_hours") or 0),
+            "total": job_store.count_jobs(**kw),
+            "active": job_store.count_jobs(active_only=True, **kw)}
 
 
 @app.get("/api/jobs/{job_id}")
@@ -980,6 +1322,8 @@ async def api_job_status(job_id: str, request: Request):
     # non-owners (no enumeration).
     if not job or not _job_access(job, request):
         return JSONResponse({"error": "job not found"}, status_code=404)
+    # 有人在輪詢 = 頁面還開著。「完成後自動存入工作區」只在使用者離開後才需要。
+    job_manager.mark_polled(job_id)
     return job.to_public()
 
 
@@ -993,8 +1337,17 @@ async def api_job_cancel(job_id: str, request: Request):
     return {"ok": ok, "status": job.status}
 
 
+
+# `_PUBLIC_PREFIXES` 含 "/api/"，所以根層級的 /api/* **完全跳過 `_auth_gate`**
+# （沒有 session 檢查、也沒有 per-tool 權限檢查）；而 API token 的 enforce 預設是
+# False。兩者相乘的結果是這幾個端點在認證開啟的站台上仍然免認證 —— 實測未登入
+# 者只要從公開的 /login 頁拿一個 CSRF token 就能呼叫（v1.14.6 資安稽核確認）。
+# /api/jobs 與 /api/my/* 沒事是因為它們各自在 handler 內做了歸屬檢查；這幾個沒有。
+# 修法不是動 `_PUBLIC_PREFIXES`（會破壞 bearer token 流程），而是照同樣的模式在
+# handler 上掛 `require_tool`，順便讓工具權限也生效（原本連授權都繞過了）。
 @app.get("/api/vat-lookup/{vat}")
-async def api_vat_lookup(vat: str):
+async def api_vat_lookup(vat: str,
+                         _u: dict = Depends(_require_tool("vat-lookup"))):
     """反查統編 → 公司資料 (M4)。
 
     來源：本地 vat_db.sqlite（admin 預先匯入）。
@@ -1010,7 +1363,8 @@ async def api_vat_lookup(vat: str):
 
 
 @app.post("/api/convert-to-pdf")
-async def api_convert_to_pdf(file: UploadFile = File(...)):
+async def api_convert_to_pdf(file: UploadFile = File(...),
+                             _u: dict = Depends(_require_tool("office-to-pdf"))):
     """Convert one Office file to PDF, return the PDF bytes inline.
 
     Used by the PDF-only tools' frontends to offer "auto-convert this Word
@@ -1078,6 +1432,7 @@ async def api_job_download(job_id: str, request: Request, _filename: str | None 
 @app.post("/api/llm-review")
 async def api_llm_review(
     file: UploadFile = File(...),
+    _u: dict = Depends(_require_tool("pdf-fill")),
     company_id: str = "",
     max_rounds: int = 0,
 ):
@@ -1255,6 +1610,50 @@ async def _startup():
         from .core import auth_db, audit_db, audit_forward, auth_settings, roles
         auth_db.init()
         audit_db.init()
+        # 工作紀錄 DB：建表，並把上次行程遺留的「進行中」標成已中斷 —— 那些執行
+        # 緒已經不存在了，繼續顯示轉換中只會讓使用者等一個永遠不會完成的工作。
+        from .core import concurrency_settings, db_health, job_store
+        job_store.init()
+        # 每分鐘記一筆資源使用率，管理頁才畫得出「何時是高峰」的歷史圖
+        job_store.start_sampler()
+        # 事件迴圈延遲監看 —— 「整站卡住但 CPU 看起來還有餘裕」只能靠這個量出來
+        _loop_watchdog.start()
+        # ---- 讓「轉檔進行中」不影響網頁操作（第二道措施）----
+        # 背景作業跑在執行緒裡，而有些工具（jtdt-layout 的版面重組尤其明顯）做的
+        # 是大量**純 Python** 的運算 —— 那種執行緒會長時間握著 GIL，同一個行程裡
+        # 的 asyncio 事件迴圈就搶不到執行機會，網頁因此卡住。
+        #
+        # `setswitchinterval` 是 GIL 的強制切換間隔，預設 5 毫秒。調小到 1 毫秒
+        # 讓事件迴圈的等待上限縮短為原本的五分之一。代價是切換次數變多（CPU 密集
+        # 工作大約慢個百分之幾），但**網頁的回應性遠比轉檔快幾秒重要**。
+        #
+        # 這不是萬靈丹：真正的根治是把重運算搬到子行程（soffice 本來就是，且已
+        # 降優先權 —— 見 office_convert._lower_priority）。兩者搭配才夠。
+        import sys as _sys
+        try:
+            _sys.setswitchinterval(0.001)
+            logger.info("GIL 切換間隔設為 1 ms（讓轉檔不影響網頁回應）")
+        except (AttributeError, ValueError):
+            pass
+        # 資料庫完整性檢查。壞掉不丟例外（一個壞掉的稽核 DB 不該讓服務起不來），
+        # 但要在記錄裡講清楚是哪個檔、影響什麼、怎麼還原 —— 原本的行為是噴一個
+        # 看不懂的 sqlite 例外，管理員完全不知道發生什麼事。
+        # 在背景跑：正式機的統編資料庫有 1.4 GB，冷快取下讀完要一分鐘 —— 同步
+        # 檢查會讓每次 `jtdt update` 多出一分鐘連不上的空窗（部署到正式機才實測
+        # 出來，啟動 7 秒變 61 秒）。
+        def _on_db_checked(rows):
+            for _r in rows:
+                if _r["exists"] and not _r["ok"]:
+                    try:
+                        audit_db.log_event("db_corruption", username="system",
+                                           target=_r["file"],
+                                           details={"detail": _r["detail"],
+                                                    "impact": _r["impact"]})
+                    except Exception:  # noqa: BLE001
+                        pass
+        db_health.startup_check_async(_on_db_checked)
+        # 依設定（並依實際記憶體夾住上限）套用併行度
+        concurrency_settings.apply()
         # Force-create the session secret on first boot so admin enabling
         # auth later doesn't see a missing-secret race.
         auth_settings.get_session_secret()

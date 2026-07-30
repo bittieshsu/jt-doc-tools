@@ -79,35 +79,45 @@ SEED_ROLES: list[dict] = [
     {
         "id": "finance",
         "display_name": "財務",
-        "description": "一般使用者 + 表單填寫 / 用印與簽名 / 浮水印 / 加密 / 去識別化",
+        # 說明必須與實際授權一致 —— 原本寫「+ 浮水印 / 加密 / 去識別化」，
+        # 但那三個本來就在一般使用者裡，讀起來會以為這個角色比較窄，其實是
+        # 「一般使用者的全部 + 兩個敏感工具」。`tests/test_roles_rbac.py` 會擋。
+        "description": "一般使用者的全部工具，另加表單填寫與用印簽名（敏感）",
         "is_builtin": True,
         "is_protected": False,
-        "tools": list(_NON_ADMIN_TOOL_IDS) + [
-            "pdf-fill", "pdf-stamp", "pdf-watermark",
-            "pdf-encrypt", "doc-deident", "text-deident",
-        ],
+        # 只列「一般使用者沒有的」—— 其餘重複列出沒有作用，只會讓人以為
+        # 這幾個是這個角色的特色。
+        "tools": list(_NON_ADMIN_TOOL_IDS) + ["pdf-fill", "pdf-stamp"],
     },
     {
         "id": "sales",
         "display_name": "業務",
-        "description": "一般使用者 + 表單填寫 / 用印與簽名 / 浮水印 / 去識別化",
+        "description": "一般使用者的全部工具，另加表單填寫與用印簽名（敏感）",
         "is_builtin": True,
         "is_protected": False,
-        "tools": list(_NON_ADMIN_TOOL_IDS) + [
-            "pdf-fill", "pdf-stamp", "pdf-watermark",
-            "doc-deident", "text-deident",
-        ],
+        "tools": list(_NON_ADMIN_TOOL_IDS) + ["pdf-fill", "pdf-stamp"],
     },
     {
         "id": "legal-sec",
         "display_name": "法務資安",
-        "description": "一般使用者 + 去識別化 / 隱藏掃描 / Metadata / 差異比對 / 加密解密",
+        # 這個角色原本寫成 `_NON_ADMIN_TOOL_IDS + [七個]`，而那七個**全部**已經
+        # 在一般使用者裡 → 指派這個角色與指派「一般使用者」完全等價，等於這個
+        # 角色什麼都沒做，而名稱與說明卻讓人以為它是收窄的專用角色。
+        #
+        # 改成名實相符的窄清單（同 clerk 的作法）。**既有安裝不會被收窄** ——
+        # `seed_builtin_roles()` 只補不減，`role_seed_snapshot` 的差集是空的，
+        # 所以已上線的客戶維持現狀（權限只增不減是刻意的設計）。新安裝則拿到
+        # 符合最小權限原則的版本。
+        "description": "法務 / 資安檢視用：去識別化、隱藏內容掃描、Metadata、差異比對、加密解密",
         "is_builtin": True,
         "is_protected": False,
-        "tools": list(_NON_ADMIN_TOOL_IDS) + [
+        "tools": [
             "doc-deident", "text-deident",
-            "pdf-hidden-scan", "pdf-metadata", "doc-diff",
+            "pdf-hidden-scan", "pdf-metadata", "doc-diff", "text-diff",
             "pdf-encrypt", "pdf-decrypt",
+            # 檢視文件內容必備的基本能力（沒有這些連要看的檔案都打不開）
+            "pdf-extract-text", "pdf-extract-images", "pdf-attachments",
+            "pdf-merge", "pdf-split", "pdf-pages", "pdf-to-image",
         ],
     },
     {
@@ -481,7 +491,10 @@ def list_roles() -> list[dict]:
             "description": r["description"], "is_builtin": bool(r["is_builtin"]),
             "is_protected": bool(r["is_protected"]),
             "is_default_for_new": bool(r["is_default_for_new"]),
-            "created_at": r["created_at"], "tools": tools,
+            # 刻意**不**回 created_at —— 這份結果會被整包序列化進管理頁，
+            # 原始 Unix 時間戳會被掃描器判為資訊洩漏（Low），而畫面上完全沒用到它。
+            # 需要建立時間的地方請直接查 DB。
+            "tools": tools,
         })
     return out
 

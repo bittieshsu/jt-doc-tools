@@ -402,7 +402,12 @@ async def analyze(request: Request, file: UploadFile = File(...)):
         raise HTTPException(400, "只支援 PDF")
     data = await file.read()
     if not data:
-        raise HTTPException(400, "empty file")
+        raise HTTPException(400, "空的檔案")
+    # 副檔名只是**名字**，不代表內容。少了這行，內容不是 PDF 時 PyMuPDF 會在
+    # 底下丟例外 → 500 Internal Server Error，使用者看到一句看不懂的英文。
+    # 同一支工具的 `/api/*` 入口本來就有這個檢查，網頁介面漏了（v1.14.6 補齊）。
+    if data[:4] != b"%PDF":
+        raise HTTPException(400, "不是有效的 PDF（缺少 %PDF 標頭）")
     upload_id = uuid.uuid4().hex
     from ...core import upload_owner as _uo
     _uo.record(upload_id, request)
@@ -426,6 +431,12 @@ async def submit(request: Request):
     preset = (body.get("preset") or "balanced").strip()
     if not upload_id:
         raise HTTPException(400, "upload_id required")
+    from ...core import safe_paths as _sp, upload_owner as _uo
+    # 歸屬驗證：這個 id 是從請求內容傳進來的，只驗格式不夠 —— 實測過
+    # B 用 A 的 upload_id 呼叫本端點，作業就會掛在 B 名下，B 再合法地
+    # 下載自己的作業結果，等於拿到 A 的文件（v1.14.6 資安稽核確認可利用）。
+    _sp.require_uuid_hex(upload_id, "upload_id")
+    _uo.require(upload_id, request)
     src = settings.temp_dir / f"cmp_{upload_id}_in.pdf"
     if not src.exists():
         raise HTTPException(404, "upload expired")

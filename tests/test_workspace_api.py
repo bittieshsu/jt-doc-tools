@@ -189,8 +189,17 @@ def test_duplicate_flag(client):
 
 
 def test_save_by_job_id_owner_acl(client):
-    """A job tagged with an owner can't be saved by a different identity.
-    Under auth OFF the requester id is None, so an owned job is refused."""
+    """歸屬判斷改走與 `/api/jobs/*` 相同的 `_job_access`（v1.14.6）。
+
+    行為因此變了：**未啟用認證時放行**。原本這裡自己一份判斷，比較
+    `cur (None) != job.owner_id`，於是單人模式下也拒絕 —— 但同一份結果在單人
+    模式下本來就能從 `/api/jobs/{id}/download` 直接下載，這裡擋住並沒有擋到任何
+    東西，只是讓兩條路徑的行為不一致。
+
+    真正重要的是「**啟用認證時**別人存不走」，那由
+    `tests/test_job_id_acl.py::test_workspace_save_denies_other_users_job`
+    與 `..._denies_ownerless_job` 驗證（那兩條在修正前是紅的）。
+    """
     ws.save_settings({"enabled": True, "per_user_quota_mb": 500,
                       "max_file_mb": 50, "retention_hours": -1})
     from app.core.job_manager import job_manager, Job
@@ -206,7 +215,8 @@ def test_save_by_job_id_owner_acl(client):
     job.owner_id = 999  # belongs to someone else
     job_manager._jobs[jid] = job
     r = client.post("/workspace/save", data={"job_id": jid})
-    assert r.status_code == 403
+    assert r.status_code == 200, (
+        f"單人模式應與 /api/jobs 一致地放行，得到 {r.status_code}")
 
 
 def test_disabled_returns_404(client):

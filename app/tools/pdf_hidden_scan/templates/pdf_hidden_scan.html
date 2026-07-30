@@ -94,7 +94,7 @@ const fu = new FileUpload($('hsUp'), async (f) => {
   $('hsCats').innerHTML = '<div class="muted">掃描中…</div>';
   const fd = new FormData(); fd.append('file', f);
   const r = await fu.upload('/tools/pdf-hidden-scan/scan', fd, {processingLabel: '掃描隱藏內容中…'});
-  if (!r.ok) { $('hsCats').innerHTML = '<span data-s="s53875d1b">失敗：' + await r.text() + '</span>'; return; }
+  if (!r.ok) { $('hsCats').textContent = '失敗：' + await window.friendlyServerError(r, '掃描失敗'); return; }
   const d = await r.json();
   uploadId = d.upload_id;
   lastFindings = d.findings;

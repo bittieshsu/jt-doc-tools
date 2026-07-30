@@ -87,15 +87,24 @@ class SynonymManager:
 
         Returns True when the synonyms file was changed.
         """
-        canonical_key = (canonical_key or "").strip()
-        synonym = (synonym or "").strip()
+        # 這是**全站共用**的一份對照表，而 pdf-fill 的「學習」功能讓一般使用者
+        # 也能寫入 —— 那是正常功能，不該改成 admin-only（會弄壞使用者的流程）。
+        # 改為加上限：字串長度、單一 key 的同義詞數、總 key 數都設頂，避免有人
+        # （或壞掉的前端迴圈）把這個檔案無上限膨脹，或塞超長字串拖慢比對。
+        _MAX_LEN, _MAX_PER_KEY, _MAX_KEYS = 120, 60, 2000
+        canonical_key = (canonical_key or "").strip()[:_MAX_LEN]
+        synonym = (synonym or "").strip()[:_MAX_LEN]
         if not canonical_key or not synonym:
             return False
         with self._lock:
             data = self._read()
             syns = data.setdefault("synonyms", {})
+            if canonical_key not in syns and len(syns) >= _MAX_KEYS:
+                return False
             lst = syns.setdefault(canonical_key, [])
             if synonym in lst:
+                return False
+            if len(lst) >= _MAX_PER_KEY:
                 return False
             lst.append(synonym)
             data["updated_at"] = time.time()

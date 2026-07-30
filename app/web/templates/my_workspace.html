@@ -18,15 +18,15 @@
 
 <div class="panel">
   <h2 data-s="s53896af7">上傳到工作區</h2>
-  <p class="muted" data-s="se2907ccc">直接把 PDF / PNG 拖進來，或點選挑選，存到自己的工作區。</p>
-  <div class="file-upload" id="wsUpload" data-accept="application/pdf,image/png">
+  <p class="muted" data-s="se2907ccc">直接把 PDF / PNG / 文書檔（Word・Excel・PowerPoint・OpenDocument）拖進來，或點選挑選，存到自己的工作區。</p>
+  <div class="file-upload" id="wsUpload" data-accept="application/pdf,image/png,.docx,.xlsx,.pptx,.odt,.ods,.odp,.odg">
     <label class="drop-zone" for="wsUpload-input">
       <div class="drop-zone-inner">
         <div class="drop-zone-icon"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l3-3 3 3"/><path d="M12 11v10"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M16 7l-4-4-4 4"/><path d="M12 3v8"/></svg></div>
-        <div class="drop-zone-text">拖曳 PDF / PNG 到此，或點選挑選</div>
+        <div class="drop-zone-text">拖曳檔案到此，或點選挑選</div>
         <div class="drop-zone-filename"></div>
       </div>
-      <input type="file" id="wsUpload-input" accept="application/pdf,image/png" multiple />
+      <input type="file" id="wsUpload-input" accept="application/pdf,image/png,.docx,.xlsx,.pptx,.odt,.ods,.odp,.odg" multiple />
     </label>
   </div>
 </div>
@@ -195,6 +195,36 @@ async function wsLoad() {
   const selAll = document.getElementById('ws-select-all');
   if (selAll) selAll.checked = false;
   if (typeof _wsUpdateBulk === 'function') _wsUpdateBulk();
+  _wsRetryBlankThumbs();
+}
+
+/** Office 檔的縮圖是背景產生的 —— 稍後重試一次，做好的就補上。
+ *
+ * 這些格式沒有便宜的「畫第一頁」方法，一定要先用 Office 引擎轉一次（幾秒）。
+ * 在 HTTP 請求裡等會讓一頁十幾個檔排隊等同一顆引擎，所以伺服器先回一張空白圖，
+ * 實際轉檔排到背景。這裡就是「等它做好再看一次」，使用者不必自己按重新整理。
+ */
+function _wsRetryBlankThumbs() {
+  const OFFICE = ['docx', 'odt', 'xlsx', 'ods', 'pptx', 'odp', 'odg'];
+  const pending = [...document.querySelectorAll('.ws-thumb')]
+    .filter(el => OFFICE.includes(el.dataset.ext || ''));
+  if (!pending.length) return;
+  let tries = 0;
+  const tick = () => {
+    tries += 1;
+    let left = 0;
+    pending.forEach((el) => {
+      const img = el.querySelector('img');
+      if (!img) return;
+      // 空白佔位圖是 1×1；真的縮圖一定比這大
+      if (img.naturalWidth > 2) return;
+      left += 1;
+      img.src = `/workspace/thumb/${el.dataset.id}?r=${tries}`;
+    });
+    // 最多試幾輪就停 —— 產不出來的檔（毀損 / 太大）不該一直打伺服器
+    if (left && tries < 6) setTimeout(tick, 2500);
+  };
+  setTimeout(tick, 2500);
 }
 
 // 點縮圖 → lightbox 放大

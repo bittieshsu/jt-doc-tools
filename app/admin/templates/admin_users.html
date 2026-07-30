@@ -49,10 +49,11 @@
       <tr>
         <th class="sortable" data-sort="text" data-col="0">帳號</th>
         <th class="sortable" data-sort="text" data-col="1">顯示名稱</th>
-        <th class="sortable" data-sort="text" data-col="2">來源</th>
-        <th class="sortable" data-sort="text" data-col="3">狀態</th>
-        <th class="sortable" data-sort="text" data-col="4">角色</th>
-        <th class="sortable" data-sort="num"  data-col="5">最後登入</th>
+        <th class="sortable" data-sort="text" data-col="2">信箱</th>
+        <th class="sortable" data-sort="text" data-col="3">來源</th>
+        <th class="sortable" data-sort="text" data-col="4">狀態</th>
+        <th class="sortable" data-sort="text" data-col="5">角色</th>
+        <th class="sortable" data-sort="num"  data-col="6">最後登入</th>
         <th></th>
       </tr>
     </thead>
@@ -64,6 +65,8 @@
           {% if u.is_admin_seed %}<span class="badge">SEED</span>{% endif %}
         </td>
         <td>{{ u.display_name }}</td>
+        {# 作業完成通知寄到這裡。AD / LDAP / SSO 帳號由來源帶入，本機帳號要人填 #}
+        <td class="muted">{{ u.email or '—' }}</td>
         <td data-sort-key="{{ u.source }}">
           <span class="src-badge src-{{ u.source }}">{{ u.source }}</span>
         </td>
@@ -76,8 +79,11 @@
             {% for r in u.roles_display %}<span class="role-chip" title="{{ r.id }}">{{ r.display_name }}</span>{% endfor %}
           {% else %}<span class="muted">(無)</span>{% endif %}
         </td>
-        <td class="muted last-login" data-sort-key="{{ u.last_login_at|int if u.last_login_at else 0 }}"
-            data-ts="{{ u.last_login_at|int if u.last_login_at else 0 }}">
+        {# 送 ISO 8601 而不是原始 Unix 秒數：①掃描器會把裸 epoch 判為資訊洩漏；
+           ②ISO 字串照字典序排就是時間序，排序功能不受影響；
+           ③仍是機器可讀，所以還是能在**瀏覽者自己的時區**格式化。 #}
+        <td class="muted last-login" data-sort-key="{{ u.last_login_at | localiso }}"
+            data-iso="{{ u.last_login_at | localiso }}">
           —
         </td>
         <td>
@@ -100,6 +106,7 @@
           <button class="btn btn-small" data-act="edit"
                   data-username="{{ u.username }}"
                   data-display="{{ u.display_name }}"
+                  data-email="{{ u.email }}"
                   data-enabled="{{ '1' if u.enabled else '0' }}"
                   data-roles="{{ u.roles|join(',') }}">{{ icon('edit', size=12) }} 編輯</button>
           <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} 重設密碼</button>
@@ -121,6 +128,16 @@
     <div class="form-row">
       <label>顯示名稱</label>
       <input class="field" type="text" id="emDisplay" maxlength="64" data-s="s7631d717">
+    </div>
+    <div class="form-row">
+      <label for="emEmail">信箱</label>
+      <input class="field" type="text" id="emEmail" maxlength="200"
+             placeholder="user@example.com" data-s="s7631d717">
+      <div class="muted em-email-hint" data-s="sf1bde2c5">
+        作業完成通知會寄到這裡。AD / LDAP / SSO 帳號在登入時由來源自動帶入
+        （AD / LDAP 讀 <code data-s="s1fcb9a2f">mail</code> 屬性），在這裡改會被下次登入覆蓋。
+        使用者若在「我的作業 → 通知設定」自己填了收件信箱，以那個為準。
+      </div>
     </div>
     <div class="form-row">
       <label class="field" data-s="sea37c3c1">
@@ -190,7 +207,8 @@
   .user-table th.sort-desc::after { content:'▼'; color:#4f46e5; font-size:9px; }
   .badge { background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:4px; font-size:10px; margin-left:6px; }
   /* source badges: distinct color per realm so rows from different sources stand out */
-  .src-badge { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; line-height:1.4; }
+  .em-email-hint { margin-top: 6px; font-size: 12.5px; line-height: 1.6; }
+.src-badge { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; line-height:1.4; }
   .src-local { background:#e5e7eb; color:#374151; }
   .src-ldap  { background:#dbeafe; color:#1e40af; }
   .src-ad    { background:#ede9fe; color:#5b21b6; }
@@ -269,7 +287,8 @@ const ALL_ROLES  = {{ all_roles|tojson }};
 const ALL_GROUPS = {{ all_groups|tojson }};
 
 // ---------- format last-login timestamps ----------
-// Server emits raw unix seconds in data-ts; render absolute datetime on first
+// Server emits ISO 8601 in data-iso (not raw unix seconds — a bare epoch reads
+// as an information leak to scanners); render absolute datetime on the first
 // line and a relative "X 分鐘前" hint on the second.
 (function fmtTimestamps() {
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -286,10 +305,16 @@ const ALL_GROUPS = {{ all_groups|tojson }};
   }
   const now = Date.now() / 1000;
   document.querySelectorAll('.last-login').forEach(td => {
-    const ts = parseInt(td.dataset.ts || '0', 10);
-    if (!ts) { td.textContent = '從未登入'; return; }
-    const d = new Date(ts * 1000);
-    td.innerHTML = `${fmtAbs(d)}<span class="ll-rel">${fmtRel(now - ts)}</span>`;
+    const iso = td.dataset.iso || '';
+    const d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d.getTime())) { td.textContent = '從未登入'; return; }
+    // 用 DOM API 而不是 innerHTML —— 專案規則：JS 動態塞 DOM 文字禁用 innerHTML
+    // （CodeQL「DOM text reinterpreted as HTML」）。
+    td.textContent = fmtAbs(d);
+    const rel = document.createElement('span');
+    rel.className = 'll-rel';
+    rel.textContent = fmtRel(now - d.getTime() / 1000);
+    td.appendChild(rel);
   });
 })();
 
@@ -435,6 +460,7 @@ function openEdit(btn) {
   currentEditUid = btn.closest('tr').dataset.uid;
   document.getElementById('emUsername').textContent = btn.dataset.username;
   document.getElementById('emDisplay').value = btn.dataset.display || '';
+  document.getElementById('emEmail').value = btn.dataset.email || '';
   document.getElementById('emEnabled').checked = btn.dataset.enabled === '1';
 
   const haveRoles = new Set((btn.dataset.roles || '').split(',').filter(Boolean));
@@ -457,6 +483,7 @@ document.getElementById('emCancel').addEventListener('click', () => hideModal('e
 document.getElementById('emSave').addEventListener('click', async () => {
   const body = {
     display_name: document.getElementById('emDisplay').value,
+    email: document.getElementById('emEmail').value,
     enabled: document.getElementById('emEnabled').checked,
     roles: Array.from(document.querySelectorAll('#emRoleGrid input:checked'))
                 .map(c => c.dataset.role),

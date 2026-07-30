@@ -205,3 +205,157 @@ def test_rbac_excludes_users(auth_off, tmp_path):
         "ou_subject_roles", "ou_subject_perms"}
     blob = json.dumps(dump)
     assert "password" not in blob.lower()
+
+
+# ---------------- v1.14.6：補齊缺漏的設定分類 ----------------
+# 這批分類是「設定備份」長期漏掉的東西（SSO / 記錄轉送 / 保留策略 / OCR …）。
+# 漏掉時不會有任何錯誤訊息，只有客戶搬機還原後才會發現設定不見了 —— 所以這裡
+# 逐項釘住，並且**特別測 SSO 的跨機還原**（那項不只是漏，是還原了也不能用）。
+
+_NEW_CATEGORY_ITEMS = {
+    "sso": "sso_settings.json",
+    "directory": "directory_sync.json",
+    "log_forward": "log_forwarders.json",
+    "retention": "retention.json",
+    "scheduled_export": "scheduled_export.json",
+    "ocr": "ocr_settings.json",
+}
+
+
+@pytest.mark.parametrize("cat_id,filename", sorted(_NEW_CATEGORY_ITEMS.items()))
+def test_new_category_exports_its_file(data_dir, tmp_path, cat_id, filename):
+    _write(data_dir, filename, {"probe": cat_id})
+    out = tmp_path / "out.zip"
+    settings_export.export_to_zip(out, selected_ids=[cat_id])
+    with zipfile.ZipFile(out) as zf:
+        assert f"data/{filename}" in zf.namelist()
+
+
+def test_auth_category_no_longer_claims_sso():
+    """舊版「認證設定」的說明寫著 OIDC / SAML，檔案卻沒包 —— 使用者勾了以為有
+    備份，實際沒有。說明與內容必須一致。"""
+    auth = next(c for c in settings_export.CATEGORIES if c["id"] == "auth")
+    assert "sso_settings.json" not in auth["items"]
+    assert "OIDC" not in auth["desc"] and "SAML" not in auth["desc"]
+    sso = next(c for c in settings_export.CATEGORIES if c["id"] == "sso")
+    assert "OIDC" in sso["desc"] and sso.get("sensitive") is True
+
+
+def test_ocr_remote_token_category_marked_sensitive():
+    """遠端 OCR 設定含 bearer token，UI 要標示為敏感。"""
+    ocr = next(c for c in settings_export.CATEGORIES if c["id"] == "ocr")
+    assert "ocr_remote.json" in ocr["items"]
+    assert ocr.get("sensitive") is True
+
+
+@pytest.mark.parametrize("cat_id", ["workspace", "scan_buffers",
+                                    "history_fill", "history_stamp"])
+def test_bulk_user_data_is_opt_in(cat_id):
+    """使用者資料量大，預設不勾（搬設定 ≠ 搬全部檔案）。"""
+    cat = next(c for c in settings_export.CATEGORIES if c["id"] == cat_id)
+    assert cat.get("default") is False
+
+
+def test_session_secret_never_exported(data_dir, tmp_path):
+    """`.session_secret` 是 session 簽章金鑰，進了備份檔等於可偽造登入。
+    不管勾選哪些分類都不可以出現。"""
+    (data_dir / ".session_secret").write_bytes(b"x" * 32)
+    out = tmp_path / "out.zip"
+    # rbac 分類讀的是 auth.sqlite，不在這個臨時 data_dir 內 → 只勾檔案 / 目錄類
+    settings_export.export_to_zip(
+        out, selected_ids=[c["id"] for c in settings_export.CATEGORIES
+                           if c["kind"] != "rbac"])
+    with zipfile.ZipFile(out) as zf:
+        assert not [n for n in zf.namelist() if ".session_secret" in n]
+
+
+# ---------------- SSO 祕密跨機還原 ----------------
+
+def _fake_sso_file(d: Path, monkeypatch, secret_key: bytes, client_secret: str):
+    """用指定的 .session_secret 產生一份「已加密」的 sso_settings.json。"""
+    from app.core import sso_settings
+    monkeypatch.setattr("app.core.auth_settings._ensure_secret",
+                        lambda: secret_key)
+    sso_settings._invalidate_cache()
+    enc = sso_settings.encrypt_secret(client_secret)
+    (d / "sso_settings.json").write_text(json.dumps({
+        "oidc": {"enabled": True, "client_id": "abc",
+                 "client_secret_enc": enc},
+        "saml": {"enabled": False, "sp_private_key_enc": ""},
+    }), encoding="utf-8")
+    return enc
+
+
+def test_sso_secret_survives_machine_change(data_dir, tmp_path, monkeypatch):
+    """**這是 SSO 分類的重點**：secret 是用本機 .session_secret 加密的，直接複製
+    檔案到另一台機器會解不開 —— 設定看起來都在，SSO 卻無聲失效。匯出要解密、
+    匯入要用目標機器的金鑰重新加密。"""
+    from app.core import sso_settings
+
+    key_a, key_b = b"A" * 32, b"B" * 32
+    enc_a = _fake_sso_file(data_dir, monkeypatch, key_a, "s3cr3t-value")
+
+    out = tmp_path / "out.zip"
+    settings_export.export_to_zip(out, selected_ids=["sso"])
+
+    # 備份檔內應是明文（與既有的 LDAP 密碼 / API token 同級，分類已標 sensitive）
+    with zipfile.ZipFile(out) as zf:
+        blob = json.loads(zf.read("data/sso_settings.json").decode())
+    assert blob["oidc"]["client_secret_enc"] == "s3cr3t-value"
+    assert blob[settings_export._SSO_PLAINTEXT_KEY] is True
+
+    # 換一台機器（不同 .session_secret）還原
+    (data_dir / "sso_settings.json").unlink()
+    monkeypatch.setattr("app.core.auth_settings._ensure_secret", lambda: key_b)
+    sso_settings._invalidate_cache()
+    settings_export.import_from_zip(out, selected_ids=["sso"])
+
+    restored = json.loads((data_dir / "sso_settings.json").read_text())
+    assert settings_export._SSO_PLAINTEXT_KEY not in restored, "明文標記要移除"
+    ct = restored["oidc"]["client_secret_enc"]
+    assert ct != "s3cr3t-value", "落地時必須是密文，不可留明文"
+    assert ct != enc_a, "應該用新機器的金鑰重新加密"
+    assert sso_settings.decrypt_secret(ct) == "s3cr3t-value"
+
+
+def test_legacy_sso_backup_without_marker_is_left_alone(data_dir, tmp_path,
+                                                        monkeypatch):
+    """v1.14.5 以前匯出的備份裡是**別台機器的密文**，本機解不開 —— 原樣保留讓
+    管理員重新輸入即可，不可試圖解密（會變成空字串，設定看似存在卻是壞的）。"""
+    from app.core import sso_settings
+
+    monkeypatch.setattr("app.core.auth_settings._ensure_secret",
+                        lambda: b"B" * 32)
+    sso_settings._invalidate_cache()
+    legacy = {"oidc": {"client_secret_enc": "gAAAAA-other-machine-ciphertext"}}
+    out = tmp_path / "legacy.zip"
+    with zipfile.ZipFile(out, "w") as zf:
+        zf.writestr("data/sso_settings.json", json.dumps(legacy))
+        zf.writestr(settings_export.MANIFEST_NAME, json.dumps({
+            "kind": "jtdt-settings-export", "schema_version": 2,
+            "categories": [{"id": "sso", "label": "SSO"}],
+            "entries_by_category": {"sso": ["data/sso_settings.json"]}}))
+    settings_export.import_from_zip(out, selected_ids=["sso"])
+    got = json.loads((data_dir / "sso_settings.json").read_text())
+    assert got["oidc"]["client_secret_enc"] == "gAAAAA-other-machine-ciphertext"
+
+
+# ---------------- 涵蓋度檢查（發版 gate 的單元測試化）----------------
+
+def test_every_settings_file_is_in_some_category():
+    """把 tools/check_settings_export_coverage.py 拉進測試 —— 加新設定檔卻忘記
+    登記時，pytest 就會紅，不必等到發版前才想起要跑那支腳本。"""
+    import sys
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root))
+    from tools import check_settings_export_coverage as chk
+
+    cov = chk.declared_coverage()
+    missing = [n for n in chk.code_references()
+               if n.split("/")[0] not in chk.EXEMPT and n not in chk.EXEMPT
+               and not chk.is_covered(n, cov)]
+    assert not missing, (
+        f"這些設定檔沒被『設定備份 / 匯入』涵蓋：{missing}。"
+        "請加進 app/core/settings_export.py 的 CATEGORIES，"
+        "或加進 tools/check_settings_export_coverage.py 的 EXEMPT 並寫明理由。")

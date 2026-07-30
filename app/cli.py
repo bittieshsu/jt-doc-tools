@@ -2101,6 +2101,87 @@ def svc_auth_disable() -> int:
     )
 
 
+def svc_db_check(thorough: bool = False) -> int:
+    """Integrity-check every managed SQLite database.
+
+    Offline by design: when auth.sqlite is damaged the web UI is unreachable,
+    so the CLI is the only way in.
+    """
+    return _run_auth_helper(
+        "from app.core import db_health\n"
+        f"th = {bool(thorough)!r}\n"
+        "rows = db_health.check_all(thorough=th,\n"
+        "                           max_bytes=None if th else db_health._STARTUP_MAX_BYTES)\n"
+        "bad = 0\n"
+        "for r in rows:\n"
+        "    if not r['exists']:\n"
+        "        print('  %-20s -  not created yet' % r['file']); continue\n"
+        "    mark = 'SKIPPED' if r.get('skipped') else ('OK' if r['ok'] else 'DAMAGED')\n"
+        "    size = r['size_bytes'] / 1024.0 / 1024.0\n"
+        "    print('  %-20s %-8s %7.1f MB  backups=%d  %s'\n"
+        "          % (r['file'], mark, size, r['backups'],\n"
+        "             '' if r['ok'] else r['detail'][:60]))\n"
+        "    if not r['ok']:\n"
+        "        bad += 1\n"
+        "        print('      impact : %s' % r['impact_en'])\n"
+        "        print('      recover: jtdt db-restore %s' % r['file'])\n"
+        "raise SystemExit(1 if bad else 0)\n"
+    )
+
+
+def svc_db_backup() -> int:
+    """Create a hot backup (VACUUM INTO) of the critical databases."""
+    return _run_auth_helper(
+        "from app.core import db_health\n"
+        "rep = db_health.backup_all()\n"
+        "for name in rep['created']:\n"
+        "    print('  created %s' % name)\n"
+        "for sk in rep['skipped']:\n"
+        "    print('  SKIPPED %s - %s' % (sk['file'], sk['reason'][:60]))\n"
+        "if rep['removed']:\n"
+        "    print('  rotated out %d old backup(s)' % rep['removed'])\n"
+        "if not rep['created'] and not rep['skipped']:\n"
+        "    print('  nothing to back up')\n"
+        "raise SystemExit(1 if rep['skipped'] else 0)\n"
+    )
+
+
+def svc_db_restore(db_name: str, backup: str = "") -> int:
+    """Restore a database from its newest (or a named) backup."""
+    return _run_auth_helper(
+        "from app.core import db_health\n"
+        f"name = {db_name!r}\n"
+        f"bk = {backup!r} or None\n"
+        "cands = db_health.list_backups(name)\n"
+        "if not bk and not cands:\n"
+        "    print('no backup found for %s' % name); raise SystemExit(1)\n"
+        "res = db_health.restore(name, bk)\n"
+        "if not res['ok']:\n"
+        "    print('FAILED: %s' % res['error']); raise SystemExit(1)\n"
+        "print('restored from %s' % res['restored_from'])\n"
+        "if res.get('previous_saved_as'):\n"
+        "    print('previous file kept at %s' % res['previous_saved_as'])\n"
+        "print('NOTE: restart the service for it to take effect '\n"
+        "      '(jtdt restart)')\n"
+    )
+
+
+def svc_db_backups(db_name: str = "") -> int:
+    """List available backups."""
+    return _run_auth_helper(
+        "from app.core import db_health\n"
+        f"only = {db_name!r}\n"
+        "names = [only] if only else [m['file'] for m in db_health.MANAGED]\n"
+        "found = 0\n"
+        "for n in names:\n"
+        "    for b in db_health.list_backups(n):\n"
+        "        print('  %-40s %8.1f MB' % (b.name, b.stat().st_size/1048576.0))\n"
+        "        found += 1\n"
+        "if not found:\n"
+        "    print('  no backups yet (run: jtdt db-backup)')\n"
+    )
+
+
 def svc_audit_user_create(username: str, password: Optional[str] = None,
                            display_name: Optional[str] = None) -> int:
     """Create a new local user with the `auditor` role + force TOTP 2FA.
@@ -2431,6 +2512,20 @@ def main(argv: list[str] | None = None) -> int:
                               help="顯示名稱（沒給就用 username）")
 
     # OCR 訓練檔管理（fleet/headless 場景的 admin/ocr-langs CLI 替代）
+    p_dbc = sub.add_parser("db-check",
+                           help="check database integrity (works offline)")
+    p_dbc.add_argument("--thorough", action="store_true",
+                       help="full integrity_check instead of quick_check")
+    sub.add_parser("db-backup", help="hot-backup the critical databases")
+    p_dbl = sub.add_parser("db-backups", help="list available backups")
+    p_dbl.add_argument("db", nargs="?", default="",
+                       help="e.g. auth.sqlite (default: all)")
+    p_dbr = sub.add_parser("db-restore",
+                           help="restore a database from backup (offline)")
+    p_dbr.add_argument("db", help="e.g. auth.sqlite")
+    p_dbr.add_argument("--backup", default="",
+                       help="specific backup file (default: newest)")
+
     p_ocr = sub.add_parser("ocr-lang", help="OCR 訓練檔管理（同 admin/ocr-langs 的 CLI 版）")
     ocr_sub = p_ocr.add_subparsers(dest="ocr_cmd", required=True)
     ocr_sub.add_parser("list", help="列所有支援語言 + 安裝狀態")
@@ -2473,6 +2568,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.auth_cmd == "set-local":
             return svc_auth_set_local()
         return 1
+    if args.cmd == "db-check":
+        return svc_db_check(args.thorough)
+    if args.cmd == "db-backup":
+        return svc_db_backup()
+    if args.cmd == "db-backups":
+        return svc_db_backups(args.db)
+    if args.cmd == "db-restore":
+        return svc_db_restore(args.db, args.backup)
     if args.cmd == "audit-user":
         if args.audit_cmd == "create":
             return svc_audit_user_create(

@@ -26,7 +26,12 @@ async def analyze(request: Request, file: UploadFile = File(...)):
         raise HTTPException(400, "只支援 PDF")
     data = await file.read()
     if not data:
-        raise HTTPException(400, "empty file")
+        raise HTTPException(400, "空的檔案")
+    # 副檔名只是**名字**，不代表內容。少了這行，內容不是 PDF 時 PyMuPDF 會在
+    # 底下丟例外 → 500 Internal Server Error，使用者看到一句看不懂的英文。
+    # 同一支工具的 `/api/*` 入口本來就有這個檢查，網頁介面漏了（v1.14.6 補齊）。
+    if data[:4] != b"%PDF":
+        raise HTTPException(400, "不是有效的 PDF（缺少 %PDF 標頭）")
     uid = uuid.uuid4().hex
     from ...core import upload_owner as _uo
     _uo.record(uid, request)
@@ -99,6 +104,11 @@ async def analyze(request: Request, file: UploadFile = File(...)):
 async def clean(request: Request):
     body = await request.json()
     uid = (body.get("upload_id") or "").strip()
+    # 歸屬驗證：沒有這道檢查，B 可以改寫 A 的輸出檔 —— 對去識別化 / 隱藏內容
+    # 清除這類工具，「被別人改掉輸出」本身就是要害（A 可能拿著被還原的檔案送出）。
+    from ...core import safe_paths as _sp, upload_owner as _uo
+    _sp.require_uuid_hex(uid, "upload_id")
+    _uo.require(uid, request)
     if not uid:
         raise HTTPException(400, "upload_id required")
     src = settings.temp_dir / f"meta_{uid}_in.pdf"

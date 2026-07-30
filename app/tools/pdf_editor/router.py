@@ -1220,10 +1220,9 @@ async def preview(filename: str, request: Request):
     if not (filename.startswith("pe_") and is_safe_name(filename)):
         raise HTTPException(400, "invalid filename")
     path = safe_join(_work_dir(), filename)
-    # extract uid from "pe_<uuid>_p1.png" / "pe_<uuid>_out_p1.png" ...
-    rest = filename[3:].split("_", 1)[0]
-    if rest:
-        upload_owner.require(rest, request)
+    # fail-closed：認不出 upload_id 就不給（`require_by_filename` 會掃過所有
+    # `_` 分隔的片段，所以 `pe_<uuid>_out_p1.png` 這類命名不必在這裡另外處理）。
+    upload_owner.require_by_filename(filename, request)
     if not path.exists():
         raise HTTPException(404, "not found")
     return FileResponse(str(path), media_type="image/png")

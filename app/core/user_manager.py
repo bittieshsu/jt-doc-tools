@@ -62,7 +62,7 @@ def list_users(view: str = "all") -> list[dict]:
     where = _view_where(view)
     conn = auth_db.conn()
     rows = conn.execute(
-        "SELECT id, username, display_name, source, external_dn, enabled, "
+        "SELECT id, username, display_name, source, external_dn, enabled, email, "
         "is_admin_seed, is_audit_seed, password_hash, created_at, last_login_at "
         f"FROM users {where} ORDER BY username"
     ).fetchall()
@@ -78,6 +78,9 @@ def list_users(view: str = "all") -> list[dict]:
             "is_admin_seed": bool(r["is_admin_seed"]),
             "is_audit_seed": bool(r["is_audit_seed"]),
             "password_set": r["password_hash"] is not None,
+            # 作業完成通知的預設收件信箱。AD / LDAP / SSO 帳號由來源帶入，
+            # 本機帳號由管理員或本人填。
+            "email": r["email"] or "",
             "created_at": r["created_at"], "last_login_at": r["last_login_at"],
             "roles": roles_by_user.get(str(r["id"]), []),
         })
@@ -136,10 +139,24 @@ def create_local(username: str, display_name: str, password: str,
     return new_id
 
 
+def normalise_email(v: str) -> str:
+    """清理信箱字串。
+
+    * 去掉控制字元 —— 含換行的值會讓寄信在送出當下失敗（標頭注入本身被
+      Python 的 email 模組擋住，但使用者只會看到「通知都沒收到」而查不出原因）。
+    * 長度上限 200。
+    * **不做嚴格格式驗證**：目錄裡什麼都有（有人填 `姓名 <a@b.c>`、有人填內部
+      別名），擋掉反而讓同步不進來。真正的驗證交給寄信時的伺服器。
+    """
+    v = "".join(ch for ch in str(v or "") if ch == "\t" or ord(ch) >= 0x20)
+    return v.strip()[:200]
+
+
 def update(user_id: int, *, display_name: Optional[str] = None,
            enabled: Optional[bool] = None,
            roles: Optional[list[str]] = None,
-           groups: Optional[list[int]] = None) -> None:
+           groups: Optional[list[int]] = None,
+           email: Optional[str] = None) -> None:
     """Update a user's mutable attributes. None = no change."""
     conn = auth_db.conn()
     existing = conn.execute(
@@ -157,6 +174,9 @@ def update(user_id: int, *, display_name: Optional[str] = None,
                 raise ValueError("顯示名稱不得超過 64 字元")
             conn.execute("UPDATE users SET display_name=? WHERE id=?",
                          (display_name, user_id))
+        if email is not None:
+            conn.execute("UPDATE users SET email=? WHERE id=?",
+                         (normalise_email(email), user_id))
         if enabled is not None:
             # Refuse to disable the seed admin (would lock everyone out).
             if existing["is_admin_seed"] and not enabled:

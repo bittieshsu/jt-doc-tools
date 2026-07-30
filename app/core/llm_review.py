@@ -15,6 +15,8 @@ caller can fall back to plain LABEL_MAP results without breaking the user.
 """
 from __future__ import annotations
 
+import os
+
 import io
 import json
 import logging
@@ -93,6 +95,30 @@ Reply as JSON:
 
 Empty array if nothing's wrong.
 """
+
+
+def _scratch_png(prefix: str) -> Path:
+    """LLM 校驗用的暫存 PNG 路徑。
+
+    原本寫死 `/tmp/...`，有兩個問題：
+
+    1. **跨平台**：Windows 沒有 `/tmp` —— `Path("/tmp/x.png")` 會解析成目前磁碟
+       根目錄下的 tmp 資料夾，多數機器沒有它，LLM 校驗因此在 Windows 上直接
+       失敗。本專案明確要求三平台皆可用。
+    2. **暫存檔安全**：`/tmp` 是全機可寫的目錄，用固定前綴 + 短亂數的檔名在那裡
+       建檔，同機的其他使用者有機會事先放一個同名符號連結進行覆寫。改用
+       `tempfile.mkstemp`（O_EXCL + 0600 建檔）就沒有這個問題。
+
+    改放到專案自己的 temp 目錄底下，順便讓既有的保留期清理機制照顧到它。
+    """
+    import tempfile
+
+    from ..config import settings
+    base = settings.temp_dir
+    base.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix=f"{prefix}_", suffix=".png", dir=str(base))
+    os.close(fd)
+    return Path(name)
 
 
 def get_review_prompt(model: str) -> str:
@@ -265,8 +291,7 @@ def render_raw_png(
 ) -> bytes:
     """Render the given page to PNG with NO overlay (the "before" image).
     Capped at LLM_IMAGE_MAX_LONG_EDGE px on long side."""
-    import uuid as _uuid
-    tmp = Path(f"/tmp/llm_raw_{page_index}_{_uuid.uuid4().hex[:8]}.png")
+    tmp = _scratch_png(f"llm_raw_{page_index}")
     pdf_preview.render_page_png(pdf_path, tmp, page_index, dpi=dpi)
     try:
         with Image.open(tmp) as im:
@@ -298,8 +323,7 @@ def render_overlay_png(
     made the actual filled content hard to read — hurting LLM accuracy.
     """
     # 1. Render the raw page to PNG via existing helper
-    import uuid as _uuid
-    tmp = Path(f"/tmp/llm_overlay_{page_index}_{_uuid.uuid4().hex[:8]}.png")
+    tmp = _scratch_png(f"llm_overlay_{page_index}")
     pdf_preview.render_page_png(pdf_path, tmp, page_index, dpi=dpi)
 
     # 2. Open as PIL for drawing the overlay

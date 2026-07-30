@@ -5,7 +5,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import Depends, APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from fastapi import Form
@@ -264,6 +264,7 @@ async def preview(
 
 @router.post("/llm-review-start")
 async def llm_review_start(
+    request: Request,
     upload_id: str = Form(...),
     max_rounds: int = Form(0),
 ):
@@ -273,6 +274,13 @@ async def llm_review_start(
 
     Requires the src PDF and placements JSON to still be in temp_dir from
     a recent /preview call (they are until cleanup / restart)."""
+    # 歸屬驗證 —— 這個 id 從請求內容傳進來，只驗格式不夠：實測 B 可用 A 的 id
+    # 讀到 A 的文件內容（v1.14.6 資安稽核）。同一家族的其他端點本來就有驗，
+    # 這幾個漏了。
+    from ...core import safe_paths as _sp, upload_owner as _uo
+    _sp.require_uuid_hex(upload_id, "upload_id")
+    _uo.require(upload_id, request)
+
     import json as _json
     from ...core.llm_settings import llm_settings
     from ...core.llm_review import filled_from_placements, FilledField
@@ -385,12 +393,18 @@ async def llm_review_start(
 
 
 @router.get("/llm-review-result/{job_id}")
-async def llm_review_result(job_id: str):
+async def llm_review_result(job_id: str, request: Request):
     """Fetch the review result JSON after a /llm-review-start job finishes.
     Returns 404 while job is still running (client should check job status
     first via /api/jobs/{id})."""
+    # 這個回應含 `filled[].value`，也就是**實際填進表單的公司資料值**（統編 /
+    # 銀行帳號 / 地址）。原本只要知道 job_id 就拿得到 —— 必須比對作業歸屬，
+    # 且與 /api/jobs/* 一樣用 404 不用 403（不對非擁有者確認 id 存在）。
+    from ...core.safe_paths import require_uuid_hex
+    require_uuid_hex(job_id, "job_id")
     job = job_manager.get(job_id)
-    if not job:
+    from app.main import _job_access
+    if not job or not _job_access(job, request):
         raise HTTPException(404, "job not found")
     if job.status not in ("done", "error"):
         raise HTTPException(425, f"job still {job.status}")
@@ -711,10 +725,8 @@ async def serve_preview(name: str, request: Request):
     from app.core.safe_paths import safe_join
     from ...core import upload_owner
     p = safe_join(settings.temp_dir, name)
-    # ACL — extract upload_id prefix, deny if not the owner (auth ON)
-    uid = upload_owner.extract_upload_id(name)
-    if uid:
-        upload_owner.require(uid, request)
+    # ACL — fail-closed：認不出 upload_id 就不給（見 require_by_filename）
+    upload_owner.require_by_filename(name, request)
     if not p.exists():
         raise HTTPException(404)
     return FileResponse(str(p), media_type="image/png")

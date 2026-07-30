@@ -49,6 +49,8 @@ _DEFAULTS: dict[str, Any] = {
         "group_attr": "memberOf",
         "username_attr": "sAMAccountName",
         "displayname_attr": "displayName",
+        # 作業完成通知的收件信箱來源（AD / LDAP 慣例都是 mail）
+        "email_attr": "mail",
     },
     # Reverse-proxy (Kerberos/SPNEGO) SSO — an ADDITIVE login path, NOT a
     # `backend` value. When enabled, a trusted upstream proxy (Nginx doing

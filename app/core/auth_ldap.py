@@ -168,6 +168,9 @@ def test_user_login(cfg: dict, username: str, password: str) -> dict:
                 cfg.get("displayname_attr", "displayName"),
                 cfg.get("group_attr", "memberOf"),
                 cfg.get("username_attr", "sAMAccountName"),
+                # 作業完成通知要寄給本人 —— 目錄裡本來就有信箱，登入時一起帶回來，
+                # 使用者才不必自己再填一次。屬性名可調（AD 慣例是 mail）。
+                cfg.get("email_attr", "mail"),
             ]
             svc_conn.search(search_base=base, search_filter=user_filter,
                             search_scope=SUBTREE, attributes=attrs,
@@ -187,6 +190,7 @@ def test_user_login(cfg: dict, username: str, password: str) -> dict:
     display_name = (str(entry[dn_attr]) if dn_attr in entry else username)
     groups_raw = entry[grp_attr] if (grp_attr in entry) else []
     group_dns = [str(g) for g in groups_raw] if groups_raw else []
+    email = _entry_email(entry, cfg)
 
     # Step 3: user bind.
     try:
@@ -197,7 +201,7 @@ def test_user_login(cfg: dict, username: str, password: str) -> dict:
         raise AuthError("帳號或密碼錯誤（service search 找到使用者，但密碼 bind 失敗）")
     elapsed = int((time.time() - t0) * 1000)
     return {"ok": True, "user_dn": user_dn, "display_name": display_name,
-            "groups": group_dns, "elapsed_ms": elapsed}
+            "groups": group_dns, "email": email, "elapsed_ms": elapsed}
 
 
 def _resolve_backend_and_cfg() -> tuple[str, dict]:
@@ -212,6 +216,24 @@ def _resolve_backend_and_cfg() -> tuple[str, dict]:
     if backend not in ("ldap", "ad"):
         backend = "ad"
     return backend, s.get("ldap", {})
+
+
+def _entry_email(entry, cfg: dict) -> str:
+    """從目錄項目取信箱。取不到回空字串（不是錯誤 —— 很多帳號本來就沒填）。
+
+    多值屬性取第一個（AD 的 `mail` 通常單值，但 `proxyAddresses` 之類是多值，
+    管理員若指到那種屬性也不該炸掉）。
+    """
+    attr = cfg.get("email_attr", "mail")
+    try:
+        if attr not in entry:
+            return ""
+        v = entry[attr].value
+        if isinstance(v, (list, tuple)):
+            v = v[0] if v else ""
+        return str(v or "").strip()[:200]
+    except Exception:  # noqa: BLE001 — 取不到信箱不該讓登入失敗
+        return ""
 
 
 def _search_ldap_user(username: str, cfg: dict) -> dict:
@@ -264,6 +286,7 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
                     cfg.get("displayname_attr", "displayName"),
                     cfg.get("group_attr", "memberOf"),
                     cfg.get("username_attr", "sAMAccountName"),
+                    cfg.get("email_attr", "mail"),
                 ],
                 size_limit=2,
             )
@@ -293,14 +316,14 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
     groups_raw = entry[grp_attr] if (grp_attr in entry) else []
     group_dns = [str(g) for g in groups_raw] if groups_raw else []
     return {"user_dn": user_dn, "display_name": display_name,
-            "group_dns": group_dns}
+            "group_dns": group_dns, "email": _entry_email(entry, cfg)}
 
 
 def _sync_directory_user(username: str, info: dict, backend: str) -> dict:
     """Sync a searched user into local users/groups/OU. Shared tail of both
     the password and reverse-proxy paths."""
     user_row = _sync_user(username, info["display_name"], info["user_dn"],
-                          backend=backend)
+                          backend=backend, email=info.get("email", ""))
     _sync_groups(user_row["user_id"], info["group_dns"], backend=backend)
     _sync_ous(user_row["user_id"], info["user_dn"])
     return user_row
@@ -379,7 +402,8 @@ def sync_user_by_username(username: str, *, ip: str = "") -> dict:
     return {**user_row, "dn": info["user_dn"]}
 
 
-def _sync_user(username: str, display_name: str, dn: str, backend: str) -> dict:
+def _sync_user(username: str, display_name: str, dn: str, backend: str,
+               email: str = "") -> dict:
     conn = auth_db.conn()
     # Already-synced LDAP user → just refresh display_name + last_login.
     row = conn.execute(
@@ -389,10 +413,20 @@ def _sync_user(username: str, display_name: str, dn: str, backend: str) -> dict:
     now = time.time()
     if row:
         with db.tx(conn):
-            conn.execute(
-                "UPDATE users SET display_name=?, last_login_at=?, enabled=1 "
-                "WHERE id=?", (display_name, now, row["id"]),
-            )
+            # 信箱以目錄為準；目錄沒填就保留原本的值（不要用空字串覆蓋掉
+            # 管理員手動補上的信箱）。使用者自己在通知設定填的 email_to 是
+            # 另一個欄位，永遠不受這裡影響。
+            if email:
+                conn.execute(
+                    "UPDATE users SET display_name=?, email=?, last_login_at=?, "
+                    "enabled=1 WHERE id=?",
+                    (display_name, email, now, row["id"]),
+                )
+            else:
+                conn.execute(
+                    "UPDATE users SET display_name=?, last_login_at=?, enabled=1 "
+                    "WHERE id=?", (display_name, now, row["id"]),
+                )
         # Activation on real login: a mirrored-only user (pre-synced by
         # directory sync with enabled=0 and NO role) gets the configured
         # new-user default role on their first actual login. Users who already
@@ -422,9 +456,9 @@ def _sync_user(username: str, display_name: str, dn: str, backend: str) -> dict:
     with db.tx(conn):
         cur = conn.execute(
             "INSERT INTO users(username, display_name, source, external_dn, "
-            "enabled, is_admin_seed, created_at, last_login_at) "
-            "VALUES (?, ?, ?, ?, 1, 0, ?, ?)",
-            (username, display_name, backend, dn, now, now),
+            "enabled, is_admin_seed, created_at, last_login_at, email) "
+            "VALUES (?, ?, ?, ?, 1, 0, ?, ?, ?)",
+            (username, display_name, backend, dn, now, now, email),
         )
         uid = cur.lastrowid
     # New users get the admin-configured new-user default role (default-user
@@ -641,6 +675,7 @@ def sync_all_users(name_contains: str = "") -> dict:
                   "(&(objectClass=user)(!(objectClass=computer))))")
     disp_attr = cfg.get("displayname_attr", "displayName")
     login_attr = cfg.get("username_attr", "sAMAccountName")
+    mail_attr = cfg.get("email_attr", "mail")
     nc = (name_contains or "").strip()
     if nc:
         ufilter = f"(&{ufilter}({login_attr}=*{escape_filter_chars(nc)}*))"
@@ -650,13 +685,14 @@ def sync_all_users(name_contains: str = "") -> dict:
         raise AuthError("「使用者搜尋 base DN」不能包含 ( 或 )；那是 filter 語法。")
 
     server = _build_server(cfg)
-    seen: list[tuple[str, str, str]] = []      # (dn, login, display)
+    seen: list[tuple[str, str, str, str]] = []   # (dn, login, display, email)
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
                         auto_bind=True, raise_exceptions=True, check_names=False) as conn:
             entries = conn.extend.standard.paged_search(
                 search_base=base, search_filter=ufilter,
-                search_scope=SUBTREE, attributes=[disp_attr, login_attr],
+                search_scope=SUBTREE,
+                attributes=[disp_attr, login_attr, mail_attr],
                 paged_size=500, generator=False)
             for e in entries:
                 dn = e.get("dn") or ""
@@ -671,7 +707,11 @@ def sync_all_users(name_contains: str = "") -> dict:
                 if not login:
                     continue                    # no username → can't key it
                 disp = _one(a.get(disp_attr)) or login
-                seen.append((dn, str(login), str(disp)))
+                # 信箱：**排程同步時就帶進來**，不必等使用者下次登入。
+                # 少了這一段，管理員設好信箱屬性之後還要等每個人各自登入一次
+                # 才會有值 —— 而通知正是要寄給那些「還沒回來」的人。
+                mail = (_one(a.get(mail_attr)) or "").strip()[:200]
+                seen.append((dn, str(login), str(disp), mail))
     except Exception as exc:  # noqa: BLE001
         raise AuthError(f"列舉使用者失敗：{type(exc).__name__}: {exc}")
 
@@ -679,11 +719,18 @@ def sync_all_users(name_contains: str = "") -> dict:
     synced = updated = skipped = 0
     now = time.time()
     with db.tx(conn_db):
-        for dn, login, disp in seen:
+        for dn, login, disp, mail in seen:
             row = conn_db.execute(
-                "SELECT id, display_name FROM users WHERE source=? AND external_dn=?",
+                "SELECT id, display_name, email FROM users "
+                "WHERE source=? AND external_dn=?",
                 (backend, dn)).fetchone()
             if row:
+                # 信箱以目錄為準；目錄沒填就**保留原值**（不要用空字串蓋掉管理員
+                # 手動補的）。與登入時的同步規則一致。
+                if mail and (row["email"] or "") != mail:
+                    conn_db.execute("UPDATE users SET email=? WHERE id=?",
+                                    (mail, row["id"]))
+                    updated += 1
                 if disp and row["display_name"] != disp:
                     # 只更新顯示名稱，**絕不動 enabled**（v1.12.70 不變量：鏡射 ≠
                     # 啟用）。舊版此處會 enabled=1，導致「已去啟用的鏡射帳號」在目錄
@@ -704,8 +751,9 @@ def sync_all_users(name_contains: str = "") -> dict:
             # admin 明確操作。已驗證 enabled=0 不擋日後 LDAP 登入。
             conn_db.execute(
                 "INSERT INTO users(username, display_name, source, external_dn, "
-                "enabled, is_admin_seed, created_at) VALUES (?,?,?,?,0,0,?)",
-                (login, disp, backend, dn, now))
+                "enabled, is_admin_seed, created_at, email) "
+                "VALUES (?,?,?,?,0,0,?,?)",
+                (login, disp, backend, dn, now, mail))
             synced += 1
     permissions.invalidate_cache()
     audit_db.log_event("ldap_user_sync",

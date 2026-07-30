@@ -34,6 +34,11 @@ _DEFAULTS: dict[str, Any] = {
     "watermark_history_days": 365,
     "temp_hours":             2,        # data/temp/
     "jobs_hours":             24,       # data/jobs/
+    # 工作紀錄（jobs.sqlite 的列，不是結果檔）。結果檔照 jobs_hours 清掉之後，
+    # 紀錄仍保留一段時間，讓使用者在「我的工作」看得到做過什麼、管理員查得到
+    # 誰在什麼時候轉了什麼。**這張表沒有人清就會無限長大** —— 8000 人規模下
+    # 每天約 4 萬筆，一年就是 1,500 萬筆。
+    "job_records_days":       30,
     "audit_days":             90,       # audit_events table rows
     "updated_at":             0.0,
 }
@@ -145,7 +150,26 @@ def collect_stats() -> dict[str, Any]:
         "size_mb": db.db_size_bytes(audit_db.audit_db_path()) / 1024 / 1024,
         "oldest_days": _audit_oldest_days(),
     }
+    stats["job_records"] = _job_records_stats()
     return stats
+
+
+def _job_records_stats() -> dict[str, Any]:
+    """jobs.sqlite 的大小與最舊一筆（給保留設定頁顯示）。"""
+    from . import job_store
+    try:
+        size = db.db_size_bytes(job_store.db_path()) / 1024 / 1024
+    except Exception:
+        size = 0.0
+    oldest = None
+    try:
+        row = db.fetchone(db.get_conn(job_store.db_path()),
+                          "SELECT MIN(created_at) FROM jobs")
+        if row and row[0]:
+            oldest = (time.time() - float(row[0])) / 86400.0
+    except Exception:
+        pass
+    return {"size_mb": size, "oldest_days": oldest}
 
 
 def _audit_oldest_days() -> float | None:
@@ -207,6 +231,38 @@ def _sweep_audit(days: int) -> int:
     return cur.rowcount
 
 
+_DB_BACKUP_INTERVAL = 20 * 3600      # 每天一份（略小於 24h，避開排程漂移）
+
+
+def _maybe_backup_dbs() -> dict:
+    """距離上一份備份超過一天才做，否則跳過（排程每 6 小時跑一次）。"""
+    from . import db_health
+    newest = 0.0
+    for m in db_health.MANAGED:
+        if not m["backup"]:
+            continue
+        for b in db_health.list_backups(m["file"])[:1]:
+            try:
+                newest = max(newest, b.stat().st_mtime)
+            except OSError:
+                pass
+    if newest and (time.time() - newest) < _DB_BACKUP_INTERVAL:
+        return {"skipped": "備份仍在有效期內"}
+    return db_health.backup_all()
+
+
+def _sweep_job_records(days: int) -> int:
+    """清掉舊的工作紀錄列（結果檔另由 _sweep_temp_dir 依 jobs_hours 處理）。
+
+    只清已結束的 —— 正在跑或排隊中的不管多舊都不能刪掉，否則使用者的工作會
+    在進行中從清單上消失。
+    """
+    if days <= 0:
+        return 0
+    from . import job_store
+    return job_store.delete_older_than(time.time() - days * 86400)
+
+
 def sweep_all() -> dict[str, Any]:
     """Run every sweeper once, return a report dict."""
     s = get()
@@ -230,6 +286,14 @@ def sweep_all() -> dict[str, Any]:
     except Exception:
         logger.exception("workspace sweep failed")
     report["audit"] = _sweep_audit(s["audit_days"])
+    report["job_records"] = _sweep_job_records(s["job_records_days"])
+    # 資料庫熱備份。掛在既有的 6 小時排程上（而不是另開一個排程執行緒），並用
+    # 時間戳自己節流成每天一份 —— 備份是**遇到磁碟毀損時唯一的救命索**，寧可
+    # 跟著清理一起跑也不要另外多一個可能沒起來的背景執行緒。
+    try:
+        report["db_backup"] = _maybe_backup_dbs()
+    except Exception:
+        logger.exception("database backup failed")
     # Expired sessions
     report["sessions"] = sessions.cleanup_expired()
     logger.info("retention sweep report: %s", report)

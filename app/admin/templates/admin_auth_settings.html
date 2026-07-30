@@ -239,6 +239,19 @@
           </div>
         </div>
         <div class="af-attr-cell">
+          <label class="af-label" for="af-attr-mail">信箱屬性</label>
+          <input id="af-attr-mail" class="field" type="text" name="email_attr"
+                 value="{{ settings.ldap.email_attr }}" placeholder="mail">
+          <div class="af-hint attr-hint" data-hint="email">
+            <span class="hint-ad">AD：<code>mail</code></span>
+            <span class="hint-ldap">LDAP：<code>mail</code>（UCS 常用 <code>mailPrimaryAddress</code>）</span>
+            作業完成通知寄到這裡。<b>兩個時機會同步</b>：該使用者登入時、以及
+            <a href="/admin/groups">目錄同步</a>執行時（排程或按「立即同步」）——
+            所以改了屬性名之後不必等大家登入，跑一次同步即可。
+            目錄沒填的人保留原值；使用者也可在「我的作業 → 通知設定」自行指定其他信箱。
+          </div>
+        </div>
+        <div class="af-attr-cell">
           <label class="af-label" for="af-attr-grp">群組屬性</label>
           <input id="af-attr-grp" class="field" type="text" name="group_attr"
                  value="{{ settings.ldap.group_attr }}" placeholder="memberOf">
@@ -525,6 +538,7 @@ async function saveLdap() {
     user_search_filter: fd.get('user_search_filter'),
     username_attr: fd.get('username_attr'),
     displayname_attr: fd.get('displayname_attr'),
+    email_attr: fd.get('email_attr'),
     group_attr: fd.get('group_attr'),
   };
   if (fd.get('service_password')) ldap.service_password = fd.get('service_password');
@@ -591,6 +605,7 @@ function _formLdapPayload() {
     user_search_filter: fd.get('user_search_filter'),
     username_attr: fd.get('username_attr'),
     displayname_attr: fd.get('displayname_attr'),
+    email_attr: fd.get('email_attr'),
     group_attr: fd.get('group_attr'),
   };
   if (fd.get('service_password')) ldap.service_password = fd.get('service_password');

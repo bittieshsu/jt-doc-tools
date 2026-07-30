@@ -783,6 +783,44 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   ]
 }</code></pre>
 <blockquote><p>需 admin 啟用 LLM 服務（<code>/admin/llm-settings</code>）。未啟用回 <code>503</code>。</p></blockquote>
+<h5 id="大量句子背景作業版">大量句子：背景作業版</h5>
+<p>上面那個端點是<strong>同步</strong>的：整份翻完才回應，句數一多就會撞到反向代理的逾時。 幾百句以上請改用背景作業 —— 送出後立刻拿到作業編號，翻譯在伺服器繼續跑， <strong>呼叫端可以離線</strong>，之後再回來查進度與結果。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/translate-doc/start
+<span class="hl-method">GET</span>  /tools/translate-doc/job/{job_id}?start=<span class="hl-num">0</span></code></pre>
+<p><code>start</code> 的 Body（JSON）：</p>
+<div class="table-wrap"><table><thead><tr><th>欄位</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>sentences</code></td><td>list[str]</td><td>✓</td><td>已切好的句子陣列（自己切，或先用 <code>/extract-text</code>）</td></tr><tr><td><code>source_lang</code></td><td>str</td><td></td><td><code>auto</code>（預設）/ <code>en</code> / <code>zh</code> …</td></tr><tr><td><code>target_lang</code></td><td>str</td><td></td><td>目標語言，預設 <code>zh-TW</code></td></tr><tr><td><code>domain</code></td><td>str</td><td></td><td>領域提示</td></tr><tr><td><code>filename</code></td><td>str</td><td></td><td>顯示用的來源檔名（會出現在「我的作業」）</td></tr></tbody></table></div>
+<pre><code class="lang-bash">JOB=$(curl <span class="hl-flag">-s</span> <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/translate-doc/start</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;sentences&quot;:[&quot;Hello world.&quot;,&quot;This is a test.&quot;],&quot;target_lang&quot;:&quot;zh-TW&quot;}&#x27;</span> \
+  | jq <span class="hl-flag">-r</span> .job_id)
+
+curl <span class="hl-flag">-s</span> <span class="hl-str">&quot;http://localhost:8765/tools/translate-doc/job/$JOB&quot;</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> | jq</code></pre>
+<p>查詢的回應：</p>
+<pre><code class="lang-json">{
+  <span class="hl-key">&quot;status&quot;</span>: <span class="hl-str">&quot;running&quot;</span>,
+  <span class="hl-key">&quot;progress&quot;</span>: <span class="hl-num">0.5</span>,
+  <span class="hl-key">&quot;message&quot;</span>: <span class="hl-str">&quot;翻譯中… 1 / 2 句&quot;</span>,
+  <span class="hl-key">&quot;elapsed&quot;</span>: <span class="hl-num">3.2</span>,
+  <span class="hl-key">&quot;total&quot;</span>: <span class="hl-num">2</span>,
+  <span class="hl-key">&quot;start&quot;</span>: <span class="hl-num">0</span>,
+  <span class="hl-key">&quot;results&quot;</span>: [
+    {<span class="hl-key">&quot;src&quot;</span>: <span class="hl-str">&quot;Hello world.&quot;</span>, <span class="hl-key">&quot;translated&quot;</span>: <span class="hl-str">&quot;你好，世界。&quot;</span>},
+    {<span class="hl-key">&quot;src&quot;</span>: <span class="hl-str">&quot;This is a test.&quot;</span>}
+  ],
+  <span class="hl-key">&quot;cancelled&quot;</span>: <span class="hl-bool">false</span>
+}</code></pre>
+<ul>
+<li><code>status</code>：<code>pending</code> / <code>running</code> / <code>done</code> / <code>error</code> / <code>cancelled</code> / <code>interrupted</code></li>
+<li><strong>原文一送出就查得到</strong>（右側還沒翻好的項目沒有 <code>translated</code> 欄位），</li>
+</ul>
+<p>  所以呼叫端可以邊跑邊顯示。</p>
+<ul>
+<li><code>start=N</code> 只回第 N 筆之後的資料 —— 幾萬句時不必每次拉全部。</li>
+<li>取消請用共用的作業端點：<code>POST /api/jobs/{job_id}/cancel</code>。</li>
+<li>歸屬與其他作業端點一致：非擁有者一律 <code>404</code>。</li>
+</ul>
 <hr>
       </section>
       <section class="doc-section" data-sec="統編查詢單筆" data-title="統編查詢（單筆）" hidden>

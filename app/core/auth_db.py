@@ -413,6 +413,52 @@ def _m12_unprovision_mirrored_users(conn: sqlite3.Connection) -> None:
         "WHERE source IN ('ldap','ad') AND COALESCE(last_login_at,0)=0")
 
 
+def _m13_grant_pdf_to_slides(conn: sqlite3.Connection) -> None:
+    """v13：把 `pdf-to-slides`（PDF 轉簡報檔，v1.14.0 新增）補給既有角色。
+
+    為什麼需要這條 migration —— `seed_builtin_roles()` 平常會自動補「這一版新增
+    的工具」，但那個機制要有 `role_seed_snapshot` 當基準線才會動。**從
+    v1.12.52 或更早直接升到現在的安裝，快照是空的 → 走保守的 bootstrap 路徑
+    → 這一輪什麼都不補**（那條路徑是為了保住「admin 刻意移除某工具」的設定）。
+    結果就是新工具對那些客戶永遠不出現，而且畫面上沒有任何線索說明原因。
+
+    backfill 的判斷沿用 m4 / m5 的做法：**誰已經有 `pdf-to-office`，就給誰**
+    —— 兩者是同一條轉檔路徑（同一顆引擎、同一批使用者），拿它當「這個角色本來
+    就該看到轉檔工具」的訊號最準。不用 `pdf-merge` 之類的通用工具當訊號，那會
+    連刻意收窄過的角色也一起放寬。
+
+    `INSERT OR IGNORE` → 可重複執行；已經有的不動。
+    """
+    conn.executescript("""
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'pdf-to-slides' FROM role_perms WHERE tool_id = 'pdf-to-office';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'pdf-to-slides'
+        FROM subject_perms WHERE tool_id = 'pdf-to-office';
+    """)
+
+
+def _m14_user_email(conn: sqlite3.Connection) -> None:
+    """v14：`users` 加 `email` 欄位（v1.14.6 起）。
+
+    為什麼需要 —— 作業完成通知要寄給送出的人，但系統裡**沒有任何地方存過使用者
+    的信箱**。原本每個人都得自己到「我的作業 → 通知設定」手動填一次；接了
+    AD / LDAP / SSO 的環境更不合理：來源系統早就有 `mail` 屬性 / `email` claim，
+    卻在登入時被丟掉。
+
+    這一欄由三個來源填：
+      * AD / LDAP：登入與目錄同步時讀 `mail`（屬性名可在認證設定調整）
+      * SSO：OIDC 的 email claim / SAML 的 email 屬性
+      * 本機帳號：管理員在使用者管理填，或使用者自己在「我的帳號」改
+
+    使用者在通知設定裡另外填的 `email_to` **優先**於這一欄 —— 那是他自己指定的
+    收件位置，不可以被下一次目錄同步蓋掉。
+    """
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "email" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -423,7 +469,9 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m9_role_seed_snapshot,
               _m10_role_default_for_new,
               _m11_group_sync_cache,
-              _m12_unprovision_mirrored_users]
+              _m12_unprovision_mirrored_users,
+              _m13_grant_pdf_to_slides,
+              _m14_user_email]
 
 
 def auth_db_path() -> Path:

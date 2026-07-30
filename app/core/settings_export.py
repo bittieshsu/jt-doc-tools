@@ -9,7 +9,12 @@ role_seed_snapshot、以及 OU 層級的權限規則（subject_type='ou'，key �
 可跨機）。**不含**使用者帳號 / 密碼 hash、也不含綁 user/group id 的個別指派
 （那些換機器 id 對不上，搬過去沒意義）。
 
-**永遠不含**：temp/ jobs/ audit.sqlite、auth.sqlite 的 users/密碼。
+**永遠不含**：temp/ jobs/ audit.sqlite、auth.sqlite 的 users/密碼、以及
+`.session_secret`（那是 session 簽章金鑰，外流等於可偽造登入）。
+
+**加新設定檔就要加分類** —— 漏加不會有任何錯誤訊息，只會在客戶搬機還原後才發現
+設定不見了。`tools/check_settings_export_coverage.py` 會掃描程式碼中所有 data_dir
+下的設定檔引用並比對本清單，發版前必跑。
 
 匯入是「合併」非「整清」：覆寫前先把現有對應檔備份成 `<name>.bak.<ts>`。
 匯出檔名：`jtdt-settings-YYYYMMDD-HHMMSS-vX.Y.Z.zip`
@@ -39,7 +44,36 @@ RBAC_NAME = "rbac.json"
 CATEGORIES: list[dict] = [
     {"id": "auth", "label": "認證設定", "kind": "files",
      "items": ["auth_settings.json"],
-     "desc": "認證後端 / LDAP / AD / OIDC / SAML / Reverse Proxy SSO 設定", "default": True},
+     "desc": "認證後端 / LDAP / AD 連線與對應設定（SSO 另見「SSO 單一登入」）",
+     "default": True},
+    {"id": "sso", "label": "SSO 單一登入", "kind": "files",
+     "items": ["sso_settings.json"], "rekey": "sso",
+     "desc": "OIDC / SAML 設定（含用戶端密鑰、SP 私鑰 — 敏感）",
+     "default": True, "sensitive": True},
+    {"id": "notify", "label": "通知設定", "kind": "files",
+     "items": ["notify_settings.json"], "rekey": "notify",
+     "desc": "作業完成通知的管道憑證（SMTP 帳密、bot token、webhook URL — 敏感）",
+     "default": True, "sensitive": True},
+    {"id": "notify_prefs", "label": "個人收訊偏好", "kind": "dirs",
+     "items": ["notify_prefs"],
+     "desc": "各使用者的通知開關、信箱、Telegram / LINE 收訊者",
+     "default": True},
+    {"id": "directory", "label": "目錄同步 / 過濾", "kind": "files",
+     "items": ["directory_sync.json", "dir_filter.json"],
+     "desc": "AD / LDAP 目錄同步排程與瀏覽過濾條件", "default": True},
+    {"id": "log_forward", "label": "記錄轉送", "kind": "files",
+     "items": ["log_forwarders.json"],
+     "desc": "稽核記錄轉送目的地（syslog / CEF / GELF）", "default": True},
+    {"id": "concurrency", "label": "併行度設定", "kind": "files",
+     "items": ["concurrency.json"],
+     "desc": "同時可處理的工作數、Office 轉檔同時數、外部服務同時呼叫數、轉檔 CPU 上限、記憶體保留量",
+     "default": True},
+    {"id": "retention", "label": "檔案保留 / 清理", "kind": "files",
+     "items": ["retention.json"],
+     "desc": "各類資料的保留天數與自動清理排程", "default": True},
+    {"id": "scheduled_export", "label": "排程備份設定", "kind": "files",
+     "items": ["scheduled_export.json"],
+     "desc": "設定備份的排程與匯出目錄", "default": True},
     {"id": "rbac", "label": "角色與權限", "kind": "rbac", "items": [],
      "desc": "角色定義、工具權限、新使用者預設角色、OU 權限規則（不含使用者 / 密碼）",
      "default": True},
@@ -56,6 +90,10 @@ CATEGORIES: list[dict] = [
      "default": True, "sensitive": True},
     {"id": "llm", "label": "LLM 設定", "kind": "files",
      "items": ["llm_settings.json"], "desc": "LLM server / 模型 / 參數", "default": True},
+    {"id": "ocr", "label": "OCR 設定", "kind": "files",
+     "items": ["ocr_settings.json", "ocr_remote.json"],
+     "desc": "預設 OCR 引擎；遠端 GPU OCR 伺服器位址與存取權杖（敏感）",
+     "default": True, "sensitive": True},
     {"id": "office_paths", "label": "Office 路徑", "kind": "files",
      "items": ["office_paths.json"], "desc": "soffice / OxOffice 執行檔路徑", "default": True},
     {"id": "fonts", "label": "自訂字型", "kind": "files_and_dirs",
@@ -65,6 +103,22 @@ CATEGORIES: list[dict] = [
      "items": ["assets"], "desc": "印章 / 簽名 / logo 圖與 metadata", "default": True},
     {"id": "branding", "label": "品牌 Logo", "kind": "dirs",
      "items": ["branding"], "desc": "企業 logo", "default": True},
+    {"id": "scan_prefs", "label": "掃描工具欄位偏好", "kind": "dirs",
+     "items": ["transit_proof_settings", "einvoice_settings"],
+     "desc": "乘車證明 / 電子發票的欄位顯示、排序、匯出標籤（各使用者一份）",
+     "default": True},
+    {"id": "scan_buffers", "label": "掃描暫存資料", "kind": "dirs",
+     "items": ["transit_proof_buffer", "einvoice_buffer"],
+     "desc": "使用者掃到一半、尚未匯出的乘車證明 / 發票資料（量大，搬機通常不需要）",
+     "default": False},
+    {"id": "submission_check", "label": "送件檢查（自家實體）", "kind": "dirs",
+     "items": ["submission_check/self_entities"],
+     "desc": "自家公司實體清單（個別 case 屬工作資料，不隨設定備份）",
+     "default": True},
+    {"id": "workspace", "label": "使用者工作區", "kind": "files_and_dirs",
+     "items": ["workspace.json"], "dirs": ["workspace"],
+     "desc": "使用者存放的檔案與 metadata（量大，搬機通常不需要）",
+     "default": False},
     {"id": "history_fill", "label": "表單填寫歷史", "kind": "dirs",
      "items": ["fill_history"], "desc": "使用者填單歷史（量大，搬機通常不需要）",
      "default": False},
@@ -89,6 +143,90 @@ def _cat_dirs(cat: dict) -> list[str]:
     if cat["kind"] == "files_and_dirs":
         return list(cat.get("dirs", []))
     return []
+
+
+# ---- SSO 祕密重新加密 ----------------------------------------------------
+# sso_settings.json 內的 client secret / SP 私鑰是用**本機** data/.session_secret
+# 當金鑰做 Fernet 加密的。直接把檔案複製到另一台機器，密文解不開 —— 設定看起來
+# 都還在，SSO 卻會在還原後無聲失效。而 .session_secret 同時是 session 簽章金鑰，
+# 放進備份檔等於把登入偽造能力一起送出去 → 只能「匯出時解密、匯入時用目標機器的
+# 金鑰重新加密」。備份檔內因此是明文，與既有的 LDAP 服務帳號密碼 / API token
+# 同級（該分類標記 sensitive）。
+_SSO_PLAINTEXT_KEY = "_jtdt_secrets_plaintext"
+
+
+def _rekey_specs() -> dict:
+    """需要「匯出解密、匯入重新加密」的檔案 → (模組, 取得該檔祕密欄位的函式)。
+
+    兩個檔案都用同一把 Fernet 金鑰（`data/.session_secret`），所以跨機都會遇到
+    一樣的問題。共用同一套處理，新增這類檔案時只要在這裡加一列。
+    """
+    from . import notify_settings as _ns, sso_settings as _sso
+    return {
+        # sso_settings.json：祕密在 data["oidc"]["client_secret_enc"] 這種兩層結構
+        "sso_settings.json": (_sso, lambda d: [
+            (d.get(sec), fld) for sec, fld in _sso.SECRET_FIELDS
+            if isinstance(d.get(sec), dict)]),
+        # notify_settings.json：祕密在 data["channels"][管道][欄位]
+        "notify_settings.json": (_ns, lambda d: [
+            ((d.get("channels") or {}).get(ch), fld)
+            for ch, fld in _ns.SECRET_FIELDS
+            if isinstance((d.get("channels") or {}).get(ch), dict)]),
+    }
+
+
+def _rekey_export_blob(name: str) -> Optional[str]:
+    """回傳「祕密已解密」的設定檔內容；檔案不存在回 None。"""
+    p = settings.data_dir / name
+    if not p.is_file():
+        return None
+    mod, locate = _rekey_specs()[name]
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    for holder, field in locate(data):
+        if holder and holder.get(field):
+            holder[field] = mod.decrypt_secret(holder[field])
+    data[_SSO_PLAINTEXT_KEY] = True
+    return json.dumps(data, ensure_ascii=False, indent=2)
+
+
+def _rekey_after_import(target: Path) -> None:
+    """把剛還原的設定檔內明文祕密改用**本機**金鑰加密。
+
+    沒有標記的（v1.14.5 以前匯出的備份）代表裡面是**別台機器的密文**，本機解不開
+    → 原樣留著，由管理員重新輸入祕密即可，不要試圖解密（會變成空字串，設定看似
+    存在卻是壞的）。
+    """
+    spec = _rekey_specs().get(target.name)
+    if not spec:
+        return
+    mod, locate = spec
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if not isinstance(data, dict) or not data.pop(_SSO_PLAINTEXT_KEY, False):
+        return
+    for holder, field in locate(data):
+        if holder and holder.get(field):
+            holder[field] = mod.encrypt_secret(holder[field])
+    target.write_text(json.dumps(data, ensure_ascii=False, indent=2),
+                      encoding="utf-8")
+    try:
+        target.chmod(0o600)
+    except OSError:      # Windows / 不支援 chmod 的檔案系統
+        pass
+
+
+# 舊名保留，既有測試與呼叫端仍可用
+def _sso_export_blob() -> Optional[str]:
+    return _rekey_export_blob("sso_settings.json")
+
+
+def _sso_rekey_after_import(target: Path) -> None:
+    _rekey_after_import(target)
 
 
 def _dir_stats(p: Path) -> tuple[int, int]:
@@ -284,12 +422,21 @@ def export_to_zip(out_path: Path, selected_ids: Optional[list[str]] = None,
             else:
                 for fn in _cat_files(c):
                     p = settings.data_dir / fn
-                    if p.is_file():
-                        arc = f"data/{fn}"
+                    if not p.is_file():
+                        continue
+                    arc = f"data/{fn}"
+                    if c.get("rekey"):
+                        # 密文換明文後才寫進備份（見 _rekey_export_blob）
+                        blob = _rekey_export_blob(fn)
+                        if blob is None:
+                            continue
+                        zf.writestr(arc, blob)
+                        total_bytes += len(blob.encode("utf-8"))
+                    else:
                         zf.write(p, arcname=arc)
-                        names.append(arc)
-                        files_added += 1
                         total_bytes += p.stat().st_size
+                    names.append(arc)
+                    files_added += 1
                 for dn in _cat_dirs(c):
                     p = settings.data_dir / dn
                     if not p.is_dir():
@@ -424,6 +571,8 @@ def import_from_zip(zip_path: Path, selected_ids: Optional[list[str]] = None,
             with zipfile.ZipFile(zip_path, "r") as zf2, zf2.open(name) as src, \
                     open(target, "wb") as dst:
                 shutil.copyfileobj(src, dst)
+            if Path(name).name in _rekey_specs():
+                _rekey_after_import(target)
             imported_files += 1
 
         rbac_result = None

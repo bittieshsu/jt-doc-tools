@@ -178,7 +178,7 @@
       <label class="px-inline"><input type="checkbox" id="px_fallback" {% if proxy_sso.fallback_login %}checked{% endif %}/> 顯示 /login 登入頁（取消勾選則回 401）</label>
     </div>
   </div>
-  <label>信任的反向代理 IP（每行一個，或用逗號分隔；可用 CIDR，如 10.0.0.0/24）</label>
+  <label>信任的反向代理 IP（每行一個，或用逗號分隔；可用 CIDR，如 192.0.2.0/24）</label>
   <textarea class="field" id="px_trusted" rows="3" data-s="sa54bfe29">{{ proxy_sso.trusted_proxies | join('\n') }}</textarea>
   <p class="muted" data-s="px-sec">只有「直接連進本服務的來源 IP」在此清單內時才採信帳號標頭（不看 X-Forwarded-For，無法偽造）。請務必讓 Python 服務只綁 127.0.0.1，且 Nginx 一律覆寫此標頭。</p>
   <p><button class="btn btn-primary" id="pxSaveBtn">{{ icon('check', size=14) }} 儲存 Reverse Proxy SSO</button> <span id="pxSaveResult" class="muted"></span></p>

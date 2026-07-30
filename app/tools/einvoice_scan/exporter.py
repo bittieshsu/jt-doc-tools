@@ -11,6 +11,8 @@
 from __future__ import annotations
 
 import csv
+
+from ...core import csv_safe as _csv_safe
 import io
 import json
 from datetime import datetime
@@ -80,7 +82,9 @@ def export_csv(invoices: list[dict], columns: list[str],
     writer = csv.writer(buf, lineterminator="\n")
     writer.writerow([_label(c, export_labels) for c in columns])
     for i, inv in enumerate(invoices):
-        writer.writerow([_row_value(inv, c, i, field_formats) for c in columns])
+        # 欄位值來自**收到的發票 PDF** —— 外部來源，必須中和（core/csv_safe）
+        writer.writerow(_csv_safe.row(
+            [_row_value(inv, c, i, field_formats) for c in columns]))
     # BOM 給 Excel 開繁中正確
     return ("﻿" + buf.getvalue()).encode("utf-8")
 
@@ -104,7 +108,8 @@ def export_xlsx(invoices: list[dict], columns: list[str],
 
     # Header
     for col_idx, c in enumerate(columns, start=1):
-        cell = ws.cell(row=1, column=col_idx, value=_label(c, export_labels))
+        # 欄位標題可由使用者自訂 —— 一樣要走 helper
+        cell = _csv_safe.xlsx_cell(ws, 1, col_idx, _label(c, export_labels))
         cell.font = hdr_font
         cell.fill = hdr_fill
         cell.alignment = hdr_align
@@ -122,9 +127,10 @@ def export_xlsx(invoices: list[dict], columns: list[str],
             v = _row_value(inv, c, i, field_formats)
             # 序號用 int，其他都當字串（已 format）以保留千分位 / 民國格式
             if c == "seq":
-                ws.cell(row=i + 2, column=col_idx, value=int(v))
+                _csv_safe.xlsx_cell(ws, i + 2, col_idx, int(v))
             else:
-                ws.cell(row=i + 2, column=col_idx, value=v if v != "" else None)
+                _csv_safe.xlsx_cell(ws, i + 2, col_idx,
+                                    v if v != "" else None)
 
     ws.freeze_panes = "A2"
     out = io.BytesIO()

@@ -117,14 +117,18 @@ def build_router(templates) -> APIRouter:
             job = job_manager.get(job_id)
             if not job or not job.result_path or not job.result_path.exists():
                 raise HTTPException(404, "找不到工作結果（可能已過期）")
-            # ACL: a job tagged with an owner can only be saved by that owner
-            # (admin override). Prevents a leaked job_id from letting another
-            # user copy someone else's result into their own workspace.
-            if job.owner_id is not None:
-                from ..core import permissions as _perm
-                cur = _user_id_of(request)
-                if cur != job.owner_id and not (cur is not None and _perm.effective_tools(cur) == "ALL"):
-                    raise HTTPException(403, "無權存取此工作結果")
+            # ACL：把結果複製進工作區等於一條下載路徑，判斷要與 `/api/jobs/*`
+            # **完全一致**，所以直接用同一個函式，不要在這裡另寫一份。
+            #
+            # 原本這裡是自己一份 `if job.owner_id is not None:` —— 無主作業
+            # （認證啟用之前產生的）任何登入者都能存進自己的工作區。`/api/jobs/*`
+            # 那邊修好之後這條仍然是開的，因為同一個判斷散在兩個地方。
+            #
+            # 回 404 而不是 403：403 等於確認「這個 job 存在，只是不是你的」，
+            # 與上面「找不到工作結果」的訊息一致才不會變成查詢介面。
+            from app.main import _job_access
+            if not _job_access(job, request):
+                raise HTTPException(404, "找不到工作結果（可能已過期）")
             data = job.result_path.read_bytes()
             if not disp_name:
                 disp_name = job.result_filename or job.result_path.name

@@ -59,7 +59,7 @@ def lookup(raw_token: str) -> Optional[dict]:
     conn = auth_db.conn()
     row = conn.execute(
         "SELECT s.user_id, s.expires_at, u.username, u.display_name, "
-        "       u.source, u.enabled, u.is_admin_seed "
+        "       u.source, u.enabled, u.is_admin_seed, u.email "
         "FROM sessions s JOIN users u ON u.id = s.user_id "
         "WHERE s.token_hash = ?",
         (th,),
@@ -80,6 +80,8 @@ def lookup(raw_token: str) -> Optional[dict]:
         "display_name": row["display_name"],
         "source": row["source"],
         "is_admin_seed": bool(row["is_admin_seed"]),
+        # 作業完成通知的預設收件信箱（AD / LDAP / SSO 帶進來，或本人自己填）
+        "email": row["email"] or "",
     }
 
 

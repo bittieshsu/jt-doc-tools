@@ -1,0 +1,828 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}背景作業與併行度 · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ icon('clock', size=22) }} 背景作業與併行度</h1>
+<p class="muted">所有使用者送出的背景作業（轉檔、OCR、合併等），以及同時可以處理幾個。</p>
+
+<div class="panel">
+  <h2>目前狀態</h2>
+  <div class="aj-stats" id="aj-stats"></div>
+  <div class="aj-chart" id="aj-chart" hidden>
+    <div class="aj-chart-head">
+      <b id="aj-chart-title">歷史</b>
+      <span class="aj-chart-range">
+        <button type="button" class="aj-rng" data-h="6">6 小時</button>
+        <button type="button" class="aj-rng is-on" data-h="24">24 小時</button>
+        <button type="button" class="aj-rng" data-h="168">7 天</button>
+      </span>
+      <button type="button" class="aj-chart-close" id="aj-chart-close" aria-label="關閉">×</button>
+    </div>
+    <div class="aj-chart-body" id="aj-chart-body"></div>
+    <div class="aj-chart-note muted" id="aj-chart-note"></div>
+  </div>
+
+  <div class="aj-controls">
+    <button class="btn" id="aj-pause" type="button">
+      <span id="aj-pause-ic">{{ icon('pause', size=15) }}</span>
+      <span id="aj-pause-tx">暫停派工</span>
+    </button>
+    <span class="muted aj-pause-note">暫停只擋<b>還沒開始</b>的作業。已經在執行的轉檔是獨立的子行程，沒辦法中途凍結 —— 要停只能取消該筆。</span>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>併行度設定</h2>
+  <div class="aj-mem is-clickable" id="aj-mem" title="點一下看歷史趨勢">
+    <div class="aj-mem-top">
+      <span id="aj-mem-text">載入中…</span>
+      <span class="aj-mem-pct" id="aj-mem-pct"></span>
+    </div>
+    <div class="aj-mem-bar">
+      <div class="aj-mem-used" id="aj-mem-used" title="已被使用的記憶體"></div>
+      <div class="aj-mem-reserve" id="aj-mem-reserve" title="保留給作業系統與資料庫，不會拿來派工"></div>
+    </div>
+    {# 圖例 —— 中間那段灰色（可派工）才是這條計量最有用的資訊，但沒有標示的話
+       看起來只像「進度條沒有滿」。 #}
+    <div class="aj-mem-legend">
+      <span><i class="sw sw-used"></i>已用</span>
+      <span><i class="sw sw-free"></i>可派工</span>
+      <span><i class="sw sw-res"></i>保留</span>
+    </div>
+  </div>
+
+  <div class="aj-mem aj-cpu is-clickable" id="aj-cpu" title="點一下看歷史趨勢">
+    <div class="aj-mem-top">
+      <span id="aj-cpu-text">載入中…</span>
+      <span class="aj-mem-pct" id="aj-cpu-pct"></span>
+    </div>
+    <div class="aj-mem-bar"><div class="aj-cpu-used" id="aj-cpu-used"></div></div>
+  </div>
+
+  <div class="aj-grid">
+    <div class="aj-field">
+      <label for="aj-jobs">{{ icon('layers', size=16) }} 最大同時作業數</label>
+      <div class="aj-field-row">
+        <input type="number" id="aj-jobs" min="1" max="{{ conc.hard_max_jobs }}" value="{{ conc.max_concurrent_jobs }}">
+        <span class="aj-limit">上限 {{ conc.hard_max_jobs }}</span>
+      </div>
+      <div class="aj-help muted">影響所有作業。OCR / 壓縮 / 合併 / 分拆這類純運算的作業受這個值控制。上限依 CPU {{ conc.cpu_count }} 核與記憶體推算。</div>
+    </div>
+
+    <div class="aj-field">
+      <label for="aj-office">{{ icon('file-swap', size=16) }} Office 轉檔同時數</label>
+      <div class="aj-field-row">
+        <input type="number" id="aj-office" min="1" max="{{ conc.hard_max_office }}"
+               value="{{ conc.max_office_concurrent }}"
+               {% if conc.office_locked_reason %}disabled{% endif %}>
+        <span class="aj-limit">上限 {{ conc.hard_max_office }}・建議 {{ conc.suggested_office }}</span>
+      </div>
+      {% if conc.office_locked_reason %}
+      <div class="aj-warn">{{ icon('info', size=14) }} {{ conc.office_locked_reason }}</div>
+      {% else %}
+      <div class="aj-help muted">影響 {{ conc.office_tools|length }} 個需要 Office 引擎的工具（PDF 轉文書 / 轉簡報 / 文書轉 PDF …）。<b>每個轉檔約佔 {{ conc.estimate_office_mb }} MB 記憶體</b>，調高前先確認機器撐得住。</div>
+      {% endif %}
+    </div>
+
+    <div class="aj-field">
+      <label for="aj-remote">{{ icon('cloud', size=16) }} 外部服務同時呼叫數</label>
+      <div class="aj-field-row">
+        <input type="number" id="aj-remote" min="1" max="16" value="{{ conc.max_remote_concurrent }}">
+        <span class="aj-limit">LLM / 遠端 GPU OCR</span>
+      </div>
+      <div class="aj-help muted">
+        {% if conc.remote_services %}目前啟用：{{ conc.remote_services|join('、') }}。{% endif %}
+        真正的瓶頸在<b>對方那台機器</b>（一張 GPU 只載一個模型），本機的記憶體判斷擋不到。
+        <b>預設 1</b> —— 一個一個過去、每個都在合理時間內完成，比全部一起去搶顯存到集體逾時好。
+      </div>
+    </div>
+
+    <div class="aj-field">
+      <label for="aj-cpupct">{{ icon('gauge', size=16) }} 轉檔 CPU 上限</label>
+      <div class="aj-field-row">
+        <select id="aj-cpupct" {% if not conc.cpu_limit.affinity_supported %}disabled{% endif %}>
+          <option value="0"{% if conc.soffice_cpu_percent == 0 %} selected{% endif %}>自動（保留 1 核給網頁）</option>
+          {% for pct in [25, 50, 75, 100] %}
+          <option value="{{ pct }}"{% if conc.soffice_cpu_percent == pct %} selected{% endif %}>{{ pct }}%{% if pct == 100 %}（不限制）{% endif %}</option>
+          {% endfor %}
+        </select>
+        <span class="aj-limit" id="aj-cpupct-now">
+          {%- set cl = conc.cpu_limit -%}
+          {%- if cl.affinity_supported -%}
+          目前 {{ cl.effective_cores }} / {{ cl.cpu_count }} 核{% if cl.reserved_cores %}・留 {{ cl.reserved_cores }} 核給網頁{% endif %}
+          {%- else -%}此平台不支援{%- endif -%}
+        </span>
+      </div>
+      {% if conc.cpu_limit.note %}
+      <div class="aj-warn">{{ icon('info', size=14) }} {{ conc.cpu_limit.note }}（轉檔仍會降低優先權）</div>
+      {% else %}
+      <div class="aj-help muted"><b>網頁回應永遠優先於轉檔快慢。</b>轉檔子行程會被綁在部分核心上，剩下的核心保證不被它佔用，所以「在忙」也不會讓頁面空轉。轉檔本身只會慢一點。</div>
+      {% endif %}
+    </div>
+
+    <div class="aj-field">
+      <label for="aj-reserve">{{ icon('memory', size=16) }} 保留記憶體（MB）</label>
+      <div class="aj-field-row">
+        <input type="number" id="aj-reserve" min="128" max="8192" step="128" value="{{ conc.reserve_mb }}">
+        <span class="aj-limit">留給作業系統與資料庫</span>
+      </div>
+      <div class="aj-help muted">可用記憶體扣掉這個數字之後不夠再開一個作業時，新作業會<b>留在佇列排隊</b>，不會硬開下去把機器打爆。</div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="aj-save" type="button">{{ icon('save', size=15) }} 儲存設定</button>
+  <span id="aj-saved" class="aj-saved" hidden>已儲存</span>
+</div>
+
+<div class="panel">
+  {# 同 my_jobs：h2 要當 .panel 的直接第一個子元素才吃得到共用標題列樣式 #}
+  <h2 class="aj-head">
+    作業清單<span id="aj-count" class="mj-count" hidden></span>
+    <span class="aj-head-right">
+      <span class="aj-live" id="aj-live" title="有作業進行中時每 2 秒自動更新">
+        <span class="aj-live-dot"></span><span id="aj-live-tx">自動更新中</span>
+      </span>
+      <label class="aj-only-active"><input type="checkbox" id="aj-active-only"> 只看進行中</label>
+      <button class="btn btn-small" id="aj-refresh" type="button">{{ icon('refresh', size=15) }} 重新整理</button>
+    </span>
+  </h2>
+  <div id="aj-empty" class="muted" hidden>目前沒有任何作業記錄。</div>
+  <div class="aj-table-wrap"><table class="aj-table" id="aj-table">
+    <thead><tr>
+      <th class="aj-sortable" data-sort="tool_name">工具</th>
+      <th class="aj-sortable" data-sort="filename">檔案</th>
+      <th class="aj-sortable" data-sort="owner">送出者</th>
+      <th class="aj-sortable" data-sort="status">狀態</th>
+      <th class="aj-sortable" data-sort="usage">資源用量</th>
+      <th class="aj-sortable" data-sort="elapsed">耗時</th>
+      <th></th>
+    </tr></thead>
+    <tbody id="aj-tbody"></tbody>
+  </table></div>
+</div>
+
+
+{# 圖示來源只有 components/icons.html 這一份 macro —— 先把每個工具的圖示畫進
+   隱藏區，JS 再複製對應節點。不要在 JS 裡另抄一份 SVG path，那遲早會跟 macro
+   長得不一樣（而且動態塞 HTML 也違反 CSP 的做法）。 #}
+<div id="toolIconSprite" hidden aria-hidden="true">
+  {% for t in tool_tiles() %}
+  <span data-tool="{{ t.id }}" data-color="{{ t.color }}">{{ icon(t.icon, size=17) }}</span>
+  {% endfor %}
+</div>
+
+<style nonce="{{ request.state.csp_nonce }}">
+.jt-tile { flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 8px; color: #fff; }
+.jt-tile svg { width: 17px; height: 17px; }
+.aj-tool-cell { display: flex; align-items: center; gap: 9px; }
+
+/* 歷史圖表 */
+.aj-mem.is-clickable { cursor: pointer; }
+.aj-mem.is-clickable:hover { border-color: #93c5fd; }
+.aj-stat.is-clickable { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.aj-stat.is-clickable:hover { border-color: #93c5fd; box-shadow: 0 2px 10px rgba(37,99,235,.12); }
+.aj-chart { margin-top: 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; overflow: hidden; }
+.aj-chart-head { display: flex; align-items: center; gap: 12px; padding: 10px 13px; border-bottom: 1px solid #f1f5f9; }
+.aj-chart-range { margin-left: auto; display: inline-flex; gap: 4px; }
+.aj-rng { border: 1px solid #cbd5e1; background: #fff; color: #475569; font-size: 12px;
+  padding: 3px 10px; border-radius: 6px; cursor: pointer; }
+.aj-rng.is-on { background: #eef2ff; border-color: #a5b4fc; color: #3730a3; font-weight: 600; }
+.aj-chart-close { border: 0; background: none; font-size: 20px; line-height: 1;
+  color: #94a3b8; cursor: pointer; padding: 0 2px; }
+.aj-chart-close:hover { color: #475569; }
+.aj-chart-body { padding: 12px 13px 4px; }
+.aj-chart-body svg { display: block; width: 100%; height: 150px; }
+.aj-chart-note { padding: 0 13px 11px; font-size: 12px; }
+.aj-peak { color: #b45309; font-weight: 600; }
+.aj-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+.aj-stat { flex: 1 1 130px; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
+.aj-stat-n { font-size: 26px; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums; }
+.aj-stat-l { font-size: 12.5px; color: #64748b; margin-top: 2px; }
+.aj-stat.warn { border-color: #fcd34d; background: #fffbeb; }
+.aj-stat.warn .aj-stat-n { color: #b45309; }
+.aj-controls { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.aj-pause-note { font-size: 12.5px; max-width: 620px; }
+.aj-mem { margin-bottom: 16px; padding: 11px 13px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; color: #475569; font-variant-numeric: tabular-nums; }
+.aj-mem.low { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.aj-mem-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
+.aj-mem-pct { font-size: 15px; font-weight: 700; color: #0f172a; }
+.aj-mem.low .aj-mem-pct { color: #b45309; }
+.aj-mem.crit .aj-mem-pct { color: #b91c1c; }
+/* 指示計：用量（左）+ 保留量（右，斜紋）—— 一眼看出「還剩多少可以派工」，
+   而不是只給一串數字要人自己心算。 */
+.aj-mem-bar { position: relative; height: 12px; background: #e2e8f0; border-radius: 7px; overflow: hidden; display: flex; }
+.aj-mem-used { height: 100%; width: 0; background: linear-gradient(to right, #2563eb, #3b82f6); transition: width .4s; }
+.aj-mem.low .aj-mem-used { background: linear-gradient(to right, #f59e0b, #f97316); }
+.aj-mem.crit .aj-mem-used { background: linear-gradient(to right, #ef4444, #dc2626); }
+.aj-cpu { margin-top: -8px; }
+.aj-cpu-used { height: 100%; width: 0; border-radius: 7px;
+  background: linear-gradient(to right, #14b8a6, #0d9488); transition: width .4s; }
+.aj-cpu.busy .aj-cpu-used { background: linear-gradient(to right, #f59e0b, #f97316); }
+.aj-cpu.busy .aj-mem-pct { color: #b45309; }
+.aj-cpu.hot .aj-cpu-used { background: linear-gradient(to right, #ef4444, #dc2626); }
+.aj-cpu.hot .aj-mem-pct { color: #b91c1c; }
+.aj-mem-legend { display: flex; gap: 14px; margin-top: 7px; font-size: 11.5px; color: #64748b; }
+.aj-mem-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.aj-mem-legend .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.aj-mem-legend .sw-used { background: linear-gradient(to right, #2563eb, #3b82f6); }
+.aj-mem-legend .sw-free { background: #e2e8f0; }
+.aj-mem-legend .sw-res { background: repeating-linear-gradient(45deg, #cbd5e1 0 3px, #e2e8f0 3px 6px); }
+.aj-mem.low .aj-mem-legend .sw-used { background: linear-gradient(to right, #f59e0b, #f97316); }
+.aj-mem.crit .aj-mem-legend .sw-used { background: linear-gradient(to right, #ef4444, #dc2626); }
+.aj-mem-reserve { height: 100%; width: 0; margin-left: auto;
+  background: repeating-linear-gradient(45deg, #cbd5e1 0 4px, #e2e8f0 4px 8px); }
+.aj-head-right { margin-left: auto; display: inline-flex; align-items: center; gap: 12px; font-weight: 400; }
+.aj-head-right .btn { display: inline-flex; align-items: center; gap: 5px; }
+.aj-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b; }
+.aj-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; }
+.aj-live.on .aj-live-dot { background: #22c55e; animation: ajPulse 1.6s ease-in-out infinite; }
+@keyframes ajPulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+/* 可排序表頭 */
+.aj-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.aj-sortable:hover { color: #1d4ed8; }
+.aj-sortable::after { content: '↕'; margin-left: 5px; opacity: .35; font-size: 11px; }
+.aj-sortable.asc::after { content: '↑'; opacity: 1; color: #1d4ed8; }
+.aj-sortable.desc::after { content: '↓'; opacity: 1; color: #1d4ed8; }
+/* 排隊序號 */
+.aj-qpos { display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; padding: 0 6px; margin-right: 7px;
+  background: #e0e7ff; color: #3730a3; border-radius: 11px;
+  font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* 資源用量 */
+.aj-usage { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.aj-usage-est { color: #94a3b8; font-size: 12px; }
+.aj-usage-cpu { color: #64748b; font-size: 12px; margin-left: 6px; }
+/* 醒目色：取消是破壞性動作、暫停會影響全體，都不該長得像一般按鈕 */
+.btn-danger { background: #dc2626; border-color: #dc2626; color: #fff; }
+.btn-danger:hover:not(:disabled) { background: #b91c1c; border-color: #b91c1c; }
+.btn-warn { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.btn-warn:hover:not(:disabled) { background: #d97706; border-color: #d97706; }
+.btn-resume { background: #16a34a; border-color: #16a34a; color: #fff; }
+.btn-resume:hover:not(:disabled) { background: #15803d; border-color: #15803d; }
+.aj-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 18px; margin-bottom: 18px; }
+.aj-field { padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
+.aj-field label { display: flex; align-items: center; gap: 7px; font-weight: 600; margin-bottom: 9px; color: #0f172a; }
+.aj-field label svg { flex: none; color: #64748b; }
+.aj-field-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* 數字欄位與下拉共用外框，才不會一個是我們的樣式、一個是瀏覽器原生的灰框。
+   （同一區的「作業完成通知」頁也是這樣寫：input 與 select 同一條規則。） */
+.aj-field-row input, .aj-field-row select {
+  padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 7px;
+  font-size: 15px; font-family: inherit; background: #fff; color: #0f172a;
+}
+.aj-field-row input { width: 96px; font-variant-numeric: tabular-nums; text-align: right; }
+/* 下拉的文字比數字長很多（「自動（保留 1 核給網頁）」），寬度讓內容決定；
+   字級略小一階才不會把整張卡撐開。 */
+.aj-field-row select { font-size: 14px; cursor: pointer; max-width: 100%; }
+.aj-field-row input:focus, .aj-field-row select:focus {
+  outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+.aj-field-row input:disabled, .aj-field-row select:disabled {
+  background: #f1f5f9; color: #94a3b8; cursor: not-allowed;
+}
+.aj-limit { font-size: 12.5px; color: #64748b; }
+.aj-help { font-size: 12.5px; margin-top: 8px; line-height: 1.6; }
+.aj-warn { display: flex; gap: 7px; margin-top: 8px; padding: 8px 11px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 7px; color: #92400e; font-size: 12.5px; line-height: 1.6; }
+.aj-warn svg { flex: none; margin-top: 2px; }
+#aj-pause { display: inline-flex; align-items: center; gap: 6px; }
+#aj-save { display: inline-flex; align-items: center; gap: 6px; }
+.aj-saved { margin-left: 10px; color: #15803d; font-size: 13px; font-weight: 600; }
+.mj-count { display: inline-block; margin-left: 10px; font-size: 12px; font-weight: 600; color: #475569; background: #e2e8f0; border-radius: 11px; padding: 1px 9px; vertical-align: middle; }
+.aj-only-active { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #475569; cursor: pointer; font-weight: 400; }
+.aj-table-wrap { overflow-x: auto; margin-top: 12px; }
+.aj-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.aj-table th { text-align: left; padding: 8px 10px; border-bottom: 2px solid #e5e7eb; color: #475569; font-size: 12.5px; white-space: nowrap; }
+.aj-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+/* nowrap + 該欄不收縮：動作欄太窄時「取消」會被斷成兩行 */
+.aj-table td .btn { display: inline-flex; align-items: center; gap: 5px;
+  white-space: nowrap; }
+.aj-table td:last-child { width: 1%; white-space: nowrap; }
+.aj-table th:last-child { width: 1%; }
+.aj-table tr.is-active { background: #f8fbff; }
+.aj-file { color: #64748b; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aj-owner { color: #475569; }
+.aj-owner-ip { color: #94a3b8; font-size: 12px; }
+.aj-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.aj-badge.done { background: #dcfce7; color: #15803d; }
+.aj-badge.running { background: #dbeafe; color: #1d4ed8; }
+.aj-badge.pending { background: #f1f5f9; color: #475569; }
+.aj-badge.error { background: #fee2e2; color: #b91c1c; }
+.aj-badge.cancelled { background: #f1f5f9; color: #64748b; }
+.aj-badge.interrupted { background: #fef3c7; color: #b45309; }
+.aj-ofc { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: #ede9fe; color: #6d28d9; font-size: 11px; font-weight: 600; }
+.aj-elapsed { font-variant-numeric: tabular-nums; color: #475569; white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/friendly_error.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const tbody = document.getElementById('aj-tbody');
+  const table = document.getElementById('aj-table');
+  const empty = document.getElementById('aj-empty');
+  const statsEl = document.getElementById('aj-stats');
+  const memEl = document.getElementById('aj-mem');
+  const countEl = document.getElementById('aj-count');
+  const pauseBtn = document.getElementById('aj-pause');
+  const activeOnly = document.getElementById('aj-active-only');
+  let timer = null;
+  let paused = false;
+
+  const LABEL = {
+    pending: '排隊中', running: '進行中', done: '已完成',
+    error: '失敗', cancelled: '已取消', interrupted: '已中斷',
+  };
+
+  const NS = 'http://www.w3.org/2000/svg';
+
+  function svgIcon(paths) {
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', '14');
+    svg.setAttribute('height', '14');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    paths.forEach((d) => {
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', d);
+      svg.appendChild(path);
+    });
+    return svg;
+  }
+
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;   // 檔名 / 使用者名是輸入資料，不用 innerHTML
+    return n;
+  }
+
+  function fmtMB(mb) {
+    mb = Number(mb) || 0;
+    if (mb >= 1024) {
+      const g = mb / 1024;
+      return (g >= 10 ? g.toFixed(1) : g.toFixed(2)) + ' GB';
+    }
+    return mb.toLocaleString('en-US') + ' MB';
+  }
+
+  function fmtElapsed(s) {
+    s = Math.max(0, Math.round(s || 0));
+    const m = Math.floor(s / 60);
+    return m ? `${m} 分 ${String(s % 60).padStart(2, '0')} 秒` : `${s} 秒`;
+  }
+
+  function stat(n, label, warn, metric) {
+    const d = el('div', 'aj-stat' + (warn ? ' warn' : '')
+                 + (metric ? ' is-clickable' : ''));
+    d.appendChild(el('div', 'aj-stat-n', String(n)));
+    d.appendChild(el('div', 'aj-stat-l', label));
+    if (metric) {
+      // 點卡片看歷史 —— 「現在幾個」看不出「什麼時候忙」，而後者才是調併行度
+      // 的依據
+      d.title = '點一下看歷史趨勢';
+      d.addEventListener('click', () => openChart(metric, label));
+    }
+    return d;
+  }
+
+  function renderStats(d) {
+    const rt = d.runtime || {};
+    const ofc = d.office || {};
+    statsEl.textContent = '';
+    statsEl.appendChild(stat(rt.running || 0, '執行中', false, 'running'));
+    statsEl.appendChild(stat(rt.queued || 0, '排隊中', (rt.queued || 0) > 0, 'queued'));
+    statsEl.appendChild(stat(`${ofc.in_use || 0} / ${ofc.limit || 1}`, 'Office 轉檔佔用'));
+    statsEl.appendChild(stat(rt.max_concurrent || 1, '同時上限'));
+    if (rt.held_for_ram) {
+      statsEl.appendChild(stat('是', '因記憶體不足而排隊', true));
+    }
+    paused = !!rt.paused;
+    document.getElementById('aj-pause-tx').textContent =
+      paused ? '恢復派工' : '暫停派工';
+    // 暫停會影響所有人 → 用醒目色，不要長得像一般按鈕；暫停中改綠色（恢復）
+    pauseBtn.classList.toggle('btn-warn', !paused);
+    pauseBtn.classList.toggle('btn-resume', paused);
+
+    const m = d.memory || {};
+    const txt = document.getElementById('aj-mem-text');
+    const pctEl = document.getElementById('aj-mem-pct');
+    if (m.total_mb) {
+      // 位數多的時候讀起來很吃力（「可用 9876 MB / 總計 10240 MB」）→ 超過
+      // 1 GB 就換算成 GB，其餘補千分位；再配一條指示計，一眼看出還剩多少。
+      const usedMb = Math.max(0, m.total_mb - m.available_mb);
+      const usedPct = Math.min(100, Math.round((usedMb / m.total_mb) * 100));
+      const resPct = Math.min(100 - usedPct,
+                              Math.round((m.reserve_mb / m.total_mb) * 100));
+      // 「可派工」= 可用 − 保留，也就是實際還能拿去開新作業的量
+      const spare = Math.max(0, (m.available_mb || 0) - (m.reserve_mb || 0));
+      txt.textContent = `記憶體：已用 ${fmtMB(usedMb)} / 總計 ${fmtMB(m.total_mb)}`
+        + `・可派工 ${fmtMB(spare)}（保留 ${fmtMB(m.reserve_mb)} 不動用）`;
+      pctEl.textContent = usedPct + '%';
+      document.getElementById('aj-mem-used').style.width = usedPct + '%';
+      document.getElementById('aj-mem-reserve').style.width = resPct + '%';
+      const freePct = 100 - usedPct;
+      memEl.classList.toggle('low', freePct < 25 && freePct >= 12);
+      memEl.classList.toggle('crit', freePct < 12);
+    } else {
+      txt.textContent = '讀不到記憶體資訊（psutil 未安裝？）—— 此時不會因記憶體因素擋下作業。';
+      pctEl.textContent = '';
+    }
+
+    // CPU：併行度的另一個真實上限。記憶體看得出「還能不能再開」，CPU 看得出
+    // 「開了會不會互相拖慢」—— 兩個都要看才知道該不該調高。
+    const cpu = d.cpu || {};
+    const cbox = document.getElementById('aj-cpu');
+    const ctxt = document.getElementById('aj-cpu-text');
+    const cpct = document.getElementById('aj-cpu-pct');
+    if (cpu.percent != null) {
+      const pct = Math.max(0, Math.min(100, Math.round(cpu.percent)));
+      const la = (cpu.loadavg || [])[0];
+      ctxt.textContent = `CPU：${cpu.count || '?'} 核`
+        + (cpu.in_container ? '（容器配額）' : '')
+        + (la != null && !cpu.in_container
+           ? `・近 1 分鐘負載 ${la.toFixed(2)}` : '');
+      cpct.textContent = pct + '%';
+      document.getElementById('aj-cpu-used').style.width = pct + '%';
+      cbox.classList.toggle('busy', pct >= 70 && pct < 90);
+      cbox.classList.toggle('hot', pct >= 90);
+      cbox.hidden = false;
+    } else {
+      cbox.hidden = true;      // 讀不到就不顯示，不要擺一條空的
+    }
+  }
+
+  let sortKey = '';
+  let sortDir = 1;
+  let lastJobs = [];
+  let lastRuntime = {}, lastOffice = {}, lastMemory = {}, lastTotal = 0;
+
+  function sortJobs(jobs) {
+    if (!sortKey) return jobs;            // 預設：排隊中在前且照派工順序
+    const val = (j) => {
+      if (sortKey === 'usage') return (j.usage ? j.usage.rss_mb : -1);
+      if (sortKey === 'elapsed') return j.elapsed || 0;
+      return String(j[sortKey] || '').toLowerCase();
+    };
+    return jobs.slice().sort((a, b) => {
+      const x = val(a), y = val(b);
+      if (x < y) return -sortDir;
+      if (x > y) return sortDir;
+      return 0;
+    });
+  }
+
+
+  // 依工具 id 取出對應的彩色圖示磚（複製隱藏區裡的節點，不用 innerHTML）
+  function toolTile(toolId) {
+    const src = document.querySelector(
+      '#toolIconSprite [data-tool="' + (toolId || '').replace(/"/g, '') + '"]');
+    if (!src) return null;
+    const tile = document.createElement('span');
+    tile.className = 'jt-tile tile-color-' + (src.dataset.color || '0');
+    const svg = src.querySelector('svg');
+    if (svg) tile.appendChild(svg.cloneNode(true));
+    return tile;
+  }
+
+  function render(d) {
+    lastRuntime = d.runtime || lastRuntime;
+    lastOffice = d.office || lastOffice;
+    lastMemory = d.memory || lastMemory;
+    lastTotal = d.total != null ? d.total : lastTotal;
+    renderStats(d);
+    lastJobs = d.jobs || [];
+    const jobs = sortJobs(lastJobs);
+    tbody.textContent = '';
+    empty.hidden = jobs.length > 0;
+    table.hidden = jobs.length === 0;
+    countEl.textContent = String(d.total || jobs.length);
+    countEl.hidden = !jobs.length;
+    jobs.forEach((j) => {
+      const active = j.status === 'running' || j.status === 'pending';
+      const tr = el('tr', active ? 'is-active' : '');
+
+      const tdTool = el('td');
+      const cell = el('div', 'aj-tool-cell');
+      // 排隊中的標上第幾位 —— 管理員與使用者最想知道的就是「還要等幾個」
+      if (j.queue_pos) cell.appendChild(el('span', 'aj-qpos', String(j.queue_pos)));
+      const tile = toolTile(j.tool_id);
+      if (tile) cell.appendChild(tile);
+      cell.appendChild(el('span', null, j.tool_name || j.tool_id));
+      if (j.is_office) cell.appendChild(el('span', 'aj-ofc', 'Office'));
+      tdTool.appendChild(cell);
+      tr.appendChild(tdTool);
+
+      tr.appendChild(el('td', 'aj-file', j.filename || '—'));
+
+      const tdOwner = el('td');
+      tdOwner.appendChild(el('div', 'aj-owner', j.owner || '（未登入）'));
+      if (j.client_ip) tdOwner.appendChild(el('div', 'aj-owner-ip', j.client_ip));
+      tr.appendChild(tdOwner);
+
+      const tdSt = el('td');
+      tdSt.appendChild(el('span', 'aj-badge ' + j.status,
+                          LABEL[j.status] || j.status));
+      if (j.status === 'running' && j.message) {
+        tdSt.appendChild(el('div', 'aj-owner-ip', j.message));
+      }
+      if (j.status === 'error' && j.error) {
+        tdSt.appendChild(el('div', 'aj-owner-ip', j.error));
+      }
+      tr.appendChild(tdSt);
+
+      // 資源用量：實測值（soffice 子行程的 RSS）優先；量不到才顯示估計值，
+      // 而且明講是估計 —— 不要把猜的數字擺得像量到的。
+      const tdUse = el('td', 'aj-usage');
+      if (j.usage) {
+        tdUse.appendChild(el('span', null, fmtMB(j.usage.rss_mb)));
+        if (j.usage.cpu_pct) {
+          tdUse.appendChild(el('span', 'aj-usage-cpu',
+                               'CPU ' + j.usage.cpu_pct + '%'));
+        }
+      } else if (j.status === 'running' || j.status === 'pending') {
+        tdUse.appendChild(el('span', 'aj-usage-est', '估 ' + fmtMB(j.est_mb)));
+      } else {
+        tdUse.appendChild(el('span', 'aj-usage-est', '—'));
+      }
+      tr.appendChild(tdUse);
+
+      tr.appendChild(el('td', 'aj-elapsed', fmtElapsed(j.elapsed)));
+
+      const tdAct = el('td');
+      if (active) {
+        // 取消是破壞性的（丟掉已經跑到一半的結果）→ 給醒目色 + 圖示
+        const b = el('button', 'btn btn-small btn-danger');
+        b.appendChild(svgIcon(['M6 6l12 12', 'M6 18L18 6']));
+        b.appendChild(document.createTextNode('取消'));
+        b.type = 'button';
+        b.addEventListener('click', () => cancelJob(j.id, b));
+        tdAct.appendChild(b);
+      }
+      tr.appendChild(tdAct);
+      tbody.appendChild(tr);
+    });
+    schedule(jobs.some((j) => j.status === 'running' || j.status === 'pending'));
+  }
+
+  function schedule(hasActive) {
+    if (timer) clearTimeout(timer);
+    // 有作業在跑就 2 秒、閒置 8 秒。指示燈讓管理員知道畫面是活的，不必猜
+    // 「這是不是舊資料」。
+    const live = document.getElementById('aj-live');
+    live.classList.toggle('on', hasActive);
+    document.getElementById('aj-live-tx').textContent =
+      hasActive ? '自動更新中（每 2 秒）' : '自動更新中（每 8 秒）';
+    timer = setTimeout(load, hasActive ? 2000 : 8000);
+  }
+
+
+  // ---------- 歷史圖表 ----------
+  // 用 DOM API 直接畫 inline SVG —— 專案不引外部 JS 函式庫（CSP 全站禁外連），
+  // 而折線 / 面積圖用原生 SVG 幾十行就夠，不需要圖表套件。
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  let chartMetric = null;
+  let chartHours = 24;
+
+  const METRICS = {
+    running:  {label: '執行中作業', pick: (j, r) => r.running_max,
+               fallback: (j) => j.active, color: '#2563eb', unit: ' 個'},
+    queued:   {label: '排隊中作業', pick: (j, r) => r.queued_max,
+               fallback: () => 0, color: '#f59e0b', unit: ' 個'},
+    started:  {label: '新送出作業', pick: (j) => j.started,
+               fallback: (j) => j.started, color: '#0d9488', unit: ' 個'},
+    cpu:      {label: 'CPU 使用率', pick: (j, r) => r.cpu_max,
+               fallback: () => 0, color: '#7c3aed', unit: '%'},
+    mem:      {label: '記憶體使用', pick: (j, r) => r.mem_max_mb,
+               fallback: () => 0, color: '#db2777', unit: ' MB'},
+  };
+
+  function svgEl(tag, attrs) {
+    const n = document.createElementNS(SVGNS, tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => n.setAttribute(k, v));
+    return n;
+  }
+
+  function fmtTime(ts, hours) {
+    const d = new Date(ts * 1000);
+    const p = (x) => String(x).padStart(2, '0');
+    return hours > 48 ? `${p(d.getMonth() + 1)}/${p(d.getDate())}`
+                      : `${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  function drawChart(data) {
+    const m = METRICS[chartMetric];
+    const body = document.getElementById('aj-chart-body');
+    body.textContent = '';
+    const jobs = data.jobs || [];
+    const res = data.resources || [];
+    const pts = jobs.map((j, i) => {
+      const r = res[i] || {};
+      let v = m.pick(j, r);
+      // 取樣資料可能還沒有（剛升級 / 剛重啟）→ 用可從作業推導的數值墊底，
+      // 不要畫一條假的零線讓人以為「那時候沒事」
+      if (v == null || (v === 0 && (r.samples || 0) === 0)) v = m.fallback(j, r) || 0;
+      return {ts: j.ts, v: Number(v) || 0};
+    });
+    if (!pts.length) { body.appendChild(el('div', 'muted', '尚無資料')); return; }
+
+    const W = 1000, H = 150, PAD_L = 42, PAD_B = 20, PAD_T = 8;
+    const maxV = Math.max(1, ...pts.map((p) => p.v));
+    const svg = svgEl('svg', {viewBox: `0 0 ${W} ${H}`,
+                              preserveAspectRatio: 'none', role: 'img'});
+    const x = (i) => PAD_L + i * (W - PAD_L - 4) / Math.max(1, pts.length - 1);
+    const y = (v) => PAD_T + (1 - v / maxV) * (H - PAD_T - PAD_B);
+
+    // 水平格線 + 刻度
+    [0, 0.5, 1].forEach((f) => {
+      const yy = y(maxV * f);
+      svg.appendChild(svgEl('line', {x1: PAD_L, y1: yy, x2: W - 4, y2: yy,
+                                     stroke: '#eef2f7', 'stroke-width': 1}));
+      const t = svgEl('text', {x: PAD_L - 6, y: yy + 3, 'text-anchor': 'end',
+                               fill: '#94a3b8', 'font-size': 10});
+      t.textContent = Math.round(maxV * f);
+      svg.appendChild(t);
+    });
+
+    // 面積 + 折線
+    const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+    svg.appendChild(svgEl('path', {
+      d: `${line} L${x(pts.length - 1).toFixed(1)},${y(0)} L${x(0).toFixed(1)},${y(0)} Z`,
+      fill: m.color, 'fill-opacity': 0.12, stroke: 'none'}));
+    svg.appendChild(svgEl('path', {d: line, fill: 'none', stroke: m.color,
+                                   'stroke-width': 2, 'stroke-linejoin': 'round'}));
+
+    // 峰值標記 —— 「何時是高峰」就是這張圖要回答的問題
+    let pk = 0;
+    pts.forEach((p, i) => { if (p.v > pts[pk].v) pk = i; });
+    if (pts[pk].v > 0) {
+      svg.appendChild(svgEl('circle', {cx: x(pk), cy: y(pts[pk].v), r: 3.5,
+                                       fill: '#b45309'}));
+    }
+
+    // 時間軸（頭 / 中 / 尾）
+    [0, Math.floor(pts.length / 2), pts.length - 1].forEach((i) => {
+      const t = svgEl('text', {x: x(i), y: H - 5, 'text-anchor':
+        i === 0 ? 'start' : (i === pts.length - 1 ? 'end' : 'middle'),
+        fill: '#94a3b8', 'font-size': 10});
+      t.textContent = fmtTime(pts[i].ts, chartHours);
+      svg.appendChild(t);
+    });
+    body.appendChild(svg);
+
+    const note = document.getElementById('aj-chart-note');
+    note.textContent = '';
+    if (pts[pk].v > 0) {
+      note.appendChild(document.createTextNode('高峰 '));
+      note.appendChild(el('span', 'aj-peak',
+        Math.round(pts[pk].v) + m.unit + '（' + fmtTime(pts[pk].ts, chartHours) + '）'));
+      const hasSamples = res.some((r) => (r.samples || 0) > 0);
+      if (!hasSamples && (chartMetric === 'cpu' || chartMetric === 'mem')) {
+        note.appendChild(document.createTextNode(
+          '・尚無取樣資料（每分鐘記錄一筆，服務啟動後才開始累積）'));
+      }
+    } else {
+      note.textContent = '這段時間沒有活動。';
+    }
+  }
+
+  async function openChart(metric, label) {
+    chartMetric = metric;
+    const box = document.getElementById('aj-chart');
+    box.hidden = false;
+    document.getElementById('aj-chart-title').textContent =
+      (METRICS[metric] || {}).label || label;
+    document.getElementById('aj-chart-body').textContent = '載入中…';
+    try {
+      const r = await fetch(`/admin/jobs/api/history?hours=${chartHours}`);
+      if (!r.ok) return;
+      drawChart(await r.json());
+    } catch (e) {
+      document.getElementById('aj-chart-body').textContent = '讀取歷史失敗';
+    }
+  }
+
+  document.getElementById('aj-mem').addEventListener('click', () => openChart('mem'));
+  document.getElementById('aj-cpu').addEventListener('click', () => openChart('cpu'));
+  document.getElementById('aj-chart-close').addEventListener('click', () => {
+    document.getElementById('aj-chart').hidden = true;
+  });
+  document.querySelectorAll('.aj-rng').forEach((b) => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.aj-rng').forEach((o) => o.classList.remove('is-on'));
+      b.classList.add('is-on');
+      chartHours = Number(b.dataset.h) || 24;
+      if (chartMetric) openChart(chartMetric);
+    });
+  });
+
+  document.getElementById('aj-refresh').addEventListener('click', async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    try { await load(); } finally { b.disabled = false; }
+  });
+
+  document.querySelectorAll('.aj-sortable').forEach((th) => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.sort;
+      if (sortKey === k) {
+        // 同一欄第三次點 → 回到預設排序（排隊中在前、照派工順序）
+        if (sortDir === -1) { sortKey = ''; sortDir = 1; } else { sortDir = -1; }
+      } else { sortKey = k; sortDir = 1; }
+      document.querySelectorAll('.aj-sortable').forEach((o) => {
+        o.classList.toggle('asc', o.dataset.sort === sortKey && sortDir === 1);
+        o.classList.toggle('desc', o.dataset.sort === sortKey && sortDir === -1);
+      });
+      render({ jobs: lastJobs, runtime: lastRuntime, office: lastOffice,
+               memory: lastMemory, total: lastTotal });
+    });
+  });
+
+  async function cancelJob(id, btn) {
+    btn.disabled = true;
+    btn.textContent = '取消中…';
+    try {
+      await fetch('/admin/jobs/api/cancel/' + encodeURIComponent(id),
+                  { method: 'POST' });
+    } catch (e) { /* 下一次輪詢會反映實際狀態 */ }
+    load();
+  }
+
+  pauseBtn.addEventListener('click', async () => {
+    pauseBtn.disabled = true;
+    try {
+      const r = await fetch('/admin/jobs/api/pause', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paused: !paused }),
+      });
+      if (!r.ok) alert(await window.friendlyServerError(r, '切換失敗'));
+    } finally {
+      pauseBtn.disabled = false;
+      load();
+    }
+  });
+
+  document.getElementById('aj-save').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    const body = {
+      max_concurrent_jobs: Number(document.getElementById('aj-jobs').value),
+      reserve_mb: Number(document.getElementById('aj-reserve').value),
+    };
+    const ofcInput = document.getElementById('aj-office');
+    if (!ofcInput.disabled) body.max_office_concurrent = Number(ofcInput.value);
+    var rmt = document.getElementById('aj-remote');
+    if (rmt) body.max_remote_concurrent = Number(rmt.value);
+    var cpuSel = document.getElementById('aj-cpupct');
+    if (cpuSel && !cpuSel.disabled) body.soffice_cpu_percent = Number(cpuSel.value);
+    try {
+      const r = await fetch('/admin/jobs/api/concurrency', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) { alert(await window.friendlyServerError(r, '儲存失敗')); return; }
+      const d = await r.json();
+      // 伺服器可能把數值夾住（例如記憶體不夠）→ 回填實際生效的值
+      document.getElementById('aj-jobs').value = d.conc.max_concurrent_jobs;
+      document.getElementById('aj-reserve').value = d.conc.reserve_mb;
+      if (!ofcInput.disabled) ofcInput.value = d.conc.max_office_concurrent;
+      var rmt2 = document.getElementById('aj-remote');
+      if (rmt2) rmt2.value = d.conc.max_remote_concurrent;
+      var cs2 = document.getElementById('aj-cpupct');
+      if (cs2 && !cs2.disabled) cs2.value = String(d.conc.soffice_cpu_percent || 0);
+      var cl = d.conc.cpu_limit || {};
+      var now = document.getElementById('aj-cpupct-now');
+      if (now && cl.affinity_supported) {
+        now.textContent = '目前 ' + cl.effective_cores + ' / ' + cl.cpu_count + ' 核'
+          + (cl.reserved_cores ? '・留 ' + cl.reserved_cores + ' 核給網頁' : '');
+      }
+      const ok = document.getElementById('aj-saved');
+      ok.hidden = false;
+      setTimeout(() => { ok.hidden = true; }, 2500);
+      load();
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  activeOnly.addEventListener('change', load);
+
+  async function load() {
+    try {
+      const q = activeOnly.checked ? '?active=1' : '';
+      const r = await fetch('/admin/jobs/api/list' + q,
+                            { headers: { Accept: 'application/json' } });
+      if (!r.ok) return;
+      render(await r.json());
+    } catch (e) { schedule(false); }
+  }
+
+  load();
+})();
+</script>
+{% endblock %}

@@ -4,7 +4,11 @@
 
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
-.vl-wrap { max-width: 900px; }
+/* 佔滿可用寬度。原本鎖 900px，但主容器（.container.with-sidebar）本身
+   已經是 max-width:none —— 在寬螢幕上右邊整片空著，而這頁是資料密集型
+   （統計三欄 + 搜尋結果），寬度用得上：統計卡是 auto-fit，變寬會自動
+   多排幾欄而不是把單欄拉長。 */
+.vl-wrap { max-width: none; }
 
 .vl-search-bar {
   display: flex; gap: 8px; align-items: stretch;

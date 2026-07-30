@@ -255,7 +255,7 @@ async def upload_files(
         case = _cm.load_case(case_id)
         if not case:
             raise HTTPException(404, "case 不存在")
-        _check_case_acl(case, request)
+        _check_case_acl(case, request, write=True)
     else:
         case = _cm.create_case(owner_uid=owner_uid)
         # 同時把 case 寫進 upload_owner 為 owner record（讓 /file/ ACL 過得去）
@@ -353,7 +353,7 @@ async def run_check(case_id: str, request: Request):
     case = _cm.load_case(case_id)
     if not case:
         raise HTTPException(404, "case 不存在")
-    _check_case_acl(case, request)
+    _check_case_acl(case, request, write=True)
     if not case.get("files"):
         raise HTTPException(400, "case 內沒有檔案，請先上傳")
 
@@ -417,17 +417,10 @@ async def delete_case(case_id: str, request: Request):
     case = _cm.load_case(case_id)
     if not case:
         raise HTTPException(404, "case 不存在")
+    # 刪除是寫入動作 —— 走共用 ACL（稽核員唯讀、無主案件僅 admin）。
+    # 不要在這裡另寫一套：原本的那一套就是因為與共用邏輯分開，而漏掉無主案件。
+    _check_case_acl(case, request, write=True)
     user = getattr(request.state, "user", None) if hasattr(request, "state") else None
-    is_admin = _is_admin(user)
-    # 稽核員不可刪（read-only）
-    if _is_auditor(user) and not is_admin:
-        raise HTTPException(403, "稽核員為唯讀，無法刪除案件")
-    # 一般 user 只能刪自己的
-    if user and not is_admin:
-        owner_uid = case.get("owner_uid")
-        user_uid = user.get("user_id") if isinstance(user, dict) else None
-        if owner_uid is not None and owner_uid != user_uid:
-            raise HTTPException(403, "您只能刪除自己建立的案件")
     by_user = (user or {}).get("username") if isinstance(user, dict) else "anonymous"
     _cm.soft_delete_case(case_id, by_user=by_user)
     return {"ok": True, "case_id": case_id}
@@ -444,7 +437,7 @@ async def post_override(case_id: str, request: Request,
     case = _cm.load_case(case_id)
     if not case:
         raise HTTPException(404, "case 不存在")
-    _check_case_acl(case, request)
+    _check_case_acl(case, request, write=True)
     user = getattr(request.state, "user", None) if hasattr(request, "state") else None
     by_user = (user or {}).get("username") if isinstance(user, dict) else None
     try:
@@ -461,7 +454,7 @@ async def delete_override(case_id: str, finding_key: str, request: Request):
     case = _cm.load_case(case_id)
     if not case:
         raise HTTPException(404, "case 不存在")
-    _check_case_acl(case, request)
+    _check_case_acl(case, request, write=True)
     ok = _override.remove_override(case_id, finding_key)
     return {"ok": ok}
 
@@ -527,41 +520,87 @@ async def get_file(case_id: str, file_id: str, request: Request):
 # ─── 內部 helpers ──────────────────────────────────────────────────────
 
 
+def _uid_of(user) -> Optional[int]:
+    if not isinstance(user, dict):
+        return None
+    try:
+        v = user.get("user_id")
+        return int(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _is_admin(user) -> bool:
-    """User 是否 admin —  看 effective_tools 是否含 ALL marker / role 是 admin。"""
-    if not user:
-        return False
-    if isinstance(user, dict):
-        et = user.get("effective_tools") or []
-        return "*" in et or user.get("role") == "admin"
-    return False
+    """User 是否 admin。
 
-
-def _is_auditor(user) -> bool:
-    """User 是否稽核員 — 走既有 perm.is_auditor()。"""
-    if not user or not isinstance(user, dict):
-        return False
-    uid = user.get("user_id")
+    **不要**改回讀 `user.get("effective_tools")` / `user.get("role")` ——
+    `sessions.lookup()` 回的字典兩個鍵都沒有，那樣寫永遠是 False：admin 會被當
+    成一般使用者（看不到別人的案件、儀表板也進不去），而且從外面看起來跟「沒
+    權限」一模一樣，極難察覺。唯一的事實來源是 `permissions`。
+    """
+    uid = _uid_of(user)
     if not uid:
         return False
     try:
-        from app.core import perm as _perm
-        return bool(_perm.is_auditor(int(uid)))
-    except Exception:
+        from app.core import permissions as _perm
+        return _perm.effective_tools(uid) == "ALL"
+    except Exception:  # noqa: BLE001 — 判不出來就當不是 admin（fail-closed）
         return False
 
 
-def _check_case_acl(case: dict, request: Request) -> None:
-    """Case 級 ACL — case owner / admin / 稽核員 可讀（稽核員唯讀，不可改 / 刪）。"""
+def _is_auditor(user) -> bool:
+    """User 是否稽核員。
+
+    原本 import 的 `app.core.perm` **不存在**（正確的是 `permissions`），例外被
+    吃掉之後永遠回 False —— 稽核員完全看不到案件。
+    """
+    uid = _uid_of(user)
+    if not uid:
+        return False
+    try:
+        from app.core import permissions as _perm
+        return bool(_perm.is_auditor(uid))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _check_case_acl(case: dict, request: Request, write: bool = False) -> None:
+    """Case 級 ACL。
+
+    | 身分 | 讀 | 寫（上傳 / 執行 / 覆寫 / 刪除） |
+    |---|---|---|
+    | 未啟用認證 | 可 | 可 |
+    | admin | 可 | 可 |
+    | 稽核員 | 可（含別人的） | **不可**（唯讀） |
+    | 案件建立者 | 可 | 可 |
+    | 其他登入者 | 不可 | 不可 |
+
+    **無主案件（`owner_uid` 為 None）只有 admin 能碰。** 原本寫成「有 owner 才
+    比對」，於是 owner 是 None 時任何登入者都能讀寫刪。無主案件真的會出現：
+    先在未啟用認證時建立、之後才開認證；或舊版建立的案件。清單頁用的是嚴格
+    比對所以看不到，但知道 case_id 就能直接開 —— 案件裡放的是證件影本與財力
+    證明，這個洞的後果不是小事。
+    """
     user = getattr(request.state, "user", None) if hasattr(request, "state") else None
     if not user:
-        return  # auth OFF
-    if _is_admin(user) or _is_auditor(user):
+        return  # auth OFF：單人模式
+    if _is_admin(user):
         return
+    if _is_auditor(user):
+        if write:
+            raise HTTPException(403, "稽核員為唯讀，無法變更案件")
+        return
+    # 非擁有者一律回**與「案件不存在」完全相同**的 404。
+    #
+    # 原本回 403「您沒有權限存取此案件」—— 那與 404「case 不存在」是可區分的兩種
+    # 回應，等於提供一個查詢介面：拿任意 case_id 打過來，403 就代表「這個案件存在，
+    # 只是不是你的」。案件編號本身就是一種資訊（客戶有沒有在這裡送過件）。
+    #
+    # 稽核員的唯讀限制不走這裡（見上面）—— 他本來就讀得到，回 403 不會洩漏任何
+    # 他還不知道的事。
     owner_uid = case.get("owner_uid")
-    user_uid = user.get("user_id") if isinstance(user, dict) else None
-    if owner_uid is not None and owner_uid != user_uid:
-        raise HTTPException(403, "您沒有權限存取此案件")
+    if owner_uid is None or owner_uid != _uid_of(user):
+        raise HTTPException(404, "case 不存在")
 
 
 def _build_report_l1(case: dict, version: str, job: "_jm.Job") -> dict:

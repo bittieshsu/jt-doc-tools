@@ -10,6 +10,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from ...core import csv_safe as _csv_safe
+
 import fitz
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
@@ -158,9 +160,11 @@ def _render_csv(annots: list[dict[str, Any]]) -> bytes:
     w.writerow(["page", "type", "author", "subject", "content",
                 "created", "modified", "x0", "y0", "x1", "y1"])
     for a in annots:
-        w.writerow([a["page"], a["type_label"], a["author"], a["subject"],
-                    a["content"], a["created"], a["modified"],
-                    *a["rect"]])
+        # 作者 / 主旨 / 內容來自**對方給的 PDF** —— 直接寫進 CSV 會讓 Excel 把
+        # `=cmd|...` 當成公式執行（見 core/csv_safe）。
+        w.writerow(_csv_safe.row([
+            a["page"], a["type_label"], a["author"], a["subject"],
+            a["content"], a["created"], a["modified"], *a["rect"]]))
     return buf.getvalue().encode("utf-8")
 
 
@@ -199,7 +203,8 @@ def _render_todo_csv(annots: list[dict[str, Any]]) -> bytes:
     w.writerow(["status", "page", "todo", "assignee", "priority", "type", "notes"])
     for a in annots:
         body = a["content"] or a["subject"] or a["type_label"]
-        w.writerow(["[ ]", a["page"], body, a["author"], "", a["type_label"], ""])
+        w.writerow(_csv_safe.row(
+            ["[ ]", a["page"], body, a["author"], "", a["type_label"], ""]))
     return buf.getvalue().encode("utf-8")
 
 

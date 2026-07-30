@@ -377,6 +377,14 @@ async def llm_reflow(request: Request):
     batch_id = str(body.get("batch_id") or "")
     if not batch_id:
         raise HTTPException(400, "batch_id required")
+    # 歸屬驗證 —— 這個 id 從請求內容傳進來，只驗格式不夠：實測 B 可用 A 的 id
+    # 讀到 A 的文件內容（v1.14.6 資安稽核）。同一家族的其他端點本來就有驗，
+    # 這幾個漏了。
+    # 必填檢查放在驗證**之前**：原本的順序（先 `if batch_id:` 再 `if not batch_id:`）
+    # 行為雖然正確，但讀起來像「空值就跳過檢查」的 fail-open。
+    from ...core import safe_paths as _sp2, upload_owner as _uo2
+    _sp2.require_uuid_hex(batch_id, "batch_id")
+    _uo2.require(batch_id, request)
     wdir = settings.temp_dir / f"ext_text_{batch_id}"
     if not wdir.exists():
         raise HTTPException(404, "batch 不存在或已過期")

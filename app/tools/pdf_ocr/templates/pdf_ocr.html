@@ -1133,6 +1133,11 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
         if (jj.status === 'error') {
           throw new Error(jj.error || 'OCR 失敗');
         }
+        // 服務在辨識途中重新啟動（多半是升級）。少了這個分支會輪詢到逾時，
+        // 使用者看到「OCR 超時」這種會誤導人的訊息。
+        if (jj.status === 'interrupted') {
+          throw new Error('服務已重新啟動，這個作業被中斷，請重新送出');
+        }
         if (jj.status === 'cancelled') {
           statusEl.textContent = '已停止辨識';
           progressBar.style.display = 'none';

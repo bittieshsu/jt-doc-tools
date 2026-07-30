@@ -19,6 +19,8 @@
       this._elapsedTimer = null;
       this._startedAt = 0;
       this.elapsed = root.querySelector('.job-elapsed');
+      // 「可以關掉這頁」提示 —— 有 job_id 才有意義，所以由這個元件控制
+      this.bgNote = root.querySelector('.job-bg-note');
       this.jobId = null;
       this.resetBtn.addEventListener('click', () => { this.hide(); this.onReset(); });
     }
@@ -40,6 +42,7 @@
       this.dlBtn.hidden = true;
       if (this.dlPngBtn) this.dlPngBtn.hidden = true;
       if (this.saveWsBtn) this.saveWsBtn.hidden = true;
+      if (this.bgNote) this.bgNote.hidden = true;
       this._stop();
     }
     _stop() {
@@ -104,6 +107,8 @@
       if (this.saveWsBtn) this.saveWsBtn.hidden = true;
       this.show();
       this.status.textContent = '處理中…';
+      // 作業已經送到伺服器了 → 這時候講「可以關掉這頁」才是對的時機
+      if (this.bgNote) this.bgNote.hidden = false;
       this._stop();
       this._startElapsed();
       const tick = async () => {
@@ -126,19 +131,37 @@
               this.dlPngBtn.href = this.downloadPngUrl(jobId);
             }
             this._wireSaveWs(j);
+            // 作業已經結束 —— 沒有「要不要繼續等」的問題了，收起提示
+            if (this.bgNote) this.bgNote.hidden = true;
             this._stop();
             try { this.onDone(j); } catch (_) {}
           } else if (j.status === 'error') {
             this.status.textContent = '失敗：' + (j.error || '未知錯誤');
             this._finishElapsed('已過 ');
             this.bar.style.background = '#dc2626';
+            // 作業已經結束 —— 沒有「要不要繼續等」的問題了，收起提示
+            if (this.bgNote) this.bgNote.hidden = true;
             this._stop();
             try { this.onError(j); } catch (_) {}
           } else if (j.status === 'cancelled') {
             this.status.textContent = j.message || '已停止';
             this._finishElapsed('已過 ');
+            // 作業已經結束 —— 沒有「要不要繼續等」的問題了，收起提示
+            if (this.bgNote) this.bgNote.hidden = true;
             this._stop();
             try { this.onCancel(j); } catch (_) {}
+          } else if (j.status === 'interrupted') {
+            // 服務在這個工作執行時重新啟動（多半是 `jtdt update` 升級）。
+            // 少了這個分支，狀態會落到所有 if 之外 → 進度條**永遠轉下去**，
+            // 使用者只看到一個卡住的頁面，不知道該重送。
+            this.status.textContent =
+              '服務已重新啟動，這個作業被中斷，請重新送出';
+            this._finishElapsed('已過 ');
+            this.bar.style.background = '#f59e0b';
+            // 作業已經結束 —— 沒有「要不要繼續等」的問題了，收起提示
+            if (this.bgNote) this.bgNote.hidden = true;
+            this._stop();
+            try { this.onError(j); } catch (_) {}
           }
         } catch (e) {
           this.status.textContent = '查詢狀態失敗';

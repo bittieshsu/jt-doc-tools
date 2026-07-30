@@ -125,11 +125,19 @@ def build_router(templates, tools, app_name: str, version: str) -> APIRouter:
             forced_by_role = _perm.is_auditor(uid)
         except Exception:
             forced_by_role = False
+        # 信箱：作業完成通知寄到這裡。
+        #
+        # **能不能自己改，取決於帳號從哪裡來** —— 與同一張卡片上的密碼是同一套
+        # 邏輯：本機帳號自己管，目錄帳號由來源管（改了也會在下次登入被覆蓋，
+        # 那種「改得動但沒有用」的欄位比唯讀更糟）。
+        src = user.get("source", "local")
         return {
             "auth_enabled": True,
             "username": user.get("username"),
             "display_name": user.get("display_name") or user.get("username"),
-            "source": user.get("source", "local"),
+            "source": src,
+            "email": user.get("email") or "",
+            "email_editable": src == "local",
             "is_admin": (et == "ALL"),
             "roles": roles_out,
             "tools": tools_out,

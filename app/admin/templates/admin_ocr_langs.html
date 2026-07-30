@@ -252,7 +252,7 @@ details[open] > .po-ext-summary .po-ext-arrow { transform:rotate(90deg); }
 <pre data-s="se69e5a84">scp jt-ocr-server-install.sh root@GPUServer:/tmp/
 ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh --dry-run'
 ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
-        <p data-s="s36aefc86">{{ icon('warn', size=12) }} 把 <code data-s="s1fcb9a2f">GPUServer</code> 換成實際 IP 或 hostname（例：<code data-s="s1fcb9a2f">10.0.0.40</code>）</p>
+        <p data-s="s36aefc86">{{ icon('warn', size=12) }} 把 <code data-s="s1fcb9a2f">GPUServer</code> 換成實際 IP 或 hostname（例：<code data-s="s1fcb9a2f">ocr.example.com</code>）</p>
         <p data-s="s2b2d9463">5-15 分鐘(含 PyTorch ~3GB)</p>
       </div>
 
@@ -272,7 +272,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
       </div>
       <div data-s="sb4ef7c78">
         <label data-s="s931aa730">Server URL</label>
-        <input type="url" id="ocrExtUrl" placeholder="http://10.0.0.5:8766"
+        <input type="url" id="ocrExtUrl" placeholder="http://ocr.example.com:8766"
                data-s="s530f0590">
 
         <label data-s="s931aa730">Token</label>

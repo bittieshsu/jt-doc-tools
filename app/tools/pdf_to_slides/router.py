@@ -65,6 +65,11 @@ async def preview_png(request: Request, job_id: str, kind: str,
         raise HTTPException(400, "kind must be orig or result")
     require_uuid_hex(job_id, "job_id")
     job = job_manager.get(job_id)
+    # 只驗 id 格式不夠 —— 預覽圖是原稿與產出的前幾頁渲染，等於別人文件的內容。
+    # 與 /api/jobs/* 同一套判斷（非擁有者一律 404，不確認 id 存在）。
+    from app.main import _job_access
+    if job and not _job_access(job, request):
+        job = None
     if not job:
         raise HTTPException(404, "job 不存在")
     if not job.result_path:

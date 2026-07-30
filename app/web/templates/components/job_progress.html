@@ -7,6 +7,15 @@
     {# 已過時間：轉檔可能要好幾分鐘，沒有計時使用者會以為當掉 #}
     <div class="job-elapsed" hidden></div>
   </div>
+  {# 「可以關掉這頁」的標記放在**這裡**，不是放在工具清單的卡片上：
+     使用者會猶豫「要不要一直開著」的時刻，就是看著這條進度列的時候。
+     而且它由「有沒有拿到 job_id」自動決定 —— 不必另外維護一份「哪些工具支援
+     背景」的清單（這種手工清單在本專案漂掉過很多次）。 #}
+  <div class="job-bg-note" hidden>
+    {{ icon('info', size=14) }}
+    <span>這份工作在伺服器上執行，<b>可以關掉這一頁</b> —— 完成後到
+      <a href="/my-jobs">我的作業</a> 下載。</span>
+  </div>
   <div class="job-actions">
     <a class="btn btn-primary job-download" hidden>{{ icon('download') }}下載 PDF</a>
     <a class="btn job-download-png" hidden>{{ icon('image') }}下載 PNG</a>

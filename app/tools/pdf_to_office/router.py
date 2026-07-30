@@ -161,6 +161,11 @@ async def preview_png(request: Request, job_id: str, kind: str,
         raise HTTPException(400, "kind must be orig or result")
     require_uuid_hex(job_id, "job_id")
     job = job_manager.get(job_id)
+    # 只驗 id 格式不夠 —— 預覽圖是原稿與產出的前幾頁渲染，等於別人文件的內容。
+    # 與 /api/jobs/* 同一套判斷（非擁有者一律 404，不確認 id 存在）。
+    from app.main import _job_access
+    if job and not _job_access(job, request):
+        job = None
     if not job:
         raise HTTPException(404, "job 不存在")
     if not job.result_path:
@@ -185,7 +190,15 @@ async def preview_png(request: Request, job_id: str, kind: str,
 @router.get("/report/{job_id}")
 async def download_report(request: Request, job_id: str):
     """下載某 job 的 Markdown 改善報告。"""
+    require_uuid_hex(job_id, "job_id")
     job = job_manager.get(job_id)
+    # 與上面的 preview_png 同一套歸屬判斷。**這裡原本沒驗**（v1.14.6 資安稽核抓到）
+    # —— 報告裡有來源檔名、頁數、語言、完整字型清單，等於別人文件的資訊；而它就
+    # 排在有驗的那個端點下面，只看程式碼很容易以為兩個都有。
+    # 非擁有者一律 404，不確認這個 id 是否存在。
+    from app.main import _job_access
+    if job and not _job_access(job, request):
+        job = None
     if not job:
         raise HTTPException(404, "job 不存在")
     summary = (job.meta or {}).get("summary") or {}

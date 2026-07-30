@@ -271,8 +271,11 @@ class LLMClient:
         if max_tokens:
             payload["max_tokens"] = max_tokens
         parts: list[str] = []
+        # 外部 LLM 的同時呼叫上限（預設 1）—— 見 remote_limit 的說明：真正的
+        # 瓶頸在對方那台機器，本機的記憶體准入檢查擋不到。
+        from . import remote_limit
         try:
-            with httpx.stream(
+            with remote_limit.slot(), httpx.stream(
                 "POST",
                 f"{self.base_url}/chat/completions",
                 headers=self._headers(),
@@ -389,8 +392,11 @@ class LLMClient:
             if profile.use_chat_template_kwargs:
                 payload["chat_template_kwargs"] = {"enable_thinking": False}
         parts: list[str] = []
+        # 外部 LLM 的同時呼叫上限（預設 1）—— 見 remote_limit 的說明：真正的
+        # 瓶頸在對方那台機器，本機的記憶體准入檢查擋不到。
+        from . import remote_limit
         try:
-            with httpx.stream(
+            with remote_limit.slot(), httpx.stream(
                 "POST",
                 f"{self.base_url}/chat/completions",
                 headers=self._headers(),

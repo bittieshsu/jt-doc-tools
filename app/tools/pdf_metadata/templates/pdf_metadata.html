@@ -74,7 +74,7 @@ const fu = new FileUpload($('mdUp'), async (f) => {
   if (!f) return;
   const fd = new FormData(); fd.append('file', f);
   const r = await fu.upload('/tools/pdf-metadata/analyze', fd, {processingLabel: '分析 metadata 中…'});
-  if (!r.ok) { $('mdInfo').hidden = false; $('mdInfo').innerHTML = '<span class="warn">分析失敗：' + await r.text() + '</span>'; return; }
+  if (!r.ok) { $('mdInfo').hidden = false; $('mdInfo').textContent = '分析失敗：' + await window.friendlyServerError(r, '分析失敗'); return; }
   const d = await r.json();
   uploadId = d.upload_id;
   const m = d.metadata || {};

@@ -510,7 +510,7 @@ btnUpload.addEventListener('click', async () => {
     btnReset.disabled = false;
     setTimeout(() => location.reload(), 800);
   } catch (e) {
-    status.innerHTML = '<span data-s="sbc8099b4">錯誤：' + e.message + '</span>';
+    status.textContent = '錯誤：' + e.message;
     btnUpload.disabled = false;
   }
 });
@@ -527,7 +527,7 @@ btnReset.addEventListener('click', async () => {
     status.innerHTML = '<span data-s="sd4ac9708">已還原預設。</span>';
     setTimeout(() => location.reload(), 600);
   } catch (e) {
-    status.innerHTML = '<span data-s="sbc8099b4">錯誤：' + e.message + '</span>';
+    status.textContent = '錯誤：' + e.message;
   }
 });
 </script>

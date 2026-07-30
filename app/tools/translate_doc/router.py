@@ -19,6 +19,8 @@ from __future__ import annotations
 import io
 import json
 import re
+import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -26,9 +28,15 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
+import logging
+
 from ...config import settings
+from ...core.job_manager import job_manager
+from ...core import csv_safe as _csv_safe
 from ...core.llm_settings import llm_settings, DEFAULT_SETTINGS
 
+
+logger = logging.getLogger("app.translate_doc")
 
 router = APIRouter()
 
@@ -572,6 +580,188 @@ async def translate_batch(request: Request):
     }
 
 
+# ---- 背景作業版（離開頁面也會繼續跑） --------------------------------------
+#
+# 為什麼要有這個：原本整個翻譯是**瀏覽器驅動**的 —— 前端開 4 個 worker 逐句打
+# `/translate-one`，結果存在那個分頁的記憶體裡。於是關掉分頁 = 翻譯停止，而且
+# 「我的作業」裡看不到任何東西（根本沒有建立 job）。幾萬句的文件要人一直開著
+# 頁面等，這不合理。
+#
+# 改成伺服器端的背景作業：送出後就與分頁無關，回到頁面（或從「我的作業」點進來）
+# 可以看到目前進度與已完成的句子。
+#
+# 結果放**檔案**不放 job.meta —— meta 有 64KB 上限，幾萬句的譯文遠遠超過。
+# 檔案放在暫存目錄，跟著既有的暫存清理排程一起被清掉。
+
+_TRD_MAX_SENTENCES_JOB = 200000     # 純粹防呆，避免一次塞爆記憶體
+
+
+def _trd_result_path(job_id: str) -> Path:
+    from ...core.safe_paths import require_uuid_hex
+    require_uuid_hex(job_id, "job_id")
+    return settings.temp_dir / f"trd_{job_id}.json"
+
+
+def _trd_write_results(job_id: str, results: list) -> None:
+    """把目前結果寫到暫存檔（先寫 .tmp 再換名，避免讀到半個檔）。"""
+    p = _trd_result_path(job_id)
+    tmp = p.with_suffix(".json.tmp")
+    try:
+        tmp.write_text(json.dumps(results, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(p)
+    except OSError as e:
+        logger.warning("translate-doc: 寫入進度檔失敗 %s：%s", job_id, e)
+
+
+def _trd_read_results(job_id: str) -> list:
+    p = _trd_result_path(job_id)
+    if not p.is_file():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+@router.post("/start")
+async def start_job(request: Request):
+    """建立背景翻譯作業，回 job_id。"""
+    if not llm_settings.is_enabled():
+        raise HTTPException(503, "LLM 服務未啟用")
+    body = await request.json()
+    sentences = body.get("sentences") or []
+    if not isinstance(sentences, list) or not sentences:
+        raise HTTPException(400, "sentences 不可為空")
+    if len(sentences) > _TRD_MAX_SENTENCES_JOB:
+        raise HTTPException(400, f"句數過多（{len(sentences)}）")
+    sentences = [str(x) for x in sentences]
+    source_lang = str(body.get("source_lang") or "auto")
+    target_lang = str(body.get("target_lang") or "zh-TW")
+    domain = str(body.get("domain") or "")
+    filename = str(body.get("filename") or "")[:200]
+
+    def run(job) -> None:
+        _trd_run_job(job, sentences, source_lang, target_lang, domain)
+
+    job = job_manager.submit(
+        "translate-doc", run,
+        meta={
+            "filename": filename or "逐句翻譯",
+            "total": len(sentences),
+            # 讓「我的作業」／管理區顯示「開啟」而不是「下載」——
+            # 這個工具的產出是頁面上的對照表，不是一個檔案。
+            "view_url": "/tools/translate-doc/?job={job_id}",
+            "target_lang": target_lang,
+        },
+        request=request,
+    )
+    # view_url 要帶真正的 job id（submit 之後才知道）
+    job.meta["view_url"] = f"/tools/translate-doc/?job={job.id}"
+    # **原文在這裡就落檔**，不是等作業真的開始跑才寫。
+    #
+    # 佇列忙的時候，作業可能要等上一段時間才輪到 —— 那段期間使用者回到頁面
+    # 應該看到「整份對照表 + 排隊中」，而不是一片空白（空白會讓人以為送丟了）。
+    # 放在作業內部寫的話，這段空窗期是無法避免的競賽。
+    _trd_write_results(job.id, [{"src": x} for x in sentences])
+    return {"job_id": job.id, "total": len(sentences)}
+
+
+def _trd_run_job(job, sentences: list[str], source_lang: str,
+                 target_lang: str, domain: str) -> None:
+    """背景執行：逐句翻譯並持續回報進度。"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    client = llm_settings.make_client()
+    if client is None:
+        raise RuntimeError("LLM 服務未啟用")
+    model = llm_settings.get_model_for("translate-doc")
+    conf = llm_settings.get()
+    concurrency = max(1, min(16, int(conf.get("translate_concurrency", 4))))
+    if source_lang == "auto":
+        source_lang = _detect_language("\n".join(sentences[:50]))
+    total = len(sentences)
+    job.message = f"準備中…（共 {total} 句）"
+    _warmup_llm(client, model)
+
+    # 原文在送出當下就寫過一次了（見 start_job）——
+    # 這裡只是把它讀回記憶體當工作陣列的起點。
+    results: list = [{"src": x} for x in sentences]
+    done = 0
+    last_flush = time.monotonic()
+    lock = threading.Lock()
+
+    def one(i: int):
+        nonlocal done, last_flush
+        if job.cancelled:
+            return
+        src = sentences[i]
+        try:
+            # **不要**在這裡再取一次 `remote_limit` 的名額 —— `llm_client.text_query`
+            # 內部已經取了。同一個執行緒取兩次會卡死自己（實測：整個作業停在
+            # 「準備中」，堆疊顯示兩個 worker 都卡在 remote_limit.__enter__）。
+            # 外部服務的上限屬於「呼叫外部服務的那一層」，呼叫端不要重複實作。
+            r = _translate_one(client, model, src, source_lang,
+                               target_lang, domain=domain)
+        except Exception as e:  # noqa: BLE001 — 單句失敗不該讓整批停掉
+            r = {"src": src, "translated": "", "error": str(e)[:300]}
+        with lock:
+            results[i] = r
+            done += 1
+            job.progress = done / total
+            job.message = f"翻譯中… {done} / {total} 句"
+            # 落檔時機：每 20 句**或**距離上次超過 1 秒。
+            # 只看句數不夠 —— 慢模型跑 20 句可能要好幾分鐘，這段期間回到頁面的人
+            # 會看到進度卡在原地（實測就是這樣：4 秒後回來顯示「完成 0 句」）。
+            now = time.monotonic()
+            if done % 20 == 0 or done == total or (now - last_flush) >= 1.0:
+                _trd_write_results(job.id, results)
+                last_flush = now
+
+    with ThreadPoolExecutor(max_workers=concurrency) as ex:
+        list(ex.map(one, range(total)))
+
+    _trd_write_results(job.id, results)
+    if job.cancelled:
+        job.message = f"已停止（完成 {done} / {total} 句）"
+        return
+    ok = sum(1 for r in results if r and not r.get("error"))
+    job.message = f"完成 {ok} / {total} 句"
+    job.progress = 1.0
+
+
+@router.get("/job/{job_id}")
+async def job_status(job_id: str, request: Request, start: int = 0):
+    """查詢背景翻譯作業的進度與（目前為止的）結果。
+
+    `start` 讓前端只取還沒拿過的部分 —— 幾萬句的譯文每次全量回傳很浪費。
+    """
+    from ...core.safe_paths import require_uuid_hex
+    require_uuid_hex(job_id, "job_id")
+    job = job_manager.get(job_id)
+    # 歸屬判斷與 /api/jobs/* 同一套：非擁有者一律 404，不確認 id 是否存在。
+    from app.main import _job_access
+    if job and not _job_access(job, request):
+        job = None
+    if not job:
+        raise HTTPException(404, "作業不存在")
+    results = _trd_read_results(job_id)
+    start = max(0, min(int(start or 0), len(results)))
+    # 已花時間由**伺服器**算 —— 從別的分頁回來時，前端的計時起點是「剛剛」，
+    # 顯示出來會變成「已花 0 秒」。用 Job 自己的 elapsed()（它知道結束後要停在
+    # 結束當下，不是一直往上加）。
+    return {
+        "status": job.status,
+        "progress": job.progress,
+        "message": job.message,
+        "elapsed": round(job.elapsed(), 1),
+        "total": (job.meta or {}).get("total") or len(results),
+        "start": start,
+        "results": results[start:],
+        "cancelled": job.cancelled,
+    }
+
+
 @router.post("/translate-one")
 async def translate_one(request: Request):
     if not llm_settings.is_enabled():
@@ -982,7 +1172,8 @@ def _build_xlsx(pairs: list[dict], meta: dict) -> bytes:
     meta_row_count = len(meta_lines)
     # 第 1～N 列是 meta（合併兩欄），N+1 列是標題列，N+2 起是資料
     for i, line in enumerate(meta_lines, start=1):
-        ws.cell(row=i, column=1, value=line).font = Font(size=10, color="64748B")
+        # meta 行含檔名（使用者取的）
+        _csv_safe.xlsx_cell(ws, i, 1, line).font = Font(size=10, color="64748B")
         ws.merge_cells(start_row=i, start_column=1, end_row=i, end_column=2)
     hdr_row = meta_row_count + 1
 
@@ -1012,8 +1203,10 @@ def _build_xlsx(pairs: list[dict], meta: dict) -> bytes:
     tgt_even = PatternFill("solid", fgColor="D1FAE5")  # 譯文偶數列：較深綠
     for i, p in enumerate(pairs, start=1):
         row = hdr_row + i
-        ws.cell(row=row, column=1, value=p.get("source") or "")
-        ws.cell(row=row, column=2, value=p.get("target") or "")
+        # 原文來自使用者提供的文件（可能是別人寄來的）——
+        # openpyxl 會把 `=` 開頭的字串存成真正的公式，Excel 打開連警告都不跳。
+        _csv_safe.xlsx_cell(ws, row, 1, p.get("source") or "")
+        _csv_safe.xlsx_cell(ws, row, 2, p.get("target") or "")
         for c in (1, 2):
             cell = ws.cell(row=row, column=c)
             cell.alignment = body_align

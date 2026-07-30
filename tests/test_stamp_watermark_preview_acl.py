@@ -58,9 +58,15 @@ def test_other_user_cannot_fetch_preview(admin_session, two_page_pdf, tool):
     assert r.status_code == 200, r.text
     preview_url = r.json()["preview_url"]
     # Cross-user isolation must still hold (the watermark ACL no-op is closed).
+    #
+    # 404 rather than 403 since v1.14.6: 403 confirms "this file exists, you
+    # just can't have it", which is itself information the caller shouldn't
+    # get. Both are acceptable here — the point is that the bytes don't come
+    # back — so assert on that too rather than on the status code alone.
     g = other.get(preview_url, follow_redirects=False)
-    assert g.status_code == 403, (
+    assert g.status_code in (403, 404), (
         f"another user fetched someone else's preview: {g.status_code}")
+    assert g.headers.get("content-type") != "image/png"
 
 
 def test_auth_off_preview_served(auth_off, two_page_pdf):

@@ -107,7 +107,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     if (h && !h.value.trim()) {
       h.style.borderColor = '#dc2626';
       h.focus();
-      await window.showAlert('Host 是必填欄位（例如 logserver.example.com 或 192.168.1.10）。', {title:'缺少 Host'});
+      await window.showAlert('Host 是必填欄位（例如 logserver.example.com）。', {title:'缺少 Host'});
       return;
     }
   }

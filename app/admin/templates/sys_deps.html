@@ -365,7 +365,12 @@
       } else {
         msg = '檢查失敗：' + escapeHtml(e.message);
       }
-      tbody.innerHTML = '<tr><td colspan="5" data-s="s1c9be233">' + msg + '</td></tr>';
+      // 訊息可能來自伺服器 —— 用 DOM API 建列，不要拼 HTML
+      tbody.textContent = '';
+      var _tr = document.createElement('tr');
+      var _td = document.createElement('td');
+      _td.colSpan = 5; _td.setAttribute('data-s', 's1c9be233'); _td.textContent = msg;
+      _tr.appendChild(_td); tbody.appendChild(_tr);
     } finally {
       clearInterval(tickerId);
       clearTimeout(timeoutId);
@@ -435,7 +440,7 @@
       }
     } catch (e) {
       verEl.textContent = '查詢失敗';
-      if (hintEl) hintEl.innerHTML = '<span data-s="sc9e34862">' + e.message + '</span>';
+      if (hintEl) hintEl.textContent = e.message;
     } finally {
       btn.innerHTML = orig;
       btn.disabled = false;

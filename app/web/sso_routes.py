@@ -161,6 +161,7 @@ def build_router(templates) -> APIRouter:
             user = sso_provision.provision(
                 "oidc", external_id=ident["sub"], username=ident["username"],
                 display_name=ident["name"], groups=ident["groups"],
+                email=ident.get("email", ""),
                 admin_group=cfg.get("admin_group", ""))
         except (oidc.OIDCError, sso_provision.SSOProvisionError) as e:
             _audit("login_fail", ip, detail=f"oidc: {e}")
@@ -194,6 +195,7 @@ def build_router(templates) -> APIRouter:
             user = sso_provision.provision(
                 "saml", external_id=ident["nameid"], username=ident["username"],
                 display_name=ident["name"], groups=ident["groups"],
+                email=ident.get("email", ""),
                 admin_group=cfg.get("admin_group", ""))
         except (saml.SAMLError, sso_provision.SSOProvisionError) as e:
             _audit("login_fail", ip, detail=f"saml: {e}")

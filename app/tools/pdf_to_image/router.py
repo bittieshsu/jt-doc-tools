@@ -134,9 +134,8 @@ async def preview(filename: str, request: Request):
     if not (filename.startswith("p2i_") and is_safe_name(filename)):
         raise HTTPException(400, "invalid filename")
     path = safe_join(_work_dir(), filename)
-    rest = filename[4:].split("_", 1)[0]
-    if rest:
-        upload_owner.require(rest, request)
+    # fail-closed：認不出 upload_id 就不給（見 upload_owner.require_by_filename）。
+    upload_owner.require_by_filename(filename, request)
     if not path.exists():
         raise HTTPException(404, "not found")
     return FileResponse(str(path), media_type="image/png")

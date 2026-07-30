@@ -25,7 +25,7 @@ class SSOProvisionError(Exception):
 
 def provision(provider: str, *, external_id: str, username: str,
               display_name: str, groups: Optional[list[str]] = None,
-              admin_group: str = "") -> dict:
+              admin_group: str = "", email: str = "") -> dict:
     """Create or refresh the local user for an authenticated SSO identity.
     Returns a user dict: {user_id, username, display_name, source, created}."""
     if provider not in ("oidc", "saml"):
@@ -35,9 +35,12 @@ def provision(provider: str, *, external_id: str, username: str,
         raise SSOProvisionError("IdP 未提供穩定使用者識別 (sub / NameID)")
     username = (username or external_id).strip()[:64] or external_id
     display_name = (display_name or username).strip()[:64] or username
+    # IdP 早就給了 email claim / 屬性，之前直接丟掉 —— 作業完成通知需要它，
+    # 不然每個人都得自己再填一次信箱。
+    email = (email or "").strip()[:200]
     groups = [g for g in (groups or []) if g and g.strip()]
 
-    user = _sync_user(provider, external_id, username, display_name)
+    user = _sync_user(provider, external_id, username, display_name, email)
     _sync_groups(user["user_id"], provider, groups)
     _apply_admin_group(user["user_id"], groups, admin_group)
     permissions.invalidate_cache()
@@ -45,7 +48,7 @@ def provision(provider: str, *, external_id: str, username: str,
 
 
 def _sync_user(provider: str, external_id: str, username: str,
-               display_name: str) -> dict:
+               display_name: str, email: str = "") -> dict:
     conn = auth_db.conn()
     now = time.time()
     row = conn.execute(
@@ -56,10 +59,17 @@ def _sync_user(provider: str, external_id: str, username: str,
         if not _user_enabled(conn, row["id"]):
             raise SSOProvisionError("此帳號已被停用，請聯絡管理員")
         with db.tx(conn):
-            conn.execute(
-                "UPDATE users SET display_name=?, last_login_at=? WHERE id=?",
-                (display_name, now, row["id"]),
-            )
+            # 信箱以 IdP 為準；IdP 沒給就保留原值（不要用空字串蓋掉手動補的）
+            if email:
+                conn.execute(
+                    "UPDATE users SET display_name=?, email=?, last_login_at=? "
+                    "WHERE id=?", (display_name, email, now, row["id"]),
+                )
+            else:
+                conn.execute(
+                    "UPDATE users SET display_name=?, last_login_at=? WHERE id=?",
+                    (display_name, now, row["id"]),
+                )
         return {"user_id": row["id"], "username": username,
                 "display_name": display_name, "source": provider, "created": False}
 
@@ -77,9 +87,9 @@ def _sync_user(provider: str, external_id: str, username: str,
     with db.tx(conn):
         cur = conn.execute(
             "INSERT INTO users(username, display_name, source, external_dn, "
-            "enabled, is_admin_seed, created_at, last_login_at) "
-            "VALUES (?, ?, ?, ?, 1, 0, ?, ?)",
-            (username, display_name, provider, external_id, now, now),
+            "enabled, is_admin_seed, created_at, last_login_at, email) "
+            "VALUES (?, ?, ?, ?, 1, 0, ?, ?, ?)",
+            (username, display_name, provider, external_id, now, now, email),
         )
         uid = cur.lastrowid
     from . import roles as _roles

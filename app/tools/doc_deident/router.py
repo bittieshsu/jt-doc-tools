@@ -393,6 +393,11 @@ def _llm_extra_findings(full_text: str, already_known: list[str]) -> list[dict]:
 async def process(request: Request):
     body = await request.json()
     upload_id = (body.get("upload_id") or "").strip()
+    # 歸屬驗證：沒有這道檢查，B 可以改寫 A 的輸出檔 —— 對去識別化 / 隱藏內容
+    # 清除這類工具，「被別人改掉輸出」本身就是要害（A 可能拿著被還原的檔案送出）。
+    from ...core import safe_paths as _sp, upload_owner as _uo
+    _sp.require_uuid_hex(upload_id, "upload_id")
+    _uo.require(upload_id, request)
     if not upload_id:
         raise HTTPException(400, "upload_id required")
     pdf_path = _src_path(upload_id)
@@ -512,9 +517,9 @@ async def preview(filename: str, request: Request):
     if not (filename.startswith("did_") and is_safe_name(filename)):
         raise HTTPException(400, "invalid")
     p = safe_join(settings.temp_dir, filename)
-    rest = filename[4:].split("_", 1)[0]
-    if rest:
-        upload_owner.require(rest, request)
+    # fail-closed：認不出 upload_id 就不給。原本是「切掉 `did_` 再取第一段，
+    # 有值才檢查」—— `did__x.png` 這種檔名切出空字串，於是完全不檢查。
+    upload_owner.require_by_filename(filename, request)
     if not p.exists():
         raise HTTPException(404)
     return FileResponse(str(p), media_type="image/png",

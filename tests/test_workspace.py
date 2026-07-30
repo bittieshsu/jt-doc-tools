@@ -188,3 +188,73 @@ def test_settings_roundtrip(wsenv):
     assert saved["retention_hours"] == 48
     monkeypatch_cache = ws._CACHE
     assert monkeypatch_cache["max_file_mb"] == 7
+
+
+# ---------------- v1.14.6：簡報 / 試算表格式 ----------------
+# 「PDF 轉簡報檔」產出的就是 .pptx / .odp，原本工作區收不下 —— 使用者按「存至
+# 工作區」只會拿到「不支援的檔案類型」，而那正是他最需要留存的產出。
+
+def _zip_bytes(entries: dict, mimetype: str = "") -> bytes:
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        if mimetype:
+            z.writestr("mimetype", mimetype)
+        for name, body in entries.items():
+            z.writestr(name, body)
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize("part,ext", [
+    ("word/document.xml", ".docx"),
+    ("xl/workbook.xml", ".xlsx"),
+    ("ppt/presentation.xml", ".pptx"),
+])
+def test_ooxml_formats_detected(part, ext):
+    from app.core.workspace import detect_kind
+    data = _zip_bytes({"[Content_Types].xml": "<x/>", part: "<x/>"})
+    got = detect_kind(data)
+    assert got and got[1] == ext, got
+
+
+@pytest.mark.parametrize("mime,ext", [
+    ("application/vnd.oasis.opendocument.text", ".odt"),
+    ("application/vnd.oasis.opendocument.spreadsheet", ".ods"),
+    ("application/vnd.oasis.opendocument.presentation", ".odp"),
+    ("application/vnd.oasis.opendocument.graphics", ".odg"),
+])
+def test_odf_formats_detected(mime, ext):
+    from app.core.workspace import detect_kind
+    got = detect_kind(_zip_bytes({"content.xml": "<x/>"}, mimetype=mime))
+    assert got and got == (mime, ext), got
+
+
+def test_plain_zip_still_rejected():
+    """**安全性**：型別判定必須開 zip 驗內部結構。只看副檔名的話，把任意 zip
+    改名成 .pptx 就能塞進工作區。"""
+    from app.core.workspace import detect_kind
+    assert detect_kind(_zip_bytes({"evil.exe": "MZ", "readme.txt": "hi"})) is None
+
+
+def test_odf_with_bogus_mimetype_rejected():
+    from app.core.workspace import detect_kind
+    assert detect_kind(_zip_bytes({"content.xml": "<x/>"},
+                                  mimetype="application/x-not-a-thing")) is None
+
+
+def test_allowed_table_matches_detect_kind():
+    """ALLOWED 與 detect_kind 必須一致 —— 兩邊各寫一份遲早會不一致，
+    結果是「偵測得出來卻存不進去」這種難查的問題。"""
+    from app.core import workspace as ws
+    for _part, mime, ext in ws._OOXML_KINDS:
+        assert ws.ALLOWED.get(mime) == ext
+    for mime, ext in ws._ODF_KINDS.items():
+        assert ws.ALLOWED.get(mime) == ext
+
+
+def test_office_formats_have_no_thumbnail_but_do_not_crash():
+    """新格式沒有縮圖是預期行為，但要丟明確的例外讓呼叫端改用預設圖示，
+    不可讓整個列表壞掉。"""
+    from app.core.workspace import WorkspaceError
+    assert issubclass(WorkspaceError, Exception)

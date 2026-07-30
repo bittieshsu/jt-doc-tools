@@ -2,6 +2,11 @@
 
 每次發版前都跑 `pytest`。覆蓋以下面向：
 
+> **資安項目已拆到獨立計畫：`TEST_PLAN_SECURITY.md`**（越權 / RBAC / 滲透測試 /
+> 源碼掃描 / ZAP）。拆開的理由是執行方式不同 —— 那些項目需要「啟用認證 + 兩個以上
+> 帳號 + 攻擊者視角」，判定標準是「拿不到」而不是「功能正常」，混在功能清單裡會被
+> 當成一般項目快速帶過。**發版前兩份都要跑完。**
+
 ## 1. 自動化測試（pytest）
 
 執行：
@@ -60,24 +65,79 @@
 - **工具權限**:default-user 沒有的工具（pdf-fill/pdf-stamp）UI 與後端動作端點都擋；有的（pdf-merge）可用
 - **水平越權**:B 使用者不可下載 A 的工作區檔（/workspace/file/{id}）與 A 的上傳檔（/tools/pdf-editor/file/{upload_id}）
 
-### 1.8 角色預設 / seed 快照 (`tests/test_roles_default_and_seed.py`)
-- **新使用者預設角色**:seed 後預設為 default-user;可改指到自訂角色（恰一個 flagged）;禁止指定 admin / auditor;被設為預設的角色不可刪;flagged 角色消失時 get_default_role_id 自動回退
-- **seed 快照**:管理員移除內建角色某工具後,升級（re-seed）不再補回;連續多次升級仍維持;管理員自行加的工具保留;這一版真正新增的工具仍自動散布;bootstrap（既有客戶無快照）保守不補回舊移除
-- **端到端**:`/admin/roles/{id}/set-default` 端點 + 建本機使用者未指定角色時套用設定的預設角色
+### 1.6 使用者工作區 (`tests/test_workspace.py` + `tests/test_workspace_api.py`)
+核心（`workspace.py`）：
+- 存 PDF / PNG → meta 正確（ext / mime / 顯示名）；list 回該使用者的檔
+- PNG 以 magic bytes 偵測（檔名沒 .png 也自動補副檔名）
+- 非 PDF/PNG（zip 等）→ `UnsupportedType`
+- get / rename / delete CRUD 正常；刪除後 get 回 `NotFound`
+- **跨使用者隔離**：bob 拿 alice 的 file_id → `NotFound`；list 互不可見
+- 每人容量額度超過 → `QuotaExceeded`；單檔上限超過 → `QuotaExceeded`
+- **停用** → save 回 `WorkspaceDisabled`、list 回空（功能完全隱藏）
+- 認證 OFF → 單一共用工作區 key `__single__`，仍可存取
+- 保留掃描 `sweep_older_than`：backdate 後掃掉過期項
+- 設定 save/get roundtrip（enabled 為布林）
 
-### 1.9 Reverse Proxy SSO (`tests/test_proxy_sso.py`)
-- **正規化**:DOMAIN\\user / user@domain / user → user;控制字元 / 空白 / CRLF 一律拒
-- **信任判定**:只認直連來源 IP（含 CIDR、IPv4-mapped）;非法 peer（testclient）不信任
-- **resolve_user**:無標頭→MISSING+audit;不可信來源帶標頭→UNTRUSTED+audit 不登入;可信→OK 同步;查詢失敗→FAIL+audit
-- **中介層 e2e**:可信標頭→自動發 session→後續請求授權;無標頭→回 /login;不可信→回 /login 且不查目錄;fallback 關→401;/login 永遠可達（break-glass）;auditor 仍導 /2fa-verify;停用時完全 no-op
-- **admin 端點**:proxy-save 停用 OK;啟用但未設 LDAP→409;啟用但信任清單空→400;LDAP+清單齊備→啟用成功
+端點（`workspace_routes.py`，auth OFF / 單機）：
+- `GET /workspace` 頁面 200、含「我的工作區」
+- save → list → file(serve) → delete 一輪；serve 回 `application/pdf`
+- save 非 PDF/PNG → 400
+- `?accept=png` 過濾掉 PDF
+- **停用時** `/workspace`、`/workspace/save`、`/workspace/api/list` 全回 404
+
+### 1.10 乘車證明整理（`tests/test_transit_proof_parser.py` + `tests/test_transit_proof_api.py`）🆕
+
+- 解析器：高鐵電子車票證明（label：value）+ 台鐵購票證明（打散版面用特徵正則）；日期正規化 ISO、乘車日排除印製日期、乘車區間抽起訖時間 / 站名、車種不被「乘車區間」誤匹配、高鐵站名去「高鐵 / 車站」；非乘車證明 / 空欄位 → ParseError。
+- 端點：頁面渲染、上傳解析 + 票號去重、非乘車證明 PDF 進 failed、7 種格式匯出（csv/xlsx/ods/json/xml/txt/md）+ 非法格式 400 + 空清單 400、CSV 預設 4 欄（日期/交通工具/來源-目的/費用）、設定 roundtrip（勾選 / 順序 / 格式 / 匯出標題）套用到匯出、刪除單筆、對外 API 不寫 buffer。
+- **手動驗收**：拉多張台鐵 + 高鐵 PDF → 表格出現 4 欄 + 底部加總；「設定」加欄位 / 改格式 / 排序 → 表格與匯出同步；各格式下載可開。合成 PDF 測試須用 CJK 字型（`fontname="china-t"`）否則抽文字變 notdef。
+
+### 1.9 目錄瀏覽 filter（`tests/test_dir_filter.py` + `tests/test_directory_filter_api.py`）🆕
+
+- 純函式：規則 → LDAP filter（類型→objectClass、名稱關鍵字 escape_filter_chars 轉義、多欄位）；符合物件 → 剪枝樹（祖先鏈、共用祖先合併去重、matched 旗標、parent 排在 child 前、cycle-safe、無 root 停在 DC 層）。
+- 設定 roundtrip / 清洗（空規則丟棄、無效類型過濾、無效 default_mode 忽略）。
+- 端點：`/directory/filter` GET/POST roundtrip（backend-agnostic）；`/directory/selected` 非目錄後端回 400；目錄頁可渲染。
+- **手動驗收（需 LDAP / AD）**：進 /admin/directory → 預設「已選定」模式；設定 filter 加規則（名稱關鍵字 + 類型 + OU 子樹）→ 儲存 → 樹只留符合分支；切「全部」看完整目錄樹；點 OU 指派角色仍正常。
+
+### 1.8 每頁畫面 + 關鍵元素可見性回歸（`scripts/page_visual_check.py`）🆕
+
+**目的**：抓「元素 / 功能靜默消失」這一類 regression（例：v1.12.30 CSP 樣式重構
+讓「下載」按鈕、臨時資產縮圖、個資限用章預覽在存檔 / 選圖後一直不顯示，
+v1.12.71 修）。純像素比對對字型 / 時間戳 / 動態內容太吵，所以主檢查是
+「可見互動元素清單」比對 + 關鍵狀態斷言，截圖僅供人工對照。
+
+**需要**：headless chromium（dev1：`chromium-browser`）+ 一個 auth-off 本機實例。
+
+**跑法（發版前）**：
+```bash
+# 1) 起 auth-off 實例（臨時 data dir）
+JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
+  .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8799 &
+# 2) 比對（有元素消失就 exit 1）
+.venv/bin/python scripts/page_visual_check.py --base http://127.0.0.1:8799
+# 3) UI 有意改動後才更新 baseline
+.venv/bin/python scripts/page_visual_check.py --base http://127.0.0.1:8799 --update
+```
+
+**檢查內容**：
+- 逐一載入 39 個工具落地頁 + 首頁 + 工作區，擷取「可見互動元素清單」
+  （可見按鈕文字 / 輸入 / 上傳區；用 `offsetParent` + computed `display` 判定
+  「真的看得到」，能抓 CSS 規則造成的隱藏）。
+- 與 baseline（`tests/visual/baseline_inventory.json`，進版控）比對：baseline 有、
+  現在不見的可見按鈕 → **FAIL（功能消失）**；控制項數量下降 → warn。
+- 每個工具落地頁至少要有一個可見的互動控制項，否則 FAIL。
+- **關鍵狀態斷言**：pdf-editor 從工作區載入 → 儲存並預覽 → `#btnDownload` 必須
+  可見（直接守住 download-after-save 這類「動作後才出現」的元素）。
+- 截圖 + 清單存 `temp/visual/<run>/`（gitignore，供人工前後對照）。
+
+**已驗證能抓到**：① 在 baseline 塞假按鈕 → 比對報「消失的可見按鈕」；
+② 還原 v1.12.71 下載鈕修法（重現 bug）→ 報「存檔後下載按鈕仍不可見」。
 
 ## 2. 手動驗收清單（每個版本）
 
 ### 2.1 填單用印
 
 #### PDF 表單填寫 (pdf-fill)
-- [ ] 上傳廠商 PDF（[樣本 Q] / [樣本 P] / [樣本 O] / [樣本 N]）
+- [ ] 上傳廠商 PDF（華儲 / Macpower / momo / Tigerair）
 - [ ] 自動偵測欄位且公司資料正確帶入
 - [ ] 切換第二公司不會 500
 - [ ] 拖曳藍框微調位置 → 套用新位置
@@ -147,19 +207,6 @@
 - [ ] 若系統裝 Ghostscript，進階選項可勾選 GS pass
 - [ ] 檔案大小比原檔小；文字內容仍可抽取
 
-#### 掃描拼合 (scan-merge) 🆕 v1.11.0
-- [ ] 拉入多張掃描（PDF / PNG / JPG）各含一塊內容 → 自動偵測出區塊
-- [ ] **保留原彩色**：合成結果不轉黑白 / 不去彩（彩色內容飽和度不掉）
-- [ ] **依原位置**：每塊擺到它在原掃描中的相對位置；重疊以紅框警示、不自動重排
-- [ ] 預覽可拖曳移動、拖右下控點等比縮放；縮放拖桿 + 「符合」整張完整顯示
-- [ ] 預設不選取；點空白處取消選取；只有選中的物件顯示刪除與縮放控點
-- [ ] 重疊處 crop 透明不互蓋；紅框緊貼內容
-- [ ] **去除掃描灰底**（預設不勾）把淡灰 / 微黃掃描底色提亮成純白，彩色內容不受影響
-- [ ] 拖入檔案產生預覽時顯示 spinner 與處理中訊息
-- [ ] 空白頁回 422（找不到內容）
-- [ ] crop 取圖 ACL：非法 id 400、不存在 404、跨 user 擋
-- [ ] **公開 API** `POST /tools/scan-merge/api/scan-merge`（form-data 多檔）回單張 A4 白底 PDF
-
 ### 2.3 內容擷取
 
 #### 擷取文字 (pdf-extract-text) 🆕
@@ -189,19 +236,16 @@
 - [ ] **Office 檔案（docx/xlsx/pptx/odt）先自動轉 PDF 再轉圖**
 - [ ] 單頁直接下 PNG、多頁自動 ZIP
 
-#### PDF 轉文書檔 (pdf-to-office) — 三引擎
-- [ ] pdf2docx-refine（預設）：一份表單轉 docx / odt，開得起來、結構在
-- [ ] jtdt-reform：同一份轉 odt，版面重組
-- [ ] **jtdt-layout 版面重現 🆕（v1.12.83）**：
-  - [ ] 表單 PDF → odt / docx：標題 / 標籤 / 底線 / 核取 / 簽名表格位置忠實還原
-  - [ ] 含框線表格（估價單類）：框線在、金額欄不裁尾（1,200 不變 1,20）
-  - [ ] 多欄版面：左右欄各在原位置（不線性化錯亂）
-  - [ ] 多頁 + 混合頁尺寸（A4/A5/橫向）：每頁尺寸正確
-  - [ ] 產出為**真 Writer**（mimetype `…opendocument.text`，非繪圖檔），可轉 docx
-  - [ ] 加密 / 毀損 / 非 PDF：優雅報錯（不 crash、清楚訊息）
-  - [ ] REST API `engine=jtdt-layout`（`/tools/pdf-to-office/convert`）端到端
-  - [ ] 需 LibreOffice-draw / OxOffice（install.sh 兩條 office 路徑都含 Draw）
-  - [ ] `tests/test_pdf_to_office_draw_engine.py`（21 項）全綠
+#### 掃描拼合 (scan-merge) 🆕 v1.11.0
+- [ ] 拉入多張掃描（PDF / PNG / JPG）各含一塊內容 → 自動偵測出區塊
+- [ ] **保留原彩色**：合成結果不轉黑白 / 不去彩（彩色內容飽和度不掉）
+- [ ] **依原位置**：每塊擺到它在原掃描中的相對位置；重疊以紅框警示、不自動重排
+- [ ] A4 預覽可拖曳移動、拖右下控點等比縮放
+- [ ] **背景淨白**（預設開）把淡灰 / 微黃掃描底色提亮成純白，彩色內容不受影響；可關閉
+- [ ] 產生單張 A4 白底 PDF（595×842 pt）
+- [ ] 空白頁回 422（找不到內容）
+- [ ] crop 取圖 ACL：非法 id 400、不存在 404、跨 user 擋
+- [ ] **公開 API** `POST /tools/scan-merge/api/scan-merge`（form-data 多檔）回 PDF
 
 ### 2.5 資安處理 🆕 全新分類
 
@@ -275,6 +319,19 @@
 - [ ] 建立 / 列表 / 刪除 token
 - [ ] 用 bearer 呼叫 `/api/*` 成功；無 token 回 401
 
+#### 工作區設定 (admin/workspace) 🆕
+- [ ] 啟用 / 停用切換；停用後重新整理任一工具頁，「存至工作區」「從工作區載入」按鈕與側欄「我的工作區」全部消失
+- [ ] 設定每人容量額度 / 單檔上限 / 保留時數並儲存
+- [ ] 「目前佔用」表列出各使用者佔用與總量
+
+### 2.6b 使用者工作區 (我的工作區) 🆕
+- [ ] 任一 job 型工具（如蓋章 / 合併 / OCR）完成後出現「存至工作區」，按下後存入成功
+- [ ] 任一上傳區出現「從工作區載入」，挑檔後該檔灌入工具流程（PDF/PNG，依工具 accept 過濾；非 PDF/PNG 工具不顯示此鈕）
+- [ ] 「我的工作區」頁：容量條、檔案清單、下載 / 重新命名 / 刪除
+- [ ] 額度已滿時再存 → 友善錯誤「容量已滿」
+- [ ] 啟用認證時：A 帳號看不到 B 帳號的檔（清單與直連 file_id 皆不可）
+- [ ] 保留時數到期後（或手動 retention sweep）過期檔被清除
+
 ### 2.7 介面
 
 - [ ] 側欄品牌顯示 logo（深底）
@@ -308,67 +365,111 @@
 - [ ] `/admin/conversion` 顯示 Windows builtin 路徑且可使用
 - [ ] Ghostscript `gswin64c.exe` 偵測
 
-## 4. API 覆蓋檢查 🆕
+## 4. API 覆蓋檢查 🆕（v1.8.55 起完整列出，現 37 個工具）
 
-每個工具都必須有可呼叫的 API endpoint（非只網頁 form）：
+每個工具至少 1 個 `/api/<tool-id>` endpoint（路徑：`/tools/<tool-id>/api/<tool-id>` 或 `/tools/<tool-id>/convert`）。發版前 curl 抽測：
 
-- [ ] pdf-merge `/api/pdf-merge` 或對等
-- [ ] pdf-split / rotate / pages / pageno / compress
-- [ ] pdf-extract-text / extract-images / attachments
-- [ ] pdf-encrypt / decrypt / metadata / hidden-scan / diff
-- [ ] doc-deident `/detect` + `/process`
-- [ ] pdf-editor `/load` + `/save`
-- [ ] pdf-stamp / watermark / fill
-- [ ] scan-merge `/api/scan-merge`（form-data 多檔 → 單張 A4 白底 PDF）
+### 結構操作（PDF in / PDF out）
+- [ ] `/tools/pdf-compress/api/pdf-compress` — POST file + preset → PDF
+- [ ] `/tools/pdf-split/api/pdf-split` — POST file + pages → PDF or ZIP
+- [ ] `/tools/pdf-rotate/api/pdf-rotate` — POST file + angle → PDF
+- [ ] `/tools/pdf-pages/api/pdf-pages` — POST file + keep_pages → PDF
+- [ ] `/tools/pdf-pageno/api/pdf-pageno` — POST file + style → PDF
+- [ ] `/tools/pdf-nup/api/pdf-nup` — POST file + n → PDF
+- [ ] `/tools/pdf-merge/api/pdf-merge` — POST files[] → PDF
+- [ ] `/tools/pdf-encrypt/api/pdf-encrypt` — POST file + password → PDF
+- [ ] `/tools/pdf-decrypt/api/pdf-decrypt` — POST file + password → PDF
+
+### 內容擷取
+- [ ] `/tools/pdf-extract-text/api/pdf-extract-text` — POST file → JSON `{pages:[...]}`
+- [ ] `/tools/pdf-extract-images/api/pdf-extract-images` — POST file → ZIP
+- [ ] `/tools/pdf-attachments/api/pdf-attachments` — POST file → ZIP
+- [ ] `/tools/pdf-wordcount/api/pdf-wordcount` — POST file → JSON `{words, chars, ...}`
+- [ ] `/tools/pdf-hidden-scan/api/pdf-hidden-scan` — POST file → JSON `{findings, totals}`
+- [ ] `/tools/pdf-metadata/api/pdf-metadata` — POST file + clear_* flags → cleaned PDF
+
+### 用印 / 簽名 / 浮水印 / 表單
+- [ ] `/tools/pdf-stamp/api/pdf-stamp` — POST file + stamp_image → PDF
+- [ ] `/tools/pdf-watermark/api/pdf-watermark` — POST file + text → PDF
+- [ ] `/tools/pdf-fill/api/pdf-fill` — POST file + company_id → PDF
+
+### 註解
+- [ ] `/tools/pdf-annotations/api/pdf-annotations` — POST file → JSON
+- [ ] `/tools/pdf-annotations-strip/api/pdf-annotations-strip` — POST file → PDF
+- [ ] `/tools/pdf-annotations-flatten/api/pdf-annotations-flatten` — POST file → PDF
+
+### 格式轉換
+- [ ] `/api/convert-to-pdf` (in main.py) — POST file → PDF (office-to-pdf)
+- [ ] `/tools/pdf-to-image/convert` — POST file → ZIP/PNG
+- [ ] `/tools/pdf-to-office/convert` — POST file → docx/odt（async job）
+- [ ] `/tools/image-to-pdf/api/image-to-pdf` — POST files[] → PDF
+- [ ] `/tools/scan-merge/api/scan-merge` — POST files[] → 單張 A4 白底 PDF
+
+### 文字工具
+- [ ] `/tools/text-list/api/text-list` — POST text → JSON
+- [ ] `/tools/text-diff/api/text-diff` — POST text → JSON / HTML
+- [ ] `/tools/text-deident/api/text-deident` — POST text → JSON
+- [ ] `/tools/translate-doc/api/translate-doc` — POST file → translated file
+
+### 文件處理
+- [ ] `/tools/doc-deident/api/doc-deident` — POST file → de-identified
+- [ ] `/tools/doc-diff/api/doc-diff` — POST file_a + file_b → JSON
+- [ ] `/tools/pdf-editor/api/pdf-editor` — POST file + edits json → PDF
+- [ ] `/tools/pdf-ocr/api/pdf-ocr` — POST file + langs → `{job_id}` (async)
+
+### 查詢 / 分析 / 檢核
+- [ ] `/tools/vat-lookup/api/vat-lookup` + `/api/vat-lookup/batch`
+- [ ] `/api/vat-lookup/{vat}` (path-style GET in main.py)
+- [ ] `/tools/einvoice-scan/api/einvoice-scan` + `/api/backend-status`
+- [ ] `/tools/submission-check/api/self-entities` (CRUD)
+
+### 共通驗證項
+每個 endpoint 至少要：
+- [ ] 拒絕非 PDF / 空檔（400）
+- [ ] 啟用認證時 token 驗證 + ACL（`upload_owner.require()` 防跨 user 取檔）
+- [ ] 大檔（> 限額）回 413 而不是 OOM
+- [ ] 回應 `Content-Disposition` 中文檔名 RFC 5987（走 `http_utils.content_disposition`）
+
+### 自動化覆蓋（理想）
+新加 endpoint 都應該在 `tests/test_api_endpoints.py`（待補）跑單元測試 — POST 假 PDF + assert 200 + assert 回傳格式。發版前 `uv run pytest tests/test_api_endpoints.py -v` 必綠。
 
 ## 4.5 壓力測試 🆕（v1.7.50+）
 
-驗證「**多人同時用**」吞吐 / 延遲 / 錯誤率，找潛在瓶頸（thread 餓死、connection pool 不足、memory leak、reverse proxy timeout 等）。
+詳細跑法 / 驗收門檻 / 歷史紀錄見獨立文件 **[STRESS_TEST.md](STRESS_TEST.md)**（涵蓋 1 / 5 / 10 / 30 / 50 並行使用者場景，輕重型工具混合）。
 
-### 跑法
-
-```bash
-# 1 user 基準
-uv run python tests/stress/run_stress.py --users 1 --duration 60
-
-# 階梯式遞增，每階段觀察吞吐曲線斷點
-for n in 5 10 30 50; do
-  uv run python tests/stress/run_stress.py --users $n --duration 60
-done
-
-# 打遠端（自架伺服器）
-uv run python tests/stress/run_stress.py --users 10 --duration 60 \
-    --base-url http://your-server:8765
-```
-
-涵蓋 5 個工具（wordcount / annotations / annot-strip / text-deident / text-diff），新增工具請改 `tests/stress/run_stress.py` 內 `SCENARIOS`。樣本 PDF 首次跑時 PyMuPDF 自動生成。
-
-### 驗收門檻（建議）
-
-| 並行 | 吞吐下限 | p95 延遲上限 | 成功率下限 |
-|---|---|---|---|
-| 1 user | — | < 500 ms | 100% |
-| 5 users | > 5 req/s | < 800 ms | 100% |
-| 10 users | > 8 req/s | < 1500 ms | ≥ 99% |
-| 30 users | > 15 req/s | < 4 s | ≥ 98% |
-| 50 users | > 20 req/s | < 8 s | ≥ 95% |
-
-數值依機器調整。**最重要：成功率不能掉太多** — 50 users 下 < 95% 表示有 thread 餓死 / connection pool 撐不住 / memory 爆。
-
-詳見 `tests/stress/README.md`。
-
-- [ ] 1 user 跑過，p95 < 500 ms 100% 成功
-- [ ] 5 users 跑過，吞吐有上升、成功率 100%
-- [ ] 10 users 跑過，p95 < 1500 ms、成功率 ≥ 99%
-- [ ] 30 users 跑過，成功率 ≥ 98%
-- [ ] 50 users 跑過，成功率 ≥ 95%
+- [ ] 1 user 跑過：p95 < 500 ms 100% 成功
+- [ ] 5 users 跑過：吞吐有上升、成功率 100%
+- [ ] 10 users 跑過：p95 < 1500 ms、成功率 ≥ 99%
+- [ ] 30 users 跑過：成功率 ≥ 98%
+- [ ] 50 users 跑過：成功率 ≥ 95%
 - [ ] 任一階段成功率突降 → 看 server log 找 root cause
 
 ## 5. 發版前最終檢查
 
 1. `git status` 沒有未追蹤的暫存檔
 2. `pytest` 全數綠燈
-3. **OWASP regression 全數綠燈**（v1.5.3 起列為發版必跑）：
+3. **文件 / 設定備份涵蓋度檢查**（v1.14.6 起列為發版必跑）：
+   ```bash
+   python tools/check_docs_tool_coverage.py        # 工具是否都寫進 README / 介紹站
+   python tools/check_settings_export_coverage.py  # 新設定檔是否都納入「設定備份 / 匯入」
+   python tools/check_version_consistency.py       # 五處版本號一致
+   ```
+   後者是 v1.14.6 補上的：`settings_export.CATEGORIES` 是**人工維護**的清單，加新設定
+   檔漏加不會有任何錯誤訊息，只有客戶搬機還原後才會發現設定不見了（該版一次補了
+   16 項，其中 `sso_settings.json` 從 v1.12.0 起就沒被備份過，而「認證設定」分類的
+   說明卻寫著含 OIDC / SAML）。
+4. **認證開 / 關兩種模式的全功能矩陣**（v1.14.6 起列為發版必跑）：
+   ```bash
+   uv run pytest tests/test_auth_modes_matrix.py -v
+   ```
+   這個專案幾乎每條路徑都有兩種行為（工作區儲存鍵、作業歸屬、通知偏好、權限閘、
+   admin 頁可見性…），而**很容易只顧到一邊** —— 例如新的 admin 頁忘了掛權限
+   dependency，在單機模式下完全看不出來（那時本來就全員放行）。人工把 41 個工具
+   在兩種模式各點一遍不現實，所以用同一組斷言自動跑兩遍。
+5. **資安測試計畫全數通過**（v1.14.6 起）：見 `TEST_PLAN_SECURITY.md` ——
+   自動化 18 支測試檔 + 滲透測試腳本（7 類 + 反向對照）+ bandit + ZAP 兩目標
+   （High / Medium / Low 全 0）。
+6. **OWASP regression 全數綠燈**（v1.5.3 起列為發版必跑）：
    ```bash
    uv run pytest -v \
        tests/test_owasp_top10.py \
@@ -378,13 +479,13 @@ uv run python tests/stress/run_stress.py --users 10 --duration 60 \
        tests/test_redos_ad_dn.py
    ```
    `test_version_consistency` 確保 `app/main.py:VERSION` / `pyproject.toml` / `uv.lock` / `README` / `CHANGELOG` 五處版本號完全一致（v1.5.3 慘案訓練）。
-4. 重啟 server，所有路由 200（以 curl 跑 1.1 列表）
-5. 手動跑一輪 2.x 清單
-6. 跑完 §6 「歷史回歸案例」清單
-7. 更新 `app/main.py` `VERSION` + `pyproject.toml` `version` + `github/CHANGELOG.md` 加一筆 + `github/README.md` 標題版號
-8. 重啟，確認 footer 顯示新版本號
-9. 確認停用的工具（`aes-zip`）仍保留程式碼但未顯示於側欄／首頁
-10. **推 GitHub 後 5–15 分鐘**檢查 GitHub native scan：
+7. 重啟 server，所有路由 200（以 curl 跑 1.1 列表）
+8. 手動跑一輪 2.x 清單
+9. 跑完 §6 「歷史回歸案例」清單
+10. 更新 `app/main.py` `VERSION` + `pyproject.toml` `version` + `github/CHANGELOG.md` 加一筆 + `github/README.md` 標題版號
+11. 重啟，確認 footer 顯示新版本號
+12. 確認停用的工具（`aes-zip`）仍保留程式碼但未顯示於側欄／首頁
+13. **推 GitHub 後 5–15 分鐘**檢查 GitHub native scan：
     - <https://github.com/jasoncheng7115/jt-doc-tools/security/dependabot> — Open alert 數應持平或下降
     - <https://github.com/jasoncheng7115/jt-doc-tools/security/code-scanning> — CodeQL 新警告當天處理或記入「已知議題」
 
@@ -395,13 +496,13 @@ uv run python tests/stress/run_stress.py --users 10 --duration 60 \
 ### 6.1 pdf-editor
 
 - [ ] **OCR 中文亂碼擷取** (v1.2.4 / v1.2.5)
-  - 上傳 `~/Nextcloud/文件檔/通告文件範例.pdf`
+  - 上傳 `~/Nextcloud/文件檔/Proxmox VE 手冊/1 Proxmox VE 準備與安裝.pdf`
   - 點選原 PDF 上「網路基本設定」→ 應顯示「網路基本設定」（非「翕⊕ㄱ」之類）
   - 點選「登入系統」→ 應顯示「登入系統」
   - 預期：自動 OCR 重建、訊息「已用 OCR 自動辨識…」
 
 - [ ] **OCR 西文字型用 eng-only** (v1.3.1)
-  - 同上 PDF，點選「通告文件」(OpenSans-Bold 字型) → 應顯示「通告文件」(非「通告文檔」)
+  - 同上 PDF，點選「Proxmox VE」(OpenSans-Bold 字型) → 應顯示「Proxmox VE」(非「ProXimoxX VE」)
 
 - [ ] **OCR 短標題 padding 不抓鄰近 span** (v1.2.5)
   - 「網路基本設定」OCR 結果不應含前後鄰近文字（不是「VE 網路基本設定一」）
@@ -581,11 +682,7 @@ grep -rnE "回滾|軟依賴|硬依賴|系統依賴(?!\s*$)|圖像(?![幾何])|�
 - [ ] 上傳 DOCX → 同上
 - [ ] 上傳 .txt → 同上
 - [ ] 「複製譯文」/「複製對照」按鈕 → 剪貼簿正確
-- [ ] **句數上限可設定（v1.11.69）**：admin LLM 設定頁有「逐句翻譯最大句數」欄位（預設 20000）；上傳超過上限的檔 → 跳「僅取前 N 句」提示，N = 設定值（`tests/test_translate_doc_pagination.py`）
-- [ ] **對照表分頁（v1.11.69）**：admin LLM 設定頁有「對照表每頁筆數」欄位（預設 200）；句數 > 每頁筆數時對照表底部出現分頁控制（首頁／上一頁／頁碼／下一頁／末頁／跳頁），翻頁不中斷背景翻譯
-- [ ] **分頁後匯出完整**：翻一份多頁文件 → 在第 2 頁時按「匯出」/「複製對照」 → 內容含**全部句子**（非只當前頁）
-- [ ] **設定 clamp**：admin 存超大／過小值 → 自動夾到合法範圍（max 100–200000、page 20–5000）
-- [ ] 公開 API：`curl -X POST .../api/translate-doc -d '{"text":"hello","target_lang":"zh-TW"}'` → 回 JSON（同步 API 維持固定 800 句上限）
+- [ ] 公開 API：`curl -X POST .../api/translate-doc -d '{"text":"hello","target_lang":"zh-TW"}'` → 回 JSON
 - [ ] sidebar 搜尋「翻譯」/ `translate` 都找得到
 - [ ] 既有客戶升級後：原本有 `text-diff` 權限的角色自動拿到 `translate-doc`（v5 migration）
 
@@ -753,36 +850,211 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 - [ ] 無真實內網 IP（test fixture 用 `10.0.0.x` / `192.168.1.10` placeholder OK）
 - [ ] 無「親測」「內部」之類用語
 
-### 6.14 v1.12.11 / v1.12.12（每次發版必過）
 
-**自動化測試**（`uv run pytest`）：
-- `test_pdf_attachments_strip.py` — 「產生無附件副本」清掉 EmbeddedFiles + catalog `/AF`（PDF/A-3 / 發票型）
-- `test_pdf_pageno_cjk.py` — 中文頁碼格式（「第 {n} / {N} 頁」）glyph 正常、純數字仍用 helv
-- `test_cpu_simd_probe.py` — `probe_cpu_simd` 對 AVX2 / x86-64-v2 / ARM / 無法判定 判定正確；sys-deps 含 PyMuPDF
+### 6.14 v1.14.6 — 設定備份補齊 + 工作佇列 / 持久化 / 併行度（每次發版必過）
 
-**手動 / 環境相關（自動化不易，發版前確認）**：
-- [ ] **無 git 的 Linux 安裝可更新**（v1.12.11）：在沒裝 git 的機器跑網站一行安裝（→ tarball）；之後 `jtdt update` 與重跑 install.sh 都不再卡死（會 ensure_git + 原地收編成 git repo；資料保留）
-- [ ] **OCR 引擎頁 CPU 指令集面板**：AVX2 CPU 顯示綠勾；缺 AVX2 顯示紅框 + 列出缺哪些 + 多平台指引（PVE / VMware / Hyper-V / VirtualBox / 實體機）
-- [ ] **OCR 在缺 AVX2 的 VM 不再悶掛服務的診斷已就位**（不自動退 tesseract，純診斷指引）
-- [ ] **企業 TLS 檢查環境 uv 可安裝**：MITM proxy 換憑證的網路，install / `jtdt update` 預設用 OS 信任庫（`UV_SYSTEM_CERTS`/`UV_NATIVE_TLS`）；必要時 `JTDT_TLS_INSECURE=1`
-- [ ] **插入頁碼縮圖放大可正常顯示**（GitHub issue #32）：點縮圖放大不再黑遮罩 / file not found
-- [ ] **中文頁碼輸出 PDF**：「第 1 / 20 頁」等格式中文不缺字（非「·」）
-- [ ] **PDF 編輯器螢光筆可改色**（GitHub issue #35）：選螢光筆 → 屬性面板改顏色 → 畫布即時變色（半透明）→ 存檔輸出該色
+自動化：`tests/test_settings_export.py`、`tests/test_job_queue.py`、
+`tests/test_job_api_acl.py`。以下為需人工確認或跨行程重啟才驗得到的項目。
 
-### 6.15 v1.12.53 — 角色預設 / seed 快照 + Reverse Proxy SSO（每次發版必過）
+#### 6.14.1 設定備份 / 匯入涵蓋度
 
-**自動化測試**（`uv run pytest`）：
-- `test_roles_default_and_seed.py` — 新使用者預設角色 + seed 快照（管理員移除不被升級蓋回）
-- `test_proxy_sso.py` — 帳號正規化 / 信任 IP / resolve_user / 中介層 e2e / admin 端點守門
+- [ ] `python tools/check_settings_export_coverage.py` 回 0（新設定檔都已納管）
+- [ ] 管理區「設定備份 / 匯入」看得到新分類：SSO 單一登入、目錄同步 / 過濾、
+      記錄轉送、檔案保留 / 清理、排程備份設定、併行度設定、OCR 設定、
+      掃描工具欄位偏好、掃描暫存資料、使用者工作區、送件檢查（自家實體）
+- [ ] 「認證設定」分類的說明**不再**宣稱含 OIDC / SAML（那項獨立成 SSO 分類）
+- [ ] **SSO 跨機還原**（最重要，是這批的核心 bug）：
+      A 機設好 OIDC（含 client secret）→ 匯出 → 在 **B 機**（不同
+      `.session_secret`）匯入 → B 機的 SSO 登入**要能成功**。
+      舊行為是複製密文過去，B 機解不開 → 設定看起來都在但登入一直失敗。
+- [ ] 備份 zip 內**沒有** `.session_secret`（有的話等於把偽造登入的能力送出去）
+- [ ] 使用者工作區 / 掃描暫存資料 / 各類歷史 → 預設**不勾選**（量大）
 
-**手動 / 環境相關（發版前確認）**：
-- [ ] **改內建角色權限後升級不被蓋回**：admin 到「角色管理」把「一般使用者」拿掉某工具 → 儲存 → 跑 `jtdt update`（或重啟）→ 該工具維持移除
-- [ ] **設定新使用者預設角色**：複製一個自訂角色 → 該角色按「設為預設」→ 出現「新使用者預設」徽章；新登入的 AD/LDAP 使用者或新建本機帳號（未指定角色）套用該角色
-- [ ] **Reverse Proxy SSO（需真 AD + Nginx + Kerberos 環境）**：
-  - [ ] 網域電腦 + Edge/Chrome（已信任站台）開站 → 自動登入（Nginx 傳 X-Remote-User）
-  - [ ] 非網域電腦（無標頭）→ 顯示原本 /login
-  - [ ] 首次 proxy 登入 → 自動同步 users / groups / OU；再次登入 → 更新 display_name / last_login / group
-  - [ ] 自送 X-Remote-User 的 untrusted client → 不得登入（稽核出現 `proxy_sso_untrusted_proxy`）
-  - [ ] jtdt-admin 仍可從 /login 登入；auditor 仍被導 /2fa-verify
-  - [ ] OIDC / SAML / 一般 Login / Logout 行為不受影響
+#### 6.14.2 工作持久化（重啟後不遺失）
 
+- [ ] 送出一份大檔轉換 → 等完成 → **重啟服務** → 「我的作業」仍列得出來，
+      且「下載」按得到、檔案正確
+- [ ] 轉換**進行中**時砍掉服務 → 重啟後該筆顯示「已中斷」+ 說明需重新送出
+      （不可繼續顯示「進行中」讓使用者等一個永遠不會完成的工作）
+- [ ] 結果檔被保留期限清掉後，該筆顯示「結果已逾期清除」而**不是**一個按了 404 的下載鈕
+
+#### 6.14.3 佇列 / 併行度 / OOM 防線
+
+- [ ] 管理區「背景作業與併行度」：同時送出超過上限的工作 → 多的顯示「排隊中」，
+      不是全部一起跑
+- [ ] 調高「最大同時工作數」→ 排隊中的**立刻**被派出去（不必等下一次送出）
+- [ ] 「暫停派工」→ 新工作停在排隊中；**已經在跑的照樣跑完**（UI 有說明原因）
+- [ ] 取消排隊中的工作 → 直接移出佇列；取消執行中的 → 下一個 checkpoint 停止
+- [ ] 併行度填一個誇張數字（9999）→ 被夾到硬上限，不可真的生效
+- [ ] macOS：「Office 轉檔同時數」欄位**停用**且顯示原因（Aqua bootstrap 競爭）；
+      Linux / Windows 可調
+- [ ] 記憶體不足時新工作**排隊**而不是硬開（`held_for_ram` 會亮）；
+      且沒有任何工作在跑時仍會派一個出去（不可整個服務靜止）
+
+#### 6.14.6 逐句翻譯的背景作業（v1.14.6）
+
+- [ ] 送出後**關掉分頁**，隔一段時間回到「我的作業」→ 那筆作業還在跑 / 已完成
+- [ ] 從「我的作業」點「看進度 / 開啟」→ 回到逐句翻譯頁，看得到目前進度與已完成的句子
+- [ ] 網址帶 `?job=<id>` 直接開 → 一樣接得回來（重新整理也是）
+- [ ] **一送出就看得到全部原文**（右側空白），不是等做完才出現
+- [ ] 已花時間顯示的是**伺服器算的**（從別的分頁回來不會變成「已花 0 秒」）
+- [ ] 中途按「停止翻譯」→ 狀態變已停止，已完成的句子保留
+- [ ] 另一個帳號拿到 job id → 進度查詢回 404（譯文就是文件內容）
+- [ ] 服務重新啟動 → 該作業顯示「已中斷，請重新送出」，不是永遠轉圈
+- [ ] **外部服務名額**：翻譯進行中，另一個需要 LLM 的工具不會卡死
+      （曾經因為名額被重複取得而自我鎖死，症狀是作業永遠停在「準備中」）
+
+#### 6.14.7 帳號信箱與通知收件人（v1.14.6）
+
+- [ ] AD / LDAP 使用者登入後，管理區「使用者管理」看得到從目錄帶入的信箱
+- [ ] **不必等登入**：改完信箱屬性後按「立即同步」→ 尚未登入過的鏡射使用者也有信箱
+      （UCS 用 `mailPrimaryAddress`，AD 用 `mail`）
+- [ ] 目錄那邊沒填信箱的帳號 → 不可以把管理員手動補的值清成空白
+- [ ] SSO（OIDC / SAML）登入 → 信箱由 IdP 帶入
+- [ ] 通知設定的 Email 那一列**沒有輸入框**，只顯示「會寄到 ○○○」與去哪改
+- [ ] 直接送 `{"email_to": "..."}` 給 `/api/my/notify` → 不會生效（擋在伺服器端）
+- [ ] 帳號沒有信箱 → Email 管道不啟用（不是錯誤，也不可以噴例外）
+- [ ] **從未設定過通知偏好的人**：管理員開好 Email + 帳號有信箱 → 跑一個超過門檻的
+      作業就收得到（不必自己去勾任何東西）
+- [ ] 使用者把管道全部取消勾選並儲存 → 之後不再收到（不可以又被自動打開）
+- [ ] 不會收到任何通知時，通知設定區有明說「目前不會收到任何通知」
+- [ ] 通知信是 HTML 版型（標題列 / 狀態徽章 / 欄位表 / 按鈕），且純文字版也在
+- [ ] 信裡看得到**站台 logo 與工具圖示**，且**不需要按「顯示圖片」**（內嵌附件，不是外部網址）
+- [ ] 管理員換過 logo → 之後寄出的信用新的那張
+- [ ] 圖片產不出來時信照樣寄得出去（只是沒有圖）
+- [ ] 「站台網址」沒填 → 信裡不放按鈕；填了非 http(s) 的值 → 不被接受
+- [ ] 認證設定的「信箱屬性」改成別的名稱後存檔 → 重新整理仍在（不可無聲消失）
+- [ ] 側欄「我的帳號」看得到信箱；沒設定時顯示「尚未設定 — 通知會寄不出去」
+- [ ] **本機帳號**：卡片上按「修改」→ 存檔 → 重開卡片仍是新值
+- [ ] **AD / LDAP / SSO 帳號**：卡片上**沒有**修改鈕，並說明由來源端管理
+- [ ] 直接打 `POST /me/email`（目錄帳號）→ 403（擋在伺服器端，不是只藏 UI）
+- [ ] 未登入打 `POST /me/email` → 被擋（不可跟著轉址誤判成 200）
+
+#### 6.14.8 工作區的 Office 檔縮圖（v1.14.6）
+
+- [ ] 存一個 .docx / .pptx / .odt 進工作區 → 稍等一下卡片出現第一頁縮圖
+      （第一次開頁面可能還是空白，幾秒後自動補上，不必手動重新整理）
+- [ ] 同一個檔第二次開頁面 → 立刻有縮圖（走快取，不會再轉一次）
+- [ ] 超過 80 MB 的檔 → 不做縮圖，畫面不破圖
+- [ ] 毀損的檔 → 失敗一次之後不再重試（不可以每次開頁面都跑一次 Office 引擎）
+- [ ] 一頁十幾個 Office 檔 → 頁面**立刻**顯示，不可以卡住等轉檔
+
+#### 6.14.9 「可以關掉這一頁」的標示（v1.14.6）
+
+- [ ] 任一個有背景作業的工具送出後 → 進度列出現這行提示
+- [ ] 作業完成 / 失敗 / 取消 → 提示收起
+- [ ] 提示只做在共用進度列，個別工具沒有各自再寫一份（文案不會分歧）
+
+#### 6.14.3b 網頁回應與轉檔隔離（「網頁回應永遠優先」）
+
+原始症狀：正式機轉檔期間整站空轉，但 CPU / 記憶體看起來都有餘裕。
+**這一節每次發版都要在真的多核機器上跑**，本機開發機（核心數多、沒有其他負載）
+重現不出來 —— 2026-07-30 就是在 8 核開發機上測不出、在 6 核正式機上才發生。
+
+- [ ] 送出 2–4 份大型轉檔，同時每 0.5 秒打一次 `/healthz`：
+      **不可有任何一次超過 1 秒**（修正前最久 226 秒）
+- [ ] 轉檔進行中點側欄任何一頁（尤其「系統狀態」）→ 立即切換，不空轉
+- [ ] `ps -o pid,ni` 看 soffice.bin：nice 應為 19（作業執行緒 10 + 子行程 10）
+- [ ] `taskset -p <soffice pid>` / `os.sched_getaffinity`：核心數應等於設定值，
+      且**至少留一顆**不給轉檔（預設「自動」）
+- [ ] 「轉檔 CPU 上限」改 25% / 50% / 100% → 下一個轉檔的核心遮罩跟著變
+      （改設定不必重啟服務）
+- [ ] 選 100%（不限制）→ 不設遮罩；此時允許網頁變慢，屬管理員明示的選擇
+- [ ] macOS：欄位停用並說明「沒有提供限制核心的介面」，但轉檔仍降優先權
+- [ ] Windows：核心限制有效（psutil），執行緒優先權不適用 →
+      soffice 由 `BELOW_NORMAL_PRIORITY_CLASS` 處理
+- [ ] 單核機器（或 cpuset 只有 1 顆）→ 不可算出 0 顆核心而讓轉檔跑不動
+- [ ] 已被 cgroup cpuset 限制過的容器 → 只在既有遮罩內挑核心，不可挑到遮罩外
+- [ ] 事件迴圈延遲監看：人為卡住主執行緒 > 1 秒 → 記錄出現警告並附當時作業數
+- [ ] 單一請求超過 3 秒 → 記錄留下慢請求警告（含路徑與耗時）
+
+#### 6.14.3c 外部服務（LLM / 遠端 GPU OCR）同時呼叫上限
+
+- [ ] 預設為 1：同時送出多個需要 LLM / 遠端 OCR 的作業 →
+      對外請求**一次只有一個**，其餘在本機等
+- [ ] 上限調高後立即生效（不必重啟）
+- [ ] 外部服務逾時 / 斷線 → 名額要**確實釋放**（不可卡死後續所有作業）
+- [ ] 這個上限與「最大同時作業數」互不影響（本機估算擋不到遠端負載）
+
+#### 6.14.4 權限邊界（水平越權）
+
+- [ ] 認證開啟：A 使用者的「我的作業」**看不到** B 的工作
+- [ ] 認證開啟：A 不可取消 B 的工作（回 404，不確認其存在）
+- [ ] 認證開啟：未登入呼叫 `/api/jobs` → 401
+- [ ] 認證關閉：以來源電腦區分，頁面上有說明 NAT 情況下會混在一起
+- [ ] 一般使用者存取 `/admin/jobs` 與其 API → 403
+
+#### 6.14.5 規模（8000 人情境）
+
+- [ ] 管理區「檔案保留 / 清理」有「作業紀錄（我的作業）」一列，預設 30 天
+- [ ] 保留期到期後舊紀錄被清掉，**但執行中 / 排隊中的不論多舊都不刪**
+- [ ] 28 萬筆時「我的作業」查詢仍在數 ms（實測 1.2 ms / 74 MB）
+
+#### 6.14.6 資料庫毀損防護（v1.14.6）
+
+自動化：`tests/test_db_health.py`（24 項）。以下為需人工或離線環境確認的項目。
+
+- [ ] `jtdt db-check` 在**服務停止**時仍可執行（資料庫壞掉時網頁本來就上不去）
+- [ ] `jtdt db-backup` → `jtdt db-backups` 看得到剛建立的備份
+- [ ] 人為打壞 `auth.sqlite`（測試機才做）→ `jtdt db-check` 回非 0 並列出影響與復原指令
+- [ ] `jtdt db-restore auth.sqlite` → 帳號資料完整回來；毀損的原檔另存為 `.corrupt.<時間>`
+- [ ] 毀損狀態下執行備份 → **略過**且既有備份數不變（不可用壞檔覆蓋好備份）
+- [ ] 拿一份被打壞的備份去還原 → 被擋下，且正式檔沒有被覆蓋
+- [ ] 服務啟動時若資料庫毀損 → 記錄有明確訊息、稽核有 `db_corruption` 事件、
+      **服務仍然起得來**（單一資料庫壞掉不該讓整個服務停擺）
+- [ ] 管理區「系統狀態 → 資料庫健康狀態」顯示正確，「立即備份」可用
+- [ ] CLI 輸出全為英文 ASCII（純文字終端 / 精簡容器 / Windows 主控台皆可讀）
+
+#### 6.14.7 升級路徑（既有客戶）
+
+自動化：`tests/test_upgrade_v1_14_6.py`（10 項）。原則是**客戶升級版本，原有
+設定必需留存**，且不需要客戶手動做任何事。
+
+- [ ] **沒有新的第三方相依** → `install.sh` / `setup-python.cmd` / `cli.py`
+      三處的 import 煙霧測試都不必改（有新增相依時要走「五處 SOP」）
+- [ ] 舊 `retention.json`（缺 `job_records_days`）→ 自動補預設，客戶調過的
+      其他天數**不被重設**
+- [ ] 舊資料目錄沒有 `jobs.sqlite` / `concurrency.json` / `db_backups/`
+      → 啟動或首次使用時自動建立
+- [ ] 併行度預設維持**舊行為**（同時 2 個工作、Office 轉檔 1 個）——
+      升級不可默默改變併行度而讓客戶機器變慢或變爆
+- [ ] 「外部服務同時呼叫數」預設 1、「轉檔 CPU 上限」預設「自動（保留 1 核給網頁）」
+      —— 升級後兩者都不需要管理員動手就生效
+- [ ] **升級當下正在轉檔的使用者**：`jtdt update` 會重啟服務 → 該工作變成
+      「已中斷」，頁面要明確顯示並提示重新送出，**不可讓進度條一直轉**
+      （共用進度元件 + pdf-ocr + submission-check 三處都要處理）
+- [ ] `sudo jtdt db-backup` 之後，`data/` 內新產生的檔案**不是 root 所有**
+      （走 `_run_auth_helper` 會自動 chown 回服務帳號）
+- [ ] 升級後管理區的「檔案保留 / 清理」多一列「工作紀錄」，且舊值都在
+- [ ] 升級後側欄多出「我的作業」，管理區多出「背景作業與併行度」
+
+#### 6.14.8 作業完成通知（v1.14.6）
+
+自動化：`tests/test_notify.py`（25 項）。以下需真的外部服務或人工確認。
+
+- [ ] 管理區「作業完成通知」→ 各管道「傳送測試」實際收得到；**失敗時顯示實際
+      原因**（例如「Connection refused」），不是只說「失敗」
+- [ ] 憑證存檔後頁面顯示遮罩；**只改別的欄位再存檔，憑證不會被洗掉**
+- [ ] `data/notify_settings.json` 內**看不到明文** token / 密碼 / webhook URL
+- [ ] 使用者到「我的作業」選管道 → 個人管道（Email / Telegram / LINE）沒填自己的
+      位址時**不會送**；團隊頻道不需填
+- [ ] 使用者選了管理員**沒啟用**的管道 → 不會送（不能繞過管理員）
+- [ ] 跑超過門檻的作業完成 → 收得到通知；**短作業不通知**
+- [ ] 通知內容只有工具名 / 檔名 / 狀態 / 耗時，**沒有檔案內容**
+- [ ] 故意把管道設成連不通 → 作業本身仍然成功（通知失敗不可影響作業）
+- [ ] 升級後預設是**關閉**的（不可無預警開始往外送訊息）
+- [ ] **跨機還原**：A 機設好 → 匯出 → B 機匯入 → 通知直接可用（不必重新輸入憑證）
+
+#### 6.14.9 站內鈴鐺 + 自動存入工作區（v1.14.6）
+
+- [ ] 側欄帳號旁有鈴鐺；有新完成的作業時顯示紅點
+- [ ] 點開顯示最近完成的作業（工具 / 檔名 / 狀態 / 多久前）；面板**不被側欄裁切**
+- [ ] 「全部標示為已讀」後紅點消失；再有新作業完成又會出現
+- [ ] **認證關閉時鈴鐺也要在**（單機使用者一樣需要）
+- [ ] 只看得到自己的作業（認證開啟依帳號、關閉依來源電腦）
+- [ ] **開著頁面等**作業完成 → **不會**自動存入工作區（人就在那裡）
+- [ ] 送出後**關掉頁面**，完成後 → 自動存入工作區，清單顯示「已自動存入」
+      且**不再顯示「存至工作區」按鈕**
+- [ ] 工作區容量調到很小 → 顯示「工作區容量已滿，未自動存入」且下載連結仍在
+- [ ] 工作區**停用**時 → 不自動存，改顯示「結果將於 N 小時後清除」
+- [ ] `.pptx` / `.odp` 存得進工作區（原本會被拒收）

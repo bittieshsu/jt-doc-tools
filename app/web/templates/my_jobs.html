@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}我的作業 · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ icon('clock', size=22) }} 我的作業</h1>
+<p class="muted">轉換是在伺服器背景執行的，<b>關掉頁面也會繼續跑</b>。這裡可以查到你送出過的作業、目前排到哪裡，以及回來下載已完成的結果。</p>
+
+<div class="panel">
+  {# h2 必須是 .panel 的**直接第一個子元素**才會套到全站共用的標題列樣式
+     （淺灰漸層底 + ▼ 收合箭頭，見 platform.css 的 `.panel > h2:first-child`）。
+     原本把它包在 <div class="mj-head"> 裡 → 選擇器對不上，這張卡片的標題就跟
+     其他工具長得不一樣。控制項改放進 h2 內靠右。 #}
+  <h2 class="mj-head">
+    作業清單<span id="mj-count" class="mj-count" hidden></span>
+    <span class="mj-head-right">
+      <span class="mj-live" id="mj-live" title="有作業進行中時每 2 秒自動更新">
+        <span class="mj-live-dot"></span><span id="mj-live-tx">自動更新中</span>
+      </span>
+      <label class="mj-only-active"><input type="checkbox" id="mj-active-only"> 只看進行中</label>
+      <button class="btn btn-small" id="mj-refresh" type="button">{{ icon('refresh', size=15) }} 重新整理</button>
+    </span>
+  </h2>
+  <div id="mj-ws-note" class="mj-note mj-note-warn" hidden></div>
+  <div id="mj-scope-note" class="mj-note" hidden></div>
+  <div id="mj-empty" class="muted" hidden>還沒有任何作業。到任何工具送出轉換之後，這裡就會列出進度。</div>
+  <div id="mj-list" class="mj-list"></div>
+</div>
+
+<div class="panel" id="mj-notify-panel" hidden>
+  <h2 class="mj-head">完成通知
+    <span class="mj-head-right">
+      <label class="mj-only-active"><input type="checkbox" id="mn-enabled"> 啟用</label>
+    </span>
+  </h2>
+  <p class="muted mn-lead">長時間的作業跑完時通知你，就不必一直開著頁面等。管道由管理員提供，這裡選你要用哪些。</p>
+  <div id="mn-list" class="mn-list"></div>
+  <div id="mn-nowhere" class="mn-warn" hidden>
+    目前<b>不會收到任何通知</b> —— 上面至少要勾選一個管道，個人管道還要有可送達的位址。
+  </div>
+  <div class="mn-actions">
+    <button class="btn btn-small btn-primary" id="mn-save" type="button">{{ icon('save', size=15) }} 儲存</button>
+    <span id="mn-saved" class="mn-saved" hidden>已儲存</span>
+  </div>
+</div>
+
+
+{# 圖示來源只有 components/icons.html 這一份 macro —— 先把每個工具的圖示畫進
+   隱藏區，JS 再複製對應節點。不要在 JS 裡另抄一份 SVG path，那遲早會跟 macro
+   長得不一樣（而且動態塞 HTML 也違反 CSP 的做法）。 #}
+<div id="toolIconSprite" hidden aria-hidden="true">
+  {% for t in tool_tiles() %}
+  <span data-tool="{{ t.id }}" data-color="{{ t.color }}">{{ icon(t.icon, size=17) }}</span>
+  {% endfor %}
+</div>
+
+<style nonce="{{ request.state.csp_nonce }}">
+.mj-qpos { flex: none; display: inline-flex; align-items: center;
+  justify-content: center; min-width: 22px; height: 22px; padding: 0 6px;
+  background: #e0e7ff; color: #3730a3; border-radius: 11px;
+  font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.jt-tile { flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 8px; color: #fff; }
+.jt-tile svg { width: 17px; height: 17px; }
+
+.mn-lead { font-size: 12.5px; }
+.mn-warn { margin-top: 12px; padding: 9px 12px; background: #fffbeb;
+  border: 1px solid #fde68a; border-radius: 8px; color: #92400e;
+  font-size: 12.5px; line-height: 1.6; }
+.mn-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.mn-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 9px; }
+.mn-item label.mn-pick { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; color: #0f172a; cursor: pointer; }
+.mn-item input[type=text] { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; min-width: 240px; }
+.mn-hint { color: #64748b; font-size: 12px; }
+.mn-actions { margin-top: 14px; display: flex; align-items: center; gap: 10px; }
+.mn-actions .btn { display: inline-flex; align-items: center; gap: 5px; }
+.mn-saved { color: #15803d; font-size: 13px; font-weight: 600; }
+.mj-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b; font-weight: 400; }
+.mj-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; }
+.mj-live.on .mj-live-dot { background: #22c55e; animation: mjPulse 1.6s ease-in-out infinite; }
+@keyframes mjPulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+.mj-head-right { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; font-weight: 400; }
+.mj-count { display: inline-block; margin-left: 10px; font-size: 12px; font-weight: 600; color: #475569; background: #e2e8f0; border-radius: 11px; padding: 1px 9px; vertical-align: middle; }
+.mj-only-active { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #475569; cursor: pointer; }
+.mj-note-warn { background: #fffbeb !important; border-color: #fde68a !important; border-left-color: #f59e0b !important; color: #92400e !important; }
+.mj-note { margin: 10px 0 0; padding: 9px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3px solid #94a3b8; border-radius: 7px; color: #475569; font-size: 12.5px; }
+.mj-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.mj-item { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
+.mj-item.is-active { border-color: #bfdbfe; background: #f8fbff; }
+.mj-main { flex: 1; min-width: 0; }
+.mj-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mj-tool { font-weight: 600; color: #0f172a; }
+.mj-file { color: #64748b; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.mj-sub { margin-top: 4px; color: #64748b; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.mj-bar { height: 6px; background: #eef2f7; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.mj-bar-fill { height: 100%; width: 0; background: linear-gradient(to right, #2563eb, #3b82f6); transition: width .3s; }
+.mj-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.mj-actions .btn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.mj-actions .btn svg { flex: none; }
+/* 與按鈕同高同圓角的靜態 chip，讓「沒有按鈕」的列仍與其他列對齊 */
+.mj-gone { display: inline-flex; align-items: center; height: 30px;
+  padding: 0 11px; border: 1px dashed #cbd5e1; border-radius: 8px;
+  color: #94a3b8; font-size: 12.5px; white-space: nowrap; }
+.btn-danger { background: #dc2626; border-color: #dc2626; color: #fff; }
+.btn-danger:hover:not(:disabled) { background: #b91c1c; border-color: #b91c1c; }
+.mj-badge { flex: none; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.mj-badge.done { background: #dcfce7; color: #15803d; }
+.mj-badge.running { background: #dbeafe; color: #1d4ed8; }
+.mj-badge.pending { background: #f1f5f9; color: #475569; }
+.mj-badge.error { background: #fee2e2; color: #b91c1c; }
+.mj-badge.cancelled { background: #f1f5f9; color: #64748b; }
+.mj-badge.interrupted { background: #fef3c7; color: #b45309; }
+.mj-err { margin-top: 4px; color: #b91c1c; font-size: 12.5px; }
+.mj-ws-ok { margin-top: 4px; color: #15803d; font-size: 12.5px; }
+.mj-ws-link { color: #15803d; font-weight: 600; margin-left: 4px; text-decoration: underline; }
+.mj-ws-fail { margin-top: 4px; color: #b45309; font-size: 12.5px; }
+@media (max-width: 640px) {
+  .mj-item { flex-wrap: wrap; }
+  .mj-actions { width: 100%; justify-content: flex-end; }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/friendly_error.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const list = document.getElementById('mj-list');
+  const empty = document.getElementById('mj-empty');
+  const countEl = document.getElementById('mj-count');
+  const noteEl = document.getElementById('mj-scope-note');
+  const activeOnly = document.getElementById('mj-active-only');
+  let timer = null;
+
+  const LABEL = {
+    pending: '排隊中', running: '進行中', done: '已完成',
+    error: '失敗', cancelled: '已取消', interrupted: '已中斷',
+  };
+
+  function fmtElapsed(s) {
+    s = Math.max(0, Math.round(s || 0));
+    const m = Math.floor(s / 60);
+    return m ? `${m} 分 ${String(s % 60).padStart(2, '0')} 秒` : `${s} 秒`;
+  }
+
+  function fmtWhen(ts) {
+    const d = new Date((ts || 0) * 1000);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `
+         + `${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  // 圖示用 DOM API 建（不是 innerHTML）—— 這裡的內容是固定常數，但養成習慣：
+  // JS 動態塞 DOM 一律走 createElement / textContent（CodeQL「DOM text
+  // reinterpreted as HTML」，v1.12.52 踩過）。
+  const NS = 'http://www.w3.org/2000/svg';
+  const ICON_DOWNLOAD = ['M12 4v11', 'M7.5 11.5L12 16l4.5-4.5', 'M5 19h14'];
+  // 「開啟」用的外連圖示（產出是頁面不是檔案的工具）。
+  // 與其他常數一樣是**陣列**（svgIcon 會逐條建 <path>），縮排也要一致 ——
+  // 這些常數住在同一個 IIFE 裡，放到外層就取不到了。
+  const ICON_OPEN = ['M14 3h7v7', 'M21 3l-9 9',
+                     'M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5'];
+  const ICON_CLOSE = ['M6 6l12 12', 'M6 18L18 6'];
+  const ICON_ARCHIVE = ['M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z',
+                        'M3 4h18v4H3z', 'M10 12h4'];
+
+  function svgIcon(paths) {
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', '15');
+    svg.setAttribute('height', '15');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.8');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('class', 'ic');
+    paths.forEach((d) => {
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', d);
+      svg.appendChild(path);
+    });
+    return svg;
+  }
+
+  // DOM 文字一律用 textContent —— 檔名是使用者輸入，用 innerHTML 會變成 XSS
+  // （CodeQL「DOM text reinterpreted as HTML」，v1.12.52 踩過）。
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+
+  // 依工具 id 取出對應的彩色圖示磚（複製隱藏區裡的節點，不用 innerHTML）
+  function toolTile(toolId) {
+    const src = document.querySelector(
+      '#toolIconSprite [data-tool="' + (toolId || '').replace(/"/g, '') + '"]');
+    if (!src) return null;
+    const tile = document.createElement('span');
+    tile.className = 'jt-tile tile-color-' + (src.dataset.color || '0');
+    const svg = src.querySelector('svg');
+    if (svg) tile.appendChild(svg.cloneNode(true));
+    return tile;
+  }
+
+  function render(data) {
+    const jobs = data.jobs || [];
+    list.textContent = '';
+    empty.hidden = jobs.length > 0;
+    countEl.textContent = String(data.total || jobs.length);
+    countEl.hidden = !jobs.length;
+    // 工作區停用 → 結果只會留一段時間，講清楚期限而不是讓人隔天才發現不見了
+    const wsNote = document.getElementById('mj-ws-note');
+    if (data.workspace_enabled === false && jobs.length) {
+      wsNote.hidden = false;
+      wsNote.textContent = '「我的工作區」目前未啟用，因此完成的結果不會自動保存。'
+        + (data.result_ttl_hours
+           ? `結果檔會在 ${data.result_ttl_hours} 小時後自動清除，請及時下載。`
+           : '請及時下載。');
+    } else {
+      wsNote.hidden = true;
+    }
+    if (data.scope === 'ip') {
+      noteEl.hidden = false;
+      // 講清楚實際的保護程度 —— 清單按來源電腦分只是「不把別人的攤在你眼前」，
+      // 不是存取控制。未啟用認證時任何知道連結的人都下載得到，不該讓使用者
+      // 誤以為這是隔離。
+      noteEl.textContent = '目前未啟用認證，清單以「來源電腦」區分：'
+        + '同一台電腦看得到自己送出的作業；多人透過同一個 NAT 出口連線時會看到'
+        + '彼此的作業。請注意這只是顯示上的區分，'
+        + '知道連結的人仍可下載結果。啟用認證後會改以帳號區分並實際隔離。';
+    }
+    jobs.forEach((j) => {
+      const active = j.status === 'running' || j.status === 'pending';
+      const item = el('div', 'mj-item' + (active ? ' is-active' : ''));
+
+      if (j.queue_pos) {
+        item.appendChild(el('span', 'mj-qpos', String(j.queue_pos)));
+      }
+      const tile = toolTile(j.tool_id);
+      if (tile) item.appendChild(tile);
+
+      const main = el('div', 'mj-main');
+      const title = el('div', 'mj-title');
+      title.appendChild(el('span', 'mj-tool', j.tool_name || j.tool_id));
+      if (j.filename) title.appendChild(el('span', 'mj-file', j.filename));
+      main.appendChild(title);
+
+      const bits = [fmtWhen(j.created_at)];
+      if (j.status === 'pending') {
+        // 使用者最想知道的是「還要等幾個」，不是「等待中」這三個字。
+        // queue_pos 取自實際的派工佇列（第 1 位＝下一個就是我）。
+        bits.push(j.queue_pos
+          ? (j.queue_pos === 1 ? '排隊中・下一個就是你'
+             : `排隊中・前面還有 ${j.queue_pos - 1} 個作業`)
+          : '排隊中');
+      } else {
+        bits.push('耗時 ' + fmtElapsed(j.elapsed));
+      }
+      if (j.message && active) bits.push(j.message);
+      main.appendChild(el('div', 'mj-sub', bits.join('・')));
+
+      if (j.status === 'running') {
+        const bar = el('div', 'mj-bar');
+        const fill = el('div', 'mj-bar-fill');
+        fill.style.width = Math.round((j.progress || 0) * 100) + '%';
+        bar.appendChild(fill);
+        main.appendChild(bar);
+      }
+      if (j.status === 'error' && j.error) {
+        main.appendChild(el('div', 'mj-err', j.error));
+      }
+      // 自動存入工作區的結果 —— 成功給一行提示，失敗講原因（下載連結照樣在）
+      const w = j.workspace;
+      if (w && w.saved) {
+        const line = el('div', 'mj-ws-ok');
+        line.appendChild(document.createTextNode('已自動存入'));
+        const a = el('a', 'mj-ws-link', '我的工作區');
+        a.href = '/workspace';
+        line.appendChild(a);
+        main.appendChild(line);
+      } else if (w && w.reason && w.reason !== 'workspace_disabled') {
+        const why = {
+          quota: '工作區容量已滿，未自動存入',
+          unsupported: '此格式工作區不支援，未自動存入',
+          too_large: '檔案過大，未自動存入（可手動存）',
+          no_owner: '此作業無歸屬帳號，未自動存入',
+        }[w.reason] || '未自動存入工作區';
+        main.appendChild(el('div', 'mj-ws-fail', why));
+      }
+      if (j.status === 'interrupted') {
+        main.appendChild(el('div', 'mj-sub',
+          '服務在這個作業執行時重新啟動，需要重新送出。'));
+      }
+      item.appendChild(main);
+
+      item.appendChild(el('span', 'mj-badge ' + j.status,
+                          LABEL[j.status] || j.status));
+
+      const acts = el('div', 'mj-actions');
+      // 產出是「一頁對照表」而不是檔案的工具（逐句翻譯）——
+      // 給「開啟」而不是「下載」，點回去就能看到進度 / 結果。
+      if (j.view_url) {
+        const v = el('a', 'btn btn-small btn-primary');
+        v.appendChild(svgIcon(ICON_OPEN));
+        v.appendChild(document.createTextNode(
+          (j.status === 'running' || j.status === 'pending') ? '看進度' : '開啟'));
+        v.href = j.view_url;
+        acts.appendChild(v);
+      }
+      if (j.has_result) {
+        const a = el('a', 'btn btn-small btn-primary');
+        a.appendChild(svgIcon(ICON_DOWNLOAD));
+        a.appendChild(document.createTextNode('下載'));
+        a.href = '/api/jobs/' + encodeURIComponent(j.id) + '/download';
+        acts.appendChild(a);
+        // 「存至工作區」只在**還沒存進去**時才出現 —— 已經自動存好了還放這顆鈕
+        // 是多餘的，按下去只會存出重複的第二份。它的角色是補救（自動存失敗、
+        // 或工作區當時是停用的），不是預設動作。
+        if (window.attachWorkspaceSave && !(j.workspace && j.workspace.saved)) {
+          const w = el('button', 'btn btn-small');
+          w.type = 'button';
+          w.appendChild(svgIcon(ICON_ARCHIVE));
+          w.appendChild(document.createTextNode('存至工作區'));
+          window.attachWorkspaceSave(w, () => ({
+            jobId: j.id,
+            name: j.result_filename || j.filename || 'result',
+            tool: j.tool_id,
+          }));
+          acts.appendChild(w);
+        }
+      } else if (j.status === 'done' && w && w.saved) {
+        // 暫存的結果檔被保留期限清掉了，但檔案已經在工作區 —— 給出路，
+        // 不要只說「已逾期清除」（那句話對使用者沒有任何幫助，而且他上面才
+        // 剛看到「已自動存入我的工作區」，兩句話擺在一起像自相矛盾）
+        const a = el('a', 'btn btn-small');
+        a.appendChild(svgIcon(ICON_ARCHIVE));
+        a.appendChild(document.createTextNode('到工作區取用'));
+        a.href = '/workspace';
+        acts.appendChild(a);
+      } else if (j.status === 'done') {
+        // 真的什麼都不剩了才說逾期。做成 chip 而不是裸文字 —— 裸文字塞在按鈕
+        // 那一欄，寬度與基線都跟其他列對不齊，看起來就是歪的。
+        acts.appendChild(el('span', 'mj-gone', '結果已逾期清除'));
+      }
+      if (active) {
+        // 取消會丟掉已經跑到一半的結果 → 醒目色
+        const b = el('button', 'btn btn-small btn-danger');
+        b.appendChild(svgIcon(ICON_CLOSE));
+        b.appendChild(document.createTextNode('取消'));
+        b.type = 'button';
+        b.addEventListener('click', () => cancelJob(j.id, b));
+        acts.appendChild(b);
+      }
+      item.appendChild(acts);
+      list.appendChild(item);
+    });
+    scheduleRefresh(jobs.some((j) => j.status === 'running'
+                                  || j.status === 'pending'));
+  }
+
+  async function cancelJob(id, btn) {
+    btn.disabled = true;
+    btn.textContent = '取消中…';
+    try {
+      await fetch('/api/jobs/' + encodeURIComponent(id) + '/cancel',
+                  { method: 'POST' });
+    } catch (e) { /* 下一次輪詢會反映實際狀態 */ }
+    load();
+  }
+
+  function scheduleRefresh(hasActive) {
+    if (timer) clearTimeout(timer);
+    // 有作業在跑 2 秒、閒置 15 秒。**閒置時不能完全停** —— 使用者常常在別的
+    // 分頁送出轉換再切回這頁，停掉輪詢的話那筆永遠不會出現，看起來就像壞了。
+    // 指示燈讓人知道畫面是活的，不必猜這是不是舊資料（原本沒有任何提示，
+    // 使用者只能自己問「這頁會自動更新嗎」）。
+    const live = document.getElementById('mj-live');
+    if (live) {
+      live.classList.toggle('on', hasActive);
+      document.getElementById('mj-live-tx').textContent =
+        hasActive ? '自動更新中（每 2 秒）' : '自動更新中（每 15 秒）';
+    }
+    timer = setTimeout(load, hasActive ? 2000 : 15000);
+  }
+
+  async function load() {
+    try {
+      const q = activeOnly.checked ? '?active=1' : '';
+      const r = await fetch('/api/jobs' + q, { headers: { Accept: 'application/json' } });
+      if (!r.ok) {
+        empty.hidden = false;
+        empty.textContent = await window.friendlyServerError(r, '讀取作業清單失敗');
+        return;
+      }
+      render(await r.json());
+    } catch (e) {
+      empty.hidden = false;
+      empty.textContent = '讀取作業清單失敗，請稍後再試。';
+    }
+  }
+
+
+  // ---- 完成通知偏好 ----
+  const PLACEHOLDER = {
+    email: '你的收件信箱',
+    telegram: 'Telegram Chat ID',
+    line: 'LINE User ID（U…）',
+    zulip: '你的 Zulip email（留空＝送到團隊頻道）',
+    nextcloud: '你的一對一對話 token（留空＝送到群組）',
+  };
+  const FIELD = { email: 'email_to', telegram: 'telegram_chat_id',
+                  line: 'line_to', zulip: 'zulip_to',
+                  nextcloud: 'nextcloud_to' };
+
+  async function loadNotify() {
+    let d;
+    try {
+      const r = await fetch('/api/my/notify');
+      if (!r.ok) return;
+      d = await r.json();
+    } catch (e) { return; }
+    // 管理員沒開通知就整區不顯示 —— 給一個按了沒反應的區塊只會讓人困惑
+    if (!d.system_enabled || !(d.available || []).length) return;
+    document.getElementById('mj-notify-panel').hidden = false;
+    document.getElementById('mn-enabled').checked = !!d.prefs.enabled;
+    const box = document.getElementById('mn-list');
+    box.textContent = '';
+    d.available.forEach((ch) => {
+      const item = el('div', 'mn-item');
+      const lab = el('label', 'mn-pick');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'mn-ch';
+      cb.value = ch.id;
+      cb.checked = (d.prefs.channels || []).includes(ch.id);
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(ch.label));
+      item.appendChild(lab);
+      if (ch.id === 'email') {
+        // 通知信箱只認帳號上的那一個 —— 這裡不給輸入框，改成告訴使用者
+        // 現在會寄到哪、以及要改的話去哪裡改。同一件事有兩個欄位只會讓人
+        // 搞不清楚哪個才算數。
+        item.appendChild(el('span', 'mn-hint', d.account_email
+          ? '寄到 ' + d.account_email
+            + (d.email_editable ? '（可在側欄「我的帳號」修改）'
+                                : '（由目錄端管理，如需更改請洽管理員）')
+          : '帳號上還沒有信箱 —— '
+            + (d.email_editable ? '請到側欄「我的帳號」設定。'
+                                : '請洽管理員設定。')));
+      } else if (ch.personal || ch.dual) {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'mn-to';
+        inp.dataset.field = FIELD[ch.id];
+        inp.placeholder = PLACEHOLDER[ch.id] || '';
+        inp.value = d.prefs[FIELD[ch.id]] || '';
+        item.appendChild(inp);
+        // Email 若帳號上已經有信箱（AD / LDAP / SSO 帶進來的），就告訴使用者
+        // 不必自己填 —— 接目錄的環境不該還要每個人手動輸入一次。
+        item.appendChild(el('span', 'mn-hint', ch.dual
+          ? '填了就收私訊，留空則送到管理員設定的團隊頻道'
+          : '個人管道，需要填自己的位址'));
+      } else {
+        item.appendChild(el('span', 'mn-hint', '團隊頻道，由管理員設定目的地'));
+      }
+      box.appendChild(item);
+    });
+    // 「我以為會收到，結果什麼都沒有」是實際踩到的狀況 —— 直接把結論講出來。
+    // 判斷用伺服器算好的 usable_channels（含「從未設定 → 預設全收」與
+    // 「個人管道沒有可送達位址 → 跳過」兩條規則），不要在前端重算一次。
+    const warn = document.getElementById('mn-nowhere');
+    if (warn) {
+      warn.hidden = (d.prefs.enabled !== false)
+        && (d.usable_channels || []).length > 0;
+    }
+  }
+
+  const mnSave = document.getElementById('mn-save');
+  if (mnSave) {
+    mnSave.addEventListener('click', async (e) => {
+      const b = e.currentTarget;
+      b.disabled = true;
+      const body = {
+        enabled: document.getElementById('mn-enabled').checked,
+        channels: [...document.querySelectorAll('.mn-ch:checked')]
+          .map((c) => c.value),
+      };
+      document.querySelectorAll('.mn-to').forEach((i) => {
+        body[i.dataset.field] = i.value;
+      });
+      try {
+        const r = await fetch('/api/my/notify', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) { alert(await window.friendlyServerError(r, '儲存失敗')); return; }
+        const ok = document.getElementById('mn-saved');
+        ok.hidden = false;
+        setTimeout(() => { ok.hidden = true; }, 2500);
+      } finally { b.disabled = false; }
+    });
+  }
+
+  loadNotify();
+
+  document.getElementById('mj-refresh').addEventListener('click', load);
+  activeOnly.addEventListener('change', load);
+  load();
+})();
+</script>
+{% endblock %}

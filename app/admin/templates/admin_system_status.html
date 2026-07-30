@@ -65,6 +65,21 @@
   padding:10px 14px; border-radius:8px; margin-bottom:12px; font-size:13.5px; }
 .ss-controls { display:flex; gap:10px; align-items:center; margin: 8px 0 14px; }
 .ss-controls .muted { font-size:12px; color:#64748b; }
+.ssdb-actions { margin-left: auto; display: inline-flex; gap: 8px; font-weight: 400; }
+.ssdb-actions .btn { display: inline-flex; align-items: center; gap: 5px; }
+.ssdb-note { font-size: 12.5px; max-width: 900px; }
+.ssdb-note code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+.ssdb-table-wrap { overflow-x: auto; margin-top: 10px; }
+.ssdb-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ssdb-table th { text-align: left; padding: 8px 10px; border-bottom: 2px solid #e5e7eb; color: #475569; font-size: 12.5px; white-space: nowrap; }
+.ssdb-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+.ssdb-badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.ssdb-badge.ok { background: #dcfce7; color: #15803d; }
+.ssdb-badge.bad { background: #fee2e2; color: #b91c1c; }
+.ssdb-badge.none { background: #f1f5f9; color: #64748b; }
+.ssdb-detail { margin-top: 4px; color: #b91c1c; font-size: 12px; }
+.ssdb-impact { margin-top: 3px; color: #64748b; font-size: 12px; }
+.ssdb-foot { margin-top: 10px; font-size: 12.5px; }
 </style>
 {% endblock %}
 {% block content %}
@@ -109,6 +124,21 @@
       </div>
     </div>
   </div>
+</div>
+
+<div class="panel">
+  <h2 class="ssdb-head">資料庫健康狀態
+    <span class="ssdb-actions">
+      <button class="btn btn-small" id="ssDbDeep" type="button">{{ icon('search', size=15) }} 完整檢查</button>
+      <button class="btn btn-small" id="ssDbBackup" type="button">{{ icon('archive', size=15) }} 立即備份</button>
+    </span>
+  </h2>
+  <p class="muted ssdb-note">資料庫毀損時，重要的兩個（使用者與權限、稽核記錄）可從熱備份還原。備份每天自動做一份，保留 7 份。<b>網頁上不去時</b>可用命令列：<code>jtdt db-check</code> / <code>jtdt db-restore auth.sqlite</code>。</p>
+  <div class="ssdb-table-wrap"><table class="ssdb-table">
+    <thead><tr><th>資料庫</th><th>狀態</th><th>大小</th><th>備份</th></tr></thead>
+    <tbody id="ssDbBody"><tr><td colspan="4" class="muted">載入中…</td></tr></tbody>
+  </table></div>
+  <div class="muted ssdb-foot" id="ssDbFoot"></div>
 </div>
 
 {% endblock %}
@@ -453,5 +483,88 @@ $('ssUserRefresh').addEventListener('click', () => {
 refreshHost();
 refreshUsers(false);
 startTimer();
+
+// ---- 資料庫健康狀態 ----
+function ssdbEl(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;   // 訊息含檔名，不用 innerHTML
+  return n;
+}
+
+async function refreshDbs(thorough) {
+  const body = $('ssDbBody');
+  try {
+    const r = await fetch('/admin/system-status/databases'
+                          + (thorough ? '?thorough=1' : ''));
+    if (!r.ok) return;
+    const d = await r.json();
+    body.textContent = '';
+    (d.databases || []).forEach((db) => {
+      const tr = document.createElement('tr');
+      const tdName = ssdbEl('td');
+      tdName.appendChild(ssdbEl('div', null, db.label));
+      tdName.appendChild(ssdbEl('div', 'ssdb-impact', db.file));
+      tr.appendChild(tdName);
+
+      const tdSt = ssdbEl('td');
+      if (!db.exists) {
+        tdSt.appendChild(ssdbEl('span', 'ssdb-badge none', '尚未建立'));
+      } else if (db.skipped) {
+        tdSt.appendChild(ssdbEl('span', 'ssdb-badge none', '未檢查'));
+        tdSt.appendChild(ssdbEl('div', 'ssdb-impact', db.detail));
+      } else if (db.ok) {
+        tdSt.appendChild(ssdbEl('span', 'ssdb-badge ok', '正常'));
+      } else {
+        tdSt.appendChild(ssdbEl('span', 'ssdb-badge bad', '毀損'));
+        tdSt.appendChild(ssdbEl('div', 'ssdb-detail', db.detail));
+        tdSt.appendChild(ssdbEl('div', 'ssdb-impact', '影響：' + db.impact));
+      }
+      tr.appendChild(tdSt);
+
+      tr.appendChild(ssdbEl('td', null,
+        db.exists ? (db.size_bytes / 1048576).toFixed(1) + ' MB' : '—'));
+      tr.appendChild(ssdbEl('td', null,
+        db.backed_up ? (db.backups + ' 份') : '不備份（可重建）'));
+      body.appendChild(tr);
+    });
+    const foot = $('ssDbFoot');
+    foot.textContent = d.newest_backup
+      ? '最新備份：' + new Date(d.newest_backup * 1000).toLocaleString()
+        + '・存放於 ' + d.backup_dir
+      : '尚無備份（可按「立即備份」建立第一份）';
+  } catch (e) { /* 保持前一次的內容 */ }
+}
+
+$('ssDbDeep').addEventListener('click', async (e) => {
+  const b = e.currentTarget;
+  // 完整檢查會連大檔一起讀（統編資料庫上 GB，可能要一分鐘）→ 先講清楚再跑，
+  // 不要讓人以為當掉了
+  if (!confirm('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，'
+               + '可能需要一分鐘以上。要繼續嗎？')) return;
+  b.disabled = true;
+  const old = b.textContent;
+  b.textContent = '檢查中…（可能需要一分鐘）';
+  try { await refreshDbs(true); }
+  finally { b.disabled = false; b.textContent = old; }
+});
+
+$('ssDbBackup').addEventListener('click', async (e) => {
+  const b = e.currentTarget;
+  b.disabled = true; b.textContent = '備份中…';
+  try {
+    const r = await fetch('/admin/system-status/databases/backup',
+                          { method: 'POST' });
+    const d = await r.json();
+    if (d.report && d.report.skipped && d.report.skipped.length) {
+      alert('部分資料庫已毀損而未備份：'
+            + d.report.skipped.map((x) => x.file).join('、')
+            + '\n（不可用毀損的檔案覆蓋既有備份）');
+    }
+    await refreshDbs(false);
+  } finally { b.disabled = false; b.textContent = '立即備份'; }
+});
+
+refreshDbs(false);
 </script>
 {% endblock %}

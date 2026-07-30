@@ -211,7 +211,8 @@ const fu = new FileUpload($('cmpUpload'), async (f) => {
   $('analyzeGrid').hidden = false;
   $('analyzeGrid').innerHTML = '<div class="muted" data-s="s1b9b41ec">分析中…</div>';
   const r = await fu.upload('/tools/pdf-compress/analyze', fd, {processingLabel: '分析 PDF 中…'});
-  if (!r.ok) { $('analyzeGrid').innerHTML = '<div class="muted">分析失敗：' + await r.text() + '</div>'; return; }
+  // 同上：不要把伺服器回應當 HTML 塞進 DOM
+  if (!r.ok) { $('analyzeGrid').textContent = '分析失敗：' + await window.friendlyServerError(r, '分析失敗'); return; }
   const d = await r.json();
   uploadId = d.upload_id;
   origSize = d.size;

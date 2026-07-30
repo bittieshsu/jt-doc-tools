@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}作業完成通知 · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ icon('mail', size=22) }} 作業完成通知</h1>
+<p class="muted">轉檔、OCR 這類作業跑完時通知<b>送出的人</b>。這裡設定各管道的憑證；每位使用者再到「我的作業」自己選要收哪些、寄到哪裡。</p>
+
+<div class="panel">
+  <h2>總開關</h2>
+  <div class="nt-row">
+    <label class="nt-switch"><input type="checkbox" id="nt-enabled" {% if cfg.enabled %}checked{% endif %}> 啟用作業完成通知</label>
+  </div>
+  <div class="nt-field">
+    <label for="nt-min">最短作業時間（秒）</label>
+    <div class="nt-inline">
+      <input type="number" id="nt-min" min="0" max="86400" value="{{ cfg.min_seconds }}">
+      <span class="muted">跑不到這麼久的作業不通知</span>
+    </div>
+    <div class="nt-help muted">兩秒就跑完的合併不需要打擾任何人 —— 通知的價值正是「久到你已經去做別的事了」。填 0 代表全部都通知。</div>
+  </div>
+  <div class="nt-field">
+    <label for="nt-site">站台網址</label>
+    <div class="nt-inline">
+      <input type="text" id="nt-site" maxlength="300" placeholder="https://doc.example.com"
+             value="{{ cfg.site_url }}">
+    </div>
+    <div class="nt-help muted">通知信裡「開啟我的作業」按鈕要用。伺服器不知道使用者是從哪個網址進來的（可能經反向代理、也可能是內網 IP），所以要在這裡填。<b>留空就不放按鈕</b> —— 放一個指向 localhost 的連結比沒有連結更糟。</div>
+  </div>
+  <div class="nt-field">
+    <label>通知時機</label>
+    <label class="nt-chk"><input type="checkbox" class="nt-on" value="done" {% if 'done' in cfg.notify_on %}checked{% endif %}> 完成</label>
+    <label class="nt-chk"><input type="checkbox" class="nt-on" value="error" {% if 'error' in cfg.notify_on %}checked{% endif %}> 失敗</label>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>通知管道</h2>
+  <p class="muted nt-note">{{ icon('info', size=14) }} <span><b>可個人 / 團隊</b>的管道（Zulip、Nextcloud Talk）：使用者在「我的作業」填了自己的收訊位址就會收到私訊，留空則送到這裡設定的團隊頻道。Slack / Teams / Discord 的 Webhook URL 天生綁定單一頻道，要私訊需改用 bot token（尚未支援）。</span></p>
+  <p class="muted nt-note">{{ icon('shield', size=14) }} 憑證以加密方式存放，頁面上一律遮罩顯示；不動它就會沿用原值。訊息只含工具名、檔名、狀態與耗時，<b>不含檔案內容</b>。</p>
+
+  {% for ch in channels %}
+  {% set c = cfg.channels[ch] %}
+  <details class="nt-ch" {% if c.enabled %}open{% endif %}>
+    <summary>
+      <span class="nt-ch-name">{{ info[ch].label }}</span>
+      {% if ch in personal %}<span class="nt-tag nt-tag-personal">個人管道</span>
+      {% elif ch in dual %}<span class="nt-tag nt-tag-dual">可個人 / 團隊</span>
+      {% else %}<span class="nt-tag">團隊頻道</span>{% endif %}
+      {% if c.enabled %}<span class="nt-tag nt-tag-on">已啟用</span>{% endif %}
+    </summary>
+    <div class="nt-ch-body" data-ch="{{ ch }}">
+      <label class="nt-switch"><input type="checkbox" class="nt-ch-en" {% if c.enabled %}checked{% endif %}> 啟用</label>
+      <div class="nt-help muted">需要：{{ info[ch].needs }}</div>
+
+      {% if ch == 'email' %}
+      <div class="nt-grid">
+        <label>SMTP 主機<input type="text" data-f="smtp_host" value="{{ c.smtp_host }}" placeholder="smtp.example.com"></label>
+        <label>連接埠<input type="number" data-f="smtp_port" value="{{ c.smtp_port }}"></label>
+        <label>加密方式
+          <select data-f="smtp_tls">
+            <option value="starttls" {% if c.smtp_tls=='starttls' %}selected{% endif %}>STARTTLS（587）</option>
+            <option value="ssl" {% if c.smtp_tls=='ssl' %}selected{% endif %}>SSL / TLS（465）</option>
+            <option value="none" {% if c.smtp_tls=='none' %}selected{% endif %}>不加密（僅限隔離內網）</option>
+          </select>
+        </label>
+        <label>帳號<input type="text" data-f="smtp_username" value="{{ c.smtp_username }}" autocomplete="off"></label>
+        <label>密碼<input type="password" data-f="smtp_password" value="{{ c.smtp_password }}" autocomplete="new-password"></label>
+        <label>寄件者<input type="text" data-f="smtp_from" value="{{ c.smtp_from }}" placeholder="jt-doc-tools@example.com"></label>
+      </div>
+      <div class="nt-test"><input type="email" class="nt-test-to" placeholder="測試收件信箱"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} 傳送測試</button><span class="nt-test-res"></span></div>
+
+      {% elif ch == 'telegram' %}
+      <div class="nt-grid">
+        <label>Bot Token<input type="password" data-f="telegram_token" value="{{ c.telegram_token }}" autocomplete="new-password"></label>
+      </div>
+      <div class="nt-test"><input type="text" class="nt-test-to" placeholder="測試用 Chat ID"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} 傳送測試</button><span class="nt-test-res"></span></div>
+
+      {% elif ch in ('slack', 'teams', 'discord') %}
+      <div class="nt-grid">
+        <label>Webhook URL<input type="password" data-f="{{ ch }}_webhook" value="{{ c[ch + '_webhook'] }}" autocomplete="new-password"></label>
+      </div>
+      <div class="nt-test"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} 傳送測試</button><span class="nt-test-res"></span></div>
+
+      {% elif ch == 'zulip' %}
+      <div class="nt-grid">
+        <label>站台網址<input type="text" data-f="zulip_site" value="{{ c.zulip_site }}" placeholder="https://zulip.example.com"></label>
+        <label>Bot Email<input type="text" data-f="zulip_bot_email" value="{{ c.zulip_bot_email }}"></label>
+        <label>API Key<input type="password" data-f="zulip_api_key" value="{{ c.zulip_api_key }}" autocomplete="new-password"></label>
+        <label>團隊頻道（stream，選填）<input type="text" data-f="zulip_stream" value="{{ c.zulip_stream }}" placeholder="留空＝只走個人私訊"></label>
+        <label>主題（topic）<input type="text" data-f="zulip_topic" value="{{ c.zulip_topic }}" placeholder="jt-doc-tools"></label>
+      </div>
+      <div class="nt-test"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} 傳送測試</button><span class="nt-test-res"></span></div>
+
+      {% elif ch == 'nextcloud' %}
+      <div class="nt-grid">
+        <label>站台網址<input type="text" data-f="nextcloud_url" value="{{ c.nextcloud_url }}" placeholder="https://cloud.example.com"></label>
+        <label>群組對話 Token（選填）<input type="text" data-f="nextcloud_token" value="{{ c.nextcloud_token }}" placeholder="留空＝只走個人一對一對話"></label>
+        <label>Bot 密鑰<input type="password" data-f="nextcloud_secret" value="{{ c.nextcloud_secret }}" autocomplete="new-password"></label>
+      </div>
+      <div class="nt-test"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} 傳送測試</button><span class="nt-test-res"></span></div>
+
+      {% elif ch == 'line' %}
+      <div class="nt-warn">{{ icon('info', size=14) }} <span><b>LINE Notify 已於 2025 年 3 月停止服務</b>，因此這裡走 Messaging API：需要 LINE 官方帳號的 Channel Access Token，收訊者要填 <code>U</code> 開頭的 User ID（不是 LINE ID），且該使用者必須先加官方帳號為好友。</span></div>
+      <div class="nt-grid">
+        <label>Channel Access Token<input type="password" data-f="line_token" value="{{ c.line_token }}" autocomplete="new-password"></label>
+      </div>
+      <div class="nt-test"><input type="text" class="nt-test-to" placeholder="測試用 User ID（U…）"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} 傳送測試</button><span class="nt-test-res"></span></div>
+
+      {% elif ch == 'webhook' %}
+      <div class="nt-grid">
+        <label>URL<input type="text" data-f="webhook_url" value="{{ c.webhook_url }}" placeholder="https://n8n.example.com/webhook/..."></label>
+        <label>Bearer Token（選填）<input type="password" data-f="webhook_token" value="{{ c.webhook_token }}" autocomplete="new-password"></label>
+      </div>
+      <div class="nt-test"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} 傳送測試</button><span class="nt-test-res"></span></div>
+      {% endif %}
+    </div>
+  </details>
+  {% endfor %}
+
+  <button class="btn btn-primary" id="nt-save" type="button">{{ icon('save', size=15) }} 儲存設定</button>
+  <span id="nt-saved" class="nt-saved" hidden>已儲存</span>
+</div>
+
+<style nonce="{{ request.state.csp_nonce }}">
+.nt-row { margin-bottom: 6px; }
+.nt-switch { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; color: #0f172a; cursor: pointer; }
+.nt-field { margin-top: 16px; }
+.nt-field > label { display: block; font-weight: 600; margin-bottom: 6px; color: #0f172a; }
+.nt-inline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.nt-inline input { width: 110px; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 7px; text-align: right; font-variant-numeric: tabular-nums; }
+.nt-help { font-size: 12.5px; margin-top: 6px; line-height: 1.6; }
+.nt-chk { display: inline-flex; align-items: center; gap: 6px; margin-right: 16px; font-size: 13.5px; color: #475569; cursor: pointer; }
+.nt-note { display: flex; align-items: flex-start; gap: 7px; font-size: 12.5px; line-height: 1.6; }
+.nt-note svg { flex: none; margin-top: 2px; }
+.nt-ch { border: 1px solid #e5e7eb; border-radius: 9px; margin-bottom: 10px; background: #fff; }
+.nt-ch > summary { display: flex; align-items: center; gap: 9px; padding: 11px 14px; cursor: pointer; list-style: none; }
+.nt-ch > summary::-webkit-details-marker { display: none; }
+.nt-ch > summary::before { content: '▸'; color: #94a3b8; font-size: 15px; }
+.nt-ch[open] > summary::before { content: '▾'; }
+.nt-ch-name { font-weight: 600; color: #0f172a; }
+.nt-tag { padding: 2px 8px; border-radius: 999px; background: #f1f5f9; color: #64748b; font-size: 11.5px; font-weight: 600; }
+.nt-tag-personal { background: #ede9fe; color: #6d28d9; }
+.nt-tag-dual { background: #dbeafe; color: #1d4ed8; }
+.nt-tag-on { background: #dcfce7; color: #15803d; }
+.nt-ch-body { padding: 0 14px 14px; border-top: 1px solid #f1f5f9; padding-top: 12px; }
+.nt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+.nt-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: #475569; font-weight: 600; }
+.nt-grid input, .nt-grid select { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13.5px; font-weight: 400; }
+.nt-test { display: flex; align-items: center; gap: 9px; margin-top: 12px; flex-wrap: wrap; }
+.nt-test input { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; min-width: 220px; }
+.nt-test .btn { display: inline-flex; align-items: center; gap: 5px; }
+.nt-test-res { font-size: 12.5px; }
+.nt-test-res.ok { color: #15803d; font-weight: 600; }
+.nt-test-res.bad { color: #b91c1c; }
+.nt-warn { display: flex; gap: 8px; margin-top: 12px; padding: 9px 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 7px; color: #92400e; font-size: 12.5px; line-height: 1.7; }
+.nt-warn svg { flex: none; margin-top: 3px; }
+.nt-warn code { background: #fef3c7; padding: 1px 5px; border-radius: 4px; }
+.nt-saved { margin-left: 10px; color: #15803d; font-size: 13px; font-weight: 600; }
+#nt-save { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/friendly_error.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const KEPT = {{ secret_kept | tojson }};
+
+  function collect() {
+    const channels = {};
+    document.querySelectorAll('.nt-ch-body').forEach((box) => {
+      const ch = box.dataset.ch;
+      const c = { enabled: box.querySelector('.nt-ch-en').checked };
+      box.querySelectorAll('[data-f]').forEach((el) => {
+        // 密碼欄顯示的是遮罩 —— 使用者沒動過就送回哨符，伺服器會沿用原值。
+        // 直接把遮罩字串存回去會把憑證洗掉（症狀是「只改了別的欄位，通知就全停了」）。
+        c[el.dataset.f] = (el.type === 'password' && !el.dataset.touched)
+          ? KEPT : el.value;
+      });
+      channels[ch] = c;
+    });
+    return {
+      enabled: document.getElementById('nt-enabled').checked,
+      min_seconds: Number(document.getElementById('nt-min').value),
+      notify_on: [...document.querySelectorAll('.nt-on:checked')].map((e) => e.value),
+      site_url: document.getElementById('nt-site').value,
+      channels,
+    };
+  }
+
+  document.querySelectorAll('input[type=password][data-f]').forEach((el) => {
+    el.addEventListener('input', () => { el.dataset.touched = '1'; });
+  });
+
+  document.getElementById('nt-save').addEventListener('click', async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    try {
+      const r = await fetch('/admin/notify/save', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(collect()),
+      });
+      if (!r.ok) { alert(await window.friendlyServerError(r, '儲存失敗')); return; }
+      const ok = document.getElementById('nt-saved');
+      ok.hidden = false;
+      setTimeout(() => { ok.hidden = true; }, 2500);
+    } finally { b.disabled = false; }
+  });
+
+  document.querySelectorAll('.nt-test-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const box = btn.closest('.nt-ch-body');
+      const ch = box.dataset.ch;
+      const res = box.querySelector('.nt-test-res');
+      const toEl = box.querySelector('.nt-test-to');
+      res.className = 'nt-test-res';
+      res.textContent = '傳送中…';
+      btn.disabled = true;
+      try {
+        // 先存再測 —— 否則測的是舊設定，管理員會以為改的東西沒生效
+        await fetch('/admin/notify/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(collect()),
+        });
+        const payload = {};
+        if (toEl && toEl.value) {
+          payload[{ email: 'email_to', telegram: 'telegram_chat_id',
+                    line: 'line_to' }[ch] || 'to'] = toEl.value;
+        }
+        const r = await fetch('/admin/notify/test/' + encodeURIComponent(ch), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const d = await r.json();
+        if (d.ok) {
+          res.className = 'nt-test-res ok';
+          res.textContent = '已送出，請到該管道確認';
+        } else {
+          // 把真正的錯誤講出來 —— 只回「失敗」對管理員毫無幫助
+          res.className = 'nt-test-res bad';
+          res.textContent = d.error || '失敗';
+        }
+      } catch (err) {
+        res.className = 'nt-test-res bad';
+        res.textContent = '無法連線到伺服器';
+      } finally { btn.disabled = false; }
+    });
+  });
+})();
+</script>
+{% endblock %}

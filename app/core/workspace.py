@@ -36,13 +36,12 @@ from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
-# mime -> extension. Scoped to PDF / PNG + Office documents (DOCX / ODT).
+# mime -> extension。涵蓋本站各工具會產出的格式：PDF / PNG + 文書 / 試算表 /
+# 簡報（OOXML 與 ODF 兩系）。實際的型別判定一律走 `detect_kind()` 開 zip 驗
+# 內部結構，這份表只是對照用 —— 只看副檔名的話，改名的 zip 就能冒充。
 ALLOWED: dict[str, str] = {
     "application/pdf": ".pdf",
     "image/png": ".png",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-        ".docx",
-    "application/vnd.oasis.opendocument.text": ".odt",
 }
 
 _SINGLE_KEY = "__single__"  # auth-OFF shared workspace
@@ -202,18 +201,46 @@ def _user_dir(request: Request, create: bool = False) -> Path:
 # Type detection
 # --------------------------------------------------------------------------- #
 
-_DOCX_MIME = ("application/vnd.openxmlformats-officedocument"
-              ".wordprocessingml.document")
-_ODT_MIME = "application/vnd.oasis.opendocument.text"
+_OOX = "application/vnd.openxmlformats-officedocument"
+_DOCX_MIME = f"{_OOX}.wordprocessingml.document"
+_XLSX_MIME = f"{_OOX}.spreadsheetml.sheet"
+_PPTX_MIME = f"{_OOX}.presentationml.presentation"
+_ODF = "application/vnd.oasis.opendocument"
+_ODT_MIME = f"{_ODF}.text"
+_ODS_MIME = f"{_ODF}.spreadsheet"
+_ODP_MIME = f"{_ODF}.presentation"
+_ODG_MIME = f"{_ODF}.graphics"
+
+#: ODF：檔頭那個未壓縮的 `mimetype` 成員直接寫明型別 → 一對一對照即可
+_ODF_KINDS = {
+    _ODT_MIME: ".odt", _ODS_MIME: ".ods",
+    _ODP_MIME: ".odp", _ODG_MIME: ".odg",
+}
+#: OOXML：沒有 mimetype 成員，靠「主要內容部件」的路徑判別
+_OOXML_KINDS = (
+    ("word/document.xml", _DOCX_MIME, ".docx"),
+    ("xl/workbook.xml", _XLSX_MIME, ".xlsx"),
+    ("ppt/presentation.xml", _PPTX_MIME, ".pptx"),
+)
+
+
+# 把 Office 型別併進 ALLOWED，維持單一事實來源 —— 兩邊各寫一份遲早會不一致
+ALLOWED.update({m: e for m, e in _ODF_KINDS.items()})
+ALLOWED.update({m: e for _p, m, e in _OOXML_KINDS})
 
 
 def detect_kind(data: bytes) -> Optional[tuple[str, str]]:
     """Return (mime, ext) for a supported file by magic bytes, else None.
 
-    PDF / PNG are matched by their leading signature. DOCX / ODT are both
+    PDF / PNG are matched by their leading signature. Office documents are all
     ZIP containers (PK\\x03\\x04) — we open the archive and inspect its
     internal structure to tell them apart (and reject arbitrary zips), so a
-    renamed .zip can't slip in claiming to be a document."""
+    renamed .zip can't slip in claiming to be a document.
+
+    簡報（.pptx / .odp）與試算表（.xlsx / .ods）是 v1.14.6 補上的：本站的
+    「PDF 轉簡報檔」產出的就是這些格式，原本工作區收不下 —— 使用者按「存至
+    工作區」只會拿到「不支援的檔案類型」，而那正是他最需要留存的產出。
+    """
     if data[:4] == b"%PDF":
         return "application/pdf", ".pdf"
     if data[:8] == b"\x89PNG\r\n\x1a\n":
@@ -226,11 +253,15 @@ def detect_kind(data: bytes) -> Optional[tuple[str, str]]:
                 names = set(z.namelist())
                 # ODF: a leading uncompressed "mimetype" member states the type.
                 if "mimetype" in names:
-                    if z.read("mimetype")[:64] == _ODT_MIME.encode():
-                        return _ODT_MIME, ".odt"
-                # OOXML docx: content-types map + the main document part.
-                if "[Content_Types].xml" in names and "word/document.xml" in names:
-                    return _DOCX_MIME, ".docx"
+                    mt = z.read("mimetype")[:96].decode("ascii", "replace")
+                    for mime, ext in _ODF_KINDS.items():
+                        if mt.startswith(mime):
+                            return mime, ext
+                # OOXML: content-types map + the main content part.
+                if "[Content_Types].xml" in names:
+                    for part, mime, ext in _OOXML_KINDS:
+                        if part in names:
+                            return mime, ext
         except Exception:  # noqa: BLE001 — malformed zip → unsupported
             return None
     return None
@@ -270,6 +301,29 @@ def _dir_size(p: Path) -> int:
     return total
 
 
+def usage_for_key(key: str) -> dict[str, Any]:
+    """以儲存鍵（而非 request）查用量 —— 背景執行緒沒有 request 可用。"""
+    s = get_settings()
+    used = _dir_size(_root() / key)
+    quota_mb = int(s.get("per_user_quota_mb") or 0)
+    quota_bytes = quota_mb * 1024 * 1024 if quota_mb > 0 else 0  # 0 = unlimited
+    return {
+        "used_bytes": used,
+        "quota_bytes": quota_bytes,
+        "max_file_bytes": (int(s.get("max_file_mb") or 0) * 1024 * 1024
+                           if int(s.get("max_file_mb") or 0) > 0 else 0),
+    }
+
+
+def key_for_user_id(user_id: Optional[int]) -> str:
+    """由使用者 id 組出儲存鍵。認證關閉時是共用的單一工作區。"""
+    if not _auth_enabled():
+        return _SINGLE_KEY
+    if user_id is None:
+        raise WorkspaceError("尚未登入")
+    return f"u{int(user_id)}"
+
+
 def usage(request: Request) -> dict[str, Any]:
     s = get_settings()
     used = _dir_size(_user_dir(request))
@@ -305,25 +359,42 @@ def save_bytes(request: Request, data: bytes, display_name: str,
                source_tool: str = "") -> dict[str, Any]:
     """Persist bytes into the requesting user's workspace. Validates the master
     switch, file type, single-file cap and per-user quota. Returns the meta."""
+    return save_bytes_for_key(user_key(request), data, display_name,
+                              source_tool, user_label=_user_label(request))
+
+
+def save_bytes_for_key(key: str, data: bytes, display_name: str,
+                       source_tool: str = "",
+                       user_label: str = "") -> dict[str, Any]:
+    """同 `save_bytes`，但以儲存鍵指定對象。
+
+    背景作業完成後要自動存進送出者的工作區，那時已經沒有 request 可用（原本的
+    寫法只接受 request）—— 把驗證與寫入的邏輯留在同一處，避免自動存入這條路
+    繞過額度 / 型別檢查。
+    """
     if not is_enabled():
         raise WorkspaceDisabled("工作區功能未啟用")
     if not data:
         raise WorkspaceError("檔案為空")
     kind = detect_kind(data)
     if kind is None:
-        raise UnsupportedType("工作區只接受 PDF / PNG / Word (.docx) / OpenDocument (.odt) 檔")
+        raise UnsupportedType(
+            "工作區接受 PDF / PNG、Word (.docx) / Excel (.xlsx) / "
+            "PowerPoint (.pptx)、OpenDocument (.odt / .ods / .odp / .odg)")
     mime, ext = kind
     s = get_settings()
     max_file_mb = int(s.get("max_file_mb") or 0)
     if max_file_mb > 0 and len(data) > max_file_mb * 1024 * 1024:
         raise QuotaExceeded(f"單檔超過上限 {max_file_mb} MB")
-    u = usage(request)
+    u = usage_for_key(key)
     if u["quota_bytes"] and u["used_bytes"] + len(data) > u["quota_bytes"]:
         quota_mb = u["quota_bytes"] // 1024 // 1024
         raise QuotaExceeded(f"工作區容量已滿（額度 {quota_mb} MB），請先刪除舊檔")
 
     file_id = uuid.uuid4().hex
-    d = _user_dir(request, create=True) / file_id
+    base = _root() / key
+    base.mkdir(parents=True, exist_ok=True)
+    d = base / file_id
     d.mkdir(parents=True, exist_ok=True)
     (d / f"file{ext}").write_bytes(data)
     meta = {
@@ -334,7 +405,7 @@ def save_bytes(request: Request, data: bytes, display_name: str,
         "size": len(data),
         "source_tool": (source_tool or "")[:64],
         "saved_at": time.time(),
-        "user_label": _user_label(request),
+        "user_label": user_label,
     }
     _meta_path(d).write_text(json.dumps(meta, ensure_ascii=False, indent=2),
                              encoding="utf-8")
@@ -395,6 +466,106 @@ def get_file(request: Request, file_id: str) -> tuple[Path, dict[str, Any]]:
     return fp, meta
 
 
+#: 需要先轉成 PDF 才畫得出第一頁的格式。
+_OFFICE_THUMB_EXTS = (".docx", ".odt", ".xlsx", ".ods", ".pptx", ".odp", ".odg")
+
+#: 超過這個大小就不做縮圖。
+#:
+#: 實測（正式機）：4.7 MB 的簡報 6 秒、37.9 MB 的年報簡報 **48 秒**。
+#: 因為是背景做、而且只做一次（結果與失敗記號都會快取），48 秒可以接受 ——
+#: 使用者原本看到的是永遠空白。上限拉到 80 MB 讓真實的大檔也有縮圖；再大的
+#: 就不划算了：那段時間 Office 引擎的名額被佔住，真正在等轉檔的人得排隊。
+_THUMB_MAX_BYTES = 80 * 1024 * 1024
+
+#: 縮圖產不出來時留一個記號，下次直接跳過。
+#: 沒有這個的話，每次開工作區頁面都會對同一個檔重跑一次 soffice ——
+#: 失敗的檔案通常每次都會失敗，等於固定的浪費。
+_THUMB_FAIL_MARK = "thumb.failed"
+
+
+#: 正在背景產生縮圖的項目（避免同一個檔被排好幾次）。
+_thumb_building: set[str] = set()
+_thumb_lock = threading.Lock()
+
+
+def _office_thumbnail(d: Path, ext: str, *, blocking: bool = False):
+    """Office / ODF 檔的第一頁縮圖：先轉 PDF，再畫第一頁，結果快取起來。
+
+    使用者問「為何非 PDF 都沒有縮圖」—— 原本這裡直接放棄，畫面上就是一片空白。
+    真正的原因是這些格式沒有便宜的「畫第一頁」方法，一定要經過 Office 引擎。
+
+    所以：**做，但只做一次**。縮圖與失敗記號都存在該檔案自己的目錄裡，跟著檔案
+    一起被清掉；轉檔本身走既有的 Office 名額控管（不會因為有人開工作區頁面就把
+    引擎佔滿）。
+    """
+    thumb = d / "thumb.png"
+    if thumb.exists():
+        return thumb, "image/png"
+    if (d / _THUMB_FAIL_MARK).exists():
+        raise WorkspaceError("此檔案無法產生預覽")
+    if not blocking:
+        # **不要在 HTTP 請求裡等轉檔**。轉一份文件要幾秒，而 Office 引擎同時只
+        # 跑得了少數幾個 —— 一頁 17 個檔就是 17 個請求排隊等同一顆引擎，最後
+        # 一個要等上一分鐘，期間還佔著 worker。
+        # 改成：排到背景去做，這次先回空白圖，做好之後下次（或前端稍後重試）
+        # 就看得到。
+        _schedule_thumbnail(d, ext)
+        raise WorkspaceError("預覽產生中")
+    src = d / f"file{ext}"
+    if not src.exists():
+        raise NotFound("檔案不存在")
+    try:
+        if src.stat().st_size > _THUMB_MAX_BYTES:
+            raise WorkspaceError("檔案過大，略過預覽")
+    except OSError:
+        raise NotFound("檔案不存在")
+
+    import tempfile
+    try:
+        from . import office_convert
+        with tempfile.TemporaryDirectory(prefix="wsthumb_") as tmp:
+            # convert_to_pdf 是「寫到指定路徑」不是「回傳路徑」——
+            # 傳目錄進去會拿到 None，然後在下一行才炸（訊息還看不出原因）。
+            pdf = Path(tmp) / "preview.pdf"
+            office_convert.convert_to_pdf(src, pdf)
+            import fitz
+            with fitz.open(str(pdf)) as doc:
+                if not doc.page_count:
+                    raise WorkspaceError("文件沒有任何頁面")
+                pix = doc[0].get_pixmap(matrix=fitz.Matrix(1.3, 1.3), alpha=False)
+                pix.save(str(thumb))
+    except Exception as e:  # noqa: BLE001 — 縮圖失敗只影響好看，不影響檔案本身
+        try:
+            (d / _THUMB_FAIL_MARK).write_text(
+                f"{e.__class__.__name__}", encoding="utf-8")
+        except OSError:
+            pass
+        logger.info("工作區縮圖產生失敗（%s）：%s", src.name, e.__class__.__name__)
+        raise WorkspaceError("無法產生預覽")
+    return thumb, "image/png"
+
+
+def _schedule_thumbnail(d: Path, ext: str) -> None:
+    """把縮圖產生排到背景。同一個項目只會排一次。"""
+    key = str(d)
+    with _thumb_lock:
+        if key in _thumb_building:
+            return
+        _thumb_building.add(key)
+
+    def work():
+        try:
+            _office_thumbnail(d, ext, blocking=True)
+        except Exception:  # noqa: BLE001 — 失敗已經寫進記號檔
+            pass
+        finally:
+            with _thumb_lock:
+                _thumb_building.discard(key)
+
+    t = threading.Thread(target=work, name="ws-thumb", daemon=True)
+    t.start()
+
+
 def get_thumbnail(request: Request, file_id: str) -> tuple[Path, str]:
     """Return (path, mime) for a preview thumbnail of one of the user's files.
     PNG → the image itself; PDF → first page rendered to a cached thumb.png
@@ -410,10 +581,8 @@ def get_thumbnail(request: Request, file_id: str) -> tuple[Path, str]:
         if not fp.exists():
             raise NotFound("檔案不存在")
         return fp, "image/png"
-    if ext in (".docx", ".odt"):
-        # Office documents have no cheap first-page render (would need soffice);
-        # caller serves the placeholder icon.
-        raise WorkspaceError("此格式無縮圖預覽")
+    if ext in _OFFICE_THUMB_EXTS:
+        return _office_thumbnail(d, ext)
     # PDF → render first page (cache thumb.png).
     thumb = d / "thumb.png"
     if thumb.exists():

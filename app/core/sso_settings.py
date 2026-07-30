@@ -77,10 +77,14 @@ _DEFAULTS: dict[str, Any] = {
     "updated_at": 0.0,
 }
 
-_SECRET_FIELDS = {
+# (section, field) 對，值以 Fernet 加密存放。settings_export 匯出時要逐項解密、
+# 匯入時用目標機器的金鑰重新加密（金鑰是本機 .session_secret，跨機解不開）→
+# 這份清單要公開給該模組用，新增祕密欄位時務必一併加進來。
+SECRET_FIELDS = {
     ("oidc", "client_secret_enc"),
     ("saml", "sp_private_key_enc"),
 }
+_SECRET_FIELDS = SECRET_FIELDS   # 舊名，本檔內沿用
 
 
 def _path() -> Path:

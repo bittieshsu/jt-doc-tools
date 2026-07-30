@@ -7,6 +7,8 @@
 from __future__ import annotations
 
 import csv
+
+from ...core import csv_safe as _csv_safe
 import io
 import json
 from datetime import datetime
@@ -86,7 +88,9 @@ def export_csv(entries, columns, field_formats, export_labels=None) -> bytes:
     w = csv.writer(buf, lineterminator="\n")
     w.writerow([_label(c, export_labels) for c in columns])
     for i, e in enumerate(entries):
-        w.writerow([_row_value(e, c, i, field_formats) for c in columns])
+        # 欄位值來自使用者上傳的檔案 —— 直接寫會被 Excel 當公式（core/csv_safe）
+        w.writerow(_csv_safe.row(
+            [_row_value(e, c, i, field_formats) for c in columns]))
     return ("﻿" + buf.getvalue()).encode("utf-8")   # BOM for Excel CJK
 
 
@@ -103,7 +107,8 @@ def export_xlsx(entries, columns, field_formats, export_labels=None) -> bytes:
     hfill = PatternFill("solid", fgColor="2563EB")
     ha = Alignment(horizontal="center", vertical="center")
     for ci, c in enumerate(columns, start=1):
-        cell = ws.cell(row=1, column=ci, value=_label(c, export_labels))
+        # 欄位標題可由使用者自訂 —— 一樣要走 helper
+        cell = _csv_safe.xlsx_cell(ws, 1, ci, _label(c, export_labels))
         cell.font = hf
         cell.fill = hfill
         cell.alignment = ha
@@ -113,9 +118,9 @@ def export_xlsx(entries, columns, field_formats, export_labels=None) -> bytes:
         for ci, c in enumerate(columns, start=1):
             v = _row_value(e, c, i, field_formats)
             if c == "seq":
-                ws.cell(row=i + 2, column=ci, value=int(v))
+                _csv_safe.xlsx_cell(ws, i + 2, ci, int(v))
             else:
-                ws.cell(row=i + 2, column=ci, value=v if v != "" else None)
+                _csv_safe.xlsx_cell(ws, i + 2, ci, v if v != "" else None)
     ws.freeze_panes = "A2"
     out = io.BytesIO()
     wb.save(out)

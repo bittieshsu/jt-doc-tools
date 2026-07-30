@@ -8,6 +8,7 @@ behaviour).
 from __future__ import annotations
 
 import logging
+import time
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -325,7 +326,7 @@ def build_auth_router(templates) -> APIRouter:
         # if caller didn't provide one — admin is just editing other fields).
         for k in ("server_url", "use_tls", "verify_cert", "service_dn",
                   "user_search_base", "user_search_filter", "group_attr",
-                  "username_attr", "displayname_attr"):
+                  "username_attr", "displayname_attr", "email_attr"):
             if k in ldap_cfg:
                 s["ldap"][k] = ldap_cfg[k]
         if ldap_cfg.get("service_password"):
@@ -349,7 +350,7 @@ def build_auth_router(templates) -> APIRouter:
         merged = {}
         for k in ("server_url", "service_dn", "user_search_base",
                   "user_search_filter", "username_attr", "displayname_attr",
-                  "group_attr"):
+                  "group_attr", "email_attr"):
             v = ldap_in.get(k)
             merged[k] = (v if v not in (None, "") else saved.get(k, ""))
         # bools — accept explicit False from the form
@@ -503,6 +504,7 @@ def build_auth_router(templates) -> APIRouter:
                 enabled=body.get("enabled"),
                 roles=body.get("roles"),
                 groups=body.get("groups"),
+                email=body.get("email"),
             )
         except ValueError as e:
             raise HTTPException(400, str(e))
@@ -633,7 +635,15 @@ def build_auth_router(templates) -> APIRouter:
             paged = True
         # Member picker only needs pickable users; use the 'active' view so we
         # don't embed thousands of never-logged-in mirrored directory users.
-        all_users = user_manager.list_users(view="active")
+        # 只送挑選器真正用到的四個欄位。整包 user 記錄會把 created_at /
+        # last_login_at / external_dn / password_set 一起序列化進頁面 ——
+        # 原始 Unix 時間戳會被掃描器判為資訊洩漏，其餘欄位這個畫面也用不到。
+        # 「送出去的資料越少越好」在這裡剛好也讓頁面變小。
+        all_users = [
+            {"id": u["id"], "username": u["username"],
+             "display_name": u["display_name"], "source": u["source"]}
+            for u in user_manager.list_users(view="active")
+        ]
         all_roles = roles.list_roles()
         backend = (auth_settings.get() or {}).get("backend", "off")
         return templates.TemplateResponse(request, "admin_groups.html", {
@@ -1249,6 +1259,7 @@ def build_auth_router(templates) -> APIRouter:
             f"FROM audit_events{where} ORDER BY id DESC", tuple(params)
         ).fetchall()
 
+        from ..core import csv_safe as _csv_safe
         buf = _io.StringIO()
         # UTF-8 BOM so Excel opens it as UTF-8 by default
         buf.write("﻿")
@@ -1256,8 +1267,11 @@ def build_auth_router(templates) -> APIRouter:
         w.writerow(["id", "time", "user", "ip", "event_type", "target", "details"])
         for r in rows:
             t = _dt.fromtimestamp(r["ts"]).isoformat(sep=" ", timespec="seconds")
-            w.writerow([r["id"], t, r["username"], r["ip"],
-                        r["event_type"], r["target"], r["details_json"]])
+            # target / details 裡有使用者取的檔名 —— 而這份 CSV 的開檔者是
+            # 管理員。不中和等於把公式送進管理員的 Excel（見 core/csv_safe）。
+            w.writerow(_csv_safe.row(
+                [r["id"], t, r["username"], r["ip"],
+                 r["event_type"], r["target"], r["details_json"]]))
         from ..core.http_utils import content_disposition
         return StreamingResponse(
             iter([buf.getvalue()]),
@@ -1512,6 +1526,190 @@ def build_auth_router(templates) -> APIRouter:
         )
         return {"ok": True, "report": report}
 
+    # ---------- /admin/notify（作業完成通知）----------
+
+    @router.get("/notify", response_class=HTMLResponse)
+    async def notify_page(request: Request):
+        from ..core import notify_channels as _nc, notify_settings as _ns
+        return templates.TemplateResponse(request, "admin_notify.html", {
+            "request": request,
+            "cfg": _ns.get(),                       # 祕密已遮罩
+            "info": _nc.CHANNEL_INFO,
+            "channels": _nc.ALL_CHANNELS,
+            "personal": _ns.PERSONAL_CHANNELS,
+            "dual": _ns.DUAL_CHANNELS,
+            "secret_kept": _ns.SECRET_KEPT,
+        })
+
+    @router.post("/notify/save")
+    async def notify_save(request: Request):
+        from ..core import notify_settings as _ns
+        body = await request.json()
+        cfg = _ns.save(body)
+        # 稽核只記「改了哪些管道」，**不記憑證內容**
+        audit_db.log_event(
+            "settings_change", username=_actor(request), ip=_client_ip(request),
+            target="notify",
+            details={"enabled": cfg.get("enabled"),
+                     "min_seconds": cfg.get("min_seconds"),
+                     "channels": sorted(
+                         k for k, v in (cfg.get("channels") or {}).items()
+                         if v.get("enabled"))},
+        )
+        return {"ok": True, "cfg": cfg}
+
+    @router.post("/notify/test/{channel}")
+    async def notify_test(request: Request, channel: str):
+        """送一則測試訊息。失敗要把原因回給管理員 —— 「失敗」兩個字沒有用。"""
+        import asyncio as _asyncio
+
+        from ..core import notify_channels as _nc, notify_settings as _ns
+        if channel not in _nc.ALL_CHANNELS:
+            raise HTTPException(400, "未知的通知管道")
+        body = await request.json() if await request.body() else {}
+        cfg = _ns.get(reveal=True)["channels"].get(channel) or {}
+        # 個人管道要有目的地才測得動 —— 用管理員自己填的測試位址
+        for f in ("email_to", "telegram_chat_id", "line_to",
+                  "zulip_to", "nextcloud_to"):
+            if body.get(f):
+                cfg[f] = body[f]
+        try:
+            await _asyncio.to_thread(
+                _nc.send_one, cfg, channel,
+                "[測試] Jason Tools 文件工具箱",
+                "這是一則測試通知，看到就代表這個管道設定正確。")
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": f"{type(e).__name__}: {e}"[:300]}
+        audit_db.log_event(
+            "notify_test", username=_actor(request), ip=_client_ip(request),
+            target=channel,
+        )
+        return {"ok": True}
+
+    # ---------- /admin/jobs（工作監控 + 併行度）----------
+
+    @router.get("/jobs", response_class=HTMLResponse)
+    async def jobs_page(request: Request):
+        from ..core import concurrency_settings as _cs
+        return templates.TemplateResponse(request, "admin_jobs.html", {
+            "request": request,
+            "conc": _cs.describe(),
+        })
+
+    @router.get("/jobs/api/list")
+    async def jobs_api_list(request: Request, active: bool = False,
+                            limit: int = 100, offset: int = 0):
+        """所有使用者的工作（管理視角）。"""
+        from ..core import concurrency_settings as _cs, job_store, office_convert
+        from ..core.job_manager import job_manager
+        from ..tool_registry import discover_tools
+        names = {t.metadata.id: t.metadata.name for t in discover_tools()}
+        rows = job_store.list_jobs(active_only=bool(active), limit=limit,
+                                   offset=offset)
+        qpos = job_manager.queue_positions()
+        usage = job_manager.resource_usage()
+        # 疊上即時狀態（進度不寫 DB，只讀 DB 的話進度條永遠是 0）
+        live = job_manager.live_snapshot()
+        out = []
+        for r in rows:
+            meta = r.get("meta") or {}
+            lv = live.get(r["id"]) or {}
+            out.append({
+                "id": r["id"],
+                "tool_id": r["tool_id"],
+                "tool_name": names.get(r["tool_id"], r["tool_id"]),
+                "status": lv.get("status", r["status"]),
+                "progress": lv.get("progress", r["progress"]),
+                "message": lv.get("message") or r["message"],
+                "error": r["error"],
+                "filename": (meta.get("filename") or r["result_filename"]
+                             or (f"{meta['count']} 個檔案"
+                                 if isinstance(meta.get("count"), int) else "")),
+                "owner": r["owner_label"] or "", "client_ip": r["client_ip"] or "",
+                "created_at": r["created_at"], "updated_at": r["updated_at"],
+                "elapsed": round(max(0.0, (r["finished_at"] or time.time())
+                                     - r["created_at"]), 1),
+                "is_office": r["tool_id"] in _cs.OFFICE_TOOL_IDS,
+                # 排隊順序取自實際的派工佇列，不是拿時間去猜
+                "queue_pos": qpos.get(r["id"]),
+                # 實測的子行程用量（soffice 才是真正吃記憶體的那個）；
+                # 量不到就給 None，前端顯示估計值並標示為估計，不混為一談
+                "usage": usage.get(r["id"]),
+                "est_mb": _cs.estimated_job_mb(r["tool_id"]),
+            })
+        # 排隊中的排最前面且**照派工順序**（其餘維持新到舊）—— 管理員最關心的
+        # 是「接下來會跑誰」，用建立時間倒序會把佇列頭尾顛倒過來。
+        out.sort(key=lambda j: (
+            0 if j["queue_pos"] else (1 if j["status"] == "running" else 2),
+            j["queue_pos"] or 0,
+            -j["created_at"]))
+        return {
+            "jobs": out,
+            "total": job_store.count_jobs(),
+            "runtime": job_manager.stats(),
+            "office": office_convert.office_concurrency(),
+            "memory": {"total_mb": _cs.total_mb(),
+                       "available_mb": _cs.available_mb(),
+                       "reserve_mb": _cs.reserve_mb()},
+            "cpu": _cs.cpu_snapshot(),
+        }
+
+    @router.get("/jobs/api/history")
+    async def jobs_api_history(request: Request, hours: int = 24,
+                               buckets: int = 96):
+        """作業量與資源使用率的歷史 —— 給「目前狀態」那幾張卡片點開看圖表用。
+
+        作業量從 jobs 表的起訖時間推導（精確、不需取樣）；CPU / 記憶體來自每分鐘
+        的取樣。
+        """
+        import asyncio as _asyncio
+
+        from ..core import job_store
+        jobs, res = await _asyncio.gather(
+            _asyncio.to_thread(job_store.history, hours, buckets),
+            _asyncio.to_thread(job_store.metrics_history, hours, buckets),
+        )
+        return {"hours": hours, "jobs": jobs, "resources": res}
+
+    @router.post("/jobs/api/cancel/{job_id}")
+    async def jobs_api_cancel(request: Request, job_id: str):
+        from ..core.job_manager import job_manager
+        from ..core.safe_paths import require_uuid_hex
+        require_uuid_hex(job_id, "job_id")
+        job = job_manager.get(job_id)
+        ok = job_manager.cancel(job_id) if job else False
+        audit_db.log_event(
+            "job_cancel", username=_actor(request), ip=_client_ip(request),
+            target=job_id, details={"tool_id": getattr(job, "tool_id", ""),
+                                    "owner": getattr(job, "owner_label", ""),
+                                    "ok": ok},
+        )
+        return {"ok": ok}
+
+    @router.post("/jobs/api/pause")
+    async def jobs_api_pause(request: Request):
+        """暫停 / 恢復派工。只影響尚未開始的工作 —— 執行中的 soffice 是獨立子
+        行程，凍結不了（UI 已照實說明）。"""
+        from ..core.job_manager import job_manager
+        body = await request.json()
+        paused = job_manager.set_paused(bool(body.get("paused")))
+        audit_db.log_event(
+            "settings_change", username=_actor(request), ip=_client_ip(request),
+            target="job_dispatch", details={"paused": paused},
+        )
+        return {"ok": True, "paused": paused}
+
+    @router.post("/jobs/api/concurrency")
+    async def jobs_api_concurrency(request: Request):
+        from ..core import concurrency_settings as _cs
+        body = await request.json()
+        cfg = _cs.save(body)          # save() 內部已把數值夾在安全範圍
+        audit_db.log_event(
+            "settings_change", username=_actor(request), ip=_client_ip(request),
+            target="concurrency", details=cfg,
+        )
+        return {"ok": True, "conc": _cs.describe()}
+
     # ---------- /admin/workspace ----------
 
     @router.get("/workspace", response_class=HTMLResponse)
@@ -1579,6 +1777,43 @@ def build_auth_router(templates) -> APIRouter:
         from ..core import host_stats as _hs
         import asyncio as _asyncio
         return await _asyncio.to_thread(_hs.get_user_file_stats, force)
+
+    @router.get("/system-status/databases")
+    async def system_status_databases(thorough: bool = False):
+        """資料庫完整性 + 備份狀況。
+
+        `thorough=1` 走完整的 integrity_check（大檔要幾秒）→ 丟到執行緒避免卡住
+        事件迴圈。
+        """
+        import asyncio as _asyncio
+
+        from ..core import db_health as _dh
+        # thorough=1（管理員按「完整檢查」）才連大檔一起掃；平時跳過 ——
+        # 統編資料庫 1.4 GB，掃一次實測 58 秒，頁面每次載入都等於整頁卡住。
+        rows = await _asyncio.to_thread(
+            _dh.check_all, bool(thorough), None if thorough else _dh._STARTUP_MAX_BYTES)
+        newest = None
+        for m in _dh.MANAGED:
+            for b in _dh.list_backups(m["file"])[:1]:
+                try:
+                    ts = b.stat().st_mtime
+                    newest = ts if newest is None else max(newest, ts)
+                except OSError:
+                    pass
+        return {"databases": rows, "newest_backup": newest,
+                "backup_dir": str(_dh.backup_dir())}
+
+    @router.post("/system-status/databases/backup")
+    async def system_status_backup_now(request: Request):
+        import asyncio as _asyncio
+
+        from ..core import db_health as _dh
+        rep = await _asyncio.to_thread(_dh.backup_all)
+        audit_db.log_event(
+            "db_backup", username=_actor(request), ip=_client_ip(request),
+            details=rep,
+        )
+        return {"ok": not rep.get("skipped"), "report": rep}
 
     return router
 

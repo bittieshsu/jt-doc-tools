@@ -145,6 +145,30 @@ def _image_to_pdf_bytes(img_bytes: bytes) -> bytes:
             pass
 
 
+def _name_sidecar(upload_id: str) -> Path:
+    return _work_dir() / f"po_{upload_id}_name.txt"
+
+
+def _remember_name(upload_id: str, filename: str) -> None:
+    """把原始檔名記下來（給作業清單顯示）。
+
+    OCR 的來源檔存成 `po_<id>_src.pdf`，原始檔名原本**只出現在上傳的回應裡、
+    沒有被保存下來** —— 所以作業清單退而顯示結果檔名 `po_<32位hex>_searchable.pdf`，
+    使用者看到的是一串看不出是什麼的內部代號（v1.14.6 使用者回報）。
+    """
+    try:
+        _name_sidecar(upload_id).write_text(filename or "", encoding="utf-8")
+    except OSError:
+        pass      # 顯示不出名稱是小事，絕不能因此讓 OCR 失敗
+
+
+def _orig_name(upload_id: str) -> str:
+    try:
+        return _name_sidecar(upload_id).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
 @router.post("/upload")
 async def upload(request: Request, file: UploadFile = File(...)):
     raw = await file.read()
@@ -173,6 +197,7 @@ async def upload(request: Request, file: UploadFile = File(...)):
             raise HTTPException(400, f"圖檔轉 PDF 失敗：{e}")
 
     _uo.record(upload_id, request)
+    _remember_name(upload_id, file.filename or ("input" + suffix))
     return {"upload_id": upload_id,
             "filename": file.filename or ("input" + suffix),
             "size": len(raw),
@@ -579,7 +604,8 @@ async def run_ocr(upload_id: str, request: Request,
             job.error = str(e)
             raise
 
-    job = _jm.job_manager.submit("pdf-ocr", _run, meta={"upload_id": upload_id})
+    job = _jm.job_manager.submit("pdf-ocr", _run, meta={"upload_id": upload_id,
+                                     "filename": _orig_name(upload_id)})
     return {"job_id": job.id, "upload_id": upload_id}
 
 
@@ -672,6 +698,7 @@ async def api_pdf_ocr(
             job.error = str(e)
             raise
 
-    job = _jm.job_manager.submit("pdf-ocr", _run, meta={"upload_id": upload_id})
+    job = _jm.job_manager.submit("pdf-ocr", _run, meta={"upload_id": upload_id,
+                                     "filename": _orig_name(upload_id)})
     return {"job_id": job.id, "upload_id": upload_id,
             "download_url": f"/api/jobs/{job.id}/download"}

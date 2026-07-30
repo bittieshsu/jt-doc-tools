@@ -67,12 +67,12 @@ def require_admin(request: Request) -> dict:
     everyone passes（單機模式不分角色）。
 
     路由分三層：
-      - AUDITOR_EXCLUSIVE：admin 也 403，**只有 auditor**通過
-      - AUDITOR_SHARED：admin 與 auditor 都通過
+      - AUDITOR_EXCLUSIVE：讀取只有 auditor（admin 也 403）；**寫入只有 admin**
+      - AUDITOR_SHARED：讀取 admin 與 auditor 都通過；**寫入只有 admin**
       - 其他 /admin/*：只有 admin 通過
 
-    Auditor 通過時寫一筆 `auditor_view` audit event，admin 看得到稽核員看了
-    什麼，稽核員自己不能刪（UI 沒刪除端點）。"""
+    Auditor 通過時寫一筆 `auditor_view` audit event。**稽核員為唯讀角色** ——
+    這兩類前綴的寫入動作（POST / DELETE …）一律只有 admin 能做。"""
     user = require_login(request)
     if user.get("source") == "off":
         return user   # auth disabled — everyone is "admin"
@@ -83,9 +83,26 @@ def require_admin(request: Request) -> dict:
     path = request.scope.get("path") or request.url.path or ""
     is_admin_user = permissions.is_admin(uid)
     is_aud_user = permissions.is_auditor(uid)
+    # 稽核員是**唯讀**角色，所以前綴判斷必須分讀寫。原本不分 method，造成兩個
+    # 相反方向的錯誤（v1.14.6 資安稽核）：
+    #   * `POST /admin/history/{kind}/{id}/delete` 只有稽核員叫得動、admin 被擋
+    #     → 「只該看」的角色可以銷毀證據，而唯一能覆核的人碰不到。
+    #   * `POST /admin/system-status/databases/backup` 稽核員可觸發；備份只留
+    #     7 份，連按 7 次就把既有備份輪替掉（資料庫毀損時的救援路徑）。
+    # 「依 id 刪除」不等於「偷看內容」，所以把寫入動作歸還 admin 不違反原本
+    # 「admin 不該偷看使用者檔案」的設計。
+    method = (request.scope.get("method") or "GET").upper()
+    is_read = method in ("GET", "HEAD", "OPTIONS")
 
-    # 1. AUDITOR_EXCLUSIVE：只有 auditor 過
+    # 1. AUDITOR_EXCLUSIVE：讀＝只有 auditor；寫＝只有 admin
     if any(path.startswith(p) for p in _AUDITOR_EXCLUSIVE_PREFIXES):
+        if not is_read:
+            if is_admin_user:
+                return user
+            raise HTTPException(
+                status_code=403,
+                detail="此操作需要管理員權限（稽核員為唯讀角色）",
+            )
         if not is_aud_user:
             raise HTTPException(
                 status_code=403,
@@ -94,13 +111,18 @@ def require_admin(request: Request) -> dict:
         _log_auditor_view(user, request, path)
         return user
 
-    # 2. AUDITOR_SHARED：admin 或 auditor 都過
+    # 2. AUDITOR_SHARED：讀＝admin 或 auditor；寫＝只有 admin
     if any(path.startswith(p) for p in _AUDITOR_SHARED_PREFIXES):
         if is_admin_user:
             return user
-        if is_aud_user:
+        if is_aud_user and is_read:
             _log_auditor_view(user, request, path)
             return user
+        if is_aud_user:
+            raise HTTPException(
+                status_code=403,
+                detail="稽核員為唯讀角色，此操作需要管理員權限",
+            )
         raise HTTPException(status_code=403, detail="需要管理員或稽核員權限")
 
     # 3. 其他 admin 頁面：只有 admin 過

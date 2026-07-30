@@ -1044,6 +1044,63 @@ curl -X POST http://localhost:8765/tools/translate-doc/api/translate-doc \
 
 > 需 admin 啟用 LLM 服務（`/admin/llm-settings`）。未啟用回 `503`。
 
+#### 大量句子：背景作業版
+
+上面那個端點是**同步**的：整份翻完才回應，句數一多就會撞到反向代理的逾時。
+幾百句以上請改用背景作業 —— 送出後立刻拿到作業編號，翻譯在伺服器繼續跑，
+**呼叫端可以離線**，之後再回來查進度與結果。
+
+```text
+POST /tools/translate-doc/start
+GET  /tools/translate-doc/job/{job_id}?start=0
+```
+
+`start` 的 Body（JSON）：
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `sentences` | list[str] | ✓ | 已切好的句子陣列（自己切，或先用 `/extract-text`） |
+| `source_lang` | str | | `auto`（預設）/ `en` / `zh` … |
+| `target_lang` | str | | 目標語言，預設 `zh-TW` |
+| `domain` | str | | 領域提示 |
+| `filename` | str | | 顯示用的來源檔名（會出現在「我的作業」） |
+
+```bash
+JOB=$(curl -s -X POST http://localhost:8765/tools/translate-doc/start \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"sentences":["Hello world.","This is a test."],"target_lang":"zh-TW"}' \
+  | jq -r .job_id)
+
+curl -s "http://localhost:8765/tools/translate-doc/job/$JOB" \
+  -H "Authorization: Bearer YOUR_TOKEN" | jq
+```
+
+查詢的回應：
+
+```json
+{
+  "status": "running",
+  "progress": 0.5,
+  "message": "翻譯中… 1 / 2 句",
+  "elapsed": 3.2,
+  "total": 2,
+  "start": 0,
+  "results": [
+    {"src": "Hello world.", "translated": "你好，世界。"},
+    {"src": "This is a test."}
+  ],
+  "cancelled": false
+}
+```
+
+* `status`：`pending` / `running` / `done` / `error` / `cancelled` / `interrupted`
+* **原文一送出就查得到**（右側還沒翻好的項目沒有 `translated` 欄位），
+  所以呼叫端可以邊跑邊顯示。
+* `start=N` 只回第 N 筆之後的資料 —— 幾萬句時不必每次拉全部。
+* 取消請用共用的作業端點：`POST /api/jobs/{job_id}/cancel`。
+* 歸屬與其他作業端點一致：非擁有者一律 `404`。
+
 ---
 
 ## 9. 商務查詢 API

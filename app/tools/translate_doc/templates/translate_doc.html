@@ -1120,19 +1120,150 @@ $('btnStop').addEventListener('click', () => {
   $('btnStop').textContent = '停止中…';
 });
 
+// ---------------------------------------------------------------------------
+// 背景作業版：翻譯跑在伺服器，這個頁面只負責「送出 + 觀看進度」。
+//
+// 原本是瀏覽器自己開 4 個 worker 逐句打 API，結果存在這個分頁的記憶體裡 ——
+// 關掉分頁翻譯就停了，而且「我的作業」裡完全看不到（根本沒有建立作業）。
+// 幾萬句的文件要人一直開著頁面等，不合理。
+//
+// 現在：送出後拿到 job_id，網址帶上 `?job=<id>`。之後不管是重新整理、關掉再
+// 從「我的作業」點回來，都會接回同一個作業繼續看進度與已完成的句子。
+// ---------------------------------------------------------------------------
+
+/** 這一列翻好了沒。
+ *
+ * 進度檔一開始就寫入**全部原文**（讓使用者一回到頁面就看得到對照表），
+ * 所以「有這一列」不等於「翻好了」—— 要看有沒有 translated / error。
+ */
+function _trdRowDone(r) {
+  return !!(r && (r.translated !== undefined && r.translated !== null || r.error));
+}
+function _trdDoneCount() {
+  return trdResults.reduce((n, r) => n + (_trdRowDone(r) ? 1 : 0), 0);
+}
+/** 下一輪要從第幾列開始拿 —— 第一個還沒翻好的位置。 */
+function _trdCursor() {
+  const i = trdResults.findIndex(r => !_trdRowDone(r));
+  return i < 0 ? trdResults.length : Math.max(0, i);
+}
+
+let _trdJobId = null;
+let _trdPollTimer = null;
+let _trdJobT0 = 0;
+
+function _trdSetRunningUI(running) {
+  btnTranslate.disabled = running;
+  if (running) {
+    if (!btnTranslate.dataset.orig) btnTranslate.dataset.orig = btnTranslate.innerHTML;
+    btnTranslate.textContent = `翻譯中… (${LLM_MODEL || '?'})`;
+  } else {
+    btnTranslate.innerHTML = btnTranslate.dataset.orig || '開始翻譯';
+  }
+  $('btnStop').hidden = !running;
+  $('btnStop').disabled = false;
+  $('btnStop').textContent = '■ 停止翻譯';
+  $('trdProgressWrap').hidden = false;
+  $('trdProgressMeta').hidden = false;
+}
+
+function _trdStopPolling() {
+  if (_trdPollTimer) { clearTimeout(_trdPollTimer); _trdPollTimer = null; }
+}
+
+/** 把網址換成帶 job 的版本，重新整理 / 分享連結都能回到同一個作業。 */
+function _trdSyncUrl(jobId) {
+  try {
+    const u = new URL(window.location.href);
+    if (jobId) u.searchParams.set('job', jobId); else u.searchParams.delete('job');
+    history.replaceState(null, '', u.toString());
+  } catch (_) {}
+}
+
+async function _trdPoll() {
+  if (!_trdJobId) return;
+  let j;
+  try {
+    const r = await fetch(
+      `/tools/translate-doc/job/${_trdJobId}?start=${_trdCursor()}`);
+    if (r.status === 404) {          // 作業已過期或被清掉
+      _trdStopPolling();
+      _trdSetRunningUI(false);
+      resultMeta.textContent = '這個作業已經不存在（可能已過保留期）。';
+      return;
+    }
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, '查詢進度失敗'));
+    j = await r.json();
+  } catch (e) {
+    // 網路暫時斷掉不該讓畫面停住 —— 下一輪再試。
+    _trdPollTimer = setTimeout(_trdPoll, 3000);
+    return;
+  }
+  const total = j.total || trdResults.length || 0;
+  // 以伺服器回報的已花時間校正計時起點 —— 從別的分頁回來時，本地的起點是
+  // 「剛剛」，不校正的話會顯示「已花 0 秒」。
+  if (typeof j.elapsed === 'number') {
+    _trdJobT0 = performance.now() - j.elapsed * 1000;
+  }
+  // 接上新到的句子
+  (j.results || []).forEach((res, k) => {
+    const idx = j.start + k;
+    if (!res) return;
+    // 原文也可能是這一輪才拿到的（第一次輪詢）——一起補進來，
+    // 對照表左半邊才有東西。
+    if (res.src && !currentSentences[idx]) currentSentences[idx] = res.src;
+    trdResults[idx] = res;
+    _trdApplyRow(idx);
+  });
+  const done = _trdDoneCount();
+  _updateProgress(done, total, _trdJobT0);
+  const running = (j.status === 'running' || j.status === 'pending');
+  if (running) {
+    if (j.status === 'pending') {
+      resultMeta.textContent = j.message || '排隊中…';
+    }
+    _trdPollTimer = setTimeout(_trdPoll, 1500);
+    return;
+  }
+  // 結束了（done / error / cancelled / interrupted）
+  _trdStopPolling();
+  _trdSetRunningUI(false);
+  renderPage(trdCurrentPage);
+  const ch = _trdTotalChars();
+  const elapsed = (performance.now() - _trdJobT0) / 1000;
+  const tail = ` · 原文 ${ch.src} 字、譯文 ${ch.tgt} 字 · 模型：${LLM_MODEL || '?'}`;
+  if (j.status === 'cancelled') {
+    resultMeta.textContent = `已中止 — 完成 ${done}/${total} 句` + tail;
+  } else if (j.status === 'error') {
+    resultMeta.textContent = `翻譯失敗：${j.message || '未知錯誤'}`;
+  } else if (j.status === 'interrupted') {
+    resultMeta.textContent = `服務重新啟動而中斷 — 完成 ${done}/${total} 句，請重新送出`;
+  } else {
+    resultMeta.textContent = `共 ${total} 句 — 完成 ${done} 句` + tail;
+  }
+  trdTranslatedAt = new Date().toISOString();
+}
+
+$('btnStop').addEventListener('click', async () => {
+  $('btnStop').disabled = true;
+  $('btnStop').textContent = '停止中…';
+  if (!_trdJobId) return;
+  try {
+    await fetch(`/api/jobs/${_trdJobId}/cancel`, {method: 'POST'});
+  } catch (_) {}
+  // 不在這裡收尾 —— 等輪詢讀到 cancelled 再統一處理，畫面才不會有兩套邏輯。
+});
+
 btnTranslate.addEventListener('click', async () => {
   const text = srcText.value;
   if (!text.trim()) return alert('請先輸入或上傳要翻譯的文字');
   currentSentences = _splitClient(text);
   if (!currentSentences.length) return alert('沒有可翻譯的內容');
-  // 句數上限保護（admin 可調）— 超過只取前 N 句，避免瀏覽器跑數小時。
   if (currentSentences.length > TRD_MAX_SENTENCES) {
     alert(`原文超過上限，僅取前 ${TRD_MAX_SENTENCES} 句翻譯。\n（管理員可在 LLM 設定調整「逐句翻譯最大句數」）`);
     currentSentences = currentSentences.slice(0, TRD_MAX_SENTENCES);
   }
   const total = currentSentences.length;
-  // 初始化資料陣列 + 分頁。只 render 第一頁，其餘留在 trdResults，翻好再依頁渲染，
-  // 避免一次把幾萬列塞進 DOM 造成卡頓。
   trdResults = new Array(total);
   trdHeaderLangs = {src: srcLang.value, tgt: tgtLang.value};
   trdCurrentPage = 0;
@@ -1140,91 +1271,66 @@ btnTranslate.addEventListener('click', async () => {
   resultPanel.hidden = false;
   const pagesNote = _trdTotalPages() > 1 ? `，分 ${_trdTotalPages()} 頁` : '';
   resultMeta.textContent = `${total} 句送出${pagesNote}（模型：${LLM_MODEL || '?'}）`;
-  btnTranslate.disabled = true;
-  btnTranslate.dataset.orig = btnTranslate.innerHTML;
-  btnTranslate.innerHTML = `翻譯中… (${LLM_MODEL || '?'})`;
-  $('btnStop').hidden = false;
-  $('btnStop').disabled = false;
-  $('btnStop').textContent = '■ 停止翻譯';
-  $('trdProgressWrap').hidden = false;
-  $('trdProgressMeta').hidden = false;
+  _trdSetRunningUI(true);
   $('trdProgressBar').style.width = '0%';
+  _trdJobT0 = performance.now();
 
-  _translateCancelled = false;
-  _translateAbortCtl = new AbortController();
-  // Token used by the finally block to ensure we only clear UI for our
-  // own run — guards against the race where Run 1's cleanup runs after
-  // Run 2 has already started (e.g., user hit stop then immediately hit
-  // translate, and Run 1's worker promises hadn't fully resolved yet).
-  const myCtl = _translateAbortCtl;
-  const t0 = performance.now();
-  let done = 0;
-  let firstError = null;
-  _updateProgress(0, total, t0);
-
-  // 簡易並行池：N workers 從 queue 拿 idx
-  let nextIdx = 0;
-  async function worker() {
-    while (true) {
-      if (_translateCancelled) return;
-      const i = nextIdx++;
-      if (i >= total) return;
-      const src = currentSentences[i];
-      try {
-        const res = await _translateOne(i, src);
-        trdResults[i] = res;
-        _trdApplyRow(i);   // 只在當前頁可見時才動 DOM
-      } catch (e) {
-        if (e.name === 'AbortError' || _translateCancelled) {
-          return;  // user pressed stop — silently exit worker
-        }
-        if (!firstError) firstError = e.message || String(e);
-        trdResults[i] = {src, translated: '', error: e.message || String(e)};
-        _trdApplyRow(i);
-      }
-      done++;
-      _updateProgress(done, total, t0);
-      _refreshTgtCharCounter();
-    }
-  }
   try {
-    const workers = [];
-    for (let w = 0; w < Math.min(CLIENT_CONCURRENCY, total); w++) {
-      workers.push(worker());
-    }
-    await Promise.all(workers);
-    // Final tally（字數讀資料陣列，跨所有頁）
-    const ch = _trdTotalChars();
-    const srcCharsAll = ch.src, tgtCharsAll = ch.tgt;
-    // 重畫目前頁，讓 header 字數與列狀態都到最終值
-    renderPage(trdCurrentPage);
-    const elapsed = (performance.now() - t0) / 1000;
-    const finishedCount = trdResults.filter(r => r).length;
-    if (_translateCancelled) {
-      resultMeta.textContent = `已中止 — 完成 ${finishedCount}/${total} 句、原文 ${srcCharsAll} 字、譯文 ${tgtCharsAll} 字 · 用時 ${elapsed.toFixed(1)} 秒 · 模型：${LLM_MODEL || '?'}`;
-    } else {
-      resultMeta.textContent = `共 ${total} 句 — 原文 ${srcCharsAll} 字、譯文 ${tgtCharsAll} 字 · 用時 ${elapsed.toFixed(1)} 秒 · 模型：${LLM_MODEL || '?'}`;
-    }
-    if (firstError) {
-      resultMeta.textContent += `（部分失敗：${firstError}）`;
-    }
+    const r = await fetch('/tools/translate-doc/start', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        sentences: currentSentences,
+        source_lang: srcLang.value, target_lang: tgtLang.value,
+        domain: getDomainHint(),
+        filename: (typeof trdUploadedName !== 'undefined' && trdUploadedName) || '',
+      }),
+    });
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, '送出失敗'));
+    const j = await r.json();
+    _trdJobId = j.job_id;
+    _trdSyncUrl(_trdJobId);
+    _trdPoll();
   } catch (e) {
-    alert('翻譯失敗：' + e.message);
-  } finally {
-    // Only reset UI if WE are still the active translation. If a new run
-    // started concurrently (rare race after stop+translate quick succession),
-    // skip — the new run owns the UI now.
-    if (_translateAbortCtl === myCtl) {
-      btnTranslate.disabled = false;
-      btnTranslate.innerHTML = btnTranslate.dataset.orig || '開始翻譯';
-      $('btnStop').hidden = true;
-      _translateAbortCtl = null;
-      // v1.7.52：記錄翻譯完成時間，匯出時帶到頁首
-      trdTranslatedAt = new Date().toISOString();
-      // Keep progress bar visible at final state
-    }
+    _trdSetRunningUI(false);
+    alert('送出失敗：' + e.message);
   }
 });
+
+/** 從網址的 `?job=` 接回既有作業（重新整理 / 從「我的作業」點進來）。 */
+async function _trdResumeFromUrl() {
+  const jobId = new URLSearchParams(window.location.search).get('job');
+  if (!jobId) return;
+  let j;
+  try {
+    const r = await fetch(`/tools/translate-doc/job/${jobId}`);
+    if (!r.ok) return;                    // 不是自己的 / 已過期 → 當作沒這回事
+    j = await r.json();
+  } catch (_) { return; }
+  _trdJobId = jobId;
+  _trdJobT0 = performance.now() - (Number(j.elapsed) || 0) * 1000;
+  const results = j.results || [];
+  trdResults = results.slice();
+  // 原文從結果裡取回 —— 這樣不必把原文再存一份
+  currentSentences = results.map(x => (x && x.src) || '');
+  const total = j.total || results.length;
+  while (currentSentences.length < total) currentSentences.push('');
+  trdCurrentPage = 0;
+  resultPanel.hidden = false;
+  renderPage(0);
+  const running = (j.status === 'running' || j.status === 'pending');
+  _trdSetRunningUI(running);
+  _updateProgress(_trdDoneCount(), total, _trdJobT0);
+  if (running) {
+    resultMeta.textContent = j.message || '翻譯中…';
+    _trdPoll();
+  } else {
+    const ch = _trdTotalChars();
+    resultMeta.textContent =
+      `共 ${total} 句 — 完成 ${_trdDoneCount()} 句 · ` +
+      `原文 ${ch.src} 字、譯文 ${ch.tgt} 字`;
+  }
+}
+_trdResumeFromUrl();
 
 // 取第 i 句的「顯示用」原文 / 譯文（讀資料陣列，與畫面所見一致）。
 // 分頁後 DOM 只剩當前頁，copy / 匯出一律改讀 trdResults 才能涵蓋全部句子。

@@ -64,7 +64,8 @@ const fu = new FileUpload($('attUp'), async (f) => {
   $('btnStrip').hidden = true;
   const fd = new FormData(); fd.append('file', f);
   const r = await fu.upload('/tools/pdf-attachments/scan', fd, {processingLabel: '掃描附件中…'});
-  if (!r.ok) { $('attInfo').innerHTML = '<span data-s="s53875d1b">失敗：' + await r.text() + '</span>'; return; }
+  // 伺服器回應可能含使用者取的檔名 —— 用 textContent 才不會被當成 HTML 解析
+  if (!r.ok) { $('attInfo').textContent = '失敗：' + await window.friendlyServerError(r, '分析失敗'); return; }
   const d = await r.json();
   uploadId = d.upload_id;
   if (!d.attachments.length) {

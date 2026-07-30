@@ -164,6 +164,12 @@ async def zip_selected(request: Request):
     names = body.get("names") or []
     if not batch_id or not isinstance(names, list) or not names:
         raise HTTPException(400, "batch_id 與 names 必填")
+    # 歸屬驗證 —— 這個 id 從請求內容傳進來，只驗格式不夠：實測 B 可用 A 的 id
+    # 讀到 A 的文件內容（v1.14.6 資安稽核）。同一家族的其他端點本來就有驗，
+    # 這幾個漏了。
+    from ...core import safe_paths as _sp, upload_owner as _uo
+    _sp.require_uuid_hex(str(batch_id), "batch_id")
+    _uo.require(str(batch_id), request)
     bdir = settings.temp_dir / f"ext_{batch_id}"
     if not bdir.exists():
         raise HTTPException(404, "batch 不存在或已過期")

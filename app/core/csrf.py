@@ -62,12 +62,37 @@ def _cookie_token(scope) -> str | None:
     return m.value if m else None
 
 
+def _has_session_cookie(scope) -> bool:
+    raw = _header(scope, b"cookie")
+    if not raw:
+        return False
+    try:
+        from .sessions import COOKIE_NAME as _SESSION_COOKIE
+    except Exception:  # noqa: BLE001
+        _SESSION_COOKIE = "jtdt_session"
+    c = SimpleCookie()
+    try:
+        c.load(raw.decode("latin-1"))
+    except Exception:  # noqa: BLE001
+        return False
+    return _SESSION_COOKIE in c
+
+
 def _is_exempt(scope) -> bool:
     path = scope.get("path", "")
     if any(path.startswith(p) for p in _EXEMPT_PREFIXES):
         return True
     if _header(scope, b"authorization").startswith(b"Bearer "):
-        return True
+        # 只在「不是瀏覽器 session」時才豁免。
+        #
+        # 這裡**不驗** token 真假（那會讓 CSRF 層依賴 token 層，兩邊互相耦合），
+        # 改用一個更穩的判斷：帶著我們的 session cookie 就是瀏覽器發出的請求 ——
+        # 真正的 API 客戶端不會有 session cookie。
+        #
+        # 原本只看標頭：附一個假的 `Authorization: Bearer x` 就跳過 CSRF。今天
+        # 還不能直接利用（跨站帶自訂標頭會觸發 CORS 預檢，本站沒有開放 CORS，
+        # 瀏覽器不會送出），但哪天加了 CORS 就會變成現成的繞過路徑。
+        return not _has_session_cookie(scope)
     return False
 
 

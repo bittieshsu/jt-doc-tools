@@ -454,13 +454,8 @@ async def serve_preview(name: str, request: Request):
     from app.core.safe_paths import safe_join
     from ...core import upload_owner
     p = safe_join(settings.temp_dir, name)
-    # Watermark temp files are named `wm_<uid>_...`; strip the `wm_` prefix so
-    # the uuid prefix is recognised (otherwise extract_upload_id sees "wm" and
-    # the ACL silently no-ops, leaking previews across users).
-    base = name[3:] if name.startswith("wm_") else name
-    uid = upload_owner.extract_upload_id(base)
-    if uid:
-        upload_owner.require(uid, request)
+    # `wm_` 前綴不需要在這裡處理 —— extract_upload_id 會掃全部片段。
+    upload_owner.require_by_filename(name, request)
     if not p.exists():
         raise HTTPException(404)
     return FileResponse(str(p), media_type="image/png")

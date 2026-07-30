@@ -62,7 +62,10 @@
           <button class="btn btn-small btn-copy" type="button" title="複製到剪貼簿">複製</button>
         </td>
         <td class="muted" data-s="s6b9c179a">
-          <script nonce="{{ request.state.csp_nonce }}">document.write(new Date({{ t.created_at * 1000 | int }}).toLocaleString('zh-TW'));</script>
+          {# 在伺服器端就格式化。原本把 `created_at * 1000` 直接寫進 JS：
+             ①原始 Unix 時間戳會被掃描器判為資訊洩漏（Low）；
+             ②`document.write` 在頁面載入後執行會整頁重寫，本來就不該用。 #}
+          {{ t.created_at | localdt }}
         </td>
         <td class="muted" data-s="s6b9c179a">
           {% if t.last_used_at %}

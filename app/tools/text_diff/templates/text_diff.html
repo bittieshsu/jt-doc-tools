@@ -221,7 +221,12 @@ function _wireDrop(textareaId, metaId) {
       m.textContent = `${m.textContent}　·　已載入 ${file.name}`;
     };
     reader.onerror = () => {
-      meta.innerHTML = `<span class="err">讀檔失敗：${reader.error?.message || 'unknown'}</span>`;
+      // 用 DOM API 建節點，不要把訊息拼進 HTML 字串
+      meta.textContent = '';
+      const _e = document.createElement('span');
+      _e.className = 'err';
+      _e.textContent = `讀檔失敗：${reader.error?.message || 'unknown'}`;
+      meta.appendChild(_e);
     };
     reader.readAsText(file, 'utf-8');
   });

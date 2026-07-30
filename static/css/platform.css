@@ -633,6 +633,12 @@ details.panel > summary select {
 .job-bar { flex: 1; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
 .job-bar-inner { height: 100%; width: 0%; background: var(--primary); transition: width .25s; }
 .job-status { color: var(--muted); font-size: 13px; min-width: 180px; }
+/* 「可以關掉這一頁」提示 —— 只在作業執行中出現（見 job_progress.js） */
+.job-bg-note { display: flex; align-items: flex-start; gap: 7px; margin-top: 10px;
+  padding: 8px 11px; border: 1px solid #bfdbfe; border-radius: 7px;
+  background: #eff6ff; color: #1e40af; font-size: 12.5px; line-height: 1.6; }
+.job-bg-note svg { flex: none; margin-top: 2px; }
+.job-bg-note a { color: inherit; font-weight: 600; }
 .job-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .job-status { font-size: 13px; color: var(--muted); min-width: 60px; white-space: nowrap; }
 /* 已過時間：等寬數字避免秒數跳動時左右晃動 */
