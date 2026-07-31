@@ -63,6 +63,44 @@ OFFICE_TOOL_IDS: frozenset[str] = frozenset({
     "translate-doc",
 })
 
+#: 會做 OCR 的工具（本機 EasyOCR / Tesseract）。第一次載入模型要數十秒又吃記憶體，
+#: 管理員看得出來才知道那個作業為什麼久。**新增用到 `ocr_engine` 的工具要加進來**。
+OCR_TOOL_IDS: frozenset[str] = frozenset({
+    "pdf-editor", "pdf-ocr", "submission-check",
+})
+
+#: 可能呼叫**外部服務**的工具（LLM 或遠端 GPU OCR）。這一類的瓶頸不在本機 ——
+#: 是對方那台機器的容量，所以走 `remote_limit` 另一條號誌。
+#: **新增用到 `llm_settings` / `llm_client` / 遠端 OCR 的工具要加進來**。
+REMOTE_TOOL_IDS: frozenset[str] = frozenset({
+    "doc-deident", "doc-diff", "einvoice-scan", "pdf-annotations",
+    "pdf-extract-text", "pdf-fill", "pdf-ocr", "pdf-wordcount",
+    "submission-check", "text-deident", "translate-doc",
+})
+
+
+def resource_tags(tool_id: str) -> list[str]:
+    """這個工具會用到哪些**共用資源**（給作業清單標示用）。
+
+    使用者看到「為什麼我的作業排這麼久」時，答案通常是「它跟別人搶同一個東西」。
+    三種資源各有自己的併行上限，標出來才知道是卡在哪一個：
+
+    * `office` —— soffice 轉檔，瓶頸是記憶體
+    * `ocr` —— 本機 OCR，第一次要載模型
+    * `remote` —— 外部 LLM / 遠端 GPU OCR，瓶頸是對方機器
+
+    一個工具可以同時屬於多類（例如 OCR 文字辨識可以走本機也可以走遠端 GPU）。
+    """
+    tags = []
+    if tool_id in OFFICE_TOOL_IDS:
+        tags.append("office")
+    if tool_id in OCR_TOOL_IDS:
+        tags.append("ocr")
+    if tool_id in REMOTE_TOOL_IDS:
+        tags.append("remote")
+    return tags
+
+
 #: 單一工作的記憶體估計值（MB）。soffice 轉檔實測 300–800MB，大檔更多 → 取
 #: 偏保守的高值；估太低的代價是 OOM，估太高只是多排隊一下。
 _MB_OFFICE = 800

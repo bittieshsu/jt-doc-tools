@@ -257,6 +257,8 @@
           ? (j.queue_pos === 1 ? '排隊中・下一個就是你'
              : `排隊中・前面還有 ${j.queue_pos - 1} 個作業`)
           : '排隊中');
+        // 插隊的作業要講清楚原因，不然使用者會以為號碼算錯了
+        if (j.priority) bits.push('優先派送');
       } else {
         bits.push('耗時 ' + fmtElapsed(j.elapsed));
       }

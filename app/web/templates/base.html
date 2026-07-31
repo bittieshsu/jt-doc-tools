@@ -233,13 +233,13 @@
                 }
                 var actionBtn = '';
                 if (!totpEnabled) {
-                  actionBtn = '<button type="button" id="meTotpEnableBtn" class="btn" data-s="s543893a7">啟用 2FA</button>';
+                  actionBtn = '<button type="button" id="meTotpEnableBtn" class="btn" data-s="s543893a7"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>啟用 2FA</button>';
                 } else if (totpRequired) {
-                  actionBtn = '<button type="button" id="meTotpReissueBtn" class="btn" data-s="s2215be2d">重新生 secret</button>'
+                  actionBtn = '<button type="button" id="meTotpReissueBtn" class="btn" data-s="s2215be2d"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>重新生 secret</button>'
                     + '<span data-s="s48accde1">您的角色強制使用 2FA，不可停用</span>';
                 } else {
-                  actionBtn = '<button type="button" id="meTotpReissueBtn" class="btn" data-s="s2215be2d">重新生 secret</button>'
-                    + '<button type="button" id="meTotpDisableBtn" class="btn btn-danger" data-s="s543893a7">停用 2FA</button>';
+                  actionBtn = '<button type="button" id="meTotpReissueBtn" class="btn" data-s="s2215be2d"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>重新生 secret</button>'
+                    + '<button type="button" id="meTotpDisableBtn" class="btn btn-danger" data-s="s543893a7"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12"/><path d="M6 18L18 6"/></svg>停用 2FA</button>';
                 }
                 totpHtml = '<div data-s="s5239fcb7">'
                   + '<div data-s="s12db6719">'
@@ -300,7 +300,7 @@
                 + '</div>'
                 + totpHtml
                 + pwBtnHtml;
-              window.showAlert(html, {title:'我的帳號', html:true, okText:'關閉'});
+              window.showAlert(html, {title:'我的帳號', html:true, okText:'關閉', okIcon:'close'});
               // Bind the 變更密碼 button — uses a self-contained inline modal
               // (showConfirm closes before we can read form values)
               setTimeout(function(){

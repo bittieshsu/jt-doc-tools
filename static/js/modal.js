@@ -32,7 +32,52 @@
     return `<svg ${_SVG} width="15" height="15"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
   }
 
-  function _show({ title, body, kind, okText, cancelText, showCancel, prompt, defaultValue, placeholder, html }) {
+
+  // 對話框按鈕的圖示。
+  //
+  // 站上其他按鈕都是「圖示 + 文字」（模板走 `icon()` macro），只有對話框的
+  // 確定 / 取消是純文字，看起來像少了什麼（使用者回報「關閉鈕缺少 icon」）。
+  //
+  // 這裡是 JS 動態產生，用不到 macro，所以**四個屬性要跟 macro 完全一致**
+  // （width / height / class="ic" / stroke-width）—— 少了尺寸，SVG 會用
+  // viewBox 的自然大小把按鈕撐到 50px 以上。
+  const _ICON_PATHS = {
+    check: ['M5 12l5 5L20 7'],
+    close: ['M6 6l12 12', 'M6 18L18 6'],
+  };
+
+  function _iconSvg(name) {
+    const paths = _ICON_PATHS[name];
+    if (!paths) return null;
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', 'ic');
+    svg.setAttribute('width', '16');
+    svg.setAttribute('height', '16');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.6');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    paths.forEach((d) => {
+      const el = document.createElementNS(NS, 'path');
+      el.setAttribute('d', d);
+      svg.appendChild(el);
+    });
+    return svg;
+  }
+
+  function _setBtnLabel(btn, iconName, text) {
+    btn.textContent = '';
+    const svg = iconName === false ? null : _iconSvg(iconName);
+    if (svg) btn.appendChild(svg);
+    btn.appendChild(document.createTextNode(text));
+  }
+
+  function _show({ title, body, kind, okText, cancelText, showCancel, prompt, defaultValue, placeholder, html, okIcon, cancelIcon }) {
     return new Promise((resolve) => {
       const host = ensureHost();
       const overlay = document.createElement('div');
@@ -100,13 +145,15 @@
         const cb = document.createElement('button');
         cb.type = 'button';
         cb.className = 'btn modal-cancel';
-        cb.textContent = cancelText || '取消';
+        _setBtnLabel(cb, cancelIcon === undefined ? 'close' : cancelIcon,
+                     cancelText || '取消');
         actionsEl.appendChild(cb);
       }
       const ob = document.createElement('button');
       ob.type = 'button';
       ob.className = 'btn btn-primary modal-ok';
-      ob.textContent = okText || '確定';
+      _setBtnLabel(ob, okIcon === undefined ? 'check' : okIcon,
+                   okText || '確定');
       actionsEl.appendChild(ob);
       card.appendChild(actionsEl);
       overlay.appendChild(card);
@@ -169,7 +216,7 @@
     opts = opts || {};
     return _show({
       title: opts.title, body: msg, kind: opts.kind, html: opts.html,
-      okText: opts.okText || '確定', showCancel: false,
+      okText: opts.okText || '確定', okIcon: opts.okIcon, showCancel: false,
     });
   };
   window.showConfirm = function (msg, opts) {
@@ -177,6 +224,7 @@
     return _show({
       title: opts.title, body: msg, kind: opts.kind || 'warn', html: opts.html,
       okText: opts.okText || '確定', cancelText: opts.cancelText || '取消',
+      okIcon: opts.okIcon, cancelIcon: opts.cancelIcon,
       showCancel: true,
     });
   };

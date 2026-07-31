@@ -17,7 +17,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.7"
+VERSION = "1.14.8"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -335,7 +335,7 @@ templates.env.globals["nav_settings"] = [
     {"icon": "gear", "name": "轉檔引擎設定", "description": "LibreOffice / OxOffice 路徑與順序",
      "url": "/admin/conversion",
      "keywords": "conversion office libreoffice oxoffice path engine 轉檔 引擎 路徑"},
-    {"icon": "gear", "name": "LLM 設定", "description": "10 個工具的 LLM AI 加值（附加功能，預設關閉）",
+    {"icon": "gear", "name": "LLM 設定", "description": "11 個工具的 LLM AI 加值（附加功能，預設關閉）",
      "url": "/admin/llm-settings",
      "keywords": "llm ai ollama qwen vision review 校驗 模型 大語言模型"},
     {"icon": "gear", "name": "API Token", "description": "對外呼叫 /api/* 的認證 token",
@@ -1290,6 +1290,8 @@ async def api_job_list(request: Request, active: bool = False,
             "progress": lv.get("progress", r["progress"]),
             "message": lv.get("message") or r["message"],
             "queue_pos": qpos.get(r["id"]),
+            # 這件作業有沒有插隊（管理員指定的優先派送名單）
+            "priority": bool(lv.get("priority")),
             "error": r["error"],
             "filename": _job_display_name(meta, r["result_filename"]),
             "result_filename": r["result_filename"],

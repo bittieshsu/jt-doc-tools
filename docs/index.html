@@ -457,6 +457,15 @@
         <h3>網頁回應永遠優先</h3>
         <p>轉檔行程降優先權並<b>限制可用核心數</b>（預設保留一顆給網頁），轉大檔時介面不會卡住。派送前先估算記憶體，不夠就<b>留在佇列排隊</b>，不會硬開下去把機器打爆；作業狀態存在資料庫，服務重啟後不會憑空消失。</p>
       </div>
+
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#fef3c7;color:#b45309;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L4 14h6l-1 7 9-11h-6z"/></svg>
+        </div>
+        <h3>優先派送（插隊）</h3>
+        <p>管理員可指定<b>少數幾位</b>使用者 —— 高階主管、或有時效性的重要工作 —— 他們送出的作業<b>直接排到佇列最前面</b>，下一個被派送的就是他們的。<b>不會中斷正在執行的作業</b>（轉檔跑到一半殺掉只會留下半成品），效果是「下一個換你」而不是「現在就換你」；名單內的人彼此仍照先來後到，記憶體不足時一樣要排隊。</p>
+      </div>
+
     </div>
   </div>
 </section>

@@ -1632,6 +1632,11 @@ def build_auth_router(templates) -> APIRouter:
                 "elapsed": round(max(0.0, (r["finished_at"] or time.time())
                                      - r["created_at"]), 1),
                 "is_office": r["tool_id"] in _cs.OFFICE_TOOL_IDS,
+                # 這個作業會跟別人搶哪些共用資源（Office / OCR / 外部服務）——
+                # 「為什麼排這麼久」的答案通常就在這裡
+                "resources": _cs.resource_tags(r["tool_id"]),
+                # 優先派送（管理員指定的名單）
+                "priority": bool(live.get(r["id"], {}).get("priority")),
                 # 排隊順序取自實際的派送佇列，不是拿時間去猜
                 "queue_pos": qpos.get(r["id"]),
                 # 實測的子行程用量（soffice 才是真正吃記憶體的那個）；
@@ -1711,6 +1716,75 @@ def build_auth_router(templates) -> APIRouter:
             target="concurrency", details=cfg,
         )
         return {"ok": True, "conc": _cs.describe()}
+
+    @router.get("/jobs/api/priority-users")
+    async def jobs_api_priority_users(request: Request):
+        """優先派送名單（含顯示用的帳號資訊）。
+
+        回傳時把已經不存在的使用者濾掉 —— 帳號刪掉之後名單裡留著一個孤兒編號，
+        畫面上會是一列空白，管理員也認不出那是誰。
+        """
+        from ..core import job_priority, user_manager
+        users = []
+        for uid in sorted(job_priority.get_user_ids()):
+            u = user_manager.get_by_id(uid)
+            if not u:
+                continue
+            users.append({"id": uid, "username": u.get("username", ""),
+                          "display_name": u.get("display_name", ""),
+                          "source": u.get("source", "")})
+        return {"ok": True, "users": users, "max": job_priority.MAX_USERS,
+                "auth_enabled": auth_settings.is_enabled()}
+
+    @router.get("/jobs/api/user-search")
+    async def jobs_api_user_search(request: Request, q: str = ""):
+        """給優先派送名單挑人用的帳號搜尋。
+
+        只回顯示需要的欄位（編號 / 帳號 / 姓名 / 來源），**不回信箱或任何憑證**
+        —— 這個端點的用途只是挑人。空字串也回前幾筆，管理員不必先知道要打什麼。
+        """
+        from ..core import user_manager
+        needle = (q or "").strip().lower()
+        out = []
+        for u in user_manager.list_users("all"):
+            hay = f"{u.get('username', '')} {u.get('display_name', '')}".lower()
+            if needle and needle not in hay:
+                continue
+            out.append({"id": u.get("id"), "username": u.get("username", ""),
+                        "display_name": u.get("display_name", ""),
+                        "source": u.get("source", "")})
+            if len(out) >= 20:
+                break
+        return {"ok": True, "users": out}
+
+    @router.post("/jobs/api/priority-users")
+    async def jobs_api_priority_users_save(request: Request):
+        """覆寫優先派送名單。
+
+        只收使用者編號，而且**逐一確認帳號存在**才存 —— 前端送一串亂數進來時
+        不該讓它們落進設定檔（之後查不到人，也看不出是誰）。
+        """
+        from ..core import job_priority, user_manager
+        body = await request.json()
+        raw = body.get("user_ids")
+        if not isinstance(raw, list):
+            raise HTTPException(400, "user_ids 必須是陣列")
+        if len(raw) > job_priority.MAX_USERS:
+            raise HTTPException(400, f"最多 {job_priority.MAX_USERS} 位")
+        valid: list[int] = []
+        for v in raw:
+            try:
+                uid = int(v)
+            except (TypeError, ValueError):
+                raise HTTPException(400, "user_ids 只能是使用者編號")
+            if user_manager.get_by_id(uid):
+                valid.append(uid)
+        saved = job_priority.set_user_ids(valid)
+        audit_db.log_event(
+            "settings_change", username=_actor(request), ip=_client_ip(request),
+            target="job_priority", details={"user_ids": sorted(saved)},
+        )
+        return {"ok": True, "count": len(saved)}
 
     # ---------- /admin/workspace ----------
 

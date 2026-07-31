@@ -54,6 +54,20 @@ logger = logging.getLogger("app.job_manager")
 JobStatus = Literal["pending", "running", "done", "error", "cancelled",
                     "interrupted"]
 
+
+def _is_priority_owner(owner_id: Optional[int]) -> bool:
+    """這位使用者的作業要不要插隊（見 `job_priority`）。
+
+    包一層是為了在名單模組出問題時**降級成一般作業**，而不是讓整個送出失敗 ——
+    插隊是加分功能，壞掉不該讓人送不出工作。
+    """
+    try:
+        from . import job_priority
+        return job_priority.is_priority(owner_id)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("優先派送判斷失敗，視為一般作業：%s", e.__class__.__name__)
+        return False
+
 #: 已結束、不會再變動的狀態
 TERMINAL: tuple[str, ...] = ("done", "error", "cancelled", "interrupted")
 
@@ -135,6 +149,10 @@ class Job:
     #: 工作區」只在他**已經離開**時才需要（人還在的話按下載就好，自動存只是
     #: 多一份重複檔案並吃掉額度）。
     last_polled_at: Optional[float] = None
+    #: 送出當下就決定：這位使用者在不在「優先派送名單」裡（見 `job_priority`）。
+    #: 存成欄位而不是每次查名單 —— 名單中途被改動時，已經在排隊的作業不該突然
+    #: 換位置（使用者會看到自己的號碼往後跳）。
+    priority: bool = False
 
     def elapsed(self) -> float:
         end = self.updated_at if self.status in TERMINAL else time.time()
@@ -152,6 +170,7 @@ class Job:
             "updated_at": self.updated_at,
             "elapsed": round(self.elapsed(), 1),
             "queued": self.status == "pending",
+            "priority": bool(self.priority),
             "has_result": self.result_path is not None and self.result_path.exists(),
             "result_filename": self.result_filename,
             "meta": self.meta or {},
@@ -234,7 +253,7 @@ class JobManager:
         """
         with self._lock:
             return {j.id: {"status": j.status, "progress": j.progress,
-                           "message": j.message}
+                           "message": j.message, "priority": bool(j.priority)}
                     for j in self._jobs.values()}
 
     def queue_positions(self) -> dict[str, int]:
@@ -330,15 +349,38 @@ class JobManager:
     ) -> Job:
         job = Job(id=uuid.uuid4().hex, tool_id=tool_id, meta=meta or {})
         self._attach_actor(job, request)
+        # 優先派送只看**伺服器端決定的擁有者**，不看任何請求參數 ——
+        # 只要前端傳得動，就等於開放所有人插隊。
+        job.priority = _is_priority_owner(job.owner_id)
         with self._lock:
             self._jobs[job.id] = job
             self._fns[job.id] = fn
-            self._pending.append(job.id)
+            self._enqueue(job.id, job.priority)
             if not job.message:
-                job.message = "排隊中…"
+                job.message = "排隊中…" if not job.priority else "排隊中（優先）…"
         self._persist(job)
         self._dispatch()
         return job
+
+    def _enqueue(self, job_id: str, priority: bool) -> None:
+        """把作業放進佇列。優先作業插到最前面，但**排在已有的優先作業之後**。
+
+        直接 `appendleft` 會讓後送出的優先使用者跑到先送出的前面 —— 同一群人之間
+        變成後進先出。他們彼此仍然要照先來後到，插隊只是相對於一般作業。
+
+        呼叫端要自己持有 `self._lock`。
+        """
+        if not priority:
+            self._pending.append(job_id)
+            return
+        idx = 0
+        for i, jid in enumerate(self._pending):
+            j = self._jobs.get(jid)
+            if j is not None and getattr(j, "priority", False):
+                idx = i + 1
+            else:
+                break
+        self._pending.insert(idx, job_id)
 
     def _attach_actor(self, job: Job, request: Any) -> None:
         """優先用明確傳入的 request，其次用中介層設定的 contextvar。"""
