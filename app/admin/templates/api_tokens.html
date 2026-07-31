@@ -58,8 +58,11 @@
         <td><strong>{{ t.label }}</strong></td>
         <td>
           <code class="token-masked" data-full="{{ t.token }}">{{ t.token[:6] }}…{{ t.token[-4:] }}</code>
-          <button class="btn btn-small btn-reveal" type="button" title="顯示完整 token">{{ icon('eye', size=12) }}顯示</button>
-          <button class="btn btn-small btn-copy" type="button" title="複製到剪貼簿">複製</button>
+          {# 兩顆按鈕的內容結構要一致（圖示 + 文字），不然高度不同會上下錯開。
+             文字包在 .btn-tx 裡，JS 切換「顯示 / 隱藏」時只換這個節點，
+             圖示才不會被 textContent 洗掉。 #}
+          <button class="btn btn-small btn-reveal" type="button" title="顯示完整 token">{{ icon('eye', size=12) }}<span class="btn-tx">顯示</span></button>
+          <button class="btn btn-small btn-copy" type="button" title="複製到剪貼簿">{{ icon('copy', size=12) }}<span class="btn-tx">複製</span></button>
         </td>
         <td class="muted" data-s="s6b9c179a">
           {# 在伺服器端就格式化。原本把 `created_at * 1000` 直接寫進 JS：
@@ -113,7 +116,9 @@ r = httpx.post(
 .tokens-table th, .tokens-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }
 .tokens-table th { background: #f1f5f9; font-weight: 600; }
 .tokens-table code.token-masked { font-family: ui-monospace, SFMono-Regular, monospace; background:#f8fafc; padding:2px 6px; border-radius:4px; }
-.tokens-table .btn-small { padding: 2px 8px; font-size:11px; margin-left:4px; }
+.tokens-table td { vertical-align: middle; }
+.tokens-table .btn-small { padding: 2px 8px; font-size:11px; margin-left:4px; vertical-align: middle; }
+.tokens-table .token-masked { vertical-align: middle; }
 .tag-ok  { background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
 .tag-off { background: #e5e7eb; color: #374151; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
 </style>
@@ -159,19 +164,28 @@ document.addEventListener('click', async (e) => {
 
   if (e.target.closest('.btn-reveal')) {
     const code = row.querySelector('.token-masked');
+    // 只換文字節點 —— 用 textContent 蓋整顆按鈕會把圖示一起洗掉
+    // （原本的程式就是這樣，切一次之後圖示就再也回不來了）。
+    const tx = e.target.closest('.btn-reveal').querySelector('.btn-tx');
     if (code.textContent.includes('…')) {
       code.textContent = full;
-      e.target.closest('.btn-reveal').textContent = '隱藏';
+      if (tx) tx.textContent = '隱藏';
     } else {
       code.textContent = full.slice(0,6) + '…' + full.slice(-4);
-      e.target.closest('.btn-reveal').innerHTML = '<span>顯示</span>';
+      if (tx) tx.textContent = '顯示';
     }
   }
   if (e.target.closest('.btn-copy')) {
     try {
       await navigator.clipboard.writeText(full);
       if (window.showToast) showToast('已複製', 'ok');
-      else { e.target.textContent = '✓ 已複製'; setTimeout(() => e.target.textContent = '複製', 1500); }
+      else {
+        const tx = e.target.closest('.btn-copy').querySelector('.btn-tx');
+        if (tx) {
+          tx.textContent = '已複製';
+          setTimeout(() => { tx.textContent = '複製'; }, 1500);
+        }
+      }
     } catch (err) { alert('複製失敗：' + err.message); }
   }
   if (e.target.closest('.btn-revoke')) {
