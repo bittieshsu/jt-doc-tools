@@ -567,7 +567,7 @@ __SECTIONS__
       <div class="footer-h">連結</div>
       <a href="index.html">介紹網站</a>
       <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">原始碼庫</a>
-      <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/github/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
       <a href="https://github.com/jasoncheng7115/jt-doc-tools/issues" target="_blank" rel="noopener">回報問題</a>
     </div>
     <div class="footer-col">
