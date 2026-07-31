@@ -431,7 +431,7 @@
   <div class="container">
     <div class="section-eyebrow">v1.14 新功能</div>
     <h2 class="section-title">背景作業與完成通知：送出就可以關掉分頁</h2>
-    <p class="section-lead">轉檔、OCR、逐句翻譯這類耗時的工作交給伺服器跑，不必守著進度條。做完了主動通知你，結果自動留在「我的工作區」。</p>
+    <p class="section-lead">轉檔、OCR、逐句翻譯這類耗時的工作交給伺服器跑，不必守著進度條。做完了主動通知你，結果自動留在「我的工作區」。管理員這一側看得到全站佇列與資源用量，也調得動所有併行上限。</p>
 
     <div class="ent-grid">
       <div class="ent-card">
@@ -439,7 +439,7 @@
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
         </div>
         <h3>20 個工具走背景作業</h3>
-        <p>PDF 轉文書檔 / 轉簡報檔、OCR 文字辨識、逐句翻譯、壓縮、合併、浮水印、用印…<b>送出後可以直接關掉分頁</b>。「我的作業」頁看得到進度、佇列位置與已過時間，跑一半也能取消。</p>
+        <p>PDF 轉文書檔 / 轉簡報檔、OCR 文字辨識、逐句翻譯、壓縮、合併、浮水印、用印…<b>送出後可以直接關掉分頁</b>。「我的作業」頁看得到進度、佇列位置與已過時間，跑一半也能取消。產出不是單一檔案的工具（例如逐句翻譯）點回去會<b>接回原本的頁面</b>繼續看。</p>
       </div>
 
       <div class="ent-card">
@@ -447,7 +447,7 @@
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
         </div>
         <h3>做完主動通知</h3>
-        <p>站內通知顯示未讀數；<b>Email</b> 寄出含站台 logo 與工具圖示的通知信。另可接 Telegram / Slack / Teams / Discord / Zulip / Nextcloud Talk / LINE / 通用 Webhook（這些管道目前標示為<b>開發階段</b>，尚未接真實服務端到端驗證）。訊息只含工具名稱、檔名與狀態，<b>不含檔案內容</b>。</p>
+        <p>站內通知顯示未讀數；<b>Email</b> 寄出含站台 logo 與工具圖示的通知信。另可接 Telegram / Slack / Teams / Discord / LINE / Webhook 等 8 種管道（目前標示為<b>開發階段</b>，尚未接真實服務驗證）。訊息只含工具名稱、檔名與狀態，<b>不含檔案內容</b>。</p>
       </div>
 
       <div class="ent-card">
@@ -455,7 +455,7 @@
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>
         </div>
         <h3>網頁回應永遠優先</h3>
-        <p>轉檔行程降優先權並<b>限制可用核心數</b>（預設保留一顆給網頁），轉大檔時介面不會卡住。派送前先估算記憶體，不夠就<b>留在佇列排隊</b>，不會硬開下去把機器打爆；作業狀態存在資料庫，服務重啟後不會憑空消失。</p>
+        <p>轉檔行程降優先權並<b>限制可用核心數</b>（預設保留一顆給網頁），轉大檔時介面不會卡住 —— 轉檔本身只會慢一點。派送前先估算記憶體，不夠就<b>留在佇列排隊</b>，不會硬開下去把機器打爆；作業狀態存在資料庫，服務重啟後不會憑空消失。</p>
       </div>
 
       <div class="ent-card">
@@ -464,6 +464,22 @@
         </div>
         <h3>優先派送（插隊）</h3>
         <p>管理員可指定<b>少數幾位</b>使用者 —— 高階主管、或有時效性的重要工作 —— 他們送出的作業<b>直接排到佇列最前面</b>，下一個被派送的就是他們的。<b>不會中斷正在執行的作業</b>（轉檔跑到一半殺掉只會留下半成品），效果是「下一個換你」而不是「現在就換你」；名單內的人彼此仍照先來後到，記憶體不足時一樣要排隊。</p>
+      </div>
+
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#e0e7ff;color:#3730a3;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18"/><path d="M3 12h18"/><path d="M3 19h18"/><circle cx="7" cy="5" r="1.6"/><circle cx="14" cy="12" r="1.6"/><circle cx="10" cy="19" r="1.6"/></svg>
+        </div>
+        <h3>管理員看得到全部</h3>
+        <p>全站作業一覽：<b>誰送的、哪個工具、哪個檔、排第幾位、跑多久</b>，可只看進行中，每一筆都能<b>直接取消</b>。維護前可<b>暫停派送</b>，讓手上的跑完但不再開新的（已在執行的轉檔是獨立子行程，凍結不了 —— 介面照實說明，不會讓人以為按了就停）。</p>
+      </div>
+
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
+        </div>
+        <h3>效能看得見、上限調得動</h3>
+        <p>執行中 / 排隊中數量、Office 轉檔佔用、CPU 與記憶體用量都在同一頁，<b>點一下看歷史趨勢圖</b>；記憶體是<b>實測子行程</b>的數字（真正吃記憶體的是 soffice）。五個併行上限全部可調，而且<b>填再大也會被實際可用記憶體夾住</b>。</p>
       </div>
 
     </div>
@@ -874,40 +890,56 @@
     <div class="ent-grid">
       <div class="ent-card">
         <div class="ent-num">A</div>
-        <h3>多領域認證 + SSO</h3>
-        <p>同時支援 <b>本機帳號</b> / <b>LDAP</b> / <b>Active Directory</b>。同名帳號可分屬不同領域並存 （<code>jason@local</code> + <code>jason@ldap</code>），登入時於下拉選擇來源。LDAP 設定有「測試伺服器連線」+「測試帳號登入」按鈕，一鍵驗證設定是否正確。</p>
-        <p>另支援 <b>SSO 單一登入</b>（<b>OIDC</b> + <b>SAML</b>），可接 Microsoft 365 / Entra ID、Google Workspace、Keycloak、Okta、Authentik 等。與上述認證<b>並存</b>（保留本機 break-glass），首次登入自動建帳號、IdP 群組對應角色，並支援單一登出（SLO）。</p>
-        <p>再支援 <b>Reverse Proxy SSO</b>（<b>Kerberos / SPNEGO</b>）：已加入 AD 網域、已登入 Windows 的使用者，經前端 Nginx 驗證後<b>自動登入</b>免再輸入帳密；非網域電腦仍回到登入頁用其他方式登入。沿用既有 LDAP / AD 查詢 + 角色 / 稽核 / 2FA，並以「信任的反向代理 IP + 標頭覆寫」防偽造。設定與部署見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/reverse_proxy_sso.md" target="_blank" rel="noopener">reverse_proxy_sso.md</a>。</p>
+        <h3>多領域認證</h3>
+        <p>同時支援 <b>本機帳號</b> / <b>LDAP</b> / <b>Active Directory</b>。同名帳號可分屬不同領域並存（<code>jason@local</code> + <code>jason@ldap</code>），登入時於下拉選擇來源。LDAP 設定有「測試伺服器連線」+「測試帳號登入」按鈕，一鍵驗證設定是否正確。</p>
       </div>
 
       <div class="ent-card">
         <div class="ent-num">B</div>
+        <h3>SSO 單一登入</h3>
+        <p><b>OIDC</b> + <b>SAML</b>，可接 Microsoft 365 / Entra ID、Google Workspace、Keycloak、Okta、Authentik 等。與本機 / LDAP / AD <b>並存</b>（保留本機 break-glass 帳號），首次登入自動建帳號、IdP 群組對應角色，並支援單一登出（SLO）。</p>
+      </div>
+
+      <div class="ent-card">
+        <div class="ent-num">C</div>
+        <h3>Reverse Proxy SSO</h3>
+        <p><b>Kerberos / SPNEGO</b>：已加入 AD 網域、已登入 Windows 的使用者，經前端 Nginx 驗證後<b>自動登入</b>免再輸入帳密；非網域電腦仍回登入頁用其他方式登入。沿用既有 LDAP / AD 查詢 + 角色 / 稽核 / 2FA，並以「信任的反向代理 IP + 標頭覆寫」防偽造。見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/reverse_proxy_sso.md" target="_blank" rel="noopener">reverse_proxy_sso.md</a>。</p>
+      </div>
+
+      <div class="ent-card">
+        <div class="ent-num">D</div>
         <h3>角色與權限</h3>
         <p>7 個內建角色：<b>管理員</b>、<b>稽核員</b>、<b>一般使用者</b>、<b>文管</b>、<b>財務</b>、<b>業務</b>、<b>法務資安</b>。可自訂新角色，指派工具使用權限到使用者 / 群組 / OU。in-memory cache 確保權限查詢不影響效能。</p>
       </div>
 
       <div class="ent-card">
-        <div class="ent-num">C</div>
+        <div class="ent-num">E</div>
         <h3>稽核記錄</h3>
         <p>登入 / 登出 / 失敗鎖定 / 權限變更 / 設定變更 / <b>工具呼叫含上傳檔名</b>，全部記下。async 寫入 SQLite （WAL） 不影響服務效能。可篩選 / 匯出 CSV，預設保留 90 天自動清理。</p>
       </div>
 
       <div class="ent-card">
-        <div class="ent-num">D</div>
+        <div class="ent-num">F</div>
         <h3>記錄轉送</h3>
         <p>支援三種格式：<b>syslog</b> （RFC 5424 UDP/TCP）、<b>CEF</b> （ArcSight）、<b>GELF</b> （Graylog）。多目的地並行，失敗 retry 3 次後降級為本地稽核事件。可接 Splunk / Graylog / ArcSight / SIEM 系統。</p>
       </div>
 
       <div class="ent-card">
-        <div class="ent-num">E</div>
+        <div class="ent-num">G</div>
         <h3>上傳檔案記錄</h3>
         <p>獨立的「上傳檔案記錄」設定頁，列出所有透過工具上傳的檔案 — 誰、什麼時候、用哪個工具、上傳什麼檔名、多大、HTTP 狀態。完整可追溯。</p>
       </div>
 
       <div class="ent-card">
-        <div class="ent-num">F</div>
+        <div class="ent-num">H</div>
         <h3>檔案保留 / 清理</h3>
         <p>表單填寫 / 用印簽名 / 浮水印歷史 / 暫存上傳 / Job 結果 / 稽核 各類獨立保留天數設定，排程清理（啟動 + 每 6 小時）。可設「永久保留」（-1）。</p>
+      </div>
+
+      <div class="ent-card">
+        <div class="ent-num">I</div>
+        <h3>設定備份 / 匯入</h3>
+        <p>全站 admin 設定（認證、角色權限、通知、併行度、保留策略、公司資料、同義詞…）可<b>打包成一份 zip 匯出</b>，換機或災後重建直接匯入。另可設<b>排程備份</b>（每日 / 每週）寫到指定目錄並自動輪替舊檔。</p>
       </div>
     </div>
   </div>
