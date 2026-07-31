@@ -58,7 +58,11 @@ def _spec_from_form(
     return BR.BorderSpec(
         mode="content" if mode == "content" else "page",
         margin_mm=max(0.0, min(100.0, float(margin_mm))),
-        width_pt=max(0.1, min(30.0, float(width_pt))),
+        # 上限 72pt（1 英寸）。再粗就不是「框線」而是「色塊」了；每一頁還會再依
+        # 該頁短邊夾一次（見 border_render._effective_width），名片大小的頁面
+        # 不會被框吃掉。**上限要讓使用者看得到** —— 前端會把欄位夾回上限值，
+        # 不然填 200 卻沒變化，只會以為工具壞了（實際回報過）。
+        width_pt=max(0.1, min(72.0, float(width_pt))),
         color=color or "#333333",
         style=style if style in ("solid", "dashed", "dotted") else "solid",
         radius_mm=max(0.0, min(50.0, float(radius_mm))),

@@ -21,7 +21,7 @@
   </div>
 </div>
 
-<div class="panel" id="bdOpts" hidden>
+<div class="panel auth-form" id="bdOpts" hidden>
   <h2>2. 框線設定</h2>
 
   <fieldset class="auth-section">
@@ -30,15 +30,31 @@
       <label class="bd-mode">
         <input type="radio" name="bdmode" value="page" checked>
         <span class="bd-mode-box">
+          {# 示意圖：外框＝頁面、粗線＝框線（貼著頁緣往內縮）、灰塊＝內容。
+             兩張圖的內容塊刻意畫成一大一小，才看得出「框不跟著內容變」。 #}
+          <svg class="bd-mode-fig" viewBox="0 0 112 76" aria-hidden="true">
+            <rect x="1" y="1" width="110" height="74" rx="3" class="fig-page"/>
+            <rect x="9" y="9" width="94" height="58" rx="2" class="fig-border"/>
+            <rect x="22" y="22" width="46" height="7" rx="1" class="fig-ink"/>
+            <rect x="22" y="35" width="68" height="5" rx="1" class="fig-ink2"/>
+            <rect x="22" y="45" width="54" height="5" rx="1" class="fig-ink2"/>
+          </svg>
           <b>自頁緣內縮</b>
-          <small>每頁框線位置完全一致，投影片加外框用這個。</small>
+          <small>框線離<b>頁面邊緣</b>固定距離，每頁位置完全一致 —— 投影片加外框用這個。</small>
         </span>
       </label>
       <label class="bd-mode">
         <input type="radio" name="bdmode" value="content">
         <span class="bd-mode-box">
+          <svg class="bd-mode-fig" viewBox="0 0 112 76" aria-hidden="true">
+            <rect x="1" y="1" width="110" height="74" rx="3" class="fig-page"/>
+            <rect x="18" y="17" width="60" height="42" rx="2" class="fig-border"/>
+            <rect x="25" y="24" width="38" height="7" rx="1" class="fig-ink"/>
+            <rect x="25" y="37" width="46" height="5" rx="1" class="fig-ink2"/>
+            <rect x="25" y="47" width="30" height="5" rx="1" class="fig-ink2"/>
+          </svg>
           <b>貼齊內容</b>
-          <small>框線跟著該頁實際內容走，每頁位置可能不同。</small>
+          <small>框線包住該頁<b>實際內容</b>，內容多寡不同時每頁位置也不同。</small>
         </span>
       </label>
     </div>
@@ -54,7 +70,8 @@
     <div class="af-attrs">
       <div class="auth-field">
         <label class="af-label" for="bdWidth">粗細（pt）</label>
-        <input class="field bd-num" type="number" id="bdWidth" min="0.1" max="30" step="0.1" value="1.5">
+        <input class="field bd-num" type="number" id="bdWidth" min="0.1" max="72" step="0.1" value="1.5">
+        <div class="af-hint">上限 72pt（1 英寸）；小尺寸頁面會再依該頁短邊自動收斂。</div>
       </div>
       <div class="auth-field">
         <label class="af-label" for="bdStyle">線型</label>
@@ -179,24 +196,43 @@
 .bd-stat { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 12px; font-size: 13px; color: #475569; }
 .bd-kv b { color: #0f172a; }
 .bd-num { width: 130px; }
-.bd-hex { width: 100px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* .auth-form input.field[type=text] 會把 text 欄位拉成 100% —— 色碼欄旁邊還有
+   色票，滿寬會擠掉它，所以用同等特異度的選擇器收回固定寬。 */
+.auth-form input.field.bd-hex { width: 116px; flex: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* 指定頁面：placeholder 是「例：1,3,5-8（留空 = 全部）」，太窄會被切掉 */
+.auth-form input.field#bdRange { width: 100%; max-width: 340px; }
 .bd-color-row { display: flex; align-items: center; gap: 8px; }
 .bd-color-row input[type=color] { width: 42px; height: 32px; padding: 2px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; }
-.bd-modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-bottom: 14px; }
+/* 兩張卡片的說明字數不同，靠 grid 的 stretch（預設值）讓它們等高；
+   內部再用 flex 把說明推到底，不然文字少的那張標題會浮在中間。 */
+.bd-modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-bottom: 14px; align-items: stretch; }
+.bd-mode { display: block; height: 100%; }
 .bd-mode input { position: absolute; opacity: 0; pointer-events: none; }
-.bd-mode-box { display: block; border: 2px solid var(--border); border-radius: 8px; padding: 10px 13px; cursor: pointer; transition: border-color .12s, background .12s; }
-.bd-mode-box b { display: block; font-size: 13.5px; color: #1e293b; }
+.bd-mode-box { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; border: 2px solid var(--border); border-radius: 8px; padding: 10px 13px; cursor: pointer; transition: border-color .12s, background .12s; }
+.bd-mode-box > b { display: block; font-size: 13.5px; color: #1e293b; }
+.bd-mode-fig { display: block; width: 112px; height: 76px; margin-bottom: 9px; }
+.bd-mode-fig .fig-page { fill: #fff; stroke: #cbd5e1; stroke-width: 1; }
+.bd-mode-fig .fig-border { fill: none; stroke: #94a3b8; stroke-width: 2.5; }
+.bd-mode-fig .fig-ink { fill: #cbd5e1; }
+.bd-mode-fig .fig-ink2 { fill: #e2e8f0; }
+/* 選中的那張圖用主色，一眼看得出目前是哪一種 */
+.bd-mode input:checked + .bd-mode-box .fig-border { stroke: var(--primary); }
+.bd-mode input:checked + .bd-mode-box .fig-page { stroke: #a5b4fc; }
 .bd-mode-box small { display: block; margin-top: 3px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.bd-mode-box > b { margin-top: auto; }
 .bd-mode input:checked + .bd-mode-box { border-color: var(--primary); background: #eef2ff; }
 .bd-mode-box:hover { border-color: #c4b5fd; }
 .bd-sub { margin-left: 22px; padding-left: 12px; border-left: 2px solid #e5e7eb; }
 .bd-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
 .bd-pv-note { font-size: 11.5px; font-weight: 400; margin-left: 8px; }
 .bd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
-.bd-cell { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: #f8fafc; cursor: zoom-in; position: relative; }
-.bd-cell img { display: block; width: 100%; height: auto; background: #fff; }
+.bd-cell { border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 6px; cursor: zoom-in; position: relative; }
+/* 頁面是方的 —— 縮圖不套圓角。卡片留 padding，圖就碰不到圓角，也就不需要
+   overflow:hidden 去裁（裁了會把頁面四角切掉，看起來像輸出是圓角的）。 */
+.bd-cell img { display: block; width: 100%; height: auto; border-radius: 0; background: #fff; }
 .bd-cell.is-skipped { opacity: .55; }
-.bd-cap { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 8px; font-size: 11.5px; color: #475569; background: #fff; border-top: 1px solid #f1f5f9; }
+.bd-cap { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; padding: 6px 2px 0; font-size: 11.5px; color: #475569; border-top: 1px solid #f1f5f9; }
 .bd-skip-tag { padding: 0 6px; border-radius: 4px; background: #f1f5f9; color: #64748b; font-size: 10.5px; font-weight: 600; }
 .bd-cell.is-loading::after { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,.55); }
 .bd-run { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -322,10 +358,22 @@
       : '框線距離頁面邊緣多遠。';
   }
 
+  // HTML 的 min/max **不會擋使用者打字** —— 填 200 之後伺服器夾成 72，畫面上
+  // 卻還顯示 200 而且框線沒變粗，看起來像工具壞了。離開欄位時把值夾回範圍內，
+  // 使用者才知道實際生效的是多少。
+  function clampField(el) {
+    if (el.type !== 'number') return;
+    const v = Number(el.value);
+    if (!isFinite(v)) return;
+    const lo = Number(el.min), hi = Number(el.max);
+    const c = Math.max(isFinite(lo) ? lo : v, Math.min(isFinite(hi) ? hi : v, v));
+    if (c !== v) el.value = String(c);
+  }
   ['bdMargin','bdWidth','bdStyle','bdRadius','bdOpacity','bdGap',
    'bdShBlur','bdShOffset','bdShOpacity','bdRange'].forEach((id) => {
     $(id).addEventListener('input', () => schedulePreview());
-    $(id).addEventListener('change', () => schedulePreview());
+    $(id).addEventListener('change', () => { clampField($(id)); schedulePreview(); });
+    $(id).addEventListener('blur', () => { clampField($(id)); schedulePreview(0); });
   });
   ['bdDouble','bdShadow','bdSkipFirst'].forEach((id) => {
     $(id).addEventListener('change', () => { syncToggles(); schedulePreview(); });

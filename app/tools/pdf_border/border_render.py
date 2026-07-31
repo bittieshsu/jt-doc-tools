@@ -152,14 +152,14 @@ def content_bbox(page) -> Optional[fitz.Rect]:
     return (r * page.rotation_matrix).normalize()
 
 
-def _dashes_for(spec: BorderSpec) -> Optional[str]:
+def _dashes_for(spec: BorderSpec, width: float) -> Optional[str]:
     if spec.style == "dashed":
-        a = max(2.0, spec.width_pt * 3)
+        a = max(2.0, width * 3)
         return f"[{a:.2f} {a * 0.6:.2f}] 0"
     if spec.style == "dotted":
         # 點線＝很短的線段配圓端點；長度取線寬本身才會是圓點而不是短線
-        a = max(0.1, spec.width_pt * 0.01)
-        return f"[{a:.2f} {max(1.5, spec.width_pt * 2):.2f}] 0"
+        a = max(0.1, width * 0.01)
+        return f"[{a:.2f} {max(1.5, width * 2):.2f}] 0"
     return None
 
 
@@ -188,9 +188,24 @@ def target_rect(page, spec: BorderSpec) -> Optional[fitz.Rect]:
         m = mm_to_pt(spec.margin_mm)
         r = fitz.Rect(page.rect.x0 + m, page.rect.y0 + m,
                       page.rect.x1 - m, page.rect.y1 - m)
+    # **線寬是置中於路徑的**：畫一條 30pt 的線，有 15pt 落在路徑外。邊距小的時候
+    # 那一半會超出頁面被裁掉 —— 使用者把粗細從 10 調到 30，看起來卻幾乎沒變粗
+    # （實際回報過）。把路徑再往內縮半個線寬，整條線才會完整留在頁面裡。
+    half = _effective_width(spec, page) / 2.0
+    r = fitz.Rect(r.x0 + half, r.y0 + half, r.x1 - half, r.y1 - half)
     if r.is_empty or r.width <= 0 or r.height <= 0:
-        return None                          # 邊距大於頁面本身
+        return None                          # 邊距 + 線寬大於頁面本身
     return r
+
+
+def _effective_width(spec: BorderSpec, page) -> float:
+    """實際會用的線寬（pt）。
+
+    除了設定值本身的上限，再依**這一頁的短邊**夾一次 —— 名片大小的頁面配
+    72pt 的框會整個被框吃掉，剩不下內容。上限取短邊的六分之一。
+    """
+    short = min(page.rect.width, page.rect.height)
+    return max(0.1, min(spec.width_pt, short / 6.0))
 
 
 def draw_border(page, spec: BorderSpec, *, page_no: int, total: int) -> bool:
@@ -208,8 +223,9 @@ def draw_border(page, spec: BorderSpec, *, page_no: int, total: int) -> bool:
         return False
 
     deroto = page.derotation_matrix
+    width = _effective_width(spec, page)
     color = hex_to_rgb01(spec.color)
-    dashes = _dashes_for(spec)
+    dashes = _dashes_for(spec, width)
     opacity = max(0.0, min(1.0, spec.opacity))
 
     def _stroke(vr: fitz.Rect, *, width: float, col, op: float,
@@ -241,15 +257,17 @@ def draw_border(page, spec: BorderSpec, *, page_no: int, total: int) -> bool:
             op = spec.shadow_opacity * (1.0 - i / steps) * opacity
             _stroke(fitz.Rect(rect.x0 - grow + dx, rect.y0 - grow + dx,
                               rect.x1 + grow + dx, rect.y1 + grow + dx),
-                    width=spec.width_pt, col=scol, op=op, dash=None)
+                    width=width, col=scol, op=op, dash=None)
 
-    _stroke(rect, width=spec.width_pt, col=color, op=opacity, dash=dashes)
+    _stroke(rect, width=width, col=color, op=opacity, dash=dashes)
 
     if spec.double:
-        gap = mm_to_pt(max(0.1, spec.double_gap_mm))
+        # 兩條線之間要留的是**空白**間距，所以還要加上兩條線各自的半個線寬，
+        # 否則線一粗就會黏在一起看起來像一條。
+        gap = mm_to_pt(max(0.1, spec.double_gap_mm)) + width
         inner = fitz.Rect(rect.x0 + gap, rect.y0 + gap,
                           rect.x1 - gap, rect.y1 - gap)
-        iw = spec.double_inner_width_pt or spec.width_pt
+        iw = spec.double_inner_width_pt or width
         _stroke(inner, width=iw, col=color, op=opacity, dash=dashes)
     return True
 

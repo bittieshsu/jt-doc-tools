@@ -57,17 +57,48 @@ def test_apply_returns_how_many_pages_were_drawn():
 
 # ------------------------------------------------------------ 位置
 
-def test_page_mode_rect_is_page_inset_by_margin():
+def test_page_mode_rect_is_page_inset_by_margin_plus_half_stroke():
+    """路徑要往內縮「邊距 + 半個線寬」。
+
+    線寬是**置中於路徑**的：30pt 的線有 15pt 落在路徑外。只縮邊距的話那一半會
+    超出頁面被裁掉 —— 使用者把粗細從 10 調到 30，看起來卻幾乎沒變粗（實際回報過）。
+    """
     doc = _make_pdf(1)
     page = doc[0]
-    spec = BR.BorderSpec(mode="page", margin_mm=10)
+    w = 6.0
+    spec = BR.BorderSpec(mode="page", margin_mm=10, width_pt=w)
     r = BR.target_rect(page, spec)
     from app.core.unit_convert import mm_to_pt
-    m = mm_to_pt(10)
-    assert r.x0 == pytest.approx(page.rect.x0 + m, abs=0.5)
-    assert r.y0 == pytest.approx(page.rect.y0 + m, abs=0.5)
-    assert r.x1 == pytest.approx(page.rect.x1 - m, abs=0.5)
-    assert r.y1 == pytest.approx(page.rect.y1 - m, abs=0.5)
+    inset = mm_to_pt(10) + w / 2
+    assert r.x0 == pytest.approx(page.rect.x0 + inset, abs=0.5)
+    assert r.y0 == pytest.approx(page.rect.y0 + inset, abs=0.5)
+    assert r.x1 == pytest.approx(page.rect.x1 - inset, abs=0.5)
+    assert r.y1 == pytest.approx(page.rect.y1 - inset, abs=0.5)
+    doc.close()
+
+
+def test_thick_border_stays_fully_inside_the_page():
+    """邊距 0 配粗線時，整條線都要看得見（不可以有一半在頁面外）。"""
+    doc = _make_pdf(1, w=400, h=300)
+    page = doc[0]
+    w = 30.0
+    assert BR.draw_border(page, BR.BorderSpec(margin_mm=0, width_pt=w),
+                          page_no=1, total=1)
+    d = page.get_drawings()[0]
+    r = d["rect"]
+    half = d.get("width", w) / 2
+    assert r.x0 - half >= page.rect.x0 - 0.01
+    assert r.y0 - half >= page.rect.y0 - 0.01
+    assert r.x1 + half <= page.rect.x1 + 0.01
+    assert r.y1 + half <= page.rect.y1 + 0.01
+    doc.close()
+
+
+def test_line_width_is_capped_by_page_size():
+    """名片大小的頁面配 72pt 的框會被框吃光 —— 依該頁短邊再夾一次。"""
+    doc = _make_pdf(1, w=200, h=120)
+    assert BR._effective_width(BR.BorderSpec(width_pt=72), doc[0]) == \
+        pytest.approx(120 / 6)
     doc.close()
 
 
@@ -235,7 +266,7 @@ def test_server_clamps_values():
     assert s.mode == "page"          # 不認得的模式退回預設
     assert s.style == "solid"
     assert 0 <= s.margin_mm <= 100
-    assert 0.1 <= s.width_pt <= 30
+    assert 0.1 <= s.width_pt <= 72
     assert s.radius_mm >= 0
     assert 0 < s.opacity <= 1.0
     assert s.double_gap_mm >= 0.2
