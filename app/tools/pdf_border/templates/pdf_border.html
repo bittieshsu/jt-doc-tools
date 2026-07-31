@@ -1,0 +1,498 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}頁面加框 · {{ app_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ icon('border', size=22) }} 頁面加框</h1>
+<p class="muted">替每一頁加上框線。<b>投影片加外框</b>最常用；也可以用在文件、講義與獎狀。
+上傳 <b>PDF</b> 或<b>文書檔</b>（Word / Excel / PowerPoint / ODF），輸出一律是 PDF。</p>
+
+<div class="panel">
+  <h2>1. 上傳檔案</h2>
+  {% with upload_id='bdUpload',
+          accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
+          hint='單檔。文書檔會先自動轉成 PDF 再加框。' %}
+    {% include "components/file_upload.html" %}
+  {% endwith %}
+  <div class="bd-stat" id="bdStat" hidden>
+    <span class="bd-kv">檔案 <b id="bdName">-</b></span>
+    <span class="bd-kv">頁數 <b id="bdPages">-</b></span>
+    <span class="bd-kv" id="bdConvKv" hidden>{{ icon('info', size=13) }} 已由文書檔轉成 PDF</span>
+  </div>
+</div>
+
+<div class="panel" id="bdOpts" hidden>
+  <h2>2. 框線設定</h2>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('crop', size=14) }} 位置</legend>
+    <div class="bd-modes">
+      <label class="bd-mode">
+        <input type="radio" name="bdmode" value="page" checked>
+        <span class="bd-mode-box">
+          <b>自頁緣內縮</b>
+          <small>每頁框線位置完全一致，投影片加外框用這個。</small>
+        </span>
+      </label>
+      <label class="bd-mode">
+        <input type="radio" name="bdmode" value="content">
+        <span class="bd-mode-box">
+          <b>貼齊內容</b>
+          <small>框線跟著該頁實際內容走，每頁位置可能不同。</small>
+        </span>
+      </label>
+    </div>
+    <div class="auth-field">
+      <label class="af-label" for="bdMargin">邊距（mm）</label>
+      <input class="field bd-num" type="number" id="bdMargin" min="0" max="100" step="0.5" value="5">
+      <div class="af-hint" id="bdMarginHint">框線距離頁面邊緣多遠。</div>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('edit', size=14) }} 線條</legend>
+    <div class="af-attrs">
+      <div class="auth-field">
+        <label class="af-label" for="bdWidth">粗細（pt）</label>
+        <input class="field bd-num" type="number" id="bdWidth" min="0.1" max="30" step="0.1" value="1.5">
+      </div>
+      <div class="auth-field">
+        <label class="af-label" for="bdStyle">線型</label>
+        <select class="field" id="bdStyle">
+          <option value="solid">實線</option>
+          <option value="dashed">虛線</option>
+          <option value="dotted">點線</option>
+        </select>
+      </div>
+      <div class="auth-field">
+        <label class="af-label" for="bdColor">顏色</label>
+        <div class="bd-color-row">
+          <input type="color" id="bdColor" value="#333333">
+          <input class="field bd-hex" type="text" id="bdColorHex" value="#333333" maxlength="7" spellcheck="false">
+        </div>
+      </div>
+      <div class="auth-field">
+        <label class="af-label" for="bdRadius">圓角半徑（mm）</label>
+        <input class="field bd-num" type="number" id="bdRadius" min="0" max="50" step="0.5" value="0">
+        <div class="af-hint">0 = 直角。</div>
+      </div>
+      <div class="auth-field">
+        <label class="af-label" for="bdOpacity">不透明度</label>
+        <input class="field bd-num" type="number" id="bdOpacity" min="5" max="100" step="5" value="100">
+        <div class="af-hint">100 = 完全不透明（%）。</div>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('layers', size=14) }} 雙線與陰影</legend>
+    <div class="auth-field af-checks">
+      <label><input type="checkbox" id="bdDouble"> 內外雙框（獎狀 / 證書風格）</label>
+    </div>
+    <div class="auth-field bd-sub" id="bdDoubleOpts" hidden>
+      <label class="af-label" for="bdGap">兩線間距（mm）</label>
+      <input class="field bd-num" type="number" id="bdGap" min="0.2" max="30" step="0.1" value="1.5">
+    </div>
+    <div class="auth-field af-checks">
+      <label><input type="checkbox" id="bdShadow"> 外側陰影</label>
+    </div>
+    <div class="bd-sub" id="bdShadowOpts" hidden>
+      <div class="af-attrs">
+        <div class="auth-field">
+          <label class="af-label" for="bdShColor">陰影顏色</label>
+          <div class="bd-color-row">
+            <input type="color" id="bdShColor" value="#000000">
+            <input class="field bd-hex" type="text" id="bdShColorHex" value="#000000" maxlength="7" spellcheck="false">
+          </div>
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="bdShBlur">擴散（mm）</label>
+          <input class="field bd-num" type="number" id="bdShBlur" min="0" max="20" step="0.1" value="1.2">
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="bdShOffset">位移（mm）</label>
+          <input class="field bd-num" type="number" id="bdShOffset" min="0" max="20" step="0.1" value="0.6">
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="bdShOpacity">濃度（%）</label>
+          <input class="field bd-num" type="number" id="bdShOpacity" min="0" max="100" step="5" value="25">
+        </div>
+      </div>
+      <div class="af-hint">PDF 沒有真正的模糊，陰影是用幾圈半透明筆畫疊出來的柔邊。</div>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('pages', size=14) }} 套用範圍</legend>
+    <div class="auth-field af-checks">
+      <label><input type="checkbox" id="bdSkipFirst"> 首頁不加框（投影片封面通常是滿版設計）</label>
+    </div>
+    <div class="auth-field">
+      <label class="af-label" for="bdRange">指定頁面</label>
+      <input class="field" type="text" id="bdRange" placeholder="例：1,3,5-8（留空 = 全部）" spellcheck="false">
+      <div class="af-hint">留空代表每一頁都加。沒有被選到的頁在下方預覽會標示為「不加框」。</div>
+    </div>
+  </fieldset>
+
+  <div class="bd-presets">
+    <span class="muted">快速套用：</span>
+    <button type="button" class="btn btn-small" data-preset="slide">投影片外框</button>
+    <button type="button" class="btn btn-small" data-preset="cert">獎狀雙框</button>
+    <button type="button" class="btn btn-small" data-preset="hairline">細灰線</button>
+    <button type="button" class="btn btn-small" data-preset="card">圓角卡片</button>
+  </div>
+</div>
+
+<div class="panel" id="bdPreviewPanel" hidden>
+  <h2>3. 預覽
+    <span class="mj-count" id="bdPvCount"></span>
+    <span class="bd-pv-note muted" id="bdPvNote">設定改動後會自動重新產生</span>
+  </h2>
+  <div class="bd-grid" id="bdGrid"></div>
+</div>
+
+<div class="panel" id="bdRunPanel" hidden>
+  <div class="bd-run">
+    <button class="btn btn-primary" id="bdGo">{{ icon('check', size=14) }} 產生加框 PDF</button>
+    {% with progress_id='bdJob' %}{% include "components/job_progress.html" %}{% endwith %}
+  </div>
+  <div class="bd-result" id="bdResult" hidden>
+    <a class="btn btn-primary" id="bdDownload" download>{{ icon('download', size=14) }} 下載</a>
+    {% if workspace_enabled(request) %}
+    <button class="btn" type="button" id="bdSaveWs">{{ icon('archive', size=14) }} 存至工作區</button>
+    {% endif %}
+    <span class="bd-done">{{ icon('check', size=14) }} <span id="bdDoneMsg">完成</span></span>
+  </div>
+</div>
+
+<div class="bd-lightbox" id="bdLightbox" hidden>
+  <button type="button" class="bd-lb-close" id="bdLbClose" aria-label="關閉">&times;</button>
+  <button type="button" class="bd-lb-nav bd-lb-prev" id="bdLbPrev" aria-label="上一頁">&lsaquo;</button>
+  <img id="bdLbImg" alt="">
+  <button type="button" class="bd-lb-nav bd-lb-next" id="bdLbNext" aria-label="下一頁">&rsaquo;</button>
+  <div class="bd-lb-cap" id="bdLbCap"></div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+.bd-stat { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 12px; font-size: 13px; color: #475569; }
+.bd-kv b { color: #0f172a; }
+.bd-num { width: 130px; }
+.bd-hex { width: 100px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.bd-color-row { display: flex; align-items: center; gap: 8px; }
+.bd-color-row input[type=color] { width: 42px; height: 32px; padding: 2px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; }
+.bd-modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.bd-mode input { position: absolute; opacity: 0; pointer-events: none; }
+.bd-mode-box { display: block; border: 2px solid var(--border); border-radius: 8px; padding: 10px 13px; cursor: pointer; transition: border-color .12s, background .12s; }
+.bd-mode-box b { display: block; font-size: 13.5px; color: #1e293b; }
+.bd-mode-box small { display: block; margin-top: 3px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.bd-mode input:checked + .bd-mode-box { border-color: var(--primary); background: #eef2ff; }
+.bd-mode-box:hover { border-color: #c4b5fd; }
+.bd-sub { margin-left: 22px; padding-left: 12px; border-left: 2px solid #e5e7eb; }
+.bd-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.bd-pv-note { font-size: 11.5px; font-weight: 400; margin-left: 8px; }
+.bd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.bd-cell { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: #f8fafc; cursor: zoom-in; position: relative; }
+.bd-cell img { display: block; width: 100%; height: auto; background: #fff; }
+.bd-cell.is-skipped { opacity: .55; }
+.bd-cap { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 8px; font-size: 11.5px; color: #475569; background: #fff; border-top: 1px solid #f1f5f9; }
+.bd-skip-tag { padding: 0 6px; border-radius: 4px; background: #f1f5f9; color: #64748b; font-size: 10.5px; font-weight: 600; }
+.bd-cell.is-loading::after { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,.55); }
+.bd-run { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bd-result { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid #f1f5f9; }
+.bd-done { display: inline-flex; align-items: center; gap: 5px; color: #15803d; font-size: 13px; font-weight: 600; }
+.bd-lightbox { position: fixed; inset: 0; z-index: 900; background: rgba(15,23,42,.88); display: flex; align-items: center; justify-content: center; }
+.bd-lightbox img { max-width: 88vw; max-height: 84vh; background: #fff; border-radius: 4px; box-shadow: 0 18px 50px rgba(0,0,0,.45); }
+.bd-lb-close { position: absolute; top: 16px; right: 20px; border: 0; background: none; color: #fff; font-size: 34px; line-height: 1; cursor: pointer; }
+.bd-lb-nav { position: absolute; top: 50%; transform: translateY(-50%); border: 0; background: rgba(255,255,255,.14); color: #fff; font-size: 34px; line-height: 1; width: 48px; height: 68px; border-radius: 8px; cursor: pointer; }
+.bd-lb-nav:hover { background: rgba(255,255,255,.26); }
+.bd-lb-prev { left: 18px; } .bd-lb-next { right: 18px; }
+/* JobProgress 內建的動作鈕與下面自己的結果列重複 —— 藏掉內建那排，
+   只留進度條本身（下載 / 存至工作區走我們自己的結果列）。 */
+#bdJob .job-actions { display: none !important; }
+.bd-lb-cap { position: absolute; bottom: 20px; color: #e2e8f0; font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script>
+<script src="/static/js/job_progress.js"></script>
+<script src="/static/js/workspace_picker.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let uploadId = null, pageCount = 0, srcName = '';
+  let pvToken = 0;              // 每次重畫預覽都換一個 token，過期的回應直接丟掉
+
+  // ---------- 上傳 ----------
+  const fu = new FileUpload($('bdUpload'), async (f) => {
+    const fd = new FormData();
+    fd.append('file', f);
+    const r = await fu.upload('/tools/pdf-border/load', fd,
+                              { processingLabel: '讀取中…（文書檔會先轉成 PDF）' });
+    if (!r.ok) {
+      (window.showAlert || alert)(await window.friendlyServerError(r, '讀取失敗'));
+      return;
+    }
+    const d = await r.json();
+    uploadId = d.upload_id;
+    pageCount = d.page_count;
+    srcName = d.filename || 'document';
+    $('bdName').textContent = srcName;
+    $('bdPages').textContent = pageCount + ' 頁';
+    $('bdConvKv').hidden = !d.converted;
+    $('bdStat').hidden = false;
+    $('bdOpts').hidden = false;
+    $('bdPreviewPanel').hidden = false;
+    $('bdRunPanel').hidden = false;
+    $('bdResult').hidden = true;
+    buildGrid();
+    schedulePreview(0);
+  });
+
+  // ---------- 設定 ----------
+  function currentSpec() {
+    return {
+      mode: document.querySelector('input[name=bdmode]:checked').value,
+      margin_mm: $('bdMargin').value,
+      width_pt: $('bdWidth').value,
+      color: $('bdColor').value,
+      style: $('bdStyle').value,
+      radius_mm: $('bdRadius').value,
+      opacity: String(Math.max(5, Number($('bdOpacity').value) || 100) / 100),
+      double: $('bdDouble').checked ? 'true' : 'false',
+      double_gap_mm: $('bdGap').value,
+      shadow: $('bdShadow').checked ? 'true' : 'false',
+      shadow_color: $('bdShColor').value,
+      shadow_blur_mm: $('bdShBlur').value,
+      shadow_offset_mm: $('bdShOffset').value,
+      shadow_opacity: String(Math.max(0, Number($('bdShOpacity').value) || 0) / 100),
+      pages: $('bdRange').value,
+      skip_first: $('bdSkipFirst').checked ? 'true' : 'false',
+    };
+  }
+
+  const PRESETS = {
+    slide:    { mode: 'page', margin: 4, width: 2, style: 'solid', color: '#1e293b', radius: 0, double: false, shadow: false, skipFirst: true },
+    cert:     { mode: 'page', margin: 8, width: 2.5, style: 'solid', color: '#92400e', radius: 0, double: true, gap: 2.5, shadow: false, skipFirst: false },
+    hairline: { mode: 'page', margin: 6, width: 0.6, style: 'solid', color: '#94a3b8', radius: 0, double: false, shadow: false, skipFirst: false },
+    card:     { mode: 'page', margin: 5, width: 1.2, style: 'solid', color: '#334155', radius: 6, double: false, shadow: true, skipFirst: false },
+  };
+
+  document.querySelectorAll('[data-preset]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const p = PRESETS[b.dataset.preset];
+      if (!p) return;
+      document.querySelector(`input[name=bdmode][value=${p.mode}]`).checked = true;
+      $('bdMargin').value = p.margin;
+      $('bdWidth').value = p.width;
+      $('bdStyle').value = p.style;
+      setColor('bdColor', 'bdColorHex', p.color);
+      $('bdRadius').value = p.radius;
+      $('bdDouble').checked = !!p.double;
+      if (p.gap) $('bdGap').value = p.gap;
+      $('bdShadow').checked = !!p.shadow;
+      $('bdSkipFirst').checked = !!p.skipFirst;
+      syncToggles();
+      schedulePreview(0);
+    });
+  });
+
+  function setColor(pickerId, hexId, v) {
+    $(pickerId).value = v;
+    $(hexId).value = v;
+  }
+  function pairColor(pickerId, hexId) {
+    $(pickerId).addEventListener('input', () => { $(hexId).value = $(pickerId).value; schedulePreview(); });
+    $(hexId).addEventListener('input', () => {
+      const v = $(hexId).value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) { $(pickerId).value = v; schedulePreview(); }
+    });
+  }
+  pairColor('bdColor', 'bdColorHex');
+  pairColor('bdShColor', 'bdShColorHex');
+
+  function syncToggles() {
+    $('bdDoubleOpts').hidden = !$('bdDouble').checked;
+    $('bdShadowOpts').hidden = !$('bdShadow').checked;
+    const contentMode = document.querySelector('input[name=bdmode]:checked').value === 'content';
+    $('bdMarginHint').textContent = contentMode
+      ? '框線離內容多遠（往外擴）。超出頁面的部分會自動收回頁內。'
+      : '框線距離頁面邊緣多遠。';
+  }
+
+  ['bdMargin','bdWidth','bdStyle','bdRadius','bdOpacity','bdGap',
+   'bdShBlur','bdShOffset','bdShOpacity','bdRange'].forEach((id) => {
+    $(id).addEventListener('input', () => schedulePreview());
+    $(id).addEventListener('change', () => schedulePreview());
+  });
+  ['bdDouble','bdShadow','bdSkipFirst'].forEach((id) => {
+    $(id).addEventListener('change', () => { syncToggles(); schedulePreview(); });
+  });
+  document.querySelectorAll('input[name=bdmode]').forEach((r) => {
+    r.addEventListener('change', () => { syncToggles(); schedulePreview(); });
+  });
+
+  // ---------- 預覽 ----------
+  //
+  // 每一頁都真的把框畫進 PDF 再渲染成 PNG（跟送出走同一段程式），不是前端疊
+  // CSS 邊框 —— 圓角、虛線間距、陰影在瀏覽器與 PDF 的算法不一樣，模擬的預覽
+  // 遲早跟實際輸出對不起來。
+  function buildGrid() {
+    const grid = $('bdGrid');
+    grid.textContent = '';
+    for (let i = 1; i <= pageCount; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'bd-cell is-loading';
+      cell.dataset.page = String(i);
+      const img = document.createElement('img');
+      img.alt = '第 ' + i + ' 頁';
+      img.loading = 'lazy';
+      img.src = `/tools/pdf-border/thumb/${uploadId}/${i}`;
+      const cap = document.createElement('div');
+      cap.className = 'bd-cap';
+      cap.appendChild(document.createTextNode('第 ' + i + ' 頁'));
+      const tag = document.createElement('span');
+      tag.className = 'bd-skip-tag';
+      tag.hidden = true;
+      tag.textContent = '不加框';
+      cap.appendChild(tag);
+      cell.appendChild(img);
+      cell.appendChild(cap);
+      grid.appendChild(cell);
+    }
+    $('bdPvCount').textContent = pageCount;
+  }
+
+  let pvTimer = null;
+  function schedulePreview(delay) {
+    if (!uploadId) return;
+    clearTimeout(pvTimer);
+    pvTimer = setTimeout(renderPreview, delay === undefined ? 280 : delay);
+  }
+
+  async function renderPreview() {
+    if (!uploadId) return;
+    const token = ++pvToken;
+    const spec = currentSpec();
+    const cells = [...document.querySelectorAll('.bd-cell')];
+    cells.forEach((c) => c.classList.add('is-loading'));
+    // 一次只打少量請求 —— 幾十頁的簡報一次全打會把伺服器與瀏覽器連線數塞爆
+    const QUEUE = 4;
+    let idx = 0;
+    async function worker() {
+      while (idx < cells.length) {
+        const cell = cells[idx++];
+        if (token !== pvToken) return;          // 設定又改了，這批作廢
+        const page = cell.dataset.page;
+        const fd = new FormData();
+        Object.entries(spec).forEach(([k, v]) => fd.append(k, v));
+        fd.append('upload_id', uploadId);
+        fd.append('page', page);
+        try {
+          const r = await fetch('/tools/pdf-border/preview', { method: 'POST', body: fd });
+          if (token !== pvToken) return;
+          if (!r.ok) { cell.classList.remove('is-loading'); continue; }
+          const drawn = r.headers.get('X-Border-Drawn') === '1';
+          const blob = await r.blob();
+          const img = cell.querySelector('img');
+          const old = img.dataset.blobUrl;
+          const url = URL.createObjectURL(blob);
+          img.src = url;
+          img.dataset.blobUrl = url;
+          if (old) URL.revokeObjectURL(old);
+          cell.classList.toggle('is-skipped', !drawn);
+          cell.querySelector('.bd-skip-tag').hidden = drawn;
+          cell.classList.remove('is-loading');
+        } catch (_e) {
+          cell.classList.remove('is-loading');
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: QUEUE }, worker));
+  }
+
+  // ---------- lightbox ----------
+  let lbPage = 1;
+  $('bdGrid').addEventListener('click', (e) => {
+    const cell = e.target.closest('.bd-cell');
+    if (!cell) return;
+    lbPage = Number(cell.dataset.page);
+    showLb();
+  });
+  async function showLb() {
+    const fd = new FormData();
+    Object.entries(currentSpec()).forEach(([k, v]) => fd.append(k, v));
+    fd.append('upload_id', uploadId);
+    fd.append('page', String(lbPage));
+    fd.append('large', 'true');
+    $('bdLbCap').textContent = `第 ${lbPage} / ${pageCount} 頁`;
+    $('bdLightbox').hidden = false;
+    try {
+      const r = await fetch('/tools/pdf-border/preview', { method: 'POST', body: fd });
+      if (!r.ok) return;
+      const url = URL.createObjectURL(await r.blob());
+      const img = $('bdLbImg');
+      const old = img.dataset.blobUrl;
+      img.src = url; img.dataset.blobUrl = url;
+      if (old) URL.revokeObjectURL(old);
+    } catch (_e) { /* 放大看不到就算了，不擋主流程 */ }
+  }
+  function closeLb() { $('bdLightbox').hidden = true; }
+  $('bdLbClose').addEventListener('click', closeLb);
+  $('bdLightbox').addEventListener('click', (e) => { if (e.target === $('bdLightbox')) closeLb(); });
+  $('bdLbPrev').addEventListener('click', () => { if (lbPage > 1) { lbPage--; showLb(); } });
+  $('bdLbNext').addEventListener('click', () => { if (lbPage < pageCount) { lbPage++; showLb(); } });
+  document.addEventListener('keydown', (e) => {
+    if ($('bdLightbox').hidden) return;
+    if (e.key === 'Escape') closeLb();
+    if (e.key === 'ArrowLeft' && lbPage > 1) { lbPage--; showLb(); }
+    if (e.key === 'ArrowRight' && lbPage < pageCount) { lbPage++; showLb(); }
+  });
+
+  // ---------- 送出 ----------
+  // JobProgress 吃的是**元素**不是 id，開始追蹤的方法叫 track()（不是 start）——
+  // 兩個都寫錯的話畫面上完全沒有反應，也不會有錯誤訊息。
+  const jp = new JobProgress($('bdJob'), {
+    onDone: (job) => {
+      $('bdDownload').href = `/api/jobs/${jp.jobId}/download`;
+      $('bdDoneMsg').textContent = (job && job.message) || '完成';
+      $('bdResult').hidden = false;
+      // attachWorkspaceSave 的第二個參數是**函式**（回一個 spec），不是物件 ——
+      // 傳物件進去 specFn() 會直接炸，而且是在按下按鈕時才炸。
+      const ws = $('bdSaveWs');
+      if (ws && window.attachWorkspaceSave) {
+        const jid = jp.jobId;
+        const outName = (srcName.replace(/\.[^.]+$/, '') || 'document') + '_border.pdf';
+        window.attachWorkspaceSave(ws, () => ({
+          jobId: jid, name: outName, tool: 'pdf-border' }));
+      }
+    },
+  });
+  $('bdGo').addEventListener('click', async () => {
+    if (!uploadId) return;
+    const btn = $('bdGo');
+    btn.disabled = true;
+    $('bdResult').hidden = true;
+    const fd = new FormData();
+    Object.entries(currentSpec()).forEach(([k, v]) => fd.append(k, v));
+    fd.append('upload_id', uploadId);
+    fd.append('out_name', srcName);
+    try {
+      const r = await fetch('/tools/pdf-border/submit', { method: 'POST', body: fd });
+      if (!r.ok) {
+        (window.showAlert || alert)(await window.friendlyServerError(r, '送出失敗'));
+        return;
+      }
+      const { job_id } = await r.json();
+      jp.track(job_id);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  syncToggles();
+})();
+</script>
+{% endblock %}

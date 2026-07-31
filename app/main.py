@@ -17,7 +17,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.10"
+VERSION = "1.14.11"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -202,6 +202,7 @@ _TOOL_ALIASES = {
     "pdf-rotate":         "rotate orient orientation flip turn 轉向 旋轉 翻轉",
     "pdf-pages":          "pages reorder rearrange remove delete drop manage 頁面 排序 重排 整理 刪除",
     "pdf-pageno":         "page number numbering numbers footer header 頁碼 頁數 編號 注頁碼",
+    "pdf-border":         "border frame outline slide 框線 加框 邊框 外框 頁框 投影片外框 線框 圓角 雙框 陰影 獎狀 證書",
     "office-to-pdf":      "convert convert-to-pdf office word excel powerpoint docx xlsx pptx odt ods odp 轉檔 轉成 文書 文件",
     "pdf-extract-images": "extract images pictures jpg png assets 擷取 提取 圖片 影像 抽圖",
     "pdf-to-image":       "convert image images png jpg jpeg raster rasterize export office word excel powerpoint docx xlsx pptx odt ods odp 文書轉圖片 轉圖 轉圖片 轉png 轉成圖片 影像 匯出圖片 Word 轉圖 Excel 轉圖 PPT 轉圖",
@@ -1182,6 +1183,16 @@ async def api_my_notify(request: Request):
                        "dual": c in _ns.DUAL_CHANNELS}
                       for c in avail],
         "prefs": _ns.get_prefs(_notify_key(request)),
+        # 「以目前設定實際會收到哪些管道」。
+        #
+        # **這個欄位一定要有** —— 畫面上那句「目前不會收到任何通知」就是靠它
+        # 判斷要不要顯示。少了它，前端拿到 undefined，警語會**永遠顯示**：
+        # 使用者勾了 Email 又按儲存，警語還杵在那裡，只會以為沒存成功
+        #（實際回報過）。
+        #
+        # 算法在 resolve_for_user：含「從未設定 → 預設全收」與「個人管道沒有
+        # 可送達位址 → 跳過」兩條規則，不要在前端重算一次。
+        "usable_channels": _ns.resolve_for_user(_notify_key(request))[0],
         # 帳號上的信箱（AD / LDAP 的 mail、SSO 的 email claim，或本人 / 管理員
         # 填的）。UI 用它告訴使用者「不填也會寄到這裡」—— 接目錄的環境本來就
         # 不該再要求每個人手動輸入一次自己的信箱。

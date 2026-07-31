@@ -489,6 +489,19 @@
       warn.hidden = (d.prefs.enabled !== false)
         && (d.usable_channels || []).length > 0;
     }
+    // 使用者改動勾選時先做**前端判斷得出來的那一半**：一個都沒勾就一定收不到，
+    // 有勾了就先收起警語（能不能送達要等伺服器算，存檔後會重讀確認）。
+    // 不做這段的話，勾了之後警語還杵在那裡，看起來像勾了沒有用。
+    function syncWarn() {
+      if (!warn) return;
+      const anyChecked = document.querySelectorAll('.mn-ch:checked').length > 0;
+      const on = document.getElementById('mn-enabled');
+      warn.hidden = anyChecked && (!on || on.checked);
+    }
+    box.querySelectorAll('.mn-ch').forEach(
+      (c) => c.addEventListener('change', syncWarn));
+    const onBox = document.getElementById('mn-enabled');
+    if (onBox) onBox.addEventListener('change', syncWarn);
   }
 
   const mnSave = document.getElementById('mn-save');
@@ -513,6 +526,11 @@
         const ok = document.getElementById('mn-saved');
         ok.hidden = false;
         setTimeout(() => { ok.hidden = true; }, 2500);
+        // **存完要重讀**。警語問的是「以目前設定會不會收到通知」，答案由伺服器
+        // 算（usable_channels 含「個人管道沒有可送達位址就跳過」這類規則）。
+        // 不重讀的話，勾了 Email 又按儲存，畫面上還留著「不會收到任何通知」——
+        // 使用者以為沒存成功（實際回報過）。
+        await loadNotify();
       } finally { b.disabled = false; }
     });
   }

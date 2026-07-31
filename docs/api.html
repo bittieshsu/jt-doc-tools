@@ -111,6 +111,7 @@
             <a class="nav-ep" href="#pdf-頁面處理">PDF 頁面處理</a>
             <a class="nav-ep" href="#pdf-旋轉">PDF 旋轉</a>
             <a class="nav-ep" href="#pdf-加頁碼">PDF 加頁碼</a>
+            <a class="nav-ep" href="#pdf-頁面加框">PDF 頁面加框</a>
             <a class="nav-ep" href="#pdf-多頁合一n-up">PDF 多頁合一（N-up）</a>
             <a class="nav-ep" href="#pdf-壓縮">PDF 壓縮</a>
             <a class="nav-ep" href="#掃描拼合">掃描拼合</a>
@@ -433,6 +434,19 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;fmt=第 {n} / {total} 頁&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;start=1&quot;</span> \
   <span class="hl-flag">--output</span> numbered.pdf</code></pre>
 <p>回應：加完頁碼的 PDF。</p>
+      </section>
+      <section class="doc-section" data-sec="pdf-頁面加框" data-title="PDF 頁面加框" hidden>
+<div class="doc-crumb">4. PDF 編修 API</div>
+<h4 id="pdf-頁面加框">PDF 頁面加框</h4>
+<p>替每一頁加上框線。收 PDF 與文書檔（Word / Excel / PowerPoint / ODF；文書檔會先自動轉成 PDF），輸出一律是 PDF。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-border/api/pdf-border</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF 或文書檔</td></tr><tr><td><code>mode</code></td><td>str</td><td></td><td><code>page</code>（自頁緣內縮，預設）/ <code>content</code>（貼齊該頁內容）</td></tr><tr><td><code>margin_mm</code></td><td>float</td><td></td><td>邊距（mm），預設 <code>5</code></td></tr><tr><td><code>width_pt</code></td><td>float</td><td></td><td>線寬（pt），預設 <code>1.5</code></td></tr><tr><td><code>color</code></td><td>str</td><td></td><td>框線顏色 hex，預設 <code>#333333</code></td></tr><tr><td><code>style</code></td><td>str</td><td></td><td><code>solid</code>（預設）/ <code>dashed</code> / <code>dotted</code></td></tr><tr><td><code>radius_mm</code></td><td>float</td><td></td><td>圓角半徑（mm），預設 <code>0</code>（直角）</td></tr><tr><td><code>opacity</code></td><td>float</td><td></td><td>不透明度 <code>0</code>~<code>1</code>，預設 <code>1</code></td></tr><tr><td><code>double</code></td><td>bool</td><td></td><td>內外雙框（獎狀 / 證書風格），預設 <code>false</code></td></tr><tr><td><code>double_gap_mm</code></td><td>float</td><td></td><td>雙框兩線間距（mm），預設 <code>1.5</code></td></tr><tr><td><code>shadow</code></td><td>bool</td><td></td><td>外側陰影，預設 <code>false</code></td></tr><tr><td><code>shadow_color</code></td><td>str</td><td></td><td>陰影顏色 hex，預設 <code>#000000</code></td></tr><tr><td><code>shadow_blur_mm</code></td><td>float</td><td></td><td>陰影擴散（mm），預設 <code>1.2</code></td></tr><tr><td><code>shadow_offset_mm</code></td><td>float</td><td></td><td>陰影位移（mm），預設 <code>0.6</code></td></tr><tr><td><code>shadow_opacity</code></td><td>float</td><td></td><td>陰影濃度 <code>0</code>~<code>1</code>，預設 <code>0.25</code></td></tr><tr><td><code>pages</code></td><td>str</td><td></td><td>指定頁面，例 <code>1,3,5-8</code>；留空 = 全部</td></tr><tr><td><code>skip_first</code></td><td>bool</td><td></td><td>首頁不加框（投影片封面常是滿版設計），預設 <code>false</code></td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-border/api/pdf-border</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@slides.pptx&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;mode=page&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;margin_mm=4&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;width_pt=2&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;color=#1e293b&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;skip_first=true&quot;</span> \
+  <span class="hl-flag">--output</span> slides_border.pdf</code></pre>
+<p>回應：加完框線的 PDF。所有數值都會在伺服器端夾在安全範圍內。</p>
       </section>
       <section class="doc-section" data-sec="pdf-多頁合一n-up" data-title="PDF 多頁合一（N-up）" hidden>
 <div class="doc-crumb">4. PDF 編修 API</div>

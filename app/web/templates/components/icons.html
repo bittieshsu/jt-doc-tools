@@ -102,6 +102,8 @@
 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
 {%- elif name == 'crop' -%}
 <path d="M6 2v16a2 2 0 0 0 2 2h14" /><path d="M22 18H8a2 2 0 0 1-2-2V2" /><path d="M2 6h4" /><path d="M18 22v-4" />
+{%- elif name == 'border' -%}
+<rect x="3" y="3" width="18" height="18" rx="2" /><rect x="7" y="7" width="10" height="10" rx="1" />
 {%- elif name == 'aspect-ratio' -%}
 <rect x="3" y="5" width="18" height="14" rx="2" /><path d="M9 9h2v2" /><path d="M15 15h-2v-2" />
 {%- elif name == 'align-mbottom' -%}

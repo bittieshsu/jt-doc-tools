@@ -437,3 +437,41 @@ def test_directory_sync_does_not_clear_email_when_absent(auth_off, monkeypatch):
     auth_ldap.sync_all_users()
     row = conn.execute("SELECT email FROM users WHERE username='bob'").fetchone()
     assert row["email"] == "kept@example.test"
+
+
+def test_notify_api_returns_usable_channels(admin_session):
+    """`/api/my/notify` **一定要回 usable_channels**。
+
+    畫面上那句「目前不會收到任何通知」就是靠它判斷要不要顯示。這個欄位原本
+    根本沒有被回傳 —— 前端拿到 undefined，`(undefined || []).length > 0` 永遠
+    是 false，於是警語**永遠顯示**：使用者勾了 Email 又按儲存，警語還杵在那裡，
+    只會以為沒存成功（實際回報過）。
+
+    模板裡的註解甚至寫著「判斷用伺服器算好的 usable_channels」，但沒有人算 ——
+    這種「一端引用、另一端沒實作」的落差不會有任何錯誤訊息。
+    """
+    client, _, _ = admin_session
+    r = client.get("/api/my/notify")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "usable_channels" in body, (
+        "少了 usable_channels —— 前端的『不會收到任何通知』警語會永遠顯示")
+    assert isinstance(body["usable_channels"], list)
+
+
+def test_template_only_reads_fields_the_api_actually_returns(admin_session):
+    """模板讀的 `d.<欄位>` 都要真的在 API 的回應裡。
+
+    少一個欄位不會報錯，只會讓那段 UI 靜靜地失效。
+    """
+    import re
+    from pathlib import Path
+    tpl = (Path(__file__).resolve().parent.parent / "app" / "web" /
+           "templates" / "my_jobs.html").read_text(encoding="utf-8")
+    client, _, _ = admin_session
+    body = client.get("/api/my/notify").json()
+    # 只看 loadNotify 內對 API 結果的存取（變數名為 d）
+    used = set(re.findall(r"\bd\.([a-z_]+)\b", tpl))
+    known = set(body.keys()) | {"prefs"}
+    missing = {f for f in used if f not in known}
+    assert not missing, f"模板讀了 API 沒回的欄位：{sorted(missing)}"

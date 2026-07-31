@@ -373,6 +373,44 @@ curl -X POST http://localhost:8765/tools/pdf-pageno/api/pdf-pageno \
 
 回應：加完頁碼的 PDF。
 
+### PDF 頁面加框
+
+替每一頁加上框線。收 PDF 與文書檔（Word / Excel / PowerPoint / ODF；文書檔會先自動轉成 PDF），輸出一律是 PDF。
+
+```text
+POST /tools/pdf-border/api/pdf-border
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | ✓ | PDF 或文書檔 |
+| `mode` | str | | `page`（自頁緣內縮，預設）/ `content`（貼齊該頁內容） |
+| `margin_mm` | float | | 邊距（mm），預設 `5` |
+| `width_pt` | float | | 線寬（pt），預設 `1.5` |
+| `color` | str | | 框線顏色 hex，預設 `#333333` |
+| `style` | str | | `solid`（預設）/ `dashed` / `dotted` |
+| `radius_mm` | float | | 圓角半徑（mm），預設 `0`（直角） |
+| `opacity` | float | | 不透明度 `0`~`1`，預設 `1` |
+| `double` | bool | | 內外雙框（獎狀 / 證書風格），預設 `false` |
+| `double_gap_mm` | float | | 雙框兩線間距（mm），預設 `1.5` |
+| `shadow` | bool | | 外側陰影，預設 `false` |
+| `shadow_color` | str | | 陰影顏色 hex，預設 `#000000` |
+| `shadow_blur_mm` | float | | 陰影擴散（mm），預設 `1.2` |
+| `shadow_offset_mm` | float | | 陰影位移（mm），預設 `0.6` |
+| `shadow_opacity` | float | | 陰影濃度 `0`~`1`，預設 `0.25` |
+| `pages` | str | | 指定頁面，例 `1,3,5-8`；留空 = 全部 |
+| `skip_first` | bool | | 首頁不加框（投影片封面常是滿版設計），預設 `false` |
+
+```bash
+curl -X POST http://localhost:8765/tools/pdf-border/api/pdf-border \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@slides.pptx" -F "mode=page" -F "margin_mm=4" \
+  -F "width_pt=2" -F "color=#1e293b" -F "skip_first=true" \
+  --output slides_border.pdf
+```
+
+回應：加完框線的 PDF。所有數值都會在伺服器端夾在安全範圍內。
+
 ### PDF 多頁合一（N-up）
 
 把多頁縮排到單頁（2-up / 4-up 等）。

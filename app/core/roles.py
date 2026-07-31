@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # check short-circuits to allow when the user has the admin role at all.
 _NON_ADMIN_TOOL_IDS = [
     "pdf-merge", "pdf-split", "pdf-rotate", "pdf-pages", "pdf-pageno",
-    "pdf-nup", "pdf-compress", "pdf-watermark",
+    "pdf-border", "pdf-nup", "pdf-compress", "pdf-watermark",
     "pdf-extract-text", "pdf-extract-images", "pdf-attachments",
     "office-to-pdf", "pdf-to-image", "image-to-pdf", "scan-merge",
     "pdf-encrypt", "pdf-decrypt", "pdf-metadata",
@@ -72,7 +72,7 @@ SEED_ROLES: list[dict] = [
         "tools": [
             "pdf-extract-text", "pdf-extract-images", "pdf-attachments",
             "pdf-merge", "pdf-split", "pdf-pages", "pdf-rotate", "pdf-pageno",
-            "pdf-nup", "pdf-compress", "office-to-pdf", "pdf-to-image",
+            "pdf-border", "pdf-nup", "pdf-compress", "office-to-pdf", "pdf-to-image",
             "image-to-pdf", "scan-merge", "pdf-to-office", "pdf-to-slides",
         ],
     },
