@@ -54,6 +54,40 @@ def _row(label: str, value: str) -> str:
     )
 
 
+def _link(url: str, text: str) -> str:
+    """信裡的連結。沒有網址時退回純文字的引號寫法。
+
+    沒設定站台網址就**不要**放連結 —— 指向 localhost 的連結點了只會更困惑。
+    """
+    if not url:
+        return f'「{escape(text)}」'
+    return (f'<a href="{escape(url, quote=True)}" '
+            f'style="color:{_BRAND};font-weight:600;text-decoration:underline">'
+            f'{escape(text)}</a>')
+
+
+def _note_box(kind: str, fallback: str, workspace_url: str,
+              jobs_url: str) -> str:
+    """結果放在哪裡的那一行。
+
+    句子在**這裡**組，不由呼叫端傳現成的 HTML 進來 —— 那樣遲早會有人把沒跳脫的
+    字串傳進來。呼叫端只給「哪一種情況」與網址。
+    """
+    if kind == "workspace":
+        body = "結果已自動存入" + _link(workspace_url, "我的工作區") + "。"
+    elif kind == "jobs":
+        body = "可到" + _link(jobs_url, "我的作業") + "頁下載結果。"
+    elif fallback:
+        body = escape(fallback)
+    else:
+        return ""
+    return (
+        f'<div style="margin-top:14px;padding:11px 13px;background:#f8fafc;'
+        f'border:1px solid {_LINE};border-radius:8px;color:{_MUTED};'
+        f'font-size:13px;line-height:1.6">{body}</div>'
+    )
+
+
 def _header(site_name: str, logo_cid: str) -> str:
     """標題列：站台 logo + 站名。
 
@@ -69,7 +103,11 @@ def _header(site_name: str, logo_cid: str) -> str:
             'border-radius:6px">'
         )
     return (
-        f'<tr><td style="background:{_BRAND};padding:14px 24px">'
+        # **圓角要畫在這一格自己身上**，不能只靠外層表格的 `overflow:hidden`
+        # 去裁切 —— 多數讀信軟體不支援 overflow 裁切子元素，結果就是卡片是圓角、
+        # 裡面的色塊卻是直角（使用者實際收到的信就是這樣）。
+        f'<tr><td style="background:{_BRAND};padding:14px 24px;'
+        'border-radius:12px 12px 0 0">'
         '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
         + (f'<td style="padding-right:10px">{logo}</td>' if logo else '')
         + '<td style="color:#ffffff;font-size:14px;font-weight:600;'
@@ -99,7 +137,8 @@ def _headline(headline: str, icon_cid: str) -> str:
 
 def render(*, site_name: str, ok: bool, tool: str, filename: str,
            elapsed: str, error: str = "", note: str = "",
-           action_url: str = "", logo_cid: str = "", icon_cid: str = "") -> str:
+           action_url: str = "", logo_cid: str = "", icon_cid: str = "",
+           note_kind: str = "", workspace_url: str = "") -> str:
     """組出通知信的 HTML。所有參數都當成不可信的字串處理。"""
     status_bg, status_fg = (_OK_BG, _OK_FG) if ok else (_ERR_BG, _ERR_FG)
     status_text = "已完成" if ok else "失敗"
@@ -126,13 +165,7 @@ def render(*, site_name: str, ok: bool, tool: str, filename: str,
             '</td></tr></table>'
         )
 
-    note_html = ""
-    if note:
-        note_html = (
-            f'<div style="margin-top:14px;padding:11px 13px;background:#f8fafc;'
-            f'border:1px solid {_LINE};border-radius:8px;color:{_MUTED};'
-            f'font-size:13px;line-height:1.6">{escape(note)}</div>'
-        )
+    note_html = _note_box(note_kind, note, workspace_url, action_url)
 
     # 用 list + join，不要靠字串隱式相接 —— 中間夾了函式呼叫時，
     # 隱式相接會變成語法錯誤（改這裡時踩過一次）。
@@ -164,6 +197,7 @@ def render(*, site_name: str, ok: bool, tool: str, filename: str,
         '</td></tr>',
 
         f'<tr><td style="padding:14px 24px;border-top:1px solid {_LINE};'
+        'border-radius:0 0 12px 12px;'
         f'color:{_MUTED};font-size:11.5px;line-height:1.6">'
         '這封信只包含工具名稱、檔名與狀態，<b>不含檔案內容</b>。<br>'
         '不想再收到可到「我的作業 → 通知設定」關閉。'

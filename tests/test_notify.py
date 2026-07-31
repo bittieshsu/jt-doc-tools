@@ -607,3 +607,82 @@ def test_tool_icon_reuses_the_shared_macro():
     src = inspect.getsource(assets)
     assert "components/icons.html" in src, "沒有走共用的圖示 macro"
     assert "<path" not in src, "看起來自己抄了 SVG path"
+
+
+def test_dev_channel_list_is_honest():
+    """「開發階段」清單要與實際驗證狀態一致。
+
+    目前只有 Email 對真實服務端到端驗證過（實機 SMTP 寄出、收件者確認收到）；
+    其餘管道只有把網路呼叫換掉的單元測試。驗證過一個就從 `DEV_CHANNELS` 拿掉，
+    並在 CHANGELOG 註明是用哪個服務驗的 —— 這條測試就是要逼那個動作發生。
+    """
+    from app.core import notify_channels as nc
+    assert "email" not in nc.DEV_CHANNELS, "Email 已實機驗證，不該標開發階段"
+    assert nc.DEV_CHANNELS == set(nc.ALL_CHANNELS) - {"email"}, (
+        "有管道被驗證過就要從 DEV_CHANNELS 移除；新增管道也要記得加進去")
+
+
+def test_dev_flag_reaches_both_uis():
+    """管理頁與使用者頁都要看得到標示 —— 只標一邊等於另一邊的人不知情。"""
+    import pathlib
+    admin = pathlib.Path("app/admin/templates/admin_notify.html").read_text(encoding="utf-8")
+    user = pathlib.Path("app/web/templates/my_jobs.html").read_text(encoding="utf-8")
+    assert "dev_channels" in admin and "開發階段" in admin
+    assert "ch.dev" in user and "開發階段" in user
+
+
+def test_email_corners_do_not_rely_on_overflow_clipping():
+    """圓角要畫在標題列 / 頁尾自己身上。
+
+    只在外層表格寫 `border-radius` + `overflow:hidden` 是不夠的 —— 多數讀信軟體
+    不支援用 overflow 裁切子元素，實際收到的信會變成「卡片圓角、裡面的紫色標題
+    列卻是直角」（使用者回報過）。
+    """
+    from app.core import notify_email_html as h
+    html = h.render(site_name="X", ok=True, tool="T", filename="f.pdf",
+                    elapsed="1 秒")
+    assert "border-radius:12px 12px 0 0" in html, "標題列沒有自己的上圓角"
+    assert "border-radius:0 0 12px 12px" in html, "頁尾沒有自己的下圓角"
+
+
+def test_workspace_mention_is_a_real_link():
+    """「我的工作區」要可以點過去（設了站台網址時）。"""
+    from app.core import notify_email_html as h
+    html = h.render(site_name="X", ok=True, tool="T", filename="f.pdf",
+                    elapsed="1 秒", note_kind="workspace",
+                    workspace_url="https://doc.example.test/workspace")
+    assert 'href="https://doc.example.test/workspace"' in html
+    assert "我的工作區</a>" in html
+
+
+def test_note_falls_back_to_plain_text_without_site_url():
+    """沒設站台網址就不放連結 —— 指向 localhost 的連結點了只會更困惑。"""
+    from app.core import notify_email_html as h
+    html = h.render(site_name="X", ok=True, tool="T", filename="f.pdf",
+                    elapsed="1 秒", note_kind="workspace")
+    assert "「我的工作區」" in html
+    assert "<a href" not in html
+
+
+def test_note_is_built_by_the_template_not_the_caller():
+    """句子與連結由版型組，呼叫端只給「哪一種情況」。
+
+    呼叫端若能傳現成的 HTML 進來，遲早會有人傳沒跳脫的字串。
+    """
+    import inspect
+
+    from app.core import job_notify
+    src = inspect.getsource(job_notify.build_html)
+    assert "note_kind" in src
+    assert "<a href" not in src and "<div" not in src
+
+
+def test_unauthenticated_workspace_link_redirects_to_login(admin_session):
+    """信裡的連結給還沒登入的人點 → 導到登入頁，登入後回到工作區。"""
+    from fastapi.testclient import TestClient
+
+    import app.main as app_main
+    anon = TestClient(app_main.app)
+    r = anon.get("/workspace", follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert r.headers.get("location") == "/login?next=/workspace"

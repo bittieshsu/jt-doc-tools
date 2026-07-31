@@ -359,7 +359,7 @@
     } catch (e) {
       let msg;
       if (e.name === 'AbortError') {
-        msg = '檢查逾時（超過 90 秒）— 系統 probe 可能卡住。請看 server log 排查 office/java/tesseract 是否回應極慢。';
+        msg = '檢查逾時（超過 90 秒）— 系統 probe 可能卡住。請看 server log 檢視 office/java/tesseract 是否回應極慢。';
       } else if (/Failed to fetch|NetworkError|Load failed/i.test(e.message)) {
         msg = '無法連到後端（' + escapeHtml(e.message) + '）。可能服務未啟動、被反向代理截斷、或 CORS 問題。請看 server log。';
       } else {

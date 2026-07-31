@@ -63,6 +63,8 @@
 .jt-tile svg { width: 17px; height: 17px; }
 
 .mn-lead { font-size: 12.5px; }
+.mn-dev { margin-left: 7px; padding: 1px 7px; border-radius: 999px;
+  background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 600; }
 .mn-warn { margin-top: 12px; padding: 9px 12px; background: #fffbeb;
   border: 1px solid #fde68a; border-radius: 8px; color: #92400e;
   font-size: 12.5px; line-height: 1.6; }
@@ -250,7 +252,7 @@
       const bits = [fmtWhen(j.created_at)];
       if (j.status === 'pending') {
         // 使用者最想知道的是「還要等幾個」，不是「等待中」這三個字。
-        // queue_pos 取自實際的派工佇列（第 1 位＝下一個就是我）。
+        // queue_pos 取自實際的派送佇列（第 1 位＝下一個就是我）。
         bits.push(j.queue_pos
           ? (j.queue_pos === 1 ? '排隊中・下一個就是你'
              : `排隊中・前面還有 ${j.queue_pos - 1} 個作業`)
@@ -437,6 +439,12 @@
       cb.checked = (d.prefs.channels || []).includes(ch.id);
       lab.appendChild(cb);
       lab.appendChild(document.createTextNode(ch.label));
+      if (ch.dev) {
+        // 還沒對真實服務驗證過的管道 —— 標出來，勾了收不到才不會被當成自己設錯
+        const tag = el('span', 'mn-dev', '開發階段');
+        tag.title = '這個管道尚未實際接上服務驗證過，目前只有 Email 是實機驗證過的';
+        lab.appendChild(tag);
+      }
       item.appendChild(lab);
       if (ch.id === 'email') {
         // 通知信箱只認帳號上的那一個 —— 這裡不給輸入框，改成告訴使用者

@@ -247,7 +247,7 @@ def _remote_easyocr_recognize(png_bytes: bytes, langs: str,
     data = {"langs": easy_langs, "preprocess": "true" if preprocess else "false"}
     headers = {"Authorization": f"Bearer {token}"}
     # 外部 GPU 的同時呼叫上限（預設 1）—— jt-ocr-server 是一張 GPU 載一個模型，
-    # 同時打多個請求過去會互相搶顯存。見 remote_limit 的說明。
+    # 同時打多個請求過去會互相搶顯示記憶體。見 remote_limit 的說明。
     from . import remote_limit
     with remote_limit.slot(), httpx.Client(timeout=float(timeout_s)) as cli:
         r = cli.post(f"{url}/ocr", files=files, data=data, headers=headers)

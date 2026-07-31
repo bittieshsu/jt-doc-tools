@@ -96,10 +96,11 @@ def build_html(job: Any) -> str:
         from . import branding, notify_email_html
         ws = (job.meta or {}).get("workspace") or {}
         ok = job.status == "done"
-        note = ""
+        # 傳「哪一種情況」而不是傳現成的句子 —— 句子與連結由版型組，
+        # 呼叫端不碰 HTML（避免哪天有人把沒跳脫的字串傳進去）。
+        note_kind = ""
         if ok:
-            note = ("結果已自動存入「我的工作區」。"
-                    if ws.get("saved") else "可到「我的作業」頁下載結果。")
+            note_kind = "workspace" if ws.get("saved") else "jobs"
         return notify_email_html.render(
             site_name=branding.get_site_name("Jason Tools 文件工具箱"),
             ok=ok,
@@ -107,7 +108,8 @@ def build_html(job: Any) -> str:
             filename=(job.meta or {}).get("filename") or job.result_filename or "",
             elapsed=_fmt_elapsed(job.elapsed()),
             error=str(job.error or "") if not ok else "",
-            note=note,
+            note_kind=note_kind,
+            workspace_url=_site_url("/workspace"),
             action_url=_site_url("/my-jobs"),
             logo_cid=LOGO_CID,
             icon_cid=ICON_CID,

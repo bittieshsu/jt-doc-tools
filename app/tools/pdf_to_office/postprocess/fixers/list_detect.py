@@ -61,7 +61,7 @@ def _is_listy_or_heading(p) -> bool:
 
 
 def _set_paragraph_style(p, style_name: str) -> None:
-    """設 docx style — 不存在的 style 不會 raise，靜默 fallback。"""
+    """設 docx style — 不存在的 style 不會 raise，會無提示 fallback。"""
     try:
         styles = p.part.document.styles
         if style_name in [s.name for s in styles]:

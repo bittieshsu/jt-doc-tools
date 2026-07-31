@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/static/css/platform.css" />
   {% block head %}{% endblock %}
   <style nonce="{{ request.state.csp_nonce }}">
-    /* ---- 站內通知鈴鐺（側欄帳號列）---- */
+    /* ---- 站內通知（側欄帳號列）---- */
     .sb-bell-wrap { position: relative; display: inline-flex; margin-left: auto; }
     .user-bar-anon { justify-content: space-between; }
     .sb-anon-label { font-size: 12.5px; opacity: .85; }
@@ -39,7 +39,7 @@
     .sb-bell.has-unread { background: rgba(255,255,255,0.18); }
     /* position:fixed 而不是 absolute —— 側欄本身會裁切溢出內容（它要捲動），
        320px 的面板放在 268px 寬的側欄裡會被切掉右半邊。改用 fixed 並在開啟時
-       依鈴鐺的實際位置計算座標，就不受任何父層 overflow 影響。 */
+       依通知按鈕的實際位置計算座標，就不受任何父層 overflow 影響。 */
     .sb-inbox { position: fixed; z-index: 200;
       width: 320px; max-width: calc(100vw - 24px); background: #fff;
       color: #0f172a; border: 1px solid #e2e8f0; border-radius: 10px;
@@ -89,7 +89,7 @@
         </div>
         <button class="sidebar-collapse" type="button" id="sidebarCollapse" aria-label="收起側邊選單" title="收起側邊選單">‹</button>
       </div>
-      {# 工具圖示來源（給鈴鐺清單複製用）—— 只有 icons.html 那個 macro 一份定義 #}
+      {# 工具圖示來源（給通知清單複製用）—— 只有 icons.html 那個 macro 一份定義 #}
       <div id="toolIconSprite" hidden aria-hidden="true">
         {% for t in tool_tiles() %}
         <span data-tool="{{ t.id }}" data-color="{{ t.color }}">{{ icon(t.icon, size=15) }}</span>
@@ -98,7 +98,7 @@
       {% set _cur = current_user(request) %}
       {% if not _cur %}
       {# 認證關閉時沒有帳號列，但單機使用者一樣需要看到作業完成通知 —— 給一列
-         只有鈴鐺的窄列，位置與有帳號時一致（都在側欄左上）。 #}
+         只有通知按鈕的窄列，位置與有帳號時一致（都在側欄左上）。 #}
       <div class="user-bar user-bar-anon" data-s="s332db6db">
         <span class="sb-anon-label">通知</span>
         <div class="sb-bell-wrap">
@@ -754,7 +754,7 @@
           });
         });
       }
-      // ---------- 站內通知鈴鐺 ----------
+      // ---------- 站內通知 ----------
       // 資料直接由「我的作業」推導（見 /api/my/inbox）—— 沒有另一張通知表，
       // 就不會有「通知說完成了、清單裡卻沒有」這種兩邊不同步的狀況。
       (function () {
@@ -827,7 +827,7 @@
         function place() {
           const r = bell.getBoundingClientRect();
           panel.style.top = Math.round(r.bottom + 6) + 'px';
-          // 靠左對齊鈴鐺，但不可超出視窗右緣
+          // 靠左對齊通知按鈕，但不可超出視窗右緣
           const left = Math.min(Math.round(r.left - 6),
                                 window.innerWidth - panel.offsetWidth - 12);
           panel.style.left = Math.max(8, left) + 'px';

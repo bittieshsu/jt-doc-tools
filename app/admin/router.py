@@ -6,6 +6,7 @@ import json
 import re
 import time
 import uuid
+from datetime import datetime, timezone
 import zipfile
 from pathlib import Path
 from typing import Optional
@@ -21,6 +22,16 @@ from ..core.template_manager import template_manager
 from ..web.deps import require_admin
 
 from fastapi import Depends
+
+
+def _export_stamp() -> str:
+    """匯出檔裡的時間戳，用 ISO 8601 文字不用 Unix 秒數。
+
+    純數字的 epoch 會被弱點掃描工具判為「Timestamp Disclosure」(Low) —— 它無法
+    分辨那是「伺服器內部時間外洩」還是「這份檔案何時匯出的」。這裡本來就只是給人
+    看的匯出時間，寫成人看得懂的格式既消掉告警，也比一串數字有用。
+    """
+    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
 def build_router(templates) -> APIRouter:
@@ -136,7 +147,7 @@ def build_router(templates) -> APIRouter:
         wrapped = {
             "_kind": "jt-doc-tools assets",
             "_version": 1,
-            "_exported_at": time.time(),
+            "_exported_at": _export_stamp(),
             "assets": meta.get("assets", []),
         }
         buf = io.BytesIO()
@@ -467,7 +478,7 @@ def build_router(templates) -> APIRouter:
         payload = {
             "_kind": "jt-doc-tools company profile",
             "_version": 1,
-            "_exported_at": time.time(),
+            "_exported_at": _export_stamp(),
             "name": company.get("name", cid),
             "fields": company.get("fields", {}),
             "labels": company.get("labels", {}),
@@ -558,7 +569,7 @@ def build_router(templates) -> APIRouter:
         payload = {
             "_kind": "jt-doc-tools synonyms",
             "_version": 1,
-            "_exported_at": time.time(),
+            "_exported_at": _export_stamp(),
             "synonyms": synonym_manager.get_map(),
         }
         body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")

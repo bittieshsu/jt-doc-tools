@@ -209,9 +209,13 @@ function _wsRetryBlankThumbs() {
   const pending = [...document.querySelectorAll('.ws-thumb')]
     .filter(el => OFFICE.includes(el.dataset.ext || ''));
   if (!pending.length) return;
+  // 重試的間隔要**涵蓋最慢的檔**。實測（正式機）：4.7 MB 的簡報 6 秒、
+  // 37.9 MB 的年報簡報 48 秒。原本固定 6 次 × 2.5 秒（共 15 秒）只夠小檔，
+  // 大檔一定等不到 —— 使用者回報「怎麼有一個 pptx 還是沒有縮圖」就是這個。
+  // 逐漸拉長間隔：前面抓小檔，後面撐到約兩分鐘接住大檔，總請求數還更少。
+  const DELAYS = [2500, 3000, 5000, 8000, 10000, 15000, 20000, 25000, 30000];
   let tries = 0;
   const tick = () => {
-    tries += 1;
     let left = 0;
     pending.forEach((el) => {
       const img = el.querySelector('img');
@@ -221,10 +225,11 @@ function _wsRetryBlankThumbs() {
       left += 1;
       img.src = `/workspace/thumb/${el.dataset.id}?r=${tries}`;
     });
-    // 最多試幾輪就停 —— 產不出來的檔（毀損 / 太大）不該一直打伺服器
-    if (left && tries < 6) setTimeout(tick, 2500);
+    tries += 1;
+    // 排完就停 —— 產不出來的檔（毀損 / 太大）不該一直打伺服器
+    if (left && tries < DELAYS.length) setTimeout(tick, DELAYS[tries]);
   };
-  setTimeout(tick, 2500);
+  setTimeout(tick, DELAYS[0]);
 }
 
 // 點縮圖 → lightbox 放大

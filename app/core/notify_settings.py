@@ -275,14 +275,14 @@ _PREF_DEFAULTS: dict[str, Any] = {
     "enabled": True,
     "channels": [],
     #: 使用者有沒有自己選過管道（不是「偏好檔存不存在」—— 那個檔案會因為
-    #: 點開鈴鐺而被建立）。見 has_chosen_channels。
+    #: 點開通知而被建立）。見 has_chosen_channels。
     "channels_set": False,
     "email_to": "",
     "telegram_chat_id": "",
     "line_to": "",
     "zulip_to": "",          # 自己的 Zulip email → 收私訊（留空＝走團隊頻道）
     "nextcloud_to": "",      # 自己的一對一對話 token（留空＝走群組對話）
-    # 站內鈴鐺「上次查看」的時間戳 —— 未讀數由它與作業的完成時間推導，
+    # 站內通知「上次查看」的時間戳 —— 未讀數由它與作業的完成時間推導，
     # 不逐筆記已讀狀態（見 /api/my/inbox）
     "inbox_seen_at": 0.0,
 }
@@ -302,7 +302,7 @@ def has_chosen_channels(key: str) -> bool:
     兩者的 `channels` 都是空陣列，光看值分不出來。
 
     **不可以用「偏好檔存不存在」來判斷** —— 那個檔案會因為別的原因被建立：
-    使用者只是點開站內鈴鐺（寫入 `inbox_seen_at`）就會產生它。實測就是這樣：
+    使用者只是點開站內通知（寫入 `inbox_seen_at`）就會產生它。實測就是這樣：
     帳號有信箱、管理員也開好了 Email，卻因為檔案已存在而被當成「他選擇不收」。
     """
     return bool(get_prefs(key).get("channels_set"))

@@ -45,6 +45,17 @@ WEBHOOK_CHANNELS = ("telegram", "slack", "teams", "discord", "zulip",
 ALL_CHANNELS = ("email",) + WEBHOOK_CHANNELS
 
 #: 顯示名稱與前置需求（給 admin UI 用）
+#: **只有 Email 對真實服務端到端驗證過**（實機 SMTP 寄出、收件者確認收到）。
+#: 其餘管道有單元測試（把網路呼叫換掉、驗載荷格式），但沒有人真的接上 Slack /
+#: Teams / Telegram … 實際收過訊息 —— 所以標為開發階段，讓管理員知道這件事，
+#: 而不是設定下去之後才發現收不到。
+#:
+#: 驗證過一個就把它從這裡拿掉（並在 CHANGELOG 註明是用哪個服務驗的）。
+DEV_CHANNELS: frozenset[str] = frozenset({
+    "telegram", "slack", "teams", "discord", "zulip", "nextcloud",
+    "line", "webhook",
+})
+
 CHANNEL_INFO: dict[str, dict] = {
     "email":     {"label": "Email", "needs": "SMTP 主機"},
     "telegram":  {"label": "Telegram", "needs": "Bot token + Chat ID"},

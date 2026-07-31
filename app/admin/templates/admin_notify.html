@@ -47,10 +47,19 @@
       {% elif ch in dual %}<span class="nt-tag nt-tag-dual">可個人 / 團隊</span>
       {% else %}<span class="nt-tag">團隊頻道</span>{% endif %}
       {% if c.enabled %}<span class="nt-tag nt-tag-on">已啟用</span>{% endif %}
+      {% if ch in dev_channels %}<span class="nt-tag nt-tag-dev">開發階段</span>{% endif %}
     </summary>
     <div class="nt-ch-body" data-ch="{{ ch }}">
       <label class="nt-switch"><input type="checkbox" class="nt-ch-en" {% if c.enabled %}checked{% endif %}> 啟用</label>
       <div class="nt-help muted">需要：{{ info[ch].needs }}</div>
+      {% if ch in dev_channels %}
+      <div class="nt-dev-note">
+        {{ icon('warn', size=14) }}
+        <span><b>開發階段</b> —— 這個管道目前只有程式層的測試（驗證送出的內容格式），
+        <b>尚未實際接上服務端到端驗證過</b>。可以設定與試用，但正式環境請先用「傳送測試訊息」
+        確認收得到，再開給使用者。目前只有 Email 是實機驗證過的。</span>
+      </div>
+      {% endif %}
 
       {% if ch == 'email' %}
       <div class="nt-grid">
@@ -141,6 +150,11 @@
 .nt-tag { padding: 2px 8px; border-radius: 999px; background: #f1f5f9; color: #64748b; font-size: 11.5px; font-weight: 600; }
 .nt-tag-personal { background: #ede9fe; color: #6d28d9; }
 .nt-tag-dual { background: #dbeafe; color: #1d4ed8; }
+.nt-tag-dev { background: #fef3c7; color: #92400e; }
+.nt-dev-note { display: flex; gap: 7px; margin-top: 9px; padding: 9px 11px;
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 7px;
+  color: #92400e; font-size: 12.5px; line-height: 1.6; }
+.nt-dev-note svg { flex: none; margin-top: 2px; }
 .nt-tag-on { background: #dcfce7; color: #15803d; }
 .nt-ch-body { padding: 0 14px 14px; border-top: 1px solid #f1f5f9; padding-top: 12px; }
 .nt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }

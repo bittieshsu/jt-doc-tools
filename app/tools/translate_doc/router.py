@@ -302,7 +302,9 @@ def _build_prompt(src_text: str, source_lang: str, target_lang: str,
             "click→點擊 / 按、support→支援（不是「支持」當技術動詞）、"
             "performance→效能（不是「性能」）、optimize→最佳化（不是「優化」當形容詞）、"
             "address→位址（IP/記憶體上下文，不是「地址」）、port→連接埠 / 通訊埠（不是「端口」）、"
-            "container→容器（OK）、virtualization→虛擬化、virtual machine→虛擬機（OK）。"
+            "container→容器（OK）、virtualization→虛擬化、virtual machine→虛擬機（OK）、"
+            "VRAM / GPU memory→顯示記憶體（不是「顯存」）、RAM→記憶體（不是「內存」）、"
+            "dispatch / schedule→派送 / 排程（不是「派送」，那是工廠管理用語）。"
         )
     # v1.5.15: domain hint（選填）— user 在 UI 填的「文件領域」直接放進
     # prompt，讓 LLM 知道這是法律 / 醫療 / 技術 / 財務等場景，挑對應專業用詞

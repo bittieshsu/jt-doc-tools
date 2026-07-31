@@ -879,7 +879,7 @@ def _ensure_system_deps_for_update() -> None:
 def _ensure_vc_redist_windows() -> None:
     """Windows only — 確保 Microsoft Visual C++ Redistributable 14.40+ 已安裝。
     PyTorch (EasyOCR 主依賴) 需要它，沒有會 c10.dll load failure。
-    符合條件就跳過；舊版或缺則靜默安裝（不需 reboot — 新 process 即可載 DLL）。"""
+    符合條件就跳過；舊版或缺則無提示安裝（不需 reboot — 新 process 即可載 DLL）。"""
     if not _is_windows():
         return
     import winreg
@@ -1256,7 +1256,7 @@ def _ensure_zbar() -> None:
 def _ensure_macos_zbar_symlink(src: str) -> None:
     """確保 /usr/local/lib/libzbar.dylib symlink 存在，讓 service 啟動時 ctypes 找得到。
     Apple Silicon brew 裝在 /opt/homebrew，預設 dyld search path 沒含；symlink 一份到
-    /usr/local/lib（在預設搜尋內）就解決。已存在或建立失敗都靜默 — 不影響主流程。"""
+    /usr/local/lib（在預設搜尋內）就解決。已存在或建立失敗都不出提示 — 不影響主流程。"""
     target_dir = "/usr/local/lib"
     target = os.path.join(target_dir, "libzbar.dylib")
     if os.path.exists(target) or os.path.islink(target):

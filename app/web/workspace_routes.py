@@ -175,7 +175,13 @@ def build_router(templates) -> APIRouter:
             fp, mime = ws.get_thumbnail(request, file_id)
         except ws.WorkspaceError:
             # 功能未啟用以外的失敗 → 回空白 placeholder（不破圖）
-            return Response(content=_BLANK_PNG, media_type="image/png")
+            #
+            # **一定要 no-store**：這張空白圖多半代表「背景還在產生」，是暫時的。
+            # 沒有這個標頭時瀏覽器會依啟發式規則把它快取起來，之後即使縮圖已經
+            # 做好了，前端重試也只會拿到快取裡那張空白圖 —— 使用者看到的就是
+            # 「這個檔永遠沒有縮圖」（大檔實際踩到過）。
+            return Response(content=_BLANK_PNG, media_type="image/png",
+                            headers={"Cache-Control": "no-store"})
         return FileResponse(str(fp), media_type=mime)
 
     @router.post("/workspace/delete")

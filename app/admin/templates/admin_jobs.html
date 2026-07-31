@@ -25,7 +25,7 @@
   <div class="aj-controls">
     <button class="btn" id="aj-pause" type="button">
       <span id="aj-pause-ic">{{ icon('pause', size=15) }}</span>
-      <span id="aj-pause-tx">暫停派工</span>
+      <span id="aj-pause-tx">暫停派送</span>
     </button>
     <span class="muted aj-pause-note">暫停只擋<b>還沒開始</b>的作業。已經在執行的轉檔是獨立的子行程，沒辦法中途凍結 —— 要停只能取消該筆。</span>
   </div>
@@ -40,13 +40,13 @@
     </div>
     <div class="aj-mem-bar">
       <div class="aj-mem-used" id="aj-mem-used" title="已被使用的記憶體"></div>
-      <div class="aj-mem-reserve" id="aj-mem-reserve" title="保留給作業系統與資料庫，不會拿來派工"></div>
+      <div class="aj-mem-reserve" id="aj-mem-reserve" title="保留給作業系統與資料庫，不會拿來開新作業"></div>
     </div>
-    {# 圖例 —— 中間那段灰色（可派工）才是這條計量最有用的資訊，但沒有標示的話
+    {# 圖例 —— 中間那段灰色（可開新作業）才是這條計量最有用的資訊，但沒有標示的話
        看起來只像「進度條沒有滿」。 #}
     <div class="aj-mem-legend">
       <span><i class="sw sw-used"></i>已用</span>
-      <span><i class="sw sw-free"></i>可派工</span>
+      <span><i class="sw sw-free"></i>可開新作業</span>
       <span><i class="sw sw-res"></i>保留</span>
     </div>
   </div>
@@ -93,7 +93,7 @@
       <div class="aj-help muted">
         {% if conc.remote_services %}目前啟用：{{ conc.remote_services|join('、') }}。{% endif %}
         真正的瓶頸在<b>對方那台機器</b>（一張 GPU 只載一個模型），本機的記憶體判斷擋不到。
-        <b>預設 1</b> —— 一個一個過去、每個都在合理時間內完成，比全部一起去搶顯存到集體逾時好。
+        <b>預設 1</b> —— 一個一個過去、每個都在合理時間內完成，比全部一起去搶顯示記憶體到集體逾時好。
       </div>
     </div>
 
@@ -209,7 +209,7 @@
 .aj-mem-pct { font-size: 15px; font-weight: 700; color: #0f172a; }
 .aj-mem.low .aj-mem-pct { color: #b45309; }
 .aj-mem.crit .aj-mem-pct { color: #b91c1c; }
-/* 指示計：用量（左）+ 保留量（右，斜紋）—— 一眼看出「還剩多少可以派工」，
+/* 指示計：用量（左）+ 保留量（右，斜紋）—— 一眼看出「還剩多少可以派送」，
    而不是只給一串數字要人自己心算。 */
 .aj-mem-bar { position: relative; height: 12px; background: #e2e8f0; border-radius: 7px; overflow: hidden; display: flex; }
 .aj-mem-used { height: 100%; width: 0; background: linear-gradient(to right, #2563eb, #3b82f6); transition: width .4s; }
@@ -404,7 +404,7 @@
     }
     paused = !!rt.paused;
     document.getElementById('aj-pause-tx').textContent =
-      paused ? '恢復派工' : '暫停派工';
+      paused ? '恢復派送' : '暫停派送';
     // 暫停會影響所有人 → 用醒目色，不要長得像一般按鈕；暫停中改綠色（恢復）
     pauseBtn.classList.toggle('btn-warn', !paused);
     pauseBtn.classList.toggle('btn-resume', paused);
@@ -419,10 +419,10 @@
       const usedPct = Math.min(100, Math.round((usedMb / m.total_mb) * 100));
       const resPct = Math.min(100 - usedPct,
                               Math.round((m.reserve_mb / m.total_mb) * 100));
-      // 「可派工」= 可用 − 保留，也就是實際還能拿去開新作業的量
+      // 「可開新作業」= 可用 − 保留，也就是實際還能拿去開新作業的量
       const spare = Math.max(0, (m.available_mb || 0) - (m.reserve_mb || 0));
       txt.textContent = `記憶體：已用 ${fmtMB(usedMb)} / 總計 ${fmtMB(m.total_mb)}`
-        + `・可派工 ${fmtMB(spare)}（保留 ${fmtMB(m.reserve_mb)} 不動用）`;
+        + `・可開新作業 ${fmtMB(spare)}（保留 ${fmtMB(m.reserve_mb)} 不動用）`;
       pctEl.textContent = usedPct + '%';
       document.getElementById('aj-mem-used').style.width = usedPct + '%';
       document.getElementById('aj-mem-reserve').style.width = resPct + '%';
@@ -463,7 +463,7 @@
   let lastRuntime = {}, lastOffice = {}, lastMemory = {}, lastTotal = 0;
 
   function sortJobs(jobs) {
-    if (!sortKey) return jobs;            // 預設：排隊中在前且照派工順序
+    if (!sortKey) return jobs;            // 預設：排隊中在前且照派送順序
     const val = (j) => {
       if (sortKey === 'usage') return (j.usage ? j.usage.rss_mb : -1);
       if (sortKey === 'elapsed') return j.elapsed || 0;
@@ -731,7 +731,7 @@
     th.addEventListener('click', () => {
       const k = th.dataset.sort;
       if (sortKey === k) {
-        // 同一欄第三次點 → 回到預設排序（排隊中在前、照派工順序）
+        // 同一欄第三次點 → 回到預設排序（排隊中在前、照派送順序）
         if (sortDir === -1) { sortKey = ''; sortDir = 1; } else { sortDir = -1; }
       } else { sortKey = k; sortDir = 1; }
       document.querySelectorAll('.aj-sortable').forEach((o) => {

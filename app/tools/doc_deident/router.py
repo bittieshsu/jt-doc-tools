@@ -40,17 +40,24 @@ def _out_path(upload_id: str) -> Path:
 
 # ------------------------------------------------------------- detection
 
-def _build_findings_for_page(page, selected_ids: set[str],
-                             custom_regexes: list[tuple[str, re.Pattern]]
-                             ) -> list[dict]:
-    """Return a list of {type, value, masked, bbox, text} for every
-    sensitive hit on this page. Each finding carries the PDF points bbox
-    used later for redaction / mask rendering."""
-    out: list[dict] = []
-    # Per line: concat span texts, remember per-char span mapping so we
-    # can map a regex match back to a bbox by union-ing span rects.
-    td = page.get_text("dict")
-    for block in td.get("blocks", []):
+#: 標籤與值分屬兩個儲存格時，允許往右找多遠（PDF points）。
+#:
+#: A4 寬 595pt。半頁已經涵蓋一般表單「標籤欄 + 內容欄」的距離，再寬就開始
+#: 把不相干的兩欄湊成一對了。
+_PAIR_MAX_GAP_X = 300.0
+#: 往下找時允許的垂直間距，以上一行的行高為單位。
+_PAIR_MAX_GAP_Y_RATIO = 1.6
+
+
+def _line_units(page) -> list[dict]:
+    """把整頁攤平成一串「文字單位」，每個單位帶著自己的 spans 與 bbox。
+
+    一個單位就是 PyMuPDF 的一條 line。表格的每個儲存格會是各自的 line
+    （有時甚至在不同 block），所以「標籤在左格、值在右格」這種寫法，
+    在任何單一單位裡都看不到完整的句子 —— 這正是 issue #43 的根因。
+    """
+    units: list[dict] = []
+    for block in page.get_text("dict").get("blocks", []):
         if block.get("type") != 0:
             continue
         for line in block.get("lines", []):
@@ -58,89 +65,206 @@ def _build_findings_for_page(page, selected_ids: set[str],
             if not spans:
                 continue
             text_parts: list[str] = []
-            span_map: list[int] = []  # span index for each char
+            span_map: list[int] = []      # 每個字元屬於哪個 span
+            span_starts: list[int] = []   # 每個 span 從第幾個字元開始
+            pos = 0
             for si, sp in enumerate(spans):
                 t = sp.get("text") or ""
+                span_starts.append(pos)
                 text_parts.append(t)
                 span_map.extend([si] * len(t))
-            line_text = "".join(text_parts)
-            if not line_text.strip():
+                pos += len(t)
+            text = "".join(text_parts)
+            if not text.strip():
                 continue
+            units.append({
+                "text": text, "spans": spans, "span_map": span_map,
+                "span_starts": span_starts,
+                "bbox": [min(s["bbox"][0] for s in spans),
+                         min(s["bbox"][1] for s in spans),
+                         max(s["bbox"][2] for s in spans),
+                         max(s["bbox"][3] for s in spans)],
+            })
+    return units
 
-            def _emit(m, pat_label: str, pat_id: str, masked: str, grp: int = 0):
-                try:
-                    start, end = m.start(grp), m.end(grp)
-                    if start < 0:
-                        start, end = m.start(), m.end()
-                except Exception:
-                    start, end = m.start(), m.end()
-                if start >= len(span_map) or end == 0:
-                    return
-                first_si = span_map[start]
-                last_si = span_map[min(end - 1, len(span_map) - 1)]
-                # Compute union bbox over involved spans. For same-line
-                # matches this over-estimates width when the match is a
-                # substring of a span (span reports full rect), so we
-                # additionally clip horizontally by char-width estimate.
-                bx0 = min(spans[i]["bbox"][0] for i in range(first_si, last_si + 1))
-                by0 = min(spans[i]["bbox"][1] for i in range(first_si, last_si + 1))
-                bx1 = max(spans[i]["bbox"][2] for i in range(first_si, last_si + 1))
-                by1 = max(spans[i]["bbox"][3] for i in range(first_si, last_si + 1))
-                # Tighten horizontally when the match sits inside a single
-                # span and doesn't cover the whole span.
-                if first_si == last_si:
-                    sp = spans[first_si]
-                    full_text = sp.get("text") or ""
-                    if full_text:
-                        sp_x0, _, sp_x1, _ = sp["bbox"]
-                        cw = (sp_x1 - sp_x0) / max(1, len(full_text))
-                        # Offset within the span
-                        span_start_in_line = sum(len(spans[i].get("text") or "")
-                                                 for i in range(first_si))
-                        local_s = start - span_start_in_line
-                        local_e = end - span_start_in_line
-                        bx0 = sp_x0 + cw * max(0, local_s)
-                        bx1 = sp_x0 + cw * max(local_e, local_s + 1)
-                        by0 = sp["bbox"][1]
-                        by1 = sp["bbox"][3]
-                try:
-                    emit_value = m.group(grp)
-                except Exception:
-                    emit_value = m.group(0)
-                out.append({
-                    "type": pat_id,
-                    "type_label": pat_label,
-                    "value": emit_value,
-                    "masked": masked,
-                    "bbox": [bx0, by0, bx1, by1],
-                    "font_size": float(spans[first_si].get("size", 11) or 11),
-                    "color_int": int(spans[first_si].get("color", 0) or 0),
-                })
 
-            # Built-in patterns
-            for pat in P.CATALOG:
-                if pat.id not in selected_ids:
-                    continue
-                for m in pat.regex.finditer(line_text):
-                    try:
-                        val = m.group(pat.value_group) if pat.value_group else m.group(0)
-                    except Exception:
-                        val = m.group(0)
-                    if val is None:
-                        continue
-                    if not pat.validate(val):
-                        continue
-                    _emit(m, pat.label, pat.id, pat.mask(val), pat.value_group)
-            # Custom user-supplied regexes (no checksum, no mask — use
-            # "****" as default mask)
-            for label, rx in custom_regexes:
-                try:
-                    for m in rx.finditer(line_text):
-                        val = m.group(0)
-                        masked = "*" * max(1, len(val))
-                        _emit(m, label, f"custom:{label}", masked)
-                except Exception:
-                    continue
+def _join_units(a: dict, b: dict) -> dict:
+    """把兩個相鄰單位接成一個「虛擬單位」，中間補一個空白。
+
+    span 的索引與起始位置都要重算 —— 之後把比對結果換算回座標時，靠的就是
+    這兩張表。用累加長度去猜起始位置會因為中間多了那個空白而整個偏一格。
+    """
+    sep = " "
+    text = a["text"] + sep + b["text"]
+    spans = list(a["spans"]) + list(b["spans"])
+    off = len(a["spans"])
+    # 中間那個空白掛在 a 的最後一個 span 底下（值一定落在 b，不受影響）
+    span_map = list(a["span_map"]) + [len(a["spans"]) - 1] + \
+        [i + off for i in b["span_map"]]
+    base = len(a["text"]) + len(sep)
+    span_starts = list(a["span_starts"]) + [base + s for s in b["span_starts"]]
+    return {"text": text, "spans": spans, "span_map": span_map,
+            "span_starts": span_starts, "junction": len(a["text"])}
+
+
+def _adjacent_pairs(units: list[dict]) -> list[dict]:
+    """找出「可能是同一句話被拆成兩格」的相鄰單位。
+
+    只認兩種相鄰：**同一列往右的下一格**、**正下方的那一格**。這兩種涵蓋了
+    表單的兩種排法（標籤在左 / 標籤在上），又不會把整頁任意兩段文字湊成一對。
+    每個單位最多各取最近的一個，數量是線性的。
+    """
+    pairs: list[dict] = []
+    for a in units:
+        ax0, ay0, ax1, ay1 = a["bbox"]
+        ah = max(1.0, ay1 - ay0)
+        right = None
+        below = None
+        for b in units:
+            if b is a:
+                continue
+            bx0, by0, bx1, by1 = b["bbox"]
+            # 同一列：垂直方向要有一半以上重疊，且在右邊
+            overlap = min(ay1, by1) - max(ay0, by0)
+            if overlap > 0.5 * min(ah, max(1.0, by1 - by0)) and bx0 >= ax1 - 2:
+                gap = bx0 - ax1
+                if gap <= _PAIR_MAX_GAP_X and (right is None or gap < right[0]):
+                    right = (gap, b)
+            # 正下方：水平方向要有重疊，且緊接著
+            h_overlap = min(ax1, bx1) - max(ax0, bx0)
+            if h_overlap > 0.3 * min(ax1 - ax0, max(1.0, bx1 - bx0)):
+                gap_y = by0 - ay1
+                if 0 <= gap_y <= _PAIR_MAX_GAP_Y_RATIO * ah and \
+                        (below is None or gap_y < below[0]):
+                    below = (gap_y, b)
+        for cand in (right, below):
+            if cand:
+                pairs.append(_join_units(a, cand[1]))
+    return pairs
+
+
+def _scan_unit(unit: dict, selected_ids: set[str],
+               custom_regexes: list[tuple[str, re.Pattern]],
+               *, labelled_only: bool = False) -> list[dict]:
+    """在一個文字單位裡找敏感資料，回傳帶座標的結果。"""
+    out: list[dict] = []
+    text = unit["text"]
+    spans = unit["spans"]
+    span_map = unit["span_map"]
+    span_starts = unit["span_starts"]
+    junction = unit.get("junction")
+
+    def _emit(m, pat_label: str, pat_id: str, masked: str, grp: int = 0):
+        try:
+            start, end = m.start(grp), m.end(grp)
+            if start < 0:
+                start, end = m.start(), m.end()
+        except Exception:
+            start, end = m.start(), m.end()
+        if start >= len(span_map) or end == 0:
+            return
+        if junction is not None:
+            # 接起來才成立的比對才收 —— 否則同一格內就找得到的東西會被重覆
+            # 收兩次（一次來自原本的單位、一次來自這個虛擬單位）。
+            if not (m.start() < junction and m.end() > junction):
+                return
+        first_si = span_map[start]
+        last_si = span_map[min(end - 1, len(span_map) - 1)]
+        # Compute union bbox over involved spans. For same-line
+        # matches this over-estimates width when the match is a
+        # substring of a span (span reports full rect), so we
+        # additionally clip horizontally by char-width estimate.
+        bx0 = min(spans[i]["bbox"][0] for i in range(first_si, last_si + 1))
+        by0 = min(spans[i]["bbox"][1] for i in range(first_si, last_si + 1))
+        bx1 = max(spans[i]["bbox"][2] for i in range(first_si, last_si + 1))
+        by1 = max(spans[i]["bbox"][3] for i in range(first_si, last_si + 1))
+        # Tighten horizontally when the match sits inside a single
+        # span and doesn't cover the whole span.
+        if first_si == last_si:
+            sp = spans[first_si]
+            full_text = sp.get("text") or ""
+            if full_text:
+                sp_x0, _, sp_x1, _ = sp["bbox"]
+                cw = (sp_x1 - sp_x0) / max(1, len(full_text))
+                local_s = start - span_starts[first_si]
+                local_e = end - span_starts[first_si]
+                bx0 = sp_x0 + cw * max(0, local_s)
+                bx1 = sp_x0 + cw * max(local_e, local_s + 1)
+                by0 = sp["bbox"][1]
+                by1 = sp["bbox"][3]
+        try:
+            emit_value = m.group(grp)
+        except Exception:
+            emit_value = m.group(0)
+        out.append({
+            "type": pat_id,
+            "type_label": pat_label,
+            "value": emit_value,
+            "masked": masked,
+            "bbox": [bx0, by0, bx1, by1],
+            "font_size": float(spans[first_si].get("size", 11) or 11),
+            "color_int": int(spans[first_si].get("color", 0) or 0),
+        })
+
+    # Built-in patterns
+    for pat in P.CATALOG:
+        if pat.id not in selected_ids:
+            continue
+        if labelled_only and not pat.value_group:
+            # 沒有標籤的式子（身分證、Email…）在單一格裡就抓得到，
+            # 不需要也不應該跨格 —— 跨格只會把兩段不相干的字湊成一筆。
+            continue
+        for m in pat.regex.finditer(text):
+            try:
+                val = m.group(pat.value_group) if pat.value_group else m.group(0)
+            except Exception:
+                val = m.group(0)
+            if val is None:
+                continue
+            if not pat.validate(val):
+                continue
+            _emit(m, pat.label, pat.id, pat.mask(val), pat.value_group)
+    # Custom user-supplied regexes (no checksum, no mask — use
+    # "****" as default mask)
+    if not labelled_only:
+        for label, rx in custom_regexes:
+            try:
+                for m in rx.finditer(text):
+                    val = m.group(0)
+                    masked = "*" * max(1, len(val))
+                    _emit(m, label, f"custom:{label}", masked)
+            except Exception:
+                continue
+    return out
+
+
+def _build_findings_for_page(page, selected_ids: set[str],
+                             custom_regexes: list[tuple[str, re.Pattern]]
+                             ) -> list[dict]:
+    """Return a list of {type, value, masked, bbox, text} for every
+    sensitive hit on this page. Each finding carries the PDF points bbox
+    used later for redaction / mask rendering."""
+    units = _line_units(page)
+    out: list[dict] = []
+    for u in units:
+        out.extend(_scan_unit(u, selected_ids, custom_regexes))
+
+    # 第二輪：標籤與值被拆到兩個儲存格的情形。
+    #
+    # 「出生日期」在左格、「1998-12-28」在右格時，兩邊各自都不成立 ——
+    # 需要標籤的式子（出生日期、銀行帳號、駕照…）在表格裡等於整組失效，
+    # 而表格正是這些欄位最常出現的地方（GitHub issue #43）。
+    seen = {(f["type"], f["value"], round(f["bbox"][0], 1), round(f["bbox"][1], 1))
+            for f in out}
+    for pair in _adjacent_pairs(units):
+        for f in _scan_unit(pair, selected_ids, custom_regexes,
+                            labelled_only=True):
+            key = (f["type"], f["value"],
+                   round(f["bbox"][0], 1), round(f["bbox"][1], 1))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(f)
     return out
 
 

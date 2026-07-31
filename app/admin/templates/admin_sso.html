@@ -141,7 +141,7 @@
     <div class="px-callout-title">{{ icon('shield', size=15) }} 反向代理主機（Nginx）必做設定 — 少任一項會不安全或無法登入</div>
     <ol class="px-callout-list">
       <li><b>Nginx 端做 SPNEGO / Kerberos 驗證，並「一律覆寫」帳號標頭</b>：在 <code>location</code> 內加
-        <code>proxy_set_header X-Remote-User $remote_user;</code> —— 先蓋掉客戶端自帶的同名標頭，只讓 Kerberos 驗到的帳號傳進來（沒這行＝任何人都能偽造身分）。</li>
+        <code>proxy_set_header X-Remote-User $remote_user;</code> —— 先蓋掉客戶端自己帶進來的同名標頭，只讓 Kerberos 驗到的帳號傳進來（沒這行＝任何人都能偽造身分）。</li>
       <li><b>下方「信任的反向代理 IP」要填「實際直接連進本服務的那台反向代理」的 IP</b>。若是「瀏覽器 → 反向代理A → 反向代理B → 本服務」的多層架構，要填<b>最後那台（直接連本服務的 B）</b>的 IP。<b>除非 Nginx 與本服務在同一台，否則不要只留 127.0.0.1。</b></li>
       <li><b>本服務只綁 <code>127.0.0.1</code>，或用防火牆只允許反向代理連 8765</b>。否則有人可繞過反向代理、直接對本服務送 <code>X-Remote-User</code> 冒充任何帳號。</li>
     </ol>

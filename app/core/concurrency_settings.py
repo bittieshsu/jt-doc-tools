@@ -34,7 +34,7 @@ process-wide 的鎖 —— 也就是說**不管 worker 開幾個，Office 轉檔
 
 1. `suggested_max_office()` / `hard_max_office()` —— 依**實際可用記憶體**算出建議
    值與硬上限，管理員填再大也會被夾住。
-2. `estimated_job_mb()` + `reserve_mb()` —— 派工前先估「再開一個要多少」，不夠就
+2. `estimated_job_mb()` + `reserve_mb()` —— 派送前先估「再開一個要多少」，不夠就
    讓工作**留在佇列裡排隊**，不是硬開。
 3. 記憶體讀取走 `host_stats`（容器感知）—— LXC / Docker 內 psutil 讀到的是實體
    主機的數字，拿那個判斷等於沒判斷。

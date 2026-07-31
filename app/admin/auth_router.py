@@ -1538,6 +1538,8 @@ def build_auth_router(templates) -> APIRouter:
             "channels": _nc.ALL_CHANNELS,
             "personal": _ns.PERSONAL_CHANNELS,
             "dual": _ns.DUAL_CHANNELS,
+            # 哪些管道還沒有對真實服務驗證過（見 notify_channels.DEV_CHANNELS）
+            "dev_channels": _nc.DEV_CHANNELS,
             "secret_kept": _ns.SECRET_KEPT,
         })
 
@@ -1630,14 +1632,14 @@ def build_auth_router(templates) -> APIRouter:
                 "elapsed": round(max(0.0, (r["finished_at"] or time.time())
                                      - r["created_at"]), 1),
                 "is_office": r["tool_id"] in _cs.OFFICE_TOOL_IDS,
-                # 排隊順序取自實際的派工佇列，不是拿時間去猜
+                # 排隊順序取自實際的派送佇列，不是拿時間去猜
                 "queue_pos": qpos.get(r["id"]),
                 # 實測的子行程用量（soffice 才是真正吃記憶體的那個）；
                 # 量不到就給 None，前端顯示估計值並標示為估計，不混為一談
                 "usage": usage.get(r["id"]),
                 "est_mb": _cs.estimated_job_mb(r["tool_id"]),
             })
-        # 排隊中的排最前面且**照派工順序**（其餘維持新到舊）—— 管理員最關心的
+        # 排隊中的排最前面且**照派送順序**（其餘維持新到舊）—— 管理員最關心的
         # 是「接下來會跑誰」，用建立時間倒序會把佇列頭尾顛倒過來。
         out.sort(key=lambda j: (
             0 if j["queue_pos"] else (1 if j["status"] == "running" else 2),
@@ -1688,7 +1690,7 @@ def build_auth_router(templates) -> APIRouter:
 
     @router.post("/jobs/api/pause")
     async def jobs_api_pause(request: Request):
-        """暫停 / 恢復派工。只影響尚未開始的工作 —— 執行中的 soffice 是獨立子
+        """暫停 / 恢復派送。只影響尚未開始的工作 —— 執行中的 soffice 是獨立子
         行程，凍結不了（UI 已照實說明）。"""
         from ..core.job_manager import job_manager
         body = await request.json()

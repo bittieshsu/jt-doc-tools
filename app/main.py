@@ -17,7 +17,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.6"
+VERSION = "1.14.7"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -1102,7 +1102,7 @@ async def my_jobs_page(request: Request):
 
 @app.get("/api/my/inbox")
 async def api_my_inbox(request: Request, limit: int = 10):
-    """站內鈴鐺：我最近完成的作業 + 未讀數。
+    """站內通知：我最近完成的作業 + 未讀數。
 
     **刻意不另外開一張通知表** —— 這裡的「通知」就是「我的作業結束了」，
     jobs.sqlite 已經有全部資訊。另存一份就得雙寫，兩邊一旦不同步就會出現
@@ -1174,6 +1174,9 @@ async def api_my_notify(request: Request):
     return {
         "system_enabled": _ns.is_enabled(),
         "available": [{"id": c, "label": _nc.CHANNEL_INFO[c]["label"],
+                       # 尚未對真實服務驗證過的管道 —— 使用者也該知道，
+                       # 不然勾了收不到會以為是自己設定錯
+                       "dev": c in _nc.DEV_CHANNELS,
                        # personal＝必須填目的地；dual＝填了就私訊、沒填走團隊頻道
                        "personal": c in _ns.PERSONAL_CHANNELS,
                        "dual": c in _ns.DUAL_CHANNELS}
