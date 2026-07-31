@@ -147,11 +147,13 @@
     {{ icon('info', size=14) }} 目前未啟用認證，沒有帳號可以指定 —— 這個功能要先到「認證設定」啟用認證才有作用。
   </div>
   <div id="aj-prio-wrap">
-    <div class="aj-prio-list" id="aj-prio-list"></div>
+    {# 搜尋在最上面：這是「加人」的入口，動作的起點應該在名單之前。
+       擺在名單下面時，名單一長就得先捲過整份名單才找得到它。 #}
     <div class="aj-prio-add">
       <input type="text" id="aj-prio-q" placeholder="輸入帳號或姓名搜尋…" autocomplete="off">
       <div class="aj-prio-sug" id="aj-prio-sug" hidden></div>
     </div>
+    <div class="aj-prio-list" id="aj-prio-list"></div>
     <div class="aj-help muted" id="aj-prio-count"></div>
   </div>
 </div>
@@ -339,21 +341,26 @@
 .aj-res.remote { background: #cffafe; color: #0e7490; }
 .aj-prio-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: #fef3c7; color: #b45309; font-size: 11px; font-weight: 600; }
 .aj-prio-note { margin: 0 0 12px; }
-.aj-prio-list { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; max-width: 520px; }
+.aj-prio-list { display: flex; flex-direction: column; gap: 7px; margin: 12px 0 10px; max-width: 520px; }
 .aj-prio-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
 .aj-prio-row.dragging { opacity: .45; }
 .aj-prio-row.drag-over { border-color: #f59e0b; box-shadow: 0 0 0 2px #fef3c7; }
 .aj-prio-no { flex: none; width: 24px; height: 24px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 .aj-prio-grip { flex: none; cursor: grab; color: #94a3b8; font-size: 15px; line-height: 1; user-select: none; }
 .aj-prio-grip:active { cursor: grabbing; }
-.aj-prio-name { flex: 1 1 auto; font-size: 14px; font-weight: 600; color: #334155; }
+.aj-prio-name { flex: 1 1 auto; display: flex; flex-direction: column; gap: 1px; font-size: 14px; font-weight: 600; color: #334155; }
+.aj-prio-who { font-size: 12px; font-weight: 400; color: #94a3b8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .aj-prio-src { flex: none; padding: 1px 7px; border-radius: 4px; background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 600; }
+.aj-prio-src.ldap, .aj-prio-src.ad { background: #e0e7ff; color: #3730a3; }
+.aj-prio-src.oidc, .aj-prio-src.saml { background: #cffafe; color: #0e7490; }
+.aj-prio-sug div { display: flex; align-items: center; gap: 8px; }
+.aj-prio-sug .aj-prio-who { margin-left: auto; }
 .aj-prio-row button { flex: none; border: 0; background: transparent; color: #94a3b8; cursor: pointer; font-size: 17px; line-height: 1; padding: 0 2px; }
 .aj-prio-row button:hover { color: #b91c1c; }
 .aj-owner-prio { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-right: 6px; border-radius: 999px; background: #f59e0b; color: #fff; font-size: 11px; font-weight: 700; }
 .aj-owner.is-prio { display: flex; align-items: center; color: #92400e; font-weight: 600; }
 .aj-prio-empty { padding: 10px 2px; }
-.aj-prio-add { position: relative; max-width: 380px; }
+.aj-prio-add { position: relative; max-width: 520px; }
 .aj-prio-add input { width: 100%; padding: 8px 11px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; }
 .aj-prio-sug { position: absolute; z-index: 30; left: 0; right: 0; top: 100%; margin-top: 4px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.10); max-height: 260px; overflow-y: auto; }
 .aj-prio-sug div { padding: 8px 11px; cursor: pointer; font-size: 14px; }
@@ -837,8 +844,18 @@
   //
   // 名單是「整份覆寫」的：每次增刪都把完整清單送上去。人數上限只有數十，
   // 用不著做差異比對，而整份覆寫不會有「兩個分頁各改一半」的合併問題。
+  // 認證來源的顯示名稱。同一個 username 可以分屬不同來源，挑人時一定要標出來。
+  const SRC_LABEL = { local: '本機', ldap: 'LDAP', ad: 'AD',
+                      oidc: 'OIDC', saml: 'SAML' };
+
+  // 全站通用的 `username@來源` 寫法（見 app/core/sessions.py:user_label）——
+  // 作業清單的送出者欄位顯示的也是這個格式，兩邊對得起來。
+  function prioWho(u) {
+    return u.source ? `${u.username}@${u.source}` : u.username;
+  }
+
   let prioUsers = [];       // [{id, username, display_name, source}]
-  let prioMax = 50;
+  let prioMax = 15;      // 伺服器會回實際值，這只是還沒載入前的預設
 
   function prioRender() {
     const list = document.getElementById('aj-prio-list');
@@ -856,12 +873,16 @@
       grip.title = '拖曳調整順序';
       row.appendChild(grip);
       // 帳號與姓名是使用者可控的內容 —— 一律 textContent
-      row.appendChild(el('span', 'aj-prio-name',
-                         u.display_name ? `${u.display_name}（${u.username}）`
-                                        : u.username));
-      if (u.source && u.source !== 'local') {
-        row.appendChild(el('span', 'aj-prio-src', u.source));
-      }
+      //
+      // **一定要顯示來源**：同一個 username 可以同時存在於本機與 LDAP
+      //（`jason@local` 與 `jason@ldap` 是兩個不同的人），只看帳號分不出來
+      // 是哪一個。用全站通用的 `username@來源` 寫法（見 sessions.user_label）。
+      const who = el('span', 'aj-prio-name');
+      who.appendChild(el('span', null, u.display_name || u.username));
+      who.appendChild(el('span', 'aj-prio-who', prioWho(u)));
+      row.appendChild(who);
+      row.appendChild(el('span', 'aj-prio-src ' + (u.source || 'local'),
+                         SRC_LABEL[u.source] || u.source || '本機'));
       const x = document.createElement('button');
       x.type = 'button';
       x.textContent = '\u00D7';
@@ -928,7 +949,7 @@
       if (!r.ok) return;
       const d = await r.json();
       prioUsers = d.users || [];
-      prioMax = d.max || 50;
+      prioMax = d.max || 15;
       document.getElementById('aj-prio-off').hidden = !!d.auth_enabled;
       document.getElementById('aj-prio-wrap').hidden = !d.auth_enabled;
       prioRender();
@@ -972,10 +993,13 @@
       }
       rows.forEach((u) => {
         const row = el('div');
-        // 文字一律用 textContent —— 帳號 / 姓名是使用者可控的內容
-        row.textContent = u.display_name
-          ? `${u.display_name}（${u.username}）` : u.username;
-        if (u.source && u.source !== 'local') row.title = '來源：' + u.source;
+        // 文字一律用 textContent —— 帳號 / 姓名是使用者可控的內容。
+        // 同名不同來源（本機 jason vs LDAP jason）在這裡一定要分得出來，
+        // 否則管理員會挑錯人。
+        row.appendChild(el('span', null, u.display_name || u.username));
+        row.appendChild(el('span', 'aj-prio-who', prioWho(u)));
+        row.appendChild(el('span', 'aj-prio-src ' + (u.source || 'local'),
+                          SRC_LABEL[u.source] || u.source || '本機'));
         row.addEventListener('click', () => {
           if (prioUsers.length >= prioMax) {
             alert('最多 ' + prioMax + ' 位');

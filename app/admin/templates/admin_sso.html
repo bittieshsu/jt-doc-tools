@@ -11,11 +11,13 @@
   {% endif %}
 </div>
 
-<div class="panel">
+<div class="panel auth-form">
   <h2 data-s="s53896af7">共用設定</h2>
-  <label>對外網址 base URL（reverse proxy 的公開網址，OIDC redirect / SAML ACS 都以此為準）</label>
-  <input class="field" id="base_url" type="url" placeholder="https://docs.example.com" value="{{ sso.base_url }}" data-s="s6d567387" />
-  <p class="muted" data-s="s6b9c179a">留空則依進來的請求推導（直連 / 開發用）。有反向代理時<b>務必</b>填對外 https 網址。</p>
+  <div class="auth-field">
+    <label class="af-label" for="base_url">對外網址 base URL（reverse proxy 的公開網址，OIDC redirect / SAML ACS 都以此為準）</label>
+    <input class="field" id="base_url" type="url" placeholder="https://docs.example.com" value="{{ sso.base_url }}" data-s="s6d567387" />
+    <div class="af-hint">留空則依進來的請求推導（直連 / 開發用）。有反向代理時<b>務必</b>填對外 https 網址。</div>
+  </div>
   <div id="urlHints" class="muted" data-s="s77a268ab"></div>
   <p class="sso-saverow">
     <button class="btn btn-primary" id="saveBtnTop">{{ icon('save', size=14) }} 儲存設定</button>
@@ -81,45 +83,146 @@
   </style>
 </details>
 
-<div class="panel">
+<div class="panel auth-form">
   <h2 data-s="s53896af7">OIDC（OpenID Connect）</h2>
   <p class="muted" data-s="s6b9c179a">適用 Microsoft 365 / Entra ID、Google、Keycloak、Okta、Authentik 等。在 IdP 設定 Redirect URI 為 <code id="oidcRedirect">（先填 base URL）</code>。</p>
-  <label><input type="checkbox" id="o_enabled" {% if sso.oidc.enabled %}checked{% endif %}/> 啟用 OIDC 登入</label>
-  <div class="grid2">
-    <div><label>登入鈕文字</label><input class="field" id="o_display_name" value="{{ sso.oidc.display_name }}" placeholder="以 Microsoft 登入"/></div>
-    <div><label>Issuer（discovery 根）</label><input class="field" id="o_issuer" value="{{ sso.oidc.issuer }}" placeholder="https://login.microsoftonline.com/&lt;tenant&gt;/v2.0"/></div>
-    <div><label>Client ID</label><input class="field" id="o_client_id" value="{{ sso.oidc.client_id }}"/></div>
-    <div><label>Client Secret</label><input class="field" id="o_client_secret" type="password" value="{{ sso.oidc.client_secret_enc }}" placeholder="（保留現有請勿更動）"/></div>
-    <div><label>Scopes</label><input class="field" id="o_scopes" value="{{ sso.oidc.scopes }}"/></div>
-    <div><label>使用者名稱 claim</label><input class="field" id="o_username_claim" value="{{ sso.oidc.username_claim }}"/></div>
-    <div><label>Email claim</label><input class="field" id="o_email_claim" value="{{ sso.oidc.email_claim }}"/></div>
-    <div><label>顯示名稱 claim</label><input class="field" id="o_name_claim" value="{{ sso.oidc.name_claim }}"/></div>
-    <div><label>群組 claim</label><input class="field" id="o_groups_claim" value="{{ sso.oidc.groups_claim }}"/></div>
-    <div><label>管理員群組（選填，此群組成員自動為 admin）</label><input class="field" id="o_admin_group" value="{{ sso.oidc.admin_group }}"/></div>
+  <div class="auth-field af-checks">
+    <label><input type="checkbox" id="o_enabled" {% if sso.oidc.enabled %}checked{% endif %}/> 啟用 OIDC 登入</label>
   </div>
-  <label data-s="saf23b8d4"><input type="checkbox" id="o_require_https" {% if sso.oidc.require_https %}checked{% endif %}/> 強制 HTTPS（建議開啟；內網 http IdP 才取消）</label>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('globe', size=14) }} 連線</legend>
+    <div class="af-attrs">
+      <div class="auth-field">
+        <label class="af-label">登入鈕文字</label>
+        <input class="field" id="o_display_name" value="{{ sso.oidc.display_name }}" placeholder="以 Microsoft 登入"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">Issuer（discovery 根）</label>
+        <input class="field" id="o_issuer" value="{{ sso.oidc.issuer }}" placeholder="https://login.microsoftonline.com/&lt;tenant&gt;/v2.0"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">Client ID</label>
+        <input class="field" id="o_client_id" value="{{ sso.oidc.client_id }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">Client Secret</label>
+        <input class="field" id="o_client_secret" type="password" value="{{ sso.oidc.client_secret_enc }}" placeholder="（保留現有請勿更動）"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">Scopes</label>
+        <input class="field" id="o_scopes" value="{{ sso.oidc.scopes }}"/>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('gear', size=14) }} 屬性對應</legend>
+    <div class="af-attrs">
+      <div class="auth-field">
+        <label class="af-label">使用者名稱 claim</label>
+        <input class="field" id="o_username_claim" value="{{ sso.oidc.username_claim }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">Email claim</label>
+        <input class="field" id="o_email_claim" value="{{ sso.oidc.email_claim }}"/>
+      <div class="af-hint">作業完成通知會寄到這裡。</div>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">顯示名稱 claim</label>
+        <input class="field" id="o_name_claim" value="{{ sso.oidc.name_claim }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">群組 claim</label>
+        <input class="field" id="o_groups_claim" value="{{ sso.oidc.groups_claim }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">管理員群組（選填）</label>
+        <input class="field" id="o_admin_group" value="{{ sso.oidc.admin_group }}"/>
+      <div class="af-hint">此群組的成員自動成為管理員。</div>
+      </div>
+    </div>
+  </fieldset>
+
+  <div class="auth-field af-checks" data-s="saf23b8d4">
+    <label><input type="checkbox" id="o_require_https" {% if sso.oidc.require_https %}checked{% endif %}/> 強制 HTTPS（建議開啟；內網 http IdP 才取消）</label>
+  </div>
   <p><button class="btn" id="testOidc">{{ icon('search', size=13) }} 測試 OIDC discovery</button> <span id="oidcResult" class="muted"></span></p>
 </div>
 
-<div class="panel">
+<div class="panel auth-form">
   <h2 data-s="s53896af7">SAML 2.0</h2>
   <p class="muted" data-s="s6b9c179a">SP metadata 網址：<code id="samlMeta">（先填 base URL）</code>；ACS（Assertion Consumer Service）：<code id="samlAcs">（先填 base URL）</code>。</p>
-  <label><input type="checkbox" id="s_enabled" {% if sso.saml.enabled %}checked{% endif %}/> 啟用 SAML 登入</label>
-  <div class="grid2">
-    <div><label>登入鈕文字</label><input class="field" id="s_display_name" value="{{ sso.saml.display_name }}"/></div>
-    <div><label>IdP EntityID</label><input class="field" id="s_idp_entity_id" value="{{ sso.saml.idp_entity_id }}"/></div>
-    <div><label>IdP SSO URL（HTTP-Redirect）</label><input class="field" id="s_idp_sso_url" value="{{ sso.saml.idp_sso_url }}"/></div>
-    <div><label>IdP SLO URL（選填，單一登出用）</label><input class="field" id="s_idp_slo_url" value="{{ sso.saml.idp_slo_url }}"/></div>
-    <div><label>SP EntityID（留空 = metadata 網址）</label><input class="field" id="s_sp_entity_id" value="{{ sso.saml.sp_entity_id }}"/></div>
-    <div><label>使用者名稱屬性（留空用 NameID）</label><input class="field" id="s_username_attr" value="{{ sso.saml.username_attr }}"/></div>
-    <div><label>Email 屬性</label><input class="field" id="s_email_attr" value="{{ sso.saml.email_attr }}"/></div>
-    <div><label>顯示名稱屬性</label><input class="field" id="s_name_attr" value="{{ sso.saml.name_attr }}"/></div>
-    <div><label>群組屬性</label><input class="field" id="s_groups_attr" value="{{ sso.saml.groups_attr }}"/></div>
-    <div><label>管理員群組（選填）</label><input class="field" id="s_admin_group" value="{{ sso.saml.admin_group }}"/></div>
+  <div class="auth-field af-checks">
+    <label><input type="checkbox" id="s_enabled" {% if sso.saml.enabled %}checked{% endif %}/> 啟用 SAML 登入</label>
   </div>
-  <label>IdP 簽章憑證 X.509（PEM 內容，不含 BEGIN/END 行）</label>
-  <textarea class="field" id="s_idp_x509cert" rows="4" data-s="sa54bfe29">{{ sso.saml.idp_x509cert }}</textarea>
-  <label data-s="s0ca67867"><input type="checkbox" id="s_want_assertions_signed" {% if sso.saml.want_assertions_signed %}checked{% endif %}/> 要求 IdP 簽署 Assertion（建議開啟）</label>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('globe', size=14) }} 連線</legend>
+    <div class="af-attrs">
+      <div class="auth-field">
+        <label class="af-label">登入鈕文字</label>
+        <input class="field" id="s_display_name" value="{{ sso.saml.display_name }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">IdP EntityID</label>
+        <input class="field" id="s_idp_entity_id" value="{{ sso.saml.idp_entity_id }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">IdP SSO URL（HTTP-Redirect）</label>
+        <input class="field" id="s_idp_sso_url" value="{{ sso.saml.idp_sso_url }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">IdP SLO URL（選填）</label>
+        <input class="field" id="s_idp_slo_url" value="{{ sso.saml.idp_slo_url }}"/>
+      <div class="af-hint">單一登出用。</div>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">SP EntityID（留空 = metadata 網址）</label>
+        <input class="field" id="s_sp_entity_id" value="{{ sso.saml.sp_entity_id }}"/>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('gear', size=14) }} 屬性對應</legend>
+    <div class="af-attrs">
+      <div class="auth-field">
+        <label class="af-label">使用者名稱屬性（留空用 NameID）</label>
+        <input class="field" id="s_username_attr" value="{{ sso.saml.username_attr }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">Email 屬性</label>
+        <input class="field" id="s_email_attr" value="{{ sso.saml.email_attr }}"/>
+      <div class="af-hint">作業完成通知會寄到這裡。</div>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">顯示名稱屬性</label>
+        <input class="field" id="s_name_attr" value="{{ sso.saml.name_attr }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">群組屬性</label>
+        <input class="field" id="s_groups_attr" value="{{ sso.saml.groups_attr }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">管理員群組（選填）</label>
+        <input class="field" id="s_admin_group" value="{{ sso.saml.admin_group }}"/>
+      <div class="af-hint">此群組的成員自動成為管理員。</div>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('lock', size=14) }} 簽章</legend>
+    <div class="auth-field">
+      <label class="af-label" for="s_idp_x509cert">IdP 簽章憑證 X.509</label>
+      <textarea class="field" id="s_idp_x509cert" rows="4" data-s="sa54bfe29">{{ sso.saml.idp_x509cert }}</textarea>
+      <div class="af-hint">貼 PEM 內容，<b>不含</b> BEGIN / END 行。</div>
+    </div>
+    <div class="auth-field af-checks" data-s="s0ca67867">
+      <label><input type="checkbox" id="s_want_assertions_signed" {% if sso.saml.want_assertions_signed %}checked{% endif %}/> 要求 IdP 簽署 Assertion（建議開啟）</label>
+    </div>
+  </fieldset>
   <p><button class="btn" id="testSaml">{{ icon('search', size=13) }} 驗證 SAML SP metadata</button> <span id="samlResult" class="muted"></span></p>
 </div>
 
@@ -128,7 +231,7 @@
   <span id="saveResult" class="muted" data-s="s610601bf"></span>
 </div>
 
-<div class="panel">
+<div class="panel auth-form">
   <h2>{{ icon('shield', size=18) }} Reverse Proxy SSO（Kerberos / SPNEGO）</h2>
   <p class="muted">
     已加入 AD 網域、且在 Windows 已登入的使用者，經前端 Nginx（SPNEGO/Kerberos）驗證後，
@@ -170,24 +273,48 @@
   {% if not ldap_configured %}
   <p class="muted" data-s="warn-noldap">⚠ 尚未設定 LDAP / AD 連線；Reverse Proxy SSO 需要它來查詢並同步網域使用者。請先到「認證設定」設定 LDAP / AD。</p>
   {% endif %}
-  <label data-s="s0ca67867"><input type="checkbox" id="px_enabled" {% if proxy_sso.enabled %}checked{% endif %}/> 啟用 Reverse Proxy SSO</label>
-  <div class="grid2">
-    <div><label>帳號標頭名稱</label><input class="field" id="px_header" value="{{ proxy_sso.header or 'X-Remote-User' }}"/></div>
-    <div>
-      <label>沒有標頭時的行為</label>
-      <label class="px-inline"><input type="checkbox" id="px_fallback" {% if proxy_sso.fallback_login %}checked{% endif %}/> 顯示 /login 登入頁（取消勾選則回 401）</label>
-    </div>
+  <div class="auth-field af-checks" data-s="s0ca67867">
+    <label><input type="checkbox" id="px_enabled" {% if proxy_sso.enabled %}checked{% endif %}/> 啟用 Reverse Proxy SSO</label>
   </div>
-  <label>信任的反向代理 IP（每行一個，或用逗號分隔；可用 CIDR，如 192.0.2.0/24）</label>
-  <textarea class="field" id="px_trusted" rows="3" data-s="sa54bfe29">{{ proxy_sso.trusted_proxies | join('\n') }}</textarea>
-  <p class="muted" data-s="px-sec">只有「直接連進本服務的來源 IP」在此清單內時才採信帳號標頭（不看 X-Forwarded-For，無法偽造）。請務必讓 Python 服務只綁 127.0.0.1，且 Nginx 一律覆寫此標頭。</p>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('gear', size=14) }} 標頭</legend>
+    <div class="af-attrs">
+      <div class="auth-field">
+        <label class="af-label" for="px_header">帳號標頭名稱</label>
+        <input class="field" id="px_header" value="{{ proxy_sso.header or 'X-Remote-User' }}"/>
+      </div>
+      <div class="auth-field">
+        <label class="af-label">沒有標頭時的行為</label>
+        <div class="af-checks">
+          <label class="px-inline"><input type="checkbox" id="px_fallback" {% if proxy_sso.fallback_login %}checked{% endif %}/> 顯示 /login 登入頁</label>
+        </div>
+        <div class="af-hint">取消勾選則直接回 401。</div>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('shield', size=14) }} 信任來源</legend>
+    <div class="auth-field">
+      <label class="af-label" for="px_trusted">信任的反向代理 IP</label>
+      <textarea class="field" id="px_trusted" rows="3" data-s="sa54bfe29">{{ proxy_sso.trusted_proxies | join('\n') }}</textarea>
+      <div class="af-hint">
+        每行一個，或用逗號分隔；可用 CIDR，如 <code>192.0.2.0/24</code>。<br>
+        只有「<b>直接連進本服務的來源 IP</b>」在此清單內時才採信帳號標頭（不看
+        <code>X-Forwarded-For</code>，無法偽造）。請務必讓 Python 服務只綁
+        <code>127.0.0.1</code>，且 Nginx 一律覆寫此標頭。
+      </div>
+    </div>
+  </fieldset>
   <p><button class="btn btn-primary" id="pxSaveBtn">{{ icon('check', size=14) }} 儲存 Reverse Proxy SSO</button> <span id="pxSaveResult" class="muted"></span></p>
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
-.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; margin:10px 0; }
-.grid2 input { width:100%; box-sizing:border-box; }
-.grid2 label, .panel > label { font-size:12px; font-weight:600; color:#374151; }
+.panel > label { font-size:12px; font-weight:600; color:#374151; }
+/* 這一頁的欄位比認證設定頁多，兩欄排得下 —— 放寬一點 */
+.auth-form { max-width: 900px; }
+.auth-form textarea.field { width:100%; box-sizing:border-box; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
 .sso-saverow { display:flex; align-items:center; gap:10px; margin:12px 0 0; flex-wrap:wrap; }
 .sso-savehint { font-size:11.5px; }
 .px-inline { font-weight:400 !important; display:inline-flex; align-items:center; gap:6px; }

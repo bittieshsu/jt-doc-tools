@@ -313,50 +313,6 @@
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
-  /* ===== Auth-settings form layout (self-contained, doesn't borrow .form-row) ===== */
-  .auth-form { max-width: 760px; }
-  .auth-form .auth-field { margin-bottom: 14px; }
-  .auth-form .af-label {
-    display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:4px;
-  }
-  .auth-form .af-hint { font-size:11.5px; color:var(--muted); margin-top:4px; line-height:1.5; }
-  .auth-form input.field[type=text],
-  .auth-form input.field[type=url],
-  .auth-form input.field[type=password] {
-    width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid var(--border);
-    border-radius:5px; font:inherit; background:#fff;
-  }
-  .auth-form .af-checks { display:flex; gap:18px; flex-wrap:wrap; font-size:13px; }
-  .auth-form .af-checks label { display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
-  /* ----- Section card (fieldset/legend) ----- */
-  .auth-section {
-    border:1px solid #e5e7eb; border-radius:8px;
-    padding:16px 18px 14px; margin:0 0 18px;
-    background:#fff;
-  }
-  .auth-section > legend {
-    display:inline-flex; align-items:center; gap:6px;
-    font-size:13px; font-weight:700; color:#1e293b;
-    padding:3px 10px; background:#eef2ff; border:1px solid #c7d2fe; border-radius:4px;
-    margin-left:4px;  /* nudge in from card edge */
-  }
-  .auth-section > legend svg.ic { color:#4f46e5; flex-shrink:0; }
-  .af-attrs {
-    display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap:14px;
-  }
-  .af-details { margin-top:8px; }
-  .af-details summary {
-    cursor:pointer; user-select:none; padding:6px 10px; font-size:12px;
-    background:#f3f4f6; border:1px solid #e5e7eb; border-radius:5px; color:#475569;
-  }
-  .af-details summary:hover { background:#e5e7eb; }
-  .af-details[open] summary { border-bottom-left-radius:0; border-bottom-right-radius:0; }
-  .af-details-body {
-    background:#fafafa; border:1px solid #e5e7eb; border-top:0;
-    border-radius:0 0 5px 5px; padding:10px 12px; font-size:11.5px; line-height:1.7;
-  }
-
   /* ----- Backend cards ----- */
   .backend-cards {
     display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

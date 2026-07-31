@@ -45,8 +45,8 @@ _LOCK = threading.RLock()
 _CACHE: Optional[list[int]] = None
 
 #: 名單人數上限。這是「少數例外」的機制 —— 名單一長就等於沒有優先順序可言，
-#: 反而讓一般使用者永遠排在最後。
-MAX_USERS = 50
+#: 反而讓一般使用者永遠排在最後（而且順序要一個一個拖，太長根本排不動）。
+MAX_USERS = 15
 
 
 def _path() -> Path:

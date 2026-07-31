@@ -319,3 +319,33 @@ def test_admin_api_returns_the_list_in_priority_order(monkeypatch, tmp_path):
     assert "get_ordered()" in body, "讀回名單沒有照順序"
     assert "sorted(job_priority" not in body, \
         "用 sorted() 讀名單會把管理員拖好的順序洗掉"
+
+
+def test_picker_shows_which_realm_each_account_belongs_to():
+    """挑人時一定要看得出是哪一種認證。
+
+    使用者回報：「本機有 jason，LDAP 也有 jason，不知是哪一個」。同一個
+    username 可以同時存在於多個來源（`UNIQUE(username, source)`），只顯示帳號
+    就會挑錯人 —— 而挑錯人的後果是「別人的作業一直插到我前面」，還很難查。
+
+    全站的寫法是 `username@來源`（見 `sessions.user_label`），這裡跟著用。
+    """
+    from pathlib import Path
+    tpl = (Path(__file__).resolve().parent.parent
+           / "app" / "admin" / "templates" / "admin_jobs.html").read_text(
+        encoding="utf-8")
+    assert "prioWho" in tpl, "挑人的下拉沒有顯示來源"
+    assert "`${u.username}@${u.source}`" in tpl, \
+        "來源沒有用全站通用的 username@來源 寫法"
+    # 名單列與搜尋結果兩邊都要標
+    assert tpl.count("prioWho(u)") >= 2, "名單列或搜尋下拉少了一邊"
+    assert "SRC_LABEL" in tpl, "沒有來源的中文標籤"
+
+
+def test_max_users_is_a_small_number():
+    """名單是「少數例外」的機制。
+
+    上限太大就等於沒有優先順序可言（一般使用者永遠排最後），而且順序要一個一個
+    拖，名單太長根本排不動。使用者指定 15。
+    """
+    assert job_priority.MAX_USERS == 15

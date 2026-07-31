@@ -60,6 +60,26 @@
   `docs/api.html` 之後，`docs/` 就是 Pages 的站台根，那裡沒有 CHANGELOG.md。生成器
   現在會把相對連結一律改寫成絕對的 GitHub 網址。
 
+### 修正 — SSO 設定頁的版面與其他設定頁不一致
+
+- 使用者回報「SSO 頁應該樣式沒套」。用真實瀏覽器截圖比對才看出差在哪：輸入框本身
+  其實有套到全域樣式，**差的是版面結構** —— 認證設定頁把欄位分組在有邊框的區塊卡片
+  裡（連線 / 屬性對應…），每個欄位有標題與說明、整體限寬；SSO 頁則是一整片兩欄
+  grid，欄位橫跨整個面板寬度、沒有分組。兩頁擺在一起看像不同產品。
+- 根因是那套樣式當初只寫在認證設定頁的 `<style>` 裡，別的頁面拿不到，只好各自寫
+  一套陽春的。已抽到 `platform.css`，SSO 的 OIDC / SAML / Reverse Proxy 三段都改用
+  同樣的分區卡片。抽出後認證設定頁的截圖與原本**逐像素相同**（確認沒動到既有版面）。
+- 加 `tests/test_admin_form_styles.py` 守住：樣式要留在共用位置、設定頁要真的用它。
+
+### 修正 — 優先派送名單挑人時看不出是哪一種認證
+
+- 本機有 `jason`、LDAP 也有 `jason` 時，下拉只顯示帳號，管理員會挑錯人。名單列與
+  搜尋結果都改成顯示全站通用的 `username@來源` 寫法，並加上來源標籤（本機 / LDAP /
+  AD / OIDC / SAML）。
+- 搜尋欄移到名單上方（它是「加人」的入口，名單一長時擺在下面要先捲過整份名單）。
+- 名單人數上限 50 → **15**：這是「少數例外」的機制，而且順序要一個一個拖，太長根本
+  排不動。
+
 ### 文件
 
 - README 與介紹網站的「背景作業與完成通知」都補上優先派送與資源標籤的說明，並新增
@@ -5073,7 +5093,7 @@ Sprint 2 會加段落拆分 / 標題識別 / 清單識別 / 表格修正 / 頁�
 
 ### 偵錯
 
-- **pdf-editor /save 加 text obj 詳細 log** — 列出每次 save 收到的所有 text 物件 （id / 位置 / 字型 / 字級 / original_bbox / 文字），方便排查字型變更後 ghost 殘留的根因（v1.6.2 修法不夠）。
+- **pdf-editor /save 加 text obj 詳細 log** — 列出每次 save 收到的所有 text 物件 （id / 位置 / 字型 / 字級 / original_bbox / 文字），方便追查字型變更後 ghost 殘留的根因（v1.6.2 修法不夠）。
 
 ## [1.6.2] - 2026-05-11
 
@@ -6159,7 +6179,7 @@ Sprint 2 會加段落拆分 / 標題識別 / 清單識別 / 表格修正 / 頁�
 ### 修正
 
 - **`jtdt update` 拒絕降版時實際還是降版了**（v1.4.36 之前長期 bug，使用者 v1.4.36 部署時觸發）：
-  - `svc_update` 偵測到 origin/main 比目前舊時，會印 warning 並嘗試 `git reset --hard v{cur}` 還原 — 但如果本地 VERSION 沒對應的 git tag（例如 dev 環境只 bump VERSION 不 git tag），restore 靜默失敗、code 繼續往下跑，最後仍然降版且服務以舊版重啟
+  - `svc_update` 偵測到 origin/main 比目前舊時，會印 warning 並嘗試 `git reset --hard v{cur}` 還原 — 但如果本地 VERSION 沒對應的 git tag（例如 dev 環境只 bump VERSION 不 git tag），restore 失敗卻沒有任何提示、code 繼續往下跑，最後仍然降版且服務以舊版重啟
   - 修法：在 `git reset --hard origin/main` 之前先用 `git rev-parse HEAD` 抓 SHA，downgrade abort 時先用 SHA 還原（一定存在），SHA-restore 失敗才 fallback 到 tag 還原
 - **逐句翻譯停止後再翻譯時停止按鈕有時消失**：
   - Race condition：使用者按下停止 → 開始新翻譯時，前一輪的 worker promise 還沒完全 resolve → finally 慢半拍執行 → 把新翻譯剛 set hidden=false 的 btnStop 改回 hidden=true
