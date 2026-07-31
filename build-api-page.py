@@ -114,6 +114,7 @@ def render_inline(text: str) -> str:
         # 純頁內 anchor（目錄）保留；外部連結開新分頁
         if url.startswith("#"):
             return stash(f'<a href="{html.escape(url)}">{html.escape(label)}</a>')
+        url = _abs_repo_url(url)
         return stash(
             f'<a href="{html.escape(url)}" target="_blank" '
             f'rel="noopener">{html.escape(label)}</a>'
@@ -136,6 +137,27 @@ def render_inline(text: str) -> str:
 
     text = re.sub(r"\x00(\d+)\x00", restore, text)
     return text
+
+
+_REPO_URL = "https://github.com/jasoncheng7115/jt-doc-tools"
+
+
+def _abs_repo_url(url: str) -> str:
+    """把 API.md 裡指向同目錄檔案的相對連結換成絕對的 GitHub 網址。
+
+    `[CHANGELOG.md](./CHANGELOG.md)` 在 API.md 裡是**對的** —— 兩份檔案就在
+    repo 根目錄並排。但這一頁會被生成到 `docs/api.html`，而 `docs/` 就是
+    GitHub Pages 的站台根，那裡沒有 CHANGELOG.md → 點下去 404。
+
+    所以凡是相對路徑一律改成 `blob/main/<檔名>`。判斷條件放寬到「不是絕對網址、
+    不是 mailto、不是錨點」，新加的相對連結才不會又漏掉。
+    """
+    if re.match(r"^[a-zA-Z][a-zA-Z0-9+.\-]*:", url) or url.startswith("//"):
+        return url                      # http(s):、mailto: 之類的絕對網址
+    if url.startswith("#"):
+        return url
+    rel = url[2:] if url.startswith("./") else url.lstrip("/")
+    return f"{_REPO_URL}/blob/main/{rel}"
 
 
 def md_to_html(md: str) -> tuple[str, list[tuple[int, str, str]]]:

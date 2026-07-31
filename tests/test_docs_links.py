@@ -82,6 +82,32 @@ def test_internal_anchors_have_targets(doc: Path):
     assert not broken, f"{doc.name} 的這些站內連結沒有對應目標：{sorted(set(broken))}"
 
 
+@pytest.mark.parametrize("doc", DOCS, ids=lambda p: p.name)
+def test_no_relative_links_to_files_outside_the_published_site(doc: Path):
+    """`docs/` 就是 Pages 的站台根 —— 相對連結只能指向 `docs/` 裡真的有的東西。
+
+    API 手冊是從 `API.md` 生成的，而 `API.md` 裡寫 `[CHANGELOG.md](./CHANGELOG.md)`
+    是**對的**（兩份檔案在 repo 根目錄並排）。但生成到 `docs/api.html` 之後，
+    那個相對路徑會指到站台根，而 `CHANGELOG.md` 不在發佈的網站裡 → 404。
+    生成器要把這種連結改寫成絕對的 GitHub 網址。
+    """
+    if not doc.exists():
+        pytest.skip(f"{doc.name} 不存在")
+    site = doc.parent
+    bad = []
+    for href in _hrefs(doc.read_text(encoding="utf-8")):
+        if href.startswith(("http://", "https://", "#", "mailto:", "//")):
+            continue
+        target = href.split("#")[0].split("?")[0]
+        if not target:
+            continue
+        if not (site / target).exists():
+            bad.append(href)
+    assert not bad, (
+        f"{doc.name} 的相對連結指向站台裡沒有的東西：{sorted(set(bad))}。"
+        "`docs/` 就是 Pages 的根，repo 根目錄的檔案要用絕對的 GitHub 網址。")
+
+
 def test_readme_repo_links_exist():
     """README 裡指向 repo 檔案的連結也要對得上（同樣的錯法會發生在這裡）。"""
     readme = PUB / "README.md"

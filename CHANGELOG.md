@@ -48,6 +48,10 @@
   `blob/main/<路徑>` 在發佈樹裡是否真的存在（不連網），並檢查站內錨點有對應目標。
 - API 手冊的生成器（`build-api-page.py`）裡也是同一條錯的連結，一併修掉，否則
   下次重新生成又會冒出來。
+- 同一輪還抓到第二個 404：API 手冊內文的「完整變更紀錄見 CHANGELOG.md」。那條在
+  `API.md` 裡寫 `./CHANGELOG.md` 是**對的**（兩份檔案在 repo 根目錄並排），但生成到
+  `docs/api.html` 之後，`docs/` 就是 Pages 的站台根，那裡沒有 CHANGELOG.md。生成器
+  現在會把相對連結一律改寫成絕對的 GitHub 網址。
 
 ### 文件
 
