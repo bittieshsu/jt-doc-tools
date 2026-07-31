@@ -139,8 +139,9 @@
   <p class="aj-help muted aj-prio-note">
     名單內的使用者送出作業時會<b>插到佇列最前面</b>，下一個被派送的就是他們的。
     通常用在高階主管或有時效性的重要工作。
+    <b>由上而下就是優先順序</b>（第 1 位最優先），可拖曳「⣿」調整；同一位使用者的多件作業之間照先來後到。
     <b>不會中斷正在執行的作業</b>（轉檔跑到一半殺掉只會留下半成品），效果是「下一個換你」而不是「現在就換你」。
-    名單內的人彼此仍照先來後到；記憶體不足時一樣要排隊，插隊不會凌駕於「不可把機器打爆」之上。
+    記憶體不足時一樣要排隊，插隊不會凌駕於「不可把機器打爆」之上。
   </p>
   <div id="aj-prio-off" class="aj-warn" hidden>
     {{ icon('info', size=14) }} 目前未啟用認證，沒有帳號可以指定 —— 這個功能要先到「認證設定」啟用認證才有作用。
@@ -338,10 +339,20 @@
 .aj-res.remote { background: #cffafe; color: #0e7490; }
 .aj-prio-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: #fef3c7; color: #b45309; font-size: 11px; font-weight: 600; }
 .aj-prio-note { margin: 0 0 12px; }
-.aj-prio-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-.aj-prio-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 8px 5px 11px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 13px; font-weight: 600; }
-.aj-prio-chip button { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; opacity: .7; }
-.aj-prio-chip button:hover { opacity: 1; }
+.aj-prio-list { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; max-width: 520px; }
+.aj-prio-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
+.aj-prio-row.dragging { opacity: .45; }
+.aj-prio-row.drag-over { border-color: #f59e0b; box-shadow: 0 0 0 2px #fef3c7; }
+.aj-prio-no { flex: none; width: 24px; height: 24px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.aj-prio-grip { flex: none; cursor: grab; color: #94a3b8; font-size: 15px; line-height: 1; user-select: none; }
+.aj-prio-grip:active { cursor: grabbing; }
+.aj-prio-name { flex: 1 1 auto; font-size: 14px; font-weight: 600; color: #334155; }
+.aj-prio-src { flex: none; padding: 1px 7px; border-radius: 4px; background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 600; }
+.aj-prio-row button { flex: none; border: 0; background: transparent; color: #94a3b8; cursor: pointer; font-size: 17px; line-height: 1; padding: 0 2px; }
+.aj-prio-row button:hover { color: #b91c1c; }
+.aj-owner-prio { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-right: 6px; border-radius: 999px; background: #f59e0b; color: #fff; font-size: 11px; font-weight: 700; }
+.aj-owner.is-prio { display: flex; align-items: center; color: #92400e; font-weight: 600; }
+.aj-prio-empty { padding: 10px 2px; }
 .aj-prio-add { position: relative; max-width: 380px; }
 .aj-prio-add input { width: 100%; padding: 8px 11px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; }
 .aj-prio-sug { position: absolute; z-index: 30; left: 0; right: 0; top: 100%; margin-top: 4px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.10); max-height: 260px; overflow-y: auto; }
@@ -565,7 +576,18 @@
       tr.appendChild(el('td', 'aj-file', j.filename || '—'));
 
       const tdOwner = el('td');
-      tdOwner.appendChild(el('div', 'aj-owner', j.owner || '（未登入）'));
+      const ownerLine = el('div', 'aj-owner');
+      // 優先派送名單裡的人要一眼認得出來 —— 名字前面掛排名徽章並改色。
+      // 這裡看的是**目前**的名單（不是作業送出當下），所以名單一改，整張清單
+      // 的標示就跟著更新。
+      if (j.owner_priority !== null && j.owner_priority !== undefined) {
+        const b = el('span', 'aj-owner-prio', String(j.owner_priority + 1));
+        b.title = '優先派送名單第 ' + (j.owner_priority + 1) + ' 位';
+        ownerLine.appendChild(b);
+        ownerLine.classList.add('is-prio');
+      }
+      ownerLine.appendChild(el('span', null, j.owner || '（未登入）'));
+      tdOwner.appendChild(ownerLine);
       if (j.client_ip) tdOwner.appendChild(el('div', 'aj-owner-ip', j.client_ip));
       tr.appendChild(tdOwner);
 
@@ -822,27 +844,83 @@
     const list = document.getElementById('aj-prio-list');
     list.textContent = '';
     if (!prioUsers.length) {
-      const empty = el('div', 'muted', '目前沒有指定任何人 —— 所有作業一律照先來後到。');
-      list.appendChild(empty);
+      list.appendChild(el('div', 'muted aj-prio-empty',
+                          '目前沒有指定任何人 —— 所有作業一律照先來後到。'));
     }
-    prioUsers.forEach((u) => {
-      const chip = el('span', 'aj-prio-chip');
-      const name = u.display_name ? `${u.display_name}（${u.username}）` : u.username;
-      chip.appendChild(el('span', null, name));
+    prioUsers.forEach((u, i) => {
+      const row = el('div', 'aj-prio-row');
+      row.dataset.id = String(u.id);
+      row.setAttribute('draggable', 'true');
+      row.appendChild(el('span', 'aj-prio-no', String(i + 1)));
+      const grip = el('span', 'aj-prio-grip', '\u283F');   // ⠿ 拖曳把手
+      grip.title = '拖曳調整順序';
+      row.appendChild(grip);
+      // 帳號與姓名是使用者可控的內容 —— 一律 textContent
+      row.appendChild(el('span', 'aj-prio-name',
+                         u.display_name ? `${u.display_name}（${u.username}）`
+                                        : u.username));
+      if (u.source && u.source !== 'local') {
+        row.appendChild(el('span', 'aj-prio-src', u.source));
+      }
       const x = document.createElement('button');
       x.type = 'button';
-      x.textContent = '×';
+      x.textContent = '\u00D7';
       x.title = '從名單移除';
       x.addEventListener('click', () => {
         prioUsers = prioUsers.filter((v) => v.id !== u.id);
         prioSave();
       });
-      chip.appendChild(x);
-      list.appendChild(chip);
+      row.appendChild(x);
+      list.appendChild(row);
     });
     document.getElementById('aj-prio-count').textContent =
-      `${prioUsers.length} / ${prioMax} 位`;
+      `${prioUsers.length} / ${prioMax} 位・由上而下為優先順序`;
   }
+
+  // 拖曳排序。順序**就是**優先順序，所以放開的當下就存檔 —— 這個面板的新增 /
+  // 移除也是立刻存，多一顆「儲存順序」按鈕反而讓人不確定到底存了沒。
+  (function prioDragSort() {
+    const list = document.getElementById('aj-prio-list');
+    if (!list) return;
+    let dragEl = null;
+    list.addEventListener('dragstart', (e) => {
+      const row = e.target.closest('.aj-prio-row');
+      if (!row) return;
+      dragEl = row;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    list.addEventListener('dragend', () => {
+      if (dragEl) dragEl.classList.remove('dragging');
+      list.querySelectorAll('.aj-prio-row').forEach(
+        (r) => r.classList.remove('drag-over'));
+      dragEl = null;
+    });
+    list.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const row = e.target.closest('.aj-prio-row');
+      if (!row || row === dragEl) return;
+      list.querySelectorAll('.aj-prio-row').forEach(
+        (r) => r.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+    });
+    list.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const row = e.target.closest('.aj-prio-row');
+      if (!row || !dragEl || row === dragEl) return;
+      const rect = row.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      row.parentNode.insertBefore(dragEl, after ? row.nextSibling : row);
+      row.classList.remove('drag-over');
+      // 以畫面上的實際順序為準重建資料，再存檔
+      const order = [...list.querySelectorAll('.aj-prio-row')]
+        .map((r) => Number(r.dataset.id));
+      prioUsers = order
+        .map((id) => prioUsers.find((u) => u.id === id))
+        .filter(Boolean);
+      prioSave();
+    });
+  })();
 
   async function prioLoad() {
     try {

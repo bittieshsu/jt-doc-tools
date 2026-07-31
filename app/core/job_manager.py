@@ -55,18 +55,23 @@ JobStatus = Literal["pending", "running", "done", "error", "cancelled",
                     "interrupted"]
 
 
-def _is_priority_owner(owner_id: Optional[int]) -> bool:
-    """這位使用者的作業要不要插隊（見 `job_priority`）。
+def _priority_rank_of(owner_id: Optional[int]) -> Optional[int]:
+    """這位使用者在優先派送名單裡排第幾（0 起算，越小越優先；不在名單裡回 None）。
 
     包一層是為了在名單模組出問題時**降級成一般作業**，而不是讓整個送出失敗 ——
     插隊是加分功能，壞掉不該讓人送不出工作。
     """
     try:
         from . import job_priority
-        return job_priority.is_priority(owner_id)
+        return job_priority.rank_of(owner_id)
     except Exception as e:  # noqa: BLE001
         logger.debug("優先派送判斷失敗，視為一般作業：%s", e.__class__.__name__)
-        return False
+        return None
+
+
+def _is_priority_owner(owner_id: Optional[int]) -> bool:
+    """這位使用者的作業要不要插隊。順序另外由 `_priority_rank_of` 決定。"""
+    return _priority_rank_of(owner_id) is not None
 
 #: 已結束、不會再變動的狀態
 TERMINAL: tuple[str, ...] = ("done", "error", "cancelled", "interrupted")
@@ -153,6 +158,8 @@ class Job:
     #: 存成欄位而不是每次查名單 —— 名單中途被改動時，已經在排隊的作業不該突然
     #: 換位置（使用者會看到自己的號碼往後跳）。
     priority: bool = False
+    #: 名單裡的排名（0 起算，越小越優先）。不是優先使用者時為 None。
+    priority_rank: Optional[int] = None
 
     def elapsed(self) -> float:
         end = self.updated_at if self.status in TERMINAL else time.time()
@@ -171,6 +178,7 @@ class Job:
             "elapsed": round(self.elapsed(), 1),
             "queued": self.status == "pending",
             "priority": bool(self.priority),
+            "priority_rank": self.priority_rank,
             "has_result": self.result_path is not None and self.result_path.exists(),
             "result_filename": self.result_filename,
             "meta": self.meta or {},
@@ -253,7 +261,8 @@ class JobManager:
         """
         with self._lock:
             return {j.id: {"status": j.status, "progress": j.progress,
-                           "message": j.message, "priority": bool(j.priority)}
+                           "message": j.message, "priority": bool(j.priority),
+                           "priority_rank": j.priority_rank}
                     for j in self._jobs.values()}
 
     def queue_positions(self) -> dict[str, int]:
@@ -351,32 +360,38 @@ class JobManager:
         self._attach_actor(job, request)
         # 優先派送只看**伺服器端決定的擁有者**，不看任何請求參數 ——
         # 只要前端傳得動，就等於開放所有人插隊。
-        job.priority = _is_priority_owner(job.owner_id)
+        job.priority_rank = _priority_rank_of(job.owner_id)
+        job.priority = job.priority_rank is not None
         with self._lock:
             self._jobs[job.id] = job
             self._fns[job.id] = fn
-            self._enqueue(job.id, job.priority)
+            self._enqueue(job.id, job.priority_rank)
             if not job.message:
                 job.message = "排隊中…" if not job.priority else "排隊中（優先）…"
         self._persist(job)
         self._dispatch()
         return job
 
-    def _enqueue(self, job_id: str, priority: bool) -> None:
-        """把作業放進佇列。優先作業插到最前面，但**排在已有的優先作業之後**。
+    def _enqueue(self, job_id: str, rank: Optional[int]) -> None:
+        """把作業放進佇列。`rank` 是優先派送名單裡的排名（None ＝ 一般作業）。
 
-        直接 `appendleft` 會讓後送出的優先使用者跑到先送出的前面 —— 同一群人之間
-        變成後進先出。他們彼此仍然要照先來後到，插隊只是相對於一般作業。
+        插在**排名同等或更前面**的優先作業之後：
+
+        * 跨排名照排名 —— 名單第 1 位的作業要排在第 2 位的前面，管理員排的順序
+          才有意義。
+        * 同排名（同一位使用者的多件）照先來後到 —— 用 `<=` 而不是 `<`，否則
+          後送出的那件會跑到自己先送出的那件前面，變成後進先出。
 
         呼叫端要自己持有 `self._lock`。
         """
-        if not priority:
+        if rank is None:
             self._pending.append(job_id)
             return
         idx = 0
         for i, jid in enumerate(self._pending):
             j = self._jobs.get(jid)
-            if j is not None and getattr(j, "priority", False):
+            r = getattr(j, "priority_rank", None) if j is not None else None
+            if r is not None and r <= rank:
                 idx = i + 1
             else:
                 break

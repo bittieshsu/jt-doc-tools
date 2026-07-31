@@ -1292,6 +1292,7 @@ async def api_job_list(request: Request, active: bool = False,
             "queue_pos": qpos.get(r["id"]),
             # 這件作業有沒有插隊（管理員指定的優先派送名單）
             "priority": bool(lv.get("priority")),
+            "priority_rank": lv.get("priority_rank"),
             "error": r["error"],
             "filename": _job_display_name(meta, r["result_filename"]),
             "result_filename": r["result_filename"],

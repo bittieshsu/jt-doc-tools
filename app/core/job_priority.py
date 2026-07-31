@@ -14,9 +14,10 @@
 1. **只插隊，不搶跑。** 已經在跑的作業不會被中斷 —— 轉檔跑到一半殺掉只會留下
    半成品，而且原本那個人也白等了。插隊的效果是「下一個換你」，不是「現在就換
    你」。
-2. **名單內的人彼此仍照先來後到。** 插到最前面時要插在**已經排在前面的其他優先
-   作業之後**，否則後送出的主管會跑到先送出的主管前面 —— 同一群人之間變成後進
-   先出，那是壞掉，不是功能。
+2. **名單本身有順序。** 管理員排的順序就是優先順序（第 1 位最優先）—— 沒有這個的
+   話「插隊」只有一級，董事長跟部門主管會互相卡。插隊時要插在**排名同等或更前面
+   的優先作業之後**：跨排名照排名，同一位使用者的多件作業之間照先來後到，否則後
+   送出的那件會跑到自己先送出的那件前面，變成後進先出。
 3. **身分只從伺服器端的作業擁有者判斷。** 不看任何請求參數 —— 讓前端傳
    `priority=1` 就等於開放所有人插隊。
 
@@ -40,7 +41,8 @@ from typing import Optional
 logger = logging.getLogger("app.job_priority")
 
 _LOCK = threading.RLock()
-_CACHE: Optional[set[int]] = None
+#: 名單是**有順序的** —— 排前面的人優先權更高。所以快取存 list 不存 set。
+_CACHE: Optional[list[int]] = None
 
 #: 名單人數上限。這是「少數例外」的機制 —— 名單一長就等於沒有優先順序可言，
 #: 反而讓一般使用者永遠排在最後。
@@ -60,32 +62,61 @@ def _auth_on() -> bool:
         return False
 
 
-def get_user_ids() -> set[int]:
-    """名單裡的使用者 id。認證關閉時一律回空集合。"""
+def get_ordered() -> list[int]:
+    """名單裡的使用者 id，**照優先順序**（排前面的先派送）。
+
+    認證關閉時一律回空清單 —— 沒有帳號就沒有「誰」可以指定。
+    """
     if not _auth_on():
-        return set()
+        return []
     global _CACHE
     with _LOCK:
         if _CACHE is not None:
-            return set(_CACHE)
-        ids: set[int] = set()
+            return list(_CACHE)
+        ids: list[int] = []
         p = _path()
         if p.exists():
             try:
                 raw = json.loads(p.read_text(encoding="utf-8"))
                 for v in (raw.get("user_ids") or []):
                     try:
-                        ids.add(int(v))
+                        n = int(v)
                     except (TypeError, ValueError):
                         continue
+                    if n not in ids:
+                        ids.append(n)
             except (OSError, ValueError) as e:
                 logger.warning("優先派送名單讀取失敗：%s", e.__class__.__name__)
         _CACHE = ids
-        return set(ids)
+        return list(ids)
 
 
-def set_user_ids(ids) -> set[int]:
-    """覆寫名單。回傳實際存下來的內容（去重、夾在上限內）。"""
+def get_user_ids() -> set[int]:
+    """名單成員（不含順序）。只在「這個人在不在名單裡」的判斷用。"""
+    return set(get_ordered())
+
+
+def rank_of(owner_id: Optional[int]) -> Optional[int]:
+    """這位使用者排第幾（0 起算，數字越小越優先）。不在名單裡回 None。
+
+    順序是管理員排的：同樣是優先使用者，排前面那位的作業要先派。沒有這個的話
+    「插隊」只有一級，董事長跟部門主管會互相卡（先送出的那個先跑）。
+    """
+    if owner_id is None:
+        return None
+    try:
+        n = int(owner_id)
+    except (TypeError, ValueError):
+        return None
+    ordered = get_ordered()
+    return ordered.index(n) if n in ordered else None
+
+
+def set_user_ids(ids) -> list[int]:
+    """覆寫名單。**順序就是優先順序**，原樣保留。
+
+    回傳實際存下來的內容（去重、夾在上限內）。
+    """
     clean: list[int] = []
     for v in (ids or []):
         try:
@@ -103,8 +134,8 @@ def set_user_ids(ids) -> set[int]:
     tmp.replace(p)
     global _CACHE
     with _LOCK:
-        _CACHE = set(clean)
-    return set(clean)
+        _CACHE = list(clean)
+    return list(clean)
 
 
 def invalidate_cache() -> None:

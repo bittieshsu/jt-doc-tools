@@ -258,7 +258,11 @@
              : `排隊中・前面還有 ${j.queue_pos - 1} 個作業`)
           : '排隊中');
         // 插隊的作業要講清楚原因，不然使用者會以為號碼算錯了
-        if (j.priority) bits.push('優先派送');
+        if (j.priority) {
+          bits.push(j.priority_rank === null || j.priority_rank === undefined
+            ? '優先派送'
+            : `優先派送（第 ${j.priority_rank + 1} 順位）`);
+        }
       } else {
         bits.push('耗時 ' + fmtElapsed(j.elapsed));
       }

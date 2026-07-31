@@ -1612,6 +1612,14 @@ def build_auth_router(templates) -> APIRouter:
         usage = job_manager.resource_usage()
         # 疊上即時狀態（進度不寫 DB，只讀 DB 的話進度條永遠是 0）
         live = job_manager.live_snapshot()
+        # 送出者目前**是不是**優先派送名單裡的人（以及排第幾）。
+        #
+        # 這跟作業自己的 `priority` 不一樣：作業上那個是**送出當下**的狀態，
+        # 用來決定它在佇列裡的位置；這裡是**現在**的名單，用來在清單上標出
+        # 「這個人是優先使用者」。兩者刻意分開 —— 名單改了不該讓歷史作業
+        # 的排隊結果看起來變了。
+        from ..core import job_priority as _jp
+        prio_rank = {uid: i for i, uid in enumerate(_jp.get_ordered())}
         out = []
         for r in rows:
             meta = r.get("meta") or {}
@@ -1628,6 +1636,8 @@ def build_auth_router(templates) -> APIRouter:
                              or (f"{meta['count']} 個檔案"
                                  if isinstance(meta.get("count"), int) else "")),
                 "owner": r["owner_label"] or "", "client_ip": r["client_ip"] or "",
+                # 送出者目前在優先派送名單裡的排名（0 起算），不在名單裡為 None
+                "owner_priority": prio_rank.get(r.get("owner_id")),
                 "created_at": r["created_at"], "updated_at": r["updated_at"],
                 "elapsed": round(max(0.0, (r["finished_at"] or time.time())
                                      - r["created_at"]), 1),
@@ -1725,8 +1735,10 @@ def build_auth_router(templates) -> APIRouter:
         畫面上會是一列空白，管理員也認不出那是誰。
         """
         from ..core import job_priority, user_manager
+        # **照名單本身的順序**，不要 sorted() —— 順序就是優先順序，
+        # 依編號排會把管理員拖好的順序整個洗掉（實測踩到）。
         users = []
-        for uid in sorted(job_priority.get_user_ids()):
+        for uid in job_priority.get_ordered():
             u = user_manager.get_by_id(uid)
             if not u:
                 continue

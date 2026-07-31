@@ -35,22 +35,27 @@ def paused_mgr():
     m.set_paused(False)
 
 
-def _submit_as(mgr, tool_id: str, owner_id, priority_ids: set[int]):
+def _submit_as(mgr, tool_id: str, owner_id, priority_ids):
     """以某位使用者的身分送出一件作業。
 
+    `priority_ids` 給**有順序的**清單（第一個最優先）；給 set 也可以，
+    那代表「都在名單裡但不在意誰前誰後」。
+
     走的是**真正的路徑**：用 `set_current_actor` 設定「這個請求是誰」（中介層在
-    正式環境做的事），再讓 `job_priority.is_priority` 去查名單。這樣測到的才是
+    正式環境做的事），再讓 `job_priority.rank_of` 去查名單。這樣測到的才是
     submit 自己的判斷，不是測試自己排好順序再塞進去。
     """
     from app.core import job_manager as jm
-    orig = job_priority.is_priority
-    job_priority.is_priority = lambda oid: oid in priority_ids
+    ordered = list(priority_ids)
+    orig = job_priority.rank_of
+    job_priority.rank_of = (
+        lambda oid: ordered.index(oid) if oid in ordered else None)
     try:
         jm.set_current_actor({"user_id": owner_id, "username": f"u{owner_id}"},
                              client_ip="127.0.0.1")
         return mgr.submit(tool_id, lambda j: None)
     finally:
-        job_priority.is_priority = orig
+        job_priority.rank_of = orig
         jm.set_current_actor(None)
 
 
@@ -63,39 +68,61 @@ def _queue(mgr):
 
 def test_priority_job_jumps_ahead_of_normal_jobs(paused_mgr):
     m = paused_mgr
-    a = _submit_as(m, "pdf-merge", 1, set())
-    b = _submit_as(m, "pdf-merge", 2, set())
-    vip = _submit_as(m, "pdf-merge", 9, {9})
+    a = _submit_as(m, "pdf-merge", 1, [])
+    b = _submit_as(m, "pdf-merge", 2, [])
+    vip = _submit_as(m, "pdf-merge", 9, [9])
     assert _queue(m)[0] == vip.id, "優先作業沒有排到最前面"
     assert _queue(m)[1:] == [a.id, b.id], "一般作業之間的順序被動到了"
 
 
-def test_priority_jobs_keep_fifo_among_themselves(paused_mgr):
-    """同一群優先使用者之間仍照先來後到。
+def test_same_rank_keeps_fifo(paused_mgr):
+    """同一位優先使用者的多件作業之間照先來後到。
 
-    直接插到最前面（appendleft）會讓後送出的主管跑到先送出的主管前面 ——
-    同一群人之間變成後進先出，那是壞掉不是功能。
+    直接插到最前面（appendleft）會讓後送出的那件跑到自己先送出的那件前面 ——
+    變成後進先出，那是壞掉不是功能。
     """
     m = paused_mgr
-    normal = _submit_as(m, "pdf-merge", 1, set())
-    vip1 = _submit_as(m, "pdf-merge", 9, {9, 10})
-    vip2 = _submit_as(m, "pdf-merge", 10, {9, 10})
-    vip3 = _submit_as(m, "pdf-merge", 9, {9, 10})
-    assert _queue(m) == [vip1.id, vip2.id, vip3.id, normal.id]
+    normal = _submit_as(m, "pdf-merge", 1, [])
+    a = _submit_as(m, "pdf-merge", 9, [9])
+    b = _submit_as(m, "pdf-merge", 9, [9])
+    c = _submit_as(m, "pdf-merge", 9, [9])
+    assert _queue(m) == [a.id, b.id, c.id, normal.id]
+
+
+def test_higher_ranked_user_jumps_ahead_of_lower_ranked(paused_mgr):
+    """名單的順序就是優先順序 —— 排前面的使用者要壓過排後面的。
+
+    沒有這一條的話「插隊」只有一級，董事長跟部門主管會互相卡（先送出的先跑），
+    管理員排的順序等於沒有作用。
+    """
+    m = paused_mgr
+    ORDER = [9, 10]                      # 9 是第 1 位、10 是第 2 位
+    normal = _submit_as(m, "pdf-merge", 1, ORDER)
+    low = _submit_as(m, "pdf-merge", 10, ORDER)     # 先送出，但排名較後
+    high = _submit_as(m, "pdf-merge", 9, ORDER)     # 後送出，但排名較前
+    assert _queue(m) == [high.id, low.id, normal.id]
+
+
+def test_lower_ranked_never_jumps_over_higher_ranked(paused_mgr):
+    m = paused_mgr
+    ORDER = [9, 10]
+    high = _submit_as(m, "pdf-merge", 9, ORDER)
+    low = _submit_as(m, "pdf-merge", 10, ORDER)
+    assert _queue(m) == [high.id, low.id]
 
 
 def test_normal_job_never_jumps(paused_mgr):
     m = paused_mgr
-    vip = _submit_as(m, "pdf-merge", 9, {9})
-    normal = _submit_as(m, "pdf-merge", 1, {9})
+    vip = _submit_as(m, "pdf-merge", 9, [9])
+    normal = _submit_as(m, "pdf-merge", 1, [9])
     assert _queue(m) == [vip.id, normal.id]
 
 
 def test_queue_positions_reflect_the_jump(paused_mgr):
     """使用者看到的號碼要跟真正的派送順序一致。"""
     m = paused_mgr
-    a = _submit_as(m, "pdf-merge", 1, set())
-    vip = _submit_as(m, "pdf-merge", 9, {9})
+    a = _submit_as(m, "pdf-merge", 1, [])
+    vip = _submit_as(m, "pdf-merge", 9, [9])
     pos = m.queue_positions()
     assert pos[vip.id] == 1 and pos[a.id] == 2
 
@@ -113,12 +140,12 @@ def test_running_job_is_not_preempted():
     running = m.submit("pdf-merge", slow)
     assert started.wait(timeout=10), "第一件作業沒有開始"
     from app.core import job_manager as jm
-    orig = jm._is_priority_owner
-    jm._is_priority_owner = lambda oid: True
+    orig = jm._priority_rank_of
+    jm._priority_rank_of = lambda oid: 0
     try:
         m.submit("pdf-merge", lambda j: None)
     finally:
-        jm._is_priority_owner = orig
+        jm._priority_rank_of = orig
     time.sleep(0.2)
     assert m.get(running.id).status == "running", "正在跑的作業被搶掉了"
     release.set()
@@ -143,6 +170,10 @@ def test_set_and_get(monkeypatch, tmp_path):
     job_priority.invalidate_cache()
     job_priority.set_user_ids([3, 7, 3, "9", "x", -1])
     assert job_priority.get_user_ids() == {3, 7, 9}
+    # 順序要原樣保留 —— 它就是優先順序
+    assert job_priority.get_ordered() == [3, 7, 9]
+    assert job_priority.rank_of(3) == 0 and job_priority.rank_of(9) == 2
+    assert job_priority.rank_of(8) is None
     assert job_priority.is_priority(7) is True
     assert job_priority.is_priority(8) is False
     assert job_priority.is_priority(None) is False
@@ -179,7 +210,7 @@ def test_priority_never_comes_from_the_request():
 
     from app.core import job_manager as jm
     src = inspect.getsource(jm.JobManager.submit)
-    assert "_is_priority_owner(job.owner_id)" in src, \
+    assert "_priority_rank_of(job.owner_id)" in src, \
         "submit 判斷優先權的依據不是伺服器端決定的 owner_id"
     # meta 是呼叫端（工具）給的，絕不可以拿它當依據
     assert 'meta.get("priority"' not in src
@@ -239,3 +270,52 @@ def test_resource_tags_can_be_multiple():
     assert resource_tags("pdf-ocr") == ["ocr", "remote"]
     assert resource_tags("pdf-to-slides") == ["office"]
     assert resource_tags("pdf-merge") == []
+
+
+def test_reordering_the_list_does_not_reshuffle_queued_jobs(paused_mgr,
+                                                            monkeypatch,
+                                                            tmp_path):
+    """名單改順序時，**已經在排隊**的作業不該換位置。
+
+    排名是送出當下記在作業上的。若每次派送都重查名單，管理員拖一下順序，
+    別人已經排好的號碼就會往後跳 —— 使用者看到的是「我明明排第 2，怎麼變第 5」。
+    """
+    from app.config import settings
+    from app.core import auth_settings
+    monkeypatch.setattr(auth_settings, "is_enabled", lambda: True)
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    job_priority.invalidate_cache()
+    job_priority.set_user_ids([9, 10])
+
+    m = paused_mgr
+    from app.core import job_manager as jm
+    jm.set_current_actor({"user_id": 9, "username": "u9"}, client_ip="1.1.1.1")
+    first = m.submit("pdf-merge", lambda j: None)
+    jm.set_current_actor({"user_id": 10, "username": "u10"}, client_ip="1.1.1.1")
+    second = m.submit("pdf-merge", lambda j: None)
+    jm.set_current_actor(None)
+    assert _queue(m) == [first.id, second.id]
+
+    # 管理員把順序倒過來 —— 已排隊的兩件不受影響
+    job_priority.set_user_ids([10, 9])
+    assert _queue(m) == [first.id, second.id]
+    assert m.get(first.id).priority_rank == 0
+
+
+def test_admin_api_returns_the_list_in_priority_order(monkeypatch, tmp_path):
+    """管理 API 讀回名單時要照**名單順序**，不是照使用者編號。
+
+    原本寫成 `sorted(get_user_ids())` —— 拖好的順序在讀回時被整個洗掉，
+    畫面上永遠是按編號排的（端對端測試才抓到，單看程式碼很像沒事）。
+    """
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent
+           / "app" / "admin" / "auth_router.py").read_text(encoding="utf-8")
+    m = re.search(r"async def jobs_api_priority_users\(.*?\n(.*?)\n    @router",
+                  src, re.S)
+    assert m, "找不到 priority-users 端點"
+    body = m.group(1)
+    assert "get_ordered()" in body, "讀回名單沒有照順序"
+    assert "sorted(job_priority" not in body, \
+        "用 sorted() 讀名單會把管理員拖好的順序洗掉"
