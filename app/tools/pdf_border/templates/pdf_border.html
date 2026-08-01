@@ -103,15 +103,13 @@
 
   <fieldset class="auth-section">
     <legend>{{ icon('layers', size=14) }} 雙線與陰影</legend>
-    <div class="auth-field af-checks">
+    <div class="af-checks bd-checks-row">
       <label><input type="checkbox" id="bdDouble"> 內外雙框（獎狀 / 證書風格）</label>
+      <label><input type="checkbox" id="bdShadow"> 外側陰影</label>
     </div>
     <div class="auth-field bd-sub" id="bdDoubleOpts" hidden>
       <label class="af-label" for="bdGap">兩線間距（mm）</label>
       <input class="field bd-num" type="number" id="bdGap" min="0.2" max="30" step="0.1" value="1.5">
-    </div>
-    <div class="auth-field af-checks">
-      <label><input type="checkbox" id="bdShadow"> 外側陰影</label>
     </div>
     <div class="bd-sub" id="bdShadowOpts" hidden>
       <div class="af-attrs">
@@ -199,6 +197,23 @@
    這一頁的設定面板要跟上面的上傳面板切齊，不要右邊留一大塊空白 —— 解除限寬。
    platform.css 先載入，這裡同特異度但在後面，所以會覆蓋掉。 */
 .auth-form { max-width: none; }
+/* 這一頁的欄位值都很短（數字、選單、色碼）。共用的 .af-attrs 用 1fr 會把欄位
+   拉滿整個 1284px 面板的寬，五欄一排、彼此離很遠、第二排又幾乎空著 —— 看起來
+   就很空曠。改成：欄位固定寬、靠左密排（auto-fill + 最大寬），面板再寬也不會被
+   撐開。只在這一頁覆寫，認證設定頁不受影響。 */
+/* 面板要全寬（背景卡片跟上傳面板切齊），但欄位只有五個 —— 硬鋪滿整個 1284px
+   會很空曠。所以卡片全寬、欄位格線限寬並靠左密排，兩個需求各自滿足。 */
+.auth-form .af-attrs { grid-template-columns: repeat(auto-fill, 168px); gap: 12px 18px; max-width: 740px; }
+.auth-form .af-attrs .bd-num, .auth-form .af-attrs .field { width: 100%; box-sizing: border-box; }
+/* 色碼欄：色票固定寬別被 flex 壓扁（上一版壓成一條線），hex 吃掉剩下的空間 */
+.auth-form .af-attrs .bd-color-row { width: 100%; }
+.auth-form .af-attrs .bd-color-row input[type=color] { flex: 0 0 34px; width: 34px; }
+.auth-form .af-attrs .bd-color-row .bd-hex { flex: 1 1 auto; width: auto; min-width: 0; }
+/* 勾選類的區塊（雙線 / 陰影 / 套用範圍）本來一列一個 checkbox，直向拖得很長。
+   讓兩個並排，把空白收掉。 */
+#bdDouble, #bdShadow { }
+.bd-checks-row { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.auth-form .auth-section { padding-bottom: 12px; }
 .bd-num { width: 130px; }
 /* .auth-form input.field[type=text] 會把 text 欄位拉成 100% —— 色碼欄旁邊還有
    色票，滿寬會擠掉它，所以用同等特異度的選擇器收回固定寬。 */
