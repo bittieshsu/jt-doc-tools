@@ -329,6 +329,41 @@ def _sync_directory_user(username: str, info: dict, backend: str) -> dict:
     return user_row
 
 
+#: AD 在 bind 失敗時會把真正的原因塞在 diagnostic message 的 `data <code>` 裡。
+#: 這些是最常見的幾個 —— 有了它管理員才分得出「密碼打錯」與「帳號被鎖」。
+_AD_SUB_STATUS = {
+    "525": "帳號不存在",
+    "52e": "密碼錯誤",
+    "530": "不在允許登入的時段",
+    "531": "不允許從這台工作站登入",
+    "532": "密碼已過期",
+    "533": "帳號已停用",
+    "701": "帳號已到期",
+    "773": "必須先變更密碼",
+    "775": "帳號已被鎖定",
+}
+
+
+def _bind_failure_detail(exc: Exception) -> dict:
+    """從 ldap3 的例外抽出可診斷的欄位（給稽核記錄用，不給登入畫面）。"""
+    out: dict = {"error_class": type(exc).__name__}
+    txt = str(exc)[:400]
+    if txt:
+        out["detail"] = txt
+    import re as _re
+    m = _re.search(r"data ([0-9a-fA-F]{3})", txt)
+    if m:
+        code = m.group(1).lower()
+        out["ad_sub_status"] = code
+        if code in _AD_SUB_STATUS:
+            out["ad_reason"] = _AD_SUB_STATUS[code]
+    for attr in ("result", "description"):
+        v = getattr(exc, attr, None)
+        if v is not None:
+            out[f"ldap_{attr}"] = str(v)[:120]
+    return out
+
+
 def authenticate(username: str, password: str, *, ip: str = "") -> dict:
     """Verify creds against AD/LDAP, sync the user, return user dict."""
     try:
@@ -356,6 +391,19 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
         audit_db.log_event("login_fail", username=username, ip=ip,
                            details={"reason": "ldap_user_not_found"})
         raise AuthError("帳號或密碼錯誤")
+    except AuthError as exc:
+        # **目錄本身連不上 / service account 有問題**（密碼過期、DC 掛掉、TLS 錯…）。
+        #
+        # 原本這個例外一路往上傳到登入畫面，把 `ldap3.core.exceptions.LDAPSocket…`
+        # 這種原始訊息直接顯示給**一般使用者**，而稽核記錄裡卻**一筆都沒有** ——
+        # service account 密碼一過期就是全公司登不進來，管理員事後查不到任何線索，
+        # 只能等使用者打電話進來。
+        #
+        # 改成：細節進稽核（管理員看得到），畫面只給通用訊息。
+        audit_db.log_event("login_fail", username=username, ip=ip,
+                           details={"reason": "ldap_unavailable",
+                                    "detail": str(exc)[:300]})
+        raise AuthError("目前無法連線到認證伺服器，請稍後再試或聯絡管理員")
     user_dn = info["user_dn"]
 
     # Step 3: try to bind as the discovered user → password check.
@@ -371,9 +419,15 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
         with Connection(server, user=user_dn, password=password,
                         auto_bind=True, raise_exceptions=True, check_names=False):
             pass
-    except Exception:
+    except Exception as exc:
+        # 使用者 bind 失敗的原因不只「密碼錯」—— 也可能是帳號在 AD 被鎖、
+        # 密碼過期、帳號停用。原本只記 `ldap_bind_failed`，管理員完全分不出來，
+        # 只能請使用者自己去猜。這裡把 LDAP 回的 result code 與 diagnostic
+        # 記進**稽核**（給管理員），畫面上仍然只說「帳號或密碼錯誤」
+        # （不做使用者列舉、也不洩漏目錄狀態）。
         audit_db.log_event("login_fail", username=username, ip=ip,
-                           details={"reason": "ldap_bind_failed"})
+                           details={"reason": "ldap_bind_failed",
+                                    **_bind_failure_detail(exc)})
         raise AuthError("帳號或密碼錯誤")
 
     # Step 4: sync into local users / groups tables.
@@ -416,16 +470,20 @@ def _sync_user(username: str, display_name: str, dn: str, backend: str,
             # 信箱以目錄為準；目錄沒填就保留原本的值（不要用空字串覆蓋掉
             # 管理員手動補上的信箱）。使用者自己在通知設定填的 email_to 是
             # 另一個欄位，永遠不受這裡影響。
+            # 人剛剛成功用目錄帳號登入 —— 那他顯然還在目錄裡。順手更新
+            # directory_seen_at，否則「上次完整同步之後才回來的人」會被誤標成
+            # 「目錄裡已找不到」，直到下一次同步才恢復。
             if email:
                 conn.execute(
                     "UPDATE users SET display_name=?, email=?, last_login_at=?, "
-                    "enabled=1 WHERE id=?",
-                    (display_name, email, now, row["id"]),
+                    "enabled=1, directory_seen_at=? WHERE id=?",
+                    (display_name, email, now, now, row["id"]),
                 )
             else:
                 conn.execute(
-                    "UPDATE users SET display_name=?, last_login_at=?, enabled=1 "
-                    "WHERE id=?", (display_name, now, row["id"]),
+                    "UPDATE users SET display_name=?, last_login_at=?, enabled=1, "
+                    "directory_seen_at=? WHERE id=?",
+                    (display_name, now, now, row["id"]),
                 )
         # Activation on real login: a mirrored-only user (pre-synced by
         # directory sync with enabled=0 and NO role) gets the configured
@@ -456,9 +514,10 @@ def _sync_user(username: str, display_name: str, dn: str, backend: str,
     with db.tx(conn):
         cur = conn.execute(
             "INSERT INTO users(username, display_name, source, external_dn, "
-            "enabled, is_admin_seed, created_at, last_login_at, email) "
-            "VALUES (?, ?, ?, ?, 1, 0, ?, ?, ?)",
-            (username, display_name, backend, dn, now, now, email),
+            "enabled, is_admin_seed, created_at, last_login_at, email, "
+            "directory_seen_at) "
+            "VALUES (?, ?, ?, ?, 1, 0, ?, ?, ?, ?)",
+            (username, display_name, backend, dn, now, now, email, now),
         )
         uid = cur.lastrowid
     # New users get the admin-configured new-user default role (default-user
@@ -718,6 +777,9 @@ def sync_all_users(name_contains: str = "") -> dict:
     conn_db = auth_db.conn()
     synced = updated = skipped = 0
     now = time.time()
+    # 這次同步是不是「看得到整個目錄」。帶了名稱過濾就只看得到一部分，
+    # **不可以**拿它去推論「沒看到的人都離職了」—— 那會把整個組織誤標。
+    full_scan = not nc
     with db.tx(conn_db):
         for dn, login, disp, mail in seen:
             row = conn_db.execute(
@@ -731,6 +793,10 @@ def sync_all_users(name_contains: str = "") -> dict:
                     conn_db.execute("UPDATE users SET email=? WHERE id=?",
                                     (mail, row["id"]))
                     updated += 1
+                # 蓋上「這次還看得到」的戳記 —— 之後就能反推誰不見了
+                conn_db.execute(
+                    "UPDATE users SET directory_seen_at=? WHERE id=?",
+                    (now, row["id"]))
                 if disp and row["display_name"] != disp:
                     # 只更新顯示名稱，**絕不動 enabled**（v1.12.70 不變量：鏡射 ≠
                     # 啟用）。舊版此處會 enabled=1，導致「已去啟用的鏡射帳號」在目錄
@@ -751,16 +817,31 @@ def sync_all_users(name_contains: str = "") -> dict:
             # admin 明確操作。已驗證 enabled=0 不擋日後 LDAP 登入。
             conn_db.execute(
                 "INSERT INTO users(username, display_name, source, external_dn, "
-                "enabled, is_admin_seed, created_at, email) "
-                "VALUES (?,?,?,?,0,0,?,?)",
-                (login, disp, backend, dn, now, mail))
+                "enabled, is_admin_seed, created_at, email, directory_seen_at) "
+                "VALUES (?,?,?,?,0,0,?,?,?)",
+                (login, disp, backend, dn, now, mail, now))
             synced += 1
+    missing = 0
+    if full_scan:
+        # 「上一次完整同步時沒看到」= 目錄裡已經找不到。這裡只**數**不動資料 ——
+        # 要不要停用是管理員的決定（有人只是暫時被移出範圍），系統擅自停用會
+        # 造成更難查的問題。
+        row = conn_db.execute(
+            "SELECT COUNT(*) c FROM users WHERE source=? AND external_dn IS NOT NULL "
+            "AND external_dn<>'' AND (directory_seen_at IS NULL OR directory_seen_at < ?)",
+            (backend, now)).fetchone()
+        missing = int(row["c"] if row else 0)
     permissions.invalidate_cache()
     audit_db.log_event("ldap_user_sync",
                        details={"synced": synced, "updated": updated,
-                                "total_seen": len(seen), "skipped_clash": skipped})
+                                "total_seen": len(seen), "skipped_clash": skipped,
+                                "full_scan": full_scan, "missing": missing})
     return {"synced": synced, "updated": updated, "total_seen": len(seen),
-            "skipped_clash": skipped}
+            "skipped_clash": skipped,
+            # 這次是不是完整掃描 + 掃完之後有幾個帳號在目錄裡已經找不到。
+            # 呼叫端（directory_sync）要把 full_scan 的時間記下來，判定「消失」
+            # 時才有基準；沒有這個時間就不能下任何結論。
+            "full_scan": full_scan, "missing": missing, "scanned_at": now}
 
 
 def get_group_members(group_dn: str) -> list[dict]:

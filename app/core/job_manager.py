@@ -524,9 +524,14 @@ class JobManager:
                                    job.id, job.tool_id, e)
             finally:
                 job.updated_at = time.time()
+                # **先把最終狀態寫進 DB**。自動存入工作區要複製檔案，可能花上
+                # 幾百毫秒到幾秒；在那之前 DB 還停在 running，而記憶體已經是
+                # done —— 這段窗口內從 DB 讀到的狀態是錯的（作業從記憶體淘汰後
+                # 更會讀到 running 的殭屍狀態）。
+                self._persist(job)
                 # 自動存入送出者的工作區（工作區停用 / 額度不足時只記原因，
-                # 不影響作業本身的成敗）—— 要在 persist 之前做，結果才會一起
-                # 寫進 DB，使用者重新整理就看得到。
+                # 不影響作業本身的成敗）。結果寫進 job.meta，所以**做完要再 persist
+                # 一次**，使用者重新整理才看得到「已自動存入」。
                 self._autosave(job)
                 self._persist(job)
                 self._notify(job)

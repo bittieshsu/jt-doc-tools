@@ -30,38 +30,92 @@
 
 <div class="panel">
   <div data-s="s5344c165">
-    <h2 data-s="s1386d503">使用者清單（共 <span id="userCount">{{ users|length }}</span> 人）</h2>
+    <h2 data-s="s1386d503">使用者清單（共 <span id="userCount">{{ page_total }}</span> 人）</h2>
     <span data-s="sda5cd676"></span>
-    <div class="src-filter" id="srcFilter" role="group" aria-label="依來源篩選">
-      <button type="button" class="sf-btn active" data-src="">全部</button>
-      <button type="button" class="sf-btn" data-src="local"><span class="src-badge src-local">local</span></button>
-      <button type="button" class="sf-btn" data-src="ldap"><span class="src-badge src-ldap">ldap</span></button>
-      <button type="button" class="sf-btn" data-src="ad"><span class="src-badge src-ad">ad</span></button>
+    {# 篩選全部走伺服器端（連結帶查詢參數）。前端過濾只過濾得到當前這一頁，
+       使用者以為篩了全部其實只篩了眼前 100 筆 —— 會讓人以為某個帳號不存在。 #}
+    <form class="uf-bar" method="get" action="/admin/users">
+      <input type="hidden" name="view" value="{{ view }}">
+      <input class="field uf-q" type="search" name="q" value="{{ q }}"
+             placeholder="搜尋帳號、顯示名稱、信箱…">
+      <select class="field uf-sel" name="src">
+        <option value="">所有來源</option>
+        {% for v, lab in [('local','本機'),('ldap','LDAP'),('ad','AD'),('oidc','OIDC'),('saml','SAML')] %}
+        <option value="{{ v }}"{% if src == v %} selected{% endif %}>{{ lab }}</option>
+        {% endfor %}
+      </select>
+      <select class="field uf-sel" name="state">
+        <option value="">所有狀態</option>
+        <option value="on"{% if state == 'on' %} selected{% endif %}>已啟用</option>
+        <option value="off"{% if state == 'off' %} selected{% endif %}>已停用</option>
+        <option value="never"{% if state == 'never' %} selected{% endif %}>從未登入</option>
+      </select>
+      <button class="btn btn-small btn-primary" type="submit">{{ icon('search', size=14) }} 篩選</button>
+      {% if q or src or state %}<a class="btn btn-small" href="/admin/users?view={{ view }}">清除</a>{% endif %}
+    </form>
+    <div class="uf-views">
+      {% for v, lab in [('active','使用中'),('directory','目錄鏡射'),('all','全部')] %}
+      <a class="uf-view{% if view == v %} active{% endif %}"
+         href="/admin/users?view={{ v }}">{{ lab }}</a>
+      {% endfor %}
+      {# 目錄裡已經找不到的帳號（離職 / 停用 / 移出範圍）。內控盤點第一個要看的就是它。 #}
+      <a class="uf-view uf-view-warn{% if view == 'missing' %} active{% endif %}"
+         href="/admin/users?view=missing"
+         title="上一次完整目錄同步時已經找不到的帳號">
+        目錄已無{% if missing_count %} <b>{{ missing_count }}</b>{% endif %}</a>
     </div>
-    <input class="field" type="search" id="userSearch"
-           placeholder="搜尋帳號、顯示名稱、角色…" data-s="s058cdc4e">
   </div>
+  {% if view == 'missing' %}
+  <div class="uf-note{% if not has_full_scan %} uf-note-warn{% endif %}">
+    {% if has_full_scan %}
+    這些帳號在<b>上一次完整目錄同步</b>時已經在 AD / LDAP 裡找不到 —— 通常代表離職、
+    停用或被移出同步範圍。系統<b>不會自動停用</b>（有人只是暫時被移出範圍，擅自停用會
+    造成更難查的問題），請確認後用下方的批次操作處理。
+    {% else %}
+    {{ icon('warn', size=14) }} 還沒有做過<b>完整</b>目錄同步，因此無法判定誰不見了。
+    帶名稱過濾的同步只看得到一部分目錄，拿它當基準會把整個組織誤標成離職 ——
+    請先到<a href="/admin/groups">群組管理</a>把名稱過濾清空後執行一次同步。
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="uf-bulk" id="ufBulk" hidden>
+    <span class="uf-bulk-n">已選 <b id="ufBulkN">0</b> 個帳號</span>
+    <button class="btn btn-small" type="button" data-bulk="enable">{{ icon('check', size=13) }} 啟用</button>
+    <button class="btn btn-small btn-danger" type="button" data-bulk="disable">{{ icon('lock', size=13) }} 停用</button>
+    <select class="field uf-sel" id="ufBulkRole">
+      <option value="">選擇角色…</option>
+      {% for r in all_roles %}<option value="{{ r.id }}">{{ r.display_name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-small" type="button" data-bulk="role-add">加上角色</button>
+    <button class="btn btn-small" type="button" data-bulk="role-remove">移除角色</button>
+    <span class="muted uf-bulk-hint">內建管理員與你自己不會被批次停用。</span>
+  </div>
+
   {% if dir_count %}
   <p class="muted">此清單顯示<b>已啟用 / 曾登入</b>的使用者。另有 <b>{{ dir_count }}</b> 位由目錄同步鏡射、<b>尚未登入（未啟用）</b>的使用者未列於此 —— 要檢視 / 指派權限 / 逐一啟用，請至 <a href="/admin/directory">目錄瀏覽</a>。他們一旦實際登入即自動啟用並取得預設角色。</p>
   {% endif %}
   <table class="user-table" id="userTable">
     <thead>
       <tr>
-        <th class="sortable" data-sort="text" data-col="0">帳號</th>
-        <th class="sortable" data-sort="text" data-col="1">顯示名稱</th>
-        <th class="sortable" data-sort="text" data-col="2">信箱</th>
-        <th class="sortable" data-sort="text" data-col="3">來源</th>
-        <th class="sortable" data-sort="text" data-col="4">狀態</th>
-        <th class="sortable" data-sort="text" data-col="5">角色</th>
-        <th class="sortable" data-sort="num"  data-col="6">最後登入</th>
+        <th class="uf-ck"><input type="checkbox" id="ufAll" title="全選本頁"></th>
+        <th class="sortable" data-sort="text" data-col="1">帳號</th>
+        <th class="sortable" data-sort="text" data-col="2">顯示名稱</th>
+        <th class="sortable" data-sort="text" data-col="3">信箱</th>
+        <th class="sortable" data-sort="text" data-col="4">來源</th>
+        <th class="sortable" data-sort="text" data-col="5">狀態</th>
+        <th class="sortable" data-sort="text" data-col="6">角色</th>
+        <th class="sortable" data-sort="date" data-col="7">最後登入</th>
         <th></th>
       </tr>
     </thead>
     <tbody>
       {% for u in users %}
       <tr data-uid="{{ u.id }}">
+        <td class="uf-ck"><input type="checkbox" class="uf-row-ck" value="{{ u.id }}"></td>
         <td>
           <b>{{ u.username }}</b>
+          {% if u.directory_missing %}<span class="uf-gone" title="上一次完整目錄同步時，AD / LDAP 裡已經找不到這個帳號">目錄已無</span>{% endif %}
           {% if u.is_admin_seed %}<span class="badge">SEED</span>{% endif %}
         </td>
         <td>{{ u.display_name }}</td>
@@ -118,6 +172,17 @@
       {% endfor %}
     </tbody>
   </table>
+
+  {% if pages > 1 %}
+  <div class="uf-pager">
+    {% set qs = 'view=' ~ view ~ ('&q=' ~ q if q else '') ~ ('&src=' ~ src if src else '') ~ ('&state=' ~ state if state else '') %}
+    <a class="btn btn-small{% if page <= 1 %} is-off{% endif %}"
+       href="?{{ qs }}&page={{ page - 1 if page > 1 else 1 }}">‹ 上一頁</a>
+    <span class="muted">第 <b>{{ page }}</b> / {{ pages }} 頁・共 {{ page_total }} 人</span>
+    <a class="btn btn-small{% if page >= pages %} is-off{% endif %}"
+       href="?{{ qs }}&page={{ page + 1 if page < pages else pages }}">下一頁 ›</a>
+  </div>
+  {% endif %}
 </div>
 
 <!-- ===== Edit-user modal ===== -->
@@ -278,6 +343,32 @@
   .picker-name { flex:1; min-width:0; word-break:break-word; overflow-wrap:anywhere; }
   .picker-sub { font-size:10px; color:#9ca3af; background:transparent; padding:0; flex-shrink:0; }
   .picker-empty { padding:10px; text-align:center; color:#9ca3af; font-size:12px; }
+
+/* ---- 篩選 / 批次 / 分頁（v1.14.14 AD 帳號管理一輪）---- */
+.uf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 8px; }
+.uf-q { min-width: 220px; flex: 1 1 240px; max-width: 340px; }
+.uf-sel { width: auto; min-width: 120px; }
+.uf-views { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.uf-view { padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px;
+  font-size: 12.5px; color: #475569; text-decoration: none; background: #fff; }
+.uf-view:hover { border-color: #94a3b8; }
+.uf-view.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.uf-view-warn { border-color: #fbbf24; color: #92400e; background: #fffbeb; }
+.uf-view-warn.active { background: #d97706; border-color: #d97706; color: #fff; }
+.uf-note { margin: 4px 0 12px; padding: 10px 13px; border-radius: 8px;
+  background: #f8fafc; border: 1px solid #e2e8f0; font-size: 12.5px; line-height: 1.7; color: #475569; }
+.uf-note-warn { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+.uf-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding: 9px 12px; border-radius: 8px;
+  background: #eef2ff; border: 1px solid #c7d2fe; }
+.uf-bulk-n { font-size: 13px; font-weight: 600; color: #3730a3; }
+.uf-bulk-hint { font-size: 11.5px; }
+.uf-ck { width: 34px; text-align: center; }
+.uf-gone { margin-left: 6px; padding: 1px 7px; border-radius: 4px;
+  background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 600; }
+.uf-pager { display: flex; align-items: center; justify-content: center;
+  gap: 12px; margin-top: 14px; font-size: 12.5px; }
+.uf-pager .is-off { opacity: .45; pointer-events: none; }
 </style>
 {% endblock %}
 
@@ -335,35 +426,81 @@ document.getElementById('newUserForm').addEventListener('submit', async (e) => {
   else showAlert('建立失敗：' + await r.text());
 });
 
-// ---------- search + source filter ----------
-const search = document.getElementById('userSearch');
+// ---------- 批次操作 ----------
+//
+// 搜尋與來源 / 狀態篩選已經改成**伺服器端**（上方那個 form）—— 前端過濾只過濾得到
+// 當前這一頁，使用者以為篩了全部其實只篩了眼前 100 筆，那會讓人以為某個帳號不存在。
+// 這裡只留「選取 + 批次動作」。
 const tbody = document.querySelector('.user-table tbody');
 const rows = Array.from(tbody.querySelectorAll('tr'));
-let activeSrc = '';  // '' = all, otherwise 'local'/'ldap'/'ad'
 
-function applyFilter() {
-  const q = (search.value || '').toLowerCase().trim();
-  let visible = 0;
-  rows.forEach(tr => {
-    const text = tr.textContent.toLowerCase();
-    const src = (tr.cells[2].dataset.sortKey || '').toLowerCase();
-    const matchText = !q || text.includes(q);
-    const matchSrc = !activeSrc || src === activeSrc;
-    const match = matchText && matchSrc;
-    tr.hidden = !match;
-    if (match) visible++;
-  });
-  document.getElementById('userCount').textContent = visible;
+const bulkBar = document.getElementById('ufBulk');
+const bulkN = document.getElementById('ufBulkN');
+
+function selectedIds() {
+  return [...document.querySelectorAll('.uf-row-ck:checked')].map(c => Number(c.value));
 }
-search.addEventListener('input', applyFilter);
-
-document.querySelectorAll('#srcFilter .sf-btn').forEach(b => {
-  b.addEventListener('click', () => {
-    activeSrc = b.dataset.src || '';
-    document.querySelectorAll('#srcFilter .sf-btn').forEach(x => x.classList.toggle('active', x === b));
-    applyFilter();
+function syncBulk() {
+  const n = selectedIds().length;
+  bulkN.textContent = String(n);
+  bulkBar.hidden = n === 0;
+  const all = document.getElementById('ufAll');
+  const boxes = document.querySelectorAll('.uf-row-ck');
+  if (all) {
+    all.checked = n > 0 && n === boxes.length;
+    all.indeterminate = n > 0 && n < boxes.length;
+  }
+}
+document.querySelectorAll('.uf-row-ck').forEach(
+  c => c.addEventListener('change', syncBulk));
+const allBox = document.getElementById('ufAll');
+if (allBox) {
+  allBox.addEventListener('change', () => {
+    document.querySelectorAll('.uf-row-ck').forEach(c => { c.checked = allBox.checked; });
+    syncBulk();
   });
-});
+}
+
+async function runBulk(action) {
+  const ids = selectedIds();
+  if (!ids.length) return;
+  let url, body, label;
+  if (action === 'enable' || action === 'disable') {
+    url = '/admin/users/bulk/enabled';
+    body = { user_ids: ids, enabled: action === 'enable' };
+    label = action === 'enable' ? '啟用' : '停用';
+  } else {
+    const role = document.getElementById('ufBulkRole').value;
+    if (!role) { (window.showAlert || alert)('請先選擇角色'); return; }
+    url = '/admin/users/bulk/roles';
+    body = { user_ids: ids, mode: action === 'role-add' ? 'add' : 'remove',
+             roles: [role] };
+    label = (action === 'role-add' ? '加上' : '移除') + '角色「' + role + '」';
+  }
+  const ok = await (window.showConfirm
+    ? window.showConfirm(`確定要對 ${ids.length} 個帳號${label}？`,
+                         { title: '批次操作', okText: '執行' })
+    : Promise.resolve(confirm(`確定要對 ${ids.length} 個帳號${label}？`)));
+  if (!ok) return;
+  const r = await fetch(url, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) {
+    (window.showAlert || alert)(await window.friendlyServerError(r, '批次操作失敗'));
+    return;
+  }
+  const d = await r.json();
+  // **被跳過的要講出來**。靜靜地少做幾筆最糟：管理員以為全部處理完了。
+  let msg = `已處理 ${d.changed} 個帳號`;
+  if ((d.skipped || []).length) {
+    msg += `；${d.skipped.length} 個被跳過（` +
+      d.skipped.slice(0, 3).map(x => x.reason).join('、') + '）';
+  }
+  if (window.showToast) window.showToast(msg, 'ok');
+  setTimeout(() => location.reload(), 600);
+}
+document.querySelectorAll('[data-bulk]').forEach(
+  b => b.addEventListener('click', () => runBulk(b.dataset.bulk)));
+syncBulk();
 
 // ---------- column sort ----------
 // Click header → toggle asc/desc; reorder <tr>s in place. Reads either
@@ -388,6 +525,16 @@ document.querySelectorAll('#srcFilter .sf-btn').forEach(b => {
         const ca = a.cells[col], cb = b.cells[col];
         let va = (ca.dataset.sortKey ?? ca.textContent ?? '').trim();
         let vb = (cb.dataset.sortKey ?? cb.textContent ?? '').trim();
+        if (type === 'date') {
+          // ISO 8601 直接字典序比較就是時間序 —— 千萬不要 parseFloat：
+          // parseFloat("2026-08-01T09:00:00") 只會得到 2026，同一年的人
+          // 全部同分，排序等於沒作用（實際踩過）。
+          // 空字串（從未登入）一律排到最後。
+          if (!va && !vb) return 0;
+          if (!va) return 1;
+          if (!vb) return -1;
+          return va < vb ? -dir : (va > vb ? dir : 0);
+        }
         if (type === 'num') {
           va = parseFloat(va) || 0; vb = parseFloat(vb) || 0;
           return (va - vb) * dir;

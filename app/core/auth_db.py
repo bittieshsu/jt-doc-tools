@@ -459,6 +459,28 @@ def _m14_user_email(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
 
 
+def _m15_directory_presence(conn: sqlite3.Connection) -> None:
+    """v15：`users` 加 `directory_seen_at`（目錄同步最後一次看到這個帳號的時間）。
+
+    為什麼需要 —— 原本目錄同步**只增不減**：AD 那邊把人停用或刪掉之後，本站的
+    帳號列、角色指派、群組成員關係全部還在。那個人登不進來（LDAP bind 會失敗），
+    但「這個系統裡還有誰」這個問題答不出來，內控盤點與離職交接都對不起來。
+
+    有了這一欄就能回答「上一次完整同步時，這個帳號還在不在目錄裡」：
+      * 有值且等於最後一次同步時間 → 還在
+      * 有值但比最後一次同步舊 → **目錄裡已經找不到了**（離職 / 停用 / 移出範圍）
+      * NULL → 從來沒被同步涵蓋過（例如只登入過、或同步有用名稱過濾）
+
+    **只有「完整同步」才能拿來判定消失**：帶了名稱過濾的同步只看得到一部分目錄，
+    拿它去推論「其他人都不見了」會把整個組織誤標成離職。所以判定要同時看
+    `directory_sync` 記錄的最後一次完整同步時間。
+    """
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "directory_seen_at" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN directory_seen_at REAL")
+
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -471,7 +493,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m11_group_sync_cache,
               _m12_unprovision_mirrored_users,
               _m13_grant_pdf_to_slides,
-              _m14_user_email]
+              _m14_user_email,
+              _m15_directory_presence]
 
 
 def auth_db_path() -> Path:

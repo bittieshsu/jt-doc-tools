@@ -39,6 +39,11 @@ _DEFAULTS = {
     "last_run_at": None,              # epoch seconds
     "last_result": None,             # dict from the last run
     "last_error": None,
+    # 上一次**完整**使用者掃描的時間。判定「這個帳號在目錄裡已經找不到」只能
+    # 相對於一次完整掃描 —— 帶名稱過濾的同步只看得到一部分目錄，拿它當基準會把
+    # 整個組織誤標成離職。沒有值就代表這個功能還不能下任何結論。
+    "last_full_scan_at": None,
+    "last_history": [],              # 最近幾次的結果（見 _HISTORY_KEEP）
 }
 
 
@@ -129,7 +134,7 @@ def run_sync(name_contains: Optional[str] = None) -> dict[str, Any]:
         # 2) cache each ldap/ad group's real member count
         conn = auth_db.conn()
         rows = conn.execute(
-            "SELECT id, external_dn FROM groups "
+            "SELECT id, name, external_dn FROM groups "
             "WHERE source IN ('ldap','ad') AND external_dn<>''"
         ).fetchall()
         for r in rows:
@@ -142,26 +147,37 @@ def run_sync(name_contains: Optional[str] = None) -> dict[str, Any]:
                     "UPDATE groups SET member_count=?, member_count_synced_at=? "
                     "WHERE id=?", (int(n), time.time(), r["id"]))
                 report["counts_updated"] += 1
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                # 只數不記的話，同步失敗時管理員只看得到「失敗 37 筆」，
+                # 完全不知道是哪些群組、什麼原因（原本連 log 都沒寫）。
                 report["counts_failed"] += 1
+                detail = report.setdefault("failed_detail", [])
+                if len(detail) < 20:
+                    detail.append({"group": r["name"] if "name" in r.keys() else "",
+                                   "dn": dn[:200],
+                                   "error": f"{type(exc).__name__}: {exc}"[:200]})
+                logger.warning("群組成員數同步失敗 %s：%s", dn, exc)
         conn.commit()
         # 3) mirror all directory users into the local users table (so 使用者管理
         #    shows everyone + admin can pre-assign roles). Best-effort — a user
         #    sync failure must not lose the group results already committed.
         if settings_now.get("sync_users", True):
             try:
-                report["users_synced"] = auth_ldap.sync_all_users()
+                report["users_synced"] = auth_ldap.sync_all_users(
+                    name_contains=name_contains)
             except Exception as uexc:  # noqa: BLE001
                 report["users_synced"] = {"error": f"{type(uexc).__name__}: {uexc}"}
                 logger.exception("user sync failed (group sync kept)")
         report["elapsed_sec"] = round(time.time() - started, 1)
         _stamp(ok=True, result=report)
         logger.info("directory sync done: %s", report)
+        _notify_if_degraded(report)
         return report
     except Exception as exc:  # noqa: BLE001
         report["error"] = f"{type(exc).__name__}: {exc}"
         report["elapsed_sec"] = round(time.time() - started, 1)
         _stamp(ok=False, result=report, error=report["error"])
+        _notify_if_degraded(report, error=report["error"])
         logger.exception("directory sync failed")
         return report
     finally:
@@ -169,11 +185,68 @@ def run_sync(name_contains: Optional[str] = None) -> dict[str, Any]:
         _RUN_LOCK.release()
 
 
+#: 保留最近幾次的同步結果。只留「上一次」的話，看不出「從什麼時候開始失敗的」
+#: —— 而那正是排查同步問題時第一個要回答的。
+_HISTORY_KEEP = 20
+
+
+def _notify_if_degraded(report: dict, *, error: Optional[str] = None) -> None:
+    """同步整個失敗、或大量子項失敗時通知管理員。
+
+    原本同步壞掉**不通知任何人** —— 要發現它壞了，必須有人主動去開群組管理頁看
+    那一行字。service account 密碼一過期就是全公司登不進來，而系統既不主動通知、
+    事後也查不到記錄。
+
+    **絕不丟例外**：通知寄不出去不該把一次成功的同步標記成失敗。
+    """
+    try:
+        failed = int((report or {}).get("counts_failed") or 0)
+        users = (report or {}).get("users_synced")
+        user_err = users.get("error") if isinstance(users, dict) else None
+        if not error and not user_err and failed == 0:
+            return
+        lines = ["目錄同步出現問題："]
+        if error:
+            lines.append(f"• 整體失敗：{error}")
+        if user_err:
+            lines.append(f"• 使用者同步失敗：{user_err}")
+        if failed:
+            lines.append(f"• 群組成員數同步失敗 {failed} 筆")
+            for d in (report.get("failed_detail") or [])[:3]:
+                lines.append(f"    - {d.get('group') or d.get('dn')}：{d.get('error')}")
+        lines.append("詳情請看「群組管理」頁的同步狀態。")
+        from . import notify_channels, notify_settings
+        cfg = notify_settings.get(reveal=True)
+        if not cfg.get("enabled"):
+            return
+        notify_channels.broadcast(cfg, notify_settings.enabled_channels(),
+                                  "目錄同步異常", "\n".join(lines))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("目錄同步異常通知寄送失敗：%s", exc)
+
+
 def _stamp(*, ok: bool, result: dict, error: Optional[str] = None) -> None:
     data = get_settings()
-    data["last_run_at"] = time.time()
+    now = time.time()
+    data["last_run_at"] = now
     data["last_result"] = result
     data["last_error"] = None if ok else error
+    # 完整掃描才更新基準時間（見 last_full_scan_at 的說明）
+    us = (result or {}).get("users_synced")
+    if isinstance(us, dict) and us.get("full_scan") and us.get("scanned_at"):
+        data["last_full_scan_at"] = us["scanned_at"]
+    hist = list(data.get("last_history") or [])
+    hist.insert(0, {
+        "at": now, "ok": ok, "error": error,
+        # 只留摘要，不要把整包結果都塞進歷史（設定檔會越長越大）
+        "groups_mirrored": (result or {}).get("groups_mirrored"),
+        "counts_updated": (result or {}).get("counts_updated"),
+        "counts_failed": (result or {}).get("counts_failed"),
+        "failed_detail": ((result or {}).get("failed_detail") or [])[:5],
+        "users_synced": us if isinstance(us, dict) else None,
+        "elapsed_sec": (result or {}).get("elapsed_sec"),
+    })
+    data["last_history"] = hist[:_HISTORY_KEEP]
     _write(data)
 
 

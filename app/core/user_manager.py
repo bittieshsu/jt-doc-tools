@@ -31,20 +31,66 @@ def _validate_username(username: str) -> str:
     return username
 
 
-def _view_where(view: str) -> str:
-    """SQL WHERE clause for the 使用者管理 view filter (see list_users)."""
+def last_full_directory_scan_at() -> float:
+    """上一次**完整**目錄同步的時間（epoch 秒）。沒有做過就回 0。
+
+    「這個帳號在目錄裡已經找不到」只能相對於一次完整掃描來判定。帶了名稱過濾的
+    同步只看得到一部分目錄，拿它當基準會把整個組織誤標成離職 —— 所以沒有完整
+    掃描過的時候，這個功能一律**不下任何結論**。
+    """
+    try:
+        from . import directory_sync
+        return float(directory_sync.get().get("last_full_scan_at") or 0)
+    except Exception:  # noqa: BLE001 — 讀不到設定就當作沒掃過
+        return 0.0
+
+
+def _is_missing(row, full_scan_at: float) -> bool:
+    """這個帳號在上一次完整目錄掃描時是不是已經不存在了。
+
+    只對目錄帳號有意義；本機與 SSO 帳號永遠回 False（它們本來就不在 AD 裡，
+    標成「離職」會是徹底的誤報）。
+    """
+    if full_scan_at <= 0:
+        return False
+    if row["source"] not in ("ldap", "ad"):
+        return False
+    if not (row["external_dn"] or ""):
+        return False
+    return float(row["directory_seen_at"] or 0) < full_scan_at
+
+
+def _view_where(view: str) -> tuple[str, tuple]:
+    """(WHERE 子句, 參數) —— 使用者管理的檢視篩選（見 list_users）。
+
+    **時間戳一律走參數綁定，不要格式化進 SQL 字串**：`f"{base:.3f}"` 會四捨五入到
+    毫秒，剛好等於基準時間的那些人（也就是這次掃描才剛看到的人）會因為誤差被判成
+    「不見了」。第一版就是這樣，測試當場抓到。
+    """
     mirror = ("source IN ('ldap','ad') AND enabled=0 "
               "AND COALESCE(last_login_at,0)=0")
     if view == "active":
-        return f"WHERE NOT ({mirror})"
+        return f"WHERE NOT ({mirror})", ()
     if view == "directory":
-        return f"WHERE {mirror}"
-    return ""
+        return f"WHERE {mirror}", ()
+    if view == "missing":
+        # 目錄裡已經找不到的帳號（離職 / 停用 / 被移出同步範圍）。
+        #
+        # 判定基準是「上一次完整掃描的時間」：那次掃描有看到的人 seen_at 會被更新
+        # 成掃描時間，沒看到的人維持舊值或 NULL。沒有完整掃描過就回一個永遠不成立
+        # 的條件 —— **寧可什麼都不顯示，也不要把整個組織標成離職**。
+        base = last_full_directory_scan_at()
+        if base <= 0:
+            return "WHERE 0", ()
+        return ("WHERE source IN ('ldap','ad') AND external_dn IS NOT NULL "
+                "AND external_dn<>'' AND COALESCE(directory_seen_at,0) < ?"), (base,)
+    return "", ()
 
 
 def count_users(view: str = "all") -> int:
+    where, params = _view_where(view)
     return auth_db.conn().execute(
-        f"SELECT COUNT(*) AS c FROM users {_view_where(view)}").fetchone()["c"]
+        f"SELECT COUNT(*) AS c FROM users {where}", params).fetchone()["c"]
 
 
 def list_users(view: str = "all") -> list[dict]:
@@ -59,12 +105,14 @@ def list_users(view: str = "all") -> list[dict]:
       - 'all'       → everyone (backward-compatible default of this function).
 
     Batched: roles for every user load in one query, not N+1."""
-    where = _view_where(view)
+    where, params = _view_where(view)
+    _full_scan_at = last_full_directory_scan_at()
     conn = auth_db.conn()
     rows = conn.execute(
         "SELECT id, username, display_name, source, external_dn, enabled, email, "
-        "is_admin_seed, is_audit_seed, password_hash, created_at, last_login_at "
-        f"FROM users {where} ORDER BY username"
+        "is_admin_seed, is_audit_seed, password_hash, created_at, last_login_at, "
+        "directory_seen_at "
+        f"FROM users {where} ORDER BY username", params
     ).fetchall()
     roles_by_user = permissions.list_roles_for_subjects(
         "user", [str(r["id"]) for r in rows])
@@ -82,6 +130,9 @@ def list_users(view: str = "all") -> list[dict]:
             # 本機帳號由管理員或本人填。
             "email": r["email"] or "",
             "created_at": r["created_at"], "last_login_at": r["last_login_at"],
+            # 上一次完整目錄掃描時還看不看得到這個帳號。None = 沒被同步涵蓋過。
+            "directory_seen_at": r["directory_seen_at"],
+            "directory_missing": _is_missing(r, _full_scan_at),
             "roles": roles_by_user.get(str(r["id"]), []),
         })
     return out
@@ -309,3 +360,65 @@ def _count_admin_users(conn) -> int:
         "WHERE u.enabled=1 AND sr.role_id='admin'"
     ).fetchall()
     return len(rows)
+
+
+#: 使用者管理一頁顯示幾筆。超過這個數量就改走伺服器端分頁 —— 一次 render
+#: 幾千列會把瀏覽器打爆（客戶做完 AD 全量同步後實際踩過）。
+PAGE_SIZE = 100
+
+
+def list_users_page(*, view: str = "all", q: str = "", offset: int = 0,
+                    limit: int = PAGE_SIZE, source: str = "",
+                    enabled: Optional[bool] = None,
+                    never_logged_in: bool = False) -> dict:
+    """分頁 + 伺服器端篩選的使用者清單。
+
+    回 `{"rows": [...], "total": N}`。篩選都在 SQL 做 —— 前端過濾只能過濾
+    「已經 render 出來的那一頁」，使用者以為篩了全部其實只篩了眼前 100 筆，
+    這種半套篩選比沒有更危險。
+    """
+    where, params = _view_where(view)
+    clauses = [where[6:]] if where.startswith("WHERE ") else []
+    args = list(params)
+    if q:
+        clauses.append("(username LIKE ? OR display_name LIKE ? OR email LIKE ?)")
+        like = f"%{q}%"
+        args += [like, like, like]
+    if source:
+        clauses.append("source = ?")
+        args.append(source)
+    if enabled is not None:
+        clauses.append("enabled = ?")
+        args.append(1 if enabled else 0)
+    if never_logged_in:
+        clauses.append("COALESCE(last_login_at,0) = 0")
+    sql_where = ("WHERE " + " AND ".join(f"({c})" for c in clauses)) if clauses else ""
+
+    conn = auth_db.conn()
+    total = conn.execute(
+        f"SELECT COUNT(*) AS c FROM users {sql_where}", args).fetchone()["c"]
+    rows = conn.execute(
+        "SELECT id, username, display_name, source, external_dn, enabled, email, "
+        "is_admin_seed, is_audit_seed, password_hash, created_at, last_login_at, "
+        f"directory_seen_at FROM users {sql_where} ORDER BY username "
+        "LIMIT ? OFFSET ?", args + [int(limit), int(offset)]).fetchall()
+    full_scan_at = last_full_directory_scan_at()
+    roles_by_user = permissions.list_roles_for_subjects(
+        "user", [str(r["id"]) for r in rows])
+    out = []
+    for r in rows:
+        out.append({
+            "id": r["id"], "username": r["username"],
+            "display_name": r["display_name"] or r["username"],
+            "source": r["source"], "external_dn": r["external_dn"],
+            "enabled": bool(r["enabled"]),
+            "is_admin_seed": bool(r["is_admin_seed"]),
+            "is_audit_seed": bool(r["is_audit_seed"]),
+            "password_set": r["password_hash"] is not None,
+            "email": r["email"] or "",
+            "created_at": r["created_at"], "last_login_at": r["last_login_at"],
+            "directory_seen_at": r["directory_seen_at"],
+            "directory_missing": _is_missing(r, full_scan_at),
+            "roles": roles_by_user.get(str(r["id"]), []),
+        })
+    return {"rows": out, "total": total}

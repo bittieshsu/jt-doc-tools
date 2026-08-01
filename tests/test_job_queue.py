@@ -398,3 +398,27 @@ def test_remote_limit_releases_on_exception():
     except RuntimeError:
         pass
     assert remote_limit.stats()["in_use"] == 0
+
+
+def test_terminal_status_hits_the_db_before_autosave(mgr, monkeypatch):
+    """作業一結束就要先把最終狀態寫進 DB，**再**去做自動存入工作區。
+
+    自動存入要複製檔案，可能花上幾百毫秒到幾秒。原本的順序是「autosave → persist」，
+    那段時間裡記憶體已經是 done、DB 還停在 running —— 從 DB 讀到的狀態是錯的
+    （作業從記憶體淘汰之後更會讀到 running 的殭屍狀態）。整套測試一起跑時實際
+    出現過這個假性失敗。
+    """
+    seen = {}
+
+    def slow_autosave(job):
+        # 在 autosave 進行中偷看一眼 DB：這時就該已經是終局狀態了
+        row = job_store.get(job.id)
+        seen["status_during_autosave"] = row["status"] if row else None
+        return None
+
+    monkeypatch.setattr("app.core.job_autosave.on_job_finished", slow_autosave)
+    j = mgr.submit("pdf-merge", lambda job: None)
+    assert _wait(lambda: j.status == "done")
+    assert seen.get("status_during_autosave") == "done", (
+        f"自動存入進行中時 DB 還是 {seen.get('status_during_autosave')}"
+        " —— 順序反了")

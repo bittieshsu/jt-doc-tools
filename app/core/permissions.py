@@ -153,12 +153,58 @@ def invalidate_cache() -> None:
         _CACHE.clear()
 
 
+#: 巢狀群組往上追的深度上限。AD 的群組巢狀通常兩三層，10 層已經遠超實務；
+#: 有上限才不會被目錄端的環狀關係拖死（環也另外用 seen 擋）。
+_NESTED_GROUP_MAX_DEPTH = 10
+
+
 def _user_groups_local(conn, user_id: int) -> list[str]:
-    """Return group_id (as text) for every local group this user belongs to."""
+    """這位使用者屬於哪些群組（group_id 字串），**含巢狀的上層群組**。
+
+    ## 為什麼要往上追
+
+    企業 AD 幾乎都是「角色群組巢在部門群組底下」：把權限指派給上層的部門群組，
+    底下各子群組的成員理當都拿得到。原本這裡只讀 `group_members` 的直接成員，
+    所以「權限給了上層群組卻沒生效」—— 而群組管理頁**還畫了樹狀縮排**，更容易
+    讓管理員以為會繼承（客戶反映「AD 帳號管理還有精進空間」時盤點到的）。
+
+    ## 怎麼追
+
+    同步時已經把每個群組的上層 DN 存進 `groups.parent_dn`（由 `memberOf` 推得），
+    這裡沿著它往上走。**要防環**：目錄端設定錯誤造成 A→B→A 時，沒有 seen 集合
+    就會無窮迴圈把請求卡死。
+    """
     rows = conn.execute(
         "SELECT group_id FROM group_members WHERE user_id=?", (user_id,)
     ).fetchall()
-    return [str(r["group_id"]) for r in rows]
+    direct = [str(r["group_id"]) for r in rows]
+    if not direct:
+        return []
+
+    # id → parent_dn，dn → id：一次撈完，不要在迴圈裡逐筆查
+    grows = conn.execute(
+        "SELECT id, external_dn, parent_dn FROM groups").fetchall()
+    parent_of = {str(g["id"]): (g["parent_dn"] or "").strip() for g in grows}
+    id_by_dn = {(g["external_dn"] or "").strip(): str(g["id"])
+                for g in grows if (g["external_dn"] or "").strip()}
+
+    out: list[str] = []
+    seen: set[str] = set()
+    stack = list(direct)
+    depth = 0
+    while stack and depth <= _NESTED_GROUP_MAX_DEPTH:
+        nxt: list[str] = []
+        for gid in stack:
+            if gid in seen:
+                continue                 # 目錄端的環狀關係：走過就不再走
+            seen.add(gid)
+            out.append(gid)
+            pdn = parent_of.get(gid, "")
+            if pdn and pdn in id_by_dn:
+                nxt.append(id_by_dn[pdn])
+        stack = nxt
+        depth += 1
+    return out
 
 
 def _user_external_subjects(conn, user_id: int) -> list[tuple[str, str]]:
@@ -313,3 +359,100 @@ def is_auditor(user_id: int) -> bool:
     except Exception:
         pass
     return False
+
+
+def explain_effective_tools(user_id: int) -> dict:
+    """「這個人最終能用哪些工具，每一項是從哪裡來的」。
+
+    ## 為什麼需要
+
+    權限來源散在四個地方 —— 直接給使用者的角色、群組（含巢狀上層）、OU、以及
+    直接工具授權。出事時管理員無法自證也無法排查：他只看得到「這個 subject 有
+    哪些角色」，看不到「A 這個人加總後實際能用什麼、是哪一條規則給的」。
+    稽核回應與交接文件都要用這個。
+
+    ## 回傳形狀
+
+    ```
+    {
+      "admin": bool,          # 有 admin 角色（全開）
+      "auditor": bool,        # 稽核員（硬牆，一律 0 個工具）
+      "subjects": [{"type","key","label"}...],   # 這個人「是」哪些主體
+      "roles":    [{"id","via"}...],             # 每個角色從哪個主體來
+      "tools":    {tool_id: [來源說明, ...]},
+      "tool_ids": [...],
+    }
+    ```
+
+    刻意**重算一次**而不是讀 `effective_tools` 的快取 —— 這個函式是拿來查真相的，
+    讀到快取就可能解釋到一份過期的結果。
+    """
+    conn = auth_db.conn()
+
+    subjects: list[tuple[str, str]] = [("user", str(user_id))]
+    group_ids = _user_groups_local(conn, user_id)
+    direct_group_ids = {
+        str(r["group_id"]) for r in conn.execute(
+            "SELECT group_id FROM group_members WHERE user_id=?",
+            (user_id,)).fetchall()}
+    for gid in group_ids:
+        subjects.append(("group", gid))
+    ou_subjects = _user_external_subjects(conn, user_id)
+    subjects.extend(ou_subjects)
+
+    gname = {str(r["id"]): r["name"] for r in
+             conn.execute("SELECT id, name FROM groups").fetchall()}
+
+    def _label(st: str, sk: str) -> str:
+        if st == "user":
+            return "直接指派給這個帳號"
+        if st == "group":
+            n = gname.get(sk, f"群組 #{sk}")
+            return (f"群組「{n}」" if sk in direct_group_ids
+                    else f"上層群組「{n}」（巢狀繼承）")
+        if st == "ou":
+            return f"OU {sk}"
+        return f"{st} {sk}"
+
+    role_via: dict[str, list[str]] = {}
+    direct_tool_via: dict[str, list[str]] = {}
+    for st, sk in subjects:
+        lab = _label(st, sk)
+        for r in conn.execute(
+                "SELECT role_id FROM subject_roles WHERE subject_type=? "
+                "AND subject_key=?", (st, sk)).fetchall():
+            role_via.setdefault(r["role_id"], []).append(lab)
+        for r in conn.execute(
+                "SELECT tool_id FROM subject_perms WHERE subject_type=? "
+                "AND subject_key=?", (st, sk)).fetchall():
+            direct_tool_via.setdefault(r["tool_id"], []).append(lab)
+
+    is_auditor = "auditor" in role_via
+    is_admin = (not is_auditor) and "admin" in role_via
+
+    tools: dict[str, list[str]] = {}
+    if not is_auditor and not is_admin:
+        for tid, vias in direct_tool_via.items():
+            tools.setdefault(tid, []).extend(f"直接授權（{v}）" for v in vias)
+        if role_via:
+            ph = ",".join("?" * len(role_via))
+            rows = conn.execute(
+                f"SELECT role_id, tool_id FROM role_perms WHERE role_id IN ({ph})",
+                tuple(role_via)).fetchall()
+            rnames = {r["id"]: r["display_name"] for r in
+                      conn.execute("SELECT id, display_name FROM roles").fetchall()}
+            for r in rows:
+                rid = r["role_id"]
+                nice = rnames.get(rid, rid)
+                for v in role_via[rid]:
+                    tools.setdefault(r["tool_id"], []).append(f"角色「{nice}」← {v}")
+
+    return {
+        "admin": is_admin,
+        "auditor": is_auditor,
+        "subjects": [{"type": st, "key": sk, "label": _label(st, sk)}
+                     for st, sk in subjects],
+        "roles": [{"id": rid, "via": vias} for rid, vias in sorted(role_via.items())],
+        "tools": {k: sorted(set(v)) for k, v in tools.items()},
+        "tool_ids": sorted(tools),
+    }

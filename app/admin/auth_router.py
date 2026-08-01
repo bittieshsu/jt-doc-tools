@@ -421,11 +421,32 @@ def build_auth_router(templates) -> APIRouter:
         # directory users mirrored as a catalog (enabled=0, never logged in) —
         # those live in the directory browser. This is what stops the browser
         # OOM the customer hit after bulk AD user sync.
-        view = (request.query_params.get("view") or "active").lower()
-        if view not in ("active", "directory", "all"):
+        qp = request.query_params
+        view = (qp.get("view") or "active").lower()
+        if view not in ("active", "directory", "all", "missing"):
             view = "active"
-        users = user_manager.list_users(view=view)
+        q = (qp.get("q") or "").strip()
+        src = (qp.get("src") or "").strip().lower()
+        if src not in ("", "local", "ldap", "ad", "oidc", "saml"):
+            src = ""
+        st = (qp.get("state") or "").strip().lower()   # on / off / never
+        try:
+            page = max(1, int(qp.get("page") or 1))
+        except ValueError:
+            page = 1
+        size = user_manager.PAGE_SIZE
+        # **篩選一律在伺服器端做**。前端過濾只過濾得到「已經 render 出來的那一頁」，
+        # 使用者以為篩了全部其實只篩了眼前 100 筆 —— 那會讓人以為某個帳號不存在。
+        data = user_manager.list_users_page(
+            view=view, q=q, offset=(page - 1) * size, limit=size,
+            source=src,
+            enabled=(True if st == "on" else (False if st == "off" else None)),
+            never_logged_in=(st == "never"))
+        users = data["rows"]
+        page_total = data["total"]
+        pages = max(1, (page_total + size - 1) // size)
         dir_count = user_manager.count_users(view="directory")
+        missing_count = user_manager.count_users(view="missing")
         all_roles = roles.list_roles()
         # Lightweight group list for the edit-modal picker: id/name/source only,
         # NOT list_groups() (which carries per-group member_ids arrays — those
@@ -472,6 +493,13 @@ def build_auth_router(templates) -> APIRouter:
             "auth_on": auth_settings.is_enabled(),
             "view": view,
             "dir_count": dir_count,
+            "missing_count": missing_count,
+            "q": q, "src": src, "state": st,
+            "page": page, "pages": pages, "page_total": page_total,
+            "page_size": size,
+            # 沒做過完整目錄掃描時「目錄已無」判定不成立 —— 畫面要說明原因，
+            # 不然管理員只會看到 0 筆而不知道是還沒掃還是真的沒有。
+            "has_full_scan": user_manager.last_full_directory_scan_at() > 0,
         })
 
     @router.post("/users/create")
@@ -513,6 +541,152 @@ def build_auth_router(templates) -> APIRouter:
             target=str(uid), details={k: v for k, v in body.items() if k != "password"},
         )
         return {"ok": True}
+
+    #: 一次最多處理幾個帳號。批次是為了省事，不是為了讓人一鍵改動整個組織 ——
+    #: 上限逼使用者先篩選再操作，也讓稽核記錄看得懂。
+    _BULK_MAX = 500
+
+    def _bulk_ids(body: dict) -> list[int]:
+        raw = body.get("user_ids")
+        if not isinstance(raw, list) or not raw:
+            raise HTTPException(400, "沒有選擇任何帳號")
+        if len(raw) > _BULK_MAX:
+            raise HTTPException(400, f"一次最多 {_BULK_MAX} 個帳號，請先篩選")
+        out = []
+        for v in raw:
+            try:
+                out.append(int(v))
+            except (TypeError, ValueError):
+                raise HTTPException(400, "帳號編號格式錯誤")
+        return out
+
+    def _protected_reason(uid: int, me_id, *, disabling: bool) -> str:
+        """這個帳號能不能被批次動到。回空字串代表可以。
+
+        三條防線，少一條就可能把自己鎖在門外：
+        1. 不能停用自己 —— 按下去當場失去管理權。
+        2. 不能動 seed 管理員 —— 那是 break-glass 帳號。
+        3. 停用前確認還留得下至少一個啟用中的管理員。
+        """
+        u = user_manager.get_by_id(uid)
+        if not u:
+            return "帳號不存在"
+        if u.get("is_admin_seed"):
+            return "內建管理員帳號不可批次異動"
+        if disabling and me_id is not None and int(uid) == int(me_id):
+            return "不可停用自己"
+        return ""
+
+    def _remaining_admin_count(excluding: set[int]) -> int:
+        """扣掉這批之後還剩幾個「啟用中且有 admin 角色」的帳號。"""
+        n = 0
+        for u in user_manager.list_users("all"):
+            if u["id"] in excluding or not u["enabled"]:
+                continue
+            if "admin" in (u.get("roles") or []) or u.get("is_admin_seed"):
+                n += 1
+        return n
+
+    @router.post("/users/bulk/enabled")
+    async def users_bulk_enabled(request: Request):
+        """批次啟用 / 停用。"""
+        body = await request.json()
+        ids = _bulk_ids(body)
+        enabled = bool(body.get("enabled"))
+        me = (getattr(request.state, "user", None) or {}).get("user_id")
+        done, skipped = [], []
+        for uid in ids:
+            why = _protected_reason(uid, me, disabling=not enabled)
+            if why:
+                skipped.append({"id": uid, "reason": why})
+                continue
+            done.append(uid)
+        if not enabled and done:
+            # **停用前確認不會把管理員清光**。少了這一條，一次全選停用之後
+            # 就沒有人能進管理區了，只能用 CLI 救。
+            if _remaining_admin_count(set(done)) == 0:
+                raise HTTPException(
+                    400, "這樣會停用最後一個管理員 —— 請至少保留一個可登入的管理員")
+        for uid in done:
+            try:
+                user_manager.update(uid, enabled=enabled)
+            except ValueError as e:
+                skipped.append({"id": uid, "reason": str(e)})
+        done = [u for u in done if u not in {s["id"] for s in skipped}]
+        audit_db.log_event(
+            "user_bulk_update", username=_actor(request), ip=_client_ip(request),
+            target=f"{len(done)} users",
+            details={"action": "enable" if enabled else "disable",
+                     "ids": done[:200], "skipped": skipped[:50]})
+        return {"ok": True, "changed": len(done), "skipped": skipped}
+
+    @router.post("/users/bulk/roles")
+    async def users_bulk_roles(request: Request):
+        """批次指派 / 移除角色。
+
+        `mode`：`add` 疊加、`remove` 移除、`set` 整組取代。預設 `add` ——
+        整組取代最危險（會洗掉別人原本的角色），要明確指定才做。
+        """
+        body = await request.json()
+        ids = _bulk_ids(body)
+        mode = (body.get("mode") or "add").lower()
+        if mode not in ("add", "remove", "set"):
+            raise HTTPException(400, "mode 只能是 add / remove / set")
+        want = [str(r) for r in (body.get("roles") or [])]
+        known = {r["id"] for r in roles.list_roles()}
+        bad = [r for r in want if r not in known]
+        if bad:
+            raise HTTPException(400, f"不存在的角色：{bad}")
+        if not want and mode != "set":
+            raise HTTPException(400, "沒有選擇角色")
+        me = (getattr(request.state, "user", None) or {}).get("user_id")
+        changed, skipped = 0, []
+        for uid in ids:
+            why = _protected_reason(uid, me, disabling=False)
+            if why:
+                skipped.append({"id": uid, "reason": why})
+                continue
+            cur = set(permissions.list_roles_for_subject("user", str(uid)))
+            if mode == "add":
+                new = cur | set(want)
+            elif mode == "remove":
+                new = cur - set(want)
+            else:
+                new = set(want)
+            if new == cur:
+                continue
+            permissions.set_subject_roles("user", str(uid), sorted(new))
+            changed += 1
+        audit_db.log_event(
+            "user_bulk_roles", username=_actor(request), ip=_client_ip(request),
+            target=f"{changed} users",
+            details={"mode": mode, "roles": want, "ids": ids[:200],
+                     "skipped": skipped[:50]})
+        return {"ok": True, "changed": changed, "skipped": skipped}
+
+    @router.get("/users/{uid}/effective")
+    async def users_effective(uid: int, request: Request):
+        """這個帳號**最終**能用哪些工具，每一項是從哪一條規則來的。
+
+        權限來源散在四處（直接角色 / 群組含巢狀 / OU / 直接授權），出事時管理員
+        原本無法自證也無法排查 —— 只看得到「這個 subject 有哪些角色」，看不到
+        加總後的結果。稽核回應與交接文件都要用這個。
+        """
+        u = user_manager.get_by_id(uid)
+        if not u:
+            raise HTTPException(404, "帳號不存在")
+        exp = permissions.explain_effective_tools(uid)
+        # 工具 id → 顯示名稱，讓畫面不用再自己對照一次
+        names = {}
+        try:
+            from ..tool_registry import discover_tools
+            names = {t.metadata.id: t.metadata.name for t in discover_tools()}
+        except Exception:  # noqa: BLE001 — 取不到名稱不該擋住這個查詢
+            pass
+        exp["tool_names"] = names
+        exp["username"] = u["username"]
+        exp["enabled"] = u["enabled"]
+        return exp
 
     @router.post("/users/{uid}/reset-password")
     async def users_reset_password(uid: int, request: Request):
