@@ -195,6 +195,10 @@
 <style nonce="{{ request.state.csp_nonce }}">
 .bd-stat { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 12px; font-size: 13px; color: #475569; }
 .bd-kv b { color: #0f172a; }
+/* 共用的 .auth-form 預設限寬 760px（認證設定頁欄位少，窄一點好讀）。
+   這一頁的設定面板要跟上面的上傳面板切齊，不要右邊留一大塊空白 —— 解除限寬。
+   platform.css 先載入，這裡同特異度但在後面，所以會覆蓋掉。 */
+.auth-form { max-width: none; }
 .bd-num { width: 130px; }
 /* .auth-form input.field[type=text] 會把 text 欄位拉成 100% —— 色碼欄旁邊還有
    色票，滿寬會擠掉它，所以用同等特異度的選擇器收回固定寬。 */

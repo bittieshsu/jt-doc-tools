@@ -162,6 +162,9 @@ def test_saved_once_polling_stops(tmp_path, _data_dir, monkeypatch):
 
     from app.core.job_manager import job_manager
     j = _job(tmp_path)
+    # 「剛送出」的作業一律算還在看（見 JobManager.JUST_SUBMITTED），所以這裡要
+    # 模擬一個已經跑了一陣子的作業，否則測到的是那條規則而不是輪詢停止。
+    j.created_at = _t.time() - 600
     job_manager._jobs[j.id] = j
     try:
         job_manager.mark_polled(j.id)
@@ -173,7 +176,53 @@ def test_saved_once_polling_stops(tmp_path, _data_dir, monkeypatch):
 
 
 def test_never_polled_counts_as_left(tmp_path, _data_dir):
-    """從沒被輪詢過 = 透過 API 送出、或送出後立刻關掉頁面 —— 正是最需要
-    自動保存的情境。"""
-    res = job_autosave.on_job_finished(_job(tmp_path))
+    """跑了一陣子卻從沒被輪詢過 = 透過 API 送出、或送出後立刻關掉頁面 ——
+    正是最需要自動保存的情境。
+
+    注意**要跑得夠久**：幾乎瞬間完成的作業輪詢根本來不及發生，那不算離開
+    （見 test_instant_job_is_not_autosaved）。
+    """
+    import time as _t
+
+    from app.core.job_manager import job_manager
+    j = _job(tmp_path)
+    j.created_at = _t.time() - 600
+    res = job_autosave.on_job_finished(j)
     assert res["saved"] is True
+
+
+def test_instant_job_is_not_autosaved(tmp_path, _data_dir):
+    """幾乎瞬間完成的作業不可以自動存 —— 使用者一定還在畫面前。
+
+    使用者回報：「我在加框頁面處理完都沒離開，可是它還是自動存去我的工作區？」
+
+    根因：`/submit` 建立作業之後**可能在 HTTP 回應送出前就跑完**（加框、旋轉這類
+    幾乎是瞬間的工具）。那時瀏覽器連 job_id 都還沒拿到，不可能輪詢過，於是
+    「從沒被輪詢過 → 人已經離開」這條判斷就誤判了 —— 前端根本沒有機會贏這場競賽，
+    所以要在伺服器端解決。
+    """
+    from app.core.job_manager import job_manager
+    j = _job(tmp_path)                      # created_at = 現在
+    job_manager._jobs[j.id] = j
+    try:
+        assert j.last_polled_at is None, "這個情境的前提就是還沒被輪詢過"
+        res = job_autosave.on_job_finished(j)
+        assert res["saved"] is False
+        assert res["reason"] == "still_watching"
+    finally:
+        job_manager._jobs.pop(j.id, None)
+
+
+def test_long_job_never_polled_is_autosaved(tmp_path, _data_dir):
+    """跑了一段時間、期間卻沒有任何輪詢 = 真的離開了 → 這時才自動存。"""
+    import time as _t
+
+    from app.core.job_manager import job_manager
+    j = _job(tmp_path)
+    j.created_at = _t.time() - (job_manager.JUST_SUBMITTED + 60)
+    job_manager._jobs[j.id] = j
+    try:
+        res = job_autosave.on_job_finished(j)
+        assert res["saved"] is True, res
+    finally:
+        job_manager._jobs.pop(j.id, None)

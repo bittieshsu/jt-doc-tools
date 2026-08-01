@@ -240,14 +240,30 @@ class JobManager:
         if job is not None:
             job.last_polled_at = time.time()
 
+    #: 送出後多久之內完成的作業，一律當成「使用者還在看」。
+    #:
+    #: 前端每 800ms 輪詢一次，但**作業有可能在 `/submit` 還沒回應前就跑完**
+    #: （加框、旋轉這類幾乎是瞬間的工具）—— 那時瀏覽器連 job_id 都還沒拿到，
+    #: 不可能輪詢過。只看「有沒有被輪詢過」的話，這種作業一律被判成「人已經
+    #: 離開」而自動存進工作區，但使用者其實就坐在畫面前（實際回報過）。
+    JUST_SUBMITTED = 5.0
+
     def is_being_watched(self, job_id: str) -> bool:
         """使用者是不是還盯著這個作業？
 
-        **從沒被輪詢過**算「沒在看」—— 那是透過 API 送出、或送出後立刻關掉頁面
-        的情況，正是最需要自動保存的。
+        兩種情況算「還在看」：
+        1. 最近 `IDLE_AFTER` 秒內有輪詢過。
+        2. **剛送出沒多久就結束**（見 `JUST_SUBMITTED`）—— 快到輪詢還來不及發生。
+
+        只有「跑了一段時間、期間卻沒有任何輪詢」才算真的離開了，那正是自動保存
+        要服務的情境（送出後去忙別的、或直接關掉分頁）。
         """
         job = self._jobs.get(job_id)
-        if job is None or not job.last_polled_at:
+        if job is None:
+            return False
+        if time.time() - job.created_at <= self.JUST_SUBMITTED:
+            return True
+        if not job.last_polled_at:
             return False
         return (time.time() - job.last_polled_at) <= self.IDLE_AFTER
 
