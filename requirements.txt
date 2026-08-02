@@ -49,6 +49,8 @@ qrcode>=7.4,<9
 # einvoice-scan QR Code 解碼（v1.7.78+）— Linux/macOS 需 zbar shared lib（apt/brew）
 pyzbar>=0.1.9,<0.2
 # pdf-to-office (v1.8.32+, Sprint 1) — pdf2docx 鎖 0.5.13（上游停止維護，已 fork 計畫），
+# fonttools 給 .ttc 子字型挑選（Noto CJK 第 0 套是日文，不挑會用到日文字形）
+fonttools>=4.40,<5
 # rapidfuzz 給 docx↔PDFTruth 模糊比對
 pdf2docx>=0.5.13,<0.6
 rapidfuzz>=3.0,<4

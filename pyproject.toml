@@ -1,6 +1,6 @@
 [project]
 name = "jt-doc-tools"
-version = "1.14.18"
+version = "1.14.19"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
@@ -70,6 +70,12 @@ dependencies = [
     # PDF→docx 引擎。上游 (Artifex) 2026 釋出 0.5.13 後停止維護，已轉 MIT。我們鎖
     # 死版本 + fork 計畫；THIRD-PARTY-NOTICES.md 標註自維護。
     "pdf2docx>=0.5.13,<0.6",
+    # fonttools — 挑 .ttc 裡的子字型。Linux 常見的 Noto CJK ttc 第 0 套是**日文**，
+    # 不挑的話寫進 PDF 的中文會是日文字形（「海」寫成「毎」等，實測台灣商務常用字
+    # 55 個裡有 36 個不同）。PyMuPDF 的 API 沒有索引參數，只能自己抽出子字型。
+    # 它本來就被 pdf2docx 間接帶進來，但**傳遞相依不能依賴** —— 上游哪天換掉，
+    # 這裡會無聲退回日文字形。
+    "fonttools>=4.40,<5",
     # rapidfuzz — pdf-to-office 的 docx↔PDFTruth alignment 模糊比對引擎（比 difflib 快 10x+）。
     "rapidfuzz>=3.0,<4",
     # numpy — 直接 import：pdf-to-office table_borders_from_image fixer（頂層）+

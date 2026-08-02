@@ -81,17 +81,25 @@ _CJK_RE = _re.compile(
 def _pageno_font(text: str):
     """選頁碼字型。含 CJK（如「第 N 頁」）時，PyMuPDF 內建 helv 沒有中文 glyph
     會印成「·」缺字；改用真 CJK 字型。找不到系統 CJK 字型則退用 PyMuPDF 內建
-    china-t（繁中，glyph 至少會顯示）。回 (fontname, fontfile|None)。"""
+    china-t（繁中，glyph 至少會顯示）。回 (fontname, fontfile|None, fontbuffer|None)。
+
+    `.ttc` 要挑繁中那一套 —— 第 0 套通常是日文，用錯的話「第 N 頁」的「第」「頁」
+    會是日文字形。PyMuPDF 沒有索引參數，只能把那一套抽成位元組用 fontbuffer 傳。
+    """
     if not _CJK_RE.search(text or ""):
-        return "helv", None
+        return "helv", None, None
     try:
         from ...core import font_catalog
         best = font_catalog.best_cjk_path("sans", "traditional")
         if best:
-            return "jtcjk", str(best[0])
+            path, idx = best[0], (best[1] if len(best) > 1 else 0)
+            # 只嵌這段文字用到的字 —— 不縮的話一支中文字型十幾 MB 會整份塞進
+            # PDF，只為了印「第 1 頁」三個字。
+            ff, buf = font_catalog.embeddable_font(path, idx, text=text)
+            return "jtcjk", (str(ff) if ff else None), buf
     except Exception:
         pass
-    return "china-t", None
+    return "china-t", None, None
 
 
 def _text_width_pt(text: str, font_size: float) -> float:
@@ -135,7 +143,10 @@ def _draw_pageno(
     import fitz
     rot = int(getattr(page, "rotation", 0)) % 360
     r = page.rect                                # visual rect(含旋轉)
-    fontname, fontfile = _pageno_font(text)      # 含中文時用 CJK 字型避免缺字
+    fontname, fontfile, fontbuf = _pageno_font(text)  # 含中文時用 CJK 字型避免缺字
+    # 用位元組嵌的字型要先在該頁註冊（insert_text 沒有 fontbuffer 參數）
+    if fontbuf is not None:
+        page.insert_font(fontname=fontname, fontbuffer=fontbuf)
     tw = _text_width_pt(text, font_size)         # CJK 全形字寬納入定位
     th = font_size * 1.2
     if position == "tl":   x, y = m_pt, m_pt + th

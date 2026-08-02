@@ -21,13 +21,17 @@ PyMuPDF built-ins are exposed with id="pymupdf:<name>" and no path.
 """
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import re
 import threading
+from functools import lru_cache
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 # Taiwan-relevant font filename patterns + display metadata.
@@ -84,6 +88,221 @@ _HINTS = [
 
 
 _FONT_DIRS: list[Path] = []
+
+
+
+# --------------------------------------------------------------- TTC 子字型 --
+#
+# `.ttc` 是**字型集合**：一個檔案裡包好幾套字。Linux 上常見的
+# `NotoSansCJK-Regular.ttc` 就有 10 套（JP / KR / SC / TC / HK × 一般 + 等寬），
+# 而 **index 0 是 JP**。
+#
+# 這件事的殺傷力在於它完全看不出來：字都印得出來、也不會缺字，只是「直、骨、過、
+# 者、銀、電、話、統、編…」這些字寫成日文寫法。實測台灣商務表單常用的 55 個字裡
+# 有 36 個不一樣 —— 也就是幾乎每個欄位名都中招。
+#
+# CLAUDE.md 在 v1.11.40 就記過這個雷（用印的限用章），但當時只修了那一處；
+# 系統字型掃描這裡一直硬寫 idx=0。
+
+#: 依目標語系挑子字型的偏好順序（比對字型家族名稱裡的語系標記）。
+_TTC_SCRIPT_PREFS: dict[str, tuple[str, ...]] = {
+    "traditional": ("TC", "TW", "HK", "MO"),
+    "simplified": ("SC", "CN"),
+    "japanese": ("JP",),
+    "korean": ("KR",),
+}
+
+
+def _ttc_subfont_names(path: Path) -> list[str]:
+    """回 `.ttc` 內各子字型的家族名稱（依序）。不是 ttc / 讀不到就回空 list。"""
+    if path.suffix.lower() != ".ttc":
+        return []
+    try:
+        from fontTools.ttLib import TTCollection
+    except Exception:  # noqa: BLE001 — 沒有 fontTools 就維持原本行為
+        logger.debug("fontTools 不可用，無法挑選 .ttc 子字型")
+        return []
+    try:
+        with TTCollection(str(path), lazy=True) as coll:
+            out = []
+            for f in coll.fonts:
+                nm = f["name"]
+                out.append(nm.getDebugName(16) or nm.getDebugName(1) or "")
+            return out
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("讀取 %s 的子字型清單失敗：%s", path, exc)
+        return []
+
+
+@lru_cache(maxsize=64)
+def _ttc_index_for(path_str: str, mtime: float, cjk: Optional[str]) -> int:
+    """這個 `.ttc` 要用第幾套子字型（依語系）。
+
+    `mtime` 只是拿來讓快取在檔案換掉時失效，函式本身不用它。
+    挑不出來就回 0（維持原本行為，不要因為挑不到就整個壞掉）。
+    """
+    names = _ttc_subfont_names(Path(path_str))
+    if not names:
+        return 0
+    prefs = _TTC_SCRIPT_PREFS.get(cjk or "", ())
+    for tag in prefs:
+        for i, nm in enumerate(names):
+            # 比對獨立的語系標記，避免 "TC" 命中 "Mono TC" 以外的無關字串。
+            # 同時排除等寬（Mono）—— 正文用等寬會很怪。
+            toks = re.split(r"[\s\-_]+", nm.upper())
+            if tag in toks and "MONO" not in toks:
+                return i
+    return 0
+
+
+
+#: 子集化時一定保留的字元。使用者的文字之外，排版過程還可能插入這些
+#: （省略號、換行後的標點、數字），少一個就會變成看不見的缺字方框。
+_SUBSET_ALWAYS = (
+    "0123456789"
+    "abcdefghijklmnopqrstuvwxyz"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    " .,:;-_/()[]#&@%+*=<>?!'\"" 
+    "。，、：；！？（）「」『』〈〉《》－—…‧　"
+)
+
+
+def subset_font(path, idx: int, text: str) -> Optional[bytes]:
+    """把字型縮成「只含這些字」的一份，回位元組。
+
+    為什麼要做：PyMuPDF 只要用到外部字型就會把**整支檔案**嵌進 PDF。中文字型
+    天生很大（Noto CJK 繁中那一套 15.7 MB），所以一張只填 30 個中文字的表單會
+    變成 13 MB —— 而這種檔案的用途就是寄出去，會撞到郵件附件上限。
+    子集化之後實測 15.7 MB → 27 KB（601 倍），產出的 PDF 13,387 KB → 23 KB。
+
+    **失敗一律回 None，由呼叫端退回整支字型** —— 寧可檔案大，也不要缺字。
+    缺字在畫面上是看不見的方框，使用者不會發現，收件方才會。
+    """
+    if not text:
+        return None
+    # **依「字元集合」快取，不是依原字串**：頁碼每一頁的文字都不同
+    # （第 1 頁 / 第 2 頁…），但數字本來就都在 `_SUBSET_ALWAYS` 裡，所以每一頁
+    # 需要的**字元集合其實一模一樣**。不這樣做的話每頁都要重跑一次子集化 ——
+    # 實測 20 頁要 19 秒，200 頁的文件會卡三分鐘。
+    charset = "".join(sorted(set(text) | set(_SUBSET_ALWAYS)))
+    return _subset_cached(str(path), _mtime(path), int(idx or 0), charset)
+
+
+@lru_cache(maxsize=8)
+def _subset_cached(path_str: str, mtime: float, idx: int,
+                   charset: str) -> Optional[bytes]:
+    """實際做子集化（子集只有幾十 KB，多放幾份不心疼）。"""
+    try:
+        import io
+
+        from fontTools import subset as _subset
+        full = _full_font_bytes(path_str, mtime, idx)
+        if not full:
+            return None
+        opts = _subset.Options()
+        opts.layout_features = ["*"]      # 保留排版特性（標點壓縮等）
+        opts.notdef_outline = True
+        opts.recalc_bounds = False
+        font = _subset.load_font(io.BytesIO(full), opts)
+        sub = _subset.Subsetter(options=opts)
+        sub.populate(text=charset)
+        sub.subset(font)
+        out = io.BytesIO()
+        _subset.save_font(font, out, opts)
+        data = out.getvalue()
+        # **保險**：子集化之後每一個要畫的字都必須還在。缺了就整份放棄，
+        # 用原本的字型 —— 檔案大總比印出方框好。
+        if not _covers(data, charset):
+            logger.warning("字型子集化後有字不見了，退回完整字型")
+            return None
+        return data
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("字型子集化失敗（退回完整字型）：%s", exc)
+        return None
+
+
+def _covers(font_bytes: bytes, text: str) -> bool:
+    """這份字型是不是每一個字都畫得出來。"""
+    try:
+        import io
+
+        from fontTools.ttLib import TTFont
+        f = TTFont(io.BytesIO(font_bytes), lazy=True)
+        cmap = f.getBestCmap()
+        missing = {ch for ch in text
+                   if ch.strip() and ord(ch) not in cmap}
+        if missing:
+            logger.warning("子集化後缺少 %d 個字：%s",
+                           len(missing), "".join(sorted(missing))[:20])
+        return not missing
+    except Exception:  # noqa: BLE001 — 驗不了就當作不安全
+        return False
+
+
+def _mtime(path) -> float:
+    try:
+        return Path(path).stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _full_font_bytes(path_str: str, mtime: float, idx: int) -> Optional[bytes]:
+    """整支字型的位元組（`.ttc` 取指定子字型；其他直接讀檔）。"""
+    if idx:
+        return _extract_subfont(path_str, mtime, idx)
+    try:
+        return Path(path_str).read_bytes()
+    except OSError:
+        return None
+
+
+def embeddable_font(path, idx: int = 0, text: Optional[str] = None):
+    """回 `(fontfile, fontbuffer)` —— 給 PyMuPDF 用，兩者只會有一個有值。
+
+    給了 `text` 就**只嵌那些字**（見 `subset_font`）—— 中文字型整支十幾 MB，
+    不縮的話一張填了幾十個字的表單就變成 13 MB。
+
+    **PyMuPDF 的公開 API 完全沒有 ttc 索引參數**（`Font()` / `insert_font()` /
+    `insert_text()` 都沒有），`fontfile` 一律用第 0 套。所以要用別套就只能自己把
+    子字型抽成位元組再用 `fontbuffer` 傳進去。
+
+    `idx == 0` 時回 `(路徑, None)`，走原本最省的路徑（不抽、不佔記憶體）。
+    抽取失敗時也回路徑 —— 寧可字形不對，也不要整個印不出來。
+    """
+    path = Path(path)
+    if text:
+        sub = subset_font(path, idx, text)
+        if sub:
+            return (None, sub)
+        # 子集化失敗 → 往下走原本的路（整支嵌入），不要因此印不出字
+    if not idx:
+        return (str(path), None)
+    buf = _extract_subfont(str(path), path.stat().st_mtime if path.exists() else 0,
+                           int(idx))
+    return (None, buf) if buf else (str(path), None)
+
+
+@lru_cache(maxsize=2)
+def _extract_subfont(path_str: str, mtime: float, idx: int) -> Optional[bytes]:
+    """把 `.ttc` 的第 idx 套抽成單一字型的位元組。
+
+    **快取上限刻意只有 2**：實測抽一份 Noto CJK 子字型是 **15.7 MB**（第一次
+    約 850 ms，之後 0.15 ms）。同時真的會用到的字型很少（多半就是黑體正常體），
+    放太多只是白佔記憶體 —— 這台機器還要跑 OCR 與轉檔。
+    """
+    try:
+        import io
+
+        from fontTools.ttLib import TTCollection
+        with TTCollection(str(path_str)) as coll:
+            if idx >= len(coll.fonts):
+                return None
+            b = io.BytesIO()
+            coll.fonts[idx].save(b)
+            return b.getvalue()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("抽取 %s 第 %d 套子字型失敗：%s", path_str, idx, exc)
+        return None
 
 
 def _detect_font_dirs() -> list[Path]:
@@ -224,6 +443,12 @@ def list_fonts(include_hidden: bool = False) -> list[dict]:
                         continue
                     family, style, cjk, category, label = hint
                     variant = _variant_from_name(p.name)
+                    # `.ttc` 要挑對子字型 —— 這裡原本硬寫 0，而 Noto CJK 的
+                    # 第 0 套是**日文**，等於全站中文都用日文字形。
+                    try:
+                        sub_idx = _ttc_index_for(str(p), p.stat().st_mtime, cjk)
+                    except Exception:  # noqa: BLE001 — 挑不到就維持 0
+                        sub_idx = 0
                     out.append({
                         "id": f"system:{p}",
                         "family": family,
@@ -233,7 +458,7 @@ def list_fonts(include_hidden: bool = False) -> list[dict]:
                         "cjk": cjk,
                         "style": style,
                         "path": str(p),
-                        "idx": 0,
+                        "idx": sub_idx,
                     })
             except Exception:
                 continue
@@ -259,7 +484,9 @@ def list_fonts(include_hidden: bool = False) -> list[dict]:
                     "cjk": None,
                     "style": "sans",
                     "path": str(p),
-                    "idx": 0,
+                    # 管理員上傳的 .ttc 不知道是給哪個語系用的 —— 本產品面向台灣，
+                    # 預設挑繁中那一套（挑不到就回 0，等同原本行為）。
+                    "idx": _ttc_index_for(str(p), p.stat().st_mtime, "traditional"),
                 })
         except Exception:
             pass
@@ -338,7 +565,9 @@ def best_cjk_path(style: str = "sans",
 
     Matches against `_BEST_CJK_PREFERENCES`; only considers fonts the catalog
     has actually scanned (via list_fonts), so hidden / missing files are
-    auto-skipped. Idx is currently always 0 (we don't pin a sub-font of TTCs).
+    auto-skipped. `.ttc` 會回**對應語系的子字型索引**（Noto CJK 的第 0 套是
+    日文，用錯整份文件的中文都會是日文字形）—— 呼叫端要把 idx 一起帶下去，
+    PyMuPDF 請走 `embeddable_font()`。
     """
     prefs = _BEST_CJK_PREFERENCES.get((cjk, style)) or []
     if not prefs:

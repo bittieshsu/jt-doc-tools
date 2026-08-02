@@ -144,6 +144,23 @@ def _font_covers_cjk(font: ImageFont.FreeTypeFont) -> bool:
             return True
 
 
+def _tc_index(path) -> int:
+    """`.ttc` 裡繁中那一套的索引。
+
+    Pillow 的 `truetype(index=)` 預設 0，而 Linux 常見的 Noto CJK ttc **第 0 套
+    是日文** —— 浮水印打上去的中文會是日文字形（「海」寫成「毎」、「過」「郎」
+    「直」的部件也不同）。挑不到就回 0（等同原本行為）。
+    """
+    try:
+        import os
+
+        from ...core import font_catalog
+        return font_catalog._ttc_index_for(str(path), os.path.getmtime(path),
+                                           "traditional")
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def _load_font(
     font_path: str, size_px: int, bold: bool = False, italic: bool = False,
     text: str = "",
@@ -156,7 +173,7 @@ def _load_font(
     # glyphs, ignore it and walk the CJK fallback list.
     if font_path:
         try:
-            f = ImageFont.truetype(font_path, size_px)
+            f = ImageFont.truetype(font_path, size_px, index=_tc_index(font_path))
             if not needs_cjk or _font_covers_cjk(f):
                 return f
         except Exception:
@@ -169,7 +186,7 @@ def _load_font(
     for k in keys:
         for cand in _CJK_FONT_LISTS.get(k, []):
             try:
-                f = ImageFont.truetype(cand, size_px)
+                f = ImageFont.truetype(cand, size_px, index=_tc_index(cand))
                 if not needs_cjk or _font_covers_cjk(f):
                     return f
             except Exception:
@@ -177,7 +194,8 @@ def _load_font(
     # Last-resort: even if it can't render CJK, return something usable.
     if font_path:
         try:
-            return ImageFont.truetype(font_path, size_px)
+            return ImageFont.truetype(font_path, size_px,
+                                       index=_tc_index(font_path))
         except Exception:
             pass
     return ImageFont.load_default()

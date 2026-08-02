@@ -657,7 +657,14 @@ def _resolve_fonts_for_pref(
             else:
                 try:
                     reg_name = f"uf{len(cache)}"
-                    page.insert_font(fontname=reg_name, fontfile=entry["path"])
+                    # `.ttc` 要挑對子字型（見 _upgrade_cjk_font 的說明）
+                    _ff, _buf = font_catalog.embeddable_font(
+                        entry["path"], int(entry.get("idx") or 0))
+                    if _buf is not None:
+                        page.insert_font(fontname=reg_name, fontbuffer=_buf)
+                    else:
+                        page.insert_font(fontname=reg_name,
+                                         fontfile=str(_ff or entry["path"]))
                     cache[fkey] = reg_name
                     custom_font_name = reg_name
                 except Exception:
@@ -672,7 +679,14 @@ def _resolve_fonts_for_pref(
             else:
                 try:
                     reg_name = f"uc{len(cache)}"
-                    page.insert_font(fontname=reg_name, fontfile=entry["path"])
+                    # `.ttc` 要挑對子字型（見 _upgrade_cjk_font 的說明）
+                    _ff, _buf = font_catalog.embeddable_font(
+                        entry["path"], int(entry.get("idx") or 0))
+                    if _buf is not None:
+                        page.insert_font(fontname=reg_name, fontbuffer=_buf)
+                    else:
+                        page.insert_font(fontname=reg_name,
+                                         fontfile=str(_ff or entry["path"]))
                     cache[fkey] = reg_name
                     custom_font_name = reg_name
                 except Exception:
@@ -993,7 +1007,14 @@ def _upgrade_cjk_font(page, builtin_name: str, cache: dict, pno: int) -> str:
         return cache[fkey]
     try:
         reg_name = f"cu{len(cache)}"
-        page.insert_font(fontname=reg_name, fontfile=str(path))
+        # `.ttc` 要挑對子字型 —— 這裡原本直接丟路徑，等於用第 0 套（Noto CJK
+        # 的第 0 套是**日文**，「海」會寫成「毎」）。PyMuPDF 沒有索引參數，
+        # 要用別套只能把那一套抽成位元組走 fontbuffer。
+        ff, buf = font_catalog.embeddable_font(path, idx)
+        if buf is not None:
+            page.insert_font(fontname=reg_name, fontbuffer=buf)
+        else:
+            page.insert_font(fontname=reg_name, fontfile=str(ff or path))
         cache[fkey] = reg_name
         return reg_name
     except Exception:
@@ -1682,11 +1703,19 @@ async def save(request: Request):
                                     try:
                                         prefix = "uc" if font_pref.startswith("custom:") else "uf"
                                         reg_name = f"{prefix}{len(_custom_font_cache)}"
-                                        page.insert_font(
-                                            fontname=reg_name,
-                                            fontfile=entry["path"],
-                                            # TTC subfont index (0 if not TTC)
-                                        )
+                                        # 原本這裡留著一句「# TTC subfont index」
+                                        # 的註解卻沒有傳 —— PyMuPDF 根本沒有那個
+                                        # 參數。要用 .ttc 的別套只能抽成位元組。
+                                        _ff, _buf = font_catalog.embeddable_font(
+                                            entry["path"],
+                                            int(entry.get("idx") or 0))
+                                        if _buf is not None:
+                                            page.insert_font(fontname=reg_name,
+                                                             fontbuffer=_buf)
+                                        else:
+                                            page.insert_font(
+                                                fontname=reg_name,
+                                                fontfile=str(_ff or entry["path"]))
                                         _custom_font_cache[fkey] = reg_name
                                         custom_font_name = reg_name
                                     except Exception:

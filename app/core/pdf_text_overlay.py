@@ -57,6 +57,21 @@ def list_fonts() -> list[dict]:
     return [f for f in out if f["available"]]
 
 
+def _ttc_index(path: str) -> int:
+    """這個字型檔要用第幾套子字型（繁中）。
+
+    `.ttc` 裡通常有 JP / KR / SC / TC 好幾套，而**第 0 套是日文** ——
+    用錯的話字都印得出來、也不缺字，只是「銀、電、話、統、編、直、骨、過」
+    這些字寫成日文寫法。實測台灣商務表單常用的 55 個字裡有 36 個不一樣。
+    """
+    try:
+        from . import font_catalog
+        return font_catalog._ttc_index_for(path, os.path.getmtime(path),
+                                           "traditional")
+    except Exception:  # noqa: BLE001 — 挑不到就用第 0 套（原本的行為）
+        return 0
+
+
 def _resolve_font_file(font_id: str) -> tuple[Optional[str], Optional[str]]:
     """Return (fontfile_path, builtin_name) — exactly one will be set."""
     if font_id in _BUILTIN_MAP:
@@ -190,7 +205,24 @@ def overlay_text(
     font_file, builtin = _resolve_font_file(font_id)
     # For width measurement we need a fitz.Font — use the TTF if available,
     # otherwise fall back to a CJK Font created from its internal name.
+    # `.ttc` 要挑對子字型 —— PyMuPDF 的 API 沒有索引參數，只能把那一套抽成
+    # 位元組再用 fontbuffer 傳。抽不出來就退回原本的整檔（字形會是日文，但至少
+    # 印得出來）。
+    font_buffer = None
     if font_file:
+        from . import font_catalog as _fc
+        # 只嵌真正會畫到的字。**所有要寫的文字在這裡都已經知道了**（placements
+        # 是完整的），所以子集化是安全的 —— 不會有「之後才冒出來的字」缺字。
+        # 不縮的話整支中文字型會進 PDF：一張填幾十個字的表單就 13 MB。
+        used = "".join(pl.text or "" for pl in placements)
+        ff, font_buffer = _fc.embeddable_font(font_file, _ttc_index(font_file),
+                                              text=used)
+        font_file = ff or font_file
+    if font_buffer is not None:
+        measure_font = fitz.Font(fontbuffer=font_buffer)
+        font_alias = "overlay-font"
+        font_file = None
+    elif font_file:
         measure_font = fitz.Font(fontfile=font_file)
         font_alias = "overlay-font"
     else:
@@ -198,9 +230,16 @@ def overlay_text(
         font_alias = builtin or "china-t"
 
     with fitz.open(str(src_pdf)) as doc:
+        # `insert_text` 沒有 fontbuffer 參數 —— 用位元組嵌字型時要先在**該頁**
+        # 註冊一次，之後 insert_text 只給 fontname 就好。每頁只註冊一次。
+        registered: set[int] = set()
         for pl in placements:
             if not pl.text or pl.page < 0 or pl.page >= doc.page_count:
                 continue
+            if font_buffer is not None and pl.page not in registered:
+                doc[pl.page].insert_font(fontname=font_alias,
+                                         fontbuffer=font_buffer)
+                registered.add(pl.page)
             size, lines = _fit(
                 pl.text, measure_font, pl.slot, pl.base_font_size, pl.min_font_size
             )
@@ -227,7 +266,8 @@ def overlay_text(
                     color=pl.color,
                     overlay=True,
                 )
-                if font_file:
+                # 用位元組嵌的字型已在上面於該頁註冊過，這裡只給別名
+                if font_buffer is None and font_file:
                     kwargs["fontfile"] = font_file
                 page.insert_text(**kwargs)
         doc.save(str(dst_pdf), garbage=3, deflate=True)

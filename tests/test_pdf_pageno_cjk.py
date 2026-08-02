@@ -11,15 +11,20 @@ R = importlib.import_module("app.tools.pdf_pageno.router")
 
 
 def test_pageno_font_picks_cjk_for_chinese():
-    fn, ff = R._pageno_font("第 4 / 20 頁")
+    # v1.14.19 起回三個值：`.ttc` 要挑繁中子字型，而 PyMuPDF 沒有索引參數，
+    # 只能把那一套抽成位元組用 fontbuffer 傳（第三個回傳值）。
+    fn, ff, buf = R._pageno_font("第 4 / 20 頁")
     assert fn != "helv"          # 真 CJK 字型(jtcjk) 或內建 china-t
     assert fn in ("jtcjk", "china-t")
+    # 找得到系統 CJK 字型時，要嘛給檔案路徑、要嘛給抽好的子字型位元組
+    if fn == "jtcjk":
+        assert ff or buf
 
 
 def test_pageno_font_keeps_helv_for_ascii():
-    fn, ff = R._pageno_font("4 / 20")
+    fn, ff, buf = R._pageno_font("4 / 20")
     assert fn == "helv"
-    assert ff is None
+    assert ff is None and buf is None
 
 
 def test_draw_pageno_chinese_glyphs_present():
