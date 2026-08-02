@@ -41,6 +41,7 @@ ACL_PATTERNS = (
     r"\b[A-Za-z_][A-Za-z_0-9]*(?:uo|owner)[A-Za-z_0-9]*\.(?:require|check)\(",
     r"\brequire_by_filename\(",
     r"\b_require_access\(",        # pdf-annotations 系列
+    r"\b_require_own_upload\(",    # pdf-nup（id 藏在 pydantic 模型欄位裡）
     r"\b_check_case_acl\(",        # submission-check
     r"\b_job_access\(",            # 作業 API / pdf-to-office 預覽與報告
     r"\brequire_admin\b", r"\b_require_admin\b",
@@ -83,6 +84,24 @@ def _has_acl(body: str) -> bool:
     return any(re.search(pat, body) for pat in ACL_PATTERNS)
 
 
+def _body_model_names() -> frozenset[str]:
+    """所有 pydantic BaseModel 的類別名 —— 用來認出「id 藏在模型欄位裡」的端點。"""
+    found = set()
+    for f in sorted(pathlib.Path("app").rglob("*.py")):
+        try:
+            tree = ast.parse(f.read_text(encoding="utf-8"))
+        except SyntaxError:  # pragma: no cover
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and any(
+                    ast.unparse(b).endswith("BaseModel") for b in node.bases):
+                found.add(node.name)
+    return frozenset(found)
+
+
+_BODY_MODELS = _body_model_names()
+
+
 def _write_endpoints() -> list[tuple[str, str, list[str], str]]:
     """回 [(檔案, 函式名, 可疑 id 參數, 函式原始碼)]。
 
@@ -117,6 +136,18 @@ def _write_endpoints() -> list[tuple[str, str, list[str], str]]:
                 if f'body.get("{n}")' in body or f"body.get('{n}')" in body:
                     if n not in names:
                         names.append(n)
+            # **pydantic 模型當內文**：`async def preview(opts: NupOptions)` ——
+            # 參數叫 `opts`，id 是模型上的欄位。這一整類原本掃不到，pdf-nup 的
+            # `/preview` 就是這樣漏掉的（B 拿 A 的 upload_id 就能取回 A 的 PDF
+            # 算成的圖）。改為**看函式內文有沒有用到 `<參數>.<id 名>`**。
+            for a in list(node.args.args) + list(node.args.kwonlyargs):
+                if a.arg in ID_NAMES or a.arg in ("self", "request"):
+                    continue
+                ann = ast.unparse(a.annotation) if a.annotation else ""
+                if ann in _BODY_MODELS:
+                    for n in ID_NAMES:
+                        if f"{a.arg}.{n}" in body and n not in names:
+                            names.append(n)
             if names:
                 out.append((str(f), node.name, names, body))
     return out

@@ -136,10 +136,14 @@
 
       <div class="auth-field">
         <label class="af-label" for="af-server-url">伺服器 URL</label>
-        <input id="af-server-url" class="field" type="url" name="server_url"
-               value="{{ settings.ldap.server_url }}"
-               placeholder="ldaps://ad.example.com:636">
-        <div class="af-hint">建議使用 <code>ldaps://</code> + 驗證憑證。</div>
+        {# **不可以用 type="url"** —— 多台 DC 是用逗號分隔的字串，瀏覽器的 HTML5
+           驗證會把它判成無效網址而擋下整個表單送出。 #}
+        <input id="af-server-url" class="field" type="text" name="server_url"
+               value="{{ settings.ldap.server_url }}" spellcheck="false"
+               placeholder="ldaps://dc1.example.com:636, ldaps://dc2.example.com:636">
+        <div class="af-hint">建議使用 <code>ldaps://</code> + 驗證憑證。
+          <b>可以填多台 DC</b>（用逗號分隔），由左往右嘗試 —— 第一台連不上會自動換下一台，
+          修好之後會自己回到輪替。企業 AD 至少填兩台，否則一台維護就全公司登不進來。</div>
       </div>
 
       <div class="auth-field af-checks">

@@ -192,3 +192,32 @@ def test_sync_failure_notifies():
     # 通知失敗不可以把一次成功的同步標記成失敗
     fn = inspect.getsource(directory_sync._notify_if_degraded)
     assert "except Exception" in fn and "logger.warning" in fn
+
+
+# ------------------------------------------------------ 基準時間本身
+
+def test_baseline_reader_actually_reads_the_settings(auth_off, tmp_path,
+                                                     monkeypatch):
+    """**這一條是被真實 bug 逼出來的。**
+
+    `last_full_directory_scan_at` 原本呼叫 `directory_sync.get()` —— 那個函式
+    不存在（正確的是 `get_settings`）。AttributeError 被 `except Exception`
+    吞掉，一律回 0，於是「目錄已無」永遠是空的、畫面永遠顯示「還沒有做過完整
+    同步」。整個功能是死的，而且不會有任何錯誤訊息。
+
+    上面的測試全部 monkeypatch 掉這個函式，所以一個都沒有踩到 —— 這裡不 patch，
+    直接寫一份真的設定檔再讀回來。
+    """
+    from app.core import directory_sync
+    monkeypatch.setattr(directory_sync, "_path",
+                        lambda: tmp_path / "directory_sync.json")
+    assert user_manager.last_full_directory_scan_at() == 0.0    # 還沒掃過
+    directory_sync._patch({"last_full_scan_at": 1700000000.0})
+    assert user_manager.last_full_directory_scan_at() == 1700000000.0
+
+
+def test_baseline_failure_is_logged_not_swallowed(auth_off):
+    """讀不到就當沒掃過是對的，但不可以**無聲**吞掉 —— 這次就是這樣才拖著沒被發現。"""
+    import inspect
+    src = inspect.getsource(user_manager.last_full_directory_scan_at)
+    assert "logger.exception" in src or "logger.warning" in src

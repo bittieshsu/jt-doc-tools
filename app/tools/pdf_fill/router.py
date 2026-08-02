@@ -186,6 +186,12 @@ async def preview(
                 {"key": k, "label": labels.get(k, k), "option": opt}
                 for k, opt in report.checked_boxes
             ],
+            "expanded_refs": [
+                {"key": e["key"], "label": labels.get(e["key"], e["key"]),
+                 "from_label": labels.get(e["from"], e["from"]),
+                 "original": e["original"], "value": e["value"]}
+                for e in report.expanded_refs
+            ],
             "unmatched_labels": unmatched,
             "applied_template": report.applied_template,
             "fingerprint": report.fingerprint,
@@ -849,6 +855,12 @@ async def history_refill(hid: str, request: Request):
             "unfilled": [{"key": k, "label": labels.get(k, k)} for k in report.unfilled_keys],
             "checked_boxes": [{"key": k, "label": labels.get(k, k), "option": opt}
                                 for k, opt in report.checked_boxes],
+            "expanded_refs": [
+                {"key": e["key"], "label": labels.get(e["key"], e["key"]),
+                 "from_label": labels.get(e["from"], e["from"]),
+                 "original": e["original"], "value": e["value"]}
+                for e in report.expanded_refs
+            ],
             "unmatched_labels": unmatched,
             "applied_template": report.applied_template,
             "fingerprint": report.fingerprint,

@@ -30,7 +30,9 @@
 
 <div class="panel">
   <div data-s="s5344c165">
-    <h2 data-s="s1386d503">使用者清單（共 <span id="userCount">{{ page_total }}</span> 人）</h2>
+    <h2 data-s="s1386d503">使用者清單（共 <span id="userCount">{{ page_total }}</span> 人）
+      {% if auth_on %}<span class="uf-online-sum" title="最近 {{ online_window_min }} 分鐘內有活動的人數（同一個人開多個瀏覽器只算一位）">{{ online_count }} 人在線</span>{% endif %}
+    </h2>
     <span data-s="sda5cd676"></span>
     {# 篩選全部走伺服器端（連結帶查詢參數）。前端過濾只過濾得到當前這一頁，
        使用者以為篩了全部其實只篩了眼前 100 筆 —— 會讓人以為某個帳號不存在。 #}
@@ -63,18 +65,46 @@
          href="/admin/users?view=missing"
          title="上一次完整目錄同步時已經找不到的帳號">
         目錄已無{% if missing_count %} <b>{{ missing_count }}</b>{% endif %}</a>
+      {# 這兩個只有 AD 環境才會有數字；0 的時候不顯示，免得佔版面又讓人困惑。 #}
+      {% if dir_disabled_count or view == 'dir_disabled' %}
+      <a class="uf-view uf-view-warn{% if view == 'dir_disabled' %} active{% endif %}"
+         href="/admin/users?view=dir_disabled"
+         title="AD 端已經停用的帳號（userAccountControl）——他們登不進來，但本站的角色指派還在">
+        AD 已停用{% if dir_disabled_count %} <b>{{ dir_disabled_count }}</b>{% endif %}</a>
+      {% endif %}
+      {% if pwd_expiring_count or view == 'pwd_expiring' %}
+      <a class="uf-view uf-view-warn{% if view == 'pwd_expiring' %} active{% endif %}"
+         href="/admin/users?view=pwd_expiring"
+         title="{{ pwd_warn_days }} 天內密碼到期（含已過期）">
+        密碼將到期{% if pwd_expiring_count %} <b>{{ pwd_expiring_count }}</b>{% endif %}</a>
+      {% endif %}
     </div>
   </div>
   {% if view == 'missing' %}
   <div class="uf-note{% if not has_full_scan %} uf-note-warn{% endif %}">
     {% if has_full_scan %}
     這些帳號在<b>上一次完整目錄同步</b>時已經在 AD / LDAP 裡找不到 —— 通常代表離職、
-    停用或被移出同步範圍。系統<b>不會自動停用</b>（有人只是暫時被移出範圍，擅自停用會
-    造成更難查的問題），請確認後用下方的批次操作處理。
+    停用或被移出同步範圍。系統<b>預設不會自動停用</b>（有人只是暫時被移出範圍，擅自停用
+    會造成更難查的問題），請確認後用下方的批次操作處理。
+    {% if actionable.missing %}
+    <button class="btn btn-small btn-danger uf-disable-all" data-view="missing"
+            type="button">全部停用（{{ actionable.missing }} 個還啟用中）</button>
+    {% endif %}
     {% else %}
     {{ icon('warn', size=14) }} 還沒有做過<b>完整</b>目錄同步，因此無法判定誰不見了。
     帶名稱過濾的同步只看得到一部分目錄，拿它當基準會把整個組織誤標成離職 ——
     請先到<a href="/admin/groups">群組管理</a>把名稱過濾清空後執行一次同步。
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if view == 'dir_disabled' %}
+  <div class="uf-note">
+    這些帳號在 AD 端的 <code>userAccountControl</code> 已標為停用 —— 他們登不進來，
+    但本站的角色指派與群組成員關係還在。
+    {% if actionable.dir_disabled %}
+    <button class="btn btn-small btn-danger uf-disable-all" data-view="dir_disabled"
+            type="button">全部停用（{{ actionable.dir_disabled }} 個還啟用中）</button>
     {% endif %}
   </div>
   {% endif %}
@@ -115,6 +145,9 @@
         <td class="uf-ck"><input type="checkbox" class="uf-row-ck" value="{{ u.id }}"></td>
         <td>
           <b>{{ u.username }}</b>
+          {% if u.online %}<span class="uf-online" title="最近 {{ online_window_min }} 分鐘內有活動">在線</span>{% endif %}
+          {% if u.dir_disabled %}<span class="uf-addis" title="AD 端已停用（userAccountControl）——這個人登不進來，但本站的角色指派與群組成員關係還在">AD 已停用</span>{% endif %}
+          {% if u.pwd_expiring_soon %}<span class="uf-pwdexp" title="{{ '密碼已過期' if u.pwd_expiry_days < 0 else '密碼即將到期' }}">{% if u.pwd_expiry_days < 0 %}密碼已過期{% else %}密碼 {{ u.pwd_expiry_days }} 天後到期{% endif %}</span>{% endif %}
           {% if u.directory_missing %}<span class="uf-gone" title="上一次完整目錄同步時，AD / LDAP 裡已經找不到這個帳號">目錄已無</span>{% endif %}
           {% if u.is_admin_seed %}<span class="badge">SEED</span>{% endif %}
         </td>
@@ -149,11 +182,13 @@
           {% if u.is_admin_seed %}
           <button class="btn btn-small" type="button" disabled
                   title="內建管理員：權限固定為 admin，不可變更">{{ icon('lock', size=12) }} 內建</button>
+          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} 登入裝置</button>
           <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} 重設密碼</button>
           <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除這個使用者的 TOTP secret，下次登入會看到 QR 重新 setup">{{ icon('refresh-cw', size=12) }} 重設 2FA</button>
           {% elif u.is_audit_seed %}
           <button class="btn btn-small" type="button" disabled
                   title="內建稽核員：強制 2FA，無工具權限，不可刪">{{ icon('lock', size=12) }} 內建</button>
+          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} 登入裝置</button>
           <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} 重設密碼</button>
           <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除 TOTP secret，下次登入重新顯示 QR setup">{{ icon('refresh-cw', size=12) }} 重設 2FA</button>
           {% else %}
@@ -163,6 +198,7 @@
                   data-email="{{ u.email }}"
                   data-enabled="{{ '1' if u.enabled else '0' }}"
                   data-roles="{{ u.roles|join(',') }}">{{ icon('edit', size=12) }} 編輯</button>
+          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} 登入裝置</button>
           <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} 重設密碼</button>
           <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除 TOTP secret，下次登入重新顯示 QR setup">{{ icon('refresh-cw', size=12) }} 重設 2FA</button>
           <button class="btn btn-small btn-danger" data-act="delete" data-username="{{ u.username }}">{{ icon('trash', size=12) }} 刪除</button>
@@ -183,6 +219,23 @@
        href="?{{ qs }}&page={{ page + 1 if page < pages else pages }}">下一頁 ›</a>
   </div>
   {% endif %}
+</div>
+
+<!-- ===== 登入裝置 modal ===== -->
+<div id="sessModal" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="modal-card">
+    <h3 data-s="s53896af7">登入裝置 <code id="smUsername"></code></h3>
+    <p class="muted" data-s="sf1bde2c5">
+      強制登出後，那台裝置下一個動作就會被導回登入頁。這裡看得到的是<b>目前還有效</b>的
+      session，過期的不會列出。
+    </p>
+    <div id="smList"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="smRevokeAll">全部登出</button>
+      <button class="btn" id="smClose">關閉</button>
+    </div>
+  </div>
 </div>
 
 <!-- ===== Edit-user modal ===== -->
@@ -231,6 +284,10 @@
         <div class="picker-list" id="emGroupGrid"></div>
       </div>
     </div>
+    <details class="em-eff">
+      <summary>有效權限（實際能用的工具與來源）</summary>
+      <div id="emEffBody" class="em-eff-body">尚未載入</div>
+    </details>
     <div data-s="s9fa82b78">
       <button class="btn" type="button" id="emCancel">取消</button>
       <button class="btn btn-primary" type="button" id="emSave">{{ icon('save', size=14) }} 儲存</button>
@@ -369,6 +426,30 @@
 .uf-pager { display: flex; align-items: center; justify-content: center;
   gap: 12px; margin-top: 14px; font-size: 12.5px; }
 .uf-pager .is-off { opacity: .45; pointer-events: none; }
+.uf-online { margin-left: 6px; padding: 1px 7px; border-radius: 4px;
+  background: #dcfce7; color: #166534; font-size: 11px; font-weight: 600; }
+.uf-online-sum { margin-left: 10px; padding: 2px 9px; border-radius: 999px;
+  background: #dcfce7; color: #166534; font-size: 12px; font-weight: 600;
+  vertical-align: middle; }
+.sm-row { display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border, #e5e7eb); }
+.sm-row:last-child { border-bottom: 0; }
+.sm-meta { font-size: 12px; margin-top: 2px; }
+.em-eff { margin: 12px 0 4px; border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px; padding: 8px 10px; }
+.em-eff > summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.em-eff-body { margin-top: 8px; max-height: 260px; overflow: auto; }
+.em-eff-note { font-size: 11.5px; margin: 0 0 6px; }
+.em-eff-count { font-weight: 600; font-size: 13px; margin: 0 0 6px; }
+.em-eff-all { font-size: 13px; margin: 0; }
+.em-eff-list { margin: 0; padding-left: 18px; font-size: 12.5px; }
+.em-eff-list li { margin-bottom: 3px; }
+.em-eff-src { font-size: 11.5px; }
+.uf-addis { margin-left: 6px; padding: 1px 7px; border-radius: 4px;
+  background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 600; }
+.uf-pwdexp { margin-left: 6px; padding: 1px 7px; border-radius: 4px;
+  background: #ffedd5; color: #9a3412; font-size: 11px; font-weight: 600; }
+.uf-disable-all { margin-left: 8px; vertical-align: middle; }
 </style>
 {% endblock %}
 
@@ -603,6 +684,71 @@ function _bindPicker(listId, searchId, countId, clearId) {
   return { refreshCount, applySearch };
 }
 
+async function loadEffective(uid) {
+  const box = document.getElementById('emEffBody');
+  box.textContent = '載入中…';
+  // 顯示的是**存檔前**的現況。改完角色要重新打開才會更新 —— 面板標題有寫明，
+  // 免得管理員以為勾選當下就已經生效。
+  let j;
+  try {
+    const r = await fetch(`/admin/users/${uid}/effective`);
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, '讀取失敗'));
+    j = await r.json();
+  } catch (e) {
+    box.textContent = '讀取失敗：' + e.message;
+    return;
+  }
+  box.textContent = '';
+
+  const note = document.createElement('p');
+  note.className = 'muted em-eff-note';
+  note.textContent = '這是目前存檔的狀態；改完角色 / 群組要儲存後重新開啟才會更新。';
+  box.appendChild(note);
+
+  if (j.admin) {
+    const p = document.createElement('p');
+    p.className = 'em-eff-all';
+    p.textContent = '管理員：所有工具與設定區都可以用。';
+    box.appendChild(p);
+    return;
+  }
+  if (j.auditor) {
+    const p = document.createElement('p');
+    p.className = 'em-eff-all';
+    p.textContent = '稽核員：只看得到稽核記錄，沒有任何工具權限（職責分離）。';
+    box.appendChild(p);
+    return;
+  }
+
+  const ids = j.tool_ids || [];
+  const head = document.createElement('p');
+  head.className = 'em-eff-count';
+  head.textContent = `可以用 ${ids.length} 個工具`;
+  box.appendChild(head);
+  if (!ids.length) {
+    const p = document.createElement('p');
+    p.className = 'muted';
+    p.textContent = '目前一個工具都不能用 —— 沒有任何角色或授權指到這個帳號。';
+    box.appendChild(p);
+    return;
+  }
+  const ul = document.createElement('ul');
+  ul.className = 'em-eff-list';
+  for (const tid of ids) {
+    const li = document.createElement('li');
+    const b = document.createElement('b');
+    b.textContent = (j.tool_names && j.tool_names[tid]) || tid;
+    li.appendChild(b);
+    const src = document.createElement('span');
+    src.className = 'muted em-eff-src';
+    // 一個工具可能同時由好幾條規則給 —— 全部列出來，才知道拿掉一條夠不夠。
+    src.textContent = '　' + (j.tools[tid] || []).join('、');
+    li.appendChild(src);
+    ul.appendChild(li);
+  }
+  box.appendChild(ul);
+}
+
 function openEdit(btn) {
   currentEditUid = btn.closest('tr').dataset.uid;
   document.getElementById('emUsername').textContent = btn.dataset.username;
@@ -624,6 +770,7 @@ function openEdit(btn) {
   const grpCtl = _bindPicker('emGroupGrid', 'emGroupSearch', 'emGroupCount', 'emGroupClear');
   grpCtl.refreshCount();
 
+  loadEffective(currentEditUid);
   showModal('editUserModal');
 }
 document.getElementById('emCancel').addEventListener('click', () => hideModal('editUserModal'));
@@ -676,6 +823,142 @@ document.getElementById('rpSave').addEventListener('click', async () => {
   }
 });
 
+// ---------- 依檢視全部停用 ----------
+document.querySelectorAll('.uf-disable-all').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const view = btn.dataset.view;
+    // 先跑一次 dry-run，把「實際會動幾個人」與安全閥的結論拿回來再問 ——
+    // 直接問「確定嗎」而不說會動幾個人，等於沒有問。
+    const probe = await fetch('/admin/users/bulk/disable-view', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({view, dry_run: true}),
+    });
+    if (!probe.ok) {
+      showAlert(await window.friendlyServerError(probe, '無法取得預估結果'));
+      return;
+    }
+    const pre = await probe.json();
+    if (pre.aborted) { showAlert(pre.reason); return; }
+    if (!pre.candidates) { showAlert('沒有需要停用的帳號。'); return; }
+    if (!(await showConfirm(
+          `停用 ${pre.candidates} 個帳號？\n\n`
+          + '帳號與權限指派都會保留，人回來時按一下就能恢復。',
+          { title: '批次停用', kind: 'danger', okText: '停用' }))) return;
+    const r = await fetch('/admin/users/bulk/disable-view', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({view}),
+    });
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, '停用失敗')); return; }
+    const j = await r.json();
+    if (j.aborted) { showAlert(j.reason); return; }
+    showAlert(`已停用 ${j.disabled} 個帳號`);
+    location.reload();
+  });
+});
+
+// ---------- 登入裝置 ----------
+let smUid = null;
+
+function _uaShort(ua) {
+  // 只要「哪一台 / 哪個瀏覽器」的程度就夠了，完整 UA 字串在畫面上是雜訊。
+  if (!ua) return '未知裝置';
+  const os = /Windows/.test(ua) ? 'Windows'
+           : /Macintosh|Mac OS/.test(ua) ? 'macOS'
+           : /Android/.test(ua) ? 'Android'
+           : /iPhone|iPad/.test(ua) ? 'iOS'
+           : /Linux/.test(ua) ? 'Linux' : '';
+  const br = /Edg\//.test(ua) ? 'Edge'
+           : /Chrome\//.test(ua) ? 'Chrome'
+           : /Firefox\//.test(ua) ? 'Firefox'
+           : /Safari\//.test(ua) ? 'Safari' : '';
+  return [os, br].filter(Boolean).join(' · ') || '未知裝置';
+}
+
+function _ago(ts) {
+  const secs = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+  if (secs < 60) return '剛剛';
+  if (secs < 3600) return Math.floor(secs / 60) + ' 分鐘前';
+  if (secs < 86400) return Math.floor(secs / 3600) + ' 小時前';
+  return Math.floor(secs / 86400) + ' 天前';
+}
+
+async function openSessions(uid, username) {
+  smUid = uid;
+  document.getElementById('smUsername').textContent = username;
+  const list = document.getElementById('smList');
+  list.textContent = '載入中…';
+  showModal('sessModal');
+  let j;
+  try {
+    const r = await fetch(`/admin/users/${uid}/sessions`);
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, '讀取失敗'));
+    j = await r.json();
+  } catch (e) {
+    list.textContent = '讀取失敗：' + e.message;
+    return;
+  }
+  list.textContent = '';
+  if (!j.sessions.length) {
+    const p = document.createElement('p');
+    p.className = 'muted';
+    p.textContent = '目前沒有有效的登入。';
+    list.appendChild(p);
+    return;
+  }
+  for (const sess of j.sessions) {
+    const row = document.createElement('div');
+    row.className = 'sm-row';
+    const info = document.createElement('div');
+    const head = document.createElement('div');
+    if (sess.online) {
+      const dot = document.createElement('span');
+      dot.className = 'uf-online';
+      dot.textContent = '在線';
+      head.appendChild(dot);
+    }
+    // 動態文字一律 textContent —— 裝置字串來自使用者送的 User-Agent。
+    const name = document.createElement('b');
+    name.textContent = _uaShort(sess.user_agent);
+    name.title = sess.user_agent || '';
+    head.appendChild(name);
+    info.appendChild(head);
+    const meta = document.createElement('div');
+    meta.className = 'muted sm-meta';
+    meta.textContent = `${sess.ip || '位址未知'}・最後活動 ${_ago(sess.last_seen_at)}`
+                     + (sess.remember ? '・記住我' : '');
+    info.appendChild(meta);
+    row.appendChild(info);
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-small btn-danger';
+    btn.textContent = '登出';
+    btn.addEventListener('click', () => revokeSession(sess.sid));
+    row.appendChild(btn);
+    list.appendChild(row);
+  }
+}
+
+async function revokeSession(sid) {
+  const r = await fetch(`/admin/users/${smUid}/sessions/revoke`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(sid ? {sid} : {}),
+  });
+  if (!r.ok) { showAlert(await window.friendlyServerError(r, '登出失敗')); return; }
+  const j = await r.json();
+  showAlert(`已登出 ${j.revoked} 個 session`);
+  openSessions(smUid, document.getElementById('smUsername').textContent);
+}
+
+document.getElementById('smClose').addEventListener('click', () => {
+  hideModal('sessModal');
+  // 人數是進頁時算好的，踢完人要重新整理才會對得上。
+  location.reload();
+});
+document.getElementById('smRevokeAll').addEventListener('click', async () => {
+  if (!(await showConfirm('把這個帳號的所有裝置都登出？',
+        { title: '全部登出', kind: 'danger', okText: '登出' }))) return;
+  revokeSession('');
+});
+
 // ---------- row action dispatch ----------
 document.querySelectorAll('.user-table button').forEach(btn => {
   btn.addEventListener('click', async () => {
@@ -701,6 +984,8 @@ document.querySelectorAll('.user-table button').forEach(btn => {
       } else {
         showAlert('解鎖失敗：' + await r.text());
       }
+    } else if (act === 'sessions') {
+      openSessions(uid, btn.dataset.username);
     } else if (act === 'reset-totp') {
       if (!(await showConfirm(
             `重設使用者「${btn.dataset.username}」的 2FA？\n\n清除原有 TOTP secret，使用者下次登入時會看到全新 QR code 重新 setup。所有現有 session 也會失效。`,

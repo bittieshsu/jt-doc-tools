@@ -140,3 +140,47 @@ def test_endpoint_requires_admin_and_returns_names(admin_session):
 def test_endpoint_404_for_unknown_user(admin_session):
     client, _, _ = admin_session
     assert client.get("/admin/users/999999/effective").status_code == 404
+
+
+# ------------------------------------------------------ 接進編輯 UI
+
+def _users_tpl() -> str:
+    from pathlib import Path
+
+    from app.core import permissions as _p
+    return (Path(_p.__file__).resolve().parent.parent / "admin" / "templates" /
+            "admin_users.html").read_text(encoding="utf-8")
+
+
+def test_panel_is_wired_into_the_edit_modal():
+    """端點做好卻沒有人呼叫的話，這個功能等於不存在（原本就是這樣）。"""
+    tpl = _users_tpl()
+    assert 'id="emEffBody"' in tpl, "編輯 modal 裡沒有面板"
+    assert "/effective`" in tpl, "沒有呼叫有效權限端點"
+    i = tpl.index("function openEdit(")
+    body = tpl[i:i + 1400]
+    assert "loadEffective(" in body, "打開編輯 modal 時沒有載入有效權限"
+
+
+def test_panel_says_it_shows_the_saved_state():
+    """面板顯示的是**存檔前**的現況 —— 沒寫清楚的話，管理員會以為勾選當下就生效。"""
+    tpl = _users_tpl()
+    i = tpl.index("function loadEffective")
+    assert "重新開啟才會更新" in tpl[i:i + 2000]
+
+
+def test_panel_builds_dom_not_innerhtml():
+    """工具名稱與來源字串含使用者可控成分（群組名來自目錄）—— 一律 textContent。"""
+    tpl = _users_tpl()
+    i = tpl.index("async function loadEffective")
+    body = tpl[i:tpl.index("function openEdit(")]
+    assert "innerHTML" not in body
+    assert "textContent" in body
+
+
+def test_panel_lists_every_source_for_a_tool():
+    """一個工具可能同時由好幾條規則給 —— 只顯示第一條，管理員會以為拿掉它就沒了。"""
+    tpl = _users_tpl()
+    i = tpl.index("async function loadEffective")
+    body = tpl[i:tpl.index("function openEdit(")]
+    assert ".join(" in body, "來源沒有全部列出"

@@ -17,7 +17,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.15"
+VERSION = "1.14.18"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -235,6 +235,8 @@ _TOOL_ALIASES = {
     "pdf-to-slides":      "pdf2pptx pdf-to-pptx pdf-to-odp pdf-to-slides pptx odp powerpoint impress keynote slide slides presentation deck convert reverse PDF轉簡報 PDF轉PPT PDF轉PPTX PDF轉ODP 簡報 投影片 簡報檔 轉簡報 轉投影片 轉成 ppt 轉成 pptx 版面重現 一頁一張投影片 可編輯",
     "pdf-to-markdown":    "pdf2md pdf-to-md pdf-to-markdown markdown md llm rag pymupdf4llm convert structured text 轉 markdown 轉成 markdown 結構化 標題層級 表格 餵 LLM RAG 預處理 chunking 文件轉換",
     "markdown-to-doc":    "md2doc md-to-doc markdown-to-doc markdown to pdf docx odt office convert export theme style commonmark gfm Markdown 轉 PDF 轉 Word 轉文書 轉換 主題 配色 渲染 報告 文件 預覽",
+    "submission-check":   "submission check submit review verify validate checklist pre-flight preflight completeness case bid tender application 送件 送審 投標 標案 申請 檢核 檢查 核對 清單 缺件 漏件 齊備 完整性 驗收 案件 送出前",
+    "transit-proof":      "transit proof commute travel receipt ticket hsr tra mrt bus taxi easycard ipass reimbursement expense 乘車 乘車證明 交通 車票 高鐵 台鐵 捷運 公車 計程車 悠遊卡 一卡通 差旅 出差 報帳 核銷 憑證 整理",
 }
 # Per-tool color class. Both home page and sidebar use the same palette
 # classes, so a given tool always shows the same colored tile regardless
@@ -573,6 +575,10 @@ async def _friendly_http_exc(request: Request, exc: _HTTPException2):
         404: ("找不到頁面", "請確認網址是否正確，或回首頁重新導覽。"),
     }
     title, msg = titles.get(exc.status_code, ("錯誤", str(exc.detail or "")))
+    # `detail` 會被直接寫進 HTML。目前所有 401/403 的 detail 都是常數字串，但
+    # 只要有一處寫成 f-string 帶進使用者輸入，這裡就是反射型 XSS —— 而打中的是
+    # 正在看錯誤頁的**管理員** session。一律跳脫，不要靠「呼叫端都很小心」。
+    title, msg = html_mod.escape(title), html_mod.escape(msg)
     # 401 多一個「去登入」按鈕；其他都給「回首頁」按鈕
     extra_btn = ""
     if exc.status_code == 401:
@@ -635,12 +641,21 @@ from fastapi import Request  # noqa: E402
 from fastapi.responses import JSONResponse as _JSONResponse  # noqa: E402
 from urllib.parse import quote as _qstr  # noqa: E402
 
-_PUBLIC_PREFIXES = ("/static/", "/login", "/logout", "/setup-admin",
-                    "/healthz", "/favicon", "/api/", "/branding/",
-                    "/2fa-verify",  # 2FA 驗證頁不需要 session（pending 階段）
-                    "/auth/oidc/", "/auth/saml/")  # SSO 登入 / 回呼端點（尚未有 session）
-_PUBLIC_EXACT = {"/login", "/logout", "/setup-admin", "/healthz", "/favicon.ico",
-                 "/2fa-verify"}
+#: **前綴**比對的公開路徑。只放「底下真的整片都公開」的東西。
+#: 這裡的每一條都會讓 `/xxx*` 全部跳過認證閘 —— 新增前先問「有沒有可能有人
+#: 之後加一條 `/login-admin` 之類的路由」。
+_PUBLIC_PREFIXES = ("/static/",
+                    "/setup-admin",   # 需前綴：還有 /setup-admin/reuse-existing
+                                      # （三個處理函式都自己再擋 is_enabled()）
+                    "/api/",          # 見下方說明：整片略過認證閘，各端點自己擋
+                    "/branding/",
+                    "/auth/oidc/", "/auth/saml/")  # SSO 登入 / 回呼（尚未有 session）
+#: **完全相等**才算公開。單一頁面一律放這裡，不要放進上面的前綴表。
+#:
+#: 原本 `/login` `/logout` `/healthz` `/favicon` `/2fa-verify` 同時列在兩邊，
+#: 前綴那份先命中，於是這個集合**整個是死的** —— 讀的人以為 `/login-xyz`
+#: 不公開，其實是公開的。目前沒有那種路由所以不成問題，但下一條新路由就會踩到。
+_PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/favicon.ico", "/2fa-verify"}
 
 
 def _looks_like_xhr(request: Request) -> bool:
@@ -825,6 +840,10 @@ async def _auth_gate(request: Request, call_next):
         # Need a valid session cookie
         token = request.cookies.get(sessions.COOKIE_NAME, "")
         user = sessions.lookup(token) if token else None
+        if user:
+            # 記下「這個 session 還活著」—— 管理員才答得出「現在有誰登入著」。
+            # 內部有節流（>60 秒才真的寫 DB），不會變成每請求一次寫入。
+            sessions.touch(token)
         if not user:
             # Reverse-proxy (Kerberos/SPNEGO) SSO: a trusted upstream proxy may
             # have asserted the domain user via a header. Try that before

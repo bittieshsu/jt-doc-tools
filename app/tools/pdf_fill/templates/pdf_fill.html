@@ -189,6 +189,7 @@
   .report-chip { padding: 2px 8px; border-radius: 10px; font-size: 12px; }
   .report-chip.ok { background: #ecfdf5; color: #065f46; }
   .report-chip.miss { background: #fef3c7; color: #92400e; }
+  .report-chip.exp { background: #eef2ff; color: #3730a3; }
 
   /* LLM 校驗結果面板 */
   .llm-toggle-row { margin-top: 10px; padding: 8px 12px; background: #f8fafc;
@@ -1368,8 +1369,18 @@ function renderLlmReview(rev) {
     return;
   }
   box.hidden = false;
-  const allCorrections = (rev.rounds || []).flatMap(r => r.corrections || []);
-  const accepted = (rev.rounds || []).flatMap(r => r.accepted || []);
+  // 每一輪都會回報它自己看到的疑慮，所以**同一個問題會出現在多輪裡** ——
+  // 直接攤平會讓同一列在表格上重複出現（連兩輪確認的那些必然重複）。
+  // 依 (種類, 欄位, 目前值) 去重，保留第一次出現的那筆。
+  const _ckey = c => [c.type, c.label, c.current_value].join('\u0000');
+  const _seen = new Set();
+  const allCorrections = (rev.rounds || []).flatMap(r => r.corrections || [])
+    .filter(c => { const k = _ckey(c); if (_seen.has(k)) return false;
+                   _seen.add(k); return true; });
+  const _aseen = new Set();
+  const accepted = (rev.rounds || []).flatMap(r => r.accepted || [])
+    .filter(c => { const k = _ckey(c); if (_aseen.has(k)) return false;
+                   _aseen.add(k); return true; });
   const learned = rev.learned || [];
   const lastVerdict = (rev.rounds || [])[rev.rounds.length - 1]?.verdict || 'needs_correction';
 
@@ -1546,9 +1557,16 @@ function renderReport(r) {
   const missing = r.unfilled.map(m =>
     `<span class="report-chip miss">${escapeHTML(m.label)} (公司資料尚未填)</span>`
   ).join('');
+  // 「同上」這類指涉值被展開成實際內容時一定要講 —— 悄悄換掉使用者打的字
+  // 是這個功能最可能造成的傷害，他要看得到才發現得了填錯。
+  const expanded = (r.expanded_refs || []).map(e =>
+    `<span class="report-chip exp" title="原本填的是「${escapeHTML(e.original)}」">`
+    + `${escapeHTML(e.label)} ← ${escapeHTML(e.from_label)}：${escapeHTML(e.value)}</span>`
+  ).join('');
   reportBox.innerHTML = `
     <p>偵測到 <b>${r.detected}</b> 個欄位，已填入 <b>${r.filled}</b> 個。</p>
     ${matched ? `<div class="report-list">${matched}</div>` : ''}
+    ${expanded ? `<p data-s="s5371db16">以下的「同上」已展開成實際內容：</p><div class="report-list">${expanded}</div>` : ''}
     ${missing ? `<p data-s="s5371db16">以下偵測到了但公司資料是空的：</p><div class="report-list">${missing}</div>` : ''}
   `;
 }

@@ -44,6 +44,11 @@ _DEFAULTS = {
     # 整個組織誤標成離職。沒有值就代表這個功能還不能下任何結論。
     "last_full_scan_at": None,
     "last_history": [],              # 最近幾次的結果（見 _HISTORY_KEEP）
+    # 完整掃描之後自動停用哪一類帳號。**預設關閉** —— 自動停用是破壞性的，
+    # 而且錯的時候一次錯一大片（service account 密碼過期就會「全公司都不見」）。
+    # 只接受 off / missing / dir_disabled，並且有 20% 安全閥（見 directory_cleanup）。
+    "auto_disable": "off",
+    "last_auto_disable": None,
 }
 
 
@@ -73,7 +78,8 @@ def get_settings() -> dict[str, Any]:
 def save_settings(*, enabled: Optional[bool] = None,
                   interval_hours: Optional[int] = None,
                   name_contains: Optional[str] = None,
-                  sync_users: Optional[bool] = None) -> dict[str, Any]:
+                  sync_users: Optional[bool] = None,
+                  auto_disable: Optional[str] = None) -> dict[str, Any]:
     data = get_settings()
     if enabled is not None:
         data["enabled"] = bool(enabled)
@@ -83,8 +89,21 @@ def save_settings(*, enabled: Optional[bool] = None,
         data["name_contains"] = str(name_contains).strip()[:128]
     if sync_users is not None:
         data["sync_users"] = bool(sync_users)
+    if auto_disable is not None:
+        # 白名單 —— 不認得的一律當關閉，不要讓設定檔決定要停用誰
+        from . import directory_cleanup
+        v = str(auto_disable).strip()
+        data["auto_disable"] = (
+            v if v in directory_cleanup.AUTO_DISABLE_VIEWS else "off")
     _write(data)
     return data
+
+
+def _patch(patch: dict[str, Any]) -> None:
+    """把幾個鍵合併進設定檔（讀 → 改 → 寫）。"""
+    data = get_settings()
+    data.update(patch or {})
+    _write(data)
 
 
 def _write(data: dict[str, Any]) -> None:
@@ -168,8 +187,21 @@ def run_sync(name_contains: Optional[str] = None) -> dict[str, Any]:
             except Exception as uexc:  # noqa: BLE001
                 report["users_synced"] = {"error": f"{type(uexc).__name__}: {uexc}"}
                 logger.exception("user sync failed (group sync kept)")
+        # 自動停用：**一定要在 _stamp 之後**才做 —— 判定「目錄裡找不到」的基準是
+        # last_full_scan_at，那個時間就是 _stamp 寫進去的。順序顛倒的話會拿上一次
+        # 的基準去判斷這一次的結果。
         report["elapsed_sec"] = round(time.time() - started, 1)
         _stamp(ok=True, result=report)
+        us = report.get("users_synced")
+        if isinstance(us, dict) and us.get("full_scan"):
+            try:
+                from . import directory_cleanup
+                auto = directory_cleanup.run_scheduled(
+                    get_settings, lambda patch: _patch(patch))
+                if auto:
+                    report["auto_disable"] = auto
+            except Exception as exc:  # noqa: BLE001 — 停用失敗不該讓同步標成失敗
+                logger.exception("自動停用失敗（同步本身成功）：%s", exc)
         logger.info("directory sync done: %s", report)
         _notify_if_degraded(report)
         return report

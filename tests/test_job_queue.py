@@ -221,9 +221,13 @@ def test_error_is_persisted(mgr):
     def boom(job):
         raise RuntimeError("壞掉了")
     j = mgr.submit("t", boom)
-    assert _wait(lambda: j.status == "error")
+    # **等 DB 那一列**，不是等記憶體狀態。狀態是先寫進記憶體、`finally` 才寫 DB，
+    # 中間有個很短的窗口；整包測試一起跑（機器忙、GIL 切換間隔又設成 1ms）時
+    # 這個窗口會被撞到 —— 單獨跑永遠是綠的，只有全跑會偶爾紅。
+    assert _wait(lambda: (job_store.get(j.id) or {}).get("status") == "error"), \
+        "作業錯誤沒有被寫進資料庫"
     row = job_store.get(j.id)
-    assert row["status"] == "error" and "壞掉了" in (row["error"] or "")
+    assert "壞掉了" in (row["error"] or "")
 
 
 def test_restart_marks_unfinished_as_interrupted():

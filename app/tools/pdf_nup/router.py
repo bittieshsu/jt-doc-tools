@@ -365,10 +365,24 @@ async def load(request: Request, files: list[UploadFile] = File(...)):
     }
 
 
-@router.post("/preview")
-async def preview(opts: NupOptions):
-    if not opts.upload_id:
+def _require_own_upload(upload_id: str, request: Request) -> None:
+    """這個上傳編號是不是這個人的。
+
+    `/preview` 會把來源 PDF 算圖回傳、`/generate` 會覆寫輸出檔 —— 兩個都吃得到
+    別人的檔案內容，所以跟 `/download` 一樣要驗歸屬。**編號從 JSON 內文來**
+    （pydantic 模型的欄位），不是路徑參數，所以很容易在盤點時被漏掉。
+    """
+    from app.core.safe_paths import require_uuid_hex
+    from ...core import upload_owner
+    if not upload_id:
         raise HTTPException(400, "missing upload_id")
+    require_uuid_hex(upload_id, "upload_id")   # 順帶擋掉 ../ 跳脫
+    upload_owner.require(upload_id, request)
+
+
+@router.post("/preview")
+async def preview(opts: NupOptions, request: Request):
+    _require_own_upload(opts.upload_id, request)
     import asyncio as _asyncio
     p = await _asyncio.to_thread(impose, opts.upload_id, opts, preview_only=True)
     return FileResponse(str(p), media_type="image/png",
@@ -376,9 +390,8 @@ async def preview(opts: NupOptions):
 
 
 @router.post("/generate")
-async def generate(opts: NupOptions):
-    if not opts.upload_id:
-        raise HTTPException(400, "missing upload_id")
+async def generate(opts: NupOptions, request: Request):
+    _require_own_upload(opts.upload_id, request)
     import asyncio as _asyncio
     p = await _asyncio.to_thread(impose, opts.upload_id, opts, preview_only=False)
     return {"ok": True, "url": f"/tools/pdf-nup/download/{opts.upload_id}"}

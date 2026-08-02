@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Optional
 
 from . import audit_db, auth_db, auth_settings, db, group_manager, permissions
@@ -61,24 +62,77 @@ class UserNotFoundError(AuthError):
     pass
 
 
-def _build_server(cfg: dict):
-    """Build a ldap3 Server from cfg dict. Raises AuthError on bad config /
-    missing ldap3."""
-    try:
-        from ldap3 import Server, Tls, ALL
-        import ssl as _ssl
-    except ImportError:
-        raise AuthError("ldap3 套件未安裝；請聯絡管理員")
-    server_url = (cfg.get("server_url") or "").strip()
-    if not server_url:
-        raise AuthError("伺服器 URL 未設定")
+#: 連到某台 DC 的 TCP 連線多久沒建起來就換下一台（秒）。
+#: 預設值刻意小 —— DC 掛掉時使用者不該枯等 socket 的預設逾時（動輒數十秒），
+#: 那個體感就是「系統掛了」。
+_CONNECT_TIMEOUT = 6
+#: 送出查詢後多久沒回應就放棄（秒）。比連線逾時寬，因為大範圍搜尋本來就慢。
+_RECEIVE_TIMEOUT = 30
+#: 某台 DC 連不上之後，隔多久再把它放回輪替（秒）。**不可以用 True**（見
+#: `_build_server` 的說明：那是永久排除）。
+_POOL_EXHAUST_SECONDS = 120
+
+
+def _split_servers(server_url: str) -> list[str]:
+    """把「多台 DC」的設定拆開。換行或逗號分隔，順序即嘗試順序。
+
+    企業 AD 標配至少兩台 DC —— 只填一台的話，那台一維護就全公司登不進來。
+    """
+    parts = []
+    for chunk in (server_url or "").replace(",", "\n").splitlines():
+        u = chunk.strip()
+        if u and u not in parts:
+            parts.append(u)
+    return parts
+
+
+def _make_tls(cfg: dict, first_url: str):
+    from ldap3 import Tls
+    import ssl as _ssl
     use_tls = bool(cfg.get("use_tls", True))
     verify = bool(cfg.get("verify_cert", True))
-    tls = None
-    if use_tls or server_url.lower().startswith("ldaps://"):
-        tls = Tls(validate=_ssl.CERT_REQUIRED if verify else _ssl.CERT_NONE,
-                  version=_ssl.PROTOCOL_TLS_CLIENT)
-    return Server(server_url, get_info=ALL, tls=tls)
+    if use_tls or first_url.lower().startswith("ldaps://"):
+        return Tls(validate=_ssl.CERT_REQUIRED if verify else _ssl.CERT_NONE,
+                   version=_ssl.PROTOCOL_TLS_CLIENT)
+    return None
+
+
+def _build_server(cfg: dict):
+    """從 cfg 建 ldap3 Server —— **多台就回 ServerPool**，並套上連線逾時。
+
+    設定失敗 / 缺 ldap3 時丟 AuthError。所有起 Connection 的地方都要走這裡，
+    容錯與逾時才會一致（否則某一條路徑漏掉，那條就會在 DC 掛掉時卡死）。
+    """
+    try:
+        from ldap3 import Server, ServerPool, ALL, FIRST
+    except ImportError:
+        raise AuthError("ldap3 套件未安裝；請聯絡管理員")
+    urls = _split_servers(cfg.get("server_url") or "")
+    if not urls:
+        raise AuthError("伺服器 URL 未設定")
+    tls = _make_tls(cfg, urls[0])
+
+    def _one(u: str):
+        return Server(u, get_info=ALL, tls=tls,
+                      connect_timeout=_CONNECT_TIMEOUT)
+
+    if len(urls) == 1:
+        return _one(urls[0])
+    # FIRST：永遠先試第一台，掛了才換下一台（不做負載平衡 —— 就近的主要 DC 優先）。
+    #
+    # `exhaust` **一定要給秒數，不能給 True**：讀 ldap3 的 pooling 原始碼，
+    # `exhaust=True` 是「永久排除」——
+    #     if (isinstance(exhaust, bool) and exhaust) or (now - last_checked) < exhaust:
+    #         continue   # keeps server offline
+    # 布林 True 那一支永遠成立，於是 DC 只要閃一次就再也不會被試，直到行程重啟。
+    # 給秒數才是「先跳過、過一段時間再試」，DC 修好之後會自己回到輪替裡。
+    return ServerPool([_one(u) for u in urls], pool_strategy=FIRST,
+                      active=True, exhaust=_POOL_EXHAUST_SECONDS)
+
+
+def _conn_kwargs() -> dict:
+    """所有 Connection 都要帶的共通參數（收訊逾時）。"""
+    return {"receive_timeout": _RECEIVE_TIMEOUT}
 
 
 def test_connection(cfg: dict) -> dict:
@@ -101,7 +155,8 @@ def test_connection(cfg: dict) -> dict:
     t0 = time.time()
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()) as conn:
             who = ""
             try:
                 who = conn.extend.standard.who_am_i() or ""
@@ -163,7 +218,8 @@ def test_user_login(cfg: dict, username: str, password: str) -> dict:
     # Step 1+2: service bind + search.
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True, check_names=False) as svc_conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()) as svc_conn:
             attrs = [
                 cfg.get("displayname_attr", "displayName"),
                 cfg.get("group_attr", "memberOf"),
@@ -195,7 +251,8 @@ def test_user_login(cfg: dict, username: str, password: str) -> dict:
     # Step 3: user bind.
     try:
         with Connection(server, user=user_dn, password=password,
-                        auto_bind=True, raise_exceptions=True, check_names=False):
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()):
             pass
     except Exception:
         raise AuthError("帳號或密碼錯誤（service search 找到使用者，但密碼 bind 失敗）")
@@ -236,6 +293,180 @@ def _entry_email(entry, cfg: dict) -> str:
         return ""
 
 
+# --------------------------------------------------------------------------
+# AD 主要群組（primaryGroupID）
+#
+# AD 的「主要群組」**不會出現在 memberOf**。多數帳號的主要群組是 Domain Users
+# （RID 513），但企業確實會把它改成別的群組 —— 一旦有人把權限掛在那個群組上，
+# 成員一個都拿不到，而且完全看不出原因（memberOf 裡就是沒有）。這是 AD 整合
+# 最經典的坑之一。
+#
+# 主要群組的 SID = 使用者 objectSid 的網域部分 + primaryGroupID 當作 RID。
+# 拿到 SID 之後再反查群組 DN。
+# --------------------------------------------------------------------------
+
+#: `userAccountControl` 的 ACCOUNTDISABLE 位元。
+#: 注意 **這不是** 帳號鎖定（那是 `lockoutTime`），也不是密碼過期。
+_UAC_ACCOUNTDISABLE = 0x0002
+#: 密碼永久有效。設了這個旗標的人 `msDS-UserPasswordExpiryTimeComputed` 會回
+#: 0x7FFFFFFFFFFFFFFF（等同「不會到期」）。
+_UAC_DONT_EXPIRE_PASSWD = 0x10000
+#: AD FILETIME 的「永不」哨兵值。
+_FILETIME_NEVER = 0x7FFFFFFFFFFFFFFF
+
+
+def uac_disabled(uac) -> bool | None:
+    """`userAccountControl` 是否含 ACCOUNTDISABLE。
+
+    取不到就回 `None`（**不知道**）—— OpenLDAP 沒有這個屬性，回 `False` 會被讀成
+    「已確認為啟用」，那是無中生有的結論。
+    """
+    if isinstance(uac, list):
+        uac = uac[0] if uac else None
+    if uac is None or isinstance(uac, bool):
+        return None
+    try:
+        return bool(int(uac) & _UAC_ACCOUNTDISABLE)
+    except (TypeError, ValueError):
+        return None
+
+
+def filetime_to_unix(value) -> float | None:
+    """AD FILETIME（1601 起算的 100 奈秒）→ Unix 秒。
+
+    0 與 0x7FFFFFFFFFFFFFFF 都代表「不會到期」，回 `None`。
+    ldap3 有時已經幫忙轉成 `datetime` 了 —— 那就直接用。
+    """
+    if isinstance(value, list):
+        value = value[0] if value else None
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        try:
+            v = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+            return v.timestamp()
+        except (OverflowError, ValueError):
+            return None
+    try:
+        raw = int(value)
+    except (TypeError, ValueError):
+        return None
+    if raw <= 0 or raw >= _FILETIME_NEVER:
+        return None
+    # 1601-01-01 → 1970-01-01 相差 11644473600 秒
+    ts = raw / 10_000_000.0 - 11644473600.0
+    # 超出合理範圍的值（目錄資料異常）當成不知道，不要畫出 1601 年的到期日
+    return ts if 0 < ts < 4102444800 else None
+
+
+def sid_to_string(raw) -> str:
+    """把二進位 objectSid 轉成 `S-1-5-21-...` 字串。
+
+    ldap3 依 schema 有時已經幫忙轉成字串了，所以先認字串；只有拿到 bytes
+    才自己解。格式（小端序的 sub-authority）：
+        byte0  revision
+        byte1  sub-authority 數量
+        byte2-7 identifier authority（**大端序** 48 bit）
+        之後每 4 bytes 一個 sub-authority（**小端序**）
+    """
+    if raw is None:
+        return ""
+    if isinstance(raw, str):
+        return raw if raw.upper().startswith("S-") else ""
+    if isinstance(raw, (list, tuple)):
+        return sid_to_string(raw[0]) if raw else ""
+    if not isinstance(raw, (bytes, bytearray)):
+        return ""
+    b = bytes(raw)
+    if len(b) < 8:
+        return ""
+    revision = b[0]
+    count = b[1]
+    if len(b) < 8 + 4 * count:
+        return ""
+    authority = int.from_bytes(b[2:8], "big")
+    parts = [f"S-{revision}-{authority}"]
+    for i in range(count):
+        off = 8 + 4 * i
+        parts.append(str(int.from_bytes(b[off:off + 4], "little")))
+    return "-".join(parts)
+
+
+def primary_group_sid(user_sid: str, primary_group_id) -> str:
+    """由使用者 SID + primaryGroupID 組出主要群組的 SID。
+
+    使用者 SID 的最後一段是他自己的 RID —— 換成 primaryGroupID 就是群組的 SID。
+    任一個取不到就回空字串（呼叫端據此跳過，不可以讓登入失敗）。
+    """
+    if not user_sid or primary_group_id in (None, ""):
+        return ""
+    try:
+        rid = int(primary_group_id)
+    except (TypeError, ValueError):
+        return ""
+    head, sep, _ = user_sid.rpartition("-")
+    if not sep or not head.upper().startswith("S-"):
+        return ""
+    return f"{head}-{rid}"
+
+
+def _sid_to_ldap_filter(sid: str) -> str:
+    r"""把 `S-1-5-21-…-513` 轉成 filter 用的跳脫二進位字串。
+
+    AD 的 objectSid 是二進位屬性 —— filter 裡要寫成 `\XX\XX…`，直接塞字串
+    SID 在多數環境查不到東西。
+    """
+    if not sid.upper().startswith("S-"):
+        return ""
+    bits = sid.split("-")
+    try:
+        revision = int(bits[1])
+        authority = int(bits[2])
+        subs = [int(x) for x in bits[3:]]
+    except (IndexError, ValueError):
+        return ""
+    out = bytes([revision, len(subs)]) + authority.to_bytes(6, "big")
+    for sub in subs:
+        out += sub.to_bytes(4, "little")
+    return "".join(f"\\{byte:02x}" for byte in out)
+
+
+def _lookup_primary_group_dn(conn, entry, cfg: dict) -> str:
+    """查出這位使用者「主要群組」的 DN。查不到一律回空字串。
+
+    **絕不丟例外** —— 主要群組只是補強，不該讓一次正常的登入失敗。
+    OpenLDAP 沒有 objectSid / primaryGroupID，這裡會自然地回空字串。
+    """
+    try:
+        def _val(name):
+            try:
+                return entry[name].value if name in entry else None
+            except Exception:  # noqa: BLE001
+                return None
+
+        user_sid = sid_to_string(_val("objectSid"))
+        gid = _val("primaryGroupID")
+        sid = primary_group_sid(user_sid, gid)
+        if not sid:
+            return ""
+        flt = _sid_to_ldap_filter(sid)
+        if not flt:
+            return ""
+        from ldap3 import SUBTREE
+        base = (cfg.get("group_search_base")
+                or cfg.get("user_search_base") or "").strip()
+        if not base:
+            return ""
+        conn.search(search_base=base,
+                    search_filter=f"(objectSid={flt})",
+                    search_scope=SUBTREE, attributes=["cn"], size_limit=1)
+        ents = list(conn.entries)
+        return str(ents[0].entry_dn) if ents else ""
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("主要群組查詢失敗（略過）：%s", exc)
+        return ""
+
+
 def _search_ldap_user(username: str, cfg: dict) -> dict:
     """Service-bind + search for a single user. Returns
     {user_dn, display_name, group_dns}. Does NOT bind as the user (no password
@@ -263,13 +494,7 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
     if not svc_dn or not svc_pw or not base:
         raise AuthError("LDAP service account / search base 尚未設定")
 
-    use_tls = bool(cfg.get("use_tls", True))
-    verify = bool(cfg.get("verify_cert", True))
-    tls = None
-    if use_tls or server_url.lower().startswith("ldaps://"):
-        tls = Tls(validate=_ssl.CERT_REQUIRED if verify else _ssl.CERT_NONE,
-                  version=_ssl.PROTOCOL_TLS_CLIENT)
-    server = Server(server_url, get_info=ALL, tls=tls)
+    server = _build_server(cfg)
 
     user_filter_tpl = cfg.get("user_search_filter", "(sAMAccountName={username})")
     safe_username = escape_filter_chars((username or "").strip())
@@ -277,7 +502,8 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
 
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True, check_names=False) as svc_conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()) as svc_conn:
             svc_conn.search(
                 search_base=base,
                 search_filter=user_filter,
@@ -287,10 +513,17 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
                     cfg.get("group_attr", "memberOf"),
                     cfg.get("username_attr", "sAMAccountName"),
                     cfg.get("email_attr", "mail"),
+                    # AD 的主要群組不在 memberOf 裡（見 primary_group_sid 的說明）。
+                    # OpenLDAP 沒有這兩個屬性，要不到就是空的，不影響。
+                    "objectSid", "primaryGroupID",
                 ],
                 size_limit=2,
             )
             entries = list(svc_conn.entries)
+            primary_dn = ""
+            if entries:
+                primary_dn = _lookup_primary_group_dn(
+                    svc_conn, entries[0], cfg)
     except Exception as exc:
         logger.warning("LDAP service bind/search failed: %s", exc)
         # Surface the real error class + message so admins can diagnose
@@ -315,6 +548,9 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
     display_name = (str(entry[dn_attr]) if dn_attr in entry else username)
     groups_raw = entry[grp_attr] if (grp_attr in entry) else []
     group_dns = [str(g) for g in groups_raw] if groups_raw else []
+    # 主要群組補進來（AD 專屬；查不到就跳過，絕不影響登入）
+    if primary_dn and primary_dn not in group_dns:
+        group_dns.append(primary_dn)
     return {"user_dn": user_dn, "display_name": display_name,
             "group_dns": group_dns, "email": _entry_email(entry, cfg)}
 
@@ -407,17 +643,11 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
     user_dn = info["user_dn"]
 
     # Step 3: try to bind as the discovered user → password check.
-    server_url = cfg.get("server_url", "")
-    use_tls = bool(cfg.get("use_tls", True))
-    verify = bool(cfg.get("verify_cert", True))
-    tls = None
-    if use_tls or server_url.lower().startswith("ldaps://"):
-        tls = Tls(validate=_ssl.CERT_REQUIRED if verify else _ssl.CERT_NONE,
-                  version=_ssl.PROTOCOL_TLS_CLIENT)
-    server = Server(server_url, get_info=ALL, tls=tls)
+    server = _build_server(cfg)
     try:
         with Connection(server, user=user_dn, password=password,
-                        auto_bind=True, raise_exceptions=True, check_names=False):
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()):
             pass
     except Exception as exc:
         # 使用者 bind 失敗的原因不只「密碼錯」—— 也可能是帳號在 AD 被鎖、
@@ -645,7 +875,8 @@ def sync_all_groups(name_contains: str = "") -> dict:
     seen: list[tuple[str, str, list[str]]] = []
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()) as conn:
             entries = conn.extend.standard.paged_search(
                 search_base=base, search_filter=gfilter,
                 search_scope=SUBTREE, attributes=[name_attr, "memberOf"],
@@ -744,14 +975,20 @@ def sync_all_users(name_contains: str = "") -> dict:
         raise AuthError("「使用者搜尋 base DN」不能包含 ( 或 )；那是 filter 語法。")
 
     server = _build_server(cfg)
-    seen: list[tuple[str, str, str, str]] = []   # (dn, login, display, email)
+    # (dn, login, display, email, dir_disabled, pwd_expires_at)
+    seen: list[tuple] = []
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()) as conn:
             entries = conn.extend.standard.paged_search(
                 search_base=base, search_filter=ufilter,
                 search_scope=SUBTREE,
-                attributes=[disp_attr, login_attr, mail_attr],
+                # userAccountControl / msDS-… 是 AD 才有的；OpenLDAP 要不到就
+                # 是拿不到，不會出錯。**構造屬性一定要顯式列出**（`*` 不會回傳）。
+                attributes=[disp_attr, login_attr, mail_attr,
+                            "userAccountControl",
+                            "msDS-UserPasswordExpiryTimeComputed"],
                 paged_size=500, generator=False)
             for e in entries:
                 dn = e.get("dn") or ""
@@ -770,7 +1007,12 @@ def sync_all_users(name_contains: str = "") -> dict:
                 # 少了這一段，管理員設好信箱屬性之後還要等每個人各自登入一次
                 # 才會有值 —— 而通知正是要寄給那些「還沒回來」的人。
                 mail = (_one(a.get(mail_attr)) or "").strip()[:200]
-                seen.append((dn, str(login), str(disp), mail))
+                # 目錄端的帳號狀態。取不到一律 None（不知道）——
+                # 回 False 會被讀成「已確認為啟用」，那是無中生有的結論。
+                disabled = uac_disabled(a.get("userAccountControl"))
+                pwd_exp = filetime_to_unix(
+                    a.get("msDS-UserPasswordExpiryTimeComputed"))
+                seen.append((dn, str(login), str(disp), mail, disabled, pwd_exp))
     except Exception as exc:  # noqa: BLE001
         raise AuthError(f"列舉使用者失敗：{type(exc).__name__}: {exc}")
 
@@ -781,7 +1023,7 @@ def sync_all_users(name_contains: str = "") -> dict:
     # **不可以**拿它去推論「沒看到的人都離職了」—— 那會把整個組織誤標。
     full_scan = not nc
     with db.tx(conn_db):
-        for dn, login, disp, mail in seen:
+        for dn, login, disp, mail, disabled, pwd_exp in seen:
             row = conn_db.execute(
                 "SELECT id, display_name, email FROM users "
                 "WHERE source=? AND external_dn=?",
@@ -797,6 +1039,12 @@ def sync_all_users(name_contains: str = "") -> dict:
                 conn_db.execute(
                     "UPDATE users SET directory_seen_at=? WHERE id=?",
                     (now, row["id"]))
+                # 目錄端狀態每次同步都覆蓋（含「從有值變回不知道」）——
+                # 停用之後又啟用回來的人，狀態要跟著回正常。
+                conn_db.execute(
+                    "UPDATE users SET dir_disabled=?, pwd_expires_at=? WHERE id=?",
+                    (None if disabled is None else int(disabled),
+                     pwd_exp, row["id"]))
                 if disp and row["display_name"] != disp:
                     # 只更新顯示名稱，**絕不動 enabled**（v1.12.70 不變量：鏡射 ≠
                     # 啟用）。舊版此處會 enabled=1，導致「已去啟用的鏡射帳號」在目錄
@@ -817,9 +1065,11 @@ def sync_all_users(name_contains: str = "") -> dict:
             # admin 明確操作。已驗證 enabled=0 不擋日後 LDAP 登入。
             conn_db.execute(
                 "INSERT INTO users(username, display_name, source, external_dn, "
-                "enabled, is_admin_seed, created_at, email, directory_seen_at) "
-                "VALUES (?,?,?,?,0,0,?,?,?)",
-                (login, disp, backend, dn, now, mail, now))
+                "enabled, is_admin_seed, created_at, email, directory_seen_at, "
+                "dir_disabled, pwd_expires_at) "
+                "VALUES (?,?,?,?,0,0,?,?,?,?,?)",
+                (login, disp, backend, dn, now, mail, now,
+                 None if disabled is None else int(disabled), pwd_exp))
             synced += 1
     missing = 0
     if full_scan:
@@ -831,17 +1081,25 @@ def sync_all_users(name_contains: str = "") -> dict:
             "AND external_dn<>'' AND (directory_seen_at IS NULL OR directory_seen_at < ?)",
             (backend, now)).fetchone()
         missing = int(row["c"] if row else 0)
+    dir_disabled_count = 0
+    if full_scan:
+        row = conn_db.execute(
+            "SELECT COUNT(*) c FROM users WHERE source=? AND dir_disabled=1",
+            (backend,)).fetchone()
+        dir_disabled_count = int(row["c"] if row else 0)
     permissions.invalidate_cache()
     audit_db.log_event("ldap_user_sync",
                        details={"synced": synced, "updated": updated,
                                 "total_seen": len(seen), "skipped_clash": skipped,
-                                "full_scan": full_scan, "missing": missing})
+                                "full_scan": full_scan, "missing": missing,
+                                "dir_disabled": dir_disabled_count})
     return {"synced": synced, "updated": updated, "total_seen": len(seen),
             "skipped_clash": skipped,
             # 這次是不是完整掃描 + 掃完之後有幾個帳號在目錄裡已經找不到。
             # 呼叫端（directory_sync）要把 full_scan 的時間記下來，判定「消失」
             # 時才有基準；沒有這個時間就不能下任何結論。
-            "full_scan": full_scan, "missing": missing, "scanned_at": now}
+            "full_scan": full_scan, "missing": missing, "scanned_at": now,
+            "dir_disabled": dir_disabled_count}
 
 
 def get_group_members(group_dn: str) -> list[dict]:
@@ -873,7 +1131,8 @@ def get_group_members(group_dn: str) -> list[dict]:
     out: list[dict] = []
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()) as conn:
             entries = conn.extend.standard.paged_search(
                 search_base=user_base, search_filter=filt,
                 search_scope=SUBTREE, attributes=[disp_attr, login_attr],
@@ -925,7 +1184,8 @@ def list_ou_children(parent_dn: str = "") -> list[dict]:
     out: list[dict] = []
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()) as conn:
             entries = conn.extend.standard.paged_search(
                 search_base=base, search_filter=node_filter,
                 search_scope=LEVEL, attributes=["ou", "cn", "objectClass"],
@@ -988,7 +1248,8 @@ def list_ou_users(ou_dn: str, recursive: bool = False) -> list[dict]:
     out: list[dict] = []
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()) as conn:
             entries = conn.extend.standard.paged_search(
                 search_base=_safe_search_base(ou_dn), search_filter=user_filter,
                 search_scope=(SUBTREE if recursive else LEVEL),
@@ -1038,7 +1299,8 @@ def search_selected_objects(rules: list[dict], cap: int = 3000) -> dict:
 
     try:
         with Connection(server, user=svc_dn, password=svc_pw, auto_bind=True,
-                        raise_exceptions=True, check_names=False) as conn:
+                        raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()) as conn:
             for rule in (rules or []):
                 base = _df.rule_base(rule, root)
                 # base 內含括號 = 不合法（防注入）；空 base 跳過
@@ -1124,7 +1386,8 @@ def get_user_detail(user_dn: str) -> dict:
     server = _build_server(cfg)
     try:
         with Connection(server, user=svc_dn, password=svc_pw,
-                        auto_bind=True, raise_exceptions=True, check_names=False) as conn:
+                        auto_bind=True, raise_exceptions=True, check_names=False,
+                        **_conn_kwargs()) as conn:
             conn.search(search_base=_safe_search_base(user_dn),
                         search_filter="(objectClass=*)",
                         search_scope=BASE, attributes=["*"])

@@ -35,6 +35,7 @@
       <a href="#llm" class="nav-link">AI 加值</a>
       <a href="#screenshots" class="nav-link">畫面</a>
       <a href="#enterprise" class="nav-link">企業管理</a>
+      <a href="#directory" class="nav-link">AD / LDAP</a>
       <a href="#disclaimer" class="nav-link">免責</a>
       <a href="#install" class="nav-link">安裝</a>
       <a href="api.html" class="nav-link">API</a>
@@ -484,6 +485,82 @@
         </div>
         <h3>效能看得見、上限調得動</h3>
         <p>執行中 / 排隊中數量、Office 轉檔佔用、CPU 與記憶體用量都在同一頁，<b>點一下看歷史趨勢圖</b>；記憶體是<b>實測子行程</b>的數字（真正吃記憶體的是 soffice）。五個併行上限全部可調，而且<b>填再大也會被實際可用記憶體夾住</b>。</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ======== AD / LDAP directory management (v1.14.16) ======== -->
+<section id="directory" class="section">
+  <div class="container">
+    <div class="section-eyebrow">v1.14 新功能</div>
+    <h2 class="section-title">AD / LDAP：企業目錄接得穩，也管得動</h2>
+    <p class="section-lead">接得上只是起點。真正會出事的是這些：主要 DC 重啟、權限掛在主要群組上卻沒生效、離職的人還留在系統裡、帳號被別人拿去用。這一輪把這些通通補上。</p>
+
+    <div class="ent-grid">
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#eef2ff;color:#4338ca;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v6H4z"/><path d="M4 14h16v6H4z"/><path d="M8 7h.01"/><path d="M8 17h.01"/></svg>
+        </div>
+        <h3>多台網域控制站容錯</h3>
+        <p>伺服器位址可以填<b>多台</b>（逗號或換行分隔），依序嘗試 —— 主要 DC 維護或重啟時，登入自動換下一台，不會變成全公司登不進來。連線與查詢都有逾時，DC 不通時<b>幾秒內就回明確訊息</b>，不會讓使用者枯等到以為系統掛了。掛掉的 DC 修好之後會自動回到輪替。</p>
+      </div>
+
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#ecfdf5;color:#047857;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 11h5"/><path d="M18.5 8.5 21 11l-2.5 2.5"/></svg>
+        </div>
+        <h3>AD 主要群組也算數</h3>
+        <p>AD 的<b>主要群組（primaryGroupID）不會出現在 memberOf</b> —— 這是 AD 整合最容易踩到的坑：企業把某個部門設成主要群組，權限掛上去之後成員一個都拿不到，而且在 AD 使用者的「成員隸屬」分頁也<b>完全看不出原因</b>。現在會自動把主要群組一併納入權限解析。OpenLDAP 沒有這個概念，行為完全不受影響。</p>
+      </div>
+
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#fef2f2;color:#b91c1c;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/></svg>
+        </div>
+        <h3>離職 / 停用的帳號看得見</h3>
+        <p>目錄同步原本<b>只增不減</b>：AD 那邊把人停用或刪掉之後，本站的帳號、角色指派、群組成員關係全部還在，「這個系統裡還有誰」答不出來。現在使用者清單多了<b>「目錄已無」</b>與<b>「AD 已停用」</b>兩個檢視與徽章。判定<b>只認完整掃描</b> —— 帶名稱過濾的同步只看得到一部分目錄，拿它當基準會把整個組織誤標成離職。</p>
+      </div>
+
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#fff7ed;color:#c2410c;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M8 7l4-4 4 4"/><path d="M4 15h16v6H4z"/></svg>
+        </div>
+        <h3>批次停用，而且有安全閥</h3>
+        <p>「目錄已無」可能好幾百人、橫跨十幾頁 —— 一鍵<b>全部停用</b>，按下去之前會先試算並告訴你<b>實際會動到幾個人</b>。也可以設成同步後<b>自動停用</b>（<b>預設關閉</b>）。關鍵是安全閥：一次要動的人數超過目錄帳號總數的 20% 就<b>整批中止、一個都不動</b> —— 服務帳號密碼過期、搜尋範圍被改都會讓「全公司都不見了」，那時候什麼都不做才是對的。而且<b>只停用不刪除</b>，帳號與權限指派都保留，人回來時按一下就恢復。</p>
+      </div>
+
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#e0e7ff;color:#3730a3;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/></svg>
+        </div>
+        <h3>現在有誰登入著</h3>
+        <p>使用者清單直接顯示<b>在線人數</b>（同一個人開三個瀏覽器算一位），每個帳號可以看目前的<b>登入裝置</b> —— 瀏覽器與作業系統、來源位址、最後活動時間 —— 並<b>個別或全部強制登出</b>，動作留在稽核記錄裡。帳號可能外洩時，不必改密碼就能先把所有裝置踢掉。</p>
+      </div>
+
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#f5f3ff;color:#6d28d9;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg>
+        </div>
+        <h3>權限指派不必等對方先登入</h3>
+        <p>目錄瀏覽裡點任何一位使用者就能<b>直接指派角色</b>，不必等他先登入過一次 —— 新人報到當天就能用。「所屬群組」每一列也能當場設群組權限。原本只能指派給整個 OU，但「這個 OU 裡只有這兩個人是財務」才是實務上最常見的需求。</p>
+      </div>
+
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v3l2 1"/></svg>
+        </div>
+        <h3>「他到底能用什麼」一眼看完</h3>
+        <p>權限來源散在四個地方（直接指派的角色、群組含<b>巢狀上層群組</b>、OU、直接工具授權），出事時很難說明。編輯使用者時可以展開<b>有效權限</b>面板：這個人最終能用哪些工具、<b>每一項是哪一條規則給的</b>。稽核回應與交接說明直接照著念。</p>
+      </div>
+
+      <div class="ent-card">
+        <div style="width:44px;height:44px;border-radius:12px;background:#fef3c7;color:#b45309;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        </div>
+        <h3>密碼快到期，先看到</h3>
+        <p>密碼到期對使用者的症狀是「<b>突然登不進來</b>」，然後才來問管理員。現在清單會標出<b>幾天後到期</b>（已過期另外標示），可以事先提醒。日期是<b>讀 AD 自己算好的值</b>，所以套了細緻密碼原則（PSO）或設了「密碼永久有效」的人都正確 —— 用網域的全域設定自己推算會算錯。</p>
       </div>
 
     </div>

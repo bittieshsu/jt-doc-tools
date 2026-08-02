@@ -16,6 +16,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from ..core import (audit_db, audit_forward, auth_db, auth_settings,
                     group_manager, permissions, roles, sso_settings,
                     user_manager)
+from ..core import db
+from ..core import sessions as _ss
 
 
 def _all_tool_ids() -> list[str]:
@@ -423,7 +425,8 @@ def build_auth_router(templates) -> APIRouter:
         # OOM the customer hit after bulk AD user sync.
         qp = request.query_params
         view = (qp.get("view") or "active").lower()
-        if view not in ("active", "directory", "all", "missing"):
+        if view not in ("active", "directory", "all", "missing",
+                        "dir_disabled", "pwd_expiring"):
             view = "active"
         q = (qp.get("q") or "").strip()
         src = (qp.get("src") or "").strip().lower()
@@ -447,6 +450,16 @@ def build_auth_router(templates) -> APIRouter:
         pages = max(1, (page_total + size - 1) // size)
         dir_count = user_manager.count_users(view="directory")
         missing_count = user_manager.count_users(view="missing")
+        # 目錄端停用 / 密碼快到期的人數。0 的時候頁籤不顯示 ——
+        # 不是 AD 環境的話這兩個永遠是 0，沒必要占版面。
+        dir_disabled_count = user_manager.count_users(view="dir_disabled")
+        pwd_expiring_count = user_manager.count_users(view="pwd_expiring")
+        # 「全部停用」按鈕上的數字要是**實際會動到的人數**（還啟用中的），
+        # 不是這個檢視的總筆數 —— 否則停用完之後按鈕還寫著「共 3 人」，
+        # 再按一次卻什麼都沒發生。
+        from ..core import directory_cleanup as _dcl
+        actionable = {v: len(_dcl.candidates(v))
+                      for v in ("missing", "dir_disabled")}
         all_roles = roles.list_roles()
         # Lightweight group list for the edit-modal picker: id/name/source only,
         # NOT list_groups() (which carries per-group member_ids arrays — those
@@ -485,15 +498,27 @@ def build_auth_router(templates) -> APIRouter:
                      or locked_by_username.get(u["username"]) or 0)
             u["locked"] = bool(until and until > now)
             u["locked_until"] = until or None
+        # 「在線」只在啟用認證時才有意義 —— 單機模式沒有帳號概念，
+        # 顯示一個永遠是 1 的人數只會誤導。
+        auth_on = auth_settings.is_enabled()
+        online_ids = _ss.online_user_ids() if auth_on else set()
+        for u in users:
+            u["online"] = auth_on and u["id"] in online_ids
         return templates.TemplateResponse(request, "admin_users.html", {
             "request": request,
             "users": users,
             "all_roles": all_roles,
             "all_groups": all_groups,
-            "auth_on": auth_settings.is_enabled(),
+            "auth_on": auth_on,
+            "online_count": len(online_ids),
+            "online_window_min": _ss.ONLINE_WINDOW_SECONDS // 60,
             "view": view,
             "dir_count": dir_count,
             "missing_count": missing_count,
+            "dir_disabled_count": dir_disabled_count,
+            "pwd_expiring_count": pwd_expiring_count,
+            "pwd_warn_days": user_manager.PWD_WARN_DAYS,
+            "actionable": actionable,
             "q": q, "src": src, "state": st,
             "page": page, "pages": pages, "page_total": page_total,
             "page_size": size,
@@ -620,6 +645,28 @@ def build_auth_router(templates) -> APIRouter:
                      "ids": done[:200], "skipped": skipped[:50]})
         return {"ok": True, "changed": len(done), "skipped": skipped}
 
+    @router.post("/users/bulk/disable-view")
+    async def users_bulk_disable_view(request: Request):
+        """把某個檢視底下**全部**的帳號停用（不只當前這一頁）。
+
+        「目錄已無」可能有好幾百人、橫跨好幾頁 —— 只能勾當前頁的話，管理員要翻
+        十幾次才做得完，實務上就是不會去做。
+
+        安全閥、管理員保護、稽核都在 `directory_cleanup` 裡，與排程自動停用共用
+        同一份邏輯（兩邊各寫一份遲早會不一致）。
+        """
+        from ..core import directory_cleanup
+        body = await request.json()
+        view = (body.get("view") or "").strip()
+        res = directory_cleanup.disable_view(
+            view, actor=_actor(request), ip=_client_ip(request),
+            force=bool(body.get("force")), dry_run=bool(body.get("dry_run")),
+            trigger="manual")
+        if res.get("aborted") and not res.get("ok"):
+            # 200 + aborted：前端要拿到 reason 顯示給人看（400 只會被當成壞掉）
+            return JSONResponse(res, status_code=200)
+        return res
+
     @router.post("/users/bulk/roles")
     async def users_bulk_roles(request: Request):
         """批次指派 / 移除角色。
@@ -687,6 +734,37 @@ def build_auth_router(templates) -> APIRouter:
         exp["username"] = u["username"]
         exp["enabled"] = u["enabled"]
         return exp
+
+    @router.get("/users/{uid}/sessions")
+    async def users_sessions(uid: int, request: Request):
+        """某個帳號目前的登入 session（裝置 / IP / 最後活動）。"""
+        from ..core import sessions as _ss
+        if not user_manager.get_by_id(uid):
+            raise HTTPException(404, "帳號不存在")
+        return {"ok": True, "sessions": _ss.list_for_user(uid),
+                "window_minutes": _ss.ONLINE_WINDOW_SECONDS // 60}
+
+    @router.post("/users/{uid}/sessions/revoke")
+    async def users_sessions_revoke(uid: int, request: Request):
+        """踢掉某個帳號的單一或全部 session。
+
+        `sid` 給就踢那一個，不給就全部踢掉。踢自己是允許的（等同登出所有裝置），
+        但要記進稽核 —— 強制登出是會被問「誰做的」的動作。
+        """
+        from ..core import sessions as _ss
+        if not user_manager.get_by_id(uid):
+            raise HTTPException(404, "帳號不存在")
+        body = await request.json()
+        sid = (body.get("sid") or "").strip()
+        if sid:
+            ok = _ss.revoke_one(uid, sid)
+            n = 1 if ok else 0
+        else:
+            n = _ss.revoke_all_for_user(uid)
+        audit_db.log_event(
+            "session_revoke", username=_actor(request), ip=_client_ip(request),
+            target=str(uid), details={"count": n, "sid": sid or "all"})
+        return {"ok": True, "revoked": n}
 
     @router.post("/users/{uid}/reset-password")
     async def users_reset_password(uid: int, request: Request):
@@ -887,6 +965,8 @@ def build_auth_router(templates) -> APIRouter:
             "interval_hours": int(s.get("interval_hours", 6)),
             "name_contains": s.get("name_contains", "") or "",
             "sync_users": bool(s.get("sync_users", True)),
+            "auto_disable": s.get("auto_disable", "off") or "off",
+            "last_auto_disable": s.get("last_auto_disable"),
             "last_run_at": s.get("last_run_at"),
             "last_result": s.get("last_result"),
             "last_error": s.get("last_error"),
@@ -907,17 +987,20 @@ def build_auth_router(templates) -> APIRouter:
             interval_hours=int(body.get("interval_hours", 6) or 6),
             name_contains=str(body.get("name_contains", "") or ""),
             sync_users=bool(body.get("sync_users", True)),
+            auto_disable=str(body.get("auto_disable", "off") or "off"),
         )
         audit_db.log_event(
             "settings_change", username=_actor(request), ip=_client_ip(request),
             target="directory_sync",
             details={"enabled": s["enabled"], "interval_hours": s["interval_hours"],
-                     "sync_users": s["sync_users"]},
+                     "sync_users": s["sync_users"],
+                     "auto_disable": s.get("auto_disable", "off")},
         )
         return {"ok": True, "enabled": s["enabled"],
                 "interval_hours": s["interval_hours"],
                 "name_contains": s["name_contains"],
-                "sync_users": s["sync_users"]}
+                "sync_users": s["sync_users"],
+                "auto_disable": s.get("auto_disable", "off")}
 
     @router.post("/groups/directory-sync/run")
     async def groups_dirsync_run(request: Request):
@@ -1117,6 +1200,138 @@ def build_auth_router(templates) -> APIRouter:
                            ip=_client_ip(request), target=dn,
                            details={"roles": role_ids})
         return {"ok": True, "dn": dn, "roles": role_ids}
+
+    def _mirror_row_for_dn(dn: str, username: str, display_name: str) -> int:
+        """找出（必要時建立）這個目錄 DN 對應的本機使用者列，回 users.id。
+
+        建立的是**鏡射列**：`enabled=0`、不給任何角色、不設密碼 —— 與排程同步
+        建出來的完全一樣。本人真的登入時 JIT 會把它啟用，而且**已經有角色的人
+        不會被塞預設角色**（見 `auth_ldap._sync_user`），所以管理員在這裡先指派
+        的東西不會被蓋掉。
+
+        這一段就是「指派權限不必等對方先登入一次」的關鍵。
+        """
+        from ..core import auth_settings as _as
+        backend = (_as.get() or {}).get("backend", "ldap")
+        conn = auth_db.conn()
+        row = conn.execute(
+            "SELECT id FROM users WHERE source IN ('ldap','ad') AND external_dn=?",
+            (dn,)).fetchone()
+        if row:
+            return int(row["id"])
+        if not username:
+            raise HTTPException(400, "這個目錄物件沒有帳號名稱，無法建立對應帳號")
+        # 同名不同 DN：拒絕，不要無聲接管別人的身分（與同步的規則一致）
+        clash = conn.execute(
+            "SELECT external_dn FROM users WHERE username=? AND source=?",
+            (username, backend)).fetchone()
+        if clash:
+            raise HTTPException(
+                409, f"已有另一個 DN 使用帳號名「{username}」（{clash['external_dn']}）"
+                     "—— 請先處理同名衝突")
+        with db.tx(conn):
+            cur = conn.execute(
+                "INSERT INTO users(username, display_name, source, external_dn, "
+                "enabled, is_admin_seed, created_at) VALUES (?,?,?,?,0,0,?)",
+                (username, display_name or username, backend, dn, time.time()))
+        return int(cur.lastrowid)
+
+    @router.get("/directory/user-roles")
+    async def directory_user_roles_get(request: Request, dn: str = ""):
+        """這個目錄使用者目前有哪些角色（還沒鏡射過就是空的）。"""
+        _require_dir_backend()
+        dn = (dn or "").strip()
+        if not dn:
+            raise HTTPException(400, "缺少 DN")
+        row = auth_db.conn().execute(
+            "SELECT id, username, enabled, last_login_at FROM users "
+            "WHERE source IN ('ldap','ad') AND external_dn=?", (dn,)).fetchone()
+        if not row:
+            return {"ok": True, "dn": dn, "mirrored": False, "roles": [],
+                    "enabled": False, "logged_in": False}
+        return {"ok": True, "dn": dn, "mirrored": True,
+                "user_id": row["id"],
+                "roles": permissions.list_roles_for_subject("user",
+                                                           str(row["id"])),
+                "enabled": bool(row["enabled"]),
+                "logged_in": bool(row["last_login_at"])}
+
+    @router.post("/directory/user-roles")
+    async def directory_user_roles_set(request: Request):
+        """指派角色給單一目錄使用者（不必等他先登入過一次）。
+
+        原本只能指派給 OU —— 但「整個 OU 都給財務權限」跟「只有這兩個人是財務」
+        是完全不同的事，後者才是實務上最常見的需求，而它以前只能等對方登入之後
+        再去使用者管理找人。
+        """
+        _require_dir_backend()
+        body = await request.json()
+        dn = str((body or {}).get("dn") or "").strip()
+        if not dn:
+            raise HTTPException(400, "缺少 DN")
+        role_ids = list((body or {}).get("roles") or [])
+        uid = _mirror_row_for_dn(dn, str((body or {}).get("username") or "").strip(),
+                                 str((body or {}).get("display_name") or "").strip())
+        permissions.set_subject_roles("user", str(uid), role_ids)
+        audit_db.log_event("perm_user_set", username=_actor(request),
+                           ip=_client_ip(request), target=dn,
+                           details={"roles": role_ids, "user_id": uid,
+                                    "via": "directory"})
+        return {"ok": True, "dn": dn, "user_id": uid, "roles": role_ids,
+                "mirrored": True}
+
+    @router.get("/directory/group-roles")
+    async def directory_group_roles_get(request: Request, dn: str = ""):
+        """這個目錄群組目前有哪些角色。"""
+        _require_dir_backend()
+        dn = (dn or "").strip()
+        if not dn:
+            raise HTTPException(400, "缺少 DN")
+        row = auth_db.conn().execute(
+            "SELECT id, name FROM groups WHERE source IN ('ldap','ad') "
+            "AND external_dn=?", (dn,)).fetchone()
+        if not row:
+            return {"ok": True, "dn": dn, "mirrored": False, "roles": []}
+        return {"ok": True, "dn": dn, "mirrored": True, "group_id": row["id"],
+                "name": row["name"],
+                "roles": permissions.list_roles_for_subject("group",
+                                                            str(row["id"]))}
+
+    @router.post("/directory/group-roles")
+    async def directory_group_roles_set(request: Request):
+        """指派角色給目錄群組（在目錄瀏覽裡看到誰屬於哪個群組時直接就能設）。"""
+        _require_dir_backend()
+        body = await request.json()
+        dn = str((body or {}).get("dn") or "").strip()
+        if not dn:
+            raise HTTPException(400, "缺少 DN")
+        role_ids = list((body or {}).get("roles") or [])
+        conn = auth_db.conn()
+        row = conn.execute(
+            "SELECT id FROM groups WHERE source IN ('ldap','ad') AND external_dn=?",
+            (dn,)).fetchone()
+        if row:
+            gid = int(row["id"])
+        else:
+            # 還沒同步到的群組：用 DN 的第一段當名稱先鏡射一列。
+            from ..core import auth_settings as _as
+            backend = (_as.get() or {}).get("backend", "ldap")
+            name = str((body or {}).get("name") or "").strip()
+            if not name:
+                head = dn.split(",")[0]
+                name = head.split("=", 1)[1] if "=" in head else head
+            with db.tx(conn):
+                cur = conn.execute(
+                    "INSERT INTO groups(name, source, external_dn, created_at) "
+                    "VALUES (?,?,?,?)", (name, backend, dn, time.time()))
+            gid = int(cur.lastrowid)
+        permissions.set_subject_roles("group", str(gid), role_ids)
+        audit_db.log_event("perm_group_set", username=_actor(request),
+                           ip=_client_ip(request), target=dn,
+                           details={"roles": role_ids, "group_id": gid,
+                                    "via": "directory"})
+        return {"ok": True, "dn": dn, "group_id": gid, "roles": role_ids,
+                "mirrored": True}
 
     # ----- 已選定 filter（全域一份，admin 共用）+ 剪枝樹 -----
 

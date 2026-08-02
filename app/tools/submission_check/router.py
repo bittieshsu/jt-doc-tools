@@ -166,9 +166,17 @@ async def api_delete_self_entity(entity_id: str, request: Request):
 
 @router.get("/admin-stats", response_class=HTMLResponse)
 async def page_admin_stats(request: Request, days: int = 30) -> HTMLResponse:
-    """Admin 儀表板 — 跨案件 stats（admin 限定）。"""
+    """Admin 儀表板 — 跨案件 stats（admin 限定）。
+
+    **判斷寫成 fail-closed**：原本是 `if not _is_admin(user) and user is not None`
+    —— 認不出身分（`request.state.user` 是 None）時檢查會被整個跳過。目前不會發生
+    （啟用認證後中介層一定會設好 user 才進得到 `/tools/`），但那是「靠別的地方
+    剛好有做」在撐，中介層一改就破。改成直接問「有沒有啟用認證」：啟用了就一定
+    要是 admin，沒啟用（單機模式）才放行。
+    """
+    from app.core import auth_settings as _as
     user = getattr(request.state, "user", None) if hasattr(request, "state") else None
-    if not _is_admin(user) and user is not None:
+    if _as.is_enabled() and not _is_admin(user):
         raise HTTPException(403, "僅 admin 可看此頁")
     from . import stats as _stats
     s = _stats.gather_stats(days=max(1, min(days, 365)))

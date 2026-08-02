@@ -218,8 +218,10 @@ def per_field_review(
 
     Skips checkbox / option-text fields (model can't reliably handle ✓).
 
-    Single round; consensus voting is unnecessary because each query is
-    narrowly scoped enough that random noise is rare.
+    **兩輪確認**：第一輪掃全部欄位，第二輪**只**重問第一輪標記出來的那幾個。
+    連兩輪都指出同一個問題才算採納（`llm_settings.consecutive_required`，
+    預設 2；設成 1 就退回單輪）。視覺模型對裁切小圖的是非題答案會抖，
+    而這裡的動作是「自動改掉已經填好的表單」—— 需要防線。
     """
     result = ReviewResult(filled=list(filled_fields))
     s = llm_settings.get()
@@ -245,6 +247,8 @@ def per_field_review(
 
     rr = RoundResult(round=1, verdict="needs_correction")
     started = time.monotonic()
+    #: 第一輪標記出來的欄位（`Correction.key()` → 欄位），第二輪只重問這些
+    flagged_first: dict[tuple, object] = {}
 
     # Build placement_idx mapping so we can tell the apply step which
     # placement to remove/modify. filled_fields is derived from placements
@@ -255,18 +259,21 @@ def per_field_review(
         # not the full placements list. The apply step maps back by
         # (label, value) which is more robust across snapshot formats.
 
-    for i, f in enumerate(fields_on_page):
-        notify(i + 1, total, f"校驗欄位 {i+1}/{total}: {f.label_text or f.profile_key}")
+    def _probe(f) -> Optional[Correction]:
+        """對單一欄位問一輪。回 `Correction`（可疑）或 `None`（沒問題 / 問不出來）。
+
+        抽成函式是為了讓**第二輪確認**能重跑同一段邏輯 —— 兩輪各寫一份遲早會不一致。
+        """
         png = _crop_tile(page_img, f.slot_pt)
 
         ans2, err2 = _ollama_chat(base_url, model, _q2_value_match(f.value),
                                    png, PER_FIELD_TIMEOUT)
         # Treat timeout as "uncertain — not a flag" (ignore noisy errors)
         if err2 == "timeout" or not ans2:
-            continue
+            return None
 
         if ans2.upper().startswith("YES"):
-            continue   # value matches what's in the box — all good
+            return None   # value matches what's in the box — all good
 
         # Q4 FIRST — get LLM's actual OCR of the red box so we can do a
         # fuzzy-match rescue on Q2 false negatives (OCR noise like doubled
@@ -289,7 +296,7 @@ def per_field_review(
         # Fuzzy rescue: Q2 said NO but actual OCR matches value within
         # noise tolerance → treat as clean, don't flag this field.
         if actual and _fuzzy_close(f.value, actual):
-            continue
+            return None
 
         # Q3 — disambiguate wrong-cell vs value-mismatch
         ans3, _ = _ollama_chat(base_url, model, _q3_label_fit(f.value),
@@ -317,7 +324,7 @@ def per_field_review(
         if suggested_label and label_to_slot:
             suggested_slot_pt = label_to_slot.get(suggested_label)
 
-        rr.corrections.append(Correction(
+        return Correction(
             type="WRONG_PLACEMENT" if is_wrong_cell else "WRONG_VALUE",
             label=f.label_text or f.profile_key,
             current_value=f.value,
@@ -331,12 +338,56 @@ def per_field_review(
             placement_idx=getattr(f, "_pidx", None),
             slot_pt=tuple(f.slot_pt) if f.slot_pt else None,
             suggested_slot_pt=tuple(suggested_slot_pt) if suggested_slot_pt else None,
-        ))
+        )
+
+
+    # ---- 第一輪：每個欄位都問
+    for i, f in enumerate(fields_on_page):
+        notify(i + 1, total, f"校驗欄位 {i+1}/{total}: {f.label_text or f.profile_key}")
+        c = _probe(f)
+        if c is not None:
+            rr.corrections.append(c)
+            flagged_first[c.key()] = f
 
     rr.elapsed_s = round(time.monotonic() - started, 2)
-    rr.accepted = list(rr.corrections)   # no consensus — accept all
     rr.verdict = "all_clear" if not rr.corrections else "needs_correction"
     result.rounds.append(rr)
+
+    # ---- 第二輪：**只**重問第一輪標記出來的欄位，連兩輪同錯才採納
+    #
+    # 為什麼需要：視覺模型對裁切小圖的是非題答案是會抖的，同一張圖問兩次答案不一定
+    # 一樣。原本這裡是 `accepted = list(corrections)` —— LLM 說什麼就採納什麼，對
+    # 「自動改掉已填好的表單」這種動作沒有任何防線。而畫面上早就寫著「連續 N 輪同錯」
+    # 並把採納的列標成綠色 —— 介面承諾了後端沒有做到的事。
+    #
+    # 只重問可疑的那幾個：貴的是逐欄查詢，而可疑欄位通常只有個位數，
+    # 成本增加很少，卻擋掉了「問一次剛好抖一下」的偽陽性。
+    need = max(1, int(s.get("consecutive_required", 2) or 1))
+    if need >= 2 and rr.corrections:
+        r2 = RoundResult(round=2, verdict="needs_correction")
+        started2 = time.monotonic()
+        n2 = len(flagged_first)
+        for j, (key, f) in enumerate(list(flagged_first.items())):
+            notify(j + 1, n2, f"再確認 {j+1}/{n2}: {f.label_text or f.profile_key}")
+            c2 = _probe(f)
+            if c2 is not None and c2.key() == key:
+                r2.corrections.append(c2)
+        r2.elapsed_s = round(time.monotonic() - started2, 2)
+        confirmed = {c.key() for c in r2.corrections}
+        # 採納 = 兩輪都指出同一個問題。**只指出一次的仍然留在 corrections 裡**
+        # （畫面看得到，只是不標成已採納）—— 無聲丟掉會讓人以為 LLM 沒發現。
+        accepted = [c for c in rr.corrections if c.key() in confirmed]
+        r2.accepted = list(accepted)
+        r2.verdict = "all_clear" if not accepted else "needs_correction"
+        result.rounds.append(r2)
+        result.total_elapsed_s = round(rr.elapsed_s + r2.elapsed_s, 2)
+        notify(total, total,
+               f"完成（{result.total_elapsed_s:.1f}s，{len(rr.corrections)} 個疑慮，"
+               f"其中 {len(accepted)} 個連兩輪都指出）")
+        return result
+
+    # 只跑一輪（管理員把 consecutive_required 設成 1，或第一輪就全清）
+    rr.accepted = list(rr.corrections)
     result.total_elapsed_s = rr.elapsed_s
     notify(total, total, f"完成（{rr.elapsed_s:.1f}s, {len(rr.corrections)} 建議）")
     return result

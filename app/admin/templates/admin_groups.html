@@ -33,9 +33,21 @@
     <label class="chk"><input type="checkbox" id="dsEnabled"> 啟用排程同步</label>
     <label class="chk"><input type="checkbox" id="dsSyncUsers"> 一併同步使用者（讓「使用者管理」預先看到所有目錄使用者）</label>
     <label>每 <input class="field field-narrow" type="number" id="dsInterval" min="1" max="168" value="6"> 小時</label>
+    {# 自動停用是破壞性的 —— 預設關閉，而且只在**完整**掃描之後才會執行。 #}
+    <label>完整掃描後自動停用
+      <select class="field" id="dsAutoDisable">
+        <option value="off">不自動停用（建議）</option>
+        <option value="missing">目錄裡已經找不到的帳號</option>
+        <option value="dir_disabled">AD 端已停用的帳號</option>
+      </select>
+    </label>
     <button class="btn" type="button" id="dsSave">{{ icon('gear', size=14) }} 儲存設定</button>
     <button class="btn btn-primary" type="button" id="dsRun">{{ icon('refresh', size=14) }} 立即同步</button>
   </div>
+  <p class="muted">自動停用只會<b>停用</b>，不會刪除帳號或權限指派，人回來時按一下即可恢復；
+    帶名稱過濾的同步<b>不會</b>觸發（只看得到一部分目錄，不能拿來推論誰不見了）。
+    另有安全閥：一次要動的人數超過目錄帳號總數的 20% 就整批中止 ——
+    服務帳號密碼過期之類的狀況會讓「全公司都不見」，那時候什麼都不做才是對的。</p>
   <p class="muted">同步範圍：目錄群組（+ 巢狀從屬）、各群組成員數、以及（勾選時）所有目錄使用者。使用者只鏡射帳號 / 顯示名稱供預先指派權限，不設密碼、仍走 LDAP 驗證。</p>
   <p class="muted" id="dsStatus">載入同步狀態中…</p>
 </div>
@@ -526,6 +538,7 @@ if (_btnSyncDir) {
 (function () {
   const ena = document.getElementById('dsEnabled');
   const su = document.getElementById('dsSyncUsers');
+  const ad = document.getElementById('dsAutoDisable');
   const itv = document.getElementById('dsInterval');
   const save = document.getElementById('dsSave');
   const run = document.getElementById('dsRun');
@@ -545,6 +558,7 @@ if (_btnSyncDir) {
       const j = await r.json();
       if (ena) ena.checked = !!j.enabled;
       if (su) su.checked = !!j.sync_users;
+      if (ad) ad.value = j.auto_disable || 'off';
       if (itv) itv.value = j.interval_hours || 6;
       let s = '排程：' + (j.enabled ? ('每 ' + (j.interval_hours || 6) + ' 小時') : '已停用')
             + ' · 上次同步：' + fmtAge(j.last_run_at);
@@ -562,6 +576,12 @@ if (_btnSyncDir) {
       } else if (us && us.error) {
         s += ' · 使用者同步錯誤：' + us.error;
       }
+      const lad = j.last_auto_disable;
+      if (lad) {
+        // 中止時一定要把原因顯示出來 —— 只寫「已停用 0 個」會讓人以為沒事
+        s += lad.aborted ? (' · 自動停用已中止：' + (lad.reason || ''))
+                         : (' · 自動停用 ' + (lad.disabled || 0) + ' 個帳號');
+      }
       if (j.last_error) s += ' · 上次錯誤：' + j.last_error;
       st.textContent = s;
     } catch (e) { st.textContent = '無法讀取同步狀態'; }
@@ -574,6 +594,7 @@ if (_btnSyncDir) {
         body: JSON.stringify({
           enabled: !!(ena && ena.checked),
           sync_users: !!(su && su.checked),
+          auto_disable: (ad && ad.value) || 'off',
           interval_hours: parseInt((itv && itv.value) || '6', 10) || 6,
         }),
       });

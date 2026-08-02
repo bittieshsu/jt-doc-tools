@@ -40,8 +40,9 @@ def last_full_directory_scan_at() -> float:
     """
     try:
         from . import directory_sync
-        return float(directory_sync.get().get("last_full_scan_at") or 0)
+        return float(directory_sync.get_settings().get("last_full_scan_at") or 0)
     except Exception:  # noqa: BLE001 — 讀不到設定就當作沒掃過
+        logger.exception("讀取上次完整目錄掃描時間失敗")
         return 0.0
 
 
@@ -58,6 +59,39 @@ def _is_missing(row, full_scan_at: float) -> bool:
     if not (row["external_dn"] or ""):
         return False
     return float(row["directory_seen_at"] or 0) < full_scan_at
+
+
+#: 密碼到期前幾天開始提醒。
+#: 兩週：短於一週的話，休假回來的人可能已經來不及在到期前改。
+PWD_WARN_DAYS = 14
+
+
+def _dir_state(r) -> dict:
+    """目錄端的帳號狀態（AD 才有；其他來源一律「不知道」）。
+
+    `dir_disabled` 是三態：True 停用 / False 正常 / **None 不知道**。
+    OpenLDAP、本機、SSO 帳號都是 None —— 把 None 顯示成「正常」等於替目錄
+    做了它沒說過的保證。
+    """
+    try:
+        raw = r["dir_disabled"]
+    except (KeyError, IndexError):
+        raw = None
+    disabled = None if raw is None else bool(raw)
+    try:
+        exp = r["pwd_expires_at"]
+    except (KeyError, IndexError):
+        exp = None
+    days = None
+    if exp:
+        days = int((exp - time.time()) // 86400)
+    return {
+        "dir_disabled": disabled,
+        "pwd_expires_at": exp,
+        # 已經過期的（負數）也要提醒 —— 那個人現在正卡在改密碼畫面前
+        "pwd_expiry_days": days,
+        "pwd_expiring_soon": days is not None and days <= PWD_WARN_DAYS,
+    }
 
 
 def _view_where(view: str) -> tuple[str, tuple]:
@@ -84,6 +118,15 @@ def _view_where(view: str) -> tuple[str, tuple]:
             return "WHERE 0", ()
         return ("WHERE source IN ('ldap','ad') AND external_dn IS NOT NULL "
                 "AND external_dn<>'' AND COALESCE(directory_seen_at,0) < ?"), (base,)
+    if view == "dir_disabled":
+        # AD 端已停用（userAccountControl 的 ACCOUNTDISABLE）。這些人登不進來，
+        # 但本站的角色指派與群組成員關係全都還在 —— 內控盤點要看得到。
+        return "WHERE dir_disabled = 1", ()
+    if view == "pwd_expiring":
+        # 密碼即將到期（含已經過期的）。到期的人會卡在 AD 的改密碼流程，
+        # 對他來說症狀是「突然登不進來」，管理員要能事先看到。
+        return ("WHERE pwd_expires_at IS NOT NULL AND pwd_expires_at < ?"), (
+            time.time() + PWD_WARN_DAYS * 86400,)
     return "", ()
 
 
@@ -111,7 +154,7 @@ def list_users(view: str = "all") -> list[dict]:
     rows = conn.execute(
         "SELECT id, username, display_name, source, external_dn, enabled, email, "
         "is_admin_seed, is_audit_seed, password_hash, created_at, last_login_at, "
-        "directory_seen_at "
+        "directory_seen_at, dir_disabled, pwd_expires_at "
         f"FROM users {where} ORDER BY username", params
     ).fetchall()
     roles_by_user = permissions.list_roles_for_subjects(
@@ -134,6 +177,7 @@ def list_users(view: str = "all") -> list[dict]:
             "directory_seen_at": r["directory_seen_at"],
             "directory_missing": _is_missing(r, _full_scan_at),
             "roles": roles_by_user.get(str(r["id"]), []),
+            **_dir_state(r),
         })
     return out
 
@@ -400,7 +444,8 @@ def list_users_page(*, view: str = "all", q: str = "", offset: int = 0,
     rows = conn.execute(
         "SELECT id, username, display_name, source, external_dn, enabled, email, "
         "is_admin_seed, is_audit_seed, password_hash, created_at, last_login_at, "
-        f"directory_seen_at FROM users {sql_where} ORDER BY username "
+        "directory_seen_at, dir_disabled, pwd_expires_at "
+        f"FROM users {sql_where} ORDER BY username "
         "LIMIT ? OFFSET ?", args + [int(limit), int(offset)]).fetchall()
     full_scan_at = last_full_directory_scan_at()
     roles_by_user = permissions.list_roles_for_subjects(
@@ -420,5 +465,6 @@ def list_users_page(*, view: str = "all", q: str = "", offset: int = 0,
             "directory_seen_at": r["directory_seen_at"],
             "directory_missing": _is_missing(r, full_scan_at),
             "roles": roles_by_user.get(str(r["id"]), []),
+            **_dir_state(r),
         })
     return {"rows": out, "total": total}

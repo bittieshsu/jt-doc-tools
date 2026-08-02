@@ -152,8 +152,15 @@ def _m2_username_source_unique(conn: sqlite3.Connection) -> None:
     exist as both a `local` account and an `ldap` account; the realm
     dropdown on /login disambiguates at auth time. SQLite can't drop a
     column-level UNIQUE in place, so rebuild the table the standard way.
+
+    **PRAGMA foreign_keys=OFF 是必要的**：`db.get_conn` 開著 FK，而
+    `group_members.user_id` 與 `sessions.user_id` 都是 `ON DELETE CASCADE`
+    指向 `users`。少了這一行，`DROP TABLE users` 的隱含刪除會**把所有群組成員
+    關係與所有 session 一併清掉** —— 升級之後每個人的群組權限無聲消失。
+    這正是 `_m8` 的說明裡記錄的那次事故：當時只修了 `_m8`，這一支一直沒補。
     """
     conn.executescript("""
+    PRAGMA foreign_keys=OFF;
     -- Lifted from _m1 with one change: UNIQUE moved off `username` onto
     -- (username, source). Everything else stays bit-for-bit identical so
     -- existing data copies over with INSERT INTO ... SELECT *.
@@ -180,6 +187,7 @@ def _m2_username_source_unique(conn: sqlite3.Connection) -> None:
     DROP TABLE users;
     ALTER TABLE users_new RENAME TO users;
     CREATE INDEX idx_users_username ON users(username);
+    PRAGMA foreign_keys=ON;
     """)
 
 
@@ -481,6 +489,84 @@ def _m15_directory_presence(conn: sqlite3.Connection) -> None:
 
 
 
+def _m16_session_last_seen(conn: sqlite3.Connection) -> None:
+    """v16：`sessions` 加 `last_seen_at`（這個 session 最後一次活動的時間）。
+
+    為什麼需要 —— 管理員原本無法回答「現在有誰登入著」。`sessions` 只有
+    `created_at` / `expires_at`：一個七天沒回來的人，他的 session 還是「有效」的，
+    看起來跟正在使用的人沒有差別。
+
+    有了這一欄就能算出「最近 N 分鐘有活動的人」= 在線人數，也能在踢人之前看出
+    哪一個 session 是他現在用的、哪些是忘了登出的舊裝置。
+
+    **更新要節流**：每個請求都寫一次 DB 會變成每請求一次寫入競爭（WAL 下仍是單一
+    writer）。實務上只要 >60 秒才寫，對「在線」的判斷完全足夠。
+    """
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
+    if "last_seen_at" not in cols:
+        conn.execute("ALTER TABLE sessions ADD COLUMN last_seen_at REAL")
+        # 既有 session 沒有這個資訊 —— 用建立時間當起點，比 NULL 好推理
+        conn.execute("UPDATE sessions SET last_seen_at = created_at "
+                     "WHERE last_seen_at IS NULL")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_seen "
+                     "ON sessions(last_seen_at)")
+
+
+def _m17_directory_account_state(conn: sqlite3.Connection) -> None:
+    """v17：`users` 加「目錄端的帳號狀態」兩欄。
+
+    * `dir_disabled` —— AD 的 `userAccountControl` 有 ACCOUNTDISABLE 位元。
+      目錄端停用之後，本站的帳號、角色指派、群組成員關係全部還在，管理員在
+      使用者清單上完全看不出這個人已經被停用了（他登不進來是因為 bind 會失敗，
+      不是因為我們知道）。
+    * `pwd_expires_at` —— AD 的 `msDS-UserPasswordExpiryTimeComputed`。
+
+      **不可以用網域的 `maxPwdAge` 自己算**：那個值忽略細緻密碼原則（PSO），也
+      忽略「密碼永久有效」旗標，算出來的日期對套了 PSO 的人是錯的。這個構造屬性
+      是 AD 自己算好的，兩者都吃得到。
+
+    兩欄都可以是 NULL —— OpenLDAP 沒有這些概念，本機 / SSO 帳號更沒有。
+    NULL 一律當「不知道」，畫面上什麼都不顯示（**不可以**當成「正常」或「已停用」）。
+    """
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "dir_disabled" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN dir_disabled INTEGER")
+    if "pwd_expires_at" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN pwd_expires_at REAL")
+
+
+def _m18_grant_transit_proof_and_border(conn: sqlite3.Connection) -> None:
+    """v18：把 `transit-proof`（v1.12.74）與 `pdf-border`（v1.14.11）補給既有角色。
+
+    同 `_m13` 的理由 —— `seed_builtin_roles()` 的 top-up 要有
+    `role_seed_snapshot` 當基準線才會動；從 v1.12.52 或更早直接升上來的安裝，
+    快照是空的，會走保守的 bootstrap 路徑（**這一輪什麼都不補**，為了保住
+    「admin 刻意移除某工具」的設定）。那條路徑之後新增的工具，如果沒有像這樣
+    明確補一條 migration，對那些客戶就**永遠不會出現**，而且畫面上沒有任何線索。
+
+    `pdf-to-slides` 當時補了（`_m13`），這兩支漏了 —— 盤點時才發現。
+
+    補的對象沿用 m4 / m5 / m13 的做法：拿一個「本來就該看到同類工具」的既有
+    授權當訊號，而不是無條件補給所有角色（那會把刻意收窄過的角色一起放寬）。
+    * `transit-proof`（乘車證明整理）→ 誰有 `einvoice-scan`（同屬報帳流程）。
+    * `pdf-border`（頁面加框）→ 誰有 `pdf-nup`（同屬版面處理，角色範圍一致）。
+
+    `INSERT OR IGNORE` → 可重複執行；已經有的不動。
+    """
+    conn.executescript("""
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'transit-proof' FROM role_perms WHERE tool_id = 'einvoice-scan';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'transit-proof'
+        FROM subject_perms WHERE tool_id = 'einvoice-scan';
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'pdf-border' FROM role_perms WHERE tool_id = 'pdf-nup';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'pdf-border'
+        FROM subject_perms WHERE tool_id = 'pdf-nup';
+    """)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -494,7 +580,9 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m12_unprovision_mirrored_users,
               _m13_grant_pdf_to_slides,
               _m14_user_email,
-              _m15_directory_presence]
+              _m15_directory_presence,
+              _m16_session_last_seen, _m17_directory_account_state,
+              _m18_grant_transit_proof_and_border]
 
 
 def auth_db_path() -> Path:

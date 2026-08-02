@@ -59,9 +59,36 @@
     <h3 id="udName" data-s="s53896af7"></h3>
     <div class="ud-dn" id="udDn"></div>
     <input class="field ud-filter" id="udFilter" type="search" placeholder="篩選欄位或值…" hidden>
+    <div class="dir-roles-box" id="udRolesBox" hidden>
+      <div class="dir-roles-title"><b>指派角色給這位使用者</b>
+        <span class="muted" id="udRoleState"></span></div>
+      <div class="dir-roles-chks" id="udRoleChks"></div>
+      <div class="dir-roles-actions">
+        <button class="btn btn-primary btn-small" id="udSaveRoles" type="button">{{ icon('save', size=12) }} 儲存角色</button>
+        <span class="muted" id="udRoleMsg"></span>
+      </div>
+      <p class="muted ud-role-note">還沒登入過的人也可以先指派 —— 系統會建一個
+        <b>未啟用</b>的對應帳號（不設密碼、仍走目錄驗證），本人第一次登入時自動啟用，
+        <b>而且這裡指派的角色不會被預設角色蓋掉</b>。</p>
+    </div>
     <div id="udBody"><p class="muted">查詢中…</p></div>
     <div data-s="s9fa82b78">
       <button class="btn" type="button" id="udClose">{{ icon('close', size=14) }} 關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- 群組角色 modal（從使用者細節的「所屬群組」點進來） -->
+<div id="grModal" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="modal-card">
+    <h3 id="grName" data-s="s53896af7"></h3>
+    <div class="ud-dn" id="grDn"></div>
+    <div class="dir-roles-chks" id="grChks"></div>
+    <div data-s="s9fa82b78">
+      <button class="btn btn-primary" type="button" id="grSave">{{ icon('save', size=14) }} 儲存角色</button>
+      <button class="btn" type="button" id="grClose">{{ icon('close', size=14) }} 關閉</button>
+      <span class="muted" id="grMsg"></span>
     </div>
   </div>
 </div>
@@ -162,6 +189,13 @@
   #udModal .modal-backdrop { position:absolute; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(2px); }
   #udModal .modal-card { position:relative; background:#fff; border-radius:8px; padding:18px 20px; width:100%; max-width:840px; max-height:86vh; overflow:auto; box-shadow:0 16px 48px rgba(0,0,0,.35); z-index:1; }
   .ud-filter { width:100%; margin:2px 0 10px; }
+  .ud-role-note { font-size:11.5px; margin:6px 0 0; }
+  .ud-grp-row { display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+  .ud-grp-row .btn { padding:1px 7px; font-size:11px; }
+  #grModal[hidden] { display:none !important; }
+  #grModal { position:fixed; inset:0; z-index:10000; display:flex; align-items:center; justify-content:center; }
+  #grModal .modal-backdrop { position:absolute; inset:0; background:rgba(15,23,42,.55); }
+  #grModal .modal-card { position:relative; background:#fff; border-radius:8px; padding:18px 20px; width:100%; max-width:560px; max-height:80vh; overflow:auto; box-shadow:0 16px 48px rgba(0,0,0,.35); z-index:1; }
   .ud-table tr[hidden] { display:none; }
   .ud-dn { font-size:11px; color:#9ca3af; word-break:break-all; margin-bottom:8px; }
   .ud-table { width:100%; border-collapse:collapse; font-size:12.5px; }
@@ -483,9 +517,40 @@ const UD_LABELS = {
 const UD_ORDER = ['displayName','cn','sAMAccountName','uid','userPrincipalName',
   'mail','title','department','company','telephoneNumber','mobile','description',
   'memberOf','objectClass','whenCreated','whenChanged'];
+let _udDn = '', _udName = '', _udLogin = '';
+
+function _roleChks(checked) {
+  // 與 OU 那一區同一種寫法（esc 過的靜態 markup）
+  return ALL_ROLES.map(role => {
+    const rid = role.id, on = (checked || []).includes(rid);
+    return `<label class="dir-role-chk"><input type="checkbox" class="ud-role" value="${esc(rid)}" ${on?'checked':''}> ${esc(role.display_name||rid)}</label>`;
+  }).join('');
+}
+
+async function loadUserRoles(dn) {
+  const box = $('udRolesBox'), st = $('udRoleState'), msg = $('udRoleMsg');
+  msg.textContent = ''; st.textContent = '（讀取中…）';
+  $('udRoleChks').innerHTML = '';
+  box.hidden = false;
+  try {
+    const r = await fetch('/admin/directory/user-roles?dn=' + encodeURIComponent(dn));
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
+    $('udRoleChks').innerHTML = _roleChks(j.roles);
+    // 狀態要說得出「這個帳號在本站是什麼情況」—— 不然管理員不知道存下去會怎樣
+    st.textContent = !j.mirrored ? '（本站還沒有這個帳號，儲存時會建立未啟用的對應帳號）'
+                   : (j.logged_in ? '（已登入過本系統）'
+                                  : '（已鏡射，尚未登入 → 未啟用）');
+  } catch (e) {
+    box.hidden = true;
+  }
+}
+
 function openUserDetail(dn, name) {
+  _udDn = dn; _udName = name; _udLogin = '';
   $('udName').textContent = name || '';
   $('udDn').textContent = dn || '';
+  loadUserRoles(dn);
   $('udBody').innerHTML = '<p class="muted">查詢中…</p>';
   $('udBody').style.minHeight = '';   // 清掉上一位使用者鎖定的高度
   const uf = $('udFilter'); if (uf) { uf.value = ''; uf.hidden = true; }
@@ -496,14 +561,28 @@ function openUserDetail(dn, name) {
       if (!ok) throw new Error(j.detail || '查詢失敗');
       const a = j.attrs || {};
       const keys = Object.keys(a);
+      // 帳號名稱在指派角色時要用到（還沒鏡射的人要靠它建列）。**從回傳的屬性取**，
+      // 不要從畫好的表格逆推 —— 那會被中文標籤與篩選字串影響。
+      const _pick = want => {
+        const k = keys.find(x => x.toLowerCase() === want);
+        const v = k ? a[k] : '';
+        return Array.isArray(v) ? (v[0] || '') : String(v || '');
+      };
+      _udLogin = _pick('samaccountname') || _pick('uid') || '';
       const ordered = UD_ORDER.filter(k => keys.some(x => x.toLowerCase() === k.toLowerCase()));
       const rest = keys.filter(k => !ordered.some(o => o.toLowerCase() === k.toLowerCase())).sort();
       const realKey = want => keys.find(x => x.toLowerCase() === want.toLowerCase()) || want;
       const rows = ordered.map(realKey).concat(rest).map(k => {
         const v = a[k];
         const label = UD_LABELS[k] || k;
+        // 所屬群組：每一列給一個「角色」鈕 —— 管理員正好在這裡看到「他屬於哪些
+        // 群組」，權限也多半是掛在群組上，讓他當場就能設，不必再繞去群組管理。
+        const isGroups = k.toLowerCase() === 'memberof';
         const vhtml = Array.isArray(v)
-          ? v.map(x => `<span class="ud-multi">${esc(x)}</span>`).join('')
+          ? v.map(x => isGroups
+              ? `<span class="ud-multi ud-grp-row"><span>${esc(x)}</span>`
+                + `<button class="btn btn-small ud-grp-btn" type="button" data-gdn="${esc(x)}">角色</button></span>`
+              : `<span class="ud-multi">${esc(x)}</span>`).join('')
           : esc(v);
         const vtext = Array.isArray(v) ? v.join(' ') : String(v == null ? '' : v);
         const sf = (label + ' ' + k + ' ' + vtext).toLowerCase();
@@ -511,6 +590,8 @@ function openUserDetail(dn, name) {
       }).join('');
       const badge = j.local ? '<span class="dir-ubadge">✓ 已登入過本系統</span> ' : '';
       $('udBody').innerHTML = badge + `<table class="ud-table"><tbody>${rows}</tbody></table>`;
+      $('udBody').querySelectorAll('.ud-grp-btn').forEach(b =>
+        b.addEventListener('click', () => openGroupRoles(b.dataset.gdn)));
       if (uf) uf.hidden = false;
       // 鎖定目前高度 → 之後篩選隱藏列時高度維持不變（避免視覺跳動）。
       const b = $('udBody'); b.style.minHeight = ''; b.style.minHeight = b.offsetHeight + 'px';
@@ -524,6 +605,65 @@ document.getElementById('udFilter').addEventListener('input', function () {
     tr.hidden = !!q && !(tr.dataset.f || '').includes(q);
   });
 });
+document.getElementById('udSaveRoles').addEventListener('click', async () => {
+  const roles = Array.from(document.querySelectorAll('#udRoleChks .ud-role:checked'))
+                     .map(c => c.value);
+  const msg = $('udRoleMsg'); msg.textContent = ' 儲存中…';
+  const username = _udLogin;
+  try {
+    const r = await fetch('/admin/directory/user-roles', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({dn: _udDn, roles, username,
+                            display_name: _udName}),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
+    msg.textContent = ` ✓ 已儲存（${roles.length} 個角色）`;
+    loadUserRoles(_udDn);
+  } catch (e) { msg.textContent = ' ✗ ' + e.message; }
+});
+
+// ---- 群組角色 ----
+let _grDn = '';
+async function openGroupRoles(dn) {
+  _grDn = dn;
+  $('grDn').textContent = dn;
+  $('grMsg').textContent = '';
+  $('grChks').innerHTML = '<p class="muted">讀取中…</p>';
+  $('grName').textContent = '群組角色';
+  $('grModal').hidden = false;
+  try {
+    const r = await fetch('/admin/directory/group-roles?dn=' + encodeURIComponent(dn));
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
+    $('grName').textContent = j.name || '群組角色';
+    $('grChks').innerHTML = ALL_ROLES.map(role => {
+      const rid = role.id, on = (j.roles || []).includes(rid);
+      return `<label class="dir-role-chk"><input type="checkbox" class="gr-role" value="${esc(rid)}" ${on?'checked':''}> ${esc(role.display_name||rid)}</label>`;
+    }).join('');
+  } catch (e) {
+    $('grChks').innerHTML = '<p class="dir-empty">✗ ' + esc(e.message) + '</p>';
+  }
+}
+document.getElementById('grSave').addEventListener('click', async () => {
+  const roles = Array.from(document.querySelectorAll('#grChks .gr-role:checked'))
+                     .map(c => c.value);
+  const msg = $('grMsg'); msg.textContent = ' 儲存中…';
+  try {
+    const r = await fetch('/admin/directory/group-roles', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({dn: _grDn, roles}),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
+    msg.textContent = ` ✓ 已儲存（${roles.length} 個角色）`;
+  } catch (e) { msg.textContent = ' ✗ ' + e.message; }
+});
+document.getElementById('grClose').addEventListener('click', () =>
+  { document.getElementById('grModal').hidden = true; });
+document.querySelector('#grModal .modal-backdrop').addEventListener('click', () =>
+  { document.getElementById('grModal').hidden = true; });
+
 document.getElementById('udClose').addEventListener('click', () =>
   { document.getElementById('udModal').hidden = true; });
 document.querySelector('#udModal .modal-backdrop').addEventListener('click', () =>

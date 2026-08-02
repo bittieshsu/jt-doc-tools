@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from ...core import pdf_checkbox, pdf_form_detect, pdf_layout, pdf_text_overlay, template_manager as _tm
+from ...core import same_as_ref as _same_as
 
 
 _LIST_SEPARATORS = re.compile(r"[,、，/／;；|]")
@@ -27,6 +28,9 @@ class FillReport:
     # (profile_key, option_text) — for the report UI.
     fingerprint: str = ""
     applied_template: Optional[dict] = None   # template dict if we used one
+    # 展開過的指涉值（「同上」→ 實際內容）。每筆 {key, from, original, value}。
+    # 要顯示給使用者看 —— 悄悄換掉他打的字是這個功能最可能造成的傷害。
+    expanded_refs: list[dict] = field(default_factory=list)
 
 
 def fill_pdf(
@@ -47,12 +51,20 @@ def fill_pdf(
     if overrides:
         profile.update({k: v for k, v in overrides.items() if v is not None})
 
+    # 「發票地址：同上」這種指涉值要先展開成實際內容 —— 直接印「同上」出去，
+    # 在**版面不一樣的新表單**上根本指不到任何東西。展不開的保留原字面（絕不填空），
+    # 展開了哪幾筆會回報給畫面（見 FillReport.expanded_refs）。
+    # **一定要放在 template 分支之前**，兩條路徑都要吃到。
+    profile, expanded_refs = _same_as.resolve_profile(profile)
+
     fingerprint = _tm.compute_fingerprint(src_pdf)
     template = _tm.template_manager.get_by_fingerprint(fingerprint)
     if template:
-        return _fill_from_template(
+        rep = _fill_from_template(
             src_pdf, dst_pdf, profile, template, fingerprint, font_id
         )
+        rep.expanded_refs = expanded_refs
+        return rep
 
     detected, _pages = pdf_form_detect.detect_fields(src_pdf)
     all_checkboxes = pdf_checkbox.extract_checkboxes(src_pdf)
@@ -427,6 +439,7 @@ def fill_pdf(
         checked_boxes=checked,
         fingerprint=fingerprint,
         applied_template=None,
+        expanded_refs=expanded_refs,
     )
 
 
