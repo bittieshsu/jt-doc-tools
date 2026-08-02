@@ -46,7 +46,16 @@
 curl -fsSL https://raw.githubusercontent.com/jasoncheng7115/jt-doc-tools/main/install.sh | sudo bash
 ```
 
-**Windows 10 / 11**（以系統管理員身分執行 PowerShell）:
+**Windows 10 / 11 — 雙擊安裝（推薦，不必開 PowerShell）**：
+
+到 [GitHub Releases](https://github.com/jasoncheng7115/jt-doc-tools/releases/latest) 下載
+`jt-doc-tools-x.y.z-setup.exe`，雙擊執行即可。安裝精靈為繁體中文，內含解除安裝功能。
+
+> **檔名上的版本比較舊沒有關係。** 這支安裝程式只是個引導程式（約 6 MB），
+> 實際的程式碼是**安裝當下才從 GitHub 下載**的，所以不論你手上那支 .exe 是哪一版，
+> 裝起來都會是最新版。安裝程式本身只有在需要改安裝流程時才會重新發佈。
+
+**Windows 10 / 11 — PowerShell 一行指令**（以系統管理員身分執行）:
 ```powershell
 $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.net/gh/jasoncheng7115/jt-doc-tools@main/install.ps1' -OutFile $f -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop; powershell -NoProfile -ExecutionPolicy Bypass -File $f } catch { Write-Host "[X] 下載安裝腳本失敗：$($_.Exception.Message)" -ForegroundColor Red }; Read-Host '按 Enter 關閉'
 ```

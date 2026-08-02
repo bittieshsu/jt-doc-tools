@@ -78,7 +78,21 @@ winget install --id Git.Git -e --accept-package-agreements --accept-source-agree
 > 不需要預先安裝 Python — 由 uv 處理。
 > Office 引擎優先 OxOffice MSI（GitHub release），失敗時 fallback `winget install LibreOffice`。
 
-### 一行安裝
+### 方式一：雙擊安裝程式（推薦）
+
+到 [GitHub Releases](https://github.com/jasoncheng7115/jt-doc-tools/releases/latest) 下載
+`jt-doc-tools-x.y.z-setup.exe`，雙擊執行。安裝精靈為繁體中文，會處理權限提升、
+服務註冊、防火牆例外與 PATH，並內含解除安裝功能。
+
+> **檔名上的版本比較舊沒有關係。** 這支安裝程式是**引導程式**（約 6 MB），
+> 它不含程式碼本身 —— 實際的程式碼是**安裝當下才從 GitHub 抓最新的 main**
+> （有 git 就 `git clone --depth=1`，沒有就下載 zip）。所以不論你手上那支 .exe
+> 是哪一版，裝起來都會是最新版；安裝程式只有在安裝流程本身要改時才會重新發佈。
+>
+> 第一次執行可能會看到 SmartScreen 警告（信譽尚在累積）—— 按「更多資訊」→
+> 「仍要執行」。點開詳細資訊可以看到 SignPath 的簽章。
+
+### 方式二：一行安裝
 
 以<b>「以系統管理員身分執行」</b>開啟 PowerShell（右鍵 PowerShell 圖示 → 系統管理員），貼：
 
