@@ -58,9 +58,10 @@ _CACHE: Optional[dict] = None
 #: `tests/test_job_concurrency.py` 會跟實際掃描結果比對，漏加會紅。
 OFFICE_TOOL_IDS: frozenset[str] = frozenset({
     "doc-deident", "doc-diff", "markdown-to-doc", "office-to-pdf",
-    "pdf-border",
+    "pdf-bookmark", "pdf-border",
     "pdf-extract-text", "pdf-fill", "pdf-nup", "pdf-to-image",
-    "pdf-to-office", "pdf-to-slides", "submission-check", "text-deident",
+    "pdf-page-size", "pdf-seam-stamp", "pdf-to-office", "pdf-to-slides", "submission-check",
+    "text-deident",
     "translate-doc",
 })
 

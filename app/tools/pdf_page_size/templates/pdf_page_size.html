@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}頁面尺寸統一 · {{ app_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ icon('aspect-ratio', size=22) }} 頁面尺寸統一</h1>
+<p class="muted">把混合尺寸的頁面統一成同一種紙張。標案、工程文件常是 <b>A3 圖說混 A4 內文</b> ——
+送印時印表機每換一種尺寸就停一次，裝訂完也會有幾頁凸出來。
+<b>內容維持向量、文字仍然選得到</b>（不是轉成圖片）。</p>
+
+<div class="panel">
+  <h2>1. 上傳檔案</h2>
+  {% with upload_id='psUpload',
+          accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
+          hint='PDF 或文書檔。上傳後會先告訴你這份文件有幾種尺寸。' %}
+    {% include "components/file_upload.html" %}
+  {% endwith %}
+  <div id="psSizes" hidden></div>
+</div>
+
+<div class="panel auth-form" id="psOpts" hidden>
+  <h2>2. 統一成</h2>
+  <fieldset class="auth-section">
+    <legend>{{ icon('page', size=14) }} 目標紙張</legend>
+    <div class="af-attrs">
+      <label class="af-field"><span class="af-label">紙張</span>
+        <span class="af-ctl"><select class="field" id="psPaper">
+          {% for p in papers %}<option value="{{ p }}"{% if p == 'a4' %} selected{% endif %}>{{ p|upper }}</option>{% endfor %}
+          <option value="custom">自訂尺寸</option>
+        </select></span></label>
+      <label class="af-field" id="psCustomBox" hidden><span class="af-label">自訂（mm）</span>
+        <span class="af-ctl ps-wh">
+          <input class="field" type="number" id="psW" value="210" min="20" max="2000" step="1">
+          <input class="field" type="number" id="psH" value="297" min="20" max="2000" step="1">
+        </span></label>
+      <label class="af-field"><span class="af-label">方向</span>
+        <span class="af-ctl"><select class="field" id="psOrient">
+          <option value="auto" selected>跟著原頁（推薦）</option>
+          <option value="portrait">一律直向</option>
+          <option value="landscape">一律橫向</option>
+        </select></span>
+        <small class="af-note">橫的圖說塞進直的 A4 會縮到看不清楚 —— 預設讓橫頁用橫的紙張。</small></label>
+      <label class="af-field"><span class="af-label">原本就對的頁面</span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="psKeep" checked> 不要動</label></span>
+        <small class="af-note">重新放一次會多一層物件、檔案變大，細線也可能被重新取樣。</small></label>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('crop', size=14) }} 內容怎麼放</legend>
+    <div class="ps-fits">
+      <label class="ps-fit"><input type="radio" name="psfit" value="scale" checked>
+        <span class="ps-fit-box">
+          <svg class="ps-fig" viewBox="0 0 100 70" aria-hidden="true">
+            <rect x="2" y="2" width="96" height="66" rx="2" class="fig-paper"/>
+            <rect x="18" y="12" width="64" height="46" rx="1" class="fig-content"/>
+          </svg>
+          <b>縮放留白</b><small>等比縮到塞得進去，四周留白。<b>不會掉內容</b>，最安全。</small>
+        </span></label>
+      <label class="ps-fit"><input type="radio" name="psfit" value="center">
+        <span class="ps-fit-box">
+          <svg class="ps-fig" viewBox="0 0 100 70" aria-hidden="true">
+            <rect x="2" y="2" width="96" height="66" rx="2" class="fig-paper"/>
+            <rect x="-6" y="6" width="112" height="58" rx="1" class="fig-content fig-over"/>
+          </svg>
+          <b>置中不縮放</b><small>維持原尺寸置中。比紙張大的部分<b>會被裁掉</b>。</small>
+        </span></label>
+      <label class="ps-fit"><input type="radio" name="psfit" value="crop">
+        <span class="ps-fit-box">
+          <svg class="ps-fig" viewBox="0 0 100 70" aria-hidden="true">
+            <rect x="2" y="2" width="96" height="66" rx="2" class="fig-paper"/>
+            <rect x="2" y="-4" width="96" height="78" rx="1" class="fig-content fig-over"/>
+          </svg>
+          <b>裁切填滿</b><small>放大到填滿紙張，超出的裁掉。適合只想去白邊。</small>
+        </span></label>
+    </div>
+  </fieldset>
+
+</div>
+
+<div class="panel auth-form" id="psPvPanel" hidden>
+  <h2>3. 預覽</h2>
+  <fieldset class="auth-section">
+    <legend>{{ icon('eye', size=14) }} 處理後長這樣</legend>
+    <p class="muted ps-hint">灰框是<b>目標紙張的邊界</b>，方便看出留白或裁切。
+      混合尺寸的文件要<b>逐頁看</b> —— 每一種原始尺寸的處理結果都不一樣。</p>
+    <label class="af-field ps-pvpick"><span class="af-label">從第幾頁開始看</span>
+      <span class="af-ctl"><input class="field af-mini" type="number" id="psPvPage" value="1" min="1">
+        <span class="af-unit">頁起，一次 20 頁<br><span id="psPvRange" class="af-note"></span></span></span></label>
+    <div class="ps-pages" id="psPages"></div>
+  </fieldset>
+
+  <div class="ps-actions">
+    <button class="btn btn-primary" type="button" id="psSubmit">{{ icon('save', size=14) }} 統一尺寸</button>
+  </div>
+  {% with progress_id='psJob' %}{% include "components/job_progress.html" %}{% endwith %}
+  <div id="psResult" hidden></div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+  .auth-form { max-width: none; }
+  .ps-sizes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .ps-chip { padding: 4px 10px; border-radius: 999px; font-size: 12.5px;
+    background: #eef2ff; color: #3730a3; }
+  .ps-mixed { margin-top: 10px; padding: 9px 12px; border-radius: 8px;
+    background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; font-size: 12.5px; }
+  .ps-ok { margin-top: 10px; padding: 9px 12px; border-radius: 8px;
+    background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-size: 12.5px; }
+  .ps-fits { display: flex; flex-wrap: wrap; gap: 10px; }
+  .ps-fit { flex: 1 1 200px; cursor: pointer; position: relative; }
+  .ps-fit input { position: absolute; opacity: 0; pointer-events: none; }
+  .ps-fit-box { display: block; padding: 11px 13px; border-radius: 9px;
+    border: 1.5px solid var(--border, #e5e7eb); background: #fff; height: 100%; }
+  .ps-fit input:checked + .ps-fit-box { border-color: #4f46e5; background: #eef2ff; }
+  .ps-fit-box small { display: block; margin-top: 3px; color: var(--text-2);
+    font-size: 11.5px; line-height: 1.5; }
+  .ps-fig { display: block; width: 100px; height: 70px; margin-bottom: 6px;
+    overflow: hidden; }
+  .ps-fig .fig-paper { fill: #fff; stroke: #94a3b8; stroke-width: 1.5; }
+  .ps-fig .fig-content { fill: #c7d2fe; stroke: #6366f1; stroke-width: 1; }
+  .ps-fig .fig-over { opacity: .75; }
+  .ps-wh { display: flex; gap: 6px; align-items: center; }
+  .ps-wh input { width: 84px; }
+  .ps-narrow { width: 74px; }
+  .ps-pv { margin-top: 10px; }
+  .ps-pv img { max-width: 380px; border: 1px solid var(--border, #e5e7eb); border-radius: 6px; }
+  /* 混合尺寸要逐頁看 —— 每一種原始尺寸的處理結果都不一樣 */
+  .ps-pages { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+  .ps-page { margin: 0; }
+  .ps-page .jt-thumb { display: block; width: 200px; min-height: 150px;
+    background: #f8fafc; border: 1px solid var(--border, #e5e7eb); border-radius: 6px; }
+  .ps-page img { display: block; width: 100%; border-radius: 6px; }
+  .ps-page figcaption { margin-top: 4px; font-size: 11.5px; color: var(--muted); text-align: center; }
+  .ps-pvpick { max-width: 340px; }
+  .ps-hint { font-size: 12px; margin-top: 6px; }
+  .ps-actions { margin-top: 16px; }
+  .ps-res { margin-top: 12px; padding: 12px 14px; border-radius: 8px;
+    background: #ecfdf5; border: 1px solid #a7f3d0; font-size: 13px; }
+  .ps-warn { margin-top: 8px; padding: 8px 11px; border-radius: 7px;
+    background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; font-size: 12.5px; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script>
+<script src="/static/js/job_progress.js"></script>
+<script src="/static/js/workspace_picker.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let uploadId = null, pageCount = 0, token = 0;
+
+  const progress = new JobProgress($('psJob'), {
+    onDone: (job) => {
+      $('psSubmit').disabled = false;
+      const r = ((job && job.meta) || {}).resize_result || {};
+      const box = $('psResult');
+      box.textContent = '';
+      box.className = 'ps-res';
+      const l = document.createElement('div');
+      l.textContent = '完成：共 ' + (r.total || 0) + ' 頁，調整 ' + (r.changed || 0)
+        + ' 頁' + (r.skipped_same ? '、' + r.skipped_same + ' 頁原本就對（沒有動）' : '')
+        + '。下載按鈕在上方。';
+      box.appendChild(l);
+      (r.warnings || []).forEach(w => {
+        const d = document.createElement('div');
+        d.className = 'ps-warn';
+        d.textContent = w;
+        box.appendChild(d);
+      });
+      box.hidden = false;
+    },
+    onError: () => { $('psSubmit').disabled = false; },
+  });
+
+  function form() {
+    const fd = new FormData();
+    fd.append('upload_id', uploadId || '');
+    fd.append('paper', $('psPaper').value);
+    fd.append('custom_w_mm', $('psW').value);
+    fd.append('custom_h_mm', $('psH').value);
+    fd.append('orientation', $('psOrient').value);
+    fd.append('fit', document.querySelector('input[name=psfit]:checked').value);
+    fd.append('align', 'center');
+    fd.append('keep_same', $('psKeep').checked ? 'true' : 'false');
+    return fd;
+  }
+
+  // 預覽是**真的處理那些頁再算圖**（與送出同一段程式）。
+  // **一次算多頁**：混合尺寸的文件每一種原始尺寸的處理結果都不一樣，
+  // 只看一頁根本判斷不出設定對不對。
+  const PV_PAGES = 20;
+  const PV_CONC = 4;      // 20 張逐一等太久；併行太多又會把伺服器塞住
+
+  function mkThumb(box, label) {
+    const fig = document.createElement('figure');
+    fig.className = 'ps-page';
+    // 縮圖是向伺服器要的，往返要時間 —— 沒有這個狀態使用者分不出
+    // 「還在算」還是「壞掉了」
+    const wrap = document.createElement('span');
+    wrap.className = 'jt-thumb is-loading';
+    const im = document.createElement('img');
+    im.alt = label;
+    wrap.appendChild(im);
+    const cap = document.createElement('figcaption');
+    cap.textContent = label;
+    fig.appendChild(wrap); fig.appendChild(cap);
+    box.appendChild(fig);
+    return [wrap, im];
+  }
+
+  async function refresh() {
+    if (!uploadId) return;
+    const my = ++token;
+    const box = $('psPages');
+    const start = Math.min(Math.max(1, parseInt($('psPvPage').value, 10) || 1),
+                           Math.max(1, pageCount));
+    const last = Math.min(start + PV_PAGES - 1, pageCount);
+    box.textContent = '';
+    const jobs = [];
+    for (let p = start; p <= last; p++) {
+      const [wrap, im] = mkThumb(box, `第 ${p} 頁`);
+      jobs.push([p, wrap, im]);
+    }
+    $('psPvRange').textContent = (start === last)
+      ? `第 ${start} 頁（共 ${pageCount} 頁）`
+      : `第 ${start}-${last} 頁（共 ${pageCount} 頁）`;
+
+    let next = 0;
+    async function worker() {
+      while (true) {
+        const k = next++;
+        if (k >= jobs.length || my !== token) return;
+        const [p, wrap, im] = jobs[k];
+        const fd = form();
+        fd.append('page_no', String(p));
+        try {
+          const r = await fetch('/tools/pdf-page-size/preview',
+                                {method: 'POST', body: fd});
+          if (my !== token) return;
+          if (!r.ok) { wrap.className = 'jt-thumb is-error'; continue; }
+          const b = await r.blob();
+          if (my !== token) return;
+          im.dataset.url = URL.createObjectURL(b);
+          im.src = im.dataset.url;
+          wrap.className = 'jt-thumb';
+        } catch (e) {
+          wrap.className = 'jt-thumb is-error';
+        }
+      }
+    }
+    await Promise.all(Array.from({length: PV_CONC}, worker));
+  }
+
+  let timer = null;
+  function schedule() { clearTimeout(timer); timer = setTimeout(refresh, 240); }
+
+  $('psPaper').addEventListener('change', () => {
+    $('psCustomBox').hidden = $('psPaper').value !== 'custom';
+    schedule();
+  });
+  ['psW', 'psH', 'psOrient', 'psKeep', 'psPvPage'].forEach(id =>
+    $(id).addEventListener('input', schedule));
+  $('psOrient').addEventListener('change', schedule);
+  document.querySelectorAll('input[name=psfit]').forEach(r =>
+    r.addEventListener('change', schedule));
+
+  function showSizes(d) {
+    const box = $('psSizes');
+    box.textContent = '';
+    const chips = document.createElement('div');
+    chips.className = 'ps-sizes';
+    (d.sizes || []).forEach(s => {
+      const c = document.createElement('span');
+      c.className = 'ps-chip';
+      c.textContent = s.label + ' × ' + s.pages + ' 頁';
+      chips.appendChild(c);
+    });
+    box.appendChild(chips);
+    const note = document.createElement('div');
+    if (d.mixed) {
+      note.className = 'ps-mixed';
+      note.textContent = '這份文件有 ' + (d.sizes || []).length
+        + ' 種頁面尺寸 —— 送印或裝訂前建議統一。';
+    } else {
+      note.className = 'ps-ok';
+      note.textContent = '這份文件的頁面尺寸本來就一致（'
+        + (((d.sizes || [])[0] || {}).label || '') + '）—— 不一定需要處理。';
+    }
+    box.appendChild(note);
+    box.hidden = false;
+  }
+
+  const fu = new FileUpload($('psUpload'), async (f) => {
+    const fd = new FormData();
+    fd.append('file', f);
+    const r = await fu.upload('/tools/pdf-page-size/load', fd,
+      {processingLabel: '分析尺寸中…'});
+    if (!r.ok) {
+      (window.showAlert || alert)(await window.friendlyServerError(r, '讀取失敗'));
+      return;
+    }
+    const d = await r.json();
+    uploadId = d.upload_id;
+    pageCount = d.total;
+    $('psPvPage').max = String(pageCount);
+    showSizes(d);
+    $('psOpts').hidden = false;
+    $('psPvPanel').hidden = false;
+    $('psResult').hidden = true;
+    refresh();
+  });
+
+  $('psSubmit').addEventListener('click', async () => {
+    if (!uploadId) return;
+    $('psSubmit').disabled = true;
+    try {
+      const r = await fetch('/tools/pdf-page-size/submit', {method: 'POST', body: form()});
+      if (!r.ok) throw new Error(await window.friendlyServerError(r, '產生失敗'));
+      const j = await r.json();
+      progress.track(j.job_id);
+    } catch (e) {
+      $('psSubmit').disabled = false;
+      (window.showAlert || alert)(e.message);
+    }
+  });
+})();
+</script>
+{% endblock %}

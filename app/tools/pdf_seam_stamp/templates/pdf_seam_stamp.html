@@ -1,0 +1,529 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}騎縫章 · {{ app_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ icon('stamp', size=22) }} 騎縫章</h1>
+<p class="muted">一個印章切成數片，蓋在連續幾頁上 —— <b>任何一頁被抽換或掉頁，那一片就對不起來</b>。
+合約、標案防抽換頁的實務作法。印章可以從資產庫選、自己上傳，或由系統產生。</p>
+
+<div class="panel">
+  <h2>1. 上傳文件</h2>
+  {% with upload_id='smUpload',
+          accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
+          hint='PDF 或文書檔（文書檔會先自動轉成 PDF）。至少要 2 頁。' %}
+    {% include "components/file_upload.html" %}
+  {% endwith %}
+  <div class="sm-stat" id="smStat" hidden>
+    <span class="sm-kv">頁數 <b id="smPages">-</b></span>
+    <span class="sm-kv">分成 <b id="smGroups">-</b> 組</span>
+  </div>
+</div>
+
+<div class="panel auth-form" id="smOpts" hidden>
+  <h2>2. 印章</h2>
+  <fieldset class="auth-section">
+    <legend>{{ icon('stamp', size=14) }} 印章來源</legend>
+    <div class="sm-srcs">
+      <label class="sm-src"><input type="radio" name="smsrc" value="generate" checked>
+        <span class="sm-src-box"><b>系統產生</b><small>輸入文字，直接畫一個紅章</small></span></label>
+      <label class="sm-src"><input type="radio" name="smsrc" value="asset">
+        <span class="sm-src-box"><b>從資產庫選</b><small>管理員上傳的公司章 / 簽名</small></span></label>
+      <label class="sm-src"><input type="radio" name="smsrc" value="upload">
+        <span class="sm-src-box"><b>自己上傳</b><small>PNG / JPG，白底會自動去掉</small></span></label>
+    </div>
+
+    <div class="af-attrs" id="smGenBox">
+      <label class="af-field"><span class="af-label">章面文字</span>
+        <span class="af-ctl"><input class="field" type="text" id="smText" value="騎縫章" maxlength="30"></span>
+        <small class="af-note">可以打公司全名。字多時章會自動變寬（長方）或分行（圓 / 方），字級不會縮小。</small></label>
+      <label class="af-field"><span class="af-label">形狀</span>
+        <span class="af-ctl"><select class="field" id="smShape">
+          <option value="circle" selected>圓章</option>
+          <option value="square">方章</option>
+          <option value="rect">長方（橫式）</option>
+        </select></span></label>
+      <label class="af-field"><span class="af-label">顏色</span>
+        <span class="af-ctl sm-color"><input type="color" id="smColor" value="#c81414">
+          <input class="field" type="text" id="smColorHex" value="#c81414" maxlength="7"></span></label>
+      <label class="af-field"><span class="af-label">雙線框</span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="smRing" checked> 內側再加一圈細線</label></span></label>
+    </div>
+
+    <div id="smAssetBox" hidden>
+      {% if assets %}
+      {# 印章是圖 —— 下拉只看得到名字，挑不出要哪一個。列出縮圖點選。 #}
+      <div class="asset-list sm-assets">
+        {% for a in assets %}
+        <label class="asset-item">
+          <div class="thumb"><img src="/assets/{{ a.id }}/thumb" alt="{{ a.name }}"></div>
+          <div class="name"><input type="radio" name="smAssetPick" value="{{ a.id }}"
+            {% if loop.first %}checked{% endif %}> {{ a.name }}</div>
+        </label>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty">資產庫裡還沒有印章 —— 請管理員到「<a href="/admin/assets">資產管理</a>」上傳，
+        或改用上面的「系統產生」/「自己上傳」。</div>
+      {% endif %}
+    </div>
+
+    <div class="af-attrs" id="smUpBox" hidden>
+      <label class="af-field af-field-wide"><span class="af-label">印章圖檔</span>
+        <span class="af-ctl"><input class="field" type="file" id="smStampFile" accept="image/png,image/jpeg"></span>
+        <small class="af-note">接近純白的底會自動轉成透明，蓋上去不會擋住內文。</small></label>
+    </div>
+    <div class="sm-stamp-pv"><img id="smStampImg" alt="印章預覽" hidden></div>
+  </fieldset>
+
+</div>
+
+<div class="panel auth-form" id="smHowPanel" hidden>
+  <h2>3. 怎麼蓋</h2>
+  <fieldset class="auth-section">
+    <legend>{{ icon('layers', size=14) }} 模式</legend>
+    <div class="sm-modes">
+      <label class="sm-mode"><input type="radio" name="smmode" value="side" checked>
+        <span class="sm-mode-box">
+          {# 示意圖：紙張疊起來扇開，章蓋在整疊的側邊 #}
+          <svg class="sm-fig" viewBox="0 0 120 78" aria-hidden="true">
+            <rect x="6" y="14" width="70" height="58" rx="2" class="fig-pg"/>
+            <rect x="16" y="9" width="70" height="58" rx="2" class="fig-pg"/>
+            <rect x="26" y="4" width="70" height="58" rx="2" class="fig-pg"/>
+            <path d="M84 20 a15 15 0 1 0 0 28" class="fig-ink"/>
+            <path d="M94 20 a15 15 0 1 1 0 28" class="fig-ink"/>
+            <line x1="78" y1="34" x2="100" y2="34" class="fig-ink"/>
+          </svg>
+          <b>側邊騎縫</b>
+          <small>紙張<b>疊起來</b>扇開，章蓋在整疊的側邊。每頁各拿一片，位置一律貼齊同一邊。合約最常用。</small>
+        </span></label>
+      <label class="sm-mode"><input type="radio" name="smmode" value="spread">
+        <span class="sm-mode-box">
+          {# 示意圖：兩頁並排攤開，章跨在中間的接縫上 #}
+          <svg class="sm-fig" viewBox="0 0 120 78" aria-hidden="true">
+            <rect x="8" y="8" width="48" height="62" rx="2" class="fig-pg"/>
+            <rect x="64" y="8" width="48" height="62" rx="2" class="fig-pg"/>
+            <path d="M56 26 a13 13 0 0 0 0 26" class="fig-ink"/>
+            <path d="M64 26 a13 13 0 0 1 0 26" class="fig-ink"/>
+            <line x1="47" y1="39" x2="73" y2="39" class="fig-ink"/>
+          </svg>
+          <b>對開跨頁</b>
+          <small>紙張<b>並排攤開</b>（裝訂成冊的樣子），章橫跨接縫。第一頁在右緣、最後一頁在左緣。</small>
+        </span></label>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('gear', size=14) }} 參數</legend>
+    <div class="af-attrs">
+      <label class="af-field"><span class="af-label">一個章跨幾頁</span>
+        <span class="af-ctl"><input class="field" type="number" id="smGroup" value="2" min="0" max="50">
+          <span class="af-unit">頁</span></span>
+        <small class="af-note">0 = 整份文件一個章。</small></label>
+      <label class="af-field"><span class="af-label">貼哪一邊</span>
+        <span class="af-ctl"><select class="field" id="smEdge">
+          <option value="right" selected>右緣</option><option value="left">左緣</option>
+        </select></span>
+        <small class="af-note">只有側邊騎縫用得到。</small></label>
+      <label class="af-field"><span class="af-label">章的大小</span>
+        <span class="af-ctl"><input class="field" type="number" id="smSize" value="40" min="8" max="120" step="1">
+          <span class="af-unit">mm</span></span>
+        <small class="af-note">整個章的寬度，切片後平分。</small></label>
+      <label class="af-field"><span class="af-label">離頁緣</span>
+        <span class="af-ctl"><input class="field" type="number" id="smOffset" value="3" min="0" max="60" step="1">
+          <span class="af-unit">mm</span></span>
+        <small class="af-note">留太多會看不出跨頁。</small></label>
+      <label class="af-field"><span class="af-label">上下位置</span>
+        <span class="af-ctl"><input class="field" type="number" id="smPos" value="0" min="-200" max="200" step="5">
+          <span class="af-unit">mm</span></span>
+        <small class="af-note">0 = 垂直置中，正值往下。</small></label>
+      <label class="af-field"><span class="af-label">濃度</span>
+        <span class="af-ctl"><input class="field" type="number" id="smOpacity" value="100" min="5" max="100" step="5">
+          <span class="af-unit">%</span></span>
+        <small class="af-note">調低一點才不會擋住內文。</small></label>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('dice', size=14) }} 位置與角度</legend>
+    <div class="af-attrs">
+      <label class="af-field"><span class="af-label">角度</span>
+        <span class="af-ctl"><input class="field" type="number" id="smAngle" value="0" min="-45" max="45" step="1">
+          <span class="af-unit">度</span></span>
+        <small class="af-note">章會<b>整個</b>先轉好再切片，接縫才對得起來。</small></label>
+      <label class="af-field"><span class="af-label">角度亂數</span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="smJA"> 每組不同</label>
+          <input class="field af-mini" type="number" id="smJADeg" value="4" min="0" max="8" step="1">
+          <span class="af-unit">度內</span></span>
+        <small class="af-note">手工蓋章本來就會歪一點。歪太多會蓋到內文，上限 8 度。</small></label>
+      <label class="af-field"><span class="af-label">位置亂數</span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="smJP"> 每組不同</label>
+          <input class="field af-mini" type="number" id="smJPMm" value="12" min="0" max="60" step="1">
+          <span class="af-unit">mm 內</span></span>
+        <small class="af-note">固定位置像機器蓋的；亂數接近手工，也比較難仿造。</small></label>
+      <label class="af-field"><span class="af-label">亂數種子</span>
+        <span class="af-ctl"><input class="field" type="number" id="smSeed" value="0" min="0"></span>
+        <small class="af-note">0 = 每次都不一樣。產生後會告訴你用了哪個種子，填回來就能重現。</small></label>
+    </div>
+  </fieldset>
+
+</div>
+
+<div class="panel auth-form" id="smPvPanel" hidden>
+  <h2>4. 預覽</h2>
+  <fieldset class="auth-section">
+    <legend>{{ icon('eye', size=14) }} 拼回去長這樣</legend>
+    <p class="muted sm-hint">只看單頁只會看到一條細片，判斷不出對不對 ——
+      這裡把<b>整組的片拼回去</b>，看是不是一個完整的章（片與片之間的縫是刻意畫的，
+      讓你看得出切在哪裡）。</p>
+    <div class="sm-assembled"><img id="smAsmImg" alt="拼回去的印章" hidden></div>
+    <div class="sm-pagepv">
+      {# 一組的每一頁都要列出來 —— 只看一頁只有一條細片，看不出接縫連不連得起來 #}
+      <label class="af-field sm-grouppick"><span class="af-label">預覽第幾組</span>
+        <span class="af-ctl"><input class="field af-mini" type="number" id="smPvGroup"
+          value="1" min="1"><span class="af-unit">組（<span id="smPvRange">—</span>）</span></span></label>
+      <div class="sm-pages" id="smPagePv"></div>
+    </div>
+  </fieldset>
+
+  <div class="sm-actions">
+    <button class="btn btn-primary" type="button" id="smSubmit">{{ icon('stamp', size=14) }} 蓋上騎縫章</button>
+  </div>
+  {% with progress_id='smJob' %}{% include "components/job_progress.html" %}{% endwith %}
+  <div id="smResult" hidden></div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+  .auth-form { max-width: none; }
+  .sm-stat { display: flex; gap: 14px; margin-top: 10px; font-size: 13px; }
+  .sm-kv { color: var(--text-2); }
+  /* 選擇卡片與下方欄位之間要留白 —— 貼在一起會讀成「欄位屬於最後一張卡片」。
+     `.af-attrs` 是 platform.css 的共用類別（其他頁也在用），所以留白加在這裡。 */
+  .sm-srcs, .sm-modes { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .sm-src, .sm-mode { flex: 1 1 210px; cursor: pointer; position: relative; }
+  .sm-src input, .sm-mode input { position: absolute; opacity: 0; pointer-events: none; }
+  .sm-src-box, .sm-mode-box { display: block; padding: 11px 13px; border-radius: 9px;
+    border: 1.5px solid var(--border, #e5e7eb); background: #fff; height: 100%; }
+  .sm-src input:checked + .sm-src-box,
+  .sm-mode input:checked + .sm-mode-box { border-color: #4f46e5; background: #eef2ff; }
+  .sm-src-box small, .sm-mode-box small { display: block; margin-top: 3px;
+    color: var(--text-2); font-size: 11.5px; line-height: 1.5; }
+  .sm-fig { display: block; width: 118px; height: 76px; margin-bottom: 6px; }
+  .sm-fig .fig-pg { fill: #fff; stroke: #94a3b8; stroke-width: 1.5; }
+  .sm-fig .fig-ink { fill: none; stroke: #c81414; stroke-width: 2.5; }
+  .sm-color { display: flex; gap: 6px; align-items: center; }
+  .sm-color input[type=color] { width: 40px; height: 30px; padding: 0; border: 0; background: none; }
+  .sm-color input[type=text] { width: 92px; }
+  .sm-narrow { width: 74px; }
+  .sm-stamp-pv, .sm-assembled, .sm-pv { margin-top: 10px; }
+  .sm-stamp-pv img { max-width: 120px; }
+  .sm-assembled img { max-width: 100%; border: 1px solid var(--border, #e5e7eb);
+    border-radius: 6px; padding: 6px; background: #fff; }
+  .sm-pv img { max-width: 340px; border: 1px solid var(--border, #e5e7eb); border-radius: 6px; }
+  /* 一組的每一頁並排 —— 接縫連不連得起來要靠相鄰兩頁對照才看得出來 */
+  .sm-pages { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px;
+    align-items: flex-start; }
+  .sm-page { margin: 0; }
+  .sm-page .jt-thumb { display: block; width: 210px; min-height: 150px;
+    background: #f8fafc; border: 1px solid var(--border, #e5e7eb); border-radius: 6px; }
+  .sm-page img { display: block; width: 100%; border-radius: 6px; }
+  .sm-page figcaption { margin-top: 4px; font-size: 11.5px; color: var(--muted); text-align: center; }
+  .sm-grouppick { max-width: 320px; }
+  /* 同一組包成一塊 —— 一組的頁面不可以被換行拆到不同行 */
+  .sm-group { border: 1px solid var(--border, #e5e7eb); border-radius: 9px;
+    padding: 9px 11px 11px; background: #fff; }
+  .sm-group-t { font-size: 11.5px; font-weight: 600; color: #4f46e5;
+    margin-bottom: 7px; }
+  .sm-group-row { display: flex; gap: 10px; flex-wrap: nowrap; overflow-x: auto; }
+  .sm-hint { font-size: 12px; }
+  .sm-pagepv { margin-top: 14px; }
+  .sm-actions { margin-top: 16px; }
+  .sm-res { margin-top: 12px; padding: 12px 14px; border-radius: 8px;
+    background: #ecfdf5; border: 1px solid #a7f3d0; font-size: 13px; }
+  .sm-warn { margin-top: 8px; padding: 8px 11px; border-radius: 7px;
+    background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; font-size: 12.5px; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script>
+<script src="/static/js/job_progress.js"></script>
+<script src="/static/js/workspace_picker.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let uploadId = null, pageCount = 0, token = 0;
+
+  const progress = new JobProgress($('smJob'), {
+    onDone: (job) => {
+      $('smSubmit').disabled = false;
+      const r = ((job && job.meta) || {}).seam_result || {};
+      const box = $('smResult');
+      box.textContent = '';
+      box.className = 'sm-res';
+      const l1 = document.createElement('div');
+      l1.textContent = '完成：' + (r.groups || 0) + ' 組騎縫章，每組 '
+        + (r.per_group || 0) + ' 頁。下載按鈕在上方。';
+      box.appendChild(l1);
+      if (r.seed) {
+        const l2 = document.createElement('div');
+        l2.className = 'muted';
+        l2.textContent = '亂數種子 ' + r.seed + '（填回設定就能重現同一份）';
+        box.appendChild(l2);
+      }
+      (r.warnings || []).forEach(w => {
+        const d = document.createElement('div');
+        d.className = 'sm-warn';
+        d.textContent = w;
+        box.appendChild(d);
+      });
+      box.hidden = false;
+    },
+    onError: () => { $('smSubmit').disabled = false; },
+  });
+
+  function form() {
+    const fd = new FormData();
+    fd.append('upload_id', uploadId || '');
+    fd.append('source', document.querySelector('input[name=smsrc]:checked').value);
+    const pick = document.querySelector('input[name=smAssetPick]:checked');
+    fd.append('asset_id', pick ? pick.value : '');
+    fd.append('text', $('smText').value);
+    fd.append('shape', $('smShape').value);
+    fd.append('color', $('smColorHex').value);
+    fd.append('double_ring', $('smRing').checked ? 'true' : 'false');
+    fd.append('mode', document.querySelector('input[name=smmode]:checked').value);
+    fd.append('group', $('smGroup').value);
+    fd.append('edge', $('smEdge').value);
+    fd.append('size_mm', $('smSize').value);
+    fd.append('offset_mm', $('smOffset').value);
+    fd.append('pos_mm', $('smPos').value);
+    fd.append('angle_deg', $('smAngle').value);
+    fd.append('opacity', String((parseFloat($('smOpacity').value) || 100) / 100));
+    fd.append('jitter_pos', $('smJP').checked ? 'true' : 'false');
+    fd.append('jitter_pos_mm', $('smJPMm').value);
+    fd.append('jitter_angle', $('smJA').checked ? 'true' : 'false');
+    fd.append('jitter_angle_deg', $('smJADeg').value);
+    fd.append('seed', $('smSeed').value);
+    return fd;
+  }
+
+  // 預覽都是**真的畫進 PDF 再算圖**（與送出走同一段程式）——
+  // 前端模擬的預覽遲早跟實際輸出對不起來，而騎縫章差一點就拼不回去。
+  function updateGroups() {
+    const g = parseInt($('smGroup').value, 10) || 0;
+    const per = (g <= 0 || g > pageCount) ? pageCount : g;
+    $('smGroups').textContent = String(Math.ceil(pageCount / Math.max(1, per)));
+  }
+
+  async function refresh() {
+    if (!uploadId) return;
+    updateGroups();          // 純算術，先更新 —— 不要等三張預覽圖都回來
+    const my = ++token;
+    const jobs = [
+      ['/tools/pdf-seam-stamp/stamp-preview', $('smStampImg'), null],
+      ['/tools/pdf-seam-stamp/assembled', $('smAsmImg'), null],
+    ];
+    for (const j of jobs) {
+      const url = j[0], img = j[1], extra = j[2];
+      const fd = form();
+      if (extra) fd.append(extra[0], extra[1]);
+      try {
+        const r = await fetch(url, {method: 'POST', body: fd});
+        if (my !== token) return;            // 過期的回應直接丟掉
+        if (!r.ok) { img.hidden = true; continue; }
+        const b = await r.blob();
+        if (my !== token) return;
+        if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+        const u = URL.createObjectURL(b);
+        img.dataset.url = u;
+        img.src = u;
+        img.hidden = false;
+      } catch (e) { img.hidden = true; }
+    }
+    await refreshPages(my);
+  }
+
+  // 該組的**每一頁**都算一張 —— 逐頁看才知道接縫是不是真的連得起來。
+  // 從所選的組開始往後排，最多 20 頁：一次只看一組看不出「每一組都對」，
+  // 而位置 / 角度亂數本來就是每組不同的。
+  const PV_PAGES = 20;
+  const PV_CONC = 4;      // 20 張逐一等太久；併行太多又會把伺服器塞住
+
+  function groupPages() {
+    const g = parseInt($('smGroup').value, 10) || 0;
+    const per = (g <= 0 || g > pageCount) ? pageCount : g;
+    const total = Math.ceil(pageCount / Math.max(1, per));
+    let gi = parseInt($('smPvGroup').value, 10) || 1;
+    gi = Math.min(Math.max(1, gi), Math.max(1, total));
+    const first = (gi - 1) * per + 1;
+    const last = Math.min(first + PV_PAGES - 1, pageCount);
+    const pages = [];
+    for (let p = first; p <= last; p++) {
+      // 標出組界，才看得出「這兩張屬於同一個章」
+      pages.push({page: p, group: Math.floor((p - 1) / per) + 1,
+                  head: ((p - 1) % per) === 0});
+    }
+    return {pages, total, per, first, last, gi};
+  }
+
+  async function refreshPages(my) {
+    const box = $('smPagePv');
+    const {pages, total, per, first, last, gi} = groupPages();
+    $('smPvGroup').max = String(Math.max(1, total));
+    const shownGroups = new Set(pages.map(x => x.group)).size;
+    $('smPvRange').textContent =
+      `共 ${total} 組、每組 ${per} 頁；這裡顯示第 ${first}-${last} 頁`
+      + (shownGroups > 1 ? `（第 ${gi}-${gi + shownGroups - 1} 組）` : '');
+    box.textContent = '';
+    // **同一組的頁面要包在一起**：騎縫章要看的就是「相鄰兩頁接不接得起來」，
+    // 讓它們被換行拆開等於把最該比對的兩張分到不同行。
+    const jobs = [];
+    let cur = null, curGroup = null;
+    pages.forEach(x => {
+      if (x.group !== curGroup) {
+        curGroup = x.group;
+        cur = document.createElement('div');
+        cur.className = 'sm-group';
+        const head = document.createElement('div');
+        head.className = 'sm-group-t';
+        head.textContent = `第 ${x.group} 組`;
+        cur.appendChild(head);
+        const row = document.createElement('div');
+        row.className = 'sm-group-row';
+        cur.appendChild(row);
+        cur._row = row;
+        box.appendChild(cur);
+      }
+      const fig = document.createElement('figure');
+      fig.className = 'sm-page';
+      // 縮圖是向伺服器要的，往返要時間 —— 沒有這個狀態使用者分不出
+      // 「還在算」還是「壞掉了」
+      const wrap = document.createElement('span');
+      wrap.className = 'jt-thumb is-loading';
+      const im = document.createElement('img');
+      im.alt = `第 ${x.page} 頁`;
+      wrap.appendChild(im);
+      const cap = document.createElement('figcaption');
+      cap.textContent = `第 ${x.page} 頁`;
+      fig.appendChild(wrap); fig.appendChild(cap);
+      cur._row.appendChild(fig);
+      jobs.push([x.page, wrap, im]);
+    });
+
+    let next = 0;
+    async function worker() {
+      while (true) {
+        const k = next++;
+        if (k >= jobs.length || my !== token) return;
+        const [pno, wrap, im] = jobs[k];
+        const fd = form();
+        fd.append('page_no', String(pno));
+        try {
+          const r = await fetch('/tools/pdf-seam-stamp/preview',
+                                {method: 'POST', body: fd});
+          if (my !== token) return;
+          if (!r.ok) { wrap.className = 'jt-thumb is-error'; continue; }
+          const b = await r.blob();
+          if (my !== token) return;
+          im.dataset.url = URL.createObjectURL(b);
+          im.src = im.dataset.url;
+          wrap.className = 'jt-thumb';
+        } catch (e) {
+          wrap.className = 'jt-thumb is-error';
+        }
+      }
+    }
+    await Promise.all(Array.from({length: PV_CONC}, worker));
+  }
+
+  let timer = null;
+  function schedule() { clearTimeout(timer); timer = setTimeout(refresh, 260); }
+
+  document.querySelectorAll('input[name=smsrc]').forEach(r =>
+    r.addEventListener('change', () => {
+      const v = document.querySelector('input[name=smsrc]:checked').value;
+      $('smGenBox').hidden = v !== 'generate';
+      $('smAssetBox').hidden = v !== 'asset';
+      $('smUpBox').hidden = v !== 'upload';
+      schedule();
+    }));
+
+  $('smColor').addEventListener('input', () => {
+    $('smColorHex').value = $('smColor').value; schedule();
+  });
+  $('smColorHex').addEventListener('input', () => {
+    if (/^#[0-9a-fA-F]{6}$/.test($('smColorHex').value)) {
+      $('smColor').value = $('smColorHex').value;
+    }
+    schedule();
+  });
+
+  ['smText','smShape','smRing','smGroup','smEdge','smSize','smOffset','smPos',
+   'smOpacity','smAngle','smJA','smJADeg','smJP','smJPMm','smSeed',
+   'smPvGroup'].forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('input', () => { if (id === 'smGroup') updateGroups(); schedule(); });
+    if (el.tagName === 'SELECT') el.addEventListener('change', schedule);
+  });
+  document.querySelectorAll('input[name=smAssetPick]').forEach(r =>
+    r.addEventListener('change', schedule));
+  document.querySelectorAll('input[name=smmode]').forEach(r =>
+    r.addEventListener('change', schedule));
+
+  $('smStampFile').addEventListener('change', async () => {
+    const f = $('smStampFile').files[0];
+    if (!f || !uploadId) return;
+    const fd = new FormData();
+    fd.append('upload_id', uploadId);
+    fd.append('file', f);
+    const r = await fetch('/tools/pdf-seam-stamp/stamp-upload', {method: 'POST', body: fd});
+    if (!r.ok) {
+      (window.showAlert || alert)(await window.friendlyServerError(r, '印章上傳失敗'));
+      return;
+    }
+    schedule();
+  });
+
+  const fu = new FileUpload($('smUpload'), async (f) => {
+    const fd = new FormData();
+    fd.append('file', f);
+    const r = await fu.upload('/tools/pdf-seam-stamp/load', fd,
+      {processingLabel: '讀取中…（文書檔會先轉成 PDF）'});
+    if (!r.ok) {
+      (window.showAlert || alert)(await window.friendlyServerError(r, '讀取失敗'));
+      return;
+    }
+    const d = await r.json();
+    uploadId = d.upload_id;
+    pageCount = d.page_count;
+    $('smPages').textContent = String(pageCount);
+    $('smPvGroup').value = '1';
+    $('smStat').hidden = false;
+    $('smOpts').hidden = false;
+    $('smHowPanel').hidden = false;
+    $('smPvPanel').hidden = false;
+    $('smResult').hidden = true;
+    updateGroups();
+    refresh();
+  });
+
+  $('smSubmit').addEventListener('click', async () => {
+    if (!uploadId) return;
+    $('smSubmit').disabled = true;
+    try {
+      const r = await fetch('/tools/pdf-seam-stamp/submit', {method: 'POST', body: form()});
+      if (!r.ok) throw new Error(await window.friendlyServerError(r, '產生失敗'));
+      const j = await r.json();
+      progress.track(j.job_id);
+    } catch (e) {
+      $('smSubmit').disabled = false;
+      (window.showAlert || alert)(e.message);
+    }
+  });
+})();
+</script>
+{% endblock %}

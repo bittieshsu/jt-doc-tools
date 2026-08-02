@@ -17,7 +17,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.19"
+VERSION = "1.14.22"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -235,6 +235,9 @@ _TOOL_ALIASES = {
     "pdf-to-slides":      "pdf2pptx pdf-to-pptx pdf-to-odp pdf-to-slides pptx odp powerpoint impress keynote slide slides presentation deck convert reverse PDF轉簡報 PDF轉PPT PDF轉PPTX PDF轉ODP 簡報 投影片 簡報檔 轉簡報 轉投影片 轉成 ppt 轉成 pptx 版面重現 一頁一張投影片 可編輯",
     "pdf-to-markdown":    "pdf2md pdf-to-md pdf-to-markdown markdown md llm rag pymupdf4llm convert structured text 轉 markdown 轉成 markdown 結構化 標題層級 表格 餵 LLM RAG 預處理 chunking 文件轉換",
     "markdown-to-doc":    "md2doc md-to-doc markdown-to-doc markdown to pdf docx odt office convert export theme style commonmark gfm Markdown 轉 PDF 轉 Word 轉文書 轉換 主題 配色 渲染 報告 文件 預覽",
+    "pdf-page-size":      "page size paper resize normalize unify uniform a4 a3 a5 b4 b5 letter legal tabloid mixed landscape portrait orientation scale fit crop margin 頁面尺寸 紙張 尺寸統一 統一尺寸 大小 A4 A3 混合尺寸 混排 直向 橫向 方向 縮放 留白 裁切 填滿 送印 裝訂 圖說 標案 工程",
+    "pdf-seam-stamp":     "seam seal perforation straddle chop stamp across pages tamper evident contract tender anti swap sliced rotate jitter random 騎縫章 騎縫印 騎縫 跨頁章 防抽換 防換頁 抽換 合約 標案 投標 用印 蓋章 切片 分片 側邊 對開 亂數 角度",
+    "pdf-bookmark":       "bookmark bookmarks outline toc table of contents index navigation nested level chapter merge combine tender annual report 書籤 大綱 目錄 導覽 索引 章節 層級 巢狀 合併 串接 標案 投標 年報 結案報告 目錄頁 可點 跳頁 加書籤 建目錄",
     "submission-check":   "submission check submit review verify validate checklist pre-flight preflight completeness case bid tender application 送件 送審 投標 標案 申請 檢核 檢查 核對 清單 缺件 漏件 齊備 完整性 驗收 案件 送出前",
     "transit-proof":      "transit proof commute travel receipt ticket hsr tra mrt bus taxi easycard ipass reimbursement expense 乘車 乘車證明 交通 車票 高鐵 台鐵 捷運 公車 計程車 悠遊卡 一卡通 差旅 出差 報帳 核銷 憑證 整理",
 }

@@ -132,10 +132,23 @@ def render_inline(text: str) -> str:
     text = html.escape(text)
 
     # restore tokens
+    #
+    # **一定要重複還原到沒有佔位符為止**：佔位符會巢狀。`**依 `x` 而定**` 的
+    # 處理順序是 code span 先被抽走成 \x000\x00，接著 bold 把「含佔位符的整段」
+    # 再抽成 token 1 —— 只掃一次的話還原出 token 1 之後，裡面那個 \x000\x00
+    # 就永遠留在輸出裡（`re.sub` 不會回頭重掃自己的替換結果）。
+    # 症狀是 HTML 裡出現 NUL 位元組、而且**該段程式碼字面直接從畫面上消失**，
+    # 不會有任何錯誤訊息。
     def restore(m: re.Match) -> str:
         return tokens[int(m.group(1))]
 
-    text = re.sub(r"\x00(\d+)\x00", restore, text)
+    for _ in range(10):
+        new = re.sub(r"\x00(\d+)\x00", restore, text)
+        if new == text:
+            break
+        text = new
+    if "\x00" in text:  # 巢狀深到異常 —— 寧可炸掉也不要產出毀損的頁面
+        raise ValueError(f"行內標記巢狀過深，佔位符無法還原：{text[:120]!r}")
     return text
 
 

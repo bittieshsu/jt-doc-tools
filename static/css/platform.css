@@ -829,8 +829,53 @@ select.jt-select-native {
   .auth-section > legend svg.ic { color:#4f46e5; flex-shrink:0; }
   .af-attrs {
     display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap:14px;
+    gap:14px 18px;
   }
+  /* 一格欄位：標籤 / 控制項 / 說明**各佔一行**。
+     `<small class="af-note">` 預設是 inline，不給 display:block 的話會直接接在
+     輸入框右邊隨意換行 —— 一整排看起來就是雜的。同理數字框與下拉沒被
+     `.auth-form input.field[type=text]` 那條規則涵蓋，寬度會各自為政。 */
+  .auth-form .af-field { display:flex; flex-direction:column; gap:5px; min-width:0; }
+  .auth-form .af-field > .af-label { margin-bottom:0; }
+  .auth-form .af-field-wide { grid-column:1 / -1; }
+  .auth-form .af-ctl { display:flex; align-items:center; gap:8px; min-width:0; }
+  .auth-form .af-ctl > input.field,
+  .auth-form .af-ctl > select.field {
+    flex:1 1 auto; width:100%; min-width:0; box-sizing:border-box;
+    padding:7px 10px; border:1px solid var(--border); border-radius:5px;
+    font:inherit; background:#fff; height:34px;
+  }
+  /* 單位後綴（mm / % / 度）—— 放進欄位而不是塞在標籤裡，標籤才短得下來 */
+  .auth-form .af-unit { flex:0 0 auto; font-size:12px; color:var(--muted); }
+  /* 勾選框：文字長短差很多（「每組不同」vs「在最前面產生目錄頁」），
+     所以不設 nowrap，讓長的自己折行；`align-items:flex-start` 讓折行時
+     方框仍對齊第一行而不是被推到中間。 */
+  .auth-form .af-ctl > .chk { flex:1 1 auto; display:inline-flex; align-items:flex-start;
+    gap:6px; font-size:12.5px; line-height:1.45; cursor:pointer; }
+  .auth-form .af-ctl > .chk input { margin-top:2px; }
+  .auth-form .af-ctl > .chk input { flex:0 0 auto; }
+  .auth-form .af-ctl > input.field.af-mini { flex:0 0 76px; width:76px; }
+  .auth-form .af-note {
+    display:block; font-size:11.5px; color:var(--muted); line-height:1.55;
+  }
+
+/* ===== 預覽縮圖的載入 / 失敗狀態 =====
+   縮圖是**向伺服器要的**（每張都是真的處理那一頁再算圖），往返要時間；
+   期間如果只放一個沒有 src 的 <img>，瀏覽器會畫成破圖或空白 —— 使用者
+   分不出「還在算」還是「壞掉了」。算失敗時也要講，不能留一格空白。 */
+.jt-thumb { position:relative; display:block; }
+.jt-thumb.is-loading::after,
+.jt-thumb.is-error::after {
+  content:""; position:absolute; left:50%; top:50%; width:20px; height:20px;
+  margin:-10px 0 0 -10px; border:2px solid #94a3b8; border-right-color:transparent;
+  border-radius:50%; animation:spin 0.7s linear infinite;
+}
+.jt-thumb.is-error::after {
+  animation:none; border:0; margin:-9px 0 0 -46px; width:92px; height:auto;
+  content:"算不出來"; font-size:11.5px; color:#b91c1c; text-align:center;
+}
+/* 還沒算好之前不要顯示 <img> 本身 —— 破圖圖示比空白更難看 */
+.jt-thumb.is-loading img, .jt-thumb.is-error img { visibility:hidden; }
   .af-details { margin-top:8px; }
   .af-details summary {
     cursor:pointer; user-select:none; padding:6px 10px; font-size:12px;

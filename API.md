@@ -208,6 +208,72 @@ curl -s http://localhost:8765/tools/pdf-to-office/preview/$JOB/result/1 \
 
 ---
 
+### PDF 轉 Markdown
+
+把 PDF 抽成 Markdown。單次呼叫直接回內容，不走 job 模式。
+
+```text
+POST /tools/pdf-to-markdown/api/pdf-to-markdown
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | ✓ | PDF |
+| `include_images` | bool | | 是否一併輸出內嵌圖片，預設 `false` |
+| `page_separator` | bool | | 頁與頁之間插入分隔線，預設 `true` |
+| `image_format` | str | | 圖片格式 `png`（預設）/ `jpg`，僅 `include_images=true` 時有效 |
+
+```bash
+# 只要文字：回 text/markdown
+curl -X POST http://localhost:8765/tools/pdf-to-markdown/api/pdf-to-markdown \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@report.pdf" --output report.md
+
+# 連圖片一起：回 ZIP（.md + 圖片檔）
+curl -X POST http://localhost:8765/tools/pdf-to-markdown/api/pdf-to-markdown \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@report.pdf" -F "include_images=true" --output report.zip
+```
+
+**回應型別依 `include_images` 而不同**：`false` 回 `text/markdown`，`true` 回 `application/zip`。
+
+---
+
+### Markdown 轉文書
+
+把 Markdown 轉成 PDF / Word / OpenDocument。內容可用 `file` 上傳，也可以直接用 `text` 帶進來。
+
+```text
+POST /tools/markdown-to-doc/api/markdown-to-doc
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | △ | Markdown 檔。與 `text` 擇一 |
+| `text` | str | △ | 直接帶 Markdown 內容。與 `file` 擇一 |
+| `format` | str | | `pdf`（預設）/ `docx` / `odt`。其他值回 400 |
+| `theme` | str | | 版面主題，預設 `classic` |
+| `font` | str | | 字型，預設 `default` |
+| `title` | str | | 文件標題 |
+
+```bash
+# 檔案轉 PDF
+curl -X POST http://localhost:8765/tools/markdown-to-doc/api/markdown-to-doc \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@notes.md" -F "format=pdf" --output notes.pdf
+
+# 直接帶內容轉 Word
+curl -X POST http://localhost:8765/tools/markdown-to-doc/api/markdown-to-doc \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  --form-string "text=# 標題
+
+內文。" -F "format=docx" --output notes.docx
+```
+
+直接回檔案本身（不是 JSON）。`format` 給了 `pdf` / `docx` / `odt` 以外的值回 `400`。
+
+---
+
 ## 4. PDF 編修 API
 
 
@@ -410,6 +476,110 @@ curl -X POST http://localhost:8765/tools/pdf-border/api/pdf-border \
 ```
 
 回應：加完框線的 PDF。所有數值都會在伺服器端夾在安全範圍內。
+
+### PDF 書籤與目錄
+
+替 PDF 加書籤（閱讀器左側的導覽）與可點的目錄頁。**傳多個檔案會自動串接，並以檔名建立第一層書籤**，子文件原有的書籤降一層保留。收 PDF 與文書檔（文書檔會先自動轉成 PDF）。
+
+```text
+POST /tools/pdf-bookmark/api/pdf-bookmark
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `files` | file[] | ✓ | 一或多個 PDF / 文書檔。多檔時依順序串接 |
+| `bookmarks` | str | | 自己指定書籤（JSON 陣列，每筆 `{"title","page","level"}`）。給了就取代自動產生的 |
+| `auto` | bool | | 依字級自動偵測標題，預設 `false`（只在沒有 `bookmarks` 且單檔時有作用） |
+| `toc_page` | bool | | 插入目錄頁，預設 `false` |
+| `toc_at` | int | | 目錄插在第幾頁之前，預設 `1`（最前面）。**有封面就填 `2`** |
+| `toc_title` | str | | 目錄頁標題，預設 `目錄` |
+| `toc_max_level` | int | | 目錄列到第幾層（1~3），預設 `3` |
+
+書籤的**層級必須從 1 開始且一次只能加一層**（1→3 會被自動修成 1→2），**頁碼超出總頁數會被夾到最後一頁** —— 兩者都會自動修正，不會失敗。插入目錄頁之後頁碼會自動往後移，不需要自己算 —— **`toc_at` 之前的書籤不會被動到**（指向封面的那一筆仍然是第 1 頁）。
+
+```bash
+# 多檔串接 + 以檔名建書籤 + 產生目錄頁
+curl -X POST http://localhost:8765/tools/pdf-bookmark/api/pdf-bookmark \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "files=@投標須知.pdf" -F "files=@規格書.pdf" -F "files=@價格標.pdf" \
+  -F "toc_page=true" \
+  --output 標案文件.pdf
+
+# 單檔 + 自己指定書籤
+curl -X POST http://localhost:8765/tools/pdf-bookmark/api/pdf-bookmark \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "files=@report.pdf" \
+  -F 'bookmarks=[{"title":"第一章","page":1,"level":1},{"title":"1.1 背景","page":3,"level":2}]' \
+  --output report_bm.pdf
+```
+
+回應：加好書籤的 PDF。
+
+### PDF 騎縫章
+
+一個印章切成數片蓋在連續頁面上 —— 任何一頁被抽換或掉頁，那一片就對不起來。收 PDF 與文書檔。
+
+```text
+POST /tools/pdf-seam-stamp/api/pdf-seam-stamp
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | ✓ | PDF 或文書檔，**至少 2 頁** |
+| `stamp` | file | | 自己的印章圖（PNG / JPG，接近純白的底會自動去掉）。不給就由系統產生 |
+| `text` | str | | 系統產生時的章面文字，預設 `騎縫章`（4 字以內排成田字） |
+| `shape` | str | | `circle`（預設）/ `square` / `rect` |
+| `color` | str | | 印章顏色 hex，預設 `#c81414` |
+| `mode` | str | | `side`（側邊騎縫，預設）/ `spread`（對開跨頁） |
+| `group` | int | | 一個章跨幾頁，預設 `2`；`0` = 整份文件一個章 |
+| `edge` | str | | side 模式貼哪一邊：`right`（預設）/ `left` |
+| `size_mm` | float | | 章的大小（mm），預設 `40` |
+| `offset_mm` | float | | 離頁緣（mm），預設 `3` |
+| `pos_mm` | float | | 上下位置（mm），`0` = 垂直置中 |
+| `angle_deg` | float | | 角度，預設 `0` |
+| `opacity` | float | | 濃度 `0`~`1`，預設 `1` |
+| `jitter_pos` | bool | | 每組高度亂數，預設 `false` |
+| `jitter_angle` | bool | | 每組角度亂數（上限 ±8 度），預設 `false` |
+| `seed` | int | | 亂數種子；`0` = 隨機 |
+
+**角度是整個章先轉好才切片** —— 反過來（先切再各自旋轉）接縫會對不起來。**同一組內的片位置與角度完全一致**，否則拼不回去。
+
+```bash
+curl -X POST http://localhost:8765/tools/pdf-seam-stamp/api/pdf-seam-stamp \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@contract.pdf" -F "text=節省" -F "group=3" \
+  -F "mode=side" -F "size_mm=45" -F "jitter_angle=true" \
+  --output contract_seam.pdf
+```
+
+回應：蓋好騎縫章的 PDF。
+
+### PDF 頁面尺寸統一
+
+把混合尺寸的頁面統一成同一種紙張。內容維持向量（文字仍選得到），不是轉成圖片。
+
+```text
+POST /tools/pdf-page-size/api/pdf-page-size
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | ✓ | PDF 或文書檔 |
+| `paper` | str | | `a3` / `a4`（預設）/ `a5` / `b4` / `b5` / `letter` / `legal` / `tabloid` / `custom` |
+| `custom_w_mm` `custom_h_mm` | float | | `paper=custom` 時的寬高（mm） |
+| `orientation` | str | | `auto`（跟著原頁，預設）/ `portrait` / `landscape` |
+| `fit` | str | | `scale`（縮放留白，預設，不會掉內容）/ `center`（置中不縮放，超出會裁掉）/ `crop`（放大填滿） |
+| `align` | str | | `center`（預設）/ `top-left` |
+| `keep_same` | bool | | 原本就是目標尺寸的頁面不動，預設 `true` |
+
+```bash
+curl -X POST http://localhost:8765/tools/pdf-page-size/api/pdf-page-size \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@tender.pdf" -F "paper=a4" -F "orientation=auto" -F "fit=scale" \
+  --output tender_a4.pdf
+```
+
+回應：統一尺寸後的 PDF。
 
 ### PDF 多頁合一（N-up）
 
@@ -1266,6 +1436,40 @@ curl -X DELETE http://localhost:8765/tools/submission-check/api/self-entities/ab
 ```
 
 回應 JSON：實體清單 / 操作結果。
+
+---
+
+### 乘車證明整理
+
+解析一批台鐵 / 高鐵乘車證明 PDF，回結構化 JSON。**只解析、不寫入使用者的清單**。
+
+```text
+POST /tools/transit-proof/api/transit-proof
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `files` | file[] | ✓ | 乘車證明 PDF，一次最多 200 個 |
+
+```bash
+curl -X POST http://localhost:8765/tools/transit-proof/api/transit-proof \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "files=@proof1.pdf" -F "files=@proof2.pdf" | jq
+```
+
+```json
+{
+  "ok": true,
+  "count": 1,
+  "entries": [{"date": "...", "from": "...", "to": "...", "amount": 0}],
+  "failed": [{"file": "other.pdf",
+              "error": "無法辨識為乘車證明（格式不符或版面不支援）"}]
+}
+```
+
+**認不出來的檔案不會讓整批失敗** —— 成功的進 `entries`，失敗的逐檔列在 `failed`
+（HTTP 仍是 200）。要判斷有沒有漏，看 `failed` 是不是空的，不要只看 HTTP 狀態。
+超過 200 個檔案回 `400`；完全沒帶 `files` 回 `422`。
 
 ---
 

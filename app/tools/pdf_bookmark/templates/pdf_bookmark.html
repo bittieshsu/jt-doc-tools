@@ -1,0 +1,493 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}書籤與目錄 · {{ app_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ icon('list', size=22) }} 書籤與目錄</h1>
+<p class="muted">替 PDF 加上<b>書籤</b>（閱讀器左側那排導覽）與<b>目錄頁</b>。
+<b>一次選多個檔案會自動串接，並以檔名建立第一層書籤</b> —— 標案、年報這種十幾個檔
+合成幾百頁的文件最有感。也可以自動偵測標題，或直接貼上現成的目錄清單。</p>
+
+<div class="panel">
+  <h2>1. 上傳檔案</h2>
+  {% with upload_id='bmUpload',
+          accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
+          multiple=true,
+          hint='可一次選多個 —— 依選取順序串接，每個檔名成為第一層書籤。文書檔會先自動轉成 PDF。' %}
+    {% include "components/file_upload.html" %}
+  {% endwith %}
+  <div class="bm-stat" id="bmStat" hidden>
+    <span class="bm-kv">頁數 <b id="bmPages">-</b></span>
+    <span class="bm-kv">書籤 <b id="bmCount">0</b></span>
+    <span class="bm-kv" id="bmMergedKv" hidden>{{ icon('merge', size=13) }} 已串接 <b id="bmFiles">0</b> 個檔案</span>
+  </div>
+</div>
+
+<div class="panel auth-form" id="bmOpts" hidden>
+  <h2>2. 書籤</h2>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('sparkles', size=14) }} 快速產生</legend>
+    <div class="bm-gen">
+      <button class="btn" type="button" id="bmAuto">{{ icon('search', size=14) }} 自動偵測標題</button>
+      <button class="btn" type="button" id="bmPasteToggle">{{ icon('text', size=14) }} 貼上目錄清單</button>
+      <button class="btn" type="button" id="bmAddRow">{{ icon('plus', size=14) }} 新增一筆</button>
+      <button class="btn btn-danger" type="button" id="bmClear">{{ icon('trash', size=14) }} 全部清除</button>
+    </div>
+    <p class="muted bm-hint">自動偵測是依<b>字級大小</b>猜的 —— 對排版規矩的文件很準，
+      對簡報 / 表單 / 掃描檔不準。<b>結果是草稿，送出前請自己看過。</b></p>
+    <div id="bmPasteBox" hidden>
+      <textarea class="field bm-paste" id="bmPasteText" rows="7"
+        placeholder="一行一筆，行尾的數字是頁碼；開頭的縮排決定層級（每 2 個空白一層）：&#10;第一章 緒論      3&#10;  1.1 研究背景   5&#10;  1.2 研究方法   9&#10;第二章 文獻探討  14"></textarea>
+      <button class="btn btn-primary btn-small" type="button" id="bmPasteApply">套用</button>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('list', size=14) }} 書籤清單</legend>
+    <div class="bm-table-wrap">
+      <table class="bm-table">
+        <thead><tr>
+          <th class="bm-c-lv">層級</th><th>標題</th>
+          <th class="bm-c-pg">頁碼</th><th class="bm-c-act"></th>
+        </tr></thead>
+        <tbody id="bmRows"></tbody>
+      </table>
+      <p class="muted bm-empty" id="bmEmpty">還沒有任何書籤。用上面的按鈕產生，或按「新增一筆」自己加。</p>
+    </div>
+    <div class="bm-warn" id="bmWarn" hidden></div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('page', size=14) }} 目錄頁（選用）</legend>
+    <div class="af-attrs">
+      <label class="af-field af-field-wide">
+        <span class="af-label">插入目錄頁</span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="bmToc"> 產生可以印出來的目錄頁</label></span>
+        <small class="af-note">插入後頁碼會往後移 —— 書籤與目錄上的頁碼都會自動跟著調整，不必自己算。</small>
+      </label>
+      <label class="af-field">
+        <span class="af-label">目錄標題</span>
+        <span class="af-ctl"><input class="field" type="text" id="bmTocTitle" value="目錄" maxlength="40"></span>
+      </label>
+      <label class="af-field">
+        <span class="af-label">插在第幾頁</span>
+        <span class="af-ctl"><input class="field af-mini" type="number" id="bmTocAt"
+          value="1" min="1"><span class="af-unit">頁之前</span></span>
+        <small class="af-note">1 = 最前面。<b>有封面就填 2</b>，目錄會排在封面後面。
+          插入點之前的書籤頁碼不會被動到。</small>
+      </label>
+      <label class="af-field">
+        <span class="af-label">列到第幾層</span>
+        <span class="af-ctl">
+          <select class="field" id="bmTocLevel">
+            <option value="1">只列第 1 層</option>
+            <option value="2">列到第 2 層</option>
+            <option value="3" selected>列到第 3 層</option>
+          </select>
+        </span>
+      </label>
+      <label class="af-field">
+        <span class="af-label">引導點</span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="bmTocDots" checked> 標題與頁碼之間加點線</label></span>
+      </label>
+    </div>
+  </fieldset>
+
+</div>
+
+<div class="panel auth-form" id="bmPvPanel" hidden>
+  <h2>3. 預覽</h2>
+  <fieldset class="auth-section">
+    <legend>{{ icon('eye', size=14) }} 目錄頁長這樣</legend>
+    <p class="muted bm-hint"><b>書籤看不到</b> —— 它在閱讀器左側的「書籤 / 大綱」面板，
+      不在頁面內容裡。這裡預覽的是<b>目錄頁</b>，也就是印得出來的那一張。</p>
+    <div class="bm-pv" id="bmPv">
+      <p class="muted bm-empty" id="bmPvOff">還沒勾「在最前面產生目錄頁」 ——
+        勾了才會有目錄頁可以看。</p>
+    </div>
+  </fieldset>
+
+  <div class="bm-actions">
+    <button class="btn btn-primary" type="button" id="bmSubmit">{{ icon('save', size=14) }} 產生 PDF</button>
+  </div>
+  {% with progress_id='bmJob' %}{% include "components/job_progress.html" %}{% endwith %}
+  <div id="bmResult" hidden></div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+  /* 書籤表格很寬，這一頁的面板要全寬（auth-form 預設限寬） */
+  .auth-form { max-width: none; }
+  .bm-stat { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 13px; }
+  .bm-kv { color: var(--text-2); }
+  .bm-gen { display: flex; flex-wrap: wrap; gap: 8px; }
+  .bm-hint { font-size: 12px; margin: 8px 0 0; }
+  .bm-paste { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+              font-size: 12.5px; margin: 10px 0 8px; }
+  .bm-table-wrap { overflow-x: auto; }
+  .bm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .bm-table th { text-align: left; font-size: 12px; color: var(--text-2);
+                 padding: 4px 6px; border-bottom: 1px solid var(--border, #e5e7eb); }
+  .bm-table td { padding: 3px 6px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  .bm-c-lv { width: 96px; }
+  .bm-c-pg { width: 88px; }
+  .bm-c-act { width: 112px; }
+  .bm-table input[type=text] { width: 100%; }
+  .bm-table input[type=number] { width: 70px; }
+  .bm-lv { display: inline-flex; align-items: center; gap: 3px; }
+  .bm-lv-n { font-variant-numeric: tabular-nums; min-width: 14px; text-align: center;
+             color: var(--text-2); font-size: 12px; }
+  .bm-ind { padding: 0 6px; }
+  .bm-empty { font-size: 12.5px; margin: 10px 0 0; }
+  .bm-warn { margin-top: 10px; padding: 9px 12px; border-radius: 8px;
+             background: #fffbeb; border: 1px solid #fcd34d; color: #92400e;
+             font-size: 12.5px; }
+  .bm-warn ul { margin: 4px 0 0; padding-left: 18px; }
+  .bm-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+  .bm-res { margin-top: 12px; padding: 12px 14px; border-radius: 8px;
+            background: #ecfdf5; border: 1px solid #a7f3d0; font-size: 13px; }
+  .bm-res .btn { margin-top: 8px; }
+  .bm-res-tip { margin-top: 6px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .bm-pv { margin-top: 10px; }
+  .bm-pv .jt-thumb { display: block; min-height: 160px; }
+  .bm-pv img { display: block; max-width: 420px; width: 100%;
+    border: 1px solid var(--border, #e5e7eb); border-radius: 6px; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script>
+<script src="/static/js/job_progress.js"></script>
+<script src="/static/js/workspace_picker.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const progress = new JobProgress(document.getElementById('bmJob'), {
+    onDone: (job) => {
+      $('bmSubmit').disabled = false;
+      const res = ((job && job.meta) || {}).bookmark_result || {};
+      const box = $('bmResult');
+      box.textContent = '';
+      box.className = 'bm-res';
+      const line = document.createElement('div');
+      line.textContent = '完成：' + (res.bookmark_count || 0) + ' 個書籤'
+        + (res.toc_pages ? '、' + res.toc_pages + ' 頁目錄' : '')
+        + '，共 ' + (res.page_count || 0) + ' 頁。下載按鈕在上方。';
+      box.appendChild(line);
+      // 「沒看到目錄」是最常見的誤會 —— 書籤在閱讀器側邊欄，不在頁面內容裡；
+      // 而目錄頁是**選用**的，沒勾就不會有。兩件事都要在結果講清楚。
+      const tip = document.createElement('div');
+      tip.className = 'bm-res-tip';
+      tip.textContent = res.toc_pages
+        ? '書籤要打開閱讀器左側的「書籤 / 大綱」面板才看得到；目錄頁在文件最前面。'
+        : '書籤要打開閱讀器左側的「書籤 / 大綱」面板才看得到（不會出現在頁面內容裡）。'
+          + '想要一頁看得見、印得出來的目錄，請勾選上方的「在最前面產生目錄頁」再產生一次。';
+      box.appendChild(tip);
+      if (res.warnings && res.warnings.length) showWarnings(res.warnings);
+      box.hidden = false;
+    },
+    onError: () => { $('bmSubmit').disabled = false; },
+  });
+  let uploadId = null;
+  let pageCount = 0;
+  let items = [];        // [{title, page, level}] —— 單一事實來源
+
+  // ---------- 畫清單 ----------
+  // 動態文字一律 textContent：標題來自使用者輸入與 PDF 內容，不可以當 HTML。
+  function renderRows() {
+    const tb = $('bmRows');
+    tb.textContent = '';
+    items.forEach((it, idx) => {
+      const tr = document.createElement('tr');
+
+      const tdLv = document.createElement('td');
+      const wrap = document.createElement('span');
+      wrap.className = 'bm-lv';
+      const bOut = mkBtn('‹', '往上一層', () => changeLevel(idx, -1), 'bm-ind');
+      const nSpan = document.createElement('span');
+      nSpan.className = 'bm-lv-n';
+      nSpan.textContent = String(it.level);
+      const bIn = mkBtn('›', '往下一層', () => changeLevel(idx, 1), 'bm-ind');
+      wrap.append(bOut, nSpan, bIn);
+      tdLv.appendChild(wrap);
+
+      const tdTitle = document.createElement('td');
+      const inTitle = document.createElement('input');
+      inTitle.className = 'field';
+      inTitle.type = 'text';
+      inTitle.maxLength = 300;
+      inTitle.value = it.title;
+      // 縮排讓層級一眼看得出來（純視覺，不影響資料）。
+      // CSP 不允許 inline style 屬性 —— 用 CSSOM 設。
+      inTitle.style.setProperty('padding-left', ((it.level - 1) * 16 + 8) + 'px');
+      inTitle.addEventListener('input', () => { items[idx].title = inTitle.value; });
+      tdTitle.appendChild(inTitle);
+
+      const tdPg = document.createElement('td');
+      const inPg = document.createElement('input');
+      inPg.className = 'field';
+      inPg.type = 'number';
+      inPg.min = '1';
+      inPg.max = String(pageCount || 1);
+      inPg.value = String(it.page);
+      inPg.addEventListener('input', () => {
+        items[idx].page = parseInt(inPg.value, 10) || 1;
+      });
+      tdPg.appendChild(inPg);
+
+      const tdAct = document.createElement('td');
+      tdAct.append(
+        mkBtn('↑', '上移', () => move(idx, -1)),
+        mkBtn('↓', '下移', () => move(idx, 1)),
+        mkBtn('✕', '刪除', () => { items.splice(idx, 1); renderRows(); }));
+
+      tr.append(tdLv, tdTitle, tdPg, tdAct);
+      tb.appendChild(tr);
+    });
+    $('bmEmpty').hidden = items.length > 0;
+    $('bmCount').textContent = String(items.length);
+  }
+
+  function mkBtn(label, title, fn, extra) {
+    const b = document.createElement('button');
+    b.className = 'btn btn-small' + (extra ? ' ' + extra : '');
+    b.type = 'button';
+    b.textContent = label;
+    b.title = title;
+    b.addEventListener('click', fn);
+    return b;
+  }
+
+  function changeLevel(idx, delta) {
+    items[idx].level = Math.max(1, Math.min(6, items[idx].level + delta));
+    renderRows();
+    validate();        // 可能違反「不可跳級」—— 讓後端講，規則只有一份
+  }
+
+  function move(idx, delta) {
+    const j = idx + delta;
+    if (j < 0 || j >= items.length) return;
+    const t = items[idx]; items[idx] = items[j]; items[j] = t;
+    renderRows();
+    validate();
+  }
+
+  function showWarnings(list) {
+    const box = $('bmWarn');
+    box.textContent = '';
+    if (!list || !list.length) { box.hidden = true; return; }
+    const head = document.createElement('div');
+    head.textContent = '以下項目已自動調整：';
+    const ul = document.createElement('ul');
+    list.slice(0, 30).forEach(w => {
+      const li = document.createElement('li');
+      li.textContent = w;
+      ul.appendChild(li);
+    });
+    box.append(head, ul);
+    if (list.length > 30) {
+      const more = document.createElement('div');
+      more.textContent = '（另有 ' + (list.length - 30) + ' 項未列出）';
+      box.appendChild(more);
+    }
+    box.hidden = false;
+  }
+
+  function applyPayload(j) {
+    uploadId = j.upload_id;
+    pageCount = j.page_count || 0;
+    items = (j.bookmarks || []).map(b => ({title: b.title, page: b.page, level: b.level}));
+    $('bmPages').textContent = String(pageCount);
+    $('bmStat').hidden = false;
+    $('bmOpts').hidden = false;
+    $('bmPvPanel').hidden = false;
+    renderRows();
+    showWarnings(j.warnings);
+    schedulePreview();
+  }
+
+  // ---------- 目錄頁預覽 ----------
+  // 走與送出**同一支** build_toc_page，所以看到的就是印出來的。
+  let pvTimer = null, pvToken = 0;
+  function schedulePreview() {
+    clearTimeout(pvTimer);
+    pvTimer = setTimeout(refreshPreview, 320);
+  }
+
+  async function refreshPreview() {
+    const box = $('bmPv');
+    if (!uploadId) return;
+    if (!$('bmToc').checked || !items.length) {
+      box.textContent = '';
+      const off = document.createElement('p');
+      off.className = 'muted bm-empty';
+      off.textContent = items.length
+        ? '還沒勾「在最前面產生目錄頁」 —— 勾了才會有目錄頁可以看。'
+        : '還沒有任何書籤，先在上面產生書籤再看目錄頁。';
+      box.appendChild(off);
+      return;
+    }
+    const my = ++pvToken;
+    // 目錄頁是向伺服器要的，往返要時間 —— 先放載入狀態，不要留一格空白
+    box.textContent = '';
+    const wrap = document.createElement('span');
+    wrap.className = 'jt-thumb is-loading';
+    const im0 = document.createElement('img');
+    im0.alt = '目錄頁預覽';
+    wrap.appendChild(im0);
+    box.appendChild(wrap);
+    const fd = new FormData();
+    fd.append('upload_id', uploadId);
+    fd.append('bookmarks', JSON.stringify(items));
+    fd.append('toc_title', $('bmTocTitle').value);
+    fd.append('toc_max_level', $('bmTocLevel').value);
+    fd.append('toc_dots', $('bmTocDots').checked ? 'true' : 'false');
+    fd.append('toc_at', $('bmTocAt').value);
+    fd.append('page_no', '1');
+    try {
+      const r = await fetch('/tools/pdf-bookmark/toc-preview',
+                            {method: 'POST', body: fd});
+      if (my !== pvToken) return;
+      if (!r.ok) { wrap.className = 'jt-thumb is-error'; return; }
+      const total = parseInt(r.headers.get('X-Toc-Pages') || '1', 10) || 1;
+      const b = await r.blob();
+      if (my !== pvToken) return;
+      im0.src = URL.createObjectURL(b);
+      wrap.className = 'jt-thumb';
+      const cap = document.createElement('p');
+      cap.className = 'muted bm-empty';
+      cap.textContent = total > 1
+        ? `目錄共 ${total} 頁，這裡顯示第 1 頁。`
+        : '目錄共 1 頁。';
+      box.appendChild(cap);
+    } catch (e) { wrap.className = 'jt-thumb is-error'; }
+  }
+
+  ['bmToc', 'bmTocTitle', 'bmTocLevel', 'bmTocDots', 'bmTocAt'].forEach(id => {
+    const el = $(id);
+    if (el) {
+      el.addEventListener('input', schedulePreview);
+      el.addEventListener('change', schedulePreview);
+    }
+  });
+
+  // 層級 / 頁碼規則只寫在後端一份，前端不自己算 —— 兩邊各寫一份遲早不一致
+  async function validate() {
+    if (!uploadId) return;
+    const fd = new FormData();
+    fd.append('upload_id', uploadId);
+    fd.append('bookmarks', JSON.stringify(items));
+    const r = await fetch('/tools/pdf-bookmark/validate', {method: 'POST', body: fd});
+    if (!r.ok) return;
+    const j = await r.json();
+    items = (j.bookmarks || []).map(b => ({title: b.title, page: b.page, level: b.level}));
+    renderRows();
+    showWarnings(j.warnings);
+  }
+
+  // ---------- 上傳 ----------
+  const fu = new FileUpload($('bmUpload'), async (arr) => {
+    const files = Array.isArray(arr) ? arr : [arr];
+    if (!files.length) return;
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    const r = await fu.upload('/tools/pdf-bookmark/load', fd,
+      {processingLabel: files.length > 1 ? '串接中…' : '讀取中…'});
+    if (!r.ok) {
+      (window.showAlert || alert)(await window.friendlyServerError(r, '讀取失敗'));
+      return;
+    }
+    applyPayload(await r.json());
+    $('bmMergedKv').hidden = files.length < 2;
+    $('bmFiles').textContent = String(files.length);
+    $('bmResult').hidden = true;
+  });
+
+  // ---------- 產生 ----------
+  $('bmAuto').addEventListener('click', async () => {
+    if (!uploadId) return;
+    const b = $('bmAuto');
+    b.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append('upload_id', uploadId);
+      const r = await fetch('/tools/pdf-bookmark/auto-detect', {method: 'POST', body: fd});
+      if (!r.ok) throw new Error(await window.friendlyServerError(r, '偵測失敗'));
+      applyPayload(await r.json());
+    } catch (e) {
+      (window.showAlert || alert)(e.message);
+    } finally {
+      b.disabled = false;
+    }
+  });
+
+  $('bmPasteToggle').addEventListener('click', () => {
+    const box = $('bmPasteBox');
+    box.hidden = !box.hidden;
+    if (!box.hidden) $('bmPasteText').focus();
+  });
+
+  $('bmPasteApply').addEventListener('click', async () => {
+    if (!uploadId) return;
+    const fd = new FormData();
+    fd.append('upload_id', uploadId);
+    fd.append('text', $('bmPasteText').value);
+    const r = await fetch('/tools/pdf-bookmark/parse-list', {method: 'POST', body: fd});
+    if (!r.ok) {
+      (window.showAlert || alert)(await window.friendlyServerError(r, '解析失敗'));
+      return;
+    }
+    applyPayload(await r.json());
+    $('bmPasteBox').hidden = true;
+  });
+
+  $('bmAddRow').addEventListener('click', () => {
+    const last = items[items.length - 1];
+    items.push({title: '', page: last ? last.page : 1, level: last ? last.level : 1});
+    renderRows();
+  });
+
+  $('bmClear').addEventListener('click', async () => {
+    const ok = await (window.showConfirm
+      ? window.showConfirm('清除所有書籤？', {title: '全部清除', kind: 'danger', okText: '清除'})
+      : Promise.resolve(confirm('清除所有書籤？')));
+    if (!ok) return;
+    items = [];
+    renderRows();
+    showWarnings([]);
+  });
+
+  // ---------- 送出 ----------
+  $('bmSubmit').addEventListener('click', async () => {
+    if (!uploadId) return;
+    if (!items.length && !$('bmToc').checked) {
+      (window.showAlert || alert)('還沒有任何書籤 —— 產生或新增之後再送出。');
+      return;
+    }
+    const btn = $('bmSubmit');
+    btn.disabled = true;
+    const fd = new FormData();
+    fd.append('upload_id', uploadId);
+    fd.append('bookmarks', JSON.stringify(items));
+    fd.append('toc_page', $('bmToc').checked ? 'true' : 'false');
+    fd.append('toc_title', $('bmTocTitle').value || '目錄');
+    fd.append('toc_max_level', $('bmTocLevel').value);
+    fd.append('toc_dots', $('bmTocDots').checked ? 'true' : 'false');
+    fd.append('toc_at', $('bmTocAt').value);
+    try {
+      const r = await fetch('/tools/pdf-bookmark/submit', {method: 'POST', body: fd});
+      if (!r.ok) throw new Error(await window.friendlyServerError(r, '產生失敗'));
+      const j = await r.json();
+      // 下載按鈕與「存至工作區」由 JobProgress 自己接（走共用的
+      // /api/jobs/{id}/download）—— 這裡只補一句人看得懂的摘要。
+      progress.track(j.job_id);
+    } catch (e) {
+      btn.disabled = false;
+      (window.showAlert || alert)(e.message);
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -196,6 +196,9 @@ def _subset_cached(path_str: str, mtime: float, idx: int,
         import io
 
         from fontTools import subset as _subset
+        # fontTools.subset 在 INFO 會逐個表印一行（幾十行）—— 每做一次子集化
+        # 就把伺服器日誌灌一次，真正的訊息會被淹掉。
+        logging.getLogger("fontTools").setLevel(logging.WARNING)
         full = _full_font_bytes(path_str, mtime, idx)
         if not full:
             return None
@@ -203,6 +206,14 @@ def _subset_cached(path_str: str, mtime: float, idx: int,
         opts.layout_features = ["*"]      # 保留排版特性（標點壓縮等）
         opts.notdef_outline = True
         opts.recalc_bounds = False
+        # **一定要保留原本的字形編號**。Noto CJK 這類是 CID-keyed CFF，
+        # MuPDF 用**原始 glyph id** 取字形；子集化預設會重新編號，一對不上
+        # 就什麼都畫不出來 —— 而且**文字層是好的**（搜尋、複製、抽取都正常），
+        # 只有畫面空白，所以極難察覺（v1.14.19 就是這樣把整個產品的中文
+        # 寫進 PDF 之後變成看不見，只驗了檔案變小沒有重新算圖）。
+        # 代價是字型檔大一些（實測 5 KB → 764 KB），但相對整支 16 MB
+        # 仍然小 20 倍以上，而且這是唯一畫得出來的做法。
+        opts.retain_gids = True
         font = _subset.load_font(io.BytesIO(full), opts)
         sub = _subset.Subsetter(options=opts)
         sub.populate(text=charset)
@@ -222,7 +233,17 @@ def _subset_cached(path_str: str, mtime: float, idx: int,
 
 
 def _covers(font_bytes: bytes, text: str) -> bool:
-    """這份字型是不是每一個字都畫得出來。"""
+    """這份字型是不是每一個字都**畫得出來**。
+
+    分兩關，**兩關都要過**：
+
+    1. `cmap` 有沒有這個字碼 —— 缺了就是缺字。
+    2. **真的算一次圖，確認紙上有墨水** —— 這一關是 v1.14.19 慘案的教訓：
+       當時只驗第 1 關，而子集化重新編號 glyph 之後 cmap 仍然完好、
+       文字層也完好（搜尋、複製、抽取都正常），**只有畫面是空白的**。
+       檔案還變小了，看起來一切都對 —— 產品的中文就這樣整個變成隱形。
+       字型的正確與否只有渲染器說了算，所以這裡就問渲染器。
+    """
     try:
         import io
 
@@ -232,10 +253,39 @@ def _covers(font_bytes: bytes, text: str) -> bool:
         missing = {ch for ch in text
                    if ch.strip() and ord(ch) not in cmap}
         if missing:
-            logger.warning("子集化後缺少 %d 個字：%s",
+            logger.warning("字型子集化後缺少 %d 個字：%s",
                            len(missing), "".join(sorted(missing))[:20])
-        return not missing
+            return False
     except Exception:  # noqa: BLE001 — 驗不了就當作不安全
+        return False
+    return _renders_ink(font_bytes, text)
+
+
+def _renders_ink(font_bytes: bytes, text: str) -> bool:
+    """把幾個字畫出來，看紙上是不是真的有東西。
+
+    只取樣前幾個非空白字元 —— 目的是抓「整份字型對不到字形」這種全有全無的
+    毀損，不是逐字校對（逐字算圖太慢，而這類毀損從來不會只壞一個字）。
+    """
+    sample = "".join(ch for ch in text if ch.strip())[:4]
+    if not sample:
+        return True
+    try:
+        import fitz
+        doc = fitz.open()
+        page = doc.new_page(width=260, height=120)
+        page.insert_font(fontname="jtprobe", fontbuffer=font_bytes)
+        page.insert_text((20, 70), sample, fontname="jtprobe", fontsize=28)
+        pix = page.get_pixmap(dpi=72, alpha=False)
+        data = pix.samples
+        ink = sum(1 for i in range(0, len(data), 3) if data[i] < 200)
+        doc.close()
+        if ink < 20:
+            logger.warning("字型子集化後畫不出字形（渲染出來是空白）")
+            return False
+        return True
+    except Exception as exc:  # noqa: BLE001 — 驗不了就當作不安全
+        logger.warning("字型子集化後無法驗證渲染：%s", exc)
         return False
 
 

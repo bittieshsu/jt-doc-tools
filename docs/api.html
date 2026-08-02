@@ -97,6 +97,8 @@
             <a class="nav-ep" href="#圖片轉-pdf">圖片轉 PDF</a>
             <a class="nav-ep" href="#pdf-轉圖片">PDF 轉圖片</a>
             <a class="nav-ep" href="#pdf-轉-office">PDF 轉 Office</a>
+            <a class="nav-ep" href="#pdf-轉-markdown">PDF 轉 Markdown</a>
+            <a class="nav-ep" href="#markdown-轉文書">Markdown 轉文書</a>
           </div>
         </div>
         <div class="nav-group">
@@ -112,6 +114,9 @@
             <a class="nav-ep" href="#pdf-旋轉">PDF 旋轉</a>
             <a class="nav-ep" href="#pdf-加頁碼">PDF 加頁碼</a>
             <a class="nav-ep" href="#pdf-頁面加框">PDF 頁面加框</a>
+            <a class="nav-ep" href="#pdf-書籤與目錄">PDF 書籤與目錄</a>
+            <a class="nav-ep" href="#pdf-騎縫章">PDF 騎縫章</a>
+            <a class="nav-ep" href="#pdf-頁面尺寸統一">PDF 頁面尺寸統一</a>
             <a class="nav-ep" href="#pdf-多頁合一n-up">PDF 多頁合一（N-up）</a>
             <a class="nav-ep" href="#pdf-壓縮">PDF 壓縮</a>
             <a class="nav-ep" href="#掃描拼合">掃描拼合</a>
@@ -183,6 +188,7 @@
             <a class="nav-ep" href="#電子發票掃描">電子發票掃描</a>
             <a class="nav-ep" href="#電子發票後端狀態">電子發票後端狀態</a>
             <a class="nav-ep" href="#送件前檢核--自家公司主檔">送件前檢核 — 自家公司主檔</a>
+            <a class="nav-ep" href="#乘車證明整理">乘車證明整理</a>
           </div>
         </div>
         <div class="nav-group">
@@ -350,6 +356,44 @@ curl <span class="hl-flag">-s</span> <span class="hl-url">http://localhost:8765/
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">--output</span> after_p1.png</code></pre>
 <hr>
       </section>
+      <section class="doc-section" data-sec="pdf-轉-markdown" data-title="PDF 轉 Markdown" hidden>
+<div class="doc-crumb">3. 文件轉換 API</div>
+<h4 id="pdf-轉-markdown">PDF 轉 Markdown</h4>
+<p>把 PDF 抽成 Markdown。單次呼叫直接回內容，不走 job 模式。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-to-markdown/api/pdf-to-markdown</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>include_images</code></td><td>bool</td><td></td><td>是否一併輸出內嵌圖片，預設 <code>false</code></td></tr><tr><td><code>page_separator</code></td><td>bool</td><td></td><td>頁與頁之間插入分隔線，預設 <code>true</code></td></tr><tr><td><code>image_format</code></td><td>str</td><td></td><td>圖片格式 <code>png</code>（預設）/ <code>jpg</code>，僅 <code>include_images=true</code> 時有效</td></tr></tbody></table></div>
+<pre><code class="lang-bash"><span class="hl-cmt"># 只要文字：回 text/markdown</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-markdown/api/pdf-to-markdown</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@report.pdf&quot;</span> <span class="hl-flag">--output</span> report.md
+
+<span class="hl-cmt"># 連圖片一起：回 ZIP（.md + 圖片檔）</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-markdown/api/pdf-to-markdown</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@report.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;include_images=true&quot;</span> <span class="hl-flag">--output</span> report.zip</code></pre>
+<p><strong>回應型別依 <code>include_images</code> 而不同</strong>：<code>false</code> 回 <code>text/markdown</code>，<code>true</code> 回 <code>application/zip</code>。</p>
+<hr>
+      </section>
+      <section class="doc-section" data-sec="markdown-轉文書" data-title="Markdown 轉文書" hidden>
+<div class="doc-crumb">3. 文件轉換 API</div>
+<h4 id="markdown-轉文書">Markdown 轉文書</h4>
+<p>把 Markdown 轉成 PDF / Word / OpenDocument。內容可用 <code>file</code> 上傳，也可以直接用 <code>text</code> 帶進來。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/markdown-to-doc/api/markdown-to-doc</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>△</td><td>Markdown 檔。與 <code>text</code> 擇一</td></tr><tr><td><code>text</code></td><td>str</td><td>△</td><td>直接帶 Markdown 內容。與 <code>file</code> 擇一</td></tr><tr><td><code>format</code></td><td>str</td><td></td><td><code>pdf</code>（預設）/ <code>docx</code> / <code>odt</code>。其他值回 400</td></tr><tr><td><code>theme</code></td><td>str</td><td></td><td>版面主題，預設 <code>classic</code></td></tr><tr><td><code>font</code></td><td>str</td><td></td><td>字型，預設 <code>default</code></td></tr><tr><td><code>title</code></td><td>str</td><td></td><td>文件標題</td></tr></tbody></table></div>
+<pre><code class="lang-bash"><span class="hl-cmt"># 檔案轉 PDF</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/markdown-to-doc/api/markdown-to-doc</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@notes.md&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;format=pdf&quot;</span> <span class="hl-flag">--output</span> notes.pdf
+
+<span class="hl-cmt"># 直接帶內容轉 Word</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/markdown-to-doc/api/markdown-to-doc</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">--form-string</span> <span class="hl-str">&quot;text=# 標題
+
+內文。&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;format=docx&quot;</span> <span class="hl-flag">--output</span> notes.docx</code></pre>
+<p>直接回檔案本身（不是 JSON）。<code>format</code> 給了 <code>pdf</code> / <code>docx</code> / <code>odt</code> 以外的值回 <code>400</code>。</p>
+<hr>
+      </section>
       <section class="doc-section" data-sec="pdf-轉簡報檔" data-title="PDF 轉簡報檔" hidden>
 <div class="doc-crumb">4. PDF 編修 API</div>
 <h4 id="pdf-轉簡報檔">PDF 轉簡報檔</h4>
@@ -447,6 +491,54 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;width_pt=2&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;color=#1e293b&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;skip_first=true&quot;</span> \
   <span class="hl-flag">--output</span> slides_border.pdf</code></pre>
 <p>回應：加完框線的 PDF。所有數值都會在伺服器端夾在安全範圍內。</p>
+      </section>
+      <section class="doc-section" data-sec="pdf-書籤與目錄" data-title="PDF 書籤與目錄" hidden>
+<div class="doc-crumb">4. PDF 編修 API</div>
+<h4 id="pdf-書籤與目錄">PDF 書籤與目錄</h4>
+<p>替 PDF 加書籤（閱讀器左側的導覽）與可點的目錄頁。<strong>傳多個檔案會自動串接，並以檔名建立第一層書籤</strong>，子文件原有的書籤降一層保留。收 PDF 與文書檔（文書檔會先自動轉成 PDF）。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-bookmark/api/pdf-bookmark</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>files</code></td><td>file[]</td><td>✓</td><td>一或多個 PDF / 文書檔。多檔時依順序串接</td></tr><tr><td><code>bookmarks</code></td><td>str</td><td></td><td>自己指定書籤（JSON 陣列，每筆 <code>{&quot;title&quot;,&quot;page&quot;,&quot;level&quot;}</code>）。給了就取代自動產生的</td></tr><tr><td><code>auto</code></td><td>bool</td><td></td><td>依字級自動偵測標題，預設 <code>false</code>（只在沒有 <code>bookmarks</code> 且單檔時有作用）</td></tr><tr><td><code>toc_page</code></td><td>bool</td><td></td><td>插入目錄頁，預設 <code>false</code></td></tr><tr><td><code>toc_at</code></td><td>int</td><td></td><td>目錄插在第幾頁之前，預設 <code>1</code>（最前面）。<strong>有封面就填 <code>2</code></strong></td></tr><tr><td><code>toc_title</code></td><td>str</td><td></td><td>目錄頁標題，預設 <code>目錄</code></td></tr><tr><td><code>toc_max_level</code></td><td>int</td><td></td><td>目錄列到第幾層（1~3），預設 <code>3</code></td></tr></tbody></table></div>
+<p>書籤的<strong>層級必須從 1 開始且一次只能加一層</strong>（1→3 會被自動修成 1→2），<strong>頁碼超出總頁數會被夾到最後一頁</strong> —— 兩者都會自動修正，不會失敗。插入目錄頁之後頁碼會自動往後移，不需要自己算 —— <strong><code>toc_at</code> 之前的書籤不會被動到</strong>（指向封面的那一筆仍然是第 1 頁）。</p>
+<pre><code class="lang-bash"><span class="hl-cmt"># 多檔串接 + 以檔名建書籤 + 產生目錄頁</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-bookmark/api/pdf-bookmark</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;files=@投標須知.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;files=@規格書.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;files=@價格標.pdf&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;toc_page=true&quot;</span> \
+  <span class="hl-flag">--output</span> 標案文件.pdf
+
+<span class="hl-cmt"># 單檔 + 自己指定書籤</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-bookmark/api/pdf-bookmark</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;files=@report.pdf&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&#x27;bookmarks=[{&quot;title&quot;:&quot;第一章&quot;,&quot;page&quot;:1,&quot;level&quot;:1},{&quot;title&quot;:&quot;1.1 背景&quot;,&quot;page&quot;:3,&quot;level&quot;:2}]&#x27;</span> \
+  <span class="hl-flag">--output</span> report_bm.pdf</code></pre>
+<p>回應：加好書籤的 PDF。</p>
+      </section>
+      <section class="doc-section" data-sec="pdf-騎縫章" data-title="PDF 騎縫章" hidden>
+<div class="doc-crumb">4. PDF 編修 API</div>
+<h4 id="pdf-騎縫章">PDF 騎縫章</h4>
+<p>一個印章切成數片蓋在連續頁面上 —— 任何一頁被抽換或掉頁，那一片就對不起來。收 PDF 與文書檔。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-seam-stamp/api/pdf-seam-stamp</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF 或文書檔，<strong>至少 2 頁</strong></td></tr><tr><td><code>stamp</code></td><td>file</td><td></td><td>自己的印章圖（PNG / JPG，接近純白的底會自動去掉）。不給就由系統產生</td></tr><tr><td><code>text</code></td><td>str</td><td></td><td>系統產生時的章面文字，預設 <code>騎縫章</code>（4 字以內排成田字）</td></tr><tr><td><code>shape</code></td><td>str</td><td></td><td><code>circle</code>（預設）/ <code>square</code> / <code>rect</code></td></tr><tr><td><code>color</code></td><td>str</td><td></td><td>印章顏色 hex，預設 <code>#c81414</code></td></tr><tr><td><code>mode</code></td><td>str</td><td></td><td><code>side</code>（側邊騎縫，預設）/ <code>spread</code>（對開跨頁）</td></tr><tr><td><code>group</code></td><td>int</td><td></td><td>一個章跨幾頁，預設 <code>2</code>；<code>0</code> = 整份文件一個章</td></tr><tr><td><code>edge</code></td><td>str</td><td></td><td>side 模式貼哪一邊：<code>right</code>（預設）/ <code>left</code></td></tr><tr><td><code>size_mm</code></td><td>float</td><td></td><td>章的大小（mm），預設 <code>40</code></td></tr><tr><td><code>offset_mm</code></td><td>float</td><td></td><td>離頁緣（mm），預設 <code>3</code></td></tr><tr><td><code>pos_mm</code></td><td>float</td><td></td><td>上下位置（mm），<code>0</code> = 垂直置中</td></tr><tr><td><code>angle_deg</code></td><td>float</td><td></td><td>角度，預設 <code>0</code></td></tr><tr><td><code>opacity</code></td><td>float</td><td></td><td>濃度 <code>0</code>~<code>1</code>，預設 <code>1</code></td></tr><tr><td><code>jitter_pos</code></td><td>bool</td><td></td><td>每組高度亂數，預設 <code>false</code></td></tr><tr><td><code>jitter_angle</code></td><td>bool</td><td></td><td>每組角度亂數（上限 ±8 度），預設 <code>false</code></td></tr><tr><td><code>seed</code></td><td>int</td><td></td><td>亂數種子；<code>0</code> = 隨機</td></tr></tbody></table></div>
+<p><strong>角度是整個章先轉好才切片</strong> —— 反過來（先切再各自旋轉）接縫會對不起來。<strong>同一組內的片位置與角度完全一致</strong>，否則拼不回去。</p>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-seam-stamp/api/pdf-seam-stamp</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@contract.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;text=節省&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;group=3&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;mode=side&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;size_mm=45&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;jitter_angle=true&quot;</span> \
+  <span class="hl-flag">--output</span> contract_seam.pdf</code></pre>
+<p>回應：蓋好騎縫章的 PDF。</p>
+      </section>
+      <section class="doc-section" data-sec="pdf-頁面尺寸統一" data-title="PDF 頁面尺寸統一" hidden>
+<div class="doc-crumb">4. PDF 編修 API</div>
+<h4 id="pdf-頁面尺寸統一">PDF 頁面尺寸統一</h4>
+<p>把混合尺寸的頁面統一成同一種紙張。內容維持向量（文字仍選得到），不是轉成圖片。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-page-size/api/pdf-page-size</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF 或文書檔</td></tr><tr><td><code>paper</code></td><td>str</td><td></td><td><code>a3</code> / <code>a4</code>（預設）/ <code>a5</code> / <code>b4</code> / <code>b5</code> / <code>letter</code> / <code>legal</code> / <code>tabloid</code> / <code>custom</code></td></tr><tr><td><code>custom_w_mm</code> <code>custom_h_mm</code></td><td>float</td><td></td><td><code>paper=custom</code> 時的寬高（mm）</td></tr><tr><td><code>orientation</code></td><td>str</td><td></td><td><code>auto</code>（跟著原頁，預設）/ <code>portrait</code> / <code>landscape</code></td></tr><tr><td><code>fit</code></td><td>str</td><td></td><td><code>scale</code>（縮放留白，預設，不會掉內容）/ <code>center</code>（置中不縮放，超出會裁掉）/ <code>crop</code>（放大填滿）</td></tr><tr><td><code>align</code></td><td>str</td><td></td><td><code>center</code>（預設）/ <code>top-left</code></td></tr><tr><td><code>keep_same</code></td><td>bool</td><td></td><td>原本就是目標尺寸的頁面不動，預設 <code>true</code></td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-page-size/api/pdf-page-size</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@tender.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;paper=a4&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;orientation=auto&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;fit=scale&quot;</span> \
+  <span class="hl-flag">--output</span> tender_a4.pdf</code></pre>
+<p>回應：統一尺寸後的 PDF。</p>
       </section>
       <section class="doc-section" data-sec="pdf-多頁合一n-up" data-title="PDF 多頁合一（N-up）" hidden>
 <div class="doc-crumb">4. PDF 編修 API</div>
@@ -918,6 +1010,25 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">PUT</span> <span cl
 curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span class="hl-url">http://localhost:8765/tools/submission-check/api/self-entities/abc123</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span></code></pre>
 <p>回應 JSON：實體清單 / 操作結果。</p>
+<hr>
+      </section>
+      <section class="doc-section" data-sec="乘車證明整理" data-title="乘車證明整理" hidden>
+<div class="doc-crumb">9. 商務查詢 API</div>
+<h4 id="乘車證明整理">乘車證明整理</h4>
+<p>解析一批台鐵 / 高鐵乘車證明 PDF，回結構化 JSON。<strong>只解析、不寫入使用者的清單</strong>。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/transit-proof/api/transit-proof</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>files</code></td><td>file[]</td><td>✓</td><td>乘車證明 PDF，一次最多 200 個</td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/transit-proof/api/transit-proof</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;files=@proof1.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;files=@proof2.pdf&quot;</span> | jq</code></pre>
+<pre><code class="lang-json">{
+  <span class="hl-key">&quot;ok&quot;</span>: <span class="hl-bool">true</span>,
+  <span class="hl-key">&quot;count&quot;</span>: <span class="hl-num">1</span>,
+  <span class="hl-key">&quot;entries&quot;</span>: [{<span class="hl-key">&quot;date&quot;</span>: <span class="hl-str">&quot;...&quot;</span>, <span class="hl-key">&quot;from&quot;</span>: <span class="hl-str">&quot;...&quot;</span>, <span class="hl-key">&quot;to&quot;</span>: <span class="hl-str">&quot;...&quot;</span>, <span class="hl-key">&quot;amount&quot;</span>: <span class="hl-num">0</span>}],
+  <span class="hl-key">&quot;failed&quot;</span>: [{<span class="hl-key">&quot;file&quot;</span>: <span class="hl-str">&quot;other.pdf&quot;</span>,
+              <span class="hl-key">&quot;error&quot;</span>: <span class="hl-str">&quot;無法辨識為乘車證明（格式不符或版面不支援）&quot;</span>}]
+}</code></pre>
+<p><strong>認不出來的檔案不會讓整批失敗</strong> —— 成功的進 <code>entries</code>，失敗的逐檔列在 <code>failed</code> （HTTP 仍是 200）。要判斷有沒有漏，看 <code>failed</code> 是不是空的，不要只看 HTTP 狀態。 超過 200 個檔案回 <code>400</code>；完全沒帶 <code>files</code> 回 <code>422</code>。</p>
 <hr>
       </section>
       <section class="doc-section" data-sec="llm-校驗pdf-fill" data-title="LLM 校驗（pdf-fill）" hidden>

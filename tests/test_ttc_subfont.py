@@ -210,11 +210,19 @@ def test_fonttools_is_declared_not_just_transitive():
 
 @needs_noto
 def test_subset_is_dramatically_smaller():
-    """整支 CJK 字型十幾 MB —— 只嵌用到的字才不會讓一張表單變成 13 MB。"""
+    """整支 CJK 字型十幾 MB —— 只嵌用到的字才不會讓一張表單變成 13 MB。
+
+    **門檻是 15 倍不是 50 倍，而且不可以再往上調。** 子集化必須保留原本的
+    字形編號（`retain_gids`），否則繪製引擎取不到字形，寫進 PDF 的中文
+    **看不見**（v1.14.19 ~ v1.14.21 正式機故障；當時正是因為壓到 8 KB 才
+    「看起來很成功」）。保留編號讓檔案比極限壓縮大一些，那是正確性的代價。
+    實測 16.4 MB → 843 KB（19.5 倍），門檻取 15 留一點餘裕給不同字集。
+    要再往下壓之前，先讓 `tests/test_cjk_font_renders.py` 全綠。
+    """
     idx = fc._ttc_index_for(str(_NOTO), os.path.getmtime(_NOTO), "traditional")
     _ff, full = fc.embeddable_font(_NOTO, idx)
     sub = fc.subset_font(_NOTO, idx, "節省股份有限公司")
-    assert sub and len(sub) < len(full) / 50, \
+    assert sub and len(sub) < len(full) / 15, \
         f"沒縮多少：{len(full)} → {len(sub) if sub else 'None'}"
 
 

@@ -64,10 +64,16 @@ def test_roles_claiming_more_than_default_actually_grant_more():
             f"{r['id']} 的說明宣稱是一般使用者的超集另加工具，實際沒有多任何工具")
 
 
-def test_finance_and_sales_extras_are_only_the_sensitive_two():
-    """財務 / 業務多出來的就是那兩個敏感工具 —— 多出別的要有人明確決定。"""
+def test_finance_and_sales_extras_are_only_the_sensitive_ones():
+    """財務 / 業務多出來的只有那幾個敏感工具 —— 多出別的要有人明確決定。
+
+    v1.14.20 加入 `pdf-seam-stamp`（騎縫章）：它就是用印的一種（把公司章蓋在
+    跨頁上），敏感度與 `pdf-stamp` 相同，所以**跟著 pdf-stamp 一起走**，不放進
+    一般使用者。第一版誤放進 `_NON_ADMIN_TOOL_IDS`，變成「一般使用者蓋不了章
+    卻蓋得了騎縫章」—— 這條測試當場擋下來。
+    """
     for rid in ("finance", "sales"):
-        assert _extras(rid) == {"pdf-fill", "pdf-stamp"}, \
+        assert _extras(rid) == {"pdf-fill", "pdf-stamp", "pdf-seam-stamp"}, \
             f"{rid} 多出來的是 {_extras(rid)}"
 
 

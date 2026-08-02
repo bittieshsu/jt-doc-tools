@@ -567,6 +567,55 @@ def _m18_grant_transit_proof_and_border(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _m19_grant_pdf_bookmark(conn: sqlite3.Connection) -> None:
+    """v19：把 `pdf-bookmark`（書籤與目錄，v1.14.20 新增）補給既有角色。
+
+    理由同 `_m18` —— `seed_builtin_roles()` 的 top-up 要有 `role_seed_snapshot`
+    當基準線才會動；從 v1.12.52 或更早直接升上來的安裝，快照是空的會走保守的
+    bootstrap 路徑（這一輪什麼都不補），新工具對那些客戶就**永遠不會出現**。
+
+    補的對象拿 `pdf-merge` 當訊號 —— 書籤與目錄最常見的用法就是「合併之後讓它
+    有導覽」，誰看得到合併就該看得到這個。
+    """
+    conn.executescript("""
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'pdf-bookmark' FROM role_perms WHERE tool_id = 'pdf-merge';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'pdf-bookmark'
+        FROM subject_perms WHERE tool_id = 'pdf-merge';
+    """)
+
+
+def _m20_grant_seam_stamp(conn: sqlite3.Connection) -> None:
+    """v20：把 `pdf-seam-stamp`（騎縫章，v1.14.20 新增）補給既有角色。
+
+    理由同 `_m18` / `_m19`（seed 快照的 bootstrap 缺口）。補的對象拿
+    `pdf-stamp` 當訊號 —— 騎縫章就是用印的一種，誰能用印就該能蓋騎縫章。
+    """
+    conn.executescript("""
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'pdf-seam-stamp' FROM role_perms WHERE tool_id = 'pdf-stamp';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'pdf-seam-stamp'
+        FROM subject_perms WHERE tool_id = 'pdf-stamp';
+    """)
+
+
+def _m21_grant_page_size(conn: sqlite3.Connection) -> None:
+    """v21：把 `pdf-page-size`（頁面尺寸統一，v1.14.20 新增）補給既有角色。
+
+    理由同 `_m18`~`_m20`（seed 快照的 bootstrap 缺口）。拿 `pdf-pages`
+    （頁面整理）當訊號 —— 兩者同屬頁面層級的整理工作。
+    """
+    conn.executescript("""
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'pdf-page-size' FROM role_perms WHERE tool_id = 'pdf-pages';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'pdf-page-size'
+        FROM subject_perms WHERE tool_id = 'pdf-pages';
+    """)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -582,7 +631,9 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m14_user_email,
               _m15_directory_presence,
               _m16_session_last_seen, _m17_directory_account_state,
-              _m18_grant_transit_proof_and_border]
+              _m18_grant_transit_proof_and_border,
+              _m19_grant_pdf_bookmark, _m20_grant_seam_stamp,
+              _m21_grant_page_size]
 
 
 def auth_db_path() -> Path:

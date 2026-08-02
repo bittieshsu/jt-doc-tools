@@ -193,6 +193,7 @@
   {% for t in tool_tiles() %}
   <span data-tool="{{ t.id }}" data-color="{{ t.color }}">{{ icon(t.icon, size=17) }}</span>
   {% endfor %}
+  <span data-tool="__generic__" data-color="0">{{ icon('tool', size=15) }}</span>
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
@@ -537,8 +538,11 @@
 
   // 依工具 id 取出對應的彩色圖示磚（複製隱藏區裡的節點，不用 innerHTML）
   function toolTile(toolId) {
+    // 查不到就用通用圖示 —— sprite 是頁面載入當下產生的，升級後多的工具
+    // 在舊分頁上查不到；缺一個方塊整排就對不齊。
     const src = document.querySelector(
-      '#toolIconSprite [data-tool="' + (toolId || '').replace(/"/g, '') + '"]');
+        '#toolIconSprite [data-tool="' + (toolId || '').replace(/"/g, '') + '"]')
+      || document.querySelector('#toolIconSprite [data-tool="__generic__"]');
     if (!src) return null;
     const tile = document.createElement('span');
     tile.className = 'jt-tile tile-color-' + (src.dataset.color || '0');

@@ -94,6 +94,10 @@
         {% for t in tool_tiles() %}
         <span data-tool="{{ t.id }}" data-color="{{ t.color }}">{{ icon(t.icon, size=15) }}</span>
         {% endfor %}
+        {# 退路：sprite 是**頁面載入當下**由伺服器產生的，通知卻是之後輪詢進來的。
+           升級後多了新工具、而使用者的分頁還停在舊頁面時，新工具就查不到圖示。
+           沒有這個退路的話那一列不會有方塊，文字往左跑、整份清單看起來是歪的。 #}
+        <span data-tool="__generic__" data-color="0">{{ icon('tool', size=15) }}</span>
       </div>
       {% set _cur = current_user(request) %}
       {% if not _cur %}
@@ -804,8 +808,11 @@
             // 圖示一欄、文字一欄的 flex 結構。原本是「圖示與工具名同一行，
             // 檔名與時間各自用 padding-left:34px 推進去」—— 那個縮排只是猜出來
             // 的數字，跟圖示實際寬度＋間距對不齊，看起來就是歪的。
+            // 查不到就用通用圖示 —— 每一列都要有方塊，缺一個整排就對不齊
             const src = document.querySelector(
-              '#toolIconSprite [data-tool="' + (it.tool_id || '').replace(/"/g, '') + '"]');
+                '#toolIconSprite [data-tool="'
+                + (it.tool_id || '').replace(/"/g, '') + '"]')
+              || document.querySelector('#toolIconSprite [data-tool="__generic__"]');
             if (src) {
               const tile = el('span', 'jt-tile tile-color-'
                               + (src.dataset.color || '0'));
