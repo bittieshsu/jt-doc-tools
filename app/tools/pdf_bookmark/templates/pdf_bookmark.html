@@ -185,6 +185,36 @@
         : '書籤要打開閱讀器左側的「書籤 / 大綱」面板才看得到（不會出現在頁面內容裡）。'
           + '想要一頁看得見、印得出來的目錄，請勾選上方的「在最前面產生目錄頁」再產生一次。';
       box.appendChild(tip);
+
+      // 目錄上寫著「第 47 頁」，但**頁面本身沒印頁碼的話讀者根本數不到**。
+      // 這兩件事一定是連著做的，所以直接把檔案帶過去，不要讓人先下載再重上傳。
+      if (job && job.id && window.handoffToTool) {
+        const next = document.createElement('div');
+        next.className = 'bm-res-tip';
+        next.appendChild(document.createTextNode(
+          '文件本身如果沒有逐頁印上頁碼，目錄與書籤上的頁碼會對不到 —— 可以用 '));
+        const a = document.createElement('a');
+        a.href = '#';
+        a.textContent = '「插入頁碼」補上';
+        const fname = (job.meta || {}).filename || 'bookmarked.pdf';
+        a.addEventListener('click', async (e) => {
+          e.preventDefault();
+          a.textContent = '準備中…';
+          try {
+            // 走「我的工作區」中轉 —— 檔案是持久的，也留一份給使用者
+            await window.handoffToTool('pdf-pageno', {jobId: job.id},
+                                       fname, 'pdf-bookmark');
+          } catch (err) {
+            a.textContent = '「插入頁碼」補上';
+            (window.showAlert || alert)('帶不過去：' + (err.message || err));
+          }
+        });
+        next.appendChild(a);
+        next.appendChild(document.createTextNode(
+          '（會帶著這份檔案過去，並存一份到「我的工作區」）。'));
+        box.appendChild(next);
+      }
+
       if (res.warnings && res.warnings.length) showWarnings(res.warnings);
       box.hidden = false;
     },

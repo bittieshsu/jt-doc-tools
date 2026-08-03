@@ -33,6 +33,55 @@
       this.multiple = !!this.input.multiple;
       this._bind();
       this._wireWorkspaceLoad();
+      this._wireJobHandoff();
+    }
+    // 工具之間的交接：把上一個工具的產出直接帶進這個工具，不用先下載再上傳。
+    //
+    // 兩種來源，接口一致（之後要串多個工具的工作流程也走這裡）：
+    //
+    //   ?from_ws=<file_id>   從**我的工作區**取（優先）。檔案是持久的 ——
+    //                        重啟、隔天再回來都還在，也看得到、刪得掉。
+    //   ?from_job=<job_id>   從作業結果取。工作區被管理員停用時的退路；
+    //                        作業會過期、重啟後也不在，所以不當主要路徑。
+    //
+    // 安全性一律靠伺服器端：`/workspace/file/{id}` 與 `/api/jobs/{id}/download`
+    // 本來就驗歸屬，拿別人的 id 一樣取不到。前端不做任何判斷。
+    _wireJobHandoff() {
+      // 一頁可能有多個上傳框（例如騎縫章有文件與印章圖兩個）。
+      // 只有第一個吃這個參數，否則印章框會被塞進一份 PDF。
+      if (window.__jtHandoffClaimed) return;
+      const qs = new URLSearchParams(window.location.search);
+      const wsId = qs.get('from_ws');
+      const jobId = qs.get('from_job');
+      const id = wsId || jobId;
+      if (!id || !/^[A-Za-z0-9_-]{6,64}$/.test(id)) return;
+      window.__jtHandoffClaimed = true;
+      // **兩個參數都要先讀出來再清網址** —— 清完才讀的話讀到的是空的
+      // （檔名會變成預設值，使用者拿到一份叫 document.pdf 的檔）。
+      const name = qs.get('from_name') || 'document.pdf';
+      // 網址用完就清掉：重新整理不該再抓一次，而且留著也只是雜訊
+      try {
+        const u = new URL(window.location.href);
+        ['from_ws', 'from_job', 'from_name'].forEach(k => u.searchParams.delete(k));
+        window.history.replaceState({}, '', u.toString());
+      } catch (_e) { /* 清不掉不影響功能 */ }
+      const url = wsId
+        ? '/workspace/file/' + encodeURIComponent(wsId)
+        : '/api/jobs/' + encodeURIComponent(jobId) + '/download';
+      this._setProgress({indeterminate: true, label: '接收上一個工具的檔案…'});
+      fetch(url)
+        .then(r => { if (!r.ok) throw new Error('取不到檔案'); return r.blob(); })
+        .then(b => {
+          this._setProgress(null);
+          this.loadFiles([new File([b], name, {type: b.type || 'application/pdf'})]);
+        })
+        .catch(() => {
+          this._setProgress(null);
+          // 檔案可能已被刪除或作業已過期 —— 講清楚，不要留一個空畫面
+          if (window.showAlert) {
+            window.showAlert('上一個工具的檔案取不到了（可能已刪除或過期），請重新上傳。');
+          }
+        });
     }
     // Wire the optional 「從工作區載入」 button (rendered by the shared
     // file_upload.html component when the workspace feature is enabled).

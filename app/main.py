@@ -17,7 +17,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.23"
+VERSION = "1.14.24"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -38,7 +38,27 @@ app.add_middleware(CSRFMiddleware)
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR.parent / "static"
 
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+class _RevalidatingStatic(StaticFiles):
+    """靜態檔一律要求瀏覽器**重新驗證**再用。
+
+    預設的 `StaticFiles` 只送 `ETag` / `Last-Modified`，**不送 `Cache-Control`**。
+    沒有這個標頭時瀏覽器會用「啟發式快取」（常見是取檔案年齡的 10% 當有效期）
+    —— 於是升級之後，使用者的瀏覽器可能好幾個小時都還在跑**舊的 JS / CSS**，
+    症狀是「我明明更新了，修好的東西還是壞的」，而且重新整理也沒用。
+    開發時就踩過一次：新加的功能在伺服器上明明有，瀏覽器就是不執行。
+
+    `no-cache` **不是不快取** —— 是「可以存，但每次用之前都要問一下」。
+    配合既有的 ETag，沒改過的檔案回 304（不帶內容），成本很低。
+    """
+
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers.setdefault("Cache-Control", "no-cache")
+        return resp
+
+
+app.mount("/static", _RevalidatingStatic(directory=str(STATIC_DIR)),
+          name="static")
 
 tools = discover_tools()
 

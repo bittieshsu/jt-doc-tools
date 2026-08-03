@@ -181,6 +181,37 @@
     });
   }
 
+  // 把這個工具的產出送去**另一個工具**繼續處理。
+  //
+  // 走**我的工作區**當中轉：檔案是持久的，重啟、隔天回來都還在，使用者也
+  // 看得到、刪得掉。之後要把多個工具串成工作流程也是走這條路，所以接口
+  // 一開始就做成通用的（給 toolId 就好，不綁任何特定工具）。
+  //
+  // 工作區被管理員停用時退回作業結果（`from_job`）—— 那條路作業會過期、
+  // 重啟後也不在，所以只當退路。
+  //
+  //   spec: {jobId} | {blob} | {url}   —— 與 saveToWorkspace 相同
+  async function handoffToTool(toolId, spec, name, fromTool) {
+    const qs = new URLSearchParams();
+    if (name) qs.set('from_name', name);
+    let usedWorkspace = false;
+    try {
+      const res = await saveToWorkspace(spec, name, fromTool || '');
+      const fid = res && res.file && (res.file.id || res.file.file_id);
+      if (fid) { qs.set('from_ws', fid); usedWorkspace = true; }
+    } catch (_e) {
+      // 工作區停用或存檔失敗 —— 不要卡住使用者，改走作業結果
+    }
+    if (!usedWorkspace) {
+      if (!spec || !spec.jobId) {
+        throw new Error('沒有可以帶過去的檔案');
+      }
+      qs.set('from_job', spec.jobId);
+    }
+    window.location.href = '/tools/' + toolId + '/?' + qs.toString();
+  }
+
+  window.handoffToTool = handoffToTool;
   window.openWorkspacePicker = openWorkspacePicker;
   window.attachWorkspaceSave = attachWorkspaceSave;
   window.attachWorkspaceLoadButton = attachWorkspaceLoadButton;
