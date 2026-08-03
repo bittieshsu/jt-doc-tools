@@ -378,3 +378,40 @@ def test_insert_point_beyond_the_document_is_clamped():
     n = BC.build_toc_page(d, [BC.BookmarkItem(title="x", page=1, level=1)],
                           BC.TocPageSpec(), at_page=999)
     assert n == 1 and d.page_count == 4
+
+
+# ------------------------------------------------------------ 貼上清單的效能
+
+def test_pasted_list_does_not_blow_up_on_pathological_input():
+    """**貼上的清單是使用者可控的輸入，解析必須是線性的。**
+
+    原本的式子把 `(title.*?)` 接在 `[\\s.…·]*` 前面 —— 兩者可以吃到同一批
+    字元，遇到不匹配的行就逐一回溯。實測一行 16,000 個點要 5.4 秒，而每一行
+    都會跑一次：貼一百行就是好幾分鐘的 CPU（CodeQL 標為 ReDoS）。
+    """
+    import time
+    # 整行都是點、結尾沒有數字 —— 最壞情況
+    evil = "\n".join(["." * 20000] * 20)
+    t0 = time.time()
+    items, warns = BC.parse_text_list(evil)
+    elapsed = time.time() - t0
+    assert elapsed < 1.0, f"解析花了 {elapsed:.2f} 秒 —— 回溯又回來了"
+    assert not items and len(warns) == 20
+
+
+def test_pasted_list_still_parses_normally():
+    """效能修正不可以改變解析結果。"""
+    items, warns = BC.parse_text_list(
+        "第一章 緒論      3\n"
+        "  1.1 研究背景 ......... 5\n"
+        "　　1.2 方法   9\n"
+        "第二章 文獻探討……14\n"
+        "沒有頁碼的一行\n"
+        "   42")
+    assert [(i.level, i.title, i.page) for i in items] == [
+        (1, "第一章 緒論", 3),
+        (2, "1.1 研究背景", 5),
+        (3, "1.2 方法", 9),
+        (1, "第二章 文獻探討", 14),
+    ]
+    assert len(warns) == 2      # 沒頁碼的、只有頁碼沒標題的

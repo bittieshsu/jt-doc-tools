@@ -119,3 +119,22 @@ def test_readme_repo_links_exist():
         if not (PUB / m.group(1)).exists():
             missing.append(m.group(1))
     assert not missing, f"README 連到不存在的檔案：{sorted(set(missing))}"
+
+
+# ------------------------------------------------- 導覽拿掉但錨點要留
+
+#: 這幾段**刻意不放在導覽列**（項目太多反而找不到東西），但內容仍在頁面上，
+#: 而且既有的直接連結 / 書籤 / 外部引用都指著這些 id —— **不可以因為
+#: 「導覽沒用到」就把 id 拿掉**，那會讓所有既有連結變成連到頁首。
+_ANCHORS_KEPT_WITHOUT_NAV = ["workspace", "jobs", "enterprise", "disclaimer"]
+
+
+def test_sections_dropped_from_nav_keep_their_anchors():
+    import pathlib
+    html = (pathlib.Path(__file__).resolve().parent.parent
+            / "github" / "docs" / "index.html").read_text(encoding="utf-8")
+    missing = [a for a in _ANCHORS_KEPT_WITHOUT_NAV
+               if f'id="{a}"' not in html]
+    assert not missing, (
+        f"這些區塊的 id 不見了：{missing}。它們沒放進導覽，但既有的 "
+        f"#{missing[0] if missing else ''} 連結還指著它們。")

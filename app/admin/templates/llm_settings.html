@@ -215,7 +215,7 @@
     <div class="field" data-s="s9586d088">
       <input type="number" id="translate_max_sentences" min="100" max="200000" step="100"
              value="{{ settings.translate_max_sentences|default(20000) }}" data-s="s088cf005" />
-      <span class="muted" data-s="s6b9c179a">逐句翻譯一次最多處理幾句（100-200000，預設 20000）。逐句並發不會單一 request timeout，但句數越多瀏覽器分頁要開越久（每千句約 2-3 分）。超過上限只取前 N 句</span>
+      <span class="muted" data-s="s6b9c179a">逐句翻譯一次最多處理幾句（100-200000，預設 20000）。逐句並行不會單一 request timeout，但句數越多瀏覽器分頁要開越久（每千句約 2-3 分）。超過上限只取前 N 句</span>
     </div>
   </div>
   <div class="form-row">

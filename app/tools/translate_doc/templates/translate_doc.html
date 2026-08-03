@@ -1149,6 +1149,11 @@ function _trdCursor() {
 }
 
 let _trdJobId = null;
+
+// 作業編號只可能是這個形狀。**來自網址的值一律先驗再用** —— 直接插進
+// fetch 路徑的話，`../` 之類的東西會讓瀏覽器打到別的端點去。
+const _TRD_JOB_RE = /^[A-Za-z0-9_-]{6,64}$/;
+function _trdSafeJob(id) { return _TRD_JOB_RE.test(id || '') ? id : ''; }
 let _trdPollTimer = null;
 let _trdJobT0 = 0;
 
@@ -1184,8 +1189,9 @@ async function _trdPoll() {
   if (!_trdJobId) return;
   let j;
   try {
-    const r = await fetch(
-      `/tools/translate-doc/job/${_trdJobId}?start=${_trdCursor()}`);
+    const r = await fetch('/tools/translate-doc/job/'
+      + encodeURIComponent(_trdSafeJob(_trdJobId))
+      + '?start=' + encodeURIComponent(_trdCursor()));
     if (r.status === 404) {          // 作業已過期或被清掉
       _trdStopPolling();
       _trdSetRunningUI(false);
@@ -1249,7 +1255,8 @@ $('btnStop').addEventListener('click', async () => {
   $('btnStop').textContent = '停止中…';
   if (!_trdJobId) return;
   try {
-    await fetch(`/api/jobs/${_trdJobId}/cancel`, {method: 'POST'});
+    await fetch('/api/jobs/' + encodeURIComponent(_trdSafeJob(_trdJobId))
+                + '/cancel', {method: 'POST'});
   } catch (_) {}
   // 不在這裡收尾 —— 等輪詢讀到 cancelled 再統一處理，畫面才不會有兩套邏輯。
 });
@@ -1298,11 +1305,13 @@ btnTranslate.addEventListener('click', async () => {
 
 /** 從網址的 `?job=` 接回既有作業（重新整理 / 從「我的作業」點進來）。 */
 async function _trdResumeFromUrl() {
-  const jobId = new URLSearchParams(window.location.search).get('job');
+  const jobId = _trdSafeJob(
+    new URLSearchParams(window.location.search).get('job'));
   if (!jobId) return;
   let j;
   try {
-    const r = await fetch(`/tools/translate-doc/job/${jobId}`);
+    const r = await fetch('/tools/translate-doc/job/'
+                          + encodeURIComponent(jobId));
     if (!r.ok) return;                    // 不是自己的 / 已過期 → 當作沒這回事
     j = await r.json();
   } catch (_) { return; }

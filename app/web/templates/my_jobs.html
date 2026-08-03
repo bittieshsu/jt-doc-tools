@@ -220,7 +220,7 @@
     const wsNote = document.getElementById('mj-ws-note');
     if (data.workspace_enabled === false && jobs.length) {
       wsNote.hidden = false;
-      wsNote.textContent = '「我的工作區」目前未啟用，因此完成的結果不會自動保存。'
+      wsNote.textContent = '「我的工作區」目前未啟用，因此完成的結果不會自動儲存。'
         + (data.result_ttl_hours
            ? `結果檔會在 ${data.result_ttl_hours} 小時後自動清除，請及時下載。`
            : '請及時下載。');

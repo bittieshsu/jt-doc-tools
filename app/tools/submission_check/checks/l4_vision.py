@@ -163,7 +163,7 @@ def vision_check_file(file_path: Path, ground_truth_main: str = "",
         "1. 偽造 / PS 痕跡：數字 / 日期 / 文字「視覺上」看起來被改過（重描、字型不一致、像素邊緣異常）\n"
         "   — 只看「畫面像素層級」異常，不要因為日期值合理或不合理就下結論\n"
         "2. 章 / 印異常：章不完整、看起來是貼上的、章內字看不清\n"
-        "3. 圖層拼貼：不同部分明顯來自不同來源（背景顏色 / 解析度 / 字體不一）\n"
+        "3. 圖層拼貼：不同部分明顯來自不同來源（背景顏色 / 解析度 / 字型不一）\n"
         f"4. 身分一致性：影像內出現的公司 / 機構名是否吻合預期主角「{ground_truth_main or '(未指定)'}」"
         f"{f'、對方「{ground_truth_counterparty}」' if ground_truth_counterparty else ''}\n"
         "\n"

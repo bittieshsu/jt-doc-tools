@@ -10,7 +10,7 @@ from __future__ import annotations
 CATEGORY_TO_TOOL: dict[str, tuple[str, str, str]] = {
     # === 結構面 ===
     "metadata-leak":   ("/tools/pdf-metadata/", "中繼資料清除",
-                         "用此工具清掉 metadata 內的作者 / 路徑 / 上次保存資訊。"),
+                         "用此工具清掉 metadata 內的作者 / 路徑 / 上次儲存資訊。"),
     "js":              ("/tools/pdf-hidden-scan/", "隱藏內容掃描",
                          "用此工具一鍵清除 PDF 內 JavaScript / OpenAction。"),
     "open-action":     ("/tools/pdf-hidden-scan/", "隱藏內容掃描",

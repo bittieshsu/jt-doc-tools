@@ -207,8 +207,19 @@ def auto_detect(doc: fitz.Document, max_items: int = _MAX_AUTO
 
 # ------------------------------------------------------------- 文字清單 --
 
-_LINE_RE = re.compile(r"^(?P<indent>[\s　]*)(?P<title>.*?)"
-                      r"[\s　.…·]*(?P<page>\d+)\s*$")
+#: 行尾的頁碼。**只錨在尾端、不含任何萬用比對**，所以是線性的。
+#:
+#: 原本寫成 `^(indent)(title.*?)[\s.…·]*(page\d+)\s*$` —— `.*?` 與後面的
+#: `[\s.…·]*` **可以吃到同一批字元**，遇到不匹配的行（例如整行都是點、
+#: 結尾沒有數字）就會逐一回溯，變成多項式時間。實測一行 16,000 個點要
+#: **5.4 秒**，而這裡的輸入是使用者貼上的目錄清單、每一行都會跑一次 ——
+#: 貼一百行就是好幾分鐘的 CPU（CodeQL 也標了 ReDoS）。
+#:
+#: 改成「尾端抓數字，其餘用字串處理」：沒有歧義、跑幾次就是幾次。
+_PAGE_TAIL_RE = re.compile(r"(\d+)[\s　]*$")
+
+#: 標題與頁碼之間的引導點 —— 使用者多半是從既有目錄複製貼上的。
+_LEADER_CHARS = " \t.…·　"
 
 
 def parse_text_list(text: str) -> tuple[list[BookmarkItem], list[str]]:
@@ -227,17 +238,18 @@ def parse_text_list(text: str) -> tuple[list[BookmarkItem], list[str]]:
         line = raw.rstrip()
         if not line.strip():
             continue
-        m = _LINE_RE.match(line)
+        m = _PAGE_TAIL_RE.search(line)
         if not m:
             warns.append(f"看不出頁碼，略過：{line.strip()[:40]}")
             continue
-        title = m.group("title").strip().rstrip(".…·　 ")
+        head = line[:m.start(1)]
+        indent = head[:len(head) - len(head.lstrip("\t 　"))].replace("　", "  ")
+        title = head.strip().rstrip(_LEADER_CHARS)
         if not title:
             warns.append(f"只有頁碼沒有標題，略過：{line.strip()[:40]}")
             continue
-        indent = m.group("indent").replace("　", "  ")
         items.append(BookmarkItem(title=title,
-                                  page=int(m.group("page")),
+                                  page=int(m.group(1)),
                                   level=len(indent) // 2 + 1))
     return items, warns
 

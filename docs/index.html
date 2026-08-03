@@ -27,16 +27,16 @@
         <div class="brand-sub">jt-doc-tools</div>
       </div>
     </a>
+    <!-- 導覽只放最常用的幾項 —— 項目太多反而找不到東西。
+         工作區 / 背景作業 / 企業管理 / 免責 這幾段**內容仍然在頁面上**，
+         各自的 id 也保留著（#workspace / #jobs / #enterprise / #disclaimer），
+         所以既有的直接連結、書籤、外部引用都還到得了，只是不佔導覽版面。 -->
     <nav class="topnav" id="topnav">
       <a href="#why" class="nav-link">為什麼自架</a>
       <a href="#features" class="nav-link">功能</a>
-      <a href="#workspace" class="nav-link">工作區</a>
-      <a href="#jobs" class="nav-link">背景作業</a>
       <a href="#llm" class="nav-link">AI 加值</a>
       <a href="#screenshots" class="nav-link">畫面</a>
-      <a href="#enterprise" class="nav-link">企業管理</a>
       <a href="#directory" class="nav-link">AD / LDAP</a>
-      <a href="#disclaimer" class="nav-link">免責</a>
       <a href="#install" class="nav-link">安裝</a>
       <a href="api.html" class="nav-link">API</a>
       <a class="btn btn-outline nav-github" href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">
@@ -186,6 +186,10 @@
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7s6 5.6 6 10.3a6 6 0 0 1-12 0c0-4.7 6-10.3 6-10.3z"/></svg></span>
             <div class="fl-text"><span class="fn">浮水印</span><span class="fd">透明度、角度、平鋪填滿或指定位置</span></div>
           </li>
+          <li>
+            <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg></span>
+            <div class="fl-text"><span class="fn">騎縫章<span class="ofc-mark" title="需 OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">一個印章切成數片蓋在連續頁面上，抽換或掉頁一眼看得出來；跨幾頁、位置與角度都可設定（文書檔輸入時需引擎）</span></div>
+          </li>
         </ul>
       </article>
 
@@ -222,10 +226,6 @@
           <li>
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13"/><path d="M3 12h13"/><path d="M3 18h13"/><path d="M19 4v16l3-3"/></svg></span>
             <div class="fl-text"><span class="fn">書籤與目錄<span class="ofc-mark" title="需 OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">加書籤（閱讀器左側導覽）與可點的目錄頁；多檔一起上傳自動串接並以檔名建第一層書籤，子文件原有書籤降一層保留 —— 標案 / 年報最有感（文書檔輸入時需引擎）</span></div>
-          </li>
-          <li>
-            <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg></span>
-            <div class="fl-text"><span class="fn">騎縫章<span class="ofc-mark" title="需 OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">一個印章切成數片蓋在連續頁面上，抽換或掉頁一眼看得出來；跨幾頁、位置與角度都可設定（文書檔輸入時需引擎）</span></div>
           </li>
           <li>
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="12" height="16" rx="1"/><rect x="9" y="3" width="12" height="12" rx="1"/></svg></span>
@@ -292,10 +292,6 @@
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
             <div class="fl-text"><span class="fn">統編查詢</span><span class="fd">8 位統編反查，或公司 / 機關 / 學校名稱、地址、行業模糊搜尋；含類別篩選 + 批次查詢 + CSV 匯出</span></div>
           </li>
-          <li>
-            <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
-            <div class="fl-text"><span class="fn">送件前檢核<span class="ofc-mark" title="需 OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">送件前自動檢核：頁面尺寸、字型嵌入、欄位完整、敏感資料殘留、隱藏內容（Office 輸入時需引擎）</span></div>
-          </li>
         </ul>
       </article>
 
@@ -342,6 +338,10 @@
         </div>
         <h3>資安處理</h3>
         <ul class="feat-list">
+          <li>
+            <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+            <div class="fl-text"><span class="fn">送件前檢核<span class="ofc-mark" title="需 OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">送件前自動檢核：頁面尺寸、字型嵌入、欄位完整、敏感資料殘留、隱藏內容（Office 輸入時需引擎）</span></div>
+          </li>
           <li>
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="m2 2 20 20"/></svg></span>
             <div class="fl-text"><span class="fn">文件去識別化<span class="ofc-mark" title="需 OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">偵測身分證 / 手機 / Email / 統編 / 帳號等敏感欄位，可編修或遮罩。</span></div>
