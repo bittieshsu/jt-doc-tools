@@ -63,7 +63,7 @@
     <div class="af-attrs">
       <label class="af-field af-field-wide">
         <span class="af-label">插入目錄頁</span>
-        <span class="af-ctl"><label class="chk"><input type="checkbox" id="bmToc"> 產生可以印出來的目錄頁</label></span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="bmToc" checked> 產生可以印出來的目錄頁</label></span>
         <small class="af-note">插入後頁碼會往後移 —— 書籤與目錄上的頁碼都會自動跟著調整，不必自己算。</small>
       </label>
       <label class="af-field">
@@ -103,7 +103,7 @@
     <p class="muted bm-hint"><b>書籤看不到</b> —— 它在閱讀器左側的「書籤 / 大綱」面板，
       不在頁面內容裡。這裡預覽的是<b>目錄頁</b>，也就是印得出來的那一張。</p>
     <div class="bm-pv" id="bmPv">
-      <p class="muted bm-empty" id="bmPvOff">還沒勾「在最前面產生目錄頁」 ——
+      <p class="muted bm-empty" id="bmPvOff">還沒勾「產生可以印出來的目錄頁」 ——
         勾了才會有目錄頁可以看。</p>
     </div>
   </fieldset>
@@ -183,7 +183,7 @@
       tip.textContent = res.toc_pages
         ? '書籤要打開閱讀器左側的「書籤 / 大綱」面板才看得到；目錄頁在文件最前面。'
         : '書籤要打開閱讀器左側的「書籤 / 大綱」面板才看得到（不會出現在頁面內容裡）。'
-          + '想要一頁看得見、印得出來的目錄，請勾選上方的「在最前面產生目錄頁」再產生一次。';
+          + '想要一頁看得見、印得出來的目錄，請勾選上方的「產生可以印出來的目錄頁」再產生一次。';
       box.appendChild(tip);
 
       // 目錄上寫著「第 47 頁」，但**頁面本身沒印頁碼的話讀者根本數不到**。
@@ -196,7 +196,9 @@
         const a = document.createElement('a');
         a.href = '#';
         a.textContent = '「插入頁碼」補上';
-        const fname = (job.meta || {}).filename || 'bookmarked.pdf';
+        // 帶過去的是產出檔，所以用 result_filename（輸入檔名會少掉後綴）
+        const fname = job.result_filename
+                      || (job.meta || {}).filename || 'bookmarked.pdf';
         a.addEventListener('click', async (e) => {
           e.preventDefault();
           a.textContent = '準備中…';
@@ -222,6 +224,9 @@
   });
   let uploadId = null;
   let pageCount = 0;
+  // 原始檔名 —— 產出要沿用它（「年度報告.pdf」→「年度報告_bookmarked.pdf」），
+  // 不送的話後端只能用寫死的預設值，每份檔案都叫同一個名字。
+  let srcName = '';
   let items = [];        // [{title, page, level}] —— 單一事實來源
 
   // ---------- 畫清單 ----------
@@ -252,7 +257,13 @@
       // 縮排讓層級一眼看得出來（純視覺，不影響資料）。
       // CSP 不允許 inline style 屬性 —— 用 CSSOM 設。
       inTitle.style.setProperty('padding-left', ((it.level - 1) * 16 + 8) + 'px');
-      inTitle.addEventListener('input', () => { items[idx].title = inTitle.value; });
+      // 改了標題 / 頁碼**目錄預覽要跟著重畫** —— 目錄的內容就是這張表，
+      // 不重畫的話使用者打完字看到的還是上一版（或空的），會以為壞掉了。
+      // `schedulePreview` 自己有防抖，逐字打不會一直打伺服器。
+      inTitle.addEventListener('input', () => {
+        items[idx].title = inTitle.value;
+        schedulePreview();
+      });
       tdTitle.appendChild(inTitle);
 
       const tdPg = document.createElement('td');
@@ -264,6 +275,7 @@
       inPg.value = String(it.page);
       inPg.addEventListener('input', () => {
         items[idx].page = parseInt(inPg.value, 10) || 1;
+        schedulePreview();
       });
       tdPg.appendChild(inPg);
 
@@ -354,7 +366,7 @@
       const off = document.createElement('p');
       off.className = 'muted bm-empty';
       off.textContent = items.length
-        ? '還沒勾「在最前面產生目錄頁」 —— 勾了才會有目錄頁可以看。'
+        ? '還沒勾「產生可以印出來的目錄頁」 —— 勾了才會有目錄頁可以看。'
         : '還沒有任何書籤，先在上面產生書籤再看目錄頁。';
       box.appendChild(off);
       return;
@@ -430,6 +442,8 @@
       return;
     }
     applyPayload(await r.json());
+    // 多檔串接時用第一個檔名當基底（順序就是串接順序）
+    srcName = files[0] && files[0].name ? files[0].name : '';
     $('bmMergedKv').hidden = files.length < 2;
     $('bmFiles').textContent = String(files.length);
     $('bmResult').hidden = true;
@@ -506,6 +520,9 @@
     fd.append('toc_max_level', $('bmTocLevel').value);
     fd.append('toc_dots', $('bmTocDots').checked ? 'true' : 'false');
     fd.append('toc_at', $('bmTocAt').value);
+    // 產出要叫「原檔名_bookmarked.pdf」 —— 不送的話後端用寫死的預設值，
+    // 每份檔案都會叫同一個名字
+    if (srcName) fd.append('filename', srcName);
     try {
       const r = await fetch('/tools/pdf-bookmark/submit', {method: 'POST', body: fd});
       if (!r.ok) throw new Error(await window.friendlyServerError(r, '產生失敗'));

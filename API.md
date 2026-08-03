@@ -490,7 +490,7 @@ POST /tools/pdf-bookmark/api/pdf-bookmark
 | `files` | file[] | ✓ | 一或多個 PDF / 文書檔。多檔時依順序串接 |
 | `bookmarks` | str | | 自己指定書籤（JSON 陣列，每筆 `{"title","page","level"}`）。給了就取代自動產生的 |
 | `auto` | bool | | 依字級自動偵測標題，預設 `false`（只在沒有 `bookmarks` 且單檔時有作用） |
-| `toc_page` | bool | | 插入目錄頁，預設 `false` |
+| `toc_page` | bool | | 插入目錄頁，預設 `false`。**網頁介面的預設是勾起來的**，API 維持 `false` 是為了不讓既有的自動化呼叫突然多出一頁 |
 | `toc_at` | int | | 目錄插在第幾頁之前，預設 `1`（最前面）。**有封面就填 `2`** |
 | `toc_title` | str | | 目錄頁標題，預設 `目錄` |
 | `toc_max_level` | int | | 目錄列到第幾層（1~3），預設 `3` |
