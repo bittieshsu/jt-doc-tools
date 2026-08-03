@@ -226,9 +226,12 @@
   .sm-pages { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px;
     align-items: flex-start; }
   .sm-page { margin: 0; }
+  /* 縮圖不加自己的框線 —— 騎縫章要判斷的是章切在頁緣哪裡，
+     容器多一條線會被誤讀成頁面邊界。 */
   .sm-page .jt-thumb { display: block; width: 210px; min-height: 150px;
-    background: #f8fafc; border: 1px solid var(--border, #e5e7eb); border-radius: 6px; }
-  .sm-page img { display: block; width: 100%; border-radius: 6px; }
+    background: #e8ecf1; border-radius: 6px; padding: 8px; box-sizing: border-box; }
+  .sm-page img { display: block; width: 100%; background: #fff;
+    box-shadow: 0 1px 5px rgba(15, 23, 42, .30); }
   .sm-page figcaption { margin-top: 4px; font-size: 11.5px; color: var(--muted); text-align: center; }
   .sm-grouppick { max-width: 320px; }
   /* 同一組包成一塊 —— 一組的頁面不可以被換行拆到不同行 */
