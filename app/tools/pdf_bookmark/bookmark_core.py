@@ -207,16 +207,40 @@ def auto_detect(doc: fitz.Document, max_items: int = _MAX_AUTO
 
 # ------------------------------------------------------------- 文字清單 --
 
-#: 行尾的頁碼。**只錨在尾端、不含任何萬用比對**，所以是線性的。
-#:
-#: 原本寫成 `^(indent)(title.*?)[\s.…·]*(page\d+)\s*$` —— `.*?` 與後面的
-#: `[\s.…·]*` **可以吃到同一批字元**，遇到不匹配的行（例如整行都是點、
-#: 結尾沒有數字）就會逐一回溯，變成多項式時間。實測一行 16,000 個點要
-#: **5.4 秒**，而這裡的輸入是使用者貼上的目錄清單、每一行都會跑一次 ——
-#: 貼一百行就是好幾分鐘的 CPU（CodeQL 也標了 ReDoS）。
-#:
-#: 改成「尾端抓數字，其餘用字串處理」：沒有歧義、跑幾次就是幾次。
-_PAGE_TAIL_RE = re.compile(r"(\d+)[\s　]*$")
+#: 標題與頁碼之間的引導點 —— 使用者多半是從既有目錄複製貼上的。
+_TRAILING_SPACE = " \t\u3000"
+
+
+def _split_tail_page(line: str) -> Optional[tuple[int, int]]:
+    r"""從行尾切出頁碼。回 `(頁碼起始位置, 頁碼)`，沒有就回 None。
+
+    **這裡刻意不用正規表示式。** 兩次嘗試都被回溯咬到：
+
+    1. 第一版 `(title.*?)[\s.…·]*(\d+)\s*$` —— `.*?` 與後面的字元集能吃到
+       同一批字元，「整行都是點」要 5.4 秒。
+    2. 第二版 `(\d+)[\s　]*$` 看起來很單純，但「一長串數字後面接一個非空白
+       字元」時，每個起始位置都要把 `\d+` 退一格重試 —— **兩萬位數字要
+       13.7 秒，比第一版更糟**。
+
+    第二次的教訓是：**我拿第一版的最壞輸入去測第二版就宣告修好了**。
+    式子換了，最壞輸入也要跟著重新設計。
+
+    純字串從尾端掃一次是 O(n) 且沒有回溯可言，這種「找行尾的數字」根本不需要
+    正規表示式。`str.isdigit()` 也涵蓋全形數字，與原本的 `\d` 行為一致。
+    """
+    i = len(line)
+    while i > 0 and line[i - 1] in _TRAILING_SPACE:
+        i -= 1
+    j = i
+    while j > 0 and line[j - 1].isdigit():
+        j -= 1
+    if j == i:
+        return None
+    try:
+        return j, int(line[j:i])
+    except ValueError:          # 全形數字以外的 isdigit 字元（例如 ²）
+        return None
+
 
 #: 標題與頁碼之間的引導點 —— 使用者多半是從既有目錄複製貼上的。
 _LEADER_CHARS = " \t.…·　"
@@ -238,18 +262,19 @@ def parse_text_list(text: str) -> tuple[list[BookmarkItem], list[str]]:
         line = raw.rstrip()
         if not line.strip():
             continue
-        m = _PAGE_TAIL_RE.search(line)
-        if not m:
+        hit = _split_tail_page(line)
+        if hit is None:
             warns.append(f"看不出頁碼，略過：{line.strip()[:40]}")
             continue
-        head = line[:m.start(1)]
+        cut, page_no = hit
+        head = line[:cut]
         indent = head[:len(head) - len(head.lstrip("\t 　"))].replace("　", "  ")
         title = head.strip().rstrip(_LEADER_CHARS)
         if not title:
             warns.append(f"只有頁碼沒有標題，略過：{line.strip()[:40]}")
             continue
         items.append(BookmarkItem(title=title,
-                                  page=int(m.group(1)),
+                                  page=page_no,
                                   level=len(indent) // 2 + 1))
     return items, warns
 

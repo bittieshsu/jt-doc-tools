@@ -382,6 +382,27 @@ def test_insert_point_beyond_the_document_is_clamped():
 
 # ------------------------------------------------------------ 貼上清單的效能
 
+@pytest.mark.parametrize("evil_line,why", [
+    ("." * 20000, "整行都是點 —— 第一版式子的最壞輸入"),
+    ("1" * 20000 + "x", "一長串數字接非空白 —— **第二版式子的最壞輸入**"),
+    ("1" * 20000 + " " * 20000, "數字後面一大片空白"),
+])
+def test_pasted_list_stays_linear_for_every_known_worst_case(evil_line, why):
+    """**換了式子就要重新設計最壞輸入。**
+
+    第一次修完，我拿第一版的最壞輸入（整行都是點）去測第二版 `(\\d+)[\\s]*$`，
+    很快就通過了，於是宣告修好 —— 但那個式子真正的殺手是「一長串數字後面接
+    一個非空白字元」，實測 **20,000 位數字要 13.7 秒，比第一版更糟**。
+    所以這裡把每一版踩過的最壞輸入都留著一起跑。
+    """
+    import time
+    t0 = time.time()
+    items, warns = BC.parse_text_list("\n".join([evil_line] * 20))
+    elapsed = time.time() - t0
+    assert elapsed < 1.0, f"{why}：花了 {elapsed:.2f} 秒 —— 回溯又回來了"
+    assert len(warns) == 20 or items
+
+
 def test_pasted_list_does_not_blow_up_on_pathological_input():
     """**貼上的清單是使用者可控的輸入，解析必須是線性的。**
 

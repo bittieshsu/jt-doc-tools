@@ -131,17 +131,31 @@ def _strip_comments(text: str, suffix: str) -> str:
             if 0 < ln < len(lines):
                 lines[ln] += " " + val.replace("\n", " ")
         return "\n".join(lines)
+    # 區塊註解（`<!-- -->`、`/* */`）**用掃描不用正規表示式**：
+    # 一來它們會跨行，正規表示式版本本來就處理不到；二來用式子剝 HTML
+    # 註解容易被畸形寫法繞過（CodeQL 也會標 bad HTML filtering）。
+    # 換成掃描之後行為明確，而且換行數保留、行號不會跑掉。
+    txt = _blank_blocks(text, [("<!--", "-->"), ("/*", "*/")])
+    # 行註解：到行尾為止，逐行處理就夠了
+    return "\n".join(line.split("//")[0] for line in txt.split("\n"))
+
+
+def _blank_blocks(text: str, pairs: list[tuple[str, str]]) -> str:
+    """把成對標記之間的內容抹掉，**換行照原樣留著**（行號才不會跑掉）。"""
     out = []
-    for line in text.split("\n"):
-        # JS / HTML：拿掉行註解與 HTML 註解
-        line = re.sub(r"//.*$", "", line)
-        line = re.sub(r"<!--.*?-->", "", line)
-        out.append(line)
-    txt = "\n".join(out)
-    # 跨行的 /* */ 註解：換成等量換行，行號才不會跑掉
-    txt = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), txt,
-                 flags=re.S)
-    return txt
+    i = 0
+    while i < len(text):
+        for start, end in pairs:
+            if text.startswith(start, i):
+                j = text.find(end, i + len(start))
+                j = len(text) if j < 0 else j + len(end)
+                out.append("".join(c if c == "\n" else " " for c in text[i:j]))
+                i = j
+                break
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
 
 
 def _offences(text: str, path: str, suffix: str = "") -> list[str]:
