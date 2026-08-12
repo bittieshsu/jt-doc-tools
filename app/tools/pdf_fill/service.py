@@ -149,6 +149,21 @@ def fill_pdf(
         if not value:
             unfilled.add(d.profile_key)
             continue
+        # **後置標籤要跟值的單位詞對得上。**
+        #
+        # 匯款欄常同時印出銀行與郵局兩組：
+        #
+        #     ＿＿＿銀行   ＿＿＿分行
+        #     ＿＿＿支局   ＿＿＿辦事處
+        #
+        # 「支局」「辦事處」也對應到 bank_branch，所以「崇德分行」會被填進
+        # 郵局那一列 —— 表面上有填，但填在錯的地方，收件方拿到的是無效資料。
+        # 值本身帶著單位詞時（崇德**分行**），就只認同名的那個標籤。
+        if pdf_layout.is_suffix_label(d.label_text):
+            unit = d.label_text.strip().strip("：:（）() ")
+            others = pdf_layout.SUFFIX_LABELS - {unit}
+            if any(value.endswith(o) for o in others):
+                continue
 
         # Universal checkbox-first: try to match profile value (including each
         # comma-separated sub-value) against any printed □ near the label. If

@@ -538,7 +538,21 @@ def detect_fields(
                         cell = None
                         slot = None
                         slot_kind = "unbounded"
-                        if cells_pp:
+                        # **後置標籤要最先判斷。** 下面那套（相鄰格 / inline）
+                        # 一律把值放到標籤右邊，`＿＿＿分行` 這種版面就會落在
+                        # 標籤後面那一小段（實測只有 38pt，「崇德分行」被擠成
+                        # 「崇德分」再折行壓到下一列）。
+                        # 走到這裡就代表這是單位詞，值一定在左邊。
+                        if pdf_layout.is_suffix_label(text):
+                            _cell = (pdf_layout.find_cell_containing(
+                                (x0, y0, x1, y1), cells_pp) if cells_pp else None)
+                            _left = pdf_layout._slot_left_of(
+                                (x0, y0, x1, y1), _cell, v_lines, 3.0,
+                                [s[1] for s in page_spans[pno]],
+                            )
+                            if _left is not None:
+                                slot, slot_kind = _left, "left-of-suffix"
+                        if slot is None and cells_pp:
                             cell_pp = pdf_layout.find_cell_containing(
                                 (x0, y0, x1, y1), cells_pp
                             )
@@ -573,8 +587,18 @@ def detect_fields(
                                 (x0, y0, x1, y1), h_lines, v_lines
                             )
                             slot, slot_kind = pdf_layout.compute_value_slot(
-                                (x0, y0, x1, y1), cell, h_lines, v_lines
+                                (x0, y0, x1, y1), cell, h_lines, v_lines,
+                                label_text=text,
+                                row_texts=[s[1] for s in page_spans[pno]],
                             )
+                        # **值不可以落在直書標籤欄**。「匯 款 資 料」那種欄位
+                        # 很窄（實測約 64pt），值塞進去只會疊在別的標籤上 ——
+                        # 使用者看到的是兩串字疊在一起，完全讀不出來。
+                        # 寧可不填也不要疊：留白至少看得出「這裡沒填」。
+                        if (slot and slot_kind != "below-adj"
+                                and slot[2] - slot[0] < pdf_layout.MIN_VALUE_SLOT_WIDTH
+                                and slot[0] < x0):
+                            slot, slot_kind = None, None
                         # Guard against slots that accidentally extend above
                         # the label's own row (pdfplumber can merge visually
                         # adjacent cells) — clamp the slot top to the label's
@@ -614,6 +638,33 @@ def detect_fields(
                                     slot_kind=slot_kind,
                                 )
                             )
+
+    # **值的位置不可以壓在別的標籤上。**
+    #
+    # 表格最左邊常有直書的分區標籤（「匯 款 資 料」），很窄。值一旦被算到
+    # 那裡，印出來就是兩串字疊在一起，完全讀不出來 —— 而且使用者第一眼
+    # 看到的是「工具把字寫爛了」，不是「這欄沒填」。
+    #
+    # 寬度門檻擋不住這種情況（那一欄本來就窄，而郵遞區號、分機這種正常欄位
+    # 也窄），真正的不變量是**值不該蓋到任何標籤**。蓋到就放棄這個位置 ——
+    # 留白至少看得出「這裡沒填」，比疊字好。
+    _label_boxes = [(d.page, d.label_rect) for d in detected]
+    for d in detected:
+        if d.value_slot is None:
+            continue
+        sx0, sy0, sx1, sy1 = d.value_slot
+        for pg, (bx0, by0, bx1, by1) in _label_boxes:
+            if pg != d.page or (bx0, by0, bx1, by1) == d.label_rect:
+                continue
+            ox = min(sx1, bx1) - max(sx0, bx0)
+            oy = min(sy1, by1) - max(sy0, by0)
+            if ox <= 1 or oy <= 1:
+                continue
+            # 只有「蓋掉標籤一大半」才算真的疊到 —— 相鄰格邊緣擦到不算
+            if ox * oy > (bx1 - bx0) * (by1 - by0) * 0.5:
+                d.value_slot = None
+                d.slot_kind = None
+                break
 
     # Occupancy check: if the target slot already contains non-trivial text
     # (i.e. the form is pre-filled or has example text like "月結30 天"),

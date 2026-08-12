@@ -363,6 +363,34 @@ def find_adjacent_cell_below(
     return None
 
 
+#: **後置標籤**：標籤印在空白的**右邊**，值要寫在它左邊。
+#:
+#: 台灣的匯款 / 地址欄常這樣排：
+#:
+#:     受款銀行   ＿＿＿銀行   ＿＿＿分行
+#:     (郵局)     ＿＿＿支局   ＿＿＿辦事處
+#:
+#: 一般欄位是「標籤：值」（值在右），這一類剛好相反。原本的定位只會往右、
+#: 往下找，遇到這種排法一定放錯格 —— 實測「崇德分行」被放到「支局」那一列、
+#: 銀行名稱被丟進最左邊的直書標籤欄，壓在別的標籤上。
+#:
+#: 只收**單位詞**（自己不成一個欄位、必須接在值後面才有意義的字），
+#: 不可以放「銀行名稱」「分行代碼」這種本身就是完整標籤的詞 —— 那些是
+#: 正常的前置標籤，收進來會把原本填對的表弄壞。
+SUFFIX_LABELS = frozenset({
+    "銀行", "分行", "支局", "辦事處", "郵局",
+})
+
+#: 直書標籤欄（「匯 款 資 料」那種）很窄，值塞進去只會疊在別的字上面。
+#: 實測那一欄約 64pt；一般值欄至少 100pt 以上。
+MIN_VALUE_SLOT_WIDTH = 80.0
+
+
+def is_suffix_label(text: str) -> bool:
+    """這個標籤是不是「印在空白右邊」的單位詞。"""
+    return (text or "").strip().strip("：:（）() ") in SUFFIX_LABELS
+
+
 def compute_value_slot(
     label_bbox: tuple[float, float, float, float],
     cell_rect: Optional[tuple[float, float, float, float]],
@@ -370,6 +398,8 @@ def compute_value_slot(
     v_lines: list[VLine],
     min_inline_width: float = 30.0,
     padding: float = 3.0,
+    label_text: str = "",
+    row_texts: Optional[list[tuple[float, float, float, float]]] = None,
 ) -> tuple[tuple[float, float, float, float], str]:
     """Pick the rectangle where the value text should live.
 
@@ -384,6 +414,12 @@ def compute_value_slot(
     "inline" | "right-adj" | "below-adj" | "unbounded".
     """
     lx0, ly0, lx1, ly1 = label_bbox
+    # **後置標籤先處理**：「＿＿＿銀行」的值在標籤左邊，往右找一定放錯。
+    if is_suffix_label(label_text):
+        left = _slot_left_of(label_bbox, cell_rect, v_lines, padding,
+                             row_texts)
+        if left is not None:
+            return left, "left-of-suffix"
     if cell_rect is not None:
         cx0, cy0, cx1, cy1 = cell_rect
         # Chinese forms typically use a label-column | value-column table
@@ -402,6 +438,50 @@ def compute_value_slot(
             return (bx0 + padding, by0, bx1 - padding, by1), "below-adj"
     # No cell info — guess a loose region to the right of the label.
     return (lx1 + padding, ly0 - 1, lx1 + 240, ly1 + 1), "unbounded"
+
+
+def _slot_left_of(
+    label_bbox: tuple[float, float, float, float],
+    cell_rect: Optional[tuple[float, float, float, float]],
+    v_lines: list[VLine],
+    padding: float,
+    row_texts: Optional[list[tuple[float, float, float, float]]] = None,
+) -> Optional[tuple[float, float, float, float]]:
+    """後置標籤左邊那段空白。
+
+    左界取三者中**最靠右**的：同列的直線、同列前一段文字的右緣、所在格左緣。
+
+    **同列文字一定要看**：`＿＿＿銀行　＿＿＿分行` 這種版面整列只有最外面
+    兩條框線，中間沒有任何分隔 —— 只找直線的話，「分行」的左界會一路退到
+    格子左緣，跨過「銀行」兩個字，算出來的位置反而落在標籤右邊。
+    實測「崇德分行」因此被擠成 38pt 寬、折行壓到下一列。
+
+    左邊沒有足夠空間就回 None（讓呼叫端走原本的規則）。
+    """
+    lx0, ly0, lx1, ly1 = label_bbox
+    cy = (ly0 + ly1) / 2
+    bound = None
+
+    def _push(x: float) -> None:
+        nonlocal bound
+        if x < lx0 - 1 and (bound is None or x > bound):
+            bound = x
+
+    for x, sy, ey in v_lines:
+        if sy - 2 <= cy <= ey + 2:
+            _push(x)
+    for bx0, by0, bx1, by1 in (row_texts or []):
+        # 同一列、在標籤左邊的文字：它的右緣就是可用空間的左界
+        if by0 - 2 <= cy <= by1 + 2 and bx1 <= lx0 + 1:
+            _push(bx1)
+    if bound is None and cell_rect is not None:
+        bound = cell_rect[0]
+    if bound is None:
+        return None
+    width = lx0 - bound - padding * 2
+    if width < 24:                      # 放不下任何有意義的內容
+        return None
+    return (bound + padding, ly0, lx0 - padding, ly1)
 
 
 def find_underline_below(

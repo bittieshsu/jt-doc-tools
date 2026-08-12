@@ -385,6 +385,18 @@ function setBusy(busy, message) {
   }
 }
 
+// 換檔案時把上一份的畫面全部收掉 —— 半舊半新的畫面比空白更容易誤導。
+function clearPreviousResult() {
+  if (resultPanel) resultPanel.hidden = true;
+  if (reportBox) reportBox.textContent = '';
+  const pv = document.getElementById('previewImg');
+  if (pv) { pv.removeAttribute('src'); pv.hidden = true; }
+  ['editorPanel', 'llmPanel', 'templateHint'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = true;
+  });
+}
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const file = fileInput.files[0];
@@ -400,6 +412,11 @@ form.addEventListener('submit', async (e) => {
   const llmOn = llmToggle && llmToggle.checked;
 
   const isOffice = !/\.pdf$/i.test(file.name);
+  // **先把上一份的結果清掉再開始。**
+  // 原本失敗時只跳 alert 就 return，舊的結果面板會整個留在畫面上 ——
+  // 使用者拉了新檔、這次失敗了，看到的還是**上一份文件**的預覽與報告，
+  // 看起來就像「工具處理了錯的檔案」（實際上是根本沒處理成功）。
+  clearPreviousResult();
   setBusy(true, isOffice ? '轉 PDF 中…' : '辨識欄位中…');
 
   try {
