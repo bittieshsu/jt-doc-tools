@@ -102,7 +102,11 @@ def _finish_login(request: Request, user: dict, next_url: str, *,
             saml_session.get("session_index", ""), expires_at)
     resp = RedirectResponse(safe_next(next_url), status_code=302)
     _set_session_cookie(resp, token, remember=False, request=request, expires_at=expires_at)
-    resp.delete_cookie(_SSO_TX_COOKIE, path="/")
+    from .auth_routes import is_https_request
+    resp.delete_cookie(
+        _SSO_TX_COOKIE, path="/", httponly=True, samesite="lax",
+        secure=is_https_request(request),
+    )
     _audit("login", ip, username=user.get("username", ""),
            detail=f"sso:{user.get('source')}{' (new)' if user.get('created') else ''}")
     return resp
@@ -224,7 +228,12 @@ def build_router(templates) -> APIRouter:
             except Exception:
                 pass
         resp = RedirectResponse(safe_next(redirect_to) or "/login", status_code=302)
-        resp.delete_cookie(sessions.COOKIE_NAME, path="/")
+        # 刪除也要帶安全旗標（Max-Age=0 不會沿用建立時的 flags）
+        from .auth_routes import is_https_request
+        resp.delete_cookie(
+            sessions.COOKIE_NAME, path="/", httponly=True, samesite="lax",
+            secure=is_https_request(request),
+        )
         return resp
 
     @router.get("/auth/saml/metadata")

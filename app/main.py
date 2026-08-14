@@ -17,7 +17,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.28"
+VERSION = "1.14.29"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -645,10 +645,40 @@ from fastapi.responses import HTMLResponse  # noqa: E402
 # 400「Invalid JSON body」（客戶端錯誤）。涵蓋全部 ~80 個 request.json() 呼叫點，
 # 不需逐一加 try/except。UI 一律送合法 JSON → 正常流程不受影響。
 import json as _json  # noqa: E402
+from fastapi.exceptions import (  # noqa: E402
+    RequestValidationError as _RequestValidationError,
+)
 
 @app.exception_handler(_json.JSONDecodeError)
 async def _json_decode_exc(request: Request, exc: _json.JSONDecodeError):
     return _JSONResponse({"detail": "Invalid JSON body"}, status_code=400)
+
+
+# 參數驗證失敗（422）**不要把使用者送的原字串回填到回應裡**。
+#
+# FastAPI 預設的 422 會帶 `"input": "<使用者原文>"`。那串東西是攻擊者可控的，
+# 掃描器因此把它判成反射型 XSS（外部掃描 2026-08-13 的 High）。
+#
+# 實際上不可利用 —— 載體是 `application/json`、又有 `X-Content-Type-Options:
+# nosniff`，瀏覽器不會當 HTML 解析；就算落到 HTML 脈絡，CSP 的 script-src
+# 沒有 unsafe-inline，注入的 inline script 缺 nonce 也執行不了。
+#
+# 但「不可利用」不等於「應該回填」：把原文吐回去本來就沒有必要（欄位名與
+# 錯誤原因才是使用者需要的），拿掉它同時消掉整個反射面，成本近乎零。
+# 這裡一次覆蓋全站所有端點的驗證錯誤，不必逐一改 route 簽章。
+@app.exception_handler(_RequestValidationError)
+async def _validation_exc(request: Request, exc: _RequestValidationError):
+    safe = [
+        {"loc": [str(x) for x in e.get("loc", [])],
+         "msg": str(e.get("msg", ""))[:200],
+         "type": str(e.get("type", ""))}
+        for e in (exc.errors() or [])[:20]
+    ]
+    return _JSONResponse(
+        {"detail": safe},
+        status_code=422,
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
 
 
 # ---- Auth gate middleware ----

@@ -27,14 +27,27 @@ def _client_ip(request: Request) -> str:
     return _cip.real_client_ip(request)
 
 
+def is_https_request(request: Request) -> bool:
+    """這個請求對外是不是 HTTPS。
+
+    **所有 cookie 的 `secure` 都要走這裡。** 判斷散在各處的話遲早有一處漏掉
+    —— 外部掃描就抓到 2FA 待驗證 cookie 建立時沒有 `secure`，而它裝的是
+    待驗證權杖，會經明文送出。
+
+    `X-Forwarded-Proto` 可能是逗號串（多層代理），取**第一段**才是最外層
+    面對使用者的那一段。
+    """
+    if request.url.scheme == "https":
+        return True
+    fwd = request.headers.get("X-Forwarded-Proto", "")
+    return fwd.split(",")[0].strip().lower() == "https"
+
+
 def _set_session_cookie(response: Response, token: str, *, remember: bool,
                        request: Request, expires_at: float) -> None:
     """Apply the session cookie with secure flags. Secure flag is enabled
     when the request looks HTTPS (proxy hint or direct)."""
-    is_https = (
-        request.url.scheme == "https"
-        or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
-    )
+    is_https = is_https_request(request)
     s = auth_settings.get()
     max_age_days = s["remember_max_age_days"] if remember else s["session_max_age_days"]
     response.set_cookie(
@@ -48,8 +61,20 @@ def _set_session_cookie(response: Response, token: str, *, remember: bool,
     )
 
 
-def _clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(sessions.COOKIE_NAME, path="/")
+def _clear_session_cookie(response: Response,
+                          request: Optional[Request] = None) -> None:
+    """清掉 session cookie。**刪除也要帶安全旗標。**
+
+    `Max-Age=0` / `expires` 不會自動沿用建立當時的 flags —— 少了
+    `HttpOnly` / `Secure`，那個 `Set-Cookie: jtdt_session=""` 本身就是一筆
+    可被 JS 讀取、可經明文 HTTP 送出的回應標頭（外部掃描實際指出這一點）。
+    刪除用的 Path / Domain 也必須與當初一致，否則瀏覽器會留著原本那個。
+    """
+    is_https = bool(request) and is_https_request(request)
+    response.delete_cookie(
+        sessions.COOKIE_NAME, path="/",
+        httponly=True, secure=is_https, samesite="lax",
+    )
 
 
 def _sso_logout_redirect(request: Request, user: dict, token: str) -> Optional[str]:
@@ -159,8 +184,10 @@ def complete_login(request: Request, user: dict, *, remember: bool, ip: str,
             next_url=safe_next(next_url), forced_setup=(not tstate["enabled"]),
         )
         resp = RedirectResponse("/2fa-verify", status_code=302)
+        # 這個 cookie 裝的是**待驗證權杖** —— 少了 secure 會經明文送出
         resp.set_cookie(key=PENDING_2FA_COOKIE, value=pending_token,
                         max_age=PENDING_2FA_TTL, httponly=True,
+                        secure=is_https_request(request),
                         samesite="lax", path="/")
         return resp
     token, expires_at = sessions.issue(
@@ -411,7 +438,11 @@ def build_router(templates) -> APIRouter:
         resp = RedirectResponse(next_url, status_code=302)
         _set_session_cookie(resp, token, remember=entry["remember"],
                             request=request, expires_at=expires_at)
-        resp.delete_cookie(PENDING_2FA_COOKIE, path="/")
+        # 刪除也要帶旗標 —— 見 _clear_session_cookie 的說明
+        resp.delete_cookie(
+            PENDING_2FA_COOKIE, path="/", httponly=True, samesite="lax",
+            secure=is_https_request(request),
+        )
         _drop_pending_2fa(ptoken)
         return resp
 
@@ -573,7 +604,7 @@ def build_router(templates) -> APIRouter:
                     "logout", username=cur["username"], ip=_client_ip(request),
                 )
         resp = RedirectResponse(dest, status_code=302)
-        _clear_session_cookie(resp)
+        _clear_session_cookie(resp, request)
         return resp
 
     # GET /logout also works (some users will type the URL); same behaviour.

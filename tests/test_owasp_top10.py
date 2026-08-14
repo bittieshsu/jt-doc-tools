@@ -318,3 +318,34 @@ def test_scheduled_export_save_rejects_system_target_dir(tmp_path, monkeypatch):
     with pytest.raises(ValueError):
         scheduled_export.save_settings({"enabled": True, "interval": "daily",
                                         "keep": 3, "target_dir": "/etc/cron.d"})
+
+
+# ---------------------------------------------- 驗證錯誤不可回填原始輸入
+
+@pytest.mark.parametrize("path", [
+    "/admin/audit?page=1%3CScRiPt%3Ealert(1)%3C/ScRiPt%3E",
+    "/admin/audit?page_size=100%3Cimg%20src=x%20onerror=alert(1)%3E",
+    "/api/jobs?limit=%3Cscript%3Ealert(1)%3C/script%3E",
+])
+def test_validation_error_does_not_echo_input(path):
+    """422 **不可以把使用者送的原字串回填到回應裡**。
+
+    FastAPI 預設的驗證錯誤會帶 `"input": "<使用者原文>"` —— 那是攻擊者可控
+    的內容，外部掃描（2026-08-13）因此把它判成反射型 XSS。
+
+    實際上不可利用（`application/json` + `nosniff` + CSP 無 unsafe-inline，
+    三重擋著），但**回填本來就沒必要** —— 使用者需要的是「哪個欄位、
+    錯在哪」，不是自己送過去的字串。拿掉就整個反射面消失。
+    """
+    from fastapi.testclient import TestClient
+
+    import app.main as main
+    with TestClient(main.app) as c:
+        r = c.get(path, follow_redirects=False)
+    if r.status_code not in (422, 400):
+        pytest.skip(f"這個路徑沒有觸發驗證錯誤（HTTP {r.status_code}）")
+    body = r.text
+    for marker in ("<ScRiPt", "<script", "onerror=", "<img"):
+        assert marker not in body, (
+            f"驗證錯誤回應回填了原始輸入（{marker!r}）：{body[:200]}")
+    assert r.headers.get("x-content-type-options") == "nosniff"
