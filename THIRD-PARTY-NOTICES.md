@@ -92,7 +92,7 @@ Jason Tools 文件工具箱 使用以下第三方開源套件。本程式遵守�
 - 專案：https://github.com/ArtifexSoftware/pdf2docx
 - 用途：pdf-to-office 主轉檔引擎（PDF → docx）
 - Copyright © Artifex Software, Inc.
-- **注意**：上游於 2026 釋出 0.5.13 後停止維護。本程式鎖死於 0.5.13；必要時 jasoncheng7115/jt-doc-tools 將自行 fork 維護（已規劃 jasoncheng7115/jt-pdf2docx 倉庫）。
+- **注意**：上游於 2026 釋出 0.5.13 後停止維護。本程式鎖死於 0.5.13；必要時 jasoncheng7115/jt-doc-tools 將自行 fork 維護（已規劃 jasoncheng7115/jt-pdf2docx 儲存庫）。
 
 ### rapidfuzz  · MIT License
 - 專案：https://github.com/rapidfuzz/RapidFuzz

@@ -7,8 +7,8 @@ from .router import router
 
 metadata = ToolMetadata(
     id="markdown-to-doc",
-    name="Markdown 轉文書",
-    description="貼上或拖入 Markdown，套用主題後輸出 PDF / DOCX / ODT，含所有頁面預覽。",
+    name="Markdown 轉辦公文件",
+    description="貼上或拖入 Markdown，套用主題後輸出 PDF 或文書檔（.docx / .odt），含所有頁面預覽。",
     icon="file-text",
     category="格式轉換",
 )

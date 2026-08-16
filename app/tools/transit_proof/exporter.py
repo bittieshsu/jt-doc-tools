@@ -86,7 +86,10 @@ def _raw_value(entry: dict, field_id: str, row_index: int):
 def export_csv(entries, columns, field_formats, export_labels=None) -> bytes:
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
-    w.writerow([_label(c, export_labels) for c in columns])
+    # 欄位標題也要中和 —— `export_labels` 是**每位使用者自己可以設定**的
+    # （`PUT /settings` 走 `_request_user`，不是管理員專屬）。使用者把公式
+    # 塞進欄位標題、匯出 CSV 寄給會計，就在對方的 Excel 裡執行了。
+    w.writerow(_csv_safe.row([_label(c, export_labels) for c in columns]))
     for i, e in enumerate(entries):
         # 欄位值來自使用者上傳的檔案 —— 直接寫會被 Excel 當公式（core/csv_safe）
         w.writerow(_csv_safe.row(

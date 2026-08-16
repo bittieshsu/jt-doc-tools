@@ -41,14 +41,18 @@
     tests/test_submission_check_acl.py \
     tests/test_preview_acl_failopen.py \
     tests/test_stamp_watermark_preview_acl.py \
-    tests/test_upload_owner_acl.py \
+    tests/test_safe_paths_and_owner.py \
     tests/test_auditor_readonly.py \
     tests/test_roles_rbac.py \
     tests/test_api_gate_and_csrf_edges.py \
     tests/test_csrf.py \
     tests/test_csp_nonce.py \
     tests/test_csv_injection.py \
-    tests/test_upload_validation_parity.py
+    tests/test_upload_validation_parity.py \
+    tests/test_cookie_flags_on_delete.py \
+    tests/test_error_message_scrub.py \
+    tests/test_forwarded_proto.py \
+    tests/test_broken_input_no_500.py
 ```
 
 各檔的分工：
@@ -58,6 +62,10 @@
 | `test_id_from_body_acl.py` | **靜態掃描**：任何吃使用者提供的 id 的端點都要有權限檢查。例外清單每筆都要寫理由，並偵測「例外項已改名 / 刪除」 |
 | `test_job_id_acl.py` / `test_job_api_acl.py` | 作業（含無主作業）不可被別人讀 / 取消 / 下載；pdf-to-office 的報告與前後預覽同樣要驗 |
 | `test_submission_check_acl.py` | 案件 ACL：無主案件僅管理員、稽核員唯讀、管理員 / 稽核員判定必須真的有效 |
+| `test_cookie_flags_on_delete.py` | **外掃 v1.14.29**：刪除 cookie 的回應也要帶安全旗標；靜態擋「新寫的 delete_cookie 沒帶旗標」 |
+| `test_error_message_scrub.py` | **外掃 v1.14.29/31**：錯誤訊息不得反射使用者原字串（檔名含 `<script>` 等一律轉全形） |
+| `test_forwarded_proto.py` | **外掃 v1.14.29**：多層代理 `X-Forwarded-Proto` 逗號串的 HTTPS 判斷（Secure 旗標與 HSTS 要同一個答案） |
+| `test_broken_input_no_500.py` | 毀損檔案一律 400 不可 500（全工具端點自動列舉，2026-08-16 掃出 28 處） |
 | `test_preview_acl_failopen.py` | 預覽端點認不出 upload_id 時**拒絕**（不可 no-op） |
 | `test_auditor_readonly.py` | 稽核員唯讀：讀得到但不可刪紀錄、不可觸發備份輪替 |
 | `test_roles_rbac.py` | 內建角色名實相符、工具 id 存在、升級步驟編號連續 |
@@ -134,8 +142,10 @@ GitHub 端（推上去 5–15 分鐘後看）：
 ```bash
 mkdir -p temp/zap/$(date +%Y%m%d)-NN
 # 依前一次的 plan 改 reportDir 後執行
-/snap/zaproxy/current/zap.sh -cmd -autorun temp/zap/<日期-NN>/plan-30.yaml
-/snap/zaproxy/current/zap.sh -cmd -autorun temp/zap/<日期-NN>/plan-doc.yaml
+/snap/bin/zaproxy -cmd -autorun temp/zap/<日期-NN>/plan-30.yaml
+/snap/bin/zaproxy -cmd -autorun temp/zap/<日期-NN>/plan-doc.yaml
+# （一律用 /snap/bin/zaproxy；舊寫法 /snap/zaproxy/current/zap.sh 與
+#   §4.1 不一致，同一份計畫兩種路徑會讓人不知道該信哪個）
 ```
 
 兩個目標都要掃：
@@ -215,4 +225,121 @@ A / B，然後：
 | v1.11.81 | Host 標頭污染 `request.url.path` 可繞過工具權限閘 | 滲透測試 §3 |
 | v1.12.52 | 群組成員數用 `innerHTML` 塞 DOM 文字（CodeQL High） | 源碼掃描 |
 | v1.12.33-34 | `csrf.js` 沒包相對 URL fetch 與 XMLHttpRequest → 所有上傳在正式環境 403 | **headless 實測上傳**（conftest 關閉 CSRF，測不到） |
-| v1.4.83 | 任一登入者拿到別人的 `upload_id` 即可下載對方 PDF | `test_upload_owner_acl.py` |
+| v1.4.83 | 任一登入者拿到別人的 `upload_id` 即可下載對方 PDF | `test_safe_paths_and_owner.py`（原名 test_upload_owner_acl，改名後這裡漏同步 —— 2026-08-16 稽核抓到，照抄舊指令會直接 file not found）|
+
+### v1.14.17 — 多頁合併的水平越權（每次發版必過）
+
+自動化：`tests/test_authz_boundaries.py`（`test_nup_preview_does_not_leak_another_users_pdf`
+與 `test_nup_rejects_path_traversal_in_upload_id`）、`tests/test_id_from_body_acl.py`
+（靜態掃描已擴充到 pydantic 模型欄位）。
+
+- [ ] 兩個帳號 A / B。A 在「多頁合併」上傳檔案取得上傳編號
+- [ ] B 用 A 的編號送 `POST /tools/pdf-nup/preview` → **403 / 404**，不可以拿到圖
+- [ ] B 用 A 的編號送 `POST /tools/pdf-nup/generate` → **403 / 404**
+- [ ] A 自己送同樣的請求 → **200 且拿得到 PNG**（不可以為了擋別人把工具擋死）
+- [ ] `upload_id` 帶 `../` → 400 / 403 / 404
+- [ ] **未啟用認證時工具照常可用**（單機模式不受影響）
+
+> 這一類的通則：**id 從 JSON 內文的 pydantic 模型欄位進來時最容易漏**，因為函式
+> 參數看起來只有一個 `opts`。新增這種形狀的端點時，處理函式一定要收 `Request`
+> 並呼叫歸屬檢查。
+
+### v1.14.17 — 升級遷移、角色補發、垂直越權收斂（每次發版必過）
+
+自動化：`tests/test_migration_fk_cascade.py`（9）、`tests/test_seed_bootstrap_gap.py`（4）、
+`tests/test_tool_search_keywords.py`（45）、`tests/test_authz_boundaries.py`（16）。
+
+- [ ] **升級不可以清空群組成員**：拿一份 v2 之前的舊資料庫（或用測試裡的模擬），
+      升級後群組成員關係與 session 都還在
+- [ ] **舊安裝升級後每支工具都有人拿得到**：特別確認「乘車證明整理」與「頁面加框」
+      在既有客戶的一般使用者角色裡看得到
+- [ ] 每支工具都搜尋得到（中英文各試一次）
+- [ ] 非 admin 打 `/tools/submission-check/admin-stats` → 403；admin → 200
+- [ ] 未登入打 `/login` `/healthz` 進得去；打 `/login-xxx` 這類不存在的路徑
+      **不可以**被當成公開而略過認證
+- [ ] 401 / 403 錯誤頁的訊息不會把輸入原樣渲染成 HTML
+
+### v1.14.29 — 外部弱點掃描的四項（每次發版必過）
+
+> 第三方弱點掃描工具對 v1.14.28 的完整掃描（公開文件不點名產品，與 CHANGELOG 同一決定）。程式面三項已修，憑證屬維運。
+
+- [ ] **登出的 `Set-Cookie` 帶 `HttpOnly` 與 `SameSite`**
+      （`Max-Age=0` 的刪除回應**不會沿用**建立當時的旗標，要再寫一次）
+- [ ] 反向代理是 HTTPS 時（`X-Forwarded-Proto: https`）刪除回應**帶 `Secure`**
+- [ ] **純 HTTP 時不可以帶 `Secure`** —— 加了瀏覽器會忽略那筆刪除，
+      使用者按了登出卻沒真的登出
+- [ ] 二階段驗證的待驗證 cookie **建立時**就要有 `Secure`（裝的是待驗證權杖）
+- [ ] 多層代理的 `X-Forwarded-Proto: https, http` 要判成 HTTPS（取最外層那段）
+- [ ] 參數驗證失敗（422）的回應**不含使用者送來的原字串**，且帶 `nosniff`
+- [ ] 管理區稽核頁四種攻擊字串：**帶 admin session 用瀏覽器實跑**，
+      注入元素 0、alert 0（只看回應文字不夠，要看瀏覽器有沒有真的執行）
+- [ ] TLS 憑證效期 —— **維運事項**，續期後以
+      `openssl s_client ... | openssl x509 -noout -dates` 確認
+- [ ] **頁面不印裸 epoch 時間戳**（掃描報告的 Timestamp Disclosure，Low）——
+      清單 / 稽核頁的時間一律經格式化再輸出（`app/main.py` 與
+      `app/core/roles.py` 內有註解說明）；新頁面要放時間就抽查一次
+      回應內文 `grep -E '1[0-9]{9}'` 不可命中
+
+### v1.14.31 — 對抗式驗證的一輪（每次發版必過）
+
+> 對每一項近期改動預設「它還有漏」，實際構造輸入去重現。
+> 全部有對應的 pytest，這裡列的是**發版前要親眼確認的那幾條**。
+
+**反射面（外部掃描判 High 的那個形狀，只修了一半）**
+
+- [ ] 上傳一個檔名是 `<script>alert(1)</script>.txt` 的檔到任一支只收 PDF 的
+      工具 → 回應的 `detail` **不可以**原樣含 `<` `>` `"` `'`
+      （`app/main.py:scrub_error_detail`，換成全形對應字元）
+- [ ] 同時確認正常訊息沒被洗壞：`image > 50MB`、`1 <= cols*rows <= 64`、
+      `engine must be 'easyocr'` 讀起來要跟原本一樣
+
+**協定判斷（多層代理）**
+
+- [ ] `X-Forwarded-Proto: https, http` → 回應**要有** HSTS
+      （不是只有 cookie 帶 Secure —— 那會是同一份回應裡兩個矛盾的答案）
+- [ ] `X-Forwarded-Proto: http, https` → **不可以**有 HSTS（最外層才算）
+- [ ] SSO 的對外網址不可以長出 `'https, http://主機名'`（會讓登入全掛）
+
+**字型（v1.14.19 慘案的防線）**
+
+- [ ] 把 `retain_gids` 暫時改成 `False` → `tests/test_cjk_font_renders.py`
+      **必須變紅**（改回來）。這道保險曾經存在一整個版本卻從來沒有生效，
+      因為它取樣到的永遠是 ASCII 標點
+- [ ] 表單填一段含**零寬空格**（U+200B）的公司名 → 產出**不可以**變成十幾 MB
+- [ ] 逐句翻譯的對照 PDF：內嵌字型要是 **TC**（不是第 0 套的日文），
+      檔案不可以是十幾 MB
+
+**服務阻斷**
+
+- [ ] 上傳一張 6000×6000 的全白 PNG 當騎縫章 → 處理時間**秒級**，
+      期間 `/healthz` 不可以被卡住（第一版是 27 秒、全站一起等）
+
+**表單自動填寫（最要緊的工具）**
+
+- [ ] 跑 `temp_pdfs/_regress/run_fill_regress.py --compare <基準>`：
+      **不可以有任何一份變差**
+- [ ] 一列格子裡「分行」被框成 60~70pt 的小格 → **不可以 500**
+- [ ] 「分行：」（有冒號）那一欄要填得到（值在冒號右邊）
+- [ ] 值填進去之後**不可以壓在原本就印在紙上的字上面** ——
+      判準用「實際畫出來的字」，不是 slot 方框
+
+**檔案保留**
+
+- [ ] 設「暫存 1 小時、作業結果 48 小時」→ 47 小時前的作業結果**要還在**
+      （`jobs_hours` 曾經是完全沒被讀過的死設定）
+
+**匯出**
+
+- [ ] 逐句翻譯 / 電子發票 / 乘車證明的 CSV：以 `=` `+` `-` `@` 開頭的內容
+      要被中和（欄位標題也算 —— 那是使用者自己可設定的）
+
+**通知**
+
+- [ ] 失敗通知的內文**不可以有伺服器路徑**（只留檔名）
+- [ ] 從未設定過偏好的使用者：預設**不可以**送到 Slack / Discord 這種
+      團隊共用頻道
+
+**前端（要用真瀏覽器，不能只看原始碼）**
+
+- [ ] 逐頁掃 CSP 違規 → 0 條（`temp/seam-ui/cdp_csp_violations.py`）
+- [ ] 沒有重複 id、沒有 JS 例外（`temp/seam-ui/cdp_frontend_fixes.py`）

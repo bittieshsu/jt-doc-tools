@@ -111,6 +111,43 @@ def _ensure_secret() -> bytes:
     return secret
 
 
+def _fallback_settings(reason: str) -> dict[str, Any]:
+    """讀不到設定時要回什麼 —— **這裡不可以無條件回「認證關閉」**。
+
+    `_DEFAULTS["backend"]` 是 `"off"`（全新安裝本來就不啟用認證），所以第一版
+    在檔案毀損 / 遺失時直接退回預設值 = **全站認證無聲關閉**。實測四種情況
+    （非法 JSON、內容是 `{}`、0 bytes、檔案被刪）都會讓未登入者拿到
+    `/admin/users`、`/admin/audit` 與受限工具的 200，而使用者、角色、權限
+    資料表**完全沒動**（v1.14.31 對抗式驗證）。
+
+    這不是假設性的：`save()` 沒有 fsync（斷電後 rename 過的檔可能是 0 bytes）、
+    設定匯入是原樣寫入不驗 JSON、備份還原漏檔、組態管理樣板出錯，都到得了。
+
+    **分辨得出來就要分辨**：資料庫裡有沒有使用者。有 → 這個安裝曾經設定過
+    認證，設定檔不見了是異常，一律 fail-secure（保持認證開啟，退到本機後端，
+    讓內建管理員還能登入做 break-glass）。沒有 → 那才是全新安裝，照舊。
+
+    真的被鎖住時的復原管道仍在：`sudo jtdt auth show / disable / set-local`
+    直接改 sqlite，不需要服務跑得起來。
+    """
+    out = json.loads(json.dumps(_DEFAULTS))
+    try:
+        has_users = bool(list_existing_users())
+    except Exception:  # noqa: BLE001 — 連查都查不到就更不該放行
+        has_users = True
+    if has_users:
+        out["backend"] = "local"
+        logger.critical(
+            "認證設定讀不到（%s），但資料庫裡已有使用者 —— "
+            "為避免全站認證被無聲關閉，暫時以本機認證運作。"
+            "請用 `sudo jtdt auth show` 檢查，並還原 auth_settings.json。",
+            reason)
+    else:
+        logger.warning("認證設定讀不到（%s），資料庫也沒有使用者 —— "
+                       "視為全新安裝，認證維持關閉。", reason)
+    return out
+
+
 def get() -> dict[str, Any]:
     """Return current settings (deep copy of cache to discourage mutation)."""
     global _CACHE
@@ -120,15 +157,22 @@ def get() -> dict[str, Any]:
             if p.exists():
                 try:
                     raw = json.loads(p.read_text(encoding="utf-8"))
+                    # **合法的 JSON 不代表是合法的設定**。`{}` 解析得過，
+                    # 跟預設值合併之後就變成 `backend: "off"` —— 一樣是
+                    # 全站認證無聲關閉，而且比毀損更難察覺（檔案「看起來
+                    # 正常」）。`save()` 寫出去的一定帶著 `backend`，
+                    # 沒有這個鍵就不是這支程式寫的。
+                    if not isinstance(raw, dict) or "backend" not in raw:
+                        raise ValueError("設定內容缺少 backend")
                     # Merge with defaults so new keys flow in on upgrade
                     merged = json.loads(json.dumps(_DEFAULTS))
                     _deep_merge(merged, raw)
                     _CACHE = merged
                 except Exception as exc:
-                    logger.error("auth_settings parse failed (%s); using defaults", exc)
-                    _CACHE = json.loads(json.dumps(_DEFAULTS))
+                    logger.error("auth_settings parse failed (%s)", exc)
+                    _CACHE = _fallback_settings("設定檔解析失敗")
             else:
-                _CACHE = json.loads(json.dumps(_DEFAULTS))
+                _CACHE = _fallback_settings("設定檔不存在")
         return json.loads(json.dumps(_CACHE))
 
 
@@ -143,12 +187,28 @@ def save(new_settings: dict[str, Any]) -> None:
         p = _path()
         p.parent.mkdir(parents=True, exist_ok=True)
         tmp = p.with_suffix(".tmp")
-        tmp.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+        # **一定要 fsync 再 rename**。ext4 的延遲配置會讓「rename 已完成、
+        # 內容還沒落地」成為可能 —— 斷電或 VM 硬重置之後那個檔就是 **0 bytes**，
+        # 而 0 bytes 的認證設定曾經等於「認證關閉」（v1.14.31 對抗式驗證）。
+        # 現在讀取端已經 fail-secure，這裡是把根因也堵掉。
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(merged, fh, ensure_ascii=False, indent=2)
+            fh.flush()
+            os.fsync(fh.fileno())
         try:
             os.chmod(tmp, 0o600)
         except Exception:
             pass
         tmp.replace(p)
+        # 目錄項本身也要落地，否則 rename 可能在當機後消失
+        try:
+            dfd = os.open(str(p.parent), os.O_RDONLY)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
+        except Exception:  # noqa: BLE001 — Windows 不支援目錄 fsync
+            pass
         _CACHE = merged
 
 

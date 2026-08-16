@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}文書轉圖片 · {{ app_name }}{% endblock %}
+{% block title %}辦公文件轉圖片 · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .p2i-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -39,8 +39,8 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('image', size=22) }} 文書轉圖片</h1>
-<p class="muted">把 PDF 或 Office 文件（Word / Excel / PowerPoint / ODF）每一頁轉成 PNG 圖片。非 PDF 會先自動轉成 PDF 再轉圖。單頁直接下載 PNG、多頁自動打包 ZIP。</p>
+<h1>{{ icon('image', size=22) }} 辦公文件轉圖片</h1>
+<p class="muted">把 PDF 或<b>辦公文件</b>每一頁轉成 PNG 圖片。非 PDF 會先自動轉成 PDF 再轉圖。單頁直接下載 PNG、多頁自動打包 ZIP。</p>
 
 <div class="panel">
   <h2 data-s="s53896af7">1. 設定</h2>
@@ -84,7 +84,7 @@
 
 <div class="panel">
   <h2 data-s="s53896af7">2. 上傳檔案</h2>
-  {% with upload_id='p2iUpload', accept='application/pdf,.pdf,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.csv', hint='支援 PDF、Word、Excel、PowerPoint、ODF；非 PDF 會先自動轉成 PDF。' %}{% include "components/file_upload.html" %}{% endwith %}
+  {% with upload_id='p2iUpload', accept='application/pdf,.pdf,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.csv', hint='支援 PDF 與辦公文件；非 PDF 會先自動轉成 PDF。' %}{% include "components/file_upload.html" %}{% endwith %}
   <div id="p2iProgress" class="p2i-progress" hidden>
     <span id="p2iProgressLabel" data-s="sf072decd">準備中…</span>
     <div class="p2i-progress-bar"><div class="p2i-progress-fill" id="p2iProgressFill"></div></div>

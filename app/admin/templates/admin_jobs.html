@@ -80,7 +80,7 @@
       {% if conc.office_locked_reason %}
       <div class="aj-warn">{{ icon('info', size=14) }} {{ conc.office_locked_reason }}</div>
       {% else %}
-      <div class="aj-help muted">影響 {{ conc.office_tools|length }} 個需要 Office 引擎的工具（PDF 轉文書 / 轉簡報 / 文書轉 PDF …）。<b>每個轉檔約佔 {{ conc.estimate_office_mb }} MB 記憶體</b>，調高前先確認機器撐得住。</div>
+      <div class="aj-help muted">影響 {{ conc.office_tools|length }} 個需要 Office 引擎的工具（PDF 轉文書檔 / 轉簡報 / 辦公文件轉 PDF …）。<b>每個轉檔約佔 {{ conc.estimate_office_mb }} MB 記憶體</b>，調高前先確認機器撐得住。</div>
       {% endif %}
     </div>
 
@@ -189,11 +189,15 @@
 {# 圖示來源只有 components/icons.html 這一份 macro —— 先把每個工具的圖示畫進
    隱藏區，JS 再複製對應節點。不要在 JS 裡另抄一份 SVG path，那遲早會跟 macro
    長得不一樣（而且動態塞 HTML 也違反 CSP 的做法）。 #}
-<div id="toolIconSprite" hidden aria-hidden="true">
+<!-- **id 不可以跟 base.html 的那份撞名**。兩份都叫 `toolIconSprite` 時
+     `querySelector('#toolIconSprite …')` 只會回文件順序第一個（base 那份，15px），
+     這一頁刻意做的 17px 版本從來沒有生效過，還白白多送 46 個 inline SVG
+     （v1.14.31 對抗式驗證用真瀏覽器量到 count=2、實際取到的是 width=15 那份）。 -->
+<div id="toolIconSpriteLg" hidden aria-hidden="true">
   {% for t in tool_tiles() %}
   <span data-tool="{{ t.id }}" data-color="{{ t.color }}">{{ icon(t.icon, size=17) }}</span>
   {% endfor %}
-  <span data-tool="__generic__" data-color="0">{{ icon('tool', size=15) }}</span>
+  <span data-tool="__generic__" data-color="0">{{ icon('tool', size=17) }}</span>
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
@@ -541,8 +545,8 @@
     // 查不到就用通用圖示 —— sprite 是頁面載入當下產生的，升級後多的工具
     // 在舊分頁上查不到；缺一個方塊整排就對不齊。
     const src = document.querySelector(
-        '#toolIconSprite [data-tool="' + (toolId || '').replace(/"/g, '') + '"]')
-      || document.querySelector('#toolIconSprite [data-tool="__generic__"]');
+        '#toolIconSpriteLg [data-tool="' + (toolId || '').replace(/"/g, '') + '"]')
+      || document.querySelector('#toolIconSpriteLg [data-tool="__generic__"]');
     if (!src) return null;
     const tile = document.createElement('span');
     tile.className = 'jt-tile tile-color-' + (src.dataset.color || '0');

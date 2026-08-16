@@ -15,6 +15,38 @@
   </div>
 </section>
 
+{# 格式用語說明。
+   「辦公文件」是統稱、「文書檔」是其中一類 —— 兩個詞字面相近，不講清楚
+   使用者會分不出「轉文書檔」跟「轉辦公文件」差在哪。
+   預設收合：首頁的主體是工具清單，這是查一次就懂的參考資訊。 #}
+<details class="fmt-note">
+  <summary>
+    {{ icon('info', size=15) }}
+    <span class="fmt-title">本站的格式用語</span>
+    {# 收合時也要看得到內容 —— 否則那一條就只是一片空白，
+       讀起來像「一張沒有內容的卡片」。 #}
+    <span class="fmt-peek">
+      <span>文書檔</span><span>試算表</span><span>簡報</span><span>PDF</span>
+    </span>
+    {# 兩段文字各自存在、用 CSS 切換顯示 —— 不要用 `content:` 產生文字，
+       那種文字選不起來也讀不出來。 #}
+    <span class="fmt-more"><span class="fmt-more-open">看說明</span><span
+      class="fmt-more-close">收起</span></span>
+  </summary>
+  <div class="fmt-note-body">
+    <div class="fmt-grid">
+      <div class="fmt-item"><b>文書檔</b><code>.docx</code><code>.odt</code></div>
+      <div class="fmt-item"><b>試算表</b><code>.xlsx</code><code>.ods</code></div>
+      <div class="fmt-item"><b>簡報</b><code>.pptx</code><code>.odp</code></div>
+      <div class="fmt-item"><b>PDF</b><code>.pdf</code></div>
+    </div>
+    {# **中文句子中間不要換行** —— 瀏覽器會把 CJK 之間的換行渲染成一個空格，
+       畫面上就會冒出「同時收 多種格式」這種多餘空白。要斷就斷在標點後。 #}
+    <p class="fmt-umbrella"><b>辦公文件</b>是以上四類的<b>統稱</b> ——
+      工具能同時收多種格式時就用這個說法（例如「辦公文件轉 PDF」）。</p>
+  </div>
+</details>
+
 {# 釘選區 — 由 JS 依 localStorage 動態填入。沒釘選的工具就 hidden。 #}
 <section class="tool-group" id="homePinnedGroup" hidden>
   <h2 class="tool-group-title">

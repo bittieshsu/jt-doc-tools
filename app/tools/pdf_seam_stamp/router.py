@@ -26,6 +26,7 @@ from ...config import settings
 from ...core import office_convert, pdf_preview, upload_owner as _uo
 from ...core.asset_manager import asset_manager
 from ...core.job_manager import job_manager
+from ...core.pdf_guard import ensure_readable_pdf
 from ...core.safe_paths import require_uuid_hex
 from . import seam_core as SC
 from . import stamp_source as SS
@@ -122,10 +123,7 @@ async def load(request: Request, file: UploadFile = File(...)):
         raise HTTPException(400, "只支援 PDF 與文書檔")
     if not dst.exists():
         raise HTTPException(400, "檔案讀取失敗")
-    with fitz.open(str(dst)) as doc:
-        n = doc.page_count
-    if n < 2:
-        raise HTTPException(400, "騎縫章至少需要 2 頁 —— 單頁沒有「跨頁」可言")
+    n = ensure_readable_pdf(dst, min_pages=2)
     return {"upload_id": uid, "filename": name, "page_count": n,
             "converted": data[:5] != b"%PDF-"}
 
@@ -140,7 +138,10 @@ async def stamp_upload(request: Request, upload_id: str = Form(...),
     if not data:
         raise HTTPException(400, "印章圖是空的")
     try:
-        png = SS.normalize_upload(data)
+        # **不可以在事件迴圈上解圖**。解碼一張大圖要數秒，這幾秒內全站每個
+        # 請求都在排隊（v1.14.31 實測 `/healthz` 從 74 ms 變成 19.6 秒）。
+        from starlette.concurrency import run_in_threadpool
+        png = await run_in_threadpool(SS.normalize_upload, data)
     except Exception:  # noqa: BLE001
         raise HTTPException(400, "印章圖讀取失敗（支援 PNG / JPG）")
     _stamp_file(upload_id).write_bytes(png)
@@ -317,6 +318,8 @@ async def api(request: Request, file: UploadFile = File(...),
                 raw.unlink(missing_ok=True)
         else:
             raise HTTPException(400, "只支援 PDF 與文書檔")
+        # **公開 API 也要驗** —— 與網頁 `/load` 是不同的一段程式碼。
+        ensure_readable_pdf(src, min_pages=2)
         png = (SS.normalize_upload(await stamp.read()) if stamp
                else SS.generate(text, shape=shape, color=color))
         spec = _spec_from_form(mode=mode, group=group, edge=edge,
@@ -345,6 +348,9 @@ async def thumb(upload_id: str, page_no: int, request: Request):
         raise HTTPException(404, "檔案不存在（可能已過期）")
     out = settings.temp_dir / f"{_PREFIX}_{upload_id}_t_{page_no}.png"
     if not out.exists():
-        pdf_preview.render_page_png(src, out, page_no - 1, dpi=70)
+        try:
+            pdf_preview.render_page_png(src, out, page_no - 1, dpi=70)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
     return FileResponse(str(out), media_type="image/png",
                         headers={"Cache-Control": "max-age=300"})

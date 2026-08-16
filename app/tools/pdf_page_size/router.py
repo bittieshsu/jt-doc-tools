@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from ...config import settings
 from ...core import office_convert, pdf_preview, upload_owner as _uo
 from ...core.job_manager import job_manager
+from ...core.pdf_guard import ensure_readable_pdf
 from ...core.safe_paths import require_uuid_hex
 from . import resize_core as RC
 
@@ -84,7 +85,10 @@ async def load(request: Request, file: UploadFile = File(...)):
         raise HTTPException(400, "只支援 PDF 與文書檔")
     if not dst.exists():
         raise HTTPException(400, "檔案讀取失敗")
-    # **先告訴使用者他的文件是不是混的** —— 多數人並不知道
+    # **先告訴使用者他的文件是不是混的** —— 多數人並不知道。
+    # 毀損 / 加密的檔要回 400 不是 500（`analyze` 內部會 `fitz.open`，
+    # 截斷的檔丟 FileDataError、加密的檔丟「document closed or encrypted」）。
+    ensure_readable_pdf(dst)
     info = RC.analyze(dst)
     return {"upload_id": uid, "filename": name, **info,
             "pages": [{"page": i + 1,
@@ -101,7 +105,10 @@ async def thumb(upload_id: str, page_no: int, request: Request):
         raise HTTPException(404, "檔案不存在（可能已過期）")
     out = settings.temp_dir / f"{_PREFIX}_{upload_id}_t_{page_no}.png"
     if not out.exists():
-        pdf_preview.render_page_png(src, out, page_no - 1, dpi=70)
+        try:
+            pdf_preview.render_page_png(src, out, page_no - 1, dpi=70)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
     return FileResponse(str(out), media_type="image/png",
                         headers={"Cache-Control": "max-age=300"})
 
@@ -211,6 +218,8 @@ async def api(request: Request, file: UploadFile = File(...),
                 raw.unlink(missing_ok=True)
         else:
             raise HTTPException(400, "只支援 PDF 與文書檔")
+        # **公開 API 也要驗** —— 這是與網頁 `/load` 不同的另一段程式碼。
+        ensure_readable_pdf(src)
         RC.resize(src, out, _spec(
             paper=paper, custom_w_mm=custom_w_mm, custom_h_mm=custom_h_mm,
             orientation=orientation, fit=fit, align=align, keep_same=keep_same))

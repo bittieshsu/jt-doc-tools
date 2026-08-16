@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}PDF 轉簡報檔 · {{ app_name }}{% endblock %}
+{% block title %}PDF 轉簡報 · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .p2o-stat { display:grid; grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr);
@@ -160,7 +160,7 @@
 {% endblock %}
 
 {% block content %}
-<h1>{{ icon('presentation', size=22) }} PDF 轉簡報檔</h1>
+<h1>{{ icon('presentation', size=22) }} PDF 轉簡報</h1>
 <p class="muted">把 PDF 轉成 <b>PowerPoint (.pptx)</b> 或 <b>OpenDocument 簡報 (.odp)</b>，<b>一頁對一張投影片</b>，位置 / 圖片 / 框線依原始座標還原，投影片尺寸沿用原稿。
 <br><span data-s="s3a4c95a1">⚠ 還原的是版面不是簡報結構：文字與圖形是各自獨立的物件，沒有標題 / 內容版面配置，也沒有動畫與備忘稿；適合「拿到一份長得跟原簡報一樣、可以再微調」的情境。掃描檔請先用「OCR 文字辨識」工具轉成可選取文字 PDF 再來。</span></p>
 

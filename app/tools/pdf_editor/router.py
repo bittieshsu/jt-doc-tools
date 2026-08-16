@@ -641,7 +641,7 @@ async def list_assets():
 
 def _resolve_fonts_for_pref(
     font_pref: str, has_cjk: bool, bold: bool, italic: bool,
-    page, cache: dict, pno: int,
+    page, cache: dict, pno: int, text: str = "",
 ) -> tuple[str, str]:
     """Return (cjk_font, ascii_font) fit for an insert_text call. Mirrors the
     save-path logic so the one-click "換字型" feature stays visually
@@ -659,7 +659,8 @@ def _resolve_fonts_for_pref(
                     reg_name = f"uf{len(cache)}"
                     # `.ttc` 要挑對子字型（見 _upgrade_cjk_font 的說明）
                     _ff, _buf = font_catalog.embeddable_font(
-                        entry["path"], int(entry.get("idx") or 0))
+                        entry["path"], int(entry.get("idx") or 0),
+                        text=text or None)
                     if _buf is not None:
                         page.insert_font(fontname=reg_name, fontbuffer=_buf)
                     else:
@@ -681,7 +682,8 @@ def _resolve_fonts_for_pref(
                     reg_name = f"uc{len(cache)}"
                     # `.ttc` 要挑對子字型（見 _upgrade_cjk_font 的說明）
                     _ff, _buf = font_catalog.embeddable_font(
-                        entry["path"], int(entry.get("idx") or 0))
+                        entry["path"], int(entry.get("idx") or 0),
+                        text=text or None)
                     if _buf is not None:
                         page.insert_font(fontname=reg_name, fontbuffer=_buf)
                     else:
@@ -697,7 +699,7 @@ def _resolve_fonts_for_pref(
     # 把 china-* 內建升級為實際系統 CJK 字型（PyMuPDF 內建在 Linux render
     # 不出 serif/sans 區別，全部變厚實 sans — v1.4.77 修）
     def _u(builtin: str) -> str:
-        return _upgrade_cjk_font(page, builtin, cache, pno)
+        return _upgrade_cjk_font(page, builtin, cache, pno, text)
     if font_pref in ("pymupdf:sans", "sans"):
         return (_u("china-ts") if has_cjk else _style_suffix("helv", bold, italic),
                 _style_suffix("helv", bold, italic))
@@ -745,6 +747,9 @@ def _replace_all_fonts_sync(src, upload_id: str, font_id: str):
                         spans.append(sp)
             if not spans:
                 continue
+            # 這一頁會重新寫進去的所有字 —— 子集化的依據必須是**超集**
+            # （漏一個字那個字就會變成看不見，見 `_upgrade_cjk_font` 的說明）。
+            _page_text = "".join(sp.get("text") or "" for sp in spans)
             # Redact all existing text first.
             for sp in spans:
                 # fill=None — 不畫白底覆蓋。否則底下原本是有色 cell（表頭灰
@@ -777,6 +782,7 @@ def _replace_all_fonts_sync(src, upload_id: str, font_id: str):
                 has_cjk = any("一" <= c <= "鿿" for c in text)
                 cjk_f, ascii_f = _resolve_fonts_for_pref(
                     font_id, has_cjk, bold, italic, page, font_cache, pno,
+                    _page_text,
                 )
                 # baseline: roughly bottom minus a small descender
                 base_y = by1 - size * 0.18
@@ -975,7 +981,8 @@ def _style_suffix(base: str, bold: bool = False, italic: bool = False) -> str:
     return base  # china-s/china-t/uf*/uc* etc have no style variants
 
 
-def _upgrade_cjk_font(page, builtin_name: str, cache: dict, pno: int) -> str:
+def _upgrade_cjk_font(page, builtin_name: str, cache: dict, pno: int,
+                      text: str = "") -> str:
     """Upgrade a PyMuPDF built-in CJK font name (china-t / china-ts /
     china-s / china-ss) to a registered system CJK font when one is
     available. Falls back to the original built-in if nothing usable.
@@ -1010,7 +1017,12 @@ def _upgrade_cjk_font(page, builtin_name: str, cache: dict, pno: int) -> str:
         # `.ttc` 要挑對子字型 —— 這裡原本直接丟路徑，等於用第 0 套（Noto CJK
         # 的第 0 套是**日文**，「海」會寫成「毎」）。PyMuPDF 沒有索引參數，
         # 要用別套只能把那一套抽成位元組走 fontbuffer。
-        ff, buf = font_catalog.embeddable_font(path, idx)
+        #
+        # **`text` 是子集化的依據，一定要是「這一頁全部會寫進去的字」的超集**。
+        # 傳漏一個字，那個字在產出的 PDF 裡會**完全看不見**（字型裡根本沒有
+        # 那個字形），而文字層仍然抽得到、搜尋得到 —— 跟 v1.14.19 的慘案一模
+        # 一樣。所以呼叫端一律傳整頁的文字。不傳的話會嵌整支 16 MB。
+        ff, buf = font_catalog.embeddable_font(path, idx, text=text or None)
         if buf is not None:
             page.insert_font(fontname=reg_name, fontbuffer=buf)
         else:
@@ -1474,6 +1486,9 @@ async def save(request: Request):
                 if pno < 0 or pno >= doc.page_count:
                     continue
                 page = doc[pno]
+                # 這一頁會寫進去的所有文字 —— 子集化的依據（超集才安全）。
+                _page_text = "".join(
+                    str(o.get("text") or "") for o in pg.get("objects", []))
                 for obj in pg.get("objects", []):
                     ot = obj.get("type")
                     x = float(obj.get("x", 0))
@@ -1708,7 +1723,8 @@ async def save(request: Request):
                                         # 參數。要用 .ttc 的別套只能抽成位元組。
                                         _ff, _buf = font_catalog.embeddable_font(
                                             entry["path"],
-                                            int(entry.get("idx") or 0))
+                                            int(entry.get("idx") or 0),
+                                            text=_page_text or None)
                                         if _buf is not None:
                                             page.insert_font(fontname=reg_name,
                                                              fontbuffer=_buf)
@@ -1765,7 +1781,8 @@ async def save(request: Request):
                         # PyMuPDF 內建在 Linux 全部 render 成 sans，serif 選項
                         # 沒效果）。Cache 用同一張 _custom_font_cache。
                         def _u(builtin: str) -> str:
-                            return _upgrade_cjk_font(page, builtin, _custom_font_cache, pno)
+                            return _upgrade_cjk_font(page, builtin, _custom_font_cache,
+                                                     pno, _page_text)
                         if fontname.startswith("uf") or fontname.startswith("uc"):
                             # Custom / system font — user picked it specifically,
                             # use it for all chars without splitting (it's

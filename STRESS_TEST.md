@@ -63,7 +63,7 @@ uv run python tests/stress/run_stress.py --users 10 --duration 60 --csv stress.c
 
 數值依機器配置調整。**最重要：成功率不能掉太多** — 50 users 下 < 95% 表示有 thread 餓死 / connection pool 撐不住 / memory 爆，要找 root cause。
 
-## 排查方向
+## 追查方向
 
 - **吞吐隨 users 線性增長 → users>20 後不增反減**：CPU / I/O 瓶頸，看 `htop` / Activity Monitor
 - **p99 突然爆掉**：某個工具 stall（OCR 載 PyTorch、soffice 啟動）— 看 server log 哪支撞到

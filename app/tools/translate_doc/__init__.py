@@ -14,7 +14,7 @@ from .router import router
 metadata = ToolMetadata(
     id="translate-doc",
     name="逐句翻譯",
-    description="接地端 LLM 逐句翻譯，左原文右譯文並排。可上傳文字或文件檔。",
+    description="接地端 LLM 逐句翻譯，左原文右譯文並排。可上傳文字或辦公文件。",
     icon="globe",
     category="內容處理",
 )

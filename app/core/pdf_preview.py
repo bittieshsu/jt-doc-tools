@@ -44,6 +44,14 @@ def render_page_png(
     PNG 過大（高解析 PDF 重繪 / autosave 變慢的主因）。
     """
     with fitz.open(str(pdf_path)) as doc:
+        # **頁碼一定要在這裡驗**。呼叫端一律傳 `page_no - 1`，所以使用者送
+        # `page_no=0` 會變成 `-1` —— Python 的負索引讓它**回最後一頁而且是
+        # 200 OK**，畫面上完全看不出拿錯頁（v1.14.31 對抗式驗證：`page_no=0`
+        # 與 `page_no=5` 回的 PNG 位元組一模一樣）。超出範圍則是 IndexError
+        # 冒上去變成 500。四支工具的縮圖端點形狀相同，擋在這一處才不會再長回來。
+        if not (0 <= page_index < doc.page_count):
+            raise ValueError(
+                f"頁碼超出範圍（第 {page_index + 1} 頁，文件共 {doc.page_count} 頁）")
         page = doc[page_index]
         actual_dpi = dpi
         if adaptive:

@@ -1,4 +1,4 @@
-"""PDF 轉簡報檔（pdf-to-slides）。
+"""PDF 轉簡報（pdf-to-slides）。
 
 PDF → OpenDocument 簡報 (.odp) / PowerPoint (.pptx)，**版面重現**：每頁內容依原始
 座標放進投影片錨定的物件，位置 / 圖片 / 框線幾乎 1:1 保留。
@@ -13,8 +13,8 @@ from .router import router
 
 metadata = ToolMetadata(
     id="pdf-to-slides",
-    name="PDF 轉簡報檔",
-    description="PDF 轉成 PowerPoint (.pptx) 或 OpenDocument 簡報 (.odp)。",
+    name="PDF 轉簡報",
+    description="PDF 轉成簡報（.pptx / .odp）。",
     icon="presentation",
     category="格式轉換",
 )

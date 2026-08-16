@@ -1691,7 +1691,7 @@ async function pickExistingObject(fc, p) {
   setStatus('偵測中…');
   // v1.7.29：選既有物件（特別是文字）後端可能要走 OCR / 字型解析，
   // 慢的話 1-2 秒；期間用半透明遮罩 + spinner 告訴使用者「轉換中」，
-  // 避免覺得當掉或重複點擊。300 ms 內回來就不顯示，避免閃爍。
+  // 避免覺得當掉或重複點選。300 ms 內回來就不顯示，避免閃爍。
   let pickOverlayShown = false;
   const pickOverlayTimer = setTimeout(() => {
     showLoading('物件轉換中…');
@@ -2006,7 +2006,7 @@ function updatePropsPanel() {
   } else if (t === 'sticky') {
     html = `<h3>便箋註解</h3>
       <div class="row"><label>備註內容</label><textarea id="pfNote" rows="4" data-s="s006f601d">${escapeHTML(active._noteText || '')}</textarea></div>
-      <div class="muted">存檔後會變成 PDF 標準便箋 (text annotation)，點擊彈出內容。</div>`;
+      <div class="muted">存檔後會變成 PDF 標準便箋 (text annotation)，點選彈出內容。</div>`;
   } else {
     html = `<h3>物件</h3><div class="muted">未知類型</div>`;
   }

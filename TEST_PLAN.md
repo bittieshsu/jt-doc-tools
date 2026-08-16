@@ -65,7 +65,7 @@
 - **工具權限**:default-user 沒有的工具（pdf-fill/pdf-stamp）UI 與後端動作端點都擋；有的（pdf-merge）可用
 - **水平越權**:B 使用者不可下載 A 的工作區檔（/workspace/file/{id}）與 A 的上傳檔（/tools/pdf-editor/file/{upload_id}）
 
-### 1.6 使用者工作區 (`tests/test_workspace.py` + `tests/test_workspace_api.py`)
+### 1.8 使用者工作區 (`tests/test_workspace.py` + `tests/test_workspace_api.py`)
 核心（`workspace.py`）：
 - 存 PDF / PNG → meta 正確（ext / mime / 顯示名）；list 回該使用者的檔
 - PNG 以 magic bytes 偵測（檔名沒 .png 也自動補副檔名）
@@ -85,20 +85,20 @@
 - `?accept=png` 過濾掉 PDF
 - **停用時** `/workspace`、`/workspace/save`、`/workspace/api/list` 全回 404
 
-### 1.10 乘車證明整理（`tests/test_transit_proof_parser.py` + `tests/test_transit_proof_api.py`）🆕
+### 1.9 乘車證明整理（`tests/test_transit_proof_parser.py` + `tests/test_transit_proof_api.py`）
 
 - 解析器：高鐵電子車票證明（label：value）+ 台鐵購票證明（打散版面用特徵正則）；日期正規化 ISO、乘車日排除印製日期、乘車區間抽起訖時間 / 站名、車種不被「乘車區間」誤匹配、高鐵站名去「高鐵 / 車站」；非乘車證明 / 空欄位 → ParseError。
 - 端點：頁面渲染、上傳解析 + 票號去重、非乘車證明 PDF 進 failed、7 種格式匯出（csv/xlsx/ods/json/xml/txt/md）+ 非法格式 400 + 空清單 400、CSV 預設 4 欄（日期/交通工具/來源-目的/費用）、設定 roundtrip（勾選 / 順序 / 格式 / 匯出標題）套用到匯出、刪除單筆、對外 API 不寫 buffer。
 - **手動驗收**：拉多張台鐵 + 高鐵 PDF → 表格出現 4 欄 + 底部加總；「設定」加欄位 / 改格式 / 排序 → 表格與匯出同步；各格式下載可開。合成 PDF 測試須用 CJK 字型（`fontname="china-t"`）否則抽文字變 notdef。
 
-### 1.9 目錄瀏覽 filter（`tests/test_dir_filter.py` + `tests/test_directory_filter_api.py`）🆕
+### 1.10 目錄瀏覽 filter（`tests/test_dir_filter.py` + `tests/test_directory_filter_api.py`）
 
 - 純函式：規則 → LDAP filter（類型→objectClass、名稱關鍵字 escape_filter_chars 轉義、多欄位）；符合物件 → 剪枝樹（祖先鏈、共用祖先合併去重、matched 旗標、parent 排在 child 前、cycle-safe、無 root 停在 DC 層）。
 - 設定 roundtrip / 清洗（空規則丟棄、無效類型過濾、無效 default_mode 忽略）。
 - 端點：`/directory/filter` GET/POST roundtrip（backend-agnostic）；`/directory/selected` 非目錄後端回 400；目錄頁可渲染。
 - **手動驗收（需 LDAP / AD）**：進 /admin/directory → 預設「已選定」模式；設定 filter 加規則（名稱關鍵字 + 類型 + OU 子樹）→ 儲存 → 樹只留符合分支；切「全部」看完整目錄樹；點 OU 指派角色仍正常。
 
-### 1.8 每頁畫面 + 關鍵元素可見性回歸（`scripts/page_visual_check.py`）🆕
+### 1.11 每頁畫面 + 關鍵元素可見性回歸（`scripts/page_visual_check.py`）
 
 **目的**：抓「元素 / 功能靜默消失」這一類 regression（例：v1.12.30 CSP 樣式重構
 讓「下載」按鈕、臨時資產縮圖、個資限用章預覽在存檔 / 選圖後一直不顯示，
@@ -137,7 +137,7 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 ### 2.1 填單用印
 
 #### PDF 表單填寫 (pdf-fill)
-- [ ] 上傳廠商 PDF（華儲 / Macpower / momo / Tigerair）
+- [ ] 上傳廠商 PDF（`temp_pdfs/` 內的真實樣本，四種不同版型）
 - [ ] 自動偵測欄位且公司資料正確帶入
 - [ ] 切換第二公司不會 500
 - [ ] 拖曳藍框微調位置 → 套用新位置
@@ -194,7 +194,7 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] 重新排序頁面
 
 #### 插入頁碼 (pdf-pageno) 🆕 視覺選位
-- [ ] **2×3 位置選擇格**點擊直接換位置
+- [ ] **2×3 位置選擇格**點選直接換位置
 - [ ] 格式 chips（1、1/10、第 1 頁、Page 1）
 - [ ] 字級 / 邊距滑桿即時調整
 - [ ] 顏色選色器
@@ -225,16 +225,72 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] 單檔下載 / 全部打包 ZIP
 - [ ] 沒附件時顯示空狀態
 
+#### 內容處理類補列（原本只有 §4 一行 API 的工具）
+- [ ] pdf-nup：2/4/8 合 1、頁序正確、邊界不裁字
+- [ ] pdf-annotations：清單列出註解（作者 / 類型 / 頁碼）＋ 匯出
+- [ ] pdf-annotations-flatten：平面化後註解不可再選取；視覺不位移
+- [ ] pdf-annotations-strip：全刪 / 依作者 / 依類型；`/AF` 附件關聯一併清
+- [ ] pdf-ocr：中文影像 PDF 辨識後文字可選取、highlight 寬度與字對齊；
+      停止辨識鈕即時中止
+- [ ] pdf-wordcount：中英混排字數與 Word 統計一致（±1%）；CSV 匯出
+- [ ] text-list：排序 / 去重 / 前綴後綴；大清單（10 萬行）不逾時
+- [ ] text-diff：長行換行後左右仍對齊（grid row pairing）
+- [ ] text-deident：貼文字與上傳 .docx 兩條路都能偵測 / 遮罩
+- [ ] translate-doc：背景作業模式、`?job=` 接回、對照表分頁後複製全文不漏頁
+- [ ] vat-lookup：統編反查 / 名稱模糊搜尋毫秒回、統計圖下鑽
+- [ ] einvoice-scan：QR 雙碼解析、月份彙整表
+- [ ] submission-check：規則 / OCR / LLM 三層可分開開關；儀表板僅 admin
+
 ### 2.4 格式轉換
 
-#### 文書轉 PDF (office-to-pdf)
+#### 辦公文件轉 PDF (office-to-pdf)
 - [ ] .docx / .xlsx / .pptx / .odt 各轉一份
 - [ ] OxOffice 優先（`find_soffice` 命中 OxOffice）
 
-#### 文書轉圖片 (pdf-to-image) 🆕 擴充 Office
+#### 辦公文件轉圖片 (pdf-to-image) 🆕 擴充 Office
 - [ ] PDF 每頁 → PNG
 - [ ] **Office 檔案（docx/xlsx/pptx/odt）先自動轉 PDF 再轉圖**
 - [ ] 單頁直接下 PNG、多頁自動 ZIP
+
+#### 辦公文件格式互轉 (office-convert) 🆕 v1.14.34
+- [ ] 上傳 `.odt` → 只顯示文書檔那一組目標；換上傳 `.pptx` → 切到簡報那一組
+- [ ] 一次混上傳兩類（.odt + .ods）→ **前端當場擋下**並講出混到哪兩類
+- [ ] `.odt` 轉 Word 97–2003：下載鈕顯示「下載 .doc」（不是「下載 PDF」）
+- [ ] **同副檔名互轉**（.pptx 選 pptx 目標）要真的轉（soffice 對同目錄同副檔名
+      會無聲跳過 —— 核心已改為獨立輸出目錄，`test_office_convert.py` 守著）
+- [ ] `.docx` 兩個版本目標（Word 2007 / Word 2010–365）產出的相容模式
+      分別是 12 / 15（`zipfile` 開 `word/settings.xml` 看 `w:val`）
+- [ ] 多檔 → ZIP；轉完「存至工作區」有出現且存得進去（.xlsx 也要）
+- [ ] 跨類（.ods 配 docx 目標）走 API 直打 → 400，不是產出一份壞檔
+- [ ] `GET /tools/office-convert/formats` 三個家族都在；缺 Impress 的機器
+      簡報家族整組消失（不是留一組永遠轉不出來的）
+
+#### 書籤與目錄 (pdf-bookmark) 🆕 v1.14.20
+- [ ] 多檔上傳自動串接，檔名成為第一層書籤；子文件原書籤降一層、頁碼加偏移
+- [ ] 貼上目錄文字解析（含頁碼在行尾）；層級不合法時自動 normalize 並逐條回報
+- [ ] 頁碼超出總頁數 → 明確擋下（PyMuPDF 預設無聲夾到最後一頁）
+- [ ] 插目錄頁：書籤頁碼 / 目錄上印的頁碼 / 目錄連結三者一起位移；
+      插入點之前的書籤**不可平移**（封面那筆不能指到目錄自己）
+
+#### 頁面尺寸統一 (pdf-page-size) 🆕 v1.14.20
+- [ ] 混合尺寸 PDF 統一成 A4：內容仍是向量、文字仍選得到（不是轉成圖）
+- [ ] 原本就是目標尺寸的頁**不重放**（不多包一層 XObject）
+- [ ] 帶 /Rotate 的頁面尺寸判斷正確（`page.rect` 已是視覺尺寸，不可再算一次）
+
+#### 騎縫章 (pdf-seam-stamp) 🆕 v1.14.20
+- [ ] 印章切片蓋在連續頁上，預覽「拼回去」看接縫是否對得起來
+- [ ] 旋轉在切片**之前**（先切再各自轉會對不起來）；切片寬度累進取整無殘條
+- [ ] 同一組內位置與角度完全一致；亂數種子有回報可重現
+- [ ] 一般使用者權限與「用印與簽名」一致（`test_roles_rbac.py` 守著）
+
+#### 頁面加框 (pdf-border) 🆕 v1.14.16
+- [ ] 單線 / 雙線 / 圓角 / 陰影各出一份，框不壓到內容
+- [ ] 自訂邊距與線寬生效；多頁整份都有框
+
+#### 乘車證明整理 (transit-proof) 🆕 v1.14.17
+- [ ] 上傳台鐵 / 高鐵乘車證明 PDF → 日期、交通工具、起訖、費用成表
+- [ ] 多份批次 → 單一彙整表；CSV 匯出欄位齊全（公式注入已由
+      `test_csv_injection.py` 守）
 
 #### 掃描拼合 (scan-merge) 🆕 v1.11.0
 - [ ] 拉入多張掃描（PDF / PNG / JPG）各含一塊內容 → 自動偵測出區塊
@@ -246,6 +302,14 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] 空白頁回 422（找不到內容）
 - [ ] crop 取圖 ACL：非法 id 400、不存在 404、跨 user 擋
 - [ ] **公開 API** `POST /tools/scan-merge/api/scan-merge`（form-data 多檔）回 PDF
+
+#### PDF 轉文書檔 / 轉簡報 / 轉 Markdown / Markdown 轉辦公文件（補列）
+- [ ] pdf-to-office：三引擎各轉一份、前後對照預覽出現、內容遺失 >50% 有紅字警示
+- [ ] pdf-to-slides：直向 PDF 尺寸照原樣還原、產出載得進 Impress
+- [ ] pdf-to-markdown：標題 / 表格 / 粗體保留；`include_images=true` 改回 ZIP
+- [ ] markdown-to-doc：三輸出（PDF / docx / odt）＋ 頁面預覽 lightbox；
+      odt 的 mimetype 是 text 不是 text-web（infilter 雷）
+- [ ] image-to-pdf：多圖排序 / 旋轉 / 刪除、頁面大小選項生效
 
 ### 2.5 資安處理 🆕 全新分類
 
@@ -324,6 +388,25 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] 設定每人容量額度 / 單檔上限 / 保留時數並儲存
 - [ ] 「目前佔用」表列出各使用者佔用與總量
 
+#### 記錄轉發（log forward）（2026-08-16 稽核補列 —— 原本整頁零驗收）
+- [ ] 新增 syslog / CEF / GELF 目的地各一，測試送出有到（tcpdump 或收端確認）
+- [ ] 收端不通時：retry 3 次後放棄，本機稽核出現 `audit_forward_failed`
+- [ ] 停用的目的地不送
+
+#### OCR 語言包管理（原本零驗收）
+- [ ] 列出已裝 / 可裝語言；補裝一種後 pdf-ocr 立即可選
+- [ ] 遠端 OCR 伺服器部署腳本可下載（install.sh / uninstall.sh）
+
+#### 統編資料庫管理（原本零驗收）
+- [ ] 財政部檔上傳走背景（頁面立即回 started，不卡住）
+- [ ] 進度列會動；完成後筆數正確、vat-lookup 查得到新資料
+- [ ] 排程自動更新設定存讀一致
+
+#### 稽核記錄頁（原本只驗權限，沒驗頁面本身）
+- [ ] 分頁列表、依 user / 事件類型 / 時間篩選有效
+- [ ] CSV 匯出欄位齊全（公式注入由 `test_csv_injection.py` 守）
+- [ ] 使用者篩選的模糊比對（LIKE）與 datalist 建議正常
+
 ### 2.6b 使用者工作區 (我的工作區) 🆕
 - [ ] 任一 job 型工具（如蓋章 / 合併 / OCR）完成後出現「存至工作區」，按下後存入成功
 - [ ] 任一上傳區出現「從工作區載入」，挑檔後該檔灌入工具流程（PDF/PNG，依工具 accept 過濾；非 PDF/PNG 工具不顯示此鈕）
@@ -342,7 +425,7 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] **側欄 active tile 白底延伸到右邊內容區**（無紫色縫隙）
 - [ ] **側欄捲軸浮動**（只在 hover / 滾動時顯示）
 - [ ] **搜尋支援中英文**（輸入 `form` 或 `填寫` 都能找到 pdf-fill）
-- [ ] 視窗縮窄到 ≤ 900px：側欄收起、漢堡按鈕展開、項目正確點擊
+- [ ] 視窗縮窄到 ≤ 900px：側欄收起、漢堡按鈕展開、項目正確點選
 
 ### 2.8 術語檢查
 
@@ -365,9 +448,13 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] `/admin/conversion` 顯示 Windows builtin 路徑且可使用
 - [ ] Ghostscript `gswin64c.exe` 偵測
 
-## 4. API 覆蓋檢查 🆕（v1.8.55 起完整列出，現 37 個工具）
+## 4. API 覆蓋檢查 🆕（v1.8.55 起完整列出，現 46 個工具）
 
 每個工具至少 1 個 `/api/<tool-id>` endpoint（路徑：`/tools/<tool-id>/api/<tool-id>` 或 `/tools/<tool-id>/convert`）。發版前 curl 抽測：
+
+> **這份清單靠人維護一定會漂**（歷史教訓：v1.14.20 核對時曾發現 7 支工具沒列、`API.md` 少 3 支 —— 已補，留此句是講「為什麼要有自動比對」）。
+> `tests/test_api_doc_coverage.py` 會用**實際路由表**反向比對這份清單與 `github/API.md`，
+> 漏列直接紅燈。手動抽測仍要做 —— 那支測試只保證「有寫」，不保證「寫的是對的」。
 
 ### 結構操作（PDF in / PDF out）
 - [ ] `/tools/pdf-compress/api/pdf-compress` — POST file + preset → PDF
@@ -379,6 +466,10 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] `/tools/pdf-merge/api/pdf-merge` — POST files[] → PDF
 - [ ] `/tools/pdf-encrypt/api/pdf-encrypt` — POST file + password → PDF
 - [ ] `/tools/pdf-decrypt/api/pdf-decrypt` — POST file + password → PDF
+- [ ] `/tools/pdf-border/api/pdf-border` — POST file + 框線設定 → PDF
+- [ ] `/tools/pdf-bookmark/api/pdf-bookmark` — POST files[] + 書籤設定 → PDF（書籤 / 目錄頁）
+- [ ] `/tools/pdf-seam-stamp/api/pdf-seam-stamp` — POST file + 章來源 → PDF（切片蓋在連續頁）
+- [ ] `/tools/pdf-page-size/api/pdf-page-size` — POST file + paper → PDF（統一尺寸）
 
 ### 內容擷取
 - [ ] `/tools/pdf-extract-text/api/pdf-extract-text` — POST file → JSON `{pages:[...]}`
@@ -400,10 +491,18 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 
 ### 格式轉換
 - [ ] `/api/convert-to-pdf` (in main.py) — POST file → PDF (office-to-pdf)
+- [ ] `/tools/office-convert/formats` — GET → 可用家族與目標格式（target id 因安裝而異）
+- [ ] `/tools/office-convert/convert` — POST files[] + target → 原格式或 ZIP（async job）；
+      跨類（試算表配文書檔的 target）與不存在的 target 都應是 400 不是 500
 - [ ] `/tools/pdf-to-image/convert` — POST file → ZIP/PNG
 - [ ] `/tools/pdf-to-office/convert` — POST file → docx/odt（async job）
 - [ ] `/tools/image-to-pdf/api/image-to-pdf` — POST files[] → PDF
 - [ ] `/tools/scan-merge/api/scan-merge` — POST files[] → 單張 A4 白底 PDF
+- [ ] `/tools/pdf-to-slides/convert` — POST file → pptx/odp（async job）
+- [ ] `/tools/pdf-to-markdown/api/pdf-to-markdown` — POST file → `text/markdown`；
+      `include_images=true` 改回 ZIP（**回應型別會變**）
+- [ ] `/tools/markdown-to-doc/api/markdown-to-doc` — POST file 或 text + format → pdf/docx/odt；
+      非法 format 應是 400 不是 500
 
 ### 文字工具
 - [ ] `/tools/text-list/api/text-list` — POST text → JSON
@@ -422,6 +521,8 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] `/api/vat-lookup/{vat}` (path-style GET in main.py)
 - [ ] `/tools/einvoice-scan/api/einvoice-scan` + `/api/backend-status`
 - [ ] `/tools/submission-check/api/self-entities` (CRUD)
+- [ ] `/tools/transit-proof/api/transit-proof` — POST files[] → JSON `{ok, count, entries, failed}`；
+      **認不出的檔不會讓整批失敗**（HTTP 仍 200），要看 `failed` 是不是空的
 
 ### 共通驗證項
 每個 endpoint 至少要：
@@ -431,7 +532,7 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] 回應 `Content-Disposition` 中文檔名 RFC 5987（走 `http_utils.content_disposition`）
 
 ### 自動化覆蓋（理想）
-新加 endpoint 都應該在 `tests/test_api_endpoints.py`（待補）跑單元測試 — POST 假 PDF + assert 200 + assert 回傳格式。發版前 `uv run pytest tests/test_api_endpoints.py -v` 必綠。
+新加 endpoint 由兩支既有測試守：`tests/test_api_doc_coverage.py`（路由表 ↔ 文件雙向比對）與 `tests/test_broken_input_no_500.py`（**全部**工具 POST 端點 × 壞輸入不可 500，從路由表自動列舉，新工具自動被涵蓋）。發版前 `uv run pytest tests/test_api_doc_coverage.py tests/test_broken_input_no_500.py -q` 必綠。（原本這裡寫「tests/test_api_endpoints.py（待補）必綠」—— 一個不存在的檔案當發版門檻，指令必然失敗，2026-08-16 稽核改掉。）
 
 ## 4.5 壓力測試 🆕（v1.7.50+）
 
@@ -1128,3 +1229,365 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 - [ ] 工作區容量調到很小 → 顯示「工作區容量已滿，未自動存入」且下載連結仍在
 - [ ] 工作區**停用**時 → 不自動存，改顯示「結果將於 N 小時後清除」
 - [ ] `.pptx` / `.odp` 存得進工作區（原本會被拒收）
+
+### 6.15 v1.14.16 — AD / LDAP 管理一輪（每次發版必過）
+
+自動化：`tests/test_ldap_failover.py`（14 項）、`test_ad_primary_group.py`（14）、
+`test_ad_account_state.py`（40）、`test_directory_cleanup.py`（31）、
+`test_online_sessions.py`（29）、`test_directory_role_assign.py`（19）、
+`test_effective_permissions.py`（11）、`test_directory_presence.py`（12）。
+以下需要**真的 AD / LDAP 環境**或人工確認。
+
+#### 6.15.1 多台 DC 容錯
+
+- [ ] 伺服器欄位填兩台（逗號分隔）→ **存得下去**（`type="url"` 會讓整個表單送不出）
+- [ ] 停掉第一台 → 仍然登得進去（自動換第二台）
+- [ ] 第一台修好後**會被重新使用**（不是永久排除 —— `exhaust` 給的是秒數）
+- [ ] 兩台都不通 → 幾秒內回「無法連線到認證伺服器」，**不是卡住幾十秒**
+- [ ] 稽核記錄有 `ldap_unavailable`，畫面上**沒有**原始例外訊息
+
+#### 6.15.2 AD 主要群組
+
+- [ ] 把某人的 primaryGroupID 改成一個有指派角色的群組（且該群組**不在**他的
+      memberOf）→ 他登入後**拿得到**那個群組的權限
+- [ ] OpenLDAP 環境登入完全正常（沒有 objectSid，不可以出錯）
+
+#### 6.15.3 帳號狀態（AD 已停用 / 密碼到期）
+
+- [ ] AD 端停用某人 → 同步後使用者清單出現「AD 已停用」徽章與檢視
+- [ ] AD 端啟用回來 → 同步後徽章**消失**（狀態要跟著回正常）
+- [ ] 密碼快到期的人出現「密碼 N 天後到期」；已過期顯示「密碼已過期」
+- [ ] 套了細緻密碼原則（PSO）的人日期**正確**（不是用網域 maxPwdAge 算的）
+- [ ] 設了「密碼永久有效」的人**不顯示**到期
+- [ ] OpenLDAP / 本機 / SSO 帳號**完全不出現**這兩種徽章
+
+#### 6.15.4 批次停用 / 排程自動停用
+
+- [ ] 「目錄已無」→「全部停用」：確認訊息寫出**實際會動到幾個人**
+- [ ] 停用後帳號與角色指派**都還在**，重新啟用即恢復
+- [ ] 停用後按鈕**消失**（沒有還啟用中的人）
+- [ ] 故意讓待停用人數超過目錄帳號的 20% → **整批中止、一個都沒動**，
+      訊息點出可能是服務帳號密碼過期 / 搜尋範圍被改
+- [ ] 排程自動停用**預設是關閉**；升級後不可自己開始停用任何人
+- [ ] 帶名稱過濾的同步**不會**觸發自動停用
+- [ ] 內建管理員永遠不被停用
+
+#### 6.15.5 在線 session
+
+- [ ] 啟用認證 → 使用者清單顯示「N 人在線」；**單機模式不顯示**
+- [ ] 同一人開三個瀏覽器 → 算 **1 人**（不是 3）
+- [ ] 閒置超過 15 分鐘後從在線人數消失
+- [ ] 「登入裝置」看得到瀏覽器 / 作業系統、來源位址、最後活動時間
+- [ ] 個別登出 → 那一台下一個動作被導回登入頁，**其他裝置不受影響**
+- [ ] 「全部登出」→ 全部被踢；稽核有 `session_revoke`
+- [ ] 瀏覽器開發者工具看不到 token 或完整雜湊
+
+#### 6.15.6 目錄瀏覽指派角色
+
+- [ ] 選一個**從沒登入過**的目錄使用者 → 指派角色 → 使用者管理看得到他
+      （**未啟用**狀態）
+- [ ] 該使用者第一次登入 → 自動啟用，**先前指派的角色還在**（沒被預設角色蓋掉）
+- [ ] 「所屬群組」點「角色」→ 設得了群組權限
+- [ ] 同名不同 DN → 拒絕並說明衝突對象
+
+#### 6.15.7 有效權限面板
+
+- [ ] 編輯使用者 → 展開「有效權限」→ 列出實際能用的工具與**來源規則**
+- [ ] 從上層群組繼承來的標成「巢狀繼承」
+- [ ] 管理員顯示「所有工具」；稽核員顯示 0 個工具
+
+### 6.16 v1.14.18 — 「同上」展開 + LLM 逐欄校驗保守規則（每次發版必過）
+
+自動化：`tests/test_same_as_ref.py`（39，含端到端真的產 PDF 抽文字）、
+`tests/test_llm_per_field_consensus.py`（13，用腳本化假模型跑真的兩輪流程）。
+
+#### 6.16.1 「同上」展開
+
+- [ ] 公司資料把「發票地址」填成 `同上` → 填出來的表單上是**實際地址**，不是「同上」
+- [ ] 填成「同公司地址」「同登記地址」→ 一樣展得開
+- [ ] 「電話」填成 `同上` → **保持原字面**（沒有約定俗成的對象，不可以亂猜）
+- [ ] 「英文地址」填成 `同上` → **保持原字面**（中文地址不可以填進英文欄）
+- [ ] 指到的欄位是空的 → 保持原字面，**不可以變成空白**
+- [ ] 結果頁列出「以下的『同上』已展開成實際內容」，且看得到原本填的是什麼
+- [ ] 公司名叫「同心圓…」之類「同」開頭的客戶，其他欄位的 `同上` 一樣展得開
+
+#### 6.16.2 LLM 逐欄校驗
+
+> LLM 校驗預設關閉；要測需先在管理區開啟並指定模型。
+
+- [ ] 校驗跑完後結果頁顯示**兩輪**；被採納的列是綠色
+- [ ] 同一個問題**不會列兩次**（去重）
+- [ ] 只在其中一輪被指出的疑慮**仍然列得出來**，但不標成已採納
+- [ ] 管理區把「連續幾輪」設成 1 → 只跑一輪，行為與舊版相同
+- [ ] 第二輪只重問可疑欄位（看進度訊息「再確認 N/M」的 M 應**遠小於**總欄位數）
+
+### 6.17 v1.14.19 — 中文字形與字型子集化（每次發版必過）
+
+自動化：`tests/test_ttc_subfont.py`（27 項，含端到端產 PDF 驗字型名稱與檔案大小）。
+
+#### 6.17.1 字形（`.ttc` 子字型）
+
+- [ ] 表單填寫產出的 PDF，內嵌字型名稱含 **CJK TC**（不是 CJK JP）
+- [ ] 頁碼、PDF 編輯器產出的中文同樣是 TC
+- [ ] 目視確認：**「海」是兩點（每），不是一橫（毎）**；「過」「郎」「船」「直」
+      也應為台灣寫法
+- [ ] 浮水印打中文字 → 同樣是台灣字形
+- [ ] 把系統 CJK 字型移走 / 改名 → **不可以整個印不出來**（退回內建字型即可）
+
+#### 6.17.2 檔案大小
+
+- [ ] 一張乾淨空白表單填幾個中文欄位 → 產出**不超過幾百 KB**（修正前是 13 MB）
+- [ ] 產出的 PDF 文字**選得起來、複製得出來、搜尋得到**
+- [ ] 100 頁文件加中文頁碼 → **秒級完成**（修正前每頁都重算一次字型子集）
+- [ ] 填入罕用字（例如姓名裡的異體字）→ **不可以變成空白方框**；
+      真的縮不出來時要退回完整字型（檔案變大是可接受的，缺字不行）
+
+### 6.18 v1.14.20 — 三個新工具（每次發版必過）
+
+自動化：`tests/test_pdf_bookmark.py`（28）、`tests/test_pdf_seam_stamp.py`（40）、
+`tests/test_pdf_page_size.py`（22）。三支都用真實瀏覽器（CDP）驗過完整流程。
+
+#### 6.18.1 書籤與目錄
+
+- [ ] 一次選 3 個 PDF → 自動串接，**每個檔名成為第一層書籤**
+- [ ] 子文件原有的書籤降一層保留，頁碼有加偏移
+- [ ] 手動把第一筆改成第 2 層 → **自動修回第 1 層並說明原因**
+- [ ] 頁碼填超過總頁數 → 夾到最後一頁並說明
+- [ ] 勾「產生目錄頁」→ 產出多一頁；**書籤頁碼、目錄上的頁碼、目錄連結三者一致**
+- [ ] 目錄頁的中文不可以是缺字方框
+- [ ] 貼上「標題 + 頁碼」清單（含縮排）→ 層級正確；看不出頁碼的行會被列出來
+
+#### 6.18.2 騎縫章
+
+- [ ] 兩種模式各有**示意圖**（不是只有文字）
+- [ ] 三種印章來源都能用：資產庫 / 上傳 / 系統產生
+- [ ] 上傳帶白底的章 → 白底變透明，不會蓋住內文
+- [ ] 每組 2 頁 / 3 頁 / 整份 → 組數顯示正確且**立刻更新**（不用等預覽圖）
+- [ ] 「拼回去」的預覽是**完整的章**（片與片之間的縫是刻意畫的）
+- [ ] 加角度之後拼回去**仍然完整**（先轉再切）
+- [ ] 開亂數 → 不同組位置 / 角度不同，**同一組內完全一致**
+- [ ] 產生後回報亂數種子；填回去重跑得到**一模一樣**的結果
+- [ ] 印出來實測：把連續幾頁的邊緣對齊，看得出是同一個章
+
+#### 6.18.3 頁面尺寸統一
+
+- [ ] 上傳混合尺寸的檔 → **先列出有幾種尺寸**並提醒
+- [ ] 尺寸一致的檔 → 明說「本來就一致，不一定需要處理」
+- [ ] 統一成 A4「跟著原頁方向」→ A3 橫變 A4 橫、A4 直不動
+- [ ] 產出的**文字仍然選得到**（不可以被轉成圖片）
+- [ ] 原本就是目標尺寸的頁面**沒有被重放**（報告要說有幾頁沒動）
+- [ ] 「置中不縮放」遇到比紙張大的頁面 → **警告會裁掉**
+- [ ] 有 `/Rotate` 的頁面方向判斷正確
+
+### 6.19 v1.14.21 — 三個新工具的介面回饋（每次發版必過）
+
+> 這一節全部來自使用者實際操作後的回報。共通點是**單元測試都測不到** ——
+> 要嘛是版面（要看畫面），要嘛是「模板誰呼叫誰」（要真瀏覽器）。
+
+#### 6.19.1 設定欄位的排版（三支新工具共通）
+
+- [ ] 每個欄位的**說明文字自己一行**，不會擠在輸入框右邊
+      （`af-note` 必須是 `display:block`；`<small>` 預設是 inline）
+- [ ] 同一區內的**數字框、下拉框、文字框等寬**
+      （原本的寬度規則只涵蓋 `text` / `url` / `password`）
+- [ ] 勾選框文字長到要折行時，**方框仍對齊第一行**不會被推到中間
+- [ ] 單位（mm / % / 度）在欄位裡，不在標籤裡
+
+#### 6.19.2 騎縫章
+
+- [ ] 章面文字打**公司全名**（10 字以上）→ 長方章**變寬**，字級不變小
+      （高度不變就是字級沒被動過）
+- [ ] 同樣的長字串在圓章 / 方章 → **分行**（直行、右至左），圓章仍是正圓
+- [ ] 「印章來源」的卡片與下方欄位之間**有留白**
+- [ ] 「從資產庫選」是**縮圖清單**不是下拉；縮圖要真的載入（不是破圖）
+- [ ] 換選另一個資產 → 印章預覽跟著更新
+- [ ] 一個章跨 N 頁時，預覽把**那一組的每一頁都列出來**（不是只有一頁）
+- [ ] 「2. 印章」「3. 怎麼蓋」「4. 預覽」是**三張獨立卡片**
+
+#### 6.19.3 頁面尺寸統一
+
+- [ ] 預覽**一次列六頁**，每張都真的載入
+- [ ] 「3. 預覽」是獨立卡片，不在「2. 統一成」裡面
+
+#### 6.19.4 書籤與目錄
+
+- [ ] 有「3. 預覽」卡片；**沒有可看的東西時會說明原因**
+      （沒書籤 / 有書籤但沒勾目錄頁，兩種訊息都算通過）
+- [ ] 勾「在最前面產生目錄頁」→ 預覽真的顯示目錄頁的圖
+- [ ] 產生完的結果訊息**有講書籤在閱讀器側邊欄看**
+      （使用者回報過「沒看到目錄」，實際上書籤有做出來）
+
+#### 6.19.5 作業通知的工具圖示
+
+- [ ] 通知清單每一列**都有圖示方塊**（缺一個整排就對不齊）
+- [ ] 模擬舊分頁（把某工具從 `#toolIconSprite` 移除）→ 改用**通用圖示**，
+      不可以整個方塊消失
+- [ ] 三處都要驗：通知下拉、`/my-jobs`、`/admin/jobs`
+
+#### 6.19.6 守門測試（會自動跑，但發版前確認有過）
+
+- [ ] `tests/test_api_doc_coverage.py` —— 以實際路由表反查 `API.md` 與本檔 §4
+- [ ] `tests/test_api_page_builder.py` —— `api.html` 不可含 NUL；
+      巢狀行內標記（粗體裡包程式碼）要完整還原
+- [ ] `tests/test_template_js_syntax.py` / `tests/test_csp_nonce.py`
+
+### 6.20 v1.14.22 — 預覽的載入狀態與頁數（每次發版必過）
+
+- [ ] 縮圖**載入中顯示轉圈**（`.jt-thumb.is-loading`），不是破圖或空白
+      —— 每張都是向伺服器要的，往返要時間
+- [ ] 縮圖**算不出來時顯示紅字「算不出來」**（`.jt-thumb.is-error`），不留空白
+- [ ] 騎縫章 / 頁面尺寸統一的預覽**預設 20 頁**（文件不足 20 頁就全部）
+- [ ] 20 張是**有限併行**（4 條），不是逐一等
+- [ ] **騎縫章的預覽以「組」為單位包起來**，同一組的頁面**永遠在同一行**
+      （驗法：每個 `.sm-group` 內所有 `.sm-page` 的 `getBoundingClientRect().top` 相同）
+      —— 這個工具要看的就是相鄰兩頁的接縫，被換行拆開等於預覽沒有用
+
+### 6.21 v1.14.22 — 中文寫進 PDF 必須看得見（每次發版必過）
+
+> v1.14.19 ~ v1.14.21 的正式機故障：字型子集化把字形重新編號，繪製引擎用
+> **原始編號**去取 → 什麼都畫不出來。**文字層完全正常**（搜尋、複製、抽取都對），
+> 只有畫面空白，所以任何「文字抽得到」的檢查都會誤判成通過。
+
+- [ ] **一律算圖數墨水**，不可以用 `get_text()` 當作通過的依據
+- [ ] 表單自動填寫：填入中文 → 下載的 PDF **看得到字**
+- [ ] 用印與簽名（含日期、個資限用章）：中文看得到
+- [ ] 插入頁碼：中文頁碼格式（第 N 頁）看得到
+- [ ] 浮水印：中文浮水印看得到
+- [ ] 書籤與目錄的目錄頁：標題看得到
+- [ ] 產出檔案**沒有暴增**（子集化仍在生效，約 820 KB 而不是 16 MB）
+- [ ] `tests/test_cjk_font_renders.py` 全綠
+
+### 6.22 v1.14.22 — 目錄頁的插入位置（每次發版必過）
+
+- [ ] 「插在第幾頁」填 1 → 目錄在最前面（與舊行為相同）
+- [ ] 填 2 → 目錄排在**封面後面**，第 1 頁仍是原本的封面
+- [ ] **插入點之前的書籤頁碼不動**（封面那筆仍是第 1 頁，不可以指到目錄自己）
+- [ ] 目錄上印的頁碼與**目錄項目的連結**都符合同一個規則
+- [ ] 填超過總頁數不會炸掉（會夾到合法範圍）
+
+### 6.23 v1.14.23 — 預覽縮圖不可以讓人誤判邊界（每次發版必過）
+
+> 加框工具的預覽縮圖，卡片自己有一圈灰框線 + 白色內距 → 看起來像「框線離
+> 頁緣還有距離」，實際上是貼齊的。使用者要判斷的正是框線位置。
+
+- [ ] 預覽縮圖的容器**沒有自己的框線**（灰底襯白紙加陰影）
+- [ ] 頁面加框：邊距設 **0** → 框線正好在白紙邊緣，外面直接是灰底，
+      **不可以有白色間隙**
+- [ ] 頁面加框：邊距設 5mm → 看得出框線確實內縮
+- [ ] 頁面尺寸統一：預覽圖裡的灰框是**目標紙張邊界**，
+      容器不可以再畫一條混淆
+- [ ] 騎縫章、書籤與目錄的縮圖同樣處理
+
+### 6.24 v1.14.24 — 工具之間的檔案交接（每次發版必過）
+
+> 之後的「工作流程串多個工具」會走同一條路，所以這一節驗的是**通用機制**，
+> 不是書籤→頁碼這一對。
+
+- [ ] 書籤與目錄做完 → 結果訊息有「用『插入頁碼』補上」的連結
+- [ ] 點下去 → **頁碼工具收到那份檔案**（檔名正確，不是 `document.pdf`）
+- [ ] 檔案有存進**我的工作區**（`source_tool` 記著來源工具）
+- [ ] 網址上的 `from_ws` / `from_job` / `from_name` **用完就清掉**
+      （重新整理不該再抓一次）
+- [ ] 一頁有多個上傳框時（如騎縫章），**只有第一個**吃這個參數
+- [ ] 工作區被管理員停用 → 退回 `from_job`，功能仍可用
+- [ ] 拿**別人的** file_id / job_id → 取不到（伺服器端驗歸屬）
+
+### 6.25 v1.14.24 — 更新後前端要立刻生效（每次發版必過）
+
+- [ ] `curl -I /static/js/file_upload.js` 有 `Cache-Control: no-cache`
+- [ ] 沒有這個標頭時瀏覽器會用啟發式快取 → 升級後好幾小時還在跑舊的
+      JS / CSS，**重新整理也沒用**；開發時就踩過一次
+- [ ] 改過前端之後實測：更新 → 重新整理 → 新功能立刻可用
+
+### 6.26 v1.14.25 — 書籤與目錄的預設值、檔名、預覽連動（每次發版必過）
+
+- [ ] 「產生可以印出來的目錄頁」**預設是勾起來的**
+- [ ] API 的 `toc_page` **仍然預設 `false`**（不可以連動改掉，
+      會讓既有自動化呼叫突然多一頁）
+- [ ] 上傳 `年度報告.pdf` → 產出檔名是 **`年度報告_bookmarked.pdf`**
+      （不是寫死的 `bookmarked.pdf`）
+- [ ] 接到「插入頁碼」時帶過去的檔名**是產出檔名**（`result_filename`），
+      不是輸入檔名
+- [ ] **改書籤標題或頁碼 → 目錄預覽跟著重畫**
+      （目錄內容就是那張表，不重畫等於顯示的是上一版）
+
+### 6.27 v1.14.26 — 貼上清單的解析效能與用詞（每次發版必過）
+
+- [ ] 「書籤與目錄」貼上**一行兩萬個點、結尾沒有數字**的內容 ×20 行
+      → **一秒內**解析完（原本每行要 5.4 秒，是可以拿來癱瘓伺服器的輸入）
+- [ ] 正常的目錄清單解析結果不變（層級、引導點、警告訊息）
+- [ ] `tests/test_taiwan_terminology.py` 全綠
+      —— 只掃**使用者看得到的文字**；程式註解、說明文件、
+      以及**刻意收錄大陸用詞的搜尋關鍵字**都要排除
+
+### 6.28 v1.14.27 — cryptography 升版與解析效能（每次發版必過）
+
+- [ ] `cryptography` 已是 50.x（49.0.0 的 PKCS#7 有 Bleichenbacher oracle；
+      本專案只用 Fernet 與 PyJWT RS256，**沒有用到 PKCS#7**，屬不可利用，
+      但 49.x 無修正版可退）
+- [ ] SSO（OIDC / SAML）端對端測試全綠 —— 升 cryptography 最可能撞到的就是這裡
+- [ ] Fernet 加解密正常（SSO 設定、通知管道的密鑰都靠它）
+- [ ] 「書籤與目錄」貼上清單的解析，**每一版踩過的最壞輸入都要跑**：
+      整行都是點 / 一長串數字接非空白 / 數字後一大片空白
+      —— **換了寫法就要重新設計最壞輸入**，拿舊的去驗會誤判成修好了
+
+### 6.29 表單自動填寫 — 改動必跑全表單回歸（每次發版必過）
+
+> 定位邏輯（`compute_value_slot` / `pdf_form_detect`）**所有表單都會走**。
+> 改壞了使用者不會馬上發現，等表寄出去才知道欄位填錯格。
+
+- [ ] 改動**之前**先存基準：
+      `python temp_pdfs/_regress/run_fill_regress.py --save before`
+- [ ] 改完比對：`... --compare before`
+- [ ] **判準：沒有任何一份變差**
+      —— 填入數不可減少、**疊字不可增加**、原本座標不可位移
+- [ ] 非填寫類（公文 / 說明書）自動略過，不列入判準
+- [ ] 樣本涵蓋五種特殊版型（後置標籤 / 純底線 / 雙欄 / 直書標籤欄 / 逐格分寫）
+- [ ] **樣本不可上 git、檔名與客戶名不可寫進 CHANGELOG**
+      （`tests/test_no_sample_names_in_public.py` 會擋）
+
+### 6.30 v1.12.95 — .docx 表單底色蓋掉整頁文字（VML z-index）（每次發版必過）
+
+> Word 匯出對**純圖形**走 VML，而 VML 的 z-index 匯出時整個不寫 → 依規範
+> 等同疊在文字層之上，底色塊把整頁文字蓋掉（.odt 正常、只有 .docx 壞）。
+> 在 ODF 端設 `draw:z-index` 救不了 —— 資訊在匯出當下就掉了。
+> 修法是轉出 .docx 後直接改寫（`_fix_docx_vml_zorder`）。
+> （2026-08-16 稽核發現這宗一直沒進 §6，補上。）
+
+- [ ] 含底色塊的表單 PDF 轉 .docx，開檔後文字**在色塊之上**（不是被蓋掉）
+- [ ] 同一份轉 .odt 對照 —— 兩種輸出都要對
+
+### 6.31 v1.14.34-35 — 作業完成列的按鈕要跟實際產出一致（每次發版必過）
+
+> 兩宗同根因：**同一份清單在兩個地方各寫一份，遲早漂掉。**
+> ①「下載 PNG」原本無條件顯示，但那個端點是把結果 PDF 算成圖 ——
+> 產出不是 PDF 的工具掛著一顆必然失敗的鈕。
+> ②「存至工作區」的副檔名判斷寫死在 JS（pdf|png|docx|odt），伺服器端
+> v1.14.6 就多收了 xlsx/ods/pptx/odp —— 伺服器收得下、鈕卻不出現，
+> 而且沒有任何錯誤訊息（使用者親自看到才回報）。
+
+- [ ] 轉出 `.xlsx` / `.odp`：主下載鈕顯示「下載 .xlsx」等（不是「下載 PDF」）
+- [ ] 產出非 PDF 時「下載 PNG」不出現；產出是 PDF 時要出現且能下載
+- [ ] 產出 `.xlsx`「存至工作區」出現、按下真的存進去
+- [ ] `tests/test_workspace_save_button.py` 全綠（JS 不可再寫死清單）
+
+### 6.32 v1.14.34 — soffice 的回傳碼不可靠（每次發版必過）
+
+> soffice 會一邊印無關警告（找不到 Java）一邊正常轉完，也可能在收尾才被
+> 中止（實測 rc=137 = SIGKILL，多半是記憶體或同時轉太多份）。
+> 先看回傳碼會把**已轉好的檔案白白丟掉**。判準一律是「有沒有拿到可用檔案」。
+
+- [ ] `tests/test_office_convert.py` 的
+      `test_good_output_wins_over_bad_exit_code` /
+      `test_killed_process_says_so_instead_of_blaming_the_format` 綠
+- [ ] 同副檔名互轉（pptx→pptx）真的有轉（無聲跳過守門也在同一檔）
+
+### 6.33 v1.14.37 — 毀損檔案一律 400，不可 500（每次發版必過）
+
+> 2026-08-16 全端點壞輸入掃描：毀損 PDF 打全部工具端點，**28 個回 500**。
+> 使用者會以為服務掛了而一直重試（其實是檔案壞了），監控端全是假警報。
+> 修法是全域 `fitz.FileDataError` 處理器（同 JSONDecodeError 的做法）。
+
+- [ ] `tests/test_broken_input_no_500.py` 全綠
+      （從路由表自動列舉全部工具 POST 端點，新工具自動被涵蓋）
+

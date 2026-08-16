@@ -230,7 +230,7 @@ def platform_install_hint(code: str) -> dict:
             "message": f"jt-doc-tools service 帳號 (jtdt) 對系統 tessdata 目錄 {td_str} 無寫入權限（Linux apt 安裝的正常狀況），請以 root / sudo 執行下面任一指令：",
             "methods": [
                 {
-                    "name": "方法 1：下載兩變體（推薦，fast + best 都有）",
+                    "name": "方法 1：下載兩變體（建議，fast + best 都有）",
                     "command": chained,
                     "note": "fast 變體（檔小快）+ best 變體（檔大準）都下載，預設 active 用 best",
                 },

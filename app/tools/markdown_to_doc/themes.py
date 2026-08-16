@@ -282,8 +282,17 @@ def get_font(name: str) -> dict:
 
 
 def font_options() -> list[dict]:
-    """For UI: list of {id, name, desc} suitable for a select."""
-    return [{"id": k, "name": v["name"], "desc": v["desc"]}
+    """給下拉選單用的字型清單。
+
+    **`stack` 一定要一起回**。模板寫的是
+    `{% if f.stack %}data-preview-style="font-family: {{ f.stack }};"{% endif %}`，
+    少了它那個條件永遠是 false → 屬性一次都沒有渲染過 → 使用者在下拉裡選
+    標楷體 / 新細明體 / 等寬時**每一項都用同一個介面預設字型顯示**，看不出
+    自己選了什麼（v1.14.31 對抗式驗證：六個選項的 data-preview-style 全是
+    null）。`FONTS` 裡六款有五款早就寫好 stack 了，只是沒有被送出去。
+    """
+    return [{"id": k, "name": v["name"], "desc": v["desc"],
+             "stack": v.get("stack") or ""}
             for k, v in FONTS.items()]
 
 

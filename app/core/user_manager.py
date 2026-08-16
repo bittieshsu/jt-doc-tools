@@ -391,6 +391,16 @@ def delete(user_id: int) -> None:
             (str(user_id),))
         conn.execute("DELETE FROM users WHERE id=?", (user_id,))
     permissions.invalidate_cache()
+    # **磁碟上的檔案也要清**。只清資料庫的話 `data/workspace/u<id>/` 會留著，
+    # 而保留期設成「永久保留」時那就是永久留著離職者的檔案；管理區的用量
+    # 統計還會繼續列出一個已經不存在的帳號。
+    try:
+        from . import workspace
+        workspace.purge_user(user_id)
+    except Exception:  # noqa: BLE001 — 帳號已經刪掉了，清檔失敗不該讓整件事失敗
+        import logging
+        logging.getLogger(__name__).warning(
+            "刪除帳號後清理工作區失敗 user_id=%s", user_id)
 
 
 def _count_admin_users(conn) -> int:

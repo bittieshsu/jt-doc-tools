@@ -261,6 +261,28 @@ def test_user_login(cfg: dict, username: str, password: str) -> dict:
             "groups": group_dns, "email": email, "elapsed_ms": elapsed}
 
 
+def _ad_only_attributes() -> list[str]:
+    """AD 專屬屬性 —— **只有 backend 真的是 AD 時才可以要**。
+
+    `objectSid` / `primaryGroupID` / `userAccountControl` /
+    `msDS-UserPasswordExpiryTimeComputed` 這幾個是 Active Directory 才有的。
+    原本的假設是「OpenLDAP 沒有這些屬性，要不到就是空的，不影響」——
+    **那個假設是錯的**：OpenLDAP / UCS 收到不認得的屬性名會直接拒絕**整個
+    查詢**（`invalid attribute type in attribute list: objectSid`），
+    於是連登入用的使用者查詢都失敗，畫面顯示「目前無法連線到認證伺服器」——
+    看起來像網路不通，其實伺服器好好的（2026-08-11 正式機實際踩到）。
+
+    所以改成依 backend 分流。backend 標成 `ldap` 卻其實接 AD 的人會少拿到
+    主要群組與帳號狀態，但**不會整個登不進去** —— 那是正確的取捨方向。
+    """
+    try:
+        return (["objectSid", "primaryGroupID", "userAccountControl",
+                 "msDS-UserPasswordExpiryTimeComputed"]
+                if auth_settings.get().get("backend") == "ad" else [])
+    except Exception:  # noqa: BLE001 — 讀不到設定就當作不是 AD（保守）
+        return []
+
+
 def _resolve_backend_and_cfg() -> tuple[str, dict]:
     """Return (backend, ldap_cfg) for directory sync.
 
@@ -514,8 +536,8 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
                     cfg.get("username_attr", "sAMAccountName"),
                     cfg.get("email_attr", "mail"),
                     # AD 的主要群組不在 memberOf 裡（見 primary_group_sid 的說明）。
-                    # OpenLDAP 沒有這兩個屬性，要不到就是空的，不影響。
-                    "objectSid", "primaryGroupID",
+                    # **只在 backend 是 AD 時才要** —— 見 `_ad_only_attributes`。
+                    *_ad_only_attributes(),
                 ],
                 size_limit=2,
             )
@@ -984,11 +1006,11 @@ def sync_all_users(name_contains: str = "") -> dict:
             entries = conn.extend.standard.paged_search(
                 search_base=base, search_filter=ufilter,
                 search_scope=SUBTREE,
-                # userAccountControl / msDS-… 是 AD 才有的；OpenLDAP 要不到就
-                # 是拿不到，不會出錯。**構造屬性一定要顯式列出**（`*` 不會回傳）。
+                # userAccountControl / msDS-… 是 AD 才有的。**構造屬性一定要
+                # 顯式列出**（`*` 不會回傳），但**只在 backend 是 AD 時才要**
+                # —— 見 `_ad_only_attributes`（OpenLDAP 會拒絕整個查詢）。
                 attributes=[disp_attr, login_attr, mail_attr,
-                            "userAccountControl",
-                            "msDS-UserPasswordExpiryTimeComputed"],
+                            *_ad_only_attributes()],
                 paged_size=500, generator=False)
             for e in entries:
                 dn = e.get("dn") or ""

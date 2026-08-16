@@ -2183,7 +2183,11 @@ def build_auth_router(templates) -> APIRouter:
         saved = job_priority.set_user_ids(valid)
         audit_db.log_event(
             "settings_change", username=_actor(request), ip=_client_ip(request),
-            target="job_priority", details={"user_ids": sorted(saved)},
+            # **不可以 sorted()** —— 這份名單的**順序本身就是優先權**，
+            # 排序之後 `[1, 3]` 與 `[3, 1]` 的稽核紀錄一模一樣，事後完全
+            # 分辨不出管理員把誰往前調了（v1.14.31 對抗式驗證實測）。
+            # 讀取端點早就正確地不排序，只有這一行漏掉。
+            target="job_priority", details={"user_ids": list(saved)},
         )
         return {"ok": True, "count": len(saved)}
 

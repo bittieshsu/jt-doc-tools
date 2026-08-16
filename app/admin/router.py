@@ -14,6 +14,12 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 
+# **模組層要有 `settings`**。設定匯出 / 匯入的三個端點用了 `settings.temp_dir`，
+# 但這個模組從來沒有 import 過它 —— 於是那三支一律 `NameError` 變成 500，
+# 而頁面本身打得開，使用者只會以為是暫時性錯誤（v1.14.31 對抗式驗證抓到，
+# 整組設定備份 / 還原是死的）。檔案裡別處寫的是函式內 `import ... as _s`，
+# 所以 grep 得到字串卻沒有這個名字。
+from ..config import settings
 from ..core.asset_manager import PositionPreset, asset_manager
 from ..core.conv_settings import BUILTIN_PATHS, conv_settings
 from ..core.profile_manager import profile_manager

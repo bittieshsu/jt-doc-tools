@@ -77,9 +77,9 @@ GET /api/jobs/abc123?token=64char-hex-token-here
 
 ## 3. 文件轉換 API
 
-### 文書轉 PDF
+### 辦公文件轉 PDF
 
-把 Word / Excel / PowerPoint / ODF 轉成 PDF（走 OxOffice / LibreOffice 引擎）。
+把 辦公文件 轉成 PDF（走 OxOffice / LibreOffice 引擎）。
 
 ```text
 POST /api/convert-to-pdf
@@ -87,7 +87,7 @@ POST /api/convert-to-pdf
 
 | 參數 | 類型 | 必填 | 說明 |
 |---|---|---|---|
-| `file` | file | ✓ | Word / Excel / PowerPoint / ODF 文件 |
+| `file` | file | ✓ | 辦公文件 文件 |
 
 ```bash
 curl -X POST http://localhost:8765/api/convert-to-pdf \
@@ -97,6 +97,64 @@ curl -X POST http://localhost:8765/api/convert-to-pdf \
 ```
 
 回應：PDF 二進位（`application/pdf`）。失敗 4xx + JSON `{"detail": "..."}`。
+
+### 辦公文件格式互轉
+
+同一類文件之間互轉格式：文書檔↔文書檔、試算表↔試算表、簡報↔簡報。走 job 模式回 `job_id`。
+
+**先問可用的目標格式再送轉換。** `target` 的值會因安裝而異（沒裝 Impress
+模組就不會有簡報那一組），不要把 id 寫死在自己的程式裡：
+
+```text
+GET /tools/office-convert/formats
+```
+
+```bash
+curl -s http://localhost:8765/tools/office-convert/formats \
+  -H "Authorization: Bearer YOUR_TOKEN" | jq
+# → {"families": [{"id": "text", "name": "文書檔",
+#                  "sources": ["odt", "docx", ...],
+#                  "targets": [{"id": "docx-2007", "ext": "docx",
+#                               "label": "Word 2007", "note": "...",
+#                               "common": true}, ...]}, ...]}
+```
+
+```text
+POST /tools/office-convert/convert
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | ✓ | 辦公文件，可重複帶多份（多份會打包成 ZIP） |
+| `target` | str | ✓ | 目標格式 id，取自上面的 `formats` |
+
+同一次請求裡的檔案**必須同屬一類**（不能把試算表和文書檔混在一起送），
+而且要與 `target` 所屬的類一致，否則回 400。
+
+```bash
+# 文書檔：.odt 轉成 Word 97–2003
+curl -X POST http://localhost:8765/tools/office-convert/convert \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@報告.odt" -F "target=doc" | jq
+# → {"job_id": "...", "download_url": "/api/jobs/.../download"}
+
+# 簡報：.pptx 轉成 ODF 簡報
+curl -X POST http://localhost:8765/tools/office-convert/convert \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@簡報.pptx" -F "target=odp" | jq
+```
+
+`.docx` / `.xlsx` / `.pptx` 各有兩個目標可選，差別是**相容模式**不是只有名稱：
+
+| 目標 id | 產出 | 相容模式 |
+|---|---|---|
+| `docx-2007` | Word 2007 寫法 | 12 |
+| `docx-365` | Word 2010–365 寫法 | 15 |
+| `xlsx-2007` / `xlsx-ooxml` | Excel 2007–365 / Office Open XML | — |
+| `pptx-2007` / `pptx-ooxml` | PowerPoint 2007–365 / Office Open XML | — |
+
+回應：`{"job_id": "...", "download_url": "..."}`。單檔回原格式，多檔回 ZIP。
+失敗 4xx + JSON `{"detail": "..."}`。
 
 ### 圖片轉 PDF
 
@@ -239,7 +297,7 @@ curl -X POST http://localhost:8765/tools/pdf-to-markdown/api/pdf-to-markdown \
 
 ---
 
-### Markdown 轉文書
+### Markdown 轉辦公文件
 
 把 Markdown 轉成 PDF / Word / OpenDocument。內容可用 `file` 上傳，也可以直接用 `text` 帶進來。
 
@@ -277,7 +335,7 @@ curl -X POST http://localhost:8765/tools/markdown-to-doc/api/markdown-to-doc \
 ## 4. PDF 編修 API
 
 
-### PDF 轉簡報檔
+### PDF 轉簡報
 
 把 PDF 反轉成 PowerPoint（.pptx）或 OpenDocument 簡報（.odp），**一頁對一張投影片**，
 投影片尺寸沿用原稿（直向 PDF 也照樣還原）。走 job 模式回 `job_id`。
@@ -441,7 +499,7 @@ curl -X POST http://localhost:8765/tools/pdf-pageno/api/pdf-pageno \
 
 ### PDF 頁面加框
 
-替每一頁加上框線。收 PDF 與文書檔（Word / Excel / PowerPoint / ODF；文書檔會先自動轉成 PDF），輸出一律是 PDF。
+替每一頁加上框線。收 PDF 與文書檔（辦公文件；文書檔會先自動轉成 PDF），輸出一律是 PDF。
 
 ```text
 POST /tools/pdf-border/api/pdf-border

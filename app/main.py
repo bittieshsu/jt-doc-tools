@@ -17,7 +17,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.29"
+VERSION = "1.14.37"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -27,7 +27,18 @@ logger = get_logger(__name__)
 from .core.net_ssl import install_os_trust  # noqa: E402
 install_os_trust()
 
-app = FastAPI(title=settings.app_name, version=VERSION)
+# `docs_url` / `redoc_url` 一律關掉。
+#
+# FastAPI 內建的 Swagger UI / ReDoc 從 cdn.jsdelivr.net 載 JS 與 CSS，又用
+# **無 nonce 的 inline script** 啟動 —— 本站的 CSP（`default-src 'self'`、
+# script-src / style-src 都移除了 unsafe-inline）三項全擋，結果是**一片純白、
+# 沒有任何錯誤訊息**（v1.14.31 對抗式驗證用真瀏覽器實測：bodyText 長度 0，
+# console 每頁 5 條 CSP 違規）。留著只是兩個看起來像壞掉的頁面。
+#
+# 對外的 API 說明走自家那份（`github/API.md` → `docs/api.html`），
+# OpenAPI 規格本身仍在 `/openapi.json`。
+app = FastAPI(title=settings.app_name, version=VERSION,
+              docs_url=None, redoc_url=None)
 
 # CSRF 防護（pure-ASGI）— double-submit token，疊在 SameSite=Lax 之上。
 # 加在 @app.middleware 之前 → 位於 auth gate 內層：公開端點（login / setup）
@@ -197,6 +208,25 @@ def _tpl_workspace_enabled(request=None) -> bool:
 templates.env.globals["workspace_enabled"] = _tpl_workspace_enabled
 
 
+def _tpl_workspace_extensions() -> str:
+    """Jinja global：工作區收得下的副檔名，空白分隔（例：``pdf png docx …``）。
+
+    **前端不可以自己抄一份這個清單。** 原本 `job_progress.js` 裡寫死
+    `pdf|png|docx|odt`，而伺服器端早在 v1.14.6 就把 `.xlsx` / `.ods` /
+    `.pptx` / `.odp` 加進來了（就是為了讓「PDF 轉簡報」的產出存得進去）
+    —— 兩邊沒有一起改，結果是**伺服器收得下的檔案，畫面上那顆「存至
+    工作區」卻不出現**，而且完全沒有錯誤訊息可循。
+    """
+    try:
+        from .core import workspace as _ws
+        return " ".join(sorted({e.lstrip(".") for e in _ws.ALLOWED.values()}))
+    except Exception:
+        return ""
+
+
+templates.env.globals["workspace_extensions"] = _tpl_workspace_extensions
+
+
 def _tpl_workspace_count(request=None) -> int:
     """Jinja global: number of files in the current user's workspace, rendered
     server-side into the sidebar badge (no extra fetch; shows in every nav
@@ -223,9 +253,10 @@ _TOOL_ALIASES = {
     "pdf-pages":          "pages reorder rearrange remove delete drop manage 頁面 排序 重排 整理 刪除",
     "pdf-pageno":         "page number numbering numbers footer header 頁碼 頁數 編號 注頁碼",
     "pdf-border":         "border frame outline slide 框線 加框 邊框 外框 頁框 投影片外框 線框 圓角 雙框 陰影 獎狀 證書",
-    "office-to-pdf":      "convert convert-to-pdf office word excel powerpoint docx xlsx pptx odt ods odp 轉檔 轉成 文書 文件",
+    "office-to-pdf":      "convert convert-to-pdf office word excel powerpoint docx xlsx pptx odt ods odp 轉檔 轉成 文書 文件 辦公文件轉PDF 辦公文件轉 PDF 辦公文件 文書轉PDF 文書轉 PDF",
+    "office-convert":     "convert format interconvert docx doc odt rtf txt xlsx xls ods csv pptx ppt odp 格式互轉 格式轉換 互轉 轉格式 轉檔 文書檔互轉 試算表互轉 簡報互轉 docx轉doc odt轉doc xlsx轉xls pptx轉odp 另存新檔 換格式 舊版格式 相容",
     "pdf-extract-images": "extract images pictures jpg png assets 擷取 提取 圖片 影像 抽圖",
-    "pdf-to-image":       "convert image images png jpg jpeg raster rasterize export office word excel powerpoint docx xlsx pptx odt ods odp 文書轉圖片 轉圖 轉圖片 轉png 轉成圖片 影像 匯出圖片 Word 轉圖 Excel 轉圖 PPT 轉圖",
+    "pdf-to-image":       "convert image images png jpg jpeg raster rasterize export office word excel powerpoint docx xlsx pptx odt ods odp 文書轉圖片 轉圖 轉圖片 轉png 轉成圖片 影像 匯出圖片 Word 轉圖 Excel 轉圖 PPT 轉圖 辦公文件轉圖片 辦公文件",
     "image-to-pdf":       "image images photos jpg jpeg png gif tiff webp heic combine merge convert scan a4 letter page size rotate reorder 圖片 照片 相片 掃描 轉 PDF 合併 排序 旋轉 頁面大小 A4",
     "scan-merge":         "scan merge combine composite id card front back two sided id-card overlay position place a4 white background crop detect color photo png jpg pdf 掃描 拼合 合併 疊合 證件 身分證 身份證 正面 反面 正反面 雙面 護照 駕照 健保卡 名片 同一張 白底 A4 位置 自動偵測 彩色 去背 淨白 拖曳",
     "pdf-editor":         "editor edit annotate annotation whiteout redact text textbox shape pencil draw highlight sticky note scribus 編輯 編輯器 標註 註記 塗黑 遮蓋 手繪 螢光筆 便箋 文字框 修圖",
@@ -252,9 +283,9 @@ _TOOL_ALIASES = {
     "einvoice-scan":      "einvoice e-invoice invoice scan qr qrcode receipt taiwan taipei vat tax 電子發票 發票 掃描 QR Code 條碼 二維碼 統編 統一發票 載具 銷售額 稅額 買方 賣方 報帳 記帳 對帳",
     "vat-lookup":         "vat lookup company business taiwan 統編 統一編號 查詢 反查 公司 行號 政府機關 學校 行業 名稱 地址 BGMOPEN 賣方 買方",
     "pdf-to-office":      "pdf2docx pdf-to-docx pdf-to-word pdf-to-odt convert reverse word document docx odt openoffice libreoffice oxoffice pdf word 轉 word 轉檔 反轉 反向 轉文書 轉成 word 轉成 odt PDF轉文書檔 PDF轉Word PDF轉ODT 文字方塊 可編輯",
-    "pdf-to-slides":      "pdf2pptx pdf-to-pptx pdf-to-odp pdf-to-slides pptx odp powerpoint impress keynote slide slides presentation deck convert reverse PDF轉簡報 PDF轉PPT PDF轉PPTX PDF轉ODP 簡報 投影片 簡報檔 轉簡報 轉投影片 轉成 ppt 轉成 pptx 版面重現 一頁一張投影片 可編輯",
+    "pdf-to-slides":      "pdf2pptx pdf-to-pptx pdf-to-odp pdf-to-slides pptx odp powerpoint impress keynote slide slides presentation deck convert reverse PDF轉簡報 PDF轉PPT PDF轉PPTX PDF轉ODP 簡報 投影片 簡報檔 轉簡報 轉投影片 轉成 ppt 轉成 pptx 版面重現 一頁一張投影片 可編輯 PDF轉簡報檔 PDF 轉簡報檔",
     "pdf-to-markdown":    "pdf2md pdf-to-md pdf-to-markdown markdown md llm rag pymupdf4llm convert structured text 轉 markdown 轉成 markdown 結構化 標題層級 表格 餵 LLM RAG 預處理 chunking 文件轉換",
-    "markdown-to-doc":    "md2doc md-to-doc markdown-to-doc markdown to pdf docx odt office convert export theme style commonmark gfm Markdown 轉 PDF 轉 Word 轉文書 轉換 主題 配色 渲染 報告 文件 預覽",
+    "markdown-to-doc":    "md2doc md-to-doc markdown-to-doc markdown to pdf docx odt office convert export theme style commonmark gfm Markdown 轉 PDF 轉 Word 轉文書 轉換 主題 配色 渲染 報告 文件 預覽 Markdown轉辦公文件 辦公文件",
     "pdf-page-size":      "page size paper resize normalize unify uniform a4 a3 a5 b4 b5 letter legal tabloid mixed landscape portrait orientation scale fit crop margin 頁面尺寸 紙張 尺寸統一 統一尺寸 大小 A4 A3 混合尺寸 混排 直向 橫向 方向 縮放 留白 裁切 填滿 送印 裝訂 圖說 標案 工程",
     "pdf-seam-stamp":     "seam seal perforation straddle chop stamp across pages tamper evident contract tender anti swap sliced rotate jitter random 騎縫章 騎縫印 騎縫 跨頁章 防抽換 防換頁 抽換 合約 標案 投標 用印 蓋章 切片 分片 側邊 對開 亂數 角度",
     "pdf-bookmark":       "bookmark bookmarks outline toc table of contents index navigation nested level chapter merge combine tender annual report 書籤 大綱 目錄 導覽 索引 章節 層級 巢狀 合併 串接 標案 投標 年報 結案報告 目錄頁 可點 跳頁 加書籤 建目錄",
@@ -584,6 +615,43 @@ templates.env.globals["branding_logo_url"] = _branding_logo_url
 # / fetch / curl）維持 JSON 行為不變。
 from fastapi.exceptions import HTTPException as _HTTPException2  # noqa: E402
 
+#: 錯誤訊息裡的危險字元 → **全形對應字元**。
+#:
+#: 一開始全部換成底線，結果把合法訊息也毀了 —— 全站有 14 句訊息本身就含這些
+#: 字元（「image > 50MB」「1 <= cols*rows <= 64」「engine must be 'easyocr'」），
+#: 洗成底線之後使用者看到的是「image ＿ 50MB」，等於為了防禦把訊息廢掉。
+#:
+#: 換成全形字元同時滿足兩件事：**讀起來一模一樣**，而且在 HTML 裡完全無害
+#: （`＜` 不會開一個標籤、`＂` 不會跳脫屬性）。控制字元沒有全形對應，直接拿掉。
+_UNSAFE_IN_MESSAGE = str.maketrans({
+    "<": "＜", ">": "＞", '"': "＂", "'": "＇", "&": "＆", "`": "｀",
+    "\r": " ", "\n": " ", "\t": " ", "\x00": "",
+})
+
+
+def scrub_error_detail(detail):
+    """把錯誤訊息裡使用者可控的危險字元洗掉。
+
+    **為什麼要在出口做，而不是逐一改呼叫端**：全站有 38 處把使用者送的檔名
+    回填進錯誤訊息（`f"只支援 PDF：{f.filename}"` 這種形狀），散在 20 個檔案。
+    逐一改一定會漏，而且下次有人新寫一支工具又會長回來。
+
+    這跟 422 handler 是同一個判準（見下方那段說明）：載體是 JSON、有 nosniff、
+    CSP 也擋著，所以**不可利用** —— 但「不可利用」不等於「應該回填」。使用者
+    需要知道的是「哪個檔案不合格」，不需要把他送的位元組原樣拿回去。
+
+    保留檔名的可辨識性（使用者上傳多個檔時要分得出是哪一個），只把 HTML 有
+    意義的字元與控制字元換掉。
+    """
+    if isinstance(detail, str):
+        return detail.translate(_UNSAFE_IN_MESSAGE)[:500]
+    if isinstance(detail, dict):
+        return {k: scrub_error_detail(v) for k, v in detail.items()}
+    if isinstance(detail, (list, tuple)):
+        return [scrub_error_detail(v) for v in detail]
+    return detail
+
+
 @app.exception_handler(_HTTPException2)
 async def _friendly_http_exc(request: Request, exc: _HTTPException2):
     # 只對「瀏覽器導航」改成 HTML；JSON / XHR / API 維持原本行為
@@ -591,7 +659,9 @@ async def _friendly_http_exc(request: Request, exc: _HTTPException2):
     is_html_nav = ("text/html" in accept and not _looks_like_xhr(request))
     if not is_html_nav or exc.status_code not in (401, 403, 404):
         # default JSON behaviour
-        return _JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        return _JSONResponse({"detail": scrub_error_detail(exc.detail)},
+                             status_code=exc.status_code,
+                             headers={"X-Content-Type-Options": "nosniff"})
     titles = {
         401: ("需要登入", "請先登入後再使用此頁。"),
         403: ("沒有存取權限", str(exc.detail or "您的角色沒有使用此頁的權限。如有需要請聯絡管理員。")),
@@ -652,6 +722,25 @@ from fastapi.exceptions import (  # noqa: E402
 @app.exception_handler(_json.JSONDecodeError)
 async def _json_decode_exc(request: Request, exc: _json.JSONDecodeError):
     return _JSONResponse({"detail": "Invalid JSON body"}, status_code=400)
+
+
+# 毀損的 PDF / 假副檔名的檔案不是伺服器錯誤，是**客戶端給錯檔**。
+#
+# 全站有二十幾個端點在 `fitz.open()` 之後才發現檔案打不開 ——
+# `fitz.FileDataError` 原本一路冒成 500「Internal Server Error」，使用者
+# 只看到一句英文不知道該怎麼辦（2026-08-16 全端點壞輸入掃描抓到 28 處）。
+# 跟上面的 JSONDecodeError 同一個做法：一個處理器涵蓋所有呼叫點，統一回
+# 400 與可行動的中文訊息，不必逐一改 router。
+import fitz as _fitz  # noqa: E402
+
+
+@app.exception_handler(_fitz.FileDataError)
+@app.exception_handler(_fitz.EmptyFileError)
+async def _broken_pdf_exc(request: Request, exc: Exception):
+    return _JSONResponse(
+        {"detail": "檔案打不開 —— 可能已毀損、內容不完整，或副檔名與實際格式"
+                   "不符。請確認來源檔可以正常開啟後再上傳一次。"},
+        status_code=400)
 
 
 # 參數驗證失敗（422）**不要把使用者送的原字串回填到回應裡**。
@@ -782,10 +871,11 @@ async def _security_headers(request: Request, call_next):
     # 靜態資產（CSS/JS/字型/圖）content-type 非 text/html → 不受影響，維持可快取。
     if "text/html" in h.get("content-type", ""):
         h.setdefault("Cache-Control", "no-store")
-    is_https = (
-        request.url.scheme == "https"
-        or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
-    )
+    # 走共用 helper —— `X-Forwarded-Proto` 可能是逗號串（多層代理）。
+    # 自己寫一份的話會出現「cookie 帶了 Secure 但同一份回應沒有 HSTS」
+    # 這種互相矛盾的狀態（v1.14.31 對抗式驗證實測）。
+    from .core.client_ip import forwarded_scheme
+    is_https = forwarded_scheme(request) == "https"
     if is_https:
         # 1 年（反向代理建議由「app 或 nginx 擇一」設 HSTS,避免重複標頭;
         # 見 OPS.md / docs 反向代理章節）

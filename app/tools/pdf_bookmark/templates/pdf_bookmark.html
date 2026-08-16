@@ -13,7 +13,7 @@
   {% with upload_id='bmUpload',
           accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
           multiple=true,
-          hint='可一次選多個 —— 依選取順序串接，每個檔名成為第一層書籤。文書檔會先自動轉成 PDF。' %}
+          hint='可一次選多個 —— 依選取順序串接，每個檔名成為第一層書籤。辦公文件會先自動轉成 PDF。' %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div class="bm-stat" id="bmStat" hidden>

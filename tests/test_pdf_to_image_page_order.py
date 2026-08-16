@@ -1,4 +1,4 @@
-"""文書轉圖片：ZIP 內檔名頁碼必須對應 PDF 實際頁數。
+"""辦公文件轉圖片：ZIP 內檔名頁碼必須對應 PDF 實際頁數。
 
 回歸 bug（v1.11.71）：download 端點用字串排序 `sorted(glob('_p*.png'))` →
 _p1, _p10, _p11 … _p2 … 再 enumerate 重新編號，導致 ≥10 頁的 PDF 第 10 頁

@@ -37,10 +37,8 @@ def is_https_request(request: Request) -> bool:
     `X-Forwarded-Proto` 可能是逗號串（多層代理），取**第一段**才是最外層
     面對使用者的那一段。
     """
-    if request.url.scheme == "https":
-        return True
-    fwd = request.headers.get("X-Forwarded-Proto", "")
-    return fwd.split(",")[0].strip().lower() == "https"
+    from ..core.client_ip import forwarded_scheme
+    return forwarded_scheme(request) == "https"
 
 
 def _set_session_cookie(response: Response, token: str, *, remember: bool,
@@ -86,9 +84,9 @@ def _sso_logout_redirect(request: Request, user: dict, token: str) -> Optional[s
         return None
     try:
         from ..core import sso_settings, oidc, saml, sso_store, sessions as _ses
-        scheme = (request.headers.get("X-Forwarded-Proto", "").lower()
-                  or request.url.scheme)
-        host = request.headers.get("X-Forwarded-Host") or request.url.netloc
+        from ..core.client_ip import forwarded_host, forwarded_scheme
+        scheme = forwarded_scheme(request)
+        host = forwarded_host(request)
         base = sso_settings.base_url() or f"{scheme}://{host}"
         if src == "oidc" and sso_settings.oidc_enabled():
             return oidc.logout_url(sso_settings.get_oidc(reveal=True),

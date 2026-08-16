@@ -1,6 +1,8 @@
 {# Renders a progress panel driven by /api/jobs/{id} polling #}
 {% from "components/icons.html" import icon %}
-<div class="job-progress" id="{{ progress_id|default('jobprogress') }}" hidden>
+<div class="job-progress" id="{{ progress_id|default('jobprogress') }}"
+     {# 工作區收得下哪些副檔名 —— 由伺服器端給，前端不要自己抄一份 #}
+     data-ws-exts="{{ workspace_extensions() }}" hidden>
   <div class="job-row">
     <div class="job-bar"><div class="job-bar-inner"></div></div>
     <div class="job-status">準備中…</div>

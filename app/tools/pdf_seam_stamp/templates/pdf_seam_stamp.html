@@ -11,7 +11,7 @@
   <h2>1. 上傳文件</h2>
   {% with upload_id='smUpload',
           accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
-          hint='PDF 或文書檔（文書檔會先自動轉成 PDF）。至少要 2 頁。' %}
+          hint='PDF 或辦公文件（會先自動轉成 PDF）。至少要 2 頁。' %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div class="sm-stat" id="smStat" hidden>
@@ -495,7 +495,7 @@
     const fd = new FormData();
     fd.append('file', f);
     const r = await fu.upload('/tools/pdf-seam-stamp/load', fd,
-      {processingLabel: '讀取中…（文書檔會先轉成 PDF）'});
+      {processingLabel: '讀取中…（辦公文件會先轉成 PDF）'});
     if (!r.ok) {
       (window.showAlert || alert)(await window.friendlyServerError(r, '讀取失敗'));
       return;

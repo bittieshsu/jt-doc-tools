@@ -234,7 +234,16 @@ SUBJECTS.forEach(s => {
 
 // ----- left side: search + type filter + count badges -----
 const permList = document.getElementById('permList');
-const permRows = Array.from(permList.querySelectorAll('.perm-row'));
+// **`permList` 只在有 subject 的時候才渲染**（本檔上方那個條件區塊），
+// 但這個 script 區塊在條件之外、一定會執行 —— 少了這道守衛就是
+// `TypeError: Cannot read properties of null`，而且是在區塊第一行，
+// **後面兩百行全部不會跑**。認證關閉或全新資料庫時就是這個狀態。
+//
+// 註解裡**不可以寫出樣板標籤的字面寫法**（原本這裡照抄了那個條件式）——
+// Jinja 不管它在不在 JS 註解裡，看到就當成真的標籤，結果多出一個沒關的
+// 條件、整頁變成 500。跟本專案記過的「註解裡寫 </script>」是同一類雷。
+const permRows = permList
+  ? Array.from(permList.querySelectorAll('.perm-row')) : [];
 const search = document.getElementById('permSearch');
 let activeType = '';
 

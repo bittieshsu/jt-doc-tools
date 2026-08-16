@@ -606,3 +606,107 @@ def convert_to_text(src: Path, timeout: float = 60.0) -> str:
             return produced.read_text(encoding="utf-8-sig")
         except UnicodeDecodeError:
             return produced.read_bytes().decode("utf-8", errors="replace")
+
+
+def convert_with_filter(src: Path, dst: Path, ext: str, filter_name: str,
+                        timeout: float = 180.0) -> None:
+    """用**指定的濾鏡**把 ``src`` 轉成 ``dst``（給「辦公文件格式互轉」用）。
+
+    與上面那幾支 `convert_to_*` 的差別是濾鏡由呼叫端決定 —— 目標格式是使用者
+    在畫面上選的，可用清單由 :mod:`app.core.office_formats` 從 soffice 自己的
+    註冊表列出來。
+
+    ## 兩件一定要做的事
+
+    1. **一律轉到獨立的暫存目錄**，不要就地轉。soffice 的輸出檔名是
+       「來源主檔名 + 目標副檔名」，**來源與輸出落在同一個目錄且副檔名相同時，
+       它會什麼都不做並回傳成功**（實測：`.pptx` 轉 `.pptx` 放同一目錄，
+       檔案的 SHA-1 完全沒變、回傳碼 0）。而同副檔名互轉正是這個工具的用途
+       之一（換版本、修復壞檔），踩到的機率不低。
+    2. **轉完要確認產出真的存在而且不是空的**。soffice 對不認得的濾鏡名稱
+       同樣是回傳 0 但不產檔 —— 沒有這一步，使用者會拿到「轉檔成功」訊息
+       配上一個 0 位元組的檔案。
+
+    Raises:
+        RuntimeError: 找不到 soffice、逾時、soffice 回錯、或產出不存在 / 空檔。
+    """
+    soffice = find_soffice()
+    if not soffice:
+        raise RuntimeError(
+            "找不到 LibreOffice / OxOffice。請先安裝其中一個再使用格式轉換。")
+
+    ext = ext.lower().lstrip(".")
+    with tempfile.TemporaryDirectory() as td:
+        outdir = Path(td) / "out"      # 見上面第 1 點：一定要獨立目錄
+        outdir.mkdir()
+        profile_path = Path(td) / "profile"
+        soffice_args = [
+            f"-env:UserInstallation={_profile_uri(profile_path)}",
+            "--safe-mode", "--headless", "--norestore", "--nologo",
+            "--nolockcheck", "--nodefault", "--nofirststartwizard",
+            "--convert-to", f"{ext}:{filter_name}",
+            "--outdir", str(outdir),
+            str(src),
+        ]
+        cmd, popen_kwargs = _build_soffice_cmd(soffice, soffice_args)
+        with _soffice_lock:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, **popen_kwargs)
+            _track(proc)
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                try:
+                    proc.communicate(timeout=5)
+                except Exception:
+                    pass
+                raise RuntimeError(
+                    f"轉換卡住（超過 {int(timeout)} 秒）。文件物件過多時會發生，"
+                    "可改轉 ODF 格式（.odt / .ods / .odp）試試。")
+            rc = proc.returncode
+
+        # **先看產出、再看回傳碼。** soffice 的離開碼不可靠 —— 它可能一邊
+        # 印無關的警告（javaldx 找不到 Java）一邊正常轉完，也可能在收尾階段
+        # 才死掉。真正的判準是「有沒有拿到一份可用的檔案」；反過來先看回傳碼
+        # 的話，會把已經轉好的檔案白白丟掉。
+        produced = outdir / f"{src.stem}.{ext}"
+        if not produced.exists():
+            # soffice 偶爾會用它自己認定的副檔名（例如 Type 有多個副檔名時）
+            others = [p for p in outdir.iterdir() if p.is_file()]
+            if len(others) == 1:
+                produced = others[0]
+
+        if produced.exists() and produced.stat().st_size > 0:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(produced), str(dst))
+            return
+
+        # 到這裡就是真的沒有可用產出了 —— 見上面第 2 點，這一段是唯一
+        # 擋得住「無聲失敗」的地方。訊息要指向對的方向，不然使用者會一直
+        # 換目標格式，而問題其實在別的地方。
+        out = (stdout.decode("utf-8", "replace")
+               + stderr.decode("utf-8", "replace"))
+        if produced.exists():          # 有檔但是空的
+            raise RuntimeError(
+                f"轉換產生的是空檔案（{produced.name}）。來源檔可能已毀損，"
+                "或這個輸出格式不支援來源的內容。")
+        if rc is not None and (rc < 0 or rc >= 128):
+            # 被訊號中止（實測 137 = SIGKILL）。多半是記憶體不足，或同時
+            # 有太多轉檔在跑 —— 跟來源檔、目標格式都無關，講錯方向使用者
+            # 會一直換格式重試。
+            raise RuntimeError(
+                "轉換被系統中止（可能是記憶體不足，或同時進行的轉檔太多）。"
+                "請稍後再試一次；持續發生請減少同時轉換的份數。")
+        if "could not be loaded" in out:
+            # 來源載不進去（檔案毀損、或缺對應模組 —— 缺 Impress 時也是這句）
+            raise RuntimeError(
+                "來源檔打不開。可能是檔案已毀損、副檔名與實際內容不符，"
+                "或這套 office 缺少對應模組（文書檔需 Writer、"
+                "試算表需 Calc、簡報需 Impress）。")
+        if rc:
+            raise RuntimeError(f"轉換失敗：{out.strip()[:300]}")
+        # 回傳 0、來源也載進去了，卻沒有檔案 → 濾鏡不認得
+        raise RuntimeError(
+            f"轉換沒有產生檔案。這套 office 可能不支援「{filter_name}」"
+            "這個輸出格式，請改選其他目標格式。")

@@ -531,7 +531,14 @@ def import_from_zip(zip_path: Path, selected_ids: Optional[list[str]] = None,
         entries_by_cat = manifest.get("entries_by_category") or {}
         is_legacy = not entries_by_cat
         if selected_ids is None:
-            wanted_entries = set(n for n in names if n not in (MANIFEST_NAME,))
+            # **`rbac.json` 不可以混進來**。它在 zip 的根目錄（不是 `data/`
+            # 底下），而下面解壓時每個項目都會做 `relative_to("data")` ——
+            # 混進來就是 `ValueError`，於是「全部還原」這條路**一定失敗**
+            # （v1.14.31 對抗式驗證：自己匯出的檔自己匯不回去）。
+            # 另外兩條分支都正確排除了它，只有這條漏掉；RBAC 由 `do_rbac`
+            # 那段單獨處理。
+            wanted_entries = set(n for n in names
+                                 if n not in (MANIFEST_NAME, RBAC_NAME))
             do_rbac = RBAC_NAME in names
         elif is_legacy:
             # v1 backup has no category map — restore all its data/ entries.
@@ -571,6 +578,18 @@ def import_from_zip(zip_path: Path, selected_ids: Optional[list[str]] = None,
             with zipfile.ZipFile(zip_path, "r") as zf2, zf2.open(name) as src, \
                     open(target, "wb") as dst:
                 shutil.copyfileobj(src, dst)
+            # **`.json` 要先確認解析得過再收下**。原本是原樣寫入，於是一份
+            # 不完整的備份可以把 `auth_settings.json` 換成壞掉的內容 ——
+            # 而壞掉的認證設定曾經等於「全站認證關閉」（v1.14.31 對抗式驗證）。
+            # 讀取端現在會 fail-secure，但讓壞資料落地本身就不該發生：
+            # 寫壞了就還原剛剛備份的那一份，並讓整批匯入失敗。
+            if target.suffix.lower() == ".json":
+                try:
+                    json.loads(target.read_text(encoding="utf-8"))
+                except Exception as exc:  # noqa: BLE001
+                    target.unlink(missing_ok=True)
+                    raise ValueError(
+                        f"備份檔內的 {name} 不是合法的 JSON，已中止匯入：{exc}")
             if Path(name).name in _rekey_specs():
                 _rekey_after_import(target)
             imported_files += 1

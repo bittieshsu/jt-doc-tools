@@ -52,7 +52,7 @@ sudo jtdt reset-password jtdt-auditor
 ## 建立額外稽核員（多人合規團隊）
 
 ```bash
-# 互動 prompt 輸入密碼（推薦）
+# 互動 prompt 輸入密碼（建議）
 sudo jtdt audit-user create alice
 
 # 一次給密碼（自動化用）

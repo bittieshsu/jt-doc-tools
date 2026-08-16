@@ -99,6 +99,11 @@ _PERSONAL_FIELD = {"email": "email_to", "telegram": "telegram_chat_id",
                    "line": "line_to"}
 _DUAL_FIELD = {"zulip": "zulip_to", "nextcloud": "nextcloud_to"}
 
+#: **送給本人**的管道 —— 目的地是使用者自己的信箱 / 帳號，別人看不到。
+#: 只有這些可以在「使用者從未設定過」時預設開啟；Slack / Teams / Discord /
+#: Webhook 的目的地是團隊共用頻道，預設打開就是把檔名公開給全公司。
+_PERSONAL_CHANNELS = {"email", "telegram", "line"}
+
 
 def _path() -> Path:
     from ..config import settings
@@ -403,7 +408,13 @@ def resolve_for_user(key: str) -> tuple[list[str], dict]:
         #
         # 管理員是刻意開啟這個功能的，信箱也來自公司目錄 —— 寄一封「你的檔案
         # 好了」是預期中的行為。不想收的人取消勾選即可（存過之後就以他的選擇為準）。
-        chosen = sorted(avail)
+        #
+        # **但只限「送給本人」的管道**。上面那段理由講的是 Email（個人信箱），
+        # 而 Slack / Teams / Discord 這類的目的地是**團隊共用頻道** —— 預設
+        # 打開等於把「[完成] 文件去識別化：2026年度_資遣名單_王小明等12人.pdf」
+        # 這種標題貼到全公司看得到的地方，而使用者根本不知道有這回事
+        # （v1.14.31 對抗式驗證實測）。共用頻道一律要本人明確勾選。
+        chosen = sorted(avail & _PERSONAL_CHANNELS)
     merged: dict[str, Any] = {}
     for ch in chosen:
         merged.update(cfg["channels"].get(ch) or {})

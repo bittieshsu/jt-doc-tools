@@ -68,7 +68,10 @@ def normalize(items: list[BookmarkItem], page_count: int
         if not title:
             warns.append("略過一筆沒有標題的書籤")
             continue
-        page = int(it.page or 1)
+        # **`or 1` 會把 0 吃掉**：`0` 是 falsy，直接變成 1，於是下面那個
+        # `page < 1` 永遠看不到它 —— 使用者打 0 被改成第 1 頁卻**一句話都
+        # 沒有**，而打 -5 反而有警告。這正好違反這個函式自己的原則。
+        page = int(it.page) if it.page is not None else 1
         if page < 1:
             warns.append(f"「{title}」的頁碼 {page} 小於 1，改為第 1 頁")
             page = 1
@@ -77,7 +80,10 @@ def normalize(items: list[BookmarkItem], page_count: int
             warns.append(f"「{title}」指到第 {page} 頁，但文件只有 "
                          f"{page_count} 頁，改為最後一頁")
             page = page_count
-        level = max(1, int(it.level or 1))
+        level = int(it.level) if it.level is not None else 1
+        if level < 1:
+            warns.append(f"「{title}」的層級 {level} 小於 1，改為第 1 層")
+            level = 1
         if prev_level == 0 and level != 1:
             warns.append(f"「{title}」是第一筆但層級為 {level}，改為第 1 層")
             level = 1

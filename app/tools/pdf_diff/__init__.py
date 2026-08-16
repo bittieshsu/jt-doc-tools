@@ -11,7 +11,7 @@ from .router import router
 metadata = ToolMetadata(
     id="doc-diff",
     name="文件差異比對",
-    description="兩份文件逐頁並排比對，文字差異以紅色標示。支援 PDF / Word / Excel / PowerPoint / ODF。",
+    description="兩份文件逐頁並排比對，文字差異以紅色標示。支援 PDF 與辦公文件。",
     icon="diff",
     category="資安處理",
 )

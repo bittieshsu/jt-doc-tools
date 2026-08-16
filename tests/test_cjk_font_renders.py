@@ -121,3 +121,53 @@ def test_toc_page_shows_its_titles(tmp_path):
         BC.TocPageSpec(title="目錄"))
     assert n == 1
     assert ink(d[0]) > INK_MIN, "目錄頁的中文標題沒有畫出來"
+
+
+# ---------------------------------------------------------------------------
+# 保險本身也要有人守 —— v1.14.31 對抗式驗證抓到的
+# ---------------------------------------------------------------------------
+
+def test_ink_probe_actually_samples_chinese():
+    """`_renders_ink` 一定要拿**中文字**去算圖。
+
+    這道保險是為了抓 CID-keyed CFF 的字形錯位（v1.14.19 慘案）而加的，而那種
+    錯位**只影響 CJK，拉丁字母照畫**。第一版寫成「取前幾個非空白字元」，但傳
+    進來的是 `sorted()` 過的字元集合、而 `_SUBSET_ALWAYS` 塞滿 ASCII → 取到的
+    永遠是 `!"#%`。保險存在了一整個版本卻從來沒有畫過一個中文字。
+
+    這裡直接測**正式碼的取樣函式**，不在測試裡重算一次邏輯 —— 重算的版本
+    對「把正式碼改回錯的」完全無感（實測過，改回去照樣全綠）。
+    """
+    from app.core import font_catalog as fc
+
+    # 真實情境：子集化拿到的是 sorted 過的字元集合，ASCII 排在最前面。
+    charset = "".join(sorted(set("測試中文字") | set(fc._SUBSET_ALWAYS)))
+    assert not any(fc._is_cjk(c) for c in charset[:8]), (
+        f"前提變了：ASCII 不再排在最前面（{charset[:8]!r}）")
+
+    sample = fc._ink_sample(charset)
+    assert sample, "取樣不可以是空的"
+    assert any(fc._is_cjk(c) for c in sample), (
+        f"保險取樣的是 {sample!r}，裡面一個中文字都沒有 —— "
+        "它驗不到 CID-keyed CFF 的字形錯位")
+
+
+def test_chars_no_font_has_do_not_force_full_font_fallback(cjk_font):
+    """零寬空格 / BOM / emoji 不可以讓整份子集化作廢。
+
+    使用者從網頁或 Word 貼上的公司名常常帶著 U+200B 或 U+FEFF。那些字元
+    **任何中文字型都沒有**，第一版卻把它們算成「子集化弄丟了」→ 整份退回完整
+    字型 → 產出從 188 KB 變成 13,386 KB，正好回到 v1.14.19 修好前的數字。
+    而且退回是白費的：完整字型一樣畫不出那些字元。
+    """
+    from app.core import font_catalog as fc
+
+    path, idx = cjk_font
+    fc._subset_cached.cache_clear()
+    plain = fc.subset_font(path, idx, "測試公司")
+    assert plain, "一般中文要能子集化"
+    for ch, label in [("​", "零寬空格"), ("﻿", "BOM"), ("\U0001f389", "emoji")]:
+        got = fc.subset_font(path, idx, "測試公司" + ch)
+        assert got, f"混入{label}後子集化整份作廢了（會退回 16 MB 完整字型）"
+        assert len(got) < len(plain) * 2, (
+            f"混入{label}後子集大小異常（{len(got):,} vs {len(plain):,}）")

@@ -223,7 +223,14 @@ def _subset_cached(path_str: str, mtime: float, idx: int,
         data = out.getvalue()
         # **保險**：子集化之後每一個要畫的字都必須還在。缺了就整份放棄，
         # 用原本的字型 —— 檔案大總比印出方框好。
-        if not _covers(data, charset):
+        #
+        # **只能要求「原本畫得出來的字」還在**。第一版拿 charset 直接比，
+        # 於是使用者從網頁或 Word 貼上帶著零寬空格（U+200B）或 BOM（U+FEFF）
+        # 的公司名時，那些字元**任何中文字型都沒有**，卻被算成「子集化弄丟了」
+        # → 整份退回完整字型 → 產出的 PDF 從 188 KB 變成 13,386 KB，
+        # 正好回到 v1.14.19 修好前的數字，等於子集化在這種輸入下完全失效。
+        # 而且退回是白費的：完整字型一樣畫不出那些字元。
+        if not _covers(data, charset, base_font=io.BytesIO(full)):
             logger.warning("字型子集化後有字不見了，退回完整字型")
             return None
         return data
@@ -232,7 +239,7 @@ def _subset_cached(path_str: str, mtime: float, idx: int,
         return None
 
 
-def _covers(font_bytes: bytes, text: str) -> bool:
+def _covers(font_bytes: bytes, text: str, base_font=None) -> bool:
     """這份字型是不是每一個字都**畫得出來**。
 
     分兩關，**兩關都要過**：
@@ -250,8 +257,17 @@ def _covers(font_bytes: bytes, text: str) -> bool:
         from fontTools.ttLib import TTFont
         f = TTFont(io.BytesIO(font_bytes), lazy=True)
         cmap = f.getBestCmap()
+        # 原本就沒有的字碼不算「弄丟」—— 詳見呼叫端的說明。
+        base_cmap = None
+        if base_font is not None:
+            try:
+                base_font.seek(0)
+                base_cmap = TTFont(base_font, lazy=True).getBestCmap()
+            except Exception:  # noqa: BLE001 — 讀不到就退回舊行為（比較嚴格）
+                base_cmap = None
         missing = {ch for ch in text
-                   if ch.strip() and ord(ch) not in cmap}
+                   if ch.strip() and ord(ch) not in cmap
+                   and (base_cmap is None or ord(ch) in base_cmap)}
         if missing:
             logger.warning("字型子集化後缺少 %d 個字：%s",
                            len(missing), "".join(sorted(missing))[:20])
@@ -261,13 +277,38 @@ def _covers(font_bytes: bytes, text: str) -> bool:
     return _renders_ink(font_bytes, text)
 
 
+def _is_cjk(ch: str) -> bool:
+    """是不是漢字（含擴充區與相容區）。標點與注音不算 —— 要的是真的字形。"""
+    o = ord(ch)
+    return (0x3400 <= o <= 0x4DBF or 0x4E00 <= o <= 0x9FFF
+            or 0xF900 <= o <= 0xFAFF or 0x20000 <= o <= 0x2FA1F)
+
+
+def _ink_sample(text: str) -> str:
+    """挑幾個字給算圖保險用 —— **優先中文**。
+
+    抽成獨立函式是為了讓測試驗得到真的取樣邏輯：寫在 `_renders_ink` 裡面時，
+    測試只能在 spy 裡重算一次同樣的邏輯，那是在測自己寫的複本 —— 實測把
+    正式碼改回錯的版本，那種測試照樣全綠。
+    """
+    cjk = [ch for ch in text if _is_cjk(ch)]
+    return "".join(cjk[:4]) or "".join(ch for ch in text if ch.strip())[:4]
+
+
 def _renders_ink(font_bytes: bytes, text: str) -> bool:
     """把幾個字畫出來，看紙上是不是真的有東西。
 
-    只取樣前幾個非空白字元 —— 目的是抓「整份字型對不到字形」這種全有全無的
-    毀損，不是逐字校對（逐字算圖太慢，而這類毀損從來不會只壞一個字）。
+    只取樣幾個字 —— 目的是抓「整份字型對不到字形」這種全有全無的毀損，
+    不是逐字校對（逐字算圖太慢，而這類毀損從來不會只壞一個字）。
+
+    **一定要優先取中文字**。這道保險是為了抓 CID-keyed CFF 的字形錯位
+    （v1.14.19 慘案）而加的，而那種錯位**只影響 CJK，拉丁字母照畫**。
+    第一版寫成「取前幾個非空白字元」，但傳進來的是 `sorted()` 過的字元集合、
+    而 `_SUBSET_ALWAYS` 塞滿 ASCII → 取到的永遠是 `!"#%` 這幾個標點。
+    實測把 `retain_gids` 拿掉：中文墨水 0（正是那個故障），ASCII 墨水 427，
+    這道保險照樣回 True 把壞掉的字型放行 —— 它從來沒有畫過一個中文字。
     """
-    sample = "".join(ch for ch in text if ch.strip())[:4]
+    sample = _ink_sample(text)
     if not sample:
         return True
     try:

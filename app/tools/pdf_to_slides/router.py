@@ -1,4 +1,4 @@
-"""pdf-to-slides FastAPI router — PDF 轉簡報檔（.odp / .pptx）。
+"""pdf-to-slides FastAPI router — PDF 轉簡報（.odp / .pptx）。
 
 端點：
   POST /tools/pdf-to-slides/upload   — 上傳 PDF，回 upload_id

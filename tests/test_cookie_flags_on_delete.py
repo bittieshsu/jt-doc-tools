@@ -113,11 +113,27 @@ def test_no_delete_cookie_without_flags_in_source():
             if not (isinstance(fn, ast.Attribute) and fn.attr == "delete_cookie"):
                 continue
             kw = {k.arg for k in node.keywords}
-            if "httponly" not in kw:
-                bad.append(f"{f.relative_to(root.parent)}:{node.lineno}")
+            # **四個旗標都要檢**。第一版只檢 `httponly`，而這個檔案開頭寫的
+            # 是「HttpOnly / Secure / Path / SameSite 四項」—— 說明與實作不
+            # 一致，等於另外三項沒人守（v1.14.31 對抗式驗證：拿 5 個不安全
+            # 的寫法去餵，4 個直接放行）。
+            #
+            # 位置引數也要算進來：`delete_cookie(name, "/", None, True)` 是
+            # 合法的呼叫方式，只看 keywords 會漏掉。
+            missing = [need for need in ("httponly", "secure", "samesite", "path")
+                       if need not in kw]
+            # 位置引數的順序是 (key, path, domain, secure, httponly, samesite)
+            npos = len(node.args)
+            for i, name in enumerate(("key", "path", "domain", "secure",
+                                      "httponly", "samesite")):
+                if i < npos and name in missing:
+                    missing.remove(name)
+            if missing:
+                bad.append(f"{f.relative_to(root.parent)}:{node.lineno} "
+                           f"少了 {'、'.join(missing)}")
     assert not bad, (
-        "這些 delete_cookie 沒有帶 httponly（刪除回應不會沿用建立時的旗標）：\n"
-        + "\n".join(bad))
+        "這些 delete_cookie 少了旗標（刪除回應**不會**沿用建立時的旗標，"
+        "少一個就可能讓瀏覽器忽略整筆刪除）：\n" + "\n".join(bad))
 
 
 # ---------------------------------------------- 建立時的旗標（不只刪除）
@@ -144,10 +160,24 @@ def test_set_cookie_calls_all_pass_secure():
             fn = node.func
             if not (isinstance(fn, ast.Attribute) and fn.attr == "set_cookie"):
                 continue
-            if "secure" not in {k.arg for k in node.keywords}:
-                bad.append(f"{f.relative_to(root.parent)}:{node.lineno}")
+            kw = {k.arg: k.value for k in node.keywords}
+            problems = []
+            # **`httponly` 一樣要檢**：少了它 JS 讀得到 session token，
+            # 比少 `secure` 更直接。第一版只檢 `secure`。
+            for need in ("secure", "httponly"):
+                if need not in kw and len(node.args) < 3:
+                    problems.append(f"沒傳 {need}")
+            # **寫死 `False` 不算「有傳」**。第一版只看有沒有這個關鍵字，
+            # 於是 `secure=False` 照樣過關 —— 那正好是要防的東西。
+            for need in ("secure", "httponly"):
+                v = kw.get(need)
+                if isinstance(v, ast.Constant) and v.value is False:
+                    problems.append(f"{need} 寫死 False")
+            if problems:
+                bad.append(f"{f.relative_to(root.parent)}:{node.lineno} "
+                           f"（{'、'.join(problems)}）")
     assert not bad, (
-        "這些 set_cookie 沒有傳 secure（HTTPS 下會經明文送出）：\n" + "\n".join(bad))
+        "這些 set_cookie 的旗標有問題：\n" + "\n".join(bad))
 
 
 def test_https_detection_handles_proxy_chain():

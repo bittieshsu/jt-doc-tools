@@ -74,7 +74,7 @@ const CATS = [
     desc:'可連結到外部網站。若敏感文件，建議視情況清除。',
     list:(f)=>f.uri_links.map(x=>`p.${x.page} → ${esc(x.uri)}`) },
   { key:'launch',      strip:'launch',      title:'啟動外部程式 (Launch)',   severity:'alert',
-    desc:'點擊會啟動外部檔案或程式。幾乎都是可疑內容，請清除。',
+    desc:'點選會啟動外部檔案或程式。幾乎都是可疑內容，請清除。',
     list:(f)=>f.launch_actions.map(x=>`p.${x.page} → ${esc(x.target)}`) },
   { key:'hidden_text', strip:'hidden_text', title:'隱藏文字',                severity:'warn',
     desc:'白底白字 / 字級 0 / 頁面外文字 — 通常是沒清乾淨的草稿，可能夾帶敏感資料。',

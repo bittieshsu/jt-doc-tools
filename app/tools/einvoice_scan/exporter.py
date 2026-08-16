@@ -80,7 +80,10 @@ def export_csv(invoices: list[dict], columns: list[str],
                export_labels: Optional[dict] = None) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator="\n")
-    writer.writerow([_label(c, export_labels) for c in columns])
+    # 欄位標題也要中和 —— `export_labels` 是**每位使用者自己可以設定**的
+    # （`PUT /settings` 走 `_request_user`，不是管理員專屬）。使用者把公式
+    # 塞進欄位標題、匯出 CSV 寄給會計，就在對方的 Excel 裡執行了。
+    writer.writerow(_csv_safe.row([_label(c, export_labels) for c in columns]))
     for i, inv in enumerate(invoices):
         # 欄位值來自**收到的發票 PDF** —— 外部來源，必須中和（core/csv_safe）
         writer.writerow(_csv_safe.row(

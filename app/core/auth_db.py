@@ -422,7 +422,7 @@ def _m12_unprovision_mirrored_users(conn: sqlite3.Connection) -> None:
 
 
 def _m13_grant_pdf_to_slides(conn: sqlite3.Connection) -> None:
-    """v13：把 `pdf-to-slides`（PDF 轉簡報檔，v1.14.0 新增）補給既有角色。
+    """v13：把 `pdf-to-slides`（PDF 轉簡報，v1.14.0 新增）補給既有角色。
 
     為什麼需要這條 migration —— `seed_builtin_roles()` 平常會自動補「這一版新增
     的工具」，但那個機制要有 `role_seed_snapshot` 當基準線才會動。**從
@@ -616,6 +616,28 @@ def _m21_grant_page_size(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _m22_grant_office_convert(conn: sqlite3.Connection) -> None:
+    """v22：把 `office-convert`（辦公文件格式互轉，v1.14.34 新增）補給既有角色。
+
+    理由同 `_m18`~`_m21`（seed 快照的 bootstrap 缺口）—— 從舊版升級上來的
+    安裝，角色早就存在，`seed_builtin_roles()` 的差集 top-up 以快照為基準，
+    新工具不會自己長出來。
+
+    拿 `office-to-pdf`（辦公文件轉 PDF）當訊號：兩者收的檔案完全一樣、
+    都要 office 引擎，能轉 PDF 的人轉別的辦公格式沒有額外風險。
+    **不可以無條件補給所有角色** —— 那會把刻意收窄過的角色（legal-sec 等）
+    一起放寬。
+    """
+    conn.executescript("""
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'office-convert' FROM role_perms
+        WHERE tool_id = 'office-to-pdf';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'office-convert'
+        FROM subject_perms WHERE tool_id = 'office-to-pdf';
+    """)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -633,7 +655,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m16_session_last_seen, _m17_directory_account_state,
               _m18_grant_transit_proof_and_border,
               _m19_grant_pdf_bookmark, _m20_grant_seam_stamp,
-              _m21_grant_page_size]
+              _m21_grant_page_size,
+              _m22_grant_office_convert]
 
 
 def auth_db_path() -> Path:

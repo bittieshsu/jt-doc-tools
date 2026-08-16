@@ -186,13 +186,24 @@ def _audit_oldest_days() -> float | None:
 
 # ---------- sweepers ----------
 
-def _sweep_temp_dir(seconds: int) -> int:
-    if seconds <= 0:
-        return 0
+def _sweep_temp_dir(temp_seconds: int, jobs_seconds: int) -> int:
+    """清掉過期的暫存檔與作業結果檔。
+
+    **兩個目錄要用各自的保留期**。第一版只收一個秒數、對 `temp` 與 `jobs`
+    用同一個 cutoff，而傳進來的是 `temp_hours` —— 於是 `jobs_hours`
+    **整個設定從來沒有被任何程式讀過**（v1.14.31 對抗式驗證：設
+    `temp_hours=1、jobs_hours=48`，47 小時前的作業結果照樣被刪）。
+
+    後果是使用者與管理員看到的保留期是假的：管理頁顯示「作業結果檔 24 小時」、
+    「我的作業」也顯示 24 小時，實際 2 小時就清掉了。這正是「壞掉了很難發現」
+    的典型 —— 沒有錯誤訊息，只有使用者回頭找不到自己的檔案。
+    """
     from ..config import settings as _s
-    cutoff = time.time() - seconds
     n = 0
-    for sub in ("temp", "jobs"):
+    for sub, seconds in (("temp", temp_seconds), ("jobs", jobs_seconds)):
+        if seconds <= 0:            # 0 或負數 = 永久保留
+            continue
+        cutoff = time.time() - seconds
         d = _s.data_dir / sub
         if not d.exists():
             continue
@@ -274,8 +285,9 @@ def sweep_all() -> dict[str, Any]:
     report["watermark"] = history_manager.watermark_history.sweep_older_than(
         s["watermark_history_days"] * 86400 if s["watermark_history_days"] > 0 else 0)
     # temp_hours is in HOURS not days
-    report["temp"] = _sweep_temp_dir(s["temp_hours"] * 3600
-                                     if s["temp_hours"] > 0 else 0)
+    report["temp"] = _sweep_temp_dir(
+        s["temp_hours"] * 3600 if s["temp_hours"] > 0 else 0,
+        s["jobs_hours"] * 3600 if s["jobs_hours"] > 0 else 0)
     # Workspace has its own settings file (data/workspace.json); retention is
     # in hours, -1 = keep forever.
     try:

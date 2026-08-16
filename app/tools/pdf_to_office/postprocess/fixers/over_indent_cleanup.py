@@ -2,7 +2,7 @@
 
 pdf2docx 對某些 PDF 段落會錯算 indent，在標題（jc=center）+ 短段落同時加上
 左右各 3000+ twips 的 ind，造成標題可用寬度被砸到剩 100pt 以內 → 中文標題
-被迫折行 / 斷字（user 反映「鼎原科技股份有 / 限公司」這類）。
+被迫折行 / 斷字（使用者回報：公司全名被斷成「…股份有 / 限公司」這類）。
 
 策略：
 - 取 sectPr 的 pgSz + pgMar 算 content_width

@@ -18,10 +18,42 @@
 """
 from __future__ import annotations
 
+import re as _re
+
 import logging
 from typing import Any
 
 logger = logging.getLogger("app.job_notify")
+
+
+#: 例外訊息裡常見的絕對路徑（POSIX 與 Windows）。
+_ABS_PATH = _re.compile(r"(?:[A-Za-z]:)?[\\/](?:[^\s'\"\\/]+[\\/])+[^\s'\"]*")
+
+
+def _safe_reason(err) -> str:
+    """把失敗原因整理成可以送到外部服務的樣子。
+
+    通知會送到 Slack / Telegram / Discord 這些**外部**服務，而 `job.error`
+    是任意例外的 `str(e)` —— PyMuPDF 的訊息長這樣：
+
+        Failed to open file '/tmp/jtdt/temp/機密_王小明_薪資.pdf'.
+
+    也就是**伺服器的絕對路徑**會一起送出去（v1.14.31 對抗式驗證實測）。
+    這個模組開頭寫的是「訊息不含檔案內容，只有工具名、檔名、狀態、耗時與
+    取件連結」—— 檔名是刻意放的，路徑不在那份清單裡。
+
+    只把路徑換成檔名（使用者需要知道是哪一個檔），其餘照舊。
+    """
+    def _leaf(m) -> str:
+        # **不可以用 `os.path.basename`** —— 在 Linux 上它不把 `\` 當分隔符，
+        # Windows 的路徑會原封不動留下來（伺服器也可能是 Windows）。
+        raw = m.group(0)
+        for sep in ("\\", "/"):
+            raw = raw.rsplit(sep, 1)[-1]
+        return raw or "檔案"
+
+    s = str(err or "")[:300]
+    return _ABS_PATH.sub(_leaf, s)
 
 
 def _fmt_elapsed(sec: float) -> str:
@@ -56,7 +88,7 @@ def build_message(job: Any) -> tuple[str, str]:
     lines.append(f"狀態：{'已完成' if ok else '失敗'}")
     lines.append(f"耗時：{_fmt_elapsed(job.elapsed())}")
     if not ok and job.error:
-        lines.append(f"原因：{str(job.error)[:300]}")
+        lines.append(f"原因：{_safe_reason(job.error)}")
     ws = (job.meta or {}).get("workspace") or {}
     if ok:
         if ws.get("saved"):

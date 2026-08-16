@@ -190,6 +190,26 @@ def _root() -> Path:
     return settings.data_dir / "workspace"
 
 
+def purge_user(user_id: int) -> int:
+    """刪掉某位使用者工作區裡的全部檔案，回傳刪了幾個。
+
+    帳號被刪除時要一起清 —— 第一版的 `user_manager.delete()` 只清資料庫，
+    `data/workspace/u<id>/` 原封不動留在磁碟上（v1.14.31 對抗式驗證實測：
+    刪掉帳號後檔案還在，管理區的用量統計也照樣列出那個人）。保留期設成
+    「永久保留」時就是**永久**留著離職者的檔案。
+
+    這件事跟交接直接相關：交接每按一次就自動存一份到工作區，使用者不見得
+    知道有留底。
+    """
+    d = _root() / f"u{int(user_id)}"
+    if not d.exists():
+        return 0
+    n = sum(1 for x in d.iterdir() if x.is_dir())
+    import shutil
+    shutil.rmtree(d, ignore_errors=True)
+    return n
+
+
 def _user_dir(request: Request, create: bool = False) -> Path:
     d = _root() / user_key(request)
     if create:
@@ -238,7 +258,7 @@ def detect_kind(data: bytes) -> Optional[tuple[str, str]]:
     renamed .zip can't slip in claiming to be a document.
 
     簡報（.pptx / .odp）與試算表（.xlsx / .ods）是 v1.14.6 補上的：本站的
-    「PDF 轉簡報檔」產出的就是這些格式，原本工作區收不下 —— 使用者按「存至
+    「PDF 轉簡報」產出的就是這些格式，原本工作區收不下 —— 使用者按「存至
     工作區」只會拿到「不支援的檔案類型」，而那正是他最需要留存的產出。
     """
     if data[:4] == b"%PDF":

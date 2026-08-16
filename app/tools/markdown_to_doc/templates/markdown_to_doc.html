@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}Markdown 轉文書 · {{ app_name }}{% endblock %}
+{% block title %}Markdown 轉辦公文件 · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .md2-textarea {
@@ -139,7 +139,7 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('file-text', size=22) }} Markdown 轉文書</h1>
+<h1>{{ icon('file-text', size=22) }} Markdown 轉辦公文件</h1>
 <p class="muted">把 Markdown 內容套上主題樣式，輸出可下載的 <b>PDF / Word (DOCX) / OpenDocument (ODT)</b>。所有頁面自動產生預覽，下載前先看效果。</p>
 
 <div class="panel">

@@ -56,7 +56,7 @@ def test_saves_result_into_workspace(tmp_path, _data_dir):
 
 
 def test_pptx_is_accepted(tmp_path, _data_dir):
-    """**這是整件事的前提**：「PDF 轉簡報檔」產出的就是 .pptx，
+    """**這是整件事的前提**：「PDF 轉簡報」產出的就是 .pptx，
     工作區原本收不下 —— 自動存入對它會永遠失敗。"""
     res = job_autosave.on_job_finished(_job(tmp_path, "季報.pptx"))
     assert res["saved"] is True

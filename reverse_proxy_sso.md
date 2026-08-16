@@ -141,7 +141,7 @@ server {
         auth_gss_allow_basic_fallback off;
 
         # ---- 關鍵資安：一律「覆寫」帳號標頭 ----
-        # $remote_user 由上面的 auth_gss 設定；先清掉任何客戶端自帶的同名標頭，
+        # $remote_user 由上面的 auth_gss 設定；先清掉任何客戶端自己帶的同名標頭，
         # 再設成 Kerberos 驗到的帳號。少了這行，攻擊者可自送 X-Remote-User 偽造身分。
         proxy_set_header X-Remote-User $remote_user;
 
@@ -204,7 +204,7 @@ server {
    清單內的請求。**絕不看 `X-Forwarded-For`**（可偽造）。預設只信任 `127.0.0.1` / `::1`。
 2. **app 只綁 127.0.0.1**：讓只有本機 Nginx 連得到 app。外部無法直接對 `:8765` 送標頭。
    （`jtdt bind 127.0.0.1 8765`）
-3. **Nginx 一律覆寫標頭**：`proxy_set_header X-Remote-User $remote_user;` 會蓋掉客戶端自帶的
+3. **Nginx 一律覆寫標頭**：`proxy_set_header X-Remote-User $remote_user;` 會蓋掉客戶端自己帶的
    同名標頭，確保只有 Kerberos 驗到的帳號會傳進 app。
 
 任何「帶標頭但來源不可信」的請求都會被拒絕登入並寫入稽核，方便事後追查。

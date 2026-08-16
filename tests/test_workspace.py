@@ -191,7 +191,7 @@ def test_settings_roundtrip(wsenv):
 
 
 # ---------------- v1.14.6：簡報 / 試算表格式 ----------------
-# 「PDF 轉簡報檔」產出的就是 .pptx / .odp，原本工作區收不下 —— 使用者按「存至
+# 「PDF 轉簡報」產出的就是 .pptx / .odp，原本工作區收不下 —— 使用者按「存至
 # 工作區」只會拿到「不支援的檔案類型」，而那正是他最需要留存的產出。
 
 def _zip_bytes(entries: dict, mimetype: str = "") -> bytes:
@@ -258,3 +258,51 @@ def test_office_formats_have_no_thumbnail_but_do_not_crash():
     不可讓整個列表壞掉。"""
     from app.core.workspace import WorkspaceError
     assert issubclass(WorkspaceError, Exception)
+
+
+def test_deleting_a_user_removes_their_workspace_files(tmp_path, monkeypatch):
+    """刪帳號要一起清磁碟上的檔案。
+
+    第一版的 `user_manager.delete()` 只清資料庫，`data/workspace/u<id>/`
+    原封不動留著 —— 保留期設成「永久保留」時那就是**永久**留著離職者的檔案，
+    管理區的用量統計還會繼續列出一個已經不存在的帳號（v1.14.31 對抗式驗證）。
+
+    這件事跟工具交接直接相關：交接每按一次就自動存一份，使用者不見得知道
+    有留底。
+    """
+    from app.config import settings
+    from app.core import workspace
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    (tmp_path / "workspace" / "u99" / "abc").mkdir(parents=True)
+    (tmp_path / "workspace" / "u99" / "abc" / "file.pdf").write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "workspace" / "u98" / "xyz").mkdir(parents=True)
+    (tmp_path / "workspace" / "u98" / "xyz" / "other.pdf").write_bytes(b"%PDF-1.4\n")
+
+    assert workspace.purge_user(99) == 1
+    assert not (tmp_path / "workspace" / "u99").exists()
+    # **只能刪那一個人的** —— 別人的檔案不可以受影響
+    assert (tmp_path / "workspace" / "u98" / "xyz" / "other.pdf").exists()
+
+    # 沒有工作區目錄的使用者不可以出錯
+    assert workspace.purge_user(12345) == 0
+
+
+def test_user_delete_actually_calls_workspace_purge(monkeypatch):
+    """整合層：`user_manager.delete()` 要**真的**去清工作區。
+
+    只測 `workspace.purge_user()` 本身不夠 —— 把 `delete()` 裡那兩行拿掉之後
+    那個單元測試照樣全綠（實測變異驗證沒抓到，這一輪第五個同類型的空殼）。
+    """
+    from app.core import auth_db, roles, user_manager, workspace
+
+    auth_db.init()
+    roles.seed_builtin_roles()
+    uid = user_manager.create_local("purge-probe", "測試", "Aa!23456789")
+
+    called = []
+    monkeypatch.setattr(workspace, "purge_user", lambda i: called.append(i) or 0)
+    user_manager.delete(uid)
+    assert called == [uid], (
+        "刪帳號沒有去清工作區 —— 離職者的檔案會永久留在磁碟上，"
+        "管理區的用量統計也會繼續列出那個帳號")

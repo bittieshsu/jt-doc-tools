@@ -8,7 +8,7 @@ from .router import router
 metadata = ToolMetadata(
     id="pdf-extract-text",
     name="擷取文字",
-    description="擷取 PDF 文字，輸出 TXT / Markdown / Word / ODT，可選 LLM 重排段落。",
+    description="擷取 PDF 文字，輸出 TXT / Markdown / 文書檔（.docx / .odt），可選 LLM 重排段落。",
     icon="paragraph",
     category="內容處理",
 )

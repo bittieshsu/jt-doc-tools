@@ -31,6 +31,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from ...config import settings
 from ...core import office_convert, pdf_preview, upload_owner as _uo
 from ...core.job_manager import job_manager
+from ...core.pdf_guard import ensure_readable_pdf
 from ...core.safe_paths import require_uuid_hex
 from . import bookmark_core as BC
 
@@ -79,10 +80,19 @@ def _items_from_json(raw: str) -> list[BC.BookmarkItem]:
     for d in data[:2000]:               # 上限：兩千筆已經遠超實用範圍
         if not isinstance(d, dict):
             continue
+        # **`int()` 一定要包起來**。上面只擋了「不是合法 JSON」與「不是陣列」，
+        # 但 `page` 的值是使用者可控的：`"abc"` / `1e400` / `[1]` / 5000 位的
+        # 數字字串各自會丟 ValueError / OverflowError / TypeError，一路冒到
+        # 最外層變成 500（v1.14.31 對抗式驗證：5 種畸形值 × 3 個端點全中）。
+        # 轉不動就跳過那一筆，不要讓整個請求爆掉。
+        try:
+            page = int(d.get("page") or 1)
+            level = int(d.get("level") or 1)
+        except (ValueError, TypeError, OverflowError):
+            continue
         out.append(BC.BookmarkItem(
             title=str(d.get("title") or "")[:300],
-            page=int(d.get("page") or 1),
-            level=int(d.get("level") or 1)))
+            page=page, level=level))
     return out
 
 
@@ -122,9 +132,8 @@ async def load(request: Request, files: list[UploadFile] = File(...)):
         if not data:
             raise HTTPException(400, "檔案是空的")
         _to_pdf(data, files[0].filename or "", dst)
+        ensure_readable_pdf(dst)
         with fitz.open(str(dst)) as doc:
-            if not doc.page_count:
-                raise HTTPException(400, "這份文件沒有任何頁面")
             items = BC.read_bookmarks(doc)
             return _payload(upload_id, doc, items, [])
 
@@ -166,8 +175,11 @@ async def thumb(upload_id: str, page_no: int, request: Request,
     suffix = "_large" if large else ""
     out = settings.temp_dir / f"{_PREFIX}_{upload_id}_t{suffix}_{page_no}.png"
     if not out.exists():
-        pdf_preview.render_page_png(src, out, page_no - 1,
-                                    dpi=150 if large else 70)
+        try:
+            pdf_preview.render_page_png(src, out, page_no - 1,
+                                        dpi=150 if large else 70)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
     return FileResponse(str(out), media_type="image/png",
                         headers={"Cache-Control": "max-age=300"})
 
@@ -356,6 +368,9 @@ async def api(request: Request,
     try:
         if len(files) == 1:
             _to_pdf(await files[0].read(), files[0].filename or "", src)
+            # **公開 API 也要驗**：網頁的 `/load` 修好之後這條路仍然全數 500
+            # —— 它是另一段程式碼（v1.14.31 對抗式驗證實測 3 支 × 3 種輸入）。
+            ensure_readable_pdf(src)
             items: list[BC.BookmarkItem] = []
         else:
             sources = []

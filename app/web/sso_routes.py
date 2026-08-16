@@ -67,8 +67,9 @@ def _public_base(request: Request) -> str:
     b = sso_settings.base_url()
     if b:
         return b
-    scheme = request.headers.get("X-Forwarded-Proto", "").lower() or request.url.scheme
-    host = request.headers.get("X-Forwarded-Host") or request.url.netloc
+    from ..core.client_ip import forwarded_host, forwarded_scheme
+    scheme = forwarded_scheme(request)
+    host = forwarded_host(request)
     return f"{scheme}://{host}"
 
 

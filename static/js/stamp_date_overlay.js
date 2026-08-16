@@ -29,13 +29,25 @@
       this.el.style.zIndex = '5';
       this.el.style.border = '2px dashed ' + this.borderColor;
       this.el.style.background = this.bgColor;
-      this.el.innerHTML =
-        '<img alt="date" style="width:100%; height:100%; pointer-events:none;">'
-        + '<div class="dpe-handle nw" data-h="nw"></div>'
-        + '<div class="dpe-handle ne" data-h="ne"></div>'
-        + '<div class="dpe-handle sw" data-h="sw"></div>'
-        + '<div class="dpe-handle se" data-h="se"></div>';
-      this.$img = this.el.querySelector('img');
+      // **不可以用字串拼 `style="…"`**：CSP 的 style-src 已移除
+      // 'unsafe-inline'，那個屬性會被瀏覽器丟掉（字串留在 HTML 裡，但
+      // `el.style.length === 0`）。這裡目前剛好被 `.dpe-asset img` 的 CSS
+      // 規則補回來所以畫面沒壞，但每次掛載都在 console 留一筆 CSP 違規，
+      // 而且下一個人照抄就不一定有那條 CSS 兜著。改用 DOM API。
+      this.el.textContent = '';
+      const img = document.createElement('img');
+      img.alt = 'date';
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.pointerEvents = 'none';
+      this.el.appendChild(img);
+      ['nw', 'ne', 'sw', 'se'].forEach(h => {
+        const g = document.createElement('div');
+        g.className = 'dpe-handle ' + h;
+        g.dataset.h = h;
+        this.el.appendChild(g);
+      });
+      this.$img = img;
       this.$img.src = this.png_src;
       paperEl.appendChild(this.el);
       this._bindDrag();

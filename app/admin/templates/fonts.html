@@ -40,11 +40,11 @@
           {{ g.title }} <span class="muted" data-s="s0c27a7ee">({{ g.fonts|length }})</span>
         </span>
         <span class="fnt-group-actions" data-stop-prop data-prevent-default>
-          <button type="button" class="btn btn-sm fnt-bulk-show" data-ids='{{ group_ids|tojson }}'
+          <button type="button" class="btn btn-small fnt-bulk-show" data-ids='{{ group_ids|tojson }}'
                   title="這個分類全部設為顯示">
             {{ icon('eye', size=13) }} 全部顯示
           </button>
-          <button type="button" class="btn btn-sm fnt-bulk-hide" data-ids='{{ group_ids|tojson }}'
+          <button type="button" class="btn btn-small fnt-bulk-hide" data-ids='{{ group_ids|tojson }}'
                   title="這個分類全部設為隱藏">
             {{ icon('eye-off', size=13) }} 全部隱藏
           </button>
@@ -76,13 +76,13 @@
             {{ f.get('path') or f.id }}
           </td>
           <td data-s="s1cb2fec9">
-            <button type="button" class="btn btn-sm toggle-hidden-font" data-id="{{ f.id }}"
+            <button type="button" class="btn btn-small toggle-hidden-font" data-id="{{ f.id }}"
                     data-s="s002c9579"
                     title="{% if f.hidden %}取消隱藏，讓工具的字型選單再次顯示這個字型{% else %}隱藏這個字型，工具的字型選單就不會出現它{% endif %}">
               {% if f.hidden %}{{ icon('eye', size=12) }} 顯示{% else %}{{ icon('eye-off', size=12) }} 隱藏{% endif %}
             </button>
             {% if f.category == 'custom' %}
-              <button type="button" class="btn btn-danger btn-sm del-custom-font" data-id="{{ f.id }}"
+              <button type="button" class="btn btn-danger btn-small del-custom-font" data-id="{{ f.id }}"
                       data-s="s002c9579">{{ icon('trash', size=11) }} 刪除</button>
             {% endif %}
           </td>

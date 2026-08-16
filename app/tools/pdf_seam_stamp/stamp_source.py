@@ -36,21 +36,47 @@ def load_asset(asset_id: str) -> bytes:
     return path.read_bytes()
 
 
+#: 印章圖的處理上限。章蓋出來最大也就幾公分，2000 px 已經遠超過 300dpi 所需，
+#: 再大只是讓伺服器多做白工。
+_MAX_STAMP_PX = 2000
+
+#: 解壓後的像素上限。PIL 預設的 178M 只會發**警告**不會擋，程式照跑。
+_MAX_DECODED_PIXELS = 40_000_000
+
+
 def normalize_upload(data: bytes) -> bytes:
     """上傳的圖統一成 RGBA PNG。
 
     **白底要去掉** —— 使用者常常是拍照或掃描的章，帶著白底貼上去會蓋掉內文。
     這裡只做保守的處理：接近純白的像素轉成透明。
+
+    **兩件事必須擋住，否則一個小檔案就能把整台伺服器停掉**（v1.14.31 對抗式
+    驗證實測）：第一版用純 Python 逐像素迴圈又沒有尺寸上限，一張 116 KB 的
+    6000×6000 全白 PNG 要跑 **27 秒**，而端點是 `async def` —— 這 27 秒卡在
+    事件迴圈執行緒上，期間**全站**每個請求都在等（實測 `/healthz` 從 74 ms
+    變成 19.6 秒）。壓縮率讓成本極度不對稱：上傳成本 116 KB，伺服器成本 27 秒，
+    反覆送幾個就是零成本的服務阻斷。
+
+    所以：①先擋掉解析度離譜的 ②縮到 `_MAX_STAMP_PX`（章不需要更大）
+    ③白底判定改用 numpy 向量運算，不逐像素跑 Python 迴圈。
     """
-    img = Image.open(io.BytesIO(data)).convert("RGBA")
-    px = img.getdata()
-    out = []
-    for r, g, b, a in px:
-        # 只吃「很白」的（>= 240），淺灰的印泥不能碰
-        out.append((r, g, b, 0) if (r >= 240 and g >= 240 and b >= 240) else (r, g, b, a))
-    img.putdata(out)
+    img = Image.open(io.BytesIO(data))
+    w, h = img.size
+    if w * h > _MAX_DECODED_PIXELS:
+        raise ValueError("印章圖的解析度太高")
+    img = img.convert("RGBA")
+    if max(img.size) > _MAX_STAMP_PX:
+        img.thumbnail((_MAX_STAMP_PX, _MAX_STAMP_PX), Image.LANCZOS)
+
+    import numpy as np
+
+    arr = np.array(img)
+    # 只吃「很白」的（>= 240），淺灰的印泥不能碰
+    white = ((arr[:, :, 0] >= 240) & (arr[:, :, 1] >= 240)
+             & (arr[:, :, 2] >= 240))
+    arr[:, :, 3] = np.where(white, 0, arr[:, :, 3])
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    Image.fromarray(arr, "RGBA").save(buf, format="PNG")
     return buf.getvalue()
 
 

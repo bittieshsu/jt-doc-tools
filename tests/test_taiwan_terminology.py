@@ -65,11 +65,54 @@ BANNED = {
     "圖像": "圖片 / 影像",
     "視頻": "影片",
     "一站式": "整合式 / 全方位",
+    # ---- 2026-08-15 使用者逐一指出（安裝說明「雙擊安裝程式（推薦）」）----
+    # 「按兩下」是微軟繁中與 Adobe 繁中的正式譯法；「雙擊」是中國用語。
+    "雙擊": "按兩下",
+    # 選項標「推薦」是中國用語；台灣正式文件用「建議」。
+    # （「推薦某人 / 某產品」仍然可以用推薦，所以這條只掃使用者看得到的文案。）
+    "推薦": "建議",
+    # 「點擊」偏中國；台灣用「點選」或「按一下」。
+    "點擊": "點選 / 按一下",
+    # 「高亮」是中國用語；台灣用「標示」或「醒目提示」。
+    "高亮": "標示 / 醒目提示",
+    "內核": "核心",
+    "端口": "連接埠",
+    "緩存": "快取",
+    "隊列": "佇列",
+    "調試": "除錯",
+    "分辨率": "解析度",
+    # **刻意不收的詞**（字面撞到，但台灣有完全正確的用法，收了只會製造誤報）：
+    #   * 代碼 —— 「銀行代碼」「機關代碼」是正確的（中國用語是把 source code
+    #     叫代碼，台灣叫程式碼；那個要靠人看，字串比對分不出來）
+    #   * 倉庫 —— 「倉庫租賃」是行業分類
+    #   * 鏡像 —— 「左右鏡像」是影像翻轉，跟磁碟映像是兩回事
+    "郵箱": "信箱",
+    "短信": "簡訊",
 }
+
+#: 這些詞在台灣有**完全正確的用法**，只是字面上撞到上面的禁用詞。
+#: 掃描時整段跳過 —— 誤報一多這份檢查就會被當成雜訊忽略，那比漏掉更糟。
+#:
+#: 實際踩過的例子（2026-08-15 全面掃描時）：
+#:   * 「用戶端」是 client 的正確譯法，但含「用戶」
+#:   * 「撤銷 token」的撤銷 = revoke，正確；跟「復原」(undo) 是兩回事
+#:   * 「SSL 在代理卸載」的卸載 = offload，正確
+#:   * 「登錄機碼」是 Windows Registry 的正確譯法
+#:   * 「已登錄資產」的登錄 = register，正確
+#:   * 「會通過的底線」的通過 = pass，正確
+#:   * 「DB 內存 sha256」是「DB 內」+「存」，不是「內存」
+SAFE_PHRASES = (
+    "用戶端", "撤銷", "卸載", "登錄機碼", "登錄檔", "已登錄", "登錄資產",
+    "通過測試", "會通過", "通過的", "內存 sha256", "內存放",
+)
 
 #: 這些檔案**必須**寫出禁用詞才能發揮作用，掃了只會誤報。
 EXEMPT_PARTS = (
     "tests/test_taiwan_terminology.py",
+    # CHANGELOG 是**已發佈的歷史紀錄**，裡面還記著「我們檢查過哪些中國用語」
+    # （是談論那個詞，不是使用）。整份掃只會製造大量誤報；新條目的用詞由
+    # 下面那個專門的 CHANGELOG 檢查負責。
+    "github/CHANGELOG.md",
     "TEST_PLAN.md",                       # 用詞檢查項本身就在列這些詞
     "app/tools/translate_doc/router.py",  # 翻譯對照表（陸→台）
     "CLAUDE.md",                          # 專案筆記裡的用詞規則
@@ -77,8 +120,18 @@ EXEMPT_PARTS = (
 
 
 def _files() -> list[pathlib.Path]:
+    """要掃的檔案。
+
+    **一定要包含 `github/` 底下的文件**。第一版只掃 `app/` 與 `static/js/`，
+    於是安裝說明裡的「方式一：雙擊安裝程式（推薦）」躲了很久 —— 那是使用者
+    第一眼看到的文字，比程式裡的任何字串都顯眼，卻剛好在掃描範圍外
+    （2026-08-15 使用者自己讀 .md 時發現的）。
+
+    介紹站的 `docs/index.html` 同理，那是對外的門面。
+    """
     out: list[pathlib.Path] = []
-    for pat in ("app/**/*.html", "app/**/*.py", "static/js/*.js"):
+    for pat in ("app/**/*.html", "app/**/*.py", "static/js/*.js",
+                "github/*.md", "github/docs/*.html"):
         out += list(ROOT.glob(pat))
     return [p for p in out
             if not any(part in str(p.relative_to(ROOT)) for part in EXEMPT_PARTS)]
@@ -172,10 +225,18 @@ def _offences(text: str, path: str, suffix: str = "") -> list[str]:
     return bad
 
 
-@pytest.mark.parametrize("kind", ["templates", "python", "js"])
+@pytest.mark.parametrize("kind", ["templates", "python", "js", "docs"])
 def test_no_mainland_terms_in_source(kind):
-    """樣板 / Python 訊息 / 前端 JS 裡的中文一律台灣用詞。"""
-    suffix = {"templates": ".html", "python": ".py", "js": ".js"}[kind]
+    """樣板 / Python 訊息 / 前端 JS / **公開文件**裡的中文一律台灣用詞。
+
+    **`docs`（`github/*.md`）這一類一定要在**。第一版只有前三類，於是
+    安裝說明裡的「方式一：雙擊安裝程式（推薦）」躲了很久 —— 那是使用者
+    第一眼看到的文字。把 `.md` 加進檔案清單還不夠：這裡的 `suffix` 對照表
+    沒有 `.md`，檔案會在下面那個 `continue` 被靜靜濾掉，測試照樣全綠
+    （2026-08-15 變異驗證當場發現）。
+    """
+    suffix = {"templates": ".html", "python": ".py", "js": ".js",
+              "docs": ".md"}[kind]
     bad: list[str] = []
     for p in _files():
         if p.suffix != suffix:
@@ -198,8 +259,10 @@ def _drop_mentions(text: str) -> str:
     """
     # 「A → B」的箭頭映射：連同前面那個詞一起拿掉
     text = re.sub(r"[^\s，。；、）】」]+\s*(?:→|->)\s*", " ", text)
-    # 引號內的詞：在談那個詞本身
-    text = re.sub(r"[「『][^」』]{1,12}[」』]", " ", text)
+    # 引號內的詞：在談那個詞本身。上限放到 24 字 —— 引用整句原文當反例
+    # （「方式一：雙擊安裝程式（推薦）」有 14 字）也是 mention；
+    # 真正的誤用發生在行文裡，不會躲在引號中。
+    text = re.sub(r"[「『][^」』]{1,24}[」』]", " ", text)
     return text
 
 

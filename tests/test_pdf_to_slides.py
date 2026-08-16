@@ -1,4 +1,4 @@
-"""pdf-to-slides（PDF 轉簡報檔）測試。
+"""pdf-to-slides（PDF 轉簡報）測試。
 
 重點在「產出必須是**合法的 Impress 檔**」——這條路最容易壞的地方不是版面，而是
 ODF 封裝細節（mimetype / manifest / master page），而 soffice 對這類問題只回一句

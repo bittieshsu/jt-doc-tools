@@ -12,7 +12,7 @@
   <h2>1. 上傳檔案</h2>
   {% with upload_id='psUpload',
           accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
-          hint='PDF 或文書檔。上傳後會先告訴你這份文件有幾種尺寸。' %}
+          hint='PDF 或辦公文件。上傳後會先告訴你這份文件有幾種尺寸。' %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div id="psSizes" hidden></div>
@@ -35,7 +35,7 @@
         </span></label>
       <label class="af-field"><span class="af-label">方向</span>
         <span class="af-ctl"><select class="field" id="psOrient">
-          <option value="auto" selected>跟著原頁（推薦）</option>
+          <option value="auto" selected>跟著原頁（建議）</option>
           <option value="portrait">一律直向</option>
           <option value="landscape">一律橫向</option>
         </select></span>

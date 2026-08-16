@@ -33,6 +33,55 @@ class FillReport:
     expanded_refs: list[dict] = field(default_factory=list)
 
 
+def _clamp_before_next_label(slot, d, detected):
+    """把退路的右緣夾到「同一列下一個標籤」的左邊。
+
+    退路是「從 anchor 往右畫 240pt」，那個寬度是憑空給的，很容易一路蓋過
+    右邊印好的標籤。與其整個放棄，先試著**縮到它前面** —— 多數情況那段空白
+    本來就是這一欄該填的地方（實測這樣救回幾個原本會被退掉的填入）。
+
+    縮完太窄（放不下任何字）就回 None，由呼叫端留白。
+    """
+    sx0, sy0, sx1, sy1 = slot
+    for other in detected:
+        if other is d or other.page != d.page:
+            continue
+        bx0, by0, bx1, by1 = other.label_rect
+        if min(sy1, by1) - max(sy0, by0) <= 1:      # 不同列
+            continue
+        if bx0 <= sx0:                              # 在左邊，不是障礙
+            continue
+        sx1 = min(sx1, bx0 - 2)
+    if sx1 - sx0 < 40:
+        return None
+    return (sx0, sy0, sx1, sy1)
+
+
+def _overlaps_printed_text(slot, d, detected) -> bool:
+    """這個位置會不會壓到同一頁上**印好的標籤**。
+
+    只看標籤（`label_rect`）：那是紙上原本就有的字，蓋掉就是兩串字糊在一起。
+    「蓋掉一大半」才算，相鄰格邊緣擦到不算 —— 判準與 `pdf_form_detect` 裡
+    那個檢查一致。
+    """
+    sx0, sy0, sx1, sy1 = slot
+    for other in detected:
+        if other is d or other.page != d.page:
+            continue
+        bx0, by0, bx1, by1 = other.label_rect
+        ox = min(sx1, bx1) - max(sx0, bx0)
+        oy = min(sy1, by1) - max(sy0, by0)
+        if ox <= 1 or oy <= 1:
+            continue
+        if ox * oy > (bx1 - bx0) * (by1 - by0) * 0.5:
+            return True
+    # 自己的標籤也不能蓋
+    bx0, by0, bx1, by1 = d.label_rect
+    ox = min(sx1, bx1) - max(sx0, bx0)
+    oy = min(sy1, by1) - max(sy0, by0)
+    return ox > 1 and oy > 1 and ox * oy > (bx1 - bx0) * (by1 - by0) * 0.5
+
+
 def fill_pdf(
     src_pdf: Path,
     dst_pdf: Path,
@@ -144,6 +193,14 @@ def fill_pdf(
                                                    profile.get(d.profile_key, "")) else 1),
     )
 
+    # 每個欄位鍵在這份表上有哪些「單位詞」的欄位（銀行 / 分行 / 支局 / 郵局…）。
+    # 用來判斷「值帶著單位詞時該不該跳過這一格」—— 詳見下面那段說明。
+    _suffix_units_for_key: dict[str, set[str]] = {}
+    for _d in detected:
+        if pdf_layout.is_suffix_label(_d.label_text):
+            _suffix_units_for_key.setdefault(_d.profile_key, set()).add(
+                _d.label_text.strip().strip("：:（）() "))
+
     for d in detected:
         value = profile.get(d.profile_key, "")
         if not value:
@@ -162,7 +219,14 @@ def fill_pdf(
         if pdf_layout.is_suffix_label(d.label_text):
             unit = d.label_text.strip().strip("：:（）() ")
             others = pdf_layout.SUFFIX_LABELS - {unit}
-            if any(value.endswith(o) for o in others):
+            hit = next((o for o in others if value.endswith(o)), None)
+            # **只有在「表上真的有那個單位的欄位」時才跳過。**
+            #
+            # 第一版無條件跳過，於是表上只有一個「分行」欄、而使用者的值是
+            # 「中山郵局」時，那一欄**完全不填而且沒有任何提示** —— 郵局帳戶
+            # 的使用者去填一般匯款表就會踩到（v1.14.31 對抗式驗證實測）。
+            # 有別的欄位可以放才叫「放錯地方」；沒有的話這裡就是唯一的位置。
+            if hit and hit in _suffix_units_for_key.get(d.profile_key, set()):
                 continue
 
         # Universal checkbox-first: try to match profile value (including each
@@ -231,9 +295,31 @@ def fill_pdf(
             # Something is already printed inside the target slot (pre-filled
             # example or carry-over from a prior fill). Don't overwrite.
             continue
-        slot = d.value_slot or (
-            d.value_anchor[0], d.label_rect[1], d.value_anchor[0] + 240, d.label_rect[3]
-        )
+        if d.value_slot is None and d.value_anchor is None:
+            # 偵測端連 anchor 都算不出來 —— 沒有任何位置可以放。
+            unfilled.add(d.profile_key)
+            continue
+        slot = d.value_slot
+        if slot is None:
+            # **退路要自己確認不會壓到字。**
+            #
+            # 偵測端把 `value_slot` 設成 None 是**刻意的**：它剛判定那個位置
+            # 會蓋掉別的標籤，註解寫著「留白至少看得出這裡沒填，比疊字好」。
+            # 但 `value_anchor` 是用**同一個已被否決的位置**算出來的，所以
+            # 這條退路等於把那個決定原封不動推翻掉 —— v1.14.31 的對抗式驗證
+            # 在真實樣本上追到 30 處疊字全部來自這裡，其中好幾處是值**完全
+            # 蓋掉自己的標籤**（重疊比 1.0）。
+            #
+            # 但整條退路拿掉會少填 43 欄（實測），因為多數情況它其實落在空白
+            # 處、只是偵測端沒算出精確的框。所以判準改成「**這一次**的退路
+            # 位置會不會壓到字」：不會就填，會就留白。
+            fb = (d.value_anchor[0], d.label_rect[1],
+                  d.value_anchor[0] + 240, d.label_rect[3])
+            fb = _clamp_before_next_label(fb, d, detected)
+            if fb is None or _overlaps_printed_text(fb, d, detected):
+                unfilled.add(d.profile_key)
+                continue
+            slot = fb
 
         # Fix A (same-key Y-overlap → prefer larger slot): when two detections
         # for the SAME profile_key have vertically-overlapping slots, it's

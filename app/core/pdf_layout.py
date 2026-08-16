@@ -387,8 +387,20 @@ MIN_VALUE_SLOT_WIDTH = 80.0
 
 
 def is_suffix_label(text: str) -> bool:
-    """這個標籤是不是「印在空白右邊」的單位詞。"""
-    return (text or "").strip().strip("：:（）() ") in SUFFIX_LABELS
+    """這個標籤是不是「印在空白右邊」的單位詞。
+
+    **結尾有冒號的一律不算**。第一版把冒號跟括號一起 `strip` 掉，於是
+    「分行：」也被判成後綴 —— 但那是標準的前置標籤，值在冒號**右邊**。
+    後果是值被瞄到左邊隔壁欄的空白，再因為 slot 撞號整欄被靜靜丟掉：
+    使用者看到「分行沒填」，不會知道為什麼（v1.14.31 對抗式驗證實測）。
+
+    「（分行）」這種括號形式仍算後綴 —— 括號是排版修飾，不改變它印在
+    空白右邊的事實。
+    """
+    s = (text or "").strip()
+    if s.endswith(("：", ":")):
+        return False
+    return s.strip("：:（）() ") in SUFFIX_LABELS
 
 
 def compute_value_slot(

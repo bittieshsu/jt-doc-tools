@@ -78,10 +78,10 @@ winget install --id Git.Git -e --accept-package-agreements --accept-source-agree
 > 不需要預先安裝 Python — 由 uv 處理。
 > Office 引擎優先 OxOffice MSI（GitHub release），失敗時 fallback `winget install LibreOffice`。
 
-### 方式一：雙擊安裝程式（推薦）
+### 方式一：按兩下安裝程式（建議）
 
 到 [GitHub Releases](https://github.com/jasoncheng7115/jt-doc-tools/releases/latest) 下載
-`jt-doc-tools-x.y.z-setup.exe`，雙擊執行。安裝精靈為繁體中文，會處理權限提升、
+`jt-doc-tools-x.y.z-setup.exe`，按兩下執行。安裝精靈為繁體中文，會處理權限提升、
 服務註冊、防火牆例外與 PATH，並內含解除安裝功能。
 
 > **檔名上的版本比較舊沒有關係。** 這支安裝程式是**引導程式**（約 6 MB），

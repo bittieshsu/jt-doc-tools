@@ -102,18 +102,26 @@
       const opt = this.select.querySelector(`option[value="${CSS.escape(v)}"]`);
       const label = opt ? opt.textContent : v;
       const previewStyle = opt ? (opt.getAttribute('data-preview-style') || '') : '';
-      this.trigger.innerHTML =
-        `<span class="jt-select-label"${previewStyle ? ` style="${this._escape(previewStyle)}"` : ''}>${this._escape(label)}</span>` +
-        `<span class="jt-select-arrow" aria-hidden="true"></span>`;
+      // **不可以用 innerHTML 拼 `style="..."` 屬性**：CSP 的 style-src 已經
+      // 移除 'unsafe-inline'，那個屬性會被瀏覽器丟掉（字串留在 HTML 裡，但
+      // `el.style.length === 0`），收合狀態的字型預覽因此永遠不生效 ——
+      // 而面板展開後那份走 CSSOM（`main.style.cssText`）反而是好的，於是
+      // 「打開看得到預覽、收起來就沒了」。改用 DOM API + CSSOM 兩者一致。
+      this.trigger.textContent = '';
+      const lab = document.createElement('span');
+      lab.className = 'jt-select-label';
+      lab.textContent = label;
+      if (previewStyle) lab.style.cssText = previewStyle;
+      const arrow = document.createElement('span');
+      arrow.className = 'jt-select-arrow';
+      arrow.setAttribute('aria-hidden', 'true');
+      this.trigger.appendChild(lab);
+      this.trigger.appendChild(arrow);
       (this._items || []).forEach(el => {
         el.classList.toggle('selected', el.dataset.value === v);
       });
     }
 
-    _escape(s) {
-      return String(s).replace(/[&<>"']/g, c =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    }
 
     _bind() {
       this.trigger.addEventListener('click', (e) => {

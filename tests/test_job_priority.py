@@ -319,6 +319,17 @@ def test_admin_api_returns_the_list_in_priority_order(monkeypatch, tmp_path):
     assert "get_ordered()" in body, "讀回名單沒有照順序"
     assert "sorted(job_priority" not in body, \
         "用 sorted() 讀名單會把管理員拖好的順序洗掉"
+    # **存檔端點是另一個函式** —— 上面那段只擷取讀取端點的主體，
+    # 稽核那行在 `..._save` 裡，不另外抓就掃不到（第一版就是這樣，
+    # 變異驗證當場發現測試沒反應）。
+    m2 = re.search(r"async def jobs_api_priority_users_save\(.*?\n(.*?)\n    @router",
+                   src, re.S)
+    assert m2, "找不到 priority-users 存檔端點"
+    save_body = m2.group(1)
+    # **稽核也不可以排序**：這份名單的順序就是優先權，`sorted()` 之後
+    # `[1, 3]` 與 `[3, 1]` 的紀錄一模一樣，事後分辨不出誰被往前調了。
+    assert "sorted(saved)" not in save_body, \
+        "稽核記下排序過的名單，等於沒有記下「順序被改了」這件事"
 
 
 def test_picker_shows_which_realm_each_account_belongs_to():

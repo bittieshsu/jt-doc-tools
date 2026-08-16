@@ -33,3 +33,49 @@ def real_client_ip(request) -> str:
         return (request.client.host if getattr(request, "client", None) else "")[:64]
     except Exception:
         return ""
+
+
+def forwarded_scheme(request) -> str:
+    """對外的協定（`https` / `http`）。
+
+    **`X-Forwarded-Proto` 可能是逗號串**：多層反向代理時每一層各自附加，
+    變成 `https, http`。取**第一段**才是最外層面對使用者的那一段。
+
+    這個判斷原本散在四個地方各寫一份，v1.14.29 只修了 cookie 那一份，
+    另外三個沒跟著改（v1.14.31 對抗式驗證抓到）。後果不只是少個旗標：
+
+    * `app/main.py` 的 HSTS：`XFP='https, http'` 時**整個 HSTS 標頭不發**，
+      而同一份回應的 session cookie 卻正確帶了 `Secure` —— 同一個請求對
+      「這是不是 HTTPS」給出兩個互相矛盾的答案。
+    * `sso_routes._public_base()`：產出 `'https, http://doc.example.com'`
+      這種壞掉的字串，直接成為 OIDC 的 `redirect_uri` 與 SAML 的 ACS URL
+      → 與 IdP 註冊值比對失敗，**登入全掛**。
+
+    前後空白也要吃掉（`' https '` 原本一樣失效）。
+    """
+    try:
+        fwd = request.headers.get("X-Forwarded-Proto", "") or ""
+    except Exception:  # noqa: BLE001
+        fwd = ""
+    first = fwd.split(",")[0].strip().lower()
+    if first in ("http", "https"):
+        return first
+    try:
+        return (request.url.scheme or "http").lower()
+    except Exception:  # noqa: BLE001
+        return "http"
+
+
+def forwarded_host(request) -> str:
+    """對外的主機名。`X-Forwarded-Host` 同樣可能是逗號串。"""
+    try:
+        h = request.headers.get("X-Forwarded-Host", "") or ""
+    except Exception:  # noqa: BLE001
+        h = ""
+    first = h.split(",")[0].strip()
+    if first:
+        return first
+    try:
+        return request.url.netloc
+    except Exception:  # noqa: BLE001
+        return ""

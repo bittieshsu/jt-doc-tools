@@ -3,11 +3,11 @@
 {% block title %}轉檔引擎設定 · {{ app_name }}{% endblock %}
 {% block content %}
 <h1>{{ icon('gear', size=22) }} 轉檔引擎設定</h1>
-<p class="muted">設定轉檔引擎（OxOffice / LibreOffice）的執行檔尋找順序。文書轉 PDF、PDF 轉文書檔 / 轉簡報檔等雙向轉換都會用到它。系統會由上往下測試，第一個存在且可執行的就會被使用。</p>
+<p class="muted">設定轉檔引擎（OxOffice / LibreOffice）的執行檔尋找順序。辦公文件轉 PDF、PDF 轉文書檔 / 轉簡報等雙向轉換都會用到它。系統會由上往下測試，第一個存在且可執行的就會被使用。</p>
 
 <div class="panel" data-s="s7ec2825b">
   <p data-s="sa90b4271">
-    💡 <strong>推薦優先採用 OxOffice</strong>：由台灣 OSSII 維護的 LibreOffice 繁中本地化分支，
+    💡 <strong>建議優先採用 OxOffice</strong>：由台灣 OSSII 維護的 LibreOffice 繁中本地化分支，
     對 CJK 字型、CNS11643 字集、台灣版面慣例支援更完整。
     下載：<a href="https://github.com/OSSII/OxOffice/releases" target="_blank" rel="noopener"
        data-s="s1b15b3d0">github.com/OSSII/OxOffice</a>
@@ -22,7 +22,7 @@
       {% if active_version %}<span class="version-chip">{{ active_version }}</span>{% endif %}
     </p>
   {% else %}
-    <p class="muted">⚠️ 找不到任何可用的 soffice / libreoffice，所有需要轉檔引擎的工具（文書轉 PDF、PDF 轉文書檔 / 轉簡報檔等）都會失敗。請新增正確路徑或安裝。</p>
+    <p class="muted">⚠️ 找不到任何可用的 soffice / libreoffice，所有需要轉檔引擎的工具（辦公文件轉 PDF、PDF 轉文書檔 / 轉簡報等）都會失敗。請新增正確路徑或安裝。</p>
   {% endif %}
 </div>
 

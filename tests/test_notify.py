@@ -218,7 +218,7 @@ def test_message_has_no_file_contents(_data_dir):
     from app.core import job_notify
     subject, body = job_notify.build_message(_job())
     assert "年報.pdf" in subject or "年報.pdf" in body
-    assert "PDF 轉簡報檔" in subject or "PDF 轉簡報檔" in body
+    assert "PDF 轉簡報" in subject or "PDF 轉簡報" in body
     assert "耗時" in body
 
 

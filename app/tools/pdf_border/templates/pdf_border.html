@@ -5,19 +5,19 @@
 {% block content %}
 <h1>{{ icon('border', size=22) }} 頁面加框</h1>
 <p class="muted">替每一頁加上框線。<b>投影片加外框</b>最常用；也可以用在文件、講義與獎狀。
-上傳 <b>PDF</b> 或<b>文書檔</b>（Word / Excel / PowerPoint / ODF），輸出一律是 PDF。</p>
+上傳 <b>PDF</b> 或<b>辦公文件</b>，輸出一律是 PDF。</p>
 
 <div class="panel">
   <h2>1. 上傳檔案</h2>
   {% with upload_id='bdUpload',
           accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
-          hint='單檔。文書檔會先自動轉成 PDF 再加框。' %}
+          hint='單檔。辦公文件會先自動轉成 PDF 再加框。' %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div class="bd-stat" id="bdStat" hidden>
     <span class="bd-kv">檔案 <b id="bdName">-</b></span>
     <span class="bd-kv">頁數 <b id="bdPages">-</b></span>
-    <span class="bd-kv" id="bdConvKv" hidden>{{ icon('info', size=13) }} 已由文書檔轉成 PDF</span>
+    <span class="bd-kv" id="bdConvKv" hidden>{{ icon('info', size=13) }} 已由辦公文件轉成 PDF</span>
   </div>
 </div>
 
@@ -293,7 +293,7 @@
     const fd = new FormData();
     fd.append('file', f);
     const r = await fu.upload('/tools/pdf-border/load', fd,
-                              { processingLabel: '讀取中…（文書檔會先轉成 PDF）' });
+                              { processingLabel: '讀取中…（辦公文件會先轉成 PDF）' });
     if (!r.ok) {
       (window.showAlert || alert)(await window.friendlyServerError(r, '讀取失敗'));
       return;

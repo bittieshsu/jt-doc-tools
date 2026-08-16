@@ -45,7 +45,7 @@ SSL: CERTIFICATE_VERIFY_FAILED ... Missing Authority Key Identifier
 ```
 
 原因：企業 CA 裝在 **OS 系統信任庫**，但 Python（程式內建的獨立 Python）用的是
-自帶的 certifi 憑證庫，**不認**那個企業 CA。
+內建的 certifi 憑證庫，**不認**那個企業 CA。
 
 **v1.12.43 起自動處理 — 不需任何設定。** 只要照原本方式安裝 / 更新即可：
 
@@ -113,7 +113,7 @@ sudo update-ca-certificates`；Windows 匯入「受信任的根憑證授權單�
 6. **安全標頭由後端 app 統一設定**（CSP / HSTS / X-Frame-Options…）— 代理**不要**再加一次，否則重複標頭（ZAP「Multiple Header Entries」）。
 7. **後端只聽 `127.0.0.1:8765`** — 對外只由代理提供 HTTPS，並隱藏代理版本號。
 
-> **防 `X-Forwarded-For` 偽造（稽核 IP 正確性）**：稽核 / 歷史記錄的來源 IP 取 `X-Forwarded-For` 最左側。若代理是用「附加」模式（nginx `$proxy_add_x_forwarded_for`、HAProxy `option forwardfor`…），惡意的內部使用者可先自帶一個假 XFF，就能把稽核記到假 IP。要杜絕，讓代理**先移除進站的 `X-Forwarded-For`，再由代理自己填真實用戶端**（各範例已標註）。這是**選用的硬化**，不影響一般顯示；跟「反向代理下稽核 IP 變 127.0.0.1」的修正（v1.12.65）無關，該問題只要升級即解。
+> **防 `X-Forwarded-For` 偽造（稽核 IP 正確性）**：稽核 / 歷史記錄的來源 IP 取 `X-Forwarded-For` 最左側。若代理是用「附加」模式（nginx `$proxy_add_x_forwarded_for`、HAProxy `option forwardfor`…），惡意的內部使用者可先自己帶一個假 XFF，就能把稽核記到假 IP。要杜絕，讓代理**先移除進站的 `X-Forwarded-For`，再由代理自己填真實用戶端**（各範例已標註）。這是**選用的硬化**，不影響一般顯示；跟「反向代理下稽核 IP 變 127.0.0.1」的修正（v1.12.65）無關，該問題只要升級即解。
 
 ### nginx
 

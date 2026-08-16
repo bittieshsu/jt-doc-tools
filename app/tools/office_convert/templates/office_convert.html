@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}辦公文件格式互轉 · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ icon('swap', size=22) }} 辦公文件格式互轉</h1>
+<p class="muted">同一類文件之間互轉格式：<b>文書檔</b>、<b>試算表</b>、<b>簡報</b>各自互換。
+上傳之後會依副檔名判斷是哪一類，只顯示轉得過去的目標格式。
+要轉成 PDF 請用<a href="/tools/office-to-pdf/">辦公文件轉 PDF</a>。</p>
+
+<div class="panel">
+  <h2 data-s="s_ofc_up">1. 上傳檔案（可多檔）</h2>
+  <p class="muted oc-hint">同一批請只放同一類文件 —— 試算表沒辦法轉成文書檔的格式。</p>
+  {% with upload_id='upOfc', accept=accept, multiple=True %}{% include "components/file_upload.html" %}{% endwith %}
+</div>
+
+<div class="panel" id="ocTargetPanel" hidden>
+  <h2 data-s="s_ofc_tg">2. 轉成什麼格式</h2>
+  <p class="muted" id="ocFamilyNote"></p>
+
+  {# 三個家族的選項**全部由伺服器端 render**，JS 只負責顯示對應的那一組。
+     這樣不用把格式清單嵌成 JSON 也不用多一次往返，CSP 也不必處理。
+     `data-ext` 讓前端能依副檔名找到該顯示哪一組。 #}
+  {% for fam in families %}
+  <div class="oc-group" data-family="{{ fam.id }}" data-name="{{ fam.name }}"
+       data-ext="{{ fam.sources|join(' ') }}" hidden>
+    <div class="oc-targets">
+      {% for t in fam.targets if t.common %}
+      <label class="oc-target">
+        <input type="radio" name="target-{{ fam.id }}" value="{{ t.id }}"
+               {% if loop.first %}checked{% endif %}>
+        <span class="oc-t-main"><b>{{ t.label }}</b><code>.{{ t.ext }}</code></span>
+        {% if t.note %}<span class="oc-t-note">{{ t.note }}</span>{% endif %}
+      </label>
+      {% endfor %}
+    </div>
+    {% set others = fam.targets | rejectattr('common') | list %}
+    {% if others %}
+    <details class="oc-more">
+      <summary>其他格式（{{ others|length }} 種）</summary>
+      <div class="oc-targets">
+        {% for t in others %}
+        <label class="oc-target">
+          <input type="radio" name="target-{{ fam.id }}" value="{{ t.id }}">
+          <span class="oc-t-main"><b>{{ t.label }}</b><code>.{{ t.ext }}</code></span>
+          {% if t.note %}<span class="oc-t-note">{{ t.note }}</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <button class="btn btn-primary oc-go" id="btn-submit" data-s="s_ofc_go">{{ icon('swap') }}開始轉換</button>
+  {% with progress_id='ocjp' %}{% include "components/job_progress.html" %}{% endwith %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script><script src="/static/js/job_progress.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+let files = [];
+const groups = [...document.querySelectorAll('.oc-group')];
+const panel  = document.getElementById('ocTargetPanel');
+const note   = document.getElementById('ocFamilyNote');
+
+function extOf(name) {
+  const i = (name || '').lastIndexOf('.');
+  return i < 0 ? '' : name.slice(i + 1).toLowerCase();
+}
+function groupFor(ext) {
+  return groups.find(g => g.dataset.ext.split(' ').includes(ext)) || null;
+}
+
+/* 依上傳的檔案決定顯示哪一組目標格式。
+   混到不同類時**在這裡就講清楚**，不要等按下去才由伺服器回錯 —— 那時
+   檔案已經傳上去了，使用者也不知道是哪一份出問題。 */
+function refreshTargets() {
+  groups.forEach(g => { g.hidden = true; });
+  if (!files.length) { panel.hidden = true; return; }
+
+  const seen = new Map();
+  for (const f of files) {
+    const g = groupFor(extOf(f.name));
+    if (!g) {
+      panel.hidden = true;
+      note.textContent = '有檔案的格式不支援：' + f.name;
+      note.className = 'muted oc-warn';
+      return;
+    }
+    if (!seen.has(g)) seen.set(g, []);
+    seen.get(g).push(f.name);
+  }
+  if (seen.size > 1) {
+    panel.hidden = true;
+    note.textContent = '同一批只能放同一類文件，目前混到了：'
+      + [...seen.keys()].map(g => g.dataset.name).join('、');
+    note.className = 'muted oc-warn';
+    alert(note.textContent);
+    return;
+  }
+  const g = [...seen.keys()][0];
+  g.hidden = false;
+  panel.hidden = false;
+  note.textContent = '偵測到' + g.dataset.name + '，共 ' + files.length + ' 份。';
+  note.className = 'muted';
+}
+
+const fu = new FileUpload(document.getElementById('upOfc'), (_f, fs) => {
+  files = Array.isArray(fs) ? fs : (fs ? [fs] : []);
+  refreshTargets();
+});
+const jp = new JobProgress(document.getElementById('ocjp'), {
+  onReset: () => { fu.reset(); files = []; refreshTargets(); }
+});
+
+document.getElementById('btn-submit').addEventListener('click', async () => {
+  if (!files.length) return alert('請先上傳檔案');
+  const g = groups.find(x => !x.hidden);
+  if (!g) return alert('請先上傳檔案');
+  const picked = g.querySelector('input[type=radio]:checked');
+  if (!picked) return alert('請選一個目標格式');
+
+  const fd = new FormData();
+  fd.append('target', picked.value);
+  for (const f of files) fd.append('file', f);
+  const r = await fu.upload('/tools/office-convert/submit', fd,
+                            { processingLabel: '排隊轉換中…' });
+  if (!r.ok) return alert(await window.friendlyServerError(r, '送出失敗'));
+  const j = await r.json();
+  jp.track(j.job_id);
+});
+</script>
+{% endblock %}

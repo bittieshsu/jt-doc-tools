@@ -50,6 +50,32 @@
       if (this._elapsedTimer) { clearInterval(this._elapsedTimer); this._elapsedTimer = null; }
     }
 
+    // 結果檔的副檔名（小寫，不含點）。拿不到就回空字串。
+    _resultExt(j) {
+      const n = (j && j.result_filename) || '';
+      const i = n.lastIndexOf('.');
+      return i < 0 ? '' : n.slice(i + 1).toLowerCase();
+    }
+    // PDF 或「一包 PDF」的 ZIP —— 只有這兩種算得出 PNG
+    _resultIsPdfish(j) {
+      const e = this._resultExt(j);
+      return e === '' || e === 'pdf' || e === 'zip';
+    }
+    // 下載鈕的文字要跟實際產出一致。模板寫死「下載 PDF」，但用這個元件的
+    // 工具有一半產出的不是 PDF（.docx / .odp / .xlsx / .zip …），
+    // 寫著 PDF 會讓人以為下載到的是 PDF。
+    _labelDownload(j) {
+      const ext = this._resultExt(j);
+      if (!ext) return;                        // 拿不到就維持模板原本的字
+      const label = ext === 'pdf' ? '下載 PDF'
+                  : ext === 'zip' ? '下載 ZIP'
+                  : '下載 .' + ext;
+      const node = [...this.dlBtn.childNodes]
+        .reverse().find((n) => n.nodeType === 3 && n.textContent.trim());
+      if (node) node.textContent = label;
+      else this.dlBtn.append(label);
+    }
+
     // 已過時間（分:秒）。轉檔動輒數分鐘，沒有這個使用者會以為當掉。
     _fmtElapsed(ms) {
       const s = Math.max(0, Math.floor(ms / 1000));
@@ -78,7 +104,13 @@
       const btn = this.saveWsBtn;
       if (!btn || !window.saveToWorkspace) return;
       const fname = j.result_filename || '';
-      if (!/\.(pdf|png|docx|odt)$/i.test(fname)) { btn.hidden = true; return; }  // workspace = PDF/PNG/DOCX/ODT
+      // **副檔名清單由伺服器端給**（`data-ws-exts`），不要在這裡寫死。
+      // 原本這行寫死 pdf|png|docx|odt，但伺服器端 v1.14.6 就多收了
+      // .xlsx / .ods / .pptx / .odp —— 兩邊沒一起改，結果是伺服器收得下的
+      // 檔案畫面上那顆鈕卻不出現，而且沒有任何錯誤訊息。
+      const exts = (this.root.dataset.wsExts || '').split(/\s+/).filter(Boolean);
+      const ext = ((fname.match(/\.([^.]+)$/) || [])[1] || '').toLowerCase();
+      if (!exts.length || !exts.includes(ext)) { btn.hidden = true; return; }
       btn.hidden = false;
       btn.disabled = false;
       const orig = btn.dataset.origHtml || (btn.dataset.origHtml = btn.innerHTML);
@@ -126,9 +158,14 @@
             this._finishElapsed('耗時 ');
             this.dlBtn.hidden = false;
             this.dlBtn.href = this.downloadUrl(jobId);
+            this._labelDownload(j);
+            // 「下載 PNG」是把**結果 PDF** 算成圖 —— 結果不是 PDF 的時候
+            // 那顆鈕按下去必然失敗（端點找不到 PDF）。以前是無條件顯示，
+            // 於是產出 .docx / .doc / .xlsx 的工具都掛著一顆壞掉的鈕。
             if (this.dlPngBtn) {
-              this.dlPngBtn.hidden = false;
-              this.dlPngBtn.href = this.downloadPngUrl(jobId);
+              const canPng = this._resultIsPdfish(j);
+              this.dlPngBtn.hidden = !canPng;
+              if (canPng) this.dlPngBtn.href = this.downloadPngUrl(jobId);
             }
             this._wireSaveWs(j);
             // 作業已經結束 —— 沒有「要不要繼續等」的問題了，收起提示

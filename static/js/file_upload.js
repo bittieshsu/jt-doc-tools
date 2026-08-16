@@ -51,10 +51,14 @@
       // 只有第一個吃這個參數，否則印章框會被塞進一份 PDF。
       if (window.__jtHandoffClaimed) return;
       const qs = new URLSearchParams(window.location.search);
-      const wsId = qs.get('from_ws');
-      const jobId = qs.get('from_job');
-      const id = wsId || jobId;
-      if (!id || !/^[A-Za-z0-9_-]{6,64}$/.test(id)) return;
+      const ok = (v) => !!v && /^[A-Za-z0-9_-]{6,64}$/.test(v);
+      // **各自驗各自的**。第一版寫成「`from_ws` 存在就用它，格式不合就整個
+      // return」，後果有兩個：①**連 `from_job` 退路都不試**（工作區被停用時
+      // 走的正是那條）②**網址參數沒被清掉**，重新整理照樣走同一條死路，
+      // 而且畫面上沒有任何訊息。
+      const wsId = ok(qs.get('from_ws')) ? qs.get('from_ws') : '';
+      const jobId = ok(qs.get('from_job')) ? qs.get('from_job') : '';
+      if (!wsId && !jobId) return;
       window.__jtHandoffClaimed = true;
       // **兩個參數都要先讀出來再清網址** —— 清完才讀的話讀到的是空的
       // （檔名會變成預設值，使用者拿到一份叫 document.pdf 的檔）。
@@ -73,7 +77,19 @@
         .then(r => { if (!r.ok) throw new Error('取不到檔案'); return r.blob(); })
         .then(b => {
           this._setProgress(null);
-          this.loadFiles([new File([b], name, {type: b.type || 'application/pdf'})]);
+          const f = new File([b], name, {type: b.type || 'application/pdf'});
+          // **交接來的檔案也要過 `accept`**。工作區收得下 docx / xlsx / pptx，
+          // 但很多工具只吃 PDF —— 沒有這道檢查的話，一份 .docx 會被包成
+          // `document.pdf` 塞進純 PDF 的工具，伺服器竟然回 200（PyMuPDF 開得
+          // 起來），使用者拿到的是一份莫名其妙的產出而不是清楚的錯誤。
+          // 工作區挑選器本來就有依 accept 過濾，交接這條路漏了。
+          if (!this._acceptsFile(f)) {
+            if (window.showAlert) {
+              window.showAlert('這個工具不接受「' + f.name + '」這種檔案格式。');
+            }
+            return;
+          }
+          this.loadFiles([f]);
         })
         .catch(() => {
           this._setProgress(null);
@@ -104,6 +120,20 @@
           },
         });
       });
+    }
+    // 這個上傳框收不收這種檔案（依 `accept` 屬性判斷）。
+    // 沒有設 `accept` 就是什麼都收。
+    _acceptsFile(file) {
+      const acc = (this.input.getAttribute('accept') || '').trim();
+      if (!acc) return true;
+      const name = (file.name || '').toLowerCase();
+      const type = (file.type || '').toLowerCase();
+      return acc.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+        .some(rule => {
+          if (rule.startsWith('.')) return name.endsWith(rule);
+          if (rule.endsWith('/*')) return type.startsWith(rule.slice(0, -1));
+          return type === rule;
+        });
     }
     // Inject File object(s) programmatically (used by 從工作區載入) — mirrors
     // a real drop/selection so the tool's onFile pipeline runs unchanged.

@@ -1,6 +1,6 @@
-# Jason Tools 文件工具箱 v1.14.29
+# Jason Tools 文件工具箱 v1.14.37
 
-> 整合式 PDF / Office 文件處理平台，45 個工具一站式解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
+> 整合式 PDF / Office 文件處理平台，46 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
 >
 > 企業功能：**本機 / LDAP / AD 多領域認證**、**SSO 單一登入**(OIDC + SAML，可接 M365 / Google / Keycloak)、**RBAC 角色權限**、**稽核記錄**、**SIEM 轉送**(syslog / CEF / GELF)、**字型管理**、**使用者工作區**、**背景作業與完成通知**、**REST API**。
 >
@@ -46,10 +46,10 @@
 curl -fsSL https://raw.githubusercontent.com/jasoncheng7115/jt-doc-tools/main/install.sh | sudo bash
 ```
 
-**Windows 10 / 11 — 雙擊安裝（推薦，不必開 PowerShell）**：
+**Windows 10 / 11 — 按兩下安裝（建議，不必開 PowerShell）**：
 
 到 [GitHub Releases](https://github.com/jasoncheng7115/jt-doc-tools/releases/latest) 下載
-`jt-doc-tools-x.y.z-setup.exe`，雙擊執行即可。安裝精靈為繁體中文，內含解除安裝功能。
+`jt-doc-tools-x.y.z-setup.exe`，按兩下執行即可。安裝精靈為繁體中文，內含解除安裝功能。
 
 > **檔名上的版本比較舊沒有關係。** 這支安裝程式只是個引導程式（約 6 MB），
 > 實際的程式碼是**安裝當下才從 GitHub 下載**的，所以不論你手上那支 .exe 是哪一版，
@@ -70,7 +70,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ---
 
-## 45 個工具速覽
+## 46 個工具速覽
 
 ### 填單用印
 - **表單自動填寫** — 自動偵測欄位 + 模板填值
@@ -96,15 +96,17 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 - **清單處理** — 貼文字 / 上傳 .txt / .csv / .xlsx / .docx / .pdf 等檔案，一行一筆做排序 / 去重 / 篩選 / 取頭尾 / 大小寫轉換等，可組合多種操作；結果一鍵複製或下載 .txt / .csv / .xlsx
 - **電子發票處理** — 掃台灣電子發票 QR Code 解出發票號碼 / 日期 / 金額 / 統編，自動帶賣方公司名、行業、會計科目（規則 + 可選 LLM 判讀），支援報帳檢查 + 當期發票檢查，匯出 .xlsx / .ods / .csv / .json / .xml / .txt / .md（標題可自訂）
 - **乘車證明整理** — 拉一批台鐵購票證明 / 高鐵電子車票證明 PDF，自動整理日期 / 交通工具 / 來源-目的 / 費用成表格，欄位可自訂，匯出 .xlsx / .ods / .csv / .json / .xml / .txt / .md 報帳
-- **統編查詢** — 輸入 8 位統一編號反查，或公司 / 機關 / 學校名稱、地址、行業關鍵字模糊搜尋（高亮命中字）；含類別篩選 + 批次查詢 + CSV 匯出
+- **統編查詢** — 輸入 8 位統一編號反查，或公司 / 機關 / 學校名稱、地址、行業關鍵字模糊搜尋（標示命中字）；含類別篩選 + 批次查詢 + CSV 匯出
 
 ### 格式轉換 [需 OxOffice/LibreOffice]
-- **文書轉 PDF / 圖片** — Word / Excel / PowerPoint / ODF
+- **辦公文件轉 PDF** — 把辦公文件批次轉成 PDF
+- **辦公文件格式互轉** — 同一類文件之間互轉格式：文書檔（.odt / .docx / .doc / .rtf / .txt）、試算表（.ods / .xlsx / .xls / .csv）、簡報（.odp / .pptx / .ppt）各自互換；`.docx` / `.xlsx` / `.pptx` 還可以指定版本（Word 2007 或 Word 2010–365 等）
+- **辦公文件轉圖片** — PDF 或辦公文件每頁轉成 PNG；多頁自動打包 ZIP
 - **圖片轉 PDF**
 - **PDF 轉 Markdown** — PDF 轉結構化 Markdown，保留標題 / 表格 / 粗體，適合餵 LLM、RAG 預處理
-- **Markdown 轉文書** [需 OxOffice/LibreOffice] — 貼上或拖入 Markdown，套用主題後輸出 PDF / DOCX / ODT，含所有頁面預覽
-- **PDF 轉文書檔（Beta）** — PDF 反轉成 Word (.docx) / OpenDocument (.odt)，三引擎可選：pdf2docx（經典穩定）、自家 jtdt-reform（幾何規則重組成可編輯內文）、自家 jtdt-layout（版面最忠於原稿：頁面錨定文字方塊，位置 / 圖片 / 框線近 1:1 保留）
-- **PDF 轉簡報檔** — PDF 反轉成 PowerPoint (.pptx) / OpenDocument 簡報 (.odp)，**一頁對一張投影片**，投影片尺寸沿用原稿（直向 PDF 也照樣還原）；用 jtdt-layout 版面重現引擎
+- **Markdown 轉辦公文件** [需 OxOffice/LibreOffice] — 貼上或拖入 Markdown，套用主題後輸出 PDF 或文書檔（.docx / .odt），含所有頁面預覽
+- **PDF 轉文書檔（Beta）** — PDF 反轉成文書檔（.docx / .odt），三引擎可選：pdf2docx（經典穩定）、自家 jtdt-reform（幾何規則重組成可編輯內文）、自家 jtdt-layout（版面最忠於原稿：頁面錨定文字方塊，位置 / 圖片 / 框線近 1:1 保留）
+- **PDF 轉簡報** — PDF 反轉成 PowerPoint (.pptx) / OpenDocument 簡報 (.odp)，**一頁對一張投影片**，投影片尺寸沿用原稿（直向 PDF 也照樣還原）；用 jtdt-layout 版面重現引擎
 
 ### 資安處理
 - **文件去識別化 / 文字去識別化** — 身分證 / 電話 / 銀行帳號 / 統編 / AD DN 等 14+ 種敏感資料
@@ -137,7 +139,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 耗時的工作（轉檔、OCR、逐句翻譯、大檔壓縮…）送出後就交給伺服器跑，**可以直接關掉分頁**，不必守著進度條。
 
-- **送出即背景執行** — 20 個工具走作業系統，包含 PDF 轉文書檔 / 轉簡報檔、OCR 文字辨識、逐句翻譯、文書轉 PDF、壓縮、合併、分拆、浮水印、用印、送件前檢核等。
+- **送出即背景執行** — 25 個工具走作業系統，包含 PDF 轉文書檔 / 轉簡報檔、格式互轉、OCR 文字辨識、逐句翻譯、辦公文件轉 PDF、壓縮、合併、分拆、浮水印、用印、騎縫章、送件前檢核等。
 - **我的作業** — 進度、佇列位置、已過時間、結果下載都在同一頁；跑一半可取消。逐句翻譯這類「產出不是單一檔案」的工具，點回去會接回原本的頁面繼續看對照表。
 - **重開機不會憑空消失** — 作業狀態存在資料庫裡，服務重啟後未完成的會標示為中斷，而不是無聲無息不見。
 - **不會把機器打爆** — 派送前先估算這個作業要用多少記憶體，不夠就讓它留在佇列排隊；同時處理數與 Office 轉檔併行上限都可在管理區調整。
@@ -322,3 +324,4 @@ Apache License 2.0 — 詳見 [LICENSE](LICENSE)。第三方套件授權見 [THI
 - **回報問題**：<https://github.com/jasoncheng7115/jt-doc-tools/issues>
 
 **Jason Cheng** (Jason Tools)
+

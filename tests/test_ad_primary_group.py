@@ -15,7 +15,11 @@ AD 使用者的「成員隸屬」分頁也只看得到 memberOf）。這是 AD �
 ## 三個不可以
 
 * **不可以讓登入失敗**：查不到就跳過。這只是補強。
-* **不可以對 OpenLDAP 出錯**：那邊沒有 objectSid / primaryGroupID，要不到就是空的。
+* **不可以對 OpenLDAP 出錯**：那邊沒有 objectSid / primaryGroupID —— 而且
+  **不是「要不到就是空的」**，OpenLDAP / UCS 收到不認得的屬性名會拒絕**整個
+  查詢**（2026-08 正式機就是這樣掛的，連登入都失敗）。所以這兩個屬性只能在
+  backend 是 AD 時才要（`_ad_only_attributes()`，由
+  `test_ldap_attribute_portability.py` 把關）。
 * **filter 不可以塞字串 SID**：AD 的 objectSid 是二進位屬性，filter 要寫成
   `\\XX\\XX…` 的跳脫位元組，直接塞 `S-1-5-…` 在多數環境查不到東西。
 """
@@ -166,4 +170,8 @@ def test_primary_group_is_appended_to_group_dns():
     assert "primary_dn" in src
     assert "group_dns.append(primary_dn)" in src
     assert "primary_dn not in group_dns" in src, "沒有去重，會重複掛同一個群組"
-    assert '"objectSid", "primaryGroupID"' in src, "搜尋沒有要這兩個屬性"
+    # 屬性**不可以寫死**在清單裡（OpenLDAP / UCS 會拒絕整個查詢），
+    # 要透過 `_ad_only_attributes()` 只在 AD backend 時才要。
+    assert "_ad_only_attributes()" in src, (
+        "搜尋沒有走 _ad_only_attributes() —— AD 時要不到 objectSid / "
+        "primaryGroupID，主要群組就算不出來")

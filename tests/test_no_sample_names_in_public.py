@@ -11,8 +11,9 @@
 
 ## 掃描範圍
 
-只掃**會被推到 GitHub 的檔案**（`github/` 底下）。專案內部的 CLAUDE.md、
-TEST_PLAN.md 不公開，可以寫得具體一點，方便日後追查。
+**整個 `github/` 底下的文字檔**，包含程式碼 —— 註解與 docstring 一樣會被
+推上去。專案根目錄的 CLAUDE.md 不公開，可以寫得具體一點方便日後追查；
+但 TEST_PLAN.md 在 `github/` 底下**有一份公開的**，那份要去識別化。
 """
 from __future__ import annotations
 
@@ -24,17 +25,32 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CORPUS = ROOT / "temp_pdfs"
 
-#: 會被推上 GitHub 的檔案。
-PUBLIC = [
-    "github/CHANGELOG.md",
-    "github/README.md",
-    "github/API.md",
-    "github/LLM.md",
-    "github/OPS.md",
-    "github/INSTALL.md",
-    "github/docs/index.html",
-    "github/docs/api.html",
-]
+#: 會被推上 GitHub 的檔案 —— **整個 `github/` 都是**。
+#:
+#: 第一版寫死了 8 個檔名，於是兩個真的外洩躲過了檢查（v1.14.31 自查發現）：
+#: `github/TEST_PLAN.md` 列著四家客戶的名字，而
+#: `github/app/tools/.../over_indent_cleanup.py` 的 docstring 裡有一家客戶的
+#: 公司全名 —— **程式碼註解也會被推上去**。
+#:
+#: 這份檔案原本的說明還寫著「TEST_PLAN.md 不公開」，那個假設本身就是錯的：
+#: 它在專案根目錄與 `github/` 底下各有一份，後者是公開的。
+def _public_files():
+    root = pathlib.Path(__file__).resolve().parent.parent / "github"
+    if not root.exists():
+        return []
+    out = []
+    for p in root.rglob("*"):
+        if not p.is_file() or p.suffix.lower() not in (
+                ".md", ".html", ".py", ".js", ".css", ".txt", ".sh", ".ps1",
+                ".yml", ".yaml", ".toml", ".cmd", ".nsi"):
+            continue
+        if "__pycache__" in p.parts or ".git" in p.parts:
+            continue
+        out.append(str(p.relative_to(root.parent)))
+    return sorted(out)
+
+
+PUBLIC = _public_files()
 
 #: 這些英文字在技術文件裡本來就會出現，不構成識別。
 _COMMON_WORDS = {
@@ -106,3 +122,69 @@ def test_corpus_is_gitignored():
             continue
         assert "temp_pdfs/" in p.read_text(encoding="utf-8"), (
             f"{rel} 沒有排除 temp_pdfs/ —— 真實客戶表單會被推上 GitHub")
+
+@pytest.fixture(scope="module")
+def corpus_company_names() -> set[str]:
+    """從樣本**內容**抽出來的公司名。
+
+    檔名的詞只擋得住「檔名被寫進文件」，擋不住「順手把客戶的公司全名寫進
+    註解或測試計畫」—— 而後者真的發生過（v1.14.31 自查在一支 fixer 的
+    docstring 與測試計畫裡各找到一處）。
+
+    這裡讀 `temp_pdfs/` 的內容（那個目錄兩層 `.gitignore` 都擋著），
+    所以名單本身不會外洩；抽出來只在記憶體裡用。實測 24 份 PDF 0.6 秒。
+    """
+    import fitz
+
+    if not CORPUS.exists():
+        return set()
+    pat = re.compile(r"[一-鿿A-Za-z0-9]{2,12}(?:股份有限公司|有限公司|企業社)")
+    out: set[str] = set()
+    for p in sorted(CORPUS.iterdir()):
+        if p.suffix.lower() != ".pdf" or p.name.startswith("syn_"):
+            continue
+        try:
+            with fitz.open(str(p)) as d:
+                for pg in d:
+                    out |= set(pat.findall(pg.get_text()))
+        except Exception:  # noqa: BLE001 — 讀不動就跳過
+            continue
+    # **通用片段不算識別**。抽取時前綴常被切掉，剩下「科技股份有限公司」
+    # 這種純行業字尾 —— 那是全台灣幾萬家公司共用的寫法，拿它去比對會讓
+    # 幾十個正常檔案報錯，而誤報一多這份檢查就會被當雜訊忽略。
+    _INDUSTRY = ("科技", "資訊", "實業", "企業", "工程", "貿易", "顧問",
+                 "有限", "股份", "國際", "開發", "投資", "文化", "傳播",
+                 "建設", "營造", "生技", "醫療", "物流", "運輸", "食品")
+    _SUFFIX = ("股份有限公司", "有限公司", "企業社")
+
+    def _distinctive(n: str) -> bool:
+        for suf in _SUFFIX:
+            if n.endswith(suf):
+                head = n[: -len(suf)]
+                break
+        else:
+            return False
+        # 去掉行業詞之後還要剩下**兩個字以上**才算得上是一家特定公司
+        for ind in _INDUSTRY:
+            if head.endswith(ind):
+                head = head[: -len(ind)]
+        return len(head) >= 2 and not head.startswith(
+            ("本人", "節省", "測試", "範例", "○", "△", "□"))
+
+    return {n for n in out if _distinctive(n)}
+
+
+@pytest.mark.parametrize("rel", PUBLIC)
+def test_public_files_do_not_leak_customer_company_names(rel, corpus_company_names):
+    """公開檔案不可以出現樣本**內容**裡的客戶公司名。
+
+    註解與 docstring 一樣會被推上 GitHub。
+    """
+    if not corpus_company_names:
+        pytest.skip("沒有語料可供比對")
+    p = ROOT / rel
+    text = p.read_text(encoding="utf-8", errors="ignore")
+    hits = sorted(n for n in corpus_company_names if n in text)
+    assert not hits, (
+        f"{rel} 出現了樣本裡的客戶公司名（{len(hits)} 個，內容不列出）—— "
+        "改用「某供應商」這種去識別化的說法。")

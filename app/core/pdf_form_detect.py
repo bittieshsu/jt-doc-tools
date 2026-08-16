@@ -595,10 +595,23 @@ def detect_fields(
                         # 很窄（實測約 64pt），值塞進去只會疊在別的標籤上 ——
                         # 使用者看到的是兩串字疊在一起，完全讀不出來。
                         # 寧可不填也不要疊：留白至少看得出「這裡沒填」。
-                        if (slot and slot_kind != "below-adj"
-                                and slot[2] - slot[0] < pdf_layout.MIN_VALUE_SLOT_WIDTH
-                                and slot[0] < x0):
-                            slot, slot_kind = None, None
+                        #
+                        # **這裡不能直接把 slot 設成 None** —— 下面第一件事
+                        # 就是 `anchor = (slot[0], baseline)`，設成 None 會
+                        # 當場 `TypeError: 'NoneType' object is not
+                        # subscriptable`，而且是在 `detect_fields` 裡面，
+                        # 整份表單一欄都偵測不出來（使用者拿到 500）。
+                        # v1.14.31 對抗式驗證用一個很常見的版型重現：一列格子
+                        # 裡「分行」被框成 60~70pt 的小格，左界取到直線之後
+                        # 寬度落在 24~80 之間就會踩到。
+                        #
+                        # 做法跟底下那個「值蓋到別的標籤」的檢查一致：
+                        # **anchor 先算好再把 slot 拿掉**（`DetectedField` 本來
+                        # 就允許 `value_slot=None`）。
+                        _rejected_narrow = bool(
+                            slot and slot_kind != "below-adj"
+                            and slot[2] - slot[0] < pdf_layout.MIN_VALUE_SLOT_WIDTH
+                            and slot[0] < x0)
                         # Guard against slots that accidentally extend above
                         # the label's own row (pdfplumber can merge visually
                         # adjacent cells) — clamp the slot top to the label's
@@ -622,7 +635,9 @@ def detect_fields(
                                         ul_y - 1,
                                     )
                                     slot_kind = "underline"
-                        anchor = (slot[0], baseline)
+                        anchor = (slot[0], baseline) if slot else None
+                        if _rejected_narrow:
+                            slot, slot_kind = None, None
                         placement_legacy = "below" if slot_kind == "below-adj" else "right"
                         for key in keys:
                             detected.append(

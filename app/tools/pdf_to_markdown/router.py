@@ -244,6 +244,12 @@ async def convert(
             )
         except Exception as e:
             log.exception("pdf2md conversion failed")
+            # 毀損的 PDF 是**客戶端給錯檔**（400），不是伺服器出錯 ——
+            # 分成 500 的話使用者會以為是服務掛了而重試，怎麼重試都一樣。
+            import fitz as _fitz
+            if isinstance(e, _fitz.FileDataError):
+                raise HTTPException(
+                    400, "PDF 打不開 —— 檔案可能已毀損或不是 PDF。") from e
             raise HTTPException(500, f"轉換失敗: {e.__class__.__name__}") from e
         md_path = wdir / f"{stem}.md"
         md_path.write_text(md, encoding="utf-8")

@@ -28,6 +28,8 @@ push message —— 需要 LINE 官方帳號、channel access token，以及收�
 """
 from __future__ import annotations
 
+import re as _re
+
 import hashlib
 import hmac
 import json
@@ -182,6 +184,12 @@ def send_nextcloud(cfg: dict[str, Any], subject: str, text: str | None) -> None:
     rnd = _secrets.token_hex(32)
     sig = hmac.new(secret.encode(), (rnd + message).encode(),
                    hashlib.sha256).hexdigest()
+    # **token 會進網址的路徑段，而它是一般使用者填得到的欄位**
+    # （`nextcloud_to`）。不做處理的話使用者可以填 `../../..` 把請求改寫成
+    # 打同一台 Nextcloud 的別的端點，而且帶著 bot 的簽章標頭
+    # （v1.14.31 對抗式驗證實測）。Talk 的 token 本來就是英數字。
+    if not _re.fullmatch(r"[A-Za-z0-9_-]{1,64}", token or ""):
+        raise RuntimeError("Nextcloud 對話 token 格式不正確（只能是英數字）")
     _post(f"{site}/ocs/v2.php/apps/spreed/api/v1/bot/{token}/message",
           json={"message": message},
           headers={
