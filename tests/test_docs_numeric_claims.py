@@ -63,7 +63,11 @@ def _claims(text: str, pattern: str) -> set[int]:
 @pytest.mark.parametrize("path", [README, INDEX], ids=["README", "index.html"])
 def test_total_tool_count_claims(path):
     actual = _actual_tool_count()
-    got = _claims(path.read_text(encoding="utf-8"), r"(\d+) 個工具(?:整合|速覽|一站|一覽|，分)")
+    text = path.read_text(encoding="utf-8")
+    got = _claims(text, r"(\d+) 個工具(?:整合|速覽|一站|一覽|，分)")
+    # 「這有 45 工具」—— hero 標題沒有「個」字，第一版正則因此漏掉它，
+    # 使用者看著首頁大標題問「為何是 45」才發現（2026-08-16）。
+    got |= _claims(text, r"有 (\d+) 工具")
     assert got == {actual} or not got, (
         f"{path.name} 說有 {got} 個工具，實際 {actual}")
 

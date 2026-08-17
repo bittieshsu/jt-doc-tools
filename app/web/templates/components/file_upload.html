@@ -11,7 +11,11 @@
   </label>
   {% if workspace_enabled(request) %}
   <div class="fu-ws-row">
-    <button type="button" class="ws-load-btn" data-accept="{{ accept|default('application/pdf') }}">
+    {# data-ws-exts：工作區收得下的副檔名，由伺服器端給 —— 前端不可自己抄
+       一份（workspaceAcceptExts 曾寫死 pdf/png 兩種，工作區實際收 9 種，
+       於是只收 docx/xlsx 的工具按鈕永遠不接線，2026-08-17 使用者回報）。 #}
+    <button type="button" class="ws-load-btn" data-accept="{{ accept|default('application/pdf') }}"
+            data-ws-exts="{{ workspace_extensions() }}">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
       <span>從工作區載入</span>
     </button>

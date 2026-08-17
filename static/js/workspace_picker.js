@@ -4,7 +4,7 @@
 //   window.openWorkspacePicker({accept, onPick})  — modal to choose a saved file
 //   window.workspaceFileAsFile(fileId, meta)      — fetch a saved file as a File
 //   window.saveToWorkspace(blobOrSpec, name, tool)— POST output into workspace
-//   window.workspaceAcceptExts(acceptAttr)        — derive [pdf,png] subset
+//   window.workspaceAcceptExts(acceptAttr, wsExts) — accept ∩ 工作區清單
 (function () {
   function fmtBytes(n) {
     if (!n) return '0 B';
@@ -14,15 +14,24 @@
   }
   function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 
-  // Map an <input accept> attribute to the subset of {pdf, png} the workspace
-  // can supply to this upload. Empty/wildcard → both. Returns [] if neither
-  // (caller should then hide the "load from workspace" button).
-  function workspaceAcceptExts(acceptAttr) {
+  // 這個上傳框收得下、而且工作區供應得了的副檔名交集。
+  //
+  // **工作區那半邊的清單一律讀 `data-ws-exts`（伺服器端給），不可寫死。**
+  // 第一版把它寫死成 {pdf, png}，而工作區從 v1.14.6 起實際收 9 種 ——
+  // 於是 accept 只有 docx/xlsx 的工具（辦公文件格式互轉）按鈕永遠不接線、
+  // 按了沒反應，而且沒有任何錯誤（2026-08-17 使用者回報）。
+  // 跟「存至工作區」按鈕那宗（v1.14.35）是同一家族的清單漂移。
+  function workspaceAcceptExts(acceptAttr, wsExtsAttr) {
+    const server = String(wsExtsAttr || '').toLowerCase().split(/\s+/)
+      .filter(Boolean);
+    const ws = server.length ? server
+      : ['pdf', 'png'];      // 舊模板沒帶清單時的保守退路
     const a = (acceptAttr || '').toLowerCase();
-    if (!a.trim() || a.includes('*/*')) return ['pdf', 'png'];
-    const out = [];
-    if (a.includes('pdf')) out.push('pdf');
-    if (a.includes('png') || a.includes('image/')) out.push('png');
+    if (!a.trim() || a.includes('*/*')) return ws;
+    const out = ws.filter((e) =>
+      a.includes('.' + e) || a.includes('/' + e)
+      || (e === 'pdf' && a.includes('pdf'))
+      || (e === 'png' && a.includes('image/')));
     return out;
   }
 
@@ -76,23 +85,12 @@
       '    <div class="ws-picker-grid"></div></div>' +
       '</div>';
     document.body.appendChild(m);
-    const style = document.createElement('style');
-    style.textContent =
-      '.ws-picker-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}' +
-      '.ws-picker-dialog{background:#fff;border-radius:12px;width:min(720px,96vw);max-height:84vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);}' +
-      '.ws-picker-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #e5e7eb;font-size:15px;}' +
-      '.ws-picker-close{border:none;background:none;font-size:24px;line-height:1;cursor:pointer;color:#64748b;}' +
-      '.ws-picker-body{padding:16px 18px;overflow:auto;}' +
-      '.ws-picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}' +
-      '.ws-pick-card{border:1px solid #e2e8f0;border-radius:9px;overflow:hidden;cursor:pointer;background:#fff;transition:all .12s;display:flex;flex-direction:column;}' +
-      '.ws-pick-card:hover{border-color:#2563eb;box-shadow:0 2px 10px rgba(37,99,235,.18);}' +
-      '.ws-pick-thumb{height:110px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;overflow:hidden;}' +
-      '.ws-pick-thumb img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;}' +
-      '.ws-pick-badge{font-size:11px;font-weight:700;color:#fff;padding:3px 8px;border-radius:6px;background:#dc2626;}' +
-      '.ws-pick-info{padding:8px 10px;font-size:12px;}' +
-      '.ws-pick-name{font-weight:600;color:#1e293b;word-break:break-all;line-height:1.3;}' +
-      '.ws-pick-meta{color:#94a3b8;font-size:11px;margin-top:2px;}';
-    document.head.appendChild(style);
+    // 樣式在 platform.css 的「工作區選擇視窗」區塊 —— **不可以在這裡動態
+    // 注入 <style>**：CSP 的 style-src 只收 'self' 與 nonce，動態注入的
+    // 沒有 nonce 會被整段擋掉，視窗變成攤在頁尾的無樣式 div（沒有遮罩、
+    // 沒有置中），看起來像「按了沒反應」（2026-08-17 使用者回報，
+    // 用印與騎縫章兩頁都中）。功能面不會有任何例外，只有 console 一行
+    // CSP 違規 —— 所以「沒有 JS 錯誤」的檢查抓不到它。
     m.querySelector('.ws-picker-close').addEventListener('click', () => { m.hidden = true; });
     m.addEventListener('click', (e) => { if (e.target === m) m.hidden = true; });
     return m;
@@ -169,7 +167,8 @@
     opts = opts || {};
     if (!btn || !inputEl || !window.openWorkspacePicker) { if (btn) btn.hidden = true; return; }
     const exts = (opts.accept && opts.accept.length)
-      ? opts.accept : workspaceAcceptExts(inputEl.getAttribute('accept') || '');
+      ? opts.accept : workspaceAcceptExts(inputEl.getAttribute('accept') || '',
+          (btn.dataset && btn.dataset.wsExts) || '');
     if (!exts.length) { btn.hidden = true; return; }
     btn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();

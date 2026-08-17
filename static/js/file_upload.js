@@ -108,7 +108,8 @@
       if (!btn) return;
       if (!window.openWorkspacePicker || !window.workspaceAcceptExts) { btn.hidden = true; return; }
       const exts = window.workspaceAcceptExts(
-        this.input.getAttribute('accept') || btn.dataset.accept || '');
+        this.input.getAttribute('accept') || btn.dataset.accept || '',
+        btn.dataset.wsExts || '');
       if (!exts.length) { btn.hidden = true; return; }
       btn.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation();

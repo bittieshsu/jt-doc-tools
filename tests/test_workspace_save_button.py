@@ -98,3 +98,15 @@ def test_rendered_page_carries_the_extension_list():
     m = re.search(r'data-ws-exts="([^"]*)"', r.text)
     assert m, "render 出來的頁面沒有 data-ws-exts"
     assert "xlsx" in m.group(1).split(), m.group(1)
+
+def test_picker_accept_mapping_reads_server_list():
+    """`workspaceAcceptExts` 不可寫死工作區清單（2026-08-17 第二宗漂移）。
+
+    第一版寫死 {pdf, png}，工作區實際收 9 種 —— accept 只有 docx/xlsx 的
+    工具（辦公文件格式互轉）「從工作區載入」按鈕永遠不接線。
+    """
+    src = (ROOT / "static" / "js" / "workspace_picker.js").read_text(encoding="utf-8")
+    assert "wsExts" in src, "workspaceAcceptExts 要吃伺服器端清單參數"
+    tpl = (ROOT / "app" / "web" / "templates" / "components" /
+           "file_upload.html").read_text(encoding="utf-8")
+    assert "data-ws-exts" in tpl, "共用上傳元件的按鈕要帶 data-ws-exts"
