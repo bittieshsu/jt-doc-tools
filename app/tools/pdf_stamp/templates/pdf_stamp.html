@@ -871,14 +871,23 @@ function appendPagesField(fd) {
   if (arr.length && arr.length < cnt) fd.append('pages_json', JSON.stringify(arr));
 }
 
+let _previewFileKey = null;
 async function loadPreview() {
   const f = firstFile();
   if (!f) return null;
+  // **同一個檔案不重新上傳。** 每次上傳伺服器都回新的 upload_id，而
+  // ensurePlacementEditor 靠「uploadId 沒變」判斷不要重建編輯器 ——
+  // 重新上傳會讓那條防線永遠不成立，於是「切到每頁統一用印再切回來」
+  // 就把使用者放好的章整批清空（防線的註解說要防的正是這件事，
+  // 但它比對的 id 每次都變，從第一天起就是空的；2026-08-17 客戶回報）。
+  const key = [f.name, f.size, f.lastModified].join('|');
+  if (previewInfo && _previewFileKey === key) return previewInfo;
   const fd = new FormData();
   fd.append('file', f);
   const r = await fu.upload('/tools/pdf-stamp/preview', fd, {processingLabel: '產生預覽中…'});
   if (!r.ok) return null;
   previewInfo = await r.json();
+  _previewFileKey = key;
   editPageIdx = 0;
   if (editor) {
     editor.setPaper(previewInfo.paper_w_mm, previewInfo.paper_h_mm);
@@ -1156,9 +1165,16 @@ function applyPosMode() {
   const pagePick = document.getElementById('pagePickRow');
   if (pagePick) pagePick.hidden = on;
   if (hint) {
+    // 兩種模式都要有提示。「可以混用多種印章」這個能力原本只寫在切過去
+    // 之後的說明裡 —— 停在統一模式的人永遠看不到，以為一次只能蓋一顆章
+    // （2026-08-17 使用者這樣問了）。
     hint.textContent = on
-      ? '頁面個別用印：蓋哪些頁由你放置的位置決定（上方「蓋章頁面」不適用）；每頁可放多個，也可換不同的章混用，並可放入日期與個資限用章（需先在 1b / 1c 啟用）。'
-      : '';
+      ? '頁面個別用印：在上方 1 區選好章，到頁面上點一下放置；'
+        + '改選另一個章再點，就能在同一份文件混用多種印章。'
+        + '蓋哪些頁由放置位置決定（上方「蓋章頁面」不適用），'
+        + '也可放入日期與個資限用章（需先在 1b / 1c 啟用）。'
+      : '每頁統一用印：整份文件蓋同一顆章。'
+        + '要在不同位置蓋多個不同的章，請切換到「頁面個別用印」。';
   }
   // 切換後一定要讓「剛顯示出來」的編輯器重算版面：元素在 hidden 狀態下
   // clientWidth = 0，之前算出的 mmPerPx 會讓紙張縮成極小一塊（切回統一位置時
@@ -1185,6 +1201,10 @@ document.querySelectorAll('#posModeSwitch .mode-btn').forEach(btn => {
     applyPosMode();
   });
 });
+// 初載也跑一次 —— applyPosMode 原本只在「切換」時被呼叫，統一模式的提示
+// （「要混多個不同章請切到頁面個別用印」）在頁面剛開時就該看得到，
+// 不然停在預設模式的人永遠看不到那句話，提示等於沒寫。
+applyPosMode();
 
 async function ensureEditor() {
   const id = getSelectedStamp();

@@ -426,11 +426,22 @@
       });
       // 1) 點擊紙面空白處 → 在該點放置一個物件（issue #38 需求 2）
       this.$paper.addEventListener('pointerdown', (e) => {
+        // **只認滑鼠左鍵**（觸控 / 手寫筆的 button 也是 0）。右鍵也會觸發
+        // pointerdown，不擋的話右鍵會「放置 + 彈出瀏覽器選單」兩件事一起
+        // 發生 —— 客戶因此以為「要按右鍵才能放章」（2026-08-17 回報），
+        // 而那其實是意外行為。
+        if (e.button !== 0) return;
         const item = e.target.closest('.spe-item');
         if (item) return;                       // 點在物件上 → 交給物件的處理
         // 印章 / 簽名要先選圖才放；日期 / 個資限用章的圖來自 1b / 1c 面板，
         // 由 add() 自行檢查（沒啟用會跳提示）。
-        if ((this.kind || 'stamp') === 'stamp' && !this.assetUrl) return;
+        if ((this.kind || 'stamp') === 'stamp' && !this.assetUrl) {
+          // **不可以無聲 return** —— 使用者只看到「點了沒反應」，
+          // 然後開始亂試右鍵（見上）。要講清楚下一步。
+          if (window.showToast)
+            window.showToast('請先在上方 1 區選一個印章 / 簽名，再點頁面放置', 'err');
+          return;
+        }
         const r = this.$paper.getBoundingClientRect();
         this.add(this._pxToMm(e.clientX - r.left), this._pxToMm(e.clientY - r.top));
       });
