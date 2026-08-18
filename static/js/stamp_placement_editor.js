@@ -174,6 +174,17 @@
                           : '請先在上方「1c. 個資限用章」啟用並設定內容', 'err');
         return null;
       }
+      // 印章類：合法的放置一定帶 asset_id（共用資產）或 png_b64（臨時資產）。
+      // 兩者都沒有 = 沒選章、或選了「不蓋印章 / 簽名」—— 後者的圖是
+      // **透明 1×1**，不擋的話會放出一個看不見的物件（畫面上只剩空的
+      // 虛線框，客戶 2026-08-17 截圖裡那些空框就是這樣來的），送出後
+      // 又因為沒有主印章而整批失敗。
+      if (kind === 'stamp' && !cur.asset_id && !cur.png_b64) {
+        if (window.showToast) window.showToast(
+          '請先在上方 1 區選一顆印章 / 簽名再點頁面放置'
+          + '（「不蓋印章」只能搭配日期 / 個資限用章使用）', 'err');
+        return null;
+      }
       const dims = this.dimsOf(this.page);
       const w = opts.width_mm || cur.width_mm || this.defaultSize.width_mm;
       const h = opts.height_mm || cur.height_mm || this.defaultSize.height_mm;
