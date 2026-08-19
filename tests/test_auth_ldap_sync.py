@@ -91,13 +91,22 @@ def test_sync_user_dict_canonical_key_is_user_id(auth_off):
     assert "id" not in u
 
 
-def test_sync_user_username_collides_with_other_ldap_dn(auth_off):
-    """Two different DNs claiming the same uid in the SAME backend → refuse
-    the second one (would silently take over the first user's identity)."""
+def test_sync_user_same_username_new_dn_rebinds(auth_off):
+    """同 backend 同帳號名、DN 不同 → **換綁**（同一個人搬了 OU），
+    不再拒絕（issue #47：搬 OU 後登不進來，唯一解法是刪帳號陪葬角色）。
+
+    「身分接管」的顧慮由搜尋階段擋：目錄裡同名多筆時
+    `_search_ldap_user` 直接拒絕登入，走得到這裡的一定是目錄中該帳號名
+    唯一的一筆、而且本人剛用新 DN 通過 bind。完整驗收（角色保留 / 稽核 /
+    local 同名不受影響）在 `tests/test_ad_ou_move.py`。"""
     _setup(auth_off)
-    auth_ldap._sync_user("dup", "First",
-                         "uid=dup,ou=Tw,dc=example,dc=com", "ldap")
-    with pytest.raises(auth_ldap.AuthError) as exc:
-        auth_ldap._sync_user("dup", "Second",
-                             "uid=dup,ou=Us,dc=example,dc=com", "ldap")
-    assert "另一個 LDAP DN" in str(exc.value)
+    first = auth_ldap._sync_user("dup", "First",
+                                 "uid=dup,ou=Tw,dc=example,dc=com", "ldap")
+    second = auth_ldap._sync_user("dup", "Second",
+                                  "uid=dup,ou=Us,dc=example,dc=com", "ldap")
+    assert second["user_id"] == first["user_id"], "應綁回同一個帳號"
+    from app.core import auth_db
+    row = auth_db.conn().execute(
+        "SELECT external_dn FROM users WHERE id=?",
+        (first["user_id"],)).fetchone()
+    assert row["external_dn"] == "uid=dup,ou=Us,dc=example,dc=com"

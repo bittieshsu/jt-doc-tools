@@ -748,20 +748,46 @@ def _sync_user(username: str, display_name: str, dn: str, backend: str,
         return {"user_id": row["id"], "username": username,
                 "display_name": display_name, "source": backend}
 
-    # First-time login for this LDAP DN. PVE-style: same username can exist
-    # in different realms (local vs ldap) — UNIQUE(username, source) lets
-    # them coexist. Still refuse when a *different* LDAP DN already claimed
-    # the same username in this same backend, to avoid silent identity
-    # takeover (login as `jason` from one OU vs another).
+    # 這個 DN 沒見過，但同 backend 可能已有同名帳號 —— 那是**同一個人搬了
+    # OU**（DN 是位置不是身分）。AD 的 sAMAccountName 全網域唯一；OpenLDAP
+    # 若真有兩筆同 uid，`_search_ldap_user` 在搜尋階段就拒絕登入了 —— 走到
+    # 這裡代表目錄裡這個帳號名**只有一筆**、而且本人剛用新 DN 通過 bind。
+    #
+    # 舊版把這種情況當「同名衝突」直接擋（issue #47）：使用者搬個 OU 就
+    # 登不進來，唯一解法是刪掉舊帳號 —— 角色與歷史全部陪葬。正確處理是
+    # **把既有帳號的 DN 換成新的**（id / 角色 / 歷史全部保留），並寫稽核。
     clash = conn.execute(
-        "SELECT external_dn FROM users WHERE username=? AND source=?",
+        "SELECT id, external_dn FROM users WHERE username=? AND source=?",
         (username, backend),
     ).fetchone()
     if clash:
-        raise AuthError(
-            f"已有另一個 {backend.upper()} DN 使用此帳號名「{username}」"
-            f"（DN: {clash['external_dn']}）。請聯絡管理員處理同名衝突。"
-        )
+        old_dn = clash["external_dn"] or ""
+        with db.tx(conn):
+            if email:
+                conn.execute(
+                    "UPDATE users SET external_dn=?, display_name=?, email=?, "
+                    "last_login_at=?, enabled=1, directory_seen_at=? WHERE id=?",
+                    (dn, display_name, email, now, now, clash["id"]))
+            else:
+                conn.execute(
+                    "UPDATE users SET external_dn=?, display_name=?, "
+                    "last_login_at=?, enabled=1, directory_seen_at=? WHERE id=?",
+                    (dn, display_name, now, now, clash["id"]))
+        from .log_safe import safe_log
+        logger.info("目錄帳號 %s 的 DN 已更新（OU 異動）：%s → %s",
+                    safe_log(username), safe_log(old_dn, max_len=200),
+                    safe_log(dn, max_len=200))
+        from . import audit_db as _audit
+        _audit.log_event(
+            "user_dn_rebind", username=username, ip="",
+            target=str(clash["id"]),
+            details={"old_dn": old_dn, "new_dn": dn, "backend": backend})
+        if not permissions.list_roles_for_subject("user", str(clash["id"])):
+            from . import roles as _roles
+            permissions.set_subject_roles(
+                "user", str(clash["id"]), [_roles.get_default_role_id()])
+        return {"user_id": clash["id"], "username": username,
+                "display_name": display_name, "source": backend}
 
     with db.tx(conn):
         cur = conn.execute(
@@ -1078,10 +1104,27 @@ def sync_all_users(name_contains: str = "") -> dict:
                     updated += 1
                 continue
             clash = conn_db.execute(
-                "SELECT id FROM users WHERE username=? AND source=?",
+                "SELECT id, external_dn FROM users WHERE username=? AND source=?",
                 (login, backend)).fetchone()
             if clash:
-                skipped += 1
+                # 同帳號名、DN 不同 = 這個人搬了 OU（issue #47）。舊版悄悄
+                # skip —— 搬家的人永遠停在舊 DN，之後還會被「完整同步沒
+                # 看到」誤標成目錄已無此人。改成更新 DN 與戳記；**絕不動
+                # enabled**（鏡射 ≠ 啟用，v1.12.70 不變量）。
+                conn_db.execute(
+                    "UPDATE users SET external_dn=?, directory_seen_at=?, "
+                    "dir_disabled=?, pwd_expires_at=? WHERE id=?",
+                    (dn, now, None if disabled is None else int(disabled),
+                     pwd_exp, clash["id"]))
+                if disp:
+                    conn_db.execute(
+                        "UPDATE users SET display_name=? WHERE id=?",
+                        (disp, clash["id"]))
+                if mail:
+                    conn_db.execute(
+                        "UPDATE users SET email=? WHERE id=?",
+                        (mail, clash["id"]))
+                updated += 1
                 continue
             # enabled=0 → 目錄可見但「未啟用」；不給角色。啟用由本人登入(JIT)或
             # admin 明確操作。已驗證 enabled=0 不擋日後 LDAP 登入。

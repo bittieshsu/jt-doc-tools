@@ -398,9 +398,9 @@ def delete(user_id: int) -> None:
         from . import workspace
         workspace.purge_user(user_id)
     except Exception:  # noqa: BLE001 — 帳號已經刪掉了，清檔失敗不該讓整件事失敗
-        import logging
-        logging.getLogger(__name__).warning(
-            "刪除帳號後清理工作區失敗 user_id=%s", user_id)
+        from .log_safe import safe_log
+        logger.warning(
+            "刪除帳號後清理工作區失敗 user_id=%s", safe_log(str(user_id)))
 
 
 def _count_admin_users(conn) -> int:
