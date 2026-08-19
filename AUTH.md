@@ -130,6 +130,29 @@ SSO 是**附加**登入方式，與本機 / LDAP / AD **並存** —— 啟用�
 - OIDC Redirect URI：`https://<你的網域>/auth/oidc/callback`
 - SAML ACS：`https://<你的網域>/auth/saml/acs`
 
+### SSO 登入失敗怎麼查原因
+
+畫面上只顯示通用訊息（「SAML 登入失敗，請重試或聯絡管理員」）—— 這是刻意的，
+失敗細節不對未登入者洩漏。**完整原因記在兩個地方，管理員都查得到**：
+
+1. **稽核記錄**：`/admin/audit` 篩選事件 `login_fail`，detail 欄有
+   「saml: …」/「oidc: …」的具體原因（簽章驗不過、Audience 不符、時間
+   偏移、帳號開通失敗…）。
+2. **伺服器日誌**：`jtdt logs`（Linux 走 journalctl；Windows 讀
+   `<資料目錄>\logs\jt-doc-tools.log`）。搜 `SAML`，XML / 簽章 / 解密層
+   的失敗連完整堆疊都在這裡。
+
+**ADFS 常見的五個原因**（IdP 端多半不會有錯誤記錄 —— 回應簽發成功，
+是我們這端驗不過）：
+
+| 症狀 | 原因 | 處理 |
+|---|---|---|
+| 解析失敗（xmlsec / decrypt 類例外） | ADFS 信賴憑證者信任啟用了**斷言加密**，但 SP 沒設定憑證 / 私鑰 | ADFS 端移除加密憑證，或在 `/admin/sso` 填 SP 憑證與私鑰 |
+| Audience / invalid_response | ADFS 的「識別碼」與 SP EntityID 不一致 | 兩邊都用 `<base>/auth/saml/metadata` |
+| 簽章驗證失敗 | 貼錯憑證（token-signing 才對）、或憑證換發過 | 重新匯出 ADFS 的 **token-signing** 憑證貼入 |
+| NotOnOrAfter / NotBefore | 兩邊時鐘偏移 | 兩邊都對 NTP |
+| 找不到 NameID | ADFS 沒發 NameID claim | 加一條規則把 UPN / sAMAccountName 轉成 Name ID |
+
 **安全**：client secret / SP 私鑰以 Fernet 加密存（金鑰沿用 session secret，檔案 mode 600）；OIDC 走 state + nonce 防 CSRF / 重放；discovery / token / JWKS 端點限 http/https 並封鎖 cloud metadata 位址。
 
 ## Reverse Proxy SSO（Kerberos / SPNEGO，v1.12.53+）

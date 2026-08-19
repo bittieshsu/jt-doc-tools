@@ -116,13 +116,23 @@ def process_acs(request: Any, cfg: dict[str, Any], base_url: str,
         auth = _auth(request, cfg, base_url, post_data)
         auth.process_response()
     except Exception as e:
-        raise SAMLError(f"SAML 回應解析失敗：{e.__class__.__name__}") from e
+        # **完整堆疊一定要進伺服器日誌**。這條路徑走到的是「XML 層就炸掉」
+        # 的失敗（最常見：IdP 啟用了斷言加密但 SP 沒設定憑證 / 私鑰、
+        # 憑證格式錯、xmlsec 演算法不支援）—— 原本只留類別名稱，客戶問
+        # 「有沒有 log 可查」時什麼都查不到（2026-08-19 ADFS 導入案）。
+        # 畫面維持通用訊息不變；細節進日誌與稽核（管理員才看得到）。
+        logger.exception("SAML 回應解析失敗（XML / 簽章 / 解密層）")
+        brief = " ".join(str(e).split())[:120]
+        raise SAMLError(
+            f"SAML 回應解析失敗：{e.__class__.__name__}"
+            + (f"（{brief}）" if brief else "")) from e
     errors = auth.get_errors()
     if errors:
         reason = auth.get_last_error_reason() or ",".join(errors)
         logger.warning("SAML ACS errors: %s (%s)", errors, reason)
         raise SAMLError(f"SAML 驗證失敗：{reason[:160]}")
     if not auth.is_authenticated():
+        logger.warning("SAML 回應驗證通過但 is_authenticated 為 False")
         raise SAMLError("SAML 未通過驗證")
     # Replay protection: reject an assertion ID we've already consumed (signature
     # + NotOnOrAfter are checked by OneLogin above, but not cross-request replay).
