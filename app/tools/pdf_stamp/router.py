@@ -106,7 +106,7 @@ async def render_restrict_stamp_endpoint(request: Request):
         date_str:     str — 日期文字(已格式化),選填
         applicant:    str — 申請人姓名，選填
         copy_label:   str — 影本份數標示(例「第 1 份 / 共 3 份」),選填
-        style:        str — "rectangle" / "diagonal",預設 rectangle
+        style:        str — "rectangle" / "vertical"（直式，中文直書）/ "diagonal",預設 rectangle
         border:       str — rectangle 模式邊框「double」/「single」/「none」
         color_hex:    str — 預設 "#c00000" 深紅
         font_size_px: int — 預設 64
@@ -124,7 +124,7 @@ async def render_restrict_stamp_endpoint(request: Request):
     applicant = str(body.get("applicant") or "").strip()[:20]
     copy_label = str(body.get("copy_label") or "").strip()[:30]
     style = str(body.get("style") or "rectangle")
-    if style not in ("rectangle", "diagonal"):
+    if style not in ("rectangle", "diagonal", "vertical"):
         style = "rectangle"
     border = str(body.get("border") or "double")
     if border not in ("double", "single", "none"):
@@ -149,7 +149,14 @@ async def render_restrict_stamp_endpoint(request: Request):
     font_size_px = max(24, min(160, font_size_px))
 
     try:
-        if style == "diagonal":
+        if style == "vertical":
+            png_bytes, w, h = _restrict_render.render_vertical_stamp(
+                purpose=purpose, date_str=date_str,
+                applicant=applicant, copy_label=copy_label,
+                color_hex=color_hex, font_size_px=font_size_px,
+                border_style=border, font_style=font_style,
+            )
+        elif style == "diagonal":
             png_bytes, w, h = _restrict_render.render_diagonal_stamp(
                 purpose=purpose, date_str=date_str,
                 color_hex=color_hex, font_size_px=font_size_px,

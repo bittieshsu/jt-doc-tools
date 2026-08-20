@@ -322,3 +322,175 @@ PURPOSE_TEMPLATES: list[dict] = [
 def font_options() -> list[dict]:
     """UI 字型清單。"""
     return [{"id": k, "name": v["name"]} for k, v in FONT_STYLES.items()]
+
+
+# ---- 直式（傳統中文直書）----------------------------------------------------
+
+#: 直書的標點呈現形（CJK Compatibility Forms）。橫式的「，」直排會浮在
+#: 格子中間偏左、看起來像放錯位置 —— 直書要用專屬字形（居右上、直向）。
+#: 同一個雷在 pdf-to-office 的直書還原做過一次（v1.9.96）。
+_VERTICAL_PUNCT = str.maketrans({
+    "，": "︐", "、": "︑", "。": "︒", "：": "︓",
+    "；": "︔", "！": "︕", "？": "︖",
+    "（": "︵", "）": "︶", "「": "﹁", "」": "﹂",
+    "『": "﹃", "』": "﹄", "—": "︱", "…": "︙",
+    # 半形句點直排時小到近乎看不見（實測 115.08.20 變成 115 08 20）——
+    # 直式日期的慣例本來就是間隔號：115·08·20
+    ".": "·",
+})
+
+
+def _vertical_text(s: str) -> str:
+    return (s or "").translate(_VERTICAL_PUNCT)
+
+
+def _draw_vertical_column(draw: ImageDraw.ImageDraw, text: str, font,
+                          x_center: int, y_top: int, color,
+                          char_gap: int, stroke_w: int = 0) -> int:
+    """把一段文字**逐字直排**在以 x_center 為中心的一欄，回傳畫完後的 y。
+
+    數字 / Latin 不旋轉、照樣逐字直排 —— 台灣直式印章與名片的電話、
+    日期慣例就是這樣（旋轉 90 度反而少見且難讀）。
+    """
+    y = y_top
+    for ch in text:
+        w, h = _text_size(draw, ch, font)
+        draw.text((x_center - w // 2, y), ch, fill=color, font=font,
+                  stroke_width=stroke_w, stroke_fill=color)
+        y += h + char_gap
+    return y
+
+
+def _measure_vertical_column(draw: ImageDraw.ImageDraw, text: str, font,
+                             char_gap: int) -> tuple[int, int]:
+    """一欄直排文字的 (寬, 高)。寬 = 最寬的字；高 = 各字高 + 字距。"""
+    max_w = total_h = 0
+    for ch in text:
+        w, h = _text_size(draw, ch, font)
+        max_w = max(max_w, w)
+        total_h += h + char_gap
+    if text:
+        total_h -= char_gap
+    return max_w, total_h
+
+
+def render_vertical_stamp(
+    purpose: str,
+    date_str: str = "",
+    applicant: str = "",
+    copy_label: str = "",
+    color_hex: str = "#c00000",
+    font_size_px: int = 64,
+    border_style: str = "double",
+    font_style: str = "kaiti",
+) -> tuple[bytes, int, int]:
+    """渲染**直式**長方形紅章（傳統中文直書：字上而下、欄右而左）。
+
+    版面（右 → 左）:
+        「僅供」(0.55x) ｜ {purpose}(1.0x, 粗) ｜ 「使用，他用無效」(0.55x)
+        ｜ 豎分隔線 ｜ footer 各項一欄 (0.45x)
+
+    公文與證件影本常直式蓋印 —— 橫式章壓在直書文件上視覺方向打架，
+    這正是要有直式的原因。
+    """
+    purpose = _vertical_text((purpose or "").strip() or "_________")
+
+    big_size = font_size_px
+    small_size = max(20, int(font_size_px * 0.55))
+    foot_size = max(18, int(font_size_px * 0.45))
+
+    font_big = _load_font(font_style, big_size, prefer_bold=True)
+    font_small = _load_font(font_style, small_size, prefer_bold=False)
+    font_foot = _load_font(font_style, foot_size, prefer_bold=False)
+
+    color = _parse_hex(color_hex)
+    tmp = Image.new("RGBA", (10, 10))
+    draw = ImageDraw.Draw(tmp)
+
+    gap_char = max(2, int(big_size * 0.06))       # 欄內字距
+    gap_col = max(8, int(big_size * 0.30))        # 欄與欄的間距
+    pad_x = max(int(big_size * 0.55), 16)
+    pad_y = max(int(big_size * 0.9), 24)
+
+    top_txt = "僅供"
+    bottom_txt = _vertical_text("使用，他用無效")
+    footer_cols = [
+        _vertical_text(s) for s in
+        (date_str.strip(), applicant.strip(), copy_label.strip()) if s
+    ]
+
+    # 右 → 左 的欄序（畫的時候從右邊算 x）。對齊比照傳統直書章：
+    # 「僅供」起於天頭（top）、主文置中、「使用，他用無效」收於地腳
+    # （bottom）—— 三欄全置中的話「僅供」會浮在半空，看起來像排版錯誤。
+    cols: list[tuple[str, object, int, str]] = [
+        (top_txt, font_small, 0, "top"),
+        (purpose, font_big, max(0, int(big_size * 0.045)), "center"),
+        (bottom_txt, font_small, 0, "bottom"),
+    ]
+    foot_meas = [_measure_vertical_column(draw, t, font_foot, gap_char)
+                 for t in footer_cols]
+    col_meas = [_measure_vertical_column(draw, t, f, gap_char)
+                for t, f, _sw, _al in cols]
+
+    content_h = max([h for _w, h in col_meas + foot_meas] or [big_size])
+    content_w = sum(w for w, _h in col_meas) + gap_col * (len(cols) - 1)
+    sep_gap = 0
+    if footer_cols:
+        # 豎分隔線佔一個 gap_col 的位置
+        sep_gap = gap_col
+        content_w += sep_gap + max(1, int(big_size * 0.025)) + gap_col
+        content_w += (sum(w for w, _h in foot_meas)
+                      + gap_col * (len(footer_cols) - 1))
+
+    img_w = content_w + pad_x * 2
+    img_h = content_h + pad_y * 2
+
+    img = Image.new("RGBA", (img_w, img_h), (255, 255, 255, 0))
+    draw = ImageDraw.Draw(img)
+
+    if border_style == "double":
+        outer_w = max(3, int(big_size * 0.08))
+        draw.rectangle([0, 0, img_w - 1, img_h - 1], outline=color, width=outer_w)
+        inner_gap = max(5, int(big_size * 0.11))
+        inner_w = max(1, int(outer_w * 0.45))
+        draw.rectangle(
+            [inner_gap, inner_gap, img_w - 1 - inner_gap, img_h - 1 - inner_gap],
+            outline=color, width=inner_w,
+        )
+    elif border_style == "single":
+        w = max(2, int(big_size * 0.06))
+        draw.rectangle([0, 0, img_w - 1, img_h - 1], outline=color, width=w)
+
+    # 從最右欄開始畫（傳統直書欄序右 → 左）；各欄垂直置中
+    x_right = img_w - pad_x
+    for (text, font, stroke_w, align), (col_w, col_h) in zip(cols, col_meas):
+        x_center = x_right - col_w // 2
+        if align == "top":
+            y_top = pad_y
+        elif align == "bottom":
+            y_top = img_h - pad_y - col_h
+        else:
+            y_top = (img_h - col_h) // 2
+        _draw_vertical_column(draw, text, font, x_center, y_top, color,
+                              gap_char, stroke_w)
+        x_right -= col_w + gap_col
+
+    if footer_cols:
+        # 豎分隔線
+        x_right -= sep_gap - gap_col   # cols 迴圈已扣掉一個 gap_col
+        line_w = max(1, int(big_size * 0.025))
+        line_pad = int(big_size * 0.5)
+        draw.line([(x_right, line_pad + pad_y // 2),
+                   (x_right, img_h - line_pad - pad_y // 2)],
+                  fill=color, width=line_w)
+        x_right -= line_w + gap_col
+        for text, (col_w, col_h) in zip(footer_cols, foot_meas):
+            x_center = x_right - col_w // 2
+            y_top = (img_h - col_h) // 2
+            _draw_vertical_column(draw, text, font_foot, x_center, y_top,
+                                  color, gap_char)
+            x_right -= col_w + gap_col
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue(), img_w, img_h

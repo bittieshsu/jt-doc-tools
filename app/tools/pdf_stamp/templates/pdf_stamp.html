@@ -231,8 +231,10 @@
 
           <label data-s="s3044b600">章型</label>
           <select id="restrict-style" class="jt-select" data-s="sc3b421e0">
-            <option value="rectangle" selected>長方形紅章（雙線框）</option>
-            <option value="rectangle-single">長方形紅章（單線框）</option>
+            <option value="rectangle" selected>橫式紅章（雙線框）</option>
+            <option value="rectangle-single">橫式紅章（單線框）</option>
+            <option value="vertical">直式紅章（雙線框）</option>
+            <option value="vertical-single">直式紅章（單線框）</option>
             <option value="diagonal">對角線斜印</option>
           </select>
 
@@ -1756,6 +1758,8 @@ function _restrictGetParams() {
   const styleSel = document.getElementById('restrict-style').value;
   let style = 'rectangle', border = 'double';
   if (styleSel === 'rectangle-single') { style = 'rectangle'; border = 'single'; }
+  else if (styleSel === 'vertical') { style = 'vertical'; border = 'double'; }
+  else if (styleSel === 'vertical-single') { style = 'vertical'; border = 'single'; }
   else if (styleSel === 'diagonal') { style = 'diagonal'; border = 'none'; }
   const fontStyle = document.getElementById('restrict-font').value || 'kaiti';
   const colorHex = document.getElementById('restrict-color').value || '#c00000';
