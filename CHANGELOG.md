@@ -4,6 +4,30 @@
 
 ---
 
+## [1.14.45] - 2026-08-23
+
+### 修正：Windows Server 沒有 winget 時裝不到 git，`jtdt update` 從此不能用
+
+**Windows Server 2019 / 2022 不內建 winget**（它隨 App Installer 提供，
+而 App Installer 不在 Server 版；Server 2025 起才有，Server Core 一律沒有）。
+安裝腳本原本只透過 winget 裝 git，偵測不到就放棄 —— 沒有 git 就走 tarball
+模式，`jtdt update` 從此不能用，客戶會卡在舊版。
+
+更糟的是 `jtdt update` 缺 git 時印的指引是「winget install --id Git.Git」
+—— **循環死結**：叫使用者用一個他也沒有的工具（沒 winget 的機器本來就
+最可能沒 git）。
+
+- `install.ps1`：偵測不到 winget（或 winget 裝失敗）時，改從 Git for
+  Windows 官方 GitHub Release 直接下載安裝檔並以無互動方式安裝
+- `jtdt update` 的指引改成**先給直接下載網址**，winget 只列為備選，
+  並補上「重新開啟 PowerShell 讓 PATH 生效」
+- `INSTALL.md` 新增「Windows Server：沒有內建 winget」小節，一併說明
+  OCR 引擎與 LibreOffice 在 Server 上會跳過（選用元件，不影響主體）
+
+守門測試 `tests/test_windows_git_guidance.py`：擋「退回只依賴 winget」、
+擋 `Net.WebClient`（無預設 timeout）、確認 `.ps1` 的 UTF-8 BOM 還在。
+PowerShell 語法在 Windows 11 實機驗過。
+
 ## [1.14.44] - 2026-08-23
 
 ### 修正：版本檢查的更新指令看起來「Windows 沒有」（客戶回報）

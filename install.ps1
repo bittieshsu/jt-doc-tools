@@ -386,6 +386,45 @@ function Install-Winsw {
 }
 
 # Source code
+function Install-GitDirect {
+    # 從 Git for Windows 的官方 GitHub Release 抓 64 位元安裝檔，靜默安裝。
+    # 給沒有 winget 的機器用（Windows Server 2019 / 2022、Server Core）。
+    # 一律 Invoke-WebRequest + -TimeoutSec：Net.WebClient 沒有預設 timeout，
+    # 網路不通會默默卡好幾分鐘（本專案踩過）。
+    try {
+        $api = "https://api.github.com/repos/git-for-windows/git/releases/latest"
+        $rel = Invoke-RestMethod -Uri $api -UseBasicParsing -TimeoutSec 20 `
+            -Headers @{ "User-Agent" = "jt-doc-tools-installer" } -ErrorAction Stop
+        $asset = $rel.assets | Where-Object {
+            $_.name -like "Git-*-64-bit.exe"
+        } | Select-Object -First 1
+        if (-not $asset) { Warn "No 64-bit Git installer asset found"; return $false }
+        $tmp = Join-Path $env:TEMP $asset.name
+        Log "Downloading $($asset.name) ..."
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tmp `
+            -UseBasicParsing -TimeoutSec 600 -ErrorAction Stop
+        Log "Installing Git for Windows (silent) ..."
+        # /VERYSILENT + /NORESTART：Inno Setup 的靜默安裝
+        $proc = Start-Process $tmp -ArgumentList `
+            "/VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /COMPONENTS=""icons,ext\reg\shellhere,assoc,assoc_sh""" `
+            -Wait -PassThru
+        Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+        if ($proc.ExitCode -ne 0) { Warn "Git installer exit code $($proc.ExitCode)"; return $false }
+        # 重新載入 PATH —— 安裝程式寫進系統 PATH，但這個 shell 還沒看到
+        $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
+                    [System.Environment]::GetEnvironmentVariable('Path', 'User')
+        if (Get-Command git -ErrorAction SilentlyContinue) {
+            Ok "git installed (direct download)"
+            return $true
+        }
+        Warn "Git installed but 'git' still not on PATH"
+        return $false
+    } catch {
+        Warn "Direct git install failed: $_"
+        return $false
+    }
+}
+
 function Install-Git {
     # Try to install Git if missing — git mode is required for `jtdt update`
     # to work later. Falling through to tarball mode leaves customers stuck
@@ -396,9 +435,15 @@ function Install-Git {
         Ok "git already installed"
         return
     }
-    Log "git not found; trying to install via winget (required for jtdt update)..."
+    Log "git not found; installing (required for jtdt update)..."
+    # **Windows Server 2019 / 2022 沒有內建 winget**（App Installer 不在
+    # Server 版；Server 2025 才開始內建，Server Core 一律沒有）。git 缺席
+    # 時直接叫使用者「用 winget 裝 git」是循環死結 —— 那台正好也沒有
+    # winget。所以 winget 只是其中一條路，缺了就直接抓官方安裝檔。
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Warn "winget not available; jtdt update will require manual git install later"
+        Warn "winget not available (typical on Windows Server) - downloading Git for Windows directly"
+        if (Install-GitDirect) { return }
+        Warn "Direct git install failed; jtdt update will not work until git is installed"
         Warn "  Manual: https://git-scm.com/download/win  then re-run this installer"
         return
     }
@@ -420,6 +465,7 @@ function Install-Git {
     } catch {
         Warn "git install via winget failed: $_"
     }
+    if (Install-GitDirect) { return }
     Warn "Falling through — installer will use tarball mode; jtdt update will not work until git is manually installed"
 }
 

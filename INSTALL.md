@@ -78,6 +78,21 @@ winget install --id Git.Git -e --accept-package-agreements --accept-source-agree
 > 不需要預先安裝 Python — 由 uv 處理。
 > Office 引擎優先 OxOffice MSI（GitHub release），失敗時 fallback `winget install LibreOffice`。
 
+### Windows Server：沒有內建 winget
+
+**Windows Server 2019 / 2022 不內建 winget**（它隨「App Installer」提供，
+而 App Installer 不在 Server 版；**Server 2025 起才內建**，Server Core 一律
+沒有）。上面的 `winget install` 在這些機器上會直接找不到指令。
+
+安裝腳本已經處理：偵測不到 winget 時**自動改抓 Git for Windows 官方安裝檔**
+以無互動方式安裝，所以 `jtdt update` 照樣能用。若要事先手動裝，到
+<https://git-scm.com/download/win> 下載安裝即可。
+
+同理，OCR 引擎（Tesseract）與 LibreOffice 的 winget 安裝在 Server 上也會
+跳過 —— 這兩個是**選用**元件，缺了只影響對應功能（OCR 文字辨識、
+Office 格式轉換），主體仍可運作。要用的話手動安裝後重新啟動服務即可，
+`/admin/sys-deps` 頁會顯示目前偵測到什麼。
+
 ### 方式一：按兩下安裝程式（建議）
 
 到 [GitHub Releases](https://github.com/jasoncheng7115/jt-doc-tools/releases/latest) 下載

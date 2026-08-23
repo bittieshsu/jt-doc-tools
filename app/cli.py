@@ -375,8 +375,16 @@ def svc_update() -> int:
                   file=sys.stderr)
             print("Install git first, then re-run the upgrade:", file=sys.stderr)
             if _is_windows():
-                print("  winget install --id Git.Git -e   (then re-run 'jtdt update')",
-                      file=sys.stderr)
+                # **不要只講 winget。** Windows Server 2019 / 2022 沒有內建
+                # winget（App Installer 不在 Server 版；Server 2025 才有，
+                # Server Core 一律沒有）—— 而那正是最可能缺 git 的機器。
+                # 只給 winget 等於叫人用一個他也沒有的工具，是循環死結。
+                print("  下載安裝 Git for Windows："
+                      "https://git-scm.com/download/win", file=sys.stderr)
+                print("  （若這台有 winget，也可以："
+                      "winget install --id Git.Git -e）", file=sys.stderr)
+                print("  裝好後重新開啟 PowerShell（讓 PATH 生效），"
+                      "再執行 jtdt update", file=sys.stderr)
             else:
                 print("  sudo apt install -y git    # Debian/Ubuntu (or dnf/yum/zypper/pacman)",
                       file=sys.stderr)
