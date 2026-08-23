@@ -88,6 +88,13 @@ winget install --id Git.Git -e --accept-package-agreements --accept-source-agree
 以無互動方式安裝，所以 `jtdt update` 照樣能用。若要事先手動裝，到
 <https://git-scm.com/download/win> 下載安裝即可。
 
+> **裝完不需要重新開機。** 剛裝好 git 時，新的 PATH 只寫進登錄檔 ——
+> 已經開著的 PowerShell / Windows Terminal（**包括新開的分頁**）看到的
+> 仍是舊的，所以「重新開啟終端機」不一定有用。`jtdt update` 因此**不靠
+> PATH 找 git**：直接查登錄檔與標準安裝位置（`C:\Program Files\Git`），
+> 裝完直接再跑一次就好。只有把 git 裝到非標準路徑時，才需要讓 PATH
+> 生效（重開終端機或重新開機）。
+
 同理，OCR 引擎（Tesseract）與 LibreOffice 的 winget 安裝在 Server 上也會
 跳過 —— 這兩個是**選用**元件，缺了只影響對應功能（OCR 文字辨識、
 Office 格式轉換），主體仍可運作。要用的話手動安裝後重新啟動服務即可，

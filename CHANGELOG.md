@@ -4,6 +4,26 @@
 
 ---
 
+## [1.14.46] - 2026-08-23
+
+### 修正：Windows 裝完 git 之後還要重新開機才更新得動（客戶回報）
+
+客戶指出「Git 裝完 Windows 要重開一次」—— 觀察正確，但根因是**我們不該
+依賴 PATH**：剛裝好 git 時，新的 PATH 只寫進登錄檔，**已經開著的
+PowerShell / Windows Terminal 看到的仍是舊的，連新開的分頁也一樣**
+（分頁繼承自同一個終端機行程）。所以上一版寫的「重新開啟 PowerShell」
+不一定有用，使用者只能重開機。
+
+`jtdt update` 改成**不靠 PATH 找 git**（與 Tesseract 同一套三層做法）：
+
+1. PATH（多數情況直接命中）
+2. 登錄檔 `HKLM\SOFTWARE\GitForWindows\InstallPath`
+3. 標準安裝位置（`C:\Program Files\Git\cmd\git.exe` 等）
+
+實機驗證：在 Windows 11 上把 git 從 PATH 完全剝離，`shutil.which("git")`
+回 `None`，`_find_git()` 仍從登錄檔解析到正確路徑。**裝完 git 直接再跑
+一次 `jtdt update` 即可，不需要重開終端機、也不需要重新開機。**
+
 ## [1.14.45] - 2026-08-23
 
 ### 修正：Windows Server 沒有 winget 時裝不到 git，`jtdt update` 從此不能用

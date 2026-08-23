@@ -325,6 +325,56 @@ def _install_owner(root: Path) -> Optional[tuple[int, int]]:
         return None
 
 
+def _find_git() -> Optional[str]:
+    r"""git 執行檔的完整路徑；找不到回 None。
+
+    **不可以只靠 `shutil.which("git")`。** Windows 上剛裝完 Git 之後，
+    PATH 只更新在**登錄檔**裡 —— 已經開著的 PowerShell / Windows Terminal
+    保留舊的環境區塊，**開新分頁也一樣是舊的**（分頁繼承自同一個終端機
+    行程）。使用者照著「重新開啟 PowerShell」做卻還是找不到 git，只好
+    重開機 —— 客戶 2026-08-23 回報的就是這一步。
+
+    改成直接找檔案，就完全不必管 PATH 有沒有更新：
+      1. PATH（最快，多數情況命中）
+      2. 登錄檔 `HKLM\SOFTWARE\GitForWindows\InstallPath`（官方安裝檔會寫）
+      3. 標準安裝位置
+
+    與 `sys_deps.configure_pytesseract()` 是同一套做法（Tesseract 也踩過
+    「裝了但不在 PATH」）。
+    """
+    found = shutil.which("git")
+    if found:
+        return found
+    if not _is_windows():
+        return None
+    cands: list[Path] = []
+    try:
+        import winreg  # noqa: PLC0415 — Windows 專用
+        for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            try:
+                with winreg.OpenKey(hive, r"SOFTWARE\GitForWindows") as k:
+                    base = winreg.QueryValueEx(k, "InstallPath")[0]
+                    cands.append(Path(base) / "cmd" / "git.exe")
+            except OSError:
+                pass
+    except Exception:  # noqa: BLE001 — 沒有 winreg / 讀不到就往下試固定路徑
+        pass
+    for env_var in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432",
+                    "LOCALAPPDATA"):
+        base = os.environ.get(env_var)
+        if not base:
+            continue
+        cands.append(Path(base) / "Git" / "cmd" / "git.exe")
+        cands.append(Path(base) / "Programs" / "Git" / "cmd" / "git.exe")
+    for c in cands:
+        try:
+            if c.is_file():
+                return str(c)
+        except OSError:
+            continue
+    return None
+
+
 def _git_env_for(root: Path) -> dict[str, str]:
     """Return an env dict with `safe.directory=<root>` set so git won't
     error out with `fatal: detected dubious ownership in repository`. This
@@ -370,7 +420,8 @@ def svc_update() -> int:
         # on a box without git) → adopt the dir into a git repo in place so
         # updates work from now on. .venv / bin / data are preserved (data dir
         # lives elsewhere; untracked files survive `git reset --hard`).
-        if not shutil.which("git"):
+        git_exe = _find_git()
+        if not git_exe:
             print(f"Install dir {root} is not a git repo and git is not installed.",
                   file=sys.stderr)
             print("Install git first, then re-run the upgrade:", file=sys.stderr)
@@ -383,8 +434,11 @@ def svc_update() -> int:
                       "https://git-scm.com/download/win", file=sys.stderr)
                 print("  （若這台有 winget，也可以："
                       "winget install --id Git.Git -e）", file=sys.stderr)
-                print("  裝好後重新開啟 PowerShell（讓 PATH 生效），"
-                      "再執行 jtdt update", file=sys.stderr)
+                # 裝在標準位置的話 `_find_git()` 直接找得到，不必重開終端機
+                # 也不必重開機；只有裝到非標準路徑才需要讓 PATH 生效。
+                print("  裝好後直接再執行一次 jtdt update 即可。"
+                      "若仍找不到（裝在非標準路徑），"
+                      "請重新開機讓 PATH 生效後再試。", file=sys.stderr)
             else:
                 print("  sudo apt install -y git    # Debian/Ubuntu (or dnf/yum/zypper/pacman)",
                       file=sys.stderr)
@@ -392,13 +446,13 @@ def svc_update() -> int:
             return 1
         print(f"Install dir {root} is not a git repo (tarball install); adopting into git ...")
         adopt_env = _git_env_for(root)
-        subprocess.call(["git", "-C", str(root), "init", "-q"], env=adopt_env)
-        subprocess.call(["git", "-C", str(root), "remote", "remove", "origin"],
+        subprocess.call([git_exe, "-C", str(root), "init", "-q"], env=adopt_env)
+        subprocess.call([git_exe, "-C", str(root), "remote", "remove", "origin"],
                         env=adopt_env, stderr=subprocess.DEVNULL)
         rc = subprocess.call(
-            ["git", "-C", str(root), "remote", "add", "origin",
+            [git_exe, "-C", str(root), "remote", "add", "origin",
              "https://github.com/jasoncheng7115/jt-doc-tools"], env=adopt_env)
-        subprocess.call(["git", "config", "--global", "--add", "safe.directory", str(root)],
+        subprocess.call([git_exe, "config", "--global", "--add", "safe.directory", str(root)],
                         env=adopt_env, stderr=subprocess.DEVNULL)
         if rc != 0 or not (root / ".git").exists():
             print("Failed to convert install dir into a git repo; re-run the install script.",
@@ -447,8 +501,18 @@ def svc_update() -> int:
     # 3. git pull (with safe.directory so it works on differently-owned repos)
     print("Pulling latest from GitHub ...")
     git_env = _git_env_for(root)
+    # 走完整路徑，不靠 PATH —— 見 `_find_git()` 的說明（剛裝完 git 的
+    # Windows 上，已開著的終端機看不到新的 PATH）。
+    git_exe = _find_git()
+    if not git_exe:
+        print("找不到 git。請安裝 Git for Windows："
+              "https://git-scm.com/download/win" if _is_windows()
+              else "git not found; please install git first", file=sys.stderr)
+        _restore_ownership(root, owner)
+        svc_start()
+        return 1
     rc = subprocess.call(
-        ["git", "-C", str(root), "fetch", "--tags", "origin"], env=git_env)
+        [git_exe, "-C", str(root), "fetch", "--tags", "origin"], env=git_env)
     if rc != 0:
         print("git fetch failed, restoring: starting previous service", file=sys.stderr)
         _restore_ownership(root, owner)
@@ -461,11 +525,11 @@ def svc_update() -> int:
     # 先把目前 HEAD 的 SHA 記下來 — 萬一發現 origin/main 是降版，要靠 SHA 回復
     # （tag 名 `v{cur}` 不一定存在，例如本地手動 reset 過、release 沒 tag 過 …）
     pre_sha_proc = subprocess.run(
-        ["git", "-C", str(root), "rev-parse", "HEAD"],
+        [git_exe, "-C", str(root), "rev-parse", "HEAD"],
         env=git_env, capture_output=True, text=True)
     pre_sha = pre_sha_proc.stdout.strip() if pre_sha_proc.returncode == 0 else ""
     rc = subprocess.call(
-        ["git", "-C", str(root), "reset", "--hard", "origin/main"], env=git_env)
+        [git_exe, "-C", str(root), "reset", "--hard", "origin/main"], env=git_env)
     if rc != 0:
         print("git reset --hard origin/main failed, restoring", file=sys.stderr)
         _restore_ownership(root, owner)
@@ -490,14 +554,14 @@ def svc_update() -> int:
         restored = False
         if pre_sha:
             restore_rc = subprocess.call(
-                ["git", "-C", str(root), "reset", "--hard", pre_sha],
+                [git_exe, "-C", str(root), "reset", "--hard", pre_sha],
                 env=git_env)
             restored = (restore_rc == 0)
         if not restored:
             # SHA-based restore failed too (shouldn't happen — pre_sha was
             # captured from THIS repo seconds ago). Last-ditch try the tag.
             subprocess.call(
-                ["git", "-C", str(root), "reset", "--hard", f"v{cur}"],
+                [git_exe, "-C", str(root), "reset", "--hard", f"v{cur}"],
                 env=git_env)
         _restore_ownership(root, owner)
         svc_start()

@@ -84,3 +84,25 @@ def test_update_guidance_is_not_winget_only():
 def test_install_ps1_keeps_utf8_bom():
     """含中文的 .ps1 少了 BOM，Win11 PowerShell 5.1 會用 CP950 解碼而炸掉。"""
     assert PS1.read_bytes().startswith(b"\xef\xbb\xbf"), "install.ps1 缺 UTF-8 BOM"
+
+
+def test_cli_does_not_rely_on_path_for_git():
+    """`jtdt update` 不可以只靠 PATH 找 git。
+
+    Windows 剛裝完 Git 時 PATH 只更新在登錄檔，**已經開著的終端機
+    （含 Windows Terminal 的新分頁）看不到** —— 使用者照著「重新開啟
+    PowerShell」做仍然失敗，只好重開機（客戶 2026-08-23 回報）。
+    所以要直接找檔案：登錄檔 + 標準安裝位置。
+    """
+    src = _strip_comments(CLI.read_text(encoding="utf-8"))
+    assert "def _find_git(" in src, "cli.py 缺 _find_git()（不依賴 PATH 的 git 尋找）"
+    assert "GitForWindows" in src, "沒有查登錄檔 HKLM\\SOFTWARE\\GitForWindows"
+    # 所有 git 呼叫都要走解析出來的完整路徑
+    assert '["git", "-C"' not in src, (
+        "還有直接呼叫 \"git\" 的地方 —— 剛裝完 git 的 Windows 上會找不到")
+
+
+def test_find_git_resolves_on_this_machine():
+    """在本機（Linux/CI）至少要找得到 —— 確認函式本身能動。"""
+    from app.cli import _find_git
+    assert _find_git(), "_find_git() 在有 git 的機器上回 None"
