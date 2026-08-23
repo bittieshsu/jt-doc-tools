@@ -422,7 +422,18 @@
         if (j.is_outdated) {
           verBox.classList.add('is-outdated');
           pillHtml = '<span class="ver-status-pill ver-out">有更新可用</span>';
-          hintHtml = '請以管理員身分跑 <code>sudo jtdt update</code>（Linux/macOS）或 <code>jtdt update</code>（Windows）';
+          // **平台標籤要在指令前面、一行一個平台。**
+          // 原本寫成「…<code>sudo jtdt update</code>（Linux/macOS）或
+          // <code>jtdt update</code>（Windows）」擠成一段，視窗一窄就把
+          // 「（Windows）」斷到下一行變成孤兒 —— 客戶因此回報「Windows 沒有
+          // 更新指令」（2026-08-23）。標籤在前，怎麼斷行都拆不散。
+          // 另外 Windows 沒有 sudo，提權方式要寫清楚（不是把 sudo 拿掉就好）。
+          hintHtml =
+            '<div class="upd-cmd"><b>Linux / macOS</b>'
+            + '<code>sudo jtdt update</code></div>'
+            + '<div class="upd-cmd"><b>Windows</b>'
+            + '<span>以系統管理員身分開啟 PowerShell，再執行</span>'
+            + '<code>jtdt update</code></div>';
         } else if (j.current === j.latest) {
           verBox.classList.add('is-current');
           pillHtml = '<span class="ver-status-pill ver-cur">已是最新</span>';

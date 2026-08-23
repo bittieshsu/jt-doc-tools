@@ -4,6 +4,24 @@
 
 ---
 
+## [1.14.44] - 2026-08-23
+
+### 修正：版本檢查的更新指令看起來「Windows 沒有」（客戶回報）
+
+有更新可用時的提示原本是一整句：「請以管理員身分跑 `sudo jtdt update`
+（Linux/macOS）或 `jtdt update`（Windows）」。視窗一窄就會把「（Windows）」
+斷到下一行變成孤兒，掃視時只看得到 `sudo jtdt update` —— 客戶因此以為
+Windows 沒有更新指令。
+
+改成**一行一個平台、平台標籤在指令前面**，怎麼斷行都拆不散：
+
+- Linux / macOS：`sudo jtdt update`
+- Windows：以系統管理員身分開啟 PowerShell，再執行 `jtdt update`
+
+順帶把 Windows 的提權方式寫清楚 —— **Windows 沒有 sudo**，只把 sudo
+拿掉不夠，要講「以系統管理員身分開啟 PowerShell」。
+實測 1440 / 780 / 480 三種寬度，標籤都與自己的指令同一行。
+
 ## [1.14.43] - 2026-08-20
 
 ### 新增：個資限用章的直式版型（使用者要求）
