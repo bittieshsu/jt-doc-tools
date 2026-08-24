@@ -964,3 +964,17 @@ def collect_sys_deps(lang: str = "zh") -> list[dict]:
             "platform": plat,
         })
     return out
+
+
+def install_cmd_for(key: str) -> str:
+    """某個相依項在**目前平台**上的安裝指令；查無回空字串。
+
+    給管理區以外的地方引用（例如工具頁的「缺中文字型」提示要順手給指令）。
+    指令只有 `_DEPS` 這一份，別處要用一律從這裡取 —— 抄一份出去就是下一個
+    會各自漂掉的清單。
+    """
+    plat = _platform_key()
+    for dep in _DEPS:
+        if dep.get("key") == key:
+            return (dep.get("install_cmd") or {}).get(plat, "")
+    return ""

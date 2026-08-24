@@ -7,6 +7,11 @@
   保留時間跟稽核記錄一致 — 90 天後自動清除。</p>
 
 <form method="get" class="uploads-filter">
+  {# 使用者瀏覽器的 UTC 偏移（分鐘，**東為正**：台北 +480）。
+     畫面上的時間是瀏覽器把 epoch 轉出來的，篩選條件必須用同一個時區解讀，
+     否則伺服器跑在 UTC 時會無聲地篩掉 8 小時的資料（issue #48）。
+     **JS 的 getTimezoneOffset() 正負號是反的**（台北回 -480），所以下面取負號。 #}
+  <input type="hidden" name="tz_offset" id="tzOffset" value="{{ tz_offset }}">
   <select class="field" name="q_user">
     <option value="">所有使用者</option>
     {% for u in distinct_users %}
@@ -136,4 +141,19 @@
   .uploads-table .ul-name { line-height:1.45; }
   .tool-pill { background:#eef2ff; color:#3730a3; padding:1px 7px; border-radius:4px; font-size:11.5px; }
 </style>
+
+<script nonce="{{ request.state.csp_nonce }}">
+  (function () {
+    // 每次載入都以「現在的瀏覽器時區」覆寫 —— 使用者可能換了時區 / 跨越日光節約。
+    var off = -new Date().getTimezoneOffset();   // 東為正（台北 = 480）
+    var el = document.getElementById('tzOffset');
+    if (el) el.value = String(off);
+    // 匯出連結也要帶，否則 CSV 的時間欄會退回伺服器時區（差 8 小時的老問題）。
+    document.querySelectorAll('a[href*="export.csv"]').forEach(function (a) {
+      var u = new URL(a.getAttribute('href'), window.location.origin);
+      u.searchParams.set('tz_offset', String(off));
+      a.setAttribute('href', u.pathname + u.search);
+    });
+  })();
+</script>
 {% endblock %}

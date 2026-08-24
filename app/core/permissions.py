@@ -29,9 +29,47 @@ logger = logging.getLogger(__name__)
 
 # ---------- assignment CRUD ----------
 
+# ---------- subject key normalisation ----------
+
+def canon_subject_key(subject_type: str, subject_key: str) -> str:
+    """正規化 subject key，讓「指派時寫的」和「登入時比對的」對得上。
+
+    **只對 `ou` 動手**（它的 key 是一段 DN）；`user` / `group` 的 key 是
+    數字 id 或群組 id，原樣返回。
+
+    問題：OU 授權的比對是**精確字串相等**（SQL `subject_key=?`），但 LDAP 的
+    DN 屬性型別**不分大小寫**、逗號後可有空白。於是 `OU=Sales,DC=x`（AD 文件 /
+    PowerShell 慣用大寫，或使用者手貼）和目錄實際回傳的 `ou=Sales,dc=x` 會被
+    當成兩個不同對象 —— 指派看起來成功、清單也列著，底下的人登入卻**無聲地**
+    拿不到權限（實測 2026-08-24）。管理介面正常操作踩不到（送出的 dn 與目錄
+    樹同源），但手動輸入 / 匯入改過的設定 / 換目錄來源就會。
+
+    正規化規則（保守，**只動結構、不動值**）：
+      * 逗號切成 RDN 分量，各自去頭尾空白
+      * 每個分量的**屬性型別**（`=` 左邊）轉小寫；**值**（右邊）原樣保留
+      * 以 `,` 重新接起（不留空白）
+
+    值的大小寫刻意不碰：LDAP 值多半也 caseIgnore，但把值一起壓平的風險是
+    「兩個剛好同名不同大小寫的 OU 被併成一個」—— 那是往「多給權限」的方向錯，
+    寧可不做。屬性型別轉小寫已經解掉最常見的 `OU=`/`DC=` 問題。
+    """
+    if subject_type != "ou" or not subject_key:
+        return subject_key
+    parts = []
+    for rdn in str(subject_key).split(","):
+        rdn = rdn.strip()
+        if "=" in rdn:
+            attr, _, val = rdn.partition("=")
+            parts.append(f"{attr.strip().lower()}={val.strip()}")
+        elif rdn:
+            parts.append(rdn)
+    return ",".join(parts)
+
+
 def assign_role(subject_type: str, subject_key: str, role_id: str) -> None:
     if subject_type not in ("user", "group", "ou"):
         raise ValueError("invalid subject_type")
+    subject_key = canon_subject_key(subject_type, subject_key)
     conn = auth_db.conn()
     with db.tx(conn):
         conn.execute(
@@ -49,6 +87,7 @@ def assign_role(subject_type: str, subject_key: str, role_id: str) -> None:
 
 
 def unassign_role(subject_type: str, subject_key: str, role_id: str) -> None:
+    subject_key = canon_subject_key(subject_type, subject_key)
     conn = auth_db.conn()
     with db.tx(conn):
         conn.execute(
@@ -62,6 +101,7 @@ def set_subject_roles(subject_type: str, subject_key: str, role_ids: list[str]) 
     """Replace the role set for a subject in one shot."""
     if subject_type not in ("user", "group", "ou"):
         raise ValueError("invalid subject_type")
+    subject_key = canon_subject_key(subject_type, subject_key)
     # 職責分離：auditor 不可和其他 role 並存。若 caller 同時送入 auditor +
     # 其他角色，silently 砍成只剩 auditor — 不靜默失敗也不丟例外（admin
     # 在 UI 同時勾兩個 role 也會走到這），讓最終 DB 狀態一致。
@@ -91,6 +131,7 @@ def grant_tool(subject_type: str, subject_key: str, tool_id: str) -> None:
     """Direct subject→tool grant (advanced; usually use roles)."""
     if subject_type not in ("user", "group", "ou"):
         raise ValueError("invalid subject_type")
+    subject_key = canon_subject_key(subject_type, subject_key)
     # 職責分離：auditor user 不可有任何直接工具授權
     if subject_type == "user":
         conn0 = auth_db.conn()
@@ -113,6 +154,7 @@ def grant_tool(subject_type: str, subject_key: str, tool_id: str) -> None:
 
 
 def revoke_tool(subject_type: str, subject_key: str, tool_id: str) -> None:
+    subject_key = canon_subject_key(subject_type, subject_key)
     conn = auth_db.conn()
     with db.tx(conn):
         conn.execute(
@@ -123,6 +165,7 @@ def revoke_tool(subject_type: str, subject_key: str, tool_id: str) -> None:
 
 
 def list_roles_for_subject(subject_type: str, subject_key: str) -> list[str]:
+    subject_key = canon_subject_key(subject_type, subject_key)
     conn = auth_db.conn()
     rows = conn.execute(
         "SELECT role_id FROM subject_roles WHERE subject_type=? AND subject_key=? "
@@ -132,6 +175,7 @@ def list_roles_for_subject(subject_type: str, subject_key: str) -> list[str]:
 
 
 def list_direct_tools_for_subject(subject_type: str, subject_key: str) -> list[str]:
+    subject_key = canon_subject_key(subject_type, subject_key)
     conn = auth_db.conn()
     rows = conn.execute(
         "SELECT tool_id FROM subject_perms WHERE subject_type=? AND subject_key=? "
@@ -220,7 +264,10 @@ def _user_external_subjects(conn, user_id: int) -> list[tuple[str, str]]:
         return []
     try:
         from . import auth_ldap
-        return auth_ldap.get_ou_subjects_for_dn(row["external_dn"])
+        # 登入時算出的 OU subject 要走**同一道正規化**，才能跟寫入端存進 DB
+        # 的 key 對得上（DN 屬性型別不分大小寫，見 canon_subject_key）。
+        return [(st, canon_subject_key(st, sk))
+                for st, sk in auth_ldap.get_ou_subjects_for_dn(row["external_dn"])]
     except Exception:
         return []
 
@@ -299,6 +346,7 @@ def list_roles_for_subject(subject_type: str, subject_key: str) -> list[str]:
     """Return list of role_ids assigned to (subject_type, subject_key).
     Re-export here as a thin alias for callers that don't want to import
     from the lower-level module — and to keep is_auditor() local."""
+    subject_key = canon_subject_key(subject_type, subject_key)
     conn = auth_db.conn()
     rows = conn.execute(
         "SELECT role_id FROM subject_roles WHERE subject_type=? AND subject_key=?",

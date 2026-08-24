@@ -106,6 +106,8 @@ async def render_restrict_stamp_endpoint(request: Request):
         date_str:     str — 日期文字(已格式化),選填
         applicant:    str — 申請人姓名，選填
         copy_label:   str — 影本份數標示(例「第 1 份 / 共 3 份」),選填
+        show_phrase:  bool — 是否加上「僅供 … 使用，他用無效」固定句，預設 True
+                            （關掉時只印用途本身 —— 用途文字已經把話說完的場合）
         style:        str — "rectangle" / "vertical"（直式，中文直書）/ "diagonal",預設 rectangle
         border:       str — rectangle 模式邊框「double」/「single」/「none」
         color_hex:    str — 預設 "#c00000" 深紅
@@ -123,6 +125,8 @@ async def render_restrict_stamp_endpoint(request: Request):
     date_str = str(body.get("date_str") or "").strip()[:40]
     applicant = str(body.get("applicant") or "").strip()[:20]
     copy_label = str(body.get("copy_label") or "").strip()[:30]
+    # 預設 True —— 舊的呼叫端（含對外 API）沒帶這個欄位時行為完全不變。
+    show_phrase = bool(body.get("show_phrase", True))
     style = str(body.get("style") or "rectangle")
     if style not in ("rectangle", "diagonal", "vertical"):
         style = "rectangle"
@@ -155,12 +159,13 @@ async def render_restrict_stamp_endpoint(request: Request):
                 applicant=applicant, copy_label=copy_label,
                 color_hex=color_hex, font_size_px=font_size_px,
                 border_style=border, font_style=font_style,
+                show_phrase=show_phrase,
             )
         elif style == "diagonal":
             png_bytes, w, h = _restrict_render.render_diagonal_stamp(
                 purpose=purpose, date_str=date_str,
                 color_hex=color_hex, font_size_px=font_size_px,
-                font_style=font_style,
+                font_style=font_style, show_phrase=show_phrase,
             )
         else:
             png_bytes, w, h = _restrict_render.render_rectangle_stamp(
@@ -168,6 +173,7 @@ async def render_restrict_stamp_endpoint(request: Request):
                 applicant=applicant, copy_label=copy_label,
                 color_hex=color_hex, font_size_px=font_size_px,
                 border_style=border, font_style=font_style,
+                show_phrase=show_phrase,
             )
     except Exception as e:
         raise HTTPException(500, f"render failed: {e.__class__.__name__}: {e}") from e

@@ -5,6 +5,8 @@
 <h1>{{ icon('hash', size=22) }} 插入頁碼</h1>
 <p class="muted">在每一頁印上頁碼；可選位置、字級、起始頁碼與顯示格式。上傳後會自動產生頁面縮圖預覽，並在縮圖上以紫色標記頁碼會出現的位置。</p>
 
+{% include "components/cjk_font_notice.html" with context %}
+
 <div class="panel">
   <h2 data-s="s53896af7">上傳 PDF</h2>
   {% with upload_id='upPN', accept='application/pdf', multiple=True %}{% include "components/file_upload.html" %}{% endwith %}

@@ -17,7 +17,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.46"
+VERSION = "1.14.48"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -225,6 +225,23 @@ def _tpl_workspace_extensions() -> str:
 
 
 templates.env.globals["workspace_extensions"] = _tpl_workspace_extensions
+
+
+def _tpl_cjk_font_status() -> dict:
+    """Jinja global：本機有沒有可用的中文字型（給工具頁的提示用）。
+
+    **偵測失敗時一律回「有」** —— 這個提示只是善意提醒，判斷不出來時安靜
+    比誤報好：跳一個「找不到中文字型」給一台其實裝好字型的機器，使用者會
+    去追一個不存在的問題，而工具本身根本沒事。
+    """
+    try:
+        from .core import font_health
+        return font_health.cjk_status()
+    except Exception:  # noqa: BLE001
+        return {"ok": True, "font": "", "install_cmd": ""}
+
+
+templates.env.globals["cjk_font_status"] = _tpl_cjk_font_status
 
 
 def _tpl_workspace_count(request=None) -> int:

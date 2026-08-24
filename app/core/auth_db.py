@@ -638,6 +638,69 @@ def _m22_grant_office_convert(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _canon_ou_key(subject_key: str) -> str:
+    """與 `permissions.canon_subject_key("ou", …)` **完全相同**的規則。
+
+    刻意在這裡複寫一份而不 import：migration 要能獨立跑（升級流程、CLI 修復
+    都可能在 permissions 還沒 import 前就跑到），而且規則一旦定版就不該再變 ——
+    變了會讓不同版本升上來的 DB 正規化成不同結果。`tests/test_ou_key_canon.py`
+    會斷言兩份實作對同一組輸入給出相同答案，漂掉就紅。
+    """
+    parts = []
+    for rdn in str(subject_key or "").split(","):
+        rdn = rdn.strip()
+        if "=" in rdn:
+            attr, _, val = rdn.partition("=")
+            parts.append(f"{attr.strip().lower()}={val.strip()}")
+        elif rdn:
+            parts.append(rdn)
+    return ",".join(parts)
+
+
+def _m23_canon_ou_subject_keys(conn: sqlite3.Connection) -> None:
+    """v23：把 subject_type='ou' 的 subject_key 正規化（屬性型別轉小寫、去空白）。
+
+    OU 授權的比對是精確字串相等，但 DN 的屬性型別不分大小寫。管理介面正常操作
+    寫進來的 key 與目錄樹同源、沒問題；但手動輸入 / 匯入改過的設定 / 換目錄來源
+    可能寫成 `OU=Sales,DC=x`，於是登入時算出的 `ou=Sales,dc=x` 對不上 ——
+    指派看起來成功，底下的人卻**無聲地**拿不到權限（2026-08-24 實測）。
+
+    這支把既有資料一次校準。**逐筆記到 log**（升級時 admin 看得到到底動了誰），
+    合併衝突（正規化後撞到已存在的列）時保留、跳過重複。
+    只動 `ou`，`user` / `group` 的 key 是 id 不碰。
+    """
+    for table, keycol_extra in (("subject_roles", "role_id"),
+                                ("subject_perms", "tool_id")):
+        rows = conn.execute(
+            f"SELECT rowid, subject_key, {keycol_extra} AS extra "
+            f"FROM {table} WHERE subject_type='ou'"
+        ).fetchall()
+        for r in rows:
+            # 位置索引 —— migration 不假設連線設了 row_factory（升級 / CLI 修復
+            # 都可能拿到裸連線）。SELECT 順序：rowid, subject_key, extra。
+            rowid, old_key, extra = r[0], r[1], r[2]
+            new_key = _canon_ou_key(old_key)
+            if new_key == old_key:
+                continue
+            # 正規化後是否已存在等價列？（同 new_key + 同 role/tool）
+            dup = conn.execute(
+                f"SELECT 1 FROM {table} WHERE subject_type='ou' "
+                f"AND subject_key=? AND {keycol_extra}=?",
+                (new_key, extra),
+            ).fetchone()
+            if dup:
+                conn.execute(f"DELETE FROM {table} WHERE rowid=?", (rowid,))
+                logger.info("OU key 正規化（%s）：'%s' → '%s'（已存在等價列，"
+                            "移除重複，%s=%s）", table, old_key, new_key,
+                            keycol_extra, extra)
+            else:
+                conn.execute(
+                    f"UPDATE {table} SET subject_key=? WHERE rowid=?",
+                    (new_key, rowid))
+                logger.info("OU key 正規化（%s）：'%s' → '%s'（%s=%s）",
+                            table, old_key, new_key, keycol_extra, extra)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -656,7 +719,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m18_grant_transit_proof_and_border,
               _m19_grant_pdf_bookmark, _m20_grant_seam_stamp,
               _m21_grant_page_size,
-              _m22_grant_office_convert]
+              _m22_grant_office_convert,
+              _m23_canon_ou_subject_keys]
 
 
 def auth_db_path() -> Path:

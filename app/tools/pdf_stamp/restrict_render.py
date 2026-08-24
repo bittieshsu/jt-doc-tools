@@ -153,15 +153,20 @@ def render_rectangle_stamp(
     font_size_px: int = 64,
     border_style: str = "double",
     font_style: str = "kaiti",
+    show_phrase: bool = True,
 ) -> tuple[bytes, int, int]:
     """渲染長方形紅章。
 
     視覺階層:
-        小「僅供」(0.55x)
+        小「僅供」(0.55x)                 ← show_phrase=False 時不畫
         大「{purpose}」(1.0x, 粗)  ← 視覺主角
-        小「使用，他用無效」(0.55x)
+        小「使用，他用無效」(0.55x)        ← show_phrase=False 時不畫
         ──────  分隔線
         小 footer: {date} {applicant} {copy_label} (0.45x)
+
+    `show_phrase=False` 用在**用途文字本身已經把話說完**的場合（例如直接寫
+    「本影本僅供投標使用」），再套一次固定句就成了贅字。此時只留用途與 footer，
+    其餘版面規則（置中、邊框、分隔線）不變。
     """
     purpose = (purpose or "").strip() or "_________"
 
@@ -178,10 +183,11 @@ def render_rectangle_stamp(
     tmp = Image.new("RGBA", (10, 10))
     draw = ImageDraw.Draw(tmp)
 
-    # 量測
-    w_top, h_top = _text_size(draw, "僅供", font_small)
+    # 量測（不畫的段落一律量成 0，才不會在版面上留下空白帶）
+    w_top, h_top = (_text_size(draw, "僅供", font_small) if show_phrase else (0, 0))
     w_main, h_main = _text_size(draw, purpose, font_big)
-    w_bottom, h_bottom = _text_size(draw, "使用，他用無效", font_small)
+    w_bottom, h_bottom = (_text_size(draw, "使用，他用無效", font_small)
+                          if show_phrase else (0, 0))
 
     footer_parts = [s for s in (date_str.strip(), applicant.strip(), copy_label.strip()) if s]
     footer = "　".join(footer_parts)
@@ -195,7 +201,9 @@ def render_rectangle_stamp(
     pad_y = max(int(big_size * 0.55), 16)
 
     content_w = max(w_top, w_main, w_bottom, w_foot)
-    content_h = h_top + gap_top_main + h_main + gap_main_bot + h_bottom
+    content_h = h_main
+    if show_phrase:
+        content_h += h_top + gap_top_main + gap_main_bot + h_bottom
     if footer:
         content_h += gap_to_foot + h_foot
 
@@ -221,20 +229,23 @@ def render_rectangle_stamp(
 
     # 寫字 (置中，逐行下移)
     y = pad_y
-    # 「僅供」
-    x = (img_w - w_top) // 2
-    draw.text((x, y), "僅供", fill=color, font=font_small)
-    y += h_top + gap_top_main
+    if show_phrase:
+        # 「僅供」
+        x = (img_w - w_top) // 2
+        draw.text((x, y), "僅供", fill=color, font=font_small)
+        y += h_top + gap_top_main
     # 主用途 (粗一點 — 用 stroke_width 模擬)
     x = (img_w - w_main) // 2
     stroke_w = max(0, int(big_size * 0.045))
     draw.text((x, y), purpose, fill=color, font=font_big,
               stroke_width=stroke_w, stroke_fill=color)
-    y += h_main + gap_main_bot
-    # 「使用，他用無效」
-    x = (img_w - w_bottom) // 2
-    draw.text((x, y), "使用，他用無效", fill=color, font=font_small)
-    y += h_bottom
+    y += h_main
+    if show_phrase:
+        y += gap_main_bot
+        # 「使用，他用無效」
+        x = (img_w - w_bottom) // 2
+        draw.text((x, y), "使用，他用無效", fill=color, font=font_small)
+        y += h_bottom
 
     if footer:
         y += gap_to_foot
@@ -257,9 +268,11 @@ def render_diagonal_stamp(
     color_hex: str = "#c00000",
     font_size_px: int = 80,
     font_style: str = "kaiti",
+    show_phrase: bool = True,
 ) -> tuple[bytes, int, int]:
     """渲染對角線斜印(45° 紅字，無邊框)。"""
-    text = f"僅供 {(purpose or '').strip() or '_________'} 使用 · 他用無效"
+    _p = (purpose or "").strip() or "_________"
+    text = f"僅供 {_p} 使用 · 他用無效" if show_phrase else _p
     if date_str.strip():
         text += f"  ({date_str.strip()})"
 
@@ -383,6 +396,7 @@ def render_vertical_stamp(
     font_size_px: int = 64,
     border_style: str = "double",
     font_style: str = "kaiti",
+    show_phrase: bool = True,
 ) -> tuple[bytes, int, int]:
     """渲染**直式**長方形紅章（傳統中文直書：字上而下、欄右而左）。
 
@@ -422,11 +436,16 @@ def render_vertical_stamp(
     # 右 → 左 的欄序（畫的時候從右邊算 x）。對齊比照傳統直書章：
     # 「僅供」起於天頭（top）、主文置中、「使用，他用無效」收於地腳
     # （bottom）—— 三欄全置中的話「僅供」會浮在半空，看起來像排版錯誤。
-    cols: list[tuple[str, object, int, str]] = [
-        (top_txt, font_small, 0, "top"),
-        (purpose, font_big, max(0, int(big_size * 0.045)), "center"),
-        (bottom_txt, font_small, 0, "bottom"),
-    ]
+    # 不加固定句時只留主文一欄，並且**改成置中** —— 沿用「起於天頭」的話，
+    # 單獨一欄會整個貼在上緣，看起來像沒排好。
+    cols: list[tuple[str, object, int, str]] = (
+        [
+            (top_txt, font_small, 0, "top"),
+            (purpose, font_big, max(0, int(big_size * 0.045)), "center"),
+            (bottom_txt, font_small, 0, "bottom"),
+        ] if show_phrase else
+        [(purpose, font_big, max(0, int(big_size * 0.045)), "center")]
+    )
     foot_meas = [_measure_vertical_column(draw, t, font_foot, gap_char)
                  for t in footer_cols]
     col_meas = [_measure_vertical_column(draw, t, f, gap_char)

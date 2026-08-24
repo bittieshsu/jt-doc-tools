@@ -450,6 +450,8 @@ body.pe-pan-active { cursor: grabbing !important; }
   <span data-s="s0c8f4b0b">{{ icon('warn', size=13) }} 不會自動斷行重排；字型為還原繪製，與原檔可能細微不同。</span>
 </p>
 
+{% include "components/cjk_font_notice.html" with context %}
+
 <div class="panel">
   <h2 data-s="s53896af7">1. 上傳 PDF</h2>
   {% with upload_id='peUpload', accept='application/pdf', hint='單檔、PDF only。' %}

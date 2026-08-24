@@ -54,10 +54,20 @@ _UCS_ONLY = {
     "shadowLastChange", "sambaAcctFlags",
 }
 
+#: **AD 相容、但少一個構造屬性**（Samba AD DC、schema 被裁過的 AD）。
+#: 這一格是 2026-08-24 用真的 OpenLDAP 加 AD 相容屬性做端到端登入時撞出來的：
+#: 那台目錄有 sAMAccountName / userAccountControl，只少
+#: `msDS-UserPasswordExpiryTimeComputed` 一個 —— 結果**整個登入查詢被拒**，
+#: 畫面一樣顯示「目前無法連線到認證伺服器」。
+#: 原本的三格全都過不了這種情況：AD 那格什麼都有，另外兩格 backend 是 ldap
+#: 根本不會去要 AD 屬性。**少一個屬性就全員登不進去**，這格就是守它。
+_AD_MINUS_ONE = _COMMON | (_AD_ONLY - {"msDS-UserPasswordExpiryTimeComputed"})
+
 SCHEMAS = {
     "Active Directory": _COMMON | _AD_ONLY,
     "OpenLDAP": _COMMON,
     "Univention (UCS)": _COMMON | _UCS_ONLY,
+    "AD 相容但少一個屬性（Samba AD DC）": _AD_MINUS_ONE,
 }
 
 #: 每種結構對應的 `auth_settings.backend` 值
@@ -65,6 +75,7 @@ BACKEND_OF = {
     "Active Directory": "ad",
     "OpenLDAP": "ldap",
     "Univention (UCS)": "ldap",
+    "AD 相容但少一個屬性（Samba AD DC）": "ad",
 }
 
 
@@ -125,6 +136,24 @@ class FakeConnection:
 
     def unbind(self):
         return True
+
+    @property
+    def server(self):
+        """像真的 ldap3 連線那樣，把 schema 掛在 `server` 上。
+
+        `get_info=ALL` 時 ldap3 就是拿這份定義去檢查**要求的屬性清單**
+        （`check_names=False` 也擋不掉這一段）。假連線少了這一層，正式碼
+        就無從得知「這台目錄認不認得這個屬性」，等於在測一個它做不到的事。
+        """
+        names = set(type(self).schema)
+
+        class _Schema:
+            attribute_types = {a: object() for a in names}
+
+        class _Server:
+            schema = _Schema()
+
+        return _Server()
 
     # -- 屬性檢查 ------------------------------------------------------
     def _check(self, attributes):
@@ -207,7 +236,8 @@ def directory(request, monkeypatch, tmp_path):
             "service_password": "x",
             "user_search_base": "dc=example,dc=com",
             "user_search_filter": "(uid={username})",
-            "username_attr": "sAMAccountName" if label == "Active Directory" else "uid",
+            "username_attr": ("sAMAccountName" if BACKEND_OF[label] == "ad"
+                              else "uid"),
             "displayname_attr": "displayName",
             "email_attr": "mail",
             "group_attr": "memberOf",

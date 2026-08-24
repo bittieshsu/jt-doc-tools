@@ -56,7 +56,7 @@ Jason Tools 文件工具箱 使用以下第三方開源套件。本程式遵守�
 - 專案：https://github.com/pymupdf/PyMuPDF
 - 用途：PDF 讀取、編輯、imposition、redaction 等核心功能
 - Copyright © Artifex Software, Inc.
-- ⚠️ **使用 AGPL 授權**：若您將本程式提供給他人作為網路服務（含內網），需將完整原始碼依 AGPL 條款公開。本專案以 Apache-2.0 釋出，這條約束**只擴及 PyMuPDF 部分**；如有商業閉源需求，請洽 Artifex 取得商業授權，或改用其他 PDF 引擎。
+- **本專案同樣以 AGPL-3.0-or-later 釋出**，正是因為在同一個行程內使用 PyMuPDF。若您修改本程式並把它當成網路服務提供給他人使用（含公司內部使用者），需依 AGPL 第 13 條提供修改後的完整原始碼。如有商業閉源需求，請洽 Artifex 取得 PyMuPDF 商業授權，並改寫本程式中屬於本專案的部分（本專案不提供商業授權）。
 
 ### Pillow  · MIT-CMU License (HPND)
 - 專案：https://github.com/python-pillow/Pillow

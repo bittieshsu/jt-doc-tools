@@ -105,7 +105,7 @@
 v1.12.71 修）。純像素比對對字型 / 時間戳 / 動態內容太吵，所以主檢查是
 「可見互動元素清單」比對 + 關鍵狀態斷言，截圖僅供人工對照。
 
-**需要**：headless chromium（dev1：`chromium-browser`）+ 一個 auth-off 本機實例。
+**需要**：headless chromium（開發機上是 `chromium-browser`）+ 一個 auth-off 本機實例。
 
 **跑法（發版前）**：
 ```bash
@@ -131,6 +131,43 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 
 **已驗證能抓到**：① 在 baseline 塞假按鈕 → 比對報「消失的可見按鈕」；
 ② 還原 v1.12.71 下載鈕修法（重現 bug）→ 報「存檔後下載按鈕仍不可見」。
+
+### 1.12 缺中文字型提示 (`tests/test_cjk_font_notice.py`)
+
+- 偵測層：挑得到黑體 / 只挑得到明體 → ok；兩種都挑不到 → 帶回 `sys_deps`
+  那一份的安裝指令（`font_health.py` 內不可自己寫死 apt 指令）
+- 偵測炸掉時 Jinja global 回 ok=True（**寧可安靜，不可誤報**）
+- **自動列舉**會把中文畫進 PDF 的工具（`ast` 看 import，不掃註解），
+  模板少 include 提示元件就 FAIL —— 已用「拿掉浮水印的 include」驗過會紅
+- 字型齊全 → 頁面上沒有這塊；缺字型 → 管理員看到安裝路徑、一般使用者
+  看到「請聯絡管理員」且**不出現任何管理區連結**
+- `.cjk-warn` 樣式必須在 `platform.css`（元件內不可有 `<style>`）
+
+### 1.13 四種登入方式的實機驗證（`temp/authtest/verify_logins.py`）
+
+**與 pytest 的差別**：pytest 走 TestClient（ASGI 內部呼叫），LDAP 端是假的；
+這支**真的起一個 uvicorn**、**真的對一台 OpenLDAP 做 bind**、**真的送表單帶
+CSRF token**，驗的是「使用者按下登入之後會發生什麼」。
+
+**需要**：開發機上的測試目錄（`slapd` + `ldap-utils`，suffix `dc=jtdt,dc=test`，
+含 memberof overlay 與 AD 相容屬性的 schema）。
+
+**跑法**：`python temp/authtest/verify_logins.py`（37 項，全部要 [OK]）
+
+| 階段 | 驗到什麼 |
+|---|---|
+| 本機 | 未登入被擋 / 錯密碼不發 session / 正確密碼發 session / whoami / 登出失效 / 一般使用者只拿到自己角色的工具 |
+| LDAP | 真實 bind、JIT 開通、顯示名稱與信箱帶入、memberOf 群組同步、錯密碼與不存在帳號同一訊息、**空密碼被核心擋下**（RFC 4513 未認證 bind） |
+| LDAP OU | OU 上指派的角色生效（判準挑**預設角色沒有**的工具）+ 反向對照、搬 OU 後 **DN 換綁**（id 不變、寫稽核 `user_dn_rebind`） |
+| AD | 以 sAMAccountName 登入、來源標記 `ad`、大小寫不敏感、`userAccountControl` 三態 |
+| SSO (OIDC) | 登入頁列出提供者、導向 IdP、state/nonce、回呼驗簽換 token 發 session、以 `sub` 當識別碼、**偽造 state 被拒** |
+
+SAML 由 `tests/test_sso_saml_e2e.py` 涵蓋（自架 IdP、真 xmlsec 簽章，含竄改 /
+換錯金鑰 / 重放三種攻擊路徑）。
+
+**踩過的坑**：①目錄是**持久**的，腳本要自己把搬走的帳號放回去，否則第二次跑
+會出現三條假失敗；②OU 的 subject key 是**精確字串比對**，要用目錄實際回傳的
+大小寫（管理介面指派時寫的也是目錄回來的那一份）。
 
 ## 2. 手動驗收清單（每個版本）
 
@@ -426,6 +463,9 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] **側欄捲軸浮動**（只在 hover / 滾動時顯示）
 - [ ] **搜尋支援中英文**（輸入 `form` 或 `填寫` 都能找到 pdf-fill）
 - [ ] 視窗縮窄到 ≤ 900px：側欄收起、漢堡按鈕展開、項目正確點選
+- [ ] **缺中文字型提示**：把系統中文字型移開（或在字型管理把它們隱藏）後開
+      浮水印 / 插入頁碼 → 頁面最上方出現黃色提示；管理員看得到安裝指令，
+      一般使用者看到「請聯絡管理員」。裝回字型後提示消失
 
 ### 2.8 術語檢查
 

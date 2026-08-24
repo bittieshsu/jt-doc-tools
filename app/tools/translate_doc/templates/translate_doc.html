@@ -8,6 +8,8 @@
 <p class="muted">上傳文字或文件檔，逐句送到地端 LLM 翻譯，左原文右譯文並排對照。每句可單獨重新翻譯。
 語言自動偵測或手動指定，目標語言預設繁體中文。</p>
 
+{% include "components/cjk_font_notice.html" with context %}
+
 {{ llm_gate('translate-doc', llm_enabled, llm_model, mode='only') }}
 
 {# 主介面：LLM 沒啟用就藏起來，不讓使用者貼字按按鈕才發現失敗 #}

@@ -614,7 +614,7 @@ __SECTIONS__
     </div>
     <div class="footer-col">
       <div class="footer-h">授權</div>
-      <p>Apache License 2.0</p>
+      <p>GNU Affero General Public License v3.0</p>
     </div>
   </div>
   <div class="footer-bottom">

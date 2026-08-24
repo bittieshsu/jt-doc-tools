@@ -1,4 +1,4 @@
-# Jason Tools 文件工具箱 v1.14.46
+# Jason Tools 文件工具箱 v1.14.48
 
 > 整合式 PDF / Office 文件處理平台，46 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
 >
@@ -8,7 +8,7 @@
 
 完整介紹網站：<https://jasoncheng7115.github.io/jt-doc-tools/>
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![CodeQL](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml)
 [![OWASP Top 10 (2025)](https://img.shields.io/badge/OWASP%20Top%2010%20(2025)-A01--A10%20covered-success?logo=owasp)](SECURITY.md)
 [![Tests](https://img.shields.io/badge/pytest-470%20passed-brightgreen?logo=pytest)](tests/)
@@ -300,7 +300,19 @@ JTDT_DEBUG=true uv run python -m app.main
 
 ## 授權
 
-Apache License 2.0 — 詳見 [LICENSE](LICENSE)。第三方套件授權見 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+**GNU Affero General Public License v3.0 或任何後續版本（AGPL-3.0-or-later）** —— 詳見 [LICENSE](LICENSE)。
+第三方套件授權見 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
+### 這對您代表什麼
+
+- **自己用（公司內部架站給同仁用）**：完全自由，沒有任何額外義務。修改也可以。
+- **您改了程式，又把它當成網路服務提供給別人使用**（AGPL 第 13 條，**含公司內部使用者**）：
+  必須把您修改後的完整原始碼提供給那些使用者。沒有修改就沒有這個問題 —— 指向本專案的
+  GitHub 即可。
+- **想閉源散布 / 包進自家商業產品**：AGPL 不允許。
+
+會採用 AGPL 而不是寬鬆授權，是因為核心的 PDF 引擎 **PyMuPDF 本身就是 AGPL**
+（Artifex 雙授權），本程式在同一個行程內使用它。
 
 ## 免責聲明
 

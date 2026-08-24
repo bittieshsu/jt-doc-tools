@@ -1556,7 +1556,11 @@ def build_auth_router(templates) -> APIRouter:
     async def audit_page(request: Request,
                          q_user: str = "", q_event: str = "",
                          q_from: str = "", q_to: str = "",
+                         tz_offset: str = "",
                          page: int = 1, page_size: int = 100):
+        # `tz_offset`：使用者瀏覽器的 UTC 偏移（分鐘，東為正），由篩選表單帶上來。
+        # 畫面上的時間是瀏覽器轉的，篩選條件當然要用**同一個時區**解讀 ——
+        # 否則伺服器跑在 UTC 時會無聲地篩掉 8 小時的資料（issue #48）。
         page = max(1, page)
         page_size = min(500, max(10, page_size))
         offset = (page - 1) * page_size
@@ -1568,20 +1572,13 @@ def build_auth_router(templates) -> APIRouter:
         if q_event:
             conds.append("event_type = ?")
             params.append(q_event)
-        if q_from:
-            try:
-                import datetime as _dt
-                ts_from = _dt.datetime.fromisoformat(q_from).timestamp()
-                conds.append("ts >= ?"); params.append(ts_from)
-            except ValueError:
-                pass
-        if q_to:
-            try:
-                import datetime as _dt
-                ts_to = _dt.datetime.fromisoformat(q_to).timestamp()
-                conds.append("ts <= ?"); params.append(ts_to)
-            except ValueError:
-                pass
+        from ..core import timeutil as _tu
+        ts_from = _tu.local_input_to_epoch(q_from, tz_offset)
+        if ts_from is not None:
+            conds.append("ts >= ?"); params.append(ts_from)
+        ts_to = _tu.local_input_to_epoch(q_to, tz_offset)
+        if ts_to is not None:
+            conds.append("ts <= ?"); params.append(ts_to)
         where = " WHERE " + " AND ".join(conds) if conds else ""
 
         c = audit_db.conn()
@@ -1612,7 +1609,7 @@ def build_auth_router(templates) -> APIRouter:
             "page": page, "page_size": page_size,
             "pages": (total + page_size - 1) // page_size,
             "q_user": q_user, "q_event": q_event,
-            "q_from": q_from, "q_to": q_to,
+            "q_from": q_from, "q_to": q_to, "tz_offset": tz_offset,
             "distinct_events": distinct_events,
             "distinct_users": distinct_users,
             "size_mb": size_bytes / 1024 / 1024,
@@ -1622,7 +1619,8 @@ def build_auth_router(templates) -> APIRouter:
     @router.get("/audit/export.csv")
     async def audit_export_csv(request: Request,
                                q_user: str = "", q_event: str = "",
-                               q_from: str = "", q_to: str = ""):
+                               q_from: str = "", q_to: str = "",
+                               tz_offset: str = ""):
         import csv as _csv
         import io as _io
         from datetime import datetime as _dt
@@ -1632,16 +1630,13 @@ def build_auth_router(templates) -> APIRouter:
             conds.append("username = ?"); params.append(q_user)
         if q_event:
             conds.append("event_type = ?"); params.append(q_event)
-        if q_from:
-            try:
-                conds.append("ts >= ?"); params.append(_dt.fromisoformat(q_from).timestamp())
-            except ValueError:
-                pass
-        if q_to:
-            try:
-                conds.append("ts <= ?"); params.append(_dt.fromisoformat(q_to).timestamp())
-            except ValueError:
-                pass
+        from ..core import timeutil as _tu
+        _f = _tu.local_input_to_epoch(q_from, tz_offset)
+        if _f is not None:
+            conds.append("ts >= ?"); params.append(_f)
+        _t2 = _tu.local_input_to_epoch(q_to, tz_offset)
+        if _t2 is not None:
+            conds.append("ts <= ?"); params.append(_t2)
         where = " WHERE " + " AND ".join(conds) if conds else ""
         rows = audit_db.conn().execute(
             f"SELECT id, ts, username, ip, event_type, target, details_json "
@@ -1655,7 +1650,9 @@ def build_auth_router(templates) -> APIRouter:
         w = _csv.writer(buf)
         w.writerow(["id", "time", "user", "ip", "event_type", "target", "details"])
         for r in rows:
-            t = _dt.fromtimestamp(r["ts"]).isoformat(sep=" ", timespec="seconds")
+            # **一定要帶偏移** —— 這份 CSV 會拿去跟畫面比對，沒有偏移的時間
+            # 字串正是 issue #48 裡「差 8 小時卻看不出原因」的來源。
+            t = _tu.epoch_to_iso(r["ts"], tz_offset)
             # target / details 裡有使用者取的檔名 —— 而這份 CSV 的開檔者是
             # 管理員。不中和等於把公式送進管理員的 Excel（見 core/csv_safe）。
             w.writerow(_csv_safe.row(
@@ -1676,6 +1673,7 @@ def build_auth_router(templates) -> APIRouter:
                            q_user: str = "", q_tool: str = "",
                            q_filename: str = "",
                            q_from: str = "", q_to: str = "",
+                           tz_offset: str = "",
                            page: int = 1, page_size: int = 50):
         """Uploads activity log — derived from `audit_events` rows where
         event_type='tool_invoke' AND details_json contains a `filename`
@@ -1698,18 +1696,15 @@ def build_auth_router(templates) -> APIRouter:
             # appears as `"filename": "X"` within details_json.
             conds.append("details_json LIKE ?")
             params.append(f"%{q_filename}%")
-        if q_from:
-            try:
-                import datetime as _dt
-                conds.append("ts >= ?"); params.append(_dt.datetime.fromisoformat(q_from).timestamp())
-            except ValueError:
-                pass
-        if q_to:
-            try:
-                import datetime as _dt
-                conds.append("ts <= ?"); params.append(_dt.datetime.fromisoformat(q_to).timestamp())
-            except ValueError:
-                pass
+        # 與稽核頁同一道換算。issue #48 的回報只提到稽核頁，但**上傳記錄頁是
+        # 同一個 bug** —— 三份重複的時間解析各自壞掉，正是它們該共用的理由。
+        from ..core import timeutil as _tu
+        _f = _tu.local_input_to_epoch(q_from, tz_offset)
+        if _f is not None:
+            conds.append("ts >= ?"); params.append(_f)
+        _t2 = _tu.local_input_to_epoch(q_to, tz_offset)
+        if _t2 is not None:
+            conds.append("ts <= ?"); params.append(_t2)
         where = " WHERE " + " AND ".join(conds)
 
         c = audit_db.conn()
@@ -1761,7 +1756,7 @@ def build_auth_router(templates) -> APIRouter:
             "page": page, "page_size": page_size,
             "pages": (total + page_size - 1) // page_size,
             "q_user": q_user, "q_tool": q_tool, "q_filename": q_filename,
-            "q_from": q_from, "q_to": q_to,
+            "q_from": q_from, "q_to": q_to, "tz_offset": tz_offset,
             "distinct_users": distinct_users,
             "distinct_tools": distinct_tools,
         })

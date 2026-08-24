@@ -115,7 +115,10 @@ JTDT_DATA_DIR=/tmp/pt-data .venv/bin/python temp/sec-audit/pentest.py \
 .venv/bin/python -m bandit -r app/ -f json -o temp/sec-audit/bandit.json -q
 ```
 
-判讀方式：只看 HIGH / MEDIUM（v1.14.6 為 30 個 MEDIUM，**全部屬於下表的已知非問題**）。
+判讀方式：只看 HIGH / MEDIUM（v1.14.48 為 0 個 HIGH、37 個 MEDIUM，**全部屬於下表的已知非問題**）。
+歷次增量都逐一判讀過：v1.14.6 是 30；v1.14.47 的 +3 是 B608 的 `IN ({placeholders})` 形狀（佔位符由
+`?` 的個數組出來）；v1.14.48 的 +4 全在 `auth_db._m23`（OU key 正規化遷移）—— 表名與欄名來自函式內
+**寫死的常數 tuple**（`subject_roles`/`role_id`、`subject_perms`/`tool_id`），值一律走參數化。
 新增的 MEDIUM 要逐一判斷；判定為非問題就補進下表並寫明理由，不可只是忽略。
 
 已知的**非問題**（複審時不必重開）：
@@ -183,6 +186,13 @@ cookie 沒生效，這次掃描等於沒做 —— 不可當成通過。
 
 `plan-auth.yaml` 的 replacer 規則 `matchType` 要寫 `req_header`（不是
 `request_header`，後者會讓整個計畫失敗），且不要加 `enabled` 欄位（會警告）。
+
+**context 一定要 `excludePaths` 掉 `/logout` 與 `/auth/*/sls`**（2026-08-24 實測）：
+爬蟲會點到登出連結，把 replacer 灌進去的 session 作廢，之後整段掃描退回未登入 ——
+**症狀不是報錯，是涵蓋的路徑悄悄變少**，而風險等級照樣全 0，看起來一切正常。
+那一次少掃了 3 條需登入的路徑（其中一條正是當輪改動的端點）。
+判讀時除了「有沒有掉到 12」，也要跟上一輪比路徑數：**變少就先查是不是被登出**
+（稽核記錄裡會有一筆 `logout` 和一連串 `login_locked`）。
 
 ---
 

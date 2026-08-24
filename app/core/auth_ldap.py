@@ -283,6 +283,41 @@ def _ad_only_attributes() -> list[str]:
         return []
 
 
+def _known_attributes(conn, attrs: list[str]) -> list[str]:
+    """把伺服器 schema 裡查不到的屬性名從清單裡拿掉。
+
+    **`check_names=False` 擋不住這一段。** 只要 ldap3 拿得到伺服器 schema
+    （我們的 `_build_server` 用 `get_info=ALL`），它就會把**要求的屬性清單**
+    逐一比對，其中一個不認得就丟 `LDAPAttributeError`，而且**整個查詢不會送
+    出去**。實測三種組合：`get_info=ALL` 時 `check_names` True / False 都炸，
+    只有 `get_info=NONE` 不會。
+
+    這件事在登入路徑上的後果是**全員登不進去**，畫面還顯示「目前無法連線到
+    認證伺服器」（看起來像網路問題，其實目錄好好的）—— 2026-08-11 正式機踩
+    過一次，當時的修法是「只有 backend 是 AD 才要那些屬性」。那修掉了
+    OpenLDAP，但**沒修掉「AD 相容但少一個屬性」的目錄**（Samba AD DC、
+    Univention、schema 被裁過的 AD）：少任何一個屬性，照樣是整個登入死掉。
+
+    所以改成「問過 schema 再要」：拿不到 schema 就原樣送出（讓伺服器自己
+    決定），拿得到就只要它認得的。少拿到的屬性一律走既有的「不知道」三態，
+    不會憑空產生結論。
+    """
+    try:
+        schema = getattr(getattr(conn, "server", None), "schema", None)
+        types = getattr(schema, "attribute_types", None) if schema else None
+        if not types:
+            return attrs
+        known = {str(k).lower() for k in types.keys()}
+        kept = [a for a in attrs if str(a).lower() in known]
+        dropped = [a for a in attrs if a not in kept]
+        if dropped:
+            logger.info("目錄 schema 沒有這些屬性，本次查詢略過：%s",
+                        ", ".join(dropped))
+        return kept or attrs
+    except Exception:  # noqa: BLE001 — 判斷不出來就照原樣送，不可因此擋下登入
+        return attrs
+
+
 def _resolve_backend_and_cfg() -> tuple[str, dict]:
     """Return (backend, ldap_cfg) for directory sync.
 
@@ -530,15 +565,17 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
                 search_base=base,
                 search_filter=user_filter,
                 search_scope=SUBTREE,
-                attributes=[
+                # AD 的主要群組不在 memberOf 裡（見 primary_group_sid 的說明）。
+                # **只在 backend 是 AD 時才要** —— 見 `_ad_only_attributes`；
+                # 再經 `_known_attributes` 濾掉這台目錄不認得的，否則少一個
+                # 屬性就是整個登入查詢被拒（見該函式的說明）。
+                attributes=_known_attributes(svc_conn, [
                     cfg.get("displayname_attr", "displayName"),
                     cfg.get("group_attr", "memberOf"),
                     cfg.get("username_attr", "sAMAccountName"),
                     cfg.get("email_attr", "mail"),
-                    # AD 的主要群組不在 memberOf 裡（見 primary_group_sid 的說明）。
-                    # **只在 backend 是 AD 時才要** —— 見 `_ad_only_attributes`。
                     *_ad_only_attributes(),
-                ],
+                ]),
                 size_limit=2,
             )
             entries = list(svc_conn.entries)
@@ -1035,8 +1072,9 @@ def sync_all_users(name_contains: str = "") -> dict:
                 # userAccountControl / msDS-… 是 AD 才有的。**構造屬性一定要
                 # 顯式列出**（`*` 不會回傳），但**只在 backend 是 AD 時才要**
                 # —— 見 `_ad_only_attributes`（OpenLDAP 會拒絕整個查詢）。
-                attributes=[disp_attr, login_attr, mail_attr,
-                            *_ad_only_attributes()],
+                attributes=_known_attributes(
+                    conn, [disp_attr, login_attr, mail_attr,
+                           *_ad_only_attributes()]),
                 paged_size=500, generator=False)
             for e in entries:
                 dn = e.get("dn") or ""

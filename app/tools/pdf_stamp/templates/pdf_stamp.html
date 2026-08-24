@@ -5,6 +5,8 @@
 <h1>{{ icon('stamp', size=22) }} PDF 用印與簽名</h1>
 <p class="muted">上傳 PDF，選擇要用的印章、簽名或 Logo 圖片，平台會依照預設位置自動套用。需要微調時可以切到進階模式。</p>
 
+{% include "components/cjk_font_notice.html" with context %}
+
 <div class="panel">
   <h2 data-s="s53896af7">1. 選擇要蓋的圖片（印章 / 簽名 / Logo）</h2>
   {% if not stamps %}
@@ -197,6 +199,11 @@
 
           <label data-s="s3044b600">用途</label>
           <input type="text" id="restrict-purpose" placeholder="例如：申請台新銀行帳戶" maxlength="60" data-s="sd477c56e">
+          <label class="rs-phrase-row">
+            <input type="checkbox" id="restrict-phrase" checked>
+            <span>加上「僅供 … 使用，他用無效」字樣</span>
+            <small class="muted">取消勾選就只印用途本身 —— 用途文字已經把話說完時（例如「本影本僅供投標使用」）再套一次會變贅字。</small>
+          </label>
 
           <label data-s="s3044b600">日期</label>
           <div data-s="scfaba5a6">
@@ -1764,7 +1771,9 @@ function _restrictGetParams() {
   const fontStyle = document.getElementById('restrict-font').value || 'kaiti';
   const colorHex = document.getElementById('restrict-color').value || '#c00000';
   const fontPx = parseInt(document.getElementById('restrict-fontsize').value, 10) || 64;
-  return { purpose, dateStr, applicant, copyLabel, style, border, fontStyle, colorHex, fontPx };
+  const showPhrase = document.getElementById('restrict-phrase').checked;
+  return { purpose, dateStr, applicant, copyLabel, style, border, fontStyle,
+           colorHex, fontPx, showPhrase };
 }
 
 async function _restrictFetchPng() {
@@ -1783,6 +1792,7 @@ async function _restrictFetchPng() {
       font_style: p.fontStyle,
       color_hex: p.colorHex,
       font_size_px: p.fontPx,
+      show_phrase: p.showPhrase,
     }),
   });
   if (!r.ok) return null;
@@ -1819,7 +1829,7 @@ async function _restrictRegen({ silent } = {}) {
   if (!silent) {
     const p = _restrictGetParams();
     document.getElementById('restrict-summary-status').textContent =
-        '— 僅供 ' + p.purpose + ' 使用';
+        p.showPhrase ? ('— 僅供 ' + p.purpose + ' 使用') : ('— ' + p.purpose);
   }
   return { dataUri, ...data };
 }
@@ -1914,7 +1924,7 @@ function _restrictRemoveOverlay() {
   document.getElementById('restrict-today').addEventListener('click', () => {
     $val.value = _isoToday(); _restrictScheduleRegen();
   });
-  ['restrict-purpose', 'restrict-date', 'restrict-date-on',
+  ['restrict-purpose', 'restrict-date', 'restrict-date-on', 'restrict-phrase',
    'restrict-applicant', 'restrict-copy-total', 'restrict-copy-current',
    'restrict-style', 'restrict-font', 'restrict-color', 'restrict-fontsize'].forEach(id => {
     const el = document.getElementById(id);
@@ -1932,7 +1942,9 @@ function _restrictRemoveOverlay() {
       _restrictEnsureOverlay();
       const p = _restrictGetParams();
       document.getElementById('restrict-summary-status').textContent =
-          p.purpose ? ('— 僅供 ' + p.purpose + ' 使用') : '— 已啟用（請填用途）';
+          p.purpose
+            ? (p.showPhrase ? ('— 僅供 ' + p.purpose + ' 使用') : ('— ' + p.purpose))
+            : '— 已啟用（請填用途）';
     } else {
       form.style.display = 'none';
       _restrictRemoveOverlay();

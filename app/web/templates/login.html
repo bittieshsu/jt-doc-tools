@@ -53,6 +53,8 @@
                      font-size:14px; text-decoration:none; }
     .login-sso-btn:hover { background:#f3f4f6; border-color:#9ca3af; }
     .login-foot { text-align:center; margin-top:18px; font-size:11px; color:#9ca3af; }
+    .login-foot .brand-src { color:#9ca3af; text-decoration:underline; text-underline-offset:2px; }
+    .login-foot .brand-src:hover { color:#4b5563; }
   </style>
 </head>
 <body>
@@ -106,7 +108,13 @@
     {% endfor %}
     {% endif %}
 
-    <div class="login-foot">{{ app_name }} · v{{ version }}</div>
+    {# 原始碼連結在登入頁也要有 —— AGPL 第 13 條講的是「透過網路與軟體互動的
+       使用者」，還沒登入的訪客同樣算數。登入頁不繼承側欄樣板，所以要各自放。 #}
+    <div class="login-foot">{{ app_name }} · v{{ version }} ·
+      <a class="brand-src" href="https://github.com/jasoncheng7115/jt-doc-tools"
+         target="_blank" rel="noopener"
+         title="本程式以 AGPL-3.0 授權；點此取得完整原始碼">原始碼</a>
+    </div>
   </form>
 </body>
 </html>
