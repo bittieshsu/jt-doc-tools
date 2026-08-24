@@ -1573,14 +1573,26 @@ def build_router(templates) -> APIRouter:
     @router.post("/vat-db/schedule")
     async def vat_db_schedule_set(payload: dict):
         from ..core import vat_db as _vatdb
+        # 自己驗、自己講 —— 直接把 int() 的 ValueError 往外送，等於把使用者
+        # 輸入的字串原樣回吐（"invalid literal for int()..."），那不是我們
+        # 自撰的驗證訊息。
+        try:
+            weekday = int(payload.get("weekday", 6))
+            hour = int(payload.get("hour", 3))
+        except (ValueError, TypeError):
+            raise HTTPException(400, "參數錯誤：星期與時間必須是數字")
+        if not (0 <= weekday <= 6):
+            raise HTTPException(400, "參數錯誤：星期必須介於 0（週一）到 6（週日）")
+        if not (0 <= hour <= 23):
+            raise HTTPException(400, "參數錯誤：時間必須介於 0 到 23 時")
         try:
             _vatdb.set_schedule(
                 enabled=bool(payload.get("enabled", False)),
-                weekday=int(payload.get("weekday", 6)),
-                hour=int(payload.get("hour", 3)),
+                weekday=weekday, hour=hour,
             )
         except (ValueError, TypeError) as e:
-            raise HTTPException(400, f"參數錯誤：{e}")
+            logger.warning("統編排程設定失敗：%s", e)
+            raise HTTPException(400, "參數錯誤：排程設定無法套用")
         return {"ok": True, **_vatdb.get_schedule()}
 
     @router.post("/vat-db/clear")

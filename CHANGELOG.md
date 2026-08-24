@@ -4,6 +4,40 @@
 
 ---
 
+## [1.14.51] - 2026-08-24
+
+### 修正：管理區把例外原文吐到畫面上（CodeQL 長期告警，實際核對後發現筆記是錯的）
+
+CodeQL 掛著 6 個「Information exposure through an exception」，而我們的筆記寫
+「逐一核實過，`except` 只收 `ValueError`、內容是自撰的驗證訊息，建議 dismiss」。
+這次用 `ast` 實際統計 —— **那句話是錯的**：`auth_router.py` 有 30 處把例外訊息
+回給使用者，其中 **8 處是 `except Exception`**，形狀是
+
+    raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
+
+會把 ldap3 的錯誤原文（可能含 DN、伺服器位址）送上畫面，而畫面會被截圖進工單。
+專案在 v1.12.86 就立過規矩「畫面給通用訊息、細節只進日誌」，還為此寫了
+`log_safe.safe_user_error()` —— 這幾處只是漏用。
+
+- 目錄 / 群組查詢的 7 處：改成通用訊息 + `logger.exception`（管理員仍查得到原因）
+- 通知測試按鈕：**保留原因**（那正是這顆按鈕的用途），但改走 `safe_user_error`
+  —— Slack / Teams 的 webhook URL 本身就是密鑰，不可原樣回吐
+- 統編排程設定：原本直接把 `int()` 的 `ValueError` 往外送（「invalid literal
+  for int() with base 10: 'abc'」把使用者輸入原樣回吐）→ 改成自己驗、自己講
+
+守門測試 `tests/test_admin_exception_leak.py`：**自動列舉**管理區與 web 路由，
+新端點自動涵蓋；含反向對照（拿假的洩漏形狀餵掃描器，抓不到就紅）與豁免清單
+防呆（檔案改名就紅）。唯一的豁免是外接 GPU OCR 伺服器的樣板 —— 那支跑在另一台
+機器上、呼叫者是我們自己的服務，錯誤訊息是排除問題時唯一的線索。
+
+### 已知議題
+
+Dependabot 的 setuptools（Moderate）**現在解得掉了**：原本的理由是「torch 2.11
+要求 `setuptools<82`，而修補需要 ≥83，無法同修」，但 **torch 2.13 已把上限
+拿掉**（改為 `setuptools>=77.0.3`）。升 torch 是跨大版本、且 OCR 要重測，
+留待下一輪處理。torch 自身的 3 個 Low（`torch.jit.script`）仍無上游修補，
+本專案未使用該函式。
+
 ## [1.14.50] - 2026-08-24
 
 ### 修正：Windows 的 `jtdt restart` 不會把服務啟起來（無聲）

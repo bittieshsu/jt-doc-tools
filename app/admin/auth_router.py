@@ -26,6 +26,9 @@ def _all_tool_ids() -> list[str]:
 
 logger = logging.getLogger(__name__)
 
+from ..core.log_safe import (safe_log as _safe_log,
+                               safe_user_error as _safe_user_error)
+
 
 def _client_ip(r: Request) -> str:
     from ..core import client_ip as _cip
@@ -948,7 +951,11 @@ def build_auth_router(templates) -> APIRouter:
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
-            raise HTTPException(500, f"同步失敗：{type(e).__name__}: {e}")
+            # 例外原文不進畫面 —— 目錄查詢的錯誤常帶 DN / 伺服器位址，
+            # 而畫面可能被截圖進工單。細節寫 log（管理員查得到），
+            # 畫面只給通用訊息（v1.12.86 就立的規矩，這幾處漏用）。
+            logger.exception("%s: %s", "同步失敗", _safe_log(e))
+            raise HTTPException(500, "同步失敗，請到「稽核記錄」或 `jtdt logs` 查看原因")
         audit_db.log_event(
             "group_sync_ldap", username=_actor(request), ip=_client_ip(request),
             details=result,
@@ -1040,7 +1047,11 @@ def build_auth_router(templates) -> APIRouter:
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
-            raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
+            # 例外原文不進畫面 —— 目錄查詢的錯誤常帶 DN / 伺服器位址，
+            # 而畫面可能被截圖進工單。細節寫 log（管理員查得到），
+            # 畫面只給通用訊息（v1.12.86 就立的規矩，這幾處漏用）。
+            logger.exception("%s: %s", "查詢失敗", _safe_log(e))
+            raise HTTPException(500, "查詢目錄失敗，請到「稽核記錄」或 `jtdt logs` 查看原因")
         # 標註哪些目錄成員「已登入過本系統」= 真正登入過（last_login>0），不是
         # 「本地表有列」（目錄同步會鏡射全部使用者，存在≠登入過）。
         local_dns, local_logins = _logged_in_identity_sets()
@@ -1072,7 +1083,11 @@ def build_auth_router(templates) -> APIRouter:
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
-            raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
+            # 例外原文不進畫面 —— 目錄查詢的錯誤常帶 DN / 伺服器位址，
+            # 而畫面可能被截圖進工單。細節寫 log（管理員查得到），
+            # 畫面只給通用訊息（v1.12.86 就立的規矩，這幾處漏用）。
+            logger.exception("%s: %s", "查詢失敗", _safe_log(e))
+            raise HTTPException(500, "查詢目錄失敗，請到「稽核記錄」或 `jtdt logs` 查看原因")
         return {"ok": True, "count": n}
 
     @router.post("/groups/{gid}/update")
@@ -1138,7 +1153,11 @@ def build_auth_router(templates) -> APIRouter:
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
-            raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
+            # 例外原文不進畫面 —— 目錄查詢的錯誤常帶 DN / 伺服器位址，
+            # 而畫面可能被截圖進工單。細節寫 log（管理員查得到），
+            # 畫面只給通用訊息（v1.12.86 就立的規矩，這幾處漏用）。
+            logger.exception("%s: %s", "查詢失敗", _safe_log(e))
+            raise HTTPException(500, "查詢目錄失敗，請到「稽核記錄」或 `jtdt logs` 查看原因")
         # 附上每個 OU 目前指派的角色（讓樹上可看到哪些 OU 有權限）
         for n in nodes:
             n["roles"] = permissions.list_roles_for_subject("ou", n["dn"])
@@ -1156,7 +1175,11 @@ def build_auth_router(templates) -> APIRouter:
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
-            raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
+            # 例外原文不進畫面 —— 目錄查詢的錯誤常帶 DN / 伺服器位址，
+            # 而畫面可能被截圖進工單。細節寫 log（管理員查得到），
+            # 畫面只給通用訊息（v1.12.86 就立的規矩，這幾處漏用）。
+            logger.exception("%s: %s", "查詢失敗", _safe_log(e))
+            raise HTTPException(500, "查詢目錄失敗，請到「稽核記錄」或 `jtdt logs` 查看原因")
         local_dns, local_logins = _logged_in_identity_sets()
         lc = 0
         for m in users:
@@ -1180,7 +1203,11 @@ def build_auth_router(templates) -> APIRouter:
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
-            raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
+            # 例外原文不進畫面 —— 目錄查詢的錯誤常帶 DN / 伺服器位址，
+            # 而畫面可能被截圖進工單。細節寫 log（管理員查得到），
+            # 畫面只給通用訊息（v1.12.86 就立的規矩，這幾處漏用）。
+            logger.exception("%s: %s", "查詢失敗", _safe_log(e))
+            raise HTTPException(500, "查詢目錄失敗，請到「稽核記錄」或 `jtdt logs` 查看原因")
         # 是否已登入過本系統 = 真正登入過（last_login>0），非「本地表有列」。
         local_dns, _ = _logged_in_identity_sets()
         detail["local"] = dn.strip().lower() in local_dns
@@ -1369,7 +1396,11 @@ def build_auth_router(templates) -> APIRouter:
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
-            raise HTTPException(500, f"查詢失敗：{type(e).__name__}: {e}")
+            # 例外原文不進畫面 —— 目錄查詢的錯誤常帶 DN / 伺服器位址，
+            # 而畫面可能被截圖進工單。細節寫 log（管理員查得到），
+            # 畫面只給通用訊息（v1.12.86 就立的規矩，這幾處漏用）。
+            logger.exception("%s: %s", "查詢失敗", _safe_log(e))
+            raise HTTPException(500, "查詢目錄失敗，請到「稽核記錄」或 `jtdt logs` 查看原因")
         tree = dir_filter.prune_tree(res["objects"], auth_ldap._dir_root_base())
         # 附上符合的 OU 目前角色（樹上可看到哪些選定 OU 有權限）
         matched = [o for o in res["objects"] if o["type"] == "ou"]
@@ -1965,7 +1996,14 @@ def build_auth_router(templates) -> APIRouter:
                 "[測試] Jason Tools 文件工具箱",
                 "這是一則測試通知，看到就代表這個管道設定正確。")
         except Exception as e:  # noqa: BLE001
-            return {"ok": False, "error": f"{type(e).__name__}: {e}"[:300]}
+            # 「測試」按鈕的用途就是告訴管理員哪裡不對，所以要給原因 ——
+            # 但**不可原樣吐出例外訊息**：通知管道的錯誤裡常帶 webhook URL
+            # （Slack / Teams 的 URL 本身就是密鑰）。走 safe_user_error：
+            # 看起來像我們自撰的短訊息才顯示，其餘退回類別名，細節進 log。
+            logger.exception("notify_test 失敗（管道 %s）: %s",
+                             _safe_log(channel), _safe_log(e))
+            return {"ok": False,
+                    "error": f"{type(e).__name__}：{_safe_user_error(e, '傳送失敗，詳見伺服器記錄')}"}
         audit_db.log_event(
             "notify_test", username=_actor(request), ip=_client_ip(request),
             target=channel,
