@@ -155,6 +155,40 @@ def _run_capture(cmd: list[str]) -> tuple[int, str]:
         return 127, ""
 
 
+def _win_service_state() -> str:
+    """Windows 服務目前的狀態字（RUNNING / STOPPED / STOP_PENDING …）。
+
+    查不到就回空字串 —— 呼叫端要能在「問不到狀態」時仍做出保守決定。
+    """
+    rc, out = _run_capture(["sc.exe", "query", SERVICE_NAME])
+    if rc != 0:
+        return ""
+    for word in ("STOP_PENDING", "START_PENDING", "RUNNING", "STOPPED",
+                 "PAUSED"):
+        if word in out.upper():
+            return word
+    return ""
+
+
+def _win_wait_state(target: str, timeout_s: float = 45.0) -> bool:
+    """等服務進入指定狀態；逾時回 False。
+
+    **`sc.exe stop` 是非同步的** —— 它送出停止要求就回來了，服務還停在
+    `STOP_PENDING`。緊接著下 `sc.exe start`，SCM 會回 **1056
+    （ERROR_SERVICE_ALREADY_RUNNING）**，而我們原本把 1056 當成「已經在跑」
+    直接回成功 —— 於是 `jtdt restart` 的結果是：**start 沒生效、服務停完就停在
+    STOPPED、回傳碼 0、畫面上沒有任何訊息**（2026-08-24 在 Windows 測試機重現）。
+    更新流程也走同一組函式，客戶更新完會發現服務沒起來卻查不到原因。
+    """
+    import time as _t
+    deadline = _t.time() + timeout_s
+    while _t.time() < deadline:
+        if _win_service_state() == target:
+            return True
+        _t.sleep(1.0)
+    return _win_service_state() == target
+
+
 def svc_start() -> int:
     if _is_linux():
         return _run(["systemctl", "start", SERVICE_NAME])
@@ -172,20 +206,29 @@ def svc_start() -> int:
             cmd = ["sudo", "-u", user] + cmd
         return _run(cmd)
     if _is_windows():
-        # sc.exe start returns 1056 when the service is already running.
-        # That's success from the user's POV (service is up). Don't alarm them.
+        # 服務還在停止中就下 start，SCM 會回 1056 而**不會**啟動它。
+        # 先等它真的停下來（見 `_win_wait_state`）。
+        if _win_service_state() == "STOP_PENDING":
+            _win_wait_state("STOPPED")
         rc, out = _run_capture(["sc.exe", "start", SERVICE_NAME])
         if rc == 0:
             return 0
-        # 1056 = ERROR_SERVICE_ALREADY_RUNNING
+        # 1056 = ERROR_SERVICE_ALREADY_RUNNING。**只有在服務真的 RUNNING 時
+        # 才算成功** —— 停止中的服務也會回 1056，早期版本把它一律當成功，
+        # 結果是「restart 之後服務沒起來，回傳碼卻是 0」。
         if "1056" in out or "1056" in str(rc):
-            return 0
+            if _win_service_state() == "RUNNING":
+                return 0
+            # 停止中 → 等停完再試一次
+            _win_wait_state("STOPPED")
+            rc, out = _run_capture(["sc.exe", "start", SERVICE_NAME])
+            if rc == 0:
+                return 0
         # Verify by querying — maybe sc.exe error was transient
-        rc2, q = _run_capture(["sc.exe", "query", SERVICE_NAME])
-        if rc2 == 0 and "RUNNING" in q.upper():
+        if _win_service_state() == "RUNNING":
             return 0
         sys.stderr.write(out)
-        return rc
+        return rc or 1
     return 1
 
 
@@ -216,7 +259,14 @@ def svc_stop() -> int:
             pass
         return 0
     if _is_windows():
-        return _run(["sc.exe", "stop", SERVICE_NAME])
+        rc = _run(["sc.exe", "stop", SERVICE_NAME])
+        # `sc.exe stop` 是**非同步**的：它送出要求就回來，服務仍在
+        # STOP_PENDING。不等的話，緊接著的 start 會被 SCM 以 1056 擋掉
+        # （見 `_win_wait_state` 的說明）。macOS 那條路徑早就有同樣的等待。
+        if not _win_wait_state("STOPPED"):
+            print("服務在 45 秒內沒有停止（仍在停止中）；"
+                  "接下來的啟動可能會失敗", file=sys.stderr)
+        return rc
     return 1
 
 

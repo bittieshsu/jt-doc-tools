@@ -187,3 +187,50 @@ def test_endpoint_accepts_show_phrase(client):
     assert r_on.status_code == 200 and r_off.status_code == 200
     on, off = r_on.json(), r_off.json()
     assert (off["width_px"] * off["height_px"]) < (on["width_px"] * on["height_px"])
+
+
+# ---------------------------------------------------------------------------
+# 置中：量測與繪製必須用同一個原點（使用者回報「中」字上方多一截空白）
+#
+# `_text_size` 量的是**墨水框**（`textbbox` 已扣掉字型上緣空隙），但 Pillow 的
+# `draw.text()` 預設錨點是 ascender —— 畫下去會再往下掉一個上緣偏移（64px 楷體
+# 實測 20px）。兩個原點不同，所有置中算式都會偏低：直式上留白 71 / 下 32，
+# 橫式 49 / 10。修法是繪製時把 bbox 原點補回去（`_draw_ink`）。
+# ---------------------------------------------------------------------------
+def _inner_padding(png: bytes) -> tuple[int, int]:
+    """回傳（框內文字上方留白, 下方留白）像素數。
+
+    先用「整列 / 整行幾乎都是墨水」找出框線，再只量框內 —— 不排除框線的話
+    每一列都有墨水，量出來永遠是 0（第一版就是這樣，看起來完全正常）。
+    """
+    import numpy as np
+    a = _np_alpha(png) > 8
+    colf, rowf = a.mean(axis=0), a.mean(axis=1)
+    vb, hb = np.where(colf > 0.5)[0], np.where(rowf > 0.5)[0]
+    inner = a[hb.min() + 4:hb.max() - 3, vb.min() + 4:vb.max() - 3]
+    rows = np.where(inner.any(axis=1))[0]
+    return int(rows.min()), int(inner.shape[0] - 1 - rows.max())
+
+
+def _np_alpha(png: bytes):
+    import numpy as np
+    return np.array(_Image.open(_io.BytesIO(png)).convert("RGBA").split()[3])
+
+
+@_pytest.mark.parametrize("fn", [_rr.render_vertical_stamp,
+                                 _rr.render_rectangle_stamp])
+@_pytest.mark.parametrize("show", [True, False])
+def test_text_is_vertically_centred(fn, show):
+    png, _w, _h = fn(purpose="中文測試", border_style="single", show_phrase=show)
+    top, bottom = _inner_padding(png)
+    assert abs(top - bottom) <= 4, (
+        f"文字沒有置中：上留白 {top} / 下留白 {bottom} —— "
+        "量測用墨水框、繪製用 ascender 錨點時就會這樣（上方多一截空白）")
+
+
+def test_centring_holds_with_footer_columns():
+    png, _w, _h = _rr.render_vertical_stamp(
+        purpose="中文測試", date_str="115.08.24", applicant="王小明",
+        border_style="single", show_phrase=False)
+    top, bottom = _inner_padding(png)
+    assert abs(top - bottom) <= 4, f"帶 footer 時也要置中（上 {top} / 下 {bottom}）"

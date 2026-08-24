@@ -137,11 +137,34 @@ def _find_kai_in_catalog() -> Optional[tuple[str, int]]:
 
 
 def _text_size(draw: ImageDraw.ImageDraw, text: str,
-                font: ImageFont.FreeTypeFont) -> tuple[int, int]:
+                font: ImageFont.FreeTypeFont,
+                stroke_w: int = 0) -> tuple[int, int]:
+    """文字的**墨水框**尺寸（不含字型上下的空隙）。
+
+    描邊寬度會撐大墨水框，所以量測與繪製要帶同一個 `stroke_w`，否則主用途
+    那行（用 stroke 模擬粗體）會量得比畫出來的小。
+    """
     if not text:
         return 0, 0
-    bbox = draw.textbbox((0, 0), text, font=font)
+    bbox = draw.textbbox((0, 0), text, font=font, stroke_width=stroke_w)
     return bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+
+def _draw_ink(draw: ImageDraw.ImageDraw, xy, text: str, font, color,
+              stroke_w: int = 0) -> None:
+    """把文字畫成「**墨水框左上角剛好落在 xy**」。
+
+    Pillow 的 `draw.text()` 預設錨點是 ascender —— 我們量到的是墨水框
+    （`textbbox` 已扣掉上緣空隙），畫下去卻又多掉一個上緣偏移（64px 楷體實測
+    **20 px**）。量測與繪製的原點不同，於是所有置中都會偏低：使用者回報直式章
+    「中」字上方多一截空白，實測橫式也一樣（上留白 49 / 下留白 10）。
+
+    這裡把 bbox 的原點補回去，讓「量到的框」與「畫出來的墨水」對齊，
+    置中的算式才會成立。
+    """
+    b = draw.textbbox((0, 0), text, font=font, stroke_width=stroke_w)
+    draw.text((xy[0] - b[0], xy[1] - b[1]), text, font=font, fill=color,
+              stroke_width=stroke_w, stroke_fill=color if stroke_w else None)
 
 
 def render_rectangle_stamp(
@@ -185,7 +208,8 @@ def render_rectangle_stamp(
 
     # 量測（不畫的段落一律量成 0，才不會在版面上留下空白帶）
     w_top, h_top = (_text_size(draw, "僅供", font_small) if show_phrase else (0, 0))
-    w_main, h_main = _text_size(draw, purpose, font_big)
+    stroke_w = max(0, int(big_size * 0.045))   # 用描邊模擬粗體
+    w_main, h_main = _text_size(draw, purpose, font_big, stroke_w)
     w_bottom, h_bottom = (_text_size(draw, "使用，他用無效", font_small)
                           if show_phrase else (0, 0))
 
@@ -232,19 +256,17 @@ def render_rectangle_stamp(
     if show_phrase:
         # 「僅供」
         x = (img_w - w_top) // 2
-        draw.text((x, y), "僅供", fill=color, font=font_small)
+        _draw_ink(draw, (x, y), "僅供", font_small, color)
         y += h_top + gap_top_main
     # 主用途 (粗一點 — 用 stroke_width 模擬)
     x = (img_w - w_main) // 2
-    stroke_w = max(0, int(big_size * 0.045))
-    draw.text((x, y), purpose, fill=color, font=font_big,
-              stroke_width=stroke_w, stroke_fill=color)
+    _draw_ink(draw, (x, y), purpose, font_big, color, stroke_w)
     y += h_main
     if show_phrase:
         y += gap_main_bot
         # 「使用，他用無效」
         x = (img_w - w_bottom) // 2
-        draw.text((x, y), "使用，他用無效", fill=color, font=font_small)
+        _draw_ink(draw, (x, y), "使用，他用無效", font_small, color)
         y += h_bottom
 
     if footer:
@@ -255,7 +277,7 @@ def render_rectangle_stamp(
         draw.line([(sep_pad, sep_y), (img_w - sep_pad, sep_y)],
                   fill=color, width=max(1, int(big_size * 0.025)))
         x = (img_w - w_foot) // 2
-        draw.text((x, y), footer, fill=color, font=font_foot)
+        _draw_ink(draw, (x, y), footer, font_foot, color)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
@@ -279,15 +301,14 @@ def render_diagonal_stamp(
     font = _load_font(font_style, font_size_px, prefer_bold=True)
     tmp = Image.new("RGBA", (10, 10))
     draw = ImageDraw.Draw(tmp)
-    tw, th = _text_size(draw, text, font)
+    stroke_w = max(0, int(font_size_px * 0.04))
+    tw, th = _text_size(draw, text, font, stroke_w)
 
     pad = int(font_size_px * 0.4)
     base = Image.new("RGBA", (tw + pad * 2, th + pad * 2), (255, 255, 255, 0))
     draw = ImageDraw.Draw(base)
     color = _parse_hex(color_hex)
-    stroke_w = max(0, int(font_size_px * 0.04))
-    draw.text((pad, pad), text, fill=color, font=font,
-              stroke_width=stroke_w, stroke_fill=color)
+    _draw_ink(draw, (pad, pad), text, font, color, stroke_w)
 
     rotated = base.rotate(-20, resample=Image.BICUBIC, expand=True)
     buf = io.BytesIO()
@@ -367,19 +388,21 @@ def _draw_vertical_column(draw: ImageDraw.ImageDraw, text: str, font,
     """
     y = y_top
     for ch in text:
-        w, h = _text_size(draw, ch, font)
-        draw.text((x_center - w // 2, y), ch, fill=color, font=font,
-                  stroke_width=stroke_w, stroke_fill=color)
+        w, h = _text_size(draw, ch, font, stroke_w)
+        _draw_ink(draw, (x_center - w // 2, y), ch, font, color, stroke_w)
         y += h + char_gap
     return y
 
 
 def _measure_vertical_column(draw: ImageDraw.ImageDraw, text: str, font,
-                             char_gap: int) -> tuple[int, int]:
-    """一欄直排文字的 (寬, 高)。寬 = 最寬的字；高 = 各字高 + 字距。"""
+                             char_gap: int, stroke_w: int = 0) -> tuple[int, int]:
+    """一欄直排文字的 (寬, 高)。寬 = 最寬的字；高 = 各字高 + 字距。
+
+    `stroke_w` 要與繪製時一致 —— 主文欄用描邊模擬粗體，不帶的話量出來會
+    比實際畫出來的小一圈。"""
     max_w = total_h = 0
     for ch in text:
-        w, h = _text_size(draw, ch, font)
+        w, h = _text_size(draw, ch, font, stroke_w)
         max_w = max(max_w, w)
         total_h += h + char_gap
     if text:
@@ -448,8 +471,8 @@ def render_vertical_stamp(
     )
     foot_meas = [_measure_vertical_column(draw, t, font_foot, gap_char)
                  for t in footer_cols]
-    col_meas = [_measure_vertical_column(draw, t, f, gap_char)
-                for t, f, _sw, _al in cols]
+    col_meas = [_measure_vertical_column(draw, t, f, gap_char, sw)
+                for t, f, sw, _al in cols]
 
     content_h = max([h for _w, h in col_meas + foot_meas] or [big_size])
     content_w = sum(w for w, _h in col_meas) + gap_col * (len(cols) - 1)
