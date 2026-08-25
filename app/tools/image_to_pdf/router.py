@@ -26,6 +26,8 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from PIL import Image, ImageOps
 
+# 這行的 import 順帶把 HEIC / HEIF 解碼器註冊給 Pillow（見 image_utils）。
+from ...core import image_utils as _imgutil
 from ...config import settings
 from ...core.job_manager import job_manager
 
@@ -53,6 +55,25 @@ PAGE_SIZES_PT = {
     # Square / sticker
     "b5": (498.90, 708.66),
 }
+
+
+def _decode_error(exc: Exception, filename: str = "") -> HTTPException:
+    """把解碼失敗轉成**使用者看得懂**的 400。
+
+    原本直接回 Pillow 的原文，使用者看到的是
+    「cannot identify image file <_io.BytesIO object at 0x000001EB43FB9350>」
+    —— 既看不懂也不知道該怎麼辦（GitHub issue #49 的截圖）。
+
+    HEIC 特別處理：那多半不是檔案壞了，而是**這台主機缺解碼元件**，
+    要講清楚怎麼解決，否則使用者只會以為自己的照片有問題。
+    """
+    name = (filename or "").strip()
+    is_heic = name.lower().endswith((".heic", ".heif"))
+    if is_heic and not _imgutil.heif_available():
+        return HTTPException(400, f"{name}：{_imgutil.HEIF_MISSING_HINT}")
+    who = f"{name}：" if name else ""
+    return HTTPException(400, f"{who}這個檔案解不開 —— 可能已毀損，或不是"
+                              f"支援的圖片格式（{type(exc).__name__}）")
 
 
 def _work_dir() -> Path:
@@ -105,7 +126,7 @@ async def upload(request: Request, file: UploadFile = File(...)):
     try:
         opened = Image.open(io.BytesIO(raw))
     except Exception as e:
-        raise HTTPException(400, f"無法解析圖片：{e}")
+        raise _decode_error(e, getattr(file, "filename", ""))
 
     # 多頁處理 — TIFF / GIF / animated WEBP 等格式可能含多 frame，要逐頁拆。
     # 之前只開第一張，使用者反映 .tiff 內 3 張只轉出 1 張（v1.4.98 修）。
@@ -412,7 +433,7 @@ async def api_image_to_pdf(
                     else:
                         src = src.convert("RGB")
             except Exception as e:
-                raise HTTPException(400, f"無法解析圖片 {f.filename}：{e}")
+                raise _decode_error(e, f.filename)
             rot = rot_list[idx]
             if rot:
                 src = src.rotate(-rot, expand=True)

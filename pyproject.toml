@@ -1,6 +1,6 @@
 [project]
 name = "jt-doc-tools"
-version = "1.14.51"
+version = "1.14.52"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
@@ -43,6 +43,11 @@ dependencies = [
     # MIT licensed,純 Python,~150KB,支援 table / code / footnote / strikethrough
     "markdown-it-py>=3.0,<4",
     "Pillow>=12.3.0,<13",
+    # pillow-heif — iPhone 拍的 HEIC / HEIF。**Pillow 本身不認這個格式**，
+    # 而我們的「圖片轉 PDF」從一開始就在畫面、副檔名白名單、搜尋關鍵字四個
+    # 地方宣稱支援 HEIC —— 只有真的要解碼時才爆（GitHub issue #49）。
+    # 全平台都有 wheel（含 win_arm64），不需要客戶自己編。
+    "pillow-heif>=1.5,<2",
     "pyasn1>=0.6.4",  # 安全: 修 DoS (uncontrolled resource / quadratic OID)
     # torch 釘 2.11.x：EasyOCR 主 OCR 引擎依賴(~700MB),防其他 dep re-lock 時意外
     # 升大版(2.13 未驗證 OCR、install/upgrade 兩路都有風險)。連帶效應:torch 2.11.x
@@ -139,4 +144,10 @@ exclude = ["tests*", "temp*", "data*"]
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
+    # bandit 是**發版門檻的工具**（TEST_PLAN_SECURITY §3）。沒宣告在這裡的話，
+    # 任何一次 `uv sync` 都會把它當成多餘套件移除 —— 而門檻腳本只會印出一段
+    # 空白，看起來像「跑過了沒問題」（2026-08-25 實際踩到）。
+    "bandit>=1.9",
+    # numpy 給視覺 / 章面置中那幾支測試算像素用（本體不依賴它）
+    "numpy>=2.0",
 ]

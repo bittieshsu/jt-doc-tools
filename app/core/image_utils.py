@@ -5,6 +5,36 @@ from pathlib import Path
 
 from PIL import Image, ImageChops
 
+# ---- HEIC / HEIF（iPhone 照片）----
+#
+# **Pillow 本身不認 HEIC**，要先向它註冊 pillow-heif 提供的解碼器。註冊放在
+# 這個共用模組的 import 時做，任何 import 過 image_utils 的地方就都支援了 ——
+# 比要求每支工具各自記得註冊可靠（GitHub issue #49 就是「四個地方都宣稱支援、
+# 卻沒有任何一處真的接上解碼器」）。
+#
+# 套件缺席時**不可以讓 import 失敗**：那會讓所有影像工具一起掛掉，代價遠大於
+# 少一個格式。`heif_available()` 讓呼叫端能給出看得懂的訊息。
+try:
+    import pillow_heif as _pillow_heif
+
+    _pillow_heif.register_heif_opener()
+    _HEIF_OK = True
+except Exception:  # noqa: BLE001 — 缺套件 / 載入失敗都只讓 HEIC 不可用
+    _HEIF_OK = False
+
+
+def heif_available() -> bool:
+    """這台主機解得開 HEIC / HEIF 嗎。"""
+    return _HEIF_OK
+
+
+#: 缺解碼器時給使用者看的訊息。**不要把 Pillow 的原文吐出去** ——
+#: 「cannot identify image file <_io.BytesIO object at 0x...>」對使用者毫無意義
+#: （issue #49 的截圖就是這句）。
+HEIF_MISSING_HINT = ("這台主機還沒有 HEIC / HEIF 解碼元件（pillow-heif）。"
+                     "請管理員執行 `jtdt update` 後再試；"
+                     "或先用手機 / 電腦把照片另存為 JPG 再上傳。")
+
 
 def ensure_rgba_png(src: Path, dst: Path) -> None:
     """Normalize an input image into an RGBA PNG written to dst."""

@@ -4,6 +4,45 @@
 
 ---
 
+## [1.14.52] - 2026-08-25
+
+### 修正：HEIC 照片上傳失敗（issue #49，客戶回報）
+
+Windows 11 上把 iPhone 拍的 HEIC 拖進「圖片轉 PDF」會失敗：
+
+    20260825_134332.heic：請求格式錯誤（400）：無法解析圖片：
+    cannot identify image file <_io.BytesIO object at 0x000001EB43FB9350>
+
+**這是我們承諾了沒做到**：工具頁說明、後端副檔名白名單、前端檔案過濾、搜尋
+關鍵字、README —— 五個地方都宣稱支援 HEIC，**但相依裡從來沒有 `pillow-heif`**，
+而 Pillow 本身不認這個格式。四道關卡全部放行，只有真的要解碼時才爆，吐出來的
+還是 Pillow 的原文（對使用者毫無意義，也看不出下一步該做什麼）。
+
+- 新增相依 `pillow-heif`（全平台都有現成 wheel，含 win_arm64，不需編譯）
+- 解碼器在 `core/image_utils` **import 時就註冊給 Pillow** —— 靠每支工具各自
+  記得註冊，遲早有一支會忘（這次就是沒有任何一處註冊）
+- 解碼失敗改成看得懂的訊息；若是 HEIC 而這台主機缺元件，直接講「請管理員執行
+  `jtdt update`，或先把照片另存成 JPG」
+- **相依套件檢查頁**（`/admin/sys-deps`）新增此項，缺套件時管理員查得出是哪一個
+- 安裝與升級三條路徑的 import 檢查都補上 `pillow_heif`（install.sh /
+  setup-python.cmd / `jtdt update`）
+
+守門測試 `tests/test_heic_support.py`（17 項）。核心那條是**從副檔名白名單自動
+列舉**：宣稱放行的每一種格式都要真的解得開 —— 日後再加格式卻沒接上解碼器，
+這裡就會紅。另有端到端（HEIC → 對外 API → PDF，且**確認紙上真的有圖**，不是
+只驗 HTTP 200）與「錯誤訊息不可回吐 Pillow 原文」。變異驗證：拿掉註冊 → 5 條紅。
+
+### 內部：發版門檻的工具不可以無聲消失
+
+裝 `pillow-heif` 時跑的 `uv sync` **把 bandit 移除了** —— 它沒宣告在
+`pyproject.toml`，而 `uv sync` 會清掉未宣告的套件。門檻腳本只是安靜印出一段
+空白，看起來像「跑過沒問題」。**少跑一項比跑出紅字危險**，因為報告仍然全綠。
+
+- `bandit` / `numpy` 補進 `[dependency-groups] dev`
+- 門檻腳本加上工具存在檢查（bandit / chromium / 測試用 LDAP 目錄），缺席時
+  印「這一項門檻等於沒跑」而不是跳過
+- 規則寫進 `TEST_PLAN_SECURITY.md`，適用整份計畫
+
 ## [1.14.51] - 2026-08-24
 
 ### 修正：管理區把例外原文吐到畫面上（CodeQL 長期告警，實際核對後發現筆記是錯的）

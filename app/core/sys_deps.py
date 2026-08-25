@@ -721,6 +721,23 @@ _DEPS = [
         },
     },
     {
+        "key": "pillow-heif",
+        "label": "pillow-heif (HEIC / HEIF)",
+        "category": "影像",
+        "impact": "iPhone 拍的 HEIC / HEIF 照片解碼。**Pillow 本身不認這個格式** —— "
+                  "缺了它，「圖片轉 PDF」放行 .heic 但解碼時才失敗（GitHub issue #49）。"
+                  "其他圖片格式不受影響。",
+        "impact_en": "Decodes HEIC/HEIF (iPhone photos). Pillow cannot read them on its "
+                     "own; without this, image-to-PDF accepts .heic but fails to decode.",
+        "soft": True,
+        "probe": lambda: _probe_python_pkg("pillow_heif", dist_name="pillow-heif"),
+        "install_cmd": {
+            "linux": "uv sync（或 sudo jtdt update；有現成 wheel，不需編譯）",
+            "macos": "uv sync",
+            "windows": "jtdt update（以系統管理員身分開啟 PowerShell）",
+        },
+    },
+    {
         "key": "pymupdf",
         "label": "PyMuPDF (fitz)",
         "category": "PDF 引擎",

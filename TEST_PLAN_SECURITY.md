@@ -112,8 +112,17 @@ JTDT_DATA_DIR=/tmp/pt-data .venv/bin/python temp/sec-audit/pentest.py \
 ## 3. 源碼掃描
 
 ```bash
+# **先確認工具在**：`uv sync` 會移除任何沒宣告在 pyproject 的套件 ——
+# bandit 曾因此被清掉，而門檻腳本只印出一段空白，看起來像「跑過沒問題」
+# （2026-08-25 實際踩到）。現已宣告在 `[dependency-groups] dev`。
+.venv/bin/python -m bandit --version || echo "bandit 不在 → 這項門檻等於沒跑"
 .venv/bin/python -m bandit -r app/ -f json -o temp/sec-audit/bandit.json -q
 ```
+
+> **門檻工具不在，就要大聲失敗**。這一條適用於整份計畫：bandit、chromium
+> （可見元素回歸）、測試用 LDAP 目錄（四種登入驗證）—— 任何一項的工具缺席時，
+> 腳本必須印出「這一項門檻等於沒跑」，不可安靜跳過。少跑一項比跑出紅字危險，
+> 因為報告看起來仍然是綠的。
 
 判讀方式：只看 HIGH / MEDIUM（v1.14.48 為 0 個 HIGH、37 個 MEDIUM，**全部屬於下表的已知非問題**）。
 歷次增量都逐一判讀過：v1.14.6 是 30；v1.14.47 的 +3 是 B608 的 `IN ({placeholders})` 形狀（佔位符由
@@ -191,8 +200,13 @@ cookie 沒生效，這次掃描等於沒做 —— 不可當成通過。
 爬蟲會點到登出連結，把 replacer 灌進去的 session 作廢，之後整段掃描退回未登入 ——
 **症狀不是報錯，是涵蓋的路徑悄悄變少**，而風險等級照樣全 0，看起來一切正常。
 那一次少掃了 3 條需登入的路徑（其中一條正是當輪改動的端點）。
-判讀時除了「有沒有掉到 12」，也要跟上一輪比路徑數：**變少就先查是不是被登出**
-（稽核記錄裡會有一筆 `logout` 和一連串 `login_locked`）。
+**判讀要看爬蟲自己的統計，不要看「告警涵蓋路徑」**（後者是從告警實例反推的，
+會隨資料量浮動而低估 —— 2026-08-24 連兩輪都因此誤以為少掃了一條）。依序看：
+
+1. ZAP log 的 `Job spider found N URLs` —— 掉到十幾個 = cookie 沒生效
+2. 拋棄式實例的稽核記錄裡 `logout` / `login_locked` 應為 **0** ——
+   非 0 代表爬蟲把自己登出了，後半段是未登入狀態在掃（無聲：風險仍全 0）
+3. High / Medium / Low 全 0
 
 ---
 

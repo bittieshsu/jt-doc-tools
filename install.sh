@@ -799,7 +799,7 @@ setup_python() {
     [ -x "$INSTALL_DIR/.venv/bin/python" ] || die "Python venv 建立失敗"
     log "驗證關鍵依賴可正常 import ..."
     "$INSTALL_DIR/.venv/bin/python" -c \
-        "import fastapi, fitz, ldap3, PIL, pdfplumber, docx, odf, openpyxl, pyzipper, httpx, psutil, pyotp, qrcode, pdf2docx, rapidfuzz, fontTools, numpy, lxml, pymupdf4llm, markdown_it, jwt, onelogin.saml2.auth, xmlsec, truststore" \
+        "import fastapi, fitz, ldap3, PIL, pillow_heif, pdfplumber, docx, odf, openpyxl, pyzipper, httpx, psutil, pyotp, qrcode, pdf2docx, rapidfuzz, fontTools, numpy, lxml, pymupdf4llm, markdown_it, jwt, onelogin.saml2.auth, xmlsec, truststore" \
         || die "依賴 import 失敗 — 安裝不完整，請查看上方錯誤"
     # easyocr 是 v1.7.2 新加的主 OCR 引擎；deps 重（PyTorch ~700MB），import
     # 失敗不致命（會自動 fallback tesseract）— warn 不 die
