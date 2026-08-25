@@ -256,6 +256,14 @@
             <span class="muted" data-s="s6b9c179a">傳統紅章 #c00000；可改藍 / 黑</span>
           </div>
 
+          <label data-s="s3044b600">底色</label>
+          <div class="rs-bg-row">
+            <label><input type="radio" name="restrict-bg" value="transparent" checked>
+              透明（看得見底下的內容）</label>
+            <label><input type="radio" name="restrict-bg" value="white">
+              白底（章會蓋住底下的內容）</label>
+          </div>
+
           <label data-s="s3044b600">字級</label>
           <div data-s="s07b81311">
             <input type="number" id="restrict-fontsize" value="64" min="32" max="120" step="4" data-s="se0c88f43">
@@ -280,7 +288,13 @@
           </div>
         {# 個資限用章旋轉：主印章的旋轉面板只作用在主印章，日期 / 個資限用章各自
            要有自己的控制（後端本來就吃 rotation_deg，先前只是缺 UI）。 #}
-        <div class="ovr-rot" data-ovr="restrict">
+        <label class="rs-tint-row">
+    <input type="checkbox" id="restrict-box-tint" checked>
+    <span>編輯時顯示輔助框底色</span>
+    <small class="muted">這層淡色只是拖曳範圍的提示，<b>不會印進 PDF</b>；
+      章本身的底色請用上面的「底色」選項。</small>
+  </label>
+  <div class="ovr-rot" data-ovr="restrict">
           <span class="ovr-rot-label">旋轉</span>
           <input type="number" class="ovr-rot-input" id="restrict-rot" value="0"
                  step="0.5" min="-45" max="45" aria-label="個資限用章旋轉角度">
@@ -1772,8 +1786,9 @@ function _restrictGetParams() {
   const colorHex = document.getElementById('restrict-color').value || '#c00000';
   const fontPx = parseInt(document.getElementById('restrict-fontsize').value, 10) || 64;
   const showPhrase = document.getElementById('restrict-phrase').checked;
+  const opaqueBg = document.querySelector('input[name="restrict-bg"]:checked')?.value === 'white';
   return { purpose, dateStr, applicant, copyLabel, style, border, fontStyle,
-           colorHex, fontPx, showPhrase };
+           colorHex, fontPx, showPhrase, opaqueBg };
 }
 
 async function _restrictFetchPng() {
@@ -1793,6 +1808,7 @@ async function _restrictFetchPng() {
       color_hex: p.colorHex,
       font_size_px: p.fontPx,
       show_phrase: p.showPhrase,
+      opaque_bg: p.opaqueBg,
     }),
   });
   if (!r.ok) return null;
@@ -1931,6 +1947,14 @@ function _restrictRemoveOverlay() {
     if (!el) return;
     const evt = (el.type === 'checkbox' || el.tagName === 'SELECT') ? 'change' : 'input';
     el.addEventListener(evt, _restrictScheduleRegen);
+  });
+  // 底色是 radio（沒有 id），另外綁
+  const tintCb = document.getElementById('restrict-box-tint');
+  if (tintCb) tintCb.addEventListener('change', () => {
+    if (restrictOverlay && restrictOverlay.setBoxTint) restrictOverlay.setBoxTint(tintCb.checked);
+  });
+  document.querySelectorAll('input[name="restrict-bg"]').forEach(el => {
+    el.addEventListener('change', _restrictScheduleRegen);
   });
   document.getElementById('restrict-regen').addEventListener('click', () => _restrictRegen({ silent: false }));
 

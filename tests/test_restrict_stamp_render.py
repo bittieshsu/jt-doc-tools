@@ -234,3 +234,71 @@ def test_centring_holds_with_footer_columns():
         border_style="single", show_phrase=False)
     top, bottom = _inner_padding(png)
     assert abs(top - bottom) <= 4, f"帶 footer 時也要置中（上 {top} / 下 {bottom}）"
+
+
+# ---------------------------------------------------------------------------
+# 底色選項（2026-08-25 使用者回報）
+#
+# 使用者以為章有半透明底色 —— 實際上那是**編輯模式的拖曳輔助框**（橘色 6%），
+# 合成後的 PDF 裡章是完全透明的。兩件事都處理：輔助框底色可關（純視覺），
+# 章本身多一個「白底」選項（真的會蓋住底下的內容）。
+# ---------------------------------------------------------------------------
+def _alpha_zero_ratio(png: bytes) -> float:
+    import numpy as np
+    a = _np_alpha(png)
+    return float((a == 0).mean())
+
+
+@_pytest.mark.parametrize("fn", [_rr.render_vertical_stamp,
+                                 _rr.render_rectangle_stamp,
+                                 _rr.render_diagonal_stamp])
+def test_transparent_is_the_default(fn):
+    """預設必須透明 —— 蓋在證件影本上本來就要看得見底下的內容。"""
+    png, _w, _h = fn(purpose="測試")
+    assert _alpha_zero_ratio(png) > 0.3, "預設的章不是透明的"
+
+
+@_pytest.mark.parametrize("fn", [_rr.render_vertical_stamp,
+                                 _rr.render_rectangle_stamp,
+                                 _rr.render_diagonal_stamp])
+def test_opaque_bg_really_covers(fn):
+    """選白底時**章的範圍內要蓋住底下的內容**。
+
+    判準用「中心不透明 + 透明像素大幅減少」而不是「整張零透明」——
+    對角線章是**旋轉後**的圖，外接矩形的四角必然透明，那是幾何결果不是 bug
+    （第一版就是這樣寫，白白紅了一條）。
+    """
+    import numpy as np
+    png, w, h = fn(purpose="測試", opaque_bg=True)
+    a = _np_alpha(png)
+    assert a[h // 2, w // 2] == 255, "章的中心竟然是透明的"
+    before = _alpha_zero_ratio(fn(purpose="測試")[0])
+    after = _alpha_zero_ratio(png)
+    # 用**絕對降幅**而不是比例：對角線章旋轉 20 度，外接矩形的四角佔掉很大
+    # 面積（實測 0.91 → 0.68），用「降一半」當判準會誤判成失敗。
+    assert before - after > 0.15, f"透明比例沒有明顯下降（{before:.2f} → {after:.2f}）"
+
+
+def test_endpoint_passes_the_flag(client):
+    base = {"purpose": "測試", "style": "vertical"}
+    a = client.post("/tools/pdf-stamp/render-restrict-stamp", json=base)
+    b = client.post("/tools/pdf-stamp/render-restrict-stamp",
+                    json={**base, "opaque_bg": True})
+    assert a.status_code == 200 and b.status_code == 200
+    import base64
+    assert _alpha_zero_ratio(base64.b64decode(a.json()["png_b64"])) > 0.3
+    assert _alpha_zero_ratio(base64.b64decode(b.json()["png_b64"])) == 0.0
+
+
+def test_editor_box_tint_can_be_turned_off():
+    """輔助框底色要能關 —— 它不會印進 PDF，卻讓使用者以為章有底色。"""
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    js = (root / "static" / "js" / "stamp_date_overlay.js").read_text(encoding="utf-8")
+    assert "setBoxTint" in js and "showBoxTint" in js
+    tpl = (root / "app" / "tools" / "pdf_stamp" / "templates"
+           / "pdf_stamp.html").read_text(encoding="utf-8")
+    assert 'id="restrict-box-tint"' in tpl
+    assert "不會印進 PDF" in tpl, "沒有告訴使用者那層淡色不會印出來"
+    css = (root / "static" / "css" / "platform.css").read_text(encoding="utf-8")
+    assert ".rs-tint-row" in css and ".rs-bg-row" in css

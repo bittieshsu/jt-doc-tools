@@ -1,4 +1,4 @@
-# Jason Tools 文件工具箱 v1.14.52
+# Jason Tools 文件工具箱 v1.14.53
 
 > 整合式 PDF / Office 文件處理平台，46 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
 >
@@ -219,6 +219,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 | **[SECURITY.md](SECURITY.md)** | 資安政策、OWASP Top 10 (2025) 對照、漏洞回報管道、GitHub native scan 整合 |
 | **[CHANGELOG.md](CHANGELOG.md)** | 完整更新記錄 |
 | **[TEST_PLAN.md](TEST_PLAN.md)** | 測試清單、發版前檢查 |
+| **[OFFLINE.md](OFFLINE.md)** | 封閉網路 / 離線安裝（Docker 映像檔搬運、走公司 PyPI 代理） |
 | **[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)** | 第三方套件授權聲明 |
 
 ---

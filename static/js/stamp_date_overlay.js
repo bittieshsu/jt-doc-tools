@@ -16,10 +16,19 @@
       // 可選自訂邊框 / 背景色，給不同類型的 overlay 視覺區分
       this.borderColor = opts.borderColor || '#10b981';
       this.bgColor = opts.bgColor || 'rgba(16, 185, 129, 0.05)';
+      // 輔助框的底色只是**編輯時的視覺提示**，不會印進 PDF。使用者會把它
+      // 誤認成章本身的底色（2026-08-25 實際回報），所以要能關掉。
+      this.showBoxTint = opts.showBoxTint !== false;
       this._mounted = false;
       this._mount();
       // Re-render when primary editor relayouts (paper resized / paper changed)
       this.editor.onRelayout(() => this._render());
+    }
+
+    /** 開 / 關輔助框的底色（不影響輸出，純視覺）。 */
+    setBoxTint(on) {
+      this.showBoxTint = !!on;
+      if (this.el) this.el.style.background = on ? this.bgColor : 'transparent';
     }
 
     _mount() {
@@ -28,7 +37,7 @@
       this.el.className = 'dpe-asset dpe-asset-date';
       this.el.style.zIndex = '5';
       this.el.style.border = '2px dashed ' + this.borderColor;
-      this.el.style.background = this.bgColor;
+      this.el.style.background = this.showBoxTint ? this.bgColor : 'transparent';
       // **不可以用字串拼 `style="…"`**：CSP 的 style-src 已移除
       // 'unsafe-inline'，那個屬性會被瀏覽器丟掉（字串留在 HTML 裡，但
       // `el.style.length === 0`）。這裡目前剛好被 `.dpe-asset img` 的 CSS

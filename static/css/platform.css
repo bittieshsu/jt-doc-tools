@@ -790,6 +790,15 @@ select.jt-select-native {
   color: #cbd5e1; cursor: not-allowed; pointer-events: none;
 }
 
+/* 「編輯時顯示輔助框底色」開關（1c 區塊；那層淡色不會印進 PDF）。 */
+.rs-tint-row { display:grid; grid-template-columns:auto 1fr; gap:2px 8px; align-items:start; margin:10px 0 4px; font-size:13px; cursor:pointer; }
+.rs-tint-row input[type=checkbox] { margin-top:3px; }
+.rs-tint-row small { grid-column:2; display:block; font-size:12px; line-height:1.55; }
+
+/* 個資限用章的「底色」選擇列（1c 區塊）。 */
+.rs-bg-row { display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; font-size:13.5px; }
+.rs-bg-row label { display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+
 /* 個資限用章：「加上固定句」勾選列（1c 區塊）。自己新開的類別名一定要在這裡
    補樣式 —— 沒補的話 <small> 會用預設的 inline 直接黏在文字右邊亂折（af-field
    那次就是這樣長歪的）。 */

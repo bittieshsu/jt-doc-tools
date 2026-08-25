@@ -106,6 +106,7 @@ async def render_restrict_stamp_endpoint(request: Request):
         date_str:     str — 日期文字(已格式化),選填
         applicant:    str — 申請人姓名，選填
         copy_label:   str — 影本份數標示(例「第 1 份 / 共 3 份」),選填
+        opaque_bg:    bool — 白色不透明底（預設 False＝透明，看得見底下的內容）
         show_phrase:  bool — 是否加上「僅供 … 使用，他用無效」固定句，預設 True
                             （關掉時只印用途本身 —— 用途文字已經把話說完的場合）
         style:        str — "rectangle" / "vertical"（直式，中文直書）/ "diagonal",預設 rectangle
@@ -127,6 +128,9 @@ async def render_restrict_stamp_endpoint(request: Request):
     copy_label = str(body.get("copy_label") or "").strip()[:30]
     # 預設 True —— 舊的呼叫端（含對外 API）沒帶這個欄位時行為完全不變。
     show_phrase = bool(body.get("show_phrase", True))
+    # 預設透明 —— 蓋在證件影本上本來就要看得見底下的內容；
+    # 需要「章壓過文字」時才選白底。舊呼叫端不帶這個欄位，行為不變。
+    opaque_bg = bool(body.get("opaque_bg", False))
     style = str(body.get("style") or "rectangle")
     if style not in ("rectangle", "diagonal", "vertical"):
         style = "rectangle"
@@ -159,13 +163,14 @@ async def render_restrict_stamp_endpoint(request: Request):
                 applicant=applicant, copy_label=copy_label,
                 color_hex=color_hex, font_size_px=font_size_px,
                 border_style=border, font_style=font_style,
-                show_phrase=show_phrase,
+                show_phrase=show_phrase, opaque_bg=opaque_bg,
             )
         elif style == "diagonal":
             png_bytes, w, h = _restrict_render.render_diagonal_stamp(
                 purpose=purpose, date_str=date_str,
                 color_hex=color_hex, font_size_px=font_size_px,
                 font_style=font_style, show_phrase=show_phrase,
+                opaque_bg=opaque_bg,
             )
         else:
             png_bytes, w, h = _restrict_render.render_rectangle_stamp(
@@ -173,7 +178,7 @@ async def render_restrict_stamp_endpoint(request: Request):
                 applicant=applicant, copy_label=copy_label,
                 color_hex=color_hex, font_size_px=font_size_px,
                 border_style=border, font_style=font_style,
-                show_phrase=show_phrase,
+                show_phrase=show_phrase, opaque_bg=opaque_bg,
             )
     except Exception as e:
         raise HTTPException(500, f"render failed: {e.__class__.__name__}: {e}") from e

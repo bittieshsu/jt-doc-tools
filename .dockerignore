@@ -1,0 +1,10 @@
+.git
+.venv
+data
+temp
+temp_pdfs
+**/__pycache__
+*.pyc
+.pytest_cache
+docs/screenshots-backup
+packaging/windows/*.exe

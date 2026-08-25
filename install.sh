@@ -91,6 +91,12 @@ fi
 # ----------------------------------------------------------------- 網路檢查
 # 沒網路（VPN 沒開、防火牆擋、DNS 壞）就馬上喊，不要等 uv / python / git
 # tarball 各自慢慢 timeout 才知道。
+# 封閉網路（公司只開放內部 PyPI 代理 / git 鏡像）本來就連不到這三個 host，
+# 但**該裝得起來** —— 見 OFFLINE.md 的「走公司代理直接安裝」。
+# 設 JTDT_SKIP_NET_CHECK=1 明確略過這道檢查（要自己確保 uv 與套件來源可達）。
+if [ "${JTDT_SKIP_NET_CHECK:-0}" = "1" ]; then
+    warn "已略過網路預檢（JTDT_SKIP_NET_CHECK=1）—— 請確認 uv 與套件來源可達"
+else
 log "檢查網路連線 ..."
 NET_OK=0
 for host in github.com cdn.jsdelivr.net astral.sh; do
@@ -99,9 +105,10 @@ for host in github.com cdn.jsdelivr.net astral.sh; do
     fi
 done
 if [ "$NET_OK" -ne 1 ]; then
-    die "連不上網路（github.com / cdn.jsdelivr.net / astral.sh 都不通）。請檢查 VPN / 防火牆 / DNS 後再重跑。"
+    die "連不上網路（github.com / cdn.jsdelivr.net / astral.sh 都不通）。若這是封閉網路，請看 OFFLINE.md，並以 JTDT_SKIP_NET_CHECK=1 重跑。"
 fi
 ok "網路 OK"
+fi
 
 # --------------------------------------------------------------------- 路徑
 
@@ -652,6 +659,17 @@ install_zbar() {
 install_uv() {
     if [ -x "$INSTALL_DIR/bin/uv" ]; then
         ok "uv 已存在於 $INSTALL_DIR/bin/uv"
+        return 0
+    fi
+    # 封閉網路裝不到 astral.sh —— 但公司環境常常已經用別的方式裝好 uv
+    # （apt / 內部套件庫 / 手動複製 binary）。系統上有就直接用，
+    # 複製一份到 bin/ 讓後續流程（含 `jtdt update`）都找得到。
+    # 沒有這一段的話，OFFLINE.md 的「走公司代理直接安裝」在第一步就卡住。
+    SYS_UV="${JTDT_UV_PATH:-$(command -v uv 2>/dev/null || true)}"
+    if [ -n "$SYS_UV" ] && [ -x "$SYS_UV" ]; then
+        mkdir -p "$INSTALL_DIR/bin"
+        cp "$SYS_UV" "$INSTALL_DIR/bin/uv" && chmod +x "$INSTALL_DIR/bin/uv"
+        ok "沿用系統既有的 uv（$SYS_UV）"
         return 0
     fi
     log "下載 uv (Astral Python 工具鏈) ..."

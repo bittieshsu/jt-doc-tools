@@ -177,6 +177,7 @@ def render_rectangle_stamp(
     border_style: str = "double",
     font_style: str = "kaiti",
     show_phrase: bool = True,
+    opaque_bg: bool = False,
 ) -> tuple[bytes, int, int]:
     """渲染長方形紅章。
 
@@ -234,7 +235,10 @@ def render_rectangle_stamp(
     img_w = content_w + pad_x * 2
     img_h = content_h + pad_y * 2
 
-    img = Image.new("RGBA", (img_w, img_h), (255, 255, 255, 0))
+    # 預設透明 —— 蓋在證件影本上要看得見底下的內容。選 `opaque_bg` 時給白底，
+    # 用在「章壓過底下文字、要一眼看清楚章的內容」那種場合。
+    img = Image.new("RGBA", (img_w, img_h),
+                    (255, 255, 255, 255) if opaque_bg else (255, 255, 255, 0))
     draw = ImageDraw.Draw(img)
 
     # 邊框
@@ -291,6 +295,7 @@ def render_diagonal_stamp(
     font_size_px: int = 80,
     font_style: str = "kaiti",
     show_phrase: bool = True,
+    opaque_bg: bool = False,
 ) -> tuple[bytes, int, int]:
     """渲染對角線斜印(45° 紅字，無邊框)。"""
     _p = (purpose or "").strip() or "_________"
@@ -305,7 +310,8 @@ def render_diagonal_stamp(
     tw, th = _text_size(draw, text, font, stroke_w)
 
     pad = int(font_size_px * 0.4)
-    base = Image.new("RGBA", (tw + pad * 2, th + pad * 2), (255, 255, 255, 0))
+    base = Image.new("RGBA", (tw + pad * 2, th + pad * 2),
+                     (255, 255, 255, 255) if opaque_bg else (255, 255, 255, 0))
     draw = ImageDraw.Draw(base)
     color = _parse_hex(color_hex)
     _draw_ink(draw, (pad, pad), text, font, color, stroke_w)
@@ -420,6 +426,7 @@ def render_vertical_stamp(
     border_style: str = "double",
     font_style: str = "kaiti",
     show_phrase: bool = True,
+    opaque_bg: bool = False,
 ) -> tuple[bytes, int, int]:
     """渲染**直式**長方形紅章（傳統中文直書：字上而下、欄右而左）。
 
@@ -487,7 +494,10 @@ def render_vertical_stamp(
     img_w = content_w + pad_x * 2
     img_h = content_h + pad_y * 2
 
-    img = Image.new("RGBA", (img_w, img_h), (255, 255, 255, 0))
+    # 預設透明 —— 蓋在證件影本上要看得見底下的內容。選 `opaque_bg` 時給白底，
+    # 用在「章壓過底下文字、要一眼看清楚章的內容」那種場合。
+    img = Image.new("RGBA", (img_w, img_h),
+                    (255, 255, 255, 255) if opaque_bg else (255, 255, 255, 0))
     draw = ImageDraw.Draw(img)
 
     if border_style == "double":

@@ -1,0 +1,26 @@
+# 最小可用的 compose 設定。詳細說明見 OFFLINE.md。
+#
+# 用法：
+#   docker compose up -d          # 啟動
+#   docker compose logs -f        # 看記錄
+#   docker compose down           # 停止（資料在 volume 裡，不會消失）
+services:
+  jt-doc-tools:
+    image: jt-doc-tools:1.14.53
+    # 沒有現成映像檔時改成自己建：
+    # build: .
+    container_name: jt-doc-tools
+    restart: unless-stopped
+    ports:
+      # 對外服務請放在反向代理 + HTTPS 後面（見 OPS.md）；
+      # 只給本機用就改成 "127.0.0.1:8765:8765"
+      - "8765:8765"
+    volumes:
+      # 設定 / 帳號 / 稽核 / 歷史全在這裡 —— 換映像檔升級時資料留著
+      - jtdt-data:/data
+    environment:
+      # 反向代理後面才需要；直接對外時維持預設即可
+      # - JTDT_HOST=0.0.0.0
+      TZ: Asia/Taipei
+volumes:
+  jtdt-data:
