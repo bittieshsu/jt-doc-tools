@@ -138,3 +138,39 @@ def test_sections_dropped_from_nav_keep_their_anchors():
     assert not missing, (
         f"這些區塊的 id 不見了：{missing}。它們沒放進導覽，但既有的 "
         f"#{missing[0] if missing else ''} 連結還指著它們。")
+
+
+# ---------------------------------------------------------------------------
+# 「文件寫了，但入口沒有」—— 這個專案已經犯過兩次
+#
+# 1. 新工具寫進 README 卻沒進介紹站（v1.11.30-31）
+# 2. OFFLINE.md 寫完只加了 README 的文件導覽，介紹站一個字都沒提
+#    （2026-08-25，使用者問「Pages 中有提到嗎」才發現）
+#
+# 對客戶而言，**沒有入口 = 沒有這份文件**。這裡把「面向使用者的重要文件」
+# 列成一份小清單，要求每一份在介紹站上都找得到。
+# ---------------------------------------------------------------------------
+#: 檔名 → 介紹站上至少要出現的關鍵字（用意是連結與說明都要在，不是只有連結）
+USER_FACING_DOCS = {
+    "OFFLINE.md": ("OFFLINE.md", "離線"),
+    "OPS.md": ("OPS.md", "反向代理"),
+    "SECURITY.md": ("SECURITY.md",),
+    "LLM.md": ("LLM.md",),
+}
+
+
+def test_user_facing_docs_are_reachable_from_the_landing_page():
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parent.parent
+    site = (root / "github" / "docs" / "index.html").read_text(encoding="utf-8")
+    missing = []
+    for doc, needles in USER_FACING_DOCS.items():
+        if not (root / "github" / doc).exists():
+            missing.append(f"{doc}（檔案不存在，清單本身過期了）")
+            continue
+        for n in needles:
+            if n not in site:
+                missing.append(f"{doc} → 介紹站找不到「{n}」")
+    assert not missing, (
+        "介紹站上沒有這些文件的入口：\n  " + "\n  ".join(missing) +
+        "\n對客戶而言，沒有入口就等於沒有這份文件。")
