@@ -1249,6 +1249,15 @@
 
     <p class="install-after">安裝完成後，瀏覽器開 <code>http://127.0.0.1:8765/</code> 即可使用。</p>
 
+    <div class="offline-note">
+      <b>公司網路連不到 GitHub / PyPI？</b>
+      兩條路都可以：①在有網路的機器建 <b>Docker 映像檔</b>，
+      <code>docker save</code> 成單一檔案（約 940 MB）帶進內網
+      <code>docker load</code> 就能跑；②有<b>公司 PyPI 代理</b>時直接照常安裝，
+      指向代理即可（之後也能照常 <code>jtdt update</code>）。
+      步驟見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OFFLINE.md" target="_blank" rel="noopener">OFFLINE.md</a>。
+    </div>
+
     <div class="install-meta">
       <div>
         <strong>系統需求</strong>
@@ -1310,6 +1319,7 @@
       <div class="footer-h">連結</div>
       <a href="api.html">API 手冊</a>
       <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">原始碼庫</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OFFLINE.md" target="_blank" rel="noopener">離線安裝</a>
       <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
       <a href="https://github.com/jasoncheng7115/jt-doc-tools/issues" target="_blank" rel="noopener">回報問題</a>
     </div>

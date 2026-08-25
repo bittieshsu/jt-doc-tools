@@ -1533,3 +1533,11 @@ code {
   transition: background 0.15s;
 }
 .lightbox-close:hover { background: rgba(255, 255, 255, 0.25); }
+
+
+/* 安裝區的「封閉網路」提示（連到 OFFLINE.md）。 */
+.offline-note { max-width: 900px; margin: 18px auto 0; padding: 14px 18px;
+  background: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #3b82f6;
+  border-radius: 8px; font-size: 14px; line-height: 1.7; color: #1e3a5f; }
+.offline-note code { background: #dbeafe; padding: 1px 6px; border-radius: 4px; }
+.offline-note a { color: #1d4ed8; text-decoration: underline; }
