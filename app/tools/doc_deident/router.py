@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 import logging
 import re
+import asyncio as _asyncio
 import time as _t
 import uuid
 from pathlib import Path
@@ -436,6 +437,16 @@ async def detect(
     for f in all_findings:
         by_type[f["type_label"]] = by_type.get(f["type_label"], 0) + 1
 
+    # 替換模式的建議值：兩種形式都先算好一起送。前端切換開關時不用重打伺服器，
+    # 也不會把使用者已經手動改過的欄位洗掉。
+    # 一致性靠 Replacer 自己的對應表：同一個原值在整份文件裡固定同一個假值 ——
+    # 少了這條，一份報表裡同一個客戶會變成三個不同的人。
+    from .fake_values import Replacer as _Replacer
+    _safe, _valid = _Replacer(valid_checksum=False), _Replacer(valid_checksum=True)
+    for f in all_findings:
+        f["fake_safe"] = _safe.for_value(f.get("type", ""), f.get("value", ""))
+        f["fake_valid"] = _valid.for_value(f.get("type", ""), f.get("value", ""))
+
     return {
         "upload_id": upload_id,
         "filename": orig_name,
@@ -513,6 +524,101 @@ def _llm_extra_findings(full_text: str, already_known: list[str]) -> list[dict]:
 
 # ----------------------------------------------------------- processing
 
+@router.post("/find")
+async def find_term(request: Request):
+    """在**已經上傳的**檔案裡搜一個字詞，回傳與偵測結果同格式的項目。
+
+    給替換模式用：使用者看完偵測結果，發現還有東西該換掉（自己公司的內部
+    代號、某個承辦人的名字、專案代稱…），直接在結果頁加進去就好，不必回到
+    上一步重設一次自訂正規式再整份重跑。
+
+    只做「純字串比對」不吃正規式 —— 這裡是給使用者手打字詞用的，讓他們去
+    背正規式不合理，而且一個寫壞的式子可以掃掉整份文件。要用正規式的人，
+    上傳那一步的「自訂 regex」本來就在。
+    """
+    body = await request.json()
+    upload_id = (body.get("upload_id") or "").strip()
+    from ...core import safe_paths as _sp, upload_owner as _uo
+    _sp.require_uuid_hex(upload_id, "upload_id")
+    _uo.require(upload_id, request)
+    term = (body.get("term") or "").strip()
+    if not term:
+        raise HTTPException(400, "term required")
+    if len(term) > 200:
+        raise HTTPException(400, "term 太長")
+    case_sensitive = bool(body.get("case_sensitive"))
+    pdf_path = _src_path(upload_id)
+    if not pdf_path.exists():
+        raise HTTPException(404, "upload expired")
+
+    valid_checksum = bool(body.get("valid_checksum"))
+
+    def _work() -> list[dict]:
+        from .fake_values import Replacer as _Replacer
+        rep = _Replacer(valid_checksum=valid_checksum)
+        hits: list[dict] = []
+        with fitz.open(str(pdf_path)) as doc:
+            for pno in range(doc.page_count):
+                page = doc[pno]
+                # PyMuPDF 的 search_for 本身不分大小寫，要區分時自己再比一次
+                for rect in page.search_for(term) or []:
+                    if case_sensitive:
+                        got = page.get_textbox(rect) or ""
+                        if term not in got:
+                            continue
+                    size, color = _span_style_at(page, rect)
+                    hits.append({
+                        "type": "custom_term",
+                        "type_label": "自訂字詞",
+                        "value": term,
+                        "masked": "*" * len(term),
+                        "bbox": [rect.x0, rect.y0, rect.x1, rect.y1],
+                        "font_size": size,
+                        "color_int": color,
+                        "page": pno + 1,
+                        "fake_safe": rep.for_value("custom_term", term),
+                        "fake_valid": rep.for_value("custom_term", term),
+                    })
+        return hits
+
+    hits = await _asyncio.to_thread(_work)
+    return {"ok": True, "term": term, "count": len(hits), "findings": hits}
+
+
+def _fit_font_size(text: str, size: float, box_width: float,
+                   minimum: float = 4.0) -> float:
+    """字太長就縮到塞得進原本的框。塞不下也不會小於 `minimum`。"""
+    if box_width <= 0 or not text:
+        return size
+    has_cjk = any("一" <= c <= "\u9fff" for c in text)
+    fontname = "china-t" if has_cjk else "helv"
+    try:
+        width = fitz.get_text_length(text, fontname=fontname, fontsize=size)
+    except Exception:
+        return size
+    if width <= box_width or width <= 0:
+        return size
+    return max(minimum, size * (box_width / width))
+
+
+def _span_style_at(page, rect) -> tuple[float, int]:
+    """找出這個位置原本的字級與顏色，貼回去才不會突兀。找不到就用預設值。"""
+    try:
+        for block in (page.get_text("dict") or {}).get("blocks", []):
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    sb = span.get("bbox") or []
+                    if len(sb) != 4:
+                        continue
+                    if sb[0] - 1 <= rect.x0 and rect.x1 <= sb[2] + 1 \
+                            and sb[1] - 2 <= rect.y0 and rect.y1 <= sb[3] + 2:
+                        return (float(span.get("size", 11) or 11),
+                                int(span.get("color", 0) or 0))
+    except Exception:
+        pass
+    return 11.0, 0
+
+
 @router.post("/process")
 async def process(request: Request):
     body = await request.json()
@@ -528,8 +634,8 @@ async def process(request: Request):
     if not pdf_path.exists():
         raise HTTPException(404, "upload expired")
     mode = (body.get("mode") or "mask").strip()
-    if mode not in ("redact", "mask"):
-        raise HTTPException(400, "mode 必須是 redact 或 mask")
+    if mode not in ("redact", "mask", "replace"):
+        raise HTTPException(400, "mode 必須是 redact、mask 或 replace")
     selections: list[dict] = body.get("selections") or []
     if not isinstance(selections, list):
         raise HTTPException(400, "selections 格式錯誤")
@@ -548,83 +654,104 @@ async def process(request: Request):
     # original page background (otherwise we get an ugly white rectangle
     # floating on top of a coloured / image-backed page).
     mode_fill = (0, 0, 0) if mode == "redact" else None
-    count_done = 0
-    doc = fitz.open(str(pdf_path))
-    try:
-        for pno, items in by_page.items():
-            if pno >= doc.page_count:
-                continue
-            page = doc[pno]
-            # Pass 1: redact (destroy) every selected region so the
-            # original sensitive text is truly removed.
-            for s in items:
-                bb = s.get("bbox") or []
-                if len(bb) != 4:
+    # **整段重活都要在執行緒裡跑**。這支端點原本直接在事件迴圈上做
+    # redaction + 存檔 + 逐頁算縮圖 —— 正式機實測一份文件卡了 116 秒，
+    # 那段時間**全站對所有人都不回應**（作業佇列是空的，所以調整
+    # 「最大同時作業數」完全沒用）。同一支工具的公開 API
+    # （`/api/doc-deident`）本來就是包在 `to_thread` 裡的，只有網頁用的
+    # 這條漏掉 —— 同一件事兩份實作，只有一份修過。
+    def _work() -> tuple[int, list[dict]]:
+        count_done = 0
+        doc = fitz.open(str(pdf_path))
+        try:
+            for pno, items in by_page.items():
+                if pno >= doc.page_count:
                     continue
-                rect = fitz.Rect(*bb)
-                if mode_fill is None:
-                    page.add_redact_annot(rect)            # no fill → transparent
-                else:
-                    page.add_redact_annot(rect, fill=mode_fill)
-                count_done += 1
-            try:
-                page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
-            except Exception:
-                page.apply_redactions()
-
-            # Pass 2 (mask mode only): re-insert the masked value at
-            # the same location, in the same font size / colour.
-            if mode == "mask":
+                page = doc[pno]
+                # Pass 1: redact (destroy) every selected region so the
+                # original sensitive text is truly removed.
                 for s in items:
                     bb = s.get("bbox") or []
                     if len(bb) != 4:
                         continue
-                    masked = s.get("masked") or ""
-                    if not masked:
-                        continue
-                    font_size = float(s.get("font_size") or 11.0)
-                    color_int = int(s.get("color_int") or 0)
-                    r = ((color_int >> 16) & 0xff) / 255.0
-                    g = ((color_int >> 8) & 0xff) / 255.0
-                    b = (color_int & 0xff) / 255.0
-                    bx0, by0, bx1, by1 = bb
-                    base_y = by1 - font_size * 0.18
-                    has_cjk = any("一" <= c <= "鿿" for c in masked)
-                    # Use built-in CJK font for CJK content, Helvetica for ASCII.
-                    if has_cjk:
-                        try:
-                            page.insert_text(
-                                fitz.Point(bx0, base_y), masked,
-                                fontname="china-t", fontsize=font_size,
-                                color=(r, g, b),
-                            )
-                        except Exception:
-                            pass
+                    rect = fitz.Rect(*bb)
+                    if mode_fill is None:
+                        page.add_redact_annot(rect)            # no fill → transparent
                     else:
-                        try:
-                            page.insert_text(
-                                fitz.Point(bx0, base_y), masked,
-                                fontname="helv", fontsize=font_size,
-                                color=(r, g, b),
-                            )
-                        except Exception:
-                            pass
-        doc.save(str(out_path), garbage=3, deflate=True)
-    finally:
-        doc.close()
+                        page.add_redact_annot(rect, fill=mode_fill)
+                    count_done += 1
+                try:
+                    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+                except Exception:
+                    page.apply_redactions()
 
-    # Render each page of the processed PDF to PNG thumbs so the UI can
-    # show a before-download preview.
-    pages_info: list[dict] = []
-    with fitz.open(str(out_path)) as d2:
-        for i in range(d2.page_count):
-            thumb = settings.temp_dir / f"did_{upload_id}_p{i+1}.png"
-            pdf_preview.render_page_png(out_path, thumb, i, dpi=120)
-            pages_info.append({
-                "page": i + 1,
-                "thumb_url": f"/tools/doc-deident/preview/{thumb.name}?t={int(_t.time())}",
-                "large_url": f"/tools/doc-deident/preview/{thumb.name}",
-            })
+                # Pass 2（遮罩 / 替換）：把字貼回原位，字級與顏色照原本的。
+                # 兩種模式的差別只在貼什麼字串 —— 遮罩貼 `0912****678`，
+                # 替換貼使用者填的（或自動產生的）假值。
+                if mode in ("mask", "replace"):
+                    for s in items:
+                        bb = s.get("bbox") or []
+                        if len(bb) != 4:
+                            continue
+                        if mode == "replace":
+                            masked = (s.get("replacement") or "").strip()
+                        else:
+                            masked = s.get("masked") or ""
+                        if not masked:
+                            continue
+                        font_size = float(s.get("font_size") or 11.0)
+                        if mode == "replace":
+                            # 遮罩的字數一定跟原值一樣，替換的**使用者想填多長就多長**
+                            # → 不縮字的話會直接壓到隔壁欄位，而且是無聲的：
+                            # 產出的檔看起來正常，收件方才會發現兩欄黏在一起。
+                            font_size = _fit_font_size(
+                                masked, font_size, float(bb[2]) - float(bb[0]))
+                        color_int = int(s.get("color_int") or 0)
+                        r = ((color_int >> 16) & 0xff) / 255.0
+                        g = ((color_int >> 8) & 0xff) / 255.0
+                        b = (color_int & 0xff) / 255.0
+                        bx0, by0, bx1, by1 = bb
+                        base_y = by1 - font_size * 0.18
+                        has_cjk = any("一" <= c <= "鿿" for c in masked)
+                        # Use built-in CJK font for CJK content, Helvetica for ASCII.
+                        if has_cjk:
+                            try:
+                                page.insert_text(
+                                    fitz.Point(bx0, base_y), masked,
+                                    fontname="china-t", fontsize=font_size,
+                                    color=(r, g, b),
+                                )
+                            except Exception:
+                                pass
+                        else:
+                            try:
+                                page.insert_text(
+                                    fitz.Point(bx0, base_y), masked,
+                                    fontname="helv", fontsize=font_size,
+                                    color=(r, g, b),
+                                )
+                            except Exception:
+                                pass
+            doc.save(str(out_path), garbage=3, deflate=True)
+        finally:
+            doc.close()
+
+        # Render each page of the processed PDF to PNG thumbs so the UI can
+        # show a before-download preview.
+        pages_info: list[dict] = []
+        with fitz.open(str(out_path)) as d2:
+            for i in range(d2.page_count):
+                thumb = settings.temp_dir / f"did_{upload_id}_p{i+1}.png"
+                pdf_preview.render_page_png(out_path, thumb, i, dpi=120)
+                pages_info.append({
+                    "page": i + 1,
+                    "thumb_url": f"/tools/doc-deident/preview/{thumb.name}?t={int(_t.time())}",
+                    "large_url": f"/tools/doc-deident/preview/{thumb.name}",
+                })
+
+        return count_done, pages_info
+
+    count_done, pages_info = await _asyncio.to_thread(_work)
 
     return {
         "ok": True,
@@ -677,11 +804,29 @@ async def api_doc_deident(
     request: Request,
     file: UploadFile = File(...),
     types: str = Form(""),       # comma-separated pattern ids（空 = 全部 default-on）
-    mode: str = Form("mask"),    # mask（覆蓋同樣字數的 *）/ redact（黑條真遮蔽）
+    mode: str = Form("mask"),    # mask（同字數的 *）/ redact（黑條真遮蔽）/ replace（換成假值）
+    replacements: str = Form(""),      # replace 模式：JSON 物件 {"原值": "指定的新值"}
+    valid_checksum: str = Form(""),    # replace 模式："1" → 產生可通過檢查碼的假值
 ):
-    """單次上傳 PDF / Office，依 types 偵測敏感資料、依 mode 處理後回 PDF。"""
-    if mode not in ("mask", "redact"):
-        raise HTTPException(400, "mode 必須是 mask 或 redact")
+    """單次上傳 PDF / Office，依 types 偵測敏感資料、依 mode 處理後回 PDF。
+
+    `replace` 模式：沒有在 `replacements` 裡指定的值一律**自動產生**假值，
+    同一個原值在整份文件裡固定對應同一個假值。`valid_checksum=1` 會讓身分證 /
+    統編 / 信用卡算出正確的檢查碼（拿去測試系統不會被擋，但算得出來的號碼有
+    可能剛好是某個真人的）。
+    """
+    if mode not in ("mask", "redact", "replace"):
+        raise HTTPException(400, "mode 必須是 mask、redact 或 replace")
+    replace_map: dict[str, str] = {}
+    if mode == "replace" and replacements.strip():
+        import json as _json
+        try:
+            loaded = _json.loads(replacements)
+        except Exception:
+            raise HTTPException(400, "replacements 必須是 JSON 物件")
+        if not isinstance(loaded, dict):
+            raise HTTPException(400, "replacements 必須是 JSON 物件")
+        replace_map = {str(k): str(v) for k, v in loaded.items()}
     data = await file.read()
     if not data:
         raise HTTPException(400, "empty file")
@@ -709,9 +854,11 @@ async def api_doc_deident(
     if not selected_ids:
         selected_ids = {p.id for p in P.CATALOG if p.default_on}
 
-    import asyncio as _asyncio
     out_path = _out_path(upload_id)
     mode_fill = (0, 0, 0) if mode == "redact" else None
+    # 一份文件共用一個 Replacer —— 同一個原值固定對應同一個假值。
+    from .fake_values import Replacer as _Replacer
+    _rep = _Replacer(valid_checksum=(valid_checksum or "").strip() == "1")
 
     def _do():
         with fitz.open(str(pdf_path)) as doc:
@@ -738,15 +885,23 @@ async def api_doc_deident(
                     page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
                 except Exception:
                     page.apply_redactions()
-                if mode == "mask":
+                if mode in ("mask", "replace"):
                     for it in items:
                         bb = it.get("bbox") or []
                         if len(bb) != 4:
                             continue
-                        masked = it.get("masked") or ""
+                        if mode == "replace":
+                            orig = it.get("value") or ""
+                            masked = replace_map.get(orig) or _rep.for_value(
+                                it.get("type", ""), orig)
+                        else:
+                            masked = it.get("masked") or ""
                         if not masked:
                             continue
                         font_size = float(it.get("font_size") or 11.0)
+                        if mode == "replace":
+                            font_size = _fit_font_size(
+                                masked, font_size, float(bb[2]) - float(bb[0]))
                         bx0, _, _, by1 = bb
                         base_y = by1 - font_size * 0.18
                         has_cjk = any("一" <= c <= "鿿" for c in masked)

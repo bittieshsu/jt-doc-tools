@@ -105,6 +105,21 @@
 .dd-mode.mode-mask .ic   { background: linear-gradient(135deg, #38bdf8, #0284c7); }
 .dd-mode .title { font-weight: 600; font-size: 14px; color:#0f172a; }
 .dd-mode .desc  { font-size: 12px; color:#475569; line-height: 1.5; }
+.dd-mode.mode-replace .ic { background: linear-gradient(135deg, #a78bfa, #7c3aed); }
+.dd-replace-opts { margin: 10px 0 4px; padding: 12px 14px; border: 1px solid #e2e8f0;
+                   border-radius: 10px; background: #faf5ff; }
+.dd-replace-opts .dd-chk { display: flex; align-items: center; gap: 8px;
+                           font-size: 13px; color: #0f172a; }
+.dd-replace-opts .dd-note { font-size: 12px; line-height: 1.6; margin-top: 6px; }
+.dd-addterm { display: flex; gap: 8px; align-items: center; margin-top: 10px;
+              flex-wrap: wrap; }
+.dd-addterm input[type="text"] { flex: 1 1 320px; min-width: 200px; }
+.dd-findings input.rep-input { width: 100%; min-width: 120px; box-sizing: border-box;
+                               font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                               font-size: 12px; padding: 3px 6px;
+                               border: 1px solid #cbd5e1; border-radius: 6px; }
+.dd-findings input.rep-input.edited { border-color: #7c3aed; background: #faf5ff; }
+.dd-findings tr.term-row td { background: #fdf4ff; }
 
 .dd-result {
   background:#ecfdf5; border:1px solid #86efac; border-radius:10px;
@@ -248,7 +263,7 @@
           <th>類型</th>
           <th>頁</th>
           <th>原值</th>
-          <th>遮罩預覽</th>
+          <th id="ddLastCol">遮罩預覽</th>
         </tr>
       </thead>
       <tbody id="ddTable"></tbody>
@@ -270,6 +285,31 @@
         <div class="title">🧬 Masking（資料遮罩）</div>
         <div class="desc">保留格式，中段以 * 替換（例：0912****678）。適合測試 / 報表 / 內部分享用。</div>
       </div>
+    </div>
+    <div class="dd-mode mode-replace" data-mode="replace">
+      <div class="ic">{{ icon('refresh', size=18) }}</div>
+      <div>
+        <div class="title">🔁 Replacement（替換）</div>
+        <div class="desc">換成另一個看起來正常、但不是真的值（例：0912345678 → 0938271654）。
+          原文一樣真刪除。適合要拿去測試系統、給外部看的報表、教學範例。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dd-replace-opts" id="ddReplaceOpts" hidden>
+    <label class="dd-chk">
+      <input type="checkbox" id="ddValidChecksum">
+      產生<b>可通過驗證</b>的假值（身分證 / 統編 / 信用卡算出正確檢查碼）
+    </label>
+    <div class="muted dd-note">
+      預設產生的假值<b>刻意不通過檢查碼</b>，絕對不會撞到真人的資料。
+      打開這個選項後，號碼拿去測試系統不會被擋 —— 但算得出來的號碼<b>有可能剛好是某個真人的</b>。
+      Email 用 <code>example.com</code>、IP 用 <code>192.0.2.x</code>，這兩種是文件專用的保留範圍，兩種設定都安全。
+    </div>
+    <div class="dd-addterm">
+      <input type="text" id="ddTermInput" placeholder="還有什麼要換掉？輸入字詞後按「加入」（例：內部代號、承辦人姓名）">
+      <button type="button" class="btn" id="btnAddTerm">加入</button>
+      <span class="muted" id="ddTermStatus"></span>
     </div>
   </div>
 
@@ -368,15 +408,68 @@ function renderDetect(d) {
     $('detectStatus').textContent = `完成 — 沒有偵測到敏感資料`;
     return;
   }
-  body.innerHTML = d.findings.map(f => `
-    <tr>
-      <td><input type="checkbox" class="fchk" value="${f.id}" checked></td>
-      <td><span class="type-tag">${escapeHTML(f.type_label)}</span></td>
-      <td>p.${f.page}</td>
-      <td class="val">${escapeHTML(f.value)}</td>
-      <td class="masked">${escapeHTML(f.masked)}</td>
-    </tr>`).join('');
+  renderRows();
   $('detectStatus').textContent = `完成 — 共 ${d.findings.length} 筆`;
+}
+
+// 使用者手動改過的替換值 —— 切換「可通過驗證」開關時**不可以**把這些洗掉，
+// 不然打錯一次就要全部重打。key 是 finding id。
+const manualReplacements = new Map();
+
+function suggestedFor(f) {
+  if (manualReplacements.has(f.id)) return manualReplacements.get(f.id);
+  const useValid = $('ddValidChecksum') && $('ddValidChecksum').checked;
+  return (useValid ? f.fake_valid : f.fake_safe) || f.masked || '';
+}
+
+function renderRows() {
+  if (!detectResult) return;
+  const body = $('ddTable');
+  const isReplace = chosenMode === 'replace';
+  body.textContent = '';
+  for (const f of detectResult.findings) {
+    const tr = document.createElement('tr');
+    if (f.type === 'custom_term') tr.className = 'term-row';
+
+    const tdChk = document.createElement('td');
+    const chk = document.createElement('input');
+    chk.type = 'checkbox'; chk.className = 'fchk'; chk.value = f.id; chk.checked = true;
+    tdChk.appendChild(chk);
+
+    const tdType = document.createElement('td');
+    const tag = document.createElement('span');
+    tag.className = 'type-tag'; tag.textContent = f.type_label;
+    tdType.appendChild(tag);
+
+    const tdPage = document.createElement('td');
+    tdPage.textContent = 'p.' + f.page;
+
+    const tdVal = document.createElement('td');
+    tdVal.className = 'val'; tdVal.textContent = f.value;
+
+    const tdLast = document.createElement('td');
+    if (isReplace) {
+      // 替換模式：最後一欄可以直接改。DOM 一律用 createElement / textContent，
+      // 不用 innerHTML（原值是檔案裡來的，塞進 HTML 會變成 XSS）。
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'rep-input';
+      inp.value = suggestedFor(f);
+      inp.dataset.fid = String(f.id);
+      if (manualReplacements.has(f.id)) inp.classList.add('edited');
+      inp.addEventListener('input', () => {
+        manualReplacements.set(f.id, inp.value);
+        inp.classList.add('edited');
+      });
+      tdLast.appendChild(inp);
+    } else {
+      tdLast.className = 'masked';
+      tdLast.textContent = f.masked;
+    }
+
+    tr.append(tdChk, tdType, tdPage, tdVal, tdLast);
+    body.appendChild(tr);
+  }
 }
 
 $('selAll').addEventListener('change', (e) => {
@@ -412,7 +505,52 @@ document.querySelectorAll('.dd-mode').forEach(m => {
     document.querySelectorAll('.dd-mode').forEach(x => x.classList.remove('active'));
     m.classList.add('active');
     chosenMode = m.dataset.mode;
+    const isReplace = chosenMode === 'replace';
+    $('ddReplaceOpts').hidden = !isReplace;
+    $('ddLastCol').textContent = isReplace ? '替換為（可直接修改）' : '遮罩預覽';
+    renderRows();
   });
+});
+
+$('ddValidChecksum').addEventListener('change', renderRows);
+
+$('btnAddTerm').addEventListener('click', async () => {
+  const term = ($('ddTermInput').value || '').trim();
+  if (!term) { $('ddTermStatus').textContent = '請先輸入要替換的字詞'; return; }
+  if (!detectResult || !detectResult.upload_id) return;
+  const btn = $('btnAddTerm');
+  btn.disabled = true;
+  $('ddTermStatus').textContent = '搜尋中…';
+  try {
+    const r = await fetch('/tools/doc-deident/find', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        upload_id: detectResult.upload_id,
+        term: term,
+        valid_checksum: !!$('ddValidChecksum').checked,
+      }),
+    });
+    if (!r.ok) {
+      $('ddTermStatus').textContent = await window.friendlyServerError(r, '搜尋失敗');
+      return;
+    }
+    const d = await r.json();
+    if (!d.count) {
+      $('ddTermStatus').textContent = `文件裡找不到「${term}」`;
+      return;
+    }
+    // 接在既有結果後面，id 沿用同一個序號空間（送出時只認 id）
+    let nextId = detectResult.findings.reduce((m, f) => Math.max(m, f.id), -1) + 1;
+    for (const f of d.findings) { f.id = nextId++; detectResult.findings.push(f); }
+    $('ddTermStatus').textContent = `已加入 ${d.count} 處`;
+    $('ddTermInput').value = '';
+    renderRows();
+  } catch (e) {
+    $('ddTermStatus').textContent = '搜尋失敗';
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 $('btnProcess').addEventListener('click', async () => {
@@ -420,8 +558,22 @@ $('btnProcess').addEventListener('click', async () => {
   const chosenIds = new Set(
     Array.from(document.querySelectorAll('.fchk:checked')).map(c => parseInt(c.value))
   );
-  const selections = detectResult.findings.filter(f => chosenIds.has(f.id));
+  let selections = detectResult.findings.filter(f => chosenIds.has(f.id));
   if (!selections.length) { await showAlert('請先勾選至少一筆要處理的項目'); return; }
+  if (chosenMode === 'replace') {
+    // 每一筆都要帶上真正要寫進 PDF 的字串（使用者改過的優先，否則用建議值）
+    selections = selections.map(f => ({...f, replacement: suggestedFor(f)}));
+    const empty = selections.filter(f => !(f.replacement || '').trim());
+    if (empty.length) {
+      await showAlert(`有 ${empty.length} 筆沒有填替換的內容，請先補上或取消勾選。`);
+      return;
+    }
+    // 替換跟編修一樣是把原文真的刪掉 —— 使用者要知道這件事
+    const ok = await showConfirm(
+      `替換 ${selections.length} 筆資料？原文會被真的刪除，這個操作無法還原。`,
+      { title: '確認替換', kind: 'danger', okText: '確認替換', cancelText: '取消' });
+    if (!ok) return;
+  }
   if (chosenMode === 'redact') {
     const ok = await showConfirm(`編修 ${selections.length} 筆資料？這個操作無法還原。`,
       { title: '確認編修', kind: 'danger', okText: '確認編修', cancelText: '取消' });

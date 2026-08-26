@@ -1161,7 +1161,9 @@ POST /tools/doc-deident/api/doc-deident
 |---|---|---|---|
 | `file` | file | ✓ | PDF / Word 文件 |
 | `types` | str | | 要偵測的 PII 類型 CSV（身分證 / 電話 / email / 地址 ...），空白 = 預設集 |
-| `mode` | str | | `mask`（遮罩，預設）/ `redact`（真刪） |
+| `mode` | str | | `mask`（遮罩，預設）/ `redact`（真刪）/ `replace`（換成假值） |
+| `replacements` | str | | 僅 `replace`：JSON 物件 `{"原值": "指定的新值"}`。沒指定的一律自動產生 |
+| `valid_checksum` | str | | 僅 `replace`：`1` = 產生可通過檢查碼的假值（見下方說明） |
 
 ```bash
 curl -X POST http://localhost:8765/tools/doc-deident/api/doc-deident \
@@ -1171,6 +1173,29 @@ curl -X POST http://localhost:8765/tools/doc-deident/api/doc-deident \
 ```
 
 回應：去識別化後的檔案。
+
+#### 替換模式（`mode=replace`）
+
+把偵測到的資料換成另一個看起來正常、但不是真的值 —— 適合拿去測試系統、
+給外部看的報表、教學範例。原文一樣是**真的刪除**。
+
+沒有在 `replacements` 裡指定的值會**自動產生**，依欄位型別給對的樣子
+（身分證、統編、手機、Email、信用卡、人名、地址、日期…），而且**同一個原值
+在整份文件裡固定對應同一個假值**。
+
+`valid_checksum` 預設不開，產生的假值**刻意不通過檢查碼**，絕不會撞到真人資料。
+設成 `1` 之後身分證 / 統編 / 信用卡會算出正確的檢查碼（拿去測試系統不會被擋，
+但算得出來的號碼有可能剛好是某個真人的）。Email 用 `example.com`、IP 用
+`192.0.2.x`、MAC 用 `00:00:5E`，都是文件專用的保留範圍，兩種設定都安全。
+
+```bash
+curl -X POST http://localhost:8765/tools/doc-deident/api/doc-deident \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@contract.pdf" -F "mode=replace" \
+  -F 'replacements={"0912345678":"0955555555"}' \
+  -F "valid_checksum=1" \
+  --output replaced.pdf
+```
 
 ### 文字去識別化
 

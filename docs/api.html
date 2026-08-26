@@ -841,12 +841,22 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="文件去識別化">文件去識別化</h4>
 <p>對 Word / PDF 文件偵測並遮蔽個資（regex / 可選 LLM）。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/doc-deident/api/doc-deident</code></pre>
-<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF / Word 文件</td></tr><tr><td><code>types</code></td><td>str</td><td></td><td>要偵測的 PII 類型 CSV（身分證 / 電話 / email / 地址 ...），空白 = 預設集</td></tr><tr><td><code>mode</code></td><td>str</td><td></td><td><code>mask</code>（遮罩，預設）/ <code>redact</code>（真刪）</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF / Word 文件</td></tr><tr><td><code>types</code></td><td>str</td><td></td><td>要偵測的 PII 類型 CSV（身分證 / 電話 / email / 地址 ...），空白 = 預設集</td></tr><tr><td><code>mode</code></td><td>str</td><td></td><td><code>mask</code>（遮罩，預設）/ <code>redact</code>（真刪）/ <code>replace</code>（換成假值）</td></tr><tr><td><code>replacements</code></td><td>str</td><td></td><td>僅 <code>replace</code>：JSON 物件 <code>{&quot;原值&quot;: &quot;指定的新值&quot;}</code>。沒指定的一律自動產生</td></tr><tr><td><code>valid_checksum</code></td><td>str</td><td></td><td>僅 <code>replace</code>：<code>1</code> = 產生可通過檢查碼的假值（見下方說明）</td></tr></tbody></table></div>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/doc-deident/api/doc-deident</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@contract.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;mode=mask&quot;</span> \
   <span class="hl-flag">--output</span> deidentified.pdf</code></pre>
 <p>回應：去識別化後的檔案。</p>
+<h5 id="替換模式modereplace">替換模式（<code>mode=replace</code>）</h5>
+<p>把偵測到的資料換成另一個看起來正常、但不是真的值 —— 適合拿去測試系統、 給外部看的報表、教學範例。原文一樣是<strong>真的刪除</strong>。</p>
+<p>沒有在 <code>replacements</code> 裡指定的值會<strong>自動產生</strong>，依欄位型別給對的樣子 （身分證、統編、手機、Email、信用卡、人名、地址、日期…），而且<strong>同一個原值 在整份文件裡固定對應同一個假值</strong>。</p>
+<p><code>valid_checksum</code> 預設不開，產生的假值<strong>刻意不通過檢查碼</strong>，絕不會撞到真人資料。 設成 <code>1</code> 之後身分證 / 統編 / 信用卡會算出正確的檢查碼（拿去測試系統不會被擋， 但算得出來的號碼有可能剛好是某個真人的）。Email 用 <code>example.com</code>、IP 用 <code>192.0.2.x</code>、MAC 用 <code>00:00:5E</code>，都是文件專用的保留範圍，兩種設定都安全。</p>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/doc-deident/api/doc-deident</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@contract.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;mode=replace&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&#x27;replacements={&quot;0912345678&quot;:&quot;0955555555&quot;}&#x27;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;valid_checksum=1&quot;</span> \
+  <span class="hl-flag">--output</span> replaced.pdf</code></pre>
       </section>
       <section class="doc-section" data-sec="文字去識別化" data-title="文字去識別化" hidden>
 <div class="doc-crumb">7. 安全與隱私 API</div>

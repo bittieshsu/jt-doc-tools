@@ -10,6 +10,7 @@ Routes:
 """
 from __future__ import annotations
 
+import asyncio as _asyncio
 import io
 import json
 import shutil
@@ -1411,7 +1412,12 @@ async def save(request: Request):
     # _do_flatten closure) in save_queue: per-upload Lock serializes rapid /save
     # calls from one user (drag-spam), global Semaphore caps total concurrent
     # flattens so multi-user load doesn't saturate CPU. (v1.7.17 改進)
-    async def _do_flatten():
+    # v1.14.55：整段是**純同步的重活**（redaction + 重畫 + 存檔），底下一個
+    # `await` 都沒有。掛在 async 函式上等於直接跑在事件迴圈裡 —— 正式機
+    # 實測 `POST /tools/pdf-editor/save` 卡住事件迴圈 6.2 秒，那段時間
+    # 全站對所有人都不回應。改成同步函式 + `to_thread`，外層維持原本的
+    # 佇列（per-upload 鎖 + 全域號誌）不變。
+    def _flatten_sync():
         out = _work_dir() / f"pe_{upload_id}_out.pdf"
         # Always open the pristine original — the client sends the FULL edit
         # model (all origBboxes, all deleted_originals, all added objects) on
@@ -1964,6 +1970,9 @@ async def save(request: Request):
         }
 
 
+
+    async def _do_flatten():
+        return await _asyncio.to_thread(_flatten_sync)
 
     return await _sq.run(upload_id, _do_flatten)
 
