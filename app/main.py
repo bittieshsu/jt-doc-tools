@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio as _asyncio
 import time
 from pathlib import Path
 
@@ -17,7 +18,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.55"
+VERSION = "1.14.56"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -1587,7 +1588,7 @@ async def api_convert_to_pdf(file: UploadFile = File(...),
     out = settings.temp_dir / (src.stem + ".pdf")
     try:
         src.write_bytes(data)
-        office_convert.convert_to_pdf(src, out)
+        await office_convert.convert_to_pdf_async(src, out)
         pdf_bytes = out.read_bytes()
     finally:
         for fp in (src, out):
@@ -1705,63 +1706,69 @@ async def api_job_download_png(job_id: str, request: Request):
     page_002.png …). If the result was already a ZIP of PDFs, all PDFs are
     extracted and rendered to PNGs in the same ZIP.
     """
-    import io
-    import shutil
-    import tempfile
-    import zipfile as _zip
-    import fitz
+    def _work():
+        # 這裡算的是預覽圖（純 CPU）。直接跑在事件迴圈上會讓**全站**
+        # 在這段時間都不回應 —— 頁數多或 DPI 高時特別明顯。包成閉包
+        # 丟到執行緒之後，慢的只有按下去的那個人自己。
+        import io
+        import shutil
+        import tempfile
+        import zipfile as _zip
+        import fitz
 
-    job = job_manager.get(job_id)
-    if not job or not _job_access(job, request):
-        return JSONResponse({"error": "no result"}, status_code=404)
-    if not job.result_path or not job.result_path.exists():
-        return JSONResponse({"error": "no result"}, status_code=404)
-    src = job.result_path
-    base_name = (job.result_filename or src.name)
-    tmp = Path(tempfile.mkdtemp(prefix="job_png_"))
+        job = job_manager.get(job_id)
+        if not job or not _job_access(job, request):
+            return JSONResponse({"error": "no result"}, status_code=404)
+        if not job.result_path or not job.result_path.exists():
+            return JSONResponse({"error": "no result"}, status_code=404)
+        src = job.result_path
+        base_name = (job.result_filename or src.name)
+        tmp = Path(tempfile.mkdtemp(prefix="job_png_"))
 
-    pdfs: list[tuple[str, Path]] = []  # (label_stem, pdf_path)
-    if src.suffix.lower() == ".zip":
-        with _zip.ZipFile(src) as zf:
-            for info in zf.infolist():
-                if info.filename.lower().endswith(".pdf"):
-                    out = tmp / Path(info.filename).name
-                    out.write_bytes(zf.read(info))
-                    pdfs.append((Path(info.filename).stem, out))
-    else:
-        pdfs.append((Path(base_name).stem, src))
+        pdfs: list[tuple[str, Path]] = []  # (label_stem, pdf_path)
+        if src.suffix.lower() == ".zip":
+            with _zip.ZipFile(src) as zf:
+                for info in zf.infolist():
+                    if info.filename.lower().endswith(".pdf"):
+                        out = tmp / Path(info.filename).name
+                        out.write_bytes(zf.read(info))
+                        pdfs.append((Path(info.filename).stem, out))
+        else:
+            pdfs.append((Path(base_name).stem, src))
 
-    pngs: list[tuple[str, bytes]] = []
-    for stem, pdf in pdfs:
-        with fitz.open(str(pdf)) as doc:
-            for i in range(doc.page_count):
-                pix = doc[i].get_pixmap(dpi=150, alpha=False)
-                name = f"{stem}_p{i + 1:03d}.png" if doc.page_count > 1 or len(pdfs) > 1 else f"{stem}.png"
-                pngs.append((name, pix.tobytes("png")))
+        pngs: list[tuple[str, bytes]] = []
+        for stem, pdf in pdfs:
+            with fitz.open(str(pdf)) as doc:
+                for i in range(doc.page_count):
+                    pix = doc[i].get_pixmap(dpi=150, alpha=False)
+                    name = f"{stem}_p{i + 1:03d}.png" if doc.page_count > 1 or len(pdfs) > 1 else f"{stem}.png"
+                    pngs.append((name, pix.tobytes("png")))
 
-    try:
-        if len(pngs) == 1:
-            name, data = pngs[0]
-            out = tmp / name
-            out.write_bytes(data)
+        try:
+            if len(pngs) == 1:
+                name, data = pngs[0]
+                out = tmp / name
+                out.write_bytes(data)
+                return FileResponse(
+                    path=str(out), filename=name,
+                    media_type="image/png",
+                    background=None,
+                )
+            zip_buf = io.BytesIO()
+            with _zip.ZipFile(zip_buf, "w", _zip.ZIP_DEFLATED) as zf:
+                for name, data in pngs:
+                    zf.writestr(name, data)
+            zip_path = tmp / (Path(base_name).stem + ".png.zip")
+            zip_path.write_bytes(zip_buf.getvalue())
             return FileResponse(
-                path=str(out), filename=name,
-                media_type="image/png",
-                background=None,
+                path=str(zip_path), filename=zip_path.name,
+                media_type="application/zip",
             )
-        zip_buf = io.BytesIO()
-        with _zip.ZipFile(zip_buf, "w", _zip.ZIP_DEFLATED) as zf:
-            for name, data in pngs:
-                zf.writestr(name, data)
-        zip_path = tmp / (Path(base_name).stem + ".png.zip")
-        zip_path.write_bytes(zip_buf.getvalue())
-        return FileResponse(
-            path=str(zip_path), filename=zip_path.name,
-            media_type="application/zip",
-        )
-    finally:
-        # Clean tmp later — FileResponse needs the file alive while streamed.
-        pass
+        finally:
+            # Clean tmp later — FileResponse needs the file alive while streamed.
+            pass
+
+    return await _asyncio.to_thread(_work)
 
 
 async def _sweep_temp_files_loop():

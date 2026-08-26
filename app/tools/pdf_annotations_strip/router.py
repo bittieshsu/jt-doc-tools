@@ -1,6 +1,7 @@
 """Endpoints for PDF 註解清除."""
 from __future__ import annotations
 
+import asyncio as _asyncio
 import json
 import re
 import uuid
@@ -113,22 +114,28 @@ async def analyze(request: Request, file: UploadFile = File(...)):
 @router.get("/preview/{upload_id}/{page}")
 async def preview(upload_id: str, page: int, request: Request):
     """Render one page (with annotations baked) as a thumbnail PNG."""
-    _validate_upload_id(upload_id)
-    from ...core import upload_owner
-    upload_owner.require(upload_id, request)
-    if page < 1:
-        raise HTTPException(400, "invalid page")
-    src, _ = _cached_paths(upload_id)
-    if not src.exists():
-        raise HTTPException(410, "上傳已過期，請重新分析")
-    with fitz.open(str(src)) as doc:
-        if page > doc.page_count:
-            raise HTTPException(404, "page out of range")
-        mat = fitz.Matrix(1.4, 1.4)
-        pix = doc[page - 1].get_pixmap(matrix=mat, alpha=False)
-        png = pix.tobytes("png")
-    return Response(png, media_type="image/png",
-                    headers={"Cache-Control": "private, max-age=600"})
+    def _work():
+        # 這裡算的是預覽圖（純 CPU）。直接跑在事件迴圈上會讓**全站**
+        # 在這段時間都不回應 —— 頁數多或 DPI 高時特別明顯。包成閉包
+        # 丟到執行緒之後，慢的只有按下去的那個人自己。
+        _validate_upload_id(upload_id)
+        from ...core import upload_owner
+        upload_owner.require(upload_id, request)
+        if page < 1:
+            raise HTTPException(400, "invalid page")
+        src, _ = _cached_paths(upload_id)
+        if not src.exists():
+            raise HTTPException(410, "上傳已過期，請重新分析")
+        with fitz.open(str(src)) as doc:
+            if page > doc.page_count:
+                raise HTTPException(404, "page out of range")
+            mat = fitz.Matrix(1.4, 1.4)
+            pix = doc[page - 1].get_pixmap(matrix=mat, alpha=False)
+            png = pix.tobytes("png")
+        return Response(png, media_type="image/png",
+                        headers={"Cache-Control": "private, max-age=600"})
+
+    return await _asyncio.to_thread(_work)
 
 
 def _strip_pdf(src: Path, out: Path,

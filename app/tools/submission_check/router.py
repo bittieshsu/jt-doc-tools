@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import asyncio as _asyncio
 import hashlib
 import json
 import re
@@ -316,7 +317,7 @@ async def upload_files(
             target = case_files_dir / f"{file_id}.docx"
             try:
                 from app.core import office_convert as _oc
-                _oc.convert_to_docx(tmp, target, timeout=90.0)
+                await _oc.convert_to_docx_async(tmp, target, timeout=90.0)
                 tmp.unlink(missing_ok=True)
                 store_suffix = ".docx"
             except Exception as e:
@@ -332,7 +333,7 @@ async def upload_files(
             target = case_files_dir / f"{file_id}.pdf"
             try:
                 from app.core import office_convert as _oc
-                _oc.convert_to_pdf(tmp, target, timeout=120.0)
+                await _oc.convert_to_pdf_async(tmp, target, timeout=120.0)
                 tmp.unlink(missing_ok=True)
                 store_suffix = ".pdf"
             except Exception as e:
@@ -470,43 +471,49 @@ async def delete_override(case_id: str, finding_key: str, request: Request):
 @router.get("/page-preview/{case_id}/{file_id}/{page}")
 async def get_page_preview(case_id: str, file_id: str, page: int, request: Request):
     """渲染指定 PDF 頁面為 PNG 預覽圖（供 finding 預覽 modal 用）。"""
-    if not _cm.CASE_ID_RE.match(case_id):
-        raise HTTPException(400, "invalid case_id")
-    if not re.match(r"^[a-f0-9]{32}$", file_id):
-        raise HTTPException(400, "invalid file_id")
-    if page < 1 or page > 5000:
-        raise HTTPException(400, "page out of range")
-    case = _cm.load_case(case_id)
-    if not case:
-        raise HTTPException(404, "case 不存在")
-    _check_case_acl(case, request)
-    fdir = _cm.case_dir(case_id) / "files"
-    matches = list(fdir.glob(f"{file_id}.*"))
-    if not matches:
-        raise HTTPException(404, "檔案不存在")
-    path = matches[0]
-    suffix = path.suffix.lower()
-    try:
-        if suffix == ".pdf":
-            import fitz
-            doc = fitz.open(str(path))
-            try:
-                if page > doc.page_count:
-                    raise HTTPException(404, f"page {page} 超過 PDF 總頁數 {doc.page_count}")
-                pix = doc[page - 1].get_pixmap(matrix=fitz.Matrix(150 / 72, 150 / 72))
-                png = pix.tobytes("png")
-            finally:
-                doc.close()
-        elif suffix in (".jpg", ".jpeg", ".png", ".tif", ".tiff"):
-            png = path.read_bytes()
-        else:
-            raise HTTPException(400, "此檔案類型不支援頁面預覽")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"渲染失敗：{e}")
-    from fastapi.responses import Response
-    return Response(content=png, media_type="image/png")
+    def _work():
+        # 這裡算的是預覽圖（純 CPU）。直接跑在事件迴圈上會讓**全站**
+        # 在這段時間都不回應 —— 頁數多或 DPI 高時特別明顯。包成閉包
+        # 丟到執行緒之後，慢的只有按下去的那個人自己。
+        if not _cm.CASE_ID_RE.match(case_id):
+            raise HTTPException(400, "invalid case_id")
+        if not re.match(r"^[a-f0-9]{32}$", file_id):
+            raise HTTPException(400, "invalid file_id")
+        if page < 1 or page > 5000:
+            raise HTTPException(400, "page out of range")
+        case = _cm.load_case(case_id)
+        if not case:
+            raise HTTPException(404, "case 不存在")
+        _check_case_acl(case, request)
+        fdir = _cm.case_dir(case_id) / "files"
+        matches = list(fdir.glob(f"{file_id}.*"))
+        if not matches:
+            raise HTTPException(404, "檔案不存在")
+        path = matches[0]
+        suffix = path.suffix.lower()
+        try:
+            if suffix == ".pdf":
+                import fitz
+                doc = fitz.open(str(path))
+                try:
+                    if page > doc.page_count:
+                        raise HTTPException(404, f"page {page} 超過 PDF 總頁數 {doc.page_count}")
+                    pix = doc[page - 1].get_pixmap(matrix=fitz.Matrix(150 / 72, 150 / 72))
+                    png = pix.tobytes("png")
+                finally:
+                    doc.close()
+            elif suffix in (".jpg", ".jpeg", ".png", ".tif", ".tiff"):
+                png = path.read_bytes()
+            else:
+                raise HTTPException(400, "此檔案類型不支援頁面預覽")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(500, f"渲染失敗：{e}")
+        from fastapi.responses import Response
+        return Response(content=png, media_type="image/png")
+
+    return await _asyncio.to_thread(_work)
 
 
 @router.get("/file/{case_id}/{file_id}")

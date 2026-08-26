@@ -957,7 +957,7 @@ async def undo_replace_all_fonts(request: Request):
         for i in range(d2.page_count):
             page = d2[i]
             png = _work_dir() / f"pe_{upload_id}_p{i+1}.png"
-            pdf_preview.render_page_png(src, png, i, dpi=120)
+            await pdf_preview.render_page_png_async(src, png, i, dpi=120)
             pages_info.append({
                 "index": i,
                 "width_pt": page.rect.width,

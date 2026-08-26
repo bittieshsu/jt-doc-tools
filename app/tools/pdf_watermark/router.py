@@ -154,7 +154,7 @@ async def preview(request: Request, file: UploadFile = File(...)):
     src = settings.temp_dir / f"wm_{upload_id}.pdf"
     src.write_bytes(data)
     png = settings.temp_dir / f"wm_{upload_id}_p1.png"
-    pdf_preview.render_page_png(src, png, 0, dpi=110)
+    await pdf_preview.render_page_png_async(src, png, 0, dpi=110)
 
     import fitz
     with fitz.open(str(src)) as doc:
@@ -211,7 +211,7 @@ async def preview_watermarked(
 
     p.pages = [page]
     service.apply_watermark(src, out, wm_path, p)
-    pdf_preview.render_page_png(out, png, page, dpi=120)
+    await pdf_preview.render_page_png_async(out, png, page, dpi=120)
 
     for f in (src, out):
         try: f.unlink()

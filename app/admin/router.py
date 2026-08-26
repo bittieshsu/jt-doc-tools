@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio as _asyncio
 import asyncio
 import io
 import json
@@ -75,54 +76,63 @@ def build_router(templates) -> APIRouter:
         is_png = data[:8] == b"\x89PNG\r\n\x1a\n"
         is_jpeg = data[:3] == b"\xff\xd8\xff"
         is_pdf = data[:4] == b"%PDF"
+        # PDF 轉圖 + 自動裁邊是純 CPU 的重活（3 倍解析度算整頁）。直接跑在
+        # 事件迴圈上會讓全站在這段時間不回應，所以丟到執行緒。這支端點有
+        # `await file.read()`，不能像其他預覽端點那樣整段包起來。
+        def _render_pdf_asset(data):
+            if is_pdf:
+                try:
+                    import fitz
+                    from PIL import Image as _Img
+                    with fitz.open(stream=data, filetype="pdf") as _doc:
+                        if _doc.page_count == 0:
+                            raise HTTPException(400, "PDF 沒有任何頁面")
+                        # Render at high DPI so the cropped stamp stays crisp.
+                        pix = _doc[0].get_pixmap(matrix=fitz.Matrix(3, 3), alpha=False)
+                        data = pix.tobytes("png")
+                    # A scanned stamp PDF is mostly paper with a small mark — auto-
+                    # crop the margins so the asset is just the stamp, not a full A4
+                    # page. A real chop is COLOURED ink (high chroma) or solid black
+                    # (much darker than paper); scan artefacts (fold/scratch lines,
+                    # shadows, paper noise) are near-grey and only slightly off the
+                    # paper tone. So detect content as "high chroma OR clearly dark"
+                    # and ignore the rest — this drops faint diagonal scan lines that
+                    # a plain brightness threshold would keep. (Transparency is still
+                    # handled separately by remove_bg.)
+                    import numpy as _np
+                    im = _Img.open(io.BytesIO(data)).convert("RGB")
+                    w, h = im.size
+                    arr = _np.asarray(im).astype(_np.int16)
+                    chroma = arr.max(axis=2) - arr.min(axis=2)
+                    bright = arr.max(axis=2)
+                    cc = max(4, min(w, h) // 40)
+                    corners_b = _np.concatenate([
+                        bright[:cc, :cc].ravel(), bright[:cc, -cc:].ravel(),
+                        bright[-cc:, :cc].ravel(), bright[-cc:, -cc:].ravel()])
+                    paper_b = float(_np.median(corners_b))
+                    content = (chroma > 40) | ((paper_b - bright) > 90)
+                    ys, xs = _np.where(content)
+                    if xs.size and ys.size:
+                        x0, x1 = int(xs.min()), int(xs.max())
+                        y0, y1 = int(ys.min()), int(ys.max())
+                        if (x1 - x0) < w * 0.96 or (y1 - y0) < h * 0.96:
+                            pad = max(6, min(w, h) // 80)
+                            crop = (max(0, x0 - pad), max(0, y0 - pad),
+                                    min(w, x1 + 1 + pad), min(h, y1 + 1 + pad))
+                            buf = io.BytesIO()
+                            im.crop(crop).save(buf, format="PNG")
+                            data = buf.getvalue()
+                except HTTPException:
+                    raise
+                except Exception:
+                    import logging
+                    logging.getLogger(__name__).exception("asset pdf render failed")
+                    raise HTTPException(400, "PDF 轉圖片失敗，請確認是有效的 PDF。")
+
+            return data
+
         if is_pdf:
-            try:
-                import fitz
-                from PIL import Image as _Img
-                with fitz.open(stream=data, filetype="pdf") as _doc:
-                    if _doc.page_count == 0:
-                        raise HTTPException(400, "PDF 沒有任何頁面")
-                    # Render at high DPI so the cropped stamp stays crisp.
-                    pix = _doc[0].get_pixmap(matrix=fitz.Matrix(3, 3), alpha=False)
-                    data = pix.tobytes("png")
-                # A scanned stamp PDF is mostly paper with a small mark — auto-
-                # crop the margins so the asset is just the stamp, not a full A4
-                # page. A real chop is COLOURED ink (high chroma) or solid black
-                # (much darker than paper); scan artefacts (fold/scratch lines,
-                # shadows, paper noise) are near-grey and only slightly off the
-                # paper tone. So detect content as "high chroma OR clearly dark"
-                # and ignore the rest — this drops faint diagonal scan lines that
-                # a plain brightness threshold would keep. (Transparency is still
-                # handled separately by remove_bg.)
-                import numpy as _np
-                im = _Img.open(io.BytesIO(data)).convert("RGB")
-                w, h = im.size
-                arr = _np.asarray(im).astype(_np.int16)
-                chroma = arr.max(axis=2) - arr.min(axis=2)
-                bright = arr.max(axis=2)
-                cc = max(4, min(w, h) // 40)
-                corners_b = _np.concatenate([
-                    bright[:cc, :cc].ravel(), bright[:cc, -cc:].ravel(),
-                    bright[-cc:, :cc].ravel(), bright[-cc:, -cc:].ravel()])
-                paper_b = float(_np.median(corners_b))
-                content = (chroma > 40) | ((paper_b - bright) > 90)
-                ys, xs = _np.where(content)
-                if xs.size and ys.size:
-                    x0, x1 = int(xs.min()), int(xs.max())
-                    y0, y1 = int(ys.min()), int(ys.max())
-                    if (x1 - x0) < w * 0.96 or (y1 - y0) < h * 0.96:
-                        pad = max(6, min(w, h) // 80)
-                        crop = (max(0, x0 - pad), max(0, y0 - pad),
-                                min(w, x1 + 1 + pad), min(h, y1 + 1 + pad))
-                        buf = io.BytesIO()
-                        im.crop(crop).save(buf, format="PNG")
-                        data = buf.getvalue()
-            except HTTPException:
-                raise
-            except Exception:
-                import logging
-                logging.getLogger(__name__).exception("asset pdf render failed")
-                raise HTTPException(400, "PDF 轉圖片失敗，請確認是有效的 PDF。")
+            data = await _asyncio.to_thread(_render_pdf_asset, data)
         elif not (is_png or is_jpeg):
             raise HTTPException(
                 400, "資產只接受 PNG / JPEG 圖片或 PDF（會自動取第一頁轉圖片）。請重新選擇檔案。")
@@ -310,56 +320,62 @@ def build_router(templates) -> APIRouter:
     ):
         """Render a sample A4 page with the asset tiled as a watermark.
         Used by the asset edit page when the asset's type is ``watermark``."""
-        from pathlib import Path
-        import uuid
-        import fitz
-        from ..config import settings as _s
-        from ..tools.pdf_watermark import service as wm_service
-        asset = asset_manager.get(asset_id)
-        if not asset:
-            raise HTTPException(404, "asset not found")
-        wm_path = asset_manager.file_path(asset)
+        def _work():
+            # 這裡算的是預覽圖（純 CPU）。直接跑在事件迴圈上會讓**全站**
+            # 在這段時間都不回應 —— 頁數多或 DPI 高時特別明顯。包成閉包
+            # 丟到執行緒之後，慢的只有按下去的那個人自己。
+            from pathlib import Path
+            import uuid
+            import fitz
+            from ..config import settings as _s
+            from ..tools.pdf_watermark import service as wm_service
+            asset = asset_manager.get(asset_id)
+            if not asset:
+                raise HTTPException(404, "asset not found")
+            wm_path = asset_manager.file_path(asset)
 
-        tmp_id = uuid.uuid4().hex
-        sample_pdf = _s.temp_dir / f"wm_sample_{tmp_id}.pdf"
-        out_pdf = _s.temp_dir / f"wm_sample_{tmp_id}_out.pdf"
-        out_png = _s.temp_dir / f"wm_sample_{tmp_id}.png"
-        try:
-            # Build a blank A4 PDF as the canvas — caption it so the user can
-            # see this is a sample, not their real document.
-            doc = fitz.open()
-            page = doc.new_page(width=595.28, height=841.89)  # A4 pt
-            page.insert_text(
-                fitz.Point(40, 60), "Sample Page · 範例頁面",
-                fontsize=18, color=(0.55, 0.6, 0.7),
-            )
-            page.insert_text(
-                fitz.Point(40, 90),
-                "This is a preview of how your watermark will look "
-                "when applied to a document.",
-                fontsize=11, color=(0.6, 0.65, 0.75),
-            )
-            doc.save(str(sample_pdf)); doc.close()
+            tmp_id = uuid.uuid4().hex
+            sample_pdf = _s.temp_dir / f"wm_sample_{tmp_id}.pdf"
+            out_pdf = _s.temp_dir / f"wm_sample_{tmp_id}_out.pdf"
+            out_png = _s.temp_dir / f"wm_sample_{tmp_id}.png"
+            try:
+                # Build a blank A4 PDF as the canvas — caption it so the user can
+                # see this is a sample, not their real document.
+                doc = fitz.open()
+                page = doc.new_page(width=595.28, height=841.89)  # A4 pt
+                page.insert_text(
+                    fitz.Point(40, 60), "Sample Page · 範例頁面",
+                    fontsize=18, color=(0.55, 0.6, 0.7),
+                )
+                page.insert_text(
+                    fitz.Point(40, 90),
+                    "This is a preview of how your watermark will look "
+                    "when applied to a document.",
+                    fontsize=11, color=(0.6, 0.65, 0.75),
+                )
+                doc.save(str(sample_pdf)); doc.close()
 
-            params = wm_service.WatermarkParams(
-                mode="tile",
-                opacity=max(0.05, min(1.0, float(opacity))),
-                rotation_deg=float(rotation),
-                tile_size_mm=max(10.0, float(size)),
-                gap_mm=max(0.0, float(gap)),
+                params = wm_service.WatermarkParams(
+                    mode="tile",
+                    opacity=max(0.05, min(1.0, float(opacity))),
+                    rotation_deg=float(rotation),
+                    tile_size_mm=max(10.0, float(size)),
+                    gap_mm=max(0.0, float(gap)),
+                )
+                wm_service.apply_watermark(sample_pdf, out_pdf, wm_path, params)
+                doc = fitz.open(str(out_pdf))
+                pix = doc[0].get_pixmap(dpi=110, alpha=False)
+                pix.save(str(out_png)); doc.close()
+            finally:
+                for p in (sample_pdf, out_pdf):
+                    try: p.unlink()
+                    except OSError: pass
+            return FileResponse(
+                str(out_png), media_type="image/png",
+                headers={"Cache-Control": "no-store"},
             )
-            wm_service.apply_watermark(sample_pdf, out_pdf, wm_path, params)
-            doc = fitz.open(str(out_pdf))
-            pix = doc[0].get_pixmap(dpi=110, alpha=False)
-            pix.save(str(out_png)); doc.close()
-        finally:
-            for p in (sample_pdf, out_pdf):
-                try: p.unlink()
-                except OSError: pass
-        return FileResponse(
-            str(out_png), media_type="image/png",
-            headers={"Cache-Control": "no-store"},
-        )
+
+        return await _asyncio.to_thread(_work)
 
     @router.post("/assets/{asset_id}/crop")
     async def asset_crop(asset_id: str, request: Request):

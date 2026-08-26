@@ -13,6 +13,7 @@
 """
 from __future__ import annotations
 
+import asyncio as _asyncio
 import io
 import uuid
 from pathlib import Path
@@ -114,7 +115,7 @@ async def load(request: Request, file: UploadFile = File(...)):
         raw = settings.temp_dir / f"{_PREFIX}raw_{uid}{Path(name).suffix}"
         raw.write_bytes(data)
         try:
-            office_convert.convert_to_pdf(raw, dst)
+            await office_convert.convert_to_pdf_async(raw, dst)
         except Exception:  # noqa: BLE001
             raise HTTPException(400, "文書檔轉換失敗，請確認檔案是否完整")
         finally:
@@ -207,28 +208,34 @@ async def preview(request: Request, upload_id: str = Form(...),
                   jitter_angle_deg: float = Form(4),
                   seed: int = Form(0), large: bool = Form(False)):
     """單頁預覽：**真的把章蓋進 PDF 再算圖**（與送出走同一段程式）。"""
-    require_uuid_hex(upload_id, "upload_id")
-    _uo.require(upload_id, request)
-    src = _src(upload_id)
-    if not src.exists():
-        raise HTTPException(404, "檔案不存在（可能已過期）")
-    png = _resolve_stamp(upload_id, source=source, asset_id=asset_id, text=text,
-                         shape=shape, color=color, style=style,
-                         double_ring=double_ring)
-    spec = _spec_from_form(mode=mode, group=group, edge=edge, size_mm=size_mm,
-                           offset_mm=offset_mm, pos_mm=pos_mm,
-                           angle_deg=angle_deg, opacity=opacity,
-                           jitter_pos=jitter_pos, jitter_pos_mm=jitter_pos_mm,
-                           jitter_angle=jitter_angle,
-                           jitter_angle_deg=jitter_angle_deg, seed=seed)
-    png = SS.apply_opacity(png, spec.opacity)
-    with fitz.open(str(src)) as doc:
-        if page_no < 1 or page_no > doc.page_count:
-            raise HTTPException(400, "頁碼超出範圍")
-        SC.apply_seam(doc, png, spec)
-        pix = doc[page_no - 1].get_pixmap(dpi=150 if large else 78, alpha=False)
-        return Response(content=pix.tobytes("png"), media_type="image/png",
-                        headers={"Cache-Control": "no-store"})
+    def _work():
+        # 這裡算的是預覽圖（純 CPU）。直接跑在事件迴圈上會讓**全站**
+        # 在這段時間都不回應 —— 頁數多或 DPI 高時特別明顯。包成閉包
+        # 丟到執行緒之後，慢的只有按下去的那個人自己。
+        require_uuid_hex(upload_id, "upload_id")
+        _uo.require(upload_id, request)
+        src = _src(upload_id)
+        if not src.exists():
+            raise HTTPException(404, "檔案不存在（可能已過期）")
+        png = _resolve_stamp(upload_id, source=source, asset_id=asset_id, text=text,
+                             shape=shape, color=color, style=style,
+                             double_ring=double_ring)
+        spec = _spec_from_form(mode=mode, group=group, edge=edge, size_mm=size_mm,
+                               offset_mm=offset_mm, pos_mm=pos_mm,
+                               angle_deg=angle_deg, opacity=opacity,
+                               jitter_pos=jitter_pos, jitter_pos_mm=jitter_pos_mm,
+                               jitter_angle=jitter_angle,
+                               jitter_angle_deg=jitter_angle_deg, seed=seed)
+        png = SS.apply_opacity(png, spec.opacity)
+        with fitz.open(str(src)) as doc:
+            if page_no < 1 or page_no > doc.page_count:
+                raise HTTPException(400, "頁碼超出範圍")
+            SC.apply_seam(doc, png, spec)
+            pix = doc[page_no - 1].get_pixmap(dpi=150 if large else 78, alpha=False)
+            return Response(content=pix.tobytes("png"), media_type="image/png",
+                            headers={"Cache-Control": "no-store"})
+
+    return await _asyncio.to_thread(_work)
 
 
 @router.post("/submit")
@@ -313,7 +320,7 @@ async def api(request: Request, file: UploadFile = File(...),
             raw = settings.temp_dir / f"{_PREFIX}raw_{uid}"
             raw.write_bytes(data)
             try:
-                office_convert.convert_to_pdf(raw, src)
+                await office_convert.convert_to_pdf_async(raw, src)
             finally:
                 raw.unlink(missing_ok=True)
         else:
@@ -349,7 +356,7 @@ async def thumb(upload_id: str, page_no: int, request: Request):
     out = settings.temp_dir / f"{_PREFIX}_{upload_id}_t_{page_no}.png"
     if not out.exists():
         try:
-            pdf_preview.render_page_png(src, out, page_no - 1, dpi=70)
+            await pdf_preview.render_page_png_async(src, out, page_no - 1, dpi=70)
         except ValueError as e:
             raise HTTPException(400, str(e))
     return FileResponse(str(out), media_type="image/png",

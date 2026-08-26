@@ -20,6 +20,7 @@
 """
 from __future__ import annotations
 
+import asyncio as _asyncio
 import json
 import uuid
 from pathlib import Path
@@ -176,7 +177,7 @@ async def thumb(upload_id: str, page_no: int, request: Request,
     out = settings.temp_dir / f"{_PREFIX}_{upload_id}_t{suffix}_{page_no}.png"
     if not out.exists():
         try:
-            pdf_preview.render_page_png(src, out, page_no - 1,
+            await pdf_preview.render_page_png_async(src, out, page_no - 1,
                                         dpi=150 if large else 70)
         except ValueError as e:
             raise HTTPException(400, str(e))
@@ -242,27 +243,33 @@ async def toc_preview(request: Request, upload_id: str = Form(...),
     書籤本身在閱讀器側邊欄，這一頁看不到；目錄頁才是印得出來的那一張，
     所以一定要能先看。走的是與送出**同一支** `build_toc_page`。
     """
-    require_uuid_hex(upload_id, "upload_id")
-    _uo.require(upload_id, request)
-    src = _src_path(upload_id)
-    if not src.exists():
-        raise HTTPException(404, "檔案不存在（可能已過期）")
-    with fitz.open(str(src)) as doc:
-        items, _ = BC.normalize(_items_from_json(bookmarks), doc.page_count)
-        if not items:
-            raise HTTPException(400, "還沒有任何書籤")
-        spec = BC.TocPageSpec(title=toc_title or "目錄",
-                              max_level=max(1, min(3, toc_max_level)),
-                              dot_leader=bool(toc_dots))
-        inserted = BC.build_toc_page(doc, items, spec, at_page=toc_at)
-        if not inserted:
-            raise HTTPException(400, "產不出目錄頁")
-        at = max(1, min(int(toc_at or 1), doc.page_count))
-        idx = at - 1 + (max(1, min(page_no, inserted)) - 1)
-        pix = doc[idx].get_pixmap(dpi=88, alpha=False)
-        return Response(content=pix.tobytes("png"), media_type="image/png",
-                        headers={"Cache-Control": "no-store",
-                                 "X-Toc-Pages": str(inserted)})
+    def _work():
+        # 這裡算的是預覽圖（純 CPU）。直接跑在事件迴圈上會讓**全站**
+        # 在這段時間都不回應 —— 頁數多或 DPI 高時特別明顯。包成閉包
+        # 丟到執行緒之後，慢的只有按下去的那個人自己。
+        require_uuid_hex(upload_id, "upload_id")
+        _uo.require(upload_id, request)
+        src = _src_path(upload_id)
+        if not src.exists():
+            raise HTTPException(404, "檔案不存在（可能已過期）")
+        with fitz.open(str(src)) as doc:
+            items, _ = BC.normalize(_items_from_json(bookmarks), doc.page_count)
+            if not items:
+                raise HTTPException(400, "還沒有任何書籤")
+            spec = BC.TocPageSpec(title=toc_title or "目錄",
+                                  max_level=max(1, min(3, toc_max_level)),
+                                  dot_leader=bool(toc_dots))
+            inserted = BC.build_toc_page(doc, items, spec, at_page=toc_at)
+            if not inserted:
+                raise HTTPException(400, "產不出目錄頁")
+            at = max(1, min(int(toc_at or 1), doc.page_count))
+            idx = at - 1 + (max(1, min(page_no, inserted)) - 1)
+            pix = doc[idx].get_pixmap(dpi=88, alpha=False)
+            return Response(content=pix.tobytes("png"), media_type="image/png",
+                            headers={"Cache-Control": "no-store",
+                                     "X-Toc-Pages": str(inserted)})
+
+    return await _asyncio.to_thread(_work)
 
 
 def _write_result(src: Path, dst: Path, items, *, toc_page: bool,

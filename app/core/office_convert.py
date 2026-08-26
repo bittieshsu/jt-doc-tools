@@ -231,6 +231,28 @@ def _profile_uri(profile_path: Path) -> str:
     return profile_path.resolve().as_uri()
 
 
+async def convert_to_pdf_async(*args, **kwargs) -> None:
+    """`convert_to_pdf` 的非同步版本 —— **端點一律用這支**。
+
+    soffice 轉檔動輒數秒到數分鐘，而且中間還有一道號誌在排隊。在 async 端點裡
+    直接呼叫會把事件迴圈卡住，全站跟著不回應。
+    """
+    import asyncio
+    return await asyncio.to_thread(convert_to_pdf, *args, **kwargs)
+
+
+async def convert_to_docx_async(*args, **kwargs):
+    """`convert_to_docx` 的非同步版本 —— 端點一律用這支。"""
+    import asyncio
+    return await asyncio.to_thread(convert_to_docx, *args, **kwargs)
+
+
+async def convert_to_odt_async(*args, **kwargs):
+    """`convert_to_odt` 的非同步版本 —— 端點一律用這支。"""
+    import asyncio
+    return await asyncio.to_thread(convert_to_odt, *args, **kwargs)
+
+
 def convert_to_pdf(src: Path, dst_pdf: Path, timeout: float = 60.0) -> None:
     """Run soffice headless to convert ``src`` into ``dst_pdf``.
 

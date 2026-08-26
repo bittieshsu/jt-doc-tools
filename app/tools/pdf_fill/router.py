@@ -115,10 +115,10 @@ async def preview(
             for i in range(total_pages)
         ]
     for i in range(total_pages):
-        pdf_preview.render_page_png(
+        await pdf_preview.render_page_png_async(
             filled, settings.temp_dir / f"{upload_id}_p{i+1}.png", i, dpi=preview_dpi
         )
-        pdf_preview.render_page_png(
+        await pdf_preview.render_page_png_async(
             src, settings.temp_dir / f"{upload_id}_raw_p{i+1}.png", i, dpi=preview_dpi
         )
     png = settings.temp_dir / f"{upload_id}_p1.png"
@@ -487,7 +487,7 @@ async def llm_review_apply(request: Request):
     pages_urls = []
     for i in range(total):
         f_png = settings.temp_dir / f"{upload_id}_p{i+1}.png"
-        pdf_preview.render_page_png(filled, f_png, i, dpi=120)
+        await pdf_preview.render_page_png_async(filled, f_png, i, dpi=120)
         pages_urls.append({
             "index": i,
             "preview_url": f"/tools/pdf-fill/preview/{upload_id}_p{i+1}.png",
@@ -601,9 +601,9 @@ async def regenerate(request: Request):
     for i in range(total):
         f_png = settings.temp_dir / f"{upload_id}_p{i+1}.png"
         r_png = settings.temp_dir / f"{upload_id}_raw_p{i+1}.png"
-        pdf_preview.render_page_png(filled, f_png, i, dpi=120)
+        await pdf_preview.render_page_png_async(filled, f_png, i, dpi=120)
         if not r_png.exists():
-            pdf_preview.render_page_png(src, r_png, i, dpi=120)
+            await pdf_preview.render_page_png_async(src, r_png, i, dpi=120)
         pages_urls.append({
             "index": i,
             "preview_url": f"/tools/pdf-fill/preview/{f_png.name}",
@@ -814,10 +814,10 @@ async def history_refill(hid: str, request: Request):
             for i in range(total_pages)
         ]
     for i in range(total_pages):
-        pdf_preview.render_page_png(
+        await pdf_preview.render_page_png_async(
             filled, settings.temp_dir / f"{upload_id}_p{i+1}.png", i, dpi=preview_dpi
         )
-        pdf_preview.render_page_png(
+        await pdf_preview.render_page_png_async(
             src, settings.temp_dir / f"{upload_id}_raw_p{i+1}.png", i, dpi=preview_dpi
         )
     png = settings.temp_dir / f"{upload_id}_p1.png"

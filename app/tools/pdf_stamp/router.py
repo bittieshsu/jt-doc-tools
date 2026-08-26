@@ -906,7 +906,7 @@ async def preview_all_pages(
     indices = pages if pages is not None else list(range(n))
     for i in range(n):
         png = settings.temp_dir / f"{upload_id}_p{i + 1}.png"
-        pdf_preview.render_page_png(stamped, png, i, dpi=120)
+        await pdf_preview.render_page_png_async(stamped, png, i, dpi=120)
         out_pages.append({
             "index": i,
             "stamped": i in indices,
@@ -1037,7 +1037,7 @@ async def preview_stamped(
             # 預覽用，任何 extras 錯誤都安靜跳過，不擋 primary 預覽
             pass
 
-    pdf_preview.render_page_png(stamped, png, preview_page, dpi=120)
+    await pdf_preview.render_page_png_async(stamped, png, preview_page, dpi=120)
 
     # Clean up intermediates
     for fp in (src, stamped, *extra_tmp_files):

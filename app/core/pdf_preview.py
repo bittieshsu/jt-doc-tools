@@ -31,6 +31,20 @@ def compute_preview_dpi(
     return max(36, int(max_pixel * 72.0 / max_dim_pt))
 
 
+async def render_page_png_async(*args, **kwargs) -> tuple[int, int]:
+    """`render_page_png` 的非同步版本 —— **端點一律用這支**。
+
+    算縮圖是純 CPU 的重活。直接在 async 端點裡呼叫同步版會把事件迴圈卡住，
+    那段時間**全站對所有人都不回應**（2026-08-26 正式機實測：文件去識別化
+    一份檔卡住 116 秒，而作業佇列是空的）。
+
+    非端點的呼叫者（背景作業、CLI、已經在執行緒裡的程式）繼續用同步版就好，
+    再包一層 `to_thread` 只是多一次跳轉。
+    """
+    import asyncio
+    return await asyncio.to_thread(render_page_png, *args, **kwargs)
+
+
 def render_page_png(
     pdf_path: Path,
     out_png: Path,

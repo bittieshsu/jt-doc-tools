@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import asyncio as _asyncio
 import uuid
 from pathlib import Path
 
@@ -76,7 +77,7 @@ async def load(request: Request, file: UploadFile = File(...)):
         raw = settings.temp_dir / f"{_PREFIX}raw_{uid}{Path(name).suffix}"
         raw.write_bytes(data)
         try:
-            office_convert.convert_to_pdf(raw, dst)
+            await office_convert.convert_to_pdf_async(raw, dst)
         except Exception:  # noqa: BLE001
             raise HTTPException(400, "文書檔轉換失敗，請確認檔案是否完整")
         finally:
@@ -106,7 +107,7 @@ async def thumb(upload_id: str, page_no: int, request: Request):
     out = settings.temp_dir / f"{_PREFIX}_{upload_id}_t_{page_no}.png"
     if not out.exists():
         try:
-            pdf_preview.render_page_png(src, out, page_no - 1, dpi=70)
+            await pdf_preview.render_page_png_async(src, out, page_no - 1, dpi=70)
         except ValueError as e:
             raise HTTPException(400, str(e))
     return FileResponse(str(out), media_type="image/png",
@@ -120,27 +121,33 @@ async def preview(request: Request, upload_id: str = Form(...),
                   orientation: str = Form("auto"), fit: str = Form("scale"),
                   align: str = Form("center"), keep_same: bool = Form(True)):
     """**真的處理那一頁再算圖**（與送出走同一段程式）。"""
-    require_uuid_hex(upload_id, "upload_id")
-    _uo.require(upload_id, request)
-    src = _src(upload_id)
-    if not src.exists():
-        raise HTTPException(404, "檔案不存在（可能已過期）")
-    spec = _spec(paper=paper, custom_w_mm=custom_w_mm, custom_h_mm=custom_h_mm,
-                 orientation=orientation, fit=fit, align=align,
-                 keep_same=keep_same)
-    with fitz.open(str(src)) as doc:
-        if page_no < 1 or page_no > doc.page_count:
-            raise HTTPException(400, "頁碼超出範圍")
-        r = doc[page_no - 1].rect
-        w, h = RC.target_size(spec, r)
-        one = fitz.open()
-        np = one.new_page(width=w, height=h)
-        np.draw_rect(fitz.Rect(0, 0, w, h), color=(0.85, 0.85, 0.85), width=0.6)
-        np.show_pdf_page(RC.content_rect(r, w, h, spec), doc, page_no - 1)
-        pix = np.get_pixmap(dpi=80, alpha=False)
-        one.close()
-        return Response(content=pix.tobytes("png"), media_type="image/png",
-                        headers={"Cache-Control": "no-store"})
+    def _work():
+        # 這裡算的是預覽圖（純 CPU）。直接跑在事件迴圈上會讓**全站**
+        # 在這段時間都不回應 —— 頁數多或 DPI 高時特別明顯。包成閉包
+        # 丟到執行緒之後，慢的只有按下去的那個人自己。
+        require_uuid_hex(upload_id, "upload_id")
+        _uo.require(upload_id, request)
+        src = _src(upload_id)
+        if not src.exists():
+            raise HTTPException(404, "檔案不存在（可能已過期）")
+        spec = _spec(paper=paper, custom_w_mm=custom_w_mm, custom_h_mm=custom_h_mm,
+                     orientation=orientation, fit=fit, align=align,
+                     keep_same=keep_same)
+        with fitz.open(str(src)) as doc:
+            if page_no < 1 or page_no > doc.page_count:
+                raise HTTPException(400, "頁碼超出範圍")
+            r = doc[page_no - 1].rect
+            w, h = RC.target_size(spec, r)
+            one = fitz.open()
+            np = one.new_page(width=w, height=h)
+            np.draw_rect(fitz.Rect(0, 0, w, h), color=(0.85, 0.85, 0.85), width=0.6)
+            np.show_pdf_page(RC.content_rect(r, w, h, spec), doc, page_no - 1)
+            pix = np.get_pixmap(dpi=80, alpha=False)
+            one.close()
+            return Response(content=pix.tobytes("png"), media_type="image/png",
+                            headers={"Cache-Control": "no-store"})
+
+    return await _asyncio.to_thread(_work)
 
 
 @router.post("/submit")
@@ -213,7 +220,7 @@ async def api(request: Request, file: UploadFile = File(...),
             raw = settings.temp_dir / f"{_PREFIX}raw_{uid}"
             raw.write_bytes(data)
             try:
-                office_convert.convert_to_pdf(raw, src)
+                await office_convert.convert_to_pdf_async(raw, src)
             finally:
                 raw.unlink(missing_ok=True)
         else:

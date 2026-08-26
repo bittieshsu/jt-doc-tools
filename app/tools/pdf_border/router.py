@@ -17,6 +17,7 @@
 """
 from __future__ import annotations
 
+import asyncio as _asyncio
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -145,7 +146,7 @@ async def thumb(upload_id: str, page: int, request: Request,
     suffix = "_large" if large else ""
     out = settings.temp_dir / f"{_PREFIX}_{upload_id}_t{suffix}_{page}.png"
     if not out.exists():
-        pdf_preview.render_page_png(src, out, page - 1,
+        await pdf_preview.render_page_png_async(src, out, page - 1,
                                     dpi=160 if large else 72)
     return FileResponse(str(out), media_type="image/png",
                         headers={"Cache-Control": "max-age=300"})
@@ -179,29 +180,35 @@ async def preview(
     刻意不是前端疊 CSS 邊框 —— 圓角、虛線間距、陰影這些在瀏覽器與 PDF 的算法
     不一樣，模擬出來的預覽跟實際輸出對不起來，而框線差一點使用者一眼看得出來。
     """
-    require_uuid_hex(upload_id, "upload_id")
-    _uo.require(upload_id, request)
-    src = _src_path(upload_id)
-    if not src.exists():
-        raise HTTPException(404, "檔案不存在（可能已過期）")
-    with fitz.open(str(src)) as doc:
-        if page < 1 or page > doc.page_count:
-            raise HTTPException(400, "頁碼超出範圍")
-        spec = _spec_from_form(
-            mode=mode, margin_mm=margin_mm, width_pt=width_pt, color=color,
-            style=style, radius_mm=radius_mm, opacity=opacity, double=double,
-            double_gap_mm=double_gap_mm, shadow=shadow,
-            shadow_color=shadow_color, shadow_blur_mm=shadow_blur_mm,
-            shadow_offset_mm=shadow_offset_mm, shadow_opacity=shadow_opacity,
-            pages=pages, skip_first=skip_first, page_count=doc.page_count)
-        drawn = BR.draw_border(doc[page - 1], spec, page_no=page,
-                               total=doc.page_count)
-        pix = doc[page - 1].get_pixmap(dpi=160 if large else 72, alpha=False)
-        png = pix.tobytes("png")
-    return Response(content=png, media_type="image/png",
-                    headers={"Cache-Control": "no-store",
-                             # 讓前端知道這頁有沒有被畫（排除的頁要標示出來）
-                             "X-Border-Drawn": "1" if drawn else "0"})
+    def _work():
+        # 這裡算的是預覽圖（純 CPU）。直接跑在事件迴圈上會讓**全站**
+        # 在這段時間都不回應 —— 頁數多或 DPI 高時特別明顯。包成閉包
+        # 丟到執行緒之後，慢的只有按下去的那個人自己。
+        require_uuid_hex(upload_id, "upload_id")
+        _uo.require(upload_id, request)
+        src = _src_path(upload_id)
+        if not src.exists():
+            raise HTTPException(404, "檔案不存在（可能已過期）")
+        with fitz.open(str(src)) as doc:
+            if page < 1 or page > doc.page_count:
+                raise HTTPException(400, "頁碼超出範圍")
+            spec = _spec_from_form(
+                mode=mode, margin_mm=margin_mm, width_pt=width_pt, color=color,
+                style=style, radius_mm=radius_mm, opacity=opacity, double=double,
+                double_gap_mm=double_gap_mm, shadow=shadow,
+                shadow_color=shadow_color, shadow_blur_mm=shadow_blur_mm,
+                shadow_offset_mm=shadow_offset_mm, shadow_opacity=shadow_opacity,
+                pages=pages, skip_first=skip_first, page_count=doc.page_count)
+            drawn = BR.draw_border(doc[page - 1], spec, page_no=page,
+                                   total=doc.page_count)
+            pix = doc[page - 1].get_pixmap(dpi=160 if large else 72, alpha=False)
+            png = pix.tobytes("png")
+        return Response(content=png, media_type="image/png",
+                        headers={"Cache-Control": "no-store",
+                                 # 讓前端知道這頁有沒有被畫（排除的頁要標示出來）
+                                 "X-Border-Drawn": "1" if drawn else "0"})
+
+    return await _asyncio.to_thread(_work)
 
 
 @router.post("/submit")

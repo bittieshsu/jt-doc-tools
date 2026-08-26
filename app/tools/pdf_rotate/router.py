@@ -79,7 +79,7 @@ async def thumb(upload_id: str, page: int, request: Request, large: bool = False
     suffix = "_large" if large else ""
     base = settings.temp_dir / f"rotL_{upload_id}_thumb{suffix}_{page}.png"
     if not base.exists():
-        pdf_preview.render_page_png(src, base, page - 1, dpi=160 if large else 64)
+        await pdf_preview.render_page_png_async(src, base, page - 1, dpi=160 if large else 64)
     mode = mode if mode in _VALID_MODES else ""
     if not mode:
         return FileResponse(str(base), media_type="image/png",
@@ -370,7 +370,7 @@ async def finalize_png(
             for i in range(doc.page_count):
                 png_path = settings.temp_dir / f"rotL_{upload_id}_pg_{i+1}.png"
                 # 150 DPI is a reasonable balance for "看得清楚 + 檔不太大"
-                pdf_preview.render_page_png(baked, png_path, i, dpi=150)
+                await pdf_preview.render_page_png_async(baked, png_path, i, dpi=150)
                 zf.write(png_path, arcname=f"page_{i+1:03d}.png")
                 try:
                     png_path.unlink()

@@ -1,6 +1,7 @@
 """Endpoints for PDF 註解平面化."""
 from __future__ import annotations
 
+import asyncio as _asyncio
 import re
 import uuid
 from collections import Counter
@@ -151,23 +152,29 @@ async def api_flatten(file: UploadFile = File(...)):
 @router.get("/baked-preview/{baked_uid}/{page}")
 async def baked_preview(baked_uid: str, page: int, request: Request):
     """Render a single page of the flattened PDF as a thumbnail PNG."""
-    _validate_uid(baked_uid)
-    from ...core import upload_owner
-    upload_owner.require(baked_uid, request)
-    if page < 1:
-        raise HTTPException(400, "invalid page")
-    out, _ = _baked_paths(baked_uid)
-    if not out.exists():
-        raise HTTPException(410, "結果已過期，請重新執行")
-    with fitz.open(str(out)) as doc:
-        if page > doc.page_count:
-            raise HTTPException(404, "page out of range")
-        mat = fitz.Matrix(1.4, 1.4)  # ~100 DPI thumbnail
-        pix = doc[page - 1].get_pixmap(matrix=mat, alpha=False)
-        png = pix.tobytes("png")
-    from fastapi.responses import Response
-    return Response(png, media_type="image/png",
-                    headers={"Cache-Control": "private, max-age=600"})
+    def _work():
+        # 這裡算的是預覽圖（純 CPU）。直接跑在事件迴圈上會讓**全站**
+        # 在這段時間都不回應 —— 頁數多或 DPI 高時特別明顯。包成閉包
+        # 丟到執行緒之後，慢的只有按下去的那個人自己。
+        _validate_uid(baked_uid)
+        from ...core import upload_owner
+        upload_owner.require(baked_uid, request)
+        if page < 1:
+            raise HTTPException(400, "invalid page")
+        out, _ = _baked_paths(baked_uid)
+        if not out.exists():
+            raise HTTPException(410, "結果已過期，請重新執行")
+        with fitz.open(str(out)) as doc:
+            if page > doc.page_count:
+                raise HTTPException(404, "page out of range")
+            mat = fitz.Matrix(1.4, 1.4)  # ~100 DPI thumbnail
+            pix = doc[page - 1].get_pixmap(matrix=mat, alpha=False)
+            png = pix.tobytes("png")
+        from fastapi.responses import Response
+        return Response(png, media_type="image/png",
+                        headers={"Cache-Control": "private, max-age=600"})
+
+    return await _asyncio.to_thread(_work)
 
 
 @router.get("/baked-download/{baked_uid}")

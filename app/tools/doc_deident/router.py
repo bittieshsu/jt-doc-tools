@@ -320,7 +320,7 @@ async def detect(
         tmp = settings.temp_dir / f"did_{upload_id}_orig{ext}"
         tmp.write_bytes(data)
         try:
-            office_convert.convert_to_pdf(tmp, pdf_path, timeout=120.0)
+            await office_convert.convert_to_pdf_async(tmp, pdf_path, timeout=120.0)
         except RuntimeError:
             raise HTTPException(
                 500,

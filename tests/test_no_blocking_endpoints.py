@@ -12,9 +12,12 @@ async 端點裡**。同一支工具的公開 API 早就包在 `to_thread` 裡了
 
 同一份日誌裡還有 `POST /tools/pdf-editor/save` 卡 6.2 秒，同一個形狀。
 
-這支測試**只釘住已經修好的端點**，不強求全站一次到位（其餘同形狀的端點列在
-下面的待辦清單裡，修一支就從清單移到守門清單）。這樣新的 regression 會被抓到，
-而既有的技術債不會讓整份測試永遠是紅的。
+v1.14.55 先釘住這兩支，v1.14.56 把其餘的全部處理完 —— **現在全站是 0**。
+
+盤點時要小心兩件事，否則數字會虛胖、虛胖的指標沒人會認真看：
+①**巢狀的同步函式不算**（那些是丟給背景作業或 `to_thread` 的閉包，跑在別的
+執行緒）；②共用的重活底層（算縮圖、soffice 轉檔）已經有 `_async` 版本，
+端點一律用那個，不必自己包。
 """
 from __future__ import annotations
 
@@ -29,9 +32,9 @@ GUARDED = [
     ("app/tools/pdf_editor/router.py", "save"),
 ]
 
-#: 還沒處理的同形狀端點（v1.14.55 盤點）。修好一支就搬到 GUARDED。
-#: 留著這份清單是為了**不要假裝問題已經解決** —— 沉默的技術債會被遺忘。
-KNOWN_REMAINING = 42
+#: v1.14.56 起是 **0**：全站的 async 端點都不會在事件迴圈上做重活了。
+#: 保留這個常數是為了讓「又多了一支」的錯誤訊息講得出數字。
+KNOWN_REMAINING = 0
 
 
 def _endpoint_body(path: str, func: str) -> ast.AST:
@@ -43,18 +46,37 @@ def _endpoint_body(path: str, func: str) -> ast.AST:
 
 
 def _offloads(node: ast.AST) -> bool:
-    return any(isinstance(n, ast.Attribute) and n.attr in ("to_thread", "run_in_executor")
-               for n in ast.walk(node))
+    return _dispatches_elsewhere(node)
+
+
+HEAVY = {"apply_redactions", "get_pixmap", "insert_pdf", "subset_fonts",
+         "convert_to_pdf", "convert_to_docx", "convert_to_odt", "render_page_png"}
+
+
+def _dispatches_elsewhere(node: ast.AST) -> bool:
+    """這支端點有沒有把重活**交給別的執行緒**跑。
+
+    兩種算數：`to_thread` / `run_in_executor`，或交給背景作業佇列
+    （`job_manager`）。
+
+    **不可以只看「重活是不是寫在巢狀函式裡」** —— 包成閉包正是修法本身，
+    只看巢不巢狀的話，有人把 `await to_thread(_work)` 改回 `_work()`，
+    重活仍然在巢狀函式裡，就抓不到了（2026-08-26 變異驗證時踩到這個盲點）。
+    """
+    for n in ast.walk(node):
+        if isinstance(n, ast.Attribute) and n.attr in ("to_thread", "run_in_executor"):
+            return True
+        if isinstance(n, ast.Name) and n.id == "job_manager":
+            return True
+        if isinstance(n, ast.Attribute) and n.attr == "job_manager":
+            return True
+    return False
 
 
 def _heavy_calls(node: ast.AST) -> set:
-    heavy = {"apply_redactions", "get_pixmap", "insert_pdf", "subset_fonts",
-             "convert_to_pdf", "convert_to_docx", "convert_to_odt", "render_page_png"}
-    found = set()
-    for n in ast.walk(node):
-        if isinstance(n, ast.Attribute) and n.attr in heavy:
-            found.add(n.attr)
-    return found
+    """這支端點會做哪些重活（含巢狀函式裡的）。"""
+    return {n.attr for n in ast.walk(node)
+            if isinstance(n, ast.Attribute) and n.attr in HEAVY}
 
 
 @pytest.mark.parametrize("path,func", GUARDED)
@@ -69,14 +91,12 @@ def test_guarded_endpoints_offload_heavy_work(path, func):
     )
 
 
-def test_the_remaining_debt_is_not_growing():
-    """其餘同形狀的端點只准變少，不准變多。
+def test_no_endpoint_blocks_the_event_loop():
+    """全站的 async 端點都不可以在事件迴圈上做重活。
 
-    不設成「必須是 0」是刻意的 —— 一次改 50 支端點的風險比 bug 本身高。
-    但也不能就這樣算了，所以用一個會隨著新增而變紅的計數守著。
+    v1.14.55 剛開始盤點時「42 支」，其中大半是誤判（巢狀的作業函式）；真正
+    有問題的是 12 支，加上共用底層改掉的 29 處，v1.14.56 全部處理完 → 0。
     """
-    heavy = {"apply_redactions", "get_pixmap", "insert_pdf", "subset_fonts",
-             "convert_to_pdf", "convert_to_docx", "convert_to_odt", "render_page_png"}
     guarded = {(p, f) for p, f in GUARDED}
     offenders = []
     for path in sorted(pathlib.Path("app").rglob("*.py")):
@@ -97,6 +117,8 @@ def test_the_remaining_debt_is_not_growing():
                 offenders.append(f"{path}:{node.name}")
 
     assert len(offenders) <= KNOWN_REMAINING, (
-        f"又多了直接在事件迴圈上做重活的端點（{len(offenders)} > {KNOWN_REMAINING}）：\n  "
-        + "\n  ".join(sorted(offenders)[-8:])
-        + "\n新端點請把重活包進 `asyncio.to_thread(...)`。")
+        f"這些端點會在事件迴圈上做重活（全站應該是 {KNOWN_REMAINING} 支）：\n  "
+        + "\n  ".join(sorted(offenders))
+        + "\n\n算縮圖用 `await pdf_preview.render_page_png_async(...)`，"
+          "soffice 轉檔用 `await office_convert.convert_to_pdf_async(...)`；"
+          "其他重活包成同步閉包再 `await asyncio.to_thread(_work)`。")

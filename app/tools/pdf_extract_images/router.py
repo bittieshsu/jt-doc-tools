@@ -58,7 +58,7 @@ async def page_thumb(upload_id: str, page: int, request: Request, large: bool = 
     suffix = "_large" if large else ""
     out = settings.temp_dir / f"exL_{upload_id}_thumb{suffix}_{page}.png"
     if not out.exists():
-        pdf_preview.render_page_png(src, out, page - 1, dpi=160 if large else 64)
+        await pdf_preview.render_page_png_async(src, out, page - 1, dpi=160 if large else 64)
     return FileResponse(str(out), media_type="image/png",
                         headers={"Cache-Control": "max-age=300"})
 

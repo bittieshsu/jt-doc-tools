@@ -574,6 +574,60 @@ SAML 由 `tests/test_sso_saml_e2e.py` 涵蓋（自架 IdP、真 xmlsec 簽章，
 ### 自動化覆蓋（理想）
 新加 endpoint 由兩支既有測試守：`tests/test_api_doc_coverage.py`（路由表 ↔ 文件雙向比對）與 `tests/test_broken_input_no_500.py`（**全部**工具 POST 端點 × 壞輸入不可 500，從路由表自動列舉，新工具自動被涵蓋）。發版前 `uv run pytest tests/test_api_doc_coverage.py tests/test_broken_input_no_500.py -q` 必綠。（原本這裡寫「tests/test_api_endpoints.py（待補）必綠」—— 一個不存在的檔案當發版門檻，指令必然失敗，2026-08-16 稽核改掉。）
 
+## 4.6 非工具 API（管理 / 作業 / 通知）🆕 v1.14.56
+
+§4 只涵蓋「每個工具至少一支 API」。**管理區、作業佇列、通知這些 API 之前
+一條驗收都沒有** —— 它們同樣是對外的攻擊面，而且改壞了整個管理功能會死掉
+（2026-08-26 稽核補上）。清單由 `tests/test_test_plan_coverage.py` **從路由表
+自動比對**，新增端點沒列進來就紅燈，不靠人記得。
+
+> 判準都一樣：①未登入一律拒絕 ②一般使用者碰管理端點一律拒絕
+> ③壞輸入回 4xx 不可 500 ④寫入端點不帶 CSRF token 要被擋。
+> 這四條由 `tests/test_authz_boundaries.py`、`tests/test_broken_input_no_500.py`、
+> `temp/sec-audit/pentest.py` 自動涵蓋；下面列的是**功能**驗收。
+
+### 管理區設定 API
+- [ ] `POST /admin/api/check-latest-version` — 回目前版本與最新版本；連不到網路時要回錯誤訊息，不可讓頁面一直轉
+- [ ] `GET|POST /admin/api/llm/settings` — 存檔後重新整理值要留著；數值欄位（逾時、並行數、句數上限）超範圍要被 clamp
+- [ ] `GET /admin/api/llm/models` — 列出遠端模型；伺服器連不上時回錯誤訊息不可拋例外
+- [ ] `POST /admin/api/llm/test-connection` — 成功 / 失敗都要有明確訊息（失敗訊息不可洩漏內部路徑或憑證）
+- [ ] `POST /admin/api/ocr-langs/set-engine` — 切換 easyocr / tesseract 後，OCR 工具實際用的引擎要跟著改
+- [ ] `POST /admin/api/ocr-langs/set-quality`、`POST /admin/api/ocr-langs/switch-active` — 設定有寫進去且重啟後仍在
+- [ ] `GET /admin/api/ocr-langs/external/status`、`POST /admin/api/ocr-langs/external/save`、
+      `POST /admin/api/ocr-langs/external/test` — 遠端 GPU OCR 設定；**test 要真的打對方**，不可只回 200
+- [ ] `GET /admin/api/settings-export/categories` — 類別清單要跟實際可匯出的項目一致
+- [ ] `POST /admin/api/tokens/create`、`POST /admin/api/tokens/revoke`、`POST /admin/api/tokens/enforce`
+      — 建立的 token 立即可用、撤銷後立即失效、enforce 開關會改變未帶 token 的行為
+
+### 作業佇列 API
+- [ ] `GET /api/jobs/{job_id}` — 進度 / 狀態；**別人的作業要拿不到**
+- [ ] `POST /api/jobs/{job_id}/cancel` — 取消後狀態要變、正在跑的要真的停
+- [ ] `GET /api/jobs/{job_id}/download`、`GET /api/jobs/{job_id}/download/{_filename}`、
+      `GET /api/jobs/{job_id}/download-png` — 歸屬驗證；作業過期回 410 不可 500
+- [ ] `POST /admin/jobs/api/cancel/{job_id}` — 管理員可取消任何人的作業
+- [ ] `POST /admin/jobs/api/pause` — 暫停後新作業排隊不派送，恢復後會繼續
+- [ ] `GET|POST /admin/jobs/api/priority-users` — **順序就是優先序**，讀回來不可以被重新排序（v1.14.7 踩過：讀取時 `sorted()` 把拖好的順序洗掉）
+- [ ] `GET /admin/jobs/api/user-search` — 模糊比對；非管理員不可用
+
+### 通知 / 其他
+- [ ] `GET /api/my/inbox` — 只回自己的通知
+- [ ] `POST /api/my/inbox/seen` — 標記已讀；別人的通知 id 標不動
+- [ ] `POST /api/llm-review` — LLM 逐欄校驗；LLM 關閉時要回明確訊息不可 500
+- [ ] `PUT|DELETE /tools/submission-check/api/self-entities/{entity_id}` — 只能改 / 刪自己的；別人的 id 要被拒
+
+### 管理頁（每一頁至少開得起來且功能可用）
+
+清單同樣由 `tests/test_test_plan_coverage.py` 從路由表比對，新增管理頁沒列進來會紅燈。
+
+- [ ] `/admin/api-tokens` — 建立 / 撤銷 token，開關 enforce
+- [ ] `/admin/log-forward` — 新增目的地、三種格式（syslog / cef / gelf）、送測試訊息
+- [ ] `/admin/synonyms` — 同義詞新增 / 刪除，會影響表單填寫的欄位對應
+- [ ] `/admin/templates` — 範本列表與刪除
+- [ ] `/admin/vat-db`、`/admin/vat-db/info`、`/admin/vat-db/schedule` — 統編資料庫下載 / 上傳匯入（背景執行，頁面不可卡住）、排程設定、狀態顯示
+- [ ] `/admin/directory/tree`、`/admin/directory/user-roles`、`/admin/directory/group-roles` — 目錄瀏覽的樹狀展開與角色指派（含 OU / 群組 / 個人三種對象）
+- [ ] `/admin/system-status/databases` — 各資料庫大小與最舊一筆時間
+- [ ] `/admin/audit/export.csv` — 稽核記錄匯出；**公式注入防護**（`=` 開頭的欄位要被前綴處理，見 TEST_PLAN_SECURITY）
+
 ## 4.5 壓力測試 🆕（v1.7.50+）
 
 詳細跑法 / 驗收門檻 / 歷史紀錄見獨立文件 **[STRESS_TEST.md](STRESS_TEST.md)**（涵蓋 1 / 5 / 10 / 30 / 50 並行使用者場景，輕重型工具混合）。
@@ -721,6 +775,34 @@ SAML 由 `tests/test_sso_saml_e2e.py` 涵蓋（自架 IdP、真 xmlsec 簽章，
 - [ ] 自訂字詞（`/find`）：找得到位置、有建議的替換值、**別人的 upload_id 拿不到東西**
 - [ ] 公開 API 同步支援（`mode=replace` / `replacements` / `valid_checksum`）
 - [ ] 真實瀏覽器：`temp/deident-replace/cdp_replace_test.py` 8/8
+
+### 6.37 v1.14.56 — 端點一律不可以鎖住事件迴圈（每次發版必過）
+
+- [ ] `tests/test_no_blocking_endpoints.py` 全綠，且 `KNOWN_REMAINING` **是 0**
+- [ ] 新端點要算縮圖 → `await pdf_preview.render_page_png_async(...)`
+- [ ] 新端點要轉檔 → `await office_convert.convert_to_pdf_async(...)`（docx / odt 同）
+- [ ] 其他重活 → 包成同步閉包再 `await asyncio.to_thread(_work)`
+- [ ] **判定的兩個陷阱**（都踩過）：
+      ①「巢狀函式裡的重活不算」是錯的 —— 包成閉包正是修法本身，只看巢不巢狀的話，
+      有人把 `await to_thread(_work)` 改回 `_work()` 反而抓不到。要看**有沒有真的
+      派到別的執行緒**（`to_thread` / 背景作業）。
+      ②交給 `job_manager` 的閉包**不算阻塞**，把它們算進來會讓數字虛胖，
+      虛胖的指標沒人會認真看。
+- [ ] 管理區的端點定義在 `build_router()` **裡面**，縮排比模組層級多一層 ——
+      自動化改寫時縮排要從 AST 的 `col_offset` 取，寫死會產生
+      `await outside async function`
+
+### 6.38 v1.14.56 — 測試計畫本身要有守門（每次發版必過）
+
+發版門檻是照這份計畫跑的，**計畫漏了什麼那塊就等於沒驗過**，而且報告看起來
+仍然全綠。
+
+- [ ] `tests/test_test_plan_coverage.py` 全綠
+- [ ] 新工具 / 新 API / 新管理頁沒寫進計畫要紅燈（從路由表與註冊表實算，
+      不寫死期望值 —— 寫死的數字自己就是下一個會漂的東西）
+- [ ] 計畫裡**指令引用的檔案**必須存在（照抄會 file not found 的那種，
+      2026-08-16 稽核踩過：一個不存在的測試檔被當成發版門檻）
+- [ ] 掃描只掃**指令行**不掃說明文字 —— 說明裡會引用「當初寫錯的檔名」當反例
 
 ### 6.2 圖片轉 PDF (image-to-pdf, v1.3.0+)
 

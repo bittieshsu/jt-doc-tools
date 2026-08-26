@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio as _asyncio
 import time
 import uuid
 import zipfile
@@ -55,7 +56,7 @@ async def thumb(upload_id: str, page: int, request: Request, large: bool = False
     suffix = "_large" if large else ""
     out = settings.temp_dir / f"pnL_{upload_id}_thumb{suffix}_{page}.png"
     if not out.exists():
-        pdf_preview.render_page_png(src, out, page - 1, dpi=160 if large else 64)
+        await pdf_preview.render_page_png_async(src, out, page - 1, dpi=160 if large else 64)
     return FileResponse(str(out), media_type="image/png",
                         headers={"Cache-Control": "max-age=300"})
 
@@ -190,28 +191,34 @@ async def preview_thumb(
 ):
     """Apply the page-number to ONE page in-memory and return a PNG thumb so
     the user sees the *real* rendered output rather than a UI overlay."""
-    from app.core.safe_paths import require_uuid_hex
-    from ...core import upload_owner as _uo
-    require_uuid_hex(upload_id, "upload_id")
-    _uo.require(upload_id, request)
-    src = settings.temp_dir / f"pnL_{upload_id}.pdf"
-    if not src.exists():
-        raise HTTPException(404, "upload not found (expired?)")
-    with fitz.open(str(src)) as doc:
-        if page < 1 or page > doc.page_count:
-            raise HTTPException(400, "page out of range")
-        tp: int | None = to_page if to_page and to_page > 0 else None
-        _draw_pageno(
-            doc[page - 1], page_index=page - 1, total=doc.page_count,
-            position=position, fmt=fmt, start=start,
-            font_size=font_size, margin_mm=margin_mm, color_hex=color,
-            from_page=max(1, from_page), to_page=tp,
-        )
-        pix = doc[page - 1].get_pixmap(dpi=160 if large else 64, alpha=False)
-        png = pix.tobytes("png")
-    from fastapi.responses import Response as _Resp
-    return _Resp(content=png, media_type="image/png",
-                 headers={"Cache-Control": "no-store"})
+    def _work():
+        # 這裡算的是預覽圖（純 CPU）。直接跑在事件迴圈上會讓**全站**
+        # 在這段時間都不回應 —— 頁數多或 DPI 高時特別明顯。包成閉包
+        # 丟到執行緒之後，慢的只有按下去的那個人自己。
+        from app.core.safe_paths import require_uuid_hex
+        from ...core import upload_owner as _uo
+        require_uuid_hex(upload_id, "upload_id")
+        _uo.require(upload_id, request)
+        src = settings.temp_dir / f"pnL_{upload_id}.pdf"
+        if not src.exists():
+            raise HTTPException(404, "upload not found (expired?)")
+        with fitz.open(str(src)) as doc:
+            if page < 1 or page > doc.page_count:
+                raise HTTPException(400, "page out of range")
+            tp: int | None = to_page if to_page and to_page > 0 else None
+            _draw_pageno(
+                doc[page - 1], page_index=page - 1, total=doc.page_count,
+                position=position, fmt=fmt, start=start,
+                font_size=font_size, margin_mm=margin_mm, color_hex=color,
+                from_page=max(1, from_page), to_page=tp,
+            )
+            pix = doc[page - 1].get_pixmap(dpi=160 if large else 64, alpha=False)
+            png = pix.tobytes("png")
+        from fastapi.responses import Response as _Resp
+        return _Resp(content=png, media_type="image/png",
+                     headers={"Cache-Control": "no-store"})
+
+    return await _asyncio.to_thread(_work)
 
 
 @router.post("/submit")
