@@ -1794,7 +1794,7 @@ async function pickExistingObject(fc, p) {
       // 只有 OCR 也失敗 (沒裝 tesseract / OCR 結果空) 才會 set
       // extracted_text_unreliable=true，此時提示使用者手動輸入。
       if (data.extracted_text_unreliable) {
-        setStatus('此 PDF 字型沒有 Unicode 對應表，且系統未裝 tesseract OCR — 無法自動擷取。請目視原文字後，用 W 白底遮罩蓋掉、再用 T 文字框輸入要替換的內容。');
+        setStatus('此 PDF 的文字對應表壞掉（擷取出來不是原文），OCR 也沒能辨識出內容。請目視原文字後，用 W 白底遮罩蓋掉、再用 T 文字框輸入要替換的內容。');
         setTool('select');
         return;
       }
@@ -1843,7 +1843,11 @@ async function pickExistingObject(fc, p) {
       fc.add(obj);
       addRedactMarker(fc, bb, obj);
       fc.setActiveObject(obj); fc.requestRenderAll();
-      if (data.ocr_used) {
+      if (data.recovered_from_font) {
+        // 這條是精確還原（從字型的字形對照表反查），不是 OCR 猜的 —— 訊息
+        // 要講清楚，否則使用者會以為需要逐字校對。
+        setStatus('此 PDF 的文字對應表不正確（直接擷取會變成一排符號），已從字型還原出原文。');
+      } else if (data.ocr_used) {
         setStatus('已用 OCR 自動辨識既有文字（此 PDF 字型缺 Unicode 對應表）。請檢查辨識結果是否正確。');
       } else {
         setStatus(`已擷取文字。原位置有虛線框表示儲存時會被真刪除。`);

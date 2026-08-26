@@ -169,7 +169,12 @@ def _ocr_bbox(page: "fitz.Page", bbox, lang: str = "chi_tra+eng") -> str:
         matrix = fitz.Matrix(dpi / 72, dpi / 72)
         pix = page.get_pixmap(matrix=matrix, clip=rect, alpha=False)
         png = pix.tobytes("png")
-        text, _used = _oe.recognize_text(png, langs=lang, preprocess=True)
+        # 使用者只是在畫面上點了一下文字，沒選過任何 OCR 引擎 —— 這種
+        # 內部退路絕不能因為本機 EasyOCR 在缺 AVX2 的 CPU 上 SIGILL 而
+        # 把整個服務打掛（連別人的作業一起陪葬）。
+        text, _used = _oe.recognize_text(
+            png, langs=lang, preprocess=True,
+            allow_local_easyocr=_oe.local_easyocr_safe())
         # Strip OCR-flavored line noise: stray standalone punctuation, NBSP,
         # zero-width chars, control chars.
         text = "".join(
@@ -251,6 +256,47 @@ _COMMON_TC = set(
     "虛擬化容器實體機器主機網域區網路由備份還原快照映像光碟硬碟"
     "記憶體處理器執行運作功能操作畫面文字段落章節範例例如說明文件"
 )
+
+
+#: 擷取失敗時常見的「佔位字元」—— 壞掉的 ToUnicode 常把所有字碼都映到同一個
+#: 符號。真正的點引導符（`……`）也長這樣，所以**不能只看字元**，見下。
+_PLACEHOLDER_CHARS = set("•·●○◦∙⋅*?？_□■▪▫◻◼ .．。﹒")
+
+
+def _placeholder_extraction(text: str, bbox, font_size: float) -> bool:
+    """擷取出來的是**佔位字元、但畫面上其實是真的字**嗎。
+
+    客戶回報（2026-08-26）：在 PDF 編輯器點「選既有物件」要改文件上原本的
+    中文，文字框裡卻整排變成 `••••••`。
+
+    根因：那份 PDF 的 ToUnicode 對照表壞掉，**把每個字碼都映到同一個圓點**。
+    畫面是用字形畫的所以完全正常，但抽出來的字串是圓點 —— 而既有的
+    `_looks_garbled` 只認「數學符號 / 方框 / 罕用漢字」那幾類，圓點
+    （U+2022）、間隔號、星號、問號都**不在名單裡**，於是被當成可靠的擷取結果
+    原樣送到畫面上。
+
+    **不可以只看「字元是不是圓點」** —— 表單裡真的有點引導符（`目錄………12`），
+    v1.6.10 起那些是刻意讓使用者選得到的。兩者的差別在**寬度**：
+
+    * 真的點引導符：每個點約 0.2–0.35 個字寬（字型的 period 前進寬度）
+    * 壞掉的 CJK 擷取：每個「點」其實是一個中文字，佔滿整個字寬
+
+    實測重現檔：4 個 `•` 佔 56pt、字級 14 → 每字 14.0pt（1.0 字寬），
+    而同樣字級的真點引導符每點約 3–4pt。門檻取 0.6 字寬，兩者差很遠。
+    """
+    s = (text or "").strip()
+    # 單一字元的訊號太弱（一個全形問號、一個句號都可能是真的內容），
+    # 而擷取整段壞掉時一定不只一個字。寧可漏判也不要誤判。
+    if len(s) < 2 or font_size <= 0:
+        return False
+    if any(ch not in _PLACEHOLDER_CHARS for ch in s):
+        return False          # 混有真正的字 → 不是整段擷取失敗
+    try:
+        width = float(bbox[2]) - float(bbox[0])
+    except Exception:
+        return False
+    per_char = width / max(1, len(s))
+    return per_char >= font_size * 0.6
 
 
 def _looks_garbled(text: str) -> bool:
@@ -486,18 +532,48 @@ async def detect_objects(request: Request):
                         # alone is sufficient (covers PUA glyphs, math
                         # operators, lone bopomofo, repeated cycles, etc.)
                         # so trust PyMuPDF when the text doesn't look broken.
-                        unreliable = bool(span_text) and _looks_garbled(span_text)
-                        # When extraction is unreliable, OCR the bbox region
-                        # to recover real text. Only fall back to "ask user
-                        # to retype" if OCR is unavailable or returns nothing.
+                        # 兩種擷取失敗：①字形被映成亂七八糟的符號
+                        # ②全部被映成同一個佔位字元（圓點 / 星號…）——
+                        # 後者從字元本身看不出來，要靠「每字寬度」判斷。
+                        unreliable = bool(span_text) and (
+                            _looks_garbled(span_text)
+                            or _placeholder_extraction(
+                                span_text, (bx0, by0, bx1, by1),
+                                float(span.get("size", 0) or 0)))
+                        # 擷取不可靠時，依序試兩條還原路徑：
+                        #
+                        # ①**從字形反查**（v1.14.54）—— PDF 記著每個字用了哪個
+                        #   字形編號，內嵌字型檔裡就有編號 ↔ Unicode 的對照表。
+                        #   反查回去是**精確**的，而且是毫秒級。壞掉的只是
+                        #   ToUnicode 那張表，字形資訊一點都沒少。
+                        # ②OCR —— 只給①也沒轍的情況（字型沒內嵌 / 沒有 cmap /
+                        #   真的是掃描件）。會認錯字、要幾秒鐘，所以排在後面。
+                        #
+                        # 兩條都不行才請使用者自己看著原文重打。
+                        from ...core import glyph_text as _glyph_text
+                        import logging as _lg
+                        glyph_text = ""
                         ocr_text = ""
                         ocr_used = False
+                        recovered_from_font = False
                         if unreliable:
-                            ocr_lang = _ocr_lang_for_font(span_font)
-                            ocr_text = _ocr_bbox(page, [bx0, by0, bx1, by1], lang=ocr_lang)
-                            if ocr_text:
-                                ocr_used = True
-                        if ocr_used:
+                            try:
+                                glyph_text = _glyph_text.recover_text_in_bbox(
+                                    page, [bx0, by0, bx1, by1], doc=doc)
+                            except Exception:
+                                _lg.getLogger(__name__).exception("字形反查失敗")
+                                glyph_text = ""
+                            if glyph_text:
+                                recovered_from_font = True
+                            else:
+                                ocr_lang = _ocr_lang_for_font(span_font)
+                                ocr_text = _ocr_bbox(page, [bx0, by0, bx1, by1],
+                                                     lang=ocr_lang)
+                                if ocr_text:
+                                    ocr_used = True
+                        if recovered_from_font:
+                            final_text = glyph_text
+                        elif ocr_used:
                             final_text = ocr_text
                         elif unreliable:
                             final_text = ""
@@ -515,8 +591,16 @@ async def detect_objects(request: Request):
                             "font_size": float(span.get("size", 11)),
                             "color": f"#{r:02x}{g:02x}{b:02x}",
                             "font": span_font,
-                            "extracted_text_unreliable": unreliable and not ocr_used,
+                            # 這個旗標的意思是「**還原不出來**，請使用者自己
+                            # 看著原文重打」，不是「原始擷取不可靠」。字形
+                            # 反查成功時也要清掉 —— 前端是先看這個旗標就
+                            # 直接放棄，忘了清會變成「明明已經還原出文字，
+                            # 使用者卻還是拿不到」（真實瀏覽器測試抓到的）。
+                            "extracted_text_unreliable": (
+                                unreliable and not ocr_used
+                                and not recovered_from_font),
                             "ocr_used": ocr_used,
+                            "recovered_from_font": recovered_from_font,
                             "is_filler": is_filler,
                         }
 

@@ -113,6 +113,27 @@ def is_tesseract_available() -> bool:
 
 # ---- EasyOCR backend ----
 
+def local_easyocr_safe() -> bool:
+    """這台機器跑**本機** EasyOCR 會不會直接把行程打掛。
+
+    EasyOCR 底層的 PyTorch 需要 AVX2；缺 AVX2 的 CPU（PVE 的 `x86-64-v2`
+    等）在辨識階段會執行非法指令 → SIGILL → **整個服務 core dump**，
+    連別人正在跑的作業一起陪葬（v1.12.10 客戶回報）。
+
+    這支只回報安不安全，**不自動改引擎** —— 使用者在 v1.12.12 明確要求
+    OCR 引擎維持手動切換、程式只做診斷與指引。要用的是那些「使用者根本
+    沒選過引擎」的內部自動退路（例如 PDF 編輯器點到壞 ToUnicode 的文字），
+    見 `recognize_image(allow_local_easyocr=...)`。
+
+    遠端 GPU EasyOCR 不受影響（算在對方機器上）。
+    """
+    try:
+        from .sys_deps import probe_cpu_simd
+        return bool(probe_cpu_simd().get("ok", True))
+    except Exception:
+        return True          # 判不出來一律放行，不誤擋
+
+
 def _get_easyocr_reader(easyocr_langs: tuple) -> Optional[object]:
     """Lazy-create or return cached EasyOCR Reader for given lang tuple.
     First call per lang combo loads model from disk (or downloads ~150MB
@@ -214,11 +235,13 @@ def _tesseract_recognize(png_bytes: bytes, langs: str, preprocess: bool = True) 
 
 def recognize_text(png_bytes: bytes, langs: str,
                     engine: Optional[str] = None,
-                    preprocess: bool = True) -> tuple[str, str]:
+                    preprocess: bool = True,
+                    allow_local_easyocr: bool = True) -> tuple[str, str]:
     """簡化介面 — 對 caller 只關心「該圖的文字內容」（不要 bbox / conf）的場景。
     內部呼叫 recognize_image，把 words join 成單字串。
     回 (text, engine_used)。"""
-    words, used = recognize_image(png_bytes, langs, engine=engine, preprocess=preprocess)
+    words, used = recognize_image(png_bytes, langs, engine=engine, preprocess=preprocess,
+                                  allow_local_easyocr=allow_local_easyocr)
     if not words:
         return "", used
     return " ".join(w.get("text", "").strip() for w in words if w.get("text", "").strip()), used
@@ -276,10 +299,15 @@ def _remote_easyocr_recognize(png_bytes: bytes, langs: str,
 
 def recognize_image(png_bytes: bytes, langs: str,
                      engine: Optional[str] = None,
-                     preprocess: bool = True) -> tuple[list[dict], str]:
+                     preprocess: bool = True,
+                     allow_local_easyocr: bool = True) -> tuple[list[dict], str]:
     """主要入口 — 跑 OCR 拿 standardized words，自動 fallback。
 
     engine: 'easyocr' / 'tesseract' / None（用 admin 預設值）
+    allow_local_easyocr: 允不允許呼叫**本機** EasyOCR。預設 True（所有既有
+      呼叫者行為不變）。缺 AVX2 的 CPU 上本機 EasyOCR 會 SIGILL 打掛整個
+      服務，所以「使用者沒選過引擎」的內部自動退路要傳
+      `allow_local_easyocr=local_easyocr_safe()`。遠端 GPU 不受此限。
     preprocess: 是否做影像預處理（grayscale + autocontrast）— 兩 engine 都受惠
 
     遠端 GPU EasyOCR server: 若 admin 已設定 + enabled,優先使用,失敗自動退本機。
@@ -304,7 +332,7 @@ def recognize_image(png_bytes: bytes, langs: str,
             log.warning("remote OCR settings check failed: %s", e)
 
     if chosen == "easyocr":
-        if is_easyocr_available():
+        if is_easyocr_available() and allow_local_easyocr:
             words = _easyocr_recognize(png_bytes, langs)
             if words:
                 return words, "easyocr"
@@ -321,7 +349,7 @@ def recognize_image(png_bytes: bytes, langs: str,
         if words:
             return words, "tesseract"
         log.info("Tesseract returned 0 words, trying easyocr fallback")
-    if is_easyocr_available():
+    if is_easyocr_available() and allow_local_easyocr:
         words = _easyocr_recognize(png_bytes, langs)
         return words, "easyocr" if words else "none"
     return [], "none"
