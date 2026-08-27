@@ -15,7 +15,7 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">目前使用</h2>
+  <h2 data-s="s53896af7">{{ icon('check', size=18) }} 目前使用</h2>
   {% if active %}
     <p data-s="s7f8d1270">
       ✅ <strong>{{ active }}</strong>
@@ -27,7 +27,7 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">尋找順序</h2>
+  <h2 data-s="s53896af7">{{ icon('list', size=18) }} 尋找順序</h2>
   <p class="muted" data-s="scea31ec8">拖曳列首的「⠿」可調整順序。內建路徑無法刪除（仍可上下移動）；自訂路徑可新增、編輯、刪除。</p>
   <ul id="path-list" class="path-list">
     {% for p in paths %}

@@ -6,7 +6,7 @@
 <p class="muted">拖曳、調整尺寸、設定預設位置。儲存後會成為此資產在所有工具中使用的預設值。</p>
 
 <div class="panel">
-  <h2>基本資訊</h2>
+  <h2>{{ icon('info', size=18) }} 基本資訊</h2>
   <div class="form-row">
     <label>名稱</label>
     <input type="text" id="asset-name" class="field" value="{{ asset.name }}" />
@@ -44,13 +44,13 @@
 </details>
 
 <div class="panel" data-s="sb0043ef4" id="panel-position" {% if asset.type == 'watermark' %}hidden{% endif %}>
-  <h2>位置與預覽</h2>
+  <h2>{{ icon('align-center', size=18) }} 位置與預覽</h2>
   {% set editor_id='assetEditor' %}
   {% include "components/drag_position_editor.html" %}
 </div>
 
 <div class="panel" data-s="sb0043ef4" id="panel-watermark" {% if asset.type != 'watermark' %}hidden{% endif %}>
-  <h2>浮水印預覽</h2>
+  <h2>{{ icon('watermark', size=18) }} 浮水印預覽</h2>
   <p class="muted" data-s="s3044b600">這個資產會以「平鋪」方式蓋滿整頁。下方參數是預覽用的預設值，正式套用時可在「PDF 浮水印」工具裡再微調。</p>
   <div class="form-row">
     <label>透明度</label>

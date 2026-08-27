@@ -178,6 +178,12 @@
     <p class="muted sm-hint">只看單頁只會看到一條細片，判斷不出對不對 ——
       這裡把<b>整組的片拼回去</b>，看是不是一個完整的章（片與片之間的縫是刻意畫的，
       讓你看得出切在哪裡）。</p>
+    {# 頁數多的時候逐頁預覽要跑一陣子，使用者會以為「要等它全部好才能送出」。
+       講清楚不必等 —— 送出走的是同一段程式，結果一樣。 #}
+    <p class="muted sm-hint sm-hint-skip">{{ icon('info', size=13) }}
+      <b>不必等預覽跑完</b> —— 上面那張「拼回去長這樣」確認過就夠了，
+      可以直接拉到最下面按「蓋上騎縫章」取回檔案。下面的逐頁預覽只是給你
+      核對用的，送出走的是同一段程式，結果完全一樣。</p>
     <div class="sm-assembled"><img id="smAsmImg" alt="拼回去的印章" hidden></div>
     <div class="sm-pagepv">
       {# 一組的每一頁都要列出來 —— 只看一頁只有一條細片，看不出接縫連不連得起來 #}
@@ -198,6 +204,11 @@
 
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
+/* 「不必等預覽」的提示：跟前一句說明區隔開，但不要搶走標題的視覺重量 */
+.sm-hint-skip { display: flex; gap: 6px; align-items: flex-start;
+                margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+                background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; }
+.sm-hint-skip svg { flex: 0 0 auto; margin-top: 2px; }
   .auth-form { max-width: none; }
   .sm-stat { display: flex; gap: 14px; margin-top: 10px; font-size: 13px; }
   .sm-kv { color: var(--text-2); }

@@ -153,7 +153,9 @@ def app_side_limits() -> list[dict]:
     return [
         {"key": "app_global", "label": "應用程式全域上傳上限",
          "value_mb": None, "configurable": False,
-         "note": "目前**沒有**全域上限 —— 大小由反向代理與各工具自己的上限決定。"
+         # **不要在這裡寫 markdown** —— 這個字串是丟進 HTML 樣板顯示的，
+         # 星號會原樣印出來（2026-08-27 使用者截圖抓到）。要強調就靠措辭。
+         "note": "目前沒有全域上限 —— 大小由反向代理與各工具自己的上限決定。"
                  "直連本機埠時等於沒有限制。"},
         {"key": "ws_file", "label": "工作區單檔上限",
          "value_mb": max_file if max_file > 0 else None, "configurable": True,

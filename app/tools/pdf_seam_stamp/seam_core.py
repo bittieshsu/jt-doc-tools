@@ -202,9 +202,18 @@ def slice_rect(page: fitz.Page, spec: SeamSpec, idx: int, total: int,
     return fitz.Rect(x0, y0, x0 + slice_w, y1)
 
 
-def apply_seam(doc: fitz.Document, stamp_png: bytes, spec: SeamSpec
-               ) -> SeamPlan:
-    """把騎縫章蓋上去。回 `SeamPlan`（含用到的亂數種子與警告）。"""
+def apply_seam(doc: fitz.Document, stamp_png: bytes, spec: SeamSpec,
+               only_pages: "set[int] | None" = None) -> SeamPlan:
+    """把騎縫章蓋上去。回 `SeamPlan`（含用到的亂數種子與警告）。
+
+    `only_pages`（0 起算的頁碼集合）給**預覽**用：版位仍然照整份文件算
+    （切片編號取決於該頁在「組」裡的位置，只算一頁會算錯），但**只對需要
+    的那幾頁做影像合成**。
+
+    為什麼要有這個：預覽原本每看一頁就把章蓋滿整份 PDF 再取那一頁 ——
+    52 頁的文件、前端又同時發 20 個請求，於是每個請求要 90 秒
+    （2026-08-27 正式機實測，使用者回報「預覽一直沒出來」）。
+    """
     spec = spec.normalized(doc.page_count)
     p = plan(doc, spec)
 
@@ -213,6 +222,8 @@ def apply_seam(doc: fitz.Document, stamp_png: bytes, spec: SeamSpec
     cache: dict[float, tuple[list[Image.Image], float]] = {}
 
     for pl in p.placements:
+        if only_pages is not None and pl["page"] not in only_pages:
+            continue          # 預覽只要那一頁 —— 其餘頁不做影像合成
         angle = round(pl["angle"], 2)
         key = (angle, pl["slices"])
         if key not in cache:

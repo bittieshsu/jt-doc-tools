@@ -8,7 +8,7 @@
 按「眼睛」按鈕可隱藏不要在工具裡出現的字型；隱藏後檔案仍保留，隨時可取消隱藏。</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">上傳自訂字型</h2>
+  <h2 data-s="s53896af7">{{ icon('upload', size=18) }} 上傳自訂字型</h2>
   <p class="muted" data-s="sea8bbc82">支援 .ttf / .otf / .ttc，可一次選多個檔。上傳後會自動加入字型清單並顯示在 PDF 編輯器的字型下拉選單最上方（分類：<b>自訂</b>）。字型存放於 <code>{{ '{data}/fonts' }}</code>。</p>
   <form id="fontUploadForm" enctype="multipart/form-data">
     <label class="fnt-drop-zone" id="fontDropZone" for="fontFile">
@@ -28,7 +28,7 @@
 
 <div class="panel">
   <div data-s="s38dc95a2">
-    <h2 data-s="s1386d503">可用字型</h2>
+    <h2 data-s="s1386d503">{{ icon('text', size=18) }} 可用字型</h2>
     <button class="btn" type="button" id="btnRefresh">{{ icon('refresh', size=14) }} 重新掃描</button>
   </div>
   {% for g in groups %}
@@ -100,7 +100,7 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">說明</h2>
+  <h2 data-s="s53896af7">{{ icon('info', size=18) }} 說明</h2>
   <ul data-s="s7b2bef78">
     <li><b>台灣系統字型</b>：macOS / Windows / Linux 預裝的繁體中文字型，如 PingFang TC、微軟正黑體、標楷體。</li>
     <li><b>開源 CJK 字型</b>：Noto Sans/Serif TC、思源黑體、cwTeX、TW-Kai/Sung 等符合開放字型授權 (OFL) 的字型。建議裝 Noto TC 可以獲得最佳的繁中顯示效果。</li>

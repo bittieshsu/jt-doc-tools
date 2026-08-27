@@ -17,7 +17,7 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">設定</h2>
+  <h2 data-s="s53896af7">{{ icon('gear', size=18) }} 設定</h2>
   <div class="form-row">
     <label>啟用工作區</label>
     <label class="switch-label"><input type="checkbox" id="ws-enabled" {% if settings.enabled %}checked{% endif %}> 開啟此功能</label>
@@ -41,7 +41,7 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">目前佔用</h2>
+  <h2 data-s="s53896af7">{{ icon('gauge', size=18) }} 目前佔用</h2>
   <p class="muted" data-s="s3044b600">總計 {{ stats.total_count }} 個檔案，{{ '%.1f'|format(stats.total_bytes / 1048576) }} MB。</p>
   {% if stats.users %}
   <table class="ws-table">

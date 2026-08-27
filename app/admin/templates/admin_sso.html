@@ -12,7 +12,7 @@
 </div>
 
 <div class="panel auth-form">
-  <h2 data-s="s53896af7">共用設定</h2>
+  <h2 data-s="s53896af7">{{ icon('gear', size=18) }} 共用設定</h2>
   <div class="auth-field">
     <label class="af-label" for="base_url">對外網址 base URL（reverse proxy 的公開網址，OIDC redirect / SAML ACS 都以此為準）</label>
     <input class="field" id="base_url" type="url" placeholder="https://docs.example.com" value="{{ sso.base_url }}" data-s="s6d567387" />
@@ -84,7 +84,7 @@
 </details>
 
 <div class="panel auth-form">
-  <h2 data-s="s53896af7">OIDC（OpenID Connect）</h2>
+  <h2 data-s="s53896af7">{{ icon('shield', size=18) }} OIDC（OpenID Connect）</h2>
   <p class="muted" data-s="s6b9c179a">適用 Microsoft 365 / Entra ID、Google、Keycloak、Okta、Authentik 等。在 IdP 設定 Redirect URI 為 <code id="oidcRedirect">（先填 base URL）</code>。</p>
   <div class="auth-field af-checks">
     <label><input type="checkbox" id="o_enabled" {% if sso.oidc.enabled %}checked{% endif %}/> 啟用 OIDC 登入</label>
@@ -151,7 +151,7 @@
 </div>
 
 <div class="panel auth-form">
-  <h2 data-s="s53896af7">SAML 2.0</h2>
+  <h2 data-s="s53896af7">{{ icon('shield', size=18) }} SAML 2.0</h2>
   <p class="muted" data-s="s6b9c179a">SP metadata 網址：<code id="samlMeta">（先填 base URL）</code>；ACS（Assertion Consumer Service）：<code id="samlAcs">（先填 base URL）</code>。</p>
   <div class="auth-field af-checks">
     <label><input type="checkbox" id="s_enabled" {% if sso.saml.enabled %}checked{% endif %}/> 啟用 SAML 登入</label>

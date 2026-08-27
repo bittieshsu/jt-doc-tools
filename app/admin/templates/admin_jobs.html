@@ -6,7 +6,7 @@
 <p class="muted">所有使用者送出的背景作業（轉檔、OCR、合併等），以及同時可以處理幾個。</p>
 
 <div class="panel">
-  <h2>目前狀態</h2>
+  <h2>{{ icon('gauge', size=18) }} 目前狀態</h2>
   <div class="aj-stats" id="aj-stats"></div>
   <div class="aj-chart" id="aj-chart" hidden>
     <div class="aj-chart-head">
@@ -32,7 +32,7 @@
 </div>
 
 <div class="panel">
-  <h2>併行度設定</h2>
+  <h2>{{ icon('gear', size=18) }} 併行度設定</h2>
   <div class="aj-mem is-clickable" id="aj-mem" title="點一下看歷史趨勢">
     <div class="aj-mem-top">
       <span id="aj-mem-text">載入中…</span>
@@ -135,7 +135,7 @@
 </div>
 
 <div class="panel" id="aj-prio-panel">
-  <h2 class="aj-head">優先派送名單</h2>
+  <h2 class="aj-head">{{ icon('star', size=18) }} 優先派送名單</h2>
   <p class="aj-help muted aj-prio-note">
     名單內的使用者送出作業時會<b>插到佇列最前面</b>，下一個被派送的就是他們的。
     通常用在高階主管或有時效性的重要工作。

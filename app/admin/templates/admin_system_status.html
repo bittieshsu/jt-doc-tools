@@ -119,52 +119,13 @@
 
 <div class="ss-grid" id="ssHostGrid"></div>
 
-<div class="panel">
-  <h2>{{ icon('upload', size=18) }} 可上傳的檔案大小</h2>
-  <p class="muted ul-lead">
-    「我們可以拉多大的檔案進來？」這個問題的答案散在好幾個地方 ——
-    反向代理的設定在別台機器上，各工具的上限寫在程式裡，工作區的額度在管理設定。
-    這裡把它們集中列出來。<b>實際能上傳的大小取決於最小的那一層。</b>
-  </p>
-
-  <div class="ul-proxy">
-    <div class="ul-proxy-head">
-      <div>
-        <div class="ul-proxy-title">反向代理 / 這條路徑的實際上限</div>
-        <div class="muted ul-proxy-note">
-          HTTP <b>沒有</b>任何 header 會公告這個值。這裡用 <code>Expect: 100-continue</code>
-          問出來：只送標頭、<b>不傳任何資料</b>，看對方回「可以開始傳」還是「太大」，
-          再二分收斂。量到的是<b>整條路徑</b>（可能有多層代理）真正的瓶頸。
-        </div>
-      </div>
-      <button class="btn" type="button" id="btnProbeUpload">
-        {{ icon('refresh', size=14) }} 偵測
-      </button>
-    </div>
-    <div class="ul-proxy-result" id="ulProbeResult">
-      <span class="muted">尚未偵測（不會傳輸檔案，通常一兩秒完成）</span>
-    </div>
-  </div>
-
-  <table class="ul-table">
-    <thead><tr><th>項目</th><th>上限</th><th>能不能調</th><th>說明</th></tr></thead>
-    <tbody>
-      {% for r in upload_limits %}
-      <tr>
-        <td>{{ r.label }}</td>
-        <td class="ul-val">{% if r.value_mb %}{{ r.value_mb }} MB{% else %}<span class="ul-none">無上限</span>{% endif %}</td>
-        <td>{% if r.configurable %}<span class="ul-cfg">可在管理介面調</span>{% else %}<span class="muted">程式內建</span>{% endif %}</td>
-        <td class="muted ul-note">{{ r.note }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
 <div class="panel" data-s="sb0043ef4">
+  {# h2 必須是 panel 的**第一個子元素**，全站的收折機制才接得到它
+     （`static/js/toast.js`）。原本包在兩層 div 裡，所以只有這張卡片點了
+     沒反應 —— 使用者回報「也要有標題可以按下收折」。 #}
+  <h2 data-s="s1f06255c">{{ icon('chart-bar', size=18) }} 使用者檔案用量</h2>
   <div data-s="se0fca1a9">
     <div>
-      <h2 data-s="s1f06255c">使用者檔案用量</h2>
       <p class="muted" data-s="s51c48588">
         包含暫存上傳檔（owner ACL 紀錄追蹤）+ 表單填寫 / 用印 / 浮水印歷史目錄。
         匿名 / 未追蹤的檔案歸到「(匿名)」列。檔案多時統計約需數秒～數十秒，
@@ -189,7 +150,7 @@
 </div>
 
 <div class="panel">
-  <h2 class="ssdb-head">資料庫健康狀態
+  <h2 class="ssdb-head">{{ icon('archive', size=18) }} 資料庫健康狀態
     <span class="ssdb-actions">
       <button class="btn btn-small" id="ssDbDeep" type="button">{{ icon('search', size=15) }} 完整檢查</button>
       <button class="btn btn-small" id="ssDbBackup" type="button">{{ icon('archive', size=15) }} 立即備份</button>
@@ -672,4 +633,46 @@ refreshDbs(false);
 })();
 
 </script>
+<div class="panel">
+  <h2>{{ icon('upload', size=18) }} 可上傳的檔案大小</h2>
+  <p class="muted ul-lead">
+    「我們可以拉多大的檔案進來？」這個問題的答案散在好幾個地方 ——
+    反向代理的設定在別台機器上，各工具的上限寫在程式裡，工作區的額度在管理設定。
+    這裡把它們集中列出來。<b>實際能上傳的大小取決於最小的那一層。</b>
+  </p>
+
+  <div class="ul-proxy">
+    <div class="ul-proxy-head">
+      <div>
+        <div class="ul-proxy-title">反向代理 / 這條路徑的實際上限</div>
+        <div class="muted ul-proxy-note">
+          HTTP <b>沒有</b>任何 header 會公告這個值。這裡用 <code>Expect: 100-continue</code>
+          問出來：只送標頭、<b>不傳任何資料</b>，看對方回「可以開始傳」還是「太大」，
+          再二分收斂。量到的是<b>整條路徑</b>（可能有多層代理）真正的瓶頸。
+        </div>
+      </div>
+      <button class="btn" type="button" id="btnProbeUpload">
+        {{ icon('refresh', size=14) }} 偵測
+      </button>
+    </div>
+    <div class="ul-proxy-result" id="ulProbeResult">
+      <span class="muted">尚未偵測（不會傳輸檔案，通常一兩秒完成）</span>
+    </div>
+  </div>
+
+  <table class="ul-table">
+    <thead><tr><th>項目</th><th>上限</th><th>能不能調</th><th>說明</th></tr></thead>
+    <tbody>
+      {% for r in upload_limits %}
+      <tr>
+        <td>{{ r.label }}</td>
+        <td class="ul-val">{% if r.value_mb %}{{ r.value_mb }} MB{% else %}<span class="ul-none">無上限</span>{% endif %}</td>
+        <td>{% if r.configurable %}<span class="ul-cfg">可在管理介面調</span>{% else %}<span class="muted">程式內建</span>{% endif %}</td>
+        <td class="muted ul-note">{{ r.note }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 {% endblock %}

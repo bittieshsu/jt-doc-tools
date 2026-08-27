@@ -230,7 +230,10 @@ async def preview(request: Request, upload_id: str = Form(...),
         with fitz.open(str(src)) as doc:
             if page_no < 1 or page_no > doc.page_count:
                 raise HTTPException(400, "頁碼超出範圍")
-            SC.apply_seam(doc, png, spec)
+            # **只蓋要看的那一頁**。版位仍照整份文件算（切片編號取決於該頁
+            # 在組裡的位置），但影像合成只做這一頁 —— 原本每看一頁就蓋滿
+            # 整份，52 頁的文件配上前端同時發 20 個請求，每個要 90 秒。
+            SC.apply_seam(doc, png, spec, only_pages={page_no - 1})
             pix = doc[page_no - 1].get_pixmap(dpi=150 if large else 78, alpha=False)
             return Response(content=pix.tobytes("png"), media_type="image/png",
                             headers={"Cache-Control": "no-store"})

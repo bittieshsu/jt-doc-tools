@@ -6,7 +6,7 @@
 <p class="muted">轉檔、OCR 這類作業跑完時通知<b>送出的人</b>。這裡設定各管道的憑證；每位使用者再到「我的作業」自己選要收哪些、寄到哪裡。</p>
 
 <div class="panel">
-  <h2>總開關</h2>
+  <h2>{{ icon('bell', size=18) }} 總開關</h2>
   <div class="nt-row">
     <label class="nt-switch"><input type="checkbox" id="nt-enabled" {% if cfg.enabled %}checked{% endif %}> 啟用作業完成通知</label>
   </div>
@@ -34,7 +34,7 @@
 </div>
 
 <div class="panel">
-  <h2>通知管道</h2>
+  <h2>{{ icon('mail', size=18) }} 通知管道</h2>
   <p class="muted nt-note">{{ icon('info', size=14) }} <span><b>可個人 / 團隊</b>的管道（Zulip、Nextcloud Talk）：使用者在「我的作業」填了自己的收訊位址就會收到私訊，留空則送到這裡設定的團隊頻道。Slack / Teams / Discord 的 Webhook URL 天生綁定單一頻道，要私訊需改用 bot token（尚未支援）。</span></p>
   <p class="muted nt-note">{{ icon('shield', size=14) }} 憑證以加密方式存放，頁面上一律遮罩顯示；不動它就會沿用原值。訊息只含工具名、檔名、狀態與耗時，<b>不含檔案內容</b>。</p>
 
