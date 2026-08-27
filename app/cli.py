@@ -659,7 +659,7 @@ def svc_update() -> int:
     if venv_py.exists():
         print("Verifying critical deps (fastapi / fitz / ldap3 / PIL / pdfplumber / docx / odf / pyzipper / pdf2docx / rapidfuzz) ...")
         rc = subprocess.call([str(venv_py), "-c",
-            "import fastapi, fitz, ldap3, PIL, pillow_heif, pdfplumber, docx, odf, openpyxl, pyzipper, httpx, psutil, pyotp, qrcode, pdf2docx, rapidfuzz, fontTools, numpy, lxml, pymupdf4llm, markdown_it, jwt, onelogin.saml2.auth, xmlsec, truststore"])
+            "import fastapi, fitz, ldap3, PIL, pillow_heif, pdfplumber, docx, odf, openpyxl, pyzipper, httpx, psutil, pyotp, qrcode, pdf2docx, rapidfuzz, fontTools, numpy, lxml, pymupdf4llm, markdown_it, jwt, onelogin.saml2.auth, xmlsec, truststore, dns.resolver"])
         if rc != 0:
             print("Dep import failed — upgrade may be incomplete, restoring", file=sys.stderr)
             _restore_ownership(root, owner)

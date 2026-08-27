@@ -475,6 +475,104 @@ def set_hidden_ids(ids: list[str]) -> None:
                  encoding="utf-8")
 
 
+#: 字型檔內建名稱的快取：{(路徑, mtime): 名稱}。讀 name 表要開檔解析，
+#: 每次列清單都重讀在字型多的時候會有感。
+_internal_name_cache: dict[tuple, str] = {}
+
+
+def font_internal_name(path: str, mtime: float = 0.0) -> str:
+    """讀字型檔**自己**的名稱（name 表）。讀不出來回空字串。
+
+    上傳的檔名常常是 `NotoSansTC-Regular.ttf` 或一串亂碼，而字型檔裡本來就
+    帶著正式名稱 —— 直接拿來用，管理員不必自己打。
+
+    **優先序**：繁中（langID 0x0404）→ 中文其他 → 英文。本產品面向台灣，
+    同一套字型有中文名時顯示中文名比較好認。取 nameID 4（完整名稱），
+    沒有才退 nameID 1（家族名）。
+    """
+    key = (path, mtime)
+    hit = _internal_name_cache.get(key)
+    if hit is not None:
+        return hit
+    name = ""
+    try:
+        from fontTools.ttLib import TTFont
+        font = TTFont(path, fontNumber=0, lazy=True)
+        best: dict[int, str] = {}
+        for rec in font["name"].names:
+            if rec.nameID not in (1, 4):
+                continue
+            try:
+                value = rec.toUnicode().strip()
+            except Exception:
+                continue
+            if not value:
+                continue
+            lang = getattr(rec, "langID", 0)
+            # 分數越高越優先：繁中 > 其他中文 > 英文 / 其他
+            score = 3 if lang == 0x0404 else (2 if lang in (0x0804, 0x0C04, 0x1004) else 1)
+            # nameID 4（完整名稱）比 1（家族名）具體
+            score = score * 10 + (2 if rec.nameID == 4 else 1)
+            if score > best.get("score", 0):
+                best = {"score": score, "value": value}
+        name = best.get("value", "")
+    except Exception:
+        name = ""
+    if len(_internal_name_cache) > 64:
+        _internal_name_cache.clear()
+    _internal_name_cache[key] = name
+    return name
+
+
+def get_custom_names() -> dict:
+    """自訂上傳字型的**顯示名稱覆寫**：{檔名: 顯示名稱}。
+
+    沒有覆寫時顯示的是檔名 —— 而檔名常常是 `NotoSansTC-Regular` 或
+    `微軟正黑體` 這種，跟公司內部怎麼稱呼那套字型未必一樣。這個名稱會出現在
+    PDF 編輯器的字型下拉裡，是使用者每天看到的東西，要能自己命名。
+
+    跟「隱藏」共用同一個設定檔（`font_settings.json`）—— 都是「管理員對字型
+    清單的偏好」，分兩個檔沒有好處，還多一個會漂的地方。
+    """
+    import json as _json
+    p = _settings_path()
+    if not p.exists():
+        return {}
+    try:
+        d = _json.loads(p.read_text(encoding="utf-8")).get("custom_names", {})
+        return {str(k): str(v) for k, v in d.items()} if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+#: 顯示名稱的長度上限。太長會把下拉撐爆，也塞不進管理頁的表格。
+CUSTOM_NAME_MAX = 40
+
+
+def set_custom_name(filename: str, name: str) -> None:
+    """設定 / 清除某個自訂字型的顯示名稱。`name` 留空 = 回到用檔名。"""
+    import json as _json
+    p = _settings_path()
+    cur = {}
+    if p.exists():
+        try:
+            cur = _json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            cur = {}
+    names = cur.get("custom_names")
+    if not isinstance(names, dict):
+        names = {}
+    clean = " ".join(str(name or "").split())[:CUSTOM_NAME_MAX]
+    if clean:
+        names[filename] = clean
+    else:
+        names.pop(filename, None)
+    cur["custom_names"] = names
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(_json.dumps(cur, ensure_ascii=False, indent=2), encoding="utf-8")
+    refresh_cache()
+
+
 def list_fonts(include_hidden: bool = False) -> list[dict]:
     """Return the catalog. Scans + caches on first call.
 
@@ -558,18 +656,32 @@ def list_fonts(include_hidden: bool = False) -> list[dict]:
         # with category='custom' so organisation fonts show up even if they
         # don't match our Taiwan/FOSS patterns.
         try:
+            _custom_names = get_custom_names()
             cdir = custom_fonts_dir()
             for p in sorted(cdir.rglob("*")):
                 if not p.is_file():
                     continue
                 if p.suffix.lower() not in (".ttf", ".otf", ".ttc"):
                     continue
-                stem = p.stem
+                # 顯示名稱的優先序：管理員自訂 > 字型檔內建的名稱 > 檔名。
+                # 自訂留空就會自動退回內建名稱，不必記得檔名長什麼樣。
+                try:
+                    _mt = p.stat().st_mtime
+                except OSError:
+                    _mt = 0.0
+                stem = (_custom_names.get(p.name)
+                        or font_internal_name(str(p), _mt)
+                        or p.stem)
                 variant = _variant_from_name(p.name)
                 out.append({
                     "id": f"custom:{p.name}",
                     "family": stem,
                     "label": f"{stem}" + (f" {variant}" if variant else ""),
+                    # 給管理頁用：有沒有被改過名字、原本的檔名是什麼
+                    "filename": p.name,
+                    "custom_name": _custom_names.get(p.name, ""),
+                    # 管理頁要顯示「自動抓到的名稱」讓管理員知道留空會變什麼
+                    "auto_name": font_internal_name(str(p), _mt),
                     "variant": variant,
                     "category": "custom",
                     "cjk": None,

@@ -242,13 +242,15 @@ def send_email(cfg: dict[str, Any], subject: str, text: str | None,
     import smtplib
     from email.message import EmailMessage
 
-    host = cfg.get("smtp_host")
     to = cfg.get("email_to")
-    if not host:
-        raise RuntimeError("尚未設定 SMTP 主機")
     if not to:
         raise RuntimeError("沒有收件者信箱")
-    port = int(cfg.get("smtp_port") or 587)
+    # 舊安裝沒有 smtp_mode 這個欄位 → 空字串一律當 auth，行為不變。
+    send_mode = (cfg.get("smtp_mode") or "auth").lower()
+    host = cfg.get("smtp_host")
+    if send_mode != "direct" and not host:
+        raise RuntimeError("尚未設定 SMTP 主機")
+    port = int(cfg.get("smtp_port") or (25 if send_mode != "auth" else 587))
     mode = (cfg.get("smtp_tls") or "starttls").lower()
     sender = cfg.get("smtp_from") or cfg.get("smtp_username") or "jt-doc-tools"
 
@@ -270,10 +272,108 @@ def send_email(cfg: dict[str, Any], subject: str, text: str | None,
                 part.add_related(data, maintype="image", subtype="png",
                                  cid=f"<{cid}>")
 
+    if send_mode == "direct":
+        _smtp_direct_send(msg, to, cfg)
+        return
+
+    _smtp_deliver(msg, host, port, mode, cfg)
+
+
+def _mx_hosts(domain: str) -> list[str]:
+    """查一個網域的 MX 主機，依優先序排好。
+
+    沒有 MX 紀錄時回網域本身 —— 這是 RFC 5321 的「隱含 MX」規則
+    （很多小網域只有 A 紀錄）。查不到就丟例外讓上層報錯。
+    """
+    import dns.resolver
+
+    try:
+        answers = dns.resolver.resolve(domain, "MX", lifetime=_TIMEOUT)
+    except Exception:
+        # 沒有 MX（或查詢失敗）→ 退回網域本身，由連線階段決定成不成功
+        return [domain]
+    hosts = sorted(((int(r.preference), str(r.exchange).rstrip("."))
+                    for r in answers), key=lambda x: x[0])
+    return [h for _pref, h in hosts if h] or [domain]
+
+
+def _smtp_direct_send(msg, to: str, cfg: dict) -> None:
+    """jtdt 自己當 MTA，查 MX 直接送到收件方的伺服器。
+
+    用在「對方的 mail server 依 IP 信任我們」的環境。與 relay 模式的差別是
+    **不經過任何中繼主機** —— 收件人是哪個網域就直接連那個網域的 MX。
+
+    **這條路有幾件事程式做不到，部署時要自己顧好**：
+      * 反向 DNS（PTR）與 SPF 要設對，否則對方多半當垃圾信擋掉
+      * 對外的 25 埠要通（很多 ISP 直接封鎖）
+      * **沒有重試佇列**：對方暫時拒收（4xx）就是這封通知沒送到。
+        通知在本專案是附屬品（送失敗只記錄、絕不影響作業本身），為了它
+        另外做一套持久化佇列與退信處理不成比例 —— 需要保證送達請改用
+        relay 模式，交給真正的 mail server 去重試。
+
+    多個收件者分屬不同網域時，**逐一網域分開送** —— 一個網域失敗不影響其他。
+    """
+    import smtplib
+
+    helo = (cfg.get("smtp_helo") or "").strip() or None
+    port = int(cfg.get("smtp_port") or 25)
+
+    recipients = [a.strip() for a in str(to).replace(";", ",").split(",") if a.strip()]
+    by_domain: dict[str, list[str]] = {}
+    for addr in recipients:
+        if "@" not in addr:
+            raise RuntimeError(f"收件信箱格式不對：{addr}")
+        by_domain.setdefault(addr.rsplit("@", 1)[1].lower(), []).append(addr)
+
+    errors: list[str] = []
+    for domain, addrs in by_domain.items():
+        last_err: Exception | None = None
+        for host in _mx_hosts(domain):
+            try:
+                client = smtplib.SMTP(host, port, timeout=_TIMEOUT,
+                                      local_hostname=helo)
+                try:
+                    client.ehlo()
+                    # 對方支援就順手加密（機會性 TLS）—— 失敗不算錯，
+                    # 直接投遞的對象是誰事先不知道，不能硬性要求。
+                    try:
+                        if client.has_extn("starttls"):
+                            client.starttls()
+                            client.ehlo()
+                    except Exception:  # noqa: BLE001
+                        pass
+                    client.send_message(msg, to_addrs=addrs)
+                finally:
+                    try:
+                        client.quit()
+                    except Exception:  # noqa: BLE001
+                        pass
+                last_err = None
+                break
+            except Exception as exc:  # noqa: BLE001
+                last_err = exc
+                continue
+        if last_err is not None:
+            errors.append(f"{domain}: {type(last_err).__name__}")
+    if errors:
+        raise RuntimeError("直接投遞失敗（" + "；".join(errors) + "）")
+
+
+def _smtp_deliver(msg, host: str, port: int, mode: str, cfg: dict) -> None:
+    """連到一台 SMTP 主機把信送出去。
+
+    `relay` 與 `auth` 走的是同一條路 —— 差別只在**有沒有帳號**：
+    relay 是對方的 mail server 依來源 IP 信任我們，所以不需要認證。
+    程式本來就是「帳號留空就不呼叫 login()」，所以 relay 不必特別處理，
+    要做的是讓介面講清楚、預設埠給 25、以及可以指定 HELO 名稱。
+    """
+    import smtplib
+
+    helo = (cfg.get("smtp_helo") or "").strip() or None
     if mode == "ssl":
-        client = smtplib.SMTP_SSL(host, port, timeout=_TIMEOUT)
+        client = smtplib.SMTP_SSL(host, port, timeout=_TIMEOUT, local_hostname=helo)
     else:
-        client = smtplib.SMTP(host, port, timeout=_TIMEOUT)
+        client = smtplib.SMTP(host, port, timeout=_TIMEOUT, local_hostname=helo)
     try:
         client.ehlo()
         if mode == "starttls":

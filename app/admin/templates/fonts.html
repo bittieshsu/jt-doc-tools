@@ -82,6 +82,11 @@
               {% if f.hidden %}{{ icon('eye', size=12) }} 顯示{% else %}{{ icon('eye-off', size=12) }} 隱藏{% endif %}
             </button>
             {% if f.category == 'custom' %}
+              <button type="button" class="btn btn-small rename-custom-font" data-id="{{ f.id }}"
+                      data-current="{{ f.custom_name or '' }}"
+                      data-auto="{{ f.auto_name or '' }}"
+                      data-s="s002c9579"
+                      title="改這個字型在工具裡顯示的名稱（PDF 編輯器的字型下拉會用到）">{{ icon('edit', size=11) }} 改名稱</button>
               <button type="button" class="btn btn-danger btn-small del-custom-font" data-id="{{ f.id }}"
                       data-s="s002c9579">{{ icon('trash', size=11) }} 刪除</button>
             {% endif %}
@@ -273,6 +278,26 @@ document.querySelectorAll('.fnt-bulk-show').forEach(b =>
   b.addEventListener('click', () => _bulkSetHidden(b, false)));
 document.querySelectorAll('.fnt-bulk-hide').forEach(b =>
   b.addEventListener('click', () => _bulkSetHidden(b, true)));
+
+document.querySelectorAll('.rename-custom-font').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.id;
+    const auto = btn.dataset.auto || '';
+    const cur = btn.dataset.current || '';
+    const name = window.prompt(
+      '這個字型在工具裡要顯示什麼名稱？\n'
+      + '（PDF 編輯器、用印、浮水印的字型選單都會用這個名稱）\n\n'
+      + (auto ? '留空 = 用字型檔內建的名稱「' + auto + '」' : '留空 = 用檔名'),
+      cur);
+    if (name === null) return;          // 按取消
+    const r = await fetch('/admin/fonts/rename', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id, name: name }),
+    });
+    if (r.ok) location.reload();
+    else showAlert('改名稱失敗：' + await window.friendlyServerError(r, '改名稱失敗'));
+  });
+});
 
 document.querySelectorAll('.del-custom-font').forEach(btn => {
   btn.addEventListener('click', async () => {

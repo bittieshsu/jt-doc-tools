@@ -197,3 +197,118 @@ def test_bulk_requires_admin(auth_off):
     r = c.post("/admin/users/bulk/enabled",
                json={"user_ids": [1], "enabled": False})
     assert r.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------- 批次刪除
+
+def test_bulk_delete_removes_the_selected_accounts(admin_client):
+    """客戶情境：AD 端已停用的帳號累積兩百多個，一個一個刪不實際。"""
+    auth_db.init()
+    ids = [_mk_user(f"bulkdel{i}") for i in range(4)]
+    r = admin_client.post("/admin/users/bulk/delete", json={"user_ids": ids})
+    assert r.status_code == 200, r.text
+    assert r.json()["deleted"] == 4
+    for uid in ids:
+        assert user_manager.get_by_id(uid) is None
+
+
+def test_bulk_delete_refuses_to_remove_the_built_in_admin(admin_session):
+    """內建管理員是 break-glass 帳號 —— 批次刪除不可以動到它。
+
+    **一定要用「另一個管理員」來測**：`admin_session` 登入的就是 seed 本人，
+    拿他自己去刪自己會被「不可刪除自己」那條擋下來，seed 這條防線等於沒驗到
+    （2026-08-27 變異驗證時發現這個假通過）。
+    """
+    from fastapi.testclient import TestClient
+    import app.main as app_main
+
+    auth_db.init()
+    seed = next((u for u in user_manager.list_users("all")
+                 if u.get("is_admin_seed")), None)
+    if seed is None:
+        pytest.skip("這個資料庫沒有 seed 管理員")
+
+    other_pw = "OtherAdmin1234"
+    other_id = user_manager.create_local("bulkdel-admin2", "另一個管理員", other_pw)
+    permissions.set_subject_roles("user", str(other_id), ["admin"])
+    client2 = TestClient(app_main.app)
+    lr = client2.post("/login", data={"username": "bulkdel-admin2",
+                                      "password": other_pw},
+                      follow_redirects=False)
+    assert lr.status_code in (302, 303), f"第二個管理員登入失敗：{lr.status_code}"
+
+    victim = _mk_user("bulkdel_ok")
+    r = client2.post("/admin/users/bulk/delete",
+                     json={"user_ids": [seed["id"], victim]})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert user_manager.get_by_id(seed["id"]) is not None, "內建管理員被刪掉了"
+    assert any(s["id"] == seed["id"] for s in body["skipped"])
+    # 其他帳號還是要照刪 —— 一顆地雷不該讓整批停擺
+    assert user_manager.get_by_id(victim) is None
+
+
+def test_bulk_delete_refuses_to_remove_yourself(admin_client, admin_session):
+    _client, uname, _pw = admin_session
+    auth_db.init()
+    me = next((u for u in user_manager.list_users("all")
+               if u["username"] == uname), None)
+    assert me is not None, "找不到登入中的管理員"
+    r = admin_client.post("/admin/users/bulk/delete", json={"user_ids": [me["id"]]})
+    assert r.status_code == 200, r.text
+    assert user_manager.get_by_id(me["id"]) is not None, "把自己刪掉了"
+    reasons = " ".join(s["reason"] for s in r.json()["skipped"])
+    assert "自己" in reasons or "內建管理員" in reasons
+
+
+def test_bulk_delete_always_leaves_an_admin_behind(admin_client):
+    """全選刪除之後，**一定還有人進得了管理區**。
+
+    這是要守的不變量。實作上有兩層：內建管理員本來就刪不掉，加上刪之前
+    整批試算「刪完還剩幾個管理員」。用不變量來寫測試比釘住某一層好 ——
+    哪天改了實作方式，這條仍然是對的。
+    """
+    auth_db.init()
+    _mk_user("bulkdel_admin2", roles=["admin"])
+    ids = [u["id"] for u in user_manager.list_users("all")]
+    admin_client.post("/admin/users/bulk/delete", json={"user_ids": ids})
+    left = [u for u in user_manager.list_users("all")
+            if u["enabled"] and ("admin" in (u.get("roles") or [])
+                                 or u.get("is_admin_seed"))]
+    assert left, "全選刪除之後一個管理員都不剩 —— 只能用 CLI 救了"
+
+
+def test_bulk_delete_is_audited(admin_client):
+    auth_db.init()
+    ids = [_mk_user(f"bulkdel_audit{i}") for i in range(2)]
+    admin_client.post("/admin/users/bulk/delete", json={"user_ids": ids})
+    from app.core import audit_db
+    import time as _t
+    deadline = _t.time() + 5          # 稽核是背景寫入，給它一點時間
+    n = 0
+    while _t.time() < deadline:
+        n = audit_db.conn().execute(
+            "SELECT COUNT(*) c FROM audit_events "
+            "WHERE event_type='user_bulk_delete'").fetchone()["c"]
+        if n:
+            break
+        _t.sleep(0.2)
+    assert n >= 1, "批次刪除沒有寫稽核 —— 不可逆的操作一定要留紀錄"
+
+
+def test_bulk_delete_respects_the_size_limit(admin_client):
+    auth_db.init()
+    r = admin_client.post("/admin/users/bulk/delete",
+                          json={"user_ids": list(range(1, 5000))})
+    assert r.status_code == 400
+    assert "一次最多" in r.text
+
+
+def test_bulk_delete_is_not_reachable_without_admin(admin_session):
+    """沒有管理員身分不可以刪別人的帳號。"""
+    from fastapi.testclient import TestClient
+    import app.main as app_main
+    anon = TestClient(app_main.app)
+    r = anon.post("/admin/users/bulk/delete", json={"user_ids": [1]},
+                  follow_redirects=False)
+    assert r.status_code in (302, 303, 401, 403, 404), r.status_code

@@ -75,15 +75,14 @@ def test_third_party_notice_no_longer_claims_apache_for_us():
 def test_ui_offers_source_to_network_users():
     """AGPL 第 13 條：透過網路使用本程式的人要拿得到原始碼。
 
-    慣例作法就是介面上放一個看得見的原始碼連結（AGPL 全文最後一段自己就是
-    這樣建議的）。放在側欄 = 每一頁都有。
+    慣例作法是介面上放一個看得見的原始碼連結（AGPL 全文最後一段自己就是這樣
+    建議的）。
+
+    **位置在 v1.14.58 從側欄搬到「相依套件」那一頁**（使用者要求，那裡本來
+    就是講版本與授權的地方）。所以這條測試釘的是「介面上還提供得到」，
+    不是「一定要在側欄」—— 釘死位置的話，下次搬家會變成測試在擋人。
     """
-    tpl = (ROOT / "app" / "web" / "templates" / "base.html").read_text(encoding="utf-8")
-    assert "brand-src" in tpl, "介面上沒有原始碼連結"
-    assert "github.com/jasoncheng7115/jt-doc-tools" in tpl
-    css = (ROOT / "static" / "css" / "platform.css").read_text(encoding="utf-8")
-    assert ".sidebar .brand-src" in css, "原始碼連結沒有樣式（會是一坨沒排版的文字）"
-    # 登入頁**不繼承側欄樣板**，要各自放一份 —— 未登入的訪客同樣是第 13 條
-    # 講的「透過網路與軟體互動的使用者」（實機部署後才發現漏這一頁）。
-    login = (ROOT / "app" / "web" / "templates" / "login.html").read_text(encoding="utf-8")
-    assert "brand-src" in login, "登入頁沒有原始碼連結"
+    deps = (ROOT / "app" / "admin" / "templates" / "sys_deps.html").read_text(encoding="utf-8")
+    assert "github.com/jasoncheng7115/jt-doc-tools" in deps, \
+        "相依套件頁沒有原始碼連結 —— AGPL 第 13 條要求提供取得管道"
+    assert "AGPL" in deps, "沒有標示授權"

@@ -193,10 +193,14 @@ def _extract_text_from_file(filename: str, data: bytes) -> str:
             raise HTTPException(500, "PyMuPDF not available")
         try:
             from ...core.bad_cmap import is_bad_cmap_text, clean_pdf_text
+            from ...core import glyph_text as _glyph_text
             with fitz.open(stream=data, filetype="pdf") as doc:
                 paras: list[str] = []
                 for page in doc:
-                    text = page.get_text("text") or ""
+                    # v1.14.57：整頁擷取壞掉時先用字形反查還原 —— 不然使用者
+                    # 看到的是一整份圓點，會以為工具壞了。頁面正常時回 None。
+                    _fixed = _glyph_text.page_text_repaired(page, doc=doc)
+                    text = _fixed if _fixed is not None else (page.get_text("text") or "")
                     # v1.9.39：OCR 過的 PDF 兩層文字（原 garbage + OCR 乾淨）
                     # 常混在同一個 chunk 內（沒 blank-line 分隔）。先逐 LINE 過
                     # 濾掉 bad-CMap noise，再做 chunk-split paragraph 合併。

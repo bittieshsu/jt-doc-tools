@@ -1,6 +1,6 @@
 [project]
 name = "jt-doc-tools"
-version = "1.14.56"
+version = "1.14.58"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
@@ -84,6 +84,9 @@ dependencies = [
     # 它本來就被 pdf2docx 間接帶進來，但**傳遞相依不能依賴** —— 上游哪天換掉，
     # 這裡會無聲退回日文字形。
     "fonttools>=4.40,<5",
+    # dnspython — 通知信的「直接投遞」模式要查收件網域的 MX 紀錄；
+    # 標準函式庫沒有 MX 查詢。ISC 授權（寬鬆，與 AGPL 相容）。
+    "dnspython>=2.6,<3",
     # rapidfuzz — pdf-to-office 的 docx↔PDFTruth alignment 模糊比對引擎（比 difflib 快 10x+）。
     "rapidfuzz>=3.0,<4",
     # numpy — 直接 import：pdf-to-office table_borders_from_image fixer（頂層）+

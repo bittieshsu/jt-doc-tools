@@ -80,6 +80,7 @@ def _extract_structured(src: Path) -> dict:
                 # v1.9.38：bad-CMap PDF（OCR 過或無 ToUnicode）會回亂碼字
                 # 段落，混在正常文字裡疊兩次。用 core.bad_cmap helper 過濾。
                 from ...core.bad_cmap import is_bad_cmap_text, clean_pdf_text
+                from ...core import glyph_text as _glyph_text
 
                 joined_lines: list[str] = []
                 sizes: list[float] = []
@@ -88,6 +89,16 @@ def _extract_structured(src: Path) -> dict:
                     parts: list[str] = []
                     for span in line.get("spans", []):
                         t = span.get("text", "")
+                        # v1.14.57：文字對應表壞掉時**先從字形反查還原**。
+                        # 那類 PDF 畫面完全正常，抽出來卻是一排圓點或亂碼 ——
+                        # 資訊沒有遺失，只是那張表壞了，反查回去是精確的。
+                        # 反查不出來才照舊當噪音丟掉（塞一串圓點給使用者
+                        # 比缺一段更糟）。
+                        repaired = _glyph_text.repair_span_text(page, span, doc=doc)
+                        if repaired is not None:
+                            if repaired:
+                                parts.append(clean_pdf_text(repaired))
+                            continue
                         if t and is_bad_cmap_text(t):
                             continue  # 跳過 bad-CMap 噪音
                         if t:

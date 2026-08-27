@@ -53,6 +53,8 @@ pyzbar>=0.1.9,<0.2
 # pdf-to-office (v1.8.32+, Sprint 1) — pdf2docx 鎖 0.5.13（上游停止維護，已 fork 計畫），
 # fonttools 給 .ttc 子字型挑選（Noto CJK 第 0 套是日文，不挑會用到日文字形）
 fonttools>=4.40,<5
+# dnspython 給通知信的「直接投遞」模式查 MX（標準函式庫沒有 MX 查詢）
+dnspython>=2.6,<3
 # rapidfuzz 給 docx↔PDFTruth 模糊比對
 pdf2docx>=0.5.13,<0.6
 rapidfuzz>=3.0,<4

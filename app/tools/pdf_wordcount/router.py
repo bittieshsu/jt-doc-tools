@@ -204,8 +204,14 @@ def _analyze_pdf(data: bytes, filename: str = "document.pdf") -> dict:
             page_count = doc.page_count
             pages: list[dict] = []
             full_text_parts: list[str] = []
+            from ...core import glyph_text as _glyph_text
             for i in range(page_count):
-                ptext = doc[i].get_text("text") or ""
+                # v1.14.57：整頁的文字對應表壞掉時先用字形反查還原，否則畫面上
+                # 明明有字、字數卻算成 0。頁面正常時回 None，走原本的路徑。
+                # **這個檔案裡有兩處抽取**（這裡是主要分析，另一處在 API 的
+                # 純文字路徑）—— 只改一處會出現「API 對了、網頁還是錯的」。
+                _fixed = _glyph_text.page_text_repaired(doc[i], doc=doc)
+                ptext = _fixed if _fixed is not None else (doc[i].get_text("text") or "")
                 full_text_parts.append(ptext)
                 pc = _count_text(ptext)
                 pages.append({
@@ -396,9 +402,14 @@ async def _llm_summarize(data: bytes, filename: str = "document.pdf") -> dict:
         text_parts = []
         try:
             from ...core.bad_cmap import is_bad_cmap_text, clean_pdf_text
+            from ...core import glyph_text as _glyph_text
             with fitz.open(stream=data, filetype="pdf") as doc:
                 for page in doc:
-                    t = page.get_text("text") or ""
+                    # v1.14.57：整頁的文字對應表壞掉時先用字形反查還原，
+                    # 否則整份文件的字數會算成 0（畫面上明明有字）。
+                    # 頁面正常時回 None，走原本的路徑一個位元都不變。
+                    _fixed = _glyph_text.page_text_repaired(page, doc=doc)
+                    t = _fixed if _fixed is not None else (page.get_text("text") or "")
                     # v1.9.38：跳過 bad-CMap 段落避免字數重複計算
                     cleaned_lines = []
                     for ln in t.split("\n"):

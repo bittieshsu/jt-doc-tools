@@ -7,6 +7,7 @@ behaviour).
 """
 from __future__ import annotations
 
+import asyncio as _asyncio
 import logging
 import time
 
@@ -648,6 +649,69 @@ def build_auth_router(templates) -> APIRouter:
                      "ids": done[:200], "skipped": skipped[:50]})
         return {"ok": True, "changed": len(done), "skipped": skipped}
 
+    @router.post("/users/bulk/delete")
+    async def users_bulk_delete(request: Request):
+        """批次刪除帳號。
+
+        使用者情境：AD 端已停用的帳號累積了兩百多個，一個一個按「刪除」不實際。
+
+        **刪除是不可逆的**，所以比批次停用多兩道：
+          * 每一筆都走 `user_manager.delete()` —— 它自己就擋內建管理員、
+            內建稽核員、最後一位管理員，不另外複製一份判斷（複製一份就會漂）
+          * **先整批試算**再真的動手：算完之後如果一個管理員都不剩就整批中止，
+            而不是刪到一半才發現（那時已經救不回來了）
+
+        角色指派與群組成員關係會跟著帳號一起消失 —— 這正是要刪除的用意，
+        但呼叫端（前端）必須讓使用者知道自己在做什麼。
+        """
+        body = await request.json()
+        ids = _bulk_ids(body)
+        me = (getattr(request.state, "user", None) or {}).get("user_id")
+
+        done: list[int] = []
+        skipped: list[dict] = []
+        for uid in ids:
+            u = user_manager.get_by_id(uid)
+            if not u:
+                skipped.append({"id": uid, "reason": "帳號不存在"})
+                continue
+            if u.get("is_admin_seed"):
+                skipped.append({"id": uid, "reason": "內建管理員帳號不可刪除"})
+                continue
+            if u.get("is_audit_seed"):
+                skipped.append({"id": uid, "reason": "內建稽核員帳號不可刪除"})
+                continue
+            if me is not None and int(uid) == int(me):
+                skipped.append({"id": uid, "reason": "不可刪除自己"})
+                continue
+            done.append(uid)
+
+        # 整批試算：刪完之後還有沒有管理員。逐筆刪到一半才發現就來不及了。
+        if done and _remaining_admin_count(set(done)) == 0:
+            raise HTTPException(
+                400, "這樣會刪掉最後一個管理員 —— 請至少保留一個可登入的管理員")
+
+        def _delete_all() -> tuple[list[int], list[dict]]:
+            ok: list[int] = []
+            bad: list[dict] = []
+            for uid in done:
+                try:
+                    user_manager.delete(uid)
+                    ok.append(uid)
+                except ValueError as e:
+                    bad.append({"id": uid, "reason": str(e)})
+            return ok, bad
+
+        # **整個迴圈**丟執行緒。一筆一筆 await 的話，每一筆之間仍然回到
+        # 事件迴圈，但每一筆自己還是同步的 —— 刪 100 筆照樣卡 100 次。
+        deleted, more_skipped = await _asyncio.to_thread(_delete_all)
+        skipped.extend(more_skipped)
+        audit_db.log_event(
+            "user_bulk_delete", username=_actor(request), ip=_client_ip(request),
+            target=f"{len(deleted)} users",
+            details={"ids": deleted[:200], "skipped": skipped[:50]})
+        return {"ok": True, "deleted": len(deleted), "skipped": skipped}
+
     @router.post("/users/bulk/disable-view")
     async def users_bulk_disable_view(request: Request):
         """把某個檢視底下**全部**的帳號停用（不只當前這一頁）。
@@ -784,8 +848,10 @@ def build_auth_router(templates) -> APIRouter:
 
     @router.post("/users/{uid}/delete")
     async def users_delete(uid: int, request: Request):
+        # 刪一個帳號要動好幾張表、還要清工作區的檔案。跑在事件迴圈上的話，
+        # 那段時間**全站對所有人都不回應**（客戶回報「多刪幾個系統就像掛掉」）。
         try:
-            user_manager.delete(uid)
+            await _asyncio.to_thread(user_manager.delete, uid)
         except ValueError as e:
             raise HTTPException(400, str(e))
         audit_db.log_event(
@@ -2061,6 +2127,14 @@ def build_auth_router(templates) -> APIRouter:
                 # 送出者目前在優先派送名單裡的排名（0 起算），不在名單裡為 None
                 "owner_priority": prio_rank.get(r.get("owner_id")),
                 "created_at": r["created_at"], "updated_at": r["updated_at"],
+                # 送出 / 開始 / 結束三個時間點分開送 —— 作業會排隊，「送出」跟
+                # 「開始跑」中間可能隔很久，管理員要分得出「排了半小時」和
+                # 「跑了半小時」，那兩件事的處理方式完全不同。
+                # 舊資料沒有 started_at → None，畫面顯示「—」，不拿 created_at
+                # 硬湊（那會讓每一筆看起來都是「送出即開始」，等於騙人）。
+                "started_at": (lv.get("started_at")
+                               or r.get("started_at")),
+                "finished_at": r["finished_at"],
                 "elapsed": round(max(0.0, (r["finished_at"] or time.time())
                                      - r["created_at"]), 1),
                 "is_office": r["tool_id"] in _cs.OFFICE_TOOL_IDS,

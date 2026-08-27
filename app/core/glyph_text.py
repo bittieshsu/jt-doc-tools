@@ -83,6 +83,30 @@ def _gid_to_unicode(buf: bytes) -> dict:
     return table
 
 
+#: 每一頁的字形資料（反查表 + texttrace）。原本每個 span 都重解一次整頁，
+#: 一頁 55 個 span 就是 55 次 —— 擷取整份文件時會慢得離譜。
+#: 鍵用 (文件物件 id, 頁碼)：文件在一次請求內存活，請求結束就沒人再查了。
+_page_cache: dict[tuple, tuple] = {}
+_PAGE_CACHE_MAX = 8
+
+
+def _page_data(doc, page):
+    key = (id(doc), getattr(page, "number", -1))
+    hit = _page_cache.get(key)
+    if hit is not None:
+        return hit
+    tables = _page_font_tables(doc, page)
+    try:
+        trace = page.get_texttrace()
+    except Exception as e:
+        log.debug("get_texttrace 失敗：%s", e)
+        trace = []
+    if len(_page_cache) >= _PAGE_CACHE_MAX:
+        _page_cache.clear()
+    _page_cache[key] = (tables, trace)
+    return tables, trace
+
+
 def _page_font_tables(doc, page) -> list[dict]:
     """這一頁所有內嵌字型的反查表。"""
     out = []
@@ -114,14 +138,8 @@ def recover_text_in_bbox(page, bbox, doc=None) -> str:
         rect = fitz.Rect(*[float(v) for v in bbox])
     except Exception:
         return ""
-    tables = _page_font_tables(doc, page)
-    if not tables:
-        return ""
-
-    try:
-        trace = page.get_texttrace()
-    except Exception as e:
-        log.debug("get_texttrace 失敗：%s", e)
+    tables, trace = _page_data(doc, page)
+    if not tables or not trace:
         return ""
 
     picked = []
@@ -164,3 +182,177 @@ def recover_text_in_bbox(page, bbox, doc=None) -> str:
     if any(uni is None for _seq, _x, uni in picked):
         return ""
     return "".join(chr(uni) for _seq, _x, uni in picked)
+
+
+#: 擷取失敗時常見的「佔位字元」—— 壞掉的 ToUnicode 常把所有字碼都映到同一個
+#: 符號。真正的點引導符（`……`）也長這樣，所以**不能只看字元**，見下。
+_PLACEHOLDER_CHARS = set("•·●○◦∙⋅*?？_□■▪▫◻◼ .．。﹒")
+
+
+def looks_like_placeholder(text: str, bbox, font_size: float) -> bool:
+    """擷取出來的是**佔位字元、但畫面上其實是真的字**嗎。
+
+    客戶回報（2026-08-26）：在 PDF 編輯器點「選既有物件」要改文件上原本的
+    中文，文字框裡卻整排變成 `••••••`。
+
+    根因：那份 PDF 的 ToUnicode 對照表壞掉，**把每個字碼都映到同一個圓點**。
+    畫面是用字形畫的所以完全正常，但抽出來的字串是圓點 —— 而既有的
+    `_looks_garbled` 只認「數學符號 / 方框 / 罕用漢字」那幾類，圓點
+    （U+2022）、間隔號、星號、問號都**不在名單裡**，於是被當成可靠的擷取結果
+    原樣送到畫面上。
+
+    **不可以只看「字元是不是圓點」** —— 表單裡真的有點引導符（`目錄………12`），
+    v1.6.10 起那些是刻意讓使用者選得到的。兩者的差別在**寬度**：
+
+    * 真的點引導符：每個點約 0.2–0.35 個字寬（字型的 period 前進寬度）
+    * 壞掉的 CJK 擷取：每個「點」其實是一個中文字，佔滿整個字寬
+
+    實測重現檔：4 個 `•` 佔 56pt、字級 14 → 每字 14.0pt（1.0 字寬），
+    而同樣字級的真點引導符每點約 3–4pt。門檻取 0.6 字寬，兩者差很遠。
+    """
+    s = (text or "").strip()
+    # 單一字元的訊號太弱（一個全形問號、一個句號都可能是真的內容），
+    # 而擷取整段壞掉時一定不只一個字。寧可漏判也不要誤判。
+    if len(s) < 2 or font_size <= 0:
+        return False
+    def _is_placeholder(ch: str) -> bool:
+        # 私人使用區（PUA）也算 —— 壞掉的對照表很常映到那一區，而且那些
+        # 字碼本來就沒有標準意義，抽出來給使用者看沒有任何用處。
+        return ch in _PLACEHOLDER_CHARS or 0xE000 <= ord(ch) <= 0xF8FF
+
+    if any(not _is_placeholder(ch) for ch in s):
+        return False          # 混有真正的字 → 不是整段擷取失敗
+    try:
+        width = float(bbox[2]) - float(bbox[0])
+    except Exception:
+        return False
+    per_char = width / max(1, len(s))
+    return per_char >= font_size * 0.6
+
+
+def _is_suspicious(ch: str) -> bool:
+    """中文文件裡不該出現的字碼區段 —— 壞掉的對照表最常 shift 到這些地方。
+
+    這不是「一看到就判定壞掉」，只是**允許去對照字型**的門檻（見
+    `repair_span_text` 的第三條）。單獨拿它當判準會誤傷正常內容。
+    """
+    cp = ord(ch)
+    return (0x0100 <= cp <= 0x024F        # 拉丁擴充 A/B（最常見的 shift 目標）
+            or 0xE000 <= cp <= 0xF8FF     # 私人使用區
+            or 0x2200 <= cp <= 0x23FF     # 數學運算子 / 技術符號
+            or 0x2500 <= cp <= 0x27BF     # 製表 / 幾何 / 雜項符號 / 裝飾符號
+            or 0x3100 <= cp <= 0x318F     # 注音 / 韓文相容字母
+            or ch in "\u2022\u00b7")       # 圓點、間隔號
+
+
+def repair_span_text(page, span: dict, doc=None) -> Optional[str]:
+    """這個 span 的擷取結果不可信的話，用字形反查還原原文。
+
+    回傳：
+      * 還原後的字串 —— 擷取壞掉、而且反查成功
+      * `""` —— 擷取壞掉、但反查也沒轍（呼叫端應該把這個 span 丟掉，
+        塞一串圓點或亂碼給使用者比缺一段更糟）
+      * `None` —— 擷取本來就是好的，照原樣用
+
+    「擷取壞掉」有兩種樣態：
+      ① 字形被映成亂七八糟的符號（`is_bad_cmap_text` 認得的那種）
+      ② 全部被映成同一個佔位字元（圓點 / 星號…）—— 從字元本身看不出來，
+         要靠「每字寬度」判斷（客戶 2026-08-26 回報的就是這種）
+
+    擷取文字、字數統計、逐句翻譯、去識別化走的是同一種壞掉的 PDF，所以這支
+    放在 core，不要各自實作一份。
+    """
+    text = (span or {}).get("text") or ""
+    if not text.strip():
+        return None
+    bbox = (span or {}).get("bbox") or ()
+    size = float((span or {}).get("size") or 0)
+
+    from .bad_cmap import is_bad_cmap_text
+    broken = is_bad_cmap_text(text)
+    if not broken and len(bbox) == 4:
+        broken = looks_like_placeholder(text, bbox, size)
+
+    if not broken:
+        # ③**拿字型自己的對照表當真值去驗**（v1.14.57，客戶實際檔案）。
+        #
+        # 前兩條都是「這串字看起來像不像壞掉」的猜測，而猜測一定有門檻：
+        # 客戶那份的每個 span 只有 5~10 個字，湊不到「拉丁擴充字 ≥ 5 個」
+        # 的門檻，於是整份亂碼被當成可靠結果直接送到使用者面前。
+        #
+        # 但字型檔裡就有正確答案 —— 直接對照就好，不必猜：
+        #   擷取結果含有「中文文件不該出現的字」**而且**反查得出不同的結果
+        #   → 擷取壞了，用反查的結果。
+        #
+        # **兩個條件缺一不可**。只看「反查結果不一致」的話，正常樣本有 23%
+        # 的 span 會對不起來（連字、空白、一形多碼），照那樣改會把正確的
+        # 文字弄壞 —— 那比原本的 bug 更嚴重。加上「擷取結果本身可疑」之後，
+        # 29 份真實樣本實測**誤判 0**，客戶那份 55 個 span 抓到 28 個。
+        if len(bbox) != 4 or not any(_is_suspicious(c) for c in text):
+            return None
+        try:
+            fixed = recover_text_in_bbox(page, bbox, doc=doc)
+        except Exception:
+            log.debug("字形反查失敗", exc_info=True)
+            return None
+        if fixed and fixed.strip() != text.strip():
+            return fixed
+        return None
+
+    if len(bbox) != 4:
+        return ""
+    try:
+        return recover_text_in_bbox(page, bbox, doc=doc) or ""
+    except Exception:
+        log.debug("字形反查失敗", exc_info=True)
+        return ""
+
+
+def page_text_repaired(page, doc=None) -> Optional[str]:
+    """整頁的文字，壞掉的部分用字形反查還原。頁面本來就正常時回 `None`。
+
+    回 `None` 是刻意的：呼叫端該走原本的 `page.get_text("text")`，那條路的
+    斷行與空白處理跟這裡不完全一樣（字數統計、逐句翻譯都吃那個結果）。
+    **正常的 PDF 一個位元都不該因為這個功能而改變** —— 這種修法最怕的是
+    「為了救 1% 的壞檔，把 99% 的好檔弄出細微差異」。
+
+    判準是「這一頁**大部分**的字都擷取壞掉」。零星幾個壞 span 不算，那多半是
+    圖示字型之類的正常東西，交給既有的 `bad_cmap` 過濾就好。
+    """
+    try:
+        blocks = (page.get_text("dict") or {}).get("blocks", [])
+    except Exception:
+        return None
+
+    from .bad_cmap import is_bad_cmap_text
+
+    total = broken = 0
+    spans_by_line = []
+    for block in blocks:
+        for line in block.get("lines", []):
+            spans = [s for s in line.get("spans", []) if (s.get("text") or "").strip()]
+            if not spans:
+                continue
+            spans_by_line.append(spans)
+            for s in spans:
+                text = s["text"]
+                total += len(text)
+                bbox = s.get("bbox") or ()
+                if is_bad_cmap_text(text) or (
+                        len(bbox) == 4
+                        and looks_like_placeholder(text, bbox, float(s.get("size") or 0))):
+                    broken += len(text)
+
+    if total == 0 or broken < total * 0.5:
+        return None
+
+    out_lines = []
+    for spans in spans_by_line:
+        parts = []
+        for s in spans:
+            fixed = repair_span_text(page, s, doc=doc)
+            parts.append(s["text"] if fixed is None else fixed)
+        line_text = "".join(parts).strip()
+        if line_text:
+            out_lines.append(line_text)
+    return "\n".join(out_lines)

@@ -964,6 +964,36 @@ def build_router(templates) -> APIRouter:
         font_catalog.refresh_cache()
         return {"ok": True, "filename": dst.name, "size": len(data)}
 
+    @router.post("/fonts/rename")
+    async def fonts_rename(request: Request):
+        """改自訂上傳字型在介面上的顯示名稱。
+
+        沒有這個功能時顯示的是檔名（`NotoSansTC-Regular`、`微軟正黑體`…），
+        跟公司內部怎麼稱呼那套字型未必一樣 —— 而這個名稱會出現在 PDF 編輯器
+        的字型下拉裡，是使用者每天看到的東西。
+
+        只動顯示名稱，**不碰檔案本身** —— 改名不該有弄壞字型檔的風險。
+        """
+        from ..core import font_catalog
+        body = await request.json()
+        font_id = str(body.get("id") or "")
+        if not font_id.startswith("custom:"):
+            raise HTTPException(400, "只有自訂上傳的字型可以改名稱")
+        fname = font_id.split(":", 1)[1]
+        # 只准動自訂字型資料夾裡真的存在的檔 —— 否則等於讓人往設定檔塞任意鍵
+        cdir = font_catalog.custom_fonts_dir().resolve()
+        target = (cdir / fname).resolve()
+        if cdir not in target.parents and target != cdir:
+            raise HTTPException(400, "invalid path")
+        if not target.exists():
+            raise HTTPException(404, "font not found")
+        name = str(body.get("name") or "")
+        if len(name) > font_catalog.CUSTOM_NAME_MAX:
+            raise HTTPException(
+                400, f"名稱不得超過 {font_catalog.CUSTOM_NAME_MAX} 個字")
+        font_catalog.set_custom_name(target.name, name)
+        return {"ok": True, "name": font_catalog.get_custom_names().get(target.name, "")}
+
     @router.post("/fonts/delete")
     async def fonts_delete(request: Request):
         from ..core import font_catalog

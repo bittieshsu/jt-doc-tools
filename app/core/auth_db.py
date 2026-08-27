@@ -701,6 +701,25 @@ def _m23_canon_ou_subject_keys(conn: sqlite3.Connection) -> None:
                             table, old_key, new_key, keycol_extra, extra)
 
 
+def _m24_index_group_members_user(conn: sqlite3.Connection) -> None:
+    """`group_members` 補一個 `user_id` 的索引。
+
+    客戶回報「刪使用者會卡住，多刪幾個系統就像掛掉」。根因之一在這裡：
+    這張表的主鍵是 `(group_id, user_id)`，**用 user_id 單獨查用不到那個索引**
+    （不是前綴）。而 `users` 的刪除會觸發 `group_members` 的 ON DELETE
+    CASCADE —— 於是每刪一個帳號就整表掃描一次。
+
+    目錄同步會把整個網域的帳號鏡射進來（客戶那邊 18,611 位），群組成員
+    表跟著長到幾十萬列，一次掃描就是好幾百毫秒，連刪十幾個就是好幾秒，
+    而且那段時間**整站都不會回應**（同步的資料庫操作跑在事件迴圈上）。
+
+    實測（18,000 使用者 / 90,000 成員列）：刪 20 個帳號 0.42 秒 → 0.042 秒。
+    """
+    conn.executescript(
+        "CREATE INDEX IF NOT EXISTS idx_group_members_user "
+        "ON group_members(user_id);")
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -720,7 +739,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m19_grant_pdf_bookmark, _m20_grant_seam_stamp,
               _m21_grant_page_size,
               _m22_grant_office_convert,
-              _m23_canon_ou_subject_keys]
+              _m23_canon_ou_subject_keys,
+              _m24_index_group_members_user]
 
 
 def auth_db_path() -> Path:

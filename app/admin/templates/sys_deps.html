@@ -21,6 +21,14 @@
     </div>
   </div>
   <button class="btn ver-btn" type="button" id="btnCheckLatest">{{ icon('refresh', size=14) }} 檢查 GitHub 最新版本</button>
+  {# 授權與原始碼取得管道。本程式以 AGPL-3.0 釋出，第 13 條要求「透過網路與
+     軟體互動的使用者」拿得到對應的原始碼 —— 固定放在這一頁，這裡本來就是
+     講版本與相依套件授權的地方（v1.14.58 從側欄搬過來）。 #}
+  <div class="ver-license">
+    授權：<b>AGPL-3.0-or-later</b> ·
+    <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener"
+       title="本程式以 AGPL-3.0 授權；點此取得完整原始碼">取得原始碼</a>
+  </div>
 </div>
 
 <div class="panel">
@@ -117,6 +125,8 @@
   .cell-status { white-space: nowrap; width: 80px; padding-left:10px !important; padding-right:8px !important; }
   .dep-table th:first-child { width: 80px; padding-left:10px !important; padding-right:8px !important; }
 
+  .ver-license { margin-top: 10px; font-size: 12px; color: #64748b; }
+  .ver-license a { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
   /* ---- 版本資訊 panel ---- */
   .ver-panel {
     display:flex; align-items:center; gap:24px; flex-wrap:wrap;

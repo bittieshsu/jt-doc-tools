@@ -32,6 +32,15 @@ GUARDED = [
     ("app/tools/pdf_editor/router.py", "save"),
 ]
 
+#: 重活**藏在被呼叫的函式裡**，端點自己看不到 —— 這種只能逐支列管。
+#: 例如刪帳號：端點只寫 `user_manager.delete(uid)`，但那裡面要動好幾張表、
+#: 觸發 CASCADE、還要清工作區的檔案。客戶回報「刪 user 會卡住，多刪幾個
+#: 系統就像掛掉」（2026-08-27）。掃描抓不到，所以用清單釘住。
+MUST_OFFLOAD = [
+    ("app/admin/auth_router.py", "users_delete"),
+    ("app/admin/auth_router.py", "users_bulk_delete"),
+]
+
 #: v1.14.56 起是 **0**：全站的 async 端點都不會在事件迴圈上做重活了。
 #: 保留這個常數是為了讓「又多了一支」的錯誤訊息講得出數字。
 KNOWN_REMAINING = 0
@@ -50,7 +59,8 @@ def _offloads(node: ast.AST) -> bool:
 
 
 HEAVY = {"apply_redactions", "get_pixmap", "insert_pdf", "subset_fonts",
-         "convert_to_pdf", "convert_to_docx", "convert_to_odt", "render_page_png"}
+         "convert_to_pdf", "convert_to_docx", "convert_to_odt", "render_page_png",
+}
 
 
 def _dispatches_elsewhere(node: ast.AST) -> bool:
@@ -89,6 +99,15 @@ def test_guarded_endpoints_offload_heavy_work(path, func):
         "會把事件迴圈鎖住，全站對所有人都不回應。"
         "請包成同步函式再 `await asyncio.to_thread(...)`。"
     )
+
+
+@pytest.mark.parametrize("path,func", MUST_OFFLOAD)
+def test_indirectly_heavy_endpoints_offload(path, func):
+    """重活藏在被呼叫的函式裡的端點，一樣要丟出事件迴圈。"""
+    node = _endpoint_body(path, func)
+    assert _offloads(node), (
+        f"{path}:{func}() 沒有把工作丟出事件迴圈。"
+        "它呼叫的函式會動資料庫與檔案系統，跑在事件迴圈上會讓全站停止回應。")
 
 
 def test_no_endpoint_blocks_the_event_loop():

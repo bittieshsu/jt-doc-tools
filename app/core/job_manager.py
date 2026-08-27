@@ -278,7 +278,10 @@ class JobManager:
         with self._lock:
             return {j.id: {"status": j.status, "progress": j.progress,
                            "message": j.message, "priority": bool(j.priority),
-                           "priority_rank": j.priority_rank}
+                           "priority_rank": j.priority_rank,
+                           # 正在跑的作業還沒寫進資料庫的 started_at，
+                           # 少了這個，「進行中」那幾筆的開始時間會是空的
+                           "started_at": j.started_at}
                     for j in self._jobs.values()}
 
     def queue_positions(self) -> dict[str, int]:
@@ -589,6 +592,10 @@ class JobManager:
                   status=row["status"], progress=row["progress"] or 0.0,
                   message=row["message"] or "", error=row["error"],
                   created_at=row["created_at"], updated_at=row["updated_at"],
+                  # 從資料庫還原時**一定要帶回開始時間**。少了這一行，還原
+                  # 之後任何一次 upsert 都會把資料庫裡的值寫成 NULL ——
+                  # 資料靜靜地不見，畫面上那一欄變成「—」，沒有人會發現。
+                  started_at=row.get("started_at"),
                   meta=row["meta"] or {},
                   owner_id=row["owner_id"],
                   owner_label=row["owner_label"] or "",

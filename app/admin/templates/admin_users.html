@@ -119,7 +119,9 @@
     </select>
     <button class="btn btn-small" type="button" data-bulk="role-add">加上角色</button>
     <button class="btn btn-small" type="button" data-bulk="role-remove">移除角色</button>
-    <span class="muted uf-bulk-hint">內建管理員與你自己不會被批次停用。</span>
+    <span class="uf-bulk-sep"></span>
+    <button class="btn btn-small btn-danger" type="button" data-bulk="delete">{{ icon('trash', size=13) }} 刪除</button>
+    <span class="muted uf-bulk-hint">內建管理員與你自己不會被批次停用或刪除。刪除不可還原。</span>
   </div>
 
   {% if dir_count %}
@@ -420,6 +422,10 @@
   background: #eef2ff; border: 1px solid #c7d2fe; }
 .uf-bulk-n { font-size: 13px; font-weight: 600; color: #3730a3; }
 .uf-bulk-hint { font-size: 11.5px; }
+/* 刪除鈕與其他批次操作之間留一道分隔 —— 破壞性操作不要跟啟用 / 停用
+   擠在一起，手滑的代價差太多。 */
+.uf-bulk-sep { width: 1px; align-self: stretch; margin: 0 6px;
+               background: #cbd5e1; }
 .uf-ck { width: 34px; text-align: center; }
 .uf-gone { margin-left: 6px; padding: 1px 7px; border-radius: 4px;
   background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 600; }
@@ -550,6 +556,36 @@ async function runBulk(action) {
     url = '/admin/users/bulk/enabled';
     body = { user_ids: ids, enabled: action === 'enable' };
     label = action === 'enable' ? '啟用' : '停用';
+  } else if (action === 'delete') {
+    // 刪除**不可還原**，而且會連角色指派與群組成員關係一起消失。
+    // 一般的「確定嗎」對幾百筆的破壞性操作太輕 —— 要求打字確認數量，
+    // 手滑點到不會有事。
+    const typed = window.prompt(
+      `即將刪除 ${ids.length} 個帳號。\n\n`
+      + `這個操作無法還原，帳號的角色指派與群組成員關係會一起消失。\n`
+      + `（AD / LDAP 目錄裡的帳號不受影響，下次登入會重新建立。）\n\n`
+      + `確定的話請輸入帳號數量「${ids.length}」：`);
+    if (typed === null) return;
+    if (String(typed).trim() !== String(ids.length)) {
+      (window.showAlert || alert)('輸入的數字不對，已取消。');
+      return;
+    }
+    const r0 = await fetch('/admin/users/bulk/delete', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_ids: ids }) });
+    if (!r0.ok) {
+      (window.showAlert || alert)(await window.friendlyServerError(r0, '批次刪除失敗'));
+      return;
+    }
+    const d0 = await r0.json();
+    let m = `已刪除 ${d0.deleted} 個帳號`;
+    if ((d0.skipped || []).length) {
+      m += `，跳過 ${d0.skipped.length} 個（`
+         + d0.skipped.slice(0, 3).map(s => s.reason).join('、') + '…）';
+    }
+    (window.showAlert || alert)(m);
+    location.reload();
+    return;
   } else {
     const role = document.getElementById('ufBulkRole').value;
     if (!role) { (window.showAlert || alert)('請先選擇角色'); return; }
@@ -968,9 +1004,20 @@ document.querySelectorAll('.user-table button').forEach(btn => {
     if (act === 'delete') {
       if (!(await showConfirm(`確定刪除使用者「${btn.dataset.username}」？所有 session 與權限指派一併移除。`,
             { title: '刪除使用者', kind: 'danger', okText: '刪除' }))) return;
+      btn.disabled = true;
       const r = await fetch(`/admin/users/${uid}/delete`, {method:'POST'});
-      if (r.ok) location.reload();
-      else showAlert('刪除失敗：' + await r.text());
+      if (r.ok) {
+        // **不要 location.reload()**。這一頁要統計整個目錄的帳號（客戶那邊
+        // 18,611 位），每刪一筆就重載一次 = 連刪十筆就重算十次，使用者看到的
+        // 是「刪一個卡好久，多刪幾個像當機」（2026-08-27 客戶回報）。
+        // 直接把那一列拿掉就好，數字用扣的。
+        tr.remove();
+        // 勾選數要跟著更新（那一列可能是勾起來的）。
+        if (typeof syncBulk === 'function') syncBulk();
+      } else {
+        btn.disabled = false;
+        showAlert('刪除失敗：' + await window.friendlyServerError(r, '刪除失敗'));
+      }
     } else if (act === 'reset-pwd') {
       openReset(btn);
     } else if (act === 'edit') {

@@ -178,6 +178,8 @@
       <th class="aj-sortable" data-sort="owner">送出者</th>
       <th class="aj-sortable" data-sort="status">狀態</th>
       <th class="aj-sortable" data-sort="usage">資源用量</th>
+      <th class="aj-sortable" data-sort="started_at">啟動時間</th>
+      <th class="aj-sortable" data-sort="finished_at">結束時間</th>
       <th class="aj-sortable" data-sort="elapsed">耗時</th>
       <th></th>
     </tr></thead>
@@ -372,6 +374,7 @@
 .aj-prio-sug div:hover, .aj-prio-sug div.on { background: #f1f5f9; }
 .aj-prio-sug .muted { font-size: 12px; }
 .aj-elapsed { font-variant-numeric: tabular-nums; color: #475569; white-space: nowrap; }
+.aj-time { font-variant-numeric: tabular-nums; color: #475569; white-space: nowrap; font-size: 12px; }
 </style>
 {% endblock %}
 
@@ -431,6 +434,21 @@
       return (g >= 10 ? g.toFixed(1) : g.toFixed(2)) + ' GB';
     }
     return mb.toLocaleString('en-US') + ' MB';
+  }
+
+  function fmtTime(ts) {
+    // 舊資料沒有開始時間 → 顯示「—」。**不要拿送出時間硬湊** ——
+    // 那會讓每一筆看起來都是「送出即開始」，等於騙人。
+    if (!ts) return '—';
+    const d = new Date(ts * 1000);
+    const p = (n) => String(n).padStart(2, '0');
+    const today = new Date();
+    const sameDay = d.getFullYear() === today.getFullYear()
+                 && d.getMonth() === today.getMonth()
+                 && d.getDate() === today.getDate();
+    const hms = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    // 同一天只顯示時分秒（清單多半在看今天的），跨天才補日期
+    return sameDay ? hms : (p(d.getMonth() + 1) + '/' + p(d.getDate()) + ' ' + hms);
   }
 
   function fmtElapsed(s) {
@@ -529,6 +547,8 @@
     const val = (j) => {
       if (sortKey === 'usage') return (j.usage ? j.usage.rss_mb : -1);
       if (sortKey === 'elapsed') return j.elapsed || 0;
+      if (sortKey === 'started_at') return j.started_at || 0;
+      if (sortKey === 'finished_at') return j.finished_at || 0;
       return String(j[sortKey] || '').toLowerCase();
     };
     return jobs.slice().sort((a, b) => {
@@ -633,6 +653,10 @@
       }
       tr.appendChild(tdUse);
 
+      // 送出 / 開始 / 結束是三件事。作業會排隊，「排了半小時」跟「跑了半小時」
+      // 處理方式完全不同 —— 只看耗時分不出來。
+      tr.appendChild(el('td', 'aj-time', fmtTime(j.started_at)));
+      tr.appendChild(el('td', 'aj-time', fmtTime(j.finished_at)));
       tr.appendChild(el('td', 'aj-elapsed', fmtElapsed(j.elapsed)));
 
       const tdAct = el('td');

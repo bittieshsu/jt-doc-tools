@@ -59,9 +59,13 @@ SECRET_FIELDS: set[tuple[str, str]] = {
 }
 
 _CHANNEL_DEFAULTS: dict[str, dict] = {
-    "email": {"enabled": False, "smtp_host": "", "smtp_port": 587,
+    # smtp_mode：外部 SMTP 帳號（auth）/ 內部轉送主機（relay，依 IP 信任、
+    #   免帳密）/ 直接投遞（direct，自己查 MX 送到收件方）。
+    #   舊安裝沒有這個欄位 → 讀出來是空字串，一律當 auth 處理。
+    "email": {"enabled": False, "smtp_mode": "auth",
+              "smtp_host": "", "smtp_port": 587,
               "smtp_tls": "starttls", "smtp_username": "",
-              "smtp_password": "", "smtp_from": ""},
+              "smtp_password": "", "smtp_from": "", "smtp_helo": ""},
     "telegram": {"enabled": False, "telegram_token": ""},
     "slack": {"enabled": False, "slack_webhook": ""},
     "teams": {"enabled": False, "teams_webhook": ""},
@@ -218,6 +222,15 @@ def save(new: dict) -> dict:
                     tgt[field] = bool(val)
                 elif field == "smtp_port":
                     tgt[field] = max(1, min(int(val or 587), 65535))
+                elif field == "smtp_mode":
+                    # 白名單 —— 沒擋的話可以塞任意字串進設定檔，而寄送端是
+                    # 用字串比對決定走哪條路，未知值會安靜落到預設分支。
+                    v = str(val or "auth").lower()
+                    tgt[field] = v if v in ("auth", "relay", "direct") else "auth"
+                elif field == "smtp_helo":
+                    # HELO 會原樣寫進 SMTP 指令 —— 控制字元與空白一律去掉，
+                    # 否則等於讓能改設定的人往協議裡插東西。
+                    tgt[field] = _strip_ctrl(str(val or "")).replace(" ", "")[:255]
                 else:
                     tgt[field] = str(val or "")
         cfg["updated_at"] = time.time()

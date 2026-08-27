@@ -91,7 +91,20 @@ def _m2_metrics(conn: sqlite3.Connection) -> None:
     """)
 
 
-MIGRATIONS = [_m1_initial, _m2_metrics]
+def _m3_started_at(conn: sqlite3.Connection) -> None:
+    """作業的**實際開始時間**。
+
+    原本只存了送出時間（`created_at`）與結束時間（`finished_at`）——
+    但作業會排隊，「送出」跟「開始跑」中間可能隔很久，管理員看清單時分不出
+    「這件排了半小時」還是「這件跑了半小時」，而那兩件事的處理方式完全不同。
+
+    舊資料沒有這個值 → NULL，畫面上顯示「—」，不要拿 created_at 硬湊
+    （那會讓每一筆看起來都是「送出即開始」，等於騙人）。
+    """
+    conn.executescript("ALTER TABLE jobs ADD COLUMN started_at REAL;")
+
+
+MIGRATIONS = [_m1_initial, _m2_metrics, _m3_started_at]
 
 # 已結束的狀態（不會再變動）
 TERMINAL = ("done", "error", "cancelled", "interrupted")
@@ -159,8 +172,9 @@ def upsert(job: Any) -> None:
                 """INSERT INTO jobs (id, tool_id, status, progress, message,
                                      error, result_path, result_filename,
                                      owner_id, owner_label, client_ip, meta,
-                                     created_at, updated_at, finished_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                     created_at, updated_at, finished_at,
+                                     started_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(id) DO UPDATE SET
                         status=excluded.status,
                         progress=excluded.progress,
@@ -170,7 +184,10 @@ def upsert(job: Any) -> None:
                         result_filename=excluded.result_filename,
                         meta=excluded.meta,
                         updated_at=excluded.updated_at,
-                        finished_at=excluded.finished_at""",
+                        finished_at=excluded.finished_at,
+                        -- 已經有值就不要蓋掉：作業跑到一半會 upsert 好幾次，
+                        -- 每次都寫的話「開始時間」會一路跟著最後一次更新跑。
+                        started_at=COALESCE(jobs.started_at, excluded.started_at)""",
                 (job.id, job.tool_id, job.status, float(job.progress or 0),
                  job.message or "", job.error,
                  str(job.result_path) if job.result_path else None,
@@ -179,7 +196,8 @@ def upsert(job: Any) -> None:
                  getattr(job, "owner_label", None),
                  getattr(job, "client_ip", None),
                  _dump_meta(getattr(job, "meta", None)),
-                 job.created_at, job.updated_at, finished),
+                 job.created_at, job.updated_at, finished,
+                 getattr(job, "started_at", None)),
             )
     except sqlite3.Error as e:
         logger.warning("job store: 寫入 %s 失敗：%s", getattr(job, "id", "?"), e)

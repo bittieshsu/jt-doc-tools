@@ -259,45 +259,9 @@ _COMMON_TC = set(
 )
 
 
-#: 擷取失敗時常見的「佔位字元」—— 壞掉的 ToUnicode 常把所有字碼都映到同一個
-#: 符號。真正的點引導符（`……`）也長這樣，所以**不能只看字元**，見下。
-_PLACEHOLDER_CHARS = set("•·●○◦∙⋅*?？_□■▪▫◻◼ .．。﹒")
-
-
-def _placeholder_extraction(text: str, bbox, font_size: float) -> bool:
-    """擷取出來的是**佔位字元、但畫面上其實是真的字**嗎。
-
-    客戶回報（2026-08-26）：在 PDF 編輯器點「選既有物件」要改文件上原本的
-    中文，文字框裡卻整排變成 `••••••`。
-
-    根因：那份 PDF 的 ToUnicode 對照表壞掉，**把每個字碼都映到同一個圓點**。
-    畫面是用字形畫的所以完全正常，但抽出來的字串是圓點 —— 而既有的
-    `_looks_garbled` 只認「數學符號 / 方框 / 罕用漢字」那幾類，圓點
-    （U+2022）、間隔號、星號、問號都**不在名單裡**，於是被當成可靠的擷取結果
-    原樣送到畫面上。
-
-    **不可以只看「字元是不是圓點」** —— 表單裡真的有點引導符（`目錄………12`），
-    v1.6.10 起那些是刻意讓使用者選得到的。兩者的差別在**寬度**：
-
-    * 真的點引導符：每個點約 0.2–0.35 個字寬（字型的 period 前進寬度）
-    * 壞掉的 CJK 擷取：每個「點」其實是一個中文字，佔滿整個字寬
-
-    實測重現檔：4 個 `•` 佔 56pt、字級 14 → 每字 14.0pt（1.0 字寬），
-    而同樣字級的真點引導符每點約 3–4pt。門檻取 0.6 字寬，兩者差很遠。
-    """
-    s = (text or "").strip()
-    # 單一字元的訊號太弱（一個全形問號、一個句號都可能是真的內容），
-    # 而擷取整段壞掉時一定不只一個字。寧可漏判也不要誤判。
-    if len(s) < 2 or font_size <= 0:
-        return False
-    if any(ch not in _PLACEHOLDER_CHARS for ch in s):
-        return False          # 混有真正的字 → 不是整段擷取失敗
-    try:
-        width = float(bbox[2]) - float(bbox[0])
-    except Exception:
-        return False
-    per_char = width / max(1, len(s))
-    return per_char >= font_size * 0.6
+#: 佔位字元的判斷搬到 `app/core/glyph_text.py` —— 擷取文字、字數統計、
+#: 逐句翻譯走的是同一種壞掉的 PDF，同一份邏輯不可以放兩個地方。
+from ...core.glyph_text import looks_like_placeholder as _placeholder_extraction  # noqa: E402
 
 
 def _looks_garbled(text: str) -> bool:
@@ -557,13 +521,23 @@ async def detect_objects(request: Request):
                         ocr_text = ""
                         ocr_used = False
                         recovered_from_font = False
+                        # v1.14.57：判定與還原一律走 core 的共用邏輯。原本編輯器
+                        # 自己判一套（亂碼 / 佔位字元），客戶實際的檔案兩條都沒
+                        # 抓到 —— 每個 span 只有 5~10 個字，湊不到「拉丁擴充字
+                        # ≥ 5 個」的門檻，整份亂碼就被當成可靠結果送出去了。
+                        # 共用邏輯多了第三條「拿字型對照表當真值去驗」。
+                        try:
+                            _fixed = _glyph_text.repair_span_text(
+                                page, span, doc=doc)
+                        except Exception:
+                            _lg.getLogger(__name__).exception("字形反查失敗")
+                            _fixed = None
+                        if _fixed:
+                            glyph_text = _fixed
+                            unreliable = True
+                        elif _fixed == "":
+                            unreliable = True
                         if unreliable:
-                            try:
-                                glyph_text = _glyph_text.recover_text_in_bbox(
-                                    page, [bx0, by0, bx1, by1], doc=doc)
-                            except Exception:
-                                _lg.getLogger(__name__).exception("字形反查失敗")
-                                glyph_text = ""
                             if glyph_text:
                                 recovered_from_font = True
                             else:

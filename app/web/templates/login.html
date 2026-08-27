@@ -108,13 +108,9 @@
     {% endfor %}
     {% endif %}
 
-    {# 原始碼連結在登入頁也要有 —— AGPL 第 13 條講的是「透過網路與軟體互動的
-       使用者」，還沒登入的訪客同樣算數。登入頁不繼承側欄樣板，所以要各自放。 #}
-    <div class="login-foot">{{ app_name }} · v{{ version }} ·
-      <a class="brand-src" href="https://github.com/jasoncheng7115/jt-doc-tools"
-         target="_blank" rel="noopener"
-         title="本程式以 AGPL-3.0 授權；點此取得完整原始碼">原始碼</a>
-    </div>
+    {# v1.14.58：登入頁不再放原始碼連結（使用者要求）。
+       取得原始碼的管道改放在「相依套件」那一頁。 #}
+    <div class="login-foot">{{ app_name }} · v{{ version }}</div>
   </form>
 </body>
 </html>
