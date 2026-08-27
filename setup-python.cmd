@@ -63,7 +63,7 @@ if not !SYNC_RC! equ 0 ( popd ^& exit /b 3 )
 popd
 
 echo ==^> Verifying critical imports ...
-"%VENV_PY%" -c "import fastapi, fitz, ldap3, PIL, pillow_heif, pdfplumber, docx, odf, openpyxl, pyzipper, httpx, psutil, pyotp, qrcode, pdf2docx, rapidfuzz, fontTools, numpy, lxml, pymupdf4llm, markdown_it, jwt, onelogin.saml2.auth, xmlsec, truststore; print('OK')"
+"%VENV_PY%" -c "import fastapi, fitz, ldap3, PIL, pillow_heif, pdfplumber, docx, odf, openpyxl, pyzipper, httpx, psutil, pyotp, qrcode, pdf2docx, rapidfuzz, fontTools, numpy, lxml, pymupdf4llm, markdown_it, jwt, onelogin.saml2.auth, xmlsec, truststore, dns.resolver; print('OK')"
 set IMP_RC=!ERRORLEVEL!
 echo [debug] import smoke test exit=!IMP_RC!
 if not !IMP_RC! equ 0 exit /b 4

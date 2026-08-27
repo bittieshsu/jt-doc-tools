@@ -13,6 +13,7 @@ the import use the dev's real `data/` dir, tests would write into it.
 """
 from __future__ import annotations
 
+import atexit
 import os
 import shutil
 import tempfile
@@ -28,6 +29,12 @@ os.environ.setdefault("JTDT_CSRF_DISABLE", "1")
 if "JTDT_DATA_DIR" not in os.environ:
     _TEST_DATA_DIR = Path(tempfile.mkdtemp(prefix="jtdt_test_"))
     os.environ["JTDT_DATA_DIR"] = str(_TEST_DATA_DIR)
+
+    # 跑完就刪掉。**這個目錄一次跑下來會長到 500 MB 以上**（字型 / 資產副本 +
+    # 各測試寫進去的檔案），原本從來沒有人收 —— 累積四十幾份就把開發機的磁碟
+    # 塞爆了（2026-08-27 實際發生）。要留下來看內容時設 `JTDT_KEEP_TEST_DATA=1`。
+    if os.environ.get("JTDT_KEEP_TEST_DATA") != "1":
+        atexit.register(shutil.rmtree, _TEST_DATA_DIR, True)
     # Seed: copy a few harmless files from real data/ if present (avoids
     # tests that need a default profile / assets failing). We deliberately
     # DO NOT copy api_tokens.json / auth.sqlite / audit.sqlite to keep
