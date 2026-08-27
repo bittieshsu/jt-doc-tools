@@ -91,11 +91,16 @@
 }
 
 .dd-mode-picker {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;
+  /* 三種模式擺三欄 —— 兩欄會讓第三張被擠到下一列，看起來像次要選項 */
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px;
+}
+@media (max-width: 980px) {
+  .dd-mode-picker { grid-template-columns: 1fr; }
 }
 .dd-mode {
-  border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 14px; cursor: pointer;
-  background:#fff; transition: all 0.12s; display: flex; gap: 10px; align-items:flex-start;
+  border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 16px 16px 16px 14px;
+  cursor: pointer;
+  background:#fff; transition: all 0.12s; display: flex; gap: 12px; align-items:flex-start;
 }
 .dd-mode:hover { border-color:#93c5fd; background:#eff6ff; }
 .dd-mode.active { border-color:#2563eb; background:#dbeafe; }
@@ -113,7 +118,17 @@
 .dd-replace-opts .dd-note { font-size: 12px; line-height: 1.6; margin-top: 6px; }
 .dd-addterm { display: flex; gap: 8px; align-items: center; margin-top: 10px;
               flex-wrap: wrap; }
-.dd-addterm input[type="text"] { flex: 1 1 320px; min-width: 200px; }
+.dd-addterm input[type="text"] {
+  /* 跟全站的輸入框同一套視覺（platform.css 的 .form-row input）——
+     只設寬度的話會是瀏覽器預設的方角灰框，跟旁邊的按鈕搭不起來。 */
+  flex: 1 1 320px; min-width: 200px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 14px; background: #fff; color: #0f172a;
+}
+.dd-addterm input[type="text"]:focus {
+  outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
 .dd-findings input.rep-input { width: 100%; min-width: 120px; box-sizing: border-box;
                                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
                                font-size: 12px; padding: 3px 6px;
@@ -270,6 +285,9 @@
     </table>
   </div>
 
+</div>
+
+<div class="panel" id="modePanel" hidden>
   <h2 data-s="sb0043ef4">4. 處理模式</h2>
   <div class="dd-mode-picker" id="ddModes">
     <div class="dd-mode mode-redact" data-mode="redact">
@@ -357,6 +375,7 @@ document.querySelectorAll('.dd-cat .dd-cat-tools button').forEach(btn => {
 const fu = new FileUpload($('ddUpload'), (f) => {
   currentFile = f;
   $('resultPanel').hidden = true;
+  $('modePanel').hidden = true;
   $('doneBox').hidden = true;
   $('detectStatus').textContent = currentFile ? `已選：${currentFile.name}` : '';
 });
@@ -381,6 +400,9 @@ $('btnDetect').addEventListener('click', async () => {
     detectResult = await r.json();
     renderDetect(detectResult);
     $('resultPanel').hidden = false;
+    // 處理模式從 v1.14.59 拆成獨立卡片 —— **顯示邏輯要跟著搬**，
+    // 忘了這行就會變成「偵測完了但選不到模式」，而且不會有任何錯誤訊息。
+    $('modePanel').hidden = false;
     $('doneBox').hidden = true;
     $('resultPanel').scrollIntoView({behavior:'smooth', block:'start'});
   } catch (e) {

@@ -297,12 +297,21 @@
         line.appendChild(a);
         main.appendChild(line);
       } else if (w && w.reason && w.reason !== 'workspace_disabled') {
+        // **每一個原因碼都要有對應的說法**。少翻一個就會掉到通用訊息，
+        // 使用者看到「未自動存入工作區」卻不知道自己該做什麼 —— 然後
+        // 結果檔在保留期到期後就沒了（2026-08-27 使用者回報：正式機上
+        // 14 筆是 still_watching，全部顯示成那句通用訊息）。
         const why = {
           quota: '工作區容量已滿，未自動存入',
           unsupported: '此格式工作區不支援，未自動存入',
           too_large: '檔案過大，未自動存入（可手動存）',
           no_owner: '此作業無歸屬帳號，未自動存入',
-        }[w.reason] || '未自動存入工作區';
+          // 送出後人還開著頁面 → 假設會直接下載，不硬存一份佔額度。
+          // 但要講清楚「不會自動保留」，否則過期之後才發現就來不及了。
+          still_watching: '完成時你還在頁面上，所以沒有自動存入 —— '
+                        + '要保留請按「存至工作區」，否則結果檔會在保留期限後清除',
+          error: '自動存入時發生錯誤，未存入（可手動存）',
+        }[w.reason] || ('未自動存入工作區（' + w.reason + '）');
         main.appendChild(el('div', 'mj-ws-fail', why));
       }
       if (j.status === 'interrupted') {

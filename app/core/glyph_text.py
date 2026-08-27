@@ -83,27 +83,36 @@ def _gid_to_unicode(buf: bytes) -> dict:
     return table
 
 
-#: 每一頁的字形資料（反查表 + texttrace）。原本每個 span 都重解一次整頁，
-#: 一頁 55 個 span 就是 55 次 —— 擷取整份文件時會慢得離譜。
-#: 鍵用 (文件物件 id, 頁碼)：文件在一次請求內存活，請求結束就沒人再查了。
-_page_cache: dict[tuple, tuple] = {}
-_PAGE_CACHE_MAX = 8
+#: 每一頁的字形資料（反查表 + texttrace）。不快取的話每個 span 都要重解一次
+#: 整頁 —— 一頁 55 個 span 就是 55 次，擷取整份文件會慢得離譜。
+#:
+#: **快取掛在文件物件上，不要用模組層級的字典搭配 `id(doc)` 當鍵。**
+#: 文件是每個請求開一份、用完就關；`id()` 在物件被回收後**會被重複使用**，
+#: 下一份文件很可能拿到同一個 id → 讀到上一份文件的字型表 → **反查出別份
+#: 文件的字**，而且完全無聲（2026-08-27 完整測試抓到：單跑全綠、合跑失敗，
+#: 而且每次失敗的項目還不一樣）。掛在文件上就跟著文件一起消失。
+_PAGE_CACHE_ATTR = "_jtdt_glyph_page_cache"
 
 
 def _page_data(doc, page):
-    key = (id(doc), getattr(page, "number", -1))
-    hit = _page_cache.get(key)
-    if hit is not None:
-        return hit
+    cache = getattr(doc, _PAGE_CACHE_ATTR, None)
+    if cache is None:
+        cache = {}
+        try:
+            setattr(doc, _PAGE_CACHE_ATTR, cache)
+        except Exception:
+            cache = None          # 掛不上就不快取，寧可慢也不要錯
+    pno = getattr(page, "number", -1)
+    if cache is not None and pno in cache:
+        return cache[pno]
     tables = _page_font_tables(doc, page)
     try:
         trace = page.get_texttrace()
     except Exception as e:
         log.debug("get_texttrace 失敗：%s", e)
         trace = []
-    if len(_page_cache) >= _PAGE_CACHE_MAX:
-        _page_cache.clear()
-    _page_cache[key] = (tables, trace)
+    if cache is not None:
+        cache[pno] = (tables, trace)
     return tables, trace
 
 

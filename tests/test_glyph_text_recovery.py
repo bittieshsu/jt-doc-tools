@@ -246,3 +246,95 @@ def test_control_characters_are_treated_as_lookup_failure(broken_pdf, monkeypatc
     assert gt.recover_text_in_bbox(page, line["bbox"]) == ""
     doc.close()
     gt._gid_map_cache.clear()
+
+
+def test_cache_never_leaks_between_documents(tmp_path):
+    """兩份不同的 PDF 不可以拿到對方的字形資料。
+
+    這條守的是一個**正式環境會產生錯字**的 bug：快取原本掛在模組層級的
+    字典、用 `id(doc)` 當鍵，而文件是每個請求開一份、用完就關 ——
+    `id()` 在物件被回收後會被重複使用，下一份文件很可能拿到同一個 id，
+    於是反查出**別份文件的字**，而且完全無聲。
+
+    2026-08-27 完整測試抓到（單跑全綠、合跑失敗，失敗的項目每次還不一樣）。
+    修法是把快取掛在文件物件上，跟著文件一起消失。
+
+    這裡用「開一份、關掉、再開另一份」重現 id 重用的情境。**注意這條測試
+    對「改回 id(doc) 當鍵」這個變異沒有牙齒** —— id 重用不保證每次都發生。
+    真正釘住修法的是下面那條 `test_page_cache_lives_on_the_document`。
+    """
+    from app.core.font_catalog import best_cjk_path, embeddable_font
+    import app.core.glyph_text as gt
+
+    fpath, idx = best_cjk_path("sans", "traditional")
+    if not fpath:
+        pytest.skip("這台機器沒有 CJK 字型")
+
+    def _make(text: str, path):
+        fontfile, fontbuffer = embeddable_font(str(fpath), idx, text)
+        d = fitz.open()
+        page = d.new_page()
+        page.insert_font(fontname="F0", fontfile=fontfile, fontbuffer=fontbuffer)
+        page.insert_text((72, 120), text, fontname="F0", fontsize=20)
+        d.save(str(path))
+        d.close()
+        return path
+
+    a = _make("甲甲甲甲", tmp_path / "a.pdf")
+    b = _make("乙乙乙乙", tmp_path / "b.pdf")
+
+    for _ in range(6):
+        for path, expected in ((a, "甲甲甲甲"), (b, "乙乙乙乙")):
+            doc = fitz.open(str(path))
+            line = next(line for blk in doc[0].get_text("dict")["blocks"]
+                        for line in blk.get("lines", []))
+            got = gt.recover_text_in_bbox(doc[0], line["bbox"], doc=doc)
+            doc.close()
+            assert got == expected, (
+                f"反查到別份文件的字：拿到 {got!r}，應該是 {expected!r}")
+
+
+def test_page_cache_lives_on_the_document(tmp_path):
+    """字形快取必須掛在文件物件上，**不可以是模組層級的全域狀態**。
+
+    這條是上面那個 bug 的結構性判準。行為測試（跨文件不可污染）抓得到
+    「真的發生了」，但 `id()` 重用不保證每次都發生 —— 只有直接釘住「快取
+    在哪裡」，才擋得住有人把它改回全域字典。
+    """
+    from app.core.font_catalog import best_cjk_path, embeddable_font
+    import app.core.glyph_text as gt
+
+    fpath, idx = best_cjk_path("sans", "traditional")
+    if not fpath:
+        pytest.skip("這台機器沒有 CJK 字型")
+    fontfile, fontbuffer = embeddable_font(str(fpath), idx, "測試")
+    d = fitz.open()
+    page = d.new_page()
+    page.insert_font(fontname="F0", fontfile=fontfile, fontbuffer=fontbuffer)
+    page.insert_text((72, 120), "測試", fontname="F0", fontsize=20)
+    out = tmp_path / "cache.pdf"
+    d.save(str(out))
+    d.close()
+
+    doc = fitz.open(str(out))
+    before = {k: v for k, v in vars(gt).items()
+              if isinstance(v, dict) and k.endswith("_cache")}
+    sizes_before = {k: len(v) for k, v in before.items()}
+
+    gt.recover_text_in_bbox(doc[0], (0, 0, 600, 400), doc=doc)
+
+    # 快取要出現在**文件物件**上
+    assert getattr(doc, gt._PAGE_CACHE_ATTR, None), \
+        "字形快取沒有掛在文件物件上"
+
+    # 模組層級的頁面快取不可以長大（字型指紋快取除外 —— 那個以字型內容
+    # 為鍵，跨文件共用是安全的，也正是它該有的行為）
+    grew = [k for k, v in vars(gt).items()
+            if isinstance(v, dict) and k.endswith("_cache")
+            and "gid" not in k and "internal_name" not in k
+            and len(v) > sizes_before.get(k, 0)]
+    doc.close()
+    assert not grew, (
+        f"這些模組層級的快取跟著文件在長大：{grew}\n"
+        "  文件是每個請求開一份、用完就關，`id()` 會被重複使用 —— "
+        "以文件為單位的資料放模組層級遲早會串到別份文件。")

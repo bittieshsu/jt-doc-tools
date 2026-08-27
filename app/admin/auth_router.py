@@ -8,6 +8,7 @@ behaviour).
 from __future__ import annotations
 
 import asyncio as _asyncio
+import re
 import logging
 import time
 
@@ -2347,9 +2348,54 @@ def build_auth_router(templates) -> APIRouter:
 
     @router.get("/system-status", response_class=HTMLResponse)
     async def system_status_page(request: Request):
-        return templates.TemplateResponse(request, 
-            "admin_system_status.html", {"request": request},
+        from ..core.upload_limits import app_side_limits
+        return templates.TemplateResponse(request,
+            "admin_system_status.html",
+            {"request": request, "upload_limits": app_side_limits()},
         )
+
+    @router.post("/api/upload-limit/probe")
+    async def upload_limit_probe(request: Request):
+        """問出這條路徑實際能收多大的 body。
+
+        **探測目標綁死在使用者當前連線的主機**，不接受任何參數 —— 讓呼叫端
+        指定位址的話，這支端點就是一個現成的 SSRF 入口（管理員身分也不該有
+        「叫伺服器去連任意位址」的能力）。
+
+        用 `Expect: 100-continue`：只送標頭不送 body，所以不會製造流量，
+        也不會在對方留下大檔案。
+        """
+        from ..core.upload_limits import probe_max_body_mb
+
+        # 走 scope 的 headers，不用 request.url —— Host 標頭可以被污染，
+        # 而這裡要連的就是 Host 指到的地方（見 BADHOST 那條規則）。
+        host_header = request.headers.get("host") or ""
+        if not host_header:
+            raise HTTPException(400, "沒有 Host 標頭，無法判斷要探測哪一條路徑")
+        proto = (request.headers.get("x-forwarded-proto")
+                 or request.url.scheme or "http").split(",")[0].strip()
+        use_tls = proto == "https"
+        if ":" in host_header and not host_header.startswith("["):
+            hostname, _, port_s = host_header.rpartition(":")
+            try:
+                port = int(port_s)
+            except ValueError:
+                hostname, port = host_header, (443 if use_tls else 80)
+        else:
+            hostname, port = host_header, (443 if use_tls else 80)
+        # 主機名稱只收合法字元 —— 這個值會被寫進 HTTP 請求行
+        if not re.match(r"^[A-Za-z0-9._\-\[\]:]{1,253}$", hostname):
+            raise HTTPException(400, "Host 標頭格式不正確")
+
+        result = await _asyncio.to_thread(
+            probe_max_body_mb, hostname, port, use_tls, "/healthz")
+        audit_db.log_event(
+            "upload_limit_probe", username=_actor(request), ip=_client_ip(request),
+            target=f"{hostname}:{port}",
+            details={"max_mb": result.get("max_mb"),
+                     "unlimited": result.get("unlimited"),
+                     "requests": result.get("requests")})
+        return result
 
     @router.get("/system-status/host")
     async def system_status_host():

@@ -721,6 +721,25 @@ _DEPS = [
         },
     },
     {
+        "key": "dnspython",
+        "label": "dnspython (MX 查詢)",
+        "category": "網路",
+        "impact": "通知信的**「直接投遞」寄送方式**要查收件網域的 MX 紀錄 —— "
+                  "標準函式庫沒有 MX 查詢。缺了它，通知設定裡選「直接投遞」"
+                  "會送不出去；另外兩種寄送方式（外部 SMTP 帳號、內部轉送主機 "
+                  "relay）**不受影響**。",
+        "impact_en": "Looks up MX records for the notification e-mail 'direct "
+                     "delivery' mode. Without it, direct delivery fails; the "
+                     "SMTP-account and internal-relay modes are unaffected.",
+        "soft": True,
+        "probe": lambda: _probe_python_pkg("dns.resolver", dist_name="dnspython"),
+        "install_cmd": {
+            "linux": "uv sync（或 sudo jtdt update；純 Python 套件，不需編譯）",
+            "macos": "uv sync",
+            "windows": "jtdt update（以系統管理員身分開啟 PowerShell）",
+        },
+    },
+    {
         "key": "pillow-heif",
         "label": "pillow-heif (HEIC / HEIF)",
         "category": "影像",

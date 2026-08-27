@@ -3,6 +3,26 @@
 {% block title %}系統狀態 · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
+/* ---- 可上傳的檔案大小 ---- */
+.ul-lead { font-size: 12.5px; line-height: 1.7; margin: 4px 0 14px; }
+.ul-proxy { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px;
+            background: #f8fafc; margin-bottom: 16px; }
+.ul-proxy-head { display: flex; gap: 16px; align-items: flex-start;
+                 justify-content: space-between; flex-wrap: wrap; }
+.ul-proxy-title { font-weight: 600; font-size: 14px; color: #0f172a; }
+.ul-proxy-note { font-size: 12px; line-height: 1.7; margin-top: 4px; max-width: 760px; }
+.ul-proxy-result { margin-top: 12px; font-size: 13px; }
+.ul-proxy-result .ul-big { font-size: 20px; font-weight: 700; color: #0f172a;
+                           font-variant-numeric: tabular-nums; }
+.ul-proxy-result .ul-bad { color: #b91c1c; }
+.ul-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ul-table th, .ul-table td { text-align: left; padding: 7px 10px;
+                             border-bottom: 1px solid #eef2f7; vertical-align: top; }
+.ul-table th { font-size: 12px; color: #64748b; font-weight: 600; }
+.ul-val { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
+.ul-none { color: #b45309; font-weight: 600; }
+.ul-cfg { color: #047857; font-size: 12px; }
+.ul-note { font-size: 12px; line-height: 1.6; }
 .ss-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:14px; }
 .ss-card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px;
   display:flex; flex-direction:column; gap:8px; }
@@ -98,6 +118,48 @@
 <div id="ssBanner"></div>
 
 <div class="ss-grid" id="ssHostGrid"></div>
+
+<div class="panel">
+  <h2>{{ icon('upload', size=18) }} 可上傳的檔案大小</h2>
+  <p class="muted ul-lead">
+    「我們可以拉多大的檔案進來？」這個問題的答案散在好幾個地方 ——
+    反向代理的設定在別台機器上，各工具的上限寫在程式裡，工作區的額度在管理設定。
+    這裡把它們集中列出來。<b>實際能上傳的大小取決於最小的那一層。</b>
+  </p>
+
+  <div class="ul-proxy">
+    <div class="ul-proxy-head">
+      <div>
+        <div class="ul-proxy-title">反向代理 / 這條路徑的實際上限</div>
+        <div class="muted ul-proxy-note">
+          HTTP <b>沒有</b>任何 header 會公告這個值。這裡用 <code>Expect: 100-continue</code>
+          問出來：只送標頭、<b>不傳任何資料</b>，看對方回「可以開始傳」還是「太大」，
+          再二分收斂。量到的是<b>整條路徑</b>（可能有多層代理）真正的瓶頸。
+        </div>
+      </div>
+      <button class="btn" type="button" id="btnProbeUpload">
+        {{ icon('refresh', size=14) }} 偵測
+      </button>
+    </div>
+    <div class="ul-proxy-result" id="ulProbeResult">
+      <span class="muted">尚未偵測（不會傳輸檔案，通常一兩秒完成）</span>
+    </div>
+  </div>
+
+  <table class="ul-table">
+    <thead><tr><th>項目</th><th>上限</th><th>能不能調</th><th>說明</th></tr></thead>
+    <tbody>
+      {% for r in upload_limits %}
+      <tr>
+        <td>{{ r.label }}</td>
+        <td class="ul-val">{% if r.value_mb %}{{ r.value_mb }} MB{% else %}<span class="ul-none">無上限</span>{% endif %}</td>
+        <td>{% if r.configurable %}<span class="ul-cfg">可在管理介面調</span>{% else %}<span class="muted">程式內建</span>{% endif %}</td>
+        <td class="muted ul-note">{{ r.note }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
 <div class="panel" data-s="sb0043ef4">
   <div data-s="se0fca1a9">
@@ -566,5 +628,48 @@ $('ssDbBackup').addEventListener('click', async (e) => {
 });
 
 refreshDbs(false);
+
+// ---- 偵測反向代理實際能收多大 ----------------------------------
+// 用 Expect: 100-continue 問，不傳輸資料。**問不到要說問不到** ——
+// 回一個看起來像答案的數字，管理員照著去設定會比沒有這個功能更糟。
+(function () {
+  const btn = document.getElementById('btnProbeUpload');
+  if (!btn) return;
+  const out = document.getElementById('ulProbeResult');
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    out.textContent = '偵測中…';
+    try {
+      const r = await fetch('/admin/api/upload-limit/probe', { method: 'POST' });
+      if (!r.ok) {
+        out.textContent = await window.friendlyServerError(r, '偵測失敗');
+        return;
+      }
+      const d = await r.json();
+      out.textContent = '';
+      if (!d.ok) {
+        const s = document.createElement('span');
+        s.className = 'ul-bad';
+        s.textContent = '問不出來：' + (d.detail || '');
+        out.appendChild(s);
+        return;
+      }
+      const big = document.createElement('span');
+      big.className = 'ul-big';
+      big.textContent = d.unlimited ? '沒有設定上限' : (d.max_mb + ' MB');
+      out.appendChild(big);
+      const note = document.createElement('span');
+      note.className = 'muted';
+      note.textContent = '　' + (d.detail || '')
+                       + '（' + d.requests + ' 次探測，未傳輸資料）';
+      out.appendChild(note);
+    } catch (e) {
+      out.textContent = '偵測失敗';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+
 </script>
 {% endblock %}
