@@ -47,7 +47,9 @@
 .ss-table th:hover { background:#eef2ff; color:#1e40af; }
 .ss-table th.sort-asc::after  { content: ' ▲'; font-size: 9px; color:#3b82f6; }
 .ss-table th.sort-desc::after { content: ' ▼'; font-size: 9px; color:#3b82f6; }
-.ss-table td.num { text-align:right; font-variant-numeric: tabular-nums; }
+/* 數字欄：**標題要跟數字同一邊**，不然標題貼左、數字貼右，眼睛要橫著走
+   一整格才對得起來（使用者回報「欄位標題跟數字對齊方向不對 很難對照著看」）。 */
+.ss-table td.num, .ss-table th.num { text-align:right; font-variant-numeric: tabular-nums; }
 .ss-table tr:hover td { background: #f8fafc; }
 /* 橫向長條圖：用獨立 column 容納，bar 寬度依 % 算 */
 .ss-bar-cell { width: 200px; padding: 6px 10px; }
@@ -452,11 +454,14 @@ function renderUsers(users) {
       </div></td>
     </tr>`;
   }
+  // 合計列原本「近 30 天上傳次數」是空的 —— 同一列其他三欄都有數字，
+  // 空一格看起來像壞掉。這一欄的合計就是畫面上各列的和（沒有分頁，加得完）。
+  const total30dCount = rows.reduce((s, r) => s + (r.activity_30d_count || 0), 0);
   html += `</tbody><tfoot><tr data-s="s0365750c">
     <td>合計</td>
     <td class="num">${users.total_count.toLocaleString()}</td>
     <td class="num">${fmtBytes(users.total_bytes)}</td>
-    <td></td>
+    <td class="num">${total30dCount.toLocaleString()}</td>
     <td class="num">${fmtBytes(users.activity_30d_total_bytes || 0)}</td>
     <td></td>
   </tr></tfoot></table>`;
