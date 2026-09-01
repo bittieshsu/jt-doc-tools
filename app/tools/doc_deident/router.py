@@ -1,6 +1,7 @@
 """Endpoints for 文件去識別化 (doc-deident)."""
 from __future__ import annotations
 
+import functools
 import io
 import logging
 import re
@@ -144,6 +145,18 @@ def _adjacent_pairs(units: list[dict]) -> list[dict]:
     return pairs
 
 
+@functools.lru_cache(maxsize=1)
+def _label_words() -> frozenset[str]:
+    """所有「欄位標籤」的詞彙表 —— **從註冊表實算**，不另外維護寫死的清單。
+
+    跨格配對（issue #43）處理的正是表格版面，而表格常常一整欄都是標籤，
+    於是上下相鄰的兩個標籤格會被配成一對：「被告代表人」＋「銀行帳號」
+    兜成一句之後，人名的式子看到前綴「代表人」就把「銀行帳號」當成人名
+    （issue #50）。值本身就是一個已知欄位標籤時直接丟掉。
+    """
+    return frozenset(p.label for p in P.CATALOG)
+
+
 def _scan_unit(unit: dict, selected_ids: set[str],
                custom_regexes: list[tuple[str, re.Pattern]],
                *, labelled_only: bool = False) -> list[dict]:
@@ -223,6 +236,9 @@ def _scan_unit(unit: dict, selected_ids: set[str],
             if val is None:
                 continue
             if not pat.validate(val):
+                continue
+            if labelled_only and val.strip() in _label_words():
+                # 配到的「值」本身就是隔壁那一格的欄位標籤 → 不是資料（issue #50）
                 continue
             _emit(m, pat.label, pat.id, pat.mask(val), pat.value_group)
     # Custom user-supplied regexes (no checksum, no mask — use
