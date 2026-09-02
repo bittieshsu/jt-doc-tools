@@ -560,11 +560,13 @@ async function runBulk(action) {
     // 刪除**不可還原**，而且會連角色指派與群組成員關係一起消失。
     // 一般的「確定嗎」對幾百筆的破壞性操作太輕 —— 要求打字確認數量，
     // 手滑點到不會有事。
-    const typed = window.prompt(
-      `即將刪除 ${ids.length} 個帳號。\n\n`
-      + `這個操作無法還原，帳號的角色指派與群組成員關係會一起消失。\n`
-      + `（AD / LDAP 目錄裡的帳號不受影響，下次登入會重新建立。）\n\n`
-      + `確定的話請輸入帳號數量「${ids.length}」：`);
+    const typed = await showPrompt(
+      `即將刪除 ${ids.length} 個帳號。`
+      + `這個操作無法還原，帳號的角色指派與群組成員關係會一起消失。`
+      + `（AD / LDAP 目錄裡的帳號不受影響，下次登入會重新建立。）`
+      + `確定的話請輸入帳號數量「${ids.length}」：`,
+      { title: '批次刪除帳號', kind: 'danger', okText: '刪除',
+        placeholder: String(ids.length) });
     if (typed === null) return;
     if (String(typed).trim() !== String(ids.length)) {
       (window.showAlert || alert)('輸入的數字不對，已取消。');

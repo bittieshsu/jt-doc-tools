@@ -227,6 +227,9 @@ DEFAULT_LABEL_MAP: dict[str, list[str]] = {
                      "分行別", "分支單位", "分號名稱",
                      "Branch", "Branch Name"],
     "bank_branch_code": ["分行代碼", "分行代號", "解款行代號", "解款行代碼",
+                          # 「解放行代號」是實際表單上的誤植（款→放）。表單在外面
+                          # 印好幾年不會改，認得它比要求對方改表單實際。
+                          "解放行代號", "解付行代號", "匯款行代號",
                           "ATM通匯金融代號",
                           "Branch Code"],
     "bank_code": ["銀行代碼", "銀行代號", "金資代號", "金融機構代碼", "金融機構代號",
@@ -234,6 +237,7 @@ DEFAULT_LABEL_MAP: dict[str, list[str]] = {
                    "Bank Code", "Bank ID"],
     "bank_address": ["銀行地址", "收款銀行地址", "Bank Address", "Beneficiary Bank Address"],
     "bank_account_name": ["銀行戶名", "戶名", "帳戶名稱", "帳戶戶名",
+                           "開戶全名", "開戶名稱", "開戶戶名", "開戶人姓名",
                            "帳號戶名", "受款人戶名", "收款人戶名",
                            "收款人名稱", "收款戶名",
                            "匯款戶名", "匯撥戶名", "匯入戶名",
@@ -447,6 +451,56 @@ def _is_seal_marker(text: str) -> bool:
     return len(t) <= 12
 
 
+#: `郵遞區號(        )` —— 標籤後面跟著一對只有空白的括號。
+#: 那對括號**就是那個欄位要填的位置**，不是註記也不是已填資料。
+_LABEL_WITH_EMPTY_PARENS = re.compile(
+    r"^(?P<lab>[^()（）]{2,12}?)[（(](?P<inner>[\s\u3000_\-－—]*)[)）]$"
+)
+
+
+def _paren_value_slot(
+    text: str, bbox: tuple[float, float, float, float],
+    char_boxes: Optional[list[tuple[float, float, float, float]]] = None,
+) -> Optional[tuple[str, tuple[float, float, float, float]]]:
+    """把 `標籤(     )` 拆成（標籤文字, 括號內部的位置）。
+
+    這種寫法在表單裡很常見（`郵遞區號(    )`、`(  )分行`），而括號中間那段
+    空白就是要人填字的地方。原本這種 span 只會被當成「值格裡的子標籤」跳過，
+    於是那個欄位**永遠不會被填**（客戶回報：郵遞區號沒抓到）。
+
+    括號內部的 x 範圍用等寬估算 —— 表單這種場合都是等寬中文字，誤差在
+    一兩個字元內，而括號內部本來就留得比實際字數寬。
+    """
+    m = _LABEL_WITH_EMPTY_PARENS.match((text or "").strip())
+    if not m:
+        return None
+    lab = m.group("lab").strip()
+    if not lab:
+        return None
+    x0, y0, x1, y1 = bbox
+    stripped = text.strip()
+    n = len(stripped)
+    if n <= 0 or x1 <= x0:
+        return None
+    inner_start = m.start("inner")
+    inner_end = m.end("inner")
+    if inner_end - inner_start < 2:      # 括號中間沒空間，不是填寫位置
+        return None
+    if char_boxes and len(char_boxes) == n:
+        # **有逐字座標就用逐字座標。** 等寬估算在這裡是錯的：`郵遞區號(   )`
+        # 前面是全形中文、中間是半形空白，估出來的括號內部會偏左一大截，
+        # 值就直接寫在「郵遞區號(」上面（實測真的疊上去了）。
+        sx0 = char_boxes[inner_start][0]
+        sx1 = char_boxes[inner_end - 1][2]
+    else:
+        char_w = (x1 - x0) / n
+        sx0 = x0 + char_w * inner_start
+        sx1 = x0 + char_w * inner_end
+    if sx1 - sx0 < 6:
+        return None
+    return lab, (sx0, y0, sx1, y1)
+
+
 def detect_fields(
     pdf_path: Path,
     label_map: Optional[dict[str, list[str]]] = None,
@@ -484,6 +538,8 @@ def detect_fields(
     # Every printed checkbox option text on each page — slot-occupancy must
     # ignore these (they're sub-labels next to □ glyphs, not pre-filled data).
     page_checkbox_texts: list[set[str]] = []
+    # 每頁：span 的 bbox（取整）→ 該 span 的逐字座標
+    page_char_boxes: list[dict] = []
     # pdfplumber-based cells (primary); fall back to line-based when empty.
     page_cells_pp = pdf_layout.extract_cells_pdfplumber(pdf_path)
 
@@ -505,6 +561,17 @@ def detect_fields(
                                  span.get("size", 10.0), int(span.get("color", 0)))
                             )
             page_spans.append(spans)
+            # 逐字座標（`rawdict`）—— `_paren_value_slot` 要拿它算括號內部的
+            # 位置。等寬估算在中文與半形空白混排時會偏掉一大截。
+            _chars: dict[tuple[int, int, int, int], list[tuple[float, float, float, float]]] = {}
+            for _blk in page.get_text("rawdict").get("blocks", []):
+                if _blk.get("type") != 0:
+                    continue
+                for _ln in _blk.get("lines", []):
+                    for _sp in _ln.get("spans", []):
+                        _bb = tuple(round(v) for v in (_sp.get("bbox") or (0, 0, 0, 0)))
+                        _chars[_bb] = [tuple(c.get("bbox")) for c in _sp.get("chars", [])]
+            page_char_boxes.append(_chars)
             page_lines.append(pdf_layout.extract_lines(page))
             # Extract checkbox option texts for occupancy filtering.
             from . import pdf_checkbox
@@ -546,6 +613,24 @@ def detect_fields(
                         norm = _normalize(text)
                         if not norm:
                             continue
+                        # `郵遞區號(     )` —— 括號中間就是要填的位置，
+                        # 不必再往右找格子（往右是地址的位置）。
+                        _paren = _paren_value_slot(
+                            text, bbox,
+                            page_char_boxes[pno].get(tuple(round(v) for v in bbox)))
+                        if _paren is not None:
+                            _lab, _pslot = _paren
+                            _pkeys = label_to_key.get(_normalize(_lab))
+                            if _pkeys:
+                                for _k in _pkeys:
+                                    detected.append(DetectedField(
+                                        page=pno, profile_key=_k, label_text=_lab,
+                                        label_rect=bbox, font_size=size,
+                                        value_anchor=(_pslot[0], bbox[3] - 0.2 * size),
+                                        placement="right",
+                                        value_slot=_pslot, slot_kind="in-paren",
+                                    ))
+                                continue
                         keys = label_to_key.get(norm)
                         if not keys and "/" in norm:
                             # Compound label like "公司名稱/個人姓名" or
@@ -684,6 +769,32 @@ def detect_fields(
                                 )
                             )
 
+    # **值的起點要推到「印在值格裡的子標籤」後面。**
+    #
+    # `郵遞區號(    )` 這種子標籤是真的印在紙上的字。值從格子左緣開始寫就會壓
+    # 在它上面（實測重疊 95pt）—— **疊字比沒填更糟**。
+    #
+    # 這一段必須排在下面那個「值不可以蓋到別的標籤」之前：那對括號本身也是一個
+    # 欄位（見 `_paren_value_slot`），先推開才不會讓整欄被判成「蓋到別的標籤」
+    # 而丟掉位置。
+    for d in detected:
+        if d.value_slot is None or d.slot_kind == "in-paren":
+            continue
+        sx0, sy0, sx1, sy1 = d.value_slot
+        for text, (bx0, by0, bx1, by1), _size, _c in page_spans[d.page]:
+            t_s = (text or "").strip()
+            if not t_s or _paren_value_slot(t_s, (bx0, by0, bx1, by1)) is None:
+                continue
+            if min(sy1, by1) - max(sy0, by0) <= 1:
+                continue
+            if bx0 > sx0 + (sx1 - sx0) * 0.5 or bx1 + 4 >= sx1 - 10:
+                continue
+            if bx1 + 4 > sx0:
+                sx0 = bx1 + 4
+                d.value_slot = (sx0, sy0, sx1, sy1)
+                if d.value_anchor is not None:
+                    d.value_anchor = (sx0, d.value_anchor[1])
+
     # **值的位置不可以壓在別的標籤上。**
     #
     # 表格最左邊常有直書的分區標籤（「匯 款 資 料」），很窄。值一旦被算到
@@ -782,11 +893,6 @@ def detect_fields(
             # 正確做法是把值的起點推到子標籤後面。
             _bare = re.sub(r"[（(][\s_－—\-]*[)）]", "", t_stripped).strip()
             if _bare != t_stripped and _normalize(_bare) in label_to_key:
-                if bx1 + 4 < sx1 - 10 and bx0 <= sx0 + (sx1 - sx0) * 0.5:
-                    d.value_slot = (bx1 + 4, sy0, sx1, sy1)
-                    sx0 = bx1 + 4
-                    if d.value_anchor is not None:
-                        d.value_anchor = (sx0, d.value_anchor[1])
                 continue
             # Strip common noise and drop anything that's still effectively
             # empty or just a single stray character (form artifacts).
@@ -1244,6 +1350,10 @@ def detect_fields(
                 continue
             # Sibling must start to our right.
             if ox0 <= lx1 + 2:
+                continue
+            # 已經被推到後面的子標籤不算右界 —— 值的起點就在它右邊了，
+            # 再拿它當右界會把位置夾成 10pt（實測地址欄整條被壓成一小段）。
+            if ox1 <= sx0 + 1:
                 continue
             right_bound = min(right_bound, ox0 - 3)
         # Apply both adjustments at once (slot.x0 may have moved right).

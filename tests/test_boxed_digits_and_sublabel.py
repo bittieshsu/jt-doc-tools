@@ -121,3 +121,53 @@ def test_value_starts_after_the_sub_label(tmp_path):
         overlap_y = min(slot[3], by1) - max(slot[1], by0)
         assert not (overlap_x > 2 and overlap_y > 2), \
             f"值的位置壓在子標籤上：slot={slot} 子標籤={(bx0, by0, bx1, by1)}"
+
+
+# ---------- 3. 括號本身就是填寫的位置 ----------
+
+def test_parens_after_a_label_are_that_label_value_slot(tmp_path):
+    """`郵遞區號(      )` —— 括號中間就是郵遞區號要寫的地方。
+
+    原本這種 span 只會被當成「值格裡的子標籤」跳過，於是那個欄位**永遠不會
+    被填**（使用者回報：郵遞區號沒抓到）。
+    """
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_font(fontname="cjk", fontbuffer=_fontbuf())
+    page.insert_text((45, 118), "通訊地址", fontname="cjk", fontsize=11)
+    page.draw_rect(fitz.Rect(40, 100, 540, 125))
+    page.draw_line(fitz.Point(115, 100), fitz.Point(115, 125))
+    page.insert_text((122, 118), "郵遞區號(        )", fontname="cjk", fontsize=10)
+    pdf = tmp_path / "zip.pdf"
+    pdf.write_bytes(doc.tobytes())
+    doc.close()
+
+    fields = [f for f in D.detect_fields(pdf)[0] if f.profile_key == "zip_code"]
+    assert fields, "括號沒有被當成郵遞區號的填寫位置"
+    slot = fields[0].value_slot
+    assert slot is not None and slot[2] - slot[0] >= 6
+
+    # 位置要**真的落在括號中間**，不可以壓在「郵遞區號(」上面。
+    # 等寬估算在中文與半形括號混排時會偏左一大截，所以這裡要逐字座標。
+    with fitz.open(pdf) as d2:
+        chars = [c for b in d2[0].get_text("rawdict")["blocks"] if b.get("type") == 0
+                 for l in b["lines"] for s in l["spans"] for c in s["chars"]]
+    open_paren = next(c for c in chars if c["c"] in "(（")
+    close_paren = next(c for c in chars if c["c"] in ")）")
+    assert slot[0] >= open_paren["bbox"][2] - 1, \
+        f"值的位置壓在「郵遞區號(」上面：slot={slot}"
+    assert slot[2] <= close_paren["bbox"][0] + 1, \
+        f"值的位置蓋到右括號：slot={slot}"
+
+
+@pytest.mark.parametrize("label,key", [
+    ("開戶全名", "bank_account_name"),
+    ("開戶名稱", "bank_account_name"),
+    # 「解放行代號」是實際表單上的誤植（款→放）；表單印好了不會改。
+    ("解放行代號", "bank_branch_code"),
+    ("解款行代號", "bank_branch_code"),
+])
+def test_labels_map_to_the_right_field(label: str, key: str):
+    idx = D._build_synonym_index(D._active_label_map())
+    got = idx.get(D._normalize(label))
+    assert got and key in got, f"{label} 沒有對應到 {key}（拿到 {got}）"

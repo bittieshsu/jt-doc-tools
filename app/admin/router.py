@@ -978,7 +978,7 @@ def build_router(templates) -> APIRouter:
         body = await request.json()
         font_id = str(body.get("id") or "")
         if not font_id.startswith("custom:"):
-            raise HTTPException(400, "只有自訂上傳的字型可以改名稱")
+            raise HTTPException(400, "只有自訂上傳的字型可以變更名稱")
         fname = font_id.split(":", 1)[1]
         # 只准動自訂字型資料夾裡真的存在的檔 —— 否則等於讓人往設定檔塞任意鍵
         cdir = font_catalog.custom_fonts_dir().resolve()

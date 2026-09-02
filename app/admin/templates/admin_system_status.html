@@ -610,8 +610,13 @@ $('ssDbDeep').addEventListener('click', async (e) => {
   const b = e.currentTarget;
   // 完整檢查會連大檔一起讀（統編資料庫上 GB，可能要一分鐘）→ 先講清楚再跑，
   // 不要讓人以為當掉了
-  if (!confirm('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，'
-               + '可能需要一分鐘以上。要繼續嗎？')) return;
+  const _go = await (window.showConfirm
+    ? window.showConfirm('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，'
+                         + '可能需要一分鐘以上。要繼續嗎？',
+                         { title: '完整檢查', okText: '開始檢查' })
+    : Promise.resolve(confirm('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，'
+                              + '可能需要一分鐘以上。要繼續嗎？')));
+  if (!_go) return;
   b.disabled = true;
   const old = b.textContent;
   b.textContent = '檢查中…（可能需要一分鐘）';

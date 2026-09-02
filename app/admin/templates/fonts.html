@@ -86,7 +86,7 @@
                       data-current="{{ f.custom_name or '' }}"
                       data-auto="{{ f.auto_name or '' }}"
                       data-s="s002c9579"
-                      title="改這個字型在工具裡顯示的名稱（PDF 編輯器的字型下拉會用到）">{{ icon('edit', size=11) }} 改名稱</button>
+                      title="變更這個字型在工具裡顯示的名稱（PDF 編輯器的字型下拉會用到）">{{ icon('edit', size=11) }} 變更名稱</button>
               <button type="button" class="btn btn-danger btn-small del-custom-font" data-id="{{ f.id }}"
                       data-s="s002c9579">{{ icon('trash', size=11) }} 刪除</button>
             {% endif %}
@@ -284,18 +284,25 @@ document.querySelectorAll('.rename-custom-font').forEach(btn => {
     const id = btn.dataset.id;
     const auto = btn.dataset.auto || '';
     const cur = btn.dataset.current || '';
-    const name = window.prompt(
-      '這個字型在工具裡要顯示什麼名稱？\n'
-      + '（PDF 編輯器、用印、浮水印的字型選單都會用這個名稱）\n\n'
-      + (auto ? '留空 = 用字型檔內建的名稱「' + auto + '」' : '留空 = 用檔名'),
-      cur);
+    // 用本系統的對話框，不要瀏覽器原生的 —— 原生那個會頂著網域名
+    // （「doc.jason.tools 顯示」），樣式也跟全站不一致。
+    const name = await showPrompt(
+      '這個字型在工具裡要顯示什麼名稱？'
+      + '（PDF 編輯器、用印、浮水印的字型選單都會用這個名稱）',
+      {
+        title: '變更名稱',
+        okText: '儲存',
+        defaultValue: cur,
+        placeholder: auto ? '留空 = 用字型檔內建的名稱「' + auto + '」'
+                          : '留空 = 用檔名',
+      });
     if (name === null) return;          // 按取消
     const r = await fetch('/admin/fonts/rename', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: id, name: name }),
     });
     if (r.ok) location.reload();
-    else showAlert('改名稱失敗：' + await window.friendlyServerError(r, '改名稱失敗'));
+    else showAlert('變更名稱失敗：' + await window.friendlyServerError(r, '變更名稱失敗'));
   });
 });
 
