@@ -204,6 +204,16 @@ def find_cell_right_of(
             continue
         cand.append(oc)
     cand.sort(key=lambda c: c[0])
+
+    # **一整排等寬的小格是「逐格分寫」的值區，不是要跳過的窄欄。**
+    # 統一編號 / 帳號常畫成 8~12 個各 30pt 的小格；照「跳過窄欄、挑第一個夠寬
+    # 的格子」去找，會一路跳過那排小格、落到隔壁欄的**標籤**上，接著被
+    # 「值不可以蓋到別的標籤」那條防線丟掉 —— 結果是那一欄整個沒有位置，
+    # 而且無聲（客戶回報的表單就是這樣，統一編號永遠沒被填）。
+    run = _leading_equal_width_run(cand)
+    if run:
+        return (run[0][0], run[0][1], run[-1][2], run[0][3])
+
     for c in cand:
         if c[2] - c[0] >= value_width_hint:
             return c
@@ -211,6 +221,26 @@ def find_cell_right_of(
         if c[2] - c[0] >= min_width:
             return c
     return None
+
+
+def _leading_equal_width_run(cand: list[Cell], min_boxes: int = 4) -> list[Cell]:
+    """從最左邊開始，連續等寬又相鄰的小格（逐格分寫的值區）。
+
+    條件跟 `extract_digit_box_clusters` 一致（寬度差 ≤20%、間距 ≤1.5pt），
+    只是這裡從候選的最前面看起，而且門檻放寬到 4 格 —— 郵遞區號只有 3~5 格。
+    """
+    if len(cand) < min_boxes:
+        return []
+    run: list[Cell] = [cand[0]]
+    for c in cand[1:]:
+        prev = run[-1]
+        pw, cw = prev[2] - prev[0], c[2] - c[0]
+        if pw <= 0 or cw <= 0:
+            break
+        if min(pw, cw) / max(pw, cw) < 0.8 or abs(c[0] - prev[2]) > 1.5:
+            break
+        run.append(c)
+    return run if len(run) >= min_boxes else []
 
 
 def find_cell_below_of(

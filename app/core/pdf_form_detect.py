@@ -417,6 +417,36 @@ class PageInfo:
     height_pt: float
 
 
+# 用印 / 簽章區的**標籤**，用來排除「要蓋實體章、手寫簽名」的那一段。
+_SEAL_MARKERS = ("公司章", "簽章", "蓋章", "印鑑", "用印", "填表人", "授權人",
+                 "負責人簽章", "核准", "審核", "主管簽章")
+# 一句話裡才會出現的東西 —— 標籤不會有句讀、也不會有條列編號。
+_SENTENCE_CHARS = "。，、；？！,;?!"
+
+
+def _is_seal_marker(text: str) -> bool:
+    """這段文字是「用印區的標籤」，還是「只是提到蓋章的說明句」？
+
+    兩者一定要分開：用印區的判定會把**那一行以下的欄位整批排除**，而很多表單
+    會在欄位**上方**的填表說明裡提到蓋章，例如
+    「(四).必須蓋上　貴寶號及負責人印鑑章，以示同意。」——
+    那句話一旦被當成用印區的起點，整張表的欄位就全部被排除，
+    畫面上是「一欄都沒抓到」，而且沒有任何錯誤訊息（客戶實際回報過）。
+
+    判準用的是標籤與句子的本質差異，不是位置（有些表單的用印格就在頁面中段）：
+    標籤**短**、而且**沒有句讀**。
+    """
+    t = (text or "").strip().rstrip(":：").strip()
+    if not t:
+        return False
+    if not any(m in t for m in _SEAL_MARKERS):
+        return False
+    if any(c in t for c in _SENTENCE_CHARS):
+        return False        # 有句讀 → 是說明句
+    # 「負責人印鑑」5 字、「公司大小章」5 字；說明句一律比這長很多。
+    return len(t) <= 12
+
+
 def detect_fields(
     pdf_path: Path,
     label_map: Optional[dict[str, list[str]]] = None,
@@ -740,6 +770,23 @@ def detect_fields(
             # Text ending with a colon — "郵遞區號:", "Phone:", "電話：" —
             # is a sub-field label inside a merged cell, not pre-filled data.
             if t_stripped.endswith(":") or t_stripped.endswith("："):
+                continue
+            # 「標籤詞＋空括號」也是子標籤，例如 `郵遞區號(        )`：
+            # 那對括號是要人填東西的位置，不是已經填好的資料。
+            # 判成「已填」的話整欄會被跳過 —— 客戶那份表單的通訊地址與發票
+            # 地址就是這樣被略過的，而且畫面上只顯示「未填」，看不出原因。
+            #
+            # **但也不能就這樣寫上去** —— 那個子標籤是真的印在紙上的字，
+            # 值從格子左緣開始寫就會壓在它上面（實測重疊 95pt）。
+            # 疊字比沒填更糟：使用者看到的是兩串字疊在一起。
+            # 正確做法是把值的起點推到子標籤後面。
+            _bare = re.sub(r"[（(][\s_－—\-]*[)）]", "", t_stripped).strip()
+            if _bare != t_stripped and _normalize(_bare) in label_to_key:
+                if bx1 + 4 < sx1 - 10 and bx0 <= sx0 + (sx1 - sx0) * 0.5:
+                    d.value_slot = (bx1 + 4, sy0, sx1, sy1)
+                    sx0 = bx1 + 4
+                    if d.value_anchor is not None:
+                        d.value_anchor = (sx0, d.value_anchor[1])
                 continue
             # Strip common noise and drop anything that's still effectively
             # empty or just a single stray character (form artifacts).
@@ -1208,8 +1255,6 @@ def detect_fields(
     # "簽章", "蓋章", "印鑑", "填表人" — those rows are for a physical
     # stamp or handwritten signature, not auto-fill. Exclude both the row
     # containing the marker and everything below it on that page.
-    _SEAL_MARKERS = ("公司章", "簽章", "蓋章", "印鑑", "用印", "填表人", "授權人",
-                     "負責人簽章", "核准", "審核", "主管簽章")
     for pno, spans in enumerate(page_spans):
         seal_y: Optional[float] = None
         for text, (bx0, by0, bx1, by1), _size, _color in spans:
@@ -1217,8 +1262,7 @@ def detect_fields(
             if not t:
                 continue
             # Strip trailing colon for comparison.
-            t_norm = t.rstrip(":：").strip()
-            if any(m in t_norm for m in _SEAL_MARKERS):
+            if _is_seal_marker(t):
                 if seal_y is None or by0 < seal_y:
                     seal_y = by0
         if seal_y is None:

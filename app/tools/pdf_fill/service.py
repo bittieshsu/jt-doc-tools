@@ -461,20 +461,23 @@ def fill_pdf(
                         source_key="zip_code", kind="text",
                     ))
 
-    # Digit-box grid for 受款帳號 / bank_account_no — drawn rectangles that
-    # hold one character each. When a bank_account_no field is detected near
-    # such a grid, distribute the account number digit-by-digit and remove
-    # the single-string placement that would otherwise overlap.
-    account_value = (profile.get("bank_account_no") or "").strip()
-    if account_value and any(digit_clusters_per_page):
-        account_chars = [c for c in account_value if c.isdigit() or c == "-"]
-        account_chars = [c for c in account_chars if c.isdigit()]
+    # 逐格分寫的數字格 —— 一格一個字的方框（受款帳號、統一編號都是這種版型）。
+    # 偵測到的欄位附近有這種格子時，就把數字逐格填進去，並且把原本那一筆
+    # 「整串寫在一起」的排版丟掉，免得兩者疊在一起。
+    #
+    # **統一編號也走這條** —— 它跟帳號是同一種版型（客戶表單實測 8 格、
+    # 每格 30pt）。原本只有帳號走，統編就整串寫在最左邊那兩三格上。
+    used_grid_ids: set[int] = set()
+    consumed_placement_ids: set[int] = set()
+    for _grid_key in ("bank_account_no", "tax_id"):
+        digit_value = (profile.get(_grid_key) or "").strip()
+        if not digit_value or not any(digit_clusters_per_page):
+            continue
+        account_chars = [c for c in digit_value if c.isdigit()]
         account_slots = [
             d for d in detected
-            if d.profile_key == "bank_account_no" and d.value_slot is not None
+            if d.profile_key == _grid_key and d.value_slot is not None
         ]
-        used_grid_ids: set[int] = set()
-        consumed_placement_ids: set[int] = set()
         for d in account_slots:
             sx0, sy0, sx1, sy1 = d.value_slot
             best_grid = None
@@ -524,10 +527,10 @@ def fill_pdf(
                     base_font_size=11.0,
                     min_font_size=7.0,
                     align="center",
-                    source_key="bank_account_no", kind="text",
+                    source_key=_grid_key, kind="text",
                 ))
-        if consumed_placement_ids:
-            placements = [p for i, p in enumerate(placements) if i not in consumed_placement_ids]
+    if consumed_placement_ids:
+        placements = [p for i, p in enumerate(placements) if i not in consumed_placement_ids]
 
     pdf_text_overlay.overlay_text(src_pdf, dst_pdf, placements, font_id=font_id)
 
