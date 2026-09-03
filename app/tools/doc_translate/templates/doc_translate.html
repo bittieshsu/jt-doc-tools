@@ -25,7 +25,9 @@
 .dt-prev { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
            gap: 14px; margin-top: 12px; }
 .dt-prev figure { margin: 0; border: 1px solid #e2e8f0; border-radius: 8px;
-                  overflow: hidden; background: #f8fafc; }
+                  overflow: hidden; background: #f8fafc; cursor: zoom-in;
+                  transition: border-color .12s, box-shadow .12s; }
+.dt-prev figure:hover { border-color: #6366f1; box-shadow: 0 4px 14px rgba(99,102,241,.18); }
 .dt-prev img { display: block; width: 100%; height: auto; }
 .dt-prev figcaption { font-size: 12px; color: #64748b; padding: 5px 8px; text-align: center; }
 </style>
@@ -98,11 +100,43 @@
   <p class="muted dt-note" id="dtPrevNote">前 {{ preview_pages }} 頁預覽（用來確認版面沒跑掉）：</p>
   <div class="dt-prev" id="dtPrev"></div>
 </div>
+
+{# 放大檢視用全站共用的 .lightbox（樣式在 platform.css）—— 不要每個工具自己刻一套 #}
+<div id="dt-lightbox" class="lightbox" hidden>
+  <div class="lightbox-inner">
+    <img id="dt-lightbox-img" alt="" />
+    <div class="lightbox-caption" id="dt-lightbox-cap"></div>
+  </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/file_upload.js"></script><script src="/static/js/job_progress.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
 let dtUpload = null;
+
+/* 預覽縮圖點一下看大圖（跟資產管理同一套 .lightbox）。
+   縮圖是 90 dpi 的小圖，只看縮圖分不出版面有沒有跑掉 —— 這個工具的整個
+   賣點就是「版面沒跑掉」，看不清楚等於沒給到證據。 */
+function openLightbox(src, caption) {
+  const lb = document.getElementById('dt-lightbox');
+  document.getElementById('dt-lightbox-img').src = src;
+  document.getElementById('dt-lightbox-cap').textContent = caption || '';
+  lb.hidden = false;
+}
+document.addEventListener('click', (e) => {
+  const lb = document.getElementById('dt-lightbox');
+  if (lb && !lb.hidden && e.target.closest('#dt-lightbox')) {
+    lb.hidden = true;
+    document.getElementById('dt-lightbox-img').src = '';
+  }
+});
+document.addEventListener('keydown', (e) => {
+  const lb = document.getElementById('dt-lightbox');
+  if (e.key === 'Escape' && lb && !lb.hidden) {
+    lb.hidden = true;
+    document.getElementById('dt-lightbox-img').src = '';
+  }
+});
 
 document.querySelectorAll('.dt-chip').forEach(c =>
   c.addEventListener('click', () => c.classList.toggle('on')));
@@ -154,7 +188,12 @@ function showResult(job) {
       img.alt = `第 ${i} 頁`;
       const cap = document.createElement('figcaption');
       cap.textContent = `第 ${i} 頁`;
-      fig.appendChild(img); fig.appendChild(cap); grid.appendChild(fig);
+      fig.appendChild(img); fig.appendChild(cap);
+      fig.title = '點一下看大圖';
+      // 放大要拿高解析度那張，縮圖放大只會糊掉
+      const big = `/tools/doc-translate/preview/${dtUpload}/${i}?large=1`;
+      fig.addEventListener('click', () => openLightbox(big, `第 ${i} 頁`));
+      grid.appendChild(fig);
     }
 }
 

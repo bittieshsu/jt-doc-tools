@@ -281,11 +281,26 @@ def _make_preview(upload_id: str, result: Path) -> int:
 
 
 @router.get("/preview/{upload_id}/{page}")
-async def preview(upload_id: str, page: int, request: Request):
+async def preview(upload_id: str, page: int, request: Request,
+                  large: str = ""):
+    """縮圖（90 dpi）；`?large=1` 給放大檢視用（170 dpi，第一次要求時才算）。
+
+    縮圖的解析度只夠看「有沒有東西」，看不出版面有沒有跑掉 —— 而這個工具的
+    整個賣點就是版面沒跑掉，所以放大要給真的看得清楚的圖。
+    """
     _sp.require_uuid_hex(upload_id, "upload_id")
     _uo.require(upload_id, request)
     if not (1 <= page <= PREVIEW_PAGES):
         raise HTTPException(400, "頁碼超出範圍")
+    if large == "1":
+        big = settings.temp_dir / f"dt_{upload_id}_p{page}_lg.png"
+        if not big.exists():
+            pdf = settings.temp_dir / f"dt_{upload_id}_preview.pdf"
+            if not pdf.exists():
+                raise HTTPException(404, "預覽不存在")
+            await asyncio.to_thread(pdf_preview.render_page_png, pdf, big,
+                                    page_index=page - 1, dpi=170)
+        return FileResponse(big, media_type="image/png")
     png = settings.temp_dir / f"dt_{upload_id}_p{page}.png"
     if not png.exists():
         raise HTTPException(404, "預覽不存在")
