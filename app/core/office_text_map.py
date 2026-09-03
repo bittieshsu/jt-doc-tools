@@ -82,6 +82,7 @@ class TextUnit:
     index: int                    # 該檔案裡的第幾段
     text: str                     # 原文（同一段所有文字節點接起來）
     nodes: list = field(repr=False, default_factory=list)   # 對應的 XML 節點
+    owners: dict = field(repr=False, default_factory=dict)  # 文字節點 → 所屬 run
 
 
 def _localname(tag: str) -> str:
@@ -90,35 +91,43 @@ def _localname(tag: str) -> str:
 
 def _iter_paragraph_nodes(root: ET.Element, kind: str):
     """回傳 [(段落元素, [文字節點, ...])]。"""
-    out: list[tuple[ET.Element, list[ET.Element]]] = []
+    out: list[tuple[ET.Element, list[ET.Element], dict]] = []
     if kind == "docx":
         for para in root.iter(f"{{{_W}}}p"):
             nodes = [n for n in para.iter(f"{{{_W}}}t")]
             if nodes:
-                out.append((para, nodes))
+                # 記下每個文字節點屬於哪個 run —— 寫進中文時要在 run 上指定
+                # 東亞字型，否則 Word 會退到文件預設的東亞字型（實測是日文的
+                # MS Mincho）：字形是日文的、行高也跟著變大，看起來就是
+                # 「行距怎麼變了」。
+                owner = {}
+                for run in para.iter(f"{{{_W}}}r"):
+                    for tn in run.iter(f"{{{_W}}}t"):
+                        owner[id(tn)] = run
+                out.append((para, nodes, owner))
     elif kind == "xlsx":
         # sharedStrings：一個 <si> 是一格的內容（可能被切成多個 <r><t>）
         for si in root.iter(f"{{{_XL}}}si"):
             nodes = [n for n in si.iter(f"{{{_XL}}}t")]
             if nodes:
-                out.append((si, nodes))
+                out.append((si, nodes, {}))
         # 直接寫在工作表裡的 inline string
         for isx in root.iter(f"{{{_XL}}}is"):
             nodes = [n for n in isx.iter(f"{{{_XL}}}t")]
             if nodes:
-                out.append((isx, nodes))
+                out.append((isx, nodes, {}))
     elif kind == "pptx":
         # 簡報的文字在 DrawingML 裡：一個 <a:p> 是一段，切成多個 <a:r><a:t>
         for para in root.iter(f"{{{_A}}}p"):
             nodes = [n for n in para.iter(f"{{{_A}}}t")]
             if nodes:
-                out.append((para, nodes))
+                out.append((para, nodes, {}))
     else:  # odf
         for tag in ("p", "h"):
             for para in root.iter(f"{{{_TEXT}}}{tag}"):
                 nodes = _odf_text_nodes(para)
                 if nodes:
-                    out.append((para, nodes))
+                    out.append((para, nodes, {}))
     return out
 
 
@@ -166,6 +175,44 @@ def _parts_for(ext: str) -> re.Pattern:
             ".pptx": _PPTX_PARTS, ".odt": _ODT_PARTS}.get(ext, _ODF_PARTS)
 
 
+
+#: 目標語言 → 該用哪個東亞字型。**不設的話 Word 會退到文件預設的東亞字型**，
+#: 而多數英文範本的預設是日文的 MS Mincho：字形是日文的（過 / 直 / 骨 寫法不同）、
+#: 行高也比中文字型大，看起來就是「翻完行距變了」。
+#: 挑的都是各平台常見、且該語言的正確字型。
+_EAST_ASIAN_FONT = {
+    "zh-TW": "Microsoft JhengHei", "zh": "Microsoft JhengHei",
+    "zh-CN": "Microsoft YaHei",
+    "ja": "Yu Gothic",
+    "ko": "Malgun Gothic",
+}
+_CJK_RE = re.compile(r"[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]")
+
+
+def east_asian_font_for(target_lang: str) -> str:
+    return _EAST_ASIAN_FONT.get(target_lang or "", "")
+
+
+def _set_run_east_asian_font(run: ET.Element, font: str) -> None:
+    """在 run 上指定東亞字型（`w:rPr/w:rFonts/@w:eastAsia`）。
+
+    只補**東亞**那一格，不動 ascii / hAnsi —— 段落裡原本的英文、數字要維持
+    原本的字型，那也是版面的一部分。
+    """
+    if not font:
+        return
+    rpr = run.find(f"{{{_W}}}rPr")
+    if rpr is None:
+        rpr = ET.Element(f"{{{_W}}}rPr")
+        run.insert(0, rpr)      # rPr 一定要是 run 的第一個子元素
+    fonts = rpr.find(f"{{{_W}}}rFonts")
+    if fonts is None:
+        fonts = ET.SubElement(rpr, f"{{{_W}}}rFonts")
+        rpr.remove(fonts)
+        rpr.insert(0, fonts)    # rFonts 要排在 rPr 的最前面
+    fonts.set(f"{{{_W}}}eastAsia", font)
+
+
 def extract_units(data: bytes, ext: str) -> tuple[list[TextUnit], dict]:
     """抽出所有可翻譯的段落。
 
@@ -187,19 +234,25 @@ def extract_units(data: bytes, ext: str) -> tuple[list[TextUnit], dict]:
             continue
         kind = _kind_for(name, ext)
         trees[name] = ET.ElementTree(root)
-        for i, (_para, nodes) in enumerate(_iter_paragraph_nodes(root, kind)):
+        for i, (_para, nodes, owner) in enumerate(
+                _iter_paragraph_nodes(root, kind)):
             text = "".join(_node_text(n, kind) for n in nodes)
             if should_translate(text):
-                units.append(TextUnit(part=name, index=i, text=text, nodes=nodes))
+                units.append(TextUnit(part=name, index=i, text=text,
+                                      nodes=nodes, owners=owner))
     return units, {"raw": raw, "names": names, "trees": trees, "ext": ext}
 
 
-def rebuild(state: dict, translations: dict[int, str], units: list[TextUnit]) -> bytes:
+def rebuild(state: dict, translations: dict[int, str], units: list[TextUnit],
+            target_lang: str = "") -> bytes:
     """把譯文寫回原檔，回傳新的檔案內容。
 
     `translations` 是 {units 的索引: 譯文}；沒有譯文的段落保持原文。
+    給了 `target_lang` 時，寫進東亞文字的 run 會一併指定對應的東亞字型
+    （見 `_EAST_ASIAN_FONT`）。
     """
     ext = state["ext"]
+    ea_font = east_asian_font_for(target_lang)
     for idx, unit in enumerate(units):
         new = translations.get(idx)
         if new is None or new == unit.text:
@@ -208,6 +261,10 @@ def rebuild(state: dict, translations: dict[int, str], units: list[TextUnit]) ->
         # 譯文全部寫進第一個節點，其餘清空 —— 段落的框 / 格 / 頁首頁尾都還在，
         # 所以版面不動；段落內部的混合格式會統一成第一個 run 的樣式。
         _set_node_text(unit.nodes[0], kind, new)
+        if kind == "docx" and ea_font and _CJK_RE.search(new):
+            run = unit.owners.get(id(unit.nodes[0]))
+            if run is not None:
+                _set_run_east_asian_font(run, ea_font)
         for n in unit.nodes[1:]:
             _set_node_text(n, kind, "")
 

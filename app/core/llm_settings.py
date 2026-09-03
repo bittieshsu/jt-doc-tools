@@ -109,6 +109,12 @@ class LLMSettingsManager:
     KNOWN_LLM_TOOLS: list[dict] = [
         {"id": "translate-doc",    "name": "逐句翻譯",
          "use": "純文字 chat — 中譯英、英譯中等", "kind": "text"},
+        {"id": "doc-translate",    "name": "文件翻譯（整份辦公文件）",
+         "use": "整份 Word / Excel / PowerPoint 翻成另一種語言，產出同格式的檔案。"
+                "**這支很吃量**（一份文件動輒幾十次請求），"
+                "換小一點的模型（9b / 12b 這一級）速度差好幾倍，"
+                "而翻譯這種任務小模型通常就夠用 —— 台灣用語對照表與領域提示"
+                "已經在 prompt 裡了。", "kind": "text"},
         {"id": "pdf-extract-text", "name": "擷取文字（LLM 段落重排）",
          "use": "把 PDF 版面切斷的句子重排回來", "kind": "text"},
         {"id": "pdf-fill",         "name": "表單自動填寫（LLM 校驗）",

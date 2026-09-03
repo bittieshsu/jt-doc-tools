@@ -346,7 +346,7 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
 
     job.message = "寫回檔案…"
     job.progress = 0.82
-    new_bytes = otm.rebuild(state, out, units)
+    new_bytes = otm.rebuild(state, out, units, target_lang=target_lang)
     result = _out_path(upload_id, work_ext)
     result.write_bytes(new_bytes)
 
@@ -359,7 +359,7 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
 
     job.message = "產生預覽…"
     job.progress = 0.9
-    pages = _make_preview(upload_id, result)
+    pages = _make_preview(upload_id, result, src)
 
     stem = Path(meta["filename"]).stem
     # **一定要設 `result_path`** —— 「我的作業」的下載鈕看的是這個
@@ -384,25 +384,39 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
     job.progress = 1.0
 
 
-def _make_preview(upload_id: str, result: Path) -> int:
-    """把產出的檔案轉成 PDF，前幾頁存成 PNG。預覽失敗不影響下載。"""
+def _render_side(upload_id: str, src_file: Path, side: str) -> int:
+    """把一份檔案轉成 PDF、前幾頁存成 PNG。回傳張數；失敗回 0。"""
+    pdf = settings.temp_dir / f"dt_{upload_id}_{side}.pdf"
+    office_convert.convert_to_pdf(src_file, pdf)
+    import fitz
+    with fitz.open(pdf) as doc:
+        n = min(PREVIEW_PAGES, doc.page_count)
+    for i in range(n):
+        png = settings.temp_dir / f"dt_{upload_id}_{side}_p{i + 1}.png"
+        pdf_preview.render_page_png(pdf, png, page_index=i, dpi=90)
+    return n
+
+
+def _make_preview(upload_id: str, result: Path, source: Path) -> int:
+    """原文與譯文各出一份前幾頁的預覽圖。預覽失敗不影響下載。
+
+    **兩邊都要**：這個工具要證明的是「版面沒跑掉」，只看譯文那一份看不出來 ——
+    要跟原稿並排比才知道框線、表格、圖片有沒有位移。
+    """
     try:
-        pdf = settings.temp_dir / f"dt_{upload_id}_preview.pdf"
-        office_convert.convert_to_pdf(result, pdf)
-        import fitz
-        with fitz.open(pdf) as doc:
-            n = min(PREVIEW_PAGES, doc.page_count)
-        for i in range(n):
-            png = settings.temp_dir / f"dt_{upload_id}_p{i + 1}.png"
-            pdf_preview.render_page_png(pdf, png, page_index=i, dpi=90)
-        return n
+        n_out = _render_side(upload_id, result, "out")
     except Exception:
         return 0
+    try:
+        n_src = _render_side(upload_id, source, "src")
+    except Exception:
+        n_src = 0
+    return min(n_out, n_src) if n_src else n_out
 
 
 @router.get("/preview/{upload_id}/{page}")
 async def preview(upload_id: str, page: int, request: Request,
-                  large: str = ""):
+                  large: str = "", side: str = "out"):
     """縮圖（90 dpi）；`?large=1` 給放大檢視用（170 dpi，第一次要求時才算）。
 
     縮圖的解析度只夠看「有沒有東西」，看不出版面有沒有跑掉 —— 而這個工具的
@@ -412,16 +426,18 @@ async def preview(upload_id: str, page: int, request: Request,
     _uo.require(upload_id, request)
     if not (1 <= page <= PREVIEW_PAGES):
         raise HTTPException(400, "頁碼超出範圍")
+    if side not in ("out", "src"):
+        raise HTTPException(400, "side 只能是 out 或 src")
     if large == "1":
-        big = settings.temp_dir / f"dt_{upload_id}_p{page}_lg.png"
+        big = settings.temp_dir / f"dt_{upload_id}_{side}_p{page}_lg.png"
         if not big.exists():
-            pdf = settings.temp_dir / f"dt_{upload_id}_preview.pdf"
+            pdf = settings.temp_dir / f"dt_{upload_id}_{side}.pdf"
             if not pdf.exists():
                 raise HTTPException(404, "預覽不存在")
             await asyncio.to_thread(pdf_preview.render_page_png, pdf, big,
                                     page_index=page - 1, dpi=170)
         return FileResponse(big, media_type="image/png")
-    png = settings.temp_dir / f"dt_{upload_id}_p{page}.png"
+    png = settings.temp_dir / f"dt_{upload_id}_{side}_p{page}.png"
     if not png.exists():
         raise HTTPException(404, "預覽不存在")
     return FileResponse(png, media_type="image/png")

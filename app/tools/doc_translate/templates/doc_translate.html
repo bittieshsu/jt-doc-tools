@@ -25,8 +25,11 @@
 .dt-note { font-size: 12.5px; line-height: 1.7; }
 .dt-stats { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; margin-top: 4px; }
 .dt-stats b { font-size: 17px; font-variant-numeric: tabular-nums; }
-.dt-prev { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-           gap: 14px; margin-top: 12px; }
+/* 一頁一列：左原文、右譯文，並排才看得出版面有沒有跑掉 */
+.dt-prev { display: flex; flex-direction: column; gap: 18px; margin-top: 12px; }
+.dt-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.dt-pair-head { font-size: 12.5px; color: #475569; font-weight: 600; margin-bottom: 6px; }
+@media (max-width: 720px) { .dt-pair { grid-template-columns: 1fr; } }
 .dt-prev figure { margin: 0; border: 1px solid #e2e8f0; border-radius: 8px;
                   overflow: hidden; background: #f8fafc; cursor: zoom-in;
                   transition: border-color .12s, box-shadow .12s; }
@@ -78,6 +81,16 @@
   </div>
   <input type="text" class="field dt-domain-input" id="dtDomain" placeholder="自填其他領域…（選填，會與上方點選的領域一起送進 prompt）">
 
+  <p class="muted dt-note" data-s="s_dt_model">
+    {{ icon('info', size=14) }} <b>模型怎麼挑</b>：這支工具一份文件動輒幾十次 LLM 請求，
+    模型大小直接決定要等多久。<b>要快</b>建議 <code>gemma4:9b</code> ~ <code>gemma4:14b</code>
+    這一級 —— 翻譯這種任務小模型通常就夠用（台灣用語對照表與領域提示已經在 prompt 裡）。
+    <b>要更好的品質</b>（法律合約、專業論文這類）再用 <code>gemma4:26b</code>。
+    {% if is_admin(request) %}可以在 <a href="/admin/llm-settings">LLM 設定</a>
+    單獨指定這支工具要用的模型，不影響其他工具。{% else %}
+    要換模型請聯絡管理員（可以只針對這支工具指定）。{% endif %}
+  </p>
+
   <p class="muted dt-note" data-s="s_dt_pdf">
     {{ icon('info', size=14) }} <b>不支援 PDF</b>：PDF 裡沒有「段落」這種東西，
     文字是一塊一塊定位好的碎片，換成長度不同的譯文之後版面一定跑掉。
@@ -100,7 +113,8 @@
   <h2 data-s="s_dt_2">2. 結果</h2>
   <p class="muted dt-note" id="dtSummary"></p>
   <p><a class="btn btn-primary" id="dtDownload" href="#" download>{{ icon('download') }} 下載翻譯後的檔案</a></p>
-  <p class="muted dt-note" id="dtPrevNote">前 {{ preview_pages }} 頁預覽（用來確認版面沒跑掉）：</p>
+  <p class="muted dt-note" id="dtPrevNote">前 {{ preview_pages }} 頁預覽 —— <b>左邊原文、右邊譯文</b>，
+    並排比對版面有沒有跑掉（點圖看大圖）：</p>
   <div class="dt-prev" id="dtPrev"></div>
 </div>
 
@@ -190,18 +204,25 @@ function showResult(job) {
     const n = m.preview_pages || 0;
     document.getElementById('dtPrevNote').hidden = n === 0;
     for (let i = 1; i <= n; i++) {
-      const fig = document.createElement('figure');
-      const img = document.createElement('img');
-      img.src = `/tools/doc-translate/preview/${dtUpload}/${i}`;
-      img.alt = `第 ${i} 頁`;
-      const cap = document.createElement('figcaption');
-      cap.textContent = `第 ${i} 頁`;
-      fig.appendChild(img); fig.appendChild(cap);
-      fig.title = '點一下看大圖';
-      // 放大要拿高解析度那張，縮圖放大只會糊掉
-      const big = `/tools/doc-translate/preview/${dtUpload}/${i}?large=1`;
-      fig.addEventListener('click', () => openLightbox(big, `第 ${i} 頁`));
-      grid.appendChild(fig);
+      const row = document.createElement('div');
+      row.className = 'dt-pair';
+      for (const side of ['src', 'out']) {
+        const label = side === 'src' ? '原文' : '譯文';
+        const fig = document.createElement('figure');
+        const img = document.createElement('img');
+        img.src = `/tools/doc-translate/preview/${dtUpload}/${i}?side=${side}`;
+        img.alt = `第 ${i} 頁（${label}）`;
+        const cap = document.createElement('figcaption');
+        cap.textContent = `第 ${i} 頁 · ${label}`;
+        fig.appendChild(img); fig.appendChild(cap);
+        fig.title = '點一下看大圖';
+        // 放大要拿高解析度那張，縮圖放大只會糊掉
+        const big = `/tools/doc-translate/preview/${dtUpload}/${i}`
+                  + `?side=${side}&large=1`;
+        fig.addEventListener('click', () => openLightbox(big, `第 ${i} 頁 · ${label}`));
+        row.appendChild(fig);
+      }
+      grid.appendChild(row);
     }
 }
 
