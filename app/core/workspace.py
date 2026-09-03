@@ -244,6 +244,19 @@ _OOXML_KINDS = (
 )
 
 
+#: OOXML 主檔的**內容型別**（權威來源）—— 主檔的路徑不保證叫什麼名字。
+_OOXML_MAIN_TYPES = (
+    ("wordprocessingml.document.main+xml", _DOCX_MIME, ".docx"),
+    ("spreadsheetml.sheet.main+xml", _XLSX_MIME, ".xlsx"),
+    ("presentationml.presentation.main+xml", _PPTX_MIME, ".pptx"),
+    # 範本（.dotx / .xltx / .potx）內容也一樣，當成對應的文件型別收
+    ("wordprocessingml.template.main+xml", _DOCX_MIME, ".docx"),
+    ("spreadsheetml.template.main+xml", _XLSX_MIME, ".xlsx"),
+    ("presentationml.template.main+xml", _PPTX_MIME, ".pptx"),
+    ("presentationml.slideshow.main+xml", _PPTX_MIME, ".pptx"),
+)
+
+
 # 把 Office 型別併進 ALLOWED，維持單一事實來源 —— 兩邊各寫一份遲早會不一致
 ALLOWED.update({m: e for m, e in _ODF_KINDS.items()})
 ALLOWED.update({m: e for _p, m, e in _OOXML_KINDS})
@@ -281,6 +294,18 @@ def detect_kind(data: bytes) -> Optional[tuple[str, str]]:
                 if "[Content_Types].xml" in names:
                     for part, mime, ext in _OOXML_KINDS:
                         if part in names:
+                            return mime, ext
+                    # **主檔不一定叫 `word/document.xml`。** Word 自己在某些
+                    # 編輯之後會寫成 `word/document2.xml`，那種檔案照樣是合法
+                    # 的 .docx，但上面那組路徑比對會認不得 → 使用者拖進工作區
+                    # 得到「不支援的檔案類型」，而錯誤訊息還寫著「接受 .docx」。
+                    # 真正權威的來源是 `[Content_Types].xml` 裡的內容型別。
+                    try:
+                        ct = z.read("[Content_Types].xml").decode("utf-8", "replace")
+                    except Exception:  # noqa: BLE001
+                        ct = ""
+                    for main_ct, mime, ext in _OOXML_MAIN_TYPES:
+                        if main_ct in ct:
                             return mime, ext
         except Exception:  # noqa: BLE001 — malformed zip → unsupported
             return None

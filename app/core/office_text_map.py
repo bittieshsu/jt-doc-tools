@@ -31,7 +31,11 @@ _A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 _XML = "http://www.w3.org/XML/1998/namespace"
 
 #: 哪些 zip 內的檔案要掃。頁首頁尾也要翻，不然翻完的文件抬頭還是原文。
-_DOCX_PARTS = re.compile(r"^word/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$")
+#: `document` 後面允許數字 —— **主檔不一定叫 `word/document.xml`**：Word 在某些
+#: 編輯之後會寫成 `word/document2.xml`，那種檔案照樣是合法的 .docx。寫死名字
+#: 的話那份文件會「找不到可以翻譯的文字」，而使用者完全看不出為什麼。
+_DOCX_PARTS = re.compile(
+    r"^word/(document\d*|header\d*|footer\d*|footnotes|endnotes)\.xml$")
 _XLSX_PARTS = re.compile(r"^xl/(sharedStrings\.xml|worksheets/sheet\d+\.xml)$")
 #: 簡報：投影片本身與備忘稿。母片 / 版面配置不翻（那是版型的佔位文字）。
 _PPTX_PARTS = re.compile(r"^ppt/(slides|notesSlides)/[a-zA-Z]+\d+\.xml$")

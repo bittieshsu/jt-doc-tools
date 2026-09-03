@@ -178,3 +178,22 @@ def test_job_produces_a_translated_file(tmp_path, monkeypatch):
     # 少了它，那一列會顯示「已完成」卻沒有任何東西可以下載（實際踩過）。
     assert job.result_path == out, "沒有把產出設成作業結果"
     assert job.result_filename.endswith(".docx")
+
+
+def test_main_part_may_have_a_number_suffix():
+    """`word/document2.xml` 也是合法的 .docx —— Word 自己會這樣寫。
+
+    寫死 `word/document.xml` 的話，那份文件在文件翻譯會「找不到可以翻譯的
+    文字」、在工作區會被判成「不支援的檔案類型」，而錯誤訊息還寫著接受 .docx，
+    使用者完全看不出為什麼（使用者實際踩到）。
+    """
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr(
+            "word/document2.xml",
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/'
+            'wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello there</w:t>'
+            "</w:r></w:p></w:body></w:document>")
+    units, _ = M.extract_units(buf.getvalue(), ".docx")
+    assert [u.text for u in units] == ["Hello there"]
