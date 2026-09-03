@@ -17,6 +17,8 @@
 .dt-upblock { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
 /* 自填領域拉滿整列 —— `.field` 對 text input 有預設寬度，不覆蓋的話只有一小截 */
 .dt-domain-input { width: 100%; max-width: none; box-sizing: border-box; }
+/* 兩顆按鈕排同一列、拉成同高 —— 圖示大小不同時高度會差幾像素，很明顯 */
+.dt-actions { display: flex; gap: 10px; align-items: stretch; margin: 14px 0; }
 .dt-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 8px; }
 .dt-chip { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px;
            padding: 5px 14px; font-size: 13px; cursor: pointer; color: #334155; }
@@ -107,12 +109,12 @@
     </div>
   </div>
 
-  <p>
+  <div class="dt-actions">
     <button class="btn btn-primary" id="btn-submit"{% if not llm_enabled %} disabled{% endif %}>
       {{ icon('translate') }} 開始翻譯</button>
     <button class="btn btn-danger" id="btnCancel" type="button" hidden>
-      {{ icon('close', size=14) }} 停止翻譯</button>
-  </p>
+      {{ icon('close') }} 停止翻譯</button>
+  </div>
   {% with progress_id='dtjp' %}{% include "components/job_progress.html" %}{% endwith %}
 </div>
 
@@ -191,8 +193,7 @@ const fu = new FileUpload(document.getElementById('upDt'), async (_f, fs) => {
 });
 
 function showResult(job) {
-    const cb = document.getElementById('btnCancel');
-    if (cb) cb.hidden = true;
+    setRunning(false);
     const m = (job && job.meta) || {};
     if (!m.download_url) return;
     const res = document.getElementById('dtResult');
@@ -237,6 +238,9 @@ function showResult(job) {
 
 const jp = new JobProgress(document.getElementById('dtjp'), {
   onDone: showResult,
+  // 失敗 / 被中斷時也要把開始鍵放回來，否則使用者卡在一個按不動的畫面
+  onError: () => setRunning(false),
+  onReset: () => setRunning(false),
 });
 
 /* 從「我的作業」按「開啟」回來（網址帶 ?job=…）要接回結果，
@@ -266,8 +270,17 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   if (!r.ok) { showAlert(await window.friendlyServerError(r, '送出失敗')); return; }
   const j = await r.json();
   jp.track(j.job_id);
-  document.getElementById('btnCancel').hidden = false;
+  setRunning(true);
 });
+
+/* 進行中：開始鍵停用、停止鍵出現。**沒有這個的話使用者會連按好幾次**，
+   每按一次就多送一份同樣的作業去排隊。 */
+function setRunning(on) {
+  const go = document.getElementById('btn-submit');
+  const stop = document.getElementById('btnCancel');
+  go.disabled = on;
+  stop.hidden = !on;
+}
 
 /* 停止翻譯：叫 cancel API + 停輪詢 + 還原畫面。
    一份翻到一半的文件比沒有更危險（看起來正常，後半段其實還是原文），
@@ -277,7 +290,7 @@ document.getElementById('btnCancel').addEventListener('click', async () => {
   b.disabled = true;
   await jp.cancel();
   b.disabled = false;
-  b.hidden = true;
+  setRunning(false);
 });
 </script>
 {% endblock %}
