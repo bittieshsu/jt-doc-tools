@@ -36,8 +36,9 @@ router = APIRouter()
 
 #: 預覽幾頁（跟其他工具一致）
 PREVIEW_PAGES = 6
-#: 單一檔案可翻的段落上限 —— 再多就該拆檔，不然一份作業要跑好幾小時。
-MAX_UNITS = 4000
+#: 單一檔案可翻的段落上限（預設值，管理員可調）。實測每段約 0.5~0.6 秒，
+#: 2 萬段大約 3 小時 —— 背景作業跑得完，中途也可以按停止。
+MAX_UNITS = 20000
 
 
 def _src_path(upload_id: str) -> Path:
@@ -189,7 +190,7 @@ async def upload(request: Request, file: UploadFile = File(...)):
         raise HTTPException(400, "檔案讀不進來（可能毀損，或不是真正的辦公文件）")
     if not units:
         raise HTTPException(400, "這份文件裡找不到可以翻譯的文字")
-    cap = max(100, min(20000, int((llm_settings.get() or {}).get(
+    cap = max(100, min(100000, int((llm_settings.get() or {}).get(
         "doctr_max_units", MAX_UNITS))))
     if len(units) > cap:
         raise HTTPException(

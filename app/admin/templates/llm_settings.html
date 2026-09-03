@@ -256,10 +256,11 @@
   <div class="form-row">
     <label>單檔段落上限</label>
     <div class="field" data-s="s9586d088">
-      <input type="number" id="doctr_max_units" min="100" max="20000" step="100"
-             value="{{ settings.doctr_max_units|default(4000) }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">一份文件最多幾段（100-20000，預設 4000）。超過就擋下來請使用者拆檔 ——
-        不然一份作業會跑好幾小時，中途出事全部重來</span>
+      <input type="number" id="doctr_max_units" min="100" max="100000" step="500"
+             value="{{ settings.doctr_max_units|default(20000) }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">一份文件最多幾段（100-100000，預設 20000）。超過就擋下來請使用者拆檔。
+        <b>實測每段約 0.5~0.6 秒</b>（gemma4:26b、並行 4）→ 4,000 段約 40 分鐘、20,000 段約 3 小時。
+        作業在背景跑、中途可以按「停止翻譯」，所以上限不必訂得太保守</span>
     </div>
   </div>
 </div>

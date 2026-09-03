@@ -766,7 +766,7 @@ def build_router(templates) -> APIRouter:
         _clamp_int("translate_concurrency", 1, 64)
         _clamp_int("doctr_batch_segments", 1, 30)
         _clamp_int("doctr_batch_chars", 200, 6000)
-        _clamp_int("doctr_max_units", 100, 20000)
+        _clamp_int("doctr_max_units", 100, 100000)
         # admin 改了 LLM 設定（base_url / model / 其他）— 把 model profile cache
         # 全部清掉，下次 LLM call 會重抓 capabilities
         try:

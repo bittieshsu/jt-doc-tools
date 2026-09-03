@@ -51,8 +51,9 @@ DEFAULT_SETTINGS: dict = {
     #: 模型也更容易漏段（漏了就整批退回逐段翻，反而變慢）。
     "doctr_batch_segments": 10,
     "doctr_batch_chars": 1200,
-    #: 單一檔案的段落上限。再多就該拆檔，不然一份作業要跑好幾小時。
-    "doctr_max_units": 4000,
+    #: 單一檔案的段落上限。實測每段約 0.5~0.6 秒（gemma4:26b、並行 4），
+    #: 2 萬段大約 3 小時 —— 背景作業跑得完，而且中途可以按停止。
+    "doctr_max_units": 20000,
     "timeout_seconds": 600,          # single HTTP call ceiling — 翻譯 / vision / reasoning 可能 5-10 分鐘
     # 預設拉到 600s（v1.8.58 起，舊 300s）— 客戶實測 gemma 大模型推理單筆 8m+，
     # 加上 reverse proxy 多層 timeout 任一斬掉就 504。要再長就 admin UI 改。
