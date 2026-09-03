@@ -83,9 +83,12 @@
 
   <p class="muted dt-note" data-s="s_dt_model">
     {{ icon('info', size=14) }} <b>模型怎麼挑</b>：這支工具一份文件動輒幾十次 LLM 請求，
-    模型大小直接決定要等多久。<b>要快</b>建議 <code>gemma4:9b</code> ~ <code>gemma4:14b</code>
-    這一級 —— 翻譯這種任務小模型通常就夠用（台灣用語對照表與領域提示已經在 prompt 裡）。
-    <b>要更好的品質</b>（法律合約、專業論文這類）再用 <code>gemma4:26b</code>。
+    模型選得對很有感。<b>Gemma 4 這一家要看的不是總參數，是「每個 token 實際算幾個參數」</b>：
+    <code>gemma4:26b</code> 是 <b>MoE</b>（26B 總參數，每個 token 只啟用約 4B），
+    產生速度接近 4B 模型 —— <b>吞吐量最好的就是它</b>（Q4 約需 14 GB 記憶體）。
+    <code>gemma4:12b</code> 是 <b>dense</b>，12B 全部都要算，<b>反而比 26B 慢</b>，
+    只有記憶體不夠（約 7 GB）時才選它。<code>gemma4:31b</code> dense 最強也最慢；
+    <code>gemma4:e4b</code> / <code>e2b</code> 是邊緣裝置用的，品質差距明顯。
     {% if is_admin(request) %}可以在 <a href="/admin/llm-settings">LLM 設定</a>
     單獨指定這支工具要用的模型，不影響其他工具。{% else %}
     要換模型請聯絡管理員（可以只針對這支工具指定）。{% endif %}
