@@ -505,7 +505,7 @@ ensure_office() {
         echo
         warn "OxOffice 與 LibreOffice 都自動安裝失敗（常見於 LXC / 精簡容器 / 無 X11 環境）。"
         warn "繼續安裝；本工具 37 個工具中有 26 個不需要 Office 引擎，仍可正常運作。"
-        warn "若需要 Office 轉檔 / PDF 轉文書檔等 11 個工具，請手動安裝後重啟服務："
+        warn "若需要 Office 轉檔 / PDF 轉文書檔等 19 個工具，請手動安裝後重啟服務："
         warn "  • OxOffice：    https://github.com/OSSII/OxOffice/releases"
         warn "  • LibreOffice： https://www.libreoffice.org/download/"
         return 0

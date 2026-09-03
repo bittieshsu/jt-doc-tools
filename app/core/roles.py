@@ -38,7 +38,7 @@ _NON_ADMIN_TOOL_IDS = [
     "office-to-pdf", "office-convert", "pdf-to-image", "image-to-pdf", "scan-merge",
     "pdf-encrypt", "pdf-decrypt", "pdf-metadata",
     "pdf-hidden-scan", "doc-diff", "text-diff", "doc-deident", "text-deident",
-    "pdf-editor", "translate-doc", "pdf-ocr", "text-list", "einvoice-scan", "transit-proof",
+    "pdf-editor", "translate-doc", "doc-translate", "pdf-ocr", "text-list", "einvoice-scan", "transit-proof",
     "vat-lookup", "pdf-to-office", "pdf-to-slides", "pdf-to-markdown", "markdown-to-doc",
     "pdf-wordcount", "submission-check",
     "pdf-annotations", "pdf-annotations-flatten", "pdf-annotations-strip",

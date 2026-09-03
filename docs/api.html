@@ -174,6 +174,7 @@
             <a class="nav-ep" href="#文字差異比對">文字差異比對</a>
             <a class="nav-ep" href="#文件差異比對">文件差異比對</a>
             <a class="nav-ep" href="#清單處理">清單處理</a>
+            <a class="nav-ep" href="#文件翻譯">文件翻譯</a>
             <a class="nav-ep" href="#逐句翻譯">逐句翻譯</a>
           </div>
         </div>
@@ -908,6 +909,23 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;text&quot;:&quot;banana\napple\napple\ncherry&quot;,&quot;ops&quot;:[{&quot;op&quot;:&quot;dedup&quot;},{&quot;op&quot;:&quot;sort&quot;}]}&#x27;</span></code></pre>
 <p>回應 JSON：<code>{&quot;lines&quot;: [...], &quot;count&quot;: N, &quot;original_count&quot;: M, ...}</code>。</p>
+      </section>
+      <section class="doc-section" data-sec="文件翻譯" data-title="文件翻譯" hidden>
+<div class="doc-crumb">8. 文字與比對 API</div>
+<h4 id="文件翻譯">文件翻譯</h4>
+<p>把整份辦公文件翻成另一種語言，<strong>回傳同格式、同版面的檔案</strong> —— 只換文字， 不重排版面。支援 <code>.doc</code> / <code>.docx</code> / <code>.odt</code>、<code>.xls</code> / <code>.xlsx</code> / <code>.ods</code>、 <code>.ppt</code> / <code>.pptx</code> / <code>.odp</code>。</p>
+<blockquote><p><strong>不收 PDF</strong>：PDF 裡沒有段落，文字是定位好的碎片，換成長度不同的譯文之後 版面一定跑掉。要翻 PDF 請用下面的「逐句翻譯」。</p></blockquote>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/doc-translate/api/doc-translate</code></pre>
+<p>Form（multipart）：</p>
+<div class="table-wrap"><table><thead><tr><th>欄位</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>辦公文件（上列九種副檔名）</td></tr><tr><td><code>target_lang</code></td><td>str</td><td></td><td>目標語言，預設 <code>zh-TW</code></td></tr><tr><td><code>source_lang</code></td><td>str</td><td></td><td><code>auto</code>（預設）/ <code>en</code> / <code>ja</code> / <code>ko</code> …</td></tr><tr><td><code>domain</code></td><td>str</td><td></td><td>領域提示（法律合約、醫療報告…），提升專業用詞準確度</td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/doc-translate/api/doc-translate</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@contract.docx&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;target_lang=en&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;domain=法律合約&quot;</span> \
+  <span class="hl-flag">-o</span> contract_translated.docx</code></pre>
+<p>回應是<strong>翻譯後的檔案本身</strong>（<code>Content-Disposition: attachment</code>），格式與上傳的相同。</p>
+<blockquote><p>這個端點是<strong>同步</strong>的：整份翻完才回應，大檔會撞到反向代理的逾時。 網頁介面走的是背景作業版（<code>POST /tools/doc-translate/start</code>， 送出後用 <code>/api/jobs/{job_id}</code> 查進度，完成後到 <code>GET /tools/doc-translate/download/{upload_id}</code> 取檔）。 需 admin 啟用 LLM 服務（<code>/admin/llm-settings</code>）。未啟用回 <code>503</code>。</p></blockquote>
       </section>
       <section class="doc-section" data-sec="逐句翻譯" data-title="逐句翻譯" hidden>
 <div class="doc-crumb">8. 文字與比對 API</div>

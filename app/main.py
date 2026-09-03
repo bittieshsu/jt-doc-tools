@@ -18,7 +18,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.66"
+VERSION = "1.14.67"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -280,6 +280,7 @@ _TOOL_ALIASES = {
     "pdf-editor":         "editor edit annotate annotation whiteout redact text textbox shape pencil draw highlight sticky note scribus 編輯 編輯器 標註 註記 塗黑 遮蓋 手繪 螢光筆 便箋 文字框 修圖",
     "pdf-extract-text":   "extract text content txt markdown md docx word odt reflow paragraph ocr llm 擷取文字 取出文字 轉文字 轉 word 轉 markdown 段落重排 LLM 重排",
     "pdf-ocr":            "ocr searchable scan image text layer invisible tesseract chi_tra chi_sim eng apple preview live text macos 文字層 補建 掃描 圖檔 變可選 可搜尋 透明文字層 蘋果 預覽程式 LiveText 圖轉文字",
+    "doc-translate":      "document translation translate whole file docx odt xlsx ods pptx odp word excel powerpoint keep layout same format 文件翻譯 整份翻譯 翻譯文件 保留排版 原格式 文書檔 試算表 簡報 翻譯後下載 llm ai 機器翻譯 中翻英 英翻中 日文 韓文",
     "translate-doc":      "translate translation translator sentence by sentence parallel side by side bilingual english chinese japanese korean traditional simplified llm ai ollama 翻譯 逐句 並排 對照 中英 中翻英 英翻中 機器翻譯 LLM 大語言模型 句子 中翻日 日翻中",
     "pdf-compress":       "compress compression shrink reduce size optimize optimise slim jpeg dpi downsample ghostscript gs subset font 壓縮 縮小 瘦身 減肥 檔案小 降解析度 去重複 Ghostscript",
     "doc-deident":        "deident deidentify de-identification redact redaction mask masking anonymize anonymise pii personal data privacy gdpr 個資 個人資料 去識別化 敏感資料 編修 不可逆遮蔽 資料遮罩 遮蔽 塗黑 脫敏 脫敏化 匿名 身分證 手機 Email 統編 信用卡 車牌 地址",
@@ -410,7 +411,7 @@ templates.env.globals["nav_settings"] = [
     {"icon": "gear", "name": "轉檔引擎設定", "description": "LibreOffice / OxOffice 路徑與順序",
      "url": "/admin/conversion",
      "keywords": "conversion office libreoffice oxoffice path engine 轉檔 引擎 路徑"},
-    {"icon": "gear", "name": "LLM 設定", "description": "11 個工具的 LLM AI 加值（附加功能，預設關閉）",
+    {"icon": "gear", "name": "LLM 設定", "description": "12 個工具的 LLM AI 加值（附加功能，預設關閉）",
      "url": "/admin/llm-settings",
      "keywords": "llm ai ollama qwen vision review 校驗 模型 大語言模型"},
     {"icon": "gear", "name": "API Token", "description": "對外呼叫 /api/* 的認證 token",

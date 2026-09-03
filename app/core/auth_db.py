@@ -720,6 +720,27 @@ def _m24_index_group_members_user(conn: sqlite3.Connection) -> None:
         "ON group_members(user_id);")
 
 
+def _m25_grant_doc_translate(conn: sqlite3.Connection) -> None:
+    """v25：把 `doc-translate`（文件翻譯，v1.14.67 新增）補給既有角色。
+
+    理由同 `_m18`~`_m22`（seed 快照的 bootstrap 缺口）—— 從舊版升上來的安裝，
+    角色早就存在，`seed_builtin_roles()` 的差集 top-up 以快照為基準，新工具
+    不會自己長出來。
+
+    拿 `translate-doc`（逐句翻譯）當訊號：同一件事（把文件內容送去翻譯），
+    只是產出從對照表變成同格式的檔案 —— 能用逐句翻譯的人用這支沒有額外風險。
+    **不可以無條件補給所有角色**，那會把刻意收窄過的角色一起放寬。
+    """
+    conn.executescript("""
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'doc-translate' FROM role_perms
+        WHERE tool_id = 'translate-doc';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'doc-translate'
+        FROM subject_perms WHERE tool_id = 'translate-doc';
+    """)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -740,7 +761,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m21_grant_page_size,
               _m22_grant_office_convert,
               _m23_canon_ou_subject_keys,
-              _m24_index_group_members_user]
+              _m24_index_group_members_user,
+              _m25_grant_doc_translate]
 
 
 def auth_db_path() -> Path:

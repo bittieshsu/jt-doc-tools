@@ -1,6 +1,6 @@
-# Jason Tools 文件工具箱 v1.14.66
+# Jason Tools 文件工具箱 v1.14.67
 
-> 整合式 PDF / Office 文件處理平台，46 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
+> 整合式 PDF / Office 文件處理平台，47 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
 >
 > 企業功能：**本機 / LDAP / AD 多領域認證**、**SSO 單一登入**(OIDC + SAML，可接 M365 / Google / Keycloak)、**RBAC 角色權限**、**稽核記錄**、**SIEM 轉送**(syslog / CEF / GELF)、**字型管理**、**使用者工作區**、**背景作業與完成通知**、**REST API**。
 >
@@ -70,7 +70,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ---
 
-## 46 個工具速覽
+## 47 個工具速覽
 
 ### 填單用印
 - **表單自動填寫** — 自動偵測欄位 + 模板填值
@@ -116,6 +116,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 - **隱藏內容掃描**
 - **文件差異比對 / 文字差異比對**
 - **逐句翻譯**
+- **文件翻譯** [需 OxOffice/LibreOffice] — 整份辦公文件翻成另一種語言，產出**同格式、同版面**的檔案（只換文字，不重排版面）。支援 .doc / .docx / .odt、.xls / .xlsx / .ods、.ppt / .pptx / .odp；翻完附前 6 頁預覽
 - **壓縮**
 
 > 標 [需 OxOffice/LibreOffice] 的工具會用到 OxOffice / LibreOffice（OxOffice 優先，OSSII 維護的台灣本地化 fork，CJK 支援更好）。其他 28 個工具只處理 PDF / 純文字 / 圖片，不需要 Office 引擎。安裝腳本會自動處理。
@@ -140,7 +141,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 耗時的工作（轉檔、OCR、逐句翻譯、大檔壓縮…）送出後就交給伺服器跑，**可以直接關掉分頁**，不必守著進度條。
 
-- **送出即背景執行** — 25 個工具走作業系統，包含 PDF 轉文書檔 / 轉簡報檔、格式互轉、OCR 文字辨識、逐句翻譯、辦公文件轉 PDF、壓縮、合併、分拆、浮水印、用印、騎縫章、送件前檢核等。
+- **送出即背景執行** — 26 個工具走作業系統，包含 PDF 轉文書檔 / 轉簡報檔、格式互轉、OCR 文字辨識、逐句翻譯、辦公文件轉 PDF、壓縮、合併、分拆、浮水印、用印、騎縫章、送件前檢核等。
 - **我的作業** — 進度、佇列位置、已過時間、結果下載都在同一頁；跑一半可取消。逐句翻譯這類「產出不是單一檔案」的工具，點回去會接回原本的頁面繼續看對照表。
 - **重開機不會憑空消失** — 作業狀態存在資料庫裡，服務重啟後未完成的會標示為中斷，而不是無聲無息不見。
 - **不會把機器打爆** — 派送前先估算這個作業要用多少記憶體，不夠就讓它留在佇列排隊；同時處理數與 Office 轉檔併行上限都可在管理區調整。
@@ -187,7 +188,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ## LLM AI 加值（選用，預設關閉）
 
-接 OpenAI-compatible 後端（本機 Ollama / vLLM / LM Studio / DGX Spark）後，**11 個工具**自動多出聰明選項：
+接 OpenAI-compatible 後端（本機 Ollama / vLLM / LM Studio / DGX Spark）後，**12 個工具**自動多出聰明選項：
 
 | 工具 | LLM 做什麼 | 模式 |
 |---|---|---|
@@ -216,7 +217,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 | **[AUTH.md](AUTH.md)** | 認證 / RBAC / 內建帳號(jtdt-admin / jtdt-auditor)/ 2FA / SSO(OIDC+SAML) / Reverse Proxy SSO(Kerberos) / 帳號鎖定 / 緊急復原 |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO（Kerberos / SPNEGO）完整部署：AD service account、setspn、ktpass / keytab、Nginx 設定、瀏覽器自動登入、標頭偽造防護 |
 | **[API.md](API.md)**（[線上網頁版](https://jasoncheng7115.github.io/jt-doc-tools/api.html)）| REST API:Bearer token、endpoint 一覽、上傳格式、回傳格式、錯誤碼、curl / Python 範例、Job 流程 |
-| **[LLM.md](LLM.md)** | LLM AI 加值功能（預設關閉）：11 個工具如何用 LLM、效果範例、部署選項（Ollama / vLLM / DGX Spark） |
+| **[LLM.md](LLM.md)** | LLM AI 加值功能（預設關閉）：12 個工具如何用 LLM、效果範例、部署選項（Ollama / vLLM / DGX Spark） |
 | **[SECURITY.md](SECURITY.md)** | 資安政策、OWASP Top 10 (2025) 對照、漏洞回報管道、GitHub native scan 整合 |
 | **[CHANGELOG.md](CHANGELOG.md)** | 完整更新記錄 |
 | **[TEST_PLAN.md](TEST_PLAN.md)** | 測試清單、發版前檢查 |

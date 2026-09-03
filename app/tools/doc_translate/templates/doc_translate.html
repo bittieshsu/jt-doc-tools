@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}文件翻譯 · {{ app_name }}{% endblock %}
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+.dt-row { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; }
+.dt-field { display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
+.dt-field > label { font-size: 12.5px; font-weight: 600; color: #334155; }
+.dt-field select { min-width: 210px; }
+.dt-up { flex: 1 1 320px; min-width: 320px; }
+.dt-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 8px; }
+.dt-chip { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px;
+           padding: 5px 14px; font-size: 13px; cursor: pointer; color: #334155; }
+.dt-chip:hover { border-color: #6366f1; color: #4338ca; }
+.dt-chip.on { background: #eef2ff; border-color: #6366f1; color: #3730a3; font-weight: 600; }
+.dt-note { font-size: 12.5px; line-height: 1.7; }
+.dt-stats { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; margin-top: 4px; }
+.dt-stats b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.dt-prev { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+           gap: 14px; margin-top: 12px; }
+.dt-prev figure { margin: 0; border: 1px solid #e2e8f0; border-radius: 8px;
+                  overflow: hidden; background: #f8fafc; }
+.dt-prev img { display: block; width: 100%; height: auto; }
+.dt-prev figcaption { font-size: 12px; color: #64748b; padding: 5px 8px; text-align: center; }
+</style>
+{% endblock %}
+{% block content %}
+<h1>{{ icon('translate', size=22) }} 文件翻譯</h1>
+<p class="muted">整份辦公文件翻成另一種語言，<b>產出同格式、同版面的檔案</b> ——
+只把文字換成譯文，框線、表格、頁首頁尾、圖片都留在原位。
+支援 .doc / .docx / .odt、.xls / .xlsx / .ods、.ppt / .pptx / .odp。</p>
+
+{% if not llm_enabled %}
+<div class="panel">
+  <h2>{{ icon('warn', size=18) }} 本工具需要 LLM 服務</h2>
+  <p class="muted">翻譯是送到管理員設定的 LLM server 做的，目前尚未啟用。
+    請先到<a href="/admin/llm-settings">「LLM 設定」</a>啟用後再回來。</p>
+</div>
+{% endif %}
+
+<div class="panel">
+  <h2 data-s="s_dt_1">1. 上傳與設定</h2>
+  <div class="dt-row">
+    <div class="dt-field">
+      <label for="dtSrc">原文語言</label>
+      <select id="dtSrc" class="field">
+        <option value="auto" selected>自動偵測</option>
+        {% for code, name in langs.items() %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="dt-field">
+      <label for="dtTgt">目標語言</label>
+      <select id="dtTgt" class="field">
+        {% for code, name in langs.items() %}
+        <option value="{{ code }}"{% if code == 'zh-TW' %} selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="dt-field dt-up">
+      <label>或上傳檔案</label>
+      {% with upload_id='upDt', accept=accept %}{% include "components/file_upload.html" %}{% endwith %}
+    </div>
+  </div>
+
+  <p class="muted dt-note" data-s="s_dt_dom">文件領域（選填，會送進 LLM prompt 提升專業用詞準確度；
+    點下方常用領域可複選，下方輸入框可加上其他自填領域）</p>
+  <div class="dt-chips" id="dtChips">
+    {% for d in ['法律合約', '醫療報告', '軟體技術文件', '財務報表', '學術論文',
+                 '新聞稿', '商業合約', '網路 / IT 維運文件'] %}
+    <button type="button" class="dt-chip" data-domain="{{ d }}">{{ d }}</button>
+    {% endfor %}
+  </div>
+  <input type="text" class="field" id="dtDomain" placeholder="自填其他領域…（選填，會與上方點選的領域一起送進 prompt）">
+
+  <p class="muted dt-note" data-s="s_dt_pdf">
+    {{ icon('info', size=14) }} <b>不支援 PDF</b>：PDF 裡沒有「段落」這種東西，
+    文字是一塊一塊定位好的碎片，換成長度不同的譯文之後版面一定跑掉。
+    要翻 PDF 請用<a href="/tools/translate-doc/">逐句翻譯</a>（左原文右譯文對照）。
+  </p>
+
+  <div id="dtInfo" hidden>
+    <div class="dt-stats">
+      <span>可翻譯段落 <b id="dtUnits">0</b></span>
+      <span>字元數 <b id="dtChars">0</b></span>
+    </div>
+  </div>
+
+  <p><button class="btn btn-primary" id="btn-submit"{% if not llm_enabled %} disabled{% endif %}>
+    {{ icon('translate') }} 開始翻譯</button></p>
+  {% with progress_id='dtjp' %}{% include "components/job_progress.html" %}{% endwith %}
+</div>
+
+<div class="panel" id="dtResult" hidden>
+  <h2 data-s="s_dt_2">2. 結果</h2>
+  <p class="muted dt-note" id="dtSummary"></p>
+  <p><a class="btn btn-primary" id="dtDownload" href="#" download>{{ icon('download') }} 下載翻譯後的檔案</a></p>
+  <p class="muted dt-note" id="dtPrevNote">前 {{ preview_pages }} 頁預覽（用來確認版面沒跑掉）：</p>
+  <div class="dt-prev" id="dtPrev"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script><script src="/static/js/job_progress.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+let dtUpload = null;
+
+document.querySelectorAll('.dt-chip').forEach(c =>
+  c.addEventListener('click', () => c.classList.toggle('on')));
+
+function pickedDomain() {
+  const chips = [...document.querySelectorAll('.dt-chip.on')].map(c => c.dataset.domain);
+  const extra = (document.getElementById('dtDomain').value || '').trim();
+  if (extra) chips.push(extra);
+  return chips.join('、');
+}
+
+const fu = new FileUpload(document.getElementById('upDt'), async (_f, fs) => {
+  const file = Array.isArray(fs) ? fs[0] : fs;
+  dtUpload = null;
+  document.getElementById('dtInfo').hidden = true;
+  document.getElementById('dtResult').hidden = true;
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await fu.upload('/tools/doc-translate/upload', fd,
+                            { processingLabel: '讀取文件…' });
+  if (!r.ok) { showAlert(await window.friendlyServerError(r, '讀取失敗')); return; }
+  const j = await r.json();
+  dtUpload = j.upload_id;
+  document.getElementById('dtUnits').textContent = j.units.toLocaleString();
+  document.getElementById('dtChars').textContent = j.chars.toLocaleString();
+  document.getElementById('dtInfo').hidden = false;
+});
+
+const jp = new JobProgress(document.getElementById('dtjp'), {
+  onDone: (job) => {
+    const m = (job && job.meta) || {};
+    if (!m.download_url) return;
+    const res = document.getElementById('dtResult');
+    res.hidden = false;
+    document.getElementById('dtSummary').textContent =
+      `共 ${m.total || 0} 段，其中 ${m.translated || 0} 段換成了譯文。` +
+      `檔案格式與版面跟原稿相同。`;
+    const dl = document.getElementById('dtDownload');
+    dl.href = m.download_url;
+    if (m.download_name) dl.setAttribute('download', m.download_name);
+    const grid = document.getElementById('dtPrev');
+    grid.textContent = '';
+    const n = m.preview_pages || 0;
+    document.getElementById('dtPrevNote').hidden = n === 0;
+    for (let i = 1; i <= n; i++) {
+      const fig = document.createElement('figure');
+      const img = document.createElement('img');
+      img.src = `/tools/doc-translate/preview/${dtUpload}/${i}`;
+      img.alt = `第 ${i} 頁`;
+      const cap = document.createElement('figcaption');
+      cap.textContent = `第 ${i} 頁`;
+      fig.appendChild(img); fig.appendChild(cap); grid.appendChild(fig);
+    }
+  },
+});
+
+document.getElementById('btn-submit').addEventListener('click', async () => {
+  if (!dtUpload) { showAlert('請先上傳一份辦公文件'); return; }
+  const r = await fetch('/tools/doc-translate/start', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      upload_id: dtUpload,
+      source_lang: document.getElementById('dtSrc').value,
+      target_lang: document.getElementById('dtTgt').value,
+      domain: pickedDomain(),
+    }),
+  });
+  if (!r.ok) { showAlert(await window.friendlyServerError(r, '送出失敗')); return; }
+  const j = await r.json();
+  jp.track(j.job_id);
+});
+</script>
+{% endblock %}

@@ -1296,6 +1296,46 @@ curl -X POST http://localhost:8765/tools/text-list/api/text-list \
 
 回應 JSON：`{"lines": [...], "count": N, "original_count": M, ...}`。
 
+### 文件翻譯
+
+把整份辦公文件翻成另一種語言，**回傳同格式、同版面的檔案** —— 只換文字，
+不重排版面。支援 `.doc` / `.docx` / `.odt`、`.xls` / `.xlsx` / `.ods`、
+`.ppt` / `.pptx` / `.odp`。
+
+> **不收 PDF**：PDF 裡沒有段落，文字是定位好的碎片，換成長度不同的譯文之後
+> 版面一定跑掉。要翻 PDF 請用下面的「逐句翻譯」。
+
+```text
+POST /tools/doc-translate/api/doc-translate
+```
+
+Form（multipart）：
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | ✓ | 辦公文件（上列九種副檔名） |
+| `target_lang` | str | | 目標語言，預設 `zh-TW` |
+| `source_lang` | str | | `auto`（預設）/ `en` / `ja` / `ko` … |
+| `domain` | str | | 領域提示（法律合約、醫療報告…），提升專業用詞準確度 |
+
+```bash
+curl -X POST http://localhost:8765/tools/doc-translate/api/doc-translate \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@contract.docx" \
+  -F "target_lang=en" \
+  -F "domain=法律合約" \
+  -o contract_translated.docx
+```
+
+回應是**翻譯後的檔案本身**（`Content-Disposition: attachment`），格式與上傳的相同。
+
+> 這個端點是**同步**的：整份翻完才回應，大檔會撞到反向代理的逾時。
+> 網頁介面走的是背景作業版（`POST /tools/doc-translate/start`，
+> 送出後用 `/api/jobs/{job_id}` 查進度，完成後到
+> `GET /tools/doc-translate/download/{upload_id}` 取檔）。
+>
+> 需 admin 啟用 LLM 服務（`/admin/llm-settings`）。未啟用回 `503`。
+
 ### 逐句翻譯
 
 走本地端 LLM 逐句翻譯。
