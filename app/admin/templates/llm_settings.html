@@ -226,6 +226,42 @@
       <span class="muted" data-s="s6b9c179a">逐句翻譯結果對照表每頁顯示幾列（20-5000，預設 200）。句數一大時全部塞進頁面會卡頓，故分頁顯示；數字越大每頁越長但翻頁越少</span>
     </div>
   </div>
+
+  <h3 class="tool-section-h" data-s="s_dt_sec">
+    <span class="tool-section-tag tool-section-tag-text">文件翻譯</span>
+    <code class="muted">doc-translate</code>
+  </h3>
+  <p class="muted" data-s="s_dt_note">整份辦公文件翻譯。<b>並行數與上面的「翻譯並行數」共用</b>
+    —— 兩支工具都是送同一台 LLM server，各設一份只會互相打架。</p>
+  <div class="form-row">
+    <label>每批最多段數</label>
+    <div class="field" data-s="s9586d088">
+      <input type="number" id="doctr_batch_segments" min="1" max="30" step="1"
+             value="{{ settings.doctr_batch_segments|default(10) }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">一次請求最多合併幾段（1-30，預設 10）。合併是為了攤掉指令的成本 ——
+        翻成繁中時光是台灣用語對照表就佔 1,250 字元，逐段送等於把同一份指令送幾百遍。
+        調大請求更少，但單次更久、模型也更容易漏段；<b>漏段會整批退回逐段翻，反而變慢</b>。
+        結果頁會顯示實際送了幾次請求、有幾批退回，照那個數字調</span>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>每批最多字元</label>
+    <div class="field" data-s="s9586d088">
+      <input type="number" id="doctr_batch_chars" min="200" max="6000" step="100"
+             value="{{ settings.doctr_batch_chars|default(1200) }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">同一批原文的總字數上限（200-6000，預設 1200）。與上面那個先到先算 ——
+        段落很長時就算沒到段數上限也會先切斷</span>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>單檔段落上限</label>
+    <div class="field" data-s="s9586d088">
+      <input type="number" id="doctr_max_units" min="100" max="20000" step="100"
+             value="{{ settings.doctr_max_units|default(4000) }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">一份文件最多幾段（100-20000，預設 4000）。超過就擋下來請使用者拆檔 ——
+        不然一份作業會跑好幾小時，中途出事全部重來</span>
+    </div>
+  </div>
 </div>
 
 <div class="panel">
@@ -350,12 +386,19 @@
 .llm-page .hint-test-conn:active { transform: translateY(1px); }
 .llm-page .hint-test-conn .ic { stroke: currentColor; vertical-align: middle; }
 
-/* 各工具進階設定 — 子標題分組 */
+/* 各工具進階設定 — 子標題分組。
+   **工具與工具之間要分得開**：這一區是好幾個不相干工具的設定疊在一起，
+   間隔太小的話，使用者會把上一個工具的欄位當成這個工具的（使用者回報）。 */
 .llm-page .tool-section-h {
-  margin: 4px 0 10px 0; font-size: 14px; font-weight: 600; color: #0f172a;
+  margin: 34px 0 14px 0; font-size: 14px; font-weight: 600; color: #0f172a;
   display: flex; align-items: center; gap: 8px;
-  padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;
+  padding: 12px 12px 12px 14px; border: 1px solid #e2e8f0;
+  border-left: 4px solid #6366f1; border-radius: 8px; background: #f8fafc;
 }
+/* 第一個不用留那麼多上緣空白 */
+.llm-page .tool-section-h:first-of-type { margin-top: 6px; }
+/* 同一個工具的欄位往內縮，視覺上「屬於」上面那個標題 */
+.llm-page .tool-section-h ~ .form-row { padding-left: 14px; }
 .llm-page .tool-section-tag {
   font-size: 12.5px; padding: 3px 10px; border-radius: 12px; font-weight: 600;
 }
@@ -524,6 +567,9 @@ async function saveSettings() {
     translate_concurrency:    parseInt($('translate_concurrency').value),
     translate_max_sentences:  parseInt($('translate_max_sentences').value),
     translate_page_size:      parseInt($('translate_page_size').value),
+    doctr_batch_segments:    parseInt($('doctr_batch_segments').value),
+    doctr_batch_chars:       parseInt($('doctr_batch_chars').value),
+    doctr_max_units:         parseInt($('doctr_max_units').value),
     debug_log:                $('debug_log').checked,
   };
   const r = await fetch('/admin/api/llm/settings', {

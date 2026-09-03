@@ -107,8 +107,12 @@
     </div>
   </div>
 
-  <p><button class="btn btn-primary" id="btn-submit"{% if not llm_enabled %} disabled{% endif %}>
-    {{ icon('translate') }} 開始翻譯</button></p>
+  <p>
+    <button class="btn btn-primary" id="btn-submit"{% if not llm_enabled %} disabled{% endif %}>
+      {{ icon('translate') }} 開始翻譯</button>
+    <button class="btn btn-danger" id="btnCancel" type="button" hidden>
+      {{ icon('close', size=14) }} 停止翻譯</button>
+  </p>
   {% with progress_id='dtjp' %}{% include "components/job_progress.html" %}{% endwith %}
 </div>
 
@@ -187,6 +191,8 @@ const fu = new FileUpload(document.getElementById('upDt'), async (_f, fs) => {
 });
 
 function showResult(job) {
+    const cb = document.getElementById('btnCancel');
+    if (cb) cb.hidden = true;
     const m = (job && job.meta) || {};
     if (!m.download_url) return;
     const res = document.getElementById('dtResult');
@@ -260,6 +266,18 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   if (!r.ok) { showAlert(await window.friendlyServerError(r, '送出失敗')); return; }
   const j = await r.json();
   jp.track(j.job_id);
+  document.getElementById('btnCancel').hidden = false;
+});
+
+/* 停止翻譯：叫 cancel API + 停輪詢 + 還原畫面。
+   一份翻到一半的文件比沒有更危險（看起來正常，後半段其實還是原文），
+   所以伺服器端取消時不會產出檔案。 */
+document.getElementById('btnCancel').addEventListener('click', async () => {
+  const b = document.getElementById('btnCancel');
+  b.disabled = true;
+  await jp.cancel();
+  b.disabled = false;
+  b.hidden = true;
 });
 </script>
 {% endblock %}

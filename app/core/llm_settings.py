@@ -45,6 +45,14 @@ DEFAULT_SETTINGS: dict = {
     # 逐句翻譯對照表每頁顯示幾列。句數一大時全部塞進 DOM 會讓瀏覽器卡頓 /
     # 吃記憶體，所以前端分頁、一次只 render 一頁。admin 依機器體質調整。
     "translate_page_size": 200,
+    # ---- 文件翻譯（doc-translate）----
+    #: 一次請求最多合併幾段 / 多少字。合併是為了攤掉指令的成本（翻成繁中時
+    #: 光是台灣用語對照表就佔 1,250 字元）。調大 → 請求更少但單次更久、
+    #: 模型也更容易漏段（漏了就整批退回逐段翻，反而變慢）。
+    "doctr_batch_segments": 10,
+    "doctr_batch_chars": 1200,
+    #: 單一檔案的段落上限。再多就該拆檔，不然一份作業要跑好幾小時。
+    "doctr_max_units": 4000,
     "timeout_seconds": 600,          # single HTTP call ceiling — 翻譯 / vision / reasoning 可能 5-10 分鐘
     # 預設拉到 600s（v1.8.58 起，舊 300s）— 客戶實測 gemma 大模型推理單筆 8m+，
     # 加上 reverse proxy 多層 timeout 任一斬掉就 504。要再長就 admin UI 改。

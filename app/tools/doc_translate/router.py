@@ -70,14 +70,16 @@ _SEG_OPEN, _SEG_CLOSE = "⟦", "⟧"
 _SEG_RE = re.compile(r"^\s*⟦(\d+)⟧\s?(.*)$")
 
 
-def _make_batches(indexes: list[int], units: list) -> list[list[int]]:
+def _make_batches(indexes: list[int], units: list,
+                  seg_cap: int = BATCH_MAX_SEGMENTS,
+                  char_cap: int = BATCH_MAX_CHARS) -> list[list[int]]:
     """把要翻的段落切成幾批。順序保持原樣，方便對回去。"""
     out: list[list[int]] = []
     cur: list[int] = []
     size = 0
     for i in indexes:
         n = len(units[i].text)
-        if cur and (len(cur) >= BATCH_MAX_SEGMENTS or size + n > BATCH_MAX_CHARS):
+        if cur and (len(cur) >= seg_cap or size + n > char_cap):
             out.append(cur)
             cur, size = [], 0
         cur.append(i)
@@ -187,9 +189,11 @@ async def upload(request: Request, file: UploadFile = File(...)):
         raise HTTPException(400, "檔案讀不進來（可能毀損，或不是真正的辦公文件）")
     if not units:
         raise HTTPException(400, "這份文件裡找不到可以翻譯的文字")
-    if len(units) > MAX_UNITS:
+    cap = max(100, min(20000, int((llm_settings.get() or {}).get(
+        "doctr_max_units", MAX_UNITS))))
+    if len(units) > cap:
         raise HTTPException(
-            400, f"段落太多（{len(units)}，上限 {MAX_UNITS}）—— 請先拆成幾份再翻。")
+            400, f"段落太多（{len(units)}，上限 {cap}）—— 請先拆成幾份再翻。")
 
     _meta_path(upload_id).write_text(json.dumps({
         "filename": name, "ext": ext, "work_ext": work_ext,
@@ -259,6 +263,9 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
             if work_ext != ext else src)
     units, state = otm.extract_units(work.read_bytes(), work_ext)
     total = len(units)
+    # 批次大小走管理設定（結果頁會顯示實際請求數，照那個數字調）
+    seg_cap = max(1, min(30, int(conf.get("doctr_batch_segments", BATCH_MAX_SEGMENTS))))
+    char_cap = max(200, min(6000, int(conf.get("doctr_batch_chars", BATCH_MAX_CHARS))))
     if source_lang == "auto":
         source_lang = _detect_language("\n".join(u.text for u in units[:50]))
 
@@ -298,7 +305,11 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
     def run_batch(batch: list[int]) -> None:
         """一次送一批。段數對不上就整批退回逐段翻。"""
         if job.cancelled:
-            raise RuntimeError("已取消")
+            # **直接 return 不要 raise**：`pool.map` 會把所有批次都排進去，
+            # raise 只會在收結果時炸，其餘批次照樣跑完 —— 按了取消還要等
+            # 好幾分鐘。而 job_manager 是看 `job.cancelled` 決定最終狀態的，
+            # raise 反而會被標成「失敗」。
+            return
         texts = [units[i].text for i in batch]
         parsed = None
         if len(texts) > 1:
@@ -338,11 +349,17 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
             done += 1
         else:
             todo.append(i)
-    batches = _make_batches(todo, units)
+    batches = _make_batches(todo, units, seg_cap, char_cap)
     job.message = f"翻譯中… 0/{total} 段（{len(batches)} 批）"
 
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
         list(pool.map(run_batch, batches))
+
+    if job.cancelled:
+        # 取消就不要產出檔案 —— 一份只翻了一半的文件比沒有更危險：
+        # 看起來是正常的檔案，實際上後半段還是原文。
+        job.message = "已取消"
+        return
 
     job.message = "寫回檔案…"
     job.progress = 0.82

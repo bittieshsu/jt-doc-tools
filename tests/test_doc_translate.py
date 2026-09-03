@@ -306,3 +306,41 @@ def test_job_uses_batching_and_keeps_segments_aligned(tmp_path, monkeypatch):
     assert [u.text for u in units] == ["譯[Alpha]", "譯[Beta]", "譯[Gamma]"], \
         [u.text for u in units]
     assert len(calls) == 1, f"三段應該合成一次請求，實際送了 {len(calls)} 次"
+
+
+def test_cancelled_job_produces_no_file(tmp_path, monkeypatch):
+    """按了取消就不要產出檔案。
+
+    一份只翻了一半的文件**比沒有更危險** —— 看起來是正常的檔案，
+    實際上後半段還是原文，寄出去才會發現。
+    """
+    R = _R()
+
+    class _Slow:
+        def text_query(self, prompt: str, **kw) -> str:
+            return "⟦1⟧甲"
+
+    monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _Slow())
+    monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
+    monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 1})
+    monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+
+    uid = "d" * 32
+    R._src_path(uid).write_bytes(_minimal_docx())
+
+    class _Job:
+        progress = 0.0
+        message = ""
+        cancelled = True          # 一開始就處於已取消
+        result_path = None
+        result_filename = ""
+        meta: dict = {}
+
+    job = _Job()
+    job.meta = {}
+    R._run_job(job, uid, {"filename": "a.docx", "ext": ".docx", "work_ext": ".docx"},
+               "en", "zh-TW", "")
+    assert not R._out_path(uid, ".docx").exists(), "取消了還是產出了檔案"
+    assert job.result_path is None
