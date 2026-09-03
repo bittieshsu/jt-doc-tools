@@ -174,3 +174,7 @@ def test_job_produces_a_translated_file(tmp_path, monkeypatch):
     assert texts == ["<Quarterly Report>", "<Revenue grew 12%.>"], texts
     assert job.meta["download_url"].endswith(upload_id)
     assert job.meta["translated"] == 2
+    # **「我的作業」的下載鈕看的是 `result_path`**，不是 meta 裡的網址。
+    # 少了它，那一列會顯示「已完成」卻沒有任何東西可以下載（實際踩過）。
+    assert job.result_path == out, "沒有把產出設成作業結果"
+    assert job.result_filename.endswith(".docx")

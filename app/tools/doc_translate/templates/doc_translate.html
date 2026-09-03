@@ -34,7 +34,7 @@
 只把文字換成譯文，框線、表格、頁首頁尾、圖片都留在原位。
 支援 .doc / .docx / .odt、.xls / .xlsx / .ods、.ppt / .pptx / .odp。</p>
 
-{{ llm_gate('doc-translate', llm_enabled, llm_model, mode='only') }}
+{{ llm_gate('doc-translate', llm_enabled, llm_model, mode='only', llm_url=llm_url) }}
 
 <div class="panel">
   <h2 data-s="s_dt_1">1. 上傳與設定</h2>
@@ -130,8 +130,7 @@ const fu = new FileUpload(document.getElementById('upDt'), async (_f, fs) => {
   document.getElementById('dtInfo').hidden = false;
 });
 
-const jp = new JobProgress(document.getElementById('dtjp'), {
-  onDone: (job) => {
+function showResult(job) {
     const m = (job && job.meta) || {};
     if (!m.download_url) return;
     const res = document.getElementById('dtResult');
@@ -155,8 +154,24 @@ const jp = new JobProgress(document.getElementById('dtjp'), {
       cap.textContent = `第 ${i} 頁`;
       fig.appendChild(img); fig.appendChild(cap); grid.appendChild(fig);
     }
-  },
+}
+
+const jp = new JobProgress(document.getElementById('dtjp'), {
+  onDone: showResult,
 });
+
+/* 從「我的作業」按「開啟」回來（網址帶 ?job=…）要接回結果，
+   不然使用者看到的是一片空白 —— 那比沒有「開啟」鈕更糟。 */
+(async () => {
+  const jid = new URLSearchParams(location.search).get('job');
+  if (!jid) return;
+  const r = await fetch('/api/jobs/' + encodeURIComponent(jid));
+  if (!r.ok) return;
+  const j = await r.json();
+  if ((j.status || '') !== 'done') { jp.track(jid); return; }
+  dtUpload = (j.meta || {}).upload_id || null;
+  showResult(j);
+})();
 
 document.getElementById('btn-submit').addEventListener('click', async () => {
   if (!dtUpload) { showAlert('請先上傳一份辦公文件'); return; }

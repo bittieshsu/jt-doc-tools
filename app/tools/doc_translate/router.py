@@ -67,6 +67,8 @@ async def index(request: Request):
         # 跟逐句翻譯一致：畫面上要看得到「這次會用哪個模型」——
         # 使用者才知道翻譯是送到哪裡、換模型要找誰。
         "llm_model": llm_settings.get_model_for("doc-translate"),
+        # server 位址只有管理員看得到（樣板裡判斷）
+        "llm_url": (llm_settings.get() or {}).get("base_url", ""),
         "langs": _LANG_NAMES,
         "accept": ",".join(otm.SUPPORTED_EXTS),
         "preview_pages": PREVIEW_PAGES,
@@ -245,10 +247,16 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
     pages = _make_preview(upload_id, result)
 
     stem = Path(meta["filename"]).stem
+    # **一定要設 `result_path`** —— 「我的作業」的下載鈕看的是這個
+    # （`has_result`），不是 meta 裡的網址。少了它，作業顯示「已完成」卻
+    # 沒有任何可以下載的東西，而且自動存入工作區、保留期清理也都不會認得它。
+    job.result_path = result
+    job.result_filename = f"{stem}_translated{ext}"
     job.meta.update({
         "download_url": f"/tools/doc-translate/download/{upload_id}",
-        "download_name": f"{stem}_{target_lang}{ext}",
+        "download_name": f"{stem}_translated{ext}",
         "preview_pages": pages,
+        "upload_id": upload_id,
         "translated": sum(1 for i, v in out.items() if v != units[i].text),
         "total": total,
     })

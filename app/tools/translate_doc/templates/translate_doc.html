@@ -10,7 +10,7 @@
 
 {% include "components/cjk_font_notice.html" with context %}
 
-{{ llm_gate('translate-doc', llm_enabled, llm_model, mode='only') }}
+{{ llm_gate('translate-doc', llm_enabled, llm_model, mode='only', llm_url=llm_url) }}
 
 {# 主介面：LLM 沒啟用就藏起來，不讓使用者貼字按按鈕才發現失敗 #}
 {% if llm_enabled %}
