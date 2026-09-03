@@ -64,6 +64,9 @@ async def index(request: Request):
     return templates.TemplateResponse(request, "doc_translate.html", {
         "request": request,
         "llm_enabled": llm_settings.is_enabled(),
+        # 跟逐句翻譯一致：畫面上要看得到「這次會用哪個模型」——
+        # 使用者才知道翻譯是送到哪裡、換模型要找誰。
+        "llm_model": llm_settings.get_model_for("doc-translate"),
         "langs": _LANG_NAMES,
         "accept": ",".join(otm.SUPPORTED_EXTS),
         "preview_pages": PREVIEW_PAGES,
@@ -200,11 +203,18 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
             translated = text
         else:
             try:
-                translated = _translate_one(client, model, text,
-                                            source_lang, target_lang, domain)
+                # **`_translate_one` 回的是 dict 不是字串**
+                # （`{"src", "translated", "error", "skipped"}`）。
+                # 當成字串用會在寫回檔案時炸 `'dict' object has no attribute
+                # 'strip'`，而且是在背景作業裡 —— 使用者只看到「失敗」。
+                res = _translate_one(client, model, text,
+                                     source_lang, target_lang, domain)
+                translated = (res.get("translated") or "").strip()
+                # 翻不出來（錯誤）或被判定不用翻 → 保留原文。
+                # 一段翻不出來不該讓整份作業掛掉，也不該在文件裡留下空白。
+                if not translated or res.get("error"):
+                    translated = text
             except Exception:
-                # 單段失敗就保留原文 —— 一段翻不出來不該讓整份作業掛掉，
-                # 使用者拿到的檔案裡那一段還是看得懂的原文。
                 translated = text
         with lock:
             out[i] = translated

@@ -1,13 +1,17 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
+{% from "components/llm_gate.html" import llm_gate, llm_gate_styles with context %}
 {% block title %}文件翻譯 · {{ app_name }}{% endblock %}
-{% block head %}
+{% block head %}{{ llm_gate_styles() }}
 <style nonce="{{ request.state.csp_nonce }}">
-.dt-row { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; }
+/* 語言兩欄一列，上傳自己一列。**不要把很高的上傳區跟下拉排在同一列** ——
+   下拉會被推到底部，上面空一大塊（第一版就是這樣長歪的）。 */
+.dt-row { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
 .dt-field { display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
-.dt-field > label { font-size: 12.5px; font-weight: 600; color: #334155; }
+.dt-field > label,
+.dt-uplabel { font-size: 12.5px; font-weight: 600; color: #334155; }
 .dt-field select { min-width: 210px; }
-.dt-up { flex: 1 1 320px; min-width: 320px; }
+.dt-upblock { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
 .dt-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 8px; }
 .dt-chip { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px;
            padding: 5px 14px; font-size: 13px; cursor: pointer; color: #334155; }
@@ -30,13 +34,7 @@
 只把文字換成譯文，框線、表格、頁首頁尾、圖片都留在原位。
 支援 .doc / .docx / .odt、.xls / .xlsx / .ods、.ppt / .pptx / .odp。</p>
 
-{% if not llm_enabled %}
-<div class="panel">
-  <h2>{{ icon('warn', size=18) }} 本工具需要 LLM 服務</h2>
-  <p class="muted">翻譯是送到管理員設定的 LLM server 做的，目前尚未啟用。
-    請先到<a href="/admin/llm-settings">「LLM 設定」</a>啟用後再回來。</p>
-</div>
-{% endif %}
+{{ llm_gate('doc-translate', llm_enabled, llm_model, mode='only') }}
 
 <div class="panel">
   <h2 data-s="s_dt_1">1. 上傳與設定</h2>
@@ -56,10 +54,11 @@
         {% endfor %}
       </select>
     </div>
-    <div class="dt-field dt-up">
-      <label>或上傳檔案</label>
-      {% with upload_id='upDt', accept=accept %}{% include "components/file_upload.html" %}{% endwith %}
-    </div>
+  </div>
+
+  <div class="dt-upblock">
+    <label class="dt-uplabel">上傳檔案</label>
+    {% with upload_id='upDt', accept=accept %}{% include "components/file_upload.html" %}{% endwith %}
   </div>
 
   <p class="muted dt-note" data-s="s_dt_dom">文件領域（選填，會送進 LLM prompt 提升專業用詞準確度；

@@ -120,3 +120,57 @@ def test_tool_page_loads(client):
     assert r.status_code == 200
     assert "文件翻譯" in r.text
     assert "不支援 PDF" in r.text, "頁面要講清楚為什麼不收 PDF"
+
+
+# ---------- 端到端：整個作業真的跑一次 ----------
+
+def test_job_produces_a_translated_file(tmp_path, monkeypatch):
+    """**走完整條路徑**：假的 LLM → 產出檔裡每一段都換成了譯文。
+
+    這條測試的由來：第一版把 `_translate_one` 的回傳當成字串用（它其實回
+    dict），結果作業跑到最後才炸 `'dict' object has no attribute 'strip'`，
+    而使用者只看到「失敗」兩個字。單元層級的測試看不出來 ——
+    只有真的把作業跑完、打開產出檔才會發現。
+    """
+    import importlib
+    R = importlib.import_module("app.tools.doc_translate.router")
+
+    class _FakeClient:
+        def text_query(self, prompt: str, **kw) -> str:
+            # prompt 最後一行是「原文：…」
+            src = prompt.rsplit("原文：", 1)[-1].strip()
+            return f"<{src}>"
+
+    monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _FakeClient())
+    monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "fake-model")
+    monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 2})
+    monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
+    # 預覽要起 soffice，這裡不是重點（另有 §0.5 的實檔驗收）
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+
+    upload_id = "b" * 32
+    R._src_path(upload_id).write_bytes(_minimal_docx())
+    R._meta_path(upload_id).write_text(
+        '{"filename": "a.docx", "ext": ".docx", "work_ext": ".docx",'
+        ' "units": 2, "chars": 30}', encoding="utf-8")
+
+    class _Job:
+        progress = 0.0
+        message = ""
+        cancelled = False
+        meta: dict = {}
+
+    job = _Job()
+    job.meta = {}
+    R._run_job(job, upload_id, {"filename": "a.docx", "ext": ".docx",
+                                "work_ext": ".docx"},
+               "en", "zh-TW", "")
+
+    out = R._out_path(upload_id, ".docx")
+    assert out.exists(), "作業跑完卻沒有產出檔"
+    units, _ = M.extract_units(out.read_bytes(), ".docx")
+    texts = [u.text for u in units]
+    assert texts == ["<Quarterly Report>", "<Revenue grew 12%.>"], texts
+    assert job.meta["download_url"].endswith(upload_id)
+    assert job.meta["translated"] == 2
