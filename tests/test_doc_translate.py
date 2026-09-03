@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import re
 import zipfile
+from xml.etree import ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -344,3 +345,215 @@ def test_cancelled_job_produces_no_file(tmp_path, monkeypatch):
                "en", "zh-TW", "")
     assert not R._out_path(uid, ".docx").exists(), "取消了還是產出了檔案"
     assert job.result_path is None
+
+
+def test_line_breaks_inside_a_cell_survive(tmp_path, monkeypatch):
+    """儲存格裡的換行要保留。
+
+    試算表的一格常是「一句話 + 好幾個項目符號」。整格丟給模型會回成一整行，
+    條列全擠成一團（使用者拿 PCI DSS 責任矩陣實測回報）。而且批次的格式是
+    「一段一行」，多行的段落本身就會把批次結構弄亂。
+    """
+    R = _R()
+
+    class _PerLine:
+        def text_query(self, prompt: str, **kw) -> str:
+            segs = re.findall(r"^⟦(\d+)⟧(.*)$", prompt, re.M)
+            return "\n".join(f"⟦{n}⟧譯[{s}]" for n, s in segs)
+
+    monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _PerLine())
+    monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
+    monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 1})
+    monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+
+    # xlsx：一個 <si> 裡帶換行的儲存格
+    cell = "All policies are:\n- Documented.\n- In use."
+    shared = (
+        '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f'<si><t xml:space="preserve">{cell}</t></si></sst>'
+    )
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("xl/sharedStrings.xml", shared)
+
+    uid = "e" * 32
+    R._src_path(uid).write_bytes(buf.getvalue())
+
+    class _Job:
+        progress = 0.0
+        message = ""
+        cancelled = False
+        result_path = None
+        result_filename = ""
+        meta: dict = {}
+
+    job = _Job()
+    job.meta = {}
+    R._run_job(job, uid, {"filename": "a.xlsx", "ext": ".xlsx", "work_ext": ".xlsx"},
+               "en", "zh-TW", "")
+
+    units, _ = M.extract_units(R._out_path(uid, ".xlsx").read_bytes(), ".xlsx")
+    assert len(units) == 1
+    got = units[0].text
+    assert got.count("\n") == 2, f"換行被吃掉了：{got!r}"
+    assert got == "譯[All policies are:]\n譯[- Documented.]\n譯[- In use.]", got
+
+
+def test_per_line_colour_survives_the_translation(tmp_path, monkeypatch):
+    """一格裡「說明文字 + 換行 + 紅色斜體補充」，翻完那行還是紅色斜體。
+
+    使用者實測回報：「有些字顏色 翻譯後失去了」。原本譯文全部寫進第一個
+    文字節點，整格就統一成第一個 run 的樣式 —— 那行「這是新增要求」的紅字
+    提示變成黑色正體。**沒有錯誤訊息、版面也沒跑掉**，只有對照原稿才看得出來。
+    """
+    R = _R()
+
+    class _PerLine:
+        def text_query(self, prompt: str, **kw) -> str:
+            segs = re.findall(r"^⟦(\d+)⟧(.*)$", prompt, re.M)
+            return "\n".join(f"⟦{n}⟧譯[{s}]" for n, s in segs)
+
+    monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _PerLine())
+    monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
+    monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 1})
+    monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    shared = (
+        f'<sst xmlns="{ns}"><si>'
+        '<r><t xml:space="preserve">Roles are documented.\n</t></r>'
+        '<r><rPr><i/><color rgb="FFFF0000"/></rPr>'
+        '<t>New requirement - effective immediately</t></r>'
+        '</si></sst>'
+    )
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("xl/sharedStrings.xml", shared)
+
+    uid = "c" * 32
+    R._src_path(uid).write_bytes(buf.getvalue())
+
+    class _Job:
+        progress = 0.0
+        message = ""
+        cancelled = False
+        result_path = None
+        result_filename = ""
+
+    job = _Job()
+    job.meta = {}
+    R._run_job(job, uid, {"filename": "a.xlsx", "ext": ".xlsx", "work_ext": ".xlsx"},
+               "en", "zh-TW", "")
+
+    out = R._out_path(uid, ".xlsx").read_bytes()
+    with zipfile.ZipFile(io.BytesIO(out)) as z:
+        xml = z.read("xl/sharedStrings.xml").decode("utf-8")
+
+    root = ET.fromstring(xml)
+    runs = list(root.iter(f"{{{ns}}}r"))
+    assert len(runs) == 2, xml
+    texts = [(r.find(f"{{{ns}}}t").text or "") for r in runs]
+    # 兩行各自回到自己的 run（第二行帶著分隔的換行）
+    assert texts[0] == "譯[Roles are documented.]", texts
+    assert texts[1] == "\n譯[New requirement - effective immediately]", texts
+    # **紅色斜體還在，而且掛在放譯文的那個 run 上**
+    rpr = runs[1].find(f"{{{ns}}}rPr")
+    assert rpr is not None and rpr.find(f"{{{ns}}}color") is not None, xml
+    assert rpr.find(f"{{{ns}}}color").get("rgb") == "FFFF0000"
+    # 整格讀回來的文字仍是兩行
+    units, _ = M.extract_units(out, ".xlsx")
+    assert units[0].text == (
+        "譯[Roles are documented.]\n譯[New requirement - effective immediately]")
+
+
+def test_mismatched_batch_is_halved_not_dropped_to_one_by_one(tmp_path, monkeypatch):
+    """模型漏段時把那一批**對切重試**，不要一路退回逐行。
+
+    批次調大之後，一次漏段原本要賠上幾十次單行請求 —— 比不合併還慢
+    （使用者實測 343 段送了 305 次請求，回報「太慢了」）。
+    """
+    R = _R()
+
+    class _PickyClient:
+        """一次超過三段就故意少回一段（模擬模型漏段）。"""
+        def __init__(self) -> None:
+            self.calls: list[int] = []
+
+        def text_query(self, prompt: str, **kw) -> str:
+            segs = re.findall(r"^⟦(\d+)⟧(.*)$", prompt, re.M)
+            self.calls.append(len(segs))
+            if len(segs) > 3:
+                segs = segs[:-1]          # 少一段 → 解析必定失敗
+            return "\n".join(f"⟦{n}⟧譯[{s}]" for n, s in segs)
+
+    client = _PickyClient()
+    monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda: client)
+    monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
+    monkeypatch.setattr(R.llm_settings, "get", lambda: {
+        "translate_concurrency": 1, "doctr_batch_segments": 12,
+        "doctr_batch_chars": 20000})
+    monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    cells = [f"Sentence number {i} here." for i in range(12)]
+    shared = (f'<sst xmlns="{ns}">'
+              + "".join(f"<si><t>{c}</t></si>" for c in cells)
+              + "</sst>")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("xl/sharedStrings.xml", shared)
+
+    uid = "d" * 32
+    R._src_path(uid).write_bytes(buf.getvalue())
+
+    class _Job:
+        progress = 0.0
+        message = ""
+        cancelled = False
+        result_path = None
+        result_filename = ""
+
+    job = _Job()
+    job.meta = {}
+    R._run_job(job, uid, {"filename": "a.xlsx", "ext": ".xlsx", "work_ext": ".xlsx"},
+               "en", "zh-TW", "")
+
+    # 12 → 6+6 → 3+3+3+3：只有四次成功的請求，不是十二次單行
+    assert job.meta["llm_requests"] == 4, (job.meta, client.calls)
+    assert job.meta["batch_fallbacks"] == 3, job.meta
+    assert client.calls == [12, 6, 3, 3, 6, 3, 3], client.calls
+
+    units, _ = M.extract_units(R._out_path(uid, ".xlsx").read_bytes(), ".xlsx")
+    assert [u.text for u in units] == [f"譯[{c}]" for c in cells]
+
+
+def test_blank_line_inside_a_cell_is_not_lost():
+    """空白行會切出一個「分不到節點」的組 —— 那時要退回舊做法，一行都不能少。
+
+    連續兩個換行（一格裡空一行）會讓中間那一行沒有任何 run 可以寫。硬跑的話
+    產出的檔案會**少一行**，而且沒有任何錯誤訊息。
+    """
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    shared = (f'<sst xmlns="{ns}"><si>'
+              '<r><t xml:space="preserve">first\n</t></r>'
+              '<r><t xml:space="preserve">\nthird</t></r>'
+              '</si></sst>')
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("xl/sharedStrings.xml", shared)
+
+    units, state = M.extract_units(buf.getvalue(), ".xlsx")
+    assert units[0].text == "first\n\nthird"
+    out = M.rebuild(state, {0: "第一\n\n第三"}, units, target_lang="zh-TW")
+    again, _ = M.extract_units(out, ".xlsx")
+    assert again[0].text == "第一\n\n第三", again[0].text

@@ -202,7 +202,7 @@ function showResult(job) {
             + `檔案格式與版面跟原稿相同。`;
     if (m.llm_requests) {
       sum += `（合併成 ${m.llm_requests} 次 LLM 請求`;
-      if (m.batch_fallbacks) sum += `，其中 ${m.batch_fallbacks} 批退回逐段翻`;
+      if (m.batch_fallbacks) sum += `，其中 ${m.batch_fallbacks} 批對切重試`;
       sum += '）';
     }
     document.getElementById('dtSummary').textContent = sum;

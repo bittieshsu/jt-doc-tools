@@ -9,8 +9,9 @@
 **以「段落」為單位翻譯，譯文寫回第一個文字節點、其餘清空。** 為什麼不逐節點
 翻：一個句子常被切成好幾個 run（改個字體、標個粗體就會切開），逐節點翻等於
 把半句話丟給 LLM，譯出來的東西會走樣。段落的框、表格的格、頁首頁尾都還在
-原位，所以版面不會跑掉；代價是段落**內部**的混合格式（同一段裡一半粗體）
-會統一成第一個 run 的樣式。
+原位，所以版面不會跑掉。**能依行切開的地方會依行切開**（一格裡的紅色斜體
+補充自己一行時，那個顏色留得住）；剩下的限制是同**一行**裡的混合格式
+（半句粗體）會統一成該行第一個 run 的樣式。
 
 不碰的東西：欄位碼（`w:instrText`）、樣式定義、關聯檔、圖片、數字與純符號。
 """
@@ -155,8 +156,10 @@ def _node_text(node: ET.Element, kind: str) -> str:
 
 def _set_node_text(node: ET.Element, kind: str, value: str) -> None:
     node.text = value
-    if kind == "docx" and value != value.strip():
-        # Word 預設會吃掉前後空白，要明講保留
+    if kind in ("docx", "xlsx") and value != value.strip():
+        # Word / Excel 預設會吃掉前後空白，要明講保留。**換行也算**：依行分組
+        # 之後，組與組之間的換行是寫在後一組的**開頭**，沒有這個屬性那個換行
+        # 就可能被吃掉 —— 兩行黏成一行，而且不會有任何錯誤。
         node.set(f"{{{_XML}}}space", "preserve")
 
 
@@ -213,6 +216,73 @@ def _set_run_east_asian_font(run: ET.Element, font: str) -> None:
     fonts.set(f"{{{_W}}}eastAsia", font)
 
 
+def _line_groups(nodes: list[ET.Element], kind: str
+                 ) -> list[tuple[int, list[ET.Element]]]:
+    """把一段文字依「行」切成幾組，回傳 [(這組有幾行, 節點清單), ...]。
+
+    **為什麼要分組**：譯文若全部寫進第一個節點，整段就統一成第一個 run 的樣式
+    —— 試算表常見的「說明文字 + 換行 + 紅色斜體的補充」翻完之後那行補充
+    **會變成黑色正體**（使用者實測回報：「有些字顏色翻譯後失去了」）。格式沒有
+    錯誤訊息、版面也沒跑掉，只是那個「這是新增要求」的紅字提示不見了。
+
+    切點只落在**沒有任何節點跨過去**的換行處：那裡切開，每一行的譯文就能寫回
+    它自己的 run，行層級的顏色 / 斜體 / 粗體都留得住。跨行的節點（一個 run 裡
+    就含換行）併成同一組 —— 那種情形本來就無法分辨格式屬於哪一行。
+    """
+    texts = [_node_text(n, kind) for n in nodes]
+    full = "".join(texts)
+    n_lines = full.count("\n") + 1
+    if n_lines == 1 or len(nodes) == 1:
+        return [(n_lines, list(nodes))]
+
+    # 每個換行字元的位置（第 i 個換行結束第 i 行）
+    nl_pos = [i for i, ch in enumerate(full) if ch == "\n"]
+    # 這個換行處可不可以切：擁有該換行字元的那個節點，不能同時含有它前後的字。
+    # 兩種寫法都要認 —— Excel 多半把換行放在 run 的**結尾**（`<t>說明&#10;</t>`），
+    # 別的產生器則會放在下一個 run 的**開頭**。只認一種的話，另一種檔案就整段
+    # 併成一組、格式照樣被吃掉（而且完全看不出來）。
+    splittable = [False] * len(nl_pos)
+    starts_new = [False] * len(nl_pos)   # 該換行屬於「下一組」的第一個字
+    starts: list[int] = []
+    pos = 0
+    for t in texts:
+        starts.append(pos)
+        pos += len(t)
+    for bi, p_nl in enumerate(nl_pos):
+        for ni, st in enumerate(starts):
+            en = st + len(texts[ni])
+            if st <= p_nl < en:
+                if en == p_nl + 1:
+                    splittable[bi] = True
+                elif st == p_nl:
+                    splittable[bi] = True
+                    starts_new[bi] = True
+                break
+
+    # 依可切的換行處把「行」分組
+    line_group: list[int] = []
+    g = 0
+    for i in range(n_lines):
+        line_group.append(g)
+        if i < len(splittable) and splittable[i]:
+            g += 1
+    n_groups = g + 1
+
+    # 節點依「起點落在哪一行」歸到那一行的組
+    buckets: list[list[ET.Element]] = [[] for _ in range(n_groups)]
+    for ni, node in enumerate(nodes):
+        st = starts[ni]
+        # 節點以換行開頭而且那個換行是切點時，這個節點屬於**後面**那一組
+        line = sum(1 for bi, p_nl in enumerate(nl_pos)
+                   if p_nl < st or (p_nl == st and starts_new[bi]))
+        buckets[line_group[min(line, n_lines - 1)]].append(node)
+
+    counts = [0] * n_groups
+    for gi in line_group:
+        counts[gi] += 1
+    return [(counts[i], buckets[i]) for i in range(n_groups)]
+
+
 def extract_units(data: bytes, ext: str) -> tuple[list[TextUnit], dict]:
     """抽出所有可翻譯的段落。
 
@@ -258,15 +328,32 @@ def rebuild(state: dict, translations: dict[int, str], units: list[TextUnit],
         if new is None or new == unit.text:
             continue
         kind = _kind_for(unit.part, ext)
-        # 譯文全部寫進第一個節點，其餘清空 —— 段落的框 / 格 / 頁首頁尾都還在，
-        # 所以版面不動；段落內部的混合格式會統一成第一個 run 的樣式。
-        _set_node_text(unit.nodes[0], kind, new)
-        if kind == "docx" and ea_font and _CJK_RE.search(new):
-            run = unit.owners.get(id(unit.nodes[0]))
-            if run is not None:
-                _set_run_east_asian_font(run, ea_font)
-        for n in unit.nodes[1:]:
-            _set_node_text(n, kind, "")
+        groups = _line_groups(unit.nodes, kind)
+        lines = new.split("\n")
+        if (sum(k for k, _ in groups) != len(lines)
+                or any(not g for _, g in groups)):
+            # 退回「全部寫進第一個節點」的兩種情形：
+            #   ①行數對不上（模型自己塞了換行）—— **不可以硬湊**，錯開一行
+            #     就把 A 行的譯文套上 B 行的格式
+            #   ②有某一組分不到任何節點（連續兩個換行、也就是空白行，會切出
+            #     一個沒有節點的組）—— 那一組的文字沒地方寫，硬跑會**少一行**
+            # 兩種都是「格式讓一步，文字不可以掉」。
+            groups = [(len(lines), list(unit.nodes))]
+        at = 0
+        for k, gnodes in groups:
+            chunk = "\n".join(lines[at:at + k])
+            at += k
+            # 組與組之間的換行由「後一組」帶著 —— 前一組的節點會被清空，
+            # 分隔的換行字元本來就在那裡面
+            if at - k > 0:
+                chunk = "\n" + chunk
+            _set_node_text(gnodes[0], kind, chunk)
+            if kind == "docx" and ea_font and _CJK_RE.search(chunk):
+                run = unit.owners.get(id(gnodes[0]))
+                if run is not None:
+                    _set_run_east_asian_font(run, ea_font)
+            for n in gnodes[1:]:
+                _set_node_text(n, kind, "")
 
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:

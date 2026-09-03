@@ -236,21 +236,26 @@
   <div class="form-row">
     <label>每批最多段數</label>
     <div class="field" data-s="s9586d088">
-      <input type="number" id="doctr_batch_segments" min="1" max="30" step="1"
-             value="{{ settings.doctr_batch_segments|default(10) }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">一次請求最多合併幾段（1-30，預設 10）。合併是為了攤掉指令的成本 ——
+      <input type="number" id="doctr_batch_segments" min="1" max="100" step="5"
+             value="{{ settings.doctr_batch_segments|default(40) }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">一次請求最多合併幾<b>行</b>（1-100，預設 40）。
+        <b>翻譯是以「行」為單位</b>（儲存格裡的換行要保留），所以這個數字要比段數大 ——
+        真正的限制通常是下面那個字數。合併是為了攤掉指令的成本 ——
         翻成繁中時光是台灣用語對照表就佔 1,250 字元，逐段送等於把同一份指令送幾百遍。
-        調大請求更少，但單次更久、模型也更容易漏段；<b>漏段會整批退回逐段翻，反而變慢</b>。
-        結果頁會顯示實際送了幾次請求、有幾批退回，照那個數字調</span>
+        調大請求更少，但單次更久、模型也更容易漏段；漏段時會<b>把那一批對切重試</b>
+        （切到只剩一行才逐行翻），所以調大的風險比以前小。
+        結果頁會顯示實際送了幾次請求、有幾批對切，照那個數字調</span>
     </div>
   </div>
   <div class="form-row">
     <label>每批最多字元</label>
     <div class="field" data-s="s9586d088">
-      <input type="number" id="doctr_batch_chars" min="200" max="6000" step="100"
-             value="{{ settings.doctr_batch_chars|default(1200) }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">同一批原文的總字數上限（200-6000，預設 1200）。與上面那個先到先算 ——
-        段落很長時就算沒到段數上限也會先切斷</span>
+      <input type="number" id="doctr_batch_chars" min="200" max="20000" step="500"
+             value="{{ settings.doctr_batch_chars|default(4000) }}" data-s="see0435f7" />
+      <span class="muted" data-s="s6b9c179a">同一批原文的總字數上限（200-20000，預設 4000）。與上面那個先到先算 ——
+        <b>實務上真正的限制是這一個</b>：技術文件的儲存格動輒兩三百字，段數上限 40 幾乎碰不到。
+        調太小等於沒合併（實測設 1200 時，343 段的文件送了 305 次請求）。
+        漏段時會<b>把那一批對切重試</b>，不會整批退回逐行，所以調大的風險比以前小</span>
     </div>
   </div>
   <div class="form-row">

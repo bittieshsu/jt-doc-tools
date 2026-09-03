@@ -14,6 +14,7 @@ import time
 import uuid
 from pathlib import Path
 import re
+from dataclasses import dataclass
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -60,18 +61,29 @@ def _read_meta(upload_id: str) -> dict:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+@dataclass
+class _Piece:
+    """一「行」原文。一個段落（試算表的一格）可能有好幾行 —— 換行要原樣保留。"""
+    unit: int
+    text: str
+    result: Optional[str] = None
+
+
 #: 一次請求最多合併幾段、以及合併後的原文長度上限。
 #: **為什麼要合併**：翻成繁中時，那張台灣用語對照表就佔了 1,250 字元 ——
 #: 一段一次請求的話，真正的內容不到 prompt 的 1%，等於把同一份指令送幾百遍。
 #: 實測 200 段的文件，逐段送要一分多鐘以上。
-BATCH_MAX_SEGMENTS = 10
-BATCH_MAX_CHARS = 1200
+BATCH_MAX_SEGMENTS = 40
+#: 合併後的原文字數上限。**這個才是實務上真正的限制** —— 段數上限 40 幾乎碰不到：
+#: 一份技術文件的儲存格動輒兩三百字，字數上限 1,200 時一批只裝得下三、四行，
+#: 343 段的文件實測送出 305 次請求（等於幾乎沒合併，使用者回報「太慢了」）。
+BATCH_MAX_CHARS = 4000
 #: 段落標記。刻意用少見的符號，避免跟內文撞在一起。
 _SEG_OPEN, _SEG_CLOSE = "⟦", "⟧"
 _SEG_RE = re.compile(r"^\s*⟦(\d+)⟧\s?(.*)$")
 
 
-def _make_batches(indexes: list[int], units: list,
+def _make_batches(indexes: list[int], items: list,
                   seg_cap: int = BATCH_MAX_SEGMENTS,
                   char_cap: int = BATCH_MAX_CHARS) -> list[list[int]]:
     """把要翻的段落切成幾批。順序保持原樣，方便對回去。"""
@@ -79,7 +91,7 @@ def _make_batches(indexes: list[int], units: list,
     cur: list[int] = []
     size = 0
     for i in indexes:
-        n = len(units[i].text)
+        n = len(items[i].text)
         if cur and (len(cur) >= seg_cap or size + n > char_cap):
             out.append(cur)
             cur, size = [], 0
@@ -265,8 +277,8 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
     units, state = otm.extract_units(work.read_bytes(), work_ext)
     total = len(units)
     # 批次大小走管理設定（結果頁會顯示實際請求數，照那個數字調）
-    seg_cap = max(1, min(30, int(conf.get("doctr_batch_segments", BATCH_MAX_SEGMENTS))))
-    char_cap = max(200, min(6000, int(conf.get("doctr_batch_chars", BATCH_MAX_CHARS))))
+    seg_cap = max(1, min(100, int(conf.get("doctr_batch_segments", BATCH_MAX_SEGMENTS))))
+    char_cap = max(200, min(20000, int(conf.get("doctr_batch_chars", BATCH_MAX_CHARS))))
     if source_lang == "auto":
         source_lang = _detect_language("\n".join(u.text for u in units[:50]))
 
@@ -278,15 +290,17 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
     lock = threading.Lock()
 
     def _bump(n: int) -> None:
+        """n 是這次完成的**行數**。畫面上仍以段數表示（行比段多，直接顯示會嚇人）。"""
         nonlocal done
         with lock:
             done += n
-            job.progress = 0.05 + 0.75 * (done / max(1, total))
-            job.message = f"翻譯中… {done}/{total} 段"
+            frac = min(1.0, done / max(1, n_pieces))
+            job.progress = 0.05 + 0.75 * frac
+            job.message = f"翻譯中… {int(frac * total)}/{total} 段"
 
-    def one(i: int) -> None:
-        """單段翻譯（批次對不上時的退路）。"""
-        text = units[i].text
+    def one(k: int) -> None:
+        """單行翻譯（批次對不上時的退路）。"""
+        text = pieces[k].text
         try:
             # **`_translate_one` 回的是 dict 不是字串**
             # （`{"src", "translated", "error", "skipped"}`）。
@@ -299,19 +313,24 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         except Exception:
             translated = text
         with lock:
-            out[i] = translated
+            pieces[k].result = translated
 
     stats = {"requests": 0, "fallbacks": 0}
 
     def run_batch(batch: list[int]) -> None:
-        """一次送一批。段數對不上就整批退回逐段翻。"""
+        """一次送一批。段數對不上就**對切再試**，切到只剩一行才逐行翻。
+
+        為什麼不直接退回逐段：批次大了以後，一次漏段就要賠上幾十次單行請求 ——
+        比不合併還慢。對切之後通常一半就過了，只有真正有問題的那幾行才會
+        走到逐行。
+        """
         if job.cancelled:
             # **直接 return 不要 raise**：`pool.map` 會把所有批次都排進去，
             # raise 只會在收結果時炸，其餘批次照樣跑完 —— 按了取消還要等
             # 好幾分鐘。而 job_manager 是看 `job.cancelled` 決定最終狀態的，
             # raise 反而會被標成「失敗」。
             return
-        texts = [units[i].text for i in batch]
+        texts = [pieces[k].text for k in batch]
         parsed = None
         if len(texts) > 1:
             try:
@@ -327,34 +346,55 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
             except Exception:
                 parsed = None
         if parsed is None:
-            # 對不上就一段一段來 —— **不可以硬湊**，錯位比慢更糟：
-            # 產出的文件看起來很正常，只有讀的人會發現整份意思都錯了。
+            # 對不上**不可以硬湊**，錯位比慢更糟：產出的文件看起來很正常，
+            # 只有讀的人會發現整份意思都錯了。
+            if len(batch) == 1:
+                with lock:
+                    stats["requests"] += 1
+                one(batch[0])
+                _bump(1)
+                return
             with lock:
-                if len(texts) > 1:
-                    stats["fallbacks"] += 1
-                stats["requests"] += len(batch)
-            for i in batch:
-                one(i)
-        else:
-            with lock:
-                stats["requests"] += 1
-                for i, tr in zip(batch, parsed):
-                    out[i] = tr.strip() or units[i].text
+                stats["fallbacks"] += 1
+            mid = len(batch) // 2
+            run_batch(batch[:mid])
+            run_batch(batch[mid:])
+            return
+        with lock:
+            stats["requests"] += 1
+            for k, tr in zip(batch, parsed):
+                pieces[k].result = tr.strip() or pieces[k].text
         _bump(len(batch))
 
-    # 不用翻的（純數字 / 日期 / 網址…）直接留原文，不佔 LLM 請求
-    todo = []
+    # **一格裡的換行要保留。** 試算表的儲存格常是「一句話 + 好幾個項目符號」，
+    # 整格丟給模型會回成一整行 —— 條列全擠成一團（使用者實測回報）。
+    # 而且批次的格式是「一段一行」，多行的段落本身就會把批次結構弄亂。
+    # 所以**拆成行**送，翻完再用換行接回去。
+    pieces: list[_Piece] = []
     for i, u in enumerate(units):
-        if _is_no_translate(u.text):
-            out[i] = u.text
+        for line in u.text.split("\n"):
+            pieces.append(_Piece(unit=i, text=line))
+
+    todo = []
+    for k, pc in enumerate(pieces):
+        if not pc.text.strip() or _is_no_translate(pc.text):
+            pc.result = pc.text          # 空行 / 純符號原樣保留，不佔 LLM 請求
             done += 1
         else:
-            todo.append(i)
-    batches = _make_batches(todo, units, seg_cap, char_cap)
+            todo.append(k)
+    batches = _make_batches(todo, pieces, seg_cap, char_cap)
     job.message = f"翻譯中… 0/{total} 段（{len(batches)} 批）"
 
+    n_pieces = len(pieces)
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
         list(pool.map(run_batch, batches))
+
+    # 行 → 段：用換行接回去，儲存格裡的條列就保住了
+    joined: dict[int, list[str]] = {}
+    for pc in pieces:
+        joined.setdefault(pc.unit, []).append(
+            pc.result if pc.result is not None else pc.text)
+    out = {i: "\n".join(v) for i, v in joined.items()}
 
     if job.cancelled:
         # 取消就不要產出檔案 —— 一份只翻了一半的文件比沒有更危險：
@@ -392,8 +432,8 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         "upload_id": upload_id,
         "translated": sum(1 for i, v in out.items() if v != units[i].text),
         "total": total,
-        # 診斷用：批次真的有生效嗎？退回逐段的比例高就代表模型不照格式回，
-        # 那時候調批次大小才有意義（沒有這個數字只能猜）。
+        # 診斷用：批次真的有生效嗎？請求數遠多於批數就代表模型常漏段，
+        # 那時候把批次調小才有意義（沒有這個數字只能猜）。
         "batches": len(batches),
         "llm_requests": stats["requests"],
         "batch_fallbacks": stats["fallbacks"],
