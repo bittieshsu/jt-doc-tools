@@ -293,6 +293,8 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         with lock:
             out[i] = translated
 
+    stats = {"requests": 0, "fallbacks": 0}
+
     def run_batch(batch: list[int]) -> None:
         """一次送一批。段數對不上就整批退回逐段翻。"""
         if job.cancelled:
@@ -315,10 +317,15 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         if parsed is None:
             # 對不上就一段一段來 —— **不可以硬湊**，錯位比慢更糟：
             # 產出的文件看起來很正常，只有讀的人會發現整份意思都錯了。
+            with lock:
+                if len(texts) > 1:
+                    stats["fallbacks"] += 1
+                stats["requests"] += len(batch)
             for i in batch:
                 one(i)
         else:
             with lock:
+                stats["requests"] += 1
                 for i, tr in zip(batch, parsed):
                     out[i] = tr.strip() or units[i].text
         _bump(len(batch))
@@ -367,6 +374,11 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         "upload_id": upload_id,
         "translated": sum(1 for i, v in out.items() if v != units[i].text),
         "total": total,
+        # 診斷用：批次真的有生效嗎？退回逐段的比例高就代表模型不照格式回，
+        # 那時候調批次大小才有意義（沒有這個數字只能猜）。
+        "batches": len(batches),
+        "llm_requests": stats["requests"],
+        "batch_fallbacks": stats["fallbacks"],
     })
     job.message = f"完成（{total} 段）"
     job.progress = 1.0

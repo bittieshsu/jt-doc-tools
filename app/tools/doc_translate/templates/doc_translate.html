@@ -174,9 +174,14 @@ function showResult(job) {
     if (!m.download_url) return;
     const res = document.getElementById('dtResult');
     res.hidden = false;
-    document.getElementById('dtSummary').textContent =
-      `共 ${m.total || 0} 段，其中 ${m.translated || 0} 段換成了譯文。` +
-      `檔案格式與版面跟原稿相同。`;
+    let sum = `共 ${m.total || 0} 段，其中 ${m.translated || 0} 段換成了譯文。`
+            + `檔案格式與版面跟原稿相同。`;
+    if (m.llm_requests) {
+      sum += `（合併成 ${m.llm_requests} 次 LLM 請求`;
+      if (m.batch_fallbacks) sum += `，其中 ${m.batch_fallbacks} 批退回逐段翻`;
+      sum += '）';
+    }
+    document.getElementById('dtSummary').textContent = sum;
     const dl = document.getElementById('dtDownload');
     dl.href = m.download_url;
     if (m.download_name) dl.setAttribute('download', m.download_name);
