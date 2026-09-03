@@ -97,3 +97,24 @@ def test_category_count_claim():
     got = _claims(INDEX.read_text(encoding="utf-8"), r"分 (\d+) 大類")
     assert got == {actual} or not got, (
         f"index.html 說分 {got} 大類，實際 metadata.category 有 {actual} 類")
+
+def test_llm_card_count_matches_the_tool_count():
+    """介紹站的 LLM 卡片數要等於實際有 LLM 加值的工具數。
+
+    **只驗標題那個數字是不夠的**：v1.14.67 加了「文件翻譯」時，數字從 11 改成
+    12 了，但**卡片沒補** —— 頁面寫著「12 個工具」底下卻只列 11 張，使用者
+    找不到新工具（使用者回報：「沒有提到新的文件翻譯啊」）。
+    """
+    import re as _re
+    from app.core.llm_settings import llm_settings as _L
+
+    html = (ROOT / "github" / "docs" / "index.html").read_text(encoding="utf-8")
+    cards = _re.findall(r'<article class="llm-card[^"]*">(.*?)</article>', html, _re.S)
+    titles = [_re.search(r"<h3>(.*?)</h3>", c, _re.S).group(1).strip()
+              for c in cards if _re.search(r"<h3>", c)]
+    # `pdf-ocr-vision` 是 pdf-ocr 的另一種模式，不是獨立工具
+    tools = {t["id"].replace("-vision", "") for t in _L.KNOWN_LLM_TOOLS}
+    assert len(titles) == len(tools), (
+        f"介紹站有 {len(titles)} 張 LLM 卡片，實際有 LLM 的工具是 {len(tools)} 個。"
+        f"\n卡片：{titles}"
+    )
