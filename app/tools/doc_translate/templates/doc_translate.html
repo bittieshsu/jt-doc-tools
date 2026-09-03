@@ -6,11 +6,14 @@
 <style nonce="{{ request.state.csp_nonce }}">
 /* 語言兩欄一列，上傳自己一列。**不要把很高的上傳區跟下拉排在同一列** ——
    下拉會被推到底部，上面空一大塊（第一版就是這樣長歪的）。 */
-.dt-row { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
-.dt-field { display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
+/* 兩個語言下拉各佔半列，把整列填滿 —— 靠左擠成兩小塊、右邊空一大片不好看。
+   窄螢幕自動變成一欄。 */
+.dt-row { display: grid; gap: 18px;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.dt-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .dt-field > label,
 .dt-uplabel { font-size: 12.5px; font-weight: 600; color: #334155; }
-.dt-field select { min-width: 210px; }
+.dt-field select { width: 100%; max-width: none; box-sizing: border-box; }
 .dt-upblock { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
 /* 自填領域拉滿整列 —— `.field` 對 text input 有預設寬度，不覆蓋的話只有一小截 */
 .dt-domain-input { width: 100%; max-width: none; box-sizing: border-box; }

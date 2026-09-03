@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 from pathlib import Path
 
@@ -136,9 +137,17 @@ def test_job_produces_a_translated_file(tmp_path, monkeypatch):
     R = importlib.import_module("app.tools.doc_translate.router")
 
     class _FakeClient:
+        """會照批次格式回覆的假模型。"""
+
         def text_query(self, prompt: str, **kw) -> str:
-            # prompt 最後一行是「原文：…」
-            src = prompt.rsplit("原文：", 1)[-1].strip()
+            if "⟦1⟧" in prompt:                     # 批次請求
+                segs = []
+                for line in prompt.splitlines():
+                    m = re.match(r"^⟦(\d+)⟧(.*)$", line)
+                    if m:
+                        segs.append((m.group(1), m.group(2)))
+                return "\n".join(f"⟦{n}⟧<{s}>" for n, s in segs)
+            src = prompt.rsplit("原文：", 1)[-1].strip()   # 單段請求
             return f"<{src}>"
 
     monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
@@ -197,3 +206,103 @@ def test_main_part_may_have_a_number_suffix():
             "</w:r></w:p></w:body></w:document>")
     units, _ = M.extract_units(buf.getvalue(), ".docx")
     assert [u.text for u in units] == ["Hello there"]
+
+
+# ---------- 批次翻譯（把好幾段合成一次請求） ----------
+
+def _R():
+    import importlib
+    return importlib.import_module("app.tools.doc_translate.router")
+
+
+def test_batches_respect_both_limits():
+    R = _R()
+
+    class U:
+        def __init__(self, text): self.text = text
+
+    units = [U("x" * 300) for _ in range(20)]
+    batches = R._make_batches(list(range(20)), units)
+    for b in batches:
+        assert len(b) <= R.BATCH_MAX_SEGMENTS
+        assert sum(len(units[i].text) for i in b) <= R.BATCH_MAX_CHARS or len(b) == 1
+    assert [i for b in batches for i in b] == list(range(20)), "順序不可以亂掉"
+
+
+def test_batch_reply_is_parsed_back_in_order():
+    R = _R()
+    reply = "⟦1⟧甲\n⟦2⟧乙\n⟦3⟧丙"
+    assert R._parse_batch_reply(reply, 3) == ["甲", "乙", "丙"]
+
+
+@pytest.mark.parametrize("reply,count", [
+    ("⟦1⟧甲\n⟦2⟧乙", 3),            # 少一段
+    ("⟦1⟧甲\n⟦2⟧乙\n⟦4⟧丁", 3),     # 編號跳號
+    ("甲\n乙\n丙", 3),               # 沒有標記
+    ("", 3),
+])
+def test_broken_batch_reply_is_rejected(reply: str, count: int):
+    """**段數對不上絕對不可以硬湊** —— 那會把 A 段的譯文寫進 B 段，
+    產出的文件看起來很正常，只有讀的人會發現整份意思都錯了。"""
+    assert _R()._parse_batch_reply(reply, count) is None
+
+
+def test_echoed_prompt_is_not_mistaken_for_a_translation():
+    """模型把 prompt 連同原文吐回來時，⟦n⟧ 標記剛好對得上段數 ——
+    會「解析成功」但內容其實是原文，一個字都沒翻。"""
+    R = _R()
+    echo = ("只輸出翻譯結果，不要附上原文。\n⟦1⟧Hello\n⟦2⟧World")
+    assert R._looks_like_echo(echo)
+
+
+def test_job_uses_batching_and_keeps_segments_aligned(tmp_path, monkeypatch):
+    """實際跑一次：三段各自拿到**自己的**譯文，而且只送一次請求。"""
+    R = _R()
+    calls = []
+
+    class _Batch:
+        def text_query(self, prompt: str, **kw) -> str:
+            calls.append(prompt)
+            segs = re.findall(r"^⟦(\d+)⟧(.*)$", prompt, re.M)
+            return "\n".join(f"⟦{n}⟧譯[{s}]" for n, s in segs)
+
+    monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _Batch())
+    monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
+    monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 2})
+    monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+
+    doc = (
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/'
+        'wordprocessingml/2006/main"><w:body>'
+        "<w:p><w:r><w:t>Alpha</w:t></w:r></w:p>"
+        "<w:p><w:r><w:t>Beta</w:t></w:r></w:p>"
+        "<w:p><w:r><w:t>Gamma</w:t></w:r></w:p>"
+        "</w:body></w:document>"
+    )
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("word/document.xml", doc)
+
+    uid = "c" * 32
+    R._src_path(uid).write_bytes(buf.getvalue())
+
+    class _Job:
+        progress = 0.0
+        message = ""
+        cancelled = False
+        result_path = None
+        result_filename = ""
+        meta: dict = {}
+
+    job = _Job()
+    job.meta = {}
+    R._run_job(job, uid, {"filename": "a.docx", "ext": ".docx", "work_ext": ".docx"},
+               "en", "zh-TW", "")
+
+    units, _ = M.extract_units(R._out_path(uid, ".docx").read_bytes(), ".docx")
+    assert [u.text for u in units] == ["譯[Alpha]", "譯[Beta]", "譯[Gamma]"], \
+        [u.text for u in units]
+    assert len(calls) == 1, f"三段應該合成一次請求，實際送了 {len(calls)} 次"

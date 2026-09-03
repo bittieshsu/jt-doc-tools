@@ -283,6 +283,19 @@ _LANG_NAMES = {
 
 def _build_prompt(src_text: str, source_lang: str, target_lang: str,
                   domain: str = "") -> str:
+    """單句翻譯的 prompt。指令部分由 `_build_prompt_prefix` 產生。"""
+    return (_build_prompt_prefix(source_lang, target_lang, domain)
+            + f"原文：{src_text}")
+
+
+def _build_prompt_prefix(source_lang: str, target_lang: str,
+                         domain: str = "") -> str:
+    """翻譯 prompt 的**指令部分**（不含原文）。
+
+    抽出來是因為「文件翻譯」要把好幾段合併成一次請求 —— 那邊需要同一份指令
+    （台灣用語對照表、領域提示），**不可以各自寫一份**：這份對照表改過很多次，
+    兩邊各留一份一定會漂掉。
+    """
     src_name = _LANG_NAMES.get(source_lang, source_lang or "原文")
     tgt_name = _LANG_NAMES.get(target_lang, target_lang or "目標語言")
     # 針對台灣繁體要求 LLM 用台灣慣用 IT 術語（避免大陸用語滲入）
@@ -329,7 +342,6 @@ def _build_prompt(src_text: str, source_lang: str, target_lang: str,
         "只輸出翻譯結果，不要附上原文、不要加任何標記、不要解釋、"
         "不要 markdown、不要行首符號、不要後綴。"
         "如果原文是專有名詞或無法翻譯，照原樣輸出即可。\n\n"
-        f"原文：{src_text}"
     )
 
 

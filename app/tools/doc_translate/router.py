@@ -13,6 +13,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+import re
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -27,8 +28,8 @@ from ...core.llm_settings import llm_settings
 # 翻譯的邏輯與「逐句翻譯」共用一份 —— prompt、台灣用語對照表、領域提示、
 # 「這段不用翻」的判斷都在那邊，複製一份一定會漂掉。
 from ..translate_doc.router import (
-    _build_prompt, _detect_language, _is_no_translate, _translate_one,
-    _warmup_llm, _LANG_NAMES,
+    _build_prompt, _build_prompt_prefix, _detect_language, _is_no_translate,
+    _translate_one, _warmup_llm, _LANG_NAMES,
 )
 
 router = APIRouter()
@@ -56,6 +57,76 @@ def _read_meta(upload_id: str) -> dict:
     if not p.exists():
         raise HTTPException(410, "上傳已過期，請重新上傳")
     return json.loads(p.read_text(encoding="utf-8"))
+
+
+#: 一次請求最多合併幾段、以及合併後的原文長度上限。
+#: **為什麼要合併**：翻成繁中時，那張台灣用語對照表就佔了 1,250 字元 ——
+#: 一段一次請求的話，真正的內容不到 prompt 的 1%，等於把同一份指令送幾百遍。
+#: 實測 200 段的文件，逐段送要一分多鐘以上。
+BATCH_MAX_SEGMENTS = 10
+BATCH_MAX_CHARS = 1200
+#: 段落標記。刻意用少見的符號，避免跟內文撞在一起。
+_SEG_OPEN, _SEG_CLOSE = "⟦", "⟧"
+_SEG_RE = re.compile(r"^\s*⟦(\d+)⟧\s?(.*)$")
+
+
+def _make_batches(indexes: list[int], units: list) -> list[list[int]]:
+    """把要翻的段落切成幾批。順序保持原樣，方便對回去。"""
+    out: list[list[int]] = []
+    cur: list[int] = []
+    size = 0
+    for i in indexes:
+        n = len(units[i].text)
+        if cur and (len(cur) >= BATCH_MAX_SEGMENTS or size + n > BATCH_MAX_CHARS):
+            out.append(cur)
+            cur, size = [], 0
+        cur.append(i)
+        size += n
+    if cur:
+        out.append(cur)
+    return out
+
+
+def _build_batch_prompt(texts: list[str], source_lang: str, target_lang: str,
+                        domain: str) -> str:
+    """把好幾段合成一次請求。指令部分與逐句翻譯**共用同一份**。"""
+    body = "\n".join(f"{_SEG_OPEN}{i + 1}{_SEG_CLOSE}{t}" for i, t in enumerate(texts))
+    return (
+        _build_prompt_prefix(source_lang, target_lang, domain)
+        + f"下面有 {len(texts)} 段文字，每段前面有 {_SEG_OPEN}編號{_SEG_CLOSE} 標記。"
+        f"請**逐段翻譯**，輸出時每段自成一行、並保留原本的 {_SEG_OPEN}編號{_SEG_CLOSE} 標記，"
+        "編號與段數都要與原文完全一致，不可以合併、拆分、增加或省略任何一段。"
+        "標記後面只放譯文，不要附上原文。\n\n"
+        + body
+    )
+
+
+#: 指令裡才有的字串。回覆裡出現＝模型把 prompt 原樣吐回來了。
+_ECHO_MARKS = ("只輸出翻譯結果", "逐段翻譯", "編號與段數都要與原文完全一致")
+
+
+def _looks_like_echo(reply: str) -> bool:
+    return any(m in reply for m in _ECHO_MARKS)
+
+
+def _parse_batch_reply(reply: str, count: int) -> Optional[list[str]]:
+    """把回覆拆回每段的譯文；對不上就回 None（呼叫端退回逐段翻）。
+
+    **段數對不上時絕對不可以硬湊** —— 那會把 A 段的譯文寫進 B 段，
+    產出的文件看起來很正常，只有讀的人會發現整份意思都錯了。
+    """
+    got: dict[int, str] = {}
+    cur: Optional[int] = None
+    for line in (reply or "").splitlines():
+        m = _SEG_RE.match(line)
+        if m:
+            cur = int(m.group(1))
+            got[cur] = m.group(2).strip()
+        elif cur is not None and line.strip():
+            got[cur] = (got[cur] + " " + line.strip()).strip()
+    if len(got) != count or set(got) != set(range(1, count + 1)):
+        return None
+    return [got[i + 1] for i in range(count)]
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -198,36 +269,73 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
     done = 0
     lock = threading.Lock()
 
-    def one(i: int) -> None:
+    def _bump(n: int) -> None:
         nonlocal done
-        text = units[i].text
-        if _is_no_translate(text):
-            translated = text
-        else:
-            try:
-                # **`_translate_one` 回的是 dict 不是字串**
-                # （`{"src", "translated", "error", "skipped"}`）。
-                # 當成字串用會在寫回檔案時炸 `'dict' object has no attribute
-                # 'strip'`，而且是在背景作業裡 —— 使用者只看到「失敗」。
-                res = _translate_one(client, model, text,
-                                     source_lang, target_lang, domain)
-                translated = (res.get("translated") or "").strip()
-                # 翻不出來（錯誤）或被判定不用翻 → 保留原文。
-                # 一段翻不出來不該讓整份作業掛掉，也不該在文件裡留下空白。
-                if not translated or res.get("error"):
-                    translated = text
-            except Exception:
-                translated = text
         with lock:
-            out[i] = translated
-            done += 1
+            done += n
             job.progress = 0.05 + 0.75 * (done / max(1, total))
             job.message = f"翻譯中… {done}/{total} 段"
+
+    def one(i: int) -> None:
+        """單段翻譯（批次對不上時的退路）。"""
+        text = units[i].text
+        try:
+            # **`_translate_one` 回的是 dict 不是字串**
+            # （`{"src", "translated", "error", "skipped"}`）。
+            res = _translate_one(client, model, text,
+                                 source_lang, target_lang, domain)
+            translated = (res.get("translated") or "").strip()
+            # 翻不出來（錯誤）或被判定不用翻 → 保留原文。
+            if not translated or res.get("error"):
+                translated = text
+        except Exception:
+            translated = text
+        with lock:
+            out[i] = translated
+
+    def run_batch(batch: list[int]) -> None:
+        """一次送一批。段數對不上就整批退回逐段翻。"""
         if job.cancelled:
             raise RuntimeError("已取消")
+        texts = [units[i].text for i in batch]
+        parsed = None
+        if len(texts) > 1:
+            try:
+                reply = client.text_query(
+                    prompt=_build_batch_prompt(texts, source_lang, target_lang, domain),
+                    model=model, temperature=0.0, think=False)
+                parsed = _parse_batch_reply(reply or "", len(texts))
+                # 模型有時會把**指令連同原文一起回**（回聲）。那種回覆裡的
+                # ⟦n⟧ 標記剛好對得上段數，會「解析成功」但內容其實是原文 ——
+                # 產出的文件看起來正常，實際上一個字都沒翻。
+                if parsed is not None and _looks_like_echo(reply or ""):
+                    parsed = None
+            except Exception:
+                parsed = None
+        if parsed is None:
+            # 對不上就一段一段來 —— **不可以硬湊**，錯位比慢更糟：
+            # 產出的文件看起來很正常，只有讀的人會發現整份意思都錯了。
+            for i in batch:
+                one(i)
+        else:
+            with lock:
+                for i, tr in zip(batch, parsed):
+                    out[i] = tr.strip() or units[i].text
+        _bump(len(batch))
+
+    # 不用翻的（純數字 / 日期 / 網址…）直接留原文，不佔 LLM 請求
+    todo = []
+    for i, u in enumerate(units):
+        if _is_no_translate(u.text):
+            out[i] = u.text
+            done += 1
+        else:
+            todo.append(i)
+    batches = _make_batches(todo, units)
+    job.message = f"翻譯中… 0/{total} 段（{len(batches)} 批）"
 
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
-        list(pool.map(one, range(total)))
+        list(pool.map(run_batch, batches))
 
     job.message = "寫回檔案…"
     job.progress = 0.82
