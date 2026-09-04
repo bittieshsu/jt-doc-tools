@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..base import ToolMetadata, ToolModule
 from .router import router
+from app.core.ui_locale import TAIWAN_ONLY
 
 metadata = ToolMetadata(
     id="vat-lookup",
@@ -14,6 +15,8 @@ metadata = ToolMetadata(
     description="輸入 8 位統一編號，反查公司 / 政府機關 / 學校的名稱、地址、行業類別。",
     icon="search",
     category="內容處理",
+    # 台灣經濟部統編資料庫
+    locales=TAIWAN_ONLY,
 )
 
 tool = ToolModule(

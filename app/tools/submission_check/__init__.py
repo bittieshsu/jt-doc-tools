@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..base import ToolMetadata, ToolModule
 from .router import router
+from app.core.ui_locale import TAIWAN_ONLY
 
 metadata = ToolMetadata(
     id="submission-check",
@@ -15,6 +16,8 @@ metadata = ToolMetadata(
     icon="id-card",
     category="資安處理",
     version="0.1.0",
+    # 台灣標案 / 送件的檢核慣例
+    locales=TAIWAN_ONLY,
 )
 
 tool = ToolModule(

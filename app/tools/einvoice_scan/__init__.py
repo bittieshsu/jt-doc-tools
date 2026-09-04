@@ -11,6 +11,7 @@ from pathlib import Path
 
 from ..base import ToolMetadata, ToolModule
 from .router import router
+from app.core.ui_locale import TAIWAN_ONLY
 
 metadata = ToolMetadata(
     id="einvoice-scan",
@@ -18,6 +19,8 @@ metadata = ToolMetadata(
     description="掃發票 QR 自動帶賣方名稱 / 行業 / 會計科目，可批次匯出與 LLM 判讀。",
     icon="qr",
     category="內容處理",
+    # 台灣電子發票 QR 格式 + 中文會計科目詞庫
+    locales=TAIWAN_ONLY,
 )
 
 tool = ToolModule(

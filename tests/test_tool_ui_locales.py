@@ -1,0 +1,84 @@
+"""工具的介面語系白名單（`ToolMetadata.locales`）。
+
+有幾支工具是為**中文 / 台灣的文件與慣例**做的 —— 把英文文件丟進去會「執行成功
+但什麼都沒抓到」，**比看不到這支工具更糟**（使用者會以為處理過了）。所以介面
+語言不是中文時，它們不列在側欄與搜尋裡。
+
+**最高原則：加 i18n 不可以改壞現有功能。** 所以這支測試的第一條就是
+「繁體中文底下，每一支工具都照樣看得到」—— 今天的行為必須跟加這個欄位之前
+一模一樣。
+"""
+from __future__ import annotations
+
+import pytest
+
+from app.core.ui_locale import CHINESE, DEFAULT_LOCALE, TAIWAN_ONLY, tool_visible
+from app.tool_registry import discover_tools
+
+#: 靠台灣特有的資料或格式才成立 —— 簡體中文環境也不成立。
+_TAIWAN_ONLY = {
+    "vat-lookup", "einvoice-scan", "transit-proof", "submission-check",
+    "pdf-fill", "doc-deident", "text-deident",
+}
+#: 靠華人文書慣例（印章）—— 之後支援簡體中文時照樣留著。
+_CHINESE = {"pdf-seam-stamp", "pdf-stamp"}
+
+
+@pytest.fixture(scope="module")
+def tools():
+    return discover_tools()
+
+
+def test_traditional_chinese_still_shows_every_tool(tools):
+    """**這條是最高原則的守門**：繁中底下一支都不可以少。"""
+    hidden = [t.metadata.id for t in tools
+              if not tool_visible(t.metadata.locales, DEFAULT_LOCALE)]
+    assert hidden == [], f"繁體中文底下不應該有工具被藏起來：{hidden}"
+
+
+def test_english_hides_exactly_the_chinese_only_tools(tools):
+    hidden = {t.metadata.id for t in tools
+              if not tool_visible(t.metadata.locales, "en")}
+    assert hidden == _TAIWAN_ONLY | _CHINESE, hidden
+
+
+def test_simplified_chinese_keeps_the_seal_tools(tools):
+    """印章類靠的是華人慣例、不是台灣資料 —— 之後支援簡體中文時要留著。"""
+    hidden = {t.metadata.id for t in tools
+              if not tool_visible(t.metadata.locales, "zh-Hans")}
+    assert hidden == _TAIWAN_ONLY, hidden
+    assert _CHINESE & hidden == set()
+
+
+def test_the_marks_use_the_shared_constants(tools):
+    """語系值只能用共用常數 —— 每支工具各寫一份 tuple 一定會漂。"""
+    for t in tools:
+        loc = t.metadata.locales
+        if t.metadata.id in _TAIWAN_ONLY:
+            assert loc == TAIWAN_ONLY, (t.metadata.id, loc)
+        elif t.metadata.id in _CHINESE:
+            assert loc == CHINESE, (t.metadata.id, loc)
+        else:
+            assert loc == (), f"{t.metadata.id} 不該有語系限制：{loc}"
+
+
+def test_hiding_is_not_disabling(tools):
+    """**隱藏 ≠ 停用。** 路由照常掛載、工具照常啟用。
+
+    有人可能介面用英文、手上卻正好有一份中文表單；而 `/api/<tool-id>` 是給機器
+    呼叫的，更不可以跟著介面語言變。
+    """
+    for t in tools:
+        if t.metadata.id in _TAIWAN_ONLY | _CHINESE:
+            assert t.metadata.enabled, t.metadata.id
+            assert t.router is not None, t.metadata.id
+            assert t.router.routes, f"{t.metadata.id} 應該仍然有路由"
+
+
+def test_permissions_do_not_depend_on_locale():
+    """權限不可以因為使用者換了介面語言就改變 —— 內建角色不認得語系這回事。"""
+    import inspect
+
+    from app.core import roles
+    src = inspect.getsource(roles)
+    assert "locale" not in src.lower(), "角色定義不應該跟介面語言有關"

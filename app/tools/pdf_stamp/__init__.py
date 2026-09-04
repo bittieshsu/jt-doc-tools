@@ -2,6 +2,7 @@ from pathlib import Path
 
 from ..base import ToolMetadata, ToolModule
 from .router import router
+from app.core.ui_locale import CHINESE
 
 metadata = ToolMetadata(
     id="pdf-stamp",
@@ -9,6 +10,8 @@ metadata = ToolMetadata(
     description="上傳 PDF，套用印章 / 簽名 / Logo 圖片並下載；支援批次處理。",
     icon="stamp",
     category="填單用印",
+    # 印鑑 / 個資限用章是華人慣例，簡體中文環境同樣適用
+    locales=CHINESE,
 )
 
 tool = ToolModule(

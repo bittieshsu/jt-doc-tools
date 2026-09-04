@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..base import ToolMetadata, ToolModule
 from .router import router
+from app.core.ui_locale import TAIWAN_ONLY
 
 metadata = ToolMetadata(
     id="transit-proof",
@@ -13,6 +14,8 @@ metadata = ToolMetadata(
     description="拉台鐵 / 高鐵乘車證明 PDF，自動整理日期 / 交通工具 / 起訖 / 費用成表格，可批次匯出報帳。",
     icon="car",
     category="內容處理",
+    # 台灣的乘車證明報帳格式
+    locales=TAIWAN_ONLY,
 )
 
 tool = ToolModule(
