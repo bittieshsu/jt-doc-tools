@@ -625,25 +625,30 @@
       </details>
       {% for g in nav_tool_groups(request) %}
       <details class="sb-group" open data-sbkey="{{ g.title }}">
-        <summary><span class="sb-group-icon">{{ icon('tool', size=15) }}</span>{{ g.title }}<span class="sb-count">{{ g.tools|length }}</span></summary>
+        <summary><span class="sb-group-icon">{{ icon('tool', size=15) }}</span>{{ tr(g.title) }}<span class="sb-count">{{ g.tools|length }}</span></summary>
         <div class="sb-items">
           {% for t in g.tools %}
-          <a class="sb-item" href="{{ t.url }}" data-tool-id="{{ t.id }}" data-name="{{ t.name }} {{ t.description }} {{ t.keywords }}">
+          {# 語言不符的工具**不藏起來，改成反灰點不下去**（使用者要求）——
+             看得到有這支工具、也看得到為什麼用不了，比整支消失好懂。 #}
+          <a class="sb-item{% if t.locked %} is-locked{% endif %}"
+             {% if not t.locked %}href="{{ t.url }}"{% else %}aria-disabled="true"
+             title="{{ tr('這支工具是為中文 / 台灣的文件與慣例設計的，介面語言切回繁體中文才能使用。') }}"{% endif %}
+             data-tool-id="{{ t.id }}" data-name="{{ tr(t.name) }} {{ tr(t.description) }} {{ t.keywords }}">
             <span class="sb-item-icon tile-color-{{ t.color|default(0) }}">{{ icon(t.icon or 'tool', size=18) }}</span>
             <span class="sb-item-text">
-              <span class="sb-item-name">{{ t.name }}</span>
-              {% if t.description %}<span class="sb-item-desc">{{ t.description }}</span>{% endif %}
+              <span class="sb-item-name">{{ tr(t.name) }}</span>
+              {% if t.description %}<span class="sb-item-desc">{{ tr(t.description) }}</span>{% endif %}
             </span>
-            <button class="sb-pin-btn" type="button" tabindex="-1"
-                    data-pin-tool="{{ t.id }}" data-pin-name="{{ t.name }}"
-                    data-pin-desc="{{ t.description or '' }}"
+            {% if not t.locked %}<button class="sb-pin-btn" type="button" tabindex="-1"
+                    data-pin-tool="{{ t.id }}" data-pin-name="{{ tr(t.name) }}"
+                    data-pin-desc="{{ tr(t.description) if t.description else '' }}"
                     data-pin-icon="{{ t.icon or 'tool' }}"
                     data-pin-color="{{ t.color|default(0) }}"
                     title="{{ tr('釘選 / 取消釘選') }}">
               <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 2l2.39 4.84L20 7.6l-4 3.9L17 17l-5-2.6L7 17l1-5.5-4-3.9 5.61-.76L12 2z"/>
               </svg>
-            </button>
+            </button>{% endif %}
           </a>
           {% endfor %}
         </div>

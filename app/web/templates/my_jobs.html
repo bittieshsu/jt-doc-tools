@@ -2,8 +2,8 @@
 {% from "components/icons.html" import icon %}
 {% block title %}我的作業 · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('clock', size=22) }} 我的作業</h1>
-<p class="muted">轉換是在伺服器背景執行的，<b>關掉頁面也會繼續跑</b>。這裡可以查到你送出過的作業、目前排到哪裡，以及回來下載已完成的結果。</p>
+<h1>{{ icon('clock', size=22) }} {{ tr('我的作業') }}</h1>
+<p class="muted">{{ tr('轉換是在伺服器背景執行的，') }}<b>{{ tr('關掉頁面也會繼續跑') }}</b>{{ tr('。這裡可以查到你送出過的作業、目前排到哪裡，以及回來下載已完成的結果。') }}</p>
 
 <div class="panel">
   {# h2 必須是 .panel 的**直接第一個子元素**才會套到全站共用的標題列樣式
@@ -11,35 +11,35 @@
      原本把它包在 <div class="mj-head"> 裡 → 選擇器對不上，這張卡片的標題就跟
      其他工具長得不一樣。控制項改放進 h2 內靠右。 #}
   <h2 class="mj-head">
-    作業清單<span id="mj-count" class="mj-count" hidden></span>
+    {{ tr('作業清單') }}<span id="mj-count" class="mj-count" hidden></span>
     <span class="mj-head-right">
-      <span class="mj-live" id="mj-live" title="有作業進行中時每 2 秒自動更新">
-        <span class="mj-live-dot"></span><span id="mj-live-tx">自動更新中</span>
+      <span class="mj-live" id="mj-live" title="{{ tr('有作業進行中時每 2 秒自動更新') }}">
+        <span class="mj-live-dot"></span><span id="mj-live-tx">{{ tr('自動更新中') }}</span>
       </span>
-      <label class="mj-only-active"><input type="checkbox" id="mj-active-only"> 只看進行中</label>
-      <button class="btn btn-small" id="mj-refresh" type="button">{{ icon('refresh', size=15) }} 重新整理</button>
+      <label class="mj-only-active"><input type="checkbox" id="mj-active-only"> {{ tr('只看進行中') }}</label>
+      <button class="btn btn-small" id="mj-refresh" type="button">{{ icon('refresh', size=15) }} {{ tr('重新整理') }}</button>
     </span>
   </h2>
   <div id="mj-ws-note" class="mj-note mj-note-warn" hidden></div>
   <div id="mj-scope-note" class="mj-note" hidden></div>
-  <div id="mj-empty" class="muted" hidden>還沒有任何作業。到任何工具送出轉換之後，這裡就會列出進度。</div>
+  <div id="mj-empty" class="muted" hidden>{{ tr('還沒有任何作業。到任何工具送出轉換之後，這裡就會列出進度。') }}</div>
   <div id="mj-list" class="mj-list"></div>
 </div>
 
 <div class="panel" id="mj-notify-panel" hidden>
-  <h2 class="mj-head">完成通知
+  <h2 class="mj-head">{{ tr('完成通知') }}
     <span class="mj-head-right">
-      <label class="mj-only-active"><input type="checkbox" id="mn-enabled"> 啟用</label>
+      <label class="mj-only-active"><input type="checkbox" id="mn-enabled"> {{ tr('啟用') }}</label>
     </span>
   </h2>
-  <p class="muted mn-lead">長時間的作業跑完時通知你，就不必一直開著頁面等。管道由管理員提供，這裡選你要用哪些。</p>
+  <p class="muted mn-lead">{{ tr('長時間的作業跑完時通知你，就不必一直開著頁面等。管道由管理員提供，這裡選你要用哪些。') }}</p>
   <div id="mn-list" class="mn-list"></div>
   <div id="mn-nowhere" class="mn-warn" hidden>
-    目前<b>不會收到任何通知</b> —— 上面至少要勾選一個管道，個人管道還要有可送達的位址。
+    {{ tr('目前') }}<b>{{ tr('不會收到任何通知') }}</b> {{ tr('—— 上面至少要勾選一個管道，個人管道還要有可送達的位址。') }}
   </div>
   <div class="mn-actions">
-    <button class="btn btn-small btn-primary" id="mn-save" type="button">{{ icon('save', size=15) }} 儲存</button>
-    <span id="mn-saved" class="mn-saved" hidden>已儲存</span>
+    <button class="btn btn-small btn-primary" id="mn-save" type="button">{{ icon('save', size=15) }} {{ tr('儲存') }}</button>
+    <span id="mn-saved" class="mn-saved" hidden>{{ tr('已儲存') }}</span>
   </div>
 </div>
 
@@ -139,8 +139,8 @@
   let timer = null;
 
   const LABEL = {
-    pending: '排隊中', running: '進行中', done: '已完成',
-    error: '失敗', cancelled: '已取消', interrupted: '已中斷',
+    pending: "{{ tr('排隊中') }}", running: "{{ tr('進行中') }}", done: "{{ tr('已完成') }}",
+    error: "{{ tr('失敗') }}", cancelled: "{{ tr('已取消') }}", interrupted: "{{ tr('已中斷') }}",
   };
 
   function fmtElapsed(s) {
@@ -264,7 +264,7 @@
         bits.push(j.queue_pos
           ? (j.queue_pos === 1 ? '排隊中・下一個就是你'
              : `排隊中・前面還有 ${j.queue_pos - 1} 個作業`)
-          : '排隊中');
+          : "{{ tr('排隊中') }}");
         // 插隊的作業要講清楚原因，不然使用者會以為號碼算錯了
         if (j.priority) {
           bits.push(j.priority_rank === null || j.priority_rank === undefined
@@ -416,7 +416,7 @@
       const r = await fetch('/api/jobs' + q, { headers: { Accept: 'application/json' } });
       if (!r.ok) {
         empty.hidden = false;
-        empty.textContent = await window.friendlyServerError(r, '讀取作業清單失敗');
+        empty.textContent = await window.friendlyServerError(r, "{{ tr('讀取作業清單失敗') }}");
         return;
       }
       render(await r.json());
@@ -539,7 +539,7 @@
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (!r.ok) { alert(await window.friendlyServerError(r, '儲存失敗')); return; }
+        if (!r.ok) { alert(await window.friendlyServerError(r, "{{ tr('儲存失敗') }}")); return; }
         const ok = document.getElementById('mn-saved');
         ok.hidden = false;
         setTimeout(() => { ok.hidden = true; }, 2500);

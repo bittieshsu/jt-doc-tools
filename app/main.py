@@ -19,7 +19,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.92"
+VERSION = "1.14.93"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -533,10 +533,10 @@ def _nav_settings_visible(request=None):
 
 
 def _nav_groups_for_locale(request=None):
-    """依介面語言過掉「只在中文環境成立」的工具（`ToolMetadata.locales`）。
+    """依介面語言把「只在中文環境成立」的工具**標成停用**（`ToolMetadata.locales`）。
 
-    **繁體中文底下不會少任何一支** —— 那些工具的 `locales` 都含 `zh-Hant`。
-    這裡只管「列不列」，路由與 API 一律不受影響。
+    **不是藏起來，是反灰點不下去**（使用者要求）—— 看得到有這支工具、也看得到
+    它為什麼用不了，比整支消失好懂。繁體中文底下沒有任何一支會被標記。
     """
     from .core import ui_locale as _loc
     lang = _loc.resolve(request)
@@ -544,9 +544,13 @@ def _nav_groups_for_locale(request=None):
         return _NAV_TOOL_GROUPS_ALL          # 最常見的路徑，不多做事
     out = []
     for g in _NAV_TOOL_GROUPS_ALL:
-        kept = [t for t in g["tools"] if _loc.tool_visible(t.get("locales"), lang)]
-        if kept:
-            out.append({"title": g["title"], "tools": kept})
+        items = []
+        for t in g["tools"]:
+            if _loc.tool_visible(t.get("locales"), lang):
+                items.append(t)
+            else:
+                items.append({**t, "locked": True})
+        out.append({"title": g["title"], "tools": items})
     return out
 
 

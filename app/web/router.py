@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
 from ..core import auth_settings as _as, permissions as _perm
+from ..core import ui_locale as _ui_locale
 
 router = APIRouter()
 
@@ -36,6 +37,9 @@ def build_router(templates, tools, app_name: str, version: str) -> APIRouter:
                 "icon": t.metadata.icon,
                 "category": t.metadata.category,
                 "color": nav_lookup.get(t.metadata.id, 0),
+                # 語言不符的工具**不藏起來，改成反灰點不下去**（跟側欄同一個規則）
+                "locked": not _ui_locale.tool_visible(
+                    getattr(t.metadata, "locales", ()), _ui_locale.resolve(request)),
             }
             for t in tools
             if allowed == "ALL" or t.metadata.id in allowed

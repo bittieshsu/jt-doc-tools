@@ -7,11 +7,11 @@
     <img src="{{ branding_logo_url() or '/static/images/logo-on-light.png' }}" alt="{{ app_name }}" />
   </div>
   <h1 class="hero-title">{{ app_name }}</h1>
-  <p class="hero-sub">整合式 PDF / Office 文件處理平台 — 表單填寫、用印簽名、浮水印、N-up、合併分拆、轉檔、文字 / 圖片擷取、敏感資料去識別化、加密 / 解密、中繼資料清除、隱藏內容掃描、差異比對、頁面編輯…可選 LDAP / AD 認證 + 角色權限 + 稽核 + 記錄轉送。</p>
+  <p class="hero-sub">{{ tr('整合式 PDF / Office 文件處理平台 — 表單填寫、用印簽名、浮水印、N-up、合併分拆、轉檔、文字 / 圖片擷取、敏感資料去識別化、加密 / 解密、中繼資料清除、隱藏內容掃描、差異比對、頁面編輯…可選 LDAP / AD 認證 + 角色權限 + 稽核 + 記錄轉送。') }}</p>
   <div class="hero-pills">
-    <span class="hero-pill"><span class="dot dot-blue"></span> 全方位文件處理</span>
-    <span class="hero-pill"><span class="dot dot-green"></span> 帳號權限與稽核</span>
-    <span class="hero-pill"><span class="dot dot-amber"></span> 不上雲，資料留在內網</span>
+    <span class="hero-pill"><span class="dot dot-blue"></span> {{ tr('全方位文件處理') }}</span>
+    <span class="hero-pill"><span class="dot dot-green"></span> {{ tr('帳號權限與稽核') }}</span>
+    <span class="hero-pill"><span class="dot dot-amber"></span> {{ tr('不上雲，資料留在內網') }}</span>
   </div>
 </section>
 
@@ -22,16 +22,16 @@
 <details class="fmt-note">
   <summary>
     {{ icon('info', size=15) }}
-    <span class="fmt-title">本站的格式用語</span>
+    <span class="fmt-title">{{ tr('本站的格式用語') }}</span>
     {# 收合時也要看得到內容 —— 否則那一條就只是一片空白，
        讀起來像「一張沒有內容的卡片」。 #}
     <span class="fmt-peek">
-      <span>文書檔</span><span>試算表</span><span>簡報</span><span>PDF</span>
+      <span>{{ tr('文書檔') }}</span><span>{{ tr('試算表') }}</span><span>{{ tr('簡報') }}</span><span>PDF</span>
     </span>
     {# 兩段文字各自存在、用 CSS 切換顯示 —— 不要用 `content:` 產生文字，
        那種文字選不起來也讀不出來。 #}
-    <span class="fmt-more"><span class="fmt-more-open">看說明</span><span
-      class="fmt-more-close">收起</span></span>
+    <span class="fmt-more"><span class="fmt-more-open">{{ tr('看說明') }}</span><span
+      class="fmt-more-close">{{ tr('收起') }}</span></span>
   </summary>
   <div class="fmt-note-body">
     <div class="fmt-grid">
@@ -42,7 +42,7 @@
     </div>
     {# **中文句子中間不要換行** —— 瀏覽器會把 CJK 之間的換行渲染成一個空格，
        畫面上就會冒出「同時收 多種格式」這種多餘空白。要斷就斷在標點後。 #}
-    <p class="fmt-umbrella"><b>辦公文件</b>是以上四類的<b>統稱</b> ——
+    <p class="fmt-umbrella"><b>{{ tr('辦公文件') }}</b>是以上四類的<b>統稱</b> ——
       工具能同時收多種格式時就用這個說法（例如「辦公文件轉 PDF」）。</p>
   </div>
 </details>
@@ -59,17 +59,20 @@
 {% for g in groups %}
 <section class="tool-group">
   <h2 class="tool-group-title">
-    {{ g.title }} <span class="tool-count">{{ g.tools|length }}</span>
+    {{ tr(g.title) }} <span class="tool-count">{{ g.tools|length }}</span>
   </h2>
   <div class="tool-grid">
     {% for t in g.tools %}
-    <a class="tool-card" href="/tools/{{ t.id }}/" data-tool-id="{{ t.id }}">
+    <a class="tool-card{% if t.locked %} is-locked{% endif %}"
+       {% if not t.locked %}href="/tools/{{ t.id }}/"{% else %}aria-disabled="true"
+       title="{{ tr('這支工具是為中文 / 台灣的文件與慣例設計的，介面語言切回繁體中文才能使用。') }}"{% endif %}
+       data-tool-id="{{ t.id }}">
       <div class="tool-icon tile-color-{{ t.color|default(0) }}">{{ icon(t.icon or 'tool', size=26) }}</div>
-      <div class="tool-name">{{ t.name }}</div>
-      <div class="tool-desc">{{ t.description }}</div>
+      <div class="tool-name">{{ tr(t.name) }}</div>
+      <div class="tool-desc">{{ tr(t.description) }}</div>
       <button class="tool-pin-btn" type="button" tabindex="-1"
               data-pin-tool="{{ t.id }}"
-              title="釘選 / 取消釘選">
+              title="{{ tr('釘選 / 取消釘選') }}">
         <svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2l2.39 4.84L20 7.6l-4 3.9L17 17l-5-2.6L7 17l1-5.5-4-3.9 5.61-.76L12 2z"/>
         </svg>
@@ -79,7 +82,7 @@
   </div>
 </section>
 {% else %}
-<div class="empty">目前沒有可用的工具模組。</div>
+<div class="empty">{{ tr('目前沒有可用的工具模組。') }}</div>
 {% endfor %}
 
 <style nonce="{{ request.state.csp_nonce }}">
@@ -160,6 +163,8 @@
   display: flex; flex-direction: column; gap: 8px;
   position: relative;
 }
+.tool-card.is-locked { opacity: 0.45; cursor: not-allowed; }
+.tool-card.is-locked:hover { transform: none; box-shadow: none; border-color: var(--border); }
 .tool-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08); border-color: var(--primary); }
 /* 釘選按鈕 — 滑入卡片時才顯示，已釘選的常駐金色 */
 .tool-pin-btn {

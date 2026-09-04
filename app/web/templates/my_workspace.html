@@ -2,23 +2,23 @@
 {% from "components/icons.html" import icon %}
 {% block title %}我的工作區 · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('archive', size=22) }} 我的工作區</h1>
-<p class="muted">這裡存放你從各工具按「存至工作區」保留的 PDF / PNG 檔，只有你的帳號看得到。在任何工具的上傳區可按「從工作區載入」取回使用。</p>
+<h1>{{ icon('archive', size=22) }} {{ tr('我的工作區') }}</h1>
+<p class="muted">{{ tr('這裡存放你從各工具按「存至工作區」保留的 PDF / PNG 檔，只有你的帳號看得到。在任何工具的上傳區可按「從工作區載入」取回使用。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">容量</h2>
+  <h2 data-s="s53896af7">{{ tr('容量') }}</h2>
   <div id="ws-usage-wrap">
     <div class="ws-usage-bar"><div class="ws-usage-fill" id="ws-usage-fill"></div></div>
     <div class="ws-usage-line">
-      <div class="ws-usage-text muted" id="ws-usage-text">載入中…</div>
+      <div class="ws-usage-text muted" id="ws-usage-text">{{ tr('載入中…') }}</div>
       <div class="ws-retention muted" id="ws-retention"></div>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">上傳到工作區</h2>
-  <p class="muted" data-s="se2907ccc">直接把 PDF / PNG / 辦公文件拖進來，或點選挑選，存到自己的工作區。</p>
+  <h2 data-s="s53896af7">{{ tr('上傳到工作區') }}</h2>
+  <p class="muted" data-s="se2907ccc">{{ tr('直接把 PDF / PNG / 辦公文件拖進來，或點選挑選，存到自己的工作區。') }}</p>
   <div class="file-upload" id="wsUpload" data-accept="application/pdf,image/png,.docx,.xlsx,.pptx,.odt,.ods,.odp,.odg">
     <label class="drop-zone" for="wsUpload-input">
       <div class="drop-zone-inner">
@@ -32,21 +32,21 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">檔案<span id="ws-count" class="ws-count"></span></h2>
+  <h2 data-s="s53896af7">{{ tr('檔案') }}<span id="ws-count" class="ws-count"></span></h2>
   <div id="ws-bulk" class="ws-bulk" hidden>
-    <label class="ws-bulk-all"><input type="checkbox" id="ws-select-all"> 全選</label>
-    <button class="btn btn-small" id="ws-del-selected" type="button" disabled>刪除選取 <span id="ws-sel-count">0</span></button>
+    <label class="ws-bulk-all"><input type="checkbox" id="ws-select-all"> {{ tr('全選') }}</label>
+    <button class="btn btn-small" id="ws-del-selected" type="button" disabled>{{ tr('刪除選取') }} <span id="ws-sel-count">0</span></button>
   </div>
-  <div id="ws-empty" class="muted" hidden data-s="s892883c7">目前沒有檔案。到任何工具產生 PDF / PNG 後，按「存至工作區」即可保留在這裡。</div>
+  <div id="ws-empty" class="muted" hidden data-s="s892883c7">{{ tr('目前沒有檔案。到任何工具產生 PDF / PNG 後，按「存至工作區」即可保留在這裡。') }}</div>
   <div id="ws-grid" class="ws-grid"></div>
 </div>
 
 <div id="ws-lightbox" class="ws-lightbox" hidden>
-  <button class="ws-lb-close" type="button" aria-label="關閉">
+  <button class="ws-lb-close" type="button" aria-label="{{ tr('關閉') }}">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12"/><path d="M6 18L18 6"/></svg>
   </button>
-  <img id="ws-lb-img" alt="預覽">
-  <a id="ws-lb-open" class="btn btn-primary" target="_blank" rel="noopener">開啟原檔</a>
+  <img id="ws-lb-img" alt="{{ tr('預覽') }}">
+  <a id="ws-lb-open" class="btn btn-primary" target="_blank" rel="noopener">{{ tr('開啟原檔') }}</a>
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">

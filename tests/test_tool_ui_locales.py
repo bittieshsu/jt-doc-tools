@@ -36,18 +36,42 @@ def test_traditional_chinese_still_shows_every_tool(tools):
     assert hidden == [], f"繁體中文底下不應該有工具被藏起來：{hidden}"
 
 
-def test_english_hides_exactly_the_chinese_only_tools(tools):
-    hidden = {t.metadata.id for t in tools
+def test_english_locks_exactly_the_chinese_only_tools(tools):
+    """英文底下這九支**反灰點不下去**（不是藏起來 —— 使用者要求）。"""
+    locked = {t.metadata.id for t in tools
               if not tool_visible(t.metadata.locales, "en")}
-    assert hidden == _TAIWAN_ONLY | _CHINESE, hidden
+    assert locked == _TAIWAN_ONLY | _CHINESE, locked
 
 
 def test_simplified_chinese_keeps_the_seal_tools(tools):
     """印章類靠的是華人慣例、不是台灣資料 —— 之後支援簡體中文時要留著。"""
-    hidden = {t.metadata.id for t in tools
+    locked = {t.metadata.id for t in tools
               if not tool_visible(t.metadata.locales, "zh-Hans")}
-    assert hidden == _TAIWAN_ONLY, hidden
-    assert _CHINESE & hidden == set()
+    assert locked == _TAIWAN_ONLY, locked
+    assert _CHINESE & locked == set()
+
+
+def test_locked_tools_are_still_listed(tools):
+    """**反灰不等於消失** —— 側欄仍然列得出全部工具，只是有幾支點不下去。"""
+    import app.main as app_main
+
+    class _En:
+        cookies = {"jtdt_locale": "en"}
+        headers: dict = {}
+
+    groups = app_main._nav_groups_for_locale(_En())
+    listed = {t["id"] for g in groups for t in g["tools"]}
+    assert listed == {t.metadata.id for t in tools}, "英文底下不可以少列任何一支"
+    locked = {t["id"] for g in groups for t in g["tools"] if t.get("locked")}
+    assert locked == _TAIWAN_ONLY | _CHINESE, locked
+
+    class _Zh:
+        cookies: dict = {}
+        headers: dict = {}
+
+    zh_locked = [t["id"] for g in app_main._nav_groups_for_locale(_Zh())
+                 for t in g["tools"] if t.get("locked")]
+    assert zh_locked == [], f"繁中底下不可以有工具被鎖住：{zh_locked}"
 
 
 def test_the_marks_use_the_shared_constants(tools):

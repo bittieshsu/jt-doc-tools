@@ -58,15 +58,38 @@ def test_catalog_entries_are_all_traditional_chinese_keys():
         assert not cjk.search(v), f"英文譯文裡不該有中文：{k!r} -> {v!r}"
 
 
-def test_domain_data_never_enters_the_catalog():
+def test_domain_data_modules_never_use_the_translation_helper():
     """**表單標籤 / 會計科目 / 去識別化式子這些中文是資料，翻掉會壞功能。**
 
     翻掉「統一編號」表單自動填寫就抓不到欄位，而且完全無聲。
+
+    守的是「**這些模組不可以碰翻譯**」，不是「語系檔裡不可以出現某些字」——
+    後者我先寫過，是錯的判準：
+      * 用關鍵字擋 → 去識別化的工具說明裡本來就會提到「統編」「身分證」，誤報
+      * 用「字串是否來自資料模組」擋 → 「帳號」「其他」同時是登入頁的欄位標籤
+        與表單欄位關鍵字，照樣誤報
+
+    真正的風險是**有人把資料的用法包進 `tr()`**。語系檔裡剛好有同樣的字不會
+    造成任何影響 —— 那些模組根本不會去查表。
     """
-    forbidden = ("統一編號", "開戶銀行", "負責人", "身分證字號", "發票")
-    for k in catalog("en"):
-        for bad in forbidden:
-            assert bad not in k, f"領域資料不可以進語系檔：{k!r}"
+    modules = (
+        "app/core/pdf_form_detect.py",
+        "app/core/pdf_layout.py",
+        "app/core/same_as_ref.py",
+        "app/tools/einvoice_scan/accounting_classifier.py",
+        "app/tools/doc_deident/patterns.py",
+    )
+    bad = []
+    for rel in modules:
+        p = ROOT / rel
+        if not p.exists():
+            continue
+        src = p.read_text(encoding="utf-8")
+        # `s.translate(_CJK_FOLD)` 是 Python 內建的 str.translate，不是我們的
+        # 取字函式 —— 前面有點就不算（第一版沒排除，誤報 pdf_form_detect）。
+        if re.search(r"\bfrom .*\bi18n\b|\bimport i18n\b|(?<![.\w])translate\(", src):
+            bad.append(rel)
+    assert bad == [], f"這些模組的中文是資料，不可以走翻譯：{bad}"
 
 
 @pytest.mark.parametrize("locale", [loc for loc in SUPPORTED if loc != DEFAULT_LOCALE])

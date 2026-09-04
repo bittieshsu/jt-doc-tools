@@ -1105,3 +1105,12 @@ select.jt-select-native {
   background: #eef2ff; border-color: #c7d2fe; color: #3730a3; font-weight: 700;
   cursor: default;
 }
+
+/* 語言不符的工具：**反灰、點不下去，但看得到**（使用者要求：不要藏起來）。
+   看得到有這支工具、也看得到為什麼用不了，比整支消失好懂。 */
+.sb-item.is-locked, .tool-card.is-locked {
+  opacity: 0.45; cursor: not-allowed; pointer-events: auto;
+}
+.sb-item.is-locked:hover, .tool-card.is-locked:hover {
+  transform: none; box-shadow: none; background: inherit;
+}
