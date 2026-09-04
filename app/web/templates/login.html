@@ -1,3 +1,4 @@
+{% from 'components/icons.html' import icon %}
 <!doctype html>
 <html lang="{{ ui_locale(request) }}">
 <head>
@@ -55,13 +56,6 @@
     .login-foot { text-align:center; margin-top:18px; font-size:11px; color:#9ca3af; }
     .login-foot .brand-src { color:#9ca3af; text-decoration:underline; text-underline-offset:2px; }
     .login-foot .brand-src:hover { color:#4b5563; }
-    /* 語言切換（登入頁在深色底上，所以用半透明白；卡片裡那一份走 platform.css） */
-    .jt-locale-login { position:fixed; left:50%; transform:translateX(-50%);
-      bottom:24px; display:flex; gap:6px; }
-    .jt-locale-login .jt-locale-btn { color:rgba(255,255,255,0.72);
-      background:rgba(255,255,255,0.10); border:0; }
-    .jt-locale-login .jt-locale-btn:hover { background:rgba(255,255,255,0.20); color:#fff; }
-    .jt-locale-login .jt-locale-btn.is-on { background:rgba(255,255,255,0.26); color:#fff; }
   </style>
 </head>
 <body>
@@ -83,7 +77,7 @@
 
     {% if realms and realms|length > 1 %}
     <div class="form-row">
-      <label for="realm">認證領域</label>
+      <label for="realm">{{ tr('認證領域') }}</label>
       <select id="realm" name="realm">
         {% for r in realms %}
         <option value="{{ r.id }}" {% if r.id == default_realm %}selected{% endif %}>{{ r.label }}</option>
@@ -93,23 +87,31 @@
     {% endif %}
 
     <div class="form-row">
-      <label for="username">帳號</label>
+      <label for="username">{{ tr('帳號') }}</label>
       <input type="text" id="username" name="username" autocomplete="username"
              value="{{ username|default('') }}" required autofocus />
     </div>
     <div class="form-row">
-      <label for="password">密碼</label>
+      <label for="password">{{ tr('密碼') }}</label>
       <input type="password" id="password" name="password"
              autocomplete="current-password" required />
     </div>
     <label class="login-remember">
       <input type="checkbox" name="remember" value="1" />
-      30 天內不用再登入
+      {{ tr('30 天內不用再登入') }}
     </label>
-    <button class="login-btn" type="submit">登入</button>
+    <div class="form-row">
+      <label for="uiLocale">{{ tr('介面語言') }}</label>
+      <select id="uiLocale" name="locale" form="loginLangForm">
+        <option value="zh-Hant" {% if ui_locale(request) == 'zh-Hant' %}selected{% endif %}>繁體中文</option>
+        <option value="en" {% if ui_locale(request) == 'en' %}selected{% endif %}>English</option>
+      </select>
+    </div>
+
+    <button class="login-btn" type="submit">{{ tr('登入') }}</button>
 
     {% if sso_buttons %}
-    <div class="login-sso-sep"><span>或</span></div>
+    <div class="login-sso-sep"><span>{{ tr('或') }}</span></div>
     {% for b in sso_buttons %}
     <a class="login-sso-btn" href="{{ b.url }}?next={{ next|urlencode }}">{{ b.label }}</a>
     {% endfor %}
@@ -119,15 +121,18 @@
        取得原始碼的管道改放在「相依套件」那一頁。 #}
     <div class="login-foot">{{ app_name }} · v{{ version }}</div>
   </form>
-  {# 語言切換要放在登入表單**外面** —— 表單不能巢狀，而且它送的是 /ui-locale
-     不是 /login。用 POST：切語言會改變狀態，不可以用 GET 連結。 #}
-  <form class="jt-locale jt-locale-login" method="post" action="/ui-locale">
+  {# 語言表單放在登入表單**外面**（表單不能巢狀，而且它送的是 /ui-locale）。
+     卡片裡的 <select> 用 `form=` 指到這裡，選了就直接送出。 #}
+  <form id="loginLangForm" method="post" action="/ui-locale" hidden>
     <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
     <input type="hidden" name="next" value="/login">
-    <button type="submit" name="locale" value="zh-Hant"
-            class="jt-locale-btn{% if ui_locale(request) == 'zh-Hant' %} is-on{% endif %}">繁體中文</button>
-    <button type="submit" name="locale" value="en"
-            class="jt-locale-btn{% if ui_locale(request) == 'en' %} is-on{% endif %}">English</button>
   </form>
+  <script nonce="{{ request.state.csp_nonce }}">
+    (function(){
+      var sel = document.getElementById('uiLocale');
+      var f = document.getElementById('loginLangForm');
+      if (sel && f) sel.addEventListener('change', function(){ f.submit(); });
+    })();
+  </script>
 </body>
 </html>

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="csrf-token" content="{{ request.state.csrf_token }}">
-  <title>啟用認證 · {{ app_name }}</title>
+  <title>{{ tr('啟用認證') }} · {{ app_name }}</title>
   <link rel="icon" type="image/png" href="{{ branding_logo_url() or '/static/images/logo-on-light.png' }}" />
   <link rel="stylesheet" href="/static/css/platform.css" />
   <link rel="stylesheet" href="/static/css/generated-inline.css" />
@@ -53,51 +53,51 @@
   {% if has_existing %}
   <div class="setup-card" data-s="se5bdc370">
     <h1>🔐 啟用認證</h1>
-    <p class="lead">系統偵測到本機已有既有的管理員帳號（先前曾啟用後又停用）。可以直接恢復、不必重建。</p>
+    <p class="lead">{{ tr('系統偵測到本機已有既有的管理員帳號（先前曾啟用後又停用）。可以直接恢復、不必重建。') }}</p>
 
     <div class="reuse-box">
       <h2>偵測到 {{ existing_users|length }} 個既有帳號</h2>
       <ul>
         {% for u in existing_users[:5] %}
-        <li><code>{{ u.username }}</code>{% if u.is_admin_seed %}（admin{% if u.source != 'local' %}@{{ u.source }}{% endif %}）{% else %}（{{ u.source }}）{% endif %}{% if not u.enabled %} <span data-s="sbc8099b4">已停用</span>{% endif %}</li>
+        <li><code>{{ u.username }}</code>{% if u.is_admin_seed %}（admin{% if u.source != 'local' %}@{{ u.source }}{% endif %}）{% else %}（{{ u.source }}）{% endif %}{% if not u.enabled %} <span data-s="sbc8099b4">{{ tr('已停用') }}</span>{% endif %}</li>
         {% endfor %}
         {% if existing_users|length > 5 %}<li>… 共 {{ existing_users|length }} 個</li>{% endif %}
       </ul>
       <p data-s="sefa9f1f9">
-        <b>建議</b>：直接恢復本機認證，沿用既有帳號 + 密碼登入。<br>
-        如果忘記密碼，請以系統管理員身分在主機上跑 <code>sudo jtdt reset-password &lt;帳號&gt;</code> 重設。
+        <b>{{ tr('建議') }}</b>{{ tr('：直接恢復本機認證，沿用既有帳號 + 密碼登入。') }}<br>
+        {{ tr('如果忘記密碼，請以系統管理員身分在主機上跑') }} <code>sudo jtdt reset-password &lt;帳號&gt;</code> {{ tr('重設。') }}
       </p>
       <form method="post" action="/setup-admin/reuse-existing">
         <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
-        <button class="reuse-btn" type="submit">恢復本機認證（沿用既有 admin）</button>
+        <button class="reuse-btn" type="submit">{{ tr('恢復本機認證（沿用既有 admin）') }}</button>
       </form>
     </div>
 
-    <div class="or-divider">或</div>
+    <div class="or-divider">{{ tr('或') }}</div>
     <details data-s="s6179637e">
-      <summary data-s="s6a1058c8">建立新管理員帳號（會與既有帳號並存）</summary>
+      <summary data-s="s6a1058c8">{{ tr('建立新管理員帳號（會與既有帳號並存）') }}</summary>
       <form method="post" action="/setup-admin" autocomplete="off" data-s="s553a645f">
         <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
         {% if error %}<div class="setup-error">{{ error }}</div>{% endif %}
         <div class="form-row">
-          <label for="username">管理員帳號</label>
+          <label for="username">{{ tr('管理員帳號') }}</label>
           <input type="text" id="username" name="username" value="{{ username|default('jtdt-admin') }}" pattern="[A-Za-z0-9._\-]+" maxlength="64" required />
-          <div class="hint">英數、點、底線、減號；最長 64 字元（避免跟既有帳號重複）</div>
+          <div class="hint">{{ tr('英數、點、底線、減號；最長 64 字元（避免跟既有帳號重複）') }}</div>
         </div>
         <div class="form-row">
-          <label for="display_name">顯示名稱（可選）</label>
+          <label for="display_name">{{ tr('顯示名稱（可選）') }}</label>
           <input type="text" id="display_name" name="display_name" value="{{ display_name|default('') }}" maxlength="64" />
         </div>
         <div class="form-row">
-          <label for="password">密碼</label>
+          <label for="password">{{ tr('密碼') }}</label>
           <input type="password" id="password" name="password" minlength="8" maxlength="128" required />
-          <div class="hint">至少 8 字元；建議用 passphrase</div>
+          <div class="hint">{{ tr('至少 8 字元；建議用 passphrase') }}</div>
         </div>
         <div class="form-row">
-          <label for="password_confirm">再輸入一次密碼</label>
+          <label for="password_confirm">{{ tr('再輸入一次密碼') }}</label>
           <input type="password" id="password_confirm" name="password_confirm" minlength="8" maxlength="128" required />
         </div>
-        <button class="setup-btn" type="submit">建立新管理員並啟用</button>
+        <button class="setup-btn" type="submit">{{ tr('建立新管理員並啟用') }}</button>
       </form>
     </details>
   </div>
@@ -105,7 +105,7 @@
   <form class="setup-card" method="post" action="/setup-admin" autocomplete="off">
     <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
     <h1>🔐 啟用認證</h1>
-    <p class="lead">啟用後，所有頁面都需要登入。請先建立第一個管理員帳號。</p>
+    <p class="lead">{{ tr('啟用後，所有頁面都需要登入。請先建立第一個管理員帳號。') }}</p>
 
     <div class="warn-box">
       ⚠ 請務必記住下面設定的密碼。沒有自助「忘記密碼」流程；密碼遺失時，
@@ -122,21 +122,21 @@
       <input type="text" id="username" name="username"
              value="{{ username|default('jtdt-admin') }}"
              pattern="[A-Za-z0-9._\-]+" maxlength="64" required autofocus />
-      <div class="hint">英數、點、底線、減號；最長 64 字元</div>
+      <div class="hint">{{ tr('英數、點、底線、減號；最長 64 字元') }}</div>
     </div>
 
     <div class="form-row">
       <label for="display_name">顯示名稱（可選）</label>
       <input type="text" id="display_name" name="display_name"
              value="{{ display_name|default('') }}" maxlength="64" />
-      <div class="hint">介面右上角顯示用，留空就用帳號</div>
+      <div class="hint">{{ tr('介面右上角顯示用，留空就用帳號') }}</div>
     </div>
 
     <div class="form-row">
       <label for="password">密碼</label>
       <input type="password" id="password" name="password"
              minlength="8" maxlength="128" required />
-      <div class="hint">至少 8 字元；建議用 passphrase（一段好記不要太短的句子）</div>
+      <div class="hint">{{ tr('至少 8 字元；建議用 passphrase（一段好記不要太短的句子）') }}</div>
     </div>
 
     <div class="form-row">
@@ -145,7 +145,7 @@
              minlength="8" maxlength="128" required />
     </div>
 
-    <button class="setup-btn" type="submit">啟用認證並建立管理員</button>
+    <button class="setup-btn" type="submit">{{ tr('啟用認證並建立管理員') }}</button>
   </form>
   {% endif %}
 </body>

@@ -6,18 +6,18 @@
             background: #fff; border-radius: 12px;
             box-shadow: 0 6px 18px rgba(15,23,42,0.10);">
   <h1 data-s="s5290506d">
-    {{ icon('lock', size=22) }} 兩步驟驗證 (TOTP)
+    {{ icon('lock', size=22) }} {{ tr('兩步驟驗證 (TOTP)') }}
   </h1>
   <p data-s="s06870b2a">
-    歡迎 <b>{{ display_name or username }}</b>，請輸入您 Authenticator App 顯示的 6 位數驗證碼。
+    {{ tr('歡迎') }} <b>{{ display_name or username }}</b>{{ tr('，請輸入您 Authenticator App 顯示的 6 位數驗證碼。') }}
   </p>
 
   {% if is_setup %}
   <div data-style="background:#fef3c7; border:1px solid #fbbf24; color:#92400e;
               padding: 12px 14px; border-radius: 8px; margin-bottom: 16px;
               font-size: 13px;">
-    <b>⚠ 您的角色強制使用 2FA</b><br>
-    請先用 Google Authenticator / Microsoft Authenticator / Authy / 1Password
+    <b>{{ tr('⚠ 您的角色強制使用 2FA') }}</b><br>
+    {{ tr('請先用 Google Authenticator / Microsoft Authenticator / Authy / 1Password') }}
     等掃描下方 QR code 加入帳號，再輸入該 App 顯示的 6 位數驗證碼完成首次設定。
   </div>
   {% if qr_url %}
@@ -28,7 +28,7 @@
   </div>
   <details data-s="sfd803557">
     <summary data-s="se0be321f">
-      無法掃描？點此手動輸入 secret
+      {{ tr('無法掃描？點此手動輸入 secret') }}
     </summary>
     <div data-style="margin-top: 8px; padding: 10px; background: #f8fafc;
                 border-radius: 6px; font-family: ui-monospace, monospace;
@@ -52,7 +52,7 @@
     <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
     <div data-s="s082edb16">
       <label data-style="display: block; font-size: 13px; color: #475569;
-                    margin-bottom: 6px;">驗證碼（6 位數字）</label>
+                    margin-bottom: 6px;">{{ tr('驗證碼（6 位數字）') }}</label>
       <input type="text" name="code" required autofocus
              inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
              data-style="width: 100%; box-sizing: border-box; padding: 12px 14px;
@@ -62,12 +62,12 @@
     </div>
     <button type="submit" class="btn btn-primary"
             data-s="sd69e05a2">
-      {{ icon('lock', size=14) }} 驗證並登入
+      {{ icon('lock', size=14) }} {{ tr('驗證並登入') }}
     </button>
   </form>
 
   <p data-s="sf2b91e0e">
-    <a href="/login" data-s="s97d7ced2">← 取消，回到登入頁</a>
+    <a href="/login" data-s="s97d7ced2">{{ tr('← 取消，回到登入頁') }}</a>
   </p>
 </div>
 {% endblock %}

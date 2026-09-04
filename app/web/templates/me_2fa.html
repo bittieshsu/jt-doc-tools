@@ -2,42 +2,42 @@
 {% from "components/icons.html" import icon %}
 {% block title %}兩步驟驗證 · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('lock', size=22) }} 兩步驟驗證 (TOTP)</h1>
+<h1>{{ icon('lock', size=22) }} {{ tr('兩步驟驗證 (TOTP)') }}</h1>
 <p class="muted">使用 Google Authenticator / Microsoft Authenticator / Authy / 1Password 等 TOTP App 在登入時提供 6 位數驗證碼，提升帳號安全。</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">目前狀態</h2>
+  <h2 data-s="s53896af7">{{ tr('目前狀態') }}</h2>
   <p data-s="s51f5d2c2">
-    使用者：<b>{{ username }}</b>
+    {{ tr('使用者：') }}<b>{{ username }}</b>
   </p>
   <p data-s="s51f5d2c2">
-    狀態：
+    {{ tr('狀態：') }}
     {% if enabled %}
-      <span data-s="s2fad45eb">✓ 已啟用</span>
+      <span data-s="s2fad45eb">{{ tr('✓ 已啟用') }}</span>
     {% else %}
-      <span data-s="s97d7ced2">○ 未啟用</span>
+      <span data-s="s97d7ced2">{{ tr('○ 未啟用') }}</span>
     {% endif %}
     {% if required %}
       <span data-style="background:#fef3c7; color:#92400e; padding: 2px 10px;
                    border-radius: 999px; font-size: 12px; margin-left: 8px;">
-        強制（您的角色強制使用 2FA，不可停用）
+        {{ tr('強制（您的角色強制使用 2FA，不可停用）') }}
       </span>
     {% endif %}
   </p>
   <div data-s="s0dc91c47">
     {% if enabled %}
-      <button class="btn" id="btnReenroll">{{ icon('refresh', size=14) }} 重新設定（換 secret）</button>
+      <button class="btn" id="btnReenroll">{{ icon('refresh', size=14) }} {{ tr('重新設定（換 secret）') }}</button>
       {% if not required %}
-      <button class="btn btn-danger" id="btnDisable">{{ icon('trash', size=14) }} 停用 TOTP</button>
+      <button class="btn btn-danger" id="btnDisable">{{ icon('trash', size=14) }} {{ tr('停用 TOTP') }}</button>
       {% endif %}
     {% else %}
-      <button class="btn btn-primary" id="btnEnroll">{{ icon('plus', size=14) }} 啟用 TOTP</button>
+      <button class="btn btn-primary" id="btnEnroll">{{ icon('plus', size=14) }} {{ tr('啟用 TOTP') }}</button>
     {% endif %}
   </div>
   <div id="setupBox" hidden data-style="margin-top: 16px; padding: 16px;
        background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;">
     <p data-s="s35424336">
-      <b>步驟 1：</b>用 TOTP App 掃描下方 QR Code（或手動輸入 secret）
+      <b>{{ tr('步驟 1：') }}</b>{{ tr('用 TOTP App 掃描下方 QR Code（或手動輸入 secret）') }}
     </p>
     <div data-s="s869aa14b">
       <img id="qrImg" src="" alt="QR Code"
@@ -46,7 +46,7 @@
     </div>
     <details data-s="s51f5d2c2">
       <summary data-s="s0346cbc1">
-        無法掃描？點此手動輸入
+        {{ tr('無法掃描？點此手動輸入') }}
       </summary>
       <div id="secretText" data-style="margin-top: 8px; padding: 10px;
            background: #fff; border-radius: 6px;
@@ -54,16 +54,16 @@
            word-break: break-all;"></div>
     </details>
     <p data-s="s4c90e441">
-      <b>步驟 2：</b>輸入 App 顯示的 6 位數驗證碼確認
+      <b>{{ tr('步驟 2：') }}</b>{{ tr('輸入 App 顯示的 6 位數驗證碼確認') }}
     </p>
     <div data-s="s8ac55174">
-      <input type="text" id="verifyCode" placeholder="6 位數字"
+      <input type="text" id="verifyCode" placeholder="{{ tr('6 位數字') }}"
              inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
              data-style="flex: 1; padding: 10px 12px; font-size: 18px;
                     text-align: center; letter-spacing: 4px;
                     font-family: ui-monospace, monospace;
                     border: 1px solid var(--border); border-radius: 6px;">
-      <button class="btn btn-primary" id="btnVerify">驗證並啟用</button>
+      <button class="btn btn-primary" id="btnVerify">{{ tr('驗證並啟用') }}</button>
     </div>
     <div id="verifyMsg" data-s="s0f22b6fc"></div>
   </div>
