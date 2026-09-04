@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
 {% from "components/llm_gate.html" import llm_gate, llm_gate_styles with context %}
-{% block title %}文件差異比對 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('文件差異比對') }} · {{ app_name }}{% endblock %}
 {% block head %}
 {{ llm_gate_styles() }}
 <style nonce="{{ request.state.csp_nonce }}">
@@ -104,18 +104,18 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('diff', size=22) }} 文件差異比對</h1>
-<p class="muted">上傳兩份文件並排顯示文字差異 — 支援 <b>PDF</b>、<b>Word</b>、<b>Excel</b>、<b>PowerPoint</b>、<b>ODT / ODS / ODP</b>。非 PDF 檔會自動先轉成 PDF 再比對（需 OxOffice / LibreOffice）。紅 = 被刪 / 綠 = 新增 / 黃 = 修改。同時顯示 metadata 差異。</p>
+<h1>{{ icon('diff', size=22) }} {{ tr('文件差異比對') }}</h1>
+<p class="muted">{{ tr('上傳兩份文件並排顯示文字差異 — 支援') }} <b>PDF</b>、<b>Word</b>、<b>Excel</b>、<b>PowerPoint</b>、<b>ODT / ODS / ODP</b>{{ tr('。非 PDF 檔會自動先轉成 PDF 再比對（需 OxOffice / LibreOffice）。紅 = 被刪 / 綠 = 新增 / 黃 = 修改。同時顯示 metadata 差異。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳兩份文件</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 上傳兩份文件') }}</h2>
   <div class="df-uploads">
     <div class="df-upload-slot">
-      <h3>{{ icon('page', size=14) }} 舊版 (左)</h3>
+      <h3>{{ icon('page', size=14) }} {{ tr('舊版 (左)') }}</h3>
       {% with upload_id='dfA', accept='.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp' %}{% include "components/file_upload.html" %}{% endwith %}
     </div>
     <div class="df-upload-slot">
-      <h3>{{ icon('page', size=14) }} 新版 (右)</h3>
+      <h3>{{ icon('page', size=14) }} {{ tr('新版 (右)') }}</h3>
       {% with upload_id='dfB', accept='.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp' %}{% include "components/file_upload.html" %}{% endwith %}
     </div>
   </div>
@@ -126,15 +126,15 @@
               input_id='dfLlmSum') }}
 
   <div data-s="s002535c2">
-    <button class="btn btn-primary" id="btnCompare">{{ icon('diff', size=14) }} 開始比對</button>
+    <button class="btn btn-primary" id="btnCompare">{{ icon('diff', size=14) }} {{ tr('開始比對') }}</button>
     <span id="status" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 data-s="s53896af7">2. 比對結果</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 比對結果') }}</h2>
   <div id="dfLlmPanel" class="df-llm-card" hidden>
-    <h3>{{ icon('globe', size=14) }} LLM 變動摘要
+    <h3>{{ icon('globe', size=14) }} {{ tr('LLM 變動摘要') }}
       <span id="dfLlmModel" data-s="sc3db4d65"></span>
     </h3>
     <div id="dfLlmErr" class="df-llm-err" hidden></div>
@@ -143,11 +143,11 @@
   </div>
   <div class="df-summary" id="sumBox"></div>
   <div class="df-meta" id="metaBox" hidden>
-    <h3 data-s="s4af51d06">Metadata 差異</h3>
-    <table><thead><tr><th>欄位</th><th>舊版</th><th>新版</th></tr></thead>
+    <h3 data-s="s4af51d06">{{ tr('Metadata 差異') }}</h3>
+    <table><thead><tr><th>{{ tr('欄位') }}</th><th>{{ tr('舊版') }}</th><th>{{ tr('新版') }}</th></tr></thead>
     <tbody id="metaBody"></tbody></table>
   </div>
-  <h3 data-s="s02ee6f6a">文字差異（逐頁）</h3>
+  <h3 data-s="s02ee6f6a">{{ tr('文字差異（逐頁）') }}</h3>
   <div id="diffBox"></div>
   <div id="df-toast" class="df-toast" hidden></div>
 </div>

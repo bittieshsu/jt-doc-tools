@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}文字差異比對 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('文字差異比對') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .td-pastes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -103,42 +103,42 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('diff', size=22) }} 文字差異比對</h1>
-<p class="muted">直接貼上兩組文字，立即並排比對 — 不用存檔上傳。適合 log 片段、code 片段、段落改稿前後的快速 diff。紅 = 被刪 / 綠 = 新增 / 黃 = 修改。</p>
+<h1>{{ icon('diff', size=22) }} {{ tr('文字差異比對') }}</h1>
+<p class="muted">{{ tr('直接貼上兩組文字，立即並排比對 — 不用存檔上傳。適合 log 片段、code 片段、段落改稿前後的快速 diff。紅 = 被刪 / 綠 = 新增 / 黃 = 修改。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 貼上兩組文字</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 貼上兩組文字') }}</h2>
   <div class="td-pastes">
     <div class="td-paste-slot">
-      <h3>{{ icon('edit', size=14) }} 舊版 (左)</h3>
+      <h3>{{ icon('edit', size=14) }} {{ tr('舊版 (左)') }}</h3>
       <textarea class="td-paste" id="textA" spellcheck="false" placeholder="貼上舊版文字，或把 .txt / .csv / .md / .log / .json / 程式碼 等文字檔拖進這裡…"></textarea>
       <div class="td-paste-meta">
-        <span id="metaA">0 行 · 0 字</span>
+        <span id="metaA">{{ tr('0 行 · 0 字') }}</span>
         <span class="td-actions">
-          <button type="button" class="td-btn-mini" data-clear="textA">清空</button>
+          <button type="button" class="td-btn-mini" data-clear="textA">{{ tr('清空') }}</button>
         </span>
       </div>
     </div>
     <div class="td-paste-slot">
-      <h3>{{ icon('edit', size=14) }} 新版 (右)</h3>
+      <h3>{{ icon('edit', size=14) }} {{ tr('新版 (右)') }}</h3>
       <textarea class="td-paste" id="textB" spellcheck="false" placeholder="貼上新版文字，或把 .txt / .csv / .md / .log / .json / 程式碼 等文字檔拖進這裡…"></textarea>
       <div class="td-paste-meta">
-        <span id="metaB">0 行 · 0 字</span>
+        <span id="metaB">{{ tr('0 行 · 0 字') }}</span>
         <span class="td-actions">
-          <button type="button" class="td-btn-mini" data-clear="textB">清空</button>
-          <button type="button" class="td-btn-mini" id="btnSwap">{{ icon('swap', size=12) }} 交換左右</button>
+          <button type="button" class="td-btn-mini" data-clear="textB">{{ tr('清空') }}</button>
+          <button type="button" class="td-btn-mini" id="btnSwap">{{ icon('swap', size=12) }} {{ tr('交換左右') }}</button>
         </span>
       </div>
     </div>
   </div>
   <div data-s="s002535c2">
-    <button class="btn btn-primary" id="btnCompare">{{ icon('diff', size=14) }} 開始比對</button>
+    <button class="btn btn-primary" id="btnCompare">{{ icon('diff', size=14) }} {{ tr('開始比對') }}</button>
     <span id="status" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 data-s="s53896af7">2. 比對結果</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 比對結果') }}</h2>
   <div id="sumBox" class="df-summary"></div>
   <div id="diffBox"></div>
   <div id="td-toast" class="td-toast" hidden></div>

@@ -1,36 +1,36 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}PDF 浮水印 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('PDF 浮水印') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('image', size=22) }} PDF 浮水印</h1>
-<p class="muted">把浮水印 / Logo 印進 PDF。可調透明度、角度，平鋪填滿整頁或只放在指定位置。輸出後浮水印是頁面的一部分，無法被選取移除。</p>
+<h1>{{ icon('image', size=22) }} {{ tr('PDF 浮水印') }}</h1>
+<p class="muted">{{ tr('把浮水印 / Logo 印進 PDF。可調透明度、角度，平鋪填滿整頁或只放在指定位置。輸出後浮水印是頁面的一部分，無法被選取移除。') }}</p>
 
 {% include "components/cjk_font_notice.html" with context %}
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 浮水印來源</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 浮水印來源') }}</h2>
   <div class="form-row">
-    <label>來源</label>
+    <label>{{ tr('來源') }}</label>
     <div class="field option-cards">
       <label class="option-card">
         <span class="opt-ic">{{ icon('image', size=28) }}</span>
-        <span class="opt-label">圖片資產</span>
-        <span class="opt-desc">使用浮水印圖檔</span>
+        <span class="opt-label">{{ tr('圖片資產') }}</span>
+        <span class="opt-desc">{{ tr('使用浮水印圖檔') }}</span>
         <input type="radio" name="source" value="asset" checked />
       </label>
       <label class="option-card">
         <span class="opt-ic">{{ icon('text', size=28) }}</span>
-        <span class="opt-label">文字</span>
-        <span class="opt-desc">直接輸入文字</span>
+        <span class="opt-label">{{ tr('文字') }}</span>
+        <span class="opt-desc">{{ tr('直接輸入文字') }}</span>
         <input type="radio" name="source" value="text" />
       </label>
     </div>
   </div>
 
   <div id="asset-source" class="wm-source-block">
-    <div class="wm-source-block-title">選擇浮水印圖片</div>
+    <div class="wm-source-block-title">{{ tr('選擇浮水印圖片') }}</div>
     {% if not assets %}
-      <div class="empty">還沒有共用浮水印資產。可請管理員到「<a href="/admin/assets">資產管理</a>」上傳（類型選「浮水印 watermark」），或使用下方「臨時上傳」一張（僅本次有效，不存於伺服器），或切到「文字」模式。</div>
+      <div class="empty">{{ tr('還沒有共用浮水印資產。可請管理員到「') }}<a href="/admin/assets">{{ tr('資產管理') }}</a>{{ tr('」上傳（類型選「浮水印 watermark」），或使用下方「臨時上傳」一張（僅本次有效，不存於伺服器），或切到「文字」模式。') }}</div>
     {% else %}
     <div class="wm-asset-grid">
       {% for s in assets %}
@@ -49,17 +49,17 @@
     <div data-s="s51512563">
       <div data-s="s31c90b93">
         <input type="file" id="wmTempAssetFile" accept="image/png,image/jpeg,image/webp" hidden />
-        <button class="btn btn-small" type="button" id="btnWmTempAsset">{{ icon('upload', size=12) }} 臨時上傳一張（僅本次）</button>
-        <span class="muted" data-s="s6b9c179a">圖片只放在你的瀏覽器，<b>不會存到伺服器</b>，別人也看不到；產製送出時才上傳。管理員會看到一筆「使用臨時資產」的稽核記錄（只記事件 + 檔名 hash，不留圖檔）。</span>
+        <button class="btn btn-small" type="button" id="btnWmTempAsset">{{ icon('upload', size=12) }} {{ tr('臨時上傳一張（僅本次）') }}</button>
+        <span class="muted" data-s="s6b9c179a">{{ tr('圖片只放在你的瀏覽器，') }}<b>{{ tr('不會存到伺服器') }}</b>{{ tr('，別人也看不到；產製送出時才上傳。管理員會看到一筆「使用臨時資產」的稽核記錄（只記事件 + 檔名 hash，不留圖檔）。') }}</span>
       </div>
       <div id="wmTempAssetSlot" data-s="s06ed15aa">
         <label class="wm-asset-card" data-s="scfd2b633">
           <input type="radio" name="asset" value="__temp__" id="wmTempAssetRadio" />
           <div class="wm-asset-thumb"><img id="wmTempAssetThumb" alt="臨時資產預覽" /></div>
           <div class="wm-asset-meta">
-            <span class="wm-asset-name" id="wmTempAssetName">（未選）</span>
-            <span class="type-chip" data-s="s53289da7">臨時</span>
-            <button type="button" class="btn btn-small" id="btnWmTempRemove" data-s="sb8b595dc">移除</button>
+            <span class="wm-asset-name" id="wmTempAssetName">{{ tr('（未選）') }}</span>
+            <span class="type-chip" data-s="s53289da7">{{ tr('臨時') }}</span>
+            <button type="button" class="btn btn-small" id="btnWmTempRemove" data-s="sb8b595dc">{{ tr('移除') }}</button>
           </div>
         </label>
       </div>
@@ -67,36 +67,36 @@
   </div>
 
   <div id="text-source" class="wm-source-block" hidden>
-    <div class="wm-source-block-title">輸入浮水印文字</div>
+    <div class="wm-source-block-title">{{ tr('輸入浮水印文字') }}</div>
     <div class="form-row">
-      <label>文字</label>
+      <label>{{ tr('文字') }}</label>
       <input id="wm-text" class="field" type="text" placeholder="例：機密 / CONFIDENTIAL / DRAFT" />
     </div>
     <div class="form-row">
-      <label>顏色</label>
+      <label>{{ tr('顏色') }}</label>
       <div class="field" data-s="s9586d088">
         <input id="wm-text-color" type="color" value="#cc0000" data-s="s077f91dd" />
         <input id="wm-text-color-hex" type="text" value="#cc0000" data-s="s71974449" />
       </div>
     </div>
     <div class="form-row">
-      <label>字級 (pt)</label>
+      <label>{{ tr('字級 (pt)') }}</label>
       <div class="field" data-s="s5f11e4db">
         <input id="wm-text-size" type="range" min="12" max="200" value="48" data-s="sb9f4f292" />
         <input id="wm-text-size-num" type="number" min="12" max="200" value="48" step="2" data-s="s8db8d854" />
       </div>
     </div>
     <div class="form-row">
-      <label>樣式</label>
+      <label>{{ tr('樣式') }}</label>
       <div class="field" data-s="s299bc2d0">
         <label data-s="sea37c3c1">
-          <input type="checkbox" id="wm-text-bold" /> <strong>粗體</strong>
+          <input type="checkbox" id="wm-text-bold" /> <strong>{{ tr('粗體') }}</strong>
         </label>
         <label data-s="sea37c3c1">
-          <input type="checkbox" id="wm-text-italic" /> <em>斜體</em>
+          <input type="checkbox" id="wm-text-italic" /> <em>{{ tr('斜體') }}</em>
         </label>
         <label data-s="sea37c3c1">
-          <input type="checkbox" id="wm-text-underline" /> <span data-s="sb61ba113">底線</span>
+          <input type="checkbox" id="wm-text-underline" /> <span data-s="sb61ba113">{{ tr('底線') }}</span>
         </label>
       </div>
     </div>
@@ -104,86 +104,86 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 上傳 PDF</h2>
-  {% with upload_id='wmUpload', accept='application/pdf', multiple=True, hint='支援單/多檔；多檔會打包為 ZIP 下載' %}
+  <h2 data-s="s53896af7">{{ tr('2. 上傳 PDF') }}</h2>
+  {% with upload_id='wmUpload', accept='application/pdf', multiple=True, hint=tr('支援單/多檔；多檔會打包為 ZIP 下載') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div id="batch-list" class="batch-list" hidden></div>
   <div class="form-row" data-s="s002535c2">
-    <label>套用頁面</label>
+    <label>{{ tr('套用頁面') }}</label>
     <select id="page-mode" class="field" data-s="s3831ac5f">
-      <option value="all">所有頁</option>
-      <option value="first">僅第一頁</option>
-      <option value="last">僅最後一頁</option>
+      <option value="all">{{ tr('所有頁') }}</option>
+      <option value="first">{{ tr('僅第一頁') }}</option>
+      <option value="last">{{ tr('僅最後一頁') }}</option>
     </select>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">3. 浮水印設定</h2>
+  <h2 data-s="s53896af7">{{ tr('3. 浮水印設定') }}</h2>
   <div class="form-row">
-    <label>模式</label>
+    <label>{{ tr('模式') }}</label>
     <div class="field option-cards">
       <label class="option-card">
         <span class="opt-ic">{{ icon('tile', size=28) }}</span>
-        <span class="opt-label">平鋪填滿整頁</span>
-        <span class="opt-desc">交錯排列鋪滿頁面</span>
+        <span class="opt-label">{{ tr('平鋪填滿整頁') }}</span>
+        <span class="opt-desc">{{ tr('交錯排列鋪滿頁面') }}</span>
         <input type="radio" name="mode" value="tile" checked />
       </label>
       <label class="option-card">
         <span class="opt-ic">{{ icon('pin', size=28) }}</span>
-        <span class="opt-label">指定位置</span>
-        <span class="opt-desc">拖曳藍框決定位置</span>
+        <span class="opt-label">{{ tr('指定位置') }}</span>
+        <span class="opt-desc">{{ tr('拖曳藍框決定位置') }}</span>
         <input type="radio" name="mode" value="single" />
       </label>
     </div>
   </div>
   <div class="form-row">
-    <label>透明度</label>
+    <label>{{ tr('透明度') }}</label>
     <div class="field" data-s="s5f11e4db">
       <input type="range" id="opacity" min="5" max="100" value="25" data-s="sda5cd676" />
       <span id="opacity-label" data-s="s00e53546">25%</span>
     </div>
   </div>
   <div class="form-row">
-    <label>旋轉角度</label>
+    <label>{{ tr('旋轉角度') }}</label>
     <div class="field" data-s="s32b9de8c">
       <input type="range" id="rotation" min="-180" max="180" value="30" data-s="se7333f54" />
       <input type="number" id="rotation-num" min="-180" max="180" value="30" step="5" data-s="s8db8d854" />
-      <span class="muted" data-s="s6b9c179a">度</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('度') }}</span>
     </div>
   </div>
 
   <div id="tile-fields">
     <div class="form-row" id="tile-image-size-row">
-      <label>圖片尺寸</label>
+      <label>{{ tr('圖片尺寸') }}</label>
       <div class="field" data-s="s32b9de8c">
         <input type="range" id="tile-size" min="10" max="200" step="1" value="60" data-s="s6c0ca763" />
         <input type="number" id="tile-size-num" min="10" max="200" step="1" value="60" data-s="s8db8d854" />
-        <span class="muted" data-s="s6b9c179a">mm（依圖片自動維持比例；文字模式由「字級」決定）</span>
+        <span class="muted" data-s="s6b9c179a">{{ tr('mm（依圖片自動維持比例；文字模式由「字級」決定）') }}</span>
       </div>
     </div>
     <div class="form-row">
-      <label>間距</label>
+      <label>{{ tr('間距') }}</label>
       <div class="field" data-s="s32b9de8c">
         <input type="range" id="gap-range" min="0" max="200" step="1" value="30" data-s="s6c0ca763" />
         <input type="number" id="gap-mm" min="0" max="200" step="1" value="30" data-s="s8db8d854" />
-        <span class="muted" data-s="s6b9c179a">mm（浮水印之間的水平 / 垂直留白）</span>
+        <span class="muted" data-s="s6b9c179a">{{ tr('mm（浮水印之間的水平 / 垂直留白）') }}</span>
       </div>
     </div>
   </div>
 
   <div id="single-fields" hidden>
-    <p class="muted" data-s="s6b9c179a">指定位置模式：拖曳藍框決定位置與大小。</p>
+    <p class="muted" data-s="s6b9c179a">{{ tr('指定位置模式：拖曳藍框決定位置與大小。') }}</p>
     {% set editor_id='wmEditor' %}
     {% include "components/drag_position_editor.html" %}
   </div>
 </div>
 
 <div class="panel" id="sim-panel" hidden>
-  <h2 data-s="s53896af7">即時預覽</h2>
+  <h2 data-s="s53896af7">{{ tr('即時預覽') }}</h2>
   <div data-s="s31c90b93">
-    <div id="sim-status" class="muted" data-s="s6b9c179a">產生中…</div>
+    <div id="sim-status" class="muted" data-s="s6b9c179a">{{ tr('產生中…') }}</div>
     <div id="wm-page-nav" hidden data-s="s148184e6">
       <button class="btn btn-small" id="wm-prev" type="button" title="上一頁">‹</button>
       <span id="wm-page-info" class="muted" data-s="scf6be43d"></span>
@@ -196,8 +196,8 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">4. 執行</h2>
-  <button class="btn btn-primary" id="btn-submit">{{ icon('stamp') }}產製合併浮水印</button>
+  <h2 data-s="s53896af7">{{ tr('4. 執行') }}</h2>
+  <button class="btn btn-primary" id="btn-submit">{{ icon('stamp') }}{{ tr('產製合併浮水印') }}</button>
   {% with progress_id='jobProgress' %}
     {% include "components/job_progress.html" %}
   {% endwith %}

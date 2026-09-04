@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}擷取文字 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('擷取文字') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .et-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
@@ -42,19 +42,19 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('paragraph', size=22) }} 擷取文字</h1>
-<p class="muted">從 PDF 把文字取出來，輸出成 TXT / Markdown / Word / ODT。會依字級推估標題層級；段落換行也會盡量還原成自然段落。可選擇交給 LLM 進一步重排被 PDF 版面切斷的句子。</p>
+<h1>{{ icon('paragraph', size=22) }} {{ tr('擷取文字') }}</h1>
+<p class="muted">{{ tr('從 PDF 把文字取出來，輸出成 TXT / Markdown / Word / ODT。會依字級推估標題層級；段落換行也會盡量還原成自然段落。可選擇交給 LLM 進一步重排被 PDF 版面切斷的句子。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">上傳 PDF</h2>
-  {% with upload_id='etUpload', accept='application/pdf', hint='單檔、PDF only。掃描檔需先 OCR 才能擷取。' %}
+  <h2 data-s="s53896af7">{{ tr('上傳 PDF') }}</h2>
+  {% with upload_id='etUpload', accept='application/pdf', hint=tr('單檔、PDF only。掃描檔需先 OCR 才能擷取。') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
 </div>
 
 <div class="panel" id="result-panel" hidden>
   <div data-s="s517f74ba">
-    <h2 data-s="s1386d503">擷取結果</h2>
+    <h2 data-s="s1386d503">{{ tr('擷取結果') }}</h2>
     <span id="status" class="muted" data-s="s3044b600"></span>
   </div>
   <div class="et-stat" id="statBar"></div>
@@ -64,26 +64,26 @@
   {% if llm_enabled %}
   <div class="et-llm-row" id="llmRow" hidden>
     <span>{{ icon('play', size=14) }}</span>
-    <span class="muted"><b>LLM 重排段落（附加功能）：</b>PDF 版面常常把句子在行尾斷掉。開啟後會把每個段落丟給 LLM 重新銜接，標題不動。</span>
-    <button class="btn" type="button" id="btnLlmReflow">{{ icon('refresh', size=14) }} 交給 LLM 重排</button>
+    <span class="muted"><b>{{ tr('LLM 重排段落（附加功能）：') }}</b>{{ tr('PDF 版面常常把句子在行尾斷掉。開啟後會把每個段落丟給 LLM 重新銜接，標題不動。') }}</span>
+    <button class="btn" type="button" id="btnLlmReflow">{{ icon('refresh', size=14) }} {{ tr('交給 LLM 重排') }}</button>
   </div>
   {% endif %}
   <div id="llmProgressBox" hidden data-s="s3853a7c5">
     <div data-s="s8fbb3507">
-      <span id="llmProgText">準備中…</span>
+      <span id="llmProgText">{{ tr('準備中…') }}</span>
       <span id="llmProgPct" data-s="s7753d02e">0%</span>
     </div>
     <div data-s="s536246e3">
       <div id="llmProgBar" data-s="sac8bd8b2"></div>
     </div>
-    <div class="muted" data-s="s789d4caf">每個段落大約需要幾秒到十幾秒，依模型與段落長度而定。</div>
+    <div class="muted" data-s="s789d4caf">{{ tr('每個段落大約需要幾秒到十幾秒，依模型與段落長度而定。') }}</div>
   </div>
 
   <div data-s="s777dab4f">
-    <h3 data-s="s1386d503">預覽（Markdown）</h3>
+    <h3 data-s="s1386d503">{{ tr('預覽（Markdown）') }}</h3>
     <div id="previewToggle" hidden data-s="s3dd663c1">
-      <button type="button" class="pv-tab" data-view="original" data-s="s9e958f59">原始</button>
-      <button type="button" class="pv-tab" data-view="reflowed" data-s="sbe8b86d6">LLM 重排</button>
+      <button type="button" class="pv-tab" data-view="original" data-s="s9e958f59">{{ tr('原始') }}</button>
+      <button type="button" class="pv-tab" data-view="reflowed" data-s="sbe8b86d6">{{ tr('LLM 重排') }}</button>
     </div>
     <span id="previewDiffHint" hidden class="muted" data-s="s6b9c179a"></span>
   </div>

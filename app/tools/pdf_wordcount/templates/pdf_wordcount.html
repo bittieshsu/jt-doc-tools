@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
 {% from "components/llm_gate.html" import llm_gate, llm_gate_styles with context %}
-{% block title %}字數統計 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('字數統計') }} · {{ app_name }}{% endblock %}
 {% block head %}
 {{ llm_gate_styles() }}
 <style nonce="{{ request.state.csp_nonce }}">
@@ -92,15 +92,15 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('chart-bar', size=22) }} 字數統計</h1>
-<p class="muted">統計 PDF 中的字數、字元、段落、句子，並繪製每頁字數直條圖、字元類型環圈、中文單字 / 中文雙字 / 英文 三類高頻詞圖表。</p>
+<h1>{{ icon('chart-bar', size=22) }} {{ tr('字數統計') }}</h1>
+<p class="muted">{{ tr('統計 PDF 中的字數、字元、段落、句子，並繪製每頁字數直條圖、字元類型環圈、中文單字 / 中文雙字 / 英文 三類高頻詞圖表。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳檔案或貼文字</h2>
-  <p class="muted" data-s="s9b38d59e">支援 PDF、辦公文件（.docx / .odt / .xlsx / .ods / .pptx / .odp 等，會先轉成 PDF 再統計）、純文字 (.txt / .md / .csv / .log / .json / .xml / .html 等)；或直接貼文字到下方文字框。</p>
+  <h2 data-s="s53896af7">{{ tr('1. 上傳檔案或貼文字') }}</h2>
+  <p class="muted" data-s="s9b38d59e">{{ tr('支援 PDF、辦公文件（.docx / .odt / .xlsx / .ods / .pptx / .odp 等，會先轉成 PDF 再統計）、純文字 (.txt / .md / .csv / .log / .json / .xml / .html 等)；或直接貼文字到下方文字框。') }}</p>
   <div class="wc-tabs" data-s="s840f7af1">
-    <button type="button" id="wcTabFile" class="wc-tab-btn wc-tab-active" data-s="s1052c80a">上傳檔案</button>
-    <button type="button" id="wcTabPaste" class="wc-tab-btn" data-s="s4c4dc256">貼文字</button>
+    <button type="button" id="wcTabFile" class="wc-tab-btn wc-tab-active" data-s="s1052c80a">{{ tr('上傳檔案') }}</button>
+    <button type="button" id="wcTabPaste" class="wc-tab-btn" data-s="s4c4dc256">{{ tr('貼文字') }}</button>
   </div>
 
   <div id="wcPanelFile">
@@ -110,8 +110,8 @@
   <div id="wcPanelPaste" hidden>
     <textarea id="wcPasteText" rows="10" placeholder="貼上要統計的文字…" data-s="s9588a4ca"></textarea>
     <div data-s="sd83b7ba6">
-      <span class="muted" id="wcPasteHint" data-s="sea8bbc82">0 字元</span>
-      <button type="button" id="wcPasteAnalyze" class="btn btn-primary" data-s="sdf3930f2">分析文字</button>
+      <span class="muted" id="wcPasteHint" data-s="sea8bbc82">{{ tr('0 字元') }}</span>
+      <button type="button" id="wcPasteAnalyze" class="btn btn-primary" data-s="sdf3930f2">{{ tr('分析文字') }}</button>
     </div>
   </div>
 
@@ -121,40 +121,40 @@
               input_id='wcLlmSum') }}
 
   <div id="wcLoading" class="muted" data-s="s5d8b4b19" hidden>
-    {{ icon('refresh', size=14) }} 分析中，請稍候…
+    {{ icon('refresh', size=14) }} {{ tr('分析中，請稍候…') }}
   </div>
   <div id="wcError" class="wc-warn" hidden></div>
 </div>
 
 <div id="wcMulti" hidden data-s="sb0043ef4">
   <div class="panel">
-    <h2 data-s="s53896af7">多檔字數統計 <span class="muted" id="wcMultiCount" data-s="sbee7077a"></span></h2>
+    <h2 data-s="s53896af7">{{ tr('多檔字數統計') }} <span class="muted" id="wcMultiCount" data-s="sbee7077a"></span></h2>
     <div id="wcMultiSkipped" class="muted" data-s="sd51702bf" hidden></div>
     <div class="wc-stats">
-      <div class="wc-stat wc-stat-1"><div class="lbl">跨檔總字數</div><div class="val" id="mWordTotal">0</div></div>
-      <div class="wc-stat"><div class="lbl">總頁數</div><div class="val" id="mPages">0</div></div>
-      <div class="wc-stat"><div class="lbl">中文字</div><div class="val" id="mCjk">0</div></div>
-      <div class="wc-stat"><div class="lbl">英文單字</div><div class="val" id="mEn">0</div></div>
-      <div class="wc-stat"><div class="lbl">段 / 句</div><div class="val" id="mParaSent">0 / 0</div></div>
-      <div class="wc-stat"><div class="lbl">總字元 (含空白)</div><div class="val" id="mChars">0</div></div>
-      <div class="wc-stat"><div class="lbl">平均每檔字數</div><div class="val" id="mAvgFile">0</div></div>
-      <div class="wc-stat"><div class="lbl">閱讀時間估計</div><div class="val" id="mRead">0 分</div></div>
+      <div class="wc-stat wc-stat-1"><div class="lbl">{{ tr('跨檔總字數') }}</div><div class="val" id="mWordTotal">0</div></div>
+      <div class="wc-stat"><div class="lbl">{{ tr('總頁數') }}</div><div class="val" id="mPages">0</div></div>
+      <div class="wc-stat"><div class="lbl">{{ tr('中文字') }}</div><div class="val" id="mCjk">0</div></div>
+      <div class="wc-stat"><div class="lbl">{{ tr('英文單字') }}</div><div class="val" id="mEn">0</div></div>
+      <div class="wc-stat"><div class="lbl">{{ tr('段 / 句') }}</div><div class="val" id="mParaSent">0 / 0</div></div>
+      <div class="wc-stat"><div class="lbl">{{ tr('總字元 (含空白)') }}</div><div class="val" id="mChars">0</div></div>
+      <div class="wc-stat"><div class="lbl">{{ tr('平均每檔字數') }}</div><div class="val" id="mAvgFile">0</div></div>
+      <div class="wc-stat"><div class="lbl">{{ tr('閱讀時間估計') }}</div><div class="val" id="mRead">{{ tr('0 分') }}</div></div>
     </div>
   </div>
   <div class="panel">
-    <h2 data-s="s53896af7">各檔排行（依字數）</h2>
+    <h2 data-s="s53896af7">{{ tr('各檔排行（依字數）') }}</h2>
     <div data-s="sdf74e8d8">
       <table data-s="sdd1ab27d">
         <thead>
           <tr data-s="s14e632eb">
             <th data-s="see901b6b">#</th>
-            <th data-s="see901b6b">檔名</th>
-            <th data-s="se95c35b1">頁數</th>
-            <th data-s="se95c35b1">字數</th>
-            <th data-s="se95c35b1">字元</th>
-            <th data-s="se95c35b1">中文</th>
-            <th data-s="se95c35b1">英文</th>
-            <th data-s="se95c35b1">閱讀</th>
+            <th data-s="see901b6b">{{ tr('檔名') }}</th>
+            <th data-s="se95c35b1">{{ tr('頁數') }}</th>
+            <th data-s="se95c35b1">{{ tr('字數') }}</th>
+            <th data-s="se95c35b1">{{ tr('字元') }}</th>
+            <th data-s="se95c35b1">{{ tr('中文') }}</th>
+            <th data-s="se95c35b1">{{ tr('英文') }}</th>
+            <th data-s="se95c35b1">{{ tr('閱讀') }}</th>
           </tr>
         </thead>
         <tbody id="mRankingBody"></tbody>
@@ -166,60 +166,60 @@
 <div id="wcResults" hidden data-s="sb0043ef4">
 
 <div class="panel">
-  <h2 data-s="s53896af7">統計總覽 <span class="muted" data-s="sbee7077a" id="wcFile"></span></h2>
+  <h2 data-s="s53896af7">{{ tr('統計總覽') }} <span class="muted" data-s="sbee7077a" id="wcFile"></span></h2>
 
   <div class="wc-stats">
     <div class="wc-stat wc-stat-1">
-      <div class="lbl">總字數</div>
+      <div class="lbl">{{ tr('總字數') }}</div>
       <div class="val" id="sWordTotal">—</div>
-      <div class="sub">CJK 字 + 英文 word</div>
+      <div class="sub">{{ tr('CJK 字 + 英文 word') }}</div>
     </div>
     <div class="wc-stat wc-stat-2">
-      <div class="lbl">頁數</div>
+      <div class="lbl">{{ tr('頁數') }}</div>
       <div class="val" id="sPages">—</div>
       <div class="sub" id="sAvgPage"></div>
     </div>
     <div class="wc-stat wc-stat-3">
-      <div class="lbl">中文字</div>
+      <div class="lbl">{{ tr('中文字') }}</div>
       <div class="val" id="sCjk">—</div>
-      <div class="sub">CJK 單字</div>
+      <div class="sub">{{ tr('CJK 單字') }}</div>
     </div>
     <div class="wc-stat wc-stat-4">
-      <div class="lbl">英文字</div>
+      <div class="lbl">{{ tr('英文字') }}</div>
       <div class="val" id="sEn">—</div>
-      <div class="sub">英文 word</div>
+      <div class="sub">{{ tr('英文 word') }}</div>
     </div>
     <div class="wc-stat wc-stat-5">
-      <div class="lbl">段落 / 句子</div>
+      <div class="lbl">{{ tr('段落 / 句子') }}</div>
       <div class="val" id="sParaSent">—</div>
       <div class="sub">paragraphs / sentences</div>
     </div>
     <div class="wc-stat wc-stat-6">
-      <div class="lbl">字元數 (含空白)</div>
+      <div class="lbl">{{ tr('字元數 (含空白)') }}</div>
       <div class="val" id="sChars">—</div>
       <div class="sub" id="sCharsNoWs"></div>
     </div>
     <div class="wc-stat wc-stat-7">
-      <div class="lbl">平均句長</div>
+      <div class="lbl">{{ tr('平均句長') }}</div>
       <div class="val" id="sAvgSent">—</div>
-      <div class="sub">字元/句</div>
+      <div class="sub">{{ tr('字元/句') }}</div>
     </div>
     <div class="wc-stat wc-stat-8">
-      <div class="lbl">預估閱讀</div>
+      <div class="lbl">{{ tr('預估閱讀') }}</div>
       <div class="val" id="sRead">—</div>
-      <div class="sub">中 300/分 · 英 200/分</div>
+      <div class="sub">{{ tr('中 300/分 · 英 200/分') }}</div>
     </div>
   </div>
 
   <div class="wc-export">
-    <button class="btn" id="btnCsv">{{ icon('download', size=12) }} 每頁明細 CSV</button>
-    <button class="btn" id="btnJson">{{ icon('download', size=12) }} 完整 JSON</button>
-    <button class="btn" id="btnMd">{{ icon('download', size=12) }} Markdown 報表</button>
+    <button class="btn" id="btnCsv">{{ icon('download', size=12) }} {{ tr('每頁明細 CSV') }}</button>
+    <button class="btn" id="btnJson">{{ icon('download', size=12) }} {{ tr('完整 JSON') }}</button>
+    <button class="btn" id="btnMd">{{ icon('download', size=12) }} {{ tr('Markdown 報表') }}</button>
   </div>
 </div>
 
 <div id="wcLlmPanel" class="wc-llm-card" hidden>
-  <h3>{{ icon('globe', size=14) }} LLM 摘要與關鍵字
+  <h3>{{ icon('globe', size=14) }} {{ tr('LLM 摘要與關鍵字') }}
     <span class="hint" id="wcLlmModel" data-s="sc6f332f2"></span>
   </h3>
   <div id="wcLlmErr" class="wc-llm-err" hidden></div>
@@ -229,14 +229,14 @@
 
 <div class="wc-grid">
   <div class="wc-card">
-    <h3>{{ icon('chart-bar', size=14) }} 每頁字數
+    <h3>{{ icon('chart-bar', size=14) }} {{ tr('每頁字數') }}
       <span class="hint" id="ppgHint"></span>
     </h3>
     <svg class="wc-chart" id="chartPerPage" viewBox="0 0 600 240" preserveAspectRatio="none"></svg>
   </div>
 
   <div class="wc-card">
-    <h3>{{ icon('paragraph', size=14) }} 字元類型分布</h3>
+    <h3>{{ icon('paragraph', size=14) }} {{ tr('字元類型分布') }}</h3>
     <svg class="wc-chart" id="chartDonut" viewBox="0 0 320 240"></svg>
     <div class="wc-legend" id="donutLegend"></div>
   </div>
@@ -244,23 +244,23 @@
 
 <div class="wc-grid-bot">
   <div class="wc-card">
-    <h3>{{ icon('hash', size=14) }} 中文單字 Top 20</h3>
+    <h3>{{ icon('hash', size=14) }} {{ tr('中文單字 Top 20') }}</h3>
     <svg class="wc-chart" id="chartFreqCjk" viewBox="0 0 380 480"></svg>
-    <div id="emptyCjk" class="wc-empty" hidden>(此 PDF 無中文)</div>
+    <div id="emptyCjk" class="wc-empty" hidden>{{ tr('(此 PDF 無中文)') }}</div>
   </div>
   <div class="wc-card">
-    <h3>{{ icon('hash', size=14) }} 中文雙字 Top 20
-      <span class="hint">連續兩字組</span>
+    <h3>{{ icon('hash', size=14) }} {{ tr('中文雙字 Top 20') }}
+      <span class="hint">{{ tr('連續兩字組') }}</span>
     </h3>
     <svg class="wc-chart" id="chartFreqBigram" viewBox="0 0 380 480"></svg>
-    <div id="emptyBigram" class="wc-empty" hidden>(此 PDF 無中文)</div>
+    <div id="emptyBigram" class="wc-empty" hidden>{{ tr('(此 PDF 無中文)') }}</div>
   </div>
   <div class="wc-card">
-    <h3>{{ icon('hash', size=14) }} 英文 Top 20
-      <span class="hint">已過濾 stopwords</span>
+    <h3>{{ icon('hash', size=14) }} {{ tr('英文 Top 20') }}
+      <span class="hint">{{ tr('已過濾 stopwords') }}</span>
     </h3>
     <svg class="wc-chart" id="chartFreqEn" viewBox="0 0 380 480"></svg>
-    <div id="emptyEn" class="wc-empty" hidden>(此 PDF 無英文)</div>
+    <div id="emptyEn" class="wc-empty" hidden>{{ tr('(此 PDF 無英文)') }}</div>
   </div>
 </div>
 

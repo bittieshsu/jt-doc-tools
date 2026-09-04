@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}Markdown 轉辦公文件 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('Markdown 轉辦公文件') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .md2-textarea {
@@ -139,11 +139,11 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('file-text', size=22) }} Markdown 轉辦公文件</h1>
-<p class="muted">把 Markdown 內容套上主題樣式，輸出可下載的 <b>PDF / Word (DOCX) / OpenDocument (ODT)</b>。所有頁面自動產生預覽，下載前先看效果。</p>
+<h1>{{ icon('file-text', size=22) }} {{ tr('Markdown 轉辦公文件') }}</h1>
+<p class="muted">{{ tr('把 Markdown 內容套上主題樣式，輸出可下載的') }} <b>PDF / Word (DOCX) / OpenDocument (ODT)</b>{{ tr('。所有頁面自動產生預覽，下載前先看效果。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. Markdown 內容</h2>
+  <h2 data-s="s53896af7">{{ tr('1. Markdown 內容') }}</h2>
   <label class="md2-drop" id="md2Drop" for="md2File">
     <input type="file" id="md2File" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6366f1"
@@ -152,8 +152,8 @@
       <polyline points="17 8 12 3 7 8"/>
       <line x1="12" y1="3" x2="12" y2="15"/>
     </svg>
-    <span><b>點此挑選</b>或拖曳檔案到此
-      <span class="hint">.md / .markdown / .txt（UTF-8，上限 5 MB）</span></span>
+    <span><b>{{ tr('點此挑選') }}</b>{{ tr('或拖曳檔案到此') }}
+      <span class="hint">{{ tr('.md / .markdown / .txt（UTF-8，上限 5 MB）') }}</span></span>
   </label>
   <textarea id="md2Text" class="md2-textarea" placeholder="把 Markdown 內容貼上來，或從上方上傳檔案 …
 
@@ -174,27 +174,27 @@ def hello():
 | B    | 2    |
 "></textarea>
   <div data-s="sda8a1590">
-    <label data-s="s3044b600">標題（檔名用）</label>
+    <label data-s="s3044b600">{{ tr('標題（檔名用）') }}</label>
     <input type="text" id="md2Title" placeholder="不填則用「document」或上傳檔名"
            data-s="seba1607b">
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 配色主題</h2>
-  <p class="muted" data-s="se2907ccc">影響 PDF / DOCX / ODT 輸出的視覺風格。</p>
+  <h2 data-s="s53896af7">{{ tr('2. 配色主題') }}</h2>
+  <p class="muted" data-s="se2907ccc">{{ tr('影響 PDF / DOCX / ODT 輸出的視覺風格。') }}</p>
   <div class="md2-themes" id="md2Themes">
     {% for t in themes %}
     <label class="md2-theme{% if loop.first %} selected{% endif %}" data-theme="{{ t.id }}">
       <input type="radio" name="md2-theme" value="{{ t.id }}"{% if loop.first %} checked{% endif %}>
-      <div class="md2-theme-name">{{ t.name }}</div>
-      <div class="md2-theme-desc">{{ t.desc }}</div>
+      <div class="md2-theme-name">{{ tr(t.name) }}</div>
+      <div class="md2-theme-desc">{{ tr(t.desc) }}</div>
     </label>
     {% endfor %}
   </div>
   <div data-s="s553a645f">
-    <label for="md2Font" data-s="sc61a0132">字型</label>
-    <p class="muted" data-s="sa5418f35">主機上沒安裝的字型會自動 fallback 到下一個候選。</p>
+    <label for="md2Font" data-s="sc61a0132">{{ tr('字型') }}</label>
+    <p class="muted" data-s="sa5418f35">{{ tr('主機上沒安裝的字型會自動 fallback 到下一個候選。') }}</p>
     <select class="jt-select" id="md2Font" name="font" data-s="sae18a06a">
       {% for f in fonts %}
       <option value="{{ f.id }}"
@@ -208,17 +208,17 @@ def hello():
 
 <div class="panel">
   <div class="md2-actions">
-    <button class="btn btn-primary" id="md2Convert">{{ icon('refresh', size=12) }} 開始轉換</button>
+    <button class="btn btn-primary" id="md2Convert">{{ icon('refresh', size=12) }} {{ tr('開始轉換') }}</button>
     <span id="md2Status" data-s="s1c9d3d97"></span>
   </div>
   <div id="md2Error" class="md2-error" hidden></div>
 </div>
 
 <div class="panel" id="md2ResultPanel" hidden>
-  <h2 data-s="s53896af7">3. 結果</h2>
+  <h2 data-s="s53896af7">{{ tr('3. 結果') }}</h2>
   <div class="md2-stat-row" id="md2Stat"></div>
   <div class="md2-dl-row" id="md2Downloads"></div>
-  <div data-s="sf086dcc7">所有頁面預覽（PDF 渲染，可點圖放大）</div>
+  <div data-s="sf086dcc7">{{ tr('所有頁面預覽（PDF 渲染，可點圖放大）') }}</div>
   <div class="md2-preview-grid" id="md2Previews"></div>
 </div>
 

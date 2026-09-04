@@ -1,22 +1,22 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}頁面轉向 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('頁面轉向') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('rotate-cw', size=22) }} 頁面轉向</h1>
-<p class="muted">上傳 PDF 後自動顯示縮圖；上方工具列可整批套用 (90 / 180 / 270 / 左右鏡向 / 上下鏡向)
-並選擇套用範圍 (所有頁 / 偶數頁 / 奇數頁 / 自訂)；每張縮圖也有獨立旋轉按鈕。完成後可下載 PDF 或 ZIP（每頁 PNG）。</p>
+<h1>{{ icon('rotate-cw', size=22) }} {{ tr('頁面轉向') }}</h1>
+<p class="muted">{{ tr('上傳 PDF 後自動顯示縮圖；上方工具列可整批套用 (90 / 180 / 270 / 左右鏡向 / 上下鏡向)
+並選擇套用範圍 (所有頁 / 偶數頁 / 奇數頁 / 自訂)；每張縮圖也有獨立旋轉按鈕。完成後可下載 PDF 或 ZIP（每頁 PNG）。') }}</p>
 
 <div class="panel" id="upload-panel">
-  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
-  {% with upload_id='upR', accept='application/pdf', multiple=False, hint='單檔；如需批次處理多個檔案請每次上傳一個。' %}{% include "components/file_upload.html" %}{% endwith %}
+  <h2 data-s="s53896af7">{{ tr('1. 上傳 PDF') }}</h2>
+  {% with upload_id='upR', accept='application/pdf', multiple=False, hint=tr('單檔；如需批次處理多個檔案請每次上傳一個。') %}{% include "components/file_upload.html" %}{% endwith %}
   <div id="loading" class="muted" data-s="s5d8b4b19" hidden>
-    {{ icon('refresh', size=14) }} 載入中…
+    {{ icon('refresh', size=14) }} {{ tr('載入中…') }}
   </div>
   <div id="upload-error" class="warn-box" hidden></div>
 </div>
 
 <div class="panel" id="work-panel" hidden>
-  <h2 data-s="s53896af7">2. 套用方式
+  <h2 data-s="s53896af7">{{ tr('2. 套用方式') }}
     <span class="muted" id="file-info" data-s="sbee7077a"></span>
   </h2>
 
@@ -33,22 +33,22 @@
         <span class="rt-mb-lbl">270°</span></button>
       <button type="button" class="rt-mb" data-mode="flip-h" title="左右鏡像">
         <span class="ic-wrap-rt">{{ icon('flip-h', size=18) }}</span>
-        <span class="rt-mb-lbl">左右</span></button>
+        <span class="rt-mb-lbl">{{ tr('左右') }}</span></button>
       <button type="button" class="rt-mb" data-mode="flip-v" title="上下鏡像">
         <span class="ic-wrap-rt">{{ icon('flip-v', size=18) }}</span>
-        <span class="rt-mb-lbl">上下</span></button>
+        <span class="rt-mb-lbl">{{ tr('上下') }}</span></button>
       <button type="button" class="rt-mb rt-mb-clear" data-mode="none" title="清除轉向">
         <span class="ic-wrap-rt">{{ icon('reset', size=18) }}</span>
-        <span class="rt-mb-lbl">清除</span></button>
+        <span class="rt-mb-lbl">{{ tr('清除') }}</span></button>
     </div>
     <div class="rt-scope">
       <div class="rt-scope-row">
-        <label class="rt-scope-label">套用範圍</label>
+        <label class="rt-scope-label">{{ tr('套用範圍') }}</label>
         <select id="scope-mode" class="field rt-scope-sel">
-          <option value="all" selected>所有頁</option>
-          <option value="even">偶數頁</option>
-          <option value="odd">奇數頁</option>
-          <option value="custom">自填頁碼…</option>
+          <option value="all" selected>{{ tr('所有頁') }}</option>
+          <option value="even">{{ tr('偶數頁') }}</option>
+          <option value="odd">{{ tr('奇數頁') }}</option>
+          <option value="custom">{{ tr('自填頁碼…') }}</option>
         </select>
         <input id="scope-custom" type="text" class="field"
           placeholder="例：1,3-5,8-10" hidden />
@@ -57,22 +57,22 @@
     </div>
   </div>
   <div class="muted" data-s="s789d4caf">
-    點上方按鈕 = 套用該轉向到「套用範圍」內的頁；每張縮圖下方也有獨立按鈕可單頁覆寫。
+    {{ tr('點上方按鈕 = 套用該轉向到「套用範圍」內的頁；每張縮圖下方也有獨立按鈕可單頁覆寫。') }}
   </div>
 
   <div class="page-grid" id="thumb-grid"></div>
 </div>
 
 <div class="panel" id="action-panel" hidden>
-  <h2 data-s="s53896af7">3. 完成</h2>
+  <h2 data-s="s53896af7">{{ tr('3. 完成') }}</h2>
   <div class="rt-actions">
     <button class="btn btn-primary" type="button" id="btn-pdf">
-      {{ icon('download', size=14) }} 下載 PDF</button>
+      {{ icon('download', size=14) }} {{ tr('下載 PDF') }}</button>
     <button class="btn" type="button" id="btn-png">
-      {{ icon('image', size=14) }} 下載 ZIP（每頁 PNG）</button>
-    {% if workspace_enabled(request) %}<button class="btn" type="button" id="wsSaveBtn">{{ icon('archive', size=14) }} 存至工作區</button>{% endif %}
+      {{ icon('image', size=14) }} {{ tr('下載 ZIP（每頁 PNG）') }}</button>
+    {% if workspace_enabled(request) %}<button class="btn" type="button" id="wsSaveBtn">{{ icon('archive', size=14) }} {{ tr('存至工作區') }}</button>{% endif %}
     <button class="btn" type="button" id="btn-reset">
-      {{ icon('reset', size=14) }} 處理新檔案</button>
+      {{ icon('reset', size=14) }} {{ tr('處理新檔案') }}</button>
     <span id="action-msg" class="muted" data-s="s414be724"></span>
   </div>
 </div>

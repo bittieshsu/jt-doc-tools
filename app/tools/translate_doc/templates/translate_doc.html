@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
 {% from "components/llm_gate.html" import llm_gate, llm_gate_styles with context %}
-{% block title %}逐句翻譯 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('逐句翻譯') }} · {{ app_name }}{% endblock %}
 {% block head %}{{ llm_gate_styles() }}{% endblock %}
 {% block content %}
-<h1>{{ icon('globe', size=22) }} 逐句翻譯</h1>
-<p class="muted">上傳文字或文件檔，逐句送到地端 LLM 翻譯，左原文右譯文並排對照。每句可單獨重新翻譯。
-語言自動偵測或手動指定，目標語言預設繁體中文。</p>
+<h1>{{ icon('globe', size=22) }} {{ tr('逐句翻譯') }}</h1>
+<p class="muted">{{ tr('上傳文字或文件檔，逐句送到地端 LLM 翻譯，左原文右譯文並排對照。每句可單獨重新翻譯。
+語言自動偵測或手動指定，目標語言預設繁體中文。') }}</p>
 
 {% include "components/cjk_font_notice.html" with context %}
 
@@ -16,10 +16,10 @@
 {% if llm_enabled %}
 
 <details class="panel" open>
-  <summary>1. 來源文字</summary>
+  <summary>{{ tr('1. 來源文字') }}</summary>
   <div class="trd-form-grid">
     <div class="trd-form-cell">
-      <label class="trd-label">原文語言</label>
+      <label class="trd-label">{{ tr('原文語言') }}</label>
       <div class="jt-select" id="srcLangSel"
            data-options='[
              {"v":"auto","l":"自動偵測"},
@@ -39,7 +39,7 @@
            ]' data-value="auto"></div>
     </div>
     <div class="trd-form-cell">
-      <label class="trd-label">目標語言</label>
+      <label class="trd-label">{{ tr('目標語言') }}</label>
       <div class="jt-select" id="tgtLangSel"
            data-options='[
              {"v":"zh-TW","l":"繁體中文"},
@@ -55,7 +55,7 @@
            ]' data-value="zh-TW"></div>
     </div>
     <div class="trd-form-cell trd-form-cell-wide">
-      <label class="trd-label">或上傳檔案</label>
+      <label class="trd-label">{{ tr('或上傳檔案') }}</label>
       <div data-s="s5ee7f1f8">
         <label class="trd-drop-zone" id="dropZone" for="fileInput" data-s="sbbf7159c">
           <input type="file" id="fileInput" accept=".pdf,.docx,.odt,.ods,.odp,.txt,.md" hidden />
@@ -67,25 +67,25 @@
             </svg>
           </div>
           <div class="trd-drop-text">
-            <b>點此挑選</b>或拖曳檔案到此
+            <b>{{ tr('點此挑選') }}</b>{{ tr('或拖曳檔案到此') }}
             <span class="trd-drop-hint">PDF / DOCX / ODT / ODS / ODP / TXT / MD</span>
           </div>
         </label>
-        {% if workspace_enabled(request) %}<button type="button" class="ws-load-btn" id="wsLoadBtn" data-s="sfb3608b6"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span>從工作區載入</span></button>{% endif %}
+        {% if workspace_enabled(request) %}<button type="button" class="ws-load-btn" id="wsLoadBtn" data-s="sfb3608b6"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span>{{ tr('從工作區載入') }}</span></button>{% endif %}
       </div>
     </div>
   </div>
   <div data-s="s553a645f">
-    <label class="trd-label" for="domainHint">文件領域 <span class="muted" data-s="sf1bde2c5">（選填，會送進 LLM prompt 提升專業用詞準確度；點下方常用領域可複選，下方輸入框可加上其他自填領域）</span></label>
+    <label class="trd-label" for="domainHint">{{ tr('文件領域') }} <span class="muted" data-s="sf1bde2c5">{{ tr('（選填，會送進 LLM prompt 提升專業用詞準確度；點下方常用領域可複選，下方輸入框可加上其他自填領域）') }}</span></label>
     <div class="trd-domain-chips" id="domainChips" data-s="s7405ba83">
-      <button type="button" class="trd-chip" data-domain="法律合約">法律合約</button>
-      <button type="button" class="trd-chip" data-domain="醫療報告">醫療報告</button>
-      <button type="button" class="trd-chip" data-domain="軟體技術文件">軟體技術文件</button>
-      <button type="button" class="trd-chip" data-domain="財務報表">財務報表</button>
-      <button type="button" class="trd-chip" data-domain="學術論文">學術論文</button>
-      <button type="button" class="trd-chip" data-domain="新聞稿">新聞稿</button>
-      <button type="button" class="trd-chip" data-domain="商業合約">商業合約</button>
-      <button type="button" class="trd-chip" data-domain="網路 / IT 維運文件">網路 / IT 維運文件</button>
+      <button type="button" class="trd-chip" data-domain="法律合約">{{ tr('法律合約') }}</button>
+      <button type="button" class="trd-chip" data-domain="醫療報告">{{ tr('醫療報告') }}</button>
+      <button type="button" class="trd-chip" data-domain="軟體技術文件">{{ tr('軟體技術文件') }}</button>
+      <button type="button" class="trd-chip" data-domain="財務報表">{{ tr('財務報表') }}</button>
+      <button type="button" class="trd-chip" data-domain="學術論文">{{ tr('學術論文') }}</button>
+      <button type="button" class="trd-chip" data-domain="新聞稿">{{ tr('新聞稿') }}</button>
+      <button type="button" class="trd-chip" data-domain="商業合約">{{ tr('商業合約') }}</button>
+      <button type="button" class="trd-chip" data-domain="網路 / IT 維運文件">{{ tr('網路 / IT 維運文件') }}</button>
     </div>
     <input type="text" class="field" id="domainHint" maxlength="200"
            data-s="se5007d97"
@@ -95,47 +95,47 @@
     <textarea class="field" id="srcText" rows="10" data-s="s20808d80" placeholder="貼上要翻譯的文字，或上傳檔案到上方欄位…"></textarea>
     <div class="trd-parse-overlay" id="trdParseOverlay" hidden>
       <span class="trd-spinner"></span>
-      <span class="trd-parse-label" id="trdParseLabel">解析中…</span>
+      <span class="trd-parse-label" id="trdParseLabel">{{ tr('解析中…') }}</span>
     </div>
   </div>
   <div data-s="sa45f86c4">
-    <button class="btn btn-primary" id="btnTranslate" {% if not llm_enabled %}disabled title="LLM 未啟用"{% endif %}>{{ icon('play', size=14) }} 開始翻譯</button>
-    <button class="btn" type="button" id="btnStop" hidden data-s="s17cfb864">■ 停止翻譯</button>
-    <button class="btn" type="button" id="btnClear">{{ icon('reset', size=14) }} 清空</button>
-    <span class="muted" data-s="s6b9c179a" id="charCounter">0 字 / 0 句</span>
+    <button class="btn btn-primary" id="btnTranslate" {% if not llm_enabled %}disabled title="LLM 未啟用"{% endif %}>{{ icon('play', size=14) }} {{ tr('開始翻譯') }}</button>
+    <button class="btn" type="button" id="btnStop" hidden data-s="s17cfb864">{{ tr('■ 停止翻譯') }}</button>
+    <button class="btn" type="button" id="btnClear">{{ icon('reset', size=14) }} {{ tr('清空') }}</button>
+    <span class="muted" data-s="s6b9c179a" id="charCounter">{{ tr('0 字 / 0 句') }}</span>
   </div>
 </details>
 
 <details class="panel" id="resultPanel" hidden open>
-  <summary>2. 並排對照</summary>
+  <summary>{{ tr('2. 並排對照') }}</summary>
   <div class="trd-result-toolbar">
     <span class="muted" id="resultMeta" data-s="s6b9c179a"></span>
     <span data-s="sda5cd676"></span>
-    <button class="btn btn-small" type="button" id="btnCopyTgt">{{ icon('paperclip', size=12) }} 複製譯文</button>
-    <button class="btn btn-small" type="button" id="btnCopySxs">{{ icon('paperclip', size=12) }} 複製對照</button>
+    <button class="btn btn-small" type="button" id="btnCopyTgt">{{ icon('paperclip', size=12) }} {{ tr('複製譯文') }}</button>
+    <button class="btn btn-small" type="button" id="btnCopySxs">{{ icon('paperclip', size=12) }} {{ tr('複製對照') }}</button>
     <span class="trd-export-wrap">
-      <button class="btn btn-small trd-export-btn" type="button" data-export-group="text">{{ icon('download', size=12) }} 匯出文字檔 ▾</button>
+      <button class="btn btn-small trd-export-btn" type="button" data-export-group="text">{{ icon('download', size=12) }} {{ tr('匯出文字檔 ▾') }}</button>
       <div class="trd-export-menu" data-export-menu="text" hidden>
-        <button type="button" data-format="txt">純文字 (.txt)</button>
+        <button type="button" data-format="txt">{{ tr('純文字 (.txt)') }}</button>
         <button type="button" data-format="md">Markdown (.md)</button>
         <button type="button" data-format="csv">CSV (.csv)</button>
       </div>
     </span>
     <span class="trd-export-wrap">
-      <button class="btn btn-small trd-export-btn" type="button" data-export-group="doc">{{ icon('download', size=12) }} 匯出文件檔 ▾</button>
+      <button class="btn btn-small trd-export-btn" type="button" data-export-group="doc">{{ icon('download', size=12) }} {{ tr('匯出文件檔 ▾') }}</button>
       <div class="trd-export-menu" data-export-menu="doc" hidden>
         <button type="button" data-format="docx">Word (.docx)</button>
         <button type="button" data-format="odt">OpenDocument (.odt)</button>
         <button type="button" data-format="pdf">PDF (.pdf)</button>
         {% if workspace_enabled(request) %}
-        <button type="button" data-ws-format="docx">＋ 存 Word 至工作區</button>
-        <button type="button" data-ws-format="odt">＋ 存 ODT 至工作區</button>
-        <button type="button" data-ws-format="pdf">＋ 存 PDF 至工作區</button>
+        <button type="button" data-ws-format="docx">{{ tr('＋ 存 Word 至工作區') }}</button>
+        <button type="button" data-ws-format="odt">{{ tr('＋ 存 ODT 至工作區') }}</button>
+        <button type="button" data-ws-format="pdf">{{ tr('＋ 存 PDF 至工作區') }}</button>
         {% endif %}
       </div>
     </span>
     <span class="trd-export-wrap">
-      <button class="btn btn-small trd-export-btn" type="button" data-export-group="sheet">{{ icon('download', size=12) }} 匯出試算表檔 ▾</button>
+      <button class="btn btn-small trd-export-btn" type="button" data-export-group="sheet">{{ icon('download', size=12) }} {{ tr('匯出試算表檔 ▾') }}</button>
       <div class="trd-export-menu" data-export-menu="sheet" hidden>
         <button type="button" data-format="xlsx">Excel (.xlsx)</button>
         <button type="button" data-format="ods">OpenDocument (.ods)</button>
@@ -149,8 +149,8 @@
   <div class="trd-grid" id="trdGrid"></div>
   <div class="trd-pager" id="trdPager" hidden></div>
   <div data-s="s69e930b3">
-    每一列對應一句。點 <b>↻</b> 可重新請 LLM 翻譯該句。空白列代表原文是空行。
-    句數多時會自動分頁（每頁筆數由管理員在 LLM 設定調整）；翻譯在背景持續進行，翻頁不影響。
+    {{ tr('每一列對應一句。點') }} <b>↻</b> {{ tr('可重新請 LLM 翻譯該句。空白列代表原文是空行。
+    句數多時會自動分頁（每頁筆數由管理員在 LLM 設定調整）；翻譯在背景持續進行，翻頁不影響。') }}
   </div>
 </details>
 

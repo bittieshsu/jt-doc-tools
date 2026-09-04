@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}PDF 編輯器 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('PDF 編輯器') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <script src="/static/vendor/fabric/fabric.min.js"></script>
 {# 修正 Fabric 文字編輯對焦把畫面捲走（issue #42）— 必須緊接在 fabric 之後 #}
@@ -444,49 +444,49 @@ body.pe-pan-active { cursor: grabbing !important; }
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('edit', size=22) }} PDF 編輯器</h1>
+<h1>{{ icon('edit', size=22) }} {{ tr('PDF 編輯器') }}</h1>
 <p class="muted">
-  疊加文字 / 圖片 / 形狀 / 標註，或用「選既有」工具直接搬動、改內容、刪除原 PDF 上的物件。
-  <span data-s="s0c8f4b0b">{{ icon('warn', size=13) }} 不會自動斷行重排；字型為還原繪製，與原檔可能細微不同。</span>
+  {{ tr('疊加文字 / 圖片 / 形狀 / 標註，或用「選既有」工具直接搬動、改內容、刪除原 PDF 上的物件。') }}
+  <span data-s="s0c8f4b0b">{{ icon('warn', size=13) }} {{ tr('不會自動斷行重排；字型為還原繪製，與原檔可能細微不同。') }}</span>
 </p>
 
 {% include "components/cjk_font_notice.html" with context %}
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
-  {% with upload_id='peUpload', accept='application/pdf', hint='單檔、PDF only。' %}
+  <h2 data-s="s53896af7">{{ tr('1. 上傳 PDF') }}</h2>
+  {% with upload_id='peUpload', accept='application/pdf', hint=tr('單檔、PDF only。') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
 </div>
 
 <div class="panel" id="editor-panel" hidden>
   <div class="pe-top">
-    <button class="btn btn-primary" type="button" id="btnSave">{{ icon('save') }} 儲存並預覽</button>
-    <a class="btn" id="btnDownload" href="#" hidden>{{ icon('download') }} 下載</a>
-    {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden>{{ icon('archive') }} 存至工作區</button>{% endif %}
+    <button class="btn btn-primary" type="button" id="btnSave">{{ icon('save') }} {{ tr('儲存並預覽') }}</button>
+    <a class="btn" id="btnDownload" href="#" hidden>{{ icon('download') }} {{ tr('下載') }}</a>
+    {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden>{{ icon('archive') }} {{ tr('存至工作區') }}</button>{% endif %}
     <span class="pe-top-divider"></span>
     <button class="btn" type="button" id="btnUndo" title="復原 (Cmd/Ctrl+Z)" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-2"/></svg>
-      復原
+      {{ tr('復原') }}
     </button>
     <button class="btn" type="button" id="btnRedo" title="重做 (Cmd/Ctrl+Shift+Z)" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9h-9a7 7 0 0 0 0 14h2"/></svg>
-      重做
+      {{ tr('重做') }}
     </button>
     <span class="pe-top-divider"></span>
     <button class="btn" type="button" id="btnGlobalFont" data-tip="把整份 PDF 的文字換成同一個字型"
       data-s="s9b9f561c">
-      {{ icon('text', size=14) }} 整份換字型
+      {{ icon('text', size=14) }} {{ tr('整份換字型') }}
     </button>
     <button class="btn" type="button" id="btnPrefs" data-tip="編輯器設定"
       data-s="sff9a0cfa">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s742e547d"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      設定
+      {{ tr('設定') }}
     </button>
     <span class="pe-top-divider"></span>
     <label class="pe-autosave" title="自動預覽（改動後 ~1 秒自動重算）">
       <input type="checkbox" id="peAutoSave" checked>
-      自動預覽<span class="hint">（改動後 ~1 秒自動重算）</span>
+      {{ tr('自動預覽') }}<span class="hint">{{ tr('（改動後 ~1 秒自動重算）') }}</span>
     </label>
     <div class="pe-zoom-ctl">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s742e547d"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5M8 11h6M11 8v6"/></svg>
@@ -495,12 +495,12 @@ body.pe-pan-active { cursor: grabbing !important; }
       <button class="btn" type="button" id="btnFitPage" title="縮放到剛好顯示整頁"
         data-s="se4fdde7a">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s16fc71ab"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg>
-        符合視窗
+        {{ tr('符合視窗') }}
       </button>
     </div>
     <div class="pe-page-ctl" title="輸入頁碼後按 Enter 直接跳到該頁">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s16fc71ab"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      頁碼
+      {{ tr('頁碼') }}
       <input type="number" id="pePageInput" min="1" value="1" step="1">
       <span class="pe-page-total">/ <span id="pePageTotal">—</span></span>
       <span class="pe-page-nav">
@@ -522,7 +522,7 @@ body.pe-pan-active { cursor: grabbing !important; }
     <button class="btn" type="button" id="btnMaxView" title="全視窗（編輯區擴到右側整個區域，Esc 退出）"
       data-s="sccfd3fa8">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s16fc71ab"><path d="M3 7V3h4M21 7V3h-4M3 17v4h4M21 17v4h-4"/></svg>
-      <span id="btnMaxViewLabel">全視窗</span>
+      <span id="btnMaxViewLabel">{{ tr('全視窗') }}</span>
     </button>
   </div>
   <div class="pe-toolbar pe-toolbar-h">
@@ -567,100 +567,100 @@ body.pe-pan-active { cursor: grabbing !important; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h.01M11 14h.01M15 14h.01"/></svg>
       </button>
       <div class="pe-shortcuts-pop" id="peShortcutsPop" hidden data-s="sf675fd80">
-        <div class="pe-shortcuts-pop-head">編輯快捷鍵</div>
+        <div class="pe-shortcuts-pop-head">{{ tr('編輯快捷鍵') }}</div>
         <div class="pe-shortcuts-pop-grid">
-          <div><kbd>V</kbd> 選取</div>
-          <div><kbd>S</kbd> 選既有</div>
-          <div><kbd>T</kbd> 文字</div>
-          <div><kbd>I</kbd> 圖片</div>
-          <div><kbd>W</kbd> 白底</div>
-          <div><kbd>R</kbd> 矩形</div>
-          <div><kbd>L</kbd> 線段</div>
-          <div><kbd>A</kbd> 箭頭</div>
-          <div><kbd>O</kbd> 橢圓</div>
-          <div><kbd>P</kbd> 手繪</div>
-          <div><kbd>H</kbd> 螢光筆</div>
-          <div><kbd>N</kbd> 便箋</div>
-          <div><kbd>Delete</kbd> 刪除選中</div>
-          <div><kbd>Cmd/Ctrl+Z</kbd> 復原</div>
-          <div><kbd>Cmd/Ctrl+Shift+Z</kbd> 重做</div>
-          <div><kbd>]</kbd> 上一層</div>
-          <div><kbd>[</kbd> 下一層</div>
-          <div><kbd>Cmd/Ctrl+]</kbd> 置頂</div>
-          <div><kbd>Cmd/Ctrl+[</kbd> 置底</div>
-          <div><kbd>PageUp / Down</kbd> 上 / 下頁</div>
-          <div><kbd>Home / End</kbd> 第一 / 最後頁</div>
-          <div><kbd>Esc</kbd> 退出全視窗</div>
-          <div><kbd>Space</kbd>＋拖曳 拖動內容區</div>
+          <div><kbd>V</kbd> {{ tr('選取') }}</div>
+          <div><kbd>S</kbd> {{ tr('選既有') }}</div>
+          <div><kbd>T</kbd> {{ tr('文字') }}</div>
+          <div><kbd>I</kbd> {{ tr('圖片') }}</div>
+          <div><kbd>W</kbd> {{ tr('白底') }}</div>
+          <div><kbd>R</kbd> {{ tr('矩形') }}</div>
+          <div><kbd>L</kbd> {{ tr('線段') }}</div>
+          <div><kbd>A</kbd> {{ tr('箭頭') }}</div>
+          <div><kbd>O</kbd> {{ tr('橢圓') }}</div>
+          <div><kbd>P</kbd> {{ tr('手繪') }}</div>
+          <div><kbd>H</kbd> {{ tr('螢光筆') }}</div>
+          <div><kbd>N</kbd> {{ tr('便箋') }}</div>
+          <div><kbd>Delete</kbd> {{ tr('刪除選中') }}</div>
+          <div><kbd>Cmd/Ctrl+Z</kbd> {{ tr('復原') }}</div>
+          <div><kbd>Cmd/Ctrl+Shift+Z</kbd> {{ tr('重做') }}</div>
+          <div><kbd>]</kbd> {{ tr('上一層') }}</div>
+          <div><kbd>[</kbd> {{ tr('下一層') }}</div>
+          <div><kbd>Cmd/Ctrl+]</kbd> {{ tr('置頂') }}</div>
+          <div><kbd>Cmd/Ctrl+[</kbd> {{ tr('置底') }}</div>
+          <div><kbd>PageUp / Down</kbd> {{ tr('上 / 下頁') }}</div>
+          <div><kbd>Home / End</kbd> {{ tr('第一 / 最後頁') }}</div>
+          <div><kbd>Esc</kbd> {{ tr('退出全視窗') }}</div>
+          <div><kbd>Space</kbd>{{ tr('＋拖曳 拖動內容區') }}</div>
         </div>
       </div>
     </div>
   </div>
   <div class="pe-wrap">
     <aside class="pe-thumbs" id="peThumbs">
-      <div class="pe-thumbs-head">頁面</div>
+      <div class="pe-thumbs-head">{{ tr('頁面') }}</div>
       <div class="pe-thumbs-list" id="peThumbsList"></div>
     </aside>
     <div class="pe-canvas-wrap" id="canvasWrap">
       <div class="pe-zoom-stage" id="zoomStage"></div>
     </div>
     <div class="pe-sidebar" id="propsPanel">
-      <h3>屬性</h3>
-      <div class="muted">點選物件後在此編輯。</div>
+      <h3>{{ tr('屬性') }}</h3>
+      <div class="muted">{{ tr('點選物件後在此編輯。') }}</div>
     </div>
   </div>
 </div>
 
 <!-- Preferences popover -->
 <div id="peSettings" data-s="s1ee1820d">
-  <h3 data-s="sa424c125">編輯器設定</h3>
+  <h3 data-s="sa424c125">{{ tr('編輯器設定') }}</h3>
   <div data-s="sa7409f75">
     <label data-s="s6293e019">
       <input type="checkbox" id="prefShowGuides" checked>
-      顯示對齊輔助線
+      {{ tr('顯示對齊輔助線') }}
     </label>
   </div>
   <div data-s="sa7409f75">
     <label data-s="s6293e019">
       <input type="checkbox" id="prefSnap" checked>
-      拖曳時自動貼合其他物件
+      {{ tr('拖曳時自動貼合其他物件') }}
     </label>
   </div>
   <div data-s="sa7409f75">
-    <label data-s="sa7a6f648">貼合距離</label>
+    <label data-s="sa7a6f648">{{ tr('貼合距離') }}</label>
     <div data-s="s2761a6ad">
       <input type="range" id="prefSnapDist" min="2" max="20" value="5" step="1" data-s="sda5cd676">
       <span id="prefSnapDistLabel" data-s="se67b272a">5 px</span>
     </div>
   </div>
   <div data-s="s8352c071">
-    <button type="button" class="btn" id="prefsClose">關閉</button>
+    <button type="button" class="btn" id="prefsClose">{{ tr('關閉') }}</button>
   </div>
 </div>
 
 <!-- Full-screen loading overlay shown during save/re-render -->
 <div id="peLoading">
-  <div class="box"><div class="spinner"></div><span id="peLoadingText">重新渲染中…</span></div>
+  <div class="box"><div class="spinner"></div><span id="peLoadingText">{{ tr('重新渲染中…') }}</span></div>
 </div>
 
 <!-- Global-font-replace modal -->
 <div id="fontPicker" data-s="se36205cc">
   <div data-s="s59f4c184">
-    <h3 data-s="s53896af7">把整份 PDF 文字換成同一個字型</h3>
+    <h3 data-s="s53896af7">{{ tr('把整份 PDF 文字換成同一個字型') }}</h3>
     <p class="muted" data-s="s94adc1b1">
-      這會把 PDF 裡每一頁、每一段文字都重繪成你選的字型（字級、顏色、粗體 / 斜體會保留）。
-      <b data-s="s0c118ea4">此動作不可 Undo；請先下載一份備份。</b>
+      {{ tr('這會把 PDF 裡每一頁、每一段文字都重繪成你選的字型（字級、顏色、粗體 / 斜體會保留）。') }}
+      <b data-s="s0c118ea4">{{ tr('此動作不可 Undo；請先下載一份備份。') }}</b>
     </p>
     <div class="row" data-s="scca18063">
-      <label data-s="sfd395466">新字型</label>
+      <label data-s="sfd395466">{{ tr('新字型') }}</label>
       <select id="gfFontSelect" data-s="s0b361cbf">
-        <option value="pymupdf:default">載入字型清單中…</option>
+        <option value="pymupdf:default">{{ tr('載入字型清單中…') }}</option>
       </select>
     </div>
     <div id="gfStatus" class="muted" data-s="s77a268ab"></div>
     <div data-s="s2dd684bd">
-      <button type="button" class="btn" id="gfCancel">取消</button>
-      <button type="button" class="btn btn-primary" id="gfGo">{{ icon('play', size=12) }} 執行換字型</button>
+      <button type="button" class="btn" id="gfCancel">{{ tr('取消') }}</button>
+      <button type="button" class="btn btn-primary" id="gfGo">{{ icon('play', size=12) }} {{ tr('執行換字型') }}</button>
     </div>
   </div>
 </div>
@@ -668,27 +668,27 @@ body.pe-pan-active { cursor: grabbing !important; }
 <!-- Asset picker modal -->
 <div id="assetPicker" data-s="se36205cc">
   <div data-s="s4a5c07d2">
-    <h3 data-s="s53896af7">選擇圖片 / 印章 / 簽名</h3>
+    <h3 data-s="s53896af7">{{ tr('選擇圖片 / 印章 / 簽名') }}</h3>
     <div data-s="s972ba3f0">
       <button type="button" class="ap-tab ap-tab-active" data-tab="asset"
-              data-s="s60440412">從資產庫</button>
+              data-s="s60440412">{{ tr('從資產庫') }}</button>
       <button type="button" class="ap-tab" data-tab="upload"
-              data-s="s2f50d2cc">上傳新圖片</button>
+              data-s="s2f50d2cc">{{ tr('上傳新圖片') }}</button>
     </div>
     <div id="apTabAsset">
-      <div id="assetGrid" data-s="s294f0794">載入中…</div>
+      <div id="assetGrid" data-s="s294f0794">{{ tr('載入中…') }}</div>
     </div>
     <div id="apTabUpload" hidden data-s="s14c65843">
-      <p class="muted" data-s="s1d962ad0">支援 PNG / JPEG / WEBP / GIF。上傳的圖片只會嵌入這份 PDF，不會加到資產庫。如果要重複使用，請到「<a href="/admin/assets" target="_blank">管理資產</a>」上傳。</p>
+      <p class="muted" data-s="s1d962ad0">{{ tr('支援 PNG / JPEG / WEBP / GIF。上傳的圖片只會嵌入這份 PDF，不會加到資產庫。如果要重複使用，請到「') }}<a href="/admin/assets" target="_blank">{{ tr('管理資產') }}</a>{{ tr('」上傳。') }}</p>
       <label data-s="s2865cacb">
-        <div data-s="s3d7dec0f">點此挑選圖片檔，或拖放到此</div>
+        <div data-s="s3d7dec0f">{{ tr('點此挑選圖片檔，或拖放到此') }}</div>
         <input type="file" id="apUploadInput" accept="image/png,image/jpeg,image/webp,image/gif" data-s="scb458930" />
       </label>
       <div id="apUploadStatus" class="muted" data-s="sf14019df"></div>
     </div>
     <div data-s="s5cb36e28">
-      <button type="button" class="btn" id="assetCancel">取消</button>
-      <a href="/admin/assets" target="_blank" class="btn" data-s="sd109945c">管理資產</a>
+      <button type="button" class="btn" id="assetCancel">{{ tr('取消') }}</button>
+      <a href="/admin/assets" target="_blank" class="btn" data-s="sd109945c">{{ tr('管理資產') }}</a>
     </div>
   </div>
 </div>

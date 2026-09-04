@@ -1,69 +1,69 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}掃描拼合 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('掃描拼合') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('credit-card', size=22) }} 掃描拼合</h1>
-<p class="muted">事務機分次掃描證件正、反面會產生多個檔，內容各落在 A4 不同位置。拉入這些掃描，系統自動抓出每張「有內容的區塊」、保留原彩色，依原位置疊到同一張 A4 白底；可拖曳微調再產生 PDF。</p>
+<h1>{{ icon('credit-card', size=22) }} {{ tr('掃描拼合') }}</h1>
+<p class="muted">{{ tr('事務機分次掃描證件正、反面會產生多個檔，內容各落在 A4 不同位置。拉入這些掃描，系統自動抓出每張「有內容的區塊」、保留原彩色，依原位置疊到同一張 A4 白底；可拖曳微調再產生 PDF。') }}</p>
 
 <details class="panel" id="upload-panel" open>
-  <summary>上傳掃描檔 <span class="muted" id="upload-count" data-s="s5a8ca7b2"></span></summary>
+  <summary>{{ tr('上傳掃描檔') }} <span class="muted" id="upload-count" data-s="s5a8ca7b2"></span></summary>
   <div class="file-upload" id="dropZone">
     <label class="drop-zone" for="fileInput">
       <div class="drop-zone-inner">
         <div class="drop-zone-icon"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l3-3 3 3"/><path d="M12 11v10"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M16 7l-4-4-4 4"/><path d="M12 3v8"/></svg></div>
-        <div class="drop-zone-text">拖曳檔案到此，或點選挑選</div>
-        <div class="drop-zone-hint">證件正反面等多張掃描，可一次選多個、上傳後可繼續加。單檔上限 50 MB；本機處理，暫存自動清除、預設不留紀錄。</div>
+        <div class="drop-zone-text">{{ tr('拖曳檔案到此，或點選挑選') }}</div>
+        <div class="drop-zone-hint">{{ tr('證件正反面等多張掃描，可一次選多個、上傳後可繼續加。單檔上限 50 MB；本機處理，暫存自動清除、預設不留紀錄。') }}</div>
       </div>
       <input type="file" id="fileInput" accept=".pdf,image/*,.tif,.tiff" multiple />
     </label>
-    {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>從工作區載入</span></button></div>{% endif %}
+    {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
     <div id="upload-list" class="sm-uploadList" hidden></div>
     <div class="sm-uploadActions" id="upload-actions" hidden>
-      <button type="button" class="btn btn-small" id="btn-clear-all">{{ icon('trash', size=14) }} 全部清除</button>
+      <button type="button" class="btn btn-small" id="btn-clear-all">{{ icon('trash', size=14) }} {{ tr('全部清除') }}</button>
     </div>
   </div>
 </details>
 
 <details class="panel" id="stage-panel" hidden open>
-  <summary>預覽與微調 <span class="muted" id="stage-info" data-s="s5a8ca7b2">—</span></summary>
+  <summary>{{ tr('預覽與微調') }} <span class="muted" id="stage-info" data-s="s5a8ca7b2">—</span></summary>
   <div class="sm-toolbar">
     <span data-s="sda5cd676"></span>
     <label class="sm-check" title="掃描常會帶一層淡灰 / 微黃的底色；勾選後把這層底色淨化成純白，不影響任何彩色內容">
-      <input type="checkbox" id="whitenToggle"> 去除掃描灰底
+      <input type="checkbox" id="whitenToggle"> {{ tr('去除掃描灰底') }}
     </label>
   </div>
 
   <!-- 橫式動作列：輸出檔名 + 產生 + 下載，放預覽上方，不佔右側空間 -->
   <div class="sm-actionbar">
     <div class="sm-field">
-      <label for="outName">輸出檔名</label>
+      <label for="outName">{{ tr('輸出檔名') }}</label>
       <input type="text" id="outName" value="scan-merge.pdf" class="sm-outname">
     </div>
-    <button class="btn btn-primary" id="btn-generate">{{ icon('save') }} 產生合併結果</button>
+    <button class="btn btn-primary" id="btn-generate">{{ icon('save') }} {{ tr('產生合併結果') }}</button>
   </div>
   <div class="sm-jp-wrap">
     {% with progress_id='jp' %}{% include "components/job_progress.html" %}{% endwith %}
   </div>
 
   <div id="overlap-warn" class="sm-warn" hidden>
-    {{ icon('info', size=14) }} 有內容區塊互相重疊（紅框標示）。已保留原掃描位置；若不想重疊，請拖曳錯開。
+    {{ icon('info', size=14) }} {{ tr('有內容區塊互相重疊（紅框標示）。已保留原掃描位置；若不想重疊，請拖曳錯開。') }}
   </div>
 
-  <p class="sm-help">{{ icon('info', size=14) }} 系統已依原掃描位置自動擺放各張內容。<b>點選任一張</b>即可拖曳移動、用右下角控點調整大小；重疊時(紅框)拖曳錯開即可。完成後按「產生合併結果」下載。</p>
+  <p class="sm-help">{{ icon('info', size=14) }} {{ tr('系統已依原掃描位置自動擺放各張內容。') }}<b>{{ tr('點選任一張') }}</b>{{ tr('即可拖曳移動、用右下角控點調整大小；重疊時(紅框)拖曳錯開即可。完成後按「產生合併結果」下載。') }}</p>
 
   <div class="sm-zoombar">
     <button type="button" class="btn btn-small sm-zbtn" id="zoom-out" title="縮小">−</button>
     <input type="range" id="zoom-range" class="sm-zoom-range" min="40" max="300" step="5" value="100" title="拖曳調整縮放" aria-label="縮放比例">
     <button type="button" class="btn btn-small sm-zbtn" id="zoom-in" title="放大">+</button>
     <span id="zoom-label" class="sm-zoom-label">100%</span>
-    <button type="button" class="btn btn-small" id="zoom-fit" title="整張完整顯示在可見範圍">{{ icon('aspect-ratio', size=14) }} 符合</button>
+    <button type="button" class="btn btn-small" id="zoom-fit" title="整張完整顯示在可見範圍">{{ icon('aspect-ratio', size=14) }} {{ tr('符合') }}</button>
     <span data-s="sda5cd676"></span>
-    <button type="button" class="btn btn-small" id="btn-preview-toggle" title="隱藏選取框，預覽實際輸出結果">{{ icon('eye', size=14) }} 預覽結果</button>
+    <button type="button" class="btn btn-small" id="btn-preview-toggle" title="隱藏選取框，預覽實際輸出結果">{{ icon('eye', size=14) }} {{ tr('預覽結果') }}</button>
   </div>
   <div class="sm-stage-scroll">
     <div id="stage-busy" class="sm-busy" hidden>
       <span class="sm-spinner"></span>
-      <span id="stage-busy-msg">處理中…</span>
+      <span id="stage-busy-msg">{{ tr('處理中…') }}</span>
     </div>
     <div id="stage" class="sm-stage" aria-label="A4 預覽，可拖曳每塊內容"></div>
   </div>

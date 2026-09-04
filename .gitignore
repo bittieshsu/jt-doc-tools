@@ -27,5 +27,3 @@ packaging/windows/jt-doc-tools-*-setup.exe
 
 # Maintainer-internal code-signing application notes (not for public repo)
 packaging/windows/SIGNPATH-APPLICATION.md
-# 授權變更通知的信稿與追蹤（含 Organization ID，內部往來紀錄）
-packaging/windows/SIGNPATH-LICENSE-CHANGE.md

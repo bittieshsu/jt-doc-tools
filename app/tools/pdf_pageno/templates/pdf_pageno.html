@@ -1,38 +1,38 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}插入頁碼 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('插入頁碼') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('hash', size=22) }} 插入頁碼</h1>
-<p class="muted">在每一頁印上頁碼；可選位置、字級、起始頁碼與顯示格式。上傳後會自動產生頁面縮圖預覽，並在縮圖上以紫色標記頁碼會出現的位置。</p>
+<h1>{{ icon('hash', size=22) }} {{ tr('插入頁碼') }}</h1>
+<p class="muted">{{ tr('在每一頁印上頁碼；可選位置、字級、起始頁碼與顯示格式。上傳後會自動產生頁面縮圖預覽，並在縮圖上以紫色標記頁碼會出現的位置。') }}</p>
 
 {% include "components/cjk_font_notice.html" with context %}
 
 <div class="panel">
-  <h2 data-s="s53896af7">上傳 PDF</h2>
+  <h2 data-s="s53896af7">{{ tr('上傳 PDF') }}</h2>
   {% with upload_id='upPN', accept='application/pdf', multiple=True %}{% include "components/file_upload.html" %}{% endwith %}
-  <p class="muted" data-s="s168f2b58">支援多檔批次；縮圖預覽僅顯示第一份檔案。</p>
+  <p class="muted" data-s="s168f2b58">{{ tr('支援多檔批次；縮圖預覽僅顯示第一份檔案。') }}</p>
 </div>
 
 <div class="panel pn-settings">
-  <h2 data-s="s53896af7">設定</h2>
+  <h2 data-s="s53896af7">{{ tr('設定') }}</h2>
 
   <div class="pn-card">
     <div class="pn-card-head">
-      <span class="pn-card-title">頁碼範圍</span>
-      <span class="pn-card-sub">跳過封面、目次、封底不印頁碼</span>
+      <span class="pn-card-title">{{ tr('頁碼範圍') }}</span>
+      <span class="pn-card-sub">{{ tr('跳過封面、目次、封底不印頁碼') }}</span>
     </div>
     <div class="pn-row">
       <div class="pn-field">
-        <label for="fromPage">從第幾頁</label>
+        <label for="fromPage">{{ tr('從第幾頁') }}</label>
         <input id="fromPage" class="field pn-num" type="number" value="1" min="1" step="1" />
       </div>
       <div class="pn-field">
-        <label for="toPage">到第幾頁</label>
+        <label for="toPage">{{ tr('到第幾頁') }}</label>
         <input id="toPage" class="field pn-num" type="number" value="0" min="0" step="1" />
-        <small class="muted">0 = 到最後一頁</small>
+        <small class="muted">{{ tr('0 = 到最後一頁') }}</small>
       </div>
       <div class="pn-field">
-        <label for="start">起始頁碼</label>
+        <label for="start">{{ tr('起始頁碼') }}</label>
         <input id="start" class="field pn-num" type="number" value="1" min="0" step="1" />
       </div>
     </div>
@@ -40,8 +40,8 @@
 
   <div class="pn-card">
     <div class="pn-card-head">
-      <span class="pn-card-title">位置</span>
-      <span class="pn-card-sub" id="posLabel">右下</span>
+      <span class="pn-card-title">{{ tr('位置') }}</span>
+      <span class="pn-card-sub" id="posLabel">{{ tr('右下') }}</span>
     </div>
     <div class="pn-poschooser" role="radiogroup" aria-label="頁碼位置">
       <button type="button" class="pn-posbtn" data-pos="tl" title="左上"><span class="pn-posdot"></span></button>
@@ -56,7 +56,7 @@
 
   <div class="pn-card">
     <div class="pn-card-head">
-      <span class="pn-card-title">顯示格式</span>
+      <span class="pn-card-title">{{ tr('顯示格式') }}</span>
     </div>
     <div class="pn-chips" role="group" aria-label="格式快選">
       <button type="button" class="pn-chip" data-fmt="{n}">{n}</button>
@@ -68,29 +68,29 @@
       <button type="button" class="pn-chip" data-fmt="Page {n} of {N}">Page {n} of {N}</button>
     </div>
     <input id="fmt" class="field pn-fmt-input" type="text" value="{n} / {N}" />
-    <small class="muted pn-fmt-hint"><code>{n}</code> = 目前頁碼　<code>{N}</code> = 會印頁碼的總頁數</small>
+    <small class="muted pn-fmt-hint"><code>{n}</code> {{ tr('= 目前頁碼') }}　<code>{N}</code> {{ tr('= 會印頁碼的總頁數') }}</small>
   </div>
 
   <div class="pn-card">
     <div class="pn-card-head">
-      <span class="pn-card-title">樣式</span>
+      <span class="pn-card-title">{{ tr('樣式') }}</span>
     </div>
 
     <div class="pn-slider-row">
-      <label for="size">字級</label>
+      <label for="size">{{ tr('字級') }}</label>
       <input id="size" type="range" min="6" max="48" step="0.5" value="11" />
       <output class="pn-slider-val"><span id="sizeVal">11</span> pt</output>
       <div class="pn-size-preview" id="sizePreview">12</div>
     </div>
 
     <div class="pn-slider-row">
-      <label for="margin">邊距</label>
+      <label for="margin">{{ tr('邊距') }}</label>
       <input id="margin" type="range" min="0" max="60" step="1" value="10" />
       <output class="pn-slider-val"><span id="marginVal">10</span> mm</output>
     </div>
 
     <div class="pn-color-row">
-      <label>字型顏色</label>
+      <label>{{ tr('字型顏色') }}</label>
       <div class="pn-swatches" role="radiogroup" aria-label="常用顏色">
         <button type="button" class="pn-swatch pn-swatch-active" data-color="#000000" data-s="s33e84a5f" title="黑"></button>
         <button type="button" class="pn-swatch" data-color="#4b5563" data-s="sdc660356" title="深灰"></button>
@@ -109,13 +109,13 @@
 </div>
 
 <details class="panel" id="thumbs-panel" hidden open>
-  <summary>頁面預覽 <span class="muted" id="thumbs-info" data-s="s5af60f7e">—</span></summary>
-  <p class="muted" data-s="s6b9c179a">縮圖直接顯示套用後的真實效果；改設定會即時重新渲染。點縮圖可放大檢視。</p>
+  <summary>{{ tr('頁面預覽') }} <span class="muted" id="thumbs-info" data-s="s5af60f7e">—</span></summary>
+  <p class="muted" data-s="s6b9c179a">{{ tr('縮圖直接顯示套用後的真實效果；改設定會即時重新渲染。點縮圖可放大檢視。') }}</p>
   <div class="page-grid" id="thumb-grid"></div>
 </details>
 
 <div data-s="s002535c2">
-  <button class="btn btn-primary" id="btn-submit">{{ icon('save') }}插入頁碼</button>
+  <button class="btn btn-primary" id="btn-submit">{{ icon('save') }}{{ tr('插入頁碼') }}</button>
 </div>
 <div data-s="s5371db16">
   {% with progress_id='jp' %}{% include "components/job_progress.html" %}{% endwith %}

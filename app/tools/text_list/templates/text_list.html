@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}清單處理 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('清單處理') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .tl-input-area { width: 100%; min-height: 220px; max-height: 480px;
@@ -180,37 +180,37 @@
 {% endblock %}
 
 {% block content %}
-<h1>{{ icon('list', size=22) }} 清單處理</h1>
-<p class="muted">把每行文字當一筆資料。可貼上文字或上傳 .txt / .csv / .xlsx / .docx / .pdf 等檔案，依序套用排序 / 去重 / 篩選等操作。</p>
+<h1>{{ icon('list', size=22) }} {{ tr('清單處理') }}</h1>
+<p class="muted">{{ tr('把每行文字當一筆資料。可貼上文字或上傳 .txt / .csv / .xlsx / .docx / .pdf 等檔案，依序套用排序 / 去重 / 篩選等操作。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 輸入清單</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 輸入清單') }}</h2>
   <textarea class="tl-input-area" id="inputArea" spellcheck="false"
     placeholder="貼上文字（每行一筆），或把檔案拖進來 .txt .csv .tsv .md .log .xlsx .ods .docx .odt .pdf …"></textarea>
   <div class="tl-meta">
-    <span id="inputMeta">0 行 · 0 字</span>
+    <span id="inputMeta">{{ tr('0 行 · 0 字') }}</span>
     <span id="loadedFile" data-s="sd4ac9708"></span>
     <span data-s="s40992687">
       <label class="tl-mini-btn" data-s="sb202c6d4">
-        {{ icon('paperclip', size=12) }} 上傳檔案
+        {{ icon('paperclip', size=12) }} {{ tr('上傳檔案') }}
         <input type="file" id="filePicker" hidden
           accept=".txt,.csv,.tsv,.md,.markdown,.log,.json,.yaml,.yml,.ini,.conf,.xlsx,.ods,.docx,.odt,.pdf">
       </label>
-      {% if workspace_enabled(request) %}<button type="button" class="tl-mini-btn" id="wsLoadBtn">{{ icon('archive', size=12) }} 從工作區載入</button>{% endif %}
-      <button type="button" class="tl-mini-btn" id="btnClearInput">清空</button>
+      {% if workspace_enabled(request) %}<button type="button" class="tl-mini-btn" id="wsLoadBtn">{{ icon('archive', size=12) }} {{ tr('從工作區載入') }}</button>{% endif %}
+      <button type="button" class="tl-mini-btn" id="btnClearInput">{{ tr('清空') }}</button>
     </span>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 操作（勾選會依序套用，拖曳可改變順序）</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 操作（勾選會依序套用，拖曳可改變順序）') }}</h2>
   <div class="tl-ops">
     <svg class="tl-connectors" xmlns="http://www.w3.org/2000/svg"></svg>
     <div class="tl-op" data-op="trim">
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle>
-        {{ icon('crop', size=14) }} Trim 前後空白
+        {{ icon('crop', size=14) }} {{ tr('Trim 前後空白') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -224,7 +224,7 @@
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle checked>
-        {{ icon('trash', size= 14) }} 移除空行
+        {{ icon('trash', size= 14) }} {{ tr('移除空行') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -238,7 +238,7 @@
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle>
-        {{ icon('layers', size= 14) }} 去重複
+        {{ icon('layers', size= 14) }} {{ tr('去重複') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -249,18 +249,18 @@
     </div>
       <div class="sub">
         <select data-param="keep">
-          <option value="first">保留首次出現</option>
-          <option value="last">保留最後出現</option>
-          <option value="count">改列出次數</option>
+          <option value="first">{{ tr('保留首次出現') }}</option>
+          <option value="last">{{ tr('保留最後出現') }}</option>
+          <option value="count">{{ tr('改列出次數') }}</option>
         </select>
-        <label><input type="checkbox" data-param="case_insensitive"> 不分大小寫</label>
+        <label><input type="checkbox" data-param="case_insensitive"> {{ tr('不分大小寫') }}</label>
       </div>
     </div>
     <div class="tl-op" data-op="sort">
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle>
-        {{ icon('chart-bar', size= 14) }} 排序
+        {{ icon('chart-bar', size= 14) }} {{ tr('排序') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -271,18 +271,18 @@
     </div>
       <div class="sub">
         <select data-param="order">
-          <option value="asc">升序 A→Z</option>
-          <option value="desc">降序 Z→A</option>
+          <option value="asc">{{ tr('升序 A→Z') }}</option>
+          <option value="desc">{{ tr('降序 Z→A') }}</option>
         </select>
-        <label><input type="checkbox" data-param="natural" checked> 數字感知</label>
-        <label><input type="checkbox" data-param="case_insensitive"> 不分大小寫</label>
+        <label><input type="checkbox" data-param="natural" checked> {{ tr('數字感知') }}</label>
+        <label><input type="checkbox" data-param="case_insensitive"> {{ tr('不分大小寫') }}</label>
       </div>
     </div>
     <div class="tl-op" data-op="reverse">
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle>
-        {{ icon('rotate-180', size= 14) }} 反轉順序
+        {{ icon('rotate-180', size= 14) }} {{ tr('反轉順序') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -296,7 +296,7 @@
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle>
-        {{ icon('dice', size= 14) }} 隨機洗牌
+        {{ icon('dice', size= 14) }} {{ tr('隨機洗牌') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -310,7 +310,7 @@
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle>
-        {{ icon('text', size= 14) }} 大小寫轉換
+        {{ icon('text', size= 14) }} {{ tr('大小寫轉換') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -321,9 +321,9 @@
     </div>
       <div class="sub">
         <select data-param="mode">
-          <option value="lower">全部小寫</option>
-          <option value="upper">全部大寫</option>
-          <option value="title">每字首大寫</option>
+          <option value="lower">{{ tr('全部小寫') }}</option>
+          <option value="upper">{{ tr('全部大寫') }}</option>
+          <option value="title">{{ tr('每字首大寫') }}</option>
         </select>
       </div>
     </div>
@@ -331,7 +331,7 @@
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle>
-        {{ icon('search', size= 14) }} 篩選
+        {{ icon('search', size= 14) }} {{ tr('篩選') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -342,19 +342,19 @@
     </div>
       <div class="sub">
         <select data-param="mode">
-          <option value="include">包含</option>
-          <option value="exclude">不包含</option>
+          <option value="include">{{ tr('包含') }}</option>
+          <option value="exclude">{{ tr('不包含') }}</option>
         </select>
         <input type="text" data-param="pattern" placeholder="關鍵字 / regex">
         <label><input type="checkbox" data-param="regex"> regex</label>
-        <label><input type="checkbox" data-param="case_insensitive"> 不分大小寫</label>
+        <label><input type="checkbox" data-param="case_insensitive"> {{ tr('不分大小寫') }}</label>
       </div>
     </div>
     <div class="tl-op" data-op="head">
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle>
-        {{ icon('align-tl', size= 14) }} 取前 N 筆
+        {{ icon('align-tl', size= 14) }} {{ tr('取前 N 筆') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -371,7 +371,7 @@
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle>
-        {{ icon('align-bl', size= 14) }} 取後 N 筆
+        {{ icon('align-bl', size= 14) }} {{ tr('取後 N 筆') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -388,7 +388,7 @@
       <div class="head-row">
       <label class="head">
         <input type="checkbox" data-op-toggle>
-        {{ icon('paragraph', size= 14) }} 加前 / 後綴
+        {{ icon('paragraph', size= 14) }} {{ tr('加前 / 後綴') }}
       </label>
       <span class="order-ctl">
         <span class="order-num">–</span>
@@ -404,24 +404,24 @@
     </div>
   </div>
   <div data-s="s5371db16">
-    <button class="btn btn-primary" id="btnRun">{{ icon('play', size=14) }} 執行</button>
+    <button class="btn btn-primary" id="btnRun">{{ icon('play', size=14) }} {{ tr('執行') }}</button>
     <span id="status" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 data-s="s53896af7">3. 結果</h2>
+  <h2 data-s="s53896af7">{{ tr('3. 結果') }}</h2>
   <div class="tl-result-toolbar">
     <div class="stats" id="resultStats">—</div>
     <div class="right">
-      <button type="button" class="tl-copy-big" id="btnCopyAll">{{ icon('copy', size=14) }} 全部複製</button>
+      <button type="button" class="tl-copy-big" id="btnCopyAll">{{ icon('copy', size=14) }} {{ tr('全部複製') }}</button>
       <span class="tl-export-wrap">
         <button type="button" class="tl-mini-btn" id="btnExport" data-s="sfd546464">
-          {{ icon('download', size=12) }} 下載 ▾
+          {{ icon('download', size=12) }} {{ tr('下載 ▾') }}
         </button>
         <span class="tl-export-menu" id="exportMenu" hidden>
-          <button data-fmt="txt">.txt 純文字</button>
-          <button data-fmt="csv">.csv 試算表</button>
+          <button data-fmt="txt">{{ tr('.txt 純文字') }}</button>
+          <button data-fmt="csv">{{ tr('.csv 試算表') }}</button>
           <button data-fmt="xlsx">.xlsx Excel</button>
         </span>
       </span>

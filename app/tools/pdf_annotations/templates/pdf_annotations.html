@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
 {% from "components/llm_gate.html" import llm_gate, llm_gate_styles with context %}
-{% block title %}註解整理 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('註解整理') }} · {{ app_name }}{% endblock %}
 {% block head %}
 {{ llm_gate_styles() }}
 <style nonce="{{ request.state.csp_nonce }}">
@@ -82,11 +82,11 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('sticky-note', size=22) }} 註解整理</h1>
-<p class="muted">擷取 PDF 中所有註解(螢光筆 / 文字註解 / 圖章 / 自由文字 / 手繪 …)，依需求輸出完整清單、審閱報告或待辦清單。</p>
+<h1>{{ icon('sticky-note', size=22) }} {{ tr('註解整理') }}</h1>
+<p class="muted">{{ tr('擷取 PDF 中所有註解(螢光筆 / 文字註解 / 圖章 / 自由文字 / 手繪 …)，依需求輸出完整清單、審閱報告或待辦清單。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 上傳 PDF') }}</h2>
   {% with upload_id='anUp', accept='application/pdf' %}{% include "components/file_upload.html" %}{% endwith %}
 
   {{ llm_gate('pdf-annotations', llm_enabled, llm_model, mode='augment',
@@ -95,7 +95,7 @@
               input_id='anLlmGroup') }}
 
   <div id="anLoading" class="muted" data-s="s5d8b4b19" hidden>
-    {{ icon('refresh', size=14) }} 分析中…
+    {{ icon('refresh', size=14) }} {{ tr('分析中…') }}
   </div>
   <div id="anError" class="an-warn" hidden></div>
 </div>
@@ -103,45 +103,45 @@
 <div id="anResults" hidden>
 
 <div class="panel">
-  <h2 data-s="s53896af7">統計總覽 <span class="muted" data-s="sbee7077a" id="anFile"></span></h2>
+  <h2 data-s="s53896af7">{{ tr('統計總覽') }} <span class="muted" data-s="sbee7077a" id="anFile"></span></h2>
   <div class="an-stats">
-    <div class="an-stat an-stat-1"><div class="lbl">註解總數</div><div class="val" id="sTotal">—</div></div>
-    <div class="an-stat an-stat-2"><div class="lbl">頁數</div><div class="val" id="sPages">—</div></div>
-    <div class="an-stat an-stat-3"><div class="lbl">含註解的頁</div><div class="val" id="sPagesAnn">—</div></div>
-    <div class="an-stat an-stat-4"><div class="lbl">作者數</div><div class="val" id="sAuthors">—</div></div>
+    <div class="an-stat an-stat-1"><div class="lbl">{{ tr('註解總數') }}</div><div class="val" id="sTotal">—</div></div>
+    <div class="an-stat an-stat-2"><div class="lbl">{{ tr('頁數') }}</div><div class="val" id="sPages">—</div></div>
+    <div class="an-stat an-stat-3"><div class="lbl">{{ tr('含註解的頁') }}</div><div class="val" id="sPagesAnn">—</div></div>
+    <div class="an-stat an-stat-4"><div class="lbl">{{ tr('作者數') }}</div><div class="val" id="sAuthors">—</div></div>
   </div>
 
   <div class="an-filters">
     <div class="an-filter">
-      <h4>類型篩選 (按一下切換)</h4>
+      <h4>{{ tr('類型篩選 (按一下切換)') }}</h4>
       <div class="an-chips" id="filterTypes"></div>
     </div>
     <div class="an-filter">
-      <h4>作者篩選</h4>
+      <h4>{{ tr('作者篩選') }}</h4>
       <div class="an-chips" id="filterAuthors"></div>
     </div>
   </div>
 
-  <h4 data-s="sb912b7d1">分組顯示與報告</h4>
+  <h4 data-s="sb912b7d1">{{ tr('分組顯示與報告') }}</h4>
   <div class="an-modes">
-    <button class="an-mode active" data-group="page">依頁碼</button>
-    <button class="an-mode" data-group="author">依作者</button>
-    <button class="an-mode" data-group="type">依類型</button>
+    <button class="an-mode active" data-group="page">{{ tr('依頁碼') }}</button>
+    <button class="an-mode" data-group="author">{{ tr('依作者') }}</button>
+    <button class="an-mode" data-group="type">{{ tr('依類型') }}</button>
   </div>
 
   <div class="an-export">
-    <button class="btn" id="btnCsv">{{ icon('download', size=12) }} 完整清單 CSV</button>
-    <button class="btn" id="btnJson">{{ icon('download', size=12) }} 完整清單 JSON</button>
-    <button class="btn" id="btnReview">{{ icon('download', size=12) }} 審閱報告 (Markdown)</button>
-    <button class="btn" id="btnTodoMd">{{ icon('download', size=12) }} 待辦清單 (Markdown)</button>
-    <button class="btn" id="btnTodoCsv">{{ icon('download', size=12) }} 待辦清單 CSV</button>
+    <button class="btn" id="btnCsv">{{ icon('download', size=12) }} {{ tr('完整清單 CSV') }}</button>
+    <button class="btn" id="btnJson">{{ icon('download', size=12) }} {{ tr('完整清單 JSON') }}</button>
+    <button class="btn" id="btnReview">{{ icon('download', size=12) }} {{ tr('審閱報告 (Markdown)') }}</button>
+    <button class="btn" id="btnTodoMd">{{ icon('download', size=12) }} {{ tr('待辦清單 (Markdown)') }}</button>
+    <button class="btn" id="btnTodoCsv">{{ icon('download', size=12) }} {{ tr('待辦清單 CSV') }}</button>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">註解明細 <span class="muted" data-s="sbee7077a" id="anCount"></span></h2>
+  <h2 data-s="s53896af7">{{ tr('註解明細') }} <span class="muted" data-s="sbee7077a" id="anCount"></span></h2>
   <div id="anList" class="an-list"></div>
-  <div id="anListEmpty" class="an-empty" hidden>沒有符合篩選的註解</div>
+  <div id="anListEmpty" class="an-empty" hidden>{{ tr('沒有符合篩選的註解') }}</div>
 </div>
 
 </div>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}PDF 附件萃取 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('PDF 附件萃取') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .att-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
@@ -12,30 +12,30 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('paperclip', size=22) }} PDF 附件萃取</h1>
-<p class="muted">列出 PDF 中嵌入的檔案；可個別下載、打包下載、或移除所有附件產生乾淨副本。<b data-s="s53875d1b">⚠ 附件可能含可執行檔；下載後請勿直接開啟，先掃毒。</b></p>
+<h1>{{ icon('paperclip', size=22) }} {{ tr('PDF 附件萃取') }}</h1>
+<p class="muted">{{ tr('列出 PDF 中嵌入的檔案；可個別下載、打包下載、或移除所有附件產生乾淨副本。') }}<b data-s="s53875d1b">{{ tr('⚠ 附件可能含可執行檔；下載後請勿直接開啟，先掃毒。') }}</b></p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 上傳 PDF') }}</h2>
   {% with upload_id='attUp', accept='application/pdf' %}{% include "components/file_upload.html" %}{% endwith %}
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 data-s="s53896af7">2. 附件清單</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 附件清單') }}</h2>
   <div id="attInfo" class="muted" data-s="s3044b600"></div>
   <table class="att-table" id="attTable" hidden>
     <thead><tr>
       <th data-s="s342efe44"><input type="checkbox" id="selAll" checked></th>
-      <th>檔名</th>
-      <th>大小</th>
-      <th>建立時間</th>
-      <th data-s="sf6e3d7fe">單檔下載</th>
+      <th>{{ tr('檔名') }}</th>
+      <th>{{ tr('大小') }}</th>
+      <th>{{ tr('建立時間') }}</th>
+      <th data-s="sf6e3d7fe">{{ tr('單檔下載') }}</th>
     </tr></thead>
     <tbody id="attBody"></tbody>
   </table>
   <div data-s="sadf49f30">
-    <button class="btn btn-primary" id="btnZip" hidden>{{ icon('download') }} 打包下載勾選項目</button>
-    <button class="btn" id="btnStrip" hidden>{{ icon('trash', size=14) }} 產生無附件副本</button>
+    <button class="btn btn-primary" id="btnZip" hidden>{{ icon('download') }} {{ tr('打包下載勾選項目') }}</button>
+    <button class="btn" id="btnStrip" hidden>{{ icon('trash', size=14) }} {{ tr('產生無附件副本') }}</button>
     <span id="status" class="muted" data-s="sea8bbc82"></span>
   </div>
 </div>

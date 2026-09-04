@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}辦公文件轉 PDF · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('辦公文件轉 PDF') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('page', size=22) }} 辦公文件轉 PDF</h1>
-<p class="muted">把<b>辦公文件</b>（.doc .docx .xls .xlsx .ppt .pptx .odt .ods .odp .rtf .csv .txt）批次轉成 PDF。
-若同一批裡夾帶 PDF 也會原樣帶過。需要 LibreOffice / OxOffice 已安裝。</p>
+<h1>{{ icon('page', size=22) }} {{ tr('辦公文件轉 PDF') }}</h1>
+<p class="muted">{{ tr('把') }}<b>{{ tr('辦公文件') }}</b>{{ tr('（.doc .docx .xls .xlsx .ppt .pptx .odt .ods .odp .rtf .csv .txt）批次轉成 PDF。
+若同一批裡夾帶 PDF 也會原樣帶過。需要 LibreOffice / OxOffice 已安裝。') }}</p>
 <div class="panel">
-  <h2 data-s="s53896af7">上傳檔案（可多檔）</h2>
+  <h2 data-s="s53896af7">{{ tr('上傳檔案（可多檔）') }}</h2>
   {% with upload_id='upO', accept=accept, multiple=True %}{% include "components/file_upload.html" %}{% endwith %}
-  <button class="btn btn-primary" id="btn-submit" data-s="s002535c2">{{ icon('save') }}開始轉檔</button>
+  <button class="btn btn-primary" id="btn-submit" data-s="s002535c2">{{ icon('save') }}{{ tr('開始轉檔') }}</button>
   {% with progress_id='jp' %}{% include "components/job_progress.html" %}{% endwith %}
 </div>
 {% endblock %}

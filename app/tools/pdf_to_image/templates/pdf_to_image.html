@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}辦公文件轉圖片 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('辦公文件轉圖片') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .p2i-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -39,54 +39,54 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('image', size=22) }} 辦公文件轉圖片</h1>
-<p class="muted">把 PDF 或<b>辦公文件</b>每一頁轉成 PNG 圖片。非 PDF 會先自動轉成 PDF 再轉圖。單頁直接下載 PNG、多頁自動打包 ZIP。</p>
+<h1>{{ icon('image', size=22) }} {{ tr('辦公文件轉圖片') }}</h1>
+<p class="muted">{{ tr('把 PDF 或') }}<b>{{ tr('辦公文件') }}</b>{{ tr('每一頁轉成 PNG 圖片。非 PDF 會先自動轉成 PDF 再轉圖。單頁直接下載 PNG、多頁自動打包 ZIP。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 設定</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 設定') }}</h2>
   <div class="form-row">
-    <label>解析度（DPI）</label>
+    <label>{{ tr('解析度（DPI）') }}</label>
     <div class="field option-cards">
       <label class="option-card">
         <span class="opt-ic">{{ icon('image', size=24) }}</span>
         <span class="opt-label">100</span>
-        <span class="opt-desc">草稿 · 小檔</span>
+        <span class="opt-desc">{{ tr('草稿 · 小檔') }}</span>
         <input type="radio" name="p2iDpi" value="100">
       </label>
       <label class="option-card">
         <span class="opt-ic">{{ icon('image', size=24) }}</span>
         <span class="opt-label">150</span>
-        <span class="opt-desc">螢幕一般</span>
+        <span class="opt-desc">{{ tr('螢幕一般') }}</span>
         <input type="radio" name="p2iDpi" value="150">
       </label>
       <label class="option-card">
         <span class="opt-ic">{{ icon('image', size=24) }}</span>
         <span class="opt-label">200</span>
-        <span class="opt-desc">螢幕高畫質 · 預設</span>
+        <span class="opt-desc">{{ tr('螢幕高畫質 · 預設') }}</span>
         <input type="radio" name="p2iDpi" value="200" checked>
       </label>
       <label class="option-card">
         <span class="opt-ic">{{ icon('image', size=24) }}</span>
         <span class="opt-label">300</span>
-        <span class="opt-desc">印刷</span>
+        <span class="opt-desc">{{ tr('印刷') }}</span>
         <input type="radio" name="p2iDpi" value="300">
       </label>
       <label class="option-card">
         <span class="opt-ic">{{ icon('image', size=24) }}</span>
         <span class="opt-label">400</span>
-        <span class="opt-desc">高 DPI · 檔最大</span>
+        <span class="opt-desc">{{ tr('高 DPI · 檔最大') }}</span>
         <input type="radio" name="p2iDpi" value="400">
       </label>
     </div>
   </div>
-  <div class="muted" data-s="s789d4caf">DPI 越高每張圖檔越大、轉檔越慢。100 約幾十 KB / 頁，400 可能達 5 MB / 頁。</div>
+  <div class="muted" data-s="s789d4caf">{{ tr('DPI 越高每張圖檔越大、轉檔越慢。100 約幾十 KB / 頁，400 可能達 5 MB / 頁。') }}</div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 上傳檔案</h2>
-  {% with upload_id='p2iUpload', accept='application/pdf,.pdf,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.csv', hint='支援 PDF 與辦公文件；非 PDF 會先自動轉成 PDF。' %}{% include "components/file_upload.html" %}{% endwith %}
+  <h2 data-s="s53896af7">{{ tr('2. 上傳檔案') }}</h2>
+  {% with upload_id='p2iUpload', accept='application/pdf,.pdf,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.csv', hint=tr('支援 PDF 與辦公文件；非 PDF 會先自動轉成 PDF。') %}{% include "components/file_upload.html" %}{% endwith %}
   <div id="p2iProgress" class="p2i-progress" hidden>
-    <span id="p2iProgressLabel" data-s="sf072decd">準備中…</span>
+    <span id="p2iProgressLabel" data-s="sf072decd">{{ tr('準備中…') }}</span>
     <div class="p2i-progress-bar"><div class="p2i-progress-fill" id="p2iProgressFill"></div></div>
     <span class="p2i-progress-pct" id="p2iProgressPct">0%</span>
   </div>
@@ -94,10 +94,10 @@
 
 <div class="panel" id="p2iResultPanel" hidden>
   <div data-s="s517f74ba">
-    <h2 data-s="s1386d503">預覽（<span id="p2iPageCount">0</span> 頁，總 <span id="p2iTotalSize">—</span>）</h2>
+    <h2 data-s="s1386d503">{{ tr('預覽（') }}<span id="p2iPageCount">0</span> {{ tr('頁，總') }} <span id="p2iTotalSize">—</span>）</h2>
     <div data-s="s38861b51">
-      {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden>{{ icon('archive') }} 存至工作區</button>{% endif %}
-      <a class="btn btn-primary" id="p2iBtnDownload" href="#">{{ icon('download') }} 下載</a>
+      {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden>{{ icon('archive') }} {{ tr('存至工作區') }}</button>{% endif %}
+      <a class="btn btn-primary" id="p2iBtnDownload" href="#">{{ icon('download') }} {{ tr('下載') }}</a>
     </div>
   </div>
   <div class="p2i-status" id="p2iStatus"></div>

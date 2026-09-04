@@ -1,31 +1,31 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}頁面加框 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('頁面加框') }} · {{ app_name }}{% endblock %}
 
 {% block content %}
-<h1>{{ icon('border', size=22) }} 頁面加框</h1>
-<p class="muted">替每一頁加上框線。<b>投影片加外框</b>最常用；也可以用在文件、講義與獎狀。
-上傳 <b>PDF</b> 或<b>辦公文件</b>，輸出一律是 PDF。</p>
+<h1>{{ icon('border', size=22) }} {{ tr('頁面加框') }}</h1>
+<p class="muted">{{ tr('替每一頁加上框線。') }}<b>{{ tr('投影片加外框') }}</b>{{ tr('最常用；也可以用在文件、講義與獎狀。
+上傳') }} <b>PDF</b> {{ tr('或') }}<b>{{ tr('辦公文件') }}</b>{{ tr('，輸出一律是 PDF。') }}</p>
 
 <div class="panel">
-  <h2>1. 上傳檔案</h2>
+  <h2>{{ tr('1. 上傳檔案') }}</h2>
   {% with upload_id='bdUpload',
           accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
-          hint='單檔。辦公文件會先自動轉成 PDF 再加框。' %}
+          hint=tr('單檔。辦公文件會先自動轉成 PDF 再加框。') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div class="bd-stat" id="bdStat" hidden>
-    <span class="bd-kv">檔案 <b id="bdName">-</b></span>
-    <span class="bd-kv">頁數 <b id="bdPages">-</b></span>
-    <span class="bd-kv" id="bdConvKv" hidden>{{ icon('info', size=13) }} 已由辦公文件轉成 PDF</span>
+    <span class="bd-kv">{{ tr('檔案') }} <b id="bdName">-</b></span>
+    <span class="bd-kv">{{ tr('頁數') }} <b id="bdPages">-</b></span>
+    <span class="bd-kv" id="bdConvKv" hidden>{{ icon('info', size=13) }} {{ tr('已由辦公文件轉成 PDF') }}</span>
   </div>
 </div>
 
 <div class="panel auth-form" id="bdOpts" hidden>
-  <h2>2. 框線設定</h2>
+  <h2>{{ tr('2. 框線設定') }}</h2>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('crop', size=14) }} 位置</legend>
+    <legend>{{ icon('crop', size=14) }} {{ tr('位置') }}</legend>
     <div class="bd-modes">
       <label class="bd-mode">
         <input type="radio" name="bdmode" value="page" checked>
@@ -39,8 +39,8 @@
             <rect x="22" y="35" width="68" height="5" rx="1" class="fig-ink2"/>
             <rect x="22" y="45" width="54" height="5" rx="1" class="fig-ink2"/>
           </svg>
-          <b>自頁緣內縮</b>
-          <small>框線離<b>頁面邊緣</b>固定距離，每頁位置完全一致 —— 投影片加外框用這個。</small>
+          <b>{{ tr('自頁緣內縮') }}</b>
+          <small>{{ tr('框線離') }}<b>{{ tr('頁面邊緣') }}</b>{{ tr('固定距離，每頁位置完全一致 —— 投影片加外框用這個。') }}</small>
         </span>
       </label>
       <label class="bd-mode">
@@ -53,130 +53,130 @@
             <rect x="25" y="37" width="46" height="5" rx="1" class="fig-ink2"/>
             <rect x="25" y="47" width="30" height="5" rx="1" class="fig-ink2"/>
           </svg>
-          <b>貼齊內容</b>
-          <small>框線包住該頁<b>實際內容</b>，內容多寡不同時每頁位置也不同。</small>
+          <b>{{ tr('貼齊內容') }}</b>
+          <small>{{ tr('框線包住該頁') }}<b>{{ tr('實際內容') }}</b>{{ tr('，內容多寡不同時每頁位置也不同。') }}</small>
         </span>
       </label>
     </div>
     <div class="auth-field">
-      <label class="af-label" for="bdMargin">邊距（mm）</label>
+      <label class="af-label" for="bdMargin">{{ tr('邊距（mm）') }}</label>
       <input class="field bd-num" type="number" id="bdMargin" min="0" max="100" step="0.5" value="5">
-      <div class="af-hint" id="bdMarginHint">框線距離頁面邊緣多遠。</div>
+      <div class="af-hint" id="bdMarginHint">{{ tr('框線距離頁面邊緣多遠。') }}</div>
     </div>
   </fieldset>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('edit', size=14) }} 線條</legend>
+    <legend>{{ icon('edit', size=14) }} {{ tr('線條') }}</legend>
     <div class="af-attrs">
       <div class="auth-field">
-        <label class="af-label" for="bdWidth">粗細（pt）</label>
+        <label class="af-label" for="bdWidth">{{ tr('粗細（pt）') }}</label>
         <input class="field bd-num" type="number" id="bdWidth" min="0.1" max="72" step="0.1" value="1.5">
-        <div class="af-hint">上限 72pt（1 英寸）；小尺寸頁面會再依該頁短邊自動收斂。</div>
+        <div class="af-hint">{{ tr('上限 72pt（1 英寸）；小尺寸頁面會再依該頁短邊自動收斂。') }}</div>
       </div>
       <div class="auth-field">
-        <label class="af-label" for="bdStyle">線型</label>
+        <label class="af-label" for="bdStyle">{{ tr('線型') }}</label>
         <select class="field" id="bdStyle">
-          <option value="solid">實線</option>
-          <option value="dashed">虛線</option>
-          <option value="dotted">點線</option>
+          <option value="solid">{{ tr('實線') }}</option>
+          <option value="dashed">{{ tr('虛線') }}</option>
+          <option value="dotted">{{ tr('點線') }}</option>
         </select>
       </div>
       <div class="auth-field">
-        <label class="af-label" for="bdColor">顏色</label>
+        <label class="af-label" for="bdColor">{{ tr('顏色') }}</label>
         <div class="bd-color-row">
           <input type="color" id="bdColor" value="#333333">
           <input class="field bd-hex" type="text" id="bdColorHex" value="#333333" maxlength="7" spellcheck="false">
         </div>
       </div>
       <div class="auth-field">
-        <label class="af-label" for="bdRadius">圓角半徑（mm）</label>
+        <label class="af-label" for="bdRadius">{{ tr('圓角半徑（mm）') }}</label>
         <input class="field bd-num" type="number" id="bdRadius" min="0" max="50" step="0.5" value="0">
-        <div class="af-hint">0 = 直角。</div>
+        <div class="af-hint">{{ tr('0 = 直角。') }}</div>
       </div>
       <div class="auth-field">
-        <label class="af-label" for="bdOpacity">不透明度</label>
+        <label class="af-label" for="bdOpacity">{{ tr('不透明度') }}</label>
         <input class="field bd-num" type="number" id="bdOpacity" min="5" max="100" step="5" value="100">
-        <div class="af-hint">100 = 完全不透明（%）。</div>
+        <div class="af-hint">{{ tr('100 = 完全不透明（%）。') }}</div>
       </div>
     </div>
   </fieldset>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('layers', size=14) }} 雙線與陰影</legend>
+    <legend>{{ icon('layers', size=14) }} {{ tr('雙線與陰影') }}</legend>
     <div class="af-checks bd-checks-row">
-      <label><input type="checkbox" id="bdDouble"> 內外雙框（獎狀 / 證書風格）</label>
-      <label><input type="checkbox" id="bdShadow"> 外側陰影</label>
+      <label><input type="checkbox" id="bdDouble"> {{ tr('內外雙框（獎狀 / 證書風格）') }}</label>
+      <label><input type="checkbox" id="bdShadow"> {{ tr('外側陰影') }}</label>
     </div>
     <div class="auth-field bd-sub" id="bdDoubleOpts" hidden>
-      <label class="af-label" for="bdGap">兩線間距（mm）</label>
+      <label class="af-label" for="bdGap">{{ tr('兩線間距（mm）') }}</label>
       <input class="field bd-num" type="number" id="bdGap" min="0.2" max="30" step="0.1" value="1.5">
     </div>
     <div class="bd-sub" id="bdShadowOpts" hidden>
       <div class="af-attrs">
         <div class="auth-field">
-          <label class="af-label" for="bdShColor">陰影顏色</label>
+          <label class="af-label" for="bdShColor">{{ tr('陰影顏色') }}</label>
           <div class="bd-color-row">
             <input type="color" id="bdShColor" value="#000000">
             <input class="field bd-hex" type="text" id="bdShColorHex" value="#000000" maxlength="7" spellcheck="false">
           </div>
         </div>
         <div class="auth-field">
-          <label class="af-label" for="bdShBlur">擴散（mm）</label>
+          <label class="af-label" for="bdShBlur">{{ tr('擴散（mm）') }}</label>
           <input class="field bd-num" type="number" id="bdShBlur" min="0" max="20" step="0.1" value="1.2">
         </div>
         <div class="auth-field">
-          <label class="af-label" for="bdShOffset">位移（mm）</label>
+          <label class="af-label" for="bdShOffset">{{ tr('位移（mm）') }}</label>
           <input class="field bd-num" type="number" id="bdShOffset" min="0" max="20" step="0.1" value="0.6">
         </div>
         <div class="auth-field">
-          <label class="af-label" for="bdShOpacity">濃度（%）</label>
+          <label class="af-label" for="bdShOpacity">{{ tr('濃度（%）') }}</label>
           <input class="field bd-num" type="number" id="bdShOpacity" min="0" max="100" step="5" value="25">
         </div>
       </div>
-      <div class="af-hint">PDF 沒有真正的模糊，陰影是用幾圈半透明筆畫疊出來的柔邊。</div>
+      <div class="af-hint">{{ tr('PDF 沒有真正的模糊，陰影是用幾圈半透明筆畫疊出來的柔邊。') }}</div>
     </div>
   </fieldset>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('pages', size=14) }} 套用範圍</legend>
+    <legend>{{ icon('pages', size=14) }} {{ tr('套用範圍') }}</legend>
     <div class="auth-field af-checks">
-      <label><input type="checkbox" id="bdSkipFirst"> 首頁不加框（投影片封面通常是滿版設計）</label>
+      <label><input type="checkbox" id="bdSkipFirst"> {{ tr('首頁不加框（投影片封面通常是滿版設計）') }}</label>
     </div>
     <div class="auth-field">
-      <label class="af-label" for="bdRange">指定頁面</label>
+      <label class="af-label" for="bdRange">{{ tr('指定頁面') }}</label>
       <input class="field" type="text" id="bdRange" placeholder="例：1,3,5-8（留空 = 全部）" spellcheck="false">
-      <div class="af-hint">留空代表每一頁都加。沒有被選到的頁在下方預覽會標示為「不加框」。</div>
+      <div class="af-hint">{{ tr('留空代表每一頁都加。沒有被選到的頁在下方預覽會標示為「不加框」。') }}</div>
     </div>
   </fieldset>
 
   <div class="bd-presets">
-    <span class="muted">快速套用：</span>
-    <button type="button" class="btn btn-small" data-preset="slide">投影片外框</button>
-    <button type="button" class="btn btn-small" data-preset="cert">獎狀雙框</button>
-    <button type="button" class="btn btn-small" data-preset="hairline">細灰線</button>
-    <button type="button" class="btn btn-small" data-preset="card">圓角卡片</button>
+    <span class="muted">{{ tr('快速套用：') }}</span>
+    <button type="button" class="btn btn-small" data-preset="slide">{{ tr('投影片外框') }}</button>
+    <button type="button" class="btn btn-small" data-preset="cert">{{ tr('獎狀雙框') }}</button>
+    <button type="button" class="btn btn-small" data-preset="hairline">{{ tr('細灰線') }}</button>
+    <button type="button" class="btn btn-small" data-preset="card">{{ tr('圓角卡片') }}</button>
   </div>
 </div>
 
 <div class="panel" id="bdPreviewPanel" hidden>
-  <h2>3. 預覽
+  <h2>{{ tr('3. 預覽') }}
     <span class="mj-count" id="bdPvCount"></span>
-    <span class="bd-pv-note muted" id="bdPvNote">設定改動後會自動重新產生</span>
+    <span class="bd-pv-note muted" id="bdPvNote">{{ tr('設定改動後會自動重新產生') }}</span>
   </h2>
   <div class="bd-grid" id="bdGrid"></div>
 </div>
 
 <div class="panel" id="bdRunPanel" hidden>
   <div class="bd-run">
-    <button class="btn btn-primary" id="bdGo">{{ icon('check', size=14) }} 產生加框 PDF</button>
+    <button class="btn btn-primary" id="bdGo">{{ icon('check', size=14) }} {{ tr('產生加框 PDF') }}</button>
     {% with progress_id='bdJob' %}{% include "components/job_progress.html" %}{% endwith %}
   </div>
   <div class="bd-result" id="bdResult" hidden>
-    <a class="btn btn-primary" id="bdDownload" download>{{ icon('download', size=14) }} 下載</a>
+    <a class="btn btn-primary" id="bdDownload" download>{{ icon('download', size=14) }} {{ tr('下載') }}</a>
     {% if workspace_enabled(request) %}
-    <button class="btn" type="button" id="bdSaveWs">{{ icon('archive', size=14) }} 存至工作區</button>
+    <button class="btn" type="button" id="bdSaveWs">{{ icon('archive', size=14) }} {{ tr('存至工作區') }}</button>
     {% endif %}
-    <span class="bd-done">{{ icon('check', size=14) }} <span id="bdDoneMsg">完成</span></span>
+    <span class="bd-done">{{ icon('check', size=14) }} <span id="bdDoneMsg">{{ tr('完成') }}</span></span>
   </div>
 </div>
 

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}多頁合併 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('多頁合併') }} · {{ app_name }}{% endblock %}
 {% block content %}
 <style nonce="{{ request.state.csp_nonce }}">
 .nup-hint { background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px;
@@ -55,23 +55,23 @@
 input.field { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
 </style>
 
-<h1>{{ icon('tile', size=22) }} 多頁合併（N-up）</h1>
-<p class="muted">把多頁 PDF 縮小排在同一張紙上，適合列印草稿 / 講義 / 對照閱讀。</p>
+<h1>{{ icon('tile', size=22) }} {{ tr('多頁合併（N-up）') }}</h1>
+<p class="muted">{{ tr('把多頁 PDF 縮小排在同一張紙上，適合列印草稿 / 講義 / 對照閱讀。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳檔案</h2>
-  {% with upload_id='nupUpload', accept='.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp', multiple=True, hint='支援多檔；多檔會依上傳順序接續排入格子' %}
+  <h2 data-s="s53896af7">{{ tr('1. 上傳檔案') }}</h2>
+  {% with upload_id='nupUpload', accept='.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp', multiple=True, hint=tr('支援多檔；多檔會依上傳順序接續排入格子') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div id="nupFilesInfo" class="nup-files-list" hidden></div>
 </div>
 
 <div class="panel" id="nupPanel" hidden>
-  <h2 data-s="s53896af7">2. 設定版面</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 設定版面') }}</h2>
   <div class="nup-layout">
     <div>
       <div class="nup-section">
-        <h3>每頁顯示張數</h3>
+        <h3>{{ tr('每頁顯示張數') }}</h3>
         <div class="nup-grid-cards" id="gridChips">
           {% for preset in [(1,2,'2','1×2'),(2,2,'4','2×2'),(2,3,'6','2×3'),(2,4,'8','2×4'),(3,3,'9','3×3'),(4,4,'16','4×4')] %}
           <div class="nup-grid-card {% if preset[0]==2 and preset[1]==2 %}active{% endif %}"
@@ -80,139 +80,139 @@ input.field { padding: 6px 10px; border: 1px solid var(--border); border-radius:
                  data-style="grid-template-columns: repeat({{ preset[0] }}, 1fr); grid-template-rows: repeat({{ preset[1] }}, 1fr);">
               {% for _ in range(preset[0] * preset[1]) %}<div></div>{% endfor %}
             </div>
-            <div class="nup-grid-label">{{ preset[2] }} 頁</div>
+            <div class="nup-grid-label">{{ preset[2] }} {{ tr('頁') }}</div>
             <div class="nup-grid-sub">{{ preset[3] }}</div>
           </div>
           {% endfor %}
         </div>
         <div data-s="s5371db16" class="nup-num-group">
-          自訂：
-          <input id="cols" class="nup-num" type="number" min="1" max="10" value="2"> 欄
-          ×
-          <input id="rows" class="nup-num" type="number" min="1" max="10" value="2"> 列
+          {{ tr('自訂：') }}
+          <input id="cols" class="nup-num" type="number" min="1" max="10" value="2"> {{ tr('欄
+          ×') }}
+          <input id="rows" class="nup-num" type="number" min="1" max="10" value="2"> {{ tr('列') }}
         </div>
       </div>
 
       <div class="nup-section">
-        <h3>紙張</h3>
+        <h3>{{ tr('紙張') }}</h3>
         <div class="nup-row">
-          <label>尺寸</label>
+          <label>{{ tr('尺寸') }}</label>
           <select id="paper" class="field">
             {% for p in paper_opts %}<option value="{{ p.key }}" {% if p.key=='a4' %}selected{% endif %}>{{ p.label }}</option>{% endfor %}
-            <option value="custom">自訂</option>
+            <option value="custom">{{ tr('自訂') }}</option>
           </select>
         </div>
         <div class="nup-row" id="customPaperRow" data-s="scb458930">
-          <label>自訂 (mm)</label>
+          <label>{{ tr('自訂 (mm)') }}</label>
           <div class="nup-num-group">
             <input id="paperW" class="nup-num" type="number" value="210"> ×
             <input id="paperH" class="nup-num" type="number" value="297">
           </div>
         </div>
         <div class="nup-row">
-          <label>方向</label>
+          <label>{{ tr('方向') }}</label>
           <div class="nup-radio-group">
-            <label><input type="radio" name="orient" value="auto" checked> 自動</label>
-            <label><input type="radio" name="orient" value="portrait"> 直式</label>
-            <label><input type="radio" name="orient" value="landscape"> 橫式</label>
+            <label><input type="radio" name="orient" value="auto" checked> {{ tr('自動') }}</label>
+            <label><input type="radio" name="orient" value="portrait"> {{ tr('直式') }}</label>
+            <label><input type="radio" name="orient" value="landscape"> {{ tr('橫式') }}</label>
           </div>
         </div>
       </div>
 
       <div class="nup-section">
-        <h3>排列</h3>
+        <h3>{{ tr('排列') }}</h3>
         <div class="nup-row">
-          <label>方向</label>
+          <label>{{ tr('方向') }}</label>
           <div class="nup-radio-group">
-            <label><input type="radio" name="direction" value="ltr" checked> 左→右</label>
-            <label><input type="radio" name="direction" value="ttb"> 上→下</label>
+            <label><input type="radio" name="direction" value="ltr" checked> {{ tr('左→右') }}</label>
+            <label><input type="radio" name="direction" value="ttb"> {{ tr('上→下') }}</label>
           </div>
         </div>
         <div class="nup-row">
-          <label>順序</label>
+          <label>{{ tr('順序') }}</label>
           <div class="nup-radio-group">
-            <label><input type="radio" name="reverse" value="false" checked> 正常</label>
-            <label><input type="radio" name="reverse" value="true"> 反向</label>
+            <label><input type="radio" name="reverse" value="false" checked> {{ tr('正常') }}</label>
+            <label><input type="radio" name="reverse" value="true"> {{ tr('反向') }}</label>
           </div>
         </div>
         <div class="nup-row">
-          <label>自動旋轉</label>
-          <label><input type="checkbox" id="autoRotate" checked> 依格子形狀自動旋轉來源頁</label>
+          <label>{{ tr('自動旋轉') }}</label>
+          <label><input type="checkbox" id="autoRotate" checked> {{ tr('依格子形狀自動旋轉來源頁') }}</label>
         </div>
         <div class="nup-row">
-          <label>對齊</label>
+          <label>{{ tr('對齊') }}</label>
           <div class="nup-radio-group">
-            <label><input type="radio" name="align" value="center" checked> 置中</label>
-            <label><input type="radio" name="align" value="left-top"> 左上</label>
+            <label><input type="radio" name="align" value="center" checked> {{ tr('置中') }}</label>
+            <label><input type="radio" name="align" value="left-top"> {{ tr('左上') }}</label>
           </div>
         </div>
       </div>
 
       <div class="nup-section">
-        <h3>邊距（mm）</h3>
+        <h3>{{ tr('邊距（mm）') }}</h3>
         <div class="nup-row">
-          <label>上 / 下</label>
+          <label>{{ tr('上 / 下') }}</label>
           <div class="nup-num-group">
             <input id="mTop" class="nup-num" type="number" value="10" min="0"> ·
             <input id="mBottom" class="nup-num" type="number" value="10" min="0">
           </div>
         </div>
         <div class="nup-row">
-          <label>左 / 右</label>
+          <label>{{ tr('左 / 右') }}</label>
           <div class="nup-num-group">
             <input id="mLeft" class="nup-num" type="number" value="10" min="0"> ·
             <input id="mRight" class="nup-num" type="number" value="10" min="0">
           </div>
         </div>
         <div class="nup-row">
-          <label>間距（mm）</label>
+          <label>{{ tr('間距（mm）') }}</label>
           <div class="nup-num-group">
-            <input id="gapX" class="nup-num" type="number" value="5" min="0"> 水平 ·
-            <input id="gapY" class="nup-num" type="number" value="5" min="0"> 垂直
+            <input id="gapX" class="nup-num" type="number" value="5" min="0"> {{ tr('水平 ·') }}
+            <input id="gapY" class="nup-num" type="number" value="5" min="0"> {{ tr('垂直') }}
           </div>
         </div>
       </div>
 
       <div class="nup-section">
-        <h3>邊框 / 裁切線 / 頁碼</h3>
+        <h3>{{ tr('邊框 / 裁切線 / 頁碼') }}</h3>
         <div class="nup-row">
-          <label><input type="checkbox" id="showBorder"> 顯示邊框</label>
+          <label><input type="checkbox" id="showBorder"> {{ tr('顯示邊框') }}</label>
           <div class="nup-num-group">
             <input id="borderW" class="nup-num" type="number" value="0.5" step="0.1" min="0"> pt
             <input id="borderC" type="color" value="#94a3b8" data-s="s91a3e648">
           </div>
         </div>
         <div class="nup-row">
-          <label><input type="checkbox" id="showPageNum"> 顯示頁碼</label>
+          <label><input type="checkbox" id="showPageNum"> {{ tr('顯示頁碼') }}</label>
           <div class="nup-num-group">
-            格式 <input id="pageNumFmt" class="field" type="text" value="{n}" data-s="s8db8d854">
+            {{ tr('格式') }} <input id="pageNumFmt" class="field" type="text" value="{n}" data-s="s8db8d854">
             <input id="pageNumSize" class="nup-num" type="number" value="8" step="1"> pt
           </div>
         </div>
         <div class="nup-row">
-          <label><input type="checkbox" id="showCrop"> 裁切線</label>
-          <div class="nup-num-group">長度 <input id="cropLen" class="nup-num" type="number" value="4"> mm</div>
+          <label><input type="checkbox" id="showCrop"> {{ tr('裁切線') }}</label>
+          <div class="nup-num-group">{{ tr('長度') }} <input id="cropLen" class="nup-num" type="number" value="4"> mm</div>
         </div>
         <div class="nup-row">
-          <label>空白補齊</label>
-          <label><input type="checkbox" id="padBlanks" checked> 不足格數時補空白頁</label>
+          <label>{{ tr('空白補齊') }}</label>
+          <label><input type="checkbox" id="padBlanks" checked> {{ tr('不足格數時補空白頁') }}</label>
         </div>
       </div>
     </div>
 
     <div>
-      <h3 data-s="s013b8cb5">即時預覽（第一張）</h3>
+      <h3 data-s="s013b8cb5">{{ tr('即時預覽（第一張）') }}</h3>
       <div class="nup-preview-wrap" id="previewWrap">
-        <div class="placeholder">上傳檔案後會自動預覽</div>
+        <div class="placeholder">{{ tr('上傳檔案後會自動預覽') }}</div>
       </div>
       <div data-s="sb37ed874">
-        <button class="btn" id="btnRefresh">{{ icon('refresh') }} 重新預覽</button>
-        <button class="btn btn-primary" id="btnGenerate" disabled>{{ icon('download') }} 產生 PDF</button>
+        <button class="btn" id="btnRefresh">{{ icon('refresh') }} {{ tr('重新預覽') }}</button>
+        <button class="btn btn-primary" id="btnGenerate" disabled>{{ icon('download') }} {{ tr('產生 PDF') }}</button>
         <span id="status" class="muted" data-s="sf3f0ec24"></span>
       </div>
       <div id="doneBox" class="muted" data-s="sa1540c58" hidden>
-        <a id="dlLink" class="btn btn-primary" href="#">{{ icon('download') }} 下載結果</a>
-        {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden>{{ icon('archive') }} 存至工作區</button>{% endif %}
+        <a id="dlLink" class="btn btn-primary" href="#">{{ icon('download') }} {{ tr('下載結果') }}</a>
+        {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden>{{ icon('archive') }} {{ tr('存至工作區') }}</button>{% endif %}
       </div>
     </div>
   </div>

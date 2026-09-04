@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
 {% from "components/llm_gate.html" import llm_gate, llm_gate_styles with context %}
-{% block title %}文件翻譯 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('文件翻譯') }} · {{ app_name }}{% endblock %}
 {% block head %}{{ llm_gate_styles() }}
 <style nonce="{{ request.state.csp_nonce }}">
 /* 語言兩欄一列，上傳自己一列。**不要把很高的上傳區跟下拉排在同一列** ——
@@ -41,25 +41,25 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('translate', size=22) }} 文件翻譯</h1>
-<p class="muted">整份辦公文件翻成另一種語言，<b>產出同格式、同版面的檔案</b> ——
+<h1>{{ icon('translate', size=22) }} {{ tr('文件翻譯') }}</h1>
+<p class="muted">{{ tr('整份辦公文件翻成另一種語言，') }}<b>{{ tr('產出同格式、同版面的檔案') }}</b> {{ tr('——
 只把文字換成譯文，框線、表格、頁首頁尾、圖片都留在原位。
-支援 .doc / .docx / .odt、.xls / .xlsx / .ods、.ppt / .pptx / .odp。</p>
+支援 .doc / .docx / .odt、.xls / .xlsx / .ods、.ppt / .pptx / .odp。') }}</p>
 
 {{ llm_gate('doc-translate', llm_enabled, llm_model, mode='only', llm_url=llm_url) }}
 
 <div class="panel">
-  <h2 data-s="s_dt_1">1. 上傳與設定</h2>
+  <h2 data-s="s_dt_1">{{ tr('1. 上傳與設定') }}</h2>
   <div class="dt-row">
     <div class="dt-field">
-      <label for="dtSrc">原文語言</label>
+      <label for="dtSrc">{{ tr('原文語言') }}</label>
       <select id="dtSrc" class="field">
-        <option value="auto" selected>自動偵測</option>
+        <option value="auto" selected>{{ tr('自動偵測') }}</option>
         {% for code, name in langs.items() %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
       </select>
     </div>
     <div class="dt-field">
-      <label for="dtTgt">目標語言</label>
+      <label for="dtTgt">{{ tr('目標語言') }}</label>
       <select id="dtTgt" class="field">
         {% for code, name in langs.items() %}
         <option value="{{ code }}"{% if code == 'zh-TW' %} selected{% endif %}>{{ name }}</option>
@@ -69,12 +69,12 @@
   </div>
 
   <div class="dt-upblock">
-    <label class="dt-uplabel">上傳檔案</label>
+    <label class="dt-uplabel">{{ tr('上傳檔案') }}</label>
     {% with upload_id='upDt', accept=accept %}{% include "components/file_upload.html" %}{% endwith %}
   </div>
 
-  <p class="muted dt-note" data-s="s_dt_dom">文件領域（選填，會送進 LLM prompt 提升專業用詞準確度；
-    點下方常用領域可複選，下方輸入框可加上其他自填領域）</p>
+  <p class="muted dt-note" data-s="s_dt_dom">{{ tr('文件領域（選填，會送進 LLM prompt 提升專業用詞準確度；
+    點下方常用領域可複選，下方輸入框可加上其他自填領域）') }}</p>
   <div class="dt-chips" id="dtChips">
     {% for d in ['法律合約', '醫療報告', '軟體技術文件', '財務報表', '學術論文',
                  '新聞稿', '商業合約', '網路 / IT 維運文件'] %}
@@ -84,46 +84,46 @@
   <input type="text" class="field dt-domain-input" id="dtDomain" placeholder="自填其他領域…（選填，會與上方點選的領域一起送進 prompt）">
 
   <p class="muted dt-note" data-s="s_dt_model">
-    {{ icon('info', size=14) }} <b>模型怎麼挑</b>：這支工具一份文件動輒幾十次 LLM 請求，
-    模型選得對很有感。<b>Gemma 4 這一家要看的不是總參數，是「每個 token 實際算幾個參數」</b>：
-    <code>gemma4:26b</code> 是 <b>MoE</b>（26B 總參數，每個 token 只啟用約 4B），
-    產生速度接近 4B 模型 —— <b>吞吐量最好的就是它</b>（Q4 約需 14 GB 記憶體）。
-    <code>gemma4:12b</code> 是 <b>dense</b>，12B 全部都要算，<b>反而比 26B 慢</b>，
-    只有記憶體不夠（約 7 GB）時才選它。<code>gemma4:31b</code> dense 最強也最慢；
-    <code>gemma4:e4b</code> / <code>e2b</code> 是邊緣裝置用的，品質差距明顯。
-    {% if is_admin(request) %}可以在 <a href="/admin/llm-settings">LLM 設定</a>
-    單獨指定這支工具要用的模型，不影響其他工具。{% else %}
+    {{ icon('info', size=14) }} <b>{{ tr('模型怎麼挑') }}</b>{{ tr('：這支工具一份文件動輒幾十次 LLM 請求，
+    模型選得對很有感。') }}<b>{{ tr('Gemma 4 這一家要看的不是總參數，是「每個 token 實際算幾個參數」') }}</b>：
+    <code>gemma4:26b</code> {{ tr('是') }} <b>MoE</b>{{ tr('（26B 總參數，每個 token 只啟用約 4B），
+    產生速度接近 4B 模型 ——') }} <b>{{ tr('吞吐量最好的就是它') }}</b>{{ tr('（Q4 約需 14 GB 記憶體）。') }}
+    <code>gemma4:12b</code> {{ tr('是') }} <b>dense</b>{{ tr('，12B 全部都要算，') }}<b>{{ tr('反而比 26B 慢') }}</b>{{ tr('，
+    只有記憶體不夠（約 7 GB）時才選它。') }}<code>gemma4:31b</code> {{ tr('dense 最強也最慢；') }}
+    <code>gemma4:e4b</code> / <code>e2b</code> {{ tr('是邊緣裝置用的，品質差距明顯。') }}
+    {% if is_admin(request) %}可以在 <a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a>
+    {{ tr('單獨指定這支工具要用的模型，不影響其他工具。') }}{% else %}
     要換模型請聯絡管理員（可以只針對這支工具指定）。{% endif %}
   </p>
 
   <p class="muted dt-note" data-s="s_dt_pdf">
-    {{ icon('info', size=14) }} <b>不支援 PDF</b>：PDF 裡沒有「段落」這種東西，
+    {{ icon('info', size=14) }} <b>{{ tr('不支援 PDF') }}</b>{{ tr('：PDF 裡沒有「段落」這種東西，
     文字是一塊一塊定位好的碎片，換成長度不同的譯文之後版面一定跑掉。
-    要翻 PDF 請用<a href="/tools/translate-doc/">逐句翻譯</a>（左原文右譯文對照）。
+    要翻 PDF 請用') }}<a href="/tools/translate-doc/">{{ tr('逐句翻譯') }}</a>{{ tr('（左原文右譯文對照）。') }}
   </p>
 
   <div id="dtInfo" hidden>
     <div class="dt-stats">
-      <span>可翻譯段落 <b id="dtUnits">0</b></span>
-      <span>字元數 <b id="dtChars">0</b></span>
+      <span>{{ tr('可翻譯段落') }} <b id="dtUnits">0</b></span>
+      <span>{{ tr('字元數') }} <b id="dtChars">0</b></span>
     </div>
   </div>
 
   <div class="dt-actions">
     <button class="btn btn-primary" id="btn-submit"{% if not llm_enabled %} disabled{% endif %}>
-      {{ icon('translate') }} 開始翻譯</button>
+      {{ icon('translate') }} {{ tr('開始翻譯') }}</button>
     <button class="btn btn-danger" id="btnCancel" type="button" hidden>
-      {{ icon('close') }} 停止翻譯</button>
+      {{ icon('close') }} {{ tr('停止翻譯') }}</button>
   </div>
   {% with progress_id='dtjp' %}{% include "components/job_progress.html" %}{% endwith %}
 </div>
 
 <div class="panel" id="dtResult" hidden>
-  <h2 data-s="s_dt_2">2. 結果</h2>
+  <h2 data-s="s_dt_2">{{ tr('2. 結果') }}</h2>
   <p class="muted dt-note" id="dtSummary"></p>
-  <p><a class="btn btn-primary" id="dtDownload" href="#" download>{{ icon('download') }} 下載翻譯後的檔案</a></p>
-  <p class="muted dt-note" id="dtPrevNote">前 {{ preview_pages }} 頁預覽 —— <b>左邊原文、右邊譯文</b>，
-    並排比對版面有沒有跑掉（點圖看大圖）：</p>
+  <p><a class="btn btn-primary" id="dtDownload" href="#" download>{{ icon('download') }} {{ tr('下載翻譯後的檔案') }}</a></p>
+  <p class="muted dt-note" id="dtPrevNote">{{ tr('前') }} {{ preview_pages }} {{ tr('頁預覽 ——') }} <b>{{ tr('左邊原文、右邊譯文') }}</b>{{ tr('，
+    並排比對版面有沒有跑掉（點圖看大圖）：') }}</p>
   <div class="dt-prev" id="dtPrev"></div>
 </div>
 

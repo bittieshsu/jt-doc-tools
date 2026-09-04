@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
 
-{% block title %}OCR 文字辨識 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('OCR 文字辨識') }} · {{ app_name }}{% endblock %}
 
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
@@ -295,34 +295,34 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 {% endblock %}
 
 {% block content %}
-<h1>{{ icon('text', size=22) }} OCR 文字辨識</h1>
-<p class="muted">把掃描 PDF 或圖片（jpg / png / tiff / bmp / webp）跑 OCR 後變成「可搜尋、可滑鼠選取複製文字」的 PDF，圖檔上傳後自動包成 PDF 再 OCR。</p>
+<h1>{{ icon('text', size=22) }} {{ tr('OCR 文字辨識') }}</h1>
+<p class="muted">{{ tr('把掃描 PDF 或圖片（jpg / png / tiff / bmp / webp）跑 OCR 後變成「可搜尋、可滑鼠選取複製文字」的 PDF，圖檔上傳後自動包成 PDF 再 OCR。') }}</p>
 
 {% if not tesseract_ok %}
-<div class="po-warn">{{ icon('warn', size=14) }} 此主機未安裝 tesseract，OCR 無法執行。請先安裝 tesseract（含 chi_tra 繁中訓練檔）。</div>
+<div class="po-warn">{{ icon('warn', size=14) }} {{ tr('此主機未安裝 tesseract，OCR 無法執行。請先安裝 tesseract（含 chi_tra 繁中訓練檔）。') }}</div>
 {% endif %}
 
 <details class="panel" open>
-  <summary>1. 上傳 PDF 或圖片</summary>
-  {% with upload_id='poUp', accept='.pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,application/pdf,image/*', hint='支援 .pdf / .jpg / .png / .tiff / .bmp / .webp；上限 200 MB；圖片會自動包成單頁 PDF' %}{% include "components/file_upload.html" %}{% endwith %}
+  <summary>{{ tr('1. 上傳 PDF 或圖片') }}</summary>
+  {% with upload_id='poUp', accept='.pdf,.jpg,.jpeg,.png,.tif,.tiff,.bmp,.webp,application/pdf,image/*', hint=tr('支援 .pdf / .jpg / .png / .tiff / .bmp / .webp；上限 200 MB；圖片會自動包成單頁 PDF') %}{% include "components/file_upload.html" %}{% endwith %}
   <div id="uploadInfo" data-s="sd1f2f617"></div>
 </details>
 
 <details class="panel" open>
-  <summary>2. 設定</summary>
+  <summary>{{ tr('2. 設定') }}</summary>
   <div class="po-fields">
     <div class="po-field" data-s="s493b1c85" id="poLangSection">
-      <label>OCR 語言
-        <span class="muted">（點選要辨識的語言；多選會增加處理時間。{% if current_engine == 'easyocr' %}<b>目前引擎：EasyOCR</b>，首次使用某語言會自動下載 ~150MB 模型{% else %}<b>目前引擎：Tesseract</b>{% endif %}，引擎切換在 <a href="/admin/ocr-langs">OCR 引擎管理</a>）</span>
-        <span id="poLangDisabledNote" class="muted" data-s="s295d6c8e">（已勾選 LLM 直接辨識，OCR 引擎不會用到，語言設定僅在 LLM 失敗自動退回 EasyOCR 時生效）</span>
+      <label>{{ tr('OCR 語言') }}
+        <span class="muted">{{ tr('（點選要辨識的語言；多選會增加處理時間。') }}{% if current_engine == 'easyocr' %}<b>{{ tr('目前引擎：EasyOCR') }}</b>{{ tr('，首次使用某語言會自動下載 ~150MB 模型') }}{% else %}<b>{{ tr('目前引擎：Tesseract') }}</b>{% endif %}，引擎切換在 <a href="/admin/ocr-langs">{{ tr('OCR 引擎管理') }}</a>）</span>
+        <span id="poLangDisabledNote" class="muted" data-s="s295d6c8e">{{ tr('（已勾選 LLM 直接辨識，OCR 引擎不會用到，語言設定僅在 LLM 失敗自動退回 EasyOCR 時生效）') }}</span>
       </label>
       {% if installed_langs %}
       <div class="po-langs-wrap" id="poLangsBox">
         {# CJK 群 — 標題列同時放統計 #}
         <div class="po-langs-group">
           <div class="po-langs-grouphdr">
-            <span class="po-langs-group-label">中日韓 CJK</span>
-            <span class="po-count">已選 <b id="poLangsCount">0</b> 種，{% if current_engine == 'easyocr' %}EasyOCR 內建 80+ 種、本頁列出常用 <b>{{ installed_langs|length }}</b> 種{% else %}共 <b>{{ installed_langs|length }}</b> 種已安裝{% endif %}</span>
+            <span class="po-langs-group-label">{{ tr('中日韓 CJK') }}</span>
+            <span class="po-count">{{ tr('已選') }} <b id="poLangsCount">0</b> {{ tr('種，') }}{% if current_engine == 'easyocr' %}EasyOCR 內建 80+ 種、本頁列出常用 <b>{{ installed_langs|length }}</b> {{ tr('種') }}{% else %}共 <b>{{ installed_langs|length }}</b> {{ tr('種已安裝') }}{% endif %}</span>
           </div>
           <div class="po-langs-grid">
             {% for lang in lang_catalog if lang.group == 'cjk' %}
@@ -331,9 +331,9 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
                  data-variant="{{ lang.active_variant or '' }}"
                  title="{{ lang.hint }}{% if not lang.installed %} — 未安裝（請至 admin/settings 安裝 tesseract 訓練檔）{% endif %}">
               <span class="po-chip-check"></span>
-              <span class="po-chip-name">{{ lang.name }}</span>
+              <span class="po-chip-name">{{ tr(lang.name) }}</span>
               <span class="po-chip-code">{{ lang.display_code or lang.code }}</span>
-              {% if not lang.installed %}<span class="po-chip-lock">未安裝</span>{% endif %}
+              {% if not lang.installed %}<span class="po-chip-lock">{{ tr('未安裝') }}</span>{% endif %}
             </div>
             {% endfor %}
           </div>
@@ -342,7 +342,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
         {# 西方語言 — 預設摺起，但若群組內有預設勾選（如 eng）則自動展開 #}
         {% set western_has_default = lang_catalog | selectattr('group', 'equalto', 'western') | selectattr('installed') | map(attribute='code') | select('in', default_langs) | list | length > 0 %}
         <details class="po-langs-group"{% if western_has_default %} open{% endif %}>
-          <summary>西方語言 <span class="more-hint">(8 種：英、德、法、西、義、葡、荷、俄)</span></summary>
+          <summary>{{ tr('西方語言') }} <span class="more-hint">{{ tr('(8 種：英、德、法、西、義、葡、荷、俄)') }}</span></summary>
           <div class="po-langs-grid">
             {% for lang in lang_catalog if lang.group == 'western' %}
             <div class="po-chip {% if lang.installed and lang.code in default_langs %}is-active{% endif %} {% if not lang.installed %}po-chip-disabled{% endif %}"
@@ -350,9 +350,9 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
                  data-variant="{{ lang.active_variant or '' }}"
                  title="{{ lang.hint }}{% if not lang.installed %} — 未安裝{% endif %}">
               <span class="po-chip-check"></span>
-              <span class="po-chip-name">{{ lang.name }}</span>
+              <span class="po-chip-name">{{ tr(lang.name) }}</span>
               <span class="po-chip-code">{{ lang.display_code or lang.code }}</span>
-              {% if not lang.installed %}<span class="po-chip-lock">未安裝</span>{% endif %}
+              {% if not lang.installed %}<span class="po-chip-lock">{{ tr('未安裝') }}</span>{% endif %}
             </div>
             {% endfor %}
           </div>
@@ -361,7 +361,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
         {# 東南亞 / 其他 — 預設摺起，群組內有預設勾選則自動展開 #}
         {% set other_has_default = lang_catalog | selectattr('group', 'equalto', 'other') | selectattr('installed') | map(attribute='code') | select('in', default_langs) | list | length > 0 %}
         <details class="po-langs-group"{% if other_has_default %} open{% endif %}>
-          <summary>東南亞 / 其他 <span class="more-hint">(6 種：越、泰、印尼、阿拉伯、希伯來、印地)</span></summary>
+          <summary>{{ tr('東南亞 / 其他') }} <span class="more-hint">{{ tr('(6 種：越、泰、印尼、阿拉伯、希伯來、印地)') }}</span></summary>
           <div class="po-langs-grid">
             {% for lang in lang_catalog if lang.group == 'other' %}
             <div class="po-chip {% if lang.installed and lang.code in default_langs %}is-active{% endif %} {% if not lang.installed %}po-chip-disabled{% endif %}"
@@ -369,9 +369,9 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
                  data-variant="{{ lang.active_variant or '' }}"
                  title="{{ lang.hint }}{% if not lang.installed %} — 未安裝{% endif %}">
               <span class="po-chip-check"></span>
-              <span class="po-chip-name">{{ lang.name }}</span>
+              <span class="po-chip-name">{{ tr(lang.name) }}</span>
               <span class="po-chip-code">{{ lang.display_code or lang.code }}</span>
-              {% if not lang.installed %}<span class="po-chip-lock">未安裝</span>{% endif %}
+              {% if not lang.installed %}<span class="po-chip-lock">{{ tr('未安裝') }}</span>{% endif %}
             </div>
             {% endfor %}
           </div>
@@ -379,7 +379,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 
         {% if extra_installed %}
         <div class="po-langs-group">
-          <span class="po-langs-group-label">其他已安裝訓練檔</span>
+          <span class="po-langs-group-label">{{ tr('其他已安裝訓練檔') }}</span>
           <div class="po-langs-grid">
             {% for code in extra_installed %}
             <div class="po-chip" data-lang="{{ code }}" data-installed="1" title="{{ code }}">
@@ -393,48 +393,48 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 
         <div class="po-langs-summary" id="poLangsSummary"></div>
         {% if current_engine == 'easyocr' %}
-        <div class="muted" data-s="s7384bffc">提示：EasyOCR 非 Latin 系語言（中、日、韓、泰、俄、阿拉伯、希伯來、印地）同時只能載一個 model，選了其一其他會自動 disable；Latin 系（英、德、法、西、義、葡、荷）可多選並搭一個非 Latin。</div>
+        <div class="muted" data-s="s7384bffc">{{ tr('提示：EasyOCR 非 Latin 系語言（中、日、韓、泰、俄、阿拉伯、希伯來、印地）同時只能載一個 model，選了其一其他會自動 disable；Latin 系（英、德、法、西、義、葡、荷）可多選並搭一個非 Latin。') }}</div>
         {% endif %}
       </div>
       {% else %}
-      <div class="po-langs-empty">未偵測到已安裝的語言（tesseract 不可用？請確認系統已安裝 tesseract 與訓練檔）</div>
+      <div class="po-langs-empty">{{ tr('未偵測到已安裝的語言（tesseract 不可用？請確認系統已安裝 tesseract 與訓練檔）') }}</div>
       {% endif %}
     </div>
     <div class="po-field" data-s="s493b1c85" id="poDpiSection">
-      <label>渲染 DPI <span class="muted">（影像解析度，越高文字辨識越準但越慢；300 是平衡點）</span>
-        <span id="poDpiDisabledNote" class="muted" data-s="s295d6c8e">（已勾選 LLM 辨識，影像會自動縮到 1568 px，DPI 主要影響 EasyOCR 失敗退回時的辨識精準度）</span>
+      <label>{{ tr('渲染 DPI') }} <span class="muted">{{ tr('（影像解析度，越高文字辨識越準但越慢；300 是平衡點）') }}</span>
+        <span id="poDpiDisabledNote" class="muted" data-s="s295d6c8e">{{ tr('（已勾選 LLM 辨識，影像會自動縮到 1568 px，DPI 主要影響 EasyOCR 失敗退回時的辨識精準度）') }}</span>
       </label>
       <div class="po-dpi-wrap">
         <div class="po-dpi-grid">
           <div class="po-dpi-card" data-dpi="150">
             <span class="po-dpi-num">150</span>
             <span class="po-dpi-unit">DPI</span>
-            <span class="po-dpi-label">草稿 · 最快</span>
+            <span class="po-dpi-label">{{ tr('草稿 · 最快') }}</span>
           </div>
           <div class="po-dpi-card" data-dpi="200">
             <span class="po-dpi-num">200</span>
             <span class="po-dpi-unit">DPI</span>
-            <span class="po-dpi-label">省時</span>
+            <span class="po-dpi-label">{{ tr('省時') }}</span>
           </div>
           <div class="po-dpi-card is-active" data-dpi="300">
-            <span class="po-dpi-recommend">推薦</span>
+            <span class="po-dpi-recommend">{{ tr('推薦') }}</span>
             <span class="po-dpi-num">300</span>
             <span class="po-dpi-unit">DPI</span>
-            <span class="po-dpi-label">標準</span>
+            <span class="po-dpi-label">{{ tr('標準') }}</span>
           </div>
           <div class="po-dpi-card" data-dpi="400">
             <span class="po-dpi-num">400</span>
             <span class="po-dpi-unit">DPI</span>
-            <span class="po-dpi-label">精準</span>
+            <span class="po-dpi-label">{{ tr('精準') }}</span>
           </div>
           <div class="po-dpi-card" data-dpi="600">
             <span class="po-dpi-num">600</span>
             <span class="po-dpi-unit">DPI</span>
-            <span class="po-dpi-label">最高</span>
+            <span class="po-dpi-label">{{ tr('最高') }}</span>
           </div>
         </div>
         <div class="po-dpi-custom-row">
-          <label for="poDpi">自訂值：</label>
+          <label for="poDpi">{{ tr('自訂值：') }}</label>
           <input type="number" id="poDpi" min="72" max="600" value="300">
           <span data-s="s8cd4ae71">DPI（72-600）</span>
           <span class="po-dpi-est" id="poDpiEst"></span>
@@ -444,12 +444,12 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
   </div>
   <div class="po-fields" data-s="s002535c2">
     <div class="po-field" data-s="s493b1c85">
-      <label>OCR 範圍 <span class="muted">（避免對已有文字層的 PDF 頁重複 OCR；多數混合 PDF 適用）</span></label>
+      <label>{{ tr('OCR 範圍') }} <span class="muted">{{ tr('（避免對已有文字層的 PDF 頁重複 OCR；多數混合 PDF 適用）') }}</span></label>
       <div class="po-toggle">
         <input type="checkbox" id="poSkipText" checked>
         <label for="poSkipText">
-          <span class="po-toggle-name">略過已有文字層的頁</span>
-          <span class="po-toggle-hint">譬如雙語 PDF 已有英文文字層，只需 OCR 中文掃描頁；勾選後可省一半時間。若 PDF 全是掃描檔可關掉。</span>
+          <span class="po-toggle-name">{{ tr('略過已有文字層的頁') }}</span>
+          <span class="po-toggle-hint">{{ tr('譬如雙語 PDF 已有英文文字層，只需 OCR 中文掃描頁；勾選後可省一半時間。若 PDF 全是掃描檔可關掉。') }}</span>
         </label>
       </div>
     </div>
@@ -462,14 +462,14 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
           <input type="checkbox" id="poUseLlmDirect" {% if not llm_vision_ok %}disabled{% endif %}>
           <label for="poUseLlmDirect">
             <span class="po-toggle-name">
-              LLM 直接辨識
-              <span class="po-toggle-tag po-toggle-tag-direct">主辨識</span>
+              {{ tr('LLM 直接辨識') }}
+              <span class="po-toggle-tag po-toggle-tag-direct">{{ tr('主辨識') }}</span>
               {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
             </span>
             {% if llm_vision_ok %}
-            <span class="po-toggle-hint">跳過 OCR 引擎，LLM 直接做 OCR。<b data-s="s9e5caf70">無逐字座標</b>（拖選位置不對應原圖），中文易腦補。失敗自動退回 EasyOCR。</span>
+            <span class="po-toggle-hint">{{ tr('跳過 OCR 引擎，LLM 直接做 OCR。') }}<b data-s="s9e5caf70">{{ tr('無逐字座標') }}</b>{{ tr('（拖選位置不對應原圖），中文易腦補。失敗自動退回 EasyOCR。') }}</span>
             {% else %}
-            <span class="po-toggle-hint" data-s="sc9e34862">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
+            <span class="po-toggle-hint" data-s="sc9e34862">{{ tr('未指定 vision 模型 — 請至') }} <a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a></span>
             {% endif %}
           </label>
         </div>
@@ -477,14 +477,14 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
           <input type="checkbox" id="poUseLlmAlign" {% if not llm_vision_ok %}disabled{% endif %}>
           <label for="poUseLlmAlign">
             <span class="po-toggle-name">
-              LLM 對位辨識
-              <span class="po-toggle-tag po-toggle-tag-align">對位混合</span>
+              {{ tr('LLM 對位辨識') }}
+              <span class="po-toggle-tag po-toggle-tag-align">{{ tr('對位混合') }}</span>
               {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
             </span>
             {% if llm_vision_ok %}
-            <span class="po-toggle-hint">EasyOCR 取座標 + LLM 取文字，行對齊。<b>拖選位置精準</b>；對齊失敗保留 EasyOCR 原字。較慢但最穩，任何 vision 模型都能用。</span>
+            <span class="po-toggle-hint">{{ tr('EasyOCR 取座標 + LLM 取文字，行對齊。') }}<b>{{ tr('拖選位置精準') }}</b>{{ tr('；對齊失敗保留 EasyOCR 原字。較慢但最穩，任何 vision 模型都能用。') }}</span>
             {% else %}
-            <span class="po-toggle-hint" data-s="sc9e34862">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
+            <span class="po-toggle-hint" data-s="sc9e34862">{{ tr('未指定 vision 模型 — 請至') }} <a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a></span>
             {% endif %}
           </label>
         </div>
@@ -492,14 +492,14 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
           <input type="checkbox" id="poUseLlmFull" {% if not llm_vision_ok %}disabled{% endif %}>
           <label for="poUseLlmFull">
             <span class="po-toggle-name">
-              LLM 完整辨識
-              <span class="po-toggle-tag po-toggle-tag-full">全自主</span>
+              {{ tr('LLM 完整辨識') }}
+              <span class="po-toggle-tag po-toggle-tag-full">{{ tr('全自主') }}</span>
               {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
             </span>
             {% if llm_vision_ok %}
-            <span class="po-toggle-hint">LLM 同時回文字與座標，不跑 OCR 引擎。<b>建議用 <code>qwen2.5vl:7b</code></b>（grounding 能給座標、無 thinking mode、約 9GB VRAM）；qwen3-vl thinking mode 不穩、gemma 無 grounding 不可用。座標解析失敗自動退回 EasyOCR。</span>
+            <span class="po-toggle-hint">{{ tr('LLM 同時回文字與座標，不跑 OCR 引擎。') }}<b>{{ tr('建議用') }} <code>qwen2.5vl:7b</code></b>{{ tr('（grounding 能給座標、無 thinking mode、約 9GB VRAM）；qwen3-vl thinking mode 不穩、gemma 無 grounding 不可用。座標解析失敗自動退回 EasyOCR。') }}</span>
             {% else %}
-            <span class="po-toggle-hint" data-s="sc9e34862">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a></span>
+            <span class="po-toggle-hint" data-s="sc9e34862">{{ tr('未指定 vision 模型 — 請至') }} <a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a></span>
             {% endif %}
           </label>
         </div>
@@ -507,25 +507,25 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 
       <details class="po-llm-details">
         <summary data-s="s9e0a843a">
-          LLM 後處理 <span class="muted" data-s="s9aa76ee8">（選用 — 預設關閉；EasyOCR 中文已夠強，需要時點開）</span>
+          {{ tr('LLM 後處理') }} <span class="muted" data-s="s9aa76ee8">{{ tr('（選用 — 預設關閉；EasyOCR 中文已夠強，需要時點開）') }}</span>
         </summary>
         <div data-s="s5371db16">
       <div data-s="s12dc63dc">
-        <b>⚠ EasyOCR 中文辨識已夠強，多數場合不需 LLM</b>。若仍要用，LLM 可能會把看不清楚的字猜成「最像的常見詞」（例：原文 OCR 結果若被改成更常見的相似詞）— 公司名 / 人名 / 編號請對照原 PDF 複核，下方「各階段詳細結果」可比對。
+        <b>{{ tr('⚠ EasyOCR 中文辨識已夠強，多數場合不需 LLM') }}</b>{{ tr('。若仍要用，LLM 可能會把看不清楚的字猜成「最像的常見詞」（例：原文 OCR 結果若被改成更常見的相似詞）— 公司名 / 人名 / 編號請對照原 PDF 複核，下方「各階段詳細結果」可比對。') }}
       </div>
       <div class="po-toggle-grid">
         <div class="po-toggle {% if not llm_vision_ok %}po-toggle-disabled{% endif %}">
           <input type="checkbox" id="poUseLlmVision" {% if not llm_vision_ok %}disabled{% endif %}>
           <label for="poUseLlmVision">
             <span class="po-toggle-name">
-              LLM 視覺校對
-              <span class="po-toggle-tag po-toggle-tag-vision">視覺</span>
+              {{ tr('LLM 視覺校對') }}
+              <span class="po-toggle-tag po-toggle-tag-vision">{{ tr('視覺') }}</span>
               {% if llm_vision_ok %}<span class="po-toggle-badge">{{ llm_vision_model }}</span>{% endif %}
             </span>
             {% if llm_vision_ok %}
-            <span class="po-toggle-hint">直接看頁面影像對照 OCR 結果，能修純文字看不出來的字元錯誤、缺漏。<b>需 vision 模型</b>（gemma4:26b、qwen3-vl 等）。較慢但對掃描品質差的 PDF 最有效。</span>
+            <span class="po-toggle-hint">{{ tr('直接看頁面影像對照 OCR 結果，能修純文字看不出來的字元錯誤、缺漏。') }}<b>{{ tr('需 vision 模型') }}</b>{{ tr('（gemma4:26b、qwen3-vl 等）。較慢但對掃描品質差的 PDF 最有效。') }}</span>
             {% else %}
-            <span class="po-toggle-hint" data-s="sc9e34862">未指定 vision 模型 — 請至 <a href="/admin/llm-settings">LLM 設定</a> 為「OCR 文字辨識（LLM 視覺校對）」指派 vision 模型</span>
+            <span class="po-toggle-hint" data-s="sc9e34862">{{ tr('未指定 vision 模型 — 請至') }} <a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a> {{ tr('為「OCR 文字辨識（LLM 視覺校對）」指派 vision 模型') }}</span>
             {% endif %}
           </label>
         </div>
@@ -533,14 +533,14 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
           <input type="checkbox" id="poUseLlm" {% if not llm_ok %}disabled{% endif %}>
           <label for="poUseLlm">
             <span class="po-toggle-name">
-              LLM 文字校正
-              <span class="po-toggle-tag po-toggle-tag-text">文字</span>
+              {{ tr('LLM 文字校正') }}
+              <span class="po-toggle-tag po-toggle-tag-text">{{ tr('文字') }}</span>
               {% if llm_ok %}<span class="po-toggle-badge">{{ llm_model }}</span>{% endif %}
             </span>
             {% if llm_ok %}
-            <span class="po-toggle-hint">純文字校正：抓 typo / 字元誤判（0/O、1/l、CJK 偏旁誤判）。任何 text 模型都可用，較省 VRAM 也較快。</span>
+            <span class="po-toggle-hint">{{ tr('純文字校正：抓 typo / 字元誤判（0/O、1/l、CJK 偏旁誤判）。任何 text 模型都可用，較省 VRAM 也較快。') }}</span>
             {% else %}
-            <span class="po-toggle-hint" data-s="sc9e34862">LLM 未設定 — 請先至 <a href="/admin/llm-settings">LLM 設定</a> 啟用</span>
+            <span class="po-toggle-hint" data-s="sc9e34862">{{ tr('LLM 未設定 — 請先至') }} <a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a> {{ tr('啟用') }}</span>
             {% endif %}
           </label>
         </div>
@@ -552,9 +552,9 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
 </details>
 
 <div class="panel">
-  <button class="btn btn-primary" id="btnRun" disabled>{{ icon('play', size=14) }} 開始 OCR</button>
-  <button class="btn btn-danger" id="btnStop" type="button" data-s="se2713b1e">{{ icon('close', size=14) }} 停止辨識</button>
-  <span id="status" class="muted" data-s="sd70b636c">請先上傳 PDF 或圖片</span>
+  <button class="btn btn-primary" id="btnRun" disabled>{{ icon('play', size=14) }} {{ tr('開始 OCR') }}</button>
+  <button class="btn btn-danger" id="btnStop" type="button" data-s="se2713b1e">{{ icon('close', size=14) }} {{ tr('停止辨識') }}</button>
+  <span id="status" class="muted" data-s="sd70b636c">{{ tr('請先上傳 PDF 或圖片') }}</span>
   <div class="po-progress" data-s="scb458930" id="progressBar"><div></div></div>
   <div id="resultBox"></div>
 </div>

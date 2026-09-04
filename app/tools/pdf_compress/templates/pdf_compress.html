@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}PDF 壓縮 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('PDF 壓縮') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .cmp-analyze { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -79,66 +79,66 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('compress', size=22) }} PDF 壓縮</h1>
-<p class="muted">減少 PDF 檔案大小。支援無損 / 平衡 / 極限三種一鍵預設，或切到進階模式自訂圖片 DPI、JPEG 品質、字型子集化、移除註解／表單／書籤等。</p>
+<h1>{{ icon('compress', size=22) }} {{ tr('PDF 壓縮') }}</h1>
+<p class="muted">{{ tr('減少 PDF 檔案大小。支援無損 / 平衡 / 極限三種一鍵預設，或切到進階模式自訂圖片 DPI、JPEG 品質、字型子集化、移除註解／表單／書籤等。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
-  {% with upload_id='cmpUpload', accept='application/pdf', hint='單檔、PDF only。上傳後會先顯示檔案資訊讓你參考再選壓縮模式。' %}
+  <h2 data-s="s53896af7">{{ tr('1. 上傳 PDF') }}</h2>
+  {% with upload_id='cmpUpload', accept='application/pdf', hint=tr('單檔、PDF only。上傳後會先顯示檔案資訊讓你參考再選壓縮模式。') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div class="cmp-analyze" id="analyzeGrid" hidden></div>
 </div>
 
 <div class="panel" id="panel-options" hidden>
-  <h2 data-s="s53896af7">2. 選擇壓縮模式</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 選擇壓縮模式') }}</h2>
   <div class="cmp-presets" id="presets">
     <div class="cmp-preset p-gentle" data-preset="gentle">
-      <div><span class="dot"></span><span class="title">無損壓縮</span></div>
-      <div class="desc">字型子集化、去除 metadata、deflate 壓縮；不動圖片。</div>
-      <div class="est">預期縮小：5–30%　｜　畫質：完全不變</div>
+      <div><span class="dot"></span><span class="title">{{ tr('無損壓縮') }}</span></div>
+      <div class="desc">{{ tr('字型子集化、去除 metadata、deflate 壓縮；不動圖片。') }}</div>
+      <div class="est">{{ tr('預期縮小：5–30%　｜　畫質：完全不變') }}</div>
     </div>
     <div class="cmp-preset p-balanced active" data-preset="balanced">
-      <div><span class="dot"></span><span class="title">平衡壓縮（建議）</span></div>
-      <div class="desc">圖片降到 150 DPI、JPEG 品質 80；字型子集化；保留註解 / 表單。</div>
-      <div class="est">預期縮小：40–70%　｜　畫質：列印 OK</div>
+      <div><span class="dot"></span><span class="title">{{ tr('平衡壓縮（建議）') }}</span></div>
+      <div class="desc">{{ tr('圖片降到 150 DPI、JPEG 品質 80；字型子集化；保留註解 / 表單。') }}</div>
+      <div class="est">{{ tr('預期縮小：40–70%　｜　畫質：列印 OK') }}</div>
     </div>
     <div class="cmp-preset p-aggressive" data-preset="aggressive">
-      <div><span class="dot"></span><span class="title">極限壓縮</span></div>
-      <div class="desc">圖片降到 96 DPI、JPEG 品質 65；移除註解／表單／書籤。</div>
-      <div class="est">預期縮小：70–90%　｜　螢幕瀏覽專用</div>
+      <div><span class="dot"></span><span class="title">{{ tr('極限壓縮') }}</span></div>
+      <div class="desc">{{ tr('圖片降到 96 DPI、JPEG 品質 65；移除註解／表單／書籤。') }}</div>
+      <div class="est">{{ tr('預期縮小：70–90%　｜　螢幕瀏覽專用') }}</div>
     </div>
     <div class="cmp-preset p-advanced" data-preset="advanced">
-      <div><span class="dot"></span><span class="title">進階模式</span></div>
-      <div class="desc">自行調整每個參數。</div>
-      <div class="est">適合熟悉壓縮參數的使用者</div>
+      <div><span class="dot"></span><span class="title">{{ tr('進階模式') }}</span></div>
+      <div class="desc">{{ tr('自行調整每個參數。') }}</div>
+      <div class="est">{{ tr('適合熟悉壓縮參數的使用者') }}</div>
     </div>
   </div>
 
   <div class="cmp-adv" id="advPanel" hidden>
     <div class="row">
-      <label for="advDpi">圖片最大 DPI</label>
+      <label for="advDpi">{{ tr('圖片最大 DPI') }}</label>
       <div data-s="s5f11e4db">
         <input type="range" id="advDpi" min="0" max="300" step="24" value="150" />
         <span class="val-label"><span id="advDpiVal">150</span> DPI</span>
       </div>
     </div>
-    <small class="muted" data-s="sdfa5686c">0 = 不降取樣。150 DPI 對電子化文件通常夠清楚，72–96 足以螢幕瀏覽。</small>
+    <small class="muted" data-s="sdfa5686c">{{ tr('0 = 不降取樣。150 DPI 對電子化文件通常夠清楚，72–96 足以螢幕瀏覽。') }}</small>
     <div class="row">
-      <label for="advJpeg">JPEG 品質</label>
+      <label for="advJpeg">{{ tr('JPEG 品質') }}</label>
       <div data-s="s5f11e4db">
         <input type="range" id="advJpeg" min="30" max="95" step="5" value="80" />
         <span class="val-label"><span id="advJpegVal">80</span> / 100</span>
       </div>
     </div>
     <div class="row">
-      <label>其他選項</label>
+      <label>{{ tr('其他選項') }}</label>
       <div class="adv-toggle-grid">
-        <label><input type="checkbox" id="advSubset" checked> 字型子集化</label>
-        <label><input type="checkbox" id="advMeta" checked> 移除 metadata</label>
-        <label><input type="checkbox" id="advAnnots"> 移除註解</label>
-        <label><input type="checkbox" id="advForms"> 移除表單欄位</label>
-        <label><input type="checkbox" id="advBookmarks"> 移除書籤 / 目錄</label>
+        <label><input type="checkbox" id="advSubset" checked> {{ tr('字型子集化') }}</label>
+        <label><input type="checkbox" id="advMeta" checked> {{ tr('移除 metadata') }}</label>
+        <label><input type="checkbox" id="advAnnots"> {{ tr('移除註解') }}</label>
+        <label><input type="checkbox" id="advForms"> {{ tr('移除表單欄位') }}</label>
+        <label><input type="checkbox" id="advBookmarks"> {{ tr('移除書籤 / 目錄') }}</label>
       </div>
     </div>
   </div>
@@ -147,28 +147,28 @@
   <div class="cmp-gs-row">
     <label data-s="s28253d82">
       <input type="checkbox" id="useGs" />
-      搭配 Ghostscript 強力壓縮
+      {{ tr('搭配 Ghostscript 強力壓縮') }}
     </label>
     <select id="gsPreset" class="field" data-s="se722e12b">
-      <option value="screen">/screen — 最小、72 DPI</option>
-      <option value="ebook" selected>/ebook — 平衡、150 DPI</option>
-      <option value="printer">/printer — 列印、300 DPI</option>
-      <option value="prepress">/prepress — 印前、300 DPI</option>
+      <option value="screen">{{ tr('/screen — 最小、72 DPI') }}</option>
+      <option value="ebook" selected>{{ tr('/ebook — 平衡、150 DPI') }}</option>
+      <option value="printer">{{ tr('/printer — 列印、300 DPI') }}</option>
+      <option value="prepress">{{ tr('/prepress — 印前、300 DPI') }}</option>
     </select>
-    <span class="muted">Ghostscript 常比 PyMuPDF 再擠出 20–50%；若最終反而變大會自動保留 PyMuPDF 版本。</span>
+    <span class="muted">{{ tr('Ghostscript 常比 PyMuPDF 再擠出 20–50%；若最終反而變大會自動保留 PyMuPDF 版本。') }}</span>
   </div>
   {% else %}
   <div class="cmp-gs-row" data-s="s32995a01">
     <span class="muted">
-      <b>選用：</b>裝了 Ghostscript 可再多擠 20–50% 壓縮率（內建 PyMuPDF 壓縮已可用，本選項非必要）。<br>
-      安裝方式：macOS <code>brew install ghostscript</code>；Linux <code>sudo apt install ghostscript</code>；Windows 到
-      <a href="https://www.ghostscript.com/releases/gsdnld.html" target="_blank" rel="noopener noreferrer">ghostscript.com 下載 64-bit AGPL Release</a>。
+      <b>{{ tr('選用：') }}</b>{{ tr('裝了 Ghostscript 可再多擠 20–50% 壓縮率（內建 PyMuPDF 壓縮已可用，本選項非必要）。') }}<br>
+      {{ tr('安裝方式：macOS') }} <code>brew install ghostscript</code>；Linux <code>sudo apt install ghostscript</code>{{ tr('；Windows 到') }}
+      <a href="https://www.ghostscript.com/releases/gsdnld.html" target="_blank" rel="noopener noreferrer">{{ tr('ghostscript.com 下載 64-bit AGPL Release') }}</a>。
     </span>
   </div>
   {% endif %}
 
   <div data-s="s002535c2">
-    <button class="btn btn-primary" id="btnCompress">{{ icon('compress', size=14) }} 開始壓縮</button>
+    <button class="btn btn-primary" id="btnCompress">{{ icon('compress', size=14) }} {{ tr('開始壓縮') }}</button>
   </div>
   <div data-s="s5371db16">
     {% with progress_id='cmpJob' %}{% include "components/job_progress.html" %}{% endwith %}
@@ -176,16 +176,16 @@
 </div>
 
 <div class="cmp-result" id="resultPanel" hidden>
-  <h3>壓縮完成 🎉</h3>
+  <h3>{{ tr('壓縮完成 🎉') }}</h3>
   <div class="sizes">
-    <span>原始 <b id="rOrig">—</b></span>
+    <span>{{ tr('原始') }} <b id="rOrig">—</b></span>
     <span class="arrow">→</span>
-    <span>壓縮後 <b id="rNew">—</b></span>
-    <span class="saved">省下 <span id="rPct">—</span></span>
+    <span>{{ tr('壓縮後') }} <b id="rNew">—</b></span>
+    <span class="saved">{{ tr('省下') }} <span id="rPct">—</span></span>
   </div>
   <div class="bar"><div id="rBar" data-s="s9c33ea5e"></div></div>
   <div data-s="s5371db16">
-    <a class="btn btn-primary" id="rDownload" href="#">{{ icon('download') }} 下載壓縮後的 PDF</a>
+    <a class="btn btn-primary" id="rDownload" href="#">{{ icon('download') }} {{ tr('下載壓縮後的 PDF') }}</a>
   </div>
 </div>
 

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}中繼資料清除 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('中繼資料清除') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .md-info { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px;
@@ -20,35 +20,35 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('info', size=22) }} 中繼資料清除</h1>
-<p class="muted">檢視 PDF 中的 metadata（作者 / 標題 / 建立軟體 / XMP 等），選擇要清除的項目後輸出無痕副本。</p>
+<h1>{{ icon('info', size=22) }} {{ tr('中繼資料清除') }}</h1>
+<p class="muted">{{ tr('檢視 PDF 中的 metadata（作者 / 標題 / 建立軟體 / XMP 等），選擇要清除的項目後輸出無痕副本。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 上傳 PDF') }}</h2>
   {% with upload_id='mdUp', accept='application/pdf' %}{% include "components/file_upload.html" %}{% endwith %}
   <div class="md-info" id="mdInfo" hidden></div>
 </div>
 
 <div class="panel" id="mdPanel" hidden>
-  <h2 data-s="s53896af7">2. 選擇要清除的項目</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 選擇要清除的項目') }}</h2>
   <div class="md-toggles">
-    <label><input type="checkbox" id="cInfo" checked> 基本 metadata（作者 / 標題 / 建立軟體 …）</label>
-    <label><input type="checkbox" id="cXmp" checked> XMP metadata（含修訂歷史）</label>
-    <label><input type="checkbox" id="cToc"> 書籤 / 目錄</label>
-    <label><input type="checkbox" id="cAnn"> 註解 / 標記</label>
-    <label><input type="checkbox" id="cFrm"> 表單欄位</label>
+    <label><input type="checkbox" id="cInfo" checked> {{ tr('基本 metadata（作者 / 標題 / 建立軟體 …）') }}</label>
+    <label><input type="checkbox" id="cXmp" checked> {{ tr('XMP metadata（含修訂歷史）') }}</label>
+    <label><input type="checkbox" id="cToc"> {{ tr('書籤 / 目錄') }}</label>
+    <label><input type="checkbox" id="cAnn"> {{ tr('註解 / 標記') }}</label>
+    <label><input type="checkbox" id="cFrm"> {{ tr('表單欄位') }}</label>
   </div>
   <div data-s="s002535c2">
-    <button class="btn btn-primary" id="btnClean">{{ icon('trash', size=14) }} 清除並產生副本</button>
+    <button class="btn btn-primary" id="btnClean">{{ icon('trash', size=14) }} {{ tr('清除並產生副本') }}</button>
     <span id="cleanStatus" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="panel" id="dlPanel" hidden data-s="s611babd7">
-  <h3 data-s="s8b6172c3">完成</h3>
+  <h3 data-s="s8b6172c3">{{ tr('完成') }}</h3>
   <div id="dlSummary" data-s="se51dd4d2"></div>
-  <a class="btn btn-primary" id="dlLink" href="#">{{ icon('download') }} 下載清除後的 PDF</a>
-  {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden data-s="sc3f83707">{{ icon('archive') }} 存至工作區</button>{% endif %}
+  <a class="btn btn-primary" id="dlLink" href="#">{{ icon('download') }} {{ tr('下載清除後的 PDF') }}</a>
+  {% if workspace_enabled(request) %}<button id="wsSaveBtn" class="btn" type="button" hidden data-s="sc3f83707">{{ icon('archive') }} {{ tr('存至工作區') }}</button>{% endif %}
 </div>
 
 {% endblock %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}PDF 密碼保護 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('PDF 密碼保護') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .enc-card { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px;
@@ -16,51 +16,51 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('lock', size=22) }} PDF 密碼保護</h1>
-<p class="muted">為 PDF 設開啟密碼 + 權限控制；輸出 AES-256 加密 PDF。支援多檔批次。</p>
+<h1>{{ icon('lock', size=22) }} {{ tr('PDF 密碼保護') }}</h1>
+<p class="muted">{{ tr('為 PDF 設開啟密碼 + 權限控制；輸出 AES-256 加密 PDF。支援多檔批次。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 上傳 PDF') }}</h2>
   {% with upload_id='encUp', accept='application/pdf', multiple=True %}{% include "components/file_upload.html" %}{% endwith %}
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 密碼</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 密碼') }}</h2>
   <div class="enc-pw">
-    <label for="userPw">開啟密碼</label>
+    <label for="userPw">{{ tr('開啟密碼') }}</label>
     <input id="userPw" type="password" class="field" placeholder="打開 PDF 時要求的密碼（留空表示不需）" />
   </div>
   <div class="enc-pw">
-    <label for="ownerPw">擁有者密碼</label>
+    <label for="ownerPw">{{ tr('擁有者密碼') }}</label>
     <input id="ownerPw" type="password" class="field" placeholder="修改權限設定時才會要求的密碼（不填就用開啟密碼）" />
   </div>
   <div class="enc-pw">
-    <label for="algo">加密演算法</label>
+    <label for="algo">{{ tr('加密演算法') }}</label>
     <select id="algo" class="field" data-s="sdd76ed55">
-      <option value="aes-256" selected>AES-256（建議）</option>
+      <option value="aes-256" selected>{{ tr('AES-256（建議）') }}</option>
       <option value="aes-128">AES-128</option>
-      <option value="rc4-128">RC4-128（舊系統相容）</option>
+      <option value="rc4-128">{{ tr('RC4-128（舊系統相容）') }}</option>
     </select>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">3. 權限（勾選 = 允許）</h2>
-  <p class="muted" data-s="s5a67dd7d">未勾選的動作，開啟密碼輸入後仍被限制；擁有者密碼輸入後可解除所有限制。</p>
+  <h2 data-s="s53896af7">{{ tr('3. 權限（勾選 = 允許）') }}</h2>
+  <p class="muted" data-s="s5a67dd7d">{{ tr('未勾選的動作，開啟密碼輸入後仍被限制；擁有者密碼輸入後可解除所有限制。') }}</p>
   <div class="enc-grid">
-    <label><input type="checkbox" id="allow_print"> 允許列印（一般畫質）</label>
-    <label><input type="checkbox" id="allow_print_hq"> 允許列印（高畫質）</label>
-    <label><input type="checkbox" id="allow_copy"> 允許複製文字 / 圖片</label>
-    <label><input type="checkbox" id="allow_modify"> 允許編輯內容</label>
-    <label><input type="checkbox" id="allow_annotate"> 允許加註解 / 畫記</label>
-    <label><input type="checkbox" id="allow_form"> 允許填寫表單</label>
-    <label><input type="checkbox" id="allow_assemble"> 允許頁面重排 / 插入</label>
-    <label><input type="checkbox" id="allow_accessibility" checked> 允許輔助工具讀取（建議打開）</label>
+    <label><input type="checkbox" id="allow_print"> {{ tr('允許列印（一般畫質）') }}</label>
+    <label><input type="checkbox" id="allow_print_hq"> {{ tr('允許列印（高畫質）') }}</label>
+    <label><input type="checkbox" id="allow_copy"> {{ tr('允許複製文字 / 圖片') }}</label>
+    <label><input type="checkbox" id="allow_modify"> {{ tr('允許編輯內容') }}</label>
+    <label><input type="checkbox" id="allow_annotate"> {{ tr('允許加註解 / 畫記') }}</label>
+    <label><input type="checkbox" id="allow_form"> {{ tr('允許填寫表單') }}</label>
+    <label><input type="checkbox" id="allow_assemble"> {{ tr('允許頁面重排 / 插入') }}</label>
+    <label><input type="checkbox" id="allow_accessibility" checked> {{ tr('允許輔助工具讀取（建議打開）') }}</label>
   </div>
 </div>
 
 <div data-s="s002535c2">
-  <button class="btn btn-primary" id="btn-submit">{{ icon('lock', size=14) }} 加密並下載</button>
+  <button class="btn btn-primary" id="btn-submit">{{ icon('lock', size=14) }} {{ tr('加密並下載') }}</button>
 </div>
 <div data-s="s5371db16">
   {% with progress_id='encJob' %}{% include "components/job_progress.html" %}{% endwith %}

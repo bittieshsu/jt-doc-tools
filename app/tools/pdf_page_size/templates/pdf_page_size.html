@@ -1,53 +1,53 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}頁面尺寸統一 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('頁面尺寸統一') }} · {{ app_name }}{% endblock %}
 
 {% block content %}
-<h1>{{ icon('aspect-ratio', size=22) }} 頁面尺寸統一</h1>
-<p class="muted">把混合尺寸的頁面統一成同一種紙張。標案、工程文件常是 <b>A3 圖說混 A4 內文</b> ——
-送印時印表機每換一種尺寸就停一次，裝訂完也會有幾頁凸出來。
-<b>內容維持向量、文字仍然選得到</b>（不是轉成圖片）。</p>
+<h1>{{ icon('aspect-ratio', size=22) }} {{ tr('頁面尺寸統一') }}</h1>
+<p class="muted">{{ tr('把混合尺寸的頁面統一成同一種紙張。標案、工程文件常是') }} <b>{{ tr('A3 圖說混 A4 內文') }}</b> {{ tr('——
+送印時印表機每換一種尺寸就停一次，裝訂完也會有幾頁凸出來。') }}
+<b>{{ tr('內容維持向量、文字仍然選得到') }}</b>{{ tr('（不是轉成圖片）。') }}</p>
 
 <div class="panel">
-  <h2>1. 上傳檔案</h2>
+  <h2>{{ tr('1. 上傳檔案') }}</h2>
   {% with upload_id='psUpload',
           accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
-          hint='PDF 或辦公文件。上傳後會先告訴你這份文件有幾種尺寸。' %}
+          hint=tr('PDF 或辦公文件。上傳後會先告訴你這份文件有幾種尺寸。') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div id="psSizes" hidden></div>
 </div>
 
 <div class="panel auth-form" id="psOpts" hidden>
-  <h2>2. 統一成</h2>
+  <h2>{{ tr('2. 統一成') }}</h2>
   <fieldset class="auth-section">
-    <legend>{{ icon('page', size=14) }} 目標紙張</legend>
+    <legend>{{ icon('page', size=14) }} {{ tr('目標紙張') }}</legend>
     <div class="af-attrs">
-      <label class="af-field"><span class="af-label">紙張</span>
+      <label class="af-field"><span class="af-label">{{ tr('紙張') }}</span>
         <span class="af-ctl"><select class="field" id="psPaper">
           {% for p in papers %}<option value="{{ p }}"{% if p == 'a4' %} selected{% endif %}>{{ p|upper }}</option>{% endfor %}
-          <option value="custom">自訂尺寸</option>
+          <option value="custom">{{ tr('自訂尺寸') }}</option>
         </select></span></label>
-      <label class="af-field" id="psCustomBox" hidden><span class="af-label">自訂（mm）</span>
+      <label class="af-field" id="psCustomBox" hidden><span class="af-label">{{ tr('自訂（mm）') }}</span>
         <span class="af-ctl ps-wh">
           <input class="field" type="number" id="psW" value="210" min="20" max="2000" step="1">
           <input class="field" type="number" id="psH" value="297" min="20" max="2000" step="1">
         </span></label>
-      <label class="af-field"><span class="af-label">方向</span>
+      <label class="af-field"><span class="af-label">{{ tr('方向') }}</span>
         <span class="af-ctl"><select class="field" id="psOrient">
-          <option value="auto" selected>跟著原頁（建議）</option>
-          <option value="portrait">一律直向</option>
-          <option value="landscape">一律橫向</option>
+          <option value="auto" selected>{{ tr('跟著原頁（建議）') }}</option>
+          <option value="portrait">{{ tr('一律直向') }}</option>
+          <option value="landscape">{{ tr('一律橫向') }}</option>
         </select></span>
-        <small class="af-note">橫的圖說塞進直的 A4 會縮到看不清楚 —— 預設讓橫頁用橫的紙張。</small></label>
-      <label class="af-field"><span class="af-label">原本就對的頁面</span>
-        <span class="af-ctl"><label class="chk"><input type="checkbox" id="psKeep" checked> 不要動</label></span>
-        <small class="af-note">重新放一次會多一層物件、檔案變大，細線也可能被重新取樣。</small></label>
+        <small class="af-note">{{ tr('橫的圖說塞進直的 A4 會縮到看不清楚 —— 預設讓橫頁用橫的紙張。') }}</small></label>
+      <label class="af-field"><span class="af-label">{{ tr('原本就對的頁面') }}</span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="psKeep" checked> {{ tr('不要動') }}</label></span>
+        <small class="af-note">{{ tr('重新放一次會多一層物件、檔案變大，細線也可能被重新取樣。') }}</small></label>
     </div>
   </fieldset>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('crop', size=14) }} 內容怎麼放</legend>
+    <legend>{{ icon('crop', size=14) }} {{ tr('內容怎麼放') }}</legend>
     <div class="ps-fits">
       <label class="ps-fit"><input type="radio" name="psfit" value="scale" checked>
         <span class="ps-fit-box">
@@ -55,7 +55,7 @@
             <rect x="2" y="2" width="96" height="66" rx="2" class="fig-paper"/>
             <rect x="18" y="12" width="64" height="46" rx="1" class="fig-content"/>
           </svg>
-          <b>縮放留白</b><small>等比縮到塞得進去，四周留白。<b>不會掉內容</b>，最安全。</small>
+          <b>{{ tr('縮放留白') }}</b><small>{{ tr('等比縮到塞得進去，四周留白。') }}<b>{{ tr('不會掉內容') }}</b>{{ tr('，最安全。') }}</small>
         </span></label>
       <label class="ps-fit"><input type="radio" name="psfit" value="center">
         <span class="ps-fit-box">
@@ -63,7 +63,7 @@
             <rect x="2" y="2" width="96" height="66" rx="2" class="fig-paper"/>
             <rect x="-6" y="6" width="112" height="58" rx="1" class="fig-content fig-over"/>
           </svg>
-          <b>置中不縮放</b><small>維持原尺寸置中。比紙張大的部分<b>會被裁掉</b>。</small>
+          <b>{{ tr('置中不縮放') }}</b><small>{{ tr('維持原尺寸置中。比紙張大的部分') }}<b>{{ tr('會被裁掉') }}</b>。</small>
         </span></label>
       <label class="ps-fit"><input type="radio" name="psfit" value="crop">
         <span class="ps-fit-box">
@@ -71,7 +71,7 @@
             <rect x="2" y="2" width="96" height="66" rx="2" class="fig-paper"/>
             <rect x="2" y="-4" width="96" height="78" rx="1" class="fig-content fig-over"/>
           </svg>
-          <b>裁切填滿</b><small>放大到填滿紙張，超出的裁掉。適合只想去白邊。</small>
+          <b>{{ tr('裁切填滿') }}</b><small>{{ tr('放大到填滿紙張，超出的裁掉。適合只想去白邊。') }}</small>
         </span></label>
     </div>
   </fieldset>
@@ -79,19 +79,19 @@
 </div>
 
 <div class="panel auth-form" id="psPvPanel" hidden>
-  <h2>3. 預覽</h2>
+  <h2>{{ tr('3. 預覽') }}</h2>
   <fieldset class="auth-section">
-    <legend>{{ icon('eye', size=14) }} 處理後長這樣</legend>
-    <p class="muted ps-hint">灰框是<b>目標紙張的邊界</b>，方便看出留白或裁切。
-      混合尺寸的文件要<b>逐頁看</b> —— 每一種原始尺寸的處理結果都不一樣。</p>
-    <label class="af-field ps-pvpick"><span class="af-label">從第幾頁開始看</span>
+    <legend>{{ icon('eye', size=14) }} {{ tr('處理後長這樣') }}</legend>
+    <p class="muted ps-hint">{{ tr('灰框是') }}<b>{{ tr('目標紙張的邊界') }}</b>{{ tr('，方便看出留白或裁切。
+      混合尺寸的文件要') }}<b>{{ tr('逐頁看') }}</b> {{ tr('—— 每一種原始尺寸的處理結果都不一樣。') }}</p>
+    <label class="af-field ps-pvpick"><span class="af-label">{{ tr('從第幾頁開始看') }}</span>
       <span class="af-ctl"><input class="field af-mini" type="number" id="psPvPage" value="1" min="1">
-        <span class="af-unit">頁起，一次 20 頁<br><span id="psPvRange" class="af-note"></span></span></span></label>
+        <span class="af-unit">{{ tr('頁起，一次 20 頁') }}<br><span id="psPvRange" class="af-note"></span></span></span></label>
     <div class="ps-pages" id="psPages"></div>
   </fieldset>
 
   <div class="ps-actions">
-    <button class="btn btn-primary" type="button" id="psSubmit">{{ icon('save', size=14) }} 統一尺寸</button>
+    <button class="btn btn-primary" type="button" id="psSubmit">{{ icon('save', size=14) }} {{ tr('統一尺寸') }}</button>
   </div>
   {% with progress_id='psJob' %}{% include "components/job_progress.html" %}{% endwith %}
   <div id="psResult" hidden></div>

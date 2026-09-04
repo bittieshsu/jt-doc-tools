@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}PDF 轉文書檔 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('PDF 轉文書檔') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .p2o-stat { display:grid; grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr);
@@ -167,72 +167,72 @@
 {% endblock %}
 
 {% block content %}
-<h1>{{ icon('file-swap', size=22) }} PDF 轉文書檔</h1>
-<p class="muted">把 PDF 轉成 <b>Word (.docx)</b> 或 <b>OpenDocument (.odt)</b>，內含字型 / 段落 / 雜訊智慧校正。
-<br><span data-s="s3a4c95a1">⚠ 不會 100% 還原原 PDF 排版（PDF 是固定排版、Word 是流動排版，本質就無法精準還原）；掃描檔請先用「OCR 文字辨識」工具轉成可選取文字 PDF 再來。</span></p>
+<h1>{{ icon('file-swap', size=22) }} {{ tr('PDF 轉文書檔') }}</h1>
+<p class="muted">{{ tr('把 PDF 轉成') }} <b>Word (.docx)</b> {{ tr('或') }} <b>OpenDocument (.odt)</b>{{ tr('，內含字型 / 段落 / 雜訊智慧校正。') }}
+<br><span data-s="s3a4c95a1">{{ tr('⚠ 不會 100% 還原原 PDF 排版（PDF 是固定排版、Word 是流動排版，本質就無法精準還原）；掃描檔請先用「OCR 文字辨識」工具轉成可選取文字 PDF 再來。') }}</span></p>
 
 <div class="panel">
-  <h2>1. 上傳 PDF</h2>
-  {% with upload_id='p2oUpload', accept='application/pdf', hint='單檔、PDF only。掃描 PDF 請先用 OCR 工具轉成可選取文字 PDF 再來。' %}
+  <h2>{{ tr('1. 上傳 PDF') }}</h2>
+  {% with upload_id='p2oUpload', accept='application/pdf', hint=tr('單檔、PDF only。掃描 PDF 請先用 OCR 工具轉成可選取文字 PDF 再來。') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div id="warnZone"></div>
   <div id="statBox" hidden>
     <div class="p2o-stat">
-      <div class="item"><div class="lbl">檔案</div><div class="val" id="sName">-</div></div>
-      <div class="item"><div class="lbl">頁數</div><div class="val" id="sPages">-</div></div>
-      <div class="item"><div class="lbl">大小</div><div class="val" id="sSize">-</div></div>
+      <div class="item"><div class="lbl">{{ tr('檔案') }}</div><div class="val" id="sName">-</div></div>
+      <div class="item"><div class="lbl">{{ tr('頁數') }}</div><div class="val" id="sPages">-</div></div>
+      <div class="item"><div class="lbl">{{ tr('大小') }}</div><div class="val" id="sSize">-</div></div>
     </div>
   </div>
 </div>
 
 <div class="panel" id="optsPanel" hidden>
-  <h2>2. 選擇輸出格式</h2>
+  <h2>{{ tr('2. 選擇輸出格式') }}</h2>
   <div class="p2o-fmt">
     <input type="radio" name="fmt" id="fmtOdt" value="odt" checked>
     <label for="fmtOdt" data-fmt="odt">
       <div class="ttl"><span class="ic-doc odt">O</span>OpenDocument (.odt)</div>
-      <div class="desc">LibreOffice / OxOffice 原生格式，開源開放。</div>
+      <div class="desc">{{ tr('LibreOffice / OxOffice 原生格式，開源開放。') }}</div>
     </label>
     <input type="radio" name="fmt" id="fmtDocx" value="docx">
     <label for="fmtDocx" data-fmt="docx">
       <div class="ttl"><span class="ic-doc docx">W</span>Word (.docx)</div>
-      <div class="desc">Microsoft Word 原生格式，使用率最廣。</div>
+      <div class="desc">{{ tr('Microsoft Word 原生格式，使用率最廣。') }}</div>
     </label>
   </div>
 </div>
 
 <div class="panel" id="enginePanel" hidden>
-  <h2>3. 轉換引擎</h2>
+  <h2>{{ tr('3. 轉換引擎') }}</h2>
   <div class="p2o-fmt" data-s="s4fa9496a">
     <input type="radio" name="engine" id="engPdf2docx" value="pdf2docx-refine" checked>
     <label for="engPdf2docx" class="eng-c-blue">
-      <div class="ttl"><span class="nm"><span class="dot"></span><b>pdf2docx</b></span><span class="bdg bdg-def">預設</span></div>
+      <div class="ttl"><span class="nm"><span class="dot"></span><b>pdf2docx</b></span><span class="bdg bdg-def">{{ tr('預設') }}</span></div>
       <div class="desc">
-        <p class="body">Artifex pdf2docx 抽取文字與結構重建成 <b>Word</b>，跨平台相容性高、速度快；可在進階選項勾啟 jtdt-refine 後處理再校正版面。</p>
+        <p class="body">{{ tr('Artifex pdf2docx 抽取文字與結構重建成') }} <b>Word</b>{{ tr('，跨平台相容性高、速度快；可在進階選項勾啟 jtdt-refine 後處理再校正版面。') }}</p>
         <div class="erows">
-          <div class="erow"><span class="etag etag-fit">適合</span><span class="etxt">一般文件轉「可繼續編輯」的 Word，追求穩定相容。</span></div>
+          <div class="erow"><span class="etag etag-fit">{{ tr('適合') }}</span><span class="etxt">{{ tr('一般文件轉「可繼續編輯」的 Word，追求穩定相容。') }}</span></div>
         </div>
       </div>
     </label>
     <input type="radio" name="engine" id="engJtdtReform" value="jtdt-reform">
     <label for="engJtdtReform" class="eng-c-violet">
-      <div class="ttl"><span class="nm"><span class="dot"></span><b>jtdt-reform</b></span><span class="bdg bdg-exp">實驗</span></div>
+      <div class="ttl"><span class="nm"><span class="dot"></span><b>jtdt-reform</b></span><span class="bdg bdg-exp">{{ tr('實驗') }}</span></div>
       <div class="desc">
-        <p class="body">依 PDF 實際版面座標，用幾何規則重新推算段落、表格與欄位，重組成 <b>docx / odt</b>，偏向還原成可流動、可再編輯的內文。</p>
+        <p class="body">{{ tr('依 PDF 實際版面座標，用幾何規則重新推算段落、表格與欄位，重組成') }} <b>docx / odt</b>{{ tr('，偏向還原成可流動、可再編輯的內文。') }}</p>
         <div class="erows">
-          <div class="erow"><span class="etag etag-fit">適合</span><span class="etxt">想要接近可編輯排版，能接受少數版面細節仍在調整。</span></div>
+          <div class="erow"><span class="etag etag-fit">{{ tr('適合') }}</span><span class="etxt">{{ tr('想要接近可編輯排版，能接受少數版面細節仍在調整。') }}</span></div>
         </div>
       </div>
     </label>
     <input type="radio" name="engine" id="engDraw" value="jtdt-layout">
     <label for="engDraw" class="eng-c-teal">
-      <div class="ttl"><span class="nm"><span class="dot"></span><b>jtdt-layout</b></span><span class="bdg bdg-new">新</span></div>
+      <div class="ttl"><span class="nm"><span class="dot"></span><b>jtdt-layout</b></span><span class="bdg bdg-new">{{ tr('新') }}</span></div>
       <div class="desc">
-        <p class="body">把每頁內容依原始座標放進頁面錨定的文字方塊，<b>位置、圖片、框線幾乎 1:1 保留</b>，輸出 Word (.docx) / OpenDocument (.odt)。</p>
+        <p class="body">{{ tr('把每頁內容依原始座標放進頁面錨定的文字方塊，') }}<b>{{ tr('位置、圖片、框線幾乎 1:1 保留') }}</b>{{ tr('，輸出 Word (.docx) / OpenDocument (.odt)。') }}</p>
         <div class="erows">
-          <div class="erow"><span class="etag etag-fit">適合</span><span class="etxt">要一份「長得跟原 PDF 一樣、再微調」。</span></div>
-          <div class="erow"><span class="etag etag-limit">限制</span><span class="etxt">浮動文字方塊、非流動文字、沒有真表格；要編輯內文 / 表格請用另兩顆引擎。</span></div>
+          <div class="erow"><span class="etag etag-fit">{{ tr('適合') }}</span><span class="etxt">{{ tr('要一份「長得跟原 PDF 一樣、再微調」。') }}</span></div>
+          <div class="erow"><span class="etag etag-limit">{{ tr('限制') }}</span><span class="etxt">{{ tr('浮動文字方塊、非流動文字、沒有真表格；要編輯內文 / 表格請用另兩顆引擎。') }}</span></div>
         </div>
       </div>
     </label>
@@ -240,56 +240,56 @@
 </div>
 
 <div class="panel" id="advPanel" hidden>
-  <h2>4. 進階選項</h2>
+  <h2>{{ tr('4. 進階選項') }}</h2>
   <label data-s="sdd9b47b8">
     <input type="checkbox" id="enablePost" data-s="sc69fd296">
-    <span>用 <b data-s="s4ddbe905">jtdt-refine</b> 後處理引擎（25 條 fixer：字型 / 段落 / 標題 / 清單 / 表格 / 雜訊 / bbox 版面校正）— 僅對 pdf2docx 引擎有效。預設不勾，需要時手動啟用。</span>
+    <span>{{ tr('用') }} <b data-s="s4ddbe905">jtdt-refine</b> {{ tr('後處理引擎（25 條 fixer：字型 / 段落 / 標題 / 清單 / 表格 / 雜訊 / bbox 版面校正）— 僅對 pdf2docx 引擎有效。預設不勾，需要時手動啟用。') }}</span>
   </label>
 
   <details class="p2o-fixers">
-    <summary>個別 fixer 開關（後處理啟用時生效）</summary>
+    <summary>{{ tr('個別 fixer 開關（後處理啟用時生效）') }}</summary>
     <div class="grid">
-      <label><input type="checkbox" id="fx_fake_table_remove" checked>假表格移除</label>
-      <label><input type="checkbox" id="fx_font_normalize" checked>字型正規化</label>
-      <label><input type="checkbox" id="fx_paragraph_merge" checked>段落合併</label>
-      <label><input type="checkbox" id="fx_paragraph_split" checked>段落拆分</label>
-      <label><input type="checkbox" id="fx_heading_detect" checked>標題識別</label>
-      <label><input type="checkbox" id="fx_list_detect" checked>清單識別</label>
-      <label><input type="checkbox" id="fx_header_footer" checked>頁首頁尾識別</label>
-      <label><input type="checkbox" id="fx_image_position_fix" checked>圖片位置校正</label>
-      <label><input type="checkbox" id="fx_cjk_typography" checked>中文排版</label>
-      <label><input type="checkbox" id="fx_cleanup" checked>雜訊清理</label>
-      <label><input type="checkbox" id="fx_table_autofit" checked>表格寬度自動</label>
-      <label><input type="checkbox" id="fx_table_normalize" checked>表格樣式正規化</label>
-      <label><input type="checkbox" id="fx_table_cell_repair" checked>表格 cell 修復(pdfplumber)</label>
-      <label><input type="checkbox" id="fx_table_dedup_cells" checked>表格相鄰重複 cell 合併</label>
-      <label><input type="checkbox" id="fx_title_split" checked>標題段啟發式拆段</label>
+      <label><input type="checkbox" id="fx_fake_table_remove" checked>{{ tr('假表格移除') }}</label>
+      <label><input type="checkbox" id="fx_font_normalize" checked>{{ tr('字型正規化') }}</label>
+      <label><input type="checkbox" id="fx_paragraph_merge" checked>{{ tr('段落合併') }}</label>
+      <label><input type="checkbox" id="fx_paragraph_split" checked>{{ tr('段落拆分') }}</label>
+      <label><input type="checkbox" id="fx_heading_detect" checked>{{ tr('標題識別') }}</label>
+      <label><input type="checkbox" id="fx_list_detect" checked>{{ tr('清單識別') }}</label>
+      <label><input type="checkbox" id="fx_header_footer" checked>{{ tr('頁首頁尾識別') }}</label>
+      <label><input type="checkbox" id="fx_image_position_fix" checked>{{ tr('圖片位置校正') }}</label>
+      <label><input type="checkbox" id="fx_cjk_typography" checked>{{ tr('中文排版') }}</label>
+      <label><input type="checkbox" id="fx_cleanup" checked>{{ tr('雜訊清理') }}</label>
+      <label><input type="checkbox" id="fx_table_autofit" checked>{{ tr('表格寬度自動') }}</label>
+      <label><input type="checkbox" id="fx_table_normalize" checked>{{ tr('表格樣式正規化') }}</label>
+      <label><input type="checkbox" id="fx_table_cell_repair" checked>{{ tr('表格 cell 修復(pdfplumber)') }}</label>
+      <label><input type="checkbox" id="fx_table_dedup_cells" checked>{{ tr('表格相鄰重複 cell 合併') }}</label>
+      <label><input type="checkbox" id="fx_title_split" checked>{{ tr('標題段啟發式拆段') }}</label>
     </div>
   </details>
 </div>
 
 <div class="panel" id="convertPanel" hidden>
   <div class="p2o-convert-row">
-    <button class="btn btn-primary" id="btnConvert">{{ icon('file-text', size=14) }} 開始轉換</button>
-    <button class="btn btn-danger" id="btnCancel" type="button" hidden>{{ icon('close', size=14) }} 停止轉換</button>
+    <button class="btn btn-primary" id="btnConvert">{{ icon('file-text', size=14) }} {{ tr('開始轉換') }}</button>
+    <button class="btn btn-danger" id="btnCancel" type="button" hidden>{{ icon('close', size=14) }} {{ tr('停止轉換') }}</button>
     {% with progress_id='p2oJob' %}{% include "components/job_progress.html" %}{% endwith %}
   </div>
 </div>
 
 <div class="panel p2o-result" id="resultPanel" hidden>
   <div class="p2o-result-bar">
-    <a class="btn btn-primary" id="rDownload" download>{{ icon('download', size=14) }} 下載</a>
-    {% if workspace_enabled(request) %}<button class="btn" type="button" id="rSaveWs" hidden>{{ icon('archive', size=14) }} 存至工作區</button>{% endif %}
+    <a class="btn btn-primary" id="rDownload" download>{{ icon('download', size=14) }} {{ tr('下載') }}</a>
+    {% if workspace_enabled(request) %}<button class="btn" type="button" id="rSaveWs" hidden>{{ icon('archive', size=14) }} {{ tr('存至工作區') }}</button>{% endif %}
     <div class="p2o-result-summary">
-      <span class="p2o-done">{{ icon('check', size=14) }} 轉換完成</span>
-      <span class="p2o-kv">引擎 <b id="rEngine">-</b></span>
-      <span class="p2o-kv">格式 <b id="rFormat">-</b></span>
+      <span class="p2o-done">{{ icon('check', size=14) }} {{ tr('轉換完成') }}</span>
+      <span class="p2o-kv">{{ tr('引擎') }} <b id="rEngine">-</b></span>
+      <span class="p2o-kv">{{ tr('格式') }} <b id="rFormat">-</b></span>
     </div>
   </div>
   <div class="p2o-heavy" id="rHeavy" hidden></div>
   <div class="meta" id="rMeta"></div>
   <div class="p2o-preview" id="rPreview" hidden>
-    <div class="preview-header" id="rPreviewHeader">前後對照（DPI 90）</div>
+    <div class="preview-header" id="rPreviewHeader">{{ tr('前後對照（DPI 90）') }}</div>
     <div id="rPreviewPages"></div>
   </div>
 </div>

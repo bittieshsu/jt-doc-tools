@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}PDF 轉 Markdown · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('PDF 轉 Markdown') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .pm-warn-box {
@@ -196,106 +196,106 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('paragraph', size=22) }} PDF 轉 Markdown</h1>
-<p class="muted">把 PDF 轉成結構化 Markdown，自動偵測標題層級、表格、粗體。適合餵 LLM / RAG、文件遷移、版本控管。</p>
+<h1>{{ icon('paragraph', size=22) }} {{ tr('PDF 轉 Markdown') }}</h1>
+<p class="muted">{{ tr('把 PDF 轉成結構化 Markdown，自動偵測標題層級、表格、粗體。適合餵 LLM / RAG、文件遷移、版本控管。') }}</p>
 
 <div class="pm-warn-box">
-  <b>{{ icon('warn', size=12) }} 適用情境提示</b>
+  <b>{{ icon('warn', size=12) }} {{ tr('適用情境提示') }}</b>
   <div class="pm-suited">
     <div class="yes">
-      <b>✓ 適合</b><br>
-      • 技術手冊 / 教學文件 / 報告<br>
-      • 政府公文 / 法規 / 條款<br>
-      • 學術論文 / 書籍章節<br>
-      • 中英文段落文字（單欄為主）
+      <b>{{ tr('✓ 適合') }}</b><br>
+      {{ tr('• 技術手冊 / 教學文件 / 報告') }}<br>
+      {{ tr('• 政府公文 / 法規 / 條款') }}<br>
+      {{ tr('• 學術論文 / 書籍章節') }}<br>
+      {{ tr('• 中英文段落文字（單欄為主）') }}
     </div>
     <div class="no">
-      <b>✗ 不適合</b><br>
-      • 表單類（請用「擷取文字」或「PDF 轉文書檔」）<br>
-      • 簡報 / 投影片<br>
-      • 複雜版面（雜誌 / 海報 / 多欄複雜表格）<br>
-      • 純圖片 / 掃描檔（先用「OCR」加文字層）
+      <b>{{ tr('✗ 不適合') }}</b><br>
+      {{ tr('• 表單類（請用「擷取文字」或「PDF 轉文書檔」）') }}<br>
+      {{ tr('• 簡報 / 投影片') }}<br>
+      {{ tr('• 複雜版面（雜誌 / 海報 / 多欄複雜表格）') }}<br>
+      {{ tr('• 純圖片 / 掃描檔（先用「OCR」加文字層）') }}
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳 PDF</h2>
-  {% with upload_id='pmUpload', accept='application/pdf', hint='單檔、PDF only、上限 100 MB' %}
+  <h2 data-s="s53896af7">{{ tr('1. 上傳 PDF') }}</h2>
+  {% with upload_id='pmUpload', accept='application/pdf', hint=tr('單檔、PDF only、上限 100 MB') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 選項</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 選項') }}</h2>
   <div class="pm-opts">
     <div class="pm-opt">
       <div class="pm-opt-head">
         <span class="pm-opt-icon">{{ icon('image', size=14) }}</span>
-        <span>抽出圖片</span>
+        <span>{{ tr('抽出圖片') }}</span>
       </div>
       <div class="pm-opt-ctrl">
         <label data-s="sf84328fe">
           <input type="checkbox" id="pmIncludeImages">
-          <span>同時抽出 PDF 圖片</span>
+          <span>{{ tr('同時抽出 PDF 圖片') }}</span>
         </label>
       </div>
-      <div class="pm-opt-hint">啟用時下載 ZIP 含 <code>images/</code> 資料夾，Markdown 以 <code>![](images/...)</code> 引用。</div>
+      <div class="pm-opt-hint">{{ tr('啟用時下載 ZIP 含') }} <code>images/</code> {{ tr('資料夾，Markdown 以') }} <code>![](images/...)</code> {{ tr('引用。') }}</div>
     </div>
 
     <div class="pm-opt">
       <div class="pm-opt-head">
         <span class="pm-opt-icon">{{ icon('file-text', size=14) }}</span>
-        <span>圖片格式</span>
+        <span>{{ tr('圖片格式') }}</span>
       </div>
       <div class="pm-opt-ctrl">
         <select id="pmImageFormat" class="jt-select" data-s="s844e0595">
-          <option value="png" selected>PNG（無損）</option>
-          <option value="jpg">JPG（小檔）</option>
+          <option value="png" selected>{{ tr('PNG（無損）') }}</option>
+          <option value="jpg">{{ tr('JPG（小檔）') }}</option>
           <option value="webp">WebP</option>
         </select>
       </div>
-      <div class="pm-opt-hint">PNG 適合文字 / 線稿；JPG / WebP 適合照片。僅在「抽出圖片」啟用時生效。</div>
+      <div class="pm-opt-hint">{{ tr('PNG 適合文字 / 線稿；JPG / WebP 適合照片。僅在「抽出圖片」啟用時生效。') }}</div>
     </div>
 
     <div class="pm-opt">
       <div class="pm-opt-head">
         <span class="pm-opt-icon">{{ icon('split', size=14) }}</span>
-        <span>頁分隔線</span>
+        <span>{{ tr('頁分隔線') }}</span>
       </div>
       <div class="pm-opt-ctrl">
         <label data-s="sf84328fe">
           <input type="checkbox" id="pmPageSeparator" checked>
-          <span>頁間插入 <code>-----</code></span>
+          <span>{{ tr('頁間插入') }} <code>-----</code></span>
         </label>
       </div>
-      <div class="pm-opt-hint">方便 LLM / RAG 系統按頁切 chunk。關閉則整份合成連續文字。</div>
+      <div class="pm-opt-hint">{{ tr('方便 LLM / RAG 系統按頁切 chunk。關閉則整份合成連續文字。') }}</div>
     </div>
   </div>
 
   <div class="pm-actions" data-s="s43843570">
-    <button class="btn btn-primary" id="pmConvert">{{ icon('refresh', size=12) }} 開始轉換</button>
+    <button class="btn btn-primary" id="pmConvert">{{ icon('refresh', size=12) }} {{ tr('開始轉換') }}</button>
     <span id="pmStatus" data-s="s954fd00a"></span>
   </div>
   <div id="pmError" class="pm-error" hidden data-s="s5371db16"></div>
 </div>
 
 <div class="panel" id="pmResultPanel" hidden>
-  <h2 data-s="s53896af7">3. 結果（Markdown 原文 ↔ 渲染對照）</h2>
+  <h2 data-s="s53896af7">{{ tr('3. 結果（Markdown 原文 ↔ 渲染對照）') }}</h2>
   <div class="pm-stat" id="pmStat"></div>
   <div class="pm-actions">
-    <a class="btn btn-primary" id="pmDlMd" download href="#">{{ icon('download', size=12) }} 下載 .md</a>
-    <a class="btn" id="pmDlZip" download href="#" hidden data-s="s14e64acc">{{ icon('download', size=12) }} 下載 ZIP（含圖片）</a>
-    <button class="btn" id="pmCopy" type="button" data-s="s14e64acc">{{ icon('copy', size=12) }} 複製全文</button>
+    <a class="btn btn-primary" id="pmDlMd" download href="#">{{ icon('download', size=12) }} {{ tr('下載 .md') }}</a>
+    <a class="btn" id="pmDlZip" download href="#" hidden data-s="s14e64acc">{{ icon('download', size=12) }} {{ tr('下載 ZIP（含圖片）') }}</a>
+    <button class="btn" id="pmCopy" type="button" data-s="s14e64acc">{{ icon('copy', size=12) }} {{ tr('複製全文') }}</button>
   </div>
 
   <div class="pm-splitwrap" id="pmSplitWrap" data-mode="both">
     <div class="pm-splitcol" id="pmColLeft">
       <div class="pm-splitcol-head">
-        <span data-s="s7691c43d">{{ icon('file-text', size=14) }} Markdown 原始碼</span>
+        <span data-s="s7691c43d">{{ icon('file-text', size=14) }} {{ tr('Markdown 原始碼') }}</span>
         <span data-s="sf84328fe">
-          <span class="muted" data-s="s8b685211">保留標記符號</span>
-          <button type="button" class="pm-collapse-btn" id="pmCollapseLeft" title="向左收折">◀ 收折</button>
+          <span class="muted" data-s="s8b685211">{{ tr('保留標記符號') }}</span>
+          <button type="button" class="pm-collapse-btn" id="pmCollapseLeft" title="向左收折">{{ tr('◀ 收折') }}</button>
         </span>
       </div>
       <div class="pm-splitcol-body">
@@ -304,10 +304,10 @@
     </div>
     <div class="pm-splitcol" id="pmColRight">
       <div class="pm-splitcol-head">
-        <span data-s="s7691c43d">{{ icon('paragraph', size=14) }} 渲染結果</span>
+        <span data-s="s7691c43d">{{ icon('paragraph', size=14) }} {{ tr('渲染結果') }}</span>
         <span data-s="sf84328fe">
-          <span class="muted" data-s="s8b685211">含標題 / 表格 / 粗體</span>
-          <button type="button" class="pm-collapse-btn" id="pmCollapseRight" title="向右收折">收折 ▶</button>
+          <span class="muted" data-s="s8b685211">{{ tr('含標題 / 表格 / 粗體') }}</span>
+          <button type="button" class="pm-collapse-btn" id="pmCollapseRight" title="向右收折">{{ tr('收折 ▶') }}</button>
         </span>
       </div>
       <div class="pm-splitcol-body">

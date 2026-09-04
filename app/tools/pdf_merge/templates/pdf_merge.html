@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}檔案合併 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('檔案合併') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('merge', size=22) }} 檔案合併</h1>
-<p class="muted">把多份 PDF 依「下方清單順序」合併為一份。可拖曳卡片調整順序、再次拖入會追加更多檔案、按 ❌ 移除單一檔。</p>
+<h1>{{ icon('merge', size=22) }} {{ tr('檔案合併') }}</h1>
+<p class="muted">{{ tr('把多份 PDF 依「下方清單順序」合併為一份。可拖曳卡片調整順序、再次拖入會追加更多檔案、按 ❌ 移除單一檔。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">上傳 PDF（多檔）</h2>
-  {% with upload_id='pdfMergeUpload', accept='application/pdf', multiple=True, hint='可分次拖入累加；至少 2 份才能合併。<br>輸出順序 = 下方清單順序，拖曳卡片可調整。' %}
+  <h2 data-s="s53896af7">{{ tr('上傳 PDF（多檔）') }}</h2>
+  {% with upload_id='pdfMergeUpload', accept='application/pdf', multiple=True, hint=tr('可分次拖入累加；至少 2 份才能合併。<br>輸出順序 = 下方清單順序，拖曳卡片可調整。') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div id="merge-list" class="merge-list" hidden></div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">執行</h2>
-  <button class="btn btn-primary" id="btn-submit">{{ icon('save') }}開始合併</button>
+  <h2 data-s="s53896af7">{{ tr('執行') }}</h2>
+  <button class="btn btn-primary" id="btn-submit">{{ icon('save') }}{{ tr('開始合併') }}</button>
   {% with progress_id='jp' %}{% include "components/job_progress.html" %}{% endwith %}
 </div>
 
