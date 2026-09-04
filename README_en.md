@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English**
 
-# Jason Tools Document Toolbox v1.15.0
+# Jason Tools Document Toolbox v1.15.1
 
 > An all-in-one PDF and Office document platform. 47 tools covering **form filling and stamping**, **watermarks**, **N-up / split / rotate / organise**, **conversion**, **scan merge**, **redaction**, **word count**, **annotation reports**, **comparison**, **sentence translation**, **list tools**, **e-invoice processing**, **company ID lookup**, **page editor**, **encryption / decryption** and more.
 >
@@ -13,7 +13,7 @@ Full introduction site: <https://jasoncheng7115.github.io/jt-doc-tools/index-en.
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![CodeQL](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml)
 [![OWASP Top 10 (2025)](https://img.shields.io/badge/OWASP%20Top%2010%20(2025)-A01--A10%20covered-success?logo=owasp)](SECURITY.md)
-[![Tests](https://img.shields.io/badge/pytest-5973%20passed-brightgreen?logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/pytest-5989%20passed-brightgreen?logo=pytest)](tests/)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-success?logo=dependabot)](.github/dependabot.yml)
 [![Python](https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white)](pyproject.toml)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](INSTALL.md)

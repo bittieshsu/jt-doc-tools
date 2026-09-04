@@ -19,7 +19,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.15.0"
+VERSION = "1.15.1"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -812,6 +812,22 @@ async def _broken_pdf_exc(request: Request, exc: Exception):
         {"detail": "檔案打不開 —— 可能已毀損、內容不完整，或副檔名與實際格式"
                    "不符。請確認來源檔可以正常開啟後再上傳一次。"},
         status_code=400)
+
+
+# 縮圖 / 預覽端點的頁碼在**路徑上**，所以「第 0 頁」「第 99 頁」這種是
+# **使用者送錯網址**，不是伺服器壞掉。`render_page_png` 早就擋住了範圍
+# （v1.14.31 修的「page_no=0 用負索引回最後一頁還 200 OK」），但它丟的
+# `ValueError` 沒人接，一路冒成 500 —— 500 會讓人以為服務掛了而一直重試，
+# 監控端也全是假警報（同上面毀損檔案那條）。
+#
+# 跟毀損檔案一樣用**一個全域處理器**涵蓋所有呼叫點：全站三十幾支縮圖 /
+# 預覽端點形狀相同，逐支改的話下一支新工具又會漏。
+from .core.pdf_preview import PageOutOfRange as _PageOutOfRange  # noqa: E402
+
+
+@app.exception_handler(_PageOutOfRange)
+async def _page_out_of_range_exc(request: Request, exc: Exception):
+    return _JSONResponse({"detail": str(exc) or "頁碼超出範圍。"}, status_code=404)
 
 
 # 參數驗證失敗（422）**不要把使用者送的原字串回填到回應裡**。

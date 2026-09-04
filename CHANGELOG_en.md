@@ -11,6 +11,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ---
 
+## [1.15.1] - 2026-09-05
+
+### An out-of-range thumbnail page returned 500
+
+`/tools/pdf-rotate/thumb/<id>/0` and `/99` both returned **500**. The page number
+is **in the path**, so that is a user asking for a URL that does not exist, not a
+broken server — **a 500 makes people think the service is down and keep retrying,
+and fills the monitoring with false alarms** (the same principle as v1.14.37's
+"a corrupt file is always 400, never 500").
+
+The interesting part: **the range was already checked**. `render_page_png` was
+fixed in v1.14.31 for the nastier bug where `page_no=0` used a negative index,
+returned the last page, and answered 200 OK. But nothing caught the `ValueError`
+it raised, so it surfaced as a 500.
+
+The fix is one **global handler** (a dedicated `PageOutOfRange` → 404), as with
+corrupt files — the thirty-odd thumbnail and preview endpoints all have the same
+shape, and patching them one at a time means the next new tool is missed again.
+
+The gate (`tests/test_preview_page_range.py`) judges **"not a 5xx" rather than
+"must be 404"** (a tool that stops it earlier with a 400 is also right), and it
+has **a reverse check**: without one, making the endpoint always return 404 would
+pass. Mutation test: removing the handler turns 12 cases red.
+
+### Running a tool for real in the English interface
+
+`temp/i18n-cdp/cdp_en_e2e.py` sends a PDF through the tools **in English** and
+looks at the output. Wrapping JS strings deliberately skipped ternaries and string
+concatenation (those may hold values that are compared or sent to the server), but
+skipping is only an attempt to avoid the problem, not proof of it — a translated
+value looks **perfectly normal on screen while the logic quietly breaks, and only
+in English**. Measured: word count reports 3 pages / 21 words, page rotation
+uploads and returns a 5,132-byte thumbnail, and not one drop-down `value` has
+turned into Chinese.
+
+The workspace drop area hint — the last leftover — is translated too.
+
+---
+
 ## [1.15.0] - 2026-09-05
 
 > The patch number rolls into a minor at 99 (a project convention, so no 1.14.100).

@@ -45,6 +45,16 @@ async def render_page_png_async(*args, **kwargs) -> tuple[int, int]:
     return await asyncio.to_thread(render_page_png, *args, **kwargs)
 
 
+class PageOutOfRange(ValueError):
+    """頁碼不在文件裡。
+
+    這是**使用者送錯網址**（縮圖 / 預覽端點的頁碼在路徑上），不是伺服器壞掉，
+    所以要回 404 而不是 500 —— 500 會讓人以為服務掛了而一直重試，監控端也全是
+    假警報（同 v1.14.37 的「毀損檔案一律 400 不可 500」）。
+    `app/main.py` 有全域處理器把它轉成 404。
+    """
+
+
 def render_page_png(
     pdf_path: Path,
     out_png: Path,
@@ -64,7 +74,7 @@ def render_page_png(
         # 與 `page_no=5` 回的 PNG 位元組一模一樣）。超出範圍則是 IndexError
         # 冒上去變成 500。四支工具的縮圖端點形狀相同，擋在這一處才不會再長回來。
         if not (0 <= page_index < doc.page_count):
-            raise ValueError(
+            raise PageOutOfRange(
                 f"頁碼超出範圍（第 {page_index + 1} 頁，文件共 {doc.page_count} 頁）")
         page = doc[page_index]
         actual_dpi = dpi

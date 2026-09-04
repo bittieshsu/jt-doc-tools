@@ -265,7 +265,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **212 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **213 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -423,6 +423,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_pdf_wordcount.py` | Tests for the pdf-wordcount tool. |
 | `test_placeholder_extraction.py` | 擷取出來全是佔位字元（圓點 / 星號…）但畫面上其實是真的字 |
 | `test_preview_acl_failopen.py` | 預覽端點的 ACL 不可以「認不出 upload_id 就放行」 |
+| `test_preview_page_range.py` | 縮圖 / 預覽的頁碼超出範圍要回 4xx，**不可以 500** |
 | `test_proxy_sso.py` | Reverse-proxy (Kerberos/SPNEGO) SSO — app/core/proxy_sso.py + middleware. |
 | `test_real_samples_smoke.py` | 拿**真實的**樣本檔掃過所有吃單一 PDF 的工具 |
 | `test_redos_ad_dn.py` | ReDoS regression for RE_AD_DN — closes CodeQL alert #13 |
@@ -2964,6 +2965,25 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       （`test_domain_data_modules_never_use_the_translation_helper`）。
       翻掉會讓表單自動填寫**安靜地抓不到欄位** —— 畫面顯示「已處理」，只有收件方發現。
 - [ ] **產品名不自動翻**：那是品牌，而且管理員可以自訂站台名稱。
+
+---
+
+### 6.64 v1.15.1 — 縮圖頁碼超出範圍不可以 500（每次發版必過）
+
+- [ ] `/tools/<id>/thumb/<upload_id>/0`、`/99` 一律 **4xx**（判準是「不是 5xx」，
+      有些工具自己先擋回 400 也對）。頁碼在路徑上 —— 那是使用者送錯網址，
+      **500 會讓人以為服務掛了而一直重試**。
+- [ ] **反向對照**：第 1 頁還是要畫得出圖而且不是空的。
+      只驗「超範圍會被擋」的話，把端點改成永遠回 404 也會過。
+- [ ] 守門 `tests/test_preview_page_range.py`；修法是**全域處理器**
+      （`PageOutOfRange` → 404），不是逐支端點改 —— 逐支改下一支新工具又會漏。
+
+### 6.65 v1.15.1 — 英文介面要真的跑得動（每次發版必過）
+
+- [ ] `temp/i18n-cdp/cdp_en_e2e.py`：英文介面送 PDF 進去，字數統計算得出頁數
+      與字數、頁面轉向取得縮圖且不是空的。
+- [ ] **下拉的 `value` 不可以變成中文** —— 那些是送給伺服器的值，翻掉之後
+      畫面完全正常、只有邏輯壞，而且只在英文介面才壞。
 
 ---
 
