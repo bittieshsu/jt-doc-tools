@@ -391,6 +391,12 @@ class LLMClient:
             payload.setdefault("options", {})["think"] = False
             if profile.use_chat_template_kwargs:
                 payload["chat_template_kwargs"] = {"enable_thinking": False}
+            # **Ollama 0.33 起 `think:false` 對 gemma4 已經沒有用**（實測：同一句
+            # 翻譯還是產生 794~23,650 字的思考內容，10 段的批次從 18 秒變成 151 秒）。
+            # 關得掉的是 OpenAI 相容端點的 `reasoning_effort: "none"`
+            # —— 實測 reasoning 0 字、0.3 秒。`low` 沒有用（仍然 1,161 字）。
+            # 真正的 OpenAI 不認得 "none"，所以 400 時會自動拿掉重送（見下面的 retry）。
+            payload["reasoning_effort"] = "none"
         parts: list[str] = []
         # 外部 LLM 的同時呼叫上限（預設 1）—— 見 remote_limit 的說明：真正的
         # 瓶頸在對方那台機器，本機的記憶體准入檢查擋不到。
