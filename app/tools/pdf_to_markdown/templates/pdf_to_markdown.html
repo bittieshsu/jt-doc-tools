@@ -339,7 +339,7 @@
   });
 
   $('pmConvert').addEventListener('click', async () => {
-    if (!pickedFile) { alert('請先選 PDF'); return; }
+    if (!pickedFile) { alert(tr('請先選 PDF')); return; }
     $('pmError').hidden = true;
     $('pmResultPanel').hidden = true;
     const btn = $('pmConvert');
@@ -358,7 +358,7 @@
       const r = await fetch('/tools/pdf-to-markdown/convert', { method:'POST', body: fd });
       if (!r.ok) {
         const txt = await r.text();
-        $('pmError').textContent = '轉換失敗: ' + txt.slice(0, 500);
+        $('pmError').textContent = tr('轉換失敗: ') + txt.slice(0, 500);
         $('pmError').hidden = false;
         $('pmStatus').textContent = '';
         return;
@@ -410,9 +410,9 @@
 
 
       $('pmResultPanel').hidden = false;
-      $('pmStatus').textContent = '✓ 完成';
+      $('pmStatus').textContent = tr('✓ 完成');
     } catch (e) {
-      $('pmError').textContent = '請求失敗: ' + e;
+      $('pmError').textContent = tr('請求失敗: ') + e;
       $('pmError').hidden = false;
       $('pmStatus').textContent = '';
     } finally {
@@ -435,13 +435,13 @@
     // Update button labels — clicking the rail's button expands it back
     if (mode === 'right-only') {
       lBtn.textContent = '▶';   // left is rail → click to expand left
-      rBtn.textContent = '◀ 收折';
+      rBtn.textContent = tr('◀ 收折');
     } else if (mode === 'left-only') {
-      lBtn.textContent = '收折 ▶';
+      lBtn.textContent = tr('收折 ▶');
       rBtn.textContent = '◀';   // right is rail → click to expand right
     } else {
-      lBtn.textContent = '◀ 收折';
-      rBtn.textContent = '收折 ▶';
+      lBtn.textContent = tr('◀ 收折');
+      rBtn.textContent = tr('收折 ▶');
     }
   }
   // Click anywhere on a rail panel head expands it back to both
@@ -473,10 +473,10 @@
       await navigator.clipboard.writeText(lastResult.markdown);
       const btn = $('pmCopy');
       const orig = btn.innerHTML;
-      btn.textContent = '✓ 已複製';
+      btn.textContent = tr('✓ 已複製');
       setTimeout(() => { btn.innerHTML = orig; }, 1500);
     } catch (e) {
-      alert('複製失敗: ' + e);
+      alert(tr('複製失敗: ') + e);
     }
   });
 })();

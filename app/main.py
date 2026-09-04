@@ -19,7 +19,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.97"
+VERSION = "1.14.98"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -784,6 +784,7 @@ from fastapi.responses import HTMLResponse  # noqa: E402
 # body 時，json.JSONDecodeError 原本會冒成 500（不雅且像伺服器出錯）。統一改回
 # 400「Invalid JSON body」（客戶端錯誤）。涵蓋全部 ~80 個 request.json() 呼叫點，
 # 不需逐一加 try/except。UI 一律送合法 JSON → 正常流程不受影響。
+import hashlib as _hashlib  # noqa: E402
 import json as _json  # noqa: E402
 from fastapi.exceptions import (  # noqa: E402
     RequestValidationError as _RequestValidationError,
@@ -856,7 +857,9 @@ from urllib.parse import quote as _qstr  # noqa: E402
 #: **前綴**比對的公開路徑。只放「底下真的整片都公開」的東西。
 #: 這裡的每一條都會讓 `/xxx*` 全部跳過認證閘 —— 新增前先問「有沒有可能有人
 #: 之後加一條 `/login-admin` 之類的路由」。
-_PUBLIC_PREFIXES = ("/static/",
+_PUBLIC_PREFIXES = (
+                    "/i18n/",         # 介面語系字典（純靜態字串，無使用者資料）
+                    "/static/",
                     "/setup-admin",   # 需前綴：還有 /setup-admin/reuse-existing
                                       # （三個處理函式都自己再擋 is_enabled()）
                     "/api/",          # 見下方說明：整片略過認證閘，各端點自己擋
@@ -886,6 +889,35 @@ async def set_ui_locale(request: Request):
                     httponly=True, samesite="lax",
                     secure=(request.url.scheme == "https"))
     return resp
+
+
+@app.get("/i18n/{locale}.js")
+async def ui_locale_dictionary(locale: str, request: Request):
+    """前端字典。`static/js/i18n.js` 的 `tr()` 讀這裡設的 `window.__I18N__`。
+
+    **為什麼是獨立的 JS 檔而不是塞進 HTML**：字典有一千多條（~90 KB），
+    塞進每一頁的 HTML 等於每次載入都重傳一次；獨立檔案瀏覽器可以快取。
+
+    **繁體中文根本不會載這支** —— 樣板只在切到別的語言時才輸出這個
+    `<script src>`，中文底下 `tr()` 原樣回傳，零成本零風險。
+    """
+    from .core import i18n as _i18n, ui_locale as _loc
+    lang = _loc.normalise(locale)
+    if not lang or lang == _loc.DEFAULT_LOCALE:
+        # 預設語言沒有字典（也不該有人來要）—— 回空的比 404 好，
+        # 因為 404 會在主控台留下紅字，看起來像壞了。
+        body = "window.__I18N__={};"
+    else:
+        body = ("window.__I18N__="
+                + _json.dumps(_i18n.catalog(lang), ensure_ascii=False) + ";")
+    # 字典有 100 KB 左右，而它只在升級時才會變 —— 給 ETag 讓瀏覽器換頁時
+    # 只送一次 If-None-Match 拿 304，不要每頁重下一份。
+    # `no-cache` 不是「不快取」，是「用之前先問一下」（同 `_RevalidatingStatic`）。
+    etag = '"%s"' % _hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
+    headers = {"Cache-Control": "no-cache", "ETag": etag}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(body, media_type="application/javascript", headers=headers)
 
 
 _PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/favicon.ico", "/2fa-verify", "/ui-locale"}

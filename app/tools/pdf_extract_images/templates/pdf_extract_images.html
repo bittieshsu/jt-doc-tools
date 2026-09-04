@@ -185,12 +185,12 @@ document.getElementById('btn-select-none').addEventListener('click', () => {
 
 document.getElementById('btn-zip').addEventListener('click', async () => {
   if (!extractedBatch) return;
-  if (!picked.size) return alert('請先勾選至少一張圖片');
+  if (!picked.size) return alert(tr('請先勾選至少一張圖片'));
   const r = await fetch('/tools/pdf-extract-images/zip-selected', {
     method:'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ batch_id: extractedBatch, names: [...picked] }),
   });
-  if (!r.ok) { alert('打包失敗'); return; }
+  if (!r.ok) { alert(tr('打包失敗')); return; }
   const blob = await r.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

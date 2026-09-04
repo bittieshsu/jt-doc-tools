@@ -133,16 +133,16 @@ async function handleUpload(file) {
       : fetch('/tools/pdf-extract-text/extract', {method:'POST', body: fd}));
     if (!r.ok) {
       const txt = await r.text();
-      $('status').textContent = '失敗';
+      $('status').textContent = tr('失敗');
       $('preview').innerHTML = `<div class="et-error">擷取失敗：${escapeHtmlExt(txt)}</div>`;
       return;
     }
     const d = await r.json();
     currentBatch = d.batch_id;
-    $('status').textContent = '完成';
+    $('status').textContent = tr('完成');
     renderResult(d);
   } catch (e) {
-    $('status').textContent = '錯誤';
+    $('status').textContent = tr('錯誤');
     $('preview').innerHTML = `<div class="et-error">${escapeHtmlExt(e.message)}</div>`;
   }
 }
@@ -199,14 +199,14 @@ document.getElementById('btnLlmReflow').addEventListener('click', async () => {
   const btn = document.getElementById('btnLlmReflow');
   const origLabel = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '重排中…';
+  btn.innerHTML = tr('重排中…');
   const box = $('llmProgressBox');
   const bar = $('llmProgBar');
   const pct = $('llmProgPct');
   const msg = $('llmProgText');
   box.hidden = false;
   bar.style.width = '0%'; pct.textContent = '0%';
-  msg.textContent = '連線到 LLM…';
+  msg.textContent = tr('連線到 LLM…');
 
   // Elapsed-time ticker: fires every second so the UI feels alive during
   // the (often 10–30s) single-paragraph LLM call where no NDJSON event
@@ -273,13 +273,13 @@ document.getElementById('btnLlmReflow').addEventListener('click', async () => {
           const hint = $('previewDiffHint');
           hint.hidden = false;
           if (diffChars === 0) {
-            hint.textContent = '（內容與原始相同 — LLM 未修改任何字元）';
+            hint.textContent = tr('（內容與原始相同 — LLM 未修改任何字元）');
             hint.style.color = '#6b7280';
           } else {
             hint.textContent = `（共 ${diffChars} 字元差異，可切換比對）`;
             hint.style.color = '#0f766e';
           }
-          $('status').textContent = 'LLM 已重排';
+          $('status').textContent = tr('LLM 已重排');
         } else if (ev.type === 'error') {
           currentStatus = '失敗：' + (ev.message || '未知錯誤');
         }

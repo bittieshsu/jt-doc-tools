@@ -1128,7 +1128,7 @@ function _ovrSetRotation(kind, deg) {
   if (input) input.value = d.toFixed(1);
   if (!ov) {
     if (window.showToast) window.showToast(
-      '請先啟用並在下方預覽區產生' + (kind === 'date' ? '日期' : '個資限用章'), 'err');
+      tr('請先啟用並在下方預覽區產生') + (kind === 'date' ? '日期' : '個資限用章'), 'err');
     return;
   }
   ov.setRotation(d);
@@ -1173,7 +1173,7 @@ function applyPosMode() {
   // 多檔批次時每頁獨立不適用（各檔頁數不同）→ 自動退回統一位置
   if (on && pickedFiles.length > 1) {
     _setPosMode('uniform');
-    if (window.showToast) window.showToast('多檔批次不支援「頁面個別用印」，已切回每頁統一用印', 'err');
+    if (window.showToast) window.showToast(tr('多檔批次不支援「頁面個別用印」，已切回每頁統一用印'), 'err');
     return;
   }
   // 「編輯 / 合成」切換在兩種位置模式下都保留（新模式也要能看合成結果）。
@@ -1289,7 +1289,7 @@ function _renderSimPage() {
   img.src = p.preview_url + '?t=' + t;
   img.alt = 'page ' + (p.index + 1);
   document.getElementById('sim-cap').textContent =
-    '第 ' + (p.index + 1) + ' 頁 / 共 ' + simPageCount + ' 頁' + (p.stamped ? ' · 已蓋章' : ' · 此頁未蓋章');
+    tr('第 ') + (p.index + 1) + ' 頁 / 共 ' + simPageCount + ' 頁' + (p.stamped ? ' · 已蓋章' : ' · 此頁未蓋章');
   document.getElementById('sim-page-info').textContent = (simPageIdx + 1) + ' / ' + simPages.length;
   document.getElementById('sim-prev').disabled = simPageIdx === 0;
   document.getElementById('sim-next').disabled = simPageIdx >= simPages.length - 1;
@@ -1307,7 +1307,7 @@ async function refreshSim() {
   simDebounce = setTimeout(async () => {
     const seq = ++simSeq;
     const status = document.getElementById('sim-status');
-    status.textContent = '產生合成圖中…';
+    status.textContent = tr('產生合成圖中…');
     // 整頁遮罩 + 大字狀態：頁數多時要數秒，沒回饋會被誤以為當機
     const busy = document.getElementById('sim-busy');
     const busySub = document.getElementById('sim-busy-sub');
@@ -1322,14 +1322,14 @@ async function refreshSim() {
     fd.append('stamp_id', stampId);
     if (stampId === '__temp__') {
       const tf = tempAssetAsFile();
-      if (!tf) { status.textContent = '臨時資產遺失'; return; }
+      if (!tf) { status.textContent = tr('臨時資產遺失'); return; }
       fd.append('temp_asset_file', tf, tf.name);
     }
     fd.append('file', f);
     // 每頁獨立位置模式：改送 placements，讓合成預覽逐頁反映各自位置（issue #38）。
     if (isPlacementMode() && placementEditor) {
       const plc = placementEditor.getValue();
-      if (!plc.length) { status.textContent = '尚未放置任何簽名 / 印章'; return; }
+      if (!plc.length) { status.textContent = tr('尚未放置任何簽名 / 印章'); return; }
       fd.append('placements_json', JSON.stringify(plc));
     } else {
       appendPagesField(fd);
@@ -1348,7 +1348,7 @@ async function refreshSim() {
     try {
       const r = await fu.upload('/tools/pdf-stamp/preview-all-pages', fd, {processingLabel: '產生全頁預覽中…'});
       if (seq !== simSeq) return; // superseded
-      if (!r.ok) { status.textContent = '模擬圖產生失敗'; return; }
+      if (!r.ok) { status.textContent = tr('模擬圖產生失敗'); return; }
       const j = await r.json();
       simPages = j.pages;
       simPageCount = j.page_count;
@@ -1363,7 +1363,7 @@ async function refreshSim() {
       _renderSimPage();
     } catch (e) {
       if (seq !== simSeq) return;
-      status.textContent = '模擬圖產生失敗';
+      status.textContent = tr('模擬圖產生失敗');
     } finally {
       // 只有「最新一次」請求負責收遮罩，避免被較早的請求提前關掉
       if (seq === simSeq && busy) busy.hidden = true;
@@ -1469,15 +1469,15 @@ document.addEventListener('change', (e) => {
 function appendTempAssetIfNeeded(fd) {
   if (getSelectedStamp() !== '__temp__') return true;
   const f = tempAssetAsFile();
-  if (!f) { alert('臨時資產已遺失，請重新上傳'); return false; }
+  if (!f) { alert(tr('臨時資產已遺失，請重新上傳')); return false; }
   fd.append('temp_asset_file', f, f.name);
   return true;
 }
 
 document.getElementById('btn-submit').addEventListener('click', async () => {
   const stampId = getSelectedStamp();
-  if (!stampId) return alert('請先選擇印章 / 簽名 / Logo,或點「不蓋章」改用下方日期 / 個資限用章');
-  if (!pickedFiles.length) return alert('請先上傳 PDF');
+  if (!stampId) return alert(tr('請先選擇印章 / 簽名 / Logo,或點「不蓋章」改用下方日期 / 個資限用章'));
+  if (!pickedFiles.length) return alert(tr('請先上傳 PDF'));
   // Extra items — backend treats them as secondary stamps (date, restrict, etc.)
   const extras = [];
   const dateItem = window.__dateOverlayState__ ? window.__dateOverlayState__() : null;
@@ -1486,11 +1486,11 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   if (restrictItem) extras.push(restrictItem);
   // 「不蓋章」必須至少有一個 extra (date 或 restrict),否則整份 PDF 不會有任何蓋章
   if (stampId === '__none__' && !extras.length) {
-    return alert('選了「不蓋章」必須至少啟用「1b 插入日期」或「1c 個資限用章」,否則送出後 PDF 不會有任何變動');
+    return alert(tr('選了「不蓋章」必須至少啟用「1b 插入日期」或「1c 個資限用章」,否則送出後 PDF 不會有任何變動'));
   }
   // 至少要選一頁 (僅在單檔且已知頁數時擋；多檔逐頁選以第一個檔頁數為準)
   if ((previewInfo?.page_count || 0) > 0 && selectedPages.size === 0) {
-    return alert('請至少選擇一頁蓋章頁面');
+    return alert(tr('請至少選擇一頁蓋章頁面'));
   }
   const fd = new FormData();
   fd.append('stamp_id', stampId);
@@ -1500,7 +1500,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   // 統一位置模式一切照舊（override + pages + extras）。
   if (isPlacementMode() && placementEditor) {
     const plc = placementEditor.getValue();
-    if (!plc.length) return alert('請先在頁面上點一下放置簽名 / 印章，或切回「每頁統一用印」模式。');
+    if (!plc.length) return alert(tr('請先在頁面上點一下放置簽名 / 印章，或切回「每頁統一用印」模式。'));
     fd.append('placements_json', JSON.stringify(plc));
   } else {
     appendPagesField(fd);
@@ -1510,7 +1510,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   const r = await fu.upload('/tools/pdf-stamp/submit', fd, {processingLabel: '排隊用印中…'});
   if (!r.ok) {
     const txt = await r.text();
-    return alert('送出失敗：' + txt);
+    return alert(tr('送出失敗：') + txt);
   }
   const j = await r.json();
   progress.track(j.job_id);
@@ -1558,7 +1558,7 @@ document.getElementById('tempAssetFile').addEventListener('change', (e) => {
   if (!f) return;
   const MAX = 5 * 1024 * 1024;
   if (f.size > MAX) {
-    alert('檔案過大（上限 5 MB）');
+    alert(tr('檔案過大（上限 5 MB）'));
     e.target.value = '';
     return;
   }
@@ -1578,7 +1578,7 @@ document.getElementById('tempAssetFile').addEventListener('change', (e) => {
 });
 
 document.getElementById('btnTempRemove').addEventListener('click', async () => {
-  if (!(await window.showConfirm('移除臨時資產？', { title: '移除', kind: 'danger', okText: '移除' }))) return;
+  if (!(await window.showConfirm(tr('移除臨時資產？'), { title: '移除', kind: 'danger', okText: '移除' }))) return;
   _tempAssetSet(null);
 });
 
@@ -1730,11 +1730,11 @@ function _dateRemoveOverlay() {
       form.style.display = 'block';
       await _dateRegen({ silent: true });
       _dateEnsureOverlay();
-      document.getElementById('date-summary-status').textContent = '— 已啟用';
+      document.getElementById('date-summary-status').textContent = tr('— 已啟用');
     } else {
       form.style.display = 'none';
       _dateRemoveOverlay();
-      document.getElementById('date-summary-status').textContent = '— 未啟用';
+      document.getElementById('date-summary-status').textContent = tr('— 未啟用');
     }
   });
 
@@ -1972,7 +1972,7 @@ function _restrictRemoveOverlay() {
     } else {
       form.style.display = 'none';
       _restrictRemoveOverlay();
-      document.getElementById('restrict-summary-status').textContent = '— 未啟用';
+      document.getElementById('restrict-summary-status').textContent = tr('— 未啟用');
     }
   });
 })();

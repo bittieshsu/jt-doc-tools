@@ -115,7 +115,7 @@ function editRow(e) {
   document.getElementById("seAddress").value = e.address || "";
   document.getElementById("seAliases").value = (e.aliases || []).join(", ");
   document.getElementById("seNote").value = e.note || "";
-  document.getElementById("seSubmitLabel").textContent = "更新";
+  document.getElementById("seSubmitLabel").textContent = tr("更新");
   window.scrollTo({top:0, behavior:"smooth"});
 }
 
@@ -127,7 +127,7 @@ function resetForm() {
   document.getElementById("seAddress").value = "";
   document.getElementById("seAliases").value = "";
   document.getElementById("seNote").value = "";
-  document.getElementById("seSubmitLabel").textContent = "新增";
+  document.getElementById("seSubmitLabel").textContent = tr("新增");
 }
 
 async function submitForm(ev) {
@@ -153,7 +153,7 @@ async function submitForm(ev) {
 }
 
 async function delRow(id, name) {
-  const ok = await window.showConfirm("確定刪除「" + name + "」？", { title: "刪除我方實體", kind: "danger", okText: "刪除" });
+  const ok = await window.showConfirm(tr("確定刪除「") + name + "」？", { title: "刪除我方實體", kind: "danger", okText: "刪除" });
   if (!ok) return;
   try {
     const r = await fetch("api/self-entities/" + id, { method: "DELETE" });

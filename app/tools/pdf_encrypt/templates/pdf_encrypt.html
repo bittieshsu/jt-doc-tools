@@ -79,9 +79,9 @@ const fu = new FileUpload($('encUp'), (_first, fs) => {
 const jp = new JobProgress($('encJob'), { onReset: () => { fu.reset(); files = []; } });
 
 $('btn-submit').addEventListener('click', async () => {
-  if (!files.length) return alert('請上傳 PDF');
+  if (!files.length) return alert(tr('請上傳 PDF'));
   const up = $('userPw').value, op = $('ownerPw').value;
-  if (!up && !op) return alert('請至少填一組密碼');
+  if (!up && !op) return alert(tr('請至少填一組密碼'));
   const fd = new FormData();
   for (const f of files) fd.append('file', f);
   fd.append('user_pw', up);
@@ -91,7 +91,7 @@ $('btn-submit').addEventListener('click', async () => {
     if ($(k).checked) fd.append(k, 'true');
   });
   const r = await fu.upload('/tools/pdf-encrypt/submit', fd, {processingLabel: '排隊加密中…'});
-  if (!r.ok) return alert('失敗：' + await r.text());
+  if (!r.ok) return alert(tr('失敗：') + await r.text());
   const j = await r.json();
   jp.track(j.job_id);
 });

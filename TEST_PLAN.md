@@ -1068,6 +1068,11 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `GET /setup-admin`
 - [ ] `POST /setup-admin`
 - [ ] `POST /setup-admin/reuse-existing`
+- [ ] `GET /i18n/{locale}.js` — **前端字串的字典**（`static/js/i18n.js` 的 `tr()` 讀它）。
+      判準：①繁體中文請求回**空字典**、而且樣板根本不輸出這個 `<script src>`
+      ②不認得的語言碼回空字典**不是 404**（404 會在主控台留紅字，看起來像壞了）
+      ③帶 `If-None-Match` 回 **304**（字典 100 KB，每頁重下一份很浪費）
+      ④未登入也拿得到（登入頁自己要用），但裡面**不含任何使用者資料**。
 - [ ] `POST /ui-locale`
 - [ ] `GET /tools/pdf-diff` / `GET /tools/pdf-diff/` — **舊工具 id 的相容轉址**（v1.1.61 改名 `pdf-diff` → `doc-diff`）。判準：轉址碼是 **308 不是 301**（301 只保留 GET，POST 的 body 會掉），且 `{rest:path}` 子路徑一起轉。
 - [ ] `GET /whoami`

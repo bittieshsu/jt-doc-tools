@@ -215,7 +215,7 @@ async function uploadFiles(fileList) {
   document.getElementById('settings-panel').hidden = false;
   for (const f of Array.from(fileList)) {
     if (!f.type.startsWith('image/') && !f.name.match(/\.(heic|heif|tif|tiff)$/i)) {
-      alert('跳過非圖片：' + f.name);
+      alert(tr('跳過非圖片：') + f.name);
       continue;
     }
     await uploadOne(f);
@@ -238,7 +238,7 @@ async function uploadOne(file) {
     if (!r.ok) {
       pages = pages.filter(p => p.file_id !== placeholderId);
       const msg = window.friendlyServerError
-        ? await window.friendlyServerError(r, '上傳失敗')
+        ? await window.friendlyServerError(r, tr('上傳失敗'))
         : await r.text();
       alert(`${file.name}：${msg}`);
       render();
@@ -255,7 +255,7 @@ async function uploadOne(file) {
     render();
   } catch (e) {
     pages = pages.filter(p => p.file_id !== placeholderId);
-    alert('上傳錯誤：' + file.name + ' — ' + e.message);
+    alert(tr('上傳錯誤：') + file.name + ' — ' + e.message);
     render();
   }
 }
@@ -369,7 +369,7 @@ document.getElementById('btn-rotate-all-r').addEventListener('click', () => {
 
 document.getElementById('btn-clear').addEventListener('click', async () => {
   if (!pages.length) return;
-  if (!(await window.showConfirm('確定要清除所有圖片嗎？', { title: '清除圖片', kind: 'danger', okText: '清除' }))) return;
+  if (!(await window.showConfirm(tr('確定要清除所有圖片嗎？'), { title: '清除圖片', kind: 'danger', okText: '清除' }))) return;
   // Best-effort server cleanup
   pages.filter(p => !p.uploading).forEach(p =>
     fetch('/tools/image-to-pdf/delete/' + p.file_id, {method: 'POST'}).catch(() => {}));
@@ -381,7 +381,7 @@ const jp = new JobProgress(document.getElementById('jp'));
 
 document.getElementById('btn-generate').addEventListener('click', async () => {
   const ready = pages.filter(p => !p.uploading);
-  if (!ready.length) { alert('請先上傳圖片'); return; }
+  if (!ready.length) { alert(tr('請先上傳圖片')); return; }
   const body = {
     items: ready.map(p => ({ file_id: p.file_id, rotation: p.rotation })),
     page_size: document.getElementById('pageSize').value,
@@ -401,7 +401,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
     });
     if (!r.ok) {
       const msg = window.friendlyServerError
-        ? await window.friendlyServerError(r, '產生失敗')
+        ? await window.friendlyServerError(r, tr('產生失敗'))
         : await r.text();
       alert(msg);
       return;

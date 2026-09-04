@@ -180,7 +180,7 @@ const fu = new FileUpload($("anUp"), async (f) => {
     resp = await fetch("/tools/pdf-annotations/analyze", { method: "POST", body: fd });
   } catch (err) {
     $("anLoading").hidden = true;
-    $("anError").textContent = "網路錯誤:" + err.message;
+    $("anError").textContent = tr("網路錯誤:") + err.message;
     $("anError").hidden = false;
     return;
   }
@@ -188,7 +188,7 @@ const fu = new FileUpload($("anUp"), async (f) => {
   if (!resp.ok) {
     let msg = "HTTP " + resp.status;
     try { msg = (await resp.json()).detail || msg; } catch (e) {}
-    $("anError").textContent = "分析失敗:" + msg;
+    $("anError").textContent = tr("分析失敗:") + msg;
     $("anError").hidden = false;
     return;
   }
@@ -231,7 +231,7 @@ function render(r) {
   }
 
   if (r.summary.total === 0) {
-    $("anError").textContent = "⚠ 此 PDF 沒有偵測到任何註解 (排除掉表單欄位 / 連結 / popup 後)。";
+    $("anError").textContent = tr("⚠ 此 PDF 沒有偵測到任何註解 (排除掉表單欄位 / 連結 / popup 後)。");
     $("anError").hidden = false;
   } else {
     $("anError").hidden = true;
@@ -367,7 +367,7 @@ $("anList").addEventListener("click", (e) => {
 // ---- export buttons ----
 function _filterFormData() {
   if (!lastResult || !lastResult.upload_id) {
-    alert("請先上傳並分析 PDF");
+    alert(tr("請先上傳並分析 PDF"));
     return null;
   }
   const fd = new FormData();
@@ -378,7 +378,7 @@ function _filterFormData() {
 }
 async function _post(url, fd) {
   const r = await fetch(url, { method: "POST", body: fd });
-  if (!r.ok) { alert("下載失敗:HTTP " + r.status); return; }
+  if (!r.ok) { alert(tr("下載失敗:HTTP ") + r.status); return; }
   const blob = await r.blob();
   const cd = r.headers.get("Content-Disposition") || "";
   let name = "download";

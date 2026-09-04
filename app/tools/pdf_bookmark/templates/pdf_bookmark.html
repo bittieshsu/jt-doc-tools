@@ -174,7 +174,7 @@
       box.textContent = '';
       box.className = 'bm-res';
       const line = document.createElement('div');
-      line.textContent = '完成：' + (res.bookmark_count || 0) + ' 個書籤'
+      line.textContent = tr('完成：') + (res.bookmark_count || 0) + ' 個書籤'
         + (res.toc_pages ? '、' + res.toc_pages + ' 頁目錄' : '')
         + '，共 ' + (res.page_count || 0) + ' 頁。下載按鈕在上方。';
       box.appendChild(line);
@@ -197,19 +197,19 @@
           '文件本身如果沒有逐頁印上頁碼，目錄與書籤上的頁碼會對不到 —— 可以用 '));
         const a = document.createElement('a');
         a.href = '#';
-        a.textContent = '「插入頁碼」補上';
+        a.textContent = tr('「插入頁碼」補上');
         // 帶過去的是產出檔，所以用 result_filename（輸入檔名會少掉後綴）
         const fname = job.result_filename
                       || (job.meta || {}).filename || 'bookmarked.pdf';
         a.addEventListener('click', async (e) => {
           e.preventDefault();
-          a.textContent = '準備中…';
+          a.textContent = tr('準備中…');
           try {
             // 走「我的工作區」中轉 —— 檔案是持久的，也留一份給使用者
             await window.handoffToTool('pdf-pageno', {jobId: job.id},
                                        fname, 'pdf-bookmark');
           } catch (err) {
-            a.textContent = '「插入頁碼」補上';
+            a.textContent = tr('「插入頁碼」補上');
             (window.showAlert || alert)('帶不過去：' + (err.message || err));
           }
         });
@@ -323,7 +323,7 @@
     box.textContent = '';
     if (!list || !list.length) { box.hidden = true; return; }
     const head = document.createElement('div');
-    head.textContent = '以下項目已自動調整：';
+    head.textContent = tr('以下項目已自動調整：');
     const ul = document.createElement('ul');
     list.slice(0, 30).forEach(w => {
       const li = document.createElement('li');
@@ -333,7 +333,7 @@
     box.append(head, ul);
     if (list.length > 30) {
       const more = document.createElement('div');
-      more.textContent = '（另有 ' + (list.length - 30) + ' 項未列出）';
+      more.textContent = tr('（另有 ') + (list.length - 30) + ' 項未列出）';
       box.appendChild(more);
     }
     box.hidden = false;
@@ -440,7 +440,7 @@
     const r = await fu.upload('/tools/pdf-bookmark/load', fd,
       {processingLabel: files.length > 1 ? '串接中…' : '讀取中…'});
     if (!r.ok) {
-      (window.showAlert || alert)(await window.friendlyServerError(r, '讀取失敗'));
+      (window.showAlert || alert)(await window.friendlyServerError(r, tr('讀取失敗')));
       return;
     }
     applyPayload(await r.json());
@@ -460,7 +460,7 @@
       const fd = new FormData();
       fd.append('upload_id', uploadId);
       const r = await fetch('/tools/pdf-bookmark/auto-detect', {method: 'POST', body: fd});
-      if (!r.ok) throw new Error(await window.friendlyServerError(r, '偵測失敗'));
+      if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('偵測失敗')));
       applyPayload(await r.json());
     } catch (e) {
       (window.showAlert || alert)(e.message);
@@ -482,7 +482,7 @@
     fd.append('text', $('bmPasteText').value);
     const r = await fetch('/tools/pdf-bookmark/parse-list', {method: 'POST', body: fd});
     if (!r.ok) {
-      (window.showAlert || alert)(await window.friendlyServerError(r, '解析失敗'));
+      (window.showAlert || alert)(await window.friendlyServerError(r, tr('解析失敗')));
       return;
     }
     applyPayload(await r.json());
@@ -497,7 +497,7 @@
 
   $('bmClear').addEventListener('click', async () => {
     const ok = await (window.showConfirm
-      ? window.showConfirm('清除所有書籤？', {title: '全部清除', kind: 'danger', okText: '清除'})
+      ? window.showConfirm(tr('清除所有書籤？'), {title: '全部清除', kind: 'danger', okText: '清除'})
       : Promise.resolve(confirm('清除所有書籤？')));
     if (!ok) return;
     items = [];
@@ -527,7 +527,7 @@
     if (srcName) fd.append('filename', srcName);
     try {
       const r = await fetch('/tools/pdf-bookmark/submit', {method: 'POST', body: fd});
-      if (!r.ok) throw new Error(await window.friendlyServerError(r, '產生失敗'));
+      if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('產生失敗')));
       const j = await r.json();
       // 下載按鈕與「存至工作區」由 JobProgress 自己接（走共用的
       // /api/jobs/{id}/download）—— 這裡只補一句人看得懂的摘要。

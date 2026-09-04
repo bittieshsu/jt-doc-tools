@@ -321,7 +321,7 @@ if (companySwitch) {
       }),
     });
     if (!res.ok) {
-      alert('重新填寫失敗：' + await res.text());
+      alert(tr('重新填寫失敗：') + await res.text());
       return;
     }
     const data = await res.json();
@@ -355,7 +355,7 @@ if (companySwitch) {
     document.getElementById('resultPanel').hidden = false;
     document.getElementById('resultPanel').scrollIntoView({ behavior: 'smooth' });
   } catch (err) {
-    alert('重新填寫失敗：' + err.message);
+    alert(tr('重新填寫失敗：') + err.message);
   }
 })();
 
@@ -424,7 +424,7 @@ form.addEventListener('submit', async (e) => {
     const res = await pfFu.upload('/tools/pdf-fill/preview', fd, {processingLabel: isOffice ? '轉 PDF + 辨識欄位中…' : '辨識欄位中…'});
     if (!res.ok) {
       const t = await res.text();
-      alert('預覽失敗：' + t);
+      alert(tr('預覽失敗：') + t);
       return;
     }
     const data = await res.json();
@@ -460,7 +460,7 @@ form.addEventListener('submit', async (e) => {
     resultPanel.hidden = false;
     resultPanel.scrollIntoView({ behavior: 'smooth' });
   } catch (err) {
-    alert('預覽失敗：' + err.message);
+    alert(tr('預覽失敗：') + err.message);
   } finally {
     setBusy(false);
   }
@@ -569,7 +569,7 @@ function renderOverlay() {
     del.className = 'del-btn';
     del.type = 'button';
     del.textContent = '×';
-    del.title = '刪除此欄位';
+    del.title = tr('刪除此欄位');
     del.addEventListener('mousedown', (e) => { e.stopPropagation(); });
     del.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -581,7 +581,7 @@ function renderOverlay() {
     box.appendChild(del);
     const handle = document.createElement('div');
     handle.className = 'resize-handle';
-    handle.title = '拖動改變大小';
+    handle.title = tr('拖動改變大小');
     attachResize(handle, box, idx);
     box.appendChild(handle);
     const warn = overlapSet.has(idx);
@@ -789,7 +789,7 @@ function openContextMenu(clientX, clientY, pt_x, pt_y, replaceIdx, pageIdx) {
     if (leftover.length) {
       const sh = document.createElement('div');
       sh.className = 'ctx-menu-section';
-      sh.textContent = '其他';
+      sh.textContent = tr('其他');
       menu.appendChild(sh);
       leftover.forEach(pk => appendItem(pk.key));
     }
@@ -1023,7 +1023,7 @@ regenBtn.addEventListener('click', async () => {
     }),
   });
   regenBtn.disabled = false;
-  regenBtn.innerHTML = '🔄 套用新位置';
+  regenBtn.innerHTML = tr('🔄 套用新位置');
   if (res.ok) {
     const d = await res.json();
     if (d.pages && d.pages.length) {
@@ -1039,9 +1039,9 @@ regenBtn.addEventListener('click', async () => {
     applyMode(currentMode);
     placementsDirty = false;
     regenBtn.hidden = true;
-    showToast('預覽已更新', 'ok');
+    showToast(tr('預覽已更新'), 'ok');
   } else {
-    showToast('更新失敗', 'err');
+    showToast(tr('更新失敗'), 'err');
   }
 });
 
@@ -1092,7 +1092,7 @@ function renderTemplateStatus(applied, uploadId, fileName) {
     templateStatus.style.color = 'var(--success, #047857)';
     saveTplBtn.hidden = true;
   } else {
-    templateStatus.textContent = '未對應到範本 · 儲存後之後同版型表單會自動套用';
+    templateStatus.textContent = tr('未對應到範本 · 儲存後之後同版型表單會自動套用');
     templateStatus.style.color = '';
     saveTplBtn.hidden = false;
   }
@@ -1103,7 +1103,7 @@ saveTplBtn.addEventListener('click', async () => {
   const name = await showPrompt('範本名稱', { title: '儲存範本', defaultValue: currentFileBaseName || '新範本' });
   if (!name) return;
   saveTplBtn.disabled = true;
-  saveTplBtn.textContent = '儲存中…';
+  saveTplBtn.textContent = tr('儲存中…');
   const cs = document.getElementById('companySwitch');
   const res = await fetch('/tools/pdf-fill/save-template', {
     method: 'POST',
@@ -1122,8 +1122,8 @@ saveTplBtn.addEventListener('click', async () => {
     templateStatus.style.color = 'var(--success, #047857)';
     saveTplBtn.hidden = true;
   } else {
-    saveTplBtn.textContent = '儲存為範本';
-    alert('儲存失敗');
+    saveTplBtn.textContent = tr('儲存為範本');
+    alert(tr('儲存失敗'));
   }
 });
 
@@ -1162,7 +1162,7 @@ document.addEventListener('click', async (e) => {
     });
     if (res.ok) {
       row.style.opacity = 0.4;
-      btn.textContent = '✓ 已學會';
+      btn.textContent = tr('✓ 已學會');
       btn.disabled = true;
       document.getElementById('rerunBtn').hidden = false;
     }
@@ -1501,7 +1501,7 @@ function renderLlmReview(rev) {
 }
 
 async function applyLlmCorrections(corrections) {
-  if (!currentUploadId) { showToast('沒有 upload_id，請先重新上傳', 'err'); return; }
+  if (!currentUploadId) { showToast(tr('沒有 upload_id，請先重新上傳'), 'err'); return; }
   if (!corrections || !corrections.length) return;
   const tryMove = !!document.getElementById('llmTryMove')?.checked;
   const moveCount = tryMove ? corrections.filter(c => c.suggested_slot_pt).length : 0;
@@ -1532,9 +1532,9 @@ async function applyLlmCorrections(corrections) {
         })),
       }),
     });
-    if (!r.ok) { const t = await r.text(); showToast('套用失敗：' + t.slice(0,120), 'err'); return; }
+    if (!r.ok) { const t = await r.text(); showToast(tr('套用失敗：') + t.slice(0,120), 'err'); return; }
     const d = await r.json();
-    if (!d.removed && !d.moved) { showToast('沒有 placement 符合條件，未變動', 'warn'); return; }
+    if (!d.removed && !d.moved) { showToast(tr('沒有 placement 符合條件，未變動'), 'warn'); return; }
     // Swap in the new preview URLs (no inline cache-bust — applyMode adds one)
     if (d.pages && d.pages.length) {
       d.pages.forEach(p => {
@@ -1555,7 +1555,7 @@ async function applyLlmCorrections(corrections) {
     if (bar) bar.innerHTML = `<span class="muted">✓ 已${actionStr}，正在重跑 LLM 校驗以確認剩餘問題…</span>`;
     startAsyncLlmReview(currentUploadId);
   } catch (e) {
-    showToast('套用發生錯誤：' + e.message, 'err');
+    showToast(tr('套用發生錯誤：') + e.message, 'err');
   }
 }
 

@@ -381,11 +381,11 @@ const fu = new FileUpload($('ddUpload'), (f) => {
 });
 
 $('btnDetect').addEventListener('click', async () => {
-  if (!currentFile) return alert('請先上傳檔案');
+  if (!currentFile) return alert(tr('請先上傳檔案'));
   const types = Array.from(document.querySelectorAll('#ddTypes input:checked'))
     .map(c => c.value).join(',');
   const custom = $('ddCustom').value || '';
-  $('detectStatus').textContent = '偵測中…';
+  $('detectStatus').textContent = tr('偵測中…');
   $('btnDetect').disabled = true;
   const fd = new FormData();
   fd.append('file', currentFile);
@@ -396,7 +396,7 @@ $('btnDetect').addEventListener('click', async () => {
   try {
     const procLabel = (llmAug && llmAug.checked) ? '偵測 + LLM 補偵測中…' : '偵測敏感資料中…';
     const r = await fu.upload('/tools/doc-deident/detect', fd, {processingLabel: procLabel});
-    if (!r.ok) { $('detectStatus').textContent = '失敗：' + await jtdtError(r); return; }
+    if (!r.ok) { $('detectStatus').textContent = tr('失敗：') + await jtdtError(r); return; }
     detectResult = await r.json();
     renderDetect(detectResult);
     $('resultPanel').hidden = false;
@@ -406,7 +406,7 @@ $('btnDetect').addEventListener('click', async () => {
     $('doneBox').hidden = true;
     $('resultPanel').scrollIntoView({behavior:'smooth', block:'start'});
   } catch (e) {
-    $('detectStatus').textContent = '錯誤：' + e.message;
+    $('detectStatus').textContent = tr('錯誤：') + e.message;
   } finally {
     $('btnDetect').disabled = false;
   }
@@ -538,11 +538,11 @@ $('ddValidChecksum').addEventListener('change', renderRows);
 
 $('btnAddTerm').addEventListener('click', async () => {
   const term = ($('ddTermInput').value || '').trim();
-  if (!term) { $('ddTermStatus').textContent = '請先輸入要替換的字詞'; return; }
+  if (!term) { $('ddTermStatus').textContent = tr('請先輸入要替換的字詞'); return; }
   if (!detectResult || !detectResult.upload_id) return;
   const btn = $('btnAddTerm');
   btn.disabled = true;
-  $('ddTermStatus').textContent = '搜尋中…';
+  $('ddTermStatus').textContent = tr('搜尋中…');
   try {
     const r = await fetch('/tools/doc-deident/find', {
       method: 'POST',
@@ -554,7 +554,7 @@ $('btnAddTerm').addEventListener('click', async () => {
       }),
     });
     if (!r.ok) {
-      $('ddTermStatus').textContent = await window.friendlyServerError(r, '搜尋失敗');
+      $('ddTermStatus').textContent = await window.friendlyServerError(r, tr('搜尋失敗'));
       return;
     }
     const d = await r.json();
@@ -569,7 +569,7 @@ $('btnAddTerm').addEventListener('click', async () => {
     $('ddTermInput').value = '';
     renderRows();
   } catch (e) {
-    $('ddTermStatus').textContent = '搜尋失敗';
+    $('ddTermStatus').textContent = tr('搜尋失敗');
   } finally {
     btn.disabled = false;
   }
@@ -602,7 +602,7 @@ $('btnProcess').addEventListener('click', async () => {
     if (!ok) return;
   }
   $('btnProcess').disabled = true;
-  $('procStatus').textContent = '處理中…';
+  $('procStatus').textContent = tr('處理中…');
   try {
     const r = await fetch('/tools/doc-deident/process', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -612,7 +612,7 @@ $('btnProcess').addEventListener('click', async () => {
         selections: selections,
       }),
     });
-    if (!r.ok) { $('procStatus').textContent = '失敗：' + await r.text(); return; }
+    if (!r.ok) { $('procStatus').textContent = tr('失敗：') + await r.text(); return; }
     const d = await r.json();
     $('procStatus').textContent = `完成，共處理 ${d.processed} 筆`;
     $('doneSummary').textContent =
@@ -630,7 +630,7 @@ $('btnProcess').addEventListener('click', async () => {
     $('doneBox').hidden = false;
     $('doneBox').scrollIntoView({behavior:'smooth', block:'end'});
   } catch (e) {
-    $('procStatus').textContent = '錯誤：' + e.message;
+    $('procStatus').textContent = tr('錯誤：') + e.message;
   } finally {
     $('btnProcess').disabled = false;
   }

@@ -121,3 +121,51 @@ def test_the_helper_name_is_not_shadowed_by_loop_variables():
         if re.search(r"\{%\s*(for|set)\s+tr\b", s):
             bad.append(str(p.relative_to(ROOT)))
     assert bad == [], f"這些樣板拿 tr 當變數名，會蓋掉取字函式：{bad}"
+
+
+def test_translation_keeps_the_trailing_colon_or_ellipsis():
+    """原文以「：」或「…」結尾，譯文也要 —— 那是「後面還要再接東西」的訊號。
+
+    程式碼常寫成 `tr('分析失敗：') + err`，譯文如果沒有那個冒號，畫面就變成
+    「Analysis failedsomething went wrong」黏成一團。這條也順便擋掉**整批譯文
+    對錯鍵**（實際踩過兩次：合併譯文時用「索引」對，清單順序一變就整段錯位）。
+    """
+    cat = catalog("en")
+    bad = [(k, v) for k, v in cat.items()
+           if k and k[-1] in "：…" and v and v[-1] not in ": ….'"]
+    assert not bad, ("原文以冒號 / 刪節號結尾但譯文沒有：\n  "
+                     + "\n  ".join(f"{k[:34]!r} -> {v[:40]!r}" for k, v in bad[:6]))
+
+
+_JS_BLOCK = re.compile(r"<script\b[^>]*>(.*?)</script>", re.S | re.I)
+_JS_CALL = re.compile(r"(?<![\w.])tr\((['\"])((?:(?!\1)[^\\])*)\1\)")
+
+
+def _keys_in_scripts() -> set[str]:
+    """樣板 `<script>` 裡的 `tr('…')`。
+
+    這些是**執行期**才求值的（按鈕文字、錯誤訊息），走 `static/js/i18n.js`
+    的 `window.tr`，跟樣板端的 `{{ tr() }}` 是兩條路，要分開收。
+    """
+    out: set[str] = set()
+    for p in TEMPLATES:
+        for m in _JS_BLOCK.finditer(p.read_text(encoding="utf-8")):
+            out |= {k.group(2) for k in _JS_CALL.finditer(m.group(1))}
+    return out
+
+
+def test_every_js_key_is_translated():
+    cat = catalog("en")
+    missing = sorted(k for k in _keys_in_scripts() if k not in cat)
+    assert not missing, f"JS 裡有 {len(missing)} 條沒翻：{missing[:6]}"
+
+
+def test_js_keys_never_contain_template_syntax():
+    """`tr('{{ icon(...) }} 重新偵測')` 這種是錯的。
+
+    Jinja 在**伺服器端**先渲染，執行期 `tr()` 拿到的是渲染後的 HTML，
+    永遠查不到翻譯 —— 而且完全無聲（原樣回傳中文）。圖示要留在字串外面：
+    `'{{ icon(...) }} ' + tr('重新偵測')`。
+    """
+    bad = [k for k in _keys_in_scripts() if "{{" in k or "{%" in k]
+    assert not bad, f"JS 的 tr() 鍵裡有樣板語法：{bad}"

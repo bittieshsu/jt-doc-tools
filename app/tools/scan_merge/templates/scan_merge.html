@@ -247,10 +247,10 @@ async function uploadFiles(fileList) {
 async function uploadOne(file) {
   const fd = new FormData();
   fd.append('file', file);
-  document.getElementById('stage-info').textContent = '處理中：' + file.name + ' …';
+  document.getElementById('stage-info').textContent = tr('處理中：') + file.name + ' …';
   try {
     const r = await fetch('/tools/scan-merge/upload', {method: 'POST', body: fd});
-    if (!r.ok) { alert('上傳失敗：' + file.name + ' — ' + await r.text()); return; }
+    if (!r.ok) { alert(tr('上傳失敗：') + file.name + ' — ' + await r.text()); return; }
     const j = await r.json();
     for (const s of (j.sources || [])) sources.push(s);
     for (const c of (j.crops || [])) {
@@ -269,7 +269,7 @@ async function uploadOne(file) {
     }
     render();
   } catch (e) {
-    alert('上傳錯誤：' + file.name + ' — ' + e.message);
+    alert(tr('上傳錯誤：') + file.name + ' — ' + e.message);
   }
 }
 
@@ -394,7 +394,7 @@ document.getElementById('whitenToggle').addEventListener('change', render);
 // 全部清除：清掉預覽內容 + 已上傳檔案 + 重置狀態
 document.getElementById('btn-clear-all').addEventListener('click', async () => {
   if (!sources.length && !crops.length) return;
-  const ok = await window.showConfirm('確定要清除所有上傳檔案與預覽內容嗎？', {
+  const ok = await window.showConfirm(tr('確定要清除所有上傳檔案與預覽內容嗎？'), {
     title: '全部清除', okText: '清除', cancelText: '取消', kind: 'warn',
   });
   if (!ok) return;
@@ -422,7 +422,7 @@ document.getElementById('btn-preview-toggle').addEventListener('click', (e) => {
 const jp = new JobProgress(document.getElementById('jp'));
 
 document.getElementById('btn-generate').addEventListener('click', async () => {
-  if (!crops.length) { alert('請先上傳掃描檔'); return; }
+  if (!crops.length) { alert(tr('請先上傳掃描檔')); return; }
   const body = {
     items: crops.map(c => ({ crop_id: c.crop_id, x: c.x, y: c.y, w: c.w, h: c.h })),
     whiten: whitenOn(),
@@ -437,7 +437,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(body),
     });
-    if (!r.ok) { alert('產生失敗：' + await r.text()); return; }
+    if (!r.ok) { alert(tr('產生失敗：') + await r.text()); return; }
     const j = await r.json();
     jp.track(j.job_id);
   } finally {

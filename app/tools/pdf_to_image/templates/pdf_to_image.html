@@ -184,7 +184,7 @@
         }
       );
       if (!r.ok) {
-        statusEl.textContent = '失敗：' + await r.text();
+        statusEl.textContent = tr('失敗：') + await r.text();
         hideProgress();
         return;
       }
@@ -192,7 +192,7 @@
       hideProgress();
       pageCountEl.textContent = d.page_count;
       totalSizeEl.textContent = fmtBytes(d.total_bytes || 0);
-      statusEl.textContent = '完成！' + d.page_count + ' 頁已轉為 PNG（' + d.dpi + ' DPI · 共 ' + fmtBytes(d.total_bytes || 0) + '）';
+      statusEl.textContent = tr('完成！') + d.page_count + ' 頁已轉為 PNG（' + d.dpi + ' DPI · 共 ' + fmtBytes(d.total_bytes || 0) + '）';
       d.pages.forEach(function(p) {
         const card = document.createElement('div');
         card.className = 'p2i-card';
@@ -222,7 +222,7 @@
         ? ' 下載 PNG（' + total + '）'
         : ' 下載全部 ZIP（' + d.page_count + ' 頁 · 約 ' + total + '）');
     } catch (e) {
-      statusEl.textContent = '錯誤：' + e.message;
+      statusEl.textContent = tr('錯誤：') + e.message;
       hideProgress();
     }
   }

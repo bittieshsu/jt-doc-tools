@@ -48,10 +48,20 @@ def _normalise(body: bytes) -> bytes:
 
 
 def _pages() -> list[str]:
+    """工具頁 + 一般頁 + **管理頁**。
+
+    管理頁一開始沒收 —— 結果是「管理區改壞了這條安全網看不到」。
+    管理頁從路由表列舉（不寫死），只收 GET 且沒有路徑參數的。
+    """
     from app.tool_registry import discover_tools
+    import app.main as app_main
     pages = ["/", "/my-jobs", "/workspace", "/login", "/search?q=pdf"]
     pages += [f"/tools/{t.metadata.id}/" for t in discover_tools()]
-    return pages
+    admin = sorted({r.path for r in app_main.app.routes
+                    if getattr(r, "path", "").startswith("/admin")
+                    and "{" not in r.path
+                    and "GET" in (getattr(r, "methods", None) or set())})
+    return pages + admin
 
 
 def _render() -> dict[str, bytes]:
@@ -68,12 +78,21 @@ def _render() -> dict[str, bytes]:
     return out
 
 
+#: `<script>` 內容可以選擇性排除。包 JS 字串（`tr('…')`）**一定會改到 script
+#: 的位元組**，那是預期內的；但「畫面上看得到的東西有沒有變」仍然要能單獨驗，
+#: 所以 `--ignore-scripts` 把 script 整段換成一個標記再比 —— 這條在包 JS 那幾
+#: 批是唯一還有意義的判準（JS 的行為改用 `temp/i18n-cdp/cdp_i18n_test.py` 驗）。
+_SCRIPT = re.compile(rb"<script\b[^>]*>.*?</script>", re.S | re.I)
+
+
 def main() -> int:
     save = "--save" in sys.argv
     if not save and "--compare" not in sys.argv:
         print(__doc__)
         return 2
     pages = _render()
+    if "--ignore-scripts" in sys.argv:
+        pages = {k: _SCRIPT.sub(b"<SCRIPT/>", v) for k, v in pages.items()}
     if save:
         if OUT.exists():
             shutil.rmtree(OUT)
@@ -86,13 +105,17 @@ def main() -> int:
     if not OUT.exists():
         print("還沒存基準，先跑 --save", file=sys.stderr)
         return 2
+    ignore = "--ignore-scripts" in sys.argv
     diff = []
     for name, body in pages.items():
         old = OUT / name
         if not old.exists():
             diff.append(f"{name}（基準裡沒有這頁）")
-        elif old.read_bytes() != body:
-            a, b = old.read_bytes(), body
+        elif (_SCRIPT.sub(b"<SCRIPT/>", old.read_bytes()) if ignore
+              else old.read_bytes()) != body:
+            a = (_SCRIPT.sub(b"<SCRIPT/>", old.read_bytes()) if ignore
+                 else old.read_bytes())
+            b = body
             i = next((i for i in range(min(len(a), len(b))) if a[i] != b[i]), min(len(a), len(b)))
             diff.append(f"{name}（第 {i} 位元組起不同）\n"
                         f"      舊：{a[max(0, i-60):i+60]!r}\n"

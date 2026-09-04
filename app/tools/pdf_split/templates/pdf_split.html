@@ -48,13 +48,13 @@ document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener('cha
   document.getElementById('ranges-row').hidden = document.querySelector('input[name=mode]:checked').value !== 'ranges';
 }));
 document.getElementById('btn-submit').addEventListener('click', async () => {
-  if (!files.length) return alert('請先上傳 PDF');
+  if (!files.length) return alert(tr('請先上傳 PDF'));
   const fd = new FormData();
   for (const f of files) fd.append('file', f);
   fd.append('mode', document.querySelector('input[name=mode]:checked').value);
   fd.append('ranges', document.getElementById('ranges').value);
   const r = await fu.upload('/tools/pdf-split/submit', fd, {processingLabel: '排隊分拆中…'});
-  if (!r.ok) return alert('送出失敗：' + await r.text());
+  if (!r.ok) return alert(tr('送出失敗：') + await r.text());
   const j = await r.json(); jp.track(j.job_id);
 });
 </script>

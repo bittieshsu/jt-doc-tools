@@ -91,7 +91,7 @@ function refreshSelUI() {
   const checked = selectedIds().length;
   selAll.indeterminate = checked > 0 && checked < total;
   selAll.checked = checked > 0 && checked === total;
-  if (checked === 0) selCountEl.textContent = '未選取';
+  if (checked === 0) selCountEl.textContent = tr('未選取');
   else selCountEl.textContent = `已選 ${checked} / ${total}`;
   bulkDeleteBtn.disabled = checked === 0;
   rowChecks().forEach(c => c.closest('.history-item').classList.toggle('selected', c.checked));
@@ -127,9 +127,9 @@ bulkDeleteBtn.addEventListener('click', async () => {
     if (typeof showToast === 'function') showToast(`已刪除 ${d.deleted} 筆`, 'ok');
     refreshSelUI();
   } else {
-    alert('批次刪除失敗');
+    alert(tr('批次刪除失敗'));
   }
-  bulkDeleteBtn.innerHTML = '🗑 批次刪除';
+  bulkDeleteBtn.innerHTML = tr('🗑 批次刪除');
 });
 
 document.addEventListener('click', async (e) => {

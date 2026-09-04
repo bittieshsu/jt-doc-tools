@@ -475,7 +475,7 @@ $('btnDetect').addEventListener('click', async () => {
     showErr('偵測失敗：' + e.message);
   } finally {
     $('btnDetect').disabled = false;
-    $('btnDetect').innerHTML = '{{ icon("search", size=14) }} 重新偵測';
+    $('btnDetect').innerHTML = '{{ icon("search", size=14) }} ' + tr('重新偵測');
   }
 });
 
@@ -547,7 +547,7 @@ $('btnApply').addEventListener('click', async () => {
     showErr('套用失敗：' + e.message);
   } finally {
     $('btnApply').disabled = false;
-    $('btnApply').innerHTML = '{{ icon("shield", size=14) }} 套用至全部';
+    $('btnApply').innerHTML = '{{ icon("shield", size=14) }} ' + tr('套用至全部');
   }
 });
 
@@ -577,8 +577,8 @@ $('btnCopy').addEventListener('click', async () => {
   if (!outEl.value) return;
   try {
     await navigator.clipboard.writeText(outEl.value);
-    if (typeof showToast === 'function') showToast('已複製處理後的文字', 'ok');
-    else $('btnCopy').textContent = '已複製';
+    if (typeof showToast === 'function') showToast(tr('已複製處理後的文字'), 'ok');
+    else $('btnCopy').textContent = tr('已複製');
   } catch (e) {
     showErr('複製失敗：' + e.message);
   }

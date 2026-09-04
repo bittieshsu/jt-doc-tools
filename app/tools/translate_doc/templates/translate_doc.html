@@ -716,7 +716,7 @@ async function handleUploadedFile(f) {
     const r = await fetch('/tools/translate-doc/extract-text', {method:'POST', body: fd});
     if (!r.ok) {
       const t = await r.text();
-      alert('解析失敗：' + t);
+      alert(tr('解析失敗：') + t);
       dropZone.classList.remove('has-file');
       dropText.innerHTML = origText;
       return;
@@ -741,7 +741,7 @@ async function handleUploadedFile(f) {
     }
     refreshCounter();
   } catch (err) {
-    alert('上傳失敗：' + err.message);
+    alert(tr('上傳失敗：') + err.message);
     dropZone.classList.remove('has-file');
     dropText.innerHTML = origText;
   } finally {
@@ -934,7 +934,7 @@ function renderPager() {
   const jump = document.createElement('input');
   jump.type = 'number'; jump.className = 'trd-pager-jump';
   jump.min = '1'; jump.max = String(totalPages); jump.value = String(p + 1);
-  jump.title = '跳到指定頁';
+  jump.title = tr('跳到指定頁');
   jump.addEventListener('change', () => {
     const n = parseInt(jump.value);
     if (!isNaN(n)) renderPage(n - 1);
@@ -1038,7 +1038,7 @@ trdGrid.addEventListener('click', async (e) => {
   if (!src) return;
   row.classList.add('is-loading');
   const tgtCell = row.querySelector('.tgt');
-  tgtCell.className = 'tgt'; tgtCell.textContent = '翻譯中…';
+  tgtCell.className = 'tgt'; tgtCell.textContent = tr('翻譯中…');
   try {
     const r = await fetch('/tools/translate-doc/translate-one', {
       method: 'POST', headers:{'Content-Type':'application/json'},
@@ -1119,7 +1119,7 @@ $('btnStop').addEventListener('click', () => {
     try { _translateAbortCtl.abort(); } catch (_) {}
   }
   $('btnStop').disabled = true;
-  $('btnStop').textContent = '停止中…';
+  $('btnStop').textContent = tr('停止中…');
 });
 
 // ---------------------------------------------------------------------------
@@ -1169,7 +1169,7 @@ function _trdSetRunningUI(running) {
   }
   $('btnStop').hidden = !running;
   $('btnStop').disabled = false;
-  $('btnStop').textContent = '■ 停止翻譯';
+  $('btnStop').textContent = tr('■ 停止翻譯');
   $('trdProgressWrap').hidden = false;
   $('trdProgressMeta').hidden = false;
 }
@@ -1197,10 +1197,10 @@ async function _trdPoll() {
     if (r.status === 404) {          // 作業已過期或被清掉
       _trdStopPolling();
       _trdSetRunningUI(false);
-      resultMeta.textContent = '這個作業已經不存在（可能已過保留期）。';
+      resultMeta.textContent = tr('這個作業已經不存在（可能已過保留期）。');
       return;
     }
-    if (!r.ok) throw new Error(await window.friendlyServerError(r, '查詢進度失敗'));
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('查詢進度失敗')));
     j = await r.json();
   } catch (e) {
     // 網路暫時斷掉不該讓畫面停住 —— 下一輪再試。
@@ -1254,7 +1254,7 @@ async function _trdPoll() {
 
 $('btnStop').addEventListener('click', async () => {
   $('btnStop').disabled = true;
-  $('btnStop').textContent = '停止中…';
+  $('btnStop').textContent = tr('停止中…');
   if (!_trdJobId) return;
   try {
     await fetch('/api/jobs/' + encodeURIComponent(_trdSafeJob(_trdJobId))
@@ -1265,9 +1265,9 @@ $('btnStop').addEventListener('click', async () => {
 
 btnTranslate.addEventListener('click', async () => {
   const text = srcText.value;
-  if (!text.trim()) return alert('請先輸入或上傳要翻譯的文字');
+  if (!text.trim()) return alert(tr('請先輸入或上傳要翻譯的文字'));
   currentSentences = _splitClient(text);
-  if (!currentSentences.length) return alert('沒有可翻譯的內容');
+  if (!currentSentences.length) return alert(tr('沒有可翻譯的內容'));
   if (currentSentences.length > TRD_MAX_SENTENCES) {
     alert(`原文超過上限，僅取前 ${TRD_MAX_SENTENCES} 句翻譯。\n（管理員可在 LLM 設定調整「逐句翻譯最大句數」）`);
     currentSentences = currentSentences.slice(0, TRD_MAX_SENTENCES);
@@ -1294,14 +1294,14 @@ btnTranslate.addEventListener('click', async () => {
         filename: (typeof trdUploadedName !== 'undefined' && trdUploadedName) || '',
       }),
     });
-    if (!r.ok) throw new Error(await window.friendlyServerError(r, '送出失敗'));
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('送出失敗')));
     const j = await r.json();
     _trdJobId = j.job_id;
     _trdSyncUrl(_trdJobId);
     _trdPoll();
   } catch (e) {
     _trdSetRunningUI(false);
-    alert('送出失敗：' + e.message);
+    alert(tr('送出失敗：') + e.message);
   }
 });
 

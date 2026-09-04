@@ -295,7 +295,7 @@
     const r = await fu.upload('/tools/pdf-border/load', fd,
                               { processingLabel: '讀取中…（辦公文件會先轉成 PDF）' });
     if (!r.ok) {
-      (window.showAlert || alert)(await window.friendlyServerError(r, '讀取失敗'));
+      (window.showAlert || alert)(await window.friendlyServerError(r, tr('讀取失敗')));
       return;
     }
     const d = await r.json();
@@ -431,7 +431,7 @@
       const tag = document.createElement('span');
       tag.className = 'bd-skip-tag';
       tag.hidden = true;
-      tag.textContent = '不加框';
+      tag.textContent = tr('不加框');
       cap.appendChild(tag);
       cell.appendChild(img);
       cell.appendChild(cap);
@@ -557,7 +557,7 @@
     try {
       const r = await fetch('/tools/pdf-border/submit', { method: 'POST', body: fd });
       if (!r.ok) {
-        (window.showAlert || alert)(await window.friendlyServerError(r, '送出失敗'));
+        (window.showAlert || alert)(await window.friendlyServerError(r, tr('送出失敗')));
         return;
       }
       const { job_id } = await r.json();

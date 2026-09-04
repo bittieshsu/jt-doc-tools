@@ -100,6 +100,10 @@
   </style>
   <!-- 取代 inline style 屬性的自動產生樣式;放最後載入,贏頁面 <style nonce="{{ request.state.csp_nonce }}"> 同特異性 tie -->
   <link rel="stylesheet" href="/static/css/generated-inline.css" />
+  {# 前端字串翻譯。`i18n.js` 一定要在其他 JS 之前載入（它定義 window.tr）；
+     字典只在非預設語言時才載，繁體中文底下連一個位元組都不會多送。 #}
+  <script src="/static/js/i18n.js"></script>
+  {% if ui_locale(request) != 'zh-Hant' %}<script src="/i18n/{{ ui_locale(request) }}.js"></script>{% endif %}
 </head>
 <body>
   <button class="sidebar-toggle" type="button" id="sidebarToggle" aria-label="展開側邊選單" title="{{ tr('展開側邊選單') }}">☰</button>

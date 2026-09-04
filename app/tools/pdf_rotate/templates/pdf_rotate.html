@@ -257,7 +257,7 @@ const fu = new FileUpload($('upR'), async (f) => {
     $('action-panel').hidden = false;
     refreshScopeCount();
   } catch (e) {
-    $('upload-error').textContent = '載入失敗：' + e.message;
+    $('upload-error').textContent = tr('載入失敗：') + e.message;
     $('upload-error').hidden = false;
   } finally {
     $('loading').hidden = true;
@@ -362,7 +362,7 @@ document.querySelectorAll('.rt-mode-buttons .rt-mb').forEach(btn => {
     const m = btn.dataset.mode;
     const sel = selectedPages();
     if (!sel.length) {
-      alert('沒有任何頁被選到 — 請檢查「套用範圍」');
+      alert(tr('沒有任何頁被選到 — 請檢查「套用範圍」'));
       return;
     }
     sel.forEach(page => {
@@ -405,12 +405,12 @@ async function buildSubmitForm() {
 $('btn-pdf').addEventListener('click', async () => {
   if (!uploadId) return;
   if (pageMode.size === 0) {
-    if (!(await window.showConfirm('沒有任何頁設定轉向，仍要下載 PDF 嗎？', { title: '確認下載', okText: '仍要下載' }))) return;
+    if (!(await window.showConfirm(tr('沒有任何頁設定轉向，仍要下載 PDF 嗎？'), { title: '確認下載', okText: '仍要下載' }))) return;
   }
   const btn = $('btn-pdf');
   const orig = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '處理中…';
+  btn.innerHTML = tr('處理中…');
   $('action-msg').textContent = '';
   try {
     const fd = await buildSubmitForm();
@@ -425,7 +425,7 @@ $('btn-pdf').addEventListener('click', async () => {
     download(blob, name);
     $('action-msg').textContent = `已下載 ${name}`;
   } catch (e) {
-    $('action-msg').textContent = '失敗：' + e.message;
+    $('action-msg').textContent = tr('失敗：') + e.message;
   } finally {
     btn.disabled = false;
     btn.innerHTML = orig;
@@ -451,7 +451,7 @@ $('btn-png').addEventListener('click', async () => {
   const btn = $('btn-png');
   const orig = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '處理中…';
+  btn.innerHTML = tr('處理中…');
   $('action-msg').textContent = '';
   try {
     const fd = await buildSubmitForm();
@@ -464,7 +464,7 @@ $('btn-png').addEventListener('click', async () => {
     download(blob, name);
     $('action-msg').textContent = `已下載 ${name}`;
   } catch (e) {
-    $('action-msg').textContent = '失敗：' + e.message;
+    $('action-msg').textContent = tr('失敗：') + e.message;
   } finally {
     btn.disabled = false;
     btn.innerHTML = orig;

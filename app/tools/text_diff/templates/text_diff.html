@@ -250,10 +250,10 @@ $('btnSwap').addEventListener('click', () => {
 
 $('btnCompare').addEventListener('click', async () => {
   const a = $('textA').value, b = $('textB').value;
-  if (!a && !b) { $('status').textContent = '請至少在一邊貼上文字'; return; }
+  if (!a && !b) { $('status').textContent = tr('請至少在一邊貼上文字'); return; }
   const btn = $('btnCompare');
   btn.disabled = true;
-  $('status').textContent = '比對中…';
+  $('status').textContent = tr('比對中…');
   let r;
   try {
     r = await fetch('/tools/text-diff/compare', {
@@ -262,20 +262,20 @@ $('btnCompare').addEventListener('click', async () => {
       body: JSON.stringify({text_a: a, text_b: b}),
     });
   } catch (e) {
-    $('status').textContent = '網路錯誤：' + e.message;
+    $('status').textContent = tr('網路錯誤：') + e.message;
     btn.disabled = false;
     return;
   }
   if (!r.ok) {
     let msg = 'HTTP ' + r.status;
     try { msg = (await r.json()).detail || msg; } catch (_) {}
-    $('status').textContent = '失敗：' + msg;
+    $('status').textContent = tr('失敗：') + msg;
     btn.disabled = false;
     return;
   }
   const d = await r.json();
   renderResult(d);
-  $('status').textContent = '完成';
+  $('status').textContent = tr('完成');
   btn.disabled = false;
 });
 
@@ -384,7 +384,7 @@ async function _copyAndFlash(btn, text, toastMsg) {
     setTimeout(() => btn.classList.remove('is-copied'), 800);
     _showToast(toastMsg || '已複製到剪貼簿');
   } else {
-    _showToast('複製失敗');
+    _showToast(tr('複製失敗'));
   }
 }
 

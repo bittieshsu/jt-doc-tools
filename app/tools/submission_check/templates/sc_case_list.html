@@ -119,7 +119,7 @@
 <script nonce="{{ request.state.csp_nonce }}">
 async function deleteCase(caseId) {
   const ok = await window.showConfirm(
-    "確定刪除此案件？（會保留歷史紀錄供稽核員調閱，但不會出現在您的清單中）",
+    tr("確定刪除此案件？（會保留歷史紀錄供稽核員調閱，但不會出現在您的清單中）"),
     { title: "刪除案件", kind: "danger", okText: "刪除" }
   );
   if (!ok) return;

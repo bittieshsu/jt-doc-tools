@@ -329,7 +329,7 @@ function renderHeavyNotice(rep, sm) {
     box.appendChild(ic);
     const tx = document.createElement('span');
     const b = document.createElement('b');
-    b.textContent = '大型文件，已自動分段轉換後合併　';
+    b.textContent = tr('大型文件，已自動分段轉換後合併　');
     tx.appendChild(b);
     tx.appendChild(document.createTextNode(
       `這份 PDF 共 ${pages} 頁、${objs.toLocaleString()} 個文字方塊 / 圖形。整份一次`
@@ -459,7 +459,7 @@ const fu = new FileUpload($('p2oUpload'), async (f) => {
   fd.append('file', f);
   const r = await fu.upload('/tools/pdf-to-office/upload', fd, {processingLabel: '解析 PDF 中…'});
   if (!r.ok) {
-    alert('上傳失敗：' + await readErr(r));
+    alert(tr('上傳失敗：') + await readErr(r));
     return;
   }
   const j = await r.json();
@@ -480,7 +480,7 @@ const fu = new FileUpload($('p2oUpload'), async (f) => {
 });
 
 $('btnConvert').addEventListener('click', async () => {
-  if (!uploadId) return alert('請先上傳 PDF');
+  if (!uploadId) return alert(tr('請先上傳 PDF'));
   const btn = $('btnConvert');
   if (btn.disabled) return;
   const fmt = document.querySelector('input[name=fmt]:checked').value;
@@ -503,11 +503,11 @@ $('btnConvert').addEventListener('click', async () => {
     });
   } catch (e) {
     setBtnBusy(btn, false);
-    return alert('送出失敗：' + e.message);
+    return alert(tr('送出失敗：') + e.message);
   }
   if (!r.ok) {
     setBtnBusy(btn, false);
-    return alert('送出失敗：' + await readErr(r));
+    return alert(tr('送出失敗：') + await readErr(r));
   }
   const j = await r.json();
   jp.track(j.job_id);

@@ -94,7 +94,7 @@ const fu = new FileUpload($('hsUp'), async (f) => {
   $('hsCats').innerHTML = '<div class="muted">掃描中…</div>';
   const fd = new FormData(); fd.append('file', f);
   const r = await fu.upload('/tools/pdf-hidden-scan/scan', fd, {processingLabel: '掃描隱藏內容中…'});
-  if (!r.ok) { $('hsCats').textContent = '失敗：' + await window.friendlyServerError(r, '掃描失敗'); return; }
+  if (!r.ok) { $('hsCats').textContent = tr('失敗：') + await window.friendlyServerError(r, tr('掃描失敗')); return; }
   const d = await r.json();
   uploadId = d.upload_id;
   lastFindings = d.findings;
@@ -125,18 +125,18 @@ async function runClean(all) {
   let strip;
   if (all) strip = CATS.map(c => c.strip);
   else strip = Array.from(document.querySelectorAll('.strip-chk:checked')).map(c => c.value);
-  if (!strip.length) return alert('請至少勾選一個類別');
-  $('cleanStatus').textContent = '清除中…';
+  if (!strip.length) return alert(tr('請至少勾選一個類別'));
+  $('cleanStatus').textContent = tr('清除中…');
   const r = await fetch('/tools/pdf-hidden-scan/clean', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({upload_id: uploadId, strip}),
   });
-  if (!r.ok) { $('cleanStatus').textContent = '失敗：' + await r.text(); return; }
+  if (!r.ok) { $('cleanStatus').textContent = tr('失敗：') + await r.text(); return; }
   const d = await r.json();
-  $('cleanStatus').textContent = '完成';
+  $('cleanStatus').textContent = tr('完成');
   const rm = d.removed || {};
   $('dlSummary').textContent =
-    '已清除：' + Object.entries(rm).filter(([_,v])=>v>0).map(([k,v])=>`${k} ${v}`).join('　·　');
+    tr('已清除：') + Object.entries(rm).filter(([_,v])=>v>0).map(([k,v])=>`${k} ${v}`).join('　·　');
   $('dlLink').href = d.download_url;
   if (window.attachWorkspaceSave) window.attachWorkspaceSave(
     document.getElementById('wsSaveBtn'),

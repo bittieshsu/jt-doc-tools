@@ -58,18 +58,18 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 const fu = new FileUpload($('attUp'), async (f) => {
   if (!f) { $('resultPanel').hidden = true; return; }
   $('resultPanel').hidden = false;
-  $('attInfo').textContent = '掃描中…';
+  $('attInfo').textContent = tr('掃描中…');
   $('attTable').hidden = true;
   $('btnZip').hidden = true;
   $('btnStrip').hidden = true;
   const fd = new FormData(); fd.append('file', f);
   const r = await fu.upload('/tools/pdf-attachments/scan', fd, {processingLabel: '掃描附件中…'});
   // 伺服器回應可能含使用者取的檔名 —— 用 textContent 才不會被當成 HTML 解析
-  if (!r.ok) { $('attInfo').textContent = '失敗：' + await window.friendlyServerError(r, '分析失敗'); return; }
+  if (!r.ok) { $('attInfo').textContent = tr('失敗：') + await window.friendlyServerError(r, tr('分析失敗')); return; }
   const d = await r.json();
   uploadId = d.upload_id;
   if (!d.attachments.length) {
-    $('attInfo').textContent = '此 PDF 沒有嵌入附件 ✓';
+    $('attInfo').textContent = tr('此 PDF 沒有嵌入附件 ✓');
     return;
   }
   $('attInfo').textContent = `共 ${d.attachments.length} 個嵌入附件。`;
@@ -95,30 +95,30 @@ $('selAll').addEventListener('change', (e) => {
 
 $('btnZip').addEventListener('click', async () => {
   const names = Array.from(document.querySelectorAll('.att-chk:checked')).map(c => c.value);
-  if (!names.length) return alert('請至少勾選一個附件');
-  $('status').textContent = '打包中…';
+  if (!names.length) return alert(tr('請至少勾選一個附件'));
+  $('status').textContent = tr('打包中…');
   const r = await fetch('/tools/pdf-attachments/zip', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({upload_id: uploadId, names}),
   });
-  if (!r.ok) { $('status').textContent = '失敗'; return; }
+  if (!r.ok) { $('status').textContent = tr('失敗'); return; }
   const blob = await r.blob();
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'attachments.zip';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 500);
-  $('status').textContent = '下載完成';
+  $('status').textContent = tr('下載完成');
 });
 
 $('btnStrip').addEventListener('click', async () => {
-  if (!(await showConfirm('產生一份移除所有附件的 PDF 副本？', { title: '移除附件' }))) return;
-  $('status').textContent = '處理中…';
+  if (!(await showConfirm(tr('產生一份移除所有附件的 PDF 副本？'), { title: '移除附件' }))) return;
+  $('status').textContent = tr('處理中…');
   const r = await fetch('/tools/pdf-attachments/strip', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({upload_id: uploadId}),
   });
-  if (!r.ok) { $('status').textContent = '失敗：' + await r.text(); return; }
+  if (!r.ok) { $('status').textContent = tr('失敗：') + await r.text(); return; }
   const d = await r.json();
   $('status').textContent = `已移除 ${d.removed} 個附件`;
   window.location.href = d.download_url;

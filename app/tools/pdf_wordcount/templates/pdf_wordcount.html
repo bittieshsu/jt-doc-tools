@@ -324,7 +324,7 @@ function fmt(n) { return (n || 0).toLocaleString(); }
 $('wcPasteAnalyze').addEventListener('click', async () => {
   const text = $('wcPasteText').value;
   if (!text.trim()) {
-    $('wcError').textContent = '請先貼上要統計的文字';
+    $('wcError').textContent = tr('請先貼上要統計的文字');
     $('wcError').hidden = false;
     return;
   }
@@ -341,7 +341,7 @@ $('wcPasteAnalyze').addEventListener('click', async () => {
     resp = await fetch('/tools/pdf-wordcount/analyze-text', { method: 'POST', body: fd });
   } catch (err) {
     $('wcLoading').hidden = true;
-    $('wcError').textContent = '網路錯誤：' + err.message;
+    $('wcError').textContent = tr('網路錯誤：') + err.message;
     $('wcError').hidden = false;
     return;
   }
@@ -349,7 +349,7 @@ $('wcPasteAnalyze').addEventListener('click', async () => {
   if (!resp.ok) {
     let msg = 'HTTP ' + resp.status;
     try { msg = (await resp.json()).detail || msg; } catch (e) {}
-    $('wcError').textContent = '分析失敗：' + msg;
+    $('wcError').textContent = tr('分析失敗：') + msg;
     $('wcError').hidden = false;
     return;
   }
@@ -382,7 +382,7 @@ const fu = new FileUpload($('wcUp'), async (files) => {
     resp = await fetch(endpoint, { method: 'POST', body: fd });
   } catch (err) {
     $('wcLoading').hidden = true;
-    $('wcError').textContent = '網路錯誤:' + err.message;
+    $('wcError').textContent = tr('網路錯誤:') + err.message;
     $('wcError').hidden = false;
     return;
   }
@@ -390,7 +390,7 @@ const fu = new FileUpload($('wcUp'), async (files) => {
   if (!resp.ok) {
     let msg = 'HTTP ' + resp.status;
     try { msg = (await resp.json()).detail || msg; } catch (e) {}
-    $('wcError').textContent = '分析失敗:' + msg;
+    $('wcError').textContent = tr('分析失敗:') + msg;
     $('wcError').hidden = false;
     return;
   }
@@ -452,18 +452,18 @@ function render(r) {
   const s = r.summary;
   $('sWordTotal').textContent = fmt(s.word_total);
   $('sPages').textContent     = fmt(r.page_count);
-  $('sAvgPage').textContent   = '平均 ' + fmt(s.avg_per_page) + ' 字/頁';
+  $('sAvgPage').textContent   = tr('平均 ') + fmt(s.avg_per_page) + ' 字/頁';
   $('sCjk').textContent       = fmt(s.cjk_chars);
   $('sEn').textContent        = fmt(s.en_words);
   $('sParaSent').textContent  = fmt(s.paragraphs) + ' / ' + fmt(s.sentences);
   $('sChars').textContent     = fmt(s.char_total);
-  $('sCharsNoWs').textContent = '不含空白 ' + fmt(s.char_no_ws);
+  $('sCharsNoWs').textContent = tr('不含空白 ') + fmt(s.char_no_ws);
   $('sAvgSent').textContent   = fmt(s.avg_sent_len);
   const m = s.reading_min;
   $('sRead').textContent = m < 1 ? '<1 分' : (m >= 60 ? (Math.floor(m/60)+'時'+Math.round(m%60)+'分') : (m + ' 分'));
 
   if (!s.has_text) {
-    $('wcError').textContent = '⚠ 此 PDF 沒有可擷取的文字層 (可能是掃描檔)。請先用 OCR 工具處理後再分析。';
+    $('wcError').textContent = tr('⚠ 此 PDF 沒有可擷取的文字層 (可能是掃描檔)。請先用 OCR 工具處理後再分析。');
     $('wcError').hidden = false;
   } else {
     $('wcError').hidden = true;
@@ -489,7 +489,7 @@ function renderLlm(llm) {
   panel.hidden = false;
   modelEl.textContent = llm.model ? '模型 ' + llm.model : '';
   if (llm.error) {
-    errEl.textContent = 'LLM 處理失敗:' + llm.error;
+    errEl.textContent = tr('LLM 處理失敗:') + llm.error;
     errEl.hidden = false;
     return;
   }
@@ -692,7 +692,7 @@ $('btnCsv').addEventListener('click', async () => {
   const fd = new FormData();
   fd.append('file', lastFile);
   const r = await fetch('/tools/pdf-wordcount/export-csv', { method: 'POST', body: fd });
-  if (!r.ok) { alert('CSV 下載失敗'); return; }
+  if (!r.ok) { alert(tr('CSV 下載失敗')); return; }
   const blob = await r.blob();
   const cd = r.headers.get('Content-Disposition') || '';
   let name = 'wordcount.csv';

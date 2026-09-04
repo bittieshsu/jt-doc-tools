@@ -173,15 +173,15 @@ document.getElementById('btn-toggle-all').addEventListener('click', () => {
 });
 
 document.getElementById('btn-submit').addEventListener('click', async () => {
-  if (!uploadId) return alert('請先上傳 PDF');
+  if (!uploadId) return alert(tr('請先上傳 PDF'));
   const order = pages.filter(p => !p.deleted).map(p => p.page).join(',');
-  if (!order) return alert('結果頁數為 0');
+  if (!order) return alert(tr('結果頁數為 0'));
   const fd = new FormData();
   fd.append('upload_id', uploadId);
   fd.append('order', order);
   fd.append('filename', filename);
   const r = await fu.upload('/tools/pdf-pages/submit-from-upload', fd, {processingLabel: '排隊處理中…'});
-  if (!r.ok) return alert('送出失敗：' + await r.text());
+  if (!r.ok) return alert(tr('送出失敗：') + await r.text());
   const j = await r.json(); jp.track(j.job_id);
 });
 </script>

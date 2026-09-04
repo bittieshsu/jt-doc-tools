@@ -11,6 +11,65 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ---
 
+## [1.14.98] - 2026-09-05
+
+### Interface language, stage B (part 2): strings inside `<script>` too
+
+The template helper `{{ tr('…') }}` is evaluated **while the server renders the
+page**, so button labels, error messages and text inserted into the DOM at runtime
+could not use it — 1,311 strings, the bulk of a tool page.
+
+The answer is a `tr()` of the same name on the front end
+(`static/js/i18n.js`), with the dictionary served from `GET /i18n/<locale>.js`:
+
+- **Traditional Chinese never loads a dictionary at all** (the template only emits
+  that `<script src>` for other languages) and `tr()` returns its argument — no
+  cost, no risk.
+- The dictionary is around 100 KB and only changes on upgrade, so it carries an
+  **ETag**: moving between pages sends one `If-None-Match` and gets a 304
+  (`no-cache` does not mean "do not cache", it means "ask before using").
+- **Sentences with variables are parameterised** (`tr('Selected: {0}').replace(...)`);
+  an interpolated sentence must never be the key, because the key changes with the
+  value.
+
+**Only positions that cannot be used as values are wrapped**: `.textContent =`,
+`.innerHTML =`, `.title =`, `.placeholder =`, `alert(`, `showToast(`,
+`showConfirm(`, `friendlyServerError(…,`. Ternary results and string
+concatenation are deliberately left alone — translating a string that is compared
+against something, or sent to the server, looks perfectly fine on screen while the
+logic quietly breaks, **and only in English**. 356 strings in this batch; the
+catalogue now holds **1,507 entries**.
+
+Verification uses a real browser (`temp/i18n-cdp/cdp_i18n_test.py`): in English the
+button raises an English message, and in Chinese not one character changed. The
+signal has to be something that only appears when the translation really happened —
+an untranslated string comes back as Chinese with **no JavaScript error at all**.
+
+### I made the "match translations by index" mistake again
+
+The batch process is: print the untranslated list → write translations in order →
+merge back by index. Between those steps I removed two keys that contained Jinja
+syntax (`tr('{{ icon(...) }} …')` — the template renders first, so the runtime key
+is rendered HTML and never matches), the list was regenerated, the order changed,
+and **everything from the 8th entry on was two places out**. Spot-checking caught
+it before it shipped.
+
+This is the same fault fixed in v1.14.97 on the introduction site. So
+`tools/i18n_merge.py` now exists: **translation batches must be keyed by the
+Chinese source string, and a batch whose keys look like indices is refused.**
+
+Three more gates: every JS `tr()` key must be translated; keys must not contain
+template syntax; and a translation must keep a trailing colon or ellipsis (`tr('Analysis failed: ') + err`
+loses the separator otherwise — and that check also catches whole-batch misalignment).
+
+### Site-wide screenshots can now be taken in English
+
+`scripts/page_screenshots.py --locale en`. English runs about 1.7× wider than
+Chinese, and **no automated test catches a broken layout** — only eyes do. All 80
+pages were reviewed this round; nothing overflowed or was cut off.
+
+---
+
 ## [1.14.97] - 2026-09-04
 
 ### Sentences chopped up and headings pasted onto the wrong section (reported from a screenshot)

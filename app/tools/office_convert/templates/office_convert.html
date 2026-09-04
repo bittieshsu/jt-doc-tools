@@ -83,7 +83,7 @@ function refreshTargets() {
     const g = groupFor(extOf(f.name));
     if (!g) {
       panel.hidden = true;
-      note.textContent = '有檔案的格式不支援：' + f.name;
+      note.textContent = tr('有檔案的格式不支援：') + f.name;
       note.className = 'muted oc-warn';
       return;
     }
@@ -92,7 +92,7 @@ function refreshTargets() {
   }
   if (seen.size > 1) {
     panel.hidden = true;
-    note.textContent = '同一批只能放同一類文件，目前混到了：'
+    note.textContent = tr('同一批只能放同一類文件，目前混到了：')
       + [...seen.keys()].map(g => g.dataset.name).join('、');
     note.className = 'muted oc-warn';
     alert(note.textContent);
@@ -101,7 +101,7 @@ function refreshTargets() {
   const g = [...seen.keys()][0];
   g.hidden = false;
   panel.hidden = false;
-  note.textContent = '偵測到' + g.dataset.name + '，共 ' + files.length + ' 份。';
+  note.textContent = tr('偵測到') + g.dataset.name + '，共 ' + files.length + ' 份。';
   note.className = 'muted';
 }
 
@@ -114,18 +114,18 @@ const jp = new JobProgress(document.getElementById('ocjp'), {
 });
 
 document.getElementById('btn-submit').addEventListener('click', async () => {
-  if (!files.length) return alert('請先上傳檔案');
+  if (!files.length) return alert(tr('請先上傳檔案'));
   const g = groups.find(x => !x.hidden);
-  if (!g) return alert('請先上傳檔案');
+  if (!g) return alert(tr('請先上傳檔案'));
   const picked = g.querySelector('input[type=radio]:checked');
-  if (!picked) return alert('請選一個目標格式');
+  if (!picked) return alert(tr('請選一個目標格式'));
 
   const fd = new FormData();
   fd.append('target', picked.value);
   for (const f of files) fd.append('file', f);
   const r = await fu.upload('/tools/office-convert/submit', fd,
                             { processingLabel: '排隊轉換中…' });
-  if (!r.ok) return alert(await window.friendlyServerError(r, '送出失敗'));
+  if (!r.ok) return alert(await window.friendlyServerError(r, tr('送出失敗')));
   const j = await r.json();
   jp.track(j.job_id);
 });

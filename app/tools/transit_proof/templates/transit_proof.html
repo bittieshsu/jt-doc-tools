@@ -262,7 +262,7 @@
     // 全選 checkbox 欄
     const thSel = document.createElement('th'); thSel.className = 'tp-selcol';
     const selAll = document.createElement('input'); selAll.type = 'checkbox';
-    selAll.id = 'tpSelAll'; selAll.title = '全選';
+    selAll.id = 'tpSelAll'; selAll.title = tr('全選');
     selAll.addEventListener('click', e => e.stopPropagation());
     selAll.addEventListener('change', () => {
       if (selAll.checked) ENTRIES.forEach(e => _selected.add(e.id));
@@ -316,7 +316,7 @@
           td.className = 'tp-editcell';
           const inp = document.createElement('input'); inp.type = 'text';
           inp.className = 'tp-cell-input'; inp.value = e.subject == null ? '' : String(e.subject);
-          inp.placeholder = '科目';
+          inp.placeholder = tr('科目');
           inp.addEventListener('change', () => saveField(e.id, 'subject', inp.value));
           td.appendChild(inp);
         } else { td.textContent = cellValue(e, c); }
@@ -324,7 +324,7 @@
       });
       const tdAct = document.createElement('td');
       const del = document.createElement('button');
-      del.className = 'tp-del'; del.type = 'button'; del.title = '刪除這筆';
+      del.className = 'tp-del'; del.type = 'button'; del.title = tr('刪除這筆');
       const icSrc = document.getElementById('tpIconTrash');
       if (icSrc && icSrc.firstElementChild) del.appendChild(icSrc.firstElementChild.cloneNode(true));
       else del.textContent = '✕';
@@ -341,7 +341,7 @@
       foot.appendChild(document.createElement('td'));   // 對齊 checkbox 欄
       cols.forEach((c, idx) => {
         const td = document.createElement('td');
-        if (idx === 0) td.textContent = '合計 ' + ENTRIES.length + ' 筆';
+        if (idx === 0) td.textContent = tr('合計 ') + ENTRIES.length + ' 筆';
         else if (c === 'fare') { td.textContent = fmtAmount(total, 'comma'); td.className = 'tp-num'; }
         else td.textContent = '';
         foot.appendChild(td);
@@ -375,7 +375,7 @@
     if (!files.length) { toast('請選 PDF 檔', 'err'); return; }
     const fd = new FormData();
     files.forEach(f => fd.append('files', f));
-    const msg = $('tpUpMsg'); msg.hidden = false; msg.className = 'tp-upmsg'; msg.textContent = '解析中… (' + files.length + ' 檔)';
+    const msg = $('tpUpMsg'); msg.hidden = false; msg.className = 'tp-upmsg'; msg.textContent = tr('解析中… (') + files.length + ' 檔)';
     try {
       const r = await fetch('/tools/transit-proof/upload', { method: 'POST', body: fd });
       if (!r.ok) { msg.className = 'tp-upmsg err'; msg.textContent = await errMsg(r, '上傳失敗'); return; }
@@ -386,7 +386,7 @@
       msg.className = 'tp-upmsg ' + (failed.length ? 'err' : 'ok');
       msg.textContent = '';
       const line = document.createElement('div');
-      line.textContent = '新增 ' + j.added + ' 筆' + (j.duplicates ? '，略過重複 ' + j.duplicates + ' 筆' : '') +
+      line.textContent = tr('新增 ') + j.added + ' 筆' + (j.duplicates ? '，略過重複 ' + j.duplicates + ' 筆' : '') +
         (j.cap_reached ? '（已達上限）' : '') + (failed.length ? '，' + failed.length + ' 檔無法解析：' : '');
       msg.appendChild(line);
       failed.forEach(f => {
@@ -395,7 +395,7 @@
       });
       if (j.added) toast('已新增 ' + j.added + ' 筆', 'ok');
     } catch (e) {
-      msg.className = 'tp-upmsg err'; msg.textContent = '上傳錯誤：' + e.message;
+      msg.className = 'tp-upmsg err'; msg.textContent = tr('上傳錯誤：') + e.message;
     }
   }
 
@@ -414,7 +414,7 @@
 
   async function deleteEntry(id, entry) {
     const desc = entry ? (entry.date + ' ' + (entry.transport || '') + ' ' + routeStr(entry)).trim() : '這筆';
-    if (!(await window.showConfirm('確定刪除「' + desc + '」？此動作不可復原。',
+    if (!(await window.showConfirm(tr('確定刪除「') + desc + '」？此動作不可復原。',
         { title: '刪除乘車證明', kind: 'danger', okText: '刪除' }))) return;
     const r = await fetch('/tools/transit-proof/entry/' + id, { method: 'DELETE' });
     if (!r.ok) { toast(await errMsg(r, '刪除失敗'), 'err'); return; }
@@ -435,7 +435,7 @@
   }
   $('tpBtnClear').addEventListener('click', async () => {
     if (!ENTRIES.length) return;
-    if (!(await window.showConfirm('確定清空全部 ' + ENTRIES.length + ' 筆乘車證明？此動作不可復原。',
+    if (!(await window.showConfirm(tr('確定清空全部 ') + ENTRIES.length + ' 筆乘車證明？此動作不可復原。',
         { title: '全部清空', kind: 'danger', okText: '清空' }))) return;
     const r = await fetch('/tools/transit-proof/buffer', { method: 'DELETE' });
     if (!r.ok) { toast(await errMsg(r, '清空失敗'), 'err'); return; }
@@ -445,7 +445,7 @@
   $('tpBtnDelSel').addEventListener('click', async () => {
     const ids = Array.from(_selected);
     if (!ids.length) return;
-    if (!(await window.showConfirm('確定刪除選取的 ' + ids.length + ' 筆乘車證明？此動作不可復原。',
+    if (!(await window.showConfirm(tr('確定刪除選取的 ') + ids.length + ' 筆乘車證明？此動作不可復原。',
         { title: '刪除選取', kind: 'danger', okText: '刪除' }))) return;
     const r = await fetch('/tools/transit-proof/buffer/delete-batch', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -501,7 +501,7 @@
       row.setAttribute('draggable', 'false');
       // 1) 拖曳把手
       const grab = document.createElement('span'); grab.className = 'tp-fr-grab';
-      grab.textContent = '⋮⋮'; grab.title = '拖曳調整順序';
+      grab.textContent = '⋮⋮'; grab.title = tr('拖曳調整順序');
       // 2) 勾選 + 名稱（同一格）
       const nameCell = document.createElement('label'); nameCell.className = 'tp-fr-name';
       const chk = document.createElement('input'); chk.type = 'checkbox'; chk.className = 'tp-fr-chk';
@@ -524,7 +524,7 @@
       }
       // 4) 匯出標題
       const lbl = document.createElement('input'); lbl.type = 'text'; lbl.className = 'fc-input tp-fr-label';
-      lbl.placeholder = '匯出標題（留空 = ' + f.label + '）';
+      lbl.placeholder = tr('匯出標題（留空 = ') + f.label + '）';
       lbl.value = SETTINGS.export_labels[fid] || ''; lbl.dataset.lblFor = fid;
       row.appendChild(grab); row.appendChild(nameCell); row.appendChild(fmtCell); row.appendChild(lbl);
       box.appendChild(row);

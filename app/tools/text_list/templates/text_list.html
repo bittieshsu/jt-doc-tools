@@ -764,7 +764,7 @@ $('btnRun').addEventListener('click', async () => {
   }
   const ops = collectOps();
   $('btnRun').disabled = true;
-  $('status').textContent = "處理中…";
+  $('status').textContent = tr("處理中…");
   try {
     const r = await fetch("/tools/text-list/process", {
       method: "POST",
@@ -798,7 +798,7 @@ function showToast(msg) {
 
 $('btnCopyAll').addEventListener('click', async () => {
   const text = $('outputArea').value || "";
-  if (!text) { showToast('沒有可複製的內容'); return; }
+  if (!text) { showToast(tr('沒有可複製的內容')); return; }
   const btn = $('btnCopyAll');
   const orig = btn.innerHTML;
   try {
@@ -811,7 +811,7 @@ $('btnCopyAll').addEventListener('click', async () => {
       window.getSelection().removeAllRanges();
     }
     btn.classList.add('ok');
-    btn.innerHTML = '已複製 ✓';
+    btn.innerHTML = tr('已複製 ✓');
     showToast(`已複製 ${_resultLines.length.toLocaleString()} 行（${text.length.toLocaleString()} 字）`);
     setTimeout(() => { btn.classList.remove('ok'); btn.innerHTML = orig; }, 1500);
   } catch (e) {
@@ -834,7 +834,7 @@ exportMenu.querySelectorAll('button[data-fmt]').forEach(btn => {
   btn.addEventListener('click', async () => {
     const fmt = btn.dataset.fmt;
     exportMenu.hidden = true;
-    if (!_resultLines.length) { showToast('沒有可下載的內容'); return; }
+    if (!_resultLines.length) { showToast(tr('沒有可下載的內容')); return; }
     showToast(`產生 ${fmt} 中…`);
     try {
       const r = await fetch(`/tools/text-list/export/${fmt}`, {

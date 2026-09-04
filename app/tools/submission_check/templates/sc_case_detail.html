@@ -265,7 +265,7 @@
 {% block scripts %}
 <script nonce="{{ request.state.csp_nonce }}">
 async function rerunCheck(caseId) {
-  const ok = await window.showConfirm("建立新版本並重新檢核？", { title: "重新檢核", okText: "確認" });
+  const ok = await window.showConfirm(tr("建立新版本並重新檢核？"), { title: "重新檢核", okText: "確認" });
   if (!ok) return;
   try {
     const r = await fetch("../run/" + caseId, { method: "POST" });
@@ -290,7 +290,7 @@ async function markOverride(caseId, findingKey, verdict) {
 }
 
 async function removeOverride(caseId, findingKey) {
-  const ok = await window.showConfirm("移除此標記？", { title: "移除標記" });
+  const ok = await window.showConfirm(tr("移除此標記？"), { title: "移除標記" });
   if (!ok) return;
   try {
     const r = await fetch("../override/" + caseId + "/" + encodeURIComponent(findingKey), { method: "DELETE" });
@@ -304,7 +304,7 @@ function previewPage(caseId, fileId, page) {
   const modal = document.getElementById("prevModal");
   const img = document.getElementById("prevImg");
   const title = document.getElementById("prevTitle");
-  title.textContent = "頁面 " + page + " 預覽（檔案 " + fileId.substring(0,8) + "...）";
+  title.textContent = tr("頁面 ") + page + " 預覽（檔案 " + fileId.substring(0,8) + "...）";
   img.src = "../page-preview/" + caseId + "/" + fileId + "/" + page;
   modal.classList.add("show");
 }

@@ -184,7 +184,7 @@ const fu = new FileUpload(document.getElementById('upDt'), async (_f, fs) => {
   fd.append('file', file);
   const r = await fu.upload('/tools/doc-translate/upload', fd,
                             { processingLabel: '讀取文件…' });
-  if (!r.ok) { showAlert(await window.friendlyServerError(r, '讀取失敗')); return; }
+  if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀取失敗'))); return; }
   const j = await r.json();
   dtUpload = j.upload_id;
   document.getElementById('dtUnits').textContent = j.units.toLocaleString();
@@ -225,7 +225,7 @@ function showResult(job) {
         const cap = document.createElement('figcaption');
         cap.textContent = `第 ${i} 頁 · ${label}`;
         fig.appendChild(img); fig.appendChild(cap);
-        fig.title = '點一下看大圖';
+        fig.title = tr('點一下看大圖');
         // 放大要拿高解析度那張，縮圖放大只會糊掉
         const big = `/tools/doc-translate/preview/${dtUpload}/${i}`
                   + `?side=${side}&large=1`;
@@ -267,7 +267,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
       domain: pickedDomain(),
     }),
   });
-  if (!r.ok) { showAlert(await window.friendlyServerError(r, '送出失敗')); return; }
+  if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('送出失敗'))); return; }
   const j = await r.json();
   jp.track(j.job_id);
   setRunning(true);

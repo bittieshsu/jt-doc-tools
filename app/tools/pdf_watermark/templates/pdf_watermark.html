@@ -493,14 +493,14 @@ function refreshSim(){
     const panel = document.getElementById('sim-panel');
     const status = document.getElementById('sim-status');
     const img = document.getElementById('sim-image');
-    panel.hidden = false; status.textContent = '產生預覽中…';
+    panel.hidden = false; status.textContent = tr('產生預覽中…');
     const fd = new FormData();
     if (src === 'asset') {
       const aid = getSelectedAsset();
       fd.append('asset_id', aid);
       if (aid === '__temp__') {
         const tf = wmTempAssetAsFile();
-        if (!tf) { status.textContent = '臨時資產遺失'; return; }
+        if (!tf) { status.textContent = tr('臨時資產遺失'); return; }
         fd.append('temp_asset_file', tf, tf.name);
       }
     }
@@ -510,7 +510,7 @@ function refreshSim(){
     try {
       const r = await fu.upload('/tools/pdf-watermark/preview-watermarked', fd, {processingLabel: '產生預覽中…'});
       if (seq !== simSeq) return;
-      if (!r.ok) { status.textContent = '預覽產生失敗'; return; }
+      if (!r.ok) { status.textContent = tr('預覽產生失敗'); return; }
       const j = await r.json();
       img.src = j.preview_url + `?t=${Date.now()}`;
       simPageCount = j.page_count || 1;
@@ -519,7 +519,7 @@ function refreshSim(){
       status.textContent = `第 ${simPage + 1} 頁預覽 / 共 ${simPageCount} 頁（依目前設定）`;
     } catch(e) {
       if (seq !== simSeq) return;
-      status.textContent = '預覽產生失敗';
+      status.textContent = tr('預覽產生失敗');
     }
   }, 300);
 }
@@ -554,9 +554,9 @@ document.addEventListener('change', (e) => {
 
 document.getElementById('btn-submit').addEventListener('click', async () => {
   const src = getSource();
-  if (src === 'asset' && !getSelectedAsset()) return alert('請先選擇浮水印圖片，或切到「文字」模式');
-  if (src === 'text' && !document.getElementById('wm-text').value.trim()) return alert('請輸入浮水印文字');
-  if (!pickedFiles.length) return alert('請先上傳 PDF');
+  if (src === 'asset' && !getSelectedAsset()) return alert(tr('請先選擇浮水印圖片，或切到「文字」模式'));
+  if (src === 'text' && !document.getElementById('wm-text').value.trim()) return alert(tr('請輸入浮水印文字'));
+  if (!pickedFiles.length) return alert(tr('請先上傳 PDF'));
 
   // 逐檔順序上傳（issue #27）：create → 每份各一個請求 add → process。
   // 每個請求 body 都很小，不會撞反向代理 / 伺服器的上傳大小上限。
@@ -572,7 +572,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
       cfd.append('asset_id', aid);
       if (aid === '__temp__') {
         const tf = wmTempAssetAsFile();
-        if (!tf) { alert('臨時資產已遺失，請重新上傳'); return; }
+        if (!tf) { alert(tr('臨時資產已遺失，請重新上傳')); return; }
         cfd.append('temp_asset_file', tf, tf.name);
       }
     }
@@ -581,8 +581,8 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     setBtn('建立批次中…');
     let cr;
     try { cr = await fetch('/tools/pdf-watermark/batch/create', { method: 'POST', body: cfd }); }
-    catch (e) { alert('建立批次失敗（連線中斷），請稍後再試。'); return; }
-    if (!cr.ok) { alert('建立批次失敗：' + (await cr.text().catch(() => 'HTTP ' + cr.status))); return; }
+    catch (e) { alert(tr('建立批次失敗（連線中斷），請稍後再試。')); return; }
+    if (!cr.ok) { alert(tr('建立批次失敗：') + (await cr.text().catch(() => 'HTTP ' + cr.status))); return; }
     const batchId = (await cr.json()).batch_id;
 
     // 2) 逐檔上傳
@@ -608,7 +608,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     // 3) 觸發處理
     setBtn('排隊處理中…');
     const pr = await fetch(`/tools/pdf-watermark/batch/${batchId}/process`, { method: 'POST' });
-    if (!pr.ok) { alert('處理失敗：' + (await pr.text().catch(() => 'HTTP ' + pr.status))); return; }
+    if (!pr.ok) { alert(tr('處理失敗：') + (await pr.text().catch(() => 'HTTP ' + pr.status))); return; }
     progress.track((await pr.json()).job_id);
   } finally {
     btn.disabled = false;
@@ -692,7 +692,7 @@ document.getElementById('wmTempAssetFile').addEventListener('change', (e) => {
   if (!f) return;
   const MAX = 5 * 1024 * 1024;
   if (f.size > MAX) {
-    alert('檔案過大（上限 5 MB）');
+    alert(tr('檔案過大（上限 5 MB）'));
     e.target.value = '';
     return;
   }
@@ -713,7 +713,7 @@ document.getElementById('wmTempAssetFile').addEventListener('change', (e) => {
 });
 document.getElementById('btnWmTempRemove').addEventListener('click', async (e) => {
   e.preventDefault(); e.stopPropagation();
-  if (!(await window.showConfirm('移除臨時資產？', { title: '移除', kind: 'danger', okText: '移除' }))) return;
+  if (!(await window.showConfirm(tr('移除臨時資產？'), { title: '移除', kind: 'danger', okText: '移除' }))) return;
   _wmTempSet(null);
 });
 </script>

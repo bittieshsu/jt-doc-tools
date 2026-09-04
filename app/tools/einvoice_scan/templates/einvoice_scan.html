@@ -1095,7 +1095,7 @@ async function saveSettings() {
     saved.classList.add('show');
     setTimeout(() => saved.classList.remove('show'), 1500);
   } catch (e) {
-    showToast('設定儲存失敗：' + e.message, 'err');
+    showToast(tr('設定儲存失敗：') + e.message, 'err');
   }
 }
 
@@ -1219,12 +1219,12 @@ function _renderPeriodPreview() {
   pv.className = 'es-period-preview';
   if (!pc.enabled) {
     pv.classList.add('empty');
-    pv.textContent = '（未啟用 — 啟用後表格內不在期內的發票會標警告）';
+    pv.textContent = tr('（未啟用 — 啟用後表格內不在期內的發票會標警告）');
     return;
   }
   if (!_activePeriod) {
     pv.classList.add('empty');
-    pv.textContent = '請選擇期間或自訂日期範圍';
+    pv.textContent = tr('請選擇期間或自訂日期範圍');
     return;
   }
   pv.classList.add('active');
@@ -1362,7 +1362,7 @@ if (_btnAddRule) {
   _btnAddRule.addEventListener('click', () => {
     if (!_settings.accounting_rules) _settings.accounting_rules = [];
     if (_settings.accounting_rules.length >= 200) {
-      showToast('規則數已達上限 200 條', 'err');
+      showToast(tr('規則數已達上限 200 條'), 'err');
       return;
     }
     _settings.accounting_rules.push({ keywords: [], subject: '', match: 'any' });
@@ -1471,7 +1471,7 @@ if (myVatInput) {
   window.addEventListener('beforeunload', forceSave);
 }
 $('btnSettingsReset').addEventListener('click', async () => {
-  if (!(await window.showConfirm('恢復欄位顯示為預設？', { title: '重設欄位' }))) return;
+  if (!(await window.showConfirm(tr('恢復欄位顯示為預設？'), { title: '重設欄位' }))) return;
   try {
     const r = await fetch('/tools/einvoice-scan/settings/reset', { method: 'POST' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1484,9 +1484,9 @@ $('btnSettingsReset').addEventListener('click', async () => {
     renderFormatsPanel();
     if ($('myCompanyVat')) $('myCompanyVat').value = _settings.my_company_vat;
     renderBufferRows();
-    showToast('已恢復預設', 'ok');
+    showToast(tr('已恢復預設'), 'ok');
   } catch (e) {
-    showToast('恢復失敗：' + e.message, 'err');
+    showToast(tr('恢復失敗：') + e.message, 'err');
   }
 });
 
@@ -1658,7 +1658,7 @@ function renderBufferRows() {
 function showDetail(id) {
   const inv = _cachedInvoices.find(x => x.id === id);
   if (!inv) return;
-  $('detailTitle').textContent = '發票 ' + (inv.invoice_number || '');
+  $('detailTitle').textContent = tr('發票 ') + (inv.invoice_number || '');
   const out = [];
   // 顯示所有欄位（依 FIELD_DEFINITIONS 順序），用使用者設定的格式。
   // 在 seller_vat 之後插入「賣方反查」補充欄位（行業 / 組織別 / 地址 / 類別）
@@ -1724,7 +1724,7 @@ async function saveNote(id, note) {
       const inv = _cachedInvoices.find(x => x.id === id);
       if (inv) inv.note = note;
     } catch (e) {
-      showToast('備註儲存失敗：' + e.message, 'err');
+      showToast(tr('備註儲存失敗：') + e.message, 'err');
     }
   }, 300);
 }
@@ -1741,7 +1741,7 @@ async function deleteInvoice(id) {
   try {
     const r = await fetch(`/tools/einvoice-scan/buffer/${id}`, { method: 'DELETE' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    showToast('已刪除');
+    showToast(tr('已刪除'));
     await loadBuffer();
   } catch (e) {
     showToast(`刪除失敗：${e.message}`, 'err');
@@ -1755,7 +1755,7 @@ const _btnLlmClassify = $('btnLlmClassify');
 if (_btnLlmClassify) {
   _btnLlmClassify.addEventListener('click', async () => {
     if (!_cachedInvoices.length) {
-      showToast('buffer 內沒有發票可分類', 'err');
+      showToast(tr('buffer 內沒有發票可分類'), 'err');
       return;
     }
     const ok = await window.showConfirm(
@@ -1767,13 +1767,13 @@ if (_btnLlmClassify) {
     if (!ok) return;
     const orig = _btnLlmClassify.innerHTML;
     _btnLlmClassify.disabled = true;
-    _btnLlmClassify.textContent = 'LLM 處理中…';
+    _btnLlmClassify.textContent = tr('LLM 處理中…');
     // 鎖整個表格 + spinner
     const overlay = $('tableBusyOverlay');
     const textEl = $('tableBusyText');
     const subEl = $('tableBusySub');
     if (overlay) {
-      textEl.textContent = 'LLM 判讀中…';
+      textEl.textContent = tr('LLM 判讀中…');
       subEl.textContent = `共 ${_cachedInvoices.length} 張，每批 20 張處理中，請勿關閉頁面`;
       overlay.hidden = false;
     }
@@ -1789,7 +1789,7 @@ if (_btnLlmClassify) {
       showToast(msg, 'ok');
       await loadBuffer();
     } catch (e) {
-      showToast('LLM 判讀失敗：' + e.message, 'err');
+      showToast(tr('LLM 判讀失敗：') + e.message, 'err');
     } finally {
       _btnLlmClassify.disabled = false;
       _btnLlmClassify.innerHTML = orig;
@@ -1808,12 +1808,12 @@ if (_btnReclassify) {
           { title: '重抓科目', okText: '開始' }))) return;
     const orig = _btnReclassify.innerHTML;
     _btnReclassify.disabled = true;
-    _btnReclassify.textContent = '處理中…';
+    _btnReclassify.textContent = tr('處理中…');
     const overlay = $('tableBusyOverlay');
     const textEl = $('tableBusyText');
     const subEl = $('tableBusySub');
     if (overlay) {
-      textEl.textContent = '重抓科目中…';
+      textEl.textContent = tr('重抓科目中…');
       subEl.textContent = `共 ${_cachedInvoices.length} 張，請稍候`;
       overlay.hidden = false;
     }
@@ -1827,7 +1827,7 @@ if (_btnReclassify) {
         'ok');
       await loadBuffer();
     } catch (e) {
-      showToast('重抓失敗：' + e.message, 'err');
+      showToast(tr('重抓失敗：') + e.message, 'err');
     } finally {
       _btnReclassify.disabled = false;
       _btnReclassify.innerHTML = orig;
@@ -1906,7 +1906,7 @@ exportMenu.querySelectorAll('button[data-fmt]').forEach(b => {
 
 $('btnClear').addEventListener('click', async () => {
   if (!(await window.showConfirm(
-        '確定要清空全部已掃描的發票？此動作不可復原。',
+        tr('確定要清空全部已掃描的發票？此動作不可復原。'),
         { title: '全部清空', kind: 'danger', okText: '清空' }))) return;
   try {
     const r = await fetch('/tools/einvoice-scan/buffer', { method: 'DELETE' });
@@ -1979,7 +1979,7 @@ const supportCheck = liveSupportCheck();
 if (!supportCheck.ok) {
   liveBtn.classList.add('disabled');
   liveBtn.style.cursor = 'not-allowed';
-  $('liveBtnTitle').textContent = '連續掃描（不可用）';
+  $('liveBtnTitle').textContent = tr('連續掃描（不可用）');
   $('liveBtnDesc').textContent = supportCheck.reason;
 } else {
   liveBtn.style.cursor = 'pointer';
@@ -1991,7 +1991,7 @@ if (!supportCheck.ok) {
 
 async function startLiveScan() {
   if (_liveStream) return;
-  liveStatusEl.textContent = '請允許相機權限…';
+  liveStatusEl.textContent = tr('請允許相機權限…');
   liveBox.hidden = false;
   _liveScannedThisSession = 0;
   liveCount.textContent = '0';
@@ -2014,7 +2014,7 @@ async function startLiveScan() {
 
   _liveCanvas = document.createElement('canvas');
   _liveCtx = _liveCanvas.getContext('2d', { willReadFrequently: true });
-  liveStatusEl.textContent = '把發票 QR 對到中央紅框內…';
+  liveStatusEl.textContent = tr('把發票 QR 對到中央紅框內…');
   // 預先初始化 AudioContext（required user gesture，這裡的 click 算）
   _ensureAudioContext();
   scanLoop();
@@ -2141,7 +2141,7 @@ async function handleLiveScanResult(qrText) {
   // 視覺 feedback 立即（不用等 server）
   liveVideo.classList.add('flash');
   setTimeout(() => liveVideo.classList.remove('flash'), 200);
-  liveStatusEl.textContent = '掃到 QR…送出中';
+  liveStatusEl.textContent = tr('掃到 QR…送出中');
 
   try {
     const r = await fetch('/tools/einvoice-scan/scan-text', {
@@ -2165,9 +2165,9 @@ async function handleLiveScanResult(qrText) {
       if (j.right_qr_count > 0) {
         // 右 QR 報帳沒幫助，廠商實作差異大不可靠 — 直接告知改掃左 QR
         liveStatusEl.textContent =
-          '這是發票右側 QR（廠商選用補充欄，報帳不需要）— 請改掃左側主 QR';
+          tr('這是發票右側 QR（廠商選用補充欄，報帳不需要）— 請改掃左側主 QR');
       } else {
-        liveStatusEl.textContent = '不是電子發票 QR — 跳過';
+        liveStatusEl.textContent = tr('不是電子發票 QR — 跳過');
       }
     }
   } catch (e) {

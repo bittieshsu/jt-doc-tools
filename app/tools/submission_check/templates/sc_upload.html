@@ -127,7 +127,7 @@
     fileList.innerHTML = '';
     if (!files.length) {
       btnRun.disabled = true;
-      statusEl.textContent = '請先上傳至少一個檔案';
+      statusEl.textContent = tr('請先上傳至少一個檔案');
       return;
     }
     btnRun.disabled = false;
@@ -172,7 +172,7 @@
 
   btnRun.addEventListener('click', async () => {
     btnRun.disabled = true;
-    statusEl.textContent = '上傳中…';
+    statusEl.textContent = tr('上傳中…');
     progressBar.style.display = 'block';
     progressInner.style.width = '10%';
     setStations({L1:'pending', L2:'pending', L3:'pending', L4:'pending', L5:'pending', L6:'pending'});
@@ -191,12 +191,12 @@
       const upJ = await up.json();
       const caseId = upJ.case_id;
       progressInner.style.width = '30%';
-      statusEl.textContent = '上傳完成，開始檢核…';
+      statusEl.textContent = tr('上傳完成，開始檢核…');
       const run = await fetch('run/' + caseId, { method: 'POST' });
       if (!run.ok) throw new Error('觸發檢核失敗：' + (await run.text()));
       const runJ = await run.json();
       progressInner.style.width = '50%';
-      statusEl.textContent = '背景檢核中（可關閉視窗稍後從案件清單回看）…';
+      statusEl.textContent = tr('背景檢核中（可關閉視窗稍後從案件清單回看）…');
       const jobId = runJ.job_id;
       const t0 = Date.now();
       while (Date.now() - t0 < 600000) {
@@ -209,7 +209,7 @@
         if (jj.meta && jj.meta.layers) setStations(jj.meta.layers);
         if (jj.status === 'done') {
           progressInner.style.width = '100%';
-          statusEl.textContent = '完成，跳轉到報告…';
+          statusEl.textContent = tr('完成，跳轉到報告…');
           setTimeout(() => window.location.href = 'case/' + caseId, 600);
           return;
         }
@@ -220,7 +220,7 @@
       }
       throw new Error('檢核超時');
     } catch (e) {
-      statusEl.textContent = '失敗：' + e.message;
+      statusEl.textContent = tr('失敗：') + e.message;
       progressBar.style.display = 'none';
       btnRun.disabled = false;
     }

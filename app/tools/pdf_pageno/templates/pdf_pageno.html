@@ -422,7 +422,7 @@ function updateSkipBadges() {
     let badge = thumb.querySelector('.pn-badge');
     if (skip && !badge) {
       badge = document.createElement('span');
-      badge.className = 'pn-badge'; badge.textContent = '不加頁碼';
+      badge.className = 'pn-badge'; badge.textContent = tr('不加頁碼');
       thumb.insertBefore(badge, thumb.firstChild);
     } else if (!skip && badge) {
       badge.remove();
@@ -603,7 +603,7 @@ document.getElementById('thumb-grid').addEventListener('click', async (e) => {
 });
 
 document.getElementById('btn-submit').addEventListener('click', async () => {
-  if(!files.length) return alert('請上傳 PDF');
+  if(!files.length) return alert(tr('請上傳 PDF'));
   const fd = new FormData();
   for (const f of files) fd.append('file', f);
   fd.append('position', getPos());
@@ -615,7 +615,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   fd.append('from_page', String(getFromPage()));
   fd.append('to_page', String(getToPageRaw()));
   const r = await fu.upload('/tools/pdf-pageno/submit', fd, {processingLabel: '排隊處理中…'});
-  if(!r.ok) return alert('送出失敗：'+ await r.text());
+  if(!r.ok) return alert(tr('送出失敗：')+ await r.text());
   const j = await r.json(); jp.track(j.job_id);
 });
 </script>

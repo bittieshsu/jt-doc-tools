@@ -174,7 +174,7 @@ const fu = new FileUpload($("asUp"), async (f) => {
     resp = await fetch("/tools/pdf-annotations-strip/analyze", { method:"POST", body:fd });
   } catch (err) {
     $("asLoading").hidden = true;
-    $("asError").textContent = "網路錯誤：" + err.message;
+    $("asError").textContent = tr("網路錯誤：") + err.message;
     $("asError").hidden = false;
     return;
   }
@@ -182,7 +182,7 @@ const fu = new FileUpload($("asUp"), async (f) => {
   if (!resp.ok) {
     let msg = "HTTP " + resp.status;
     try { msg = (await resp.json()).detail || msg; } catch (e) {}
-    $("asError").textContent = "分析失敗：" + msg;
+    $("asError").textContent = tr("分析失敗：") + msg;
     $("asError").hidden = false;
     return;
   }
@@ -219,7 +219,7 @@ function render(r) {
   }
 
   if (r.total === 0) {
-    $("asError").textContent = "⚠ 此 PDF 沒有偵測到任何可刪除的註解。";
+    $("asError").textContent = tr("⚠ 此 PDF 沒有偵測到任何可刪除的註解。");
     $("asError").hidden = false;
   } else {
     $("asError").hidden = true;
@@ -306,9 +306,9 @@ document.querySelectorAll(".as-mode").forEach(b => {
 });
 
 $("btnStrip").addEventListener("click", async () => {
-  if (!lastResult || !lastResult.upload_id) { alert("請先上傳並分析 PDF"); return; }
+  if (!lastResult || !lastResult.upload_id) { alert(tr("請先上傳並分析 PDF")); return; }
   if (mode === "filter" && stripState.types.size === 0 && stripState.authors.size === 0) {
-    alert("請至少勾選一個類型或作者");
+    alert(tr("請至少勾選一個類型或作者"));
     return;
   }
   if (mode === "all" && lastResult.total > 0) {
@@ -327,14 +327,14 @@ $("btnStrip").addEventListener("click", async () => {
     r = await fetch("/tools/pdf-annotations-strip/strip", { method:"POST", body:fd });
   } catch (err) {
     _setBusy(btn, false);
-    $("stripStatus").textContent = "失敗：" + err.message;
+    $("stripStatus").textContent = tr("失敗：") + err.message;
     return;
   }
   if (!r.ok) {
     let msg = "HTTP " + r.status;
     try { msg = (await r.json()).detail || msg; } catch (e) {}
     _setBusy(btn, false);
-    $("stripStatus").textContent = "失敗：" + msg;
+    $("stripStatus").textContent = tr("失敗：") + msg;
     return;
   }
   const removed = r.headers.get("X-Annotations-Removed") || "?";

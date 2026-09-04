@@ -515,7 +515,7 @@ function _renderDrillBar() {
   const active = Object.entries(_drill).filter(([k, v]) => v);
   if (!active.length) { bar.hidden = true; bar.innerHTML = ''; return; }
   bar.hidden = false;
-  bar.innerHTML = '已篩選：' + active.map(([k, v]) =>
+  bar.innerHTML = tr('已篩選：') + active.map(([k, v]) =>
     `<span class="vl-drill-chip">${_DRILL_LABELS[k] || k}：${escapeHtml(v)}`
     + `<span class="vl-drill-x" data-drill="${k}">×</span></span>`).join('')
     + ` <button class="vl-btn-sm" id="drillClearAll">清除全部</button>`;
@@ -675,7 +675,7 @@ async function smartQuery() {
     $('results').innerHTML = `<div class="vl-card miss"><div class="vl-card-head"><span data-s="s217480ed">查詢失敗：${escapeHtml(e.message)}</span></div></div>`;
   } finally {
     btn.disabled = false;
-    btnText.textContent = '查詢';
+    btnText.textContent = tr('查詢');
   }
 }
 

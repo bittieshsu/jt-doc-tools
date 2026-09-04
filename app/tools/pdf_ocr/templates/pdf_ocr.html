@@ -733,7 +733,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
     if (!summaryEl) return;
     if (items.length === 0) {
       summaryEl.className = 'po-langs-summary is-empty';
-      summaryEl.textContent = '尚未選擇任何語言（至少要選一種才能 OCR）';
+      summaryEl.textContent = tr('尚未選擇任何語言（至少要選一種才能 OCR）');
     } else {
       summaryEl.className = 'po-langs-summary';
       // v1.7.50：避免 innerHTML 拼 DOM textContent 來源（CodeQL js/xss-through-dom），
@@ -827,7 +827,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
 
   const fu = new FileUpload(document.getElementById('poUp'), async (file) => {
     if (!file) return;
-    statusEl.textContent = '上傳中…';
+    statusEl.textContent = tr('上傳中…');
     btnRun.disabled = true;
     resultBox.innerHTML = '';
     const fd = new FormData(); fd.append('file', file);
@@ -839,10 +839,10 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
       let info = `已上傳 ${j.filename}（${(j.size/1024).toFixed(1)} KB）`;
       if (j.converted_from) info += `；已從 ${j.converted_from} 自動轉成 PDF`;
       uploadInfo.textContent = info;
-      statusEl.textContent = '可以開始 OCR';
+      statusEl.textContent = tr('可以開始 OCR');
       btnRun.disabled = false;
     } catch (e) {
-      statusEl.textContent = '上傳失敗：' + e.message;
+      statusEl.textContent = tr('上傳失敗：') + e.message;
     }
   });
 
@@ -955,7 +955,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
   btnStop.addEventListener('click', async () => {
     if (!currentJobId) return;
     btnStop.disabled = true;
-    statusEl.textContent = '取消中…';
+    statusEl.textContent = tr('取消中…');
     userCancelled = true;
     try {
       await fetch('/api/jobs/' + currentJobId + '/cancel', { method: 'POST' });
@@ -967,7 +967,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
   btnRun.addEventListener('click', async () => {
     if (!uploadId) return;
     const langsSel = getSelectedLangs();
-    if (!langsSel) { statusEl.textContent = '請至少勾選一種 OCR 語言'; return; }
+    if (!langsSel) { statusEl.textContent = tr('請至少勾選一種 OCR 語言'); return; }
     setBtnBusy(true, '處理中…');
     btnStop.style.display = 'inline-flex';
     btnStop.disabled = false;
@@ -975,7 +975,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
     progressBar.style.display = 'block';
     progressInner.style.width = '5%';
     resultBox.innerHTML = '';
-    statusEl.textContent = '排隊中…';
+    statusEl.textContent = tr('排隊中…');
     const fd = new FormData();
     fd.append('langs', getSelectedLangs());
     fd.append('dpi', $('poDpi').value);
@@ -1117,13 +1117,13 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
             copyBtn.addEventListener('click', async () => {
               try {
                 await navigator.clipboard.writeText(fullText);
-                copyBtn.textContent = '✓ 已複製 ' + fullText.length + ' 字';
+                copyBtn.textContent = tr('✓ 已複製 ') + fullText.length + ' 字';
                 setTimeout(() => { copyBtn.textContent = ('<span data-s="se1b879c5">' + PO_ICON_COPY + '</span>複製全文'); }, 2000);
               } catch (e) {
                 const ta = document.createElement('textarea');
                 ta.value = fullText; document.body.appendChild(ta);
                 ta.select(); document.execCommand('copy'); ta.remove();
-                copyBtn.textContent = '✓ 已複製';
+                copyBtn.textContent = tr('✓ 已複製');
                 setTimeout(() => { copyBtn.textContent = ('<span data-s="se1b879c5">' + PO_ICON_COPY + '</span>複製全文'); }, 2000);
               }
             });
@@ -1139,7 +1139,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
           throw new Error('服務已重新啟動，這個作業被中斷，請重新送出');
         }
         if (jj.status === 'cancelled') {
-          statusEl.textContent = '已停止辨識';
+          statusEl.textContent = tr('已停止辨識');
           progressBar.style.display = 'none';
           btnStop.style.display = 'none';
           currentJobId = null;
@@ -1150,9 +1150,9 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
       throw new Error('OCR 超時');
     } catch (e) {
       if (userCancelled) {
-        statusEl.textContent = '已停止辨識';
+        statusEl.textContent = tr('已停止辨識');
       } else {
-        statusEl.textContent = '失敗：' + e.message;
+        statusEl.textContent = tr('失敗：') + e.message;
       }
       progressBar.style.display = 'none';
       btnStop.style.display = 'none';

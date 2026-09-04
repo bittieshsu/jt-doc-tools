@@ -410,10 +410,10 @@ $('thsrFmtPreset').addEventListener('change', () => {
 $('thsrFmtCustom').addEventListener('input', _refreshFmtPreview);
 
 $('btn-submit').addEventListener('click', async () => {
-  if (!files.length) return alert('請上傳 PDF');
+  if (!files.length) return alert(tr('請上傳 PDF'));
   // 至少要勾一個模式才有意義
   if (!$('mPassword').checked && !$('mFilename').checked && !$('mThsr').checked) {
-    return alert('請至少勾選一種解密模式（密碼 / 檔名 / 高鐵）');
+    return alert(tr('請至少勾選一種解密模式（密碼 / 檔名 / 高鐵）'));
   }
   const fd = new FormData();
   for (const f of files) fd.append('file', f);
@@ -437,7 +437,7 @@ $('btn-submit').addEventListener('click', async () => {
     fd.append('thsr_date_format', _getThsrFormat());
   }
   const r = await fu.upload('/tools/pdf-decrypt/submit', fd, {processingLabel: '排隊解密中…'});
-  if (!r.ok) return alert('失敗：' + await jtdtError(r));
+  if (!r.ok) return alert(tr('失敗：') + await jtdtError(r));
   const j = await r.json();
   jp.track(j.job_id);
 });
