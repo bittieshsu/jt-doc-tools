@@ -675,3 +675,24 @@ def test_trailing_newline_run_does_not_defeat_the_colour_fix():
     # 而且整格讀回來一個字都沒少
     again, _ = M.extract_units(out, ".xlsx")
     assert again[0].text == "1.1 角色已記錄。\n新要求 - 立即生效\n", again[0].text
+
+
+def test_stray_byte_token_in_the_marker_is_tolerated():
+    """`⟦<0xC2>5⟧` 這種標記也要認得。
+
+    模型遇到不成字的位元組時，tokenizer 會把它原樣吐成 `<0xC2>` 這種**字面文字**。
+    實測 gemma4:26b 翻 40 段的批次**每一次都會出現一次**，害那一段解析不到、
+    整批被判定漏段 → 對切重試 → 白跑一次生成。這正是正式環境上兩成批次「漏段」
+    的真正原因：譯文其實好端端在那裡。
+    """
+    R = _R()
+    reply = "\n".join(
+        f"⟦{i}⟧譯文 {i}" if i != 5 else f"⟦<0xC2>{i}⟧譯文 {i}"
+        for i in range(1, 6))
+    got = R._parse_batch_reply(reply, 5)
+    assert got is not None, "帶位元組 token 的標記應該要認得"
+    assert got[4] == "譯文 5", got
+    # 標記裡有空白也要認
+    assert R._parse_batch_reply("⟦ 1 ⟧甲\n⟦2⟧乙", 2) == ["甲", "乙"]
+    # 但段數真的對不上時仍然要退回 None（不可以硬湊）
+    assert R._parse_batch_reply("⟦1⟧甲", 2) is None

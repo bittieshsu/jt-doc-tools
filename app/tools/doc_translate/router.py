@@ -83,7 +83,12 @@ BATCH_MAX_SEGMENTS = 40
 BATCH_MAX_CHARS = 1200
 #: 段落標記。刻意用少見的符號，避免跟內文撞在一起。
 _SEG_OPEN, _SEG_CLOSE = "⟦", "⟧"
-_SEG_RE = re.compile(r"^\s*⟦(\d+)⟧\s?(.*)$")
+_SEG_RE = re.compile(r"^\s*⟦\s*(\d+)\s*⟧\s?(.*)$")
+#: 模型偶爾會在標記中間吐出**位元組 token 的字面寫法**（`⟦<0xC2>5⟧`）——
+#: 那是 tokenizer 遇到不成字的位元組時的退路，會原樣變成文字。實測 gemma4:26b
+#: 翻 40 段的批次時**每次都會出現一次**，於是那一段解析不到、整批被判定漏段
+#: → 對切重試 → 白跑一次生成。正文不可能出現 `<0x??>` 這種東西，解析前直接拿掉。
+_BYTE_TOKEN_RE = re.compile(r"<0x[0-9A-Fa-f]{2}>")
 
 
 def _make_batches(indexes: list[int], items: list,
@@ -135,7 +140,7 @@ def _parse_batch_reply(reply: str, count: int) -> Optional[list[str]]:
     """
     got: dict[int, str] = {}
     cur: Optional[int] = None
-    for line in (reply or "").splitlines():
+    for line in _BYTE_TOKEN_RE.sub("", reply or "").splitlines():
         m = _SEG_RE.match(line)
         if m:
             cur = int(m.group(1))
