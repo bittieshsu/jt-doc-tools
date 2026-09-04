@@ -4,6 +4,7 @@ import asyncio as _asyncio
 import time
 from pathlib import Path
 
+import jinja2
 from fastapi import Depends, FastAPI, File, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -18,7 +19,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.89"
+VERSION = "1.14.90"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -570,6 +571,22 @@ def _nav_tool_groups_visible(request=None):
         if kept:
             out.append({"title": g["title"], "tools": kept})
     return out
+
+
+@jinja2.pass_context
+def _tpl_t(ctx, text: str) -> str:
+    """樣板裡的取字函式：`{{ tr('我的作業') }}`。
+
+    **key 就是繁體中文原文** —— 查不到翻譯時原樣回傳，畫面自動回退成中文。
+    詳見 `app/core/i18n.py` 的說明（為什麼不用符號 key）。
+    """
+    from .core import i18n as _i18n, ui_locale as _loc
+    return _i18n.translate(text, _loc.resolve(ctx.get("request")))
+
+
+# **名字不能叫 `t`** —— 側欄那些 `{% for t in g.tools %}` 會把它蓋掉，
+# 迴圈裡呼叫就變成「'dict' object is not callable」（實際踩到，整頁 500）。
+templates.env.globals["tr"] = _tpl_t
 
 
 def _tpl_ui_locale(request=None) -> str:

@@ -80,7 +80,7 @@
   <link rel="stylesheet" href="/static/css/generated-inline.css" />
 </head>
 <body>
-  <button class="sidebar-toggle" type="button" id="sidebarToggle" aria-label="展開側邊選單" title="展開側邊選單">☰</button>
+  <button class="sidebar-toggle" type="button" id="sidebarToggle" aria-label="展開側邊選單" title="{{ tr('展開側邊選單') }}">☰</button>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="brand-row">
@@ -94,7 +94,7 @@
             <span>v{{ version }}</span>
           </div>
         </div>
-        <button class="sidebar-collapse" type="button" id="sidebarCollapse" aria-label="收起側邊選單" title="收起側邊選單">‹</button>
+        <button class="sidebar-collapse" type="button" id="sidebarCollapse" aria-label="收起側邊選單" title="{{ tr('收起側邊選單') }}">‹</button>
       </div>
       {# 工具圖示來源（給通知清單複製用）—— 只有 icons.html 那個 macro 一份定義 #}
       <div id="toolIconSprite" hidden aria-hidden="true">
@@ -113,17 +113,17 @@
       <div class="user-bar user-bar-anon" data-s="s332db6db">
         <span class="sb-anon-label">通知</span>
         <div class="sb-bell-wrap">
-          <button type="button" class="sb-bell" id="sbBell" title="作業完成通知" aria-label="通知">
+          <button type="button" class="sb-bell" id="sbBell" title="{{ tr('作業完成通知') }}" aria-label="通知">
             {{ icon('bell', size=15) }}
             <span class="sb-bell-dot" id="sbBellDot" hidden></span>
           </button>
           <div class="sb-inbox" id="sbInbox" hidden>
             <div class="sb-inbox-head">
-              <b class="sb-inbox-title">{{ icon('bell', size=15) }} 通知</b>
-              <button type="button" class="sb-inbox-clear" id="sbInboxClear">{{ icon('check', size=14) }} 全部標示為已讀</button>
+              <b class="sb-inbox-title">{{ icon('bell', size=15) }} {{ tr('通知') }}</b>
+              <button type="button" class="sb-inbox-clear" id="sbInboxClear">{{ icon('check', size=14) }} {{ tr('全部標示為已讀') }}</button>
             </div>
             <div class="sb-inbox-list" id="sbInboxList"></div>
-            <a class="sb-inbox-all" href="/my-jobs">查看我的作業 →</a>
+            <a class="sb-inbox-all" href="/my-jobs">{{ tr('查看我的作業 →') }}</a>
           </div>
         </div>
       </div>
@@ -132,29 +132,29 @@
       <div class="user-bar" data-s="s332db6db">
         <button type="button" id="userInfoBtn"
                 data-s="s7de1fa5e"
-                title="查看角色與權限">
+                title="{{ tr('查看角色與權限') }}">
           {{ icon('user', size=14) }}
           <b>{{ _cur.username }}</b>{% if _cur.source and _cur.source != 'off' %}<span data-s="s5bca4f8e">@{{ _cur.source }}</span>{% endif %}
         </button>
         <div class="sb-bell-wrap">
-          <button type="button" class="sb-bell" id="sbBell" title="作業完成通知" aria-label="通知">
+          <button type="button" class="sb-bell" id="sbBell" title="{{ tr('作業完成通知') }}" aria-label="通知">
             {{ icon('bell', size=15) }}
             <span class="sb-bell-dot" id="sbBellDot" hidden></span>
           </button>
           <div class="sb-inbox" id="sbInbox" hidden>
             <div class="sb-inbox-head">
-              <b class="sb-inbox-title">{{ icon('bell', size=15) }} 通知</b>
-              <button type="button" class="sb-inbox-clear" id="sbInboxClear">{{ icon('check', size=14) }} 全部標示為已讀</button>
+              <b class="sb-inbox-title">{{ icon('bell', size=15) }} {{ tr('通知') }}</b>
+              <button type="button" class="sb-inbox-clear" id="sbInboxClear">{{ icon('check', size=14) }} {{ tr('全部標示為已讀') }}</button>
             </div>
             <div class="sb-inbox-list" id="sbInboxList"></div>
-            <a class="sb-inbox-all" href="/my-jobs">查看我的作業 →</a>
+            <a class="sb-inbox-all" href="/my-jobs">{{ tr('查看我的作業 →') }}</a>
           </div>
         </div>
         <form id="logoutForm" method="post" action="/logout" data-s="s1386d503">
           <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
           <button class="btn btn-small" type="button" id="logoutBtn"
                   data-s="s29201f78"
-                  title="登出">{{ icon('back', size=11) }} 登出</button>
+                  title="{{ tr('登出') }}">{{ icon('back', size=11) }} {{ tr('登出') }}</button>
         </form>
         <script nonce="{{ request.state.csp_nonce }}">
           (function(){
@@ -499,15 +499,15 @@
         </script>
       </div>
       {% endif %}
-      <input class="sidebar-search" id="sidebarSearch" type="search" placeholder="搜尋工具… (例：填表 / form fill、用印 / stamp)" />
+      <input class="sidebar-search" id="sidebarSearch" type="search" placeholder="{{ tr('搜尋工具… (例：填表 / form fill、用印 / stamp)') }}" />
     </div>
     <div class="sidebar-scroll">
       <div class="sb-solo">
         <a class="sb-item sb-jobs-link" href="/my-jobs" data-name="我的作業 jobs job 作業 工作 進度 佇列 排隊 queue tasks 背景 轉換進度">
           <span class="sb-item-icon">{{ icon('clock', size=18) }}</span>
           <span class="sb-item-text">
-            <span class="sb-item-name">我的作業</span>
-            <span class="sb-item-desc">你送出的轉換進度與結果</span>
+            <span class="sb-item-name">{{ tr('我的作業') }}</span>
+            <span class="sb-item-desc">{{ tr('你送出的轉換進度與結果') }}</span>
           </span>
         </a>
       </div>
@@ -516,8 +516,8 @@
         <a class="sb-item sb-workspace-link" href="/workspace" data-name="我的工作區 workspace 工作區 我的檔案 saved files 暫存">
           <span class="sb-item-icon">{{ icon('archive', size=18) }}</span>
           <span class="sb-item-text">
-            <span class="sb-item-name">我的工作區</span>
-            <span class="sb-item-desc">存放各工具輸出的檔案</span>
+            <span class="sb-item-name">{{ tr('我的工作區') }}</span>
+            <span class="sb-item-desc">{{ tr('存放各工具輸出的檔案') }}</span>
           </span>
           {% set _wc = workspace_count(request) %}
           {% if _wc %}<span class="sb-count" data-s="sace3ddd9">{{ _wc }}</span>{% endif %}
@@ -527,7 +527,7 @@
       {# 釘選群組 — 預留 placeholder，由前端 JS 依 localStorage 動態填入。
          如果使用者有釘選工具，這裡會顯示在最上方便快速存取。 #}
       <details class="sb-group sb-pinned" id="sbPinnedGroup" open hidden data-sbkey="__pinned__">
-        <summary><span class="sb-group-icon">{{ icon('star', size=15) }}</span>釘選<span class="sb-count" id="sbPinnedCount">0</span></summary>
+        <summary><span class="sb-group-icon">{{ icon('star', size=15) }}</span>{{ tr('釘選') }}<span class="sb-count" id="sbPinnedCount">0</span></summary>
         <div class="sb-items" id="sbPinnedItems"></div>
       </details>
       {% for g in nav_tool_groups(request) %}
@@ -546,7 +546,7 @@
                     data-pin-desc="{{ t.description or '' }}"
                     data-pin-icon="{{ t.icon or 'tool' }}"
                     data-pin-color="{{ t.color|default(0) }}"
-                    title="釘選 / 取消釘選">
+                    title="{{ tr('釘選 / 取消釘選') }}">
               <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 2l2.39 4.84L20 7.6l-4 3.9L17 17l-5-2.6L7 17l1-5.5-4-3.9 5.61-.76L12 2z"/>
               </svg>
@@ -557,7 +557,7 @@
       </details>
       {% endfor %}
       <details class="sb-group" open data-sbkey="設定">
-        <summary><span class="sb-group-icon">{{ icon('gear', size=15) }}</span>設定<span class="sb-count">{{ nav_settings(request)|length }}</span></summary>
+        <summary><span class="sb-group-icon">{{ icon('gear', size=15) }}</span>{{ tr('設定') }}<span class="sb-count">{{ nav_settings(request)|length }}</span></summary>
         <div class="sb-items">
           {% for s in nav_settings(request) %}
           <a class="sb-item" href="{{ s.url }}" data-name="{{ s.name }} {{ s.description }} {{ s.keywords }}">
@@ -590,7 +590,7 @@
       {# 工具頁可在此 block 加自己的右上 fab（顯示在首頁鈕左邊） #}
       {% block right_fab %}{% endblock %}
       {# 「回首頁」按鈕 — 任何非首頁的頁面都顯示 #}
-      <a class="home-fab" id="homeFab" href="/" title="回首頁" aria-label="回首頁">
+      <a class="home-fab" id="homeFab" href="/" title="{{ tr('回首頁') }}" aria-label="{{ tr('回首頁') }}">
         {{ icon('home', size=18) }}<span class="home-fab-text">首頁</span>
       </a>
     </div>
@@ -598,7 +598,7 @@
     <div class="net-expose-warn" role="alert" id="netExposeWarn">
       {{ icon('warn', size=16) }}
       <span><b>本服務已對網路開放</b>（綁定 <code>{{ bind_host() }}</code>）。本工具會處理公司<b>內部 / 機密文件</b>，若直接對<b>公開網際網路</b>開放，等於把這些文件與後台一併暴露出去，有<b>資料外洩風險</b>。建議<b>只在內網 / VPN 使用</b>，並置於<b>反向代理 + HTTPS + 認證</b>後面，勿把 <code>:8765</code> 直接對外開放。詳見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener">OPS.md</a>。</span>
-      <button type="button" class="net-expose-x" id="netExposeWarnX" aria-label="關閉此提醒" title="知道了，關閉此提醒（本瀏覽器記住，不再顯示）">&times;</button>
+      <button type="button" class="net-expose-x" id="netExposeWarnX" aria-label="{{ tr('關閉此提醒') }}" title="{{ tr('知道了，關閉此提醒（本瀏覽器記住，不再顯示）') }}">&times;</button>
     </div>
     <script nonce="{{ request.state.csp_nonce }}">
       (function () {
