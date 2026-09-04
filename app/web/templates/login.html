@@ -55,6 +55,13 @@
     .login-foot { text-align:center; margin-top:18px; font-size:11px; color:#9ca3af; }
     .login-foot .brand-src { color:#9ca3af; text-decoration:underline; text-underline-offset:2px; }
     .login-foot .brand-src:hover { color:#4b5563; }
+    /* 語言切換（登入頁在深色底上，所以用半透明白；卡片裡那一份走 platform.css） */
+    .jt-locale-login { position:fixed; left:50%; transform:translateX(-50%);
+      bottom:24px; display:flex; gap:6px; }
+    .jt-locale-login .jt-locale-btn { color:rgba(255,255,255,0.72);
+      background:rgba(255,255,255,0.10); border:0; }
+    .jt-locale-login .jt-locale-btn:hover { background:rgba(255,255,255,0.20); color:#fff; }
+    .jt-locale-login .jt-locale-btn.is-on { background:rgba(255,255,255,0.26); color:#fff; }
   </style>
 </head>
 <body>
@@ -111,6 +118,16 @@
     {# v1.14.58：登入頁不再放原始碼連結（使用者要求）。
        取得原始碼的管道改放在「相依套件」那一頁。 #}
     <div class="login-foot">{{ app_name }} · v{{ version }}</div>
+  </form>
+  {# 語言切換要放在登入表單**外面** —— 表單不能巢狀，而且它送的是 /ui-locale
+     不是 /login。用 POST：切語言會改變狀態，不可以用 GET 連結。 #}
+  <form class="jt-locale jt-locale-login" method="post" action="/ui-locale">
+    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+    <input type="hidden" name="next" value="/login">
+    <button type="submit" name="locale" value="zh-Hant"
+            class="jt-locale-btn{% if ui_locale(request) == 'zh-Hant' %} is-on{% endif %}">繁體中文</button>
+    <button type="submit" name="locale" value="en"
+            class="jt-locale-btn{% if ui_locale(request) == 'en' %} is-on{% endif %}">English</button>
   </form>
 </body>
 </html>

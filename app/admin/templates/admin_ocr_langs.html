@@ -378,7 +378,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
         const gpu = info.gpu || info.device_name || '';
         const sel = (info.selected_device && info.selected_device !== 'pending') ? ' [' + info.selected_device + ']' : '';
         const vram = info.vram_free_mb ? ' (free ' + info.vram_free_mb + ' MB / ' + info.vram_total_mb + ' MB)' : '';
-        setStatus('上次測試 ' + j.last_test_at + '：<b data-s="sd706e66c">' +
+        setStatus('上次測試 ' + j.last_test_at + '：<b data-s="sd706e66c" class="' + (ok?'is-ok':'is-bad') + '">' +
                    (ok?'✓ 通過':'✗ 失敗') + '</b>' + (gpu ? '<br>GPU: ' + gpu + sel + vram : ''),
                    ok?'ok':'err');
       }

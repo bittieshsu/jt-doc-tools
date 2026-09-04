@@ -91,21 +91,19 @@ def from_accept_language(header: str | None) -> str | None:
 
 
 def resolve(request) -> str:
-    """這個請求要用哪個介面語言：**明確選過的 cookie > 瀏覽器偏好 > 繁體中文**。
+    """這個請求要用哪個介面語言：**只有明確選過才會變**，否則一律繁體中文。
+
+    **刻意不看 `Accept-Language`。** 本專案以繁體中文為主，而「切成英文」現在
+    還會**連帶把九支中文專用工具從側欄拿掉** —— 如果照瀏覽器語言自動切，
+    一位把 macOS 設成英文的台灣使用者會突然發現統編查詢不見了，而他完全沒有
+    做過任何選擇。**因為瀏覽器設定而改變功能可見範圍，是不能接受的。**
+    （`from_accept_language()` 留著：日後若要做「第一次造訪給個提示」用得到。）
 
     沒有帳號設定也要能用 —— 單機模式（未啟用認證）根本沒有「使用者」這回事，
-    所以先做 cookie；之後要加「跟著帳號走」再疊上去即可。
+    所以用 cookie；之後要加「跟著帳號走」再疊上去即可。
     """
     # **不可以假設拿到的是完整的 Request** —— 側欄那條路徑在測試與部分內部呼叫
     # 裡會收到簡化的假物件（甚至 None）。語言只是顯示偏好，取不到就回繁中，
     # 絕不可以因此讓整個側欄炸掉。
     cookies = getattr(request, "cookies", None) or {}
-    chosen = normalise(cookies.get(COOKIE_NAME))
-    if chosen:
-        return chosen
-    headers = getattr(request, "headers", None) or {}
-    try:
-        accept = headers.get("accept-language")
-    except AttributeError:
-        accept = None
-    return from_accept_language(accept) or DEFAULT_LOCALE
+    return normalise(cookies.get(COOKIE_NAME)) or DEFAULT_LOCALE

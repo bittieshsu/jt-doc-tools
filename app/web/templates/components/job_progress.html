@@ -5,7 +5,7 @@
      data-ws-exts="{{ workspace_extensions() }}" hidden>
   <div class="job-row">
     <div class="job-bar"><div class="job-bar-inner"></div></div>
-    <div class="job-status">準備中…</div>
+    <div class="job-status">{{ tr('準備中…') }}</div>
     {# 已過時間：轉檔可能要好幾分鐘，沒有計時使用者會以為當掉 #}
     <div class="job-elapsed" hidden></div>
   </div>
@@ -19,9 +19,9 @@
       <a href="/my-jobs">我的作業</a> 下載。</span>
   </div>
   <div class="job-actions">
-    <a class="btn btn-primary job-download" hidden>{{ icon('download') }}下載 PDF</a>
-    <a class="btn job-download-png" hidden>{{ icon('image') }}下載 PNG</a>
-    {% if workspace_enabled(request) %}<button class="btn job-save-ws" type="button" hidden>{{ icon('archive') }}存至工作區</button>{% endif %}
-    <button class="btn btn-secondary job-reset" type="button">{{ icon('refresh') }}處理新檔案</button>
+    <a class="btn btn-primary job-download" hidden>{{ icon('download') }}{{ tr('下載 PDF') }}</a>
+    <a class="btn job-download-png" hidden>{{ icon('image') }}{{ tr('下載 PNG') }}</a>
+    {% if workspace_enabled(request) %}<button class="btn job-save-ws" type="button" hidden>{{ icon('archive') }}{{ tr('存至工作區') }}</button>{% endif %}
+    <button class="btn btn-secondary job-reset" type="button">{{ icon('refresh') }}{{ tr('處理新檔案') }}</button>
   </div>
 </div>

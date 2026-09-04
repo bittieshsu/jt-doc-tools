@@ -104,3 +104,25 @@ def test_locale_resolution_survives_a_partial_request():
         cookies = {"jtdt_locale": "en"}
 
     assert resolve(_OnlyCookies()) == "en"
+
+
+def test_browser_language_alone_never_switches_the_ui():
+    """**不可以因為瀏覽器語言就自動切成英文。**
+
+    切成英文會連帶把九支中文專用工具從側欄拿掉 —— 一位把系統設成英文的台灣
+    使用者會突然發現統編查詢不見了，而他完全沒有做過任何選擇。
+    因為瀏覽器設定而改變功能可見範圍，是不能接受的。
+    """
+    from app.core.ui_locale import DEFAULT_LOCALE, resolve
+
+    class _EnBrowser:
+        cookies: dict = {}
+        headers = {"accept-language": "en-US,en;q=0.9"}
+
+    assert resolve(_EnBrowser()) == DEFAULT_LOCALE
+
+    class _Chose:
+        cookies = {"jtdt_locale": "en"}
+        headers = {"accept-language": "zh-TW"}
+
+    assert resolve(_Chose()) == "en", "明確選過的要贏"

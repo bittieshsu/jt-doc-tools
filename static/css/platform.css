@@ -1091,21 +1091,17 @@ select.jt-select-native {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   white-space: nowrap; }
 
-/* 側欄底部的介面語言切換（v1.14.89）。用表單 POST 而不是連結 —— 切語言會改變
-   狀態，不可以用 GET；也因此不需要任何 inline 事件處理器（CSP 擋 inline）。 */
-.sb-locale {
-  display: flex; align-items: center; gap: 6px;
-  margin: 4px 12px 10px 0; padding: 8px 10px;
-  background: rgba(15,15,40,0.35); border-radius: 8px;
+/* 介面語言切換 —— 用在**帳號卡片**與**登入頁**（使用者要求：不放側欄底部）。
+   用表單 POST 而不是連結：切語言會改變狀態，不可以用 GET；也因此不需要任何
+   inline 事件處理器（CSP 擋 inline）。 */
+.jt-locale { display: flex; gap: 6px; margin-top: 6px; }
+.jt-locale-btn {
+  appearance: none; border: 1px solid #e2e8f0; cursor: pointer;
+  background: #fff; color: #475569; font: inherit; font-size: 12.5px;
+  padding: 5px 12px; border-radius: 7px;
 }
-.sb-locale-icon { display: inline-flex; opacity: 0.75; color: #fff; }
-.sb-locale-btn {
-  flex: 1; appearance: none; border: 0; cursor: pointer;
-  background: transparent; color: rgba(255,255,255,0.72);
-  font: inherit; font-size: 12px; padding: 4px 6px; border-radius: 6px;
-}
-.sb-locale-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
-.sb-locale-btn.is-on {
-  background: rgba(255,255,255,0.22); color: #fff; font-weight: 700;
+.jt-locale-btn:hover { background: #f1f5f9; color: #0f172a; }
+.jt-locale-btn.is-on {
+  background: #eef2ff; border-color: #c7d2fe; color: #3730a3; font-weight: 700;
   cursor: default;
 }

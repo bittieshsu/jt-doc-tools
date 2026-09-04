@@ -44,6 +44,26 @@
       width: 320px; max-width: calc(100vw - 24px); background: #fff;
       color: #0f172a; border: 1px solid #e2e8f0; border-radius: 10px;
       box-shadow: 0 18px 40px rgba(0,0,0,0.28); overflow: hidden; }
+    /* 帳號功能表（語言 / 我的帳號 / 登出）。跟通知面板同一個做法：
+       position:fixed + JS 算座標 —— 側欄會裁切溢出內容，放在裡面會被切掉半邊。 */
+    .sb-menu-wrap { position: relative; display: inline-flex; }
+    .sb-menu-btn { display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px;
+      background: rgba(255,255,255,0.10); color: inherit; cursor: pointer; }
+    .sb-menu-btn:hover { background: rgba(255,255,255,0.20); }
+    .sb-menu { position: fixed; z-index: 200; width: 208px; padding: 6px;
+      background: #fff; color: #0f172a; border: 1px solid #e2e8f0;
+      border-radius: 10px; box-shadow: 0 18px 40px rgba(0,0,0,0.28); }
+    .sb-menu-item { display: flex; align-items: center; gap: 8px; width: 100%;
+      padding: 8px 10px; border: 0; border-radius: 7px; background: none;
+      color: #0f172a; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+    .sb-menu-item:hover { background: #f1f5f9; }
+    .sb-menu-item.is-danger { color: #b91c1c; }
+    .sb-menu-item.is-danger:hover { background: #fef2f2; }
+    .sb-menu-sep { height: 1px; margin: 6px 4px; background: #f1f5f9; }
+    .sb-menu-label { padding: 2px 10px 4px; font-size: 11.5px; color: #94a3b8; }
+    .sb-menu-locale { padding: 0 6px 4px; }
+    .sb-menu-locale .jt-locale-btn { flex: 1; padding: 5px 8px; font-size: 12px; }
     .sb-inbox-title { display: inline-flex; align-items: center; gap: 7px; }
     .sb-inbox-title svg { color: #475569; }
     .sb-inbox-head { display: flex; align-items: center; justify-content: space-between;
@@ -150,12 +170,36 @@
             <a class="sb-inbox-all" href="/my-jobs">{{ tr('查看我的作業 →') }}</a>
           </div>
         </div>
-        <form id="logoutForm" method="post" action="/logout" data-s="s1386d503">
-          <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
-          <button class="btn btn-small" type="button" id="logoutBtn"
-                  data-s="s29201f78"
-                  title="{{ tr('登出') }}">{{ icon('back', size=11) }} {{ tr('登出') }}</button>
-        </form>
+        {# 帳號功能表：語言 / 我的帳號 / 登出。位置用 position:fixed 算出來 ——
+           側欄本身會裁切溢出內容（它要捲動），選單放在裡面會被切掉一半，
+           這跟通知面板是同一個理由。 #}
+        <div class="sb-menu-wrap">
+          <button type="button" class="sb-menu-btn" id="sbMenuBtn"
+                  title="{{ tr('帳號功能表') }}" aria-haspopup="true" aria-expanded="false">
+            {{ icon('gear', size=15) }}
+          </button>
+          <div class="sb-menu" id="sbMenu" hidden>
+            <button type="button" class="sb-menu-item" id="sbMenuAccount">
+              {{ icon('user', size=14) }} {{ tr('我的帳號') }}
+            </button>
+            <div class="sb-menu-sep"></div>
+            <div class="sb-menu-label">{{ tr('介面語言') }}</div>
+            <form class="jt-locale sb-menu-locale" method="post" action="/ui-locale">
+              <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+              <input type="hidden" name="next" value="{{ request.url.path }}">
+              <button type="submit" name="locale" value="zh-Hant"
+                      class="jt-locale-btn{% if ui_locale(request) == 'zh-Hant' %} is-on{% endif %}">繁體中文</button>
+              <button type="submit" name="locale" value="en"
+                      class="jt-locale-btn{% if ui_locale(request) == 'en' %} is-on{% endif %}">English</button>
+            </form>
+            <div class="sb-menu-sep"></div>
+            <form id="logoutForm" method="post" action="/logout">
+              <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+              <button class="sb-menu-item is-danger" type="button" id="logoutBtn"
+                      title="{{ tr('登出') }}">{{ icon('back', size=14) }} {{ tr('登出') }}</button>
+            </form>
+          </div>
+        </div>
         <script nonce="{{ request.state.csp_nonce }}">
           (function(){
             var lbtn = document.getElementById('logoutBtn');
@@ -166,6 +210,34 @@
                   title: '確定要登出？', okText: '登出', cancelText: '取消'
                 });
                 if (ok) form.submit();
+              });
+            }
+            // 帳號功能表：點按鈕開合、點外面關掉、Esc 關掉。
+            // 位置用 fixed 算 —— 側欄會裁切溢出內容（跟通知面板同一個理由）。
+            var mbtn = document.getElementById('sbMenuBtn');
+            var menu = document.getElementById('sbMenu');
+            if (mbtn && menu) {
+              function closeMenu(){ menu.hidden = true; mbtn.setAttribute('aria-expanded','false'); }
+              mbtn.addEventListener('click', function(ev){
+                ev.stopPropagation();
+                if (!menu.hidden) { closeMenu(); return; }
+                var r = mbtn.getBoundingClientRect();
+                menu.style.top = Math.round(r.bottom + 6) + 'px';
+                menu.style.left = Math.round(Math.max(8, r.right - 208)) + 'px';
+                menu.hidden = false;
+                mbtn.setAttribute('aria-expanded','true');
+              });
+              document.addEventListener('click', function(ev){
+                if (!menu.hidden && !menu.contains(ev.target)) closeMenu();
+              });
+              document.addEventListener('keydown', function(ev){
+                if (ev.key === 'Escape') closeMenu();
+              });
+              var acc = document.getElementById('sbMenuAccount');
+              if (acc) acc.addEventListener('click', function(){
+                closeMenu();
+                var b = document.getElementById('userInfoBtn');
+                if (b) b.click();
               });
             }
             var ibtn = document.getElementById('userInfoBtn');
@@ -188,8 +260,8 @@
               // 顯示名稱可能跟 username 一樣，避免重複資訊
               var displayName = info.display_name || info.username || '';
               var initials = (displayName.replace(/\s+/g,'').slice(0,2) || '?').toUpperCase();
-              // 大頭像顏色依 source 配色
-              var avatarBg = {ldap:'#1e40af', ad:'#7c3aed', local:'#16a34a', off:'#64748b'}[info.source] || '#64748b';
+              // 大頭像顏色依 source 走 CSS class（av-ldap / av-ad / av-local / av-off）——
+              // **不可以在 JS 裡算顏色再塞進 style**，CSP 擋 inline style。
               // 角色 badges
               var roleBadges;
               if (info.is_admin) {
@@ -290,7 +362,8 @@
               // 完整 modal HTML
               var html =
                 '<div data-s="s4e2f3a19">'
-                  + '<div data-s="s3ea515db">'
+                  + '<div data-s="s3ea515db" class="av-'
+                    + esc(info.source || 'off') + '">'
                     + esc(initials) + '</div>'
                   + '<div data-s="s3f9f96c6">'
                     + '<div data-s="s538163da">' + esc(displayName) + '</div>'
@@ -571,16 +644,6 @@
         </div>
       </details>
     </div>
-    <form class="sb-locale" method="post" action="/ui-locale">
-      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
-      <input type="hidden" name="next" value="{{ request.url.path }}">
-      <span class="sb-locale-icon">{{ icon('globe', size=15) }}</span>
-      {% for code, label in [('zh-Hant', '繁體中文'), ('en', 'English')] %}
-      <button type="submit" name="locale" value="{{ code }}"
-              class="sb-locale-btn{% if ui_locale(request) == code %} is-on{% endif %}"
-              {% if ui_locale(request) == code %}aria-current="true"{% endif %}>{{ label }}</button>
-      {% endfor %}
-    </form>
     <div class="sidebar-scrollbar" id="sidebarScrollbar"></div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>

@@ -16,49 +16,49 @@
     </div>
   </div>
   <div class="dpe-panel panel">
-    <h2 data-s="s53896af7">位置與尺寸</h2>
+    <h2 data-s="s53896af7">{{ tr('位置與尺寸') }}</h2>
     <div class="form-row"><label>X (mm)</label><input type="number" step="0.1" class="dpe-x" /></div>
     <div class="form-row"><label>Y (mm)</label><input type="number" step="0.1" class="dpe-y" /></div>
-    <div class="form-row"><label>寬 (mm)</label><input type="number" step="0.1" class="dpe-w" /></div>
-    <div class="form-row"><label>高 (mm)</label><input type="number" step="0.1" class="dpe-h" /></div>
+    <div class="form-row"><label>{{ tr('寬 (mm)') }}</label><input type="number" step="0.1" class="dpe-w" /></div>
+    <div class="form-row"><label>{{ tr('高 (mm)') }}</label><input type="number" step="0.1" class="dpe-h" /></div>
     <div class="form-row">
-      <label>紙張</label>
+      <label>{{ tr('紙張') }}</label>
       <select class="dpe-paper-select">
-        <option value="210,297">A4 直 (210×297)</option>
-        <option value="297,210">A4 橫 (297×210)</option>
-        <option value="297,420">A3 直 (297×420)</option>
-        <option value="420,297">A3 橫 (420×297)</option>
-        <option value="216,279">Letter 直 (216×279)</option>
+        <option value="210,297">{{ tr('A4 直 (210×297)') }}</option>
+        <option value="297,210">{{ tr('A4 橫 (297×210)') }}</option>
+        <option value="297,420">{{ tr('A3 直 (297×420)') }}</option>
+        <option value="420,297">{{ tr('A3 橫 (420×297)') }}</option>
+        <option value="216,279">{{ tr('Letter 直 (216×279)') }}</option>
       </select>
     </div>
-    <div class="form-row"><label><input type="checkbox" class="dpe-lock" /> 鎖定長寬比</label></div>
-    <div class="form-row"><label>旋轉 (度)</label><input type="number" step="0.5" min="-45" max="45" class="dpe-rot" /></div>
+    <div class="form-row"><label><input type="checkbox" class="dpe-lock" /> {{ tr('鎖定長寬比') }}</label></div>
+    <div class="form-row"><label>{{ tr('旋轉 (度)') }}</label><input type="number" step="0.5" min="-45" max="45" class="dpe-rot" /></div>
     <div class="rot-actions">
-      <button type="button" class="btn btn-small dpe-rot-reset">{{ icon('reset') }}歸零</button>
-      <button type="button" class="btn btn-small dpe-rot-rand" data-range="3">{{ icon('dice') }}隨機 ±3°</button>
-      <button type="button" class="btn btn-small dpe-rot-rand" data-range="10" data-min="3">{{ icon('dice') }}隨機 ±3°~10°</button>
-      <button type="button" class="btn btn-small dpe-rot-rand" data-range="30" data-min="10">{{ icon('dice') }}隨機 ±10°~30°</button>
+      <button type="button" class="btn btn-small dpe-rot-reset">{{ icon('reset') }}{{ tr('歸零') }}</button>
+      <button type="button" class="btn btn-small dpe-rot-rand" data-range="3">{{ icon('dice') }}{{ tr('隨機 ±3°') }}</button>
+      <button type="button" class="btn btn-small dpe-rot-rand" data-range="10" data-min="3">{{ icon('dice') }}{{ tr('隨機 ±3°~10°') }}</button>
+      <button type="button" class="btn btn-small dpe-rot-rand" data-range="30" data-min="10">{{ icon('dice') }}{{ tr('隨機 ±10°~30°') }}</button>
     </div>
 
     <div>
-      <div class="muted" data-s="s730ec98e">快速定位</div>
+      <div class="muted" data-s="s730ec98e">{{ tr('快速定位') }}</div>
       <div class="presets">
-        <button type="button" class="btn btn-small" data-preset="tl">{{ icon('align-tl') }}左上</button>
-        <button type="button" class="btn btn-small" data-preset="tr">{{ icon('align-tr') }}右上</button>
-        <button type="button" class="btn btn-small" data-preset="bl">{{ icon('align-bl') }}左下</button>
-        <button type="button" class="btn btn-small" data-preset="br">{{ icon('align-br') }}右下</button>
-        <button type="button" class="btn btn-small" data-preset="hc">{{ icon('align-hc') }}水平置中</button>
-        <button type="button" class="btn btn-small" data-preset="vc">{{ icon('align-vc') }}垂直置中</button>
-        <button type="button" class="btn btn-small" data-preset="center">{{ icon('align-center') }}正中</button>
-        <button type="button" class="btn btn-small" data-preset="mbottom">{{ icon('align-mbottom') }}中間偏下</button>
+        <button type="button" class="btn btn-small" data-preset="tl">{{ icon('align-tl') }}{{ tr('左上') }}</button>
+        <button type="button" class="btn btn-small" data-preset="tr">{{ icon('align-tr') }}{{ tr('右上') }}</button>
+        <button type="button" class="btn btn-small" data-preset="bl">{{ icon('align-bl') }}{{ tr('左下') }}</button>
+        <button type="button" class="btn btn-small" data-preset="br">{{ icon('align-br') }}{{ tr('右下') }}</button>
+        <button type="button" class="btn btn-small" data-preset="hc">{{ icon('align-hc') }}{{ tr('水平置中') }}</button>
+        <button type="button" class="btn btn-small" data-preset="vc">{{ icon('align-vc') }}{{ tr('垂直置中') }}</button>
+        <button type="button" class="btn btn-small" data-preset="center">{{ icon('align-center') }}{{ tr('正中') }}</button>
+        <button type="button" class="btn btn-small" data-preset="mbottom">{{ icon('align-mbottom') }}{{ tr('中間偏下') }}</button>
       </div>
     </div>
 
     <div>
-      <div class="muted" data-s="s730ec98e">底圖</div>
+      <div class="muted" data-s="s730ec98e">{{ tr('底圖') }}</div>
       <div class="bg-toggle">
-        <button type="button" class="btn btn-small dpe-bg-blank">{{ icon('page') }}白紙</button>
-        <button type="button" class="btn btn-small dpe-bg-pdf" hidden>{{ icon('eye') }}PDF 預覽</button>
+        <button type="button" class="btn btn-small dpe-bg-blank">{{ icon('page') }}{{ tr('白紙') }}</button>
+        <button type="button" class="btn btn-small dpe-bg-pdf" hidden>{{ icon('eye') }}{{ tr('PDF 預覽') }}</button>
       </div>
     </div>
   </div>

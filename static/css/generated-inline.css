@@ -31,7 +31,15 @@
 [data-s="s12db6719"]{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 [data-s="s89b3a6c5"]{font-size:11.5px;color:#64748b;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;}
 [data-s="s4e2f3a19"]{display:flex;align-items:center;gap:14px;margin:-4px 0 18px;}
-[data-s="s3ea515db"]{background:' + avatarBg + ';color:#fff;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;}
+/* 帳號卡片的大頭像。**底色不可以用 JS 運算式** —— v1.12.30 把 inline style
+   搬進這個檔案時，把 `background:' + avatarBg + '` 原封不動貼了進來，那是無效
+   的 CSS 宣告，整條 background 被丟掉 → 白底白字，畫面上就是一塊空白
+   （使用者回報「帳號左邊留空是大頭照嗎？」）。改成依來源給 class。 */
+[data-s="s3ea515db"]{background:#64748b;color:#fff;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;}
+[data-s="s3ea515db"].av-ldap{background:#1e40af;}
+[data-s="s3ea515db"].av-ad{background:#7c3aed;}
+[data-s="s3ea515db"].av-local{background:#16a34a;}
+[data-s="s3ea515db"].av-off{background:#64748b;}
 [data-s="s3f9f96c6"]{min-width:0;}
 [data-s="s538163da"]{font-size:17px;font-weight:600;color:#0f172a;line-height:1.2;}
 [data-s="sb8ff32c9"]{font-size:12.5px;color:#64748b;margin-top:3px;font-family:ui-monospace,SFMono-Regular,monospace;}
@@ -251,7 +259,10 @@
 [data-s="s8dddc341"]{grid-column:1 / -1; padding:10px 12px; background:#eff6ff; border:1px solid #93c5fd; border-radius:6px;}
 [data-s="s631de63c"]{font-weight:600; color:#1e40af; font-size:12px; margin-bottom:4px; display:flex; align-items:center; gap:4px;}
 [data-s="s1b654cfc"]{font-size:11px; color:#1e3a8a; line-height:1.6;}
-[data-s="sd706e66c"]{color:' + (ok?'#10b981':'#ef4444') + ';}
+/* 同上：這條原本也是 JS 運算式，等於沒有顏色。改成成功 / 失敗兩個 class。 */
+[data-s="sd706e66c"]{font-weight:700;}
+[data-s="sd706e66c"].is-ok{color:#10b981;}
+[data-s="sd706e66c"].is-bad{color:#ef4444;}
 [data-s="s497705de"]{border-left:4px solid #94a3b8;}
 [data-s="se7333f54"]{flex:1; min-width:200px;}
 [data-s="sd924ba51"]{color:#10b981; font-size:11px;}
