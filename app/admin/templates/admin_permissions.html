@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}權限矩陣 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('權限矩陣') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('gear', size=22) }} 權限矩陣</h1>
+<h1>{{ icon('gear', size=22) }} {{ tr('權限矩陣') }}</h1>
 <p class="muted" data-s="s53896af7">
-  每位使用者 / 群組可以指派多個角色（自動聯集權限）。
+  {{ tr('每位使用者 / 群組可以指派多個角色（自動聯集權限）。
   進階：直接 grant 個別工具給特定 subject（少數客製情境用）。
-  左側選 subject，右側即時編輯，存檔後生效。
+  左側選 subject，右側即時編輯，存檔後生效。') }}
 </p>
 
 {% if not subjects %}
-<div class="panel"><i>尚無使用者或群組。</i></div>
+<div class="panel"><i>{{ tr('尚無使用者或群組。') }}</i></div>
 {% else %}
 <div class="perm-shell panel">
   <!-- ===== Left: subject list ===== -->
@@ -18,9 +18,9 @@
     <div class="perm-side-toolbar">
       <input class="field perm-search" id="permSearch" type="search" placeholder="搜尋名稱 / 帳號…">
       <div class="perm-tabs" role="group">
-        <button type="button" class="pt-btn active" data-type="">全部 <span class="pt-cnt" id="cntAll">0</span></button>
-        <button type="button" class="pt-btn" data-type="user">使用者 <span class="pt-cnt" id="cntUser">0</span></button>
-        <button type="button" class="pt-btn" data-type="group">群組 <span class="pt-cnt" id="cntGroup">0</span></button>
+        <button type="button" class="pt-btn active" data-type="">{{ tr('全部') }} <span class="pt-cnt" id="cntAll">0</span></button>
+        <button type="button" class="pt-btn" data-type="user">{{ tr('使用者') }} <span class="pt-cnt" id="cntUser">0</span></button>
+        <button type="button" class="pt-btn" data-type="group">{{ tr('群組') }} <span class="pt-cnt" id="cntGroup">0</span></button>
       </div>
     </div>
     <div class="perm-list" id="permList">
@@ -56,7 +56,7 @@
   <section class="perm-detail" id="permDetail">
     <div class="perm-empty" id="permEmpty">
       {{ icon('shield', size=36) }}
-      <p>從左側選一位使用者或群組來編輯權限。</p>
+      <p>{{ tr('從左側選一位使用者或群組來編輯權限。') }}</p>
     </div>
 
     <div class="perm-form" id="permForm" hidden>
@@ -66,36 +66,36 @@
           <div class="perm-detail-sub" id="pdSub"></div>
         </div>
         <div data-s="s9586d088">
-          <span id="pdDirty" class="muted" data-s="sc73c4105" hidden>未儲存的變更</span>
-          <button class="btn btn-primary" type="button" id="pdSave">{{ icon('save', size=14) }} 儲存</button>
+          <span id="pdDirty" class="muted" data-s="sc73c4105" hidden>{{ tr('未儲存的變更') }}</span>
+          <button class="btn btn-primary" type="button" id="pdSave">{{ icon('save', size=14) }} {{ tr('儲存') }}</button>
         </div>
       </div>
 
       <fieldset class="auth-section" data-s="s553a645f">
-        <legend>{{ icon('shield', size=14) }} 角色</legend>
+        <legend>{{ icon('shield', size=14) }} {{ tr('角色') }}</legend>
         <div class="picker">
           <div class="picker-toolbar">
             <input class="field picker-search" type="search" id="pdRoleSearch" placeholder="搜尋角色…">
             <span class="picker-count" id="pdRoleCount">0 / 0</span>
-            <button type="button" class="btn btn-small" data-bulk="all" data-target="pdRoleList" title="全選">全選</button>
-            <button type="button" class="btn btn-small" data-bulk="none" data-target="pdRoleList" title="取消全選">取消全選</button>
-            <button type="button" class="btn btn-small" data-bulk="invert" data-target="pdRoleList" title="反向選取">反向選取</button>
-            <button type="button" class="btn btn-small picker-clear" id="pdRoleClear">清除</button>
+            <button type="button" class="btn btn-small" data-bulk="all" data-target="pdRoleList" title="全選">{{ tr('全選') }}</button>
+            <button type="button" class="btn btn-small" data-bulk="none" data-target="pdRoleList" title="取消全選">{{ tr('取消全選') }}</button>
+            <button type="button" class="btn btn-small" data-bulk="invert" data-target="pdRoleList" title="反向選取">{{ tr('反向選取') }}</button>
+            <button type="button" class="btn btn-small picker-clear" id="pdRoleClear">{{ tr('清除') }}</button>
           </div>
           <div class="picker-list" id="pdRoleList"></div>
         </div>
       </fieldset>
 
       <fieldset class="auth-section" data-s="s002535c2">
-        <legend>{{ icon('tool', size=14) }} 進階：直接 grant 工具 <span class="muted" data-s="s3cef0ca8">（角色之外的客製授權）</span></legend>
+        <legend>{{ icon('tool', size=14) }} {{ tr('進階：直接 grant 工具') }} <span class="muted" data-s="s3cef0ca8">{{ tr('（角色之外的客製授權）') }}</span></legend>
         <div class="picker">
           <div class="picker-toolbar">
             <input class="field picker-search" type="search" id="pdToolSearch" placeholder="搜尋工具…">
             <span class="picker-count" id="pdToolCount">0 / 0</span>
-            <button type="button" class="btn btn-small" data-bulk="all" data-target="pdToolList" title="全選（只影響目前搜尋結果可見的）">全選</button>
-            <button type="button" class="btn btn-small" data-bulk="none" data-target="pdToolList" title="取消全選">取消全選</button>
-            <button type="button" class="btn btn-small" data-bulk="invert" data-target="pdToolList" title="反向選取">反向選取</button>
-            <button type="button" class="btn btn-small picker-clear" id="pdToolClear">清除</button>
+            <button type="button" class="btn btn-small" data-bulk="all" data-target="pdToolList" title="全選（只影響目前搜尋結果可見的）">{{ tr('全選') }}</button>
+            <button type="button" class="btn btn-small" data-bulk="none" data-target="pdToolList" title="取消全選">{{ tr('取消全選') }}</button>
+            <button type="button" class="btn btn-small" data-bulk="invert" data-target="pdToolList" title="反向選取">{{ tr('反向選取') }}</button>
+            <button type="button" class="btn btn-small picker-clear" id="pdToolClear">{{ tr('清除') }}</button>
           </div>
           <div class="picker-list" id="pdToolList"></div>
         </div>
@@ -353,7 +353,7 @@ function loadSubject(s) {
     lockBanner.innerHTML = '🔒 <b>內建帳號</b>：角色與工具權限固定，不可從權限矩陣修改。' +
       '（此處顯示的勾選只是讓您查看現狀，按儲存會被拒。）';
     document.getElementById('pdSave').disabled = true;
-    document.getElementById('pdSave').title = '內建帳號權限固定不可修改';
+    document.getElementById('pdSave').title = tr('內建帳號權限固定不可修改');
   } else {
     lockBanner.hidden = true;
     document.getElementById('pdSave').disabled = false;
@@ -402,7 +402,7 @@ function loadSubject(s) {
 permRows.forEach(r => {
   r.addEventListener('click', async () => {
     if (dirty) {
-      const ok = await showConfirm('目前有未儲存的變更，要切換嗎？變更會遺失。',
+      const ok = await showConfirm(tr('目前有未儲存的變更，要切換嗎？變更會遺失。'),
         { title: '未儲存', kind: 'warn', okText: '捨棄' });
       if (!ok) return;
     }
@@ -425,7 +425,7 @@ document.getElementById('pdSave').addEventListener('click', async () => {
     body: JSON.stringify(body),
   });
   if (r.ok) {
-    showToast('已儲存', 'ok');
+    showToast(tr('已儲存'), 'ok');
     markDirty(false);
     // Refresh in-memory subject + the row's role-count badge.
     currentSubject.roles = body.roles;

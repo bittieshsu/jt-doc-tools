@@ -1,26 +1,26 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}字型管理 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('字型管理') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('text', size=22) }} 字型管理</h1>
-<p class="muted">PDF 編輯器可用的字型清單。系統會自動掃描標準字型目錄，識別出台灣常見字型與開源 CJK 字型；也可以在下方直接上傳自訂字型。
-<b>總計 {{ total }} 個字型</b>（{{ visible_count }} 顯示、{{ hidden_count }} 隱藏）。
-按「眼睛」按鈕可隱藏不要在工具裡出現的字型；隱藏後檔案仍保留，隨時可取消隱藏。</p>
+<h1>{{ icon('text', size=22) }} {{ tr('字型管理') }}</h1>
+<p class="muted">{{ tr('PDF 編輯器可用的字型清單。系統會自動掃描標準字型目錄，識別出台灣常見字型與開源 CJK 字型；也可以在下方直接上傳自訂字型。') }}
+<b>{{ tr('總計') }} {{ total }} {{ tr('個字型') }}</b>（{{ visible_count }} {{ tr('顯示、') }}{{ hidden_count }} {{ tr('隱藏）。
+按「眼睛」按鈕可隱藏不要在工具裡出現的字型；隱藏後檔案仍保留，隨時可取消隱藏。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">{{ icon('upload', size=18) }} 上傳自訂字型</h2>
-  <p class="muted" data-s="sea8bbc82">支援 .ttf / .otf / .ttc，可一次選多個檔。上傳後會自動加入字型清單並顯示在 PDF 編輯器的字型下拉選單最上方（分類：<b>自訂</b>）。字型存放於 <code>{{ '{data}/fonts' }}</code>。</p>
+  <h2 data-s="s53896af7">{{ icon('upload', size=18) }} {{ tr('上傳自訂字型') }}</h2>
+  <p class="muted" data-s="sea8bbc82">{{ tr('支援 .ttf / .otf / .ttc，可一次選多個檔。上傳後會自動加入字型清單並顯示在 PDF 編輯器的字型下拉選單最上方（分類：') }}<b>{{ tr('自訂') }}</b>{{ tr('）。字型存放於') }} <code>{{ '{data}/fonts' }}</code>。</p>
   <form id="fontUploadForm" enctype="multipart/form-data">
     <label class="fnt-drop-zone" id="fontDropZone" for="fontFile">
       <input type="file" id="fontFile" accept=".ttf,.otf,.ttc" multiple hidden />
       <span class="fnt-drop-icon">{{ icon('upload', size=22) }}</span>
       <span class="fnt-drop-text">
-        <b>點此挑選</b>或拖曳字型檔到此
-        <span class="fnt-drop-hint">.ttf / .otf / .ttc，可多選</span>
+        <b>{{ tr('點此挑選') }}</b>{{ tr('或拖曳字型檔到此') }}
+        <span class="fnt-drop-hint">{{ tr('.ttf / .otf / .ttc，可多選') }}</span>
       </span>
     </label>
     <div class="fnt-upload-bar">
-      <button class="btn btn-primary" type="submit" id="btnUploadFont" disabled>{{ icon('upload', size=14) }} 上傳</button>
+      <button class="btn btn-primary" type="submit" id="btnUploadFont" disabled>{{ icon('upload', size=14) }} {{ tr('上傳') }}</button>
       <span id="uploadStatus" class="muted" data-s="s6b9c179a"></span>
     </div>
   </form>
@@ -28,8 +28,8 @@
 
 <div class="panel">
   <div data-s="s38dc95a2">
-    <h2 data-s="s1386d503">{{ icon('text', size=18) }} 可用字型</h2>
-    <button class="btn" type="button" id="btnRefresh">{{ icon('refresh', size=14) }} 重新掃描</button>
+    <h2 data-s="s1386d503">{{ icon('text', size=18) }} {{ tr('可用字型') }}</h2>
+    <button class="btn" type="button" id="btnRefresh">{{ icon('refresh', size=14) }} {{ tr('重新掃描') }}</button>
   </div>
   {% for g in groups %}
   {% set group_ids = g.fonts|map(attribute='id')|list %}
@@ -42,11 +42,11 @@
         <span class="fnt-group-actions" data-stop-prop data-prevent-default>
           <button type="button" class="btn btn-small fnt-bulk-show" data-ids='{{ group_ids|tojson }}'
                   title="這個分類全部設為顯示">
-            {{ icon('eye', size=13) }} 全部顯示
+            {{ icon('eye', size=13) }} {{ tr('全部顯示') }}
           </button>
           <button type="button" class="btn btn-small fnt-bulk-hide" data-ids='{{ group_ids|tojson }}'
                   title="這個分類全部設為隱藏">
-            {{ icon('eye-off', size=13) }} 全部隱藏
+            {{ icon('eye-off', size=13) }} {{ tr('全部隱藏') }}
           </button>
         </span>
       </span>
@@ -54,10 +54,10 @@
     <table data-s="s92143ca0">
       <thead>
         <tr data-s="s98f358ac">
-          <th data-s="s45d3b42e">字型名稱</th>
-          <th data-s="s45d3b42e">類型</th>
-          <th data-s="sebbae7ba">路徑 / ID</th>
-          <th data-s="sd9ba85f5">在工具中</th>
+          <th data-s="s45d3b42e">{{ tr('字型名稱') }}</th>
+          <th data-s="s45d3b42e">{{ tr('類型') }}</th>
+          <th data-s="sebbae7ba">{{ tr('路徑 / ID') }}</th>
+          <th data-s="sd9ba85f5">{{ tr('在工具中') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -65,11 +65,11 @@
         <tr data-style="{% if f.hidden %}opacity:0.55; background:#fafafa;{% endif %}">
           <td data-s="s769f6444">
             {{ f.label }}
-            {% if f.hidden %}<span data-s="s26857338">隱藏</span>{% endif %}
+            {% if f.hidden %}<span data-s="s26857338">{{ tr('隱藏') }}</span>{% endif %}
           </td>
           <td data-s="s769f6444">
-            {% if f.cjk == 'traditional' %}<span data-s="s41d84831">繁中</span>{% endif %}
-            {% if f.cjk == 'simplified' %}<span data-s="s87b8dfbe">簡中</span>{% endif %}
+            {% if f.cjk == 'traditional' %}<span data-s="s41d84831">{{ tr('繁中') }}</span>{% endif %}
+            {% if f.cjk == 'simplified' %}<span data-s="s87b8dfbe">{{ tr('簡中') }}</span>{% endif %}
             {% if f.style == 'sans' %}Sans{% elif f.style == 'serif' %}Serif{% elif f.style == 'mono' %}Mono{% elif f.style == 'script' %}楷書{% endif %}
           </td>
           <td data-s="s07e9d204">
@@ -79,16 +79,16 @@
             <button type="button" class="btn btn-small toggle-hidden-font" data-id="{{ f.id }}"
                     data-s="s002c9579"
                     title="{% if f.hidden %}取消隱藏，讓工具的字型選單再次顯示這個字型{% else %}隱藏這個字型，工具的字型選單就不會出現它{% endif %}">
-              {% if f.hidden %}{{ icon('eye', size=12) }} 顯示{% else %}{{ icon('eye-off', size=12) }} 隱藏{% endif %}
+              {% if f.hidden %}{{ icon('eye', size=12) }} {{ tr('顯示') }}{% else %}{{ icon('eye-off', size=12) }} {{ tr('隱藏') }}{% endif %}
             </button>
             {% if f.category == 'custom' %}
               <button type="button" class="btn btn-small rename-custom-font" data-id="{{ f.id }}"
                       data-current="{{ f.custom_name or '' }}"
                       data-auto="{{ f.auto_name or '' }}"
                       data-s="s002c9579"
-                      title="變更這個字型在工具裡顯示的名稱（PDF 編輯器的字型下拉會用到）">{{ icon('edit', size=11) }} 變更名稱</button>
+                      title="變更這個字型在工具裡顯示的名稱（PDF 編輯器的字型下拉會用到）">{{ icon('edit', size=11) }} {{ tr('變更名稱') }}</button>
               <button type="button" class="btn btn-danger btn-small del-custom-font" data-id="{{ f.id }}"
-                      data-s="s002c9579">{{ icon('trash', size=11) }} 刪除</button>
+                      data-s="s002c9579">{{ icon('trash', size=11) }} {{ tr('刪除') }}</button>
             {% endif %}
           </td>
         </tr>
@@ -100,12 +100,12 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">{{ icon('info', size=18) }} 說明</h2>
+  <h2 data-s="s53896af7">{{ icon('info', size=18) }} {{ tr('說明') }}</h2>
   <ul data-s="s7b2bef78">
-    <li><b>台灣系統字型</b>：macOS / Windows / Linux 預裝的繁體中文字型，如 PingFang TC、微軟正黑體、標楷體。</li>
-    <li><b>開源 CJK 字型</b>：Noto Sans/Serif TC、思源黑體、cwTeX、TW-Kai/Sung 等符合開放字型授權 (OFL) 的字型。建議裝 Noto TC 可以獲得最佳的繁中顯示效果。</li>
-    <li><b>PyMuPDF 內建</b>：`china-t / china-ts / china-s / china-ss / helv / tiro / cour` — 最輕量、100% 相容，但字型美感較差，只在系統沒有更好選擇時使用。</li>
-    <li><b>自訂字型</b>：用上面的上傳區加入 .ttf / .otf / .ttc；自訂字型會顯示在 PDF 編輯器字型下拉選單的最上方，並可從表格直接刪除。</li>
+    <li><b>{{ tr('台灣系統字型') }}</b>{{ tr('：macOS / Windows / Linux 預裝的繁體中文字型，如 PingFang TC、微軟正黑體、標楷體。') }}</li>
+    <li><b>{{ tr('開源 CJK 字型') }}</b>{{ tr('：Noto Sans/Serif TC、思源黑體、cwTeX、TW-Kai/Sung 等符合開放字型授權 (OFL) 的字型。建議裝 Noto TC 可以獲得最佳的繁中顯示效果。') }}</li>
+    <li><b>{{ tr('PyMuPDF 內建') }}</b>{{ tr('：`china-t / china-ts / china-s / china-ss / helv / tiro / cour` — 最輕量、100% 相容，但字型美感較差，只在系統沒有更好選擇時使用。') }}</li>
+    <li><b>{{ tr('自訂字型') }}</b>{{ tr('：用上面的上傳區加入 .ttf / .otf / .ttc；自訂字型會顯示在 PDF 編輯器字型下拉選單的最上方，並可從表格直接刪除。') }}</li>
   </ul>
 </div>
 
@@ -186,9 +186,9 @@ function _refreshDropZoneLabel() {
   text.replaceChildren();
   if (!files.length) {
     fontDropZone.classList.remove('has-file');
-    const b = document.createElement('b'); b.textContent = '點此挑選';
+    const b = document.createElement('b'); b.textContent = tr('點此挑選');
     const hint = document.createElement('span');
-    hint.className = 'fnt-drop-hint'; hint.textContent = '.ttf / .otf / .ttc，可多選';
+    hint.className = 'fnt-drop-hint'; hint.textContent = tr('.ttf / .otf / .ttc，可多選');
     text.appendChild(b);
     text.appendChild(document.createTextNode('或拖曳字型檔到此'));
     text.appendChild(hint);
@@ -198,9 +198,9 @@ function _refreshDropZoneLabel() {
   const names = files.length === 1
     ? files[0].name
     : files[0].name + ` 等 ${files.length} 個檔案`;
-  const b = document.createElement('b'); b.textContent = '已選擇：';
+  const b = document.createElement('b'); b.textContent = tr('已選擇：');
   const hint = document.createElement('span');
-  hint.className = 'fnt-drop-hint'; hint.textContent = '點選「上傳」開始';
+  hint.className = 'fnt-drop-hint'; hint.textContent = tr('點選「上傳」開始');
   text.appendChild(b);
   text.appendChild(document.createTextNode(names));
   text.appendChild(hint);
@@ -222,7 +222,7 @@ fontFile.addEventListener('change', _refreshDropZoneLabel);
 document.getElementById('fontUploadForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const files = Array.from(fontFile.files || []);
-  if (!files.length) { status.textContent = '請先選擇字型檔'; return; }
+  if (!files.length) { status.textContent = tr('請先選擇字型檔'); return; }
   btnUploadFont.disabled = true;
   let ok = 0, fail = 0;
   for (const f of files) {
@@ -302,7 +302,7 @@ document.querySelectorAll('.rename-custom-font').forEach(btn => {
       body: JSON.stringify({ id: id, name: name }),
     });
     if (r.ok) location.reload();
-    else showAlert('變更名稱失敗：' + await window.friendlyServerError(r, '變更名稱失敗'));
+    else showAlert('變更名稱失敗：' + await window.friendlyServerError(r, tr('變更名稱失敗')));
   });
 });
 

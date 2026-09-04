@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}統編資料庫 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('統編資料庫') }} · {{ app_name }}{% endblock %}
 
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
@@ -226,34 +226,34 @@
 {% endblock %}
 
 {% block content %}
-<h1>{{ icon('id-card', size=22) }} 統編資料庫</h1>
-<p class="muted">電子發票處理 / 統編查詢工具用此反查公司、機關、學校。資料來源：財政部「營業（稅籍）登記資料集」(BGMOPEN 主檔) + 行政院 / 地方政府機關 + 全國學校統編（補充來源）。</p>
+<h1>{{ icon('id-card', size=22) }} {{ tr('統編資料庫') }}</h1>
+<p class="muted">{{ tr('電子發票處理 / 統編查詢工具用此反查公司、機關、學校。資料來源：財政部「營業（稅籍）登記資料集」(BGMOPEN 主檔) + 行政院 / 地方政府機關 + 全國學校統編（補充來源）。') }}</p>
 
 <div class="vd-status" id="status"></div>
 
 <div class="vd-progress" id="progressWrap" data-s="scb458930">
   <div class="vd-progress-bar" id="progressBar"><div class="vd-progress-fill" id="progressFill"></div></div>
-  <div class="vd-progress-meta" id="progressMeta">準備中…</div>
+  <div class="vd-progress-meta" id="progressMeta">{{ tr('準備中…') }}</div>
 </div>
 
 <div class="vd-breakdown" id="categoryStats" data-s="scb458930">
-  <h4>資料庫組成</h4>
+  <h4>{{ tr('資料庫組成') }}</h4>
   <div class="vd-bd-rows" id="catRows"></div>
 </div>
 
 <div class="vd-breakdown" id="breakdown" data-s="scb458930">
-  <h4>上次更新明細 <span class="vd-bd-time" id="bdTime"></span></h4>
-  <p class="muted" data-s="safaac883">主檔每次為「全量重新匯入」（財政部發布的是完整資料集，非增量），筆數接近整個資料庫屬正常；補充來源為「新增不覆蓋」。</p>
+  <h4>{{ tr('上次更新明細') }} <span class="vd-bd-time" id="bdTime"></span></h4>
+  <p class="muted" data-s="safaac883">{{ tr('主檔每次為「全量重新匯入」（財政部發布的是完整資料集，非增量），筆數接近整個資料庫屬正常；補充來源為「新增不覆蓋」。') }}</p>
   <div class="vd-bd-rows" id="bdRows"></div>
 </div>
 
 <div class="vd-summary" id="summary">
   <div class="vd-stat">
-    <span class="vd-stat-label">資料筆數</span>
+    <span class="vd-stat-label">{{ tr('資料筆數') }}</span>
     <span class="vd-stat-value" id="recordCount">{{ "{:,}".format(meta.record_count) if meta.record_count else 0 }}</span>
   </div>
   <div class="vd-stat">
-    <span class="vd-stat-label">最後更新</span>
+    <span class="vd-stat-label">{{ tr('最後更新') }}</span>
     <span class="vd-stat-value {% if not meta.last_updated %}empty{% endif %}" id="lastUpdated">{{ meta.last_updated or '尚未匯入' }}</span>
   </div>
 </div>
@@ -261,81 +261,81 @@
 
 
 <div class="vd-section primary">
-  <h3>自動下載並更新（建議）</h3>
-  <p>從財政部開放資料平台下載最新主檔（BGMOPEN1，~3M 筆營業人），再依序補充政府機關、學校等統編。下載 + 解析時間視網路 5 - 30 分鐘，期間請勿關閉頁面。</p>
+  <h3>{{ tr('自動下載並更新（建議）') }}</h3>
+  <p>{{ tr('從財政部開放資料平台下載最新主檔（BGMOPEN1，~3M 筆營業人），再依序補充政府機關、學校等統編。下載 + 解析時間視網路 5 - 30 分鐘，期間請勿關閉頁面。') }}</p>
   <div class="vd-actions">
     <button type="button" class="vd-btn primary" id="btnAutoDownload">
-      {{ icon('download', size=14) }} 立即自動下載
+      {{ icon('download', size=14) }} {{ tr('立即自動下載') }}
     </button>
   </div>
   <ul class="vd-sources">
-    <li><b>主檔</b>：全國營業(稅籍)登記資料集 — <code>eip.fia.gov.tw/data/BGMOPEN1.zip</code></li>
-    <li><b>補充</b>：行政院機關 + 地方政府機關 + 全國學校統編（INSERT OR IGNORE，主檔已有的不覆蓋）</li>
+    <li><b>{{ tr('主檔') }}</b>{{ tr('：全國營業(稅籍)登記資料集 —') }} <code>eip.fia.gov.tw/data/BGMOPEN1.zip</code></li>
+    <li><b>{{ tr('補充') }}</b>{{ tr('：行政院機關 + 地方政府機關 + 全國學校統編（INSERT OR IGNORE，主檔已有的不覆蓋）') }}</li>
   </ul>
 </div>
 
 <div class="vd-section">
-  <h3>每週自動排程</h3>
-  <p>啟用後每週自動更新一次。設定的星期 + 時段（local time）抵達且距上次成功運行超過 6 天就觸發；當下機器若關機，下次開機並達條件時自動補跑。預設關閉。</p>
+  <h3>{{ tr('每週自動排程') }}</h3>
+  <p>{{ tr('啟用後每週自動更新一次。設定的星期 + 時段（local time）抵達且距上次成功運行超過 6 天就觸發；當下機器若關機，下次開機並達條件時自動補跑。預設關閉。') }}</p>
   <div class="vd-schedule-row">
-    <label for="schEnabled">啟用排程</label>
+    <label for="schEnabled">{{ tr('啟用排程') }}</label>
     <input type="checkbox" id="schEnabled">
   </div>
   <div class="vd-schedule-row">
-    <label for="schWeekday">星期</label>
+    <label for="schWeekday">{{ tr('星期') }}</label>
     <select id="schWeekday">
-      <option value="0">週一</option>
-      <option value="1">週二</option>
-      <option value="2">週三</option>
-      <option value="3">週四</option>
-      <option value="4">週五</option>
-      <option value="5">週六</option>
-      <option value="6" selected>週日</option>
+      <option value="0">{{ tr('週一') }}</option>
+      <option value="1">{{ tr('週二') }}</option>
+      <option value="2">{{ tr('週三') }}</option>
+      <option value="3">{{ tr('週四') }}</option>
+      <option value="4">{{ tr('週五') }}</option>
+      <option value="5">{{ tr('週六') }}</option>
+      <option value="6" selected>{{ tr('週日') }}</option>
     </select>
-    <label for="schHour" data-s="s3b76ebd1">時段</label>
+    <label for="schHour" data-s="s3b76ebd1">{{ tr('時段') }}</label>
     <select id="schHour">
       {% for h in range(24) %}
         <option value="{{ h }}"{% if h == 3 %} selected{% endif %}>{{ '%02d' % h }}:00 - {{ '%02d' % h }}:59</option>
       {% endfor %}
     </select>
-    <button type="button" class="vd-btn primary" id="btnSchSave">{{ icon('save', size=14) }} 儲存設定</button>
+    <button type="button" class="vd-btn primary" id="btnSchSave">{{ icon('save', size=14) }} {{ tr('儲存設定') }}</button>
   </div>
   <div class="vd-schedule-last" id="schLast" data-s="scb458930"></div>
 </div>
 
 <div class="vd-section">
-  <h3>手動上傳 CSV / ZIP</h3>
-  <p>當自動下載失敗或要客製來源時用。可從 data.gov.tw 開放資料平台手動下載後上傳。</p>
+  <h3>{{ tr('手動上傳 CSV / ZIP') }}</h3>
+  <p>{{ tr('當自動下載失敗或要客製來源時用。可從 data.gov.tw 開放資料平台手動下載後上傳。') }}</p>
   <div class="vd-actions">
     <a class="vd-btn" href="https://data.gov.tw/dataset/9400" target="_blank" rel="noopener">
-      {{ icon('external-link', size=14) }} 前往 data.gov.tw 下載 (主檔)
+      {{ icon('external-link', size=14) }} {{ tr('前往 data.gov.tw 下載 (主檔)') }}
     </a>
     <label class="vd-btn">
-      {{ icon('paperclip', size=14) }} 選擇檔案上傳
+      {{ icon('paperclip', size=14) }} {{ tr('選擇檔案上傳') }}
       <input type="file" id="fileInput" accept=".csv,.zip" hidden>
     </label>
   </div>
   <p data-s="s570bb83a">
-    支援 .csv（UTF-8 / Big5 自動偵測）或 .zip（內含 .csv）。手動上傳屬完整匯入會替換主檔，不會帶補充來源。
+    {{ tr('支援 .csv（UTF-8 / Big5 自動偵測）或 .zip（內含 .csv）。手動上傳屬完整匯入會替換主檔，不會帶補充來源。') }}
   </p>
 </div>
 
 <div class="vd-section">
-  <h3>反查測試</h3>
-  <p>輸入 8 位統編快速驗證資料庫正確匯入。</p>
+  <h3>{{ tr('反查測試') }}</h3>
+  <p>{{ tr('輸入 8 位統編快速驗證資料庫正確匯入。') }}</p>
   <div class="vd-test">
     <input type="text" id="testVat" maxlength="8" placeholder="12345678">
-    <button type="button" class="vd-btn" id="btnTest">{{ icon('search', size=14) }} 反查</button>
+    <button type="button" class="vd-btn" id="btnTest">{{ icon('search', size=14) }} {{ tr('反查') }}</button>
   </div>
   <div class="vd-test-result" id="testResult"></div>
 </div>
 
 <div class="vd-section">
-  <h3>清空資料庫</h3>
-  <p>刪除所有匯入的統編資料；einvoice-scan 暫時失去反查能力但發票掃描仍可用。</p>
+  <h3>{{ tr('清空資料庫') }}</h3>
+  <p>{{ tr('刪除所有匯入的統編資料；einvoice-scan 暫時失去反查能力但發票掃描仍可用。') }}</p>
   <div class="vd-actions">
     <button type="button" class="vd-btn danger" id="btnClear">
-      {{ icon('trash', size=14) }} 清空
+      {{ icon('trash', size=14) }} {{ tr('清空') }}
     </button>
   </div>
 </div>
@@ -784,13 +784,13 @@ $('btnTest').addEventListener('click', async () => {
       (j.owner ? `<div data-s="sa18ac805">負責人：${escapeHtml(j.owner)}</div>` : '');
   } catch (e) {
     result.classList.add('show', 'miss');
-    result.textContent = '反查失敗：' + e.message;
+    result.textContent = tr('反查失敗：') + e.message;
   }
 });
 
 $('btnClear').addEventListener('click', async () => {
   const ok = await window.showConfirm(
-    '確定清空所有統編資料？此動作不可復原。',
+    tr('確定清空所有統編資料？此動作不可復原。'),
     { title: '清空資料庫', kind: 'danger', okText: '清空' }
   );
   if (!ok) return;

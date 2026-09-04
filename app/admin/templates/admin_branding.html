@@ -1,43 +1,43 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}企業 Logo / 識別 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('企業 Logo / 識別') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('image', size=22) }} 企業 Logo / 識別</h1>
-<p class="muted">上傳一張企業 Logo，自動套用到左側 sidebar、瀏覽器頁籤 favicon、首頁與登入頁。
-建議使用 PNG（含透明）/ JPG / WEBP，正方形或近正方形最佳；最大 {{ max_dim }} px、{{ max_mb }} MB。</p>
+<h1>{{ icon('image', size=22) }} {{ tr('企業 Logo / 識別') }}</h1>
+<p class="muted">{{ tr('上傳一張企業 Logo，自動套用到左側 sidebar、瀏覽器頁籤 favicon、首頁與登入頁。
+建議使用 PNG（含透明）/ JPG / WEBP，正方形或近正方形最佳；最大') }} {{ max_dim }} px、{{ max_mb }} MB。</p>
 
 <div class="panel" data-s="s714ca188">
   <div data-s="s01551c63">
-    <h3 data-s="s4c672c49">目前 Logo</h3>
+    <h3 data-s="s4c672c49">{{ tr('目前 Logo') }}</h3>
     <div id="logoBox" class="logo-preview">
       {% if has_custom %}
       <img id="logoImg" src="{{ logo_url }}?v={{ range(100000) | random }}" alt="目前 Logo" />
       {% else %}
       <img id="logoImg" src="/static/images/logo-on-light.png" alt="預設 Logo" />
-      <div class="muted" data-s="s67fed56e">（使用內建預設）</div>
+      <div class="muted" data-s="s67fed56e">{{ tr('（使用內建預設）') }}</div>
       {% endif %}
     </div>
     <div data-s="sd4316970" id="statusLine"></div>
   </div>
 
   <div data-s="s4b69465b">
-    <h3 data-s="s4c672c49">上傳新 Logo</h3>
+    <h3 data-s="s4c672c49">{{ tr('上傳新 Logo') }}</h3>
     <label class="br-drop-zone" id="dropZone" for="logoFile">
       <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp" hidden />
       <span class="br-drop-icon">{{ icon('upload', size=22) }}</span>
       <span class="br-drop-text">
-        <b>點此挑選</b>或拖曳檔案到此
-        <span class="br-drop-hint">PNG / JPG / WEBP，正方形最佳，最大 {{ max_dim }} px、{{ max_mb }} MB</span>
+        <b>{{ tr('點此挑選') }}</b>{{ tr('或拖曳檔案到此') }}
+        <span class="br-drop-hint">{{ tr('PNG / JPG / WEBP，正方形最佳，最大') }} {{ max_dim }} px、{{ max_mb }} MB</span>
       </span>
     </label>
 
     <!-- 裁切 UI — 上傳非正方形圖片時自動出現 -->
     <div id="cropPanel" hidden data-s="s002535c2">
       <div class="crop-toolbar">
-        <span class="muted" data-s="s6b9c179a">拖曳方框與四角調整裁切範圍：</span>
-        <button class="btn btn-small" type="button" id="btnAspectSquare" title="鎖定 1:1">▢ 正方形</button>
-        <button class="btn btn-small" type="button" id="btnAspectFree" title="自由比例">↔ 自由</button>
-        <button class="btn btn-small" type="button" id="btnAspectFull" title="全圖（不裁切）">🗖 全圖</button>
+        <span class="muted" data-s="s6b9c179a">{{ tr('拖曳方框與四角調整裁切範圍：') }}</span>
+        <button class="btn btn-small" type="button" id="btnAspectSquare" title="鎖定 1:1">{{ tr('▢ 正方形') }}</button>
+        <button class="btn btn-small" type="button" id="btnAspectFree" title="自由比例">{{ tr('↔ 自由') }}</button>
+        <button class="btn btn-small" type="button" id="btnAspectFull" title="全圖（不裁切）">{{ tr('🗖 全圖') }}</button>
       </div>
       <div class="crop-wrap" id="cropWrap">
         <img id="cropImg" alt="" />
@@ -53,44 +53,44 @@
         </div>
       </div>
       <div class="muted" data-s="s789d4caf">
-        裁切後尺寸：<span id="cropDim">—</span>
+        {{ tr('裁切後尺寸：') }}<span id="cropDim">—</span>
       </div>
     </div>
 
     <div data-s="s002535c2">
-      <button class="btn btn-primary" id="btnUpload" disabled>{{ icon('upload', size=14) }} 上傳並套用</button>
-      <button class="btn" id="btnReset" {% if not has_custom %}disabled{% endif %}>{{ icon('refresh', size=14) }} 還原預設</button>
+      <button class="btn btn-primary" id="btnUpload" disabled>{{ icon('upload', size=14) }} {{ tr('上傳並套用') }}</button>
+      <button class="btn" id="btnReset" {% if not has_custom %}disabled{% endif %}>{{ icon('refresh', size=14) }} {{ tr('還原預設') }}</button>
     </div>
     <p class="muted" data-s="s3cce2c11">
-      <b>套用範圍</b>：<br>
-      • 左側 sidebar 上方品牌列<br>
-      • 瀏覽器頁籤 favicon（重新整理頁籤後生效）<br>
-      • 首頁 hero logo<br>
-      • 登入頁 / 啟用認證頁
+      <b>{{ tr('套用範圍') }}</b>：<br>
+      {{ tr('• 左側 sidebar 上方品牌列') }}<br>
+      {{ tr('• 瀏覽器頁籤 favicon（重新整理頁籤後生效）') }}<br>
+      {{ tr('• 首頁 hero logo') }}<br>
+      {{ tr('• 登入頁 / 啟用認證頁') }}
     </p>
     <p class="muted" data-s="sc73c4105">
-      Logo 存於 <code>data/branding/logo.png</code>，正規化為 PNG，超過 {{ max_dim }} px 會自動縮小。
-      Sidebar 背景偏深色，建議使用透明背景或淺色 logo 才看得見。
+      {{ tr('Logo 存於') }} <code>data/branding/logo.png</code>{{ tr('，正規化為 PNG，超過') }} {{ max_dim }} {{ tr('px 會自動縮小。
+      Sidebar 背景偏深色，建議使用透明背景或淺色 logo 才看得見。') }}
     </p>
   </div>
 </div>
 
 <div class="panel">
-  <h3 data-s="sc56508cb">{{ icon('edit', size=18) }} 站台名稱</h3>
+  <h3 data-s="sc56508cb">{{ icon('edit', size=18) }} {{ tr('站台名稱') }}</h3>
   <p class="muted" data-s="sc56c652f">
-    出現在左上 sidebar、瀏覽器分頁標題、首頁與登入頁。
-    留空可還原預設「<code>{{ default_site_name }}</code>」。
+    {{ tr('出現在左上 sidebar、瀏覽器分頁標題、首頁與登入頁。
+    留空可還原預設「') }}<code>{{ default_site_name }}</code>」。
   </p>
   <div class="br-name-row">
     <input type="text" id="siteName" maxlength="60"
       value="{{ current_site_name if has_custom_site_name else '' }}"
       placeholder="例如：某某公司文件工具箱" />
-    <button class="btn btn-primary" type="button" id="btnSaveName">{{ icon('save', size=14) }} 儲存</button>
-    <button class="btn" type="button" id="btnResetName" {% if not has_custom_site_name %}disabled{% endif %}>{{ icon('refresh', size=14) }} 還原預設</button>
+    <button class="btn btn-primary" type="button" id="btnSaveName">{{ icon('save', size=14) }} {{ tr('儲存') }}</button>
+    <button class="btn" type="button" id="btnResetName" {% if not has_custom_site_name %}disabled{% endif %}>{{ icon('refresh', size=14) }} {{ tr('還原預設') }}</button>
   </div>
   <div class="br-name-default">
-    目前生效：<code id="curName">{{ current_site_name }}</code>
-    {% if has_custom_site_name %}<span data-s="s2282d3a4">（自訂）</span>{% else %}<span data-s="s88652408">（預設）</span>{% endif %}
+    {{ tr('目前生效：') }}<code id="curName">{{ current_site_name }}</code>
+    {% if has_custom_site_name %}<span data-s="s2282d3a4">{{ tr('（自訂）') }}</span>{% else %}<span data-s="s88652408">{{ tr('（預設）') }}</span>{% endif %}
   </div>
   <div id="nameStatus" data-s="sf14019df"></div>
 </div>
@@ -510,13 +510,13 @@ btnUpload.addEventListener('click', async () => {
     btnReset.disabled = false;
     setTimeout(() => location.reload(), 800);
   } catch (e) {
-    status.textContent = '錯誤：' + e.message;
+    status.textContent = tr('錯誤：') + e.message;
     btnUpload.disabled = false;
   }
 });
 
 btnReset.addEventListener('click', async () => {
-  if (!await showConfirm('確定要還原為內建預設 Logo？', {okText:'還原', kind:'danger'})) return;
+  if (!await showConfirm(tr('確定要還原為內建預設 Logo？'), {okText:'還原', kind:'danger'})) return;
   status.innerHTML = '<span class="muted">還原中…</span>';
   try {
     const r = await fetch('/admin/branding/reset', {method: 'POST'});
@@ -527,7 +527,7 @@ btnReset.addEventListener('click', async () => {
     status.innerHTML = '<span data-s="sd4ac9708">已還原預設。</span>';
     setTimeout(() => location.reload(), 600);
   } catch (e) {
-    status.textContent = '錯誤：' + e.message;
+    status.textContent = tr('錯誤：') + e.message;
   }
 });
 </script>

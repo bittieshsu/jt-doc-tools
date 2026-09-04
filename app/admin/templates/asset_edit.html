@@ -1,31 +1,31 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}編輯「{{ asset.name }}」 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('編輯「') }}{{ asset.name }}」 · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('edit', size=22) }} 編輯資產</h1>
-<p class="muted">拖曳、調整尺寸、設定預設位置。儲存後會成為此資產在所有工具中使用的預設值。</p>
+<h1>{{ icon('edit', size=22) }} {{ tr('編輯資產') }}</h1>
+<p class="muted">{{ tr('拖曳、調整尺寸、設定預設位置。儲存後會成為此資產在所有工具中使用的預設值。') }}</p>
 
 <div class="panel">
-  <h2>{{ icon('info', size=18) }} 基本資訊</h2>
+  <h2>{{ icon('info', size=18) }} {{ tr('基本資訊') }}</h2>
   <div class="form-row">
-    <label>名稱</label>
+    <label>{{ tr('名稱') }}</label>
     <input type="text" id="asset-name" class="field" value="{{ asset.name }}" />
   </div>
   <div class="form-row">
-    <label>類型</label>
+    <label>{{ tr('類型') }}</label>
     <select id="asset-type" class="field" data-s="s3831ac5f">
-      <option value="stamp"     {% if asset.type == 'stamp' %}selected{% endif %}>印章 stamp</option>
-      <option value="signature" {% if asset.type == 'signature' %}selected{% endif %}>簽名 signature</option>
-      <option value="watermark" {% if asset.type == 'watermark' %}selected{% endif %}>浮水印 watermark</option>
+      <option value="stamp"     {% if asset.type == 'stamp' %}selected{% endif %}>{{ tr('印章 stamp') }}</option>
+      <option value="signature" {% if asset.type == 'signature' %}selected{% endif %}>{{ tr('簽名 signature') }}</option>
+      <option value="watermark" {% if asset.type == 'watermark' %}selected{% endif %}>{{ tr('浮水印 watermark') }}</option>
       <option value="logo"      {% if asset.type == 'logo' %}selected{% endif %}>Logo</option>
     </select>
-    <span class="muted" data-s="s6b9c179a">類型決定這個資產出現在哪個工具的選單裡</span>
+    <span class="muted" data-s="s6b9c179a">{{ tr('類型決定這個資產出現在哪個工具的選單裡') }}</span>
   </div>
 </div>
 
 <details class="panel" data-s="sb0043ef4">
-  <summary>裁剪圖片</summary>
-  <p class="muted" data-s="s3044b600">拖曳藍色框調整裁剪範圍；拖四角可縮放。確認後按「套用裁剪」。</p>
+  <summary>{{ tr('裁剪圖片') }}</summary>
+  <p class="muted" data-s="s3044b600">{{ tr('拖曳藍色框調整裁剪範圍；拖四角可縮放。確認後按「套用裁剪」。') }}</p>
   <div class="crop-wrap" id="cropWrap">
     <img id="cropImg" src="/admin/assets/{{ asset.id }}/file?v={{ asset.updated_at|default(0) }}" alt="{{ asset.name }}" />
     <div class="crop-sel" id="cropSel">
@@ -36,47 +36,47 @@
     </div>
   </div>
   <div data-s="sa1540c58">
-    <button class="btn btn-primary" id="btn-crop-apply" type="button">{{ icon('save') }}套用裁剪</button>
-    <button class="btn" id="btn-crop-reset" type="button">{{ icon('refresh') }}重設範圍</button>
-    <button class="btn" id="btn-crop-auto" type="button">{{ icon('crop') }}自動貼齊內容</button>
-    <button class="btn" id="btn-match-aspect" type="button" title="將預覽尺寸的長寬比調整為圖片原始比例">{{ icon('aspect-ratio') }}讓尺寸比例對齊圖片</button>
+    <button class="btn btn-primary" id="btn-crop-apply" type="button">{{ icon('save') }}{{ tr('套用裁剪') }}</button>
+    <button class="btn" id="btn-crop-reset" type="button">{{ icon('refresh') }}{{ tr('重設範圍') }}</button>
+    <button class="btn" id="btn-crop-auto" type="button">{{ icon('crop') }}{{ tr('自動貼齊內容') }}</button>
+    <button class="btn" id="btn-match-aspect" type="button" title="將預覽尺寸的長寬比調整為圖片原始比例">{{ icon('aspect-ratio') }}{{ tr('讓尺寸比例對齊圖片') }}</button>
   </div>
 </details>
 
 <div class="panel" data-s="sb0043ef4" id="panel-position" {% if asset.type == 'watermark' %}hidden{% endif %}>
-  <h2>{{ icon('align-center', size=18) }} 位置與預覽</h2>
+  <h2>{{ icon('align-center', size=18) }} {{ tr('位置與預覽') }}</h2>
   {% set editor_id='assetEditor' %}
   {% include "components/drag_position_editor.html" %}
 </div>
 
 <div class="panel" data-s="sb0043ef4" id="panel-watermark" {% if asset.type != 'watermark' %}hidden{% endif %}>
-  <h2>{{ icon('watermark', size=18) }} 浮水印預覽</h2>
-  <p class="muted" data-s="s3044b600">這個資產會以「平鋪」方式蓋滿整頁。下方參數是預覽用的預設值，正式套用時可在「PDF 浮水印」工具裡再微調。</p>
+  <h2>{{ icon('watermark', size=18) }} {{ tr('浮水印預覽') }}</h2>
+  <p class="muted" data-s="s3044b600">{{ tr('這個資產會以「平鋪」方式蓋滿整頁。下方參數是預覽用的預設值，正式套用時可在「PDF 浮水印」工具裡再微調。') }}</p>
   <div class="form-row">
-    <label>透明度</label>
+    <label>{{ tr('透明度') }}</label>
     <div class="field" data-s="s5f11e4db">
       <input type="range" id="wm-opacity" min="5" max="100" value="25" data-s="s45d9430f" />
       <span id="wm-opacity-label" data-s="s00e53546">25%</span>
     </div>
   </div>
   <div class="form-row">
-    <label>旋轉角度</label>
+    <label>{{ tr('旋轉角度') }}</label>
     <div class="field" data-s="s5f11e4db">
       <input type="range" id="wm-rotation" min="-180" max="180" value="30" data-s="s45d9430f" />
       <input type="number" id="wm-rotation-num" min="-180" max="180" value="30" step="5" data-s="s8db8d854" />
-      <span class="muted" data-s="s6b9c179a">度</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('度') }}</span>
     </div>
   </div>
   <div class="form-row">
-    <label>圖片尺寸</label>
+    <label>{{ tr('圖片尺寸') }}</label>
     <div class="field" data-s="s5f11e4db">
       <input type="range" id="wm-size" min="10" max="200" value="60" data-s="s45d9430f" />
       <input type="number" id="wm-size-num" min="10" max="200" value="60" data-s="s8db8d854" />
-      <span class="muted" data-s="s6b9c179a">mm（依圖片自動維持比例）</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('mm（依圖片自動維持比例）') }}</span>
     </div>
   </div>
   <div class="form-row">
-    <label>間距</label>
+    <label>{{ tr('間距') }}</label>
     <div class="field" data-s="s5f11e4db">
       <input type="range" id="wm-gap" min="0" max="200" value="30" data-s="s45d9430f" />
       <input type="number" id="wm-gap-num" min="0" max="200" value="30" data-s="s8db8d854" />
@@ -87,7 +87,7 @@
     <img id="wm-preview-img" alt="浮水印預覽"
          data-s="s45bb712b" />
   </div>
-  <p class="muted" id="wm-preview-status" data-s="s1cad5387">產生預覽中…</p>
+  <p class="muted" id="wm-preview-status" data-s="s1cad5387">{{ tr('產生預覽中…') }}</p>
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
@@ -115,8 +115,8 @@
 </style>
 
 <div data-s="s37941ba4">
-  <button class="btn btn-primary" id="btn-save">{{ icon('save') }}儲存</button>
-  <a class="btn" href="/admin/assets">{{ icon('back') }}回清單</a>
+  <button class="btn btn-primary" id="btn-save">{{ icon('save') }}{{ tr('儲存') }}</button>
+  <a class="btn" href="/admin/assets">{{ icon('back') }}{{ tr('回清單') }}</a>
 </div>
 {% endblock %}
 
@@ -268,7 +268,7 @@ const editor = new DragPositionEditor({
           }
         }
       }
-      if (maxX < minX || maxY < minY) { alert('選取範圍內找不到可見內容'); return; }
+      if (maxX < minX || maxY < minY) { alert(tr('選取範圍內找不到可見內容')); return; }
       const pad = Math.max(2, Math.round(Math.min(canvas.width, canvas.height) / 200));
       minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
       maxX = Math.min(canvas.width - 1, maxX + pad);
@@ -281,13 +281,13 @@ const editor = new DragPositionEditor({
       clampRect();
       layout();
     } catch (err) {
-      alert('自動貼齊失敗：' + err.message);
+      alert(tr('自動貼齊失敗：') + err.message);
     }
   });
 
   document.getElementById('btn-match-aspect').addEventListener('click', async () => {
     const r = await fetch(`/admin/assets/${assetId}/match-aspect`, { method: 'POST' });
-    if (!r.ok) { alert('調整失敗'); return; }
+    if (!r.ok) { alert(tr('調整失敗')); return; }
     const j = await r.json();
     const p = j.asset && j.asset.preset;
     if (p && editor) {
@@ -304,7 +304,7 @@ const editor = new DragPositionEditor({
 
   document.getElementById('btn-crop-apply').addEventListener('click', async () => {
     clampRect();
-    if (!(await showConfirm('套用裁剪？這會覆寫原始檔。', { title: '套用裁剪', kind: 'warn' }))) return;
+    if (!(await showConfirm(tr('套用裁剪？這會覆寫原始檔。'), { title: '套用裁剪', kind: 'warn' }))) return;
     const r = await fetch(`/admin/assets/${assetId}/crop`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rect),
@@ -356,7 +356,7 @@ function refreshWmPreview(){
   clearTimeout(wmDebounce);
   wmDebounce = setTimeout(() => {
     const seq = ++wmSeq;
-    wmStatus.textContent = '產生預覽中…';
+    wmStatus.textContent = tr('產生預覽中…');
     const params = new URLSearchParams({
       opacity: ((parseFloat(wmOpacity.value) || 25) / 100).toFixed(2),
       rotation: String(parseFloat(wmRot.value) || 0),
@@ -369,9 +369,9 @@ function refreshWmPreview(){
     tmp.onload = () => {
       if (seq !== wmSeq) return;
       wmImg.src = tmp.src;
-      wmStatus.textContent = '預覽：A4 範例頁面';
+      wmStatus.textContent = tr('預覽：A4 範例頁面');
     };
-    tmp.onerror = () => { if (seq === wmSeq) wmStatus.textContent = '預覽產生失敗'; };
+    tmp.onerror = () => { if (seq === wmSeq) wmStatus.textContent = tr('預覽產生失敗'); };
     tmp.src = url;
   }, 250);
 }
@@ -409,10 +409,10 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     body: JSON.stringify(body),
   });
   if (r.ok) {
-    if (window.showToast) window.showToast('已儲存', 'ok');
+    if (window.showToast) window.showToast(tr('已儲存'), 'ok');
     setTimeout(() => location.href = '/admin/assets', 400);
   } else {
-    alert('儲存失敗');
+    alert(tr('儲存失敗'));
   }
 });
 </script>

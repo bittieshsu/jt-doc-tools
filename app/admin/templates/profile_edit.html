@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}公司資料 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('公司資料') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('building', size=22) }} 公司基本資料</h1>
-<p class="muted">支援多公司。目前作用中的公司會被「表單自動填寫」預設使用。</p>
+<h1>{{ icon('building', size=22) }} {{ tr('公司基本資料') }}</h1>
+<p class="muted">{{ tr('支援多公司。目前作用中的公司會被「表單自動填寫」預設使用。') }}</p>
 
 <div class="panel">
-  <h2>{{ icon('building', size=18) }} 選擇公司</h2>
+  <h2>{{ icon('building', size=18) }} {{ tr('選擇公司') }}</h2>
   <div class="form-row">
-    <label>編輯公司</label>
+    <label>{{ tr('編輯公司') }}</label>
     <div class="field" data-s="sc8395ac5">
       <select id="companySelect" data-s="sd7c87199">
         {% for c in companies %}
@@ -18,27 +18,27 @@
         {% endfor %}
       </select>
       {% if edit_id != active_id %}
-      <button class="btn btn-small" id="activateBtn" type="button">{{ icon('star') }}設為作用中</button>
+      <button class="btn btn-small" id="activateBtn" type="button">{{ icon('star') }}{{ tr('設為作用中') }}</button>
       {% endif %}
-      <button class="btn btn-small" id="newBtn" type="button">{{ icon('plus') }}新增公司</button>
-      <a class="btn btn-small" href="/admin/profile/{{ edit_id }}/export" download>{{ icon('download') }}匯出</a>
-      <button class="btn btn-small" id="importBtn" type="button">{{ icon('upload') }}匯入</button>
+      <button class="btn btn-small" id="newBtn" type="button">{{ icon('plus') }}{{ tr('新增公司') }}</button>
+      <a class="btn btn-small" href="/admin/profile/{{ edit_id }}/export" download>{{ icon('download') }}{{ tr('匯出') }}</a>
+      <button class="btn btn-small" id="importBtn" type="button">{{ icon('upload') }}{{ tr('匯入') }}</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden />
       {% if companies|length > 1 %}
-      <button class="btn btn-small btn-danger" id="deleteBtn" type="button">{{ icon('trash') }}刪除此公司</button>
+      <button class="btn btn-small btn-danger" id="deleteBtn" type="button">{{ icon('trash') }}{{ tr('刪除此公司') }}</button>
       {% endif %}
     </div>
   </div>
   <div class="form-row" data-s="s5371db16">
-    <label>公司顯示名稱</label>
+    <label>{{ tr('公司顯示名稱') }}</label>
     <input class="field" id="companyName" type="text" value="{{ profile.name }}" />
   </div>
 </div>
 
 <div class="panel">
-  <h2>{{ icon('edit', size=18) }} 欄位編輯</h2>
+  <h2>{{ icon('edit', size=18) }} {{ tr('欄位編輯') }}</h2>
   <div class="profile-toolbar">
-    <button class="btn btn-primary" id="saveBtn" type="button">{{ icon('save') }}儲存</button>
+    <button class="btn btn-primary" id="saveBtn" type="button">{{ icon('save') }}{{ tr('儲存') }}</button>
     <span class="muted" id="status"></span>
   </div>
 
@@ -47,7 +47,7 @@
     <h3 class="profile-section-title">{{ sec.title }}</h3>
     <div class="edit-list">
       <div class="edit-row edit-head">
-        <span>key</span><span>顯示名稱</span><span>值</span><span></span>
+        <span>key</span><span>{{ tr('顯示名稱') }}</span><span>{{ tr('值') }}</span><span></span>
       </div>
       {% for row in sec.rows %}
       <div class="edit-row" data-key="{{ row.key }}">
@@ -58,7 +58,7 @@
       </div>
       {% endfor %}
       <div class="edit-add-row">
-        <button class="btn btn-small" data-act="add" type="button">{{ icon('plus') }}在此群組新增欄位</button>
+        <button class="btn btn-small" data-act="add" type="button">{{ icon('plus') }}{{ tr('在此群組新增欄位') }}</button>
       </div>
     </div>
   </section>
@@ -125,11 +125,11 @@ importFile.addEventListener('change', async () => {
   const res = await fetch('/admin/profile/import', { method: 'POST', body: fd });
   if (res.ok) {
     const data = await res.json();
-    showToast('匯入成功', 'ok');
+    showToast(tr('匯入成功'), 'ok');
     location.href = '/admin/profile?cid=' + encodeURIComponent(data.id);
   } else {
     const t = await res.text();
-    showToast('匯入失敗：' + t, 'err');
+    showToast(tr('匯入失敗：') + t, 'err');
   }
   importFile.value = '';
 });
@@ -137,7 +137,7 @@ importFile.addEventListener('change', async () => {
 document.getElementById('newBtn').addEventListener('click', async () => {
   const name = await showPrompt('新公司顯示名稱', { title: '新增公司' });
   if (!name) return;
-  const copy = (await showConfirm('要從目前這家公司複製欄位嗎？',
+  const copy = (await showConfirm(tr('要從目前這家公司複製欄位嗎？'),
     { title: '欄位來源', okText: '從目前公司複製', cancelText: '使用預設範本' })) ? EDIT_ID : null;
   const res = await fetch('/admin/profile/create', {
     method: 'POST',
@@ -151,7 +151,7 @@ document.getElementById('newBtn').addEventListener('click', async () => {
 const deleteBtn = document.getElementById('deleteBtn');
 if (deleteBtn) {
   deleteBtn.addEventListener('click', async () => {
-    if (!(await showConfirm('確定刪除這家公司的所有資料？', { title: '刪除公司', kind: 'danger' }))) return;
+    if (!(await showConfirm(tr('確定刪除這家公司的所有資料？'), { title: '刪除公司', kind: 'danger' }))) return;
     const res = await fetch(`/admin/profile/${encodeURIComponent(EDIT_ID)}/delete`, { method: 'POST' });
     if (res.ok) location.href = '/admin/profile';
     else showAlert('刪除失敗');
@@ -210,9 +210,9 @@ saveBtn.addEventListener('click', async () => {
     body: JSON.stringify({ cid: EDIT_ID, name, keys, labels, values }),
   });
   if (res.ok) {
-    saveBtn.innerHTML = '✓ 已儲存';
+    saveBtn.innerHTML = tr('✓ 已儲存');
     saveBtn.classList.add('saved-flash');
-    showToast('公司資料已儲存', 'ok');
+    showToast(tr('公司資料已儲存'), 'ok');
     setTimeout(() => {
       saveBtn.innerHTML = saveBtnOriginalHTML;
       saveBtn.classList.remove('saved-flash');
@@ -221,7 +221,7 @@ saveBtn.addEventListener('click', async () => {
   } else {
     saveBtn.innerHTML = saveBtnOriginalHTML;
     saveBtn.disabled = false;
-    showToast('儲存失敗', 'err');
+    showToast(tr('儲存失敗'), 'err');
   }
 });
 

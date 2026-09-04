@@ -26,7 +26,11 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "temp" / "i18n-baseline"
 os.environ.setdefault("JTDT_CSRF_DISABLE", "1")
-os.environ.setdefault("JTDT_DATA_DIR", tempfile.mkdtemp(prefix="jtdt-i18n-base-"))
+# **資料目錄要固定**，不可以每次 mkdtemp —— 管理頁會把資料目錄的路徑印在畫面上
+# （匯出目錄、字型目錄…），路徑每次都不一樣的話整份比對永遠是紅的。
+_DATA = ROOT / "temp" / "i18n-baseline-data"
+_DATA.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("JTDT_DATA_DIR", str(_DATA))
 sys.path.insert(0, str(ROOT))
 
 
@@ -73,6 +77,11 @@ def _render() -> dict[str, bytes]:
         c.cookies.set("jtdt_locale", "zh-Hant")
         for p in _pages():
             r = c.get(p, follow_redirects=True)
+            # **只收 HTML**。管理區的 GET 路由裡混著 JSON API（系統狀態、
+            # 作業佇列…），那些回應帶時間戳，每次都不一樣 —— 收進來的話
+            # 這條安全網永遠是紅的，等於沒有。
+            if not r.headers.get("content-type", "").startswith("text/html"):
+                continue
             name = p.strip("/").replace("/", "_").replace("?", "_") or "home"
             out[f"{name}.html"] = _normalise(r.content)
     return out

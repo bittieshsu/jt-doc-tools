@@ -131,8 +131,11 @@ def test_translation_keeps_the_trailing_colon_or_ellipsis():
     對錯鍵**（實際踩過兩次：合併譯文時用「索引」對，清單順序一變就整段錯位）。
     """
     cat = catalog("en")
+    # **只看短字串**。長句子以「：」結尾時，後面接的是另一個元素，英文很自然
+    # 會以 "from" / "Download" 這種詞收尾而不需要冒號 —— 對那些誤報的話，
+    # 這條守門就會被當成雜訊忽略（本專案的老問題）。
     bad = [(k, v) for k, v in cat.items()
-           if k and k[-1] in "：…" and v and v[-1] not in ": ….'"]
+           if k and len(k) <= 20 and k[-1] in "：…" and v and v[-1] not in ": ….'"]
     assert not bad, ("原文以冒號 / 刪節號結尾但譯文沒有：\n  "
                      + "\n  ".join(f"{k[:34]!r} -> {v[:40]!r}" for k, v in bad[:6]))
 

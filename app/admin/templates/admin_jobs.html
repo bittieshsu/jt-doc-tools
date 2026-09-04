@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}背景作業與併行度 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('背景作業與併行度') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('clock', size=22) }} 背景作業與併行度</h1>
-<p class="muted">所有使用者送出的背景作業（轉檔、OCR、合併等），以及同時可以處理幾個。</p>
+<h1>{{ icon('clock', size=22) }} {{ tr('背景作業與併行度') }}</h1>
+<p class="muted">{{ tr('所有使用者送出的背景作業（轉檔、OCR、合併等），以及同時可以處理幾個。') }}</p>
 
 <div class="panel">
-  <h2>{{ icon('gauge', size=18) }} 目前狀態</h2>
+  <h2>{{ icon('gauge', size=18) }} {{ tr('目前狀態') }}</h2>
   <div class="aj-stats" id="aj-stats"></div>
   <div class="aj-chart" id="aj-chart" hidden>
     <div class="aj-chart-head">
-      <b id="aj-chart-title">歷史</b>
+      <b id="aj-chart-title">{{ tr('歷史') }}</b>
       <span class="aj-chart-range">
-        <button type="button" class="aj-rng" data-h="6">6 小時</button>
-        <button type="button" class="aj-rng is-on" data-h="24">24 小時</button>
-        <button type="button" class="aj-rng" data-h="168">7 天</button>
+        <button type="button" class="aj-rng" data-h="6">{{ tr('6 小時') }}</button>
+        <button type="button" class="aj-rng is-on" data-h="24">{{ tr('24 小時') }}</button>
+        <button type="button" class="aj-rng" data-h="168">{{ tr('7 天') }}</button>
       </span>
       <button type="button" class="aj-chart-close" id="aj-chart-close" aria-label="關閉">×</button>
     </div>
@@ -25,17 +25,17 @@
   <div class="aj-controls">
     <button class="btn" id="aj-pause" type="button">
       <span id="aj-pause-ic">{{ icon('pause', size=15) }}</span>
-      <span id="aj-pause-tx">暫停派送</span>
+      <span id="aj-pause-tx">{{ tr('暫停派送') }}</span>
     </button>
-    <span class="muted aj-pause-note">暫停只擋<b>還沒開始</b>的作業。已經在執行的轉檔是獨立的子行程，沒辦法中途凍結 —— 要停只能取消該筆。</span>
+    <span class="muted aj-pause-note">{{ tr('暫停只擋') }}<b>{{ tr('還沒開始') }}</b>{{ tr('的作業。已經在執行的轉檔是獨立的子行程，沒辦法中途凍結 —— 要停只能取消該筆。') }}</span>
   </div>
 </div>
 
 <div class="panel">
-  <h2>{{ icon('gear', size=18) }} 併行度設定</h2>
+  <h2>{{ icon('gear', size=18) }} {{ tr('併行度設定') }}</h2>
   <div class="aj-mem is-clickable" id="aj-mem" title="點一下看歷史趨勢">
     <div class="aj-mem-top">
-      <span id="aj-mem-text">載入中…</span>
+      <span id="aj-mem-text">{{ tr('載入中…') }}</span>
       <span class="aj-mem-pct" id="aj-mem-pct"></span>
     </div>
     <div class="aj-mem-bar">
@@ -45,15 +45,15 @@
     {# 圖例 —— 中間那段灰色（可開新作業）才是這條計量最有用的資訊，但沒有標示的話
        看起來只像「進度條沒有滿」。 #}
     <div class="aj-mem-legend">
-      <span><i class="sw sw-used"></i>已用</span>
-      <span><i class="sw sw-free"></i>可開新作業</span>
-      <span><i class="sw sw-res"></i>保留</span>
+      <span><i class="sw sw-used"></i>{{ tr('已用') }}</span>
+      <span><i class="sw sw-free"></i>{{ tr('可開新作業') }}</span>
+      <span><i class="sw sw-res"></i>{{ tr('保留') }}</span>
     </div>
   </div>
 
   <div class="aj-mem aj-cpu is-clickable" id="aj-cpu" title="點一下看歷史趨勢">
     <div class="aj-mem-top">
-      <span id="aj-cpu-text">載入中…</span>
+      <span id="aj-cpu-text">{{ tr('載入中…') }}</span>
       <span class="aj-mem-pct" id="aj-cpu-pct"></span>
     </div>
     <div class="aj-mem-bar"><div class="aj-cpu-used" id="aj-cpu-used"></div></div>
@@ -61,47 +61,47 @@
 
   <div class="aj-grid">
     <div class="aj-field">
-      <label for="aj-jobs">{{ icon('layers', size=16) }} 最大同時作業數</label>
+      <label for="aj-jobs">{{ icon('layers', size=16) }} {{ tr('最大同時作業數') }}</label>
       <div class="aj-field-row">
         <input type="number" id="aj-jobs" min="1" max="{{ conc.hard_max_jobs }}" value="{{ conc.max_concurrent_jobs }}">
-        <span class="aj-limit">上限 {{ conc.hard_max_jobs }}</span>
+        <span class="aj-limit">{{ tr('上限') }} {{ conc.hard_max_jobs }}</span>
       </div>
-      <div class="aj-help muted">影響所有作業。OCR / 壓縮 / 合併 / 分拆這類純運算的作業受這個值控制。上限依 CPU {{ conc.cpu_count }} 核與記憶體推算。</div>
+      <div class="aj-help muted">{{ tr('影響所有作業。OCR / 壓縮 / 合併 / 分拆這類純運算的作業受這個值控制。上限依 CPU') }} {{ conc.cpu_count }} {{ tr('核與記憶體推算。') }}</div>
     </div>
 
     <div class="aj-field">
-      <label for="aj-office">{{ icon('file-swap', size=16) }} Office 轉檔同時數</label>
+      <label for="aj-office">{{ icon('file-swap', size=16) }} {{ tr('Office 轉檔同時數') }}</label>
       <div class="aj-field-row">
         <input type="number" id="aj-office" min="1" max="{{ conc.hard_max_office }}"
                value="{{ conc.max_office_concurrent }}"
                {% if conc.office_locked_reason %}disabled{% endif %}>
-        <span class="aj-limit">上限 {{ conc.hard_max_office }}・建議 {{ conc.suggested_office }}</span>
+        <span class="aj-limit">{{ tr('上限') }} {{ conc.hard_max_office }}{{ tr('・建議') }} {{ conc.suggested_office }}</span>
       </div>
       {% if conc.office_locked_reason %}
       <div class="aj-warn">{{ icon('info', size=14) }} {{ conc.office_locked_reason }}</div>
       {% else %}
-      <div class="aj-help muted">影響 {{ conc.office_tools|length }} 個需要 Office 引擎的工具（PDF 轉文書檔 / 轉簡報 / 辦公文件轉 PDF …）。<b>每個轉檔約佔 {{ conc.estimate_office_mb }} MB 記憶體</b>，調高前先確認機器撐得住。</div>
+      <div class="aj-help muted">{{ tr('影響') }} {{ conc.office_tools|length }} {{ tr('個需要 Office 引擎的工具（PDF 轉文書檔 / 轉簡報 / 辦公文件轉 PDF …）。') }}<b>{{ tr('每個轉檔約佔') }} {{ conc.estimate_office_mb }} {{ tr('MB 記憶體') }}</b>{{ tr('，調高前先確認機器撐得住。') }}</div>
       {% endif %}
     </div>
 
     <div class="aj-field">
-      <label for="aj-remote">{{ icon('cloud', size=16) }} 外部服務同時呼叫數</label>
+      <label for="aj-remote">{{ icon('cloud', size=16) }} {{ tr('外部服務同時呼叫數') }}</label>
       <div class="aj-field-row">
         <input type="number" id="aj-remote" min="1" max="16" value="{{ conc.max_remote_concurrent }}">
-        <span class="aj-limit">LLM / 遠端 GPU OCR</span>
+        <span class="aj-limit">{{ tr('LLM / 遠端 GPU OCR') }}</span>
       </div>
       <div class="aj-help muted">
         {% if conc.remote_services %}目前啟用：{{ conc.remote_services|join('、') }}。{% endif %}
-        真正的瓶頸在<b>對方那台機器</b>（一張 GPU 只載一個模型），本機的記憶體判斷擋不到。
-        <b>預設 1</b> —— 一個一個過去、每個都在合理時間內完成，比全部一起去搶顯示記憶體到集體逾時好。
+        真正的瓶頸在<b>{{ tr('對方那台機器') }}</b>{{ tr('（一張 GPU 只載一個模型），本機的記憶體判斷擋不到。') }}
+        <b>{{ tr('預設 1') }}</b> {{ tr('—— 一個一個過去、每個都在合理時間內完成，比全部一起去搶顯示記憶體到集體逾時好。') }}
       </div>
     </div>
 
     <div class="aj-field">
-      <label for="aj-cpupct">{{ icon('gauge', size=16) }} 轉檔 CPU 上限</label>
+      <label for="aj-cpupct">{{ icon('gauge', size=16) }} {{ tr('轉檔 CPU 上限') }}</label>
       <div class="aj-field-row">
         <select id="aj-cpupct" {% if not conc.cpu_limit.affinity_supported %}disabled{% endif %}>
-          <option value="0"{% if conc.soffice_cpu_percent == 0 %} selected{% endif %}>自動（保留 1 核給網頁）</option>
+          <option value="0"{% if conc.soffice_cpu_percent == 0 %} selected{% endif %}>{{ tr('自動（保留 1 核給網頁）') }}</option>
           {% for pct in [25, 50, 75, 100] %}
           <option value="{{ pct }}"{% if conc.soffice_cpu_percent == pct %} selected{% endif %}>{{ pct }}%{% if pct == 100 %}（不限制）{% endif %}</option>
           {% endfor %}
@@ -109,42 +109,42 @@
         <span class="aj-limit" id="aj-cpupct-now">
           {%- set cl = conc.cpu_limit -%}
           {%- if cl.affinity_supported -%}
-          目前 {{ cl.effective_cores }} / {{ cl.cpu_count }} 核{% if cl.reserved_cores %}・留 {{ cl.reserved_cores }} 核給網頁{% endif %}
+          目前 {{ cl.effective_cores }} / {{ cl.cpu_count }} {{ tr('核') }}{% if cl.reserved_cores %}・留 {{ cl.reserved_cores }} {{ tr('核給網頁') }}{% endif %}
           {%- else -%}此平台不支援{%- endif -%}
         </span>
       </div>
       {% if conc.cpu_limit.note %}
-      <div class="aj-warn">{{ icon('info', size=14) }} {{ conc.cpu_limit.note }}（轉檔仍會降低優先權）</div>
+      <div class="aj-warn">{{ icon('info', size=14) }} {{ conc.cpu_limit.note }}{{ tr('（轉檔仍會降低優先權）') }}</div>
       {% else %}
-      <div class="aj-help muted"><b>網頁回應永遠優先於轉檔快慢。</b>轉檔子行程會被綁在部分核心上，剩下的核心保證不被它佔用，所以「在忙」也不會讓頁面空轉。轉檔本身只會慢一點。</div>
+      <div class="aj-help muted"><b>{{ tr('網頁回應永遠優先於轉檔快慢。') }}</b>{{ tr('轉檔子行程會被綁在部分核心上，剩下的核心保證不被它佔用，所以「在忙」也不會讓頁面空轉。轉檔本身只會慢一點。') }}</div>
       {% endif %}
     </div>
 
     <div class="aj-field">
-      <label for="aj-reserve">{{ icon('memory', size=16) }} 保留記憶體（MB）</label>
+      <label for="aj-reserve">{{ icon('memory', size=16) }} {{ tr('保留記憶體（MB）') }}</label>
       <div class="aj-field-row">
         <input type="number" id="aj-reserve" min="128" max="8192" step="128" value="{{ conc.reserve_mb }}">
-        <span class="aj-limit">留給作業系統與資料庫</span>
+        <span class="aj-limit">{{ tr('留給作業系統與資料庫') }}</span>
       </div>
-      <div class="aj-help muted">可用記憶體扣掉這個數字之後不夠再開一個作業時，新作業會<b>留在佇列排隊</b>，不會硬開下去把機器打爆。</div>
+      <div class="aj-help muted">{{ tr('可用記憶體扣掉這個數字之後不夠再開一個作業時，新作業會') }}<b>{{ tr('留在佇列排隊') }}</b>{{ tr('，不會硬開下去把機器打爆。') }}</div>
     </div>
   </div>
 
-  <button class="btn btn-primary" id="aj-save" type="button">{{ icon('save', size=15) }} 儲存設定</button>
-  <span id="aj-saved" class="aj-saved" hidden>已儲存</span>
+  <button class="btn btn-primary" id="aj-save" type="button">{{ icon('save', size=15) }} {{ tr('儲存設定') }}</button>
+  <span id="aj-saved" class="aj-saved" hidden>{{ tr('已儲存') }}</span>
 </div>
 
 <div class="panel" id="aj-prio-panel">
-  <h2 class="aj-head">{{ icon('star', size=18) }} 優先派送名單</h2>
+  <h2 class="aj-head">{{ icon('star', size=18) }} {{ tr('優先派送名單') }}</h2>
   <p class="aj-help muted aj-prio-note">
-    名單內的使用者送出作業時會<b>插到佇列最前面</b>，下一個被派送的就是他們的。
-    通常用在高階主管或有時效性的重要工作。
-    <b>由上而下就是優先順序</b>（第 1 位最優先），可拖曳「⣿」調整；同一位使用者的多件作業之間照先來後到。
-    <b>不會中斷正在執行的作業</b>（轉檔跑到一半殺掉只會留下半成品），效果是「下一個換你」而不是「現在就換你」。
-    記憶體不足時一樣要排隊，插隊不會凌駕於「不可把機器打爆」之上。
+    {{ tr('名單內的使用者送出作業時會') }}<b>{{ tr('插到佇列最前面') }}</b>{{ tr('，下一個被派送的就是他們的。
+    通常用在高階主管或有時效性的重要工作。') }}
+    <b>{{ tr('由上而下就是優先順序') }}</b>{{ tr('（第 1 位最優先），可拖曳「⣿」調整；同一位使用者的多件作業之間照先來後到。') }}
+    <b>{{ tr('不會中斷正在執行的作業') }}</b>{{ tr('（轉檔跑到一半殺掉只會留下半成品），效果是「下一個換你」而不是「現在就換你」。
+    記憶體不足時一樣要排隊，插隊不會凌駕於「不可把機器打爆」之上。') }}
   </p>
   <div id="aj-prio-off" class="aj-warn" hidden>
-    {{ icon('info', size=14) }} 目前未啟用認證，沒有帳號可以指定 —— 這個功能要先到「認證設定」啟用認證才有作用。
+    {{ icon('info', size=14) }} {{ tr('目前未啟用認證，沒有帳號可以指定 —— 這個功能要先到「認證設定」啟用認證才有作用。') }}
   </div>
   <div id="aj-prio-wrap">
     {# 搜尋在最上面：這是「加人」的入口，動作的起點應該在名單之前。
@@ -161,26 +161,26 @@
 <div class="panel">
   {# 同 my_jobs：h2 要當 .panel 的直接第一個子元素才吃得到共用標題列樣式 #}
   <h2 class="aj-head">
-    作業清單<span id="aj-count" class="mj-count" hidden></span>
+    {{ tr('作業清單') }}<span id="aj-count" class="mj-count" hidden></span>
     <span class="aj-head-right">
       <span class="aj-live" id="aj-live" title="有作業進行中時每 2 秒自動更新">
-        <span class="aj-live-dot"></span><span id="aj-live-tx">自動更新中</span>
+        <span class="aj-live-dot"></span><span id="aj-live-tx">{{ tr('自動更新中') }}</span>
       </span>
-      <label class="aj-only-active"><input type="checkbox" id="aj-active-only"> 只看進行中</label>
-      <button class="btn btn-small" id="aj-refresh" type="button">{{ icon('refresh', size=15) }} 重新整理</button>
+      <label class="aj-only-active"><input type="checkbox" id="aj-active-only"> {{ tr('只看進行中') }}</label>
+      <button class="btn btn-small" id="aj-refresh" type="button">{{ icon('refresh', size=15) }} {{ tr('重新整理') }}</button>
     </span>
   </h2>
-  <div id="aj-empty" class="muted" hidden>目前沒有任何作業記錄。</div>
+  <div id="aj-empty" class="muted" hidden>{{ tr('目前沒有任何作業記錄。') }}</div>
   <div class="aj-table-wrap"><table class="aj-table" id="aj-table">
     <thead><tr>
-      <th class="aj-sortable" data-sort="tool_name">工具</th>
-      <th class="aj-sortable" data-sort="filename">檔案</th>
-      <th class="aj-sortable" data-sort="owner">送出者</th>
-      <th class="aj-sortable" data-sort="status">狀態</th>
-      <th class="aj-sortable" data-sort="usage">資源用量</th>
-      <th class="aj-sortable" data-sort="started_at">啟動時間</th>
-      <th class="aj-sortable" data-sort="finished_at">結束時間</th>
-      <th class="aj-sortable" data-sort="elapsed">耗時</th>
+      <th class="aj-sortable" data-sort="tool_name">{{ tr('工具') }}</th>
+      <th class="aj-sortable" data-sort="filename">{{ tr('檔案') }}</th>
+      <th class="aj-sortable" data-sort="owner">{{ tr('送出者') }}</th>
+      <th class="aj-sortable" data-sort="status">{{ tr('狀態') }}</th>
+      <th class="aj-sortable" data-sort="usage">{{ tr('資源用量') }}</th>
+      <th class="aj-sortable" data-sort="started_at">{{ tr('啟動時間') }}</th>
+      <th class="aj-sortable" data-sort="finished_at">{{ tr('結束時間') }}</th>
+      <th class="aj-sortable" data-sort="elapsed">{{ tr('耗時') }}</th>
       <th></th>
     </tr></thead>
     <tbody id="aj-tbody"></tbody>
@@ -465,7 +465,7 @@
     if (metric) {
       // 點卡片看歷史 —— 「現在幾個」看不出「什麼時候忙」，而後者才是調併行度
       // 的依據
-      d.title = '點一下看歷史趨勢';
+      d.title = tr('點一下看歷史趨勢');
       d.addEventListener('click', () => openChart(metric, label));
     }
     return d;
@@ -510,7 +510,7 @@
       memEl.classList.toggle('low', freePct < 25 && freePct >= 12);
       memEl.classList.toggle('crit', freePct < 12);
     } else {
-      txt.textContent = '讀不到記憶體資訊（psutil 未安裝？）—— 此時不會因記憶體因素擋下作業。';
+      txt.textContent = tr('讀不到記憶體資訊（psutil 未安裝？）—— 此時不會因記憶體因素擋下作業。');
       pctEl.textContent = '';
     }
 
@@ -617,7 +617,7 @@
       // 的標示就跟著更新。
       if (j.owner_priority !== null && j.owner_priority !== undefined) {
         const b = el('span', 'aj-owner-prio', String(j.owner_priority + 1));
-        b.title = '優先派送名單第 ' + (j.owner_priority + 1) + ' 位';
+        b.title = tr('優先派送名單第 ') + (j.owner_priority + 1) + ' 位';
         ownerLine.appendChild(b);
         ownerLine.classList.add('is-prio');
       }
@@ -792,7 +792,7 @@
           '・尚無取樣資料（每分鐘記錄一筆，服務啟動後才開始累積）'));
       }
     } else {
-      note.textContent = '這段時間沒有活動。';
+      note.textContent = tr('這段時間沒有活動。');
     }
   }
 
@@ -802,13 +802,13 @@
     box.hidden = false;
     document.getElementById('aj-chart-title').textContent =
       (METRICS[metric] || {}).label || label;
-    document.getElementById('aj-chart-body').textContent = '載入中…';
+    document.getElementById('aj-chart-body').textContent = tr('載入中…');
     try {
       const r = await fetch(`/admin/jobs/api/history?hours=${chartHours}`);
       if (!r.ok) return;
       drawChart(await r.json());
     } catch (e) {
-      document.getElementById('aj-chart-body').textContent = '讀取歷史失敗';
+      document.getElementById('aj-chart-body').textContent = tr('讀取歷史失敗');
     }
   }
 
@@ -850,7 +850,7 @@
 
   async function cancelJob(id, btn) {
     btn.disabled = true;
-    btn.textContent = '取消中…';
+    btn.textContent = tr('取消中…');
     try {
       await fetch('/admin/jobs/api/cancel/' + encodeURIComponent(id),
                   { method: 'POST' });
@@ -865,7 +865,7 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paused: !paused }),
       });
-      if (!r.ok) alert(await window.friendlyServerError(r, '切換失敗'));
+      if (!r.ok) alert(await window.friendlyServerError(r, tr('切換失敗')));
     } finally {
       pauseBtn.disabled = false;
       load();
@@ -902,7 +902,7 @@
       row.setAttribute('draggable', 'true');
       row.appendChild(el('span', 'aj-prio-no', String(i + 1)));
       const grip = el('span', 'aj-prio-grip', '\u283F');   // ⠿ 拖曳把手
-      grip.title = '拖曳調整順序';
+      grip.title = tr('拖曳調整順序');
       row.appendChild(grip);
       // 帳號與姓名是使用者可控的內容 —— 一律 textContent
       //
@@ -918,7 +918,7 @@
       const x = document.createElement('button');
       x.type = 'button';
       x.textContent = '\u00D7';
-      x.title = '從名單移除';
+      x.title = tr('從名單移除');
       x.addEventListener('click', () => {
         prioUsers = prioUsers.filter((v) => v.id !== u.id);
         prioSave();
@@ -995,7 +995,7 @@
       body: JSON.stringify({ user_ids: ids }),
     });
     if (!r.ok) {
-      alert(await window.friendlyServerError(r, '儲存優先派送名單失敗'));
+      alert(await window.friendlyServerError(r, tr('儲存優先派送名單失敗')));
       prioLoad();          // 失敗就回到伺服器上的真實狀態，不要留著假的畫面
       return;
     }
@@ -1034,7 +1034,7 @@
                           SRC_LABEL[u.source] || u.source || '本機'));
         row.addEventListener('click', () => {
           if (prioUsers.length >= prioMax) {
-            alert('最多 ' + prioMax + ' 位');
+            alert(tr('最多 ') + prioMax + ' 位');
             return;
           }
           prioUsers.push(u);
@@ -1078,7 +1078,7 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!r.ok) { alert(await window.friendlyServerError(r, '儲存失敗')); return; }
+      if (!r.ok) { alert(await window.friendlyServerError(r, tr('儲存失敗'))); return; }
       const d = await r.json();
       // 伺服器可能把數值夾住（例如記憶體不夠）→ 回填實際生效的值
       document.getElementById('aj-jobs').value = d.conc.max_concurrent_jobs;
@@ -1091,7 +1091,7 @@
       var cl = d.conc.cpu_limit || {};
       var now = document.getElementById('aj-cpupct-now');
       if (now && cl.affinity_supported) {
-        now.textContent = '目前 ' + cl.effective_cores + ' / ' + cl.cpu_count + ' 核'
+        now.textContent = tr('目前 ') + cl.effective_cores + ' / ' + cl.cpu_count + ' 核'
           + (cl.reserved_cores ? '・留 ' + cl.reserved_cores + ' 核給網頁' : '');
       }
       const ok = document.getElementById('aj-saved');

@@ -34,13 +34,24 @@ def _src() -> str:
     return TPL.read_text(encoding="utf-8")
 
 
+#: 標題現在包在 `{{ tr('…') }}` 裡（i18n）。這支測試在乎的是**欄位順序**，
+#: 不是字面文字，所以把包裝拆掉再比 —— 不拆的話它會在加 i18n 的那一刻紅，
+#: 而那跟它要守的東西無關。
+_TR = re.compile(r"\{\{\s*tr\(\s*'([^']*)'\s*\)\s*\}\}")
+
+
+def _label(raw: str) -> str:
+    m = _TR.search(raw)
+    return (m.group(1) if m else raw).strip()
+
+
 def _headers(src: str) -> list[tuple[int, str, str]]:
     """[(data-col, data-sort, 標題文字)]。"""
     out = []
     for m in re.finditer(
-            r'<th class="sortable"\s+data-sort="([a-z]+)"\s+data-col="(\d+)">([^<]+)</th>',
-            src):
-        out.append((int(m.group(2)), m.group(1), m.group(3).strip()))
+            r'<th class="sortable"\s+data-sort="([a-z]+)"\s+data-col="(\d+)">(.*?)</th>',
+            src, re.S):
+        out.append((int(m.group(2)), m.group(1), _label(m.group(3))))
     return sorted(out)
 
 

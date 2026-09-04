@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}稽核記錄 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('稽核記錄') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('eye', size=22) }} 稽核記錄</h1>
-<p class="muted">所有登入、權限變更、工具呼叫等敏感操作都會記錄於此（async 寫入，不影響服務效能）。
+<h1>{{ icon('eye', size=22) }} {{ tr('稽核記錄') }}</h1>
+<p class="muted">{{ tr('所有登入、權限變更、工具呼叫等敏感操作都會記錄於此（async 寫入，不影響服務效能）。
 資料保留 90 天後自動清除（可在「檔案保留 / 清理」設定）。
-目前資料庫大小：<b>{{ '%.1f'|format(size_mb) }} MB</b>。</p>
+目前資料庫大小：') }}<b>{{ '%.1f'|format(size_mb) }} MB</b>。</p>
 
 {% if size_warn %}
 <div class="panel" data-s="s63e76a59">
-  ⚠ 稽核資料庫超過 5 GB。建議：縮短保留天數 + 啟用外部 log 轉發（syslog / CEF / GELF）。
+  {{ tr('⚠ 稽核資料庫超過 5 GB。建議：縮短保留天數 + 啟用外部 log 轉發（syslog / CEF / GELF）。') }}
 </div>
 {% endif %}
 
@@ -26,24 +26,24 @@
     {% for u in distinct_users %}<option value="{{ u }}"></option>{% endfor %}
   </datalist>
   <select class="field" name="q_event">
-    <option value="">所有事件類型</option>
+    <option value="">{{ tr('所有事件類型') }}</option>
     {% for e in distinct_events %}
     <option value="{{ e }}" {% if e == q_event %}selected{% endif %}>{{ e }}</option>
     {% endfor %}
   </select>
   <input class="field" type="datetime-local" name="q_from" value="{{ q_from }}" placeholder="從">
   <input class="field" type="datetime-local" name="q_to" value="{{ q_to }}" placeholder="到">
-  <button class="btn btn-primary" type="submit">{{ icon('search', size=14) }} 篩選</button>
-  <a class="btn" href="/admin/audit">{{ icon('back', size=14) }} 清除</a>
+  <button class="btn btn-primary" type="submit">{{ icon('search', size=14) }} {{ tr('篩選') }}</button>
+  <a class="btn" href="/admin/audit">{{ icon('back', size=14) }} {{ tr('清除') }}</a>
   <span data-s="sda5cd676"></span>
   <a class="btn" href="/admin/audit/export.csv?q_user={{ q_user }}&q_event={{ q_event }}&q_from={{ q_from }}&q_to={{ q_to }}">
-    {{ icon('download', size=14) }} 匯出 CSV
+    {{ icon('download', size=14) }} {{ tr('匯出 CSV') }}
   </a>
 </form>
 
 <div class="panel">
   <p class="muted" data-s="sea8bbc82">
-    共 <b>{{ total }}</b> 筆，第 {{ page }}/{{ pages }} 頁（每頁 {{ page_size }} 筆）
+    {{ tr('共') }} <b>{{ total }}</b> {{ tr('筆，第') }} {{ page }}/{{ pages }} {{ tr('頁（每頁') }} {{ page_size }} {{ tr('筆）') }}
   </p>
   <table class="audit-table">
     <colgroup>
@@ -55,7 +55,7 @@
       <col><!-- 詳細：吃剩餘寬度 -->
     </colgroup>
     <thead>
-      <tr><th>時間</th><th>使用者</th><th>IP</th><th>事件</th><th>目標</th><th>詳細</th></tr>
+      <tr><th>{{ tr('時間') }}</th><th>{{ tr('使用者') }}</th><th>IP</th><th>{{ tr('事件') }}</th><th>{{ tr('目標') }}</th><th>{{ tr('詳細') }}</th></tr>
     </thead>
     <tbody>
       {% for e in events %}
@@ -133,11 +133,11 @@
   {% if pages > 1 %}
   <div class="pagination" data-s="s7b767013">
     {% if page > 1 %}
-    <a class="btn btn-small" href="?page={{ page-1 }}&q_user={{ q_user }}&q_event={{ q_event }}&q_from={{ q_from }}&q_to={{ q_to }}">‹ 上一頁</a>
+    <a class="btn btn-small" href="?page={{ page-1 }}&q_user={{ q_user }}&q_event={{ q_event }}&q_from={{ q_from }}&q_to={{ q_to }}">{{ tr('‹ 上一頁') }}</a>
     {% endif %}
     <span data-s="sb9ac7d92">{{ page }} / {{ pages }}</span>
     {% if page < pages %}
-    <a class="btn btn-small" href="?page={{ page+1 }}&q_user={{ q_user }}&q_event={{ q_event }}&q_from={{ q_from }}&q_to={{ q_to }}">下一頁 ›</a>
+    <a class="btn btn-small" href="?page={{ page+1 }}&q_user={{ q_user }}&q_event={{ q_event }}&q_from={{ q_from }}&q_to={{ q_to }}">{{ tr('下一頁 ›') }}</a>
     {% endif %}
   </div>
   {% endif %}

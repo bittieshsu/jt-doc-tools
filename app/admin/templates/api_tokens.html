@@ -6,28 +6,28 @@
   {{ icon('gear', size=22) }} API Token
   <a class="btn btn-small" href="https://jasoncheng7115.github.io/jt-doc-tools/api.html"
      target="_blank" rel="noopener" data-s="se634e6da">
-    {{ icon('book', size=14) }} API 使用說明
+    {{ icon('book', size=14) }} {{ tr('API 使用說明') }}
   </a>
 </h1>
 <p class="muted">
-  呼叫本工具的 REST API（<code>/api/*</code>、<code>/tools/*/submit</code> 等）時要帶的 bearer token。
-  使用方式：<code>Authorization: Bearer &lt;token&gt;</code>。
-  完整端點、請求／回應格式與整合範例請見
-  <a href="https://jasoncheng7115.github.io/jt-doc-tools/api.html" target="_blank" rel="noopener">API 使用手冊</a>。
+  {{ tr('呼叫本工具的 REST API（') }}<code>/api/*</code>、<code>/tools/*/submit</code> {{ tr('等）時要帶的 bearer token。
+  使用方式：') }}<code>Authorization: Bearer &lt;token&gt;</code>{{ tr('。
+  完整端點、請求／回應格式與整合範例請見') }}
+  <a href="https://jasoncheng7115.github.io/jt-doc-tools/api.html" target="_blank" rel="noopener">{{ tr('API 使用手冊') }}</a>。
 </p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">{{ icon('shield', size=18) }} 強制檢查</h2>
+  <h2 data-s="s53896af7">{{ icon('shield', size=18) }} {{ tr('強制檢查') }}</h2>
   <div class="form-row">
-    <label>狀態</label>
+    <label>{{ tr('狀態') }}</label>
     <div class="field">
       <label data-s="s3199a011">
         <input type="checkbox" id="enforce" {% if enforce %}checked{% endif %}>
-        <b>強制所有 API 呼叫必須帶 token</b>
+        <b>{{ tr('強制所有 API 呼叫必須帶 token') }}</b>
       </label>
       <div class="muted" data-s="s41f96333">
-        關閉（預設）：寬限期，方便 web UI 與既有 script 無痛使用；不檢查 token。<br>
-        開啟：沒帶有效 token 的 <code>/api/*</code> 呼叫一律拒絕 401；web UI 本身仍照常運作（不走 token）。
+        {{ tr('關閉（預設）：寬限期，方便 web UI 與既有 script 無痛使用；不檢查 token。') }}<br>
+        {{ tr('開啟：沒帶有效 token 的') }} <code>/api/*</code> {{ tr('呼叫一律拒絕 401；web UI 本身仍照常運作（不走 token）。') }}
       </div>
     </div>
   </div>
@@ -35,21 +35,21 @@
 
 <div class="panel">
   <h2 data-s="se2363aeb">
-    現有 Token
-    <span class="muted" data-s="s29406bf4">（{{ tokens|length }} 個）</span>
+    {{ tr('現有 Token') }}
+    <span class="muted" data-s="s29406bf4">（{{ tokens|length }} {{ tr('個）') }}</span>
   </h2>
   {% if not tokens %}
-    <p class="muted">（沒有任何 token，請新增一個）</p>
+    <p class="muted">{{ tr('（沒有任何 token，請新增一個）') }}</p>
   {% else %}
   <table class="tokens-table">
     <thead>
       <tr>
         <th>Label</th>
         <th>Token</th>
-        <th>建立時間</th>
-        <th>最近使用</th>
-        <th>狀態</th>
-        <th data-s="s2f01efdd">動作</th>
+        <th>{{ tr('建立時間') }}</th>
+        <th>{{ tr('最近使用') }}</th>
+        <th>{{ tr('狀態') }}</th>
+        <th data-s="s2f01efdd">{{ tr('動作') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -61,8 +61,8 @@
           {# 兩顆按鈕的內容結構要一致（圖示 + 文字），不然高度不同會上下錯開。
              文字包在 .btn-tx 裡，JS 切換「顯示 / 隱藏」時只換這個節點，
              圖示才不會被 textContent 洗掉。 #}
-          <button class="btn btn-small btn-reveal" type="button" title="顯示完整 token">{{ icon('eye', size=12) }}<span class="btn-tx">顯示</span></button>
-          <button class="btn btn-small btn-copy" type="button" title="複製到剪貼簿">{{ icon('copy', size=12) }}<span class="btn-tx">複製</span></button>
+          <button class="btn btn-small btn-reveal" type="button" title="顯示完整 token">{{ icon('eye', size=12) }}<span class="btn-tx">{{ tr('顯示') }}</span></button>
+          <button class="btn btn-small btn-copy" type="button" title="複製到剪貼簿">{{ icon('copy', size=12) }}<span class="btn-tx">{{ tr('複製') }}</span></button>
         </td>
         <td class="muted" data-s="s6b9c179a">
           {# 在伺服器端就格式化。原本把 `created_at * 1000` 直接寫進 JS：
@@ -76,10 +76,10 @@
           {% else %}—{% endif %}
         </td>
         <td>
-          {% if t.enabled %}<span class="tag-ok">啟用</span>{% else %}<span class="tag-off">停用</span>{% endif %}
+          {% if t.enabled %}<span class="tag-ok">{{ tr('啟用') }}</span>{% else %}<span class="tag-off">{{ tr('停用') }}</span>{% endif %}
         </td>
         <td>
-          <button class="btn btn-small btn-revoke" type="button" data-s="s7ea2ec11">撤銷</button>
+          <button class="btn btn-small btn-revoke" type="button" data-s="s7ea2ec11">{{ tr('撤銷') }}</button>
         </td>
       </tr>
       {% endfor %}
@@ -90,12 +90,12 @@
   <div data-s="s5dc4cf38">
     <input type="text" id="new-label" class="field" placeholder="新 token 的 label（例：my-script）"
            data-s="s8ebd14fe" />
-    <button class="btn btn-primary" id="btn-create" type="button">{{ icon('save') }}產生新 Token</button>
+    <button class="btn btn-primary" id="btn-create" type="button">{{ icon('save') }}{{ tr('產生新 Token') }}</button>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">{{ icon('book', size=18) }} 使用範例</h2>
+  <h2 data-s="s53896af7">{{ icon('book', size=18) }} {{ tr('使用範例') }}</h2>
   <pre data-s="s940b277c"><code># cURL
 curl -X POST http://localhost:8765/api/llm-review \
   -H "Authorization: Bearer &lt;YOUR_TOKEN&gt;" \
@@ -141,7 +141,7 @@ $('enforce').addEventListener('change', async () => {
 
 $('btn-create').addEventListener('click', async () => {
   const label = $('new-label').value.trim();
-  if (!label) { alert('請輸入 label'); return; }
+  if (!label) { alert(tr('請輸入 label')); return; }
   const r = await fetch('/admin/api/tokens/create', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
@@ -152,7 +152,7 @@ $('btn-create').addEventListener('click', async () => {
     alert(`已產生新 token：\n\n${j.token}\n\n請立即複製保留，離開本頁後仍可用「顯示」查看完整值。`);
     location.reload();
   } else {
-    alert('產生失敗');
+    alert(tr('產生失敗'));
   }
 });
 
@@ -169,24 +169,24 @@ document.addEventListener('click', async (e) => {
     const tx = e.target.closest('.btn-reveal').querySelector('.btn-tx');
     if (code.textContent.includes('…')) {
       code.textContent = full;
-      if (tx) tx.textContent = '隱藏';
+      if (tx) tx.textContent = tr('隱藏');
     } else {
       code.textContent = full.slice(0,6) + '…' + full.slice(-4);
-      if (tx) tx.textContent = '顯示';
+      if (tx) tx.textContent = tr('顯示');
     }
   }
   if (e.target.closest('.btn-copy')) {
     try {
       await navigator.clipboard.writeText(full);
-      if (window.showToast) showToast('已複製', 'ok');
+      if (window.showToast) showToast(tr('已複製'), 'ok');
       else {
         const tx = e.target.closest('.btn-copy').querySelector('.btn-tx');
         if (tx) {
-          tx.textContent = '已複製';
-          setTimeout(() => { tx.textContent = '複製'; }, 1500);
+          tx.textContent = tr('已複製');
+          setTimeout(() => { tx.textContent = tr('複製'); }, 1500);
         }
       }
-    } catch (err) { alert('複製失敗：' + err.message); }
+    } catch (err) { alert(tr('複製失敗：') + err.message); }
   }
   if (e.target.closest('.btn-revoke')) {
     if (!(await window.showConfirm('確定要撤銷這個 token？\n之後任何用它的 script 都會 401。', { title: '撤銷 Token', kind: 'danger', okText: '撤銷' }))) return;
@@ -196,7 +196,7 @@ document.addEventListener('click', async (e) => {
       body: JSON.stringify({token: full}),
     });
     if (r.ok) location.reload();
-    else alert('撤銷失敗');
+    else alert(tr('撤銷失敗'));
   }
 });
 </script>

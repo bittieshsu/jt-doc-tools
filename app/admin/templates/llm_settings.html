@@ -1,58 +1,58 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}LLM 設定 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('LLM 設定') }} · {{ app_name }}{% endblock %}
 {% block content %}
 <div class="llm-page">
-<h1>{{ icon('gear', size=22) }} LLM 設定 <span class="addon-badge">附加功能</span></h1>
+<h1>{{ icon('gear', size=22) }} {{ tr('LLM 設定') }} <span class="addon-badge">{{ tr('附加功能') }}</span></h1>
 <p class="muted">
-  LLM AI 加值是<strong>附加功能</strong>，預設關閉。啟用後共 10 個工具（pdf-fill 視覺校驗、
+  {{ tr('LLM AI 加值是') }}<strong>{{ tr('附加功能') }}</strong>{{ tr('，預設關閉。啟用後共 10 個工具（pdf-fill 視覺校驗、
   doc-deident / text-deident 智慧分類、doc-diff / pdf-extract-text / pdf-wordcount /
   pdf-annotations 內容摘要、pdf-ocr 文字校正、submission-check 送件檢核、translate-doc
   逐句翻譯）可選擇性地把資料送給本機或 LAN 上的 LLM server (OpenAI-compat) 處理。
-  本機 / LAN 上需有運行中的 LLM backend (Ollama / vLLM / LM Studio / jan.ai 皆可)。
+  本機 / LAN 上需有運行中的 LLM backend (Ollama / vLLM / LM Studio / jan.ai 皆可)。') }}
 </p>
 
 <div data-s="s58ee086a">
   <div data-s="s460ef344">
     <span data-s="s1a13aaed">⚠</span>
     <div data-s="s5d1fb75a">
-      <b data-s="se5c35fcd">使用反向代理（nginx / Caddy）必看 — 504 Gateway Timeout 預防</b><br>
-      LLM 推理單筆常 <b>5-15 分鐘</b>（翻譯 / 視覺校驗 / 大模型）。若 jt-doc-tools 放在 nginx 後面，
-      <b>nginx 預設 60 秒就會回 504</b>，本頁下方 Timeout 設多少都救不了。
+      <b data-s="se5c35fcd">{{ tr('使用反向代理（nginx / Caddy）必看 — 504 Gateway Timeout 預防') }}</b><br>
+      {{ tr('LLM 推理單筆常') }} <b>{{ tr('5-15 分鐘') }}</b>{{ tr('（翻譯 / 視覺校驗 / 大模型）。若 jt-doc-tools 放在 nginx 後面，') }}
+      <b>{{ tr('nginx 預設 60 秒就會回 504') }}</b>{{ tr('，本頁下方 Timeout 設多少都救不了。') }}
       <ul data-s="sb0eb5b8d">
-        <li>nginx 設 <code>proxy_read_timeout 900s;</code> + <code>proxy_send_timeout 900s;</code>（≥ 下方 Timeout 值 + 60s 緩衝）</li>
-        <li><b>多層反向代理</b>（例：自架 LLM proxy 在前 + jt-doc-tools 在後，各自有 nginx）：<b>每一層 nginx 都要設</b>，任一層用預設就斷</li>
-        <li>Caddy 對應加 <code>read_timeout 900s</code> / <code>write_timeout 900s</code></li>
+        <li>{{ tr('nginx 設') }} <code>proxy_read_timeout 900s;</code> + <code>proxy_send_timeout 900s;</code>{{ tr('（≥ 下方 Timeout 值 + 60s 緩衝）') }}</li>
+        <li><b>{{ tr('多層反向代理') }}</b>{{ tr('（例：自架 LLM proxy 在前 + jt-doc-tools 在後，各自有 nginx）：') }}<b>{{ tr('每一層 nginx 都要設') }}</b>{{ tr('，任一層用預設就斷') }}</li>
+        <li>{{ tr('Caddy 對應加') }} <code>read_timeout 900s</code> / <code>write_timeout 900s</code></li>
       </ul>
       <div data-s="s9e3c4ccb">
-        詳見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md#504-gateway-timeout-排錯流程" target="_blank" data-s="s37ab9c10">OPS.md 504 排錯流程</a>
+        {{ tr('詳見') }} <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md#504-gateway-timeout-排錯流程" target="_blank" data-s="s37ab9c10">{{ tr('OPS.md 504 排錯流程') }}</a>
       </div>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 啟用</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 啟用') }}</h2>
   <div class="form-row">
-    <label>狀態</label>
+    <label>{{ tr('狀態') }}</label>
     <div class="field">
       <label data-s="s32a6345d">
         <input type="checkbox" id="enabled" {% if settings.enabled %}checked{% endif %}>
-        啟用 LLM AI 加值
+        {{ tr('啟用 LLM AI 加值') }}
       </label>
       <div class="muted" data-s="s41f96333">
-        關閉時，所有 LLM 邏輯不會執行，pdf-fill / doc-deident / translate-doc 等 10 個工具的 AI 加值會自動隱藏，純規則處理不受影響。
+        {{ tr('關閉時，所有 LLM 邏輯不會執行，pdf-fill / doc-deident / translate-doc 等 10 個工具的 AI 加值會自動隱藏，純規則處理不受影響。') }}
       </div>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 連線資訊</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 連線資訊') }}</h2>
   <div data-s="sb4d92341">
-    <b data-s="s9a2b98e5">⚠ 隱私建議</b>：強烈建議接 <b>地端自架 LLM Server</b>（如 <a href="https://ollama.com/" target="_blank" rel="noopener">Ollama</a> / vLLM / LM Studio），讓檔案內容只在公司內網流動。
-    若指向 OpenAI / Claude / Gemini 等雲端 API，所有送 LLM 校驗 / 翻譯 / 段落重排的<b>原始文件內容</b>都會離開公司網路，
-    可能違反個資法、營業秘密或客戶 NDA。地端 LLM 才能符合本平台「資料留在自己手中」的設計初衷。
+    <b data-s="s9a2b98e5">{{ tr('⚠ 隱私建議') }}</b>{{ tr('：強烈建議接') }} <b>{{ tr('地端自架 LLM Server') }}</b>{{ tr('（如') }} <a href="https://ollama.com/" target="_blank" rel="noopener">Ollama</a> {{ tr('/ vLLM / LM Studio），讓檔案內容只在公司內網流動。
+    若指向 OpenAI / Claude / Gemini 等雲端 API，所有送 LLM 校驗 / 翻譯 / 段落重排的') }}<b>{{ tr('原始文件內容') }}</b>{{ tr('都會離開公司網路，
+    可能違反個資法、營業秘密或客戶 NDA。地端 LLM 才能符合本平台「資料留在自己手中」的設計初衷。') }}
   </div>
   <div class="form-row">
     <label>Base URL</label>
@@ -61,7 +61,7 @@
              value="{{ settings.base_url }}"
              placeholder="http://localhost:11434/v1" />
       <button class="btn btn-primary" id="btn-test" type="button">
-        {{ icon('refresh', size=14) }} 測試連線
+        {{ icon('refresh', size=14) }} {{ tr('測試連線') }}
       </button>
     </div>
   </div>
@@ -78,58 +78,58 @@
              value="{{ settings.api_key or '' }}"
              placeholder="(空白 — Ollama 不需要)" />
       <div class="muted" data-s="s41f96333">
-        雲端 OpenAI-compat 服務才需要；本地 Ollama / vLLM 留空。
+        {{ tr('雲端 OpenAI-compat 服務才需要；本地 Ollama / vLLM 留空。') }}
       </div>
     </div>
   </div>
   <div class="form-row">
-    <label>單次 Timeout</label>
+    <label>{{ tr('單次 Timeout') }}</label>
     <div class="field" data-s="sc445ac64">
       <input type="number" id="timeout_seconds" min="10" max="1800" step="5"
              value="{{ settings.timeout_seconds }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">秒（單次 HTTP call 上限；翻譯 / 視覺校驗 / 大模型推理常 5-15 分鐘）</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('秒（單次 HTTP call 上限；翻譯 / 視覺校驗 / 大模型推理常 5-15 分鐘）') }}</span>
       <div data-s="s9bc8e1b6">
-        <b>⚠ 反向代理（nginx / Caddy）對應設定一定要一起改：</b><br>
-        若 jt-doc-tools 在 nginx 後面，nginx 的 <code>proxy_read_timeout</code> + <code>proxy_send_timeout</code>
-        必須 <b>≥ 此 Timeout 值 + 60s 緩衝</b>（建議 900s）。<br>
-        若有「LLM proxy 也在另一台 nginx 後面」這類多層架構，<b>每一層 nginx 都要設</b> — 任何一層用預設 60s 就會 504。
-        詳見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md#504-gateway-timeout-排錯流程" target="_blank">OPS.md 504 排錯流程</a>。
+        <b>{{ tr('⚠ 反向代理（nginx / Caddy）對應設定一定要一起改：') }}</b><br>
+        {{ tr('若 jt-doc-tools 在 nginx 後面，nginx 的') }} <code>proxy_read_timeout</code> + <code>proxy_send_timeout</code>
+        {{ tr('必須') }} <b>{{ tr('≥ 此 Timeout 值 + 60s 緩衝') }}</b>{{ tr('（建議 900s）。') }}<br>
+        {{ tr('若有「LLM proxy 也在另一台 nginx 後面」這類多層架構，') }}<b>{{ tr('每一層 nginx 都要設') }}</b> {{ tr('— 任何一層用預設 60s 就會 504。
+        詳見') }} <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md#504-gateway-timeout-排錯流程" target="_blank">{{ tr('OPS.md 504 排錯流程') }}</a>。
       </div>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">3. 模型</h2>
+  <h2 data-s="s53896af7">{{ tr('3. 模型') }}</h2>
   <div class="form-row">
-    <label>模型</label>
+    <label>{{ tr('模型') }}</label>
     <div class="field" data-s="sc445ac64">
       <select id="model" class="field" data-s="s121317d5">
         <option value="{{ settings.model }}">{{ settings.model }}</option>
       </select>
       <button class="btn" id="btn-refresh-models" type="button">
-        {{ icon('refresh', size=14) }} 重新整理清單
+        {{ icon('refresh', size=14) }} {{ tr('重新整理清單') }}
       </button>
     </div>
   </div>
   <div class="model-hint">
     <p class="model-hint-line">
-      清單會在<a href="#" id="lnkTestConn" class="hint-test-conn">{{ icon('refresh', size=12) }} 點此測試連線</a>後從 server 抓取。視覺模型 (vl/vision/llava/gemma 等) 會標 ✨。
+      {{ tr('清單會在') }}<a href="#" id="lnkTestConn" class="hint-test-conn">{{ icon('refresh', size=12) }} {{ tr('點此測試連線') }}</a>{{ tr('後從 server 抓取。視覺模型 (vl/vision/llava/gemma 等) 會標 ✨。') }}
     </p>
     <p class="model-hint-line">
-      <b>建議</b>：<code>gemma4:26b</code>（預設；MoE 架構、4 張廠商表單實測 100% 準、平均 11 秒）。
+      <b>{{ tr('建議') }}</b>：<code>gemma4:26b</code>{{ tr('（預設；MoE 架構、4 張廠商表單實測 100% 準、平均 11 秒）。') }}
     </p>
     <p class="model-hint-line model-hint-warn">
-      ⚠️ <code>gemma4:e4b</code> 對繁中人名 / 公司名多處誤判（58% 準），不建議。
+      ⚠️ <code>gemma4:e4b</code> {{ tr('對繁中人名 / 公司名多處誤判（58% 準），不建議。') }}
     </p>
   </div>
 
   <div class="per-tool-section">
     <div class="per-tool-header">
-      <h3>各工具個別模型 <span class="muted">（可選）</span></h3>
+      <h3>{{ tr('各工具個別模型') }} <span class="muted">{{ tr('（可選）') }}</span></h3>
       <p class="muted">
-        依工具用途指定不同模型 — 純文字翻譯可用文字模型、PDF 校驗用視覺模型。
-        選「（用上方預設）」就跟隨預設。重新整理清單後，新抓回的 model 會自動出現在下拉。
+        {{ tr('依工具用途指定不同模型 — 純文字翻譯可用文字模型、PDF 校驗用視覺模型。
+        選「（用上方預設）」就跟隨預設。重新整理清單後，新抓回的 model 會自動出現在下拉。') }}
       </p>
     </div>
     <div class="per-tool-cards">
@@ -139,13 +139,13 @@
         <div class="ptc-head">
           <span class="ptc-icon">{{ icon(t.icon|default('tool'), size=16) }}</span>
           <span class="ptc-name">{{ t.name }}</span>
-          {% if t.kind == 'vision' %}<span class="ptc-tag ptc-tag-vision">需視覺</span>{% else %}<span class="ptc-tag ptc-tag-text">文字</span>{% endif %}
+          {% if t.kind == 'vision' %}<span class="ptc-tag ptc-tag-vision">{{ tr('需視覺') }}</span>{% else %}<span class="ptc-tag ptc-tag-text">{{ tr('文字') }}</span>{% endif %}
           <code class="ptc-id">{{ t.id }}</code>
         </div>
         <div class="ptc-desc">{{ t.use }}</div>
         <div class="ptc-select">
           <select class="field per-tool-model" data-tool-id="{{ t.id }}" data-kind="{{ t.kind }}">
-            <option value="">（用上方預設：{{ settings.model }}）</option>
+            <option value="">{{ tr('（用上方預設：') }}{{ settings.model }}）</option>
             {% if _v and _v != settings.model %}
             <option value="{{ _v }}" selected>{{ _v }}</option>
             {% endif %}
@@ -158,138 +158,138 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">4. 各工具進階設定</h2>
-  <p class="muted" data-s="sb035986c">下列設定<b>各自只影響特定工具</b>。沒在用該工具的話可保留預設。</p>
+  <h2 data-s="s53896af7">{{ tr('4. 各工具進階設定') }}</h2>
+  <p class="muted" data-s="sb035986c">{{ tr('下列設定') }}<b>{{ tr('各自只影響特定工具') }}</b>{{ tr('。沒在用該工具的話可保留預設。') }}</p>
 
   <h3 class="tool-section-h">
-    <span class="tool-section-tag tool-section-tag-vision">表單自動填寫 · LLM 校驗</span>
+    <span class="tool-section-tag tool-section-tag-vision">{{ tr('表單自動填寫 · LLM 校驗') }}</span>
     <code class="muted">pdf-fill</code>
   </h3>
   <div class="form-row">
-    <label>預設審查輪數</label>
+    <label>{{ tr('預設審查輪數') }}</label>
     <div class="field" data-s="s9586d088">
       <input type="number" id="default_review_rounds" min="1" max="5" step="1"
              value="{{ settings.default_review_rounds }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">輪 (1-5)；每輪是一次 LLM 來回</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('輪 (1-5)；每輪是一次 LLM 來回') }}</span>
     </div>
   </div>
   <div class="form-row">
-    <label>Confidence 門檻</label>
+    <label>{{ tr('Confidence 門檻') }}</label>
     <div class="field" data-s="s9586d088">
       <input type="number" id="confidence_threshold" min="0.5" max="1.0" step="0.05"
              value="{{ settings.confidence_threshold }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">(0.0-1.0) — 影響自動採納門檻（UI 顯示全部）</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('(0.0-1.0) — 影響自動採納門檻（UI 顯示全部）') }}</span>
     </div>
   </div>
   <div class="form-row">
-    <label>連續 N 次同錯才接受</label>
+    <label>{{ tr('連續 N 次同錯才接受') }}</label>
     <div class="field" data-s="s9586d088">
       <input type="number" id="consecutive_required" min="1" max="3" step="1"
              value="{{ settings.consecutive_required }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">保守規則，避免 LLM 抖動造成誤改</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('保守規則，避免 LLM 抖動造成誤改') }}</span>
     </div>
   </div>
   <div class="form-row">
-    <label>整體 Timeout</label>
+    <label>{{ tr('整體 Timeout') }}</label>
     <div class="field" data-s="s9586d088">
       <input type="number" id="overall_timeout_seconds" min="30" max="600" step="10"
              value="{{ settings.overall_timeout_seconds }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">秒 — review loop 上限，避免死循環</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('秒 — review loop 上限，避免死循環') }}</span>
     </div>
   </div>
 
   <h3 class="tool-section-h" data-s="s062d4a88">
-    <span class="tool-section-tag tool-section-tag-text">逐句翻譯</span>
+    <span class="tool-section-tag tool-section-tag-text">{{ tr('逐句翻譯') }}</span>
     <code class="muted">translate-doc</code>
   </h3>
   <div class="form-row">
-    <label>翻譯並行數</label>
+    <label>{{ tr('翻譯並行數') }}</label>
     <div class="field" data-s="s9586d088">
       <input type="number" id="translate_concurrency" min="1" max="16" step="1"
              value="{{ settings.translate_concurrency|default(4) }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">逐句翻譯時同時送 LLM 的 worker 數（1-16，預設 4）。本機 Ollama 建議 4-8；高 VRAM 可拉到 12+；雲端 API 設小一點避免被 rate-limit</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('逐句翻譯時同時送 LLM 的 worker 數（1-16，預設 4）。本機 Ollama 建議 4-8；高 VRAM 可拉到 12+；雲端 API 設小一點避免被 rate-limit') }}</span>
     </div>
   </div>
   <div class="form-row">
-    <label>逐句翻譯最大句數</label>
+    <label>{{ tr('逐句翻譯最大句數') }}</label>
     <div class="field" data-s="s9586d088">
       <input type="number" id="translate_max_sentences" min="100" max="200000" step="100"
              value="{{ settings.translate_max_sentences|default(20000) }}" data-s="s088cf005" />
-      <span class="muted" data-s="s6b9c179a">逐句翻譯一次最多處理幾句（100-200000，預設 20000）。逐句並行不會單一 request timeout，但句數越多瀏覽器分頁要開越久（每千句約 2-3 分）。超過上限只取前 N 句</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('逐句翻譯一次最多處理幾句（100-200000，預設 20000）。逐句並行不會單一 request timeout，但句數越多瀏覽器分頁要開越久（每千句約 2-3 分）。超過上限只取前 N 句') }}</span>
     </div>
   </div>
   <div class="form-row">
-    <label>對照表每頁筆數</label>
+    <label>{{ tr('對照表每頁筆數') }}</label>
     <div class="field" data-s="s9586d088">
       <input type="number" id="translate_page_size" min="20" max="5000" step="10"
              value="{{ settings.translate_page_size|default(200) }}" data-s="s088cf005" />
-      <span class="muted" data-s="s6b9c179a">逐句翻譯結果對照表每頁顯示幾列（20-5000，預設 200）。句數一大時全部塞進頁面會卡頓，故分頁顯示；數字越大每頁越長但翻頁越少</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('逐句翻譯結果對照表每頁顯示幾列（20-5000，預設 200）。句數一大時全部塞進頁面會卡頓，故分頁顯示；數字越大每頁越長但翻頁越少') }}</span>
     </div>
   </div>
 
   <h3 class="tool-section-h" data-s="s_dt_sec">
-    <span class="tool-section-tag tool-section-tag-text">文件翻譯</span>
+    <span class="tool-section-tag tool-section-tag-text">{{ tr('文件翻譯') }}</span>
     <code class="muted">doc-translate</code>
   </h3>
-  <p class="muted" data-s="s_dt_note">整份辦公文件翻譯。<b>並行數與上面的「翻譯並行數」共用</b>
-    —— 兩支工具都是送同一台 LLM server，各設一份只會互相打架。</p>
+  <p class="muted" data-s="s_dt_note">{{ tr('整份辦公文件翻譯。') }}<b>{{ tr('並行數與上面的「翻譯並行數」共用') }}</b>
+    {{ tr('—— 兩支工具都是送同一台 LLM server，各設一份只會互相打架。') }}</p>
   <div class="form-row">
-    <label>每批最多段數</label>
+    <label>{{ tr('每批最多段數') }}</label>
     <div class="field" data-s="s9586d088">
       <input type="number" id="doctr_batch_segments" min="1" max="100" step="5"
              value="{{ settings.doctr_batch_segments|default(40) }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">一次請求最多合併幾<b>行</b>（1-100，預設 40）。
-        <b>翻譯是以「行」為單位</b>（儲存格裡的換行要保留），所以這個數字要比段數大 ——
+      <span class="muted" data-s="s6b9c179a">{{ tr('一次請求最多合併幾') }}<b>{{ tr('行') }}</b>{{ tr('（1-100，預設 40）。') }}
+        <b>{{ tr('翻譯是以「行」為單位') }}</b>{{ tr('（儲存格裡的換行要保留），所以這個數字要比段數大 ——
         真正的限制通常是下面那個字數。合併是為了攤掉指令的成本 ——
         翻成繁中時光是台灣用語對照表就佔 1,250 字元，逐段送等於把同一份指令送幾百遍。
-        調大請求更少，但單次更久、模型也更容易漏段；漏段時會<b>把那一批對切重試</b>
-        （切到只剩一行才逐行翻），所以調大的風險比以前小。
-        結果頁會顯示實際送了幾次請求、有幾批對切，照那個數字調</span>
+        調大請求更少，但單次更久、模型也更容易漏段；漏段時會') }}<b>{{ tr('把那一批對切重試') }}</b>
+        {{ tr('（切到只剩一行才逐行翻），所以調大的風險比以前小。
+        結果頁會顯示實際送了幾次請求、有幾批對切，照那個數字調') }}</span>
     </div>
   </div>
   <div class="form-row">
-    <label>每批最多字元</label>
+    <label>{{ tr('每批最多字元') }}</label>
     <div class="field" data-s="s9586d088">
       <input type="number" id="doctr_batch_chars" min="200" max="20000" step="500"
              value="{{ settings.doctr_batch_chars|default(4000) }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">同一批原文的總字數上限（200-20000，預設 1200）。與上面那個先到先算 ——
-        <b>實務上真正的限制是這一個</b>：技術文件的儲存格動輒兩三百字，段數上限 40 幾乎碰不到。
-        <b>不要以為調大就會快</b>：同一份 343 段的真實文件實測，1,200 字元是 129 批 / 129 次請求 /
-        607 秒，4,000 字元變成 34 批 / 69 次請求 / <b>35 批漏段</b> / 1,361 秒 ——
-        漏段的成本跟批次大小成正比，40 行的一批漏一段，那一整段生成就整個白做</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('同一批原文的總字數上限（200-20000，預設 1200）。與上面那個先到先算 ——') }}
+        <b>{{ tr('實務上真正的限制是這一個') }}</b>{{ tr('：技術文件的儲存格動輒兩三百字，段數上限 40 幾乎碰不到。') }}
+        <b>{{ tr('不要以為調大就會快') }}</b>{{ tr('：同一份 343 段的真實文件實測，1,200 字元是 129 批 / 129 次請求 /
+        607 秒，4,000 字元變成 34 批 / 69 次請求 /') }} <b>{{ tr('35 批漏段') }}</b> {{ tr('/ 1,361 秒 ——
+        漏段的成本跟批次大小成正比，40 行的一批漏一段，那一整段生成就整個白做') }}</span>
     </div>
   </div>
   <div class="form-row">
-    <label>單檔段落上限</label>
+    <label>{{ tr('單檔段落上限') }}</label>
     <div class="field" data-s="s9586d088">
       <input type="number" id="doctr_max_units" min="100" max="100000" step="500"
              value="{{ settings.doctr_max_units|default(20000) }}" data-s="see0435f7" />
-      <span class="muted" data-s="s6b9c179a">一份文件最多幾段（100-100000，預設 20000）。超過就擋下來請使用者拆檔。
-        <b>實測每段約 0.5~0.6 秒</b>（gemma4:26b、並行 4）→ 4,000 段約 40 分鐘、20,000 段約 3 小時。
-        作業在背景跑、中途可以按「停止翻譯」，所以上限不必訂得太保守</span>
+      <span class="muted" data-s="s6b9c179a">{{ tr('一份文件最多幾段（100-100000，預設 20000）。超過就擋下來請使用者拆檔。') }}
+        <b>{{ tr('實測每段約 0.5~0.6 秒') }}</b>{{ tr('（gemma4:26b、並行 4）→ 4,000 段約 40 分鐘、20,000 段約 3 小時。
+        作業在背景跑、中途可以按「停止翻譯」，所以上限不必訂得太保守') }}</span>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">5. 除錯</h2>
+  <h2 data-s="s53896af7">{{ tr('5. 除錯') }}</h2>
   <div class="form-row">
     <label>Debug log</label>
     <div class="field">
       <label data-s="s3199a011">
         <input type="checkbox" id="debug_log" {% if settings.debug_log %}checked{% endif %}>
-        儲存送 LLM 的 PNG 與回應 JSON
+        {{ tr('儲存送 LLM 的 PNG 與回應 JSON') }}
       </label>
       <div class="muted" data-s="s41f96333">
-        儲存於 <code>data/llm_debug/</code>，方便排錯。會佔用磁碟空間，使用時記得手動清理。
+        {{ tr('儲存於') }} <code>data/llm_debug/</code>{{ tr('，方便排錯。會佔用磁碟空間，使用時記得手動清理。') }}
       </div>
     </div>
   </div>
 </div>
 
 <div data-s="s37941ba4">
-  <button class="btn btn-primary" id="btn-save">{{ icon('save') }}儲存</button>
-  <a class="btn" href="/admin">{{ icon('back') }}回管理</a>
+  <button class="btn btn-primary" id="btn-save">{{ icon('save') }}{{ tr('儲存') }}</button>
+  <a class="btn" href="/admin">{{ icon('back') }}{{ tr('回管理') }}</a>
 </div>
 </div><!-- /.llm-page -->
 
@@ -427,7 +427,7 @@ async function testConnection() {
   const row    = $('conn-status-row');
   row.hidden = false;
   status.className = 'conn-pend';
-  status.textContent = '連線中…';
+  status.textContent = tr('連線中…');
 
   const body = {
     base_url:        $('base_url').value.trim(),
@@ -497,7 +497,7 @@ function _fillSelectGrouped(sel, models, includeBlank, preserveValue, defaultMod
   }
   if (!vision.length && !others.length && !includeBlank) {
     const o = document.createElement('option');
-    o.textContent = '(server 上沒有任何模型)';
+    o.textContent = tr('(server 上沒有任何模型)');
     o.disabled = true;
     sel.appendChild(o);
   }
@@ -534,7 +534,7 @@ async function refreshModels() {
   const row    = $('conn-status-row');
   row.hidden = false;
   status.className = 'conn-pend';
-  status.textContent = '抓取模型清單…';
+  status.textContent = tr('抓取模型清單…');
 
   try {
     const r = await fetch('/admin/api/llm/models');
@@ -585,11 +585,11 @@ async function saveSettings() {
     body: JSON.stringify(body),
   });
   if (!r.ok) {
-    alert('儲存失敗');
+    alert(tr('儲存失敗'));
     return;
   }
-  if (window.showToast) window.showToast('已儲存', 'ok');
-  else alert('已儲存');
+  if (window.showToast) window.showToast(tr('已儲存'), 'ok');
+  else alert(tr('已儲存'));
 }
 
 $('btn-test').addEventListener('click', testConnection);

@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}{{ title }} 歷史 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr(title) }} {{ tr('歷史 ·') }} {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('page', size=22) }} {{ title }} 歷史記錄</h1>
-<p class="muted">所有透過 <a href="{{ tool_url }}">{{ title }}</a> 處理過的檔案都會留存於此（除非超過保留期限被自動清掉）。</p>
+<h1>{{ icon('page', size=22) }} {{ tr(title) }} {{ tr('歷史記錄') }}</h1>
+<p class="muted">{{ tr('所有透過') }} <a href="{{ tool_url }}">{{ tr(title) }}</a> {{ tr('處理過的檔案都會留存於此（除非超過保留期限被自動清掉）。') }}</p>
 
 <nav class="kind-tabs">
   <a class="kt-tab {% if kind=='fill' %}is-active{% endif %}" href="/admin/history/fill">
-    {{ icon('page', size=14) }} 表單填寫</a>
+    {{ icon('page', size=14) }} {{ tr('表單填寫') }}</a>
   <a class="kt-tab {% if kind=='stamp' %}is-active{% endif %}" href="/admin/history/stamp">
-    {{ icon('shield', size=14) }} 用印簽名</a>
+    {{ icon('shield', size=14) }} {{ tr('用印簽名') }}</a>
   <a class="kt-tab {% if kind=='watermark' %}is-active{% endif %}" href="/admin/history/watermark">
-    {{ icon('image', size=14) }} 浮水印</a>
+    {{ icon('image', size=14) }} {{ tr('浮水印') }}</a>
 </nav>
 
 <style nonce="{{ request.state.csp_nonce }}">
@@ -30,9 +30,9 @@
 
 <form method="get" data-s="sa7409f75">
   <label>
-    使用者篩選：
+    {{ tr('使用者篩選：') }}
     <select class="field" name="q_user" data-submit-on-change>
-      <option value="">所有人</option>
+      <option value="">{{ tr('所有人') }}</option>
       {% for u in users %}
       <option value="{{ u }}" {% if u == q_user %}selected{% endif %}>{{ u }}</option>
       {% endfor %}
@@ -41,10 +41,10 @@
 </form>
 
 <div class="panel">
-  <p class="muted">共 <b>{{ entries|length }}</b> 筆</p>
+  <p class="muted">{{ tr('共') }} <b>{{ entries|length }}</b> {{ tr('筆') }}</p>
   <table class="hist-table">
     <thead>
-      <tr><th data-s="s2f01efdd">時間</th><th>檔名</th><th>使用者</th><th>備註</th><th></th></tr>
+      <tr><th data-s="s2f01efdd">{{ tr('時間') }}</th><th>{{ tr('檔名') }}</th><th>{{ tr('使用者') }}</th><th>{{ tr('備註') }}</th><th></th></tr>
     </thead>
     <tbody>
       {% for e in entries %}
@@ -59,13 +59,13 @@
           {% if e.extra %}<details><summary>extra</summary><pre>{{ e.extra|tojson }}</pre></details>{% endif %}
         </td>
         <td data-s="s4ddbe905">
-          {% if e.has_original %}<a class="btn btn-small" href="/admin/history/{{ kind }}/{{ e.id }}/file/original">{{ icon('download', size=12) }} 原檔</a>{% endif %}
-          {% if e.has_filled %}<a class="btn btn-small btn-primary" href="/admin/history/{{ kind }}/{{ e.id }}/file/output">{{ icon('download', size=12) }} 結果</a>{% endif %}
-          <button class="btn btn-small btn-danger" data-act="del">{{ icon('trash', size=12) }} 刪除</button>
+          {% if e.has_original %}<a class="btn btn-small" href="/admin/history/{{ kind }}/{{ e.id }}/file/original">{{ icon('download', size=12) }} {{ tr('原檔') }}</a>{% endif %}
+          {% if e.has_filled %}<a class="btn btn-small btn-primary" href="/admin/history/{{ kind }}/{{ e.id }}/file/output">{{ icon('download', size=12) }} {{ tr('結果') }}</a>{% endif %}
+          <button class="btn btn-small btn-danger" data-act="del">{{ icon('trash', size=12) }} {{ tr('刪除') }}</button>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="5" data-s="safc73ac1">尚無歷史記錄。</td></tr>
+      <tr><td colspan="5" data-s="safc73ac1">{{ tr('尚無歷史記錄。') }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -86,7 +86,7 @@ document.querySelectorAll('[data-act="del"]').forEach(btn => {
   btn.addEventListener('click', async () => {
     const tr = btn.closest('tr');
     const hid = tr.dataset.hid;
-    if (!(await showConfirm('確定刪除這筆？',
+    if (!(await showConfirm(tr('確定刪除這筆？'),
           { title: '刪除', kind: 'danger' }))) return;
     const r = await fetch(`/admin/history/${KIND}/${hid}/delete`, {method:'POST'});
     if (r.ok) tr.remove();

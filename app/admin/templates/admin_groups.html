@@ -1,71 +1,71 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}群組管理 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('群組管理') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('building', size=22) }} 群組管理</h1>
+<h1>{{ icon('building', size=22) }} {{ tr('群組管理') }}</h1>
 
 <details class="panel" {% if not groups %}open{% endif %}>
-  <summary><b>新增本機群組</b></summary>
+  <summary><b>{{ tr('新增本機群組') }}</b></summary>
   <form id="newGroupForm" data-s="s23e0c196">
-    <div><label>群組名稱<br><input class="field" name="name" required maxlength="64"></label></div>
-    <div data-s="se7333f54"><label>說明<br><input class="field" name="description" maxlength="500" data-s="s6d567387"></label></div>
-    <button class="btn btn-primary" type="submit">{{ icon('plus', size=14) }} 建立</button>
+    <div><label>{{ tr('群組名稱') }}<br><input class="field" name="name" required maxlength="64"></label></div>
+    <div data-s="se7333f54"><label>{{ tr('說明') }}<br><input class="field" name="description" maxlength="500" data-s="s6d567387"></label></div>
+    <button class="btn btn-primary" type="submit">{{ icon('plus', size=14) }} {{ tr('建立') }}</button>
   </form>
 </details>
 
 {% if is_directory_backend %}
 <div class="panel">
-  <b>從 {{ auth_backend|upper }} 目錄同步群組</b>
-  <p class="muted">這裡的「群組清單」只是讓你<b>預先把權限指派給目錄群組</b>用。<b>權限判斷本身永遠正確</b> —— 每位使用者登入時是從他當下在 {{ auth_backend|upper }} 的即時群組解析權限，不靠這份清單。清單預設只含「登入過的人所屬群組」，按此可一次列舉目錄群組補齊（不會更動成員）。</p>
+  <b>{{ tr('從') }} {{ auth_backend|upper }} {{ tr('目錄同步群組') }}</b>
+  <p class="muted">{{ tr('這裡的「群組清單」只是讓你') }}<b>{{ tr('預先把權限指派給目錄群組') }}</b>{{ tr('用。') }}<b>{{ tr('權限判斷本身永遠正確') }}</b> {{ tr('—— 每位使用者登入時是從他當下在') }} {{ auth_backend|upper }} {{ tr('的即時群組解析權限，不靠這份清單。清單預設只含「登入過的人所屬群組」，按此可一次列舉目錄群組補齊（不會更動成員）。') }}</p>
   <div class="grp-sync-row">
     <input class="field" type="text" id="syncNameFilter" maxlength="128"
            placeholder="只同步名稱含此字（選填，避免帶入 Domain Users 等系統群組）例：UG_ / NTPD">
-    <button class="btn" type="button" id="btnSyncDir">{{ icon('refresh', size=14) }} 同步目錄群組</button>
+    <button class="btn" type="button" id="btnSyncDir">{{ icon('refresh', size=14) }} {{ tr('同步目錄群組') }}</button>
   </div>
-  <p class="muted">留空 = 同步全部。想更精準可在「認證設定」的 LDAP 進階填 <code>group_search_base</code>（限某個 OU）或 <code>group_search_filter</code>（自訂 filter）。</p>
+  <p class="muted">{{ tr('留空 = 同步全部。想更精準可在「認證設定」的 LDAP 進階填') }} <code>group_search_base</code>{{ tr('（限某個 OU）或') }} <code>group_search_filter</code>{{ tr('（自訂 filter）。') }}</p>
   <span id="syncDirMsg" class="muted"></span>
 </div>
 
 <div class="panel">
-  <b>排程目錄同步（成員數快取）</b>
-  <p class="muted">群組的「目錄成員數」由背景排程<b>定期同步</b>寫進本機快取，本頁直接讀快取（毫秒），<b>不再每列即時查 LDAP</b>（群組數以千計時原本會很慢）。可設定間隔，或隨時「立即同步」。</p>
+  <b>{{ tr('排程目錄同步（成員數快取）') }}</b>
+  <p class="muted">{{ tr('群組的「目錄成員數」由背景排程') }}<b>{{ tr('定期同步') }}</b>{{ tr('寫進本機快取，本頁直接讀快取（毫秒），') }}<b>{{ tr('不再每列即時查 LDAP') }}</b>{{ tr('（群組數以千計時原本會很慢）。可設定間隔，或隨時「立即同步」。') }}</p>
   <div class="grp-sync-row">
-    <label class="chk"><input type="checkbox" id="dsEnabled"> 啟用排程同步</label>
-    <label class="chk"><input type="checkbox" id="dsSyncUsers"> 一併同步使用者（讓「使用者管理」預先看到所有目錄使用者）</label>
-    <label>每 <input class="field field-narrow" type="number" id="dsInterval" min="1" max="168" value="6"> 小時</label>
+    <label class="chk"><input type="checkbox" id="dsEnabled"> {{ tr('啟用排程同步') }}</label>
+    <label class="chk"><input type="checkbox" id="dsSyncUsers"> {{ tr('一併同步使用者（讓「使用者管理」預先看到所有目錄使用者）') }}</label>
+    <label>{{ tr('每') }} <input class="field field-narrow" type="number" id="dsInterval" min="1" max="168" value="6"> {{ tr('小時') }}</label>
     {# 自動停用是破壞性的 —— 預設關閉，而且只在**完整**掃描之後才會執行。 #}
-    <label>完整掃描後自動停用
+    <label>{{ tr('完整掃描後自動停用') }}
       <select class="field" id="dsAutoDisable">
-        <option value="off">不自動停用（建議）</option>
-        <option value="missing">目錄裡已經找不到的帳號</option>
-        <option value="dir_disabled">AD 端已停用的帳號</option>
+        <option value="off">{{ tr('不自動停用（建議）') }}</option>
+        <option value="missing">{{ tr('目錄裡已經找不到的帳號') }}</option>
+        <option value="dir_disabled">{{ tr('AD 端已停用的帳號') }}</option>
       </select>
     </label>
-    <button class="btn" type="button" id="dsSave">{{ icon('gear', size=14) }} 儲存設定</button>
-    <button class="btn btn-primary" type="button" id="dsRun">{{ icon('refresh', size=14) }} 立即同步</button>
+    <button class="btn" type="button" id="dsSave">{{ icon('gear', size=14) }} {{ tr('儲存設定') }}</button>
+    <button class="btn btn-primary" type="button" id="dsRun">{{ icon('refresh', size=14) }} {{ tr('立即同步') }}</button>
   </div>
-  <p class="muted">自動停用只會<b>停用</b>，不會刪除帳號或權限指派，人回來時按一下即可恢復；
-    帶名稱過濾的同步<b>不會</b>觸發（只看得到一部分目錄，不能拿來推論誰不見了）。
+  <p class="muted">{{ tr('自動停用只會') }}<b>{{ tr('停用') }}</b>{{ tr('，不會刪除帳號或權限指派，人回來時按一下即可恢復；
+    帶名稱過濾的同步') }}<b>{{ tr('不會') }}</b>{{ tr('觸發（只看得到一部分目錄，不能拿來推論誰不見了）。
     另有安全閥：一次要動的人數超過目錄帳號總數的 20% 就整批中止 ——
-    服務帳號密碼過期之類的狀況會讓「全公司都不見」，那時候什麼都不做才是對的。</p>
-  <p class="muted">同步範圍：目錄群組（+ 巢狀從屬）、各群組成員數、以及（勾選時）所有目錄使用者。使用者只鏡射帳號 / 顯示名稱供預先指派權限，不設密碼、仍走 LDAP 驗證。</p>
-  <p class="muted" id="dsStatus">載入同步狀態中…</p>
+    服務帳號密碼過期之類的狀況會讓「全公司都不見」，那時候什麼都不做才是對的。') }}</p>
+  <p class="muted">{{ tr('同步範圍：目錄群組（+ 巢狀從屬）、各群組成員數、以及（勾選時）所有目錄使用者。使用者只鏡射帳號 / 顯示名稱供預先指派權限，不設密碼、仍走 LDAP 驗證。') }}</p>
+  <p class="muted" id="dsStatus">{{ tr('載入同步狀態中…') }}</p>
 </div>
 {% endif %}
 
 <div class="panel">
-  <h2 data-s="s53896af7">群組清單（共 {{ total_groups }}）</h2>
+  <h2 data-s="s53896af7">{{ tr('群組清單（共') }} {{ total_groups }}）</h2>
   {% if paged %}
   <form method="get" action="/admin/groups" class="grp-sync-row">
     <input class="field" type="search" name="q" value="{{ q }}" placeholder="搜尋群組名稱…">
-    <button class="btn" type="submit">{{ icon('search', size=14) }} 搜尋</button>
-    {% if q %}<a class="btn btn-small" href="/admin/groups">清除</a>{% endif %}
-    <span class="muted">群組數多，改為分頁顯示；第 {{ page }} / {{ pages }} 頁（符合 {{ page_total }} 筆）</span>
+    <button class="btn" type="submit">{{ icon('search', size=14) }} {{ tr('搜尋') }}</button>
+    {% if q %}<a class="btn btn-small" href="/admin/groups">{{ tr('清除') }}</a>{% endif %}
+    <span class="muted">{{ tr('群組數多，改為分頁顯示；第') }} {{ page }} / {{ pages }} {{ tr('頁（符合') }} {{ page_total }} {{ tr('筆）') }}</span>
   </form>
-  {% elif is_directory_backend %}<p class="muted">有上下從屬關係的巢狀群組會以樹狀縮排呈現（子群組縮排在上層群組下方）。從屬關係由目錄的 <code>memberOf</code> 於同步時解析。</p>{% endif %}
+  {% elif is_directory_backend %}<p class="muted">{{ tr('有上下從屬關係的巢狀群組會以樹狀縮排呈現（子群組縮排在上層群組下方）。從屬關係由目錄的') }} <code>memberOf</code> {{ tr('於同步時解析。') }}</p>{% endif %}
   <table class="grp-table">
     <thead>
-      <tr><th>名稱</th><th>來源</th><th>說明</th><th>成員數</th><th>角色</th><th></th></tr>
+      <tr><th>{{ tr('名稱') }}</th><th>{{ tr('來源') }}</th><th>{{ tr('說明') }}</th><th>{{ tr('成員數') }}</th><th>{{ tr('角色') }}</th><th></th></tr>
     </thead>
     <tbody>
       {% for g in groups %}
@@ -83,24 +83,24 @@
         {% if g.source in ('ldap', 'ad') and g.dir_member_count is not none %}
         <td title="目錄成員數（由排程同步快取；本機登入數 {{ g.member_count }}）">{{ g.dir_member_count }}</td>
         {% elif g.source in ('ldap', 'ad') %}
-        <td class="muted" title="尚未同步；請按上方「立即同步」或等排程執行。本機登入數 {{ g.member_count }}">{{ g.member_count }} <span class="muted">（未同步）</span></td>
+        <td class="muted" title="尚未同步；請按上方「立即同步」或等排程執行。本機登入數 {{ g.member_count }}">{{ g.member_count }} <span class="muted">{{ tr('（未同步）') }}</span></td>
         {% else %}
         <td>{{ g.member_count }}</td>
         {% endif %}
         <td>
           {% if g.roles %}
             {% for rid in g.roles %}<span class="role-chip">{{ rid }}</span>{% endfor %}
-          {% else %}<span class="muted">(無)</span>{% endif %}
+          {% else %}<span class="muted">{{ tr('(無)') }}</span>{% endif %}
         </td>
         <td>
           {% if g.source == 'local' %}
-          <button class="btn btn-small" data-act="members">{{ icon('user', size=12) }} 成員</button>
+          <button class="btn btn-small" data-act="members">{{ icon('user', size=12) }} {{ tr('成員') }}</button>
           {% else %}
-          <button class="btn btn-small" data-act="dir-members">{{ icon('user', size=12) }} 成員</button>
+          <button class="btn btn-small" data-act="dir-members">{{ icon('user', size=12) }} {{ tr('成員') }}</button>
           {% endif %}
-          <button class="btn btn-small" data-act="roles">{{ icon('shield', size=12) }} 角色</button>
+          <button class="btn btn-small" data-act="roles">{{ icon('shield', size=12) }} {{ tr('角色') }}</button>
           {% if g.source == 'local' %}
-          <button class="btn btn-small btn-danger" data-act="delete">{{ icon('trash', size=12) }} 刪除</button>
+          <button class="btn btn-small btn-danger" data-act="delete">{{ icon('trash', size=12) }} {{ tr('刪除') }}</button>
           {% endif %}
         </td>
       </tr>
@@ -110,9 +110,9 @@
   {% if paged and pages > 1 %}
   <div class="grp-pager">
     {% set qs = ('&q=' ~ q) if q else '' %}
-    {% if page > 1 %}<a class="btn btn-small" href="/admin/groups?page={{ page - 1 }}{{ qs }}">‹ 上一頁</a>{% endif %}
-    <span class="muted">第 {{ page }} / {{ pages }} 頁</span>
-    {% if page < pages %}<a class="btn btn-small" href="/admin/groups?page={{ page + 1 }}{{ qs }}">下一頁 ›</a>{% endif %}
+    {% if page > 1 %}<a class="btn btn-small" href="/admin/groups?page={{ page - 1 }}{{ qs }}">{{ tr('‹ 上一頁') }}</a>{% endif %}
+    <span class="muted">{{ tr('第') }} {{ page }} / {{ pages }} {{ tr('頁') }}</span>
+    {% if page < pages %}<a class="btn btn-small" href="/admin/groups?page={{ page + 1 }}{{ qs }}">{{ tr('下一頁 ›') }}</a>{% endif %}
   </div>
   {% endif %}
 </div>
@@ -121,18 +121,18 @@
 <div id="rolesModal" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-card">
-    <h3 data-s="s53896af7">指派角色給群組 <code id="rmGroupName"></code></h3>
+    <h3 data-s="s53896af7">{{ tr('指派角色給群組') }} <code id="rmGroupName"></code></h3>
     <div class="picker">
       <div class="picker-toolbar">
         <input class="field picker-search" type="search" id="rmSearch" placeholder="搜尋角色…">
         <span class="picker-count" id="rmCount">0 / 0</span>
-        <button type="button" class="btn btn-small picker-clear" id="rmClear">清除</button>
+        <button type="button" class="btn btn-small picker-clear" id="rmClear">{{ tr('清除') }}</button>
       </div>
       <div class="picker-list" id="rmList"></div>
     </div>
     <div data-s="s9fa82b78">
-      <button class="btn" type="button" id="rmCancel">取消</button>
-      <button class="btn btn-primary" type="button" id="rmSave">{{ icon('save', size=14) }} 儲存</button>
+      <button class="btn" type="button" id="rmCancel">{{ tr('取消') }}</button>
+      <button class="btn btn-primary" type="button" id="rmSave">{{ icon('save', size=14) }} {{ tr('儲存') }}</button>
     </div>
   </div>
 </div>
@@ -141,18 +141,18 @@
 <div id="membersModal" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-card">
-    <h3 data-s="s53896af7">編輯成員 <code id="mmGroupName"></code></h3>
+    <h3 data-s="s53896af7">{{ tr('編輯成員') }} <code id="mmGroupName"></code></h3>
     <div class="picker">
       <div class="picker-toolbar">
         <input class="field picker-search" type="search" id="mmSearch" placeholder="搜尋使用者（帳號或顯示名稱）…">
         <span class="picker-count" id="mmCount">0 / 0</span>
-        <button type="button" class="btn btn-small picker-clear" id="mmClear">清除</button>
+        <button type="button" class="btn btn-small picker-clear" id="mmClear">{{ tr('清除') }}</button>
       </div>
       <div class="picker-list" id="mmList"></div>
     </div>
     <div data-s="s9fa82b78">
-      <button class="btn" type="button" id="mmCancel">取消</button>
-      <button class="btn btn-primary" type="button" id="mmSave">{{ icon('save', size=14) }} 儲存</button>
+      <button class="btn" type="button" id="mmCancel">{{ tr('取消') }}</button>
+      <button class="btn btn-primary" type="button" id="mmSave">{{ icon('save', size=14) }} {{ tr('儲存') }}</button>
     </div>
   </div>
 </div>
@@ -161,17 +161,17 @@
 <div id="dirMembersModal" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-card">
-    <h3 data-s="s53896af7">目錄成員 <code id="dmGroupName"></code></h3>
-    <p class="muted" id="dmSummary">查詢目錄中…</p>
+    <h3 data-s="s53896af7">{{ tr('目錄成員') }} <code id="dmGroupName"></code></h3>
+    <p class="muted" id="dmSummary">{{ tr('查詢目錄中…') }}</p>
     <div class="dm-filters">
-      <button class="btn btn-small dm-fbtn is-active" type="button" data-f="all">全部 <span id="dmCntAll">0</span></button>
-      <button class="btn btn-small dm-fbtn" type="button" data-f="in">已登入本系統 <span id="dmCntIn">0</span></button>
-      <button class="btn btn-small dm-fbtn" type="button" data-f="out">未登入 <span id="dmCntOut">0</span></button>
+      <button class="btn btn-small dm-fbtn is-active" type="button" data-f="all">{{ tr('全部') }} <span id="dmCntAll">0</span></button>
+      <button class="btn btn-small dm-fbtn" type="button" data-f="in">{{ tr('已登入本系統') }} <span id="dmCntIn">0</span></button>
+      <button class="btn btn-small dm-fbtn" type="button" data-f="out">{{ tr('未登入') }} <span id="dmCntOut">0</span></button>
     </div>
     <input class="field" type="search" id="dmSearch" placeholder="篩選（帳號或姓名）…">
     <div class="dm-list" id="dmList"></div>
     <div data-s="s9fa82b78">
-      <button class="btn" type="button" id="dmClose">{{ icon('close', size=14) }} 關閉</button>
+      <button class="btn" type="button" id="dmClose">{{ icon('close', size=14) }} {{ tr('關閉') }}</button>
     </div>
   </div>
 </div>
@@ -472,7 +472,7 @@ function _dmSetFilter(f) {
 async function openDirMembers(tr) {
   const gid = tr.dataset.gid;
   document.getElementById('dmGroupName').textContent = tr.dataset.gname || '';
-  document.getElementById('dmSummary').textContent = '查詢目錄中…';
+  document.getElementById('dmSummary').textContent = tr('查詢目錄中…');
   document.getElementById('dmSearch').value = '';
   _dmAll = []; _dmSetFilter('all');
   document.getElementById('dmCntAll').textContent = '0';
@@ -511,7 +511,7 @@ if (_btnSyncDir) {
   _btnSyncDir.addEventListener('click', async () => {
     const msg = document.getElementById('syncDirMsg');
     _btnSyncDir.disabled = true;
-    msg.textContent = ' 同步中…（目錄大時可能數秒）';
+    msg.textContent = tr(' 同步中…（目錄大時可能數秒）');
     const nameContains = (document.getElementById('syncNameFilter') || {}).value || '';
     try {
       const r = await fetch('/admin/groups/sync-ldap', {
@@ -584,7 +584,7 @@ if (_btnSyncDir) {
       }
       if (j.last_error) s += ' · 上次錯誤：' + j.last_error;
       st.textContent = s;
-    } catch (e) { st.textContent = '無法讀取同步狀態'; }
+    } catch (e) { st.textContent = tr('無法讀取同步狀態'); }
   }
   if (save) save.addEventListener('click', async () => {
     save.disabled = true;
@@ -600,12 +600,12 @@ if (_btnSyncDir) {
       });
       if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.detail || ('HTTP ' + r.status)); }
       await load();
-    } catch (e) { st.textContent = '儲存失敗：' + e.message; }
+    } catch (e) { st.textContent = tr('儲存失敗：') + e.message; }
     finally { save.disabled = false; }
   });
   if (run) run.addEventListener('click', async () => {
     run.disabled = true;
-    st.textContent = '已開始背景同步…（目錄大時可能數分鐘，完成後重新整理即看到新的成員數）';
+    st.textContent = tr('已開始背景同步…（目錄大時可能數分鐘，完成後重新整理即看到新的成員數）');
     try {
       const r = await fetch('/admin/groups/directory-sync/run', { method: 'POST' });
       if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.detail || ('HTTP ' + r.status)); }
@@ -616,7 +616,7 @@ if (_btnSyncDir) {
           if (!s.running) { clearInterval(poll); run.disabled = false; await load(); }
         } catch (e) { clearInterval(poll); run.disabled = false; }
       }, 3000);
-    } catch (e) { st.textContent = '同步失敗：' + e.message; run.disabled = false; }
+    } catch (e) { st.textContent = tr('同步失敗：') + e.message; run.disabled = false; }
   });
   load();
 })();

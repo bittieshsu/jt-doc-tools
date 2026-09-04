@@ -11,6 +11,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ---
 
+## [1.14.99] - 2026-09-05
+
+### Interface language, stage B finished: the administration area
+
+Every visible string on the 30 administration pages (1,048 of them) and the
+messages inside their `<script>` blocks (118) now go through the translation
+layer, along with the 34 descriptions in the "settings" menu. The catalogue holds
+**2,711 entries**. Chinese left on the administration pages in English went from
+**1,497 to about 200** (what remains comes from Python data — LLM tool names, OCR
+language labels — and the product name in the page title).
+
+### ⚠ The safety net could not see the administration area
+
+`tools/i18n_zh_baseline.py` originally covered only tool pages and general pages,
+so **a broken administration page was invisible to it**. Extending it ran into two
+things that differ on every run, either of which would have made the comparison
+permanently red (and therefore worthless):
+
+- **JSON APIs share the administration GET routes** (system status, job queue …)
+  and their responses carry timestamps → only `content-type: text/html` is kept.
+- **The data directory path is printed on the pages** (export directory, font
+  directory), and the baseline script used a fresh `mkdtemp` each time → it now
+  uses a fixed `temp/i18n-baseline-data`.
+
+It now covers **81 pages**, including every administration page, and this round
+was byte-for-byte identical throughout.
+
+### Chinese keywords still find administration pages in English
+
+The sidebar search matches against `data-name`; replacing it wholesale with
+English would mean **a Chinese search no longer finds anything**. Both languages
+now go into `data-name` in English, while **the Chinese interface is left exactly
+as it was** (otherwise the same string appears twice and the bytes change — the
+safety net caught that immediately).
+
+---
+
 ## [1.14.98] - 2026-09-05
 
 ### Interface language, stage B (part 2): strings inside `<script>` too

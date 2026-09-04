@@ -1,75 +1,75 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}SSO 單一登入 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('SSO 單一登入') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('lock', size=22) }} SSO 單一登入（OIDC / SAML）</h1>
+<h1>{{ icon('lock', size=22) }} {{ tr('SSO 單一登入（OIDC / SAML）') }}</h1>
 
 <div class="panel" data-s="s05937742">
-  <p data-s="s1386d503">SSO 是<b>附加</b>登入方式，與本機 / LDAP / AD 並存 —— 啟用後本機 <code>jtdt-admin</code> 仍可登入當作 break-glass。首次以 SSO 登入會自動建立帳號（預設「一般使用者」角色）；IdP 群組會同步成本站群組，可在「權限矩陣」對應到角色。</p>
+  <p data-s="s1386d503">{{ tr('SSO 是') }}<b>{{ tr('附加') }}</b>{{ tr('登入方式，與本機 / LDAP / AD 並存 —— 啟用後本機') }} <code>jtdt-admin</code> {{ tr('仍可登入當作 break-glass。首次以 SSO 登入會自動建立帳號（預設「一般使用者」角色）；IdP 群組會同步成本站群組，可在「權限矩陣」對應到角色。') }}</p>
   {% if not auth_enabled %}
-  <p data-s="s53265c10">{{ icon('warn', size=14) }} 目前<b>未啟用認證</b>。請先到「認證設定」啟用並建立管理員，才能開啟 SSO。</p>
+  <p data-s="s53265c10">{{ icon('warn', size=14) }} {{ tr('目前') }}<b>{{ tr('未啟用認證') }}</b>{{ tr('。請先到「認證設定」啟用並建立管理員，才能開啟 SSO。') }}</p>
   {% endif %}
 </div>
 
 <div class="panel auth-form">
-  <h2 data-s="s53896af7">{{ icon('gear', size=18) }} 共用設定</h2>
+  <h2 data-s="s53896af7">{{ icon('gear', size=18) }} {{ tr('共用設定') }}</h2>
   <div class="auth-field">
-    <label class="af-label" for="base_url">對外網址 base URL（reverse proxy 的公開網址，OIDC redirect / SAML ACS 都以此為準）</label>
+    <label class="af-label" for="base_url">{{ tr('對外網址 base URL（reverse proxy 的公開網址，OIDC redirect / SAML ACS 都以此為準）') }}</label>
     <input class="field" id="base_url" type="url" placeholder="https://docs.example.com" value="{{ sso.base_url }}" data-s="s6d567387" />
-    <div class="af-hint">留空則依進來的請求推導（直連 / 開發用）。有反向代理時<b>務必</b>填對外 https 網址。</div>
+    <div class="af-hint">{{ tr('留空則依進來的請求推導（直連 / 開發用）。有反向代理時') }}<b>{{ tr('務必') }}</b>{{ tr('填對外 https 網址。') }}</div>
   </div>
   <div id="urlHints" class="muted" data-s="s77a268ab"></div>
   <p class="sso-saverow">
-    <button class="btn btn-primary" id="saveBtnTop">{{ icon('save', size=14) }} 儲存設定</button>
-    <span class="muted sso-savehint">base URL 會與下方 OIDC / SAML 一起儲存</span>
+    <button class="btn btn-primary" id="saveBtnTop">{{ icon('save', size=14) }} {{ tr('儲存設定') }}</button>
+    <span class="muted sso-savehint">{{ tr('base URL 會與下方 OIDC / SAML 一起儲存') }}</span>
     <span id="saveResultTop" class="muted"></span>
   </p>
 </div>
 
 <details class="panel">
-  <summary data-s="s35a6dee3">{{ icon('page', size=14) }} 常見 IdP 設定範例（點開）</summary>
-  <p class="muted" data-s="s5207ccf8">把 <code>&lt;...&gt;</code> 換成你的實際值。各家都要先在 IdP 端把 <b>Redirect URI</b>（OIDC）或 <b>ACS</b>（SAML）設成本站對外網址，見上方提示。</p>
+  <summary data-s="s35a6dee3">{{ icon('page', size=14) }} {{ tr('常見 IdP 設定範例（點開）') }}</summary>
+  <p class="muted" data-s="s5207ccf8">{{ tr('把') }} <code>&lt;...&gt;</code> {{ tr('換成你的實際值。各家都要先在 IdP 端把') }} <b>Redirect URI</b>{{ tr('（OIDC）或') }} <b>ACS</b>{{ tr('（SAML）設成本站對外網址，見上方提示。') }}</p>
 
   <h3 data-s="s21c252e2">OIDC</h3>
   <table class="kv sso-eg">
-    <tr><th>欄位</th><th>Microsoft 365 / Entra ID</th><th>Google Workspace</th><th>Keycloak</th></tr>
+    <tr><th>{{ tr('欄位') }}</th><th>Microsoft 365 / Entra ID</th><th>Google Workspace</th><th>Keycloak</th></tr>
     <tr><td>Issuer</td>
         <td><code>https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0</code></td>
         <td><code>https://accounts.google.com</code></td>
         <td><code>https://&lt;keycloak&gt;/realms/&lt;realm&gt;</code></td></tr>
     <tr><td>Client ID / Secret</td>
-        <td colspan="3">在 IdP 端建立應用程式（Entra：應用程式註冊；Google：OAuth 用戶端 ID；Keycloak：confidential client）後取得</td></tr>
-    <tr><td>Scopes</td><td colspan="3"><code>openid email profile</code>（三家相同）</td></tr>
-    <tr><td>使用者名稱 claim</td>
+        <td colspan="3">{{ tr('在 IdP 端建立應用程式（Entra：應用程式註冊；Google：OAuth 用戶端 ID；Keycloak：confidential client）後取得') }}</td></tr>
+    <tr><td>Scopes</td><td colspan="3"><code>openid email profile</code>{{ tr('（三家相同）') }}</td></tr>
+    <tr><td>{{ tr('使用者名稱 claim') }}</td>
         <td><code>preferred_username</code></td>
-        <td><code>email</code>（Google 無 preferred_username）</td>
+        <td><code>email</code>{{ tr('（Google 無 preferred_username）') }}</td>
         <td><code>preferred_username</code></td></tr>
-    <tr><td>Email / 顯示名稱 claim</td><td colspan="3"><code>email</code> / <code>name</code>（三家相同）</td></tr>
-    <tr><td>群組 claim</td>
-        <td><code>groups</code>（需在 token 設定加 groups claim）</td>
-        <td>—（Google id_token 不含群組，留空，角色用權限矩陣手動指派）</td>
-        <td><code>groups</code>（需加 Group Membership mapper）</td></tr>
+    <tr><td>{{ tr('Email / 顯示名稱 claim') }}</td><td colspan="3"><code>email</code> / <code>name</code>{{ tr('（三家相同）') }}</td></tr>
+    <tr><td>{{ tr('群組 claim') }}</td>
+        <td><code>groups</code>{{ tr('（需在 token 設定加 groups claim）') }}</td>
+        <td>{{ tr('—（Google id_token 不含群組，留空，角色用權限矩陣手動指派）') }}</td>
+        <td><code>groups</code>{{ tr('（需加 Group Membership mapper）') }}</td></tr>
   </table>
   <p class="muted" data-s="s3bb8533d">
-    ⚠ <b>Entra 群組</b>預設送的是群組 <b>GUID</b> 不是名稱；「管理員群組」與權限矩陣請填該 GUID，或在 Entra 設定送 group name。<br>
-    ⚠ <b>Google</b> 沒有標準群組 claim；要群組對應需另接 Cloud Identity，否則留空、用權限矩陣手動給角色。
+    ⚠ <b>{{ tr('Entra 群組') }}</b>{{ tr('預設送的是群組') }} <b>GUID</b> {{ tr('不是名稱；「管理員群組」與權限矩陣請填該 GUID，或在 Entra 設定送 group name。') }}<br>
+    ⚠ <b>Google</b> {{ tr('沒有標準群組 claim；要群組對應需另接 Cloud Identity，否則留空、用權限矩陣手動給角色。') }}
   </p>
 
   <h3 data-s="s130604ce">SAML</h3>
   <table class="kv sso-eg">
-    <tr><th>欄位</th><th>Entra ID（企業應用程式）</th><th>Keycloak</th></tr>
+    <tr><th>{{ tr('欄位') }}</th><th>{{ tr('Entra ID（企業應用程式）') }}</th><th>Keycloak</th></tr>
     <tr><td>IdP EntityID</td>
         <td><code>https://sts.windows.net/&lt;tenant-id&gt;/</code></td>
         <td><code>https://&lt;keycloak&gt;/realms/&lt;realm&gt;</code></td></tr>
     <tr><td>IdP SSO URL</td>
         <td><code>https://login.microsoftonline.com/&lt;tenant-id&gt;/saml2</code></td>
         <td><code>https://&lt;keycloak&gt;/realms/&lt;realm&gt;/protocol/saml</code></td></tr>
-    <tr><td>簽章憑證</td><td colspan="2">從 IdP 的 Federation Metadata / SAML descriptor 取 X.509（貼憑證內容，不含 BEGIN/END 行）</td></tr>
-    <tr><td>群組屬性</td>
+    <tr><td>{{ tr('簽章憑證') }}</td><td colspan="2">{{ tr('從 IdP 的 Federation Metadata / SAML descriptor 取 X.509（貼憑證內容，不含 BEGIN/END 行）') }}</td></tr>
+    <tr><td>{{ tr('群組屬性') }}</td>
         <td><code>http://schemas.microsoft.com/ws/2008/06/identity/claims/groups</code></td>
-        <td><code>groups</code>（需加 Group list mapper）</td></tr>
+        <td><code>groups</code>{{ tr('（需加 Group list mapper）') }}</td></tr>
   </table>
-  <p class="muted" data-s="s3bb8533d">SAML 也是 Entra 送群組 GUID；Google Workspace SAML 不送群組屬性。把本站 SP metadata（<code>&lt;base&gt;/auth/saml/metadata</code>）餵給 IdP 最省事。</p>
+  <p class="muted" data-s="s3bb8533d">{{ tr('SAML 也是 Entra 送群組 GUID；Google Workspace SAML 不送群組屬性。把本站 SP metadata（') }}<code>&lt;base&gt;/auth/saml/metadata</code>{{ tr('）餵給 IdP 最省事。') }}</p>
   <style nonce="{{ request.state.csp_nonce }}">
     .sso-eg { width:100%; border-collapse:collapse; margin:10px 0 8px; font-size:12.5px; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
     .sso-eg th, .sso-eg td { padding:8px 12px; text-align:left; vertical-align:top; border-bottom:1px solid #eef2f7; }
@@ -85,20 +85,20 @@
 
 <div class="panel auth-form">
   <h2 data-s="s53896af7">{{ icon('shield', size=18) }} OIDC（OpenID Connect）</h2>
-  <p class="muted" data-s="s6b9c179a">適用 Microsoft 365 / Entra ID、Google、Keycloak、Okta、Authentik 等。在 IdP 設定 Redirect URI 為 <code id="oidcRedirect">（先填 base URL）</code>。</p>
+  <p class="muted" data-s="s6b9c179a">{{ tr('適用 Microsoft 365 / Entra ID、Google、Keycloak、Okta、Authentik 等。在 IdP 設定 Redirect URI 為') }} <code id="oidcRedirect">{{ tr('（先填 base URL）') }}</code>。</p>
   <div class="auth-field af-checks">
-    <label><input type="checkbox" id="o_enabled" {% if sso.oidc.enabled %}checked{% endif %}/> 啟用 OIDC 登入</label>
+    <label><input type="checkbox" id="o_enabled" {% if sso.oidc.enabled %}checked{% endif %}/> {{ tr('啟用 OIDC 登入') }}</label>
   </div>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('globe', size=14) }} 連線</legend>
+    <legend>{{ icon('globe', size=14) }} {{ tr('連線') }}</legend>
     <div class="af-attrs">
       <div class="auth-field">
-        <label class="af-label">登入鈕文字</label>
+        <label class="af-label">{{ tr('登入鈕文字') }}</label>
         <input class="field" id="o_display_name" value="{{ sso.oidc.display_name }}" placeholder="以 Microsoft 登入"/>
       </div>
       <div class="auth-field">
-        <label class="af-label">Issuer（discovery 根）</label>
+        <label class="af-label">{{ tr('Issuer（discovery 根）') }}</label>
         <input class="field" id="o_issuer" value="{{ sso.oidc.issuer }}" placeholder="https://login.microsoftonline.com/&lt;tenant&gt;/v2.0"/>
       </div>
       <div class="auth-field">
@@ -117,51 +117,51 @@
   </fieldset>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('gear', size=14) }} 屬性對應</legend>
+    <legend>{{ icon('gear', size=14) }} {{ tr('屬性對應') }}</legend>
     <div class="af-attrs">
       <div class="auth-field">
-        <label class="af-label">使用者名稱 claim</label>
+        <label class="af-label">{{ tr('使用者名稱 claim') }}</label>
         <input class="field" id="o_username_claim" value="{{ sso.oidc.username_claim }}"/>
       </div>
       <div class="auth-field">
         <label class="af-label">Email claim</label>
         <input class="field" id="o_email_claim" value="{{ sso.oidc.email_claim }}"/>
-      <div class="af-hint">作業完成通知會寄到這裡。</div>
+      <div class="af-hint">{{ tr('作業完成通知會寄到這裡。') }}</div>
       </div>
       <div class="auth-field">
-        <label class="af-label">顯示名稱 claim</label>
+        <label class="af-label">{{ tr('顯示名稱 claim') }}</label>
         <input class="field" id="o_name_claim" value="{{ sso.oidc.name_claim }}"/>
       </div>
       <div class="auth-field">
-        <label class="af-label">群組 claim</label>
+        <label class="af-label">{{ tr('群組 claim') }}</label>
         <input class="field" id="o_groups_claim" value="{{ sso.oidc.groups_claim }}"/>
       </div>
       <div class="auth-field">
-        <label class="af-label">管理員群組（選填）</label>
+        <label class="af-label">{{ tr('管理員群組（選填）') }}</label>
         <input class="field" id="o_admin_group" value="{{ sso.oidc.admin_group }}"/>
-      <div class="af-hint">此群組的成員自動成為管理員。</div>
+      <div class="af-hint">{{ tr('此群組的成員自動成為管理員。') }}</div>
       </div>
     </div>
   </fieldset>
 
   <div class="auth-field af-checks" data-s="saf23b8d4">
-    <label><input type="checkbox" id="o_require_https" {% if sso.oidc.require_https %}checked{% endif %}/> 強制 HTTPS（建議開啟；內網 http IdP 才取消）</label>
+    <label><input type="checkbox" id="o_require_https" {% if sso.oidc.require_https %}checked{% endif %}/> {{ tr('強制 HTTPS（建議開啟；內網 http IdP 才取消）') }}</label>
   </div>
-  <p><button class="btn" id="testOidc">{{ icon('search', size=13) }} 測試 OIDC discovery</button> <span id="oidcResult" class="muted"></span></p>
+  <p><button class="btn" id="testOidc">{{ icon('search', size=13) }} {{ tr('測試 OIDC discovery') }}</button> <span id="oidcResult" class="muted"></span></p>
 </div>
 
 <div class="panel auth-form">
   <h2 data-s="s53896af7">{{ icon('shield', size=18) }} SAML 2.0</h2>
-  <p class="muted" data-s="s6b9c179a">SP metadata 網址：<code id="samlMeta">（先填 base URL）</code>；ACS（Assertion Consumer Service）：<code id="samlAcs">（先填 base URL）</code>。</p>
+  <p class="muted" data-s="s6b9c179a">{{ tr('SP metadata 網址：') }}<code id="samlMeta">{{ tr('（先填 base URL）') }}</code>；ACS（Assertion Consumer Service）：<code id="samlAcs">{{ tr('（先填 base URL）') }}</code>。</p>
   <div class="auth-field af-checks">
-    <label><input type="checkbox" id="s_enabled" {% if sso.saml.enabled %}checked{% endif %}/> 啟用 SAML 登入</label>
+    <label><input type="checkbox" id="s_enabled" {% if sso.saml.enabled %}checked{% endif %}/> {{ tr('啟用 SAML 登入') }}</label>
   </div>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('globe', size=14) }} 連線</legend>
+    <legend>{{ icon('globe', size=14) }} {{ tr('連線') }}</legend>
     <div class="af-attrs">
       <div class="auth-field">
-        <label class="af-label">登入鈕文字</label>
+        <label class="af-label">{{ tr('登入鈕文字') }}</label>
         <input class="field" id="s_display_name" value="{{ sso.saml.display_name }}"/>
       </div>
       <div class="auth-field">
@@ -173,84 +173,84 @@
         <input class="field" id="s_idp_sso_url" value="{{ sso.saml.idp_sso_url }}"/>
       </div>
       <div class="auth-field">
-        <label class="af-label">IdP SLO URL（選填）</label>
+        <label class="af-label">{{ tr('IdP SLO URL（選填）') }}</label>
         <input class="field" id="s_idp_slo_url" value="{{ sso.saml.idp_slo_url }}"/>
-      <div class="af-hint">單一登出用。</div>
+      <div class="af-hint">{{ tr('單一登出用。') }}</div>
       </div>
       <div class="auth-field">
-        <label class="af-label">SP EntityID（留空 = metadata 網址）</label>
+        <label class="af-label">{{ tr('SP EntityID（留空 = metadata 網址）') }}</label>
         <input class="field" id="s_sp_entity_id" value="{{ sso.saml.sp_entity_id }}"/>
       </div>
     </div>
   </fieldset>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('gear', size=14) }} 屬性對應</legend>
+    <legend>{{ icon('gear', size=14) }} {{ tr('屬性對應') }}</legend>
     <div class="af-attrs">
       <div class="auth-field">
-        <label class="af-label">使用者名稱屬性（留空用 NameID）</label>
+        <label class="af-label">{{ tr('使用者名稱屬性（留空用 NameID）') }}</label>
         <input class="field" id="s_username_attr" value="{{ sso.saml.username_attr }}"/>
       </div>
       <div class="auth-field">
-        <label class="af-label">Email 屬性</label>
+        <label class="af-label">{{ tr('Email 屬性') }}</label>
         <input class="field" id="s_email_attr" value="{{ sso.saml.email_attr }}"/>
-      <div class="af-hint">作業完成通知會寄到這裡。</div>
+      <div class="af-hint">{{ tr('作業完成通知會寄到這裡。') }}</div>
       </div>
       <div class="auth-field">
-        <label class="af-label">顯示名稱屬性</label>
+        <label class="af-label">{{ tr('顯示名稱屬性') }}</label>
         <input class="field" id="s_name_attr" value="{{ sso.saml.name_attr }}"/>
       </div>
       <div class="auth-field">
-        <label class="af-label">群組屬性</label>
+        <label class="af-label">{{ tr('群組屬性') }}</label>
         <input class="field" id="s_groups_attr" value="{{ sso.saml.groups_attr }}"/>
       </div>
       <div class="auth-field">
-        <label class="af-label">管理員群組（選填）</label>
+        <label class="af-label">{{ tr('管理員群組（選填）') }}</label>
         <input class="field" id="s_admin_group" value="{{ sso.saml.admin_group }}"/>
-      <div class="af-hint">此群組的成員自動成為管理員。</div>
+      <div class="af-hint">{{ tr('此群組的成員自動成為管理員。') }}</div>
       </div>
     </div>
   </fieldset>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('lock', size=14) }} 簽章</legend>
+    <legend>{{ icon('lock', size=14) }} {{ tr('簽章') }}</legend>
     <div class="auth-field">
-      <label class="af-label" for="s_idp_x509cert">IdP 簽章憑證 X.509</label>
+      <label class="af-label" for="s_idp_x509cert">{{ tr('IdP 簽章憑證 X.509') }}</label>
       <textarea class="field" id="s_idp_x509cert" rows="4" data-s="sa54bfe29">{{ sso.saml.idp_x509cert }}</textarea>
-      <div class="af-hint">貼 PEM 內容，<b>不含</b> BEGIN / END 行。</div>
+      <div class="af-hint">{{ tr('貼 PEM 內容，') }}<b>{{ tr('不含') }}</b> {{ tr('BEGIN / END 行。') }}</div>
     </div>
     <div class="auth-field af-checks" data-s="s0ca67867">
-      <label><input type="checkbox" id="s_want_assertions_signed" {% if sso.saml.want_assertions_signed %}checked{% endif %}/> 要求 IdP 簽署 Assertion（建議開啟）</label>
+      <label><input type="checkbox" id="s_want_assertions_signed" {% if sso.saml.want_assertions_signed %}checked{% endif %}/> {{ tr('要求 IdP 簽署 Assertion（建議開啟）') }}</label>
     </div>
   </fieldset>
-  <p><button class="btn" id="testSaml">{{ icon('search', size=13) }} 驗證 SAML SP metadata</button> <span id="samlResult" class="muted"></span></p>
+  <p><button class="btn" id="testSaml">{{ icon('search', size=13) }} {{ tr('驗證 SAML SP metadata') }}</button> <span id="samlResult" class="muted"></span></p>
 </div>
 
 <div class="panel">
-  <button class="btn btn-primary btn-lg" id="saveBtn">{{ icon('save', size=14) }} 儲存 OIDC / SAML / 共用設定</button>
+  <button class="btn btn-primary btn-lg" id="saveBtn">{{ icon('save', size=14) }} {{ tr('儲存 OIDC / SAML / 共用設定') }}</button>
   <span id="saveResult" class="muted" data-s="s610601bf"></span>
 </div>
 
 <div class="panel auth-form">
   <h2>{{ icon('shield', size=18) }} Reverse Proxy SSO（Kerberos / SPNEGO）</h2>
   <p class="muted">
-    已加入 AD 網域、且在 Windows 已登入的使用者，經前端 Nginx（SPNEGO/Kerberos）驗證後，
+    {{ tr('已加入 AD 網域、且在 Windows 已登入的使用者，經前端 Nginx（SPNEGO/Kerberos）驗證後，
     由 Nginx 傳入使用者帳號標頭，自動登入本系統。非網域電腦或未帶標頭者，仍回到 /login
     使用 Local / LDAP / AD / OIDC / SAML 登入。使用者查詢與同步沿用下方「認證設定」的
-    LDAP / AD 連線。完整部署（AD service account / setspn / ktpass / 瀏覽器設定）詳見文件 <code>reverse_proxy_sso.md</code>。
+    LDAP / AD 連線。完整部署（AD service account / setspn / ktpass / 瀏覽器設定）詳見文件') }} <code>reverse_proxy_sso.md</code>。
   </p>
 
   <div class="px-callout">
-    <div class="px-callout-title">{{ icon('shield', size=15) }} 反向代理主機（Nginx）必做設定 — 少任一項會不安全或無法登入</div>
+    <div class="px-callout-title">{{ icon('shield', size=15) }} {{ tr('反向代理主機（Nginx）必做設定 — 少任一項會不安全或無法登入') }}</div>
     <ol class="px-callout-list">
-      <li><b>Nginx 端做 SPNEGO / Kerberos 驗證，並「一律覆寫」帳號標頭</b>：在 <code>location</code> 內加
-        <code>proxy_set_header X-Remote-User $remote_user;</code> —— 先蓋掉客戶端自己帶進來的同名標頭，只讓 Kerberos 驗到的帳號傳進來（沒這行＝任何人都能偽造身分）。</li>
-      <li><b>下方「信任的反向代理 IP」要填「實際直接連進本服務的那台反向代理」的 IP</b>。若是「瀏覽器 → 反向代理A → 反向代理B → 本服務」的多層架構，要填<b>最後那台（直接連本服務的 B）</b>的 IP。<b>除非 Nginx 與本服務在同一台，否則不要只留 127.0.0.1。</b></li>
-      <li><b>本服務只綁 <code>127.0.0.1</code>，或用防火牆只允許反向代理連 8765</b>。否則有人可繞過反向代理、直接對本服務送 <code>X-Remote-User</code> 冒充任何帳號。</li>
+      <li><b>{{ tr('Nginx 端做 SPNEGO / Kerberos 驗證，並「一律覆寫」帳號標頭') }}</b>{{ tr('：在') }} <code>location</code> {{ tr('內加') }}
+        <code>proxy_set_header X-Remote-User $remote_user;</code> {{ tr('—— 先蓋掉客戶端自己帶進來的同名標頭，只讓 Kerberos 驗到的帳號傳進來（沒這行＝任何人都能偽造身分）。') }}</li>
+      <li><b>{{ tr('下方「信任的反向代理 IP」要填「實際直接連進本服務的那台反向代理」的 IP') }}</b>{{ tr('。若是「瀏覽器 → 反向代理A → 反向代理B → 本服務」的多層架構，要填') }}<b>{{ tr('最後那台（直接連本服務的 B）') }}</b>{{ tr('的 IP。') }}<b>{{ tr('除非 Nginx 與本服務在同一台，否則不要只留 127.0.0.1。') }}</b></li>
+      <li><b>{{ tr('本服務只綁') }} <code>127.0.0.1</code>{{ tr('，或用防火牆只允許反向代理連 8765') }}</b>{{ tr('。否則有人可繞過反向代理、直接對本服務送') }} <code>X-Remote-User</code> {{ tr('冒充任何帳號。') }}</li>
     </ol>
-    <p class="px-callout-hint">提示：你這次開這個頁面，本服務看到的<b>直接來源 IP＝<code>{{ peer_ip or '(未知)' }}</code></b>。若你正是<b>經反向代理</b>連進來管理的，這通常就是要填到下面清單的值；若你是直接連本服務（未經代理）則不是。</p>
+    <p class="px-callout-hint">{{ tr('提示：你這次開這個頁面，本服務看到的') }}<b>{{ tr('直接來源 IP＝') }}<code>{{ peer_ip or '(未知)' }}</code></b>{{ tr('。若你正是') }}<b>{{ tr('經反向代理') }}</b>{{ tr('連進來管理的，這通常就是要填到下面清單的值；若你是直接連本服務（未經代理）則不是。') }}</p>
     <details class="px-eg">
-      <summary>展開 Nginx 設定範例（可複製）</summary>
+      <summary>{{ tr('展開 Nginx 設定範例（可複製）') }}</summary>
 {% raw %}<pre class="px-pre">location / {
     # --- SPNEGO / Kerberos（需 libnginx-mod-http-auth-spnego） ---
     auth_gss on;
@@ -271,43 +271,43 @@
   </div>
 
   {% if not ldap_configured %}
-  <p class="muted" data-s="warn-noldap">⚠ 尚未設定 LDAP / AD 連線；Reverse Proxy SSO 需要它來查詢並同步網域使用者。請先到「認證設定」設定 LDAP / AD。</p>
+  <p class="muted" data-s="warn-noldap">{{ tr('⚠ 尚未設定 LDAP / AD 連線；Reverse Proxy SSO 需要它來查詢並同步網域使用者。請先到「認證設定」設定 LDAP / AD。') }}</p>
   {% endif %}
   <div class="auth-field af-checks" data-s="s0ca67867">
-    <label><input type="checkbox" id="px_enabled" {% if proxy_sso.enabled %}checked{% endif %}/> 啟用 Reverse Proxy SSO</label>
+    <label><input type="checkbox" id="px_enabled" {% if proxy_sso.enabled %}checked{% endif %}/> {{ tr('啟用 Reverse Proxy SSO') }}</label>
   </div>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('gear', size=14) }} 標頭</legend>
+    <legend>{{ icon('gear', size=14) }} {{ tr('標頭') }}</legend>
     <div class="af-attrs">
       <div class="auth-field">
-        <label class="af-label" for="px_header">帳號標頭名稱</label>
+        <label class="af-label" for="px_header">{{ tr('帳號標頭名稱') }}</label>
         <input class="field" id="px_header" value="{{ proxy_sso.header or 'X-Remote-User' }}"/>
       </div>
       <div class="auth-field">
-        <label class="af-label">沒有標頭時的行為</label>
+        <label class="af-label">{{ tr('沒有標頭時的行為') }}</label>
         <div class="af-checks">
-          <label class="px-inline"><input type="checkbox" id="px_fallback" {% if proxy_sso.fallback_login %}checked{% endif %}/> 顯示 /login 登入頁</label>
+          <label class="px-inline"><input type="checkbox" id="px_fallback" {% if proxy_sso.fallback_login %}checked{% endif %}/> {{ tr('顯示 /login 登入頁') }}</label>
         </div>
-        <div class="af-hint">取消勾選則直接回 401。</div>
+        <div class="af-hint">{{ tr('取消勾選則直接回 401。') }}</div>
       </div>
     </div>
   </fieldset>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('shield', size=14) }} 信任來源</legend>
+    <legend>{{ icon('shield', size=14) }} {{ tr('信任來源') }}</legend>
     <div class="auth-field">
-      <label class="af-label" for="px_trusted">信任的反向代理 IP</label>
+      <label class="af-label" for="px_trusted">{{ tr('信任的反向代理 IP') }}</label>
       <textarea class="field" id="px_trusted" rows="3" data-s="sa54bfe29">{{ proxy_sso.trusted_proxies | join('\n') }}</textarea>
       <div class="af-hint">
-        每行一個，或用逗號分隔；可用 CIDR，如 <code>192.0.2.0/24</code>。<br>
-        只有「<b>直接連進本服務的來源 IP</b>」在此清單內時才採信帳號標頭（不看
-        <code>X-Forwarded-For</code>，無法偽造）。請務必讓 Python 服務只綁
-        <code>127.0.0.1</code>，且 Nginx 一律覆寫此標頭。
+        {{ tr('每行一個，或用逗號分隔；可用 CIDR，如') }} <code>192.0.2.0/24</code>。<br>
+        {{ tr('只有「') }}<b>{{ tr('直接連進本服務的來源 IP') }}</b>{{ tr('」在此清單內時才採信帳號標頭（不看') }}
+        <code>X-Forwarded-For</code>{{ tr('，無法偽造）。請務必讓 Python 服務只綁') }}
+        <code>127.0.0.1</code>{{ tr('，且 Nginx 一律覆寫此標頭。') }}
       </div>
     </div>
   </fieldset>
-  <p><button class="btn btn-primary" id="pxSaveBtn">{{ icon('check', size=14) }} 儲存 Reverse Proxy SSO</button> <span id="pxSaveResult" class="muted"></span></p>
+  <p><button class="btn btn-primary" id="pxSaveBtn">{{ icon('check', size=14) }} {{ tr('儲存 Reverse Proxy SSO') }}</button> <span id="pxSaveResult" class="muted"></span></p>
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
@@ -388,10 +388,10 @@
   // base URL + OIDC + SAML 一起原子儲存（後端 /admin/sso/save 一次收全部），
   // 所以頁面上有兩顆「儲存」（共用設定區一顆、底部一顆）都呼叫同一個儲存。
   async function doSaveAll(btn, resultEl){
-    btn.disabled = true; resultEl.textContent = '儲存中…';
+    btn.disabled = true; resultEl.textContent = tr('儲存中…');
     try {
       const r = await postJson('/admin/sso/save', collect());
-      resultEl.textContent = r.ok ? '✓ 已儲存' : ('✗ ' + await window.friendlyServerError(r, '儲存失敗'));
+      resultEl.textContent = r.ok ? '✓ 已儲存' : ('✗ ' + await window.friendlyServerError(r, tr('儲存失敗')));
     } catch(e){ resultEl.textContent = '✗ ' + e; }
     finally { btn.disabled = false; }
   }
@@ -399,7 +399,7 @@
   if ($('saveBtnTop')) $('saveBtnTop').addEventListener('click', () => doSaveAll($('saveBtnTop'), $('saveResultTop')));
 
   async function runTest(provider, resultEl){
-    resultEl.textContent = '測試中…';
+    resultEl.textContent = tr('測試中…');
     try {
       // Save first so the test runs against the latest values.
       await postJson('/admin/sso/save', collect());
@@ -415,7 +415,7 @@
   // --- Reverse Proxy SSO (separate save; own endpoint) ---
   $('pxSaveBtn').addEventListener('click', async () => {
     const btn = $('pxSaveBtn'); btn.disabled = true;
-    $('pxSaveResult').textContent = '儲存中…';
+    $('pxSaveResult').textContent = tr('儲存中…');
     try {
       const body = {
         enabled: $('px_enabled').checked,
@@ -424,8 +424,8 @@
         trusted_proxies: $('px_trusted').value,
       };
       const r = await postJson('/admin/sso/proxy-save', body);
-      if (!r.ok) { $('pxSaveResult').textContent = '✗ ' + await window.friendlyServerError(r, '儲存失敗'); }
-      else { $('pxSaveResult').textContent = '✓ 已儲存'; }
+      if (!r.ok) { $('pxSaveResult').textContent = '✗ ' + await window.friendlyServerError(r, tr('儲存失敗')); }
+      else { $('pxSaveResult').textContent = tr('✓ 已儲存'); }
     } catch(e){ $('pxSaveResult').textContent = '✗ ' + e; }
     finally { btn.disabled = false; }
   });

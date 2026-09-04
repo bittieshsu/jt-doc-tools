@@ -1,25 +1,25 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}欄位同義詞 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('欄位同義詞') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('book', size=22) }} 欄位同義詞</h1>
-<p class="muted">一個 <code>key</code> 可以對應多個 <b>同義詞</b>（用逗號分隔）。PDF 中如果出現任一個同義詞，就會當成該 <code>key</code> 的欄位並填入公司資料。儲存於 <code>data/label_synonyms.json</code>。</p>
+<h1>{{ icon('book', size=22) }} {{ tr('欄位同義詞') }}</h1>
+<p class="muted">{{ tr('一個') }} <code>key</code> {{ tr('可以對應多個') }} <b>{{ tr('同義詞') }}</b>{{ tr('（用逗號分隔）。PDF 中如果出現任一個同義詞，就會當成該') }} <code>key</code> {{ tr('的欄位並填入公司資料。儲存於') }} <code>data/label_synonyms.json</code>。</p>
 
 <div class="panel">
-  <h2>{{ icon('list', size=18) }} 同義詞對照表</h2>
+  <h2>{{ icon('list', size=18) }} {{ tr('同義詞對照表') }}</h2>
   <div class="profile-toolbar">
-    <button class="btn" id="addRow" type="button">{{ icon('plus') }}新增 key</button>
-    <button class="btn btn-primary" id="saveBtn" type="button">{{ icon('save') }}儲存</button>
+    <button class="btn" id="addRow" type="button">{{ icon('plus') }}{{ tr('新增 key') }}</button>
+    <button class="btn btn-primary" id="saveBtn" type="button">{{ icon('save') }}{{ tr('儲存') }}</button>
     <span data-s="sda5cd676"></span>
-    <a class="btn" href="/admin/synonyms/export" download>{{ icon('download') }}匯出 JSON</a>
-    <button class="btn" id="importMergeBtn" type="button" title="保留現有同義詞，新檔案的 key 補上去；同 key 兩邊的同義詞做聯集">{{ icon('upload') }}匯入（合併）</button>
-    <button class="btn btn-danger" id="importReplaceBtn" type="button" title="清掉現有所有同義詞，只保留匯入檔內容（不可還原）">{{ icon('upload') }}匯入（取代）</button>
+    <a class="btn" href="/admin/synonyms/export" download>{{ icon('download') }}{{ tr('匯出 JSON') }}</a>
+    <button class="btn" id="importMergeBtn" type="button" title="保留現有同義詞，新檔案的 key 補上去；同 key 兩邊的同義詞做聯集">{{ icon('upload') }}{{ tr('匯入（合併）') }}</button>
+    <button class="btn btn-danger" id="importReplaceBtn" type="button" title="清掉現有所有同義詞，只保留匯入檔內容（不可還原）">{{ icon('upload') }}{{ tr('匯入（取代）') }}</button>
     <input type="file" id="importFile" accept="application/json,.json" data-s="scb458930">
     <span class="muted" id="status"></span>
   </div>
   <table class="profile-table">
     <thead>
-      <tr><th data-s="s8f77872c">canonical key</th><th>同義詞（逗號分隔）</th><th data-s="sc5ac9c43"></th></tr>
+      <tr><th data-s="s8f77872c">canonical key</th><th>{{ tr('同義詞（逗號分隔）') }}</th><th data-s="sc5ac9c43"></th></tr>
     </thead>
     <tbody id="rows">
       {% for r in rows %}
@@ -97,9 +97,9 @@ saveBtn.addEventListener('click', async () => {
     body: JSON.stringify({ rows }),
   });
   if (res.ok) {
-    saveBtn.innerHTML = '✓ 已儲存';
+    saveBtn.innerHTML = tr('✓ 已儲存');
     saveBtn.classList.add('saved-flash');
-    showToast('同義詞已儲存', 'ok');
+    showToast(tr('同義詞已儲存'), 'ok');
     setTimeout(() => {
       saveBtn.innerHTML = saveBtnOriginalHTML;
       saveBtn.classList.remove('saved-flash');
@@ -108,7 +108,7 @@ saveBtn.addEventListener('click', async () => {
   } else {
     saveBtn.innerHTML = saveBtnOriginalHTML;
     saveBtn.disabled = false;
-    showToast('儲存失敗', 'err');
+    showToast(tr('儲存失敗'), 'err');
   }
 });
 
@@ -144,7 +144,7 @@ importFile.addEventListener('change', async () => {
   const res = await fetch('/admin/synonyms/import', { method: 'POST', body: fd });
   importFile.value = '';
   if (!res.ok) {
-    showToast('匯入失敗：' + (await res.text()), 'err');
+    showToast(tr('匯入失敗：') + (await res.text()), 'err');
     return;
   }
   const j = await res.json();

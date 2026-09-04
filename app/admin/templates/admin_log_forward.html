@@ -1,24 +1,24 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}記錄轉送 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('記錄轉送') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('gear', size=22) }} 記錄轉送</h1>
-<p class="muted">把稽核記錄轉發到外部 log server (Splunk / Graylog / SIEM…)。
+<h1>{{ icon('gear', size=22) }} {{ tr('記錄轉送') }}</h1>
+<p class="muted">{{ tr('把稽核記錄轉發到外部 log server (Splunk / Graylog / SIEM…)。
 支援 syslog / CEF / GELF 三種格式，多個 destination 可以同時啟用。
-失敗會 retry 3 次後放棄並寫入本地稽核（<code>audit_forward_failed</code>）。</p>
+失敗會 retry 3 次後放棄並寫入本地稽核（') }}<code>audit_forward_failed</code>）。</p>
 
 <div class="panel">
   <div data-s="s3390deba">
-    <h2 data-s="s1386d503">{{ icon('globe', size=18) }} 轉發目的地</h2>
-    <button class="btn btn-primary" id="addBtn" type="button">{{ icon('plus', size=14) }} 新增</button>
+    <h2 data-s="s1386d503">{{ icon('globe', size=18) }} {{ tr('轉發目的地') }}</h2>
+    <button class="btn btn-primary" id="addBtn" type="button">{{ icon('plus', size=14) }} {{ tr('新增') }}</button>
   </div>
 
   <table id="destTable" data-s="s553a645f">
     <thead>
       <tr>
-        <th>啟用</th>
-        <th title="自訂識別名稱（多個 destination 時方便區分，例如 Splunk Prod / Graylog Backup）。留空會自動帶入 {format}://{host}:{port}。">名稱</th>
-        <th>格式</th><th>傳輸</th>
+        <th>{{ tr('啟用') }}</th>
+        <th title="自訂識別名稱（多個 destination 時方便區分，例如 Splunk Prod / Graylog Backup）。留空會自動帶入 {format}://{host}:{port}。">{{ tr('名稱') }}</th>
+        <th>{{ tr('格式') }}</th><th>{{ tr('傳輸') }}</th>
         <th>Host <span data-s="sbc8099b4" title="必填">*</span></th>
         <th>Port</th><th></th>
       </tr>
@@ -27,7 +27,7 @@
   </table>
 
   <p data-s="s553a645f">
-    <button class="btn btn-primary" id="saveBtn" type="button">{{ icon('save', size=14) }} 儲存所有變更</button>
+    <button class="btn btn-primary" id="saveBtn" type="button">{{ icon('save', size=14) }} {{ tr('儲存所有變更') }}</button>
     <span class="muted" id="status" data-s="sc57a38d4"></span>
   </p>
 </div>
@@ -127,7 +127,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     body: JSON.stringify({destinations: dests}),
   });
   if (r.ok) {
-    document.getElementById('status').textContent = '✓ 已儲存';
+    document.getElementById('status').textContent = tr('✓ 已儲存');
     document.getElementById('status').style.color = '#16a34a';
   } else {
     let detail = '';
@@ -140,7 +140,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     };
     detail = tr[detail] || detail;
     await window.showAlert('儲存失敗：' + detail, {title:'錯誤'});
-    document.getElementById('status').textContent = '✗ 儲存失敗';
+    document.getElementById('status').textContent = tr('✗ 儲存失敗');
     document.getElementById('status').style.color = '#dc2626';
   }
 });

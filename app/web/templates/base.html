@@ -662,11 +662,11 @@
         <summary><span class="sb-group-icon">{{ icon('gear', size=15) }}</span>{{ tr('設定') }}<span class="sb-count">{{ nav_settings(request)|length }}</span></summary>
         <div class="sb-items">
           {% for s in nav_settings(request) %}
-          <a class="sb-item" href="{{ s.url }}" data-name="{{ s.name }} {{ s.description }} {{ s.keywords }}">
+          <a class="sb-item" href="{{ s.url }}" data-name="{{ s.name }} {{ s.description }} {{ s.keywords }}{% if ui_locale(request) != 'zh-Hant' %} {{ tr(s.name) }} {{ tr(s.description) }}{% endif %}">
             <span class="sb-item-icon">{{ icon(s.icon, size=18) }}</span>
             <span class="sb-item-text">
-              <span class="sb-item-name">{{ s.name }}</span>
-              <span class="sb-item-desc">{{ s.description }}</span>
+              <span class="sb-item-name">{{ tr(s.name) }}</span>
+              <span class="sb-item-desc">{{ tr(s.description) }}</span>
             </span>
           </a>
           {% endfor %}

@@ -1,73 +1,73 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}相依套件檢查 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('相依套件檢查') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('gear', size=22) }} 相依套件檢查</h1>
+<h1>{{ icon('gear', size=22) }} {{ tr('相依套件檢查') }}</h1>
 <p class="muted">
-  本工具列出所有需要的系統套件、Python 相依套件與字型，並顯示在這台機器上是否安裝、版本、以及缺漏時的安裝指令。
-  選用相依（標 <span class="dep-soft">optional</span>）缺失時相關功能會自動跳過，本體仍可運作；必要相依缺失則影響核心功能。
+  {{ tr('本工具列出所有需要的系統套件、Python 相依套件與字型，並顯示在這台機器上是否安裝、版本、以及缺漏時的安裝指令。
+  選用相依（標') }} <span class="dep-soft">optional</span>{{ tr('）缺失時相關功能會自動跳過，本體仍可運作；必要相依缺失則影響核心功能。') }}
 </p>
 
 <div class="panel ver-panel" id="versionPanel">
   <div class="ver-grid">
     <div class="ver-card">
-      <div class="ver-label">本機版本</div>
+      <div class="ver-label">{{ tr('本機版本') }}</div>
       <div class="ver-num" id="curVer">v{{ app_version }}</div>
     </div>
     <div class="ver-card" id="latestVerBox">
-      <div class="ver-label">GitHub 最新版本</div>
-      <div class="ver-num ver-num-pending" id="latestVer">尚未檢查</div>
-      <div class="ver-hint" id="latestVerHint">點右側按鈕主動偵測（不會自動連網）</div>
+      <div class="ver-label">{{ tr('GitHub 最新版本') }}</div>
+      <div class="ver-num ver-num-pending" id="latestVer">{{ tr('尚未檢查') }}</div>
+      <div class="ver-hint" id="latestVerHint">{{ tr('點右側按鈕主動偵測（不會自動連網）') }}</div>
     </div>
   </div>
-  <button class="btn ver-btn" type="button" id="btnCheckLatest">{{ icon('refresh', size=14) }} 檢查 GitHub 最新版本</button>
+  <button class="btn ver-btn" type="button" id="btnCheckLatest">{{ icon('refresh', size=14) }} {{ tr('檢查 GitHub 最新版本') }}</button>
   {# 授權與原始碼取得管道。本程式以 AGPL-3.0 釋出，第 13 條要求「透過網路與
      軟體互動的使用者」拿得到對應的原始碼 —— 固定放在這一頁，這裡本來就是
      講版本與相依套件授權的地方（v1.14.58 從側欄搬過來）。 #}
   <div class="ver-license">
-    授權：<b>AGPL-3.0-or-later</b> ·
+    {{ tr('授權：') }}<b>AGPL-3.0-or-later</b> ·
     <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener"
-       title="本程式以 AGPL-3.0 授權；點此取得完整原始碼">取得原始碼</a>
+       title="本程式以 AGPL-3.0 授權；點此取得完整原始碼">{{ tr('取得原始碼') }}</a>
   </div>
 </div>
 
 <div class="panel">
   <div class="dep-summary-bar">
-    <h2 data-s="s1386d503">{{ icon('gauge', size=18) }} 總覽</h2>
+    <h2 data-s="s1386d503">{{ icon('gauge', size=18) }} {{ tr('總覽') }}</h2>
     <div class="dep-stat-cards" id="depStatCards">
       <div class="dep-stat dep-stat-ok">
         <div class="dep-stat-num" id="statOk">—<span class="dep-stat-of" id="statTotal"></span></div>
-        <div class="dep-stat-label">就緒</div>
+        <div class="dep-stat-label">{{ tr('就緒') }}</div>
       </div>
       <div class="dep-stat dep-stat-bad" id="statBadCard">
         <div class="dep-stat-num" id="statBad">—</div>
-        <div class="dep-stat-label">必要相依缺</div>
+        <div class="dep-stat-label">{{ tr('必要相依缺') }}</div>
       </div>
       <div class="dep-stat dep-stat-warn" id="statWarnCard">
         <div class="dep-stat-num" id="statWarn">—</div>
-        <div class="dep-stat-label">選用相依缺</div>
+        <div class="dep-stat-label">{{ tr('選用相依缺') }}</div>
       </div>
     </div>
     <button class="btn btn-small" type="button" id="btnRefresh">
-      {{ icon('refresh') }} 重新檢查
+      {{ icon('refresh') }} {{ tr('重新檢查') }}
     </button>
   </div>
 
   <table class="dep-table">
     <thead>
       <tr>
-        <th>狀態</th>
-        <th>套件 / 相依</th>
-        <th>分類</th>
-        <th>版本 / 備註</th>
-        <th>影響</th>
+        <th>{{ tr('狀態') }}</th>
+        <th>{{ tr('套件 / 相依') }}</th>
+        <th>{{ tr('分類') }}</th>
+        <th>{{ tr('版本 / 備註') }}</th>
+        <th>{{ tr('影響') }}</th>
       </tr>
     </thead>
     <tbody id="dep-tbody">
       <tr id="depLoadingRow">
         <td colspan="5" data-s="sea8a9570">
           <span class="dep-spinner" aria-hidden="true"></span>
-          <span data-s="s044eb717">正在檢查系統相依套件…</span>
+          <span data-s="s044eb717">{{ tr('正在檢查系統相依套件…') }}</span>
         </td>
       </tr>
     </tbody>
@@ -391,7 +391,7 @@
     const btn = document.getElementById('btnRefresh');
     btn.disabled = true;
     const orig = btn.innerHTML;
-    btn.innerHTML = '檢查中…';
+    btn.innerHTML = tr('檢查中…');
     try {
       // 重新檢查按鈕跳過快取，強制重跑（v1.7.48）
       await loadDeps(true);
@@ -412,15 +412,15 @@
     const hintEl = document.getElementById('latestVerHint');
     const orig = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '查詢中…';
-    verEl.textContent = '查詢中…';
+    btn.innerHTML = tr('查詢中…');
+    verEl.textContent = tr('查詢中…');
     verEl.className = 'ver-num ver-num-pending';
-    if (hintEl) hintEl.textContent = '正在連線到 api.github.com，最多 8 秒…';
+    if (hintEl) hintEl.textContent = tr('正在連線到 api.github.com，最多 8 秒…');
     try {
       const r = await fetch('/admin/api/check-latest-version', {method: 'POST'});
       const j = await r.json();
       if (!j.ok) {
-        verEl.textContent = '查詢失敗';
+        verEl.textContent = tr('查詢失敗');
         verEl.className = 'ver-num ver-num-pending';
         if (hintEl) hintEl.innerHTML = '<span data-s="sc9e34862">' + (j.error || '未知錯誤') + '</span>';
         verBox.classList.remove('is-current', 'is-outdated', 'is-newer');
@@ -460,7 +460,7 @@
         if (hintEl) hintEl.innerHTML = hintHtml;
       }
     } catch (e) {
-      verEl.textContent = '查詢失敗';
+      verEl.textContent = tr('查詢失敗');
       if (hintEl) hintEl.textContent = e.message;
     } finally {
       btn.innerHTML = orig;

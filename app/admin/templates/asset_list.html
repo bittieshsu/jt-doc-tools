@@ -1,53 +1,53 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}資產管理 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('資產管理') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('image', size=22) }} 資產管理</h1>
-<p class="muted">管理所有工具會用到的圖片資產（印章、浮水印、簽名、Logo）。</p>
+<h1>{{ icon('image', size=22) }} {{ tr('資產管理') }}</h1>
+<p class="muted">{{ tr('管理所有工具會用到的圖片資產（印章、浮水印、簽名、Logo）。') }}</p>
 
 <details class="panel" open>
-  <summary>新增資產</summary>
+  <summary>{{ tr('新增資產') }}</summary>
   <form method="post" action="/admin/assets/upload" enctype="multipart/form-data" id="assetUploadForm">
     <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
-    {% with upload_id='assetUpload', accept='image/png,image/jpeg,application/pdf', input_name='file', hint='PNG（建議帶透明背景）/ JPEG / PDF（自動取第一頁轉圖片）' %}
+    {% with upload_id='assetUpload', accept='image/png,image/jpeg,application/pdf', input_name='file', hint=tr('PNG（建議帶透明背景）/ JPEG / PDF（自動取第一頁轉圖片）') %}
       {% include "components/file_upload.html" %}
     {% endwith %}
     <div class="form-row">
-      <label>名稱</label>
+      <label>{{ tr('名稱') }}</label>
       <input class="field" type="text" name="name" required placeholder="例：公司報價章" />
     </div>
     <div class="form-row">
-      <label>類型</label>
+      <label>{{ tr('類型') }}</label>
       <select class="field" name="type">
-        <option value="stamp">印章 stamp</option>
-        <option value="watermark">浮水印 watermark</option>
-        <option value="signature">簽名 signature</option>
+        <option value="stamp">{{ tr('印章 stamp') }}</option>
+        <option value="watermark">{{ tr('浮水印 watermark') }}</option>
+        <option value="signature">{{ tr('簽名 signature') }}</option>
         <option value="logo">Logo</option>
       </select>
     </div>
     <div class="form-row">
-      <label>去背</label>
+      <label>{{ tr('去背') }}</label>
       <label class="field" data-s="s0f07f19c">
         <input type="checkbox" name="remove_bg" value="true" />
-        白底自動轉透明（掃描件／手機拍攝的簽名或印章適用）
+        {{ tr('白底自動轉透明（掃描件／手機拍攝的簽名或印章適用）') }}
       </label>
     </div>
     <div class="form-row">
       <label></label>
       <div class="field" data-s="s49587d05">
-        <button class="btn btn-primary" type="submit" id="assetUploadBtn" disabled>{{ icon('upload') }}上傳</button>
-        <span class="muted" data-s="s6b9c179a">建議 PNG 帶透明背景；上傳後可在編輯頁調整預設位置與尺寸。</span>
+        <button class="btn btn-primary" type="submit" id="assetUploadBtn" disabled>{{ icon('upload') }}{{ tr('上傳') }}</button>
+        <span class="muted" data-s="s6b9c179a">{{ tr('建議 PNG 帶透明背景；上傳後可在編輯頁調整預設位置與尺寸。') }}</span>
       </div>
     </div>
   </form>
 </details>
 
 <h2 data-s="sc367548a">
-  現有資產
+  {{ tr('現有資產') }}
   <span data-s="sda5cd676"></span>
-  <a class="btn btn-small" href="/admin/assets/export" download>{{ icon('download') }}匯出 ZIP</a>
-  <button class="btn btn-small" id="assetImportMergeBtn" type="button" title="保留現有資產，把匯入檔的資產通通新增進來（id 重複會自動分配新 id）">{{ icon('upload') }}匯入（合併）</button>
-  <button class="btn btn-small btn-danger" id="assetImportReplaceBtn" type="button" title="清掉現有所有資產，整個換成匯入檔內容（不可還原）">{{ icon('upload') }}匯入（取代）</button>
+  <a class="btn btn-small" href="/admin/assets/export" download>{{ icon('download') }}{{ tr('匯出 ZIP') }}</a>
+  <button class="btn btn-small" id="assetImportMergeBtn" type="button" title="保留現有資產，把匯入檔的資產通通新增進來（id 重複會自動分配新 id）">{{ icon('upload') }}{{ tr('匯入（合併）') }}</button>
+  <button class="btn btn-small btn-danger" id="assetImportReplaceBtn" type="button" title="清掉現有所有資產，整個換成匯入檔內容（不可還原）">{{ icon('upload') }}{{ tr('匯入（取代）') }}</button>
   <input type="file" id="assetImportFile" accept="application/zip,.zip" data-s="scb458930">
 </h2>
 <div class="asset-list">
@@ -58,19 +58,19 @@
            data-zoom-src="/admin/assets/{{ a.id }}/file?v={{ a.updated_at|default(0) }}" data-zoom-name="{{ a.name }}"
            title="點一下放大檢視" />
     </div>
-    <div class="name">{{ a.name }} {% if a.is_default %}<span class="badge-default">預設</span>{% endif %}</div>
+    <div class="name">{{ a.name }} {% if a.is_default %}<span class="badge-default">{{ tr('預設') }}</span>{% endif %}</div>
     <div class="meta">{{ a.type }} · {{ '%.0f'|format(a.preset.width_mm) }}×{{ '%.0f'|format(a.preset.height_mm) }} mm</div>
     <div class="actions">
-      <a class="btn btn-small" href="/admin/assets/{{ a.id }}/edit">{{ icon('edit') }}編輯</a>
-      <a class="btn btn-small" href="/admin/assets/{{ a.id }}/file" download="{{ a.name }}.png">{{ icon('download') }}下載</a>
+      <a class="btn btn-small" href="/admin/assets/{{ a.id }}/edit">{{ icon('edit') }}{{ tr('編輯') }}</a>
+      <a class="btn btn-small" href="/admin/assets/{{ a.id }}/file" download="{{ a.name }}.png">{{ icon('download') }}{{ tr('下載') }}</a>
       {% if not a.is_default %}
-      <button class="btn btn-small" data-act="default" data-id="{{ a.id }}">{{ icon('star') }}設為預設</button>
+      <button class="btn btn-small" data-act="default" data-id="{{ a.id }}">{{ icon('star') }}{{ tr('設為預設') }}</button>
       {% endif %}
-      <button class="btn btn-small btn-danger" data-act="delete" data-id="{{ a.id }}">{{ icon('trash') }}刪除</button>
+      <button class="btn btn-small btn-danger" data-act="delete" data-id="{{ a.id }}">{{ icon('trash') }}{{ tr('刪除') }}</button>
     </div>
   </div>
   {% else %}
-  <div class="empty">尚未上傳任何資產。</div>
+  <div class="empty">{{ tr('尚未上傳任何資產。') }}</div>
   {% endfor %}
 </div>
 
@@ -103,12 +103,12 @@
   if (form) form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const orig = btn.innerHTML;
-    btn.disabled = true; btn.innerHTML = '上傳中…';
+    btn.disabled = true; btn.innerHTML = tr('上傳中…');
     try {
       const r = await fetch('/admin/assets/upload', {
         method: 'POST', body: new FormData(form), headers: { 'Accept': 'application/json' } });
       if (r.ok) { location.href = (await r.json()).edit_url; return; }
-      (window.showAlert || window.alert)(await window.friendlyServerError(r, '上傳失敗'));
+      (window.showAlert || window.alert)(await window.friendlyServerError(r, tr('上傳失敗')));
     } catch (err) {
       (window.showAlert || window.alert)('上傳失敗：' + err.message);
     }
@@ -125,7 +125,7 @@ document.addEventListener('click', async (e) => {
       await fetch(`/admin/assets/${id}/default`, { method: 'POST' });
       location.reload();
     } else if (btn.dataset.act === 'delete') {
-      if (!(await window.showConfirm('確定刪除這個資產？此動作無法復原。', { title: '刪除資產', kind: 'danger', okText: '刪除' }))) return;
+      if (!(await window.showConfirm(tr('確定刪除這個資產？此動作無法復原。'), { title: '刪除資產', kind: 'danger', okText: '刪除' }))) return;
       await fetch(`/admin/assets/${id}/delete`, { method: 'POST' });
       location.reload();
     }
@@ -185,7 +185,7 @@ assetImportFile.addEventListener('change', async () => {
   const res = await fetch('/admin/assets/import', { method: 'POST', body: fd });
   assetImportFile.value = '';
   if (!res.ok) {
-    showToast('匯入失敗：' + (await res.text()), 'err');
+    showToast(tr('匯入失敗：') + (await res.text()), 'err');
     return;
   }
   const j = await res.json();

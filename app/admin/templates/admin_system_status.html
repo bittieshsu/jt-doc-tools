@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}系統狀態 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('系統狀態') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 /* ---- 可上傳的檔案大小 ---- */
@@ -105,15 +105,15 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('eye', size=22) }} 系統狀態</h1>
-<p class="muted">主機資源用量 + 各使用者檔案佔用。資料每 5 秒自動刷新。</p>
+<h1>{{ icon('eye', size=22) }} {{ tr('系統狀態') }}</h1>
+<p class="muted">{{ tr('主機資源用量 + 各使用者檔案佔用。資料每 5 秒自動刷新。') }}</p>
 
 <div class="ss-controls">
   <label data-s="se6cd16ab">
     <input type="checkbox" id="ssAutoRefresh" checked>
-    自動刷新（每 5 秒）
+    {{ tr('自動刷新（每 5 秒）') }}
   </label>
-  <button class="btn" id="ssRefreshNow">{{ icon('refresh', size=14) }} 立即刷新</button>
+  <button class="btn" id="ssRefreshNow">{{ icon('refresh', size=14) }} {{ tr('立即刷新') }}</button>
   <span class="muted" id="ssLastUpdate"></span>
 </div>
 
@@ -125,18 +125,18 @@
   {# h2 必須是 panel 的**第一個子元素**，全站的收折機制才接得到它
      （`static/js/toast.js`）。原本包在兩層 div 裡，所以只有這張卡片點了
      沒反應 —— 使用者回報「也要有標題可以按下收折」。 #}
-  <h2 data-s="s1f06255c">{{ icon('chart-bar', size=18) }} 使用者檔案用量</h2>
+  <h2 data-s="s1f06255c">{{ icon('chart-bar', size=18) }} {{ tr('使用者檔案用量') }}</h2>
   <div data-s="se0fca1a9">
     <div>
       <p class="muted" data-s="s51c48588">
-        包含暫存上傳檔（owner ACL 紀錄追蹤）+ 表單填寫 / 用印 / 浮水印歷史目錄。
+        {{ tr('包含暫存上傳檔（owner ACL 紀錄追蹤）+ 表單填寫 / 用印 / 浮水印歷史目錄。
         匿名 / 未追蹤的檔案歸到「(匿名)」列。檔案多時統計約需數秒～數十秒，
-        結果會 cache 60 秒。
+        結果會 cache 60 秒。') }}
       </p>
     </div>
     <div data-s="sc445ac64">
       <span class="muted" id="ssUserAge" data-s="s6b9c179a"></span>
-      <button class="btn" id="ssUserRefresh">{{ icon('refresh', size=14) }} 重新統計</button>
+      <button class="btn" id="ssUserRefresh">{{ icon('refresh', size=14) }} {{ tr('重新統計') }}</button>
     </div>
   </div>
   <div id="ssUserStats" data-s="s5371db16">
@@ -145,62 +145,62 @@
       <div class="ss-skel-bar"></div>
       <div class="ss-skel-bar" data-s="s6f982333"></div>
       <div data-s="sb28d471e">
-        正在掃描檔案系統… (檔案多時可能需要數秒)
+        {{ tr('正在掃描檔案系統… (檔案多時可能需要數秒)') }}
       </div>
     </div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 class="ssdb-head">{{ icon('archive', size=18) }} 資料庫健康狀態
+  <h2 class="ssdb-head">{{ icon('archive', size=18) }} {{ tr('資料庫健康狀態') }}
     <span class="ssdb-actions">
-      <button class="btn btn-small" id="ssDbDeep" type="button">{{ icon('search', size=15) }} 完整檢查</button>
-      <button class="btn btn-small" id="ssDbBackup" type="button">{{ icon('archive', size=15) }} 立即備份</button>
+      <button class="btn btn-small" id="ssDbDeep" type="button">{{ icon('search', size=15) }} {{ tr('完整檢查') }}</button>
+      <button class="btn btn-small" id="ssDbBackup" type="button">{{ icon('archive', size=15) }} {{ tr('立即備份') }}</button>
     </span>
   </h2>
-  <p class="muted ssdb-note">資料庫毀損時，重要的兩個（使用者與權限、稽核記錄）可從熱備份還原。備份每天自動做一份，保留 7 份。<b>網頁上不去時</b>可用命令列：<code>jtdt db-check</code> / <code>jtdt db-restore auth.sqlite</code>。</p>
+  <p class="muted ssdb-note">{{ tr('資料庫毀損時，重要的兩個（使用者與權限、稽核記錄）可從熱備份還原。備份每天自動做一份，保留 7 份。') }}<b>{{ tr('網頁上不去時') }}</b>{{ tr('可用命令列：') }}<code>jtdt db-check</code> / <code>jtdt db-restore auth.sqlite</code>。</p>
   <div class="ssdb-table-wrap"><table class="ssdb-table">
-    <thead><tr><th>資料庫</th><th>狀態</th><th>大小</th><th>備份</th></tr></thead>
-    <tbody id="ssDbBody"><tr><td colspan="4" class="muted">載入中…</td></tr></tbody>
+    <thead><tr><th>{{ tr('資料庫') }}</th><th>{{ tr('狀態') }}</th><th>{{ tr('大小') }}</th><th>{{ tr('備份') }}</th></tr></thead>
+    <tbody id="ssDbBody"><tr><td colspan="4" class="muted">{{ tr('載入中…') }}</td></tr></tbody>
   </table></div>
   <div class="muted ssdb-foot" id="ssDbFoot"></div>
 </div>
 
 <div class="panel">
-  <h2>{{ icon('upload', size=18) }} 可上傳的檔案大小</h2>
+  <h2>{{ icon('upload', size=18) }} {{ tr('可上傳的檔案大小') }}</h2>
   <p class="muted ul-lead">
-    「我們可以拉多大的檔案進來？」這個問題的答案散在好幾個地方 ——
+    {{ tr('「我們可以拉多大的檔案進來？」這個問題的答案散在好幾個地方 ——
     反向代理的設定在別台機器上，各工具的上限寫在程式裡，工作區的額度在管理設定。
-    這裡把它們集中列出來。<b>實際能上傳的大小取決於最小的那一層。</b>
+    這裡把它們集中列出來。') }}<b>{{ tr('實際能上傳的大小取決於最小的那一層。') }}</b>
   </p>
 
   <div class="ul-proxy">
     <div class="ul-proxy-head">
       <div>
-        <div class="ul-proxy-title">反向代理 / 這條路徑的實際上限</div>
+        <div class="ul-proxy-title">{{ tr('反向代理 / 這條路徑的實際上限') }}</div>
         <div class="muted ul-proxy-note">
-          HTTP <b>沒有</b>任何 header 會公告這個值。這裡用 <code>Expect: 100-continue</code>
-          問出來：只送標頭、<b>不傳任何資料</b>，看對方回「可以開始傳」還是「太大」，
-          再二分收斂。量到的是<b>整條路徑</b>（可能有多層代理）真正的瓶頸。
+          HTTP <b>{{ tr('沒有') }}</b>{{ tr('任何 header 會公告這個值。這裡用') }} <code>Expect: 100-continue</code>
+          {{ tr('問出來：只送標頭、') }}<b>{{ tr('不傳任何資料') }}</b>{{ tr('，看對方回「可以開始傳」還是「太大」，
+          再二分收斂。量到的是') }}<b>{{ tr('整條路徑') }}</b>{{ tr('（可能有多層代理）真正的瓶頸。') }}
         </div>
       </div>
       <button class="btn" type="button" id="btnProbeUpload">
-        {{ icon('refresh', size=14) }} 偵測
+        {{ icon('refresh', size=14) }} {{ tr('偵測') }}
       </button>
     </div>
     <div class="ul-proxy-result" id="ulProbeResult">
-      <span class="muted">尚未偵測（不會傳輸檔案，通常一兩秒完成）</span>
+      <span class="muted">{{ tr('尚未偵測（不會傳輸檔案，通常一兩秒完成）') }}</span>
     </div>
   </div>
 
   <table class="ul-table">
-    <thead><tr><th>項目</th><th>上限</th><th>能不能調</th><th>說明</th></tr></thead>
+    <thead><tr><th>{{ tr('項目') }}</th><th>{{ tr('上限') }}</th><th>{{ tr('能不能調') }}</th><th>{{ tr('說明') }}</th></tr></thead>
     <tbody>
       {% for r in upload_limits %}
       <tr>
         <td>{{ r.label }}</td>
-        <td class="ul-val">{% if r.value_mb %}{{ r.value_mb }} MB{% else %}<span class="ul-none">無上限</span>{% endif %}</td>
-        <td>{% if r.configurable %}<span class="ul-cfg">可在管理介面調</span>{% else %}<span class="muted">程式內建</span>{% endif %}</td>
+        <td class="ul-val">{% if r.value_mb %}{{ r.value_mb }} MB{% else %}<span class="ul-none">{{ tr('無上限') }}</span>{% endif %}</td>
+        <td>{% if r.configurable %}<span class="ul-cfg">{{ tr('可在管理介面調') }}</span>{% else %}<span class="muted">{{ tr('程式內建') }}</span>{% endif %}</td>
         <td class="muted ul-note">{{ r.note }}</td>
       </tr>
       {% endfor %}
@@ -487,7 +487,7 @@ async function refreshHost() {
     const host = await r.json();
     renderHost(host);
     prev = { host };
-    $('ssLastUpdate').textContent = '最後更新：' + new Date().toLocaleTimeString();
+    $('ssLastUpdate').textContent = tr('最後更新：') + new Date().toLocaleTimeString();
   } catch (e) {
     $('ssBanner').innerHTML = `<div class="ss-disabled-banner">主機資料錯誤：${escapeHTML(e.message)}</div>`;
   }
@@ -503,7 +503,7 @@ async function refreshUsers(force) {
       <div class="ss-skel-bar" data-s="s518cc756"></div>
       <div data-s="sb28d471e">
         正在重新統計（檔案多時可能需要數秒）…</div></div>`;
-    $('ssUserAge').textContent = '統計中…';
+    $('ssUserAge').textContent = tr('統計中…');
   }
   try {
     const url = '/admin/system-status/users' + (force ? '?force=1' : '');
@@ -518,7 +518,7 @@ async function refreshUsers(force) {
       $('ssUserAge').textContent =
         `資料時間：${Math.round(users.age_seconds)} 秒前 (cache)`;
     } else {
-      $('ssUserAge').textContent = '資料時間：剛剛';
+      $('ssUserAge').textContent = tr('資料時間：剛剛');
     }
   } catch (e) {
     $('ssUserStats').innerHTML = `<div class="ss-disabled-banner">取得使用者統計錯誤：${escapeHTML(e.message)}</div>`;
@@ -611,7 +611,7 @@ $('ssDbDeep').addEventListener('click', async (e) => {
   // 完整檢查會連大檔一起讀（統編資料庫上 GB，可能要一分鐘）→ 先講清楚再跑，
   // 不要讓人以為當掉了
   const _go = await (window.showConfirm
-    ? window.showConfirm('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，'
+    ? window.showConfirm(tr('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，')
                          + '可能需要一分鐘以上。要繼續嗎？',
                          { title: '完整檢查', okText: '開始檢查' })
     : Promise.resolve(confirm('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，'
@@ -619,25 +619,25 @@ $('ssDbDeep').addEventListener('click', async (e) => {
   if (!_go) return;
   b.disabled = true;
   const old = b.textContent;
-  b.textContent = '檢查中…（可能需要一分鐘）';
+  b.textContent = tr('檢查中…（可能需要一分鐘）');
   try { await refreshDbs(true); }
   finally { b.disabled = false; b.textContent = old; }
 });
 
 $('ssDbBackup').addEventListener('click', async (e) => {
   const b = e.currentTarget;
-  b.disabled = true; b.textContent = '備份中…';
+  b.disabled = true; b.textContent = tr('備份中…');
   try {
     const r = await fetch('/admin/system-status/databases/backup',
                           { method: 'POST' });
     const d = await r.json();
     if (d.report && d.report.skipped && d.report.skipped.length) {
-      alert('部分資料庫已毀損而未備份：'
+      alert(tr('部分資料庫已毀損而未備份：')
             + d.report.skipped.map((x) => x.file).join('、')
             + '\n（不可用毀損的檔案覆蓋既有備份）');
     }
     await refreshDbs(false);
-  } finally { b.disabled = false; b.textContent = '立即備份'; }
+  } finally { b.disabled = false; b.textContent = tr('立即備份'); }
 });
 
 refreshDbs(false);
@@ -651,11 +651,11 @@ refreshDbs(false);
   const out = document.getElementById('ulProbeResult');
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    out.textContent = '偵測中…';
+    out.textContent = tr('偵測中…');
     try {
       const r = await fetch('/admin/api/upload-limit/probe', { method: 'POST' });
       if (!r.ok) {
-        out.textContent = await window.friendlyServerError(r, '偵測失敗');
+        out.textContent = await window.friendlyServerError(r, tr('偵測失敗'));
         return;
       }
       const d = await r.json();
@@ -663,7 +663,7 @@ refreshDbs(false);
       if (!d.ok) {
         const s = document.createElement('span');
         s.className = 'ul-bad';
-        s.textContent = '問不出來：' + (d.detail || '');
+        s.textContent = tr('問不出來：') + (d.detail || '');
         out.appendChild(s);
         return;
       }
@@ -677,7 +677,7 @@ refreshDbs(false);
                        + '（' + d.requests + ' 次探測，未傳輸資料）';
       out.appendChild(note);
     } catch (e) {
-      out.textContent = '偵測失敗';
+      out.textContent = tr('偵測失敗');
     } finally {
       btn.disabled = false;
     }

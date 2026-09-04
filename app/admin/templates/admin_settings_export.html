@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}設定備份 / 匯入 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('設定備份 / 匯入') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('archive', size=22) }} 設定備份 / 匯入</h1>
-<p class="muted">把 admin 設定打包成單一壓縮檔備份 / 搬遷到另一台機器；或從備份檔還原。
-匯出與匯入都可<b>逐項勾選</b>要包含 / 還原哪些設定。匯入時會自動把現有設定備份成
-<code>.bak.&lt;時間&gt;</code>（在 <code>data/</code> 下），失敗可手動 rollback。</p>
+<h1>{{ icon('archive', size=22) }} {{ tr('設定備份 / 匯入') }}</h1>
+<p class="muted">{{ tr('把 admin 設定打包成單一壓縮檔備份 / 搬遷到另一台機器；或從備份檔還原。
+匯出與匯入都可') }}<b>{{ tr('逐項勾選') }}</b>{{ tr('要包含 / 還原哪些設定。匯入時會自動把現有設定備份成') }}
+<code>.bak.&lt;時間&gt;</code>{{ tr('（在') }} <code>data/</code> {{ tr('下），失敗可手動 rollback。') }}</p>
 
 <div class="panel">
-  <h2 class="exp-h2">{{ icon('download', size=18) }} 1. 匯出設定</h2>
-  <p class="muted">勾選要包含的設定類別（預設全含；歷史記錄預設不含）。檔名格式：<code>jtdt-settings-YYYYMMDD-HHMMSS-vX.Y.Z.zip</code></p>
+  <h2 class="exp-h2">{{ icon('download', size=18) }} {{ tr('1. 匯出設定') }}</h2>
+  <p class="muted">{{ tr('勾選要包含的設定類別（預設全含；歷史記錄預設不含）。檔名格式：') }}<code>jtdt-settings-YYYYMMDD-HHMMSS-vX.Y.Z.zip</code></p>
   <div class="exp-toolbar">
-    <button type="button" class="btn btn-small" id="expAll">全選</button>
-    <button type="button" class="btn btn-small" id="expNone">全不選</button>
-    <button type="button" class="btn btn-small" id="expDefault">回預設</button>
+    <button type="button" class="btn btn-small" id="expAll">{{ tr('全選') }}</button>
+    <button type="button" class="btn btn-small" id="expNone">{{ tr('全不選') }}</button>
+    <button type="button" class="btn btn-small" id="expDefault">{{ tr('回預設') }}</button>
   </div>
   <div class="cat-grid">
     {% for c in categories %}
@@ -21,54 +21,54 @@
       <input type="checkbox" class="exp-cat" data-id="{{ c.id }}" data-default="{{ '1' if c.default else '0' }}"
              {% if c.default and c.present %}checked{% endif %} {% if not c.present %}disabled{% endif %}>
       <span class="cat-body">
-        <span class="cat-label">{{ c.label }}{% if c.sensitive %} <span class="cat-badge">敏感</span>{% endif %}{% if not c.present %} <span class="muted">（無）</span>{% endif %}</span>
+        <span class="cat-label">{{ c.label }}{% if c.sensitive %} <span class="cat-badge">{{ tr('敏感') }}</span>{% endif %}{% if not c.present %} <span class="muted">{{ tr('（無）') }}</span>{% endif %}</span>
         <span class="cat-desc muted">{{ c.desc }} · {{ c.detail }}</span>
       </span>
     </label>
     {% endfor %}
   </div>
-  <p class="muted exp-note">說明：<b>認證設定</b>含 LDAP / SSO / Reverse Proxy SSO；<b>角色與權限</b>含角色定義、工具權限、新使用者預設角色與 OU 權限規則（<b>不含使用者帳號 / 密碼</b>，換機後帳號請另建或由 AD / LDAP 同步）。</p>
+  <p class="muted exp-note">{{ tr('說明：') }}<b>{{ tr('認證設定') }}</b>{{ tr('含 LDAP / SSO / Reverse Proxy SSO；') }}<b>{{ tr('角色與權限') }}</b>{{ tr('含角色定義、工具權限、新使用者預設角色與 OU 權限規則（') }}<b>{{ tr('不含使用者帳號 / 密碼') }}</b>{{ tr('，換機後帳號請另建或由 AD / LDAP 同步）。') }}</p>
   <div class="exp-actions">
-    <button class="btn btn-primary" id="btnExport">{{ icon('download', size=14) }} 下載備份壓縮檔</button>
+    <button class="btn btn-primary" id="btnExport">{{ icon('download', size=14) }} {{ tr('下載備份壓縮檔') }}</button>
     <span id="exportStatus" class="muted"></span>
   </div>
 </div>
 
 <div class="panel">
-  <h2 class="exp-h2">{{ icon('upload', size=18) }} 2. 匯入備份</h2>
-  <p class="muted"><b>注意</b>：匯入會覆蓋所勾選類別的現有設定，現有檔會自動備份成 <code>.bak.&lt;時間&gt;</code>。建議先匯出當前設定當保險。</p>
+  <h2 class="exp-h2">{{ icon('upload', size=18) }} {{ tr('2. 匯入備份') }}</h2>
+  <p class="muted"><b>{{ tr('注意') }}</b>{{ tr('：匯入會覆蓋所勾選類別的現有設定，現有檔會自動備份成') }} <code>.bak.&lt;時間&gt;</code>{{ tr('。建議先匯出當前設定當保險。') }}</p>
   <input type="file" id="importFile" accept=".zip" class="field">
   <div class="exp-actions">
-    <button class="btn" id="btnPreview" disabled>{{ icon('search', size=14) }} 讀取備份內容</button>
+    <button class="btn" id="btnPreview" disabled>{{ icon('search', size=14) }} {{ tr('讀取備份內容') }}</button>
     <span id="previewStatus" class="muted"></span>
   </div>
   <div id="importCats" class="cat-grid import-cats" hidden></div>
   <div id="importActions" class="exp-actions" hidden>
-    <button class="btn btn-danger" id="btnImport">{{ icon('upload', size=14) }} 匯入勾選的類別</button>
+    <button class="btn btn-danger" id="btnImport">{{ icon('upload', size=14) }} {{ tr('匯入勾選的類別') }}</button>
     <span id="importStatus" class="muted"></span>
   </div>
 </div>
 
 <div class="panel">
-  <h2 class="exp-h2">{{ icon('refresh', size=18) }} 3. 排程自動匯出</h2>
-  <p class="muted">定期自動產生一份設定備份到指定目錄，並依「保留份數」輪替舊檔。預設關閉。</p>
-  <label class="sched-enable"><input type="checkbox" id="schEnabled" {% if sched.enabled %}checked{% endif %}> 啟用排程自動匯出</label>
+  <h2 class="exp-h2">{{ icon('refresh', size=18) }} {{ tr('3. 排程自動匯出') }}</h2>
+  <p class="muted">{{ tr('定期自動產生一份設定備份到指定目錄，並依「保留份數」輪替舊檔。預設關閉。') }}</p>
+  <label class="sched-enable"><input type="checkbox" id="schEnabled" {% if sched.enabled %}checked{% endif %}> {{ tr('啟用排程自動匯出') }}</label>
   <div class="grid2">
     <div>
-      <label>週期</label>
+      <label>{{ tr('週期') }}</label>
       <select id="schInterval" class="field">
-        <option value="daily" {% if sched.interval == 'daily' %}selected{% endif %}>每日</option>
-        <option value="weekly" {% if sched.interval == 'weekly' %}selected{% endif %}>每週</option>
+        <option value="daily" {% if sched.interval == 'daily' %}selected{% endif %}>{{ tr('每日') }}</option>
+        <option value="weekly" {% if sched.interval == 'weekly' %}selected{% endif %}>{{ tr('每週') }}</option>
       </select>
     </div>
-    <div><label>保留份數（超過刪最舊）</label><input id="schKeep" class="field" type="number" min="1" max="500" value="{{ sched.keep }}"></div>
+    <div><label>{{ tr('保留份數（超過刪最舊）') }}</label><input id="schKeep" class="field" type="number" min="1" max="500" value="{{ sched.keep }}"></div>
   </div>
-  <label>匯出目錄（留空 = <code>{{ sched.target_dir_effective }}</code>）</label>
+  <label>{{ tr('匯出目錄（留空 =') }} <code>{{ sched.target_dir_effective }}</code>）</label>
   <input id="schTargetDir" class="field" value="{{ sched.target_dir }}" placeholder="{{ sched.target_dir_effective }}">
-  <p class="muted">排程匯出的類別＝上方「匯出設定」目前勾選的項目（按下方儲存時一併記錄）。</p>
+  <p class="muted">{{ tr('排程匯出的類別＝上方「匯出設定」目前勾選的項目（按下方儲存時一併記錄）。') }}</p>
   <div class="exp-actions">
-    <button class="btn btn-primary" id="btnSchedSave">{{ icon('check', size=14) }} 儲存排程</button>
-    <button class="btn" id="btnRunNow">{{ icon('download', size=14) }} 立即測試匯出一次</button>
+    <button class="btn btn-primary" id="btnSchedSave">{{ icon('check', size=14) }} {{ tr('儲存排程') }}</button>
+    <button class="btn" id="btnRunNow">{{ icon('download', size=14) }} {{ tr('立即測試匯出一次') }}</button>
     <span id="schStatus" class="muted"></span>
   </div>
   <p class="muted" id="schLast">{% if sched.last_run %}上次執行：{{ sched.last_result }}{% else %}尚未執行過{% endif %}</p>
@@ -111,15 +111,15 @@ $('expDefault').addEventListener('click', () =>
 
 $('btnExport').addEventListener('click', async () => {
   const selected = selectedExportCats();
-  if (!selected.length) { $('exportStatus').textContent = '請至少勾選一項'; return; }
+  if (!selected.length) { $('exportStatus').textContent = tr('請至少勾選一項'); return; }
   $('btnExport').disabled = true;
-  $('exportStatus').textContent = '產生中…';
+  $('exportStatus').textContent = tr('產生中…');
   try {
     const r = await fetch('/admin/settings-export/download', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({selected}),
     });
-    if (!r.ok) { $('exportStatus').textContent = '失敗：' + await window.friendlyServerError(r, '匯出失敗'); return; }
+    if (!r.ok) { $('exportStatus').textContent = tr('失敗：') + await window.friendlyServerError(r, tr('匯出失敗')); return; }
     const blob = await r.blob();
     const dispo = r.headers.get('content-disposition') || '';
     const m = dispo.match(/filename="([^"]+)"/);
@@ -128,9 +128,9 @@ $('btnExport').addEventListener('click', async () => {
     const a = document.createElement('a');
     a.href = url; a.download = fname; document.body.appendChild(a);
     a.click(); a.remove(); URL.revokeObjectURL(url);
-    $('exportStatus').textContent = '已下載 ' + fname;
+    $('exportStatus').textContent = tr('已下載 ') + fname;
   } catch (e) {
-    $('exportStatus').textContent = '錯誤：' + e.message;
+    $('exportStatus').textContent = tr('錯誤：') + e.message;
   } finally { $('btnExport').disabled = false; }
 });
 
@@ -144,11 +144,11 @@ $('btnPreview').addEventListener('click', async () => {
   const f = $('importFile').files[0];
   if (!f) return;
   $('btnPreview').disabled = true;
-  $('previewStatus').textContent = '讀取中…';
+  $('previewStatus').textContent = tr('讀取中…');
   try {
     const fd = new FormData(); fd.append('file', f);
     const r = await fetch('/admin/settings-export/preview', {method:'POST', body: fd});
-    if (!r.ok) { $('previewStatus').textContent = await window.friendlyServerError(r, '讀取失敗'); return; }
+    if (!r.ok) { $('previewStatus').textContent = await window.friendlyServerError(r, tr('讀取失敗')); return; }
     const j = await r.json();
     importToken = j.token;
     const cats = (j.manifest && j.manifest.categories) || [];
@@ -171,39 +171,39 @@ $('btnPreview').addEventListener('click', async () => {
     });
     $('importCats').hidden = false;
     $('importActions').hidden = false;
-    $('previewStatus').textContent = '備份版本 ' + ((j.manifest && j.manifest.app_version) || '?') + '，勾選要還原的類別後匯入。';
+    $('previewStatus').textContent = tr('備份版本 ') + ((j.manifest && j.manifest.app_version) || '?') + '，勾選要還原的類別後匯入。';
   } catch (e) {
-    $('previewStatus').textContent = '錯誤：' + e.message;
+    $('previewStatus').textContent = tr('錯誤：') + e.message;
   } finally { $('btnPreview').disabled = false; }
 });
 
 $('btnImport').addEventListener('click', async () => {
   const selected = Array.from(document.querySelectorAll('.imp-cat:checked')).map(c => c.dataset.id);
-  if (!selected.length) { $('importStatus').textContent = '請至少勾選一項'; return; }
-  if (!importToken) { $('importStatus').textContent = '請先讀取備份內容'; return; }
-  const ok = await showConfirm('即將還原勾選的 ' + selected.length + ' 個設定類別，現有檔會自動備份成 .bak。\n\n確認繼續？',
+  if (!selected.length) { $('importStatus').textContent = tr('請至少勾選一項'); return; }
+  if (!importToken) { $('importStatus').textContent = tr('請先讀取備份內容'); return; }
+  const ok = await showConfirm(tr('即將還原勾選的 ') + selected.length + ' 個設定類別，現有檔會自動備份成 .bak。\n\n確認繼續？',
     {okText: '匯入', kind: 'danger'});
   if (!ok) return;
   $('btnImport').disabled = true;
-  $('importStatus').textContent = '匯入中…';
+  $('importStatus').textContent = tr('匯入中…');
   try {
     const r = await fetch('/admin/settings-export/import', {
       method:'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({token: importToken, selected}),
     });
-    if (!r.ok) { $('importStatus').textContent = await window.friendlyServerError(r, '匯入失敗'); return; }
+    if (!r.ok) { $('importStatus').textContent = await window.friendlyServerError(r, tr('匯入失敗')); return; }
     const j = await r.json();
-    $('importStatus').textContent = '已匯入 ' + j.imported_files + ' 個檔案' + (j.rbac ? ('、角色/權限 ' + j.rbac.roles + ' 個') : '') + '，原檔已備份。建議重啟服務套用新設定。';
+    $('importStatus').textContent = tr('已匯入 ') + j.imported_files + ' 個檔案' + (j.rbac ? ('、角色/權限 ' + j.rbac.roles + ' 個') : '') + '，原檔已備份。建議重啟服務套用新設定。';
     importToken = null;
   } catch (e) {
-    $('importStatus').textContent = '錯誤：' + e.message;
+    $('importStatus').textContent = tr('錯誤：') + e.message;
   } finally { $('btnImport').disabled = false; }
 });
 
 // ---- scheduled export ----
 $('btnSchedSave').addEventListener('click', async () => {
   $('btnSchedSave').disabled = true;
-  $('schStatus').textContent = '儲存中…';
+  $('schStatus').textContent = tr('儲存中…');
   try {
     const body = {
       enabled: $('schEnabled').checked,
@@ -216,22 +216,22 @@ $('btnSchedSave').addEventListener('click', async () => {
       method:'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body),
     });
-    if (!r.ok) { $('schStatus').textContent = await window.friendlyServerError(r, '儲存失敗'); return; }
-    $('schStatus').textContent = '已儲存';
-  } catch (e) { $('schStatus').textContent = '錯誤：' + e.message; }
+    if (!r.ok) { $('schStatus').textContent = await window.friendlyServerError(r, tr('儲存失敗')); return; }
+    $('schStatus').textContent = tr('已儲存');
+  } catch (e) { $('schStatus').textContent = tr('錯誤：') + e.message; }
   finally { $('btnSchedSave').disabled = false; }
 });
 
 $('btnRunNow').addEventListener('click', async () => {
   $('btnRunNow').disabled = true;
-  $('schStatus').textContent = '匯出中…';
+  $('schStatus').textContent = tr('匯出中…');
   try {
     const r = await fetch('/admin/settings-export/run-now', {method:'POST'});
-    if (!r.ok) { $('schStatus').textContent = await window.friendlyServerError(r, '測試失敗'); return; }
+    if (!r.ok) { $('schStatus').textContent = await window.friendlyServerError(r, tr('測試失敗')); return; }
     const j = await r.json();
-    $('schStatus').textContent = '已匯出：' + (j.result && j.result.file || '');
-    $('schLast').textContent = '上次執行：剛剛（' + (j.result && j.result.file_count) + ' 檔）';
-  } catch (e) { $('schStatus').textContent = '錯誤：' + e.message; }
+    $('schStatus').textContent = tr('已匯出：') + (j.result && j.result.file || '');
+    $('schLast').textContent = tr('上次執行：剛剛（') + (j.result && j.result.file_count) + ' 檔）';
+  } catch (e) { $('schStatus').textContent = tr('錯誤：') + e.message; }
   finally { $('btnRunNow').disabled = false; }
 });
 </script>

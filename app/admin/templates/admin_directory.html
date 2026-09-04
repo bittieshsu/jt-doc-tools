@@ -1,47 +1,47 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}目錄瀏覽 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('目錄瀏覽') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('building', size=22) }} 目錄瀏覽（{{ auth_backend|upper if is_directory_backend else 'AD/LDAP' }}）</h1>
+<h1>{{ icon('building', size=22) }} {{ tr('目錄瀏覽（') }}{{ auth_backend|upper if is_directory_backend else 'AD/LDAP' }}）</h1>
 
 {% if not is_directory_backend %}
-<div class="panel"><p class="muted">目前認證後端不是 LDAP / AD。到「認證設定」啟用後即可用樹狀瀏覽 OU、挑選使用者、把權限指派給 OU。</p></div>
+<div class="panel"><p class="muted">{{ tr('目前認證後端不是 LDAP / AD。到「認證設定」啟用後即可用樹狀瀏覽 OU、挑選使用者、把權限指派給 OU。') }}</p></div>
 {% else %}
 <div class="panel">
-  <p class="muted dir-intro">左側展開 OU 樹,點某個 OU 看它底下的使用者（<span class="dir-in-legend">綠底 = 已登入過本系統</span>）。把角色<b>指派給 OU</b> → 該 OU（含子 OU）下所有使用者登入時即生效,不必等他們先登入。</p>
+  <p class="muted dir-intro">{{ tr('左側展開 OU 樹,點某個 OU 看它底下的使用者（') }}<span class="dir-in-legend">{{ tr('綠底 = 已登入過本系統') }}</span>{{ tr('）。把角色') }}<b>{{ tr('指派給 OU') }}</b> {{ tr('→ 該 OU（含子 OU）下所有使用者登入時即生效,不必等他們先登入。') }}</p>
 </div>
 
 <!-- 模式切換：已選定（依 filter 規則只留選定分支）/ 全部（完整目錄樹） -->
 <div class="dir-modebar">
   <div class="dir-modes" role="tablist">
-    <button class="btn btn-small dir-mode-btn" data-mode="selected" type="button">已選定</button>
-    <button class="btn btn-small dir-mode-btn" data-mode="all" type="button">全部</button>
+    <button class="btn btn-small dir-mode-btn" data-mode="selected" type="button">{{ tr('已選定') }}</button>
+    <button class="btn btn-small dir-mode-btn" data-mode="all" type="button">{{ tr('全部') }}</button>
   </div>
-  <button class="btn btn-small" id="dirFilterToggle" type="button">{{ icon('settings', size=13) }} 設定 filter</button>
+  <button class="btn btn-small" id="dirFilterToggle" type="button">{{ icon('settings', size=13) }} {{ tr('設定 filter') }}</button>
   <span class="muted dir-mode-hint" id="dirModeHint"></span>
 </div>
 
 <div class="panel dir-filter-panel" id="dirFilterPanel" hidden>
   <div class="dff-head">
-    <b>「已選定」filter 規則</b>
-    <span class="muted">符合<b>任一</b>規則的 OU / 群組 / 使用者才會出現；樹只保留通往它們的分支。全域一份，所有管理員共用。</span>
+    <b>{{ tr('「已選定」filter 規則') }}</b>
+    <span class="muted">{{ tr('符合') }}<b>{{ tr('任一') }}</b>{{ tr('規則的 OU / 群組 / 使用者才會出現；樹只保留通往它們的分支。全域一份，所有管理員共用。') }}</span>
   </div>
   <div id="dffRules"></div>
-  <button class="btn btn-small" id="dffAdd" type="button">＋ 新增規則</button>
+  <button class="btn btn-small" id="dffAdd" type="button">{{ tr('＋ 新增規則') }}</button>
   <div class="dff-actions">
-    <label class="dir-role-chk"><input type="checkbox" id="dffDefaultSelected"> 進頁面預設用「已選定」模式</label>
-    <button class="btn btn-primary btn-small" id="dffSave" type="button">{{ icon('save', size=12) }} 儲存並套用</button>
+    <label class="dir-role-chk"><input type="checkbox" id="dffDefaultSelected"> {{ tr('進頁面預設用「已選定」模式') }}</label>
+    <button class="btn btn-primary btn-small" id="dffSave" type="button">{{ icon('save', size=12) }} {{ tr('儲存並套用') }}</button>
     <span class="muted" id="dffMsg"></span>
   </div>
 </div>
 
 <div class="tree-legend muted">
-  {{ icon('building', size=13) }} OU　{{ icon('layers', size=13) }} 容器 / 其他　{{ icon('user', size=13) }} 群組　{{ icon('id-card', size=13) }} 角色
+  {{ icon('building', size=13) }} OU　{{ icon('layers', size=13) }} {{ tr('容器 / 其他') }}　{{ icon('user', size=13) }} {{ tr('群組') }}　{{ icon('id-card', size=13) }} {{ tr('角色') }}
 </div>
 <div class="dir-wrap">
-  <div class="dir-tree panel"><div class="dir-tree-scroll" id="dirTree"><div class="dir-loading">載入目錄樹…</div></div></div>
+  <div class="dir-tree panel"><div class="dir-tree-scroll" id="dirTree"><div class="dir-loading">{{ tr('載入目錄樹…') }}</div></div></div>
   <div class="dir-detail panel" id="dirDetail">
-    <p class="muted">← 從左側點一個 OU</p>
+    <p class="muted">{{ tr('← 從左側點一個 OU') }}</p>
   </div>
 </div>
 
@@ -60,20 +60,20 @@
     <div class="ud-dn" id="udDn"></div>
     <input class="field ud-filter" id="udFilter" type="search" placeholder="篩選欄位或值…" hidden>
     <div class="dir-roles-box" id="udRolesBox" hidden>
-      <div class="dir-roles-title"><b>指派角色給這位使用者</b>
+      <div class="dir-roles-title"><b>{{ tr('指派角色給這位使用者') }}</b>
         <span class="muted" id="udRoleState"></span></div>
       <div class="dir-roles-chks" id="udRoleChks"></div>
       <div class="dir-roles-actions">
-        <button class="btn btn-primary btn-small" id="udSaveRoles" type="button">{{ icon('save', size=12) }} 儲存角色</button>
+        <button class="btn btn-primary btn-small" id="udSaveRoles" type="button">{{ icon('save', size=12) }} {{ tr('儲存角色') }}</button>
         <span class="muted" id="udRoleMsg"></span>
       </div>
-      <p class="muted ud-role-note">還沒登入過的人也可以先指派 —— 系統會建一個
-        <b>未啟用</b>的對應帳號（不設密碼、仍走目錄驗證），本人第一次登入時自動啟用，
-        <b>而且這裡指派的角色不會被預設角色蓋掉</b>。</p>
+      <p class="muted ud-role-note">{{ tr('還沒登入過的人也可以先指派 —— 系統會建一個') }}
+        <b>{{ tr('未啟用') }}</b>{{ tr('的對應帳號（不設密碼、仍走目錄驗證），本人第一次登入時自動啟用，') }}
+        <b>{{ tr('而且這裡指派的角色不會被預設角色蓋掉') }}</b>。</p>
     </div>
-    <div id="udBody"><p class="muted">查詢中…</p></div>
+    <div id="udBody"><p class="muted">{{ tr('查詢中…') }}</p></div>
     <div data-s="s9fa82b78">
-      <button class="btn" type="button" id="udClose">{{ icon('close', size=14) }} 關閉</button>
+      <button class="btn" type="button" id="udClose">{{ icon('close', size=14) }} {{ tr('關閉') }}</button>
     </div>
   </div>
 </div>
@@ -86,8 +86,8 @@
     <div class="ud-dn" id="grDn"></div>
     <div class="dir-roles-chks" id="grChks"></div>
     <div data-s="s9fa82b78">
-      <button class="btn btn-primary" type="button" id="grSave">{{ icon('save', size=14) }} 儲存角色</button>
-      <button class="btn" type="button" id="grClose">{{ icon('close', size=14) }} 關閉</button>
+      <button class="btn btn-primary" type="button" id="grSave">{{ icon('save', size=14) }} {{ tr('儲存角色') }}</button>
+      <button class="btn" type="button" id="grClose">{{ icon('close', size=14) }} {{ tr('關閉') }}</button>
       <span class="muted" id="grMsg"></span>
     </div>
   </div>
@@ -244,7 +244,7 @@ function makeNode(node) {
   }
   row.appendChild(nm);
   if (node.roles && node.roles.length) {
-    const b = document.createElement('span'); b.className = 'tn-hasrole'; b.textContent = '● 有權限'; row.appendChild(b);
+    const b = document.createElement('span'); b.className = 'tn-hasrole'; b.textContent = tr('● 有權限'); row.appendChild(b);
   }
   const kids = document.createElement('div'); kids.className = 'tn-children'; kids.style.display = 'none';
   let loaded = false;
@@ -296,7 +296,7 @@ function makeNodeStatic(node) {
     row.appendChild(mb);
   }
   if (node.roles && node.roles.length) {
-    const b = document.createElement('span'); b.className = 'tn-hasrole'; b.textContent = '● 有權限'; row.appendChild(b);
+    const b = document.createElement('span'); b.className = 'tn-hasrole'; b.textContent = tr('● 有權限'); row.appendChild(b);
   }
   const kids = document.createElement('div'); kids.className = 'tn-children';
   if (hasKids) node.children.forEach(c => kids.appendChild(makeNodeStatic(c)));
@@ -400,7 +400,7 @@ $('dirFilterToggle').addEventListener('click', () => {
 });
 $('dffSave').addEventListener('click', async () => {
   const rules = collectRules().filter(r => r.name_contains || r.types.length || r.base_dn);
-  const msg = $('dffMsg'); msg.textContent = '儲存中…';
+  const msg = $('dffMsg'); msg.textContent = tr('儲存中…');
   const default_mode = $('dffDefaultSelected').checked ? 'selected' : 'all';
   try {
     const r = await fetch('/admin/directory/filter', {
@@ -410,7 +410,7 @@ $('dffSave').addEventListener('click', async () => {
     const j = await r.json();
     if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
     DIR_RULES = j.rules || []; DIR_DEFAULT_MODE = j.default_mode; renderRules();
-    msg.textContent = '已儲存';
+    msg.textContent = tr('已儲存');
     setTimeout(() => { msg.textContent = ''; }, 2000);
     setMode('selected');   // 套用後切到已選定看結果
   } catch (e) { msg.textContent = '✗ ' + e.message; }
@@ -491,7 +491,7 @@ async function openOU(dn, name) {
   }
   $('duSaveRoles').addEventListener('click', async () => {
     const roles = Array.from(box.querySelectorAll('.du-role:checked')).map(c => c.value);
-    const msg = $('duRoleMsg'); msg.textContent = ' 儲存中…';
+    const msg = $('duRoleMsg'); msg.textContent = tr(' 儲存中…');
     try {
       const r = await fetch('/admin/directory/ou-roles', {
         method:'POST', headers:{'Content-Type':'application/json'},
@@ -529,7 +529,7 @@ function _roleChks(checked) {
 
 async function loadUserRoles(dn) {
   const box = $('udRolesBox'), st = $('udRoleState'), msg = $('udRoleMsg');
-  msg.textContent = ''; st.textContent = '（讀取中…）';
+  msg.textContent = ''; st.textContent = tr('（讀取中…）');
   $('udRoleChks').innerHTML = '';
   box.hidden = false;
   try {
@@ -608,7 +608,7 @@ document.getElementById('udFilter').addEventListener('input', function () {
 document.getElementById('udSaveRoles').addEventListener('click', async () => {
   const roles = Array.from(document.querySelectorAll('#udRoleChks .ud-role:checked'))
                      .map(c => c.value);
-  const msg = $('udRoleMsg'); msg.textContent = ' 儲存中…';
+  const msg = $('udRoleMsg'); msg.textContent = tr(' 儲存中…');
   const username = _udLogin;
   try {
     const r = await fetch('/admin/directory/user-roles', {
@@ -630,7 +630,7 @@ async function openGroupRoles(dn) {
   $('grDn').textContent = dn;
   $('grMsg').textContent = '';
   $('grChks').innerHTML = '<p class="muted">讀取中…</p>';
-  $('grName').textContent = '群組角色';
+  $('grName').textContent = tr('群組角色');
   $('grModal').hidden = false;
   try {
     const r = await fetch('/admin/directory/group-roles?dn=' + encodeURIComponent(dn));
@@ -648,7 +648,7 @@ async function openGroupRoles(dn) {
 document.getElementById('grSave').addEventListener('click', async () => {
   const roles = Array.from(document.querySelectorAll('#grChks .gr-role:checked'))
                      .map(c => c.value);
-  const msg = $('grMsg'); msg.textContent = ' 儲存中…';
+  const msg = $('grMsg'); msg.textContent = tr(' 儲存中…');
   try {
     const r = await fetch('/admin/directory/group-roles', {
       method: 'POST', headers: {'Content-Type': 'application/json'},

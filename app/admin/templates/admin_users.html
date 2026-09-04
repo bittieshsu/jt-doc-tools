@@ -1,22 +1,22 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}使用者管理 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('使用者管理') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('id-card', size=22) }} 使用者管理</h1>
+<h1>{{ icon('id-card', size=22) }} {{ tr('使用者管理') }}</h1>
 {% if not auth_on %}
 <div class="panel" data-s="s642302c7">
-  ⚠ 認證目前沒啟用。建立的使用者會被保留但要等
-  <a href="/admin/auth-settings">啟用認證</a> 後才有作用。
+  {{ tr('⚠ 認證目前沒啟用。建立的使用者會被保留但要等') }}
+  <a href="/admin/auth-settings">{{ tr('啟用認證') }}</a> {{ tr('後才有作用。') }}
 </div>
 {% endif %}
 
 <details class="panel" {% if not users %}open{% endif %}>
-  <summary><b>新增使用者</b></summary>
+  <summary><b>{{ tr('新增使用者') }}</b></summary>
   <form id="newUserForm" data-s="s23e0c196">
-    <div><label>帳號<br><input class="field" name="username" required pattern="[A-Za-z0-9._\-]+" maxlength="64"></label></div>
-    <div><label>顯示名稱<br><input class="field" name="display_name" maxlength="64"></label></div>
-    <div><label>密碼<br><input class="field" name="password" type="password" minlength="8" maxlength="128" required></label></div>
-    <div><label>初始角色
+    <div><label>{{ tr('帳號') }}<br><input class="field" name="username" required pattern="[A-Za-z0-9._\-]+" maxlength="64"></label></div>
+    <div><label>{{ tr('顯示名稱') }}<br><input class="field" name="display_name" maxlength="64"></label></div>
+    <div><label>{{ tr('密碼') }}<br><input class="field" name="password" type="password" minlength="8" maxlength="128" required></label></div>
+    <div><label>{{ tr('初始角色') }}
       <br>
       <select class="field" name="role" data-s="s4a93029a">
         {% for r in all_roles %}
@@ -24,14 +24,14 @@
         {% endfor %}
       </select>
     </label></div>
-    <button class="btn btn-primary" type="submit">{{ icon('plus', size=14) }} 建立</button>
+    <button class="btn btn-primary" type="submit">{{ icon('plus', size=14) }} {{ tr('建立') }}</button>
   </form>
 </details>
 
 <div class="panel">
   <div data-s="s5344c165">
-    <h2 data-s="s1386d503">使用者清單（共 <span id="userCount">{{ page_total }}</span> 人）
-      {% if auth_on %}<span class="uf-online-sum" title="最近 {{ online_window_min }} 分鐘內有活動的人數（同一個人開多個瀏覽器只算一位）">{{ online_count }} 人在線</span>{% endif %}
+    <h2 data-s="s1386d503">{{ tr('使用者清單（共') }} <span id="userCount">{{ page_total }}</span> {{ tr('人）') }}
+      {% if auth_on %}<span class="uf-online-sum" title="最近 {{ online_window_min }} 分鐘內有活動的人數（同一個人開多個瀏覽器只算一位）">{{ online_count }} {{ tr('人在線') }}</span>{% endif %}
     </h2>
     <span data-s="sda5cd676"></span>
     {# 篩選全部走伺服器端（連結帶查詢參數）。前端過濾只過濾得到當前這一頁，
@@ -41,19 +41,19 @@
       <input class="field uf-q" type="search" name="q" value="{{ q }}"
              placeholder="搜尋帳號、顯示名稱、信箱…">
       <select class="field uf-sel" name="src">
-        <option value="">所有來源</option>
+        <option value="">{{ tr('所有來源') }}</option>
         {% for v, lab in [('local','本機'),('ldap','LDAP'),('ad','AD'),('oidc','OIDC'),('saml','SAML')] %}
         <option value="{{ v }}"{% if src == v %} selected{% endif %}>{{ lab }}</option>
         {% endfor %}
       </select>
       <select class="field uf-sel" name="state">
-        <option value="">所有狀態</option>
-        <option value="on"{% if state == 'on' %} selected{% endif %}>已啟用</option>
-        <option value="off"{% if state == 'off' %} selected{% endif %}>已停用</option>
-        <option value="never"{% if state == 'never' %} selected{% endif %}>從未登入</option>
+        <option value="">{{ tr('所有狀態') }}</option>
+        <option value="on"{% if state == 'on' %} selected{% endif %}>{{ tr('已啟用') }}</option>
+        <option value="off"{% if state == 'off' %} selected{% endif %}>{{ tr('已停用') }}</option>
+        <option value="never"{% if state == 'never' %} selected{% endif %}>{{ tr('從未登入') }}</option>
       </select>
-      <button class="btn btn-small btn-primary" type="submit">{{ icon('search', size=14) }} 篩選</button>
-      {% if q or src or state %}<a class="btn btn-small" href="/admin/users?view={{ view }}">清除</a>{% endif %}
+      <button class="btn btn-small btn-primary" type="submit">{{ icon('search', size=14) }} {{ tr('篩選') }}</button>
+      {% if q or src or state %}<a class="btn btn-small" href="/admin/users?view={{ view }}">{{ tr('清除') }}</a>{% endif %}
     </form>
     <div class="uf-views">
       {% for v, lab in [('active','使用中'),('directory','目錄鏡射'),('all','全部')] %}
@@ -64,80 +64,80 @@
       <a class="uf-view uf-view-warn{% if view == 'missing' %} active{% endif %}"
          href="/admin/users?view=missing"
          title="上一次完整目錄同步時已經找不到的帳號">
-        目錄已無{% if missing_count %} <b>{{ missing_count }}</b>{% endif %}</a>
+        {{ tr('目錄已無') }}{% if missing_count %} <b>{{ missing_count }}</b>{% endif %}</a>
       {# 這兩個只有 AD 環境才會有數字；0 的時候不顯示，免得佔版面又讓人困惑。 #}
       {% if dir_disabled_count or view == 'dir_disabled' %}
       <a class="uf-view uf-view-warn{% if view == 'dir_disabled' %} active{% endif %}"
          href="/admin/users?view=dir_disabled"
          title="AD 端已經停用的帳號（userAccountControl）——他們登不進來，但本站的角色指派還在">
-        AD 已停用{% if dir_disabled_count %} <b>{{ dir_disabled_count }}</b>{% endif %}</a>
+        {{ tr('AD 已停用') }}{% if dir_disabled_count %} <b>{{ dir_disabled_count }}</b>{% endif %}</a>
       {% endif %}
       {% if pwd_expiring_count or view == 'pwd_expiring' %}
       <a class="uf-view uf-view-warn{% if view == 'pwd_expiring' %} active{% endif %}"
          href="/admin/users?view=pwd_expiring"
          title="{{ pwd_warn_days }} 天內密碼到期（含已過期）">
-        密碼將到期{% if pwd_expiring_count %} <b>{{ pwd_expiring_count }}</b>{% endif %}</a>
+        {{ tr('密碼將到期') }}{% if pwd_expiring_count %} <b>{{ pwd_expiring_count }}</b>{% endif %}</a>
       {% endif %}
     </div>
   </div>
   {% if view == 'missing' %}
   <div class="uf-note{% if not has_full_scan %} uf-note-warn{% endif %}">
     {% if has_full_scan %}
-    這些帳號在<b>上一次完整目錄同步</b>時已經在 AD / LDAP 裡找不到 —— 通常代表離職、
-    停用或被移出同步範圍。系統<b>預設不會自動停用</b>（有人只是暫時被移出範圍，擅自停用
-    會造成更難查的問題），請確認後用下方的批次操作處理。
+    這些帳號在<b>{{ tr('上一次完整目錄同步') }}</b>{{ tr('時已經在 AD / LDAP 裡找不到 —— 通常代表離職、
+    停用或被移出同步範圍。系統') }}<b>{{ tr('預設不會自動停用') }}</b>{{ tr('（有人只是暫時被移出範圍，擅自停用
+    會造成更難查的問題），請確認後用下方的批次操作處理。') }}
     {% if actionable.missing %}
     <button class="btn btn-small btn-danger uf-disable-all" data-view="missing"
-            type="button">全部停用（{{ actionable.missing }} 個還啟用中）</button>
+            type="button">{{ tr('全部停用（') }}{{ actionable.missing }} {{ tr('個還啟用中）') }}</button>
     {% endif %}
     {% else %}
-    {{ icon('warn', size=14) }} 還沒有做過<b>完整</b>目錄同步，因此無法判定誰不見了。
+    {{ icon('warn', size=14) }} {{ tr('還沒有做過') }}<b>{{ tr('完整') }}</b>{{ tr('目錄同步，因此無法判定誰不見了。
     帶名稱過濾的同步只看得到一部分目錄，拿它當基準會把整個組織誤標成離職 ——
-    請先到<a href="/admin/groups">群組管理</a>把名稱過濾清空後執行一次同步。
+    請先到') }}<a href="/admin/groups">{{ tr('群組管理') }}</a>{{ tr('把名稱過濾清空後執行一次同步。') }}
     {% endif %}
   </div>
   {% endif %}
 
   {% if view == 'dir_disabled' %}
   <div class="uf-note">
-    這些帳號在 AD 端的 <code>userAccountControl</code> 已標為停用 —— 他們登不進來，
-    但本站的角色指派與群組成員關係還在。
+    {{ tr('這些帳號在 AD 端的') }} <code>userAccountControl</code> {{ tr('已標為停用 —— 他們登不進來，
+    但本站的角色指派與群組成員關係還在。') }}
     {% if actionable.dir_disabled %}
     <button class="btn btn-small btn-danger uf-disable-all" data-view="dir_disabled"
-            type="button">全部停用（{{ actionable.dir_disabled }} 個還啟用中）</button>
+            type="button">{{ tr('全部停用（') }}{{ actionable.dir_disabled }} {{ tr('個還啟用中）') }}</button>
     {% endif %}
   </div>
   {% endif %}
 
   <div class="uf-bulk" id="ufBulk" hidden>
-    <span class="uf-bulk-n">已選 <b id="ufBulkN">0</b> 個帳號</span>
-    <button class="btn btn-small" type="button" data-bulk="enable">{{ icon('check', size=13) }} 啟用</button>
-    <button class="btn btn-small btn-danger" type="button" data-bulk="disable">{{ icon('lock', size=13) }} 停用</button>
+    <span class="uf-bulk-n">{{ tr('已選') }} <b id="ufBulkN">0</b> {{ tr('個帳號') }}</span>
+    <button class="btn btn-small" type="button" data-bulk="enable">{{ icon('check', size=13) }} {{ tr('啟用') }}</button>
+    <button class="btn btn-small btn-danger" type="button" data-bulk="disable">{{ icon('lock', size=13) }} {{ tr('停用') }}</button>
     <select class="field uf-sel" id="ufBulkRole">
-      <option value="">選擇角色…</option>
+      <option value="">{{ tr('選擇角色…') }}</option>
       {% for r in all_roles %}<option value="{{ r.id }}">{{ r.display_name }}</option>{% endfor %}
     </select>
-    <button class="btn btn-small" type="button" data-bulk="role-add">加上角色</button>
-    <button class="btn btn-small" type="button" data-bulk="role-remove">移除角色</button>
+    <button class="btn btn-small" type="button" data-bulk="role-add">{{ tr('加上角色') }}</button>
+    <button class="btn btn-small" type="button" data-bulk="role-remove">{{ tr('移除角色') }}</button>
     <span class="uf-bulk-sep"></span>
-    <button class="btn btn-small btn-danger" type="button" data-bulk="delete">{{ icon('trash', size=13) }} 刪除</button>
-    <span class="muted uf-bulk-hint">內建管理員與你自己不會被批次停用或刪除。刪除不可還原。</span>
+    <button class="btn btn-small btn-danger" type="button" data-bulk="delete">{{ icon('trash', size=13) }} {{ tr('刪除') }}</button>
+    <span class="muted uf-bulk-hint">{{ tr('內建管理員與你自己不會被批次停用或刪除。刪除不可還原。') }}</span>
   </div>
 
   {% if dir_count %}
-  <p class="muted">此清單顯示<b>已啟用 / 曾登入</b>的使用者。另有 <b>{{ dir_count }}</b> 位由目錄同步鏡射、<b>尚未登入（未啟用）</b>的使用者未列於此 —— 要檢視 / 指派權限 / 逐一啟用，請至 <a href="/admin/directory">目錄瀏覽</a>。他們一旦實際登入即自動啟用並取得預設角色。</p>
+  <p class="muted">{{ tr('此清單顯示') }}<b>{{ tr('已啟用 / 曾登入') }}</b>{{ tr('的使用者。另有') }} <b>{{ dir_count }}</b> {{ tr('位由目錄同步鏡射、') }}<b>{{ tr('尚未登入（未啟用）') }}</b>{{ tr('的使用者未列於此 —— 要檢視 / 指派權限 / 逐一啟用，請至') }} <a href="/admin/directory">{{ tr('目錄瀏覽') }}</a>{{ tr('。他們一旦實際登入即自動啟用並取得預設角色。') }}</p>
   {% endif %}
   <table class="user-table" id="userTable">
     <thead>
       <tr>
         <th class="uf-ck"><input type="checkbox" id="ufAll" title="全選本頁"></th>
-        <th class="sortable" data-sort="text" data-col="1">帳號</th>
-        <th class="sortable" data-sort="text" data-col="2">顯示名稱</th>
-        <th class="sortable" data-sort="text" data-col="3">信箱</th>
-        <th class="sortable" data-sort="text" data-col="4">來源</th>
-        <th class="sortable" data-sort="text" data-col="5">狀態</th>
-        <th class="sortable" data-sort="text" data-col="6">角色</th>
-        <th class="sortable" data-sort="date" data-col="7">最後登入</th>
+        <th class="sortable" data-sort="text" data-col="1">{{ tr('帳號') }}</th>
+        <th class="sortable" data-sort="text" data-col="2">{{ tr('顯示名稱') }}</th>
+        <th class="sortable" data-sort="text" data-col="3">{{ tr('信箱') }}</th>
+        <th class="sortable" data-sort="text" data-col="4">{{ tr('來源') }}</th>
+        <th class="sortable" data-sort="text" data-col="5">{{ tr('狀態') }}</th>
+        <th class="sortable" data-sort="text" data-col="6">{{ tr('角色') }}</th>
+        <th class="sortable" data-sort="date" data-col="7">{{ tr('最後登入') }}</th>
         <th></th>
       </tr>
     </thead>
@@ -147,10 +147,10 @@
         <td class="uf-ck"><input type="checkbox" class="uf-row-ck" value="{{ u.id }}"></td>
         <td>
           <b>{{ u.username }}</b>
-          {% if u.online %}<span class="uf-online" title="最近 {{ online_window_min }} 分鐘內有活動">在線</span>{% endif %}
-          {% if u.dir_disabled %}<span class="uf-addis" title="AD 端已停用（userAccountControl）——這個人登不進來，但本站的角色指派與群組成員關係還在">AD 已停用</span>{% endif %}
-          {% if u.pwd_expiring_soon %}<span class="uf-pwdexp" title="{{ '密碼已過期' if u.pwd_expiry_days < 0 else '密碼即將到期' }}">{% if u.pwd_expiry_days < 0 %}密碼已過期{% else %}密碼 {{ u.pwd_expiry_days }} 天後到期{% endif %}</span>{% endif %}
-          {% if u.directory_missing %}<span class="uf-gone" title="上一次完整目錄同步時，AD / LDAP 裡已經找不到這個帳號">目錄已無</span>{% endif %}
+          {% if u.online %}<span class="uf-online" title="最近 {{ online_window_min }} 分鐘內有活動">{{ tr('在線') }}</span>{% endif %}
+          {% if u.dir_disabled %}<span class="uf-addis" title="AD 端已停用（userAccountControl）——這個人登不進來，但本站的角色指派與群組成員關係還在">{{ tr('AD 已停用') }}</span>{% endif %}
+          {% if u.pwd_expiring_soon %}<span class="uf-pwdexp" title="{{ '密碼已過期' if u.pwd_expiry_days < 0 else '密碼即將到期' }}">{% if u.pwd_expiry_days < 0 %}密碼已過期{% else %}密碼 {{ u.pwd_expiry_days }} {{ tr('天後到期') }}{% endif %}</span>{% endif %}
+          {% if u.directory_missing %}<span class="uf-gone" title="上一次完整目錄同步時，AD / LDAP 裡已經找不到這個帳號">{{ tr('目錄已無') }}</span>{% endif %}
           {% if u.is_admin_seed %}<span class="badge">SEED</span>{% endif %}
         </td>
         <td>{{ u.display_name }}</td>
@@ -160,13 +160,13 @@
           <span class="src-badge src-{{ u.source }}">{{ u.source }}</span>
         </td>
         <td data-sort-key="{{ '1' if u.enabled else '0' }}">
-          {% if u.enabled %}<span data-s="sdeccf9e7">● 啟用</span>
-          {% else %}<span data-s="sbc8099b4">● 停用</span>{% endif %}
+          {% if u.enabled %}<span data-s="sdeccf9e7">{{ tr('● 啟用') }}</span>
+          {% else %}<span data-s="sbc8099b4">{{ tr('● 停用') }}</span>{% endif %}
         </td>
         <td data-sort-key="{{ u.roles|join(',') }}">
           {% if u.roles_display %}
             {% for r in u.roles_display %}<span class="role-chip" title="{{ r.id }}">{{ r.display_name }}</span>{% endfor %}
-          {% else %}<span class="muted">(無)</span>{% endif %}
+          {% else %}<span class="muted">{{ tr('(無)') }}</span>{% endif %}
         </td>
         {# 送 ISO 8601 而不是原始 Unix 秒數：①掃描器會把裸 epoch 判為資訊洩漏；
            ②ISO 字串照字典序排就是時間序，排序功能不受影響；
@@ -179,31 +179,31 @@
           {% if u.locked %}
           <button class="btn btn-small" data-act="unlock" data-uid="{{ u.id }}" data-username="{{ u.username }}"
                   title="清除這個帳號的密碼錯誤次數鎖定"
-                  data-s="s0ad83627">{{ icon('unlock', size=12) }} 解鎖</button>
+                  data-s="s0ad83627">{{ icon('unlock', size=12) }} {{ tr('解鎖') }}</button>
           {% endif %}
           {% if u.is_admin_seed %}
           <button class="btn btn-small" type="button" disabled
-                  title="內建管理員：權限固定為 admin，不可變更">{{ icon('lock', size=12) }} 內建</button>
-          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} 登入裝置</button>
-          <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} 重設密碼</button>
-          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除這個使用者的 TOTP secret，下次登入會看到 QR 重新 setup">{{ icon('refresh-cw', size=12) }} 重設 2FA</button>
+                  title="內建管理員：權限固定為 admin，不可變更">{{ icon('lock', size=12) }} {{ tr('內建') }}</button>
+          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} {{ tr('登入裝置') }}</button>
+          <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} {{ tr('重設密碼') }}</button>
+          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除這個使用者的 TOTP secret，下次登入會看到 QR 重新 setup">{{ icon('refresh-cw', size=12) }} {{ tr('重設 2FA') }}</button>
           {% elif u.is_audit_seed %}
           <button class="btn btn-small" type="button" disabled
-                  title="內建稽核員：強制 2FA，無工具權限，不可刪">{{ icon('lock', size=12) }} 內建</button>
-          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} 登入裝置</button>
-          <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} 重設密碼</button>
-          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除 TOTP secret，下次登入重新顯示 QR setup">{{ icon('refresh-cw', size=12) }} 重設 2FA</button>
+                  title="內建稽核員：強制 2FA，無工具權限，不可刪">{{ icon('lock', size=12) }} {{ tr('內建') }}</button>
+          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} {{ tr('登入裝置') }}</button>
+          <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} {{ tr('重設密碼') }}</button>
+          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除 TOTP secret，下次登入重新顯示 QR setup">{{ icon('refresh-cw', size=12) }} {{ tr('重設 2FA') }}</button>
           {% else %}
           <button class="btn btn-small" data-act="edit"
                   data-username="{{ u.username }}"
                   data-display="{{ u.display_name }}"
                   data-email="{{ u.email }}"
                   data-enabled="{{ '1' if u.enabled else '0' }}"
-                  data-roles="{{ u.roles|join(',') }}">{{ icon('edit', size=12) }} 編輯</button>
-          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} 登入裝置</button>
-          <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} 重設密碼</button>
-          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除 TOTP secret，下次登入重新顯示 QR setup">{{ icon('refresh-cw', size=12) }} 重設 2FA</button>
-          <button class="btn btn-small btn-danger" data-act="delete" data-username="{{ u.username }}">{{ icon('trash', size=12) }} 刪除</button>
+                  data-roles="{{ u.roles|join(',') }}">{{ icon('edit', size=12) }} {{ tr('編輯') }}</button>
+          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} {{ tr('登入裝置') }}</button>
+          <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} {{ tr('重設密碼') }}</button>
+          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除 TOTP secret，下次登入重新顯示 QR setup">{{ icon('refresh-cw', size=12) }} {{ tr('重設 2FA') }}</button>
+          <button class="btn btn-small btn-danger" data-act="delete" data-username="{{ u.username }}">{{ icon('trash', size=12) }} {{ tr('刪除') }}</button>
           {% endif %}
         </td>
       </tr>
@@ -215,10 +215,10 @@
   <div class="uf-pager">
     {% set qs = 'view=' ~ view ~ ('&q=' ~ q if q else '') ~ ('&src=' ~ src if src else '') ~ ('&state=' ~ state if state else '') %}
     <a class="btn btn-small{% if page <= 1 %} is-off{% endif %}"
-       href="?{{ qs }}&page={{ page - 1 if page > 1 else 1 }}">‹ 上一頁</a>
-    <span class="muted">第 <b>{{ page }}</b> / {{ pages }} 頁・共 {{ page_total }} 人</span>
+       href="?{{ qs }}&page={{ page - 1 if page > 1 else 1 }}">{{ tr('‹ 上一頁') }}</a>
+    <span class="muted">{{ tr('第') }} <b>{{ page }}</b> / {{ pages }} {{ tr('頁・共') }} {{ page_total }} {{ tr('人') }}</span>
     <a class="btn btn-small{% if page >= pages %} is-off{% endif %}"
-       href="?{{ qs }}&page={{ page + 1 if page < pages else pages }}">下一頁 ›</a>
+       href="?{{ qs }}&page={{ page + 1 if page < pages else pages }}">{{ tr('下一頁 ›') }}</a>
   </div>
   {% endif %}
 </div>
@@ -227,15 +227,15 @@
 <div id="sessModal" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-card">
-    <h3 data-s="s53896af7">登入裝置 <code id="smUsername"></code></h3>
+    <h3 data-s="s53896af7">{{ tr('登入裝置') }} <code id="smUsername"></code></h3>
     <p class="muted" data-s="sf1bde2c5">
-      強制登出後，那台裝置下一個動作就會被導回登入頁。這裡看得到的是<b>目前還有效</b>的
-      session，過期的不會列出。
+      {{ tr('強制登出後，那台裝置下一個動作就會被導回登入頁。這裡看得到的是') }}<b>{{ tr('目前還有效') }}</b>{{ tr('的
+      session，過期的不會列出。') }}
     </p>
     <div id="smList"></div>
     <div class="modal-actions">
-      <button class="btn btn-danger" id="smRevokeAll">全部登出</button>
-      <button class="btn" id="smClose">關閉</button>
+      <button class="btn btn-danger" id="smRevokeAll">{{ tr('全部登出') }}</button>
+      <button class="btn" id="smClose">{{ tr('關閉') }}</button>
     </div>
   </div>
 </div>
@@ -244,55 +244,55 @@
 <div id="editUserModal" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-card">
-    <h3 data-s="s53896af7">編輯使用者 <code id="emUsername"></code></h3>
+    <h3 data-s="s53896af7">{{ tr('編輯使用者') }} <code id="emUsername"></code></h3>
     <div class="form-row">
-      <label>顯示名稱</label>
+      <label>{{ tr('顯示名稱') }}</label>
       <input class="field" type="text" id="emDisplay" maxlength="64" data-s="s7631d717">
     </div>
     <div class="form-row">
-      <label for="emEmail">信箱</label>
+      <label for="emEmail">{{ tr('信箱') }}</label>
       <input class="field" type="text" id="emEmail" maxlength="200"
              placeholder="user@example.com" data-s="s7631d717">
       <div class="muted em-email-hint" data-s="sf1bde2c5">
-        作業完成通知會寄到這裡。AD / LDAP / SSO 帳號在登入時由來源自動帶入
-        （AD / LDAP 讀 <code data-s="s1fcb9a2f">mail</code> 屬性），在這裡改會被下次登入覆蓋。
-        使用者若在「我的作業 → 通知設定」自己填了收件信箱，以那個為準。
+        {{ tr('作業完成通知會寄到這裡。AD / LDAP / SSO 帳號在登入時由來源自動帶入
+        （AD / LDAP 讀') }} <code data-s="s1fcb9a2f">mail</code> {{ tr('屬性），在這裡改會被下次登入覆蓋。
+        使用者若在「我的作業 → 通知設定」自己填了收件信箱，以那個為準。') }}
       </div>
     </div>
     <div class="form-row">
       <label class="field" data-s="sea37c3c1">
-        <input type="checkbox" id="emEnabled"> 帳號啟用
+        <input type="checkbox" id="emEnabled"> {{ tr('帳號啟用') }}
       </label>
     </div>
     <div class="form-row">
-      <label>角色（複選）</label>
+      <label>{{ tr('角色（複選）') }}</label>
       <div class="picker">
         <div class="picker-toolbar">
           <input class="field picker-search" type="search" id="emRoleSearch" placeholder="搜尋角色…">
           <span class="picker-count" id="emRoleCount">0 / 0</span>
-          <button type="button" class="btn btn-small picker-clear" id="emRoleClear">清除</button>
+          <button type="button" class="btn btn-small picker-clear" id="emRoleClear">{{ tr('清除') }}</button>
         </div>
         <div class="picker-list" id="emRoleGrid"></div>
       </div>
     </div>
     <div class="form-row">
-      <label>群組（複選）</label>
+      <label>{{ tr('群組（複選）') }}</label>
       <div class="picker">
         <div class="picker-toolbar">
           <input class="field picker-search" type="search" id="emGroupSearch" placeholder="搜尋群組…">
           <span class="picker-count" id="emGroupCount">0 / 0</span>
-          <button type="button" class="btn btn-small picker-clear" id="emGroupClear">清除</button>
+          <button type="button" class="btn btn-small picker-clear" id="emGroupClear">{{ tr('清除') }}</button>
         </div>
         <div class="picker-list" id="emGroupGrid"></div>
       </div>
     </div>
     <details class="em-eff">
-      <summary>有效權限（實際能用的工具與來源）</summary>
-      <div id="emEffBody" class="em-eff-body">尚未載入</div>
+      <summary>{{ tr('有效權限（實際能用的工具與來源）') }}</summary>
+      <div id="emEffBody" class="em-eff-body">{{ tr('尚未載入') }}</div>
     </details>
     <div data-s="s9fa82b78">
-      <button class="btn" type="button" id="emCancel">取消</button>
-      <button class="btn btn-primary" type="button" id="emSave">{{ icon('save', size=14) }} 儲存</button>
+      <button class="btn" type="button" id="emCancel">{{ tr('取消') }}</button>
+      <button class="btn btn-primary" type="button" id="emSave">{{ icon('save', size=14) }} {{ tr('儲存') }}</button>
     </div>
   </div>
 </div>
@@ -301,18 +301,18 @@
 <div id="resetPwdModal" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-card" data-s="s757df271">
-    <h3 data-s="s53896af7">重設密碼 <code id="rpUsername"></code></h3>
+    <h3 data-s="s53896af7">{{ tr('重設密碼') }} <code id="rpUsername"></code></h3>
     <div class="form-row">
-      <label>新密碼（至少 8 字元）</label>
+      <label>{{ tr('新密碼（至少 8 字元）') }}</label>
       <input class="field" type="password" id="rpPw" minlength="8" maxlength="128" data-s="s7631d717">
     </div>
     <div class="form-row">
-      <label>再輸入一次</label>
+      <label>{{ tr('再輸入一次') }}</label>
       <input class="field" type="password" id="rpPw2" minlength="8" maxlength="128" data-s="s7631d717">
     </div>
     <div data-s="s9fa82b78">
-      <button class="btn" type="button" id="rpCancel">取消</button>
-      <button class="btn btn-primary" type="button" id="rpSave">{{ icon('lock', size=14) }} 重設</button>
+      <button class="btn" type="button" id="rpCancel">{{ tr('取消') }}</button>
+      <button class="btn btn-primary" type="button" id="rpSave">{{ icon('lock', size=14) }} {{ tr('重設') }}</button>
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ const ALL_GROUPS = {{ all_groups|tojson }};
   document.querySelectorAll('.last-login').forEach(td => {
     const iso = td.dataset.iso || '';
     const d = iso ? new Date(iso) : null;
-    if (!d || isNaN(d.getTime())) { td.textContent = '從未登入'; return; }
+    if (!d || isNaN(d.getTime())) { td.textContent = tr('從未登入'); return; }
     // 用 DOM API 而不是 innerHTML —— 專案規則：JS 動態塞 DOM 文字禁用 innerHTML
     // （CodeQL「DOM text reinterpreted as HTML」）。
     td.textContent = fmtAbs(d);
@@ -576,7 +576,7 @@ async function runBulk(action) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_ids: ids }) });
     if (!r0.ok) {
-      (window.showAlert || alert)(await window.friendlyServerError(r0, '批次刪除失敗'));
+      (window.showAlert || alert)(await window.friendlyServerError(r0, tr('批次刪除失敗')));
       return;
     }
     const d0 = await r0.json();
@@ -604,7 +604,7 @@ async function runBulk(action) {
   const r = await fetch(url, { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!r.ok) {
-    (window.showAlert || alert)(await window.friendlyServerError(r, '批次操作失敗'));
+    (window.showAlert || alert)(await window.friendlyServerError(r, tr('批次操作失敗')));
     return;
   }
   const d = await r.json();
@@ -724,36 +724,36 @@ function _bindPicker(listId, searchId, countId, clearId) {
 
 async function loadEffective(uid) {
   const box = document.getElementById('emEffBody');
-  box.textContent = '載入中…';
+  box.textContent = tr('載入中…');
   // 顯示的是**存檔前**的現況。改完角色要重新打開才會更新 —— 面板標題有寫明，
   // 免得管理員以為勾選當下就已經生效。
   let j;
   try {
     const r = await fetch(`/admin/users/${uid}/effective`);
-    if (!r.ok) throw new Error(await window.friendlyServerError(r, '讀取失敗'));
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('讀取失敗')));
     j = await r.json();
   } catch (e) {
-    box.textContent = '讀取失敗：' + e.message;
+    box.textContent = tr('讀取失敗：') + e.message;
     return;
   }
   box.textContent = '';
 
   const note = document.createElement('p');
   note.className = 'muted em-eff-note';
-  note.textContent = '這是目前存檔的狀態；改完角色 / 群組要儲存後重新開啟才會更新。';
+  note.textContent = tr('這是目前存檔的狀態；改完角色 / 群組要儲存後重新開啟才會更新。');
   box.appendChild(note);
 
   if (j.admin) {
     const p = document.createElement('p');
     p.className = 'em-eff-all';
-    p.textContent = '管理員：所有工具與設定區都可以用。';
+    p.textContent = tr('管理員：所有工具與設定區都可以用。');
     box.appendChild(p);
     return;
   }
   if (j.auditor) {
     const p = document.createElement('p');
     p.className = 'em-eff-all';
-    p.textContent = '稽核員：只看得到稽核記錄，沒有任何工具權限（職責分離）。';
+    p.textContent = tr('稽核員：只看得到稽核記錄，沒有任何工具權限（職責分離）。');
     box.appendChild(p);
     return;
   }
@@ -766,7 +766,7 @@ async function loadEffective(uid) {
   if (!ids.length) {
     const p = document.createElement('p');
     p.className = 'muted';
-    p.textContent = '目前一個工具都不能用 —— 沒有任何角色或授權指到這個帳號。';
+    p.textContent = tr('目前一個工具都不能用 —— 沒有任何角色或授權指到這個帳號。');
     box.appendChild(p);
     return;
   }
@@ -855,7 +855,7 @@ document.getElementById('rpSave').addEventListener('click', async () => {
   });
   if (r.ok) {
     hideModal('resetPwdModal');
-    showToast('密碼已重設，該使用者所有 session 已失效', 'ok');
+    showToast(tr('密碼已重設，該使用者所有 session 已失效'), 'ok');
   } else {
     showAlert('重設失敗：' + await r.text());
   }
@@ -872,7 +872,7 @@ document.querySelectorAll('.uf-disable-all').forEach(btn => {
       body: JSON.stringify({view, dry_run: true}),
     });
     if (!probe.ok) {
-      showAlert(await window.friendlyServerError(probe, '無法取得預估結果'));
+      showAlert(await window.friendlyServerError(probe, tr('無法取得預估結果')));
       return;
     }
     const pre = await probe.json();
@@ -886,7 +886,7 @@ document.querySelectorAll('.uf-disable-all').forEach(btn => {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({view}),
     });
-    if (!r.ok) { showAlert(await window.friendlyServerError(r, '停用失敗')); return; }
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('停用失敗'))); return; }
     const j = await r.json();
     if (j.aborted) { showAlert(j.reason); return; }
     showAlert(`已停用 ${j.disabled} 個帳號`);
@@ -924,22 +924,22 @@ async function openSessions(uid, username) {
   smUid = uid;
   document.getElementById('smUsername').textContent = username;
   const list = document.getElementById('smList');
-  list.textContent = '載入中…';
+  list.textContent = tr('載入中…');
   showModal('sessModal');
   let j;
   try {
     const r = await fetch(`/admin/users/${uid}/sessions`);
-    if (!r.ok) throw new Error(await window.friendlyServerError(r, '讀取失敗'));
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('讀取失敗')));
     j = await r.json();
   } catch (e) {
-    list.textContent = '讀取失敗：' + e.message;
+    list.textContent = tr('讀取失敗：') + e.message;
     return;
   }
   list.textContent = '';
   if (!j.sessions.length) {
     const p = document.createElement('p');
     p.className = 'muted';
-    p.textContent = '目前沒有有效的登入。';
+    p.textContent = tr('目前沒有有效的登入。');
     list.appendChild(p);
     return;
   }
@@ -951,7 +951,7 @@ async function openSessions(uid, username) {
     if (sess.online) {
       const dot = document.createElement('span');
       dot.className = 'uf-online';
-      dot.textContent = '在線';
+      dot.textContent = tr('在線');
       head.appendChild(dot);
     }
     // 動態文字一律 textContent —— 裝置字串來自使用者送的 User-Agent。
@@ -968,7 +968,7 @@ async function openSessions(uid, username) {
     row.appendChild(info);
     const btn = document.createElement('button');
     btn.className = 'btn btn-small btn-danger';
-    btn.textContent = '登出';
+    btn.textContent = tr('登出');
     btn.addEventListener('click', () => revokeSession(sess.sid));
     row.appendChild(btn);
     list.appendChild(row);
@@ -980,7 +980,7 @@ async function revokeSession(sid) {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(sid ? {sid} : {}),
   });
-  if (!r.ok) { showAlert(await window.friendlyServerError(r, '登出失敗')); return; }
+  if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('登出失敗'))); return; }
   const j = await r.json();
   showAlert(`已登出 ${j.revoked} 個 session`);
   openSessions(smUid, document.getElementById('smUsername').textContent);
@@ -992,7 +992,7 @@ document.getElementById('smClose').addEventListener('click', () => {
   location.reload();
 });
 document.getElementById('smRevokeAll').addEventListener('click', async () => {
-  if (!(await showConfirm('把這個帳號的所有裝置都登出？',
+  if (!(await showConfirm(tr('把這個帳號的所有裝置都登出？'),
         { title: '全部登出', kind: 'danger', okText: '登出' }))) return;
   revokeSession('');
 });
@@ -1018,7 +1018,7 @@ document.querySelectorAll('.user-table button').forEach(btn => {
         if (typeof syncBulk === 'function') syncBulk();
       } else {
         btn.disabled = false;
-        showAlert('刪除失敗：' + await window.friendlyServerError(r, '刪除失敗'));
+        showAlert('刪除失敗：' + await window.friendlyServerError(r, tr('刪除失敗')));
       }
     } else if (act === 'reset-pwd') {
       openReset(btn);
