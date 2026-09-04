@@ -201,20 +201,20 @@
         <span class="dd-cat-icon">{{ icon(cat_icons.get(grp_name, 'tool'), size=15) }}</span>
         <span class="dd-cat-name">{{ grp_name }}</span>
         <span class="dd-cat-tools">
-          <button type="button" data-cat-act="all" title="全選（這組全部勾選）">
+          <button type="button" data-cat-act="all" title="{{ tr('全選（這組全部勾選）') }}">
             <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
               <polyline points="7 12 11 16 17 9"/>
             </svg>
           </button>
-          <button type="button" data-cat-act="none" title="取消全選（這組全部清空）">
+          <button type="button" data-cat-act="none" title="{{ tr('取消全選（這組全部清空）') }}">
             <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
             </svg>
           </button>
-          <button type="button" data-cat-act="invert" title="反向選取（這組勾與未勾對調）">
+          <button type="button" data-cat-act="invert" title="{{ tr('反向選取（這組勾與未勾對調）') }}">
             <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="9" height="18" rx="1.5" fill="currentColor"/>
@@ -325,7 +325,7 @@
       Email 用 <code>example.com</code>、IP 用 <code>192.0.2.x</code>，這兩種是文件專用的保留範圍，兩種設定都安全。
     </div>
     <div class="dd-addterm">
-      <input type="text" id="ddTermInput" placeholder="還有什麼要換掉？輸入字詞後按「加入」（例：內部代號、承辦人姓名）">
+      <input type="text" id="ddTermInput" placeholder="{{ tr('還有什麼要換掉？輸入字詞後按「加入」（例：內部代號、承辦人姓名）') }}">
       <button type="button" class="btn" id="btnAddTerm">加入</button>
       <span class="muted" id="ddTermStatus"></span>
     </div>

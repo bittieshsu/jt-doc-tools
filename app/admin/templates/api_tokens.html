@@ -61,8 +61,8 @@
           {# 兩顆按鈕的內容結構要一致（圖示 + 文字），不然高度不同會上下錯開。
              文字包在 .btn-tx 裡，JS 切換「顯示 / 隱藏」時只換這個節點，
              圖示才不會被 textContent 洗掉。 #}
-          <button class="btn btn-small btn-reveal" type="button" title="顯示完整 token">{{ icon('eye', size=12) }}<span class="btn-tx">{{ tr('顯示') }}</span></button>
-          <button class="btn btn-small btn-copy" type="button" title="複製到剪貼簿">{{ icon('copy', size=12) }}<span class="btn-tx">{{ tr('複製') }}</span></button>
+          <button class="btn btn-small btn-reveal" type="button" title="{{ tr('顯示完整 token') }}">{{ icon('eye', size=12) }}<span class="btn-tx">{{ tr('顯示') }}</span></button>
+          <button class="btn btn-small btn-copy" type="button" title="{{ tr('複製到剪貼簿') }}">{{ icon('copy', size=12) }}<span class="btn-tx">{{ tr('複製') }}</span></button>
         </td>
         <td class="muted" data-s="s6b9c179a">
           {# 在伺服器端就格式化。原本把 `created_at * 1000` 直接寫進 JS：
@@ -88,7 +88,7 @@
   {% endif %}
 
   <div data-s="s5dc4cf38">
-    <input type="text" id="new-label" class="field" placeholder="新 token 的 label（例：my-script）"
+    <input type="text" id="new-label" class="field" placeholder="{{ tr('新 token 的 label（例：my-script）') }}"
            data-s="s8ebd14fe" />
     <button class="btn btn-primary" id="btn-create" type="button">{{ icon('save') }}{{ tr('產生新 Token') }}</button>
   </div>

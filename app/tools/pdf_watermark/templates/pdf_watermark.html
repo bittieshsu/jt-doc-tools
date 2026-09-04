@@ -55,7 +55,7 @@
       <div id="wmTempAssetSlot" data-s="s06ed15aa">
         <label class="wm-asset-card" data-s="scfd2b633">
           <input type="radio" name="asset" value="__temp__" id="wmTempAssetRadio" />
-          <div class="wm-asset-thumb"><img id="wmTempAssetThumb" alt="臨時資產預覽" /></div>
+          <div class="wm-asset-thumb"><img id="wmTempAssetThumb" alt="{{ tr('臨時資產預覽') }}" /></div>
           <div class="wm-asset-meta">
             <span class="wm-asset-name" id="wmTempAssetName">{{ tr('（未選）') }}</span>
             <span class="type-chip" data-s="s53289da7">{{ tr('臨時') }}</span>
@@ -70,7 +70,7 @@
     <div class="wm-source-block-title">{{ tr('輸入浮水印文字') }}</div>
     <div class="form-row">
       <label>{{ tr('文字') }}</label>
-      <input id="wm-text" class="field" type="text" placeholder="例：機密 / CONFIDENTIAL / DRAFT" />
+      <input id="wm-text" class="field" type="text" placeholder="{{ tr('例：機密 / CONFIDENTIAL / DRAFT') }}" />
     </div>
     <div class="form-row">
       <label>{{ tr('顏色') }}</label>
@@ -185,13 +185,13 @@
   <div data-s="s31c90b93">
     <div id="sim-status" class="muted" data-s="s6b9c179a">{{ tr('產生中…') }}</div>
     <div id="wm-page-nav" hidden data-s="s148184e6">
-      <button class="btn btn-small" id="wm-prev" type="button" title="上一頁">‹</button>
+      <button class="btn btn-small" id="wm-prev" type="button" title="{{ tr('上一頁') }}">‹</button>
       <span id="wm-page-info" class="muted" data-s="scf6be43d"></span>
-      <button class="btn btn-small" id="wm-next" type="button" title="下一頁">›</button>
+      <button class="btn btn-small" id="wm-next" type="button" title="{{ tr('下一頁') }}">›</button>
     </div>
   </div>
   <div id="sim-image-wrap" data-s="sa2928aa0">
-    <img id="sim-image" alt="浮水印預覽" data-s="s74bacc29" />
+    <img id="sim-image" alt="{{ tr('浮水印預覽') }}" data-s="s74bacc29" />
   </div>
 </div>
 

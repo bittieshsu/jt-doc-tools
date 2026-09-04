@@ -465,11 +465,11 @@ body.pe-pan-active { cursor: grabbing !important; }
     <a class="btn" id="btnDownload" href="#" hidden>{{ icon('download') }} {{ tr('下載') }}</a>
     {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden>{{ icon('archive') }} {{ tr('存至工作區') }}</button>{% endif %}
     <span class="pe-top-divider"></span>
-    <button class="btn" type="button" id="btnUndo" title="復原 (Cmd/Ctrl+Z)" disabled>
+    <button class="btn" type="button" id="btnUndo" title="{{ tr('復原 (Cmd/Ctrl+Z)') }}" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-2"/></svg>
       {{ tr('復原') }}
     </button>
-    <button class="btn" type="button" id="btnRedo" title="重做 (Cmd/Ctrl+Shift+Z)" disabled>
+    <button class="btn" type="button" id="btnRedo" title="{{ tr('重做 (Cmd/Ctrl+Shift+Z)') }}" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9h-9a7 7 0 0 0 0 14h2"/></svg>
       {{ tr('重做') }}
     </button>
@@ -484,7 +484,7 @@ body.pe-pan-active { cursor: grabbing !important; }
       {{ tr('設定') }}
     </button>
     <span class="pe-top-divider"></span>
-    <label class="pe-autosave" title="自動預覽（改動後 ~1 秒自動重算）">
+    <label class="pe-autosave" title="{{ tr('自動預覽（改動後 ~1 秒自動重算）') }}">
       <input type="checkbox" id="peAutoSave" checked>
       {{ tr('自動預覽') }}<span class="hint">{{ tr('（改動後 ~1 秒自動重算）') }}</span>
     </label>
@@ -492,34 +492,34 @@ body.pe-pan-active { cursor: grabbing !important; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s742e547d"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5M8 11h6M11 8v6"/></svg>
       <input type="range" id="zoomSlider" min="10" max="200" value="100" step="5">
       <span class="muted" data-s="se67b272a" id="zoomLabel">100%</span>
-      <button class="btn" type="button" id="btnFitPage" title="縮放到剛好顯示整頁"
+      <button class="btn" type="button" id="btnFitPage" title="{{ tr('縮放到剛好顯示整頁') }}"
         data-s="se4fdde7a">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s16fc71ab"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg>
         {{ tr('符合視窗') }}
       </button>
     </div>
-    <div class="pe-page-ctl" title="輸入頁碼後按 Enter 直接跳到該頁">
+    <div class="pe-page-ctl" title="{{ tr('輸入頁碼後按 Enter 直接跳到該頁') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s16fc71ab"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       {{ tr('頁碼') }}
       <input type="number" id="pePageInput" min="1" value="1" step="1">
       <span class="pe-page-total">/ <span id="pePageTotal">—</span></span>
       <span class="pe-page-nav">
-        <button type="button" class="pe-nav-btn" id="pePageFirst" title="第一頁 (Home)" disabled>
+        <button type="button" class="pe-nav-btn" id="pePageFirst" title="{{ tr('第一頁 (Home)') }}" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
         </button>
-        <button type="button" class="pe-nav-btn" id="pePagePrev" title="上一頁 (PageUp)" disabled>
+        <button type="button" class="pe-nav-btn" id="pePagePrev" title="{{ tr('上一頁 (PageUp)') }}" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <button type="button" class="pe-nav-btn" id="pePageNext" title="下一頁 (PageDown)" disabled>
+        <button type="button" class="pe-nav-btn" id="pePageNext" title="{{ tr('下一頁 (PageDown)') }}" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
-        <button type="button" class="pe-nav-btn" id="pePageLast" title="最後一頁 (End)" disabled>
+        <button type="button" class="pe-nav-btn" id="pePageLast" title="{{ tr('最後一頁 (End)') }}" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
         </button>
       </span>
     </div>
     <span class="pe-status" id="peStatus"></span>
-    <button class="btn" type="button" id="btnMaxView" title="全視窗（編輯區擴到右側整個區域，Esc 退出）"
+    <button class="btn" type="button" id="btnMaxView" title="{{ tr('全視窗（編輯區擴到右側整個區域，Esc 退出）') }}"
       data-s="sccfd3fa8">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s16fc71ab"><path d="M3 7V3h4M21 7V3h-4M3 17v4h4M21 17v4h-4"/></svg>
       <span id="btnMaxViewLabel">{{ tr('全視窗') }}</span>

@@ -95,7 +95,7 @@
     <div class="af-attrs">
       <div class="auth-field">
         <label class="af-label">{{ tr('登入鈕文字') }}</label>
-        <input class="field" id="o_display_name" value="{{ sso.oidc.display_name }}" placeholder="以 Microsoft 登入"/>
+        <input class="field" id="o_display_name" value="{{ sso.oidc.display_name }}" placeholder="{{ tr('以 Microsoft 登入') }}"/>
       </div>
       <div class="auth-field">
         <label class="af-label">{{ tr('Issuer（discovery 根）') }}</label>
@@ -107,7 +107,7 @@
       </div>
       <div class="auth-field">
         <label class="af-label">Client Secret</label>
-        <input class="field" id="o_client_secret" type="password" value="{{ sso.oidc.client_secret_enc }}" placeholder="（保留現有請勿更動）"/>
+        <input class="field" id="o_client_secret" type="password" value="{{ sso.oidc.client_secret_enc }}" placeholder="{{ tr('（保留現有請勿更動）') }}"/>
       </div>
       <div class="auth-field">
         <label class="af-label">Scopes</label>

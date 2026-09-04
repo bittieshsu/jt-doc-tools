@@ -24,7 +24,7 @@
     <option value="{{ t }}" {% if t == q_tool %}selected{% endif %}>{{ t }}</option>
     {% endfor %}
   </select>
-  <input class="field" type="search" name="q_filename" value="{{ q_filename }}" placeholder="檔名包含…" data-s="sdf7d1005">
+  <input class="field" type="search" name="q_filename" value="{{ q_filename }}" placeholder="{{ tr('檔名包含…') }}" data-s="sdf7d1005">
   <input class="field" type="datetime-local" name="q_from" value="{{ q_from }}">
   <input class="field" type="datetime-local" name="q_to" value="{{ q_to }}">
   <button class="btn btn-primary" type="submit">{{ icon('search', size=14) }} {{ tr('篩選') }}</button>

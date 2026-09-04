@@ -20,7 +20,7 @@
      **JS 的 getTimezoneOffset() 正負號是反的**（台北回 -480），所以下面取負號。 #}
   <input type="hidden" name="tz_offset" id="tzOffset" value="{{ tz_offset }}">
   <input class="field" type="text" name="q_user" list="auditUserSuggest"
-         value="{{ q_user }}" placeholder="使用者（可輸入部分，模糊比對；留空 = 全部）"
+         value="{{ q_user }}" placeholder="{{ tr('使用者（可輸入部分，模糊比對；留空 = 全部）') }}"
          autocomplete="off">
   <datalist id="auditUserSuggest">
     {% for u in distinct_users %}<option value="{{ u }}"></option>{% endfor %}
@@ -31,8 +31,8 @@
     <option value="{{ e }}" {% if e == q_event %}selected{% endif %}>{{ e }}</option>
     {% endfor %}
   </select>
-  <input class="field" type="datetime-local" name="q_from" value="{{ q_from }}" placeholder="從">
-  <input class="field" type="datetime-local" name="q_to" value="{{ q_to }}" placeholder="到">
+  <input class="field" type="datetime-local" name="q_from" value="{{ q_from }}" placeholder="{{ tr('從') }}">
+  <input class="field" type="datetime-local" name="q_to" value="{{ q_to }}" placeholder="{{ tr('到') }}">
   <button class="btn btn-primary" type="submit">{{ icon('search', size=14) }} {{ tr('篩選') }}</button>
   <a class="btn" href="/admin/audit">{{ icon('back', size=14) }} {{ tr('清除') }}</a>
   <span data-s="sda5cd676"></span>

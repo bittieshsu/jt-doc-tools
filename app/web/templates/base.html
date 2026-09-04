@@ -106,7 +106,7 @@
   {% if ui_locale(request) != 'zh-Hant' %}<script src="/i18n/{{ ui_locale(request) }}.js"></script>{% endif %}
 </head>
 <body>
-  <button class="sidebar-toggle" type="button" id="sidebarToggle" aria-label="展開側邊選單" title="{{ tr('展開側邊選單') }}">☰</button>
+  <button class="sidebar-toggle" type="button" id="sidebarToggle" aria-label="{{ tr('展開側邊選單') }}" title="{{ tr('展開側邊選單') }}">☰</button>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="brand-row">
@@ -120,7 +120,7 @@
             <span>v{{ version }}</span>
           </div>
         </div>
-        <button class="sidebar-collapse" type="button" id="sidebarCollapse" aria-label="收起側邊選單" title="{{ tr('收起側邊選單') }}">‹</button>
+        <button class="sidebar-collapse" type="button" id="sidebarCollapse" aria-label="{{ tr('收起側邊選單') }}" title="{{ tr('收起側邊選單') }}">‹</button>
       </div>
       {# 工具圖示來源（給通知清單複製用）—— 只有 icons.html 那個 macro 一份定義 #}
       <div id="toolIconSprite" hidden aria-hidden="true">
@@ -137,9 +137,9 @@
       {# 認證關閉時沒有帳號列，但單機使用者一樣需要看到作業完成通知 —— 給一列
          只有通知按鈕的窄列，位置與有帳號時一致（都在側欄左上）。 #}
       <div class="user-bar user-bar-anon" data-s="s332db6db">
-        <span class="sb-anon-label">通知</span>
+        <span class="sb-anon-label">{{ tr('通知') }}</span>
         <div class="sb-bell-wrap">
-          <button type="button" class="sb-bell" id="sbBell" title="{{ tr('作業完成通知') }}" aria-label="通知">
+          <button type="button" class="sb-bell" id="sbBell" title="{{ tr('作業完成通知') }}" aria-label="{{ tr('通知') }}">
             {{ icon('bell', size=15) }}
             <span class="sb-bell-dot" id="sbBellDot" hidden></span>
           </button>
@@ -163,7 +163,7 @@
           <b>{{ _cur.username }}</b>{% if _cur.source and _cur.source != 'off' %}<span data-s="s5bca4f8e">@{{ _cur.source }}</span>{% endif %}
         </button>
         <div class="sb-bell-wrap">
-          <button type="button" class="sb-bell" id="sbBell" title="{{ tr('作業完成通知') }}" aria-label="通知">
+          <button type="button" class="sb-bell" id="sbBell" title="{{ tr('作業完成通知') }}" aria-label="{{ tr('通知') }}">
             {{ icon('bell', size=15) }}
             <span class="sb-bell-dot" id="sbBellDot" hidden></span>
           </button>
@@ -683,7 +683,7 @@
       {% block right_fab %}{% endblock %}
       {# 「回首頁」按鈕 — 任何非首頁的頁面都顯示 #}
       <a class="home-fab" id="homeFab" href="/" title="{{ tr('回首頁') }}" aria-label="{{ tr('回首頁') }}">
-        {{ icon('home', size=18) }}<span class="home-fab-text">首頁</span>
+        {{ icon('home', size=18) }}<span class="home-fab-text">{{ tr('首頁') }}</span>
       </a>
     </div>
     {% if is_admin(request) and net_exposed() and (request.scope.get('path') or '').startswith('/admin') %}

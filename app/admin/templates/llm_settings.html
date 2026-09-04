@@ -76,7 +76,7 @@
     <div class="field">
       <input type="password" id="api_key" class="field field-wide"
              value="{{ settings.api_key or '' }}"
-             placeholder="(空白 — Ollama 不需要)" />
+             placeholder="{{ tr('(空白 — Ollama 不需要)') }}" />
       <div class="muted" data-s="s41f96333">
         {{ tr('雲端 OpenAI-compat 服務才需要；本地 Ollama / vLLM 留空。') }}
       </div>
@@ -138,11 +138,11 @@
       <div class="ptc-card">
         <div class="ptc-head">
           <span class="ptc-icon">{{ icon(t.icon|default('tool'), size=16) }}</span>
-          <span class="ptc-name">{{ t.name }}</span>
+          <span class="ptc-name">{{ tr(t.name) }}</span>
           {% if t.kind == 'vision' %}<span class="ptc-tag ptc-tag-vision">{{ tr('需視覺') }}</span>{% else %}<span class="ptc-tag ptc-tag-text">{{ tr('文字') }}</span>{% endif %}
           <code class="ptc-id">{{ t.id }}</code>
         </div>
-        <div class="ptc-desc">{{ t.use }}</div>
+        <div class="ptc-desc">{{ tr(t.use) }}</div>
         <div class="ptc-select">
           <select class="field per-tool-model" data-tool-id="{{ t.id }}" data-kind="{{ t.kind }}">
             <option value="">{{ tr('（用上方預設：') }}{{ settings.model }}）</option>

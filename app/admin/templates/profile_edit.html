@@ -52,9 +52,9 @@
       {% for row in sec.rows %}
       <div class="edit-row" data-key="{{ row.key }}">
         <input class="k" type="text" value="{{ row.key }}" />
-        <input class="lbl" type="text" value="{{ row.label }}" placeholder="顯示名稱" />
+        <input class="lbl" type="text" value="{{ row.label }}" placeholder="{{ tr('顯示名稱') }}" />
         <textarea class="v" rows="1">{{ row.value }}</textarea>
-        <button class="btn-icon btn-danger" data-act="del" type="button" title="刪除">{{ icon('trash') }}</button>
+        <button class="btn-icon btn-danger" data-act="del" type="button" title="{{ tr('刪除') }}">{{ icon('trash') }}</button>
       </div>
       {% endfor %}
       <div class="edit-add-row">

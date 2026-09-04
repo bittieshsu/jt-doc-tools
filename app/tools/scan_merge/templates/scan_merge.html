@@ -28,7 +28,7 @@
   <summary>{{ tr('預覽與微調') }} <span class="muted" id="stage-info" data-s="s5a8ca7b2">—</span></summary>
   <div class="sm-toolbar">
     <span data-s="sda5cd676"></span>
-    <label class="sm-check" title="掃描常會帶一層淡灰 / 微黃的底色；勾選後把這層底色淨化成純白，不影響任何彩色內容">
+    <label class="sm-check" title="{{ tr('掃描常會帶一層淡灰 / 微黃的底色；勾選後把這層底色淨化成純白，不影響任何彩色內容') }}">
       <input type="checkbox" id="whitenToggle"> {{ tr('去除掃描灰底') }}
     </label>
   </div>
@@ -52,20 +52,20 @@
   <p class="sm-help">{{ icon('info', size=14) }} {{ tr('系統已依原掃描位置自動擺放各張內容。') }}<b>{{ tr('點選任一張') }}</b>{{ tr('即可拖曳移動、用右下角控點調整大小；重疊時(紅框)拖曳錯開即可。完成後按「產生合併結果」下載。') }}</p>
 
   <div class="sm-zoombar">
-    <button type="button" class="btn btn-small sm-zbtn" id="zoom-out" title="縮小">−</button>
-    <input type="range" id="zoom-range" class="sm-zoom-range" min="40" max="300" step="5" value="100" title="拖曳調整縮放" aria-label="縮放比例">
-    <button type="button" class="btn btn-small sm-zbtn" id="zoom-in" title="放大">+</button>
+    <button type="button" class="btn btn-small sm-zbtn" id="zoom-out" title="{{ tr('縮小') }}">−</button>
+    <input type="range" id="zoom-range" class="sm-zoom-range" min="40" max="300" step="5" value="100" title="{{ tr('拖曳調整縮放') }}" aria-label="{{ tr('縮放比例') }}">
+    <button type="button" class="btn btn-small sm-zbtn" id="zoom-in" title="{{ tr('放大') }}">+</button>
     <span id="zoom-label" class="sm-zoom-label">100%</span>
-    <button type="button" class="btn btn-small" id="zoom-fit" title="整張完整顯示在可見範圍">{{ icon('aspect-ratio', size=14) }} {{ tr('符合') }}</button>
+    <button type="button" class="btn btn-small" id="zoom-fit" title="{{ tr('整張完整顯示在可見範圍') }}">{{ icon('aspect-ratio', size=14) }} {{ tr('符合') }}</button>
     <span data-s="sda5cd676"></span>
-    <button type="button" class="btn btn-small" id="btn-preview-toggle" title="隱藏選取框，預覽實際輸出結果">{{ icon('eye', size=14) }} {{ tr('預覽結果') }}</button>
+    <button type="button" class="btn btn-small" id="btn-preview-toggle" title="{{ tr('隱藏選取框，預覽實際輸出結果') }}">{{ icon('eye', size=14) }} {{ tr('預覽結果') }}</button>
   </div>
   <div class="sm-stage-scroll">
     <div id="stage-busy" class="sm-busy" hidden>
       <span class="sm-spinner"></span>
       <span id="stage-busy-msg">{{ tr('處理中…') }}</span>
     </div>
-    <div id="stage" class="sm-stage" aria-label="A4 預覽，可拖曳每塊內容"></div>
+    <div id="stage" class="sm-stage" aria-label="{{ tr('A4 預覽，可拖曳每塊內容') }}"></div>
   </div>
 </details>
 

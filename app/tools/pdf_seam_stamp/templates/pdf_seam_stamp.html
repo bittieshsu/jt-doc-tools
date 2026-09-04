@@ -75,7 +75,7 @@
         <span class="af-ctl"><input class="field" type="file" id="smStampFile" accept="image/png,image/jpeg"></span>
         <small class="af-note">接近純白的底會自動轉成透明，蓋上去不會擋住內文。</small></label>
     </div>
-    <div class="sm-stamp-pv"><img id="smStampImg" alt="印章預覽" hidden></div>
+    <div class="sm-stamp-pv"><img id="smStampImg" alt="{{ tr('印章預覽') }}" hidden></div>
   </fieldset>
 
 </div>
@@ -184,7 +184,7 @@
       <b>不必等預覽跑完</b> —— 上面那張「拼回去長這樣」確認過就夠了，
       可以直接拉到最下面按「蓋上騎縫章」取回檔案。下面的逐頁預覽只是給你
       核對用的，送出走的是同一段程式，結果完全一樣。</p>
-    <div class="sm-assembled"><img id="smAsmImg" alt="拼回去的印章" hidden></div>
+    <div class="sm-assembled"><img id="smAsmImg" alt="{{ tr('拼回去的印章') }}" hidden></div>
     <div class="sm-pagepv">
       {# 一組的每一頁都要列出來 —— 只看一頁只有一條細片，看不出接縫連不連得起來 #}
       <label class="af-field sm-grouppick"><span class="af-label">預覽第幾組</span>

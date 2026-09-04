@@ -11,6 +11,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ---
 
+## [1.15.0] - 2026-09-05
+
+> The patch number rolls into a minor at 99 (a project convention, so no 1.14.100).
+
+### Finishing the interface language work
+
+Chinese left across the site in English went from thousands of strings to **202**,
+and nearly all of what remains **should not be translated**:
+
+- **The product name** (`Jason Tools 文件工具箱`, 74 occurrences) — it is a brand,
+  and an administrator can replace it; translating it automatically would also
+  replace a company name somebody had set.
+- **Domain data** — the field synonym dictionary (`付款方式, 匯款方式, Style of
+  Payment…`), accounting categories, the redaction patterns. **Not one word of
+  this may enter the catalogue**: translating it makes auto-fill forms **silently
+  stop finding fields**.
+
+What was filled in this round were the sidebar items that kept being missed: the
+`aria-label` and button text for **"notifications" and "home"** (71 occurrences
+each, the most frequent leftovers on the site), the retention item names, and the
+history page title.
+
+### Display-only attributes and the LLM tool labels
+
+`placeholder`, `title`, `alt` and `aria-label` — attributes that are **display
+only** — had been missed by the first two passes (which covered text nodes and
+`{% with %}` parameters). 174 of them are now translated, so input hints and
+button tooltips follow the interface language. The per-tool descriptions in the
+administration LLM settings (29 more) are covered too. The catalogue holds
+**2,917 entries**.
+
+### Two things fixed along the way
+
+- **`current_locale()`'s documentation was wrong** (it still said "switching is not
+  available yet"). It is really the fallback for when there is no request to ask —
+  the language lives in a cookie and can only be determined with a `Request`.
+  `tool_visible()` must always be given the locale explicitly; falling back means
+  treating everything as Chinese, and the nine Chinese-only tools would appear
+  usable in English.
+- **`test_admin_users_table` did not recognise the `{{ tr('…') }}` wrapper** and
+  went red the moment i18n was added, which has nothing to do with the column
+  order it exists to protect. **A gate that fails on unrelated changes is as bad as
+  one that misses real problems** — nobody believes it the next time it goes red.
+
+---
+
 ## [1.14.99] - 2026-09-05
 
 ### Interface language, stage B finished: the administration area

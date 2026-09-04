@@ -8,12 +8,19 @@ from __future__ import annotations
 
 from typing import Iterable
 
-#: 目前唯一的介面語言。i18n 做起來之後，這裡會改成「依使用者偏好 / Accept-Language」。
+#: 預設（也是主要）介面語言。**本專案以繁體中文為主**，英文是附加：
+#: 查不到翻譯時一律回退成中文，而不是顯示 key 或空白。
 DEFAULT_LOCALE = "zh-Hant"
 
 
 def current_locale() -> str:
-    """目前的介面語言。**現在恆為繁體中文** —— 尚未提供切換。"""
+    """沒有請求可問時的回退語言。
+
+    **這支不知道「現在這個請求」是什麼語言** —— 語言記在 cookie 上，只有拿得到
+    `Request` 才判斷得出來（`resolve(request)`）。所以呼叫 `tool_visible()` 時
+    **一定要把 locale 明確傳進去**；讓它掉到這裡就等於一律當成繁體中文，
+    英文介面下那九支中文專用工具會照樣顯示成可用的。
+    """
     return DEFAULT_LOCALE
 
 

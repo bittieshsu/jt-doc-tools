@@ -474,7 +474,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
   <span class="ol-stat">{{ tr('已安裝') }} <b>{{ installed_count }}</b> / {{ total_count }} {{ tr('種') }}</span>
   <span class="ol-stat">{{ tr('合計') }} <b>{{ total_size_mb }}</b> {{ tr('MB（含 fast + best 變體）') }}</span>
   <span class="ol-stat" data-s="se7333f54">{{ tr('tessdata 目錄：') }}<span class="ol-path">{{ tessdata_dir }}</span>{% if tessdata_writable %} <span data-s="sd924ba51">{{ tr('（可寫入）') }}</span>{% else %} <span data-s="seacff6c7">{{ tr('（無寫入權限）') }}</span>{% endif %}</span>
-  <button class="btn" type="button" id="btnRescan" title="重新跑 tesseract --list-langs，更新已安裝清單" data-s="s644e2e03">{{ icon('refresh', size=13) }} {{ tr('重新偵測') }}</button>
+  <button class="btn" type="button" id="btnRescan" title="{{ tr('重新跑 tesseract --list-langs，更新已安裝清單') }}" data-s="s644e2e03">{{ icon('refresh', size=13) }} {{ tr('重新偵測') }}</button>
 </div>
 
 <div class="panel" data-s="sbd996c7e">
@@ -527,15 +527,15 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
       <div class="ol-card-actions">
         {% if item.installed %}
           {% if not (item.fast_installed and item.best_installed) %}
-          <button class="btn btn-primary ol-install" type="button" data-code="{{ item.code }}" title="補下缺的變體">{{ icon('download', size=11) }} {{ tr('補齊變體') }}</button>
+          <button class="btn btn-primary ol-install" type="button" data-code="{{ item.code }}" title="{{ tr('補下缺的變體') }}">{{ icon('download', size=11) }} {{ tr('補齊變體') }}</button>
           {% endif %}
           {% if item.code in ['eng', 'chi_tra'] %}
-          <button class="btn" type="button" disabled title="核心語言不可移除">{{ icon('lock', size=11) }} {{ tr('核心語言') }}</button>
+          <button class="btn" type="button" disabled title="{{ tr('核心語言不可移除') }}">{{ icon('lock', size=11) }} {{ tr('核心語言') }}</button>
           {% else %}
           <button class="btn ol-uninstall" type="button" data-code="{{ item.code }}">{{ icon('trash', size=11) }} {{ tr('移除') }}</button>
           {% endif %}
         {% else %}
-        <button class="btn btn-primary ol-install" type="button" data-code="{{ item.code }}" title="同時下載 fast + best">{{ icon('download', size=11) }} {{ tr('安裝（fast+best）') }}</button>
+        <button class="btn btn-primary ol-install" type="button" data-code="{{ item.code }}" title="{{ tr('同時下載 fast + best') }}">{{ icon('download', size=11) }} {{ tr('安裝（fast+best）') }}</button>
         {% endif %}
       </div>
     </div>
@@ -571,7 +571,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
   <div class="ol-modal" data-s="sc4cd9de6">
     <div class="ol-modal-head">
       <h3 class="ol-modal-title" id="olConfirmTitle">{{ tr('確認') }}</h3>
-      <button class="ol-modal-close" type="button" aria-label="關閉" data-confirm-action="cancel">{{ icon('close', size=20) }}</button>
+      <button class="ol-modal-close" type="button" aria-label="{{ tr('關閉') }}" data-confirm-action="cancel">{{ icon('close', size=20) }}</button>
     </div>
     <div class="ol-modal-body">
       <p class="ol-modal-msg" id="olConfirmMsg" data-s="s11305aad"></p>
@@ -589,7 +589,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
   <div class="ol-modal">
     <div class="ol-modal-head">
       <h3 class="ol-modal-title" id="olHintTitle">{{ tr('需要管理員權限安裝') }}</h3>
-      <button class="ol-modal-close" type="button" aria-label="關閉" data-action="close">{{ icon('close', size=20) }}</button>
+      <button class="ol-modal-close" type="button" aria-label="{{ tr('關閉') }}" data-action="close">{{ icon('close', size=20) }}</button>
     </div>
     <div class="ol-modal-body">
       <p class="ol-modal-msg" id="olHintMsg"></p>

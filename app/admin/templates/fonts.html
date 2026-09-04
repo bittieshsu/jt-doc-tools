@@ -41,11 +41,11 @@
         </span>
         <span class="fnt-group-actions" data-stop-prop data-prevent-default>
           <button type="button" class="btn btn-small fnt-bulk-show" data-ids='{{ group_ids|tojson }}'
-                  title="這個分類全部設為顯示">
+                  title="{{ tr('這個分類全部設為顯示') }}">
             {{ icon('eye', size=13) }} {{ tr('全部顯示') }}
           </button>
           <button type="button" class="btn btn-small fnt-bulk-hide" data-ids='{{ group_ids|tojson }}'
-                  title="這個分類全部設為隱藏">
+                  title="{{ tr('這個分類全部設為隱藏') }}">
             {{ icon('eye-off', size=13) }} {{ tr('全部隱藏') }}
           </button>
         </span>
@@ -86,7 +86,7 @@
                       data-current="{{ f.custom_name or '' }}"
                       data-auto="{{ f.auto_name or '' }}"
                       data-s="s002c9579"
-                      title="變更這個字型在工具裡顯示的名稱（PDF 編輯器的字型下拉會用到）">{{ icon('edit', size=11) }} {{ tr('變更名稱') }}</button>
+                      title="{{ tr('變更這個字型在工具裡顯示的名稱（PDF 編輯器的字型下拉會用到）') }}">{{ icon('edit', size=11) }} {{ tr('變更名稱') }}</button>
               <button type="button" class="btn btn-danger btn-small del-custom-font" data-id="{{ f.id }}"
                       data-s="s002c9579">{{ icon('trash', size=11) }} {{ tr('刪除') }}</button>
             {% endif %}

@@ -31,7 +31,7 @@
   </div>
   <div class="form-row" id="ranges-row" hidden>
     <label>{{ tr('範圍') }}</label>
-    <input id="ranges" class="field" type="text" placeholder="例：1-3, 5, 7-（每段以逗號分隔）" />
+    <input id="ranges" class="field" type="text" placeholder="{{ tr('例：1-3, 5, 7-（每段以逗號分隔）') }}" />
   </div>
   <button class="btn btn-primary" id="btn-submit">{{ icon('save') }}{{ tr('開始分拆') }}</button>
   {% with progress_id='jp' %}{% include "components/job_progress.html" %}{% endwith %}

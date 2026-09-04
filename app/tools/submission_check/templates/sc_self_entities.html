@@ -35,7 +35,7 @@
     <input type="hidden" id="seId">
     <div>
       <label>名稱（必填）<span class="muted">公司全名 / 機關全名</span></label>
-      <input type="text" id="seName" required placeholder="例：某某科技股份有限公司">
+      <input type="text" id="seName" required placeholder="{{ tr('例：某某科技股份有限公司') }}">
     </div>
     <div>
       <label>類型</label>
@@ -50,19 +50,19 @@
     </div>
     <div>
       <label>統編 / 識別碼 <span class="muted">8 碼公司統編、機關代碼等</span></label>
-      <input type="text" id="seTaxId" placeholder="例：12345675">
+      <input type="text" id="seTaxId" placeholder="{{ tr('例：12345675') }}">
     </div>
     <div>
       <label>地址</label>
-      <input type="text" id="seAddress" placeholder="例：台北市中正區...">
+      <input type="text" id="seAddress" placeholder="{{ tr('例：台北市中正區...') }}">
     </div>
     <div class="full">
       <label>別名 / 簡稱 <span class="muted">用半形逗號分隔（例：某某, 某某科技, SOMECO）</span></label>
-      <input type="text" id="seAliases" placeholder="某某, 某某科技, SOMECO">
+      <input type="text" id="seAliases" placeholder="{{ tr('某某, 某某科技, SOMECO') }}">
     </div>
     <div class="full">
       <label>備註</label>
-      <input type="text" id="seNote" placeholder="例：母公司 / 海外子公司 / 常見客戶">
+      <input type="text" id="seNote" placeholder="{{ tr('例：母公司 / 海外子公司 / 常見客戶') }}">
     </div>
     <div class="full" data-s="s38861b51">
       <button type="submit" class="btn btn-primary">{{ icon('save', size=14) }} <span id="seSubmitLabel">新增</span></button>

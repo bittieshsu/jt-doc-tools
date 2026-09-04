@@ -85,16 +85,16 @@
         <label>{{ tr('帳號') }}<input type="text" data-f="smtp_username" value="{{ c.smtp_username }}" autocomplete="off"></label>
         <label>{{ tr('密碼') }}<input type="password" data-f="smtp_password" value="{{ c.smtp_password }}" autocomplete="new-password"></label>
         <label>{{ tr('寄件者') }}<input type="text" data-f="smtp_from" value="{{ c.smtp_from }}" placeholder="jt-doc-tools@example.com"></label>
-        <label class="nt-helo">{{ tr('HELO 名稱') }}<input type="text" data-f="smtp_helo" value="{{ c.smtp_helo or '' }}" placeholder="（留空用主機名稱）">
+        <label class="nt-helo">{{ tr('HELO 名稱') }}<input type="text" data-f="smtp_helo" value="{{ c.smtp_helo or '' }}" placeholder="{{ tr('（留空用主機名稱）') }}">
           <small class="nt-hint">{{ tr('有些轉送主機會依 HELO 名稱決定收不收') }}</small></label>
       </div>
-      <div class="nt-test"><input type="email" class="nt-test-to" placeholder="測試收件信箱"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} {{ tr('傳送測試') }}</button><span class="nt-test-res"></span></div>
+      <div class="nt-test"><input type="email" class="nt-test-to" placeholder="{{ tr('測試收件信箱') }}"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} {{ tr('傳送測試') }}</button><span class="nt-test-res"></span></div>
 
       {% elif ch == 'telegram' %}
       <div class="nt-grid">
         <label>Bot Token<input type="password" data-f="telegram_token" value="{{ c.telegram_token }}" autocomplete="new-password"></label>
       </div>
-      <div class="nt-test"><input type="text" class="nt-test-to" placeholder="測試用 Chat ID"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} {{ tr('傳送測試') }}</button><span class="nt-test-res"></span></div>
+      <div class="nt-test"><input type="text" class="nt-test-to" placeholder="{{ tr('測試用 Chat ID') }}"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} {{ tr('傳送測試') }}</button><span class="nt-test-res"></span></div>
 
       {% elif ch in ('slack', 'teams', 'discord') %}
       <div class="nt-grid">
@@ -107,7 +107,7 @@
         <label>{{ tr('站台網址') }}<input type="text" data-f="zulip_site" value="{{ c.zulip_site }}" placeholder="https://zulip.example.com"></label>
         <label>Bot Email<input type="text" data-f="zulip_bot_email" value="{{ c.zulip_bot_email }}"></label>
         <label>API Key<input type="password" data-f="zulip_api_key" value="{{ c.zulip_api_key }}" autocomplete="new-password"></label>
-        <label>{{ tr('團隊頻道（stream，選填）') }}<input type="text" data-f="zulip_stream" value="{{ c.zulip_stream }}" placeholder="留空＝只走個人私訊"></label>
+        <label>{{ tr('團隊頻道（stream，選填）') }}<input type="text" data-f="zulip_stream" value="{{ c.zulip_stream }}" placeholder="{{ tr('留空＝只走個人私訊') }}"></label>
         <label>{{ tr('主題（topic）') }}<input type="text" data-f="zulip_topic" value="{{ c.zulip_topic }}" placeholder="jt-doc-tools"></label>
       </div>
       <div class="nt-test"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} {{ tr('傳送測試') }}</button><span class="nt-test-res"></span></div>
@@ -115,7 +115,7 @@
       {% elif ch == 'nextcloud' %}
       <div class="nt-grid">
         <label>{{ tr('站台網址') }}<input type="text" data-f="nextcloud_url" value="{{ c.nextcloud_url }}" placeholder="https://cloud.example.com"></label>
-        <label>{{ tr('群組對話 Token（選填）') }}<input type="text" data-f="nextcloud_token" value="{{ c.nextcloud_token }}" placeholder="留空＝只走個人一對一對話"></label>
+        <label>{{ tr('群組對話 Token（選填）') }}<input type="text" data-f="nextcloud_token" value="{{ c.nextcloud_token }}" placeholder="{{ tr('留空＝只走個人一對一對話') }}"></label>
         <label>{{ tr('Bot 密鑰') }}<input type="password" data-f="nextcloud_secret" value="{{ c.nextcloud_secret }}" autocomplete="new-password"></label>
       </div>
       <div class="nt-test"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} {{ tr('傳送測試') }}</button><span class="nt-test-res"></span></div>
@@ -125,7 +125,7 @@
       <div class="nt-grid">
         <label>Channel Access Token<input type="password" data-f="line_token" value="{{ c.line_token }}" autocomplete="new-password"></label>
       </div>
-      <div class="nt-test"><input type="text" class="nt-test-to" placeholder="測試用 User ID（U…）"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} {{ tr('傳送測試') }}</button><span class="nt-test-res"></span></div>
+      <div class="nt-test"><input type="text" class="nt-test-to" placeholder="{{ tr('測試用 User ID（U…）') }}"><button class="btn btn-small nt-test-btn" type="button">{{ icon('play', size=14) }} {{ tr('傳送測試') }}</button><span class="nt-test-res"></span></div>
 
       {% elif ch == 'webhook' %}
       <div class="nt-grid">

@@ -46,7 +46,7 @@
 
 <div class="panel">
   <form method="get" action="cases" class="scl-search">
-    <input type="text" name="q" value="{{ q or '' }}" placeholder="搜尋主角名 / 統編 / case_id">
+    <input type="text" name="q" value="{{ q or '' }}" placeholder="{{ tr('搜尋主角名 / 統編 / case_id') }}">
     <select name="status">
       <option value="">所有狀態</option>
       <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>draft</option>
@@ -99,7 +99,7 @@
         <td data-sort-value="{{ c.updated_at|int }}"><span title="epoch {{ c.updated_at|int|string }}">{{ c.updated_at_str }}</span></td>
         <td>
           {% if not c.deleted_at %}
-            <button class="scl-del" title="刪除案件" data-case-id="{{ c.case_id }}">{{ icon('trash', size=16) }}</button>
+            <button class="scl-del" title="{{ tr('刪除案件') }}" data-case-id="{{ c.case_id }}">{{ icon('trash', size=16) }}</button>
           {% endif %}
         </td>
       </tr>

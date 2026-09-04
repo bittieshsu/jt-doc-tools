@@ -35,15 +35,15 @@
   </summary>
   <div class="fmt-note-body">
     <div class="fmt-grid">
-      <div class="fmt-item"><b>文書檔</b><code>.docx</code><code>.odt</code></div>
-      <div class="fmt-item"><b>試算表</b><code>.xlsx</code><code>.ods</code></div>
-      <div class="fmt-item"><b>簡報</b><code>.pptx</code><code>.odp</code></div>
+      <div class="fmt-item"><b>{{ tr('文書檔') }}</b><code>.docx</code><code>.odt</code></div>
+      <div class="fmt-item"><b>{{ tr('試算表') }}</b><code>.xlsx</code><code>.ods</code></div>
+      <div class="fmt-item"><b>{{ tr('簡報') }}</b><code>.pptx</code><code>.odp</code></div>
       <div class="fmt-item"><b>PDF</b><code>.pdf</code></div>
     </div>
     {# **中文句子中間不要換行** —— 瀏覽器會把 CJK 之間的換行渲染成一個空格，
        畫面上就會冒出「同時收 多種格式」這種多餘空白。要斷就斷在標點後。 #}
-    <p class="fmt-umbrella"><b>{{ tr('辦公文件') }}</b>是以上四類的<b>統稱</b> ——
-      工具能同時收多種格式時就用這個說法（例如「辦公文件轉 PDF」）。</p>
+    <p class="fmt-umbrella"><b>{{ tr('辦公文件') }}</b>{{ tr('是以上四類的') }}<b>{{ tr('統稱') }}</b> ——
+      {{ tr('工具能同時收多種格式時就用這個說法（例如「辦公文件轉 PDF」）。') }}</p>
   </div>
 </details>
 
@@ -51,7 +51,7 @@
 <section class="tool-group" id="homePinnedGroup" hidden>
   <h2 class="tool-group-title">
     <span data-s="s38288887">{{ icon('star', size=18) }}</span>
-    釘選 <span class="tool-count" id="homePinnedCount">0</span>
+    {{ tr('釘選') }} <span class="tool-count" id="homePinnedCount">0</span>
   </h2>
   <div class="tool-grid" id="homePinnedGrid"></div>
 </section>

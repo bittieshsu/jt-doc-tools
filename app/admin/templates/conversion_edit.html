@@ -32,14 +32,14 @@
   <ul id="path-list" class="path-list">
     {% for p in paths %}
     <li class="path-item" data-id="{{ p.id }}" data-builtin="{{ 'true' if p.builtin else 'false' }}">
-      <span class="drag-handle" title="拖曳調整順序">⠿</span>
+      <span class="drag-handle" title="{{ tr('拖曳調整順序') }}">⠿</span>
       <span class="badge {% if p.builtin %}badge-builtin{% else %}badge-custom{% endif %}">{% if p.builtin %}內建{% else %}自訂{% endif %}</span>
       {% if p.builtin %}
         <code class="p-text">{{ p.path }}</code>
       {% else %}
         <input type="text" class="p-input" value="{{ p.path }}" />
       {% endif %}
-      {% if p.version %}<span class="version-chip" title="--version 輸出">{{ p.version }}</span>{% endif %}
+      {% if p.version %}<span class="version-chip" title="{{ tr('--version 輸出') }}">{{ p.version }}</span>{% endif %}
       <span class="status">{% if p.exists and p.executable %}✅{% elif p.exists %}⚠️ 不可執行{% else %}❌ 不存在{% endif %}</span>
       {% if not p.builtin %}
       <button class="btn btn-small btn-danger" type="button" data-act="remove">{{ icon('trash') }}</button>

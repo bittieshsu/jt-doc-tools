@@ -81,7 +81,7 @@
     <button type="button" class="dt-chip" data-domain="{{ d }}">{{ d }}</button>
     {% endfor %}
   </div>
-  <input type="text" class="field dt-domain-input" id="dtDomain" placeholder="自填其他領域…（選填，會與上方點選的領域一起送進 prompt）">
+  <input type="text" class="field dt-domain-input" id="dtDomain" placeholder="{{ tr('自填其他領域…（選填，會與上方點選的領域一起送進 prompt）') }}">
 
   <p class="muted dt-note" data-s="s_dt_model">
     {{ icon('info', size=14) }} <b>{{ tr('模型怎麼挑') }}</b>{{ tr('：這支工具一份文件動輒幾十次 LLM 請求，

@@ -89,17 +89,17 @@
     </div>
     <input type="text" class="field" id="domainHint" maxlength="200"
            data-s="se5007d97"
-           placeholder="自填其他領域…（選填，會與上方點選的領域一起送進 prompt）">
+           placeholder="{{ tr('自填其他領域…（選填，會與上方點選的領域一起送進 prompt）') }}">
   </div>
   <div class="trd-srctext-wrap" data-s="se7325f84">
-    <textarea class="field" id="srcText" rows="10" data-s="s20808d80" placeholder="貼上要翻譯的文字，或上傳檔案到上方欄位…"></textarea>
+    <textarea class="field" id="srcText" rows="10" data-s="s20808d80" placeholder="{{ tr('貼上要翻譯的文字，或上傳檔案到上方欄位…') }}"></textarea>
     <div class="trd-parse-overlay" id="trdParseOverlay" hidden>
       <span class="trd-spinner"></span>
       <span class="trd-parse-label" id="trdParseLabel">{{ tr('解析中…') }}</span>
     </div>
   </div>
   <div data-s="sa45f86c4">
-    <button class="btn btn-primary" id="btnTranslate" {% if not llm_enabled %}disabled title="LLM 未啟用"{% endif %}>{{ icon('play', size=14) }} {{ tr('開始翻譯') }}</button>
+    <button class="btn btn-primary" id="btnTranslate" {% if not llm_enabled %}disabled title="{{ tr('LLM 未啟用') }}"{% endif %}>{{ icon('play', size=14) }} {{ tr('開始翻譯') }}</button>
     <button class="btn" type="button" id="btnStop" hidden data-s="s17cfb864">{{ tr('■ 停止翻譯') }}</button>
     <button class="btn" type="button" id="btnClear">{{ icon('reset', size=14) }} {{ tr('清空') }}</button>
     <span class="muted" data-s="s6b9c179a" id="charCounter">{{ tr('0 字 / 0 句') }}</span>

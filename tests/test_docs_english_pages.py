@@ -66,10 +66,15 @@ def test_language_link_points_both_ways(src: str, cat: str, dst: str):
 
 GH = DOCS.parent
 _FENCE = re.compile(r"```.*?```", re.S)
+#: 行內程式碼（單反引號）也要拿掉 —— 英文版的更新記錄會**引用**中文字串當例子
+#: （「產品名 `Jason Tools 文件工具箱` 是品牌，不翻」「欄位同義詞字典不可以翻」）。
+#: 那是 mention 不是 use，跟「這一行忘了翻」是兩回事；不分開的話這條守門會在
+#: 每次寫到中文例子時紅，然後被當成雜訊忽略。
+_CODE = re.compile(r"`[^`]*`")
 
 
 def _chinese_lines(md: str) -> list[str]:
-    return [ln for ln in _FENCE.sub(" ", md).splitlines()
+    return [ln for ln in _CODE.sub(" ", _FENCE.sub(" ", md)).splitlines()
             if CJK.search(ln) and "繁體中文" not in ln]
 
 

@@ -12,8 +12,8 @@
     <button class="btn btn-primary" id="saveBtn" type="button">{{ icon('save') }}{{ tr('儲存') }}</button>
     <span data-s="sda5cd676"></span>
     <a class="btn" href="/admin/synonyms/export" download>{{ icon('download') }}{{ tr('匯出 JSON') }}</a>
-    <button class="btn" id="importMergeBtn" type="button" title="保留現有同義詞，新檔案的 key 補上去；同 key 兩邊的同義詞做聯集">{{ icon('upload') }}{{ tr('匯入（合併）') }}</button>
-    <button class="btn btn-danger" id="importReplaceBtn" type="button" title="清掉現有所有同義詞，只保留匯入檔內容（不可還原）">{{ icon('upload') }}{{ tr('匯入（取代）') }}</button>
+    <button class="btn" id="importMergeBtn" type="button" title="{{ tr('保留現有同義詞，新檔案的 key 補上去；同 key 兩邊的同義詞做聯集') }}">{{ icon('upload') }}{{ tr('匯入（合併）') }}</button>
+    <button class="btn btn-danger" id="importReplaceBtn" type="button" title="{{ tr('清掉現有所有同義詞，只保留匯入檔內容（不可還原）') }}">{{ icon('upload') }}{{ tr('匯入（取代）') }}</button>
     <input type="file" id="importFile" accept="application/json,.json" data-s="scb458930">
     <span class="muted" id="status"></span>
   </div>

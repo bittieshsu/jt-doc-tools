@@ -43,13 +43,13 @@
       <span class="pn-card-title">{{ tr('位置') }}</span>
       <span class="pn-card-sub" id="posLabel">{{ tr('右下') }}</span>
     </div>
-    <div class="pn-poschooser" role="radiogroup" aria-label="頁碼位置">
-      <button type="button" class="pn-posbtn" data-pos="tl" title="左上"><span class="pn-posdot"></span></button>
-      <button type="button" class="pn-posbtn" data-pos="tc" title="中上"><span class="pn-posdot"></span></button>
-      <button type="button" class="pn-posbtn" data-pos="tr" title="右上"><span class="pn-posdot"></span></button>
-      <button type="button" class="pn-posbtn" data-pos="bl" title="左下"><span class="pn-posdot"></span></button>
-      <button type="button" class="pn-posbtn" data-pos="bc" title="中下"><span class="pn-posdot"></span></button>
-      <button type="button" class="pn-posbtn pn-posbtn-active" data-pos="br" title="右下"><span class="pn-posdot"></span></button>
+    <div class="pn-poschooser" role="radiogroup" aria-label="{{ tr('頁碼位置') }}">
+      <button type="button" class="pn-posbtn" data-pos="tl" title="{{ tr('左上') }}"><span class="pn-posdot"></span></button>
+      <button type="button" class="pn-posbtn" data-pos="tc" title="{{ tr('中上') }}"><span class="pn-posdot"></span></button>
+      <button type="button" class="pn-posbtn" data-pos="tr" title="{{ tr('右上') }}"><span class="pn-posdot"></span></button>
+      <button type="button" class="pn-posbtn" data-pos="bl" title="{{ tr('左下') }}"><span class="pn-posdot"></span></button>
+      <button type="button" class="pn-posbtn" data-pos="bc" title="{{ tr('中下') }}"><span class="pn-posdot"></span></button>
+      <button type="button" class="pn-posbtn pn-posbtn-active" data-pos="br" title="{{ tr('右下') }}"><span class="pn-posdot"></span></button>
     </div>
     <input id="position" type="hidden" value="br" />
   </div>
@@ -58,7 +58,7 @@
     <div class="pn-card-head">
       <span class="pn-card-title">{{ tr('顯示格式') }}</span>
     </div>
-    <div class="pn-chips" role="group" aria-label="格式快選">
+    <div class="pn-chips" role="group" aria-label="{{ tr('格式快選') }}">
       <button type="button" class="pn-chip" data-fmt="{n}">{n}</button>
       <button type="button" class="pn-chip pn-chip-active" data-fmt="{n} / {N}">{n} / {N}</button>
       <button type="button" class="pn-chip" data-fmt="- {n} -">- {n} -</button>
@@ -91,18 +91,18 @@
 
     <div class="pn-color-row">
       <label>{{ tr('字型顏色') }}</label>
-      <div class="pn-swatches" role="radiogroup" aria-label="常用顏色">
-        <button type="button" class="pn-swatch pn-swatch-active" data-color="#000000" data-s="s33e84a5f" title="黑"></button>
-        <button type="button" class="pn-swatch" data-color="#4b5563" data-s="sdc660356" title="深灰"></button>
-        <button type="button" class="pn-swatch" data-color="#9ca3af" data-s="s8fc33b67" title="淺灰"></button>
-        <button type="button" class="pn-swatch" data-color="#dc2626" data-s="saa7ca405" title="紅"></button>
-        <button type="button" class="pn-swatch" data-color="#2563eb" data-s="s00f4c1b9" title="藍"></button>
-        <button type="button" class="pn-swatch" data-color="#059669" data-s="s3ea417ed" title="綠"></button>
-        <button type="button" class="pn-swatch" data-color="#b45309" data-s="s4d6e7908" title="棕"></button>
+      <div class="pn-swatches" role="radiogroup" aria-label="{{ tr('常用顏色') }}">
+        <button type="button" class="pn-swatch pn-swatch-active" data-color="#000000" data-s="s33e84a5f" title="{{ tr('黑') }}"></button>
+        <button type="button" class="pn-swatch" data-color="#4b5563" data-s="sdc660356" title="{{ tr('深灰') }}"></button>
+        <button type="button" class="pn-swatch" data-color="#9ca3af" data-s="s8fc33b67" title="{{ tr('淺灰') }}"></button>
+        <button type="button" class="pn-swatch" data-color="#dc2626" data-s="saa7ca405" title="{{ tr('紅') }}"></button>
+        <button type="button" class="pn-swatch" data-color="#2563eb" data-s="s00f4c1b9" title="{{ tr('藍') }}"></button>
+        <button type="button" class="pn-swatch" data-color="#059669" data-s="s3ea417ed" title="{{ tr('綠') }}"></button>
+        <button type="button" class="pn-swatch" data-color="#b45309" data-s="s4d6e7908" title="{{ tr('棕') }}"></button>
       </div>
       <div class="pn-color-custom">
-        <input id="color" type="color" value="#000000" aria-label="自訂顏色" />
-        <input id="color-hex" type="text" value="#000000" aria-label="顏色色碼" />
+        <input id="color" type="color" value="#000000" aria-label="{{ tr('自訂顏色') }}" />
+        <input id="color-hex" type="text" value="#000000" aria-label="{{ tr('顏色色碼') }}" />
       </div>
     </div>
   </div>

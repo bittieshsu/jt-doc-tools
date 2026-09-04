@@ -16,7 +16,7 @@
         <button type="button" class="aj-rng is-on" data-h="24">{{ tr('24 小時') }}</button>
         <button type="button" class="aj-rng" data-h="168">{{ tr('7 天') }}</button>
       </span>
-      <button type="button" class="aj-chart-close" id="aj-chart-close" aria-label="關閉">×</button>
+      <button type="button" class="aj-chart-close" id="aj-chart-close" aria-label="{{ tr('關閉') }}">×</button>
     </div>
     <div class="aj-chart-body" id="aj-chart-body"></div>
     <div class="aj-chart-note muted" id="aj-chart-note"></div>
@@ -33,14 +33,14 @@
 
 <div class="panel">
   <h2>{{ icon('gear', size=18) }} {{ tr('併行度設定') }}</h2>
-  <div class="aj-mem is-clickable" id="aj-mem" title="點一下看歷史趨勢">
+  <div class="aj-mem is-clickable" id="aj-mem" title="{{ tr('點一下看歷史趨勢') }}">
     <div class="aj-mem-top">
       <span id="aj-mem-text">{{ tr('載入中…') }}</span>
       <span class="aj-mem-pct" id="aj-mem-pct"></span>
     </div>
     <div class="aj-mem-bar">
-      <div class="aj-mem-used" id="aj-mem-used" title="已被使用的記憶體"></div>
-      <div class="aj-mem-reserve" id="aj-mem-reserve" title="保留給作業系統與資料庫，不會拿來開新作業"></div>
+      <div class="aj-mem-used" id="aj-mem-used" title="{{ tr('已被使用的記憶體') }}"></div>
+      <div class="aj-mem-reserve" id="aj-mem-reserve" title="{{ tr('保留給作業系統與資料庫，不會拿來開新作業') }}"></div>
     </div>
     {# 圖例 —— 中間那段灰色（可開新作業）才是這條計量最有用的資訊，但沒有標示的話
        看起來只像「進度條沒有滿」。 #}
@@ -51,7 +51,7 @@
     </div>
   </div>
 
-  <div class="aj-mem aj-cpu is-clickable" id="aj-cpu" title="點一下看歷史趨勢">
+  <div class="aj-mem aj-cpu is-clickable" id="aj-cpu" title="{{ tr('點一下看歷史趨勢') }}">
     <div class="aj-mem-top">
       <span id="aj-cpu-text">{{ tr('載入中…') }}</span>
       <span class="aj-mem-pct" id="aj-cpu-pct"></span>
@@ -150,7 +150,7 @@
     {# 搜尋在最上面：這是「加人」的入口，動作的起點應該在名單之前。
        擺在名單下面時，名單一長就得先捲過整份名單才找得到它。 #}
     <div class="aj-prio-add">
-      <input type="text" id="aj-prio-q" placeholder="輸入帳號或姓名搜尋…" autocomplete="off">
+      <input type="text" id="aj-prio-q" placeholder="{{ tr('輸入帳號或姓名搜尋…') }}" autocomplete="off">
       <div class="aj-prio-sug" id="aj-prio-sug" hidden></div>
     </div>
     <div class="aj-prio-list" id="aj-prio-list"></div>
@@ -163,7 +163,7 @@
   <h2 class="aj-head">
     {{ tr('作業清單') }}<span id="aj-count" class="mj-count" hidden></span>
     <span class="aj-head-right">
-      <span class="aj-live" id="aj-live" title="有作業進行中時每 2 秒自動更新">
+      <span class="aj-live" id="aj-live" title="{{ tr('有作業進行中時每 2 秒自動更新') }}">
         <span class="aj-live-dot"></span><span id="aj-live-tx">{{ tr('自動更新中') }}</span>
       </span>
       <label class="aj-only-active"><input type="checkbox" id="aj-active-only"> {{ tr('只看進行中') }}</label>

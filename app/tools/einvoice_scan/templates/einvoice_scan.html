@@ -550,7 +550,7 @@
 
 {% block right_fab %}
 <button type="button" class="es-handoff-fab" id="esHandoffFab"
-        title="顯示 QR Code 用手機接續掃描" aria-label="手機掃描">
+        title="{{ tr('顯示 QR Code 用手機接續掃描') }}" aria-label="{{ tr('手機掃描') }}">
   {{ icon('qr', size=16) }}<span>手機掃描</span>
 </button>
 {% endblock %}
@@ -629,7 +629,7 @@
       <label data-s="s9061fe43">
         <input type="checkbox" id="autoRefresh" checked> 自動更新
       </label>
-      <button type="button" class="es-mini-btn" id="btnSettings" title="欄位顯示設定">{{ icon('gear', size=12) }} 設定</button>
+      <button type="button" class="es-mini-btn" id="btnSettings" title="{{ tr('欄位顯示設定') }}">{{ icon('gear', size=12) }} 設定</button>
       <span class="es-export-wrap" data-s="s5ce657fb">
         <button type="button" class="es-mini-btn" id="btnExport">{{ icon('download', size=12) }} 匯出 ▾</button>
         <span id="exportMenu" hidden data-s="sd0f0af67">
@@ -644,13 +644,13 @@
       </span>
       <button type="button" class="es-mini-btn" id="btnRefresh">{{ icon('refresh', size=12) }} 重新整理</button>
       <button type="button" class="es-mini-btn es-desktop-only" id="btnReclassify"
-              title="對 buffer 內所有發票重新跑「賣方反查 + 會計科目分類」（不影響掃描資料，只更新自動帶入的賣方名稱 / 行業 / 科目）">
+              title="{{ tr('對 buffer 內所有發票重新跑「賣方反查 + 會計科目分類」（不影響掃描資料，只更新自動帶入的賣方名稱 / 行業 / 科目）') }}">
         {{ icon('refresh', size=12) }} 重抓科目
       </button>
       <button type="button" class="es-mini-btn es-desktop-only" id="btnLlmClassify"
               {% if not llm_enabled %}disabled
-              title="LLM 功能未啟用 — 請到 /admin/llm 設定"
-              {% else %}title="批次送 LLM 判讀所有發票科目（依據賣方統編 / 名稱 / 行業）"
+              title="{{ tr('LLM 功能未啟用 — 請到 /admin/llm 設定') }}"
+              {% else %}title="{{ tr('批次送 LLM 判讀所有發票科目（依據賣方統編 / 名稱 / 行業）') }}"
               {% endif %}>
         {{ icon('sparkles', size=12) }} LLM 判讀科目
       </button>
@@ -690,7 +690,7 @@
       <p data-s="s83862576">設定我方公司統編後，發票買方統編不符或為空者會在表格中標註為「非報帳用」。</p>
       <div class="es-my-vat-row">
         <span>我方公司統編：</span>
-        <input type="text" id="myCompanyVat" maxlength="8" placeholder="8 位數字 / 留空關閉檢查">
+        <input type="text" id="myCompanyVat" maxlength="8" placeholder="{{ tr('8 位數字 / 留空關閉檢查') }}">
         <span class="hint">必須是 8 位數字。空白 = 不檢查</span>
       </div>
 

@@ -39,7 +39,7 @@
     <form class="uf-bar" method="get" action="/admin/users">
       <input type="hidden" name="view" value="{{ view }}">
       <input class="field uf-q" type="search" name="q" value="{{ q }}"
-             placeholder="搜尋帳號、顯示名稱、信箱…">
+             placeholder="{{ tr('搜尋帳號、顯示名稱、信箱…') }}">
       <select class="field uf-sel" name="src">
         <option value="">{{ tr('所有來源') }}</option>
         {% for v, lab in [('local','本機'),('ldap','LDAP'),('ad','AD'),('oidc','OIDC'),('saml','SAML')] %}
@@ -63,13 +63,13 @@
       {# 目錄裡已經找不到的帳號（離職 / 停用 / 移出範圍）。內控盤點第一個要看的就是它。 #}
       <a class="uf-view uf-view-warn{% if view == 'missing' %} active{% endif %}"
          href="/admin/users?view=missing"
-         title="上一次完整目錄同步時已經找不到的帳號">
+         title="{{ tr('上一次完整目錄同步時已經找不到的帳號') }}">
         {{ tr('目錄已無') }}{% if missing_count %} <b>{{ missing_count }}</b>{% endif %}</a>
       {# 這兩個只有 AD 環境才會有數字；0 的時候不顯示，免得佔版面又讓人困惑。 #}
       {% if dir_disabled_count or view == 'dir_disabled' %}
       <a class="uf-view uf-view-warn{% if view == 'dir_disabled' %} active{% endif %}"
          href="/admin/users?view=dir_disabled"
-         title="AD 端已經停用的帳號（userAccountControl）——他們登不進來，但本站的角色指派還在">
+         title="{{ tr('AD 端已經停用的帳號（userAccountControl）——他們登不進來，但本站的角色指派還在') }}">
         {{ tr('AD 已停用') }}{% if dir_disabled_count %} <b>{{ dir_disabled_count }}</b>{% endif %}</a>
       {% endif %}
       {% if pwd_expiring_count or view == 'pwd_expiring' %}
@@ -130,7 +130,7 @@
   <table class="user-table" id="userTable">
     <thead>
       <tr>
-        <th class="uf-ck"><input type="checkbox" id="ufAll" title="全選本頁"></th>
+        <th class="uf-ck"><input type="checkbox" id="ufAll" title="{{ tr('全選本頁') }}"></th>
         <th class="sortable" data-sort="text" data-col="1">{{ tr('帳號') }}</th>
         <th class="sortable" data-sort="text" data-col="2">{{ tr('顯示名稱') }}</th>
         <th class="sortable" data-sort="text" data-col="3">{{ tr('信箱') }}</th>
@@ -148,9 +148,9 @@
         <td>
           <b>{{ u.username }}</b>
           {% if u.online %}<span class="uf-online" title="最近 {{ online_window_min }} 分鐘內有活動">{{ tr('在線') }}</span>{% endif %}
-          {% if u.dir_disabled %}<span class="uf-addis" title="AD 端已停用（userAccountControl）——這個人登不進來，但本站的角色指派與群組成員關係還在">{{ tr('AD 已停用') }}</span>{% endif %}
+          {% if u.dir_disabled %}<span class="uf-addis" title="{{ tr('AD 端已停用（userAccountControl）——這個人登不進來，但本站的角色指派與群組成員關係還在') }}">{{ tr('AD 已停用') }}</span>{% endif %}
           {% if u.pwd_expiring_soon %}<span class="uf-pwdexp" title="{{ '密碼已過期' if u.pwd_expiry_days < 0 else '密碼即將到期' }}">{% if u.pwd_expiry_days < 0 %}密碼已過期{% else %}密碼 {{ u.pwd_expiry_days }} {{ tr('天後到期') }}{% endif %}</span>{% endif %}
-          {% if u.directory_missing %}<span class="uf-gone" title="上一次完整目錄同步時，AD / LDAP 裡已經找不到這個帳號">{{ tr('目錄已無') }}</span>{% endif %}
+          {% if u.directory_missing %}<span class="uf-gone" title="{{ tr('上一次完整目錄同步時，AD / LDAP 裡已經找不到這個帳號') }}">{{ tr('目錄已無') }}</span>{% endif %}
           {% if u.is_admin_seed %}<span class="badge">SEED</span>{% endif %}
         </td>
         <td>{{ u.display_name }}</td>
@@ -178,21 +178,21 @@
         <td>
           {% if u.locked %}
           <button class="btn btn-small" data-act="unlock" data-uid="{{ u.id }}" data-username="{{ u.username }}"
-                  title="清除這個帳號的密碼錯誤次數鎖定"
+                  title="{{ tr('清除這個帳號的密碼錯誤次數鎖定') }}"
                   data-s="s0ad83627">{{ icon('unlock', size=12) }} {{ tr('解鎖') }}</button>
           {% endif %}
           {% if u.is_admin_seed %}
           <button class="btn btn-small" type="button" disabled
-                  title="內建管理員：權限固定為 admin，不可變更">{{ icon('lock', size=12) }} {{ tr('內建') }}</button>
-          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} {{ tr('登入裝置') }}</button>
+                  title="{{ tr('內建管理員：權限固定為 admin，不可變更') }}">{{ icon('lock', size=12) }} {{ tr('內建') }}</button>
+          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="{{ tr('這個帳號目前的登入裝置，可個別或全部強制登出') }}">{{ icon('smartphone', size=12) }} {{ tr('登入裝置') }}</button>
           <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} {{ tr('重設密碼') }}</button>
-          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除這個使用者的 TOTP secret，下次登入會看到 QR 重新 setup">{{ icon('refresh-cw', size=12) }} {{ tr('重設 2FA') }}</button>
+          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="{{ tr('清除這個使用者的 TOTP secret，下次登入會看到 QR 重新 setup') }}">{{ icon('refresh-cw', size=12) }} {{ tr('重設 2FA') }}</button>
           {% elif u.is_audit_seed %}
           <button class="btn btn-small" type="button" disabled
-                  title="內建稽核員：強制 2FA，無工具權限，不可刪">{{ icon('lock', size=12) }} {{ tr('內建') }}</button>
-          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} {{ tr('登入裝置') }}</button>
+                  title="{{ tr('內建稽核員：強制 2FA，無工具權限，不可刪') }}">{{ icon('lock', size=12) }} {{ tr('內建') }}</button>
+          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="{{ tr('這個帳號目前的登入裝置，可個別或全部強制登出') }}">{{ icon('smartphone', size=12) }} {{ tr('登入裝置') }}</button>
           <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} {{ tr('重設密碼') }}</button>
-          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除 TOTP secret，下次登入重新顯示 QR setup">{{ icon('refresh-cw', size=12) }} {{ tr('重設 2FA') }}</button>
+          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="{{ tr('清除 TOTP secret，下次登入重新顯示 QR setup') }}">{{ icon('refresh-cw', size=12) }} {{ tr('重設 2FA') }}</button>
           {% else %}
           <button class="btn btn-small" data-act="edit"
                   data-username="{{ u.username }}"
@@ -200,9 +200,9 @@
                   data-email="{{ u.email }}"
                   data-enabled="{{ '1' if u.enabled else '0' }}"
                   data-roles="{{ u.roles|join(',') }}">{{ icon('edit', size=12) }} {{ tr('編輯') }}</button>
-          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="這個帳號目前的登入裝置，可個別或全部強制登出">{{ icon('smartphone', size=12) }} {{ tr('登入裝置') }}</button>
+          <button class="btn btn-small" data-act="sessions" data-username="{{ u.username }}" title="{{ tr('這個帳號目前的登入裝置，可個別或全部強制登出') }}">{{ icon('smartphone', size=12) }} {{ tr('登入裝置') }}</button>
           <button class="btn btn-small" data-act="reset-pwd" data-username="{{ u.username }}">{{ icon('lock', size=12) }} {{ tr('重設密碼') }}</button>
-          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="清除 TOTP secret，下次登入重新顯示 QR setup">{{ icon('refresh-cw', size=12) }} {{ tr('重設 2FA') }}</button>
+          <button class="btn btn-small" data-act="reset-totp" data-username="{{ u.username }}" title="{{ tr('清除 TOTP secret，下次登入重新顯示 QR setup') }}">{{ icon('refresh-cw', size=12) }} {{ tr('重設 2FA') }}</button>
           <button class="btn btn-small btn-danger" data-act="delete" data-username="{{ u.username }}">{{ icon('trash', size=12) }} {{ tr('刪除') }}</button>
           {% endif %}
         </td>
@@ -268,7 +268,7 @@
       <label>{{ tr('角色（複選）') }}</label>
       <div class="picker">
         <div class="picker-toolbar">
-          <input class="field picker-search" type="search" id="emRoleSearch" placeholder="搜尋角色…">
+          <input class="field picker-search" type="search" id="emRoleSearch" placeholder="{{ tr('搜尋角色…') }}">
           <span class="picker-count" id="emRoleCount">0 / 0</span>
           <button type="button" class="btn btn-small picker-clear" id="emRoleClear">{{ tr('清除') }}</button>
         </div>
@@ -279,7 +279,7 @@
       <label>{{ tr('群組（複選）') }}</label>
       <div class="picker">
         <div class="picker-toolbar">
-          <input class="field picker-search" type="search" id="emGroupSearch" placeholder="搜尋群組…">
+          <input class="field picker-search" type="search" id="emGroupSearch" placeholder="{{ tr('搜尋群組…') }}">
           <span class="picker-count" id="emGroupCount">0 / 0</span>
           <button type="button" class="btn btn-small picker-clear" id="emGroupClear">{{ tr('清除') }}</button>
         </div>

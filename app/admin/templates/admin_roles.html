@@ -9,8 +9,8 @@
 <details class="panel">
   <summary><b>{{ tr('新增角色') }}</b></summary>
   <form id="newRoleForm" data-s="s23e0c196">
-    <div><label>{{ tr('id（英文）') }}<br><input class="field" name="id" required pattern="[a-z][a-z0-9-]{1,30}" placeholder="例：accountant"></label></div>
-    <div><label>{{ tr('顯示名稱') }}<br><input class="field" name="display_name" required maxlength="64" placeholder="例：會計"></label></div>
+    <div><label>{{ tr('id（英文）') }}<br><input class="field" name="id" required pattern="[a-z][a-z0-9-]{1,30}" placeholder="{{ tr('例：accountant') }}"></label></div>
+    <div><label>{{ tr('顯示名稱') }}<br><input class="field" name="display_name" required maxlength="64" placeholder="{{ tr('例：會計') }}"></label></div>
     <div data-s="sda5cd676"><label>{{ tr('說明') }}<br><input class="field" name="description" maxlength="500" data-s="s6d567387"></label></div>
     <button class="btn btn-primary" type="submit">{{ icon('plus', size=14) }} {{ tr('建立') }}</button>
   </form>
@@ -24,17 +24,17 @@
       <code data-s="sa9648fd5">{{ r.id }}</code>
       {% if r.is_builtin %}<span class="badge">{{ tr('預設') }}</span>{% endif %}
       {% if r.is_protected %}<span class="badge" data-s="s5f951fed">{{ tr('受保護') }}</span>{% endif %}
-      {% if r.is_default_for_new %}<span class="badge badge-newuser" title="新加入的使用者（AD / LDAP / SSO 首次登入、或管理員未指定角色時）會自動套用此角色">{{ tr('新使用者預設') }}</span>{% endif %}
+      {% if r.is_default_for_new %}<span class="badge badge-newuser" title="{{ tr('新加入的使用者（AD / LDAP / SSO 首次登入、或管理員未指定角色時）會自動套用此角色') }}">{{ tr('新使用者預設') }}</span>{% endif %}
     </div>
     <div>
       {% if r.id not in ('admin', 'auditor') %}
       <button class="btn btn-small" data-act="save">{{ icon('save', size=12) }} {{ tr('儲存') }}</button>
       {% endif %}
       {% if r.id not in ('admin', 'auditor') and not r.is_default_for_new %}
-      <button class="btn btn-small" data-act="set-default" title="設為新使用者預設角色">{{ icon('star', size=12) }} {{ tr('設為預設') }}</button>
+      <button class="btn btn-small" data-act="set-default" title="{{ tr('設為新使用者預設角色') }}">{{ icon('star', size=12) }} {{ tr('設為預設') }}</button>
       {% endif %}
       {% if r.id != 'admin' %}
-      <button class="btn btn-small" data-act="copy" title="複製此角色為新的可編輯角色">{{ icon('copy', size=12) }} {{ tr('複製') }}</button>
+      <button class="btn btn-small" data-act="copy" title="{{ tr('複製此角色為新的可編輯角色') }}">{{ icon('copy', size=12) }} {{ tr('複製') }}</button>
       {% endif %}
       {% if not r.is_protected %}
       <button class="btn btn-small btn-danger" data-act="delete">{{ icon('trash', size=12) }} {{ tr('刪除') }}</button>

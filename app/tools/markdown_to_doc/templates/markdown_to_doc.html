@@ -175,7 +175,7 @@ def hello():
 "></textarea>
   <div data-s="sda8a1590">
     <label data-s="s3044b600">{{ tr('標題（檔名用）') }}</label>
-    <input type="text" id="md2Title" placeholder="不填則用「document」或上傳檔名"
+    <input type="text" id="md2Title" placeholder="{{ tr('不填則用「document」或上傳檔名') }}"
            data-s="seba1607b">
   </div>
 </div>
@@ -222,10 +222,10 @@ def hello():
   <div class="md2-preview-grid" id="md2Previews"></div>
 </div>
 
-<div class="md2-lightbox" id="md2Lightbox" role="dialog" aria-modal="true" aria-label="頁面預覽放大檢視">
-  <button type="button" class="md2-lightbox-nav prev" id="md2LbPrev" aria-label="上一頁">‹</button>
-  <button type="button" class="md2-lightbox-nav next" id="md2LbNext" aria-label="下一頁">›</button>
-  <button type="button" class="md2-lightbox-close" id="md2LbClose" aria-label="關閉">×</button>
+<div class="md2-lightbox" id="md2Lightbox" role="dialog" aria-modal="true" aria-label="{{ tr('頁面預覽放大檢視') }}">
+  <button type="button" class="md2-lightbox-nav prev" id="md2LbPrev" aria-label="{{ tr('上一頁') }}">‹</button>
+  <button type="button" class="md2-lightbox-nav next" id="md2LbNext" aria-label="{{ tr('下一頁') }}">›</button>
+  <button type="button" class="md2-lightbox-close" id="md2LbClose" aria-label="{{ tr('關閉') }}">×</button>
   <div class="md2-lightbox-cap" id="md2LbCap"></div>
   <img class="md2-lightbox-img" id="md2LbImg" alt="">
 </div>

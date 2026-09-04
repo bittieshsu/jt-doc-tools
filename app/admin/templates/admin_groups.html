@@ -19,7 +19,7 @@
   <p class="muted">{{ tr('這裡的「群組清單」只是讓你') }}<b>{{ tr('預先把權限指派給目錄群組') }}</b>{{ tr('用。') }}<b>{{ tr('權限判斷本身永遠正確') }}</b> {{ tr('—— 每位使用者登入時是從他當下在') }} {{ auth_backend|upper }} {{ tr('的即時群組解析權限，不靠這份清單。清單預設只含「登入過的人所屬群組」，按此可一次列舉目錄群組補齊（不會更動成員）。') }}</p>
   <div class="grp-sync-row">
     <input class="field" type="text" id="syncNameFilter" maxlength="128"
-           placeholder="只同步名稱含此字（選填，避免帶入 Domain Users 等系統群組）例：UG_ / NTPD">
+           placeholder="{{ tr('只同步名稱含此字（選填，避免帶入 Domain Users 等系統群組）例：UG_ / NTPD') }}">
     <button class="btn" type="button" id="btnSyncDir">{{ icon('refresh', size=14) }} {{ tr('同步目錄群組') }}</button>
   </div>
   <p class="muted">{{ tr('留空 = 同步全部。想更精準可在「認證設定」的 LDAP 進階填') }} <code>group_search_base</code>{{ tr('（限某個 OU）或') }} <code>group_search_filter</code>{{ tr('（自訂 filter）。') }}</p>
@@ -57,7 +57,7 @@
   <h2 data-s="s53896af7">{{ tr('群組清單（共') }} {{ total_groups }}）</h2>
   {% if paged %}
   <form method="get" action="/admin/groups" class="grp-sync-row">
-    <input class="field" type="search" name="q" value="{{ q }}" placeholder="搜尋群組名稱…">
+    <input class="field" type="search" name="q" value="{{ q }}" placeholder="{{ tr('搜尋群組名稱…') }}">
     <button class="btn" type="submit">{{ icon('search', size=14) }} {{ tr('搜尋') }}</button>
     {% if q %}<a class="btn btn-small" href="/admin/groups">{{ tr('清除') }}</a>{% endif %}
     <span class="muted">{{ tr('群組數多，改為分頁顯示；第') }} {{ page }} / {{ pages }} {{ tr('頁（符合') }} {{ page_total }} {{ tr('筆）') }}</span>
@@ -77,7 +77,7 @@
           data-depth="{{ g.depth or 0 }}"
           data-dn="{{ (g.external_dn or '')|lower }}"
           data-haschildren="{{ 1 if g.has_children else 0 }}">
-        <td>{% if g.depth %}{% for _ in range(g.depth) %}<span class="grp-indent"></span>{% endfor %}<span class="grp-branch">└</span> {% endif %}{% if g.has_children %}<button type="button" class="grp-toggle" aria-expanded="true" title="收折 / 展開子群組">▾</button>{% else %}<span class="grp-caret-spacer"></span>{% endif %}<b>{{ g.name }}</b></td>
+        <td>{% if g.depth %}{% for _ in range(g.depth) %}<span class="grp-indent"></span>{% endfor %}<span class="grp-branch">└</span> {% endif %}{% if g.has_children %}<button type="button" class="grp-toggle" aria-expanded="true" title="{{ tr('收折 / 展開子群組') }}">▾</button>{% else %}<span class="grp-caret-spacer"></span>{% endif %}<b>{{ g.name }}</b></td>
         <td><span class="src-badge src-{{ g.source }}">{{ g.source }}</span></td>
         <td class="muted">{{ g.description }}</td>
         {% if g.source in ('ldap', 'ad') and g.dir_member_count is not none %}
@@ -124,7 +124,7 @@
     <h3 data-s="s53896af7">{{ tr('指派角色給群組') }} <code id="rmGroupName"></code></h3>
     <div class="picker">
       <div class="picker-toolbar">
-        <input class="field picker-search" type="search" id="rmSearch" placeholder="搜尋角色…">
+        <input class="field picker-search" type="search" id="rmSearch" placeholder="{{ tr('搜尋角色…') }}">
         <span class="picker-count" id="rmCount">0 / 0</span>
         <button type="button" class="btn btn-small picker-clear" id="rmClear">{{ tr('清除') }}</button>
       </div>
@@ -144,7 +144,7 @@
     <h3 data-s="s53896af7">{{ tr('編輯成員') }} <code id="mmGroupName"></code></h3>
     <div class="picker">
       <div class="picker-toolbar">
-        <input class="field picker-search" type="search" id="mmSearch" placeholder="搜尋使用者（帳號或顯示名稱）…">
+        <input class="field picker-search" type="search" id="mmSearch" placeholder="{{ tr('搜尋使用者（帳號或顯示名稱）…') }}">
         <span class="picker-count" id="mmCount">0 / 0</span>
         <button type="button" class="btn btn-small picker-clear" id="mmClear">{{ tr('清除') }}</button>
       </div>
@@ -168,7 +168,7 @@
       <button class="btn btn-small dm-fbtn" type="button" data-f="in">{{ tr('已登入本系統') }} <span id="dmCntIn">0</span></button>
       <button class="btn btn-small dm-fbtn" type="button" data-f="out">{{ tr('未登入') }} <span id="dmCntOut">0</span></button>
     </div>
-    <input class="field" type="search" id="dmSearch" placeholder="篩選（帳號或姓名）…">
+    <input class="field" type="search" id="dmSearch" placeholder="{{ tr('篩選（帳號或姓名）…') }}">
     <div class="dm-list" id="dmList"></div>
     <div data-s="s9fa82b78">
       <button class="btn" type="button" id="dmClose">{{ icon('close', size=14) }} {{ tr('關閉') }}</button>

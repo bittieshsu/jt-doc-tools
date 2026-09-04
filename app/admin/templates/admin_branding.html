@@ -11,9 +11,9 @@
     <h3 data-s="s4c672c49">{{ tr('目前 Logo') }}</h3>
     <div id="logoBox" class="logo-preview">
       {% if has_custom %}
-      <img id="logoImg" src="{{ logo_url }}?v={{ range(100000) | random }}" alt="目前 Logo" />
+      <img id="logoImg" src="{{ logo_url }}?v={{ range(100000) | random }}" alt="{{ tr('目前 Logo') }}" />
       {% else %}
-      <img id="logoImg" src="/static/images/logo-on-light.png" alt="預設 Logo" />
+      <img id="logoImg" src="/static/images/logo-on-light.png" alt="{{ tr('預設 Logo') }}" />
       <div class="muted" data-s="s67fed56e">{{ tr('（使用內建預設）') }}</div>
       {% endif %}
     </div>
@@ -35,9 +35,9 @@
     <div id="cropPanel" hidden data-s="s002535c2">
       <div class="crop-toolbar">
         <span class="muted" data-s="s6b9c179a">{{ tr('拖曳方框與四角調整裁切範圍：') }}</span>
-        <button class="btn btn-small" type="button" id="btnAspectSquare" title="鎖定 1:1">{{ tr('▢ 正方形') }}</button>
-        <button class="btn btn-small" type="button" id="btnAspectFree" title="自由比例">{{ tr('↔ 自由') }}</button>
-        <button class="btn btn-small" type="button" id="btnAspectFull" title="全圖（不裁切）">{{ tr('🗖 全圖') }}</button>
+        <button class="btn btn-small" type="button" id="btnAspectSquare" title="{{ tr('鎖定 1:1') }}">{{ tr('▢ 正方形') }}</button>
+        <button class="btn btn-small" type="button" id="btnAspectFree" title="{{ tr('自由比例') }}">{{ tr('↔ 自由') }}</button>
+        <button class="btn btn-small" type="button" id="btnAspectFull" title="{{ tr('全圖（不裁切）') }}">{{ tr('🗖 全圖') }}</button>
       </div>
       <div class="crop-wrap" id="cropWrap">
         <img id="cropImg" alt="" />
@@ -84,7 +84,7 @@
   <div class="br-name-row">
     <input type="text" id="siteName" maxlength="60"
       value="{{ current_site_name if has_custom_site_name else '' }}"
-      placeholder="例如：某某公司文件工具箱" />
+      placeholder="{{ tr('例如：某某公司文件工具箱') }}" />
     <button class="btn btn-primary" type="button" id="btnSaveName">{{ icon('save', size=14) }} {{ tr('儲存') }}</button>
     <button class="btn" type="button" id="btnResetName" {% if not has_custom_site_name %}disabled{% endif %}>{{ icon('refresh', size=14) }} {{ tr('還原預設') }}</button>
   </div>

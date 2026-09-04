@@ -48,7 +48,7 @@
     </div>
     <div id="tempAssetSlot" data-s="s06ed15aa">
       <div class="asset-item" data-s="s500d9a0e">
-        <div class="thumb"><img id="tempAssetThumb" alt="臨時資產預覽" /></div>
+        <div class="thumb"><img id="tempAssetThumb" alt="{{ tr('臨時資產預覽') }}" /></div>
         <div class="name">
           <input type="radio" name="stamp" value="__temp__" id="tempAssetRadio" />
           <span id="tempAssetName">（未選）</span>
@@ -151,7 +151,7 @@
           <div data-s="sbbf7159c">
             <div data-s="sfd99a134">預覽</div>
             <div data-s="s44d3eff8">
-              <img id="date-preview" data-s="sc2e9e4f9" alt="日期預覽">
+              <img id="date-preview" data-s="sc2e9e4f9" alt="{{ tr('日期預覽') }}">
             </div>
           </div>
         </div>
@@ -161,7 +161,7 @@
         <div class="ovr-rot" data-ovr="date">
           <span class="ovr-rot-label">旋轉</span>
           <input type="number" class="ovr-rot-input" id="date-rot" value="0"
-                 step="0.5" min="-45" max="45" aria-label="日期旋轉角度">
+                 step="0.5" min="-45" max="45" aria-label="{{ tr('日期旋轉角度') }}">
           <span class="ovr-rot-unit">°</span>
           <button type="button" class="btn-mini ovr-rot-reset" data-ovr="date">歸零</button>
           <button type="button" class="btn-mini ovr-rot-rand" data-ovr="date" data-mag="3">隨機 ±3°</button>
@@ -198,7 +198,7 @@
           </select>
 
           <label data-s="s3044b600">用途</label>
-          <input type="text" id="restrict-purpose" placeholder="例如：申請台新銀行帳戶" maxlength="60" data-s="sd477c56e">
+          <input type="text" id="restrict-purpose" placeholder="{{ tr('例如：申請台新銀行帳戶') }}" maxlength="60" data-s="sd477c56e">
           <label class="rs-phrase-row">
             <input type="checkbox" id="restrict-phrase" checked>
             <span>加上「僅供 … 使用，他用無效」字樣</span>
@@ -215,7 +215,7 @@
           </div>
 
           <label data-s="s3044b600">申請人</label>
-          <input type="text" id="restrict-applicant" placeholder="（選填）例：王小明" maxlength="20" data-s="s521eab31">
+          <input type="text" id="restrict-applicant" placeholder="{{ tr('（選填）例：王小明') }}" maxlength="20" data-s="s521eab31">
 
           <label data-s="s3044b600">份數</label>
           <div data-s="s07b81311">
@@ -297,7 +297,7 @@
   <div class="ovr-rot" data-ovr="restrict">
           <span class="ovr-rot-label">旋轉</span>
           <input type="number" class="ovr-rot-input" id="restrict-rot" value="0"
-                 step="0.5" min="-45" max="45" aria-label="個資限用章旋轉角度">
+                 step="0.5" min="-45" max="45" aria-label="{{ tr('個資限用章旋轉角度') }}">
           <span class="ovr-rot-unit">°</span>
           <button type="button" class="btn-mini ovr-rot-reset" data-ovr="restrict">歸零</button>
           <button type="button" class="btn-mini ovr-rot-rand" data-ovr="restrict" data-mag="3">隨機 ±3°</button>
@@ -373,10 +373,10 @@
       <button class="btn btn-small" type="button" id="sim-next">下一頁 ›</button>
       <span class="nav-hint">或左右鍵切換</span>
     </div>
-    <div class="zoom-ctl" role="group" aria-label="檢視縮放">
-      <button class="zoom-btn" type="button" id="zoom-out" title="縮小" aria-label="縮小">−</button>
-      <button class="zoom-btn zoom-level" type="button" id="zoom-level" title="點選重設為符合畫面">100%</button>
-      <button class="zoom-btn" type="button" id="zoom-in" title="放大" aria-label="放大">+</button>
+    <div class="zoom-ctl" role="group" aria-label="{{ tr('檢視縮放') }}">
+      <button class="zoom-btn" type="button" id="zoom-out" title="{{ tr('縮小') }}" aria-label="{{ tr('縮小') }}">−</button>
+      <button class="zoom-btn zoom-level" type="button" id="zoom-level" title="{{ tr('點選重設為符合畫面') }}">100%</button>
+      <button class="zoom-btn" type="button" id="zoom-in" title="{{ tr('放大') }}" aria-label="{{ tr('放大') }}">+</button>
     </div>
   </div>
   <div id="edit-mode" data-s="sd4316970">
@@ -391,7 +391,7 @@
     <div class="spe-wrap" id="speRoot">
       <div class="spe-canvas-wrap">
         <div class="spe-paper">
-          <img class="spe-bg" alt="PDF 頁面" />
+          <img class="spe-bg" alt="{{ tr('PDF 頁面') }}" />
           <div class="spe-layer"></div>
           <div class="spe-guide v" hidden></div>
           <div class="spe-guide h" hidden></div>
@@ -408,19 +408,19 @@
       </div>
       <div class="spe-side">
         <div class="preview-nav">
-          <button class="btn btn-small spe-prev" type="button" title="上一頁">‹</button>
+          <button class="btn btn-small spe-prev" type="button" title="{{ tr('上一頁') }}">‹</button>
           <span class="page-info spe-page-label">— / —</span>
-          <button class="btn btn-small spe-next" type="button" title="下一頁">›</button>
+          <button class="btn btn-small spe-next" type="button" title="{{ tr('下一頁') }}">›</button>
         </div>
         <div class="spe-thumbs"></div>
         {# 要放置的種類：主印章 / 日期(1b) / 個資限用章(1c)。日期與限用章要先在
            上方 1b / 1c 啟用並設定內容，這裡才會亮起可選。 #}
-        <div class="spe-kind" role="group" aria-label="要放置的種類">
+        <div class="spe-kind" role="group" aria-label="{{ tr('要放置的種類') }}">
           <button class="spe-kind-btn active" type="button" data-kind="stamp">印章 / 簽名</button>
           <button class="spe-kind-btn needs-setup" type="button" data-kind="date"
-                  title="尚未啟用 — 點一下前往「1b. 插入日期」設定">日期</button>
+                  title="{{ tr('尚未啟用 — 點一下前往「1b. 插入日期」設定') }}">日期</button>
           <button class="spe-kind-btn needs-setup" type="button" data-kind="restrict"
-                  title="尚未啟用 — 點一下前往「1c. 個資限用章」設定">個資限用章</button>
+                  title="{{ tr('尚未啟用 — 點一下前往「1c. 個資限用章」設定') }}">個資限用章</button>
         </div>
         <div class="spe-count">0 個物件</div>
         {# 旋轉：只作用在「目前選取的物件」，與每頁統一用印的旋轉功能對應 #}
@@ -429,9 +429,9 @@
             <input type="number" class="spe-rot-input" step="0.5" value="0"> °
           </label>
           <div class="spe-rot-btns">
-            <button class="btn btn-small spe-rot-reset" type="button" title="歸零">{{ icon('reset', size=12) }}</button>
-            <button class="btn btn-small spe-rot-rand" type="button" data-range="3" title="隨機 ±3°">±3°</button>
-            <button class="btn btn-small spe-rot-rand" type="button" data-range="10" title="隨機 ±10°">±10°</button>
+            <button class="btn btn-small spe-rot-reset" type="button" title="{{ tr('歸零') }}">{{ icon('reset', size=12) }}</button>
+            <button class="btn btn-small spe-rot-rand" type="button" data-range="3" title="{{ tr('隨機 ±3°') }}">±3°</button>
+            <button class="btn btn-small spe-rot-rand" type="button" data-range="10" title="{{ tr('隨機 ±10°') }}">±10°</button>
           </div>
         </div>
         <button class="btn btn-small spe-del" type="button">{{ icon('trash', size=12) }} 刪除選取</button>
@@ -449,7 +449,7 @@
   </div>
   <div id="composite-mode" hidden data-s="s410c244f">
     <div id="sim-single" data-s="s37e04321">
-      <img id="sim-image" alt="蓋章後預覽" data-s="s45bb712b" />
+      <img id="sim-image" alt="{{ tr('蓋章後預覽') }}" data-s="s45bb712b" />
       <div id="sim-cap" data-s="sefa9f1f9"></div>
       {# 產生合成圖時的整頁遮罩：沒有回饋會讓人以為當機（頁數多時要幾秒） #}
       <div id="sim-busy" class="sim-busy" hidden>
