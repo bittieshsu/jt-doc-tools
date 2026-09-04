@@ -557,3 +557,121 @@ def test_blank_line_inside_a_cell_is_not_lost():
     out = M.rebuild(state, {0: "第一\n\n第三"}, units, target_lang="zh-TW")
     again, _ = M.extract_units(out, ".xlsx")
     assert again[0].text == "第一\n\n第三", again[0].text
+
+
+def test_progress_counts_batches_not_just_segments(tmp_path, monkeypatch):
+    """進度列要講「已完成 N/M 批」。
+
+    合併批次之後進度只在整批回來時才跳 —— 一批 40 行、四條並行，畫面上就是
+    跳一大格然後很久不動，使用者會以為卡住（實測回報「太慢了」，但同時量到的
+    每段耗時其實沒有變）。分母用**原本切好的批數**：對切重試時分母不可以變大，
+    會動的分母比沒有進度列更糟。
+    """
+    R = _R()
+
+    class _Client:
+        def text_query(self, prompt: str, **kw) -> str:
+            segs = re.findall(r"^⟦(\d+)⟧(.*)$", prompt, re.M)
+            return "\n".join(f"⟦{n}⟧譯[{s}]" for n, s in segs)
+
+    monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _Client())
+    monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
+    monkeypatch.setattr(R.llm_settings, "get", lambda: {
+        "translate_concurrency": 1, "doctr_batch_segments": 2,
+        "doctr_batch_chars": 20000})
+    monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    cells = [f"Sentence number {i} here." for i in range(6)]
+    shared = (f'<sst xmlns="{ns}">'
+              + "".join(f"<si><t>{c}</t></si>" for c in cells) + "</sst>")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("xl/sharedStrings.xml", shared)
+
+    uid = "f" * 32
+    R._src_path(uid).write_bytes(buf.getvalue())
+
+    seen: list[str] = []
+
+    class _Job:
+        progress = 0.0
+        cancelled = False
+        result_path = None
+        result_filename = ""
+
+        def __init__(self) -> None:
+            self.meta: dict = {}
+            self._msg = ""
+
+        @property
+        def message(self) -> str:
+            return self._msg
+
+        @message.setter
+        def message(self, v: str) -> None:
+            self._msg = v
+            seen.append(v)
+
+    job = _Job()
+    R._run_job(job, uid, {"filename": "a.xlsx", "ext": ".xlsx", "work_ext": ".xlsx"},
+               "en", "zh-TW", "")
+
+    batch_msgs = [m for m in seen if "批" in m and m.startswith("翻譯中")]
+    assert batch_msgs, seen
+    # 6 段 / 每批 2 段 = 3 批，分母全程是 3
+    assert all("/3 批" in m for m in batch_msgs), batch_msgs
+    assert "已完成 3/3 批" in batch_msgs[-1], batch_msgs
+    assert "（約 6/6 段）" in batch_msgs[-1], batch_msgs[-1]
+
+
+def test_trailing_newline_run_does_not_defeat_the_colour_fix():
+    """最後一個 run 只裝一個換行時，紅字那行還是要留在紅色 run 上。
+
+    真實檔案很常見這種收尾：`<r><rPr 紅色/><t>\\n</t></r>`。那個換行會切出一個
+    「空白行」的組，而它前後的節點都歸給別組 —— 這一組因此一個節點都沒有。
+    早期版本遇到這種就整段退回「全部寫進第一個節點」，於是**修法明明在，
+    客戶檔案的紅字還是變黑的**（使用者實測回報「有字顏色沒出來啊」）。
+    """
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    shared = (
+        f'<sst xmlns="{ns}"><si>'
+        '<r><rPr><b/></rPr><t>1.1</t></r>'
+        '<r><t xml:space="preserve"> Roles are documented.\n</t></r>'
+        '<r><rPr><i/><color rgb="FFC00000"/></rPr>'
+        '<t>New requirement - effective immediately</t></r>'
+        '<r><rPr><i/><color rgb="FFFF0000"/></rPr>'
+        '<t xml:space="preserve">\n</t></r>'
+        '</si></sst>'
+    )
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("xl/sharedStrings.xml", shared)
+
+    units, state = M.extract_units(buf.getvalue(), ".xlsx")
+    assert units[0].text == "1.1 Roles are documented.\n新要求前的原文\n".replace(
+        "新要求前的原文", "New requirement - effective immediately")
+
+    out = M.rebuild(state, {0: "1.1 角色已記錄。\n新要求 - 立即生效\n"}, units,
+                    target_lang="zh-TW")
+
+    root = ET.fromstring(zipfile.ZipFile(io.BytesIO(out)).read("xl/sharedStrings.xml"))
+    by_colour = {}
+    for r in root.iter(f"{{{ns}}}r"):
+        rpr = r.find(f"{{{ns}}}rPr")
+        col = rpr.find(f"{{{ns}}}color") if rpr is not None else None
+        key = col.get("rgb") if col is not None else None
+        t = r.find(f"{{{ns}}}t")
+        if t is not None and (t.text or "").strip():
+            by_colour[key] = (t.text or "")
+    # 紅字那行落在紅色 run 上，不是被塞進第一個（粗體黑字）run
+    assert "FFC00000" in by_colour, by_colour
+    assert "新要求 - 立即生效" in by_colour["FFC00000"], by_colour
+    assert "角色已記錄" not in by_colour["FFC00000"], by_colour
+    # 而且整格讀回來一個字都沒少
+    again, _ = M.extract_units(out, ".xlsx")
+    assert again[0].text == "1.1 角色已記錄。\n新要求 - 立即生效\n", again[0].text

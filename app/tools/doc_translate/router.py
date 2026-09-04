@@ -74,10 +74,13 @@ class _Piece:
 #: 一段一次請求的話，真正的內容不到 prompt 的 1%，等於把同一份指令送幾百遍。
 #: 實測 200 段的文件，逐段送要一分多鐘以上。
 BATCH_MAX_SEGMENTS = 40
-#: 合併後的原文字數上限。**這個才是實務上真正的限制** —— 段數上限 40 幾乎碰不到：
-#: 一份技術文件的儲存格動輒兩三百字，字數上限 1,200 時一批只裝得下三、四行，
-#: 343 段的文件實測送出 305 次請求（等於幾乎沒合併，使用者回報「太慢了」）。
-BATCH_MAX_CHARS = 4000
+#: 合併後的原文字數上限。**不要以為調大就會快** —— 同一份 343 段的真實文件實測：
+#:   1,200 字元 → 129 批 / 129 次請求 / 0 次重試 / **607 秒**
+#:   1,200 字元 → 110 批 / 305 次請求 / 17 批漏段 / 878 秒（同設定，模型當天狀況較差）
+#:   4,000 字元 →  34 批 /  69 次請求 / **35 批漏段** / **1,361 秒**
+#: 漏段的成本**跟批次大小成正比**：40 行的一批漏一段，那一整段生成就整個白做。
+#: 所以批次要訂在「模型幾乎都照格式回」的大小，不是「指令成本攤得最平」的大小。
+BATCH_MAX_CHARS = 1200
 #: 段落標記。刻意用少見的符號，避免跟內文撞在一起。
 _SEG_OPEN, _SEG_CLOSE = "⟦", "⟧"
 _SEG_RE = re.compile(r"^\s*⟦(\d+)⟧\s?(.*)$")
@@ -294,9 +297,21 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         nonlocal done
         with lock:
             done += n
-            frac = min(1.0, done / max(1, n_pieces))
-            job.progress = 0.05 + 0.75 * frac
-            job.message = f"翻譯中… {int(frac * total)}/{total} 段"
+            _refresh_message_locked()
+
+    def _refresh_message_locked() -> None:
+        """更新進度列。**批數是主角、段數放括號裡。**
+
+        為什麼：合併批次之後，進度只會在「整批回來」時才跳 —— 一批 40 行、
+        四條並行，看起來就是一次跳一大格然後長時間不動，使用者會以為卡住了
+        （實測回報「太慢了」，但同時量到的每段耗時其實沒有變）。寫成
+        「已完成 N/M 批」至少講得出「還有幾批」，跳一格代表什麼也清楚。
+        """
+        frac = min(1.0, done / max(1, n_pieces))
+        job.progress = 0.05 + 0.75 * frac
+        n_batches = len(batches) or 1
+        job.message = (f"翻譯中… 已完成 {stats['done_batches']}/{n_batches} 批"
+                       f"（約 {int(frac * total)}/{total} 段）")
 
     def one(k: int) -> None:
         """單行翻譯（批次對不上時的退路）。"""
@@ -315,7 +330,7 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         with lock:
             pieces[k].result = translated
 
-    stats = {"requests": 0, "fallbacks": 0}
+    stats = {"requests": 0, "fallbacks": 0, "done_batches": 0}
 
     def run_batch(batch: list[int]) -> None:
         """一次送一批。段數對不上就**對切再試**，切到只剩一行才逐行翻。
@@ -383,11 +398,21 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         else:
             todo.append(k)
     batches = _make_batches(todo, pieces, seg_cap, char_cap)
-    job.message = f"翻譯中… 0/{total} 段（{len(batches)} 批）"
+    job.message = (f"翻譯中… 已完成 0/{len(batches) or 1} 批"
+                   f"（約 0/{total} 段）")
 
     n_pieces = len(pieces)
+
+    def run_top_batch(batch: list[int]) -> None:
+        """跑一個**原本切好的**批次。對切重試時分母不變 —— 分母會動的進度列
+        比沒有進度列更糟（使用者會以為又多出工作）。"""
+        run_batch(batch)
+        with lock:
+            stats["done_batches"] += 1
+            _refresh_message_locked()
+
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
-        list(pool.map(run_batch, batches))
+        list(pool.map(run_top_batch, batches))
 
     # 行 → 段：用換行接回去，儲存格裡的條列就保住了
     joined: dict[int, list[str]] = {}

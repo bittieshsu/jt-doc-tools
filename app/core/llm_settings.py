@@ -53,7 +53,7 @@ DEFAULT_SETTINGS: dict = {
     # 拆成 4 倍的請求（一格 4 行的文件實測慢很多）。真正該限制的是**字數**，
     # 段數只是防呆 —— 實測 10 → 40 段每段耗時不變。
     "doctr_batch_segments": 40,
-    "doctr_batch_chars": 4000,
+    "doctr_batch_chars": 1200,
     #: 單一檔案的段落上限。實測每段約 0.5~0.6 秒（gemma4:26b、並行 4），
     #: 2 萬段大約 3 小時 —— 背景作業跑得完，而且中途可以按停止。
     "doctr_max_units": 20000,

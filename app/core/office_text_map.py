@@ -280,7 +280,27 @@ def _line_groups(nodes: list[ET.Element], kind: str
     counts = [0] * n_groups
     for gi in line_group:
         counts[gi] += 1
-    return [(counts[i], buckets[i]) for i in range(n_groups)]
+
+    # **分不到節點的組要併進隔壁，不可以留著也不可以整段放棄。**
+    # 真實檔案很常見這種收尾：最後一個 run 只裝一個換行（`<r><rPr 紅色/><t>\n</t></r>`）
+    # —— 那個換行會切出一個「空白行」的組，而它前後的節點都歸給別組，於是這一組
+    # 一個節點都沒有。早期版本遇到這種就整段退回「全部寫進第一個節點」，結果就是
+    # **那份客戶檔案的紅字還是變黑的**（使用者實測回報「有字顏色沒出來啊」）——
+    # 修法明明在，卻被這條保險擋掉了。併進前一組就同時保住文字與其他組的格式。
+    groups = [[counts[i], buckets[i]] for i in range(n_groups)]
+    merged: list[list] = []
+    for k, gnodes in groups:
+        if not gnodes and merged:
+            merged[-1][0] += k          # 併進前一組（那幾行接在前一組後面）
+        elif not gnodes and not merged:
+            groups_rest = None          # 第一組就是空的 → 留著，等下一組來收
+            merged.append([k, gnodes])
+        else:
+            if merged and not merged[-1][1]:
+                # 前面那組（開頭的空組）沒有節點 → 讓這一組一起收走
+                k += merged.pop()[0]
+            merged.append([k, gnodes])
+    return [(k, g) for k, g in merged]
 
 
 def extract_units(data: bytes, ext: str) -> tuple[list[TextUnit], dict]:
@@ -330,14 +350,10 @@ def rebuild(state: dict, translations: dict[int, str], units: list[TextUnit],
         kind = _kind_for(unit.part, ext)
         groups = _line_groups(unit.nodes, kind)
         lines = new.split("\n")
-        if (sum(k for k, _ in groups) != len(lines)
-                or any(not g for _, g in groups)):
-            # 退回「全部寫進第一個節點」的兩種情形：
-            #   ①行數對不上（模型自己塞了換行）—— **不可以硬湊**，錯開一行
-            #     就把 A 行的譯文套上 B 行的格式
-            #   ②有某一組分不到任何節點（連續兩個換行、也就是空白行，會切出
-            #     一個沒有節點的組）—— 那一組的文字沒地方寫，硬跑會**少一行**
-            # 兩種都是「格式讓一步，文字不可以掉」。
+        if sum(k for k, _ in groups) != len(lines) or any(not g for _, g in groups):
+            # 行數對不上（模型自己在譯文裡塞了換行）→ 退回「全部寫進第一個節點」。
+            # **不可以硬湊** —— 錯開一行就把 A 行的譯文套上 B 行的格式。
+            # （分不到節點的組已經在 `_line_groups` 併進隔壁了，這裡是最後一道保險。）
             groups = [(len(lines), list(unit.nodes))]
         at = 0
         for k, gnodes in groups:
