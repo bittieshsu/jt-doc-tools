@@ -696,3 +696,34 @@ def test_stray_byte_token_in_the_marker_is_tolerated():
     assert R._parse_batch_reply("⟦ 1 ⟧甲\n⟦2⟧乙", 2) == ["甲", "乙"]
     # 但段數真的對不上時仍然要退回 None（不可以硬湊）
     assert R._parse_batch_reply("⟦1⟧甲", 2) is None
+
+
+def test_spreadsheet_preview_fits_all_columns():
+    """試算表的預覽要看得到**所有欄位**，不能只有第一欄。
+
+    超出紙寬的欄位會被 Calc 丟到後面好幾頁（實測一份四欄的責任矩陣：72 頁，
+    而前 6 頁全部只有 A 欄）。預覽只取前幾頁 —— 使用者於是看到「只有第一欄」，
+    而這個工具的預覽正是要證明「版面沒跑掉」，看不到其他欄就證明不了任何事。
+    """
+    R = _R()
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    sheet = (f'<worksheet xmlns="{ns}"><dimension ref="A1:D2"/>'
+             '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>甲</t></is></c>'
+             '</row></sheetData></worksheet>')
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("xl/worksheets/sheet1.xml", sheet)
+
+    out = R._fit_to_width(buf.getvalue())
+    got = zipfile.ZipFile(io.BytesIO(out)).read("xl/worksheets/sheet1.xml").decode()
+    assert 'fitToPage="1"' in got, got
+    assert 'fitToWidth="1"' in got and 'fitToHeight="0"' in got, got
+    # 其他檔案不可以被動到
+    assert zipfile.ZipFile(io.BytesIO(out)).read("[Content_Types].xml") == b"<Types/>"
+
+
+def test_fit_to_width_leaves_a_broken_file_alone():
+    """改不動就原樣回傳 —— 預覽是附屬品，不可以因為它讓整個作業失敗。"""
+    R = _R()
+    assert R._fit_to_width(b"not a zip") == b"not a zip"

@@ -18,7 +18,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.14.88"
+VERSION = "1.14.89"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -367,6 +367,8 @@ _nav_tool_items = [
         "url": f"/tools/{t.metadata.id}/",
         "keywords": _TOOL_ALIASES.get(t.metadata.id, ""),
         "color": _tool_color_map.get(t.metadata.id, 0),
+        # 這支工具只在哪些介面語言底下列出來（空的＝全部）
+        "locales": getattr(t.metadata, "locales", ()),
     }
     for t in tools
 ]
@@ -529,27 +531,55 @@ def _nav_settings_visible(request=None):
     return []
 
 
+def _nav_groups_for_locale(request=None):
+    """依介面語言過掉「只在中文環境成立」的工具（`ToolMetadata.locales`）。
+
+    **繁體中文底下不會少任何一支** —— 那些工具的 `locales` 都含 `zh-Hant`。
+    這裡只管「列不列」，路由與 API 一律不受影響。
+    """
+    from .core import ui_locale as _loc
+    lang = _loc.resolve(request)
+    if lang == _loc.DEFAULT_LOCALE:
+        return _NAV_TOOL_GROUPS_ALL          # 最常見的路徑，不多做事
+    out = []
+    for g in _NAV_TOOL_GROUPS_ALL:
+        kept = [t for t in g["tools"] if _loc.tool_visible(t.get("locales"), lang)]
+        if kept:
+            out.append({"title": g["title"], "tools": kept})
+    return out
+
+
 def _nav_tool_groups_visible(request=None):
-    """Filter sidebar tool groups by the viewer's permissions.
+    """Filter sidebar tool groups by the viewer's permissions **and** the UI language.
 
     Auth OFF → everything. Auth ON → only tools the user is allowed to
     use (matches the backend gate so users don't see tiles that 403)."""
     from .core import auth_settings as _as, permissions as _perm
+    groups = _nav_groups_for_locale(request)
     if not _as.is_enabled():
-        return _NAV_TOOL_GROUPS_ALL
+        return groups
     user = getattr(getattr(request, "state", None), "user", None) if request else None
     if not user:
         return []
     et = _perm.effective_tools(user.get("user_id", 0))
     if et == "ALL":
-        return _NAV_TOOL_GROUPS_ALL
+        return groups
     out = []
-    for g in _NAV_TOOL_GROUPS_ALL:
+    for g in groups:
         kept = [t for t in g["tools"] if t["id"] in et]
         if kept:
             out.append({"title": g["title"], "tools": kept})
     return out
 
+
+def _tpl_ui_locale(request=None) -> str:
+    """樣板裡問「現在是哪個介面語言」。**目前只有繁體中文有語系檔**，
+    切成英文時字串仍然回退繁中（見 `ui_locale.resolve`）。"""
+    from .core import ui_locale as _loc
+    return _loc.resolve(request)
+
+
+templates.env.globals["ui_locale"] = _tpl_ui_locale
 
 # Override the static globals with callables that re-evaluate per request.
 templates.env.globals["nav_settings"] = _nav_settings_visible
@@ -816,7 +846,28 @@ _PUBLIC_PREFIXES = ("/static/",
 #: 原本 `/login` `/logout` `/healthz` `/favicon` `/2fa-verify` 同時列在兩邊，
 #: 前綴那份先命中，於是這個集合**整個是死的** —— 讀的人以為 `/login-xyz`
 #: 不公開，其實是公開的。目前沒有那種路由所以不成問題，但下一條新路由就會踩到。
-_PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/favicon.ico", "/2fa-verify"}
+@app.post("/ui-locale")
+async def set_ui_locale(request: Request):
+    """切換介面語言。**用 POST**（會改變狀態，不能用 GET 連結）。
+
+    語言記在 cookie 而不是帳號設定：單機模式（未啟用認證）根本沒有「使用者」
+    這回事，而語言偏好在那種環境同樣要能記住。之後要再疊「跟著帳號走」都可以。
+    """
+    from .core import ui_locale as _loc
+    form = await request.form()
+    lang = _loc.normalise(str(form.get("locale") or "")) or _loc.DEFAULT_LOCALE
+    back = str(form.get("next") or "/")
+    # 只回自己站內 —— 從表單來的網址不可以直接拿去重導（open redirect）
+    if not back.startswith("/") or back.startswith("//"):
+        back = "/"
+    resp = RedirectResponse(back, status_code=303)
+    resp.set_cookie(_loc.COOKIE_NAME, lang, max_age=_loc.COOKIE_MAX_AGE,
+                    httponly=True, samesite="lax",
+                    secure=(request.url.scheme == "https"))
+    return resp
+
+
+_PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/favicon.ico", "/2fa-verify", "/ui-locale"}
 
 
 def _looks_like_xhr(request: Request) -> bool:

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import threading
 import time
@@ -472,9 +473,61 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
     job.progress = 1.0
 
 
+#: 試算表轉 PDF 時，**超出紙寬的欄位會被丟到後面好幾頁**（實測一份四欄的
+#: 責任矩陣：72 頁，而前 6 頁全部只有 A 欄）。預覽只取前幾頁，於是使用者
+#: 看到的是「只有第一欄」的畫面 —— 而這個工具的預覽正是要證明「版面沒跑掉」，
+#: 看不到其他欄就證明不了任何事（使用者回報「試算表 xlsx 會超過畫面」）。
+#:
+#: 修法是**在預覽用的副本上**打開「調整成一頁寬」的列印設定，直接改 XML
+#: （不經 openpyxl 轉存 —— 那會把圖表與圖片弄丟，預覽反而更不像原稿）。
+#: 原文與譯文兩邊套一樣的設定，比對才公平。**產出的檔案完全不受影響。**
+_XLSX_SHEET_RE = re.compile(r"^xl/worksheets/sheet\d+\.xml$")
+
+
+def _fit_to_width(data: bytes) -> bytes:
+    """回傳一份「列印時縮成一頁寬」的 xlsx 副本；改不動就原樣回傳。"""
+    import zipfile
+    out = io.BytesIO()
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zin, \
+                zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+            for name in zin.namelist():
+                raw = zin.read(name)
+                if _XLSX_SHEET_RE.match(name):
+                    x = raw.decode("utf-8")
+                    if "<pageSetUpPr" in x:
+                        x = re.sub(r"<pageSetUpPr([^/>]*)/>",
+                                   r'<pageSetUpPr\1 fitToPage="1"/>', x, count=1)
+                    elif "<sheetPr" in x:
+                        x = re.sub(r"<sheetPr([^>/]*)/>",
+                                   r'<sheetPr\1><pageSetUpPr fitToPage="1"/></sheetPr>',
+                                   x, count=1)
+                        x = re.sub(r"<sheetPr([^>/]*)>",
+                                   r'<sheetPr\1><pageSetUpPr fitToPage="1"/>', x, count=1)
+                    else:
+                        x = x.replace("<dimension",
+                                      '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension', 1)
+                    if "<pageSetup " in x:
+                        x = x.replace("<pageSetup ",
+                                      '<pageSetup fitToWidth="1" fitToHeight="0" ', 1)
+                    else:
+                        x = x.replace("</worksheet>",
+                                      '<pageSetup fitToWidth="1" fitToHeight="0"'
+                                      ' orientation="landscape"/></worksheet>', 1)
+                    raw = x.encode("utf-8")
+                zout.writestr(name, raw)
+    except Exception:          # noqa: BLE001 - 預覽用，改不動就照原檔轉
+        return data
+    return out.getvalue()
+
+
 def _render_side(upload_id: str, src_file: Path, side: str) -> int:
     """把一份檔案轉成 PDF、前幾頁存成 PNG。回傳張數；失敗回 0。"""
     pdf = settings.temp_dir / f"dt_{upload_id}_{side}.pdf"
+    if src_file.suffix.lower() == ".xlsx":
+        fitted = settings.temp_dir / f"dt_{upload_id}_{side}_fit.xlsx"
+        fitted.write_bytes(_fit_to_width(src_file.read_bytes()))
+        src_file = fitted
     office_convert.convert_to_pdf(src_file, pdf)
     import fitz
     with fitz.open(pdf) as doc:

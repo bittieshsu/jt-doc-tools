@@ -1,6 +1,6 @@
 {% from "components/icons.html" import icon %}
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="{{ ui_locale(request) }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -49,6 +49,7 @@
     .sb-inbox-head { display: flex; align-items: center; justify-content: space-between;
       gap: 8px; padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
     .sb-inbox-clear { border: 0; background: none; color: #2563eb; font-size: 12px;
+      display: inline-flex; align-items: center; gap: 5px;
       cursor: pointer; padding: 0; }
     .sb-inbox-clear:hover { text-decoration: underline; }
     .sb-inbox-list { max-height: 330px; overflow-y: auto; }
@@ -119,7 +120,7 @@
           <div class="sb-inbox" id="sbInbox" hidden>
             <div class="sb-inbox-head">
               <b class="sb-inbox-title">{{ icon('bell', size=15) }} 通知</b>
-              <button type="button" class="sb-inbox-clear" id="sbInboxClear">全部標示為已讀</button>
+              <button type="button" class="sb-inbox-clear" id="sbInboxClear">{{ icon('check', size=14) }} 全部標示為已讀</button>
             </div>
             <div class="sb-inbox-list" id="sbInboxList"></div>
             <a class="sb-inbox-all" href="/my-jobs">查看我的作業 →</a>
@@ -142,8 +143,8 @@
           </button>
           <div class="sb-inbox" id="sbInbox" hidden>
             <div class="sb-inbox-head">
-              <b>通知</b>
-              <button type="button" class="sb-inbox-clear" id="sbInboxClear">全部標示為已讀</button>
+              <b class="sb-inbox-title">{{ icon('bell', size=15) }} 通知</b>
+              <button type="button" class="sb-inbox-clear" id="sbInboxClear">{{ icon('check', size=14) }} 全部標示為已讀</button>
             </div>
             <div class="sb-inbox-list" id="sbInboxList"></div>
             <a class="sb-inbox-all" href="/my-jobs">查看我的作業 →</a>
@@ -570,6 +571,16 @@
         </div>
       </details>
     </div>
+    <form class="sb-locale" method="post" action="/ui-locale">
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+      <input type="hidden" name="next" value="{{ request.url.path }}">
+      <span class="sb-locale-icon">{{ icon('globe', size=15) }}</span>
+      {% for code, label in [('zh-Hant', '繁體中文'), ('en', 'English')] %}
+      <button type="submit" name="locale" value="{{ code }}"
+              class="sb-locale-btn{% if ui_locale(request) == code %} is-on{% endif %}"
+              {% if ui_locale(request) == code %}aria-current="true"{% endif %}>{{ label }}</button>
+      {% endfor %}
+    </form>
     <div class="sidebar-scrollbar" id="sidebarScrollbar"></div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>

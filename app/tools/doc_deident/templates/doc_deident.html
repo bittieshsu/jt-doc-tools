@@ -291,23 +291,23 @@
   <h2 data-s="sb0043ef4">4. 處理模式</h2>
   <div class="dd-mode-picker" id="ddModes">
     <div class="dd-mode mode-redact" data-mode="redact">
-      <div class="ic">{{ icon('trash', size=18) }}</div>
+      <div class="ic">{{ icon('eye-off', size=18) }}</div>
       <div>
-        <div class="title">🔒 Redaction（編修）</div>
+        <div class="title">Redaction（編修）</div>
         <div class="desc">原文字完全刪除 + 塗黑覆蓋，複製選取都拿不到原值。<b>不可還原。</b>適合機密文件對外釋出。</div>
       </div>
     </div>
     <div class="dd-mode mode-mask active" data-mode="mask">
-      <div class="ic">{{ icon('edit', size=18) }}</div>
+      <div class="ic">{{ icon('hash', size=18) }}</div>
       <div>
-        <div class="title">🧬 Masking（資料遮罩）</div>
+        <div class="title">Masking（資料遮罩）</div>
         <div class="desc">保留格式，中段以 * 替換（例：0912****678）。適合測試 / 報表 / 內部分享用。</div>
       </div>
     </div>
     <div class="dd-mode mode-replace" data-mode="replace">
-      <div class="ic">{{ icon('refresh', size=18) }}</div>
+      <div class="ic">{{ icon('swap', size=18) }}</div>
       <div>
-        <div class="title">🔁 Replacement（替換）</div>
+        <div class="title">Replacement（替換）</div>
         <div class="desc">換成另一個看起來正常、但不是真的值（例：0912345678 → 0938271654）。
           原文一樣真刪除。適合要拿去測試系統、給外部看的報表、教學範例。</div>
       </div>

@@ -82,3 +82,25 @@ def test_permissions_do_not_depend_on_locale():
     from app.core import roles
     src = inspect.getsource(roles)
     assert "locale" not in src.lower(), "角色定義不應該跟介面語言有關"
+
+
+def test_locale_resolution_survives_a_partial_request():
+    """**不可以假設拿到的是完整的 Request。**
+
+    側欄那條路徑在測試與部分內部呼叫裡會收到簡化的假物件（甚至 None）。
+    語言只是顯示偏好 —— 取不到就回繁中，絕不可以因此讓整個側欄炸掉。
+    （這條是實際踩到的：加了語言判斷之後，既有的
+    `test_nav_tool_groups_auth_on_no_user_empty` 立刻紅了。）
+    """
+    from app.core.ui_locale import DEFAULT_LOCALE, resolve
+
+    class _Bare:            # 沒有 cookies、也沒有 headers
+        pass
+
+    assert resolve(None) == DEFAULT_LOCALE
+    assert resolve(_Bare()) == DEFAULT_LOCALE
+
+    class _OnlyCookies:
+        cookies = {"jtdt_locale": "en"}
+
+    assert resolve(_OnlyCookies()) == "en"
