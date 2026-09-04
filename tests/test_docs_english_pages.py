@@ -49,3 +49,48 @@ def test_language_link_points_both_ways(src: str, cat: str, dst: str):
     en = (DOCS / dst).read_text(encoding="utf-8")
     assert f'href="{dst}"' in zh, f"{src} 少了往英文版的連結"
     assert f'href="{src}"' in en, f"{dst} 少了回中文版的連結"
+
+
+# ---------------------------------------------------------------------------
+# README / CHANGELOG 的英文版
+#
+# 使用者定案（2026-09-04）：中文版維持原檔名不動，英文版另立
+# `README_en.md` / `CHANGELOG_en.md`，兩邊最上面各放一條語言切換。
+#
+# README_en 同樣是**生成**的（`github/build-i18n-md.py` 逐行對照
+# `docs/i18n/readme.en.json`）；CHANGELOG_en 則是**手寫的摘要版** ——
+# 中文版有 724 個版本、6 千多行，全譯沒有意義也維護不起來，
+# 它自己在開頭就寫明「完整歷史看中文版」。所以這裡只驗它存在、
+# 沒有殘留中文、而且真的指回中文版。
+# ---------------------------------------------------------------------------
+
+GH = DOCS.parent
+_FENCE = re.compile(r"```.*?```", re.S)
+
+
+def _chinese_lines(md: str) -> list[str]:
+    return [ln for ln in _FENCE.sub(" ", md).splitlines()
+            if CJK.search(ln) and "繁體中文" not in ln]
+
+
+def test_readme_english_version_is_generated_and_complete():
+    p = GH / "README_en.md"
+    assert p.exists(), "缺 README_en.md（跑 python3 github/build-i18n-md.py）"
+    left = _chinese_lines(p.read_text(encoding="utf-8"))
+    assert left == [], f"README_en.md 還有中文沒翻：{left[:3]}"
+
+
+def test_changelog_english_version_exists_and_has_no_chinese_left():
+    p = GH / "CHANGELOG_en.md"
+    assert p.exists(), "缺 CHANGELOG_en.md"
+    left = _chinese_lines(p.read_text(encoding="utf-8"))
+    assert left == [], f"CHANGELOG_en.md 還有中文沒翻：{left[:3]}"
+
+
+@pytest.mark.parametrize("zh,en", [("README.md", "README_en.md"),
+                                   ("CHANGELOG.md", "CHANGELOG_en.md")])
+def test_markdown_language_switch_points_both_ways(zh: str, en: str):
+    zh_head = (GH / zh).read_text(encoding="utf-8").splitlines()[0]
+    en_head = (GH / en).read_text(encoding="utf-8").splitlines()[0]
+    assert f"({en})" in zh_head, f"{zh} 第一行要有連到 {en} 的語言切換"
+    assert f"({zh})" in en_head, f"{en} 第一行要有連回 {zh} 的語言切換"

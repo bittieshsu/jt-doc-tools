@@ -118,3 +118,38 @@ def test_llm_card_count_matches_the_tool_count():
         f"介紹站有 {len(titles)} 張 LLM 卡片，實際有 LLM 的工具是 {len(tools)} 個。"
         f"\n卡片：{titles}"
     )
+
+
+# ---------------------------------------------------------------------------
+# README 的 pytest 徽章
+#
+# 2026-09-04 使用者截圖回報時看到的：徽章寫著「470 passed」，實際是 5,9xx。
+# 那個數字從很多版以前就沒人動過 —— 又是「同一個數字寫在兩個地方」的老病。
+#
+# 判準刻意做成**單邊**的：徽章不可以低於 tests/ 裡 `def test_` 的個數。
+# 參數化只會把實際跑的項目變**更多**，所以「徽章 < 函式定義數」一定是漂掉了，
+# 不可能誤報。反過來抓精確值要真的 collect 一次（慢，而且在跑測試的行程裡
+# 再 collect 一次會去回收別人的 tmp_path 基底目錄）—— 那條路不划算。
+# ---------------------------------------------------------------------------
+
+_TEST_DEF_RE = re.compile(r"^\s*(?:async\s+)?def test_", re.M)
+_BADGE_RE = re.compile(r"pytest-([\d,]+)%20passed")
+
+
+def _defined_test_functions() -> int:
+    return sum(
+        len(_TEST_DEF_RE.findall(p.read_text(encoding="utf-8")))
+        for p in (ROOT / "tests").glob("*.py")
+    )
+
+
+def test_readme_pytest_badge_is_not_stale():
+    m = _BADGE_RE.search(README.read_text(encoding="utf-8"))
+    assert m, "README 找不到 pytest 徽章"
+    claimed = int(m.group(1).replace(",", ""))
+    defined = _defined_test_functions()
+    assert claimed >= defined, (
+        f"README 的 pytest 徽章寫 {claimed}，但 tests/ 裡光是 def test_ 就有 "
+        f"{defined} 個（參數化只會更多）—— 徽章已經漂掉，請更新成最近一次"
+        f"完整跑出來的數字。"
+    )

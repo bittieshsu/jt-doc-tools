@@ -124,16 +124,46 @@ def _reading_minutes(cjk_chars: int, en_words: int) -> float:
     return round(cjk_chars / 300 + en_words / 200, 1)
 
 
+#: 辦公文件：**先轉成 PDF 再統計**（使用者要求納入）。這樣頁數 / 每頁字數
+#: 都是「真的印出來會長那樣」的數字，而且直接沿用既有的 PDF 統計路徑；
+#: 直接讀 XML 雖然快，但拿不到頁數，段落與換行也跟排版後不一樣。
+_OFFICE_EXTS = (".doc", ".docx", ".odt", ".xls", ".xlsx", ".ods",
+                ".ppt", ".pptx", ".odp")
 _SUPPORTED_EXTS = (".pdf", ".txt", ".md", ".csv", ".log", ".rtf",
-                    ".html", ".htm", ".xml", ".json")
+                    ".html", ".htm", ".xml", ".json") + _OFFICE_EXTS
 
 
 def _is_supported(filename: str) -> bool:
     return (filename or "").lower().endswith(_SUPPORTED_EXTS)
 
 
+def _office_to_pdf_bytes(data: bytes, filename: str) -> bytes:
+    """把辦公文件轉成 PDF 再回位元組。轉不出來就給看得懂的 400。"""
+    import tempfile
+    from pathlib import Path as _P
+
+    from app.core import office_convert
+
+    suffix = _P(filename).suffix or ".docx"
+    with tempfile.TemporaryDirectory() as td:
+        src = _P(td) / f"src{suffix}"
+        src.write_bytes(data)
+        dst = _P(td) / "out.pdf"
+        try:
+            office_convert.convert_to_pdf(src, dst, timeout=180.0)
+        except Exception:      # noqa: BLE001 - 轉檔失敗的原因對使用者沒意義
+            raise HTTPException(
+                400, "這份辦公文件轉不成 PDF（檔案可能毀損，或伺服器缺 Office 引擎）")
+        # **判準是「有沒有拿到可用檔案」不是回傳碼** —— soffice 會一邊印警告
+        # 一邊正常轉完，也可能回 0 卻沒產出（這條記過很多次）。
+        if not dst.exists() or dst.stat().st_size == 0:
+            raise HTTPException(
+                400, "這份辦公文件轉不成 PDF（檔案可能毀損，或伺服器缺 Office 引擎）")
+        return dst.read_bytes()
+
+
 def _analyze_doc(data: bytes, filename: str = "document.pdf") -> dict:
-    """通用文件分析：PDF 走 PyMuPDF，純文字 (.txt/.md/.csv/...) 直接 decode。
+    """通用文件分析：PDF 走 PyMuPDF，辦公文件先轉 PDF，純文字直接 decode。
     回統計 dict 跟 _analyze_pdf 同 schema。
     """
     if not data:
@@ -141,6 +171,8 @@ def _analyze_doc(data: bytes, filename: str = "document.pdf") -> dict:
     name = (filename or "").lower()
     if name.endswith(".pdf"):
         return _analyze_pdf(data, filename)
+    if name.endswith(_OFFICE_EXTS):
+        return _analyze_pdf(_office_to_pdf_bytes(data, name), filename)
     # 純文字：guess encoding (utf-8 / utf-8-sig / cp950 / big5)
     text = None
     for enc in ("utf-8-sig", "utf-8", "cp950", "big5", "latin-1"):

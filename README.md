@@ -1,4 +1,6 @@
-# Jason Tools 文件工具箱 v1.14.93
+**繁體中文** ｜ [English](README_en.md)
+
+# Jason Tools 文件工具箱 v1.14.95
 
 > 整合式 PDF / Office 文件處理平台，47 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
 >
@@ -11,7 +13,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![CodeQL](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml)
 [![OWASP Top 10 (2025)](https://img.shields.io/badge/OWASP%20Top%2010%20(2025)-A01--A10%20covered-success?logo=owasp)](SECURITY.md)
-[![Tests](https://img.shields.io/badge/pytest-470%20passed-brightgreen?logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/pytest-5951%20passed-brightgreen?logo=pytest)](tests/)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-success?logo=dependabot)](.github/dependabot.yml)
 [![Python](https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white)](pyproject.toml)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](INSTALL.md)
@@ -89,7 +91,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ### 內容處理
 - **擷取文字 / 圖片 / 附件** — 含 LLM 段落重排選項
-- **字數統計** — 表格 + 圖表 + LLM 摘要
+- **字數統計** [需 OxOffice/LibreOffice] — 表格 + 圖表 + LLM 摘要；收 PDF / 辦公文件 / 純文字
 - **註解整理 / 清除 / 平面化**
 - **OCR 文字辨識** — 掃描 PDF / 圖片跑 OCR 後變可搜尋、可滑鼠選取複製（同 macOS 預覽程式 Live Text 概念）；雙引擎（**EasyOCR** 預設，中日韓辨識準確度高；**Tesseract** 備援），可選 LLM 校正 typo。**支援外部 GPU 識別伺服器**（DGX Spark / H100 / 4090 等），管理介面下載 `install.sh` 即可一鍵部署，每頁辨識時間從 CPU 上的 8-15 秒降到 GPU 上的 0.3-0.8 秒（**速度 10× 以上**）。
 - **送件前檢核** — 批次驗收：頁面尺寸、字型嵌入、欄位完整、敏感資料殘留、隱藏內容

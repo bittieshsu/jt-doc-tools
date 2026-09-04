@@ -664,7 +664,8 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="pdf-字數統計">PDF 字數統計</h4>
 <p>統計頁數、字數、詞數、閱讀時間與高頻詞。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-wordcount/api/pdf-wordcount</code></pre>
-<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF、辦公文件（.doc / .docx / .odt / .xls / .xlsx / .ods / .ppt / .pptx / .odp）或純文字（.txt / .md / .csv / .log / .json / .xml / .html）</td></tr></tbody></table></div>
+<p>辦公文件會<strong>先轉成 PDF 再統計</strong> —— 頁數與每頁字數才是「真的印出來會長那樣」的 數字。因此這支端點在收辦公文件時需要 Office 引擎（OxOffice / LibreOffice）。</p>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-wordcount/api/pdf-wordcount</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@document.pdf&quot;</span> | jq</code></pre>

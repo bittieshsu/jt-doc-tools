@@ -612,5 +612,9 @@
  "；": ", ",
  "Body（JSON）：": "(",
  "Form（multipart）：": "; ",
- "…": "Body (JSON):"
+ "…": "Body (JSON):",
+ "PDF、辦公文件（.doc / .docx / .odt / .xls / .xlsx / .ods / .ppt / .pptx / .odp）或純文字（.txt / .md / .csv / .log / .json / .xml / .html）": "PDF, an office document (.doc / .docx / .odt / .xls / .xlsx / .ods / .ppt / .pptx / .odp) or plain text (.txt / .md / .csv / .log / .json / .xml / .html)",
+ "辦公文件會": "Office documents are",
+ "先轉成 PDF 再統計": "converted to PDF before counting",
+ "—— 頁數與每頁字數才是「真的印出來會長那樣」的 數字。因此這支端點在收辦公文件時需要 Office 引擎（OxOffice / LibreOffice）。": " — so the page count and per-page figures match what actually prints. This endpoint therefore needs the Office engine (OxOffice / LibreOffice) when given an office document."
 }

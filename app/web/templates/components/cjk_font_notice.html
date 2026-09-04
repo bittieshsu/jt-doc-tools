@@ -10,12 +10,12 @@
 {%- if not _cjk.ok %}
 <div class="cjk-warn" role="status">
   {{ icon('warn', size=16) }}
-  <span><b>這台主機找不到中文字型</b>，本工具寫進 PDF 的中文可能變成空白方框，或字形與預期不同（英數字不受影響）。
+  <span><b>{{ tr('這台主機找不到中文字型') }}</b>{{ tr('，本工具寫進 PDF 的中文可能變成空白方框，或字形與預期不同（英數字不受影響）。') }}
   {%- if is_admin(request) %}
-    請到<a href="/admin/sys-deps">相依套件檢查</a>安裝{% if _cjk.install_cmd %}（<code>{{ _cjk.install_cmd }}</code>）{% endif %}，
-    或到<a href="/admin/fonts">字型管理</a>上傳一支中文字型。
+    {{ tr('請到') }}<a href="/admin/sys-deps">{{ tr('相依套件檢查') }}</a>{{ tr('安裝') }}{% if _cjk.install_cmd %}{{ tr('（') }}<code>{{ _cjk.install_cmd }}</code>{{ tr('）') }}{% endif %}{{ tr('，') }}
+    {{ tr('或到') }}<a href="/admin/fonts">{{ tr('字型管理') }}</a>{{ tr('上傳一支中文字型。') }}
   {%- else %}
-    請聯絡管理員安裝中文字型；在那之前，含中文的輸出請先確認過再送出。
+    {{ tr('請聯絡管理員安裝中文字型；在那之前，含中文的輸出請先確認過再送出。') }}
   {%- endif %}
   </span>
 </div>

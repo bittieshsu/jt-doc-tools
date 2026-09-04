@@ -813,7 +813,10 @@ POST /tools/pdf-wordcount/api/pdf-wordcount
 
 | 參數 | 類型 | 必填 | 說明 |
 |---|---|---|---|
-| `file` | file | ✓ | PDF |
+| `file` | file | ✓ | PDF、辦公文件（.doc / .docx / .odt / .xls / .xlsx / .ods / .ppt / .pptx / .odp）或純文字（.txt / .md / .csv / .log / .json / .xml / .html） |
+
+辦公文件會**先轉成 PDF 再統計** —— 頁數與每頁字數才是「真的印出來會長那樣」的
+數字。因此這支端點在收辦公文件時需要 Office 引擎（OxOffice / LibreOffice）。
 
 ```bash
 curl -X POST http://localhost:8765/tools/pdf-wordcount/api/pdf-wordcount \

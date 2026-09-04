@@ -34,22 +34,20 @@
       <div class="llm-gate-block">
         <div class="llm-gate-icon">{{ icon('globe', size=28) }}</div>
         <div class="llm-gate-body">
-          <h2 class="llm-gate-h">本工具需要 LLM 服務</h2>
+          <h2 class="llm-gate-h">{{ tr('本工具需要 LLM 服務') }}</h2>
           <p class="llm-gate-p">
-            這個工具完全靠 LLM 運作 — 沒有設定 LLM server 就無法使用。
+            {{ tr('這個工具完全靠 LLM 運作 — 沒有設定 LLM server 就無法使用。') }}
           </p>
           <p class="llm-gate-p llm-gate-privacy">
-            <b>強烈建議</b>使用<b>地端 LLM Server</b>（Ollama / vLLM / LM Studio…），
-            讓檔案內容只在公司內網流動。指向雲端 API 會把所有送 LLM 的<b>原始文件內容外傳</b>，
-            可能違反個資法、營業秘密、客戶 NDA。
+            <b>{{ tr('強烈建議') }}</b>{{ tr('使用') }}<b>{{ tr('地端 LLM Server') }}</b>{{ tr('（Ollama / vLLM / LM Studio…），') }}{{ tr('讓檔案內容只在公司內網流動。指向雲端 API 會把所有送 LLM 的') }}<b>{{ tr('原始文件內容外傳') }}</b>{{ tr('，') }}{{ tr('可能違反個資法、營業秘密、客戶 NDA。') }}
           </p>
           {%- if _is_admin -%}
           <div class="llm-gate-actions">
-            <a class="btn btn-primary" href="/admin/llm-settings">{{ icon('gear', size=14) }} 前往 LLM 設定</a>
+            <a class="btn btn-primary" href="/admin/llm-settings">{{ icon('gear', size=14) }} {{ tr('前往 LLM 設定') }}</a>
           </div>
           {%- else -%}
           <p class="llm-gate-contact">
-            請聯絡管理員到「LLM 設定」啟用後再使用本工具。
+            {{ tr('請聯絡管理員到「LLM 設定」啟用後再使用本工具。') }}
           </p>
           {%- endif -%}
         </div>
@@ -58,16 +56,16 @@
       {# 啟用狀態：頂端小 banner 顯示用了哪個 model；admin 才看 server URL #}
       <div class="llm-gate-banner llm-gate-banner-on">
         <span class="llm-gate-icon-sm">{{ icon('globe', size=14) }}</span>
-        <span><b>使用模型：</b><code class="llm-gate-model">{{ llm_model or '(預設)' }}</code></span>
+        <span><b>{{ tr('使用模型：') }}</b><code class="llm-gate-model">{{ llm_model or tr('(預設)') }}</code></span>
         {%- if _is_admin and llm_url -%}
         {# server 位址**只有管理員看得到** —— 那是內網位址，對一般使用者屬敏感資訊
            （v1.12.x 的決定）。管理員需要它才能一眼確認翻譯送去哪一台。 #}
         <span><b>LLM Server：</b><code class="llm-gate-model">{{ llm_url }}</code></span>
         {%- endif -%}
         {%- if _is_admin -%}
-        <span class="llm-gate-hint">（要換模型請到 <a href="/admin/llm-settings">LLM 設定</a>）</span>
+        <span class="llm-gate-hint">{{ tr('（要換模型請到 ') }}<a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a>{{ tr('）') }}</span>
         {%- else -%}
-        <span class="llm-gate-hint">（如要更換模型，請聯絡管理員）</span>
+        <span class="llm-gate-hint">{{ tr('（如要更換模型，請聯絡管理員）') }}</span>
         {%- endif -%}
       </div>
     {%- endif -%}
@@ -75,7 +73,7 @@
   {%- elif mode == 'augment' -%}
     {# Pattern B — LLM 是加值。永遠顯示 checkbox，狀態依 llm_enabled 決定 #}
     <div class="llm-gate-augment {% if not llm_enabled %}is-disabled{% endif %}">
-      <label class="llm-gate-aug-label" {% if not llm_enabled %}title="LLM 服務尚未啟用，請聯絡管理員"{% endif %}>
+      <label class="llm-gate-aug-label" {% if not llm_enabled %}title="{{ tr('LLM 服務尚未啟用，請聯絡管理員') }}"{% endif %}>
         <input type="checkbox"
                id="{{ input_id }}"
                class="llm-gate-aug-cb"
@@ -83,9 +81,9 @@
         <span class="llm-gate-aug-text">
           <b>{{ feature_label }}</b>
           {%- if llm_enabled -%}
-          <span class="llm-gate-aug-tag llm-gate-aug-tag-on">已啟用 · {{ llm_model or '(預設)' }}</span>
+          <span class="llm-gate-aug-tag llm-gate-aug-tag-on">{{ tr('已啟用 · ') }}{{ llm_model or tr('(預設)') }}</span>
           {%- else -%}
-          <span class="llm-gate-aug-tag llm-gate-aug-tag-off">需 LLM 服務</span>
+          <span class="llm-gate-aug-tag llm-gate-aug-tag-off">{{ tr('需 LLM 服務') }}</span>
           {%- endif -%}
           {%- if feature_desc -%}
           {# feature_desc is hard-coded in template callers (no user input),

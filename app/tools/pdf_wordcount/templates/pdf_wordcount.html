@@ -97,14 +97,14 @@
 
 <div class="panel">
   <h2 data-s="s53896af7">1. 上傳檔案或貼文字</h2>
-  <p class="muted" data-s="s9b38d59e">支援 PDF、純文字 (.txt / .md / .csv / .log / .json / .xml / .html 等)；或直接貼文字到下方文字框。</p>
+  <p class="muted" data-s="s9b38d59e">支援 PDF、辦公文件（.docx / .odt / .xlsx / .ods / .pptx / .odp 等，會先轉成 PDF 再統計）、純文字 (.txt / .md / .csv / .log / .json / .xml / .html 等)；或直接貼文字到下方文字框。</p>
   <div class="wc-tabs" data-s="s840f7af1">
     <button type="button" id="wcTabFile" class="wc-tab-btn wc-tab-active" data-s="s1052c80a">上傳檔案</button>
     <button type="button" id="wcTabPaste" class="wc-tab-btn" data-s="s4c4dc256">貼文字</button>
   </div>
 
   <div id="wcPanelFile">
-    {% with upload_id='wcUp', accept='application/pdf,.pdf,.txt,.md,.csv,.log,.rtf,.html,.htm,.xml,.json,text/plain,text/csv,text/markdown,text/html,application/xml,application/json', multiple=true %}{% include "components/file_upload.html" %}{% endwith %}
+    {% with upload_id='wcUp', accept='application/pdf,.pdf,.txt,.md,.csv,.log,.rtf,.html,.htm,.xml,.json,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp,text/plain,text/csv,text/markdown,text/html,application/xml,application/json', multiple=true %}{% include "components/file_upload.html" %}{% endwith %}
   </div>
 
   <div id="wcPanelPaste" hidden>

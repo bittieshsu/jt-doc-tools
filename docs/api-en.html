@@ -664,7 +664,8 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="pdf-字數統計">PDF word count</h4>
 <p>Count pages, characters, words, reading time and frequent terms.</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-wordcount/api/pdf-wordcount</code></pre>
-<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF, an office document (.doc / .docx / .odt / .xls / .xlsx / .ods / .ppt / .pptx / .odp) or plain text (.txt / .md / .csv / .log / .json / .xml / .html)</td></tr></tbody></table></div>
+<p>Office documents are<strong>converted to PDF before counting</strong>  — so the page count and per-page figures match what actually prints. This endpoint therefore needs the Office engine (OxOffice / LibreOffice) when given an office document.</p>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-wordcount/api/pdf-wordcount</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@document.pdf&quot;</span> | jq</code></pre>

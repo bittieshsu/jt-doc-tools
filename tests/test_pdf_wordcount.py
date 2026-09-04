@@ -186,3 +186,57 @@ def test_export_csv_filename_handles_cjk(client):
     cd = r.headers.get("content-disposition", "")
     # RFC 5987 encoding for non-latin filenames
     assert "filename*=" in cd or "filename=" in cd
+
+
+def test_office_documents_are_counted_via_pdf():
+    """字數統計也收辦公文件（使用者要求）。
+
+    做法是**先轉成 PDF 再統計** —— 頁數與每頁字數才是「真的印出來會長那樣」
+    的數字，而且直接沿用既有的 PDF 統計路徑。直接讀 XML 雖然快，但拿不到頁數，
+    段落與換行也跟排版後不一樣。
+    """
+    import importlib
+
+    R = importlib.import_module("app.tools.pdf_wordcount.router")
+    for ext in (".docx", ".odt", ".xlsx", ".ods", ".pptx", ".odp", ".doc", ".xls", ".ppt"):
+        assert R._is_supported("x" + ext), ext
+    assert R._is_supported("a.pdf") and R._is_supported("a.txt")
+    assert not R._is_supported("a.exe")
+
+
+def test_office_word_count_matches_the_pdf_path(monkeypatch):
+    """辦公文件的統計必須走 `_analyze_pdf` —— 而且轉不出檔案要回 400，不是 500。"""
+    import importlib
+
+    from fastapi import HTTPException
+
+    R = importlib.import_module("app.tools.pdf_wordcount.router")
+
+    seen = {}
+
+    def _fake_pdf(data, filename="x"):
+        seen["called"] = True
+        return {"filename": filename, "page_count": 1, "summary": {}}
+
+    monkeypatch.setattr(R, "_analyze_pdf", _fake_pdf)
+    monkeypatch.setattr(R, "_office_to_pdf_bytes", lambda d, n: b"%PDF-1.4")
+    R._analyze_doc(b"whatever", "report.docx")
+    assert seen.get("called"), "辦公文件應該走 PDF 統計路徑"
+
+    def _boom(src, dst, timeout=0):
+        raise RuntimeError("soffice died")
+
+    import app.core.office_convert as oc
+    monkeypatch.setattr(oc, "convert_to_pdf", _boom)
+    monkeypatch.undo()          # 還原 _office_to_pdf_bytes，改測真的那支
+    monkeypatch.setattr(oc, "convert_to_pdf", _boom)
+    with pytest.raises(HTTPException) as e:
+        R._office_to_pdf_bytes(b"x", "a.docx")
+    assert e.value.status_code == 400, "轉檔失敗要回 400（毀損檔案不可以回 500）"
+
+
+def test_wordcount_is_registered_as_an_office_tool():
+    """收辦公文件就會起 soffice —— 漏列會低估記憶體，派送時開太多份把機器打爆。"""
+    from app.core.concurrency_settings import OFFICE_TOOL_IDS
+
+    assert "pdf-wordcount" in OFFICE_TOOL_IDS

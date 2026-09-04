@@ -110,7 +110,6 @@
  "PDF 附件萃取": "PDF attachments",
  "取出 PDF 嵌入的檔案 （EmbeddedFiles）": "Extract files embedded in a PDF (EmbeddedFiles)",
  "字數統計": "Word count",
- "總字 / 字元 / 段落 / 句子 + 4 張互動圖表 + CSV/JSON/Markdown 匯出": "Words, characters, paragraphs and sentences, four interactive charts and CSV / JSON / Markdown export",
  "註解整理": "Annotation report",
  "擷取 PDF 註解輸出完整清單 / 審閱報告 / 待辦清單（CSV / JSON / Markdown）；可依類型 / 作者篩選": "Extract PDF annotations as a full list, a review report or a to-do list (CSV / JSON / Markdown), filtered by type or author",
  "逐句翻譯": "Sentence translation",
@@ -716,5 +715,6 @@
  "（ArcSight）、": " (ArcSight), ",
  "）。": ").",
  "12+（Apple Silicon）": "12+ (Apple Silicon)",
- "10 / 11（x64・ARM64）": "10 / 11 (x64 / ARM64)"
+ "10 / 11（x64・ARM64）": "10 / 11 (x64 / ARM64)",
+ "總字 / 字元 / 段落 / 句子 + 4 張互動圖表 + CSV/JSON/Markdown 匯出；收 PDF / 辦公文件 / 純文字（辦公文件先轉 PDF 再統計）": "Words, characters, paragraphs and sentences, four interactive charts and CSV / JSON / Markdown export; accepts PDF, office and plain-text files (office files are converted to PDF first)"
 }

@@ -64,6 +64,8 @@ OFFICE_TOOL_IDS: frozenset[str] = frozenset({
     "pdf-page-size", "pdf-seam-stamp", "pdf-to-office", "pdf-to-slides", "submission-check",
     "text-deident",
     "translate-doc",
+    # 字數統計收辦公文件後也會起 soffice（v1.14.94）
+    "pdf-wordcount",
 })
 
 #: 會做 OCR 的工具（本機 EasyOCR / Tesseract）。第一次載入模型要數十秒又吃記憶體，

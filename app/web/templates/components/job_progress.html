@@ -15,8 +15,8 @@
      背景」的清單（這種手工清單在本專案漂掉過很多次）。 #}
   <div class="job-bg-note" hidden>
     {{ icon('info', size=14) }}
-    <span>這份工作在伺服器上執行，<b>可以關掉這一頁</b> —— 完成後到
-      <a href="/my-jobs">我的作業</a> 下載。</span>
+    <span>{{ tr('這份工作在伺服器上執行，') }}<b>{{ tr('可以關掉這一頁') }}</b> {{ tr('—— 完成後到') }}
+      <a href="/my-jobs">我的作業</a> {{ tr('下載。') }}</span>
   </div>
   <div class="job-actions">
     <a class="btn btn-primary job-download" hidden>{{ icon('download') }}{{ tr('下載 PDF') }}</a>

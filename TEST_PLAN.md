@@ -228,6 +228,267 @@ SAML 由 `tests/test_sso_saml_e2e.py` 涵蓋（自架 IdP、真 xmlsec 簽章，
 會出現三條假失敗；②OU 的 subject key 是**精確字串比對**，要用目錄實際回傳的
 大小寫（管理介面指派時寫的也是目錄回來的那一份）。
 
+### 1.98 資料庫 schema 遷移 —— 每一支都要有「舊資料升上來」的測試 🆕 v1.14.95
+
+**全新資料庫升級測不到災難** —— 表本來就是空的，怎麼搬都不會少東西。
+v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵，
+`DROP TABLE` 的隱含 DELETE 觸發子表的 ON DELETE CASCADE，
+**把 `group_members` 與 `sessions` 整個清空**；要「先塞舊版資料再升級」
+才驗得出來。
+
+- [ ] **每一支 `_m*` 都要有一份「先建舊版結構 + 塞資料 → 跑升級 → 資料還在、
+      形狀正確」的測試**（`tests/test_auth_db_migration_v8.py` 是範本）。
+- [ ] **重建表一律 `PRAGMA foreign_keys=OFF; … ; ON;`**（migrate 連線是 autocommit，
+      pragma 要放在 executescript 內才生效）。
+- [ ] **授權 backfill（`_mN_grant_*`）**：拿一份**舊版本時代建立**的資料庫升上來，
+      內建角色要拿得到新工具 —— 這條漏掉的症狀是「新工具對老客戶永遠不出現」，
+      而且完全無聲（v1.14.17 抓到 `transit-proof` / `pdf-border` 兩支）。
+- [ ] **索引類（`_m24`）驗的是查詢計畫**不是速度：`tests/test_db_query_plans.py`
+      要求 SQLite 的計畫**不可以出現 SCAN**。功能測試看不出這種缺陷
+      （功能完全正確，只是資料量大時慢）。
+- [ ] 升級**不可以卡住啟動**：大表加索引要能在合理時間內做完，或放到背景。
+
+- **`app/core/auth_db.py`**：`_m1_initial`、`_m2_username_source_unique`、`_m3_rename_pdf_diff_to_doc_diff`、`_m4_grant_image_to_pdf`、`_m5_grant_translate_doc`、`_m6_totp_columns`、`_m7_audit_seed_column`、`_m8_sso_sources`、`_m9_role_seed_snapshot`、`_m10_role_default_for_new`、`_m11_group_sync_cache`、`_m12_unprovision_mirrored_users`、`_m13_grant_pdf_to_slides`、`_m14_user_email`、`_m15_directory_presence`、`_m16_session_last_seen`、`_m17_directory_account_state`、`_m18_grant_transit_proof_and_border`、`_m19_grant_pdf_bookmark`、`_m20_grant_seam_stamp`、`_m21_grant_page_size`、`_m22_grant_office_convert`、`_m23_canon_ou_subject_keys`、`_m24_index_group_members_user`、`_m25_grant_doc_translate`
+- **`app/core/audit_db.py`**：`_m1_initial`
+- **`app/core/job_store.py`**：`_m1_initial`、`_m2_metrics`、`_m3_started_at`
+
+### 1.99 全部自動化測試一覽 🆕 v1.14.95
+
+上面 §1.1 起是**逐項寫出驗收內容**的重點測試。但 `tests/` 底下實際有兩百多支，
+2026-09-04 稽核發現**測試計畫只提到其中 96 支** —— 另外一百多支等於沒有出現在
+發版門檻的視野裡：它們照跑，可是「這支在守什麼」沒有人看得到，要判斷某個功能
+有沒有被守住只能自己去翻程式。
+
+所以這裡列全。**說明直接取自每支測試檔自己的開頭說明**（不是另外寫一份），
+改了程式說明就跟著變，不會漂。守門 `tests/test_test_plan_coverage.py` 會確認
+每一支測試檔都在這張表裡。
+
+<!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
+
+共 **212 支測試檔**。說明取自每支檔案自己的開頭說明，
+跑 `python tools/build_test_plan_index.py` 重建。
+
+> 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
+> 會讓「一覽表過期」的守門在每次寫測試時都紅一次（純噪音）。
+> 要看實際跑了幾項看 pytest 的結尾摘要；README 的徽章另有守門。
+
+| 測試檔 | 守的是什麼 |
+|---|---|
+| `test_ad_account_state.py` | AD 端的帳號狀態：已停用偵測 + 密碼到期預警 |
+| `test_ad_ou_move.py` | AD / LDAP 帳號搬 OU（DN 改變）後要能繼續登入（issue #47） |
+| `test_ad_primary_group.py` | AD 的「主要群組」（primaryGroupID）也要算成使用者的群組 |
+| `test_addr_pattern_coverage.py` | 台灣地址的涵蓋率（GitHub issue #51） |
+| `test_admin_apis.py` | Admin API regression tests. |
+| `test_admin_exception_leak.py` | 管理區不可把例外原文吐到畫面上（CodeQL py/stack-trace-exposure） |
+| `test_admin_form_styles.py` | 管理區的設定頁要用同一套表單樣式 |
+| `test_admin_picker_css.py` | admin 角色/群組 picker 的長名稱不可溢出重疊（2026-06-30 客戶回報） |
+| `test_admin_users_table.py` | 使用者清單的欄位索引與排序型別要對得起來 |
+| `test_api_doc_contract.py` | API 文件契約回歸測試 |
+| `test_api_doc_coverage.py` | 每個工具的 API 都要在 `github/API.md` 與 `TEST_PLAN.md` §4 出現 |
+| `test_api_gate_and_csrf_edges.py` | API token 閘與 CSRF 豁免的邊界 |
+| `test_api_page_builder.py` | `github/build-api-page.py` 產出的 api.html 不可以毀損 |
+| `test_asset_image_acl.py` | ACL test for the login-gated shared-asset image endpoints (GitHub #28). |
+| `test_asset_thumbnails_resolve.py` | 資產縮圖必須載入得到 — 防「import 後 file_key/thumb_key 與磁碟檔名不一致 |
+| `test_assets_and_image_utils.py` | Asset upload + crop + match-aspect + remove-bg auto-crop. |
+| `test_audit_timezone.py` | 稽核 / 上傳記錄的時間解讀必須與畫面一致（GitHub issue #48） |
+| `test_auditor_readonly.py` | 稽核員必須是唯讀角色 —— 而 admin 不該因為隱私規則而失去管理能力 |
+| `test_auth_db_migration_v8.py` | Regression: auth_db migration v8 (SSO sources) must NOT wipe data. |
+| `test_auth_ldap_security.py` | LDAP / AD 登入路徑資安回歸測試（審查後補） |
+| `test_auth_ldap_sync.py` | Unit tests for auth_ldap._sync_user — collision behaviour. |
+| `test_auth_local.py` | Tests for app.core.auth_local (local credential auth + lockout). |
+| `test_auth_middleware.py` | Tests for the auth middleware (gate that requires session when auth on). |
+| `test_auth_modes_matrix.py` | 認證「開 / 關」兩種模式下的全功能矩陣（發版必跑） |
+| `test_auth_routes.py` | End-to-end tests for the auth HTTP layer. |
+| `test_auth_settings.py` | Tests for app.core.auth_settings (backend selection + bootstrap). |
+| `test_auth_settings_fail_secure.py` | 認證設定讀不到的時候，**不可以無聲地把認證關掉** |
+| `test_authz_boundaries.py` | 登入後的授權邊界測試（2026-06-27 使用者要求）： |
+| `test_autosave_reason_coverage.py` | 自動存入工作區的每一個失敗原因，畫面上都要有對應的說法 |
+| `test_background_capability.py` | 哪些工具支援背景作業 —— 一律**推導**，不維護清單 |
+| `test_badhost_path_gate.py` | Regression test for the Starlette BADHOST path-poisoning bypass |
+| `test_boxed_digits_and_sublabel.py` | 兩種讓欄位「有偵測到卻填不進去」的版型 |
+| `test_broken_input_no_500.py` | 任何工具端點收到壞輸入都不可以回 500 |
+| `test_cjk_font_notice.py` | 缺中文字型時，**一般使用者**在工具頁上看得到提示（v1.14.47） |
+| `test_cjk_font_renders.py` | 寫進 PDF 的中文**必須畫得出來** |
+| `test_client_ip_audit.py` | Client-IP resolution for audit / history / display — app/core/client_ip.py. |
+| `test_cookie_flags_on_delete.py` | 刪除 cookie 的回應也要帶安全旗標 |
+| `test_cpu_limit.py` | CPU 限制（轉檔不影響網頁回應）的測試 |
+| `test_cpu_simd_probe.py` | CPU SIMD 指令集偵測 + sys-deps PyMuPDF 條目測試 |
+| `test_csp_nonce.py` | CSP nonce 靜態回歸測試（Phase 1：script-src 移除 'unsafe-inline'） |
+| `test_csrf.py` | CSRF middleware（app/core/csrf.py）單元測試 —— 直接以 ASGI 呼叫 middleware， |
+| `test_csv_injection.py` | 匯出的 CSV 不可以讓試算表把內容當公式執行（CSV / 公式注入，CWE-1236） |
+| `test_db.py` | Tests for app.core.db (SQLite layer). |
+| `test_db_health.py` | SQLite 完整性檢查、熱備份與復原 |
+| `test_db_query_plans.py` | 熱路徑的 SQL 不可以整表掃描 |
+| `test_deident_label_not_value.py` | 跨格配對時，欄位標籤不可以被當成值（GitHub issue #50） |
+| `test_deident_replace_mode.py` | 文件去識別化的第三種模式：替換 |
+| `test_dependency_declaration_sop.py` | 新增 Python 相依時的六處宣告，一處都不能漏 |
+| `test_dir_filter.py` | 目錄瀏覽「已選定」模式 filter 的純函式 + 設定測試 |
+| `test_directory_browser.py` | 目錄瀏覽（AD/LDAP OU treeview → 指派權限給 OU，2026-07-01） |
+| `test_directory_cleanup.py` | 批次停用「目錄已無 / AD 端已停用」的帳號，以及排程自動停用 |
+| `test_directory_filter_api.py` | 目錄瀏覽「已選定」filter 端點整合測試（auth OFF = 單機 admin） |
+| `test_directory_presence.py` | 目錄裡已經找不到的帳號要看得出來（離職 / 停用偵測） |
+| `test_directory_role_assign.py` | 目錄瀏覽：指派角色給**單一使用者**與**群組**（原本只能指派給 OU） |
+| `test_directory_schema_matrix.py` | 目錄查詢要能在 **AD / OpenLDAP / UCS** 三種結構上都跑得起來 |
+| `test_directory_sync.py` | Scheduled AD/LDAP directory sync + the perf fixes it enables (v1.12.67). |
+| `test_doc_deident_e2e.py` | 文件去識別化：**走完整條路徑**的驗收（issue #50 / #51） |
+| `test_doc_deident_table_labels.py` | 標籤與值分屬兩個表格儲存格時也要偵測得到（GitHub issue #43） |
+| `test_doc_diff.py` | Tests for the renamed 文件差異比對 tool (formerly pdf-diff). |
+| `test_doc_translate.py` | 文件翻譯：產出**同格式、同版面**的檔案 |
+| `test_docs_english_pages.py` | 介紹站與 API 手冊的英文版（GitHub Pages） |
+| `test_docs_links.py` | 介紹網站與 API 手冊的連結不可以指向不存在的東西 |
+| `test_docs_numeric_claims.py` | 公開文件裡的數字宣稱要跟程式對得上 |
+| `test_docs_tool_categories.py` | 介紹站的工具分類要跟程式裡的一致 |
+| `test_effective_permissions.py` | 「這個人最終有哪些工具、從哪來」的檢視 |
+| `test_einvoice_formatters.py` | Tests for einvoice-scan field formatters (M3.2). |
+| `test_einvoice_scan.py` | Tests for einvoice-scan tool — QR parser, buffer storage, HTTP endpoints. |
+| `test_error_message_scrub.py` | 錯誤訊息不可以把使用者送的字串原樣吐回去 |
+| `test_extract_text_glyph_repair.py` | 壞掉的文字對應表：擷取文字 / 字數統計 / 逐句翻譯也要能還原 |
+| `test_font_display_names.py` | 自訂上傳字型的顯示名稱 |
+| `test_format_terminology.py` | 格式用語要一致：「辦公文件」是統稱，「文書檔」是其中一類 |
+| `test_forwarded_proto.py` | `X-Forwarded-Proto` 的解析要全站一致 |
+| `test_generated_css_valid.py` | `generated-inline.css` 裡不可以出現 JavaScript 運算式 |
+| `test_glyph_text_recovery.py` | 從字形反查還原文字 —— 對付壞掉的 ToUnicode 對照表 |
+| `test_heic_support.py` | HEIC / HEIF（iPhone 照片）要真的解得開（GitHub issue #49） |
+| `test_host_stats_container.py` | 系統狀態 CPU 在容器(LXC/Docker)內要顯示容器自己的用量，不抓宿主機 |
+| `test_i18n_catalog.py` | 語系檔與樣板的一致性守門 |
+| `test_id_from_body_acl.py` | 「id 由使用者傳入」的端點一律要有 ACL —— 靜態全面掃描 |
+| `test_job_acl.py` | Regression tests for the /api/jobs/* per-job ownership ACL (v1.12.61). |
+| `test_job_api_acl.py` | 「我的工作」/ 管理區工作監控的 API 與權限邊界 |
+| `test_job_autosave.py` | 作業完成後自動存入工作區 |
+| `test_job_cancel.py` | Tests for job cancellation (停止轉換). |
+| `test_job_id_acl.py` | 換掉 job id 能不能看到別人的作業？ |
+| `test_job_priority.py` | 優先派送名單 —— 指定的使用者送出的作業會插到佇列最前面 |
+| `test_job_queue.py` | 背景工作的佇列 / 持久化 / 記憶體准入 |
+| `test_job_timestamps.py` | 作業的三個時間點：送出 / 開始 / 結束 |
+| `test_json_error_handling.py` | 非 JSON / 壞掉的 request body 應回 400（而非 500） |
+| `test_latin_ext_garbled_recovery.py` | 擷取結果被映到拉丁擴充區、而且每個 span 都很短 —— 舊的判準抓不到 |
+| `test_ldap_attribute_portability.py` | LDAP 查詢的屬性清單不可以夾帶 AD 專屬屬性 |
+| `test_ldap_failover.py` | 多台 DC 容錯與連線逾時 |
+| `test_license_declaration.py` | 本專案宣告的授權必須處處一致（v1.14.48 起改為 AGPL-3.0-or-later） |
+| `test_llm_per_field_consensus.py` | LLM 逐欄校驗：連兩輪都指出同一個問題才採納 |
+| `test_llm_url_ssrf.py` | SSRF defence — admin-supplied LLM base URL must reject suspicious schemes |
+| `test_looks_garbled.py` | Regression tests for pdf_editor._looks_garbled(). |
+| `test_migration_fk_cascade.py` | 重建資料表的 migration 一律要關掉外鍵，否則升級會**清空子表** |
+| `test_nav_visibility_and_whoami.py` | Tests for v1.1.5 - v1.1.7 visibility / identity changes. |
+| `test_nested_group_permissions.py` | 巢狀群組的權限要往上繼承 |
+| `test_net_ssl_corp_tls.py` | 企業 TLS 攔截環境的 Python 端信任修正（2026-06-30 客戶回報） |
+| `test_new_tools_input_boundaries.py` | 三支新工具（書籤與目錄 / 騎縫章 / 頁面尺寸統一）的輸入邊界 |
+| `test_no_blocking_endpoints.py` | async 端點裡不可以直接做重活 —— 那會把整站鎖住 |
+| `test_no_dynamic_style_injection.py` | 前端 JS 不可以動態注入 `<style>` —— CSP 會把它整段擋掉 |
+| `test_no_native_dialogs.py` | 樣板裡不可以用瀏覽器原生的 alert / confirm / prompt（使用者要求） |
+| `test_no_sample_names_in_public.py` | 測試樣本的檔名 / 客戶公司名不可以出現在會公開的檔案裡 |
+| `test_notify.py` | 作業完成通知：管道發送、設定分層、觸發條件 |
+| `test_notify_privacy.py` | 通知送出去的內容不可以外洩多餘的東西 |
+| `test_ocr_avx2_guard.py` | 本機 EasyOCR 在缺 AVX2 的 CPU 上會 SIGILL 打掛整個服務 |
+| `test_ocr_server_gpu_select.py` | Unit tests for jt-ocr-server's auto GPU selection (server_template.py). |
+| `test_office_convert.py` | 辦公文件格式互轉（office-convert） |
+| `test_online_sessions.py` | 在線人數、某人的登入裝置清單、強制登出 |
+| `test_open_redirect.py` | Open-redirect regression — closes CodeQL alerts #14 / #15 |
+| `test_ou_key_canon.py` | OU 授權的 DN 大小寫 / 空白正規化（v1.14.48） |
+| `test_output_verification_coverage.py` | 去識別化類工具**必須**驗到「產出本身」（使用者要求，2026-09-01） |
+| `test_owasp_top10.py` | OWASP Top 10 (2025) regression suite. |
+| `test_passwords.py` | Tests for app.core.passwords (scrypt hashing + policy). |
+| `test_path_traversal_audit.py` | Audit every tool router for unsafe path expressions. |
+| `test_pdf_annotations.py` | Tests for the pdf-annotations tool. |
+| `test_pdf_annotations_flatten.py` | Tests for the pdf-annotations-flatten tool. |
+| `test_pdf_annotations_strip.py` | Tests for the pdf-annotations-strip tool. |
+| `test_pdf_attachments_strip.py` | pdf-attachments「產生無附件副本」測試 |
+| `test_pdf_bookmark.py` | 書籤與目錄 |
+| `test_pdf_border.py` | 頁面加框（pdf-border） |
+| `test_pdf_compress.py` | Tests for the pdf-compress tool, focused on transparency preservation. |
+| `test_pdf_editor_font_subset.py` | PDF 編輯器寫進去的中文：字形要看得見、檔案不可以是十幾 MB |
+| `test_pdf_fill_positioning.py` | 表單自動填寫的定位規則 |
+| `test_pdf_form_detect.py` | Unit tests for the field detector. Builds tiny synthetic PDFs in memory |
+| `test_pdf_ocr_preview_acl.py` | End-to-end ACL test for pdf-ocr `/preview/{uid}.pdf` endpoint (v1.7.6). |
+| `test_pdf_page_size.py` | 頁面尺寸統一 |
+| `test_pdf_pageno_cjk.py` | pdf-pageno 中文頁碼字型回歸 |
+| `test_pdf_seam_stamp.py` | 騎縫章 |
+| `test_pdf_stamp_blend.py` | Regression tests for the Multiply blend mode applied to pdf-stamp output. |
+| `test_pdf_stamp_date_resolution.py` | Regression: the handwriting date stamp must render crisp, not blurry. |
+| `test_pdf_stamp_pages.py` | Regression tests for pdf-stamp per-page selection (`_resolve_pages`). |
+| `test_pdf_stamp_placements.py` | pdf-stamp「每頁獨立位置」placements 模式測試（issue #38 / Phase B） |
+| `test_pdf_stamp_rotated.py` | Regression: stamp placement must honour page /Rotate (GitHub #28 follow-up). |
+| `test_pdf_to_image_page_order.py` | 辦公文件轉圖片：ZIP 內檔名頁碼必須對應 PDF 實際頁數 |
+| `test_pdf_to_office_a_b_fixers.py` | Sprint B 二階段 5 個 fixer 單元測試（v1.8.60）： |
+| `test_pdf_to_office_api_engine.py` | 對外 API /tools/pdf-to-office/convert 的引擎參數與 meta 測試 |
+| `test_pdf_to_office_bbox_fixers.py` | Sprint B 新 fixer 單元測試： |
+| `test_pdf_to_office_c_fixers.py` | v1.8.61 C 階段強化 fixer 測試 |
+| `test_pdf_to_office_d_fixers.py` | v1.8.62 D 階段 fixer 測試 |
+| `test_pdf_to_office_draw_engine.py` | pdf-to-office 第三引擎 draw（版面重現）測試 |
+| `test_pdf_to_office_jtdt_reform.py` | v1.8.63 jtdt-reform engine 單元 + 端對端測試 |
+| `test_pdf_to_slides.py` | pdf-to-slides（PDF 轉簡報）測試 |
+| `test_pdf_tools.py` | End-to-end tests for the simple PDF tools (merge / split / rotate / pages / |
+| `test_pdf_watermark.py` | Tests for the watermark service — focused on CJK font fallback. |
+| `test_pdf_watermark_batch.py` | pdf-watermark 逐檔順序上傳（issue #27） |
+| `test_pdf_wordcount.py` | Tests for the pdf-wordcount tool. |
+| `test_placeholder_extraction.py` | 擷取出來全是佔位字元（圓點 / 星號…）但畫面上其實是真的字 |
+| `test_preview_acl_failopen.py` | 預覽端點的 ACL 不可以「認不出 upload_id 就放行」 |
+| `test_proxy_sso.py` | Reverse-proxy (Kerberos/SPNEGO) SSO — app/core/proxy_sso.py + middleware. |
+| `test_real_samples_smoke.py` | 拿**真實的**樣本檔掃過所有吃單一 PDF 的工具 |
+| `test_redos_ad_dn.py` | ReDoS regression for RE_AD_DN — closes CodeQL alert #13 |
+| `test_restrict_stamp_render.py` | 個資限用章的渲染 —— 橫式 / 直式 / 對角線 |
+| `test_retention_periods.py` | 檔案保留期：**設定頁上的每一個數字都要真的生效** |
+| `test_roles.py` | Tests for app.core.roles. |
+| `test_roles_default_and_seed.py` | Tests for the new-user default role + seed-snapshot behaviour (v1.12.53). |
+| `test_roles_rbac.py` | 內建角色（RBAC）的完整性檢查 |
+| `test_safe_paths_and_owner.py` | Tests for app.core.safe_paths and app.core.upload_owner. |
+| `test_same_as_ref.py` | 把「同上」「同登記地址」展開成實際內容 |
+| `test_save_queue.py` | Tests for app.core.save_queue (v1.7.17). |
+| `test_scan_merge_api.py` | 掃描拼合 (scan-merge) — 端點 / ACL / 公開 API 測試 |
+| `test_scan_merge_detector.py` | 掃描拼合 — 內容偵測 + 背景淨白 單元測試 |
+| `test_scheduled_export.py` | Scheduled settings export (v1.12.54). |
+| `test_seal_zone_marker.py` | 用印區的排除條件：**標籤才算，說明句不算** |
+| `test_seam_preview_speed.py` | 騎縫章預覽：只蓋要看的那一頁 |
+| `test_seed_bootstrap_gap.py` | 新工具要真的到得了**既有客戶**，不是只有全新安裝看得到 |
+| `test_sessions.py` | Tests for app.core.sessions (issue / lookup / revoke). |
+| `test_settings_export.py` | Category-based settings export / import (v1.12.54). |
+| `test_settings_export_roundtrip.py` | 設定備份：**匯出的檔案要匯得回去** |
+| `test_smoke_routes.py` | Smoke tests: every public page renders 200, no 500s. |
+| `test_smtp_relay_modes.py` | 通知信的三種寄送方式 |
+| `test_sso.py` | Tests for the SSO feature (OIDC + SAML): settings encryption, JIT |
+| `test_sso_oidc_e2e.py` | Real end-to-end OIDC login against a self-hosted, spec-conformant mini IdP. |
+| `test_sso_saml_e2e.py` | Real end-to-end SAML login with a genuinely signed SAML Response. |
+| `test_stamp_watermark_preview_acl.py` | End-to-end ACL test for pdf-stamp / pdf-watermark preview endpoints (#28 pt2). |
+| `test_static_image_budget.py` | 自家的介面圖片不可以大到離譜（v1.14.61） |
+| `test_submission_check_acl.py` | 送件檢核（submission-check）的案件 ACL 測試 |
+| `test_taiwan_terminology.py` | 使用者看得到的文字不可以用中國大陸用詞 |
+| `test_template_block_placement.py` | 兩個「看不到 JS 例外、只有畫面怪怪的」樣板雷的守門 |
+| `test_template_head_block.py` | 工具模板的 `<style>` 一定要放在 base.html 真的有的區塊裡 |
+| `test_template_js_syntax.py` | Inline-JS syntax check for every Jinja2 template (v1.7.14). |
+| `test_template_renders.py` | 每一支模板都要**渲染得起來**，而且註解裡不可以寫出樣板標籤的字面寫法 |
+| `test_test_plan_coverage.py` | 測試計畫本身的守門：計畫沒涵蓋到的東西要紅燈 |
+| `test_text_deident_e2e.py` | 文字去識別化：走完整條路徑的驗收 |
+| `test_text_diff.py` | Tests for the new 文字差異比對 tool — paste-text variant of doc-diff. |
+| `test_text_list.py` | Tests for text-list tool — pipeline ops, file extraction, export formats. |
+| `test_tool_search_keywords.py` | 每一支工具都要有搜尋關鍵字（中文 + 英文） |
+| `test_tool_ui_locales.py` | 工具的介面語系白名單（`ToolMetadata.locales`） |
+| `test_transit_proof_api.py` | 乘車證明工具端點整合測試（合成 PDF，auth OFF = 單機） |
+| `test_transit_proof_parser.py` | 乘車證明解析器單元測試（合成 fixture，不含真實票號 / 統編 / 站名資料） |
+| `test_translate_doc_job.py` | 逐句翻譯改成背景作業（離開頁面也會繼續跑） |
+| `test_translate_doc_pagination.py` | 逐句翻譯：admin 可設定句數上限 + 分頁大小，前端分頁 |
+| `test_ttc_subfont.py` | `.ttc` 要挑對子字型，否則寫進 PDF 的中文是**日文字形** |
+| `test_upgrade_v1_14_6.py` | 升級到 v1.14.6：既有客戶的資料目錄要能無痛接上 |
+| `test_upload_limits.py` | 這台機器實際能收多大的檔案 —— 系統狀態頁的「可上傳的檔案大小」 |
+| `test_upload_validation_parity.py` | 上傳的檔案不是 PDF 時要回 400，不是 500 |
+| `test_url_safety.py` | safe_next open-redirect sanitizer — including the encoded-slash hardening. |
+| `test_user_email.py` | 帳號上的信箱欄位（作業完成通知要寄給誰） |
+| `test_user_manager.py` | Tests for app.core.user_manager + app.core.group_manager. |
+| `test_users_bulk_ops.py` | 使用者批次操作（啟用 / 停用 / 指派角色）與伺服器端分頁 |
+| `test_v1_4_99_audit_2fa.py` | v1.4.99 — auditor role + TOTP 2FA + separation-of-duties tests. |
+| `test_vat_db.py` | Tests for vat_db (M4.a). |
+| `test_vat_upload_and_group_sync.py` | 2026-06-30 客戶回報兩項： |
+| `test_version_consistency.py` | Release-time version consistency — every source agrees on `app/main.py:VERSION`. |
+| `test_windows_git_guidance.py` | Windows 缺 git 時的指引不可以只講 winget |
+| `test_windows_service_restart.py` | Windows 的 `jtdt restart` 必須真的把服務啟起來（2026-08-24 實機重現） |
+| `test_workspace.py` | Tests for the user-workspace core (app/core/workspace.py). |
+| `test_workspace_api.py` | HTTP-level tests for the workspace endpoints (auth OFF / single mode). |
+| `test_workspace_office_thumbnail.py` | 工作區的 Office / ODF 檔要有第一頁縮圖 |
+| `test_workspace_ooxml_detect.py` | 工作區的型別判斷要以**內容型別**為準，不是主檔的路徑名 |
+| `test_workspace_save_button.py` | 「存至工作區」按鈕出現的條件，必須跟工作區真正收得下的格式一致 |
+| `test_workspace_thumb_pending.py` | 縮圖還沒做好時回的那張空白圖，不可以被瀏覽器快取 |
+
+<!-- END test-index -->
+
 ## 2. 手動驗收清單（每個版本）
 
 ### 2.1 填單用印
@@ -548,6 +809,57 @@ SAML 由 `tests/test_sso_saml_e2e.py` 涵蓋（自架 IdP、真 xmlsec 簽章，
 - [ ] `/admin/conversion` 顯示 Windows builtin 路徑且可使用
 - [ ] Ghostscript `gswin64c.exe` 偵測
 
+## 3.5 CLI 指令（`jtdt`）🆕 v1.14.95
+
+**web 上不去的時候只剩它** —— 啟用 LDAP / AD 之後如果設定寫錯，畫面上救不回來，
+緊急復原全靠 CLI（`jtdt auth show / disable / set-local` + `reset-password` 四件套）。
+所以這幾支的驗收標準跟工具一樣嚴，而且**必須在服務沒跑的情況下也能用**。
+
+### 服務控制
+- [ ] `jtdt start` / `stop` / `restart` / `status` / `run` / `open` / `logs` / `version`
+      —— 每支跑得起來，`status` 要能正確分辨「跑著」與「沒跑」
+      （**判 PID 一律 `lsof -tiTCP:<port>`，不要 `pgrep`** —— `.venv/bin/python`
+      是 symlink，ps 印的是解析後的路徑，pgrep 抓不到）。
+- [ ] `jtdt bind` 改監聽位址後重啟生效（Windows 走 WinSW 的 XML）。
+
+### 更新
+- [ ] `jtdt update` **拒絕降版**：`origin/main` 比目前舊要中止並還原。
+- [ ] **root 跑 update 不可以撞 git 的 dubious ownership**（安裝目錄屬於服務帳號）。
+- [ ] update 完成後**新檔要 chown 回服務帳號**，否則服務讀不到 `.venv` 裡的新東西。
+- [ ] 輸出的 `vX -> vY` 就是**版本有沒有 bump 的檢查點** —— 印出來前後相同
+      就是忘了 bump（動到 `app/` 或 `static/` 一定要 bump）。
+- [ ] **改 update 流程本身要連測兩個版本**：這一次跑的是改之前的 `cli.py`
+      （已經載進記憶體了），修好的行為要下一次更新才看得到。
+- [ ] 加了新相依之後：`jtdt update` 要真的把它裝起來，
+      **部署後驗 `import <新模組>`，不能只看 `/healthz`**（延遲匯入會蓋掉缺相依）。
+
+### 緊急復原（**服務沒跑也要能用**）
+- [ ] `jtdt auth show` / `jtdt auth disable` / `jtdt set-local`（= `jtdt auth set-local`）
+      / `jtdt reset-password <user>` —— 直接動 sqlite，**不需要服務在跑**，也不需要登入。
+- [ ] `jtdt audit-user create <帳號>` —— 建立本機**稽核員**（唯讀稽核記錄、
+      **強制 2FA**）。判準：建出來的帳號登入後只看得到稽核記錄，
+      而且**沒設定 2FA 之前登不進去**；`--password` 只是免互動，
+      不可以在共用機器上用（會留在 shell history）。
+- [ ] 寫進 `data/` 的檔案（`auth_settings.json` 等）**要 chown 回服務帳號**：
+      sudo 跑出來的是 `root:root` mode 600，服務讀不到，
+      使用者看到的是「設定不見了」。
+
+### 資料庫 / OCR 語言包 / 安裝
+- [ ] `jtdt db-backup` / `db-backups` / `db-check` / `db-restore`
+      —— 備份可還原、`db-check` 抓得出毀損。
+- [ ] `jtdt ocr-lang list` / `install` / `remove` / `switch` / `quality`
+      —— 裝完該語言在 OCR 工具的選單裡出得來。
+- [ ] `jtdt install` / `uninstall`（含 `--purge`）
+      —— Windows 的 `--purge` 要用 detached 的清理程序刪安裝目錄，
+      否則 `jtdt.cmd` 把自己刪掉、cmd.exe 讀下一行會噴「找不到批次檔。」。
+- [ ] `jtdt list` / `show` / `disable` / `remove` / `switch` 等子指令都跑得起來。
+
+### 共通
+- [ ] **CLI 的說明訊息一律英文 ASCII**（純文字 TTY / Windows console / minimal
+      container 渲染不出中文），GUI 與網頁介面才用繁體中文。
+- [ ] Windows **沒有 `sudo`**：文件裡的指令要分平台寫
+      （Linux/macOS `sudo jtdt update`；Windows 先開系統管理員 PowerShell）。
+
 ## 4. API 覆蓋檢查 🆕（v1.8.55 起完整列出，現 47 個工具）
 
 每個工具至少 1 個 `/api/<tool-id>` endpoint（路徑：`/tools/<tool-id>/api/<tool-id>` 或 `/tools/<tool-id>/convert`）。發版前 curl 抽測：
@@ -688,6 +1000,459 @@ SAML 由 `tests/test_sso_saml_e2e.py` 涵蓋（自架 IdP、真 xmlsec 簽章，
 - [ ] `/admin/directory/tree`、`/admin/directory/user-roles`、`/admin/directory/group-roles` — 目錄瀏覽的樹狀展開與角色指派（含 OU / 群組 / 個人三種對象）
 - [ ] `/admin/system-status/databases` — 各資料庫大小與最舊一筆時間
 - [ ] `/admin/audit/export.csv` — 稽核記錄匯出；**公式注入防護**（`=` 開頭的欄位要被前綴處理，見 TEST_PLAN_SECURITY）
+
+## 4.7 工具的非 API 端點 —— **畫面上實際打的那些** 🆕 v1.14.95
+
+§4 只保證「每個工具至少一支 `/api/`」有驗收，§4.6 補了管理 / 作業 / 通知 API。
+**但使用者在畫面上按的每一顆按鈕，打的其實是這一層**（`analyze` / `preview` /
+`thumb` / `download` / `export-*` / 暫存區 CRUD）—— 而它們一條驗收都沒有。
+
+這不是理論風險。這個專案歷來最痛的幾個 bug **全部出在這一層**，而且 `/api/`
+那條路都是好的：
+
+| 版本 | 出事的端點 | 症狀 |
+|---|---|---|
+| v1.14.17 | `pdf-nup` 的 `preview` / `generate` | **水平越權**：B 拿 A 的 upload_id 就下載得到對方的 PDF |
+| v1.14.62 | `pdf-seam-stamp` 的逐頁預覽 | 每看一頁要 90～104 秒（每頁都合成整份，只取一頁） |
+| v1.14.9 | 工作區縮圖 | 永遠空白（佔位圖沒有快取標頭，瀏覽器把空白那張存起來了） |
+| v1.12.12 | `pdf-attachments` 的「無附件副本」 | 產出檔裡附件還在（PDF/A-3 的 `/AF` 沒清） |
+
+> **判準依類型分六條**（下面清單逐支勾，但判準看這裡）：
+>
+> 1. **產出類**（`download` / `export-*`）—— **把產出打開來看內容**才算驗收（§0.5）。
+>    端點回 200、筆數對、畫面顯示成功，**都不算**。
+> 2. **預覽 / 縮圖類**（`preview` / `thumb` / `*-preview`）—— ①真的回到圖而且不是白的
+>    ②**預覽要跟最終產出一致**（騎縫章那次是逐頁比對兩者的 PNG 位元組）
+>    ③不可以「算整份、只用一頁」④空白佔位圖一定要 `Cache-Control: no-store`。
+> 3. **兩段式分析**（`analyze` / `load`）—— 分析結果寫 sidecar，後續端點吃 `upload_id`
+>    不重傳；**過期回 410 不可 500**；`upload_id` 走嚴格格式驗證（防路徑跳脫）。
+> 4. **暫存區 CRUD**（`buffer` / `entry` / `case` / `override`）—— 只能動自己的；
+>    批次刪除**先整批試算再動手**；刪完就地移除那一列，不可 `location.reload()`。
+> 5. **LLM 加值**（`llm-*`）—— LLM 關閉或連不上時要**優雅退場**：明確訊息、不可 500、
+>    更不可以把上游的 HTML 錯誤頁當成結果塞進去（v1.8.58 踩過）。
+> 6. **全部共通** —— 壞輸入回 4xx（`tests/test_broken_input_no_500.py` 從路由表自動
+>    列舉）、寫入端點要帶 CSRF、下載 / 預覽一律 `upload_owner.require()` 驗歸屬。
+
+清單由 `tests/test_test_plan_coverage.py` **從路由表自動比對**：新增端點沒補進來
+就紅燈。**不要用啟發式去猜「這支有沒有被測到」** —— 那條路試過，判準寬一點是
+永遠綠的假測試，嚴一點就把驗得更嚴的工具誤報（v1.14.63 的教訓）。想看哪些端點
+目前沒有自動化測試碰過，跑 `python tools/report_endpoint_test_coverage.py`，
+那份是**提示不是判決**。
+
+共 **267 支**（工具首頁不列，§2 已逐支驗收）。
+
+**全站（認證 / 帳號 / 工作區 / 介面語言）**
+
+- [ ] `GET /`
+- [ ] `POST /2fa-verify`
+- [ ] `GET /2fa-verify`
+- [ ] `GET /auth/oidc/callback`
+- [ ] `GET /auth/oidc/login`
+- [ ] `POST /auth/saml/acs`
+- [ ] `GET /auth/saml/login`
+- [ ] `GET /auth/saml/metadata`
+- [ ] `GET/POST /auth/saml/sls`
+- [ ] `GET /branding/logo`
+- [ ] `POST /change-password`
+- [ ] `GET /healthz`
+- [ ] `POST /login`
+- [ ] `GET /login`
+- [ ] `POST /logout`
+- [ ] `GET /logout`
+- [ ] `GET /me/2fa`
+- [ ] `POST /me/2fa/disable`
+- [ ] `POST /me/2fa/start`
+- [ ] `POST /me/2fa/verify`
+- [ ] `POST /me/email`
+- [ ] `GET /my-jobs`
+- [ ] `GET /setup-admin`
+- [ ] `POST /setup-admin`
+- [ ] `POST /setup-admin/reuse-existing`
+- [ ] `POST /ui-locale`
+- [ ] `GET /tools/pdf-diff` / `GET /tools/pdf-diff/` — **舊工具 id 的相容轉址**（v1.1.61 改名 `pdf-diff` → `doc-diff`）。判準：轉址碼是 **308 不是 301**（301 只保留 GET，POST 的 body 會掉），且 `{rest:path}` 子路徑一起轉。
+- [ ] `GET /whoami`
+- [ ] `GET /workspace`
+- [ ] `POST /workspace/delete`
+- [ ] `GET /workspace/file/{file_id}`
+- [ ] `POST /workspace/rename`
+- [ ] `POST /workspace/save`
+- [ ] `GET /workspace/thumb/{file_id}`
+
+**doc-deident（文件去識別化）**
+
+- [ ] `POST /tools/doc-deident/detect`
+- [ ] `GET /tools/doc-deident/download/{upload_id}`
+- [ ] `POST /tools/doc-deident/find`
+- [ ] `GET /tools/doc-deident/preview/{filename}`
+- [ ] `POST /tools/doc-deident/process`
+
+**doc-diff（文件差異比對）**
+
+- [ ] `POST /tools/doc-diff/compare`
+
+**doc-translate（文件翻譯）**
+
+- [ ] `GET /tools/doc-translate/download/{upload_id}`
+- [ ] `GET /tools/doc-translate/preview/{upload_id}/{page}`
+- [ ] `POST /tools/doc-translate/start`
+- [ ] `POST /tools/doc-translate/upload`
+
+**einvoice-scan（電子發票處理）**
+
+- [ ] `GET /tools/einvoice-scan/accounting-rules/builtin`
+- [ ] `DELETE /tools/einvoice-scan/buffer`
+- [ ] `GET /tools/einvoice-scan/buffer`
+- [ ] `POST /tools/einvoice-scan/buffer/delete-batch`
+- [ ] `POST /tools/einvoice-scan/buffer/llm-classify`
+- [ ] `POST /tools/einvoice-scan/buffer/reclassify-accounting`
+- [ ] `PATCH /tools/einvoice-scan/buffer/{invoice_id}`
+- [ ] `DELETE /tools/einvoice-scan/buffer/{invoice_id}`
+- [ ] `POST /tools/einvoice-scan/export`
+- [ ] `GET /tools/einvoice-scan/handoff-qr`
+- [ ] `GET /tools/einvoice-scan/period-info`
+- [ ] `POST /tools/einvoice-scan/scan`
+- [ ] `POST /tools/einvoice-scan/scan-text`
+- [ ] `GET /tools/einvoice-scan/settings`
+- [ ] `PUT /tools/einvoice-scan/settings`
+- [ ] `POST /tools/einvoice-scan/settings/reset`
+
+**image-to-pdf（圖片轉 PDF）**
+
+- [ ] `POST /tools/image-to-pdf/delete/{fid}`
+- [ ] `GET /tools/image-to-pdf/full/{fid}`
+- [ ] `POST /tools/image-to-pdf/generate`
+- [ ] `GET /tools/image-to-pdf/thumb/{fid}`
+- [ ] `POST /tools/image-to-pdf/upload`
+
+**markdown-to-doc（Markdown 轉辦公文件）**
+
+- [ ] `POST /tools/markdown-to-doc/convert`
+- [ ] `GET /tools/markdown-to-doc/download/{upload_id}/{fmt}`
+- [ ] `GET /tools/markdown-to-doc/preview/{upload_id}/{page}`
+
+**office-convert（辦公文件格式互轉）**
+
+- [ ] `POST /tools/office-convert/convert`
+- [ ] `GET /tools/office-convert/formats`
+- [ ] `POST /tools/office-convert/submit`
+
+**office-to-pdf（辦公文件轉 PDF）**
+
+- [ ] `POST /tools/office-to-pdf/submit`
+
+**pdf-annotations（註解整理）**
+
+- [ ] `POST /tools/pdf-annotations/analyze`
+- [ ] `POST /tools/pdf-annotations/export-csv`
+- [ ] `POST /tools/pdf-annotations/export-json`
+- [ ] `POST /tools/pdf-annotations/export-review`
+- [ ] `POST /tools/pdf-annotations/export-todo`
+- [ ] `GET /tools/pdf-annotations/preview/{upload_id}/{page}`
+
+**pdf-annotations-flatten（註解平面化）**
+
+- [ ] `POST /tools/pdf-annotations-flatten/analyze`
+- [ ] `GET /tools/pdf-annotations-flatten/baked-download/{baked_uid}`
+- [ ] `GET /tools/pdf-annotations-flatten/baked-preview/{baked_uid}/{page}`
+- [ ] `POST /tools/pdf-annotations-flatten/flatten`
+
+**pdf-annotations-strip（註解清除）**
+
+- [ ] `POST /tools/pdf-annotations-strip/analyze`
+- [ ] `GET /tools/pdf-annotations-strip/preview/{upload_id}/{page}`
+- [ ] `POST /tools/pdf-annotations-strip/strip`
+
+**pdf-attachments（PDF 附件萃取）**
+
+- [ ] `GET /tools/pdf-attachments/file/{uid}/{name}`
+- [ ] `POST /tools/pdf-attachments/scan`
+- [ ] `POST /tools/pdf-attachments/strip`
+- [ ] `GET /tools/pdf-attachments/stripped/{uid}`
+- [ ] `POST /tools/pdf-attachments/zip`
+
+**pdf-bookmark（書籤與目錄）**
+
+- [ ] `POST /tools/pdf-bookmark/auto-detect`
+- [ ] `GET /tools/pdf-bookmark/download/{upload_id}`
+- [ ] `POST /tools/pdf-bookmark/load`
+- [ ] `POST /tools/pdf-bookmark/parse-list`
+- [ ] `POST /tools/pdf-bookmark/submit`
+- [ ] `GET /tools/pdf-bookmark/thumb/{upload_id}/{page_no}`
+- [ ] `POST /tools/pdf-bookmark/toc-preview`
+- [ ] `POST /tools/pdf-bookmark/validate`
+
+**pdf-border（頁面加框）**
+
+- [ ] `POST /tools/pdf-border/load`
+- [ ] `POST /tools/pdf-border/preview`
+- [ ] `POST /tools/pdf-border/submit`
+- [ ] `GET /tools/pdf-border/thumb/{upload_id}/{page}`
+
+**pdf-compress（PDF 壓縮）**
+
+- [ ] `POST /tools/pdf-compress/analyze`
+- [ ] `POST /tools/pdf-compress/submit`
+
+**pdf-decrypt（PDF 密碼解除）**
+
+- [ ] `POST /tools/pdf-decrypt/submit`
+
+**pdf-editor（PDF 編輯器）**
+
+- [ ] `GET /tools/pdf-editor/assets`
+- [ ] `POST /tools/pdf-editor/detect-objects`
+- [ ] `GET /tools/pdf-editor/download/{upload_id}`
+- [ ] `GET /tools/pdf-editor/file/{upload_id}`
+- [ ] `GET /tools/pdf-editor/fonts`
+- [ ] `POST /tools/pdf-editor/list-objects`
+- [ ] `POST /tools/pdf-editor/load`
+- [ ] `GET /tools/pdf-editor/preview/{filename}`
+- [ ] `POST /tools/pdf-editor/replace-all-fonts`
+- [ ] `POST /tools/pdf-editor/save`
+- [ ] `POST /tools/pdf-editor/undo-replace-all-fonts`
+- [ ] `POST /tools/pdf-editor/upload-image`
+
+**pdf-encrypt（PDF 密碼保護）**
+
+- [ ] `POST /tools/pdf-encrypt/submit`
+
+**pdf-extract-images（擷取圖片）**
+
+- [ ] `POST /tools/pdf-extract-images/extract`
+- [ ] `GET /tools/pdf-extract-images/file/{batch_id}/{name}`
+- [ ] `POST /tools/pdf-extract-images/load`
+- [ ] `GET /tools/pdf-extract-images/page-thumb/{upload_id}/{page}`
+- [ ] `POST /tools/pdf-extract-images/submit`
+- [ ] `POST /tools/pdf-extract-images/zip-selected`
+
+**pdf-extract-text（擷取文字）**
+
+- [ ] `GET /tools/pdf-extract-text/download/{batch_id}/{fmt}`
+- [ ] `POST /tools/pdf-extract-text/extract`
+- [ ] `POST /tools/pdf-extract-text/llm-reflow`
+
+**pdf-fill（表單自動填寫）**
+
+- [ ] `GET /tools/pdf-fill/download/{upload_id}`
+- [ ] `GET /tools/pdf-fill/history`
+- [ ] `POST /tools/pdf-fill/history/bulk-delete`
+- [ ] `POST /tools/pdf-fill/history/{hid}/delete`
+- [ ] `GET /tools/pdf-fill/history/{hid}/file/{kind}`
+- [ ] `POST /tools/pdf-fill/history/{hid}/refill`
+- [ ] `POST /tools/pdf-fill/learn-synonym`
+- [ ] `POST /tools/pdf-fill/llm-review-apply`
+- [ ] `GET /tools/pdf-fill/llm-review-result/{job_id}`
+- [ ] `POST /tools/pdf-fill/llm-review-start`
+- [ ] `POST /tools/pdf-fill/preview`
+- [ ] `GET /tools/pdf-fill/preview/{name}`
+- [ ] `POST /tools/pdf-fill/regenerate`
+- [ ] `POST /tools/pdf-fill/save-template`
+- [ ] `POST /tools/pdf-fill/submit`
+
+**pdf-hidden-scan（隱藏內容掃描）**
+
+- [ ] `POST /tools/pdf-hidden-scan/clean`
+- [ ] `GET /tools/pdf-hidden-scan/download/{uid}`
+- [ ] `POST /tools/pdf-hidden-scan/scan`
+
+**pdf-merge（檔案合併）**
+
+- [ ] `POST /tools/pdf-merge/submit`
+
+**pdf-metadata（中繼資料清除）**
+
+- [ ] `POST /tools/pdf-metadata/analyze`
+- [ ] `POST /tools/pdf-metadata/clean`
+- [ ] `GET /tools/pdf-metadata/download/{uid}`
+
+**pdf-nup（多頁合併）**
+
+- [ ] `GET /tools/pdf-nup/download/{upload_id}`
+- [ ] `POST /tools/pdf-nup/generate`
+- [ ] `POST /tools/pdf-nup/load`
+- [ ] `POST /tools/pdf-nup/preview`
+
+**pdf-ocr（OCR 文字辨識）**
+
+- [ ] `GET /tools/pdf-ocr/download/{upload_id}`
+- [ ] `GET /tools/pdf-ocr/preview/{upload_id}.pdf`
+- [ ] `POST /tools/pdf-ocr/run/{upload_id}`
+- [ ] `POST /tools/pdf-ocr/upload`
+
+**pdf-page-size（頁面尺寸統一）**
+
+- [ ] `GET /tools/pdf-page-size/download/{upload_id}`
+- [ ] `POST /tools/pdf-page-size/load`
+- [ ] `POST /tools/pdf-page-size/preview`
+- [ ] `POST /tools/pdf-page-size/submit`
+- [ ] `GET /tools/pdf-page-size/thumb/{upload_id}/{page_no}`
+
+**pdf-pageno（插入頁碼）**
+
+- [ ] `POST /tools/pdf-pageno/load`
+- [ ] `POST /tools/pdf-pageno/preview-thumb`
+- [ ] `POST /tools/pdf-pageno/submit`
+- [ ] `GET /tools/pdf-pageno/thumb/{upload_id}/{page}`
+
+**pdf-pages（頁面整理）**
+
+- [ ] `POST /tools/pdf-pages/load`
+- [ ] `POST /tools/pdf-pages/submit`
+- [ ] `POST /tools/pdf-pages/submit-from-upload`
+- [ ] `GET /tools/pdf-pages/thumb/{upload_id}/{page}`
+
+**pdf-rotate（頁面轉向）**
+
+- [ ] `POST /tools/pdf-rotate/finalize`
+- [ ] `POST /tools/pdf-rotate/finalize-png`
+- [ ] `POST /tools/pdf-rotate/load`
+- [ ] `POST /tools/pdf-rotate/submit`
+- [ ] `GET /tools/pdf-rotate/thumb/{upload_id}/{page}`
+
+**pdf-seam-stamp（騎縫章）**
+
+- [ ] `POST /tools/pdf-seam-stamp/assembled`
+- [ ] `POST /tools/pdf-seam-stamp/load`
+- [ ] `POST /tools/pdf-seam-stamp/preview`
+- [ ] `POST /tools/pdf-seam-stamp/stamp-preview`
+- [ ] `POST /tools/pdf-seam-stamp/stamp-upload`
+- [ ] `POST /tools/pdf-seam-stamp/submit`
+- [ ] `GET /tools/pdf-seam-stamp/thumb/{upload_id}/{page_no}`
+
+**pdf-split（頁面分拆）**
+
+- [ ] `POST /tools/pdf-split/submit`
+
+**pdf-stamp（用印與簽名）**
+
+- [ ] `GET /tools/pdf-stamp/pdf-preview/{upload_id}`
+- [ ] `POST /tools/pdf-stamp/preview`
+- [ ] `POST /tools/pdf-stamp/preview-all-pages`
+- [ ] `GET /tools/pdf-stamp/preview-bg/{upload_id}/{page_idx}`
+- [ ] `POST /tools/pdf-stamp/preview-stamped`
+- [ ] `GET /tools/pdf-stamp/preview/{name}`
+- [ ] `POST /tools/pdf-stamp/render-date`
+- [ ] `POST /tools/pdf-stamp/render-restrict-stamp`
+- [ ] `GET /tools/pdf-stamp/restrict-fonts`
+- [ ] `GET /tools/pdf-stamp/restrict-templates`
+- [ ] `POST /tools/pdf-stamp/submit`
+
+**pdf-to-image（辦公文件轉圖片）**
+
+- [ ] `POST /tools/pdf-to-image/convert`
+- [ ] `GET /tools/pdf-to-image/download/{upload_id}`
+- [ ] `GET /tools/pdf-to-image/preview/{filename}`
+
+**pdf-to-markdown（PDF 轉 Markdown）**
+
+- [ ] `POST /tools/pdf-to-markdown/convert`
+- [ ] `GET /tools/pdf-to-markdown/download/{upload_id}/{kind}`
+- [ ] `GET /tools/pdf-to-markdown/pdf/{upload_id}`
+
+**pdf-to-office（PDF 轉文書檔（Beta））**
+
+- [ ] `POST /tools/pdf-to-office/convert`
+- [ ] `GET /tools/pdf-to-office/preview/{job_id}/{kind}`
+- [ ] `GET /tools/pdf-to-office/preview/{job_id}/{kind}/{page}`
+- [ ] `GET /tools/pdf-to-office/report/{job_id}`
+- [ ] `POST /tools/pdf-to-office/submit`
+- [ ] `POST /tools/pdf-to-office/upload`
+
+**pdf-to-slides（PDF 轉簡報）**
+
+- [ ] `POST /tools/pdf-to-slides/convert`
+- [ ] `GET /tools/pdf-to-slides/preview/{job_id}/{kind}`
+- [ ] `GET /tools/pdf-to-slides/preview/{job_id}/{kind}/{page}`
+- [ ] `POST /tools/pdf-to-slides/submit`
+- [ ] `POST /tools/pdf-to-slides/upload`
+
+**pdf-watermark（浮水印）**
+
+- [ ] `POST /tools/pdf-watermark/batch/create`
+- [ ] `POST /tools/pdf-watermark/batch/{batch_id}/add`
+- [ ] `POST /tools/pdf-watermark/batch/{batch_id}/process`
+- [ ] `POST /tools/pdf-watermark/preview`
+- [ ] `POST /tools/pdf-watermark/preview-watermarked`
+- [ ] `GET /tools/pdf-watermark/preview/{name}`
+- [ ] `POST /tools/pdf-watermark/submit`
+- [ ] `GET /tools/pdf-watermark/text-png`
+
+**pdf-wordcount（字數統計）**
+
+- [ ] `POST /tools/pdf-wordcount/analyze`
+- [ ] `POST /tools/pdf-wordcount/analyze-multi`
+- [ ] `POST /tools/pdf-wordcount/analyze-text`
+- [ ] `POST /tools/pdf-wordcount/export-csv`
+
+**scan-merge（掃描拼合）**
+
+- [ ] `GET /tools/scan-merge/crop/{cid}/{variant}`
+- [ ] `POST /tools/scan-merge/delete/{cid}`
+- [ ] `POST /tools/scan-merge/generate`
+- [ ] `GET /tools/scan-merge/source/{sid}`
+- [ ] `POST /tools/scan-merge/upload`
+
+**submission-check（送件前檢核）**
+
+- [ ] `GET /tools/submission-check/admin-stats`
+- [ ] `DELETE /tools/submission-check/case/{case_id}`
+- [ ] `GET /tools/submission-check/case/{case_id}`
+- [ ] `GET /tools/submission-check/cases`
+- [ ] `GET /tools/submission-check/file/{case_id}/{file_id}`
+- [ ] `POST /tools/submission-check/override/{case_id}`
+- [ ] `DELETE /tools/submission-check/override/{case_id}/{finding_key}`
+- [ ] `GET /tools/submission-check/page-preview/{case_id}/{file_id}/{page}`
+- [ ] `GET /tools/submission-check/result/{case_id}/{version}`
+- [ ] `POST /tools/submission-check/run/{case_id}`
+- [ ] `GET /tools/submission-check/self-entities`
+- [ ] `POST /tools/submission-check/upload`
+
+**text-deident（文字去識別化）**
+
+- [ ] `POST /tools/text-deident/detect`
+- [ ] `POST /tools/text-deident/download`
+- [ ] `POST /tools/text-deident/extract-text`
+- [ ] `POST /tools/text-deident/process`
+
+**text-diff（文字差異比對）**
+
+- [ ] `POST /tools/text-diff/compare`
+
+**text-list（清單處理）**
+
+- [ ] `POST /tools/text-list/export/{fmt}`
+- [ ] `POST /tools/text-list/process`
+- [ ] `POST /tools/text-list/upload`
+
+**transit-proof（乘車證明整理）**
+
+- [ ] `DELETE /tools/transit-proof/buffer`
+- [ ] `GET /tools/transit-proof/buffer`
+- [ ] `POST /tools/transit-proof/buffer/delete-batch`
+- [ ] `POST /tools/transit-proof/entry/{entry_id}`
+- [ ] `DELETE /tools/transit-proof/entry/{entry_id}`
+- [ ] `POST /tools/transit-proof/export`
+- [ ] `POST /tools/transit-proof/settings`
+- [ ] `GET /tools/transit-proof/settings`
+- [ ] `POST /tools/transit-proof/upload`
+
+**translate-doc（逐句翻譯）**
+
+- [ ] `POST /tools/translate-doc/export`
+- [ ] `POST /tools/translate-doc/extract-text`
+- [ ] `GET /tools/translate-doc/job/{job_id}`
+- [ ] `POST /tools/translate-doc/start`
+- [ ] `POST /tools/translate-doc/translate-batch`
+- [ ] `POST /tools/translate-doc/translate-one`
+
+**vat-lookup（統編查詢）**
+
+- [ ] `POST /tools/vat-lookup/batch`
+- [ ] `GET /tools/vat-lookup/db-info`
+- [ ] `POST /tools/vat-lookup/lookup`
+- [ ] `POST /tools/vat-lookup/search`
+- [ ] `POST /tools/vat-lookup/stats`
+
 
 ## 4.5 壓力測試 🆕（v1.7.50+）
 
@@ -2111,6 +2876,60 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       `fitToPage`。
 - [ ] 原文與譯文兩邊要套**一樣**的列印設定，否則比對不公平。
 - [ ] 壞掉 / 非 zip 的檔案要原樣轉（預覽是附屬品，不可以害整個作業失敗）。
+
+### 6.56 v1.14.90 — 樣板的全域函式被迴圈變數遮蔽（每次發版必過）
+
+- [ ] 首頁、側欄、任何有 `{% for t in ... %}` 的樣板都要**開得起來**。
+      i18n 的樣板函式當初叫 `t()`，而全站有十幾個樣板用 `t` 當工具的迴圈變數
+      → 迴圈裡呼叫 `t('字')` 變成呼叫那個 dict，`'dict' object is not callable`
+      **整頁 500**。改名 `tr()` 之後才沒事。
+- [ ] 守門：`tests/test_i18n_catalog.py` 釘死「樣板全域只註冊 `tr`，
+      不可以再出現單字母的 `t`」—— 這種撞名不會有靜態警告，只會在
+      「剛好那一頁有迴圈」的時候炸。
+
+### 6.57 v1.14.91 — 語言只認明確選擇，不看瀏覽器（每次發版必過）
+
+- [ ] 帶 `Accept-Language: en-US` 但**沒有選過語言**的請求 → 介面仍是**繁體中文**，
+      九支中文專用工具**照常可用**。
+      為什麼不自動切：切成英文會把那九支工具反灰，**台灣同事只因為瀏覽器是
+      英文就少了九支工具**，而且他不會知道為什麼。
+- [ ] 選過語言之後（cookie `jtdt_locale`）才切換，重新整理仍然記得。
+- [ ] `POST /ui-locale` 的 `next` 只收站內路徑（`/` 開頭且不是 `//`），
+      擋開放轉址。
+
+### 6.58 v1.14.92 — 產生出來的 CSS 裡不可以混進 JS 運算式（每次發版必過）
+
+- [ ] `static/css/generated-inline.css` 必須是**合法 CSS**。
+      這份檔是把樣板裡的行內 `style="..."` 抽出來產生的（CSP 不准行內樣式），
+      而抽的時候把兩段**含 JS 字串運算**的樣式一起抽了進去
+      （`background:' + avatarBg + ';`）→ 那兩條規則整條無效，
+      **大頭照沒有底色**，而且**沒有任何錯誤訊息**（瀏覽器只是安靜跳過壞規則）。
+- [ ] 守門 `tests/test_generated_css_valid.py`：不可以出現 `' +` / `+ '`
+      這種字串串接的痕跡，也不可以有沒配對的引號。
+
+### 6.59 v1.14.93~94 — 英文版文件是「生成」的（每次發版必過）
+
+- [ ] `docs/index-en.html`、`docs/api-en.html`、`README_en.md` **不可以有殘留中文**
+      （守門 `tests/test_docs_english_pages.py` 逐行檢查，程式區塊除外）。
+- [ ] 改了中文版之後**要重跑生成器**（`build-i18n-page.py` / `build-i18n-md.py`），
+      否則英文版停在舊內容 —— 這個專案已經吃過兩次虧
+      （`github/TEST_PLAN.md` 手動複製漂了 182 行、介紹站的工具數與卡片對不上）。
+- [ ] 中英兩版最上面的語言切換要**互相指得到**（`README.md` ↔ `README_en.md`、
+      `CHANGELOG.md` ↔ `CHANGELOG_en.md`、兩個網頁的 langSwitch）。
+- [ ] README 的 pytest 徽章不可以低於 `tests/` 裡 `def test_` 的個數
+      （守門 `test_readme_pytest_badge_is_not_stale`）—— 它曾經停在 **470**，
+      而實際是 5,9xx。
+
+### 6.60 v1.14.94 — 字數統計收辦公文件（每次發版必過）
+
+- [ ] 九種辦公格式（doc/docx/odt、xls/xlsx/ods、ppt/pptx/odp）都能統計，
+      而且**頁數是轉成 PDF 後的真實頁數**，不是段落數硬湊的。
+- [ ] 毀損檔案或缺 Office 引擎 → **400**，不是 500；判準是「**有沒有拿到可用檔案**」
+      而不是 soffice 的回傳碼。
+- [ ] `OFFICE_TOOL_IDS` 要含 `pdf-wordcount`（漏列會低估記憶體、派送時開太多份），
+      README 與介紹站的**扳手標記**同步（`check_docs_tool_coverage.py` 會擋）。
+
+---
 
 ---
 

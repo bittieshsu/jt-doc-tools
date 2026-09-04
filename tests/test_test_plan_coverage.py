@@ -106,3 +106,135 @@ def test_the_plan_does_not_hardcode_a_tool_count_that_can_drift():
     claims = [int(n) for n in re.findall(r"現\s*(\d+)\s*個工具", text)]
     wrong = [n for n in claims if n != actual]
     assert not wrong, f"計畫寫的工具數 {wrong} 與實際 {actual} 不符"
+
+
+# ---------------------------------------------------------------------------
+# 非 API 端點（§4.7）
+#
+# 2026-09-04 稽核：`test_every_api_endpoint_appears_in_the_plan` 只看 `/api/`，
+# 但**畫面上按的每一顆按鈕打的都是非 API 端點**（analyze / preview / thumb /
+# download / export / 暫存區 CRUD），267 支一條驗收都沒有。歷來最痛的幾個
+# bug 就出在這一層（多頁合併預覽的水平越權、騎縫章預覽 90 秒、工作區縮圖
+# 永遠空白、附件「無附件副本」沒清 /AF）—— 而那些工具的 `/api/` 都是好的。
+#
+# 判準是**字面比對整條路徑**，不是猜「有沒有被測到」。猜涵蓋率那條路
+# v1.14.63 試過：寬一點是永遠綠的假測試，嚴一點會把驗得更嚴的工具誤報。
+# ---------------------------------------------------------------------------
+
+_SKIP_PREFIXES = ("/static", "/admin", "/openapi", "/docs", "/redoc", "/assets")
+
+
+def _non_api_paths() -> set[str]:
+    from app.tool_registry import discover_tools
+    tool_home = set()
+    for t in discover_tools():
+        tool_home |= {f"/tools/{t.metadata.id}", f"/tools/{t.metadata.id}/"}
+    out = set()
+    for r in _routes():
+        p = getattr(r, "path", "")
+        if not p or "/api/" in p or "{rest:path}" in p:
+            continue
+        if p.startswith(_SKIP_PREFIXES) or p in tool_home:
+            continue          # 工具首頁由 test_every_tool_appears_in_the_plan 守
+        out.add(p)
+    return out
+
+
+def test_every_non_api_endpoint_appears_in_the_plan():
+    text = _plan_text()
+    missing = sorted(p for p in _non_api_paths() if p not in text)
+    assert not missing, (
+        f"這 {len(missing)} 支非 API 端點在測試計畫裡沒有任何驗收項：\n  "
+        + "\n  ".join(missing)
+        + "\n請補進 TEST_PLAN.md §4.7（每一支都要寫得出「怎麼知道它真的做對了」）。")
+
+
+# ---------------------------------------------------------------------------
+# 測試檔本身（§1.99）
+#
+# 2026-09-04 稽核：`tests/` 有 212 支，測試計畫只提到 96 支。剩下那 116 支
+# **照跑**，但「這支在守什麼」在發版門檻上看不到 —— 要判斷某個功能有沒有
+# 被守住，只能自己去翻程式。一覽表由 `tools/build_test_plan_index.py`
+# 從每支檔案自己的開頭說明產生（說明跟程式同檔，不會漂）。
+# ---------------------------------------------------------------------------
+
+def test_every_test_file_appears_in_the_plan():
+    text = _plan_text()
+    missing = sorted(p.name for p in (ROOT / "tests").glob("test_*.py")
+                     if p.name not in text)
+    assert not missing, (
+        f"這 {len(missing)} 支測試檔在測試計畫裡沒出現：{missing[:8]}…\n"
+        "跑 `python tools/build_test_plan_index.py` 重建 §1.99 的一覽表。")
+
+
+def test_the_test_index_is_not_stale():
+    """一覽表過期 = 說明跟實際測試對不上，跟沒有一樣。"""
+    import subprocess
+    import sys
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "build_test_plan_index.py"), "--check"],
+        capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+# ---------------------------------------------------------------------------
+# CLI 指令與資料庫遷移（§3.5 / §1.98）
+#
+# 這兩塊在 2026-09-04 稽核前完全沒有驗收項：
+#   * `jtdt` 的 26 個子指令只有 8 個被提到過 —— 而**啟用 LDAP 設定寫錯時，
+#     web 上不去，救援全靠 CLI**。
+#   * 29 支 schema 遷移一支都沒單獨列 —— 而 v1.12.0 的 `_m8` 就是升級時
+#     把 `group_members` 與 `sessions` 清空的那一支。
+# ---------------------------------------------------------------------------
+
+def test_every_cli_subcommand_appears_in_the_plan():
+    src = (ROOT / "app" / "cli.py").read_text(encoding="utf-8")
+    cmds = sorted(set(re.findall(r'add_parser\(\s*"([a-z0-9-]+)"', src)))
+    # 巢狀子指令（`jtdt auth set-local`、`jtdt audit-user create`）在計畫裡是寫成
+    # 完整那一句，所以判準是「**出現在某一行提到 jtdt 的句子裡**」，
+    # 而不是死板地找 `jtdt <cmd>`。
+    lines = [ln for ln in _plan_text().splitlines() if "jtdt" in ln]
+    missing = [c for c in cmds
+               if not any(re.search(r"(?<![\w-])" + re.escape(c) + r"(?![\w-])", ln)
+                          for ln in lines)]
+    assert not missing, (
+        f"這些 jtdt 子指令在測試計畫裡沒有驗收項：{missing}\n請補進 TEST_PLAN.md §3.5。")
+
+
+def test_every_schema_migration_appears_in_the_plan():
+    text = _plan_text()
+    missing = []
+    for p in (ROOT / "app" / "core").glob("*.py"):
+        for name in re.findall(r"^def (_m\d+_\w+)\(", p.read_text(encoding="utf-8"), re.M):
+            if name not in text:
+                missing.append(f"{p.name}:{name}")
+    assert not missing, (
+        f"這些 schema 遷移在測試計畫裡沒列到：{missing}\n"
+        "請補進 TEST_PLAN.md §1.98（每一支都要有「舊資料升上來」的測試）。")
+
+
+def test_commands_in_the_plan_also_exist_in_the_published_tree():
+    """公開版也要跑得起來。
+
+    上面那條只驗**開發樹**。2026-09-04 稽核發現：公開版的 `TEST_PLAN.md`
+    照樣叫人跑 `python tools/check_docs_tool_coverage.py`，但 `tools/`
+    **從來沒有同步進 `github/`** —— 照抄指令直接 file not found，那幾條
+    檢查在公開版等於沒跑。這正是計畫自己在 §5 警告過的那個坑
+    （必跑指令引用不存在的檔案），只是換成從外面看。
+
+    判準：計畫裡指令行引用到的相對路徑，`github/` 底下也要有。
+    （`github/` 是 repo 的根，不是子目錄 —— 路徑寫法完全一樣。）
+    """
+    gh = ROOT / "github"
+    if not gh.exists():          # 只有開發樹有 github/
+        pytest.skip("沒有 github/ 發佈樹")
+    bad = []
+    for doc in (PLAN, PLAN_SEC):
+        for line in _CMD_LINE.findall(doc.read_text(encoding="utf-8")):
+            for ref in _FILE_REF.findall(line):
+                if (ROOT / ref).exists() and not (gh / ref).exists():
+                    bad.append(ref)
+    assert not bad, (
+        "這些檔案在開發樹有、公開樹沒有（公開版照抄指令會 file not found）：\n  "
+        + "\n  ".join(sorted(set(bad)))
+        + "\n請把它加進 sync-to-github.sh 的 ITEMS。")

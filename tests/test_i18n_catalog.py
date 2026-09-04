@@ -52,10 +52,13 @@ def test_catalog_entries_are_all_traditional_chinese_keys():
     用符號 key（`nav.jobs`）的話，`test_taiwan_terminology.py` 那類
     「掃描使用者看得到的文字」的守門會變成永遠綠燈的假測試。
     """
-    cjk = re.compile(r"[㐀-鿿]")
+    # 中文標點也算 —— `<b>A</b>，<b>B</b>` 中間那個逗號本身就是要翻的片段
+    cjk = re.compile(r"[㐀-鿿、。，：；！？（）「」《》…—]")
     for k, v in catalog("en").items():
         assert cjk.search(k), f"key 不是中文原文：{k!r}"
-        assert not cjk.search(v), f"英文譯文裡不該有中文：{k!r} -> {v!r}"
+        # 譯文只擋**漢字**：`…` 這類標點在英文裡也用得到（"Search tools…"），
+        # 用同一個寬鬆的字元集去擋會誤報。
+        assert not re.search(r"[㐀-鿿]", v), f"英文譯文裡不該有中文：{k!r} -> {v!r}"
 
 
 def test_domain_data_modules_never_use_the_translation_helper():
