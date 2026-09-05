@@ -55,14 +55,14 @@
       <label for="dtSrc">{{ tr('原文語言') }}</label>
       <select id="dtSrc" class="field">
         <option value="auto" selected>{{ tr('自動偵測') }}</option>
-        {% for code, name in langs.items() %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+        {% for code, name in langs.items() %}<option value="{{ code }}">{{ tr(name) }}</option>{% endfor %}
       </select>
     </div>
     <div class="dt-field">
       <label for="dtTgt">{{ tr('目標語言') }}</label>
       <select id="dtTgt" class="field">
         {% for code, name in langs.items() %}
-        <option value="{{ code }}"{% if code == 'zh-TW' %} selected{% endif %}>{{ name }}</option>
+        <option value="{{ code }}"{% if code == 'zh-TW' %} selected{% endif %}>{{ tr(name) }}</option>
         {% endfor %}
       </select>
     </div>
@@ -78,7 +78,7 @@
   <div class="dt-chips" id="dtChips">
     {% for d in ['法律合約', '醫療報告', '軟體技術文件', '財務報表', '學術論文',
                  '新聞稿', '商業合約', '網路 / IT 維運文件'] %}
-    <button type="button" class="dt-chip" data-domain="{{ d }}">{{ d }}</button>
+    <button type="button" class="dt-chip" data-domain="{{ d }}">{{ tr(d) }}</button>
     {% endfor %}
   </div>
   <input type="text" class="field dt-domain-input" id="dtDomain" placeholder="{{ tr('自填其他領域…（選填，會與上方點選的領域一起送進 prompt）') }}">
@@ -91,9 +91,9 @@
     <code>gemma4:12b</code> {{ tr('是') }} <b>dense</b>{{ tr('，12B 全部都要算，') }}<b>{{ tr('反而比 26B 慢') }}</b>{{ tr('，
     只有記憶體不夠（約 7 GB）時才選它。') }}<code>gemma4:31b</code> {{ tr('dense 最強也最慢；') }}
     <code>gemma4:e4b</code> / <code>e2b</code> {{ tr('是邊緣裝置用的，品質差距明顯。') }}
-    {% if is_admin(request) %}可以在 <a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a>
+    {% if is_admin(request) %}{{ tr('可以在') }} <a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a>
     {{ tr('單獨指定這支工具要用的模型，不影響其他工具。') }}{% else %}
-    要換模型請聯絡管理員（可以只針對這支工具指定）。{% endif %}
+    {{ tr('要換模型請聯絡管理員（可以只針對這支工具指定）。') }}{% endif %}
   </p>
 
   <p class="muted dt-note" data-s="s_dt_pdf">

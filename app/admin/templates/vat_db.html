@@ -444,7 +444,7 @@ async function refreshInfo() {
     const j = await r.json();
     $('recordCount').textContent = (j.meta.record_count || 0).toLocaleString('en-US');
     const lu = j.meta.last_updated;
-    $('lastUpdated').textContent = lu ? _fmtTimestamp(lu) : '尚未匯入';
+    $('lastUpdated').textContent = lu ? _fmtTimestamp(lu) : tr('尚未匯入');
     $('lastUpdated').classList.toggle('empty', !lu);
     renderBreakdown(j.meta.last_result);
     renderCategoryStats(j.categories);

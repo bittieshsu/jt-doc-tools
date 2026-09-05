@@ -275,12 +275,12 @@
   function renderRows(deps) {
     const tbody = document.getElementById('dep-tbody');
     if (!deps || !deps.length) {
-      tbody.innerHTML = '<tr><td colspan="5" data-s="sae7f222f">無資料</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" data-s="sae7f222f">' + tr('無資料') + '</td></tr>';
       return;
     }
     let html = '';
     for (const d of deps) {
-      const { main, paren } = splitLabelParen(d.label);
+      const { main, paren } = splitLabelParen(tr(d.label));
       const rowCls = d.ok ? 'row-ok' : (d.soft ? 'row-warn' : 'row-bad');
       const pill = d.ok
         ? '<span class="dep-pill dep-ok">✓</span>'
@@ -293,14 +293,22 @@
         ? `<span class="dep-name-paren">${escapeHtml(paren)}</span>` : '';
       const binaryLine = d.binary
         ? `<div class="dep-binary${paren ? ' has-paren-gap' : ''}">${escapeHtml(d.binary)}</div>` : '';
+      // 帶數字的句子（「完整（22 個）」）沒辦法整句當翻譯的鍵，伺服器另外
+      // 附了 `*_i18n`（含 {0} 的鍵）與 `*_args`；沒有附的就照原本的字串顯示。
+      const fill = (key, args) => (args || []).reduce(
+        (acc, v, i) => acc.replace('{' + i + '}', v), tr(key));
+      const versionText = d.version_i18n ? fill(d.version_i18n, d.version_args)
+                                         : tr(d.version || '');
+      const extraText = d.extra_i18n ? fill(d.extra_i18n, d.extra_args)
+                                     : tr(d.extra || '');
       const versionPart = d.version
-        ? `<span class="dep-version">${escapeHtml(d.version)}</span>` : '';
+        ? `<span class="dep-version">${escapeHtml(versionText)}</span>` : '';
       const extraPart = d.extra
-        ? `<div class="muted" data-s="s168f2b58">${escapeHtml(d.extra)}</div>` : '';
+        ? `<div class="muted" data-s="s168f2b58">${escapeHtml(extraText)}</div>` : '';
       let cmdPart = '';
       if (!d.ok && d.install_cmd) {
         cmdPart = `<div class="dep-cmd-block">
-          <div class="dep-cmd-label">手動安裝（${escapeHtml(d.platform || '')}）</div>
+          <div class="dep-cmd-label">${tr('手動安裝')}（${escapeHtml(d.platform || '')}）</div>
           <code class="dep-cmd">${escapeHtml(d.install_cmd)}</code>
         </div>`;
       }
@@ -313,9 +321,9 @@
           </div>
           ${binaryLine}
         </td>
-        <td><span class="dep-cat">${escapeHtml(d.category || '')}</span></td>
+        <td><span class="dep-cat">${escapeHtml(tr(d.category || ''))}</span></td>
         <td>${versionPart}${extraPart}${cmdPart}</td>
-        <td class="dep-impact">${escapeHtml(d.impact || '')}</td>
+        <td class="dep-impact">${escapeHtml(tr(d.impact || ''))}</td>
       </tr>`;
     }
     tbody.innerHTML = html;
@@ -431,7 +439,7 @@
         let hintHtml = '';
         if (j.is_outdated) {
           verBox.classList.add('is-outdated');
-          pillHtml = '<span class="ver-status-pill ver-out">有更新可用</span>';
+          pillHtml = '<span class="ver-status-pill ver-out">' + tr('有更新可用') + '</span>';
           // **平台標籤要在指令前面、一行一個平台。**
           // 原本寫成「…<code>sudo jtdt update</code>（Linux/macOS）或
           // <code>jtdt update</code>（Windows）」擠成一段，視窗一窄就把
@@ -442,11 +450,11 @@
             '<div class="upd-cmd"><b>Linux / macOS</b>'
             + '<code>sudo jtdt update</code></div>'
             + '<div class="upd-cmd"><b>Windows</b>'
-            + '<span>以系統管理員身分開啟 PowerShell，再執行</span>'
+            + '<span>' + tr('以系統管理員身分開啟 PowerShell，再執行') + '</span>'
             + '<code>jtdt update</code></div>';
         } else if (j.current === j.latest) {
           verBox.classList.add('is-current');
-          pillHtml = '<span class="ver-status-pill ver-cur">已是最新</span>';
+          pillHtml = '<span class="ver-status-pill ver-cur">' + tr('已是最新') + '</span>';
           hintHtml = '本機與 GitHub main 同版號';
         } else {
           verBox.classList.add('is-newer');

@@ -22,6 +22,10 @@ import re
 
 import pytest
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CORPUS = ROOT / "temp_pdfs"
 
@@ -34,8 +38,12 @@ CORPUS = ROOT / "temp_pdfs"
 #:
 #: 這份檔案原本的說明還寫著「TEST_PLAN.md 不公開」，那個假設本身就是錯的：
 #: 它在專案根目錄與 `github/` 底下各有一份，後者是公開的。
+#: 路徑一律**相對於公開樹的根**。原本是相對於 `root.parent`：開發樹剛好對
+#: （`github/xxx` 接在 repo 根底下），但 clone 下來的樹 root 就是 repo 根，
+#: 於是每一條都變成 `<repo>/<repo 目錄名>/xxx` → **整份守門逐條 skip**，
+#: 1,426 個案例一個都沒有真的檢查（外部評估 2026-09-05 才看得出來）。
 def _public_files():
-    root = pathlib.Path(__file__).resolve().parent.parent / "github"
+    root = _public_root(pathlib.Path(__file__).resolve().parent.parent)
     if not root.exists():
         return []
     out = []
@@ -46,7 +54,7 @@ def _public_files():
             continue
         if "__pycache__" in p.parts or ".git" in p.parts:
             continue
-        out.append(str(p.relative_to(root.parent)))
+        out.append(str(p.relative_to(root)))
     return sorted(out)
 
 
@@ -102,7 +110,7 @@ def _sample_tokens() -> set[str]:
 @pytest.mark.parametrize("rel", PUBLIC)
 def test_public_docs_do_not_leak_sample_names(rel):
     """公開檔案不可以出現樣本檔名 / 客戶名。"""
-    p = ROOT / rel
+    p = _public_root(ROOT) / rel
     if not p.exists():
         pytest.skip(f"{rel} 不存在")
     text = p.read_text(encoding="utf-8", errors="ignore")
@@ -117,7 +125,7 @@ def test_public_docs_do_not_leak_sample_names(rel):
 def test_corpus_is_gitignored():
     """樣本本身更不可以上 git —— 兩層 .gitignore 都要擋。"""
     for rel in (".gitignore", "github/.gitignore"):
-        p = ROOT / rel
+        p = _public_root(ROOT) / rel
         if not p.exists():
             continue
         assert "temp_pdfs/" in p.read_text(encoding="utf-8"), (
@@ -182,9 +190,24 @@ def test_public_files_do_not_leak_customer_company_names(rel, corpus_company_nam
     """
     if not corpus_company_names:
         pytest.skip("沒有語料可供比對")
-    p = ROOT / rel
+    p = _public_root(ROOT) / rel
     text = p.read_text(encoding="utf-8", errors="ignore")
     hits = sorted(n for n in corpus_company_names if n in text)
     assert not hits, (
         f"{rel} 出現了樣本裡的客戶公司名（{len(hits)} 個，內容不列出）—— "
         "改用「某供應商」這種去識別化的說法。")
+
+
+def test_this_gate_actually_inspects_files():
+    """守門本身不可以整份 skip 掉。
+
+    這條在 2026-09-05 的外部評估才被看出來：路徑寫成相對於 `root.parent`，
+    開發樹剛好對，**clone 下來的樹每一條都 skip**，1,426 個案例一個都沒真的
+    檢查過。「全部 skip」在 pytest 的輸出裡跟「全部通過」長得很像。
+    """
+    root = _public_root(ROOT)
+    assert PUBLIC, "公開檔案清單是空的 —— 守門等於沒有"
+    missing = [rel for rel in PUBLIC if not (root / rel).exists()]
+    assert not missing, (
+        f"清單裡有 {len(missing)} 條指向不存在的檔案（會被 skip 掉）："
+        f"{missing[:5]}")

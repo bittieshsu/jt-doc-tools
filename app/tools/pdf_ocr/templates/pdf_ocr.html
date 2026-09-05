@@ -313,7 +313,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
   <div class="po-fields">
     <div class="po-field" data-s="s493b1c85" id="poLangSection">
       <label>{{ tr('OCR 語言') }}
-        <span class="muted">{{ tr('（點選要辨識的語言；多選會增加處理時間。') }}{% if current_engine == 'easyocr' %}<b>{{ tr('目前引擎：EasyOCR') }}</b>{{ tr('，首次使用某語言會自動下載 ~150MB 模型') }}{% else %}<b>{{ tr('目前引擎：Tesseract') }}</b>{% endif %}，引擎切換在 <a href="/admin/ocr-langs">{{ tr('OCR 引擎管理') }}</a>）</span>
+        <span class="muted">{{ tr('（點選要辨識的語言；多選會增加處理時間。') }}{% if current_engine == 'easyocr' %}<b>{{ tr('目前引擎：EasyOCR') }}</b>{{ tr('，首次使用某語言會自動下載 ~150MB 模型') }}{% else %}<b>{{ tr('目前引擎：Tesseract') }}</b>{% endif %}{{ tr('，引擎切換在') }} <a href="/admin/ocr-langs">{{ tr('OCR 引擎管理') }}</a>{{ tr('）') }}</span>
         <span id="poLangDisabledNote" class="muted" data-s="s295d6c8e">{{ tr('（已勾選 LLM 直接辨識，OCR 引擎不會用到，語言設定僅在 LLM 失敗自動退回 EasyOCR 時生效）') }}</span>
       </label>
       {% if installed_langs %}
@@ -322,14 +322,14 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
         <div class="po-langs-group">
           <div class="po-langs-grouphdr">
             <span class="po-langs-group-label">{{ tr('中日韓 CJK') }}</span>
-            <span class="po-count">{{ tr('已選') }} <b id="poLangsCount">0</b> {{ tr('種，') }}{% if current_engine == 'easyocr' %}EasyOCR 內建 80+ 種、本頁列出常用 <b>{{ installed_langs|length }}</b> {{ tr('種') }}{% else %}共 <b>{{ installed_langs|length }}</b> {{ tr('種已安裝') }}{% endif %}</span>
+            <span class="po-count">{{ tr('已選') }} <b id="poLangsCount">0</b> {{ tr('種，') }}{% if current_engine == 'easyocr' %}{{ tr('EasyOCR 內建 80+ 種、本頁列出常用') }} <b>{{ installed_langs|length }}</b> {{ tr('種') }}{% else %}{{ tr('共') }} <b>{{ installed_langs|length }}</b> {{ tr('種已安裝') }}{% endif %}</span>
           </div>
           <div class="po-langs-grid">
             {% for lang in lang_catalog if lang.group == 'cjk' %}
             <div class="po-chip {% if lang.installed and lang.code in default_langs %}is-active{% endif %} {% if not lang.installed %}po-chip-disabled{% endif %}"
                  data-lang="{{ lang.code }}" data-installed="{{ '1' if lang.installed else '0' }}"
                  data-variant="{{ lang.active_variant or '' }}"
-                 title="{{ lang.hint }}{% if not lang.installed %} — 未安裝（請至 admin/settings 安裝 tesseract 訓練檔）{% endif %}">
+                 title="{{ tr(lang.hint) }}{% if not lang.installed %} — 未安裝（請至 admin/settings 安裝 tesseract 訓練檔）{% endif %}">
               <span class="po-chip-check"></span>
               <span class="po-chip-name">{{ tr(lang.name) }}</span>
               <span class="po-chip-code">{{ lang.display_code or lang.code }}</span>
@@ -348,7 +348,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
             <div class="po-chip {% if lang.installed and lang.code in default_langs %}is-active{% endif %} {% if not lang.installed %}po-chip-disabled{% endif %}"
                  data-lang="{{ lang.code }}" data-installed="{{ '1' if lang.installed else '0' }}"
                  data-variant="{{ lang.active_variant or '' }}"
-                 title="{{ lang.hint }}{% if not lang.installed %} — 未安裝{% endif %}">
+                 title="{{ tr(lang.hint) }}{% if not lang.installed %} — 未安裝{% endif %}">
               <span class="po-chip-check"></span>
               <span class="po-chip-name">{{ tr(lang.name) }}</span>
               <span class="po-chip-code">{{ lang.display_code or lang.code }}</span>
@@ -367,7 +367,7 @@ details.po-langs-group > summary .more-hint { color:#94a3b8; font-weight:normal;
             <div class="po-chip {% if lang.installed and lang.code in default_langs %}is-active{% endif %} {% if not lang.installed %}po-chip-disabled{% endif %}"
                  data-lang="{{ lang.code }}" data-installed="{{ '1' if lang.installed else '0' }}"
                  data-variant="{{ lang.active_variant or '' }}"
-                 title="{{ lang.hint }}{% if not lang.installed %} — 未安裝{% endif %}">
+                 title="{{ tr(lang.hint) }}{% if not lang.installed %} — 未安裝{% endif %}">
               <span class="po-chip-check"></span>
               <span class="po-chip-name">{{ tr(lang.name) }}</span>
               <span class="po-chip-code">{{ lang.display_code or lang.code }}</span>
@@ -651,9 +651,9 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
     return ''
       + '<div class="po-viewer-wrap" id="poViewerWrap">'
       + '  <div class="po-viewer-head">'
-      + '    <span class="title"><span data-s="se1b879c5">' + PO_ICON_FILE + '</span>預覽結果（直接拖選文字試試看）</span>'
+      + '    <span class="title"><span data-s="se1b879c5">' + PO_ICON_FILE + '</span>' + tr('預覽結果（直接拖選文字試試看）') + '</span>'
       + '    <span class="actions">'
-      + '      <a href="' + viewerSrc + '" target="_blank" rel="noopener">在新分頁開啟 ↗</a>'
+      + '      <a href="' + viewerSrc + '" target="_blank" rel="noopener">' + tr('在新分頁開啟 ↗') + '</a>'
       + '    </span>'
       + '  </div>'
       + '  <iframe class="po-viewer-frame" id="poViewerFrame" src="' + viewerSrc + '"'
@@ -741,11 +741,11 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
       // chip 內 textContent，理論上 server-rendered 信任，但用 textContent 設值
       // 是 defense in depth + 過 codeQL static analysis。
       summaryEl.replaceChildren();
-      summaryEl.appendChild(document.createTextNode('將使用 '));
+      summaryEl.appendChild(document.createTextNode(tr('將使用 ')));
       const cnt = document.createElement('b');
       cnt.textContent = String(items.length);
       summaryEl.appendChild(cnt);
-      summaryEl.appendChild(document.createTextNode(' 種語言：'));
+      summaryEl.appendChild(document.createTextNode(tr(' 種語言：')));
       items.forEach((it, idx) => {
         if (idx > 0) summaryEl.appendChild(document.createTextNode('、'));
         summaryEl.appendChild(document.createTextNode(it.name + ' '));
@@ -804,7 +804,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
       let hint = '';
       if (v < 150)       hint = '極快，但小字易誤判';
       else if (v < 250)  hint = '較快';
-      else if (v <= 350) hint = '平衡';
+      else if (v <= 350) hint = tr('平衡');
       else if (v < 500)  hint = '精準（較慢）';
       else               hint = '最精準（最慢）';
       dpiEst.textContent = hint;
@@ -1071,25 +1071,25 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
           }
           resultBox.innerHTML =
             '<div class="po-result">'
-            + '<b>完成！</b><br>'
+            + '<b>' + tr('完成！') + '</b><br>'
             + '處理 ' + (stats.pages_ocrd || 0) + ' / ' + (stats.pages_total || 0) + ' 頁'
             + '（略過 ' + (stats.pages_skipped || 0) + ' 頁已有文字層）<br>'
             + '插入文字 ' + (stats.words_inserted || 0) + ' 字' + modeLabel
             + '<br><br>'
-            + '<a class="btn btn-primary" href="' + url + '" download>下載文字辨識後 PDF</a>'
-            + (window.attachWorkspaceSave ? '<button id="ocrWsSave" class="btn" type="button" data-s="sc3f83707"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="sb4a65f0b"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>存至工作區</button>' : '')
+            + '<a class="btn btn-primary" href="' + url + '" download>' + tr('下載文字辨識後 PDF') + '</a>'
+            + (window.attachWorkspaceSave ? '<button id="ocrWsSave" class="btn" type="button" data-s="sc3f83707"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="sb4a65f0b"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>' + tr('存至工作區') + '</button>' : '')
             + (stats.llm_direct_used
-               ? '<div data-s="sf2fd7057">⚠ LLM 直接辨識無逐字座標，拖選反白位置不對應圖上文字位置（要精準對位請改用「LLM 對位辨識」）；要拿完整內容請展開下方「識別結果全文」一次複製。中文易腦補，務必對照原檔複核。</div>'
+               ? '<div data-s="sf2fd7057">' + tr('⚠ LLM 直接辨識無逐字座標，拖選反白位置不對應圖上文字位置（要精準對位請改用「LLM 對位辨識」）；要拿完整內容請展開下方「識別結果全文」一次複製。中文易腦補，務必對照原檔複核。') + '</div>'
                : '')
             + (stats.llm_full_used
-               ? '<div data-s="sf2fd7057">⚠ LLM 完整辨識的座標由 vision 模型預測，typical 誤差 ±10-30px（grounded 模型本質限制，非引擎 bug）。如需 pixel-accurate 拖選位置，請改勾「LLM 對位辨識」(EasyOCR 拿像素級座標 + LLM 拿文字)。</div>'
+               ? '<div data-s="sf2fd7057">' + tr('⚠ LLM 完整辨識的座標由 vision 模型預測，typical 誤差 ±10-30px（grounded 模型本質限制，非引擎 bug）。如需 pixel-accurate 拖選位置，請改勾「LLM 對位辨識」(EasyOCR 拿像素級座標 + LLM 拿文字)。') + '</div>'
                : '')
             + '</div>'
             // 識別結果全文 — 預設摺疊，方便檢視 / 複製
             + (fullText
                ? '<details class="po-fulltext"><summary>' + PO_ICON_WRAP(PO_ICON_FILE) + '識別結果全文（' + fullCharCount + ' 字' + (stages.length > 1 ? '，' + stages.length + ' 頁' : '') + '，點開檢視 / 複製）</summary>'
                  + '<div class="po-fulltext-body">'
-                 + '<div data-s="sd51702bf"><button type="button" class="btn btn-small" id="poCopyFullText">📋 複製全文</button></div>'
+                 + '<div data-s="sd51702bf"><button type="button" class="btn btn-small" id="poCopyFullText">' + tr('📋 複製全文') + '</button></div>'
                  + '<pre id="poFullTextPre" class="po-fulltext-pre">' + fullText.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") + '</pre>'
                  + '</div></details>'
                : '')
@@ -1099,8 +1099,8 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
             + '<div class="po-stages-body">'
             + '<div data-s="s1382a0b4">'
             + '下載後用 Adobe Acrobat / Apple 預覽程式開啟，三個方法擇一：<br>'
-            + '①「<b>檔案 → 簡介</b>」（Preview）或「<b>檔案 → 內容</b>」（Acrobat）— Producer 欄位顯示「<code>' + producer + '</code>」+ tesseract 版本「<code>' + tessV + '</code>」<br>'
-            + '② Cmd+F 搜尋「<code>' + marker + '</code>」— 每頁右下角有此透明標記，能搜到代表是本工具產生的文字層<br>'
+            + '①「<b>' + tr('檔案 → 簡介') + '</b>' + tr('」（Preview）或「') + '<b>' + tr('檔案 → 內容') + '</b>' + tr('」（Acrobat）— Producer 欄位顯示「') + '<code>' + producer + '</code>' + tr('」+ tesseract 版本「') + '<code>' + tessV + '</code>」<br>'
+            + '② Cmd+F 搜尋「<code>' + marker + '</code>' + tr('」— 每頁右下角有此透明標記，能搜到代表是本工具產生的文字層') + '<br>'
             + '③ 比對檔名：本工具輸出檔名以「<code>_searchable.pdf</code>」結尾'
             + '</div>'
             + '</div>'

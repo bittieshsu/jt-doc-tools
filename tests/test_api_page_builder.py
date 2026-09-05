@@ -19,8 +19,12 @@ import pathlib
 
 import pytest
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-BUILDER = ROOT / "github" / "build-api-page.py"
+BUILDER = _public_root(ROOT) / "build-api-page.py"
 
 
 @pytest.fixture(scope="module")
@@ -63,7 +67,7 @@ def test_plain_text_is_escaped(builder):
 
 def test_generated_page_has_no_nul_bytes():
     """NUL 會讓 grep 把整頁當二進位 —— 連查端點在不在都查不出來。"""
-    data = (ROOT / "github" / "docs" / "api.html").read_bytes()
+    data = (_public_root(ROOT) / "docs" / "api.html").read_bytes()
     assert data.count(b"\x00") == 0, (
         "api.html 有 NUL 位元組，代表行內標記還原失敗；"
         "重跑 python3 github/build-api-page.py")
@@ -71,7 +75,7 @@ def test_generated_page_has_no_nul_bytes():
 
 def test_generated_page_is_in_sync_with_api_md(tmp_path, builder, monkeypatch):
     """改了 API.md 沒重跑生成器 → 網頁版 stale，只有點進去的人看得到。"""
-    current = (ROOT / "github" / "docs" / "api.html").read_text(encoding="utf-8")
+    current = (_public_root(ROOT) / "docs" / "api.html").read_text(encoding="utf-8")
     out = tmp_path / "api.html"
     monkeypatch.setattr(builder, "OUT", out)
     builder.main()

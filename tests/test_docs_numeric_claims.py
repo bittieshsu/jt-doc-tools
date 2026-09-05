@@ -20,9 +20,13 @@ import re
 
 import pytest
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-README = ROOT / "github" / "README.md"
-INDEX = ROOT / "github" / "docs" / "index.html"
+README = _public_root(ROOT) / "README.md"
+INDEX = _public_root(ROOT) / "docs" / "index.html"
 
 
 def _actual_tool_count() -> int:
@@ -108,7 +112,7 @@ def test_llm_card_count_matches_the_tool_count():
     import re as _re
     from app.core.llm_settings import llm_settings as _L
 
-    html = (ROOT / "github" / "docs" / "index.html").read_text(encoding="utf-8")
+    html = (_public_root(ROOT) / "docs" / "index.html").read_text(encoding="utf-8")
     cards = _re.findall(r'<article class="llm-card[^"]*">(.*?)</article>', html, _re.S)
     titles = [_re.search(r"<h3>(.*?)</h3>", c, _re.S).group(1).strip()
               for c in cards if _re.search(r"<h3>", c)]

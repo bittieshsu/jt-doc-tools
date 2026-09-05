@@ -19,7 +19,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.15.4"
+VERSION = "1.15.5"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -894,12 +894,14 @@ async def set_ui_locale(request: Request):
     這回事，而語言偏好在那種環境同樣要能記住。之後要再疊「跟著帳號走」都可以。
     """
     from .core import ui_locale as _loc
+    from .core.url_safety import safe_next
     form = await request.form()
     lang = _loc.normalise(str(form.get("locale") or "")) or _loc.DEFAULT_LOCALE
-    back = str(form.get("next") or "/")
-    # 只回自己站內 —— 從表單來的網址不可以直接拿去重導（open redirect）
-    if not back.startswith("/") or back.startswith("//"):
-        back = "/"
+    # 只回自己站內 —— 從表單來的網址不可以直接拿去重導（open redirect）。
+    # **自己寫一份判斷是錯的**：原本只擋 `//`，但瀏覽器會把 `/\evil.com` 的反斜線
+    # 正規化成斜線 → 變成協定相對網址，照樣被導到站外。登入的 `next` 早就有一份
+    # 擋得住的實作（含百分比解碼、反斜線、CRLF），共用它就好。
+    back = safe_next(str(form.get("next") or "/"))
     resp = RedirectResponse(back, status_code=303)
     resp.set_cookie(_loc.COOKIE_NAME, lang, max_age=_loc.COOKIE_MAX_AGE,
                     httponly=True, samesite="lax",

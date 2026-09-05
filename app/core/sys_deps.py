@@ -271,13 +271,18 @@ def _probe_office() -> dict:
     # 看起來像我們產出的檔案壞掉（開發時在這上面卡了很久）→ 在相依檢查明確列出。
     has_impress = _office_has_impress(binary)
     extra = f"類型：{flavor}"
+    extra_i18n, extra_args = "類型：{0}", [flavor]
     if not has_impress:
-        extra += "；**缺 Impress 模組**（PDF 轉簡報不可用，請安裝 " + (
+        extra += "；「缺 Impress 模組」（PDF 轉簡報不可用，請安裝 " + (
             "oxoffice-impress" if flavor == "OxOffice" else "libreoffice-impress") + "）"
     return {
         "installed": True,
         "version": version,
         "extra": extra,
+        # 有 Impress 時 extra 只有「類型：X」這一段，可以整段翻；缺 Impress 時
+        # 後面接了一長串安裝說明，那一段另外有自己的鍵，這裡就不給 i18n 版。
+        "extra_i18n": extra_i18n if has_impress else "",
+        "extra_args": extra_args,
         "binary": binary,
         "ok": True,
         "flavor": flavor,
@@ -479,7 +484,11 @@ def _probe_oxoffice_x11_libs() -> dict:
         }
     return {
         "installed": True,
+        # 帶數字的句子沒辦法直接當翻譯的鍵。留一份組好的中文給既有 API，
+        # 另外附上**鍵 + 參數**，前端才有辦法 `tr(鍵).replace("{0}", 參數)`。
         "version": f"完整（{len(_OXOFFICE_X11_LIBS)} 個）",
+        "version_i18n": "完整（{0} 個）",
+        "version_args": [str(len(_OXOFFICE_X11_LIBS))],
         "extra": "",
         "ok": True,
         "binary": "",
@@ -637,7 +646,9 @@ def _probe_cjk_fonts() -> dict:
     found = [c for c in candidates if Path(c).exists()]
     return {
         "installed": bool(found),
-        "version": f"{len(found)} 個 CJK 字型檔" if found else "",
+        "version": (f"{len(found)} 個 CJK 字型檔" if found else ""),
+        "version_i18n": "{0} 個 CJK 字型檔" if found else "",
+        "version_args": [str(len(found))],
         "extra": "" if found else "建議安裝 Noto CJK 或系統內建 CJK 字型",
         "binary": found[0] if found else "",
         "ok": bool(found),
@@ -724,10 +735,10 @@ _DEPS = [
         "key": "dnspython",
         "label": "dnspython (MX 查詢)",
         "category": "網路",
-        "impact": "通知信的**「直接投遞」寄送方式**要查收件網域的 MX 紀錄 —— "
+        "impact": "通知信的「直接投遞」寄送方式要查收件網域的 MX 紀錄 —— "
                   "標準函式庫沒有 MX 查詢。缺了它，通知設定裡選「直接投遞」"
                   "會送不出去；另外兩種寄送方式（外部 SMTP 帳號、內部轉送主機 "
-                  "relay）**不受影響**。",
+                  "relay）不受影響。",
         "impact_en": "Looks up MX records for the notification e-mail 'direct "
                      "delivery' mode. Without it, direct delivery fails; the "
                      "SMTP-account and internal-relay modes are unaffected.",
@@ -743,7 +754,7 @@ _DEPS = [
         "key": "pillow-heif",
         "label": "pillow-heif (HEIC / HEIF)",
         "category": "影像",
-        "impact": "iPhone 拍的 HEIC / HEIF 照片解碼。**Pillow 本身不認這個格式** —— "
+        "impact": "iPhone 拍的 HEIC / HEIF 照片解碼。「Pillow 本身不認這個格式」—— "
                   "缺了它，「圖片轉 PDF」放行 .heic 但解碼時才失敗（GitHub issue #49）。"
                   "其他圖片格式不受影響。",
         "impact_en": "Decodes HEIC/HEIF (iPhone photos). Pillow cannot read them on its "
@@ -995,6 +1006,13 @@ def collect_sys_deps(lang: str = "zh") -> list[dict]:
             "ok": ok,
             "version": probe.get("version", ""),
             "extra": probe.get("extra", ""),
+            # 帶數字的句子（「完整（22 個）」）不能整句當翻譯的鍵 —— probe 另外
+            # 給了含 `{0}` 的鍵與參數，這裡要一起帶出去，前端才翻得到。
+            # **漏帶會完全無聲**：畫面照常顯示，只是永遠是中文。
+            "version_i18n": probe.get("version_i18n", ""),
+            "version_args": probe.get("version_args", []),
+            "extra_i18n": probe.get("extra_i18n", ""),
+            "extra_args": probe.get("extra_args", []),
             "binary": probe.get("binary", ""),
             "install_cmd": dep["install_cmd"].get(plat, ""),
             "platform": plat,

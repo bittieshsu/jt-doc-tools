@@ -2,19 +2,19 @@
 {% from "components/icons.html" import icon %}
 {% block title %}歷史記錄 · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>📝 表單自動填寫 · 歷史記錄</h1>
-<p class="muted">所有上傳過的 PDF 與填寫結果永久保留於 <code>data/fill_history/</code>。</p>
+<h1>{{ tr('📝 表單自動填寫 · 歷史記錄') }}</h1>
+<p class="muted">{{ tr('所有上傳過的 PDF 與填寫結果永久保留於') }} <code>data/fill_history/</code>。</p>
 
 <div class="panel">
-  <h2>歷史清單（{{ history|length }} 筆）</h2>
+  <h2>{{ tr('歷史清單（') }}{{ history|length }} {{ tr('筆）') }}</h2>
   {% if history %}
   <div class="history-toolbar">
     <label class="sel-all">
-      <input type="checkbox" id="selAll" /> 全選
+      <input type="checkbox" id="selAll" /> {{ tr('全選') }}
     </label>
-    <span class="muted sel-count" id="selCount">未選取</span>
+    <span class="muted sel-count" id="selCount">{{ tr('未選取') }}</span>
     <span data-s="sda5cd676"></span>
-    <button class="btn btn-small btn-danger" id="bulkDeleteBtn" type="button" disabled>{{ icon('trash') }}批次刪除</button>
+    <button class="btn btn-small btn-danger" id="bulkDeleteBtn" type="button" disabled>{{ icon('trash') }}{{ tr('批次刪除') }}</button>
   </div>
   <div class="history-list">
     {% for h in history %}
@@ -28,7 +28,7 @@
           <img src="/tools/pdf-fill/history/{{ h.id }}/file/preview" alt="preview" />
         </a>
         {% else %}
-        <div class="no-thumb muted">無預覽</div>
+        <div class="no-thumb muted">{{ tr('無預覽') }}</div>
         {% endif %}
       </div>
       <div class="info">
@@ -40,21 +40,21 @@
         </div>
         <div class="actions">
           {% if h.has_filled %}
-          <a class="btn btn-small" href="/tools/pdf-fill/history/{{ h.id }}/file/filled" target="_blank">{{ icon('eye') }}檢視填好</a>
-          <a class="btn btn-small" href="/tools/pdf-fill/history/{{ h.id }}/file/filled" download>{{ icon('download') }}下載填好</a>
+          <a class="btn btn-small" href="/tools/pdf-fill/history/{{ h.id }}/file/filled" target="_blank">{{ icon('eye') }}{{ tr('檢視填好') }}</a>
+          <a class="btn btn-small" href="/tools/pdf-fill/history/{{ h.id }}/file/filled" download>{{ icon('download') }}{{ tr('下載填好') }}</a>
           {% endif %}
           {% if h.has_original %}
-          <a class="btn btn-small" href="/tools/pdf-fill/history/{{ h.id }}/file/original" download>{{ icon('download') }}原檔</a>
-          <button class="btn btn-small btn-primary" data-act="refill" type="button">{{ icon('refresh') }}重新填寫</button>
+          <a class="btn btn-small" href="/tools/pdf-fill/history/{{ h.id }}/file/original" download>{{ icon('download') }}{{ tr('原檔') }}</a>
+          <button class="btn btn-small btn-primary" data-act="refill" type="button">{{ icon('refresh') }}{{ tr('重新填寫') }}</button>
           {% endif %}
-          <button class="btn btn-small btn-danger" data-act="del" type="button">{{ icon('trash') }}刪除</button>
+          <button class="btn btn-small btn-danger" data-act="del" type="button">{{ icon('trash') }}{{ tr('刪除') }}</button>
         </div>
       </div>
     </div>
     {% endfor %}
   </div>
   {% else %}
-  <p class="muted">還沒有任何歷史記錄。到 <a href="/tools/pdf-fill/">PDF 表單自動填寫</a> 上傳 PDF 後就會自動保留。</p>
+  <p class="muted">{{ tr('還沒有任何歷史記錄。到') }} <a href="/tools/pdf-fill/">{{ tr('PDF 表單自動填寫') }}</a> {{ tr('上傳 PDF 後就會自動保留。') }}</p>
   {% endif %}
 </div>
 

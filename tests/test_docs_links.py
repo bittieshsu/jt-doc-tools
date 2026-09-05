@@ -26,8 +26,12 @@ from pathlib import Path
 
 import pytest
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = Path(__file__).resolve().parent.parent
-PUB = ROOT / "github"          # 這個資料夾就是發佈到 GitHub 的 repo 根
+PUB = _public_root(ROOT)          # 這個資料夾就是發佈到 GitHub 的 repo 根
 DOCS = [PUB / "docs" / "index.html", PUB / "docs" / "api.html"]
 
 _REPO = "https://github.com/jasoncheng7115/jt-doc-tools"
@@ -131,8 +135,8 @@ _ANCHORS_KEPT_WITHOUT_NAV = ["workspace", "jobs", "enterprise", "disclaimer"]
 
 def test_sections_dropped_from_nav_keep_their_anchors():
     import pathlib
-    html = (pathlib.Path(__file__).resolve().parent.parent
-            / "github" / "docs" / "index.html").read_text(encoding="utf-8")
+    html = (_public_root(pathlib.Path(__file__).resolve().parent.parent)
+            / "docs" / "index.html").read_text(encoding="utf-8")
     missing = [a for a in _ANCHORS_KEPT_WITHOUT_NAV
                if f'id="{a}"' not in html]
     assert not missing, (
@@ -162,10 +166,10 @@ USER_FACING_DOCS = {
 def test_user_facing_docs_are_reachable_from_the_landing_page():
     from pathlib import Path as _P
     root = _P(__file__).resolve().parent.parent
-    site = (root / "github" / "docs" / "index.html").read_text(encoding="utf-8")
+    site = (_public_root(root) / "docs" / "index.html").read_text(encoding="utf-8")
     missing = []
     for doc, needles in USER_FACING_DOCS.items():
-        if not (root / "github" / doc).exists():
+        if not (_public_root(root) / doc).exists():
             missing.append(f"{doc}（檔案不存在，清單本身過期了）")
             continue
         for n in needles:
@@ -174,3 +178,23 @@ def test_user_facing_docs_are_reachable_from_the_landing_page():
     assert not missing, (
         "介紹站上沒有這些文件的入口：\n  " + "\n  ".join(missing) +
         "\n對客戶而言，沒有入口就等於沒有這份文件。")
+
+
+def test_compose_builds_from_source_not_a_nonexistent_image():
+    """`docker-compose.yml` 不可以引用**不存在的官方映像**。
+
+    本專案刻意不提供預先建置的容器映像（AGPL 本體 + PyTorch / CUDA 這類
+    專有元件，重新散布有授權風險）。原本 compose 寫 `image: jt-doc-tools:1.14.53`
+    —— 那個 tag 從來沒有發佈過，使用者 `docker compose up` 會直接 pull 失敗，
+    而且會誤以為我們有官方映像。預設一律 `build:` 自己建。
+    """
+    pub = _public_root(ROOT)
+    f = pub / "docker-compose.yml"
+    if not f.is_file():
+        pytest.skip("沒有 docker-compose.yml")
+    text = f.read_text(encoding="utf-8")
+    assert re.search(r"^\s*build:", text, re.MULTILINE), (
+        "compose 沒有 build: —— 使用者沒有映像可以拉")
+    bad = re.findall(r"^\s*image:\s*(jt-doc-tools:(?!local)\S+)", text, re.MULTILINE)
+    assert not bad, (f"compose 引用了不存在的映像 {bad} —— 本專案不發佈預建映像，"
+                     "請改成 image: jt-doc-tools:local 並保留 build:")

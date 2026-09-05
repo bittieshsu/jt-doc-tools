@@ -17,6 +17,10 @@ import re
 
 import pytest
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PLAN = ROOT / "TEST_PLAN.md"
 PLAN_SEC = ROOT / "TEST_PLAN_SECURITY.md"
@@ -225,7 +229,7 @@ def test_commands_in_the_plan_also_exist_in_the_published_tree():
     判準：計畫裡指令行引用到的相對路徑，`github/` 底下也要有。
     （`github/` 是 repo 的根，不是子目錄 —— 路徑寫法完全一樣。）
     """
-    gh = ROOT / "github"
+    gh = _public_root(ROOT)
     if not gh.exists():          # 只有開發樹有 github/
         pytest.skip("沒有 github/ 發佈樹")
     bad = []
@@ -238,3 +242,55 @@ def test_commands_in_the_plan_also_exist_in_the_published_tree():
         "這些檔案在開發樹有、公開樹沒有（公開版照抄指令會 file not found）：\n  "
         + "\n  ".join(sorted(set(bad)))
         + "\n請把它加進 sync-to-github.sh 的 ITEMS。")
+
+
+def test_every_tool_has_its_own_manual_acceptance_block():
+    """每一支工具在 §2 都要有**自己的**驗收區塊，而且不只一兩條。
+
+    `test_every_tool_appears_in_the_plan` 只驗「工具 id 在計畫裡出現過」——
+    以前有兩段「補列」把十幾支工具擠成一行一條，通得過那條守門，但實際上
+    等於**沒有驗收**（一支工具一條，涵蓋不到它自己的主要功能）。
+
+    判準：`#### 名稱 (tool-id)` 這樣的標題要在，底下至少三條 `- [ ]`。
+    三條是下限不是目標 —— 少於三條幾乎一定漏掉主要路徑。
+    """
+    from app.tool_registry import discover_tools
+    text = _plan_text()
+    start = text.index("## 2. 手動驗收清單")
+    end = text.index("## 3. 跨平台檢查")
+    blocks: dict[str, int] = {}
+    for b in re.split(r"\n#### ", text[start:end])[1:]:
+        head = b.split("\n", 1)[0]
+        m = re.search(r"\(([a-z0-9-]+)\)", head)
+        if m:
+            blocks[m.group(1)] = b.count("\n- [ ]")
+    no_block = sorted(t.metadata.id for t in discover_tools()
+                      if t.metadata.id not in blocks)
+    thin = sorted((tid, n) for tid, n in blocks.items() if n < 3)
+    assert not no_block, f"這些工具在 §2 沒有自己的驗收區塊：{no_block}"
+    assert not thin, f"這些工具的驗收項少於三條：{thin}"
+
+
+def test_every_html_page_appears_in_the_plan():
+    """**非管理區**的頁面也要有驗收 —— 首頁 / 我的作業 / 工作區 / 登入 / 2FA。
+
+    原本只有管理頁那條守門，於是「每一頁都要測」在管理區以外是空的。
+    判準同樣是從路由表實算，不寫死清單。
+    """
+    text = _plan_text()
+    pages = sorted({
+        r.path for r in _routes()
+        if getattr(r, "path", "")
+        and not r.path.startswith(("/admin", "/api", "/tools", "/static",
+                                   "/assets", "/branding", "/i18n"))
+        and "{" not in r.path
+        and "GET" in (getattr(r, "methods", None) or set())
+        and r.path not in ("/healthz", "/favicon.ico", "/robots.txt",
+                           "/openapi.json", "/docs", "/redoc",
+                           "/docs/oauth2-redirect")
+    })
+    missing = [p for p in pages
+               if p not in text and p.strip("/").rsplit("/", 1)[-1] not in text]
+    assert not missing, (
+        "這些頁面在測試計畫裡沒有任何驗收項：\n  " + "\n  ".join(missing)
+        + "\n請補進 TEST_PLAN.md §2.7（介面）。")

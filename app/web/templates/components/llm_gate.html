@@ -79,7 +79,7 @@
                class="llm-gate-aug-cb"
                {% if not llm_enabled %}disabled{% endif %}>
         <span class="llm-gate-aug-text">
-          <b>{{ feature_label }}</b>
+          <b>{{ tr(feature_label) }}</b>
           {%- if llm_enabled -%}
           <span class="llm-gate-aug-tag llm-gate-aug-tag-on">{{ tr('已啟用 · ') }}{{ llm_model or tr('(預設)') }}</span>
           {%- else -%}
@@ -88,16 +88,16 @@
           {%- if feature_desc -%}
           {# feature_desc is hard-coded in template callers (no user input),
              so | safe is fine — lets tools use <b>, <code>, <a> inline. #}
-          <span class="llm-gate-aug-desc">{{ feature_desc | safe }}</span>
+          <span class="llm-gate-aug-desc">{{ tr(feature_desc) | safe }}</span>
           {%- endif -%}
         </span>
       </label>
       {%- if not llm_enabled -%}
       <div class="llm-gate-aug-hint">
         {%- if _is_admin -%}
-        本功能需要 LLM 服務。請先到「<a href="/admin/llm-settings">LLM 設定</a>」啟用。
+        {{ tr('本功能需要 LLM 服務。請先到「') }}<a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a>{{ tr('」啟用。') }}
         {%- else -%}
-        本功能需要 LLM 服務。請聯絡管理員啟用後再使用。
+        {{ tr('本功能需要 LLM 服務。請聯絡管理員啟用後再使用。') }}
         {%- endif -%}
       </div>
       {%- endif -%}

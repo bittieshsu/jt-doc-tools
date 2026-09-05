@@ -78,10 +78,10 @@
     m.hidden = true;
     m.innerHTML =
       '<div class="ws-picker-dialog" role="dialog" aria-modal="true">' +
-      '  <div class="ws-picker-head"><b>從工作區載入</b>' +
+      '  <div class="ws-picker-head"><b>' + tr('從工作區載入') + '</b>' +
       '    <button type="button" class="ws-picker-close" aria-label="關閉">' +
       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12"/><path d="M6 18L18 6"/></svg></button></div>' +
-      '  <div class="ws-picker-body"><div class="ws-picker-status muted">載入中…</div>' +
+      '  <div class="ws-picker-body"><div class="ws-picker-status muted">' + tr('載入中…') + '</div>' +
       '    <div class="ws-picker-grid"></div></div>' +
       '</div>';
     document.body.appendChild(m);

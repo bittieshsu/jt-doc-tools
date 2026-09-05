@@ -121,8 +121,8 @@ def html_strings(path: Path) -> tuple[list[str], list[str]]:
     """回傳 (標記文字, 行內 JS 字串)。註解先去掉，否則會把反例也算進去。"""
     s = path.read_text(encoding="utf-8", errors="ignore")
     s = re.sub(r"<!--.*?-->", "", s, flags=re.S)
-    scripts = re.findall(r"<script\b[^>]*>(.*?)</script>", s, flags=re.S | re.I)
-    body = re.sub(r"<script\b.*?</script>", " ", s, flags=re.S | re.I)
+    scripts = re.findall(r"<script\b[^>]*>(.*?)</script\s*>", s, flags=re.S | re.I)
+    body = re.sub(r"<script\b.*?</script\s*>", " ", s, flags=re.S | re.I)
     body = re.sub(r"<style\b.*?</style>", " ", body, flags=re.S | re.I)
     text = re.findall(r">([^<>]*[㐀-鿿][^<>]*)<", body)
     attrs = re.findall(

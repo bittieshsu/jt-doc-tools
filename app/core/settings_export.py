@@ -385,7 +385,14 @@ def list_categories() -> list[dict]:
                     size += fs
                     count += fc
             detail = f"{count} 個檔案・{size/1024:.1f} KB" if present else "（無）"
+        # `detail` 是**組好的中文字串**，沒辦法當翻譯的鍵（數字每次都不一樣）。
+        # 另外附上組成的零件，樣板才有辦法用 `tr()` 各自翻再拼起來。
+        parts = ({"kind": "rbac", "roles": s["roles"], "perms": s["role_perms"],
+                  "ou": s["ou_rules"]} if c["kind"] == "rbac"
+                 else {"kind": "files" if present else "none",
+                       "count": count, "kb": round(size / 1024, 1)})
         out.append({
+            "detail_parts": parts,
             "id": c["id"], "label": c["label"], "desc": c["desc"],
             "kind": c["kind"], "default": c.get("default", True),
             "sensitive": c.get("sensitive", False),

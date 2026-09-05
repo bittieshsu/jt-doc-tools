@@ -58,8 +58,10 @@
     <div class="pn-card-head">
       <span class="pn-card-title">{{ tr('顯示格式') }}</span>
     </div>
-    <div class="pn-chips" role="group" aria-label="{{ tr('格式快選') }}">
+    <div class="pn-chips" data-i18n="skip" role="group" aria-label="{{ tr('格式快選') }}">
       <button type="button" class="pn-chip" data-fmt="{n}">{n}</button>
+      {# data-i18n="skip"：這一排的文字**就是頁碼格式本身**（會原樣印進 PDF），
+   是資料不是介面文字，翻掉等於讓使用者選到別的輸出。 #}
       <button type="button" class="pn-chip pn-chip-active" data-fmt="{n} / {N}">{n} / {N}</button>
       <button type="button" class="pn-chip" data-fmt="- {n} -">- {n} -</button>
       <button type="button" class="pn-chip" data-fmt="第 {n} 頁">第 {n} 頁</button>
@@ -347,11 +349,11 @@ const fu = new FileUpload(document.getElementById('upPN'), async (_first, fs) =>
   }
   document.getElementById('thumbs-panel').hidden = false;
   document.getElementById('thumb-grid').innerHTML =
-    '<p class="muted" data-s="s2a9ed20f">載入縮圖中…</p>';
+    '<p class="muted" data-s="s2a9ed20f">' + tr('載入縮圖中…') + '</p>';
   const fd = new FormData(); fd.append('file', files[0]);
   const r = await fu.upload('/tools/pdf-pageno/load', fd, {processingLabel: '載入縮圖中…'});
   if (!r.ok) {
-    document.getElementById('thumb-grid').innerHTML = '<p class="muted">載入失敗</p>';
+    document.getElementById('thumb-grid').innerHTML = '<p class="muted">' + tr('載入失敗') + '</p>';
     return;
   }
   const j = await r.json();

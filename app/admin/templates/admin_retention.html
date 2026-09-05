@@ -45,7 +45,7 @@
         <td>
           <input class="field" type="number" data-key="{{ setting_key }}"
                  value="{{ settings[setting_key] }}" min="-1" max="36500"
-                 data-s="s8db8d854"> {{ "天" if unit == "days" else "小時" }}
+                 data-s="s8db8d854"> {{ tr('天') if unit == 'days' else tr('小時') }}
         </td>
       </tr>
       {% endfor %}

@@ -40,7 +40,7 @@
       對簡報 / 表單 / 掃描檔不準。') }}<b>{{ tr('結果是草稿，送出前請自己看過。') }}</b></p>
     <div id="bmPasteBox" hidden>
       <textarea class="field bm-paste" id="bmPasteText" rows="7"
-        placeholder="一行一筆，行尾的數字是頁碼；開頭的縮排決定層級（每 2 個空白一層）：&#10;第一章 緒論      3&#10;  1.1 研究背景   5&#10;  1.2 研究方法   9&#10;第二章 文獻探討  14"></textarea>
+        placeholder="{{ tr('一行一筆，行尾的數字是頁碼；開頭的縮排決定層級（每 2 個空白一層）：') }}&#10;{{ tr('第一章 緒論      3') }}&#10;{{ tr('  1.1 研究背景   5') }}&#10;{{ tr('  1.2 研究方法   9') }}&#10;{{ tr('第二章 文獻探討  14') }}"></textarea>
       <button class="btn btn-primary btn-small" type="button" id="bmPasteApply">{{ tr('套用') }}</button>
     </div>
   </fieldset>
@@ -70,7 +70,7 @@
       </label>
       <label class="af-field">
         <span class="af-label">{{ tr('目錄標題') }}</span>
-        <span class="af-ctl"><input class="field" type="text" id="bmTocTitle" value="目錄" maxlength="40"></span>
+        <span class="af-ctl"><input class="field" type="text" id="bmTocTitle" value="{{ tr('目錄') }}" maxlength="40"></span>
       </label>
       <label class="af-field">
         <span class="af-label">{{ tr('插在第幾頁') }}</span>

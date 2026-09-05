@@ -8,41 +8,41 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('archive', size=22) }} AES ZIP 加密</h1>
-<p class="muted">把多個檔案打包成密碼保護的 ZIP。採 WinZip AES-256 加密（不是過時的 ZipCrypto），跟 7-Zip / Keka / macOS Archive Utility 10.13+ / WinRAR 相容。</p>
+<h1>{{ icon('archive', size=22) }} {{ tr('AES ZIP 加密') }}</h1>
+<p class="muted">{{ tr('把多個檔案打包成密碼保護的 ZIP。採 WinZip AES-256 加密（不是過時的 ZipCrypto），跟 7-Zip / Keka / macOS Archive Utility 10.13+ / WinRAR 相容。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 選擇要打包的檔案</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 選擇要打包的檔案') }}</h2>
   {% with upload_id='azUp', accept='*', multiple=True, hint='任意檔案格式，多檔會打包成同一個 ZIP。' %}{% include "components/file_upload.html" %}{% endwith %}
   <ul class="az-file-list" id="fileList" hidden></ul>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 密碼與設定</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 密碼與設定') }}</h2>
   <div class="form-row">
-    <label>密碼</label>
+    <label>{{ tr('密碼') }}</label>
     <input id="pw" type="password" class="field" placeholder="{{ tr('解壓時要求的密碼') }}" />
   </div>
   <div class="form-row">
-    <label>再次輸入</label>
+    <label>{{ tr('再次輸入') }}</label>
     <input id="pw2" type="password" class="field" placeholder="{{ tr('避免密碼打錯') }}" />
   </div>
   <div class="form-row">
-    <label>ZIP 檔名</label>
+    <label>{{ tr('ZIP 檔名') }}</label>
     <input id="zname" type="text" class="field" placeholder="{{ tr('留空則使用時間戳') }}" data-s="sf758c5d0" />
   </div>
   <div class="form-row">
-    <label>壓縮方式</label>
+    <label>{{ tr('壓縮方式') }}</label>
     <select id="comp" class="field" data-s="sac5a4114">
-      <option value="deflate" selected>Deflate（一般，速度快）</option>
-      <option value="lzma">LZMA（壓縮率較高，較慢）</option>
-      <option value="store">不壓縮（適合已壓縮過的檔案）</option>
+      <option value="deflate" selected>{{ tr('Deflate（一般，速度快）') }}</option>
+      <option value="lzma">{{ tr('LZMA（壓縮率較高，較慢）') }}</option>
+      <option value="store">{{ tr('不壓縮（適合已壓縮過的檔案）') }}</option>
     </select>
   </div>
 </div>
 
 <div data-s="s002535c2">
-  <button class="btn btn-primary" id="btnZip">{{ icon('lock', size=14) }} 加密並下載</button>
+  <button class="btn btn-primary" id="btnZip">{{ icon('lock', size=14) }} {{ tr('加密並下載') }}</button>
   <span id="status" class="muted" data-s="s414be724"></span>
 </div>
 

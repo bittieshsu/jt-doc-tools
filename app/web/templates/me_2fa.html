@@ -3,7 +3,7 @@
 {% block title %}兩步驟驗證 · {{ app_name }}{% endblock %}
 {% block content %}
 <h1>{{ icon('lock', size=22) }} {{ tr('兩步驟驗證 (TOTP)') }}</h1>
-<p class="muted">使用 Google Authenticator / Microsoft Authenticator / Authy / 1Password 等 TOTP App 在登入時提供 6 位數驗證碼，提升帳號安全。</p>
+<p class="muted">{{ tr('使用 Google Authenticator / Microsoft Authenticator / Authy / 1Password 等 TOTP App 在登入時提供 6 位數驗證碼，提升帳號安全。') }}</p>
 
 <div class="panel">
   <h2 data-s="s53896af7">{{ tr('目前狀態') }}</h2>
@@ -89,7 +89,7 @@ const vb = $('btnVerify');
 if (vb) vb.addEventListener('click', async () => {
   const code = $('verifyCode').value.trim();
   if (!/^\d{6}$/.test(code)) {
-    $('verifyMsg').innerHTML = '<span data-s="sbc8099b4">請輸入 6 位數字</span>';
+    $('verifyMsg').innerHTML = '<span data-s="sbc8099b4">' + tr('請輸入 6 位數字') + '</span>';
     return;
   }
   vb.disabled = true;

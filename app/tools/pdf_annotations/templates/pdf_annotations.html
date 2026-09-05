@@ -265,7 +265,7 @@ function renderLlm(llm) {
         '</div>';
     }
   } else {
-    html += '<div class="an-llm-err">LLM 未回傳任何分組</div>';
+    html += '<div class="an-llm-err">' + tr('LLM 未回傳任何分組') + '</div>';
   }
   card.innerHTML = html;
   // Insert before the "註解明細" panel

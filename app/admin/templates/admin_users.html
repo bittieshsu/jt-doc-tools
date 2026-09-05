@@ -474,12 +474,15 @@ const ALL_GROUPS = {{ all_groups|tojson }};
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
   function fmtRel(secsAgo) {
-    if (secsAgo < 60)        return `${Math.max(1, Math.floor(secsAgo))} 秒前`;
-    if (secsAgo < 3600)      return `${Math.floor(secsAgo / 60)} 分鐘前`;
-    if (secsAgo < 86400)     return `${Math.floor(secsAgo / 3600)} 小時前`;
-    if (secsAgo < 30*86400)  return `${Math.floor(secsAgo / 86400)} 天前`;
-    if (secsAgo < 365*86400) return `${Math.floor(secsAgo / (30*86400))} 個月前`;
-    return `${Math.floor(secsAgo / (365*86400))} 年前`;
+    // 帶數字的句子要用 `{0}` 當鍵再代回去 —— 直接把數字接在中文後面的話
+    // 那條字串永遠查不到翻譯（而且完全無聲）。
+    const rel = (key, n) => tr(key).replace('{0}', String(n));
+    if (secsAgo < 60)        return rel('{0} 秒前', Math.max(1, Math.floor(secsAgo)));
+    if (secsAgo < 3600)      return rel('{0} 分鐘前', Math.floor(secsAgo / 60));
+    if (secsAgo < 86400)     return rel('{0} 小時前', Math.floor(secsAgo / 3600));
+    if (secsAgo < 30*86400)  return rel('{0} 天前', Math.floor(secsAgo / 86400));
+    if (secsAgo < 365*86400) return rel('{0} 個月前', Math.floor(secsAgo / (30*86400)));
+    return rel('{0} 年前', Math.floor(secsAgo / (365*86400)));
   }
   const now = Date.now() / 1000;
   document.querySelectorAll('.last-login').forEach(td => {

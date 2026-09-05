@@ -1,14 +1,22 @@
 # 最小可用的 compose 設定。詳細說明見 OFFLINE.md。
 #
+# ⚠ 本專案**刻意不提供預先建置的容器映像**。
+#   本體是 AGPL，而 OCR 那條路會帶進 PyTorch 與 NVIDIA CUDA runtime 這類
+#   專有元件 —— 把它們打包在一起重新散布會有授權風險。Dockerfile 只是
+#   「可重現的建置配方」，映像請自己建。
+#
 # 用法：
+#   docker compose build          # 從原始碼建置（第一次一定要）
 #   docker compose up -d          # 啟動
 #   docker compose logs -f        # 看記錄
 #   docker compose down           # 停止（資料在 volume 裡，不會消失）
 services:
   jt-doc-tools:
-    image: jt-doc-tools:1.14.53
-    # 沒有現成映像檔時改成自己建：
-    # build: .
+    # **預設就從原始碼建**。原本寫 `image: jt-doc-tools:1.14.53` 會讓人以為
+    # 有官方映像可以拉（其實沒有），而且版本早就落後了。
+    build:
+      context: .
+    image: jt-doc-tools:local
     container_name: jt-doc-tools
     restart: unless-stopped
     ports:

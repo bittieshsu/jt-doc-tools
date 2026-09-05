@@ -135,7 +135,7 @@ details[open] > .po-ext-summary .po-ext-arrow { transform:rotate(90deg); }
         <li><b>Proxmox VE</b>{{ tr('：VM →「硬體」→「處理器」→「類型」改成') }} <code>host</code>{{ tr('（透傳實體 CPU），或至少改') }} <code>x86-64-v3</code>。</li>
         <li><b>VMware（ESXi / Workstation）</b>{{ tr('：確認實體 CPU 有 AVX2；若叢集啟用 EVC，把 EVC 基準調到 Haswell 以上，或關閉 EVC。') }}</li>
         <li><b>Hyper-V</b>{{ tr('：關閉該 VM 的「處理器相容性模式」，改用主機 CPU。') }}</li>
-        <li><b>VirtualBox</b>：<code>VBoxManage modifyvm "&lt;VM 名稱&gt;" --cpu-profile host</code>{{ tr('，並確認未限制指令集。') }}</li>
+        <li><b>VirtualBox</b>：<code>VBoxManage modifyvm "&lt;{{ tr('VM 名稱') }}&gt;" --cpu-profile host</code>{{ tr('，並確認未限制指令集。') }}</li>
         <li><b>{{ tr('實體機 / 雲端') }}</b>{{ tr('：使用含 AVX2 的 CPU（Intel Haswell 2013 年後 / AMD Excavator 2015 年後）或對應雲端機型。') }}</li>
       </ul>
       <div data-s="s80c94f87">{{ tr('若暫時無法調整 CPU，可在下方「OCR 引擎」') }}<b>{{ tr('手動') }}</b>{{ tr('切換為 Tesseract（不需 AVX2，CJK 辨識較弱）—— 系統') }}<b>{{ tr('不會') }}</b>{{ tr('自動切換。') }}</div>
@@ -505,13 +505,13 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
 
 {% for g in groups %}
 <div class="panel ol-group">
-  <h2 data-s="sb9b6a2a1">{{ g.title }} <span class="muted" data-s="s29406bf4">({{ g['items']|length }} {{ tr('種)') }}</span></h2>
+  <h2 data-s="sb9b6a2a1">{{ tr(g.title) }} <span class="muted" data-s="s29406bf4">({{ g['items']|length }} {{ tr('種)') }}</span></h2>
   <div class="ol-grid">
     {% for item in g['items'] %}
     <div class="ol-card {% if item.installed %}is-installed{% endif %}" data-code="{{ item.code }}">
-      {% if item.installed %}<span class="ol-installed-badge">{% if item.active_variant == 'best' %}best 啟用{% elif item.active_variant == 'fast' %}fast 啟用{% else %}已安裝{% endif %}</span>{% endif %}
+      {% if item.installed %}<span class="ol-installed-badge">{% if item.active_variant == 'best' %}{{ tr('best 啟用') }}{% elif item.active_variant == 'fast' %}{{ tr('fast 啟用') }}{% else %}{{ tr('已安裝') }}{% endif %}</span>{% endif %}
       <div class="ol-card-head">
-        <span class="ol-card-name">{{ item.name }}</span>
+        <span class="ol-card-name">{{ tr(item.name) }}</span>
         <span class="ol-card-code">{{ item.code }}</span>
       </div>
       <div class="ol-card-meta" data-s="s167dc439">
@@ -648,7 +648,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
         '<div class="ol-cmd" id="olCmd' + i + '">' + escapeHtml(m.command) + '</div>' +
         '<button type="button" class="ol-cmd-copy" data-cmd-idx="' + i + '">' +
         '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/></svg>' +
-        '<span>複製</span>' +
+        '<span>' + tr('複製') + '</span>' +
         '</button>' +
         '</div>';
       methodsBox.appendChild(row);
@@ -661,7 +661,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
         try {
           await navigator.clipboard.writeText(cmd);
           const orig = btn.innerHTML;
-          btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg><span>已複製</span>';
+          btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg><span>' + tr('已複製') + '</span>';
           btn.classList.add('copied');
           setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 1500);
         } catch (e) {

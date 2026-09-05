@@ -17,8 +17,12 @@ import re
 
 import pytest
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-INDEX = ROOT / "github" / "docs" / "index.html"
+INDEX = _public_root(ROOT) / "docs" / "index.html"
 
 #: 介紹站的欄位標題對到程式裡的分類。名稱不同的在這裡對照。
 #: 介紹站可以合併呈現（例如把兩個分類放同一欄），但**不可以放到不相干的欄**。

@@ -33,7 +33,7 @@
     {% for p in paths %}
     <li class="path-item" data-id="{{ p.id }}" data-builtin="{{ 'true' if p.builtin else 'false' }}">
       <span class="drag-handle" title="{{ tr('拖曳調整順序') }}">⠿</span>
-      <span class="badge {% if p.builtin %}badge-builtin{% else %}badge-custom{% endif %}">{% if p.builtin %}內建{% else %}自訂{% endif %}</span>
+      <span class="badge {% if p.builtin %}badge-builtin{% else %}badge-custom{% endif %}">{% if p.builtin %}{{ tr('內建') }}{% else %}{{ tr('自訂') }}{% endif %}</span>
       {% if p.builtin %}
         <code class="p-text">{{ p.path }}</code>
       {% else %}
@@ -48,7 +48,7 @@
     {% endfor %}
   </ul>
   <div data-s="sd478ce6a">
-    <input type="text" id="new-path" placeholder="新增自訂路徑（例：D:\soffice\program\soffice.exe）" data-s="sb9903bd5" />
+    <input type="text" id="new-path" placeholder="{{ tr('新增自訂路徑（例：D:\soffice\program\soffice.exe）') }}" data-s="sb9903bd5" />
     <button class="btn" type="button" id="btn-add">{{ icon('plus') }}{{ tr('新增') }}</button>
   </div>
   <div data-s="s7b733630">
@@ -125,10 +125,10 @@ document.getElementById('btn-add').addEventListener('click', () => {
   li.className = 'path-item';
   li.dataset.builtin = 'false';
   li.setAttribute('draggable', 'true');
-  li.innerHTML = `<span class="drag-handle" title="拖曳調整順序">⠿</span>
-    <span class="badge badge-custom">自訂</span>
+  li.innerHTML = `<span class="drag-handle" title="${tr('拖曳調整順序')}">⠿</span>
+    <span class="badge badge-custom">${tr('自訂')}</span>
     <input type="text" class="p-input" value="${v.replace(/[<>"']/g,'')}" />
-    <span class="status">（儲存後檢查）</span>
+    <span class="status">${tr('（儲存後檢查）')}</span>
     <button class="btn btn-small btn-danger" type="button" data-act="remove">🗑</button>`;
   list.insertBefore(li, list.firstChild);
   document.getElementById('new-path').value = '';

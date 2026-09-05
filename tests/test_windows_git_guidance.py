@@ -26,8 +26,12 @@ from __future__ import annotations
 import pathlib
 import re
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-PS1 = ROOT / "github" / "install.ps1"
+PS1 = _public_root(ROOT) / "install.ps1"
 CLI = ROOT / "app" / "cli.py"
 
 

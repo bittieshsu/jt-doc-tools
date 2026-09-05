@@ -166,15 +166,15 @@
 </style>
 {% endblock %}
 {% block content %}
-<h1>{{ icon('shield', size=22) }} 文件去識別化</h1>
-<p class="muted">偵測 PDF 與辦公文件中的敏感資料（身分證、手機、Email、統編、信用卡、地址 …），可選擇「編修」(Redaction，不可還原) 或「資料遮罩」(Masking，保留格式)。</p>
+<h1>{{ icon('shield', size=22) }} {{ tr('文件去識別化') }}</h1>
+<p class="muted">{{ tr('偵測 PDF 與辦公文件中的敏感資料（身分證、手機、Email、統編、信用卡、地址 …），可選擇「編修」(Redaction，不可還原) 或「資料遮罩」(Masking，保留格式)。') }}</p>
 
 <div class="dd-hint">
-  <b>⚠ 警告：</b> Redaction 是 <b>毀滅性</b> 操作，處理後原值無法還原，請務必保留原始檔備份。Masking 適合測試 / 報表場景，<b>不要當成加密手段</b>。
+  <b>{{ tr('⚠ 警告：') }}</b> {{ tr('Redaction 是') }} <b>{{ tr('毀滅性') }}</b> {{ tr('操作，處理後原值無法還原，請務必保留原始檔備份。Masking 適合測試 / 報表場景，') }}<b>{{ tr('不要當成加密手段') }}</b>。
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳檔案</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 上傳檔案') }}</h2>
   {% with upload_id='ddUpload',
           accept='application/pdf,.pdf,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.csv',
           hint='支援 PDF 與 Office 檔；非 PDF 會先自動轉成 PDF。掃描檔需先 OCR。' %}
@@ -183,7 +183,7 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 選擇要偵測的類型</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 選擇要偵測的類型') }}</h2>
   <div class="dd-pattern-cats" id="ddTypes">
     {% set cat_icons = {
       '個人身分': 'id-card', '聯絡方式': 'mail', '金融資訊': 'credit-card',
@@ -199,7 +199,7 @@
     <div class="dd-cat" data-cat="{{ grp_name }}">
       <h4>
         <span class="dd-cat-icon">{{ icon(cat_icons.get(grp_name, 'tool'), size=15) }}</span>
-        <span class="dd-cat-name">{{ grp_name }}</span>
+        <span class="dd-cat-name">{{ tr(grp_name) }}</span>
         <span class="dd-cat-tools">
           <button type="button" data-cat-act="all" title="{{ tr('全選（這組全部勾選）') }}">
             <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -227,7 +227,7 @@
       <label>
         <input type="checkbox" class="dd-type-cb" value="{{ p.id }}"
                data-group="{{ grp_name }}" {% if p.default_on %}checked{% endif %}>
-        <span>{{ p.label }}</span>
+        <span>{{ tr(p.label) }}</span>
       </label>
       {% endfor %}
     </div>
@@ -252,8 +252,8 @@
     </div>
   </div>
   <details class="dd-custom" data-s="s5371db16">
-    <summary class="muted" data-s="sb96c3baa">+ 自訂 regex（一行一條，格式：<code>標籤|正則式</code>）</summary>
-    <textarea id="ddCustom" placeholder="員編|EMP\d{5}&#10;合約號|CON-\d{4}-\d{3}"></textarea>
+    <summary class="muted" data-s="sb96c3baa">{{ tr('+ 自訂 regex（一行一條，格式：') }}<code>{{ tr('標籤|正則式') }}</code>）</summary>
+    <textarea id="ddCustom" placeholder="{{ tr('員編') }}|EMP\d{5}&#10;{{ tr('合約號') }}|CON-\d{4}-\d{3}"></textarea>
   </details>
 
   {{ llm_gate('doc-deident', llm_enabled, llm_model, mode='augment',
@@ -262,23 +262,23 @@
               input_id='ddLlmAugment') }}
 
   <div data-s="s5371db16">
-    <button class="btn btn-primary" id="btnDetect">{{ icon('eye', size=14) }} 偵測敏感資料</button>
+    <button class="btn btn-primary" id="btnDetect">{{ icon('eye', size=14) }} {{ tr('偵測敏感資料') }}</button>
     <span id="detectStatus" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 data-s="s53896af7">3. 偵測結果</h2>
+  <h2 data-s="s53896af7">{{ tr('3. 偵測結果') }}</h2>
   <div class="dd-stats" id="ddStats"></div>
   <div class="dd-findings">
     <table>
       <thead>
         <tr>
           <th data-s="sa4f3a333"><input type="checkbox" id="selAll" checked></th>
-          <th>類型</th>
-          <th>頁</th>
-          <th>原值</th>
-          <th id="ddLastCol">遮罩預覽</th>
+          <th>{{ tr('類型') }}</th>
+          <th>{{ tr('頁') }}</th>
+          <th>{{ tr('原值') }}</th>
+          <th id="ddLastCol">{{ tr('遮罩預覽') }}</th>
         </tr>
       </thead>
       <tbody id="ddTable"></tbody>
@@ -288,28 +288,28 @@
 </div>
 
 <div class="panel" id="modePanel" hidden>
-  <h2 data-s="sb0043ef4">4. 處理模式</h2>
+  <h2 data-s="sb0043ef4">{{ tr('4. 處理模式') }}</h2>
   <div class="dd-mode-picker" id="ddModes">
     <div class="dd-mode mode-redact" data-mode="redact">
       <div class="ic">{{ icon('eye-off', size=18) }}</div>
       <div>
-        <div class="title">Redaction（編修）</div>
-        <div class="desc">原文字完全刪除 + 塗黑覆蓋，複製選取都拿不到原值。<b>不可還原。</b>適合機密文件對外釋出。</div>
+        <div class="title">{{ tr('Redaction（編修）') }}</div>
+        <div class="desc">{{ tr('原文字完全刪除 + 塗黑覆蓋，複製選取都拿不到原值。') }}<b>{{ tr('不可還原。') }}</b>{{ tr('適合機密文件對外釋出。') }}</div>
       </div>
     </div>
     <div class="dd-mode mode-mask active" data-mode="mask">
       <div class="ic">{{ icon('hash', size=18) }}</div>
       <div>
-        <div class="title">Masking（資料遮罩）</div>
-        <div class="desc">保留格式，中段以 * 替換（例：0912****678）。適合測試 / 報表 / 內部分享用。</div>
+        <div class="title">{{ tr('Masking（資料遮罩）') }}</div>
+        <div class="desc">{{ tr('保留格式，中段以 * 替換（例：0912****678）。適合測試 / 報表 / 內部分享用。') }}</div>
       </div>
     </div>
     <div class="dd-mode mode-replace" data-mode="replace">
       <div class="ic">{{ icon('swap', size=18) }}</div>
       <div>
-        <div class="title">Replacement（替換）</div>
-        <div class="desc">換成另一個看起來正常、但不是真的值（例：0912345678 → 0938271654）。
-          原文一樣真刪除。適合要拿去測試系統、給外部看的報表、教學範例。</div>
+        <div class="title">{{ tr('Replacement（替換）') }}</div>
+        <div class="desc">{{ tr('換成另一個看起來正常、但不是真的值（例：0912345678 → 0938271654）。
+          原文一樣真刪除。適合要拿去測試系統、給外部看的報表、教學範例。') }}</div>
       </div>
     </div>
   </div>
@@ -317,33 +317,33 @@
   <div class="dd-replace-opts" id="ddReplaceOpts" hidden>
     <label class="dd-chk">
       <input type="checkbox" id="ddValidChecksum">
-      產生<b>可通過驗證</b>的假值（身分證 / 統編 / 信用卡算出正確檢查碼）
+      {{ tr('產生') }}<b>{{ tr('可通過驗證') }}</b>{{ tr('的假值（身分證 / 統編 / 信用卡算出正確檢查碼）') }}
     </label>
     <div class="muted dd-note">
-      預設產生的假值<b>刻意不通過檢查碼</b>，絕對不會撞到真人的資料。
-      打開這個選項後，號碼拿去測試系統不會被擋 —— 但算得出來的號碼<b>有可能剛好是某個真人的</b>。
-      Email 用 <code>example.com</code>、IP 用 <code>192.0.2.x</code>，這兩種是文件專用的保留範圍，兩種設定都安全。
+      {{ tr('預設產生的假值') }}<b>{{ tr('刻意不通過檢查碼') }}</b>{{ tr('，絕對不會撞到真人的資料。
+      打開這個選項後，號碼拿去測試系統不會被擋 —— 但算得出來的號碼') }}<b>{{ tr('有可能剛好是某個真人的') }}</b>{{ tr('。
+      Email 用') }} <code>example.com</code>{{ tr('、IP 用') }} <code>192.0.2.x</code>{{ tr('，這兩種是文件專用的保留範圍，兩種設定都安全。') }}
     </div>
     <div class="dd-addterm">
       <input type="text" id="ddTermInput" placeholder="{{ tr('還有什麼要換掉？輸入字詞後按「加入」（例：內部代號、承辦人姓名）') }}">
-      <button type="button" class="btn" id="btnAddTerm">加入</button>
+      <button type="button" class="btn" id="btnAddTerm">{{ tr('加入') }}</button>
       <span class="muted" id="ddTermStatus"></span>
     </div>
   </div>
 
   <div data-s="s553a645f">
-    <button class="btn btn-primary" id="btnProcess">{{ icon('shield', size=14) }} 產生處理後 PDF</button>
+    <button class="btn btn-primary" id="btnProcess">{{ icon('shield', size=14) }} {{ tr('產生處理後 PDF') }}</button>
     <span id="procStatus" class="muted" data-s="s414be724"></span>
   </div>
 </div>
 
 <div class="dd-result" id="doneBox" hidden>
-  <h3 data-s="s8b6172c3">處理完成</h3>
+  <h3 data-s="s8b6172c3">{{ tr('處理完成') }}</h3>
   <div id="doneSummary" data-s="s5d5fcd83"></div>
-  <a class="btn btn-primary" id="dlLink" href="#">{{ icon('download') }} 下載處理後的 PDF</a>
-  {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden data-s="sc3f83707">{{ icon('archive') }} 存至工作區</button>{% endif %}
-  <h4 data-s="s4fd43b62">處理後預覽</h4>
-  <p class="muted" data-s="s001d1537">點縮圖可放大檢視。</p>
+  <a class="btn btn-primary" id="dlLink" href="#">{{ icon('download') }} {{ tr('下載處理後的 PDF') }}</a>
+  {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden data-s="sc3f83707">{{ icon('archive') }} {{ tr('存至工作區') }}</button>{% endif %}
+  <h4 data-s="s4fd43b62">{{ tr('處理後預覽') }}</h4>
+  <p class="muted" data-s="s001d1537">{{ tr('點縮圖可放大檢視。') }}</p>
   <div class="dd-preview-grid" id="ddPreviewGrid"></div>
 </div>
 
@@ -415,9 +415,9 @@ $('btnDetect').addEventListener('click', async () => {
 function renderDetect(d) {
   const stats = $('ddStats');
   stats.innerHTML = `
-    <div class="dd-stat"><div class="lbl">來源</div><div class="val">${d.source_type.toUpperCase()}</div></div>
-    <div class="dd-stat"><div class="lbl">頁數</div><div class="val">${d.pages}</div></div>
-    <div class="dd-stat"><div class="lbl">偵測到</div><div class="val">${d.findings.length}</div></div>`;
+    <div class="dd-stat"><div class="lbl">${tr('來源')}</div><div class="val">${d.source_type.toUpperCase()}</div></div>
+    <div class="dd-stat"><div class="lbl">${tr('頁數')}</div><div class="val">${d.pages}</div></div>
+    <div class="dd-stat"><div class="lbl">${tr('偵測到')}</div><div class="val">${d.findings.length}</div></div>`;
   for (const [t, n] of Object.entries(d.by_type || {})) {
     const el = document.createElement('div');
     el.className = 'dd-stat';
@@ -426,7 +426,7 @@ function renderDetect(d) {
   }
   const body = $('ddTable');
   if (!d.findings.length) {
-    body.innerHTML = `<tr><td colspan="5" data-s="s22a809a0">沒有偵測到敏感資料 🎉</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" data-s="s22a809a0">${tr('沒有偵測到敏感資料 🎉')}</td></tr>`;
     $('detectStatus').textContent = tr('完成 — 沒有偵測到敏感資料');
     return;
   }

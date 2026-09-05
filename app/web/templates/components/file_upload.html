@@ -4,7 +4,9 @@
     <div class="drop-zone-inner">
       <div class="drop-zone-icon"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l3-3 3 3"/><path d="M12 11v10"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M16 7l-4-4-4 4"/><path d="M12 3v8"/></svg></div>
       <div class="drop-zone-text">{{ tr('拖曳檔案到此，或點選挑選') }}</div>
-      <div class="drop-zone-hint">{{ hint|default('')|safe }}</div>
+      {# hint 是**呼叫端用 `{% with %}` 傳進來的中文**（18 支工具各寫一句），
+     那個位置包不了 `tr()`（`{{ }}` 巢在 `{% %}` 裡樣板編不過），
+     所以在這裡翻。`|safe` 要留著 —— 有幾句帶 <br> 與 <strong>。 #}<div class="drop-zone-hint">{{ tr(hint|default(''))|safe }}</div>
       <div class="drop-zone-filename"></div>
     </div>
     <input type="file" id="{{ upload_id|default('upload') }}-input" {% if input_name %}name="{{ input_name }}"{% endif %} accept="{{ accept|default('application/pdf') }}" {% if multiple %}multiple{% endif %} />

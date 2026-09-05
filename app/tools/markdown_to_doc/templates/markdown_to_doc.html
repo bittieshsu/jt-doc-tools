@@ -155,7 +155,7 @@
     <span><b>{{ tr('點此挑選') }}</b>{{ tr('或拖曳檔案到此') }}
       <span class="hint">{{ tr('.md / .markdown / .txt（UTF-8，上限 5 MB）') }}</span></span>
   </label>
-  <textarea id="md2Text" class="md2-textarea" placeholder="把 Markdown 內容貼上來，或從上方上傳檔案 …
+  <textarea id="md2Text" class="md2-textarea" placeholder="{{ tr("把 Markdown 內容貼上來，或從上方上傳檔案 …
 
 # 我的文件
 這裡輸入 Markdown 內容...
@@ -172,7 +172,7 @@ def hello():
 |------|------|
 | A    | 1    |
 | B    | 2    |
-"></textarea>
+")|safe }}"></textarea>
   <div data-s="sda8a1590">
     <label data-s="s3044b600">{{ tr('標題（檔名用）') }}</label>
     <input type="text" id="md2Title" placeholder="{{ tr('不填則用「document」或上傳檔名') }}"
@@ -199,8 +199,8 @@ def hello():
       {% for f in fonts %}
       <option value="{{ f.id }}"
               {% if f.stack %}data-preview-style="font-family: {{ f.stack }};"{% endif %}
-              data-sub="{{ f.desc }}"
-              {% if loop.first %}selected{% endif %}>{{ f.name }}</option>
+              data-sub="{{ tr(f.desc) }}"
+              {% if loop.first %}selected{% endif %}>{{ tr(f.name) }}</option>
       {% endfor %}
     </select>
   </div>
@@ -309,8 +309,8 @@ def hello():
       pickedFilename = f.name;
       drop.classList.add('has-file');
       drop.querySelector('span').innerHTML =
-        `<b>已載入</b> ${_esc(f.name)} · ${(f.size / 1024).toFixed(1)} KB
-        <span class="hint">點此換檔</span>`;
+        `<b>${tr('已載入')}</b> ${_esc(f.name)} · ${(f.size / 1024).toFixed(1)} KB
+        <span class="hint">${tr('點此換檔')}</span>`;
       // auto-fill title from filename stem (if user hasn't typed one)
       const titleEl = $('md2Title');
       if (!titleEl.value.trim()) {

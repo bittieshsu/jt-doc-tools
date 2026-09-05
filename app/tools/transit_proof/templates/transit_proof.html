@@ -2,31 +2,31 @@
 {% from "components/icons.html" import icon %}
 {% block title %}乘車證明整理 · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('car', size=22) }} 乘車證明整理</h1>
-<p class="tp-intro muted">拉一批台鐵「購票證明」或高鐵「電子車票證明」PDF 進來，自動抽出日期 / 交通工具 / 起訖 / 費用等欄位，整理成表格後可多格式匯出報帳（CSV / XLSX / ODS / JSON / XML / TXT / MD）。預設顯示日期、交通工具、來源-目的、費用，欄位可在「設定」自訂。</p>
+<h1>{{ icon('car', size=22) }} {{ tr('乘車證明整理') }}</h1>
+<p class="tp-intro muted">{{ tr('拉一批台鐵「購票證明」或高鐵「電子車票證明」PDF 進來，自動抽出日期 / 交通工具 / 起訖 / 費用等欄位，整理成表格後可多格式匯出報帳（CSV / XLSX / ODS / JSON / XML / TXT / MD）。預設顯示日期、交通工具、來源-目的、費用，欄位可在「設定」自訂。') }}</p>
 
 <div class="panel">
-  <h2 class="tp-panel-h2">{{ icon('upload', size=16) }} 上傳乘車證明</h2>
+  <h2 class="tp-panel-h2">{{ icon('upload', size=16) }} {{ tr('上傳乘車證明') }}</h2>
   <div class="tp-drop" id="tpDrop" tabindex="0" role="button" aria-label="{{ tr('上傳 PDF') }}">
     <div class="tp-drop-inner">
       {{ icon('upload', size=28) }}
-      <div class="tp-drop-main">拖曳 PDF 到此，或點選挑選</div>
-      <div class="tp-drop-sub muted">可一次多張 · 支援台鐵購票證明 / 高鐵電子車票證明 PDF</div>
+      <div class="tp-drop-main">{{ tr('拖曳 PDF 到此，或點選挑選') }}</div>
+      <div class="tp-drop-sub muted">{{ tr('可一次多張 · 支援台鐵購票證明 / 高鐵電子車票證明 PDF') }}</div>
     </div>
     <input type="file" id="tpFile" accept="application/pdf,.pdf" multiple hidden>
   </div>
-  {% if workspace_enabled(request) %}<div class="fu-ws-row"><button type="button" class="ws-load-btn" id="tpWsLoad">{{ icon('archive', size=16) }}<span>從工作區載入</span></button></div>{% endif %}
+  {% if workspace_enabled(request) %}<div class="fu-ws-row"><button type="button" class="ws-load-btn" id="tpWsLoad">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
   <div class="tp-upmsg" id="tpUpMsg" hidden></div>
 </div>
 
 <div class="panel">
   <h2 class="tp-panel-h2 tp-list-head">
-    <span class="tp-list-title">{{ icon('list', size=16) }} 已整理清單 <span class="tp-count" id="tpCount">0</span></span>
+    <span class="tp-list-title">{{ icon('list', size=16) }} {{ tr('已整理清單') }} <span class="tp-count" id="tpCount">0</span></span>
     <span class="tp-toolbar">
-      <button type="button" class="btn btn-small btn-danger" id="tpBtnDelSel" hidden>{{ icon('trash', size=13) }} 刪除選取 (<span id="tpSelCount">0</span>)</button>
-      <button type="button" class="btn btn-small" id="tpBtnSettings">{{ icon('columns', size=13) }} 欄位</button>
+      <button type="button" class="btn btn-small btn-danger" id="tpBtnDelSel" hidden>{{ icon('trash', size=13) }} {{ tr('刪除選取 (') }}<span id="tpSelCount">0</span>)</button>
+      <button type="button" class="btn btn-small" id="tpBtnSettings">{{ icon('columns', size=13) }} {{ tr('欄位') }}</button>
       <span class="tp-export-wrap">
-        <button type="button" class="btn btn-small" id="tpBtnExport">{{ icon('download', size=13) }} 匯出 ▾</button>
+        <button type="button" class="btn btn-small" id="tpBtnExport">{{ icon('download', size=13) }} {{ tr('匯出 ▾') }}</button>
         <span class="tp-export-menu" id="tpExportMenu" hidden>
           <button type="button" data-fmt="xlsx">.xlsx</button>
           <button type="button" data-fmt="ods">.ods</button>
@@ -37,8 +37,8 @@
           <button type="button" data-fmt="md">.md</button>
         </span>
       </span>
-      <button type="button" class="btn btn-small" id="tpBtnRefresh">{{ icon('refresh', size=13) }} 重新整理</button>
-      <button type="button" class="btn btn-small btn-danger" id="tpBtnClear">{{ icon('trash', size=13) }} 全部清空</button>
+      <button type="button" class="btn btn-small" id="tpBtnRefresh">{{ icon('refresh', size=13) }} {{ tr('重新整理') }}</button>
+      <button type="button" class="btn btn-small btn-danger" id="tpBtnClear">{{ icon('trash', size=13) }} {{ tr('全部清空') }}</button>
     </span>
   </h2>
   <div class="tp-table-wrap">
@@ -47,7 +47,7 @@
       <tbody id="tpBody"></tbody>
       <tfoot><tr id="tpFoot" hidden></tr></tfoot>
     </table>
-    <div class="tp-empty" id="tpEmpty">尚無資料。上傳乘車證明 PDF 後會出現在這裡。</div>
+    <div class="tp-empty" id="tpEmpty">{{ tr('尚無資料。上傳乘車證明 PDF 後會出現在這裡。') }}</div>
   </div>
 </div>
 
@@ -57,14 +57,14 @@
 <div id="tpSettingsModal" hidden>
   <div class="modal-backdrop"></div>
   <div class="modal-card">
-    <h3>欄位設定</h3>
-    <p class="muted tp-set-hint">勾選要顯示的欄位、調整順序與格式；「匯出標題」可覆寫匯出時的欄位名稱（留空 = 用左側名稱）。設定只影響你自己。</p>
+    <h3>{{ tr('欄位設定') }}</h3>
+    <p class="muted tp-set-hint">{{ tr('勾選要顯示的欄位、調整順序與格式；「匯出標題」可覆寫匯出時的欄位名稱（留空 = 用左側名稱）。設定只影響你自己。') }}</p>
     <div class="tp-fieldlist" id="tpFieldList"></div>
     <div class="tp-set-actions">
-      <button type="button" class="btn" id="tpSetReset">還原預設</button>
+      <button type="button" class="btn" id="tpSetReset">{{ tr('還原預設') }}</button>
       <span class="tp-set-spacer"></span>
-      <button type="button" class="btn" id="tpSetCancel">取消</button>
-      <button type="button" class="btn btn-primary" id="tpSetSave">{{ icon('save', size=14) }} 儲存</button>
+      <button type="button" class="btn" id="tpSetCancel">{{ tr('取消') }}</button>
+      <button type="button" class="btn btn-primary" id="tpSetSave">{{ icon('save', size=14) }} {{ tr('儲存') }}</button>
     </div>
   </div>
 </div>
@@ -194,7 +194,7 @@
     const mm = String(m).padStart(2, '0'), dd = String(d).padStart(2, '0');
     if (fid === 'slash') return y + '/' + mm + '/' + dd;
     if (fid === 'roc') return (y - 1911) + '/' + mm + '/' + dd;
-    if (fid === 'roc_chinese') return '民國' + (y - 1911) + '年' + mm + '月' + dd + '日';
+    if (fid === 'roc_chinese') return tr('民國') + (y - 1911) + '年' + mm + '月' + dd + '日';
     return String(y).padStart(4, '0') + '-' + mm + '-' + dd;
   }
   const AMOUNT_FIELDS = { fare: 1, amount_untaxed: 1, tax: 1 };
@@ -274,7 +274,7 @@
       const th = document.createElement('th');
       th.className = 'tp-sortable' + (_sort.col === c ? ' tp-sort-active' : '');
       const lbl = document.createElement('span');
-      lbl.textContent = (SETTINGS.export_labels[c] || FIELD_BY_ID[c].label);
+      lbl.textContent = (SETTINGS.export_labels[c] || tr(FIELD_BY_ID[c].label));
       th.appendChild(lbl);
       const arrow = document.createElement('span'); arrow.className = 'tp-th-arrow';
       arrow.textContent = _sort.col === c ? (_sort.dir === 1 ? '▲' : '▼') : '⇅';
@@ -506,7 +506,7 @@
       const nameCell = document.createElement('label'); nameCell.className = 'tp-fr-name';
       const chk = document.createElement('input'); chk.type = 'checkbox'; chk.className = 'tp-fr-chk';
       chk.checked = SETTINGS.visible_columns.indexOf(fid) >= 0;
-      const nm = document.createElement('span'); nm.textContent = f.label;
+      const nm = document.createElement('span'); nm.textContent = tr(f.label);
       nameCell.appendChild(chk); nameCell.appendChild(nm);
       // 3) 格式（有 formats 才給下拉）
       let fmtCell;
@@ -514,7 +514,7 @@
         fmtCell = document.createElement('select'); fmtCell.className = 'fc-input tp-fr-fmt';
         f.formats.options.forEach(o => {
           const opt = document.createElement('option'); opt.value = o.id;
-          opt.textContent = o.label + '（' + o.example + '）'; fmtCell.appendChild(opt);
+          opt.textContent = tr(o.label) + '（' + o.example + '）'; fmtCell.appendChild(opt);
         });
         fmtCell.value = SETTINGS.field_formats[fid] || f.formats.default;
         fmtCell.dataset.fmtFor = fid;
@@ -524,7 +524,7 @@
       }
       // 4) 匯出標題
       const lbl = document.createElement('input'); lbl.type = 'text'; lbl.className = 'fc-input tp-fr-label';
-      lbl.placeholder = tr('匯出標題（留空 = ') + f.label + '）';
+      lbl.placeholder = tr('匯出標題（留空 = ') + tr(f.label) + '）';
       lbl.value = SETTINGS.export_labels[fid] || ''; lbl.dataset.lblFor = fid;
       row.appendChild(grab); row.appendChild(nameCell); row.appendChild(fmtCell); row.appendChild(lbl);
       box.appendChild(row);
@@ -602,7 +602,7 @@
     if (!r.ok) { toast(await errMsg(r, '儲存失敗'), 'err'); return; }
     const j = await r.json();
     SETTINGS = j.settings;
-    closeSettings(); renderTable(); toast('已儲存', 'ok');
+    closeSettings(); renderTable(); toast(tr('已儲存'), 'ok');
   });
 
   (async function init() {

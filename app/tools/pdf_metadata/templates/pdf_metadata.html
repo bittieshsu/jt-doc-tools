@@ -90,7 +90,7 @@ const fu = new FileUpload($('mdUp'), async (f) => {
   ];
   let html = '<dl>';
   for (const [k, v] of rows) {
-    html += `<dt>${k}</dt><dd>${v ? escapeHTML(String(v)) : '<span class="muted">(空)</span>'}</dd>`;
+    html += `<dt>${k}</dt><dd>${v ? escapeHTML(String(v)) : '<span class="muted">' + tr('(空)') + '</span>'}</dd>`;
   }
   html += `<dt>檔案大小</dt><dd>${fmt(d.size)}</dd>`;
   html += `<dt>頁數</dt><dd>${d.page_count}</dd>`;
@@ -98,7 +98,7 @@ const fu = new FileUpload($('mdUp'), async (f) => {
   html += `<dt>註解</dt><dd>${d.annot_count} 個</dd>`;
   html += `<dt>表單欄位</dt><dd>${d.form_field_count} 個</dd>`;
   html += `<dt>嵌入檔案</dt><dd>${d.attach_count} 個</dd>`;
-  html += `<dt>XMP</dt><dd>${d.xmp_present ? '<span class="warn">有（含修訂歷史等）</span>' : '無'}</dd>`;
+  html += `<dt>XMP</dt><dd>${d.xmp_present ? '<span class="warn">' + tr('有（含修訂歷史等）') + '</span>' : '無'}</dd>`;
   html += '</dl>';
   if (d.xmp_preview) {
     html += `<div class="muted" data-s="sd27759c9">XMP 前 800 字元預覽：</div>`;

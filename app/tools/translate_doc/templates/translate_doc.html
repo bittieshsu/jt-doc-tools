@@ -811,10 +811,10 @@ function renderRow(idx, src, translated, error) {
     tgtHtml = escapeHTML(translated);
   }
   const copyBtn = (which) =>
-    `<button type="button" class="cell-copy" data-act="copy-cell" data-which="${which}" title="複製到剪貼簿">${COPY_ICON_SVG}</button>`;
+    `<button type="button" class="cell-copy" data-act="copy-cell" data-which="${which}" title="${tr('複製到剪貼簿')}">${COPY_ICON_SVG}</button>`;
   row.innerHTML = `
     <div class="num">${idx + 1}</div>
-    <div class="src">${escapeHTML(src) || '<span data-s="s15f0c2e8">（空行）</span>'}${copyBtn('src')}</div>
+    <div class="src">${escapeHTML(src) || ('<span data-s="s15f0c2e8">' + tr('（空行）') + '</span>')}${copyBtn('src')}</div>
     <div class="tgt ${tgtCls}">${tgtHtml}${copyBtn('tgt')}</div>
     <div class="ctl"><button type="button" data-act="retry" title="重新翻譯本句">↻</button></div>
   `;
@@ -840,13 +840,13 @@ function _setHoverRow(idx) {
 // 語言代碼 → 中文顯示名稱（與後端 _LANG_NAMES 對齊；header 已用「（…）」
 // 包起來，所以這裡只放純中文，避免變成「（English (英文)）」雙層括號）
 const LANG_NAMES = {
-  'auto': '自動偵測', 'en': '英文',
-  'zh': '中文', 'zh-TW': '繁體中文', 'zh-CN': '簡體中文',
-  'ja': '日文', 'ko': '韓文',
-  'fr': '法文', 'de': '德文',
-  'es': '西班牙文', 'vi': '越南文',
-  'th': '泰文', 'id': '印尼文',
-  'ru': '俄文',
+  'auto': '自動偵測', 'en': tr('英文'),
+  'zh': tr('中文'), 'zh-TW': '繁體中文', 'zh-CN': tr('簡體中文'),
+  'ja': tr('日文'), 'ko': tr('韓文'),
+  'fr': tr('法文'), 'de': tr('德文'),
+  'es': tr('西班牙文'), 'vi': tr('越南文'),
+  'th': tr('泰文'), 'id': tr('印尼文'),
+  'ru': tr('俄文'),
 };
 function _langName(code) { return LANG_NAMES[code] || code || '?'; }
 
@@ -856,8 +856,8 @@ function renderHeader(srcLang, tgtLang, srcChars, tgtChars) {
   hd.className = 'trd-head';
   hd.innerHTML = `
     <div class="h-num">#<div class="trd-resize-handle" data-resize="num"></div></div>
-    <div class="h-src">原文<span class="h-lang">（${escapeHTML(_langName(srcLang))}）</span><span class="h-stat">${srcChars} 字</span><div class="trd-resize-handle" data-resize="src"></div></div>
-    <div class="h-tgt">譯文<span class="h-lang">（${escapeHTML(_langName(tgtLang))}）</span><span class="h-stat">${tgtChars} 字</span><div class="trd-resize-handle" data-resize="tgt"></div></div>
+    <div class="h-src">${tr('原文')}<span class="h-lang">（${escapeHTML(_langName(srcLang))}）</span><span class="h-stat">${srcChars} 字</span><div class="trd-resize-handle" data-resize="src"></div></div>
+    <div class="h-tgt">${tr('譯文')}<span class="h-lang">（${escapeHTML(_langName(tgtLang))}）</span><span class="h-stat">${tgtChars} 字</span><div class="trd-resize-handle" data-resize="tgt"></div></div>
     <div class="h-ctl"></div>
   `;
   return hd;

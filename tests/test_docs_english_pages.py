@@ -13,7 +13,11 @@ from pathlib import Path
 
 import pytest
 
-DOCS = Path(__file__).resolve().parent.parent / "github" / "docs"
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
+DOCS = _public_root(Path(__file__).resolve().parent.parent) / "docs"
 PAGES = (("index.html", "index.en.json", "index-en.html"),
          ("api.html", "api.en.json", "api-en.html"))
 CJK = re.compile(r"[㐀-鿿]")
@@ -193,3 +197,22 @@ def test_no_pure_punctuation_keys(cat: str):
     data = json.loads((DOCS / "i18n" / cat).read_text(encoding="utf-8"))
     bad = [k for k in data if not _HAS_WORD.search(k)]
     assert not bad, f"純標點的鍵：{bad}"
+
+
+def test_english_page_uses_english_screenshots():
+    """英文版引用的截圖必須是**英文介面**那一組。
+
+    原本兩個版本共用同一批中文截圖 —— 讀者看到的畫面跟他實際會看到的不一樣，
+    而截圖正是「有沒有真的支援英文」最直接的證據。
+
+    產生方式：`python tools/capture_en_screenshots.py --base <拋棄式實例>`。
+    """
+    import re
+    html = (DOCS / "index-en.html").read_text(encoding="utf-8")
+    refs = sorted(set(re.findall(r'screenshots/[\w./-]+\.png', html)))
+    assert refs, "英文版頁面一張截圖都沒有"
+    zh = [r for r in refs if not r.startswith("screenshots/en/")]
+    assert not zh, f"英文版還在用中文介面的截圖：{zh}"
+    for r in refs:
+        p = DOCS / r
+        assert p.is_file(), f"英文版引用了不存在的截圖：{r}"

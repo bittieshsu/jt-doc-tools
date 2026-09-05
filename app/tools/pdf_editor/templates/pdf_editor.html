@@ -474,11 +474,11 @@ body.pe-pan-active { cursor: grabbing !important; }
       {{ tr('重做') }}
     </button>
     <span class="pe-top-divider"></span>
-    <button class="btn" type="button" id="btnGlobalFont" data-tip="把整份 PDF 的文字換成同一個字型"
+    <button class="btn" type="button" id="btnGlobalFont" data-tip="{{ tr('把整份 PDF 的文字換成同一個字型') }}"
       data-s="s9b9f561c">
       {{ icon('text', size=14) }} {{ tr('整份換字型') }}
     </button>
-    <button class="btn" type="button" id="btnPrefs" data-tip="編輯器設定"
+    <button class="btn" type="button" id="btnPrefs" data-tip="{{ tr('編輯器設定') }}"
       data-s="sff9a0cfa">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="s742e547d"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       {{ tr('設定') }}
@@ -526,44 +526,44 @@ body.pe-pan-active { cursor: grabbing !important; }
     </button>
   </div>
   <div class="pe-toolbar pe-toolbar-h">
-    <button type="button" id="toolSelect" class="active" data-tip="選取 (V)">
+    <button type="button" id="toolSelect" class="active" data-tip="{{ tr('選取 (V)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3l15 8-6 2-2 6z"/></svg>
     </button>
-    <button type="button" id="toolPick" data-tip="選既有 PDF 物件 (S)">
+    <button type="button" id="toolPick" data-tip="{{ tr('選既有 PDF 物件 (S)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
     </button>
-    <button type="button" id="toolText" data-tip="文字框 (T)">
+    <button type="button" id="toolText" data-tip="{{ tr('文字框 (T)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6h12M12 6v14M9 20h6"/></svg>
     </button>
-    <button type="button" id="toolImage" data-tip="圖片 / 印章 / 簽名 (I)">
+    <button type="button" id="toolImage" data-tip="{{ tr('圖片 / 印章 / 簽名 (I)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M3 16l5-4 5 5 3-2 5 4"/></svg>
     </button>
-    <button type="button" id="toolWhiteout" data-tip="白底遮罩 (W)">
+    <button type="button" id="toolWhiteout" data-tip="{{ tr('白底遮罩 (W)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="4" y="8" width="16" height="8" rx="1" stroke-dasharray="3 2"/><path d="M6 12h12" stroke="#e5e7eb" stroke-width="5" stroke-linecap="round"/></svg>
     </button>
-    <button type="button" id="toolRect" data-tip="矩形 (R)">
+    <button type="button" id="toolRect" data-tip="{{ tr('矩形 (R)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="1"/></svg>
     </button>
-    <button type="button" id="toolLine" data-tip="線段 (L)">
+    <button type="button" id="toolLine" data-tip="{{ tr('線段 (L)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20L20 4"/></svg>
     </button>
-    <button type="button" id="toolArrow" data-tip="箭頭 (A)">
+    <button type="button" id="toolArrow" data-tip="{{ tr('箭頭 (A)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M14 6l6 6-6 6"/></svg>
     </button>
-    <button type="button" id="toolEllipse" data-tip="橢圓 (O)">
+    <button type="button" id="toolEllipse" data-tip="{{ tr('橢圓 (O)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="12" rx="8" ry="6"/></svg>
     </button>
-    <button type="button" id="toolPencil" data-tip="手繪 (P)">
+    <button type="button" id="toolPencil" data-tip="{{ tr('手繪 (P)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l3-1 11-11-2-2L5 17l-1 3z"/><path d="M14 6l2 2"/></svg>
     </button>
-    <button type="button" id="toolHighlight" data-tip="螢光筆 (H)">
+    <button type="button" id="toolHighlight" data-tip="{{ tr('螢光筆 (H)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l4 4 10-10-4-4z"/><path d="M2 22h8"/><path d="M15 6l3 3"/></svg>
     </button>
-    <button type="button" id="toolStickyNote" data-tip="便箋註解 (N)">
+    <button type="button" id="toolStickyNote" data-tip="{{ tr('便箋註解 (N)') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4"/><path d="M8 12h6M8 16h4"/></svg>
     </button>
     <div class="pe-shortcuts-trigger-wrap" data-s="s7ecd9b0b">
-      <button type="button" id="btnShortcuts" data-tip="快捷鍵總覽">
+      <button type="button" id="btnShortcuts" data-tip="{{ tr('快捷鍵總覽') }}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h.01M11 14h.01M15 14h.01"/></svg>
       </button>
       <div class="pe-shortcuts-pop" id="peShortcutsPop" hidden data-s="sf675fd80">
@@ -1104,7 +1104,7 @@ function gotoPage(n) {
   try {
     pageCanvases.forEach(c => { if (c.getActiveObject()) { c.discardActiveObject(); c.requestRenderAll(); } });
     const panel = $('propsPanel');
-    if (panel) panel.innerHTML = '<h3>屬性</h3><div class="muted">點選物件後在此編輯。</div>';
+    if (panel) panel.innerHTML = '<h3>' + tr('屬性') + '</h3><div class="muted">' + tr('點選物件後在此編輯。') + '</div>';
   } catch (_) {}
 }
 
@@ -1377,7 +1377,7 @@ function attachPageHandlers(fc) {
       if (o._peSaved) o.set('opacity', 0.01);
     });
     fc.requestRenderAll();
-    $('propsPanel').innerHTML = '<h3>屬性</h3><div class="muted">點選物件後在此編輯。</div>';
+    $('propsPanel').innerHTML = '<h3>' + tr('屬性') + '</h3><div class="muted">' + tr('點選物件後在此編輯。') + '</div>';
     if (needBakeOnDeselect) {
       needBakeOnDeselect = false;
       scheduleAutoSave();
@@ -2282,7 +2282,7 @@ function populateFontDropdown(selectEl, currentId) {
   }).catch(() => {
     // Fallback to basic PyMuPDF options if fetch fails
     _fontGroups = [{
-      key: 'pymupdf', title: 'PyMuPDF 內建', fonts: [
+      key: 'pymupdf', title: tr('PyMuPDF 內建'), fonts: [
         {id: 'pymupdf:default', label: '自動'},
         {id: 'pymupdf:sans', label: 'Sans'},
         {id: 'pymupdf:serif', label: 'Serif'},
@@ -2376,7 +2376,7 @@ function installFontPicker(selectEl, currentId) {
         const preview = fontFamilyForKey(f.id);
         row.innerHTML = `
           <span class="fp-item-name">${escapeHTML(f.label)}</span>
-          <span class="fp-item-preview" data-style="font-family:${preview};">字 Ag 1</span>`;
+          <span class="fp-item-preview" data-style="font-family:${preview};">${tr('字 Ag 1')}</span>`;
         if (f.id === selectEl.value) row.classList.add('fp-item-active');
         row.addEventListener('click', () => {
           selectEl.value = f.id;
@@ -2388,7 +2388,7 @@ function installFontPicker(selectEl, currentId) {
       }
     }
     if (!list.firstChild) {
-      list.innerHTML = '<div class="fp-empty">沒有符合的字型</div>';
+      list.innerHTML = '<div class="fp-empty">' + tr('沒有符合的字型') + '</div>';
     }
   }
 
@@ -2808,7 +2808,7 @@ function openAssetPicker(onPick) {
   grid.innerHTML = tr('載入中…');
   fetch('/tools/pdf-editor/assets').then(r => r.json()).then(data => {
     if (!data.assets?.length) {
-      grid.innerHTML = '<div class="muted" data-s="s1b9b41ec">尚無資產，請切到「上傳新圖片」或到「管理資產」新增印章 / 簽名 / Logo。</div>';
+      grid.innerHTML = '<div class="muted" data-s="s1b9b41ec">' + tr('尚無資產，請切到「上傳新圖片」或到「管理資產」新增印章 / 簽名 / Logo。') + '</div>';
       return;
     }
     grid.innerHTML = '';

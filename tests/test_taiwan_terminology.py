@@ -31,6 +31,10 @@ import re
 
 import pytest
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 #: 禁用詞 → 該用什麼。使用者逐一糾正過的，見 CLAUDE.md 的用詞段落。
@@ -268,7 +272,7 @@ def _drop_mentions(text: str) -> str:
 
 def test_no_mainland_terms_in_latest_changelog_entry():
     """只擋**最新一版** —— 歷史版本是已發佈的記錄，改掉等於竄改歷史。"""
-    text = (ROOT / "github" / "CHANGELOG.md").read_text(encoding="utf-8")
+    text = (_public_root(ROOT) / "CHANGELOG.md").read_text(encoding="utf-8")
     parts = re.split(r"^## \[", text, flags=re.M)
     if len(parts) < 2:
         pytest.skip("CHANGELOG 格式不符預期")

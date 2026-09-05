@@ -54,6 +54,10 @@ def _ask_once(host: str, port: int, use_tls: bool, path: str,
         sock = socket.create_connection((host, port), timeout=timeout)
         if use_tls:
             ctx = ssl.create_default_context()
+            # 預設情境已經會驗憑證，但**沒有釘最低版本** —— 對方如果還開著
+            # TLS 1.0 / 1.1 就會談成舊版（CodeQL py/insecure-protocol 指的是
+            # 這一點）。這支只是去問反向代理的上傳上限，釘死 1.2 不影響相容性。
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
             sock = ctx.wrap_socket(sock, server_hostname=host)
         sock.sendall(req)
         sock.settimeout(timeout)

@@ -253,11 +253,11 @@ function makeNode(node) {
     if (kids.style.display === 'none') {
       kids.style.display = 'block'; tog.textContent = '▾';
       if (!loaded) {
-        loaded = true; kids.innerHTML = '<div class="dir-loading">載入…</div>';
+        loaded = true; kids.innerHTML = '<div class="dir-loading">' + tr('載入…') + '</div>';
         try {
           const ch = await loadChildren(node.dn);
           kids.innerHTML = '';
-          if (!ch.length) kids.innerHTML = '<div class="dir-empty">（無子 OU）</div>';
+          if (!ch.length) kids.innerHTML = '<div class="dir-empty">' + tr('（無子 OU）') + '</div>';
           ch.forEach(c => kids.appendChild(makeNode(c)));
         } catch (err) { kids.innerHTML = '<div class="dir-empty">✗ ' + esc(err.message) + '</div>'; }
       }
@@ -320,17 +320,17 @@ function makeNodeStatic(node) {
 }
 
 async function loadAllTree() {
-  const tree = $('dirTree'); tree.innerHTML = '<div class="dir-loading">載入目錄樹…</div>';
+  const tree = $('dirTree'); tree.innerHTML = '<div class="dir-loading">' + tr('載入目錄樹…') + '</div>';
   try {
     const roots = await loadChildren('');
     tree.innerHTML = '';
-    if (!roots.length) { tree.innerHTML = '<div class="dir-empty">根節點下沒有 OU（可在認證設定填 directory_root_base）</div>'; return; }
+    if (!roots.length) { tree.innerHTML = '<div class="dir-empty">' + tr('根節點下沒有 OU（可在認證設定填 directory_root_base）') + '</div>'; return; }
     roots.forEach(n => tree.appendChild(makeNode(n)));
   } catch (e) { tree.innerHTML = '<div class="dir-empty">✗ ' + esc(e.message) + '</div>'; }
 }
 
 async function loadSelectedTree() {
-  const tree = $('dirTree'); tree.innerHTML = '<div class="dir-loading">依 filter 搜尋中…</div>';
+  const tree = $('dirTree'); tree.innerHTML = '<div class="dir-loading">' + tr('依 filter 搜尋中…') + '</div>';
   let j;
   try {
     const r = await fetch('/admin/directory/selected');
@@ -339,12 +339,12 @@ async function loadSelectedTree() {
   } catch (e) { tree.innerHTML = '<div class="dir-empty">✗ ' + esc(e.message) + '</div>'; return; }
   tree.innerHTML = '';
   if (j.empty_rules) {
-    tree.innerHTML = '<div class="dir-empty">尚未設定任何 filter 規則。<br>點上方「設定 filter」新增，或切到「全部」瀏覽完整目錄。</div>';
+    tree.innerHTML = '<div class="dir-empty">' + tr('尚未設定任何 filter 規則。') + '<br>' + tr('點上方「設定 filter」新增，或切到「全部」瀏覽完整目錄。') + '</div>';
     setHint('已選定：尚未設定規則');
     return;
   }
   if (!j.tree || !j.tree.length) {
-    tree.innerHTML = '<div class="dir-empty">沒有符合 filter 的物件。調整規則或切到「全部」。</div>';
+    tree.innerHTML = '<div class="dir-empty">' + tr('沒有符合 filter 的物件。調整規則或切到「全部」。') + '</div>';
     setHint('已選定：符合 0 筆');
     return;
   }
@@ -358,7 +358,7 @@ function setMode(mode) {
   DIR_MODE = (mode === 'all') ? 'all' : 'selected';
   document.querySelectorAll('.dir-mode-btn').forEach(b =>
     b.classList.toggle('is-active', b.dataset.mode === DIR_MODE));
-  $('dirDetail').innerHTML = '<p class="muted">← 從左側點一個項目</p>';
+  $('dirDetail').innerHTML = '<p class="muted">' + tr('← 從左側點一個項目') + '</p>';
   if (DIR_MODE === 'all') { setHint('全部：完整目錄樹'); loadAllTree(); }
   else loadSelectedTree();
 }
@@ -369,7 +369,7 @@ document.querySelectorAll('.dir-mode-btn').forEach(b =>
 const DFF_TYPES = [['ou','OU'],['group','群組'],['user','使用者']];
 function renderRules() {
   const box = $('dffRules'); box.innerHTML = '';
-  if (!DIR_RULES.length) { box.innerHTML = '<div class="dff-empty">還沒有規則。新增一條後，只有符合的物件會出現在「已選定」。</div>'; }
+  if (!DIR_RULES.length) { box.innerHTML = '<div class="dff-empty">' + tr('還沒有規則。新增一條後，只有符合的物件會出現在「已選定」。') + '</div>'; }
   DIR_RULES.forEach((rule, i) => {
     const row = document.createElement('div'); row.className = 'dff-rule'; row.dataset.i = i;
     const types = DFF_TYPES.map(([v,l]) =>
@@ -432,19 +432,19 @@ function renderUsers() {
     if (q && !((u.name||'').toLowerCase().includes(q) || (u.login||'').toLowerCase().includes(q))) return false;
     return true;
   });
-  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="3" class="dir-empty">此 OU 下沒有符合的使用者</td></tr>'; return; }
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="3" class="dir-empty">' + tr('此 OU 下沒有符合的使用者') + '</td></tr>'; return; }
   tbody.innerHTML = rows.map(u =>
     `<tr class="${u.local?'is-local':''}" data-dn="${esc(u.dn)}" data-name="${esc(u.name)}" title="點看細節">` +
     `<td><b>${esc(u.name)}</b></td>` +
     `<td class="du-login">${esc(u.login||'')}</td>` +
-    `<td class="du-st">${u.local?'<span class="dir-ubadge">✓ 已登入</span>':'<span class="du-dim">—</span>'}</td>` +
+    `<td class="du-st">${u.local?'<span class="dir-ubadge">' + tr('✓ 已登入') + '</span>':'<span class="du-dim">—</span>'}</td>` +
     `</tr>`
   ).join('');
 }
 async function openOU(dn, name) {
   _curDn = dn; _curName = name;
   const box = $('dirDetail');
-  box.innerHTML = '<p class="muted">查詢目錄中…</p>';
+  box.innerHTML = '<p class="muted">' + tr('查詢目錄中…') + '</p>';
   let j;
   try {
     const r = await fetch('/admin/directory/users?dn=' + encodeURIComponent(dn));
@@ -551,7 +551,7 @@ function openUserDetail(dn, name) {
   $('udName').textContent = name || '';
   $('udDn').textContent = dn || '';
   loadUserRoles(dn);
-  $('udBody').innerHTML = '<p class="muted">查詢中…</p>';
+  $('udBody').innerHTML = '<p class="muted">' + tr('查詢中…') + '</p>';
   $('udBody').style.minHeight = '';   // 清掉上一位使用者鎖定的高度
   const uf = $('udFilter'); if (uf) { uf.value = ''; uf.hidden = true; }
   $('udModal').hidden = false;
@@ -588,7 +588,7 @@ function openUserDetail(dn, name) {
         const sf = (label + ' ' + k + ' ' + vtext).toLowerCase();
         return `<tr data-f="${esc(sf)}"><td class="ud-k">${esc(label)}</td><td class="ud-v">${vhtml}</td></tr>`;
       }).join('');
-      const badge = j.local ? '<span class="dir-ubadge">✓ 已登入過本系統</span> ' : '';
+      const badge = j.local ? '<span class="dir-ubadge">' + tr('✓ 已登入過本系統') + '</span> ' : '';
       $('udBody').innerHTML = badge + `<table class="ud-table"><tbody>${rows}</tbody></table>`;
       $('udBody').querySelectorAll('.ud-grp-btn').forEach(b =>
         b.addEventListener('click', () => openGroupRoles(b.dataset.gdn)));
@@ -629,7 +629,7 @@ async function openGroupRoles(dn) {
   _grDn = dn;
   $('grDn').textContent = dn;
   $('grMsg').textContent = '';
-  $('grChks').innerHTML = '<p class="muted">讀取中…</p>';
+  $('grChks').innerHTML = '<p class="muted">' + tr('讀取中…') + '</p>';
   $('grName').textContent = tr('群組角色');
   $('grModal').hidden = false;
   try {

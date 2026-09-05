@@ -18,11 +18,15 @@ import re
 import sys
 from pathlib import Path
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-INDEX_HTML = ROOT / "github" / "docs" / "index.html"
-README = ROOT / "github" / "README.md"
+INDEX_HTML = _public_root(ROOT) / "docs" / "index.html"
+README = _public_root(ROOT) / "README.md"
 
 # 文件為了版面精簡，常把數個工具寫成一列（「擷取文字 / 圖片 / 附件」）或用不同
 # 措辭（工具叫「PDF 密碼保護」，README 寫「PDF 加密 / 解密」）。這裡列出這些工具

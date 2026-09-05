@@ -91,9 +91,9 @@ const fu = new FileUpload(document.getElementById('upPg'), async (f) => {
   filename = f.name;
   const fd = new FormData(); fd.append('file', f);
   document.getElementById('pages-panel').hidden = false;
-  document.getElementById('page-grid').innerHTML = '<p class="muted" data-s="s2a9ed20f">載入中…</p>';
+  document.getElementById('page-grid').innerHTML = '<p class="muted" data-s="s2a9ed20f">' + tr('載入中…') + '</p>';
   const r = await fu.upload('/tools/pdf-pages/load', fd, {processingLabel: '載入頁面中…'});
-  if (!r.ok) { document.getElementById('page-grid').innerHTML = '<p class="muted">載入失敗</p>'; return; }
+  if (!r.ok) { document.getElementById('page-grid').innerHTML = '<p class="muted">' + tr('載入失敗') + '</p>'; return; }
   const j = await r.json();
   uploadId = j.upload_id;
   pages = j.pages.map(p => ({ ...p, deleted: false }));

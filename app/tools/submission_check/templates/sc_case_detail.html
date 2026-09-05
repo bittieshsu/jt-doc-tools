@@ -83,45 +83,45 @@
 {% endblock %}
 
 {% block content %}
-<p class="muted" data-s="s730ec98e"><a href="../cases" data-s="sd2abea56">← 案件清單</a></p>
+<p class="muted" data-s="s730ec98e"><a href="../cases" data-s="sd2abea56">{{ tr('← 案件清單') }}</a></p>
 <h1>{{ icon('id-card', size=22) }}
-  {% if case.name %}{{ case.name }}{% else %}<span data-s="s8cd4ae71">(未命名案件)</span>{% endif %}
+  {% if case.name %}{{ case.name }}{% else %}<span data-s="s8cd4ae71">{{ tr('(未命名案件)') }}</span>{% endif %}
   <span title="{{ case.case_id }}" data-s="sfa8a6633">{{ case.case_id[:8] }}</span>
 </h1>
 
 <div class="panel scd-meta">
   <dl>
-    <dt>狀態</dt><dd><span data-s="s1e29eefb">{{ case.status }}</span></dd>
-    <dt>檔案數</dt><dd>{{ case.files|length }}</dd>
-    <dt>主角</dt><dd>
+    <dt>{{ tr('狀態') }}</dt><dd><span data-s="s1e29eefb">{{ case.status }}</span></dd>
+    <dt>{{ tr('檔案數') }}</dt><dd>{{ case.files|length }}</dd>
+    <dt>{{ tr('主角') }}</dt><dd>
       {% if case.ground_truth.main_entity %}
         {{ case.ground_truth.main_entity.name }}
         {% if case.ground_truth.main_entity.identifier %}
           <span class="muted">（{{ case.ground_truth.main_entity.identifier }}）</span>
         {% endif %}
-      {% else %}<span data-s="s8cd4ae71">(未設定)</span>{% endif %}
+      {% else %}<span data-s="s8cd4ae71">{{ tr('(未設定)') }}</span>{% endif %}
     </dd>
     {% if case.ground_truth.counterparty %}
-    <dt>對方</dt><dd>{{ case.ground_truth.counterparty.name }}</dd>
+    <dt>{{ tr('對方') }}</dt><dd>{{ case.ground_truth.counterparty.name }}</dd>
     {% endif %}
     {% if case.ground_truth.case_number %}
-    <dt>案號</dt><dd>{{ case.ground_truth.case_number }}</dd>
+    <dt>{{ tr('案號') }}</dt><dd>{{ case.ground_truth.case_number }}</dd>
     {% endif %}
     {% if case.ground_truth.deadline %}
-    <dt>截止日</dt><dd>{{ case.ground_truth.deadline }}</dd>
+    <dt>{{ tr('截止日') }}</dt><dd>{{ case.ground_truth.deadline }}</dd>
     {% endif %}
   </dl>
   <div data-s="s002535c2">
-    <button class="btn btn-primary" data-act="rerun">{{ icon('refresh', size=14) }} 重新檢核（新版本）</button>
-    <button class="btn" data-act="reload" data-s="sda472840">{{ icon('refresh', size=14) }} 重新整理</button>
+    <button class="btn btn-primary" data-act="rerun">{{ icon('refresh', size=14) }} {{ tr('重新檢核（新版本）') }}</button>
+    <button class="btn" data-act="reload" data-s="sda472840">{{ icon('refresh', size=14) }} {{ tr('重新整理') }}</button>
   </div>
 </div>
 
 {# 進行中時顯示 inline 進度 + 6 層燈號，自動 poll #}
 {% if case.status == 'running' and case.current_job_id %}
 <div class="panel" id="runningPanel" data-job-id="{{ case.current_job_id }}" data-s="s952f79a6">
-  <h3 data-s="sbd49e862">{{ icon('refresh', size=16) }} 正在檢核中…</h3>
-  <div class="muted" id="runningMsg" data-s="s90d46ee8">準備中…</div>
+  <h3 data-s="sbd49e862">{{ icon('refresh', size=16) }} {{ tr('正在檢核中…') }}</h3>
+  <div class="muted" id="runningMsg" data-s="s90d46ee8">{{ tr('準備中…') }}</div>
   <div data-s="s6c0b83a4">
     <div id="runningBar" data-s="s83ed22de"></div>
   </div>
@@ -133,26 +133,26 @@
     {% if not loop.last %}<div class="scd-st-line"></div>{% endif %}
     {% endfor %}
   </div>
-  <p class="muted" data-s="s34ac9235">完成後本頁會自動更新。</p>
+  <p class="muted" data-s="s34ac9235">{{ tr('完成後本頁會自動更新。') }}</p>
 </div>
 {% endif %}
 
 {% if not versions_with_reports %}
   <div class="panel" data-s="s57599526">
-    尚無檢核版本，按上方「重新檢核」開始第一次檢核。
+    {{ tr('尚無檢核版本，按上方「重新檢核」開始第一次檢核。') }}
   </div>
 {% endif %}
 
 {% for v in versions_with_reports %}
   <details class="panel" {% if loop.last %}open{% endif %}>
-    <summary>版本 {{ v.version }}</summary>
+    <summary>{{ tr('版本') }} {{ v.version }}</summary>
     {% if v.report %}
       {% set s = v.report.summary %}
       <div class="scd-summary">
-        <div class="card score"><div class="num">{{ s.score }}</div><div class="lbl">就緒度</div></div>
-        <div class="card fail"><div class="num">{{ s.fail }}</div><div class="lbl">失敗</div></div>
-        <div class="card warn"><div class="num">{{ s.warn }}</div><div class="lbl">警告</div></div>
-        <div class="card info"><div class="num">{{ s.info }}</div><div class="lbl">資訊</div></div>
+        <div class="card score"><div class="num">{{ s.score }}</div><div class="lbl">{{ tr('就緒度') }}</div></div>
+        <div class="card fail"><div class="num">{{ s.fail }}</div><div class="lbl">{{ tr('失敗') }}</div></div>
+        <div class="card warn"><div class="num">{{ s.warn }}</div><div class="lbl">{{ tr('警告') }}</div></div>
+        <div class="card info"><div class="num">{{ s.info }}</div><div class="lbl">{{ tr('資訊') }}</div></div>
       </div>
       <div class="scd-stations">
         {% set _layers = s.layers or {} %}
@@ -171,14 +171,14 @@
 
       {% if v.report.cross_findings %}
       <div class="scd-subsection cross">
-        <div class="scd-subsection-title">{{ icon('layers', size=14) }} 跨檔發現 <span class="muted" data-s="s0c27a7ee">({{ v.report.cross_findings|length }} 項 — 多檔之間的一致性 / 重複 / 衝突)</span></div>
+        <div class="scd-subsection-title">{{ icon('layers', size=14) }} {{ tr('跨檔發現') }} <span class="muted" data-s="s0c27a7ee">({{ v.report.cross_findings|length }} {{ tr('項 — 多檔之間的一致性 / 重複 / 衝突)') }}</span></div>
       {% for fd in v.report.cross_findings %}
         <div class="scd-finding {{ fd.severity }}{% if fd._override %} has-override{% endif %}">
           <span class="scd-layer">{{ fd.layer }}</span>
           <span class="scd-finding-title">{{ fd.title }}</span>
           <div class="scd-finding-detail">{{ fd.detail }}</div>
           {% if fd.evidence and fd.evidence|length > 0 %}
-          <button class="scd-evidence-toggle" data-act="toggle">▸ 顯示細節</button>
+          <button class="scd-evidence-toggle" data-act="toggle">{{ tr('▸ 顯示細節') }}</button>
           <pre class="scd-evidence" data-s="scb458930">{{ fd.evidence|tojson(indent=2) }}</pre>
           {% endif %}
           {% if fd._override %}
@@ -202,10 +202,10 @@
               {% endfor %}
             {% endif %}
             {% if not fd._override %}
-            <button class="ok" data-act="mark" data-key="{{ fd.finding_key|e }}" data-status="confirmed_ok">標已確認 OK</button>
-            <button class="fp" data-act="mark" data-key="{{ fd.finding_key|e }}" data-status="false_positive">標誤報</button>
+            <button class="ok" data-act="mark" data-key="{{ fd.finding_key|e }}" data-status="confirmed_ok">{{ tr('標已確認 OK') }}</button>
+            <button class="fp" data-act="mark" data-key="{{ fd.finding_key|e }}" data-status="false_positive">{{ tr('標誤報') }}</button>
             {% else %}
-            <button data-act="removeMark" data-key="{{ fd.finding_key|e }}">移除標記</button>
+            <button data-act="removeMark" data-key="{{ fd.finding_key|e }}">{{ tr('移除標記') }}</button>
             {% endif %}
           </div>
         </div>
@@ -214,7 +214,7 @@
       {% endif %}
 
       <div class="scd-subsection per-file">
-        <div class="scd-subsection-title">{{ icon('page', size=14) }} 逐檔結果 <span class="muted" data-s="s0c27a7ee">({{ case.files|length }} 個檔案各自的 finding)</span></div>
+        <div class="scd-subsection-title">{{ icon('page', size=14) }} {{ tr('逐檔結果') }} <span class="muted" data-s="s0c27a7ee">({{ case.files|length }} {{ tr('個檔案各自的 finding)') }}</span></div>
       {% for f in case.files %}
         {% set fds = v.report.findings_per_file.get(f.file_id, []) %}
         <div class="scd-file-name">{{ f.name }} <span class="sz">({{ (f.size/1024)|round(1) }} KB)</span></div>
@@ -230,24 +230,24 @@
             {% endif %}
             <div class="scd-finding-actions">
               {% if fd.page %}
-              <button class="prev" data-act="preview" data-fid="{{ f.file_id }}" data-page="{{ fd.page }}">{{ icon('eye', size=12) }} 預覽 p.{{ fd.page }}</button>
+              <button class="prev" data-act="preview" data-fid="{{ f.file_id }}" data-page="{{ fd.page }}">{{ icon('eye', size=12) }} {{ tr('預覽 p.') }}{{ fd.page }}</button>
               {% endif %}
               {% if not fd._override %}
-              <button class="ok" data-act="mark" data-key="{{ fd.finding_key|e }}" data-status="confirmed_ok">標已確認 OK</button>
-              <button class="fp" data-act="mark" data-key="{{ fd.finding_key|e }}" data-status="false_positive">標誤報</button>
+              <button class="ok" data-act="mark" data-key="{{ fd.finding_key|e }}" data-status="confirmed_ok">{{ tr('標已確認 OK') }}</button>
+              <button class="fp" data-act="mark" data-key="{{ fd.finding_key|e }}" data-status="false_positive">{{ tr('標誤報') }}</button>
               {% else %}
-              <button data-act="removeMark" data-key="{{ fd.finding_key|e }}">移除標記</button>
+              <button data-act="removeMark" data-key="{{ fd.finding_key|e }}">{{ tr('移除標記') }}</button>
               {% endif %}
             </div>
           </div>
           {% endfor %}
         {% else %}
-          <div class="scd-no-finding">✓ 無發現</div>
+          <div class="scd-no-finding">{{ tr('✓ 無發現') }}</div>
         {% endif %}
       {% endfor %}
       </div>
     {% else %}
-      <div class="muted">報告未產生</div>
+      <div class="muted">{{ tr('報告未產生') }}</div>
     {% endif %}
   </details>
 {% endfor %}
@@ -255,7 +255,7 @@
 <div class="scd-modal" id="prevModal">
   <div class="scd-modal-content">
     <button class="scd-modal-close" data-act="closePreview">×</button>
-    <div class="scd-modal-title" id="prevTitle">預覽中…</div>
+    <div class="scd-modal-title" id="prevTitle">{{ tr('預覽中…') }}</div>
     <img id="prevImg" alt="{{ tr('頁面預覽') }}">
   </div>
 </div>

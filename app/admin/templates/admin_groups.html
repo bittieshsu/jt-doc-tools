@@ -312,7 +312,7 @@ function openRoles(tr) {
           <span class="picker-name">${escapeHtml(name)}</span>
         </label>`;
       }).join('')
-    : '<div class="picker-empty">尚無角色</div>';
+    : '<div class="picker-empty">' + tr('尚無角色') + '</div>';
   document.getElementById('rmSearch').value = '';
   bindPicker('rmList', 'rmSearch', 'rmCount', 'rmClear')();
   document.getElementById('rolesModal').hidden = false;
@@ -345,7 +345,7 @@ function openMembers(tr) {
           <span class="picker-name">${escapeHtml(name)}${sub}${realm}</span>
         </label>`;
       }).join('')
-    : '<div class="picker-empty">尚無使用者</div>';
+    : '<div class="picker-empty">' + tr('尚無使用者') + '</div>';
   document.getElementById('mmSearch').value = '';
   bindPicker('mmList', 'mmSearch', 'mmCount', 'mmClear')();
   document.getElementById('membersModal').hidden = false;

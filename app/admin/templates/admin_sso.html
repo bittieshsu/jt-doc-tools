@@ -251,7 +251,8 @@
     <p class="px-callout-hint">{{ tr('提示：你這次開這個頁面，本服務看到的') }}<b>{{ tr('直接來源 IP＝') }}<code>{{ peer_ip or '(未知)' }}</code></b>{{ tr('。若你正是') }}<b>{{ tr('經反向代理') }}</b>{{ tr('連進來管理的，這通常就是要填到下面清單的值；若你是直接連本服務（未經代理）則不是。') }}</p>
     <details class="px-eg">
       <summary>{{ tr('展開 Nginx 設定範例（可複製）') }}</summary>
-{% raw %}<pre class="px-pre">location / {
+{# 設定範例整段是**要複製去貼**的組態檔，不是介面文字（裡面的中文是註解）。 #}
+{% raw %}<pre class="px-pre" data-i18n="skip">location / {
     # --- SPNEGO / Kerberos（需 libnginx-mod-http-auth-spnego） ---
     auth_gss on;
     auth_gss_realm EXAMPLE.LOCAL;
@@ -313,7 +314,7 @@
 <style nonce="{{ request.state.csp_nonce }}">
 .panel > label { font-size:12px; font-weight:600; color:#374151; }
 /* 這一頁的欄位比認證設定頁多，兩欄排得下 —— 放寬一點 */
-.auth-form { max-width: 900px; }
+.auth-form { max-width: none; }  /* 使用者要求：SSO 設定頁卡片一律全寬，右邊不留白 */
 .auth-form textarea.field { width:100%; box-sizing:border-box; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
 .sso-saverow { display:flex; align-items:center; gap:10px; margin:12px 0 0; flex-wrap:wrap; }
 .sso-savehint { font-size:11.5px; }
@@ -333,7 +334,7 @@
   const $ = id => document.getElementById(id);
   function refreshHints(){
     const b = ($('base_url').value || '').trim().replace(/\/+$/, '');
-    const show = b || '（先填上方 base URL，或會依請求推導）';
+    const show = b || tr('（先填上方 base URL，或會依請求推導）');
     $('oidcRedirect').textContent = b ? (b + '/auth/oidc/callback') : show;
     $('samlMeta').textContent = b ? (b + '/auth/saml/metadata') : show;
     $('samlAcs').textContent = b ? (b + '/auth/saml/acs') : show;

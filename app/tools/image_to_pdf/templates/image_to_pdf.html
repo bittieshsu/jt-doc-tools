@@ -268,7 +268,7 @@ function render() {
     if (p.uploading) {
       return `<div class="i2p-card" data-s="sb1aca7e1">
         <div class="i2p-thumb-wrap" data-s="sb1aca7e1">
-          <span class="muted" data-s="s6b9c179a">上傳中…</span>
+          <span class="muted" data-s="s6b9c179a">${tr('上傳中…')}</span>
         </div>
         <div class="i2p-num">第 ${idx + 1} 頁</div>
         <div class="i2p-fname" title="${escapeHtml(p.filename)}">${escapeHtml(p.filename)}</div>

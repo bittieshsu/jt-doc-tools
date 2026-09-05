@@ -10,6 +10,13 @@
 
 兩條都不需要改程式，也不需要我們提供特製版本。
 
+> **本專案不提供預先建置的容器映像 —— 這是刻意的授權風險控制，不是缺漏。**
+>
+> 本體採 AGPL-3.0，而 OCR 那條路會帶進 PyTorch 與 NVIDIA CUDA runtime 這類
+> **專有授權**元件。把它們打包成映像再散布，等於由我們替第三方元件重新散布，
+> 授權風險我們不承擔。`Dockerfile` 提供的是**可重現的建置配方**，映像請自行
+> 建置（`docker compose build`）；預設建置不含 EasyOCR / PyTorch / CUDA。
+
 ---
 
 ## A. Docker 映像檔搬運
@@ -19,7 +26,7 @@
 ```bash
 git clone https://github.com/jasoncheng7115/jt-doc-tools.git
 cd jt-doc-tools
-docker build -t jt-doc-tools:1.14.52 .
+docker build -t jt-doc-tools:local .
 ```
 
 建置約 10–20 分鐘（視網速），映像檔約 **3.7 GB**。
@@ -27,7 +34,7 @@ docker build -t jt-doc-tools:1.14.52 .
 ### A-2. 匯出成單一檔案
 
 ```bash
-docker save jt-doc-tools:1.14.52 | gzip -1 > jtdt-image.tgz    # 約 940 MB
+docker save jt-doc-tools:local | gzip -1 > jtdt-image.tgz    # 約 940 MB
 ```
 
 用隨身碟 / 內部檔案交換區把 `jtdt-image.tgz` 帶進內網。
@@ -41,7 +48,7 @@ docker run -d --name jt-doc-tools \
     -p 8765:8765 \
     -v jtdt-data:/data \
     --restart unless-stopped \
-    jt-doc-tools:1.14.52
+    jt-doc-tools:local
 ```
 
 開瀏覽器到 `http://<內網機器>:8765/`。

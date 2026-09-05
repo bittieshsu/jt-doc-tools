@@ -24,6 +24,10 @@ import re
 
 import pytest
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 #: 工具頁面本身沒有對外 API 的例外。加進來要寫清楚為什麼。
@@ -63,7 +67,7 @@ def _missing_from(text: str, tool_apis: dict[str, set[str]]) -> list[str]:
 
 def test_every_tool_api_is_in_api_md(tool_apis):
     """API.md 漏寫 = 照文件串接的人會以為這支沒有 API。"""
-    text = (ROOT / "github" / "API.md").read_text(encoding="utf-8")
+    text = (_public_root(ROOT) / "API.md").read_text(encoding="utf-8")
     missing = _missing_from(text, tool_apis)
     assert not missing, (
         f"這些工具有 API 但 github/API.md 沒寫：{missing}\n"
@@ -79,7 +83,7 @@ def test_every_tool_api_is_in_test_plan(tool_apis):
 
 def test_api_md_does_not_promise_endpoints_that_do_not_exist(tool_apis):
     """反過來：文件寫了但程式沒有 —— 照著呼叫會 404。"""
-    text = (ROOT / "github" / "API.md").read_text(encoding="utf-8")
+    text = (_public_root(ROOT) / "API.md").read_text(encoding="utf-8")
     documented = set(re.findall(r"/tools/([a-z0-9-]+)/(?:api/|convert)", text))
     ghost = sorted(documented - set(tool_apis))
     assert not ghost, f"API.md 寫了這些工具的端點但實際不存在：{ghost}"

@@ -37,7 +37,7 @@
     <summary data-s="s9afb64c1">
       <span class="fnt-group-head">
         <span class="fnt-group-title">
-          {{ g.title }} <span class="muted" data-s="s0c27a7ee">({{ g.fonts|length }})</span>
+          {{ tr(g.title) }} <span class="muted" data-s="s0c27a7ee">({{ g.fonts|length }})</span>
         </span>
         <span class="fnt-group-actions" data-stop-prop data-prevent-default>
           <button type="button" class="btn btn-small fnt-bulk-show" data-ids='{{ group_ids|tojson }}'
@@ -64,7 +64,7 @@
         {% for f in g.fonts %}
         <tr data-style="{% if f.hidden %}opacity:0.55; background:#fafafa;{% endif %}">
           <td data-s="s769f6444">
-            {{ f.label }}
+            {{ tr(f.label) }}
             {% if f.hidden %}<span data-s="s26857338">{{ tr('隱藏') }}</span>{% endif %}
           </td>
           <td data-s="s769f6444">
@@ -78,7 +78,7 @@
           <td data-s="s1cb2fec9">
             <button type="button" class="btn btn-small toggle-hidden-font" data-id="{{ f.id }}"
                     data-s="s002c9579"
-                    title="{% if f.hidden %}取消隱藏，讓工具的字型選單再次顯示這個字型{% else %}隱藏這個字型，工具的字型選單就不會出現它{% endif %}">
+                    title="{% if f.hidden %}{{ tr('取消隱藏，讓工具的字型選單再次顯示這個字型') }}{% else %}{{ tr('隱藏這個字型，工具的字型選單就不會出現它') }}{% endif %}">
               {% if f.hidden %}{{ icon('eye', size=12) }} {{ tr('顯示') }}{% else %}{{ icon('eye-off', size=12) }} {{ tr('隱藏') }}{% endif %}
             </button>
             {% if f.category == 'custom' %}
@@ -291,7 +291,7 @@ document.querySelectorAll('.rename-custom-font').forEach(btn => {
       + '（PDF 編輯器、用印、浮水印的字型選單都會用這個名稱）',
       {
         title: '變更名稱',
-        okText: '儲存',
+        okText: tr('儲存'),
         defaultValue: cur,
         placeholder: auto ? '留空 = 用字型檔內建的名稱「' + auto + '」'
                           : '留空 = 用檔名',

@@ -81,7 +81,7 @@ const fu = new FileUpload($('attUp'), async (f) => {
       <td data-s="sd2abea56">${esc(a.creation || '-')}</td>
       <td data-s="sf6e3d7fe">
         <a class="btn" href="/tools/pdf-attachments/file/${uploadId}/${encodeURIComponent(a.name)}"
-           download data-s="sdbf04bec">下載</a>
+           download data-s="sdbf04bec">${tr('下載')}</a>
       </td>
     </tr>`).join('');
   $('attTable').hidden = false;

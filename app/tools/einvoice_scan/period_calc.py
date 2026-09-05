@@ -92,6 +92,10 @@ def all_recent_periods(today: Optional[date] = None, n: int = 6) -> list[dict]:
                 "year": y, "period_no": p,
                 "start": s.isoformat(), "end": e.isoformat(),
                 "label": _format_label(y, p) + (" (進行中)" if e >= today else ""),
+                # 翻譯用：鍵 + 參數（見 LABEL_I18N 的說明）
+                "label_i18n": LABEL_I18N,
+                "label_args": label_args(y, p),
+                "in_progress": e >= today,
             })
     out.sort(key=lambda x: x["start"], reverse=True)
     return out[:n]
@@ -102,6 +106,18 @@ def _format_label(year: int, period_no: int) -> str:
     sm = (period_no - 1) * 2 + 1
     em = sm + 1
     return f"{year} 年第 {period_no} 期 ({sm}-{em} 月)"
+
+
+#: 期別標籤的**翻譯用鍵**（`{0}` 年、`{1}` 期別、`{2}`-`{3}` 起訖月）。
+#: 組好的中文字串沒辦法當鍵（數字每次都不一樣），所以另外附鍵與參數，
+#: 前端 `tr(鍵).replace('{0}', …)` 才翻得到。
+LABEL_I18N = "{0} 年第 {1} 期 ({2}-{3} 月)"
+IN_PROGRESS_I18N = " (進行中)"
+
+
+def label_args(year: int, period_no: int) -> list[str]:
+    sm = (period_no - 1) * 2 + 1
+    return [str(year), str(period_no), str(sm), str(sm + 1)]
 
 
 def is_in_period(invoice_date_str: str, start_str: str, end_str: str) -> bool:

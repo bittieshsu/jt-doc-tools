@@ -91,7 +91,7 @@ def _render() -> dict[str, bytes]:
 #: 的位元組**，那是預期內的；但「畫面上看得到的東西有沒有變」仍然要能單獨驗，
 #: 所以 `--ignore-scripts` 把 script 整段換成一個標記再比 —— 這條在包 JS 那幾
 #: 批是唯一還有意義的判準（JS 的行為改用 `temp/i18n-cdp/cdp_i18n_test.py` 驗）。
-_SCRIPT = re.compile(rb"<script\b[^>]*>.*?</script>", re.S | re.I)
+_SCRIPT = re.compile(rb"<script\b[^>]*>.*?</script\s*>", re.S | re.I)
 
 
 def main() -> int:

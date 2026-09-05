@@ -130,6 +130,10 @@
       };
     }
     track(jobId) {
+      // 作業編號一律**當成不可信的值**：它從網址 / 伺服器回應進來，直接拼進
+      // 路徑的話可以塞進 `../` 或 `//` 改寫成別的端點（CodeQL 的
+      // client-side request forgery 指的就是這一條）。編碼一次就沒有這個問題。
+      jobId = encodeURIComponent(String(jobId == null ? '' : jobId));
       this.jobId = jobId;
       // 重設前次 run 的殘留狀態（進度條 / 下載按鈕 / 錯誤色），避免顯示 stale UI
       this.bar.style.width = '0%';

@@ -23,31 +23,31 @@
 {% endblock %}
 
 {% block content %}
-<h1>{{ icon('chart-bar', size=22) }} 送件檢核儀表板（admin）</h1>
-<p class="muted">跨案件統計，僅 admin 可見。</p>
+<h1>{{ icon('chart-bar', size=22) }} {{ tr('送件檢核儀表板（admin）') }}</h1>
+<p class="muted">{{ tr('跨案件統計，僅 admin 可見。') }}</p>
 
 <div class="panel scs-filter">
-  時間區間：
-  <a href="admin-stats?days=7" {% if days == 7 %}class="active"{% endif %}>近 7 天</a>
-  <a href="admin-stats?days=30" {% if days == 30 %}class="active"{% endif %}>近 30 天</a>
-  <a href="admin-stats?days=90" {% if days == 90 %}class="active"{% endif %}>近 90 天</a>
-  <a href="admin-stats?days=365" {% if days == 365 %}class="active"{% endif %}>近 1 年</a>
+  {{ tr('時間區間：') }}
+  <a href="admin-stats?days=7" {% if days == 7 %}class="active"{% endif %}>{{ tr('近 7 天') }}</a>
+  <a href="admin-stats?days=30" {% if days == 30 %}class="active"{% endif %}>{{ tr('近 30 天') }}</a>
+  <a href="admin-stats?days=90" {% if days == 90 %}class="active"{% endif %}>{{ tr('近 90 天') }}</a>
+  <a href="admin-stats?days=365" {% if days == 365 %}class="active"{% endif %}>{{ tr('近 1 年') }}</a>
 </div>
 
 {% if stats.cases_total == 0 %}
-  <div class="panel scs-empty">所選區間內沒有案件。</div>
+  <div class="panel scs-empty">{{ tr('所選區間內沒有案件。') }}</div>
 {% else %}
   <div class="panel">
     <div class="scs-cards">
-      <div class="scs-card"><div class="num">{{ stats.cases_total }}</div><div class="lbl">案件總數</div></div>
-      <div class="scs-card"><div class="num">{{ stats.files_total }}</div><div class="lbl">檔案總數</div></div>
-      <div class="scs-card"><div class="num">{{ stats.avg_score if stats.avg_score is not none else "—" }}</div><div class="lbl">平均就緒度</div></div>
-      <div class="scs-card"><div class="num">{{ stats.by_status.get("done", 0) }}</div><div class="lbl">已完成案件</div></div>
+      <div class="scs-card"><div class="num">{{ stats.cases_total }}</div><div class="lbl">{{ tr('案件總數') }}</div></div>
+      <div class="scs-card"><div class="num">{{ stats.files_total }}</div><div class="lbl">{{ tr('檔案總數') }}</div></div>
+      <div class="scs-card"><div class="num">{{ stats.avg_score if stats.avg_score is not none else "—" }}</div><div class="lbl">{{ tr('平均就緒度') }}</div></div>
+      <div class="scs-card"><div class="num">{{ stats.by_status.get("done", 0) }}</div><div class="lbl">{{ tr('已完成案件') }}</div></div>
     </div>
   </div>
 
   <details class="panel" open>
-    <summary>狀態分布</summary>
+    <summary>{{ tr('狀態分布') }}</summary>
     <table class="scs-tbl">
       {% for st, n in stats.by_status.items() %}
       <tr><td data-s="s088cf005">{{ st }}</td><td>
@@ -59,18 +59,18 @@
   </details>
 
   <details class="panel" open>
-    <summary>三層使用統計（已 done 案件中）</summary>
+    <summary>{{ tr('三層使用統計（已 done 案件中）') }}</summary>
     <table class="scs-tbl">
       {% for layer, n in stats.layer_used.items() %}
-      <tr><td data-s="s088cf005">{{ layer }}</td><td>{{ n }} 個案件</td></tr>
+      <tr><td data-s="s088cf005">{{ layer }}</td><td>{{ n }} {{ tr('個案件') }}</td></tr>
       {% endfor %}
     </table>
   </details>
 
   <details class="panel" open>
-    <summary>Top 10 失敗 / 警告類型</summary>
+    <summary>{{ tr('Top 10 失敗 / 警告類型') }}</summary>
     <table class="scs-tbl">
-      <thead><tr><th>類型</th><th>次數</th></tr></thead>
+      <thead><tr><th>{{ tr('類型') }}</th><th>{{ tr('次數') }}</th></tr></thead>
       <tbody>
       {% for cat, n in stats.top_categories %}
       <tr><td>{{ cat or "(未分類)" }}</td><td>{{ n }}</td></tr>
@@ -80,7 +80,7 @@
   </details>
 
   <details class="panel">
-    <summary>嚴重度分布</summary>
+    <summary>{{ tr('嚴重度分布') }}</summary>
     <table class="scs-tbl">
       {% for sev, n in stats.severity_breakdown.items() %}
       <tr><td data-s="s088cf005">{{ sev }}</td><td>{{ n }}</td></tr>
@@ -90,6 +90,6 @@
 {% endif %}
 
 <p class="muted" data-s="sc30c30a1">
-  <a href="cases" data-s="sd294e9a2">→ 查看所有案件清單</a>
+  <a href="cases" data-s="sd294e9a2">{{ tr('→ 查看所有案件清單') }}</a>
 </p>
 {% endblock %}

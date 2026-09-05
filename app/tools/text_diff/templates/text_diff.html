@@ -211,7 +211,7 @@ function _wireDrop(textareaId, metaId) {
     reader.onload = () => {
       const text = reader.result || "";
       if (_looksBinary(text)) {
-        meta.innerHTML = `<span class="err">看起來是二進位檔（含 NUL）— 拒絕載入</span>`;
+        meta.innerHTML = `<span class="err">${tr('看起來是二進位檔（含 NUL）— 拒絕載入')}</span>`;
         return;
       }
       ta.value = text;
@@ -287,22 +287,22 @@ function renderResult(d) {
   const deltaStr = (delta > 0 ? '+' : '') + delta.toLocaleString();
   $('sumBox').innerHTML = `
     <div class="stat-group">
-      <div class="stat-group-title muted">行數</div>
+      <div class="stat-group-title muted">${tr('行數')}</div>
       <div class="stat-row">
-        <div class="stat add">新增行 <b>${(t.added || 0).toLocaleString()}</b></div>
-        <div class="stat rem">刪除行 <b>${(t.removed || 0).toLocaleString()}</b></div>
-        <div class="stat chg">修改行 <b>${(t.changed || 0).toLocaleString()}</b></div>
+        <div class="stat add">${tr('新增行')} <b>${(t.added || 0).toLocaleString()}</b></div>
+        <div class="stat rem">${tr('刪除行')} <b>${(t.removed || 0).toLocaleString()}</b></div>
+        <div class="stat chg">${tr('修改行')} <b>${(t.changed || 0).toLocaleString()}</b></div>
       </div>
     </div>
     <div class="stat-group">
-      <div class="stat-group-title muted">字數差異</div>
+      <div class="stat-group-title muted">${tr('字數差異')}</div>
       <div class="stat-row">
-        <div class="stat">舊版 <b>${ca.toLocaleString()}</b> 字</div>
-        <div class="stat">新版 <b>${cb.toLocaleString()}</b> 字</div>
-        <div class="stat ${delta >= 0 ? 'add' : 'rem'}">差 <b>${deltaStr}</b> 字</div>
-        <div class="stat add">新增字 <b>${(t.chars_added || 0).toLocaleString()}</b></div>
-        <div class="stat rem">刪除字 <b>${(t.chars_removed || 0).toLocaleString()}</b></div>
-        <div class="stat chg">修改字 <b>${(t.chars_changed || 0).toLocaleString()}</b></div>
+        <div class="stat">${tr('舊版')} <b>${ca.toLocaleString()}</b> ${tr('字')}</div>
+        <div class="stat">${tr('新版')} <b>${cb.toLocaleString()}</b> ${tr('字')}</div>
+        <div class="stat ${delta >= 0 ? 'add' : 'rem'}">${tr('差')} <b>${deltaStr}</b> ${tr('字')}</div>
+        <div class="stat add">${tr('新增字')} <b>${(t.chars_added || 0).toLocaleString()}</b></div>
+        <div class="stat rem">${tr('刪除字')} <b>${(t.chars_removed || 0).toLocaleString()}</b></div>
+        <div class="stat chg">${tr('修改字')} <b>${(t.chars_changed || 0).toLocaleString()}</b></div>
       </div>
     </div>`;
 

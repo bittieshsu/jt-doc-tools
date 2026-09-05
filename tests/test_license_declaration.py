@@ -13,8 +13,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import sys as _sys, pathlib as _pathlib
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
+from tools.repo_paths import public_root as _public_root
+
 ROOT = Path(__file__).resolve().parent.parent
-GH = ROOT / "github"
+GH = _public_root(ROOT)
 
 #: 單一事實來源 —— 要換授權就改這裡，測試會指出所有沒跟上的檔案。
 SPDX = "AGPL-3.0-or-later"

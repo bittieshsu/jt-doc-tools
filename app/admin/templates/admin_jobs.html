@@ -91,8 +91,8 @@
         <span class="aj-limit">{{ tr('LLM / 遠端 GPU OCR') }}</span>
       </div>
       <div class="aj-help muted">
-        {% if conc.remote_services %}目前啟用：{{ conc.remote_services|join('、') }}。{% endif %}
-        真正的瓶頸在<b>{{ tr('對方那台機器') }}</b>{{ tr('（一張 GPU 只載一個模型），本機的記憶體判斷擋不到。') }}
+        {% if conc.remote_services %}{{ tr('目前啟用：') }}{{ conc.remote_services|join('、') }}。{% endif %}
+        {{ tr('真正的瓶頸在') }}<b>{{ tr('對方那台機器') }}</b>{{ tr('（一張 GPU 只載一個模型），本機的記憶體判斷擋不到。') }}
         <b>{{ tr('預設 1') }}</b> {{ tr('—— 一個一個過去、每個都在合理時間內完成，比全部一起去搶顯示記憶體到集體逾時好。') }}
       </div>
     </div>
@@ -103,13 +103,13 @@
         <select id="aj-cpupct" {% if not conc.cpu_limit.affinity_supported %}disabled{% endif %}>
           <option value="0"{% if conc.soffice_cpu_percent == 0 %} selected{% endif %}>{{ tr('自動（保留 1 核給網頁）') }}</option>
           {% for pct in [25, 50, 75, 100] %}
-          <option value="{{ pct }}"{% if conc.soffice_cpu_percent == pct %} selected{% endif %}>{{ pct }}%{% if pct == 100 %}（不限制）{% endif %}</option>
+          <option value="{{ pct }}"{% if conc.soffice_cpu_percent == pct %} selected{% endif %}>{{ pct }}%{% if pct == 100 %}{{ tr('（不限制）') }}{% endif %}</option>
           {% endfor %}
         </select>
         <span class="aj-limit" id="aj-cpupct-now">
           {%- set cl = conc.cpu_limit -%}
           {%- if cl.affinity_supported -%}
-          目前 {{ cl.effective_cores }} / {{ cl.cpu_count }} {{ tr('核') }}{% if cl.reserved_cores %}・留 {{ cl.reserved_cores }} {{ tr('核給網頁') }}{% endif %}
+          {{ tr('目前') }} {{ cl.effective_cores }} / {{ cl.cpu_count }} {{ tr('核') }}{% if cl.reserved_cores %}{{ tr('・留') }} {{ cl.reserved_cores }} {{ tr('核給網頁') }}{% endif %}
           {%- else -%}此平台不支援{%- endif -%}
         </span>
       </div>
@@ -394,7 +394,7 @@
   let paused = false;
 
   const LABEL = {
-    pending: '排隊中', running: '進行中', done: '已完成',
+    pending: tr('排隊中'), running: '進行中', done: '已完成',
     error: '失敗', cancelled: '已取消', interrupted: '已中斷',
   };
   // 共用資源標籤 —— 三種資源各有自己的併行上限，標出來才知道卡在哪一個
@@ -475,16 +475,16 @@
     const rt = d.runtime || {};
     const ofc = d.office || {};
     statsEl.textContent = '';
-    statsEl.appendChild(stat(rt.running || 0, '執行中', false, 'running'));
-    statsEl.appendChild(stat(rt.queued || 0, '排隊中', (rt.queued || 0) > 0, 'queued'));
-    statsEl.appendChild(stat(`${ofc.in_use || 0} / ${ofc.limit || 1}`, 'Office 轉檔佔用'));
-    statsEl.appendChild(stat(rt.max_concurrent || 1, '同時上限'));
+    statsEl.appendChild(stat(rt.running || 0, tr('執行中'), false, 'running'));
+    statsEl.appendChild(stat(rt.queued || 0, tr('排隊中'), (rt.queued || 0) > 0, 'queued'));
+    statsEl.appendChild(stat(`${ofc.in_use || 0} / ${ofc.limit || 1}`, tr('Office 轉檔佔用')));
+    statsEl.appendChild(stat(rt.max_concurrent || 1, tr('同時上限')));
     if (rt.held_for_ram) {
       statsEl.appendChild(stat('是', '因記憶體不足而排隊', true));
     }
     paused = !!rt.paused;
     document.getElementById('aj-pause-tx').textContent =
-      paused ? '恢復派送' : '暫停派送';
+      paused ? '恢復派送' : tr('暫停派送');
     // 暫停會影響所有人 → 用醒目色，不要長得像一般按鈕；暫停中改綠色（恢復）
     pauseBtn.classList.toggle('btn-warn', !paused);
     pauseBtn.classList.toggle('btn-resume', paused);
@@ -501,8 +501,9 @@
                               Math.round((m.reserve_mb / m.total_mb) * 100));
       // 「可開新作業」= 可用 − 保留，也就是實際還能拿去開新作業的量
       const spare = Math.max(0, (m.available_mb || 0) - (m.reserve_mb || 0));
-      txt.textContent = `記憶體：已用 ${fmtMB(usedMb)} / 總計 ${fmtMB(m.total_mb)}`
-        + `・可開新作業 ${fmtMB(spare)}（保留 ${fmtMB(m.reserve_mb)} 不動用）`;
+      txt.textContent = tr('記憶體：已用 {0} / 總計 {1}・可開新作業 {2}（保留 {3} 不動用）')
+        .replace('{0}', fmtMB(usedMb)).replace('{1}', fmtMB(m.total_mb))
+        .replace('{2}', fmtMB(spare)).replace('{3}', fmtMB(m.reserve_mb));
       pctEl.textContent = usedPct + '%';
       document.getElementById('aj-mem-used').style.width = usedPct + '%';
       document.getElementById('aj-mem-reserve').style.width = resPct + '%';
@@ -523,10 +524,10 @@
     if (cpu.percent != null) {
       const pct = Math.max(0, Math.min(100, Math.round(cpu.percent)));
       const la = (cpu.loadavg || [])[0];
-      ctxt.textContent = `CPU：${cpu.count || '?'} 核`
-        + (cpu.in_container ? '（容器配額）' : '')
+      ctxt.textContent = tr('CPU：{0} 核').replace('{0}', String(cpu.count || '?'))
+        + (cpu.in_container ? tr('（容器配額）') : '')
         + (la != null && !cpu.in_container
-           ? `・近 1 分鐘負載 ${la.toFixed(2)}` : '');
+           ? tr('・近 1 分鐘負載 {0}').replace('{0}', la.toFixed(2)) : '');
       cpct.textContent = pct + '%';
       document.getElementById('aj-cpu-used').style.width = pct + '%';
       cbox.classList.toggle('busy', pct >= 70 && pct < 90);
@@ -682,7 +683,7 @@
     const live = document.getElementById('aj-live');
     live.classList.toggle('on', hasActive);
     document.getElementById('aj-live-tx').textContent =
-      hasActive ? '自動更新中（每 2 秒）' : '自動更新中（每 8 秒）';
+      hasActive ? '自動更新中（每 2 秒）' : tr('自動更新中（每 8 秒）');
     timer = setTimeout(load, hasActive ? 2000 : 8000);
   }
 
@@ -894,7 +895,7 @@
     list.textContent = '';
     if (!prioUsers.length) {
       list.appendChild(el('div', 'muted aj-prio-empty',
-                          '目前沒有指定任何人 —— 所有作業一律照先來後到。'));
+                          tr('目前沒有指定任何人 —— 所有作業一律照先來後到。')));
     }
     prioUsers.forEach((u, i) => {
       const row = el('div', 'aj-prio-row');

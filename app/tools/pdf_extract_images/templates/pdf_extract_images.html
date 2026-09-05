@@ -105,7 +105,7 @@ const fu = new FileUpload(document.getElementById('upE'), async (f) => {
   }
   document.getElementById('extract-panel').hidden = false;
   document.getElementById('img-grid').innerHTML =
-    '<div class="ext-loading" data-s="s1b9b41ec"><span class="ext-spinner ext-spinner-lg"></span><div>正在擷取嵌入圖片，請稍候…</div></div>';
+    '<div class="ext-loading" data-s="s1b9b41ec"><span class="ext-spinner ext-spinner-lg"></span><div>' + tr('正在擷取嵌入圖片，請稍候…') + '</div></div>';
   document.getElementById('extract-info').innerHTML = '<span class="ext-spinner"></span> 擷取中…';
   const fd = new FormData(); fd.append('file', f);
   const r = await fu.upload('/tools/pdf-extract-images/extract', fd, {processingLabel: '伺服器擷取圖片中…'});
@@ -132,7 +132,7 @@ function renderExtracted() {
   const info = document.getElementById('extract-info');
   info.textContent = tr('共 {0} 張，已勾選 {1} 張').replace('{0}', extractedItems.length).replace('{1}', picked.size);
   if (!extractedItems.length) {
-    grid.innerHTML = '<p class="muted" data-s="s2a9ed20f">這份 PDF 沒有嵌入圖片。</p>';
+    grid.innerHTML = '<p class="muted" data-s="s2a9ed20f">' + tr('這份 PDF 沒有嵌入圖片。') + '</p>';
     return;
   }
   grid.innerHTML = extractedItems.map(it => {

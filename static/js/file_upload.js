@@ -220,7 +220,7 @@
       const wrap = document.createElement('div');
       wrap.className = 'fu-progress';
       wrap.innerHTML =
-        '<div class="fu-progress-label">準備中…</div>' +
+        '<div class="fu-progress-label">' + tr('準備中…') + '</div>' +
         '<div class="fu-progress-bar"><div class="fu-progress-fill"></div></div>' +
         '<div class="fu-progress-pct">0%</div>';
       this.dropZone.appendChild(wrap);

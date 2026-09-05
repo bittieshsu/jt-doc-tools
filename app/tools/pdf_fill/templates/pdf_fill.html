@@ -2,8 +2,8 @@
 {% from "components/icons.html" import icon %}
 {% block title %}表單自動填寫 · {{ app_name }}{% endblock %}
 {% block content %}
-<h1 data-s="s6d2e9344">{{ icon('edit', size=22) }} 表單自動填寫</h1>
-<p class="muted">上傳○○資料表/匯款申請書（支援 PDF 及 Word/Excel/ODF，輸出為 PDF），自動偵測欄位並用公司基本資料填好。處理完成後上傳檔案會於數小時內自動刪除，不留存副本。</p>
+<h1 data-s="s6d2e9344">{{ icon('edit', size=22) }} {{ tr('表單自動填寫') }}</h1>
+<p class="muted">{{ tr('上傳○○資料表/匯款申請書（支援 PDF 及 Word/Excel/ODF，輸出為 PDF），自動偵測欄位並用公司基本資料填好。處理完成後上傳檔案會於數小時內自動刪除，不留存副本。') }}</p>
 
 {% include "components/cjk_font_notice.html" with context %}
 
@@ -11,7 +11,7 @@
   <summary>
     <div data-s="s2238b756">
       <div data-s="s5f11e4db">
-        <h2 data-s="s1386d503">公司資料</h2>
+        <h2 data-s="s1386d503">{{ tr('公司資料') }}</h2>
         {% if companies|length > 1 %}
         <select id="companySwitch" data-stop-prop>
           {% for c in companies %}
@@ -19,13 +19,13 @@
           {% endfor %}
         </select>
         {% else %}
-        <span class="muted">{{ profile.name }}</span>
+        <span class="muted">{{ tr(profile.name) }}</span>
         {% endif %}
       </div>
-      <a class="btn btn-small" href="/admin/profile?cid={{ selected_id }}" data-stop-prop>{{ icon('edit') }}編輯</a>
+      <a class="btn btn-small" href="/admin/profile?cid={{ selected_id }}" data-stop-prop>{{ icon('edit') }}{{ tr('編輯') }}</a>
     </div>
   </summary>
-  <p class="muted" data-s="s402978b9">這些欄位會被自動帶入偵測到的對應欄位。</p>
+  <p class="muted" data-s="s402978b9">{{ tr('這些欄位會被自動帶入偵測到的對應欄位。') }}</p>
   {% for sec in sections %}
     {% set visible_rows = sec.rows|selectattr('value')|list %}
     {% if visible_rows %}
@@ -45,33 +45,33 @@
 </details>
 
 <div class="panel">
-  <h2 data-s="s53896af7">上傳檔案</h2>
+  <h2 data-s="s53896af7">{{ tr('上傳檔案') }}</h2>
   <form id="uploadForm">
     {% with upload_id='pdfFileUpload', accept='.pdf,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.csv', hint='支援 PDF 及 Word/Excel/PowerPoint/ODF；非 PDF 會先轉 PDF 再填。<br><strong>一次只處理一份檔案</strong>，若選了多份會自動取第一份。' %}
       {% include "components/file_upload.html" %}
     {% endwith %}
     <div class="upload-actions">
       <div class="upload-font">
-        <label for="fontSelect">字型</label>
+        <label for="fontSelect">{{ tr('字型') }}</label>
         <select id="fontSelect" name="font_id">
           {% for f in fonts %}
-          <option value="{{ f.id }}">{{ f.name }}</option>
+          <option value="{{ f.id }}">{{ tr(f.name) }}</option>
           {% endfor %}
         </select>
       </div>
       <button class="btn btn-primary btn-lg" type="submit" id="submitBtn">
         <span class="btn-icon-slot">{{ icon('eye') }}</span>
-        <span class="btn-label">預覽填寫結果</span>
+        <span class="btn-label">{{ tr('預覽填寫結果') }}</span>
       </button>
     </div>
     {% if llm_enabled %}
     <div class="llm-toggle-row">
       <label data-s="s1f833120">
         <input type="checkbox" id="useLlmReview">
-        啟用 LLM 校驗（會多花約 30-60 秒）
+        {{ tr('啟用 LLM 校驗（會多花約 30-60 秒）') }}
       </label>
       <span class="muted" data-s="s8b685211">
-        (附加功能；本地 / LAN LLM server 對填寫結果做品質檢查)
+        {{ tr('(附加功能；本地 / LAN LLM server 對填寫結果做品質檢查)') }}
       </span>
     </div>
     {% endif %}
@@ -79,40 +79,40 @@
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 data-s="s53896af7">預覽結果</h2>
+  <h2 data-s="s53896af7">{{ tr('預覽結果') }}</h2>
   <div id="reportBox"></div>
   <div id="llmReviewBox" hidden data-s="s553a645f"></div>
   <details id="unmatchedBox" class="unmatched-box" hidden>
     <summary data-s="s6150e8f6">
-      未對應的標籤（教系統認識）<span id="unmatchedCount" class="muted" data-s="s5a8ca7b2"></span>
+      {{ tr('未對應的標籤（教系統認識）') }}<span id="unmatchedCount" class="muted" data-s="s5a8ca7b2"></span>
     </summary>
-    <p class="muted" data-s="s6b9c179a">下拉選對應的欄位後按「學起來」，下次遇到相同字串就會自動填。</p>
+    <p class="muted" data-s="s6b9c179a">{{ tr('下拉選對應的欄位後按「學起來」，下次遇到相同字串就會自動填。') }}</p>
     <div id="unmatchedList"></div>
-    <button class="btn btn-small" id="rerunBtn" type="button" data-s="s9e3c4ccb" hidden>{{ icon('refresh') }}重新識別</button>
+    <button class="btn btn-small" id="rerunBtn" type="button" data-s="s9e3c4ccb" hidden>{{ icon('refresh') }}{{ tr('重新識別') }}</button>
   </details>
   <div data-s="s0fb4a9c0">
-    <a class="btn btn-primary" id="downloadBtn" href="#">{{ icon('download') }}下載填好的 PDF</a>
-    {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden>{{ icon('archive') }}存至工作區</button>{% endif %}
-    <button class="btn btn-small" id="regenBtn" type="button" hidden>{{ icon('refresh') }}套用新位置</button>
+    <a class="btn btn-primary" id="downloadBtn" href="#">{{ icon('download') }}{{ tr('下載填好的 PDF') }}</a>
+    {% if workspace_enabled(request) %}<button class="btn" id="wsSaveBtn" type="button" hidden>{{ icon('archive') }}{{ tr('存至工作區') }}</button>{% endif %}
+    <button class="btn btn-small" id="regenBtn" type="button" hidden>{{ icon('refresh') }}{{ tr('套用新位置') }}</button>
     <span id="templateStatus" class="muted" data-s="s3044b600"></span>
-    <button class="btn btn-small" id="saveTplBtn" type="button" hidden>{{ icon('save') }}儲存為範本</button>
+    <button class="btn btn-small" id="saveTplBtn" type="button" hidden>{{ icon('save') }}{{ tr('儲存為範本') }}</button>
   </div>
   <div class="preview-note">
-    <strong>💡 兩種檢視模式：</strong>
-    <b>編輯模式</b> 顯示原始 PDF 加上藍色可拖動框，用來調整欄位位置（滑鼠滑到框上出現 <span data-s="s43327cce">×</span> 可刪除，<b>右鍵</b>新增/覆寫）。
-    <b>合成模式</b> 才是真正的填寫結果；調完位置請按「套用新位置」，切回合成模式就能看到實際效果。
+    <strong>{{ tr('💡 兩種檢視模式：') }}</strong>
+    <b>{{ tr('編輯模式') }}</b> {{ tr('顯示原始 PDF 加上藍色可拖動框，用來調整欄位位置（滑鼠滑到框上出現') }} <span data-s="s43327cce">×</span> {{ tr('可刪除，') }}<b>{{ tr('右鍵') }}</b>{{ tr('新增/覆寫）。') }}
+    <b>{{ tr('合成模式') }}</b> {{ tr('才是真正的填寫結果；調完位置請按「套用新位置」，切回合成模式就能看到實際效果。') }}
   </div>
   <div class="preview-toolbar">
     <div class="mode-switch" role="tablist">
-      <button class="mode-btn active" type="button" data-mode="edit">編輯模式</button>
-      <button class="mode-btn" type="button" data-mode="composite">合成模式</button>
+      <button class="mode-btn active" type="button" data-mode="edit">{{ tr('編輯模式') }}</button>
+      <button class="mode-btn" type="button" data-mode="composite">{{ tr('合成模式') }}</button>
     </div>
     <span data-s="sda5cd676"></span>
     <button class="btn btn-small" type="button" id="zoomOut">−</button>
     <input type="range" id="zoomSlider" min="25" max="300" step="5" value="100" class="zoom-slider" />
     <button class="btn btn-small" type="button" id="zoomIn">＋</button>
     <span id="zoomLabel" class="muted" data-s="sa6476ff2">100%</span>
-    <button class="btn btn-small" type="button" id="zoomReset">重設</button>
+    <button class="btn btn-small" type="button" id="zoomReset">{{ tr('重設') }}</button>
   </div>
   <div class="preview-scroll">
     <div class="preview-stack" id="previewStack"></div>
@@ -739,7 +739,7 @@ function openContextMenu(clientX, clientY, pt_x, pt_y, replaceIdx, pageIdx) {
   menu.appendChild(checkHead);
   const checkItem = document.createElement('div');
   checkItem.className = 'ctx-menu-item';
-  checkItem.innerHTML = '<span class="k-label">✓ 勾選（checkmark）</span><span class="k-val">打勾框</span>';
+  checkItem.innerHTML = '<span class="k-label">' + tr('✓ 勾選（checkmark）') + '</span><span class="k-val">' + tr('打勾框') + '</span>';
   checkItem.addEventListener('click', () => {
     closeContextMenu();
     if (isReplace) replaceWithCheck(replaceIdx);
@@ -1137,14 +1137,14 @@ function renderUnmatched(items, profileKeys) {
   // summary to expand when they want to teach the system new labels.
   box.open = false;
   if (count) count.textContent = tr('（{0} 項）').replace('{0}', items.length);
-  const options = ['<option value="">— 略過 —</option>'].concat(
+  const options = ['<option value="">' + tr('— 略過 —') + '</option>'].concat(
     profileKeys.map(pk => `<option value="${escapeHTML(pk.key)}">${escapeHTML(pk.label)} (${escapeHTML(pk.key)})</option>`)
   ).join('');
   list.innerHTML = items.map((it, i) =>
     `<div class="unmatched-row" data-label="${escapeHTML(it.text)}">
        <code class="unmatched-text">${escapeHTML(it.text)}</code>
        <select class="unmatched-select">${options}</select>
-       <button class="btn btn-small learn-btn" type="button">學起來</button>
+       <button class="btn btn-small learn-btn" type="button">${tr('學起來')}</button>
      </div>`
   ).join('');
 }
@@ -1429,8 +1429,8 @@ function renderLlmReview(rev) {
       ${accepted.length ? `· <b>${accepted.length}</b> 個被採納（連續 N 輪同錯）` : ''}
     </div>`;
     html += '<table class="llm-corrections"><thead><tr>'
-      + '<th>類型</th><th>欄位 label</th><th>目前值</th><th>LLM 實際讀到</th>'
-      + '<th>建議改去</th><th>信心</th><th>原因</th>'
+      + '<th>' + tr('類型') + '</th><th>' + tr('欄位 label') + '</th><th>' + tr('目前值') + '</th><th>' + tr('LLM 實際讀到') + '</th>'
+      + '<th>' + tr('建議改去') + '</th><th>' + tr('信心') + '</th><th>' + tr('原因') + '</th>'
       + '</tr></thead><tbody>';
     for (const c of allCorrections) {
       const isAccepted = accepted.some(a => a.label === c.label && a.type === c.type);
@@ -1582,7 +1582,7 @@ function renderReport(r) {
     + `${escapeHTML(e.label)} ← ${escapeHTML(e.from_label)}：${escapeHTML(e.value)}</span>`
   ).join('');
   reportBox.innerHTML = `
-    <p>偵測到 <b>${r.detected}</b> 個欄位，已填入 <b>${r.filled}</b> 個。</p>
+    <p>${tr('偵測到')} <b>${r.detected}</b> ${tr('個欄位，已填入')} <b>${r.filled}</b> ${tr('個。')}</p>
     ${matched ? `<div class="report-list">${matched}</div>` : ''}
     ${expanded ? `<p data-s="s5371db16">以下的「同上」已展開成實際內容：</p><div class="report-list">${expanded}</div>` : ''}
     ${missing ? `<p data-s="s5371db16">以下偵測到了但公司資料是空的：</p><div class="report-list">${missing}</div>` : ''}

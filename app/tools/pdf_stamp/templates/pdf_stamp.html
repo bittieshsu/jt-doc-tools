@@ -83,7 +83,7 @@
 
           <label data-s="s3044b600">{{ tr('格式') }}</label>
           <select id="date-format" class="jt-select" data-s="s757df271">
-            <optgroup label="西元（ISO 風 / 中文）">
+            <optgroup label="{{ tr('西元（ISO 風 / 中文）') }}">
               <option value="iso">2026-05-26</option>
               <option value="iso-noz">2026-5-26</option>
               <option value="slash">2026/05/26</option>
@@ -93,7 +93,7 @@
               <option value="cjk-noz">{{ tr('2026 年 5 月 26 日') }}</option>
               <option value="md-slash">5/26</option>
             </optgroup>
-            <optgroup label="民國">
+            <optgroup label="{{ tr('民國') }}">
               <option value="roc">{{ tr('民國 115 年 05 月 26 日') }}</option>
               <option value="roc-noz">{{ tr('民國 115 年 5 月 26 日') }}</option>
               <option value="roc-slash">115/05/26</option>
@@ -816,7 +816,7 @@ function _renderPageChips() {
   if (!box) return;
   const cnt = previewInfo?.page_count || 0;
   if (!cnt) {
-    box.innerHTML = '<div class="page-pick-hint muted">上傳 PDF 後可逐頁選擇（預設全選）</div>';
+    box.innerHTML = '<div class="page-pick-hint muted">' + tr('上傳 PDF 後可逐頁選擇（預設全選）') + '</div>';
     return;
   }
   // New file / different length → default to all pages selected.
@@ -825,9 +825,9 @@ function _renderPageChips() {
     _pageChipCount = cnt;
   }
   let html = '<div class="page-pick-tools">'
-    + '<button type="button" class="btn btn-small" data-pp="all">全選</button>'
-    + '<button type="button" class="btn btn-small" data-pp="none">全不選</button>'
-    + '<button type="button" class="btn btn-small" data-pp="invert">反選</button>'
+    + '<button type="button" class="btn btn-small" data-pp="all">' + tr('全選') + '</button>'
+    + '<button type="button" class="btn btn-small" data-pp="none">' + tr('全不選') + '</button>'
+    + '<button type="button" class="btn btn-small" data-pp="invert">' + tr('反選') + '</button>'
     + '<span class="page-pick-count muted"></span></div>'
     + '<div class="page-pick-grid">';
   for (let i = 0; i < cnt; i++) {
@@ -1192,12 +1192,8 @@ function applyPosMode() {
     // 之後的說明裡 —— 停在統一模式的人永遠看不到，以為一次只能蓋一顆章
     // （2026-08-17 使用者這樣問了）。
     hint.textContent = on
-      ? '頁面個別用印：在上方 1 區選好章，到頁面上點一下放置；'
-        + '改選另一個章再點，就能在同一份文件混用多種印章。'
-        + '蓋哪些頁由放置位置決定（上方「蓋章頁面」不適用），'
-        + '也可放入日期與個資限用章（需先在 1b / 1c 啟用）。'
-      : '每頁統一用印：整份文件蓋同一顆章。'
-        + '要在不同位置蓋多個不同的章，請切換到「頁面個別用印」。';
+      ? tr('頁面個別用印：在上方 1 區選好章，到頁面上點一下放置；改選另一個章再點，就能在同一份文件混用多種印章。蓋哪些頁由放置位置決定（上方「蓋章頁面」不適用），也可放入日期與個資限用章（需先在 1b / 1c 啟用）。')
+      : tr('每頁統一用印：整份文件蓋同一顆章。要在不同位置蓋多個不同的章，請切換到「頁面個別用印」。');
   }
   // 切換後一定要讓「剛顯示出來」的編輯器重算版面：元素在 hidden 狀態下
   // clientWidth = 0，之前算出的 mmPerPx 會讓紙張縮成極小一塊（切回統一位置時

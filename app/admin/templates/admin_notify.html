@@ -42,7 +42,7 @@
   {% set c = cfg.channels[ch] %}
   <details class="nt-ch" {% if c.enabled %}open{% endif %}>
     <summary>
-      <span class="nt-ch-name">{{ info[ch].label }}</span>
+      <span class="nt-ch-name">{{ tr(info[ch].label) }}</span>
       {% if ch in personal %}<span class="nt-tag nt-tag-personal">{{ tr('個人管道') }}</span>
       {% elif ch in dual %}<span class="nt-tag nt-tag-dual">{{ tr('可個人 / 團隊') }}</span>
       {% else %}<span class="nt-tag">{{ tr('團隊頻道') }}</span>{% endif %}
@@ -51,7 +51,7 @@
     </summary>
     <div class="nt-ch-body" data-ch="{{ ch }}">
       <label class="nt-switch"><input type="checkbox" class="nt-ch-en" {% if c.enabled %}checked{% endif %}> {{ tr('啟用') }}</label>
-      <div class="nt-help muted">{{ tr('需要：') }}{{ info[ch].needs }}</div>
+      <div class="nt-help muted">{{ tr('需要：') }}{{ tr(info[ch].needs) }}</div>
       {% if ch in dev_channels %}
       <div class="nt-dev-note">
         {{ icon('warn', size=14) }}
@@ -284,7 +284,7 @@
   if (!sel) return;
   const help = document.getElementById('smtpModeHelp');
   const HELP = {
-    auth: '向外部信箱服務（Gmail、Office 365、自架 mail）認證後寄出。需要帳號與密碼。',
+    auth: tr('向外部信箱服務（Gmail、Office 365、自架 mail）認證後寄出。需要帳號與密碼。'),
     relay: '送到公司內部的 mail server，由它轉送出去。那台機器設定成「來自 jtdt 這個 IP 就放行」，'
          + '所以不需要帳號密碼，通常走 25 埠。寄件者網域要是對方允許的，否則會被退。',
     direct: 'jtdt 自己查收件網域的 MX 紀錄直接送過去，不經過任何中繼主機。'

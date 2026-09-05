@@ -154,11 +154,11 @@
 {% endblock %}
 
 {% block content %}
-<h1>{{ icon('shield', size=22) }} 文字去識別化</h1>
-<p class="muted">貼上文字，或上傳 .txt / .md / .docx / .doc / .odt / .pdf 等檔案，自動偵測敏感資料（身分證 / 手機 / Email / 統編 / 信用卡 / 銀行帳號 / 地址 …），可選擇<b>遮罩</b>（保留邊緣字元，例如「王*明」）、<b>編修</b>（整段塗黑「█」）或<b>替換假資料</b>（產生新的假姓名 / 假號碼，保留格式）後輸出。</p>
+<h1>{{ icon('shield', size=22) }} {{ tr('文字去識別化') }}</h1>
+<p class="muted">{{ tr('貼上文字，或上傳 .txt / .md / .docx / .doc / .odt / .pdf 等檔案，自動偵測敏感資料（身分證 / 手機 / Email / 統編 / 信用卡 / 銀行帳號 / 地址 …），可選擇') }}<b>{{ tr('遮罩') }}</b>{{ tr('（保留邊緣字元，例如「王*明」）、') }}<b>{{ tr('編修') }}</b>{{ tr('（整段塗黑「█」）或') }}<b>{{ tr('替換假資料') }}</b>{{ tr('（產生新的假姓名 / 假號碼，保留格式）後輸出。') }}</p>
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 來源文字</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 來源文字') }}</h2>
   <div class="td-input-area">
     <label class="td-drop-zone" id="dropZone" for="fileInput">
       <input type="file" id="fileInput" accept=".txt,.md,.docx,.doc,.odt,.ods,.odp,.rtf,.pdf" hidden />
@@ -168,17 +168,17 @@
         <polyline points="17 8 12 3 7 8"/>
         <line x1="12" y1="3" x2="12" y2="15"/>
       </svg>
-      <span class="td-drop-text"><b>點此挑選</b>或拖曳檔案到此
+      <span class="td-drop-text"><b>{{ tr('點此挑選') }}</b>{{ tr('或拖曳檔案到此') }}
         <span class="hint">.txt / .md / .docx / .odt / .pdf …</span></span>
     </label>
-    {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span>從工作區載入 PDF</span></button></div>{% endif %}
+    {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span>{{ tr('從工作區載入 PDF') }}</span></button></div>{% endif %}
     <textarea id="srcText" placeholder="{{ tr('把要處理的文字貼上來，或從上方上傳檔案…') }}"></textarea>
-    <div class="td-help"><span id="srcCount">0</span> 字</div>
+    <div class="td-help"><span id="srcCount">0</span> {{ tr('字') }}</div>
   </div>
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 設定要偵測的資料類型</h2>
+  <h2 data-s="s53896af7">{{ tr('2. 設定要偵測的資料類型') }}</h2>
   <div class="td-pattern-cats">
     {% set cat_icons = {
       '個人身分': 'id-card',
@@ -199,7 +199,7 @@
     <div class="td-cat" data-cat="{{ idx }}">
       <h4>
         <span class="td-cat-icon">{{ icon(cat_icons.get(grp_name, 'tool'), size=15) }}</span>
-        <span class="td-cat-name">{{ grp_name }}</span>
+        <span class="td-cat-name">{{ tr(grp_name) }}</span>
         <span class="td-cat-tools">
           <button type="button" data-cat-act="all" title="{{ tr('全選（這組全部勾選）') }}">
             <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -226,7 +226,7 @@
       {% for p in items %}
       <label>
         <input type="checkbox" data-pat-id="{{ p.id }}" {% if p.default_on %}checked{% endif %}>
-        <span>{{ p.label }}</span>
+        <span>{{ tr(p.label) }}</span>
       </label>
       {% endfor %}
     </div>
@@ -255,12 +255,12 @@
   </div>
   <details data-s="s5371db16">
     <summary data-s="seccd2985">
-      自訂 regex（一行一條，格式：<code>標籤 | 正則式</code>）
+      {{ tr('自訂 regex（一行一條，格式：') }}<code>{{ tr('標籤 | 正則式') }}</code>）
     </summary>
     <textarea id="customRx" rows="4" data-style="width:100%; box-sizing:border-box; margin-top:6px;
       font-family: ui-monospace, monospace; font-size:12px; padding:8px;
       border:1px solid var(--border); border-radius:6px;"
-      placeholder="員工編號 | EMP-\d{6}&#10;客戶代號 | CUS-[A-Z0-9]{4,8}"></textarea>
+      placeholder="{{ tr('員工編號') }} | EMP-\d{6}&#10;{{ tr('客戶代號') }} | CUS-[A-Z0-9]{4,8}"></textarea>
   </details>
 
   {{ llm_gate('text-deident', llm_enabled, llm_model, mode='augment',
@@ -270,52 +270,52 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">3. 處理方式</h2>
+  <h2 data-s="s53896af7">{{ tr('3. 處理方式') }}</h2>
   <div class="td-modes" id="modeBar">
     <button type="button" class="td-mode-btn active" data-mode="mask">
       <span class="ic-wrap">{{ icon('shield', size=18) }}</span>
-      <span><span class="lbl-main">遮罩</span>
-        <span class="lbl-sub">保留邊緣字元 · 例：王*明</span></span>
+      <span><span class="lbl-main">{{ tr('遮罩') }}</span>
+        <span class="lbl-sub">{{ tr('保留邊緣字元 · 例：王*明') }}</span></span>
     </button>
     <button type="button" class="td-mode-btn" data-mode="redact">
       <span class="ic-wrap">{{ icon('lock', size=18) }}</span>
-      <span><span class="lbl-main">編修</span>
-        <span class="lbl-sub">整段塗黑</span></span>
+      <span><span class="lbl-main">{{ tr('編修') }}</span>
+        <span class="lbl-sub">{{ tr('整段塗黑') }}</span></span>
     </button>
     <button type="button" class="td-mode-btn" data-mode="fake">
       <span class="ic-wrap">{{ icon('refresh', size=18) }}</span>
-      <span><span class="lbl-main">替換假資料</span>
-        <span class="lbl-sub">置換成擬造資訊</span></span>
+      <span><span class="lbl-main">{{ tr('替換假資料') }}</span>
+        <span class="lbl-sub">{{ tr('置換成擬造資訊') }}</span></span>
     </button>
   </div>
   <div class="td-actions">
-    <button class="btn btn-primary" type="button" id="btnDetect">{{ icon('search', size=14) }} 偵測敏感資料</button>
+    <button class="btn btn-primary" type="button" id="btnDetect">{{ icon('search', size=14) }} {{ tr('偵測敏感資料') }}</button>
   </div>
   <div id="errBox" class="td-help" data-s="s53875d1b" hidden></div>
 </div>
 
 <div class="panel" id="resultPanel" hidden>
-  <h2 data-s="s53896af7">4. 偵測結果
+  <h2 data-s="s53896af7">{{ tr('4. 偵測結果') }}
     <span class="muted" id="resultMeta" data-s="s9ca5dca5"></span>
   </h2>
   <div class="td-counts" id="counts"></div>
   <div class="td-finding-list" id="findings"></div>
-  <div class="td-help">每筆預設都會被處理。要排除某筆？取消左側勾選後再按「套用至全部」。</div>
+  <div class="td-help">{{ tr('每筆預設都會被處理。要排除某筆？取消左側勾選後再按「套用至全部」。') }}</div>
 </div>
 
 <div class="panel" id="applyPanel" hidden>
-  <h2 data-s="s53896af7">5. 套用 / 輸出</h2>
+  <h2 data-s="s53896af7">{{ tr('5. 套用 / 輸出') }}</h2>
   <div class="td-actions">
-    <button class="btn btn-primary" type="button" id="btnApply">{{ icon('shield', size=14) }} 套用至全部</button>
-    <button class="btn" type="button" id="btnDownload" disabled>{{ icon('download', size=14) }} 下載結果 (.txt)</button>
-    <button class="btn" type="button" id="btnCopy" disabled>{{ icon('paperclip', size=14) }} 複製到剪貼簿</button>
+    <button class="btn btn-primary" type="button" id="btnApply">{{ icon('shield', size=14) }} {{ tr('套用至全部') }}</button>
+    <button class="btn" type="button" id="btnDownload" disabled>{{ icon('download', size=14) }} {{ tr('下載結果 (.txt)') }}</button>
+    <button class="btn" type="button" id="btnCopy" disabled>{{ icon('paperclip', size=14) }} {{ tr('複製到剪貼簿') }}</button>
   </div>
 </div>
 
 <div class="panel" id="outputPanel" hidden>
-  <h2 data-s="s53896af7">6. 處理後文字
+  <h2 data-s="s53896af7">{{ tr('6. 處理後文字') }}
     <span class="muted" data-s="s9ca5dca5">
-      <span id="outCount">0</span> 字
+      <span id="outCount">0</span> {{ tr('字') }}
     </span>
   </h2>
   <textarea id="outText" placeholder="{{ tr('按下「套用至全部」後處理結果會顯示在這裡。') }}" readonly></textarea>
@@ -491,7 +491,7 @@ function renderFindings(findings) {
     </div>`;
   });
   $('findings').innerHTML = lines.join('') ||
-    '<div class="td-help" data-s="s3e0c5272">沒有偵測到敏感資料</div>';
+    '<div class="td-help" data-s="s3e0c5272">' + tr('沒有偵測到敏感資料') + '</div>';
   // checkbox toggles row state
   $('findings').querySelectorAll('input[type=checkbox]').forEach(cb => {
     cb.addEventListener('change', () => {

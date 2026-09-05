@@ -29,6 +29,11 @@ from pathlib import Path
 from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent
+# 開發樹的公開檔案在 `github/` 裡，clone 下來則直接在根目錄 —— 寫死 `github/`
+# 的話在公開版永遠 file not found（外部評估 2026-09-05 實測固定紅）。
+sys.path.insert(0, str(ROOT))
+from tools.repo_paths import public_root  # noqa: E402
+PUB = public_root(ROOT)
 
 
 def read_main_version() -> str:
@@ -62,7 +67,7 @@ def read_uv_lock_version() -> Optional[str]:
 
 
 def read_readme_version() -> Optional[str]:
-    f = ROOT / "github" / "README.md"
+    f = PUB / "README.md"
     if not f.exists():
         return None
     # Format: "# Jason Tools 文件工具箱 v1.5.3".  Look for the H1 rather than
@@ -77,7 +82,7 @@ def read_readme_version() -> Optional[str]:
 
 
 def read_changelog_version() -> Optional[str]:
-    f = ROOT / "github" / "CHANGELOG.md"
+    f = PUB / "CHANGELOG.md"
     if not f.exists():
         return None
     for ln in f.read_text(encoding="utf-8").splitlines():
@@ -91,8 +96,8 @@ SOURCES = [
     ("app/main.py:VERSION",        read_main_version),
     ("pyproject.toml:version",     read_pyproject_version),
     ("uv.lock:jt-doc-tools",       read_uv_lock_version),
-    ("github/README.md heading",   read_readme_version),
-    ("github/CHANGELOG.md latest", read_changelog_version),
+    ("README.md heading",          read_readme_version),
+    ("CHANGELOG.md latest",        read_changelog_version),
 ]
 
 

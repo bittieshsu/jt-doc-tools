@@ -350,7 +350,7 @@ function loadSubject(s) {
   }
   if (isLocked) {
     lockBanner.hidden = false;
-    lockBanner.innerHTML = '🔒 <b>內建帳號</b>：角色與工具權限固定，不可從權限矩陣修改。' +
+    lockBanner.innerHTML = '🔒 <b>' + tr('內建帳號') + '</b>：角色與工具權限固定，不可從權限矩陣修改。' +
       '（此處顯示的勾選只是讓您查看現狀，按儲存會被拒。）';
     document.getElementById('pdSave').disabled = true;
     document.getElementById('pdSave').title = tr('內建帳號權限固定不可修改');
@@ -378,7 +378,7 @@ function loadSubject(s) {
           <span class="picker-name">${escapeHtml(name)}</span>
         </label>`;
       }).join('')
-    : '<div class="picker-empty">尚無角色</div>';
+    : '<div class="picker-empty">' + tr('尚無角色') + '</div>';
   document.getElementById('pdRoleSearch').value = '';
   bindPicker('pdRoleList', 'pdRoleSearch', 'pdRoleCount', 'pdRoleClear')();
 
@@ -392,7 +392,7 @@ function loadSubject(s) {
           <span class="picker-name">${escapeHtml(t.name)}</span>
         </label>`;
       }).join('')
-    : '<div class="picker-empty">尚無工具</div>';
+    : '<div class="picker-empty">' + tr('尚無工具') + '</div>';
   document.getElementById('pdToolSearch').value = '';
   bindPicker('pdToolList', 'pdToolSearch', 'pdToolCount', 'pdToolClear')();
 

@@ -114,6 +114,19 @@ body {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .sb-group > summary::-webkit-details-marker { display: none; }
+
+/* 側欄分類名稱**只能一行**（使用者要求）。中文四個字剛好，英文大寫字距又寬，
+   「FORMS & STAMPS」在 14px 會折成兩行、把整塊撐高（2026-09-05 截圖回報）。
+   非中文介面縮一號字、字距收緊、明確不換行；繁體中文完全不受影響。 */
+html[lang]:not([lang="zh-Hant"]) .sb-group > summary {
+  font-size: 12.5px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+html[lang]:not([lang="zh-Hant"]) .sb-group > summary > span:first-of-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .sb-group > summary::after {
   content: '▾'; margin-left: auto; font-size: 18px; line-height: 1;
   transition: transform 0.15s; opacity: 0.9; padding: 0 2px;
@@ -412,6 +425,25 @@ html[lang]:not([lang="zh-Hant"]) .form-row label {
   line-height: 1.35;
 }
 html[lang]:not([lang="zh-Hant"]) .dpe-panel .form-row label { width: 120px; }
+
+/* 英文的行距要放寬 —— 中文本來就一字一格、看得出行，英文換行後兩行會黏在一起
+   （2026-09-05 使用者截圖回報：說明區的條列每條折兩行，讀起來連成一片）。
+   同樣用 `html[lang]` 限定，繁體中文的版面完全不動。 */
+html[lang]:not([lang="zh-Hant"]) {
+  --jt-en-lh: 1.65;
+}
+html[lang]:not([lang="zh-Hant"]) p,
+html[lang]:not([lang="zh-Hant"]) li,
+html[lang]:not([lang="zh-Hant"]) .muted,
+html[lang]:not([lang="zh-Hant"]) .hint,
+html[lang]:not([lang="zh-Hant"]) .af-hint,
+html[lang]:not([lang="zh-Hant"]) .desc,
+html[lang]:not([lang="zh-Hant"]) td {
+  line-height: var(--jt-en-lh);
+}
+/* 條列之間也要有間隔，不然「行距放寬」只是把每一條變高，條與條還是黏著 */
+html[lang]:not([lang="zh-Hant"]) li + li { margin-top: 6px; }
+html[lang]:not([lang="zh-Hant"]) p + p { margin-top: 8px; }
 .form-row .field { flex: 1 1 220px; min-width: 0; }
 @media (max-width: 640px) {
   .form-row { align-items: flex-start; }

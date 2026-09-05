@@ -551,45 +551,45 @@
 {% block right_fab %}
 <button type="button" class="es-handoff-fab" id="esHandoffFab"
         title="{{ tr('顯示 QR Code 用手機接續掃描') }}" aria-label="{{ tr('手機掃描') }}">
-  {{ icon('qr', size=16) }}<span>手機掃描</span>
+  {{ icon('qr', size=16) }}<span>{{ tr('手機掃描') }}</span>
 </button>
 {% endblock %}
 
 {% block content %}
-<h1>{{ icon('qr', size=22) }} 電子發票處理</h1>
-<p class="muted">上傳發票照片或 PDF，自動掃描 QR Code 解出發票號碼 / 日期 / 金額 / 統編。手機可直接拍照，掃完的資料會即時同步到電腦端的列表（同一帳號跨裝置共用）。</p>
+<h1>{{ icon('qr', size=22) }} {{ tr('電子發票處理') }}</h1>
+<p class="muted">{{ tr('上傳發票照片或 PDF，自動掃描 QR Code 解出發票號碼 / 日期 / 金額 / 統編。手機可直接拍照，掃完的資料會即時同步到電腦端的列表（同一帳號跨裝置共用）。') }}</p>
 
 {% if not qr_backend_available %}
 <div class="es-warn">
-  <b>⚠ QR 解碼後端 (pyzbar) 未安裝。</b>
-  Linux 請執行 <code>apt install libzbar0</code>，macOS 執行 <code>brew install zbar</code>，
-  Windows wheel 已內含 dll。安裝完請執行 <code>jtdt restart</code>。
+  <b>{{ tr('⚠ QR 解碼後端 (pyzbar) 未安裝。') }}</b>
+  {{ tr('Linux 請執行') }} <code>apt install libzbar0</code>{{ tr('，macOS 執行') }} <code>brew install zbar</code>{{ tr('，
+  Windows wheel 已內含 dll。安裝完請執行') }} <code>jtdt restart</code>。
 </div>
 {% endif %}
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 上傳發票</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 上傳發票') }}</h2>
   <div class="es-uploader">
     <label class="es-drop" id="liveBtn" data-s="se2c971ff">
       <input type="button" hidden id="liveStartTrigger">
       <span class="ic" data-s="se987c5dc">{{ icon('qr', size=32) }}</span>
-      <span class="ttl" id="liveBtnTitle">連續掃描（相機）</span>
-      <span class="desc" id="liveBtnDesc">手機建議 — 對著發票自動掃，不用一張一張按</span>
+      <span class="ttl" id="liveBtnTitle">{{ tr('連續掃描（相機）') }}</span>
+      <span class="desc" id="liveBtnDesc">{{ tr('手機建議 — 對著發票自動掃，不用一張一張按') }}</span>
     </label>
     <label class="es-drop">
       <input type="file" id="cameraInput" accept="image/*" capture="environment" multiple>
       <span class="ic">{{ icon('image', size=32) }}</span>
-      <span class="ttl">拍照 / 從相簿選</span>
-      <span class="desc">無 HTTPS 環境用此；可一次選多張</span>
+      <span class="ttl">{{ tr('拍照 / 從相簿選') }}</span>
+      <span class="desc">{{ tr('無 HTTPS 環境用此；可一次選多張') }}</span>
     </label>
     <label class="es-drop" id="dropZone">
       <input type="file" id="fileInput" accept="image/*,application/pdf" multiple>
       <span class="ic">{{ icon('paperclip', size=32) }}</span>
-      <span class="ttl">上傳檔案 / 拖放</span>
-      <span class="desc">支援 PNG / JPG / WebP / PDF</span>
+      <span class="ttl">{{ tr('上傳檔案 / 拖放') }}</span>
+      <span class="desc">{{ tr('支援 PNG / JPG / WebP / PDF') }}</span>
     </label>
   </div>
-  {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>從工作區載入</span></button></div>{% endif %}
+  {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
   <div class="es-status" id="status"></div>
 
   <!-- 連續掃描的 live preview 區，預設隱藏 -->
@@ -601,9 +601,9 @@
         <span class="corner bl"></span><span class="corner br"></span>
       </div>
     </div>
-    <div class="live-counter">本次已掃描：<b id="liveCount">0</b> 張</div>
-    <div class="live-status" id="liveStatus">把發票 QR 對到中央紅框內…</div>
-    <button type="button" id="liveStop">停止掃描</button>
+    <div class="live-counter">{{ tr('本次已掃描：') }}<b id="liveCount">0</b> {{ tr('張') }}</div>
+    <div class="live-status" id="liveStatus">{{ tr('把發票 QR 對到中央紅框內…') }}</div>
+    <button type="button" id="liveStop">{{ tr('停止掃描') }}</button>
   </div>
 </div>
 
@@ -614,7 +614,7 @@
 <div class="es-modal-backdrop" id="detailModal" hidden>
   <div class="es-modal">
     <div class="es-modal-header">
-      <h3 id="detailTitle">發票細節</h3>
+      <h3 id="detailTitle">{{ tr('發票細節') }}</h3>
       <button type="button" class="es-modal-close" id="detailClose">×</button>
     </div>
     <div class="es-modal-body" id="detailBody"></div>
@@ -623,15 +623,15 @@
 
 <div class="panel" data-s="sfc696d6c">
   <div class="es-buffer-toolbar">
-    <h2 data-s="s1c244e6b">2. 已掃描清單</h2>
+    <h2 data-s="s1c244e6b">{{ tr('2. 已掃描清單') }}</h2>
     <div class="info" id="bufferInfo">— / 1000</div>
     <div class="right">
       <label data-s="s9061fe43">
-        <input type="checkbox" id="autoRefresh" checked> 自動更新
+        <input type="checkbox" id="autoRefresh" checked> {{ tr('自動更新') }}
       </label>
-      <button type="button" class="es-mini-btn" id="btnSettings" title="{{ tr('欄位顯示設定') }}">{{ icon('gear', size=12) }} 設定</button>
+      <button type="button" class="es-mini-btn" id="btnSettings" title="{{ tr('欄位顯示設定') }}">{{ icon('gear', size=12) }} {{ tr('設定') }}</button>
       <span class="es-export-wrap" data-s="s5ce657fb">
-        <button type="button" class="es-mini-btn" id="btnExport">{{ icon('download', size=12) }} 匯出 ▾</button>
+        <button type="button" class="es-mini-btn" id="btnExport">{{ icon('download', size=12) }} {{ tr('匯出 ▾') }}</button>
         <span id="exportMenu" hidden data-s="sd0f0af67">
           <button type="button" data-fmt="xlsx" data-s="s4e3a4431">.xlsx</button>
           <button type="button" data-fmt="ods"  data-s="s4e3a4431">.ods</button>
@@ -642,56 +642,56 @@
           <button type="button" data-fmt="md"   data-s="s4e3a4431">.md</button>
         </span>
       </span>
-      <button type="button" class="es-mini-btn" id="btnRefresh">{{ icon('refresh', size=12) }} 重新整理</button>
+      <button type="button" class="es-mini-btn" id="btnRefresh">{{ icon('refresh', size=12) }} {{ tr('重新整理') }}</button>
       <button type="button" class="es-mini-btn es-desktop-only" id="btnReclassify"
               title="{{ tr('對 buffer 內所有發票重新跑「賣方反查 + 會計科目分類」（不影響掃描資料，只更新自動帶入的賣方名稱 / 行業 / 科目）') }}">
-        {{ icon('refresh', size=12) }} 重抓科目
+        {{ icon('refresh', size=12) }} {{ tr('重抓科目') }}
       </button>
       <button type="button" class="es-mini-btn es-desktop-only" id="btnLlmClassify"
               {% if not llm_enabled %}disabled
               title="{{ tr('LLM 功能未啟用 — 請到 /admin/llm 設定') }}"
               {% else %}title="{{ tr('批次送 LLM 判讀所有發票科目（依據賣方統編 / 名稱 / 行業）') }}"
               {% endif %}>
-        {{ icon('sparkles', size=12) }} LLM 判讀科目
+        {{ icon('sparkles', size=12) }} {{ tr('LLM 判讀科目') }}
       </button>
-      <button type="button" class="es-mini-btn danger" id="btnDeleteSelected" hidden>{{ icon('trash', size=12) }} 刪除選取 (<span id="selectedCount">0</span>)</button>
-      <button type="button" class="es-mini-btn danger" id="btnClear">{{ icon('trash', size=12) }} 全部清空</button>
+      <button type="button" class="es-mini-btn danger" id="btnDeleteSelected" hidden>{{ icon('trash', size=12) }} {{ tr('刪除選取 (') }}<span id="selectedCount">0</span>)</button>
+      <button type="button" class="es-mini-btn danger" id="btnClear">{{ icon('trash', size=12) }} {{ tr('全部清空') }}</button>
     </div>
   </div>
 
   <!-- 設定面板（預設摺疊；按 ⚙️ 欄位 開啟） -->
   <div class="es-settings-panel" id="settingsPanel" hidden>
     <div class="es-tabs">
-      <button type="button" data-tab="display" class="active">{{ icon('columns', size=14) }} 欄位顯示</button>
-      <button type="button" data-tab="format">{{ icon('edit', size=14) }} 欄位格式</button>
-      <button type="button" data-tab="check">{{ icon('shield', size=14) }} 報帳檢查</button>
-      <button type="button" data-tab="rules">{{ icon('gear', size=14) }} 會計科目規則</button>
+      <button type="button" data-tab="display" class="active">{{ icon('columns', size=14) }} {{ tr('欄位顯示') }}</button>
+      <button type="button" data-tab="format">{{ icon('edit', size=14) }} {{ tr('欄位格式') }}</button>
+      <button type="button" data-tab="check">{{ icon('shield', size=14) }} {{ tr('報帳檢查') }}</button>
+      <button type="button" data-tab="rules">{{ icon('gear', size=14) }} {{ tr('會計科目規則') }}</button>
     </div>
 
     <!-- Tab 1：欄位顯示 / 排序 -->
     <div data-tab-pane="display">
-      <p data-s="s83862576">勾選顯示哪些欄位；拖曳左側 ⋮⋮ 把手調整順序。設定變更立即套用，並同步到帳號（手機 / 電腦共用）。</p>
+      <p data-s="s83862576">{{ tr('勾選顯示哪些欄位；拖曳左側 ⋮⋮ 把手調整順序。設定變更立即套用，並同步到帳號（手機 / 電腦共用）。') }}</p>
       <div class="es-fc-hdr">
         <span class="hdr-grab"></span>
-        <span class="hdr-name">顯示欄位</span>
-        <span class="hdr-export">匯出欄位標題（CSV / XLSX / ODS / TXT / MD 用；留空 = 同左）</span>
+        <span class="hdr-name">{{ tr('顯示欄位') }}</span>
+        <span class="hdr-export">{{ tr('匯出欄位標題（CSV / XLSX / ODS / TXT / MD 用；留空 = 同左）') }}</span>
       </div>
       <div class="es-settings-fields" id="settingsFields"></div>
     </div>
 
     <!-- Tab 2：欄位格式 -->
     <div data-tab-pane="format" hidden>
-      <p data-s="s83862576">選擇欄位的顯示樣式。設定立即套用到表格與匯出 (CSV / XLSX)；JSON 匯出永遠用內部標準格式。</p>
+      <p data-s="s83862576">{{ tr('選擇欄位的顯示樣式。設定立即套用到表格與匯出 (CSV / XLSX)；JSON 匯出永遠用內部標準格式。') }}</p>
       <div id="settingsFormats"></div>
     </div>
 
     <!-- Tab 3：報帳檢查 (M3.5) -->
     <div data-tab-pane="check" hidden>
-      <p data-s="s83862576">設定我方公司統編後，發票買方統編不符或為空者會在表格中標註為「非報帳用」。</p>
+      <p data-s="s83862576">{{ tr('設定我方公司統編後，發票買方統編不符或為空者會在表格中標註為「非報帳用」。') }}</p>
       <div class="es-my-vat-row">
-        <span>我方公司統編：</span>
+        <span>{{ tr('我方公司統編：') }}</span>
         <input type="text" id="myCompanyVat" maxlength="8" placeholder="{{ tr('8 位數字 / 留空關閉檢查') }}">
-        <span class="hint">必須是 8 位數字。空白 = 不檢查</span>
+        <span class="hint">{{ tr('必須是 8 位數字。空白 = 不檢查') }}</span>
       </div>
 
       <hr data-s="s176e419f">
@@ -700,30 +700,30 @@
         <div class="es-period-title">
           <label data-s="s729653e2">
             <input type="checkbox" id="periodCheckEnabled">
-            <span><b>當期發票檢查</b></span>
+            <span><b>{{ tr('當期發票檢查') }}</b></span>
           </label>
           <span data-s="sd38208b1">
-            開立日期不在期內 → 表格中標警告
+            {{ tr('開立日期不在期內 → 表格中標警告') }}
           </span>
         </div>
 
         <div id="periodPanel" class="es-period-panel">
           <div class="es-period-modetabs">
-            <button type="button" data-period-mode="auto" class="active">自動 / 選期</button>
-            <button type="button" data-period-mode="custom">自訂日期範圍</button>
+            <button type="button" data-period-mode="auto" class="active">{{ tr('自動 / 選期') }}</button>
+            <button type="button" data-period-mode="custom">{{ tr('自訂日期範圍') }}</button>
           </div>
 
           <div data-period-pane="auto">
-            <p class="hint">系統依今日自動推算「現在要報的這一期」（4/28 / 5/10 都報 3-4 月期）。若需指定別期請點 chip 切換。</p>
+            <p class="hint">{{ tr('系統依今日自動推算「現在要報的這一期」（4/28 / 5/10 都報 3-4 月期）。若需指定別期請點 chip 切換。') }}</p>
             <div id="periodChips" class="es-period-chips"></div>
           </div>
 
           <div data-period-pane="custom" hidden>
-            <p class="hint">自行指定日期區間（不限期別格式）。</p>
+            <p class="hint">{{ tr('自行指定日期區間（不限期別格式）。') }}</p>
             <div class="es-period-custom">
-              <label>起始 <input type="date" id="periodCustomStart"></label>
+              <label>{{ tr('起始') }} <input type="date" id="periodCustomStart"></label>
               <span data-s="s8cd4ae71">～</span>
-              <label>結束 <input type="date" id="periodCustomEnd"></label>
+              <label>{{ tr('結束') }} <input type="date" id="periodCustomEnd"></label>
             </div>
           </div>
 
@@ -735,19 +735,19 @@
     <!-- Tab 4：會計科目自訂規則 -->
     <div data-tab-pane="rules" hidden>
       <p data-s="s83862576">
-        加自訂規則：賣方<b>行業</b>或<b>名稱</b>包含 keyword 時，自動指定該會計科目。<b>自訂規則優先級高於內建</b>，可用來覆寫或補強。每筆規則可填多個 keyword（逗號分隔）。
+        {{ tr('加自訂規則：賣方') }}<b>{{ tr('行業') }}</b>{{ tr('或') }}<b>{{ tr('名稱') }}</b>{{ tr('包含 keyword 時，自動指定該會計科目。') }}<b>{{ tr('自訂規則優先級高於內建') }}</b>{{ tr('，可用來覆寫或補強。每筆規則可填多個 keyword（逗號分隔）。') }}
       </p>
       <div id="rulesList" data-s="s4b7f350e"></div>
-      <button type="button" class="es-mini-btn" id="btnAddRule">{{ icon('plus', size=12) }} 新增規則</button>
+      <button type="button" class="es-mini-btn" id="btnAddRule">{{ icon('plus', size=12) }} {{ tr('新增規則') }}</button>
       <details data-s="s553a645f">
-        <summary data-s="s2f6e60eb">查看內建規則（共 <span id="builtinRuleCount">…</span> 條）</summary>
-        <div id="builtinRules" data-s="s29df7e22"></div>
+        <summary data-s="s2f6e60eb">{{ tr('查看內建規則（共') }} <span id="builtinRuleCount">…</span> {{ tr('條）') }}</summary>
+        {# data-i18n="skip"：裡面列的是**拿去比對賣方名稱 / 行業別的中文關鍵字**，是領域資料不是介面文字；翻掉會讓會計科目對不上而且完全無聲，所以 tools/i18n_untranslated_scan.py 要跳過這一區。 #}<div id="builtinRules" data-i18n="skip" data-s="s29df7e22"></div>
       </details>
     </div>
 
     <div class="es-settings-actions">
-      <button type="button" class="es-mini-btn" id="btnSettingsReset">{{ icon('refresh', size=12) }} 恢復預設</button>
-      <span class="saved" id="settingsSaved">{{ icon('check', size=12) }} 已儲存</span>
+      <button type="button" class="es-mini-btn" id="btnSettingsReset">{{ icon('refresh', size=12) }} {{ tr('恢復預設') }}</button>
+      <span class="saved" id="settingsSaved">{{ icon('check', size=12) }} {{ tr('已儲存') }}</span>
     </div>
   </div>
 
@@ -759,7 +759,7 @@
     </table>
     <div class="es-busy-overlay" id="tableBusyOverlay" hidden>
       <div class="es-busy-spinner"></div>
-      <div class="es-busy-text" id="tableBusyText">處理中…</div>
+      <div class="es-busy-text" id="tableBusyText">{{ tr('處理中…') }}</div>
       <div class="es-busy-sub" id="tableBusySub"></div>
     </div>
   </div>
@@ -834,11 +834,12 @@ function _fmtScannedAt(v, fid) {
   if (fid === 'relative') {
     const now = new Date();
     const secs = Math.floor((now - dt) / 1000);
-    if (secs < 60) return '剛剛';
-    if (secs < 3600) return Math.floor(secs / 60) + ' 分鐘前';
-    if (secs < 86400) return Math.floor(secs / 3600) + ' 小時前';
+    const rel = (key, n) => tr(key).replace('{0}', String(n));
+    if (secs < 60) return tr('剛剛');
+    if (secs < 3600) return rel('{0} 分鐘前', Math.floor(secs / 60));
+    if (secs < 86400) return rel('{0} 小時前', Math.floor(secs / 3600));
     const days = Math.floor(secs / 86400);
-    if (days < 7) return days + ' 天前';
+    if (days < 7) return rel('{0} 天前', days);
     return _fmtScannedAt(v, 'date_only');
   }
   // local
@@ -977,15 +978,15 @@ function renderSettingsPanel() {
     const isReq = REQUIRED_FIELDS.has(def.id);
     const checked = (isReq || _settings.visible_columns.includes(def.id)) ? 'checked' : '';
     const disabled = isReq ? 'disabled' : '';
-    const reqMark = isReq ? '<span data-s="s7daab690" title="必選欄位">（必選）</span>' : '';
+    const reqMark = isReq ? '<span data-s="s7daab690" title="' + tr('必選欄位') + '">' + tr('（必選）') + '</span>' : '';
     const customLabel = _settings.export_labels[def.id] || '';
     return `<div class="es-field-card" data-field="${escapeHtml(def.id)}" draggable="false">
-      <span class="grab" title="拖曳調整順序">⋮⋮</span>
-      <label class="fc-toggle"><input type="checkbox" data-toggle ${checked} ${disabled}> ${escapeHtml(def.label)}${reqMark}</label>
+      <span class="grab" title="${tr('拖曳調整順序')}">⋮⋮</span>
+      <label class="fc-toggle"><input type="checkbox" data-toggle ${checked} ${disabled}> ${escapeHtml(tr(def.label))}${reqMark}</label>
       <input type="text" data-export-label class="fc-export-label"
-             placeholder="${escapeHtml(def.label)}" value="${escapeHtml(customLabel)}"
+             placeholder="${escapeHtml(tr(def.label))}" value="${escapeHtml(customLabel)}"
              maxlength="64"
-             title="自訂匯出時的欄位標題（留空 = 用內建「${escapeHtml(def.label)}」）">
+             title="${tr('自訂匯出時的欄位標題（留空 = 用內建')}「${escapeHtml(tr(def.label))}」${tr('）')}">
     </div>`;
   }).join('');
   // 保證必選欄位在 visible_columns 內
@@ -1165,7 +1166,7 @@ function _renderPeriodChips() {
     const key = p.start + '|' + p.end;
     const active = key === activeKey ? ' active' : '';
     return `<div class="es-period-chip${active}" data-key="${escapeHtml(key)}" data-start="${escapeHtml(p.start)}" data-end="${escapeHtml(p.end)}">
-      <span class="label-main">${escapeHtml(p.label)}</span>
+      <span class="label-main">${escapeHtml(p.label_i18n ? (p.label_args || []).reduce((a, v, i) => a.replace('{' + i + '}', v), tr(p.label_i18n)) + (p.in_progress ? tr(' (進行中)') : '') : tr(p.label))}</span>
       <span class="range">${escapeHtml(p.start)} ~ ${escapeHtml(p.end)}</span>
     </div>`;
   }).join('');
@@ -1313,15 +1314,15 @@ function renderRulesPanel() {
   if (!wrap) return;
   const rules = _settings.accounting_rules || [];
   if (!rules.length) {
-    wrap.innerHTML = '<div data-s="sd3a89e63">尚無自訂規則。內建規則已涵蓋常見公司類型；自訂規則優先級更高，可用於覆寫或補強。</div>';
+    wrap.innerHTML = '<div data-s="sd3a89e63">' + tr('尚無自訂規則。內建規則已涵蓋常見公司類型；自訂規則優先級更高，可用於覆寫或補強。') + '</div>';
     return;
   }
   wrap.innerHTML = rules.map((r, idx) => `
     <div class="es-rule-row" data-idx="${idx}" data-s="s057d0b4d">
       <select class="rule-match" data-idx="${idx}" data-s="s68c9ff5d">
-        <option value="any"${r.match==='any'?' selected':''}>任一</option>
-        <option value="industries"${r.match==='industries'?' selected':''}>僅行業</option>
-        <option value="name"${r.match==='name'?' selected':''}>僅名稱</option>
+        <option value="any"${r.match==='any'?' selected':''}>${tr('任一')}</option>
+        <option value="industries"${r.match==='industries'?' selected':''}>${tr('僅行業')}</option>
+        <option value="name"${r.match==='name'?' selected':''}>${tr('僅名稱')}</option>
       </select>
       <input type="text" class="rule-keywords" data-idx="${idx}" value="${escapeHtml((r.keywords||[]).join(', '))}" placeholder="keyword1, keyword2, ..." data-s="s7f6005c9">
       <input type="text" class="rule-subject" data-idx="${idx}" value="${escapeHtml(r.subject||'')}" placeholder="科目名稱 (例 油料費)" data-s="s7f6005c9">
@@ -1404,11 +1405,12 @@ function renderFormatsPanel() {
       if (seenGroups.has(grp)) continue;
       seenGroups.add(grp);
       // amount group：「金額（總計 / 銷售額 / 稅額 共用設定）」
-      const groupLabels = _fieldDefs.filter(f => f.formats && f.formats.group === grp).map(f => f.label);
-      title = '金額：' + groupLabels.join(' / ') + '（共用）';
+      const groupLabels = _fieldDefs.filter(f => f.formats && f.formats.group === grp)
+        .map(f => tr(f.label));
+      title = tr('金額：') + groupLabels.join(' / ') + tr('（共用）');
       repId = def.id;  // 用第一個欄位 ID 當 group 的代表
     } else {
-      title = def.label;
+      title = tr(def.label);
       repId = def.id;
     }
     const currentFmt = _settings.field_formats[repId] || def.formats.default;
@@ -1418,7 +1420,7 @@ function renderFormatsPanel() {
       return `<label class="${labelClass}" data-opt="${escapeHtml(o.id)}">
         <input type="radio" name="fmt-${escapeHtml(repId)}" value="${escapeHtml(o.id)}" ${checked}
                data-group="${escapeHtml(grp || '')}" data-rep="${escapeHtml(repId)}">
-        <span class="ex">${escapeHtml(o.example)}</span>
+        <span class="ex" data-i18n="skip">${escapeHtml(o.example)}</span><!--這是「選了這個格式會長什麼樣」的預覽，是資料不是介面文字-->
       </label>`;
     }).join('');
     blocks.push(`<div class="es-format-group" data-rep="${escapeHtml(repId)}">
@@ -1548,20 +1550,20 @@ function renderBufferRows() {
   const visibleIds = _settings.column_order.filter(c => _settings.visible_columns.includes(c));
   const visibleDefs = visibleIds.map(id => _fieldDefs.find(f => f.id === id)).filter(Boolean);
 
-  $('bufferInfo').innerHTML = `<b>${_cachedInvoices.length}</b> / ${_cachedInfo.limit || 1000} 張`;
+  $('bufferInfo').innerHTML = `<b>${_cachedInvoices.length}</b> / ${_cachedInfo.limit || 1000} ${tr('張')}`;
 
   const thead = $('bufferThead');
   // 多選 checkbox 在最前面
-  thead.innerHTML = '<tr><th><input type="checkbox" class="sel-check" id="selAll" title="全選"></th>' +
+  thead.innerHTML = '<tr><th><input type="checkbox" class="sel-check" id="selAll" title="' + tr('全選') + '"></th>' +
     visibleDefs.map(d => {
       const cls = NUMERIC_FIELDS.has(d.id) ? ' class="num"' : '';
-      return `<th${cls}>${escapeHtml(d.label)}</th>`;
+      return `<th${cls}>${escapeHtml(tr(d.label))}</th>`;
     }).join('') + '<th></th></tr>';
 
   const tbody = $('bufferTbody');
   const tfoot = $('bufferTfoot');
   if (!_cachedInvoices.length) {
-    tbody.innerHTML = `<tr><td colspan="${visibleDefs.length + 2}" class="es-empty">尚未掃描任何發票</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${visibleDefs.length + 2}" class="es-empty">${tr('尚未掃描任何發票')}</td></tr>`;
     if (tfoot) tfoot.innerHTML = '';
     _updateSelectedUI();
     return;
@@ -1673,7 +1675,7 @@ function showDetail(id) {
     } else {
       val = applyFormat(def.id, inv[def.id]);
     }
-    out.push(`<div class="es-detail-row"><span class="label">${escapeHtml(def.label)}</span><span class="val">${escapeHtml(val) || '<span data-s="s8cd4ae71">—</span>'}</span></div>`);
+    out.push(`<div class="es-detail-row"><span class="label">${escapeHtml(tr(def.label))}</span><span class="val">${escapeHtml(val) || '<span data-s="s8cd4ae71">—</span>'}</span></div>`);
     // 在 seller_vat 之後插入反查到的補充欄
     if (def.id === 'seller_vat') {
       const supplemental = [
@@ -2191,12 +2193,11 @@ window.addEventListener('beforeunload', stopLiveScan);
     overlay.className = 'es-handoff-overlay';
     overlay.innerHTML = `
       <div class="es-handoff-card">
-        <h3>用手機接續掃描</h3>
-        <p>用手機相機掃下方 QR Code，直接帶到電子發票處理頁。
-           若手機未登入會先要求登入，登入後自動回到此頁。</p>
+        <h3>${tr('用手機接續掃描')}</h3>
+        <p>${tr('用手機相機掃下方 QR Code，直接帶到電子發票處理頁。若手機未登入會先要求登入，登入後自動回到此頁。')}</p>
         <img id="esHandoffImg" alt="QR Code">
         <div class="url" id="esHandoffUrl"></div>
-        <button type="button" id="esHandoffClose">關閉</button>
+        <button type="button" id="esHandoffClose">${tr('關閉')}</button>
       </div>
     `;
     document.body.appendChild(overlay);

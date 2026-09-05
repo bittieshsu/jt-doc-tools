@@ -161,7 +161,7 @@
       <div class="auth-field" data-s="se7ec5403">
         <label class="af-label" for="af-svc-pw">{{ tr('Service Account 密碼') }}</label>
         <input id="af-svc-pw" class="field" type="password" name="service_password"
-               placeholder="{% if settings.ldap.service_password %}（已設定，留白不變更）{% else %}輸入密碼{% endif %}">
+               placeholder="{% if settings.ldap.service_password %}{{ tr('（已設定，留白不變更）') }}{% else %}{{ tr('輸入密碼') }}{% endif %}">
       </div>
     </fieldset>
 
@@ -632,7 +632,7 @@ if (tlBtn) tlBtn.addEventListener('click', async () => {
       html += `<div><b>顯示名稱：</b>${escapeHtml(j.display_name || '(無)')}</div>`;
       html += `<div><b>群組（${j.groups.length}）：</b>`;
       if (j.groups.length === 0) {
-        html += '<span class="muted">(無)</span>';
+        html += '<span class="muted">' + tr('(無)') + '</span>';
       } else {
         html += '<ul data-s="s2bc9add7">';
         j.groups.forEach(g => { html += `<li><code>${escapeHtml(g)}</code></li>`; });

@@ -382,7 +382,7 @@
     const contentMode = document.querySelector('input[name=bdmode]:checked').value === 'content';
     $('bdMarginHint').textContent = contentMode
       ? '框線離內容多遠（往外擴）。超出頁面的部分會自動收回頁內。'
-      : '框線距離頁面邊緣多遠。';
+      : tr('框線距離頁面邊緣多遠。');
   }
 
   // HTML 的 min/max **不會擋使用者打字** —— 填 200 之後伺服器夾成 72，畫面上

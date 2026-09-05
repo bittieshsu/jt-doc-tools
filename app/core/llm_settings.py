@@ -123,7 +123,7 @@ class LLMSettingsManager:
          "use": "純文字 chat — 中譯英、英譯中等", "kind": "text"},
         {"id": "doc-translate",    "name": "文件翻譯（整份辦公文件）",
          "use": "整份 Word / Excel / PowerPoint 翻成另一種語言，產出同格式的檔案。"
-                "**這支很吃量**（一份文件動輒幾十次請求）。"
+                "這支很吃量（一份文件動輒幾十次請求）。"
                 "Gemma 4 要看的是「每個 token 實際算幾個參數」不是總參數："
                 "gemma4:26b 是 MoE（每 token 只啟用約 4B），吞吐量最好；"
                 "gemma4:12b 是 dense，12B 全都要算，反而比 26b 慢 —— "
@@ -147,7 +147,7 @@ class LLMSettingsManager:
         {"id": "pdf-ocr", "name": "OCR 文字辨識（LLM 文字校正）",
          "use": "純文字校正：抓 typo / 字元誤判（0/O、1/l、CJK 偏旁混淆），不看影像", "kind": "text"},
         {"id": "pdf-ocr-vision", "name": "OCR 文字辨識（LLM 視覺校對 / 直接 / 對位 / 完整辨識共用）",
-         "use": "視覺校對：直接看頁面影像對照 OCR 結果，能修文字脫漏 / 排版亂；直接 / 對位 / 完整辨識也走此設定。**完整辨識建議用 qwen2.5vl:7b**（grounding 能給座標、無 thinking mode、約 9GB VRAM）；qwen3-vl 因 thinking mode 在 Ollama 整合不穩、gemma4:26b 無 grounding 能力不可用於完整辨識", "kind": "vision"},
+         "use": "視覺校對：直接看頁面影像對照 OCR 結果，能修文字脫漏 / 排版亂；直接 / 對位 / 完整辨識也走此設定。完整辨識建議用 qwen2.5vl:7b（grounding 能給座標、無 thinking mode、約 9GB VRAM）；qwen3-vl 因 thinking mode 在 Ollama 整合不穩、gemma4:26b 無 grounding 能力不可用於完整辨識", "kind": "vision"},
         {"id": "einvoice-scan", "name": "電子發票處理（LLM 判讀會計科目）",
          "use": "批次依賣方統編 / 名稱 / 行業，判斷對應會計科目（油料費 / 餐費 / 郵電費 等）", "kind": "text"},
     ]

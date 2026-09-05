@@ -46,7 +46,7 @@ def _strip_comments(js: str) -> str:
 @pytest.mark.parametrize("path", TEMPLATES, ids=IDS)
 def test_no_native_prompt_or_confirm(path: Path):
     src = path.read_text(encoding="utf-8")
-    for block in re.findall(r"<script\b[^>]*>(.*?)</script>", src, re.S | re.I):
+    for block in re.findall(r"<script\b[^>]*>(.*?)</script\s*>", src, re.S | re.I):
         code = _strip_comments(block)
         hit = next((m for m in _NATIVE.finditer(code)
                     if not _is_fallback(code, m.start())), None)

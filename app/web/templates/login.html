@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="csrf-token" content="{{ request.state.csrf_token }}">
-  <title>登入 · {{ app_name }}</title>
+  <title>{{ tr('登入 ·') }} {{ app_name }}</title>
   {% set _brand_logo = branding_logo_url() %}
   <link rel="icon" type="image/png" href="{{ _brand_logo or '/static/images/logo-on-light.png' }}" />
   <link rel="stylesheet" href="/static/css/platform.css" />
@@ -103,7 +103,7 @@
     <div class="form-row">
       <label for="uiLocale">{{ tr('介面語言') }}</label>
       <select id="uiLocale" name="locale" form="loginLangForm">
-        <option value="zh-Hant" {% if ui_locale(request) == 'zh-Hant' %}selected{% endif %}>繁體中文</option>
+        <option value="zh-Hant" {% if ui_locale(request) == 'zh-Hant' %}selected{% endif %}>{{ tr('繁體中文') }}</option>
         <option value="en" {% if ui_locale(request) == 'en' %}selected{% endif %}>English</option>
       </select>
     </div>

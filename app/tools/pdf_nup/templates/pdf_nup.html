@@ -98,7 +98,7 @@ input.field { padding: 6px 10px; border: 1px solid var(--border); border-radius:
         <div class="nup-row">
           <label>{{ tr('尺寸') }}</label>
           <select id="paper" class="field">
-            {% for p in paper_opts %}<option value="{{ p.key }}" {% if p.key=='a4' %}selected{% endif %}>{{ p.label }}</option>{% endfor %}
+            {% for p in paper_opts %}<option value="{{ p.key }}" {% if p.key=='a4' %}selected{% endif %}>{{ tr(p.label) }}</option>{% endfor %}
             <option value="custom">{{ tr('自訂') }}</option>
           </select>
         </div>
@@ -242,7 +242,7 @@ const fu = new FileUpload($('nupUpload'), async (_first, files) => {
   totalPages = d.total_pages;
   const info = $('nupFilesInfo');
   info.hidden = false;
-  info.innerHTML = '<b>已上傳</b>：共 ' + d.total_pages + ' 頁' +
+  info.innerHTML = '<b>' + tr('已上傳') + '</b>：共 ' + d.total_pages + ' 頁' +
     '<ul>' + d.files.map(f => `<li>${escapeHTML(f.name)} · ${f.pages} 頁</li>`).join('') + '</ul>';
   $('nupPanel').hidden = false;
   $('btnGenerate').disabled = false;

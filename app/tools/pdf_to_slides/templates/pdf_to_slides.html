@@ -364,7 +364,7 @@ const fu = new FileUpload($('p2sUpload'), async (f) => {
   $('sSize').textContent = fmtBytes(j.size);
   $('statBox').hidden = false;
   if (j.is_scanned_likely) {
-    $('warnZone').innerHTML = `<div class="p2o-warn">⚠ 偵測到此 PDF 沒有文字層（多半是掃描檔）。轉檔結果會是空白的，請先用「OCR 文字辨識」工具把它變成可選取文字 PDF 後再回來。</div>`;
+    $('warnZone').innerHTML = `<div class="p2o-warn">${tr('⚠ 偵測到此 PDF 沒有文字層（多半是掃描檔）。轉檔結果會是空白的，請先用「OCR 文字辨識」工具把它變成可選取文字 PDF 後再回來。')}</div>`;
   }
   $('optsPanel').hidden = false;
   $('convertPanel').hidden = false;
@@ -485,7 +485,7 @@ const jp = new JobProgress($('p2sJob'), {
       rows.push(['修正',
         chips.length
           ? `<div class="fixer-chips">${chips.join('')}</div>`
-          : '<span data-s="s8cd4ae71">無變動</span>'
+          : '<span data-s="s8cd4ae71">' + tr('無變動') + '</span>'
       ]);
     }
     if (rows.length) {

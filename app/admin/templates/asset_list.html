@@ -9,7 +9,7 @@
   <summary>{{ tr('新增資產') }}</summary>
   <form method="post" action="/admin/assets/upload" enctype="multipart/form-data" id="assetUploadForm">
     <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
-    {% with upload_id='assetUpload', accept='image/png,image/jpeg,application/pdf', input_name='file', hint=tr('PNG（建議帶透明背景）/ JPEG / PDF（自動取第一頁轉圖片）') %}
+    {% with upload_id='assetUpload', accept='image/png,image/jpeg,application/pdf', input_name='file', hint='PNG（建議帶透明背景）/ JPEG / PDF（自動取第一頁轉圖片）' %}
       {% include "components/file_upload.html" %}
     {% endwith %}
     <div class="form-row">

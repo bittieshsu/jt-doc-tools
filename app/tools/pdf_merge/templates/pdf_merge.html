@@ -80,11 +80,11 @@ function render() {
   box.hidden = false;
   box.innerHTML = files.map((f, i) => `
     <div class="merge-card" data-idx="${i}" draggable="true">
-      <span class="drag-handle" title="拖曳調整順序">⠿</span>
+      <span class="drag-handle" title="${tr('拖曳調整順序')}">⠿</span>
       <span class="seq">${i + 1}.</span>
       <span class="name">${escapeHTML(f.name)}</span>
       <span class="size">${fmtSize(f.size)}</span>
-      <button type="button" class="del-btn" data-act="delete" title="移除">×</button>
+      <button type="button" class="del-btn" data-act="delete" title="${tr('移除')}">×</button>
     </div>
   `).join('');
 }

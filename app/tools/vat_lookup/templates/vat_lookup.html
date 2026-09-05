@@ -272,55 +272,55 @@ mark.vl-hl {
 {% block content %}
 <div class="vl-wrap">
 
-<h1>{{ icon('search', size=22) }} 統編查詢</h1>
-<p class="muted">輸入 8 位統一編號反查，或輸入公司 / 機關名稱、地址、行業關鍵字搜尋。資料來源：<a href="/admin/vat-db">統編資料庫</a>（財政部 BGMOPEN + 行政院 / 地方政府機關 + 學校）。</p>
+<h1>{{ icon('search', size=22) }} {{ tr('統編查詢') }}</h1>
+<p class="muted">{{ tr('輸入 8 位統一編號反查，或輸入公司 / 機關名稱、地址、行業關鍵字搜尋。資料來源：') }}<a href="/admin/vat-db">{{ tr('統編資料庫') }}</a>{{ tr('（財政部 BGMOPEN + 行政院 / 地方政府機關 + 學校）。') }}</p>
 
 <div class="vl-search-bar">
   <input type="text" id="qInput" placeholder="{{ tr('輸入統編 (8 位數字) 或公司名稱、地址、行業關鍵字…') }}"
          autocomplete="off" autofocus>
   <button type="button" id="btnSearch">
-    {{ icon('search', size=14) }} <span id="btnSearchText">查詢</span>
+    {{ icon('search', size=14) }} <span id="btnSearchText">{{ tr('查詢') }}</span>
   </button>
 </div>
 <div class="vl-search-hint">
-  <span><span class="key">12345678</span> 8 位數字 → 統編反查</span>
-  <span><span class="key">節省</span> 1 個字起 → 名稱 / 地址 / 行業模糊搜尋</span>
-  <span><span class="key">節省 工具</span> 空格分隔多個關鍵字 → 都要符合</span>
-  <span><span class="key">台 / 臺</span> 異體字自動互通（打哪個都查得到）</span>
-  <span><span class="key">Enter</span> 送出</span>
+  <span><span class="key">12345678</span> {{ tr('8 位數字 → 統編反查') }}</span>
+  <span><span class="key">{{ tr('節省') }}</span> {{ tr('1 個字起 → 名稱 / 地址 / 行業模糊搜尋') }}</span>
+  <span><span class="key">{{ tr('節省 工具') }}</span> {{ tr('空格分隔多個關鍵字 → 都要符合') }}</span>
+  <span><span class="key">{{ tr('台 / 臺') }}</span> {{ tr('異體字自動互通（打哪個都查得到）') }}</span>
+  <span><span class="key">Enter</span> {{ tr('送出') }}</span>
 </div>
 
 <div class="vl-field-toggles" id="fieldToggles">
-  <span class="vl-ft-label">搜尋欄位：</span>
-  <label><input type="checkbox" class="vl-ft" value="name" checked> 名稱</label>
-  <label><input type="checkbox" class="vl-ft" value="address" checked> 地址</label>
-  <label><input type="checkbox" class="vl-ft" value="org_type" checked> 組織</label>
-  <label><input type="checkbox" class="vl-ft" value="industries" checked> 行業</label>
-  <label><input type="checkbox" class="vl-ft" value="owner" checked> 負責人</label>
+  <span class="vl-ft-label">{{ tr('搜尋欄位：') }}</span>
+  <label><input type="checkbox" class="vl-ft" value="name" checked> {{ tr('名稱') }}</label>
+  <label><input type="checkbox" class="vl-ft" value="address" checked> {{ tr('地址') }}</label>
+  <label><input type="checkbox" class="vl-ft" value="org_type" checked> {{ tr('組織') }}</label>
+  <label><input type="checkbox" class="vl-ft" value="industries" checked> {{ tr('行業') }}</label>
+  <label><input type="checkbox" class="vl-ft" value="owner" checked> {{ tr('負責人') }}</label>
 </div>
 
 {% if meta.record_count %}
 <div class="vl-db-info" id="dbInfoBar">
-  <span class="label">資料庫含 <b>{{ "{:,}".format(meta.record_count) }}</b> 筆 · 點分類縮小搜尋範圍：</span>
+  <span class="label">{{ tr('資料庫含') }} <b>{{ "{:,}".format(meta.record_count) }}</b> {{ tr('筆 · 點分類縮小搜尋範圍：') }}</span>
   {% for c in categories %}
     <span class="vl-cat-filter" data-cat="{{ c.category }}">
       {{ c.category }} <b>{{ "{:,}".format(c.count) }}</b>
     </span>
   {% endfor %}
-  <button type="button" class="clear-filter" id="btnClearFilter" hidden>清除篩選</button>
+  <button type="button" class="clear-filter" id="btnClearFilter" hidden>{{ tr('清除篩選') }}</button>
   {% if meta.last_updated %}
-    <span class="meta-right">最後更新 {{ meta.last_updated[:10] }}</span>
+    <span class="meta-right">{{ tr('最後更新') }} {{ meta.last_updated[:10] }}</span>
   {% endif %}
 </div>
 {% else %}
 <div class="vl-db-info vl-db-empty">
-  ⚠ 統編資料庫尚未匯入任何資料。請先到 <a href="/admin/vat-db">/admin/vat-db</a> 自動下載 BGMOPEN 主檔（約 65 MB）。
+  {{ tr('⚠ 統編資料庫尚未匯入任何資料。請先到') }} <a href="/admin/vat-db">/admin/vat-db</a> {{ tr('自動下載 BGMOPEN 主檔（約 65 MB）。') }}
 </div>
 {% endif %}
 
 <div class="vl-tabs">
-  <button type="button" data-tab="search" class="active">查詢 / 搜尋</button>
-  <button type="button" data-tab="batch">批次查詢</button>
+  <button type="button" data-tab="search" class="active">{{ tr('查詢 / 搜尋') }}</button>
+  <button type="button" data-tab="batch">{{ tr('批次查詢') }}</button>
 </div>
 
 <!-- 查詢 / 搜尋（合併模式：自動辨識 8 位 vs 名稱） -->
@@ -330,7 +330,7 @@ mark.vl-hl {
   <div id="results">
     <div class="vl-result-empty">
       {{ icon('search', size=32) }}
-      <div>輸入統編、公司名稱、或地址、行業關鍵字開始查詢</div>
+      <div>{{ tr('輸入統編、公司名稱、或地址、行業關鍵字開始查詢') }}</div>
     </div>
   </div>
 </div>
@@ -338,18 +338,18 @@ mark.vl-hl {
 <!-- 批次查詢（多筆統編） -->
 <div data-pane="batch" hidden>
   <p data-s="scd16eb0c">
-    每行一個 8 位統編，最多 200 筆。可貼上 Excel 一整欄。
+    {{ tr('每行一個 8 位統編，最多 200 筆。可貼上 Excel 一整欄。') }}
   </p>
   <textarea class="vl-batch-textarea" id="batchInput"
             placeholder="12345678&#10;87654321&#10;11223344&#10;..."></textarea>
   <div data-s="s229e47fc">
     <button type="button" id="btnBatch"
             data-s="sefd385ed">
-      {{ icon('search', size=14) }} 批次查詢
+      {{ icon('search', size=14) }} {{ tr('批次查詢') }}
     </button>
     <button type="button" id="btnBatchExport" hidden
             data-s="s619f67b3">
-      {{ icon('download', size=14) }} 下載 .csv
+      {{ icon('download', size=14) }} {{ tr('下載 .csv') }}
     </button>
   </div>
   <div id="batchResult"></div>
@@ -411,7 +411,7 @@ function _renderCard(r, isMiss, query) {
     `<span class="label">${label}</span>` +
     `<span class="val vl-copy" data-copy="${cAttr(val)}" title="點選複製" tabindex="0" role="button">${hl(val)}</span>`;
   let metaRows = '';
-  if (r.address)    metaRows += metaRow('地址', r.address);
+  if (r.address)    metaRows += metaRow(tr('地址'), r.address);
   if (r.owner)      metaRows += metaRow('負責人', r.owner);
   if (r.org_type)   metaRows += metaRow('組織別', r.org_type);
   if (r.industries) metaRows += metaRow('行業', r.industries);
@@ -468,7 +468,7 @@ function _showResultsEmpty() {
   _hideStats();
   $('results').innerHTML = `<div class="vl-result-empty">
     {{ icon('search', size=32) }}
-    <div>輸入統編、公司名稱、或地址、行業關鍵字開始查詢</div>
+    <div>${tr('輸入統編、公司名稱、或地址、行業關鍵字開始查詢')}</div>
   </div>`;
 }
 
@@ -615,7 +615,7 @@ async function smartQuery() {
   const btnText = $('btnSearchText');
   btn.disabled = true;
   btnText.innerHTML = '<span class="vl-spinner"></span> 查詢中…';
-  $('results').innerHTML = '<div class="vl-result-empty">查詢中…</div>';
+  $('results').innerHTML = '<div class="vl-result-empty">' + tr('查詢中…') + '</div>';
   try {
     // 8 位數字 + 沒有類別篩選 → 直接 vat lookup
     if (/^\d{8}$/.test(q) && _activeCategories.size === 0) {
@@ -638,7 +638,7 @@ async function smartQuery() {
     } else {
       // 文字 OR (8 位數字 + 有篩選) → 模糊搜尋
       if (q.length < 1) {
-        $('results').innerHTML = `<div class="vl-result-empty">請輸入關鍵字</div>`;
+        $('results').innerHTML = `<div class="vl-result-empty">${tr('請輸入關鍵字')}</div>`;
         return;
       }
       const payload = { query: q, limit: 50, ..._searchExtras() };
@@ -715,7 +715,7 @@ document.addEventListener('click', (e) => {
 
 function exportResultsCsv() {
   if (!_lastSearchResults.length) return;
-  const rows = [['統編', '名稱', '類別', '行業', '地址', '負責人', '組織別', '狀態']];
+  const rows = [['統編', '名稱', '類別', '行業', tr('地址'), '負責人', '組織別', '狀態']];
   for (const r of _lastSearchResults) {
     rows.push([r.vat, r.name || '', r.category || '', r.industries || '',
                r.address || '', r.owner || '', r.org_type || '', r.status || '']);
@@ -775,7 +775,7 @@ async function doBatch() {
   }
   const btn = $('btnBatch');
   btn.disabled = true;
-  $('batchResult').innerHTML = '<div class="vl-result-empty">查詢中…</div>';
+  $('batchResult').innerHTML = '<div class="vl-result-empty">' + tr('查詢中…') + '</div>';
   try {
     const r = await fetch('/tools/vat-lookup/batch', {
       method: 'POST',
@@ -827,7 +827,7 @@ function _renderBatch(j) {
 
 function exportBatchCsv() {
   if (!_lastBatchResults.length) return;
-  const rows = [['統編', '名稱', '類別', '行業', '地址', '負責人', '組織別', '狀態', '結果']];
+  const rows = [['統編', '名稱', '類別', '行業', tr('地址'), '負責人', '組織別', '狀態', '結果']];
   for (const r of _lastBatchResults) {
     if (r.found) {
       rows.push([r.vat, r.name || '', r.category || '', r.industries || '',

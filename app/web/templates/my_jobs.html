@@ -236,10 +236,7 @@
       // 講清楚實際的保護程度 —— 清單按來源電腦分只是「不把別人的攤在你眼前」，
       // 不是存取控制。未啟用認證時任何知道連結的人都下載得到，不該讓使用者
       // 誤以為這是隔離。
-      noteEl.textContent = '目前未啟用認證，清單以「來源電腦」區分：'
-        + '同一台電腦看得到自己送出的作業；多人透過同一個 NAT 出口連線時會看到'
-        + '彼此的作業。請注意這只是顯示上的區分，'
-        + '知道連結的人仍可下載結果。啟用認證後會改以帳號區分並實際隔離。';
+      noteEl.textContent = tr('目前未啟用認證，清單以「來源電腦」區分：同一台電腦看得到自己送出的作業；多人透過同一個 NAT 出口連線時會看到彼此的作業。請注意這只是顯示上的區分，知道連結的人仍可下載結果。啟用認證後會改以帳號區分並實際隔離。');
     }
     jobs.forEach((j) => {
       const active = j.status === 'running' || j.status === 'pending';
@@ -405,7 +402,7 @@
     if (live) {
       live.classList.toggle('on', hasActive);
       document.getElementById('mj-live-tx').textContent =
-        hasActive ? '自動更新中（每 2 秒）' : '自動更新中（每 15 秒）';
+        hasActive ? '自動更新中（每 2 秒）' : tr('自動更新中（每 15 秒）');
     }
     timer = setTimeout(load, hasActive ? 2000 : 15000);
   }

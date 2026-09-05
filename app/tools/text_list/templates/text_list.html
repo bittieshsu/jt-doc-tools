@@ -759,7 +759,7 @@ function setStats(j) {
 $('btnRun').addEventListener('click', async () => {
   const text = $('inputArea').value || "";
   if (!text.trim()) {
-    $('status').innerHTML = '<span data-s="s53875d1b">請先輸入或上傳清單</span>';
+    $('status').innerHTML = '<span data-s="s53875d1b">' + tr('請先輸入或上傳清單') + '</span>';
     return;
   }
   const ops = collectOps();

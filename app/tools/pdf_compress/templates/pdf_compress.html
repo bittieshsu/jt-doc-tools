@@ -209,7 +209,7 @@ const fu = new FileUpload($('cmpUpload'), async (f) => {
   if (!f) { $('panel-options').hidden = true; $('analyzeGrid').hidden = true; return; }
   const fd = new FormData(); fd.append('file', f);
   $('analyzeGrid').hidden = false;
-  $('analyzeGrid').innerHTML = '<div class="muted" data-s="s1b9b41ec">分析中…</div>';
+  $('analyzeGrid').innerHTML = '<div class="muted" data-s="s1b9b41ec">' + tr('分析中…') + '</div>';
   const r = await fu.upload('/tools/pdf-compress/analyze', fd, {processingLabel: '分析 PDF 中…'});
   // 同上：不要把伺服器回應當 HTML 塞進 DOM
   if (!r.ok) { $('analyzeGrid').textContent = tr('分析失敗：') + await window.friendlyServerError(r, tr('分析失敗')); return; }
@@ -217,12 +217,12 @@ const fu = new FileUpload($('cmpUpload'), async (f) => {
   uploadId = d.upload_id;
   origSize = d.size;
   $('analyzeGrid').innerHTML = `
-    <div class="cmp-stat"><div class="lbl">原始檔案大小</div><div class="val">${fmt(d.size)}</div></div>
-    <div class="cmp-stat"><div class="lbl">頁數</div><div class="val">${d.pages}</div></div>
-    <div class="cmp-stat"><div class="lbl">嵌入圖片</div><div class="val">${d.image_count}</div></div>
-    <div class="cmp-stat"><div class="lbl">嵌入字型</div><div class="val">${d.font_count}</div></div>
-    <div class="cmp-stat"><div class="lbl">註解</div><div class="val">${d.annot_count}</div></div>
-    <div class="cmp-stat"><div class="lbl">含表單</div><div class="val">${d.has_form ? '是' : '否'}</div></div>`;
+    <div class="cmp-stat"><div class="lbl">${tr('原始檔案大小')}</div><div class="val">${fmt(d.size)}</div></div>
+    <div class="cmp-stat"><div class="lbl">${tr('頁數')}</div><div class="val">${d.pages}</div></div>
+    <div class="cmp-stat"><div class="lbl">${tr('嵌入圖片')}</div><div class="val">${d.image_count}</div></div>
+    <div class="cmp-stat"><div class="lbl">${tr('嵌入字型')}</div><div class="val">${d.font_count}</div></div>
+    <div class="cmp-stat"><div class="lbl">${tr('註解')}</div><div class="val">${d.annot_count}</div></div>
+    <div class="cmp-stat"><div class="lbl">${tr('含表單')}</div><div class="val">${d.has_form ? '是' : '否'}</div></div>`;
   $('panel-options').hidden = false;
   $('resultPanel').hidden = true;
 });

@@ -497,7 +497,7 @@ btnUpload.addEventListener('click', async () => {
   const fd = new FormData();
   fd.append('file', blob, filename);
   btnUpload.disabled = true;
-  status.innerHTML = '<span class="muted">上傳中…</span>';
+  status.innerHTML = '<span class="muted">' + tr('上傳中…') + '</span>';
   try {
     const r = await fetch('/admin/branding/upload', {method: 'POST', body: fd});
     if (!r.ok) {
@@ -506,7 +506,7 @@ btnUpload.addEventListener('click', async () => {
       btnUpload.disabled = false;
       return;
     }
-    status.innerHTML = '<span data-s="sd4ac9708">已套用！重整頁面後生效。</span>';
+    status.innerHTML = '<span data-s="sd4ac9708">' + tr('已套用！重整頁面後生效。') + '</span>';
     btnReset.disabled = false;
     setTimeout(() => location.reload(), 800);
   } catch (e) {
@@ -517,14 +517,14 @@ btnUpload.addEventListener('click', async () => {
 
 btnReset.addEventListener('click', async () => {
   if (!await showConfirm(tr('確定要還原為內建預設 Logo？'), {okText: tr('還原'), kind:'danger'})) return;
-  status.innerHTML = '<span class="muted">還原中…</span>';
+  status.innerHTML = '<span class="muted">' + tr('還原中…') + '</span>';
   try {
     const r = await fetch('/admin/branding/reset', {method: 'POST'});
     if (!r.ok) {
-      status.innerHTML = '<span data-s="sbc8099b4">還原失敗</span>';
+      status.innerHTML = '<span data-s="sbc8099b4">' + tr('還原失敗') + '</span>';
       return;
     }
-    status.innerHTML = '<span data-s="sd4ac9708">已還原預設。</span>';
+    status.innerHTML = '<span data-s="sd4ac9708">' + tr('已還原預設。') + '</span>';
     setTimeout(() => location.reload(), 600);
   } catch (e) {
     status.textContent = tr('錯誤：') + e.message;

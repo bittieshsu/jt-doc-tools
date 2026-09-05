@@ -25,48 +25,48 @@
 {% endblock %}
 
 {% block content %}
-<p class="muted" data-s="s730ec98e"><a href="." data-s="sd2abea56">← 送件前檢核</a></p>
-<h1>{{ icon('id-card', size=22) }} 我方資料管理</h1>
-<p class="muted">預先登錄自家公司、子公司、客戶等常用實體 — 跨檔檢核時系統自動排除（不再誤標「非預期主體」），同時偵測是否打錯（漏字 / 統編位錯）。<strong>支援多公司</strong>。</p>
+<p class="muted" data-s="s730ec98e"><a href="." data-s="sd2abea56">{{ tr('← 送件前檢核') }}</a></p>
+<h1>{{ icon('id-card', size=22) }} {{ tr('我方資料管理') }}</h1>
+<p class="muted">{{ tr('預先登錄自家公司、子公司、客戶等常用實體 — 跨檔檢核時系統自動排除（不再誤標「非預期主體」），同時偵測是否打錯（漏字 / 統編位錯）。') }}<strong>{{ tr('支援多公司') }}</strong>。</p>
 
 <details class="panel" {% if not entities %}open{% endif %}>
-  <summary>新增 / 編輯實體</summary>
+  <summary>{{ tr('新增 / 編輯實體') }}</summary>
   <form id="seForm" class="se-form">
     <input type="hidden" id="seId">
     <div>
-      <label>名稱（必填）<span class="muted">公司全名 / 機關全名</span></label>
+      <label>{{ tr('名稱（必填）') }}<span class="muted">{{ tr('公司全名 / 機關全名') }}</span></label>
       <input type="text" id="seName" required placeholder="{{ tr('例：某某科技股份有限公司') }}">
     </div>
     <div>
-      <label>類型</label>
+      <label>{{ tr('類型') }}</label>
       <select id="seType">
-        <option value="company">公司</option>
-        <option value="agency">政府機關</option>
-        <option value="school">學校</option>
-        <option value="legal-person">財團 / 社團法人</option>
-        <option value="medical">醫療機構</option>
-        <option value="other">其他</option>
+        <option value="company">{{ tr('公司') }}</option>
+        <option value="agency">{{ tr('政府機關') }}</option>
+        <option value="school">{{ tr('學校') }}</option>
+        <option value="legal-person">{{ tr('財團 / 社團法人') }}</option>
+        <option value="medical">{{ tr('醫療機構') }}</option>
+        <option value="other">{{ tr('其他') }}</option>
       </select>
     </div>
     <div>
-      <label>統編 / 識別碼 <span class="muted">8 碼公司統編、機關代碼等</span></label>
+      <label>{{ tr('統編 / 識別碼') }} <span class="muted">{{ tr('8 碼公司統編、機關代碼等') }}</span></label>
       <input type="text" id="seTaxId" placeholder="{{ tr('例：12345675') }}">
     </div>
     <div>
-      <label>地址</label>
+      <label>{{ tr('地址') }}</label>
       <input type="text" id="seAddress" placeholder="{{ tr('例：台北市中正區...') }}">
     </div>
     <div class="full">
-      <label>別名 / 簡稱 <span class="muted">用半形逗號分隔（例：某某, 某某科技, SOMECO）</span></label>
+      <label>{{ tr('別名 / 簡稱') }} <span class="muted">{{ tr('用半形逗號分隔（例：某某, 某某科技, SOMECO）') }}</span></label>
       <input type="text" id="seAliases" placeholder="{{ tr('某某, 某某科技, SOMECO') }}">
     </div>
     <div class="full">
-      <label>備註</label>
+      <label>{{ tr('備註') }}</label>
       <input type="text" id="seNote" placeholder="{{ tr('例：母公司 / 海外子公司 / 常見客戶') }}">
     </div>
     <div class="full" data-s="s38861b51">
-      <button type="submit" class="btn btn-primary">{{ icon('save', size=14) }} <span id="seSubmitLabel">新增</span></button>
-      <button type="button" class="btn" data-act="reset">清除</button>
+      <button type="submit" class="btn btn-primary">{{ icon('save', size=14) }} <span id="seSubmitLabel">{{ tr('新增') }}</span></button>
+      <button type="button" class="btn" data-act="reset">{{ tr('清除') }}</button>
     </div>
   </form>
 </details>
@@ -75,7 +75,7 @@
   {% if entities %}
   <table class="se-tbl">
     <thead><tr>
-      <th>名稱</th><th>類型</th><th>統編</th><th>別名</th><th>地址 / 備註</th><th></th>
+      <th>{{ tr('名稱') }}</th><th>{{ tr('類型') }}</th><th>{{ tr('統編') }}</th><th>{{ tr('別名') }}</th><th>{{ tr('地址 / 備註') }}</th><th></th>
     </tr></thead>
     <tbody id="seBody">
     {% for e in entities %}
@@ -89,8 +89,8 @@
           {% if e.note %}<br><span data-s="sb46e8ec6">{{ e.note }}</span>{% endif %}
         </td>
         <td class="actions">
-          <button class="btn" data-act="edit" data-entity='{{ e|tojson }}'>編輯</button>
-          <button class="btn" data-act="del" data-id="{{ e.id }}" data-name="{{ e.name|e }}" data-s="sbc8099b4">刪除</button>
+          <button class="btn" data-act="edit" data-entity='{{ e|tojson }}'>{{ tr('編輯') }}</button>
+          <button class="btn" data-act="del" data-id="{{ e.id }}" data-name="{{ e.name|e }}" data-s="sbc8099b4">{{ tr('刪除') }}</button>
         </td>
       </tr>
     {% endfor %}
@@ -98,7 +98,7 @@
   </table>
   {% else %}
   <div class="se-empty">
-    尚未登錄任何實體。在上方表單新增第一筆。
+    {{ tr('尚未登錄任何實體。在上方表單新增第一筆。') }}
   </div>
   {% endif %}
 </div>

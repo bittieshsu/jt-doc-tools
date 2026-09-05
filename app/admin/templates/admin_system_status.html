@@ -198,10 +198,10 @@
     <tbody>
       {% for r in upload_limits %}
       <tr>
-        <td>{{ r.label }}</td>
+        <td>{{ tr(r.label) }}</td>
         <td class="ul-val">{% if r.value_mb %}{{ r.value_mb }} MB{% else %}<span class="ul-none">{{ tr('無上限') }}</span>{% endif %}</td>
         <td>{% if r.configurable %}<span class="ul-cfg">{{ tr('可在管理介面調') }}</span>{% else %}<span class="muted">{{ tr('程式內建') }}</span>{% endif %}</td>
-        <td class="muted ul-note">{{ r.note }}</td>
+        <td class="muted ul-note">{{ tr(r.note) }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -242,9 +242,11 @@ function fmtUptime(secAgo) {
   const days = Math.floor(secAgo / 86400);
   const hours = Math.floor((secAgo % 86400) / 3600);
   const mins = Math.floor((secAgo % 3600) / 60);
-  if (days > 0) return `${days} 天 ${hours} 時 ${mins} 分`;
-  if (hours > 0) return `${hours} 時 ${mins} 分`;
-  return `${mins} 分`;
+  const put = (key, ...vals) => vals.reduce(
+    (acc, v, i) => acc.replace('{' + i + '}', String(v)), tr(key));
+  if (days > 0) return put('{0} 天 {1} 時 {2} 分', days, hours, mins);
+  if (hours > 0) return put('{0} 時 {1} 分', hours, mins);
+  return put('{0} 分', mins);
 }
 function escapeHTML(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function barClass(pct) {
@@ -259,8 +261,8 @@ let prev = null;
 function renderHost(host) {
   if (!host.available) {
     $('ssBanner').innerHTML = `<div class="ss-disabled-banner">
-      <b>主機資源監控未啟用</b>：${escapeHTML(host.error || 'psutil 模組未安裝')}。
-      請執行 <code>jtdt update</code> 或重新安裝。</div>`;
+      <b>${tr('主機資源監控未啟用')}</b>：${escapeHTML(host.error || 'psutil 模組未安裝')}。
+      請執行 <code>jtdt update</code> ${tr('或重新安裝。')}</div>`;
     $('ssHostGrid').innerHTML = '';
     return;
   }
@@ -275,13 +277,13 @@ function renderHost(host) {
     const ct = c.in_container;
     cards.push(`
       <div class="ss-card">
-        <h3>CPU${ct ? ' <span data-s="s6c50edeb">容器</span>' : ''}</h3>
+        <h3>CPU${ct ? ' <span data-s="s6c50edeb">' + tr('容器') + '</span>' : ''}</h3>
         <div class="ss-metric"><span class="num">${fmtPercent(c.percent)}</span></div>
         <div class="ss-bar ${barClass(c.percent)}"><i data-style="width:${Math.min(100,c.percent||0)}%"></i></div>
-        <div class="ss-row"><span>${ct ? '可用核心' : '邏輯核心'}</span><span>${c.count_logical || '—'}</span></div>
-        ${ct ? '' : `<div class="ss-row"><span>實體核心</span><span>${c.count_physical || '—'}</span></div>`}
+        <div class="ss-row"><span>${ct ? '可用核心' : tr('邏輯核心')}</span><span>${c.count_logical || '—'}</span></div>
+        ${ct ? '' : `<div class="ss-row"><span>${tr('實體核心')}</span><span>${c.count_physical || '—'}</span></div>`}
         ${la ? `<div class="ss-row"><span>Load avg</span><span>${la.map(v=>v.toFixed(2)).join(' / ')}</span></div>` : ''}
-        ${ct ? '<div class="ss-row" data-s="sb071a446"><span>顯示本容器用量</span><span></span></div>' : ''}
+        ${ct ? '<div class="ss-row" data-s="sb071a446"><span>' + tr('顯示本容器用量') + '</span><span></span></div>' : ''}
       </div>`);
   }
 
@@ -290,13 +292,13 @@ function renderHost(host) {
     const m = host.mem;
     cards.push(`
       <div class="ss-card">
-        <h3>記憶體 (RAM)</h3>
+        <h3>${tr('記憶體 (RAM)')}</h3>
         <div class="ss-metric">
           <span class="num">${fmtBytes(m.used)}</span>
           <span class="unit">/ ${fmtBytes(m.total)} (${fmtPercent(m.percent)})</span>
         </div>
         <div class="ss-bar ${barClass(m.percent)}"><i data-style="width:${Math.min(100,m.percent||0)}%"></i></div>
-        <div class="ss-row"><span>可用</span><span>${fmtBytes(m.available)}</span></div>
+        <div class="ss-row"><span>${tr('可用')}</span><span>${fmtBytes(m.available)}</span></div>
         <div class="ss-row"><span>Swap</span><span>${m.swap_total_known === false
           ? `${fmtBytes(m.swap_used)} 已用（總量由主機端管理）`
           : `${fmtBytes(m.swap_used)} / ${fmtBytes(m.swap_total)} (${fmtPercent(m.swap_percent)})`}</span></div>
@@ -307,13 +309,13 @@ function renderHost(host) {
   for (const d of (host.disks || [])) {
     cards.push(`
       <div class="ss-card">
-        <h3>${escapeHTML(d.label || d.path)}</h3>
+        <h3>${escapeHTML(tr(d.label || d.path))}</h3>
         <div class="ss-metric">
           <span class="num">${fmtBytes(d.used)}</span>
           <span class="unit">/ ${fmtBytes(d.total)} (${fmtPercent(d.percent)})</span>
         </div>
         <div class="ss-bar ${barClass(d.percent)}"><i data-style="width:${Math.min(100,d.percent||0)}%"></i></div>
-        <div class="ss-row"><span>剩餘</span><span>${fmtBytes(d.free)}</span></div>
+        <div class="ss-row"><span>${tr('剩餘')}</span><span>${fmtBytes(d.free)}</span></div>
         <div class="ss-sub">${escapeHTML(d.path)}</div>
       </div>`);
   }
@@ -326,20 +328,20 @@ function renderHost(host) {
       const w = (host.disk_io.write_bytes - prev.host.disk_io.write_bytes) / dt;
       cards.push(`
         <div class="ss-card">
-          <h3>磁碟 I/O</h3>
-          <div class="ss-row"><span>讀取速率</span><span><b>${fmtBytesRate(Math.max(0,r))}</b></span></div>
-          <div class="ss-row"><span>寫入速率</span><span><b>${fmtBytesRate(Math.max(0,w))}</b></span></div>
-          <div class="ss-row"><span>累計讀</span><span>${fmtBytes(host.disk_io.read_bytes)}</span></div>
-          <div class="ss-row"><span>累計寫</span><span>${fmtBytes(host.disk_io.write_bytes)}</span></div>
+          <h3>${tr('磁碟 I/O')}</h3>
+          <div class="ss-row"><span>${tr('讀取速率')}</span><span><b>${fmtBytesRate(Math.max(0,r))}</b></span></div>
+          <div class="ss-row"><span>${tr('寫入速率')}</span><span><b>${fmtBytesRate(Math.max(0,w))}</b></span></div>
+          <div class="ss-row"><span>${tr('累計讀')}</span><span>${fmtBytes(host.disk_io.read_bytes)}</span></div>
+          <div class="ss-row"><span>${tr('累計寫')}</span><span>${fmtBytes(host.disk_io.write_bytes)}</span></div>
         </div>`);
     }
   } else if (host.disk_io) {
     cards.push(`
       <div class="ss-card">
-        <h3>磁碟 I/O</h3>
-        <div class="ss-sub">下次刷新後顯示速率（需要兩個取樣點）</div>
-        <div class="ss-row"><span>累計讀</span><span>${fmtBytes(host.disk_io.read_bytes)}</span></div>
-        <div class="ss-row"><span>累計寫</span><span>${fmtBytes(host.disk_io.write_bytes)}</span></div>
+        <h3>${tr('磁碟 I/O')}</h3>
+        <div class="ss-sub">${tr('下次刷新後顯示速率（需要兩個取樣點）')}</div>
+        <div class="ss-row"><span>${tr('累計讀')}</span><span>${fmtBytes(host.disk_io.read_bytes)}</span></div>
+        <div class="ss-row"><span>${tr('累計寫')}</span><span>${fmtBytes(host.disk_io.write_bytes)}</span></div>
       </div>`);
   }
 
@@ -351,20 +353,20 @@ function renderHost(host) {
       const rx = (host.net_io.bytes_recv - prev.host.net_io.bytes_recv) / dt;
       cards.push(`
         <div class="ss-card">
-          <h3>網路</h3>
-          <div class="ss-row"><span>下傳速率</span><span><b>${fmtBitsRate(Math.max(0,rx))}</b></span></div>
-          <div class="ss-row"><span>上傳速率</span><span><b>${fmtBitsRate(Math.max(0,tx))}</b></span></div>
-          <div class="ss-row"><span>累計接收</span><span>${fmtBytes(host.net_io.bytes_recv)}</span></div>
-          <div class="ss-row"><span>累計發送</span><span>${fmtBytes(host.net_io.bytes_sent)}</span></div>
+          <h3>${tr('網路')}</h3>
+          <div class="ss-row"><span>${tr('下傳速率')}</span><span><b>${fmtBitsRate(Math.max(0,rx))}</b></span></div>
+          <div class="ss-row"><span>${tr('上傳速率')}</span><span><b>${fmtBitsRate(Math.max(0,tx))}</b></span></div>
+          <div class="ss-row"><span>${tr('累計接收')}</span><span>${fmtBytes(host.net_io.bytes_recv)}</span></div>
+          <div class="ss-row"><span>${tr('累計發送')}</span><span>${fmtBytes(host.net_io.bytes_sent)}</span></div>
         </div>`);
     }
   } else if (host.net_io) {
     cards.push(`
       <div class="ss-card">
-        <h3>網路</h3>
-        <div class="ss-sub">下次刷新後顯示速率</div>
-        <div class="ss-row"><span>累計接收</span><span>${fmtBytes(host.net_io.bytes_recv)}</span></div>
-        <div class="ss-row"><span>累計發送</span><span>${fmtBytes(host.net_io.bytes_sent)}</span></div>
+        <h3>${tr('網路')}</h3>
+        <div class="ss-sub">${tr('下次刷新後顯示速率')}</div>
+        <div class="ss-row"><span>${tr('累計接收')}</span><span>${fmtBytes(host.net_io.bytes_recv)}</span></div>
+        <div class="ss-row"><span>${tr('累計發送')}</span><span>${fmtBytes(host.net_io.bytes_sent)}</span></div>
       </div>`);
   }
 
@@ -374,12 +376,12 @@ function renderHost(host) {
     const upSec = (Date.now()/1000) - sp.create_time;
     cards.push(`
       <div class="ss-card">
-        <h3>本服務行程</h3>
+        <h3>${tr('本服務行程')}</h3>
         <div class="ss-row"><span>PID</span><span>${sp.pid}</span></div>
-        <div class="ss-row"><span>RSS 記憶體</span><span>${fmtBytes(sp.rss)}</span></div>
-        <div class="ss-row"><span>執行緒數</span><span>${sp.threads}</span></div>
+        <div class="ss-row"><span>${tr('RSS 記憶體')}</span><span>${fmtBytes(sp.rss)}</span></div>
+        <div class="ss-row"><span>${tr('執行緒數')}</span><span>${sp.threads}</span></div>
         <div class="ss-row"><span>CPU%</span><span>${fmtPercent(sp.cpu_percent)}</span></div>
-        <div class="ss-row"><span>運行時間</span><span>${fmtUptime(upSec)}</span></div>
+        <div class="ss-row"><span>${tr('運行時間')}</span><span>${fmtUptime(upSec)}</span></div>
       </div>`);
   }
 
@@ -394,11 +396,11 @@ let _lastUsersData = null;
 function renderUsers(users) {
   _lastUsersData = users;
   if (!users || !users.users) {
-    $('ssUserStats').innerHTML = '<div class="muted">無資料</div>';
+    $('ssUserStats').innerHTML = '<div class="muted">' + tr('無資料') + '</div>';
     return;
   }
   if (users.users.length === 0) {
-    $('ssUserStats').innerHTML = '<div class="muted">尚無使用者檔案紀錄</div>';
+    $('ssUserStats').innerHTML = '<div class="muted">' + tr('尚無使用者檔案紀錄') + '</div>';
     return;
   }
   // 特殊列的即時說明（hover 立刻彈出）
@@ -502,7 +504,7 @@ async function refreshUsers(force) {
       <div class="ss-skel-bar"></div><div class="ss-skel-bar"></div>
       <div class="ss-skel-bar" data-s="s518cc756"></div>
       <div data-s="sb28d471e">
-        正在重新統計（檔案多時可能需要數秒）…</div></div>`;
+        ${tr('正在重新統計（檔案多時可能需要數秒）…')}</div></div>`;
     $('ssUserAge').textContent = tr('統計中…');
   }
   try {
@@ -579,12 +581,12 @@ async function refreshDbs(thorough) {
 
       const tdSt = ssdbEl('td');
       if (!db.exists) {
-        tdSt.appendChild(ssdbEl('span', 'ssdb-badge none', '尚未建立'));
+        tdSt.appendChild(ssdbEl('span', 'ssdb-badge none', tr('尚未建立')));
       } else if (db.skipped) {
         tdSt.appendChild(ssdbEl('span', 'ssdb-badge none', '未檢查'));
         tdSt.appendChild(ssdbEl('div', 'ssdb-impact', db.detail));
       } else if (db.ok) {
-        tdSt.appendChild(ssdbEl('span', 'ssdb-badge ok', '正常'));
+        tdSt.appendChild(ssdbEl('span', 'ssdb-badge ok', tr('正常')));
       } else {
         tdSt.appendChild(ssdbEl('span', 'ssdb-badge bad', '毀損'));
         tdSt.appendChild(ssdbEl('div', 'ssdb-detail', db.detail));
@@ -595,7 +597,7 @@ async function refreshDbs(thorough) {
       tr.appendChild(ssdbEl('td', null,
         db.exists ? (db.size_bytes / 1048576).toFixed(1) + ' MB' : '—'));
       tr.appendChild(ssdbEl('td', null,
-        db.backed_up ? (db.backups + ' 份') : '不備份（可重建）'));
+        db.backed_up ? (db.backups + ' 份') : tr('不備份（可重建）')));
       body.appendChild(tr);
     });
     const foot = $('ssDbFoot');

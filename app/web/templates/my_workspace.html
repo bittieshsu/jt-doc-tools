@@ -141,11 +141,12 @@ async function wsLoad() {
     const pct = Math.min(100, Math.round(u.used_bytes / u.quota_bytes * 100));
     fill.style.width = pct + '%';
     fill.className = 'ws-usage-fill' + (pct >= 100 ? ' full' : pct >= 80 ? ' warn' : '');
-    txt.textContent = `已用 ${WS.fmtBytes(u.used_bytes)} / ${WS.fmtBytes(u.quota_bytes)}（${pct}%）`;
+    txt.textContent = tr('已用 {0} / {1}（{2}%）').replace('{0}', WS.fmtBytes(u.used_bytes))
+      .replace('{1}', WS.fmtBytes(u.quota_bytes)).replace('{2}', String(pct));
   } else {
     fill.style.width = '100%';
     fill.className = 'ws-usage-fill';
-    txt.textContent = `已用 ${WS.fmtBytes(u.used_bytes)}（無容量上限）`;
+    txt.textContent = tr('已用 {0}（無容量上限）').replace('{0}', WS.fmtBytes(u.used_bytes));
   }
 
   // 保留期限（讀系統設定值）
@@ -154,13 +155,13 @@ async function wsLoad() {
   const clock = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
   let rtext;
   if (rh === -1 || rh === null || rh === undefined) {
-    rtext = '永久保留，除非你手動刪除';
+    rtext = tr('永久保留，除非你手動刪除');
   } else if (rh % 24 === 0 && rh >= 24) {
-    rtext = `檔案存放超過 ${rh / 24} 天會自動清除`;
+    rtext = tr('檔案存放超過 {0} 天會自動清除').replace('{0}', String(rh / 24));
   } else {
-    rtext = `檔案存放超過 ${rh} 小時會自動清除`;
+    rtext = tr('檔案存放超過 {0} 小時會自動清除').replace('{0}', String(rh));
   }
-  ret.innerHTML = clock + '<span>保留期限：' + rtext + '</span>';
+  ret.innerHTML = clock + '<span>' + tr('保留期限：') + rtext + '</span>';
   // 有 TTL（會自動清除）→ 醒目琥珀警示；永久保留 → 中性
   ret.classList.toggle('warn', rh !== -1 && rh !== null && rh !== undefined);
 

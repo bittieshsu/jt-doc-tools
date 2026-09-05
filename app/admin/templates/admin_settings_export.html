@@ -5,7 +5,7 @@
 <h1>{{ icon('archive', size=22) }} {{ tr('設定備份 / 匯入') }}</h1>
 <p class="muted">{{ tr('把 admin 設定打包成單一壓縮檔備份 / 搬遷到另一台機器；或從備份檔還原。
 匯出與匯入都可') }}<b>{{ tr('逐項勾選') }}</b>{{ tr('要包含 / 還原哪些設定。匯入時會自動把現有設定備份成') }}
-<code>.bak.&lt;時間&gt;</code>{{ tr('（在') }} <code>data/</code> {{ tr('下），失敗可手動 rollback。') }}</p>
+<code>.bak.&lt;{{ tr('時間') }}&gt;</code>{{ tr('（在') }} <code>data/</code> {{ tr('下），失敗可手動 rollback。') }}</p>
 
 <div class="panel">
   <h2 class="exp-h2">{{ icon('download', size=18) }} {{ tr('1. 匯出設定') }}</h2>
@@ -21,8 +21,8 @@
       <input type="checkbox" class="exp-cat" data-id="{{ c.id }}" data-default="{{ '1' if c.default else '0' }}"
              {% if c.default and c.present %}checked{% endif %} {% if not c.present %}disabled{% endif %}>
       <span class="cat-body">
-        <span class="cat-label">{{ c.label }}{% if c.sensitive %} <span class="cat-badge">{{ tr('敏感') }}</span>{% endif %}{% if not c.present %} <span class="muted">{{ tr('（無）') }}</span>{% endif %}</span>
-        <span class="cat-desc muted">{{ c.desc }} · {{ c.detail }}</span>
+        <span class="cat-label">{{ tr(c.label) }}{% if c.sensitive %} <span class="cat-badge">{{ tr('敏感') }}</span>{% endif %}{% if not c.present %} <span class="muted">{{ tr('（無）') }}</span>{% endif %}</span>
+        <span class="cat-desc muted">{% set d = c.detail_parts %}{{ tr(c.desc) }} · {% if d.kind == "rbac" %}{{ d.roles }} {{ tr("個角色") }} / {{ d.perms }} {{ tr("項權限") }} / {{ d.ou }} {{ tr("條 OU 規則") }}{% elif d.kind == "files" %}{{ d.count }} {{ tr("個檔案") }}・{{ d.kb }} KB{% else %}{{ tr("（無）") }}{% endif %}</span>
       </span>
     </label>
     {% endfor %}
@@ -36,7 +36,7 @@
 
 <div class="panel">
   <h2 class="exp-h2">{{ icon('upload', size=18) }} {{ tr('2. 匯入備份') }}</h2>
-  <p class="muted"><b>{{ tr('注意') }}</b>{{ tr('：匯入會覆蓋所勾選類別的現有設定，現有檔會自動備份成') }} <code>.bak.&lt;時間&gt;</code>{{ tr('。建議先匯出當前設定當保險。') }}</p>
+  <p class="muted"><b>{{ tr('注意') }}</b>{{ tr('：匯入會覆蓋所勾選類別的現有設定，現有檔會自動備份成') }} <code>.bak.&lt;{{ tr('時間') }}&gt;</code>{{ tr('。建議先匯出當前設定當保險。') }}</p>
   <input type="file" id="importFile" accept=".zip" class="field">
   <div class="exp-actions">
     <button class="btn" id="btnPreview" disabled>{{ icon('search', size=14) }} {{ tr('讀取備份內容') }}</button>
@@ -71,7 +71,7 @@
     <button class="btn" id="btnRunNow">{{ icon('download', size=14) }} {{ tr('立即測試匯出一次') }}</button>
     <span id="schStatus" class="muted"></span>
   </div>
-  <p class="muted" id="schLast">{% if sched.last_run %}上次執行：{{ sched.last_result }}{% else %}尚未執行過{% endif %}</p>
+  <p class="muted" id="schLast">{% if sched.last_run %}{{ tr('上次執行：') }}{{ sched.last_result }}{% else %}{{ tr('尚未執行過') }}{% endif %}</p>
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">

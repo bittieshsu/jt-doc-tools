@@ -37,13 +37,13 @@
 
     <div class="af-attrs" id="smGenBox">
       <label class="af-field"><span class="af-label">{{ tr('章面文字') }}</span>
-        <span class="af-ctl"><input class="field" type="text" id="smText" value="騎縫章" maxlength="30"></span>
+        <span class="af-ctl"><input class="field" type="text" id="smText" value="{{ tr('騎縫章') }}" maxlength="30"></span>
         <small class="af-note">{{ tr('可以打公司全名。字多時章會自動變寬（長方）或分行（圓 / 方），字級不會縮小。') }}</small></label>
       <label class="af-field"><span class="af-label">{{ tr('形狀') }}</span>
         <span class="af-ctl"><select class="field" id="smShape">
-          <option value="circle" selected>{{ tr('圓章') }}</option>
+          <option value="rect" selected>{{ tr('長方（橫式）') }}</option>
+          <option value="circle">{{ tr('圓章') }}</option>
           <option value="square">{{ tr('方章') }}</option>
-          <option value="rect">{{ tr('長方（橫式）') }}</option>
         </select></span></label>
       <label class="af-field"><span class="af-label">{{ tr('顏色') }}</span>
         <span class="af-ctl sm-color"><input type="color" id="smColor" value="#c81414">
