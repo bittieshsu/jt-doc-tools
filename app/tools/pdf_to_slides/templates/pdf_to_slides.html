@@ -277,14 +277,14 @@ function renderHeavyNotice(rep, sm) {
   box.appendChild(ic);
   const txt = document.createElement('span');
   const head = document.createElement('b');
-  head.textContent = bad ? '這份檔案物件很多，開啟會很慢　' : '這份檔案物件較多　';
+  head.textContent = bad ? '這份檔案物件很多，開啟會很慢　' : tr('這份檔案物件較多　');
   txt.appendChild(head);
   txt.appendChild(document.createTextNode(
     `共 ${objs.toLocaleString()} 個文字方塊 / 圖形（${pages} 張投影片，平均每張 ${perPage} 個）。` +
     (bad
-      ? '用 PowerPoint / Impress / Keynote 開啟可能需要數分鐘，捲動也會卡頓。'
-        + '若只需要部分投影片，建議先用「PDF 頁面管理」取出需要的頁再轉。'
-      : '用 PowerPoint / Impress 開啟時可能需要數十秒，屬正常現象。')));
+      ? tr('用 PowerPoint / Impress / Keynote 開啟可能需要數分鐘，捲動也會卡頓。')
+        + tr('若只需要部分投影片，建議先用「PDF 頁面管理」取出需要的頁再轉。')
+      : tr('用 PowerPoint / Impress 開啟時可能需要數十秒，屬正常現象。'))));
   box.appendChild(txt);
   box.hidden = false;
 }
@@ -352,7 +352,7 @@ const fu = new FileUpload($('p2sUpload'), async (f) => {
   jp.hide();
   const fd = new FormData();
   fd.append('file', f);
-  const r = await fu.upload('/tools/pdf-to-slides/upload', fd, {processingLabel: '解析 PDF 中…'});
+  const r = await fu.upload('/tools/pdf-to-slides/upload', fd, {processingLabel: tr('解析 PDF 中…')});
   if (!r.ok) {
     alert(tr('上傳失敗：') + await readErr(r));
     return;
@@ -376,7 +376,7 @@ $('btnConvert').addEventListener('click', async () => {
   if (btn.disabled) return;
   const fmt = document.querySelector('input[name=fmt]:checked').value;
   $('resultPanel').hidden = true;
-  setBtnBusy(btn, true, '轉換中…');
+  setBtnBusy(btn, true, tr('轉換中…'));
   let r;
   try {
     r = await fetch('/tools/pdf-to-slides/submit', {
@@ -438,33 +438,33 @@ const jp = new JobProgress($('p2sJob'), {
     $('rFormat').textContent = (sm.output_format || '').toUpperCase();
     if (rep.diagnosis && rep.diagnosis.summary) {
       const ds = rep.diagnosis.summary;
-      rows.push(['語言', ds.language_guess || '-']);
-      rows.push(['頁數', ds.page_count]);
-      rows.push(['內文字型', `${ds.primary_body_font_pdf || '-'}　${ds.primary_body_font_size_pdf}pt`]);
+      rows.push([tr('語言'), ds.language_guess || '-']);
+      rows.push([tr('頁數'), ds.page_count]);
+      rows.push([tr('內文字型'), `${ds.primary_body_font_pdf || '-'}　${ds.primary_body_font_size_pdf}pt`]);
     }
     if (rep.alignment) {
-      rows.push(['對齊率', `<b>${(rep.alignment.match_rate*100).toFixed(0)}%</b>　（已對齊段落 ${rep.alignment.matched}）`]);
+      rows.push([tr('對齊率'), `<b>${(rep.alignment.match_rate*100).toFixed(0)}%</b>　（已對齊段落 ${rep.alignment.matched}）`]);
     }
     if (rep.fixers && rep.fixers.length) {
       const chips = rep.fixers.map(f => {
         const map = {
-          fake_table_remove:   ['假表格移除', f.removed_tables],
-          font_normalize:      ['字型正規化', f.changes],
-          paragraph_merge:     ['合併段落',   f.merged],
-          paragraph_split:     ['段落拆分',   f.split],
-          heading_detect:      ['標題識別',   f.promoted],
-          list_detect:         ['清單識別',   f.converted_paragraphs],
-          header_footer:       ['頁首頁尾',   (f.moved_to_header||0) + (f.moved_to_footer||0)],
-          image_position_fix:  ['圖片位置',   f.adjusted],
-          cjk_typography:      ['中文排版',   f.inter_cjk_spaces_removed],
-          cleanup:             ['清雜訊',     (f.removed_empty_paragraphs||0) + (f.removed_tiny_images||0)],
-          table_autofit:       ['表格寬度',   f.tables_changed],
-          table_normalize:     ['表格樣式',   f.tables_styled],
-          table_cell_repair:   ['表格cell修復', f.filled],
-          table_dedup_cells:   ['表格合併cell', (f.horizontal_merges||0)+(f.vertical_merges||0)],
-          title_split:         ['標題拆段',   f.split],
-          bbox_layout:         ['版面分析',   (f.multi_column_pages?.length||0) + (f.out_of_order_paragraphs||0)],
-          page_geometry:       ['頁面幾何',   1],
+          fake_table_remove:   [tr('假表格移除'), f.removed_tables],
+          font_normalize:      [tr('字型正規化'), f.changes],
+          paragraph_merge:     [tr('合併段落'),   f.merged],
+          paragraph_split:     [tr('段落拆分'),   f.split],
+          heading_detect:      [tr('標題識別'),   f.promoted],
+          list_detect:         [tr('清單識別'),   f.converted_paragraphs],
+          header_footer:       [tr('頁首頁尾'),   (f.moved_to_header||0) + (f.moved_to_footer||0)],
+          image_position_fix:  [tr('圖片位置'),   f.adjusted],
+          cjk_typography:      [tr('中文排版'),   f.inter_cjk_spaces_removed],
+          cleanup:             [tr('清雜訊'),     (f.removed_empty_paragraphs||0) + (f.removed_tiny_images||0)],
+          table_autofit:       [tr('表格寬度'),   f.tables_changed],
+          table_normalize:     [tr('表格樣式'),   f.tables_styled],
+          table_cell_repair:   [tr('表格cell修復'), f.filled],
+          table_dedup_cells:   [tr('表格合併cell'), (f.horizontal_merges||0)+(f.vertical_merges||0)],
+          title_split:         [tr('標題拆段'),   f.split],
+          bbox_layout:         [tr('版面分析'),   (f.multi_column_pages?.length||0) + (f.out_of_order_paragraphs||0)],
+          page_geometry:       [tr('頁面幾何'),   1],
         };
         const m = map[f.fixer];
         if (!m) return null;
@@ -482,7 +482,7 @@ const jp = new JobProgress($('p2sJob'), {
         const titleAttr = detail ? ` title="${detail.replace(/"/g, '&quot;')}"` : '';
         return `<span class="fixer-chip"${titleAttr}>${label}<b>${n}</b></span>`;
       }).filter(Boolean);
-      rows.push(['修正',
+      rows.push([tr('修正'),
         chips.length
           ? `<div class="fixer-chips">${chips.join('')}</div>`
           : '<span data-s="s8cd4ae71">' + tr('無變動') + '</span>'
@@ -529,9 +529,9 @@ const jp = new JobProgress($('p2sJob'), {
       let rcExtra = '';
       if (oc !== undefined && rc !== undefined && oc > 50) {
         if (rc === 0) {
-          rcExtra = ` <span class="p2o-raster-note">此頁為設計 / 圖片版面，已用整頁圖保真還原（無可選取文字）</span>`;
+          rcExtra = ` <span class="p2o-raster-note">${tr('此頁為設計 / 圖片版面，已用整頁圖保真還原（無可選取文字）')}</span>`;
         } else if (rc < oc * 0.5) {
-          rcExtra = ` <span data-s="s901fdc89">⚠ 內容部分遺失</span>`;
+          rcExtra = ` <span data-s="s901fdc89">${tr('⚠ 內容部分遺失')}</span>`;
         }
       }
       const block = document.createElement('div');
@@ -541,11 +541,11 @@ const jp = new JobProgress($('p2sJob'), {
         <div class="preview-grid">
           <div class="preview-cell">
             <div class="preview-label">原 PDF${ocLabel}</div>
-            <img alt="原 PDF 第 ${p1} 頁" data-kind="orig" data-page="${p1}" />
+            <img alt="${tr('原 PDF 第 ${p1} 頁')}" data-kind="orig" data-page="${p1}" />
           </div>
           <div class="preview-cell">
             <div class="preview-label">轉換結果（${fmt}）${rcLabel}${rcExtra}</div>
-            <img alt="轉換結果第 ${p1} 頁" data-kind="result" data-page="${p1}" />
+            <img alt="${tr('轉換結果第 ${p1} 頁')}" data-kind="result" data-page="${p1}" />
           </div>
         </div>`;
       pagesContainer.appendChild(block);

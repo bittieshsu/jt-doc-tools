@@ -168,7 +168,7 @@
     gridEl.innerHTML = '';
     statusEl.textContent = '';
     btnDownload.style.display = 'none';
-    setProgress(0, '上傳中…');
+    setProgress(0, tr('上傳中…'));
     const fd = new FormData();
     fd.append('file', file);
     fd.append('dpi', String(getDpi()));
@@ -176,10 +176,10 @@
       const r = await window.uploadWithProgress(
         '/tools/pdf-to-image/convert', fd,
         function(loaded, total, pct) {
-          setProgress(pct, '上傳中… ' + fmtBytes(loaded) + ' / ' + fmtBytes(total));
+          setProgress(pct, tr('上傳中… ') + fmtBytes(loaded) + ' / ' + fmtBytes(total));
           if (pct >= 100) {
             // Upload done, server is processing. Switch to indeterminate.
-            setIndeterminate('伺服器轉檔中…（' + fmtBytes(total) + '）');
+            setIndeterminate(tr('伺服器轉檔中…（') + fmtBytes(total) + '）');
           }
         }
       );
@@ -192,7 +192,7 @@
       hideProgress();
       pageCountEl.textContent = d.page_count;
       totalSizeEl.textContent = fmtBytes(d.total_bytes || 0);
-      statusEl.textContent = tr('完成！') + d.page_count + ' 頁已轉為 PNG（' + d.dpi + ' DPI · 共 ' + fmtBytes(d.total_bytes || 0) + '）';
+      statusEl.textContent = tr('完成！') + d.page_count + tr(' 頁已轉為 PNG（') + d.dpi + tr(' DPI · 共 ') + fmtBytes(d.total_bytes || 0) + '）';
       d.pages.forEach(function(p) {
         const card = document.createElement('div');
         card.className = 'p2i-card';
@@ -201,7 +201,7 @@
             '<img src="' + p.preview_url + '" loading="lazy" />' +
           '</a>' +
           '<div class="p2i-meta">' +
-            '<span>第 ' + (p.index + 1) + ' 頁 · ' + p.width_px + '×' + p.height_px + ' · ' + fmtBytes(p.size_bytes || 0) + '</span>' +
+            tr('<span>第 ') + (p.index + 1) + tr(' 頁 · ') + p.width_px + '×' + p.height_px + ' · ' + fmtBytes(p.size_bytes || 0) + '</span>' +
             '<a class="p2i-dl" href="' + p.preview_url + '" download="page_' + (p.index + 1) + '.png" title="下載此頁 PNG" aria-label="下載此頁 PNG">' + dlIcon + '</a>' +
           '</div>';
         gridEl.appendChild(card);
@@ -219,8 +219,8 @@
       }
       const total = fmtBytes(d.total_bytes || 0);
       btnDownload.innerHTML = dlIcon + (d.page_count === 1
-        ? ' 下載 PNG（' + total + '）'
-        : ' 下載全部 ZIP（' + d.page_count + ' 頁 · 約 ' + total + '）');
+        ? tr(' 下載 PNG（') + total + '）'
+        : tr(' 下載全部 ZIP（') + d.page_count + tr(' 頁 · 約 ') + total + '）');
     } catch (e) {
       statusEl.textContent = tr('錯誤：') + e.message;
       hideProgress();
@@ -241,7 +241,7 @@
     e.preventDefault();
     const lb = document.createElement('div');
     lb.className = 'p2i-lightbox';
-    lb.innerHTML = '<button class="p2i-lightbox-close" type="button" aria-label="關閉">×</button>' +
+    lb.innerHTML = '<button class="p2i-lightbox-close" type="button" aria-label="' + tr('關閉') + '">×</button>' +
                    '<img src="' + t.dataset.zoomSrc + '" alt="" />';
     lb.addEventListener('click', function() { lb.remove(); });
     document.addEventListener('keydown', function esc(ev) {

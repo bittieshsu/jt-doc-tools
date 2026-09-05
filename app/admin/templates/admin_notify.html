@@ -264,7 +264,7 @@
         } else {
           // 把真正的錯誤講出來 —— 只回「失敗」對管理員毫無幫助
           res.className = 'nt-test-res bad';
-          res.textContent = d.error || '失敗';
+          res.textContent = d.error || tr('失敗');
         }
       } catch (err) {
         res.className = 'nt-test-res bad';
@@ -285,11 +285,11 @@
   const help = document.getElementById('smtpModeHelp');
   const HELP = {
     auth: tr('向外部信箱服務（Gmail、Office 365、自架 mail）認證後寄出。需要帳號與密碼。'),
-    relay: '送到公司內部的 mail server，由它轉送出去。那台機器設定成「來自 jtdt 這個 IP 就放行」，'
-         + '所以不需要帳號密碼，通常走 25 埠。寄件者網域要是對方允許的，否則會被退。',
-    direct: 'jtdt 自己查收件網域的 MX 紀錄直接送過去，不經過任何中繼主機。'
-          + '需要反向 DNS（PTR）與 SPF 設對、對外 25 埠可通，否則多半會被當垃圾信。'
-          + '另外這個模式沒有重試佇列，對方暫時拒收就是這封通知沒送到 —— 要保證送達請用 relay。',
+    relay: tr('送到公司內部的 mail server，由它轉送出去。那台機器設定成「來自 jtdt 這個 IP 就放行」，')
+         + tr('所以不需要帳號密碼，通常走 25 埠。寄件者網域要是對方允許的，否則會被退。'),
+    direct: tr('jtdt 自己查收件網域的 MX 紀錄直接送過去，不經過任何中繼主機。')
+          + tr('需要反向 DNS（PTR）與 SPF 設對、對外 25 埠可通，否則多半會被當垃圾信。')
+          + tr('另外這個模式沒有重試佇列，對方暫時拒收就是這封通知沒送到 —— 要保證送達請用 relay。'),
   };
   function apply() {
     const mode = sel.value;

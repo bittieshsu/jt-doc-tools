@@ -745,11 +745,11 @@ let _resultLines = [];
 function setStats(j) {
   const dropped = j.original_count - j.count;
   const parts = [
-    `輸入 <b>${j.original_count.toLocaleString()}</b> 行`,
-    `輸出 <b>${j.count.toLocaleString()}</b> 行`,
+    `輸入 <b>${j.original_count.toLocaleString()}</b> ${tr('行')}<`,
+    `輸出 <b>${j.count.toLocaleString()}</b> ${tr('行')}<`,
   ];
-  if (dropped > 0) parts.push(`減少 <b>${dropped.toLocaleString()}</b> 行`);
-  else if (dropped < 0) parts.push(`增加 <b>${(-dropped).toLocaleString()}</b> 行`);
+  if (dropped > 0) parts.push(`減少 <b>${dropped.toLocaleString()}</b> ${tr('行')}<`);
+  else if (dropped < 0) parts.push(`增加 <b>${(-dropped).toLocaleString()}</b> ${tr('行')}<`);
   if (j.ops_applied && j.ops_applied.length) {
     parts.push(`套用：${j.ops_applied.join(' → ')}`);
   }

@@ -310,7 +310,7 @@ const editor = new DragPositionEditor({
       body: JSON.stringify(rect),
     });
     if (r.ok) { location.reload(); }
-    else { showAlert('裁剪失敗'); }
+    else { showAlert(tr('裁剪失敗')); }
   });
 })();
 

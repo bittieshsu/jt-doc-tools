@@ -103,8 +103,8 @@
         const xb = document.createElement('button');
         xb.type = 'button';
         xb.className = 'modal-x';
-        xb.setAttribute('aria-label', '關閉');
-        xb.title = '關閉';
+        xb.setAttribute('aria-label', tr('關閉'));
+        xb.title = tr('關閉');
         xb.innerHTML = _closeIcon();
         titleEl.appendChild(xb);
         card.appendChild(titleEl);
@@ -146,14 +146,14 @@
         cb.type = 'button';
         cb.className = 'btn modal-cancel';
         _setBtnLabel(cb, cancelIcon === undefined ? 'close' : cancelIcon,
-                     cancelText || '取消');
+                     cancelText || tr('取消'));
         actionsEl.appendChild(cb);
       }
       const ob = document.createElement('button');
       ob.type = 'button';
       ob.className = 'btn btn-primary modal-ok';
       _setBtnLabel(ob, okIcon === undefined ? 'check' : okIcon,
-                   okText || '確定');
+                   okText || tr('確定'));
       actionsEl.appendChild(ob);
       card.appendChild(actionsEl);
       overlay.appendChild(card);
@@ -216,14 +216,14 @@
     opts = opts || {};
     return _show({
       title: opts.title, body: msg, kind: opts.kind, html: opts.html,
-      okText: opts.okText || '確定', okIcon: opts.okIcon, showCancel: false,
+      okText: opts.okText || tr('確定'), okIcon: opts.okIcon, showCancel: false,
     });
   };
   window.showConfirm = function (msg, opts) {
     opts = opts || {};
     return _show({
       title: opts.title, body: msg, kind: opts.kind || 'warn', html: opts.html,
-      okText: opts.okText || '確定', cancelText: opts.cancelText || '取消',
+      okText: opts.okText || tr('確定'), cancelText: opts.cancelText || tr('取消'),
       okIcon: opts.okIcon, cancelIcon: opts.cancelIcon,
       showCancel: true,
     });
@@ -232,7 +232,7 @@
     opts = opts || {};
     return _show({
       title: opts.title, body: msg, kind: opts.kind, html: opts.html,
-      okText: opts.okText || '確定', cancelText: opts.cancelText || '取消',
+      okText: opts.okText || tr('確定'), cancelText: opts.cancelText || tr('取消'),
       showCancel: true, prompt: true,
       defaultValue: opts.defaultValue || '', placeholder: opts.placeholder || '',
     });

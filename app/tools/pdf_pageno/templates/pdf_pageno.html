@@ -351,7 +351,7 @@ const fu = new FileUpload(document.getElementById('upPN'), async (_first, fs) =>
   document.getElementById('thumb-grid').innerHTML =
     '<p class="muted" data-s="s2a9ed20f">' + tr('載入縮圖中…') + '</p>';
   const fd = new FormData(); fd.append('file', files[0]);
-  const r = await fu.upload('/tools/pdf-pageno/load', fd, {processingLabel: '載入縮圖中…'});
+  const r = await fu.upload('/tools/pdf-pageno/load', fd, {processingLabel: tr('載入縮圖中…')});
   if (!r.ok) {
     document.getElementById('thumb-grid').innerHTML = '<p class="muted">' + tr('載入失敗') + '</p>';
     return;
@@ -395,7 +395,7 @@ function renderThumbs() {
   if (files.length > 1) info.textContent += `；批次共 ${files.length} 份檔案（縮圖只顯示第一份）`;
   grid.innerHTML = pages.map(p => {
     const skip = (p.page < fp || p.page > tp);
-    const badge = skip ? `<span class="pn-badge">不加頁碼</span>` : '';
+    const badge = skip ? `<span class="pn-badge">${tr('不加頁碼')}</span>` : '';
     return `<div class="page-card${skip ? ' pn-skip' : ''}">
       <div class="page-thumb" data-page="${p.page}" data-zoom-src="${p.thumb}">
         ${badge}
@@ -515,7 +515,7 @@ swatches.forEach(s => s.addEventListener('click', () => {
 // Position visual picker
 const posInput = document.getElementById('position');
 const posLabel = document.getElementById('posLabel');
-const POS_NAMES = { tl:'左上', tc:'中上', tr:'右上', bl:'左下', bc:'中下', br:'右下' };
+const POS_NAMES = { tl:tr('左上'), tc:tr('中上'), tr:tr('右上'), bl:tr('左下'), bc:tr('中下'), br:tr('右下') };
 document.querySelectorAll('.pn-posbtn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.pn-posbtn').forEach(b => b.classList.remove('pn-posbtn-active'));
@@ -616,7 +616,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   fd.append('color', getColor());
   fd.append('from_page', String(getFromPage()));
   fd.append('to_page', String(getToPageRaw()));
-  const r = await fu.upload('/tools/pdf-pageno/submit', fd, {processingLabel: '排隊處理中…'});
+  const r = await fu.upload('/tools/pdf-pageno/submit', fd, {processingLabel: tr('排隊處理中…')});
   if(!r.ok) return alert(tr('送出失敗：')+ await r.text());
   const j = await r.json(); jp.track(j.job_id);
 });

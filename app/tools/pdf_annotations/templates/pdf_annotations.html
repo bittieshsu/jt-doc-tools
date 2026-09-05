@@ -257,7 +257,7 @@ function renderLlm(llm) {
     for (const g of llm.groups) {
       const ids = (g.indices || []).slice(0, 30);
       html += '<div class="an-llm-grp">' +
-        '<div><span class="name">' + escapeHtml(g.name || "未分類") + '</span>' +
+        '<div><span class="name">' + escapeHtml(g.name || tr("未分類")) + '</span>' +
         '<span class="count">' + (g.indices || []).length + '</span></div>' +
         (g.summary ? '<div class="desc">' + escapeHtml(g.summary) + '</div>' : '') +
         (ids.length ? '<div class="ids">註解 #: ' + ids.join(", ") +
@@ -305,7 +305,7 @@ function _filteredAnnots() {
   if (!lastResult) return [];
   return lastResult.annots.filter(a =>
     filterState.types.has(a.type_label) &&
-    filterState.authors.has(a.author || "(未署名)"));
+    filterState.authors.has(a.author || tr("(未署名)")));
 }
 
 function redrawList() {
@@ -332,10 +332,10 @@ function redrawList() {
     html += `<div class="an-group">`;
     html += `<div class="an-group-h">${escapeHtml(k)} <span data-s="s1efd9ac4">(${items.length})</span></div>`;
     for (const a of items) {
-      const who = a.author || "(未署名)";
+      const who = a.author || tr("(未署名)");
       const body = a.content || a.subject || "<em data-s='s8cd4ae71'>(無文字內容)</em>";
       const thumb = lastResult.upload_id
-        ? `<div class="thumb"><img loading="lazy" class="loading" src="/tools/pdf-annotations/preview/${lastResult.upload_id}/${a.page}" alt="第 ${a.page} 頁預覽" data-page="${a.page}"></div>`
+        ? `<div class="thumb"><img loading="lazy" class="loading" src="/tools/pdf-annotations/preview/${lastResult.upload_id}/${a.page}" alt="${tr('第 ${a.page} 頁預覽')}" data-page="${a.page}"></div>`
         : "";
       html += `<div class="an-row">`;
       html += thumb;

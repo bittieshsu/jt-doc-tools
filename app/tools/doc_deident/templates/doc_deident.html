@@ -394,7 +394,7 @@ $('btnDetect').addEventListener('click', async () => {
   const llmAug = $('ddLlmAugment');
   if (llmAug && llmAug.checked) fd.append('llm_augment', '1');
   try {
-    const procLabel = (llmAug && llmAug.checked) ? '偵測 + LLM 補偵測中…' : '偵測敏感資料中…';
+    const procLabel = (llmAug && llmAug.checked) ? '偵測 + LLM 補偵測中…' : tr('偵測敏感資料中…');
     const r = await fu.upload('/tools/doc-deident/detect', fd, {processingLabel: procLabel});
     if (!r.ok) { $('detectStatus').textContent = tr('失敗：') + await jtdtError(r); return; }
     detectResult = await r.json();
@@ -529,7 +529,7 @@ document.querySelectorAll('.dd-mode').forEach(m => {
     chosenMode = m.dataset.mode;
     const isReplace = chosenMode === 'replace';
     $('ddReplaceOpts').hidden = !isReplace;
-    $('ddLastCol').textContent = isReplace ? '替換為（可直接修改）' : '遮罩預覽';
+    $('ddLastCol').textContent = isReplace ? '替換為（可直接修改）' : tr('遮罩預覽');
     renderRows();
   });
 });
@@ -581,7 +581,7 @@ $('btnProcess').addEventListener('click', async () => {
     Array.from(document.querySelectorAll('.fchk:checked')).map(c => parseInt(c.value))
   );
   let selections = detectResult.findings.filter(f => chosenIds.has(f.id));
-  if (!selections.length) { await showAlert('請先勾選至少一筆要處理的項目'); return; }
+  if (!selections.length) { await showAlert(tr('請先勾選至少一筆要處理的項目')); return; }
   if (chosenMode === 'replace') {
     // 每一筆都要帶上真正要寫進 PDF 的字串（使用者改過的優先，否則用建議值）
     selections = selections.map(f => ({...f, replacement: suggestedFor(f)}));

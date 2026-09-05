@@ -230,7 +230,7 @@ function render(r) {
 function _willRemove(a) {
   if (mode === "all") return true;
   if (stripState.types.has(a.type)) return true;
-  const who = a.author || "(未署名)";
+  const who = a.author || tr("(未署名)");
   if (stripState.authors.has(who)) return true;
   return false;
 }
@@ -255,11 +255,11 @@ function redrawList() {
     html += `<div class="as-group">`;
     html += `<div class="as-group-h">${escapeHtml(k)} <span data-s="s1efd9ac4">(${items.length})</span></div>`;
     for (const a of items) {
-      const who = a.author || "(未署名)";
+      const who = a.author || tr("(未署名)");
       const body = a.content || a.subject || "<em data-s='s8cd4ae71'>(無文字內容)</em>";
       const willRemove = _willRemove(a);
       const thumb = lastResult.upload_id
-        ? `<div class="thumb"><img loading="lazy" class="loading" src="/tools/pdf-annotations-strip/preview/${lastResult.upload_id}/${a.page}" alt="第 ${a.page} 頁預覽" data-page="${a.page}"></div>`
+        ? `<div class="thumb"><img loading="lazy" class="loading" src="/tools/pdf-annotations-strip/preview/${lastResult.upload_id}/${a.page}" alt="${tr('第 ${a.page} 頁預覽')}" data-page="${a.page}"></div>`
         : "";
       html += `<div class="as-row${willRemove ? ' will-remove' : ''}">`;
       html += thumb;
@@ -320,7 +320,7 @@ $("btnStrip").addEventListener("click", async () => {
   fd.append("types",   Array.from(stripState.types).join(","));
   fd.append("authors", Array.from(stripState.authors).join(","));
   const btn = $("btnStrip");
-  _setBusy(btn, true, "處理中…");
+  _setBusy(btn, true, tr("處理中…"));
   $("stripStatus").textContent = "";
   let r;
   try {

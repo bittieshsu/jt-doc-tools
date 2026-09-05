@@ -265,18 +265,18 @@
 {% block scripts %}
 <script nonce="{{ request.state.csp_nonce }}">
 async function rerunCheck(caseId) {
-  const ok = await window.showConfirm(tr("建立新版本並重新檢核？"), { title: "重新檢核", okText: "確認" });
+  const ok = await window.showConfirm(tr("建立新版本並重新檢核？"), { title: tr("重新檢核"), okText: tr("確認") });
   if (!ok) return;
   try {
     const r = await fetch("../run/" + caseId, { method: "POST" });
     if (!r.ok) throw new Error(await r.text());
     const j = await r.json();
     setTimeout(() => location.reload(), 600);
-  } catch (e) { window.showAlert("失敗：" + e.message); }
+  } catch (e) { window.showAlert(tr("失敗：") + e.message); }
 }
 
 async function markOverride(caseId, findingKey, verdict) {
-  const reason = await window.showPrompt("(選填) 註明原因：", { title: "新增標記", okText: "確認" });
+  const reason = await window.showPrompt(tr("(選填) 註明原因："), { title: tr("新增標記"), okText: tr("確認") });
   if (reason === null) return;  // cancelled
   const fd = new FormData();
   fd.append("finding_key", findingKey);
@@ -286,25 +286,25 @@ async function markOverride(caseId, findingKey, verdict) {
     const r = await fetch("../override/" + caseId, { method: "POST", body: fd });
     if (!r.ok) throw new Error(await r.text());
     location.reload();
-  } catch (e) { window.showAlert("失敗：" + e.message); }
+  } catch (e) { window.showAlert(tr("失敗：") + e.message); }
 }
 
 async function removeOverride(caseId, findingKey) {
-  const ok = await window.showConfirm(tr("移除此標記？"), { title: "移除標記" });
+  const ok = await window.showConfirm(tr("移除此標記？"), { title: tr("移除標記") });
   if (!ok) return;
   try {
     const r = await fetch("../override/" + caseId + "/" + encodeURIComponent(findingKey), { method: "DELETE" });
     if (!r.ok) throw new Error(await r.text());
     location.reload();
-  } catch (e) { window.showAlert("失敗：" + e.message); }
+  } catch (e) { window.showAlert(tr("失敗：") + e.message); }
 }
 
 function previewPage(caseId, fileId, page) {
-  if (!fileId) { window.showAlert("此 finding 未綁定特定檔案，無法預覽"); return; }
+  if (!fileId) { window.showAlert(tr("此 finding 未綁定特定檔案，無法預覽")); return; }
   const modal = document.getElementById("prevModal");
   const img = document.getElementById("prevImg");
   const title = document.getElementById("prevTitle");
-  title.textContent = tr("頁面 ") + page + " 預覽（檔案 " + fileId.substring(0,8) + "...）";
+  title.textContent = tr("頁面 ") + page + tr(" 預覽（檔案 ") + fileId.substring(0,8) + "...）";
   img.src = "../page-preview/" + caseId + "/" + fileId + "/" + page;
   modal.classList.add("show");
 }
@@ -330,7 +330,7 @@ document.addEventListener("click", function (ev) {
       const box = b.nextElementSibling;
       const show = box.style.display === "none";
       box.style.display = show ? "block" : "none";
-      b.textContent = show ? "▾ 收合細節" : "▸ 顯示細節";
+      b.textContent = show ? "▾ 收合細節" : tr("▸ 顯示細節");
       break;
     }
     case "preview": previewPage(CASE_ID, a.fid, parseInt(a.page, 10)); break;

@@ -379,7 +379,7 @@ function setBusy(busy, message) {
   submitBtn.disabled = busy;
   if (busy) {
     btnIconSlot.innerHTML = '<span class="spinner"></span>';
-    btnLabel.textContent = message || '處理中…';
+    btnLabel.textContent = message || tr('處理中…');
   } else {
     btnIconSlot.innerHTML = btnIconOriginal;
     btnLabel.textContent = btnLabelOriginal;
@@ -418,10 +418,10 @@ form.addEventListener('submit', async (e) => {
   // 使用者拉了新檔、這次失敗了，看到的還是**上一份文件**的預覽與報告，
   // 看起來就像「工具處理了錯的檔案」（實際上是根本沒處理成功）。
   clearPreviousResult();
-  setBusy(true, isOffice ? '轉 PDF 中…' : '辨識欄位中…');
+  setBusy(true, isOffice ? '轉 PDF 中…' : tr('辨識欄位中…'));
 
   try {
-    const res = await pfFu.upload('/tools/pdf-fill/preview', fd, {processingLabel: isOffice ? '轉 PDF + 辨識欄位中…' : '辨識欄位中…'});
+    const res = await pfFu.upload('/tools/pdf-fill/preview', fd, {processingLabel: isOffice ? '轉 PDF + 辨識欄位中…' : tr('辨識欄位中…')});
     if (!res.ok) {
       const t = await res.text();
       alert(tr('預覽失敗：') + t);
@@ -735,7 +735,7 @@ function openContextMenu(clientX, clientY, pt_x, pt_y, replaceIdx, pageIdx) {
   // missed a checkbox, or for per-form template overrides).
   const checkHead = document.createElement('div');
   checkHead.className = 'ctx-menu-section';
-  checkHead.textContent = isReplace ? '覆寫為：' : '快速插入';
+  checkHead.textContent = isReplace ? '覆寫為：' : tr('快速插入');
   menu.appendChild(checkHead);
   const checkItem = document.createElement('div');
   checkItem.className = 'ctx-menu-item';
@@ -749,7 +749,7 @@ function openContextMenu(clientX, clientY, pt_x, pt_y, replaceIdx, pageIdx) {
 
   const header = document.createElement('div');
   header.className = 'ctx-menu-header';
-  header.textContent = isReplace ? '或改用以下欄位：' : '選要插入的欄位：';
+  header.textContent = isReplace ? '或改用以下欄位：' : tr('選要插入的欄位：');
   menu.appendChild(header);
 
   const labelByKey = {};
@@ -761,7 +761,7 @@ function openContextMenu(clientX, clientY, pt_x, pt_y, replaceIdx, pageIdx) {
     const val = (currentProfileValues[key] || '').trim();
     const item = document.createElement('div');
     item.className = 'ctx-menu-item' + (val ? '' : ' empty');
-    item.innerHTML = `<span class="k-label">${escapeHTML(pk.label)}</span><span class="k-val">${val ? escapeHTML(val) : '(空)'}</span>`;
+    item.innerHTML = `<span class="k-label">${escapeHTML(pk.label)}</span><span class="k-val">${val ? escapeHTML(val) : tr('(空)')}</span>`;
     item.addEventListener('click', () => {
       closeContextMenu();
       if (isReplace) replaceWithField(replaceIdx, pk.key, val);
@@ -996,7 +996,7 @@ downloadBtn.addEventListener('click', async (e) => {
   const ok = await regenIfDirty();
   downloadBtn.innerHTML = original;
   downloadBtn.classList.remove('saved-flash');
-  if (!ok) { showAlert('合成失敗，請再試一次'); return; }
+  if (!ok) { showAlert(tr('合成失敗，請再試一次')); return; }
   // Trigger the download with the (now-current) href.
   const href = downloadBtn.getAttribute('href');
   const dlName = downloadBtn.getAttribute('download') || '';
@@ -1100,7 +1100,7 @@ function renderTemplateStatus(applied, uploadId, fileName) {
 
 saveTplBtn.addEventListener('click', async () => {
   if (!currentUploadId) return;
-  const name = await showPrompt('範本名稱', { title: '儲存範本', defaultValue: currentFileBaseName || '新範本' });
+  const name = await showPrompt(tr('範本名稱'), { title: tr('儲存範本'), defaultValue: currentFileBaseName || tr('新範本') });
   if (!name) return;
   saveTplBtn.disabled = true;
   saveTplBtn.textContent = tr('儲存中…');
@@ -1196,23 +1196,23 @@ function llmErrorCard(raw) {
   if (s.includes('timed out') || s.includes('readtimeout') || s.includes('timeout')) {
     return msgCard({
       type: 'error',
-      title: 'LLM 校驗逾時',
+      title: tr('LLM 校驗逾時'),
       detail: `LLM 伺服器在規定時間內沒有回應完成。原始訊息：${raw}`,
-      hint: `建議：到 <a href="/admin/llm-settings">LLM 設定</a> 把「單次 Timeout」調到 <b>300 秒以上</b>（視覺模型冷啟動+推理常超過 120s）。也可換成較快的模型，或改用較小的圖片。`,
+      hint: `建議：到 <a href="/admin/llm-settings">${tr('LLM 設定')}</a> ${tr('把「單次 Timeout」調到')} <b>${tr('300 秒以上')}</b>${tr('（視覺模型冷啟動+推理常超過 120s）。也可換成較快的模型，或改用較小的圖片。')}<`,
     });
   }
   if (s.includes('connect') || s.includes('refused') || s.includes('unreachable')) {
     return msgCard({
       type: 'error',
-      title: 'LLM 伺服器連不上',
+      title: tr('LLM 伺服器連不上'),
       detail: `無法連線到 LLM 伺服器。原始訊息：${raw}`,
-      hint: `請確認 <a href="/admin/llm-settings">LLM 設定</a> 的 Base URL 正確且 server 有運行。可在該頁按「測試連線」驗證。`,
+      hint: `請確認 <a href="/admin/llm-settings">${tr('LLM 設定')}</a> ${tr('的 Base URL 正確且 server 有運行。可在該頁按「測試連線」驗證。')}<`,
     });
   }
   if (s.includes('no parseable json') || s.includes('valid json')) {
     return msgCard({
       type: 'warn',
-      title: 'LLM 回應無法解析為 JSON',
+      title: tr('LLM 回應無法解析為 JSON'),
       detail: `模型有回應但格式不是預期的 JSON。原始訊息：${raw}`,
       hint: `可能是模型能力不足或 prompt 被誤解。試換一個視覺能力較強的模型（例：gemma4:26b）。`,
     });
@@ -1220,23 +1220,23 @@ function llmErrorCard(raw) {
   if (s.includes('empty response')) {
     return msgCard({
       type: 'warn',
-      title: 'LLM 回應為空',
+      title: tr('LLM 回應為空'),
       detail: `模型連線成功但沒有輸出任何內容。原始訊息：${raw}`,
       hint: `可能模型正在冷啟動或被 load/unload。請稍等再試一次。`,
     });
   }
-  if (s.includes('llm 未啟用')) {
+  if (s.includes(tr('llm 未啟用'))) {
     return msgCard({
       type: 'info',
-      title: 'LLM 校驗未啟用',
+      title: tr('LLM 校驗未啟用'),
       detail: raw,
-      hint: `到 <a href="/admin/llm-settings">LLM 設定</a> 勾選「啟用 LLM 校驗」再儲存。`,
+      hint: `到 <a href="/admin/llm-settings">${tr('LLM 設定')}</a> ${tr('勾選「啟用 LLM 校驗」再儲存。')}<`,
     });
   }
   // Fallback
   return msgCard({
     type: 'error',
-    title: 'LLM 校驗失敗',
+    title: tr('LLM 校驗失敗'),
     detail: raw,
   });
 }
@@ -1265,12 +1265,12 @@ async function startAsyncLlmReview(uploadId) {
           <span class="muted" data-s="s0c27a7ee">${sec}s</span>
         </div>
         <div class="llm-progress-bar"><div class="llm-progress-fill" data-style="width:${pct}%"></div></div>
-        <div class="llm-progress-msg">${escapeHTML(msg || '啟動中…')}</div>
+        <div class="llm-progress-msg">${escapeHTML(msg || tr('啟動中…'))}</div>
         ${subtitle ? `<div class="muted" data-s="s8b685211">${escapeHTML(subtitle)}</div>` : ''}
       </div>
     `;
   };
-  renderProgress(0, '送出校驗任務…');
+  renderProgress(0, tr('送出校驗任務…'));
 
   // 1. start the job
   let jobId;
@@ -1307,7 +1307,7 @@ async function startAsyncLlmReview(uploadId) {
     if (lastState) renderProgress(lastState.progress, lastState.message, lastState.subtitle);
   }, 500);
 
-  let lastState = {progress: 0.05, message: '啟動中…', subtitle: ''};
+  let lastState = {progress: 0.05, message: tr('啟動中…'), subtitle: ''};
   while (!stopped) {
     await new Promise(r => setTimeout(r, pollInterval));
     let status;
@@ -1320,7 +1320,7 @@ async function startAsyncLlmReview(uploadId) {
     }
     lastState = {
       progress: status.progress || 0,
-      message: status.message || '處理中…',
+      message: status.message || tr('處理中…'),
       subtitle: status.status === 'error' ? (status.error || '錯誤') : '',
     };
     renderProgress(lastState.progress, lastState.message, lastState.subtitle);
@@ -1347,9 +1347,9 @@ async function startAsyncLlmReview(uploadId) {
       } catch (e) {
         box.innerHTML = msgCard({
           type: 'warn',
-          title: '抓取 LLM 結果失敗',
+          title: tr('抓取 LLM 結果失敗'),
           detail: e.message,
-          hint: '可能是 job 超過保留期限，請重新送出校驗。',
+          hint: tr('可能是 job 超過保留期限，請重新送出校驗。'),
         });
       }
       return;
@@ -1367,7 +1367,7 @@ function renderLlmReview(rev) {
     box.hidden = false;
     box.innerHTML = msgCard({
       type: 'info',
-      title: 'LLM 校驗被略過',
+      title: tr('LLM 校驗被略過'),
       detail: rev.skipped,
     });
     return;
@@ -1408,15 +1408,15 @@ function renderLlmReview(rev) {
   const modelTag = rev._model
     ? `<span class="llm-model-tag">${escapeHTML(rev._model)}</span>` : '';
   let html = `<details open class="llm-review-details">
-    <summary><b>🤖 LLM 校驗結果</b> ${modelTag}
+    <summary><b>${tr('🤖 LLM 校驗結果')}</b> ${modelTag}
       <span class="muted" data-s="s5a8ca7b2">
         ${rev.rounds.length} 輪、共 ${rev.total_elapsed_s}s
       </span>
     </summary>`;
   if (lastVerdict === 'all_clear' && !allCorrections.length) {
-    html += `<div class="llm-clear">✅ LLM 認為填寫結果正確，沒有發現問題。</div>`;
+    html += `<div class="llm-clear">${tr('✅ LLM 認為填寫結果正確，沒有發現問題。')}</div>`;
   } else if (allCorrections.length === 0) {
-    html += `<div class="llm-clear">⚠ LLM 沒回報任何建議（模型可能漏掉了問題，可試其他模型或換 prompt）。</div>`;
+    html += `<div class="llm-clear">${tr('⚠ LLM 沒回報任何建議（模型可能漏掉了問題，可試其他模型或換 prompt）。')}</div>`;
   } else {
     const strong = allCorrections.filter(c => c.confidence >= 0.7).length;
     const med    = allCorrections.filter(c => c.confidence >= 0.4 && c.confidence < 0.7).length;
@@ -1439,10 +1439,10 @@ function renderLlmReview(rev) {
       if (conf >= 0.7) confClass = 'conf-strong';
       else if (conf >= 0.4) confClass = 'conf-med';
       const typeMap = {
-        WRONG_PLACEMENT: '位置錯',
-        WRONG_VALUE:     '值不符',
-        MISSING:         '漏填',
-        EXTRA:           '多填',
+        WRONG_PLACEMENT: tr('位置錯'),
+        WRONG_VALUE:     tr('值不符'),
+        MISSING:         tr('漏填'),
+        EXTRA:           tr('多填'),
       };
       const actual = (c.actual_ocr === '' ? '（空）'
         : c.actual_ocr != null ? c.actual_ocr : '—');
@@ -1489,7 +1489,7 @@ function renderLlmReview(rev) {
     }
   }
   if (learned.length) {
-    html += `<div data-s="s5371db16"><b>💡 已自動學習</b>
+    html += `<div data-s="s5371db16"><b>${tr('💡 已自動學習')}</b>
       <ul data-s="sa4ba34c9">`;
     for (const l of learned) {
       html += `<li>${escapeHTML(l.detail)}</li>`;
@@ -1578,7 +1578,7 @@ function renderReport(r) {
   // 「同上」這類指涉值被展開成實際內容時一定要講 —— 悄悄換掉使用者打的字
   // 是這個功能最可能造成的傷害，他要看得到才發現得了填錯。
   const expanded = (r.expanded_refs || []).map(e =>
-    `<span class="report-chip exp" title="原本填的是「${escapeHTML(e.original)}」">`
+    `<span class="report-chip exp" title="${tr('原本填的是「${escapeHTML(e.original)}」')}">`
     + `${escapeHTML(e.label)} ← ${escapeHTML(e.from_label)}：${escapeHTML(e.value)}</span>`
   ).join('');
   reportBox.innerHTML = `

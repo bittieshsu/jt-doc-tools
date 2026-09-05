@@ -141,7 +141,7 @@ document.addEventListener('click', async (e) => {
     if (!(await showConfirm(`確定刪除「${item.querySelector('.filename').textContent}」的歷史記錄？`, { title: tr('刪除記錄'), kind: 'danger' }))) return;
     const r = await fetch(`/tools/pdf-fill/history/${hid}/delete`, { method: 'POST' });
     if (r.ok) { item.remove(); refreshSelUI(); }
-    else showAlert('刪除失敗');
+    else showAlert(tr('刪除失敗'));
   } else if (btn.dataset.act === 'refill') {
     // Redirect to the tool with ?refill=<id>; the tool index page will
     // detect the param, call /history/<id>/refill, and render the result.

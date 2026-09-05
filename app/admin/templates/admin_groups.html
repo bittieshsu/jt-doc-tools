@@ -291,7 +291,7 @@ document.getElementById('newGroupForm').addEventListener('submit', async (e) => 
     body: JSON.stringify({name: fd.get('name'), description: fd.get('description')}),
   });
   if (r.ok) location.reload();
-  else showAlert('建立失敗：' + await r.text());
+  else showAlert(tr('建立失敗：') + await r.text());
 });
 
 document.querySelectorAll('.modal-backdrop').forEach(b =>
@@ -325,7 +325,7 @@ document.getElementById('rmSave').onclick = async () => {
     body: JSON.stringify({roles}),
   });
   if (r.ok) location.reload();
-  else showAlert('儲存失敗：' + await r.text());
+  else showAlert(tr('儲存失敗：') + await r.text());
 };
 
 // ---------- members modal ----------
@@ -358,7 +358,7 @@ document.getElementById('mmSave').onclick = async () => {
     body: JSON.stringify({members}),
   });
   if (r.ok) location.reload();
-  else showAlert('儲存失敗：' + await r.text());
+  else showAlert(tr('儲存失敗：') + await r.text());
 };
 
 // ---------- row buttons dispatch ----------
@@ -372,7 +372,7 @@ document.querySelectorAll('.grp-table button').forEach(btn => {
             { title: tr('刪除群組'), kind: 'danger', okText: tr('刪除') }))) return;
       const r = await fetch(`/admin/groups/${tr.dataset.gid}/delete`, {method:'POST'});
       if (r.ok) location.reload();
-      else showAlert('刪除失敗：' + await r.text());
+      else showAlert(tr('刪除失敗：') + await r.text());
     } else if (act === 'roles') {
       openRoles(tr);
     } else if (act === 'members') {
@@ -452,14 +452,14 @@ function _dmRender() {
   });
   if (!rows.length) {
     list.innerHTML = '<div class="dm-empty">' +
-      (_dmAll.length ? '沒有符合的成員' : '此群組在目錄中沒有直接成員') + '</div>';
+      (_dmAll.length ? '沒有符合的成員' : tr('此群組在目錄中沒有直接成員')) + '</div>';
     return;
   }
   list.innerHTML = rows.map(m =>
     `<div class="dm-row${m.local ? ' is-local' : ''}">` +
     `<span class="dm-name">${escapeHtml(m.name || '')}</span>` +
     (m.login ? `<span class="dm-login">${escapeHtml(m.login)}</span>` : '') +
-    (m.local ? `<span class="dm-badge">✓ 已登入本系統</span>` : '') +
+    (m.local ? `<span class="dm-badge">${tr('✓ 已登入本系統')}</span>` : '') +
     `</div>`
   ).join('');
 }
@@ -545,12 +545,12 @@ if (_btnSyncDir) {
   const st = document.getElementById('dsStatus');
   if (!st) return;
   function fmtAge(ts) {
-    if (!ts) return '尚未同步過';
+    if (!ts) return tr('尚未同步過');
     const secs = Math.max(0, Math.floor(Date.now() / 1000 - ts));
-    if (secs < 60) return secs + ' 秒前';
-    if (secs < 3600) return Math.floor(secs / 60) + ' 分鐘前';
-    if (secs < 86400) return Math.floor(secs / 3600) + ' 小時前';
-    return Math.floor(secs / 86400) + ' 天前';
+    if (secs < 60) return secs + tr(' 秒前');
+    if (secs < 3600) return Math.floor(secs / 60) + tr(' 分鐘前');
+    if (secs < 86400) return Math.floor(secs / 3600) + tr(' 小時前');
+    return Math.floor(secs / 86400) + tr(' 天前');
   }
   async function load() {
     try {
@@ -560,29 +560,29 @@ if (_btnSyncDir) {
       if (su) su.checked = !!j.sync_users;
       if (ad) ad.value = j.auto_disable || 'off';
       if (itv) itv.value = j.interval_hours || 6;
-      let s = '排程：' + (j.enabled ? ('每 ' + (j.interval_hours || 6) + ' 小時') : '已停用')
-            + ' · 上次同步：' + fmtAge(j.last_run_at);
-      if (j.running) s += ' · 同步中…';
+      let s = tr('排程：') + (j.enabled ? (tr('每 ') + (j.interval_hours || 6) + tr(' 小時')) : tr('已停用'))
+            + tr(' · 上次同步：') + fmtAge(j.last_run_at);
+      if (j.running) s += tr(' · 同步中…');
       const lr = j.last_result || {};
       if (typeof lr.counts_updated === 'number') {
-        s += ' · 更新 ' + lr.counts_updated + ' 個群組成員數'
-           + (lr.counts_failed ? ('（' + lr.counts_failed + ' 個失敗）') : '');
+        s += tr(' · 更新 ') + lr.counts_updated + tr(' 個群組成員數')
+           + (lr.counts_failed ? ('（' + lr.counts_failed + tr(' 個失敗）')) : '');
       }
       const us = lr.users_synced;
       if (us && typeof us.synced === 'number') {
-        s += ' · 使用者：新增 ' + us.synced + '、更新 ' + us.updated
-           + '（目錄共 ' + us.total_seen + '）'
-           + (us.skipped_clash ? ('，' + us.skipped_clash + ' 個同名衝突略過') : '');
+        s += tr(' · 使用者：新增 ') + us.synced + tr('、更新 ') + us.updated
+           + tr('（目錄共 ') + us.total_seen + '）'
+           + (us.skipped_clash ? ('，' + us.skipped_clash + tr(' 個同名衝突略過')) : '');
       } else if (us && us.error) {
-        s += ' · 使用者同步錯誤：' + us.error;
+        s += tr(' · 使用者同步錯誤：') + us.error;
       }
       const lad = j.last_auto_disable;
       if (lad) {
         // 中止時一定要把原因顯示出來 —— 只寫「已停用 0 個」會讓人以為沒事
-        s += lad.aborted ? (' · 自動停用已中止：' + (lad.reason || ''))
-                         : (' · 自動停用 ' + (lad.disabled || 0) + ' 個帳號');
+        s += lad.aborted ? (tr(' · 自動停用已中止：') + (lad.reason || ''))
+                         : (tr(' · 自動停用 ') + (lad.disabled || 0) + tr(' 個帳號'));
       }
-      if (j.last_error) s += ' · 上次錯誤：' + j.last_error;
+      if (j.last_error) s += tr(' · 上次錯誤：') + j.last_error;
       st.textContent = s;
     } catch (e) { st.textContent = tr('無法讀取同步狀態'); }
   }

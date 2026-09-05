@@ -315,7 +315,7 @@ function renderResult(d) {
   // SVG paperclip icon for per-cell copy buttons (matches translate-doc)
   const COPY_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2" ry="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
   const copyBtn = (text) =>
-    `<button type="button" class="cell-copy" data-act="cell-copy" data-text="${esc(text)}" title="複製此格內容">${COPY_ICON}</button>`;
+    `<button type="button" class="cell-copy" data-act="cell-copy" data-text="${esc(text)}" title="${tr('複製此格內容')}">${COPY_ICON}</button>`;
   let rows = '';
   // 保留兩邊全文以提供「複製全文」按鈕（去掉 blank 補位）
   const _oldLines = [], _newLines = [];
@@ -331,13 +331,13 @@ function renderResult(d) {
   const header = `
     <div class="td-header">
       <div class="col left">
-        <span>舊版內容</span>
+        <span>${tr('舊版內容')}</span>
         <span class="col-actions">
           <button class="btn btn-small" type="button" id="btnCopyAllOld" data-text="${esc(_oldLines.join('\\n'))}">{{ icon('paperclip', size=12) }} 複製舊版全文</button>
         </span>
       </div>
       <div class="col right">
-        <span>新版內容</span>
+        <span>${tr('新版內容')}</span>
         <span class="col-actions">
           <button class="btn btn-small" type="button" id="btnCopyAllNew" data-text="${esc(_newLines.join('\\n'))}">{{ icon('paperclip', size=12) }} 複製新版全文</button>
         </span>
@@ -382,7 +382,7 @@ async function _copyAndFlash(btn, text, toastMsg) {
   if (ok) {
     btn.classList.add('is-copied');
     setTimeout(() => btn.classList.remove('is-copied'), 800);
-    _showToast(toastMsg || '已複製到剪貼簿');
+    _showToast(toastMsg || tr('已複製到剪貼簿'));
   } else {
     _showToast(tr('複製失敗'));
   }

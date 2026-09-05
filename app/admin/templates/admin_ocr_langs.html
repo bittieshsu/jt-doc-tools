@@ -370,7 +370,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
       enEl.checked = !!j.enabled;
       toEl.value = j.timeout_s || 30;
       if (j.token_set) {
-        tokEl.placeholder = tr('已設定 (') + j.token_masked + ') — 留空保留現有 token';
+        tokEl.placeholder = tr('已設定 (') + j.token_masked + ') — ' + tr('留空保留現有 token');
       }
       if (j.last_test_at) {
         const ok = j.last_test_ok;
@@ -378,19 +378,19 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
         const gpu = info.gpu || info.device_name || '';
         const sel = (info.selected_device && info.selected_device !== 'pending') ? ' [' + info.selected_device + ']' : '';
         const vram = info.vram_free_mb ? ' (free ' + info.vram_free_mb + ' MB / ' + info.vram_total_mb + ' MB)' : '';
-        setStatus('上次測試 ' + j.last_test_at + '：<b data-s="sd706e66c" class="' + (ok?'is-ok':'is-bad') + '">' +
-                   (ok?'✓ 通過':'✗ 失敗') + '</b>' + (gpu ? '<br>GPU: ' + gpu + sel + vram : ''),
+        setStatus(tr('上次測試 ') + j.last_test_at + '：<b data-s="sd706e66c" class="' + (ok?'is-ok':'is-bad') + '">' +
+                   (ok ? '✓ ' + tr('通過') : '✗ ' + tr('失敗')) + '</b>' + (gpu ? '<br>GPU: ' + gpu + sel + vram : ''),
                    ok?'ok':'err');
       }
     } catch(e) {}
   }
 
   testBtn.addEventListener('click', async () => {
-    if (!urlEl.value.trim()) { setStatus('請先填 URL', 'warn'); return; }
+    if (!urlEl.value.trim()) { setStatus(tr('請先填 URL'), 'warn'); return; }
     testBtn.disabled = true;
     const origText = testBtn.textContent;
     testBtn.textContent = tr('測試中...');
-    setStatus('連接中...', 'info');
+    setStatus(tr('連接中...'), 'info');
     try {
       const r = await fetch('/admin/api/ocr-langs/external/test', {
         method: 'POST',
@@ -404,18 +404,18 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
         const sel = (h.selected_device && h.selected_device !== 'pending') ? ' [' + h.selected_device + ']' : '';
         const vram = h.vram_free_mb ? ' (free ' + h.vram_free_mb + ' MB / ' + h.vram_total_mb + ' MB)' : '';
         const multi = (Array.isArray(h.gpus) && h.gpus.length > 1)
-          ? '<br>偵測到 ' + h.gpus.length + ' 張 GPU，辨識時自動選用空閒 VRAM 最多者（門檻 ' + (h.min_free_mb || '?') + ' MB）'
+          ? tr('<br>偵測到 ') + h.gpus.length + tr(' 張 GPU，辨識時自動選用空閒 VRAM 最多者（門檻 ') + (h.min_free_mb || '?') + ' MB）'
           : '';
-        setStatus('✓ 連接成功<br>Server: ' + (h.server || '?') +
+        setStatus(tr('✓ 連接成功<br>Server: ') + (h.server || '?') +
                   '<br>EasyOCR: ' + (h.easyocr || '?') +
                   '<br>PyTorch: ' + (h.torch || '?') +
                   '<br>CUDA: ' + (h.cuda_available ? '✓' : '✗') +
                    (gpu ? '<br>GPU: ' + gpu + sel + vram : '') + multi, 'ok');
       } else {
-        setStatus('✗ ' + (j.error || '失敗'), 'err');
+        setStatus('✗ ' + (j.error || tr('失敗')), 'err');
       }
     } catch(e) {
-      setStatus('✗ 請求失敗: ' + e, 'err');
+      setStatus(tr('✗ 請求失敗: ') + e, 'err');
     } finally {
       testBtn.disabled = false;
       testBtn.textContent = origText;
@@ -439,14 +439,14 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
       });
       const j = await r.json();
       if (j.ok) {
-        setStatus('✓ 已儲存(' + (j.enabled ? '已啟用' : '未啟用') + ')', 'ok');
+        setStatus(tr('✓ 已儲存(') + (j.enabled ? '已啟用' : tr('未啟用')) + ')', 'ok');
         tokEl.value = '';
         loadStatus();
       } else {
-        setStatus('✗ 儲存失敗', 'err');
+        setStatus(tr('✗ 儲存失敗'), 'err');
       }
     } catch(e) {
-      setStatus('✗ 請求失敗: ' + e, 'err');
+      setStatus(tr('✗ 請求失敗: ') + e, 'err');
     } finally {
       saveBtn.disabled = false;
       saveBtn.textContent = origText;
@@ -635,7 +635,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
     const title = document.getElementById('olHintTitle');
     const msg = document.getElementById('olHintMsg');
     const methodsBox = document.getElementById('olHintMethods');
-    title.textContent = tr('安裝 ') + code + ' 需要管理員權限';
+    title.textContent = tr('安裝 ') + code + tr(' 需要管理員權限');
     msg.textContent = hint.message || '';
     methodsBox.innerHTML = '';
     (hint.methods || []).forEach((m, i) => {
@@ -710,7 +710,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
         });
         const j = await r.json();
         if (j.ok) {
-          engineMsg.textContent = tr('✓ 已切到 ') + radio.value + '（下次 OCR 立即生效）';
+          engineMsg.textContent = tr('✓ 已切到 ') + radio.value + tr('（下次 OCR 立即生效）');
           engineMsg.style.color = '#166534';
           engineMsg.style.background = '#f0fdf4';
           engineMsg.style.borderLeftColor = '#10b981';
@@ -820,12 +820,12 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
           card.classList.remove('ol-card-busy');
         } else {
           // 其他錯誤（網路斷線等）— 短訊息用 toast
-          showToast(tr('安裝失敗：') + (j.error || '未知錯誤'), 'err');
+          showToast(tr('安裝失敗：') + (j.error || tr('未知錯誤')), 'err');
           btn.innerHTML = orig;
           card.classList.remove('ol-card-busy');
         }
       } catch (e) {
-        alert(tr('安裝 ') + code + ' 失敗：' + e.message);
+        alert(tr('安裝 ') + code + tr(' 失敗：') + e.message);
         btn.innerHTML = orig;
         card.classList.remove('ol-card-busy');
       }
@@ -838,7 +838,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
   const confirmMsg = document.getElementById('olConfirmMsg');
   function showConfirm(opts) {
     return new Promise(resolve => {
-      confirmTitle.textContent = opts.title || '確認';
+      confirmTitle.textContent = opts.title || tr('確認');
       confirmMsg.textContent = opts.message || '';
       confirmModal.classList.add('show');
       function done(val) {
@@ -860,7 +860,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
       const code = btn.dataset.code;
       const ok = await showConfirm({
         title: tr('移除訓練檔'),
-        message: '確定要移除 ' + code + ' 的訓練檔？\n（fast 與 best 兩個變體都會刪除，之後可隨時重新安裝）',
+        message: tr('確定要移除 ') + code + tr(' 的訓練檔？\n（fast 與 best 兩個變體都會刪除，之後可隨時重新安裝）'),
       });
       if (!ok) return;
       const card = btn.closest('.ol-card');
@@ -878,7 +878,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
           btn.innerHTML = orig;
           card.classList.remove('ol-card-busy');
         } else {
-          showToast(tr('移除失敗：') + (j.error || '未知錯誤'), 'err');
+          showToast(tr('移除失敗：') + (j.error || tr('未知錯誤')), 'err');
           btn.innerHTML = orig;
           card.classList.remove('ol-card-busy');
         }

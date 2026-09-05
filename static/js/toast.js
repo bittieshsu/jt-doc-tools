@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
 window.flashSaved = function(btn, originalHTML) {
   const restore = originalHTML || btn.dataset.origHTML || btn.innerHTML;
   btn.dataset.origHTML = restore;
-  btn.innerHTML = '✓ 已儲存';
+  btn.innerHTML = tr('✓ 已儲存');
   btn.classList.add('saved-flash');
   btn.disabled = true;
   setTimeout(() => {

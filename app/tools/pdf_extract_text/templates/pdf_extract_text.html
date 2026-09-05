@@ -129,7 +129,7 @@ async function handleUpload(file) {
   const fd = new FormData(); fd.append('file', file);
   try {
     const r = await (etFu
-      ? etFu.upload('/tools/pdf-extract-text/extract', fd, {processingLabel: '伺服器解析中…'})
+      ? etFu.upload('/tools/pdf-extract-text/extract', fd, {processingLabel: tr('伺服器解析中…')})
       : fetch('/tools/pdf-extract-text/extract', {method:'POST', body: fd}));
     if (!r.ok) {
       const txt = await r.text();
@@ -154,8 +154,8 @@ function escapeHtmlExt(s) {
 function renderResult(d) {
   $('statBar').innerHTML =
     `<span><b>${d.page_count}</b> ${tr('頁')}</span>` +
-    `<span><b>${d.block_count}</b> 個段落</span>` +
-    `<span><b>${d.char_count.toLocaleString()}</b> 字</span>`;
+    `<span><b>${d.block_count}</b> ${tr('個段落')}</span>` +
+    `<span><b>${d.char_count.toLocaleString()}</b> ${tr('字')}</span>`;
   const dlIcon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>`;
   const dl = (key, label) => {
     const href = d.downloads[key];
@@ -169,10 +169,10 @@ function renderResult(d) {
   const wsBtn = (key, label) => (d.downloads[key] && window.saveToWorkspace)
     ? `<button class="btn" type="button" data-ws="${key}">${wsIcon} ${label}存至工作區</button>` : '';
   $('dlGroup').innerHTML =
-    dl('txt',  '下載 TXT') +
-    dl('md',   '下載 Markdown') +
-    dl('docx', '下載 Word (.docx)') +
-    dl('odt',  '下載 ODT') +
+    dl('txt',  tr('下載 TXT')) +
+    dl('md',   tr('下載 Markdown')) +
+    dl('docx', tr('下載 Word (.docx)')) +
+    dl('odt',  tr('下載 ODT')) +
     wsBtn('docx', 'Word ') +
     wsBtn('odt', 'ODT ');
   $('dlGroup').querySelectorAll('button[data-ws]').forEach((btn) => {
@@ -185,7 +185,7 @@ function renderResult(d) {
   // Reset preview state for the new batch — original known, reflowed empty.
   originalPreview = d.preview_md || '';
   reflowedPreview = '';
-  $('preview').textContent = originalPreview || '(沒有內容)';
+  $('preview').textContent = originalPreview || tr('(沒有內容)');
   $('previewToggle').hidden = true;
   $('previewDiffHint').hidden = true;
   if ($('llmRow')) $('llmRow').hidden = false;
@@ -212,7 +212,7 @@ document.getElementById('btnLlmReflow').addEventListener('click', async () => {
   // the (often 10–30s) single-paragraph LLM call where no NDJSON event
   // arrives until the HTTP call returns.
   const t0 = Date.now();
-  let currentStatus = '連線到 LLM…';
+  let currentStatus = tr('連線到 LLM…');
   const ticker = setInterval(() => {
     const secs = Math.floor((Date.now() - t0) / 1000);
     msg.textContent = tr('{0}（已耗時 {1}s）').replace('{0}', currentStatus).replace('{1}', secs);
@@ -225,10 +225,10 @@ document.getElementById('btnLlmReflow').addEventListener('click', async () => {
     });
     if (!resp.ok) {
       const txt = await resp.text();
-      currentStatus = '失敗：' + txt;
+      currentStatus = tr('失敗：') + txt;
       return;
     }
-    currentStatus = '連線成功，等待第一段回應…';
+    currentStatus = tr('連線成功，等待第一段回應…');
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
@@ -244,7 +244,7 @@ document.getElementById('btnLlmReflow').addEventListener('click', async () => {
         try { ev = JSON.parse(line); } catch { continue; }
         if (ev.type === 'start') {
           currentStatus = ev.total === 0
-            ? '沒有需要重排的段落'
+            ? tr('沒有需要重排的段落')
             : `共 ${ev.total} 個段落需要重排，準備送出第 1 段…`;
           if (ev.total === 0) bar.style.width = '100%';
         } else if (ev.type === 'working') {
@@ -281,12 +281,12 @@ document.getElementById('btnLlmReflow').addEventListener('click', async () => {
           }
           $('status').textContent = tr('LLM 已重排');
         } else if (ev.type === 'error') {
-          currentStatus = '失敗：' + (ev.message || '未知錯誤');
+          currentStatus = tr('失敗：') + (ev.message || tr('未知錯誤'));
         }
       }
     }
   } catch (e) {
-    currentStatus = '錯誤：' + e.message;
+    currentStatus = tr('錯誤：') + e.message;
   } finally {
     clearInterval(ticker);
     const totalSecs = Math.floor((Date.now() - t0) / 1000);

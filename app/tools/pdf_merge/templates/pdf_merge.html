@@ -136,7 +136,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   if (files.length < 2) return alert(tr('請上傳至少 2 個 PDF'));
   const fd = new FormData();
   for (const f of files) fd.append('file', f);
-  const r = await fu.upload('/tools/pdf-merge/submit', fd, {processingLabel: '排隊合併中…'});
+  const r = await fu.upload('/tools/pdf-merge/submit', fd, {processingLabel: tr('排隊合併中…')});
   if (!r.ok) return alert(tr('送出失敗：') + await r.text());
   const j = await r.json();
   progress.track(j.job_id);

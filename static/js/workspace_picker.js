@@ -37,7 +37,7 @@
 
   async function workspaceFileAsFile(fileId, meta) {
     const r = await fetch('/workspace/file/' + fileId);
-    if (!r.ok) throw new Error('讀取工作區檔案失敗');
+    if (!r.ok) throw new Error(tr('讀取工作區檔案失敗'));
     const blob = await r.blob();
     const name = (meta && meta.name) || ('workspace' + ((meta && meta.ext) || ''));
     const type = (meta && meta.mime) || blob.type || 'application/octet-stream';
@@ -56,15 +56,15 @@
       fd.append('file', spec.blob, name || 'file');
     } else if (spec && spec.url) {
       const rr = await fetch(spec.url);
-      if (!rr.ok) throw new Error('讀取輸出檔失敗');
+      if (!rr.ok) throw new Error(tr('讀取輸出檔失敗'));
       const blob = await rr.blob();
       fd.append('file', blob, name || 'file');
     } else {
-      throw new Error('沒有可儲存的內容');
+      throw new Error(tr('沒有可儲存的內容'));
     }
     const r = await fetch('/workspace/save', { method: 'POST', body: fd });
     if (!r.ok) {
-      throw new Error(await window.friendlyServerError(r, '存至工作區失敗'));
+      throw new Error(await window.friendlyServerError(r, tr('存至工作區失敗')));
     }
     return await r.json();  // { ok, file, duplicate }
   }
@@ -79,7 +79,7 @@
     m.innerHTML =
       '<div class="ws-picker-dialog" role="dialog" aria-modal="true">' +
       '  <div class="ws-picker-head"><b>' + tr('從工作區載入') + '</b>' +
-      '    <button type="button" class="ws-picker-close" aria-label="關閉">' +
+      '    <button type="button" class="ws-picker-close" aria-label="' + tr('關閉') + '">' +
       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12"/><path d="M6 18L18 6"/></svg></button></div>' +
       '  <div class="ws-picker-body"><div class="ws-picker-status muted">' + tr('載入中…') + '</div>' +
       '    <div class="ws-picker-grid"></div></div>' +
@@ -103,16 +103,16 @@
     const grid = m.querySelector('.ws-picker-grid');
     const status = m.querySelector('.ws-picker-status');
     grid.innerHTML = '';
-    status.textContent = '載入中…';
+    status.textContent = tr('載入中…');
     status.hidden = false;
     m.hidden = false;
     let files = [];
     try {
       const r = await fetch('/workspace/api/list?accept=' + encodeURIComponent(exts.join(',')));
-      if (!r.ok) throw new Error(await window.friendlyServerError(r, '載入工作區失敗'));
+      if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('載入工作區失敗')));
       files = (await r.json()).files || [];
-    } catch (e) { status.textContent = e.message || '載入工作區失敗'; return; }
-    if (!files.length) { status.textContent = '工作區內沒有符合的檔案（' + exts.join(' / ').toUpperCase() + '）。'; return; }
+    } catch (e) { status.textContent = e.message || tr('載入工作區失敗'); return; }
+    if (!files.length) { status.textContent = tr('工作區內沒有符合的檔案（') + exts.join(' / ').toUpperCase() + '）。'; return; }
     status.hidden = true;
     grid.innerHTML = files.map(f => {
       const ext = (f.ext || '').replace('.', '');
@@ -129,7 +129,7 @@
         const meta = files.find(x => x.file_id === id);
         m.hidden = true;
         try { await opts.onPick(id, meta); }
-        catch (e) { alert(e.message || '載入失敗'); }
+        catch (e) { alert(e.message || tr('載入失敗')); }
       });
     });
   }
@@ -150,12 +150,12 @@
         const s = await specFn();
         const res = await window.saveToWorkspace(s, s.name, s.tool);
         const dup = res && res.duplicate;
-        btn.innerHTML = '已存至工作區';
+        btn.innerHTML = tr('已存至工作區');
         if (window.showToast) window.showToast(
-          dup ? '已存至工作區（工作區已有同名檔，已另存一份）' : '已存至工作區', 'ok');
+          dup ? '已存至工作區（工作區已有同名檔，已另存一份）' : tr('已存至工作區'), 'ok');
       } catch (e) {
         btn.disabled = false;
-        (window.showAlert || window.alert)(e.message || '存至工作區失敗');
+        (window.showAlert || window.alert)(e.message || tr('存至工作區失敗'));
       }
     };
   }
@@ -203,7 +203,7 @@
     }
     if (!usedWorkspace) {
       if (!spec || !spec.jobId) {
-        throw new Error('沒有可以帶過去的檔案');
+        throw new Error(tr('沒有可以帶過去的檔案'));
       }
       qs.set('from_job', spec.jobId);
     }

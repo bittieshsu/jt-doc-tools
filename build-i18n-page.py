@@ -67,6 +67,55 @@ def _block_segments(html: str, inside) -> list:
     return out
 
 
+#: 中文不用空格，英文要。`…的<b>公司內部文件</b>，…` 翻成英文之後會變成
+#: `is<b>downloaded from GitHub</b>, so` —— 字黏在一起（2026-09-05 使用者回報）。
+#: 這是**語言層級**的規則，所以放在產生英文頁的最後一步，而不是逐條去改譯文。
+_INLINE_TAGS = "b|strong|i|em|code|span|a|kbd|small|u|mark"
+
+
+def _space_around_inline_tags(html: str) -> str:
+    """英文頁：行內標記與前後英數字之間補一個空白。"""
+    # 「字母 + <b>」→ 「字母 + 空白 + <b>」
+    html = re.sub(r"(?<=[A-Za-z0-9,.)])(<(?:" + _INLINE_TAGS + r")[ >])",
+                  r" \1", html)
+    # 「</b> + 字母」→ 「</b> + 空白 + 字母」
+    html = re.sub(r"(</(?:" + _INLINE_TAGS + r")>)(?=[A-Za-z0-9(])",
+                  r"\1 ", html)
+    return html
+
+
+#: 安裝指令是**程式碼**，抽字串那條路不會碰它 —— 但裡面的錯誤訊息是給人看的，
+#: 英文版留著中文很怪（2026-09-05 使用者截圖回報）。這裡逐字換掉那幾句。
+_CMD_ZH_TO_EN = {
+    "[X] 下載安裝腳本失敗：": "[X] Could not download the install script: ",
+    "請檢查網路（VPN？防火牆？DNS？）後重試。":
+        "Check the network (VPN? firewall? DNS?) and try again.",
+    "按 Enter 關閉": "Press Enter to close",
+}
+
+
+def _english_install_command(html: str) -> str:
+    """把安裝指令裡給人看的中文訊息換成英文。"""
+    for zh, en in _CMD_ZH_TO_EN.items():
+        html = html.replace(zh, en)
+    return html
+
+
+def _english_screenshots(html: str, docs_dir) -> str:
+    """英文版指到英文介面的截圖（`screenshots/en/…`）。
+
+    讀者看到的畫面要跟他實際會看到的一樣 —— 截圖正是「有沒有真的支援英文」
+    最直接的證據。**只有在英文版那張真的存在時才換**，所以還沒補英文截圖的
+    工具會繼續沿用中文版那張，不會變成破圖。
+    """
+    def rep(m):
+        name = m.group(1)
+        return (f"screenshots/en/{name}"
+                if (docs_dir / "screenshots" / "en" / name).is_file()
+                else m.group(0))
+    return re.sub(r"screenshots/([\w.-]+\.png)", rep, html)
+
+
 def _segments(html: str):
     """回傳 [(是不是屬性, 起, 迄, 原文)]，只收含中文的片段。
 
@@ -144,6 +193,9 @@ def build(src: Path, cat_path: Path, dst: Path, lang: str = "en") -> int:
         f'<a href="{src.name}" class="nav-link nav-lang" id="langSwitch"'
         ' hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>',
         out, count=1)
+    out = _space_around_inline_tags(out)
+    out = _english_install_command(out)
+    out = _english_screenshots(out, dst.parent)
     dst.write_text(out, encoding="utf-8")
     print(f"{dst.name}: 產生完成（{len(missing)} 條還沒翻，暫時保留中文）")
     return len(missing)

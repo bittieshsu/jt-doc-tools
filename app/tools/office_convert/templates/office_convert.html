@@ -124,7 +124,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   fd.append('target', picked.value);
   for (const f of files) fd.append('file', f);
   const r = await fu.upload('/tools/office-convert/submit', fd,
-                            { processingLabel: '排隊轉換中…' });
+                            { processingLabel: tr('排隊轉換中…') });
   if (!r.ok) return alert(await window.friendlyServerError(r, tr('送出失敗')));
   const j = await r.json();
   jp.track(j.job_id);

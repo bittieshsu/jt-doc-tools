@@ -236,13 +236,13 @@ dropZone.addEventListener('drop', (e) => {
       if (!r.ok) { showS(j.detail || ('HTTP '+r.status), true); btnSave.disabled = false; return; }
       curName.textContent = j.site_name;
       btnReset.disabled = !j.is_custom;
-      showS('已儲存（重新整理頁面看 sidebar / 標題生效）', false);
+      showS(tr('已儲存（重新整理頁面看 sidebar / 標題生效）'), false);
       // also update visible app_name spots on this page if any
       try {
         document.querySelectorAll('.brand-text').forEach(function(el){ el.textContent = j.site_name; });
         document.title = j.site_name;
       } catch(e) {}
-    } catch (e) { showS('網路錯誤：' + e.message, true); }
+    } catch (e) { showS(tr('網路錯誤：') + e.message, true); }
     btnSave.disabled = false;
   }
   btnSave.addEventListener('click', function(){

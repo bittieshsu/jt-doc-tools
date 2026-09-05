@@ -90,7 +90,7 @@ document.querySelectorAll('[data-act="del"]').forEach(btn => {
           { title: tr('刪除'), kind: 'danger' }))) return;
     const r = await fetch(`/admin/history/${KIND}/${hid}/delete`, {method:'POST'});
     if (r.ok) tr.remove();
-    else showAlert('刪除失敗：' + await r.text());
+    else showAlert(tr('刪除失敗：') + await r.text());
   });
 });
 </script>

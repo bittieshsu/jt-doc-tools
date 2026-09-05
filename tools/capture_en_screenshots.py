@@ -49,6 +49,20 @@ SHOTS: dict[str, str] = {
 }
 WIDTH, HEIGHT = 1400, 1020
 
+#: 要**先上傳一份檔案**才有東西可看的頁面。空的上傳頁當產品截圖沒有意義
+#: （2026-09-05 使用者回報：中文版的截圖都是「工具實際在用」的畫面）。
+#: 檔案一律用合成的示範 PDF —— `temp_pdfs/` 裡是客戶資料，截圖要公開。
+NEEDS_FILE = {
+    "pdf-editor": "#peFile, input[type=file]",
+    "pdf-ocr": "input[type=file]",
+    "pdf-to-image": "input[type=file]",
+    "pdf-to-office": "input[type=file]",
+    "stamp": "input[type=file]",
+    "watermark": "input[type=file]",
+    "deident-1": "input[type=file]",
+}
+SAMPLE = REPO / "temp" / "en-shots" / "sample-quotation.pdf"
+
 
 async def _capture(base: str, cdp_port: int) -> list[str]:
     import httpx
@@ -91,6 +105,7 @@ async def _capture(base: str, cdp_port: int) -> list[str]:
                         return msg.get("result", {})
 
             await cmd("Page.enable")
+            await cmd("Runtime.enable")
             await cmd("Network.enable")
             host = base.split("//", 1)[-1].split(":")[0].split("/")[0]
             await cmd("Network.setCookie", {"name": "jtdt_locale", "value": "en",
@@ -99,9 +114,41 @@ async def _capture(base: str, cdp_port: int) -> list[str]:
                       {"width": WIDTH, "height": HEIGHT,
                        "deviceScaleFactor": 1, "mobile": False})
             OUT.mkdir(parents=True, exist_ok=True)
+            await cmd("DOM.enable")
             for name, path in SHOTS.items():
                 await cmd("Page.navigate", {"url": base + path})
                 await asyncio.sleep(2.0)
+                if name in NEEDS_FILE and SAMPLE.is_file():
+                    # 用 CDP 直接把檔案塞進 <input type=file> —— headless 沒有
+                    # 檔案選擇器，只能這樣做。塞完要自己發 change 事件，
+                    # 頁面才會開始處理（少了它畫面完全不動，看起來像沒作用）。
+                    try:
+                        doc = await cmd("DOM.getDocument", {"depth": -1})
+                        node = await cmd("DOM.querySelector", {
+                            "nodeId": doc["root"]["nodeId"],
+                            "selector": "input[type=file]"})
+                        if node.get("nodeId"):
+                            await cmd("DOM.setFileInputFiles", {
+                                "files": [str(SAMPLE)], "nodeId": node["nodeId"]})
+                            await cmd("Runtime.evaluate", {"expression":
+                                "document.querySelector('input[type=file]')"
+                                ".dispatchEvent(new Event('change',{bubbles:true}))"})
+                            await asyncio.sleep(4.0)
+                            # 大部分工具**還要按一下主要按鈕**才會真的開始 ——
+                            # 只塞檔案的話畫面停在「已選好檔案」，跟空的上傳頁
+                            # 一樣沒有內容可看。
+                            await cmd("Runtime.evaluate", {"expression": '''
+                              (() => {
+                                const vis = (e) => e && e.offsetParent !== null
+                                  && !e.disabled;
+                                const b = [...document.querySelectorAll(
+                                  '.btn-primary, button[type=submit]')].find(vis);
+                                if (b) { b.click(); return true; }
+                                return false;
+                              })()'''})
+                            await asyncio.sleep(12.0)  # 等預覽 / 轉檔跑完
+                    except Exception:
+                        pass
                 shot = await cmd("Page.captureScreenshot", {})
                 (OUT / f"{name}.png").write_bytes(base64.b64decode(shot["data"]))
                 done.append(name)

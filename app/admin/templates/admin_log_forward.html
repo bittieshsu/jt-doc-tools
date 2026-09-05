@@ -107,7 +107,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     if (h && !h.value.trim()) {
       h.style.borderColor = '#dc2626';
       h.focus();
-      await window.showAlert('Host 是必填欄位（例如 logserver.example.com）。', {title:'缺少 Host'});
+      await window.showAlert(tr('Host 是必填欄位（例如 logserver.example.com）。'), {title:tr('缺少 Host')});
       return;
     }
   }
@@ -134,12 +134,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     try { detail = (await r.json()).detail || ''; } catch(e) { detail = await r.text(); }
     // Translate well-known backend errors to Chinese for clarity.
     const tr = {
-      'host required': 'Host 為必填',
-      'port out of range': 'Port 必須介於 1 ~ 65535',
-      'port must be int': 'Port 必須是整數',
+      'host required': tr('Host 為必填'),
+      'port out of range': tr('Port 必須介於 1 ~ 65535'),
+      'port must be int': tr('Port 必須是整數'),
     };
     detail = tr[detail] || detail;
-    await window.showAlert('儲存失敗：' + detail, {title:'錯誤'});
+    await window.showAlert(tr('儲存失敗：') + detail, {title:tr('錯誤')});
     document.getElementById('status').textContent = tr('✗ 儲存失敗');
     document.getElementById('status').style.color = '#dc2626';
   }

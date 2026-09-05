@@ -93,7 +93,7 @@ document.getElementById('newRoleForm').addEventListener('submit', async (e) => {
     }),
   });
   if (r.ok) location.reload();
-  else showAlert('建立失敗：' + await r.text());
+  else showAlert(tr('建立失敗：') + await r.text());
 });
 
 document.querySelectorAll('[data-role] [data-act="save"]').forEach(btn => {
@@ -107,7 +107,7 @@ document.querySelectorAll('[data-role] [data-act="save"]').forEach(btn => {
       body: JSON.stringify({tools}),
     });
     if (r.ok) showToast(tr('已儲存'), 'ok');
-    else showAlert('儲存失敗：' + await r.text());
+    else showAlert(tr('儲存失敗：') + await r.text());
   });
 });
 
@@ -149,23 +149,23 @@ document.querySelectorAll('[data-role] [data-act="copy"]').forEach(btn => {
                        .map(c => c.dataset.tool);
     const newId = await showPrompt(
       `複製「${srcName}」為新角色\n新角色的 id（英文，僅 a-z 0-9 -）：`,
-      { defaultValue: srcId + '-copy', okText: '複製', title: '複製角色' });
+      { defaultValue: srcId + '-copy', okText: tr('複製'), title: tr('複製角色') });
     if (!newId) return;
     if (!/^[a-z][a-z0-9-]{1,30}$/.test(newId)) {
-      showAlert('id 必須以英文小寫開頭，只能用 a-z 0-9 與 -');
+      showAlert(tr('id 必須以英文小寫開頭，只能用 a-z 0-9 與 -'));
       return;
     }
     const r = await fetch('/admin/roles/create', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         id: newId,
-        display_name: srcName + '（副本）',
-        description: '複製自 ' + srcId,
+        display_name: srcName + tr('（副本）'),
+        description: tr('複製自 ') + srcId,
         tools: tools,
       }),
     });
     if (r.ok) location.reload();
-    else showAlert('複製失敗：' + await r.text());
+    else showAlert(tr('複製失敗：') + await r.text());
   });
 });
 
@@ -182,7 +182,7 @@ document.querySelectorAll('[data-role] [data-act="set-default"]').forEach(btn =>
         { title: tr('設為新使用者預設'), okText: tr('設為預設') }))) return;
     const r = await fetch(`/admin/roles/${roleId}/set-default`, {method:'POST'});
     if (r.ok) location.reload();
-    else showAlert('設定失敗：' + await window.friendlyServerError(r, tr('設定失敗')));
+    else showAlert(tr('設定失敗：') + await window.friendlyServerError(r, tr('設定失敗')));
   });
 });
 
@@ -194,7 +194,7 @@ document.querySelectorAll('[data-role] [data-act="delete"]').forEach(btn => {
           { title: tr('刪除'), kind: 'danger', okText: tr('刪除') }))) return;
     const r = await fetch(`/admin/roles/${roleId}/delete`, {method:'POST'});
     if (r.ok) location.reload();
-    else showAlert('刪除失敗：' + await r.text());
+    else showAlert(tr('刪除失敗：') + await r.text());
   });
 });
 </script>

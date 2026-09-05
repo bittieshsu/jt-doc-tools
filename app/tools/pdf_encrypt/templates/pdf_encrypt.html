@@ -90,7 +90,7 @@ $('btn-submit').addEventListener('click', async () => {
   ['allow_print','allow_print_hq','allow_copy','allow_modify','allow_annotate','allow_form','allow_assemble','allow_accessibility'].forEach(k => {
     if ($(k).checked) fd.append(k, 'true');
   });
-  const r = await fu.upload('/tools/pdf-encrypt/submit', fd, {processingLabel: '排隊加密中…'});
+  const r = await fu.upload('/tools/pdf-encrypt/submit', fd, {processingLabel: tr('排隊加密中…')});
   if (!r.ok) return alert(tr('失敗：') + await r.text());
   const j = await r.json();
   jp.track(j.job_id);

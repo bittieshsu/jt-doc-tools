@@ -436,7 +436,7 @@ $('btn-submit').addEventListener('click', async () => {
       `${tYM.y}-${String(tYM.m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`);
     fd.append('thsr_date_format', _getThsrFormat());
   }
-  const r = await fu.upload('/tools/pdf-decrypt/submit', fd, {processingLabel: '排隊解密中…'});
+  const r = await fu.upload('/tools/pdf-decrypt/submit', fd, {processingLabel: tr('排隊解密中…')});
   if (!r.ok) return alert(tr('失敗：') + await jtdtError(r));
   const j = await r.json();
   jp.track(j.job_id);

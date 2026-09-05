@@ -244,9 +244,9 @@ function fmtUptime(secAgo) {
   const mins = Math.floor((secAgo % 3600) / 60);
   const put = (key, ...vals) => vals.reduce(
     (acc, v, i) => acc.replace('{' + i + '}', String(v)), tr(key));
-  if (days > 0) return put('{0} 天 {1} 時 {2} 分', days, hours, mins);
-  if (hours > 0) return put('{0} 時 {1} 分', hours, mins);
-  return put('{0} 分', mins);
+  if (days > 0) return put(tr('{0} 天 {1} 時 {2} 分'), days, hours, mins);
+  if (hours > 0) return put(tr('{0} 時 {1} 分'), hours, mins);
+  return put(tr('{0} 分'), mins);
 }
 function escapeHTML(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function barClass(pct) {
@@ -261,7 +261,7 @@ let prev = null;
 function renderHost(host) {
   if (!host.available) {
     $('ssBanner').innerHTML = `<div class="ss-disabled-banner">
-      <b>${tr('主機資源監控未啟用')}</b>：${escapeHTML(host.error || 'psutil 模組未安裝')}。
+      <b>${tr('主機資源監控未啟用')}</b>：${escapeHTML(host.error || tr('psutil 模組未安裝'))}。
       請執行 <code>jtdt update</code> ${tr('或重新安裝。')}</div>`;
     $('ssHostGrid').innerHTML = '';
     return;
@@ -405,8 +405,8 @@ function renderUsers(users) {
   }
   // 特殊列的即時說明（hover 立刻彈出）
   const SS_ROW_HINTS = {
-    '(未追蹤暫存)': '暫存目錄裡「沒有擁有者標記」的檔案 — 無法歸到特定使用者的暫存工作檔：某些工具處理時的中間檔、認證關閉時上傳的檔、蓋章/浮水印的臨時圖（stamp_temp_ / wm_temp_）、或擷取文字的過期暫存目錄。屬正常暫存，會由排程（暫存預設 2 小時）自動清理，不需處理。',
-    '(匿名)': '從稽核記錄還原的活動量，但操作當下的使用者是匿名（未登入 / 認證關閉時）。不是實體檔案佔用，只反映活動量。',
+    '(未追蹤暫存)': tr('暫存目錄裡「沒有擁有者標記」的檔案 — 無法歸到特定使用者的暫存工作檔：某些工具處理時的中間檔、認證關閉時上傳的檔、蓋章/浮水印的臨時圖（stamp_temp_ / wm_temp_）、或擷取文字的過期暫存目錄。屬正常暫存，會由排程（暫存預設 2 小時）自動清理，不需處理。'),
+    '(匿名)': tr('從稽核記錄還原的活動量，但操作當下的使用者是匿名（未登入 / 認證關閉時）。不是實體檔案佔用，只反映活動量。'),
   };
   // Sort copy of rows. 'viz' is a synthetic key that mirrors the bar
   // length so sorting by 「活動量視覺化」 column matches what user sees.
@@ -428,12 +428,12 @@ function renderUsers(users) {
   const arrowFor = (k) =>
     sortKey === k ? (sortDir > 0 ? 'sort-asc' : 'sort-desc') : '';
   let html = `<table class="ss-table"><thead><tr>
-    <th data-sort-key="username" class="${arrowFor('username')}">使用者</th>
-    <th data-sort-key="count" class="num ${arrowFor('count')}" title="目前 disk 上的檔案數">目前檔案數</th>
-    <th data-sort-key="bytes" class="num ${arrowFor('bytes')}" title="目前 disk 佔用">目前容量</th>
-    <th data-sort-key="activity_30d_count" class="num ${arrowFor('activity_30d_count')}" title="近 30 天透過 audit_events 紀錄的工具呼叫次數">近 30 天上傳次數</th>
-    <th data-sort-key="activity_30d_bytes" class="num ${arrowFor('activity_30d_bytes')}" title="近 30 天上傳總位元組（即使檔案已被排程清掉也會看到，自 audit 還原）">近 30 天上傳量</th>
-    <th data-sort-key="viz" class="${arrowFor('viz')}" data-s="s8f77872c" title="按目前容量與近 30 天上傳量取最大值排序，與長條圖長度一致">活動量視覺化</th>
+    <th data-sort-key="username" class="${arrowFor('username')}">${tr('使用者')}</th>
+    <th data-sort-key="count" class="num ${arrowFor('count')}" title="目前 disk 上的檔案數">${tr('目前檔案數')}</th>
+    <th data-sort-key="bytes" class="num ${arrowFor('bytes')}" title="目前 disk 佔用">${tr('目前容量')}</th>
+    <th data-sort-key="activity_30d_count" class="num ${arrowFor('activity_30d_count')}" title="近 30 天透過 audit_events 紀錄的工具呼叫次數">${tr('近 30 天上傳次數')}</th>
+    <th data-sort-key="activity_30d_bytes" class="num ${arrowFor('activity_30d_bytes')}" title="近 30 天上傳總位元組（即使檔案已被排程清掉也會看到，自 audit 還原）">${tr('近 30 天上傳量')}</th>
+    <th data-sort-key="viz" class="${arrowFor('viz')}" data-s="s8f77872c" title="按目前容量與近 30 天上傳量取最大值排序，與長條圖長度一致">${tr('活動量視覺化')}</th>
   </tr></thead><tbody>`;
   for (const r of rows) {
     const refBytes = Math.max(r.bytes || 0, r.activity_30d_bytes || 0);
@@ -460,7 +460,7 @@ function renderUsers(users) {
   // 空一格看起來像壞掉。這一欄的合計就是畫面上各列的和（沒有分頁，加得完）。
   const total30dCount = rows.reduce((s, r) => s + (r.activity_30d_count || 0), 0);
   html += `</tbody><tfoot><tr data-s="s0365750c">
-    <td>合計</td>
+    <td>${tr('合計')}</td>
     <td class="num">${users.total_count.toLocaleString()}</td>
     <td class="num">${fmtBytes(users.total_bytes)}</td>
     <td class="num">${total30dCount.toLocaleString()}</td>
@@ -583,28 +583,28 @@ async function refreshDbs(thorough) {
       if (!db.exists) {
         tdSt.appendChild(ssdbEl('span', 'ssdb-badge none', tr('尚未建立')));
       } else if (db.skipped) {
-        tdSt.appendChild(ssdbEl('span', 'ssdb-badge none', '未檢查'));
+        tdSt.appendChild(ssdbEl('span', 'ssdb-badge none', tr('未檢查')));
         tdSt.appendChild(ssdbEl('div', 'ssdb-impact', db.detail));
       } else if (db.ok) {
         tdSt.appendChild(ssdbEl('span', 'ssdb-badge ok', tr('正常')));
       } else {
-        tdSt.appendChild(ssdbEl('span', 'ssdb-badge bad', '毀損'));
+        tdSt.appendChild(ssdbEl('span', 'ssdb-badge bad', tr('毀損')));
         tdSt.appendChild(ssdbEl('div', 'ssdb-detail', db.detail));
-        tdSt.appendChild(ssdbEl('div', 'ssdb-impact', '影響：' + db.impact));
+        tdSt.appendChild(ssdbEl('div', 'ssdb-impact', tr('影響：') + db.impact));
       }
       tr.appendChild(tdSt);
 
       tr.appendChild(ssdbEl('td', null,
         db.exists ? (db.size_bytes / 1048576).toFixed(1) + ' MB' : '—'));
       tr.appendChild(ssdbEl('td', null,
-        db.backed_up ? (db.backups + ' 份') : tr('不備份（可重建）')));
+        db.backed_up ? (db.backups + tr(' 份')) : tr('不備份（可重建）')));
       body.appendChild(tr);
     });
     const foot = $('ssDbFoot');
     foot.textContent = d.newest_backup
-      ? '最新備份：' + new Date(d.newest_backup * 1000).toLocaleString()
-        + '・存放於 ' + d.backup_dir
-      : '尚無備份（可按「立即備份」建立第一份）';
+      ? tr('最新備份：') + new Date(d.newest_backup * 1000).toLocaleString()
+        + tr('・存放於 ') + d.backup_dir
+      : tr('尚無備份（可按「立即備份」建立第一份）');
   } catch (e) { /* 保持前一次的內容 */ }
 }
 
@@ -614,10 +614,10 @@ $('ssDbDeep').addEventListener('click', async (e) => {
   // 不要讓人以為當掉了
   const _go = await (window.showConfirm
     ? window.showConfirm(tr('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，')
-                         + '可能需要一分鐘以上。要繼續嗎？',
+                         + tr('可能需要一分鐘以上。要繼續嗎？'),
                          { title: tr('完整檢查'), okText: tr('開始檢查') })
-    : Promise.resolve(confirm('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，'
-                              + '可能需要一分鐘以上。要繼續嗎？')));
+    : Promise.resolve(confirm(tr('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，')
+                              + tr('可能需要一分鐘以上。要繼續嗎？'))));
   if (!_go) return;
   b.disabled = true;
   const old = b.textContent;
@@ -636,7 +636,7 @@ $('ssDbBackup').addEventListener('click', async (e) => {
     if (d.report && d.report.skipped && d.report.skipped.length) {
       alert(tr('部分資料庫已毀損而未備份：')
             + d.report.skipped.map((x) => x.file).join('、')
-            + '\n（不可用毀損的檔案覆蓋既有備份）');
+            + tr('\n（不可用毀損的檔案覆蓋既有備份）'));
     }
     await refreshDbs(false);
   } finally { b.disabled = false; b.textContent = tr('立即備份'); }
@@ -676,7 +676,7 @@ refreshDbs(false);
       const note = document.createElement('span');
       note.className = 'muted';
       note.textContent = '　' + (d.detail || '')
-                       + '（' + d.requests + ' 次探測，未傳輸資料）';
+                       + '（' + d.requests + tr(' 次探測，未傳輸資料）');
       out.appendChild(note);
     } catch (e) {
       out.textContent = tr('偵測失敗');

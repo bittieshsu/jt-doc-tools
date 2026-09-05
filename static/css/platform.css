@@ -115,6 +115,20 @@ body {
 }
 .sb-group > summary::-webkit-details-marker { display: none; }
 
+/* 按鈕文字**不換行**。中文兩到四個字怎麼排都不會折，英文「Set default」在
+   小按鈕上會斷成兩行、把整排卡片撐高（2026-09-05 使用者截圖回報兩次）。
+   讓按鈕自己不換行、整排 flex 去 wrap，版面才不會被撐開。 */
+html[lang]:not([lang="zh-Hant"]) .btn,
+html[lang]:not([lang="zh-Hant"]) .btn-small {
+  white-space: nowrap;
+}
+html[lang]:not([lang="zh-Hant"]) .actions,
+html[lang]:not([lang="zh-Hant"]) .rot-actions,
+html[lang]:not([lang="zh-Hant"]) .presets,
+html[lang]:not([lang="zh-Hant"]) .bg-toggle {
+  flex-wrap: wrap;
+}
+
 /* 側欄分類名稱**只能一行**（使用者要求）。中文四個字剛好，英文大寫字距又寬，
    「FORMS & STAMPS」在 14px 會折成兩行、把整塊撐高（2026-09-05 截圖回報）。
    非中文介面縮一號字、字距收緊、明確不換行；繁體中文完全不受影響。 */
@@ -419,12 +433,30 @@ details.panel:not([open]) > summary { margin-bottom: 0 !important; border-bottom
    用 `html[lang]` 限定範圍，**繁體中文的版面一個像素都不會動** ——
    這比「把 96px 改大」安全，那樣會讓中文的欄位標題欄憑空變寬。
    自動化測試抓不到這種問題（元素都在、也沒有 JS 例外），只有截圖看得到。 */
-html[lang]:not([lang="zh-Hant"]) .form-row label {
+/* **只認直接子層的 label**（`>`）。`.form-row label` 會連**勾選框自己的
+   label** 一起選到 —— 那個 label 在 `.field` 裡面、本來是跟著內容走的，
+   被釘成 168px 之後右邊明明有空間卻折成三行（2026-09-05 使用者截圖回報）。
+   中文那條 96px + nowrap 也有同樣的形狀，只是 nowrap 讓它看起來沒事。 */
+/* 登入卡片自己有一套版面（`.login-card` 裡的 label 是區塊、寬度 100%），
+   套上 168px 之後標題欄變寬、輸入框被擠窄（2026-09-05 使用者截圖比對
+   中英兩版）。那張卡片排除在外。 */
+html[lang]:not([lang="zh-Hant"]) .form-row > label {
   width: 168px;
   white-space: normal;
   line-height: 1.35;
 }
-html[lang]:not([lang="zh-Hant"]) .dpe-panel .form-row label { width: 120px; }
+html[lang]:not([lang="zh-Hant"]) .dpe-panel .form-row > label { width: 120px; }
+/* 登入卡片的 label 是區塊、佔滿一行 —— 套上固定寬度會把輸入框擠窄。
+   用一條明確的覆寫（比 `:not(.login-card *)` 相容性好）。 */
+html[lang]:not([lang="zh-Hant"]) .login-card .form-row > label { width: auto; }
+/* 勾選框 / 選項的 label 是內容不是欄位標題：跟著內容寬度走，不要被釘寬 */
+html[lang]:not([lang="zh-Hant"]) .form-row .field label,
+html[lang]:not([lang="zh-Hant"]) .form-row label label {
+  width: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
 
 /* 英文的行距要放寬 —— 中文本來就一字一格、看得出行，英文換行後兩行會黏在一起
    （2026-09-05 使用者截圖回報：說明區的條列每條折兩行，讀起來連成一片）。

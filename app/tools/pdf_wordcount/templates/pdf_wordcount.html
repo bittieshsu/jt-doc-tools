@@ -422,14 +422,14 @@ function renderMulti(r) {
   $('mChars').textContent = fmt(a.char_total);
   $('mAvgFile').textContent = fmt(a.avg_words_per_file);
   const m = a.reading_min;
-  $('mRead').textContent = m < 1 ? '<1 分' : (m >= 60 ? (Math.floor(m/60)+'時'+Math.round(m%60)+'分') : (m + ' 分'));
+  $('mRead').textContent = m < 1 ? '<1 分' : (m >= 60 ? (Math.floor(m/60)+'時'+Math.round(m%60)+'分') : (m + tr(' 分')));
   const tb = $('mRankingBody');
   tb.innerHTML = '';
   r.ranking.forEach((row, i) => {
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid #e2e8f0';
     const rd = row.reading_min;
-    const rdTxt = rd < 1 ? '<1 分' : (rd >= 60 ? (Math.floor(rd/60)+'時'+Math.round(rd%60)+'分') : (rd + ' 分'));
+    const rdTxt = rd < 1 ? '<1 分' : (rd >= 60 ? (Math.floor(rd/60)+'時'+Math.round(rd%60)+'分') : (rd + tr(' 分')));
     tr.innerHTML = `
       <td data-s="s01015751">${i+1}</td>
       <td data-s="s607685be">${row.filename.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</td>
@@ -452,7 +452,7 @@ function render(r) {
   const s = r.summary;
   $('sWordTotal').textContent = fmt(s.word_total);
   $('sPages').textContent     = fmt(r.page_count);
-  $('sAvgPage').textContent   = tr('平均 ') + fmt(s.avg_per_page) + ' 字/頁';
+  $('sAvgPage').textContent   = tr('平均 ') + fmt(s.avg_per_page) + tr(' 字/頁');
   $('sCjk').textContent       = fmt(s.cjk_chars);
   $('sEn').textContent        = fmt(s.en_words);
   $('sParaSent').textContent  = fmt(s.paragraphs) + ' / ' + fmt(s.sentences);
@@ -460,7 +460,7 @@ function render(r) {
   $('sCharsNoWs').textContent = tr('不含空白 ') + fmt(s.char_no_ws);
   $('sAvgSent').textContent   = fmt(s.avg_sent_len);
   const m = s.reading_min;
-  $('sRead').textContent = m < 1 ? '<1 分' : (m >= 60 ? (Math.floor(m/60)+'時'+Math.round(m%60)+'分') : (m + ' 分'));
+  $('sRead').textContent = m < 1 ? '<1 分' : (m >= 60 ? (Math.floor(m/60)+'時'+Math.round(m%60)+'分') : (m + tr(' 分')));
 
   if (!s.has_text) {
     $('wcError').textContent = tr('⚠ 此 PDF 沒有可擷取的文字層 (可能是掃描檔)。請先用 OCR 工具處理後再分析。');
@@ -487,7 +487,7 @@ function renderLlm(llm) {
   sumEl.hidden = true; kwEl.hidden = true; errEl.hidden = true;
   if (!llm) return;
   panel.hidden = false;
-  modelEl.textContent = llm.model ? '模型 ' + llm.model : '';
+  modelEl.textContent = llm.model ? tr('模型 ') + llm.model : '';
   if (llm.error) {
     errEl.textContent = tr('LLM 處理失敗:') + llm.error;
     errEl.hidden = false;
@@ -513,7 +513,7 @@ function drawPerPage(pages) {
   const cw = W - padL - padR;
   const ch = H - padT - padB;
   const maxV = Math.max(1, ...pages.map(p => p.word_total));
-  $('ppgHint').textContent = pages.length + ' 頁 · 最高 ' + fmt(maxV) + ' 字';
+  $('ppgHint').textContent = pages.length + tr(' 頁 · 最高 ') + fmt(maxV) + tr(' 字');
 
   // grid lines + Y ticks (5 levels)
   const ticks = 5;
@@ -575,8 +575,8 @@ const DONUT_COLORS = {
   other:      '#ef4444',  // red
 };
 const DONUT_LABELS = {
-  cjk: '中文字', en_letter: '英文字母', digit: '數字',
-  punct: '標點符號', whitespace: '空白', other: tr('其他'),
+  cjk: tr('中文字'), en_letter: tr('英文字母'), digit: tr('數字'),
+  punct: tr('標點符號'), whitespace: tr('空白'), other: tr('其他'),
 };
 function drawDonut(b) {
   const svg = $('chartDonut');
@@ -712,34 +712,34 @@ $('btnMd').addEventListener('click', () => {
   if (!lastResult) return;
   const r = lastResult, s = r.summary;
   const lines = [
-    '# 字數統計報表 — ' + (r.filename || ''),
+    tr('# 字數統計報表 — ') + (r.filename || ''),
     '',
-    '## 總覽',
+    tr('## 總覽'),
     '',
-    '| 項目 | 數值 |',
+    tr('| 項目 | 數值 |'),
     '|---|---|',
-    '| 總頁數 | ' + r.page_count + ' |',
-    '| 總字數 | ' + s.word_total + ' |',
-    '| 中文字 | ' + s.cjk_chars + ' |',
-    '| 英文字 | ' + s.en_words + ' |',
-    '| 字元數 (含空白) | ' + s.char_total + ' |',
-    '| 字元數 (不含空白) | ' + s.char_no_ws + ' |',
-    '| 段落數 | ' + s.paragraphs + ' |',
-    '| 句子數 | ' + s.sentences + ' |',
-    '| 平均每頁字數 | ' + s.avg_per_page + ' |',
-    '| 平均句長 | ' + s.avg_sent_len + ' |',
-    '| 預估閱讀時間 | ' + s.reading_min + ' 分 |',
+    tr('| 總頁數 | ') + r.page_count + ' |',
+    tr('| 總字數 | ') + s.word_total + ' |',
+    tr('| 中文字 | ') + s.cjk_chars + ' |',
+    tr('| 英文字 | ') + s.en_words + ' |',
+    tr('| 字元數 (含空白) | ') + s.char_total + ' |',
+    tr('| 字元數 (不含空白) | ') + s.char_no_ws + ' |',
+    tr('| 段落數 | ') + s.paragraphs + ' |',
+    tr('| 句子數 | ') + s.sentences + ' |',
+    tr('| 平均每頁字數 | ') + s.avg_per_page + ' |',
+    tr('| 平均句長 | ') + s.avg_sent_len + ' |',
+    tr('| 預估閱讀時間 | ') + s.reading_min + tr(' 分 |'),
     '',
-    '## 高頻詞 Top 20',
+    tr('## 高頻詞 Top 20'),
     '',
-    '### 中文單字',
-    r.freq.cjk_chars.map(d => `- ${d.term}: ${d.count}`).join('\n') || '(無)',
+    tr('### 中文單字'),
+    r.freq.cjk_chars.map(d => `- ${d.term}: ${d.count}`).join('\n') || tr('(無)'),
     '',
-    '### 中文雙字',
-    r.freq.cjk_bigrams.map(d => `- ${d.term}: ${d.count}`).join('\n') || '(無)',
+    tr('### 中文雙字'),
+    r.freq.cjk_bigrams.map(d => `- ${d.term}: ${d.count}`).join('\n') || tr('(無)'),
     '',
-    '### 英文',
-    r.freq.en_words.map(d => `- ${d.term}: ${d.count}`).join('\n') || '(無)',
+    tr('### 英文'),
+    r.freq.en_words.map(d => `- ${d.term}: ${d.count}`).join('\n') || tr('(無)'),
     '',
   ];
   const base = (r.filename || 'document').replace(/\.(pdf|txt|md|csv|log|rtf|html|htm|xml|json)$/i, '');

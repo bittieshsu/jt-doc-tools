@@ -135,7 +135,7 @@ importFile.addEventListener('change', async () => {
 });
 
 document.getElementById('newBtn').addEventListener('click', async () => {
-  const name = await showPrompt('新公司顯示名稱', { title: '新增公司' });
+  const name = await showPrompt(tr('新公司顯示名稱'), { title: tr('新增公司') });
   if (!name) return;
   const copy = (await showConfirm(tr('要從目前這家公司複製欄位嗎？'),
     { title: tr('欄位來源'), okText: tr('從目前公司複製'), cancelText: tr('使用預設範本') })) ? EDIT_ID : null;
@@ -154,7 +154,7 @@ if (deleteBtn) {
     if (!(await showConfirm(tr('確定刪除這家公司的所有資料？'), { title: tr('刪除公司'), kind: 'danger' }))) return;
     const res = await fetch(`/admin/profile/${encodeURIComponent(EDIT_ID)}/delete`, { method: 'POST' });
     if (res.ok) location.href = '/admin/profile';
-    else showAlert('刪除失敗');
+    else showAlert(tr('刪除失敗'));
   });
 }
 
@@ -163,9 +163,9 @@ function makeRow(key = '', label = '', value = '') {
   div.className = 'edit-row';
   div.innerHTML = `
     <input class="k" type="text" value="${esc(key)}" placeholder="key" />
-    <input class="lbl" type="text" value="${esc(label)}" placeholder="顯示名稱" />
+    <input class="lbl" type="text" value="${esc(label)}" placeholder="${tr('顯示名稱')}" />
     <textarea class="v" rows="1">${esc(value)}</textarea>
-    <button class="btn-icon btn-danger" data-act="del" type="button" title="刪除">🗑</button>
+    <button class="btn-icon btn-danger" data-act="del" type="button" title="' + tr('刪除') + '">🗑</button>
   `;
   return div;
 }

@@ -376,11 +376,11 @@
         `<div class="pm-stat-chip ${cls}"><span class="pm-stat-icon">${icon}</span>` +
         `<div class="pm-stat-body"><span class="pm-stat-label">${label}</span>` +
         `<span class="pm-stat-value" title="${_esc(value)}">${_esc(value)}</span></div></div>`;
-      let html = chip('pm-stat-filename', fileSvg, '檔名', j.stem + '.md');
-      html += chip('', hashSvg, '字數', j.char_count.toLocaleString());
-      html += chip('', linesSvg, '行數', j.line_count.toLocaleString());
+      let html = chip('pm-stat-filename', fileSvg, tr('檔名'), j.stem + '.md');
+      html += chip('', hashSvg, tr('字數'), j.char_count.toLocaleString());
+      html += chip('', linesSvg, tr('行數'), j.line_count.toLocaleString());
       if (j.image_count > 0) {
-        html += chip('', imgSvg, '抽出圖片', j.image_count + ' 張');
+        html += chip('', imgSvg, tr('抽出圖片'), j.image_count + tr(' 張'));
       }
       stat.innerHTML = html;
 
@@ -395,7 +395,7 @@
       // Source markdown on left pane (truncate if huge)
       const TRUNC = 200000;
       const sourceMd = j.markdown.length > TRUNC
-        ? j.markdown.slice(0, TRUNC) + '\n\n... [原始碼預覽截斷，完整內容請下載 .md]'
+        ? j.markdown.slice(0, TRUNC) + tr('\n\n... [原始碼預覽截斷，完整內容請下載 .md]')
         : j.markdown;
       $('pmPreview').textContent = sourceMd;
 

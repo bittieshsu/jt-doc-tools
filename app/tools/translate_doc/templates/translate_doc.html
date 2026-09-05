@@ -22,36 +22,36 @@
       <label class="trd-label">{{ tr('原文語言') }}</label>
       <div class="jt-select" id="srcLangSel"
            data-options='[
-             {"v":"auto","l":"自動偵測"},
-             {"v":"en","l":"英文"},
-             {"v":"zh","l":"中文（簡 / 繁混合）"},
-             {"v":"zh-TW","l":"繁體中文"},
-             {"v":"zh-CN","l":"簡體中文"},
-             {"v":"ja","l":"日文"},
-             {"v":"ko","l":"韓文"},
-             {"v":"fr","l":"法文"},
-             {"v":"de","l":"德文"},
-             {"v":"es","l":"西班牙文"},
-             {"v":"vi","l":"越南文"},
-             {"v":"th","l":"泰文"},
-             {"v":"id","l":"印尼文"},
-             {"v":"ru","l":"俄文"}
+             {"v":"auto","l":"{{ tr('自動偵測') }}"},
+             {"v":"en","l":"{{ tr('英文') }}"},
+             {"v":"zh","l":"{{ tr('中文（簡 / 繁混合）') }}"},
+             {"v":"zh-TW","l":"{{ tr('繁體中文') }}"},
+             {"v":"zh-CN","l":"{{ tr('簡體中文') }}"},
+             {"v":"ja","l":"{{ tr('日文') }}"},
+             {"v":"ko","l":"{{ tr('韓文') }}"},
+             {"v":"fr","l":"{{ tr('法文') }}"},
+             {"v":"de","l":"{{ tr('德文') }}"},
+             {"v":"es","l":"{{ tr('西班牙文') }}"},
+             {"v":"vi","l":"{{ tr('越南文') }}"},
+             {"v":"th","l":"{{ tr('泰文') }}"},
+             {"v":"id","l":"{{ tr('印尼文') }}"},
+             {"v":"ru","l":"{{ tr('俄文') }}"}
            ]' data-value="auto"></div>
     </div>
     <div class="trd-form-cell">
       <label class="trd-label">{{ tr('目標語言') }}</label>
       <div class="jt-select" id="tgtLangSel"
            data-options='[
-             {"v":"zh-TW","l":"繁體中文"},
-             {"v":"zh-CN","l":"簡體中文"},
-             {"v":"en","l":"英文"},
-             {"v":"ja","l":"日文"},
-             {"v":"ko","l":"韓文"},
-             {"v":"fr","l":"法文"},
-             {"v":"de","l":"德文"},
-             {"v":"es","l":"西班牙文"},
-             {"v":"vi","l":"越南文"},
-             {"v":"th","l":"泰文"}
+             {"v":"zh-TW","l":"{{ tr('繁體中文') }}"},
+             {"v":"zh-CN","l":"{{ tr('簡體中文') }}"},
+             {"v":"en","l":"{{ tr('英文') }}"},
+             {"v":"ja","l":"{{ tr('日文') }}"},
+             {"v":"ko","l":"{{ tr('韓文') }}"},
+             {"v":"fr","l":"{{ tr('法文') }}"},
+             {"v":"de","l":"{{ tr('德文') }}"},
+             {"v":"es","l":"{{ tr('西班牙文') }}"},
+             {"v":"vi","l":"{{ tr('越南文') }}"},
+             {"v":"th","l":"{{ tr('泰文') }}"}
            ]' data-value="zh-TW"></div>
     </div>
     <div class="trd-form-cell trd-form-cell-wide">
@@ -612,8 +612,8 @@ function _engineLabelFor(filename) {
   if (_OFFICE_EXTS.some(ext => lower.endsWith(ext))) {
     return `${OFFICE_ENGINE} 解析中…`;
   }
-  if (lower.endsWith('.pdf')) return 'PyMuPDF 解析中…';
-  return '解析中…';
+  if (lower.endsWith('.pdf')) return tr('PyMuPDF 解析中…');
+  return tr('解析中…');
 }
 const $ = (id) => document.getElementById(id);
 const srcText = $('srcText');
@@ -730,8 +730,8 @@ async function handleUploadedFile(f) {
       // 沒抽到任何文字 — 多半是掃描檔 PDF / 純圖片內嵌 PDF。提示使用者用 OCR 工具
       const isPdf = /\.pdf$/i.test(f.name);
       const hint = isPdf
-        ? '⚠ 沒偵測到文字，可能是掃描檔 PDF — 請先用「OCR 文字辨識」工具把它變成可選取文字 PDF 再回來翻譯'
-        : '⚠ 沒偵測到任何文字 — 檔案可能損毀或內容皆為圖片';
+        ? tr('⚠ 沒偵測到文字，可能是掃描檔 PDF — 請先用「OCR 文字辨識」工具把它變成可選取文字 PDF 再回來翻譯')
+        : tr('⚠ 沒偵測到任何文字 — 檔案可能損毀或內容皆為圖片');
       dropZone.classList.remove('has-file');
       dropZone.classList.add('has-warn');
       dropText.innerHTML = `<b>${escapeHTML(f.name)}</b><div class="trd-drop-hint warn">${hint}</div>`;
@@ -806,7 +806,7 @@ function renderRow(idx, src, translated, error) {
     tgtHtml = escapeHTML(error);
   } else if (!translated) {
     tgtCls = 'is-empty';
-    tgtHtml = '（無）';
+    tgtHtml = tr('（無）');
   } else {
     tgtHtml = escapeHTML(translated);
   }
@@ -816,7 +816,7 @@ function renderRow(idx, src, translated, error) {
     <div class="num">${idx + 1}</div>
     <div class="src">${escapeHTML(src) || ('<span data-s="s15f0c2e8">' + tr('（空行）') + '</span>')}${copyBtn('src')}</div>
     <div class="tgt ${tgtCls}">${tgtHtml}${copyBtn('tgt')}</div>
-    <div class="ctl"><button type="button" data-act="retry" title="重新翻譯本句">↻</button></div>
+    <div class="ctl"><button type="button" data-act="retry" title="' + tr('重新翻譯本句') + '">↻</button></div>
   `;
   return row;
 }
@@ -840,8 +840,8 @@ function _setHoverRow(idx) {
 // 語言代碼 → 中文顯示名稱（與後端 _LANG_NAMES 對齊；header 已用「（…）」
 // 包起來，所以這裡只放純中文，避免變成「（English (英文)）」雙層括號）
 const LANG_NAMES = {
-  'auto': '自動偵測', 'en': tr('英文'),
-  'zh': tr('中文'), 'zh-TW': '繁體中文', 'zh-CN': tr('簡體中文'),
+  'auto': tr('自動偵測'), 'en': tr('英文'),
+  'zh': tr('中文'), 'zh-TW': tr('繁體中文'), 'zh-CN': tr('簡體中文'),
   'ja': tr('日文'), 'ko': tr('韓文'),
   'fr': tr('法文'), 'de': tr('德文'),
   'es': tr('西班牙文'), 'vi': tr('越南文'),
@@ -877,7 +877,7 @@ function _trdPageBounds(page) {
 function _rowFromResult(i) {
   const r = trdResults[i];
   if (r === undefined) {
-    const row = renderRow(i, currentSentences[i] ?? '', '翻譯中…', '');
+    const row = renderRow(i, currentSentences[i] ?? '', tr('翻譯中…'), '');
     row.classList.add('is-loading');
     return row;
   }
@@ -927,10 +927,10 @@ function renderPager() {
   pager.appendChild(mk('‹ 上一頁', p - 1, p === 0));
   const info = document.createElement('span');
   info.className = 'trd-pager-info';
-  info.innerHTML = `第 <b>${p + 1}</b> / ${totalPages} 頁（第 ${start + 1}–${end} 句，共 <b>${total}</b> 句）`;
+  info.innerHTML = `第 <b>${p + 1}</b> / ${totalPages} 頁（第 ${start + 1}–${end} 句，共 <b>${total}</b> ${tr('句）')}<`;
   pager.appendChild(info);
-  pager.appendChild(mk('下一頁 ›', p + 1, p >= totalPages - 1));
-  pager.appendChild(mk('末頁 »', totalPages - 1, p >= totalPages - 1));
+  pager.appendChild(mk(tr('下一頁 ›'), p + 1, p >= totalPages - 1));
+  pager.appendChild(mk(tr('末頁 »'), totalPages - 1, p >= totalPages - 1));
   const jump = document.createElement('input');
   jump.type = 'number'; jump.className = 'trd-pager-jump';
   jump.min = '1'; jump.max = String(totalPages); jump.value = String(p + 1);
@@ -950,7 +950,7 @@ function _trdApplyRow(i) {
 // 即時更新譯文字數（header 那行的「N 字」）
 function _refreshTgtCharCounter() {
   const head = trdGrid.querySelector('.trd-head .h-tgt .h-stat');
-  if (head) head.textContent = _trdTotalChars().tgt + ' 字';
+  if (head) head.textContent = _trdTotalChars().tgt + tr(' 字');
 }
 
 // ---- Column resize ----
@@ -1027,7 +1027,7 @@ trdGrid.addEventListener('click', async (e) => {
     const which = copyBtn.dataset.which;   // 'src' | 'tgt'
     const label = which === 'src' ? '原文' : (which === 'tgt' ? '譯文' : '');
     if (copyOk) showToast?.(`已複製${label}（${text.length} 字）`, 'ok');
-    else        showToast?.('複製失敗（瀏覽器不允許剪貼簿存取？）', 'err');
+    else        showToast?.(tr('複製失敗（瀏覽器不允許剪貼簿存取？）'), 'err');
     return;
   }
   const btn = e.target.closest('button[data-act=retry]');
@@ -1046,7 +1046,7 @@ trdGrid.addEventListener('click', async (e) => {
     });
     // 寫回資料陣列（單一事實來源），再依資料重畫該列 — copy / 匯出 / 翻頁都讀得到。
     if (!r.ok) {
-      trdResults[idx] = {src, translated: '', error: '失敗：' + await r.text()};
+      trdResults[idx] = {src, translated: '', error: tr('失敗：') + await r.text()};
     } else {
       const j = await r.json();
       trdResults[idx] = {
@@ -1109,8 +1109,8 @@ function _updateProgress(done, total, t0) {
                             : `${Math.floor(s/60)} 分 ${Math.round(s%60)} 秒`;
   $('trdProgressMeta').innerHTML =
     `<span><b>${done}</b> / <b>${total}</b> 句（${pct}%）</span>` +
-    `<span>已花 <b>${fmt(elapsed)}</b></span>` +
-    (done < total && rate > 0 ? `<span>預估剩 <b>${fmt(eta)}</b></span>` : '');
+    `<span>${tr('已花')} <b>${fmt(elapsed)}</b></span>` +
+    (done < total && rate > 0 ? `<span>${tr('預估剩')} <b>${fmt(eta)}</b></span>` : '');
 }
 
 $('btnStop').addEventListener('click', () => {
@@ -1228,7 +1228,7 @@ async function _trdPoll() {
   const running = (j.status === 'running' || j.status === 'pending');
   if (running) {
     if (j.status === 'pending') {
-      resultMeta.textContent = j.message || '排隊中…';
+      resultMeta.textContent = j.message || tr('排隊中…');
     }
     _trdPollTimer = setTimeout(_trdPoll, 1500);
     return;
@@ -1243,7 +1243,7 @@ async function _trdPoll() {
   if (j.status === 'cancelled') {
     resultMeta.textContent = tr('已中止 — 完成 {0}/{1} 句').replace('{0}', done).replace('{1}', total) + tail;
   } else if (j.status === 'error') {
-    resultMeta.textContent = `翻譯失敗：${j.message || '未知錯誤'}`;
+    resultMeta.textContent = `翻譯失敗：${j.message || tr('未知錯誤')}`;
   } else if (j.status === 'interrupted') {
     resultMeta.textContent = tr('服務重新啟動而中斷 — 完成 {0}/{1} 句，請重新送出').replace('{0}', done).replace('{1}', total);
   } else {
@@ -1332,7 +1332,7 @@ async function _trdResumeFromUrl() {
   _trdSetRunningUI(running);
   _updateProgress(_trdDoneCount(), total, _trdJobT0);
   if (running) {
-    resultMeta.textContent = j.message || '翻譯中…';
+    resultMeta.textContent = j.message || tr('翻譯中…');
     _trdPoll();
   } else {
     const ch = _trdTotalChars();
@@ -1364,7 +1364,7 @@ $('btnCopyTgt').addEventListener('click', (e) => {
     if (!p.isError && !p.isEmpty) lines.push(p.tgt);
   }
   navigator.clipboard.writeText(lines.join('\n'));
-  showToast?.('已複製譯文', 'ok');
+  showToast?.(tr('已複製譯文'), 'ok');
 });
 $('btnCopySxs').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1374,7 +1374,7 @@ $('btnCopySxs').addEventListener('click', (e) => {
     lines.push(p.src + '\n' + p.tgt + '\n');
   }
   navigator.clipboard.writeText(lines.join('\n'));
-  showToast?.('已複製對照', 'ok');
+  showToast?.(tr('已複製對照'), 'ok');
 });
 
 // ============ 匯出檔案（v1.7.51）============
@@ -1392,8 +1392,8 @@ function _trdGetPairs() {
 // 產生文件檔（docx/odt/pdf）後直接存進工作區，免下載再上傳。
 async function _trdSaveToWorkspace(format) {
   const pairs = _trdGetPairs();
-  if (!pairs.length) { showToast?.('沒有可匯出的內容', 'err'); return; }
-  if (!window.saveToWorkspace) { showToast?.('工作區未啟用', 'err'); return; }
+  if (!pairs.length) { showToast?.(tr('沒有可匯出的內容'), 'err'); return; }
+  if (!window.saveToWorkspace) { showToast?.(tr('工作區未啟用'), 'err'); return; }
   showToast?.(`產生 ${format} 中…`, 'ok');
   try {
     const r = await fetch('/tools/translate-doc/export', {
@@ -1409,15 +1409,15 @@ async function _trdSaveToWorkspace(format) {
     const fname = m ? decodeURIComponent(m[1]) : `translated.${format}`;
     const res = await window.saveToWorkspace({ blob }, fname, 'translate-doc');
     showToast?.((res && res.duplicate)
-      ? '已存至工作區（工作區已有同名檔，已另存一份）' : '已存至工作區', 'ok');
+      ? '已存至工作區（工作區已有同名檔，已另存一份）' : tr('已存至工作區'), 'ok');
   } catch (e) {
-    showToast?.('存至工作區失敗：' + e.message, 'err');
+    showToast?.(tr('存至工作區失敗：') + e.message, 'err');
   }
 }
 
 async function _trdExport(format) {
   const pairs = _trdGetPairs();
-  if (!pairs.length) { showToast?.('沒有可匯出的內容', 'err'); return; }
+  if (!pairs.length) { showToast?.(tr('沒有可匯出的內容'), 'err'); return; }
   showToast?.(`產生 ${format} 中…`, 'ok');
   try {
     const r = await fetch('/tools/translate-doc/export', {
@@ -1444,7 +1444,7 @@ async function _trdExport(format) {
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
   } catch (e) {
-    showToast?.('匯出失敗：' + e.message, 'err');
+    showToast?.(tr('匯出失敗：') + e.message, 'err');
   }
 }
 

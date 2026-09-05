@@ -110,7 +110,7 @@
       if (r.ok) { location.href = (await r.json()).edit_url; return; }
       (window.showAlert || window.alert)(await window.friendlyServerError(r, tr('上傳失敗')));
     } catch (err) {
-      (window.showAlert || window.alert)('上傳失敗：' + err.message);
+      (window.showAlert || window.alert)(tr('上傳失敗：') + err.message);
     }
     btn.disabled = false; btn.innerHTML = orig;
   });
@@ -167,7 +167,7 @@ document.getElementById('assetImportMergeBtn').addEventListener('click', () => {
 
 document.getElementById('assetImportReplaceBtn').addEventListener('click', async () => {
   const ok = await showConfirm(
-    '「整個取代」會刪掉現有所有資產（包含 PNG 檔），只保留匯入檔的內容。\n這個動作不可還原，確定要繼續？',
+    tr('「整個取代」會刪掉現有所有資產（包含 PNG 檔），只保留匯入檔的內容。\n這個動作不可還原，確定要繼續？'),
     { title: tr('確認整個取代'), kind: 'danger', okText: tr('我確定，繼續'), cancelText: tr('取消') }
   );
   if (!ok) return;

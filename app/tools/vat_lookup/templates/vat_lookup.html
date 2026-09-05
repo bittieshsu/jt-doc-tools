@@ -375,7 +375,7 @@ const CAT_CLASS = {
 };
 
 function _catChip(cat) {
-  cat = cat || '未分類';
+  cat = cat || tr('未分類');
   const cls = CAT_CLASS[cat] || 'unknown';
   return `<span class="vl-cat-chip ${cls}">${escapeHtml(cat)}</span>`;
 }
@@ -400,7 +400,7 @@ function _renderCard(r, isMiss, query) {
     return `<div class="vl-card miss">
       <div class="vl-card-head">
         <span class="vl-card-vat">${escapeHtml(r.vat)}</span>
-        <span data-s="saaeec3f3">✗ ${escapeHtml(r.error || '查無此統編')}</span>
+        <span data-s="saaeec3f3">✗ ${escapeHtml(r.error || tr('查無此統編'))}</span>
       </div>
     </div>`;
   }
@@ -409,17 +409,17 @@ function _renderCard(r, isMiss, query) {
   const cAttr = v => escapeHtml(String(v == null ? '' : v));
   const metaRow = (label, val) =>
     `<span class="label">${label}</span>` +
-    `<span class="val vl-copy" data-copy="${cAttr(val)}" title="點選複製" tabindex="0" role="button">${hl(val)}</span>`;
+    `<span class="val vl-copy" data-copy="${cAttr(val)}" title="${tr('點選複製')}" tabindex="0" role="button">${hl(val)}</span>`;
   let metaRows = '';
   if (r.address)    metaRows += metaRow(tr('地址'), r.address);
-  if (r.owner)      metaRows += metaRow('負責人', r.owner);
-  if (r.org_type)   metaRows += metaRow('組織別', r.org_type);
-  if (r.industries) metaRows += metaRow('行業', r.industries);
-  if (r.status)     metaRows += metaRow('狀態', r.status);
+  if (r.owner)      metaRows += metaRow(tr('負責人'), r.owner);
+  if (r.org_type)   metaRows += metaRow(tr('組織別'), r.org_type);
+  if (r.industries) metaRows += metaRow(tr('行業'), r.industries);
+  if (r.status)     metaRows += metaRow(tr('狀態'), r.status);
   return `<div class="vl-card found">
     <div class="vl-card-head">
-      <span class="vl-card-vat vl-copy" data-copy="${cAttr(r.vat)}" title="點選複製統編" tabindex="0" role="button">${hl(r.vat)}</span>
-      <span class="vl-card-name vl-copy" data-copy="${cAttr(r.name)}" title="點選複製公司名稱" tabindex="0" role="button">${hl(r.name)}</span>
+      <span class="vl-card-vat vl-copy" data-copy="${cAttr(r.vat)}" title="${tr('點選複製統編')}" tabindex="0" role="button">${hl(r.vat)}</span>
+      <span class="vl-card-name vl-copy" data-copy="${cAttr(r.name)}" title="${tr('點選複製公司名稱')}" tabindex="0" role="button">${hl(r.name)}</span>
       ${_catChip(r.category)}
     </div>
     ${metaRows ? `<div class="vl-card-meta">${metaRows}</div>` : ''}
@@ -507,7 +507,7 @@ function _hideStats() {
   const s = $('vlStats'); if (s) { s.hidden = true; s.innerHTML = ''; }
 }
 
-const _DRILL_LABELS = { industry: '行業', city: '縣市', org_type: '組織' };
+const _DRILL_LABELS = { industry: tr('行業'), city: tr('縣市'), org_type: tr('組織') };
 
 function _renderDrillBar() {
   const bar = $('vlDrillBar');
@@ -518,7 +518,7 @@ function _renderDrillBar() {
   bar.innerHTML = tr('已篩選：') + active.map(([k, v]) =>
     `<span class="vl-drill-chip">${_DRILL_LABELS[k] || k}：${escapeHtml(v)}`
     + `<span class="vl-drill-x" data-drill="${k}">×</span></span>`).join('')
-    + ` <button class="vl-btn-sm" id="drillClearAll">清除全部</button>`;
+    + ` <button class="vl-btn-sm" id="drillClearAll">${tr('清除全部')}</button>`;
 }
 
 async function _loadStats(q) {
@@ -557,16 +557,16 @@ function _statCard(title, type, items, total) {
 function renderStats(s) {
   const box = $('vlStats');
   if (!box) return;
-  const html = _statCard('行業統計', 'industry', s.industry, s.total)
-    + _statCard('縣市統計', 'city', s.city, s.total)
-    + _statCard('組織統計', 'org_type', s.org, s.total);
+  const html = _statCard(tr('行業統計'), 'industry', s.industry, s.total)
+    + _statCard(tr('縣市統計'), 'city', s.city, s.total)
+    + _statCard(tr('組織統計'), 'org_type', s.org, s.total);
   if (!html) { _hideStats(); return; }
   const topN = s.top_n || 8;
   const sampleNote = (s.total > (s.sampled || 0) && s.sampled)
     ? `<span class="vl-stats-head-note">　·　依前 ${(s.sampled).toLocaleString('en-US')} 筆命中計算分布</span>` : '';
   const head = `<div class="vl-stats-head">搜尋結果分布 — 各類取前 ${topN} 名${sampleNote}</div>`;
   box.innerHTML = head + html
-    + `<div class="vl-stats-hint">點任一項統計可加入篩選（可疊加多個條件；點已選的可取消）</div>`;
+    + `<div class="vl-stats-hint">${tr('點任一項統計可加入篩選（可疊加多個條件；點已選的可取消）')}</div>`;
   box.hidden = false;
 }
 
@@ -626,7 +626,7 @@ async function smartQuery() {
         body: JSON.stringify({ vat: q }),
       });
       if (r.status === 404) {
-        $('results').innerHTML = _renderCard({vat: q, error: '資料庫中找不到此統編'}, true);
+        $('results').innerHTML = _renderCard({vat: q, error: tr('資料庫中找不到此統編')}, true);
         return;
       }
       if (!r.ok) {
@@ -664,7 +664,7 @@ async function smartQuery() {
         return;
       }
       const hdr = `<div class="vl-results-hdr">
-        <span class="count">找到 <b>${j.count}</b> 筆${j.count >= 50 ? '（最多顯示 50 筆，可加更具體關鍵字縮小範圍）' : ''}${escapeHtml(catNote)}</span>
+        <span class="count">${tr('找到')} <b>${j.count}</b> 筆${j.count >= 50 ? '（最多顯示 50 筆，可加更具體關鍵字縮小範圍）' : ''}${escapeHtml(catNote)}</span>
         <span class="actions"><button class="vl-btn-sm" data-act="export-csv">{{ icon('download', size=12) }} 下載 .csv</button></span>
       </div>`;
       _lastSearchResults = j.results;
@@ -715,7 +715,7 @@ document.addEventListener('click', (e) => {
 
 function exportResultsCsv() {
   if (!_lastSearchResults.length) return;
-  const rows = [['統編', '名稱', '類別', '行業', tr('地址'), '負責人', '組織別', '狀態']];
+  const rows = [[tr('統編'), tr('名稱'), tr('類別'), tr('行業'), tr('地址'), tr('負責人'), tr('組織別'), tr('狀態')]];
   for (const r of _lastSearchResults) {
     rows.push([r.vat, r.name || '', r.category || '', r.industries || '',
                r.address || '', r.owner || '', r.org_type || '', r.status || '']);
@@ -759,18 +759,18 @@ let _lastBatchResults = [];
 async function doBatch() {
   const raw = $('batchInput').value.trim();
   if (!raw) {
-    await window.showAlert('請貼上至少一個統編', { title: '空輸入' });
+    await window.showAlert(tr('請貼上至少一個統編'), { title: tr('空輸入') });
     return;
   }
   const matches = raw.match(/\d{8}/g) || [];
   const seen = new Set();
   const vats = matches.filter(v => seen.has(v) ? false : (seen.add(v), true));
   if (!vats.length) {
-    await window.showAlert('找不到任何 8 位數字統編', { title: '無有效統編' });
+    await window.showAlert(tr('找不到任何 8 位數字統編'), { title: tr('無有效統編') });
     return;
   }
   if (vats.length > 200) {
-    await window.showAlert(`一次最多查 200 筆，目前 ${vats.length} 筆`, { title: '過多' });
+    await window.showAlert(`一次最多查 200 筆，目前 ${vats.length} 筆`, { title: tr('過多') });
     return;
   }
   const btn = $('btnBatch');
@@ -800,10 +800,10 @@ async function doBatch() {
 function _renderBatch(j) {
   const wrap = $('batchResult');
   let html = `<p data-s="s83cf399e">
-    共 ${j.count} 筆 · 查到 <b>${j.found_count}</b> · 查無 <b>${j.count - j.found_count}</b>
+    共 ${j.count} 筆 · 查到 <b>${j.found_count}</b> ${tr('· 查無')} <b>${j.count - j.found_count}</b>
   </p>`;
   html += `<table class="vl-batch-table"><thead><tr>
-    <th>統編</th><th>名稱</th><th>類別</th><th>行業</th><th>地址</th>
+    <th>${tr('統編')}</th><th>${tr('名稱')}</th><th>${tr('類別')}</th><th>${tr('行業')}</th><th>${tr('地址')}</th>
   </tr></thead><tbody>`;
   for (const r of j.results) {
     if (r.found) {
@@ -817,7 +817,7 @@ function _renderBatch(j) {
     } else {
       html += `<tr class="miss">
         <td class="vat-cell">${escapeHtml(r.vat)}</td>
-        <td colspan="4">${escapeHtml(r.error || '查無')}</td>
+        <td colspan="4">${escapeHtml(r.error || tr('查無'))}</td>
       </tr>`;
     }
   }
@@ -827,13 +827,13 @@ function _renderBatch(j) {
 
 function exportBatchCsv() {
   if (!_lastBatchResults.length) return;
-  const rows = [['統編', '名稱', '類別', '行業', tr('地址'), '負責人', '組織別', '狀態', '結果']];
+  const rows = [[tr('統編'), tr('名稱'), tr('類別'), tr('行業'), tr('地址'), tr('負責人'), tr('組織別'), tr('狀態'), tr('結果')]];
   for (const r of _lastBatchResults) {
     if (r.found) {
       rows.push([r.vat, r.name || '', r.category || '', r.industries || '',
                  r.address || '', r.owner || '', r.org_type || '', r.status || '', '✓']);
     } else {
-      rows.push([r.vat, '', '', '', '', '', '', '', r.error || '查無']);
+      rows.push([r.vat, '', '', '', '', '', '', '', r.error || tr('查無')]);
     }
   }
   _downloadCsv(rows, 'vat-batch');

@@ -210,7 +210,7 @@ const fu = new FileUpload($('cmpUpload'), async (f) => {
   const fd = new FormData(); fd.append('file', f);
   $('analyzeGrid').hidden = false;
   $('analyzeGrid').innerHTML = '<div class="muted" data-s="s1b9b41ec">' + tr('分析中…') + '</div>';
-  const r = await fu.upload('/tools/pdf-compress/analyze', fd, {processingLabel: '分析 PDF 中…'});
+  const r = await fu.upload('/tools/pdf-compress/analyze', fd, {processingLabel: tr('分析 PDF 中…')});
   // 同上：不要把伺服器回應當 HTML 塞進 DOM
   if (!r.ok) { $('analyzeGrid').textContent = tr('分析失敗：') + await window.friendlyServerError(r, tr('分析失敗')); return; }
   const d = await r.json();
@@ -304,7 +304,7 @@ $('btnCompress').addEventListener('click', async () => {
   }
   {% endif %}
   $('resultPanel').hidden = true;
-  _setBtnBusy(btn, true, '壓縮中…');
+  _setBtnBusy(btn, true, tr('壓縮中…'));
   let r;
   try {
     r = await fetch('/tools/pdf-compress/submit', {

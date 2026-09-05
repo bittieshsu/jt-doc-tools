@@ -97,7 +97,7 @@ document.querySelectorAll('.ws-clear-user').forEach(btn => {
     const fd = new FormData(); fd.append('user_key', btn.dataset.key);
     const r = await fetch('/admin/workspace/clear-user', { method: 'POST', body: fd });
     if (r.ok) { const j = await r.json(); showToast(tr('已清空 {0} 個檔案').replace('{0}', j.removed), 'ok'); setTimeout(() => location.reload(), 800); }
-    else showAlert('失敗：' + await r.text());
+    else showAlert(tr('失敗：') + await r.text());
   });
 });
 const clearAll = document.getElementById('ws-clear-all');
@@ -105,7 +105,7 @@ if (clearAll) clearAll.addEventListener('click', async () => {
   if (!(await showConfirm(tr('確定清空「所有使用者」的工作區？此動作無法復原。'), { title: tr('清空全部'), okText: tr('確定清空') }))) return;
   const r = await fetch('/admin/workspace/clear-all', { method: 'POST' });
   if (r.ok) { const j = await r.json(); showToast(tr('已清空 {0} 個檔案').replace('{0}', j.removed), 'ok'); setTimeout(() => location.reload(), 800); }
-  else showAlert('失敗：' + await r.text());
+  else showAlert(tr('失敗：') + await r.text());
 });
 </script>
 {% endblock %}

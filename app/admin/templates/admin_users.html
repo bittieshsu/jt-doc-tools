@@ -477,12 +477,12 @@ const ALL_GROUPS = {{ all_groups|tojson }};
     // 帶數字的句子要用 `{0}` 當鍵再代回去 —— 直接把數字接在中文後面的話
     // 那條字串永遠查不到翻譯（而且完全無聲）。
     const rel = (key, n) => tr(key).replace('{0}', String(n));
-    if (secsAgo < 60)        return rel('{0} 秒前', Math.max(1, Math.floor(secsAgo)));
-    if (secsAgo < 3600)      return rel('{0} 分鐘前', Math.floor(secsAgo / 60));
-    if (secsAgo < 86400)     return rel('{0} 小時前', Math.floor(secsAgo / 3600));
-    if (secsAgo < 30*86400)  return rel('{0} 天前', Math.floor(secsAgo / 86400));
-    if (secsAgo < 365*86400) return rel('{0} 個月前', Math.floor(secsAgo / (30*86400)));
-    return rel('{0} 年前', Math.floor(secsAgo / (365*86400)));
+    if (secsAgo < 60)        return rel(tr('{0} 秒前'), Math.max(1, Math.floor(secsAgo)));
+    if (secsAgo < 3600)      return rel(tr('{0} 分鐘前'), Math.floor(secsAgo / 60));
+    if (secsAgo < 86400)     return rel(tr('{0} 小時前'), Math.floor(secsAgo / 3600));
+    if (secsAgo < 30*86400)  return rel(tr('{0} 天前'), Math.floor(secsAgo / 86400));
+    if (secsAgo < 365*86400) return rel(tr('{0} 個月前'), Math.floor(secsAgo / (30*86400)));
+    return rel(tr('{0} 年前'), Math.floor(secsAgo / (365*86400)));
   }
   const now = Date.now() / 1000;
   document.querySelectorAll('.last-login').forEach(td => {
@@ -513,7 +513,7 @@ document.getElementById('newUserForm').addEventListener('submit', async (e) => {
     body: JSON.stringify(body),
   });
   if (r.ok) location.reload();
-  else showAlert('建立失敗：' + await r.text());
+  else showAlert(tr('建立失敗：') + await r.text());
 });
 
 // ---------- 批次操作 ----------
@@ -568,11 +568,11 @@ async function runBulk(action) {
       + `這個操作無法還原，帳號的角色指派與群組成員關係會一起消失。`
       + `（AD / LDAP 目錄裡的帳號不受影響，下次登入會重新建立。）`
       + `確定的話請輸入帳號數量「${ids.length}」：`,
-      { title: '批次刪除帳號', kind: 'danger', okText: '刪除',
+      { title: tr('批次刪除帳號'), kind: 'danger', okText: tr('刪除'),
         placeholder: String(ids.length) });
     if (typed === null) return;
     if (String(typed).trim() !== String(ids.length)) {
-      (window.showAlert || alert)('輸入的數字不對，已取消。');
+      (window.showAlert || alert)(tr('輸入的數字不對，已取消。'));
       return;
     }
     const r0 = await fetch('/admin/users/bulk/delete', { method: 'POST',
@@ -593,7 +593,7 @@ async function runBulk(action) {
     return;
   } else {
     const role = document.getElementById('ufBulkRole').value;
-    if (!role) { (window.showAlert || alert)('請先選擇角色'); return; }
+    if (!role) { (window.showAlert || alert)(tr('請先選擇角色')); return; }
     url = '/admin/users/bulk/roles';
     body = { user_ids: ids, mode: action === 'role-add' ? 'add' : 'remove',
              roles: [role] };
@@ -799,14 +799,14 @@ function openEdit(btn) {
 
   const haveRoles = new Set((btn.dataset.roles || '').split(',').filter(Boolean));
   _renderPicker(document.getElementById('emRoleGrid'), ALL_ROLES, 'role',
-                haveRoles, '尚無角色定義');
+                haveRoles, tr('尚無角色定義'));
   document.getElementById('emRoleSearch').value = '';
   const roleCtl = _bindPicker('emRoleGrid', 'emRoleSearch', 'emRoleCount', 'emRoleClear');
   roleCtl.refreshCount();
 
   // groups (we don't yet send current memberships; admin re-picks each time)
   _renderPicker(document.getElementById('emGroupGrid'), ALL_GROUPS, 'group',
-                new Set(), '尚無群組');
+                new Set(), tr('尚無群組'));
   document.getElementById('emGroupSearch').value = '';
   const grpCtl = _bindPicker('emGroupGrid', 'emGroupSearch', 'emGroupCount', 'emGroupClear');
   grpCtl.refreshCount();
@@ -833,7 +833,7 @@ document.getElementById('emSave').addEventListener('click', async () => {
     body: JSON.stringify(body),
   });
   if (r.ok) location.reload();
-  else showAlert('更新失敗：' + await r.text());
+  else showAlert(tr('更新失敗：') + await r.text());
 });
 
 // ---------- reset password modal ----------
@@ -851,7 +851,7 @@ document.getElementById('rpSave').addEventListener('click', async () => {
   const p1 = document.getElementById('rpPw').value;
   const p2 = document.getElementById('rpPw2').value;
   if (p1 !== p2) { showAlert('兩次輸入不一致'); return; }
-  if (p1.length < 8) { showAlert('密碼至少 8 字元'); return; }
+  if (p1.length < 8) { showAlert(tr('密碼至少 8 字元')); return; }
   const r = await fetch(`/admin/users/${currentResetUid}/reset-password`, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({password: p1}),
@@ -860,7 +860,7 @@ document.getElementById('rpSave').addEventListener('click', async () => {
     hideModal('resetPwdModal');
     showToast(tr('密碼已重設，該使用者所有 session 已失效'), 'ok');
   } else {
-    showAlert('重設失敗：' + await r.text());
+    showAlert(tr('重設失敗：') + await r.text());
   }
 });
 
@@ -880,10 +880,10 @@ document.querySelectorAll('.uf-disable-all').forEach(btn => {
     }
     const pre = await probe.json();
     if (pre.aborted) { showAlert(pre.reason); return; }
-    if (!pre.candidates) { showAlert('沒有需要停用的帳號。'); return; }
+    if (!pre.candidates) { showAlert(tr('沒有需要停用的帳號。')); return; }
     if (!(await showConfirm(
           `停用 ${pre.candidates} 個帳號？\n\n`
-          + '帳號與權限指派都會保留，人回來時按一下就能恢復。',
+          + tr('帳號與權限指派都會保留，人回來時按一下就能恢復。'),
           { title: tr('批次停用'), kind: 'danger', okText: tr('停用') }))) return;
     const r = await fetch('/admin/users/bulk/disable-view', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -902,7 +902,7 @@ let smUid = null;
 
 function _uaShort(ua) {
   // 只要「哪一台 / 哪個瀏覽器」的程度就夠了，完整 UA 字串在畫面上是雜訊。
-  if (!ua) return '未知裝置';
+  if (!ua) return tr('未知裝置');
   const os = /Windows/.test(ua) ? 'Windows'
            : /Macintosh|Mac OS/.test(ua) ? 'macOS'
            : /Android/.test(ua) ? 'Android'
@@ -912,15 +912,15 @@ function _uaShort(ua) {
            : /Chrome\//.test(ua) ? 'Chrome'
            : /Firefox\//.test(ua) ? 'Firefox'
            : /Safari\//.test(ua) ? 'Safari' : '';
-  return [os, br].filter(Boolean).join(' · ') || '未知裝置';
+  return [os, br].filter(Boolean).join(' · ') || tr('未知裝置');
 }
 
 function _ago(ts) {
   const secs = Math.max(0, Math.floor(Date.now() / 1000 - ts));
-  if (secs < 60) return '剛剛';
-  if (secs < 3600) return Math.floor(secs / 60) + ' 分鐘前';
-  if (secs < 86400) return Math.floor(secs / 3600) + ' 小時前';
-  return Math.floor(secs / 86400) + ' 天前';
+  if (secs < 60) return tr('剛剛');
+  if (secs < 3600) return Math.floor(secs / 60) + tr(' 分鐘前');
+  if (secs < 86400) return Math.floor(secs / 3600) + tr(' 小時前');
+  return Math.floor(secs / 86400) + tr(' 天前');
 }
 
 async function openSessions(uid, username) {
@@ -965,7 +965,7 @@ async function openSessions(uid, username) {
     info.appendChild(head);
     const meta = document.createElement('div');
     meta.className = 'muted sm-meta';
-    meta.textContent = `${sess.ip || '位址未知'}・最後活動 ${_ago(sess.last_seen_at)}`
+    meta.textContent = `${sess.ip || tr('位址未知')}・最後活動 ${_ago(sess.last_seen_at)}`
                      + (sess.remember ? '・記住我' : '');
     info.appendChild(meta);
     row.appendChild(info);
@@ -1021,7 +1021,7 @@ document.querySelectorAll('.user-table button').forEach(btn => {
         if (typeof syncBulk === 'function') syncBulk();
       } else {
         btn.disabled = false;
-        showAlert('刪除失敗：' + await window.friendlyServerError(r, tr('刪除失敗')));
+        showAlert(tr('刪除失敗：') + await window.friendlyServerError(r, tr('刪除失敗')));
       }
     } else if (act === 'reset-pwd') {
       openReset(btn);
@@ -1034,7 +1034,7 @@ document.querySelectorAll('.user-table button').forEach(btn => {
         showAlert(`已清除 ${j.cleared} 筆鎖定`);
         location.reload();
       } else {
-        showAlert('解鎖失敗：' + await r.text());
+        showAlert(tr('解鎖失敗：') + await r.text());
       }
     } else if (act === 'sessions') {
       openSessions(uid, btn.dataset.username);
@@ -1044,9 +1044,9 @@ document.querySelectorAll('.user-table button').forEach(btn => {
             { title: tr('重設 2FA'), okText: tr('重設') }))) return;
       const r = await fetch(`/admin/users/${uid}/reset-totp`, {method:'POST'});
       if (r.ok) {
-        showAlert('OK：使用者下次登入會重新看到 QR');
+        showAlert(tr('OK：使用者下次登入會重新看到 QR'));
       } else {
-        showAlert('失敗：' + await r.text());
+        showAlert(tr('失敗：') + await r.text());
       }
     }
   });

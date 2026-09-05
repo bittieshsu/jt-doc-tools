@@ -73,35 +73,35 @@ const fu = new FileUpload($('mdUp'), async (f) => {
   $('mdInfo').hidden = true;
   if (!f) return;
   const fd = new FormData(); fd.append('file', f);
-  const r = await fu.upload('/tools/pdf-metadata/analyze', fd, {processingLabel: '分析 metadata 中…'});
+  const r = await fu.upload('/tools/pdf-metadata/analyze', fd, {processingLabel: tr('分析 metadata 中…')});
   if (!r.ok) { $('mdInfo').hidden = false; $('mdInfo').textContent = tr('分析失敗：') + await window.friendlyServerError(r, tr('分析失敗')); return; }
   const d = await r.json();
   uploadId = d.upload_id;
   const m = d.metadata || {};
   const rows = [
-    ['標題',     m.title],
-    ['作者',     m.author],
-    ['主題',     m.subject],
-    ['關鍵字',   m.keywords],
-    ['建立軟體', m.creator],
-    ['產生軟體', m.producer],
-    ['建立時間', m.creationDate],
-    ['修改時間', m.modDate],
+    [tr('標題'),     m.title],
+    [tr('作者'),     m.author],
+    [tr('主題'),     m.subject],
+    [tr('關鍵字'),   m.keywords],
+    [tr('建立軟體'), m.creator],
+    [tr('產生軟體'), m.producer],
+    [tr('建立時間'), m.creationDate],
+    [tr('修改時間'), m.modDate],
   ];
   let html = '<dl>';
   for (const [k, v] of rows) {
     html += `<dt>${k}</dt><dd>${v ? escapeHTML(String(v)) : '<span class="muted">' + tr('(空)') + '</span>'}</dd>`;
   }
-  html += `<dt>檔案大小</dt><dd>${fmt(d.size)}</dd>`;
-  html += `<dt>頁數</dt><dd>${d.page_count}</dd>`;
-  html += `<dt>書籤 / 目錄</dt><dd>${d.has_toc ? '有' : '無'}</dd>`;
-  html += `<dt>註解</dt><dd>${d.annot_count} 個</dd>`;
-  html += `<dt>表單欄位</dt><dd>${d.form_field_count} 個</dd>`;
-  html += `<dt>嵌入檔案</dt><dd>${d.attach_count} 個</dd>`;
+  html += `<dt>${tr('檔案大小')}</dt><dd>${fmt(d.size)}</dd>`;
+  html += `<dt>${tr('頁數')}</dt><dd>${d.page_count}</dd>`;
+  html += `<dt>${tr('書籤 / 目錄')}</dt><dd>${d.has_toc ? '有' : '無'}</dd>`;
+  html += `<dt>${tr('註解')}</dt><dd>${d.annot_count} 個</dd>`;
+  html += `<dt>${tr('表單欄位')}</dt><dd>${d.form_field_count} 個</dd>`;
+  html += `<dt>${tr('嵌入檔案')}</dt><dd>${d.attach_count} 個</dd>`;
   html += `<dt>XMP</dt><dd>${d.xmp_present ? '<span class="warn">' + tr('有（含修訂歷史等）') + '</span>' : '無'}</dd>`;
   html += '</dl>';
   if (d.xmp_preview) {
-    html += `<div class="muted" data-s="sd27759c9">XMP 前 800 字元預覽：</div>`;
+    html += `<div class="muted" data-s="sd27759c9">${tr('XMP 前 800 字元預覽：')}</div>`;
     html += `<div class="md-xmp">${escapeHTML(d.xmp_preview)}</div>`;
   }
   $('mdInfo').innerHTML = html;

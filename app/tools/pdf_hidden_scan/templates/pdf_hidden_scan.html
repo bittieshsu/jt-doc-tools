@@ -64,26 +64,26 @@ let lastFindings = null;
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 const CATS = [
-  { key:'js',          strip:'js',          title:'JavaScript 動作',        severity:'alert',
-    desc:'PDF 開檔自動執行或使用者互動時觸發的 JS。多半不是正常需求，建議清除。',
+  { key:'js',          strip:'js',          title:tr('JavaScript 動作'),        severity:'alert',
+    desc:tr('PDF 開檔自動執行或使用者互動時觸發的 JS。多半不是正常需求，建議清除。'),
     list:(f)=>f.js_events.map(x=>`[${x.scope}] ${x.kind} — ${esc(x.detail)}`) },
-  { key:'embeds',      strip:'embeds',      title:'嵌入檔案 (EmbeddedFiles)', severity:'alert',
-    desc:'PDF 可以藏任何檔案（.exe / .js / 另一份 PDF）。外送前應清除或改用「附件萃取」手動取出審查。',
+  { key:'embeds',      strip:'embeds',      title:tr('嵌入檔案 (EmbeddedFiles)'), severity:'alert',
+    desc:tr('PDF 可以藏任何檔案（.exe / .js / 另一份 PDF）。外送前應清除或改用「附件萃取」手動取出審查。'),
     list:(f)=>f.embeds.map(x=>`📎 ${esc(x.name)} ${x.size?`(${x.size} bytes)`:''}`) },
-  { key:'uri',         strip:'uri',         title:'外部連結 (URI)',          severity:'warn',
-    desc:'可連結到外部網站。若敏感文件，建議視情況清除。',
+  { key:'uri',         strip:'uri',         title:tr('外部連結 (URI)'),          severity:'warn',
+    desc:tr('可連結到外部網站。若敏感文件，建議視情況清除。'),
     list:(f)=>f.uri_links.map(x=>`p.${x.page} → ${esc(x.uri)}`) },
-  { key:'launch',      strip:'launch',      title:'啟動外部程式 (Launch)',   severity:'alert',
-    desc:'點選會啟動外部檔案或程式。幾乎都是可疑內容，請清除。',
+  { key:'launch',      strip:'launch',      title:tr('啟動外部程式 (Launch)'),   severity:'alert',
+    desc:tr('點選會啟動外部檔案或程式。幾乎都是可疑內容，請清除。'),
     list:(f)=>f.launch_actions.map(x=>`p.${x.page} → ${esc(x.target)}`) },
-  { key:'hidden_text', strip:'hidden_text', title:'隱藏文字',                severity:'warn',
-    desc:'白底白字 / 字級 0 / 頁面外文字 — 通常是沒清乾淨的草稿，可能夾帶敏感資料。',
+  { key:'hidden_text', strip:'hidden_text', title:tr('隱藏文字'),                severity:'warn',
+    desc:tr('白底白字 / 字級 0 / 頁面外文字 — 通常是沒清乾淨的草稿，可能夾帶敏感資料。'),
     list:(f)=>f.hidden_text.map(x=>`p.${x.page} [${x.reason}] ${esc(x.text)}`) },
-  { key:'annots',      strip:'annots',      title:'註解 / 標記',             severity:'warn',
-    desc:'內含作者姓名、修改記錄；外送前常要清掉。',
+  { key:'annots',      strip:'annots',      title:tr('註解 / 標記'),             severity:'warn',
+    desc:tr('內含作者姓名、修改記錄；外送前常要清掉。'),
     list:(f)=>f.annot_details.map(x=>`p.${x.page} · ${x.type} ${x.author?`(${esc(x.author)})`:''} ${x.content?'— '+esc(x.content):''}`) },
-  { key:'3d',          strip:'3d',          title:'3D / 多媒體',             severity:'warn',
-    desc:'3D 物件、影片、RichMedia — 通常不必要，且增加檔案大小與攻擊面。',
+  { key:'3d',          strip:'3d',          title:tr('3D / 多媒體'),             severity:'warn',
+    desc:tr('3D 物件、影片、RichMedia — 通常不必要，且增加檔案大小與攻擊面。'),
     list:(f)=>f.threed_multi.map(x=>`p.${x.page}`) },
 ];
 
@@ -93,7 +93,7 @@ const fu = new FileUpload($('hsUp'), async (f) => {
   $('resultPanel').hidden = false;
   $('hsCats').innerHTML = '<div class="muted">' + tr('掃描中…') + '</div>';
   const fd = new FormData(); fd.append('file', f);
-  const r = await fu.upload('/tools/pdf-hidden-scan/scan', fd, {processingLabel: '掃描隱藏內容中…'});
+  const r = await fu.upload('/tools/pdf-hidden-scan/scan', fd, {processingLabel: tr('掃描隱藏內容中…')});
   if (!r.ok) { $('hsCats').textContent = tr('失敗：') + await window.friendlyServerError(r, tr('掃描失敗')); return; }
   const d = await r.json();
   uploadId = d.upload_id;

@@ -97,7 +97,7 @@ document.getElementById('sweepNowBtn').addEventListener('click', async () => {
     showToast(`清理完成：${JSON.stringify(j.report)}`, 'ok');
     setTimeout(() => location.reload(), 1500);
   } else {
-    showAlert('失敗：' + await r.text());
+    showAlert(tr('失敗：') + await r.text());
   }
 });
 </script>

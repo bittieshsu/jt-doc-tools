@@ -74,7 +74,7 @@ const $ = (id) => document.getElementById(id);
 async function startEnroll() {
   const r = await fetch('/me/2fa/start', {method: 'POST'});
   const j = await r.json();
-  if (!r.ok) { alert('啟用失敗：' + (j.detail || r.status)); return; }
+  if (!r.ok) { alert(tr('啟用失敗：') + (j.detail || r.status)); return; }
   $('qrImg').src = j.qr_url;
   $('secretText').textContent = j.secret;
   $('setupBox').hidden = false;
@@ -100,28 +100,28 @@ if (vb) vb.addEventListener('click', async () => {
     });
     const j = await r.json();
     if (r.ok) {
-      $('verifyMsg').textContent = '✓ ' + (j.detail || '已啟用') + '，重新整理頁面…';
+      $('verifyMsg').textContent = '✓ ' + (j.detail || tr('已啟用')) + tr('，重新整理頁面…');
       setTimeout(() => location.reload(), 800);
     } else {
-      $('verifyMsg').textContent = j.detail || '驗證失敗';
+      $('verifyMsg').textContent = j.detail || tr('驗證失敗');
       vb.disabled = false;
     }
   } catch (e) {
-    $('verifyMsg').textContent = '錯誤：' + e.message;
+    $('verifyMsg').textContent = tr('錯誤：') + e.message;
     vb.disabled = false;
   }
 });
 
 const db = $('btnDisable');
 if (db) db.addEventListener('click', async () => {
-  if (!(await window.showConfirm('確定要停用 TOTP 嗎？您的帳號將回到只用密碼登入。', { title: tr('停用 2FA'), kind: 'danger', okText: tr('停用') }))) return;
+  if (!(await window.showConfirm(tr('確定要停用 TOTP 嗎？您的帳號將回到只用密碼登入。'), { title: tr('停用 2FA'), kind: 'danger', okText: tr('停用') }))) return;
   db.disabled = true;
   try {
     const r = await fetch('/me/2fa/disable', {method: 'POST'});
     const j = await r.json();
     if (r.ok) location.reload();
-    else { alert(j.detail || '停用失敗'); db.disabled = false; }
-  } catch (e) { alert('錯誤：' + e.message); db.disabled = false; }
+    else { alert(j.detail || tr('停用失敗')); db.disabled = false; }
+  } catch (e) { alert(tr('錯誤：') + e.message); db.disabled = false; }
 });
 </script>
 {% endblock %}

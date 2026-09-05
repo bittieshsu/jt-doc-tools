@@ -39,7 +39,7 @@
         <div class="wm-asset-thumb"><img src="/assets/{{ s.id }}/thumb" /></div>
         <div class="wm-asset-meta">
           <span class="wm-asset-name">{{ s.name }}</span>
-          <span class="type-chip type-{{ s.type }}">{{ {'stamp':'印章','signature':'簽名','logo':'Logo','watermark':'浮水印'}[s.type] or s.type }}</span>
+          <span class="type-chip type-{{ s.type }}">{{ tr({'stamp':'印章','signature':'簽名','logo':'Logo','watermark':'浮水印'}[s.type] or s.type) }}</span>
         </div>
       </label>
       {% endfor %}
@@ -332,7 +332,7 @@ async function loadPreviewInfo(){
   const f = firstFile(); if (!f) return null;
   const fd = new FormData(); fd.append('file', f);
   try {
-    const r = await fu.upload('/tools/pdf-watermark/preview', fd, {processingLabel: '產生預覽中…'});
+    const r = await fu.upload('/tools/pdf-watermark/preview', fd, {processingLabel: tr('產生預覽中…')});
     if (!r.ok) { console.warn('preview failed', r.status); return null; }
     previewInfo = await r.json();
     if (editor) {
@@ -508,7 +508,7 @@ function refreshSim(){
     fd.append('params', JSON.stringify(buildParams()));
     fd.append('page', simPage);
     try {
-      const r = await fu.upload('/tools/pdf-watermark/preview-watermarked', fd, {processingLabel: '產生預覽中…'});
+      const r = await fu.upload('/tools/pdf-watermark/preview-watermarked', fd, {processingLabel: tr('產生預覽中…')});
       if (seq !== simSeq) return;
       if (!r.ok) { status.textContent = tr('預覽產生失敗'); return; }
       const j = await r.json();
@@ -578,7 +578,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     }
     cfd.append('params', JSON.stringify(buildParams()));
     cfd.append('page_mode', document.getElementById('page-mode').value);
-    setBtn('建立批次中…');
+    setBtn(tr('建立批次中…'));
     let cr;
     try { cr = await fetch('/tools/pdf-watermark/batch/create', { method: 'POST', body: cfd }); }
     catch (e) { alert(tr('建立批次失敗（連線中斷），請稍後再試。')); return; }
@@ -606,7 +606,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     }
 
     // 3) 觸發處理
-    setBtn('排隊處理中…');
+    setBtn(tr('排隊處理中…'));
     const pr = await fetch(`/tools/pdf-watermark/batch/${batchId}/process`, { method: 'POST' });
     if (!pr.ok) { alert(tr('處理失敗：') + (await pr.text().catch(() => 'HTTP ' + pr.status))); return; }
     progress.track((await pr.json()).job_id);
@@ -655,7 +655,7 @@ function _wmTempRender() {
   }
   slot.style.display = 'block';  // 明確值：蓋過 data-s 的 display:none 規則（空字串蓋不過）
   document.getElementById('wmTempAssetThumb').src = t.dataUrl;
-  document.getElementById('wmTempAssetName').textContent = t.filename || '臨時資產';
+  document.getElementById('wmTempAssetName').textContent = t.filename || tr('臨時資產');
 }
 function _wmTempSet(t) {
   window._wmTempAsset = t;

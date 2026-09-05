@@ -190,7 +190,7 @@ function _refreshDropZoneLabel() {
     const hint = document.createElement('span');
     hint.className = 'fnt-drop-hint'; hint.textContent = tr('.ttf / .otf / .ttc，可多選');
     text.appendChild(b);
-    text.appendChild(document.createTextNode('或拖曳字型檔到此'));
+    text.appendChild(document.createTextNode(tr('或拖曳字型檔到此')));
     text.appendChild(hint);
     return;
   }
@@ -249,7 +249,7 @@ document.querySelectorAll('.toggle-hidden-font').forEach(btn => {
       location.reload();
     } else {
       btn.disabled = false;
-      showAlert('切換失敗：' + await r.text());
+      showAlert(tr('切換失敗：') + await r.text());
     }
   });
 });
@@ -260,7 +260,7 @@ async function _bulkSetHidden(btn, hidden) {
   try { ids = JSON.parse(btn.dataset.ids || '[]'); } catch (_e) {}
   if (!ids.length) return;
   btn.disabled = true;
-  const verb = hidden ? '隱藏' : '顯示';
+  const verb = hidden ? '隱藏' : tr('顯示');
   if (!(await showConfirm(tr('確定要把這個分類的 {0} 個字型全部設為「{1}」？').replace('{0}', ids.length).replace('{1}', verb),
         { title: `全部${verb}`, kind: hidden ? 'danger' : 'primary', okText: `全部${verb}` }))) {
     btn.disabled = false; return;
@@ -271,8 +271,8 @@ async function _bulkSetHidden(btn, hidden) {
       body: JSON.stringify({ids, hidden}),
     });
     if (r.ok) { location.reload(); }
-    else { btn.disabled = false; showAlert('操作失敗：' + await r.text()); }
-  } catch (e) { btn.disabled = false; showAlert('網路錯誤：' + e.message); }
+    else { btn.disabled = false; showAlert(tr('操作失敗：') + await r.text()); }
+  } catch (e) { btn.disabled = false; showAlert(tr('網路錯誤：') + e.message); }
 }
 document.querySelectorAll('.fnt-bulk-show').forEach(b =>
   b.addEventListener('click', () => _bulkSetHidden(b, false)));
@@ -287,14 +287,14 @@ document.querySelectorAll('.rename-custom-font').forEach(btn => {
     // 用本系統的對話框，不要瀏覽器原生的 —— 原生那個會頂著網域名
     // （「doc.jason.tools 顯示」），樣式也跟全站不一致。
     const name = await showPrompt(
-      '這個字型在工具裡要顯示什麼名稱？'
-      + '（PDF 編輯器、用印、浮水印的字型選單都會用這個名稱）',
+      tr('這個字型在工具裡要顯示什麼名稱？')
+      + tr('（PDF 編輯器、用印、浮水印的字型選單都會用這個名稱）'),
       {
-        title: '變更名稱',
+        title: tr('變更名稱'),
         okText: tr('儲存'),
         defaultValue: cur,
-        placeholder: auto ? '留空 = 用字型檔內建的名稱「' + auto + '」'
-                          : '留空 = 用檔名',
+        placeholder: auto ? tr('留空 = 用字型檔內建的名稱「') + auto + '」'
+                          : tr('留空 = 用檔名'),
       });
     if (name === null) return;          // 按取消
     const r = await fetch('/admin/fonts/rename', {
@@ -302,7 +302,7 @@ document.querySelectorAll('.rename-custom-font').forEach(btn => {
       body: JSON.stringify({ id: id, name: name }),
     });
     if (r.ok) location.reload();
-    else showAlert('變更名稱失敗：' + await window.friendlyServerError(r, tr('變更名稱失敗')));
+    else showAlert(tr('變更名稱失敗：') + await window.friendlyServerError(r, tr('變更名稱失敗')));
   });
 });
 
@@ -315,7 +315,7 @@ document.querySelectorAll('.del-custom-font').forEach(btn => {
       body: JSON.stringify({id}),
     });
     if (r.ok) location.reload();
-    else showAlert('刪除失敗：' + await r.text());
+    else showAlert(tr('刪除失敗：') + await r.text());
   });
 });
 </script>

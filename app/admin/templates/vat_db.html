@@ -388,17 +388,17 @@ function renderCategoryStats(cats) {
   let total = 0;
   for (const c of cats) total += (c.count || 0);
   for (const c of cats) {
-    rows.appendChild(_mkCell('vd-bd-label', '類別'));
+    rows.appendChild(_mkCell('vd-bd-label', tr('類別')));
     rows.appendChild(_mkCell('vd-bd-name', c.category));
-    rows.appendChild(_mkCell('vd-bd-count', (c.count || 0).toLocaleString('en-US') + ' 筆'));
+    rows.appendChild(_mkCell('vd-bd-count', (c.count || 0).toLocaleString('en-US') + tr(' 筆')));
     const pct = total > 0 ? (c.count / total * 100).toFixed(1) + '%' : '';
     rows.appendChild(_mkCell('vd-bd-pct', pct));
   }
   // 總計列（4 個 cell，含分隔線樣式）
-  rows.appendChild(_mkCell('vd-bd-label vd-bd-total-label', '總計'));
-  rows.appendChild(_mkCell('vd-bd-name vd-bd-total-label', '所有類別合計'));
+  rows.appendChild(_mkCell('vd-bd-label vd-bd-total-label', tr('總計')));
+  rows.appendChild(_mkCell('vd-bd-name vd-bd-total-label', tr('所有類別合計')));
   rows.appendChild(_mkCell('vd-bd-count vd-bd-total-count',
-    total.toLocaleString('en-US') + ' 筆'));
+    total.toLocaleString('en-US') + tr(' 筆')));
   rows.appendChild(_mkCell('vd-bd-pct vd-bd-total-pct', '100%'));
 }
 
@@ -417,24 +417,24 @@ function renderBreakdown(lr) {
     rows.appendChild(_mkCell('vd-bd-name', name));
     if (errMsg) {
       // 失敗訊息跨 count + pct 兩欄
-      rows.appendChild(_mkCell('vd-bd-count err', '失敗：' + errMsg));
+      rows.appendChild(_mkCell('vd-bd-count err', tr('失敗：') + errMsg));
     } else {
       const n = (count || 0).toLocaleString('en-US');
       rows.appendChild(_mkCell('vd-bd-count',
-        isMain ? ('匯入 ' + n + ' 筆') : ('+' + n + ' 筆')));
-      rows.appendChild(_mkCell('vd-bd-pct', isMain ? '全量' : '新增'));
+        isMain ? (tr('匯入 ') + n + tr(' 筆')) : ('+' + n + tr(' 筆'))));
+      rows.appendChild(_mkCell('vd-bd-pct', isMain ? '全量' : tr('新增')));
     }
   };
 
-  addRow('主檔', lr.main_source_name || '(未知來源)', lr.main_records, null, true);
+  addRow(tr('主檔'), lr.main_source_name || tr('(未知來源)'), lr.main_records, null, true);
   for (const s of (lr.supplements || [])) {
-    addRow('補充', s.name, s.added, s.error, false);
+    addRow(tr('補充'), s.name, s.added, s.error, false);
   }
   // 總計列
-  rows.appendChild(_mkCell('vd-bd-label vd-bd-total-label', '總計'));
-  rows.appendChild(_mkCell('vd-bd-name vd-bd-total-label', '資料庫合併後 (去重)'));
+  rows.appendChild(_mkCell('vd-bd-label vd-bd-total-label', tr('總計')));
+  rows.appendChild(_mkCell('vd-bd-name vd-bd-total-label', tr('資料庫合併後 (去重)')));
   rows.appendChild(_mkCell('vd-bd-count vd-bd-total-count',
-    (lr.records || 0).toLocaleString('en-US') + ' 筆'));
+    (lr.records || 0).toLocaleString('en-US') + tr(' 筆')));
   rows.appendChild(_mkCell('vd-bd-pct vd-bd-total-pct', ''));
 }
 
@@ -449,7 +449,7 @@ async function refreshInfo() {
     renderBreakdown(j.meta.last_result);
     renderCategoryStats(j.categories);
   } catch (e) {
-    setStatus('讀取資訊失敗：' + e.message, 'err');
+    setStatus(tr('讀取資訊失敗：') + e.message, 'err');
   }
 }
 
@@ -463,7 +463,7 @@ renderCategoryStats({{ categories | tojson }});
 {% endif %}
 
 // ===== Schedule (weekly auto-update) =====
-const WEEKDAY_LABEL = ['週一','週二','週三','週四','週五','週六','週日'];
+const WEEKDAY_LABEL = [tr('週一'),tr('週二'),tr('週三'),tr('週四'),tr('週五'),tr('週六'),tr('週日')];
 
 function _renderScheduleLast(sch) {
   const el = $('schLast');
@@ -473,14 +473,14 @@ function _renderScheduleLast(sch) {
   }
   el.style.display = 'block';  // CSS [data-s] 隱藏須用具體值覆寫（非 ''）
   let cls = '';
-  let text = `上次排程運行：${_fmtTimestamp(sch.last_run_at)}`;
+  let text = tr('上次排程運行：') + _fmtTimestamp(sch.last_run_at);
   if (sch.last_run_status === 'ok') {
-    cls = 'ok'; text += ' — 成功';
+    cls = 'ok'; text += ' — ' + tr('成功');
   } else if (sch.last_run_status === 'running') {
-    cls = 'running'; text += ' — 進行中…';
+    cls = 'running'; text += ' — ' + tr('進行中…');
   } else if (sch.last_run_status === 'error') {
     cls = 'err';
-    text += ' — 失敗：' + (sch.last_run_error || '(unknown)');
+    text += ' — ' + tr('失敗：') + (sch.last_run_error || '(unknown)');
   } else {
     text += ' — ' + (sch.last_run_status || '');
   }
@@ -519,11 +519,11 @@ $('btnSchSave').addEventListener('click', async () => {
     if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
     const tag = j.enabled
       ? `每${WEEKDAY_LABEL[j.weekday]} ${String(j.hour).padStart(2,'0')}:00 自動更新`
-      : '排程已關閉';
-    setStatus('✓ 設定已儲存：' + tag, 'ok');
+      : tr('排程已關閉');
+    setStatus(tr('✓ 設定已儲存：') + tag, 'ok');
     _renderScheduleLast(j);
   } catch (e) {
-    setStatus('儲存排程失敗：' + e.message, 'err');
+    setStatus(tr('儲存排程失敗：') + e.message, 'err');
   } finally {
     btn.disabled = false;
   }
@@ -577,13 +577,13 @@ function _setCooldown(ms) {
 
 // ===== Progress bar polling =====
 const STAGE_TEXT = {
-  starting: '準備中',
-  downloading_main: '下載主檔',
-  parsing_main: '解析 + 寫入主檔',
-  downloading_supplement: '下載補充來源',
-  parsing_supplement: '寫入補充來源',
-  done: '完成',
-  error: '失敗',
+  starting: tr('準備中'),
+  downloading_main: tr('下載主檔'),
+  parsing_main: tr('解析 + 寫入主檔'),
+  downloading_supplement: tr('下載補充來源'),
+  parsing_supplement: tr('寫入補充來源'),
+  done: tr('完成'),
+  error: tr('失敗'),
 };
 
 function _fmtBytes(n) {
@@ -663,19 +663,19 @@ function _finalizeDownload(j) {
     const okSupp = supp.filter(s => !s.error);
     const failSupp = supp.filter(s => s.error);
     if (okSupp.length) {
-      msg += '\n補充來源：' + okSupp.map(s =>
+      msg += tr('\n補充來源：') + okSupp.map(s =>
         `${s.name} +${(s.added || 0).toLocaleString('en-US')}`
       ).join(' / ');
     }
     if (failSupp.length) {
-      msg += '\n補充失敗：' + failSupp.map(s => `${s.name} (${s.error})`).join(' / ');
+      msg += tr('\n補充失敗：') + failSupp.map(s => `${s.name} (${s.error})`).join(' / ');
     }
     msg += `\n總計 ${(j.records || 0).toLocaleString('en-US')} 筆`;
     setStatus(msg, 'ok');
     refreshInfo();
     _setCooldown(COOLDOWN_OK_MS);
   } else {
-    setStatus('自動下載失敗：' + (j.error || '未知錯誤') + '\n建議改用下方手動上傳。', 'err');
+    setStatus(tr('自動下載失敗：') + (j.error || tr('未知錯誤')) + tr('\n建議改用下方手動上傳。'), 'err');
     _setCooldown(COOLDOWN_ERR_MS);
   }
   _stopProgressPolling();
@@ -684,7 +684,7 @@ function _finalizeDownload(j) {
 _btnAutoDl.addEventListener('click', async () => {
   if (_autoDlInFlight || _btnAutoDl.disabled) return;
   const ok = await window.showConfirm(
-    '將從備援 URL 下載最新統編資料（可能 5 - 30 分鐘）。\n\n注意：開始下載後 5 分鐘內無法再次觸發。下載期間在背景跑，不影響此頁其他操作。',
+    tr('將從備援 URL 下載最新統編資料（可能 5 - 30 分鐘）。\n\n注意：開始下載後 5 分鐘內無法再次觸發。下載期間在背景跑，不影響此頁其他操作。'),
     { title: tr('自動下載'), okText: tr('開始下載') }
   );
   if (!ok) return;
@@ -692,7 +692,7 @@ _btnAutoDl.addEventListener('click', async () => {
   _autoDlInFlight = true;
   _btnAutoDl.disabled = true;
   _btnAutoDl.innerHTML = '<span class="vd-spinner sm"></span> 下載中…';
-  setStatus('下載中…在背景進行，本頁仍可操作；視資料量約 5 - 30 分鐘', 'busy');
+  setStatus(tr('下載中…在背景進行，本頁仍可操作；視資料量約 5 - 30 分鐘'), 'busy');
   // 立刻顯示 progress wrap，不等首次 poll
   const wrap = $('progressWrap');
   const bar = $('progressBar');
@@ -711,7 +711,7 @@ _btnAutoDl.addEventListener('click', async () => {
     }
   } catch (e) {
     _autoDlInFlight = false;
-    setStatus('啟動下載失敗：' + e.message, 'err');
+    setStatus(tr('啟動下載失敗：') + e.message, 'err');
     _setCooldown(COOLDOWN_ERR_MS);
     _stopProgressPolling();
   }
@@ -725,7 +725,7 @@ _btnAutoDl.addEventListener('click', async () => {
                   'downloading_supplement', 'parsing_supplement', 'starting'];
     if (live.includes(j.stage)) {
       _autoDlInFlight = true;
-      setStatus('偵測到資料更新進行中（下載或匯入，可能由其他 admin 觸發）…', 'busy');
+      setStatus(tr('偵測到資料更新進行中（下載或匯入，可能由其他 admin 觸發）…'), 'busy');
       $('progressWrap').style.display = 'block';
       _startProgressPolling();
     }
@@ -736,7 +736,7 @@ $('fileInput').addEventListener('change', async e => {
   const f = e.target.files && e.target.files[0];
   if (!f) return;
   e.target.value = '';
-  if (_autoDlInFlight) { setStatus('已有背景工作進行中，請稍候。', 'busy'); return; }
+  if (_autoDlInFlight) { setStatus(tr('已有背景工作進行中，請稍候。'), 'busy'); return; }
   const fd = new FormData();
   fd.append('file', f);
   // 背景匯入：上傳後立刻 return，由進度輪詢處理解析 + 建索引（網頁不卡住）
@@ -752,12 +752,12 @@ $('fileInput').addEventListener('change', async e => {
     const j = await r.json();
     if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
     if (!j.started && j.status === 'already_running') {
-      setStatus('已有背景工作進行中，沿用其進度。', 'busy');
+      setStatus(tr('已有背景工作進行中，沿用其進度。'), 'busy');
     }
     // started → 背景 thread 在跑，後續由 polling + _finalizeDownload 處理
   } catch (err) {
     _autoDlInFlight = false;
-    setStatus('上傳失敗：' + err.message, 'err');
+    setStatus(tr('上傳失敗：') + err.message, 'err');
     _stopProgressPolling();
   }
 });
@@ -765,7 +765,7 @@ $('fileInput').addEventListener('change', async e => {
 $('btnTest').addEventListener('click', async () => {
   const vat = $('testVat').value.trim();
   if (!/^\d{8}$/.test(vat)) {
-    await window.showAlert('請輸入 8 位數字統編', { title: '格式錯誤' });
+    await window.showAlert(tr('請輸入 8 位數字統編'), { title: tr('格式錯誤') });
     return;
   }
   const result = $('testResult');
@@ -797,10 +797,10 @@ $('btnClear').addEventListener('click', async () => {
   try {
     const r = await fetch('/admin/vat-db/clear', { method: 'POST' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    setStatus('✓ 已清空', 'ok');
+    setStatus(tr('✓ 已清空'), 'ok');
     refreshInfo();
   } catch (e) {
-    setStatus('清空失敗：' + e.message, 'err');
+    setStatus(tr('清空失敗：') + e.message, 'err');
   }
 });
 

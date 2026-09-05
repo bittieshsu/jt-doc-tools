@@ -171,7 +171,7 @@
       <span class="td-drop-text"><b>{{ tr('點此挑選') }}</b>{{ tr('或拖曳檔案到此') }}
         <span class="hint">.txt / .md / .docx / .odt / .pdf …</span></span>
     </label>
-    {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span>{{ tr('從工作區載入 PDF') }}</span></button></div>{% endif %}
+    {% if workspace_enabled(request) %}<div class="fu-ws-row"><button type="button" class="ws-load-btn" id="wsLoadBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg><span>{{ tr('從工作區載入 PDF') }}</span></button></div>{% endif %}
     <textarea id="srcText" placeholder="{{ tr('把要處理的文字貼上來，或從上方上傳檔案…') }}"></textarea>
     <div class="td-help"><span id="srcCount">0</span> {{ tr('字') }}</div>
   </div>
@@ -350,7 +350,7 @@ async function handleUploadedFile(f) {
   if (!f) return;
   const ext = (f.name || '').toLowerCase().split('.').pop();
   const officeExts = ['docx', 'doc', 'odt', 'ods', 'odp', 'rtf'];
-  let parseLabel = '解析中…';
+  let parseLabel = tr('解析中…');
   if (officeExts.includes(ext)) parseLabel = `${ENGINE} 解析中…`;
   else if (ext === 'pdf') parseLabel = 'PyMuPDF 解析中…';
   const dropText = dropZone.querySelector('.td-drop-text');
@@ -363,7 +363,7 @@ async function handleUploadedFile(f) {
     const r = await fetch('/tools/text-deident/extract-text', {method:'POST', body: fd});
     if (!r.ok) {
       const t = await r.text();
-      showErr('解析失敗：' + t);
+      showErr(tr('解析失敗：') + t);
       dropZone.classList.remove('has-file');
       dropText.innerHTML = orig;
       return;
@@ -374,7 +374,7 @@ async function handleUploadedFile(f) {
     lastFilename = (j.filename || 'text_deident').replace(/\.[^.]+$/, '') + '_deident.txt';
     dropText.innerHTML = `<b>${escapeHTML(j.filename || f.name)}</b> <span class="hint">已載入 ${(j.char_count || 0).toLocaleString()} 字</span>`;
   } catch (err) {
-    showErr('上傳失敗：' + err.message);
+    showErr(tr('上傳失敗：') + err.message);
     dropZone.classList.remove('has-file');
     dropText.innerHTML = orig;
   } finally {
@@ -434,7 +434,7 @@ function selectedTypes() {
 
 $('btnDetect').addEventListener('click', async () => {
   clearErr();
-  if (!srcEl.value.trim()) { showErr('請貼上或上傳要處理的文字'); return; }
+  if (!srcEl.value.trim()) { showErr(tr('請貼上或上傳要處理的文字')); return; }
   $('btnDetect').disabled = true;
   $('btnDetect').innerHTML = '<span class="spinner"></span>偵測中…';
   try {
@@ -450,7 +450,7 @@ $('btnDetect').addEventListener('click', async () => {
       }),
     });
     if (!r.ok) {
-      showErr('偵測失敗：' + await r.text());
+      showErr(tr('偵測失敗：') + await r.text());
       return;
     }
     const j = await r.json();
@@ -472,7 +472,7 @@ $('btnDetect').addEventListener('click', async () => {
       $('btnApply').click();
     }
   } catch (e) {
-    showErr('偵測失敗：' + e.message);
+    showErr(tr('偵測失敗：') + e.message);
   } finally {
     $('btnDetect').disabled = false;
     $('btnDetect').innerHTML = '{{ icon("search", size=14) }} ' + tr('重新偵測');
@@ -504,7 +504,7 @@ function previewReplacement(f, mode) {
   if (mode === 'redact') return '█'.repeat(Math.max(1, f.end - f.start));
   if (mode === 'mask')   return f.masked || ('*'.repeat(Math.max(1, f.end - f.start)));
   // fake — show "(隨機產生)" placeholder; real value generated server-side on apply
-  return '(套用後產生)';
+  return tr('(套用後產生)');
 }
 
 // ---- apply ----
@@ -516,7 +516,7 @@ $('btnApply').addEventListener('click', async () => {
          .map(c => c.dataset.findingId)
   );
   const selections = lastFindings.filter(f => enabledIds.has(f.id));
-  if (!selections.length) { showErr('沒有勾選任何項目'); return; }
+  if (!selections.length) { showErr(tr('沒有勾選任何項目')); return; }
   $('btnApply').disabled = true;
   $('btnApply').innerHTML = '<span class="spinner"></span>套用中…';
   try {
@@ -529,7 +529,7 @@ $('btnApply').addEventListener('click', async () => {
       }),
     });
     if (!r.ok) {
-      showErr('套用失敗：' + await r.text());
+      showErr(tr('套用失敗：') + await r.text());
       return;
     }
     const j = await r.json();
@@ -544,7 +544,7 @@ $('btnApply').addEventListener('click', async () => {
     // were applied. Server already substituted; we don't have per-finding
     // replacement strings back, so leave preview as "(套用後產生)".
   } catch (e) {
-    showErr('套用失敗：' + e.message);
+    showErr(tr('套用失敗：') + e.message);
   } finally {
     $('btnApply').disabled = false;
     $('btnApply').innerHTML = '{{ icon("shield", size=14) }} ' + tr('套用至全部');
@@ -580,7 +580,7 @@ $('btnCopy').addEventListener('click', async () => {
     if (typeof showToast === 'function') showToast(tr('已複製處理後的文字'), 'ok');
     else $('btnCopy').textContent = tr('已複製');
   } catch (e) {
-    showErr('複製失敗：' + e.message);
+    showErr(tr('複製失敗：') + e.message);
   }
 });
 </script>

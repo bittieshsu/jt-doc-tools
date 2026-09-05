@@ -131,7 +131,7 @@
       return;
     }
     btnRun.disabled = false;
-    statusEl.textContent = files.length + ' 個檔案，按「開始檢核」上傳並掃描';
+    statusEl.textContent = files.length + tr(' 個檔案，按「開始檢核」上傳並掃描');
     files.forEach((f, i) => {
       const li = document.createElement('li');
       const sz = (f.size / 1024).toFixed(1) + ' KB';
@@ -187,13 +187,13 @@
     if (tn('deadline')) fd.append('deadline', tn('deadline'));
     try {
       const up = await fetch('upload', { method: 'POST', body: fd });
-      if (!up.ok) throw new Error('上傳失敗：' + (await up.text()));
+      if (!up.ok) throw new Error(tr('上傳失敗：') + (await up.text()));
       const upJ = await up.json();
       const caseId = upJ.case_id;
       progressInner.style.width = '30%';
       statusEl.textContent = tr('上傳完成，開始檢核…');
       const run = await fetch('run/' + caseId, { method: 'POST' });
-      if (!run.ok) throw new Error('觸發檢核失敗：' + (await run.text()));
+      if (!run.ok) throw new Error(tr('觸發檢核失敗：') + (await run.text()));
       const runJ = await run.json();
       progressInner.style.width = '50%';
       statusEl.textContent = tr('背景檢核中（可關閉視窗稍後從案件清單回看）…');
@@ -218,7 +218,7 @@
         // 使用者看到的是「檢核超時」這種會誤導人的訊息。
         if (jj.status === 'interrupted') throw new Error('服務已重新啟動，這個作業被中斷，請重新送出');
       }
-      throw new Error('檢核超時');
+      throw new Error(tr('檢核超時'));
     } catch (e) {
       statusEl.textContent = tr('失敗：') + e.message;
       progressBar.style.display = 'none';

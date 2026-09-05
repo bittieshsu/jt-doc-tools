@@ -224,10 +224,10 @@
     const wsNote = document.getElementById('mj-ws-note');
     if (data.workspace_enabled === false && jobs.length) {
       wsNote.hidden = false;
-      wsNote.textContent = '「我的工作區」目前未啟用，因此完成的結果不會自動儲存。'
+      wsNote.textContent = tr('「我的工作區」目前未啟用，因此完成的結果不會自動儲存。')
         + (data.result_ttl_hours
-           ? `結果檔會在 ${data.result_ttl_hours} 小時後自動清除，請及時下載。`
-           : '請及時下載。');
+           ? tr('結果檔會在 {0} 小時後自動清除，請及時下載。').replace('{0}', String(data.result_ttl_hours))
+           : tr('請及時下載。'));
     } else {
       wsNote.hidden = true;
     }
@@ -250,7 +250,8 @@
 
       const main = el('div', 'mj-main');
       const title = el('div', 'mj-title');
-      title.appendChild(el('span', 'mj-tool', j.tool_name || j.tool_id));
+      // 工具名稱是伺服器給的中文，整句當鍵查得到（工具名早就在語系檔裡）。
+      title.appendChild(el('span', 'mj-tool', tr(j.tool_name || j.tool_id)));
       if (j.filename) title.appendChild(el('span', 'mj-file', j.filename));
       main.appendChild(title);
 
@@ -265,11 +266,11 @@
         // 插隊的作業要講清楚原因，不然使用者會以為號碼算錯了
         if (j.priority) {
           bits.push(j.priority_rank === null || j.priority_rank === undefined
-            ? '優先派送'
+            ? tr('優先派送')
             : `優先派送（第 ${j.priority_rank + 1} 順位）`);
         }
       } else {
-        bits.push('耗時 ' + fmtElapsed(j.elapsed));
+        bits.push(tr('耗時 ') + fmtElapsed(j.elapsed));
       }
       if (j.message && active) bits.push(j.message);
       main.appendChild(el('div', 'mj-sub', bits.join('・')));
@@ -288,8 +289,8 @@
       const w = j.workspace;
       if (w && w.saved) {
         const line = el('div', 'mj-ws-ok');
-        line.appendChild(document.createTextNode('已自動存入'));
-        const a = el('a', 'mj-ws-link', '我的工作區');
+        line.appendChild(document.createTextNode(tr('已自動存入')));
+        const a = el('a', 'mj-ws-link', tr('我的工作區'));
         a.href = '/workspace';
         line.appendChild(a);
         main.appendChild(line);
@@ -299,21 +300,21 @@
         // 結果檔在保留期到期後就沒了（2026-08-27 使用者回報：正式機上
         // 14 筆是 still_watching，全部顯示成那句通用訊息）。
         const why = {
-          quota: '工作區容量已滿，未自動存入',
-          unsupported: '此格式工作區不支援，未自動存入',
-          too_large: '檔案過大，未自動存入（可手動存）',
-          no_owner: '此作業無歸屬帳號，未自動存入',
+          quota: tr('工作區容量已滿，未自動存入'),
+          unsupported: tr('此格式工作區不支援，未自動存入'),
+          too_large: tr('檔案過大，未自動存入（可手動存）'),
+          no_owner: tr('此作業無歸屬帳號，未自動存入'),
           // 送出後人還開著頁面 → 假設會直接下載，不硬存一份佔額度。
           // 但要講清楚「不會自動保留」，否則過期之後才發現就來不及了。
-          still_watching: '完成時你還在頁面上，所以沒有自動存入 —— '
-                        + '要保留請按「存至工作區」，否則結果檔會在保留期限後清除',
-          error: '自動存入時發生錯誤，未存入（可手動存）',
-        }[w.reason] || ('未自動存入工作區（' + w.reason + '）');
+          still_watching: tr('完成時你還在頁面上，所以沒有自動存入 —— ')
+                        + tr('要保留請按「存至工作區」，否則結果檔會在保留期限後清除'),
+          error: tr('自動存入時發生錯誤，未存入（可手動存）'),
+        }[w.reason] || (tr('未自動存入工作區（') + w.reason + '）');
         main.appendChild(el('div', 'mj-ws-fail', why));
       }
       if (j.status === 'interrupted') {
         main.appendChild(el('div', 'mj-sub',
-          '服務在這個作業執行時重新啟動，需要重新送出。'));
+          tr('服務在這個作業執行時重新啟動，需要重新送出。')));
       }
       item.appendChild(main);
 
@@ -327,14 +328,14 @@
         const v = el('a', 'btn btn-small btn-primary');
         v.appendChild(svgIcon(ICON_OPEN));
         v.appendChild(document.createTextNode(
-          (j.status === 'running' || j.status === 'pending') ? '看進度' : '開啟'));
+          (j.status === 'running' || j.status === 'pending') ? tr('看進度') : tr('開啟')));
         v.href = j.view_url;
         acts.appendChild(v);
       }
       if (j.has_result) {
         const a = el('a', 'btn btn-small btn-primary');
         a.appendChild(svgIcon(ICON_DOWNLOAD));
-        a.appendChild(document.createTextNode('下載'));
+        a.appendChild(document.createTextNode(tr('下載')));
         a.href = '/api/jobs/' + encodeURIComponent(j.id) + '/download';
         acts.appendChild(a);
         // 「存至工作區」只在**還沒存進去**時才出現 —— 已經自動存好了還放這顆鈕
@@ -344,7 +345,7 @@
           const w = el('button', 'btn btn-small');
           w.type = 'button';
           w.appendChild(svgIcon(ICON_ARCHIVE));
-          w.appendChild(document.createTextNode('存至工作區'));
+          w.appendChild(document.createTextNode(tr('存至工作區')));
           window.attachWorkspaceSave(w, () => ({
             jobId: j.id,
             name: j.result_filename || j.filename || 'result',
@@ -358,19 +359,19 @@
         // 剛看到「已自動存入我的工作區」，兩句話擺在一起像自相矛盾）
         const a = el('a', 'btn btn-small');
         a.appendChild(svgIcon(ICON_ARCHIVE));
-        a.appendChild(document.createTextNode('到工作區取用'));
+        a.appendChild(document.createTextNode(tr('到工作區取用')));
         a.href = '/workspace';
         acts.appendChild(a);
       } else if (j.status === 'done') {
         // 真的什麼都不剩了才說逾期。做成 chip 而不是裸文字 —— 裸文字塞在按鈕
         // 那一欄，寬度與基線都跟其他列對不齊，看起來就是歪的。
-        acts.appendChild(el('span', 'mj-gone', '結果已逾期清除'));
+        acts.appendChild(el('span', 'mj-gone', tr('結果已逾期清除')));
       }
       if (active) {
         // 取消會丟掉已經跑到一半的結果 → 醒目色
         const b = el('button', 'btn btn-small btn-danger');
         b.appendChild(svgIcon(ICON_CLOSE));
-        b.appendChild(document.createTextNode('取消'));
+        b.appendChild(document.createTextNode(tr('取消')));
         b.type = 'button';
         b.addEventListener('click', () => cancelJob(j.id, b));
         acts.appendChild(b);
@@ -384,7 +385,7 @@
 
   async function cancelJob(id, btn) {
     btn.disabled = true;
-    btn.textContent = '取消中…';
+    btn.textContent = tr('取消中…');
     try {
       await fetch('/api/jobs/' + encodeURIComponent(id) + '/cancel',
                   { method: 'POST' });
@@ -419,18 +420,18 @@
       render(await r.json());
     } catch (e) {
       empty.hidden = false;
-      empty.textContent = '讀取作業清單失敗，請稍後再試。';
+      empty.textContent = tr('讀取作業清單失敗，請稍後再試。');
     }
   }
 
 
   // ---- 完成通知偏好 ----
   const PLACEHOLDER = {
-    email: '你的收件信箱',
+    email: tr('你的收件信箱'),
     telegram: 'Telegram Chat ID',
     line: 'LINE User ID（U…）',
-    zulip: '你的 Zulip email（留空＝送到團隊頻道）',
-    nextcloud: '你的一對一對話 token（留空＝送到群組）',
+    zulip: tr('你的 Zulip email（留空＝送到團隊頻道）'),
+    nextcloud: tr('你的一對一對話 token（留空＝送到群組）'),
   };
   const FIELD = { email: 'email_to', telegram: 'telegram_chat_id',
                   line: 'line_to', zulip: 'zulip_to',
@@ -461,8 +462,8 @@
       lab.appendChild(document.createTextNode(ch.label));
       if (ch.dev) {
         // 還沒對真實服務驗證過的管道 —— 標出來，勾了收不到才不會被當成自己設錯
-        const tag = el('span', 'mn-dev', '開發階段');
-        tag.title = '這個管道尚未實際接上服務驗證過，目前只有 Email 是實機驗證過的';
+        const tag = el('span', 'mn-dev', tr('開發階段'));
+        tag.title = tr('這個管道尚未實際接上服務驗證過，目前只有 Email 是實機驗證過的');
         lab.appendChild(tag);
       }
       item.appendChild(lab);
@@ -471,12 +472,12 @@
         // 現在會寄到哪、以及要改的話去哪裡改。同一件事有兩個欄位只會讓人
         // 搞不清楚哪個才算數。
         item.appendChild(el('span', 'mn-hint', d.account_email
-          ? '寄到 ' + d.account_email
-            + (d.email_editable ? '（可在側欄「我的帳號」修改）'
-                                : '（由目錄端管理，如需更改請洽管理員）')
-          : '帳號上還沒有信箱 —— '
-            + (d.email_editable ? '請到側欄「我的帳號」設定。'
-                                : '請洽管理員設定。')));
+          ? tr('寄到 ') + d.account_email
+            + (d.email_editable ? tr('（可在側欄「我的帳號」修改）')
+                                : tr('（由目錄端管理，如需更改請洽管理員）'))
+          : tr('帳號上還沒有信箱 —— ')
+            + (d.email_editable ? tr('請到側欄「我的帳號」設定。')
+                                : tr('請洽管理員設定。'))));
       } else if (ch.personal || ch.dual) {
         const inp = document.createElement('input');
         inp.type = 'text';
@@ -488,10 +489,10 @@
         // Email 若帳號上已經有信箱（AD / LDAP / SSO 帶進來的），就告訴使用者
         // 不必自己填 —— 接目錄的環境不該還要每個人手動輸入一次。
         item.appendChild(el('span', 'mn-hint', ch.dual
-          ? '填了就收私訊，留空則送到管理員設定的團隊頻道'
-          : '個人管道，需要填自己的位址'));
+          ? tr('填了就收私訊，留空則送到管理員設定的團隊頻道')
+          : tr('個人管道，需要填自己的位址')));
       } else {
-        item.appendChild(el('span', 'mn-hint', '團隊頻道，由管理員設定目的地'));
+        item.appendChild(el('span', 'mn-hint', tr('團隊頻道，由管理員設定目的地')));
       }
       box.appendChild(item);
     });

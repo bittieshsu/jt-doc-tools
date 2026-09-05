@@ -16,14 +16,14 @@
   async function friendlyServerError(r, fallback) {
     const code = r ? r.status : 0;
     const codeMap = {
-      400: '請求格式錯誤', 401: '未登入或登入逾期', 403: '權限不足',
-      404: '找不到資源', 408: '請求逾時', 410: '檔案已過期',
-      413: '檔案太大', 415: '不支援的檔案格式', 422: '參數驗證失敗',
-      429: '請求過於頻繁',
-      500: '伺服器內部錯誤', 502: '後端服務無回應', 503: '服務暫時不可用',
-      504: '後端逾時',
+      400: tr('請求格式錯誤'), 401: tr('未登入或登入逾期'), 403: tr('權限不足'),
+      404: tr('找不到資源'), 408: tr('請求逾時'), 410: tr('檔案已過期'),
+      413: tr('檔案太大'), 415: tr('不支援的檔案格式'), 422: tr('參數驗證失敗'),
+      429: tr('請求過於頻繁'),
+      500: tr('伺服器內部錯誤'), 502: tr('後端服務無回應'), 503: tr('服務暫時不可用'),
+      504: tr('後端逾時'),
     };
-    const base = codeMap[code] || (fallback || '操作失敗');
+    const base = codeMap[code] || (fallback || tr('操作失敗'));
     let detail = '';
     try {
       const ct = (r.headers && r.headers.get && r.headers.get('content-type')) || '';

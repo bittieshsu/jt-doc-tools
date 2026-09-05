@@ -17,7 +17,9 @@ COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
 SAFE = [r"\.innerHTML\s*=\s*$", r"\.outerHTML\s*=\s*$", r"\.innerHTML\s*\+=\s*$",
         r"insertAdjacentHTML\([^,]*,\s*$", r"\breturn\s+$", r"push\(\s*$",
         r"=>\s*$"]
-NODE = re.compile(r"(>)([^<>{}`\n]+)(<)")
+#: 文字節點：`>` 之後到 `<` 或**literal 結尾**之間。只認 `<` 的話，
+#: `<span class="spinner"></span>合成中…` 這種收尾的文字會整條漏掉。
+NODE = re.compile(r"(>)([^<>{}`\n]+)(<|$)")
 
 
 def _wrap_nodes(lit: str) -> tuple[str, int]:
@@ -48,7 +50,11 @@ def wrap_block(body: str) -> tuple[str, int]:
         if in_comment(m.start()) or not CJK.search(lit) or "<" not in lit:
             continue
         before = body[max(0, m.start() - 60):m.start()]
-        if not any(re.search(s, before) for s in SAFE):
+        # **含 HTML 標記的 template literal 幾乎一定是要塞進 innerHTML 的** ——
+        # 只認 `.innerHTML =` / `return` 這幾個位置會漏掉 `html = \`<h3>…\`` 這種
+        # 先組字串再塞的寫法（PDF 編輯器整個屬性面板都是這樣寫的）。
+        looks_like_markup = re.search(r"<[a-zA-Z][^>]*>", lit) is not None
+        if not looks_like_markup and not any(re.search(s, before) for s in SAFE):
             continue
         new, n = _wrap_nodes(lit)
         if not n:

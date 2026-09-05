@@ -239,7 +239,7 @@ function makeNode(node) {
   if (icSrc && icSrc.firstElementChild) {
     const ic = icSrc.firstElementChild.cloneNode(true);
     ic.classList.add('tn-ic', 'tn-ic-' + nt);
-    ic.setAttribute('title', {ou:'OU', container:'容器', group:'群組', role:'角色', node:'節點'}[nt] || '節點');
+    ic.setAttribute('title', {ou:'OU', container:tr('容器'), group:tr('群組'), role:tr('角色'), node:tr('節點')}[nt] || tr('節點'));
     row.appendChild(ic);
   }
   row.appendChild(nm);
@@ -286,13 +286,13 @@ function makeNodeStatic(node) {
   if (icSrc && icSrc.firstElementChild) {
     const ic = icSrc.firstElementChild.cloneNode(true);
     ic.classList.add('tn-ic', 'tn-ic-' + nt);
-    ic.setAttribute('title', {ou:'OU', container:'容器', group:'群組', user:'使用者', role:'角色', node:'節點'}[nt] || '節點');
+    ic.setAttribute('title', {ou:'OU', container:tr('容器'), group:tr('群組'), user:tr('使用者'), role:tr('角色'), node:tr('節點')}[nt] || tr('節點'));
     row.appendChild(ic);
   }
   row.appendChild(nm);
   if (node.matched) {
     const mb = document.createElement('span'); mb.className = 'tn-match-badge';
-    mb.textContent = {ou:'OU', group:'群組', user:'使用者'}[nt] || '已選';
+    mb.textContent = {ou:'OU', group:tr('群組'), user:tr('使用者')}[nt] || tr('已選');
     row.appendChild(mb);
   }
   if (node.roles && node.roles.length) {
@@ -340,12 +340,12 @@ async function loadSelectedTree() {
   tree.innerHTML = '';
   if (j.empty_rules) {
     tree.innerHTML = '<div class="dir-empty">' + tr('尚未設定任何 filter 規則。') + '<br>' + tr('點上方「設定 filter」新增，或切到「全部」瀏覽完整目錄。') + '</div>';
-    setHint('已選定：尚未設定規則');
+    setHint(tr('已選定：尚未設定規則'));
     return;
   }
   if (!j.tree || !j.tree.length) {
     tree.innerHTML = '<div class="dir-empty">' + tr('沒有符合 filter 的物件。調整規則或切到「全部」。') + '</div>';
-    setHint('已選定：符合 0 筆');
+    setHint(tr('已選定：符合 0 筆'));
     return;
   }
   j.tree.forEach(n => tree.appendChild(makeNodeStatic(n)));
@@ -366,7 +366,7 @@ document.querySelectorAll('.dir-mode-btn').forEach(b =>
   b.addEventListener('click', () => setMode(b.dataset.mode)));
 
 // ---- filter 規則管理 ----
-const DFF_TYPES = [['ou','OU'],['group','群組'],['user','使用者']];
+const DFF_TYPES = [['ou','OU'],['group',tr('群組')],['user',tr('使用者')]];
 function renderRules() {
   const box = $('dffRules'); box.innerHTML = '';
   if (!DIR_RULES.length) { box.innerHTML = '<div class="dff-empty">' + tr('還沒有規則。新增一條後，只有符合的物件會出現在「已選定」。') + '</div>'; }
@@ -375,10 +375,10 @@ function renderRules() {
     const types = DFF_TYPES.map(([v,l]) =>
       `<label><input type="checkbox" class="dff-t" value="${v}" ${(rule.types||[]).includes(v)?'checked':''}> ${l}</label>`).join('');
     row.innerHTML =
-      `<input class="field dff-name" type="text" placeholder="名稱關鍵字（空=不限）" value="${esc(rule.name_contains||'')}">` +
+      `<input class="field dff-name" type="text" placeholder="${tr('名稱關鍵字（空=不限）')}" value="${esc(rule.name_contains||'')}">` +
       `<span class="dff-types">${types}</span>` +
-      `<input class="field dff-base" type="text" placeholder="限定 OU 子樹 DN（空=整個目錄）" value="${esc(rule.base_dn||'')}">` +
-      `<button class="btn btn-small dff-del" type="button" title="刪除此規則">✕</button>`;
+      `<input class="field dff-base" type="text" placeholder="${tr('限定 OU 子樹 DN（空=整個目錄）')}" value="${esc(rule.base_dn||'')}">` +
+      `<button class="btn btn-small dff-del" type="button" title="${tr('刪除此規則')}">✕</button>`;
     row.querySelector('.dff-del').addEventListener('click', () => { collectRules(); DIR_RULES.splice(i,1); renderRules(); });
     box.appendChild(row);
   });
@@ -459,20 +459,20 @@ async function openOU(dn, name) {
   const cnt = j.count || 0;
   // 有使用者才顯示篩選 / 搜尋 / 表格；0 人就給乾淨的空狀態，不擺一堆空鷹架。
   const usersBody = cnt > 0
-    ? `<div class="dir-filters"><button class="btn btn-small dir-fbtn is-active" data-f="all" type="button">全部</button>` +
-      `<button class="btn btn-small dir-fbtn" data-f="in" type="button">已登入</button>` +
-      `<button class="btn btn-small dir-fbtn" data-f="out" type="button">未登入</button></div>` +
-      `<input class="field" id="duSearch" type="search" placeholder="篩選（帳號或姓名）…">` +
-      `<table class="dir-utable"><thead><tr><th>姓名</th><th>帳號</th><th class="du-st">狀態</th></tr></thead><tbody id="duBody"></tbody></table>`
-    : `<p class="dir-users-empty">此 OU 底下沒有直屬使用者。</p>`;
+    ? `<div class="dir-filters"><button class="btn btn-small dir-fbtn is-active" data-f="all" type="button">${tr('全部')}</button>` +
+      `<button class="btn btn-small dir-fbtn" data-f="in" type="button">${tr('已登入')}</button>` +
+      `<button class="btn btn-small dir-fbtn" data-f="out" type="button">${tr('未登入')}</button></div>` +
+      `<input class="field" id="duSearch" type="search" placeholder="${tr('篩選（帳號或姓名）…')}">` +
+      `<table class="dir-utable"><thead><tr><th>${tr('姓名')}</th><th>${tr('帳號')}</th><th class="du-st">${tr('狀態')}</th></tr></thead><tbody id="duBody"></tbody></table>`
+    : `<p class="dir-users-empty">${tr('此 OU 底下沒有直屬使用者。')}</p>`;
   box.innerHTML =
     `<div class="dir-detail-head"><h3>${esc(name)}</h3><div class="dir-dn">${esc(dn)}</div></div>` +
     `<div class="dir-roles-box">` +
-      `<div class="dir-roles-title"><b>指派角色給此 OU</b> <span class="muted">（含子 OU 全部使用者登入時生效）</span></div>` +
+      `<div class="dir-roles-title"><b>${tr('指派角色給此 OU')}</b> <span class="muted">${tr('（含子 OU 全部使用者登入時生效）')}</span></div>` +
       `<div class="dir-roles-chks">${roleChks}</div>` +
       `<div class="dir-roles-actions"><button class="btn btn-primary btn-small" id="duSaveRoles" type="button">{{ icon('save', size=12) }} 儲存角色</button> <span class="muted" id="duRoleMsg"></span></div>` +
     `</div>` +
-    `<div class="dir-users-head"><span class="dir-sec-title">此 OU 直屬使用者</span>` +
+    `<div class="dir-users-head"><span class="dir-sec-title">${tr('此 OU 直屬使用者')}</span>` +
       `<span class="dir-users-meta">共 ${cnt}${cnt > 0 ? `　·　已登入 ${j.local_count} / 未登入 ${j.not_local_count}` : ''}</span></div>` +
     usersBody;
   if (cnt > 0) {
@@ -507,12 +507,12 @@ async function openOU(dn, name) {
 // ---- 點使用者看細節 ----
 // 常見屬性優先排序 + 中文標籤（其餘照字母序附後）
 const UD_LABELS = {
-  displayName:'顯示名稱', cn:'CN', sAMAccountName:'帳號(sAM)', uid:'帳號(uid)',
-  userPrincipalName:'UPN', mail:'Email', title:'職稱', department:'部門',
-  telephoneNumber:'電話', mobile:'手機', company:'公司', description:'描述',
-  memberOf:'所屬群組', distinguishedName:'DN', whenCreated:'建立時間',
-  whenChanged:'異動時間', uidNumber:'uidNumber', gidNumber:'gidNumber',
-  loginShell:'Shell', homeDirectory:'家目錄', objectClass:'objectClass',
+  displayName:tr('顯示名稱'), cn:'CN', sAMAccountName:tr('帳號(sAM)'), uid:tr('帳號(uid)'),
+  userPrincipalName:'UPN', mail:'Email', title:tr('職稱'), department:tr('部門'),
+  telephoneNumber:tr('電話'), mobile:tr('手機'), company:tr('公司'), description:tr('描述'),
+  memberOf:tr('所屬群組'), distinguishedName:'DN', whenCreated:tr('建立時間'),
+  whenChanged:tr('異動時間'), uidNumber:'uidNumber', gidNumber:'gidNumber',
+  loginShell:'Shell', homeDirectory:tr('家目錄'), objectClass:'objectClass',
 };
 const UD_ORDER = ['displayName','cn','sAMAccountName','uid','userPrincipalName',
   'mail','title','department','company','telephoneNumber','mobile','description',
@@ -538,9 +538,9 @@ async function loadUserRoles(dn) {
     if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
     $('udRoleChks').innerHTML = _roleChks(j.roles);
     // 狀態要說得出「這個帳號在本站是什麼情況」—— 不然管理員不知道存下去會怎樣
-    st.textContent = !j.mirrored ? '（本站還沒有這個帳號，儲存時會建立未啟用的對應帳號）'
-                   : (j.logged_in ? '（已登入過本系統）'
-                                  : '（已鏡射，尚未登入 → 未啟用）');
+    st.textContent = !j.mirrored ? tr('（本站還沒有這個帳號，儲存時會建立未啟用的對應帳號）')
+                   : (j.logged_in ? tr('（已登入過本系統）')
+                                  : tr('（已鏡射，尚未登入 → 未啟用）'));
   } catch (e) {
     box.hidden = true;
   }
@@ -558,7 +558,7 @@ function openUserDetail(dn, name) {
   fetch('/admin/directory/user?dn=' + encodeURIComponent(dn))
     .then(r => r.json().then(j => ({ ok: r.ok, j })))
     .then(({ ok, j }) => {
-      if (!ok) throw new Error(j.detail || '查詢失敗');
+      if (!ok) throw new Error(j.detail || tr('查詢失敗'));
       const a = j.attrs || {};
       const keys = Object.keys(a);
       // 帳號名稱在指派角色時要用到（還沒鏡射的人要靠它建列）。**從回傳的屬性取**，
@@ -581,7 +581,7 @@ function openUserDetail(dn, name) {
         const vhtml = Array.isArray(v)
           ? v.map(x => isGroups
               ? `<span class="ud-multi ud-grp-row"><span>${esc(x)}</span>`
-                + `<button class="btn btn-small ud-grp-btn" type="button" data-gdn="${esc(x)}">角色</button></span>`
+                + `<button class="btn btn-small ud-grp-btn" type="button" data-gdn="${esc(x)}">${tr('角色')}</button></span>`
               : `<span class="ud-multi">${esc(x)}</span>`).join('')
           : esc(v);
         const vtext = Array.isArray(v) ? v.join(' ') : String(v == null ? '' : v);
@@ -636,7 +636,7 @@ async function openGroupRoles(dn) {
     const r = await fetch('/admin/directory/group-roles?dn=' + encodeURIComponent(dn));
     const j = await r.json();
     if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
-    $('grName').textContent = j.name || '群組角色';
+    $('grName').textContent = j.name || tr('群組角色');
     $('grChks').innerHTML = ALL_ROLES.map(role => {
       const rid = role.id, on = (j.roles || []).includes(rid);
       return `<label class="dir-role-chk"><input type="checkbox" class="gr-role" value="${esc(rid)}" ${on?'checked':''}> ${esc(role.display_name||rid)}</label>`;

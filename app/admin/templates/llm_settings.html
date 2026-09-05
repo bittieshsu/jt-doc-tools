@@ -444,7 +444,7 @@ async function testConnection() {
     const j = await r.json();
     if (!j.ok) {
       status.className = 'conn-fail';
-      status.textContent = `❌ ${j.error || '連線失敗'}`;
+      status.textContent = `❌ ${j.error || tr('連線失敗')}`;
       return;
     }
     status.className = 'conn-ok';
@@ -484,14 +484,14 @@ function _fillSelectGrouped(sel, models, includeBlank, preserveValue, defaultMod
   const others = models.filter(m => !m.looks_vision).sort((a,b)=>a.id.localeCompare(b.id));
   if (vision.length) {
     const grp = document.createElement('optgroup');
-    grp.label = '✨ 視覺模型';
+    grp.label = tr('✨ 視覺模型');
     vision.forEach(m => grp.appendChild(makeOpt(m, /* disabled */ false)));
     sel.appendChild(grp);
   }
   if (others.length) {
     const grp = document.createElement('optgroup');
     // 視覺工具：把非視覺模型整組標示為「不可用」
-    grp.label = requiresVision ? '文字 / 其他模型（此工具需視覺模型，無法使用）' : '文字 / 其他模型';
+    grp.label = requiresVision ? '文字 / 其他模型（此工具需視覺模型，無法使用）' : tr('文字 / 其他模型');
     others.forEach(m => grp.appendChild(makeOpt(m, /* disabled */ requiresVision)));
     sel.appendChild(grp);
   }
@@ -541,7 +541,7 @@ async function refreshModels() {
     const j = await r.json();
     if (!j.ok) {
       status.className = 'conn-fail';
-      status.textContent = `❌ ${j.error || '抓取失敗'} — 請先測試連線並儲存`;
+      status.textContent = `❌ ${j.error || tr('抓取失敗')} — 請先測試連線並儲存`;
       return;
     }
     fillModelDropdown(j.models);

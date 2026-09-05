@@ -377,11 +377,11 @@
     } catch (e) {
       let msg;
       if (e.name === 'AbortError') {
-        msg = '檢查逾時（超過 90 秒）— 系統 probe 可能卡住。請看 server log 檢視 office/java/tesseract 是否回應極慢。';
+        msg = tr('檢查逾時（超過 90 秒）— 系統 probe 可能卡住。請看 server log 檢視 office/java/tesseract 是否回應極慢。');
       } else if (/Failed to fetch|NetworkError|Load failed/i.test(e.message)) {
-        msg = '無法連到後端（' + escapeHtml(e.message) + '）。可能服務未啟動、被反向代理截斷、或 CORS 問題。請看 server log。';
+        msg = tr('無法連到後端（') + escapeHtml(e.message) + tr('）。可能服務未啟動、被反向代理截斷、或 CORS 問題。請看 server log。');
       } else {
-        msg = '檢查失敗：' + escapeHtml(e.message);
+        msg = tr('檢查失敗：') + escapeHtml(e.message);
       }
       // 訊息可能來自伺服器 —— 用 DOM API 建列，不要拼 HTML
       tbody.textContent = '';
@@ -455,11 +455,11 @@
         } else if (j.current === j.latest) {
           verBox.classList.add('is-current');
           pillHtml = '<span class="ver-status-pill ver-cur">' + tr('已是最新') + '</span>';
-          hintHtml = '本機與 GitHub main 同版號';
+          hintHtml = tr('本機與 GitHub main 同版號');
         } else {
           verBox.classList.add('is-newer');
           pillHtml = '<span class="ver-status-pill ver-dev">dev build</span>';
-          hintHtml = '本機版本比 GitHub 新（開發中或已 commit 但尚未推送）';
+          hintHtml = tr('本機版本比 GitHub 新（開發中或已 commit 但尚未推送）');
         }
         const linkHtml = j.html_url
           ? ' <a href="' + j.html_url + '" target="_blank" rel="noopener">CHANGELOG</a>'

@@ -784,13 +784,13 @@ const $ = (id) => document.getElementById(id);
 async function friendlyServerError(r, fallback) {
   const code = r ? r.status : 0;
   const codeMap = {
-    400: '請求格式錯誤', 401: '未登入或登入逾期', 403: '權限不足',
-    404: '找不到資源', 408: '請求逾時', 410: '檔案已過期',
-    413: '檔案太大', 422: '參數驗證失敗', 429: '請求過於頻繁',
-    500: '伺服器內部錯誤', 502: '後端服務無回應', 503: '服務暫時不可用',
-    504: '後端逾時',
+    400: tr('請求格式錯誤'), 401: tr('未登入或登入逾期'), 403: tr('權限不足'),
+    404: tr('找不到資源'), 408: tr('請求逾時'), 410: tr('檔案已過期'),
+    413: tr('檔案太大'), 422: tr('參數驗證失敗'), 429: tr('請求過於頻繁'),
+    500: tr('伺服器內部錯誤'), 502: tr('後端服務無回應'), 503: tr('服務暫時不可用'),
+    504: tr('後端逾時'),
   };
-  const base = codeMap[code] || (fallback || '操作失敗');
+  const base = codeMap[code] || (fallback || tr('操作失敗'));
   let detail = '';
   try {
     const ct = (r.headers && r.headers.get && r.headers.get('content-type')) || '';
@@ -972,11 +972,11 @@ let deletedOrigs = {};   // {pageIdx: [[x0,y0,x1,y1], ...]}
 // ============ Upload ============
 async function handleUpload(file) {
   if (!file) return;
-  setStatus('上傳中…');
+  setStatus(tr('上傳中…'));
   const fd = new FormData(); fd.append('file', file);
   try {
     const r = await (peFu
-      ? peFu.upload('/tools/pdf-editor/load', fd, {processingLabel: '渲染預覽中…'})
+      ? peFu.upload('/tools/pdf-editor/load', fd, {processingLabel: tr('渲染預覽中…')})
       : fetch('/tools/pdf-editor/load', {method:'POST', body: fd}));
     if (!r.ok) { setStatus(await friendlyServerError(r, tr('上傳失敗')), 'error'); return; }
     const data = await r.json();
@@ -992,7 +992,7 @@ async function handleUpload(file) {
     // before we measure canvasWrap's clientWidth/Height.
     setTimeout(() => fitPageToView(), 0);
     setStatus(`載入完成，${pages.length} 頁。選工具開始編輯。`);
-  } catch (e) { setStatus('上傳錯誤：' + e.message); }
+  } catch (e) { setStatus(tr('上傳錯誤：') + e.message); }
 }
 const uploadRoot = $('peUpload');
 let peFu = null;
@@ -1483,7 +1483,7 @@ function createObject(fc, p, tool) {
   if (tool === 'text') {
     // IText auto-sizes to its content (no fixed width/wrap). Better than
     // Textbox when users type freely — selection box follows the glyphs.
-    obj = new fabric.IText('請輸入文字', {
+    obj = new fabric.IText(tr('請輸入文字'), {
       left: p.x, top: p.y, fontSize: 16, fill: '#000000',
       fontFamily: 'sans-serif',
     });
@@ -1531,7 +1531,7 @@ function createObject(fc, p, tool) {
       strokeUniform: true,
     });
     group._peType = 'sticky';
-    group._noteText = '便箋內容…';
+    group._noteText = tr('便箋內容…');
     fc.add(group); fc.setActiveObject(group);
   } else if (tool === 'image') {
     openAssetPicker((result) => {
@@ -1685,26 +1685,26 @@ async function pickExistingObject(fc, p) {
   const y_pt = p.y / PT2PX;
   // v1.7.31：該位置已被「選既有」抓出來過（或標記為刪除過）就不再次處理
   if (_isOrigPicked(fc, x_pt, y_pt)) {
-    setStatus('此位置的原 PDF 物件已被選取過，請直接編輯既有的擷取物件或先刪除它再重選。');
+    setStatus(tr('此位置的原 PDF 物件已被選取過，請直接編輯既有的擷取物件或先刪除它再重選。'));
     setTimeout(() => setStatus(''), 3000);
     setTool('select');
     return;
   }
-  setStatus('偵測中…');
+  setStatus(tr('偵測中…'));
   // v1.7.29：選既有物件（特別是文字）後端可能要走 OCR / 字型解析，
   // 慢的話 1-2 秒；期間用半透明遮罩 + spinner 告訴使用者「轉換中」，
   // 避免覺得當掉或重複點選。300 ms 內回來就不顯示，避免閃爍。
   let pickOverlayShown = false;
   const pickOverlayTimer = setTimeout(() => {
-    showLoading('物件轉換中…');
+    showLoading(tr('物件轉換中…'));
     pickOverlayShown = true;
   }, 300);
   // 若 detect-objects 在 500 ms 內沒回，幾乎一定是文字 span 撞到 OCR
   // fallback (字型缺/壞 ToUnicode → render bbox + tesseract)，OCR 通常
   // 要 1-2 秒。提前升級訊息讓使用者知道在做什麼，不會以為當掉。
   const ocrHintTimer = setTimeout(() => {
-    setStatus('原文字物件已平面化（字型 Unicode 對應表不完整），需經 OCR 辨識後重建可編輯文字…');
-    if (pickOverlayShown) showLoading('原文字物件已平面化，需經 OCR 辨識後重建可編輯文字…');
+    setStatus(tr('原文字物件已平面化（字型 Unicode 對應表不完整），需經 OCR 辨識後重建可編輯文字…'));
+    if (pickOverlayShown) showLoading(tr('原文字物件已平面化，需經 OCR 辨識後重建可編輯文字…'));
   }, 500);
   const cleanupPickOverlay = () => {
     clearTimeout(pickOverlayTimer);
@@ -1743,7 +1743,7 @@ async function pickExistingObject(fc, p) {
     });
     const data = await r.json();
     if (!data || !data.kind) {
-      setStatus('此位置沒有可選取的物件');
+      setStatus(tr('此位置沒有可選取的物件'));
       setTimeout(() => setStatus(''), 2000);
       return;
     }
@@ -1766,7 +1766,7 @@ async function pickExistingObject(fc, p) {
       marker._origBbox = bb.slice();
       fc.add(marker);
       fc.setActiveObject(marker); fc.requestRenderAll();
-      setStatus(`已標記表單欄位「${data.field_name || '未命名'}」為刪除；儲存後會被移除。`);
+      setStatus(`已標記表單欄位「${data.field_name || tr('未命名')}」為刪除；儲存後會被移除。`);
       setTool('select');
       return;
     }
@@ -1784,7 +1784,7 @@ async function pickExistingObject(fc, p) {
       marker._origBbox = bb.slice();
       fc.add(marker);
       fc.setActiveObject(marker); fc.requestRenderAll();
-      setStatus('已標記此向量圖形為刪除；儲存後會被遮蓋移除。');
+      setStatus(tr('已標記此向量圖形為刪除；儲存後會被遮蓋移除。'));
       setTool('select');
       return;
     }
@@ -1794,7 +1794,7 @@ async function pickExistingObject(fc, p) {
       // 只有 OCR 也失敗 (沒裝 tesseract / OCR 結果空) 才會 set
       // extracted_text_unreliable=true，此時提示使用者手動輸入。
       if (data.extracted_text_unreliable) {
-        setStatus('此 PDF 的文字對應表壞掉（擷取出來不是原文），OCR 也沒能辨識出內容。請目視原文字後，用 W 白底遮罩蓋掉、再用 T 文字框輸入要替換的內容。');
+        setStatus(tr('此 PDF 的文字對應表壞掉（擷取出來不是原文），OCR 也沒能辨識出內容。請目視原文字後，用 W 白底遮罩蓋掉、再用 T 文字框輸入要替換的內容。'));
         setTool('select');
         return;
       }
@@ -1816,7 +1816,7 @@ async function pickExistingObject(fc, p) {
         marker._origBbox = bb.slice();
         fc.add(marker);
         fc.setActiveObject(marker); fc.requestRenderAll();
-        setStatus('已標記填充字元（leader dots / 空白）為刪除；儲存後會被遮蓋移除。可拖動到新位置或按 Delete 取消。');
+        setStatus(tr('已標記填充字元（leader dots / 空白）為刪除；儲存後會被遮蓋移除。可拖動到新位置或按 Delete 取消。'));
         setTool('select');
         return;
       }
@@ -1846,9 +1846,9 @@ async function pickExistingObject(fc, p) {
       if (data.recovered_from_font) {
         // 這條是精確還原（從字型的字形對照表反查），不是 OCR 猜的 —— 訊息
         // 要講清楚，否則使用者會以為需要逐字校對。
-        setStatus('此 PDF 的文字對應表不正確（直接擷取會變成一排符號），已從字型還原出原文。');
+        setStatus(tr('此 PDF 的文字對應表不正確（直接擷取會變成一排符號），已從字型還原出原文。'));
       } else if (data.ocr_used) {
-        setStatus('已用 OCR 自動辨識既有文字（此 PDF 字型缺 Unicode 對應表）。請檢查辨識結果是否正確。');
+        setStatus(tr('已用 OCR 自動辨識既有文字（此 PDF 字型缺 Unicode 對應表）。請檢查辨識結果是否正確。'));
       } else {
         setStatus(`已擷取文字。原位置有虛線框表示儲存時會被真刪除。`);
       }
@@ -1862,13 +1862,13 @@ async function pickExistingObject(fc, p) {
       // 100ms 內就回，pickOverlayShown 還沒被 timer 設 true → overlay 沒
       // 顯示也不會保留 → 雙影 1-2 秒視覺很差。改為 IText 成功建出後直接
       // showLoading 並 set flag，savePdf BG load 完才 hideLoading。
-      showLoading('重繪中…');
+      showLoading(tr('重繪中…'));
       pickOverlayShown = true;
       _keepLoadingUntilBgReady = true;
       triggerPickSave();
     } else if (data.kind === 'image') {
       if (!data.thumb_url) {
-        setStatus('此圖片無法擷取（可能是 vector）');
+        setStatus(tr('此圖片無法擷取（可能是 vector）'));
         setTimeout(() => setStatus(''), 2000);
         return;
       }
@@ -1890,14 +1890,14 @@ async function pickExistingObject(fc, p) {
         fc.setActiveObject(img); fc.requestRenderAll();
         setStatus(`已擷取圖片。原位置有虛線框表示儲存時會被真刪除。`);
         // v1.7.41：圖片 pick 同 text — 一律 overlay 到 BG 重畫完
-        showLoading('重繪中…');
+        showLoading(tr('重繪中…'));
         pickOverlayShown = true;
         _keepLoadingUntilBgReady = true;
         triggerPickSave();
       }, { crossOrigin: 'anonymous' });
     }
   } catch (e) {
-    setStatus('偵測失敗：' + e.message);
+    setStatus(tr('偵測失敗：') + e.message);
   } finally {
     cleanupPickOverlay();
     // 快照還原 scroll — Fabric 內部 hiddenTextarea append 可能讓瀏覽器
@@ -1939,9 +1939,9 @@ function updatePropsPanel() {
       const curColor = colorToHex(first.fill, '#000000');
       html += `
         <div class="muted" data-s="s84532722">其中 ${tCount} 個文字可批次變更屬性：</div>
-        <div class="row"><label>字型</label><select id="pfBatchFont"><option value="${curFont}" selected>載入字型清單中…</option></select></div>
-        <div class="row"><label>字級</label><input type="number" id="pfBatchSize" value="${curSize}" step="1" min="6" max="96"></div>
-        <div class="row"><label>顏色</label><div class="inline">
+        <div class="row"><label>${tr('字型')}</label><select id="pfBatchFont"><option value="${curFont}" selected>${tr('載入字型清單中…')}</option></select></div>
+        <div class="row"><label>${tr('字級')}</label><input type="number" id="pfBatchSize" value="${curSize}" step="1" min="6" max="96"></div>
+        <div class="row"><label>${tr('顏色')}</label><div class="inline">
           <input type="color" id="pfBatchColor" value="${curColor}">
           <input type="text" id="pfBatchColorHex" value="${curColor}" data-s="sda5cd676">
         </div></div>
@@ -1952,7 +1952,7 @@ function updatePropsPanel() {
         </div>
         <div class="muted" data-s="sc73c4105">改動會套用到這 ${tCount} 個文字，不影響其他物件。</div>`;
     } else {
-      html += `<div class="muted">選取的物件都不是文字，無可批次編輯的屬性。</div>`;
+      html += `<div class="muted">${tr('選取的物件都不是文字，無可批次編輯的屬性。')}</div>`;
     }
     panel.innerHTML = html;
     if (tCount > 0) {
@@ -1966,11 +1966,11 @@ function updatePropsPanel() {
   let html = '';
   if (t === 'text') {
     const curFont = active._peFont || 'pymupdf:default';
-    html = `<h3>文字框</h3>
-      <div class="row"><label>文字</label><input type="text" id="pfText" value="${escapeHTML(active.text || '')}"></div>
-      <div class="row"><label>字型</label><select id="pfFont"><option value="${curFont}" selected>載入字型清單中…</option></select></div>
-      <div class="row"><label>字級</label><input type="number" id="pfSize" value="${Math.round(active.fontSize)}" step="1" min="6" max="96"></div>
-      <div class="row"><label>顏色</label><div class="inline">
+    html = `<h3>${tr('文字框')}</h3>
+      <div class="row"><label>${tr('文字')}</label><input type="text" id="pfText" value="${escapeHTML(active.text || '')}"></div>
+      <div class="row"><label>${tr('字型')}</label><select id="pfFont"><option value="${curFont}" selected>${tr('載入字型清單中…')}</option></select></div>
+      <div class="row"><label>${tr('字級')}</label><input type="number" id="pfSize" value="${Math.round(active.fontSize)}" step="1" min="6" max="96"></div>
+      <div class="row"><label>${tr('顏色')}</label><div class="inline">
         <input type="color" id="pfColor" value="${colorToHex(active.fill, '#000000')}">
         <input type="text" id="pfColorHex" value="${colorToHex(active.fill, '#000000')}" data-s="sda5cd676">
       </div></div>
@@ -1981,50 +1981,50 @@ function updatePropsPanel() {
       </div>
       <div class="muted">位置 (pt)：x=${(active.left/PT2PX).toFixed(1)} y=${(active.top/PT2PX).toFixed(1)}</div>`;
   } else if (t === 'whiteout') {
-    html = `<h3>白底遮罩</h3>
+    html = `<h3>${tr('白底遮罩')}</h3>
       <div class="row muted">${(active.getScaledWidth()/PT2PX).toFixed(1)} × ${(active.getScaledHeight()/PT2PX).toFixed(1)} pt</div>
-      <div class="muted">蓋掉底層內容。按 Delete 移除。</div>`;
+      <div class="muted">${tr('蓋掉底層內容。按 Delete 移除。')}</div>`;
   } else if (t === 'rect' || t === 'ellipse') {
     html = `<h3>${t === 'rect' ? '矩形' : '橢圓'}</h3>
-      <div class="row"><label>描邊色</label><input type="color" id="pfStroke" value="${colorToHex(active.stroke, '#000000')}"></div>
-      <div class="row"><label>線寬</label><input type="number" id="pfStrokeW" value="${active.strokeWidth || 1}" step="0.5" min="0" max="20"></div>
-      <div class="row"><label>填色</label><div class="inline">
+      <div class="row"><label>${tr('描邊色')}</label><input type="color" id="pfStroke" value="${colorToHex(active.stroke, '#000000')}"></div>
+      <div class="row"><label>${tr('線寬')}</label><input type="number" id="pfStrokeW" value="${active.strokeWidth || 1}" step="0.5" min="0" max="20"></div>
+      <div class="row"><label>${tr('填色')}</label><div class="inline">
         <input type="color" id="pfFill" value="${colorToHex(active.fill, '#ffffff')}">
-        <label><input type="checkbox" id="pfFillOn" ${active.fill && active.fill !== '' && active.fill !== 'transparent' ? 'checked':''}> 填色</label>
+        <label><input type="checkbox" id="pfFillOn" ${active.fill && active.fill !== '' && active.fill !== 'transparent' ? 'checked':''}> ${tr('填色')}</label>
       </div></div>`;
   } else if (t === 'line' || t === 'arrow') {
     html = `<h3>${t === 'arrow' ? '箭頭' : '線段'}</h3>
-      <div class="row"><label>色彩</label><input type="color" id="pfStroke" value="${colorToHex(active.stroke, '#000000')}"></div>
-      <div class="row"><label>線寬</label><input type="number" id="pfStrokeW" value="${active.strokeWidth || 1}" step="0.5" min="0" max="20"></div>`;
+      <div class="row"><label>${tr('色彩')}</label><input type="color" id="pfStroke" value="${colorToHex(active.stroke, '#000000')}"></div>
+      <div class="row"><label>${tr('線寬')}</label><input type="number" id="pfStrokeW" value="${active.strokeWidth || 1}" step="0.5" min="0" max="20"></div>`;
   } else if (t === 'image') {
-    html = `<h3>圖片</h3>
-      <div class="row"><label>不透明度</label><input type="range" id="pfOpacity" min="0" max="100" value="${Math.round((active.opacity || 1)*100)}" data-s="s6d567387"></div>
-      <div class="row"><label>旋轉</label><input type="number" id="pfAngle" value="${Math.round(active.angle || 0)}" step="15"></div>
+    html = `<h3>${tr('圖片')}</h3>
+      <div class="row"><label>${tr('不透明度')}</label><input type="range" id="pfOpacity" min="0" max="100" value="${Math.round((active.opacity || 1)*100)}" data-s="s6d567387"></div>
+      <div class="row"><label>${tr('旋轉')}</label><input type="number" id="pfAngle" value="${Math.round(active.angle || 0)}" step="15"></div>
       <div class="muted">比例：${active.scaleX.toFixed(2)} × ${active.scaleY.toFixed(2)}</div>`;
   } else if (t === 'pencil') {
-    html = `<h3>手繪</h3>
-      <div class="row"><label>色彩</label><input type="color" id="pfStroke" value="${colorToHex(active.stroke, '#000000')}"></div>
-      <div class="row"><label>線寬</label><input type="number" id="pfStrokeW" value="${active.strokeWidth || 2}" step="0.5" min="0.5" max="20"></div>`;
+    html = `<h3>${tr('手繪')}</h3>
+      <div class="row"><label>${tr('色彩')}</label><input type="color" id="pfStroke" value="${colorToHex(active.stroke, '#000000')}"></div>
+      <div class="row"><label>${tr('線寬')}</label><input type="number" id="pfStrokeW" value="${active.strokeWidth || 2}" step="0.5" min="0.5" max="20"></div>`;
   } else if (t === 'highlight') {
-    html = `<h3>螢光筆</h3>
-      <div class="row"><label>顏色</label><input type="color" id="pfFill" value="${colorToHex(active.fill, '#fde047')}"></div>
-      <div class="muted">拖拉 / 縮放調整框住要螢光的區域。</div>`;
+    html = `<h3>${tr('螢光筆')}</h3>
+      <div class="row"><label>${tr('顏色')}</label><input type="color" id="pfFill" value="${colorToHex(active.fill, '#fde047')}"></div>
+      <div class="muted">${tr('拖拉 / 縮放調整框住要螢光的區域。')}</div>`;
   } else if (t === 'sticky') {
-    html = `<h3>便箋註解</h3>
-      <div class="row"><label>備註內容</label><textarea id="pfNote" rows="4" data-s="s006f601d">${escapeHTML(active._noteText || '')}</textarea></div>
-      <div class="muted">存檔後會變成 PDF 標準便箋 (text annotation)，點選彈出內容。</div>`;
+    html = `<h3>${tr('便箋註解')}</h3>
+      <div class="row"><label>${tr('備註內容')}</label><textarea id="pfNote" rows="4" data-s="s006f601d">${escapeHTML(active._noteText || '')}</textarea></div>
+      <div class="muted">${tr('存檔後會變成 PDF 標準便箋 (text annotation)，點選彈出內容。')}</div>`;
   } else {
-    html = `<h3>物件</h3><div class="muted">未知類型</div>`;
+    html = `<h3>${tr('物件')}</h3><div class="muted">${tr('未知類型')}</div>`;
   }
   // 層次（z-order）— 適用於所有實際物件，markers / covers 不在此面板出現
   const _zsvg = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-s="s12da9e4d"';
   html += `
     <div class="row chip-row" data-s="s23c29730">
-      <label data-s="sfc2c3a92">層次</label>
-      <button type="button" id="pfZTop"    title="置頂（Cmd+]）"><svg ${_zsvg}><path d="M4 4h16"/><polyline points="7 14 12 9 17 14"/><line x1="12" y1="9" x2="12" y2="20"/></svg></button>
-      <button type="button" id="pfZUp"     title="上一層（]）"><svg ${_zsvg}><polyline points="6 15 12 9 18 15"/></svg></button>
-      <button type="button" id="pfZDown"   title="下一層（[）"><svg ${_zsvg}><polyline points="6 9 12 15 18 9"/></svg></button>
-      <button type="button" id="pfZBottom" title="置底（Cmd+[）"><svg ${_zsvg}><line x1="12" y1="4" x2="12" y2="15"/><polyline points="7 10 12 15 17 10"/><path d="M4 20h16"/></svg></button>
+      <label data-s="sfc2c3a92">${tr('層次')}</label>
+      <button type="button" id="pfZTop"    title="${tr('置頂（Cmd+]）')}"><svg ${_zsvg}><path d="M4 4h16"/><polyline points="7 14 12 9 17 14"/><line x1="12" y1="9" x2="12" y2="20"/></svg></button>
+      <button type="button" id="pfZUp"     title="${tr('上一層（]）')}"><svg ${_zsvg}><polyline points="6 15 12 9 18 15"/></svg></button>
+      <button type="button" id="pfZDown"   title="${tr('下一層（[）')}"><svg ${_zsvg}><polyline points="6 9 12 15 18 9"/></svg></button>
+      <button type="button" id="pfZBottom" title="${tr('置底（Cmd+[）')}"><svg ${_zsvg}><line x1="12" y1="4" x2="12" y2="15"/><polyline points="7 10 12 15 17 10"/><path d="M4 20h16"/></svg></button>
     </div>`;
   panel.innerHTML = html;
   wirePropsPanel(active);
@@ -2283,7 +2283,7 @@ function populateFontDropdown(selectEl, currentId) {
     // Fallback to basic PyMuPDF options if fetch fails
     _fontGroups = [{
       key: 'pymupdf', title: tr('PyMuPDF 內建'), fonts: [
-        {id: 'pymupdf:default', label: '自動'},
+        {id: 'pymupdf:default', label: tr('自動')},
         {id: 'pymupdf:sans', label: 'Sans'},
         {id: 'pymupdf:serif', label: 'Serif'},
       ]
@@ -2331,7 +2331,7 @@ function installFontPicker(selectEl, currentId) {
     </button>
     <div class="fp-pop" hidden>
       <div class="fp-search-row">
-        <input type="search" class="fp-search" placeholder="搜尋字型名稱…" />
+        <input type="search" class="fp-search" placeholder="' + tr('搜尋字型名稱…') + '" />
       </div>
       <div class="fp-list"></div>
     </div>`;
@@ -2815,7 +2815,7 @@ function openAssetPicker(onPick) {
     data.assets.forEach(a => {
       const div = document.createElement('div');
       div.style.cssText = 'border:1px solid #e5e7eb; border-radius:6px; padding:8px; cursor:pointer; text-align:center; background:#fff;';
-      const typeMap = {stamp:'印章', signature:'簽名', logo:'Logo'};
+      const typeMap = {stamp:tr('印章'), signature:tr('簽名'), logo:'Logo'};
       div.innerHTML = `
         <img src="${a.thumb_url}" data-s="sc6d45a08" />
         <div data-s="s4adf3392">${escapeHTML(a.name)}</div>
@@ -2838,7 +2838,7 @@ async function _doImageUpload(f) {
   if (!f) return;
   const status = $('apUploadStatus');
   if (!/^image\//.test(f.type)) {
-    status.textContent = `不支援的檔案類型：${f.type || '未知'}`;
+    status.textContent = `不支援的檔案類型：${f.type || tr('未知')}`;
     return;
   }
   status.textContent = tr('上傳中：{0} …').replace('{0}', f.name);
@@ -2922,7 +2922,7 @@ $('btnDownload').addEventListener('click', async (e) => {
 
 // ============ Global font replace ============
 $('btnGlobalFont').addEventListener('click', () => {
-  if (!uploadId) { setStatus('請先上傳 PDF'); return; }
+  if (!uploadId) { setStatus(tr('請先上傳 PDF')); return; }
   $('fontPicker').style.display = 'flex';
   const sel = $('gfFontSelect');
   populateFontDropdown(sel, 'pymupdf:default');
@@ -2933,7 +2933,7 @@ $('gfGo').addEventListener('click', async () => {
   const font_id = $('gfFontSelect').value || 'pymupdf:default';
   const status = $('gfStatus');
   status.textContent = tr('換字型中…');
-  showLoading('整份換字型中…');
+  showLoading(tr('整份換字型中…'));
   try {
     const r = await fetch('/tools/pdf-editor/replace-all-fonts', {
       method: 'POST', headers: {'Content-Type':'application/json'},
@@ -2980,7 +2980,7 @@ function _showUndoReplaceFonts(replaced) {
     if (!(await showConfirm(tr('要把 PDF 還原到「整份換字型」之前的狀態嗎？'),
           { title: tr('復原換字型'), okText: tr('復原'), kind: 'warning' }))) return;
     undoBtn.disabled = true;
-    showLoading('復原中…');
+    showLoading(tr('復原中…'));
     try {
       const r = await fetch('/tools/pdf-editor/undo-replace-all-fonts', {
         method: 'POST', headers: {'Content-Type':'application/json'},
@@ -2997,9 +2997,9 @@ function _showUndoReplaceFonts(replaced) {
       });
       try { await savePdf(true); } catch (_e) {}
       undoBtn.remove();
-      setStatus('已復原至換字型前的狀態。');
+      setStatus(tr('已復原至換字型前的狀態。'));
     } catch (e) {
-      showAlert('復原錯誤：' + e.message);
+      showAlert(tr('復原錯誤：') + e.message);
       undoBtn.disabled = false;
     } finally {
       hideLoading();
@@ -3009,7 +3009,7 @@ function _showUndoReplaceFonts(replaced) {
 }
 
 function showLoading(text) {
-  $('peLoadingText').textContent = text || '重新渲染中…';
+  $('peLoadingText').textContent = text || tr('重新渲染中…');
   $('peLoading').classList.add('show');
 }
 function hideLoading() { $('peLoading').classList.remove('show'); }
@@ -3029,10 +3029,10 @@ function flattenEnd() {
 async function savePdf(isAuto, opts) {
   opts = opts || {};
   if (!uploadId) return;
-  setStatus(isAuto ? '重繪中…' : '儲存並重繪中…');
+  setStatus(isAuto ? '重繪中…' : tr('儲存並重繪中…'));
   // Full-screen overlay only on manual save — auto-save shouldn't cover
   // the canvas because it hides the object the user is editing.
-  if (!isAuto) showLoading('儲存並重繪中…');
+  if (!isAuto) showLoading(tr('儲存並重繪中…'));
   // 重繪期間 body 加 .pe-flattening → 全頁游標變 OS progress spinner。
   flattenStart();
   // bgLoadedPromises 宣告在 try 外 — finally 要等這些 promise resolve 才收
@@ -3162,7 +3162,7 @@ async function savePdf(isAuto, opts) {
       } else if (t === 'sticky') {
         objs.push({ id: rid(), type: 'sticky',
           x: x_pt, y: y_pt, w: w_pt, h: h_pt,
-          note: o._noteText || '便箋內容…' });
+          note: o._noteText || tr('便箋內容…') });
       } else if (o.type === 'path' || t === 'pencil') {
         // Free-hand drawing — resolve each path command to ABSOLUTE
         // canvas coords using Fabric's own transform matrix, then
@@ -3266,7 +3266,7 @@ async function savePdf(isAuto, opts) {
     // v1.12.71：用 hidden 屬性顯示（全域 [hidden]{display:none!important}）。
     // 之前用 data-s CSS 規則隱藏 + `style.display=''` 清 inline style，蓋不過
     // CSS 規則的 display:none → CSP 樣式重構後「下載 PDF」鈕存檔後一直不出現。
-    dl.hidden = false; dl.innerHTML = dl.innerHTML.includes('svg') ? dl.innerHTML : '下載 PDF';
+    dl.hidden = false; dl.innerHTML = dl.innerHTML.includes('svg') ? dl.innerHTML : tr('下載 PDF');
     dl.setAttribute('download', suggestedFilename());
     // NOTE: intentionally NOT clearing _origBbox or markers. Each save
     // replays all edits on pristine SRC, so state must persist across
@@ -3360,9 +3360,9 @@ async function savePdf(isAuto, opts) {
         });
       });
     }
-    setStatus(isAuto ? '已自動儲存。' : '已儲存。預覽已更新，點「下載 PDF」取回。', 'saved');
+    setStatus(isAuto ? '已自動儲存。' : tr('已儲存。預覽已更新，點「下載 PDF」取回。'), 'saved');
   } catch (e) {
-    setStatus('儲存錯誤：' + e.message, 'error');
+    setStatus(tr('儲存錯誤：') + e.message, 'error');
     // Save failed — restore dirty pages so next save retries those pages
     dirtyForThisSave.forEach(p => dirtyPages.add(p));
     // Save failed — remove whiteout covers so they don't stay stuck on canvas

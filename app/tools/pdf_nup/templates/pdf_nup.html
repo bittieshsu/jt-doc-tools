@@ -234,7 +234,7 @@ const fu = new FileUpload($('nupUpload'), async (_first, files) => {
   $('status').textContent = tr('上傳中…');
   const fd = new FormData();
   for (const f of list) fd.append('files', f);
-  const r = await fu.upload('/tools/pdf-nup/load', fd, {processingLabel: '載入頁面中…'});
+  const r = await fu.upload('/tools/pdf-nup/load', fd, {processingLabel: tr('載入頁面中…')});
   if (!r.ok) { $('status').textContent = tr('上傳失敗：') + await r.text(); return; }
   const d = await r.json();
   uploadId = d.upload_id;
@@ -242,7 +242,7 @@ const fu = new FileUpload($('nupUpload'), async (_first, files) => {
   totalPages = d.total_pages;
   const info = $('nupFilesInfo');
   info.hidden = false;
-  info.innerHTML = '<b>' + tr('已上傳') + '</b>：共 ' + d.total_pages + ' 頁' +
+  info.innerHTML = '<b>' + tr('已上傳') + tr('</b>：共 ') + d.total_pages + tr(' 頁') +
     '<ul>' + d.files.map(f => `<li>${escapeHTML(f.name)} · ${f.pages} 頁</li>`).join('') + '</ul>';
   $('nupPanel').hidden = false;
   $('btnGenerate').disabled = false;
@@ -331,7 +331,7 @@ async function refreshPreview() {
   if (!r.ok) { $('status').textContent = tr('預覽失敗：') + await r.text(); return; }
   const blob = await r.blob();
   const url = URL.createObjectURL(blob);
-  $('previewWrap').innerHTML = `<img src="${url}" alt="預覽">`;
+  $('previewWrap').innerHTML = `<img src="${url}" alt="${tr('預覽')}">`;
   $('status').textContent = '';
 }
 

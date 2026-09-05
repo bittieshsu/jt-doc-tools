@@ -293,7 +293,7 @@
     const fd = new FormData();
     fd.append('file', f);
     const r = await fu.upload('/tools/pdf-border/load', fd,
-                              { processingLabel: '讀取中…（辦公文件會先轉成 PDF）' });
+                              { processingLabel: tr('讀取中…（辦公文件會先轉成 PDF）') });
     if (!r.ok) {
       (window.showAlert || alert)(await window.friendlyServerError(r, tr('讀取失敗')));
       return;
@@ -303,7 +303,7 @@
     pageCount = d.page_count;
     srcName = d.filename || 'document';
     $('bdName').textContent = srcName;
-    $('bdPages').textContent = pageCount + ' 頁';
+    $('bdPages').textContent = pageCount + tr(' 頁');
     $('bdConvKv').hidden = !d.converted;
     $('bdStat').hidden = false;
     $('bdOpts').hidden = false;
@@ -381,7 +381,7 @@
     $('bdShadowOpts').hidden = !$('bdShadow').checked;
     const contentMode = document.querySelector('input[name=bdmode]:checked').value === 'content';
     $('bdMarginHint').textContent = contentMode
-      ? '框線離內容多遠（往外擴）。超出頁面的部分會自動收回頁內。'
+      ? tr('框線離內容多遠（往外擴）。超出頁面的部分會自動收回頁內。')
       : tr('框線距離頁面邊緣多遠。');
   }
 
@@ -422,12 +422,12 @@
       cell.className = 'bd-cell is-loading';
       cell.dataset.page = String(i);
       const img = document.createElement('img');
-      img.alt = '第 ' + i + ' 頁';
+      img.alt = tr('第 ') + i + tr(' 頁');
       img.loading = 'lazy';
       img.src = `/tools/pdf-border/thumb/${uploadId}/${i}`;
       const cap = document.createElement('div');
       cap.className = 'bd-cap';
-      cap.appendChild(document.createTextNode('第 ' + i + ' 頁'));
+      cap.appendChild(document.createTextNode(tr('第 ') + i + tr(' 頁')));
       const tag = document.createElement('span');
       tag.className = 'bd-skip-tag';
       tag.hidden = true;
@@ -532,7 +532,7 @@
   const jp = new JobProgress($('bdJob'), {
     onDone: (job) => {
       $('bdDownload').href = `/api/jobs/${jp.jobId}/download`;
-      $('bdDoneMsg').textContent = (job && job.message) || '完成';
+      $('bdDoneMsg').textContent = (job && job.message) || tr('完成');
       $('bdResult').hidden = false;
       // attachWorkspaceSave 的第二個參數是**函式**（回一個 spec），不是物件 ——
       // 傳物件進去 specFn() 會直接炸，而且是在按下按鈕時才炸。

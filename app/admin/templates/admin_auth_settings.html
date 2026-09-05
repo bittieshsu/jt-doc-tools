@@ -435,7 +435,7 @@ if (btn) btn.addEventListener('click', async () => {
         { title: tr('停用認證'), kind: 'danger', okText: tr('確定停用') }))) return;
   const r = await fetch('/admin/auth-settings/disable', {method:'POST'});
   if (r.ok) location.reload();
-  else showAlert('停用失敗：' + await r.text());
+  else showAlert(tr('停用失敗：') + await r.text());
 });
 
 const unlockBtn = document.getElementById('btnUnlockAll');
@@ -447,7 +447,7 @@ if (unlockBtn) unlockBtn.addEventListener('click', async () => {
     const j = await r.json();
     showAlert(`已清除 ${j.cleared} 筆鎖定`);
   } else {
-    showAlert('清除失敗：' + await r.text());
+    showAlert(tr('清除失敗：') + await r.text());
   }
 });
 
@@ -480,7 +480,7 @@ document.querySelectorAll('.lk-unlock').forEach(b => b.addEventListener('click',
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({key})});
   if (r.ok) { const tr = b.closest('tr'); if (tr) tr.remove(); }
-  else { b.disabled = false; showAlert('解鎖失敗：' + await window.friendlyServerError(r, tr('解鎖失敗'))); }
+  else { b.disabled = false; showAlert(tr('解鎖失敗：') + await window.friendlyServerError(r, tr('解鎖失敗'))); }
 }));
 
 const CURRENT_BACKEND = {{ settings.backend|tojson }};
@@ -506,7 +506,7 @@ async function saveLdap() {
   // Confirm only when actually changing the backend (cosmetic save inside
   // the same backend doesn't kill sessions, so skip the prompt).
   if (targetBackend && targetBackend !== CURRENT_BACKEND) {
-    const label = {local:'本機帳號', ldap:'LDAP', ad:'Active Directory'}[targetBackend] || targetBackend;
+    const label = {local:tr('本機帳號'), ldap:'LDAP', ad:'Active Directory'}[targetBackend] || targetBackend;
     const ok = await showConfirm(
       `要把 backend 從「${CURRENT_BACKEND}」切換為「${label}」嗎？\n\n所有現有 session 會立刻失效，所有人都需要重新登入。`,
       { title: tr('切換認證 backend'), kind: 'warn', okText: tr('儲存並切換') }
@@ -629,7 +629,7 @@ if (tlBtn) tlBtn.addEventListener('click', async () => {
       const j = await r.json();
       let html = `<div data-s="s1b8eadeb">✓ 登入成功（${j.elapsed_ms} ms）</div>`;
       html += `<div data-s="sa18ac805"><b>DN：</b><code data-s="sc73c4105">${escapeHtml(j.user_dn)}</code></div>`;
-      html += `<div><b>顯示名稱：</b>${escapeHtml(j.display_name || '(無)')}</div>`;
+      html += `<div><b>${tr('顯示名稱：')}</b>${escapeHtml(j.display_name || tr('(無)'))}</div>`;
       html += `<div><b>群組（${j.groups.length}）：</b>`;
       if (j.groups.length === 0) {
         html += '<span class="muted">' + tr('(無)') + '</span>';

@@ -176,7 +176,7 @@ $("btnFlatten").addEventListener("click", async () => {
     if (!(await window.showConfirm(tr('即將把 {0} 條註解寫入頁面內容流，操作不可逆，要繼續？').replace('{0}', lastResult.total), { title: tr('平面化註解'), kind: 'danger', okText: tr('繼續') }))) return;
   }
   const btn = $("btnFlatten");
-  _setBusy(btn, true, "處理中…");
+  _setBusy(btn, true, tr("處理中…"));
   $("flatStatus").textContent = "";
   $("bakedPanel").hidden = true;
   $("bakedGrid").innerHTML = "";
@@ -210,7 +210,7 @@ function _renderBakedGrid(r) {
   let html = "";
   for (let p = 1; p <= r.page_count; p++) {
     html += `<div class="thumb">`;
-    html += `<img loading="lazy" class="loading" src="/tools/pdf-annotations-flatten/baked-preview/${r.baked_uid}/${p}" alt="第 ${p} 頁" data-page="${p}">`;
+    html += `<img loading="lazy" class="loading" src="/tools/pdf-annotations-flatten/baked-preview/${r.baked_uid}/${p}" alt="${tr('第 ${p} 頁')}" data-page="${p}">`;
     html += `<div class="cap">第 ${p} 頁</div>`;
     html += `</div>`;
   }
@@ -241,7 +241,7 @@ $("bakedGrid").addEventListener("click", (e) => {
 $("btnDownload").addEventListener("click", async () => {
   if (!bakedUid) return;
   const btn = $("btnDownload");
-  _setBusy(btn, true, "下載中…");
+  _setBusy(btn, true, tr("下載中…"));
   try {
     const r = await fetch(`/tools/pdf-annotations-flatten/baked-download/${bakedUid}`);
     if (!r.ok) {

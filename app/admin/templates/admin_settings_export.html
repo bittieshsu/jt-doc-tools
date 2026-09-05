@@ -171,7 +171,7 @@ $('btnPreview').addEventListener('click', async () => {
     });
     $('importCats').hidden = false;
     $('importActions').hidden = false;
-    $('previewStatus').textContent = tr('備份版本 ') + ((j.manifest && j.manifest.app_version) || '?') + '，勾選要還原的類別後匯入。';
+    $('previewStatus').textContent = tr('備份版本 ') + ((j.manifest && j.manifest.app_version) || '?') + tr('，勾選要還原的類別後匯入。');
   } catch (e) {
     $('previewStatus').textContent = tr('錯誤：') + e.message;
   } finally { $('btnPreview').disabled = false; }
@@ -181,7 +181,7 @@ $('btnImport').addEventListener('click', async () => {
   const selected = Array.from(document.querySelectorAll('.imp-cat:checked')).map(c => c.dataset.id);
   if (!selected.length) { $('importStatus').textContent = tr('請至少勾選一項'); return; }
   if (!importToken) { $('importStatus').textContent = tr('請先讀取備份內容'); return; }
-  const ok = await showConfirm(tr('即將還原勾選的 ') + selected.length + ' 個設定類別，現有檔會自動備份成 .bak。\n\n確認繼續？',
+  const ok = await showConfirm(tr('即將還原勾選的 ') + selected.length + tr(' 個設定類別，現有檔會自動備份成 .bak。\n\n確認繼續？'),
     {okText: tr('匯入'), kind: 'danger'});
   if (!ok) return;
   $('btnImport').disabled = true;
@@ -193,7 +193,7 @@ $('btnImport').addEventListener('click', async () => {
     });
     if (!r.ok) { $('importStatus').textContent = await window.friendlyServerError(r, tr('匯入失敗')); return; }
     const j = await r.json();
-    $('importStatus').textContent = tr('已匯入 ') + j.imported_files + ' 個檔案' + (j.rbac ? ('、角色/權限 ' + j.rbac.roles + ' 個') : '') + '，原檔已備份。建議重啟服務套用新設定。';
+    $('importStatus').textContent = tr('已匯入 ') + j.imported_files + tr(' 個檔案') + (j.rbac ? (tr('、角色/權限 ') + j.rbac.roles + tr(' 個')) : '') + tr('，原檔已備份。建議重啟服務套用新設定。');
     importToken = null;
   } catch (e) {
     $('importStatus').textContent = tr('錯誤：') + e.message;
@@ -230,7 +230,7 @@ $('btnRunNow').addEventListener('click', async () => {
     if (!r.ok) { $('schStatus').textContent = await window.friendlyServerError(r, tr('測試失敗')); return; }
     const j = await r.json();
     $('schStatus').textContent = tr('已匯出：') + (j.result && j.result.file || '');
-    $('schLast').textContent = tr('上次執行：剛剛（') + (j.result && j.result.file_count) + ' 檔）';
+    $('schLast').textContent = tr('上次執行：剛剛（') + (j.result && j.result.file_count) + tr(' 檔）');
   } catch (e) { $('schStatus').textContent = tr('錯誤：') + e.message; }
   finally { $('btnRunNow').disabled = false; }
 });

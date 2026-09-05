@@ -164,9 +164,9 @@
       box.textContent = '';
       box.className = 'ps-res';
       const l = document.createElement('div');
-      l.textContent = tr('完成：共 ') + (r.total || 0) + ' 頁，調整 ' + (r.changed || 0)
-        + ' 頁' + (r.skipped_same ? '、' + r.skipped_same + ' 頁原本就對（沒有動）' : '')
-        + '。下載按鈕在上方。';
+      l.textContent = tr('完成：共 ') + (r.total || 0) + tr(' 頁，調整 ') + (r.changed || 0)
+        + tr(' 頁') + (r.skipped_same ? '、' + r.skipped_same + ' 頁原本就對（沒有動）' : '')
+        + tr('。下載按鈕在上方。');
       box.appendChild(l);
       (r.warnings || []).forEach(w => {
         const d = document.createElement('div');
@@ -279,7 +279,7 @@
     (d.sizes || []).forEach(s => {
       const c = document.createElement('span');
       c.className = 'ps-chip';
-      c.textContent = s.label + ' × ' + s.pages + ' 頁';
+      c.textContent = s.label + ' × ' + s.pages + tr(' 頁');
       chips.appendChild(c);
     });
     box.appendChild(chips);
@@ -287,11 +287,11 @@
     if (d.mixed) {
       note.className = 'ps-mixed';
       note.textContent = tr('這份文件有 ') + (d.sizes || []).length
-        + ' 種頁面尺寸 —— 送印或裝訂前建議統一。';
+        + tr(' 種頁面尺寸 —— 送印或裝訂前建議統一。');
     } else {
       note.className = 'ps-ok';
       note.textContent = tr('這份文件的頁面尺寸本來就一致（')
-        + (((d.sizes || [])[0] || {}).label || '') + '）—— 不一定需要處理。';
+        + (((d.sizes || [])[0] || {}).label || '') + tr('）—— 不一定需要處理。');
     }
     box.appendChild(note);
     box.hidden = false;
@@ -301,7 +301,7 @@
     const fd = new FormData();
     fd.append('file', f);
     const r = await fu.upload('/tools/pdf-page-size/load', fd,
-      {processingLabel: '分析尺寸中…'});
+      {processingLabel: tr('分析尺寸中…')});
     if (!r.ok) {
       (window.showAlert || alert)(await window.friendlyServerError(r, tr('讀取失敗')));
       return;

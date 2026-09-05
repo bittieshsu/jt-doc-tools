@@ -171,7 +171,7 @@
       if (kind !== 'stamp' && !cur.png_b64) {
         if (window.showToast) window.showToast(
           kind === 'date' ? '請先在上方「1b. 插入日期」啟用並設定內容'
-                          : '請先在上方「1c. 個資限用章」啟用並設定內容', 'err');
+                          : tr('請先在上方「1c. 個資限用章」啟用並設定內容'), 'err');
         return null;
       }
       // 印章類：合法的放置一定帶 asset_id（共用資產）或 png_b64（臨時資產）。
@@ -181,8 +181,8 @@
       // 又因為沒有主印章而整批失敗。
       if (kind === 'stamp' && !cur.asset_id && !cur.png_b64) {
         if (window.showToast) window.showToast(
-          '請先在上方 1 區選一顆印章 / 簽名再點頁面放置'
-          + '（「不蓋印章」只能搭配日期 / 個資限用章使用）', 'err');
+          tr('請先在上方 1 區選一顆印章 / 簽名再點頁面放置')
+          + tr('（「不蓋印章」只能搭配日期 / 個資限用章使用）'), 'err');
         return null;
       }
       const dims = this.dimsOf(this.page);
@@ -410,8 +410,8 @@
         if (b.dataset.kind !== kind) return;
         b.classList.toggle('needs-setup', !ok);
         b.title = ok ? '' : (kind === 'date'
-          ? '尚未啟用 — 點一下前往「1b. 插入日期」設定'
-          : '尚未啟用 — 點一下前往「1c. 個資限用章」設定');
+          ? tr('尚未啟用 — 點一下前往「1b. 插入日期」設定')
+          : tr('尚未啟用 — 點一下前往「1c. 個資限用章」設定'));
         if (!ok && this.kind === kind) fellBack = true;
       });
       if (fellBack) this.setKind('stamp');
@@ -450,7 +450,7 @@
           // **不可以無聲 return** —— 使用者只看到「點了沒反應」，
           // 然後開始亂試右鍵（見上）。要講清楚下一步。
           if (window.showToast)
-            window.showToast('請先在上方 1 區選一個印章 / 簽名，再點頁面放置', 'err');
+            window.showToast(tr('請先在上方 1 區選一個印章 / 簽名，再點頁面放置'), 'err');
           return;
         }
         const r = this.$paper.getBoundingClientRect();
@@ -554,7 +554,7 @@
       if (this.$btnCopyAll) this.$btnCopyAll.addEventListener('click', () => {
         const n = this.copyPageToAll();
         if (window.showToast) {
-          window.showToast(n ? `已複製 ${n} 個物件到其他頁` : '目前頁沒有物件可複製',
+          window.showToast(n ? `已複製 ${n} 個物件到其他頁` : tr('目前頁沒有物件可複製'),
                            n ? 'ok' : 'err');
         }
       });

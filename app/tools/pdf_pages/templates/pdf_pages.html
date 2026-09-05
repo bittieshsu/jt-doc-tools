@@ -92,7 +92,7 @@ const fu = new FileUpload(document.getElementById('upPg'), async (f) => {
   const fd = new FormData(); fd.append('file', f);
   document.getElementById('pages-panel').hidden = false;
   document.getElementById('page-grid').innerHTML = '<p class="muted" data-s="s2a9ed20f">' + tr('載入中…') + '</p>';
-  const r = await fu.upload('/tools/pdf-pages/load', fd, {processingLabel: '載入頁面中…'});
+  const r = await fu.upload('/tools/pdf-pages/load', fd, {processingLabel: tr('載入頁面中…')});
   if (!r.ok) { document.getElementById('page-grid').innerHTML = '<p class="muted">' + tr('載入失敗') + '</p>'; return; }
   const j = await r.json();
   uploadId = j.upload_id;
@@ -116,7 +116,7 @@ function render() {
        <div class="page-num">原第 ${p.page} 頁</div>
        ${p.deleted
          ? `<button type="button" class="restore-btn" data-act="restore">還原</button>`
-         : `<button type="button" class="del-btn" data-act="delete" title="標記為刪除">×</button>`}
+         : `<button type="button" class="del-btn" data-act="delete" title="${tr('標記為刪除')}">×</button>`}
      </div>`
   ).join('');
 }
@@ -180,7 +180,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   fd.append('upload_id', uploadId);
   fd.append('order', order);
   fd.append('filename', filename);
-  const r = await fu.upload('/tools/pdf-pages/submit-from-upload', fd, {processingLabel: '排隊處理中…'});
+  const r = await fu.upload('/tools/pdf-pages/submit-from-upload', fd, {processingLabel: tr('排隊處理中…')});
   if (!r.ok) return alert(tr('送出失敗：') + await r.text());
   const j = await r.json(); jp.track(j.job_id);
 });

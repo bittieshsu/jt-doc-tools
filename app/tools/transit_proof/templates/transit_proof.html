@@ -364,7 +364,7 @@
   }
   async function loadBuffer() {
     const r = await fetch('/tools/transit-proof/buffer');
-    if (!r.ok) { toast(await errMsg(r, '載入清單失敗'), 'err'); return; }
+    if (!r.ok) { toast(await errMsg(r, tr('載入清單失敗')), 'err'); return; }
     const j = await r.json();
     ENTRIES = j.entries || [];
     renderTable();
@@ -372,13 +372,13 @@
 
   async function uploadFiles(fileList) {
     const files = Array.from(fileList || []).filter(f => /\.pdf$/i.test(f.name));
-    if (!files.length) { toast('請選 PDF 檔', 'err'); return; }
+    if (!files.length) { toast(tr('請選 PDF 檔'), 'err'); return; }
     const fd = new FormData();
     files.forEach(f => fd.append('files', f));
-    const msg = $('tpUpMsg'); msg.hidden = false; msg.className = 'tp-upmsg'; msg.textContent = tr('解析中… (') + files.length + ' 檔)';
+    const msg = $('tpUpMsg'); msg.hidden = false; msg.className = 'tp-upmsg'; msg.textContent = tr('解析中… (') + files.length + tr(' 檔)');
     try {
       const r = await fetch('/tools/transit-proof/upload', { method: 'POST', body: fd });
-      if (!r.ok) { msg.className = 'tp-upmsg err'; msg.textContent = await errMsg(r, '上傳失敗'); return; }
+      if (!r.ok) { msg.className = 'tp-upmsg err'; msg.textContent = await errMsg(r, tr('上傳失敗')); return; }
       const j = await r.json();
       ENTRIES = j.entries || [];
       renderTable();
@@ -386,14 +386,14 @@
       msg.className = 'tp-upmsg ' + (failed.length ? 'err' : 'ok');
       msg.textContent = '';
       const line = document.createElement('div');
-      line.textContent = tr('新增 ') + j.added + ' 筆' + (j.duplicates ? '，略過重複 ' + j.duplicates + ' 筆' : '') +
+      line.textContent = tr('新增 ') + j.added + tr(' 筆') + (j.duplicates ? tr('，略過重複 ') + j.duplicates + ' 筆' : '') +
         (j.cap_reached ? '（已達上限）' : '') + (failed.length ? '，' + failed.length + ' 檔無法解析：' : '');
       msg.appendChild(line);
       failed.forEach(f => {
         const d = document.createElement('div'); d.className = 'tp-fail-item';
         d.textContent = '• ' + f.file + '：' + f.error; msg.appendChild(d);
       });
-      if (j.added) toast('已新增 ' + j.added + ' 筆', 'ok');
+      if (j.added) toast(tr('已新增 ') + j.added + tr(' 筆'), 'ok');
     } catch (e) {
       msg.className = 'tp-upmsg err'; msg.textContent = tr('上傳錯誤：') + e.message;
     }
@@ -413,14 +413,14 @@
     window.attachWorkspaceLoadButton($('tpWsLoad'), fileInput, { accept: ['pdf'] });
 
   async function deleteEntry(id, entry) {
-    const desc = entry ? (entry.date + ' ' + (entry.transport || '') + ' ' + routeStr(entry)).trim() : '這筆';
-    if (!(await window.showConfirm(tr('確定刪除「') + desc + '」？此動作不可復原。',
+    const desc = entry ? (entry.date + ' ' + (entry.transport || '') + ' ' + routeStr(entry)).trim() : tr('這筆');
+    if (!(await window.showConfirm(tr('確定刪除「') + desc + tr('」？此動作不可復原。'),
         { title: tr('刪除乘車證明'), kind: 'danger', okText: tr('刪除') }))) return;
     const r = await fetch('/tools/transit-proof/entry/' + id, { method: 'DELETE' });
-    if (!r.ok) { toast(await errMsg(r, '刪除失敗'), 'err'); return; }
+    if (!r.ok) { toast(await errMsg(r, tr('刪除失敗')), 'err'); return; }
     _selected.delete(id);
     await loadBuffer();
-    toast('已刪除', 'ok');
+    toast(tr('已刪除'), 'ok');
   }
   // 表格內編輯欄位（科目等）→ 存回該筆；同步更新本地 ENTRIES 免整表重繪。
   async function saveField(id, field, value) {
@@ -428,34 +428,34 @@
     const r = await fetch('/tools/transit-proof/entry/' + id, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body) });
-    if (!r.ok) { toast(await errMsg(r, '儲存失敗'), 'err'); return; }
+    if (!r.ok) { toast(await errMsg(r, tr('儲存失敗')), 'err'); return; }
     const ent = ENTRIES.find(x => x.id === id);
     if (ent) ent[field] = value;
-    toast('已更新', 'ok');
+    toast(tr('已更新'), 'ok');
   }
   $('tpBtnClear').addEventListener('click', async () => {
     if (!ENTRIES.length) return;
-    if (!(await window.showConfirm(tr('確定清空全部 ') + ENTRIES.length + ' 筆乘車證明？此動作不可復原。',
+    if (!(await window.showConfirm(tr('確定清空全部 ') + ENTRIES.length + tr(' 筆乘車證明？此動作不可復原。'),
         { title: tr('全部清空'), kind: 'danger', okText: tr('清空') }))) return;
     const r = await fetch('/tools/transit-proof/buffer', { method: 'DELETE' });
-    if (!r.ok) { toast(await errMsg(r, '清空失敗'), 'err'); return; }
-    await loadBuffer(); toast('已清空', 'ok');
+    if (!r.ok) { toast(await errMsg(r, tr('清空失敗')), 'err'); return; }
+    await loadBuffer(); toast(tr('已清空'), 'ok');
   });
   $('tpBtnRefresh').addEventListener('click', loadBuffer);
   $('tpBtnDelSel').addEventListener('click', async () => {
     const ids = Array.from(_selected);
     if (!ids.length) return;
-    if (!(await window.showConfirm(tr('確定刪除選取的 ') + ids.length + ' 筆乘車證明？此動作不可復原。',
+    if (!(await window.showConfirm(tr('確定刪除選取的 ') + ids.length + tr(' 筆乘車證明？此動作不可復原。'),
         { title: tr('刪除選取'), kind: 'danger', okText: tr('刪除') }))) return;
     const r = await fetch('/tools/transit-proof/buffer/delete-batch', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids }) });
-    if (!r.ok) { toast(await errMsg(r, '刪除失敗'), 'err'); return; }
+    if (!r.ok) { toast(await errMsg(r, tr('刪除失敗')), 'err'); return; }
     const j = await r.json();
     _selected.clear();
     ENTRIES = j.entries || [];
     renderTable();
-    toast('已刪除 ' + j.deleted + ' 筆', 'ok');
+    toast(tr('已刪除 ') + j.deleted + tr(' 筆'), 'ok');
   });
 
   const exMenu = $('tpExportMenu');
@@ -464,13 +464,13 @@
   exMenu.querySelectorAll('button[data-fmt]').forEach(b => {
     b.addEventListener('click', async () => {
       const fmt = b.dataset.fmt; exMenu.hidden = true;
-      if (!ENTRIES.length) { toast('清單為空', 'err'); return; }
-      toast('產生 ' + fmt + ' 中…');
+      if (!ENTRIES.length) { toast(tr('清單為空'), 'err'); return; }
+      toast(tr('產生 ') + fmt + tr(' 中…'));
       try {
         const r = await fetch('/tools/transit-proof/export', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ format: fmt }) });
-        if (!r.ok) { toast(await errMsg(r, '匯出失敗'), 'err'); return; }
+        if (!r.ok) { toast(await errMsg(r, tr('匯出失敗')), 'err'); return; }
         const blob = await r.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url;
@@ -479,8 +479,8 @@
         a.download = m ? decodeURIComponent(m[1]) : ('transit-proof.' + fmt);
         document.body.appendChild(a); a.click(); a.remove();
         URL.revokeObjectURL(url);
-        toast('已下載 ' + a.download, 'ok');
-      } catch (e) { toast('匯出失敗：' + e.message, 'err'); }
+        toast(tr('已下載 ') + a.download, 'ok');
+      } catch (e) { toast(tr('匯出失敗：') + e.message, 'err'); }
     });
   });
 
@@ -599,7 +599,7 @@
     const r = await fetch('/tools/transit-proof/settings', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload) });
-    if (!r.ok) { toast(await errMsg(r, '儲存失敗'), 'err'); return; }
+    if (!r.ok) { toast(await errMsg(r, tr('儲存失敗')), 'err'); return; }
     const j = await r.json();
     SETTINGS = j.settings;
     closeSettings(); renderTable(); toast(tr('已儲存'), 'ok');

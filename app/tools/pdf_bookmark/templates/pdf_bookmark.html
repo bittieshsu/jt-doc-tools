@@ -174,18 +174,18 @@
       box.textContent = '';
       box.className = 'bm-res';
       const line = document.createElement('div');
-      line.textContent = tr('完成：') + (res.bookmark_count || 0) + ' 個書籤'
+      line.textContent = tr('完成：') + (res.bookmark_count || 0) + tr(' 個書籤')
         + (res.toc_pages ? '、' + res.toc_pages + ' 頁目錄' : '')
-        + '，共 ' + (res.page_count || 0) + ' 頁。下載按鈕在上方。';
+        + tr('，共 ') + (res.page_count || 0) + tr(' 頁。下載按鈕在上方。');
       box.appendChild(line);
       // 「沒看到目錄」是最常見的誤會 —— 書籤在閱讀器側邊欄，不在頁面內容裡；
       // 而目錄頁是**選用**的，沒勾就不會有。兩件事都要在結果講清楚。
       const tip = document.createElement('div');
       tip.className = 'bm-res-tip';
       tip.textContent = res.toc_pages
-        ? '書籤要打開閱讀器左側的「書籤 / 大綱」面板才看得到；目錄頁在文件最前面。'
-        : '書籤要打開閱讀器左側的「書籤 / 大綱」面板才看得到（不會出現在頁面內容裡）。'
-          + '想要一頁看得見、印得出來的目錄，請勾選上方的「產生可以印出來的目錄頁」再產生一次。';
+        ? tr('書籤要打開閱讀器左側的「書籤 / 大綱」面板才看得到；目錄頁在文件最前面。')
+        : tr('書籤要打開閱讀器左側的「書籤 / 大綱」面板才看得到（不會出現在頁面內容裡）。')
+          + tr('想要一頁看得見、印得出來的目錄，請勾選上方的「產生可以印出來的目錄頁」再產生一次。');
       box.appendChild(tip);
 
       // 目錄上寫著「第 47 頁」，但**頁面本身沒印頁碼的話讀者根本數不到**。
@@ -194,7 +194,7 @@
         const next = document.createElement('div');
         next.className = 'bm-res-tip';
         next.appendChild(document.createTextNode(
-          '文件本身如果沒有逐頁印上頁碼，目錄與書籤上的頁碼會對不到 —— 可以用 '));
+          tr('文件本身如果沒有逐頁印上頁碼，目錄與書籤上的頁碼會對不到 —— 可以用 ')));
         const a = document.createElement('a');
         a.href = '#';
         a.textContent = tr('「插入頁碼」補上');
@@ -210,12 +210,12 @@
                                        fname, 'pdf-bookmark');
           } catch (err) {
             a.textContent = tr('「插入頁碼」補上');
-            (window.showAlert || alert)('帶不過去：' + (err.message || err));
+            (window.showAlert || alert)(tr('帶不過去：') + (err.message || err));
           }
         });
         next.appendChild(a);
         next.appendChild(document.createTextNode(
-          '（會帶著這份檔案過去，並存一份到「我的工作區」）。'));
+          tr('（會帶著這份檔案過去，並存一份到「我的工作區」）。')));
         box.appendChild(next);
       }
 
@@ -242,11 +242,11 @@
       const tdLv = document.createElement('td');
       const wrap = document.createElement('span');
       wrap.className = 'bm-lv';
-      const bOut = mkBtn('‹', '往上一層', () => changeLevel(idx, -1), 'bm-ind');
+      const bOut = mkBtn('‹', tr('往上一層'), () => changeLevel(idx, -1), 'bm-ind');
       const nSpan = document.createElement('span');
       nSpan.className = 'bm-lv-n';
       nSpan.textContent = String(it.level);
-      const bIn = mkBtn('›', '往下一層', () => changeLevel(idx, 1), 'bm-ind');
+      const bIn = mkBtn('›', tr('往下一層'), () => changeLevel(idx, 1), 'bm-ind');
       wrap.append(bOut, nSpan, bIn);
       tdLv.appendChild(wrap);
 
@@ -283,9 +283,9 @@
 
       const tdAct = document.createElement('td');
       tdAct.append(
-        mkBtn('↑', '上移', () => move(idx, -1)),
-        mkBtn('↓', '下移', () => move(idx, 1)),
-        mkBtn('✕', '刪除', () => { items.splice(idx, 1); renderRows(); }));
+        mkBtn('↑', tr('上移'), () => move(idx, -1)),
+        mkBtn('↓', tr('下移'), () => move(idx, 1)),
+        mkBtn('✕', tr('刪除'), () => { items.splice(idx, 1); renderRows(); }));
 
       tr.append(tdLv, tdTitle, tdPg, tdAct);
       tb.appendChild(tr);
@@ -333,7 +333,7 @@
     box.append(head, ul);
     if (list.length > 30) {
       const more = document.createElement('div');
-      more.textContent = tr('（另有 ') + (list.length - 30) + ' 項未列出）';
+      more.textContent = tr('（另有 ') + (list.length - 30) + tr(' 項未列出）');
       box.appendChild(more);
     }
     box.hidden = false;
@@ -368,8 +368,8 @@
       const off = document.createElement('p');
       off.className = 'muted bm-empty';
       off.textContent = items.length
-        ? '還沒勾「產生可以印出來的目錄頁」 —— 勾了才會有目錄頁可以看。'
-        : '還沒有任何書籤，先在上面產生書籤再看目錄頁。';
+        ? tr('還沒勾「產生可以印出來的目錄頁」 —— 勾了才會有目錄頁可以看。')
+        : tr('還沒有任何書籤，先在上面產生書籤再看目錄頁。');
       box.appendChild(off);
       return;
     }
@@ -379,7 +379,7 @@
     const wrap = document.createElement('span');
     wrap.className = 'jt-thumb is-loading';
     const im0 = document.createElement('img');
-    im0.alt = '目錄頁預覽';
+    im0.alt = tr('目錄頁預覽');
     wrap.appendChild(im0);
     box.appendChild(wrap);
     const fd = new FormData();
@@ -404,7 +404,7 @@
       cap.className = 'muted bm-empty';
       cap.textContent = total > 1
         ? `目錄共 ${total} 頁，這裡顯示第 1 頁。`
-        : '目錄共 1 頁。';
+        : tr('目錄共 1 頁。');
       box.appendChild(cap);
     } catch (e) { wrap.className = 'jt-thumb is-error'; }
   }
@@ -438,7 +438,7 @@
     const fd = new FormData();
     files.forEach(f => fd.append('files', f));
     const r = await fu.upload('/tools/pdf-bookmark/load', fd,
-      {processingLabel: files.length > 1 ? '串接中…' : '讀取中…'});
+      {processingLabel: files.length > 1 ? '串接中…' : tr('讀取中…')});
     if (!r.ok) {
       (window.showAlert || alert)(await window.friendlyServerError(r, tr('讀取失敗')));
       return;
@@ -498,7 +498,7 @@
   $('bmClear').addEventListener('click', async () => {
     const ok = await (window.showConfirm
       ? window.showConfirm(tr('清除所有書籤？'), {title: tr('全部清除'), kind: 'danger', okText: tr('清除')})
-      : Promise.resolve(confirm('清除所有書籤？')));
+      : Promise.resolve(confirm(tr('清除所有書籤？'))));
     if (!ok) return;
     items = [];
     renderRows();
@@ -509,7 +509,7 @@
   $('bmSubmit').addEventListener('click', async () => {
     if (!uploadId) return;
     if (!items.length && !$('bmToc').checked) {
-      (window.showAlert || alert)('還沒有任何書籤 —— 產生或新增之後再送出。');
+      (window.showAlert || alert)(tr('還沒有任何書籤 —— 產生或新增之後再送出。'));
       return;
     }
     const btn = $('bmSubmit');
@@ -518,7 +518,7 @@
     fd.append('upload_id', uploadId);
     fd.append('bookmarks', JSON.stringify(items));
     fd.append('toc_page', $('bmToc').checked ? 'true' : 'false');
-    fd.append('toc_title', $('bmTocTitle').value || '目錄');
+    fd.append('toc_title', $('bmTocTitle').value || tr('目錄'));
     fd.append('toc_max_level', $('bmTocLevel').value);
     fd.append('toc_dots', $('bmTocDots').checked ? 'true' : 'false');
     fd.append('toc_at', $('bmTocAt').value);

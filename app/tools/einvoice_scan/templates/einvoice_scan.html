@@ -589,7 +589,7 @@
       <span class="desc">{{ tr('支援 PNG / JPG / WebP / PDF') }}</span>
     </label>
   </div>
-  {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
+  {% if workspace_enabled(request) %}<div class="fu-ws-row"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
   <div class="es-status" id="status"></div>
 
   <!-- 連續掃描的 live preview 區，預設隱藏 -->
@@ -836,10 +836,10 @@ function _fmtScannedAt(v, fid) {
     const secs = Math.floor((now - dt) / 1000);
     const rel = (key, n) => tr(key).replace('{0}', String(n));
     if (secs < 60) return tr('剛剛');
-    if (secs < 3600) return rel('{0} 分鐘前', Math.floor(secs / 60));
-    if (secs < 86400) return rel('{0} 小時前', Math.floor(secs / 3600));
+    if (secs < 3600) return rel(tr('{0} 分鐘前'), Math.floor(secs / 60));
+    if (secs < 86400) return rel(tr('{0} 小時前'), Math.floor(secs / 3600));
     const days = Math.floor(secs / 86400);
-    if (days < 7) return rel('{0} 天前', days);
+    if (days < 7) return rel(tr('{0} 天前'), days);
     return _fmtScannedAt(v, 'date_only');
   }
   // local
@@ -1190,7 +1190,7 @@ function _updateActivePeriod() {
   if (!pc.enabled) { _activePeriod = null; return; }
   if (pc.mode === 'custom') {
     if (pc.custom_start && pc.custom_end) {
-      _activePeriod = {start: pc.custom_start, end: pc.custom_end, label: '自訂日期範圍'};
+      _activePeriod = {start: pc.custom_start, end: pc.custom_end, label: tr('自訂日期範圍')};
     } else {
       _activePeriod = null;
     }
@@ -1201,7 +1201,7 @@ function _updateActivePeriod() {
         p.start === pc.custom_start && p.end === pc.custom_end);
       _activePeriod = {
         start: pc.custom_start, end: pc.custom_end,
-        label: matched ? matched.label : '指定期',
+        label: matched ? matched.label : tr('指定期'),
       };
     } else if (_periodInfo && _periodInfo.latest) {
       _activePeriod = {
@@ -1326,7 +1326,7 @@ function renderRulesPanel() {
       </select>
       <input type="text" class="rule-keywords" data-idx="${idx}" value="${escapeHtml((r.keywords||[]).join(', '))}" placeholder="keyword1, keyword2, ..." data-s="s7f6005c9">
       <input type="text" class="rule-subject" data-idx="${idx}" value="${escapeHtml(r.subject||'')}" placeholder="科目名稱 (例 油料費)" data-s="s7f6005c9">
-      <button type="button" class="rule-del" data-idx="${idx}" title="刪除" data-s="s1cde43fc">×</button>
+      <button type="button" class="rule-del" data-idx="${idx}" title="${tr('刪除')}" data-s="s1cde43fc">×</button>
     </div>`).join('');
   // 事件
   wrap.querySelectorAll('.rule-match, .rule-keywords, .rule-subject').forEach(el => {
@@ -1583,7 +1583,7 @@ function renderBufferRows() {
         return `<td>${val}</td>`;
       }
       if (d.id === 'date' && warn === 'out-of-period') {
-        val = (val || '<span data-s="s8cd4ae71">—</span>') + `<span class="warn-tag">不在期內</span>`;
+        val = (val || '<span data-s="s8cd4ae71">—</span>') + `<span class="warn-tag">${tr('不在期內')}</span>`;
         return `<td>${val}</td>`;
       }
       // note 欄位用可編輯 input
@@ -1596,8 +1596,8 @@ function renderBufferRows() {
       <td><input type="checkbox" class="sel-check" data-id="${escapeHtml(inv.id)}" ${selChecked}></td>
       ${cells}
       <td data-s="s4ddbe905">
-        <button class="info-btn" data-id="${escapeHtml(inv.id)}" title="詳細資訊">{{ icon('info', size=14) }}</button>
-        <button class="del-btn" data-id="${escapeHtml(inv.id)}" title="刪除">{{ icon('trash', size=14) }}</button>
+        <button class="info-btn" data-id="${escapeHtml(inv.id)}" title="${tr('詳細資訊')}">{{ icon('info', size=14) }}</button>
+        <button class="del-btn" data-id="${escapeHtml(inv.id)}" title="${tr('刪除')}">{{ icon('trash', size=14) }}</button>
       </td>
     </tr>`;
   });
@@ -1679,10 +1679,10 @@ function showDetail(id) {
     // 在 seller_vat 之後插入反查到的補充欄
     if (def.id === 'seller_vat') {
       const supplemental = [
-        ['seller_category', '類別'],
-        ['seller_industries', '行業'],
-        ['seller_org_type', '組織別'],
-        ['seller_address', '賣方地址'],
+        ['seller_category', tr('類別')],
+        ['seller_industries', tr('行業')],
+        ['seller_org_type', tr('組織別')],
+        ['seller_address', tr('賣方地址')],
       ];
       for (const [fid, lbl] of supplemental) {
         const v = inv[fid];
@@ -1693,7 +1693,7 @@ function showDetail(id) {
   });
   let extraHtml = '';
   if (inv.note) {
-    extraHtml = `<div class="es-detail-items"><div class="ttl">備註</div><div>${escapeHtml(inv.note)}</div></div>`;
+    extraHtml = `<div class="es-detail-items"><div class="ttl">${tr('備註')}</div><div>${escapeHtml(inv.note)}</div></div>`;
   }
   $('detailBody').innerHTML = out.join('') + extraHtml;
   $('detailModal').hidden = false;
@@ -1735,8 +1735,8 @@ async function deleteInvoice(id) {
   if (!id) return;
   const inv = _cachedInvoices.find(x => x.id === id);
   const label = inv
-    ? `${inv.invoice_number || '(無號碼)'}${inv.seller_name ? '（' + inv.seller_name + '）' : ''}`
-    : '此筆發票';
+    ? `${inv.invoice_number || tr('(無號碼)')}${inv.seller_name ? '（' + inv.seller_name + '）' : ''}`
+    : tr('此筆發票');
   if (!(await window.showConfirm(
         tr('確定刪除 {0}？').replace('{0}', label),
         { title: tr('刪除發票'), kind: 'danger', okText: tr('刪除') }))) return;
@@ -1762,9 +1762,9 @@ if (_btnLlmClassify) {
     }
     const ok = await window.showConfirm(
       `將送 ${_cachedInvoices.length} 張發票給 LLM 判讀會計科目。\n\n` +
-      '會用賣方統編 / 名稱 / 行業批次送（每批 20 張），\n' +
-      '視 LLM 速度與發票量約需 1 ~ 10 分鐘。\n' +
-      '結果會覆寫目前的「科目」欄位（標示 source=llm）。',
+      tr('會用賣方統編 / 名稱 / 行業批次送（每批 20 張），\n') +
+      tr('視 LLM 速度與發票量約需 1 ~ 10 分鐘。\n') +
+      tr('結果會覆寫目前的「科目」欄位（標示 source=llm）。'),
       { title: tr('LLM 判讀科目'), okText: tr('開始') });
     if (!ok) return;
     const orig = _btnLlmClassify.innerHTML;
@@ -1805,8 +1805,8 @@ const _btnReclassify = $('btnReclassify');
 if (_btnReclassify) {
   _btnReclassify.addEventListener('click', async () => {
     if (!(await window.showConfirm(
-          '對 buffer 內所有發票重新跑「賣方反查 + 會計科目分類」？\n' +
-          '會更新賣方名稱 / 行業 / 科目，但不影響原始掃描資料（發票號碼 / 金額等）。',
+          tr('對 buffer 內所有發票重新跑「賣方反查 + 會計科目分類」？\n') +
+          tr('會更新賣方名稱 / 行業 / 科目，但不影響原始掃描資料（發票號碼 / 金額等）。'),
           { title: tr('重抓科目'), okText: tr('開始') }))) return;
     const orig = _btnReclassify.innerHTML;
     _btnReclassify.disabled = true;
@@ -1964,15 +1964,15 @@ let _lastScannedAt = 0;
 function liveSupportCheck() {
   // 1) HTTPS / localhost
   if (typeof window.isSecureContext !== 'undefined' && !window.isSecureContext) {
-    return { ok: false, reason: '需 HTTPS — 內網直連 IP 請改用「拍照 / 從相簿選」' };
+    return { ok: false, reason: tr('需 HTTPS — 內網直連 IP 請改用「拍照 / 從相簿選」') };
   }
   // 2) getUserMedia API
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    return { ok: false, reason: '此瀏覽器不支援相機 API（請改 Chrome / Safari）' };
+    return { ok: false, reason: tr('此瀏覽器不支援相機 API（請改 Chrome / Safari）') };
   }
   // 3) jsQR loaded
   if (typeof jsQR !== 'function') {
-    return { ok: false, reason: 'QR 解碼 lib 未載入（重新整理試試）' };
+    return { ok: false, reason: tr('QR 解碼 lib 未載入（重新整理試試）') };
   }
   return { ok: true };
 }

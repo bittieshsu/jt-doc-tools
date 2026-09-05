@@ -380,10 +380,10 @@ def hello():
       `<span class="md2-stat-value">${_esc(value)}</span></div></div>`;
     const stat = $('md2Stat');
     stat.innerHTML =
-      chip(fileSvg, '檔名', j.stem) +
-      chip(pagesSvg, '頁數', j.page_count) +
-      chip(hashSvg, '原文字數', j.char_count.toLocaleString()) +
-      chip(themeSvg, '主題', _themeLabel(j.theme));
+      chip(fileSvg, tr('檔名'), j.stem) +
+      chip(pagesSvg, tr('頁數'), j.page_count) +
+      chip(hashSvg, tr('原文字數'), j.char_count.toLocaleString()) +
+      chip(themeSvg, tr('主題'), _themeLabel(j.theme));
 
     const dl = $('md2Downloads');
     const fmts = [

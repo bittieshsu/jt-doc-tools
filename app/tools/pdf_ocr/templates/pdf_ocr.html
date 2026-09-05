@@ -802,11 +802,11 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
     });
     if (dpiEst) {
       let hint = '';
-      if (v < 150)       hint = '極快，但小字易誤判';
-      else if (v < 250)  hint = '較快';
+      if (v < 150)       hint = tr('極快，但小字易誤判');
+      else if (v < 250)  hint = tr('較快');
       else if (v <= 350) hint = tr('平衡');
-      else if (v < 500)  hint = '精準（較慢）';
-      else               hint = '最精準（最慢）';
+      else if (v < 500)  hint = tr('精準（較慢）');
+      else               hint = tr('最精準（最慢）');
       dpiEst.textContent = hint;
     }
   }
@@ -874,24 +874,24 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
       if (p.llm_full) {
         const f = p.llm_full;
         const cls = f.used ? 'po-stage-status-ok' : 'po-stage-status-warn';
-        const lbl = f.used ? ((f.n_items || 0) + ' 段') : '未套用';
+        const lbl = f.used ? ((f.n_items || 0) + tr(' 段')) : tr('未套用');
         const status = '<span class="po-stage-status ' + cls + '">' + lbl + '</span>';
-        pageHtml += renderStageRow('LLM 完整辨識', 'po-stage-tag-vision', status,
+        pageHtml += renderStageRow(tr('LLM 完整辨識'), 'po-stage-tag-vision', status,
                                     f.note || '', f.text);
       }
       // LLM 直接辨識
       if (p.llm_direct) {
         const d = p.llm_direct;
         const cls = d.used ? 'po-stage-status-ok' : 'po-stage-status-warn';
-        const lbl = d.used ? '已套用' : '未套用';
+        const lbl = d.used ? '已套用' : tr('未套用');
         const status = '<span class="po-stage-status ' + cls + '">' + lbl + '</span>';
-        pageHtml += renderStageRow('LLM 直接辨識', 'po-stage-tag-vision', status,
+        pageHtml += renderStageRow(tr('LLM 直接辨識'), 'po-stage-tag-vision', status,
                                     d.note || '', d.text);
       }
       // ① OCR raw
       if (p.ocr_raw) {
         const status = '<span class="po-stage-status po-stage-status-ok">'
-                     + p.ocr_raw.word_count + ' 字</span>';
+                     + p.ocr_raw.word_count + tr(' 字</span>');
         pageHtml += renderStageRow('① OCR raw', 'po-stage-tag-ocr', status,
                                     p.ocr_raw.note || '', p.ocr_raw.text);
       }
@@ -899,38 +899,38 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
       if (p.llm_align) {
         const a = p.llm_align;
         const cls = a.used ? 'po-stage-status-ok' : 'po-stage-status-warn';
-        const lbl = a.used ? '已套用' : '未套用';
+        const lbl = a.used ? '已套用' : tr('未套用');
         const status = '<span class="po-stage-status ' + cls + '">' + lbl + '</span>';
-        pageHtml += renderStageRow('LLM 對位辨識', 'po-stage-tag-vision', status,
+        pageHtml += renderStageRow(tr('LLM 對位辨識'), 'po-stage-tag-vision', status,
                                     a.note || '', a.text);
       }
       // ② vision
       if (p.llm_vision) {
         const v = p.llm_vision;
         const cls = v.used ? 'po-stage-status-ok' : 'po-stage-status-warn';
-        const lbl = v.used ? '已套用' : '未套用';
+        const lbl = v.used ? '已套用' : tr('未套用');
         const status = '<span class="po-stage-status ' + cls + '">' + lbl + '</span>';
-        pageHtml += renderStageRow('② LLM 視覺校對', 'po-stage-tag-vision', status,
+        pageHtml += renderStageRow(tr('② LLM 視覺校對'), 'po-stage-tag-vision', status,
                                     v.note || '', v.text);
       }
       // ③ text
       if (p.llm_text) {
         const t = p.llm_text;
         const cls = t.used ? 'po-stage-status-ok' : 'po-stage-status-warn';
-        const lbl = t.used ? '已套用' : '未套用';
+        const lbl = t.used ? '已套用' : tr('未套用');
         const status = '<span class="po-stage-status ' + cls + '">' + lbl + '</span>';
-        pageHtml += renderStageRow('③ LLM 文字校正', 'po-stage-tag-text', status,
+        pageHtml += renderStageRow(tr('③ LLM 文字校正'), 'po-stage-tag-text', status,
                                     t.note || '', t.text);
       }
       // ④ final
       if (p.final_text != null) {
-        pageHtml += renderStageRow('④ 最終寫入文字層', 'po-stage-tag-final', '', '', p.final_text);
+        pageHtml += renderStageRow(tr('④ 最終寫入文字層'), 'po-stage-tag-final', '', '', p.final_text);
       }
       pageHtml += '</div>';
       body += pageHtml;
     });
     return '<details class="po-stages">'
-      + '<summary>' + PO_ICON_WRAP(PO_ICON_LAYERS) + '各階段詳細結果（' + stageResults.length + ' 頁，點開比對每段成效）</summary>'
+      + '<summary>' + PO_ICON_WRAP(PO_ICON_LAYERS) + tr('各階段詳細結果（') + stageResults.length + tr(' 頁，點開比對每段成效）</summary>')
       + '<div class="po-stages-body">' + body + '</div>'
       + '</details>';
   }
@@ -939,7 +939,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
     if (busy) {
       if (!btnRun.dataset.origHtml) btnRun.dataset.origHtml = btnRun.innerHTML;
       btnRun.disabled = true;
-      btnRun.innerHTML = `<span class="po-spinner"></span>${label || '處理中…'}`;
+      btnRun.innerHTML = `<span class="po-spinner"></span>${label || tr('處理中…')}`;
     } else {
       btnRun.disabled = false;
       if (btnRun.dataset.origHtml) {
@@ -968,7 +968,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
     if (!uploadId) return;
     const langsSel = getSelectedLangs();
     if (!langsSel) { statusEl.textContent = tr('請至少勾選一種 OCR 語言'); return; }
-    setBtnBusy(true, '處理中…');
+    setBtnBusy(true, tr('處理中…'));
     btnStop.style.display = 'inline-flex';
     btnStop.disabled = false;
     userCancelled = false;
@@ -1023,7 +1023,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
           statusEl.textContent = tr('啟動中（首次載入模型約 5-30 秒）… 已等 {0}s').replace('{0}', elapsed);
         } else if (jj.status === 'pending') {
           const elapsed = Math.round((Date.now() - t0) / 1000);
-          statusEl.textContent = elapsed >= 3 ? `排隊中… 已等 ${elapsed}s` : '排隊中…';
+          statusEl.textContent = elapsed >= 3 ? `排隊中… 已等 ${elapsed}s` : tr('排隊中…');
         }
         if (jj.status === 'done') {
           progressInner.style.width = '100%';
@@ -1066,15 +1066,15 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
             const t = stats.llm_direct_total_s || 0;
             modeLabel = `（LLM 直接辨識，LLM 用時 ${t}s）`;
           } else if (stats.llm_vision_used || stats.llm_used) {
-            modeLabel = '（含 ' + [stats.llm_vision_used ? 'LLM 視覺校對' : null,
+            modeLabel = tr('（含 ') + [stats.llm_vision_used ? 'LLM 視覺校對' : null,
                                   stats.llm_used ? 'LLM 文字校正' : null].filter(Boolean).join(' + ') + '）';
           }
           resultBox.innerHTML =
             '<div class="po-result">'
             + '<b>' + tr('完成！') + '</b><br>'
-            + '處理 ' + (stats.pages_ocrd || 0) + ' / ' + (stats.pages_total || 0) + ' 頁'
-            + '（略過 ' + (stats.pages_skipped || 0) + ' 頁已有文字層）<br>'
-            + '插入文字 ' + (stats.words_inserted || 0) + ' 字' + modeLabel
+            + tr('處理 ') + (stats.pages_ocrd || 0) + ' / ' + (stats.pages_total || 0) + tr(' 頁')
+            + tr('（略過 ') + (stats.pages_skipped || 0) + tr(' 頁已有文字層）<br>')
+            + tr('插入文字 ') + (stats.words_inserted || 0) + tr(' 字') + modeLabel
             + '<br><br>'
             + '<a class="btn btn-primary" href="' + url + '" download>' + tr('下載文字辨識後 PDF') + '</a>'
             + (window.attachWorkspaceSave ? '<button id="ocrWsSave" class="btn" type="button" data-s="sc3f83707"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="sb4a65f0b"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>' + tr('存至工作區') + '</button>' : '')
@@ -1095,13 +1095,13 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
                : '')
             + renderStageDetails(stages)
             + '<details class="po-stages">'
-            + '<summary>' + PO_ICON_WRAP(PO_ICON_INFO) + '怎麼確認是這個工具 OCR 的（不是 macOS 預覽程式自動 OCR）？</summary>'
+            + '<summary>' + PO_ICON_WRAP(PO_ICON_INFO) + tr('怎麼確認是這個工具 OCR 的（不是 macOS 預覽程式自動 OCR）？</summary>')
             + '<div class="po-stages-body">'
             + '<div data-s="s1382a0b4">'
-            + '下載後用 Adobe Acrobat / Apple 預覽程式開啟，三個方法擇一：<br>'
+            + tr('下載後用 Adobe Acrobat / Apple 預覽程式開啟，三個方法擇一：<br>')
             + '①「<b>' + tr('檔案 → 簡介') + '</b>' + tr('」（Preview）或「') + '<b>' + tr('檔案 → 內容') + '</b>' + tr('」（Acrobat）— Producer 欄位顯示「') + '<code>' + producer + '</code>' + tr('」+ tesseract 版本「') + '<code>' + tessV + '</code>」<br>'
-            + '② Cmd+F 搜尋「<code>' + marker + '</code>' + tr('」— 每頁右下角有此透明標記，能搜到代表是本工具產生的文字層') + '<br>'
-            + '③ 比對檔名：本工具輸出檔名以「<code>_searchable.pdf</code>」結尾'
+            + tr('② Cmd+F 搜尋「<code>') + marker + '</code>' + tr('」— 每頁右下角有此透明標記，能搜到代表是本工具產生的文字層') + '<br>'
+            + tr('③ 比對檔名：本工具輸出檔名以「<code>_searchable.pdf</code>」結尾')
             + '</div>'
             + '</div>'
             + '</details>'
@@ -1117,7 +1117,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
             copyBtn.addEventListener('click', async () => {
               try {
                 await navigator.clipboard.writeText(fullText);
-                copyBtn.textContent = tr('✓ 已複製 ') + fullText.length + ' 字';
+                copyBtn.textContent = tr('✓ 已複製 ') + fullText.length + tr(' 字');
                 setTimeout(() => { copyBtn.textContent = ('<span data-s="se1b879c5">' + PO_ICON_COPY + '</span>複製全文'); }, 2000);
               } catch (e) {
                 const ta = document.createElement('textarea');
@@ -1131,12 +1131,12 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
           return;
         }
         if (jj.status === 'error') {
-          throw new Error(jj.error || 'OCR 失敗');
+          throw new Error(jj.error || tr('OCR 失敗'));
         }
         // 服務在辨識途中重新啟動（多半是升級）。少了這個分支會輪詢到逾時，
         // 使用者看到「OCR 超時」這種會誤導人的訊息。
         if (jj.status === 'interrupted') {
-          throw new Error('服務已重新啟動，這個作業被中斷，請重新送出');
+          throw new Error(tr('服務已重新啟動，這個作業被中斷，請重新送出'));
         }
         if (jj.status === 'cancelled') {
           statusEl.textContent = tr('已停止辨識');
@@ -1147,7 +1147,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
           return;
         }
       }
-      throw new Error('OCR 超時');
+      throw new Error(tr('OCR 超時'));
     } catch (e) {
       if (userCancelled) {
         statusEl.textContent = tr('已停止辨識');

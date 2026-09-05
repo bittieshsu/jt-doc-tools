@@ -53,7 +53,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   for (const f of files) fd.append('file', f);
   fd.append('mode', document.querySelector('input[name=mode]:checked').value);
   fd.append('ranges', document.getElementById('ranges').value);
-  const r = await fu.upload('/tools/pdf-split/submit', fd, {processingLabel: '排隊分拆中…'});
+  const r = await fu.upload('/tools/pdf-split/submit', fd, {processingLabel: tr('排隊分拆中…')});
   if (!r.ok) return alert(tr('送出失敗：') + await r.text());
   const j = await r.json(); jp.track(j.job_id);
 });

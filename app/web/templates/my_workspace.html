@@ -129,9 +129,9 @@ async function wsLoad() {
   let j;
   try {
     const r = await fetch('/workspace/api/list');
-    if (!r.ok) throw new Error(await window.friendlyServerError(r, '載入工作區失敗'));
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('載入工作區失敗')));
     j = await r.json();
-  } catch (e) { alert(e.message || '載入工作區失敗'); return; }
+  } catch (e) { alert(e.message || tr('載入工作區失敗')); return; }
 
   // usage
   const u = j.usage || {};
@@ -179,17 +179,17 @@ async function wsLoad() {
     // PNG. Falls back to a coloured badge if the thumbnail can't be produced.
     const thumb = `<img src="/workspace/thumb/${f.file_id}" alt="" loading="lazy">`;
     return `<div class="ws-card" data-id="${f.file_id}">
-      <input type="checkbox" class="ws-check" data-id="${f.file_id}" aria-label="選取">
+      <input type="checkbox" class="ws-check" data-id="${f.file_id}" aria-label="${tr('選取')}">
       <div class="ws-thumb" data-id="${f.file_id}" data-ext="${ext}">${thumb}</div>
       <div class="ws-body">
         <div class="ws-name">${WS.esc(f.name)}</div>
-        <div class="ws-meta">${WS.fmtBytes(f.size)} · ${WS.esc(f.source_tool_name || f.source_tool || '—')}</div>
+        <div class="ws-meta">${WS.fmtBytes(f.size)} · ${WS.esc(tr(f.source_tool_name || f.source_tool || '—'))}</div>
         <div class="ws-meta">${WS.fmtTime(f.saved_at)}</div>
       </div>
       <div class="ws-actions">
-        <a class="btn btn-small" href="/workspace/file/${f.file_id}?dl=1">${WS.IC.dl}下載</a>
-        <button class="btn btn-small" type="button" data-act="rename">${WS.IC.rename}重新命名</button>
-        <button class="btn btn-small" type="button" data-act="delete">${WS.IC.del}刪除</button>
+        <a class="btn btn-small" href="/workspace/file/${f.file_id}?dl=1">${WS.IC.dl}${tr('下載')}</a>
+        <button class="btn btn-small" type="button" data-act="rename">${WS.IC.rename}${tr('重新命名')}</button>
+        <button class="btn btn-small" type="button" data-act="delete">${WS.IC.del}${tr('刪除')}</button>
       </div>
     </div>`;
   }).join('');
@@ -284,18 +284,18 @@ document.getElementById('ws-grid').addEventListener('click', async (e) => {
   const id = card.dataset.id;
   const act = btn.dataset.act;
   if (act === 'delete') {
-    if (!(await window.showConfirm('確定刪除這個檔案？此動作無法復原。', { title: tr('刪除檔案'), kind: 'danger', okText: tr('刪除') }))) return;
+    if (!(await window.showConfirm(tr('確定刪除這個檔案？此動作無法復原。'), { title: tr('刪除檔案'), kind: 'danger', okText: tr('刪除') }))) return;
     const fd = new FormData(); fd.append('file_id', id);
     const r = await fetch('/workspace/delete', { method: 'POST', body: fd });
-    if (!r.ok) return alert(await window.friendlyServerError(r, '刪除失敗'));
+    if (!r.ok) return alert(await window.friendlyServerError(r, tr('刪除失敗')));
     wsLoad();
   } else if (act === 'rename') {
     const cur = card.querySelector('.ws-name').textContent;
-    const name = await window.showPrompt('新檔名：', { title: '重新命名', defaultValue: cur });
+    const name = await window.showPrompt(tr('新檔名：'), { title: tr('重新命名'), defaultValue: cur });
     if (name == null || !name.trim()) return;
     const fd = new FormData(); fd.append('file_id', id); fd.append('name', name.trim());
     const r = await fetch('/workspace/rename', { method: 'POST', body: fd });
-    if (!r.ok) return alert(await window.friendlyServerError(r, '重新命名失敗'));
+    if (!r.ok) return alert(await window.friendlyServerError(r, tr('重新命名失敗')));
     wsLoad();
   }
 });
@@ -308,9 +308,9 @@ if (window.FileUpload) {
     for (const f of arr) {
       const fd = new FormData();
       fd.append('file', f, f.name);
-      fd.append('source_tool', '手動上傳');
+      fd.append('source_tool', tr('手動上傳'));
       const r = await fetch('/workspace/save', { method: 'POST', body: fd });
-      if (!r.ok) { alert(await window.friendlyServerError(r, '上傳失敗')); break; }
+      if (!r.ok) { alert(await window.friendlyServerError(r, tr('上傳失敗'))); break; }
       try { if ((await r.json()).duplicate) dup++; } catch (_e) {}
     }
     wsUp.reset();

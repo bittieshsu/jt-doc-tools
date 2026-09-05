@@ -222,7 +222,7 @@
             var form = document.getElementById('logoutForm');
             if (lbtn && form) {
               lbtn.addEventListener('click', async function(){
-                var ok = await window.showConfirm('未儲存的變更將遺失。', {
+                var ok = await window.showConfirm(tr('未儲存的變更將遺失。'), {
                   title: tr('確定要登出？'), okText: tr('登出'), cancelText: tr('取消')
                 });
                 if (ok) form.submit();
@@ -277,10 +277,10 @@
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 info = await r.json();
               } catch (e) {
-                window.showAlert('無法載入帳號資訊：' + e.message);
+                window.showAlert(tr('無法載入帳號資訊：') + e.message);
                 return;
               }
-              var srcMap = {local:'本機', ldap:'LDAP', ad:'Active Directory', off:'單機模式'};
+              var srcMap = {local:tr('本機'), ldap:'LDAP', ad:'Active Directory', off:tr('單機模式')};
               var srcLabel = srcMap[info.source] || esc(info.source||'');
               // 顯示名稱可能跟 username 一樣，避免重複資訊
               var displayName = info.display_name || info.username || '';
@@ -321,10 +321,10 @@
                 pwBtnHtml = '<div data-s="s5239fcb7">'
                   + '<button type="button" id="meChangePwBtn" class="btn" data-s="s1bddf699">'
                   + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-s="sb4a65f0b"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
-                  + '變更密碼</button></div>';
+                  + tr('變更密碼</button></div>');
               } else if (info.source === 'ldap' || info.source === 'ad') {
                 pwBtnHtml = '<div data-s="s9daaf75f">'
-                  + '密碼由 ' + esc(srcLabel) + ' 目錄端管理。</div>';
+                  + tr('密碼由 ') + esc(srcLabel) + tr(' 目錄端管理。</div>');
               }
               // 2FA 區塊 — 任何 source 都能用（含 LDAP/AD），TOTP 是本機 app 狀態
               var totpHtml = '';
@@ -380,8 +380,8 @@
                       + '</div>'
                       + '<div data-s="s7e11a0c4">' + tr('作業完成通知會寄到這裡。') + '</div>'
                     : '<div data-s="s7e11a0c4">信箱由 ' + esc(srcLabel)
-                      + ' 端管理，每次登入自動同步。要把通知收在別的信箱，'
-                      + '可到「我的作業 → 通知設定」指定。</div>')
+                      + tr(' 端管理，每次登入自動同步。要把通知收在別的信箱，')
+                      + tr('可到「我的作業 → 通知設定」指定。</div>'))
                 + '</div>';
 
               // 完整 modal HTML
@@ -409,7 +409,7 @@
                 + '</div>'
                 + totpHtml
                 + pwBtnHtml;
-              window.showAlert(html, {title:'我的帳號', html:true, okText:'關閉', okIcon:'close'});
+              window.showAlert(html, {title:tr('我的帳號'), html:true, okText:tr('關閉'), okIcon:'close'});
               // Bind the 變更密碼 button — uses a self-contained inline modal
               // (showConfirm closes before we can read form values)
               setTimeout(function(){
@@ -439,16 +439,16 @@
                         body: JSON.stringify({email: eInp.value}),
                       });
                       if (!r.ok) {
-                        throw new Error(await window.friendlyServerError(r, '儲存失敗'));
+                        throw new Error(await window.friendlyServerError(r, tr('儲存失敗')));
                       }
                       var j = await r.json();
                       info.email = j.email || '';
                       var txt = document.getElementById('meEmailText');
-                      if (txt) txt.textContent = info.email || '（尚未設定）';
+                      if (txt) txt.textContent = info.email || tr('（尚未設定）');
                       eBox.hidden = true; eRow.hidden = false;
-                      if (window.showToast) window.showToast('信箱已更新', 'ok');
+                      if (window.showToast) window.showToast(tr('信箱已更新'), 'ok');
                     } catch (err) {
-                      window.showAlert(err.message || '儲存失敗');
+                      window.showAlert(err.message || tr('儲存失敗'));
                     } finally {
                       eSave.disabled = false;
                     }
@@ -459,21 +459,21 @@
                 var reissueBtn = document.getElementById('meTotpReissueBtn');
                 if (reissueBtn) reissueBtn.addEventListener('click', function(){
                   window.showConfirm(
-                    '重新生 secret 會把現有的 TOTP secret 換掉，您需要重新用 Authenticator app 掃 QR。原來的 secret 失效。',
+                    tr('重新生 secret 會把現有的 TOTP secret 換掉，您需要重新用 Authenticator app 掃 QR。原來的 secret 失效。'),
                     {title: tr('重新生成'), okText: tr('繼續')}
                   ).then(function(ok){ if (ok) openTotpSetupModal(); });
                 });
                 var disableBtn = document.getElementById('meTotpDisableBtn');
                 if (disableBtn) disableBtn.addEventListener('click', async function(){
                   var ok = await window.showConfirm(
-                    '停用 2FA？下次登入只會問密碼，安全性降低。',
+                    tr('停用 2FA？下次登入只會問密碼，安全性降低。'),
                     {title: tr('停用 2FA'), kind:'danger', okText: tr('停用')}
                   );
                   if (!ok) return;
                   var r = await fetch('/me/2fa/disable', {method:'POST'});
-                  if (r.ok) { window.showAlert('已停用 2FA'); location.reload(); }
+                  if (r.ok) { window.showAlert(tr('已停用 2FA')); location.reload(); }
                   else { var j = await r.json().catch(function(){return{};});
-                    window.showAlert('停用失敗：' + (j.detail || r.status)); }
+                    window.showAlert(tr('停用失敗：') + (j.detail || r.status)); }
                 });
               }, 50);
 
@@ -507,12 +507,12 @@
                 fetch('/me/2fa/start', {method:'POST'})
                   .then(function(r){ return r.json(); })
                   .then(function(j){
-                    if (!j.ok) { qrSlot.textContent = '建立 secret 失敗'; return; }
+                    if (!j.ok) { qrSlot.textContent = tr('建立 secret 失敗'); return; }
                     qrSlot.innerHTML = '<img src="' + j.qr_url + '" data-s="s69cda33d" alt="QR">';
-                    secSlot.textContent = '若無法掃 QR，可手動輸入：' + j.secret;
+                    secSlot.textContent = tr('若無法掃 QR，可手動輸入：') + j.secret;
                     codeEl.focus();
                   })
-                  .catch(function(){ qrSlot.textContent = '建立 secret 失敗（網路錯誤）'; });
+                  .catch(function(){ qrSlot.textContent = tr('建立 secret 失敗（網路錯誤）'); });
                 okBtn.addEventListener('click', async function(){
                   errEl.style.display = 'none';
                   var code = (codeEl.value || '').replace(/\D/g, '');
@@ -526,10 +526,10 @@
                   var j = await r.json().catch(function(){ return {}; });
                   if (r.ok && j.ok) {
                     ov.remove();
-                    window.showAlert('已啟用 兩步驟驗證');
+                    window.showAlert(tr('已啟用 兩步驟驗證'));
                     location.reload();
                   } else {
-                    showE(j.detail || ('驗證失敗：' + r.status));
+                    showE(j.detail || (tr('驗證失敗：') + r.status));
                     okBtn.disabled = false;
                   }
                 });
@@ -572,9 +572,9 @@
                 okBtn.addEventListener('click', async function(){
                   errEl.style.display='none';
                   var o = oldEl.value, n = newEl.value, n2 = new2El.value;
-                  if (!o || !n || !n2) { showE('三個欄位都要填'); return; }
+                  if (!o || !n || !n2) { showE(tr('三個欄位都要填')); return; }
                   if (n !== n2) { showE('兩次新密碼不一致'); return; }
-                  okBtn.disabled = true; okBtn.textContent = '變更中…';
+                  okBtn.disabled = true; okBtn.textContent = tr('變更中…');
                   try {
                     var r = await fetch('/change-password', {
                       method: 'POST',
@@ -582,12 +582,12 @@
                       body: JSON.stringify({old_password: o, new_password: n}),
                     });
                     var j = await r.json().catch(function(){ return {}; });
-                    if (!r.ok) { showE(j.detail || ('HTTP ' + r.status)); okBtn.disabled = false; okBtn.textContent = '變更'; return; }
+                    if (!r.ok) { showE(j.detail || ('HTTP ' + r.status)); okBtn.disabled = false; okBtn.textContent = tr('變更'); return; }
                     close();
-                    window.showAlert('密碼已變更，其他裝置 session 已登出', {title:'成功', okText:'關閉'});
+                    window.showAlert(tr('密碼已變更，其他裝置 session 已登出'), {title:tr('成功'), okText:tr('關閉')});
                   } catch (e) {
-                    showE('網路錯誤：' + e.message);
-                    okBtn.disabled = false; okBtn.textContent = '變更';
+                    showE(tr('網路錯誤：') + e.message);
+                    okBtn.disabled = false; okBtn.textContent = tr('變更');
                   }
                 });
                 setTimeout(function(){ oldEl.focus(); }, 30);
@@ -690,7 +690,7 @@
     {% if is_admin(request) and net_exposed() and (request.scope.get('path') or '').startswith('/admin') %}
     <div class="net-expose-warn" role="alert" id="netExposeWarn">
       {{ icon('warn', size=16) }}
-      <span><b>本服務已對網路開放</b>（綁定 <code>{{ bind_host() }}</code>）。本工具會處理公司<b>內部 / 機密文件</b>，若直接對<b>公開網際網路</b>開放，等於把這些文件與後台一併暴露出去，有<b>資料外洩風險</b>。建議<b>只在內網 / VPN 使用</b>，並置於<b>反向代理 + HTTPS + 認證</b>後面，勿把 <code>:8765</code> 直接對外開放。詳見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener">OPS.md</a>。</span>
+      <span><b>{{ tr('本服務已對網路開放') }}</b>{{ tr('（綁定') }} <code>{{ bind_host() }}</code>{{ tr('）。本工具會處理公司') }}<b>{{ tr('內部 / 機密文件') }}</b>{{ tr('，若直接對') }}<b>{{ tr('公開網際網路') }}</b>{{ tr('開放，等於把這些文件與後台一併暴露出去，有') }}<b>{{ tr('資料外洩風險') }}</b>{{ tr('。建議') }}<b>{{ tr('只在內網 / VPN 使用') }}</b>{{ tr('，並置於') }}<b>{{ tr('反向代理 + HTTPS + 認證') }}</b>{{ tr('後面，勿把') }} <code>:8765</code> {{ tr('直接對外開放。詳見') }} <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener">OPS.md</a>{{ tr('。') }}</span>
       <button type="button" class="net-expose-x" id="netExposeWarnX" aria-label="{{ tr('關閉此提醒') }}" title="{{ tr('知道了，關閉此提醒（本瀏覽器記住，不再顯示）') }}">&times;</button>
     </div>
     <script nonce="{{ request.state.csp_nonce }}">
@@ -877,15 +877,15 @@
         const dot = document.getElementById('sbBellDot');
         const list = document.getElementById('sbInboxList');
         if (!bell || !panel) return;
-        const LABEL = { done: '已完成', error: '失敗', cancelled: '已取消',
-                        interrupted: '已中斷' };
+        const LABEL = { done: tr('已完成'), error: tr('失敗'), cancelled: tr('已取消'),
+                        interrupted: tr('已中斷') };
 
         function ago(ts) {
           const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
-          if (s < 60) return '剛剛';
-          if (s < 3600) return Math.floor(s / 60) + ' 分鐘前';
-          if (s < 86400) return Math.floor(s / 3600) + ' 小時前';
-          return Math.floor(s / 86400) + ' 天前';
+          if (s < 60) return tr('剛剛');
+          if (s < 3600) return Math.floor(s / 60) + tr(' 分鐘前');
+          if (s < 86400) return Math.floor(s / 3600) + tr(' 小時前');
+          return Math.floor(s / 86400) + tr(' 天前');
         }
 
         function el(tag, cls, text) {
@@ -931,7 +931,8 @@
               a.appendChild(tile);
             }
             const body = el('div', 'sb-inbox-body');
-            body.appendChild(el('div', 'sb-inbox-t', it.tool_name));
+            // 工具名稱是伺服器給的中文 —— 整句當鍵查得到（工具名早就在語系檔裡）。
+            body.appendChild(el('div', 'sb-inbox-t', tr(it.tool_name)));
             if (it.filename) body.appendChild(el('div', 'sb-inbox-f', it.filename));
             const bad = it.status !== 'done';
             body.appendChild(el('div', 'sb-inbox-m' + (bad ? ' sb-inbox-bad' : ''),

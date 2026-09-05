@@ -280,13 +280,13 @@
       box.textContent = '';
       box.className = 'sm-res';
       const l1 = document.createElement('div');
-      l1.textContent = tr('完成：') + (r.groups || 0) + ' 組騎縫章，每組 '
-        + (r.per_group || 0) + ' 頁。下載按鈕在上方。';
+      l1.textContent = tr('完成：') + (r.groups || 0) + tr(' 組騎縫章，每組 ')
+        + (r.per_group || 0) + tr(' 頁。下載按鈕在上方。');
       box.appendChild(l1);
       if (r.seed) {
         const l2 = document.createElement('div');
         l2.className = 'muted';
-        l2.textContent = tr('亂數種子 ') + r.seed + '（填回設定就能重現同一份）';
+        l2.textContent = tr('亂數種子 ') + r.seed + tr('（填回設定就能重現同一份）');
         box.appendChild(l2);
       }
       (r.warnings || []).forEach(w => {
@@ -508,7 +508,7 @@
     const fd = new FormData();
     fd.append('file', f);
     const r = await fu.upload('/tools/pdf-seam-stamp/load', fd,
-      {processingLabel: '讀取中…（辦公文件會先轉成 PDF）'});
+      {processingLabel: tr('讀取中…（辦公文件會先轉成 PDF）')});
     if (!r.ok) {
       (window.showAlert || alert)(await window.friendlyServerError(r, tr('讀取失敗')));
       return;

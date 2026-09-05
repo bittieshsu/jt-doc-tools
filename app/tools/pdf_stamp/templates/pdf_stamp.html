@@ -21,7 +21,7 @@
       <div class="name">
         <input type="radio" name="stamp" value="{{ s.id }}" {% if s.id == default_id %}checked{% endif %} />
         {{ s.name }}
-        <span class="type-chip type-{{ s.type }}">{{ {'stamp':'印章','signature':'簽名','logo':'Logo'}[s.type] or s.type }}</span>
+        <span class="type-chip type-{{ s.type }}">{{ tr({'stamp':'印章','signature':'簽名','logo':'Logo'}[s.type] or s.type) }}</span>
       </div>
       <div class="meta">{{ '%.0f'|format(s.preset.width_mm) }}×{{ '%.0f'|format(s.preset.height_mm) }}mm, Y={{ '%.0f'|format(s.preset.y_mm) }}</div>
     </label>
@@ -701,7 +701,7 @@ function renderBatchList() {
   if (pickedFiles.length <= 1) { box.hidden = true; box.innerHTML = ''; return; }
   box.hidden = false;
   box.innerHTML = '<div class="muted" data-s="scac3de05">共 '
-    + pickedFiles.length + ' 份 PDF，將統一套用相同位置、尺寸、頁面模式，完成後打包為 ZIP。</div>'
+    + pickedFiles.length + tr(' 份 PDF，將統一套用相同位置、尺寸、頁面模式，完成後打包為 ZIP。</div>')
     + '<ul data-s="s0eeb0191">'
     + pickedFiles.map(f => `<li>${escapeHTML(f.name)}</li>`).join('')
     + '</ul>';
@@ -832,7 +832,7 @@ function _renderPageChips() {
     + '<div class="page-pick-grid">';
   for (let i = 0; i < cnt; i++) {
     html += `<button type="button" class="page-chip${selectedPages.has(i) ? ' on' : ''}" `
-      + `data-pg="${i}" title="第 ${i + 1} 頁">${i + 1}</button>`;
+      + `data-pg="${i}" title="${tr('第 ${i + 1} 頁')}">${i + 1}</button>`;
   }
   html += '</div>';
   box.innerHTML = html;
@@ -907,7 +907,7 @@ async function loadPreview() {
   if (previewInfo && _previewFileKey === key) return previewInfo;
   const fd = new FormData();
   fd.append('file', f);
-  const r = await fu.upload('/tools/pdf-stamp/preview', fd, {processingLabel: '產生預覽中…'});
+  const r = await fu.upload('/tools/pdf-stamp/preview', fd, {processingLabel: tr('產生預覽中…')});
   if (!r.ok) return null;
   previewInfo = await r.json();
   _previewFileKey = key;
@@ -1285,7 +1285,7 @@ function _renderSimPage() {
   img.src = p.preview_url + '?t=' + t;
   img.alt = 'page ' + (p.index + 1);
   document.getElementById('sim-cap').textContent =
-    tr('第 ') + (p.index + 1) + ' 頁 / 共 ' + simPageCount + ' 頁' + (p.stamped ? ' · 已蓋章' : ' · 此頁未蓋章');
+    tr('第 ') + (p.index + 1) + tr(' 頁 / 共 ') + simPageCount + tr(' 頁') + (p.stamped ? ' · 已蓋章' : tr(' · 此頁未蓋章'));
   document.getElementById('sim-page-info').textContent = (simPageIdx + 1) + ' / ' + simPages.length;
   document.getElementById('sim-prev').disabled = simPageIdx === 0;
   document.getElementById('sim-next').disabled = simPageIdx >= simPages.length - 1;
@@ -1311,7 +1311,7 @@ async function refreshSim() {
       const n = (previewInfo && previewInfo.page_count) || 0;
       if (busySub) busySub.textContent = n
         ? `正在逐頁蓋章並產生預覽（共 ${n} 頁）`
-        : '正在逐頁蓋章並產生預覽';
+        : tr('正在逐頁蓋章並產生預覽');
       busy.hidden = false;
     }
     const fd = new FormData();
@@ -1342,7 +1342,7 @@ async function refreshSim() {
       if (simExtras.length) fd.append('extras_json', JSON.stringify(simExtras));
     }
     try {
-      const r = await fu.upload('/tools/pdf-stamp/preview-all-pages', fd, {processingLabel: '產生全頁預覽中…'});
+      const r = await fu.upload('/tools/pdf-stamp/preview-all-pages', fd, {processingLabel: tr('產生全頁預覽中…')});
       if (seq !== simSeq) return; // superseded
       if (!r.ok) { status.textContent = tr('模擬圖產生失敗'); return; }
       const j = await r.json();
@@ -1503,7 +1503,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     if (editor) fd.append('override', JSON.stringify(editor.getValue()));
     if (extras.length) fd.append('extras_json', JSON.stringify(extras));
   }
-  const r = await fu.upload('/tools/pdf-stamp/submit', fd, {processingLabel: '排隊用印中…'});
+  const r = await fu.upload('/tools/pdf-stamp/submit', fd, {processingLabel: tr('排隊用印中…')});
   if (!r.ok) {
     const txt = await r.text();
     return alert(tr('送出失敗：') + txt);
@@ -1525,7 +1525,7 @@ function _tempAssetRender() {
   }
   slot.style.display = 'block';  // 明確值：蓋過 data-s 的 display:none 規則（空字串蓋不過）
   document.getElementById('tempAssetThumb').src = t.dataUrl;
-  document.getElementById('tempAssetName').textContent = t.filename || '臨時資產';
+  document.getElementById('tempAssetName').textContent = t.filename || tr('臨時資產');
 }
 
 function _tempAssetSet(t) {
@@ -1841,7 +1841,7 @@ async function _restrictRegen({ silent } = {}) {
   if (!silent) {
     const p = _restrictGetParams();
     document.getElementById('restrict-summary-status').textContent =
-        p.showPhrase ? ('— 僅供 ' + p.purpose + ' 使用') : ('— ' + p.purpose);
+        p.showPhrase ? (tr('— 僅供 ') + p.purpose + tr(' 使用')) : ('— ' + p.purpose);
   }
   return { dataUri, ...data };
 }
@@ -1963,8 +1963,8 @@ function _restrictRemoveOverlay() {
       const p = _restrictGetParams();
       document.getElementById('restrict-summary-status').textContent =
           p.purpose
-            ? (p.showPhrase ? ('— 僅供 ' + p.purpose + ' 使用') : ('— ' + p.purpose))
-            : '— 已啟用（請填用途）';
+            ? (p.showPhrase ? (tr('— 僅供 ') + p.purpose + tr(' 使用')) : ('— ' + p.purpose))
+            : tr('— 已啟用（請填用途）');
     } else {
       form.style.display = 'none';
       _restrictRemoveOverlay();

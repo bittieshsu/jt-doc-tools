@@ -72,9 +72,9 @@
       const url = wsId
         ? '/workspace/file/' + encodeURIComponent(wsId)
         : '/api/jobs/' + encodeURIComponent(jobId) + '/download';
-      this._setProgress({indeterminate: true, label: '接收上一個工具的檔案…'});
+      this._setProgress({indeterminate: true, label: tr('接收上一個工具的檔案…')});
       fetch(url)
-        .then(r => { if (!r.ok) throw new Error('取不到檔案'); return r.blob(); })
+        .then(r => { if (!r.ok) throw new Error(tr('取不到檔案')); return r.blob(); })
         .then(b => {
           this._setProgress(null);
           const f = new File([b], name, {type: b.type || 'application/pdf'});
@@ -85,7 +85,7 @@
           // 工作區挑選器本來就有依 accept 過濾，交接這條路漏了。
           if (!this._acceptsFile(f)) {
             if (window.showAlert) {
-              window.showAlert('這個工具不接受「' + f.name + '」這種檔案格式。');
+              window.showAlert(tr('這個工具不接受「') + f.name + tr('」這種檔案格式。'));
             }
             return;
           }
@@ -95,7 +95,7 @@
           this._setProgress(null);
           // 檔案可能已被刪除或作業已過期 —— 講清楚，不要留一個空畫面
           if (window.showAlert) {
-            window.showAlert('上一個工具的檔案取不到了（可能已刪除或過期），請重新上傳。');
+            window.showAlert(tr('上一個工具的檔案取不到了（可能已刪除或過期），請重新上傳。'));
           }
         });
     }
@@ -268,9 +268,9 @@
       self.setBusy(true);
       return window.uploadWithProgress(url, formData, function (loaded, total, pct) {
         if (pct < 100) {
-          self._setProgress({pct: pct, label: '上傳中… ' + fmt(loaded) + ' / ' + fmt(total)});
+          self._setProgress({pct: pct, label: tr('上傳中… ') + fmt(loaded) + ' / ' + fmt(total)});
         } else {
-          self._setProgress({indeterminate: true, label: opts.processingLabel || '處理中…（' + fmt(total) + '）'});
+          self._setProgress({indeterminate: true, label: opts.processingLabel || tr('處理中…（') + fmt(total) + '）'});
         }
       }, opts).finally(function () {
         // Hide progress shortly after; tool's own UI will take over.

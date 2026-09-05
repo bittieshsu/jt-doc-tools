@@ -407,7 +407,7 @@
       const r = await postJson('/admin/sso/test', {provider});
       const j = await r.json();
       const res = (j.result || {})[provider] || {};
-      resultEl.textContent = res.ok ? '✓ 通過' : ('✗ ' + (res.error || '失敗'));
+      resultEl.textContent = res.ok ? '✓ 通過' : ('✗ ' + (res.error || tr('失敗')));
     } catch(e){ resultEl.textContent = '✗ ' + e; }
   }
   $('testOidc').addEventListener('click', () => runTest('oidc', $('oidcResult')));

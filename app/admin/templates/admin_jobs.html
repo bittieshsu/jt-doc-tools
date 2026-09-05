@@ -91,7 +91,7 @@
         <span class="aj-limit">{{ tr('LLM / 遠端 GPU OCR') }}</span>
       </div>
       <div class="aj-help muted">
-        {% if conc.remote_services %}{{ tr('目前啟用：') }}{{ conc.remote_services|join('、') }}。{% endif %}
+        {% if conc.remote_services %}{{ tr('目前啟用：') }}{% for r in conc.remote_services %}{{ tr(r) }}{% if not loop.last %}、{% endif %}{% endfor %}{{ tr('。') }}{% endif %}
         {{ tr('真正的瓶頸在') }}<b>{{ tr('對方那台機器') }}</b>{{ tr('（一張 GPU 只載一個模型），本機的記憶體判斷擋不到。') }}
         <b>{{ tr('預設 1') }}</b> {{ tr('—— 一個一個過去、每個都在合理時間內完成，比全部一起去搶顯示記憶體到集體逾時好。') }}
       </div>
@@ -394,11 +394,11 @@
   let paused = false;
 
   const LABEL = {
-    pending: tr('排隊中'), running: '進行中', done: '已完成',
-    error: '失敗', cancelled: '已取消', interrupted: '已中斷',
+    pending: tr('排隊中'), running: tr('進行中'), done: tr('已完成'),
+    error: tr('失敗'), cancelled: tr('已取消'), interrupted: tr('已中斷'),
   };
   // 共用資源標籤 —— 三種資源各有自己的併行上限，標出來才知道卡在哪一個
-  const RES_LABEL = { office: 'Office', ocr: 'OCR', remote: '外部服務' };
+  const RES_LABEL = { office: 'Office', ocr: 'OCR', remote: tr('外部服務') };
 
   const NS = 'http://www.w3.org/2000/svg';
 
@@ -480,7 +480,7 @@
     statsEl.appendChild(stat(`${ofc.in_use || 0} / ${ofc.limit || 1}`, tr('Office 轉檔佔用')));
     statsEl.appendChild(stat(rt.max_concurrent || 1, tr('同時上限')));
     if (rt.held_for_ram) {
-      statsEl.appendChild(stat('是', '因記憶體不足而排隊', true));
+      statsEl.appendChild(stat('是', tr('因記憶體不足而排隊'), true));
     }
     paused = !!rt.paused;
     document.getElementById('aj-pause-tx').textContent =
@@ -605,7 +605,7 @@
         const t = RES_LABEL[r];
         if (t) cell.appendChild(el('span', 'aj-res ' + r, t));
       });
-      if (j.priority) cell.appendChild(el('span', 'aj-prio-tag', '優先'));
+      if (j.priority) cell.appendChild(el('span', 'aj-prio-tag', tr('優先')));
       tdTool.appendChild(cell);
       tr.appendChild(tdTool);
 
@@ -618,11 +618,11 @@
       // 的標示就跟著更新。
       if (j.owner_priority !== null && j.owner_priority !== undefined) {
         const b = el('span', 'aj-owner-prio', String(j.owner_priority + 1));
-        b.title = tr('優先派送名單第 ') + (j.owner_priority + 1) + ' 位';
+        b.title = tr('優先派送名單第 ') + (j.owner_priority + 1) + tr(' 位');
         ownerLine.appendChild(b);
         ownerLine.classList.add('is-prio');
       }
-      ownerLine.appendChild(el('span', null, j.owner || '（未登入）'));
+      ownerLine.appendChild(el('span', null, j.owner || tr('（未登入）')));
       tdOwner.appendChild(ownerLine);
       if (j.client_ip) tdOwner.appendChild(el('div', 'aj-owner-ip', j.client_ip));
       tr.appendChild(tdOwner);
@@ -648,7 +648,7 @@
                                'CPU ' + j.usage.cpu_pct + '%'));
         }
       } else if (j.status === 'running' || j.status === 'pending') {
-        tdUse.appendChild(el('span', 'aj-usage-est', '估 ' + fmtMB(j.est_mb)));
+        tdUse.appendChild(el('span', 'aj-usage-est', tr('估 ') + fmtMB(j.est_mb)));
       } else {
         tdUse.appendChild(el('span', 'aj-usage-est', '—'));
       }
@@ -665,7 +665,7 @@
         // 取消是破壞性的（丟掉已經跑到一半的結果）→ 給醒目色 + 圖示
         const b = el('button', 'btn btn-small btn-danger');
         b.appendChild(svgIcon(['M6 6l12 12', 'M6 18L18 6']));
-        b.appendChild(document.createTextNode('取消'));
+        b.appendChild(document.createTextNode(tr('取消')));
         b.type = 'button';
         b.addEventListener('click', () => cancelJob(j.id, b));
         tdAct.appendChild(b);
@@ -696,15 +696,15 @@
   let chartHours = 24;
 
   const METRICS = {
-    running:  {label: '執行中作業', pick: (j, r) => r.running_max,
-               fallback: (j) => j.active, color: '#2563eb', unit: ' 個'},
-    queued:   {label: '排隊中作業', pick: (j, r) => r.queued_max,
-               fallback: () => 0, color: '#f59e0b', unit: ' 個'},
-    started:  {label: '新送出作業', pick: (j) => j.started,
-               fallback: (j) => j.started, color: '#0d9488', unit: ' 個'},
-    cpu:      {label: 'CPU 使用率', pick: (j, r) => r.cpu_max,
+    running:  {label: tr('執行中作業'), pick: (j, r) => r.running_max,
+               fallback: (j) => j.active, color: '#2563eb', unit: tr(' 個')},
+    queued:   {label: tr('排隊中作業'), pick: (j, r) => r.queued_max,
+               fallback: () => 0, color: '#f59e0b', unit: tr(' 個')},
+    started:  {label: tr('新送出作業'), pick: (j) => j.started,
+               fallback: (j) => j.started, color: '#0d9488', unit: tr(' 個')},
+    cpu:      {label: tr('CPU 使用率'), pick: (j, r) => r.cpu_max,
                fallback: () => 0, color: '#7c3aed', unit: '%'},
-    mem:      {label: '記憶體使用', pick: (j, r) => r.mem_max_mb,
+    mem:      {label: tr('記憶體使用'), pick: (j, r) => r.mem_max_mb,
                fallback: () => 0, color: '#db2777', unit: ' MB'},
   };
 
@@ -735,7 +735,7 @@
       if (v == null || (v === 0 && (r.samples || 0) === 0)) v = m.fallback(j, r) || 0;
       return {ts: j.ts, v: Number(v) || 0};
     });
-    if (!pts.length) { body.appendChild(el('div', 'muted', '尚無資料')); return; }
+    if (!pts.length) { body.appendChild(el('div', 'muted', tr('尚無資料'))); return; }
 
     const W = 1000, H = 150, PAD_L = 42, PAD_B = 20, PAD_T = 8;
     const maxV = Math.max(1, ...pts.map((p) => p.v));
@@ -784,13 +784,13 @@
     const note = document.getElementById('aj-chart-note');
     note.textContent = '';
     if (pts[pk].v > 0) {
-      note.appendChild(document.createTextNode('高峰 '));
+      note.appendChild(document.createTextNode(tr('高峰 ')));
       note.appendChild(el('span', 'aj-peak',
         Math.round(pts[pk].v) + m.unit + '（' + fmtTime(pts[pk].ts, chartHours) + '）'));
       const hasSamples = res.some((r) => (r.samples || 0) > 0);
       if (!hasSamples && (chartMetric === 'cpu' || chartMetric === 'mem')) {
         note.appendChild(document.createTextNode(
-          '・尚無取樣資料（每分鐘記錄一筆，服務啟動後才開始累積）'));
+          tr('・尚無取樣資料（每分鐘記錄一筆，服務啟動後才開始累積）')));
       }
     } else {
       note.textContent = tr('這段時間沒有活動。');
@@ -878,7 +878,7 @@
   // 名單是「整份覆寫」的：每次增刪都把完整清單送上去。人數上限只有數十，
   // 用不著做差異比對，而整份覆寫不會有「兩個分頁各改一半」的合併問題。
   // 認證來源的顯示名稱。同一個 username 可以分屬不同來源，挑人時一定要標出來。
-  const SRC_LABEL = { local: '本機', ldap: 'LDAP', ad: 'AD',
+  const SRC_LABEL = { local: tr('本機'), ldap: 'LDAP', ad: 'AD',
                       oidc: 'OIDC', saml: 'SAML' };
 
   // 全站通用的 `username@來源` 寫法（見 app/core/sessions.py:user_label）——
@@ -915,7 +915,7 @@
       who.appendChild(el('span', 'aj-prio-who', prioWho(u)));
       row.appendChild(who);
       row.appendChild(el('span', 'aj-prio-src ' + (u.source || 'local'),
-                         SRC_LABEL[u.source] || u.source || '本機'));
+                         SRC_LABEL[u.source] || u.source || tr('本機')));
       const x = document.createElement('button');
       x.type = 'button';
       x.textContent = '\u00D7';
@@ -1019,7 +1019,7 @@
       const rows = (d.users || []).filter((u) => !chosen.has(u.id));
       prioSug.textContent = '';
       if (!rows.length) {
-        const none = el('div', 'muted', q ? '沒有符合的帳號' : '沒有可指定的帳號');
+        const none = el('div', 'muted', q ? '沒有符合的帳號' : tr('沒有可指定的帳號'));
         prioSug.appendChild(none);
         prioSug.hidden = false;
         return;
@@ -1032,10 +1032,10 @@
         row.appendChild(el('span', null, u.display_name || u.username));
         row.appendChild(el('span', 'aj-prio-who', prioWho(u)));
         row.appendChild(el('span', 'aj-prio-src ' + (u.source || 'local'),
-                          SRC_LABEL[u.source] || u.source || '本機'));
+                          SRC_LABEL[u.source] || u.source || tr('本機')));
         row.addEventListener('click', () => {
           if (prioUsers.length >= prioMax) {
-            alert(tr('最多 ') + prioMax + ' 位');
+            alert(tr('最多 ') + prioMax + tr(' 位'));
             return;
           }
           prioUsers.push(u);
@@ -1092,8 +1092,8 @@
       var cl = d.conc.cpu_limit || {};
       var now = document.getElementById('aj-cpupct-now');
       if (now && cl.affinity_supported) {
-        now.textContent = tr('目前 ') + cl.effective_cores + ' / ' + cl.cpu_count + ' 核'
-          + (cl.reserved_cores ? '・留 ' + cl.reserved_cores + ' 核給網頁' : '');
+        now.textContent = tr('目前 ') + cl.effective_cores + ' / ' + cl.cpu_count + tr(' 核')
+          + (cl.reserved_cores ? tr('・留 ') + cl.reserved_cores + ' 核給網頁' : '');
       }
       const ok = document.getElementById('aj-saved');
       ok.hidden = false;

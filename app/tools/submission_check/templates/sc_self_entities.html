@@ -147,20 +147,20 @@ async function submitForm(ev) {
     if (!r.ok) throw new Error(await r.text());
     location.reload();
   } catch (e) {
-    window.showAlert("失敗：" + e.message);
+    window.showAlert(tr("失敗：") + e.message);
   }
   return false;
 }
 
 async function delRow(id, name) {
-  const ok = await window.showConfirm(tr("確定刪除「") + name + "」？", { title: "刪除我方實體", kind: "danger", okText: "刪除" });
+  const ok = await window.showConfirm(tr("確定刪除「") + name + "」？", { title: tr("刪除我方實體"), kind: "danger", okText: tr("刪除") });
   if (!ok) return;
   try {
     const r = await fetch("api/self-entities/" + id, { method: "DELETE" });
     if (!r.ok) throw new Error(await r.text());
     location.reload();
   } catch (e) {
-    window.showAlert("失敗：" + e.message);
+    window.showAlert(tr("失敗：") + e.message);
   }
 }
 

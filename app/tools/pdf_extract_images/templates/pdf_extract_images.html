@@ -108,7 +108,7 @@ const fu = new FileUpload(document.getElementById('upE'), async (f) => {
     '<div class="ext-loading" data-s="s1b9b41ec"><span class="ext-spinner ext-spinner-lg"></span><div>' + tr('正在擷取嵌入圖片，請稍候…') + '</div></div>';
   document.getElementById('extract-info').innerHTML = '<span class="ext-spinner"></span> 擷取中…';
   const fd = new FormData(); fd.append('file', f);
-  const r = await fu.upload('/tools/pdf-extract-images/extract', fd, {processingLabel: '伺服器擷取圖片中…'});
+  const r = await fu.upload('/tools/pdf-extract-images/extract', fd, {processingLabel: tr('伺服器擷取圖片中…')});
   if (!r.ok) {
     document.getElementById('img-grid').innerHTML =
       '<p class="muted" data-s="s4a71db72">擷取失敗：' +
@@ -139,8 +139,8 @@ function renderExtracted() {
     const isPicked = picked.has(it.id);
     const sizeKB = (it.size / 1024).toFixed(1);
     return `<label class="img-card ${isPicked ? 'picked' : ''}" data-id="${it.id}" title="點選勾選">
-      <span class="pick" title="勾選 / 取消勾選">${isPicked ? '✓' : ''}</span>
-      <a class="dl-link" href="${it.url}" download="${it.id}" data-stop-prop title="下載這張">
+      <span class="pick" title="${tr('勾選 / 取消勾選')}">${isPicked ? '✓' : ''}</span>
+      <a class="dl-link" href="${it.url}" download="${it.id}" data-stop-prop title="${tr('下載這張')}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
       </a>
       <div class="img-thumb" data-zoom-src="${it.url}">

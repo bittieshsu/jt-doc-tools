@@ -183,7 +183,7 @@ const fu = new FileUpload(document.getElementById('upDt'), async (_f, fs) => {
   const fd = new FormData();
   fd.append('file', file);
   const r = await fu.upload('/tools/doc-translate/upload', fd,
-                            { processingLabel: '讀取文件…' });
+                            { processingLabel: tr('讀取文件…') });
   if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀取失敗'))); return; }
   const j = await r.json();
   dtUpload = j.upload_id;
@@ -257,7 +257,7 @@ const jp = new JobProgress(document.getElementById('dtjp'), {
 })();
 
 document.getElementById('btn-submit').addEventListener('click', async () => {
-  if (!dtUpload) { showAlert('請先上傳一份辦公文件'); return; }
+  if (!dtUpload) { showAlert(tr('請先上傳一份辦公文件')); return; }
   const r = await fetch('/tools/doc-translate/start', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

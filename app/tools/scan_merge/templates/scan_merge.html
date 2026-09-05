@@ -16,7 +16,7 @@
       </div>
       <input type="file" id="fileInput" accept=".pdf,image/*,.tif,.tiff" multiple />
     </label>
-    {% if workspace_enabled(request) %}<div class="fu-ws-row" data-s="sfa4778ee"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
+    {% if workspace_enabled(request) %}<div class="fu-ws-row"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
     <div id="upload-list" class="sm-uploadList" hidden></div>
     <div class="sm-uploadActions" id="upload-actions" hidden>
       <button type="button" class="btn btn-small" id="btn-clear-all">{{ icon('trash', size=14) }} {{ tr('全部清除') }}</button>
@@ -300,7 +300,7 @@ function render() {
     return `<div class="${cls}" data-id="${c.crop_id}"
       data-style="left:${c.x*100}%;top:${c.y*100}%;width:${c.w*100}%;height:${c.h*100}%;">
       <img src="${cropSrc(c)}" alt="${escapeHtml(c.filename)}">
-      <button type="button" class="sm-del" data-act="del" title="移除這塊">×</button>
+      <button type="button" class="sm-del" data-act="del" title="' + tr('移除這塊') + '">×</button>
       <span class="sm-resize" data-act="resize"></span>
     </div>`;
   }).join('');

@@ -350,8 +350,8 @@ function loadSubject(s) {
   }
   if (isLocked) {
     lockBanner.hidden = false;
-    lockBanner.innerHTML = '🔒 <b>' + tr('內建帳號') + '</b>：角色與工具權限固定，不可從權限矩陣修改。' +
-      '（此處顯示的勾選只是讓您查看現狀，按儲存會被拒。）';
+    lockBanner.innerHTML = '🔒 <b>' + tr('內建帳號') + tr('</b>：角色與工具權限固定，不可從權限矩陣修改。') +
+      tr('（此處顯示的勾選只是讓您查看現狀，按儲存會被拒。）');
     document.getElementById('pdSave').disabled = true;
     document.getElementById('pdSave').title = tr('內建帳號權限固定不可修改');
   } else {
@@ -438,7 +438,7 @@ document.getElementById('pdSave').addEventListener('click', async () => {
       rc.dataset.direct = String(body.direct_tools.length);
     }
   } else {
-    showAlert('儲存失敗：' + await r.text());
+    showAlert(tr('儲存失敗：') + await r.text());
   }
 });
 })();
