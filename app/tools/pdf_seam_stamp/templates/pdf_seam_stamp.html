@@ -1,55 +1,55 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}騎縫章 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('騎縫章') }} · {{ app_name }}{% endblock %}
 
 {% block content %}
-<h1>{{ icon('stamp', size=22) }} 騎縫章</h1>
-<p class="muted">一個印章切成數片，蓋在連續幾頁上 —— <b>任何一頁被抽換或掉頁，那一片就對不起來</b>。
-合約、標案防抽換頁的實務作法。印章可以從資產庫選、自己上傳，或由系統產生。</p>
+<h1>{{ icon('stamp', size=22) }} {{ tr('騎縫章') }}</h1>
+<p class="muted">{{ tr('一個印章切成數片，蓋在連續幾頁上 ——') }} <b>{{ tr('任何一頁被抽換或掉頁，那一片就對不起來') }}</b>{{ tr('。
+合約、標案防抽換頁的實務作法。印章可以從資產庫選、自己上傳，或由系統產生。') }}</p>
 
 {% include "components/cjk_font_notice.html" with context %}
 
 <div class="panel">
-  <h2>1. 上傳文件</h2>
+  <h2>{{ tr('1. 上傳文件') }}</h2>
   {% with upload_id='smUpload',
           accept='application/pdf,.pdf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp',
-          hint='PDF 或辦公文件（會先自動轉成 PDF）。至少要 2 頁。' %}
+          hint=tr('PDF 或辦公文件（會先自動轉成 PDF）。至少要 2 頁。') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div class="sm-stat" id="smStat" hidden>
-    <span class="sm-kv">頁數 <b id="smPages">-</b></span>
-    <span class="sm-kv">分成 <b id="smGroups">-</b> 組</span>
+    <span class="sm-kv">{{ tr('頁數') }} <b id="smPages">-</b></span>
+    <span class="sm-kv">{{ tr('分成') }} <b id="smGroups">-</b> {{ tr('組') }}</span>
   </div>
 </div>
 
 <div class="panel auth-form" id="smOpts" hidden>
-  <h2>2. 印章</h2>
+  <h2>{{ tr('2. 印章') }}</h2>
   <fieldset class="auth-section">
-    <legend>{{ icon('stamp', size=14) }} 印章來源</legend>
+    <legend>{{ icon('stamp', size=14) }} {{ tr('印章來源') }}</legend>
     <div class="sm-srcs">
       <label class="sm-src"><input type="radio" name="smsrc" value="generate" checked>
-        <span class="sm-src-box"><b>系統產生</b><small>輸入文字，直接畫一個紅章</small></span></label>
+        <span class="sm-src-box"><b>{{ tr('系統產生') }}</b><small>{{ tr('輸入文字，直接畫一個紅章') }}</small></span></label>
       <label class="sm-src"><input type="radio" name="smsrc" value="asset">
-        <span class="sm-src-box"><b>從資產庫選</b><small>管理員上傳的公司章 / 簽名</small></span></label>
+        <span class="sm-src-box"><b>{{ tr('從資產庫選') }}</b><small>{{ tr('管理員上傳的公司章 / 簽名') }}</small></span></label>
       <label class="sm-src"><input type="radio" name="smsrc" value="upload">
-        <span class="sm-src-box"><b>自己上傳</b><small>PNG / JPG，白底會自動去掉</small></span></label>
+        <span class="sm-src-box"><b>{{ tr('自己上傳') }}</b><small>{{ tr('PNG / JPG，白底會自動去掉') }}</small></span></label>
     </div>
 
     <div class="af-attrs" id="smGenBox">
-      <label class="af-field"><span class="af-label">章面文字</span>
+      <label class="af-field"><span class="af-label">{{ tr('章面文字') }}</span>
         <span class="af-ctl"><input class="field" type="text" id="smText" value="騎縫章" maxlength="30"></span>
-        <small class="af-note">可以打公司全名。字多時章會自動變寬（長方）或分行（圓 / 方），字級不會縮小。</small></label>
-      <label class="af-field"><span class="af-label">形狀</span>
+        <small class="af-note">{{ tr('可以打公司全名。字多時章會自動變寬（長方）或分行（圓 / 方），字級不會縮小。') }}</small></label>
+      <label class="af-field"><span class="af-label">{{ tr('形狀') }}</span>
         <span class="af-ctl"><select class="field" id="smShape">
-          <option value="circle" selected>圓章</option>
-          <option value="square">方章</option>
-          <option value="rect">長方（橫式）</option>
+          <option value="circle" selected>{{ tr('圓章') }}</option>
+          <option value="square">{{ tr('方章') }}</option>
+          <option value="rect">{{ tr('長方（橫式）') }}</option>
         </select></span></label>
-      <label class="af-field"><span class="af-label">顏色</span>
+      <label class="af-field"><span class="af-label">{{ tr('顏色') }}</span>
         <span class="af-ctl sm-color"><input type="color" id="smColor" value="#c81414">
           <input class="field" type="text" id="smColorHex" value="#c81414" maxlength="7"></span></label>
-      <label class="af-field"><span class="af-label">雙線框</span>
-        <span class="af-ctl"><label class="chk"><input type="checkbox" id="smRing" checked> 內側再加一圈細線</label></span></label>
+      <label class="af-field"><span class="af-label">{{ tr('雙線框') }}</span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="smRing" checked> {{ tr('內側再加一圈細線') }}</label></span></label>
     </div>
 
     <div id="smAssetBox" hidden>
@@ -65,15 +65,15 @@
         {% endfor %}
       </div>
       {% else %}
-      <div class="empty">資產庫裡還沒有印章 —— 請管理員到「<a href="/admin/assets">資產管理</a>」上傳，
-        或改用上面的「系統產生」/「自己上傳」。</div>
+      <div class="empty">{{ tr('資產庫裡還沒有印章 —— 請管理員到「') }}<a href="/admin/assets">{{ tr('資產管理') }}</a>{{ tr('」上傳，
+        或改用上面的「系統產生」/「自己上傳」。') }}</div>
       {% endif %}
     </div>
 
     <div class="af-attrs" id="smUpBox" hidden>
-      <label class="af-field af-field-wide"><span class="af-label">印章圖檔</span>
+      <label class="af-field af-field-wide"><span class="af-label">{{ tr('印章圖檔') }}</span>
         <span class="af-ctl"><input class="field" type="file" id="smStampFile" accept="image/png,image/jpeg"></span>
-        <small class="af-note">接近純白的底會自動轉成透明，蓋上去不會擋住內文。</small></label>
+        <small class="af-note">{{ tr('接近純白的底會自動轉成透明，蓋上去不會擋住內文。') }}</small></label>
     </div>
     <div class="sm-stamp-pv"><img id="smStampImg" alt="{{ tr('印章預覽') }}" hidden></div>
   </fieldset>
@@ -81,9 +81,9 @@
 </div>
 
 <div class="panel auth-form" id="smHowPanel" hidden>
-  <h2>3. 怎麼蓋</h2>
+  <h2>{{ tr('3. 怎麼蓋') }}</h2>
   <fieldset class="auth-section">
-    <legend>{{ icon('layers', size=14) }} 模式</legend>
+    <legend>{{ icon('layers', size=14) }} {{ tr('模式') }}</legend>
     <div class="sm-modes">
       <label class="sm-mode"><input type="radio" name="smmode" value="side" checked>
         <span class="sm-mode-box">
@@ -96,8 +96,8 @@
             <path d="M94 20 a15 15 0 1 1 0 28" class="fig-ink"/>
             <line x1="78" y1="34" x2="100" y2="34" class="fig-ink"/>
           </svg>
-          <b>側邊騎縫</b>
-          <small>紙張<b>疊起來</b>扇開，章蓋在整疊的側邊。每頁各拿一片，位置一律貼齊同一邊。合約最常用。</small>
+          <b>{{ tr('側邊騎縫') }}</b>
+          <small>{{ tr('紙張') }}<b>{{ tr('疊起來') }}</b>{{ tr('扇開，章蓋在整疊的側邊。每頁各拿一片，位置一律貼齊同一邊。合約最常用。') }}</small>
         </span></label>
       <label class="sm-mode"><input type="radio" name="smmode" value="spread">
         <span class="sm-mode-box">
@@ -109,93 +109,93 @@
             <path d="M64 26 a13 13 0 0 1 0 26" class="fig-ink"/>
             <line x1="47" y1="39" x2="73" y2="39" class="fig-ink"/>
           </svg>
-          <b>對開跨頁</b>
-          <small>紙張<b>並排攤開</b>（裝訂成冊的樣子），章橫跨接縫。第一頁在右緣、最後一頁在左緣。</small>
+          <b>{{ tr('對開跨頁') }}</b>
+          <small>{{ tr('紙張') }}<b>{{ tr('並排攤開') }}</b>{{ tr('（裝訂成冊的樣子），章橫跨接縫。第一頁在右緣、最後一頁在左緣。') }}</small>
         </span></label>
     </div>
   </fieldset>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('gear', size=14) }} 參數</legend>
+    <legend>{{ icon('gear', size=14) }} {{ tr('參數') }}</legend>
     <div class="af-attrs">
-      <label class="af-field"><span class="af-label">一個章跨幾頁</span>
+      <label class="af-field"><span class="af-label">{{ tr('一個章跨幾頁') }}</span>
         <span class="af-ctl"><input class="field" type="number" id="smGroup" value="2" min="0" max="50">
-          <span class="af-unit">頁</span></span>
-        <small class="af-note">0 = 整份文件一個章。</small></label>
-      <label class="af-field"><span class="af-label">貼哪一邊</span>
+          <span class="af-unit">{{ tr('頁') }}</span></span>
+        <small class="af-note">{{ tr('0 = 整份文件一個章。') }}</small></label>
+      <label class="af-field"><span class="af-label">{{ tr('貼哪一邊') }}</span>
         <span class="af-ctl"><select class="field" id="smEdge">
-          <option value="right" selected>右緣</option><option value="left">左緣</option>
+          <option value="right" selected>{{ tr('右緣') }}</option><option value="left">{{ tr('左緣') }}</option>
         </select></span>
-        <small class="af-note">只有側邊騎縫用得到。</small></label>
-      <label class="af-field"><span class="af-label">章的大小</span>
+        <small class="af-note">{{ tr('只有側邊騎縫用得到。') }}</small></label>
+      <label class="af-field"><span class="af-label">{{ tr('章的大小') }}</span>
         <span class="af-ctl"><input class="field" type="number" id="smSize" value="40" min="8" max="120" step="1">
           <span class="af-unit">mm</span></span>
-        <small class="af-note">整個章的寬度，切片後平分。</small></label>
-      <label class="af-field"><span class="af-label">離頁緣</span>
+        <small class="af-note">{{ tr('整個章的寬度，切片後平分。') }}</small></label>
+      <label class="af-field"><span class="af-label">{{ tr('離頁緣') }}</span>
         <span class="af-ctl"><input class="field" type="number" id="smOffset" value="3" min="0" max="60" step="1">
           <span class="af-unit">mm</span></span>
-        <small class="af-note">留太多會看不出跨頁。</small></label>
-      <label class="af-field"><span class="af-label">上下位置</span>
+        <small class="af-note">{{ tr('留太多會看不出跨頁。') }}</small></label>
+      <label class="af-field"><span class="af-label">{{ tr('上下位置') }}</span>
         <span class="af-ctl"><input class="field" type="number" id="smPos" value="0" min="-200" max="200" step="5">
           <span class="af-unit">mm</span></span>
-        <small class="af-note">0 = 垂直置中，正值往下。</small></label>
-      <label class="af-field"><span class="af-label">濃度</span>
+        <small class="af-note">{{ tr('0 = 垂直置中，正值往下。') }}</small></label>
+      <label class="af-field"><span class="af-label">{{ tr('濃度') }}</span>
         <span class="af-ctl"><input class="field" type="number" id="smOpacity" value="100" min="5" max="100" step="5">
           <span class="af-unit">%</span></span>
-        <small class="af-note">調低一點才不會擋住內文。</small></label>
+        <small class="af-note">{{ tr('調低一點才不會擋住內文。') }}</small></label>
     </div>
   </fieldset>
 
   <fieldset class="auth-section">
-    <legend>{{ icon('dice', size=14) }} 位置與角度</legend>
+    <legend>{{ icon('dice', size=14) }} {{ tr('位置與角度') }}</legend>
     <div class="af-attrs">
-      <label class="af-field"><span class="af-label">角度</span>
+      <label class="af-field"><span class="af-label">{{ tr('角度') }}</span>
         <span class="af-ctl"><input class="field" type="number" id="smAngle" value="0" min="-45" max="45" step="1">
-          <span class="af-unit">度</span></span>
-        <small class="af-note">章會<b>整個</b>先轉好再切片，接縫才對得起來。</small></label>
-      <label class="af-field"><span class="af-label">角度亂數</span>
-        <span class="af-ctl"><label class="chk"><input type="checkbox" id="smJA"> 每組不同</label>
+          <span class="af-unit">{{ tr('度') }}</span></span>
+        <small class="af-note">{{ tr('章會') }}<b>{{ tr('整個') }}</b>{{ tr('先轉好再切片，接縫才對得起來。') }}</small></label>
+      <label class="af-field"><span class="af-label">{{ tr('角度亂數') }}</span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="smJA"> {{ tr('每組不同') }}</label>
           <input class="field af-mini" type="number" id="smJADeg" value="4" min="0" max="8" step="1">
-          <span class="af-unit">度內</span></span>
-        <small class="af-note">手工蓋章本來就會歪一點。歪太多會蓋到內文，上限 8 度。</small></label>
-      <label class="af-field"><span class="af-label">位置亂數</span>
-        <span class="af-ctl"><label class="chk"><input type="checkbox" id="smJP"> 每組不同</label>
+          <span class="af-unit">{{ tr('度內') }}</span></span>
+        <small class="af-note">{{ tr('手工蓋章本來就會歪一點。歪太多會蓋到內文，上限 8 度。') }}</small></label>
+      <label class="af-field"><span class="af-label">{{ tr('位置亂數') }}</span>
+        <span class="af-ctl"><label class="chk"><input type="checkbox" id="smJP"> {{ tr('每組不同') }}</label>
           <input class="field af-mini" type="number" id="smJPMm" value="12" min="0" max="60" step="1">
-          <span class="af-unit">mm 內</span></span>
-        <small class="af-note">固定位置像機器蓋的；亂數接近手工，也比較難仿造。</small></label>
-      <label class="af-field"><span class="af-label">亂數種子</span>
+          <span class="af-unit">{{ tr('mm 內') }}</span></span>
+        <small class="af-note">{{ tr('固定位置像機器蓋的；亂數接近手工，也比較難仿造。') }}</small></label>
+      <label class="af-field"><span class="af-label">{{ tr('亂數種子') }}</span>
         <span class="af-ctl"><input class="field" type="number" id="smSeed" value="0" min="0"></span>
-        <small class="af-note">0 = 每次都不一樣。產生後會告訴你用了哪個種子，填回來就能重現。</small></label>
+        <small class="af-note">{{ tr('0 = 每次都不一樣。產生後會告訴你用了哪個種子，填回來就能重現。') }}</small></label>
     </div>
   </fieldset>
 
 </div>
 
 <div class="panel auth-form" id="smPvPanel" hidden>
-  <h2>4. 預覽</h2>
+  <h2>{{ tr('4. 預覽') }}</h2>
   <fieldset class="auth-section">
-    <legend>{{ icon('eye', size=14) }} 拼回去長這樣</legend>
-    <p class="muted sm-hint">只看單頁只會看到一條細片，判斷不出對不對 ——
-      這裡把<b>整組的片拼回去</b>，看是不是一個完整的章（片與片之間的縫是刻意畫的，
-      讓你看得出切在哪裡）。</p>
+    <legend>{{ icon('eye', size=14) }} {{ tr('拼回去長這樣') }}</legend>
+    <p class="muted sm-hint">{{ tr('只看單頁只會看到一條細片，判斷不出對不對 ——
+      這裡把') }}<b>{{ tr('整組的片拼回去') }}</b>{{ tr('，看是不是一個完整的章（片與片之間的縫是刻意畫的，
+      讓你看得出切在哪裡）。') }}</p>
     {# 頁數多的時候逐頁預覽要跑一陣子，使用者會以為「要等它全部好才能送出」。
        講清楚不必等 —— 送出走的是同一段程式，結果一樣。 #}
     <p class="muted sm-hint sm-hint-skip">{{ icon('info', size=13) }}
-      <b>不必等預覽跑完</b> —— 上面那張「拼回去長這樣」確認過就夠了，
+      <b>{{ tr('不必等預覽跑完') }}</b> {{ tr('—— 上面那張「拼回去長這樣」確認過就夠了，
       可以直接拉到最下面按「蓋上騎縫章」取回檔案。下面的逐頁預覽只是給你
-      核對用的，送出走的是同一段程式，結果完全一樣。</p>
+      核對用的，送出走的是同一段程式，結果完全一樣。') }}</p>
     <div class="sm-assembled"><img id="smAsmImg" alt="{{ tr('拼回去的印章') }}" hidden></div>
     <div class="sm-pagepv">
       {# 一組的每一頁都要列出來 —— 只看一頁只有一條細片，看不出接縫連不連得起來 #}
-      <label class="af-field sm-grouppick"><span class="af-label">預覽第幾組</span>
+      <label class="af-field sm-grouppick"><span class="af-label">{{ tr('預覽第幾組') }}</span>
         <span class="af-ctl"><input class="field af-mini" type="number" id="smPvGroup"
-          value="1" min="1"><span class="af-unit">組（<span id="smPvRange">—</span>）</span></span></label>
+          value="1" min="1"><span class="af-unit">{{ tr('組（') }}<span id="smPvRange">—</span>）</span></span></label>
       <div class="sm-pages" id="smPagePv"></div>
     </div>
   </fieldset>
 
   <div class="sm-actions">
-    <button class="btn btn-primary" type="button" id="smSubmit">{{ icon('stamp', size=14) }} 蓋上騎縫章</button>
+    <button class="btn btn-primary" type="button" id="smSubmit">{{ icon('stamp', size=14) }} {{ tr('蓋上騎縫章') }}</button>
   </div>
   {% with progress_id='smJob' %}{% include "components/job_progress.html" %}{% endwith %}
   <div id="smResult" hidden></div>
@@ -391,7 +391,7 @@
     $('smPvGroup').max = String(Math.max(1, total));
     const shownGroups = new Set(pages.map(x => x.group)).size;
     $('smPvRange').textContent =
-      `共 ${total} 組、每組 ${per} 頁；這裡顯示第 ${first}-${last} 頁`
+      tr('共 {0} 組、每組 {1} 頁；這裡顯示第 {2}-{3} 頁').replace('{0}', total).replace('{1}', per).replace('{2}', first).replace('{3}', last)
       + (shownGroups > 1 ? `（第 ${gi}-${gi + shownGroups - 1} 組）` : '');
     box.textContent = '';
     // **同一組的頁面要包在一起**：騎縫章要看的就是「相鄰兩頁接不接得起來」，
@@ -405,7 +405,7 @@
         cur.className = 'sm-group';
         const head = document.createElement('div');
         head.className = 'sm-group-t';
-        head.textContent = `第 ${x.group} 組`;
+        head.textContent = tr('第 {0} 組').replace('{0}', x.group);
         cur.appendChild(head);
         const row = document.createElement('div');
         row.className = 'sm-group-row';
@@ -423,7 +423,7 @@
       im.alt = `第 ${x.page} 頁`;
       wrap.appendChild(im);
       const cap = document.createElement('figcaption');
-      cap.textContent = `第 ${x.page} 頁`;
+      cap.textContent = tr('第 {0} 頁').replace('{0}', x.page);
       fig.appendChild(wrap); fig.appendChild(cap);
       cur._row.appendChild(fig);
       jobs.push([x.page, wrap, im]);

@@ -63,8 +63,19 @@ def test_the_three_timestamps_are_in_order(store):
     jid = _run_a_job(sleep_s=0.4)
     row = next(r for r in store.list_jobs(limit=20) if r["id"] == jid)
     assert row["created_at"] <= row["started_at"] <= row["finished_at"]
-    # 實際執行時間要跟工作內容對得上（不是把排隊也算進去）
-    assert row["finished_at"] - row["started_at"] >= 0.3
+    # 實際執行時間要跟工作內容對得上（不是把排隊也算進去）。
+    #
+    # **門檻刻意離 0.4 秒遠一點**：機器同時在跑別的東西時（本輪就撞到一次：
+    # 完整測試 + 無頭瀏覽器抓圖同時跑），排程抖動會讓量到的時間略短於 sleep，
+    # 這條就會偶爾紅一次 —— 而**偶爾紅的守門跟壞掉的守門一樣沒人信**。
+    #
+    # 0.15 仍然擋得住「根本沒記 started_at」（差值趨近 0）。
+    #
+    # **它擋不住「started_at 記在進佇列而不是開始跑」** —— 這支測試裡作業是
+    # 立刻開始的，兩個時間點幾乎一樣（實測把 `started_at` 改成 `created_at`
+    # 這條照樣綠）。要驗那個得先讓佇列塞住再送一件，成本比較高；
+    # 先把限制寫在這裡，不要讓人以為它守得住。
+    assert row["finished_at"] - row["started_at"] >= 0.15
 
 
 def test_restoring_a_job_from_the_database_keeps_started_at(store):

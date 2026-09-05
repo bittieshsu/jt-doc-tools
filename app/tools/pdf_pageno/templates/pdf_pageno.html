@@ -389,7 +389,7 @@ function renderThumbs() {
   const fp = Math.max(1, getFromPage());
   const tp = Math.min(pageCount, effectiveToPage());
   const numbered = Math.max(0, tp - fp + 1);
-  info.textContent = `共 ${pageCount} 頁，會印 ${numbered} 個頁碼（第 ${fp}–${tp} 頁）`;
+  info.textContent = tr('共 {0} 頁，會印 {1} 個頁碼（第 {2}–{3} 頁）').replace('{0}', pageCount).replace('{1}', numbered).replace('{2}', fp).replace('{3}', tp);
   if (files.length > 1) info.textContent += `；批次共 ${files.length} 份檔案（縮圖只顯示第一份）`;
   grid.innerHTML = pages.map(p => {
     const skip = (p.page < fp || p.page > tp);
@@ -411,7 +411,7 @@ function updateSkipBadges() {
   const tp = Math.min(pageCount, effectiveToPage());
   const info = document.getElementById('thumbs-info');
   const numbered = Math.max(0, tp - fp + 1);
-  info.textContent = `共 ${pageCount} 頁，會印 ${numbered} 個頁碼（第 ${fp}–${tp} 頁）`;
+  info.textContent = tr('共 {0} 頁，會印 {1} 個頁碼（第 {2}–{3} 頁）').replace('{0}', pageCount).replace('{1}', numbered).replace('{2}', fp).replace('{3}', tp);
   if (files.length > 1) info.textContent += `；批次共 ${files.length} 份檔案（縮圖只顯示第一份）`;
   document.querySelectorAll('.page-card').forEach(card => {
     const thumb = card.querySelector('.page-thumb');

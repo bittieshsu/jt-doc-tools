@@ -189,7 +189,7 @@ assetImportFile.addEventListener('change', async () => {
     return;
   }
   const j = await res.json();
-  showToast(`匯入完成：新增 ${j.added} 筆，目前共 ${j.total} 筆`, 'ok');
+  showToast(tr('匯入完成：新增 {0} 筆，目前共 {1} 筆').replace('{0}', j.added).replace('{1}', j.total), 'ok');
   setTimeout(() => location.reload(), 900);
 });
 </script>

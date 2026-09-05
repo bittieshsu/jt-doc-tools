@@ -312,7 +312,7 @@ $("btnStrip").addEventListener("click", async () => {
     return;
   }
   if (mode === "all" && lastResult.total > 0) {
-    if (!(await window.showConfirm(`即將刪除全部 ${lastResult.total} 條註解，要繼續？`, { title: '清除註解', kind: 'danger', okText: '清除' }))) return;
+    if (!(await window.showConfirm(tr('即將刪除全部 {0} 條註解，要繼續？').replace('{0}', lastResult.total), { title: '清除註解', kind: 'danger', okText: '清除' }))) return;
   }
   const fd = new FormData();
   fd.append("upload_id", lastResult.upload_id);
@@ -348,7 +348,7 @@ $("btnStrip").addEventListener("click", async () => {
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
   _setBusy(btn, false);
-  $("stripStatus").textContent = `完成，刪除了 ${removed} 條註解`;
+  $("stripStatus").textContent = tr('完成，刪除了 {0} 條註解').replace('{0}', removed);
   if (window.attachWorkspaceSave) window.attachWorkspaceSave(
     document.getElementById("wsSaveBtn"),
     () => ({ blob: blob, name: name, tool: 'pdf-annotations-strip' }));

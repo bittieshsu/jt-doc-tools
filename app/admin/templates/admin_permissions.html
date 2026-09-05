@@ -293,7 +293,7 @@ function bindPicker(listId, searchId, countId, clearId) {
   function refresh() {
     const all = list.querySelectorAll('.picker-item');
     const sel = list.querySelectorAll('.picker-item input:checked').length;
-    cEl.textContent = `已選 ${sel} / ${all.length}`;
+    cEl.textContent = tr('已選 {0} / {1}').replace('{0}', sel).replace('{1}', all.length);
   }
   sEl.oninput = () => {
     const q = (sEl.value || '').toLowerCase().trim();

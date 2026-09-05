@@ -499,7 +499,7 @@ async function openOU(dn, name) {
       });
       const jj = await r.json();
       if (!r.ok) throw new Error(jj.detail || ('HTTP ' + r.status));
-      msg.textContent = ` ✓ 已儲存（${roles.length} 個角色）`;
+      msg.textContent = tr(' ✓ 已儲存（{0} 個角色）').replace('{0}', roles.length);
     } catch (e) { msg.textContent = ' ✗ ' + e.message; }
   });
 }
@@ -618,7 +618,7 @@ document.getElementById('udSaveRoles').addEventListener('click', async () => {
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
-    msg.textContent = ` ✓ 已儲存（${roles.length} 個角色）`;
+    msg.textContent = tr(' ✓ 已儲存（{0} 個角色）').replace('{0}', roles.length);
     loadUserRoles(_udDn);
   } catch (e) { msg.textContent = ' ✗ ' + e.message; }
 });
@@ -656,7 +656,7 @@ document.getElementById('grSave').addEventListener('click', async () => {
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
-    msg.textContent = ` ✓ 已儲存（${roles.length} 個角色）`;
+    msg.textContent = tr(' ✓ 已儲存（{0} 個角色）').replace('{0}', roles.length);
   } catch (e) { msg.textContent = ' ✗ ' + e.message; }
 });
 document.getElementById('grClose').addEventListener('click', () =>

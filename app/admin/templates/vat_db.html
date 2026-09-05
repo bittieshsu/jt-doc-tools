@@ -558,7 +558,7 @@ function _startCooldownCountdown() {
     const sec = Math.ceil(remain / 1000);
     const mm = Math.floor(sec / 60), ss = sec % 60;
     const fmt = mm > 0 ? `${mm} 分 ${ss} 秒` : `${ss} 秒`;
-    _btnAutoDl.textContent = `冷卻中（${fmt}）`;
+    _btnAutoDl.textContent = tr('冷卻中（{0}）').replace('{0}', fmt);
   };
   tick();
   _cooldownTimer = setInterval(tick, 1000);
@@ -774,7 +774,7 @@ $('btnTest').addEventListener('click', async () => {
     const r = await fetch(`/api/vat-lookup/${vat}`);
     if (r.status === 404) {
       result.classList.add('show', 'miss');
-      result.textContent = `✗ 統編 ${vat} 在資料庫中找不到`;
+      result.textContent = tr('✗ 統編 {0} 在資料庫中找不到').replace('{0}', vat);
       return;
     }
     const j = await r.json();

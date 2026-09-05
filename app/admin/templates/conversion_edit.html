@@ -40,7 +40,7 @@
         <input type="text" class="p-input" value="{{ p.path }}" />
       {% endif %}
       {% if p.version %}<span class="version-chip" title="{{ tr('--version 輸出') }}">{{ p.version }}</span>{% endif %}
-      <span class="status">{% if p.exists and p.executable %}✅{% elif p.exists %}⚠️ 不可執行{% else %}❌ 不存在{% endif %}</span>
+      <span class="status">{% if p.exists and p.executable %}✅{% elif p.exists %}⚠️ {{ tr('不可執行') }}{% else %}❌ {{ tr('不存在') }}{% endif %}</span>
       {% if not p.builtin %}
       <button class="btn btn-small btn-danger" type="button" data-act="remove">{{ icon('trash') }}</button>
       {% endif %}

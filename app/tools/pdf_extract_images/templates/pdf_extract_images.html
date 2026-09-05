@@ -120,7 +120,7 @@ const fu = new FileUpload(document.getElementById('upE'), async (f) => {
   extractedItems = j.items;
   picked = new Set(extractedItems.map(it => it.id));   // default: all picked
   renderExtracted();
-  if (window.showToast) window.showToast(`擷取完成，共 ${extractedItems.length} 張`, 'ok');
+  if (window.showToast) window.showToast(tr('擷取完成，共 {0} 張').replace('{0}', extractedItems.length), 'ok');
 });
 function escapeHtmlPx(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -130,7 +130,7 @@ function escapeHtmlPx(s) {
 function renderExtracted() {
   const grid = document.getElementById('img-grid');
   const info = document.getElementById('extract-info');
-  info.textContent = `共 ${extractedItems.length} 張，已勾選 ${picked.size} 張`;
+  info.textContent = tr('共 {0} 張，已勾選 {1} 張').replace('{0}', extractedItems.length).replace('{1}', picked.size);
   if (!extractedItems.length) {
     grid.innerHTML = '<p class="muted" data-s="s2a9ed20f">這份 PDF 沒有嵌入圖片。</p>';
     return;

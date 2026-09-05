@@ -251,7 +251,7 @@ const fu = new FileUpload($('upR'), async (f) => {
     filename = j.filename;
     pageCount = j.page_count;
     pageMode.clear();
-    $('file-info').textContent = `${filename} · ${pageCount} 頁`;
+    $('file-info').textContent = tr('{0} · {1} 頁').replace('{0}', filename).replace('{1}', pageCount);
     renderGrid(j.pages);
     $('work-panel').hidden = false;
     $('action-panel').hidden = false;
@@ -353,7 +353,7 @@ function selectedPages() {
 
 function refreshScopeCount() {
   const sel = selectedPages();
-  $('scope-count').textContent = `${sel.length} 頁將被套用`;
+  $('scope-count').textContent = tr('{0} 頁將被套用').replace('{0}', sel.length);
 }
 
 // Top toolbar mode click — apply to all selected pages -------------------
@@ -423,7 +423,7 @@ $('btn-pdf').addEventListener('click', async () => {
     const m = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
     const name = m ? decodeURIComponent(m[1]) : 'rotated.pdf';
     download(blob, name);
-    $('action-msg').textContent = `已下載 ${name}`;
+    $('action-msg').textContent = tr('已下載 {0}').replace('{0}', name);
   } catch (e) {
     $('action-msg').textContent = tr('失敗：') + e.message;
   } finally {
@@ -462,7 +462,7 @@ $('btn-png').addEventListener('click', async () => {
     const m = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
     const name = m ? decodeURIComponent(m[1]) : 'rotated.zip';
     download(blob, name);
-    $('action-msg').textContent = `已下載 ${name}`;
+    $('action-msg').textContent = tr('已下載 {0}').replace('{0}', name);
   } catch (e) {
     $('action-msg').textContent = tr('失敗：') + e.message;
   } finally {

@@ -347,7 +347,7 @@ function _updateMrUI() {
 
   const months = (t - f) + 1;
   $('mrSummary').textContent = `${_ymLabel(f)} ～ ${_ymLabel(t)}`;
-  $('mrCount').textContent = `（共 ${months} 個月）`;
+  $('mrCount').textContent = tr('（共 {0} 個月）').replace('{0}', months);
   _renderMrTicks();
 }
 

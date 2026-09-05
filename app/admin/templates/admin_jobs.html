@@ -927,7 +927,7 @@
       list.appendChild(row);
     });
     document.getElementById('aj-prio-count').textContent =
-      `${prioUsers.length} / ${prioMax} 位・由上而下為優先順序`;
+      tr('{0} / {1} 位・由上而下為優先順序').replace('{0}', prioUsers.length).replace('{1}', prioMax);
   }
 
   // 拖曳排序。順序**就是**優先順序，所以放開的當下就存檔 —— 這個面板的新增 /

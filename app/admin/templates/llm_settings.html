@@ -448,7 +448,7 @@ async function testConnection() {
       return;
     }
     status.className = 'conn-ok';
-    status.innerHTML = `✅ 已連線（${j.latency_ms}ms） — 找到 ${j.models.length} 個模型`;
+    status.innerHTML = tr('✅ 已連線（{0}ms） — 找到 {1} 個模型').replace('{0}', j.latency_ms).replace('{1}', j.models.length);
     fillModelDropdown(j.models);
   } catch (e) {
     status.className = 'conn-fail';
@@ -546,7 +546,7 @@ async function refreshModels() {
     }
     fillModelDropdown(j.models);
     status.className = 'conn-ok';
-    status.textContent = `✅ 找到 ${j.models.length} 個模型`;
+    status.textContent = tr('✅ 找到 {0} 個模型').replace('{0}', j.models.length);
   } catch (e) {
     status.className = 'conn-fail';
     status.textContent = `❌ ${e.message}`;

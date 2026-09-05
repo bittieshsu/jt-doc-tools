@@ -316,7 +316,7 @@ function fmt(n) { return (n || 0).toLocaleString(); }
   const ta = $('wcPasteText');
   const hint = $('wcPasteHint');
   ta.addEventListener('input', () => {
-    hint.textContent = `${ta.value.length.toLocaleString()} 字元`;
+    hint.textContent = tr('{0} 字元').replace('{0}', ta.value.length.toLocaleString());
   });
 })();
 
@@ -405,10 +405,10 @@ const fu = new FileUpload($('wcUp'), async (files) => {
 function renderMulti(r) {
   $('wcResults').hidden = true;
   $('wcMulti').hidden = false;
-  $('wcMultiCount').textContent = `共 ${r.file_count} 個檔案`;
+  $('wcMultiCount').textContent = tr('共 {0} 個檔案').replace('{0}', r.file_count);
   const skipEl = $('wcMultiSkipped');
   if (r.skipped && r.skipped.length) {
-    skipEl.textContent = `已跳過 ${r.skipped.length} 個檔案：` + r.skipped.join('、');
+    skipEl.textContent = tr('已跳過 {0} 個檔案：').replace('{0}', r.skipped.length) + r.skipped.join('、');
     skipEl.hidden = false;
   } else {
     skipEl.hidden = true;

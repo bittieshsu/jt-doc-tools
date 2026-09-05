@@ -20,7 +20,7 @@
 <div class="panel" data-role="{{ r.id }}" data-s="s6179637e">
   <div data-s="s3390deba">
     <div>
-      <h2 data-s="sa36eac26">{{ r.display_name }}</h2>
+      <h2 data-s="sa36eac26">{{ tr(r.display_name) }}</h2>
       <code data-s="sa9648fd5">{{ r.id }}</code>
       {% if r.is_builtin %}<span class="badge">{{ tr('預設') }}</span>{% endif %}
       {% if r.is_protected %}<span class="badge" data-s="s5f951fed">{{ tr('受保護') }}</span>{% endif %}
@@ -41,7 +41,7 @@
       {% endif %}
     </div>
   </div>
-  {% if r.description %}<p class="muted" data-s="sea8bbc82">{{ r.description }}</p>{% endif %}
+  {% if r.description %}<p class="muted" data-s="sea8bbc82">{{ tr(r.description) }}</p>{% endif %}
   {% if r.id == 'admin' %}
   <p data-s="s28435393">
     {{ tr('🔒 admin 角色擁有所有工具與設定區的存取權，無需個別勾選。此角色不可刪、不可改名。') }}
@@ -61,7 +61,7 @@
     {% for t in tools %}
     <label class="tool-chk">
       <input type="checkbox" data-tool="{{ t.id }}" {% if t.id in r.tools %}checked{% endif %}>
-      <span>{{ t.name }} <code class="muted" data-s="sbcf88ef7">{{ t.id }}</code></span>
+      <span>{{ tr(t.name) }} <code class="muted" data-s="sbcf88ef7">{{ t.id }}</code></span>
     </label>
     {% endfor %}
   </div>
@@ -117,7 +117,7 @@ function refreshCounter(panel) {
   if (!counter) return;
   const boxes = panel.querySelectorAll('.tool-grid input[type=checkbox]');
   const checked = panel.querySelectorAll('.tool-grid input[type=checkbox]:checked').length;
-  counter.textContent = `已選 ${checked} / ${boxes.length}`;
+  counter.textContent = tr('已選 {0} / {1}').replace('{0}', checked).replace('{1}', boxes.length);
 }
 document.querySelectorAll('[data-role]').forEach(panel => {
   refreshCounter(panel);
@@ -190,7 +190,7 @@ document.querySelectorAll('[data-role] [data-act="delete"]').forEach(btn => {
   btn.addEventListener('click', async () => {
     const panel = btn.closest('[data-role]');
     const roleId = panel.dataset.role;
-    if (!(await showConfirm(`刪除角色「${roleId}」？所有指派會一併移除。`,
+    if (!(await showConfirm(tr('刪除角色「{0}」？所有指派會一併移除。').replace('{0}', roleId),
           { title: '刪除', kind: 'danger', okText: '刪除' }))) return;
     const r = await fetch(`/admin/roles/${roleId}/delete`, {method:'POST'});
     if (r.ok) location.reload();

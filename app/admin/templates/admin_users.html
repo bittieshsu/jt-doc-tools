@@ -20,7 +20,7 @@
       <br>
       <select class="field" name="role" data-s="s4a93029a">
         {% for r in all_roles %}
-        <option value="{{ r.id }}" {% if r.id == 'default-user' %}selected{% endif %}>{{ r.display_name }}</option>
+        <option value="{{ r.id }}" {% if r.id == 'default-user' %}selected{% endif %}>{{ tr(r.display_name) }}</option>
         {% endfor %}
       </select>
     </label></div>
@@ -43,7 +43,7 @@
       <select class="field uf-sel" name="src">
         <option value="">{{ tr('所有來源') }}</option>
         {% for v, lab in [('local','本機'),('ldap','LDAP'),('ad','AD'),('oidc','OIDC'),('saml','SAML')] %}
-        <option value="{{ v }}"{% if src == v %} selected{% endif %}>{{ lab }}</option>
+        <option value="{{ v }}"{% if src == v %} selected{% endif %}>{{ tr(lab) }}</option>
         {% endfor %}
       </select>
       <select class="field uf-sel" name="state">
@@ -58,7 +58,7 @@
     <div class="uf-views">
       {% for v, lab in [('active','使用中'),('directory','目錄鏡射'),('all','全部')] %}
       <a class="uf-view{% if view == v %} active{% endif %}"
-         href="/admin/users?view={{ v }}">{{ lab }}</a>
+         href="/admin/users?view={{ v }}">{{ tr(lab) }}</a>
       {% endfor %}
       {# 目錄裡已經找不到的帳號（離職 / 停用 / 移出範圍）。內控盤點第一個要看的就是它。 #}
       <a class="uf-view uf-view-warn{% if view == 'missing' %} active{% endif %}"
@@ -115,7 +115,7 @@
     <button class="btn btn-small btn-danger" type="button" data-bulk="disable">{{ icon('lock', size=13) }} {{ tr('停用') }}</button>
     <select class="field uf-sel" id="ufBulkRole">
       <option value="">{{ tr('選擇角色…') }}</option>
-      {% for r in all_roles %}<option value="{{ r.id }}">{{ r.display_name }}</option>{% endfor %}
+      {% for r in all_roles %}<option value="{{ r.id }}">{{ tr(r.display_name) }}</option>{% endfor %}
     </select>
     <button class="btn btn-small" type="button" data-bulk="role-add">{{ tr('加上角色') }}</button>
     <button class="btn btn-small" type="button" data-bulk="role-remove">{{ tr('移除角色') }}</button>
@@ -165,7 +165,7 @@
         </td>
         <td data-sort-key="{{ u.roles|join(',') }}">
           {% if u.roles_display %}
-            {% for r in u.roles_display %}<span class="role-chip" title="{{ r.id }}">{{ r.display_name }}</span>{% endfor %}
+            {% for r in u.roles_display %}<span class="role-chip" title="{{ r.id }}">{{ tr(r.display_name) }}</span>{% endfor %}
           {% else %}<span class="muted">{{ tr('(無)') }}</span>{% endif %}
         </td>
         {# 送 ISO 8601 而不是原始 Unix 秒數：①掃描器會把裸 epoch 判為資訊洩漏；
@@ -597,7 +597,7 @@ async function runBulk(action) {
     label = (action === 'role-add' ? '加上' : '移除') + '角色「' + role + '」';
   }
   const ok = await (window.showConfirm
-    ? window.showConfirm(`確定要對 ${ids.length} 個帳號${label}？`,
+    ? window.showConfirm(tr('確定要對 {0} 個帳號{1}？').replace('{0}', ids.length).replace('{1}', label),
                          { title: '批次操作', okText: '執行' })
     : Promise.resolve(confirm(`確定要對 ${ids.length} 個帳號${label}？`)));
   if (!ok) return;
@@ -705,7 +705,7 @@ function _bindPicker(listId, searchId, countId, clearId) {
   function refreshCount() {
     const all = list.querySelectorAll('.picker-item');
     const sel = list.querySelectorAll('.picker-item input:checked').length;
-    count.textContent = `已選 ${sel} / ${all.length}`;
+    count.textContent = tr('已選 {0} / {1}').replace('{0}', sel).replace('{1}', all.length);
   }
   function applySearch() {
     const q = (search.value || '').toLowerCase().trim();
@@ -761,7 +761,7 @@ async function loadEffective(uid) {
   const ids = j.tool_ids || [];
   const head = document.createElement('p');
   head.className = 'em-eff-count';
-  head.textContent = `可以用 ${ids.length} 個工具`;
+  head.textContent = tr('可以用 {0} 個工具').replace('{0}', ids.length);
   box.appendChild(head);
   if (!ids.length) {
     const p = document.createElement('p');
@@ -1004,7 +1004,7 @@ document.querySelectorAll('.user-table button').forEach(btn => {
     const uid = tr.dataset.uid;
     const act = btn.dataset.act;
     if (act === 'delete') {
-      if (!(await showConfirm(`確定刪除使用者「${btn.dataset.username}」？所有 session 與權限指派一併移除。`,
+      if (!(await showConfirm(tr('確定刪除使用者「{0}」？所有 session 與權限指派一併移除。').replace('{0}', btn.dataset.username),
             { title: '刪除使用者', kind: 'danger', okText: '刪除' }))) return;
       btn.disabled = true;
       const r = await fetch(`/admin/users/${uid}/delete`, {method:'POST'});

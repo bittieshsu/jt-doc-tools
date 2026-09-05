@@ -215,7 +215,7 @@ document.getElementById('btnLlmReflow').addEventListener('click', async () => {
   let currentStatus = '連線到 LLM…';
   const ticker = setInterval(() => {
     const secs = Math.floor((Date.now() - t0) / 1000);
-    msg.textContent = `${currentStatus}（已耗時 ${secs}s）`;
+    msg.textContent = tr('{0}（已耗時 {1}s）').replace('{0}', currentStatus).replace('{1}', secs);
   }, 500);
 
   try {
@@ -276,7 +276,7 @@ document.getElementById('btnLlmReflow').addEventListener('click', async () => {
             hint.textContent = tr('（內容與原始相同 — LLM 未修改任何字元）');
             hint.style.color = '#6b7280';
           } else {
-            hint.textContent = `（共 ${diffChars} 字元差異，可切換比對）`;
+            hint.textContent = tr('（共 {0} 字元差異，可切換比對）').replace('{0}', diffChars);
             hint.style.color = '#0f766e';
           }
           $('status').textContent = tr('LLM 已重排');
@@ -290,7 +290,7 @@ document.getElementById('btnLlmReflow').addEventListener('click', async () => {
   } finally {
     clearInterval(ticker);
     const totalSecs = Math.floor((Date.now() - t0) / 1000);
-    msg.textContent = `${currentStatus}（總耗時 ${totalSecs}s）`;
+    msg.textContent = tr('{0}（總耗時 {1}s）').replace('{0}', currentStatus).replace('{1}', totalSecs);
     btn.disabled = false;
     btn.innerHTML = origLabel;
   }

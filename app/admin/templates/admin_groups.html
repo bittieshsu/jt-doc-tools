@@ -267,7 +267,7 @@ function bindPicker(listId, searchId, countId, clearId) {
   function refresh() {
     const all = list.querySelectorAll('.picker-item');
     const sel = list.querySelectorAll('.picker-item input:checked').length;
-    count.textContent = `已選 ${sel} / ${all.length}`;
+    count.textContent = tr('已選 {0} / {1}').replace('{0}', sel).replace('{1}', all.length);
   }
   search.oninput = () => {
     const q = (search.value || '').toLowerCase().trim();
@@ -368,7 +368,7 @@ document.querySelectorAll('.grp-table button').forEach(btn => {
     const tr = btn.closest('tr');
     const act = btn.dataset.act;
     if (act === 'delete') {
-      if (!(await showConfirm(`確定刪除群組「${tr.dataset.gname}」？此動作無法復原。`,
+      if (!(await showConfirm(tr('確定刪除群組「{0}」？此動作無法復原。').replace('{0}', tr.dataset.gname),
             { title: '刪除群組', kind: 'danger', okText: '刪除' }))) return;
       const r = await fetch(`/admin/groups/${tr.dataset.gid}/delete`, {method:'POST'});
       if (r.ok) location.reload();
@@ -489,7 +489,7 @@ async function openDirMembers(tr) {
     document.getElementById('dmCntIn').textContent = j.local_count;
     document.getElementById('dmCntOut').textContent = j.not_local_count;
     document.getElementById('dmSummary').textContent =
-      `目錄中共 ${j.count} 位直接成員，其中 ${j.local_count} 位已登入過本系統、${j.not_local_count} 位尚未登入。`;
+      tr('目錄中共 {0} 位直接成員，其中 {1} 位已登入過本系統、{2} 位尚未登入。').replace('{0}', j.count).replace('{1}', j.local_count).replace('{2}', j.not_local_count);
     // 順手把清單頁該列的「成員數」更新成目錄實際數（原本顯示的是本地登入數，會不一致）
     const cell = tr.children[3];
     if (cell) cell.textContent = j.count;
@@ -521,7 +521,7 @@ if (_btnSyncDir) {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
-      msg.textContent = ` ✓ 新增 ${j.synced}、更新 ${j.updated}，目錄共 ${j.total_seen} 個群組，頁面即將重整…`;
+      msg.textContent = tr(' ✓ 新增 {0}、更新 {1}，目錄共 {2} 個群組，頁面即將重整…').replace('{0}', j.synced).replace('{1}', j.updated).replace('{2}', j.total_seen);
       setTimeout(() => location.reload(), 1400);
     } catch (e) {
       msg.textContent = ' ✗ ' + e.message;

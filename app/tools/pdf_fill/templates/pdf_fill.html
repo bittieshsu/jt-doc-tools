@@ -1088,7 +1088,7 @@ function renderTemplateStatus(applied, uploadId, fileName) {
   currentUploadId = uploadId;
   currentFileBaseName = (fileName || '').replace(/\.[^.]+$/i, '');
   if (applied && applied.id) {
-    templateStatus.textContent = `📝 已套用範本：${applied.name}`;
+    templateStatus.textContent = tr('📝 已套用範本：{0}').replace('{0}', applied.name);
     templateStatus.style.color = 'var(--success, #047857)';
     saveTplBtn.hidden = true;
   } else {
@@ -1118,7 +1118,7 @@ saveTplBtn.addEventListener('click', async () => {
   saveTplBtn.disabled = false;
   if (res.ok) {
     const d = await res.json();
-    templateStatus.textContent = `📝 已儲存為範本：${d.template.name}（${d.template.fields} 欄位 + ${d.template.checkboxes} 勾選）`;
+    templateStatus.textContent = tr('📝 已儲存為範本：{0}（{1} 欄位 + {2} 勾選）').replace('{0}', d.template.name).replace('{1}', d.template.fields).replace('{2}', d.template.checkboxes);
     templateStatus.style.color = 'var(--success, #047857)';
     saveTplBtn.hidden = true;
   } else {
@@ -1136,7 +1136,7 @@ function renderUnmatched(items, profileKeys) {
   // Always collapse by default — users rarely need this list. Click the
   // summary to expand when they want to teach the system new labels.
   box.open = false;
-  if (count) count.textContent = `（${items.length} 項）`;
+  if (count) count.textContent = tr('（{0} 項）').replace('{0}', items.length);
   const options = ['<option value="">— 略過 —</option>'].concat(
     profileKeys.map(pk => `<option value="${escapeHTML(pk.key)}">${escapeHTML(pk.label)} (${escapeHTML(pk.key)})</option>`)
   ).join('');
@@ -1548,7 +1548,7 @@ async function applyLlmCorrections(corrections) {
     if (d.moved) actionParts.push(`搬 ${d.moved} 格`);
     if (d.removed) actionParts.push(`清 ${d.removed} 格`);
     const actionStr = actionParts.join('、');
-    showToast(`已${actionStr}，重跑 LLM 校驗中…`, 'ok');
+    showToast(tr('已{0}，重跑 LLM 校驗中…').replace('{0}', actionStr), 'ok');
     // Auto-rerun review — after clearing, new issues often surface that
     // were hidden by overlapping placements. Iterate until clean.
     const bar = document.querySelector('.llm-apply-bar');

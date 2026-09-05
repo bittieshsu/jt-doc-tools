@@ -263,7 +263,7 @@ async function uploadOne(file) {
 function render() {
   const grid = document.getElementById('i2p-grid');
   const info = document.getElementById('grid-info');
-  info.textContent = `共 ${pages.length} 張圖片`;
+  info.textContent = tr('共 {0} 張圖片').replace('{0}', pages.length);
   grid.innerHTML = pages.map((p, idx) => {
     if (p.uploading) {
       return `<div class="i2p-card" data-s="sb1aca7e1">

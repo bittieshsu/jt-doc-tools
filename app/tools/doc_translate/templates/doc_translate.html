@@ -223,7 +223,7 @@ function showResult(job) {
         img.src = `/tools/doc-translate/preview/${dtUpload}/${i}?side=${side}`;
         img.alt = `第 ${i} 頁（${label}）`;
         const cap = document.createElement('figcaption');
-        cap.textContent = `第 ${i} 頁 · ${label}`;
+        cap.textContent = tr('第 {0} 頁 · {1}').replace('{0}', i).replace('{1}', label);
         fig.appendChild(img); fig.appendChild(cap);
         fig.title = tr('點一下看大圖');
         // 放大要拿高解析度那張，縮圖放大只會糊掉

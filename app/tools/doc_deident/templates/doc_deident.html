@@ -427,11 +427,11 @@ function renderDetect(d) {
   const body = $('ddTable');
   if (!d.findings.length) {
     body.innerHTML = `<tr><td colspan="5" data-s="s22a809a0">沒有偵測到敏感資料 🎉</td></tr>`;
-    $('detectStatus').textContent = `完成 — 沒有偵測到敏感資料`;
+    $('detectStatus').textContent = tr('完成 — 沒有偵測到敏感資料');
     return;
   }
   renderRows();
-  $('detectStatus').textContent = `完成 — 共 ${d.findings.length} 筆`;
+  $('detectStatus').textContent = tr('完成 — 共 {0} 筆').replace('{0}', d.findings.length);
 }
 
 // 使用者手動改過的替換值 —— 切換「可通過驗證」開關時**不可以**把這些洗掉，
@@ -559,13 +559,13 @@ $('btnAddTerm').addEventListener('click', async () => {
     }
     const d = await r.json();
     if (!d.count) {
-      $('ddTermStatus').textContent = `文件裡找不到「${term}」`;
+      $('ddTermStatus').textContent = tr('文件裡找不到「{0}」').replace('{0}', term);
       return;
     }
     // 接在既有結果後面，id 沿用同一個序號空間（送出時只認 id）
     let nextId = detectResult.findings.reduce((m, f) => Math.max(m, f.id), -1) + 1;
     for (const f of d.findings) { f.id = nextId++; detectResult.findings.push(f); }
-    $('ddTermStatus').textContent = `已加入 ${d.count} 處`;
+    $('ddTermStatus').textContent = tr('已加入 {0} 處').replace('{0}', d.count);
     $('ddTermInput').value = '';
     renderRows();
   } catch (e) {
@@ -592,12 +592,12 @@ $('btnProcess').addEventListener('click', async () => {
     }
     // 替換跟編修一樣是把原文真的刪掉 —— 使用者要知道這件事
     const ok = await showConfirm(
-      `替換 ${selections.length} 筆資料？原文會被真的刪除，這個操作無法還原。`,
+      tr('替換 {0} 筆資料？原文會被真的刪除，這個操作無法還原。').replace('{0}', selections.length),
       { title: '確認替換', kind: 'danger', okText: '確認替換', cancelText: '取消' });
     if (!ok) return;
   }
   if (chosenMode === 'redact') {
-    const ok = await showConfirm(`編修 ${selections.length} 筆資料？這個操作無法還原。`,
+    const ok = await showConfirm(tr('編修 {0} 筆資料？這個操作無法還原。').replace('{0}', selections.length),
       { title: '確認編修', kind: 'danger', okText: '確認編修', cancelText: '取消' });
     if (!ok) return;
   }
@@ -614,7 +614,7 @@ $('btnProcess').addEventListener('click', async () => {
     });
     if (!r.ok) { $('procStatus').textContent = tr('失敗：') + await r.text(); return; }
     const d = await r.json();
-    $('procStatus').textContent = `完成，共處理 ${d.processed} 筆`;
+    $('procStatus').textContent = tr('完成，共處理 {0} 筆').replace('{0}', d.processed);
     $('doneSummary').textContent =
       `模式：${chosenMode === 'redact' ? 'Redaction（編修）' : 'Masking（資料遮罩）'}　·　處理 ${d.processed} 筆`;
     $('dlLink').href = d.download_url;

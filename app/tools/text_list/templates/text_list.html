@@ -443,7 +443,7 @@ let _loadedFilename = "";
 function updateInputMeta() {
   const v = $('inputArea').value || "";
   const lines = v ? v.split(/\r?\n/).length : 0;
-  $('inputMeta').textContent = `${lines.toLocaleString()} 行 · ${v.length.toLocaleString()} 字`;
+  $('inputMeta').textContent = tr('{0} 行 · {1} 字').replace('{0}', lines.toLocaleString()).replace('{1}', v.length.toLocaleString());
 }
 $('inputArea').addEventListener('input', () => {
   updateInputMeta();
@@ -463,7 +463,7 @@ $('btnClearInput').addEventListener('click', () => {
 // 上傳檔案 — 走 /upload 直接萃取後填回 input area（不套 ops，給 user 看到原文）
 async function _uploadFile(f) {
   if (!f) return;
-  $('status').textContent = `讀取 ${f.name}…`;
+  $('status').textContent = tr('讀取 {0}…').replace('{0}', f.name);
   const fd = new FormData();
   fd.append("file", f);
   fd.append("ops", "[]");
@@ -473,7 +473,7 @@ async function _uploadFile(f) {
     if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
     $('inputArea').value = j.lines.join("\n");
     _loadedFilename = f.name;
-    $('loadedFile').textContent = `已載入：${f.name}（${j.count.toLocaleString()} 行）`;
+    $('loadedFile').textContent = tr('已載入：{0}（{1} 行）').replace('{0}', f.name).replace('{1}', j.count.toLocaleString());
     updateInputMeta();
     $('status').textContent = "";
   } catch (e) {
@@ -812,10 +812,10 @@ $('btnCopyAll').addEventListener('click', async () => {
     }
     btn.classList.add('ok');
     btn.innerHTML = tr('已複製 ✓');
-    showToast(`已複製 ${_resultLines.length.toLocaleString()} 行（${text.length.toLocaleString()} 字）`);
+    showToast(tr('已複製 {0} 行（{1} 字）').replace('{0}', _resultLines.length.toLocaleString()).replace('{1}', text.length.toLocaleString()));
     setTimeout(() => { btn.classList.remove('ok'); btn.innerHTML = orig; }, 1500);
   } catch (e) {
-    showToast(`複製失敗：${e.message}`);
+    showToast(tr('複製失敗：{0}').replace('{0}', e.message));
   }
 });
 
@@ -835,7 +835,7 @@ exportMenu.querySelectorAll('button[data-fmt]').forEach(btn => {
     const fmt = btn.dataset.fmt;
     exportMenu.hidden = true;
     if (!_resultLines.length) { showToast(tr('沒有可下載的內容')); return; }
-    showToast(`產生 ${fmt} 中…`);
+    showToast(tr('產生 {0} 中…').replace('{0}', fmt));
     try {
       const r = await fetch(`/tools/text-list/export/${fmt}`, {
         method: "POST",
@@ -860,9 +860,9 @@ exportMenu.querySelectorAll('button[data-fmt]').forEach(btn => {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      showToast(`已下載 ${fname}`);
+      showToast(tr('已下載 {0}').replace('{0}', fname));
     } catch (e) {
-      showToast(`下載失敗：${e.message}`);
+      showToast(tr('下載失敗：{0}').replace('{0}', e.message));
     }
   });
 });

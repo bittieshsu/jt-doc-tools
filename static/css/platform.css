@@ -396,6 +396,22 @@ details.panel:not([open]) > summary { margin-bottom: 0 !important; border-bottom
 .row > * { flex: 1 1 auto; }
 .form-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; flex-wrap: wrap; }
 .form-row label { width: 96px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+/* 英文（或任何非中文）介面的欄位標題要更寬，而且要可以換行。
+   ------------------------------------------------------------------
+   `.form-row label` 的 96px + nowrap 是照**中文**的長度定的（四到六個字）。
+   英文比中文寬約 1.7 倍：「Enable the workspace」「Remove the background」
+   都超過 96px，而 nowrap 讓它直接**溢出去蓋住旁邊的勾選框與輸入框**
+   （2026-09-05 使用者截圖回報兩處）。
+   用 `html[lang]` 限定範圍，**繁體中文的版面一個像素都不會動** ——
+   這比「把 96px 改大」安全，那樣會讓中文的欄位標題欄憑空變寬。
+   自動化測試抓不到這種問題（元素都在、也沒有 JS 例外），只有截圖看得到。 */
+html[lang]:not([lang="zh-Hant"]) .form-row label {
+  width: 168px;
+  white-space: normal;
+  line-height: 1.35;
+}
+html[lang]:not([lang="zh-Hant"]) .dpe-panel .form-row label { width: 120px; }
 .form-row .field { flex: 1 1 220px; min-width: 0; }
 @media (max-width: 640px) {
   .form-row { align-items: flex-start; }

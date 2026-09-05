@@ -92,7 +92,7 @@ function refreshSelUI() {
   selAll.indeterminate = checked > 0 && checked < total;
   selAll.checked = checked > 0 && checked === total;
   if (checked === 0) selCountEl.textContent = tr('未選取');
-  else selCountEl.textContent = `已選 ${checked} / ${total}`;
+  else selCountEl.textContent = tr('已選 {0} / {1}').replace('{0}', checked).replace('{1}', total);
   bulkDeleteBtn.disabled = checked === 0;
   rowChecks().forEach(c => c.closest('.history-item').classList.toggle('selected', c.checked));
 }
@@ -110,7 +110,7 @@ document.addEventListener('change', (e) => {
 bulkDeleteBtn.addEventListener('click', async () => {
   const ids = selectedIds();
   if (!ids.length) return;
-  if (!(await showConfirm(`確定刪除已選的 ${ids.length} 筆歷史記錄？`, { title: '批次刪除', kind: 'danger' }))) return;
+  if (!(await showConfirm(tr('確定刪除已選的 {0} 筆歷史記錄？').replace('{0}', ids.length), { title: '批次刪除', kind: 'danger' }))) return;
   bulkDeleteBtn.disabled = true;
   bulkDeleteBtn.innerHTML = '<span class="spinner"></span>刪除中…';
   const r = await fetch('/tools/pdf-fill/history/bulk-delete', {
@@ -124,7 +124,7 @@ bulkDeleteBtn.addEventListener('click', async () => {
       const item = document.querySelector(`.history-item[data-hid="${id}"]`);
       if (item) item.remove();
     });
-    if (typeof showToast === 'function') showToast(`已刪除 ${d.deleted} 筆`, 'ok');
+    if (typeof showToast === 'function') showToast(tr('已刪除 {0} 筆').replace('{0}', d.deleted), 'ok');
     refreshSelUI();
   } else {
     alert(tr('批次刪除失敗'));

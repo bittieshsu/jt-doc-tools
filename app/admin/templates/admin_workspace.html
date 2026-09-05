@@ -93,10 +93,10 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
 document.querySelectorAll('.ws-clear-user').forEach(btn => {
   btn.addEventListener('click', async () => {
-    if (!(await window.showConfirm(`確定清空「${btn.dataset.label}」的工作區？此動作無法復原。`, { title: '清空工作區', kind: 'danger', okText: '清空' }))) return;
+    if (!(await window.showConfirm(tr('確定清空「{0}」的工作區？此動作無法復原。').replace('{0}', btn.dataset.label), { title: '清空工作區', kind: 'danger', okText: '清空' }))) return;
     const fd = new FormData(); fd.append('user_key', btn.dataset.key);
     const r = await fetch('/admin/workspace/clear-user', { method: 'POST', body: fd });
-    if (r.ok) { const j = await r.json(); showToast(`已清空 ${j.removed} 個檔案`, 'ok'); setTimeout(() => location.reload(), 800); }
+    if (r.ok) { const j = await r.json(); showToast(tr('已清空 {0} 個檔案').replace('{0}', j.removed), 'ok'); setTimeout(() => location.reload(), 800); }
     else showAlert('失敗：' + await r.text());
   });
 });
@@ -104,7 +104,7 @@ const clearAll = document.getElementById('ws-clear-all');
 if (clearAll) clearAll.addEventListener('click', async () => {
   if (!(await showConfirm(tr('確定清空「所有使用者」的工作區？此動作無法復原。'), { title: '清空全部', okText: '確定清空' }))) return;
   const r = await fetch('/admin/workspace/clear-all', { method: 'POST' });
-  if (r.ok) { const j = await r.json(); showToast(`已清空 ${j.removed} 個檔案`, 'ok'); setTimeout(() => location.reload(), 800); }
+  if (r.ok) { const j = await r.json(); showToast(tr('已清空 {0} 個檔案').replace('{0}', j.removed), 'ok'); setTimeout(() => location.reload(), 800); }
   else showAlert('失敗：' + await r.text());
 });
 </script>

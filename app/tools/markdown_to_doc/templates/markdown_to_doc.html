@@ -315,7 +315,7 @@ def hello():
       const titleEl = $('md2Title');
       if (!titleEl.value.trim()) {
         const stem = f.name.replace(/\.[^.]+$/, '');
-        titleEl.placeholder = `（已預設為 ${stem}）`;
+        titleEl.placeholder = tr('（已預設為 {0}）').replace('{0}', stem);
       }
     };
     reader.readAsText(f, 'utf-8');

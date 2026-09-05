@@ -1020,7 +1020,7 @@ const PO_ICON_WARN = {{ icon('warn', size=12) | tojson }};
           // 常見原因：遠端 GPU EasyOCR server 第一次載 model（5-30 秒）
           //          / httpx 等不通的遠端 timeout / PDF 開檔 + LLM profile preamble
           const elapsed = Math.round((Date.now() - t0) / 1000);
-          statusEl.textContent = `啟動中（首次載入模型約 5-30 秒）… 已等 ${elapsed}s`;
+          statusEl.textContent = tr('啟動中（首次載入模型約 5-30 秒）… 已等 {0}s').replace('{0}', elapsed);
         } else if (jj.status === 'pending') {
           const elapsed = Math.round((Date.now() - t0) / 1000);
           statusEl.textContent = elapsed >= 3 ? `排隊中… 已等 ${elapsed}s` : '排隊中…';

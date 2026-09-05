@@ -689,7 +689,7 @@ function _splitClient(text) {
 function refreshCounter() {
   const t = srcText.value;
   const sents = _splitClient(t);
-  charCounter.textContent = `${t.length} 字 / ${sents.length} 句`;
+  charCounter.textContent = tr('{0} 字 / {1} 句').replace('{0}', t.length).replace('{1}', sents.length);
 }
 srcText.addEventListener('input', refreshCounter);
 refreshCounter();
@@ -724,7 +724,7 @@ async function handleUploadedFile(f) {
     const j = await r.json();
     srcText.value = j.sentences.join('\n');
     if (j.truncated) {
-      alert(`原文超過上限，僅取前 ${j.sentences.length} 句翻譯。`);
+      alert(tr('原文超過上限，僅取前 {0} 句翻譯。').replace('{0}', j.sentences.length));
     }
     if ((j.sentence_count || 0) === 0 || (j.char_count || 0) === 0) {
       // 沒抽到任何文字 — 多半是掃描檔 PDF / 純圖片內嵌 PDF。提示使用者用 OCR 工具
@@ -1241,13 +1241,13 @@ async function _trdPoll() {
   const elapsed = (performance.now() - _trdJobT0) / 1000;
   const tail = ` · 原文 ${ch.src} 字、譯文 ${ch.tgt} 字 · 模型：${LLM_MODEL || '?'}`;
   if (j.status === 'cancelled') {
-    resultMeta.textContent = `已中止 — 完成 ${done}/${total} 句` + tail;
+    resultMeta.textContent = tr('已中止 — 完成 {0}/{1} 句').replace('{0}', done).replace('{1}', total) + tail;
   } else if (j.status === 'error') {
     resultMeta.textContent = `翻譯失敗：${j.message || '未知錯誤'}`;
   } else if (j.status === 'interrupted') {
-    resultMeta.textContent = `服務重新啟動而中斷 — 完成 ${done}/${total} 句，請重新送出`;
+    resultMeta.textContent = tr('服務重新啟動而中斷 — 完成 {0}/{1} 句，請重新送出').replace('{0}', done).replace('{1}', total);
   } else {
-    resultMeta.textContent = `共 ${total} 句 — 完成 ${done} 句` + tail;
+    resultMeta.textContent = tr('共 {0} 句 — 完成 {1} 句').replace('{0}', total).replace('{1}', done) + tail;
   }
   trdTranslatedAt = new Date().toISOString();
 }
@@ -1337,7 +1337,7 @@ async function _trdResumeFromUrl() {
   } else {
     const ch = _trdTotalChars();
     resultMeta.textContent =
-      `共 ${total} 句 — 完成 ${_trdDoneCount()} 句 · ` +
+      tr('共 {0} 句 — 完成 {1} 句 · ').replace('{0}', total).replace('{1}', _trdDoneCount()) +
       `原文 ${ch.src} 字、譯文 ${ch.tgt} 字`;
   }
 }

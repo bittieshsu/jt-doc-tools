@@ -11,6 +11,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ---
 
+## [1.15.2] - 2026-09-05
+
+### Stamp and sign / seam stamp are no longer restricted to Chinese
+
+These two were shown only in a Chinese interface, on the grounds that "stamps are
+a Chinese documentary convention". **That judgement was wrong**: applying a company
+stamp, a signature image or a logo, and stamping across pages so a swap shows, are
+done everywhere. The bar for greying a tool out should be "**an English document
+goes in, it succeeds, and nothing is found**" (the company ID database, e-invoice
+QR codes, the ID-number and Taiwanese address patterns, the Chinese field-label
+dictionary) — stamping is not one of those. Tools greyed out in English go from 9
+to **7**.
+
+The 246 strings on those two pages are translated as well (the catalogue now holds
+**3,208 entries**).
+
+### In English, field labels covered the checkboxes and inputs (reported from two screenshots)
+
+`.form-row label` is a **fixed 96px with nowrap** — sized for **Chinese** (four to
+six characters). English runs about 1.7× wider, so "Enable the workspace" and
+"Remove the background" **overflowed straight over the controls beside them**.
+
+The fix is scoped with `html[lang]:not([lang="zh-Hant"])`, so **the Chinese layout
+does not move by a single pixel**. That is safer than widening the 96px, which
+would give Chinese a wider label column for no reason.
+
+60 over-long English strings were shortened at the same time (buttons and field
+labels): `Make it the default` → `Set default`; `Counting window (minutes) — only
+failures inside it count` → `Counting window (minutes)` (the explanation is
+already on the hint line below).
+
+> **No automated test catches this class of problem** — the elements are all there,
+> there is no JavaScript error, and no Chinese is left. Only looking at a
+> screenshot shows it. That is what `scripts/page_screenshots.py --locale en` is
+> for.
+
+### Sentences with variables in JavaScript are translated too
+
+`` `已選：${file.name}` `` cannot simply be wrapped — **once interpolated the key
+no longer matches**, so the lookup silently fails. They are parameterised instead:
+`tr('…{0}…').replace('{0}', expr)`, and only when the interpolated expression is
+simple enough (no quotes, backticks, newlines or nested templates); anything else
+is skipped entirely. 97 in this batch.
+
+---
+
 ## [1.15.1] - 2026-09-05
 
 ### An out-of-range thumbnail page returned 500

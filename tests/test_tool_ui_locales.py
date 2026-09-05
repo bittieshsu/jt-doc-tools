@@ -20,8 +20,11 @@ _TAIWAN_ONLY = {
     "vat-lookup", "einvoice-scan", "transit-proof", "submission-check",
     "pdf-fill", "doc-deident", "text-deident",
 }
-#: 靠華人文書慣例（印章）—— 之後支援簡體中文時照樣留著。
-_CHINESE = {"pdf-seam-stamp", "pdf-stamp"}
+#: 靠華人文書慣例（印章）—— 曾經限成中文，2026-09-05 使用者指示**解除**：
+#: 蓋章 / 簽名 / 跨頁防抽換不是華人專有，英文環境一樣會蓋公司章、貼簽名圖。
+#: 這個集合現在是空的，但**留著不刪** —— 下一支「靠華人慣例」的工具還是會用到
+#: `CHINESE` 這個常數，而且這裡寫著當初為什麼判斷錯，免得有人再限一次。
+_CHINESE: set[str] = set()
 
 
 @pytest.fixture(scope="module")
@@ -37,14 +40,23 @@ def test_traditional_chinese_still_shows_every_tool(tools):
 
 
 def test_english_locks_exactly_the_chinese_only_tools(tools):
-    """英文底下這九支**反灰點不下去**（不是藏起來 —— 使用者要求）。"""
+    """英文底下這七支**反灰點不下去**（不是藏起來 —— 使用者要求）。
+
+    印章那兩支曾經也在裡面，2026-09-05 解除 —— **限制要有理由**：
+    這七支是「英文文件丟進去會執行成功但什麼都沒抓到」，
+    蓋章不是（英文 PDF 一樣蓋得上去）。
+    """
     locked = {t.metadata.id for t in tools
               if not tool_visible(t.metadata.locales, "en")}
     assert locked == _TAIWAN_ONLY | _CHINESE, locked
 
 
 def test_simplified_chinese_keeps_the_seal_tools(tools):
-    """印章類靠的是華人慣例、不是台灣資料 —— 之後支援簡體中文時要留著。"""
+    """簡體中文底下只鎖台灣專用那七支。
+
+    印章類原本列在這裡（靠華人慣例），使用者指示解除之後兩邊都不鎖 ——
+    這條測試留著是為了守「簡中不可以誤鎖台灣以外的東西」。
+    """
     locked = {t.metadata.id for t in tools
               if not tool_visible(t.metadata.locales, "zh-Hans")}
     assert locked == _TAIWAN_ONLY, locked

@@ -108,7 +108,7 @@ function render() {
   const grid = document.getElementById('page-grid');
   const info = document.getElementById('pages-info');
   const kept = pages.filter(p => !p.deleted).length;
-  info.textContent = `共 ${pages.length} 頁，將輸出 ${kept} 頁`;
+  info.textContent = tr('共 {0} 頁，將輸出 {1} 頁').replace('{0}', pages.length).replace('{1}', kept);
   grid.innerHTML = pages.map((p, idx) =>
     `<div class="page-card ${p.deleted ? 'deleted' : ''}" data-idx="${idx}" draggable="true">
        <span class="drag-hint">⠿</span>

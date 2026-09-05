@@ -292,7 +292,7 @@ function computeOverlaps() {
 function render() {
   const over = computeOverlaps();
   document.getElementById('overlap-warn').hidden = over.size === 0;
-  document.getElementById('stage-info').textContent = `共 ${crops.length} 塊內容`;
+  document.getElementById('stage-info').textContent = tr('共 {0} 塊內容').replace('{0}', crops.length);
   // stage items
   stage.innerHTML = crops.map(c => {
     const cls = 'sm-item' + (c.crop_id === selectedId ? ' selected' : '') +

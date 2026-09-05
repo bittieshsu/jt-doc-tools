@@ -226,14 +226,14 @@ document.getElementById('fontUploadForm').addEventListener('submit', async (e) =
   btnUploadFont.disabled = true;
   let ok = 0, fail = 0;
   for (const f of files) {
-    status.textContent = `上傳中：${f.name} …`;
+    status.textContent = tr('上傳中：{0} …').replace('{0}', f.name);
     const fd = new FormData(); fd.append('file', f);
     try {
       const r = await fetch('/admin/fonts/upload', { method:'POST', body: fd });
       if (r.ok) { ok++; } else { fail++; }
     } catch (_e) { fail++; }
   }
-  status.textContent = `完成：成功 ${ok} 個` + (fail ? `，失敗 ${fail} 個` : '');
+  status.textContent = tr('完成：成功 {0} 個').replace('{0}', ok) + (fail ? `，失敗 ${fail} 個` : '');
   setTimeout(() => location.reload(), 600);
 });
 
@@ -261,7 +261,7 @@ async function _bulkSetHidden(btn, hidden) {
   if (!ids.length) return;
   btn.disabled = true;
   const verb = hidden ? '隱藏' : '顯示';
-  if (!(await showConfirm(`確定要把這個分類的 ${ids.length} 個字型全部設為「${verb}」？`,
+  if (!(await showConfirm(tr('確定要把這個分類的 {0} 個字型全部設為「{1}」？').replace('{0}', ids.length).replace('{1}', verb),
         { title: `全部${verb}`, kind: hidden ? 'danger' : 'primary', okText: `全部${verb}` }))) {
     btn.disabled = false; return;
   }

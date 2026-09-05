@@ -502,7 +502,7 @@
     fd.append('upload_id', uploadId);
     fd.append('page', String(lbPage));
     fd.append('large', 'true');
-    $('bdLbCap').textContent = `第 ${lbPage} / ${pageCount} 頁`;
+    $('bdLbCap').textContent = tr('第 {0} / {1} 頁').replace('{0}', lbPage).replace('{1}', pageCount);
     $('bdLightbox').hidden = false;
     try {
       const r = await fetch('/tools/pdf-border/preview', { method: 'POST', body: fd });

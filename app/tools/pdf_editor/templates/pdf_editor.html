@@ -2841,7 +2841,7 @@ async function _doImageUpload(f) {
     status.textContent = `不支援的檔案類型：${f.type || '未知'}`;
     return;
   }
-  status.textContent = `上傳中：${f.name} …`;
+  status.textContent = tr('上傳中：{0} …').replace('{0}', f.name);
   const fd = new FormData();
   fd.append('upload_id', uploadId);
   fd.append('file', f);
@@ -2947,9 +2947,9 @@ $('gfGo').addEventListener('click', async () => {
     });
     // 換字型只改 src.pdf，下載用的 out.pdf 還是舊的 — 馬上觸發一次 savePdf
     // 把目前 overlay 加新 src 平面化進 out.pdf，使用者下載才拿得到新字型版。
-    status.textContent = `完成！已重繪 ${data.replaced} 段文字，正在更新下載檔…`;
+    status.textContent = tr('完成！已重繪 {0} 段文字，正在更新下載檔…').replace('{0}', data.replaced);
     try { await savePdf(true); } catch (_e) {}
-    status.textContent = `完成！已重繪 ${data.replaced} 段文字，下載檔已更新。`;
+    status.textContent = tr('完成！已重繪 {0} 段文字，下載檔已更新。').replace('{0}', data.replaced);
     setTimeout(() => { $('fontPicker').style.display = 'none'; }, 900);
     // 顯示「復原此次換字型」按鈕（只能還原最近一次 — 後端只保留一份備份）
     if (data.can_undo) {
@@ -2969,7 +2969,7 @@ $('gfGo').addEventListener('click', async () => {
 // restore。按一次後就拿掉（後端 backup 也搬走了，只能還原一次）。
 function _showUndoReplaceFonts(replaced) {
   const status = $('peStatus');
-  status.innerHTML = `已把 ${replaced} 段文字換成新字型。`;
+  status.innerHTML = tr('已把 {0} 段文字換成新字型。').replace('{0}', replaced);
   const undoBtn = document.createElement('button');
   undoBtn.type = 'button';
   undoBtn.className = 'btn';

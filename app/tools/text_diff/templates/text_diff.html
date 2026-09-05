@@ -156,7 +156,7 @@ function updateMeta(textareaId, metaId) {
   const v = $(textareaId).value || "";
   const lines = v ? v.split(/\r?\n/).length : 0;
   const chars = v.length;
-  $(metaId).textContent = `${lines.toLocaleString()} 行 · ${chars.toLocaleString()} 字`;
+  $(metaId).textContent = tr('{0} 行 · {1} 字').replace('{0}', lines.toLocaleString()).replace('{1}', chars.toLocaleString());
 }
 $('textA').addEventListener('input', () => updateMeta('textA', 'metaA'));
 $('textB').addEventListener('input', () => updateMeta('textB', 'metaB'));
@@ -218,7 +218,7 @@ function _wireDrop(textareaId, metaId) {
       updateMeta(textareaId, metaId);
       // Keep the filename visible so the user knows what was loaded.
       const m = meta.querySelector('span:first-child') || meta;
-      m.textContent = `${m.textContent}　·　已載入 ${file.name}`;
+      m.textContent = tr('{0}　·　已載入 {1}').replace('{0}', m.textContent).replace('{1}', file.name);
     };
     reader.onerror = () => {
       // 用 DOM API 建節點，不要把訊息拼進 HTML 字串

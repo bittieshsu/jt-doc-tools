@@ -192,7 +192,7 @@ saveBtn.addEventListener('click', async () => {
     const k = kEl.value.trim();
     if (!k) continue;
     if (keys.includes(k)) {
-      statusEl.textContent = `key 重複：${k}`;
+      statusEl.textContent = tr('key 重複：{0}').replace('{0}', k);
       statusEl.className = 'err';
       return;
     }

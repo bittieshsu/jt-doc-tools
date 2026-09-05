@@ -72,7 +72,7 @@ const fu = new FileUpload($('attUp'), async (f) => {
     $('attInfo').textContent = tr('此 PDF 沒有嵌入附件 ✓');
     return;
   }
-  $('attInfo').textContent = `共 ${d.attachments.length} 個嵌入附件。`;
+  $('attInfo').textContent = tr('共 {0} 個嵌入附件。').replace('{0}', d.attachments.length);
   $('attBody').innerHTML = d.attachments.map(a => `
     <tr>
       <td><input type="checkbox" class="att-chk" value="${esc(a.name)}" checked></td>
@@ -120,7 +120,7 @@ $('btnStrip').addEventListener('click', async () => {
   });
   if (!r.ok) { $('status').textContent = tr('失敗：') + await r.text(); return; }
   const d = await r.json();
-  $('status').textContent = `已移除 ${d.removed} 個附件`;
+  $('status').textContent = tr('已移除 {0} 個附件').replace('{0}', d.removed);
   window.location.href = d.download_url;
 });
 </script>

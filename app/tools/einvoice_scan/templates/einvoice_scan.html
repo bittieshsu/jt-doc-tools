@@ -1736,7 +1736,7 @@ async function deleteInvoice(id) {
     ? `${inv.invoice_number || '(無號碼)'}${inv.seller_name ? '（' + inv.seller_name + '）' : ''}`
     : '此筆發票';
   if (!(await window.showConfirm(
-        `確定刪除 ${label}？`,
+        tr('確定刪除 {0}？').replace('{0}', label),
         { title: '刪除發票', kind: 'danger', okText: '刪除' }))) return;
   try {
     const r = await fetch(`/tools/einvoice-scan/buffer/${id}`, { method: 'DELETE' });
@@ -1744,7 +1744,7 @@ async function deleteInvoice(id) {
     showToast(tr('已刪除'));
     await loadBuffer();
   } catch (e) {
-    showToast(`刪除失敗：${e.message}`, 'err');
+    showToast(tr('刪除失敗：{0}').replace('{0}', e.message), 'err');
   }
 }
 
@@ -1774,7 +1774,7 @@ if (_btnLlmClassify) {
     const subEl = $('tableBusySub');
     if (overlay) {
       textEl.textContent = tr('LLM 判讀中…');
-      subEl.textContent = `共 ${_cachedInvoices.length} 張，每批 20 張處理中，請勿關閉頁面`;
+      subEl.textContent = tr('共 {0} 張，每批 20 張處理中，請勿關閉頁面').replace('{0}', _cachedInvoices.length);
       overlay.hidden = false;
     }
     try {
@@ -1814,7 +1814,7 @@ if (_btnReclassify) {
     const subEl = $('tableBusySub');
     if (overlay) {
       textEl.textContent = tr('重抓科目中…');
-      subEl.textContent = `共 ${_cachedInvoices.length} 張，請稍候`;
+      subEl.textContent = tr('共 {0} 張，請稍候').replace('{0}', _cachedInvoices.length);
       overlay.hidden = false;
     }
     try {
@@ -1823,7 +1823,7 @@ if (_btnReclassify) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
       showToast(
-        `已重抓：${j.classified} / ${j.total} 張有科目（更新 ${j.updated} 筆）`,
+        tr('已重抓：{0} / {1} 張有科目（更新 {2} 筆）').replace('{0}', j.classified).replace('{1}', j.total).replace('{2}', j.updated),
         'ok');
       await loadBuffer();
     } catch (e) {
@@ -1841,7 +1841,7 @@ $('btnDeleteSelected').addEventListener('click', async () => {
   const ids = _selectedIds();
   if (!ids.length) return;
   if (!(await window.showConfirm(
-        `確定刪除選取的 ${ids.length} 張發票？`,
+        tr('確定刪除選取的 {0} 張發票？').replace('{0}', ids.length),
         { title: '刪除選取', kind: 'danger', okText: '刪除' }))) return;
   try {
     const r = await fetch('/tools/einvoice-scan/buffer/delete-batch', {
@@ -1851,10 +1851,10 @@ $('btnDeleteSelected').addEventListener('click', async () => {
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
-    showToast(`已刪除 ${j.deleted} 張`, 'ok');
+    showToast(tr('已刪除 {0} 張').replace('{0}', j.deleted), 'ok');
     await loadBuffer();
   } catch (e) {
-    showToast(`刪除失敗：${e.message}`, 'err');
+    showToast(tr('刪除失敗：{0}').replace('{0}', e.message), 'err');
   }
 });
 
@@ -1873,7 +1873,7 @@ exportMenu.querySelectorAll('button[data-fmt]').forEach(b => {
   b.addEventListener('click', async () => {
     const fmt = b.dataset.fmt;
     exportMenu.hidden = true;
-    showToast(`產生 ${fmt} 中…`);
+    showToast(tr('產生 {0} 中…').replace('{0}', fmt));
     try {
       const r = await fetch('/tools/einvoice-scan/export', {
         method: 'POST',
@@ -1895,11 +1895,11 @@ exportMenu.querySelectorAll('button[data-fmt]').forEach(b => {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      showToast(`已下載 ${a.download}`, 'ok');
+      showToast(tr('已下載 {0}').replace('{0}', a.download), 'ok');
       // 注意：這裡沒有「匯出後清空」的 UI，不要引用未定義的 clearAfter —
       // 之前那行會拋 ReferenceError，讓已成功下載的檔案誤報「匯出失敗」。
     } catch (e) {
-      showToast(`匯出失敗：${e.message}`, 'err');
+      showToast(tr('匯出失敗：{0}').replace('{0}', e.message), 'err');
     }
   });
 });
@@ -1912,10 +1912,10 @@ $('btnClear').addEventListener('click', async () => {
     const r = await fetch('/tools/einvoice-scan/buffer', { method: 'DELETE' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
-    showToast(`已清空 ${j.cleared} 張`, 'ok');
+    showToast(tr('已清空 {0} 張').replace('{0}', j.cleared), 'ok');
     await loadBuffer();
   } catch (e) {
-    showToast(`清空失敗：${e.message}`, 'err');
+    showToast(tr('清空失敗：{0}').replace('{0}', e.message), 'err');
   }
 });
 
@@ -2033,7 +2033,7 @@ function stopLiveScan() {
   liveBox.hidden = true;
   // 提示掃完幾張 + refresh buffer
   if (_liveScannedThisSession > 0) {
-    showToast(`連續掃描結束 — 共加入 ${_liveScannedThisSession} 張`, 'ok');
+    showToast(tr('連續掃描結束 — 共加入 {0} 張').replace('{0}', _liveScannedThisSession), 'ok');
   }
   loadBuffer();
 }
@@ -2155,7 +2155,7 @@ async function handleLiveScanResult(qrText) {
       _liveScannedThisSession += j.added_count;
       liveCount.textContent = String(_liveScannedThisSession);
       const last = j.added[0];
-      liveStatusEl.textContent = `已加入 ${last.invoice_number}（${j.buffer.count} / ${j.buffer.limit}）`;
+      liveStatusEl.textContent = tr('已加入 {0}（{1} / {2}）').replace('{0}', last.invoice_number).replace('{1}', j.buffer.count).replace('{2}', j.buffer.limit);
       // 成功才放閃光彈 + 嗶聲（duplicate 或非 e-invoice 不打擾）
       fireFlashbang();
       beep();

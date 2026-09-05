@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}PDF 用印與簽名 · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('PDF 用印與簽名') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('stamp', size=22) }} PDF 用印與簽名</h1>
-<p class="muted">上傳 PDF，選擇要用的印章、簽名或 Logo 圖片，平台會依照預設位置自動套用。需要微調時可以切到進階模式。</p>
+<h1>{{ icon('stamp', size=22) }} {{ tr('PDF 用印與簽名') }}</h1>
+<p class="muted">{{ tr('上傳 PDF，選擇要用的印章、簽名或 Logo 圖片，平台會依照預設位置自動套用。需要微調時可以切到進階模式。') }}</p>
 
 {% include "components/cjk_font_notice.html" with context %}
 
 <div class="panel">
-  <h2 data-s="s53896af7">1. 選擇要蓋的圖片（印章 / 簽名 / Logo）</h2>
+  <h2 data-s="s53896af7">{{ tr('1. 選擇要蓋的圖片（印章 / 簽名 / Logo）') }}</h2>
   {% if not stamps %}
-    <div class="empty">還沒有共用印章 / 簽名 / Logo，可請管理員到「<a href="/admin/assets">資產管理</a>」上傳，或使用下方「臨時上傳」一張（僅本次有效，不存於伺服器）。也可以直接選下方「<b>不蓋印章 / 簽名</b>」，只套用日期 / 個資限用章。</div>
+    <div class="empty">{{ tr('還沒有共用印章 / 簽名 / Logo，可請管理員到「') }}<a href="/admin/assets">{{ tr('資產管理') }}</a>{{ tr('」上傳，或使用下方「臨時上傳」一張（僅本次有效，不存於伺服器）。也可以直接選下方「') }}<b>{{ tr('不蓋印章 / 簽名') }}</b>{{ tr('」，只套用日期 / 個資限用章。') }}</div>
   {% endif %}
   {# 資產清單永遠 render：即使沒有共用資產，也要能選「不蓋印章 / 簽名」（只用日期 / #}
   {# 個資限用章），或搭配下方臨時上傳。#}
@@ -29,33 +29,33 @@
     <label class="asset-item" data-s="sb202c6d4" id="noneStampCard">
       <div class="thumb" data-s="s20338d91">
         <div data-s="sa7ecb24e">
-          {{ icon('close', size=24) }}<br>不蓋章
+          {{ icon('close', size=24) }}<br>{{ tr('不蓋章') }}
         </div>
       </div>
       <div class="name">
         <input type="radio" name="stamp" value="__none__" id="noneStampRadio" {% if not stamps %}checked{% endif %} />
-        <span>不蓋印章 / 簽名</span>
-        <span class="type-chip" data-s="s3f18db9a">無</span>
+        <span>{{ tr('不蓋印章 / 簽名') }}</span>
+        <span class="type-chip" data-s="s3f18db9a">{{ tr('無') }}</span>
       </div>
-      <div class="meta">只用下方日期 / 個資限用章</div>
+      <div class="meta">{{ tr('只用下方日期 / 個資限用章') }}</div>
     </label>
   </div>
   <div data-s="s51512563">
     <div data-s="s31c90b93">
       <input type="file" id="tempAssetFile" accept="image/png,image/jpeg,image/webp" hidden />
-      <button class="btn btn-small" type="button" id="btnTempAsset">{{ icon('upload', size=12) }} 臨時上傳一張（僅本次）</button>
-      <span class="muted" data-s="s6b9c179a">圖片只放在你的瀏覽器，<b>不會存到伺服器</b>，別人也看不到；蓋章送出時才上傳。管理員會看到一筆「使用臨時資產」的稽核記錄（只記事件 + 檔名 hash，不留圖檔）。</span>
+      <button class="btn btn-small" type="button" id="btnTempAsset">{{ icon('upload', size=12) }} {{ tr('臨時上傳一張（僅本次）') }}</button>
+      <span class="muted" data-s="s6b9c179a">{{ tr('圖片只放在你的瀏覽器，') }}<b>{{ tr('不會存到伺服器') }}</b>{{ tr('，別人也看不到；蓋章送出時才上傳。管理員會看到一筆「使用臨時資產」的稽核記錄（只記事件 + 檔名 hash，不留圖檔）。') }}</span>
     </div>
     <div id="tempAssetSlot" data-s="s06ed15aa">
       <div class="asset-item" data-s="s500d9a0e">
         <div class="thumb"><img id="tempAssetThumb" alt="{{ tr('臨時資產預覽') }}" /></div>
         <div class="name">
           <input type="radio" name="stamp" value="__temp__" id="tempAssetRadio" />
-          <span id="tempAssetName">（未選）</span>
-          <span class="type-chip" data-s="s53289da7">臨時</span>
+          <span id="tempAssetName">{{ tr('（未選）') }}</span>
+          <span class="type-chip" data-s="s53289da7">{{ tr('臨時') }}</span>
         </div>
         <div class="meta">
-          <button type="button" class="btn btn-small" id="btnTempRemove" data-s="s0f8959df">移除</button>
+          <button type="button" class="btn btn-small" id="btnTempRemove" data-s="s0f8959df">{{ tr('移除') }}</button>
         </div>
       </div>
     </div>
@@ -63,25 +63,25 @@
 </div>
 
 <details class="panel" id="date-panel">
-  <summary>1b. 插入日期
-    <span data-s="s719f3aa3">選用</span>
-    <span id="date-summary-status" data-s="s333a2780"> — 未啟用</span>
+  <summary>{{ tr('1b. 插入日期') }}
+    <span data-s="s719f3aa3">{{ tr('選用') }}</span>
+    <span id="date-summary-status" data-s="s333a2780"> {{ tr('— 未啟用') }}</span>
   </summary>
   <div>
       <label data-s="s5decd72b">
         <input type="checkbox" id="date-enabled">
-        <span><b>啟用日期蓋章</b>（會跟印章同步套用至每一頁設定）</span>
+        <span><b>{{ tr('啟用日期蓋章') }}</b>{{ tr('（會跟印章同步套用至每一頁設定）') }}</span>
       </label>
 
       <div id="date-form" data-s="s122900a0">
         <div data-s="s27b0a0b0">
-          <label data-s="s3044b600">日期</label>
+          <label data-s="s3044b600">{{ tr('日期') }}</label>
           <div data-s="s07b81311">
             <input type="date" id="date-value" data-s="s06320905">
-            <button type="button" id="date-today" class="btn" data-s="s7ea62d04">今天</button>
+            <button type="button" id="date-today" class="btn" data-s="s7ea62d04">{{ tr('今天') }}</button>
           </div>
 
-          <label data-s="s3044b600">格式</label>
+          <label data-s="s3044b600">{{ tr('格式') }}</label>
           <select id="date-format" class="jt-select" data-s="s757df271">
             <optgroup label="西元（ISO 風 / 中文）">
               <option value="iso">2026-05-26</option>
@@ -89,67 +89,67 @@
               <option value="slash">2026/05/26</option>
               <option value="slash-noz">2026/5/26</option>
               <option value="dot">2026.05.26</option>
-              <option value="cjk">2026 年 05 月 26 日</option>
-              <option value="cjk-noz">2026 年 5 月 26 日</option>
+              <option value="cjk">{{ tr('2026 年 05 月 26 日') }}</option>
+              <option value="cjk-noz">{{ tr('2026 年 5 月 26 日') }}</option>
               <option value="md-slash">5/26</option>
             </optgroup>
             <optgroup label="民國">
-              <option value="roc">民國 115 年 05 月 26 日</option>
-              <option value="roc-noz">民國 115 年 5 月 26 日</option>
+              <option value="roc">{{ tr('民國 115 年 05 月 26 日') }}</option>
+              <option value="roc-noz">{{ tr('民國 115 年 5 月 26 日') }}</option>
               <option value="roc-slash">115/05/26</option>
               <option value="roc-slash-noz">115/5/26</option>
               <option value="roc-dot">115.05.26</option>
             </optgroup>
           </select>
 
-          <label data-s="s3044b600">字型</label>
+          <label data-s="s3044b600">{{ tr('字型') }}</label>
           <select id="date-font" class="jt-select" data-s="s015ccf91">
-            <option value="lxgw" selected>文楷 LXGW（毛筆手寫感）</option>
-            <option value="klee">Klee One（鉛筆手寫感）</option>
+            <option value="lxgw" selected>{{ tr('文楷 LXGW（毛筆手寫感）') }}</option>
+            <option value="klee">{{ tr('Klee One（鉛筆手寫感）') }}</option>
           </select>
 
-          <label data-s="s3044b600">粗細</label>
+          <label data-s="s3044b600">{{ tr('粗細') }}</label>
           <select id="date-weight" class="jt-select" data-s="s844e0595">
-            <option value="light">細</option>
-            <option value="regular" selected>標準</option>
-            <option value="medium">中粗</option>
-            <option value="bold">粗</option>
-            <option value="heavy">特粗</option>
+            <option value="light">{{ tr('細') }}</option>
+            <option value="regular" selected>{{ tr('標準') }}</option>
+            <option value="medium">{{ tr('中粗') }}</option>
+            <option value="bold">{{ tr('粗') }}</option>
+            <option value="heavy">{{ tr('特粗') }}</option>
           </select>
 
-          <label data-s="s3044b600">字級</label>
+          <label data-s="s3044b600">{{ tr('字級') }}</label>
           <div data-s="s07b81311">
             <input type="number" id="date-fontsize" value="96" min="24" max="200" step="4" data-s="se0c88f43">
-            <span class="muted" data-s="s6b9c179a">px（render 端；最終 PDF 看拖拉的 mm 寬度）</span>
+            <span class="muted" data-s="s6b9c179a">{{ tr('px（render 端；最終 PDF 看拖拉的 mm 寬度）') }}</span>
           </div>
 
-          <label data-s="s3044b600">顏色</label>
+          <label data-s="s3044b600">{{ tr('顏色') }}</label>
           <div data-s="s5f11e4db">
             <input type="color" id="date-color" value="#1a1a2e" data-s="se666a1a1">
-            <span class="muted" data-s="s6b9c179a">建議深色（黑、藍墨水）</span>
+            <span class="muted" data-s="s6b9c179a">{{ tr('建議深色（黑、藍墨水）') }}</span>
           </div>
 
-          <label data-s="s3044b600">手寫質感</label>
+          <label data-s="s3044b600">{{ tr('手寫質感') }}</label>
           <label data-s="sbd9a85c0">
             <input type="checkbox" id="date-jitter" checked data-s="s487b71ac">
-            隨機旋轉 / 字距 / 墨水深淺
+            {{ tr('隨機旋轉 / 字距 / 墨水深淺') }}
           </label>
 
-          <label data-s="s3044b600">邊緣粗糙</label>
+          <label data-s="s3044b600">{{ tr('邊緣粗糙') }}</label>
           <select id="date-texture" class="jt-select" data-s="s844e0595">
-            <option value="none">無（乾淨）</option>
-            <option value="light">輕（微毛邊）</option>
-            <option value="medium" selected>中（毛邊 + 缺口）</option>
-            <option value="heavy">重（明顯毛邊 + 多缺口）</option>
+            <option value="none">{{ tr('無（乾淨）') }}</option>
+            <option value="light">{{ tr('輕（微毛邊）') }}</option>
+            <option value="medium" selected>{{ tr('中（毛邊 + 缺口）') }}</option>
+            <option value="heavy">{{ tr('重（明顯毛邊 + 多缺口）') }}</option>
           </select>
         </div>
 
         <div data-s="sc8423af8">
           <button type="button" id="date-regen" class="btn btn-primary" data-s="sd7345d1b">
-            {{ icon('refresh', size=12) }} 重新生成
+            {{ icon('refresh', size=12) }} {{ tr('重新生成') }}
           </button>
           <div data-s="sbbf7159c">
-            <div data-s="sfd99a134">預覽</div>
+            <div data-s="sfd99a134">{{ tr('預覽') }}</div>
             <div data-s="s44d3eff8">
               <img id="date-preview" data-s="sc2e9e4f9" alt="{{ tr('日期預覽') }}">
             </div>
@@ -159,32 +159,32 @@
         {# 日期旋轉：主印章的旋轉面板只作用在主印章，日期 / 個資限用章各自
            要有自己的控制（後端本來就吃 rotation_deg，先前只是缺 UI）。 #}
         <div class="ovr-rot" data-ovr="date">
-          <span class="ovr-rot-label">旋轉</span>
+          <span class="ovr-rot-label">{{ tr('旋轉') }}</span>
           <input type="number" class="ovr-rot-input" id="date-rot" value="0"
                  step="0.5" min="-45" max="45" aria-label="{{ tr('日期旋轉角度') }}">
           <span class="ovr-rot-unit">°</span>
-          <button type="button" class="btn-mini ovr-rot-reset" data-ovr="date">歸零</button>
-          <button type="button" class="btn-mini ovr-rot-rand" data-ovr="date" data-mag="3">隨機 ±3°</button>
+          <button type="button" class="btn-mini ovr-rot-reset" data-ovr="date">{{ tr('歸零') }}</button>
+          <button type="button" class="btn-mini ovr-rot-rand" data-ovr="date" data-mag="3">{{ tr('隨機 ±3°') }}</button>
           <button type="button" class="btn-mini ovr-rot-rand" data-ovr="date" data-mag="10">±10°</button>
         </div>
         <div data-s="s886f54c7">
-          啟用後可在下方預覽區獨立拖拉日期（綠虛線框）+ 4 角縮放。預設位置：印章右側自動排。
+          {{ tr('啟用後可在下方預覽區獨立拖拉日期（綠虛線框）+ 4 角縮放。預設位置：印章右側自動排。') }}
         </div>
       </div>
     </div>
   </details>
 
 <details class="panel" id="restrict-panel">
-  <summary>1c. 個資限用章
-    <span data-s="s25260053">選用</span>
-    <span id="restrict-summary-status" data-s="s333a2780"> — 未啟用</span>
+  <summary>{{ tr('1c. 個資限用章') }}
+    <span data-s="s25260053">{{ tr('選用') }}</span>
+    <span id="restrict-summary-status" data-s="s333a2780"> {{ tr('— 未啟用') }}</span>
   </summary>
   <div>
-    <p class="muted" data-s="sb9a12908">把證件影本（身分證／護照／健保卡等）送銀行、政府、學校申辦時，蓋「僅供 [用途] 使用，他用無效」紅章防個資外流挪用。</p>
+    <p class="muted" data-s="sb9a12908">{{ tr('把證件影本（身分證／護照／健保卡等）送銀行、政府、學校申辦時，蓋「僅供 [用途] 使用，他用無效」紅章防個資外流挪用。') }}</p>
 
     <label data-s="s5decd72b">
       <input type="checkbox" id="restrict-enabled">
-      <span><b>啟用個資限用章</b>（會跟印章同步套用至每一頁設定）</span>
+      <span><b>{{ tr('啟用個資限用章') }}</b>{{ tr('（會跟印章同步套用至每一頁設定）') }}</span>
     </label>
 
     <div id="restrict-form" data-s="s122900a0">
@@ -192,79 +192,79 @@
         <!-- 左欄:表單 -->
         <div data-s="sdd13290a">
 
-          <label data-s="s3044b600">用途範本</label>
+          <label data-s="s3044b600">{{ tr('用途範本') }}</label>
           <select id="restrict-template" class="jt-select" data-s="sa2937b9e">
-            <option value="">（自訂用途，請在下方輸入）</option>
+            <option value="">{{ tr('（自訂用途，請在下方輸入）') }}</option>
           </select>
 
-          <label data-s="s3044b600">用途</label>
+          <label data-s="s3044b600">{{ tr('用途') }}</label>
           <input type="text" id="restrict-purpose" placeholder="{{ tr('例如：申請台新銀行帳戶') }}" maxlength="60" data-s="sd477c56e">
           <label class="rs-phrase-row">
             <input type="checkbox" id="restrict-phrase" checked>
-            <span>加上「僅供 … 使用，他用無效」字樣</span>
-            <small class="muted">取消勾選就只印用途本身 —— 用途文字已經把話說完時（例如「本影本僅供投標使用」）再套一次會變贅字。</small>
+            <span>{{ tr('加上「僅供 … 使用，他用無效」字樣') }}</span>
+            <small class="muted">{{ tr('取消勾選就只印用途本身 —— 用途文字已經把話說完時（例如「本影本僅供投標使用」）再套一次會變贅字。') }}</small>
           </label>
 
-          <label data-s="s3044b600">日期</label>
+          <label data-s="s3044b600">{{ tr('日期') }}</label>
           <div data-s="scfaba5a6">
             <input type="date" id="restrict-date" data-s="s06320905">
-            <button type="button" id="restrict-today" class="btn" data-s="s7ea62d04">今天</button>
+            <button type="button" id="restrict-today" class="btn" data-s="s7ea62d04">{{ tr('今天') }}</button>
             <label data-s="se72b7744">
-              <input type="checkbox" id="restrict-date-on" checked data-s="s831b94f4"> 章身含日期
+              <input type="checkbox" id="restrict-date-on" checked data-s="s831b94f4"> {{ tr('章身含日期') }}
             </label>
           </div>
 
-          <label data-s="s3044b600">申請人</label>
+          <label data-s="s3044b600">{{ tr('申請人') }}</label>
           <input type="text" id="restrict-applicant" placeholder="{{ tr('（選填）例：王小明') }}" maxlength="20" data-s="s521eab31">
 
-          <label data-s="s3044b600">份數</label>
+          <label data-s="s3044b600">{{ tr('份數') }}</label>
           <div data-s="s07b81311">
             <select id="restrict-copy-total" class="jt-select" data-s="sa497ea78">
-              <option value="">不顯示份數</option>
-              <option value="1">共 1 份</option>
-              <option value="2">共 2 份</option>
-              <option value="3">共 3 份</option>
-              <option value="4">共 4 份</option>
-              <option value="5">共 5 份</option>
+              <option value="">{{ tr('不顯示份數') }}</option>
+              <option value="1">{{ tr('共 1 份') }}</option>
+              <option value="2">{{ tr('共 2 份') }}</option>
+              <option value="3">{{ tr('共 3 份') }}</option>
+              <option value="4">{{ tr('共 4 份') }}</option>
+              <option value="5">{{ tr('共 5 份') }}</option>
             </select>
             <select id="restrict-copy-current" class="jt-select" data-s="s8c92abea">
-              <option value="1">第 1 份</option>
-              <option value="2">第 2 份</option>
-              <option value="3">第 3 份</option>
-              <option value="4">第 4 份</option>
-              <option value="5">第 5 份</option>
+              <option value="1">{{ tr('第 1 份') }}</option>
+              <option value="2">{{ tr('第 2 份') }}</option>
+              <option value="3">{{ tr('第 3 份') }}</option>
+              <option value="4">{{ tr('第 4 份') }}</option>
+              <option value="5">{{ tr('第 5 份') }}</option>
             </select>
           </div>
 
-          <label data-s="s3044b600">章型</label>
+          <label data-s="s3044b600">{{ tr('章型') }}</label>
           <select id="restrict-style" class="jt-select" data-s="sc3b421e0">
-            <option value="rectangle" selected>橫式紅章（雙線框）</option>
-            <option value="rectangle-single">橫式紅章（單線框）</option>
-            <option value="vertical">直式紅章（雙線框）</option>
-            <option value="vertical-single">直式紅章（單線框）</option>
-            <option value="diagonal">對角線斜印</option>
+            <option value="rectangle" selected>{{ tr('橫式紅章（雙線框）') }}</option>
+            <option value="rectangle-single">{{ tr('橫式紅章（單線框）') }}</option>
+            <option value="vertical">{{ tr('直式紅章（雙線框）') }}</option>
+            <option value="vertical-single">{{ tr('直式紅章（單線框）') }}</option>
+            <option value="diagonal">{{ tr('對角線斜印') }}</option>
           </select>
 
-          <label data-s="s3044b600">字型</label>
+          <label data-s="s3044b600">{{ tr('字型') }}</label>
           <select id="restrict-font" class="jt-select" data-s="sa2937b9e">
-            <option value="kaiti" selected>標楷體（自動找系統最佳）</option>
+            <option value="kaiti" selected>{{ tr('標楷體（自動找系統最佳）') }}</option>
           </select>
 
-          <label data-s="s3044b600">顏色</label>
+          <label data-s="s3044b600">{{ tr('顏色') }}</label>
           <div data-s="s5f11e4db">
             <input type="color" id="restrict-color" value="#c00000" data-s="se666a1a1">
-            <span class="muted" data-s="s6b9c179a">傳統紅章 #c00000；可改藍 / 黑</span>
+            <span class="muted" data-s="s6b9c179a">{{ tr('傳統紅章 #c00000；可改藍 / 黑') }}</span>
           </div>
 
-          <label data-s="s3044b600">底色</label>
+          <label data-s="s3044b600">{{ tr('底色') }}</label>
           <div class="rs-bg-row">
             <label><input type="radio" name="restrict-bg" value="transparent" checked>
-              透明（看得見底下的內容）</label>
+              {{ tr('透明（看得見底下的內容）') }}</label>
             <label><input type="radio" name="restrict-bg" value="white">
-              白底（章會蓋住底下的內容）</label>
+              {{ tr('白底（章會蓋住底下的內容）') }}</label>
           </div>
 
-          <label data-s="s3044b600">字級</label>
+          <label data-s="s3044b600">{{ tr('字級') }}</label>
           <div data-s="s07b81311">
             <input type="number" id="restrict-fontsize" value="64" min="32" max="120" step="4" data-s="se0c88f43">
             <span class="muted" data-s="s6b9c179a">px</span>
@@ -272,17 +272,17 @@
 
           <div></div>
           <button type="button" id="restrict-regen" class="btn btn-primary" data-s="s477e0231">
-            {{ icon('refresh', size=12) }} 重新生成預覽
+            {{ icon('refresh', size=12) }} {{ tr('重新生成預覽') }}
           </button>
         </div>
 
         <!-- 右欄:預覽 + 提示 -->
         <div data-s="s3f9f96c6">
-          <div data-s="sfd99a134">預覽</div>
+          <div data-s="sfd99a134">{{ tr('預覽') }}</div>
           <div id="restrict-preview-box" data-s="sbe22b62b">
             <div id="restrict-preview-placeholder" data-s="s5250697e">
               {{ icon('stamp', size=28) }}
-              <div data-s="s9e3c4ccb">填入「用途」後<br>會自動產生章身預覽</div>
+              <div data-s="s9e3c4ccb">{{ tr('填入「用途」後') }}<br>{{ tr('會自動產生章身預覽') }}</div>
             </div>
             <img id="restrict-preview" data-s="sf2f6294f" alt="">
           </div>
@@ -290,24 +290,24 @@
            要有自己的控制（後端本來就吃 rotation_deg，先前只是缺 UI）。 #}
         <label class="rs-tint-row">
     <input type="checkbox" id="restrict-box-tint" checked>
-    <span>編輯時顯示輔助框底色</span>
-    <small class="muted">這層淡色只是拖曳範圍的提示，<b>不會印進 PDF</b>；
-      章本身的底色請用上面的「底色」選項。</small>
+    <span>{{ tr('編輯時顯示輔助框底色') }}</span>
+    <small class="muted">{{ tr('這層淡色只是拖曳範圍的提示，') }}<b>{{ tr('不會印進 PDF') }}</b>{{ tr('；
+      章本身的底色請用上面的「底色」選項。') }}</small>
   </label>
   <div class="ovr-rot" data-ovr="restrict">
-          <span class="ovr-rot-label">旋轉</span>
+          <span class="ovr-rot-label">{{ tr('旋轉') }}</span>
           <input type="number" class="ovr-rot-input" id="restrict-rot" value="0"
                  step="0.5" min="-45" max="45" aria-label="{{ tr('個資限用章旋轉角度') }}">
           <span class="ovr-rot-unit">°</span>
-          <button type="button" class="btn-mini ovr-rot-reset" data-ovr="restrict">歸零</button>
-          <button type="button" class="btn-mini ovr-rot-rand" data-ovr="restrict" data-mag="3">隨機 ±3°</button>
+          <button type="button" class="btn-mini ovr-rot-reset" data-ovr="restrict">{{ tr('歸零') }}</button>
+          <button type="button" class="btn-mini ovr-rot-rand" data-ovr="restrict" data-mag="3">{{ tr('隨機 ±3°') }}</button>
           <button type="button" class="btn-mini ovr-rot-rand" data-ovr="restrict" data-mag="10">±10°</button>
         </div>
           <div data-s="s77b02064">
-            啟用後可在下方預覽區獨立拖拉限用章（橘虛線框）+ 4 角縮放。建議蓋在證件「個資欄位上方」但留得辨識。
+            {{ tr('啟用後可在下方預覽區獨立拖拉限用章（橘虛線框）+ 4 角縮放。建議蓋在證件「個資欄位上方」但留得辨識。') }}
           </div>
           <div data-s="sfc99145b">
-            想加自己的字型？到 <a href="/admin/fonts" target="_blank" data-s="sd294e9a2">設定 → 字型管理</a> 上傳，會自動出現在字型下拉內。
+            {{ tr('想加自己的字型？到') }} <a href="/admin/fonts" target="_blank" data-s="sd294e9a2">{{ tr('設定 → 字型管理') }}</a> {{ tr('上傳，會自動出現在字型下拉內。') }}
           </div>
         </div>
       </div>
@@ -316,62 +316,62 @@
 </details>
 
 <div class="panel">
-  <h2 data-s="s53896af7">2. 上傳 PDF</h2>
-  {% with upload_id='pdfUpload', accept='application/pdf', multiple=True, hint='支援單/多檔；多檔會打包為 ZIP 下載' %}
+  <h2 data-s="s53896af7">{{ tr('2. 上傳 PDF') }}</h2>
+  {% with upload_id='pdfUpload', accept='application/pdf', multiple=True, hint=tr('支援單/多檔；多檔會打包為 ZIP 下載') %}
     {% include "components/file_upload.html" %}
   {% endwith %}
   <div id="batch-list" class="batch-list" hidden></div>
 
   <div class="form-row" id="pagePickRow" data-s="sbe169e79">
-    <label data-s="s2c01dca4">蓋章頁面</label>
+    <label data-s="s2c01dca4">{{ tr('蓋章頁面') }}</label>
     <div id="page-pick" class="page-pick">
-      <div class="page-pick-hint muted">上傳 PDF 後可逐頁選擇（預設全選）</div>
+      <div class="page-pick-hint muted">{{ tr('上傳 PDF 後可逐頁選擇（預設全選）') }}</div>
     </div>
   </div>
 
 </div>
 
 <div class="panel" id="preview-panel" hidden>
-  <h2 class="panel-title" data-s="s1386d503">預覽</h2>
+  <h2 class="panel-title" data-s="s1386d503">{{ tr('預覽') }}</h2>
   {# 兩組切換器收在同一條工具列：標籤小字置上、中間細分隔線，比橫排整齊。
      位置模式：每頁統一用印（現行預設）↔ 頁面個別用印（issue #38 新增），
      兩者走不同的送出路徑，舊模式行為完全不變。 #}
   <div class="switch-bar">
     <span class="switch-group">
-      <span class="switch-label">檢視方式</span>
+      <span class="switch-label">{{ tr('檢視方式') }}</span>
       <span class="mode-switch" role="tablist">
-        <button class="mode-btn active" type="button" data-mode="edit">編輯模式</button>
-        <button class="mode-btn" type="button" data-mode="composite">合成模式</button>
+        <button class="mode-btn active" type="button" data-mode="edit">{{ tr('編輯模式') }}</button>
+        <button class="mode-btn" type="button" data-mode="composite">{{ tr('合成模式') }}</button>
       </span>
     </span>
     <span class="switch-group">
-      <span class="switch-label">用印方式</span>
+      <span class="switch-label">{{ tr('用印方式') }}</span>
       <span class="mode-switch pos-mode-switch" role="tablist" id="posModeSwitch">
-        <button class="mode-btn active" type="button" data-posmode="uniform">每頁統一用印</button>
-        <button class="mode-btn" type="button" data-posmode="placements">頁面個別用印
+        <button class="mode-btn active" type="button" data-posmode="uniform">{{ tr('每頁統一用印') }}</button>
+        <button class="mode-btn" type="button" data-posmode="placements">{{ tr('頁面個別用印') }}
           <span class="beta-chip">Beta</span></button>
       </span>
     </span>
   </div>
   <p id="posModeHint" class="muted spe-tip"></p>
   <p class="muted" data-s="sbc8dda50">
-    <b>編輯模式</b>：在 PDF 上拖曳藍框調整位置 / 大小 / 旋轉。可切換頁面驗證印章位置在每一頁都不衝突。
-    <b>合成模式</b>：列出實際蓋章後的<strong>每一頁</strong>，所見即所得。
-    任何調整只套用到這一次，不會改到印章預設值。
+    <b>{{ tr('編輯模式') }}</b>{{ tr('：在 PDF 上拖曳藍框調整位置 / 大小 / 旋轉。可切換頁面驗證印章位置在每一頁都不衝突。') }}
+    <b>{{ tr('合成模式') }}</b>{{ tr('：列出實際蓋章後的') }}<strong>{{ tr('每一頁') }}</strong>{{ tr('，所見即所得。
+    任何調整只套用到這一次，不會改到印章預設值。') }}
   </p>
   <div class="preview-controls">
     <span id="sim-status" class="muted" data-s="s5de6eafe"></span>
     <div id="edit-page-nav" hidden class="preview-nav">
-      <button class="btn btn-small" type="button" id="edit-prev">‹ 上一頁</button>
+      <button class="btn btn-small" type="button" id="edit-prev">{{ tr('‹ 上一頁') }}</button>
       <span id="edit-page-info" class="page-info">— / —</span>
-      <button class="btn btn-small" type="button" id="edit-next">下一頁 ›</button>
-      <span class="nav-hint">或左右鍵切換</span>
+      <button class="btn btn-small" type="button" id="edit-next">{{ tr('下一頁 ›') }}</button>
+      <span class="nav-hint">{{ tr('或左右鍵切換') }}</span>
     </div>
     <div id="sim-page-nav" hidden class="preview-nav">
-      <button class="btn btn-small" type="button" id="sim-prev">‹ 上一頁</button>
+      <button class="btn btn-small" type="button" id="sim-prev">{{ tr('‹ 上一頁') }}</button>
       <span id="sim-page-info" class="page-info">— / —</span>
-      <button class="btn btn-small" type="button" id="sim-next">下一頁 ›</button>
-      <span class="nav-hint">或左右鍵切換</span>
+      <button class="btn btn-small" type="button" id="sim-next">{{ tr('下一頁 ›') }}</button>
+      <span class="nav-hint">{{ tr('或左右鍵切換') }}</span>
     </div>
     <div class="zoom-ctl" role="group" aria-label="{{ tr('檢視縮放') }}">
       <button class="zoom-btn" type="button" id="zoom-out" title="{{ tr('縮小') }}" aria-label="{{ tr('縮小') }}">−</button>
@@ -381,7 +381,7 @@
   </div>
   <div id="edit-mode" data-s="sd4316970">
     <div id="edit-deselected-hint" hidden>
-      此頁未勾選蓋章 — 不會套用任何印章 / 日期 / 限用章。要蓋此頁請在上方「蓋章頁面」勾選第 <span id="edit-deselected-pg">—</span> 頁。
+      {{ tr('此頁未勾選蓋章 — 不會套用任何印章 / 日期 / 限用章。要蓋此頁請在上方「蓋章頁面」勾選第') }} <span id="edit-deselected-pg">—</span> {{ tr('頁。') }}
     </div>
     {% set editor_id='stampOverride' %}
     {% include "components/drag_position_editor.html" %}
@@ -401,8 +401,8 @@
         <div class="spe-busy" id="speBusy" hidden>
           <div class="sim-busy-box">
             <div class="sim-spinner"></div>
-            <div class="sim-busy-title">載入頁面中…</div>
-            <div class="sim-busy-sub">正在準備可編輯的頁面</div>
+            <div class="sim-busy-title">{{ tr('載入頁面中…') }}</div>
+            <div class="sim-busy-sub">{{ tr('正在準備可編輯的頁面') }}</div>
           </div>
         </div>
       </div>
@@ -416,16 +416,16 @@
         {# 要放置的種類：主印章 / 日期(1b) / 個資限用章(1c)。日期與限用章要先在
            上方 1b / 1c 啟用並設定內容，這裡才會亮起可選。 #}
         <div class="spe-kind" role="group" aria-label="{{ tr('要放置的種類') }}">
-          <button class="spe-kind-btn active" type="button" data-kind="stamp">印章 / 簽名</button>
+          <button class="spe-kind-btn active" type="button" data-kind="stamp">{{ tr('印章 / 簽名') }}</button>
           <button class="spe-kind-btn needs-setup" type="button" data-kind="date"
-                  title="{{ tr('尚未啟用 — 點一下前往「1b. 插入日期」設定') }}">日期</button>
+                  title="{{ tr('尚未啟用 — 點一下前往「1b. 插入日期」設定') }}">{{ tr('日期') }}</button>
           <button class="spe-kind-btn needs-setup" type="button" data-kind="restrict"
-                  title="{{ tr('尚未啟用 — 點一下前往「1c. 個資限用章」設定') }}">個資限用章</button>
+                  title="{{ tr('尚未啟用 — 點一下前往「1c. 個資限用章」設定') }}">{{ tr('個資限用章') }}</button>
         </div>
-        <div class="spe-count">0 個物件</div>
+        <div class="spe-count">{{ tr('0 個物件') }}</div>
         {# 旋轉：只作用在「目前選取的物件」，與每頁統一用印的旋轉功能對應 #}
         <div class="spe-rot" hidden>
-          <label class="spe-rot-row">旋轉
+          <label class="spe-rot-row">{{ tr('旋轉') }}
             <input type="number" class="spe-rot-input" step="0.5" value="0"> °
           </label>
           <div class="spe-rot-btns">
@@ -434,15 +434,15 @@
             <button class="btn btn-small spe-rot-rand" type="button" data-range="10" title="{{ tr('隨機 ±10°') }}">±10°</button>
           </div>
         </div>
-        <button class="btn btn-small spe-del" type="button">{{ icon('trash', size=12) }} 刪除選取</button>
-        <button class="btn btn-small spe-clear-page" type="button">{{ icon('refresh', size=12) }} 清空本頁</button>
-        <button class="btn btn-small spe-copy-all" type="button">{{ icon('copy', size=12) }} 複製本頁到所有頁</button>
+        <button class="btn btn-small spe-del" type="button">{{ icon('trash', size=12) }} {{ tr('刪除選取') }}</button>
+        <button class="btn btn-small spe-clear-page" type="button">{{ icon('refresh', size=12) }} {{ tr('清空本頁') }}</button>
+        <button class="btn btn-small spe-copy-all" type="button">{{ icon('copy', size=12) }} {{ tr('複製本頁到所有頁') }}</button>
         <ul class="spe-help">
-          <li>{{ icon('plus', size=13) }}<span><b>點一下</b>頁面空白處放置</span></li>
-          <li>{{ icon('swap', size=13) }}<span><b>拖曳</b>移動位置</span></li>
-          <li>{{ icon('aspect-ratio', size=13) }}<span>拉<b>右下圓點</b>縮放大小</span></li>
-          <li>{{ icon('trash', size=13) }}<span>選取後按 <kbd>Delete</kbd> / <kbd>Backspace</kbd></span></li>
-          <li><span class="spe-dot-demo"></span><span>頁碼有<b>紅點</b>＝該頁已用印</span></li>
+          <li>{{ icon('plus', size=13) }}<span><b>{{ tr('點一下') }}</b>{{ tr('頁面空白處放置') }}</span></li>
+          <li>{{ icon('swap', size=13) }}<span><b>{{ tr('拖曳') }}</b>{{ tr('移動位置') }}</span></li>
+          <li>{{ icon('aspect-ratio', size=13) }}<span>{{ tr('拉') }}<b>{{ tr('右下圓點') }}</b>{{ tr('縮放大小') }}</span></li>
+          <li>{{ icon('trash', size=13) }}<span>{{ tr('選取後按') }} <kbd>Delete</kbd> / <kbd>Backspace</kbd></span></li>
+          <li><span class="spe-dot-demo"></span><span>{{ tr('頁碼有') }}<b>{{ tr('紅點') }}</b>{{ tr('＝該頁已用印') }}</span></li>
         </ul>
       </div>
     </div>
@@ -455,8 +455,8 @@
       <div id="sim-busy" class="sim-busy" hidden>
         <div class="sim-busy-box">
           <div class="sim-spinner"></div>
-          <div class="sim-busy-title">產生合成圖中…</div>
-          <div class="sim-busy-sub" id="sim-busy-sub">正在逐頁蓋章並產生預覽</div>
+          <div class="sim-busy-title">{{ tr('產生合成圖中…') }}</div>
+          <div class="sim-busy-sub" id="sim-busy-sub">{{ tr('正在逐頁蓋章並產生預覽') }}</div>
         </div>
       </div>
     </div>
@@ -464,8 +464,8 @@
 </div>
 
 <div class="panel">
-  <h2 data-s="s53896af7">3. 執行</h2>
-  <button class="btn btn-primary" id="btn-submit">{{ icon('stamp') }}開始蓋章</button>
+  <h2 data-s="s53896af7">{{ tr('3. 執行') }}</h2>
+  <button class="btn btn-primary" id="btn-submit">{{ icon('stamp') }}{{ tr('開始蓋章') }}</button>
   {% with progress_id='jobProgress' %}
     {% include "components/job_progress.html" %}
   {% endwith %}
@@ -808,7 +808,7 @@ function _allPagesSet(cnt) { return new Set(Array.from({ length: cnt }, (_, i) =
 function _updatePageCount() {
   const cnt = previewInfo?.page_count || 0;
   const el = document.querySelector('#page-pick .page-pick-count');
-  if (el) el.textContent = `已選 ${selectedPages.size} / ${cnt} 頁`;
+  if (el) el.textContent = tr('已選 {0} / {1} 頁').replace('{0}', selectedPages.size).replace('{1}', cnt);
 }
 
 function _renderPageChips() {
@@ -1088,7 +1088,7 @@ async function ensurePlacementEditor() {
         kind === 'date' ? 'date-panel' : 'restrict-panel');
       const label = kind === 'date' ? '1b. 插入日期' : '1c. 個資限用章';
       if (window.showToast)
-        window.showToast(`請先在「${label}」勾選啟用並設定內容，才能放到頁面上`, 'err');
+        window.showToast(tr('請先在「{0}」勾選啟用並設定內容，才能放到頁面上').replace('{0}', label), 'err');
       if (!panel) return;
       panel.open = true;
       panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1353,7 +1353,7 @@ async function refreshSim() {
       simPages = j.pages;
       simPageCount = j.page_count;
       const stamped = simPages.filter(p => p.stamped).length;
-      status.textContent = `共 ${simPageCount} 頁，蓋章 ${stamped} 頁`;
+      status.textContent = tr('共 {0} 頁，蓋章 {1} 頁').replace('{0}', simPageCount).replace('{1}', stamped);
       // Keep current page index if still valid; otherwise reset to first
       // stamped page (more useful than always page 1).
       if (simPageIdx >= simPages.length) {
