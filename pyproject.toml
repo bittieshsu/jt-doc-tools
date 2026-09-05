@@ -1,6 +1,6 @@
 [project]
 name = "jt-doc-tools"
-version = "1.15.3"
+version = "1.15.4"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
@@ -49,13 +49,25 @@ dependencies = [
     # 全平台都有 wheel（含 win_arm64），不需要客戶自己編。
     "pillow-heif>=1.5,<2",
     "pyasn1>=0.6.4",  # 安全: 修 DoS (uncontrolled resource / quadratic OID)
-    # torch 釘 2.11.x：EasyOCR 主 OCR 引擎依賴(~700MB),防其他 dep re-lock 時意外
-    # 升大版(2.13 未驗證 OCR、install/upgrade 兩路都有風險)。連帶效應:torch 2.11.x
-    # 要求 setuptools<82,故 setuptools 停在 81 → Dependabot 的 setuptools MANIFEST.in
-    # bypass(GHSA-h35f,fixed 83) 無法升(要升需 torch 2.13);惟該 CVE 屬「build sdist
-    # 階段 macOS 問題」,本 app 執行期從不 build sdist → 不可利用,屬 dismiss。
-    # torch Low CVE(#69 torch.jit.script)目前亦無上游修補。
-    "torch>=2.11,<2.12",
+    # torch 釘 2.14.x：EasyOCR 主 OCR 引擎依賴，鎖 minor 是防其他 dep re-lock
+    # 時意外升大版（換版要重驗 OCR）。
+    #
+    # 2026-09-05 從 2.11 升上來：**2.11 / 2.12 要求 `setuptools<82`，2.13 起
+    # 改成 `setuptools>=77.0.3`** —— 那個相依正是 Dependabot 那條
+    # setuptools MANIFEST.in bypass（GHSA-h35f，fixed 83）升不上去的原因。
+    # 升完 setuptools 就能到 84，那條告警跟著消掉。
+    #
+    # 兩台實機驗過**辨識結果一模一樣**（同一張中英數混排測試圖，連 OCR 自己
+    # 認錯的地方都一樣）：`.30` Linux / Python 3.10 / `+cu130`（正式機的組態）、
+    # `.154` Windows / Python 3.12 / `+cpu`。
+    #
+    # ⚠ **torchvision 一定要跟 torch 同一個 index**。PyPI 的 torchvision 配上
+    # `download.pytorch.org/whl/cpu` 的 torch → `RuntimeError: operator
+    # torchvision::nms does not exist`，**import 就炸、OCR 整支死掉**。
+    # 走預設 PyPI（本專案就是）兩者會一起解析，沒有這個問題。
+    #
+    # torch Low CVE(#69 torch.jit.script)目前仍無上游修補（本專案不用 jit.script）。
+    "torch>=2.14,<2.15",
     "pdfplumber>=0.11.0",
     # pyzipper 0.4.0 修了 small-file encryption bypass (Dependabot #45 Moderate)
     "pyzipper>=0.4.0",

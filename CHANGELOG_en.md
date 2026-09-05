@@ -11,6 +11,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ---
 
+## [1.15.4] - 2026-09-05
+
+### torch 2.11 → 2.14 (the setuptools alert can finally move)
+
+The comment in `pyproject.toml` said the setuptools CVE needed torch 2.13 —
+**torch 2.13 did drop the `setuptools<82` cap** (2.11 and 2.12 pin `<82`; 2.13
+and later ask for `>=77.0.3`). With that gone, setuptools moves to **84** and the
+moderate alert goes with it.
+
+**Recognition was verified as identical on two real machines**, not assumed:
+
+| Machine | Configuration | Result |
+|---|---|---|
+| `.30` | Linux / Python 3.10 / `+cu130` (the production configuration) | **line for line identical** to 2.11 |
+| `.154` | Windows / Python 3.12 / `+cpu` | **line for line identical** to 2.11 |
+
+The test image has six mixed Chinese/English/numeric lines (company ID, invoice
+number, amount, address, email, restricted-use wording) — and **even the mistakes
+OCR makes are the same** (`AB-` read as `1B-`, `NT$` as `1TT$`, `Xinyi` as
+`Yinyi`). That is what shows the model behaviour has not changed; "it runs" would
+not.
+
+> ⚠ **torchvision must come from the same index as torch.** PyPI's torchvision
+> with a torch from `download.pytorch.org/whl/cpu` gives `RuntimeError: operator
+> torchvision::nms does not exist` — **it fails at import, so OCR is completely
+> dead**. This project uses the default PyPI index, where both resolve together,
+> but anyone installing by hand can hit it.
+
+> ⚠ **OCR cannot be verified on dev1**: that machine is a QEMU VM whose **CPU has
+> no AVX2**, so `readtext` dumps core. A control run showed **the current 2.11
+> does exactly the same there** — it is the CPU, not the version. Without that
+> control I would have blamed the upgrade.
+
+**Production's torch changes on the next `jtdt update`** (that step runs uv sync:
+about 5 GB of downloads and a restart). This release only updates the declaration
+and the lockfile.
+
+---
+
 ## [1.15.3] - 2026-09-05
 
 ### Stamp and seam stamp had identical icons (spotted by a user)

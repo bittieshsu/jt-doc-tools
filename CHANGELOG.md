@@ -6,6 +6,40 @@
 
 ---
 
+## [1.15.4] - 2026-09-05
+
+### torch 2.11 → 2.14（Dependabot 那條 setuptools 終於升得上去了）
+
+`pyproject.toml` 的註解寫著「setuptools 的 CVE 要升需 torch 2.13」——
+**torch 2.13 起真的拿掉了 `setuptools<82`**（2.11 / 2.12 是 `<82`，
+2.13+ 改成 `>=77.0.3`）。升完 setuptools 就到 **84**，那條 Moderate 跟著消。
+
+**兩台實機驗過辨識結果一模一樣**，不是「應該沒問題」：
+
+| 機器 | 組態 | 結果 |
+|---|---|---|
+| `.30` | Linux / Python 3.10 / `+cu130`（正式機的組態） | 與 2.11 **逐行相同** |
+| `.154` | Windows / Python 3.12 / `+cpu` | 與 2.11 **逐行相同** |
+
+用的是一張六行中英數混排的測試圖（統編 / 發票號碼 / 金額 / 地址 / Email /
+限用章字樣）—— **連 OCR 自己認錯的地方都一樣**（`AB-` 讀成 `1B-`、
+`NT$` 讀成 `1TT$`、`Xinyi` 讀成 `Yinyi`），那才是「模型行為沒變」的證據，
+比「跑得起來」有意義得多。
+
+> ⚠ **torchvision 一定要跟 torch 同一個 index**。PyPI 的 torchvision 配上
+> `download.pytorch.org/whl/cpu` 的 torch → `RuntimeError: operator
+> torchvision::nms does not exist`，**import 就炸、OCR 整支死掉**。
+> 本專案走預設 PyPI，兩者一起解析，沒有這個問題 —— 但手動裝的人會踩到。
+
+> ⚠ **dev1 驗不了 OCR**：那台是 QEMU VM、**CPU 沒有 AVX2**，`readtext` 直接
+> core dump。**對照組確認現行的 2.11 也一樣 dump** —— 是 CPU 不是版本
+> （同 v1.12.12 記的那條）。沒有這個對照組，我會把它誤判成升級造成的。
+
+**正式機的 torch 會在下一次 `jtdt update` 時才真的換掉**（那一步會跑 uv sync，
+約 5 GB 下載 + 重啟）。這一版只是把宣告與 lockfile 改好。
+
+---
+
 ## [1.15.3] - 2026-09-05
 
 ### 用印與騎縫章的圖示一模一樣（使用者發現）
