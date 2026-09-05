@@ -40,6 +40,28 @@
 - **顯示文字裡的 markdown**：`**粗體**` 在畫面上會原樣印出星號（相依檢查頁、
   LLM 設定頁、角色管理頁各一處）。
 
+### Windows 安裝程式：實測一輪（使用者要求）
+
+拿 GitHub Releases 上最新那支 `jt-doc-tools-1.12.82-setup.exe` 在 Win11 實機跑
+無介面安裝（/S），**exit code 0、服務起得來、healthz OK、資料目錄 32 個檔案與四個
+sqlite 原封不動**，上傳 → 轉檔 → 下載整條走通（產出的 PNG 逐像素確認不是白紙）。
+簽章 `Valid`（SignPath Foundation，DigiCert 時戳）。
+
+它是**瘦 bootstrapper**：安裝時才 `git clone --depth=1 --branch main`，所以
+檔名的 1.12.82 只是打包當天的版本，實際裝出來的是**當下的 main**（這次是 v1.15.6）。
+
+實測抓到兩個問題：
+
+- **「設定 → 應用程式」顯示的版本是錯的**：登錄檔的 `DisplayVersion` 寫的是 NSIS
+  打包時的 `${VERSION}`（1.12.82），但裝進去的是 v1.15.6。使用者與客服看到的
+  版本跟實際完全對不上。修法是安裝完從 `app/main.py:VERSION` 讀**實際版本**寫回
+  登錄檔（`install_core.ps1:Sync-DisplayVersion`）—— bootstrapper 會抓最新的
+  install_core.ps1，所以不必重新打包 exe 就會生效。
+- **`uninstall.exe` 沒有簽章**（`NotSigned`）：解除安裝時 Windows 會跳「發行者
+  不明」。CLAUDE.md 的規劃本來就寫著要做 SignPath **兩段式簽章**（先產 uninstaller
+  → 簽 → 再包進 installer → 簽），但 workflow 從頭到尾沒有提到 uninstaller。
+  這一項需要在 SignPath 主控台配合，列為待辦。
+
 ### 英文介面第二輪（使用者逐頁檢視回報）
 
 第一輪只掃「頁面剛載入」的狀態就回報 0 條殘留 —— **那是錯的**。對話框、屬性面板、

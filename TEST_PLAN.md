@@ -987,6 +987,26 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `/admin/conversion` 顯示 Windows builtin 路徑且可使用
 - [ ] Ghostscript `gswin64c.exe` 偵測
 
+## 3.4 Windows 安裝程式（GitHub Releases 上那支 .exe）🆕 v1.15.6
+
+**它是瘦 bootstrapper**：安裝時才去 `git clone --branch main`，所以**檔名上的
+版本沒有意義** —— 裝出來的一定是當下的 `main`。驗收要驗「裝出來的那一版」，
+不是檔名。
+
+    # 從 GitHub Releases 抓最新那支，複製到 Win11 測試機
+    powershell -Command "Start-Process setup.exe -ArgumentList '/S' -Wait -Verb RunAs"
+
+- [ ] **簽章 `Valid`**：`(Get-AuthenticodeSignature setup.exe).Status`
+- [ ] 無介面安裝（/S） **exit code 0**
+- [ ] 服務 `RUNNING`、`curl http://127.0.0.1:8765/healthz` 回 `{"ok":true}`
+- [ ] `jtdt status` 的版本 = **GitHub main 當下的版本**（不是檔名那個）
+- [ ] **資料目錄原封不動**：安裝前後檔案數與 `*.sqlite` 清單一致
+- [ ] 「設定 → 應用程式」顯示的版本**跟實際裝的一樣**
+      （2026-09-05 抓到：登錄檔寫打包時的版本，實際是 main 的版本）
+- [ ] `uninstall.exe` 存在**且有簽章**（目前 `NotSigned`，待辦）
+- [ ] **端到端**：上傳 → 轉檔 → 下載，產出打開來看得到內容
+      （不是只看 HTTP 200 —— §0.5 那條）
+
 ## 3.5 CLI 指令（`jtdt`）🆕 v1.14.95
 
 **web 上不去的時候只剩它** —— 啟用 LDAP / AD 之後如果設定寫錯，畫面上救不回來，

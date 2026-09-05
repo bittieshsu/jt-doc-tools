@@ -539,5 +539,27 @@ if ($InstallService) {
     Log 'Service component skipped; start manually with: jtdt start'
 }
 
+# --- Add/Remove Programs 的版本要寫「實際裝進去的」版本 -----------------
+# installer 是瘦 bootstrapper：檔名與 NSIS 的 ${VERSION} 是**打包當天**的版本，
+# 程式碼卻是安裝當下從 main 抓的。不改的話「設定 → 應用程式」會顯示一個跟實際
+# 完全對不上的版本（實測：檔名 1.12.82 的 installer 裝出 v1.15.6，登錄檔卻寫
+# 1.12.82），使用者與客服都會被誤導。
+function Sync-DisplayVersion {
+    try {
+        $mainPy = Join-Path $InstallDir 'app\main.py'
+        if (-not (Test-Path $mainPy)) { return }
+        $m = Select-String -Path $mainPy -Pattern '^VERSION\s*=\s*"([^"]+)"' |
+             Select-Object -First 1
+        if (-not $m) { return }
+        $ver = $m.Matches[0].Groups[1].Value
+        $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\jt-doc-tools'
+        if (Test-Path $key) {
+            Set-ItemProperty -Path $key -Name 'DisplayVersion' -Value $ver
+            Log "Add/Remove Programs version set to $ver"
+        }
+    } catch { Log "could not sync DisplayVersion: $($_.Exception.Message)" }
+}
+Sync-DisplayVersion
+
 Ok 'Install complete!'
 exit 0
