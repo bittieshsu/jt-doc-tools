@@ -713,7 +713,7 @@ document.getElementById('wmTempAssetFile').addEventListener('change', (e) => {
 });
 document.getElementById('btnWmTempRemove').addEventListener('click', async (e) => {
   e.preventDefault(); e.stopPropagation();
-  if (!(await window.showConfirm(tr('移除臨時資產？'), { title: '移除', kind: 'danger', okText: '移除' }))) return;
+  if (!(await window.showConfirm(tr('移除臨時資產？'), { title: tr('移除'), kind: 'danger', okText: tr('移除') }))) return;
   _wmTempSet(null);
 });
 </script>

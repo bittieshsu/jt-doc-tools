@@ -593,12 +593,12 @@ $('btnProcess').addEventListener('click', async () => {
     // 替換跟編修一樣是把原文真的刪掉 —— 使用者要知道這件事
     const ok = await showConfirm(
       tr('替換 {0} 筆資料？原文會被真的刪除，這個操作無法還原。').replace('{0}', selections.length),
-      { title: '確認替換', kind: 'danger', okText: '確認替換', cancelText: '取消' });
+      { title: tr('確認替換'), kind: 'danger', okText: tr('確認替換'), cancelText: tr('取消') });
     if (!ok) return;
   }
   if (chosenMode === 'redact') {
     const ok = await showConfirm(tr('編修 {0} 筆資料？這個操作無法還原。').replace('{0}', selections.length),
-      { title: '確認編修', kind: 'danger', okText: '確認編修', cancelText: '取消' });
+      { title: tr('確認編修'), kind: 'danger', okText: tr('確認編修'), cancelText: tr('取消') });
     if (!ok) return;
   }
   $('btnProcess').disabled = true;

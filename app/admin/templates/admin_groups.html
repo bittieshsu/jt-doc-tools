@@ -369,7 +369,7 @@ document.querySelectorAll('.grp-table button').forEach(btn => {
     const act = btn.dataset.act;
     if (act === 'delete') {
       if (!(await showConfirm(tr('確定刪除群組「{0}」？此動作無法復原。').replace('{0}', tr.dataset.gname),
-            { title: '刪除群組', kind: 'danger', okText: '刪除' }))) return;
+            { title: tr('刪除群組'), kind: 'danger', okText: tr('刪除') }))) return;
       const r = await fetch(`/admin/groups/${tr.dataset.gid}/delete`, {method:'POST'});
       if (r.ok) location.reload();
       else showAlert('刪除失敗：' + await r.text());

@@ -112,7 +112,7 @@ $('btnZip').addEventListener('click', async () => {
 });
 
 $('btnStrip').addEventListener('click', async () => {
-  if (!(await showConfirm(tr('產生一份移除所有附件的 PDF 副本？'), { title: '移除附件' }))) return;
+  if (!(await showConfirm(tr('產生一份移除所有附件的 PDF 副本？'), { title: tr('移除附件') }))) return;
   $('status').textContent = tr('處理中…');
   const r = await fetch('/tools/pdf-attachments/strip', {
     method:'POST', headers:{'Content-Type':'application/json'},

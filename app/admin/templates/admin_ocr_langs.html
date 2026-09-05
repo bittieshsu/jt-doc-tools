@@ -859,7 +859,7 @@ ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
     btn.addEventListener('click', async () => {
       const code = btn.dataset.code;
       const ok = await showConfirm({
-        title: '移除訓練檔',
+        title: tr('移除訓練檔'),
         message: '確定要移除 ' + code + ' 的訓練檔？\n（fast 與 best 兩個變體都會刪除，之後可隨時重新安裝）',
       });
       if (!ok) return;

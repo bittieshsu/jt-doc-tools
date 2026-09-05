@@ -432,7 +432,7 @@
 const btn = document.getElementById('btnDisableAuth');
 if (btn) btn.addEventListener('click', async () => {
   if (!(await showConfirm(tr('確定停用認證？所有 session 會立刻失效。'),
-        { title: '停用認證', kind: 'danger', okText: '確定停用' }))) return;
+        { title: tr('停用認證'), kind: 'danger', okText: tr('確定停用') }))) return;
   const r = await fetch('/admin/auth-settings/disable', {method:'POST'});
   if (r.ok) location.reload();
   else showAlert('停用失敗：' + await r.text());
@@ -441,7 +441,7 @@ if (btn) btn.addEventListener('click', async () => {
 const unlockBtn = document.getElementById('btnUnlockAll');
 if (unlockBtn) unlockBtn.addEventListener('click', async () => {
   if (!(await showConfirm(tr('清除「所有」帳號與 IP 的密碼錯誤鎖定？'),
-        { title: '清除所有鎖定', okText: '清除' }))) return;
+        { title: tr('清除所有鎖定'), okText: tr('清除') }))) return;
   const r = await fetch('/admin/auth-settings/unlock-all', {method:'POST'});
   if (r.ok) {
     const j = await r.json();
@@ -509,7 +509,7 @@ async function saveLdap() {
     const label = {local:'本機帳號', ldap:'LDAP', ad:'Active Directory'}[targetBackend] || targetBackend;
     const ok = await showConfirm(
       `要把 backend 從「${CURRENT_BACKEND}」切換為「${label}」嗎？\n\n所有現有 session 會立刻失效，所有人都需要重新登入。`,
-      { title: '切換認證 backend', kind: 'warn', okText: '儲存並切換' }
+      { title: tr('切換認證 backend'), kind: 'warn', okText: tr('儲存並切換') }
     );
     if (!ok) return;
   }

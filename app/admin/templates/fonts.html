@@ -309,7 +309,7 @@ document.querySelectorAll('.rename-custom-font').forEach(btn => {
 document.querySelectorAll('.del-custom-font').forEach(btn => {
   btn.addEventListener('click', async () => {
     const id = btn.dataset.id;
-    if (!(await showConfirm(`確定刪除自訂字型？\n${id}`, { title: '刪除字型', kind: 'danger' }))) return;
+    if (!(await showConfirm(`確定刪除自訂字型？\n${id}`, { title: tr('刪除字型'), kind: 'danger' }))) return;
     const r = await fetch('/admin/fonts/delete', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({id}),

@@ -516,7 +516,7 @@ btnUpload.addEventListener('click', async () => {
 });
 
 btnReset.addEventListener('click', async () => {
-  if (!await showConfirm(tr('確定要還原為內建預設 Logo？'), {okText:'還原', kind:'danger'})) return;
+  if (!await showConfirm(tr('確定要還原為內建預設 Logo？'), {okText: tr('還原'), kind:'danger'})) return;
   status.innerHTML = '<span class="muted">還原中…</span>';
   try {
     const r = await fetch('/admin/branding/reset', {method: 'POST'});

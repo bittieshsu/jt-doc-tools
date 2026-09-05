@@ -13,7 +13,8 @@ metadata = ToolMetadata(
     id="text-deident",
     name="文字去識別化",
     description="貼文字或上傳 .txt / .md / .docx / .odt 等檔，偵測敏感資料並編修 / 遮罩 / 替換假資料。",
-    icon="shield",
+    # 文件版（doc-deident）用 `shield`；純文字版改 `text`，同一組裡才分得出來。
+    icon="text",
     category="資安處理",
     # 同上，共用同一份台灣個資式子
     locales=TAIWAN_ONLY,

@@ -395,7 +395,7 @@ document.getElementById('whitenToggle').addEventListener('change', render);
 document.getElementById('btn-clear-all').addEventListener('click', async () => {
   if (!sources.length && !crops.length) return;
   const ok = await window.showConfirm(tr('確定要清除所有上傳檔案與預覽內容嗎？'), {
-    title: '全部清除', okText: '清除', cancelText: '取消', kind: 'warn',
+    title: tr('全部清除'), okText: tr('清除'), cancelText: tr('取消'), kind: 'warn',
   });
   if (!ok) return;
   // 通知後端刪除暫存 crop（best-effort，失敗也無妨，過期會自動清）

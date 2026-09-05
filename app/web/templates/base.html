@@ -222,7 +222,7 @@
             if (lbtn && form) {
               lbtn.addEventListener('click', async function(){
                 var ok = await window.showConfirm('未儲存的變更將遺失。', {
-                  title: '確定要登出？', okText: '登出', cancelText: '取消'
+                  title: tr('確定要登出？'), okText: tr('登出'), cancelText: tr('取消')
                 });
                 if (ok) form.submit();
               });
@@ -459,14 +459,14 @@
                 if (reissueBtn) reissueBtn.addEventListener('click', function(){
                   window.showConfirm(
                     '重新生 secret 會把現有的 TOTP secret 換掉，您需要重新用 Authenticator app 掃 QR。原來的 secret 失效。',
-                    {title:'重新生成', okText:'繼續'}
+                    {title: tr('重新生成'), okText: tr('繼續')}
                   ).then(function(ok){ if (ok) openTotpSetupModal(); });
                 });
                 var disableBtn = document.getElementById('meTotpDisableBtn');
                 if (disableBtn) disableBtn.addEventListener('click', async function(){
                   var ok = await window.showConfirm(
                     '停用 2FA？下次登入只會問密碼，安全性降低。',
-                    {title:'停用 2FA', kind:'danger', okText:'停用'}
+                    {title: tr('停用 2FA'), kind:'danger', okText: tr('停用')}
                   );
                   if (!ok) return;
                   var r = await fetch('/me/2fa/disable', {method:'POST'});

@@ -1578,7 +1578,7 @@ document.getElementById('tempAssetFile').addEventListener('change', (e) => {
 });
 
 document.getElementById('btnTempRemove').addEventListener('click', async () => {
-  if (!(await window.showConfirm(tr('移除臨時資產？'), { title: '移除', kind: 'danger', okText: '移除' }))) return;
+  if (!(await window.showConfirm(tr('移除臨時資產？'), { title: tr('移除'), kind: 'danger', okText: tr('移除') }))) return;
   _tempAssetSet(null);
 });
 

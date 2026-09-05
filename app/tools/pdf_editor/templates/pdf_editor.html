@@ -2978,7 +2978,7 @@ function _showUndoReplaceFonts(replaced) {
   undoBtn.innerHTML = tr('↶ 復原此次換字型');
   undoBtn.addEventListener('click', async () => {
     if (!(await showConfirm(tr('要把 PDF 還原到「整份換字型」之前的狀態嗎？'),
-          { title: '復原換字型', okText: '復原', kind: 'warning' }))) return;
+          { title: tr('復原換字型'), okText: tr('復原'), kind: 'warning' }))) return;
     undoBtn.disabled = true;
     showLoading('復原中…');
     try {

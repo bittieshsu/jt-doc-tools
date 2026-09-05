@@ -267,7 +267,7 @@ document.getElementById('ws-select-all').addEventListener('change', (e) => {
 document.getElementById('ws-del-selected').addEventListener('click', async () => {
   const sel = _wsSelected();
   if (!sel.length) return;
-  if (!(await window.showConfirm(tr('確定刪除選取的 {0} 個檔案？此動作無法復原。').replace('{0}', sel.length), { title: '批次刪除', kind: 'danger', okText: '刪除' }))) return;
+  if (!(await window.showConfirm(tr('確定刪除選取的 {0} 個檔案？此動作無法復原。').replace('{0}', sel.length), { title: tr('批次刪除'), kind: 'danger', okText: tr('刪除') }))) return;
   for (const id of sel) {
     const fd = new FormData(); fd.append('file_id', id);
     await fetch('/workspace/delete', { method: 'POST', body: fd });
@@ -283,7 +283,7 @@ document.getElementById('ws-grid').addEventListener('click', async (e) => {
   const id = card.dataset.id;
   const act = btn.dataset.act;
   if (act === 'delete') {
-    if (!(await window.showConfirm('確定刪除這個檔案？此動作無法復原。', { title: '刪除檔案', kind: 'danger', okText: '刪除' }))) return;
+    if (!(await window.showConfirm('確定刪除這個檔案？此動作無法復原。', { title: tr('刪除檔案'), kind: 'danger', okText: tr('刪除') }))) return;
     const fd = new FormData(); fd.append('file_id', id);
     const r = await fetch('/workspace/delete', { method: 'POST', body: fd });
     if (!r.ok) return alert(await window.friendlyServerError(r, '刪除失敗'));

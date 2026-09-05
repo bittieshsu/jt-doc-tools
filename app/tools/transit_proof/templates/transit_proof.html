@@ -415,7 +415,7 @@
   async function deleteEntry(id, entry) {
     const desc = entry ? (entry.date + ' ' + (entry.transport || '') + ' ' + routeStr(entry)).trim() : '這筆';
     if (!(await window.showConfirm(tr('確定刪除「') + desc + '」？此動作不可復原。',
-        { title: '刪除乘車證明', kind: 'danger', okText: '刪除' }))) return;
+        { title: tr('刪除乘車證明'), kind: 'danger', okText: tr('刪除') }))) return;
     const r = await fetch('/tools/transit-proof/entry/' + id, { method: 'DELETE' });
     if (!r.ok) { toast(await errMsg(r, '刪除失敗'), 'err'); return; }
     _selected.delete(id);
@@ -436,7 +436,7 @@
   $('tpBtnClear').addEventListener('click', async () => {
     if (!ENTRIES.length) return;
     if (!(await window.showConfirm(tr('確定清空全部 ') + ENTRIES.length + ' 筆乘車證明？此動作不可復原。',
-        { title: '全部清空', kind: 'danger', okText: '清空' }))) return;
+        { title: tr('全部清空'), kind: 'danger', okText: tr('清空') }))) return;
     const r = await fetch('/tools/transit-proof/buffer', { method: 'DELETE' });
     if (!r.ok) { toast(await errMsg(r, '清空失敗'), 'err'); return; }
     await loadBuffer(); toast('已清空', 'ok');
@@ -446,7 +446,7 @@
     const ids = Array.from(_selected);
     if (!ids.length) return;
     if (!(await window.showConfirm(tr('確定刪除選取的 ') + ids.length + ' 筆乘車證明？此動作不可復原。',
-        { title: '刪除選取', kind: 'danger', okText: '刪除' }))) return;
+        { title: tr('刪除選取'), kind: 'danger', okText: tr('刪除') }))) return;
     const r = await fetch('/tools/transit-proof/buffer/delete-batch', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids }) });

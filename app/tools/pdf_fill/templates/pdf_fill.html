@@ -1512,7 +1512,7 @@ async function applyLlmCorrections(corrections) {
     `${actionDesc}\n\n` +
     `（不會刪除公司資料，僅取消這張 PDF 上的套用；原版 PDF 留在 history）\n\n` +
     `確定要套用嗎？`,
-    { title: '套用 LLM 建議', kind: 'warn', okText: '套用', cancelText: '取消' }
+    { title: tr('套用 LLM 建議'), kind: 'warn', okText: tr('套用'), cancelText: tr('取消') }
   );
   if (!ok) return;
   try {

@@ -1471,7 +1471,7 @@ if (myVatInput) {
   window.addEventListener('beforeunload', forceSave);
 }
 $('btnSettingsReset').addEventListener('click', async () => {
-  if (!(await window.showConfirm(tr('恢復欄位顯示為預設？'), { title: '重設欄位' }))) return;
+  if (!(await window.showConfirm(tr('恢復欄位顯示為預設？'), { title: tr('重設欄位') }))) return;
   try {
     const r = await fetch('/tools/einvoice-scan/settings/reset', { method: 'POST' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1737,7 +1737,7 @@ async function deleteInvoice(id) {
     : '此筆發票';
   if (!(await window.showConfirm(
         tr('確定刪除 {0}？').replace('{0}', label),
-        { title: '刪除發票', kind: 'danger', okText: '刪除' }))) return;
+        { title: tr('刪除發票'), kind: 'danger', okText: tr('刪除') }))) return;
   try {
     const r = await fetch(`/tools/einvoice-scan/buffer/${id}`, { method: 'DELETE' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1763,7 +1763,7 @@ if (_btnLlmClassify) {
       '會用賣方統編 / 名稱 / 行業批次送（每批 20 張），\n' +
       '視 LLM 速度與發票量約需 1 ~ 10 分鐘。\n' +
       '結果會覆寫目前的「科目」欄位（標示 source=llm）。',
-      { title: 'LLM 判讀科目', okText: '開始' });
+      { title: tr('LLM 判讀科目'), okText: tr('開始') });
     if (!ok) return;
     const orig = _btnLlmClassify.innerHTML;
     _btnLlmClassify.disabled = true;
@@ -1805,7 +1805,7 @@ if (_btnReclassify) {
     if (!(await window.showConfirm(
           '對 buffer 內所有發票重新跑「賣方反查 + 會計科目分類」？\n' +
           '會更新賣方名稱 / 行業 / 科目，但不影響原始掃描資料（發票號碼 / 金額等）。',
-          { title: '重抓科目', okText: '開始' }))) return;
+          { title: tr('重抓科目'), okText: tr('開始') }))) return;
     const orig = _btnReclassify.innerHTML;
     _btnReclassify.disabled = true;
     _btnReclassify.textContent = tr('處理中…');
@@ -1842,7 +1842,7 @@ $('btnDeleteSelected').addEventListener('click', async () => {
   if (!ids.length) return;
   if (!(await window.showConfirm(
         tr('確定刪除選取的 {0} 張發票？').replace('{0}', ids.length),
-        { title: '刪除選取', kind: 'danger', okText: '刪除' }))) return;
+        { title: tr('刪除選取'), kind: 'danger', okText: tr('刪除') }))) return;
   try {
     const r = await fetch('/tools/einvoice-scan/buffer/delete-batch', {
       method: 'POST',
@@ -1907,7 +1907,7 @@ exportMenu.querySelectorAll('button[data-fmt]').forEach(b => {
 $('btnClear').addEventListener('click', async () => {
   if (!(await window.showConfirm(
         tr('確定要清空全部已掃描的發票？此動作不可復原。'),
-        { title: '全部清空', kind: 'danger', okText: '清空' }))) return;
+        { title: tr('全部清空'), kind: 'danger', okText: tr('清空') }))) return;
   try {
     const r = await fetch('/tools/einvoice-scan/buffer', { method: 'DELETE' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);

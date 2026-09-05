@@ -179,7 +179,7 @@ document.querySelectorAll('[data-role] [data-act="set-default"]').forEach(btn =>
     const roleName = panel.querySelector('h2').textContent.trim();
     if (!(await showConfirm(
         `把「${roleName}」設為新使用者預設角色？\n之後新加入的使用者若未指定角色，會自動套用此角色。`,
-        { title: '設為新使用者預設', okText: '設為預設' }))) return;
+        { title: tr('設為新使用者預設'), okText: tr('設為預設') }))) return;
     const r = await fetch(`/admin/roles/${roleId}/set-default`, {method:'POST'});
     if (r.ok) location.reload();
     else showAlert('設定失敗：' + await window.friendlyServerError(r, tr('設定失敗')));
@@ -191,7 +191,7 @@ document.querySelectorAll('[data-role] [data-act="delete"]').forEach(btn => {
     const panel = btn.closest('[data-role]');
     const roleId = panel.dataset.role;
     if (!(await showConfirm(tr('刪除角色「{0}」？所有指派會一併移除。').replace('{0}', roleId),
-          { title: '刪除', kind: 'danger', okText: '刪除' }))) return;
+          { title: tr('刪除'), kind: 'danger', okText: tr('刪除') }))) return;
     const r = await fetch(`/admin/roles/${roleId}/delete`, {method:'POST'});
     if (r.ok) location.reload();
     else showAlert('刪除失敗：' + await r.text());

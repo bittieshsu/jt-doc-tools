@@ -685,7 +685,7 @@ _btnAutoDl.addEventListener('click', async () => {
   if (_autoDlInFlight || _btnAutoDl.disabled) return;
   const ok = await window.showConfirm(
     '將從備援 URL 下載最新統編資料（可能 5 - 30 分鐘）。\n\n注意：開始下載後 5 分鐘內無法再次觸發。下載期間在背景跑，不影響此頁其他操作。',
-    { title: '自動下載', okText: '開始下載' }
+    { title: tr('自動下載'), okText: tr('開始下載') }
   );
   if (!ok) return;
   if (_autoDlInFlight) return;  // 雙保險：confirm 期間若被別處觸發
@@ -791,7 +791,7 @@ $('btnTest').addEventListener('click', async () => {
 $('btnClear').addEventListener('click', async () => {
   const ok = await window.showConfirm(
     tr('確定清空所有統編資料？此動作不可復原。'),
-    { title: '清空資料庫', kind: 'danger', okText: '清空' }
+    { title: tr('清空資料庫'), kind: 'danger', okText: tr('清空') }
   );
   if (!ok) return;
   try {

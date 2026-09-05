@@ -116,7 +116,7 @@ importFile.addEventListener('change', async () => {
   if (!f) return;
   const mode = (await showConfirm(
     `匯入 "${f.name}"：\n\n按「覆蓋」= 覆蓋當前公司\n按「新增」= 以新公司形式匯入（保留當前）`,
-    { title: '匯入公司資料', okText: '覆蓋當前', cancelText: '新增為新公司' }
+    { title: tr('匯入公司資料'), okText: tr('覆蓋當前'), cancelText: tr('新增為新公司') }
   )) ? 'overwrite' : 'create';
   const fd = new FormData();
   fd.append('file', f);
@@ -138,7 +138,7 @@ document.getElementById('newBtn').addEventListener('click', async () => {
   const name = await showPrompt('新公司顯示名稱', { title: '新增公司' });
   if (!name) return;
   const copy = (await showConfirm(tr('要從目前這家公司複製欄位嗎？'),
-    { title: '欄位來源', okText: '從目前公司複製', cancelText: '使用預設範本' })) ? EDIT_ID : null;
+    { title: tr('欄位來源'), okText: tr('從目前公司複製'), cancelText: tr('使用預設範本') })) ? EDIT_ID : null;
   const res = await fetch('/admin/profile/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -151,7 +151,7 @@ document.getElementById('newBtn').addEventListener('click', async () => {
 const deleteBtn = document.getElementById('deleteBtn');
 if (deleteBtn) {
   deleteBtn.addEventListener('click', async () => {
-    if (!(await showConfirm(tr('確定刪除這家公司的所有資料？'), { title: '刪除公司', kind: 'danger' }))) return;
+    if (!(await showConfirm(tr('確定刪除這家公司的所有資料？'), { title: tr('刪除公司'), kind: 'danger' }))) return;
     const res = await fetch(`/admin/profile/${encodeURIComponent(EDIT_ID)}/delete`, { method: 'POST' });
     if (res.ok) location.href = '/admin/profile';
     else showAlert('刪除失敗');

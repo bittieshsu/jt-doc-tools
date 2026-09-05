@@ -88,7 +88,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
 document.getElementById('sweepNowBtn').addEventListener('click', async () => {
   if (!(await showConfirm(tr('立即清理符合過期條件的檔案？此操作不可復原。'),
-        { title: '立即清理', okText: '確定清理' }))) return;
+        { title: tr('立即清理'), okText: tr('確定清理') }))) return;
   document.getElementById('sweepNowBtn').disabled = true;
   const r = await fetch('/admin/retention/sweep-now', {method:'POST'});
   document.getElementById('sweepNowBtn').disabled = false;

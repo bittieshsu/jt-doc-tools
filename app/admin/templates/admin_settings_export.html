@@ -182,7 +182,7 @@ $('btnImport').addEventListener('click', async () => {
   if (!selected.length) { $('importStatus').textContent = tr('請至少勾選一項'); return; }
   if (!importToken) { $('importStatus').textContent = tr('請先讀取備份內容'); return; }
   const ok = await showConfirm(tr('即將還原勾選的 ') + selected.length + ' 個設定類別，現有檔會自動備份成 .bak。\n\n確認繼續？',
-    {okText: '匯入', kind: 'danger'});
+    {okText: tr('匯入'), kind: 'danger'});
   if (!ok) return;
   $('btnImport').disabled = true;
   $('importStatus').textContent = tr('匯入中…');

@@ -162,3 +162,32 @@ def test_browser_language_alone_never_switches_the_ui():
         headers = {"accept-language": "zh-TW"}
 
     assert resolve(_Chose()) == "en", "明確選過的要贏"
+
+
+def test_no_two_tools_in_one_group_share_an_icon(tools):
+    """同一組裡不可以有兩支工具用同一個圖示。
+
+    2026-09-05 使用者問「用印跟騎縫章 icon 是不是長的一樣？」—— 是。
+    兩支都在「填單用印」、都用 `stamp`，側欄相鄰，**要讀完字才分得出來**。
+    一起清出另外三對（`image-to-pdf` / `pdf-to-image`、
+    `doc-deident` / `text-deident`、`doc-diff` / `text-diff`）。
+
+    **跨組重複不管** —— 那是兩個不同的清單，不會擺在一起比。
+    """
+    import collections
+    by = collections.defaultdict(list)
+    for t in tools:
+        by[(t.metadata.category, t.metadata.icon)].append(t.metadata.id)
+    dup = {k: v for k, v in by.items() if len(v) > 1}
+    assert not dup, f"同一組內圖示重複：{dup}"
+
+
+def test_every_icon_name_exists(tools):
+    """圖示名稱打錯**不會報錯，只是沒有圖** —— 那種缺陷只有用眼睛看得到。"""
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent
+           / "app" / "web" / "templates" / "components" / "icons.html").read_text(encoding="utf-8")
+    known = set(re.findall(r"name == '([a-z0-9-]+)'", src))
+    missing = sorted({t.metadata.icon for t in tools if t.metadata.icon not in known})
+    assert not missing, f"這些圖示名稱在 icons.html 裡不存在：{missing}"

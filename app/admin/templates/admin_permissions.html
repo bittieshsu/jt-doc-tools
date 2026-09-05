@@ -403,7 +403,7 @@ permRows.forEach(r => {
   r.addEventListener('click', async () => {
     if (dirty) {
       const ok = await showConfirm(tr('目前有未儲存的變更，要切換嗎？變更會遺失。'),
-        { title: '未儲存', kind: 'warn', okText: '捨棄' });
+        { title: tr('未儲存'), kind: 'warn', okText: tr('捨棄') });
       if (!ok) return;
     }
     permRows.forEach(x => x.classList.toggle('active', x === r));

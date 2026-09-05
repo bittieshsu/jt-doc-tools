@@ -304,7 +304,7 @@ const editor = new DragPositionEditor({
 
   document.getElementById('btn-crop-apply').addEventListener('click', async () => {
     clampRect();
-    if (!(await showConfirm(tr('套用裁剪？這會覆寫原始檔。'), { title: '套用裁剪', kind: 'warn' }))) return;
+    if (!(await showConfirm(tr('套用裁剪？這會覆寫原始檔。'), { title: tr('套用裁剪'), kind: 'warn' }))) return;
     const r = await fetch(`/admin/assets/${assetId}/crop`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rect),

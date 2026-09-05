@@ -11,6 +11,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ---
 
+## [1.15.3] - 2026-09-05
+
+### Stamp and seam stamp had identical icons (spotted by a user)
+
+Both sit in the "forms and stamps" group, both used `stamp`, and they are next to
+each other in the sidebar — **you had to read the label to tell them apart**. The
+seam stamp now has its own icon: **two sheets side by side with a round stamp
+straddling the seam between them**, which is exactly what the tool does.
+
+Three more same-group duplicates were cleared at the same time:
+`image-to-pdf` / `pdf-to-image` (both `image`), `doc-deident` / `text-deident`
+(both `shield`) and `doc-diff` / `text-diff` (both `diff`). The plain-text
+variants now use `text` and `columns`, and images-to-PDF uses `layers` (several
+stacked into one). **Duplication across groups is left alone** — those are two
+different lists and never sit side by side.
+
+Two gates: no two tools in one group may share an icon (mutation test: putting
+`stamp` back on the seam stamp turns it red), and every icon name must actually
+exist in `icons.html` (**a typo raises no error, it simply shows no icon**, and
+only eyes catch that).
+
+### Dialog titles and buttons were still in Chinese
+
+`showConfirm(message, { title: '清空工作區', okText: '清空' })` — the message was
+already translated, but **the strings in the options object were not**, so in
+English the dialog's title and buttons stayed Chinese. 175 of them are fixed.
+
+The rewrite only touches text **inside a `showConfirm` / `showToast` /
+`showModal` call** — `title:` elsewhere is **data, not display text** (a bookmark
+is `{title, page, level}`), and translating that would rewrite the user's bookmark
+titles, which is corrupting data rather than translating it.
+
+Tooltips (`title=` attributes) were already covered by the 174 display-only
+attributes in v1.15.2. The catalogue now holds **3,286 entries**.
+
+---
+
 ## [1.15.2] - 2026-09-05
 
 ### Stamp and sign / seam stamp are no longer restricted to Chinese

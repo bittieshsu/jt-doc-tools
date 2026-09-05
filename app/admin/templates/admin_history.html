@@ -87,7 +87,7 @@ document.querySelectorAll('[data-act="del"]').forEach(btn => {
     const tr = btn.closest('tr');
     const hid = tr.dataset.hid;
     if (!(await showConfirm(tr('確定刪除這筆？'),
-          { title: '刪除', kind: 'danger' }))) return;
+          { title: tr('刪除'), kind: 'danger' }))) return;
     const r = await fetch(`/admin/history/${KIND}/${hid}/delete`, {method:'POST'});
     if (r.ok) tr.remove();
     else showAlert('刪除失敗：' + await r.text());

@@ -13,7 +13,8 @@ metadata = ToolMetadata(
     id="text-diff",
     name="文字差異比對",
     description="直接貼上兩組文字進行比對，不需上傳檔案。給 log / code / 段落改稿快速 diff。",
-    icon="diff",
+    # 文件版（doc-diff）用 `diff`；純文字版改 `columns`（貼兩塊文字並排比對）。
+    icon="columns",
     category="資安處理",
 )
 

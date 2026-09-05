@@ -598,7 +598,7 @@ async function runBulk(action) {
   }
   const ok = await (window.showConfirm
     ? window.showConfirm(tr('確定要對 {0} 個帳號{1}？').replace('{0}', ids.length).replace('{1}', label),
-                         { title: '批次操作', okText: '執行' })
+                         { title: tr('批次操作'), okText: tr('執行') })
     : Promise.resolve(confirm(`確定要對 ${ids.length} 個帳號${label}？`)));
   if (!ok) return;
   const r = await fetch(url, { method: 'POST',
@@ -881,7 +881,7 @@ document.querySelectorAll('.uf-disable-all').forEach(btn => {
     if (!(await showConfirm(
           `停用 ${pre.candidates} 個帳號？\n\n`
           + '帳號與權限指派都會保留，人回來時按一下就能恢復。',
-          { title: '批次停用', kind: 'danger', okText: '停用' }))) return;
+          { title: tr('批次停用'), kind: 'danger', okText: tr('停用') }))) return;
     const r = await fetch('/admin/users/bulk/disable-view', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({view}),
@@ -993,7 +993,7 @@ document.getElementById('smClose').addEventListener('click', () => {
 });
 document.getElementById('smRevokeAll').addEventListener('click', async () => {
   if (!(await showConfirm(tr('把這個帳號的所有裝置都登出？'),
-        { title: '全部登出', kind: 'danger', okText: '登出' }))) return;
+        { title: tr('全部登出'), kind: 'danger', okText: tr('登出') }))) return;
   revokeSession('');
 });
 
@@ -1005,7 +1005,7 @@ document.querySelectorAll('.user-table button').forEach(btn => {
     const act = btn.dataset.act;
     if (act === 'delete') {
       if (!(await showConfirm(tr('確定刪除使用者「{0}」？所有 session 與權限指派一併移除。').replace('{0}', btn.dataset.username),
-            { title: '刪除使用者', kind: 'danger', okText: '刪除' }))) return;
+            { title: tr('刪除使用者'), kind: 'danger', okText: tr('刪除') }))) return;
       btn.disabled = true;
       const r = await fetch(`/admin/users/${uid}/delete`, {method:'POST'});
       if (r.ok) {
@@ -1038,7 +1038,7 @@ document.querySelectorAll('.user-table button').forEach(btn => {
     } else if (act === 'reset-totp') {
       if (!(await showConfirm(
             `重設使用者「${btn.dataset.username}」的 2FA？\n\n清除原有 TOTP secret，使用者下次登入時會看到全新 QR code 重新 setup。所有現有 session 也會失效。`,
-            { title: '重設 2FA', okText: '重設' }))) return;
+            { title: tr('重設 2FA'), okText: tr('重設') }))) return;
       const r = await fetch(`/admin/users/${uid}/reset-totp`, {method:'POST'});
       if (r.ok) {
         showAlert('OK：使用者下次登入會重新看到 QR');

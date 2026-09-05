@@ -613,7 +613,7 @@ $('ssDbDeep').addEventListener('click', async (e) => {
   const _go = await (window.showConfirm
     ? window.showConfirm(tr('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，')
                          + '可能需要一分鐘以上。要繼續嗎？',
-                         { title: '完整檢查', okText: '開始檢查' })
+                         { title: tr('完整檢查'), okText: tr('開始檢查') })
     : Promise.resolve(confirm('完整檢查會逐頁讀取所有資料庫，包含較大的統編資料庫，'
                               + '可能需要一分鐘以上。要繼續嗎？')));
   if (!_go) return;

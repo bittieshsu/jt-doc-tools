@@ -497,7 +497,7 @@
 
   $('bmClear').addEventListener('click', async () => {
     const ok = await (window.showConfirm
-      ? window.showConfirm(tr('清除所有書籤？'), {title: '全部清除', kind: 'danger', okText: '清除'})
+      ? window.showConfirm(tr('清除所有書籤？'), {title: tr('全部清除'), kind: 'danger', okText: tr('清除')})
       : Promise.resolve(confirm('清除所有書籤？')));
     if (!ok) return;
     items = [];
