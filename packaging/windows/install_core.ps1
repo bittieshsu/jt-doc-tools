@@ -544,6 +544,10 @@ if ($InstallService) {
 # 程式碼卻是安裝當下從 main 抓的。不改的話「設定 → 應用程式」會顯示一個跟實際
 # 完全對不上的版本（實測：檔名 1.12.82 的 installer 裝出 v1.15.6，登錄檔卻寫
 # 1.12.82），使用者與客服都會被誤導。
+#
+# 注意：這支腳本是**打包時就嵌進 exe 的**（installer.nsi 的 `File`），不是安裝
+# 時才下載 —— 所以改這裡只對**重新打包過的** installer 有效。既有安裝要靠
+# `app/cli.py:_sync_windows_display_version()`，下一次 `jtdt update` 會更正。
 function Sync-DisplayVersion {
     try {
         $mainPy = Join-Path $InstallDir 'app\main.py'

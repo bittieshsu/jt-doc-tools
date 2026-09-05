@@ -6,7 +6,7 @@
 
 ---
 
-## [1.15.6] - 2026-09-05
+## [1.15.7] - 2026-09-05
 
 ### 英文介面：用真的瀏覽器逐頁掃，殘留中文 986 → 0
 
@@ -54,9 +54,12 @@ sqlite 原封不動**，上傳 → 轉檔 → 下載整條走通（產出的 PNG
 
 - **「設定 → 應用程式」顯示的版本是錯的**：登錄檔的 `DisplayVersion` 寫的是 NSIS
   打包時的 `${VERSION}`（1.12.82），但裝進去的是 v1.15.6。使用者與客服看到的
-  版本跟實際完全對不上。修法是安裝完從 `app/main.py:VERSION` 讀**實際版本**寫回
-  登錄檔（`install_core.ps1:Sync-DisplayVersion`）—— bootstrapper 會抓最新的
-  install_core.ps1，所以不必重新打包 exe 就會生效。
+  版本跟實際完全對不上。修法在**兩個地方**：`install_core.ps1:Sync-DisplayVersion`
+  （新打包的 installer 第一次安裝就正確）與 `app/cli.py:_sync_windows_display_version`
+  （**既有安裝下一次 `jtdt update` 自動更正**，不必重新打包）。
+  兩個都要 —— 我一開始以為 bootstrapper 會抓最新的 install_core.ps1，
+  **那是錯的**：那支腳本是打包時就嵌進 exe 的（`installer.nsi` 的 `File`），
+  改了對已經發佈的那支 exe 沒有任何作用。實測驗證過才發現。
 - **`uninstall.exe` 沒有簽章**（`NotSigned`）：解除安裝時 Windows 會跳「發行者
   不明」。CLAUDE.md 的規劃本來就寫著要做 SignPath **兩段式簽章**（先產 uninstaller
   → 簽 → 再包進 installer → 簽），但 workflow 從頭到尾沒有提到 uninstaller。

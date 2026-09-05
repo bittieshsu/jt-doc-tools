@@ -110,3 +110,26 @@ def test_find_git_resolves_on_this_machine():
     """在本機（Linux/CI）至少要找得到 —— 確認函式本身能動。"""
     from app.cli import _find_git
     assert _find_git(), "_find_git() 在有 git 的機器上回 None"
+
+
+def test_update_syncs_the_add_remove_programs_version():
+    """`jtdt update` 要把「設定 → 應用程式」的版本更正成實際安裝的版本。
+
+    NSIS installer 是瘦 bootstrapper：登錄檔寫的是**打包當天**的版本，程式碼卻是
+    安裝當下的 main。2026-09-05 實測：檔名 1.12.82 的 installer 裝出 v1.15.6，
+    登錄檔仍寫 1.12.82 —— 使用者與客服看到的版本跟實際完全對不上。
+
+    修在 `install_core.ps1` 只對**重新打包過的** installer 有效（那支腳本是打包時
+    就嵌進 exe 的），既有安裝要靠這裡。
+    """
+    import inspect
+    from app import cli
+    assert hasattr(cli, "_sync_windows_display_version"), (
+        "少了 _sync_windows_display_version —— 既有 Windows 安裝的版本永遠是錯的")
+    src = inspect.getsource(cli.svc_update)
+    assert "_sync_windows_display_version" in src, (
+        "svc_update 沒有呼叫 _sync_windows_display_version，等於沒接上")
+    fn = inspect.getsource(cli._sync_windows_display_version)
+    assert "DisplayVersion" in fn and "winreg" in fn
+    # 非 Windows 上必須直接 return，不可以丟例外（會讓 Linux 的升級整個失敗）
+    cli._sync_windows_display_version("9.9.9")

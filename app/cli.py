@@ -453,6 +453,41 @@ def _restore_ownership(root: Path, owner: Optional[tuple[int, int]]) -> None:
         print(f"Warning: failed to restore owner of {root}: {exc}", file=sys.stderr)
 
 
+def _sync_windows_display_version(version: str) -> None:
+    """Windows: fix the version shown in Settings -> Apps.
+
+    The NSIS installer is a thin bootstrapper. It bakes its own build-time
+    version into the Add/Remove Programs entry, but the code it installs comes
+    from GitHub main -- so the two drift apart the moment a newer version is
+    pushed. Measured on 2026-09-05: an installer named 1.12.82 installed
+    v1.15.6 while the registry still said 1.12.82, which misleads both users
+    and support.
+
+    Fixing it here (rather than only in install_core.ps1) means every existing
+    installation is corrected by its next `jtdt update`, without rebuilding
+    the installer. Never raises: a wrong entry in Add/Remove Programs must not
+    be able to fail an upgrade.
+    """
+    if not _is_windows() or not version:
+        return
+    try:
+        import winreg  # noqa: PLC0415  (Windows-only import)
+
+        key_path = (r"SOFTWARE\Microsoft\Windows\CurrentVersion"
+                    r"\Uninstall\jt-doc-tools")
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path, 0,
+                            winreg.KEY_READ | winreg.KEY_SET_VALUE) as k:
+            try:
+                current, _ = winreg.QueryValueEx(k, "DisplayVersion")
+            except OSError:
+                current = None
+            if current != version:
+                winreg.SetValueEx(k, "DisplayVersion", 0, winreg.REG_SZ, version)
+                print(f"  Add/Remove Programs version: {current} -> {version}")
+    except Exception:      # noqa: BLE001 - never break an upgrade over this
+        pass
+
+
 def svc_update() -> int:
     """Pull latest release and re-sync deps. Backups data dir first."""
     if not _is_admin():
@@ -769,6 +804,7 @@ def svc_update() -> int:
             with urllib.request.urlopen(url, timeout=2) as r:
                 if r.status == 200:
                     new = _read_version()
+                    _sync_windows_display_version(new)
                     print(f"Upgrade done: v{cur} -> v{new}")
                     _print_system_deps_summary()
                     return 0
