@@ -489,6 +489,11 @@ def _fit_to_width(data: bytes) -> bytes:
     import zipfile
     out = io.BytesIO()
     try:
+        # zip 炸彈：判斷集中在 `zip_guard`，全站一份
+        import io as _io
+        from ...core.zip_guard import check as _zip_check
+        with zipfile.ZipFile(_io.BytesIO(data)) as _zchk:
+            _zip_check(_zchk)
         with zipfile.ZipFile(io.BytesIO(data)) as zin, \
                 zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
             for name in zin.namelist():

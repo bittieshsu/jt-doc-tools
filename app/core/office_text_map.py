@@ -320,6 +320,9 @@ def extract_units(data: bytes, ext: str) -> tuple[list[TextUnit], dict]:
     units: list[TextUnit] = []
     trees: dict[str, ET.ElementTree] = {}
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        # zip 炸彈：判斷集中在 `zip_guard`，全站一份
+        from .zip_guard import check as _zip_check
+        _zip_check(zf)
         names = zf.namelist()
         raw = {n: zf.read(n) for n in names}
     for name in names:

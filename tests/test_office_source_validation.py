@@ -82,7 +82,11 @@ def test_a_zip_bomb_is_rejected(tmp_path):
         z.writestr("word/document.xml", b"\0" * (200 * 1024 * 1024))
     with pytest.raises(oc.OfficeSourceError) as ei:
         oc.ensure_readable(p)
-    assert "龐大" in str(ei.value)
+    msg = str(ei.value)
+    # 釘**意義**不釘特定用字 —— 判斷集中到 `zip_guard` 之後，
+    # 「總量過大」與「壓縮比異常」是兩句不同的訊息，兩種都算擋下來了。
+    assert ("龐大" in msg or "壓縮比" in msg), msg
+    assert "伺服器資源" in msg, "訊息要說得出為什麼拒絕"
 
 
 def test_flat_xml_odf_is_not_a_zip_but_is_still_valid(tmp_path):

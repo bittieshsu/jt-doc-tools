@@ -197,8 +197,17 @@ def build_router(templates) -> APIRouter:
             raise HTTPException(400, "empty file")
         try:
             zf = zipfile.ZipFile(io.BytesIO(raw))
+            # zip 炸彈：判斷集中在 `zip_guard`，全站一份
+            from ..core.zip_guard import check as _zip_check, ZipBombError
+            _zip_check(zf)
         except zipfile.BadZipFile:
             raise HTTPException(400, "不是合法的 ZIP 檔")
+        except ZipBombError:
+            # 管理區一律**通用訊息**，細節進日誌（v1.12.86 的規矩）——
+            # 即使這個例外的文字是我們自己寫的，也不要開這個口子。
+            log.warning("asset import rejected: zip bomb heuristics tripped")
+            raise HTTPException(
+                400, "這個備份檔解開後異常龐大，為了避免耗盡伺服器資源而拒絕匯入。")
         # 找 assets.json 在 zip 裡的位置（可能在 root，也可能在 assets/ 之類的
         # 子資料夾裡——使用者用 `zip -r assets/` 打包就會有 prefix）。
         # 找到後抓它的 parent dir 當所有檔案的 base prefix。

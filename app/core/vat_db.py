@@ -1478,6 +1478,11 @@ def ingest_archive_or_csv(data: bytes, source: str, build_index: bool = True) ->
     if data.startswith(b"PK\x03\x04"):
         import zipfile
         with zipfile.ZipFile(io.BytesIO(data)) as z:
+            # zip 炸彈 —— 但**這裡的上限要放寬**：統編資料庫是 170 萬筆的
+            # 政府開放資料，解開後本來就好幾百 MB，套一般文件的 1 GB 會
+            # 擋掉合法的匯入。判斷仍走同一份實作，只是明確給更大的值。
+            from .zip_guard import check as _zip_check
+            _zip_check(z, max_uncompressed=8 * 1024 * 1024 * 1024)
             csv_names = [n for n in z.namelist() if n.lower().endswith(".csv")]
             if not csv_names:
                 raise ValueError("ZIP 檔案內找不到 .csv")

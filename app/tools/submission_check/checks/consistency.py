@@ -111,6 +111,8 @@ def _extract_docx_text(path: Path) -> str:
         # 解析使用者上傳的 XML 一律走 defusedxml（實體展開 DoS）
         from defusedxml import ElementTree as ET
         with ZipFile(path) as z:
+            from ....core.zip_guard import check as _zip_check
+            _zip_check(z)
             if "word/document.xml" not in z.namelist():
                 return ""
             xml_data = z.read("word/document.xml").decode("utf-8", errors="replace")

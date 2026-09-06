@@ -16,6 +16,8 @@ import threading
 from pathlib import Path
 from typing import Optional
 
+from .zip_guard import ZipBombError
+
 logger = logging.getLogger(__name__)
 
 
@@ -328,10 +330,6 @@ _ZIP_ODF = {".odt", ".ods", ".odp", ".odg", ".odf", ".ott", ".ots", ".otp"}
 _OLE2 = {".doc", ".xls", ".ppt"}
 _OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
-#: zip 炸彈門檻：解開後總量上限，以及壓縮比上限。
-#: 一份正常的辦公文件解開後極少超過 1 GB；壓縮比破百的多半是刻意構造的。
-_ZIP_MAX_UNCOMPRESSED = 1024 * 1024 * 1024
-_ZIP_MAX_RATIO = 200
 
 
 def ensure_readable(src: Path) -> None:
@@ -383,15 +381,12 @@ def ensure_readable(src: Path) -> None:
                 raise OfficeSourceError(
                     "這份檔案缺少 ODF 文件必要的內部結構（可能已毀損，"
                     "或只是副檔名被改過）。")
-            total = comp = 0
-            for info in z.infolist():
-                total += info.file_size
-                comp += info.compress_size
-            if total > _ZIP_MAX_UNCOMPRESSED or (
-                    comp > 0 and total // max(comp, 1) > _ZIP_MAX_RATIO
-                    and total > 64 * 1024 * 1024):
-                raise OfficeSourceError(
-                    "這份檔案解開後異常龐大，為了避免耗盡伺服器資源而拒絕處理。")
+            # zip 炸彈的判斷**全站只有一份**（`zip_guard`）—— 寫在各處一定會漂
+            try:
+                from .zip_guard import check as _zip_check
+                _zip_check(z)
+            except ZipBombError as e:
+                raise OfficeSourceError(str(e)) from e
     except zipfile.BadZipFile as e:
         # 被截斷的檔案最常見：有局部檔頭、**沒有中央目錄**。
         raise OfficeSourceError(

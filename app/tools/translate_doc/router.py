@@ -159,7 +159,10 @@ def _extract_text_from_odf(data: bytes, kind: str) -> str:
     from defusedxml.common import DefusedXmlException
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
-            # 解壓縮炸彈防護：content.xml 解壓後上限 200 MiB（正常文件遠小於此）。
+            # 整份的總量與壓縮比走共用判斷（全站一份）
+            from ...core.zip_guard import check as _zip_check
+            _zip_check(zf)
+            # 另外針對 content.xml 再設一道更緊的上限（正常文件遠小於此）。
             if zf.getinfo("content.xml").file_size > 200 * 1024 * 1024:
                 raise HTTPException(400, "文件內容過大（疑似解壓縮炸彈），已中止")
             with zf.open("content.xml") as fp:

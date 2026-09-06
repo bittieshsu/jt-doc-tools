@@ -193,6 +193,8 @@ def _scan_docx(path: Path) -> list[dict]:
 
     try:
         with ZipFile(path) as z:
+            from ....core.zip_guard import check as _zip_check
+            _zip_check(z)
             names = z.namelist()
             # core.xml metadata
             if "docProps/core.xml" in names:

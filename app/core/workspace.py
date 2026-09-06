@@ -283,6 +283,9 @@ def detect_kind(data: bytes) -> Optional[tuple[str, str]]:
             import io
             import zipfile
             with zipfile.ZipFile(io.BytesIO(data)) as z:
+                # zip 炸彈：判斷集中在 `zip_guard`，全站一份
+                from .zip_guard import check as _zip_check
+                _zip_check(z)
                 names = set(z.namelist())
                 # ODF: a leading uncompressed "mimetype" member states the type.
                 if "mimetype" in names:
