@@ -36,7 +36,11 @@ def latin_ext_pdf(tmp_path_factory):
     """中文被映到拉丁擴充區、每個 span 只有 4 個字的 PDF。"""
     from app.core.font_catalog import best_cjk_path, embeddable_font
 
-    fpath, idx = best_cjk_path("serif", "traditional") or best_cjk_path("sans", "traditional")
+    _cjk = (best_cjk_path("serif", "traditional")
+            or best_cjk_path("sans", "traditional"))
+    if not _cjk:
+        pytest.skip("這台機器沒有 CJK 字型")
+    fpath, idx = _cjk
     if not fpath:
         pytest.skip("這台機器沒有 CJK 字型")
     joined = "".join(SHORT_RUNS)

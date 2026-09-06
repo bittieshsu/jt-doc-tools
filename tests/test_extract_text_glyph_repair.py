@@ -25,7 +25,13 @@ def broken_pdf(tmp_path_factory):
     """畫面畫得出中文、但抽出來全是圓點的 PDF。"""
     from app.core.font_catalog import best_cjk_path, embeddable_font
 
-    fpath, idx = best_cjk_path("sans", "traditional")
+    _cjk = best_cjk_path("sans", "traditional")
+    if not _cjk:
+        # **判斷要在解包之前** —— 原本的 skip 寫在下一行，永遠來不及執行，
+        # 使用者看到的是 `TypeError: cannot unpack non-iterable NoneType`，
+        # 完全看不出跟字型有關（2026-09-06 CI 抓到）。
+        pytest.skip("這台機器沒有 CJK 字型")
+    fpath, idx = _cjk
     if not fpath:
         pytest.skip("這台機器沒有 CJK 字型")
     fontfile, fontbuffer = embeddable_font(str(fpath), idx, SAMPLE)

@@ -23,7 +23,13 @@ SAMPLE = "測試單位：範例文字"
 def _make_broken_cmap_pdf(path, text=SAMPLE, size=20):
     from app.core.font_catalog import best_cjk_path, embeddable_font
 
-    fpath, idx = best_cjk_path("sans", "traditional")
+    _cjk = best_cjk_path("sans", "traditional")
+    if not _cjk:
+        # `best_cjk_path` 沒有字型時回 None，直接解包會是 TypeError 而不是
+        # 「這台沒有中文字型」—— 缺系統相依要**明確跳過並寫原因**
+        # （2026-09-06 CI 的核心 job 沒裝字型，一次紅了 10 條）。
+        pytest.skip("這台機器沒有中文字型")
+    fpath, idx = _cjk
     if not fpath:
         pytest.skip("這台機器沒有 CJK 字型")
     fontfile, fontbuffer = embeddable_font(str(fpath), idx, text)
@@ -77,7 +83,13 @@ def test_healthy_pdf_recovers_the_same_text(tmp_path):
     """對照組：對正常 PDF 反查，結果要跟正常擷取一致（不會反而弄壞）。"""
     from app.core.font_catalog import best_cjk_path, embeddable_font
 
-    fpath, idx = best_cjk_path("sans", "traditional")
+    _cjk = best_cjk_path("sans", "traditional")
+    if not _cjk:
+        # `best_cjk_path` 沒有字型時回 None，直接解包會是 TypeError 而不是
+        # 「這台沒有中文字型」—— 缺系統相依要**明確跳過並寫原因**
+        # （2026-09-06 CI 的核心 job 沒裝字型，一次紅了 10 條）。
+        pytest.skip("這台機器沒有中文字型")
+    fpath, idx = _cjk
     if not fpath:
         pytest.skip("這台機器沒有 CJK 字型")
     fontfile, fontbuffer = embeddable_font(str(fpath), idx, SAMPLE)
@@ -201,7 +213,13 @@ def test_does_not_bleed_into_the_neighbouring_glyph(tmp_path):
     """
     from app.core.font_catalog import best_cjk_path, embeddable_font
 
-    fpath, idx = best_cjk_path("sans", "traditional")
+    _cjk = best_cjk_path("sans", "traditional")
+    if not _cjk:
+        # `best_cjk_path` 沒有字型時回 None，直接解包會是 TypeError 而不是
+        # 「這台沒有中文字型」—— 缺系統相依要**明確跳過並寫原因**
+        # （2026-09-06 CI 的核心 job 沒裝字型，一次紅了 10 條）。
+        pytest.skip("這台機器沒有中文字型")
+    fpath, idx = _cjk
     if not fpath:
         pytest.skip("這台機器沒有 CJK 字型")
     text = "甲乙丙丁"
@@ -266,7 +284,13 @@ def test_cache_never_leaks_between_documents(tmp_path):
     from app.core.font_catalog import best_cjk_path, embeddable_font
     import app.core.glyph_text as gt
 
-    fpath, idx = best_cjk_path("sans", "traditional")
+    _cjk = best_cjk_path("sans", "traditional")
+    if not _cjk:
+        # `best_cjk_path` 沒有字型時回 None，直接解包會是 TypeError 而不是
+        # 「這台沒有中文字型」—— 缺系統相依要**明確跳過並寫原因**
+        # （2026-09-06 CI 的核心 job 沒裝字型，一次紅了 10 條）。
+        pytest.skip("這台機器沒有中文字型")
+    fpath, idx = _cjk
     if not fpath:
         pytest.skip("這台機器沒有 CJK 字型")
 
@@ -304,7 +328,13 @@ def test_page_cache_lives_on_the_document(tmp_path):
     from app.core.font_catalog import best_cjk_path, embeddable_font
     import app.core.glyph_text as gt
 
-    fpath, idx = best_cjk_path("sans", "traditional")
+    _cjk = best_cjk_path("sans", "traditional")
+    if not _cjk:
+        # `best_cjk_path` 沒有字型時回 None，直接解包會是 TypeError 而不是
+        # 「這台沒有中文字型」—— 缺系統相依要**明確跳過並寫原因**
+        # （2026-09-06 CI 的核心 job 沒裝字型，一次紅了 10 條）。
+        pytest.skip("這台機器沒有中文字型")
+    fpath, idx = _cjk
     if not fpath:
         pytest.skip("這台機器沒有 CJK 字型")
     fontfile, fontbuffer = embeddable_font(str(fpath), idx, "測試")

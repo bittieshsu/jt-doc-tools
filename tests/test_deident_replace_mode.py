@@ -67,7 +67,13 @@ SENSITIVE = "身分證 A123456789 電話 0912345678"
 @pytest.fixture
 def pdf_bytes():
     from app.core.font_catalog import best_cjk_path, embeddable_font
-    path, idx = best_cjk_path("sans", "traditional")
+    _cjk = best_cjk_path("sans", "traditional")
+    if not _cjk:
+        # `best_cjk_path` 沒有字型時回 None，直接解包會是 TypeError 而不是
+        # 「這台沒有中文字型」—— 缺系統相依要**明確跳過並寫原因**
+        # （2026-09-06 CI 的核心 job 沒裝字型，一次紅了 10 條）。
+        pytest.skip("這台機器沒有中文字型")
+    path, idx = _cjk
     if not path:
         pytest.skip("這台機器沒有 CJK 字型")
     fontfile, fontbuffer = embeddable_font(str(path), idx, SENSITIVE)

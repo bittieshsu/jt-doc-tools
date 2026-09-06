@@ -3210,6 +3210,25 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 
 ---
 
+### 6.81 v1.15.12 — 缺中日韓字型時的行為（**每次發版必過**）
+
+> CI 的核心 job 沒裝字型，一次紅十條，訊息是
+> `TypeError: cannot unpack non-iterable NoneType` —— **看不出跟字型有關**。
+
+- [ ] 用 `temp/ci-sim/no_sysdeps.py` 跑一輪（同時關掉 `find_soffice()` 與
+      `best_cjk_path()`）→ 不可以有 FAILED / ERROR，只能有 skip
+- [ ] 每個 `best_cjk_path(...)` 的呼叫點都是**先判斷再解包**，
+      skip 的原因寫得出「這台機器沒有中文字型」
+- [ ] CI 的核心 job 要裝 `fonts-noto-cjk` —— **只加 gate 不補相依，
+      那十幾條「中文真的畫得出來」的驗證就在 CI 上整片消失**
+
+### ⚠ CI 失敗要看得到是哪一條
+
+- [ ] pytest / bandit 失敗時把失敗項目寫成 `::error::` annotation
+      （job 的 log 需要 repo admin 權限才讀得到，只看得到 exit code 等於沒有線索）
+- [ ] 判讀方式：`GET /repos/{owner}/{repo}/check-runs/{job_id}/annotations`
+      —— **匿名就讀得到**
+
 ### 6.79 v1.15.11 — 乘車證明的原始檔（**每次發版必過**）
 
 - [ ] 上傳一份乘車證明 → 表格那一列有**眼睛圖示**，點下去開得出原始 PDF
@@ -3257,7 +3276,10 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 |---|---|
 | 專案樹結構 | 用**標準 clone**（沒有 `github/` 那一層） |
 | Python 相依 | 用只裝 `requirements.txt` 的乾淨 venv（**版本會跟 uv.lock 不同，那是刻意的**） |
-| **系統相依** | pytest plugin 把 `find_soffice()` 關掉；或用容器不裝 soffice / node / tesseract |
+| **系統相依** | pytest plugin 同時關掉 `find_soffice()` **與 `best_cjk_path()`**；或用容器不裝 soffice / node / 字型 |
+
+> **藏一半等於沒藏。** 只關 soffice 的話，「缺中日韓字型」那一類完全驗不到 ——
+> 2026-09-06 就是這樣回報了一次假的「模擬全綠」，CI 照樣紅十條。
 
 ### 6.74 v1.15.9 — 路由表列舉要**跟得上框架版本**（每次發版必過）
 

@@ -38,6 +38,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # **中日韓字型不是 Office 相依** —— 有十幾條測試在驗「中文真的畫得出來」
+      # （浮水印的字型退回、限用章的天頭、騎縫章的字寬、字形反查）。
+      # 沒有字型時它們會跳過，等於那一整片防護在 CI 上不存在。
+      # 裝一個 apt 套件就換回這些涵蓋，很划算（2026-09-06 一次紅了 10 條）。
+      - name: 安裝中日韓字型
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
       - name: 安裝相依
         run: |
           python -m pip install --upgrade pip

@@ -37,6 +37,16 @@ needs_noto = pytest.mark.skipif(not _has_noto, reason="測試機沒有 Noto CJK 
 # ------------------------------------------------------------ 索引挑選
 
 @needs_noto
+def _no_cjk_font() -> bool:
+    """沒有系統中文字型時，頁碼會退回 PyMuPDF 內建的字型（嵌進去是 Fangti），
+    這條斷言「要嵌入 CJK TC」就必然紅 —— 那反映的是機器不是程式。"""
+    from app.core import font_catalog
+    return not font_catalog.best_cjk_path("sans", "traditional")
+
+
+_needs_cjk = pytest.mark.skipif(_no_cjk_font(), reason="這台機器沒有中文字型")
+
+
 def test_subfont_names_are_readable():
     names = fc._ttc_subfont_names(_NOTO)
     assert len(names) >= 4, f"讀不到子字型清單：{names}"
@@ -159,6 +169,7 @@ def test_pdf_fill_embeds_the_traditional_subfont(tmp_path):
     assert any("CJK TC" in n for n in names), f"填入的文字用了 {names}"
 
 
+@_needs_cjk
 @needs_noto
 def test_pageno_embeds_the_traditional_subfont(tmp_path):
     import sys

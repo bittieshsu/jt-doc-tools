@@ -25,6 +25,20 @@ from PIL import Image
 from app.tools.pdf_stamp import restrict_render as rr
 
 
+def _no_cjk_font() -> bool:
+    """這台機器上有沒有中文字型。
+
+    **缺字型要跳過不是失敗** —— 這幾條驗的是「中文真的畫得出來」，
+    沒有字型時它們必然紅，但那反映的是機器不是程式
+    （2026-09-06 CI 的核心 job 沒裝字型，一次紅了 10 條）。
+    """
+    from app.core import font_catalog
+    return not font_catalog.best_cjk_path("sans", "traditional")
+
+
+_needs_cjk = pytest.mark.skipif(_no_cjk_font(), reason="這台機器沒有中文字型")
+
+
 def _ink_ratio(png: bytes) -> float:
     img = Image.open(io.BytesIO(png)).convert("RGBA")
     px = list(img.getdata())
@@ -76,6 +90,7 @@ def test_vertical_border_styles_differ():
     assert len({v for v in outs.values()}) == 3, "三種邊框產出相同 —— 參數沒生效"
 
 
+@_needs_cjk
 def test_vertical_alignment_top_and_bottom():
     """「僅供」起於天頭、「使用，他用無效」收於地腳。
 

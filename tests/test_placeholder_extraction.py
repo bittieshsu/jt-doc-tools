@@ -65,7 +65,10 @@ def broken_cmap_pdf(tmp_path_factory):
     """畫面畫得出中文、但抽出來全是圓點的 PDF。"""
     from app.core.font_catalog import best_cjk_path, embeddable_font
 
-    path, idx = best_cjk_path("sans", "traditional")
+    _cjk = best_cjk_path("sans", "traditional")
+    if not _cjk:
+        pytest.skip("這台機器沒有 CJK 字型")
+    path, idx = _cjk
     if not path:
         pytest.skip("這台機器沒有 CJK 字型，做不出重現檔")
     text = "測試單位：範例文字"

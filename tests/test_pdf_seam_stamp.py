@@ -26,6 +26,20 @@ from app.tools.pdf_seam_stamp import seam_core as SC
 from app.tools.pdf_seam_stamp import stamp_source as SS
 
 
+def _no_cjk_font() -> bool:
+    """這台機器上有沒有中文字型。
+
+    **缺字型要跳過不是失敗** —— 這幾條驗的是「中文真的畫得出來」，
+    沒有字型時它們必然紅，但那反映的是機器不是程式
+    （2026-09-06 CI 的核心 job 沒裝字型，一次紅了 10 條）。
+    """
+    from app.core import font_catalog
+    return not font_catalog.best_cjk_path("sans", "traditional")
+
+
+_needs_cjk = pytest.mark.skipif(_no_cjk_font(), reason="這台機器沒有中文字型")
+
+
 def _stamp(size: int = 400) -> bytes:
     """一個「有沒有對齊」一眼看得出來的章：雙圓框 + 十字。"""
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
@@ -275,6 +289,7 @@ def test_long_text_in_a_round_stamp_wraps_into_more_columns():
     assert big.size[0] == big.size[1], "圓章必須維持正圓"
 
 
+@_needs_cjk
 def test_company_full_name_is_not_truncated():
     """公司全名不可以被截掉 —— 截一半的章比沒蓋更糟。"""
     name = "節省工具箱資訊科技股份有限公司"

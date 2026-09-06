@@ -9,6 +9,20 @@ from app.tools.pdf_watermark.service import (
 )
 
 
+def _no_cjk_font() -> bool:
+    """這台機器上有沒有中文字型。
+
+    **缺字型要跳過不是失敗** —— 這幾條驗的是「中文真的畫得出來」，
+    沒有字型時它們必然紅，但那反映的是機器不是程式
+    （2026-09-06 CI 的核心 job 沒裝字型，一次紅了 10 條）。
+    """
+    from app.core import font_catalog
+    return not font_catalog.best_cjk_path("sans", "traditional")
+
+
+_needs_cjk = pytest.mark.skipif(_no_cjk_font(), reason="這台機器沒有中文字型")
+
+
 def test_has_cjk_detects_chinese():
     assert _has_cjk("已蓋章")
     assert _has_cjk("混合 mixed 中英")
@@ -21,6 +35,7 @@ def test_has_cjk_false_for_ascii():
     assert not _has_cjk("")
 
 
+@_needs_cjk
 def test_load_font_picks_cjk_fallback_for_cjk_text():
     """If text has CJK and font_path is empty, the loaded font must
     actually cover CJK (regression for: 浮水印中文 → 顯示方框 on Windows)."""
@@ -56,6 +71,7 @@ def _find_dejavu():
     return None
 
 
+@_needs_cjk
 def test_load_font_skips_non_cjk_user_font_when_text_has_cjk():
     """Caller passes an explicit non-CJK font (DejaVuSans). For ASCII text
     we keep that choice; for CJK text we should fall back to a CJK face."""
