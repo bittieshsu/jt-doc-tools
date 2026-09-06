@@ -3205,6 +3205,32 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 
 ---
 
+### 6.78 v1.15.10 — 缺系統相依時的行為（**每次發版必過**）
+
+> CI 的 runner 沒有 LibreOffice，抓到 Markdown 轉辦公文件回 **500**。
+> 缺相依是**部署層面**的問題，不是使用者送錯東西 —— 500 會讓人以為服務
+> 整個掛了而一直重試。
+
+- [ ] 缺 Office 引擎時，工具端點回 **503**（不是 500），訊息說得出要裝什麼
+- [ ] 驗法：`pytest -p no_sysdeps`（把 `find_soffice()` 關掉）跑
+      `tests/test_broken_input_no_500.py`
+- [ ] **需要 soffice 的測試一定要掛 `@_gate`** —— 缺相依要 **skip 不是 fail**
+      （`test_every_soffice_dependent_test_is_gated` 用 AST 檢查）
+
+### ⚠ 驗證環境要**連系統層一起對齊**
+
+> 2026-09-06 我報過一次「乾淨環境 5306 passed」，但那個環境**只有 Python 層
+> 乾淨**（跑在開發機上，有 LibreOffice / 字型 / node / zbar）。CI 是全裸的
+> ubuntu-latest，於是整整一類問題（缺系統相依）完全沒被涵蓋到。
+
+驗 CI 行為時三件事都要對齊，缺一件就會漏掉一整類：
+
+| 層 | 怎麼對齊 |
+|---|---|
+| 專案樹結構 | 用**標準 clone**（沒有 `github/` 那一層） |
+| Python 相依 | 用只裝 `requirements.txt` 的乾淨 venv（**版本會跟 uv.lock 不同，那是刻意的**） |
+| **系統相依** | pytest plugin 把 `find_soffice()` 關掉；或用容器不裝 soffice / node / tesseract |
+
 ### 6.74 v1.15.9 — 路由表列舉要**跟得上框架版本**（每次發版必過）
 
 > CI 第一次真跑就紅：`requirements.txt` 是 `starlette>=1.3.1,<2`，開發機被

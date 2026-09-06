@@ -928,6 +928,7 @@ def _multipage_pdf(path: Path, n: int) -> None:
     d.close()
 
 
+@_gate
 @pytest.mark.parametrize("fmt", ["odt", "docx"])
 def test_chunked_merge_matches_unchunked_output(tmp_path, fmt):
     """**核心驗證**：分段轉換再合併，要與「整份一次轉」結果等價（頁數 + 逐頁文字）。
@@ -979,6 +980,7 @@ def test_merge_rejects_empty_list(tmp_path):
         doc_merge.merge_odt([], tmp_path / "x.odt")
 
 
+@_gate
 def test_convert_via_draw_reports_progress(tmp_path):
     """轉檔要逐階段回報進度（沒有回饋使用者會以為當掉）。"""
     import fitz
@@ -1003,6 +1005,7 @@ def test_convert_via_draw_reports_progress(tmp_path):
     assert all(0 < f < 1 for f in fracs), fracs
 
 
+@_gate
 def test_chunked_progress_reports_part_and_pages(tmp_path):
     """分段時要回報「第 N/M 段（第 a-b 頁）」，讓使用者知道還有多少。"""
     import fitz
@@ -1057,3 +1060,53 @@ def test_latin_fonts_never_remapped_to_cjk(font):
     加圓體 / 黑體 token 時特別容易誤傷（例如通用的 "gothic"、"rounded"）。
     """
     assert de._classify_cjk_font(font) == (None, None)
+
+def test_every_soffice_dependent_test_is_gated():
+    """**需要 soffice 的測試一定要掛 `@_gate`** —— 缺相依時要 skip 不是 fail。
+
+    2026-09-06 CI 抓到：runner 上沒有 LibreOffice，這個檔案裡三支後來才加的
+    端到端測試沒掛 gate，於是**紅**而不是跳過（`{'ok': False, 'error':
+    '找不到 LibreOffice / OxOffice…'}`）。workflow 自己的註解就寫著
+    「缺系統相依時要明確 skip 並寫原因，不可以靜靜地當成通過」。
+
+    判準是**這支測試自己的函式體**裡有沒有呼叫會起 soffice 的入口 ——
+    用 AST 取範圍，不用正規式切：第一版用「切到下一個 `def test_`」，
+    結果把中間的模組層級 helper（`_draw_capable`，它自己就呼叫
+    `convert_to_odg`）算進了前一支測試，誤報。掃描器也不可以掃到自己
+    （這一條 CLAUDE.md 記過好幾次）。
+    """
+    import ast
+    import inspect
+
+    mod = inspect.getmodule(test_every_soffice_dependent_test_is_gated)
+    src = inspect.getsource(mod)
+    tree = ast.parse(src)
+    #: 這些是真的會起 soffice 行程的入口
+    ENTRIES = {"convert_via_draw", "convert_to_odg", "convert_to_docx",
+               "convert_to_odt", "convert_to_pdf", "convert_to_text"}
+    SELF = "test_every_soffice_dependent_test_is_gated"
+
+    bad = []
+    for node in tree.body:                      # **只看模組層級的定義**
+        if not isinstance(node, ast.FunctionDef) or not node.name.startswith("test_"):
+            continue
+        if node.name == SELF:                   # 不要掃到自己
+            continue
+        called = set()
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Call):
+                f = sub.func
+                name = getattr(f, "attr", None) or getattr(f, "id", None)
+                if name:
+                    called.add(name)
+        if called & ENTRIES:
+            decos = {getattr(d, "id", None) or getattr(d, "attr", None)
+                     for d in node.decorator_list}
+            # `@_gate` 是名字；`@pytest.mark.parametrize` 之類不算
+            gated = "_gate" in {getattr(d, "id", None) for d in node.decorator_list}
+            if not gated:
+                bad.append(node.name)
+
+    assert not bad, (
+        "這些測試會真的起 soffice，但沒有掛 `@_gate` —— 缺 LibreOffice 的機器上"
+        f"會紅而不是跳過：{bad}")

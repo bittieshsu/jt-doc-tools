@@ -300,6 +300,17 @@ async def convert_to_odt_async(*args, **kwargs):
     return await asyncio.to_thread(convert_to_odt, *args, **kwargs)
 
 
+class OfficeUnavailableError(RuntimeError):
+    """**這台機器沒有裝 Office 引擎** —— 跟使用者送什麼檔案無關。
+
+    這是**部署層面**的問題，不是使用者的錯，所以要回 **503**（服務暫時無法
+    提供）而不是 500。500 會讓人以為服務整個掛了而一直重試，監控端也全是
+    假警報 —— 這個專案在毀損 PDF 上早就記過同一條。
+
+    2026-09-06 CI 抓到：runner 上沒有 LibreOffice，Markdown 轉辦公文件回 **500**。
+    """
+
+
 class OfficeSourceError(RuntimeError):
     """來源檔本身就讀不出來（毀損 / 被截斷 / 不是它宣稱的格式）。
 
@@ -409,7 +420,7 @@ def convert_to_pdf(src: Path, dst_pdf: Path, timeout: float = 60.0) -> None:
     """
     soffice = find_soffice()
     if not soffice:
-        raise RuntimeError(
+        raise OfficeUnavailableError(
             "找不到 LibreOffice / OxOffice。請安裝其中一個，或先自行轉成 PDF 上傳。"
         )
     # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
@@ -485,7 +496,7 @@ def convert_to_odg(src: Path, dst_odg: Path, timeout: float = 120.0) -> None:
     """
     soffice = find_soffice()
     if not soffice:
-        raise RuntimeError(
+        raise OfficeUnavailableError(
             "找不到 LibreOffice / OxOffice。請安裝其中一個，或先自行轉成 PDF 上傳。"
         )
     # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
@@ -548,7 +559,7 @@ def convert_to_docx(src: Path, dst_docx: Path, timeout: float = 60.0,
     """
     soffice = find_soffice()
     if not soffice:
-        raise RuntimeError(
+        raise OfficeUnavailableError(
             "找不到 LibreOffice / OxOffice。請先安裝其中一個，或自行在 Word 內另存為 .docx 後上傳。"
         )
     # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
@@ -607,7 +618,7 @@ def convert_to_pptx(src: Path, dst_pptx: Path, timeout: float = 120.0) -> None:
     """
     soffice = find_soffice()
     if not soffice:
-        raise RuntimeError(
+        raise OfficeUnavailableError(
             "找不到 LibreOffice / OxOffice。請先安裝其中一個再轉簡報檔。"
         )
     # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
@@ -668,7 +679,7 @@ def convert_to_odt(src: Path, dst_odt: Path, timeout: float = 60.0,
     """
     soffice = find_soffice()
     if not soffice:
-        raise RuntimeError(
+        raise OfficeUnavailableError(
             "找不到 LibreOffice / OxOffice。請先安裝其中一個才能輸出 .odt 格式。"
         )
     # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
@@ -732,7 +743,7 @@ def convert_to_text(src: Path, timeout: float = 60.0) -> str:
     """
     soffice = find_soffice()
     if not soffice:
-        raise RuntimeError(
+        raise OfficeUnavailableError(
             "找不到 LibreOffice / OxOffice — Office / ODF 檔案需先轉成 TXT 才能翻譯。"
         )
     # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
@@ -810,7 +821,7 @@ def convert_with_filter(src: Path, dst: Path, ext: str, filter_name: str,
     """
     soffice = find_soffice()
     if not soffice:
-        raise RuntimeError(
+        raise OfficeUnavailableError(
             "找不到 LibreOffice / OxOffice。請先安裝其中一個再使用格式轉換。")
 
     ext = ext.lower().lstrip(".")

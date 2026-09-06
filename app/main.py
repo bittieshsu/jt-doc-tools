@@ -19,7 +19,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.15.9"
+VERSION = "1.15.10"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -886,12 +886,23 @@ async def _broken_pdf_exc(request: Request, exc: Exception):
 # （2026-09-06 使用者上傳一份被截斷的 docx 時回報）。
 # `office_convert.ensure_readable()` 在送進 soffice **之前**就判斷得出來，
 # 這裡統一轉成 400 —— 跟毀損 PDF 同一個做法，新工具自動涵蓋。
-from .core.office_convert import OfficeSourceError as _OfficeSourceError  # noqa: E402
+from .core.office_convert import (  # noqa: E402
+    OfficeSourceError as _OfficeSourceError,
+    OfficeUnavailableError as _OfficeUnavailableError,
+)
 
 
 @app.exception_handler(_OfficeSourceError)
 async def _bad_office_source_exc(request: Request, exc: Exception):
     return _JSONResponse({"detail": str(exc)}, status_code=400)
+
+
+# 這台機器沒有裝 Office 引擎 —— **部署層面**的問題，不是使用者送錯東西。
+# 回 503（服務暫時無法提供）而不是 500：500 會讓人以為整個服務掛了而一直重試。
+# 2026-09-06 CI 抓到 —— runner 上沒有 LibreOffice，Markdown 轉辦公文件回 500。
+@app.exception_handler(_OfficeUnavailableError)
+async def _office_unavailable_exc(request: Request, exc: Exception):
+    return _JSONResponse({"detail": str(exc)}, status_code=503)
 
 
 # 縮圖 / 預覽端點的頁碼在**路徑上**，所以「第 0 頁」「第 99 頁」這種是

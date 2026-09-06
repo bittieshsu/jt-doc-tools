@@ -141,6 +141,8 @@ async def convert(
     _uo.record(uid, request)
     wdir = _work_dir(uid)
 
+    # 保留原例外物件：缺 Office 引擎要回 503 不是 500，壓成字串就分辨不出來了
+    exc_objs: dict = {}
     def _do():
         # 1. markdown → HTML with theme
         html = _render_md_html(md_text, theme, stem, font)
@@ -155,6 +157,7 @@ async def convert(
             _oc.convert_to_pdf(html_path, pdf_path, timeout=120.0)
         except Exception as e:
             errors["pdf"] = str(e)
+            exc_objs["pdf"] = e
             log.exception("md→pdf failed")
         # HTML → ODT 直轉 OK,DOCX 直轉 soffice filter chain 常失敗 →
         # 先 HTML → ODT,再 ODT → DOCX 兩段轉檔保險
@@ -162,6 +165,7 @@ async def convert(
             _oc.convert_to_odt(html_path, odt_path, timeout=120.0)
         except Exception as e:
             errors["odt"] = str(e)
+            exc_objs["odt"] = e
             log.exception("md→odt failed")
         try:
             if odt_path.exists():
@@ -171,6 +175,7 @@ async def convert(
                 _oc.convert_to_docx(html_path, docx_path, timeout=120.0)
         except Exception as e:
             errors["docx"] = str(e)
+            exc_objs["docx"] = e
             log.exception("md→docx failed")
         # 3. Render PDF preview pages
         previews: list[Path] = []
@@ -185,6 +190,13 @@ async def convert(
     pdf_path, docx_path, odt_path, previews, errors = await asyncio.to_thread(_do)
 
     if not pdf_path.exists() and "pdf" in errors:
+        # **缺 Office 引擎是部署問題不是使用者的錯** —— 讓它原樣冒上去由全域
+        # 處理器回 503。壓成 500 會讓人以為服務掛了而一直重試
+        # （2026-09-06 CI 在沒有 LibreOffice 的 runner 上抓到）。
+        from ...core.office_convert import OfficeUnavailableError, OfficeSourceError
+        e = exc_objs.get("pdf")
+        if isinstance(e, (OfficeUnavailableError, OfficeSourceError)):
+            raise e
         raise HTTPException(500, f"轉檔失敗:{errors['pdf']}")
 
     return {

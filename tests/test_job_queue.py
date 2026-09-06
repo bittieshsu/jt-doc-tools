@@ -254,6 +254,14 @@ def test_get_falls_back_to_db_after_memory_eviction(mgr, tmp_path):
         job.result_filename = "r.pdf"
     j = mgr.submit("pdf-merge", run)
     assert _wait(lambda: j.status == "done")
+    # **等的東西要跟斷言的東西一致**：上面等的是**記憶體物件**變 done，但下面
+    # 讀的是**資料庫**。兩者之間有寫回的延遲 —— 機器忙的時候（例如同時跑了
+    # 另一套測試）就會撞到那個窗口，拿到 'running' 而紅
+    # （2026-09-06 實際發生，單獨重跑三次都過）。
+    # 這裡等到「持久化也完成」才往下走；**逾時仍會紅**，所以不是把問題蓋掉。
+    from app.core import job_store
+    assert _wait(lambda: (job_store.get(j.id) or {}).get("status") == "done"), \
+        "作業已完成但沒有寫回資料庫 —— 重啟後使用者的結果檔就找不回來了"
     mgr._jobs.clear()              # 模擬記憶體汰除 / 行程重啟
     again = mgr.get(j.id)
     assert again is not None, "記憶體沒有就查不到 → 使用者的結果檔等於遺失"
