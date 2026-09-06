@@ -53,6 +53,7 @@
 
 <!-- 列刪除鈕的垃圾桶 icon 來源（server-render 一次，JS clone；避免手刻 SVG） -->
 <span id="tpIconTrash" hidden>{{ icon('trash', size=15) }}</span>
+<span id="tpIconEye" hidden>{{ icon('eye', size=15) }}</span>
 
 <div id="tpSettingsModal" hidden>
   <div class="modal-backdrop"></div>
@@ -124,6 +125,9 @@
   .tp-table td.tp-transport-tra .tp-tag { background: #dbeafe; color: #1e40af; }
   .tp-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
   .tp-table tbody tr:hover td { background: #f8fafc; }
+  .tp-view { color: #6b7280; cursor: pointer; background: none; border: none;
+    padding: 2px 6px; border-radius: 4px; }
+  .tp-view:hover { color: #2563eb; background: #eff6ff; }
   .tp-del { color: #9ca3af; cursor: pointer; background: none; border: none; padding: 2px 6px;
     display: inline-flex; align-items: center; border-radius: 5px; }
   .tp-del:hover { color: #dc2626; background: #fef2f2; }
@@ -333,6 +337,21 @@
         rowEl.appendChild(td);
       });
       const tdAct = document.createElement('td');
+      // 看原始證明 —— **只有真的存了原件的那幾筆才出現**。
+      // 舊資料（這個功能之前上傳的）沒有 has_file，不該給一顆點了會 404 的鈕。
+      if (e.has_file) {
+        const view = document.createElement('a');
+        view.className = 'tp-view';
+        view.href = '/tools/transit-proof/file/' + encodeURIComponent(e.id);
+        view.target = '_blank';
+        view.rel = 'noopener';
+        view.title = tr('看原始乘車證明');
+        const eyeSrc = document.getElementById('tpIconEye');
+        if (eyeSrc && eyeSrc.firstElementChild) {
+          view.appendChild(eyeSrc.firstElementChild.cloneNode(true));
+        } else { view.textContent = '👁'; }
+        tdAct.appendChild(view);
+      }
       const del = document.createElement('button');
       del.className = 'tp-del'; del.type = 'button'; del.title = tr('刪除這筆');
       const icSrc = document.getElementById('tpIconTrash');

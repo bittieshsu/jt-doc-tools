@@ -108,7 +108,8 @@ def _extract_docx_text(path: Path) -> str:
     """從 .docx 抽文字。"""
     try:
         from zipfile import ZipFile
-        import xml.etree.ElementTree as ET
+        # 解析使用者上傳的 XML 一律走 defusedxml（實體展開 DoS）
+        from defusedxml import ElementTree as ET
         with ZipFile(path) as z:
             if "word/document.xml" not in z.namelist():
                 return ""

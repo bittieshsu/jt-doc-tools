@@ -5,6 +5,7 @@ sweeper runs at startup + every 6 hours, walking each category's storage
 location and deleting entries older than the cutoff.
 
 Categories:
+  - transit_proof      (data/transit_proof_files/) — 乘車證明的原始檔
   - fill_history       (data/fill_history/)
   - stamp_history      (data/stamp_history/)
   - watermark_history  (data/watermark_history/)
@@ -29,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 
 _DEFAULTS: dict[str, Any] = {
+    # 乘車證明的**原始 PDF**（使用者事後點得回去看原件）。
+    # 報帳單據的性質跟填寫歷史一樣是「事後可能要翻出來對」，所以同樣預設一年。
+    # 這些是**使用者上傳的原始憑證**，含個資 —— 保留期到了就該清掉。
+    "transit_proof_days":     365,
     "fill_history_days":      365,
     "stamp_history_days":     365,
     "watermark_history_days": 365,
@@ -140,6 +145,7 @@ def collect_stats() -> dict[str, Any]:
     for key, sub in [("fill_history", "fill_history"),
                      ("stamp_history", "stamp_history"),
                      ("watermark_history", "watermark_history"),
+                     ("transit_proof", "transit_proof_files"),
                      ("temp", "temp"), ("jobs", "jobs")]:
         d = _s.data_dir / sub
         stats[key] = {
@@ -274,6 +280,42 @@ def _sweep_job_records(days: int) -> int:
     return job_store.delete_older_than(time.time() - days * 86400)
 
 
+def _sweep_transit_proof(days: int) -> int:
+    """清掉過期的**乘車證明原始檔**（每位使用者一個目錄）。
+
+    `days <= 0` = 永久保留。判準用檔案自己的 mtime —— 上傳當下寫進去，
+    之後不會再動。清完把空目錄一併移除，不要留一堆空殼。
+    """
+    if days <= 0:
+        return 0
+    from ..config import settings as _s
+    root = _s.data_dir / "transit_proof_files"
+    if not root.is_dir():
+        return 0
+    cutoff = time.time() - days * 86400
+    removed = 0
+    for user_dir in root.iterdir():
+        if not user_dir.is_dir():
+            continue
+        for f in user_dir.iterdir():
+            try:
+                if f.is_file() and f.stat().st_mtime < cutoff:
+                    f.unlink()
+                    removed += 1
+            except OSError:
+                pass
+        try:
+            next(user_dir.iterdir())
+        except StopIteration:
+            try:
+                user_dir.rmdir()
+            except OSError:
+                pass
+        except OSError:
+            pass
+    return removed
+
+
 def sweep_all() -> dict[str, Any]:
     """Run every sweeper once, return a report dict."""
     s = get()
@@ -297,6 +339,7 @@ def sweep_all() -> dict[str, Any]:
             ws_hours * 3600 if ws_hours > 0 else 0)
     except Exception:
         logger.exception("workspace sweep failed")
+    report["transit_proof"] = _sweep_transit_proof(s["transit_proof_days"])
     report["audit"] = _sweep_audit(s["audit_days"])
     report["job_records"] = _sweep_job_records(s["job_records_days"])
     # 資料庫熱備份。掛在既有的 6 小時排程上（而不是另開一個排程執行緒），並用

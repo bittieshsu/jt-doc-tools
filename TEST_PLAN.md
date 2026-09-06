@@ -328,7 +328,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **217 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **218 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -530,6 +530,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_tool_search_keywords.py` | 每一支工具都要有搜尋關鍵字（中文 + 英文） |
 | `test_tool_ui_locales.py` | 工具的介面語系白名單（`ToolMetadata.locales`） |
 | `test_transit_proof_api.py` | 乘車證明工具端點整合測試（合成 PDF，auth OFF = 單機） |
+| `test_transit_proof_files.py` | 乘車證明的**原始檔**：存得下、看得到、別人拿不到、刪掉就不見 |
 | `test_transit_proof_parser.py` | 乘車證明解析器單元測試（合成 fixture，不含真實票號 / 統編 / 站名資料） |
 | `test_translate_doc_job.py` | 逐句翻譯改成背景作業（離開頁面也會繼續跑） |
 | `test_translate_doc_pagination.py` | 逐句翻譯：admin 可設定句數上限 + 分頁大小，前端分頁 |
@@ -1638,6 +1639,10 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 - [ ] `DELETE /tools/transit-proof/buffer`
 - [ ] `GET /tools/transit-proof/buffer`
+- [ ] `GET /tools/transit-proof/file/{entry_id}` —— 看**原始乘車證明**。
+      驗收：①自己的那筆點得開、回的是 PDF ②**拿別人的 entry_id 一律 404**
+      （歸屬由路徑結構決定：檔案在 `<使用者雜湊>/` 底下，路徑從當前登入者算出）
+      ③清空清單之後再點就 404（檔案要跟著清掉）
 - [ ] `POST /tools/transit-proof/buffer/delete-batch`
 - [ ] `POST /tools/transit-proof/entry/{entry_id}`
 - [ ] `DELETE /tools/transit-proof/entry/{entry_id}`
@@ -3204,6 +3209,29 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
 
 ---
+
+### 6.79 v1.15.11 — 乘車證明的原始檔（**每次發版必過**）
+
+- [ ] 上傳一份乘車證明 → 表格那一列有**眼睛圖示**，點下去開得出原始 PDF
+- [ ] **拿別人的 entry_id 打 `/tools/transit-proof/file/<id>` 一律 404**
+      （歸屬由路徑結構決定，路徑從當前登入者算出、不吃請求參數）
+- [ ] 同一張證明重複上傳 → 只佔一份空間（去重的不存第二份）
+- [ ] **四條刪除路徑都要清檔**：單筆 / 批次 / 全部清空 / 上限淘汰。
+      清空之後再點那個連結要 404
+- [ ] 「檔案保留 / 清理」頁看得到**乘車證明原始檔**（佔用空間、最舊一筆、保留期），
+      設 0 = 永久保留時**完全不刪**
+- [ ] 這個功能之前上傳的舊資料**不該出現按鈕**（沒有原件，點了會 404）
+- [ ] 磁碟寫不下時**清單本身仍要建立** —— 原件只是附加價值
+
+### 6.80 v1.15.11 — 使用者上傳的 XML 與對外下載（**每次發版必過**）
+
+- [ ] `bandit -r app -ll -iii -q` 回 **0**（Medium 以上、高信心）。
+      **不可以把門檻調到 `-lll` 來讓它變綠** —— 第一次真的跑到這一步就掃出
+      四處用 stdlib `ElementTree` 解析使用者上傳的 XML
+- [ ] 解析上傳檔內部 XML 一律走 `defusedxml`；**`EntitiesForbidden` 要被接住**
+      （它不是 `ParseError` 的子類，漏接會變成 500）
+- [ ] 對外下載一律走 `app/core/safe_fetch.py`（只放行 http / https）——
+      管理員可設定的鏡像若被設成 `file://` 不可以讀到本機檔案
 
 ### 6.78 v1.15.10 — 缺系統相依時的行為（**每次發版必過**）
 

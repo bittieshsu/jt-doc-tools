@@ -29,6 +29,7 @@ from ..core.template_manager import template_manager
 from ..web.deps import require_admin
 
 from fastapi import Depends
+from ..core import safe_fetch as _safe_fetch
 
 
 def _export_stamp() -> str:
@@ -1113,7 +1114,7 @@ def build_router(templates) -> APIRouter:
                 url,
                 headers={"User-Agent": f"jt-doc-tools/{_app_version} (sys-deps version check)"},
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            with _safe_fetch.urlopen(req, timeout=8) as resp:
                 content = resp.read().decode("utf-8", errors="replace")
             # 解析 [project] version = "x.y.z"
             m = _re.search(r'^\s*version\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"', content, _re.M)

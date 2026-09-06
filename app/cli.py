@@ -801,7 +801,7 @@ def svc_update() -> int:
     url = _server_url() + "healthz"
     for _ in range(15):
         try:
-            with urllib.request.urlopen(url, timeout=2) as r:
+            with _safe_fetch.urlopen(url, timeout=2) as r:
                 if r.status == 200:
                     new = _read_version()
                     _sync_windows_display_version(new)
@@ -1070,7 +1070,7 @@ def _ensure_vc_redist_windows() -> None:
     import subprocess as _sp
     tmp = Path(tempfile.gettempdir()) / "jtdt-vc_redist.x64.exe"
     try:
-        urllib.request.urlretrieve(
+        _safe_fetch.urlretrieve(
             "https://aka.ms/vs/17/release/vc_redist.x64.exe", str(tmp),
         )
         rc = _sp.call([str(tmp), "/install", "/quiet", "/norestart"])
@@ -1155,7 +1155,7 @@ def _legacy_download_chi_tra_fast_only(binary: str) -> bool:
     print(f"  Downloading chi_tra.traineddata (~12MB) → {dst} ...")
     try:
         import urllib.request
-        urllib.request.urlretrieve(url, str(dst))
+        _safe_fetch.urlretrieve(url, str(dst))
         if dst.exists() and dst.stat().st_size > 1_000_000:
             print(f"  OK: chi_tra.traineddata installed ({dst.stat().st_size / 1024 / 1024:.1f} MB)")
             return True
@@ -1650,7 +1650,7 @@ def _ensure_winsw_binary() -> bool:
     print(f"  Downloading WinSW from {_WINSW_RELEASE_URL} ...")
     try:
         import urllib.request
-        with urllib.request.urlopen(_WINSW_RELEASE_URL, timeout=30) as r:
+        with _safe_fetch.urlopen(_WINSW_RELEASE_URL, timeout=30) as r:
             data = r.read()
         target.write_bytes(data)
         if _verify(target):
@@ -2382,6 +2382,7 @@ preset_pw = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
 display_name = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else username
 
 import re
+from app.core import safe_fetch as _safe_fetch
 if not re.fullmatch(r'[A-Za-z][A-Za-z0-9._-]{{1,30}}', username):
     print('Invalid username — letters/digits/._- only, 2-31 chars, must start with a letter',
           file=sys.stderr)

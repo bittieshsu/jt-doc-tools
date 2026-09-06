@@ -4733,5 +4733,7 @@
  "高鐵的電子車票證明沒有印車次": "The THSR e-ticket proof does not print a train number",
  "同時可處理的工作數、Office 轉檔同時數、外部服務同時呼叫數、轉檔 CPU 上限、記憶體保留量、優先派送名單、全域上傳大小上限": "How many jobs run at once, how many Office conversions run at once, how many calls go to external services at once, the CPU ceiling for conversions, the memory reserve, the priority dispatch list and the global upload size limit",
  "超過就直接回 413，body 一個位元組都不會讀。0 = 不限。這是最外層的粗篩，各工具仍有自己的上限。在下方「上傳大小」卡片調整。": "Anything larger gets a 413 straight away and not a single byte of the body is read. 0 means no limit. This is the outermost coarse filter; every tool still has its own limits. Change it in the upload size card below.",
- "目前設為不限 —— 大小完全由反向代理與各工具自己的上限決定。直連本機埠時等於沒有限制。": "Currently set to no limit: the size is decided entirely by the reverse proxy and by each tool's own limits. Connecting to the local port directly means no limit at all."
+ "目前設為不限 —— 大小完全由反向代理與各工具自己的上限決定。直連本機埠時等於沒有限制。": "Currently set to no limit: the size is decided entirely by the reverse proxy and by each tool's own limits. Connecting to the local port directly means no limit at all.",
+ "看原始乘車證明": "View the original travel receipt",
+ "乘車證明原始檔": "Original travel receipts"
 }

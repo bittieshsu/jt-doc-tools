@@ -154,7 +154,9 @@ def _extract_text_from_odf(data: bytes, kind: str) -> str:
     when round-tripping through PDF.
     """
     import zipfile
-    from xml.etree import ElementTree as ET
+    # 解析使用者上傳的 XML 一律走 defusedxml（實體展開 DoS）
+    from defusedxml import ElementTree as ET
+    from defusedxml.common import DefusedXmlException
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
             # 解壓縮炸彈防護：content.xml 解壓後上限 200 MiB（正常文件遠小於此）。
@@ -162,7 +164,7 @@ def _extract_text_from_odf(data: bytes, kind: str) -> str:
                 raise HTTPException(400, "文件內容過大（疑似解壓縮炸彈），已中止")
             with zf.open("content.xml") as fp:
                 tree = ET.parse(fp)
-    except (zipfile.BadZipFile, KeyError) as e:
+    except (zipfile.BadZipFile, KeyError, DefusedXmlException) as e:
         raise HTTPException(400, f"{kind.upper()} parse failed: {e}")
     text_ns = "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}"
     raw_paras: list[str] = []

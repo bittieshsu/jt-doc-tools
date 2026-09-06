@@ -124,18 +124,28 @@ def list_entries(user: Optional[Any]) -> list[dict]:
     return sorted(entries, key=lambda x: x.get("added_at", ""), reverse=True)
 
 
-def add_entries(user: Optional[Any], parsed: list[dict]) -> dict:
-    """加入解析結果。回 {added:[...], duplicates:int, cap_reached:bool}。"""
+def add_entries(user: Optional[Any], parsed: list[dict],
+                blobs: Optional[list] = None) -> dict:
+    """加入解析結果。回 {added:[...], duplicates:int, cap_reached:bool}。
+
+    `blobs[i]` 是 `parsed[i]` 那份證明的**原始 PDF 位元組**（可省略）。
+    有給的話會存成 `<files_dir>/<entry_id>.pdf`，讓使用者事後點得回去看原件。
+
+    **檔案與 entry 在同一個鎖裡一起建立** —— 分開做的話會出現「清單上有一筆
+    但檔案不存在」或反過來的孤兒檔，而且兩種都是靜靜地錯。
+    去重跳過的那些**不會存檔**（同一張證明重複上傳不佔第二份空間）。
+    """
     if not parsed:
         return {"added": [], "duplicates": 0, "cap_reached": False}
     path = _buffer_path(user)
     now = datetime.now(timezone.utc).isoformat()
+    fdir = _files_dir(user)
     with _get_lock(_user_key(user)):
         data = _read(path)
         entries = data.get("entries", [])
         existing = {_dedup_key(e) for e in entries}
         added, dups, cap = [], 0, False
-        for p in parsed:
+        for idx, p in enumerate(parsed):
             k = _dedup_key(p)
             if k in existing:
                 dups += 1
@@ -146,6 +156,16 @@ def add_entries(user: Optional[Any], parsed: list[dict]) -> dict:
             entry = dict(p)
             entry["id"] = uuid.uuid4().hex
             entry["added_at"] = now
+            blob = blobs[idx] if blobs and idx < len(blobs) else None
+            if blob:
+                try:
+                    fdir.mkdir(parents=True, exist_ok=True)
+                    (fdir / f"{entry['id']}.pdf").write_bytes(blob)
+                    entry["has_file"] = True
+                except OSError:
+                    # 存不下（磁碟滿 / 權限）**不可以讓整批上傳失敗** ——
+                    # 清單本身才是這支工具的主要產出，原件只是附加價值。
+                    entry.pop("has_file", None)
             added.append(entry)
             existing.add(k)
         if added:
@@ -182,7 +202,8 @@ def delete_entry(user: Optional[Any], entry_id: str) -> bool:
             return False
         data["entries"] = new
         _write(path, data)
-        return True
+    _forget_files(user, [entry_id])
+    return True
 
 
 def delete_entries(user: Optional[Any], ids: list[str]) -> int:
@@ -199,6 +220,8 @@ def delete_entries(user: Optional[Any], ids: list[str]) -> int:
         if removed:
             data["entries"] = new
             _write(path, data)
+    if removed:
+        _forget_files(user, id_set)
     return removed
 
 
@@ -207,5 +230,16 @@ def clear_all(user: Optional[Any]) -> int:
     with _get_lock(_user_key(user)):
         data = _read(path)
         n = len(data.get("entries", []))
+        ids = [e.get("id") for e in data.get("entries", [])]
         _write(path, {"entries": []})
+    # **整個目錄砍掉** —— 逐筆刪會漏掉「清單裡已經沒有、檔案卻還在」的孤兒
+    _forget_files(user, ids)
+    try:
+        d = _files_dir(user)
+        if d.is_dir():
+            for leftover in d.iterdir():
+                leftover.unlink(missing_ok=True)
+            d.rmdir()
+    except OSError:
+        pass
     return n

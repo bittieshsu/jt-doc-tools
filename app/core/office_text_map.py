@@ -22,7 +22,14 @@ import re
 import zipfile
 from dataclasses import dataclass, field
 from typing import Callable, Optional
-from xml.etree import ElementTree as ET
+# **解析**使用者上傳的 XML 一律走 defusedxml —— stdlib 的 ElementTree
+# 對「十億笑聲」這類實體展開攻擊是脆弱的（一份幾 KB 的 .docx 可以撐爆
+# 記憶體）。它**不會**解析外部實體，所以沒有讀檔的 XXE，但 DoS 那條是真的。
+# 注意：defusedxml 擋下攻擊時丟的是 `EntitiesForbidden` 之類，
+# **不是 ParseError** —— except 要一起收，否則會變成 500。
+from xml.etree import ElementTree as ET          # 建構用（安全）
+from defusedxml.ElementTree import fromstring as _safe_fromstring
+from defusedxml.common import DefusedXmlException
 
 # ---- 命名空間 ----------------------------------------------------------
 _W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -319,7 +326,7 @@ def extract_units(data: bytes, ext: str) -> tuple[list[TextUnit], dict]:
         if not part_re.match(name):
             continue
         try:
-            root = ET.fromstring(raw[name])
+            root = _safe_fromstring(raw[name])
         except ET.ParseError:
             continue
         kind = _kind_for(name, ext)

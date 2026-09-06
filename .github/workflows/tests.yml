@@ -49,11 +49,24 @@ jobs:
         run: python tools/check_version_consistency.py
       - name: 文件與工具涵蓋
         run: python tools/check_docs_tool_coverage.py
+      # **失敗的測試名稱要寫成 annotation** —— job 的 log 需要 repo admin 權限
+      # 才讀得到，所以光看 "Process completed with exit code 1" 完全無從下手
+      # （2026-09-06 為了查兩次紅燈，只能在本機重建環境反推）。
+      # `::error::` 產生的 annotation 匿名就讀得到，通知信裡也看得見。
       - name: pytest（排除需要 Office / OCR 的）
         run: |
+          set +e
           pytest -q --deselect tests/test_pdf_to_slides.py \
                     --deselect tests/test_office_convert.py \
-                    -p no:cacheprovider
+                    -p no:cacheprovider > /tmp/pytest.out 2>&1
+          code=$?
+          tail -60 /tmp/pytest.out
+          if [ $code -ne 0 ]; then
+            grep -E '^(FAILED|ERROR)' /tmp/pytest.out | head -25 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          fi
+          exit $code
 
   security:
     name: 資安測試
@@ -71,6 +84,7 @@ jobs:
           pip install pytest bandit
       - name: OWASP / 越權 / CSRF / SSRF / path traversal
         run: |
+          set +e
           pytest -q -p no:cacheprovider \
             tests/test_owasp_top10.py \
             tests/test_authz_boundaries.py \
@@ -79,9 +93,31 @@ jobs:
             tests/test_open_redirect.py \
             tests/test_id_from_body_acl.py \
             tests/test_csv_injection.py \
-            tests/test_broken_input_no_500.py
-      - name: bandit（只擋 HIGH）
-        run: bandit -r app -ll -iii -q
+            tests/test_broken_input_no_500.py > /tmp/sec.out 2>&1
+          code=$?
+          tail -60 /tmp/sec.out
+          if [ $code -ne 0 ]; then
+            grep -E '^(FAILED|ERROR)' /tmp/sec.out | head -25 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          fi
+          exit $code
+      # `-ll` 是「Medium 以上」不是「只擋 HIGH」—— 名稱與旗標一度不一致。
+      # 這裡**刻意維持 Medium**：2026-09-06 第一次真的跑到這一步就掃出 10 個，
+      # 其中四個是用 stdlib ElementTree 解析**使用者上傳的 XML**（實體展開 DoS）。
+      # 門檻調低只會讓那種東西再也看不見。
+      - name: bandit（Medium 以上、高信心）
+        run: |
+          set +e
+          bandit -r app -ll -iii -q > /tmp/bandit.out 2>&1
+          code=$?
+          cat /tmp/bandit.out
+          if [ $code -ne 0 ]; then
+            grep -E '^>> Issue' /tmp/bandit.out | head -25 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          fi
+          exit $code
 
   office:
     name: 轉檔測試（LibreOffice + 中日韓字型）

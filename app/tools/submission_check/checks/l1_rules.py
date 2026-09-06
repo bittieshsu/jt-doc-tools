@@ -182,7 +182,8 @@ def _scan_docx(path: Path) -> list[dict]:
     findings: list[dict] = []
     try:
         from zipfile import ZipFile
-        import xml.etree.ElementTree as ET
+        # 解析使用者上傳的 XML 一律走 defusedxml（實體展開 DoS）
+        from defusedxml import ElementTree as ET
     except ImportError:
         return findings
 

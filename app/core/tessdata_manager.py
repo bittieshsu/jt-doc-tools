@@ -16,6 +16,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+from . import safe_fetch as _safe_fetch
 
 # 共用語言 catalog — pdf-ocr router + admin/ocr-langs 都引用同一份
 LANG_CATALOG: list[dict] = [
@@ -300,7 +301,7 @@ def _download_variant(code: str, variant: str, tessdata: Path) -> tuple[bool, in
         install_os_trust()
         import urllib.request
         tmp = dst.with_suffix(".traineddata.part")
-        urllib.request.urlretrieve(url, str(tmp))
+        _safe_fetch.urlretrieve(url, str(tmp))
         if not tmp.exists() or tmp.stat().st_size < 1_000_000:
             tmp.unlink(missing_ok=True)
             return False, 0, f"下載 {variant} 不完整（< 1 MB）"
