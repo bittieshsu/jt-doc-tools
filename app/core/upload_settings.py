@@ -1,0 +1,68 @@
+"""應用層的**全域上傳上限**。
+
+## 為什麼需要
+
+原本大小完全靠反向代理擋（doc.jason.tools 量到 300 MB），但**直連應用程式埠
+就沒有任何限制** —— 而內網直連是很常見的部署方式（CLAUDE.md 早就記著這件事，
+`upload_limits.app_side_limits()` 裡那一筆 `app_global` 也一直寫著「目前沒有」）。
+
+沒有上限時，任何能連到服務的人送一個超大 body 就能吃光磁碟與記憶體，
+**不需要任何帳號**（未登入的請求也會先被讀進來才被擋）。
+
+## 判準
+
+* 預設 **500 MB** —— 遠高於任何正常用途（工具自己的上限多在 200 MB 以下，
+  浮水印那種大批次也已改成逐檔上傳），但擋得住「隨手丟一個 10 GB」。
+* **0 = 不限**（給真的需要的部署留一條路，但要管理員自己明確設定）。
+* 這是**最外層**的粗篩，不取代各工具自己的上限。
+"""
+from __future__ import annotations
+
+import json
+import threading
+from typing import Any
+
+_LOCK = threading.Lock()
+_DEFAULTS: dict[str, Any] = {"max_upload_mb": 500}
+
+
+def _path():
+    from ..config import settings
+    return settings.data_dir / "upload_settings.json"
+
+
+def get() -> dict[str, Any]:
+    out = dict(_DEFAULTS)
+    try:
+        p = _path()
+        if p.exists():
+            got = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(got, dict):
+                out.update({k: v for k, v in got.items() if k in _DEFAULTS})
+    except (OSError, ValueError):
+        pass          # 設定檔壞掉就用預設值，不可以讓整站起不來
+    try:
+        out["max_upload_mb"] = max(0, int(out["max_upload_mb"]))
+    except (TypeError, ValueError):
+        out["max_upload_mb"] = _DEFAULTS["max_upload_mb"]
+    return out
+
+
+def save(new: dict[str, Any]) -> dict[str, Any]:
+    cur = get()
+    if "max_upload_mb" in (new or {}):
+        try:
+            cur["max_upload_mb"] = max(0, int(new["max_upload_mb"]))
+        except (TypeError, ValueError):
+            raise ValueError("上傳上限必須是 0 以上的整數（0 = 不限）")
+    with _LOCK:
+        p = _path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(cur, ensure_ascii=False, indent=2),
+                     encoding="utf-8")
+    return cur
+
+
+def max_upload_bytes() -> int:
+    """0 = 不限。"""
+    return get()["max_upload_mb"] * 1024 * 1024

@@ -7,6 +7,7 @@ surface a clear error.
 """
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
@@ -14,6 +15,8 @@ import tempfile
 import threading
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 OFFICE_EXTENSIONS = {
@@ -228,7 +231,51 @@ def _profile_uri(profile_path: Path) -> str:
 
     Path.as_uri() does the right thing on all platforms.
     """
+    _harden_profile(profile_path)
     return profile_path.resolve().as_uri()
+
+
+#: 丟進拋棄式設定檔的安全設定。**停用巨集執行**，不要依賴 LibreOffice 的預設值。
+#:
+#: `--safe-mode` 只是「重設使用者設定檔」，**跟巨集無關** —— 這是很容易誤會的
+#: 一點。LibreOffice 出廠的巨集安全性是「高」（未簽署的不執行），headless 轉檔
+#: 也不會觸發 auto-exec，但那是**別人的預設值**，隨版本可能改變，而我們處理的
+#: 是使用者上傳的、不可信的檔案。顯式釘住成本極低。
+#:
+#: * `DisableMacrosExecution` = true —— 最強的一道，直接關掉巨集執行。
+#: * `MacroSecurityLevel` = 3（最高）—— 萬一上面那項在某個版本被忽略時的後備。
+_HARDENED_PROFILE_XCU = """<?xml version="1.0" encoding="UTF-8"?>
+<oor:items xmlns:oor="http://openoffice.org/2001/registry"
+           xmlns:xs="http://www.w3.org/2001/XMLSchema">
+ <item oor:path="/org.openoffice.Office.Common/Security/Scripting">
+  <prop oor:name="DisableMacrosExecution" oor:op="fuse">
+   <value>true</value>
+  </prop>
+ </item>
+ <item oor:path="/org.openoffice.Office.Common/Security/Scripting">
+  <prop oor:name="MacroSecurityLevel" oor:op="fuse">
+   <value>3</value>
+  </prop>
+ </item>
+</oor:items>
+"""
+
+
+def _harden_profile(profile_path: Path) -> None:
+    """在拋棄式設定檔裡預先寫入安全設定（停用巨集）。
+
+    **寫不進去也不可以讓轉檔失敗** —— 那會把一個「加強防護」變成
+    「整批轉檔壞掉」。寫不成時記一筆 warning 就好：巨集安全性仍有
+    LibreOffice 自己的預設值當底。
+    """
+    try:
+        user_dir = profile_path / "user"
+        user_dir.mkdir(parents=True, exist_ok=True)
+        target = user_dir / "registrymodifications.xcu"
+        if not target.exists():
+            target.write_text(_HARDENED_PROFILE_XCU, encoding="utf-8")
+    except OSError as e:
+        logger.warning("無法寫入 soffice 安全設定（巨集停用）：%s", e)
 
 
 async def convert_to_pdf_async(*args, **kwargs) -> None:
@@ -253,6 +300,97 @@ async def convert_to_odt_async(*args, **kwargs):
     return await asyncio.to_thread(convert_to_odt, *args, **kwargs)
 
 
+class OfficeSourceError(RuntimeError):
+    """來源檔本身就讀不出來（毀損 / 被截斷 / 不是它宣稱的格式）。
+
+    **和「轉檔失敗」要分開**：soffice 遇到這種檔案會**回傳 0 卻不產出任何檔案**，
+    我們原本只能丟一句「轉檔成功但找不到輸出 .txt」——自相矛盾又幫不上忙
+    （2026-09-06 使用者上傳一份**被截斷的 docx** 時踩到）。
+    在送進 soffice **之前**就判斷得出來，訊息也才講得清楚。
+    """
+
+
+#: zip 為容器的格式（OOXML 與 ODF）。
+_ZIP_OOXML = {".docx", ".xlsx", ".pptx", ".docm", ".xlsm", ".pptm"}
+_ZIP_ODF = {".odt", ".ods", ".odp", ".odg", ".odf", ".ott", ".ots", ".otp"}
+#: 舊的二進位格式，容器是 OLE2 複合文件。
+_OLE2 = {".doc", ".xls", ".ppt"}
+_OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+
+#: zip 炸彈門檻：解開後總量上限，以及壓縮比上限。
+#: 一份正常的辦公文件解開後極少超過 1 GB；壓縮比破百的多半是刻意構造的。
+_ZIP_MAX_UNCOMPRESSED = 1024 * 1024 * 1024
+_ZIP_MAX_RATIO = 200
+
+
+def ensure_readable(src: Path) -> None:
+    """在丟給 soffice 之前先確認這份檔案的**容器**是完好的。
+
+    只看容器結構，不解析內容 —— 便宜（毫秒級）而且判準明確。
+    擋得到三種東西：
+
+    1. **被截斷 / 毀損的 zip**（docx / xlsx / odt …）—— 沒有中央目錄的 zip
+       就像被撕掉目錄的書，soffice 打得開檔案卻讀不出內容。
+    2. **改了副檔名的假檔** —— 內容根本不是那個容器。
+    3. **zip 炸彈** —— 解開後大得離譜或壓縮比異常的檔案。
+
+    不認得的副檔名一律放行（純文字 / csv / rtf 之類沒有容器可驗）。
+    """
+    ext = src.suffix.lower()
+    if ext in _OLE2:
+        try:
+            head = src.open("rb").read(8)
+        except OSError as e:
+            raise OfficeSourceError(f"檔案讀不到：{e}") from e
+        if head != _OLE2_MAGIC:
+            raise OfficeSourceError(
+                "這份檔案的內容不是舊版 Office 格式（可能已毀損，或只是副檔名被改過）。")
+        return
+    if ext not in _ZIP_OOXML and ext not in _ZIP_ODF:
+        return
+
+    import zipfile
+    if not zipfile.is_zipfile(src):
+        # **ODF 允許未壓縮的 flat XML**（`.fodt` 是明示的副檔名，但副檔名寫
+        # `.odt` 而內容是 flat XML 的檔案 LibreOffice 也讀得進去）。
+        # 「不是 zip」因此**不等於**壞檔 —— 看起來像 XML 就放行，
+        # 真正壞掉的檔案會在下一關（soffice 沒產出檔案）被抓到。
+        try:
+            head = src.open("rb").read(512).lstrip()
+        except OSError as e:
+            raise OfficeSourceError(f"檔案讀不到：{e}") from e
+        if head.startswith(b"<?xml") or b"office:document" in head:
+            return
+    try:
+        with zipfile.ZipFile(src) as z:
+            names = set(z.namelist())
+            if ext in _ZIP_OOXML and "[Content_Types].xml" not in names:
+                raise OfficeSourceError(
+                    "這份檔案缺少 Office 文件必要的內部結構（可能已毀損，"
+                    "或只是副檔名被改過）。")
+            if ext in _ZIP_ODF and "mimetype" not in names and "content.xml" not in names:
+                raise OfficeSourceError(
+                    "這份檔案缺少 ODF 文件必要的內部結構（可能已毀損，"
+                    "或只是副檔名被改過）。")
+            total = comp = 0
+            for info in z.infolist():
+                total += info.file_size
+                comp += info.compress_size
+            if total > _ZIP_MAX_UNCOMPRESSED or (
+                    comp > 0 and total // max(comp, 1) > _ZIP_MAX_RATIO
+                    and total > 64 * 1024 * 1024):
+                raise OfficeSourceError(
+                    "這份檔案解開後異常龐大，為了避免耗盡伺服器資源而拒絕處理。")
+    except zipfile.BadZipFile as e:
+        # 被截斷的檔案最常見：有局部檔頭、**沒有中央目錄**。
+        raise OfficeSourceError(
+            "這份檔案不完整或已毀損（找不到壓縮檔的目錄結構），Office 引擎讀不出來。"
+            "常見原因是下載或複製時被中斷 —— 請重新取得檔案，"
+            "或用 Word / LibreOffice 開啟後另存新檔再試一次。") from e
+    except OSError as e:
+        raise OfficeSourceError(f"檔案讀不到：{e}") from e
+
+
 def convert_to_pdf(src: Path, dst_pdf: Path, timeout: float = 60.0) -> None:
     """Run soffice headless to convert ``src`` into ``dst_pdf``.
 
@@ -274,6 +412,9 @@ def convert_to_pdf(src: Path, dst_pdf: Path, timeout: float = 60.0) -> None:
         raise RuntimeError(
             "找不到 LibreOffice / OxOffice。請安裝其中一個，或先自行轉成 PDF 上傳。"
         )
+    # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
+    # 會回傳 0 卻不產檔，訊息只能寫「轉檔成功但找不到輸出」，幫不上使用者。
+    ensure_readable(src)
 
     with tempfile.TemporaryDirectory() as td:
         # Fresh per-call profile dir. A *shared* profile accumulates crash/recovery
@@ -347,6 +488,9 @@ def convert_to_odg(src: Path, dst_odg: Path, timeout: float = 120.0) -> None:
         raise RuntimeError(
             "找不到 LibreOffice / OxOffice。請安裝其中一個，或先自行轉成 PDF 上傳。"
         )
+    # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
+    # 會回傳 0 卻不產檔，訊息只能寫「轉檔成功但找不到輸出」，幫不上使用者。
+    ensure_readable(src)
     with tempfile.TemporaryDirectory() as td:
         profile_path = Path(td) / "profile"
         soffice_args = [
@@ -407,6 +551,9 @@ def convert_to_docx(src: Path, dst_docx: Path, timeout: float = 60.0,
         raise RuntimeError(
             "找不到 LibreOffice / OxOffice。請先安裝其中一個，或自行在 Word 內另存為 .docx 後上傳。"
         )
+    # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
+    # 會回傳 0 卻不產檔，訊息只能寫「轉檔成功但找不到輸出」，幫不上使用者。
+    ensure_readable(src)
 
     if input_filter is None and src.suffix.lower() in (".html", ".htm"):
         input_filter = "HTML (StarWriter)"
@@ -463,6 +610,9 @@ def convert_to_pptx(src: Path, dst_pptx: Path, timeout: float = 120.0) -> None:
         raise RuntimeError(
             "找不到 LibreOffice / OxOffice。請先安裝其中一個再轉簡報檔。"
         )
+    # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
+    # 會回傳 0 卻不產檔，訊息只能寫「轉檔成功但找不到輸出」，幫不上使用者。
+    ensure_readable(src)
 
     with tempfile.TemporaryDirectory() as td:
         profile_path = Path(td) / "profile"
@@ -521,6 +671,9 @@ def convert_to_odt(src: Path, dst_odt: Path, timeout: float = 60.0,
         raise RuntimeError(
             "找不到 LibreOffice / OxOffice。請先安裝其中一個才能輸出 .odt 格式。"
         )
+    # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
+    # 會回傳 0 卻不產檔，訊息只能寫「轉檔成功但找不到輸出」，幫不上使用者。
+    ensure_readable(src)
 
     # HTML 輸入自動指定 Writer 篩選器，避免 Web filter 輸出 text-web mimetype
     if input_filter is None and src.suffix.lower() in (".html", ".htm"):
@@ -582,6 +735,9 @@ def convert_to_text(src: Path, timeout: float = 60.0) -> str:
         raise RuntimeError(
             "找不到 LibreOffice / OxOffice — Office / ODF 檔案需先轉成 TXT 才能翻譯。"
         )
+    # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
+    # 會回傳 0 卻不產檔，訊息只能寫「轉檔成功但找不到輸出」，幫不上使用者。
+    ensure_readable(src)
     with tempfile.TemporaryDirectory() as td:
         profile_path = Path(td) / "profile"
         soffice_args = [
@@ -732,3 +888,7 @@ def convert_with_filter(src: Path, dst: Path, ext: str, filter_name: str,
         raise RuntimeError(
             f"轉換沒有產生檔案。這套 office 可能不支援「{filter_name}」"
             "這個輸出格式，請改選其他目標格式。")
+
+    # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
+    # 會回傳 0 卻不產檔，訊息只能寫「轉檔成功但找不到輸出」，幫不上使用者。
+    ensure_readable(src)

@@ -137,7 +137,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   const fd = new FormData();
   for (const f of files) fd.append('file', f);
   const r = await fu.upload('/tools/pdf-merge/submit', fd, {processingLabel: tr('排隊合併中…')});
-  if (!r.ok) return alert(tr('送出失敗：') + await r.text());
+  if (!r.ok) return alert(await window.friendlyServerError(r, tr('送出失敗')));
   const j = await r.json();
   progress.track(j.job_id);
 });

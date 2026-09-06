@@ -184,7 +184,7 @@
         }
       );
       if (!r.ok) {
-        statusEl.textContent = tr('失敗：') + await r.text();
+        statusEl.textContent = await window.friendlyServerError(r, tr('失敗'));
         hideProgress();
         return;
       }

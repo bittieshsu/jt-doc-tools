@@ -416,7 +416,7 @@ $('btn-pdf').addEventListener('click', async () => {
     const fd = await buildSubmitForm();
     const r = await fetch('/tools/pdf-rotate/finalize', { method: 'POST', body: fd });
     if (!r.ok) {
-      throw new Error(await r.text());
+      throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
     }
     const blob = await r.blob();
     const cd = r.headers.get('Content-Disposition') || '';
@@ -437,7 +437,7 @@ if (window.attachWorkspaceSave && document.getElementById('wsSaveBtn')) {
     if (!uploadId) throw new Error(tr('沒有檔案'));
     const fd = await buildSubmitForm();
     const r = await fetch('/tools/pdf-rotate/finalize', { method: 'POST', body: fd });
-    if (!r.ok) throw new Error(await r.text());
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
     const blob = await r.blob();
     const cd = r.headers.get('Content-Disposition') || '';
     const m = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
@@ -456,7 +456,7 @@ $('btn-png').addEventListener('click', async () => {
   try {
     const fd = await buildSubmitForm();
     const r = await fetch('/tools/pdf-rotate/finalize-png', { method: 'POST', body: fd });
-    if (!r.ok) throw new Error(await r.text());
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
     const blob = await r.blob();
     const cd = r.headers.get('Content-Disposition') || '';
     const m = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);

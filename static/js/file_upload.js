@@ -183,7 +183,7 @@
           } catch (_e) {
             this.input.files = dt.files;  // fallback
           }
-          this._dropMultiNotice = `（拖入了 ${dt.files.length} 份，只取第一份）`;
+          this._dropMultiNotice = tr('（拖入了 {0} 份，只取第一份）').replace('{0}', dt.files.length);
         } else {
           this.input.files = dt.files;
           this._dropMultiNotice = '';
@@ -195,7 +195,7 @@
       const arr = Array.isArray(files) ? files : [files];
       if (this.nameEl) {
         if (arr.length > 1) {
-          this.nameEl.textContent = `${arr.length} 個檔案：${arr.map(f => f.name).join('、')}`;
+          this.nameEl.textContent = tr('{0} 個檔案：{1}').replace('{0}', arr.length).replace('{1}', arr.map(f => f.name).join('、'));
         } else {
           this.nameEl.textContent = arr[0].name + (this._dropMultiNotice || '');
         }

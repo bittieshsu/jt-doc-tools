@@ -154,7 +154,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ builtin_order, custom })
     });
-    if (!r.ok) throw new Error(await r.text());
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
     // Visible success: green flash on the button + toast, then reload to
     // pick up the re-probed version chips.
     btn.classList.add('saved-flash');

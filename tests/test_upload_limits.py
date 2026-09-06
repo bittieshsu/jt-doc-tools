@@ -135,14 +135,37 @@ def test_configurable_flag_is_honest():
         assert rows[k]["configurable"] is False, f"{k} 其實是寫死的"
 
 
-def test_app_has_no_global_limit_and_says_so():
-    """目前應用程式端**沒有**全域上傳上限 —— 這件事要講出來，不要留白。
+def test_app_global_limit_is_reported_accurately():
+    """全域上傳上限**要如實顯示**，設了就寫數字、沒設就明講「沒有」。
 
-    直連本機埠（內網部署很常見）時等於完全沒有限制，管理員應該知道。
+    這條原本釘的是「應用程式端沒有全域上限」—— 那是 v1.15.8 之前的事實。
+    2026-09-06 加了應用層中介層（預設 500 MB，0 = 不限）之後，這裡改成
+    釘「**顯示的內容要跟實際設定一致**」：說「可調」卻其實寫死、
+    或設了上限卻還寫著「沒有限制」，都會讓管理員做出錯誤判斷。
     """
+    from app.core import upload_settings
+    configured = upload_settings.get()["max_upload_mb"]
     row = next(r for r in ul.app_side_limits() if r["key"] == "app_global")
-    assert row["value_mb"] is None
-    assert "沒有" in row["note"]
+    assert row["configurable"] is True, "這個值現在管理介面調得到"
+    if configured > 0:
+        assert row["value_mb"] == configured, "顯示的數字要等於實際設定"
+        assert "413" in row["note"], "要說明超過會怎樣"
+    else:
+        assert row["value_mb"] is None
+        assert "不限" in row["note"] or "沒有" in row["note"]
+
+
+def test_the_global_limit_is_actually_enforced():
+    """**有寫在清單上不等於真的擋得住** —— 中介層要在那裡。
+
+    只驗 `app_side_limits()` 的話，把中介層整個拿掉也照樣綠燈。
+    """
+    import inspect
+    from app import main as app_main
+    src = inspect.getsource(app_main._UploadSizeLimitMiddleware)
+    assert "content-length" in src, "沒有看 Content-Length"
+    assert "413" in src, "超過上限不是回 413"
+    assert "max_upload_bytes" in src, "沒有讀設定值"
 
 
 # --- 端點 ---------------------------------------------------------------

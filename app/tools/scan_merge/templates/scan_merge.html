@@ -234,8 +234,8 @@ async function uploadFiles(fileList) {
     const arr = Array.from(fileList);
     for (let i = 0; i < arr.length; i++) {
       busyMsg.textContent = arr.length > 1
-        ? `處理中（${i + 1}/${arr.length}）：${arr[i].name} …`
-        : `處理中：${arr[i].name} …`;
+        ? tr('處理中（{0}/{1}）：{2} …').replace('{0}', i + 1).replace('{1}', arr.length).replace('{2}', arr[i].name)
+        : tr('處理中：{0} …').replace('{0}', arr[i].name);
       await uploadOne(arr[i]);
     }
   } finally {
@@ -437,7 +437,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(body),
     });
-    if (!r.ok) { alert(tr('產生失敗：') + await r.text()); return; }
+    if (!r.ok) { alert(await window.friendlyServerError(r, tr('產生失敗'))); return; }
     const j = await r.json();
     jp.track(j.job_id);
   } finally {

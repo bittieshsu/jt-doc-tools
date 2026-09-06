@@ -83,7 +83,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   });
   const status = document.getElementById('status');
   if (r.ok) { status.textContent = tr('✓ 已儲存'); status.style.color = '#16a34a'; }
-  else { status.textContent = tr('失敗：') + await r.text(); status.style.color = '#dc2626'; }
+  else { status.textContent = await window.friendlyServerError(r, tr('失敗')); status.style.color = '#dc2626'; }
 });
 
 document.getElementById('sweepNowBtn').addEventListener('click', async () => {

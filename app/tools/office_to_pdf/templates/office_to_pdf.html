@@ -22,7 +22,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   const fd = new FormData();
   for (const f of files) fd.append('file', f);
   const r = await fu.upload('/tools/office-to-pdf/submit', fd, {processingLabel: tr('排隊轉檔中…')});
-  if(!r.ok) return alert(tr('送出失敗：')+ await r.text());
+  if(!r.ok) return alert(await window.friendlyServerError(r, tr('送出失敗')));
   const j = await r.json(); jp.track(j.job_id);
 });
 </script>

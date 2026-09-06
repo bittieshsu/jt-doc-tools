@@ -91,7 +91,7 @@ $('btn-submit').addEventListener('click', async () => {
     if ($(k).checked) fd.append(k, 'true');
   });
   const r = await fu.upload('/tools/pdf-encrypt/submit', fd, {processingLabel: tr('排隊加密中…')});
-  if (!r.ok) return alert(tr('失敗：') + await r.text());
+  if (!r.ok) return alert(await window.friendlyServerError(r, tr('失敗')));
   const j = await r.json();
   jp.track(j.job_id);
 });

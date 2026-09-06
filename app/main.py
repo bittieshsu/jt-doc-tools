@@ -19,7 +19,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.15.8"
+VERSION = "1.15.9"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -47,6 +47,59 @@ app = FastAPI(title=settings.app_name, version=VERSION,
 # 仍會被 CSRF 驗證，已認證動作在 auth 通過後驗證；bearer API / SSO 回呼豁免。
 from app.core.csrf import CSRFMiddleware  # noqa: E402
 app.add_middleware(CSRFMiddleware)
+
+
+class _UploadSizeLimitMiddleware:
+    """**最外層**的上傳大小粗篩（純 ASGI）。
+
+    在此之前大小完全靠反向代理擋 —— 而**直連應用程式埠就沒有任何限制**，
+    內網直連又是很常見的部署。沒有帳號的人送一個超大 body 就能吃光資源。
+
+    判準刻意簡單：只看 `Content-Length`，超過就直接回 **413**，
+    **body 一個位元組都不讀**。沒有 Content-Length 的（分塊傳輸）交給
+    後面的既有防線，這裡不做串流計數 —— 那要攔 receive，複雜度與風險
+    都高得多，而分塊上傳在瀏覽器端的檔案上傳並不會發生。
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            return await self.app(scope, receive, send)
+        limit = 0
+        try:
+            from app.core.upload_settings import max_upload_bytes
+            limit = max_upload_bytes()
+        except Exception:
+            limit = 0          # 讀不到設定就不擋，不可以讓整站上傳不了
+        if limit > 0:
+            for k, v in scope.get("headers") or []:
+                if k == b"content-length":
+                    try:
+                        if int(v) > limit:
+                            import json as _j
+                            mb = limit // (1024 * 1024)
+                            body = _j.dumps(
+                                {"detail": f"檔案太大 —— 這個站台的單次上傳上限是 "
+                                           f"{mb} MB。請分批上傳，或請管理員調整。"},
+                                ensure_ascii=False).encode("utf-8")
+                            await send({"type": "http.response.start",
+                                        "status": 413,
+                                        "headers": [
+                                            (b"content-type",
+                                             b"application/json; charset=utf-8"),
+                                            (b"content-length",
+                                             str(len(body)).encode())]})
+                            await send({"type": "http.response.body", "body": body})
+                            return
+                    except ValueError:
+                        pass
+                    break
+        return await self.app(scope, receive, send)
+
+
+app.add_middleware(_UploadSizeLimitMiddleware)
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR.parent / "static"
@@ -825,6 +878,20 @@ async def _broken_pdf_exc(request: Request, exc: Exception):
         {"detail": "檔案打不開 —— 可能已毀損、內容不完整，或副檔名與實際格式"
                    "不符。請確認來源檔可以正常開啟後再上傳一次。"},
         status_code=400)
+
+
+# 辦公文件的**來源檔本身**讀不出來（毀損 / 被截斷 / 副檔名被改過 / zip 炸彈）。
+# soffice 碰到這種檔案會**回傳 0 卻不產出任何檔案**，端點原本只能回一句
+# 「轉檔成功但找不到輸出 .txt」—— 自相矛盾，而且對使用者毫無幫助
+# （2026-09-06 使用者上傳一份被截斷的 docx 時回報）。
+# `office_convert.ensure_readable()` 在送進 soffice **之前**就判斷得出來，
+# 這裡統一轉成 400 —— 跟毀損 PDF 同一個做法，新工具自動涵蓋。
+from .core.office_convert import OfficeSourceError as _OfficeSourceError  # noqa: E402
+
+
+@app.exception_handler(_OfficeSourceError)
+async def _bad_office_source_exc(request: Request, exc: Exception):
+    return _JSONResponse({"detail": str(exc)}, status_code=400)
 
 
 # 縮圖 / 預覽端點的頁碼在**路徑上**，所以「第 0 頁」「第 99 頁」這種是

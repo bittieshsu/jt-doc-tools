@@ -144,7 +144,7 @@ async function submitForm(ev) {
   const method = id ? "PUT" : "POST";
   try {
     const r = await fetch(url, { method, body: fd });
-    if (!r.ok) throw new Error(await r.text());
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
     location.reload();
   } catch (e) {
     window.showAlert(tr("失敗：") + e.message);
@@ -157,7 +157,7 @@ async function delRow(id, name) {
   if (!ok) return;
   try {
     const r = await fetch("api/self-entities/" + id, { method: "DELETE" });
-    if (!r.ok) throw new Error(await r.text());
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
     location.reload();
   } catch (e) {
     window.showAlert(tr("失敗：") + e.message);

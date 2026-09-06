@@ -612,7 +612,7 @@ $('btnProcess').addEventListener('click', async () => {
         selections: selections,
       }),
     });
-    if (!r.ok) { $('procStatus').textContent = tr('失敗：') + await r.text(); return; }
+    if (!r.ok) { $('procStatus').textContent = await window.friendlyServerError(r, tr('失敗')); return; }
     const d = await r.json();
     $('procStatus').textContent = tr('完成，共處理 {0} 筆').replace('{0}', d.processed);
     $('doneSummary').textContent =

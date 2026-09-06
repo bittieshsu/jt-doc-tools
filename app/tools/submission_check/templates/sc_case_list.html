@@ -125,7 +125,7 @@ async function deleteCase(caseId) {
   if (!ok) return;
   try {
     const r = await fetch("case/" + caseId, { method: "DELETE" });
-    if (!r.ok) throw new Error(await r.text());
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
     location.reload();
   } catch (e) {
     window.showAlert(tr("刪除失敗：") + e.message);

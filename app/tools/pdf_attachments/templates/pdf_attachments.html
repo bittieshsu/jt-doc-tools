@@ -118,7 +118,7 @@ $('btnStrip').addEventListener('click', async () => {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({upload_id: uploadId}),
   });
-  if (!r.ok) { $('status').textContent = tr('失敗：') + await r.text(); return; }
+  if (!r.ok) { $('status').textContent = await window.friendlyServerError(r, tr('失敗')); return; }
   const d = await r.json();
   $('status').textContent = tr('已移除 {0} 個附件').replace('{0}', d.removed);
   window.location.href = d.download_url;

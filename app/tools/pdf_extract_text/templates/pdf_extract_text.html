@@ -116,7 +116,7 @@ async function handleUpload(file) {
   if (!file) return;
   // Show a spinning indicator while the upload + extract round-trip runs
   // (PDF parse + render takes a few seconds — silent UI looked broken).
-  $('status').innerHTML = '<span class="et-spinner"></span> 擷取中…';
+  $('status').innerHTML = '<span class="et-spinner"></span> ' + tr('擷取中…');
   // Also render an in-flow placeholder block in the preview area so the
   // user sees activity without scrolling.
   $('preview').innerHTML = '<div class="et-loading"><span class="et-spinner et-spinner-lg"></span><div>' + tr('正在解析 PDF，請稍候…') + '</div></div>';
@@ -167,7 +167,7 @@ function renderResult(d) {
   // 存至工作區：工作區收 docx / odt（txt / md 不支援）。僅在工作區啟用時出現。
   const wsIcon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>`;
   const wsBtn = (key, label) => (d.downloads[key] && window.saveToWorkspace)
-    ? `<button class="btn" type="button" data-ws="${key}">${wsIcon} ${label}存至工作區</button>` : '';
+    ? `<button class="btn" type="button" data-ws="${key}">${wsIcon} ${tr('{0} 存至工作區').replace('{0}', label)}</button>` : '';
   $('dlGroup').innerHTML =
     dl('txt',  tr('下載 TXT')) +
     dl('md',   tr('下載 Markdown')) +

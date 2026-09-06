@@ -17,6 +17,8 @@ import re
 
 import pytest
 
+from tools.route_index import iter_routes, assert_sane
+
 import sys as _sys, pathlib as _pathlib
 _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
 from tools.repo_paths import public_root as _public_root
@@ -32,7 +34,8 @@ def _plan_text() -> str:
 
 def _routes():
     import app.main as app_main
-    return app_main.app.routes
+    assert_sane(app_main.app)
+    return list(iter_routes(app_main.app))
 
 
 def test_every_tool_appears_in_the_plan():

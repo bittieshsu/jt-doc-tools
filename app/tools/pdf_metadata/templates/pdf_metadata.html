@@ -123,7 +123,7 @@ $('btnClean').addEventListener('click', async () => {
       clear_forms: $('cFrm').checked,
     }),
   });
-  if (!r.ok) { $('cleanStatus').textContent = tr('失敗：') + await r.text(); return; }
+  if (!r.ok) { $('cleanStatus').textContent = await window.friendlyServerError(r, tr('失敗')); return; }
   const d = await r.json();
   $('cleanStatus').textContent = tr('完成');
   $('dlSummary').textContent = `清除後檔案大小：${fmt(d.size)}`;

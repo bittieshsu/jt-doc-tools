@@ -48,7 +48,8 @@ def main() -> int:
         return False
 
     rows = []
-    for r in app_main.app.routes:
+    from route_index import iter_routes as _iter
+    for r in _iter(app_main.app):
         p = getattr(r, "path", "")
         if not p or "/api/" in p or "{rest:path}" in p or p.startswith(SKIP):
             continue

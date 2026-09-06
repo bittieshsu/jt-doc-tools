@@ -4,6 +4,8 @@
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 /* ---- 可上傳的檔案大小 ---- */
+.ul-proxy-set { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.ul-proxy-set input.field { width:110px; }
 .ul-lead { font-size: 12.5px; line-height: 1.7; margin: 4px 0 14px; }
 .ul-proxy { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px;
             background: #f8fafc; margin-bottom: 16px; }
@@ -191,6 +193,28 @@
     <div class="ul-proxy-result" id="ulProbeResult">
       <span class="muted">{{ tr('尚未偵測（不會傳輸檔案，通常一兩秒完成）') }}</span>
     </div>
+  </div>
+
+  <div class="ul-proxy">
+    <div class="ul-proxy-head">
+      <div>
+        <div class="ul-proxy-title">{{ tr('應用程式自己的上限') }}</div>
+        <div class="muted ul-proxy-note">
+          {{ tr('反向代理擋不到') }}<b>{{ tr('直連應用程式埠') }}</b>{{ tr('的請求，而內網直連很常見。
+          超過這個大小會直接回 413，') }}<b>{{ tr('body 一個位元組都不會讀') }}</b>{{ tr('。
+          0 = 不限。這是最外層的粗篩，各工具仍有自己的上限。') }}
+        </div>
+      </div>
+      <div class="ul-proxy-set">
+        <input class="field" type="number" id="ulMaxMb" min="0" step="1"
+               value="{{ upload_max_mb }}" aria-label="{{ tr('全域上傳上限（MB）') }}">
+        <span class="muted">MB</span>
+        <button class="btn btn-primary" type="button" id="btnSaveUploadLimit">
+          {{ icon('save', size=14) }} {{ tr('儲存') }}
+        </button>
+      </div>
+    </div>
+    <div class="ul-proxy-result" id="ulSaveResult" hidden></div>
   </div>
 
   <table class="ul-table">
@@ -644,6 +668,42 @@ $('ssDbBackup').addEventListener('click', async (e) => {
 
 refreshDbs(false);
 
+// ---- 應用層的全域上傳上限 --------------------------------------
+// 反向代理擋不到直連應用程式埠的請求，而內網直連很常見。
+(function () {
+  const btn = document.getElementById('btnSaveUploadLimit');
+  if (!btn) return;
+  const input = document.getElementById('ulMaxMb');
+  const out = document.getElementById('ulSaveResult');
+  btn.addEventListener('click', async () => {
+    const v = parseInt(input.value, 10);
+    if (isNaN(v) || v < 0) {
+      out.hidden = false;
+      out.textContent = tr('請輸入 0 以上的整數（0 = 不限）');
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const r = await fetch('/admin/system-status/upload-limit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ max_upload_mb: v }),
+      });
+      out.hidden = false;
+      if (!r.ok) {
+        out.textContent = await window.friendlyServerError(r, tr('儲存失敗'));
+        return;
+      }
+      const d = await r.json();
+      out.textContent = d.max_upload_mb > 0
+        ? tr('已儲存：單次上傳上限 {0} MB').replace('{0}', d.max_upload_mb)
+        : tr('已儲存：不限制上傳大小');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+
 // ---- 偵測反向代理實際能收多大 ----------------------------------
 // 用 Expect: 100-continue 問，不傳輸資料。**問不到要說問不到** ——
 // 回一個看起來像答案的數字，管理員照著去設定會比沒有這個功能更糟。
@@ -671,7 +731,7 @@ refreshDbs(false);
       }
       const big = document.createElement('span');
       big.className = 'ul-big';
-      big.textContent = d.unlimited ? '沒有設定上限' : (d.max_mb + ' MB');
+      big.textContent = d.unlimited ? tr('沒有設定上限') : (d.max_mb + ' MB');
       out.appendChild(big);
       const note = document.createElement('span');
       note.className = 'muted';

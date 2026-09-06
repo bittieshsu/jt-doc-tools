@@ -241,8 +241,14 @@ def _extract_text_from_file(filename: str, data: bytes) -> str:
             src_path = Path(tf.name)
         try:
             text = office_convert.convert_to_text(src_path)
+        except office_convert.OfficeSourceError:
+            # 來源檔本身就讀不出來（毀損 / 截斷 / 副檔名被改過）——
+            # 它的訊息已經是寫給使用者看的，交給全域處理器原樣回 400，
+            # 不要再包一層「office 檔解析失敗：」那種開發者術語。
+            raise
         except Exception as e:
-            raise HTTPException(400, f"office 檔解析失敗：{e}")
+            raise HTTPException(
+                400, f"這份檔案的文字擷取失敗，Office 引擎回報：{e}")
         finally:
             try:
                 src_path.unlink()

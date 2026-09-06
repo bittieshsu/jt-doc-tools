@@ -215,6 +215,13 @@
       const t = (entry.transport || '').trim(), r = routeStr(entry);
       return (t + ' ' + r).trim();
     }
+    // 高鐵的電子車票證明**本來就沒有印車次**（它只有起訖站、乘車日期時間、
+    // 票價與控管編號），所以那一格永遠是空的。留白會讓人以為是我們沒抓到，
+    // 顯示 `--` 才看得出「這份證明就是沒有這項」。
+    // **只影響畫面** —— 匯出仍是空值，不可以把 `--` 寫進報帳單據。
+    if (fid === 'train' && !entry[fid] && (entry.transport || '').indexOf('高鐵') >= 0) {
+      return '--';
+    }
     if (AMOUNT_FIELDS[fid]) return fmtAmount(entry[fid], 'comma');   // 畫面一律千分位
     if (fid === 'date') return fmtDate(entry[fid], formatId(fid) || 'iso');
     return entry[fid] == null ? '' : String(entry[fid]);
@@ -319,7 +326,10 @@
           inp.placeholder = tr('科目');
           inp.addEventListener('change', () => saveField(e.id, 'subject', inp.value));
           td.appendChild(inp);
-        } else { td.textContent = cellValue(e, c); }
+        } else {
+          td.textContent = cellValue(e, c);
+          if (td.textContent === '--') td.title = tr('高鐵的電子車票證明沒有印車次');
+        }
         rowEl.appendChild(td);
       });
       const tdAct = document.createElement('td');

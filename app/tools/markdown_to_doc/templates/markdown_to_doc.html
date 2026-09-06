@@ -408,7 +408,7 @@ def hello():
       if (['pdf', 'docx', 'odt'].includes(f.id) && url && window.attachWorkspaceSave) {
         const wb = document.createElement('button');
         wb.className = 'btn'; wb.type = 'button';
-        wb.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="sb4a65f0b"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>存至工作區';
+        wb.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-s="sb4a65f0b"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>' + tr('存至工作區');
         dl.appendChild(wb);
         window.attachWorkspaceSave(wb, () => ({
           url: url, name: (url.split('/').pop() || ('document.' + f.id)).split('?')[0],

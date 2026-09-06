@@ -22,14 +22,21 @@ from __future__ import annotations
 
 import pytest
 
+from tools.route_index import iter_routes, assert_sane
+
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 
 def _tool_post_paths():
     from app.main import app
-    return sorted({r.path for r in app.routes
+    # **不可以直接讀 `app.routes`** —— Starlette 1.6 起 include_router 的
+    # 路由包在 `_IncludedRouter` 裡（沒有 `.path`），照舊寫法會在收集階段
+    # 直接 AttributeError（2026-09-06 CI 就是這樣紅的），而「只跳過沒有
+    # .path 的」更糟：會安靜地只剩三條然後全綠。
+    assert_sane(app)
+    return sorted({r.path for r in iter_routes(app)
                    if r.path.startswith("/tools/")
-                   and "POST" in getattr(r, "methods", set())
+                   and "POST" in (getattr(r, "methods", None) or set())
                    and "{" not in r.path})
 
 

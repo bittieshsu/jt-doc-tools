@@ -2361,10 +2361,33 @@ def build_auth_router(templates) -> APIRouter:
     @router.get("/system-status", response_class=HTMLResponse)
     async def system_status_page(request: Request):
         from ..core.upload_limits import app_side_limits
+        from ..core import upload_settings as _upload_settings
         return templates.TemplateResponse(request,
             "admin_system_status.html",
-            {"request": request, "upload_limits": app_side_limits()},
+            {"request": request, "upload_limits": app_side_limits(),
+             "upload_max_mb": _upload_settings.get()["max_upload_mb"]},
         )
+
+    @router.post("/system-status/upload-limit")
+    async def set_upload_limit(request: Request):
+        """設定**應用層**的全域上傳上限（MB，0 = 不限）。
+
+        在此之前大小完全靠反向代理擋，而**直連應用程式埠沒有任何限制** ——
+        內網直連是很常見的部署方式，等於完全沒有防護。
+        """
+        from ..core import upload_settings
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(400, "invalid JSON body")
+        try:
+            cur = upload_settings.save(
+                {"max_upload_mb": (body or {}).get("max_upload_mb")})
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        audit_db.log(request, "settings_change", "upload_limit",
+                     {"max_upload_mb": cur["max_upload_mb"]})
+        return {"ok": True, "max_upload_mb": cur["max_upload_mb"]}
 
     @router.post("/api/upload-limit/probe")
     async def upload_limit_probe(request: Request):

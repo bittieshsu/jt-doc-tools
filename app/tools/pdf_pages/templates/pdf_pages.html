@@ -113,7 +113,7 @@ function render() {
     `<div class="page-card ${p.deleted ? 'deleted' : ''}" data-idx="${idx}" draggable="true">
        <span class="drag-hint">⠿</span>
        <div class="page-thumb"><img src="${p.thumb}" alt="page ${p.page}" loading="lazy" /></div>
-       <div class="page-num">原第 ${p.page} 頁</div>
+       <div class="page-num">${tr('原第 {0} 頁').replace('{0}', p.page)}</div>
        ${p.deleted
          ? `<button type="button" class="restore-btn" data-act="restore">還原</button>`
          : `<button type="button" class="del-btn" data-act="delete" title="${tr('標記為刪除')}">×</button>`}
@@ -181,7 +181,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
   fd.append('order', order);
   fd.append('filename', filename);
   const r = await fu.upload('/tools/pdf-pages/submit-from-upload', fd, {processingLabel: tr('排隊處理中…')});
-  if (!r.ok) return alert(tr('送出失敗：') + await r.text());
+  if (!r.ok) return alert(await window.friendlyServerError(r, tr('送出失敗')));
   const j = await r.json(); jp.track(j.job_id);
 });
 </script>

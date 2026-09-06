@@ -328,7 +328,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **216 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **217 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -447,6 +447,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_ocr_avx2_guard.py` | 本機 EasyOCR 在缺 AVX2 的 CPU 上會 SIGILL 打掛整個服務 |
 | `test_ocr_server_gpu_select.py` | Unit tests for jt-ocr-server's auto GPU selection (server_template.py). |
 | `test_office_convert.py` | 辦公文件格式互轉（office-convert） |
+| `test_office_source_validation.py` | 辦公文件的**來源檔**壞掉時，要在送進 soffice 之前就擋下來 |
 | `test_online_sessions.py` | 在線人數、某人的登入裝置清單、強制登出 |
 | `test_open_redirect.py` | Open-redirect regression — closes CodeQL alerts #14 / #15 |
 | `test_ou_key_canon.py` | OU 授權的 DN 大小寫 / 空白正規化（v1.14.48） |
@@ -3203,6 +3204,55 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
 
 ---
+
+### 6.74 v1.15.9 — 路由表列舉要**跟得上框架版本**（每次發版必過）
+
+> CI 第一次真跑就紅：`requirements.txt` 是 `starlette>=1.3.1,<2`，開發機被
+> uv.lock 鎖在 **1.3.1**，CI 從範圍解析裝到 **1.6.0**。新版把 `include_router()`
+> 的路由包進 `_IncludedRouter`（**沒有 `.path`**），`test_broken_input_no_500`
+> 在收集階段就 `AttributeError` → pytest exit 2 → 兩分鐘內整個 job 紅。
+
+- [ ] `python tools/route_index.py` 印出的路由數與上一版相近（目前 536 條）
+- [ ] **逐路由參數化的守門都要先呼叫 `assert_sane(app)`**
+      —— 新版底下頂層只看得到 **3 條** `/tools/` 路由，
+      「只跳過沒有 `.path` 的物件」會讓那些守門**縮成三條然後全綠**
+- [ ] 六個讀路由表的地方都走 `tools/route_index.py`：
+      `test_broken_input_no_500` / `test_api_doc_coverage` / `test_test_plan_coverage` /
+      `i18n_untranslated_scan` / `i18n_zh_baseline` / `report_endpoint_test_coverage`
+
+> **開發機與 CI 裝的版本本來就不同**（uv.lock 鎖定 vs 範圍解析）——
+> 這是**特性不是缺陷**：CI 裝最新版才會提早撞到框架升級的相容性問題。
+> 所以修的是程式碼的版本強健度，**不是把版本釘死**。
+
+### 6.75 v1.15.9 — 毀損 / 惡意的辦公文件（每次發版必過）
+
+> 使用者把一份**被截斷的 docx**（36 KiB 整、沒有中央目錄）拉進逐句翻譯，
+> soffice **回傳碼 0 卻不產檔**，畫面只丟一句自相矛盾的
+> 「轉檔成功但找不到輸出 .txt」。
+
+- [ ] `pytest tests/test_office_source_validation.py` 綠燈
+- [ ] 拿一份**截斷的 docx**（把好檔案攔腰切一半）丟進逐句翻譯 / 文字去識別化，
+      要看到「檔案不完整或已毀損…請重新取得或另存新檔」而**不是**開發者術語
+- [ ] **好檔案一個都不能誤擋** —— 正常的 docx / xlsx / odt 照常轉
+- [ ] 每個轉檔入口都先驗（`test_every_conversion_entry_point_validates_first`）
+
+### 6.76 v1.15.9 — 上傳的防護（每次發版必過）
+
+- [ ] **巨集**：轉檔用的拋棄式設定檔要寫入 `DisableMacrosExecution`
+      —— `--safe-mode` 只是重設設定檔，**跟巨集無關**，很容易誤會
+- [ ] **全域上傳上限**：超過設定值要回 **413**，且 body 不被讀取；
+      管理頁「可上傳的檔案大小」可調、會寫稽核
+- [ ] **顯示要與實際一致**：設了數字就顯示數字，設 0 就明講不限
+      （`test_app_global_limit_is_reported_accurately`）
+- [ ] **有寫在清單上不等於擋得住** —— 另有一條驗中介層真的存在
+- [ ] zip 炸彈：解開後 > 1 GB 或壓縮比 > 200 的辦公文件要拒絕
+
+### 6.77 v1.15.9 — 錯誤訊息不可以把原始回應丟給使用者（每次發版必過）
+
+- [ ] 任何 `if (!r.ok)` 的分支都走 `window.friendlyServerError(r, …)`，
+      **不可以** `await r.text()` 直接顯示（使用者截圖看到
+      `Parsing failed: {"detail":"…"}` 這種原始 JSON）
+- [ ] 後端只回**寫給使用者看**的訊息，開發者術語留在日誌
 
 ### 6.67 v1.15.8 — `tr` 被同名變數遮蔽（**每次發版必過**）
 

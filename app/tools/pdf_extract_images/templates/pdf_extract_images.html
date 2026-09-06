@@ -106,7 +106,7 @@ const fu = new FileUpload(document.getElementById('upE'), async (f) => {
   document.getElementById('extract-panel').hidden = false;
   document.getElementById('img-grid').innerHTML =
     '<div class="ext-loading" data-s="s1b9b41ec"><span class="ext-spinner ext-spinner-lg"></span><div>' + tr('正在擷取嵌入圖片，請稍候…') + '</div></div>';
-  document.getElementById('extract-info').innerHTML = '<span class="ext-spinner"></span> 擷取中…';
+  document.getElementById('extract-info').innerHTML = '<span class="ext-spinner"></span> ' + tr('擷取中…');
   const fd = new FormData(); fd.append('file', f);
   const r = await fu.upload('/tools/pdf-extract-images/extract', fd, {processingLabel: tr('伺服器擷取圖片中…')});
   if (!r.ok) {
@@ -146,7 +146,7 @@ function renderExtracted() {
       <div class="img-thumb" data-zoom-src="${it.url}">
         <img src="${it.url}" alt="${it.id}" loading="lazy" />
       </div>
-      <div class="img-num">原第 ${it.page} 頁 · ${sizeKB} KB · ${it.ext.toUpperCase()}</div>
+      <div class="img-num">${tr('原第 {0} 頁').replace('{0}', it.page)} · ${sizeKB} KB · ${it.ext.toUpperCase()}</div>
     </label>`;
   }).join('');
   if (window.bindStopProp) window.bindStopProp(grid);  // dl-link 動態插入後綁定

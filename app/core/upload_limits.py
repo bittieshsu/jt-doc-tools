@@ -146,6 +146,9 @@ def app_side_limits() -> list[dict]:
     from . import workspace as ws
     from .branding import MAX_LOGO_BYTES
     from .job_autosave import _AUTO_MAX_BYTES
+    from .upload_settings import get as _upload_get
+
+    app_global = int(_upload_get()["max_upload_mb"])
 
     s = ws.get_settings() if hasattr(ws, "get_settings") else {}
     per_user = int(s.get("per_user_quota_mb") or 0)
@@ -156,11 +159,16 @@ def app_side_limits() -> list[dict]:
 
     return [
         {"key": "app_global", "label": "應用程式全域上傳上限",
-         "value_mb": None, "configurable": False,
+         "value_mb": app_global if app_global > 0 else None,
+         "configurable": True,
          # **不要在這裡寫 markdown** —— 這個字串是丟進 HTML 樣板顯示的，
          # 星號會原樣印出來（2026-08-27 使用者截圖抓到）。要強調就靠措辭。
-         "note": "目前沒有全域上限 —— 大小由反向代理與各工具自己的上限決定。"
-                 "直連本機埠時等於沒有限制。"},
+         "note": ("超過就直接回 413，body 一個位元組都不會讀。0 = 不限。"
+                  "這是最外層的粗篩，各工具仍有自己的上限。"
+                  "在下方「上傳大小」卡片調整。")
+                 if app_global > 0 else
+                 ("目前設為不限 —— 大小完全由反向代理與各工具自己的上限決定。"
+                  "直連本機埠時等於沒有限制。")},
         {"key": "ws_file", "label": "工作區單檔上限",
          "value_mb": max_file if max_file > 0 else None, "configurable": True,
          "note": "0 或 -1 = 不限。在「工作區設定」調整。"},

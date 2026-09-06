@@ -173,7 +173,7 @@ $('btnCompare').addEventListener('click', async () => {
   const llmCb = $('dfLlmSum');
   if (llmCb && llmCb.checked) fd.append('llm_summarize', '1');
   const r = await fuA.upload('/tools/doc-diff/compare', fd, {processingLabel: tr('比對中…')});
-  if (!r.ok) { $('status').textContent = tr('失敗：') + await r.text(); return; }
+  if (!r.ok) { $('status').textContent = await window.friendlyServerError(r, tr('失敗')); return; }
   const d = await r.json();
   $('status').textContent = tr('完成');
   renderResult(d);

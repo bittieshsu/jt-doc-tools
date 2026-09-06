@@ -351,8 +351,8 @@ async function handleUploadedFile(f) {
   const ext = (f.name || '').toLowerCase().split('.').pop();
   const officeExts = ['docx', 'doc', 'odt', 'ods', 'odp', 'rtf'];
   let parseLabel = tr('解析中…');
-  if (officeExts.includes(ext)) parseLabel = `${ENGINE} 解析中…`;
-  else if (ext === 'pdf') parseLabel = 'PyMuPDF 解析中…';
+  if (officeExts.includes(ext)) parseLabel = tr('{0} 解析中…').replace('{0}', ENGINE);
+  else if (ext === 'pdf') parseLabel = tr('{0} 解析中…').replace('{0}', 'PyMuPDF');
   const dropText = dropZone.querySelector('.td-drop-text');
   const orig = dropText.innerHTML;
   dropZone.classList.add('has-file');

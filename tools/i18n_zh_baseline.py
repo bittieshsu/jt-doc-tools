@@ -61,7 +61,8 @@ def _pages() -> list[str]:
     import app.main as app_main
     pages = ["/", "/my-jobs", "/workspace", "/login", "/search?q=pdf"]
     pages += [f"/tools/{t.metadata.id}/" for t in discover_tools()]
-    admin = sorted({r.path for r in app_main.app.routes
+    from route_index import iter_routes as _iter
+    admin = sorted({r.path for r in _iter(app_main.app)
                     if getattr(r, "path", "").startswith("/admin")
                     and "{" not in r.path
                     and "GET" in (getattr(r, "methods", None) or set())})

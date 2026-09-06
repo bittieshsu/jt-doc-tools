@@ -235,7 +235,7 @@ const fu = new FileUpload($('nupUpload'), async (_first, files) => {
   const fd = new FormData();
   for (const f of list) fd.append('files', f);
   const r = await fu.upload('/tools/pdf-nup/load', fd, {processingLabel: tr('載入頁面中…')});
-  if (!r.ok) { $('status').textContent = tr('上傳失敗：') + await r.text(); return; }
+  if (!r.ok) { $('status').textContent = await window.friendlyServerError(r, tr('上傳失敗')); return; }
   const d = await r.json();
   uploadId = d.upload_id;
   fileCount = d.file_count;
@@ -328,7 +328,7 @@ async function refreshPreview() {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(opts),
   });
-  if (!r.ok) { $('status').textContent = tr('預覽失敗：') + await r.text(); return; }
+  if (!r.ok) { $('status').textContent = await window.friendlyServerError(r, tr('預覽失敗')); return; }
   const blob = await r.blob();
   const url = URL.createObjectURL(blob);
   $('previewWrap').innerHTML = `<img src="${url}" alt="${tr('預覽')}">`;
@@ -352,7 +352,7 @@ $('btnGenerate').addEventListener('click', async () => {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(collectOpts()),
     });
-    if (!r.ok) { $('status').textContent = tr('失敗：') + await r.text(); return; }
+    if (!r.ok) { $('status').textContent = await window.friendlyServerError(r, tr('失敗')); return; }
     const d = await r.json();
     $('dlLink').href = d.url;
     $('doneBox').hidden = false;

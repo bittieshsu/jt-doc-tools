@@ -94,7 +94,8 @@ JS = """
 def _pages(base: str) -> list[str]:
     from app.main import app
     from app.tool_registry import discover_tools
-    admin = sorted({r.path for r in app.routes
+    from route_index import iter_routes as _iter
+    admin = sorted({r.path for r in _iter(app)
                     if getattr(r, "path", "").startswith("/admin")
                     and "GET" in getattr(r, "methods", set())
                     and "{" not in getattr(r, "path", "")})

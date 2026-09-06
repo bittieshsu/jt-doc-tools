@@ -610,7 +610,7 @@ const _OFFICE_EXTS = ['.docx', '.doc', '.odt', '.ods', '.odp', '.rtf'];
 function _engineLabelFor(filename) {
   const lower = (filename || '').toLowerCase();
   if (_OFFICE_EXTS.some(ext => lower.endsWith(ext))) {
-    return `${OFFICE_ENGINE} 解析中…`;
+    return tr('{0} 解析中…').replace('{0}', OFFICE_ENGINE);
   }
   if (lower.endsWith('.pdf')) return tr('PyMuPDF 解析中…');
   return tr('解析中…');
@@ -715,8 +715,9 @@ async function handleUploadedFile(f) {
   try {
     const r = await fetch('/tools/translate-doc/extract-text', {method:'POST', body: fd});
     if (!r.ok) {
-      const t = await r.text();
-      alert(tr('解析失敗：') + t);
+      // 直接把伺服器回應原樣秀出來的話，使用者看到的是
+      // `{"detail":"…"}` 這種原始 JSON（2026-09-06 使用者截圖回報）。
+      alert(await window.friendlyServerError(r, tr('解析失敗')));
       dropZone.classList.remove('has-file');
       dropText.innerHTML = origText;
       return;

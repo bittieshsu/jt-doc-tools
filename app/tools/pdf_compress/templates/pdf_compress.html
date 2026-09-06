@@ -317,7 +317,7 @@ $('btnCompress').addEventListener('click', async () => {
   }
   if (!r.ok) {
     _setBtnBusy(btn, false);
-    return alert(tr('送出失敗：') + await r.text());
+    return alert(await window.friendlyServerError(r, tr('送出失敗')));
   }
   const j = await r.json();
   jp.track(j.job_id);

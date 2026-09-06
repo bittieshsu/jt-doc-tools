@@ -24,6 +24,8 @@ import re
 
 import pytest
 
+from tools.route_index import iter_routes, assert_sane
+
 import sys as _sys, pathlib as _pathlib
 _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent.parent))
 from tools.repo_paths import public_root as _public_root
@@ -39,7 +41,8 @@ def _tool_api_paths() -> dict[str, set[str]]:
     from app.main import app
 
     out: dict[str, set[str]] = {}
-    for route in app.routes:
+    assert_sane(app)
+    for route in iter_routes(app):
         path = getattr(route, "path", "")
         m = re.match(r"^/tools/([a-z0-9-]+)/(api/[a-z0-9-{}_]+|convert)$", path)
         if m:

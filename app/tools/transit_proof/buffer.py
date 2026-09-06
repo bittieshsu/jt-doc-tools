@@ -1,7 +1,12 @@
-"""Per-user 乘車證明暫存清單（JSON 檔）。
+"""Per-user 乘車證明暫存清單（JSON 檔）＋ 原始證明檔。
 
 - 認證 ON：每個 user 一個檔 `<data_dir>/transit_proof_buffer/<key>.json`。
 - 認證 OFF：共用 `default.json`。
+- **原始 PDF**：`<data_dir>/transit_proof_files/<key>/<entry_id>.pdf`。
+  歸屬**由路徑結構決定** —— 取檔時只從「當前使用者自己的那個目錄」找，
+  所以 A 拿著 B 的 entry_id 也讀不到東西。這比事後檢查 ACL 難寫錯
+  （本專案在 fail-open 的 ACL 上吃過虧）。
+  檔案與 entry **在同一個鎖裡一起建立、一起刪除**，不會出現有紀錄沒檔案。
 - 去重：以 (transport, ticket_no) 或（無票號時）(transport,date,origin,destination,fare)。
 - 上限：每人 2000 筆（差旅報帳量級足夠）。
 """
@@ -45,6 +50,37 @@ def _get_lock(key: str) -> threading.Lock:
 def _buffer_dir() -> Path:
     from ...config import settings as app_settings
     return app_settings.data_dir / "transit_proof_buffer"
+
+
+def _files_dir(user: Optional[Any]) -> Path:
+    """這位使用者的原始證明目錄。**路徑由使用者身分算出，不吃任何請求參數。**"""
+    from ...config import settings as app_settings
+    return app_settings.data_dir / "transit_proof_files" / _user_key(user)
+
+
+def entry_file(user: Optional[Any], entry_id: str) -> Optional[Path]:
+    """取某一筆的原始證明（找不到回 None）。
+
+    `entry_id` 只當檔名用，呼叫端必須先驗過格式（十六進位 uuid）；
+    再加一層防呆：任何帶路徑分隔或 `..` 的一律拒絕。
+    """
+    if not entry_id or "/" in entry_id or "\\" in entry_id or ".." in entry_id:
+        return None
+    p = _files_dir(user) / f"{entry_id}.pdf"
+    return p if p.is_file() else None
+
+
+def _forget_files(user: Optional[Any], ids) -> None:
+    """刪掉這些 entry 的原始證明。**每一條刪除路徑都要走這裡** ——
+    漏掉一條就會留下永遠沒人清的孤兒檔（而且畫面上看不出來）。"""
+    d = _files_dir(user)
+    for i in ids:
+        if not i:
+            continue
+        try:
+            (d / f"{i}.pdf").unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _buffer_path(user: Optional[Any]) -> Path:

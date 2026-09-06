@@ -79,7 +79,7 @@ $('btnZip').addEventListener('click', async () => {
   fd.append('compression', $('comp').value);
   try {
     const r = await fu.upload('/tools/aes-zip/submit', fd, {processingLabel: tr('AES 加密中…')});
-    if (!r.ok) { $('status').textContent = tr('失敗：') + await r.text(); return; }
+    if (!r.ok) { $('status').textContent = await window.friendlyServerError(r, tr('失敗')); return; }
     const blob = await r.blob();
     // Extract filename from Content-Disposition
     const cd = r.headers.get('content-disposition') || '';
