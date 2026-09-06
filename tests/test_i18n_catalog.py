@@ -119,7 +119,7 @@ def test_the_helper_name_is_not_shadowed_by_loop_variables():
         s = p.read_text(encoding="utf-8")
         # 只看樣板語法，JS 裡的 `const tr = ...` 是另一個命名空間，不衝突
         if re.search(r"\{%\s*(for|set)\s+tr\b", s):
-            bad.append(str(p.relative_to(ROOT)))
+            bad.append(p.relative_to(ROOT).as_posix())
     assert bad == [], f"這些樣板拿 tr 當變數名，會蓋掉取字函式：{bad}"
 
 

@@ -1912,11 +1912,14 @@ function _restrictRemoveOverlay() {
     sel.innerHTML = '';
     j.groups.forEach(g => {
       const og = document.createElement('optgroup');
-      og.label = g.title;
+      // 只翻**顯示文字**（value 是 f.id，不受影響）。字型的真名沒有譯文，
+      // `tr()` 查不到會原樣回傳 —— 所以「標楷體（自動找系統最佳）」這種
+      // 帶說明的標籤會翻，使用者上傳的字型名稱不會被動到。
+      og.label = tr(g.title);
       g.fonts.forEach(f => {
         const opt = document.createElement('option');
         opt.value = f.id;
-        opt.textContent = f.label || f.family;
+        opt.textContent = tr(f.label || f.family);
         og.appendChild(opt);
       });
       sel.appendChild(og);

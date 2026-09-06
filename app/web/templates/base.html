@@ -666,7 +666,7 @@
           <a class="sb-item" href="{{ s.url }}" data-name="{{ s.name }} {{ s.description }} {{ s.keywords }}{% if ui_locale(request) != 'zh-Hant' %} {{ tr(s.name) }} {{ tr(s.description) }}{% endif %}">
             <span class="sb-item-icon">{{ icon(s.icon, size=18) }}</span>
             <span class="sb-item-text">
-              <span class="sb-item-name">{{ tr(s.name) }}</span>
+              <span class="sb-item-name">{{ tr(s.name)|ucfirst }}</span>
               <span class="sb-item-desc">{{ tr(s.description) }}</span>
             </span>
           </a>

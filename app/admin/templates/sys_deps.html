@@ -352,7 +352,7 @@
       const sec = Math.floor((Date.now() - startedAt) / 1000);
       tbody.innerHTML = '<tr><td colspan="5" data-s="sea8a9570">' +
         '<span class="dep-spinner" aria-hidden="true"></span>' +
-        '<span data-s="s044eb717">正在檢查系統相依套件…（已等 ' + sec + ' 秒，慢機器最多 60 秒）</span></td></tr>';
+        '<span data-s="s044eb717">' + tr('正在檢查系統相依套件…（已等 {0} 秒，慢機器最多 60 秒）').replace('{0}', sec) + '</span></td></tr>';
     };
     renderWaiting();
     const tickerId = setInterval(renderWaiting, 1000);

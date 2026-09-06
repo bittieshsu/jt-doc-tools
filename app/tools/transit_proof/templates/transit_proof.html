@@ -291,7 +291,7 @@
     const rows = sortedEntries();
     const body = $('tpBody'); body.textContent = '';
     rows.forEach((e, i) => {
-      const tr = document.createElement('tr');
+      const rowEl = document.createElement('tr');
       // 列選取 checkbox
       const tdSel = document.createElement('td'); tdSel.className = 'tp-selcol';
       const cb = document.createElement('input'); cb.type = 'checkbox';
@@ -299,10 +299,10 @@
       cb.addEventListener('change', () => {
         if (cb.checked) _selected.add(e.id); else _selected.delete(e.id);
         updateSelUI();
-        tr.classList.toggle('tp-row-sel', cb.checked);
+        rowEl.classList.toggle('tp-row-sel', cb.checked);
       });
-      tdSel.appendChild(cb); tr.appendChild(tdSel);
-      if (_selected.has(e.id)) tr.classList.add('tp-row-sel');
+      tdSel.appendChild(cb); rowEl.appendChild(tdSel);
+      if (_selected.has(e.id)) rowEl.classList.add('tp-row-sel');
       cols.forEach(c => {
         const td = document.createElement('td');
         if (c === 'seq') { td.textContent = String(i + 1); td.className = 'tp-num'; }
@@ -320,7 +320,7 @@
           inp.addEventListener('change', () => saveField(e.id, 'subject', inp.value));
           td.appendChild(inp);
         } else { td.textContent = cellValue(e, c); }
-        tr.appendChild(td);
+        rowEl.appendChild(td);
       });
       const tdAct = document.createElement('td');
       const del = document.createElement('button');
@@ -329,8 +329,8 @@
       if (icSrc && icSrc.firstElementChild) del.appendChild(icSrc.firstElementChild.cloneNode(true));
       else del.textContent = '✕';
       del.addEventListener('click', () => deleteEntry(e.id, e));
-      tdAct.appendChild(del); tr.appendChild(tdAct);
-      body.appendChild(tr);
+      tdAct.appendChild(del); rowEl.appendChild(tdAct);
+      body.appendChild(rowEl);
     });
 
     const foot = $('tpFoot'); foot.textContent = '';

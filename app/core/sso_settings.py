@@ -226,14 +226,23 @@ def base_url() -> str:
 
 
 def login_buttons() -> list[dict[str, str]]:
-    """Providers to render on the login page (enabled + minimally configured)."""
+    """Providers to render on the login page (enabled + minimally configured).
+
+    `is_default_label` 標示這個按鈕文字**還是出廠預設**。登入頁只在那種情況下
+    才把它翻成介面語言 —— 管理員自己填過的字是他的資料，任何語言都照他寫的顯示。
+    **設定頁的輸入框一律用原值**，否則英文介面按一次儲存就把設定換成英文了。
+    """
     out: list[dict[str, str]] = []
     o = _load()["oidc"]
     if o.get("enabled") and o.get("issuer") and o.get("client_id"):
         out.append({"provider": "oidc", "label": o.get("display_name") or "OIDC 登入",
+                    "is_default_label":
+                        (o.get("display_name") or "OIDC 登入") == "OIDC 登入",
                     "url": "/auth/oidc/login"})
     sm = _load()["saml"]
     if sm.get("enabled") and sm.get("idp_sso_url") and sm.get("idp_x509cert"):
         out.append({"provider": "saml", "label": sm.get("display_name") or "SAML 登入",
+                    "is_default_label":
+                        (sm.get("display_name") or "SAML 登入") == "SAML 登入",
                     "url": "/auth/saml/login"})
     return out

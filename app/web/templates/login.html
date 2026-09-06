@@ -113,7 +113,7 @@
     {% if sso_buttons %}
     <div class="login-sso-sep"><span>{{ tr('或') }}</span></div>
     {% for b in sso_buttons %}
-    <a class="login-sso-btn" href="{{ b.url }}?next={{ next|urlencode }}">{{ b.label }}</a>
+    <a class="login-sso-btn" href="{{ b.url }}?next={{ next|urlencode }}">{% if b.is_default_label %}{{ tr(b.label) }}{% else %}{{ b.label }}{% endif %}</a>
     {% endfor %}
     {% endif %}
 

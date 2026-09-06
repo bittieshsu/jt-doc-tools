@@ -48,15 +48,15 @@
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-act]');
   if (!btn) return;
-  const tr = btn.closest('tr');
-  const tid = tr.dataset.tid;
+  const rowEl = btn.closest('tr');
+  const tid = rowEl.dataset.tid;
   if (btn.dataset.act === 'delete') {
     if (!(await window.showConfirm(tr('確定刪除這個範本？'), { title: tr('刪除範本'), kind: 'danger', okText: tr('刪除') }))) return;
     const r = await fetch(`/admin/templates/${tid}/delete`, { method: 'POST' });
-    if (r.ok) tr.remove();
+    if (r.ok) rowEl.remove();
     else alert(tr('刪除失敗'));
   } else if (btn.dataset.act === 'rename') {
-    const name = tr.querySelector('.tname').value.trim();
+    const name = rowEl.querySelector('.tname').value.trim();
     if (!name) return;
     const r = await fetch(`/admin/templates/${tid}/rename`, {
       method: 'POST',

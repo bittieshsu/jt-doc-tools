@@ -591,7 +591,7 @@
     countEl.hidden = !jobs.length;
     jobs.forEach((j) => {
       const active = j.status === 'running' || j.status === 'pending';
-      const tr = el('tr', active ? 'is-active' : '');
+      const rowEl = el('tr', active ? 'is-active' : '');
 
       const tdTool = el('td');
       const cell = el('div', 'aj-tool-cell');
@@ -607,9 +607,9 @@
       });
       if (j.priority) cell.appendChild(el('span', 'aj-prio-tag', tr('優先')));
       tdTool.appendChild(cell);
-      tr.appendChild(tdTool);
+      rowEl.appendChild(tdTool);
 
-      tr.appendChild(el('td', 'aj-file', j.filename || '—'));
+      rowEl.appendChild(el('td', 'aj-file', j.filename || '—'));
 
       const tdOwner = el('td');
       const ownerLine = el('div', 'aj-owner');
@@ -625,7 +625,7 @@
       ownerLine.appendChild(el('span', null, j.owner || tr('（未登入）')));
       tdOwner.appendChild(ownerLine);
       if (j.client_ip) tdOwner.appendChild(el('div', 'aj-owner-ip', j.client_ip));
-      tr.appendChild(tdOwner);
+      rowEl.appendChild(tdOwner);
 
       const tdSt = el('td');
       tdSt.appendChild(el('span', 'aj-badge ' + j.status,
@@ -636,7 +636,7 @@
       if (j.status === 'error' && j.error) {
         tdSt.appendChild(el('div', 'aj-owner-ip', j.error));
       }
-      tr.appendChild(tdSt);
+      rowEl.appendChild(tdSt);
 
       // 資源用量：實測值（soffice 子行程的 RSS）優先；量不到才顯示估計值，
       // 而且明講是估計 —— 不要把猜的數字擺得像量到的。
@@ -652,13 +652,13 @@
       } else {
         tdUse.appendChild(el('span', 'aj-usage-est', '—'));
       }
-      tr.appendChild(tdUse);
+      rowEl.appendChild(tdUse);
 
       // 送出 / 開始 / 結束是三件事。作業會排隊，「排了半小時」跟「跑了半小時」
       // 處理方式完全不同 —— 只看耗時分不出來。
-      tr.appendChild(el('td', 'aj-time', fmtTime(j.started_at)));
-      tr.appendChild(el('td', 'aj-time', fmtTime(j.finished_at)));
-      tr.appendChild(el('td', 'aj-elapsed', fmtElapsed(j.elapsed)));
+      rowEl.appendChild(el('td', 'aj-time', fmtTime(j.started_at)));
+      rowEl.appendChild(el('td', 'aj-time', fmtTime(j.finished_at)));
+      rowEl.appendChild(el('td', 'aj-elapsed', fmtElapsed(j.elapsed)));
 
       const tdAct = el('td');
       if (active) {
@@ -670,8 +670,8 @@
         b.addEventListener('click', () => cancelJob(j.id, b));
         tdAct.appendChild(b);
       }
-      tr.appendChild(tdAct);
-      tbody.appendChild(tr);
+      rowEl.appendChild(tdAct);
+      tbody.appendChild(rowEl);
     });
     schedule(jobs.some((j) => j.status === 'running' || j.status === 'pending'));
   }

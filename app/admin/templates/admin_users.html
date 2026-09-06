@@ -1003,8 +1003,8 @@ document.getElementById('smRevokeAll').addEventListener('click', async () => {
 // ---------- row action dispatch ----------
 document.querySelectorAll('.user-table button').forEach(btn => {
   btn.addEventListener('click', async () => {
-    const tr = btn.closest('tr');
-    const uid = tr.dataset.uid;
+    const rowEl = btn.closest('tr');
+    const uid = rowEl.dataset.uid;
     const act = btn.dataset.act;
     if (act === 'delete') {
       if (!(await showConfirm(tr('確定刪除使用者「{0}」？所有 session 與權限指派一併移除。').replace('{0}', btn.dataset.username),
@@ -1016,7 +1016,7 @@ document.querySelectorAll('.user-table button').forEach(btn => {
         // 18,611 位），每刪一筆就重載一次 = 連刪十筆就重算十次，使用者看到的
         // 是「刪一個卡好久，多刪幾個像當機」（2026-08-27 客戶回報）。
         // 直接把那一列拿掉就好，數字用扣的。
-        tr.remove();
+        rowEl.remove();
         // 勾選數要跟著更新（那一列可能是勾起來的）。
         if (typeof syncBulk === 'function') syncBulk();
       } else {

@@ -25,7 +25,7 @@ class TestSettings:
         # get() masks the secret
         assert s.get()["oidc"]["client_secret_enc"] == s.SECRET_KEPT
         # on-disk value is NOT the plaintext
-        raw = (tmp_path / "sso.json").read_text()
+        raw = (tmp_path / "sso.json").read_text(encoding="utf-8")
         assert "supersecret" not in raw
         # reveal decrypts
         assert s.get_oidc(reveal=True)["client_secret"] == "supersecret"

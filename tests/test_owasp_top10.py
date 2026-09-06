@@ -35,7 +35,10 @@ def test_a01_path_traversal_blocked(admin_session):
     """safe_join must reject `..` escapes."""
     from app.core.safe_paths import safe_join
     from pathlib import Path
-    base = Path("/tmp/jtdt-safe-test")
+    # 寫死 `/tmp` 在 Windows 會變成 `\tmp\...`（WinError 3 找不到路徑），
+    # 這條資安守門就永遠跑不到 —— 而「跑不到」跟「擋住了」看起來一樣。
+    import tempfile
+    base = Path(tempfile.gettempdir()) / "jtdt-safe-test"
     base.mkdir(exist_ok=True)
     with pytest.raises(Exception):
         safe_join(base, "../../etc/passwd")

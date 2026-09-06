@@ -19,6 +19,21 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
+from tools.repo_paths import public_root as _public_root
+
+
+def _p(path: str) -> pathlib.Path:
+    """把 `github/xxx` 解析到**公開樹**，其餘維持 repo 根。
+
+    開發樹的公開檔在 `github/` 底下，clone 下來就在根目錄。寫死 `github/`
+    的話這幾條在公開版與正式機上一律 file not found —— 2026-09-06 在 `.30`
+    實跑時就是這樣紅的（外部評估修過 11 支，這兩支是漏網的）。
+    """
+    if path.startswith("github/"):
+        return _public_root(ROOT) / path[len("github/"):]
+    return ROOT / path
+
+
 #: 這些相依不需要出現在相依頁面：要嘛是別的套件的傳遞相依、要嘛缺了會直接
 #: 開不了機（開不了機就不需要用頁面告訴你缺什麼）。列在這裡是**明確決定**，
 #: 不是漏掉 —— 新增例外要在這裡寫清楚為什麼。
@@ -114,8 +129,8 @@ def test_smoke_import_lists_stay_in_sync(path, label):
         body = m.group(0).replace("import ", "").split(";")[0]
         return {x.strip() for x in body.split(",") if x.strip()}
 
-    mods = _mods((ROOT / path).read_text(encoding="utf-8"), f"{label}（{path}）")
-    ref = _mods((ROOT / "github/install.sh").read_text(encoding="utf-8"),
+    mods = _mods(_p(path).read_text(encoding="utf-8"), f"{label}（{path}）")
+    ref = _mods(_p("github/install.sh").read_text(encoding="utf-8"),
                 "install.sh")
     assert mods == ref, (
         f"{label} 的 import 煙霧清單跟 install.sh 不一致：\n"

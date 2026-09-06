@@ -19,7 +19,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.15.7"
+VERSION = "1.15.8"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -135,6 +135,19 @@ def _tpl_localiso(ts) -> str:
 
 templates.env.filters["localdt"] = _tpl_localdt
 templates.env.filters["localiso"] = _tpl_localiso
+
+
+def _tpl_ucfirst(s: str) -> str:
+    """導覽名稱一律**首字大寫** —— 語系檔的鍵是中文原文，同一個鍵在句子中間
+    也會被用到（「一個 key 可以對應多個 synonyms」），那裡小寫才對，
+    所以不能把譯文本身改成大寫。側欄是標題語境，在**渲染時**補這一層。
+
+    **對中文是無操作**（中文沒有大小寫），所以繁中輸出位元組完全不變。
+    """
+    return s[:1].upper() + s[1:] if s else s
+
+
+templates.env.filters["ucfirst"] = _tpl_ucfirst
 
 
 def _tpl_current_user(request) -> dict | None:

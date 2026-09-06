@@ -140,7 +140,7 @@ def test_retention_sweep(wsenv):
     d = ws._user_dir(req) / meta["file_id"]
     mf = d / "meta.json"
     import json
-    data = json.loads(mf.read_text())
+    data = json.loads(mf.read_text(encoding="utf-8"))
     data["saved_at"] = time.time() - 10 * 3600
     mf.write_text(json.dumps(data))
     # sweep entries older than 1 hour

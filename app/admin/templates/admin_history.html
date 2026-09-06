@@ -84,12 +84,12 @@
 const KIND = "{{ kind }}";
 document.querySelectorAll('[data-act="del"]').forEach(btn => {
   btn.addEventListener('click', async () => {
-    const tr = btn.closest('tr');
-    const hid = tr.dataset.hid;
+    const rowEl = btn.closest('tr');
+    const hid = rowEl.dataset.hid;
     if (!(await showConfirm(tr('確定刪除這筆？'),
           { title: tr('刪除'), kind: 'danger' }))) return;
     const r = await fetch(`/admin/history/${KIND}/${hid}/delete`, {method:'POST'});
-    if (r.ok) tr.remove();
+    if (r.ok) rowEl.remove();
     else showAlert(tr('刪除失敗：') + await r.text());
   });
 });

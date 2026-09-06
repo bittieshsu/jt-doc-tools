@@ -133,3 +133,33 @@ def test_update_syncs_the_add_remove_programs_version():
     assert "DisplayVersion" in fn and "winreg" in fn
     # 非 Windows 上必須直接 return，不可以丟例外（會讓 Linux 的升級整個失敗）
     cli._sync_windows_display_version("9.9.9")
+
+
+def test_setup_python_cmd_can_recover_from_a_leftover_venv():
+    """安裝被中斷過的機器要能自己裝回來。
+
+    `uv venv` 碰到既有的 `.venv` 會直接失敗（"A virtual environment already
+    exists"），所以**上一次安裝被中斷之後,每一次重裝都死在同一個地方** ——
+    2026-09-05 在 Win11 實機上重現：客戶端只能手動刪目錄，而錯誤訊息不會提。
+    """
+    cmd = (_public_root(ROOT) / "setup-python.cmd").read_text(encoding="utf-8")
+    assert "venv --clear" in cmd, (
+        "uv venv 少了 --clear —— 既有的 .venv 會讓每一次重裝都失敗")
+
+
+def test_setup_python_cmd_failure_guards_actually_exit():
+    """`( popd ^& exit /b 2 )` 在括號裡不成立 —— 守衛是死的。
+
+    caret 在括號內會被當字面字元，cmd 印一句「命令語法不正確」然後**繼續往下跑**。
+    實測結果：`uv venv` 失敗（exit 2）被吞掉，流程照樣進到 `uv sync`，然後以
+    0xC0000409 當掉 —— 真正的原因被一個看起來完全無關的當機蓋掉。
+    """
+    cmd = (_public_root(ROOT) / "setup-python.cmd").read_text(encoding="utf-8")
+    # **跳過註解** —— 說明裡引用「原本錯誤的寫法」當反例會誤報。這個專案的
+    # 守門已經因為「連說明一起掃」誤報過兩次，這裡不再犯第三次。
+    bad = [ln.strip() for ln in cmd.splitlines()
+           if "^&" in ln and "exit /b" in ln
+           and not ln.strip().upper().startswith("REM")]
+    assert not bad, (
+        "失敗守衛用了 `( ... ^& exit /b N )`，那不會結束批次檔：\n  "
+        + "\n  ".join(bad) + "\n請改成分行的 ( popd / exit /b N )")

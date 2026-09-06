@@ -306,7 +306,7 @@ function openRoles(tr) {
   const list = document.getElementById('rmList');
   list.innerHTML = ALL_ROLES.length
     ? ALL_ROLES.map(r => {
-        const id = r.id, name = r.display_name || r.id;
+        const id = r.id, name = r.display_label || r.display_name || r.id;
         return `<label class="picker-item" data-name="${escapeHtml(name)} ${escapeHtml(id)}" title="${escapeHtml(id)}">
           <input type="checkbox" data-rid="${escapeHtml(id)}" ${have.has(id)?'checked':''}>
           <span class="picker-name">${escapeHtml(name)}</span>
@@ -365,20 +365,20 @@ document.getElementById('mmSave').onclick = async () => {
 document.querySelectorAll('.grp-table button').forEach(btn => {
   btn.addEventListener('click', async () => {
     if (btn.classList.contains('grp-toggle')) return;  // 收折鈕另行處理
-    const tr = btn.closest('tr');
+    const rowEl = btn.closest('tr');
     const act = btn.dataset.act;
     if (act === 'delete') {
-      if (!(await showConfirm(tr('確定刪除群組「{0}」？此動作無法復原。').replace('{0}', tr.dataset.gname),
+      if (!(await showConfirm(tr('確定刪除群組「{0}」？此動作無法復原。').replace('{0}', rowEl.dataset.gname),
             { title: tr('刪除群組'), kind: 'danger', okText: tr('刪除') }))) return;
       const r = await fetch(`/admin/groups/${tr.dataset.gid}/delete`, {method:'POST'});
       if (r.ok) location.reload();
       else showAlert(tr('刪除失敗：') + await r.text());
     } else if (act === 'roles') {
-      openRoles(tr);
+      openRoles(rowEl);
     } else if (act === 'members') {
-      openMembers(tr);
+      openMembers(rowEl);
     } else if (act === 'dir-members') {
-      openDirMembers(tr);
+      openDirMembers(rowEl);
     }
   });
 });
@@ -403,20 +403,20 @@ document.querySelectorAll('.grp-table button').forEach(btn => {
 
   function recompute() {
     let cutoff = Infinity;  // 隱藏 depth > cutoff 的列；離開子樹時重設
-    for (const tr of rows) {
-      const d = parseInt(tr.dataset.depth || '0', 10);
+    for (const rowEl of rows) {
+      const d = parseInt(rowEl.dataset.depth || '0', 10);
       if (d <= cutoff) cutoff = Infinity;
       const hidden = d > cutoff;
-      tr.classList.toggle('grp-row-hidden', hidden);
-      const dn = tr.dataset.dn || '';
-      const btn = tr.querySelector('.grp-toggle');
+      rowEl.classList.toggle('grp-row-hidden', hidden);
+      const dn = rowEl.dataset.dn || '';
+      const btn = rowEl.querySelector('.grp-toggle');
       if (btn) {
         const isCol = !!dn && collapsed.has(dn);
         btn.textContent = isCol ? '▸' : '▾';  // ▸ / ▾
         btn.classList.toggle('is-collapsed', isCol);
         btn.setAttribute('aria-expanded', isCol ? 'false' : 'true');
       }
-      if (!hidden && tr.dataset.haschildren === '1' && dn && collapsed.has(dn)) {
+      if (!hidden && rowEl.dataset.haschildren === '1' && dn && collapsed.has(dn)) {
         cutoff = d;  // 此節點收折 → 隱藏其下所有更深的列
       }
     }
@@ -426,8 +426,8 @@ document.querySelectorAll('.grp-table button').forEach(btn => {
     const btn = e.target.closest('.grp-toggle');
     if (!btn || !table.contains(btn)) return;
     e.preventDefault();
-    const tr = btn.closest('tr');
-    const dn = tr && tr.dataset.dn;
+    const rowEl = btn.closest('tr');
+    const dn = rowEl && rowEl.dataset.dn;
     if (!dn) return;
     if (collapsed.has(dn)) collapsed.delete(dn); else collapsed.add(dn);
     saveSet(collapsed);

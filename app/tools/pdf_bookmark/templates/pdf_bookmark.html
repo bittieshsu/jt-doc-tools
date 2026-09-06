@@ -237,7 +237,7 @@
     const tb = $('bmRows');
     tb.textContent = '';
     items.forEach((it, idx) => {
-      const tr = document.createElement('tr');
+      const rowEl = document.createElement('tr');
 
       const tdLv = document.createElement('td');
       const wrap = document.createElement('span');
@@ -287,8 +287,8 @@
         mkBtn('↓', tr('下移'), () => move(idx, 1)),
         mkBtn('✕', tr('刪除'), () => { items.splice(idx, 1); renderRows(); }));
 
-      tr.append(tdLv, tdTitle, tdPg, tdAct);
-      tb.appendChild(tr);
+      rowEl.append(tdLv, tdTitle, tdPg, tdAct);
+      tb.appendChild(rowEl);
     });
     $('bmEmpty').hidden = items.length > 0;
     $('bmCount').textContent = String(items.length);

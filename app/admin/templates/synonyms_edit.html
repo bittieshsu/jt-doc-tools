@@ -52,13 +52,13 @@ const rowsEl = document.getElementById('rows');
 const statusEl = document.getElementById('status');
 
 function makeRow(key = '', syns = '') {
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
+  const rowEl = document.createElement('tr');
+  rowEl.innerHTML = `
     <td><input class="k" type="text" value="${esc(key)}" /></td>
     <td><textarea class="s" rows="1">${esc(syns)}</textarea></td>
     <td><button class="btn btn-small btn-danger" data-act="del" type="button">🗑</button></td>
   `;
-  return tr;
+  return rowEl;
 }
 
 document.getElementById('addRow').addEventListener('click', () => {
@@ -77,8 +77,8 @@ const saveBtnOriginalHTML = saveBtn.innerHTML;
 saveBtn.addEventListener('click', async () => {
   const rows = [];
   const seen = new Set();
-  for (const tr of rowsEl.querySelectorAll('tr')) {
-    const key = tr.querySelector('.k').value.trim();
+  for (const rowEl of rowsEl.querySelectorAll('tr')) {
+    const key = rowEl.querySelector('.k').value.trim();
     if (!key) continue;
     if (seen.has(key)) {
       statusEl.textContent = tr('key 重複：{0}').replace('{0}', key);
@@ -86,7 +86,7 @@ saveBtn.addEventListener('click', async () => {
       return;
     }
     seen.add(key);
-    rows.push({ key, synonyms: tr.querySelector('.s').value });
+    rows.push({ key, synonyms: rowEl.querySelector('.s').value });
   }
   saveBtn.disabled = true;
   saveBtn.innerHTML = '<span class="spinner"></span>儲存中…';

@@ -69,7 +69,7 @@ SCAN_EXEMPT = {
 def test_admin_routes_do_not_leak_exception_text():
     leaks = []
     files = [f for f in (list(ADMIN.rglob("*.py")) + list(WEB.rglob("*.py")))
-             if str(f.relative_to(ROOT)) not in SCAN_EXEMPT]
+             if f.relative_to(ROOT).as_posix() not in SCAN_EXEMPT]
     for f in files:
         for lineno, typ in _leaky_handlers(f):
             leaks.append(f"{f.relative_to(ROOT)}:{lineno}（except {typ}）")

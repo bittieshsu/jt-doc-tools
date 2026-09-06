@@ -122,3 +122,30 @@ def test_backfill_does_not_widen_narrowed_roles(legacy_install):
             "SELECT role_id FROM role_perms WHERE tool_id=?", (tool,))}
         want = {r["id"] for r in SEED_ROLES if tool in r["tools"]} - {"admin"}
         assert got == want, f"{tool} 補到的角色與 seed 定義不符：{got} vs {want}"
+
+
+def test_legacy_role_description_is_refreshed(legacy_install):
+    """舊安裝的內建角色說明要在升級時換成這一版的 —— 但**管理員改過的不動**。
+
+    `seed_builtin_roles()` 對既有角色只補新工具，說明從來沒更新過，於是
+    finance / sales / legal-sec 在所有既有安裝上顯示的都還是當初那段
+    **描述了它其實沒有的權限**的文字（那正是它被改掉的原因），而且不在語系檔裡、
+    英文介面翻不出來（2026-09-06 使用者截圖回報）。
+    """
+    from app.core import auth_db, roles
+
+    legacy = sorted(roles._LEGACY_DESCRIPTIONS["finance"])[0]
+    conn = auth_db.conn()
+    # ① 舊出廠值 → 應該被換掉
+    conn.execute("UPDATE roles SET description=? WHERE id='finance'", (legacy,))
+    # ② 管理員自己寫的 → 一個字都不可以動
+    conn.execute("UPDATE roles SET description=? WHERE id='sales'",
+                 ("本公司業務部專用，問陳經理",))
+    conn.commit()
+
+    roles.seed_builtin_roles()
+
+    got = {r["id"]: r["description"] for r in roles.list_roles()}
+    seeded = {r["id"]: r["description"] for r in roles.SEED_ROLES}
+    assert got["finance"] == seeded["finance"], "舊出廠說明沒有被更新"
+    assert got["sales"] == "本公司業務部專用，問陳經理", "管理員改過的說明被蓋掉了"

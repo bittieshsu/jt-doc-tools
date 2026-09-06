@@ -131,8 +131,12 @@ def test_dependency_is_declared_in_all_the_usual_places():
         "app/cli.py": "pillow_heif",
         "uv.lock": "pillow-heif",
     }
+    # `github/xxx` 要解析到公開樹 —— 開發樹在 `github/` 底下，clone 下來在根目錄
+    from tools.repo_paths import public_root
+    def _at(f):
+        return (public_root(root) / f[len("github/"):]) if f.startswith("github/") else (root / f)
     missing = [f for f, needle in checks.items()
-               if needle not in (root / f).read_text(encoding="utf-8")]
+               if needle not in _at(f).read_text(encoding="utf-8")]
     assert not missing, f"這些地方沒有宣告 pillow-heif：{missing}"
 
 

@@ -109,7 +109,7 @@ def _write_endpoints() -> list[tuple[str, str, list[str], str]]:
     """
     out = []
     for f in sorted(pathlib.Path("app").rglob("*.py")):
-        if any(str(f).startswith(d) for d in SKIP_DIRS):
+        if any(f.as_posix().startswith(d) for d in SKIP_DIRS):
             continue
         text = f.read_text(encoding="utf-8")
         if "router." not in text and "@app." not in text:
@@ -149,7 +149,7 @@ def _write_endpoints() -> list[tuple[str, str, list[str], str]]:
                         if f"{a.arg}.{n}" in body and n not in names:
                             names.append(n)
             if names:
-                out.append((str(f), node.name, names, body))
+                out.append((f.as_posix(), node.name, names, body))
     return out
 
 
@@ -254,7 +254,7 @@ def _conditional_acl_sites() -> list[tuple[str, str, str]]:
     """
     out = []
     for f in sorted(pathlib.Path("app").rglob("*.py")):
-        if any(str(f).startswith(d) for d in SKIP_DIRS):
+        if any(f.as_posix().startswith(d) for d in SKIP_DIRS):
             continue
         text = f.read_text(encoding="utf-8")
         if not _has_acl(text):
@@ -277,7 +277,7 @@ def _conditional_acl_sites() -> list[tuple[str, str, str]]:
                     continue
                 if _OK_COND.search(test_src):
                     continue
-                out.append((str(f), fn.name, test_src[:70]))
+                out.append((f.as_posix(), fn.name, test_src[:70]))
     return out
 
 
@@ -323,7 +323,7 @@ def test_acl_exceptions_are_never_swallowed():
     """ACL 呼叫不可以被 `try/except: pass` 包住 —— 那等於沒有檢查。"""
     bad = []
     for f in sorted(pathlib.Path("app").rglob("*.py")):
-        if any(str(f).startswith(d) for d in SKIP_DIRS):
+        if any(f.as_posix().startswith(d) for d in SKIP_DIRS):
             continue
         text = f.read_text(encoding="utf-8")
         if not _has_acl(text):
@@ -374,7 +374,7 @@ def test_ownership_check_is_not_reimplemented():
     """
     bad = []
     for f in sorted(pathlib.Path("app").rglob("*.py")):
-        if str(f) in _OWNERSHIP_HOME:
+        if f.as_posix() in _OWNERSHIP_HOME:
             continue
         text = f.read_text(encoding="utf-8")
         for i, line in enumerate(text.split("\n"), 1):

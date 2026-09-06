@@ -372,7 +372,7 @@ function loadSubject(s) {
   const lockedAttr = isLocked ? 'disabled' : '';
   roleList.innerHTML = ALL_ROLES.length
     ? ALL_ROLES.map(r => {
-        const id = r.id, name = r.display_name || r.id;
+        const id = r.id, name = r.display_label || r.display_name || r.id;
         return `<label class="picker-item" data-name="${escapeHtml(name)} ${escapeHtml(id)}" title="${escapeHtml(id)}">
           <input type="checkbox" data-rid="${escapeHtml(id)}" ${haveR.has(id)?'checked':''} ${lockedAttr}>
           <span class="picker-name">${escapeHtml(name)}</span>

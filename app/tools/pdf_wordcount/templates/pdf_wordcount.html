@@ -426,11 +426,11 @@ function renderMulti(r) {
   const tb = $('mRankingBody');
   tb.innerHTML = '';
   r.ranking.forEach((row, i) => {
-    const tr = document.createElement('tr');
-    tr.style.borderBottom = '1px solid #e2e8f0';
+    const rowEl = document.createElement('tr');
+    rowEl.style.borderBottom = '1px solid #e2e8f0';
     const rd = row.reading_min;
     const rdTxt = rd < 1 ? '<1 分' : (rd >= 60 ? (Math.floor(rd/60)+'時'+Math.round(rd%60)+'分') : (rd + tr(' 分')));
-    tr.innerHTML = `
+    rowEl.innerHTML = `
       <td data-s="s01015751">${i+1}</td>
       <td data-s="s607685be">${row.filename.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</td>
       <td data-s="sba95a9d8">${fmt(row.page_count)}</td>
@@ -440,7 +440,7 @@ function renderMulti(r) {
       <td data-s="sba95a9d8">${fmt(row.en_words)}</td>
       <td data-s="sba95a9d8">${rdTxt}</td>
     `;
-    tb.appendChild(tr);
+    tb.appendChild(rowEl);
   });
 }
 

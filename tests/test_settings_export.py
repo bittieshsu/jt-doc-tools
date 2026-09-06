@@ -94,8 +94,8 @@ def test_import_only_selected_category(data_dir, tmp_path):
     _write(data_dir, "llm_settings.json", {"model": "MUTATED"})
     # Import only 'auth' → auth restored, llm stays mutated.
     res = settings_export.import_from_zip(out, ["auth"])
-    assert json.loads((data_dir / "auth_settings.json").read_text())["backend"] == "local"
-    assert json.loads((data_dir / "llm_settings.json").read_text())["model"] == "MUTATED"
+    assert json.loads((data_dir / "auth_settings.json").read_text(encoding="utf-8"))["backend"] == "local"
+    assert json.loads((data_dir / "llm_settings.json").read_text(encoding="utf-8"))["model"] == "MUTATED"
     assert "auth" in res["restored_categories"]
     # A .bak of the overwritten auth_settings.json was made.
     assert any("auth_settings.json.bak." in b for b in res["backup_paths"])
@@ -310,7 +310,7 @@ def test_sso_secret_survives_machine_change(data_dir, tmp_path, monkeypatch):
     sso_settings._invalidate_cache()
     settings_export.import_from_zip(out, selected_ids=["sso"])
 
-    restored = json.loads((data_dir / "sso_settings.json").read_text())
+    restored = json.loads((data_dir / "sso_settings.json").read_text(encoding="utf-8"))
     assert settings_export._SSO_PLAINTEXT_KEY not in restored, "明文標記要移除"
     ct = restored["oidc"]["client_secret_enc"]
     assert ct != "s3cr3t-value", "落地時必須是密文，不可留明文"
@@ -336,7 +336,7 @@ def test_legacy_sso_backup_without_marker_is_left_alone(data_dir, tmp_path,
             "categories": [{"id": "sso", "label": "SSO"}],
             "entries_by_category": {"sso": ["data/sso_settings.json"]}}))
     settings_export.import_from_zip(out, selected_ids=["sso"])
-    got = json.loads((data_dir / "sso_settings.json").read_text())
+    got = json.loads((data_dir / "sso_settings.json").read_text(encoding="utf-8"))
     assert got["oidc"]["client_secret_enc"] == "gAAAAA-other-machine-ciphertext"
 
 

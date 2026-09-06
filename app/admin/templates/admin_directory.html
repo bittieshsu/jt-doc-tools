@@ -359,7 +359,7 @@ function setMode(mode) {
   document.querySelectorAll('.dir-mode-btn').forEach(b =>
     b.classList.toggle('is-active', b.dataset.mode === DIR_MODE));
   $('dirDetail').innerHTML = '<p class="muted">' + tr('← 從左側點一個項目') + '</p>';
-  if (DIR_MODE === 'all') { setHint('全部：完整目錄樹'); loadAllTree(); }
+  if (DIR_MODE === 'all') { setHint(tr('全部：完整目錄樹')); loadAllTree(); }
   else loadSelectedTree();
 }
 document.querySelectorAll('.dir-mode-btn').forEach(b =>
@@ -454,7 +454,7 @@ async function openOU(dn, name) {
   _ouUsers = j.users || []; _ouFilter = 'all';
   const roleChks = ALL_ROLES.map(role => {
     const rid = role.id, on = (j.ou_roles||[]).includes(rid);
-    return `<label class="dir-role-chk"><input type="checkbox" class="du-role" value="${esc(rid)}" ${on?'checked':''}> ${esc(role.display_name||rid)}</label>`;
+    return `<label class="dir-role-chk"><input type="checkbox" class="du-role" value="${esc(rid)}" ${on?'checked':''}> ${esc(role.display_label||role.display_name||rid)}</label>`;
   }).join('');
   const cnt = j.count || 0;
   // 有使用者才顯示篩選 / 搜尋 / 表格；0 人就給乾淨的空狀態，不擺一堆空鷹架。
@@ -470,10 +470,10 @@ async function openOU(dn, name) {
     `<div class="dir-roles-box">` +
       `<div class="dir-roles-title"><b>${tr('指派角色給此 OU')}</b> <span class="muted">${tr('（含子 OU 全部使用者登入時生效）')}</span></div>` +
       `<div class="dir-roles-chks">${roleChks}</div>` +
-      `<div class="dir-roles-actions"><button class="btn btn-primary btn-small" id="duSaveRoles" type="button">{{ icon('save', size=12) }} 儲存角色</button> <span class="muted" id="duRoleMsg"></span></div>` +
+      `<div class="dir-roles-actions"><button class="btn btn-primary btn-small" id="duSaveRoles" type="button">{{ icon('save', size=12) }} ${tr('儲存角色')}</button> <span class="muted" id="duRoleMsg"></span></div>` +
     `</div>` +
     `<div class="dir-users-head"><span class="dir-sec-title">${tr('此 OU 直屬使用者')}</span>` +
-      `<span class="dir-users-meta">共 ${cnt}${cnt > 0 ? `　·　已登入 ${j.local_count} / 未登入 ${j.not_local_count}` : ''}</span></div>` +
+      `<span class="dir-users-meta">${tr('共 {0}').replace('{0}', cnt)}${cnt > 0 ? `　·　${tr('已登入 {0} / 未登入 {1}').replace('{0}', j.local_count).replace('{1}', j.not_local_count)}` : ''}</span></div>` +
     usersBody;
   if (cnt > 0) {
     renderUsers();
@@ -523,7 +523,7 @@ function _roleChks(checked) {
   // 與 OU 那一區同一種寫法（esc 過的靜態 markup）
   return ALL_ROLES.map(role => {
     const rid = role.id, on = (checked || []).includes(rid);
-    return `<label class="dir-role-chk"><input type="checkbox" class="ud-role" value="${esc(rid)}" ${on?'checked':''}> ${esc(role.display_name||rid)}</label>`;
+    return `<label class="dir-role-chk"><input type="checkbox" class="ud-role" value="${esc(rid)}" ${on?'checked':''}> ${esc(role.display_label||role.display_name||rid)}</label>`;
   }).join('');
 }
 
@@ -639,7 +639,7 @@ async function openGroupRoles(dn) {
     $('grName').textContent = j.name || tr('群組角色');
     $('grChks').innerHTML = ALL_ROLES.map(role => {
       const rid = role.id, on = (j.roles || []).includes(rid);
-      return `<label class="dir-role-chk"><input type="checkbox" class="gr-role" value="${esc(rid)}" ${on?'checked':''}> ${esc(role.display_name||rid)}</label>`;
+      return `<label class="dir-role-chk"><input type="checkbox" class="gr-role" value="${esc(rid)}" ${on?'checked':''}> ${esc(role.display_label||role.display_name||rid)}</label>`;
     }).join('');
   } catch (e) {
     $('grChks').innerHTML = '<p class="dir-empty">✗ ' + esc(e.message) + '</p>';

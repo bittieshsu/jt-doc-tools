@@ -329,7 +329,7 @@ def test_every_csv_data_row_is_neutralised():
     root = pathlib.Path(__file__).resolve().parent.parent
     bad = []
     for f in sorted((root / "app").rglob("*.py")):
-        rel = str(f.relative_to(root))
+        rel = f.relative_to(root).as_posix()
         if rel in _ALLOWED:
             continue
         try:

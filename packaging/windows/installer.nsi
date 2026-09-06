@@ -41,6 +41,12 @@ ShowUninstDetails show
 !include "LogicLib.nsh"
 !include "Sections.nsh"
 !include "x64.nsh"
+!include "FileFunc.nsh"
+
+; 解除安裝模式的狀態（同一支執行檔靠 `/uninstall` 分流）
+Var UNMODE
+Var UN_PURGE
+Var UN_DIR
 
 ; ---- branding -------------------------------------------------------
 !define MUI_ICON   "assets\jtdt.ico"
@@ -48,24 +54,28 @@ ShowUninstDetails show
 !define MUI_ABORTWARNING
 
 ; ---- install pages --------------------------------------------------
+; 解除安裝模式（`setup.exe /uninstall`）走同一支執行檔，安裝那幾頁要跳過。
+; **為什麼不用 NSIS 內建的 uninstaller**：`WriteUninstaller` 會產生**第二個
+; 執行檔**，那一個也要簽章（SignPath 得做兩段式），而 2026-09-05 實測發現它
+; 根本沒被簽，解除安裝時 Windows 跳「發行者不明」。同一支 exe 只要簽一次。
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipWhenUninstalling
 !insertmacro MUI_PAGE_WELCOME
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipWhenUninstalling
 !insertmacro MUI_PAGE_LICENSE "..\..\LICENSE"
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipWhenUninstalling
 !insertmacro MUI_PAGE_COMPONENTS
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipWhenUninstalling
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 
 ; finish page: offer to open the web UI
+!define MUI_PAGE_CUSTOMFUNCTION_PRE FinishPagePre
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_TEXT "$(FINISH_OPEN)"
 !define MUI_FINISHPAGE_RUN_FUNCTION "OpenWebUI"
 !define MUI_FINISHPAGE_LINK "$(FINISH_LINK)"
 !define MUI_FINISHPAGE_LINK_LOCATION "${WEBSITE}"
 !insertmacro MUI_PAGE_FINISH
-
-; ---- uninstall pages ------------------------------------------------
-!define MUI_UNCONFIRMPAGE_TEXT_TOP "$(UNINST_TOP)"
-!insertmacro MUI_UNPAGE_CONFIRM
-!insertmacro MUI_UNPAGE_INSTFILES
 
 ; ---- languages (Traditional Chinese first, then English) ------------
 !insertmacro MUI_LANGUAGE "TradChinese"
@@ -112,6 +122,9 @@ SectionEnd
 ; Hidden section that performs the actual install once component choices
 ; are known. The '-' prefix hides it from the components list.
 Section "-DoInstall"
+  ${If} $UNMODE == "1"
+    Return
+  ${EndIf}
   SetDetailsPrint both
   ; System-level install: shortcuts go to the All Users start menu, not the
   ; current (elevating) user's. Without this, $SMPROGRAMS = the running user's
@@ -170,8 +183,18 @@ Section "-DoInstall"
   SetOutPath "$INSTDIR\packaging\windows"
   File "uninstall_core.ps1"
 
-  ; ---- write uninstaller + Add/Remove-Programs registry entry ----------
-  WriteUninstaller "$INSTDIR\uninstall.exe"
+  ; ---- 解除安裝用的是**這一支 setup.exe 自己**（不再產生第二個執行檔）----
+  ; 這樣只有一個二進位檔要簽章。原本的 `WriteUninstaller` 產出的 uninstall.exe
+  ; 沒有被 SignPath 簽到，解除安裝時 Windows 會跳「發行者不明」。
+  ; **不可以用 `CopyFiles`** —— 它走 shell 的 SHFileOperation，安裝程式在
+  ; session 0（服務工作階段、無桌面）跑的時候會直接卡住不返回（2026-09-05
+  ; 實測：安裝核心已經跑完，NSIS 行程還掛在那裡不結束）。用純 Win32 的
+  ; CopyFile 就沒有這個問題。
+  System::Call 'kernel32::CopyFile(t "$EXEPATH", t "$INSTDIR\${SHORTNAME}-setup.exe", i 0) i .r0'
+
+  ; 從舊版（會產生 uninstall.exe 的那種）升上來時，把那支殘留的清掉 ——
+  ; 它已經沒有人指向它了，留著只是一支沒簽章、按了會出事的執行檔。
+  Delete "$INSTDIR\uninstall.exe"
 
   WriteRegStr   HKLM "${ARP_KEY}" "DisplayName"     "${APPNAME}"
   WriteRegStr   HKLM "${ARP_KEY}" "DisplayVersion"  "${VERSION}"
@@ -179,19 +202,17 @@ Section "-DoInstall"
   WriteRegStr   HKLM "${ARP_KEY}" "URLInfoAbout"    "${WEBSITE}"
   WriteRegStr   HKLM "${ARP_KEY}" "HelpLink"        "${REPOURL}"
   WriteRegStr   HKLM "${ARP_KEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr   HKLM "${ARP_KEY}" "DisplayIcon"     "$INSTDIR\uninstall.exe"
-  WriteRegStr   HKLM "${ARP_KEY}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
-  ; Silent uninstall runs in-place (_?=) -- NSIS's auto-relaunch-to-temp does NOT
-  ; forward /S, so in-place is the reliable way to run the section silently. The
-  ; section schedules a detached cleanup to remove the locked uninstall.exe + dir.
-  WriteRegStr   HKLM "${ARP_KEY}" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S _?=$INSTDIR"
+  WriteRegStr   HKLM "${ARP_KEY}" "DisplayIcon"     "$INSTDIR\${SHORTNAME}-setup.exe"
+  WriteRegStr   HKLM "${ARP_KEY}" "UninstallString" "$\"$INSTDIR\${SHORTNAME}-setup.exe$\" /uninstall"
+  ; 無介面解除安裝：`/S` 交給同一支處理，它自己會先複製到 %TEMP% 再回頭刪目錄。
+  WriteRegStr   HKLM "${ARP_KEY}" "QuietUninstallString" "$\"$INSTDIR\${SHORTNAME}-setup.exe$\" /S /uninstall"
   WriteRegDWORD HKLM "${ARP_KEY}" "NoModify" 1
   WriteRegDWORD HKLM "${ARP_KEY}" "NoRepair" 1
 
   ; Start menu shortcut (browser link to the local UI).
   CreateDirectory "$SMPROGRAMS\${APPNAME}"
   CreateShortcut  "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "http://127.0.0.1:8765/" "" "$INSTDIR\packaging\windows\assets\jtdt.ico"
-  CreateShortcut  "$SMPROGRAMS\${APPNAME}\解除安裝 Uninstall.lnk" "$INSTDIR\uninstall.exe"
+  CreateShortcut  "$SMPROGRAMS\${APPNAME}\解除安裝 Uninstall.lnk" "$INSTDIR\${SHORTNAME}-setup.exe" "/uninstall"
 SectionEnd
 
 ; ---- component descriptions ----------------------------------------
@@ -212,79 +233,149 @@ Function .onInit
     MessageBox MB_ICONSTOP "32-bit Windows is not supported."
     Abort
   ${EndIf}
+  SetRegView 64
+
+  ; ---- `/uninstall` → 走解除安裝流程（同一支執行檔）--------------------
+  StrCpy $UNMODE "0"
+  StrCpy $UN_PURGE "0"
+  ${GetParameters} $R0
+  ClearErrors
+  ${GetOptions} $R0 "/uninstall" $R1
+  ${IfNot} ${Errors}
+    StrCpy $UNMODE "1"
+  ${EndIf}
+
+  ${If} $UNMODE == "1"
+    ; 安裝目錄：`/instdir=` 指定（從 %TEMP% 重跑時），否則就是自己所在的目錄
+    ClearErrors
+    ${GetOptions} $R0 "/instdir=" $R2
+    ${If} ${Errors}
+      StrCpy $UN_DIR "$EXEDIR"
+    ${Else}
+      StrCpy $UN_DIR $R2
+    ${EndIf}
+
+    ; **不能站在要刪的目錄裡刪自己**。還沒搬到 %TEMP% 的話，先複製過去再重跑
+    ; ——這正是 NSIS 內建 uninstaller 用 `_?=` 在做的事，我們自己做一次。
+    ClearErrors
+    ${GetOptions} $R0 "/fromtemp" $R3
+    ${If} ${Errors}
+      StrCpy $R4 "$TEMP\jtdt-uninstall-$${VERSION}.exe"
+      System::Call 'kernel32::CopyFile(t "$EXEPATH", t "$R4", i 0) i .r0'   ; 同上：不走 shell
+      IfFileExists "$R4" 0 un_no_copy
+        ${If} ${Silent}
+          Exec '"$R4" /S /uninstall /fromtemp /instdir="$UN_DIR"'
+        ${Else}
+          Exec '"$R4" /uninstall /fromtemp /instdir="$UN_DIR"'
+        ${EndIf}
+        Quit
+      un_no_copy:
+    ${EndIf}
+
+    ; 要不要一併刪掉使用者資料。`/SD IDNO`：無介面模式預設**保留**。
+    MessageBox MB_YESNO|MB_ICONQUESTION \
+      "是否一併刪除使用者資料（銀行帳號、簽名、歷史記錄）？$\r$\n$\r$\n選「否」會保留資料，下次重新安裝可沿用。" \
+      /SD IDNO IDYES un_purge_yes IDNO un_purge_done
+    un_purge_yes:
+      StrCpy $UN_PURGE "1"
+    un_purge_done:
+    Return          ; 解除安裝不需要選語言 / 元件
+  ${EndIf}
+
   !insertmacro MUI_LANGDLL_DISPLAY
 FunctionEnd
 
 ; =====================================================================
-;  Uninstaller
+;  解除安裝 —— **同一支執行檔**，用 `/uninstall` 分流
+;
+;  原本是 NSIS 的 `WriteUninstaller`，那會產生**第二個執行檔**。兩個問題：
+;    1. 兩個都要簽章（SignPath 要做兩段式：先產 uninstaller → 簽 → 再包進
+;       installer → 簽）。2026-09-05 實測發現 uninstall.exe 根本是 NotSigned，
+;       解除安裝時 Windows 跳「發行者不明」。
+;    2. 多一個要維護、要驗證的產物。
+;
+;  改成同一支之後只剩一個二進位檔要簽。做法跟 Chrome / VS Code 一樣：把
+;  setup.exe 複製進 $INSTDIR，`UninstallString` 指向它加 `/uninstall`。
 ; =====================================================================
-Var /GLOBAL UN_PURGE
 
-Function un.onInit
-  SetRegView 64
-  ; Ask whether to also delete user data. /SD IDNO => silent mode
-  ; (QuietUninstallString uses "/S _?=$INSTDIR") defaults to KEEPING data.
-  StrCpy $UN_PURGE "0"
-  MessageBox MB_YESNO|MB_ICONQUESTION \
-    "是否一併刪除使用者資料（銀行帳號、簽名、歷史記錄）？$\r$\n$\r$\n選「否」會保留資料，下次重新安裝可沿用。" \
-    /SD IDNO IDYES un_purge_yes IDNO un_purge_done
-  un_purge_yes:
-    StrCpy $UN_PURGE "1"
-  un_purge_done:
+;; 解除安裝模式時跳過安裝用的頁面。
+Function SkipWhenUninstalling
+  ${If} $UNMODE == "1"
+    Abort
+  ${EndIf}
 FunctionEnd
 
-Section "Uninstall"
+;; 完成頁：解除安裝模式不要顯示「開啟網頁介面」。
+Function FinishPagePre
+  ${If} $UNMODE == "1"
+    ; 服務已經移除了，開網頁只會得到連不上
+    SendMessage $mui.FinishPage.Run ${BM_SETCHECK} 0 0
+    ShowWindow $mui.FinishPage.Run 0
+    ShowWindow $mui.FinishPage.Link 0
+  ${EndIf}
+FunctionEnd
+
+Section "-DoUninstall"
+  ${If} $UNMODE != "1"
+    Return
+  ${EndIf}
+  ; **拿一個半截的路徑去 RMDir /r 是災難**（`C:\Program Files\x` 被空白截斷成
+  ; `C:\Program`）。動手刪之前先確認那真的是我們的安裝目錄。
+  ${If} $UN_DIR == ""
+    MessageBox MB_ICONSTOP "找不到安裝目錄，已中止解除安裝。"
+    Abort
+  ${EndIf}
+  IfFileExists "$UN_DIR\packaging\windows\uninstall_core.ps1" un_dir_ok 0
+  IfFileExists "$UN_DIR\${SHORTNAME}-setup.exe" un_dir_ok 0
+    MessageBox MB_ICONSTOP "$UN_DIR 看起來不是 ${SHORTNAME} 的安裝目錄，已中止解除安裝。"
+    Abort
+  un_dir_ok:
   SetDetailsPrint both
   SetRegView 64
-  SetShellVarContext all   ; match the install context for shortcut removal
+  SetShellVarContext all   ; 要跟安裝時同一個情境，捷徑才刪得掉
 
-  ; --- breadcrumb (diagnostic): record what the uninstaller actually does ---
+  ; --- 診斷用的麵包屑：記錄解除安裝實際做了什麼 ---
   CreateDirectory "$APPDATA\${SHORTNAME}\Logs"
   FileOpen $4 "$APPDATA\${SHORTNAME}\Logs\nsis-uninstall.marker" w
-  FileWrite $4 "uninstall section reached$\r$\nINSTDIR=$INSTDIR$\r$\n"
+  FileWrite $4 "uninstall section reached$\r$\nUN_DIR=$UN_DIR$\r$\n"
 
-  ; Run the uninstall core (stop service, firewall, PATH, optional purge).
   StrCpy $0 ""
   ${If} $UN_PURGE == "1"
     StrCpy $0 " -PurgeData"
   ${EndIf}
 
-  ; 64-bit PowerShell via Sysnative (same rationale as install -- native registry
-  ; / service / firewall view from a 32-bit uninstaller, x64 + ARM64).
+  ; 64 位元的 PowerShell 走 Sysnative（理由同安裝那段：這支是 32 位元行程，
+  ; 直接叫 powershell.exe 拿到的是 WOW64 那個，登錄檔與服務的視圖是被轉向的）
   StrCpy $2 "powershell.exe"
   IfFileExists "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" 0 +2
     StrCpy $2 "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
   FileWrite $4 "psexe=$2$\r$\n"
 
-  IfFileExists "$INSTDIR\packaging\windows\uninstall_core.ps1" core_found core_missing
+  IfFileExists "$UN_DIR\packaging\windows\uninstall_core.ps1" core_found core_missing
   core_found:
     FileWrite $4 "uninstall_core.ps1 found, running ...$\r$\n"
     DetailPrint "Running uninstall core ..."
-    nsExec::ExecToLog '"$2" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\packaging\windows\uninstall_core.ps1" -InstallDir "$INSTDIR"$0'
+    nsExec::ExecToLog '"$2" -NoProfile -ExecutionPolicy Bypass -File "$UN_DIR\packaging\windows\uninstall_core.ps1" -InstallDir "$UN_DIR"$0'
     Pop $1
     FileWrite $4 "nsExec exit=$1$\r$\n"
     Goto skip_uncore
   core_missing:
-    FileWrite $4 "uninstall_core.ps1 NOT FOUND at $INSTDIR\packaging\windows$\r$\n"
+    FileWrite $4 "uninstall_core.ps1 NOT FOUND at $UN_DIR\packaging\windows$\r$\n"
   skip_uncore:
   FileClose $4
 
-  ; Remove program files. /REBOOTOK schedules locked files for deletion on
-  ; next boot (e.g. a .venv file still briefly held).
-  RMDir /r /REBOOTOK "$INSTDIR"
+  ; 移除程式檔。/REBOOTOK：鎖住的檔案排到下次開機刪（例如 .venv 裡還被短暫持有的）
+  RMDir /r /REBOOTOK "$UN_DIR"
 
-  ; Start menu + registry cleanup.
   Delete "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"
   Delete "$SMPROGRAMS\${APPNAME}\解除安裝 Uninstall.lnk"
   RMDir  "$SMPROGRAMS\${APPNAME}"
   DeleteRegKey HKLM "${ARP_KEY}"
 
-  ; When run in-place (silent _?= mode) uninstall.exe is locked and $INSTDIR
-  ; survives RMDir. Schedule a detached cmd that waits ~2s for us to exit, then
-  ; removes the leftover. No-op when the interactive auto-relaunch already wiped
-  ; $INSTDIR. (Windows self-delete idiom, see CLAUDE.md.)
-  IfFileExists "$INSTDIR\uninstall.exe" 0 +2
-    Exec 'cmd /c ping -n 3 127.0.0.1 >nul & rmdir /s /q "$INSTDIR"'
+  ; 我們是從 %TEMP% 的副本跑的，所以 $UN_DIR 可以整個刪掉；萬一還有殘留
+  ; （檔案被鎖），排一個脫離的 cmd 等我們結束後再清。
+  IfFileExists "$UN_DIR\*.*" 0 +2
+    Exec 'cmd /c ping -n 3 127.0.0.1 >nul & rmdir /s /q "$UN_DIR"'
 
   ${If} $UN_PURGE == "1"
     DetailPrint "User data purged."

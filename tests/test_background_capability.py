@@ -76,5 +76,5 @@ def test_hint_is_not_duplicated_in_individual_tools():
     for f in pathlib.Path("app/tools").rglob("*.html"):
         t = f.read_text(encoding="utf-8")
         if "可以關掉這一頁" in t or "可以關掉這頁" in t:
-            dupes.append(str(f))
+            dupes.append(f.as_posix())
     assert not dupes, f"這些工具自己又寫了一次提示：{dupes}"

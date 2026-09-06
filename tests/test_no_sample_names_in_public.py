@@ -54,7 +54,7 @@ def _public_files():
             continue
         if "__pycache__" in p.parts or ".git" in p.parts:
             continue
-        out.append(str(p.relative_to(root)))
+        out.append(p.relative_to(root).as_posix())
     return sorted(out)
 
 

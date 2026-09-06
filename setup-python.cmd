@@ -44,10 +44,23 @@ echo [debug] uv python install exit=!ERRORLEVEL!
 
 echo ==^> Creating venv via uv venv ...
 pushd "%INSTALL_DIR%"
-"%UV_EXE%" venv --python 3.12 .venv
+REM --clear: a leftover .venv (interrupted install, older layout) makes
+REM `uv venv` fail outright with "A virtual environment already exists",
+REM so every later attempt dies the same way and the machine can never
+REM heal itself. Measured 2026-09-05 on a Win11 box whose install was
+REM interrupted mid-sync. Recreating is cheap; uv re-links from its cache.
+"%UV_EXE%" venv --clear --python 3.12 .venv
 set VENV_RC=!ERRORLEVEL!
 echo [debug] uv venv exit=!VENV_RC!
-if not !VENV_RC! equ 0 ( popd ^& exit /b 2 )
+REM NOTE: `( popd ^& exit /b 2 )` does NOT work -- inside parentheses the
+REM caret is taken literally, cmd prints "the syntax of the command is
+REM incorrect" and CARRIES ON. The failure guard was therefore dead: a
+REM broken venv fell through to `uv sync`, which then crashed with
+REM 0xC0000409. Use separate statements.
+if not !VENV_RC! equ 0 (
+  popd
+  exit /b 2
+)
 
 echo ==^> Installing dependencies via uv sync ...
 REM Don't pass --python here. With --python uv may pick the BASE managed Python
@@ -59,7 +72,10 @@ REM Python with editable install).
 "%UV_EXE%" sync --reinstall
 set SYNC_RC=!ERRORLEVEL!
 echo [debug] uv sync exit=!SYNC_RC!
-if not !SYNC_RC! equ 0 ( popd ^& exit /b 3 )
+if not !SYNC_RC! equ 0 (
+  popd
+  exit /b 3
+)
 popd
 
 echo ==^> Verifying critical imports ...

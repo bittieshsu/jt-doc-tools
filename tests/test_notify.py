@@ -267,7 +267,7 @@ def test_secrets_survive_machine_change(_data_dir, monkeypatch):
     se.import_from_zip(out, selected_ids=["notify"])
     ns.invalidate_cache()
 
-    on_disk = json.loads((_data_dir / "notify_settings.json").read_text())
+    on_disk = json.loads((_data_dir / "notify_settings.json").read_text(encoding="utf-8"))
     ct = on_disk["channels"]["telegram"]["telegram_token"]
     assert ct != "tok-from-machine-A", "落地時必須是密文"
     assert ns.get(reveal=True)["channels"]["telegram"]["telegram_token"] \

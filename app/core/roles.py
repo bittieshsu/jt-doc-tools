@@ -198,6 +198,16 @@ def seed_builtin_roles() -> None:
                 # else: no snapshot yet → bootstrap, add nothing this run.
                 # Refresh the snapshot to this release's seed definition either
                 # way, so the next upgrade diffs against the right baseline.
+                # 說明如果還是**以前出廠的那一段**就換成這一版的（見
+                # `_LEGACY_DESCRIPTIONS`）。管理員改過的不動。
+                legacy = _LEGACY_DESCRIPTIONS.get(r["id"])
+                if legacy:
+                    cur_desc = conn.execute(
+                        "SELECT description FROM roles WHERE id=?",
+                        (r["id"],)).fetchone()
+                    if cur_desc and cur_desc["description"] in legacy:
+                        conn.execute("UPDATE roles SET description=? WHERE id=?",
+                                     (r["description"], r["id"]))
                 conn.execute("DELETE FROM role_seed_snapshot WHERE role_id=?",
                              (r["id"],))
                 for tool_id in seed_tools:
@@ -506,6 +516,51 @@ def get(role_id: str) -> Optional[dict]:
         if r["id"] == role_id:
             return r
     return None
+
+
+#: **以前出廠過**的說明字串。`seed_builtin_roles()` 只做 INSERT OR IGNORE，
+#: 所以說明在既有安裝裡永遠停在當初那一版 —— 而 finance / sales / legal-sec
+#: 這三段當初正是**因為描述了角色其實沒有的權限**才被改掉的（見 SEED_ROLES 的
+#: 註解）。管理員在指派角色時讀到的是錯的說明，而且那些字串不在語系檔裡，
+#: 英文介面下也翻不出來（2026-09-06 使用者截圖回報）。
+#:
+#: **只有值還完全等於某個舊出廠值時才更新** —— 管理員自己改過的說明是他的資料。
+_LEGACY_DESCRIPTIONS: dict[str, set[str]] = {
+    "finance": {"一般使用者 + 表單填寫 / 用印與簽名 / 浮水印 / 加密 / 去識別化"},
+    "sales": {"一般使用者 + 表單填寫 / 用印與簽名 / 浮水印 / 去識別化"},
+    "legal-sec": {"一般使用者 + 去識別化 / 隱藏掃描 / Metadata / 差異比對 / 加密解密"},
+}
+
+#: 內建角色的**出廠**名稱與說明。判斷「這個角色有沒有被管理員改過名字」用。
+_SEED_DISPLAY = {r["id"]: r["display_name"] for r in SEED_ROLES}
+_SEED_DESC = {r["id"]: r["description"] for r in SEED_ROLES}
+
+
+def localize_for_display(rows: list[dict], tr) -> list[dict]:
+    """替每個角色補上**顯示用**的 `display_label` / `description_label`。
+
+    判準是「**現在的值還等於出廠預設**」，不是「is_builtin」——因為四個內建
+    角色（文管 / 財務 / 業務 / 法務資安）`is_protected=False`，**管理員可以改
+    名字**。改過就是他的資料，任何語言都要照他寫的顯示；照 `is_builtin` 翻的話
+    會把「會計部」變回「Finance」，那是把使用者的資料蓋掉。
+
+    原本的 `display_name` / `description` **原封不動**：編輯表單一律用原值，
+    否則英文介面下按一次儲存，資料庫裡的中文名稱就變成英文了
+    （同 CLAUDE.md 記過的「`title:` 在別的地方是資料不是顯示文字」）。
+    """
+    out = []
+    for r in rows:
+        r = dict(r)
+        rid = r.get("id")
+        name, desc = r.get("display_name", ""), r.get("description", "")
+        # **另外附欄位，不覆寫原值** —— 角色管理頁的重新命名表單要用原值，
+        # 覆寫的話英文介面按一次儲存就把資料庫裡的中文名稱換成英文了。
+        r["display_label"] = (tr(name) if rid in _SEED_DISPLAY
+                              and name == _SEED_DISPLAY[rid] else name)
+        r["description_label"] = (tr(desc) if rid in _SEED_DESC
+                                  and desc == _SEED_DESC[rid] else desc)
+        out.append(r)
+    return out
 
 
 def create(role_id: str, display_name: str, description: str = "",

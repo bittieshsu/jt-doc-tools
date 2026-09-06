@@ -19,7 +19,19 @@ from ..core import (audit_db, audit_forward, auth_db, auth_settings,
                     group_manager, permissions, roles, sso_settings,
                     user_manager)
 from ..core import db
+from ..core.i18n import translate as _translate
+from ..core.ui_locale import resolve as _resolve_locale
 from ..core import sessions as _ss
+
+def _roles_for_display(request, rows):
+    """角色清單加上顯示用的 `display_label` / `description_label`。
+
+    只給畫面看；`display_name` / `description` 保持原值給編輯表單用。
+    """
+    loc = _resolve_locale(request)
+    return roles.localize_for_display(rows, lambda s: _translate(s, loc))
+
+
 
 
 def _all_tool_ids() -> list[str]:
@@ -465,7 +477,7 @@ def build_auth_router(templates) -> APIRouter:
         from ..core import directory_cleanup as _dcl
         actionable = {v: len(_dcl.candidates(v))
                       for v in ("missing", "dir_disabled")}
-        all_roles = roles.list_roles()
+        all_roles = _roles_for_display(request, roles.list_roles())
         # Lightweight group list for the edit-modal picker: id/name/source only,
         # NOT list_groups() (which carries per-group member_ids arrays — those
         # bloated the page to the point of OOM and the picker never used them).
@@ -966,7 +978,7 @@ def build_auth_router(templates) -> APIRouter:
              "display_name": u["display_name"], "source": u["source"]}
             for u in user_manager.list_users(view="active")
         ]
-        all_roles = roles.list_roles()
+        all_roles = _roles_for_display(request, roles.list_roles())
         backend = (auth_settings.get() or {}).get("backend", "off")
         return templates.TemplateResponse(request, "admin_groups.html", {
             "request": request,
@@ -1200,7 +1212,7 @@ def build_auth_router(templates) -> APIRouter:
             "request": request,
             "auth_backend": backend,
             "is_directory_backend": backend in ("ldap", "ad"),
-            "all_roles": _roles.list_roles(),
+            "all_roles": _roles_for_display(request, _roles.list_roles()),
             "dir_default_mode": flt["default_mode"],
             "dir_rules": flt["rules"],
         })
@@ -1488,7 +1500,7 @@ def build_auth_router(templates) -> APIRouter:
 
     @router.get("/roles", response_class=HTMLResponse)
     async def roles_page(request: Request):
-        all_roles = roles.list_roles()
+        all_roles = _roles_for_display(request, roles.list_roles())
         # tool registry: id + display name
         tools_meta = [{"id": tid, "name": _tool_name(tid)} for tid in _all_tool_ids()]
         return templates.TemplateResponse(request, "admin_roles.html", {
@@ -1568,7 +1580,7 @@ def build_auth_router(templates) -> APIRouter:
     async def permissions_page(request: Request):
         users = user_manager.list_users()
         groups = group_manager.list_groups()
-        all_roles = roles.list_roles()
+        all_roles = _roles_for_display(request, roles.list_roles())
         # Subjects shown in matrix: users + groups (OUs only when LDAP/AD active
         # and admin has set per-OU rules — TBD via M3).
         subjects = []

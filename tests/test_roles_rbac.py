@@ -197,3 +197,45 @@ def test_admin_role_has_no_explicit_tools():
 def test_auditor_has_no_tools():
     """稽核員是唯讀角色，不可以有任何工具權限（職責分離）。"""
     assert _by_id()["auditor"]["tools"] == []
+
+
+def test_legacy_builtin_descriptions_get_refreshed_on_upgrade():
+    """升級時要把**以前出廠的**內建角色說明換成這一版的。
+
+    `seed_builtin_roles()` 對既有角色只做「補新工具」，**說明從來沒有被更新**
+    —— 於是 finance / sales / legal-sec 三個角色在所有既有安裝上，
+    顯示的還是當初那段**描述了它其實沒有的權限**的文字（那正是它被改掉的原因）。
+    管理員指派角色時讀到的是錯的，而且那些字串不在語系檔裡，英文介面也翻不出來
+    （2026-09-06 使用者截圖回報）。
+
+    **管理員自己改過的說明不可以被蓋掉** —— 只有值還完全等於某個舊出廠值時才換。
+    """
+    from app.core import roles as _r
+    seeded = {x["id"]: x["description"] for x in _r.SEED_ROLES}
+    for rid, legacy_set in _r._LEGACY_DESCRIPTIONS.items():
+        assert rid in seeded, f"{rid} 不在 SEED_ROLES 裡"
+        assert seeded[rid] not in legacy_set, (
+            f"{rid} 的舊說明跟現在的種子值一樣，那條 legacy 記錄該移除了")
+
+    # 真的有沒有換掉是行為問題，用一份「舊安裝」的資料庫驗
+    # （`tests/test_seed_bootstrap_gap.py::test_legacy_role_description_is_refreshed`）。
+
+
+def test_role_display_localisation_never_touches_a_renamed_role():
+    """翻譯只能套在**還是出廠預設**的名稱上。
+
+    四個內建角色 `is_protected=False`，**管理員可以改名**。照 `is_builtin` 翻的話
+    會把管理員取的「會計部」變回「Finance」—— 那是把使用者的資料蓋掉。
+    """
+    from app.core import roles as _r
+    rows = [
+        {"id": "finance", "display_name": "財務", "description": "x"},
+        {"id": "finance", "display_name": "會計部", "description": "x"},
+        {"id": "my-own", "display_name": "財務", "description": "x"},
+    ]
+    out = _r.localize_for_display(rows, lambda s: "TRANSLATED")
+    assert out[0]["display_label"] == "TRANSLATED", "出廠預設名稱要翻"
+    assert out[1]["display_label"] == "會計部", "管理員改過的名稱不可以翻"
+    assert out[2]["display_label"] == "財務", "自訂角色不可以翻，即使名字剛好一樣"
+    # 原值一律不動 —— 編輯表單要用它
+    assert [r["display_name"] for r in out] == ["財務", "會計部", "財務"]

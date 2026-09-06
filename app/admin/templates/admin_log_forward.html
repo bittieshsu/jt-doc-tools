@@ -50,7 +50,7 @@ function row(d) {
             host: '', port: 514, enabled: true};
   return `<tr>
     <td><input type="checkbox" data-k="enabled" ${d.enabled ? 'checked' : ''}></td>
-    <td><input class="field" type="text" data-k="name" value="${esc(d.name||'')}" placeholder="(自動產生)" title="自訂識別名稱，留空會自動帶入 {format}://{host}:{port}"></td>
+    <td><input class="field" type="text" data-k="name" value="${esc(d.name||'')}" placeholder="${tr('(自動產生)')}" title="${tr('自訂識別名稱，留空會自動帶入 {format}://{host}:{port}')}"></td>
     <td>
       <select class="field" data-k="format">
         <option value="syslog" ${d.format==='syslog'?'selected':''}>syslog (RFC 5424)</option>
@@ -87,9 +87,9 @@ function render() {
 
 document.getElementById('addBtn').addEventListener('click', () => {
   const tbody = document.querySelector('#destTable tbody');
-  const tr = document.createElement('tbody');
-  tr.innerHTML = row();
-  const newRow = tr.querySelector('tr');
+  const rowEl = document.createElement('tbody');
+  rowEl.innerHTML = row();
+  const newRow = rowEl.querySelector('tr');
   tbody.appendChild(newRow);
   newRow.querySelector('[data-act="del"]').addEventListener('click', () => newRow.remove());
 });
@@ -102,8 +102,8 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     if (h) h.style.borderColor = '';
   });
   const rows = Array.from(document.querySelectorAll('#destTable tbody tr'));
-  for (const tr of rows) {
-    const h = tr.querySelector('[data-k="host"]');
+  for (const rowEl of rows) {
+    const h = rowEl.querySelector('[data-k="host"]');
     if (h && !h.value.trim()) {
       h.style.borderColor = '#dc2626';
       h.focus();
@@ -112,9 +112,9 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     }
   }
   const dests = [];
-  for (const tr of rows) {
+  for (const rowEl of rows) {
     const d = {};
-    tr.querySelectorAll('[data-k]').forEach(el => {
+    rowEl.querySelectorAll('[data-k]').forEach(el => {
       const k = el.dataset.k;
       if (el.type === 'checkbox') d[k] = el.checked;
       else if (el.type === 'number') d[k] = parseInt(el.value, 10);
@@ -133,12 +133,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     let detail = '';
     try { detail = (await r.json()).detail || ''; } catch(e) { detail = await r.text(); }
     // Translate well-known backend errors to Chinese for clarity.
-    const tr = {
+    const errMap = {
       'host required': tr('Host 為必填'),
       'port out of range': tr('Port 必須介於 1 ~ 65535'),
       'port must be int': tr('Port 必須是整數'),
     };
-    detail = tr[detail] || detail;
+    detail = errMap[detail] || detail;
     await window.showAlert(tr('儲存失敗：') + detail, {title:tr('錯誤')});
     document.getElementById('status').textContent = tr('✗ 儲存失敗');
     document.getElementById('status').style.color = '#dc2626';

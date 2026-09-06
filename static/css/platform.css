@@ -921,7 +921,10 @@ select.jt-select-native {
 /* ===== 管理區設定表單（分區卡片 + 欄位標籤 + 說明） =====
    原本只寫在認證設定頁裡，SSO 頁自己用了一組陽春的 grid，兩頁看起來像不同產品。
    抽到這裡之後，任何設定頁掛上 .auth-form / fieldset.auth-section 就一致。 */
-  .auth-form { max-width: 760px; }
+  /* 卡片內的分區**填滿到右邊** —— 原本夾在 760px，右邊留一大條空白
+     （使用者 2026-09-06 回報）。`.af-attrs` 是 auto-fit 的格線，放寬之後
+     會自己多排一欄而不是把單一輸入框拉到超長。 */
+  .auth-form { max-width: none; }
   .auth-form .auth-field { margin-bottom: 14px; }
   .auth-form .af-label {
     display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:4px;

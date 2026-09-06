@@ -300,7 +300,7 @@ function renderHost(host) {
         <div class="ss-bar ${barClass(m.percent)}"><i data-style="width:${Math.min(100,m.percent||0)}%"></i></div>
         <div class="ss-row"><span>${tr('可用')}</span><span>${fmtBytes(m.available)}</span></div>
         <div class="ss-row"><span>Swap</span><span>${m.swap_total_known === false
-          ? `${fmtBytes(m.swap_used)} 已用（總量由主機端管理）`
+          ? tr('{0} 已用（總量由主機端管理）').replace('{0}', fmtBytes(m.swap_used))
           : `${fmtBytes(m.swap_used)} / ${fmtBytes(m.swap_total)} (${fmtPercent(m.swap_percent)})`}</span></div>
       </div>`);
   }
@@ -573,11 +573,11 @@ async function refreshDbs(thorough) {
     const d = await r.json();
     body.textContent = '';
     (d.databases || []).forEach((db) => {
-      const tr = document.createElement('tr');
+      const rowEl = document.createElement('tr');
       const tdName = ssdbEl('td');
       tdName.appendChild(ssdbEl('div', null, db.label));
       tdName.appendChild(ssdbEl('div', 'ssdb-impact', db.file));
-      tr.appendChild(tdName);
+      rowEl.appendChild(tdName);
 
       const tdSt = ssdbEl('td');
       if (!db.exists) {
@@ -592,13 +592,13 @@ async function refreshDbs(thorough) {
         tdSt.appendChild(ssdbEl('div', 'ssdb-detail', db.detail));
         tdSt.appendChild(ssdbEl('div', 'ssdb-impact', tr('影響：') + db.impact));
       }
-      tr.appendChild(tdSt);
+      rowEl.appendChild(tdSt);
 
-      tr.appendChild(ssdbEl('td', null,
+      rowEl.appendChild(ssdbEl('td', null,
         db.exists ? (db.size_bytes / 1048576).toFixed(1) + ' MB' : '—'));
-      tr.appendChild(ssdbEl('td', null,
+      rowEl.appendChild(ssdbEl('td', null,
         db.backed_up ? (db.backups + tr(' 份')) : tr('不備份（可重建）')));
-      body.appendChild(tr);
+      body.appendChild(rowEl);
     });
     const foot = $('ssDbFoot');
     foot.textContent = d.newest_backup

@@ -39,6 +39,11 @@ EVENT_TS = dt.datetime(2026, 8, 21, 1, 30, tzinfo=dt.timezone.utc).timestamp()
 def server_in_utc(monkeypatch):
     """**強制行程時區為 UTC** —— 這個 bug 只在「伺服器時區 ≠ 使用者時區」時
     現形。不固定的話，在剛好設成 Asia/Taipei 的機器上，修正前的程式也會過。"""
+    if not hasattr(time, "tzset"):
+        # `time.tzset()` 是 POSIX-only，Windows 沒有這個函式，也沒有辦法在
+        # 行程內改變時區。**誠實跳過**比讓整支測試在 Windows 上 error 好 ——
+        # 後者會讓「Windows 跑不跑得過」這件事永遠看不清楚。
+        pytest.skip("Windows 沒有 time.tzset()，無法強制行程時區")
     old = os.environ.get("TZ")
     monkeypatch.setenv("TZ", "UTC")
     time.tzset()

@@ -116,7 +116,7 @@ EXEMPT_PARTS = (
     # CHANGELOG 是**已發佈的歷史紀錄**，裡面還記著「我們檢查過哪些中國用語」
     # （是談論那個詞，不是使用）。整份掃只會製造大量誤報；新條目的用詞由
     # 下面那個專門的 CHANGELOG 檢查負責。
-    "github/CHANGELOG.md",
+    "CHANGELOG.md",   # 開發樹是 github/CHANGELOG.md，clone 下來在根目錄
     "TEST_PLAN.md",                       # 用詞檢查項本身就在列這些詞
     "app/tools/translate_doc/router.py",  # 翻譯對照表（陸→台）
     "CLAUDE.md",                          # 專案筆記裡的用詞規則
@@ -134,11 +134,16 @@ def _files() -> list[pathlib.Path]:
     介紹站的 `docs/index.html` 同理，那是對外的門面。
     """
     out: list[pathlib.Path] = []
-    for pat in ("app/**/*.html", "app/**/*.py", "static/js/*.js",
-                "github/*.md", "github/docs/*.html"):
+    for pat in ("app/**/*.html", "app/**/*.py", "static/js/*.js"):
         out += list(ROOT.glob(pat))
+    # 公開樹的文件：**開發樹在 `github/` 底下，clone 下來就在根目錄**。
+    # 寫死 `github/*.md` 的話，公開版這兩行 glob 一個檔案都收不到 ——
+    # 而「收不到檔案」跟「掃過都沒問題」在 pytest 輸出裡長得一模一樣。
+    pub = _public_root(ROOT)
+    for pat in ("*.md", "docs/*.html"):
+        out += list(pub.glob(pat))
     return [p for p in out
-            if not any(part in str(p.relative_to(ROOT)) for part in EXEMPT_PARTS)]
+            if not any(part in p.relative_to(ROOT).as_posix() for part in EXEMPT_PARTS)]
 
 
 def _strip_comments(text: str, suffix: str) -> str:
@@ -246,8 +251,26 @@ def test_no_mainland_terms_in_source(kind):
         if p.suffix != suffix:
             continue
         bad += _offences(p.read_text(encoding="utf-8"),
-                         str(p.relative_to(ROOT)), p.suffix)
+                         p.relative_to(ROOT).as_posix(), p.suffix)
     assert not bad, "使用者看得到的文字用了大陸用詞：\n" + "\n".join(bad[:20])
+
+
+def test_the_scan_actually_reaches_every_class_of_file():
+    """**這條守的是上面那條測試自己**。
+
+    `test_no_mainland_terms_in_source` 是逐類參數化的，某一類收不到檔案時
+    迴圈直接空轉、`assert not bad` 照樣成立 —— **「一個檔都沒掃」跟「掃過都
+    乾淨」在 pytest 輸出裡長得一模一樣**。實際發生過：公開文件那一類寫死
+    `github/*.md`，clone 下來的樹沒有那一層，於是 `docs` 這一類在公開版
+    永遠掃 0 個檔（2026-09-05）。
+    """
+    got = {}
+    for kind, suffix in (("templates", ".html"), ("python", ".py"),
+                         ("js", ".js"), ("docs", ".md")):
+        got[kind] = sum(1 for f in _files() if f.suffix == suffix)
+    empty = [k for k, n in got.items() if n == 0]
+    assert not empty, (
+        f"這幾類一個檔案都沒收到，那一類的檢查等於沒跑：{empty}（實收 {got}）")
 
 
 def _drop_mentions(text: str) -> str:

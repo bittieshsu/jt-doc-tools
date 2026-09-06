@@ -4696,5 +4696,18 @@
  "🗑 批次刪除": "🗑 Bulk delete",
  "🗖 全圖": "🗖 Whole image",
  "🤖 LLM 校驗結果": "LLM check result",
- " 個": " items"
+ " 個": " items",
+ "正在檢查系統相依套件…（已等 {0} 秒，慢機器最多 60 秒）": "Checking system dependencies… ({0}s so far; up to 60s on a slow machine)",
+ "全部：完整目錄樹": "All: the complete directory tree",
+ "共 {0}": "{0} in total",
+ "已登入 {0} / 未登入 {1}": "{0} signed in / {1} never signed in",
+ "{0} 已用（總量由主機端管理）": "{0} used (the total is managed by the host)",
+ "(自動產生)": "(generated automatically)",
+ "自訂識別名稱，留空會自動帶入 {format}://{host}:{port}": "A custom label; leave it blank to fill in {format}://{host}:{port} automatically",
+ "內建快選": "Built-in quick picks",
+ "宋體（典雅）": "Song / Ming (classic)",
+ "黑體（現代）": "Hei / Gothic (modern)",
+ "霞鶩文楷（內建）": "LXGW WenKai (bundled)",
+ "OIDC 登入": "Sign in with OIDC",
+ "SAML 登入": "Sign in with SAML"
 }
