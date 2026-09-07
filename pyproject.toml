@@ -1,6 +1,6 @@
 [project]
 name = "jt-doc-tools"
-version = "1.15.13"
+version = "1.15.15"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
@@ -99,6 +99,11 @@ dependencies = [
     # dnspython — 通知信的「直接投遞」模式要查收件網域的 MX 紀錄；
     # 標準函式庫沒有 MX 查詢。ISC 授權（寬鬆，與 AGPL 相容）。
     "dnspython>=2.6,<3",
+    # defusedxml —— 剖析**使用者上傳的 XML**（辦公文件、送件檢核、翻譯）。
+    # 標準函式庫的 ElementTree 會展開實體，一份小檔案就能吃光記憶體。
+    # 這個套件是**直接 import 的**，不是誰的傳遞相依：v1.15.8 起開始用，
+    # 卻一直沒有宣告 —— 沒裝到的機器上四支工具會在啟動時被安靜跳過。
+    "defusedxml>=0.7,<1",
     # rapidfuzz — pdf-to-office 的 docx↔PDFTruth alignment 模糊比對引擎（比 difflib 快 10x+）。
     "rapidfuzz>=3.0,<4",
     # numpy — 直接 import：pdf-to-office table_borders_from_image fixer（頂層）+

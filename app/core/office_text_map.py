@@ -310,6 +310,84 @@ def _line_groups(nodes: list[ET.Element], kind: str
     return [(k, g) for k, g in merged]
 
 
+#: 試算表會把「上次看到哪裡」存進檔案裡（`sheetView/@topLeftCell`、凍結
+#: 窗格的 `pane/@topLeftCell`、以及選取的儲存格）。這份文件的原稿停在
+#: 第 338 列 —— 那裡什麼都沒有，於是**翻譯後的檔案一打開是一片空白**，
+#: 要往上捲才看得到內容（使用者回報「乍看是空的」）。
+#:
+#: 這不是我們弄壞的（原稿本來就停在那裡），但我們交出去的是一份要給人
+#: **打開來核對譯文**的新檔案，開在空白處等於看起來像失敗了。所以寫回
+#: 檔案時把捲動位置歸零 —— 只動顯示狀態，凍結窗格、選取範圍的分割位置
+#: 都照舊，儲存格內容一個位元都不變。
+_XLSX_SHEET_PART = re.compile(r"^xl/worksheets/sheet\d+\.xml$")
+
+
+def _col_name(n: int) -> str:
+    """1 -> A、27 -> AA。"""
+    name = ""
+    while n > 0:
+        n, rem = divmod(n - 1, 26)
+        name = chr(65 + rem) + name
+    return name
+
+
+def _reset_sheet_scroll(root: ET.Element) -> None:
+    """把工作表的捲動位置移回內容的開頭。"""
+    for view in root.iter(f"{{{_XL}}}sheetView"):
+        panes = view.findall(f"{{{_XL}}}pane")
+        x_split = y_split = 0
+        frozen = False
+        for pane in panes:
+            try:
+                x_split = int(float(pane.get("xSplit") or 0))
+                y_split = int(float(pane.get("ySplit") or 0))
+            except ValueError:
+                x_split = y_split = 0
+            frozen = (pane.get("state") or "").startswith("frozen")
+            if not frozen:
+                x_split = y_split = 0
+            if pane.get("topLeftCell"):
+                pane.set("topLeftCell",
+                         f"{_col_name(x_split + 1)}{y_split + 1}")
+        if view.get("topLeftCell"):
+            view.set("topLeftCell", "A1")
+        # 選取的儲存格也要跟著回來 —— 只把捲軸移回去，Excel 會為了顯示
+        # 作用儲存格再捲回原處，等於沒改
+        quadrant = {"topLeft": (0, 0), "topRight": (x_split, 0),
+                    "bottomLeft": (0, y_split), "bottomRight": (x_split, y_split)}
+        for sel in view.findall(f"{{{_XL}}}selection"):
+            col, row = quadrant.get(sel.get("pane") or "topLeft", (0, 0))
+            cell = f"{_col_name(col + 1)}{row + 1}"
+            if sel.get("activeCell"):
+                sel.set("activeCell", cell)
+            if sel.get("sqref"):
+                sel.set("sqref", cell)
+
+
+#: ODF 試算表把同一件事存在 `settings.xml`（LibreOffice 存檔時才會寫）。
+#: 那一份不在要翻譯的清單裡、是原封不動複製過去的，所以同樣會把「上次
+#: 停在第幾列」帶到翻譯後的檔案。這幾個項目純粹是顯示狀態，歸零就是
+#: 「從頭開始看」；分割 / 凍結的位置存在別的項目裡，不受影響。
+_ODS_SCROLL_ITEMS = ("CursorPositionX", "CursorPositionY",
+                     "PositionLeft", "PositionRight",
+                     "PositionTop", "PositionBottom")
+_ODS_SCROLL_RE = re.compile(
+    r'(<config:config-item config:name="(?:' + "|".join(_ODS_SCROLL_ITEMS)
+    + r')" config:type="int">)\d+(</config:config-item>)')
+
+
+def _reset_ods_scroll(raw: bytes) -> bytes:
+    """把 ODF 試算表的捲動位置歸零；改不動就原樣回傳。"""
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw
+    patched = _ODS_SCROLL_RE.sub(r"\g<1>0\g<2>", text)
+    if patched == text:
+        return raw
+    return patched.encode("utf-8")
+
+
 def extract_units(data: bytes, ext: str) -> tuple[list[TextUnit], dict]:
     """抽出所有可翻譯的段落。
 
@@ -385,12 +463,16 @@ def rebuild(state: dict, translations: dict[int, str], units: list[TextUnit],
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         for name in state["names"]:
             tree = state["trees"].get(name)
+            if tree is not None and _XLSX_SHEET_PART.match(name):
+                _reset_sheet_scroll(tree.getroot())
             if tree is not None:
                 buf = io.BytesIO()
                 tree.write(buf, encoding="UTF-8", xml_declaration=True)
                 payload = buf.getvalue()
             else:
                 payload = state["raw"][name]
+                if ext == ".ods" and name == "settings.xml":
+                    payload = _reset_ods_scroll(payload)
             # mimetype 必須是第一個且不壓縮，否則 ODF 讀不進去
             if name == "mimetype":
                 zf.writestr(name, payload, zipfile.ZIP_STORED)

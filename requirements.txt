@@ -55,6 +55,8 @@ pyzbar>=0.1.9,<0.2
 fonttools>=4.40,<5
 # dnspython 給通知信的「直接投遞」模式查 MX（標準函式庫沒有 MX 查詢）
 dnspython>=2.6,<3
+# defusedxml 剖析使用者上傳的 XML（標準函式庫會展開實體 → 記憶體耗盡）
+defusedxml>=0.7,<1
 # rapidfuzz 給 docx↔PDFTruth 模糊比對
 pdf2docx>=0.5.13,<0.6
 rapidfuzz>=3.0,<4

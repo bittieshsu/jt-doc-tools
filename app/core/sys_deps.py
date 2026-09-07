@@ -732,6 +732,27 @@ _DEPS = [
         },
     },
     {
+        "key": "defusedxml",
+        "label": "defusedxml (XML 剖析防護)",
+        "category": "文書處理",
+        "impact": "剖析使用者上傳的 XML（辦公文件、送件檢核、文件翻譯、"
+                  "逐句翻譯）。標準函式庫的剖析器會展開實體，一份很小的檔案"
+                  "就能吃光記憶體。缺了它，那幾支工具會在啟動時被安靜跳過"
+                  "（日誌只留一行錯誤，服務照常起來）—— 使用者只會發現"
+                  "工具不見了。",
+        "impact_en": "Parses user-supplied XML (office documents, submission "
+                     "checks, document and sentence translation). Without it "
+                     "those tools are skipped at start-up with only a log "
+                     "line, so they simply disappear from the tool list.",
+        "soft": False,
+        "probe": lambda: _probe_python_pkg("defusedxml", dist_name="defusedxml"),
+        "install_cmd": {
+            "linux": "uv sync（或 sudo jtdt update；純 Python 套件，不需編譯）",
+            "macos": "uv sync",
+            "windows": "jtdt update（以系統管理員身分開啟 PowerShell）",
+        },
+    },
+    {
         "key": "dnspython",
         "label": "dnspython (MX 查詢)",
         "category": "網路",

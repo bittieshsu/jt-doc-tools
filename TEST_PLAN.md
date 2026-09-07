@@ -328,7 +328,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **219 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **222 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -372,6 +372,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_broken_input_no_500.py` | 任何工具端點收到壞輸入都不可以回 500 |
 | `test_cjk_font_notice.py` | 缺中文字型時，**一般使用者**在工具頁上看得到提示（v1.14.47） |
 | `test_cjk_font_renders.py` | 寫進 PDF 的中文**必須畫得出來** |
+| `test_cli_health_check.py` | `jtdt update` 的健康檢查要探對地方，失敗要說得出原因 |
 | `test_client_ip_audit.py` | Client-IP resolution for audit / history / display — app/core/client_ip.py. |
 | `test_cookie_flags_on_delete.py` | 刪除 cookie 的回應也要帶安全旗標 |
 | `test_cpu_limit.py` | CPU 限制（轉檔不影響網頁回應）的測試 |
@@ -382,6 +383,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_db.py` | Tests for app.core.db (SQLite layer). |
 | `test_db_health.py` | SQLite 完整性檢查、熱備份與復原 |
 | `test_db_query_plans.py` | 熱路徑的 SQL 不可以整表掃描 |
+| `test_declared_dependencies.py` | `app/` 直接 import 的第三方套件，**一定要宣告成相依** |
 | `test_deident_label_not_value.py` | 跨格配對時，欄位標籤不可以被當成值（GitHub issue #50） |
 | `test_deident_replace_mode.py` | 文件去識別化的第三種模式：替換 |
 | `test_dependency_declaration_sop.py` | 新增 Python 相依時的六處宣告，一處都不能漏 |
@@ -397,6 +399,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_doc_deident_table_labels.py` | 標籤與值分屬兩個表格儲存格時也要偵測得到（GitHub issue #43） |
 | `test_doc_diff.py` | Tests for the renamed 文件差異比對 tool (formerly pdf-diff). |
 | `test_doc_translate.py` | 文件翻譯：產出**同格式、同版面**的檔案 |
+| `test_doc_translate_spreadsheet_view.py` | 試算表翻譯的兩件事：預覽要看得到東西、產出要開在內容的開頭 |
 | `test_docs_english_pages.py` | 介紹站與 API 手冊的英文版（GitHub Pages） |
 | `test_docs_links.py` | 介紹網站與 API 手冊的連結不可以指向不存在的東西 |
 | `test_docs_numeric_claims.py` | 公開文件裡的數字宣稱要跟程式對得上 |
@@ -3208,6 +3211,59 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       資料不是顯示文字（書籤的 `{title, page, level}`），翻掉是改壞資料。
 - [ ] 新畫的 SVG 圖示要**算圖確認過**才收（snap chromium 的 `--screenshot`
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
+
+---
+
+### 6.84 v1.15.15 — `jtdt update` 的健康檢查與相依宣告（**每次發版必過**）
+
+> 客戶回報：更新完印 `Health check timed out`，服務其實是好的。
+
+- [ ] `pytest tests/test_cli_health_check.py tests/test_declared_dependencies.py` 綠燈
+- [ ] **綁定位址要去問服務**，不可以只讀執行更新那個 shell 的環境變數
+      （`sudo jtdt update` 繼承不到 systemd 的 `Environment=`）
+- [ ] 三種平台的設定格式都讀得出來：systemd unit / macOS launcher / WinSW XML
+- [ ] `0.0.0.0` 探 loopback；綁單一網卡時**loopback 也要探**
+- [ ] **本機探測不走代理**（`http_proxy` 設著時「連自己」會被送去代理）
+- [ ] 健康檢查失敗要印出：探過哪些位址、服務狀態、**日誌最後 20 行**
+- [ ] 改過 port 的安裝，`jtdt status` 印出來的網址要是對的
+
+### ⚠ 直接 import 的第三方套件一定要宣告，傳遞相依不算
+
+> `defusedxml` 從 v1.15.8 起被四個模組直接 import 卻沒有宣告。沒裝到的
+> 機器上那四支工具**在啟動時被安靜跳過**（日誌一行 ERROR，服務照常起來、
+> healthz 照樣 200）。
+
+- [ ] `app/` 直接 import 的第三方套件，`pyproject.toml` 與
+      `requirements.txt` 都要有（`test_every_third_party_import_is_declared`）
+- [ ] 三處相依煙霧測試（`app/cli.py` / `install.sh` / `setup-python.cmd`）
+      要跟著補 —— 煙霧測試沒列到的東西，缺了不會有人發現
+
+---
+
+### 6.83 v1.15.14 — 試算表翻譯的預覽與捲動位置（**每次發版必過**）
+
+> 使用者回報三件事：並排預覽右邊（譯文）整片空白、左邊（原文）的表格被切到
+> 頁面外面、打開翻譯後的檔案乍看是空的。
+
+- [ ] `pytest tests/test_doc_translate_spreadsheet_view.py` 綠燈
+- [ ] **改完 XML 一定要確認它還讀得進去**：預覽用的「縮成一頁寬」副本，
+      每一張工作表改完都要剖析一次，剖析不過就退回原檔的列印設定
+- [ ] **改屬性要用換的不是再寫一次**：原檔已經有 `fitToPage` /
+      `fitToWidth` / `fitToHeight` 時，改完每個屬性都只能出現**一次**
+- [ ] **原文與譯文兩邊要套一樣的列印設定**：原稿存成沒有副檔名的暫存檔，
+      判斷格式**不可以看檔名**，要由呼叫端把格式傳進來
+- [ ] 拿一份四欄的試算表實跑：兩邊預覽都要看得到**全部四欄**
+      （修正前是譯文 1 頁空白、原文 6 頁只有 A 欄）
+- [ ] **翻譯後的檔案要開在內容的開頭**：`pane` / `sheetView` 的
+      `topLeftCell`、選取的儲存格都歸零；ODF 走 `settings.xml`
+- [ ] **凍結與分割的位置不可以一起歸零**，儲存格內容一個位元都不變
+
+### ⚠ soffice 讀不進去的工作表**不會報錯，會變成一張空白表**
+
+> 這次的檔案回傳碼 0、PDF 產得出來、頁首頁尾都在，只是一個儲存格都沒有。
+> 「轉出來了」不是「轉對了」——判準要看**產出裡面有沒有東西**。
+
+- [ ] 預覽類的驗收要**算圖數墨水**或抽文字，不可以只看「檔案有產出」
 
 ---
 

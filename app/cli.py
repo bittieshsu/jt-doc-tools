@@ -133,10 +133,94 @@ def _read_version() -> str:
         return "?"
 
 
+def _service_bind() -> tuple[Optional[str], Optional[str]]:
+    """Read the host / port the **installed service** actually uses.
+
+    `jtdt bind` writes these into the service manager's own configuration
+    (systemd `Environment=`, the macOS launcher script, the WinSW XML) —
+    **not** into anybody's shell. So `sudo jtdt update` does not inherit
+    them, and reading only `os.environ` gives the defaults 127.0.0.1:8765.
+
+    That is a real customer-visible bug: on an install bound to another
+    port (or to one specific LAN address rather than 0.0.0.0), the update
+    health check probes a port nothing is listening on and reports
+    "Health check timed out" while the service is perfectly healthy.
+    """
+    import re as _re
+    txt = ""
+    try:
+        if _is_linux():
+            unit = Path("/etc/systemd/system") / f"{SERVICE_NAME}.service"
+            if unit.exists():
+                txt = unit.read_text(encoding="utf-8", errors="replace")
+        elif _is_macos():
+            launcher = Path(MACOS_APP_PATH) / "Contents" / "MacOS" / "launcher"
+            if launcher.exists():
+                txt = launcher.read_text(encoding="utf-8", errors="replace")
+        elif _is_windows():
+            xml = _winsw_xml_path()
+            if xml.exists():
+                txt = xml.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None, None
+    if not txt:
+        return None, None
+
+    def _pick(name: str) -> Optional[str]:
+        # systemd `Environment=JTDT_HOST=x` / launcher `JTDT_HOST=x`
+        m = _re.search(rf"{name}=([^\s\"']+)", txt)
+        if m:
+            return m.group(1)
+        # WinSW `<env name="JTDT_HOST" value="x"/>`
+        m = _re.search(rf'name="{name}"\s+value="([^"]+)"', txt)
+        return m.group(1) if m else None
+
+    return _pick("JTDT_HOST"), _pick("JTDT_PORT")
+
+
+#: `0.0.0.0` / `::` 是**綁定**位址（「所有介面」），不是連得上的位址 ——
+#: 印出來給人點、或拿去探測都要換成 loopback。
+_WILDCARD_BINDS = ("0.0.0.0", "::", "*", "")     # noqa: S104 - 只是比對用
+
+
+def _reachable_host(host: str) -> str:
+    return "127.0.0.1" if host in _WILDCARD_BINDS else host
+
+
+def _bind_now() -> tuple[str, str]:
+    """目前生效的 host / port。
+
+    明確匯出的環境變數優先（前景執行 `jtdt run` 就是靠它驅動的），
+    其次問已安裝的服務，最後才是預設值。
+    """
+    svc_host, svc_port = _service_bind()
+    host = os.environ.get("JTDT_HOST") or svc_host or "127.0.0.1"
+    port = os.environ.get("JTDT_PORT") or svc_port or "8765"
+    return host, port
+
+
 def _server_url() -> str:
-    host = os.environ.get("JTDT_HOST", "127.0.0.1")
-    port = os.environ.get("JTDT_PORT", "8765")
-    return f"http://{host}:{port}/"
+    """這個安裝連得上的網址（`jtdt status` / `jtdt open` 都用這個）。"""
+    host, port = _bind_now()
+    return f"http://{_reachable_host(host)}:{port}/"
+
+
+def _health_urls() -> list[str]:
+    """Every address worth probing for `healthz`, most specific first.
+
+    `0.0.0.0` / `::` mean "every interface" — those are **bind** addresses,
+    not addresses you can connect to on every platform, so translate them
+    to loopback. Loopback on the configured port is always worth a try as
+    well: a service bound to one LAN address still tells us it is up if we
+    can reach it, and this way a wrong host guess cannot fail the check on
+    its own.
+    """
+    host, port = _bind_now()
+    urls = [f"http://{_reachable_host(host)}:{port}/healthz"]
+    loopback = f"http://127.0.0.1:{port}/healthz"
+    if loopback not in urls:
+        urls.append(loopback)
+    return urls
 
 
 # ------------------------------------------------------------ service control
@@ -692,9 +776,9 @@ def svc_update() -> int:
     if not venv_py.exists() and _is_windows():
         venv_py = root / ".venv" / "Scripts" / "python.exe"
     if venv_py.exists():
-        print("Verifying critical deps (fastapi / fitz / ldap3 / PIL / pdfplumber / docx / odf / pyzipper / pdf2docx / rapidfuzz) ...")
+        print("Verifying critical deps (fastapi / fitz / ldap3 / PIL / pdfplumber / docx / odf / pyzipper / pdf2docx / rapidfuzz / defusedxml) ...")
         rc = subprocess.call([str(venv_py), "-c",
-            "import fastapi, fitz, ldap3, PIL, pillow_heif, pdfplumber, docx, odf, openpyxl, pyzipper, httpx, psutil, pyotp, qrcode, pdf2docx, rapidfuzz, fontTools, numpy, lxml, pymupdf4llm, markdown_it, jwt, onelogin.saml2.auth, xmlsec, truststore, dns.resolver"])
+            "import fastapi, fitz, ldap3, PIL, pillow_heif, pdfplumber, docx, odf, openpyxl, pyzipper, httpx, psutil, pyotp, qrcode, pdf2docx, rapidfuzz, fontTools, numpy, lxml, pymupdf4llm, markdown_it, jwt, onelogin.saml2.auth, xmlsec, truststore, dns.resolver, defusedxml.ElementTree"])
         if rc != 0:
             print("Dep import failed — upgrade may be incomplete, restoring", file=sys.stderr)
             _restore_ownership(root, owner)
@@ -796,23 +880,70 @@ def svc_update() -> int:
 
     # 6. Health check
     import time
-    import urllib.request
-    print("Health check ...")
-    url = _server_url() + "healthz"
+    urls = _health_urls()
+    print(f"Health check ({urls[0]}) ...")
     for _ in range(15):
-        try:
-            with _safe_fetch.urlopen(url, timeout=2) as r:
-                if r.status == 200:
-                    new = _read_version()
-                    _sync_windows_display_version(new)
-                    print(f"Upgrade done: v{cur} -> v{new}")
-                    _print_system_deps_summary()
-                    return 0
-        except Exception:
-            time.sleep(1)
-    print("Health check timed out; check 'jtdt logs'", file=sys.stderr)
+        for url in urls:
+            try:
+                with _safe_fetch.urlopen_direct(url, timeout=2) as r:
+                    if r.status == 200:
+                        new = _read_version()
+                        _sync_windows_display_version(new)
+                        print(f"Upgrade done: v{cur} -> v{new}")
+                        _print_system_deps_summary()
+                        return 0
+            except Exception:
+                pass
+        time.sleep(1)
+    _report_health_failure(urls)
     _print_system_deps_summary()
     return 1
+
+
+def _report_health_failure(urls: list[str]) -> None:
+    """Say what actually went wrong instead of only "timed out".
+
+    "Timed out" tells the operator nothing: a crashed service, a service
+    listening somewhere else and a blocked probe all print the same line,
+    and the customer is left guessing. Print what we probed, whether the
+    service manager thinks it is running, and the tail of the log.
+    """
+    print("", file=sys.stderr)
+    print("Health check failed. Probed:", file=sys.stderr)
+    for u in urls:
+        print(f"  {u}", file=sys.stderr)
+    state = ""
+    if _is_linux():
+        _, state = _run_capture(["systemctl", "is-active", SERVICE_NAME])
+    elif _is_windows():
+        state = _win_service_state()
+    state = (state or "").strip()
+    if state:
+        print(f"Service state: {state}", file=sys.stderr)
+    if state.startswith("active") or state == "RUNNING":
+        print("The service is running, so this may be a wrong address or a "
+              "proxy in the way rather than a broken upgrade — open the URL "
+              "above in a browser to confirm.", file=sys.stderr)
+    print("Last log lines:", file=sys.stderr)
+    _print_log_tail(20)
+    print("Full log: jtdt logs", file=sys.stderr)
+
+
+def _print_log_tail(n: int) -> None:
+    try:
+        if _is_linux():
+            _run(["journalctl", "-u", SERVICE_NAME, "--no-pager", "-n", str(n)])
+            return
+        log = (_real_home() / "Library" / "Logs" / "jt-doc-tools.log"
+               if _is_macos() else _data_dir() / "logs" / "jt-doc-tools.log")
+        if not log.exists():
+            print(f"  (no log at {log})", file=sys.stderr)
+            return
+        lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
+        for line in lines[-n:]:
+            print(f"  {line}", file=sys.stderr)
+    except Exception as e:          # noqa: BLE001 - 診斷用，不可以自己炸掉
+        print(f"  (could not read the log: {e})", file=sys.stderr)
 
 
 def _ensure_systemd_utf8_locale() -> None:

@@ -48,6 +48,20 @@ def urlopen(target: Any, timeout: Optional[float] = None):
     return urllib.request.urlopen(target, timeout=timeout)  # nosec B310
 
 
+def urlopen_direct(target: Any, timeout: Optional[float] = None):
+    """同上，但**不經過任何代理伺服器**。
+
+    `urlopen` 會照 `http_proxy` / `https_proxy` 環境變數走。探測自己這台機器
+    的 `healthz` 時那是錯的：企業環境的管理員 shell 常設著代理，而
+    `no_proxy` 不見得列了 127.0.0.1 —— 於是「連自己」被送去代理伺服器、
+    失敗，看起來就像服務沒起來。**本機探測一律直連。**
+    """
+    url = target if isinstance(target, str) else getattr(target, "full_url", "")
+    _check(url)
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    return opener.open(target, timeout=timeout)
+
+
 def urlretrieve(url: str, filename: str):
     """`urllib.request.urlretrieve` 的白名單版本。"""
     _check(url)

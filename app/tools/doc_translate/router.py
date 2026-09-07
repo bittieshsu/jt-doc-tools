@@ -18,6 +18,9 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+# 使用者上傳的 XML 一律走 defusedxml 剖析（實體展開 DoS）
+from defusedxml.ElementTree import fromstring as _safe_fromstring
+
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
@@ -448,7 +451,7 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
 
     job.message = "產生預覽…"
     job.progress = 0.9
-    pages = _make_preview(upload_id, result, src)
+    pages = _make_preview(upload_id, result, src, ext)
 
     stem = Path(meta["filename"]).stem
     # **一定要設 `result_path`** —— 「我的作業」的下載鈕看的是這個
@@ -484,6 +487,65 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
 _XLSX_SHEET_RE = re.compile(r"^xl/worksheets/sheet\d+\.xml$")
 
 
+def _set_tag_attrs(tag: str, **attrs: str) -> str:
+    """把一個標籤的屬性設成指定值 —— 本來就有的要**換掉**，不是再寫一次。
+
+    ⚠ 這裡踩過一次很貴的坑：原本的寫法是直接把屬性接在標籤名後面，於是
+    原檔已經寫了 `fitToPage="false"` 的表單會變成
+    `<pageSetUpPr fitToPage="false" fitToPage="1"/>`。**XML 不允許同名屬性
+    出現兩次**，那份工作表就此讀不進去 —— 而 LibreOffice 遇到讀不進去的
+    工作表**不會報錯，會安靜地當成空白表**：回傳碼 0、PDF 產得出來、
+    只是裡面只剩頁首頁尾（使用者看到的就是「譯文預覽整片空白」）。
+    """
+    self_closing = tag.rstrip().endswith("/>")
+    body = tag[1:-2] if self_closing else tag[1:-1]
+    # 名字與屬性之間的空白要留著（`partition(" ")` 會把它吃掉，於是屬性
+    # 直接黏在標籤名後面 —— 那不但改不到原屬性，標籤名本身也壞了）
+    m = re.match(r"\s*([^\s/>]+)(.*)$", body, re.S)
+    if m is None:
+        return tag
+    name, rest = m.group(1), m.group(2)
+    for key in attrs:
+        rest = re.sub(rf"\s+{re.escape(key)}\s*=\s*\"[^\"]*\"", "", rest)
+        rest = re.sub(rf"\s+{re.escape(key)}\s*=\s*'[^']*'", "", rest)
+    extra = "".join(f' {k}="{v}"' for k, v in attrs.items())
+    return f"<{name}{rest.rstrip()}{extra}{'/>' if self_closing else '>'}"
+
+
+def _fit_sheet_xml(x: str) -> str:
+    """把一張工作表的列印設定改成「縮成一頁寬」。"""
+    m = re.search(r"<pageSetUpPr\b[^>]*?/?>", x)
+    if m:
+        x = x[:m.start()] + _set_tag_attrs(m.group(0), fitToPage="1") + x[m.end():]
+    else:
+        m = re.search(r"<sheetPr\b[^>]*?/?>", x)
+        if m and m.group(0).rstrip().endswith("/>"):
+            opened = m.group(0).rstrip()[:-2].rstrip() + ">"
+            x = (x[:m.start()] + opened
+                 + '<pageSetUpPr fitToPage="1"/></sheetPr>' + x[m.end():])
+        elif m:
+            # 放在 `</sheetPr>` 之前 —— schema 規定 pageSetUpPr 排在
+            # tabColor / outlinePr 後面，接在開始標籤後會排錯順序
+            close = x.find("</sheetPr>", m.end())
+            if close < 0:
+                return x
+            x = x[:close] + '<pageSetUpPr fitToPage="1"/>' + x[close:]
+        else:
+            x = x.replace("<dimension",
+                          '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'
+                          "<dimension", 1)
+    m = re.search(r"<pageSetup\b[^>]*?/?>", x)
+    if m:
+        x = (x[:m.start()]
+             + _set_tag_attrs(m.group(0), fitToWidth="1", fitToHeight="0")
+             + x[m.end():])
+    else:
+        x = x.replace("</worksheet>",
+                      '<pageSetup fitToWidth="1" fitToHeight="0"'
+                      ' orientation="landscape"/></worksheet>', 1)
+    return x
+
+
 def _fit_to_width(data: bytes) -> bytes:
     """回傳一份「列印時縮成一頁寬」的 xlsx 副本；改不動就原樣回傳。"""
     import zipfile
@@ -499,37 +561,32 @@ def _fit_to_width(data: bytes) -> bytes:
             for name in zin.namelist():
                 raw = zin.read(name)
                 if _XLSX_SHEET_RE.match(name):
-                    x = raw.decode("utf-8")
-                    if "<pageSetUpPr" in x:
-                        x = re.sub(r"<pageSetUpPr([^/>]*)/>",
-                                   r'<pageSetUpPr\1 fitToPage="1"/>', x, count=1)
-                    elif "<sheetPr" in x:
-                        x = re.sub(r"<sheetPr([^>/]*)/>",
-                                   r'<sheetPr\1><pageSetUpPr fitToPage="1"/></sheetPr>',
-                                   x, count=1)
-                        x = re.sub(r"<sheetPr([^>/]*)>",
-                                   r'<sheetPr\1><pageSetUpPr fitToPage="1"/>', x, count=1)
+                    patched = _fit_sheet_xml(raw.decode("utf-8")).encode("utf-8")
+                    # **改完一定要確認它還讀得進去**：這份副本只是拿來算
+                    # 預覽圖的，寧可退回原本的列印設定（欄位會被切到後面
+                    # 幾頁），也不能給 soffice 一份它會安靜當成空白表的檔案
+                    try:
+                        _safe_fromstring(patched)
+                    except Exception:      # noqa: BLE001
+                        pass
                     else:
-                        x = x.replace("<dimension",
-                                      '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension', 1)
-                    if "<pageSetup " in x:
-                        x = x.replace("<pageSetup ",
-                                      '<pageSetup fitToWidth="1" fitToHeight="0" ', 1)
-                    else:
-                        x = x.replace("</worksheet>",
-                                      '<pageSetup fitToWidth="1" fitToHeight="0"'
-                                      ' orientation="landscape"/></worksheet>', 1)
-                    raw = x.encode("utf-8")
+                        raw = patched
                 zout.writestr(name, raw)
     except Exception:          # noqa: BLE001 - 預覽用，改不動就照原檔轉
         return data
     return out.getvalue()
 
 
-def _render_side(upload_id: str, src_file: Path, side: str) -> int:
-    """把一份檔案轉成 PDF、前幾頁存成 PNG。回傳張數；失敗回 0。"""
+def _render_side(upload_id: str, src_file: Path, side: str, ext: str) -> int:
+    """把一份檔案轉成 PDF、前幾頁存成 PNG。回傳張數；失敗回 0。
+
+    `ext` 要由呼叫端給 —— **不可以從檔名推**：原稿是存成
+    `dt_<id>_src`（沒有副檔名），拿 `suffix` 判斷的話原文那邊永遠不算
+    xlsx，於是只有譯文縮成一頁寬、原文照樣被切到後面幾頁，
+    兩邊條件不同，並排比對就失去意義（使用者回報「原文表格又超出去了」）。
+    """
     pdf = settings.temp_dir / f"dt_{upload_id}_{side}.pdf"
-    if src_file.suffix.lower() == ".xlsx":
+    if ext.lower() == ".xlsx":
         fitted = settings.temp_dir / f"dt_{upload_id}_{side}_fit.xlsx"
         fitted.write_bytes(_fit_to_width(src_file.read_bytes()))
         src_file = fitted
@@ -543,18 +600,18 @@ def _render_side(upload_id: str, src_file: Path, side: str) -> int:
     return n
 
 
-def _make_preview(upload_id: str, result: Path, source: Path) -> int:
+def _make_preview(upload_id: str, result: Path, source: Path, ext: str) -> int:
     """原文與譯文各出一份前幾頁的預覽圖。預覽失敗不影響下載。
 
     **兩邊都要**：這個工具要證明的是「版面沒跑掉」，只看譯文那一份看不出來 ——
     要跟原稿並排比才知道框線、表格、圖片有沒有位移。
     """
     try:
-        n_out = _render_side(upload_id, result, "out")
+        n_out = _render_side(upload_id, result, "out", ext)
     except Exception:
         return 0
     try:
-        n_src = _render_side(upload_id, source, "src")
+        n_src = _render_side(upload_id, source, "src", ext)
     except Exception:
         n_src = 0
     return min(n_out, n_src) if n_src else n_out
