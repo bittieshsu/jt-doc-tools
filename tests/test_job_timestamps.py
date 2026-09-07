@@ -25,12 +25,26 @@ def _run_a_job(sleep_s: float = 0.3) -> str:
 
     jid = job_manager.submit("pdf-compress", work, meta={"filename": "t.pdf"}).id
     deadline = time.time() + 30
+    in_memory_done = False
     while time.time() < deadline:
-        time.sleep(0.1)
+        time.sleep(0.05)
         j = job_manager.get(jid)
-        if j and j.status in ("done", "error"):
+        if not (j and j.status in ("done", "error")):
+            continue
+        in_memory_done = True
+        # **記憶體先變 done，資料庫是之後才寫的** —— `finished_at` 是在
+        # `job_store.upsert()` 裡才依狀態算出來的。只等記憶體狀態的話，
+        # 接著讀到的會是還沒收尾的那一列（`finished_at` 還是 NULL），
+        # 於是 `float <= None` 直接 TypeError。
+        #
+        # 這條在開發機上幾乎不會紅，是**排程跑的 CI**（機器忙、時序不同）
+        # 抓到的 —— 而偶爾紅的守門跟壞掉的守門一樣沒人信。
+        row = next((r for r in job_store.list_jobs(limit=50)
+                    if r["id"] == jid), None)
+        if row and row["finished_at"] is not None:
             return jid
-    pytest.fail("作業沒有在時限內結束")
+    pytest.fail("作業沒有在時限內結束" if not in_memory_done
+                else "作業結束了，但資料庫那一列始終沒有寫入 finished_at")
 
 
 @pytest.fixture(autouse=True)
@@ -76,6 +90,32 @@ def test_the_three_timestamps_are_in_order(store):
     # 這條照樣綠）。要驗那個得先讓佇列塞住再送一件，成本比較高；
     # 先把限制寫在這裡，不要讓人以為它守得住。
     assert row["finished_at"] - row["started_at"] >= 0.15
+
+
+def test_waiting_for_a_job_waits_for_the_database_row(store, monkeypatch):
+    """**記憶體先變 done，資料庫是之後才寫的。**
+
+    `finished_at` 是在 `job_store.upsert()` 裡依狀態算出來的，所以只等
+    記憶體狀態的話，接著讀到的可能是還沒收尾的那一列（`finished_at`
+    還是 NULL），比較時直接 `float <= None` → TypeError。
+
+    這條在開發機上幾乎不會紅 —— 是**排程跑的 CI**（機器忙、時序不同）
+    2026-09-07 抓到的，而同一個 commit 的 push 那次是綠的。
+    **偶爾紅的守門跟壞掉的守門一樣沒人信**，所以這裡把窗口拉寬，
+    讓它每次都會踩到。
+    """
+    real = job_store.upsert
+
+    def slow_upsert(job):
+        if job.status in ("done", "error", "cancelled"):
+            time.sleep(0.6)          # 模擬忙碌機器上的寫入延遲
+        return real(job)
+
+    monkeypatch.setattr(job_store, "upsert", slow_upsert)
+    jid = _run_a_job(sleep_s=0.2)    # 等不對的話這裡就會拿到半成品
+    row = next(r for r in store.list_jobs(limit=20) if r["id"] == jid)
+    assert row["finished_at"] is not None, "拿到還沒寫完的那一列"
+    assert row["created_at"] <= row["started_at"] <= row["finished_at"]
 
 
 def test_restoring_a_job_from_the_database_keeps_started_at(store):

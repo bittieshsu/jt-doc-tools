@@ -18,7 +18,13 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # 每日台北時間 09:00（01:00 UTC）跑一次完整的（含 office）
+    # 每日台北時間 09:00（01:00 UTC）跑一次完整的（含 office）。
+    # **GitHub 會延遲排程執行**（共用 runner 忙的時候實測晚了四個多小時），
+    # 所以收到失敗通知的時間跟這裡寫的對不起來是正常的 —— 要看 run 的
+    # `event` 欄位分辨是 push 還是 schedule 觸發的。
+    #
+    # 排程這一次的價值就在**時序跟 push 那次不一樣**：機器忙、寫入慢，
+    # 才會踩到 push 永遠踩不到的競態（v1.15.18 的作業時間點就是這樣抓到的）。
     - cron: '0 1 * * *'
 
 permissions:
