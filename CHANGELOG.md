@@ -6,6 +6,43 @@
 
 ---
 
+## [1.15.16] - 2026-09-07
+
+### `sudo jtdt reset-password` 之後服務可能再也寫不進資料庫
+
+以 root 執行的 CLI 只要在資料目錄裡**建出一個新檔案**，那個檔案就是
+`root:root` —— 服務是用 `jtdt` 帳號跑的，接下來會拿到
+`attempt to write a readonly database`。實測確認：root 先建 DB，
+服務帳號就完全寫不進去。
+
+最糟的是 `jtdt reset-password` 正是「被鎖在門外」時的那條救命指令 ——
+**救援做完反而登不進去**。v1.4.2 已經為 `jtdt auth disable` 踩過一次
+（設定檔變成 root:root 600，畫面顯示預設值），當時加的
+`_chown_data_files_back()` 沒有推廣到其他指令。
+
+- `jtdt reset-password` 收尾補上擁有者還原。
+- `jtdt ocr-lang install / remove / switch / quality` 會以 root 寫
+  `ocr_settings.json`（就在資料目錄裡），同樣補上 —— 這幾支有好幾個
+  return 點，逐個補一定會漏，改在派送層用 `finally` 統一收尾。
+- 守門 `tests/test_cli_data_dir_ownership.py`：用 **AST 找真正的呼叫**
+  （只寫在註解裡不算數）。
+
+### 公開版叫人跑的檔案，公開版裡沒有
+
+- `scripts/page_screenshots.py` / `page_visual_check.py`：測試計畫 §0 的
+  「每次發版都要把全站頁面截圖逐張看過」就靠它們，但 `scripts/`
+  **從來沒有同步進公開樹**。v1.14.46 為 `tools/` 修過一模一樣的問題。
+- 資安測試計畫叫人跑 `temp/sec-audit/pentest.py` 與
+  `setup_pentest_users.py` —— 那是只存在開發機的暫存目錄，**整條滲透
+  測試在公開版跑不起來**。已移進 `tools/`（並拿掉裡面寫死的絕對路徑）。
+
+**這兩件為什麼守門沒抓到**：那條守門只認 `python …` 開頭的指令，而計畫裡
+有一半寫的是 `.venv/bin/python …` —— 17 行指令裡有 9 行**從來沒有被檢查
+過**。判準已放寬成「直譯器可以帶路徑」，並把 `-o 檔名` 這種**產出**路徑
+排除掉（那本來就不該存在）。
+
+---
+
 ## [1.15.15] - 2026-09-07
 
 ### `jtdt update` 回報 Health check timed out，但服務其實是好的

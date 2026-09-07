@@ -82,11 +82,22 @@ def test_admin_pages_appear_in_the_plan():
 #: 只檢查「**指令**裡引用的檔案」。說明文字裡引用當反例的不算 ——
 #: 掃描連說明一起掃會誤報，這個專案已經踩過兩次（migration FK 順序、
 #: fail-open 形狀），這裡不再犯第三次。
+#: 指令行。**直譯器可以帶路徑** —— 計畫裡有一半的指令寫的是
+#: `.venv/bin/python scripts/…`，第一版只認 `python …` 開頭，於是那
+#: 一半從來沒有被檢查過（`scripts/` 沒同步進公開樹就是這樣漏掉的）。
 _CMD_LINE = re.compile(r"^\s*(?:\$ )?(?:[A-Z_]+=\S+\s+)*"
-                       r"(?:uv run |sudo )?(?:pytest|python3?|bash|sh)\b.*$",
+                       r"(?:uv run |sudo )?[\w./-]*(?:pytest|python3?|bash|sh)\b.*$",
                        re.MULTILINE)
 _FILE_REF = re.compile(r"(?:tests|scripts|tools|temp|temp_pdfs)/[\w./-]+"
                        r"\.(?:py|sh|yaml|json)")
+#: `-o out.json` / `> out.txt` 後面那個路徑是**產出**不是輸入 —— 它本來就
+#: 不該存在，拿它當「引用了不存在的檔案」是誤報。
+_OUTPUT_ARG = re.compile(r"(?:-o|--output|-w|>>?)\s+(\S+)")
+
+
+def _input_refs(line: str) -> list[str]:
+    outputs = set(_OUTPUT_ARG.findall(line))
+    return [r for r in _FILE_REF.findall(line) if r not in outputs]
 
 
 def test_commands_in_the_plan_reference_files_that_exist():
@@ -98,7 +109,7 @@ def test_commands_in_the_plan_reference_files_that_exist():
     for doc in (PLAN, PLAN_SEC):
         text = doc.read_text(encoding="utf-8")
         for line in _CMD_LINE.findall(text):
-            for ref in _FILE_REF.findall(line):
+            for ref in _input_refs(line):
                 if not (ROOT / ref).exists():
                     bad.append(f"{doc.name}: {ref}")
     assert not bad, ("計畫的必跑指令引用了不存在的檔案（照抄會直接失敗，"
@@ -238,7 +249,7 @@ def test_commands_in_the_plan_also_exist_in_the_published_tree():
     bad = []
     for doc in (PLAN, PLAN_SEC):
         for line in _CMD_LINE.findall(doc.read_text(encoding="utf-8")):
-            for ref in _FILE_REF.findall(line):
+            for ref in _input_refs(line):
                 if (ROOT / ref).exists() and not (gh / ref).exists():
                     bad.append(ref)
     assert not bad, (

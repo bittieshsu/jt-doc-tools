@@ -328,7 +328,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **222 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **223 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -372,6 +372,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_broken_input_no_500.py` | 任何工具端點收到壞輸入都不可以回 500 |
 | `test_cjk_font_notice.py` | 缺中文字型時，**一般使用者**在工具頁上看得到提示（v1.14.47） |
 | `test_cjk_font_renders.py` | 寫進 PDF 的中文**必須畫得出來** |
+| `test_cli_data_dir_ownership.py` | 以 root 寫資料目錄的 CLI 指令，收尾**一定要把擁有者改回去** |
 | `test_cli_health_check.py` | `jtdt update` 的健康檢查要探對地方，失敗要說得出原因 |
 | `test_client_ip_audit.py` | Client-IP resolution for audit / history / display — app/core/client_ip.py. |
 | `test_cookie_flags_on_delete.py` | 刪除 cookie 的回應也要帶安全旗標 |
@@ -3211,6 +3212,29 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       資料不是顯示文字（書籤的 `{title, page, level}`），翻掉是改壞資料。
 - [ ] 新畫的 SVG 圖示要**算圖確認過**才收（snap chromium 的 `--screenshot`
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
+
+---
+
+### 6.85 v1.15.16 — 以 root 執行的 CLI 與公開樹的完整性（**每次發版必過**）
+
+> 主動稽核「只有安裝／升級才會遇到」的問題時找到的。
+
+- [ ] `pytest tests/test_cli_data_dir_ownership.py` 綠燈
+- [ ] **以 root 寫資料目錄的指令收尾一定要還原擁有者**
+      （`jtdt reset-password` / `ocr-lang *` / `auth *` / `update`）——
+      少了它，服務帳號會拿到 `attempt to write a readonly database`
+- [ ] 判斷「有沒有呼叫防護」一律走 **AST 的 Call 節點**（寫在註解裡不算）
+- [ ] 公開樹要有測試計畫叫人跑的每一個檔案（`tools/` 與 `scripts/` 都要同步）
+- [ ] 指令行的判準要認得**帶路徑的直譯器**（`.venv/bin/python …`）
+
+### 升級路徑（拿舊版建的資料實跑）
+
+- [ ] v1.12.0 / v1.14.46 / v1.15.7 的資料目錄，用最新版開得起來
+- [ ] **資料要活著**：`group_members` 筆數不變（`_m8` 當年就是在這裡清空的）
+- [ ] 新工具的權限要自動補進既有角色（`role_perms` 會變多）
+- [ ] 用升級後的舊資料掃**全部 GET 路由，不可以有 5xx**
+- [ ] 只用 `requirements.txt` 建的乾淨環境要載得出**全部工具**
+      （少一個相依宣告就會少工具，而且是安靜的）
 
 ---
 

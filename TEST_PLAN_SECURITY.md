@@ -81,12 +81,12 @@
 ```bash
 # 1) 起一個乾淨的本機實例（**不要**打客戶機 / 正式機）
 rm -rf /tmp/pt-data && mkdir -p /tmp/pt-data
-JTDT_DATA_DIR=/tmp/pt-data .venv/bin/python temp/sec-audit/setup_pentest_users.py
+JTDT_DATA_DIR=/tmp/pt-data .venv/bin/python tools/setup_pentest_users.py
 JTDT_DATA_DIR=/tmp/pt-data .venv/bin/python -m uvicorn app.main:app \
     --host 127.0.0.1 --port 8794 &
 
 # 2) 打
-JTDT_DATA_DIR=/tmp/pt-data .venv/bin/python temp/sec-audit/pentest.py \
+JTDT_DATA_DIR=/tmp/pt-data .venv/bin/python tools/pentest.py \
     http://127.0.0.1:8794
 ```
 
@@ -179,7 +179,7 @@ GitHub）。
 # 1) 拋棄式實例（**絕不可**對正式機做這件事 —— 帶管理員身分的爬蟲會去點各種
 #    設定與刪除端點，那是破壞性的）
 rm -rf /tmp/ztdata && mkdir -p /tmp/ztdata
-JTDT_DATA_DIR=/tmp/ztdata .venv/bin/python temp/sec-audit/setup_pentest_users.py
+JTDT_DATA_DIR=/tmp/ztdata .venv/bin/python tools/setup_pentest_users.py
 JTDT_DATA_DIR=/tmp/ztdata .venv/bin/python -m uvicorn app.main:app \
     --host 127.0.0.1 --port 8795 &
 

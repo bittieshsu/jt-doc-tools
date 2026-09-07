@@ -2284,7 +2284,13 @@ print(f"   All existing sessions invalidated; failure-counter reset.")
     cmd = [str(venv_python), "-c", helper, username]
     if new_password:
         cmd.append(new_password)
-    return subprocess.call(cmd)
+    rc = subprocess.call(cmd)
+    # ⚠ 以 root 寫資料目錄之後**一定要把擁有者改回去**。這支是「被鎖在門外」
+    # 時的救命指令，而它跑起來是 root：只要它建出任何一個新檔案
+    # （audit.sqlite、WAL、備份目錄…），服務帳號接下來就會拿到
+    # `attempt to write a readonly database` —— 等於救援完之後反而登不進去。
+    _chown_data_files_back()
+    return rc
 
 
 # --------------------------------------------------------------------- auth recovery (offline)
@@ -2873,17 +2879,23 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 1
     if args.cmd == "ocr-lang":
-        if args.ocr_cmd == "list":
-            return svc_ocr_lang_list()
-        if args.ocr_cmd == "install":
-            return svc_ocr_lang_install(args.code, only=args.only)
-        if args.ocr_cmd == "remove":
-            return svc_ocr_lang_remove(args.code)
-        if args.ocr_cmd == "switch":
-            return svc_ocr_lang_switch(args.code, args.quality)
-        if args.ocr_cmd == "quality":
-            return svc_ocr_lang_quality(args.quality)
-        return 1
+        # 這幾支會以 root 寫 `ocr_settings.json`（就在資料目錄裡）。收尾一定
+        # 要把擁有者改回去 —— 這些指令有好幾個 return 點，逐個補一定會漏，
+        # 所以在派送這一層統一做。
+        try:
+            if args.ocr_cmd == "list":
+                return svc_ocr_lang_list()
+            if args.ocr_cmd == "install":
+                return svc_ocr_lang_install(args.code, only=args.only)
+            if args.ocr_cmd == "remove":
+                return svc_ocr_lang_remove(args.code)
+            if args.ocr_cmd == "switch":
+                return svc_ocr_lang_switch(args.code, args.quality)
+            if args.ocr_cmd == "quality":
+                return svc_ocr_lang_quality(args.quality)
+            return 1
+        finally:
+            _chown_data_files_back()
     return table[args.cmd]()
 
 

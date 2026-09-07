@@ -105,14 +105,25 @@ def _distribution_for(root: str) -> str | None:
 
 
 def test_every_third_party_import_is_declared():
+    """對應不到發行套件時**要紅，不可以 skip**。
+
+    `pytest.skip` 寫在迴圈裡會讓整條測試在第一個對應不到的模組就中止，
+    後面一個都沒檢查 —— 而「全部 skip」在 pytest 輸出裡跟「全部通過」
+    長得一模一樣。更糟的是：對應不到最常見的原因就是**那個套件沒裝**，
+    也就是這條守門要抓的那件事本身。
+    """
     declared = _declared()
     missing: list[str] = []
     for root, users in sorted(_imported_roots().items()):
         dist = _distribution_for(root)
+        where = f"（{users[0]} 等 {len(users)} 處）"
         if dist is None:
-            pytest.skip(f"`{root}` 沒有安裝，無法對應到發行套件（{users[0]}）")
+            if _norm(root) in declared:
+                continue                     # 宣告了、只是這台沒裝
+            missing.append(f"{root} → 對應不到任何已安裝的發行套件{where}")
+            continue
         if dist not in declared:
-            missing.append(f"{root} → {dist}（{users[0]} 等 {len(users)} 處）")
+            missing.append(f"{root} → {dist}{where}")
     assert not missing, (
         "這些套件是**直接 import 的**，但 pyproject.toml 沒有宣告 —— "
         "只要提供它的上游換掉，那些模組就會在使用者的機器上安靜地載不進來：\n  "
