@@ -572,6 +572,81 @@ def _sync_windows_display_version(version: str) -> None:
         pass
 
 
+#: 升級前備份**不必**複製的東西。判準是「弄丟了能自己長回來」——
+#: 而在真實部署上這佔了絕大部分：正式機的資料目錄 2.0 GB，其中
+#: **1.4 GB 是統編資料庫**（政府公開資料，排程會自己重新下載）。每次升級
+#: 整份複製、還留三份，等於 4.2 GB 的純浪費；那台磁碟只剩 11 GB，再幾次
+#: 更新就滿了 —— 而滿掉的時機正好是「服務已經停掉、備份寫到一半」。
+_BACKUP_SKIP = {
+    "vat_db.sqlite", "vat_db.sqlite-wal", "vat_db.sqlite-shm",  # 可重新下載
+    "temp",          # 暫存檔，本來就有 2 小時保留期
+    "jobs",          # 作業產出，本來就有 24 小時保留期
+    "db_backups",    # 資料庫備份的備份
+}
+
+
+def _dir_size(path: Path, skip: set[str]) -> int:
+    total = 0
+    try:
+        for entry in path.iterdir():
+            if entry.name in skip:
+                continue
+            try:
+                if entry.is_dir():
+                    total += _dir_size(entry, set())
+                else:
+                    total += entry.stat().st_size
+            except OSError:
+                pass
+    except OSError:
+        pass
+    return total
+
+
+def _backup_space_needed() -> tuple[int, Optional[int]]:
+    """(大約要多少 bytes, 現在還有多少)。取不到就回 (0, None)。"""
+    data = _data_dir()
+    if not data.exists():
+        return 0, None
+    need = int(_dir_size(data, _BACKUP_SKIP) * 1.2)     # 兩成餘裕
+    try:
+        avail = shutil.disk_usage(data.parent).free
+    except OSError:
+        avail = None
+    return need, avail
+
+
+def _backup_data_dir() -> None:
+    """升級前把資料目錄複製一份（保留最近三份）。"""
+    import datetime
+    data = _data_dir()
+    if not data.exists():
+        return
+    backup = data.parent / f"{data.name}.backup-{datetime.datetime.now():%Y%m%d-%H%M%S}"
+    skipped = sorted(n for n in _BACKUP_SKIP if (data / n).exists())
+    print(f"Backed up data: {data} -> {backup}")
+    try:
+        shutil.copytree(data, backup, dirs_exist_ok=False,
+                        ignore=lambda _d, names: [n for n in names
+                                                  if n in _BACKUP_SKIP])
+    except OSError as exc:
+        # 備份失敗不可以無聲 —— 使用者要知道這次升級沒有回頭路
+        print(f"WARNING: backup failed ({exc}); continuing without one.",
+              file=sys.stderr)
+        shutil.rmtree(backup, ignore_errors=True)
+        return
+    if skipped:
+        print("  Skipped (rebuildable / temporary): " + ", ".join(skipped))
+    siblings = sorted(
+        data.parent.glob(f"{data.name}.backup-*"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for stale in siblings[3:]:
+        print(f"  Removed old backup: {stale}")
+        shutil.rmtree(stale, ignore_errors=True)
+
+
 def svc_update() -> int:
     """Pull latest release and re-sync deps. Backups data dir first."""
     if not _is_admin():
@@ -646,26 +721,25 @@ def svc_update() -> int:
         except OSError:
             pass
 
+    # 0b. Check there is room for the backup **before stopping the service**.
+    #     Running out of disk half way through leaves the service down and a
+    #     half-written backup taking up the little space that was left.
+    need, avail = _backup_space_needed()
+    if need and avail is not None and avail < need:
+        print(f"Not enough free disk for the pre-upgrade backup: "
+              f"need about {need // (1024**2)} MB, {avail // (1024**2)} MB free.",
+              file=sys.stderr)
+        print("Free some space (older data.backup-* directories are safe to "
+              "delete) and run the upgrade again. The service was NOT stopped.",
+              file=sys.stderr)
+        return 1
+
     # 1. Stop service
     print("Stopping service ...")
     svc_stop()
 
     # 2. Backup data
-    import datetime
-    data = _data_dir()
-    if data.exists():
-        backup = data.parent / f"{data.name}.backup-{datetime.datetime.now():%Y%m%d-%H%M%S}"
-        print(f"Backed up data: {data} -> {backup}")
-        shutil.copytree(data, backup, dirs_exist_ok=False)
-        # Keep only last 3 backups
-        siblings = sorted(
-            data.parent.glob(f"{data.name}.backup-*"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        for stale in siblings[3:]:
-            print(f"  Removed old backup: {stale}")
-            shutil.rmtree(stale, ignore_errors=True)
+    _backup_data_dir()
 
     # 3. git pull (with safe.directory so it works on differently-owned repos)
     print("Pulling latest from GitHub ...")

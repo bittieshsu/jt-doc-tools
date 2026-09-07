@@ -25,17 +25,38 @@ from typing import Any
 _LOCK = threading.Lock()
 _DEFAULTS: dict[str, Any] = {"max_upload_mb": 500}
 
+#: 這份設定被**最外層的中介層每一個請求都讀一次**（連靜態檔與 healthz 都算）
+#: —— 沒有快取的話那是每個請求一次同步檔案 I/O，而且就跑在事件迴圈上
+#: （實測 104 µs/次；一頁幾十個靜態檔就是好幾毫秒，純浪費）。
+#:
+#: 依 **mtime + 大小**失效，所以管理員在畫面上改完立刻生效，不必重啟。
+#: 這跟字型名稱快取是同一套做法。
+_CACHE: tuple[tuple[float, int] | None, dict[str, Any]] | None = None
+
 
 def _path():
     from ..config import settings
     return settings.data_dir / "upload_settings.json"
 
 
+def _stamp(p) -> tuple[float, int] | None:
+    try:
+        st = p.stat()
+        return (st.st_mtime, st.st_size)
+    except OSError:
+        return None                      # 檔案不存在＝用預設值
+
+
 def get() -> dict[str, Any]:
+    global _CACHE
+    p = _path()
+    stamp = _stamp(p)
+    cached = _CACHE
+    if cached is not None and cached[0] == stamp:
+        return dict(cached[1])
     out = dict(_DEFAULTS)
     try:
-        p = _path()
-        if p.exists():
+        if stamp is not None:
             got = json.loads(p.read_text(encoding="utf-8"))
             if isinstance(got, dict):
                 out.update({k: v for k, v in got.items() if k in _DEFAULTS})
@@ -45,6 +66,7 @@ def get() -> dict[str, Any]:
         out["max_upload_mb"] = max(0, int(out["max_upload_mb"]))
     except (TypeError, ValueError):
         out["max_upload_mb"] = _DEFAULTS["max_upload_mb"]
+    _CACHE = (stamp, dict(out))
     return out
 
 
