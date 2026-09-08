@@ -26,6 +26,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from ...config import settings
 from ...core import office_convert, office_text_map as otm, pdf_preview
+from ...core import translation_glossary as _gloss
 from ...core import safe_paths as _sp, upload_owner as _uo
 from ...core.http_utils import content_disposition
 from ...core.job_manager import job_manager
@@ -170,6 +171,7 @@ async def index(request: Request):
         "langs": _LANG_NAMES,
         "accept": ",".join(otm.SUPPORTED_EXTS),
         "preview_pages": PREVIEW_PAGES,
+        "glossary_pairs": _gloss.pair_counts(),
     })
 
 
@@ -257,9 +259,12 @@ async def start(request: Request):
     source_lang = str(body.get("source_lang") or "auto")
     target_lang = str(body.get("target_lang") or "zh-TW")
     domain = str(body.get("domain") or "")[:200]
+    # 預設套用字典：管理員特地設了對照表，不該因為使用者忘記勾而失效。
+    use_glossary = bool(body.get("use_glossary", True))
 
     def run(job) -> None:
-        _run_job(job, upload_id, meta, source_lang, target_lang, domain)
+        _run_job(job, upload_id, meta, source_lang, target_lang, domain,
+                 use_glossary=use_glossary)
 
     job = job_manager.submit(
         "doc-translate", run,
@@ -272,7 +277,8 @@ async def start(request: Request):
 
 
 def _run_job(job, upload_id: str, meta: dict, source_lang: str,
-             target_lang: str, domain: str) -> None:
+             target_lang: str, domain: str,
+             use_glossary: bool = True) -> None:
     from concurrent.futures import ThreadPoolExecutor
 
     client = llm_settings.make_client()
@@ -293,6 +299,13 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
     char_cap = max(200, min(20000, int(conf.get("doctr_batch_chars", BATCH_MAX_CHARS))))
     if source_lang == "auto":
         source_lang = _detect_language("\n".join(u.text for u in units[:50]))
+
+    # 翻譯對照字典（只在這個語言對真的有條目時才成立；沒有就是 None，
+    # 整條路徑一個位元組都不會變）
+    glossary = None
+    if use_glossary:
+        m = _gloss.matcher_for(source_lang, target_lang)
+        glossary = m if m else None
 
     job.message = f"準備中…（共 {total} 段）"
     _warmup_llm(client, model)
@@ -322,24 +335,35 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         job.message = (f"翻譯中… 已完成 {stats['done_batches']}/{n_batches} 批"
                        f"（約 {int(frac * total)}/{total} 段）")
 
-    def one(k: int) -> None:
-        """單行翻譯（批次對不上時的退路）。"""
+    def one(k: int, use_glossary: bool = True) -> None:
+        """單行翻譯（批次對不上時的退路）。
+
+        `use_glossary=False` 是給「字典的佔位符在批次回覆裡壞掉」的那幾段用的
+        —— 那一段已經證明模型顧不好標記，再保護一次多半還是壞。
+        """
         text = pieces[k].text
         try:
             # **`_translate_one` 回的是 dict 不是字串**
             # （`{"src", "translated", "error", "skipped"}`）。
             res = _translate_one(client, model, text,
-                                 source_lang, target_lang, domain)
+                                 source_lang, target_lang, domain,
+                                 glossary=glossary if use_glossary else None)
             translated = (res.get("translated") or "").strip()
             # 翻不出來（錯誤）或被判定不用翻 → 保留原文。
             if not translated or res.get("error"):
                 translated = text
+            # 字典在這一段退回不保護重翻了 —— **要記進統計**。回報 0 次
+            # 退回但字典其實沒生效，比不回報還糟：使用者會以為它有用。
+            if (res.get("glossary") or {}).get("fallback"):
+                with lock:
+                    stats["gloss_fallbacks"] += 1
         except Exception:
             translated = text
         with lock:
             pieces[k].result = translated
 
-    stats = {"requests": 0, "fallbacks": 0, "done_batches": 0}
+    stats = {"requests": 0, "fallbacks": 0, "done_batches": 0,
+             "gloss_fallbacks": 0}
 
     def run_batch(batch: list[int]) -> None:
         """一次送一批。段數對不上就**對切再試**，切到只剩一行才逐行翻。
@@ -355,11 +379,18 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
             # raise 反而會被標成「失敗」。
             return
         texts = [pieces[k].text for k in batch]
+        # 翻譯對照字典：**每一段各自保護**（每段自己的編號從 1 開始），
+        # 所以某一段的標記壞掉只會退那一段，不會整批重來。
+        masked, maps = [], []
+        for t in texts:
+            mt, mp = ((t, {}) if glossary is None else _gloss.protect(t, glossary))
+            masked.append(mt)
+            maps.append(mp)
         parsed = None
         if len(texts) > 1:
             try:
                 reply = client.text_query(
-                    prompt=_build_batch_prompt(texts, source_lang, target_lang, domain),
+                    prompt=_build_batch_prompt(masked, source_lang, target_lang, domain),
                     model=model, temperature=0.0, think=False)
                 parsed = _parse_batch_reply(reply or "", len(texts))
                 # 模型有時會把**指令連同原文一起回**（回聲）。那種回覆裡的
@@ -384,10 +415,26 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
             run_batch(batch[:mid])
             run_batch(batch[mid:])
             return
+        # 還原佔位符。**還原不完整的那幾段退回逐段不保護重翻** —— 產出裡
+        # 絕對不可以殘留 `⟪1⟫`，那比翻錯還明顯。
+        redo: list[int] = []
+        results: list[str] = []
+        for k, tr, mp in zip(batch, parsed, maps):
+            out, ok = _gloss.restore(tr.strip(), mp)
+            if not ok:
+                redo.append(k)
+                results.append("")
+            else:
+                results.append(out)
         with lock:
             stats["requests"] += 1
-            for k, tr in zip(batch, parsed):
-                pieces[k].result = tr.strip() or pieces[k].text
+            if redo:
+                stats["gloss_fallbacks"] += len(redo)
+            for k, tr in zip(batch, results):
+                if k not in redo:
+                    pieces[k].result = tr or pieces[k].text
+        for k in redo:
+            one(k, use_glossary=False)
         _bump(len(batch))
 
     # **一格裡的換行要保留。** 試算表的儲存格常是「一句話 + 好幾個項目符號」，
@@ -471,6 +518,10 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         "batches": len(batches),
         "llm_requests": stats["requests"],
         "batch_fallbacks": stats["fallbacks"],
+        # 字典：套用了幾條、有幾段因為模型顧不好標記而退回不保護重翻。
+        # **要顯示出來** —— 使用者設了字典就要看得到它有沒有生效。
+        "glossary_terms": len(glossary.terms) if glossary else 0,
+        "glossary_fallbacks": stats["gloss_fallbacks"],
     })
     job.message = f"完成（{total} 段）"
     job.progress = 1.0

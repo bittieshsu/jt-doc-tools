@@ -33,6 +33,7 @@ import logging
 from ...config import settings
 from ...core.job_manager import job_manager
 from ...core import csv_safe as _csv_safe
+from ...core import translation_glossary as _gloss
 from ...core.llm_settings import llm_settings, DEFAULT_SETTINGS
 
 
@@ -432,9 +433,24 @@ def _looks_like_proxy_error_page(text: str) -> str:
 _MAX_TRANSLATE_RETRY = 2
 
 
+def _glossary_for(source_lang: str, target_lang: str,
+                  use_glossary: bool = True):
+    """取這個語言對的字典比對器；沒有條目就回 `None`。
+
+    回 `None` 而不是空的比對器，是為了讓下游那一行
+    `if glossary is None` 直接短路 —— 沒設字典的安裝，這條路徑上
+    **一個位元組都不會變**。
+    """
+    if not use_glossary:
+        return None
+    m = _gloss.matcher_for(source_lang, target_lang)
+    return m if m else None
+
+
 def _translate_one(client, model: str, src: str,
                    source_lang: str, target_lang: str,
-                   domain: str = "") -> dict:
+                   domain: str = "", glossary=None,
+                   _no_glossary: bool = False) -> dict:
     """單句翻譯 worker（給並行 executor 用）。
     空字串直接回 empty，不發 LLM call。任何 exception 回 error 字串，
     不 raise — caller 用 list 收集所有結果。
@@ -447,7 +463,12 @@ def _translate_one(client, model: str, src: str,
     prefix, body = _split_line_prefix(src)
     if not body.strip():
         return {"src": src, "translated": "", "error": "", "skipped": "filler"}
-    prompt = _build_prompt(body, source_lang, target_lang, domain=domain)
+    # 翻譯對照字典：**送出前把命中的詞換成佔位符**，模型看不到那些詞就不
+    # 可能翻錯（見 `core/translation_glossary`）。沒命中的話 `masked is body`，
+    # 這條路徑一個位元組都不會變。
+    masked, gloss_map = ((body, {}) if (glossary is None or _no_glossary)
+                         else _gloss.protect(body, glossary))
+    prompt = _build_prompt(masked, source_lang, target_lang, domain=domain)
     last_error = ""
     for attempt in range(_MAX_TRANSLATE_RETRY + 1):
         try:
@@ -465,12 +486,25 @@ def _translate_one(client, model: str, src: str,
                     continue  # retry
                 return {"src": src, "translated": "",
                         "error": f"⚠ LLM 上游錯誤 ({proxy_err})：請檢查 LLM proxy 設定 (gateway timeout)；此句未翻譯"}
+            if gloss_map:
+                restored, ok = _gloss.restore(translated, gloss_map)
+                if not ok:
+                    # 模型把佔位符弄丟或改壞了 → **這一句退回不保護重翻**。
+                    # 硬把剩下的填回去會產出少了字的句子，而且沒有人看得
+                    # 出來；產出裡更不可以殘留 `⟪1⟫`。
+                    out = _translate_one(client, model, src, source_lang,
+                                         target_lang, domain=domain,
+                                         glossary=None, _no_glossary=True)
+                    out["glossary"] = {"hits": len(gloss_map), "fallback": True}
+                    return out
+                translated = restored
             # 防 LLM 自己又加上同樣的行首符號 → 重複
             if prefix and translated.startswith(prefix.strip()):
                 translated = translated[len(prefix.strip()):].lstrip()
             if prefix:
                 translated = prefix + translated
-            return {"src": src, "translated": translated, "error": ""}
+            return {"src": src, "translated": translated, "error": "",
+                    "glossary": {"hits": len(gloss_map), "fallback": False}}
         except Exception as e:
             last_error = f"LLM 失敗：{e}"
             if attempt < _MAX_TRANSLATE_RETRY:
@@ -499,7 +533,7 @@ def _warmup_llm(client, model: str) -> None:
 
 def _translate_sentences(
     sentences: list[str], source_lang: str, target_lang: str,
-    domain: str = "",
+    domain: str = "", use_glossary: bool = True,
 ) -> list[dict]:
     client = llm_settings.make_client()
     if client is None:
@@ -514,9 +548,11 @@ def _translate_sentences(
     # 平行 worker 一起卡 cold load → httpx 60s timeout 全部 fire 整個 batch 死。
     # 客戶 v1.8.31 回報的「卡住」根因。
     _warmup_llm(client, model)
+    glossary = _glossary_for(source_lang, target_lang, use_glossary)
     n = len(sentences)
     if n <= 1 or concurrency == 1:
-        return [_translate_one(client, model, src, source_lang, target_lang, domain=domain)
+        return [_translate_one(client, model, src, source_lang, target_lang,
+                               domain=domain, glossary=glossary)
                 for src in sentences]
     # ThreadPoolExecutor.map 保證 output 順序對應 input 順序（重要 — UI
     # 是依索引貼回原文位置）。內部 LLMClient 的 httpx 是同步的，所以用
@@ -524,7 +560,9 @@ def _translate_sentences(
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=concurrency) as ex:
         results = list(ex.map(
-            lambda src: _translate_one(client, model, src, source_lang, target_lang, domain=domain),
+            lambda src: _translate_one(client, model, src, source_lang,
+                                       target_lang, domain=domain,
+                                       glossary=glossary),
             sentences,
         ))
     return results
@@ -546,6 +584,7 @@ async def index(request: Request):
             "llm_default_model": s.get("model", ""),
             "llm_url": s.get("base_url", ""),
             "office_engine": detect_engine(),
+            "glossary_pairs": _gloss.pair_counts(),
             # 逐句翻譯上限 + 分頁大小（admin 可在 LLM 設定調整）
             "trd_max_sentences": int(s.get("translate_max_sentences",
                                            DEFAULT_SETTINGS["translate_max_sentences"])),
@@ -601,7 +640,8 @@ async def translate_batch(request: Request):
     # executor 跑，async loop 就能繼續處理其他請求。
     import asyncio as _asyncio
     results = await _asyncio.to_thread(
-        _translate_sentences, sentences, source_lang, target_lang, domain)
+        _translate_sentences, sentences, source_lang, target_lang, domain,
+        bool(body.get("use_glossary", True)))
     return {
         "source_lang": source_lang,
         "target_lang": target_lang,
@@ -669,9 +709,12 @@ async def start_job(request: Request):
     target_lang = str(body.get("target_lang") or "zh-TW")
     domain = str(body.get("domain") or "")
     filename = str(body.get("filename") or "")[:200]
+    # 預設套用字典：管理員特地設了對照表，不該因為使用者忘記勾而失效。
+    use_glossary = bool(body.get("use_glossary", True))
 
     def run(job) -> None:
-        _trd_run_job(job, sentences, source_lang, target_lang, domain)
+        _trd_run_job(job, sentences, source_lang, target_lang, domain,
+                     use_glossary=use_glossary)
 
     job = job_manager.submit(
         "translate-doc", run,
@@ -697,7 +740,8 @@ async def start_job(request: Request):
 
 
 def _trd_run_job(job, sentences: list[str], source_lang: str,
-                 target_lang: str, domain: str) -> None:
+                 target_lang: str, domain: str,
+                 use_glossary: bool = True) -> None:
     """背景執行：逐句翻譯並持續回報進度。"""
     from concurrent.futures import ThreadPoolExecutor
 
@@ -710,6 +754,7 @@ def _trd_run_job(job, sentences: list[str], source_lang: str,
     if source_lang == "auto":
         source_lang = _detect_language("\n".join(sentences[:50]))
     total = len(sentences)
+    glossary = _glossary_for(source_lang, target_lang, use_glossary)
     job.message = f"準備中…（共 {total} 句）"
     _warmup_llm(client, model)
 
@@ -731,7 +776,7 @@ def _trd_run_job(job, sentences: list[str], source_lang: str,
             # 「準備中」，堆疊顯示兩個 worker 都卡在 remote_limit.__enter__）。
             # 外部服務的上限屬於「呼叫外部服務的那一層」，呼叫端不要重複實作。
             r = _translate_one(client, model, src, source_lang,
-                               target_lang, domain=domain)
+                               target_lang, domain=domain, glossary=glossary)
         except Exception as e:  # noqa: BLE001 — 單句失敗不該讓整批停掉
             r = {"src": src, "translated": "", "error": str(e)[:300]}
         with lock:
@@ -804,9 +849,11 @@ async def translate_one(request: Request):
     domain = str(body.get("domain") or "")
     if source_lang == "auto":
         source_lang = _detect_language(src)
+    use_glossary = bool(body.get("use_glossary", True))
     import asyncio as _asyncio
     results = await _asyncio.to_thread(
-        _translate_sentences, [src], source_lang, target_lang, domain)
+        _translate_sentences, [src], source_lang, target_lang, domain,
+        use_glossary)
     return results[0] if results else {"src": src, "translated": "",
                                        "error": "no result"}
 
@@ -856,7 +903,8 @@ async def api_translate_doc(request: Request):
     # executor 跑，async loop 就能繼續處理其他請求。
     import asyncio as _asyncio
     results = await _asyncio.to_thread(
-        _translate_sentences, sentences, source_lang, target_lang, domain)
+        _translate_sentences, sentences, source_lang, target_lang, domain,
+        bool(body.get("use_glossary", True)))
     return {
         "source_lang": source_lang,
         "target_lang": target_lang,

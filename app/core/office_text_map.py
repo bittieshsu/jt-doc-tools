@@ -97,11 +97,49 @@ def _localname(tag: str) -> str:
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
+#: Word 的相容包裝：同一個圖形存兩份，`mc:Choice` 是新的（DrawingML）、
+#: `mc:Fallback` 是舊的（VML）。內容一樣，只翻其中一份就好。
+_MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+
+
+def _docx_skipped_paragraphs(root: ET.Element) -> set[int]:
+    """哪些 `w:p` 不可以當成一段。
+
+    兩類：
+    1. **裡面還有別的 `w:p`** —— 那是包著文字方塊的外層容器，它的文字是
+       所有子孫串起來的結果，翻了會被塞進第一個方塊裡。
+    2. **`mc:Fallback` 底下的** —— 跟 `mc:Choice` 是同一份內容的兩種存法。
+    """
+    skip: set[int] = set()
+    for para in root.iter(f"{{{_W}}}p"):
+        for _inner in para.iter(f"{{{_W}}}p"):
+            if _inner is not para:
+                skip.add(id(para))
+                break
+    for fb in root.iter(f"{{{_MC}}}Fallback"):
+        for para in fb.iter(f"{{{_W}}}p"):
+            skip.add(id(para))
+    return skip
+
+
 def _iter_paragraph_nodes(root: ET.Element, kind: str):
     """回傳 [(段落元素, [文字節點, ...])]。"""
     out: list[tuple[ET.Element, list[ET.Element], dict]] = []
     if kind == "docx":
+        # **文字方塊會讓同一段文字被收好幾次。** 一個含文字方塊的段落，
+        # `para.iter()` 會把方塊裡的文字也收進來 —— 於是外層拿到「整頁
+        # 串成一段」，方塊自己又各拿一次。寫回去時那一大段會被塞進**第一個
+        # 文字方塊**裡（實測：12 頁的年報，第一個小標題方塊收到整頁 4,882 字
+        # 的譯文），版面直接毀掉。
+        #
+        # 而且 Word 的 `mc:AlternateContent` 會把同一個方塊存兩份
+        # （`mc:Choice` 走 DrawingML、`mc:Fallback` 走 VML）—— 兩份都翻就是
+        # **兩倍的 LLM 費用**，而且兩份可能翻得不一樣，不同的閱讀器看到不同
+        # 的內容。實測一份 12 頁的文件：44,900 字被算成 180,532 字（四倍）。
+        skip = _docx_skipped_paragraphs(root)
         for para in root.iter(f"{{{_W}}}p"):
+            if id(para) in skip:
+                continue
             nodes = [n for n in para.iter(f"{{{_W}}}t")]
             if nodes:
                 # 記下每個文字節點屬於哪個 run —— 寫進中文時要在 run 上指定
@@ -421,6 +459,28 @@ def extract_units(data: bytes, ext: str) -> tuple[list[TextUnit], dict]:
     return units, {"raw": raw, "names": names, "trees": trees, "ext": ext}
 
 
+def _mirror_docx_fallback(root: ET.Element) -> None:
+    """把 `mc:Choice` 裡的文字複製到同一組的 `mc:Fallback`。
+
+    **兩邊的文字節點數量對不上就整組不動** —— 硬對會把 A 方塊的譯文寫進
+    B 方塊，比留著原文更糟。
+    """
+    for alt in root.iter(f"{{{_MC}}}AlternateContent"):
+        choice = alt.find(f"{{{_MC}}}Choice")
+        fallback = alt.find(f"{{{_MC}}}Fallback")
+        if choice is None or fallback is None:
+            continue
+        src = [n for n in choice.iter(f"{{{_W}}}t")]
+        dst = [n for n in fallback.iter(f"{{{_W}}}t")]
+        if not src or len(src) != len(dst):
+            continue
+        for a, b in zip(src, dst):
+            b.text = a.text
+            space = a.get(f"{{{_XML}}}space")
+            if space:
+                b.set(f"{{{_XML}}}space", space)
+
+
 def rebuild(state: dict, translations: dict[int, str], units: list[TextUnit],
             target_lang: str = "") -> bytes:
     """把譯文寫回原檔，回傳新的檔案內容。
@@ -458,6 +518,14 @@ def rebuild(state: dict, translations: dict[int, str], units: list[TextUnit],
                     _set_run_east_asian_font(run, ea_font)
             for n in gnodes[1:]:
                 _set_node_text(n, kind, "")
+
+    # 把譯文鏡射到 `mc:Fallback`。我們只翻 `mc:Choice`（同一個文字方塊的兩種
+    # 存法），不鏡射的話交出去的檔案會**藏著一份完整的原文**：新版 Word 與
+    # LibreOffice 看的是 Choice、顯示譯文，但用 VML 那條路的閱讀器會看到英文，
+    # 全文搜尋與字數統計也會把兩份都算進去。
+    if ext == ".docx":
+        for tree in state["trees"].values():
+            _mirror_docx_fallback(tree.getroot())
 
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:

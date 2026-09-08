@@ -46,7 +46,11 @@ def _fake_llm(monkeypatch):
     monkeypatch.setattr(trd, "_warmup_llm", lambda *a, **k: None)
     monkeypatch.setattr(trd, "_detect_language", lambda _t: "en")
 
-    def fake_one(client, model, src, sl, tl, domain=""):
+    def fake_one(client, model, src, sl, tl, domain="", **kw):
+        # `**kw` 是刻意的：`_translate_one` 之後又多了 `glossary=`
+        # （翻譯對照字典）。假函式收不下新參數時，正式碼的 `except`
+        # 會把 TypeError 吞掉，作業變成「完成但每句都是空的」——
+        # 看起來像產品壞了，其實是測試沒跟上。
         time.sleep(0.02)              # 讓「中途查得到」有機會被觀察到
         return {"src": src, "translated": f"[{tl}] {src}"}
 

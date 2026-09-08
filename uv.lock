@@ -710,7 +710,7 @@ wheels = [
 
 [[package]]
 name = "jt-doc-tools"
-version = "1.15.18"
+version = "1.15.21"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

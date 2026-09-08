@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import zipfile
 from pathlib import Path
 from typing import Optional
+from dataclasses import asdict
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -25,6 +26,7 @@ from ..core.asset_manager import PositionPreset, asset_manager
 from ..core.conv_settings import BUILTIN_PATHS, conv_settings
 from ..core.profile_manager import profile_manager
 from ..core.synonym_manager import synonym_manager
+from ..core import translation_glossary as _tg
 from ..core.template_manager import template_manager
 from ..web.deps import require_admin
 
@@ -548,6 +550,86 @@ def build_router(templates) -> APIRouter:
         new_co = profile_manager.create(name)
         profile_manager.save(new_co["id"], name, fields, labels)
         return {"ok": True, "id": new_co["id"], "name": name}
+
+    # ---------- 翻譯對照字典 ----------
+    @router.get("/translation-glossary", response_class=HTMLResponse)
+    async def glossary_page(request: Request):
+        terms = _tg.load()
+        return templates.TemplateResponse(request, "translation_glossary.html", {
+            "request": request,
+            "terms": [asdict(t) for t in terms],
+            "max_terms": _tg.MAX_TERMS,
+            "langs": _tg.lang_choices(),
+        })
+
+    @router.post("/translation-glossary/save")
+    async def glossary_save(request: Request):
+        body = await request.json()
+        rows = body.get("terms")
+        if not isinstance(rows, list):
+            raise HTTPException(400, "terms 要是陣列")
+        if len(rows) > _tg.MAX_TERMS:
+            raise HTTPException(400, f"字典最多 {_tg.MAX_TERMS} 條")
+        terms, seen = [], set()
+        for i, raw in enumerate(rows, start=1):
+            try:
+                t = _tg.normalise(raw if isinstance(raw, dict) else {})
+            except ValueError as e:
+                # **指出是第幾條** —— 只說「格式錯誤」的話，一份幾百條的
+                # 字典要自己一條一條找。
+                raise HTTPException(400, f"第 {i} 條：{e}") from None
+            k = _tg.key_of(t)
+            if k in seen:
+                raise HTTPException(400, f"第 {i} 條：同一個語言對裡「{t.source}」重複了")
+            seen.add(k)
+            terms.append(t)
+        _tg.save(terms)
+        from ..core import audit_db, client_ip as _cip
+        user = getattr(request.state, "user", None)
+        audit_db.log_event("glossary_change",
+                           username=(user or {}).get("username", ""),
+                           ip=_cip.real_client_ip(request),
+                           details={"terms": len(terms)})
+        return {"ok": True, "terms": len(terms)}
+
+    @router.post("/translation-glossary/preview")
+    async def glossary_preview(request: Request):
+        """貼一段文字，看會命中哪幾條。
+
+        **設完看不出有沒有生效，等於沒設** —— 詞邊界、大小寫、最長優先
+        這些規則從表格上看不出來，要能當場試。
+        """
+        body = await request.json()
+        text = str(body.get("text") or "")[:5000]
+        src = str(body.get("src_lang") or "")
+        tgt = str(body.get("tgt_lang") or "")
+        m = _tg.matcher_for(src, tgt)
+        masked, mapping = _tg.protect(text, m)
+        return {"hits": [{"source": t.source, "target": t.replacement(),
+                          "mode": t.mode} for t in m.find(text)],
+                "masked": masked, "count": len(mapping)}
+
+    @router.get("/translation-glossary/export")
+    async def glossary_export():
+        """CSV 匯出。企業一定有現成的對照表，要進得來也出得去。"""
+        import csv
+        import io as _io
+        from ..core import csv_safe as _csv_safe
+        from ..core.http_utils import content_disposition
+        buf = _io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["source", "target", "src_lang", "tgt_lang",
+                    "mode", "case_sensitive", "note", "enabled"])
+        for t in _tg.load():
+            w.writerow(_csv_safe.row([t.source, t.target,
+                                      t.src_lang, t.tgt_lang, t.mode,
+                                      "1" if t.case_sensitive else "0",
+                                      t.note, "1" if t.enabled else "0"]))
+        return Response(
+            content=buf.getvalue().encode("utf-8-sig"),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition":
+                     content_disposition("translation_glossary.csv")})
 
     # ---------- PDF label synonyms ----------
     @router.get("/synonyms", response_class=HTMLResponse)

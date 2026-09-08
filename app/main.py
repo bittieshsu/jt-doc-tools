@@ -19,7 +19,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.15.18"
+VERSION = "1.15.21"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -471,6 +471,10 @@ templates.env.globals["nav_settings"] = [
     {"icon": "building", "name": "公司資料", "description": "管理多公司基本資料",
      "url": "/admin/profile",
      "keywords": "company profile vendor info 廠商 公司"},
+    {"icon": "book", "name": "翻譯對照字典", "description": "單位內部專有名詞怎麼翻（逐句翻譯 / 文件翻譯共用）",
+     "url": "/admin/translation-glossary",
+     "keywords": "glossary terminology term dictionary translate translation "
+                 "brand proper noun 字典 對照 術語 專有名詞 翻譯 品牌 不要翻"},
     {"icon": "book", "name": "同義詞", "description": "PDF 標籤對應字典",
      "url": "/admin/synonyms",
      "keywords": "synonym synonyms alias dictionary label mapping 字典 同義 詞"},

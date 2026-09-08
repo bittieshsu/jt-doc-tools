@@ -83,6 +83,12 @@
   </div>
   <input type="text" class="field dt-domain-input" id="dtDomain" placeholder="{{ tr('自填其他領域…（選填，會與上方點選的領域一起送進 prompt）') }}">
 
+  <p class="muted dt-note" id="dtGlossRow" hidden>
+    <label><input type="checkbox" id="dtGloss" checked>
+      {{ tr('套用翻譯對照字典') }}</label>
+    <span id="dtGlossCount"></span>
+  </p>
+
   <p class="muted dt-note" data-s="s_dt_model">
     {{ icon('info', size=14) }} <b>{{ tr('模型怎麼挑') }}</b>{{ tr('：這支工具一份文件動輒幾十次 LLM 請求，
     模型選得對很有感。') }}<b>{{ tr('Gemma 4 這一家要看的不是總參數，是「每個 token 實際算幾個參數」') }}</b>：
@@ -138,6 +144,22 @@
 {% block scripts %}
 <script src="/static/js/file_upload.js"></script><script src="/static/js/job_progress.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
+// 翻譯對照字典：**只在選到的語言對真的有條目時才顯示這個勾選** ——
+// 沒設定就給一個永遠沒作用的勾選，只會讓人以為自己設錯了。
+const DT_GLOSS = {{ glossary_pairs|tojson }};
+function dtSyncGloss() {
+  const src = document.getElementById('dtSrc').value;
+  const tgt = document.getElementById('dtTgt').value;
+  const n = DT_GLOSS[src + '|' + tgt] || 0;
+  document.getElementById('dtGlossRow').hidden = !n;
+  document.getElementById('dtGlossCount').textContent =
+    n ? tr('（目前有 {0} 條可套用）').replace('{0}', n) : '';
+}
+['dtSrc', 'dtTgt'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', dtSyncGloss);
+});
+document.addEventListener('DOMContentLoaded', dtSyncGloss);
 let dtUpload = null;
 
 /* 預覽縮圖點一下看大圖（跟資產管理同一套 .lightbox）。
@@ -265,6 +287,8 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
       source_lang: document.getElementById('dtSrc').value,
       target_lang: document.getElementById('dtTgt').value,
       domain: pickedDomain(),
+      use_glossary: !document.getElementById('dtGlossRow').hidden
+                    && document.getElementById('dtGloss').checked,
     }),
   });
   if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('送出失敗'))); return; }

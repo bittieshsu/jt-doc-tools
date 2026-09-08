@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}{{ tr('翻譯對照字典') }} · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ icon('book', size=22) }} {{ tr('翻譯對照字典') }}</h1>
+<p class="muted">{{ tr('單位內部的專有名詞要怎麼翻（或不要翻）。設好之後') }}<b>{{ tr('逐句翻譯') }}</b>{{ tr('與') }}<b>{{ tr('文件翻譯') }}</b>{{ tr('都會套用。') }}</p>
+<p class="muted">{{ tr('做法不是「請模型照著翻」——送出前就把這些詞換成佔位符，模型根本看不到，收回來再填上指定的譯法。所以是確定的，不靠模型配合。') }}{{ tr('儲存於') }} <code>data/translation_glossary.json</code>。</p>
+
+<div class="panel">
+  <h2>{{ icon('list', size=18) }} {{ tr('對照表') }}</h2>
+  <div class="profile-toolbar">
+    <button class="btn" id="addRow" type="button">{{ icon('plus') }}{{ tr('新增一條') }}</button>
+    <button class="btn btn-primary" id="saveBtn" type="button">{{ icon('save') }}{{ tr('儲存') }}</button>
+    <span class="tg-sep"></span>
+    <a class="btn" href="/admin/translation-glossary/export" download>{{ icon('download') }}{{ tr('匯出 CSV') }}</a>
+    <button class="btn" id="importBtn" type="button">{{ icon('upload') }}{{ tr('匯入 CSV') }}</button>
+    <input type="file" id="importFile" accept=".csv,text/csv" class="tg-hidden">
+    <span class="tg-sep"></span>
+    <input type="search" id="filter" placeholder="{{ tr('搜尋原文 / 譯文 / 備註') }}" class="field tg-filter">
+    <span class="muted" id="status"></span>
+  </div>
+
+  <table class="profile-table" id="tbl">
+    <thead>
+      <tr>
+        <th>{{ tr('原文') }}</th>
+        <th>{{ tr('原文語言') }}</th>
+        <th>{{ tr('譯文') }}</th>
+        <th>{{ tr('譯文語言') }}</th>
+        <th>{{ tr('處理方式') }}</th>
+        <th title="{{ tr('打勾表示 Acer 與 acer 視為不同') }}">{{ tr('區分大小寫') }}</th>
+        <th>{{ tr('備註') }}</th>
+        <th>{{ tr('啟用') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p class="muted" id="pager"></p>
+</div>
+
+<div class="panel">
+  <h2>{{ icon('search', size=18) }} {{ tr('試一段文字') }}</h2>
+  <p class="muted">{{ tr('設完看不出有沒有生效等於沒設。貼一段原文，看會命中哪幾條。') }}</p>
+  <div class="profile-toolbar">
+    <label class="tg-inline">{{ tr('原文語言') }}
+      <select id="tSrc" class="field">{% for l in langs %}<option value="{{ l.code }}">{{ l.name }}</option>{% endfor %}</select>
+    </label>
+    <label class="tg-inline">{{ tr('譯文語言') }}
+      <select id="tTgt" class="field">{% for l in langs %}<option value="{{ l.code }}">{{ l.name }}</option>{% endfor %}</select>
+    </label>
+    <button class="btn" id="tryBtn" type="button">{{ icon('play') }}{{ tr('試一次') }}</button>
+  </div>
+  <textarea id="tryText" rows="3" class="field tg-try" placeholder="The Acer server runs Foxconn firmware."></textarea>
+  <div id="tryOut" class="muted"></div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+  .profile-table { width: 100%; border-collapse: collapse; }
+  .profile-table td, .profile-table th { padding: 4px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .profile-table th { text-align: left; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  /* 輸入框 / 下拉一律用全站的 `.field`（`platform.css`）——**不要各自寫一套**，
+     那正是 SSO 設定頁長歪的原因。這裡只補表格裡需要的寬度。 */
+  .profile-table .field { width: 100%; }
+  .tg-inline .field { width: auto; }
+  .profile-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .tg-sep { flex: 0 0 12px; }
+  .tg-hidden { display: none; }
+  .tg-filter { min-width: 200px; }
+  .tg-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .tg-try { width: 100%; }
+  #tryOut { margin-top: 8px; font-size: 13px; }
+  #status.ok { color: var(--success); }
+  #status.err { color: #b91c1c; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+const LANGS = {{ langs|tojson }};
+const MAX_TERMS = {{ max_terms }};
+const PAGE = 100;   // 幾千條全塞 DOM 會卡（逐句翻譯的對照表就是這樣改的）
+let terms = {{ terms|tojson }};
+let page = 0;
+
+const rowsEl = document.getElementById('rows');
+const statusEl = document.getElementById('status');
+const pagerEl = document.getElementById('pager');
+const filterEl = document.getElementById('filter');
+
+function say(msg, cls) {
+  statusEl.textContent = msg;
+  statusEl.className = 'muted ' + (cls || '');
+}
+
+function langOptions(sel) {
+  return LANGS.map(l =>
+    `<option value="${l.code}"${l.code === sel ? ' selected' : ''}>${l.name}</option>`
+  ).join('');
+}
+
+function visible() {
+  const q = (filterEl.value || '').trim().toLowerCase();
+  if (!q) return terms;
+  return terms.filter(t =>
+    (t.source + ' ' + t.target + ' ' + (t.note || '')).toLowerCase().includes(q));
+}
+
+function render() {
+  const list = visible();
+  const start = page * PAGE;
+  const slice = list.slice(start, start + PAGE);
+  rowsEl.textContent = '';
+  slice.forEach((t) => {
+    const idx = terms.indexOf(t);
+    const rowEl = document.createElement('tr');
+    rowEl.innerHTML =
+      `<td><input class="field f-source" type="text" value=""></td>` +
+      `<td><select class="field f-src_lang">${langOptions(t.src_lang)}</select></td>` +
+      `<td><input class="field f-target" type="text" value=""></td>` +
+      `<td><select class="field f-tgt_lang">${langOptions(t.tgt_lang)}</select></td>` +
+      `<td><select class="field f-mode">` +
+        `<option value="translate">${tr('照這樣翻')}</option>` +
+        `<option value="keep">${tr('不要翻譯')}</option></select></td>` +
+      `<td><input class="f-case_sensitive" type="checkbox"></td>` +
+      `<td><input class="field f-note" type="text" value=""></td>` +
+      `<td><input class="f-enabled" type="checkbox"></td>` +
+      `<td><button class="btn btn-small btn-danger" data-act="del" type="button">` +
+        `${tr('刪除')}</button></td>`;
+    // **值用 property 設，不要塞進 HTML 字串** —— 詞條是使用者輸入的
+    rowEl.querySelector('.f-source').value = t.source;
+    rowEl.querySelector('.f-target').value = t.target;
+    rowEl.querySelector('.f-note').value = t.note || '';
+    rowEl.querySelector('.f-mode').value = t.mode;
+    rowEl.querySelector('.f-case_sensitive').checked = !!t.case_sensitive;
+    rowEl.querySelector('.f-enabled').checked = t.enabled !== false;
+    rowEl.dataset.idx = String(idx);
+    rowsEl.appendChild(rowEl);
+  });
+  const pages = Math.max(1, Math.ceil(list.length / PAGE));
+  pagerEl.textContent = tr('共 {0} 條').replace('{0}', list.length) +
+    (pages > 1 ? '　' + tr('第 {0} / {1} 頁').replace('{0}', page + 1).replace('{1}', pages) : '');
+  pagerEl.textContent += '　' + tr('上限 {0} 條').replace('{0}', MAX_TERMS);
+}
+
+function collect() {
+  // 畫面上只有目前這一頁，所以要先把這一頁的編輯寫回 terms
+  rowsEl.querySelectorAll('tr').forEach(rowEl => {
+    const t = terms[Number(rowEl.dataset.idx)];
+    if (!t) return;
+    t.source = rowEl.querySelector('.f-source').value.trim();
+    t.target = rowEl.querySelector('.f-target').value.trim();
+    t.src_lang = rowEl.querySelector('.f-src_lang').value;
+    t.tgt_lang = rowEl.querySelector('.f-tgt_lang').value;
+    t.mode = rowEl.querySelector('.f-mode').value;
+    t.case_sensitive = rowEl.querySelector('.f-case_sensitive').checked;
+    t.note = rowEl.querySelector('.f-note').value.trim();
+    t.enabled = rowEl.querySelector('.f-enabled').checked;
+  });
+}
+
+document.getElementById('addRow').addEventListener('click', () => {
+  collect();
+  // 依目前介面語言自動帶：介面是中文 → 原文英文、譯文中文；反之亦然。
+  const uiZh = (document.documentElement.lang || 'zh-Hant').startsWith('zh');
+  terms.unshift({
+    source: '', target: '',
+    src_lang: uiZh ? 'en' : 'zh-TW', tgt_lang: uiZh ? 'zh-TW' : 'en',
+    mode: 'translate', case_sensitive: false, note: '', enabled: true,
+  });
+  page = 0;
+  filterEl.value = '';
+  render();
+  const first = rowsEl.querySelector('.f-source');
+  if (first) first.focus();
+});
+
+rowsEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-act="del"]');
+  if (!btn) return;
+  collect();
+  terms.splice(Number(btn.closest('tr').dataset.idx), 1);
+  render();
+});
+
+filterEl.addEventListener('input', () => { collect(); page = 0; render(); });
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  collect();
+  say(tr('儲存中…'));
+  try {
+    const r = await fetch('/admin/translation-glossary/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ terms }),
+    });
+    if (!r.ok) { say(await window.friendlyServerError(r, tr('儲存失敗')), 'err'); return; }
+    const j = await r.json();
+    say(tr('已儲存 {0} 條').replace('{0}', j.terms), 'ok');
+  } catch (err) {
+    say(tr('儲存失敗'), 'err');
+  }
+});
+
+// ---- CSV 匯入 ----
+const importFile = document.getElementById('importFile');
+document.getElementById('importBtn').addEventListener('click', () => importFile.click());
+importFile.addEventListener('change', async () => {
+  const f = importFile.files && importFile.files[0];
+  if (!f) return;
+  const text = await f.text();
+  const rows = parseCsv(text);
+  if (!rows.length) { say(tr('這個檔案裡沒有資料'), 'err'); return; }
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const col = (n) => head.indexOf(n);
+  if (col('source') < 0 || col('src_lang') < 0 || col('tgt_lang') < 0) {
+    say(tr('CSV 少了必要的欄位（source / src_lang / tgt_lang）'), 'err');
+    return;
+  }
+  const added = rows.slice(1).filter(r => r.length && (r[col('source')] || '').trim())
+    .map(r => ({
+      source: (r[col('source')] || '').trim(),
+      target: col('target') >= 0 ? (r[col('target')] || '').trim() : '',
+      src_lang: (r[col('src_lang')] || '').trim(),
+      tgt_lang: (r[col('tgt_lang')] || '').trim(),
+      mode: col('mode') >= 0 && (r[col('mode')] || '').trim() === 'keep' ? 'keep' : 'translate',
+      case_sensitive: col('case_sensitive') >= 0 && ['1', 'true', 'yes'].includes((r[col('case_sensitive')] || '').trim().toLowerCase()),
+      note: col('note') >= 0 ? (r[col('note')] || '').trim() : '',
+      enabled: col('enabled') < 0 || !['0', 'false', 'no'].includes((r[col('enabled')] || '').trim().toLowerCase()),
+    }));
+  // 同一個語言對裡原文重複 → 用匯入的那一筆蓋掉（否則儲存時會被擋下來，
+  // 而使用者根本不知道是哪一條重複）
+  const keyOf = (t) => [t.src_lang, t.tgt_lang, t.source.toLowerCase()].join(' ');
+  const map = new Map(terms.map(t => [keyOf(t), t]));
+  let replaced = 0;
+  added.forEach(t => { if (map.has(keyOf(t))) replaced++; map.set(keyOf(t), t); });
+  terms = Array.from(map.values());
+  page = 0;
+  render();
+  say(tr('已讀入 {0} 條（覆蓋 {1} 條），請按「儲存」才會生效')
+      .replace('{0}', added.length).replace('{1}', replaced), 'ok');
+  importFile.value = '';
+});
+
+function parseCsv(text) {
+  // 夠用的 CSV 解析：支援引號、引號內的逗號與換行、"" 轉義
+  const out = [];
+  let row = [], cell = '', q = false;
+  const src = text.replace(/^﻿/, '').replace(/\r\n/g, '\n');
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (q) {
+      if (c === '"') { if (src[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+      else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n') { row.push(cell); out.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); out.push(row); }
+  return out.filter(r => r.some(x => x.trim()));
+}
+
+// ---- 試一段文字 ----
+document.getElementById('tryBtn').addEventListener('click', async () => {
+  const out = document.getElementById('tryOut');
+  out.textContent = tr('比對中…');
+  try {
+    const r = await fetch('/admin/translation-glossary/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: document.getElementById('tryText').value,
+        src_lang: document.getElementById('tSrc').value,
+        tgt_lang: document.getElementById('tTgt').value,
+      }),
+    });
+    if (!r.ok) { out.textContent = await window.friendlyServerError(r, tr('比對失敗')); return; }
+    const j = await r.json();
+    out.textContent = '';
+    if (!j.hits.length) { out.textContent = tr('沒有命中任何條目'); return; }
+    const ul = document.createElement('ul');
+    j.hits.forEach(h => {
+      const li = document.createElement('li');
+      li.textContent = h.mode === 'keep'
+        ? tr('{0}：保持原樣').replace('{0}', h.source)
+        : h.source + ' → ' + h.target;
+      ul.appendChild(li);
+    });
+    out.appendChild(ul);
+    const p = document.createElement('p');
+    p.textContent = tr('共會保護 {0} 處').replace('{0}', j.count);
+    out.appendChild(p);
+  } catch (err) {
+    out.textContent = tr('比對失敗');
+  }
+});
+
+// 試用區的語言預設跟「新增」一致
+(function () {
+  const uiZh = (document.documentElement.lang || 'zh-Hant').startsWith('zh');
+  document.getElementById('tSrc').value = uiZh ? 'en' : 'zh-TW';
+  document.getElementById('tTgt').value = uiZh ? 'zh-TW' : 'en';
+})();
+
+render();
+</script>
+{% endblock %}
