@@ -55,7 +55,7 @@ def env(tmp_path, monkeypatch):
             "translate_concurrency": 1,
             "doctr_batch_segments": 40, "doctr_batch_chars": 1200})
         monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
-    monkeypatch.setattr(DT, "_make_preview", lambda *a, **k: 0)
+    monkeypatch.setattr(DT, "_make_preview", lambda *a, **k: (0, 0))
     G.save([_t("Acer", "宏碁"), _t("Foxconn", "富士康"),
             _t("jt-doc-tools", "", mode="keep")])
     return d

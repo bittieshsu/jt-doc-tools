@@ -157,7 +157,7 @@ def test_job_produces_a_translated_file(tmp_path, monkeypatch):
     monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 2})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
     # 預覽要起 soffice，這裡不是重點（另有 §0.5 的實檔驗收）
-    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: (0, 0))
 
     upload_id = "b" * 32
     R._src_path(upload_id).write_bytes(_minimal_docx())
@@ -272,7 +272,7 @@ def test_job_uses_batching_and_keeps_segments_aligned(tmp_path, monkeypatch):
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 2})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
-    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: (0, 0))
 
     doc = (
         '<w:document xmlns:w="http://schemas.openxmlformats.org/'
@@ -326,7 +326,7 @@ def test_cancelled_job_produces_no_file(tmp_path, monkeypatch):
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 1})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
-    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: (0, 0))
 
     uid = "d" * 32
     R._src_path(uid).write_bytes(_minimal_docx())
@@ -366,7 +366,7 @@ def test_line_breaks_inside_a_cell_survive(tmp_path, monkeypatch):
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 1})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
-    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: (0, 0))
 
     # xlsx：一個 <si> 裡帶換行的儲存格
     cell = "All policies are:\n- Documented.\n- In use."
@@ -421,7 +421,7 @@ def test_per_line_colour_survives_the_translation(tmp_path, monkeypatch):
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 1})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
-    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: (0, 0))
 
     ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     shared = (
@@ -500,7 +500,7 @@ def test_mismatched_batch_is_halved_not_dropped_to_one_by_one(tmp_path, monkeypa
         "translate_concurrency": 1, "doctr_batch_segments": 12,
         "doctr_batch_chars": 20000})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
-    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: (0, 0))
 
     ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     cells = [f"Sentence number {i} here." for i in range(12)]
@@ -581,7 +581,7 @@ def test_progress_counts_batches_not_just_segments(tmp_path, monkeypatch):
         "translate_concurrency": 1, "doctr_batch_segments": 2,
         "doctr_batch_chars": 20000})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
-    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: 0)
+    monkeypatch.setattr(R, "_make_preview", lambda *a, **k: (0, 0))
 
     ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     cells = [f"Sentence number {i} here." for i in range(6)]

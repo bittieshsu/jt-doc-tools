@@ -4,6 +4,26 @@
 {% block title %}{{ tr('文件翻譯') }} · {{ app_name }}{% endblock %}
 {% block head %}{{ llm_gate_styles() }}
 <style nonce="{{ request.state.csp_nonce }}">
+/* 預覽結束的擋板：使用者是捲到這裡才誤以為「只翻到第 N 頁」的，
+   所以這一塊不可以是灰色小字 —— 要有框、有底色、有下載鈕。 */
+.dt-prev-end {
+  grid-column: 1 / -1;
+  margin: 14px 0 4px;
+  padding: 16px 18px;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+.dt-prev-end-t { margin: 0 0 6px; font-weight: 700; font-size: 15px; }
+.dt-prev-end p { margin: 0 0 10px; }
+/* 預覽區的說明也要看得見，不是一行灰字 */
+#dtPrevNote {
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent, #6366f1);
+  background: #f8fafc;
+  border-radius: 0 6px 6px 0;
+}
+
 /* 語言兩欄一列，上傳自己一列。**不要把很高的上傳區跟下拉排在同一列** ——
    下拉會被推到底部，上面空一大塊（第一版就是這樣長歪的）。 */
 /* 兩個語言下拉各佔半列，把整列填滿 —— 靠左擠成兩小塊、右邊空一大片不好看。
@@ -108,6 +128,25 @@
     要翻 PDF 請用') }}<a href="/tools/translate-doc/">{{ tr('逐句翻譯') }}</a>{{ tr('（左原文右譯文對照）。') }}
   </p>
 
+  <p class="muted dt-note" data-s="s_dt_pdf2">
+    {{ icon('info', size=14) }} {{ tr('如果一定要走這支工具，可以先用') }}<a
+      href="/tools/pdf-to-office/">{{ tr('PDF 轉文書檔') }}</a>{{ tr('轉成 .docx 再上傳，
+    轉換引擎請選') }}<b>pdf2docx-refine</b>{{ tr('。') }}
+    <br>
+    {{ tr('原因是這支工具以「段落」為單位翻譯，而各引擎保住段落的能力差很多
+    （同一份 12 頁文件實測）：') }}
+    <b>{{ tr('pdf2docx-refine 保住 11 段完整段落（最長 1,635 字）') }}</b>{{ tr('、
+    jtdt-reform 只保住 6 段、') }}<b>{{ tr('jtdt-layout 一段都沒有') }}</b>{{ tr('
+    （最長 179 字＝一行）—— 它把每一行釘在固定位置，版面最漂亮，但每個跨行的句子
+    都會被切開，半句話送給模型翻出來的東西接不起來。') }}
+    <br>
+    {{ tr('反過來說，如果只是要') }}<b>{{ tr('存檔或重新排版、不打算翻譯') }}</b>{{ tr('，
+    jtdt-layout 才是最好的（版面幾乎 1:1）。') }}
+    <br>
+    {{ tr('另外：如果那份 PDF 的文字是「外框曲線」（擷取不到任何文字），
+    任何引擎都救不回來 —— 要先用') }}<a href="/tools/pdf-ocr/">{{ tr('OCR 文字辨識') }}</a>{{ tr('補上文字層。') }}
+  </p>
+
   <div id="dtInfo" hidden>
     <div class="dt-stats">
       <span>{{ tr('可翻譯段落') }} <b id="dtUnits">0</b></span>
@@ -128,8 +167,9 @@
   <h2 data-s="s_dt_2">{{ tr('2. 結果') }}</h2>
   <p class="muted dt-note" id="dtSummary"></p>
   <p><a class="btn btn-primary" id="dtDownload" href="#" download>{{ icon('download') }} {{ tr('下載翻譯後的檔案') }}</a></p>
-  <p class="muted dt-note" id="dtPrevNote">{{ tr('前') }} {{ preview_pages }} {{ tr('頁預覽 ——') }} <b>{{ tr('左邊原文、右邊譯文') }}</b>{{ tr('，
-    並排比對版面有沒有跑掉（點圖看大圖）：') }}</p>
+  <p class="muted dt-note" id="dtPrevNote"><b>{{ tr('以下只是預覽，不是完整內容') }}</b>{{ tr('——
+    為了讓你') }}<b>{{ tr('並排比對版面有沒有跑掉') }}</b>{{ tr('，這裡只算前幾頁的圖（左邊原文、右邊譯文，
+    點圖看大圖）。完整內容請按上面的下載鈕。') }}<span id="dtPrevCount"></span></p>
   <div class="dt-prev" id="dtPrev"></div>
 </div>
 
@@ -220,8 +260,13 @@ function showResult(job) {
     if (!m.download_url) return;
     const res = document.getElementById('dtResult');
     res.hidden = false;
-    let sum = `共 ${m.total || 0} 段，其中 ${m.translated || 0} 段換成了譯文。`
-            + `檔案格式與版面跟原稿相同。`;
+    let sum = `共 ${m.total || 0} 段，其中 ${m.translated || 0} 段換成了譯文。`;
+    // **整份有幾頁一定要講** —— 客戶回報過「只翻到第六頁」，其實是預覽只出
+    // 前 6 頁，下載的檔案是完整的。畫面沒講清楚，使用者只能從預覽判斷。
+    if (m.total_pages) {
+      sum += tr('翻譯後的檔案共 {0} 頁，全部都已翻譯完成。').replace('{0}', m.total_pages);
+    }
+    sum += tr('檔案格式與版面跟原稿相同。');
     if (m.llm_requests) {
       sum += `（合併成 ${m.llm_requests} 次 LLM 請求`;
       if (m.batch_fallbacks) sum += `，其中 ${m.batch_fallbacks} 批對切重試`;
@@ -235,6 +280,10 @@ function showResult(job) {
     grid.textContent = '';
     const n = m.preview_pages || 0;
     document.getElementById('dtPrevNote').hidden = n === 0;
+    document.getElementById('dtPrevCount').textContent =
+      (n && m.total_pages)
+        ? tr('（共 {1} 頁，這裡只顯示前 {0} 頁）').replace('{0}', n).replace('{1}', m.total_pages)
+        : '';
     for (let i = 1; i <= n; i++) {
       const row = document.createElement('div');
       row.className = 'dt-pair';
@@ -245,7 +294,10 @@ function showResult(job) {
         img.src = `/tools/doc-translate/preview/${dtUpload}/${i}?side=${side}`;
         img.alt = `第 ${i} 頁（${label}）`;
         const cap = document.createElement('figcaption');
-        cap.textContent = tr('第 {0} 頁 · {1}').replace('{0}', i).replace('{1}', label);
+        cap.textContent = m.total_pages
+          ? tr('第 {0} 頁 / 共 {2} 頁 · {1}')
+              .replace('{0}', i).replace('{1}', label).replace('{2}', m.total_pages)
+          : tr('第 {0} 頁 · {1}').replace('{0}', i).replace('{1}', label);
         fig.appendChild(img); fig.appendChild(cap);
         fig.title = tr('點一下看大圖');
         // 放大要拿高解析度那張，縮圖放大只會糊掉
@@ -255,6 +307,26 @@ function showResult(job) {
         row.appendChild(fig);
       }
       grid.appendChild(row);
+    }
+    // **捲到預覽最後一張的那個位置，才是誤會發生的地方。**
+    // 客戶回報「只翻到第六頁」—— 其實是預覽只出前 6 頁，檔案是完整的。
+    // 光在上面寫一行灰字沒有用，要在他停下來的地方擋住他。
+    if (n && m.total_pages && m.total_pages > n) {
+      const end = document.createElement('div');
+      end.className = 'dt-prev-end';
+      const h = document.createElement('p');
+      h.className = 'dt-prev-end-t';
+      h.textContent = tr('預覽到這裡為止（前 {0} 頁）').replace('{0}', n);
+      const b = document.createElement('p');
+      b.textContent = tr('這份文件共 {0} 頁，後面還有 {1} 頁 —— 也都已經翻譯完成，只是沒有算成預覽圖（算圖很慢）。請下載檔案查看完整內容。')
+        .replace('{0}', m.total_pages).replace('{1}', m.total_pages - n);
+      const a = document.createElement('a');
+      a.className = 'btn btn-primary';
+      a.href = m.download_url;
+      if (m.download_name) a.setAttribute('download', m.download_name);
+      a.textContent = tr('下載翻譯後的檔案（共 {0} 頁）').replace('{0}', m.total_pages);
+      end.appendChild(h); end.appendChild(b); end.appendChild(a);
+      grid.appendChild(end);
     }
 }
 

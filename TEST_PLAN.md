@@ -105,7 +105,7 @@ v1.15.19 加翻譯對照字典時，完整套件一次紅了四條，**全是這
 | 2 | 新設定檔加進 `settings_export.CATEGORIES` | 「設定備份 / 匯入」漏掉它 → 客戶搬機器時**這份設定不見了**，而且要用到才發現 |
 | 3 | 所有 `tr()` 的字串補進 `app/i18n/en.json`（含 **JS 裡的**與**從資料算出來的**標籤） | 英文介面下那幾塊是中文 |
 | 4 | 側欄項目補**中英搜尋關鍵字** | 管理員搜不到這一頁 |
-| 5 | 改了共用函式的簽章 → **回頭改測試裡的假函式** | 假函式收不下新參數時，正式碼的 `except` 會把 TypeError 吞掉 → 作業「完成但每筆都是空的」，看起來像產品壞了 |
+| 5 | 改了共用函式的**簽章或回傳形狀** → **回頭改測試裡的替身** | 兩天踩兩次：①假函式收不下新參數 → 正式碼的 `except` 吞掉 TypeError → 作業「完成但每筆都是空的」②回傳從 `int` 改成 tuple，`lambda: 0` 的替身讓 11 條測試紅。**改完先 `grep` 測試裡有沒有替身**，不要等完整套件 |
 
 > **這五條都有守門**（`test_template_head_block` / `test_settings_export` /
 > `test_i18n_catalog` / `test_i18n_dynamic_labels` / `test_tool_search_keywords`）
@@ -347,7 +347,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **227 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **229 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -454,6 +454,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_ldap_failover.py` | 多台 DC 容錯與連線逾時 |
 | `test_license_declaration.py` | 本專案宣告的授權必須處處一致（v1.14.48 起改為 AGPL-3.0-or-later） |
 | `test_llm_per_field_consensus.py` | LLM 逐欄校驗：連兩輪都指出同一個問題才採納 |
+| `test_llm_stream_deadline.py` | 串流回應要有**整次生成的上限**，不是只有每個 chunk |
 | `test_llm_url_ssrf.py` | SSRF defence — admin-supplied LLM base URL must reject suspicious schemes |
 | `test_looks_garbled.py` | Regression tests for pdf_editor._looks_garbled(). |
 | `test_migration_fk_cascade.py` | 重建資料表的 migration 一律要關掉外鍵，否則升級會**清空子表** |
@@ -513,6 +514,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_pdf_wordcount.py` | Tests for the pdf-wordcount tool. |
 | `test_placeholder_extraction.py` | 擷取出來全是佔位字元（圓點 / 星號…）但畫面上其實是真的字 |
 | `test_preview_acl_failopen.py` | 預覽端點的 ACL 不可以「認不出 upload_id 就放行」 |
+| `test_preview_is_not_the_result.py` | **預覽只有前幾頁時，畫面一定要講出整份有幾頁。** |
 | `test_preview_page_range.py` | 縮圖 / 預覽的頁碼超出範圍要回 4xx，**不可以 500** |
 | `test_proxy_sso.py` | Reverse-proxy (Kerberos/SPNEGO) SSO — app/core/proxy_sso.py + middleware. |
 | `test_real_samples_smoke.py` | 拿**真實的**樣本檔掃過所有吃單一 PDF 的工具 |
@@ -3262,6 +3264,51 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       資料不是顯示文字（書籤的 `{title, page, level}`），翻掉是改壞資料。
 - [ ] 新畫的 SVG 圖示要**算圖確認過**才收（snap chromium 的 `--screenshot`
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
+
+---
+
+### 6.90 v1.15.23 — 預覽不是產出（**每次發版必過**）
+
+> 客戶回報「只翻到第六頁」。實跑他們的檔案：182 段翻了 179 段、產出 11 頁
+> 每一頁都有內容 —— 只是預覽只算前 6 頁。他們同時說「整體字數跟原始檔案
+> 接近」，正好印證下載的檔案是完整的。
+
+- [ ] `pytest tests/test_preview_is_not_the_result.py` 綠燈
+- [ ] **每一支只出部分預覽的工具**都要在預覽結束的位置有擋板
+      （目前：文件翻譯、PDF 轉文書檔）
+- [ ] 擋板**不可以是灰色小字**（要有框線與底色）—— 使用者是捲到最後一張
+      才下判斷的，寫在上面的說明他早就捲過去了
+- [ ] 擋板上要寫得出**整份幾頁、後面還有幾頁**，並且**就地放下載鈕**
+- [ ] 摘要要明說「全部都已翻譯完成」，每張預覽的標題要寫「第 N 頁 / 共 M 頁」
+
+### ⚠ 使用者只能從畫面判斷
+
+> 這條的通則：**畫面上看得到的東西如果只是產出的一部分，就一定要講出
+> 「完整的有多少」**。否則使用者會把看得到的當成全部 —— 而且他不會來問，
+> 他會以為功能壞了。
+
+---
+
+### 6.89 v1.15.22 — 串流回應要有整次生成的上限（**每次發版必過**）
+
+> 客戶的年報翻到第 24 段就永遠卡住。那一段是表格的填空欄位
+> （`For the period from<16 個不斷行空白> to`），模型停不下來。
+
+- [ ] `pytest tests/test_llm_stream_deadline.py` 綠燈
+- [ ] **兩處串流迴圈都要檢查**（只補一處等於沒補；用 AST 判斷真的有呼叫，
+      寫在註解裡不算）
+- [ ] 錯誤訊息要說得出**是模型不是網路** —— 連線失敗要查網路、模型停不下來
+      要看那一段文字，處理方式完全不同
+- [ ] 上限設 0 時不強制（留給刻意要跑很久的部署）
+- [ ] **這個 bug 的症狀是「什麼都沒發生」**：畫面顯示「翻譯中… N/M」不動、
+      沒有錯誤、也不會失敗。驗收要看**進度會不會前進**，不是看有沒有紅字
+
+### 從 PDF 來的文件要翻譯，畫面上要說用哪一顆引擎
+
+- [ ] 文件翻譯頁看得到「先轉 .docx、引擎選 pdf2docx-refine」
+- [ ] PDF 轉文書檔頁的三張引擎卡各自標明適不適合拿去翻譯
+- [ ] 判準是**保住幾段完整段落**（實測 11 / 6 / 0），不是視覺相似度 ——
+      jtdt-layout 視覺 0.997 最高，卻是翻譯最差的那一顆
 
 ---
 

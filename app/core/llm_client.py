@@ -133,6 +133,25 @@ def _extract_json_from_response(content: str) -> dict:
     raise LLMError(f"no parseable JSON in response: {s[:300]!r}")
 
 
+class StreamDeadline(Exception):
+    """整次生成超過上限。**不是連線問題，是模型停不下來。**
+
+    `stream=True` 時 httpx 的 `timeout` 是**每個 chunk 的讀取逾時** —— 只要
+    模型一直吐 token，逾時就永遠不會觸發，而設定裡那個
+    `timeout_seconds` 的說明寫的是「單次 HTTP 呼叫上限」。實測：一段表格的
+    填空文字（`For the transition period from<16 個不斷行空白> to`）讓
+    gemma4:26b 停不下來，**整份文件的翻譯就永遠卡在那一段**，畫面顯示
+    「翻譯中… N/M」不動，也沒有任何錯誤訊息。
+    """
+
+
+def _check_deadline(t0: float, limit: float) -> None:
+    import time as _t
+    if limit and _t.monotonic() - t0 > limit:
+        raise StreamDeadline(
+            f"單次生成超過 {limit:.0f} 秒仍未結束（模型可能停不下來）")
+
+
 class LLMClient:
     """Thin OpenAI-compat client. Stateless — safe to construct per-request."""
 
@@ -283,7 +302,13 @@ class LLMClient:
                 timeout=self.timeout,
             ) as r:
                 r.raise_for_status()
+                import time as _time
+                _t0 = _time.monotonic()
                 for line in r.iter_lines():
+                    # **整次生成也要有上限**，不是只有每個 chunk（見
+                    # `StreamDeadline`）。少了這一行，模型停不下來時整份
+                    # 文件的翻譯會永遠卡住而且沒有錯誤訊息。
+                    _check_deadline(_t0, self.timeout)
                     if not line or not line.startswith("data: "):
                         continue
                     data_line = line[6:].strip()
@@ -410,7 +435,13 @@ class LLMClient:
                 timeout=self.timeout,
             ) as r:
                 r.raise_for_status()
+                import time as _time
+                _t0 = _time.monotonic()
                 for line in r.iter_lines():
+                    # **整次生成也要有上限**，不是只有每個 chunk（見
+                    # `StreamDeadline`）。少了這一行，模型停不下來時整份
+                    # 文件的翻譯會永遠卡住而且沒有錯誤訊息。
+                    _check_deadline(_t0, self.timeout)
                     if not line or not line.startswith("data: "):
                         continue
                     data_line = line[6:].strip()

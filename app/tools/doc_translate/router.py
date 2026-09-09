@@ -498,7 +498,7 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
 
     job.message = "產生預覽…"
     job.progress = 0.9
-    pages = _make_preview(upload_id, result, src, ext)
+    pages, total_pages = _make_preview(upload_id, result, src, ext)
 
     stem = Path(meta["filename"]).stem
     # **一定要設 `result_path`** —— 「我的作業」的下載鈕看的是這個
@@ -510,6 +510,8 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
         "download_url": f"/tools/doc-translate/download/{upload_id}",
         "download_name": f"{stem}_translated{ext}",
         "preview_pages": pages,
+        # 整份有幾頁 —— 沒有這個數字，預覽停在第 6 頁會被讀成「只翻到第 6 頁」
+        "total_pages": total_pages,
         "upload_id": upload_id,
         "translated": sum(1 for i, v in out.items() if v != units[i].text),
         "total": total,
@@ -644,28 +646,36 @@ def _render_side(upload_id: str, src_file: Path, side: str, ext: str) -> int:
     office_convert.convert_to_pdf(src_file, pdf)
     import fitz
     with fitz.open(pdf) as doc:
-        n = min(PREVIEW_PAGES, doc.page_count)
+        total = doc.page_count
+        n = min(PREVIEW_PAGES, total)
     for i in range(n):
         png = settings.temp_dir / f"dt_{upload_id}_{side}_p{i + 1}.png"
         pdf_preview.render_page_png(pdf, png, page_index=i, dpi=90)
-    return n
+    return n, total
 
 
-def _make_preview(upload_id: str, result: Path, source: Path, ext: str) -> int:
+def _make_preview(upload_id: str, result: Path, source: Path,
+                  ext: str) -> tuple[int, int]:
     """原文與譯文各出一份前幾頁的預覽圖。預覽失敗不影響下載。
+
+    回傳 (預覽張數, 產出檔的總頁數)。
 
     **兩邊都要**：這個工具要證明的是「版面沒跑掉」，只看譯文那一份看不出來 ——
     要跟原稿並排比才知道框線、表格、圖片有沒有位移。
+
+    **總頁數要一起回報**：預覽只有前幾頁，畫面上如果沒講清楚整份有幾頁，
+    使用者會以為「翻譯只做到第 N 頁」——客戶真的這樣回報過（一份 11 頁的
+    文件全部翻好了，但預覽停在第 6 頁）。
     """
     try:
-        n_out = _render_side(upload_id, result, "out", ext)
+        n_out, total = _render_side(upload_id, result, "out", ext)
     except Exception:
-        return 0
+        return 0, 0
     try:
-        n_src = _render_side(upload_id, source, "src", ext)
+        n_src, _ = _render_side(upload_id, source, "src", ext)
     except Exception:
         n_src = 0
-    return min(n_out, n_src) if n_src else n_out
+    return (min(n_out, n_src) if n_src else n_out), total
 
 
 @router.get("/preview/{upload_id}/{page}")

@@ -3,6 +3,16 @@
 {% block title %}{{ tr('PDF 轉文書檔') }} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
+/* 預覽結束的擋板 —— 使用者是捲到這裡才誤以為「只轉了前幾頁」的，
+   所以不可以是灰色小字。 */
+.pv-end {
+  margin: 14px 0 4px; padding: 16px 18px;
+  border: 1px solid #fcd34d; border-radius: 10px;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+.pv-end-t { margin: 0 0 6px; font-weight: 700; font-size: 15px; }
+.pv-end p { margin: 0; }
+
 .p2o-stat { display:grid; grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr);
   gap:10px; margin:10px 0; }
 @media (max-width:560px){ .p2o-stat { grid-template-columns:1fr; } }
@@ -212,6 +222,7 @@
         <p class="body">{{ tr('Artifex pdf2docx 抽取文字與結構重建成') }} <b>Word</b>{{ tr('，跨平台相容性高、速度快；可在進階選項勾啟 jtdt-refine 後處理再校正版面。') }}</p>
         <div class="erows">
           <div class="erow"><span class="etag etag-fit">{{ tr('適合') }}</span><span class="etxt">{{ tr('一般文件轉「可繼續編輯」的 Word，追求穩定相容。') }}</span></div>
+          <div class="erow"><span class="etag etag-fit">{{ tr('適合') }}</span><span class="etxt"><b>{{ tr('要拿去做「文件翻譯」就選這顆') }}</b>{{ tr('：三顆之中只有它把跨行的句子併回完整段落（同一份 12 頁文件實測：保住 11 段、最長 1,635 字）。') }}</span></div>
         </div>
       </div>
     </label>
@@ -222,6 +233,7 @@
         <p class="body">{{ tr('依 PDF 實際版面座標，用幾何規則重新推算段落、表格與欄位，重組成') }} <b>docx / odt</b>{{ tr('，偏向還原成可流動、可再編輯的內文。') }}</p>
         <div class="erows">
           <div class="erow"><span class="etag etag-fit">{{ tr('適合') }}</span><span class="etxt">{{ tr('想要接近可編輯排版，能接受少數版面細節仍在調整。') }}</span></div>
+          <div class="erow"><span class="etag etag-limit">{{ tr('限制') }}</span><span class="etxt">{{ tr('段落只併回一部分（同一份文件保住 6 段），要拿去翻譯的話不如 pdf2docx。') }}</span></div>
         </div>
       </div>
     </label>
@@ -233,6 +245,7 @@
         <div class="erows">
           <div class="erow"><span class="etag etag-fit">{{ tr('適合') }}</span><span class="etxt">{{ tr('要一份「長得跟原 PDF 一樣、再微調」。') }}</span></div>
           <div class="erow"><span class="etag etag-limit">{{ tr('限制') }}</span><span class="etxt">{{ tr('浮動文字方塊、非流動文字、沒有真表格；要編輯內文 / 表格請用另兩顆引擎。') }}</span></div>
+          <div class="erow"><span class="etag etag-limit">{{ tr('限制') }}</span><span class="etxt"><b>{{ tr('不要拿去做「文件翻譯」') }}</b>{{ tr('：每一行是一個獨立的方塊（實測最長只有 179 字，一段完整段落都沒有），跨行的句子會被切開，半句話翻出來接不起來。') }}</span></div>
         </div>
       </div>
     </label>
@@ -668,6 +681,20 @@ const jp = new JobProgress($('p2oJob'), {
         </div>`;
       pagesContainer.appendChild(block);
     });
+    // 捲到預覽最後一張的位置要擋一下 —— 文件翻譯那邊真的有客戶把
+    // 「預覽只有 6 頁」讀成「只轉了 6 頁」（v1.15.23）。
+    if (nOrig > pageIdxs.length) {
+      const end = document.createElement('div');
+      end.className = 'pv-end';
+      const h = document.createElement('p');
+      h.className = 'pv-end-t';
+      h.textContent = tr('預覽到這裡為止（前 {0} 頁）').replace('{0}', pageIdxs.length);
+      const b = document.createElement('p');
+      b.textContent = tr('這份文件共 {0} 頁，後面 {1} 頁也都轉好了，只是沒有算成預覽圖（算圖很慢）。請下載檔案查看完整內容。')
+        .replace('{0}', nOrig).replace('{1}', nOrig - pageIdxs.length);
+      end.appendChild(h); end.appendChild(b);
+      pagesContainer.appendChild(end);
+    }
     previewWrap.hidden = false;
     // 等 unhide 後再設 src（避免 hidden 時 lazy load catch-22）
     pagesContainer.querySelectorAll('img').forEach(img => {
