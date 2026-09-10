@@ -148,7 +148,15 @@
 .nt-field { margin-top: 16px; }
 .nt-field > label { display: block; font-weight: 600; margin-bottom: 6px; color: #0f172a; }
 .nt-inline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.nt-inline input { width: 110px; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 7px; text-align: right; font-variant-numeric: tabular-nums; }
+/* **按型別分開** —— 這條原本是照「最短作業時間」那個數字欄寫的
+   （110px、靠右、等寬數字），網址欄繼承了同一條規則就被壓成一小格，
+   使用者只看得到 `https://doc.exa…`（客戶截圖回報）。 */
+.nt-inline input { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 7px; }
+.nt-inline input[type=number] { width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+.nt-inline input[type=text], .nt-inline input[type=url] { flex: 1 1 360px; min-width: 0; max-width: 560px; }
+/* 各通知管道裡的網址欄同理 —— 一小格看不到自己填了什麼。 */
+.nt-body label > input[type=text] { width: 100%; box-sizing: border-box; }
+.nt-body label { min-width: 0; }
 .nt-help { font-size: 12.5px; margin-top: 6px; line-height: 1.6; }
 .nt-chk { display: inline-flex; align-items: center; gap: 6px; margin-right: 16px; font-size: 13.5px; color: #475569; cursor: pointer; }
 .nt-note { display: flex; align-items: flex-start; gap: 7px; font-size: 12.5px; line-height: 1.6; }
@@ -291,7 +299,12 @@
           + tr('需要反向 DNS（PTR）與 SPF 設對、對外 25 埠可通，否則多半會被當垃圾信。')
           + tr('另外這個模式沒有重試佇列，對方暫時拒收就是這封通知沒送到 —— 要保證送達請用 relay。'),
   };
-  function apply() {
+  //: 慣例埠號。**只有「使用者沒有自己設過」時才幫他帶** —— 判準是目前的值
+  //: 剛好是另一個模式的慣例值（或空白）。
+  const CONVENTION = { auth: 587, relay: 25, direct: 25 };
+  const CONVENTIONAL = new Set(['', '25', '465', '587', '2525']);
+
+  function apply(initial) {
     const mode = sel.value;
     const root = sel.closest('.nt-body') || document;
     const show = (f, on) => {
@@ -305,18 +318,22 @@
     show('smtp_password', mode === 'auth');
     show('smtp_helo', mode !== 'auth');
     if (help) help.textContent = HELP[mode] || '';
-    // 換模式時把預設埠帶成慣例值，但**使用者自己改過就不要覆蓋**
+    // 換模式時把預設埠帶成慣例值。
+    //
+    // ⚠ **載入時絕對不可以動它。** 原本這裡是「`touched` 沒設過就覆寫」，
+    // 而 `touched` 只在使用者這次打字時才會設 —— 於是每次重新開頁都把存好的
+    // 值覆蓋成慣例值：使用者存了 25，回來看又變 587（客戶回報）。
+    // **設定頁面自動帶值時，一定要先問「這個值是不是使用者存的」。**
     const portEl = root.querySelector('[data-f="smtp_port"]');
-    if (portEl && !portEl.dataset.touched) {
-      portEl.value = (mode === 'auth') ? 587 : 25;
-    }
-    if (portEl && !portEl.dataset.wired) {
-      portEl.dataset.wired = '1';
-      portEl.addEventListener('input', () => { portEl.dataset.touched = '1'; });
+    if (portEl && !initial) {
+      // 只有目前是空的、或還停在別的模式的慣例值時才幫他換掉；
+      // 自己填過 2526 這種值就一個字都不要動。
+      const cur = String(portEl.value || '').trim();
+      if (CONVENTIONAL.has(cur)) portEl.value = CONVENTION[mode] || 25;
     }
   }
-  sel.addEventListener('change', apply);
-  apply();
+  sel.addEventListener('change', () => apply(false));
+  apply(true);
 })();
 
 </script>

@@ -347,7 +347,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **230 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **232 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -469,6 +469,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_no_tr_shadowing.py` | `tr` 是表格列最自然的變數名，也是前端翻譯函式的名字 —— 撞名會讓整段 JS 當場死掉 |
 | `test_notify.py` | 作業完成通知：管道發送、設定分層、觸發條件 |
 | `test_notify_privacy.py` | 通知送出去的內容不可以外洩多餘的東西 |
+| `test_notify_settings_form.py` | 通知設定頁的兩件事：**存進去的值不可以被自動帶值蓋掉**、欄位要看得到內容 |
 | `test_ocr_avx2_guard.py` | 本機 EasyOCR 在缺 AVX2 的 CPU 上會 SIGILL 打掛整個服務 |
 | `test_ocr_server_gpu_select.py` | Unit tests for jt-ocr-server's auto GPU selection (server_template.py). |
 | `test_office_convert.py` | 辦公文件格式互轉（office-convert） |
@@ -517,6 +518,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_preview_acl_failopen.py` | 預覽端點的 ACL 不可以「認不出 upload_id 就放行」 |
 | `test_preview_is_not_the_result.py` | **預覽只有前幾頁時，畫面一定要講出整份有幾頁。** |
 | `test_preview_page_range.py` | 縮圖 / 預覽的頁碼超出範圍要回 4xx，**不可以 500** |
+| `test_proxy_scheme_mismatch.py` | 代理宣稱的協定 ≠ 瀏覽器實際的協定（客戶回報，v1.15.26） |
 | `test_proxy_sso.py` | Reverse-proxy (Kerberos/SPNEGO) SSO — app/core/proxy_sso.py + middleware. |
 | `test_real_samples_smoke.py` | 拿**真實的**樣本檔掃過所有吃單一 PDF 的工具 |
 | `test_redos_ad_dn.py` | ReDoS regression for RE_AD_DN — closes CodeQL alert #13 |
@@ -3265,6 +3267,41 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       資料不是顯示文字（書籤的 `{title, page, level}`），翻掉是改壞資料。
 - [ ] 新畫的 SVG 圖示要**算圖確認過**才收（snap chromium 的 `--screenshot`
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
+
+---
+
+### 6.93 v1.15.26 — 代理宣稱的協定要跟瀏覽器實際的一致（**每次發版必過**）
+
+> 客戶回報「遠端電腦一上傳就 CSRF token 遺失或不正確，本機不會」。
+> 根因是 `OPS.md` 的 IIS 範例寫死 `X-Forwarded-Proto: https`，站台卻只有 http
+> → cookie 帶 `Secure` → 瀏覽器丟掉。
+
+- [ ] `pytest tests/test_proxy_scheme_mismatch.py` 綠燈
+- [ ] `OPS.md` 的 IIS 範例**不可以**寫死 `value="https"`
+- [ ] 共通要求那一節要寫出「**在伺服器本機測不出來**」（localhost 是例外）
+- [ ] 403 的訊息在偵測得到時要說出是哪個標頭設錯了
+- [ ] 反向（代理說 http、瀏覽器是 https）**不可以**報成故障
+- [ ] **不可以**因為看到 `Origin: http://…` 就不加 `Secure`（cookie 降級）
+- [ ] 要重現的話：起一個會加 `X-Forwarded-Proto: https` 的代理，用真的瀏覽器
+      分別開 `http://localhost:<埠>` 與 `http://<別的主機名稱>:<埠>` ——
+      前者 cookie 存得下來、後者存不下來
+
+---
+
+### 6.92 v1.15.25 — 設定頁自動帶值不可以蓋掉存好的值（**每次發版必過**）
+
+> 客戶回報：「連接埠就算改成 25 按儲存，下次再回來看又變 587。」
+> 換寄送方式時幫忙帶慣例埠號的那段程式，**在頁面載入時也跑了一次**。
+
+- [ ] `pytest tests/test_notify_settings_form.py` 綠燈
+- [ ] 用真的瀏覽器走一次：`/admin/notify` 把埠改 25 → 儲存 → **重新載入**
+      → 仍然是 25（舊版會變 587）
+- [ ] 換寄送方式時仍會帶慣例埠（外部帳號 587、轉送 / 直送 25），
+      但**自己填過的非慣例值（如 2526）一個字都不碰**
+- [ ] **判準是「這個值是不是使用者存的」**，不是「這次載入他有沒有打字」——
+      那個旗標每次載入都會重置，等於沒有防護
+- [ ] 站台網址欄看得到完整網址（不可以繼承數字欄位的 `width: 110px` 靠右樣式）
+- [ ] 這一頁只有埠號這一處會自動改欄位的值（新增自動帶值時要重新確認）
 
 ---
 

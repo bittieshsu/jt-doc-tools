@@ -18,6 +18,8 @@ PATCH/DELETE）比對「提交的 token」與「cookie 的 token」是否一致�
 from __future__ import annotations
 
 import hmac
+import json
+import logging
 import os
 import secrets
 from http.cookies import SimpleCookie
@@ -26,6 +28,8 @@ from urllib.parse import parse_qs
 COOKIE_NAME = "jtdt_csrf"
 HEADER_NAME = b"x-csrf-token"
 FIELD_NAME = "csrf_token"
+
+_log = logging.getLogger("jtdt.csrf")
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 # 跨站回呼（IdP → 我方），本就跨站、改用簽章 / replay 防護 → CSRF 豁免
@@ -119,8 +123,27 @@ async def _buffer_body(receive):
     return body, messages
 
 
-async def _reject(send):
-    body = b'{"detail":"CSRF token \\u907a\\u5931\\u6216\\u4e0d\\u6b63\\u78ba"}'
+async def _reject(send, scope=None):
+    """403 —— 若查得出是「代理宣稱 https、瀏覽器其實是 http」就把原因說出來。
+
+    只回「CSRF token 遺失或不正確」的話，管理員無從查起：頁面看得到、
+    登入看起來也正常，只有上傳會壞，而且在伺服器本機怎麼測都是好的。
+    """
+    detail = "CSRF token 遺失或不正確"
+    hint = None
+    if scope is not None:
+        try:
+            from .proxy_scheme import secure_cookie_mismatch
+            hint = secure_cookie_mismatch(scope)
+        except Exception:  # noqa: BLE001
+            hint = None
+    if hint and _cookie_token(scope) is None:
+        detail = f"{detail} —— {hint}"
+        try:
+            _log.warning("CSRF 遭拒，疑似反向代理協定設定有誤：%s", hint)
+        except Exception:  # noqa: BLE001
+            pass
+    body = json.dumps({"detail": detail}, ensure_ascii=False).encode("utf-8")
     await send({
         "type": "http.response.start", "status": 403,
         "headers": [(b"content-type", b"application/json; charset=utf-8"),
@@ -159,16 +182,16 @@ class CSRFMiddleware:
             hdr = _header(scope, HEADER_NAME).decode("latin-1") or None
             if hdr is not None:
                 if not _valid(cookie_tok, hdr):
-                    return await _reject(send)
+                    return await _reject(send, scope)
             else:
                 ctype = _header(scope, b"content-type").decode("latin-1").lower()
                 if ctype.startswith("application/x-www-form-urlencoded"):
                     body, replay_messages = await _buffer_body(receive)
                     if not _valid(cookie_tok, _form_token(body)):
-                        return await _reject(send)
+                        return await _reject(send, scope)
                 else:
                     # 不安全方法、非 bearer/SSO、又沒帶標頭（multipart / JSON）→ 拒
-                    return await _reject(send)
+                    return await _reject(send, scope)
 
         set_cookie = cookie_tok is None
         # 反向代理（nginx 終結 TLS）後 scope scheme 是 http；與 app 其他 cookie /

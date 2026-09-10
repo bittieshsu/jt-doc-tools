@@ -107,7 +107,16 @@ sudo update-ca-certificates`；Windows 匯入「受信任的根憑證授權單�
 
 1. **掛根路徑 `/`**（不能 `/jtdt/`）— 所有頁面用絕對路徑。
 2. **body 上限 ≥ 100 MB** — 上傳大檔需要。
-3. **傳 `X-Forwarded-Proto`** — 後端據此設 Secure cookie + HSTS（SSL 在代理卸載時尤其必要）。
+3. **傳 `X-Forwarded-Proto`，而且值要跟著瀏覽器實際用的協定走** — 後端據此設 Secure cookie + HSTS（SSL 在代理卸載時尤其必要）。
+   > ⚠ **站台只有 http 卻寫死 `https` 會讓整套 cookie 失效**：後端會在
+   > `jtdt_csrf` / `jtdt_session` 加上 `Secure`，而**瀏覽器在明文連線下會直接
+   > 丟掉 Secure cookie** → 上傳一律「CSRF token 遺失或不正確」，啟用認證的話
+   > 則是登入後又被踢回登入頁。
+   >
+   > **最會誤導人的地方**：`http://localhost` 是瀏覽器的安全來源例外，**照樣
+   > 收 Secure cookie** —— 所以在伺服器本機上怎麼測都正常，只有遠端會壞
+   > （客戶回報過：「本機 8765 或 localhost:80 都不會有問題，只要在遠端電腦
+   > 就會」）。v1.15.26 起後端偵測得到這個情況，會把原因寫進錯誤訊息與日誌。
 4. **傳 `X-Forwarded-For`（真實用戶端 IP）** — 稽核 / 歷史顯示來源 IP 靠它。**並且要覆寫進站的 XFF**（見下方防偽造）。
 5. **read / send 逾時 ≥ 900s** — LLM 工具（翻譯 / OCR 校驗 / pdf-fill 視覺校驗）單筆推理常 5–15 分鐘，預設 60s 會 504。
 6. **安全標頭由後端 app 統一設定**（CSP / HSTS / X-Frame-Options…）— 代理**不要**再加一次，否則重複標頭（ZAP「Multiple Header Entries」）。
@@ -295,13 +304,21 @@ Traefik 會自動帶 `X-Forwarded-For` / `-Proto`；body 以串流轉發不受�
 <configuration>
   <system.webServer>
     <rewrite>
+      <!-- 依這個連線「實際」是 http 還是 https 帶值。
+           **不要寫死 https** —— 站台只有 http 時，後端會加 Secure cookie，
+           瀏覽器直接丟掉，遠端使用者一上傳就「CSRF token 遺失或不正確」。 -->
+      <rewriteMaps>
+        <rewriteMap name="MapProto" defaultValue="http">
+          <add key="on" value="https" />
+          <add key="off" value="http" />
+        </rewriteMap>
+      </rewriteMaps>
       <rules>
         <rule name="jtdt-reverse-proxy" stopProcessing="true">
           <match url="(.*)" />
           <action type="Rewrite" url="http://127.0.0.1:8765/{R:1}" />
           <serverVariables>
-            <!-- SSL 在 IIS 卸載 → 告知後端原始協定 -->
-            <set name="HTTP_X_FORWARDED_PROTO" value="https" />
+            <set name="HTTP_X_FORWARDED_PROTO" value="{MapProto:{HTTPS}}" />
           </serverVariables>
         </rule>
       </rules>
@@ -318,6 +335,10 @@ Traefik 會自動帶 `X-Forwarded-For` / `-Proto`；body 以串流轉發不受�
 
 - ARR 啟用 proxy 後會自動帶 `X-Forwarded-For`（真實用戶端）。
 - 要設 `HTTP_X_FORWARDED_PROTO`：URL Rewrite →「View Server Variables」→ 把它加進允許清單，上面 `<set>` 才生效。
+- **`{HTTPS}` 是 IIS 內建變數**（`ON` / `OFF`），上面的 `rewriteMap` 把它翻成
+  `https` / `http`；同一份 `web.config` 給 http 與 https 綁定都對。
+  **改成寫死 `https` 之前先想清楚**：站台若有 http 的綁定，那些連線的 cookie
+  會全部失效，而且**在伺服器本機測不出來**（見上方共通要求第 3 點）。
 - **逾時（LLM）**：ARR → Proxy →「Time-out (seconds)」設 `900`（預設 120）。
 - **streaming**：ARR →「Response buffer threshold」設 `0`。
 
