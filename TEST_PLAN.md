@@ -347,7 +347,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **232 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **233 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -539,6 +539,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_sessions.py` | Tests for app.core.sessions (issue / lookup / revoke). |
 | `test_settings_export.py` | Category-based settings export / import (v1.12.54). |
 | `test_settings_export_roundtrip.py` | 設定備份：**匯出的檔案要匯得回去** |
+| `test_signpath_notes_are_private.py` | SignPath 的往來筆記不可以出現在公開版（v1.15.27） |
 | `test_smoke_routes.py` | Smoke tests: every public page renders 200, no 500s. |
 | `test_smtp_relay_modes.py` | 通知信的三種寄送方式 |
 | `test_sso.py` | Tests for the SSO feature (OIDC + SAML): settings encryption, JIT |

@@ -25,5 +25,8 @@ docs/screenshots-backup/
 # NSIS installer build output (CI rebuilds it; winsw.exe/nssm.exe stay tracked)
 packaging/windows/jt-doc-tools-*-setup.exe
 
-# Maintainer-internal code-signing application notes (not for public repo)
-packaging/windows/SIGNPATH-APPLICATION.md
+# Maintainer-internal code-signing notes (not for public repo).
+# 萬用字元，不要逐檔列 —— SIGNPATH-LICENSE-CHANGE.md 就是因為這裡只列了
+# APPLICATION 那一檔，自 v1.15.8 起被公開了四天（裡面有 Organization ID，
+# 而 CI 是把它當機密存的）。守門 tests/test_signpath_notes_are_private.py。
+packaging/windows/SIGNPATH-*.md
