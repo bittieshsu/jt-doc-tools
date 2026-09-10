@@ -6,6 +6,28 @@
 
 ---
 
+## [1.15.24] - 2026-09-10
+
+### IIS 反向代理的安裝順序寫反了（客戶回報）
+
+`OPS.md` 原本寫「先裝 **ARR** + **URL Rewrite**」。**ARR 相依於 URL Rewrite**
+—— 反過來裝的話 ARR 裝不起來，或是裝完之後「Server Proxy Settings」根本
+出不來。
+
+ARR 的官方下載頁自己就寫著 *"ARR depends on URL Rewrite. Ensure URL Rewrite
+is installed prior to installing ARR."*（客戶指出來的）。以前那頁有 Web
+Platform Installer 的連結會自動依正確順序裝相依元件，**現在那個連結已經被
+拿掉、只剩手動安裝檔 —— 順序就變成會踩到的坑**。
+
+改成編號步驟（URL Rewrite → ARR → 啟用 proxy），附上兩個官方下載連結，
+並寫明「順序不能顛倒」與原因 —— 只換順序而不說為什麼，下一個人還是會調回去。
+
+守門 `tests/test_ops_iis_prereq_order.py`：標題與內文都要照正確順序，而且
+要說得出相依關係。**這種錯誤沒有任何自動化抓得到** —— 程式完全正確，
+只有照著文件做的人會卡住。
+
+---
+
 ## [1.15.23] - 2026-09-09
 
 ### 客戶以為「只翻到第六頁」—— 其實是預覽只出六頁

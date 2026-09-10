@@ -347,7 +347,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **229 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **230 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -475,6 +475,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_office_source_validation.py` | 辦公文件的**來源檔**壞掉時，要在送進 soffice 之前就擋下來 |
 | `test_online_sessions.py` | 在線人數、某人的登入裝置清單、強制登出 |
 | `test_open_redirect.py` | Open-redirect regression — closes CodeQL alerts #14 / #15 |
+| `test_ops_iis_prereq_order.py` | IIS 反向代理的安裝順序：**URL Rewrite 要先裝，ARR 後裝。** |
 | `test_ou_key_canon.py` | OU 授權的 DN 大小寫 / 空白正規化（v1.14.48） |
 | `test_output_verification_coverage.py` | 去識別化類工具**必須**驗到「產出本身」（使用者要求，2026-09-01） |
 | `test_owasp_top10.py` | OWASP Top 10 (2025) regression suite. |
@@ -3264,6 +3265,26 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       資料不是顯示文字（書籤的 `{title, page, level}`），翻掉是改壞資料。
 - [ ] 新畫的 SVG 圖示要**算圖確認過**才收（snap chromium 的 `--screenshot`
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
+
+---
+
+### 6.91 v1.15.24 — 文件裡的安裝順序（**每次發版必過**）
+
+> 客戶回報：`OPS.md` 的 IIS 那節寫「先裝 ARR + URL Rewrite」——
+> **ARR 相依於 URL Rewrite**，反過來裝會裝不起來。
+
+- [ ] `pytest tests/test_ops_iis_prereq_order.py` 綠燈
+- [ ] 標題與內文都照正確順序（URL Rewrite → ARR）
+- [ ] **要寫出「為什麼」** —— 只換順序不說原因，下一個人還是會調回去
+- [ ] 附官方下載連結（WebPI 已退役，現在是手動裝 MSI）
+
+### ⚠ 文件錯誤沒有任何自動化抓得到
+
+> 程式完全正確、測試全綠、CI 全綠 —— **只有照著文件做的人會卡住**，
+> 而他多半不會回報，會以為是自己的環境有問題。
+
+- [ ] 凡是「照著做」的步驟（安裝順序、相依關係、前置條件），
+      改動時要用**字面守門**釘住，不能只靠 review
 
 ---
 

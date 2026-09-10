@@ -270,9 +270,26 @@ serversTransport:
 
 Traefik 會自動帶 `X-Forwarded-For` / `-Proto`；body 以串流轉發不受限。
 
-### IIS（ARR + URL Rewrite，Windows）
+### IIS（URL Rewrite + ARR，Windows）
 
-先裝 **Application Request Routing (ARR)** + **URL Rewrite**，在 ARR →「Server Proxy Settings」勾 **Enable proxy**。站台放這份 `web.config`：
+**順序不能顛倒 —— 先裝 URL Rewrite，再裝 ARR。** ARR 相依於 URL Rewrite：
+反過來裝的話 ARR 會裝不起來，或是裝完之後「Server Proxy Settings」根本
+出不來（客戶回報過）。
+
+1. **URL Rewrite**（先）—— <https://www.iis.net/downloads/microsoft/url-rewrite>
+2. **Application Request Routing (ARR)**（後）—— <https://www.iis.net/downloads/microsoft/application-request-routing>
+3. IIS 管理員 → 伺服器節點 → **Application Request Routing Cache** →
+   右側「Server Proxy Settings」→ 勾 **Enable proxy** → 套用
+
+> ARR 的官方下載頁在「Installing ARR 3.0 manually」那一段就寫著：
+> *"ARR depends on URL Rewrite. Ensure URL Rewrite is installed prior to
+> installing ARR."*
+>
+> 以前那頁有 Web Platform Installer 的連結，裝 ARR 時會自動把相依的
+> URL Rewrite 依正確順序一起裝；**現在那個連結已經被拿掉，只剩 x86 / x64
+> 手動安裝檔 —— 所以順序得自己顧。**
+
+裝完之後，站台放這份 `web.config`：
 
 ```xml
 <configuration>
