@@ -120,6 +120,10 @@ EXEMPT_PARTS = (
     # （是談論那個詞，不是使用）。整份掃只會製造大量誤報；新條目的用詞由
     # 下面那個專門的 CHANGELOG 檢查負責。
     "CHANGELOG.md",   # 開發樹是 github/CHANGELOG.md，clone 下來在根目錄
+    # 英文版更新記錄同理 —— 它會**引用**中文詞當例子（「`在線` → `線上`」），
+    # 那是 mention 不是 use。2026-09-13 補上這條之前，只要英文摘要寫到
+    # 「這一版改掉了哪個用詞」就會紅。
+    "CHANGELOG_en.md",
     "TEST_PLAN.md",                       # 用詞檢查項本身就在列這些詞
     "app/tools/translate_doc/router.py",  # 翻譯對照表（陸→台）
     "CLAUDE.md",                          # 專案筆記裡的用詞規則

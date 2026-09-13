@@ -3152,7 +3152,7 @@
  "產生處理後 PDF": "Produce the processed PDF",
  "產生軟體": "Producer",
  "產生預覽…": "Making the preview…",
- "產生預覽中…": "Building the preview…",
+ "產生預覽中…": "Generating the preview…",
  "產製合併浮水印": "Generate the watermarked file",
  "用": "with",
  "用 Google Authenticator / Microsoft Authenticator / Authy / 1Password 等 TOTP App 掃 QR，再輸入 6 碼確認。": "Scan the QR code with a TOTP app such as Google Authenticator, Microsoft Authenticator, Authy or 1Password, then enter the 6 digits to confirm.",
@@ -4448,7 +4448,7 @@
  "預覽失敗": "Preview failed",
  "預覽失敗：": "Preview failed: ",
  "預覽已更新": "The preview has been updated",
- "預覽產生失敗": "Building the preview failed",
+ "預覽產生失敗": "The preview could not be generated",
  "預覽第幾組": "Which group to preview",
  "預覽結果": "Preview the result",
  "預覽結果（直接拖選文字試試看）": "Preview (try selecting the text)",
@@ -4849,5 +4849,9 @@
  "縮小檔案（預設不要開）": "Makes the file smaller (leave this off by default)",
  "拖曳對準紙張的角": "Drag to the corner of the sheet",
  "（用的是你自己拉的四個角）": " (using the corners you placed)",
- "（這一頁另外轉了 {0}°）": " (this page was also rotated {0}°)"
+ "（這一頁另外轉了 {0}°）": " (this page was also rotated {0}°)",
+ "上傳檔案後顯示": "Shown after you upload a file",
+ "按「預覽這一頁的修正結果」": "Press “Preview this page”",
+ "載入原稿…": "Loading the original…",
+ "這一頁的原稿載不出來": "The original of this page could not be loaded"
 }

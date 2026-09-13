@@ -5,9 +5,659 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (724 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (767 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
+
+---
+
+## [1.15.38] - 2026-09-13
+
+### The same root cause, four times: classes that do nothing where they are used
+
+`class="notice"`, `af-field` / `af-note`, `jt-select`, `btn-secondary` — four
+separate places where markup referenced a class that **has no effect in that
+context**. `.af-field` is only styled inside `.auth-form`; `jt-select` is a hook
+for `custom_select.js` and is inert without that script. Nothing errors, nothing
+logs, the element is there — the page just looks unstyled.
+
+A new guard, `tests/test_template_css_is_effective.py`, resolves every class
+used in a template against the stylesheets **and against the scope it is used
+in**, so a selector that can never match is now a failing test rather than
+something only a screenshot would reveal.
+
+### A job-autosave test waited on the wrong thing (**test-only change**)
+
+One test failed at the end of the full suite and passed on its own. Reproduced
+by running it alongside the browser tests, which load the machine: the output
+file existed, `result_path` resolved, the workspace was enabled — and `meta` was
+empty. Not a timeout: the read happened too early.
+
+The finishing order in `_run()` is deliberate — status goes to `done` and the
+final state is persisted **before** the autosave copies the file and fills in
+`meta`. The test waited for the status and read `meta` immediately, landing in
+that window; under load the copy takes long enough to hit it every time. It now
+waits for `meta["workspace"]` to appear.
+
+### Windows installer: a successful uninstall reported a non-zero exit code
+
+Found while testing the uninstall → fresh install path on a real machine. The
+silent uninstall **succeeded completely** — service, registry entry and install
+directory removed, firewall rule gone, **user data and all four SQLite files
+preserved** — and still exited with **2**, because NSIS's `Quit` defaults to
+"aborted by script" after handing off to the copy in `%TEMP%`. A scripted
+uninstall (MDM, `Start-Process -Wait`) would call that a failure. Fixed with an
+explicit `SetErrorLevel 0`.
+
+> This release is **not tagged**, so the fix ships with the next installer.
+
+### Both installer paths are now verified
+
+Only the upgrade path had been tested before. The other half is now covered:
+uninstall (user data verified intact) → **fresh install** — 131 seconds, exit 0,
+signature `Valid` with `CN=SignPath Foundation`, service running and set to
+automatic, health check `{"ok":true}`, correct version on the page, and the
+**existing user data picked up** by the new installation.
+
+### Buttons in one row now agree on their icons
+
+A user pointed out two buttons in a four-button row had no icon. Fifteen more
+rows across the site had the same mix. Both the inconsistency and a second,
+invisible variant — a button whose icon is silently wiped because JavaScript
+overwrites the whole button with `textContent` — are now guarded by
+`tests/test_button_icons_are_consistent.py`.
+
+### English documentation had fallen 34 releases behind
+
+`CHANGELOG_en.md` stopped at 1.15.4 — and the three existing guards (file
+exists, no Chinese left, language links point both ways) were **all green** for
+a document that was a month out of date. Entries for 1.15.7 through 1.15.38 are
+now written, and three new guards make it impossible to repeat: the newest
+English entry must match the newest Chinese one, `README_en.md` must carry the
+same version as `README.md`, and the English site pages are **regenerated and
+compared byte for byte** — a criterion that computes itself rather than relying
+on somebody remembering to run the generator.
+
+### Document straighten: layout and loading polish
+
+Before/after images no longer flash a broken-image icon while they are being
+rendered; the cards use the same field layout as the rest of the site.
+
+---
+
+## [1.15.37] - 2026-09-13
+
+### Windows installer: upgrading an existing installation always failed
+
+The installer ran `uv venv --clear` against a virtual environment that was still
+in use by the running service. It **deleted the environment and then failed**,
+leaving a machine that could not start (`ModuleNotFoundError: jinja2`), and a
+`MessageBox` without `/SD` meant the silent installer then **waited forever for a
+click nobody could give**. The service is now stopped and its handles released
+before the environment is touched, and every dialog has a silent-mode default.
+
+Verified end to end on a real Windows machine, upgrading an existing install.
+
+### Automatic page-edge detection failed on both real photos
+
+Tested with actual phone photographs: `approxPolyDP` returned five and six
+points, so no quadrilateral was found. Replaced with an Otsu brightness mask,
+morphological closing, a convex hull and `minAreaRect`, plus a sanity check that
+rejects wildly skewed corner sets.
+
+> Two intermediate attempts scored **perfectly on residual angle** while
+> cropping away content or framing the desk instead of the paper. A residual
+> angle near zero does not mean the right sheet was found — the output has to be
+> looked at.
+
+### Document straighten: drag the four corners, rotate individual pages
+
+Manual mode (phase 2): drag each corner with a magnifier under the cursor,
+rotate a single page 90°/180°, reset to the original orientation, and apply a
+correction to one page, all pages, or all following pages.
+
+---
+
+## [1.15.36] - 2026-09-13
+
+### The new tool's page was dead JavaScript — and every gate was green
+
+The document-straighten template never loaded its `<script src>` dependencies,
+so the page threw `ReferenceError` on load: no drag and drop, no file picker,
+nothing. Syntax checks, i18n scans and the API tests were all green, because
+none of them **opens the page**.
+
+Two new gates close that hole for every current and future tool:
+
+* `tests/test_pages_boot_in_a_browser.py` — loads every page in a real browser
+  and fails on any console error or CSP violation. It found a second instance of
+  the same bug by itself.
+* `tests/test_template_script_deps.py` — every global a template uses must be
+  provided by a script that template actually includes.
+
+### Fixes
+
+* The sidebar highlighted two tools at once: the match was a prefix match, so
+  `/tools/pdf-annotations` also lit up `/tools/pdf-annotations-flatten`.
+* `class="notice"` was not defined anywhere in the stylesheets.
+* Terminology: `在線` → `線上` in the Traditional Chinese interface.
+
+---
+
+## [1.15.35] - 2026-09-13
+
+### History ids came straight from the URL without a format check
+
+`/history/<id>` passed the id through to the filesystem layer, where a malformed
+value produced a 500 instead of a 404. Ids are now validated against their
+actual shape (12 hex characters) before anything is opened.
+
+The test plan gained §4.9 for read-only admin endpoints that still return data.
+
+---
+
+## [1.15.34] - 2026-09-13
+
+### Settings files interrupted mid-write turned silently into defaults
+
+A note in the project file listed "six modules still writing settings
+non-atomically". Counting them properly — with an AST pass rather than from
+memory — produced **eighteen**, and three of them mattered a great deal:
+
+| File | What a truncated write meant |
+|---|---|
+| `auth_settings` | zero bytes used to read as "authentication off" |
+| **`api_tokens`** | every token gone **and `enforce` back to false — API authentication silently disabled** |
+| `asset_manager` | the whole stamp / signature / watermark index disappears |
+
+All thirty call sites now go through one helper (`app/core/atomic_json.py`):
+same-directory temporary file → `fsync` → `os.replace` → `fsync` of the
+directory. Four deliberate exceptions are documented, with a guard that checks
+the exception list has not gone stale.
+
+### Converted files were thrown away, with a message pointing at Java
+
+`soffice` prints warnings (`failed to launch javaldx`) while converting
+perfectly well, so its exit code is not a verdict. Only one of seven conversion
+paths judged by the output file; the other six checked the return code first and
+**discarded a good file**. All seven now require a usable output, and the three
+failure modes are reported distinctly: empty output (source may be damaged),
+killed by a signal (memory or concurrency, nothing to do with the file), and
+everything else (with what soffice actually said).
+
+### Calling the API exactly as documented could still fail
+
+All 84 `curl` examples in `API.md` are now executed by
+`tools/api_doc_example_audit.py`. One was genuinely broken:
+`/admin/api/llm/test-connection` had no body in the example and no parameter
+table, and the endpoint raised on an empty body. Both sides fixed — the endpoint
+now falls back to the saved settings.
+
+---
+
+## [1.15.33] - 2026-09-13
+
+### New tool: Document straighten (`doc-straighten`) — 47 tools → 48
+
+Straightens skewed scans and phone photographs, trims black edges and evens out
+background shading. **No AI and no GPU**: measured 0.83 s/page at 200 dpi.
+A scan tilted 2.3° was estimated at −2.30° (error 0.00°) with 0.10° residual.
+
+> **Pages that already have a text layer and are already straight are copied
+> through untouched.** Re-rendering a born-digital PDF would turn selectable
+> text into an image that merely looks the same — the document would stop being
+> searchable and nobody would notice. Across eight real files, **100% of text
+> survived**, and the completion message says how many pages were preserved.
+
+"Convert to black and white" is off by default, and the interface says what it
+is for: **smaller files, not better recognition**. Measured: local thresholding
+drops OCR similarity from 0.775 to 0.108 on Chinese text.
+
+### CI caught two problems that only exist in the published tree
+
+A test hard-coded `github/OPS.md`, a path that only exists in the development
+tree; and the SignPath signing step waited only ten minutes for an approval that
+is manual by policy. Both fixed, and a guard now rejects literal `github/` paths.
+
+---
+
+## [1.15.32] - 2026-09-13
+
+### De-identification now supports English documents
+
+Adding English patterns was only half the work. **The Taiwanese patterns applied
+to an English document do not miss things — they match the wrong things**:
+passport numbers, IBAN fragments and card fragments were all matched as
+telephone numbers, and a flight number matched a UK postcode. A false positive
+is more dangerous than a miss, because the screen says "done".
+
+Patterns now carry a locale and are selected by the **document's** language
+(which is not the interface language — an English contract with a Chinese
+interface is common, so the choice is on the page).
+
+Everything with a check digit is verified — IBAN mod-97 above all — and the
+replacement values are drawn from ranges that are **never assigned** (SSN 9xx,
+555-01xx numbers, IBANs that deliberately fail their checksum), because a fake
+number that validates may belong to a real person.
+
+Both de-identification tools are no longer greyed out in the English interface.
+The Taiwanese patterns were re-checked against real samples: no regressions.
+
+---
+
+## [1.15.31] - 2026-09-13
+
+### The Windows installer is now English on English Windows
+
+The product name is also a **path** — the Start menu folder and two shortcut
+file names. Translating it naively means an installation made in one language
+cannot be uninstalled in another: uninstall "succeeds" and leaves a folder
+behind. The actual paths created are now recorded in the registry and read back
+at uninstall time, with the old Chinese name kept as a fallback for upgrades.
+
+### Services installed by the one-line Linux installer are now hardened
+
+`packaging/jt-doc-tools.service` had five hardening settings; the unit the
+installer generated itself had only `User=`. Anyone who installed with the
+one-liner never had that protection. Verified with `systemd-run` using the same
+settings — `sudo -u` proves nothing here, as it runs outside the namespace.
+
+---
+
+## [1.15.30] - 2026-09-13
+
+### A coverage gate that compared the last path segment was not checking anything
+
+It matched `/api/` endpoints by their final segment, so `list`, `count`,
+`assets` and `history` matched something in a four-thousand-line document no
+matter what. Eight of 84 endpoints passed without being covered at all; seven of
+them appeared nowhere. Full-path matching now, with the mutation verified in
+**both** directions — reverting to the old rule has to pass, or the change only
+proves the wording moved.
+
+### 79 state-changing admin endpoints had no acceptance criteria
+
+The gate skipped the whole `/admin` prefix. Writes now require acceptance items
+(§4.8, grouped by page); reads stay covered by page-level acceptance, and that
+trade-off is written into the test itself.
+
+### Further
+
+* `API.md` was missing 16 endpoints.
+* CI installed from `requirements.txt` while production uses the lockfile; a new
+  test checks the three dependency declarations agree.
+
+---
+
+## [1.15.29] - 2026-09-13
+
+* **Audit forwarding**: one failing destination no longer blocks the others —
+  each destination keeps its own cursor and bounded retry queue.
+* **PNG export**: pages are written to disk instead of accumulating in memory,
+  and the temporary directory is cleaned up after the response.
+* **Administrator privacy boundaries** are now one written policy rather than
+  two endpoints disagreeing about what an administrator may open.
+
+---
+
+## [1.15.28] - 2026-09-13
+
+### De-identification did not actually remove personal data from scans
+
+Output looked correct in every visible way — text could not be extracted, black
+boxes were on the page — but **extracting the page image and running OCR on it
+recovered the data in full**.
+
+The cause was `apply_redactions(images=PDF_REDACT_IMAGE_NONE)`: clearing pixels
+inside the box is PyMuPDF's *default*, and that line deliberately turned the safe
+default off. The pattern had been copied from the PDF editor, where the goal is
+the opposite (move text, keep the logo underneath).
+
+> Copying code means asking whether the source tool had the same goal. Here the
+> correct value is the exact opposite, and no test went red.
+
+The affected shape — a scanned image with an invisible text layer — is what this
+product's own OCR tool produces, so it is a primary case, not an edge case.
+Acceptance now inspects the images inside the output and re-runs OCR on them.
+
+Clearing pixels re-encodes images as PNG: a real scan went from 2.3 MB to 5.5 MB.
+Re-compressing to JPEG cost 3–4 s per page for 20–30% and a second lossy pass, so
+the result page says so plainly and points at the compression tool instead.
+
+### "Restoring previous state" was not true
+
+When `uv sync` failed during an upgrade, that message was printed while the
+working tree stayed on the **new** code with partially synced dependencies — and
+the service was then started. Recovery now resets the code *and* re-syncs
+dependencies, and the message distinguishes three outcomes: fully restored, code
+restored but dependencies not synced, and could not restore.
+
+### Further
+
+* GELF over TCP is framed with a null byte, as Graylog requires; syslog and CEF
+  keep RFC 6587 framing, pinned by tests.
+* Cancelling a queued job released its row but kept its callable alive; one
+  place now forgets a job, and a guard stops a fourth cleanup path from
+  reintroducing the leak.
+
+---
+
+## [1.15.27] - 2026-09-10
+
+### Parts of the Windows installer stayed Chinese on English Windows
+
+Component names, failure messages and the three uninstall dialogs were
+hard-coded. Three things were established by running the executable on real
+Windows rather than by reading documentation: NSIS picks the language table from
+the **system** locale, not from declaration order; `StrCpy $LANGUAGE` at runtime
+cannot change an already-loaded table; and `makensis` does **not** warn when a
+string is missing a language — "zero warnings" proves nothing.
+
+---
+
+## [1.15.26] - 2026-09-10
+
+### Our own reverse-proxy example broke a customer: a hard-coded `X-Forwarded-Proto: https`
+
+A customer reported "CSRF token missing or incorrect" as soon as a **remote**
+machine uploaded a file, while the server itself was fine. The IIS `web.config`
+example in `OPS.md` set the header to a fixed `https`; on an http-only site the
+backend then marked cookies `Secure` and the browser dropped them over plain
+http. Sign-in broke the same way, with no error shown.
+
+> `http://localhost` is a secure-origin exception, so it accepts `Secure`
+> cookies. **Testing a remote user's problem locally cannot reproduce it.**
+
+The example now maps `{HTTPS}` properly, the documentation says the symptom
+cannot be reproduced on the server itself, and the backend can explain the
+mismatch. It **reports** it and does not relax anything automatically — the
+detection headers are attacker-controlled.
+
+---
+
+## [1.15.25] - 2026-09-10
+
+* **A saved SMTP port was overwritten every time the page loaded** (customer
+  report). The convenience "fill in the usual port" logic also ran on load, and
+  the flag meant to prevent that reset on every page view. The initial call now
+  touches nothing, and switching mode only fills a field that is empty or still
+  holds another convention value.
+* The site-URL field was sized by a rule written for numeric fields.
+
+---
+
+## [1.15.24] - 2026-09-10
+
+### The IIS reverse-proxy prerequisites were in the wrong order (customer report)
+
+`OPS.md` said to install ARR and then URL Rewrite; **ARR depends on URL
+Rewrite**. The instructions were correct when written — the Web Platform
+Installer used to resolve that automatically, and upstream has since removed it.
+The order is fixed, the reason is written down so it does not get "tidied" back,
+and a literal test pins it.
+
+---
+
+## [1.15.23] - 2026-09-09
+
+### A customer thought translation stopped at page six
+
+It did not: 179 of 182 segments were translated and all 11 pages of output had
+content. The side-by-side preview only renders the first six pages, and that was
+said in small grey text nobody reads. The clue was in the customer's own words —
+"the total word count is close to the original".
+
+Anything that shows only part of a result now says how much the whole is, **at
+the point where scrolling stops**, in a bordered box, with the download button
+right there. A guard pins this for both tools that preview partially.
+
+---
+
+## [1.15.22] - 2026-09-08
+
+### One table cell froze an entire translation, forever
+
+A fill-in-the-blank line with sixteen non-breaking spaces made the model unable
+to stop. With `stream=True`, an httpx `timeout` applies **per chunk**, so tokens
+kept arriving and it never fired — the progress display simply stopped moving,
+with no error and no failure. Streaming now has a separate wall-clock limit in
+both loops, and the message says the model may be unable to stop rather than
+blaming the network.
+
+Documents that came from a PDF now say which engine was used, because the engine
+with the best visual fidelity is the worst one to translate from: it pins each
+line in place, which splits sentences across lines.
+
+---
+
+## [1.15.21] - 2026-09-08
+
+### Word files containing text boxes were wrecked by translation
+
+The same text was collected **four times** (a 44,900-word document extracted as
+180,532 words): paragraphs that contain text boxes also iterate their contents,
+and `mc:AlternateContent` stores the same content twice. Writing back put a whole
+page into the first text box.
+
+> When walking paragraphs, ask whether a node contains more nodes of its own
+> kind — if it does, it is a container, not content. **A word count that does not
+> match the original is the signal.**
+
+The legacy VML copy is mirrored after translation, so the delivered file does not
+carry a hidden full copy of the original text.
+
+---
+
+## [1.15.20] - 2026-09-07
+
+### The glossary's placeholders were destroyed by the real model
+
+Every test passed — a fake model naturally preserves whatever it is given. On
+the production model, **all five sentences fell back** and the glossary did
+nothing. The raw reply showed `<0xE2><0x9F><0xAA>1⟫`: a tokenizer that meets a
+character outside its vocabulary emits the **literal text of the byte tokens**.
+
+> Anything that depends on a model following instructions has to be tested
+> against a real model. **Markers sent to a model must be ASCII** — seven were
+> measured; `[[T1]]` was chosen.
+
+The safety net worked so well that the output looked perfect while the feature
+was not working at all; only the fallback counter could tell.
+
+---
+
+## [1.15.19] - 2026-09-07
+
+### New: a translation glossary (shared by sentence and document translation)
+
+Company-specific terms need one consistent translation. Putting a table in the
+prompt is only a request the model may ignore, and the Traditional Chinese
+instructions are already 1,179 characters against a 1,200-character batch limit.
+
+This uses **term protection**, the standard approach in translation tools: the
+terms are replaced with placeholders before the request, so the model never sees
+them, and the required translation is substituted back afterwards. Deterministic,
+and **not one character is added to the prompt**.
+
+---
+
+## [1.15.18] - 2026-09-07
+
+### A scheduled CI run went red where the push run was green (**test-only change**)
+
+The test waited on in-memory job state and then read the database, which is
+written afterwards. Reproduced first by delaying the write, which made the old
+test fail with exactly the CI message, then fixed to wait for what it actually
+verifies.
+
+---
+
+## [1.15.17] - 2026-09-07
+
+* **The pre-upgrade backup could fill the disk — and failed after the service
+  was already stopped.** On production, 1.4 GB of a 2.0 GB data directory is a
+  government dataset that re-downloads itself. Free space is now checked before
+  anything stops, and the skip list has one rule: it must be able to rebuild
+  itself. Measured: 1.93 → 0.56 GB per backup.
+* **Every HTTP request read a settings file from disk**, on the event loop,
+  including static files and health checks. Now cached by mtime and size:
+  104 µs → 32 µs, with no restart needed for changes to take effect.
+
+---
+
+## [1.15.16] - 2026-09-07
+
+### `sudo jtdt reset-password` could leave the service unable to write
+
+Anything the CLI creates while running as root is owned by root, and the service
+runs as its own account: `attempt to write a readonly database`. The worst case
+is the rescue command itself — recovery would lock you out. Ownership is now
+restored in one place in the dispatcher rather than at each return point.
+
+### Files the public instructions tell you to run were not in the public tree
+
+The screenshot script and the penetration-test script were missing, so the whole
+procedure could not run from a clone. The existing gate only recognised commands
+starting with `python …`, and half the document uses `.venv/bin/python …` — nine
+of seventeen command lines had never been checked.
+
+---
+
+## [1.15.15] - 2026-09-07
+
+* **`jtdt update` reported "Health check timed out" while the service was fine.**
+  `jtdt bind` writes the listen address into the service manager's own
+  configuration, and the health check read it from the shell's environment. Any
+  installation with a changed port probed the wrong address forever. It now
+  reads where the setting actually lives, probes loopback as well, bypasses any
+  proxy, and prints what it probed plus the last 20 log lines instead of one
+  unhelpful word.
+* **`defusedxml` was imported by four modules but never declared.** On a machine
+  without it, the tools are skipped silently: the service starts and health
+  checks pass, and four tools simply are not there. A new test compares imports
+  against the declared dependencies.
+
+---
+
+## [1.15.14] - 2026-09-06
+
+* **Spreadsheet translation previews were blank.** The "fit to one page wide"
+  step wrote new attributes after the tag name instead of replacing existing
+  ones, producing duplicate attributes — invalid XML, which LibreOffice turns
+  into an empty sheet with a **zero exit code**. Modified XML is now re-parsed
+  before use, and falls back to the original if it does not load.
+* **Translated spreadsheets opened on a blank area**, because the scroll
+  position is stored in the file. The view is reset without touching frozen
+  panes or a single cell of content.
+
+---
+
+## [1.15.13] - 2026-09-06
+
+Every path that reads a user-supplied zip is now covered by one zip-bomb guard.
+
+> ⚠ The first version of that guard was fake: it looked for the guard's *name* in
+> the source, and every place that called it also had a comment mentioning it —
+> so removing the import and the call left the test green. It now matches AST
+> call nodes.
+
+---
+
+## [1.15.12] - 2026-09-06
+
+* Without CJK fonts, ten tests failed with `TypeError: cannot unpack
+  non-iterable NoneType` — nothing that suggests fonts. They now skip honestly,
+  and the fonts are installed in CI so the "Chinese really renders" checks still
+  run there.
+* CI failures now name the failing test.
+
+> ⚠ Hiding half the environment is the same as hiding none: a plugin that removed
+> only LibreOffice reported "all green" while CI stayed red, because the runner
+> has no CJK fonts either.
+
+---
+
+## [1.15.11] - 2026-09-06
+
+* **Transit certificates keep the original file**, reachable from the record.
+* High-speed-rail certificates that carry no train number no longer display `--`.
+* Security: uploaded XML is parsed defensively and outbound downloads validated.
+
+---
+
+## [1.15.10] - 2026-09-06
+
+Missing Office engine now returns **503**, not 500 — that is a deployment
+problem, not a malformed request, and a 500 makes people retry forever while
+monitoring fills with false alarms. One global handler covers every tool.
+
+Tests that need system dependencies now carry skip gates, checked by AST rather
+than a regular expression.
+
+---
+
+## [1.15.9] - 2026-09-06
+
+* The first real CI run went red; the dangerous part was **silent loss of
+  coverage** rather than the failures themselves.
+* Damaged or hostile office documents are rejected **before** they reach soffice.
+* Error messages no longer hand raw upstream responses to the user.
+* English interface fixes from a page-by-page user review.
+
+---
+
+## [1.15.8] - 2026-09-06
+
+### `tr` shadowed by a variable of the same name — three tools completely broken
+
+A user reported `Upload error: tr is not a function`. `tr` is the front-end
+translation function and also the most natural name for a table row:
+
+```js
+const tr = document.createElement('tr');   // tr is a DOM element here
+inp.placeholder = tr('Subject');            // so this calls an element
+```
+
+Sixteen occurrences across three tools and nine admin pages. The worst was
+`const tr = { 'host required': tr('Host is required') }` — calling itself from
+its own initialiser.
+
+Both existing defences were green: `node --check` only validates syntax, and this
+shadowing **is** valid syntax; the i18n scanner checks whether strings are
+wrapped, not what `tr` refers to where they are wrapped.
+
+### Further
+
+* Built-in role descriptions were wrong on existing installations.
+* A batch of English interface fixes from a user's page-by-page review.
+
+---
+
+## [1.15.7] - 2026-09-05
+
+### English interface: 986 untranslated strings → 0, verified in a real browser
+
+Static scanning cannot see three sources of leftover Chinese: nodes built by
+JavaScript, attributes (`title` / `placeholder` / `aria-label`), and server data
+inserted into the DOM. A real browser walking every page found 986 strings, over
+60% of them in the first two categories. The catalogue went from 3,286 to 4,698
+entries.
+
+> ⚠ "The scan found zero" is not "the translation is finished". A user replied
+> with a dozen screenshots: dialogs, property panels, job lists, expanded
+> dropdowns, error messages, tables that only exist once there is data — **none
+> of that exists when the page first loads**. Three methods are needed, and the
+> test plan now says so.
+
+### Further
+
+* **Windows: a machine whose installation was interrupted could never install
+  again** (`uv venv --clear` added).
+* CodeQL: an open redirect in `/ui-locale`, a `</script>` pattern that ignored
+  whitespace, an unpinned minimum TLS version, and an unencoded job id.
+* CI exists for the first time (`.github/workflows/tests.yml`).
+* The English introduction site now uses **screenshots of the English
+  interface** — the most direct evidence that English is really supported.
 
 ---
 
@@ -430,7 +1080,7 @@ Chinese files keep their names.
 (`github/build-i18n-md.py`, line by line against `docs/i18n/readme.en.json`, code
 blocks left untouched) — one document maintained by hand in two places always
 drifts, and this project has paid for that several times. This change log is a
-**summary**: the Chinese one covers 724 releases over six thousand lines, which is
+**summary**: the Chinese one covers 767 releases over six thousand lines, which is
 neither useful nor maintainable to translate in full.
 
 ### The README's pytest badge had been stale for many releases

@@ -181,14 +181,21 @@
   <h2 data-s="s53896af7">{{ tr('2. 設定要偵測的資料類型') }}</h2>
   {# 文件語言 ≠ 介面語言：中文介面貼進英文文字是最容易踩到的組合 ——
      台灣的市話 / 地址 / 統編式子套在英文上是**抓錯**不是抓不到。 #}
-  <div class="af-field" id="tdLangRow">
+  {# 版面用全站的 `.form-row` ＋ `.field` ＋ `.muted`。
+     **不要用 `af-field` / `af-note`**（只在 `.auth-form` 底下有定義）
+     或 `jt-select`（那是 `custom_select.js` 的掛勾，這一頁沒載它）——
+     兩者在這裡都等於**完全沒有樣式**，下拉會是瀏覽器原生的樣子
+     （使用者截圖回報）。 #}
+  <div class="form-row" id="tdLangRow">
     <label for="tdDocLang">{{ tr('文件語言') }}</label>
-    <select id="tdDocLang" class="jt-select">
+    <div class="field">
+    <select id="tdDocLang">
       {% for code, name in doc_langs %}
       <option value="{{ code }}" {% if code == default_doc_lang %}selected{% endif %}>{{ name }}</option>
       {% endfor %}
     </select>
-    <small class="af-note">{{ tr('決定套用哪一組偵測規則（台灣專屬的身分證 / 統編 / 市話，或英美的 SSN / IBAN / 郵遞區號）。換語言後請重新偵測。') }}</small>
+    <div class="muted">{{ tr('決定套用哪一組偵測規則（台灣專屬的身分證 / 統編 / 市話，或英美的 SSN / IBAN / 郵遞區號）。換語言後請重新偵測。') }}</div>
+    </div>
   </div>
   <div class="td-pattern-cats">
     {% set cat_icons = {
@@ -319,7 +326,7 @@
   <div class="td-actions">
     <button class="btn btn-primary" type="button" id="btnApply">{{ icon('shield', size=14) }} {{ tr('套用至全部') }}</button>
     <button class="btn" type="button" id="btnDownload" disabled>{{ icon('download', size=14) }} {{ tr('下載結果 (.txt)') }}</button>
-    <button class="btn" type="button" id="btnCopy" disabled>{{ icon('paperclip', size=14) }} {{ tr('複製到剪貼簿') }}</button>
+    <button class="btn" type="button" id="btnCopy" disabled>{{ icon('paperclip', size=14) }} <span id="btnCopyLabel">{{ tr('複製到剪貼簿') }}</span></button>
   </div>
 </div>
 
@@ -592,7 +599,10 @@ $('btnCopy').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(outEl.value);
     if (typeof showToast === 'function') showToast(tr('已複製處理後的文字'), 'ok');
-    else $('btnCopy').textContent = tr('已複製');
+    else {
+      $('btnCopyLabel').textContent = tr('已複製');
+      setTimeout(() => { $('btnCopyLabel').textContent = tr('複製到剪貼簿'); }, 1500);
+    }
   } catch (e) {
     showErr(tr('複製失敗：') + e.message);
   }

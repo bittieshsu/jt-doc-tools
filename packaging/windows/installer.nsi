@@ -334,6 +334,12 @@ Function .onInit
         ${Else}
           Exec '"$R4" /uninstall /fromtemp /instdir="$UN_DIR"'
         ${EndIf}
+        ; 交棒給 %TEMP% 那一份之後就離開。**離開碼要顯式設 0** ——
+        ; NSIS 的 `Quit` 預設回報「被腳本中止」= 2，於是腳本化的解除安裝
+        ; （MDM／`Start-Process -Wait`）會判定失敗，而它其實完全成功了
+        ; （2026-09-13 在 .154 實測：服務、登錄檔、安裝目錄全清掉、使用者
+        ; 資料完整保留，回傳碼卻是 2）。
+        SetErrorLevel 0
         Quit
       un_no_copy:
     ${EndIf}

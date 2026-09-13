@@ -105,7 +105,7 @@
   </div>
   <div data-s="sa45f86c4">
     <button class="btn btn-primary" id="btnTranslate" {% if not llm_enabled %}disabled title="{{ tr('LLM 未啟用') }}"{% endif %}>{{ icon('play', size=14) }} {{ tr('開始翻譯') }}</button>
-    <button class="btn" type="button" id="btnStop" hidden data-s="s17cfb864">{{ tr('■ 停止翻譯') }}</button>
+    <button class="btn" type="button" id="btnStop" hidden data-s="s17cfb864">{{ icon('pause', size=14) }} <span id="btnStopLabel">{{ tr('停止翻譯') }}</span></button>
     <button class="btn" type="button" id="btnClear">{{ icon('reset', size=14) }} {{ tr('清空') }}</button>
     <span class="muted" data-s="s6b9c179a" id="charCounter">{{ tr('0 字 / 0 句') }}</span>
   </div>
@@ -1147,7 +1147,7 @@ $('btnStop').addEventListener('click', () => {
     try { _translateAbortCtl.abort(); } catch (_) {}
   }
   $('btnStop').disabled = true;
-  $('btnStop').textContent = tr('停止中…');
+  $('btnStopLabel').textContent = tr('停止中…');
 });
 
 // ---------------------------------------------------------------------------
@@ -1197,7 +1197,7 @@ function _trdSetRunningUI(running) {
   }
   $('btnStop').hidden = !running;
   $('btnStop').disabled = false;
-  $('btnStop').textContent = tr('■ 停止翻譯');
+  $('btnStopLabel').textContent = tr('停止翻譯');
   $('trdProgressWrap').hidden = false;
   $('trdProgressMeta').hidden = false;
 }
@@ -1282,7 +1282,7 @@ async function _trdPoll() {
 
 $('btnStop').addEventListener('click', async () => {
   $('btnStop').disabled = true;
-  $('btnStop').textContent = tr('停止中…');
+  $('btnStopLabel').textContent = tr('停止中…');
   if (!_trdJobId) return;
   try {
     await fetch('/api/jobs/' + encodeURIComponent(_trdSafeJob(_trdJobId))

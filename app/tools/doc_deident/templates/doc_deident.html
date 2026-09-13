@@ -187,14 +187,21 @@
   {# **文件語言**不是介面語言：介面開中文、手上是英文合約很常見。
      台灣的市話 / 地址 / 統編式子套在英文文件上是**抓錯**不是抓不到
      （會把護照號、IBAN 片段、信用卡片段都當成電話），所以要分開。 #}
-  <div class="af-field" id="ddLangRow">
+  {# 版面用全站的 `.form-row` ＋ `.field` ＋ `.muted`。
+     **不要用 `af-field` / `af-note`**（只在 `.auth-form` 底下有定義）
+     或 `jt-select`（那是 `custom_select.js` 的掛勾，這一頁沒載它）——
+     兩者在這裡都等於**完全沒有樣式**，下拉會是瀏覽器原生的樣子
+     （使用者截圖回報）。 #}
+  <div class="form-row" id="ddLangRow">
     <label for="ddDocLang">{{ tr('文件語言') }}</label>
-    <select id="ddDocLang" class="jt-select">
+    <div class="field">
+    <select id="ddDocLang">
       {% for code, name in doc_langs %}
       <option value="{{ code }}" {% if code == default_doc_lang %}selected{% endif %}>{{ name }}</option>
       {% endfor %}
     </select>
-    <small class="af-note">{{ tr('決定套用哪一組偵測規則（台灣專屬的身分證 / 統編 / 市話，或英美的 SSN / IBAN / 郵遞區號）。換語言後請重新偵測。') }}</small>
+    <div class="muted">{{ tr('決定套用哪一組偵測規則（台灣專屬的身分證 / 統編 / 市話，或英美的 SSN / IBAN / 郵遞區號）。換語言後請重新偵測。') }}</div>
+    </div>
   </div>
   <div class="dd-pattern-cats" id="ddTypes">
     {% set cat_icons = {

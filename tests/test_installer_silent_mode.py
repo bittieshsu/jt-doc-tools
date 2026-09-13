@@ -147,3 +147,26 @@ def test_the_installer_script_actually_compiles():
     assert made.exists() and made.stat().st_size > 50_000, (
         f"編譯回 0 但沒有產出可用的 exe（找過 {out_dir} 與 {NSI.parent}）")
     made.unlink()
+
+
+def test_the_uninstall_handoff_reports_success(nsi):
+    """交棒給 %TEMP% 那一份之後離開時，離開碼要顯式設 0。
+
+    NSIS 的 `Quit` 預設回報「被腳本中止」= **2**。解除安裝其實完全成功
+    （2026-09-13 在真的 Windows 上實測：服務、登錄檔、安裝目錄全部清掉、
+    使用者資料與四個 sqlite 完整保留），但腳本化的解除安裝
+    （MDM、`Start-Process -Wait`）看到的是非零，會判定失敗。
+
+    判準要落在**那一段交棒邏輯**上，不是整份檔案有沒有出現過 `SetErrorLevel 0`
+    ——別處寫一次也會讓這條變綠。
+    """
+    src = code_text(nsi)
+    i = src.find("/fromtemp")
+    assert i != -1, "找不到交棒用的 /fromtemp 分支"
+    # 交棒那一段：從 /fromtemp 到第一個 Quit
+    j = src.find("Quit", i)
+    assert j != -1, "交棒之後應該要 Quit"
+    seg = src[i:j]
+    assert re.search(r"^\s*SetErrorLevel\s+0\s*$", seg, re.M), (
+        "交棒離開前沒有 `SetErrorLevel 0` —— 解除安裝成功卻會回報非零離開碼"
+    )

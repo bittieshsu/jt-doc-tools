@@ -216,3 +216,88 @@ def test_english_page_uses_english_screenshots():
     for r in refs:
         p = DOCS / r
         assert p.is_file(), f"英文版引用了不存在的截圖：{r}"
+
+
+# ---------------------------------------------------------------------------
+# 英文版跟不跟得上中文版（2026-09-13 使用者問「CHANGELOG_en.md 為何很久沒更新了?」）
+#
+# 答案是：**沒有守門。** 上面那幾條只驗「檔案在不在、有沒有殘留中文、連結指不指
+# 得回去」—— 一份停在 34 個版本以前的英文更新記錄，那三條**全部都是綠的**。
+# 這個專案反覆出現同一句教訓：記了規則但沒有守門，等於沒記。
+#
+# 判準要能自己算，不可以寫死期望值：
+#   * `CHANGELOG_en.md` **最新那一條的版本號**必須等於中文版最新那一條。
+#   * `README_en.md` 標題的版本號必須等於 `README.md` 的（它是生成的，
+#     所以只要有人忘記在最後一次編輯之後重跑產生器就會紅）。
+# ---------------------------------------------------------------------------
+
+_ENTRY = re.compile(r"^## \[(\d+\.\d+\.\d+)\]", re.M)
+_README_VER = re.compile(r"v(\d+\.\d+\.\d+)")
+
+
+def _latest_entry(p: Path) -> str:
+    m = _ENTRY.search(p.read_text(encoding="utf-8"))
+    assert m, f"{p.name} 找不到任何 `## [x.y.z]` 條目"
+    return m.group(1)
+
+
+def test_english_changelog_keeps_up_with_the_chinese_one() -> None:
+    zh = _latest_entry(GH / "CHANGELOG.md")
+    en = _latest_entry(GH / "CHANGELOG_en.md")
+    assert en == zh, (
+        f"CHANGELOG_en.md 最新只到 {en}，中文版已經到 {zh} —— "
+        "每次 bump 版本，中英兩份要一起寫（使用者 2026-09-13 指示）。\n"
+        "英文版是**摘要**不是全譯，但最新那一版一定要有。"
+    )
+
+
+def test_english_readme_keeps_up_with_the_chinese_one() -> None:
+    zh_m = _README_VER.search((GH / "README.md").read_text(encoding="utf-8"))
+    en_m = _README_VER.search((GH / "README_en.md").read_text(encoding="utf-8"))
+    assert zh_m and en_m, "README 的標題應該帶著版本號"
+    assert en_m.group(1) == zh_m.group(1), (
+        f"README_en.md 停在 v{en_m.group(1)}，中文版是 v{zh_m.group(1)} —— "
+        "跑 `python3 github/build-i18n-md.py` 重新生成（要在最後一次編輯之後才跑）。"
+    )
+
+
+def _regenerated(script: str, targets: tuple[str, ...]) -> list[str]:
+    """把產生器跑一次，比對輸出檔有沒有變 —— 變了就是公開樹上那份是舊的。
+
+    **判準不能是「有沒有記得跑產生器」**（那是人的記憶，正是會漏的地方），
+    要能自己算：把現在的產出留起來、重新生成、逐位元組比對。
+    """
+    import shutil
+    import subprocess
+    import sys
+
+    root = GH.parent
+    keep = {t: (GH / t).read_bytes() for t in targets}
+    try:
+        subprocess.run([sys.executable, str(GH / script)], cwd=root,
+                       check=True, capture_output=True)
+        return [t for t in targets if (GH / t).read_bytes() != keep[t]]
+    finally:
+        for t, data in keep.items():
+            (GH / t).write_bytes(data)
+        del shutil
+
+
+def test_english_site_pages_are_regenerated_after_every_change() -> None:
+    """介紹站與 API 手冊的英文版不可以落後中文版。
+
+    使用者 2026-09-13：「以後更新版本 英文文件 pages 都要跟著」。
+    """
+    stale = _regenerated("build-i18n-page.py",
+                         ("docs/index-en.html", "docs/api-en.html"))
+    assert not stale, (
+        f"英文版的介紹站 / API 手冊是舊的：{stale} —— "
+        "跑 `python3 github/build-i18n-page.py`（要在最後一次編輯之後才跑）。"
+    )
+
+
+def test_english_readme_is_regenerated_after_every_change() -> None:
+    stale = _regenerated("build-i18n-md.py", ("README_en.md",))
+    assert not stale, (
+        "README_en.md 是舊的 —— 跑 `python3 github/build-i18n-md.py`。"
+    )

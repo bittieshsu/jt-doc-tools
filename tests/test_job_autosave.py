@@ -132,8 +132,17 @@ def test_end_to_end_through_job_manager(tmp_path, _data_dir):
 
     m = JobManager(workers=1)
     j = m.submit("pdf-to-slides", run)
-    end = time.time() + 8
-    while time.time() < end and j.status != "done":
+
+    # **要等的是 `meta["workspace"]`，不是 `status`。**
+    # `_run()` 的收尾順序是刻意的：先把最終狀態寫進 DB（那一段有註解說明
+    # 為什麼），**之後**才自動存入工作區並補寫 `meta`。等到 status 就讀 meta
+    # 會撞上中間那段窗口 —— 機器一忙（完整套件、瀏覽器測試同時開著 chromium）
+    # 複製檔案要花上幾百毫秒，這條就紅，而產品完全正常。
+    # 實測重現：跟 `test_pages_boot_in_a_browser.py` 一起跑，舊寫法必紅，
+    # 診斷顯示產出檔在、工作區是開的、`meta` 卻還是空的。
+    # 同 v1.15.18 的教訓：**等待要等到你真正要驗的那個東西落地。**
+    end = time.time() + 20
+    while time.time() < end and "workspace" not in (j.meta or {}):
         time.sleep(0.03)
     assert j.status == "done"
     assert j.meta.get("workspace", {}).get("saved") is True, j.meta

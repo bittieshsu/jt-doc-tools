@@ -75,8 +75,8 @@
       <div class="ds-actions">
         <button class="btn" type="button" data-rot="270">{{ icon('rotate-ccw') }} {{ tr('左轉 90°') }}</button>
         <button class="btn" type="button" data-rot="90">{{ icon('rotate-cw') }} {{ tr('右轉 90°') }}</button>
-        <button class="btn" type="button" data-rot="180">{{ tr('轉 180°') }}</button>
-        <button class="btn btn-secondary" type="button" id="dsRotReset">{{ tr('回到原方向') }}</button>
+        <button class="btn" type="button" data-rot="180">{{ icon('rotate-180') }} {{ tr('轉 180°') }}</button>
+        <button class="btn btn-secondary" type="button" id="dsRotReset">{{ icon('reset') }} {{ tr('回到原方向') }}</button>
       </div>
       <div class="muted">{{ tr('掃反了或掃成橫的請用這裡 —— 自動拉正只處理 ±6° 的歪斜，方向要自己指定。轉向之後仍然會自動拉正。') }}</div>
     </div>
@@ -94,16 +94,25 @@
   <div class="ds-compare">
     <figure>
       <figcaption>{{ tr('修正前') }}</figcaption>
-      {# 四個角的把手疊在圖上；座標一律**正規化 0~1**，這樣縮放到任何寬度都對得上。 #}
+      {# 四個角的把手疊在圖上；座標一律**正規化 0~1**，這樣縮放到任何寬度都對得上。
+         **圖還沒載好時不可以露出瀏覽器的破圖 icon** —— `<img>` 先 hidden，
+         位置用骨架佔著，`onload` 才換上（使用者截圖回報）。 #}
       <div class="ds-stage" id="dsStage">
-        <img id="dsPvBefore" alt="{{ tr('修正前') }}" />
+        <img id="dsPvBefore" alt="{{ tr('修正前') }}" hidden />
+        <div class="ds-ph" id="dsPhBefore">{{ tr('上傳檔案後顯示') }}</div>
         <svg class="ds-quad" id="dsQuadSvg" hidden viewBox="0 0 100 100" preserveAspectRatio="none">
           <polygon id="dsQuadPoly" points="" />
         </svg>
         <div class="ds-handles" id="dsHandles" hidden></div>
       </div>
     </figure>
-    <figure><figcaption>{{ tr('修正後') }}</figcaption><img id="dsPvAfter" alt="{{ tr('修正後') }}" /></figure>
+    <figure>
+      <figcaption>{{ tr('修正後') }}</figcaption>
+      <div class="ds-stage">
+        <img id="dsPvAfter" alt="{{ tr('修正後') }}" hidden />
+        <div class="ds-ph" id="dsPhAfter">{{ tr('按「預覽這一頁的修正結果」') }}</div>
+      </div>
+    </figure>
   </div>
 </div>
 
@@ -134,7 +143,27 @@
   .ds-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
   /* 四個角的拖曳舞台：把手與連線疊在「修正前」那張圖上。
      座標一律**正規化 0~1** —— 圖在不同寬度下縮放，存像素的話換個視窗就全錯。 */
+  /* 說明文字**不可以拉成整行** —— 1000px 寬的灰字讀起來像一面牆，
+     而且每一條長短不一時整張卡片看起來沒有結構（使用者回報「很 low」）。
+     62ch 大約是中文 30 字，一眼掃得完。 */
+  #dsOptPanel .field .muted, #dsPvPanel .field .muted { max-width: 62ch; }
+  /* 控制項與它的說明之間要有呼吸 */
+  #dsOptPanel .field > .muted, #dsPvPanel .field > .muted { margin-top: 4px; }
+  #dsOptPanel .form-row, #dsPvPanel .form-row { align-items: flex-start; margin: 10px 0; }
+  #dsOptPanel .form-row > label, #dsPvPanel .form-row > label { padding-top: 7px; }
   .ds-stage { position: relative; line-height: 0; }
+  /* 圖還沒好時的佔位：**不可以讓瀏覽器畫破圖 icon**。高度用 aspect-ratio 撐著，
+     圖換上來時版面不會跳。 */
+  .ds-ph { display: flex; align-items: center; justify-content: center;
+           aspect-ratio: 3 / 4; border: 1px dashed var(--border); border-radius: 4px;
+           background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 10px,
+                       #f1f5f9 10px, #f1f5f9 20px);
+           color: var(--muted); font-size: 13px; line-height: 1.5;
+           text-align: center; padding: 12px; }
+  .ds-ph.is-busy::before { content: ''; width: 14px; height: 14px; margin-right: 8px;
+           border: 2px solid currentColor; border-right-color: transparent;
+           border-radius: 50%; animation: ds-spin .8s linear infinite; }
+  @keyframes ds-spin { to { transform: rotate(360deg); } }
   .ds-quad { position: absolute; inset: 0; width: 100%; height: 100%;
              pointer-events: none; }
   .ds-quad polygon { fill: rgba(37,99,235,.12); stroke: #2563eb;
@@ -165,9 +194,13 @@
   .ds-compare figcaption { font-size: 12px; font-weight: 600; color: var(--muted);
                            text-align: center; }
   .ds-compare .ds-stage, .ds-compare img { width: 100%; }
-  .ds-compare img { display: block; max-height: 58vh; object-fit: contain;
+  /* **兩張一定要等高**：左右高度不一樣時整組看起來是歪的。
+     固定高度 ＋ `object-fit: contain`，比例不同的圖各自置中留白。 */
+  .ds-compare img, .ds-compare .ds-ph { display: block; height: 46vh; min-height: 260px;
+                    width: 100%; object-fit: contain;
                     border: 1px solid var(--border); border-radius: 4px;
                     background: #fafafa; }
+  .ds-compare .ds-ph { display: flex; aspect-ratio: auto; }
   @media (max-width: 720px) { .ds-compare { grid-template-columns: 1fr; } }
   @media (max-width: 860px) { .ds-compare { grid-template-columns: 1fr; } }
 </style>
@@ -216,13 +249,39 @@
     return overrides[page];
   }
 
+  // 圖片的優雅載入：**先顯示骨架，載好才把圖換上**。
+  // 直接設 `src` 然後讓瀏覽器自己畫的話，網路慢或 404 時會露出破圖 icon
+  // 與 alt 文字，很醜（使用者截圖回報）。
+  function showImg(imgId, phId, url, busyText, failText) {
+    const img = $(imgId), ph = $(phId);
+    if (!img || !ph) return;
+    img.hidden = true;
+    ph.hidden = false;
+    ph.classList.add('is-busy');
+    ph.textContent = busyText;
+    img.onload = () => {
+      ph.hidden = true;
+      ph.classList.remove('is-busy');
+      img.hidden = false;
+    };
+    img.onerror = () => {
+      img.hidden = true;
+      ph.hidden = false;
+      ph.classList.remove('is-busy');
+      ph.textContent = failText;
+    };
+    img.src = url;
+  }
+
   async function drawPreview() {
     if (!uploadId) return;
     const page = curPage();
     const token = ++pvToken;
     $('dsPvPanel').hidden = false;
     $('dsPvStat').textContent = tr('產生預覽中…');
-    $('dsPvBefore').src = `/tools/doc-straighten/thumb/${uploadId}/${page}`;
+    showImg('dsPvBefore', 'dsPhBefore',
+            `/tools/doc-straighten/thumb/${uploadId}/${page}`,
+            tr('載入原稿…'), tr('這一頁的原稿載不出來'));
     const ov = overrides[page] || {};
     const fd = new FormData();
     fd.append('upload_id', uploadId);
@@ -240,7 +299,8 @@
         return;
       }
       const d = await r.json();
-      $('dsPvAfter').src = d.url + '?t=' + Date.now();
+      showImg('dsPvAfter', 'dsPhAfter', d.url + '?t=' + Date.now(),
+              tr('產生預覽中…'), tr('預覽產生失敗'));
       // **殘留角是驗收指標**：轉錯方向時角度看起來「有動」，只有殘留角會現形
       const ovNow = overrides[page] || {};
       $('dsPvStat').textContent =

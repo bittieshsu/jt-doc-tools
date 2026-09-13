@@ -39,6 +39,44 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 > 而且**必須測 Release 上那一支**（SignPath 簽過的），不是本機建的未簽章版
 > —— 簽章會影響 SmartScreen 與「發行者不明」的行為，本機那份測不到。
 
+### 每一版都要驗「全新安裝」與「舊版升級上來」兩條（使用者要求 2026-09-13）
+
+> **兩條路會壞在完全不同的地方**，只驗一條等於沒驗：
+>
+> | | 全新安裝 | 舊版升級上來 |
+> |---|---|---|
+> | 會踩到 | 相依裝不齊、資料目錄沒建、服務註冊失敗 | **舊服務還跑著**（檔案被鎖）、舊 `.venv` 殘留、schema migration、舊的開始功能表資料夾 |
+> | 實例 | — | v1.15.36 的安裝程式在升級那條路**把 `.venv` 清成 0 個套件**，服務再也起不來 —— 而全新安裝完全正常 |
+>
+> **三條安裝路徑各自都有這兩條**，發版時至少要涵蓋當版動到的那些：
+>
+> | 路徑 | 全新安裝 | 升級 |
+> |---|---|---|
+> | Windows 安裝程式（`setup.exe`）| 乾淨機器雙擊 | **裝到既有安裝上**（`.154` 就是這條） |
+> | 一行安裝（`install.sh` / `install.ps1`）| 乾淨機器跑一次 | 同一台再跑一次 |
+> | `jtdt update` | — | **正式機實際跑一次**（`.30`）|
+>
+> **判準一律是「服務起得來 ＋ healthz ok ＋ 版本正確 ＋ 使用者資料還在」**，
+> 不是「安裝程式回 0」。v1.15.36 那次安裝程式連 0 都沒回（掛住），
+> 而更早的 v1.1.x 是回 0 但 `.venv` 是半個。
+
+> **最近一次實測（v1.15.37 的安裝程式，`.154`，2026-09-13）**：兩條都走過。
+>
+> | 這一條 | 結果 |
+> |---|---|
+> | 升級（裝到既有安裝上）| 服務起得來、healthz ok、v1.15.37 |
+> | **無介面解除安裝** | 離開碼 2（見下）、服務／登錄檔／安裝目錄全清、防火牆規則 0、**標記檔與四個 sqlite 完整保留** |
+> | **全新安裝**（解除安裝之後的乾淨機器）| 131 秒、離開碼 0、簽章 `Valid` ＋ `CN=SignPath Foundation`、服務 Running／自動啟動、ARP 版本 1.15.37、healthz `{"ok":true}`、首頁 v1.15.37、**舊的使用者資料被接手** |
+>
+> ⚠ **解除安裝成功卻回傳 2**：交棒給 `%TEMP%` 那一份之後 NSIS 的 `Quit` 預設
+> 回報「被腳本中止」。腳本化的解除安裝（MDM、`Start-Process -Wait`）會判定失敗，
+> 而它其實完全成功了。已修（顯式 `SetErrorLevel 0`），守門
+> `tests/test_installer_silent_mode.py::test_the_uninstall_handoff_reports_success`
+> —— 判準落在**那一段交棒邏輯**裡，不是整份檔案有沒有出現過那個指令。
+>
+> 另外 `Start-Process -Wait` **等不到真正結束**（交棒是非同步的），所以驗收要
+> 等幾秒再看結果，不可以 `-Wait` 一回來就判定。
+
 ### 每次打 tag 之後
 
 - [ ] `Build Windows installer` 這個 workflow **completed success**
@@ -55,6 +93,11 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
       （服務 / 登錄檔 / 防火牆 / PATH 全清、**使用者資料保留**）→ 重裝
 - [ ] 裝完之後 `curl http://127.0.0.1:8765/healthz` 要回 `{"ok":true}`，
       而且版本號是這一版
+- [ ] **把那支 exe 抓回本地留存**（使用者要求 2026-09-13）：
+      `/opt/jt-doc-tools/releases/`（**不上 git**，`.gitignore` 有擋、
+      `sync-to-github.sh` 也沒列它）。同時把 **SHA256、tag、發佈時間**寫進
+      `MANIFEST.json` —— 日後客戶回報「我裝的是哪一版」時，比對雜湊就知道，
+      而 GitHub 上的 asset 是**可以被刪掉或換掉的**（這個 repo 今天就刪過四個）
 
 > **這一關會讓測試機離線一段時間**，所以要挑有人看著的時候跑 —— 但
 > **不可以因此跳過**：安裝程式那條路從 v1.15.26 之後就沒有人走過。
@@ -410,7 +453,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **256 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **258 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -456,6 +499,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_badhost_path_gate.py` | Regression test for the Starlette BADHOST path-poisoning bypass |
 | `test_boxed_digits_and_sublabel.py` | 兩種讓欄位「有偵測到卻填不進去」的版型 |
 | `test_broken_input_no_500.py` | 任何工具端點收到壞輸入都不可以回 500 |
+| `test_button_icons_are_consistent.py` | 按鈕圖示的兩條守門 |
 | `test_cjk_font_notice.py` | 缺中文字型時，**一般使用者**在工具頁上看得到提示（v1.14.47） |
 | `test_cjk_font_renders.py` | 寫進 PDF 的中文**必須畫得出來** |
 | `test_cli_data_dir_ownership.py` | 以 root 寫資料目錄的 CLI 指令，收尾**一定要把擁有者改回去** |
@@ -635,6 +679,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_submission_check_acl.py` | 送件檢核（submission-check）的案件 ACL 測試 |
 | `test_taiwan_terminology.py` | 使用者看得到的文字不可以用中國大陸用詞 |
 | `test_template_block_placement.py` | 兩個「看不到 JS 例外、只有畫面怪怪的」樣板雷的守門 |
+| `test_template_css_is_effective.py` | 模板用到的 CSS 類別，在**那個情境下**必須真的有樣式 |
 | `test_template_head_block.py` | 工具模板的 `<style>` 一定要放在 base.html 真的有的區塊裡 |
 | `test_template_js_syntax.py` | Inline-JS syntax check for every Jinja2 template (v1.7.14). |
 | `test_template_renders.py` | 每一支模板都要**渲染得起來**，而且註解裡不可以寫出樣板標籤的字面寫法 |
