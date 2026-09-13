@@ -334,7 +334,30 @@ function Install-Winsw {
     Die 'WinSW install failed (network + bundled both unavailable).' 23
 }
 
+function Stop-RunningService {
+    # **重寫檔案之前一定要先停服務。**
+    #
+    # 原本只有「不是 git repo」那條分支停 —— 而**升級既有安裝走的是 git 那條**，
+    # 服務一直跑著，於是後面的 `uv venv --clear` 刪不掉被 python.exe 佔住的
+    # `.venv`，整個安裝停在 `[X] uv venv failed`。v1.15.36 在真的 Windows 上
+    # 實測才看到：**這是每一個「裝到既有安裝上」的客戶都會踩的路徑**。
+    $svc = Get-Service $ServiceName -ErrorAction SilentlyContinue
+    if ($svc -and $svc.Status -eq 'Running') {
+        Log 'Stopping running service before refreshing files ...'
+        Stop-Service $ServiceName -Force -ErrorAction SilentlyContinue
+        # WinSW 停下來之後 python.exe 還要一點時間放掉檔案握把 ——
+        # 沒有這段等待，uv 照樣會撞到「檔案使用中」。
+        for ($i = 0; $i -lt 15; $i++) {
+            Start-Sleep -Seconds 1
+            $s = Get-Service $ServiceName -ErrorAction SilentlyContinue
+            if (-not $s -or $s.Status -ne 'Running') { break }
+        }
+        Start-Sleep -Seconds 2
+    }
+}
+
 function Fetch-Code {
+    Stop-RunningService
     if (Test-Path (Join-Path $InstallDir '.git')) {
         Log 'Existing git install detected, updating ...'
         Push-Location $InstallDir
@@ -347,12 +370,6 @@ function Fetch-Code {
         return
     }
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    $svc = Get-Service $ServiceName -ErrorAction SilentlyContinue
-    if ($svc -and $svc.Status -eq 'Running') {
-        Log 'Stopping running service before refreshing files ...'
-        Stop-Service $ServiceName -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 2
-    }
     Warn "$InstallDir not a git repo; cleaning non-bin files (keeping bin/) ..."
     Get-ChildItem $InstallDir -Force | Where-Object { $_.Name -ne 'bin' } |
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue

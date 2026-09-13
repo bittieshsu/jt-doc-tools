@@ -4832,5 +4832,22 @@
  "單檔。手機拍的照片（含 HEIC）與文書檔都可以，文書檔會先自動轉成 PDF。": "One file. Phone photos (including HEIC) and office documents are accepted; office documents are converted to PDF first.",
  "「文件拉正」的核心（去除不勻底色、裁出紙張、估歪斜角、透視校正）。headless 版沒有 GUI 相依，伺服器上裝得起來。缺了它，那支工具會在啟動時被安靜跳過（日誌只留一行錯誤，服務照常起來）—— 使用者只會發現工具不見了。OCR 引擎（EasyOCR）也會用到它。": "The core of Document straightening (evening out the background, cropping the sheet, estimating skew, perspective correction). The headless build has no GUI dependencies, so it installs on a server. Without it that tool is skipped at start-up with only a log line while the service starts normally, so users just find the tool missing. The OCR engine (EasyOCR) uses it too.",
  "OpenCV (影像處理)": "OpenCV (image processing)",
- "人在線上": "online"
+ "人在線上": "online",
+ "這一頁的轉向": "This page's orientation",
+ "左轉 90°": "Rotate left 90°",
+ "右轉 90°": "Rotate right 90°",
+ "轉 180°": "Rotate 180°",
+ "回到原方向": "Back to the original orientation",
+ "掃反了或掃成橫的請用這裡 —— 自動拉正只處理 ±6° 的歪斜，方向要自己指定。轉向之後仍然會自動拉正。": "Use this when a page came out upside down or sideways: automatic straightening only handles a skew of about ±6°, so the orientation has to be set by hand. Straightening still runs afterwards.",
+ "紙張的四個角": "The four corners of the sheet",
+ "自己拉四個角": "Place the four corners myself",
+ "勾起來之後，在左邊「修正前」的圖上拖曳四個圓點，對準紙張的四個角。自動抓到的位置會先填好，通常只要修不準的那一兩個。": "With this ticked, drag the four dots on the “Before” image to the corners of the sheet. The detected positions are filled in first, so usually only the one or two that are off need adjusting.",
+ "重新自動抓": "Detect again",
+ "手機翻拍時把紙張的四個角抓出來做透視校正": "Find the four corners of the sheet and correct the perspective (for photos)",
+ "純掃描件通常不需要；抓不到時會自動只做拉正。": "Scans rarely need it; when no corners are found, only straightening is applied.",
+ "轉成黑白": "Convert to black and white",
+ "縮小檔案（預設不要開）": "Makes the file smaller (leave this off by default)",
+ "拖曳對準紙張的角": "Drag to the corner of the sheet",
+ "（用的是你自己拉的四個角）": " (using the corners you placed)",
+ "（這一頁另外轉了 {0}°）": " (this page was also rotated {0}°)"
 }

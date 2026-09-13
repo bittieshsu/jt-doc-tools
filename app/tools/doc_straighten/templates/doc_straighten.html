@@ -25,38 +25,83 @@
 
 <div class="panel" id="dsOptPanel" hidden>
   <h2>{{ tr('2. 選項') }}</h2>
-  <div class="af-field">
+  {# 版面一律用全站的 `.form-row` ＋ `.field` ＋ `.muted`。
+     **不要用 `af-field` / `af-note`** —— 那兩個只在 `.auth-form` 底下才有定義
+     （`platform.css`），工具頁用了等於完全沒有樣式：標籤、控制項、說明會全部
+     擠在同一行。v1.15.36 使用者截圖回報，這是同一支模板第三個同型的錯。 #}
+  <div class="form-row">
     <label for="dsDpi">{{ tr('處理解析度') }}</label>
-    <select id="dsDpi" class="jt-select">
-      {% for d in dpi_choices %}
-      <option value="{{ d }}" {% if d == 200 %}selected{% endif %}>{{ d }} dpi</option>
-      {% endfor %}
-    </select>
-    <small class="af-note">{{ tr('200 dpi 是清晰度與速度的平衡（約 0.8 秒／頁）；300 dpi 細節好一點但慢一倍、檔案也大。') }}</small>
+    <div class="field">
+      <select id="dsDpi">
+        {% for d in dpi_choices %}
+        <option value="{{ d }}" {% if d == 200 %}selected{% endif %}>{{ d }} dpi</option>
+        {% endfor %}
+      </select>
+      <div class="muted">{{ tr('200 dpi 是清晰度與速度的平衡（約 0.8 秒／頁）；300 dpi 細節好一點但慢一倍、檔案也大。') }}</div>
+    </div>
   </div>
-  <div class="af-field">
-    <label for="dsQuad">{{ tr('偵測紙張邊界') }}</label>
-    <input type="checkbox" id="dsQuad" checked />
-    <small class="af-note">{{ tr('手機翻拍時把紙張的四個角抓出來做透視校正。純掃描件通常不需要，抓不到時會自動只做拉正。') }}</small>
+  <div class="form-row">
+    <label>{{ tr('偵測紙張邊界') }}</label>
+    <div class="field">
+      <label class="ds-check"><input type="checkbox" id="dsQuad" checked> {{ tr('手機翻拍時把紙張的四個角抓出來做透視校正') }}</label>
+      <div class="muted">{{ tr('純掃描件通常不需要；抓不到時會自動只做拉正。') }}</div>
+    </div>
   </div>
-  <div class="af-field">
-    <label for="dsBin">{{ tr('轉成黑白（縮小檔案）') }}</label>
-    <input type="checkbox" id="dsBin" />
-    <small class="af-note"><strong>{{ tr('預設不要開。') }}</strong>{{ tr('實測轉成黑白會把中文的細筆畫吃掉，文字辨識率反而明顯下降（0.775 → 0.108）。它的用途是縮小檔案，不是讓文字更清楚。') }}</small>
+  <div class="form-row">
+    <label>{{ tr('轉成黑白') }}</label>
+    <div class="field">
+      <label class="ds-check"><input type="checkbox" id="dsBin"> {{ tr('縮小檔案（預設不要開）') }}</label>
+      <div class="muted">{{ tr('實測轉成黑白會把中文的細筆畫吃掉，文字辨識率反而明顯下降（0.775 → 0.108）。它的用途是縮小檔案，不是讓文字更清楚。') }}</div>
+    </div>
   </div>
-  <button class="btn" id="dsPreview" type="button">{{ icon('eye') }} {{ tr('預覽這一頁的修正結果') }}</button>
-  <button class="btn btn-primary" id="dsGo" type="button">{{ icon('play') }} {{ tr('開始拉正') }}</button>
+  <div class="ds-actions">
+    <button class="btn" id="dsPreview" type="button">{{ icon('eye') }} {{ tr('預覽這一頁的修正結果') }}</button>
+    <button class="btn btn-primary" id="dsGo" type="button">{{ icon('play') }} {{ tr('開始拉正') }}</button>
+  </div>
 </div>
 
 <div class="panel" id="dsPvPanel" hidden>
   <h2>{{ tr('3. 修正前後') }}</h2>
-  <div class="af-field">
+  <div class="form-row">
     <label for="dsPvPage">{{ tr('頁碼') }}</label>
-    <input type="number" id="dsPvPage" value="1" min="1" />
-    <small class="af-note" id="dsPvStat"></small>
+    <div class="field">
+      <input type="number" id="dsPvPage" value="1" min="1" />
+      <div class="muted" id="dsPvStat"></div>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>{{ tr('這一頁的轉向') }}</label>
+    <div class="field">
+      <div class="ds-actions">
+        <button class="btn" type="button" data-rot="270">{{ icon('rotate-ccw') }} {{ tr('左轉 90°') }}</button>
+        <button class="btn" type="button" data-rot="90">{{ icon('rotate-cw') }} {{ tr('右轉 90°') }}</button>
+        <button class="btn" type="button" data-rot="180">{{ tr('轉 180°') }}</button>
+        <button class="btn btn-secondary" type="button" id="dsRotReset">{{ tr('回到原方向') }}</button>
+      </div>
+      <div class="muted">{{ tr('掃反了或掃成橫的請用這裡 —— 自動拉正只處理 ±6° 的歪斜，方向要自己指定。轉向之後仍然會自動拉正。') }}</div>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>{{ tr('紙張的四個角') }}</label>
+    <div class="field">
+      <label class="ds-check"><input type="checkbox" id="dsQuadEdit"> {{ tr('自己拉四個角') }}</label>
+      <div class="muted">{{ tr('勾起來之後，在左邊「修正前」的圖上拖曳四個圓點，對準紙張的四個角。自動抓到的位置會先填好，通常只要修不準的那一兩個。') }}
+        <button class="btn btn-secondary" type="button" id="dsQuadReset" hidden>{{ tr('重新自動抓') }}</button>
+      </div>
+    </div>
   </div>
   <div class="ds-compare">
-    <figure><figcaption>{{ tr('修正前') }}</figcaption><img id="dsPvBefore" alt="{{ tr('修正前') }}" /></figure>
+    <figure>
+      <figcaption>{{ tr('修正前') }}</figcaption>
+      {# 四個角的把手疊在圖上；座標一律**正規化 0~1**，這樣縮放到任何寬度都對得上。 #}
+      <div class="ds-stage" id="dsStage">
+        <img id="dsPvBefore" alt="{{ tr('修正前') }}" />
+        <svg class="ds-quad" id="dsQuadSvg" hidden viewBox="0 0 100 100" preserveAspectRatio="none">
+          <polygon id="dsQuadPoly" points="" />
+        </svg>
+        <div class="ds-handles" id="dsHandles" hidden></div>
+      </div>
+    </figure>
     <figure><figcaption>{{ tr('修正後') }}</figcaption><img id="dsPvAfter" alt="{{ tr('修正後') }}" /></figure>
   </div>
 </div>
@@ -67,17 +112,44 @@
    這跟上傳區是同一個錯，我上一版只修了上傳區。 #}
 {% with progress_id='dsJob' %}{% include "components/job_progress.html" %}{% endwith %}
 
-<div class="panel" id="dsResult" hidden>
-  <h2>{{ tr('完成') }}</h2>
-  <div id="dsDoneMsg" class="muted"></div>
-  <a class="btn btn-primary" id="dsDownload" href="#">{{ icon('download') }} {{ tr('下載拉正後的 PDF') }}</a>
-  {% if workspace_enabled(request) %}<button class="btn" id="dsSaveWs" type="button">{{ icon('archive') }} {{ tr('存至工作區') }}</button>{% endif %}
-</div>
+{# **不要再做一張自己的「完成」卡片。** 共用元件的 `.job-actions` 已經有
+   下載 PDF / 下載 PNG / 存至工作區 / 處理新檔案 四顆鈕，再加一張自己的
+   就會變成兩排幾乎貼在一起的按鈕（使用者截圖回報）。完成訊息交給元件的
+   狀態列，工作區那顆也用元件自己的。 #}
 {% endblock %}
 
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
   /* 修正前後並排。窄畫面改成上下 —— 兩張 A4 並排在手機上會小到看不出差別。 */
+  /* 勾選框那一行：**不要讓它吃到 `.form-row label` 的 96px 固定寬 ＋ nowrap**
+     （那條是給左邊欄位標題用的），所以用自己的類別，寬度自動、可以換行。 */
+  .ds-check { display: inline-flex; align-items: center; gap: 6px;
+              width: auto; white-space: normal; color: var(--text); }
+  /* 按鈕列：**一定要有間距與換行**。直接把兩顆 `.btn` 並排會貼在一起，
+     窄畫面還會擠出內容欄（v1.15.36 使用者截圖回報）。 */
+  .ds-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  /* 四個角的拖曳舞台：把手與連線疊在「修正前」那張圖上。
+     座標一律**正規化 0~1** —— 圖在不同寬度下縮放，存像素的話換個視窗就全錯。 */
+  .ds-stage { position: relative; line-height: 0; }
+  .ds-quad { position: absolute; inset: 0; width: 100%; height: 100%;
+             pointer-events: none; }
+  .ds-quad polygon { fill: rgba(37,99,235,.12); stroke: #2563eb;
+                     stroke-width: .6; vector-effect: non-scaling-stroke; }
+  .ds-handles { position: absolute; inset: 0; }
+  .ds-h { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px;
+          border-radius: 50%; background: #fff; border: 3px solid #2563eb;
+          cursor: grab; touch-action: none; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .ds-h:active { cursor: grabbing; background: #dbeafe; }
+  /* 拖曳時的放大鏡：手指 / 游標會蓋住要對齊的那個角，沒有它等於在瞎拉。 */
+  .ds-loupe { position: absolute; width: 128px; height: 128px; margin: -150px 0 0 -64px;
+              border-radius: 50%; border: 2px solid #2563eb; overflow: hidden;
+              pointer-events: none; background: #fff no-repeat;
+              box-shadow: 0 2px 10px rgba(0,0,0,.35); z-index: 3; }
+  .ds-loupe::after { content: ''; position: absolute; inset: 0;
+                     background:
+                       linear-gradient(#2563eb, #2563eb) 50% 0/1px 100% no-repeat,
+                       linear-gradient(#2563eb, #2563eb) 0 50%/100% 1px no-repeat;
+                     opacity: .5; }
   .ds-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .ds-compare figure { margin: 0; }
   .ds-compare figcaption { font-size: .85rem; color: var(--muted, #64748b); margin-bottom: 6px; }
@@ -118,19 +190,33 @@
     drawPreview();
   });
 
+  function curPage() {
+    return Math.min(pageCount, Math.max(1, parseInt($('dsPvPage').value || '1', 10)));
+  }
+  //: 逐頁覆寫 —— `{ 3: { rotate: 90, quad: [[x,y] × 4] } }`，**鍵是 1-based 頁碼**
+  //  （畫面上看到的那個數字）。座標一律正規化 0~1。
+  const overrides = {};
+  function ovFor(page, create) {
+    if (!overrides[page] && create) overrides[page] = {};
+    return overrides[page];
+  }
+
   async function drawPreview() {
     if (!uploadId) return;
-    const page = Math.min(pageCount, Math.max(1, parseInt($('dsPvPage').value || '1', 10)));
+    const page = curPage();
     const token = ++pvToken;
     $('dsPvPanel').hidden = false;
     $('dsPvStat').textContent = tr('產生預覽中…');
     $('dsPvBefore').src = `/tools/doc-straighten/thumb/${uploadId}/${page}`;
+    const ov = overrides[page] || {};
     const fd = new FormData();
     fd.append('upload_id', uploadId);
     fd.append('page', page);
     fd.append('dpi', $('dsDpi').value);
     fd.append('binarize', $('dsBin').checked ? '1' : '');
     fd.append('detect_quad', $('dsQuad').checked ? '1' : '');
+    fd.append('rotate', ov.rotate || 0);
+    if (ov.quad) fd.append('quad', ov.quad.map((pt) => pt.join(',')).join(','));
     try {
       const r = await fetch('/tools/doc-straighten/preview', { method: 'POST', body: fd });
       if (token !== pvToken) return;          // 已經有更新的請求了
@@ -141,46 +227,157 @@
       const d = await r.json();
       $('dsPvAfter').src = d.url + '?t=' + Date.now();
       // **殘留角是驗收指標**：轉錯方向時角度看起來「有動」，只有殘留角會現形
+      const ovNow = overrides[page] || {};
       $('dsPvStat').textContent =
         tr('轉了 {0}°，修正後殘留 {1}°（越接近 0 越好）')
           .replace('{0}', d.angle).replace('{1}', d.residual)
-        + (d.quad_found ? '　' + tr('（抓到紙張邊界，已做透視校正）') : '');
+        + (d.quad_found ? '　' + tr('（抓到紙張邊界，已做透視校正）') : '')
+        + (ovNow.rotate ? '　' + tr('（這一頁另外轉了 {0}°）').replace('{0}', ovNow.rotate) : '')
+        + (ovNow.quad ? '　' + tr('（用的是你自己拉的四個角）') : '');
+      // 自動抓到的四角回來了就當作拖曳的起點 —— 使用者只要修不準的那幾個。
+      if (d.quad && !ovNow.quad) autoQuad = d.quad;
+      renderQuad();
     } catch (e) {
       if (token === pvToken) $('dsPvStat').textContent = tr('預覽失敗');
     }
   }
 
-  $('dsPreview').addEventListener('click', drawPreview);
-  $('dsPvPage').addEventListener('change', drawPreview);
-  ['dsDpi', 'dsBin', 'dsQuad'].forEach((id) =>
-    $(id).addEventListener('change', drawPreview));
-
-  const jp = new JobProgress($('dsJob'), {
-    onDone: (job) => {
-      $('dsDownload').href = `/api/jobs/${jp.jobId}/download`;
-      $('dsDoneMsg').textContent = (job && job.message) || tr('完成');
-      $('dsResult').hidden = false;
-      const ws = $('dsSaveWs');
-      if (ws && window.attachWorkspaceSave) {
-        const jid = jp.jobId;
-        const outName = (srcName || 'document') + '_straightened.pdf';
-        window.attachWorkspaceSave(ws, () => ({
-          jobId: jid, name: outName, tool: 'doc-straighten' }));
-      }
-    },
+  // ---------- 這一頁的轉向 ----------
+  document.querySelectorAll('[data-rot]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const page = curPage();
+      const cur = (overrides[page] && overrides[page].rotate) || 0;
+      // 按鈕是**相對**轉向：連按兩次「右轉 90°」就是 180°，跟一般看圖軟體一樣。
+      const next = (cur + parseInt(b.dataset.rot, 10)) % 360;
+      const ov = ovFor(page, true);
+      if (next) ov.rotate = next; else delete ov.rotate;
+      // **四個角不用丟掉。** 使用者是在「修正前」那張圖上拉的，而那張圖是
+      // **未旋轉的原稿**（`/thumb`）—— 後端會把四個角跟著頁面一起轉
+      // （`_rotate_quad`）。丟掉的話等於把他拉了半天的東西無聲清空。
+      if (!Object.keys(ov).length) delete overrides[page];
+      drawPreview();
+    });
   });
+  $('dsRotReset').addEventListener('click', () => {
+    const page = curPage();
+    const ov = overrides[page];
+    if (!ov) return;
+    delete ov.rotate; delete ov.quad; autoQuad = null;
+    if (!Object.keys(ov).length) delete overrides[page];
+    drawPreview();
+  });
+
+  // ---------- 自己拉四個角 ----------
+  //  座標一律**正規化 0~1**：圖會隨視窗縮放，存像素的話換個寬度就全錯
+  //  （而且預覽 200 dpi、輸出 300 dpi 用的也是不同像素尺寸）。
+  let autoQuad = null;        // 伺服器自動抓到的，當作拖曳起點
+
+  function quadNow() {
+    const ov = overrides[curPage()];
+    return (ov && ov.quad) || autoQuad;
+  }
+  function renderQuad() {
+    const on = $('dsQuadEdit').checked;
+    const q = quadNow();
+    const svg = $('dsQuadSvg'), box = $('dsHandles');
+    $('dsQuadReset').hidden = !on;
+    if (!on || !q) { svg.hidden = true; box.hidden = true; box.innerHTML = ''; return; }
+    svg.hidden = false; box.hidden = false;
+    $('dsQuadPoly').setAttribute(
+      'points', q.map(([x, y]) => `${x * 100},${y * 100}`).join(' '));
+    if (box.children.length !== 4) {
+      box.innerHTML = '';
+      q.forEach((_, i) => {
+        const h = document.createElement('div');
+        h.className = 'ds-h';
+        h.dataset.i = i;
+        h.title = tr('拖曳對準紙張的角');
+        box.appendChild(h);
+        wireDrag(h);
+      });
+    }
+    [...box.children].forEach((h, i) => {
+      h.style.left = (q[i][0] * 100) + '%';
+      h.style.top = (q[i][1] * 100) + '%';
+    });
+  }
+
+  function wireDrag(h) {
+    let loupe = null;
+    const move = (ev) => {
+      const stage = $('dsStage').getBoundingClientRect();
+      if (!stage.width || !stage.height) return;
+      const x = Math.min(1, Math.max(0, (ev.clientX - stage.left) / stage.width));
+      const y = Math.min(1, Math.max(0, (ev.clientY - stage.top) / stage.height));
+      const page = curPage();
+      const ov = ovFor(page, true);
+      if (!ov.quad) ov.quad = (quadNow() || []).map((pt) => pt.slice());
+      if (ov.quad.length !== 4) { delete ov.quad; return; }
+      ov.quad[parseInt(h.dataset.i, 10)] = [x, y];
+      h.style.left = (x * 100) + '%';
+      h.style.top = (y * 100) + '%';
+      $('dsQuadPoly').setAttribute(
+        'points', ov.quad.map(([a, b]) => `${a * 100},${b * 100}`).join(' '));
+      if (loupe) {
+        // 放大鏡：手指 / 游標一定會蓋住要對齊的那個角，沒有它等於在瞎拉。
+        const img = $('dsPvBefore');
+        loupe.style.left = (x * 100) + '%';
+        loupe.style.top = (y * 100) + '%';
+        loupe.style.backgroundImage = `url("${img.currentSrc || img.src}")`;
+        loupe.style.backgroundSize = (stage.width * 2.5) + 'px ' + (stage.height * 2.5) + 'px';
+        loupe.style.backgroundPosition =
+          `${64 - x * stage.width * 2.5}px ${64 - y * stage.height * 2.5}px`;
+      }
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      if (loupe) { loupe.remove(); loupe = null; }
+      drawPreview();          // 放開才重算 —— 拖曳過程中每動一下就打伺服器太浪費
+    };
+    h.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      loupe = document.createElement('div');
+      loupe.className = 'ds-loupe';
+      $('dsStage').appendChild(loupe);
+      move(ev);
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    });
+  }
+
+  $('dsQuadEdit').addEventListener('change', renderQuad);
+  $('dsQuadReset').addEventListener('click', () => {
+    const ov = overrides[curPage()];
+    if (ov) { delete ov.quad; if (!Object.keys(ov).length) delete overrides[curPage()]; }
+    autoQuad = null;
+    drawPreview();
+  });
+
+  $('dsPreview').addEventListener('click', drawPreview);
+  $('dsPvPage').addEventListener('change', () => { autoQuad = null; drawPreview(); });
+  ['dsDpi', 'dsBin', 'dsQuad'].forEach((id) =>
+    $(id).addEventListener('change', () => { autoQuad = null; drawPreview(); }));
+
+  // 完成之後的下載 PDF / 下載 PNG / 存至工作區 / 處理新檔案**全部由共用元件
+  // 自己處理**（它從作業結果拿檔名與副檔名）。不要再自己做一張完成卡片 ——
+  // 那會變成兩排幾乎貼在一起的按鈕（使用者截圖回報）。
+  const jp = new JobProgress($('dsJob'));
 
   $('dsGo').addEventListener('click', async () => {
     if (!uploadId) return;
     const btn = $('dsGo');
     btn.disabled = true;
-    $('dsResult').hidden = true;
     const fd = new FormData();
     fd.append('upload_id', uploadId);
     fd.append('dpi', $('dsDpi').value);
     fd.append('binarize', $('dsBin').checked ? '1' : '');
     fd.append('detect_quad', $('dsQuad').checked ? '1' : '');
     fd.append('out_name', srcName);
+    // 使用者自己調過的那幾頁一起送出去（沒調過就不送，維持自動）
+    if (Object.keys(overrides).length) {
+      fd.append('overrides', JSON.stringify(overrides));
+    }
     try {
       const r = await fetch('/tools/doc-straighten/submit', { method: 'POST', body: fd });
       if (!r.ok) {

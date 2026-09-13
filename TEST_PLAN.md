@@ -410,7 +410,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **254 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **256 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -516,6 +516,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_id_from_body_acl.py` | 「id 由使用者傳入」的端點一律要有 ACL —— 靜態全面掃描 |
 | `test_installer_languages.py` | Windows 安裝程式在英文 Windows 上要顯示英文（v1.15.27） |
 | `test_installer_product_name.py` | Windows 安裝程式的產品名稱多語系 + Linux 服務的安全強化（第 1 批，v1.15.31） |
+| `test_installer_silent_mode.py` | 安裝程式在**無介面模式**下不可以停下來等人按對話框 |
 | `test_job_acl.py` | Regression tests for the /api/jobs/* per-job ownership ACL (v1.12.61). |
 | `test_job_api_acl.py` | 「我的工作」/ 管理區工作監控的 API 與權限邊界 |
 | `test_job_autosave.py` | 作業完成後自動存入工作區 |
@@ -603,6 +604,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_public_tree_paths.py` | 測試不可以寫死 `github/` 這一層（2026-09-13，CI 在 main 上紅了才抓到） |
 | `test_real_samples_smoke.py` | 拿**真實的**樣本檔掃過所有吃單一 PDF 的工具 |
 | `test_redos_ad_dn.py` | ReDoS regression for RE_AD_DN — closes CodeQL alert #13 |
+| `test_release_installer_must_be_signed.py` | Release 上掛的安裝程式**只能是簽章過的** |
 | `test_restrict_stamp_render.py` | 個資限用章的渲染 —— 橫式 / 直式 / 對角線 |
 | `test_retention_periods.py` | 檔案保留期：**設定頁上的每一個數字都要真的生效** |
 | `test_roles.py` | Tests for app.core.roles. |

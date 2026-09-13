@@ -143,7 +143,9 @@ async def thumb(upload_id: str, page: int, request: Request):
 async def preview(request: Request, upload_id: str = Form(...),
                   page: int = Form(1), dpi: int = Form(200),
                   binarize: bool = Form(False),
-                  detect_quad: bool = Form(True)):
+                  detect_quad: bool = Form(True),
+                  rotate: int = Form(0),
+                  quad: str = Form("")):
     """單頁的「修正後」預覽。
 
     **預覽跟產出走同一段程式**（`straighten_core.straighten_page`）——
@@ -167,16 +169,30 @@ async def preview(request: Request, upload_id: str = Form(...),
                 pix.height, pix.width, pix.n)
             gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY) if pix.n >= 3 \
                 else arr[:, :, 0]
-        quad = SC.find_page_quad(gray) if detect_quad else None
-        fixed, res = SC.straighten_page(gray, quad=quad, do_binarize=binarize,
-                                        dpi=_clamp_dpi(dpi), page_no=page)
+        h, w = gray.shape[:2]
+        user_quad = _parse_quad(quad)
+        if user_quad is not None:
+            # 使用者拉的是**正規化座標**（0~1）—— 換算成這次算圖的像素。
+            # 收像素的話，預覽用 200 dpi、輸出用 300 dpi 就整組跑掉了。
+            q = np.float32([[x * w, y * h] for x, y in user_quad])
+        else:
+            q = SC.find_page_quad(gray) if detect_quad else None
+        fixed, res = SC.straighten_page(gray, quad=q, do_binarize=binarize,
+                                        dpi=_clamp_dpi(dpi), page_no=page,
+                                        rotate_deg=_clamp_rotate(rotate))
         png = cv2.imencode(".png", cv2.resize(
             fixed, None, fx=0.45, fy=0.45, interpolation=cv2.INTER_AREA))[1]
         out = settings.temp_dir / f"{_PREFIX}pv_{upload_id}_{page}.png"
         out.write_bytes(png.tobytes())
+        # 自動抓到的四角也回給前端**當作拖曳的起點** —— 使用者只要修不滿意的
+        # 那幾個角，不必四個重拉。回正規化座標，畫面縮放多少都對得上。
+        auto = None
+        if q is not None:
+            auto = [[round(float(x) / w, 5), round(float(y) / h, 5)] for x, y in q]
         return {"url": f"/tools/doc-straighten/preview-img/{upload_id}/{page}",
                 "angle": res.angle, "residual": res.residual,
-                "quad_found": res.quad_found, "ms": res.ms}
+                "quad_found": res.quad_found, "ms": res.ms,
+                "rotate": res.rotate_deg, "quad": auto}
 
     return await _asyncio.to_thread(_work)
 
@@ -192,6 +208,36 @@ async def preview_img(upload_id: str, page: int, request: Request):
                         headers={"Cache-Control": "no-store"})
 
 
+
+def _clamp_rotate(deg) -> int:
+    """只收 0 / 90 / 180 / 270。**其餘一律當 0**，不要丟例外 ——
+    這是畫面上按鈕送來的值，送壞了不該讓整個預覽失敗。"""
+    try:
+        d = int(deg) % 360
+    except (TypeError, ValueError):
+        return 0
+    return d if d in (0, 90, 180, 270) else 0
+
+
+def _parse_quad(raw: str):
+    """解析前端送來的四個角：`"x1,y1,x2,y2,x3,y3,x4,y4"`，**正規化 0~1**。
+
+    格式不對就回 `None`（退回自動偵測）—— 這是使用者拖出來的東西，
+    不該因為少一個數字就整個失敗。範圍稍微超出一點（拖到圖外）放行並夾住，
+    `quad_is_sane()` 還會再擋一次自交 / 過小。
+    """
+    if not raw:
+        return None
+    try:
+        nums = [float(x) for x in raw.replace(" ", "").split(",") if x != ""]
+    except ValueError:
+        return None
+    if len(nums) != 8:
+        return None
+    pts = [(min(1.0, max(0.0, nums[i])), min(1.0, max(0.0, nums[i + 1])))
+           for i in range(0, 8, 2)]
+    return pts
+
 def _clamp_dpi(dpi: int) -> int:
     """夾在允許的範圍內 —— 前端的下拉只是提示，API 呼叫者不受它拘束。
 
@@ -205,7 +251,7 @@ def _clamp_dpi(dpi: int) -> int:
 
 
 def _run_job(src: Path, out: Path, *, dpi: int, binarize: bool,
-             detect_quad: bool, stem: str):
+             detect_quad: bool, stem: str, overrides: dict | None = None):
     def run(job):
         job.message = "拉正中…"
 
@@ -215,6 +261,7 @@ def _run_job(src: Path, out: Path, *, dpi: int, binarize: bool,
 
         results = SC.straighten_pdf(src, out, dpi=dpi, do_binarize=binarize,
                                     detect_quad=detect_quad,
+                                    overrides=overrides,
                                     progress=progress,
                                     cancelled=lambda: job.cancelled)
         job.result_path = out
@@ -227,6 +274,8 @@ def _run_job(src: Path, out: Path, *, dpi: int, binarize: bool,
         job.meta["worst_residual"] = round(worst, 2)
         job.meta["quad_pages"] = sum(1 for r in results if r.quad_found)
         job.meta["kept_pages"] = skipped
+        # 使用者自己動過的頁數 —— 完成訊息要講出來，不然他不確定有沒有吃到
+        job.meta["manual_pages"] = len(overrides or {})
         job.progress = 1.0
         # **原樣保留幾頁一定要講出來** —— 使用者丟一份原生 PDF 進來，
         # 看到「完成」卻什麼都沒變的話會以為工具壞了。
@@ -235,14 +284,58 @@ def _run_job(src: Path, out: Path, *, dpi: int, binarize: bool,
             msg += f"，處理 {len(done)} 頁、殘留歪斜最大 {worst:.2f}°"
         if skipped:
             msg += f"；{skipped} 頁本來就是正的且有文字層，原樣保留（文字不會變成圖片）"
+        if overrides:
+            msg += f"；{len(overrides)} 頁套用了你自己調的轉向 / 四個角"
         job.message = msg + "）"
     return run
 
 
+
+def _parse_overrides(raw: str, page_count: int) -> dict:
+    """解析逐頁覆寫：`{"3": {"rotate": 90, "quad": [[x,y] × 4]}, ...}`。
+
+    **壞掉的項目個別丟掉，不要整批失敗** —— 這是使用者在畫面上調了半天的
+    東西，其中一頁的資料有問題不該讓整份工作送不出去。頁碼是 1-based
+    （畫面上看到的那個數字），超出範圍的直接忽略。
+    """
+    if not raw:
+        return {}
+    import json
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict[int, dict] = {}
+    for k, v in data.items():
+        try:
+            page = int(k)
+        except (TypeError, ValueError):
+            continue
+        if not (1 <= page <= page_count) or not isinstance(v, dict):
+            continue
+        item: dict = {}
+        rot = _clamp_rotate(v.get("rotate", 0))
+        if rot:
+            item["rotate"] = rot
+        q = v.get("quad")
+        if isinstance(q, list) and len(q) == 4 and all(
+                isinstance(pt, (list, tuple)) and len(pt) == 2 for pt in q):
+            try:
+                item["quad"] = [[min(1.0, max(0.0, float(x))),
+                                 min(1.0, max(0.0, float(y)))] for x, y in q]
+            except (TypeError, ValueError):
+                pass
+        if item:
+            out[page] = item
+    return out
+
 @router.post("/submit")
 async def submit(request: Request, upload_id: str = Form(...),
                  dpi: int = Form(200), binarize: bool = Form(False),
-                 detect_quad: bool = Form(True), out_name: str = Form("")):
+                 detect_quad: bool = Form(True), out_name: str = Form(""),
+                 overrides: str = Form("")):
     require_uuid_hex(upload_id, "upload_id")
     _uo.require(upload_id, request)
     src = _src_path(upload_id)
@@ -252,10 +345,11 @@ async def submit(request: Request, upload_id: str = Form(...),
         page_count = doc.page_count
     stem = Path(out_name or "document").stem or "document"
     out = settings.temp_dir / f"{_PREFIX}out_{upload_id}.pdf"
+    ov = _parse_overrides(overrides, page_count)
     job = job_manager.submit(
         "doc-straighten",
         _run_job(src, out, dpi=_clamp_dpi(dpi), binarize=binarize,
-                 detect_quad=detect_quad, stem=stem),
+                 detect_quad=detect_quad, stem=stem, overrides=ov),
         request=request,
         meta={"filename": f"{stem}.pdf", "count": page_count})
     return {"job_id": job.id}
