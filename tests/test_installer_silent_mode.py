@@ -110,3 +110,40 @@ def test_stopping_waits_for_the_process_to_let_go():
     body = m.group(1)
     assert "Start-Sleep" in body and re.search(r"for \(|while \(", body), (
         "停完服務之後沒有等它真的停下來")
+
+
+def test_the_installer_script_actually_compiles():
+    """**真正的判準是編得過。**
+
+    v1.15.37 踩到：我把 `/SD IDOK` 放在**文字前面**，而 NSIS 的語法是
+    `MessageBox mode text [/SD return]` —— 文字在前、`/SD` 在後。
+    上面那條「每個 MessageBox 都要有 /SD」照樣綠燈（字串確實在那一行），
+    **CI 卻在 26 秒後編譯失敗**：
+
+        Error: Goto targets cannot begin with 0-9, $, !
+
+    「有沒有那個字串」跟「語法對不對」是兩件事。這台有 `makensis`，
+    編一次只要幾秒 —— 那就編。沒有 `makensis` 的環境誠實 skip。
+    """
+    import shutil
+    import subprocess
+
+    exe = shutil.which("makensis")
+    if not exe:
+        pytest.skip("沒有 makensis（CI 的 ubuntu runner 會裝）")
+    out_dir = ROOT / "temp" / "nsis-build"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    made = out_dir / "probe.exe"
+    made.unlink(missing_ok=True)
+    r = subprocess.run(
+        [exe, "-DVERSION=0.0.0-test", f"-XOutFile {made}", str(NSI)],
+        cwd=str(NSI.parent), capture_output=True, text=True, timeout=180)
+    assert r.returncode == 0, (
+        "installer.nsi 編不過：\n" + (r.stdout or "")[-1500:] + (r.stderr or "")[-500:])
+    # **判準是「有沒有拿到可用的檔案」**，不是回傳碼 —— 跟 soffice 那條同一個道理
+    # （`-XOutFile` 會被腳本裡自己的 `OutFile` 蓋掉，那時回傳碼照樣 0）。
+    if not made.exists():
+        made = NSI.parent / "jt-doc-tools-0.0.0-test-setup.exe"
+    assert made.exists() and made.stat().st_size > 50_000, (
+        f"編譯回 0 但沒有產出可用的 exe（找過 {out_dir} 與 {NSI.parent}）")
+    made.unlink()

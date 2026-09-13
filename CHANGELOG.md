@@ -37,6 +37,13 @@ CPU 0、使用者只看到「什麼都沒發生」（實測卡了 30 分鐘）�
 `tests/test_installer_silent_mode.py`（判準要接 NSIS 的續行 —— 不接的話那個跨兩行
 的 `MB_YESNO` 會被誤報）。
 
+> **而我第一版把 `/SD` 放錯位置**（NSIS 的語法是 `MessageBox mode text [/SD return]`
+> ——文字在前、`/SD` 在後）。**「有沒有 `/SD` 這個字串」照樣綠燈，CI 卻在 26 秒後
+> 編譯失敗**（`Error: Goto targets cannot begin with 0-9, $, !`）。
+> 所以守門補上**真的用 `makensis` 編一次**：這台幾秒就編完，判準是
+> **有沒有拿到可用的 exe**（不是回傳碼 —— `-XOutFile` 會被腳本自己的 `OutFile`
+> 蓋掉，那時回傳碼照樣 0，跟 soffice 那條同一個道理）。
+
 ### ⚠⚠ 自動抓紙張邊界：拿真實手機照片一測，**兩張都抓不到**
 
 使用者丟了兩張真的手機照片（桌面上的手寫筆記、名片）。第一版的偵測是教科書

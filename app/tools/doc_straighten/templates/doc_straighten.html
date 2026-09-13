@@ -65,7 +65,7 @@
   <div class="form-row">
     <label for="dsPvPage">{{ tr('頁碼') }}</label>
     <div class="field">
-      <input type="number" id="dsPvPage" value="1" min="1" />
+      <input type="number" id="dsPvPage" class="ds-page-no" value="1" min="1" />
       <div class="muted" id="dsPvStat"></div>
     </div>
   </div>
@@ -85,8 +85,9 @@
     <label>{{ tr('紙張的四個角') }}</label>
     <div class="field">
       <label class="ds-check"><input type="checkbox" id="dsQuadEdit"> {{ tr('自己拉四個角') }}</label>
-      <div class="muted">{{ tr('勾起來之後，在左邊「修正前」的圖上拖曳四個圓點，對準紙張的四個角。自動抓到的位置會先填好，通常只要修不準的那一兩個。') }}
-        <button class="btn btn-secondary" type="button" id="dsQuadReset" hidden>{{ tr('重新自動抓') }}</button>
+      <div class="muted">{{ tr('勾起來之後，在左邊「修正前」的圖上拖曳四個圓點，對準紙張的四個角。自動抓到的位置會先填好，通常只要修不準的那一兩個。') }}</div>
+      <div class="ds-actions" id="dsQuadActions" hidden>
+        <button class="btn btn-secondary" type="button" id="dsQuadReset">{{ icon('refresh') }} {{ tr('重新自動抓') }}</button>
       </div>
     </div>
   </div>
@@ -123,6 +124,9 @@
   /* 修正前後並排。窄畫面改成上下 —— 兩張 A4 並排在手機上會小到看不出差別。 */
   /* 勾選框那一行：**不要讓它吃到 `.form-row label` 的 96px 固定寬 ＋ nowrap**
      （那條是給左邊欄位標題用的），所以用自己的類別，寬度自動、可以換行。 */
+  /* 頁碼是個位數 —— 撐滿整欄看起來像在等一串長字 */
+  .ds-page-no { width: 90px; padding: 6px 8px; border: 1px solid var(--border);
+                border-radius: 6px; font-size: 14px; }
   .ds-check { display: inline-flex; align-items: center; gap: 6px;
               width: auto; white-space: normal; color: var(--text); }
   /* 按鈕列：**一定要有間距與換行**。直接把兩顆 `.btn` 並排會貼在一起，
@@ -150,10 +154,21 @@
                        linear-gradient(#2563eb, #2563eb) 50% 0/1px 100% no-repeat,
                        linear-gradient(#2563eb, #2563eb) 0 50%/100% 1px no-repeat;
                      opacity: .5; }
-  .ds-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .ds-compare figure { margin: 0; }
-  .ds-compare figcaption { font-size: .85rem; color: var(--muted, #64748b); margin-bottom: 6px; }
-  .ds-compare img { width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
+  /* 修正前後並排。窄畫面改成上下 —— 兩張 A4 並排在手機上會小到看不出差別。
+     版面照 `pdf-to-office` 的預覽格：白底卡片 ＋ 置中小標 ＋ 圖片限高。
+     **一定要限高**：手機照片是 3024×4032，不限的話兩張圖會把整頁撐成一面牆，
+     而且左右不等高（使用者截圖回報「跟其它工具頁比還是不美觀」）。 */
+  .ds-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .ds-compare figure { margin: 0; background: #fff; border: 1px solid var(--border);
+                       border-radius: 8px; padding: 8px; display: flex;
+                       flex-direction: column; gap: 6px; }
+  .ds-compare figcaption { font-size: 12px; font-weight: 600; color: var(--muted);
+                           text-align: center; }
+  .ds-compare .ds-stage, .ds-compare img { width: 100%; }
+  .ds-compare img { display: block; max-height: 58vh; object-fit: contain;
+                    border: 1px solid var(--border); border-radius: 4px;
+                    background: #fafafa; }
+  @media (max-width: 720px) { .ds-compare { grid-template-columns: 1fr; } }
   @media (max-width: 860px) { .ds-compare { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
@@ -280,7 +295,7 @@
     const on = $('dsQuadEdit').checked;
     const q = quadNow();
     const svg = $('dsQuadSvg'), box = $('dsHandles');
-    $('dsQuadReset').hidden = !on;
+    $('dsQuadActions').hidden = !on;
     if (!on || !q) { svg.hidden = true; box.hidden = true; box.innerHTML = ''; return; }
     svg.hidden = false; box.hidden = false;
     $('dsQuadPoly').setAttribute(

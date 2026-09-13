@@ -191,7 +191,7 @@ Section "-DoInstall"
   ${If} ${RunningX64}
     SetRegView 64
   ${Else}
-    MessageBox MB_ICONSTOP /SD IDOK "32-bit Windows is not supported."
+    MessageBox MB_ICONSTOP "32-bit Windows is not supported." /SD IDOK
     Abort
   ${EndIf}
 
@@ -235,7 +235,7 @@ Section "-DoInstall"
     ; 沒有桌面可以按這個對話框 —— 少了 `/SD` 它會**永遠等下去**：安裝程式
     ; 掛在那裡不結束、也不報錯，使用者只看到「什麼都沒發生」。
     ; v1.15.36 實機測試就是這樣卡了 30 分鐘才被發現。
-    MessageBox MB_ICONSTOP /SD IDOK "$(ERR_INSTALL)"
+    MessageBox MB_ICONSTOP "$(ERR_INSTALL)" /SD IDOK
     SetErrorLevel 1
     Abort
   ${EndIf}
@@ -296,7 +296,7 @@ FunctionEnd
 
 Function .onInit
   ${IfNot} ${RunningX64}
-    MessageBox MB_ICONSTOP /SD IDOK "32-bit Windows is not supported."
+    MessageBox MB_ICONSTOP "32-bit Windows is not supported." /SD IDOK
     Abort
   ${EndIf}
   SetRegView 64
@@ -395,12 +395,12 @@ Section "-DoUninstall"
   ; **拿一個半截的路徑去 RMDir /r 是災難**（`C:\Program Files\x` 被空白截斷成
   ; `C:\Program`）。動手刪之前先確認那真的是我們的安裝目錄。
   ${If} $UN_DIR == ""
-    MessageBox MB_ICONSTOP /SD IDOK "$(UN_NO_DIR)"
+    MessageBox MB_ICONSTOP "$(UN_NO_DIR)" /SD IDOK
     Abort
   ${EndIf}
   IfFileExists "$UN_DIR\packaging\windows\uninstall_core.ps1" un_dir_ok 0
   IfFileExists "$UN_DIR\${SHORTNAME}-setup.exe" un_dir_ok 0
-    MessageBox MB_ICONSTOP /SD IDOK "$(UN_NOT_OURS)"
+    MessageBox MB_ICONSTOP "$(UN_NOT_OURS)" /SD IDOK
     Abort
   un_dir_ok:
   SetDetailsPrint both
