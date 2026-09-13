@@ -12,10 +12,15 @@ name: Build Windows installer
 #   * push of a version tag (v*)        -> build + attach to the GitHub Release
 #   * manual run (workflow_dispatch)    -> build + upload as a workflow artifact
 #
-# Code signing: SignPath OSS (approved 2026-06). The signing step is GATED on
-# the SIGNPATH_ORG_ID repo secret being present — until you add the secrets it
-# is skipped and the (unsigned) installer is released as before. Once the three
-# secrets + matching SignPath slugs exist, the next tag is auto-signed.
+# Code signing: SignPath OSS (production certificate since 2026-07). The signing
+# step is gated on the SIGNPATH_ORG_ID secret being present.
+#
+# **Only a signed installer is ever attached to a Release** (v1.15.36). If the
+# signing step produces nothing — approval timed out or was declined, or the
+# secrets are missing — the workflow FAILS instead of quietly releasing the
+# unsigned build. That fallback is how v1.12.8 / v1.12.10 / v1.12.24 ended up
+# on Releases carrying `CN=Test certificate for 'jt-doc-tools [OSS]'`.
+# The unsigned build is still kept as a workflow artifact for inspection.
 # Setup: packaging/windows/SIGNPATH-APPLICATION.md §3-4 (gitignored).
 
 on:
@@ -108,19 +113,30 @@ jobs:
           wait-for-completion-timeout-in-seconds: 10800
           output-artifact-directory: packaging/windows/signed
 
-      - name: Select release file (signed if present, else unsigned)
+      # 掛上 Release 的**只能是簽章過的那一支**。
+      #
+      # 這一步原本在拿不到簽章檔時會安靜地改用未簽章版 —— 那是 2026-06
+      # 正式憑證還在審核時的設計，而它的後果留在 Release 上：v1.12.8 /
+      # v1.12.10 / v1.12.24 掛的是 `CN=Test certificate for 'jt-doc-tools [OSS]'`，
+      # Windows 驗出來是 UnknownError，使用者下載會看到「發行者不明」。
+      # 沒有人回頭清掉，因為**流程本身不會出聲**。
+      #
+      # 現在改成直接失敗：未簽章的版本仍然留在 workflow artifact 裡（上一步已
+      # 上傳）可以自己抓下來看，但**不會出現在 Release 上**。
+      - name: Select release file (signed only)
         id: pick
         if: github.ref_type == 'tag'
         run: |
-          UNSIGNED="packaging/windows/jt-doc-tools-${{ steps.ver.outputs.version }}-setup.exe"
           SIGNED=$(ls packaging/windows/signed/*.exe 2>/dev/null | head -1)
-          if [ -n "$SIGNED" ] && [ -f "$SIGNED" ]; then
-            echo "Using SIGNED installer: $SIGNED"
-            echo "file=$SIGNED" >> "$GITHUB_OUTPUT"
-          else
-            echo "Using UNSIGNED installer (SignPath not configured yet)"
-            echo "file=$UNSIGNED" >> "$GITHUB_OUTPUT"
+          if [ -z "$SIGNED" ] || [ ! -f "$SIGNED" ]; then
+            echo "::error::找不到簽章過的安裝程式 —— 不發佈未簽章版本。"
+            echo "::error::可能原因：SignPath 的核准逾時 / 被拒絕，或這個 repo"
+            echo "::error::還沒設定 SIGNPATH_* secrets。未簽章的建置結果在這次"
+            echo "::error::執行的 workflow artifact 裡，可自行下載檢查。"
+            exit 1
           fi
+          echo "Using SIGNED installer: $SIGNED"
+          echo "file=$SIGNED" >> "$GITHUB_OUTPUT"
 
       - name: Attach to GitHub Release
         if: github.ref_type == 'tag'
