@@ -11,6 +11,64 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ---
 
+## [1.15.39] - 2026-09-13
+
+### A strip of desk survived the straightening — the mask, not the quadrilateral
+
+A user reported that the corrected page still had the desk around it. Drawing the
+mask made it clear: **the half of the paper lying in shadow was classified as
+desk** (Otsu covered 32% of the frame where the paper occupies 40%), so the
+quadrilateral only enclosed the lit half — and the minimum-area rectangle, in
+pulling that back in, swallowed a band of desk.
+
+| | old (Otsu + min-area rect) | new (Otsu ∪ chroma + scored candidates) |
+|---|---|---|
+| photo A | ink 0.738 / purity 0.909 | ink 0.737 / **purity 1.000** |
+| photo B | ink 0.747 / purity 0.925 | **ink 1.000 / purity 1.000** |
+
+Three changes: the mask gains a **chroma** layer (paper is neutral in Lab, a
+wooden or coloured desk is not — and shadow changes brightness, not hue);
+several **candidate** quadrilaterals are generated rather than one; and the
+choice is made on two measurable numbers — **ink coverage** (how much of the
+writing is enclosed) and **purity** (how much of the enclosure is really paper).
+Ink is the hard constraint; purity is maximised under it.
+
+> **The brightness threshold has to be relative to what is definitely paper, not
+> to a percentile of the whole frame.** A synthetic heavy-shadow sample exposed
+> it: shadowed paper sits at L=118 while the frame's 25th percentile is 122 — a
+> large shadow raises the percentile until the rule disqualifies itself. It is
+> now 0.45 × the median brightness of the paper; sweeping 0.30/0.40/0.45/0.55/0.65
+> shows everything at or below 0.45 scoring perfectly and 0.55 collapsing.
+
+### Two job tests waited on the wrong thing (**test-only change**)
+
+Two consecutive full-suite runs each failed one test that passed on its own, both
+with the same shape: wait for `status == "done"`, then read something that only
+happens afterwards. The finishing order is deliberate — status, then persist,
+then autosave — so under load the read lands in that window. Both now wait for
+what they actually verify; a scan found no third instance.
+
+### Editing the public `.gitignore` does nothing — it is regenerated on every sync
+
+Widening the rule that keeps the code-signing notes private (from one directory
+to any directory) exposed this: `github/.gitignore` is written from a heredoc by
+the sync script every time, so an edit to the file itself is silently reverted on
+the next sync — green before the sync, red after. The rule now lives in the sync
+script, with a guard that checks it there rather than in the generated output.
+
+A second guard scans the public tree's filesystem: `git ls-files` only sees what
+is already tracked, so a note dropped in but not yet committed looks clean to it
+while `rsync -a --delete` would carry it into the clone.
+
+### Document straighten interface (reported from screenshots)
+
+The "place the four corners yourself" option was a small checkbox nobody would
+notice; it is now a two-card choice using the same pattern as the rest of the
+site, as is the resolution setting. Hint text no longer wraps while space
+remains beside it.
+
+---
+
 ## [1.15.38] - 2026-09-13
 
 ### The same root cause, four times: classes that do nothing where they are used

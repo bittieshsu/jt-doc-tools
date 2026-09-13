@@ -430,7 +430,12 @@ def test_terminal_status_hits_the_db_before_autosave(mgr, monkeypatch):
 
     monkeypatch.setattr("app.core.job_autosave.on_job_finished", slow_autosave)
     j = mgr.submit("pdf-merge", lambda job: None)
-    assert _wait(lambda: j.status == "done")
+    # **等的是 `seen` 被填進去，不是 `status`。** 收尾順序是
+    # 「status=done → 寫 DB → autosave」，等到 status 時 autosave 還沒跑，
+    # 機器一忙就會讀到空的 `seen`（2026-09-13 完整套件實際紅過一次；
+    # 同一輪 `test_job_autosave` 也是同一個形狀）。
+    assert _wait(lambda: "status_during_autosave" in seen), "autosave 沒有被呼叫"
+    assert j.status == "done"
     assert seen.get("status_during_autosave") == "done", (
         f"自動存入進行中時 DB 還是 {seen.get('status_during_autosave')}"
         " —— 順序反了")

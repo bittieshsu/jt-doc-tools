@@ -87,46 +87,149 @@ def rotate(img: np.ndarray, a: float) -> np.ndarray:
                           (w, h), flags=cv2.INTER_CUBIC, borderValue=255)
 
 
-def find_page_quad(g: np.ndarray):
-    """手機翻拍：找紙張的四邊形。回 None 表示沒把握 → 走純拉正那條路。
+def _paper_mask(g: np.ndarray, rgb=None):
+    """紙張的遮罩（四分之一尺寸）。回 `(縮圖, 遮罩)`。
 
-    ## 為什麼是「亮度分割 ＋ 最小外接矩形」（v1.15.37 用真實照片重寫）
+    **只用亮度分割會在陰影處把紙切掉一半。** 實測使用者的手機照片
+    `IMG_2905`：紙有一角落在陰影裡，Otsu 把那一塊判成桌面 —— 遮罩只蓋到
+    32% 的畫面，而紙實際佔 40%，**那一角上面有字**。
 
-    第一版是教科書做法：Canny 找邊 → `approxPolyDP` 近似成 4 個點。
-    拿使用者的兩張手機照片實測，**兩張都抓不到** —— 最大的輪廓**就是紙**
-    （佔畫面 29% / 44%），但真實照片的角落有陰影與圓角，2% 容差近似出來是
-    **6 個點 / 5 個點**，而寫死的 `len(ap) == 4` 直接把它丟掉。
+    所以再加一層**色度**：紙是中性色（Lab 的 a/b 接近 128），木頭桌面 /
+    橘色桌墊 / 綠色滑鼠墊偏離很多，**而且影子不改變色相**（只改亮度）。
+    兩張遮罩各自做完形態學再取聯集：Otsu 負責一般情況，色度負責陰影。
 
-    改法與踩過的兩個坑：
-
-    * **先去陰影再分割是錯的**：`normalize_illum()` 會把桌面也一起提亮，
-      亮區從 21% 爆到 58~83%，四個角直接跑到畫面邊界。
-    * **用凸包近似成 4 點也不夠**：陰影裡的那一角會被吃掉，四邊形縮進紙內，
-      **內容被切掉**（實測左邊一整行字不見）—— 而**殘留角仍然是 -0.05°**，
-      看起來完美。**殘留角量的是「裁出來那塊正不正」，不是「有沒有抓對紙」。**
-
-    所以自動模式一律走**最小外接矩形**：紙本來就是矩形，三個角就定得出第四個，
-    陰影吃掉一角也不會縮水。代價是斜著拍時會多框一條桌面 ——
-    **切到內容是不可原諒的失敗，多框一條桌面只是難看**，而要精準貼齊紙緣
-    有「自己拉四個角」那條路（使用者拖曳，見 `straighten_page` 的 `quad`）。
+    實測（IMG_2905）：32% → **40%**，紙上的墨水從 0.747 變成 **1.000**。
     """
     s = cv2.resize(g, None, fx=0.25, fy=0.25)
     b = cv2.GaussianBlur(s, (9, 9), 0)
-    # 紙比桌面亮很多 —— Otsu 分得開。**不要先做去陰影**（見上面）。
     _t, m = cv2.threshold(b, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
     m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((9, 9), np.uint8))
+    if rgb is not None and getattr(rgb, "ndim", 2) == 3:
+        c = cv2.resize(rgb, (s.shape[1], s.shape[0]), interpolation=cv2.INTER_AREA)
+        lab = cv2.cvtColor(cv2.GaussianBlur(c, (9, 9), 0), cv2.COLOR_RGB2LAB)
+        L, A, B = cv2.split(lab)
+        chroma = np.hypot(A.astype(np.float32) - 128.0, B.astype(np.float32) - 128.0)
+        # 中性色 ＋ 夠亮。**亮度門檻要相對於「確定是紙」那一塊**
+        # （Otsu 選出來的亮區），不可以用整張圖的百分位 ——
+        # 陰影面積一大，百分位自己就被拉上去，陰影裡的紙反而被排除
+        # （實測：陰影裡的紙 L=118，而第 25 百分位是 122，整條判準失效）。
+        # 係數掃過 0.30 / 0.40 / 0.45 / 0.55 / 0.65：**0.45 以下三個樣本
+        # 全部滿分，0.55 起崩**（純度掉到 0.74 / 0.88）。取 0.45 留安全邊界，
+        # 對「深色但中性」的桌面仍然擋得住（它會暗於紙的 45%）。
+        ref = float(np.median(L[m > 0])) if (m > 0).any() else 255.0
+        mc = ((chroma < 12) & (L > 0.45 * ref)).astype(np.uint8) * 255
+        mc = cv2.morphologyEx(mc, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
+        mc = cv2.morphologyEx(mc, cv2.MORPH_OPEN, np.ones((9, 9), np.uint8))
+        m = cv2.bitwise_or(m, mc)
+    return s, m
+
+
+def _quad_candidates(c: np.ndarray):
+    """幾個候選四邊形（四分之一尺寸的座標）。
+
+    **不要只產生一種。** 教科書的 `approxPolyDP` 在真實照片上常常回 5、6 個
+    點（角落有陰影與圓角），而最小外接矩形永遠回得出四個點卻會多框一條桌面。
+    OSS 的文件掃描 app 也是這個路數：**多產幾個候選，再用一個判準挑**。
+    """
+    hull = cv2.convexHull(c)
+    out = []
+    peri = cv2.arcLength(hull, True)
+    for pct in (x / 1000.0 for x in range(5, 121)):
+        ap = cv2.approxPolyDP(hull, pct * peri, True)
+        if len(ap) == 4:
+            out.append(ap.reshape(4, 2).astype(np.float32))
+            break
+    out.append(cv2.boxPoints(cv2.minAreaRect(hull)).astype(np.float32))
+    return out
+
+
+def _quad_score(s: np.ndarray, mask: np.ndarray, quad: np.ndarray):
+    """回 `(墨水涵蓋率, 純度)` —— 兩個都是 0~1，都算在四分之一尺寸上。
+
+    * **墨水涵蓋率**：紙上的字有多少被框進去。**切到字是不可原諒的失敗**，
+      所以這個是硬條件。量的時候紙要先**內縮**幾個像素 —— 不然紙緣的陰影會
+      被當成字，讓「剛好切在紙邊」的候選看起來像切到內容（實測 IMG_2904
+      因此被低估 7%）。
+    * **純度**：框裡面有多少真的是紙。低就是框到桌面 —— 那就是使用者看到的
+      黑邊（實測現行做法在 IMG_2905 只有 0.925）。
+    """
+    inner = cv2.erode(mask, np.ones((7, 7), np.uint8))
+    paper = inner > 0
+    if not paper.any():
+        return 0.0, 0.0
+    thr = np.percentile(s[paper], 12)      # 紙上最暗的一成二 ≈ 筆跡
+    ink = paper & (s <= thr)
+    poly = np.zeros(mask.shape, np.uint8)
+    cv2.fillPoly(poly, [quad.astype(np.int32)], 255)
+    inside = poly > 0
+    full = mask > 0
+    return ((ink & inside).sum() / max(1, int(ink.sum())),
+            (full & inside).sum() / max(1, int(inside.sum())))
+
+
+def find_page_quad(g: np.ndarray, rgb=None):
+    """手機翻拍：找紙張的四邊形。回 None 表示沒把握 → 走純拉正那條路。
+
+    ## 做法（v1.15.39 用真實照片重寫第二次）
+
+    1. **遮罩**：Otsu ∪ 色度（見 `_paper_mask`）。只用 Otsu 的話，陰影裡的
+       半張紙會被判成桌面。
+    2. **候選**：`approxPolyDP` 掃 epsilon 找四個點，加上最小外接矩形。
+    3. **評分**：先要求**墨水涵蓋率不可以比最好的那個差 1% 以上**（切到字是
+       不可原諒的），在這個前提下挑**純度最高**的。
+
+    ### 為什麼不是單一演算法
+
+    | 做法 | IMG_2904 | IMG_2905 |
+    |---|---|---|
+    | 舊：Otsu ＋ 最小外接矩形 | ink 0.738 / 純度 0.909 | ink 0.747 / 純度 0.925 |
+    | 新：Otsu∪色度 ＋ 評分挑選 | ink 0.737 / **純度 1.000** | **ink 1.000 / 純度 1.000** |
+
+    純度 0.925 的意思是**框進去的東西有 7.5% 是桌面** —— 使用者截圖回報的
+    就是那一圈黑邊（2026-09-13）。
+
+    ### 踩過的兩個坑（留著，不要再走一次）
+
+    * **先去陰影再分割是錯的**：`normalize_illum()` 會把桌面也一起提亮，
+      亮區從 21% 爆到 58~83%，四個角直接跑到畫面邊界。
+    * **殘留角不能當判準**：把四邊形縮進紙內會切掉內容，而**殘留角仍然是
+      -0.05°**，看起來完美。殘留角量的是「裁出來那塊正不正」，
+      **不是「有沒有抓對紙」**。所以這裡的判準是墨水涵蓋率與純度。
+    """
+    s, m = _paper_mask(g, rgb)
     cnts, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not cnts:
         return None
     c = max(cnts, key=cv2.contourArea)
     frac = cv2.contourArea(c) / float(s.shape[0] * s.shape[1])
-    # 太小 = 不是紙（可能是反光）；太大 = 整張都是紙（掃描件），那不需要透視校正
+    # 太小 = 不是紙（可能是反光）；太大 = 整張都是紙（掃描件），不需要透視校正
     if frac < 0.05 or frac > 0.95:
         return None
-    box = cv2.boxPoints(cv2.minAreaRect(cv2.convexHull(c)))
-    q = (box * 4).astype(np.float32)
-    return q if quad_is_sane(q, g.shape) else None
+    # 評分只看「紙那一塊」—— 畫面上別的亮物（鍵盤、白牆）不算
+    only = np.zeros_like(m)
+    cv2.drawContours(only, [c], -1, 255, cv2.FILLED)
+    best = None
+    for q in _quad_candidates(c):
+        full = (q * 4).astype(np.float32)
+        if not quad_is_sane(full, g.shape):
+            continue
+        ink, pur = _quad_score(s, only, q)
+        if best is None or ink > best[0] + 1e-9:
+            best = (ink, pur, full)
+    if best is None:
+        return None
+    top_ink = best[0]
+    chosen = best
+    for q in _quad_candidates(c):
+        full = (q * 4).astype(np.float32)
+        if not quad_is_sane(full, g.shape):
+            continue
+        ink, pur = _quad_score(s, only, q)
+        # 墨水不可以比最好的差 1% 以上；在這個前提下挑純度最高的
+        if ink >= top_ink - 0.01 and pur > chosen[1]:
+            chosen = (ink, pur, full)
+    return chosen[2]
 
 
 def order_quad(q: np.ndarray) -> np.ndarray:
@@ -384,7 +487,11 @@ def straighten_pdf(src: Path, dst: Path, *, dpi: int = 200,
                 h, w = gray.shape[:2]
                 quad = np.float32([[x * w, y * h] for x, y in ov["quad"]])
             else:
-                quad = find_page_quad(gray) if detect_quad else None
+                # **彩色一起送進去**：陰影裡的紙只有靠色度才救得回來
+                # （`_paper_mask`）。只給灰階時 IMG_2905 的純度只有 0.784，
+                # 也就是框進去的東西有兩成是桌面。
+                quad = find_page_quad(
+                    gray, arr if pix.n >= 3 else None) if detect_quad else None
             fixed, res = straighten_page(gray, quad=quad, do_binarize=do_binarize,
                                          dpi=dpi, page_no=i + 1, rotate_deg=rot)
             # **編碼要看內容**：灰階掃描件用 JPEG（實測 2.7 MB → 1.0 MB，

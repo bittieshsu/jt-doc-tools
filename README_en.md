@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English**
 
-# Jason Tools Document Toolbox v1.15.38
+# Jason Tools Document Toolbox v1.15.39
 
 > An integrated PDF / Office document platform: 48 tools covering **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan assembly**, **de-identification**, **word counts**, **annotation reports**, **diffs**, **sentence-by-sentence translation**, **list processing**, **e-invoice handling**, **VAT number lookup**, **a page editor**, **encryption and decryption**, and more.
 >

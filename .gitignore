@@ -30,3 +30,6 @@ packaging/windows/jt-doc-tools-*-setup.exe
 # APPLICATION 那一檔，自 v1.15.8 起被公開了四天（裡面有 Organization ID，
 # 而 CI 是把它當機密存的）。守門 tests/test_signpath_notes_are_private.py。
 packaging/windows/SIGNPATH-*.md
+# **任何目錄底下**的 SignPath 筆記都擋 —— 綁在單一路徑上的規則，只要有人把
+# 筆記放到別的資料夾就又公開一次（同一個病換一個維度：上次漏的是檔名）。
+SIGNPATH-*.md

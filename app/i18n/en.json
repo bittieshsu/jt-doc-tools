@@ -4853,5 +4853,10 @@
  "上傳檔案後顯示": "Shown after you upload a file",
  "按「預覽這一頁的修正結果」": "Press “Preview this page”",
  "載入原稿…": "Loading the original…",
- "這一頁的原稿載不出來": "The original of this page could not be loaded"
+ "這一頁的原稿載不出來": "The original of this page could not be loaded",
+ "自動抓": "Detect automatically",
+ "多數情況夠用": "Good enough most of the time",
+ "抓不準時用這個": "Use this when detection is off",
+ "用途是縮小檔案，不是讓文字更清楚 —— 實測轉成黑白會把中文的細筆畫吃掉，文字辨識率反而從 0.775 掉到 0.108。": "This makes the file smaller; it does not make the text clearer. Measured: converting to black and white eats the fine strokes of Chinese characters and drops recognition accuracy from 0.775 to 0.108.",
+ "選「自己拉四個角」之後，在左邊「修正前」的圖上拖曳四個圓點對準紙張的角；自動抓到的位置會先填好，通常只要修不準的那一兩個。": "Choose “Place the corners yourself”, then drag the four dots on the “Before” image onto the corners of the paper. The detected positions are filled in first, so usually only one or two need adjusting."
 }

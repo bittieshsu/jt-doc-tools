@@ -547,3 +547,80 @@ def test_the_angle_range_rejects_a_quad_that_grabbed_the_desk():
     shape = (4032, 3024)
     assert SC.quad_is_sane(good, shape)
     assert not SC.quad_is_sane(desk, shape), "框到桌面的四邊形沒有被擋掉"
+
+
+# ---------------------------------------------------------------------------
+# 陰影裡的紙（2026-09-13 使用者截圖回報：修正後的圖上下還留著一圈桌面）
+#
+# 根因**不是四邊形擬合**，是遮罩：只用亮度分割時，落在陰影裡的那半張紙會被
+# 判成桌面，於是四邊形只框到「被照到的那一半」，而最小外接矩形為了把它包回來
+# 就多框了一條桌面。實測使用者的照片：純度只有 0.784，**框進去的東西兩成是桌面**。
+#
+# 這裡用合成樣本釘住兩件事：①有色桌面 ＋ 一角在陰影裡時，抓出來的四邊形
+# **不可以把桌面框進來**；②**彩色資訊真的有被用到** —— 只給灰階時會退步。
+# ---------------------------------------------------------------------------
+
+def _photo_with_shadow():
+    """一張「有色桌面 ＋ 白紙 ＋ 一角落在陰影裡」的合成照片。"""
+    import numpy as np
+    import cv2
+
+    h, w = 900, 700
+    # 木頭色桌面（偏橘）—— 色度離中性色很遠，這正是色度那條判準的依據
+    img = np.zeros((h, w, 3), np.uint8)
+    img[:, :] = (150, 105, 60)          # RGB
+    quad = np.float32([[120, 90], [610, 150], [560, 780], [90, 700]])
+    cv2.fillPoly(img, [quad.astype(np.int32)], (245, 245, 242))
+    # 紙上寫點字（深色），整張都要在最後被框進去
+    for i, y in enumerate(range(230, 700, 70)):
+        cv2.line(img, (170, y), (470 - i * 8, y), (40, 40, 40), 6)
+    # 左下角打一片陰影：亮度砍半，**色相不變**（真實陰影就是這樣）
+    sh = np.zeros((h, w), np.float32)
+    cv2.fillPoly(sh, [np.int32([[0, 430], [430, 560], [330, 900], [0, 900]])], 1.0)
+    sh = cv2.GaussianBlur(sh, (81, 81), 0)[..., None]
+    img = (img * (1.0 - 0.55 * sh)).astype(np.uint8)
+    return img, quad
+
+
+def _quad_quality(rgb, quad):
+    """回 (墨水涵蓋率, 純度) —— 直接用核心裡的評分函式，判準跟產品一致。"""
+    import numpy as np
+    import cv2
+
+    g = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    s, m = SC._paper_mask(g, rgb)
+    cnts, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    only = np.zeros_like(m)
+    cv2.drawContours(only, [max(cnts, key=cv2.contourArea)], -1, 255, cv2.FILLED)
+    return SC._quad_score(s, only, (np.asarray(quad, np.float32) / 4.0))
+
+
+def test_a_shadowed_corner_does_not_drag_the_desk_into_the_crop():
+    import cv2
+
+    rgb, _truth = _photo_with_shadow()
+    g = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    q = SC.find_page_quad(g, rgb)
+    assert q is not None, "有色桌面上的白紙應該抓得到"
+    ink, purity = _quad_quality(rgb, q)
+    # 切到字是不可原諒的；框到桌面是使用者看得到的黑邊
+    assert ink >= 0.99, f"切到內容了：墨水涵蓋率只有 {ink:.3f}"
+    assert purity >= 0.95, f"框到桌面了：純度只有 {purity:.3f}"
+
+
+def test_the_colour_information_is_actually_used():
+    """只給灰階時**會退步** —— 證明色度那一層真的在做事。
+
+    沒有這條的話，把 `_paper_mask` 的色度分支整段拿掉，上面那條可能照樣過
+    （合成樣本的陰影不夠重時亮度分割仍然分得開）。
+    """
+    import cv2
+
+    rgb, _ = _photo_with_shadow()
+    g = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    colour = _quad_quality(rgb, SC.find_page_quad(g, rgb))
+    grey_q = SC.find_page_quad(g, None)
+    grey = _quad_quality(rgb, grey_q) if grey_q is not None else (0.0, 0.0)
+    assert colour[1] >= grey[1], (
+        f"帶彩色的純度 {colour[1]:.3f} 不應該比只有灰階的 {grey[1]:.3f} 差")
+    assert colour[0] >= grey[0] - 1e-6

@@ -43,6 +43,9 @@ _PREFIX = "ds"
 #: 算圖的解析度。200 dpi 是「看得清楚 + 跑得動」的平衡（實測 0.83 秒/頁）；
 #: 300 dpi 細節好一點但 1.4 秒/頁、檔案也大一倍。
 _DPI_CHOICES = (150, 200, 300)
+#: 每個解析度的一句話（給 `option-card` 用）。**下拉選單看不出差別在哪** ——
+#: 卡片把取捨直接寫在上面，使用者不必去讀底下那行灰字。
+_DPI_NOTES = {150: "快，草稿夠用", 200: "平衡（建議）", 300: "細節好，慢一倍"}
 
 
 def _src_path(upload_id: str) -> Path:
@@ -54,7 +57,8 @@ async def index(request: Request):
     templates = request.app.state.templates
     return templates.TemplateResponse(request, "doc_straighten.html",
                                       {"request": request,
-                                       "dpi_choices": _DPI_CHOICES})
+                                       "dpi_choices": _DPI_CHOICES,
+                                       "dpi_notes": _DPI_NOTES})
 
 
 async def _stash(request: Request, data: bytes, filename: str) -> dict:
@@ -176,7 +180,10 @@ async def preview(request: Request, upload_id: str = Form(...),
             # 收像素的話，預覽用 200 dpi、輸出用 300 dpi 就整組跑掉了。
             q = np.float32([[x * w, y * h] for x, y in user_quad])
         else:
-            q = SC.find_page_quad(gray) if detect_quad else None
+            # 彩色一起送（見 `_paper_mask`）—— 預覽與輸出要用同一組判準，
+            # 不然畫面上看到的四個角跟實際裁出來的不一樣。
+            q = SC.find_page_quad(
+                gray, arr if pix.n >= 3 else None) if detect_quad else None
         fixed, res = SC.straighten_page(gray, quad=q, do_binarize=binarize,
                                         dpi=_clamp_dpi(dpi), page_no=page,
                                         rotate_deg=_clamp_rotate(rotate))

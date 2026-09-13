@@ -42,6 +42,31 @@ def test_the_gitignore_uses_a_wildcard_not_a_per_file_list():
     rules = (PUB / ".gitignore").read_text(encoding="utf-8")
     assert "packaging/windows/SIGNPATH-*.md" in rules, (
         "SignPath 筆記要用萬用字元擋，逐檔列會漏掉下一份")
+    # **而且不可以只綁在那一個路徑上。** 綁路徑的規則只要有人把筆記放到別的
+    # 資料夾就又公開一次 —— 跟當初「只列了 APPLICATION 那一檔」是同一個病，
+    # 只是換一個維度（那次漏的是檔名，這次會漏的是目錄）。
+    assert any(ln.strip() == "SIGNPATH-*.md" for ln in rules.splitlines()), (
+        "還要有一條不綁目錄的 `SIGNPATH-*.md`，任何位置的筆記都擋得住")
+
+
+def test_the_rule_lives_where_it_actually_survives():
+    """規則要寫在 **`sync-to-github.sh`** 裡，不是改公開樹那份產出。
+
+    `github/.gitignore` 是**每次同步都用 heredoc 重寫的**。直接改那個檔，
+    下一次 `sync-to-github.sh` 就把它蓋回去 —— 而且完全無聲：測試在同步之前
+    是綠的，同步之後才紅（2026-09-13 就是這樣，我加的規則活了不到一輪）。
+
+    這跟本專案反覆出現的那條是同一件事：**同一份清單放兩個地方一定會漂**，
+    所以判準要落在**唯一來源**上。
+    """
+    script = (ROOT / "sync-to-github.sh")
+    if not script.exists():
+        pytest.skip("公開樹沒有 sync-to-github.sh（它只在開發樹）")
+    body = script.read_text(encoding="utf-8")
+    for rule in ("packaging/windows/SIGNPATH-*.md", "SIGNPATH-*.md"):
+        assert any(ln.strip() == rule for ln in body.splitlines()), (
+            f"`sync-to-github.sh` 產生 .gitignore 的那段少了 `{rule}` —— "
+            "改 github/.gitignore 沒有用，下一次同步就被蓋掉")
 
 
 def test_no_signpath_note_is_tracked_in_the_public_repo():
@@ -75,3 +100,21 @@ def test_no_organization_guid_leaks_into_public_text_files():
                 continue
             bad.append(f"{p.relative_to(PUB).as_posix()}: {m}")
     assert not bad, f"公開檔案裡出現 GUID（SignPath Organization ID 是機密）：{bad}"
+
+
+def test_no_signpath_note_sits_in_the_public_tree_at_all():
+    """公開樹的**檔案系統**上不該出現 SignPath 筆記以外的位置。
+
+    `git ls-files` 只看得到「已經被追蹤的」。一份剛放進去、還沒 commit 的
+    筆記在那條檢查眼裡是乾淨的 —— 而 `rsync -a --delete github/ <clone>/`
+    會把它一起帶過去，接著 `git add -A` 就公開了。所以這裡直接掃檔案系統，
+    並確認每一份都真的落在被 gitignore 擋住的位置。
+    """
+    notes = sorted(p.relative_to(PUB).as_posix()
+                   for p in PUB.rglob("SIGNPATH-*.md"))
+    allowed = {"packaging/windows/SIGNPATH-APPLICATION.md",
+               "packaging/windows/SIGNPATH-LICENSE-CHANGE.md"}
+    unexpected = [n for n in notes if n not in allowed]
+    assert not unexpected, (
+        f"公開樹裡出現沒預期的 SignPath 筆記：{unexpected} —— "
+        "內部 SOP 放開發樹（例如 docs-share/），不要放進 github/")
