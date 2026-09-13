@@ -366,6 +366,18 @@ h2 { font-size: 18px; margin: 20px 0 10px; }
 .empty { color: var(--muted); padding: 40px; text-align: center; grid-column: 1 / -1; }
 
 /* Cards / forms */
+/* 說明用的資訊框 —— 標題下面那句「這個工具會 / 不會做什麼」。
+   `pdf-annotations-flatten` 本來在自己的 <style> 裡寫了一份 `.af-info`，
+   v1.15.36 收成共用的一份：同一種東西寫兩個地方一定會漂，而且新工具
+   照著發明第三個類別名時**不會有任何錯誤訊息**，只是那段字變成沒有樣式的
+   純文字（文件拉正 v1.15.33 就是這樣，使用者截圖才看出來）。 */
+.info-box {
+  background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a;
+  padding: 10px 12px; border-radius: var(--radius);
+  font-size: 13px; margin: 10px 0 18px;
+}
+.info-box svg { vertical-align: -2px; margin-right: 4px; }
+
 .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
 .panel + .panel { margin-top: 16px; }
 /* Tinted header strip: any <h2> or <summary> that opens a .panel gets a

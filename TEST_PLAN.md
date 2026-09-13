@@ -31,6 +31,41 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 
 > 「跑過腳本」不等於「看過」——截圖存下來沒人看的話，這一節等於沒做。
 
+## 0.4 每一頁都要在真的瀏覽器裡「活著」 🆕 v1.15.36（使用者要求）
+
+> **「頁面渲染得出來」跟「頁面活著」是兩件事，而我們從來只驗前者。**
+>
+> v1.15.36 使用者回報「文件拉正拉檔案進去沒反應、點選檔案也沒反應」。根因是
+> 那支模板漏了兩行 `<script src>` —— `new FileUpload(...)` 在行內腳本第一行丟
+> `ReferenceError`，**整段腳本停在那裡**（上傳沒接線、選項面板不出現、
+> 作業進度不會動）。而**當時每一關都是綠的**：
+>
+> | 關卡 | 為什麼看不到 |
+> |---|---|
+> | `pytest` 6,800+ 支 | 沒有任何一支會把工具頁「開起來跑 JS」 |
+> | `test_template_js_syntax`（`node --check`）| 漏載腳本**語法完全合法** |
+> | §0 全站截圖逐張目視 | **畫面長得完全正常** —— 上傳區是 `<label for>` 包
+>   `<input type=file>`，純 HTML 就點得開檔案選擇器 |
+> | 端點測試 | 頁面回 200，API 也都好好的 |
+>
+> 同一個家族本專案踩過很多次，共同點都是**畫面看起來正常**：CSP 擋掉動態注入的
+> `<style>`（沒有 JS 例外，元件變成無樣式的 DOM）、`tr` 被同名變數遮蔽讓三支
+> 工具整支不能用、樣板把兩百行程式碼當文字印出來、id 撞名讓
+> `getElementById` 拿到別的元素。
+
+```bash
+.venv/bin/python -m pytest tests/test_pages_boot_in_a_browser.py -q
+```
+
+- [ ] **每一支工具頁 ＋ 首頁 / 我的作業 / 工作區**都在無頭瀏覽器開過一次
+- [ ] **沒有任何一頁有主控台錯誤**：`Runtime.exceptionThrown`（沒接住的例外）
+      與 `Log.entryAdded` level=error（含 **CSP 違規**與載不到的資源）
+- [ ] 沒有瀏覽器的環境會**誠實 skip**（不是 pass）；另有一條驗「真的逐頁走過」，
+      因為「掃 0 頁」跟「每頁都乾淨」在 pytest 輸出裡一模一樣
+
+> **判準刻意嚴格**：主控台有錯誤＝那一頁有一段程式碼沒跑到，
+> 而「沒跑到的是哪一段」永遠只有使用者會發現。
+
 ## 0.6 英文介面 —— **只掃「頁面剛載入」的狀態是不夠的**（使用者要求，2026-09-05）
 
 > **這一節是被打臉之後改寫的。** 第一版只在頁面載入後掃一次，跑出「0 條殘留」，
@@ -347,7 +382,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **251 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **254 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -496,6 +531,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_ou_key_canon.py` | OU 授權的 DN 大小寫 / 空白正規化（v1.14.48） |
 | `test_output_verification_coverage.py` | 去識別化類工具**必須**驗到「產出本身」（使用者要求，2026-09-01） |
 | `test_owasp_top10.py` | OWASP Top 10 (2025) regression suite. |
+| `test_pages_boot_in_a_browser.py` | 每一頁都要在**真的瀏覽器**裡開得起來，而且主控台不可以有錯誤 |
 | `test_passwords.py` | Tests for app.core.passwords (scrypt hashing + policy). |
 | `test_path_traversal_audit.py` | Audit every tool router for unsafe path expressions. |
 | `test_pdf_annotations.py` | Tests for the pdf-annotations tool. |
@@ -557,6 +593,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_settings_atomic_write.py` | 設定檔一律原子寫入（`app/core/atomic_json.py`），不可以直接覆寫 |
 | `test_settings_export.py` | Category-based settings export / import (v1.12.54). |
 | `test_settings_export_roundtrip.py` | 設定備份：**匯出的檔案要匯得回去** |
+| `test_sidebar_active_match.py` | 側欄「使用中」只能標一支 —— 判準是整段路徑，不是前綴 |
 | `test_signpath_notes_are_private.py` | SignPath 的往來筆記不可以出現在公開版（v1.15.27） |
 | `test_smoke_routes.py` | Smoke tests: every public page renders 200, no 500s. |
 | `test_smtp_relay_modes.py` | 通知信的三種寄送方式 |
@@ -571,6 +608,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_template_head_block.py` | 工具模板的 `<style>` 一定要放在 base.html 真的有的區塊裡 |
 | `test_template_js_syntax.py` | Inline-JS syntax check for every Jinja2 template (v1.7.14). |
 | `test_template_renders.py` | 每一支模板都要**渲染得起來**，而且註解裡不可以寫出樣板標籤的字面寫法 |
+| `test_template_script_deps.py` | 模板用到的前端元件，那一頁必須自己載進來 |
 | `test_test_plan_coverage.py` | 測試計畫本身的守門：計畫沒涵蓋到的東西要紅燈 |
 | `test_text_deident_e2e.py` | 文字去識別化：走完整條路徑的驗收 |
 | `test_text_diff.py` | Tests for the new 文字差異比對 tool — paste-text variant of doc-diff. |
@@ -2961,11 +2999,11 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 - [ ] 帶名稱過濾的同步**不會**觸發自動停用
 - [ ] 內建管理員永遠不被停用
 
-#### 6.15.5 在線 session
+#### 6.15.5 線上 session
 
-- [ ] 啟用認證 → 使用者清單顯示「N 人在線」；**單機模式不顯示**
+- [ ] 啟用認證 → 使用者清單顯示「N 人在線上」；**單機模式不顯示**
 - [ ] 同一人開三個瀏覽器 → 算 **1 人**（不是 3）
-- [ ] 閒置超過 15 分鐘後從在線人數消失
+- [ ] 閒置超過 15 分鐘後從線上人數消失
 - [ ] 「登入裝置」看得到瀏覽器 / 作業系統、來源位址、最後活動時間
 - [ ] 個別登出 → 那一台下一個動作被導回登入頁，**其他裝置不受影響**
 - [ ] 「全部登出」→ 全部被踢；稽核有 `session_revoke`

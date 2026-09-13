@@ -45,6 +45,9 @@ BANNED = {
     "自帶": "內建 / 預載",
     "流式": "流動 / 流動排版",
     "宿主機": "實體主機",
+    # 「在線」是大陸用法（使用者 2026-09-13 當場糾正）。台灣說「線上」——
+    # 「線上會議」「線上人數」。注意**「在線上」是對的**，判準要排掉它。
+    "在線": "線上",
     "靜默": "無提示 / 沒有任何反應",
     "排查": "檢視 / 排除 / 追查",
     "查核": "查驗 / 核對 / 確認",
@@ -229,9 +232,29 @@ def _offences(text: str, path: str, suffix: str = "") -> list[str]:
         if '"keywords"' in line or "'keywords'" in line or "keywords=" in line:
             continue
         for word, better in BANNED.items():
-            if word in line:
+            if _used_as_itself(line, word):
                 bad.append(f"{path}:{i} 用了「{word}」，請改成 {better}")
     return bad
+
+
+
+#: 有些禁用詞是**更長的正確詞**的前綴 —— 那時候不可以誤報。
+#: 「在線」是大陸用法，但「在線上」（他在線上、N 人在線上）是正確的中文；
+#: 只比對子字串的話，改對了反而會紅（v1.15.36 實測當場踩到）。
+_ALLOW_WITHIN: dict[str, tuple[str, ...]] = {
+    "在線": ("在線上",),
+}
+
+
+def _used_as_itself(line: str, word: str) -> bool:
+    """這一行有沒有**真的用到那個詞**（而不是某個正確長詞的一部分）。"""
+    longer = _ALLOW_WITHIN.get(word)
+    if not longer:
+        return word in line
+    probe = line
+    for L in longer:
+        probe = probe.replace(L, "")
+    return word in probe
 
 
 @pytest.mark.parametrize("kind", ["templates", "python", "js", "docs"])

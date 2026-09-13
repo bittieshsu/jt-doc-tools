@@ -811,7 +811,14 @@
         sb && sb.querySelectorAll('.sb-item').forEach(a => {
           const href = a.getAttribute('href');
           if (!href) return;
-          if (href === '/' ? path === '/' : path.startsWith(href.replace(/\/$/, ''))) {
+          // **要比對到「整段路徑」，不是前綴。** `/tools/pdf-annotations-flatten/`
+          // 的前綴就是 `/tools/pdf-annotations` —— 用 startsWith 的話「註解整理」
+          // 會跟著被標成使用中，而且自動捲動會停在錯的那一支（使用者回報）。
+          // 仍要讓子頁面標到父項（例如 /admin/users/123 標在 /admin/users），
+          // 所以判準是「完全相同，或下一個字元是 /」。
+          const base = href.replace(/\/$/, '');
+          if (href === '/' ? path === '/'
+              : (path === base || path === base + '/' || path.startsWith(base + '/'))) {
             a.classList.add('active');
             activeItem = a;
           }

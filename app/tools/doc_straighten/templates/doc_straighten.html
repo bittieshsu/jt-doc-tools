@@ -8,7 +8,7 @@
 {# 原生 PDF 丟進來會被整頁轉成圖片 → 文字選不到、搜尋不到，而畫面上看起來
    一模一樣。所以核心會把「已經是正的、而且有文字層」的頁面原樣保留，
    **並且要在這裡先講出來**，不然使用者會以為工具沒作用。 #}
-<div class="notice">{{ icon('info') }} {{ tr('已經是正的、而且有文字層的頁面會原樣保留 —— 那種頁面處理它只會把文字變成圖片（選不到、搜尋不到）。真正歪掉或掃描來的頁面才會重新算圖。') }}</div>
+<div class="info-box">{{ icon('info') }} {{ tr('已經是正的、而且有文字層的頁面會原樣保留 —— 那種頁面處理它只會把文字變成圖片（選不到、搜尋不到）。真正歪掉或掃描來的頁面才會重新算圖。') }}</div>
 
 <div class="panel">
   <h2>{{ tr('1. 上傳檔案') }}</h2>
@@ -61,7 +61,11 @@
   </div>
 </div>
 
-<div id="dsJob"></div>
+{# 作業進度也要用共用元件 —— `JobProgress` 靠裡面的 `.job-bar` / `.job-status`
+   與那顆取消鈕接線。只放一個空的 `<div id="dsJob">` 的話，它會在
+   `addEventListener` 上丟 `TypeError: ... null`，**整段行內腳本從那裡死掉**。
+   這跟上傳區是同一個錯，我上一版只修了上傳區。 #}
+{% with progress_id='dsJob' %}{% include "components/job_progress.html" %}{% endwith %}
 
 <div class="panel" id="dsResult" hidden>
   <h2>{{ tr('完成') }}</h2>
@@ -83,6 +87,13 @@
 {% endblock %}
 
 {% block scripts %}
+{# 這三支**不是**全站載入的，每支工具自己載。漏掉的話 `new FileUpload(...)`
+   會直接丟例外，**整段行內腳本停在第一行** —— 畫面看起來正常（上傳區是
+   `<label for>`，點得開檔案選擇器），但選完檔案什麼都沒發生、拖曳也沒反應，
+   而且沒有任何畫面上的錯誤。v1.15.33 我就是漏了這兩行（使用者回報）。 #}
+<script src="/static/js/file_upload.js"></script>
+<script src="/static/js/job_progress.js"></script>
+<script src="/static/js/workspace_picker.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
 (function () {
   const $ = (id) => document.getElementById(id);

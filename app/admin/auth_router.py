@@ -515,7 +515,7 @@ def build_auth_router(templates) -> APIRouter:
                      or locked_by_username.get(u["username"]) or 0)
             u["locked"] = bool(until and until > now)
             u["locked_until"] = until or None
-        # 「在線」只在啟用認證時才有意義 —— 單機模式沒有帳號概念，
+        # 「線上」只在啟用認證時才有意義 —— 單機模式沒有帳號概念，
         # 顯示一個永遠是 1 的人數只會誤導。
         auth_on = auth_settings.is_enabled()
         online_ids = _ss.online_user_ids() if auth_on else set()

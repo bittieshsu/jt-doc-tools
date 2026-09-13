@@ -19,9 +19,6 @@
 
 .af-warn { background:#fef3c7; border:1px solid #fde68a; color:#78350f;
   padding:10px 12px; border-radius:8px; font-size:13px; margin-top:10px; }
-.af-info { background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a;
-  padding:10px 12px; border-radius:8px; font-size:13px;
-  margin: 10px 0 18px; }
 #afResults { margin-top:16px; }
 
 /* spinner used while a button is processing */
@@ -51,7 +48,7 @@
 {% block content %}
 <h1>{{ icon('layers', size=22) }} {{ tr('註解平面化') }}</h1>
 <p class="muted">{{ tr('把 PDF 中的註解(螢光筆 / 文字註解 / 圖章 / 自由文字 …)燒進頁面內容流。視覺上完全一樣，但') }}<b>{{ tr('收件方無法移除、無法另存') }}</b>{{ tr('，適合對外定稿前的最後一步。') }}</p>
-<div class="af-info">
+<div class="info-box">
   {{ tr('表單欄位 (AcroForm widgets) 不會被平面化，使用者收到後仍可填表。') }}
 </div>
 

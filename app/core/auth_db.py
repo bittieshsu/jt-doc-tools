@@ -496,11 +496,11 @@ def _m16_session_last_seen(conn: sqlite3.Connection) -> None:
     `created_at` / `expires_at`：一個七天沒回來的人，他的 session 還是「有效」的，
     看起來跟正在使用的人沒有差別。
 
-    有了這一欄就能算出「最近 N 分鐘有活動的人」= 在線人數，也能在踢人之前看出
+    有了這一欄就能算出「最近 N 分鐘有活動的人」= 線上人數，也能在踢人之前看出
     哪一個 session 是他現在用的、哪些是忘了登出的舊裝置。
 
     **更新要節流**：每個請求都寫一次 DB 會變成每請求一次寫入競爭（WAL 下仍是單一
-    writer）。實務上只要 >60 秒才寫，對「在線」的判斷完全足夠。
+    writer）。實務上只要 >60 秒才寫，對「線上」的判斷完全足夠。
     """
     cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
     if "last_seen_at" not in cols:

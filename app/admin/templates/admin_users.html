@@ -31,7 +31,7 @@
 <div class="panel">
   <div data-s="s5344c165">
     <h2 data-s="s1386d503">{{ tr('使用者清單（共') }} <span id="userCount">{{ page_total }}</span> {{ tr('人）') }}
-      {% if auth_on %}<span class="uf-online-sum" title="最近 {{ online_window_min }} 分鐘內有活動的人數（同一個人開多個瀏覽器只算一位）">{{ online_count }} {{ tr('人在線') }}</span>{% endif %}
+      {% if auth_on %}<span class="uf-online-sum" title="最近 {{ online_window_min }} 分鐘內有活動的人數（同一個人開多個瀏覽器只算一位）">{{ online_count }} {{ tr('人在線上') }}</span>{% endif %}
     </h2>
     <span data-s="sda5cd676"></span>
     {# 篩選全部走伺服器端（連結帶查詢參數）。前端過濾只過濾得到當前這一頁，
@@ -147,7 +147,7 @@
         <td class="uf-ck"><input type="checkbox" class="uf-row-ck" value="{{ u.id }}"></td>
         <td>
           <b>{{ u.username }}</b>
-          {% if u.online %}<span class="uf-online" title="最近 {{ online_window_min }} 分鐘內有活動">{{ tr('在線') }}</span>{% endif %}
+          {% if u.online %}<span class="uf-online" title="最近 {{ online_window_min }} 分鐘內有活動">{{ tr('線上') }}</span>{% endif %}
           {% if u.dir_disabled %}<span class="uf-addis" title="{{ tr('AD 端已停用（userAccountControl）——這個人登不進來，但本站的角色指派與群組成員關係還在') }}">{{ tr('AD 已停用') }}</span>{% endif %}
           {% if u.pwd_expiring_soon %}<span class="uf-pwdexp" title="{{ '密碼已過期' if u.pwd_expiry_days < 0 else '密碼即將到期' }}">{% if u.pwd_expiry_days < 0 %}密碼已過期{% else %}密碼 {{ u.pwd_expiry_days }} {{ tr('天後到期') }}{% endif %}</span>{% endif %}
           {% if u.directory_missing %}<span class="uf-gone" title="{{ tr('上一次完整目錄同步時，AD / LDAP 裡已經找不到這個帳號') }}">{{ tr('目錄已無') }}</span>{% endif %}
@@ -954,7 +954,7 @@ async function openSessions(uid, username) {
     if (sess.online) {
       const dot = document.createElement('span');
       dot.className = 'uf-online';
-      dot.textContent = tr('在線');
+      dot.textContent = tr('線上');
       head.appendChild(dot);
     }
     // 動態文字一律 textContent —— 裝置字串來自使用者送的 User-Agent。

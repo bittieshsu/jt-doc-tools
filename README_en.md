@@ -1,8 +1,8 @@
 [繁體中文](README.md) ｜ **English**
 
-# Jason Tools Document Toolbox v1.15.7
+# Jason Tools Document Toolbox v1.15.35
 
-> An all-in-one PDF and Office document platform. 47 tools covering **form filling and stamping**, **watermarks**, **N-up / split / rotate / organise**, **conversion**, **scan merge**, **redaction**, **word count**, **annotation reports**, **comparison**, **sentence translation**, **list tools**, **e-invoice processing**, **company ID lookup**, **page editor**, **encryption / decryption** and more.
+> An integrated PDF / Office document platform: 48 tools covering **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan assembly**, **de-identification**, **word counts**, **annotation reports**, **diffs**, **sentence-by-sentence translation**, **list processing**, **e-invoice handling**, **VAT number lookup**, **a page editor**, **encryption and decryption**, and more.
 >
 > Enterprise features: **local / LDAP / AD multi-realm authentication**, **single sign-on** (OIDC + SAML, ready for M365 / Google / Keycloak), **RBAC roles and permissions**, **audit log**, **SIEM forwarding** (syslog / CEF / GELF), **font management**, **user workspace**, **background jobs with completion notices** and a **REST API**.
 >
@@ -72,7 +72,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 
 ---
 
-## The 47 tools at a glance
+## The 48 tools at a glance
 
 ### Forms and stamps
 - **Auto-fill forms**; field detection plus template values
@@ -83,6 +83,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 - **Page editor**: text boxes, shapes, whiteout, highlighter, signatures, annotations, genuine object deletion
 - **Organise / rotate pages, page numbers, N-up**
 - **Page borders** [needs OxOffice/LibreOffice]: a border on every page: width, colour, style, rounded corners, double lines and shadow, inset from the edge or flush with the content, selected pages and skip-first-page; especially for slides. Accepts PDF and office files (office input needs the engine).
+- **Straighten documents** [needs OxOffice/LibreOffice]: straightens photographed or crookedly scanned pages, crops the black edges and evens out uneven background; for phone photos it finds the four corners of the sheet and corrects the perspective, reporting the correction angle and the residual skew page by page. Takes PDFs, images and office documents (the engine is only needed for office input).
 - **Seam stamp** [needs OxOffice/LibreOffice]: one stamp split across consecutive pages, so **a swapped or missing page is obvious** (that slice no longer lines up); side seams and spreads, a configurable page span, and fixed or random position and angle. The stamp can come from the asset library, your own upload, or be generated from text (office input needs the engine).
 - **Unify page size** [needs OxOffice/LibreOffice]: bring mixed page sizes onto one paper size (A4 / A3 / custom): scale to fit, centre without scaling, or crop to fill; mixed orientations rotate automatically and **the content stays vector, so text is still selectable** (not turned into images). Tenders often mix A3 drawings with A4 text; unify them before printing and binding (office input needs the engine).
 - **Merge files / split pages**
@@ -143,7 +144,7 @@ Enabled by default; an administrator can turn it off at any time under “Settin
 
 Slow work (conversion, OCR, sentence translation, compressing large files …) is handed to the server when you submit it, so **you can close the tab** instead of watching a progress bar.
 
-- **Submit and it runs in the background**: 26 tools use the job system, including PDF to Word and slides, format conversion, OCR, sentence translation, office to PDF, compression, merging, splitting, watermarks, stamping, seam stamps and pre-submission checks.
+- **Submit and it runs in the background**: 27 tools go through the job queue, among them PDF to word processor / presentation, format conversion, OCR, sentence-by-sentence translation, office documents to PDF, compression, merge, split, watermarks, stamping, seam stamps and the pre-submission check.
 - **My jobs**: progress, queue position, elapsed time and the download are all on one page, and a running job can be cancelled. Tools whose output is not a single file (sentence translation, say) take you back to the original page to keep reading the comparison.
 - **Nothing vanishes on restart**; job state lives in the database; anything unfinished when the service restarts is marked as interrupted rather than silently disappearing.
 - **It will not take the machine down**; memory is estimated before dispatch, and a job that does not fit waits in the queue; the concurrency limits for jobs and Office conversion are both adjustable in the admin area.

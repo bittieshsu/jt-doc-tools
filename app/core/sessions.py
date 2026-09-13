@@ -135,10 +135,10 @@ def cleanup_expired() -> int:
 
 
 # --------------------------------------------------------------------------
-# 在線狀態
+# 線上狀態
 # --------------------------------------------------------------------------
 
-#: 多久沒有活動就不算「在線」（秒）。
+#: 多久沒有活動就不算「線上」（秒）。
 #: 15 分鐘是常見的閒置判定 —— 比它短會讓只是去開會的人一直閃掉。
 ONLINE_WINDOW_SECONDS = 15 * 60
 
@@ -170,7 +170,7 @@ def touch(raw_token: str) -> None:
 def online_user_count(window_seconds: int = ONLINE_WINDOW_SECONDS) -> int:
     """最近 N 秒內有活動的**去重使用者數**。
 
-    算「人」不算 session —— 同一個人開三個瀏覽器不該算成三個人在線。
+    算「人」不算 session —— 同一個人開三個瀏覽器不該算成三個人在線上。
     """
     try:
         now = time.time()
@@ -233,7 +233,7 @@ def revoke_one(user_id: int, sid_prefix: str) -> bool:
 def online_user_ids(window_seconds: int = ONLINE_WINDOW_SECONDS) -> set[int]:
     """最近 N 秒內有活動的 user_id 集合。
 
-    給清單頁一次撈完標「在線」用 —— 逐列去問會變成 N 次查詢。
+    給清單頁一次撈完標「線上」用 —— 逐列去問會變成 N 次查詢。
     """
     try:
         now = time.time()
