@@ -149,18 +149,25 @@ GitHub 端（推上去 5–15 分鐘後看）：
 
 ---
 
-## 4. OWASP ZAP DAST（每次發版必跑，兩個目標）
+## 4. OWASP ZAP DAST（每次發版必跑，三個目標）
 
 ```bash
-mkdir -p temp/zap/$(date +%Y%m%d)-NN
-# 依前一次的 plan 改 reportDir 後執行
-/snap/bin/zaproxy -cmd -autorun temp/zap/<日期-NN>/plan-30.yaml
-/snap/bin/zaproxy -cmd -autorun temp/zap/<日期-NN>/plan-doc.yaml
-# （一律用 /snap/bin/zaproxy；舊寫法 /snap/zaproxy/current/zap.sh 與
-#   §4.1 不一致，同一份計畫兩種路徑會讓人不知道該信哪個）
+python tools/run_zap_scan.py            # 三個目標一次跑完並印出判讀
+python tools/run_zap_scan.py --only auth   # 只跑已登入那個
 ```
 
-兩個目標都要掃：
+> **⚠ 這一條斷過一次：v1.15.8 ~ v1.15.39 整整 13 個版本沒跑**，最後一份報告
+> 停在 2026-09-05。原因不是忘記，是**每次都要手刻 plan 檔與已登入實例**
+> —— 要重建才能做的事就是會斷掉的事。所以現在收成一支腳本：它自己建
+> 拋棄式實例、發 session cookie、產生三份 plan、跑完之後**印出每個目標的
+> 網址數與 High/Medium/Low**。
+>
+> **目標位址放 `temp/zap/targets.json`**（`temp/` 不進公開樹），格式：
+> `{"doc": ["https://網址", "說明"], "30": ["http://位址:8765", "說明"]}`。
+> 沒有那個檔就只跑 `auth` —— **腳本本身不可以寫死內網位址**，`tools/` 會
+> 同步進公開樹。
+
+另外兩個目標（要在 `targets.json` 裡設好）：
 
 1. **經反向代理的正式路徑**（`https://doc.jason.tools`）—— 才驗得到 nginx 的標頭、
    HSTS、TLS 設定
