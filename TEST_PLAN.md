@@ -31,6 +31,34 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 
 > 「跑過腳本」不等於「看過」——截圖存下來沒人看的話，這一節等於沒做。
 
+## 0.3 打了 tag 就一定要測那支安裝程式 🆕 v1.15.36（使用者要求）
+
+> **「CI 建出來了」不等於「裝得起來」。** 使用者 2026-09-13 交代：
+> **每次打 tag 產出 Windows 安裝程式，上去之後都必須實機測試過。**
+>
+> 而且**必須測 Release 上那一支**（SignPath 簽過的），不是本機建的未簽章版
+> —— 簽章會影響 SmartScreen 與「發行者不明」的行為，本機那份測不到。
+
+### 每次打 tag 之後
+
+- [ ] `Build Windows installer` 這個 workflow **completed success**
+      （只看 tag 有沒有推上去不算 —— v1.15.32 那次 build 成功但**簽章步驟
+      逾時**，Release 上根本沒有檔案，而 tag 看起來好端端的）
+- [ ] **提醒使用者去 SignPath 按 Approve**（OSS 憑證強制人工核准，CI 會等）
+- [ ] Release 上真的掛著 `jt-doc-tools-<版本>-setup.exe`
+- [ ] **驗簽章**：Windows 上 `Get-AuthenticodeSignature` 要是
+      `Valid` ＋ `CN=SignPath Foundation` ＋ DigiCert 時戳
+      （**曾經出過測試憑證的版本**：v1.12.8 / v1.12.10 / v1.12.24 掛的是
+      `CN=Test certificate for 'jt-doc-tools [OSS]'`，Status 是 `UnknownError`
+      —— 那是正式憑證還在審核時的產物，後來沒有人回頭清掉）
+- [ ] **實機跑完整循環**（`.154`）：全新安裝 → 開得起來 → 解除安裝
+      （服務 / 登錄檔 / 防火牆 / PATH 全清、**使用者資料保留**）→ 重裝
+- [ ] 裝完之後 `curl http://127.0.0.1:8765/healthz` 要回 `{"ok":true}`，
+      而且版本號是這一版
+
+> **這一關會讓測試機離線一段時間**，所以要挑有人看著的時候跑 —— 但
+> **不可以因此跳過**：安裝程式那條路從 v1.15.26 之後就沒有人走過。
+
 ## 0.4 每一頁都要在真的瀏覽器裡「活著」 🆕 v1.15.36（使用者要求）
 
 > **「頁面渲染得出來」跟「頁面活著」是兩件事，而我們從來只驗前者。**
