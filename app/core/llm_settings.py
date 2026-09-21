@@ -134,6 +134,15 @@ class LLMSettingsManager:
          "use": "regex 抓不到的人名 / 職稱 / 客戶代號等 context-sensitive 案例", "kind": "text"},
         {"id": "text-deident",     "name": "文字去識別化（LLM 補偵測）",
          "use": "純文字版的 doc-deident，貼上 / 上傳文字檔做去識別化", "kind": "text"},
+        {"id": "meeting-summary",  "name": "會議摘要",
+         "use": "會議逐字稿 → 摘要 / 決議 / 待辦 / 風險 / 議題，每一條都要附段號。"
+                "這支要的是「照格式回答而且不要編」，不是文筆。"
+                "建議用 gemma4:26b 或參數量更高的模型；"
+                "顯示記憶體有限時 qwen3.8:27b 是實測可用的選擇"
+                "（兩者都跑過 160 分鐘的語料各三次：抓到率 100% / 94%，"
+                "兩個都沒有編造任何東西，差別是風格不是安全性）。"
+                "一場兩小時的會議約 30~60 次請求（視窗數 ＋ 複審 ＋ 議題 ＋ 摘要），"
+                "所以吞吐量也要一起看。", "kind": "text"},
         {"id": "pdf-wordcount",    "name": "字數統計（LLM 摘要 / 關鍵字）",
          "use": "依文章內容生成 3-5 句摘要 + TOP 10 關鍵概念", "kind": "text"},
         {"id": "pdf-annotations",  "name": "註解整理（LLM 自動分組）",

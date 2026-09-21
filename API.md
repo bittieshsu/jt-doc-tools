@@ -877,6 +877,87 @@ curl -X POST http://localhost:8765/tools/pdf-wordcount/api/pdf-wordcount \
 }
 ```
 
+### 會議摘要
+
+把會議逐字稿整理成摘要、決議、待辦、風險與章節，**每一條都附段號**。
+
+```text
+POST /tools/meeting-summary/api/meeting-summary
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | ✓ | 逐字稿：`.vtt` / `.srt` / `.json` / `.txt` / `.md` / `.docx` / `.odt` |
+| `second_pass` | string | | `1`（預設）跑第二輪複審；`0` 只跑第一輪，快但漏抓與誤抓都會多 |
+| `context` | string | | **會議背景**（選填，上限 4000 字）：主題、與會者與職稱、專有名詞說明，或你自己要交代的話 |
+
+**`context` 只拿來讀懂逐字稿，不會變成項目的來源。**
+知道「某某是營運副總、會議主席」對判斷誰在交辦、誰是負責人很有幫助，
+但背景裡寫的事情**沒有在會議上發生過** —— 決議 / 待辦 / 風險 / 未決問題
+一律只從逐字稿產生。除了提示裡明講之外，還有兩道機制擋著：
+引用驗證（項目必須指得回逐字稿的段落，背景不在被比對的範圍裡），
+以及「跟背景很像、而且明顯比跟逐字稿更像」就丟掉。
+被丟掉的會計進 `dropped_count`。
+
+**這支是同步的** —— 一場兩小時的會議要跑幾分鐘（約 30~60 次模型請求），
+呼叫端的逾時要放寬。要背景處理請走網頁那條路
+（`POST /upload` → `POST /start` → 拿作業編號輪詢 `/api/jobs/{id}`）。
+
+需要先在管理區啟用 LLM；沒啟用回 **503**。逐字稿讀不出東西回 **400**
+（訊息會說得出支援哪些格式）。
+
+**時間戳記是選用的**：純文字逐字稿沒有時間時，摘要 / 決議 / 待辦照常有，
+但 `speaker_stats` 會是空的、`charts` 不會包含 `speaker_share` 與 `timeline`
+—— 那兩個要靠時間算，猜出來的數字不能用。
+
+```bash
+curl -X POST http://localhost:8765/tools/meeting-summary/api/meeting-summary \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@meeting.vtt" \
+  --form-string 'context=會議主題：第四季預算
+與會者
+王小明：財務部經理，會議主席
+李美華：法務專員' | jq
+```
+
+回應 JSON（節錄）：
+
+```json
+{
+  "summary": { "summary": "這場會議確認了第四季的預算…" },
+  "items": {
+    "decision": [
+      { "text": "第四季預算維持原案", "segment_ids": [18, 19],
+        "speaker": "王小明", "quote": "那就照原案走" }
+    ],
+    "action": [
+      { "text": "月底前把修訂版寄給法務", "owner": "李美華",
+        "due": "月底", "segment_ids": [42] }
+    ],
+    "risk": [], "question": []
+  },
+  "chapters": [
+    { "title": "預算討論", "start_ms": 0, "end_ms": 840000, "start_seq": 1 }
+  ],
+  "mindmap": [
+    { "node_id": "c1", "parent_id": null, "label": "預算討論",
+      "type": "topic", "segment_ids": [1] }
+  ],
+  "charts": ["timeline", "topic_share", "speaker_share", "mindmap"],
+  "speaker_stats": {
+    "王小明": { "speaking_ms": 512000, "percentage": 61.2,
+                "turn_count": 24, "average_turn_ms": 21333 }
+  },
+  "dropped_count": 3,
+  "llm_calls": 41,
+  "source": { "filename": "meeting.vtt", "segments": 186 }
+}
+```
+
+`dropped_count` 是**引用對不上原文而被丟掉的項目數** —— 每一條抽出來的內容
+都要在它宣稱的段落裡找得到，找不到就不留。這個數字偏高時代表模型在編，
+換一個模型會比調參數有效。
+
 ### PDF OCR
 
 對掃描 PDF 做文字辨識，加上可選取的文字層。
@@ -1893,6 +1974,24 @@ curl -X POST http://localhost:8765/admin/api/tokens/enforce \
 ```
 
 ---
+
+### 簽章網址取檔（不是給人呼叫的）
+
+有些外部服務只收「網址」—— 檔案不是我們上傳給它，是它拿我們給的網址自己來拉。
+這種情況我們給的是**短效簽章網址**，而不是 API Token：
+
+```text
+GET /api/speech/audio/{file_id}?exp=<到期的 unix 秒數>&sig=<簽章>
+```
+
+* **認證是網址本身**，不帶 `Authorization`。簽章綁住「檔案 id ＋ 到期時間」，
+  所以改 `exp` 延期會讓簽章失效。
+* **驗不過一律回 404** —— 格式不對、簽章錯、過期、檔案不在，四種在外面
+  看起來一模一樣（回 403 等於告訴對方「這個 id 是存在的」）。
+* 網址由伺服器端產生，**沒有公開的端點可以要一組簽章** ——
+  這一條列在這裡是為了「這份文件不漏掉任何端點」，不是給你呼叫的。
+
+拉檔拿到 404 時，最常見的原因是**網址過期**而不是檔案不見了。
 
 ### 管理介面自己用的 XHR 端點
 

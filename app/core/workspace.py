@@ -44,6 +44,9 @@ logger = logging.getLogger(__name__)
 ALLOWED: dict[str, str] = {
     "application/pdf": ".pdf",
     "image/png": ".png",
+    # 純文字沒有魔術位元組，判準見 `_looks_like_text()`。
+    "text/plain": ".txt",
+    "text/markdown": ".md",
 }
 
 _SINGLE_KEY = "__single__"  # auth-OFF shared workspace
@@ -255,7 +258,38 @@ ALLOWED.update({m: e for m, e in _ODF_KINDS.items()})
 ALLOWED.update({m: e for _p, m, e in _OOXML_KINDS})
 
 
-def detect_kind(data: bytes) -> Optional[tuple[str, str]]:
+#: 純文字裡**允許**出現的控制字元。其餘 C0 與 DEL 一律視為「不是文字」。
+#: 這一條是純文字唯一的防線 —— 它沒有魔術位元組，只看副檔名的話，
+#: 任何東西改名成 `.txt` 都進得來。
+_TEXT_OK_CONTROLS = frozenset("\t\n\r")
+
+
+def _looks_like_text(data: bytes) -> bool:
+    """整份解得開 UTF-8，而且沒有奇怪的控制字元，才算純文字。
+
+    **判準不可以是副檔名。** 工作區其餘型別都靠魔術位元組或 zip 內部結構認，
+    純文字沒有那種東西，所以改用「內容本身說得通」當判準：
+
+    * 整份 UTF-8 解得開（含 BOM）—— 多數二進位檔在這一關就過不了。
+    * 沒有 `\t\n\r` 以外的控制字元 —— 擋住「全部是 ASCII 位元組但夾著
+      NUL」那種會通過解碼的二進位檔。
+
+    **整份都要看，不可以只抽前面幾 KB**：前 4 KB 乾淨、後面是二進位的檔案
+    是真的做得出來的，而抽樣會讓它整個進來。單檔上限預設 50 MB，解一次的
+    成本可以接受。
+    """
+    if not data:
+        return False
+    try:
+        s = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return False
+    return not any(
+        (ch < " " or ch == "\x7f") and ch not in _TEXT_OK_CONTROLS for ch in s
+    )
+
+
+def detect_kind(data: bytes, name: str = "") -> Optional[tuple[str, str]]:
     """Return (mime, ext) for a supported file by magic bytes, else None.
 
     PDF / PNG are matched by their leading signature. Office documents are all
@@ -305,6 +339,14 @@ def detect_kind(data: bytes) -> Optional[tuple[str, str]]:
                             return mime, ext
         except Exception:  # noqa: BLE001 — malformed zip → unsupported
             return None
+    # 純文字放最後：上面每一種都有明確的訊號，文字是「都不像，但內容說得通」。
+    # **`name` 只在兩種文字型別之間二選一**，不可以讓不是文字的東西過關 ——
+    # 先過 `_looks_like_text()` 才輪得到它。
+    if _looks_like_text(data):
+        low = (name or "").lower()
+        if low.endswith(".md") or low.endswith(".markdown"):
+            return "text/markdown", ".md"
+        return "text/plain", ".txt"
     return None
 
 
@@ -417,11 +459,12 @@ def save_bytes_for_key(key: str, data: bytes, display_name: str,
         raise WorkspaceDisabled("工作區功能未啟用")
     if not data:
         raise WorkspaceError("檔案為空")
-    kind = detect_kind(data)
+    kind = detect_kind(data, display_name)
     if kind is None:
         raise UnsupportedType(
             "工作區接受 PDF / PNG、Word (.docx) / Excel (.xlsx) / "
-            "PowerPoint (.pptx)、OpenDocument (.odt / .ods / .odp / .odg)")
+            "PowerPoint (.pptx)、OpenDocument (.odt / .ods / .odp / .odg)、"
+            "純文字 (.txt / .md)")
     mime, ext = kind
     s = get_settings()
     max_file_mb = int(s.get("max_file_mb") or 0)
@@ -508,6 +551,8 @@ def get_file(request: Request, file_id: str) -> tuple[Path, dict[str, Any]]:
 
 #: 需要先轉成 PDF 才畫得出第一頁的格式。
 _OFFICE_THUMB_EXTS = (".docx", ".odt", ".xlsx", ".ods", ".pptx", ".odp", ".odg")
+#: 純文字：沒有可以畫的「第一頁」，縮圖一律回空白佔位圖。
+_TEXT_EXTS = (".txt", ".md")
 
 #: 超過這個大小就不做縮圖。
 #:
@@ -621,6 +666,11 @@ def get_thumbnail(request: Request, file_id: str) -> tuple[Path, str]:
         if not fp.exists():
             raise NotFound("檔案不存在")
         return fp, "image/png"
+    if ext in _TEXT_EXTS:
+        # 純文字沒有「第一頁」可以畫。**要明講**，不要讓它掉到下面那條
+        # 「當成 PDF」的路 —— 那會去找一個不存在的 `file.pdf`，
+        # 錯誤訊息變成「檔案不存在」，看起來像檔案掉了。
+        raise WorkspaceError("純文字沒有預覽圖")
     if ext in _OFFICE_THUMB_EXTS:
         return _office_thumbnail(d, ext)
     # PDF → render first page (cache thumb.png).

@@ -180,6 +180,29 @@ def _lower_priority():
         pass
 
 
+def _kill_tree(proc) -> None:
+    """把 soffice **整棵行程樹**殺掉，不是只殺我們拿到的那個 PID。
+
+    `proc.kill()` 殺的是 `/opt/oxoffice/program/soffice`（shell 包裝腳本），
+    而真正在解析檔案的 `soffice.bin` 是它的子行程 —— **會活下來變成孤兒**。
+    這段程式原本的註解寫著「force-kill so it doesn't leave a zombie soffice」，
+    **但它沒有做到**（正式機 2026-09-18 實測：逾時後 4 分鐘那支還在跑）。
+
+    收尾要保證不丟例外：**這是錯誤處理路徑**，在這裡再炸一次的話，
+    使用者看到的會是堆疊而不是「轉檔逾時」。
+    """
+    from . import proc_tree
+    proc_tree.kill_tree(proc.pid)
+    try:
+        proc.kill()
+    except Exception:                                    # noqa: BLE001
+        pass
+    try:
+        proc.communicate(timeout=5)
+    except Exception:                                    # noqa: BLE001
+        pass
+
+
 def _build_soffice_cmd(soffice: str, args: list[str]) -> tuple[list, dict]:
     """Build subprocess.Popen kwargs for cross-platform soffice invocation.
 
@@ -190,6 +213,13 @@ def _build_soffice_cmd(soffice: str, args: list[str]) -> tuple[list, dict]:
     import os as _os
     import shlex as _shlex
     kwargs: dict = {}
+    if not _sys.platform.startswith("win"):
+        # **自己一個 session** —— `soffice` 是 shell 包裝腳本，真正在算的是它
+        # fork 出來的 `soffice.bin`。逾時時只 kill 我們拿到的那個 PID，
+        # **子行程會活下來變成孤兒**（PPID=1）而且繼續空轉。
+        # 正式機實測到過：逾時 4 分鐘之後那支 soffice.bin 還在 R 狀態燒 CPU，
+        # 讓下一次轉檔更慢 —— **一次逾時會把後面每一次都拖下水**。
+        kwargs["start_new_session"] = True
     if _sys.platform == "darwin":
         # macOS: 直接 fork+exec soffice 會 SIGABRT (拿不到 WindowServer)，
         # `open -W -a` 又會被當 GUI app 啟動而忽略 --headless。改用 osascript
@@ -221,7 +251,7 @@ def _build_soffice_cmd(soffice: str, args: list[str]) -> tuple[list, dict]:
     return [soffice] + args, kwargs
 
 
-def _profile_uri(profile_path: Path) -> str:
+def _profile_uri(profile_path: Path, *, paper_default: bool = False) -> str:
     """Build a valid `file://` URI for the soffice -env:UserInstallation arg.
 
     Bug fix (issue #5, v1.5.1): on Windows we used to build
@@ -233,19 +263,38 @@ def _profile_uri(profile_path: Path) -> str:
 
     Path.as_uri() does the right thing on all platforms.
     """
-    _harden_profile(profile_path)
+    _harden_profile(profile_path, paper_default=paper_default)
     return profile_path.resolve().as_uri()
 
 
-#: 丟進拋棄式設定檔的安全設定。**停用巨集執行**，不要依賴 LibreOffice 的預設值。
+#: 丟進拋棄式設定檔的設定。**停用巨集執行** ＋ **預設紙張 A4**。
 #:
-#: `--safe-mode` 只是「重設使用者設定檔」，**跟巨集無關** —— 這是很容易誤會的
-#: 一點。LibreOffice 出廠的巨集安全性是「高」（未簽署的不執行），headless 轉檔
-#: 也不會觸發 auto-exec，但那是**別人的預設值**，隨版本可能改變，而我們處理的
-#: 是使用者上傳的、不可信的檔案。顯式釘住成本極低。
+#: ⚠⚠ **這份設定原本從來沒有生效過**（v1.15.87 實測）：每一支轉檔函式都帶著
+#: `--safe-mode`，而那個旗標會在啟動時**把使用者設定檔重設掉** ——
+#: 我們剛剛種下去的 `registrymodifications.xcu` 跑完之後
+#: **`DisableMacrosExecution` 已經不在裡面了**。
+#: 舊註解寫「`--safe-mode` 跟巨集無關」，那句話本身沒錯，錯在它**跟我們種的
+#: 設定有關**：safe-mode 會把整份洗掉。
+#:
+#: 判準是**行為**不是檔案在不在**：種 `ooSetupSystemLocale=zh-TW` 之後，
+#: 帶 safe-mode 出來仍是 Letter、不帶才變 A4 —— 那就是「有沒有被讀進去」的證據。
+#:
+#: 拿掉 `--safe-mode` 之後用三份真實檔案（docx / xlsx）逐項比對過
+#: **頁數、頁面尺寸、字數、逐頁算圖的像素雜湊完全一致**。
+#: 它原本要防的兩件事本來就已經有別的東西擋著：使用者自訂設定 ——
+#: 每次呼叫都是**全新的拋棄式 profile**，根本沒有自訂；當機復原提示 ——
+#: `--norestore`。
 #:
 #: * `DisableMacrosExecution` = true —— 最強的一道，直接關掉巨集執行。
 #: * `MacroSecurityLevel` = 3（最高）—— 萬一上面那項在某個版本被忽略時的後備。
+#: * `ooSetupSystemLocale` = zh-TW —— **決定「沒有宣告頁面尺寸的來源」用什麼紙**。
+#:   HTML / 純文字 / CSV 都不帶頁面尺寸，LibreOffice 就用系統語系推出來的紙張，
+#:   而這台（以及多數伺服器）是 `en_US` → **Letter**。台灣印的是 A4，
+#:   短 18mm、寬 6mm，照 A4 邊界排的內容會跑掉。
+#:   **`LANG` / `LC_PAPER` 環境變數沒有用**（實測：`LANG=zh_TW.UTF-8` 只換掉
+#:   長度單位、紙張仍是 Letter；而且多數機器根本沒有產生 zh_TW 這個 locale）。
+#:   **來源自己宣告了尺寸就一律照它的**（實測 Letter 的 .odt 仍出 Letter），
+#:   所以這一條只影響「本來就沒有答案」的那些輸入。
 _HARDENED_PROFILE_XCU = """<?xml version="1.0" encoding="UTF-8"?>
 <oor:items xmlns:oor="http://openoffice.org/2001/registry"
            xmlns:xs="http://www.w3.org/2001/XMLSchema">
@@ -262,8 +311,36 @@ _HARDENED_PROFILE_XCU = """<?xml version="1.0" encoding="UTF-8"?>
 </oor:items>
 """
 
+#: 只在**來源本來就沒有宣告頁面尺寸**時才追加的那一項（見 `_NO_PAGE_SIZE_SUFFIXES`）。
+#:
+#: **不要無條件套**：它同時是「系統語系」，會改變 CJK 的字型 fallback。
+#: 實測一份真實廠商表 docx，套上去之後前導空白改用別的字型量寬度，
+#: 整段標籤**左移約 10pt**（墨點數完全相同、字形也一樣，純粹是空白的寬度）。
+#: 那個位移對表單那一家工具是不可接受的風險，而它們的來源本來就寫著頁面尺寸、
+#: 根本不需要這一項。
+_PAPER_XCU_ITEM = """ <item oor:path="/org.openoffice.Setup/L10N">
+  <prop oor:name="ooSetupSystemLocale" oor:op="fuse">
+   <value>zh-TW</value>
+  </prop>
+ </item>
+"""
 
-def _harden_profile(profile_path: Path) -> None:
+#: 這些來源**不帶頁面尺寸**，LibreOffice 只能用系統語系推一個出來
+#: （伺服器多半是 `en_US` → Letter）。台灣印的是 A4。
+_NO_PAGE_SIZE_SUFFIXES = frozenset({".html", ".htm", ".txt", ".csv", ".md"})
+
+
+def _needs_paper_default(src: Path) -> bool:
+    """來源自己沒宣告頁面尺寸時，才需要我們替它決定紙張。
+
+    `.docx` / `.odt` / `.xlsx` / `.pptx` 自己就帶著尺寸，**一律照它的**
+    （實測宣告 Letter 的 .odt 轉出來仍是 Letter）——
+    我們不可以把別人文件的紙張改掉。
+    """
+    return src.suffix.lower() in _NO_PAGE_SIZE_SUFFIXES
+
+
+def _harden_profile(profile_path: Path, *, paper_default: bool = False) -> None:
     """在拋棄式設定檔裡預先寫入安全設定（停用巨集）。
 
     **寫不進去也不可以讓轉檔失敗** —— 那會把一個「加強防護」變成
@@ -275,7 +352,10 @@ def _harden_profile(profile_path: Path) -> None:
         user_dir.mkdir(parents=True, exist_ok=True)
         target = user_dir / "registrymodifications.xcu"
         if not target.exists():
-            target.write_text(_HARDENED_PROFILE_XCU, encoding="utf-8")
+            xcu = _HARDENED_PROFILE_XCU
+            if paper_default:
+                xcu = xcu.replace("</oor:items>", _PAPER_XCU_ITEM + "</oor:items>")
+            target.write_text(xcu, encoding="utf-8")
     except OSError as e:
         logger.warning("無法寫入 soffice 安全設定（巨集停用）：%s", e)
 
@@ -437,7 +517,8 @@ def _require_output(produced: Path, *, rc, stdout: bytes, stderr: bytes,
     raise RuntimeError(msg)
 
 
-def convert_to_pdf(src: Path, dst_pdf: Path, timeout: float = 60.0) -> None:
+def convert_to_pdf(src: Path, dst_pdf: Path, timeout: float = 60.0,
+                   input_filter: Optional[str] = None) -> None:
     """Run soffice headless to convert ``src`` into ``dst_pdf``.
 
     Uses a *fresh* per-call user-profile directory (``-env:UserInstallation``)
@@ -452,12 +533,24 @@ def convert_to_pdf(src: Path, dst_pdf: Path, timeout: float = 60.0) -> None:
     Concurrency: serialised via a process-wide lock (see _soffice_lock).
     Multiple simultaneous calls queue up rather than interleave (one soffice
     process per host at a time keeps things predictable).
+
+    input_filter: 顯式指定輸入篩選器名。**HTML 輸入一定要用
+    ``"HTML (StarWriter)"``**，否則 soffice 走 **Writer/Web** 排版 ——
+    那是「網頁檢視」模式，分頁很糟。實測一份 43 KB 的 Markdown：
+    Web 排版出來 **36 頁、其中 3 頁只有 25~53 個字**（表格被切成一列一頁），
+    改用 Writer 之後 **25 頁、沒有任何空頁**，每頁字數中位數 687 → 1029。
+
+    這條規則 `convert_to_odt` / `convert_to_docx` 早就有了（v1.11.36 為了
+    ODT 的 mimetype 加的），**只有這一支漏掉** —— 同一個家族要一次掃完。
     """
     soffice = find_soffice()
     if not soffice:
         raise OfficeUnavailableError(
             "找不到 LibreOffice / OxOffice。請安裝其中一個，或先自行轉成 PDF 上傳。"
         )
+    # HTML 輸入自動走 Writer 篩選器（見 docstring：Web 排版的分頁很糟）
+    if input_filter is None and src.suffix.lower() in (".html", ".htm"):
+        input_filter = "HTML (StarWriter)"
     # 環境沒問題之後才驗**來源檔的容器** —— 毀損 / 截斷的檔案 soffice
     # 會回傳 0 卻不產檔，訊息只能寫「轉檔成功但找不到輸出」，幫不上使用者。
     ensure_readable(src)
@@ -469,8 +562,7 @@ def convert_to_pdf(src: Path, dst_pdf: Path, timeout: float = 60.0) -> None:
         # entire problem (cost is ~200ms first-run init, acceptable).
         profile_path = Path(td) / "profile"
         soffice_args = [
-            f"-env:UserInstallation={_profile_uri(profile_path)}",
-            "--safe-mode",       # skip user customisations + recovery prompt
+            f"-env:UserInstallation={_profile_uri(profile_path, paper_default=_needs_paper_default(src))}",
             "--headless",
             "--norestore",
             "--nologo",
@@ -479,8 +571,10 @@ def convert_to_pdf(src: Path, dst_pdf: Path, timeout: float = 60.0) -> None:
             "--nofirststartwizard",
             "--convert-to", "pdf",
             "--outdir", td,
-            str(src),
         ]
+        if input_filter:
+            soffice_args += ["--infilter=" + input_filter]
+        soffice_args += [str(src)]
         cmd, popen_kwargs = _build_soffice_cmd(soffice, soffice_args)
         # Serialise: at most one soffice at a time. Even though each call now
         # has its own profile, two concurrent osascript→soffice on macOS still
@@ -497,11 +591,7 @@ def convert_to_pdf(src: Path, dst_pdf: Path, timeout: float = 60.0) -> None:
             except subprocess.TimeoutExpired:
                 # Hung parsing the file — force-kill so it doesn't leave a
                 # zombie soffice holding the profile lock.
-                proc.kill()
-                try:
-                    proc.communicate(timeout=5)
-                except Exception:
-                    pass
+                _kill_tree(proc)
                 raise RuntimeError(
                     f"office 轉 PDF 卡住（超過 {int(timeout)} 秒）。這份檔案可能已毀損或"
                     f"含有 LibreOffice/OxOffice 無法解析的內容。請用 Word/Pages 另存"
@@ -538,7 +628,6 @@ def convert_to_odg(src: Path, dst_odg: Path, timeout: float = 120.0) -> None:
         profile_path = Path(td) / "profile"
         soffice_args = [
             f"-env:UserInstallation={_profile_uri(profile_path)}",
-            "--safe-mode",
             "--headless",
             "--norestore",
             "--nologo",
@@ -559,11 +648,7 @@ def convert_to_odg(src: Path, dst_odg: Path, timeout: float = 120.0) -> None:
             try:
                 stdout, stderr = proc.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
-                proc.kill()
-                try:
-                    proc.communicate(timeout=5)
-                except Exception:
-                    pass
+                _kill_tree(proc)
                 raise RuntimeError(
                     f"PDF 匯入 Draw 卡住（超過 {int(timeout)} 秒）。這份 PDF 可能已毀損"
                     f"或含 LibreOffice/OxOffice 無法解析的內容。"
@@ -600,8 +685,8 @@ def convert_to_docx(src: Path, dst_docx: Path, timeout: float = 60.0,
     with tempfile.TemporaryDirectory() as td:
         profile_path = Path(td) / "profile"
         soffice_args = [
-            f"-env:UserInstallation={_profile_uri(profile_path)}",
-            "--safe-mode", "--headless", "--norestore", "--nologo",
+            f"-env:UserInstallation={_profile_uri(profile_path, paper_default=_needs_paper_default(src))}",
+            "--headless", "--norestore", "--nologo",
             "--nolockcheck", "--nodefault", "--nofirststartwizard",
         ]
         if input_filter:
@@ -619,9 +704,7 @@ def convert_to_docx(src: Path, dst_docx: Path, timeout: float = 60.0,
             try:
                 stdout, stderr = proc.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
-                proc.kill()
-                try: proc.communicate(timeout=5)
-                except Exception: pass
+                _kill_tree(proc)
                 raise RuntimeError(
                     f"office 轉 .docx 卡住（超過 {int(timeout)} 秒）。檔案可能已毀損或含 LibreOffice 無法解析的內容。"
                 )
@@ -654,7 +737,7 @@ def convert_to_pptx(src: Path, dst_pptx: Path, timeout: float = 120.0) -> None:
         profile_path = Path(td) / "profile"
         soffice_args = [
             f"-env:UserInstallation={_profile_uri(profile_path)}",
-            "--safe-mode", "--headless", "--norestore", "--nologo",
+            "--headless", "--norestore", "--nologo",
             "--nolockcheck", "--nodefault", "--nofirststartwizard",
             "--convert-to", "pptx:Impress Office Open XML",
             "--outdir", td,
@@ -668,11 +751,7 @@ def convert_to_pptx(src: Path, dst_pptx: Path, timeout: float = 120.0) -> None:
             try:
                 stdout, stderr = proc.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
-                proc.kill()
-                try:
-                    proc.communicate(timeout=5)
-                except Exception:
-                    pass
+                _kill_tree(proc)
                 raise RuntimeError(
                     f"office 轉 .pptx 卡住（超過 {int(timeout)} 秒）。"
                     "簡報物件過多時會發生,可改輸出 .odp。"
@@ -714,8 +793,8 @@ def convert_to_odt(src: Path, dst_odt: Path, timeout: float = 60.0,
     with tempfile.TemporaryDirectory() as td:
         profile_path = Path(td) / "profile"
         soffice_args = [
-            f"-env:UserInstallation={_profile_uri(profile_path)}",
-            "--safe-mode", "--headless", "--norestore", "--nologo",
+            f"-env:UserInstallation={_profile_uri(profile_path, paper_default=_needs_paper_default(src))}",
+            "--headless", "--norestore", "--nologo",
             "--nolockcheck", "--nodefault", "--nofirststartwizard",
         ]
         if input_filter:
@@ -733,9 +812,7 @@ def convert_to_odt(src: Path, dst_odt: Path, timeout: float = 60.0,
             try:
                 stdout, stderr = proc.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
-                proc.kill()
-                try: proc.communicate(timeout=5)
-                except Exception: pass
+                _kill_tree(proc)
                 raise RuntimeError(
                     f"office 轉 .odt 卡住（超過 {int(timeout)} 秒）。"
                 )
@@ -771,7 +848,6 @@ def convert_to_text(src: Path, timeout: float = 60.0) -> str:
         profile_path = Path(td) / "profile"
         soffice_args = [
             f"-env:UserInstallation={_profile_uri(profile_path)}",
-            "--safe-mode",
             "--headless",
             "--norestore",
             "--nologo",
@@ -792,11 +868,7 @@ def convert_to_text(src: Path, timeout: float = 60.0) -> str:
             try:
                 stdout, stderr = proc.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
-                proc.kill()
-                try:
-                    proc.communicate(timeout=5)
-                except Exception:
-                    pass
+                _kill_tree(proc)
                 raise RuntimeError(
                     f"office 轉文字卡住（超過 {int(timeout)} 秒）。"
                     "這份檔案可能已毀損或含有 LibreOffice/OxOffice 無法解析的內容。"
@@ -845,8 +917,8 @@ def convert_with_filter(src: Path, dst: Path, ext: str, filter_name: str,
         outdir.mkdir()
         profile_path = Path(td) / "profile"
         soffice_args = [
-            f"-env:UserInstallation={_profile_uri(profile_path)}",
-            "--safe-mode", "--headless", "--norestore", "--nologo",
+            f"-env:UserInstallation={_profile_uri(profile_path, paper_default=_needs_paper_default(src))}",
+            "--headless", "--norestore", "--nologo",
             "--nolockcheck", "--nodefault", "--nofirststartwizard",
             "--convert-to", f"{ext}:{filter_name}",
             "--outdir", str(outdir),
@@ -860,11 +932,7 @@ def convert_with_filter(src: Path, dst: Path, ext: str, filter_name: str,
             try:
                 stdout, stderr = proc.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
-                proc.kill()
-                try:
-                    proc.communicate(timeout=5)
-                except Exception:
-                    pass
+                _kill_tree(proc)
                 raise RuntimeError(
                     f"轉換卡住（超過 {int(timeout)} 秒）。文件物件過多時會發生，"
                     "可改轉 ODF 格式（.odt / .ods / .odp）試試。")

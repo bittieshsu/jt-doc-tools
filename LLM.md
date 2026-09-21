@@ -4,7 +4,7 @@
 
 > **預設關閉。** 安裝後不接任何 LLM 服務，所有核心工具（掃描、轉檔、編輯、簽章、加密、合併、分拆、去識別化…）照樣 100% 可用。
 >
-> 啟用方式：`/admin/llm-settings` 頁面填 OpenAI-compatible API base URL（如本機 Ollama / vLLM / LM Studio / DGX Spark）+ 選預設模型，即可在 12 個工具看到「啟用 LLM」選項。
+> 啟用方式：`/admin/llm-settings` 頁面填 OpenAI-compatible API base URL（如本機 Ollama / vLLM / LM Studio / DGX Spark）+ 選預設模型，即可在 13 個工具看到「啟用 LLM」選項。
 
 ## 為什麼要支援 LLM
 

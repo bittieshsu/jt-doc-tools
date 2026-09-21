@@ -88,6 +88,57 @@ jobs:
           fi
           exit $code
 
+  lockfile:
+    name: 正式機的相依版本（uv sync 讀 uv.lock）
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 安裝中日韓字型
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+      # **這個 job 存在的理由**（外部稽核 2026-09-18）：上面的 `core` 走
+      # `pip install -r requirements.txt`（版本**範圍**），而正式機走
+      # `uv sync` 讀 `uv.lock`（**固定版本**）。兩條路解析出來的東西不保證相同，
+      # 所以「客戶機器上跑的那一組版本」原本從來沒有被測過 ——
+      # 「CI 綠、正式機炸」多半就是從這個縫隙來的。
+      #
+      # `tests/test_dependency_declarations_agree.py` 比對的是三份**宣告**
+      # （鎖住的版本有沒有落在兩份範圍內），它證明不了那一組版本真的跑得起來。
+      #
+      # **用 uv 官方的安裝腳本而不是第三方 action** —— 少一個供應鏈面。
+      # **不要加 `--frozen`**：正式機跑的是普通 `uv sync`（`app/cli.py:svc_update`
+      # 與 `install.sh` 都是），frozen 會盲信 lockfile 而不跟 pyproject 對帳，
+      # 那就不是客戶會遇到的那條路了（v1.1.68 的教訓）。
+      - name: 安裝 uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: uv sync（跟正式機同一條路）
+        run: uv sync
+      - name: 印出實際裝到的版本（跟 core 那個 job 對照用）
+        run: uv pip list
+      - name: 匯入 smoke test
+        run: uv run python -c "import fastapi, fitz, ldap3, jwt, PIL, httpx"
+      - name: pytest（排除需要 Office / OCR 的）
+        run: |
+          set +e
+          uv run pytest -q --deselect tests/test_pdf_to_slides.py \
+                    --deselect tests/test_office_convert.py \
+                    -p no:cacheprovider > /tmp/pytest.out 2>&1
+          code=$?
+          tail -60 /tmp/pytest.out
+          if [ $code -ne 0 ]; then
+            grep -E '^(FAILED|ERROR)' /tmp/pytest.out | head -25 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          fi
+          exit $code
+
   security:
     name: 資安測試
     runs-on: ubuntu-latest

@@ -138,6 +138,7 @@
             <a class="nav-ep" href="#pdf-附件擷取">Extract PDF attachments</a>
             <a class="nav-ep" href="#pdf-中繼資料">PDF metadata</a>
             <a class="nav-ep" href="#pdf-字數統計">PDF word count</a>
+            <a class="nav-ep" href="#會議摘要">Meeting summary</a>
             <a class="nav-ep" href="#pdf-ocr">PDF OCR</a>
             <a class="nav-ep" href="#pdf-註解整理">PDF annotation report</a>
             <a class="nav-ep" href="#pdf-註解清除">Remove PDF annotations</a>
@@ -223,6 +224,7 @@
             <a class="nav-ep" href="#企業-logo-狀態">Company logo status</a>
             <a class="nav-ep" href="#設定匯出清單">Settings export list</a>
             <a class="nav-ep" href="#token-管理">Token management</a>
+            <a class="nav-ep" href="#簽章網址取檔不是給人呼叫的">Signed-URL file fetch (not meant to be called by hand)</a>
             <a class="nav-ep" href="#管理介面自己用的-xhr-端點">XHR endpoints used by the admin UI itself</a>
           </div>
         </div>
@@ -703,6 +705,55 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;per_page_chars&quot;</span>: [<span class="hl-cmt">/* ... */</span>],
   <span class="hl-key">&quot;top_words_zh2&quot;</span>: [<span class="hl-cmt">/* ... */</span>], <span class="hl-key">&quot;top_words_en&quot;</span>: [<span class="hl-cmt">/* ... */</span>]
 }</code></pre>
+      </section>
+      <section class="doc-section" data-sec="會議摘要" data-title="Meeting summary" hidden>
+<div class="doc-crumb">5. PDF extraction and analysis API</div>
+<h4 id="會議摘要">Meeting summary</h4>
+<p>Turns a meeting transcript into a summary, decisions, action items, risks and chapters, <strong>with a segment number on every entry</strong>.</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-summary/api/meeting-summary</code></pre>
+<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>Transcript: <code>.vtt</code> / <code>.srt</code> / <code>.json</code> / <code>.txt</code> / <code>.md</code> / <code>.docx</code> / <code>.odt</code></td></tr><tr><td><code>second_pass</code></td><td>string</td><td></td><td><code>1</code> (default) runs the second review pass;<code>0</code> first pass only: faster, but both misses and false positives go up</td></tr><tr><td><code>context</code></td><td>string</td><td></td><td><strong>Meeting background</strong> (optional, up to 4000 characters): the topic, attendees and their roles, terminology, or anything else you want to tell the model</td></tr></tbody></table></div>
+<p><strong><code>context</code> is used only to make sense of the transcript; it never becomes a source of items.</strong> Knowing that someone is the VP of Operations and chairs the meeting helps decide who is delegating and who is the owner, but what you write in the background <strong>did not happen in the meeting</strong> — decisions, actions, risks and open questions are always drawn from the transcript. Besides saying so in the prompt, two mechanisms enforce it: citation verification (an item must point back to transcript segments, and the background is not part of what is compared), and dropping anything that closely matches the background and matches it noticeably better than it matches the transcript. Dropped items are counted in <code>dropped_count</code>.</p>
+<p><strong>This endpoint is synchronous</strong>; a two-hour meeting takes several minutes (roughly 30-60 model requests), so raise the caller's timeout. For background processing use the web path instead (<code>POST /upload</code> to <code>POST /start</code>, then poll the job id with <code>/api/jobs/{id}</code>).</p>
+<p>The LLM must be enabled in the admin area first; if it is not, this returns <strong>503</strong>. A transcript that cannot be read returns <strong>400</strong> (the message says which formats are supported).</p>
+<p><strong>Timestamps are optional</strong>: for a plain-text transcript with no times, the summary, decisions and action items still work, but <code>speaker_stats</code> comes back empty and <code>charts</code> will not contain <code>speaker_share</code> or <code>timeline</code>; both are computed from the times, and a guessed number would be worse than none.</p>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-summary/api/meeting-summary</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@meeting.vtt&quot;</span> \
+  <span class="hl-flag">--form-string</span> <span class="hl-str">&#x27;context=會議主題：第四季預算
+與會者
+王小明：財務部經理，會議主席
+李美華：法務專員&#x27;</span> | jq</code></pre>
+<p>JSON response (excerpt):</p>
+<pre><code class="lang-json">{
+  <span class="hl-key">&quot;summary&quot;</span>: { <span class="hl-key">&quot;summary&quot;</span>: <span class="hl-str">&quot;這場會議確認了第四季的預算…&quot;</span> },
+  <span class="hl-key">&quot;items&quot;</span>: {
+    <span class="hl-key">&quot;decision&quot;</span>: [
+      { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;第四季預算維持原案&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">18</span>, <span class="hl-num">19</span>],
+        <span class="hl-key">&quot;speaker&quot;</span>: <span class="hl-str">&quot;王小明&quot;</span>, <span class="hl-key">&quot;quote&quot;</span>: <span class="hl-str">&quot;那就照原案走&quot;</span> }
+    ],
+    <span class="hl-key">&quot;action&quot;</span>: [
+      { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;月底前把修訂版寄給法務&quot;</span>, <span class="hl-key">&quot;owner&quot;</span>: <span class="hl-str">&quot;李美華&quot;</span>,
+        <span class="hl-key">&quot;due&quot;</span>: <span class="hl-str">&quot;月底&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">42</span>] }
+    ],
+    <span class="hl-key">&quot;risk&quot;</span>: [], <span class="hl-key">&quot;question&quot;</span>: []
+  },
+  <span class="hl-key">&quot;chapters&quot;</span>: [
+    { <span class="hl-key">&quot;title&quot;</span>: <span class="hl-str">&quot;預算討論&quot;</span>, <span class="hl-key">&quot;start_ms&quot;</span>: <span class="hl-num">0</span>, <span class="hl-key">&quot;end_ms&quot;</span>: <span class="hl-num">840000</span>, <span class="hl-key">&quot;start_seq&quot;</span>: <span class="hl-num">1</span> }
+  ],
+  <span class="hl-key">&quot;mindmap&quot;</span>: [
+    { <span class="hl-key">&quot;node_id&quot;</span>: <span class="hl-str">&quot;c1&quot;</span>, <span class="hl-key">&quot;parent_id&quot;</span>: <span class="hl-bool">null</span>, <span class="hl-key">&quot;label&quot;</span>: <span class="hl-str">&quot;預算討論&quot;</span>,
+      <span class="hl-key">&quot;type&quot;</span>: <span class="hl-str">&quot;topic&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">1</span>] }
+  ],
+  <span class="hl-key">&quot;charts&quot;</span>: [<span class="hl-str">&quot;timeline&quot;</span>, <span class="hl-str">&quot;topic_share&quot;</span>, <span class="hl-str">&quot;speaker_share&quot;</span>, <span class="hl-str">&quot;mindmap&quot;</span>],
+  <span class="hl-key">&quot;speaker_stats&quot;</span>: {
+    <span class="hl-key">&quot;王小明&quot;</span>: { <span class="hl-key">&quot;speaking_ms&quot;</span>: <span class="hl-num">512000</span>, <span class="hl-key">&quot;percentage&quot;</span>: <span class="hl-num">61.2</span>,
+                <span class="hl-key">&quot;turn_count&quot;</span>: <span class="hl-num">24</span>, <span class="hl-key">&quot;average_turn_ms&quot;</span>: <span class="hl-num">21333</span> }
+  },
+  <span class="hl-key">&quot;dropped_count&quot;</span>: <span class="hl-num">3</span>,
+  <span class="hl-key">&quot;llm_calls&quot;</span>: <span class="hl-num">41</span>,
+  <span class="hl-key">&quot;source&quot;</span>: { <span class="hl-key">&quot;filename&quot;</span>: <span class="hl-str">&quot;meeting.vtt&quot;</span>, <span class="hl-key">&quot;segments&quot;</span>: <span class="hl-num">186</span> }
+}</code></pre>
+<p><code>dropped_count</code> Yes <strong>the number of entries dropped because their citation did not match the transcript</strong> Everything extracted has to be findable in the segment it claims; if it is not, it is not kept. A high number here means the model is inventing, and changing the model helps more than tuning parameters.</p>
       </section>
       <section class="doc-section" data-sec="pdf-ocr" data-title="PDF OCR" hidden>
 <div class="doc-crumb">5. PDF extraction and analysis API</div>
@@ -1271,6 +1322,25 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;enforce&quot;:true}&#x27;</span></code></pre>
 <hr>
+      </section>
+      <section class="doc-section" data-sec="簽章網址取檔不是給人呼叫的" data-title="Signed-URL file fetch (not meant to be called by hand)" hidden>
+<div class="doc-crumb">11. Administration API</div>
+<h4 id="簽章網址取檔不是給人呼叫的">Signed-URL file fetch (not meant to be called by hand)</h4>
+<p>Some external services only accept a URL — the file is not uploaded to them, they fetch it themselves from an address we provide. In that case we hand over a <strong>short-lived signed URL</strong> rather than an API token:</p>
+<pre><code class="lang-text"><span class="hl-method">GET</span> /api/speech/audio/{file_id}?exp=&lt;到期的 unix 秒數&gt;&amp;sig=&lt;簽章&gt;</code></pre>
+<ul>
+<li><strong>The URL itself is the authentication</strong>, with no <code>Authorization</code> header. The signature binds the file id together with the expiry,</li>
+</ul>
+<p>  so extending <code>exp</code> invalidates the signature.</p>
+<ul>
+<li><strong>Anything that fails to verify returns 404</strong> — a malformed id, a wrong signature, an expired URL and a missing file all</li>
+</ul>
+<p>  look identical from outside (a 403 would tell the caller “that id exists”).</p>
+<ul>
+<li>The URL is produced server-side, and <strong>there is no public endpoint that hands out a signature</strong> —</li>
+</ul>
+<p>  it is listed here so that this document misses no endpoint, not for you to call.</p>
+<p>If a fetch returns 404, the usual cause is <strong>an expired URL</strong>, not a missing file.</p>
       </section>
       <section class="doc-section" data-sec="管理介面自己用的-xhr-端點" data-title="XHR endpoints used by the admin UI itself" hidden>
 <div class="doc-crumb">11. Administration API</div>

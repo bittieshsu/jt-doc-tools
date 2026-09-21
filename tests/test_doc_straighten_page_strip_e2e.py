@@ -369,8 +369,11 @@ def test_rotating_then_dragging_corners_still_lands_on_the_paper(page):
             break
     else:
         raise AssertionError("拖完之後沒有變成手動的結果")
+    # **預算要撐得住機器在忙**：這台同時有別的專案在跑，算圖 ＋ 瀏覽器載圖
+    # 在尖峰時會超過 30 秒。這條紅的時候不是產品壞了，是等不夠久 ——
+    # 而「等不夠久」與「真的壞了」在原本的訊息裡長得一模一樣。
     dark = None
-    for _ in range(30):
+    for _ in range(90):
         time.sleep(1)
         dark = ev("""(()=>{
           const im = document.getElementById('dsPvAfter');
@@ -386,6 +389,17 @@ def test_rotating_then_dragging_corners_still_lands_on_the_paper(page):
         })()""")
         if dark is not None:
             break
-    assert dark is not None, "修正後的圖load 不出來，量不到"
+    if dark is None:
+        # **失敗時要說得出是哪一種沒載到** —— 元素不在、被藏起來、還沒載完、
+        # 載了但寬度是 0，四種的下一步完全不同。
+        why = ev("""(()=>{
+          const im = document.getElementById('dsPvAfter');
+          if (!im) return '元素不在';
+          if (im.hidden) return '元素被藏起來（流程沒走到）';
+          if (!im.complete) return '圖還沒載完（src=' + (im.src || '').slice(-40) + '）';
+          if (!im.naturalWidth) return '載完了但寬度是 0（圖壞了或是 404）';
+          return '說不上來';
+        })()""")
+        raise AssertionError(f"修正後的圖量不到 —— {why}")
     assert dark < 25, (
         f"修正後有 {dark}% 的像素是暗的 —— 框到桌面了（座標系錯了）")

@@ -52,11 +52,41 @@ if "JTDT_DATA_DIR" not in os.environ:
                 shutil.copy2(sf, _TEST_DATA_DIR / f)
 
 import fitz
+import time
+
 import pytest
 from PIL import Image, ImageDraw
 from fastapi.testclient import TestClient
 
 import app.main as app_main
+
+
+@pytest.fixture(autouse=True)
+def _quiet_job_queue():
+    """每支測試開始前，等**全域**作業佇列把手上的工作跑完。
+
+    **為什麼**：`job_store` 是在**呼叫當下**才從 `settings.data_dir` 解出路徑的。
+    有 20 支測試會 monkeypatch 那個路徑 —— 只要前一支測試留下的 worker 執行緒
+    在換路徑之後寫一次進度，它就會寫到**新的那個目錄**上：
+
+    * 新目錄還沒建表 → `no such table: jobs`
+    * 剛好撞上 `job_store.init()` 在建表 → **`database is locked`**
+
+    2026-09-18 完整套件實際踩到後者：8,910 支裡就這一支，**而且單跑全綠**。
+    看到「單跑綠、合跑紅」就先懷疑共用狀態（本專案第 N 次）。
+
+    **這是測試之間的隔離問題，不是產品缺陷** —— 正式環境只有一個 data_dir，
+    不會有人在服務跑著的時候把它換掉。
+
+    **等不到也照樣往下走**（best effort）：有些測試本來就會刻意留著長時間的
+    作業，在這裡卡死比偶爾一次競爭更糟。
+    """
+    from app.core.job_manager import job_manager as _global
+    for _ in range(200):                      # 最多 10 秒
+        st = _global.stats()
+        if not st["running"] and not st["queued"]:
+            return
+        time.sleep(0.05)
 
 
 @pytest.fixture(scope="session")

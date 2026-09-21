@@ -397,6 +397,13 @@ async def run_check(case_id: str, request: Request):
 
     job = _jm.job_manager.submit("submission-check", _run,
                                   meta={"case_id": case_id, "version": version})
+    # 「我的作業」要有路徑回到結果。這支工具的產出不是一個檔案而是**案件底下的
+    # 一份報告**，所以沒有 `result_path` —— 少了這一行的話，那一列會顯示「完成」
+    # 卻既沒有下載也沒有開啟，使用者得自己想到要回工具裡翻案件。
+    #
+    # 案件頁本來就按 case_id 定址、自己會輪詢進度、也有 ACL，
+    # 所以直接指過去就好，**不需要做 `?job=` 還原**。
+    job.meta["view_url"] = f"/tools/submission-check/case/{case_id}"
     # 把 job_id 寫進 case 讓詳情頁能 poll 進度
     case["current_job_id"] = job.id
     case["current_job_started"] = time.time()

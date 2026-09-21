@@ -710,7 +710,7 @@ wheels = [
 
 [[package]]
 name = "jt-doc-tools"
-version = "1.15.59"
+version = "1.15.93"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
@@ -738,6 +738,7 @@ dependencies = [
     { name = "pyasn1" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pygments" },
     { name = "pyjwt" },
     { name = "pymupdf" },
     { name = "pymupdf4llm" },
@@ -791,6 +792,7 @@ requires-dist = [
     { name = "pyasn1", specifier = ">=0.6.4" },
     { name = "pydantic", specifier = ">=2.9.0,<3" },
     { name = "pydantic-settings", specifier = ">=2.14.2,<3" },
+    { name = "pygments", specifier = ">=2.17,<3" },
     { name = "pyjwt", specifier = ">=2.8,<3" },
     { name = "pymupdf", specifier = ">=1.26.0,<2" },
     { name = "pymupdf4llm", specifier = ">=0.3.0,<0.4" },

@@ -1,0 +1,1091 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% from "components/llm_gate.html" import llm_gate, llm_gate_styles with context %}
+{% block title %}{{ tr('會議摘要') }} · {{ app_name }}{% endblock %}
+{% block head %}{{ llm_gate_styles() }}
+<style nonce="{{ request.state.csp_nonce }}">
+/* 解析結果的預覽：使用者要在**花掉那幾分鐘之前**看出講者判對了沒有 */
+/* 統計做成有底色的區塊（2026-09-19 使用者要求）——
+   原本是一排純文字，跟旁邊的說明文字混在一起，看不出那是「這份檔案的量」。
+   四個各一個顏色，跟圖上的配色是同一組感覺。 */
+/* 統計四格。**等寬撐滿整列**（2026-09-19 回報「這區總覺排的不夠好」）——
+   原本是 flex ＋ `min-width`，寬度跟著內容跑，四格大小不一又靠左擠成一團，
+   跟下面滿版的欄位對不齊。用 auto-fit 的格線，**不寫斷點**：
+   窄了自己折成兩排，加第五格也不必改這裡。
+   數字靠左對齊、標籤在下面 —— 數字是答案，要最先看到。 */
+.ms-stats { display:grid; gap:10px; margin:12px 0 10px;
+            grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); }
+.ms-stats > span { display:flex; flex-direction:column; gap:3px;
+                   padding:10px 14px; border-radius:10px; font-size:12px;
+                   border:1px solid currentColor; line-height:1.3; }
+.ms-stats > span > b { font-size:22px; font-weight:700; line-height:1.1;
+                       font-variant-numeric:tabular-nums; color:#0f172a;
+                       letter-spacing:-.5px; }
+.ms-stats > span:nth-child(1) { color:#4338ca; background:#eef2ff; }
+.ms-stats > span:nth-child(2) { color:#047857; background:#ecfdf5; }
+.ms-stats > span:nth-child(3) { color:#b45309; background:#fffbeb; }
+.ms-stats > span:nth-child(4) { color:#0e7490; background:#ecfeff; }
+/* 會議背景（選填）。**預設展開**（使用者 2026-09-19 指示）——
+   我原本收起來是怕它看起來像必填，但收起來的代價更大：
+   **使用者根本不知道有這個欄位**，而它正是讓分析變準的關鍵。
+   標題已經寫著「（選填）」，那句話比折疊更能表達「可以不填」。
+   **不要給它邊框與底色**：這一區在「1. 上傳逐字稿」那張卡片**裡面**，
+   再包一層框就變成「卡片裡又一張卡片」，看起來像另一個獨立區塊
+   （2026-09-19 回報「會議背景 移進 1.上傳逐字稿卡片裡」—— 它其實一直
+   都在裡面，是這層框讓它看起來不在）。用一條分隔線收邊就夠。 */
+/* 表格底下的來源說明（發言時間是量到的還是推估的）。
+   **自己開的類別名一定要補樣式** —— 少了的話它會是沒有樣式的純文字，
+   緊貼在表格下緣，看起來像排版壞掉（本專案 v1.14.21 記過這一條）。 */
+.ms-note { margin:8px 2px 0; font-size:12.5px; line-height:1.6; }
+
+/* 「事件與影響」的開關。**自己開的類別名要補樣式** —— 少了的話它是一段
+   沒有樣式的純文字貼在貼上框下面（本專案 v1.14.21 記過）。 */
+.ms-opt { display:flex; gap:8px; align-items:flex-start; margin:10px 2px 0;
+          font-size:13px; line-height:1.65; }
+.ms-opt > input { margin-top:3px; flex:0 0 auto; }
+.ms-opt > span { color:var(--muted); }
+.ms-opt b { color:var(--fg); font-weight:600; }
+
+.ms-ctx { border:0; border-top:1px solid var(--border); padding:0;
+          margin:14px 0 16px; background:none; }
+.ms-ctx > summary { cursor:pointer; padding:12px 0 10px; font-size:13.5px;
+                    font-weight:600; color:#334155; display:flex;
+                    align-items:center; gap:7px; list-style:none; }
+.ms-ctx > summary::-webkit-details-marker { display:none; }
+/* 自己畫收合箭頭（拿掉原生標記之後要有東西告訴使用者這裡點得開） */
+.ms-ctx > summary::before { content:'▸'; color:#94a3b8; font-size:12px;
+                            transition:transform .15s; display:inline-block; }
+.ms-ctx[open] > summary::before { transform:rotate(90deg); }
+.ms-ctx > summary:hover { color:#4338ca; }
+.ms-ctx > summary .ic { color:#6366f1; }
+.ms-ctx > p.muted { margin:0 0 8px; font-size:12.5px; line-height:1.7; }
+/* **要跟貼上框長一樣** —— 原本只設了寬高與字級，邊框、圓角、內距都沒有，
+   看起來是瀏覽器的預設方框（2026-09-19 回報「輸入框沒有套用到樣式」）。 */
+.ms-ctx textarea { width:100%; box-sizing:border-box; resize:vertical;
+                   min-height:120px; font-size:13px; line-height:1.75;
+                   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+                   padding:10px 12px; border:1px solid var(--border);
+                   border-radius:8px; background:#fff; color:inherit; }
+.ms-ctx textarea:hover { border-color:#cbd5e1; }
+.ms-ctx textarea:focus { outline:none; border-color:#6366f1;
+                         box-shadow:0 0 0 3px rgba(99,102,241,.15); }
+.ms-ctx-foot { display:flex; justify-content:flex-end; padding:6px 0 2px; }
+
+.ms-warn { border:1px solid #fcd34d; background:#fffbeb; border-radius:8px;
+           padding:10px 12px; font-size:12.5px; line-height:1.7; margin:10px 0; }
+.ms-prev { border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-top:8px; }
+.ms-prev-row { display:grid; grid-template-columns:52px 96px 1fr; gap:10px;
+               padding:7px 12px; font-size:13px; border-bottom:1px solid #f1f5f9; }
+.ms-prev-row:last-child { border-bottom:0; }
+.ms-seq { color:#94a3b8; font-variant-numeric:tabular-nums; }
+.ms-spk { color:#4338ca; font-weight:600; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width:640px){ .ms-prev-row { grid-template-columns:44px 1fr; }
+  .ms-prev-row .ms-spk { grid-column:2; } }
+
+/* 結果：摘要 ＋ 四種卡片 ＋ 章節 ＋ 圖 ＋ 逐字稿 */
+.ms-summary { font-size:15px; line-height:1.9; padding:14px 16px;
+              border-left:3px solid var(--accent,#6366f1); background:#f8fafc;
+              border-radius:0 8px 8px 0; }
+.ms-cards { display:grid; gap:14px;
+            grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); margin-top:6px; }
+.ms-card { border:1px solid var(--border); border-radius:10px; background:#fff; }
+/* **標題要一眼分得出是哪一類**：原本只有文字顏色不同，字級跟內文差不多，
+   四張卡片並排時看起來是一片（2026-09-19 回報「卡片標題要明顯一點」）。
+   加上：字大一點、有底色、左邊一條粗色條、數字做成徽章。 */
+.ms-card > h3 { margin:0; font-size:15px; font-weight:700; padding:11px 14px;
+                border-bottom:1px solid #e2e8f0; display:flex; gap:8px;
+                align-items:center; letter-spacing:.3px;
+                border-left:4px solid currentColor;
+                border-radius:9px 9px 0 0; }
+.ms-card > h3 .ic { width:17px; height:17px; }
+.ms-card > h3 .ms-n { margin-left:auto; font-size:12.5px; font-weight:700;
+                      background:currentColor; border-radius:999px;
+                      min-width:22px; text-align:center; padding:1px 8px; }
+/* 徽章的字要反白：背景用 currentColor，文字用卡片底色疊上去。 */
+.ms-card > h3 .ms-n > span { color:#fff; mix-blend-mode:normal; }
+/* 事件與影響。**要跟風險（紅）分得開** —— 兩者的界線是「發生了沒有」，
+   顏色相近會讓人以為是同一類。 */
+.ms-card.k-impact   > h3 { color:#0f766e; background:#f0fdfa; }
+.ms-card.k-decision > h3 { color:#047857; background:#ecfdf5; }
+.ms-card.k-action   > h3 { color:#1d4ed8; background:#eff6ff; }
+.ms-card.k-risk     > h3 { color:#b91c1c; background:#fef2f2; }
+.ms-card.k-question > h3 { color:#b45309; background:#fffbeb; }
+.ms-card ul { list-style:none; margin:0; padding:6px 0; }
+.ms-card li { padding:8px 14px; font-size:13.5px; line-height:1.75;
+              border-bottom:1px solid #f8fafc; }
+.ms-card li:last-child { border-bottom:0; }
+.ms-meta { display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; font-size:12px; color:#64748b; }
+/* 引用的段號。**只放數字**（見下方 `citeIds` 那一段的說明），所以要有
+   最小寬度，不然一位數的那幾顆會縮成一個小圓點，跟兩位數排在一起很亂。 */
+.ms-cite { border:0; background:#eef2ff; color:#3730a3; border-radius:999px;
+           padding:2px 9px; min-width:26px; text-align:center;
+           font-size:11.5px; font-variant-numeric:tabular-nums; cursor:pointer; }
+.ms-cite:hover { background:#e0e7ff; }
+.ms-empty { padding:12px 14px; font-size:12.5px; color:#94a3b8; }
+
+/* 章節＝**時間軸**（2026-09-19 使用者要求）。
+   原本是「時間 ｜ 標題」兩欄的表，標題只有十幾個字，**右邊空掉一大半**。
+   改成左邊一條軸線、每一章一個點，右邊除了標題再畫一條長度條 ——
+   同樣的資料，但「哪一段談最久、中間有沒有跳」一眼看得出來。 */
+.ms-chap { border:1px solid var(--border); border-radius:8px; padding:6px 4px 6px 0;
+           --ms-chap-pad:7px; }
+.ms-chap-row { display:grid; grid-template-columns:70px 18px 1fr; gap:0 10px;
+               align-items:center; font-size:13.5px;
+               padding:var(--ms-chap-pad) 14px var(--ms-chap-pad) 10px;
+               cursor:pointer; background:none; border:0; width:100%;
+               text-align:left; position:relative; }
+.ms-chap-row:hover { background:#f8fafc; }
+.ms-chap-t { color:#64748b; font-variant-numeric:tabular-nums; text-align:right;
+             font-size:12.5px; }
+/* 軸線與圓點。線用 ::before 貫穿整列，第一列與最後一列各切掉一半。
+   **要溢出到列的上下內距外面** —— `align-self:stretch` 只撐到「內容框」，
+   而列有上下內距，所以每兩列之間會空一段，軸線變成一截一截的
+   （2026-09-19 回報「時間軸的線段沒有接在一起 都有打空白」）。
+   溢出量與內距綁同一個變數，改內距時不會又斷掉。 */
+.ms-chap-dot { position:relative; align-self:stretch; }
+.ms-chap-dot::before { content:''; position:absolute; left:50%; width:2px;
+                       margin-left:-1px; background:#e2e8f0;
+                       top:calc(var(--ms-chap-pad) * -1);
+                       bottom:calc(var(--ms-chap-pad) * -1); }
+.ms-chap-row:first-child .ms-chap-dot::before { top:50%; }
+.ms-chap-row:last-child .ms-chap-dot::before { bottom:50%; }
+.ms-chap-dot > i { position:absolute; left:50%; top:50%; width:9px; height:9px;
+                   margin:-4.5px 0 0 -4.5px; border-radius:50%;
+                   background:currentColor; box-shadow:0 0 0 2px #fff; }
+.ms-chap-body { min-width:0; }
+/* **行高要收緊** —— 列的行高是給一般內文用的（約 1.5），標題底下會多出
+   三四個像素的空白，加上長度條自己的 margin，色條看起來離標題很遠
+   （2026-09-19 回報「色條跟上面的說明文字應該要更靠近一點」）。
+   標題與它的長度條是同一件事，要看起來像一組。 */
+.ms-chap-name { display:block; color:#0f172a; line-height:1.3; }
+/* 長度條：讓「談多久」看得見，同時把右邊那片空白用掉。
+   **長條要畫在一條固定的軌道裡**，不要讓它直接跟文字搶寬度 ——
+   最長的那一列會把百分比與時間擠到沒有空間，於是折成兩行
+   （2026-09-19 回報「怎麼有一條字被換行」）。
+   軌道是透明的，只有填色的部分看得見；比例也因此是精確的
+   （每一列的分母都是同一條軌道，不會因為文字長短而不同）。 */
+.ms-chap-bar { display:flex; align-items:center; gap:8px; margin-top:1px; }
+.ms-chap-track { flex:1 1 auto; min-width:0; height:5px; }
+.ms-chap-track > i { display:block; height:100%; border-radius:3px;
+                     background:currentColor; opacity:.75; min-width:3px; }
+.ms-chap-bar > em { flex:none; white-space:nowrap;
+                    font-style:normal; font-size:11.5px; color:#94a3b8;
+                    font-variant-numeric:tabular-nums; }
+
+/* **不要設 max-height** —— 區塊內捲軸會讓「點引用跳到那一段」變成
+   在一個小視窗裡捲動，而且使用者用頁面捲軸找不到後面的內容
+   （2026-09-19 回報「逐字稿要全展開 不要區塊有捲軸」）。 */
+.ms-script { border:1px solid var(--border);
+             border-radius:8px; }
+.ms-line { display:grid; grid-template-columns:52px 96px 1fr; gap:10px;
+           padding:6px 12px; font-size:13px; border-bottom:1px solid #f8fafc; }
+.ms-line:last-child { border-bottom:0; }
+.ms-line.hit { background:#fef9c3; }
+@media (max-width:640px){ .ms-line { grid-template-columns:44px 1fr; }
+  .ms-line .ms-spk { grid-column:2; } }
+.ms-actions { display:flex; gap:10px; flex-wrap:wrap; margin:14px 0 4px; }
+/* 匯出那一排跟下面的內容要留開 —— 原本只隔 4px，按鈕像是貼在摘要上
+   （2026-09-18 使用者回報「靠太近」）。 */
+.ms-exports { display:flex; gap:10px; flex-wrap:wrap; margin:4px 0 6px; }
+.ms-calls { margin:0 0 4px; }
+/* 每一段自己成一塊，段與段之間留開，標題帶 icon */
+.ms-sec { margin-top:30px; }
+.ms-sec:first-of-type { margin-top:18px; }
+.ms-sec > h3 { display:flex; align-items:center; gap:7px; margin:0 0 10px;
+               font-size:15px; color:#0f172a; }
+.ms-sec > h3 .ic { color:#6366f1; }
+.ms-sec > p.muted { margin:-4px 0 10px; }
+.ms-chart { margin-top:12px; overflow-x:auto; }
+.ms-chart svg, .ms-chart img { display:block; max-width:100%; height:auto; }
+/* 圖是向量的，所以寬螢幕上讓它長大填滿 —— 不然右邊一大片留白，
+   看起來像圖畫壞了。上限 1180px 是版面的內容欄寬度，再大字會過大。 */
+.ms-map img { width:100%; max-width:1180px; }
+/* 前端畫的圖：每一格都指得回逐字稿，所以要看得出來可以點。
+   **不要寫 `width:100%`** —— 圖是照實際像素畫的（見 meeting_charts.js），
+   百分比會在量錯寬度時把整張圖連字一起放大。 */
+.ms-chart svg { display:block; max-width:100%; height:auto; }
+.mc-hit { cursor:pointer; }
+/* ⚠ **不要用 opacity 做 hover**：心智圖右邊那些項目框底色是白的、
+   opacity 本來就 .95，調到 .85 在白頁面上**看不出任何差別**
+   （2026-09-19 回報「左邊的懸停有亮起 但右邊的沒有」）。
+   `brightness` 對白底與彩色長條都看得出來，一條規則涵蓋兩種。 */
+.mc-hit:hover { filter:brightness(.93); }
+.mc-hit:focus { outline:2px solid #6366f1; outline-offset:2px; }
+.mc-hit text { pointer-events:none; }
+/* 滑過長條 → 對應的圖例亮著、其餘變淡 */
+.mc-row { transition:opacity .12s; }
+.mc-row.mc-faded { opacity:.3; }
+.mc-row.mc-lit { filter:brightness(.93); }
+/* 區塊裡的小標題。**跟 h3 一樣要有 icon**（2026-09-19 回報「章節佔比怎麼沒有
+   icon」）—— 原本那個標題是畫在 SVG 裡的文字，SVG 裡放不了共用的圖示元件，
+   所以把標題搬到 HTML 來，圖裡就不再畫標題。 */
+.ms-subhead { display:flex; align-items:center; gap:7px; margin:16px 0 2px;
+              font-size:13.5px; font-weight:700; color:#0f172a; }
+.ms-subhead .ic { color:#6366f1; }
+.ms-sec .ms-subhead + p.muted { margin:0 0 4px; font-size:12px; }
+/* 圖上的數字用等寬數字 —— 不然 1 比 8 窄，同一欄的小數點還是對不齊。 */
+.mc-num { font-variant-numeric:tabular-nums; }
+/* 版面主題：跟下載按鈕同一排，但看得出是「設定」不是「動作」。 */
+.ms-theme { display:inline-flex; align-items:center; gap:7px; font-size:12.5px;
+            color:#475569; margin-left:4px; }
+.ms-theme label { display:inline-flex; align-items:center; gap:5px;
+                  white-space:nowrap; }
+.ms-theme label .ic { color:#6366f1; }
+.ms-theme select { font-size:12.5px; padding:4px 8px; }
+/* 「發言分布」那一欄：一條底軌 ＋ 幾段色塊，位置用**百分比**。
+   合併進表格之後就沒有對齊問題了 —— 一列就是一列。
+   欄寬變了色塊自己跟著變，不需要重畫、不需要量。 */
+.ms-spk .ms-trk { width:100%; min-width:180px; }
+.ms-trk-bg { position:relative; display:block; height:13px; border-radius:3px;
+             background:#f1f5f9; overflow:hidden; }
+/* 每一格都點得下去 —— 點哪一格就跳到那個時間講的那一段。
+   **不要只讓整列可點**：整列只跳得到「這個人第一次發言」，
+   而使用者看到的是某個時間點的色塊（2026-09-19 使用者要求）。 */
+.ms-trk-bg > i { position:absolute; top:0; bottom:0; border-radius:2px;
+                 min-width:2px; cursor:pointer; }
+.ms-trk-bg > i:hover { filter:brightness(.8); outline:1px solid #1e293b;
+                       outline-offset:1px; }
+.ms-spk tbody tr { cursor:pointer; }
+.ms-map { border:1px solid var(--border); border-radius:10px; padding:10px;
+          background:#fff; }
+.ms-tablewrap { overflow-x:auto; margin-top:10px; }
+/* 圖與表左右並排，**寬度不夠就自己往下排**（2026-09-19 使用者要求）。
+   用 auto-fit ＋ minmax，不寫斷點 —— 斷點是照某一種語言的長度定的，
+   換個語言或收起側欄就不準了（本專案在導覽列上踩過）。 */
+.ms-side-by-side { display:grid; gap:16px; align-items:start;
+                   grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); }
+/* 下載按鈕產生中：轉圈 ＋ 擋住重複點擊。 */
+.btn.is-busy { pointer-events:none; opacity:.72; }
+.btn.is-busy .ic { animation:ms-spin .9s linear infinite; }
+@keyframes ms-spin { to { transform:rotate(360deg); } }
+/* 數字表要有格線（2026-09-19 使用者要求「不然很難對齊看數字」）——
+   原本只有很淺的底線、沒有直線，一列有五個數字時眼睛接不起來。
+   橫線 ＋ 直線 ＋ 隔列底色，三者一起才追得住。 */
+.ms-table { border-collapse:collapse; font-size:13px; min-width:420px;
+            width:100%; border:1px solid var(--border); border-radius:8px;
+            overflow:hidden; }
+.ms-table th, .ms-table td { padding:7px 12px; text-align:left;
+                             white-space:nowrap;
+                             border-bottom:1px solid #e2e8f0;
+                             border-right:1px solid #eef2f7; }
+.ms-table th:last-child, .ms-table td:last-child { border-right:0; }
+.ms-table tr:last-child td { border-bottom:0; }
+.ms-table th { font-size:12px; color:#475569; font-weight:700;
+               background:#f8fafc; border-bottom:1px solid #cbd5e1; }
+.ms-table tbody tr:nth-child(even) td { background:#fafbfc; }
+.ms-table tbody tr:hover td { background:#eef2ff; }
+.ms-table td.num { text-align:right; font-variant-numeric:tabular-nums; }
+/* 格式選單 */
+.ms-shape { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+            margin:10px 0 2px; font-size:12.5px; }
+.ms-shape select { max-width:none; }
+/* 直接貼上：跟上傳並列，不是藏在某個地方 —— 手上是一段文字時，
+   「先存成檔案再拉進來」是多餘的一步。 */
+.ms-or { display:flex; align-items:center; gap:12px; margin:14px 0 10px;
+         color:#94a3b8; font-size:12.5px; }
+.ms-or::before, .ms-or::after { content:""; flex:1; height:1px; background:#e2e8f0; }
+#msPasteBox { width:100%; box-sizing:border-box; min-height:180px; resize:vertical;
+              font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px;
+              line-height:1.75; padding:10px 12px; border:1px solid var(--border);
+              border-radius:8px; }
+.ms-paste-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{{ icon('clipboard-list', size=22) }} {{ tr('會議摘要') }}</h1>
+<p class="muted">{{ tr('把會議逐字稿整理成摘要、決議、待辦、風險與章節。每一條都指得回原文的第幾段、誰講的 —— 點下去就跳到那一段。') }}</p>
+
+{{ llm_gate('meeting-summary', llm_enabled, llm_model, mode='only', llm_url=llm_url) }}
+
+<div class="panel">
+  <h2>{{ icon('upload', size=18) }} {{ tr('1. 上傳逐字稿') }}</h2>
+  <div>
+    <div class="info-box">
+      {{ tr('收得進來的格式：字幕檔（.vtt / .srt）、逐字稿的 JSON、純文字（.txt / .md）、Word 與 ODF（.docx / .odt）。') }}
+      <br>
+      {{ tr('純文字的話一行一句話，前面可以寫「講者：」；有時間戳記也讀得到。') }}
+    </div>
+    {% with upload_id='msUp', accept=accept, hint='逐字稿檔案（.vtt / .srt / .json / .txt / .md / .docx / .odt）' %}
+      {% include "components/file_upload.html" %}
+    {% endwith %}
+
+    <div class="ms-or">{{ tr('或者直接貼上逐字稿') }}</div>
+    <textarea id="msPasteBox" placeholder="{{ tr('王小明：各位早，今天要談三件事。') }}&#10;{{ tr('李美華：我看過草案了。') }}&#10;&#10;{{ tr('（一行一句話，前面可以寫「講者：」；有時間戳記也讀得到）') }}"></textarea>
+    <label class="ms-opt">
+      <input type="checkbox" id="msImpacts" checked>
+      <span>
+        <b>{{ tr('整理「事件與影響」') }}</b>
+        {{ tr('—— 已經發生的事與它造成的影響（哪個系統、多少人、多少金額）。事故與狀態會議建議開著；純規劃的會議可以關掉，分析時間大約少一半。') }}
+      </span>
+    </label>
+    <details class="ms-ctx" id="msCtxWrap" open>
+      <summary>{{ icon('list', size=15) }} {{ tr('會議背景（選填）—— 主題、與會者職稱、專有名詞') }}</summary>
+      <p class="muted">
+        {{ tr('填了會讓分析更準：知道誰是主管、誰是承辦，「請某某去辦」才判得出負責人；知道系統代號與縮寫，整理出來的句子才不會走樣。') }}
+      </p>
+      <p class="muted">
+        {{ tr('這段內容只拿來讀懂逐字稿 —— 事件與影響、決議、待辦、風險、未決問題一律只會從逐字稿產生，背景裡寫的事不會被寫成項目。') }}
+      </p>
+      <textarea id="msCtxBox" rows="7"
+        placeholder="{{ tr('會議主題：電商平台營運穩定度與大促容量整備') }}&#10;{{ tr('會議日期：2026 年 9 月 19 日') }}&#10;&#10;{{ tr('與會者') }}&#10;{{ tr('趙明哲：營運副總經理，會議主席') }}&#10;{{ tr('林冠宇：基礎架構部經理') }}"></textarea>
+      <div class="ms-ctx-foot"><span class="muted" id="msCtxCount"></span></div>
+    </details>
+
+    <div class="ms-paste-row">
+      <button type="button" class="btn btn-primary" id="msPasteGo">
+        {{ icon('check', size=16) }} <span>{{ tr('解析逐字稿') }}</span>
+      </button>
+      <span class="muted" id="msPasteCount"></span>
+    </div>
+
+
+    <div id="msParsed" hidden>
+      <div class="ms-stats">
+        <span><b id="msNSeg">0</b>{{ tr('段落') }}</span>
+        <span><b id="msNSpk">0</b>{{ tr('講者') }}</span>
+        <span><b id="msNChar">0</b>{{ tr('字數') }}</span>
+        <span id="msDurWrap" hidden><b id="msDur">—</b>{{ tr('總長') }}</span>
+      </div>
+      <div class="ms-warn" id="msNoTimes" hidden>
+        {{ tr('這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有，但「語者發言佔比」與「章節時間軸」不會出現（那兩個要靠時間算，猜出來的數字不能用）。') }}
+      </div>
+      <div class="ms-warn" id="msNoSpk" hidden>
+        {{ tr('沒有認出任何講者。如果你的逐字稿是「講者：內容」這種格式卻沒認出來，多半是名字只出現過一次 —— 分析照常可以做，只是不會有語者佔比。') }}
+      </div>
+      <div class="ms-shape">
+        <span class="muted">{{ tr('逐字稿排法') }}</span>
+        <select id="msShape" class="field"></select>
+        <span class="muted" id="msShapeNote"></span>
+      </div>
+      <p class="muted" id="msPrevNote"></p>
+      <div class="ms-prev" id="msPrev"></div>
+      <div class="ms-actions">
+        <button type="button" class="btn btn-primary" id="msStart">
+          {{ icon('sparkles', size=16) }} <span>{{ tr('開始分析') }}</span>
+        </button>
+        <button type="button" class="btn btn-secondary" id="msCancel" hidden>
+          {{ icon('close', size=16) }} <span>{{ tr('停止分析') }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% with progress_id='msJob' %}{% include "components/job_progress.html" %}{% endwith %}
+
+<div class="panel" id="msResult" hidden
+     data-palette='{{ chart_palette }}' data-kinds='{{ chart_kinds }}'>
+  <h2>{{ icon('clipboard-list', size=18) }} {{ tr('分析結果') }}</h2>
+  <div>
+    <div class="ms-exports">
+      <a class="btn btn-primary" id="msDlPdf" download>{{ icon('download', size=16) }} <span>PDF</span></a>
+      <a class="btn btn-secondary" id="msDlDocx" download>{{ icon('download', size=16) }} <span>Word（.docx）</span></a>
+      <a class="btn btn-secondary" id="msDlOdt" download>{{ icon('download', size=16) }} <span>ODF（.odt）</span></a>
+      <a class="btn btn-secondary" id="msDlMd" download>{{ icon('download', size=16) }} <span>Markdown</span></a>
+      <a class="btn btn-secondary" id="msDlPng" download hidden>{{ icon('image', size=16) }} <span>{{ tr('圖表') }} PNG</span></a>
+      <a class="btn btn-secondary" id="msDlZip" download>{{ icon('layers', size=16) }} <span>Markdown ＋ {{ tr('圖') }}（ZIP）</span></a>
+      <a class="btn btn-secondary" id="msDlJson" download>{{ icon('hash', size=16) }} <span>JSON</span></a>
+      <span class="ms-theme">
+        <label for="msTheme">{{ icon('edit', size=14) }} {{ tr('版面主題') }}</label>
+        <select class="field" id="msTheme">
+          {% for tid, th in doc_themes %}
+          <option value="{{ tid }}"{% if tid == 'report' %} selected{% endif %}>{{ tr(th) }}</option>
+          {% endfor %}
+        </select>
+      </span>
+    </div>
+    <p class="muted ms-calls" id="msCalls"></p>
+
+    <section class="ms-sec">
+      <h3>{{ icon('sparkles', size=16) }} {{ tr('摘要') }}</h3>
+      <div class="ms-summary" id="msSummary"></div>
+      <div class="ms-warn" id="msSummaryWarn" hidden></div>
+    </section>
+
+    <section class="ms-sec">
+      <h3>{{ icon('check', size=16) }} {{ tr('決議與待辦') }}</h3>
+      <div class="ms-cards" id="msCards"></div>
+    </section>
+
+    <section class="ms-sec" id="msChapWrap" hidden>
+      <h3>{{ icon('list', size=16) }} {{ tr('議題時間軸') }}</h3>
+      <div class="ms-chap" id="msChap"></div>
+      <h4 class="ms-subhead">{{ icon('chart-bar', size=15) }} <span id="msTlTitle"></span></h4>
+      <p class="muted" id="msTlNote"></p>
+      <div class="ms-chart" id="msTimeline"></div>
+    </section>
+
+    <section class="ms-sec" id="msSpkWrap" hidden>
+      <h3>{{ icon('user', size=16) }} {{ tr('誰講了多少') }}</h3>
+      <p class="muted" id="msSpkNote"></p>
+      <div class="ms-tablewrap" id="msSpkTableWrap"><table class="ms-table ms-spk" id="msSpkTable"></table></div>
+      <p class="muted ms-note" id="msSpkNote" hidden></p>
+    </section>
+
+    <section class="ms-sec" id="msMapWrap" hidden>
+      <h3>{{ icon('layers', size=16) }} {{ tr('討論結構') }}</h3>
+      <p class="muted">{{ tr('每一個節點都來自通過引用驗證的項目 —— 圖上的每一格都指得回逐字稿。') }}</p>
+      <div class="ms-chart ms-map" id="msMap"></div>
+    </section>
+
+    <section class="ms-sec">
+      <h3>{{ icon('file-text', size=16) }} {{ tr('逐字稿') }}</h3>
+      <p class="muted">{{ tr('上面每一條引用都指得回這裡。') }}</p>
+      <div class="ms-script" id="msScript"></div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script>
+<script src="/static/js/job_progress.js"></script>
+<script src="/static/js/meeting_charts.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  'use strict';
+  var BASE = '/tools/meeting-summary';
+  var uploadId = null, segments = [], result = null;
+
+  var el = function (id) { return document.getElementById(id); };
+  var esc = function (s) {
+    var d = document.createElement('div'); d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  };
+  var mmss = function (ms) {
+    if (ms == null) return '';
+    var t = Math.round(ms / 1000), h = Math.floor(t / 3600),
+        m = Math.floor((t % 3600) / 60), s = t % 60;
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return h ? (h + ':' + pad(m) + ':' + pad(s)) : (m + ':' + pad(s));
+  };
+
+  // ---------------------------------------------------------------- 上傳
+  var lastFile = null, lastShapeAuto = null;
+
+  async function sendFile(file, shape) {
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('shape', shape || 'auto');
+    var r = await fu.upload(BASE + '/upload', fd,
+                            { processingLabel: tr('讀取逐字稿…') });
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀取失敗'))); return; }
+    showParsed(await r.json());
+  }
+
+  var fu = new FileUpload(el('msUp'), async function (_f, fs) {
+    var file = Array.isArray(fs) ? fs[0] : fs;
+    uploadId = null;
+    el('msParsed').hidden = true;
+    el('msResult').hidden = true;
+    if (!file) return;
+    lastFile = file;
+    el('msShape').value = 'auto';
+    await sendFile(file, 'auto');
+  });
+
+  function showParsed(d) {
+    uploadId = d.upload_id;
+    el('msNSeg').textContent = d.segments;
+    el('msNSpk').textContent = d.speakers.length;
+    el('msNChar').textContent = d.chars;
+    el('msDurWrap').hidden = !d.has_times;
+    if (d.has_times) el('msDur').textContent = mmss(d.duration_ms);
+    el('msNoTimes').hidden = !!d.has_times;
+    el('msNoSpk').hidden = d.speakers.length > 0;
+    el('msPrevNote').textContent =
+      tr('下面是前 {0} 段 —— 先確認講者與斷句是對的，再開始分析。')
+        .replace('{0}', String(d.preview.length));
+    var html = '';
+    d.preview.forEach(function (s) {
+      html += '<div class="ms-prev-row"><span class="ms-seq">' + esc(s.seq) + '</span>'
+            + '<span class="ms-spk">' + esc(s.speaker || '') + '</span>'
+            + '<span>' + esc(s.text || '') + '</span></div>';
+    });
+    el('msPrev').innerHTML = html;
+    // 用了哪一種排法 —— 判斷錯時使用者可以自己改（伺服器端是唯一來源）
+    var sel = el('msShape');
+    if (!sel.options.length && d.shapes) {
+      Object.keys(d.shapes).forEach(function (k) {
+        var o = document.createElement('option');
+        o.value = k; o.textContent = d.shapes[k];
+        sel.appendChild(o);
+      });
+    }
+    lastShapeAuto = d.shape;
+    el('msShapeNote').textContent = (sel.value === 'auto' && d.shape)
+      // **不要再包一層括號** —— 排法的名字本身就帶括號
+      //（「一行一句（講者：內容）」），外面再包就變成
+      // 「（自動判斷為：一行一句（講者：內容））」兩層，很難讀
+      //（2026-09-19 回報）。
+      ? tr('自動判斷：{0}').replace('{0}', (d.shapes || {})[d.shape] || d.shape)
+      : '';
+    el('msParsed').hidden = false;
+    el('msResult').hidden = true;
+  }
+
+  // 換排法就用同一份原始資料重新解析一次
+  el('msShape').addEventListener('change', function () {
+    if (lastFile) { sendFile(lastFile, this.value); }
+    else if (el('msPasteBox').value.trim()) { sendPaste(this.value); }
+  });
+
+  // ---------------------------------------------------------------- 分析
+  var job = new JobProgress(el('msJob'), {
+    // **不要共用的下載鈕** —— 結果區自己就有一整排（PDF / Markdown /
+    // 圖表 PNG / ZIP / JSON / 轉送），共用那顆會顯示「下載 .json」，
+    // 使用者看到兩個下載會以為是不同的東西（2026-09-19 回報）。
+    showDownload: false,
+    onDone: function () { loadResult(); el('msCancel').hidden = true; },
+    onError: function () { el('msCancel').hidden = true; },
+    onCancel: function () { el('msCancel').hidden = true; }
+  });
+
+  el('msStart').addEventListener('click', async function () {
+    if (!uploadId) return;
+    var btn = el('msStart');
+    btn.disabled = true;
+    try {
+      var r = await fetch(BASE + '/start', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ upload_id: uploadId,
+                               context: el('msCtxBox').value.trim(),
+                               with_impacts: el('msImpacts').checked ? '1' : '0' })
+      });
+      if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('無法開始分析'))); return; }
+      var d = await r.json();
+      el('msCancel').hidden = false;
+      job.track(d.job_id);
+    } finally { btn.disabled = false; }
+  });
+
+  el('msCancel').addEventListener('click', function () { job.cancel(); });
+
+  // ---------------------------------------------------------------- 貼上
+  // **走跟上傳完全同一條路**（送到 `/upload`，只是內容來自 textarea）——
+  // 另寫一個端點的話，解析規則就會有兩份，而那兩份一定會漂。
+  el('msCtxBox').addEventListener('input', function () {
+    var n = this.value.trim().length;
+    el('msCtxCount').textContent = n
+      ? tr('{0} 字').replace('{0}', n.toLocaleString()) : '';
+  });
+
+  el('msPasteBox').addEventListener('input', function () {
+    var n = this.value.trim().length;
+    el('msPasteCount').textContent = n
+      ? tr('{0} 字').replace('{0}', n.toLocaleString()) : '';
+  });
+
+  async function sendPaste(shape) {
+    var text = el('msPasteBox').value.trim();
+    if (!text) { showAlert(tr('請先貼上逐字稿')); return; }
+    var fd = new FormData();
+    fd.append('file', new Blob([text], { type: 'text/plain' }), '貼上的逐字稿.txt');
+    fd.append('shape', shape || 'auto');
+    var r = await fetch(BASE + '/upload', { method: 'POST', body: fd });
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀取失敗'))); return; }
+    uploadId = null;
+    el('msResult').hidden = true;
+    showParsed(await r.json());
+  }
+
+  el('msPasteGo').addEventListener('click', async function () {
+    this.disabled = true;
+    lastFile = null;
+    el('msShape').value = 'auto';
+    try { await sendPaste('auto'); } finally { this.disabled = false; }
+  });
+
+  // ---------------------------------------------------------------- 結果
+  async function loadResult() {
+    if (!uploadId) return;
+    var r = await fetch(BASE + '/result/' + encodeURIComponent(uploadId));
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀取結果失敗'))); return; }
+    result = await r.json();
+    var rs = await fetch(BASE + '/segments/' + encodeURIComponent(uploadId));
+    segments = rs.ok ? (await rs.json()).segments : [];
+    render();
+  }
+
+  // **鍵是複數**（後端的 meeting_insight.KINDS）—— 寫成單數的話四張卡片
+  // 永遠是空的，而畫面看起來只是「這場會議沒有決議」，完全不像寫錯了。
+  // **鍵是複數**（後端的 meeting_insight.KINDS）—— 寫成單數的話四張卡片
+  // 永遠是空的，而畫面看起來只是「這場會議沒有決議」，完全不像寫錯了。
+  // 第四欄是 icon 名稱（`components/icons.html` 裡真的有的那些 ——
+  // **打錯不會報錯，只是沒有圖**）。
+  var KINDS = [
+    // **事件與影響排第一** —— 它是讀懂其餘四類的前提（為什麼要開這個會）。
+    ['impacts',   '事件與影響', 'k-impact',  'shield'],
+    ['decisions', '決議',     'k-decision', 'check'],
+    ['actions',   '待辦',     'k-action',   'pin'],
+    ['risks',     '風險',     'k-risk',     'warn'],
+    ['questions', '未決問題', 'k-question', 'search']
+  ];
+
+  // 圖示：跟樣板的 `{{ icon() }}` 同一組線條（stroke 1.6、16×16）
+  var ICONS = {
+    check: '<path d="M5 12l5 5L20 7"/>',
+    pin:   '<path d="M12 2v8"/><circle cx="12" cy="14" r="4"/><path d="M12 18v4"/><path d="M8 14h8"/>',
+    warn:  '<path d="M12 3l9 17H3z"/><path d="M12 10v5"/><path d="M12 17.5v.5"/>',
+    search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'
+  };
+  // **`unknown` 是我們自己塞的代號，不是講者的名字。**
+  // 資料裡維持 `unknown`（統計、引用、匯出都靠它對應），
+  // **只在顯示的時候換成看得懂的字**（2026-09-19 回報「中文介面不要用 unknown」）。
+  // 這跟「欄位同義詞字典不可以翻」是一體兩面：**資料不翻，顯示要翻**。
+  function spk(name) {
+    return (name === 'unknown' || !name) ? tr('未標示講者') : name;
+  }
+
+  function svgIcon(name) {
+    return '<svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" '
+      + 'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" '
+      + 'stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || '') + '</svg>';
+  }
+
+  function citeIds(it) {
+    var v = it.segment_ids != null ? it.segment_ids : it.seq;
+    if (v == null) return [];
+    return Array.isArray(v) ? v : [v];
+  }
+
+  function render() {
+    el('msResult').hidden = false;
+    var u = encodeURIComponent(uploadId);
+    el('msDlMd').href   = BASE + '/download/' + u + '?fmt=md';
+    setDocHrefs();
+    el('msDlPng').href  = BASE + '/download/' + u + '?fmt=png';
+    el('msDlZip').href  = BASE + '/download/' + u + '?fmt=zip';
+    el('msDlJson').href = BASE + '/download/' + u + '?fmt=json';
+    el('msCalls').textContent =
+      tr('共送出 {0} 次模型請求。').replace('{0}', String(result.llm_calls || 0));
+
+    var sm = result.summary || {};
+    el('msSummary').textContent = sm.text || tr('（沒有產生摘要）');
+    var warn = el('msSummaryWarn');
+    var bad = (sm.grounded === false) && (sm.unsupported || []).length;
+    warn.hidden = !bad;
+    if (bad) {
+      warn.textContent = tr('這幾個詞在逐字稿裡找不到依據：') + sm.unsupported.join('、');
+    }
+
+    var html = '';
+    KINDS.forEach(function (k) {
+      var items = (result.items && result.items[k[0]]) || [];
+      html += '<section class="ms-card ' + k[2] + '"><h3>' + svgIcon(k[3]) + ' '
+            + esc(tr(k[1]))
+            + '<span class="ms-n"><span>' + items.length + '</span></span></h3>';
+      if (!items.length) {
+        html += '<p class="ms-empty">' + esc(tr('分析沒有在逐字稿裡找到這一類的內容。')) + '</p>';
+      } else {
+        html += '<ul>';
+        items.forEach(function (it) {
+          html += '<li>' + esc(it.text || '');
+          var meta = [];
+          if (it.owner) meta.push(esc(tr('負責：')) + esc(it.owner));
+          var due = it.due_text || it.due;
+          if (due) meta.push(esc(tr('期限：')) + esc(due));
+          html += '<div class="ms-meta">' + meta.map(function (m) {
+            return '<span>' + m + '</span>';
+          }).join('');
+          // **只放數字** —— 卡片很窄，而一條項目常常有三四個引用，
+          // 「第 10 段」三個字裡有兩個是每一顆都一樣的裝飾
+          //（2026-09-19 使用者要求）。
+          // **完整的說法留在 `title` 裡**：滑鼠移上去、螢幕閱讀器都讀得到，
+          // 省空間不等於把意思拿掉。
+          citeIds(it).forEach(function (n) {
+            var full = esc(tr('第 {0} 段').replace('{0}', String(n)));
+            html += '<button type="button" class="ms-cite" data-seq="' + esc(n) + '"'
+                  + ' title="' + full + '" aria-label="' + full + '">'
+                  + esc(String(n)) + '</button>';
+          });
+          html += '</div></li>';
+        });
+        html += '</ul>';
+      }
+      html += '</section>';
+    });
+    el('msCards').innerHTML = html;
+
+    renderChapters();
+    renderSpeakers();
+    renderScript();
+    loadCharts();
+  }
+
+  function renderChapters() {
+    var cs = result.chapters || [];
+    el('msChapWrap').hidden = cs.length < 1;
+    if (!cs.length) return;
+    // 長度條的比例：有時間就用時間，沒有就用發言段數（跟圖同一條規則）。
+    var useTime = cs.every(function (c) { return c.duration_ms != null; });
+    var vals = cs.map(function (c) {
+      return useTime ? c.duration_ms : (c.segment_ids || []).length;
+    });
+    var top = Math.max.apply(null, vals.concat([1]));
+    var cfg = chartConfig();
+    var pal = cfg.palette.length ? cfg.palette : ['#6366f1'];
+
+    var html = '';
+    cs.forEach(function (c, i) {
+      var t = (c.start_ms != null) ? mmss(c.start_ms) : '';
+      var seq = c.start_seq != null ? c.start_seq : (c.segment_ids || [])[0];
+      var colour = pal[i % pal.length];
+      var pct = vals[i] * 100 / (vals.reduce(function (a, b) { return a + b; }, 0) || 1);
+      var barPct = Math.max(2, vals[i] * 100 / top);
+      html += '<button type="button" class="ms-chap-row" data-seq="'
+            + esc(seq == null ? '' : seq) + '" data-s="mschap' + i + '">'
+            + '<span class="ms-chap-t">'
+            + esc(t || (seq != null ? tr('第 {0} 段').replace('{0}', seq) : ''))
+            + '</span>'
+            + '<span class="ms-chap-dot"><i></i></span>'
+            + '<span class="ms-chap-body">'
+            + '<span class="ms-chap-name">' + esc(c.title || '') + '</span>'
+            + '<span class="ms-chap-bar">'
+            + '<span class="ms-chap-track"><i data-s="mschapbar' + i + '"></i></span>'
+            + '<em>' + pct.toFixed(1) + '%　'
+            + esc(useTime ? mmss(c.duration_ms)
+                          : tr('{0} 段').replace('{0}', vals[i])) + '</em></span>'
+            + '</span></button>';
+    });
+    el('msChap').innerHTML = html;
+    // 圖的標題搬到 HTML（才放得了 icon）—— 內容跟圖裡用的是同一個判斷。
+    el('msTlTitle').textContent =
+      useTime ? tr('各議題佔多少時間') : tr('各議題佔多少發言段落');
+    el('msTlNote').textContent =
+      useTime ? '' : tr('這份逐字稿沒有時間戳記，長度改用發言段數算');
+    el('msTlNote').hidden = useTime;
+    // **顏色與寬度用 CSSOM 設，不用 inline style 屬性** —— CSP 的 style-src
+    // 沒有 unsafe-inline，寫 `style="…"` 會被整個擋掉而且不會有 JS 例外。
+    cs.forEach(function (c, i) {
+      var row = el('msChap').querySelector('[data-s="mschap' + i + '"]');
+      if (row) row.style.color = pal[i % pal.length];
+      var bar = el('msChap').querySelector('[data-s="mschapbar' + i + '"]');
+      if (bar) bar.style.width = Math.max(2, vals[i] * 100 / top) + '%';
+    });
+  }
+
+  /* 語者的排序 —— **圖與表共用這一支**。
+     有發言時間就依時間（圖畫的就是時間），否則依字數。 */
+  function speakerOrder(stats) {
+    var names = Object.keys(stats || {}).filter(function (k) {
+      var s = stats[k] || {};
+      return s.turn_count || s.speaking_ms;
+    });
+    var byTime = names.length > 0 && names.every(function (k) {
+      return (stats[k] || {}).speaking_ms != null;
+    });
+    return names.sort(function (a, b) {
+      var x = stats[a] || {}, y = stats[b] || {};
+      return byTime ? (y.speaking_ms - x.speaking_ms)
+                    : ((y.chars || 0) - (x.chars || 0));
+    });
+  }
+
+  /* 圖的列高與起點**照右邊那張表量出來**，兩邊才對得齊。
+     量不到（還沒畫、或版面已經折成上下排）就回 null，讓圖用自己的預設值。
+
+     **不要用字型度量去推** —— 字級、行高、邊框、瀏覽器都會影響，
+     推出來的數字換個瀏覽器就差一兩像素，而「差一點點」正是對不齊的樣子。 */
+  /* 發言時間是量到的還是推估的 —— **判準由伺服器端給**（哪一種解析方式）。
+     前端不要自己從段落猜（「每一段的結束時間剛好等於下一段的開始」在真的
+     字幕檔上也可能成立，猜出來的判準會在某些檔案上說謊）。 */
+  function measured() {
+    return !!(result && result.source && result.source.times_are_measured);
+  }
+
+  function renderSpeakers() {
+    // **圖與表合併成一張表**（使用者 2026-09-19 指示）。
+    //
+    // 原本是左圖右表並排，但兩邊要逐列對齊 —— 順序、列高、起點都得一致，
+    // 而列高會受字型、瀏覽器、捲軸影響，量出來對齊還是會差個幾像素，
+    // 而「差一點點」正是對不齊的樣子。合併之後**由結構保證對齊**，
+    // 一列就是一列，不需要量任何東西。
+    //
+    // 發言分布那一欄用**百分比定位**（`left` / `width` 都是 %），
+    // 所以欄寬變了自己就跟著變，連重畫都不用。
+    var stats = result.speaker_stats || {};
+    var order = speakerOrder(stats);
+    el('msSpkWrap').hidden = order.length < 2;
+    if (order.length < 2) return;
+
+    var rows = order.map(function (n) { return Object.assign({ name: n }, stats[n]); });
+    var hasTime = rows.some(function (r) { return r.speaking_ms; });
+    var segs = segments || [];
+    var useTime = segs.length > 0 && segs.every(function (s) { return s.start_ms != null; });
+
+    el('msSpkNote').textContent = segs.length
+      ? (useTime ? tr('「發言分布」的橫軸是會議時間，色塊是那個人在講話')
+                 : tr('這份逐字稿沒有時間戳記，「發言分布」的橫軸改用逐字稿的順序'))
+      : '';
+
+    function at(s) { return useTime ? s.start_ms : s.seq; }
+    function dur(s) {
+      if (!useTime) return 0;
+      return (s.end_ms != null && s.end_ms > s.start_ms) ? s.end_ms - s.start_ms : 0;
+    }
+    var lo = Infinity, hi = -Infinity;
+    segs.forEach(function (s) {
+      lo = Math.min(lo, at(s));
+      hi = Math.max(hi, at(s) + dur(s));
+    });
+    var span = Math.max(1, hi - lo);
+    var mine = {};
+    segs.forEach(function (s) {
+      var k = String(s.speaker || 'unknown');
+      (mine[k] = mine[k] || []).push(s);
+    });
+
+    var head = '<tr><th>' + esc(tr('講者')) + '</th>'
+             + (segs.length ? '<th>' + esc(tr('發言分布')) + '</th>' : '')
+             + '<th>' + esc(tr('發言次數')) + '</th>'
+             + '<th>' + esc(tr('字數')) + '</th>'
+             + '<th>' + esc(tr('字數佔比')) + '</th>'
+             + (hasTime ? '<th>' + esc(measured() ? tr('發言時間')
+                                                     : tr('推估發言時間')) + '</th>' : '')
+             + '</tr>';
+
+    var body = rows.map(function (r, i) {
+      var track = '';
+      if (segs.length) {
+        // **相鄰的段落要合併** —— 兩小時的會議上千段，逐段一個節點會很慢，
+        // 而且畫出來是糊成一片。距離不到 0.4% 的就併起來。
+        var list = (mine[r.name] || []).slice().sort(function (a, b) { return at(a) - at(b); });
+        var marks = [];
+        list.forEach(function (s) {
+          var x = (at(s) - lo) / span * 100;
+          var w = Math.max(0.5, dur(s) / span * 100);
+          var last = marks[marks.length - 1];
+          // 合併時**保留第一段的段號**：點下去要跳到那個位置講的那一段，
+          // 不是這個人第一次發言的地方（2026-09-19 使用者要求）。
+          if (last && x - (last.x + last.w) < 0.4) {
+            last.w = Math.max(last.w, x + w - last.x);
+          } else {
+            marks.push({ x: x, w: w, seq: s.seq,
+                         at: useTime ? mmss(s.start_ms) : null });
+          }
+        });
+        track = '<td class="ms-trk"><span class="ms-trk-bg" data-s="trk' + i + '">'
+              + marks.map(function (m, j) {
+                  // **每一格帶自己的段號** —— 頁面上那支委派取的是
+                  // `closest('[data-seq]')`，也就是**最近**的那一個，
+                  // 所以點色塊跳那一段、點空白處才退回這一列的第一段。
+                  var lbl = m.at ? (m.at + '　' + tr('第 {0} 段').replace('{0}', m.seq))
+                                 : tr('第 {0} 段').replace('{0}', m.seq);
+                  return '<i data-s="m' + i + '_' + j + '"'
+                       + ' data-seq="' + esc(m.seq) + '"'
+                       + ' title="' + esc(lbl) + '"></i>';
+                }).join('') + '</span></td>';
+        r._marks = marks;
+      }
+      return '<tr data-seq="' + esc(r.first_seq == null ? '' : r.first_seq) + '">'
+           + '<td>' + esc(spk(r.name)) + '</td>' + track
+           + '<td class="num">' + (r.turn_count || 0) + '</td>'
+           + '<td class="num">' + (r.chars || 0).toLocaleString() + '</td>'
+           + '<td class="num">' + (r.char_pct != null ? r.char_pct : 0) + '%</td>'
+           + (hasTime ? '<td class="num">' + (r.speaking_ms ? mmss(r.speaking_ms) : '—') + '</td>' : '')
+           + '</tr>';
+    }).join('');
+    el('msSpkTable').innerHTML = head + body;
+
+    // **那個數字是量到的還是推估的，要講出來。**
+    // 純文字逐字稿只有「誰在幾點幾分開始講」，結束時間是拿下一段的開始補的
+    // —— 中間的停頓也算了進去。不講的話它看起來跟量到的一模一樣。
+    var note = el('msSpkNote');
+    if (note) {
+      var show = hasTime && !measured();
+      note.hidden = !show;
+      // **鍵要是一個完整的字面值** —— 抽鍵的掃描器讀的是原始碼，
+      // 把字串接起來的話它算不出鍵，語系檔就永遠對不上（而且無聲）。
+      if (show) note.textContent = tr('發言時間是推估的：這份逐字稿只有每個人開始講的時間，所以算的是「從他開始講到下一位開始講」，中間的停頓也算在內。字幕檔（.vtt / .srt）每一段都帶著自己的結束時間，那種才是量到的。');
+    }
+
+    // **位置與顏色用 CSSOM 設** —— CSP 的 style-src 沒有 unsafe-inline，
+    // 寫 `style="…"` 會被整段擋掉而且不會有 JS 例外。
+    var pal = chartConfig().palette;
+    if (!pal.length) pal = ['#6366f1'];
+    rows.forEach(function (r, i) {
+      (r._marks || []).forEach(function (m, j) {
+        var e = el('msSpkTable').querySelector('[data-s="m' + i + '_' + j + '"]');
+        if (!e) return;
+        e.style.left = m.x.toFixed(2) + '%';
+        e.style.width = Math.min(m.w, 100 - m.x).toFixed(2) + '%';
+        e.style.background = pal[i % pal.length];
+      });
+    });
+  }
+
+  // **圖在瀏覽器裡畫**（使用者 2026-09-19：「圖都要用前端產 才能互動」）。
+  //
+  // 每一格都帶 `data-seq`，頁面下方那支 `document` 上的委派就會跳到逐字稿
+  // 那一段並 highlight —— **不要另外寫一份跳轉邏輯**，卡片與章節用的是同一支。
+  //
+  // 匯出（PNG / PDF / Markdown 內嵌）仍然是伺服器畫的，理由與界線寫在
+  // `static/js/meeting_charts.js` 的開頭。
+  var chartCfg = null;
+
+  function chartConfig() {
+    if (chartCfg) return chartCfg;
+    var box = el('msResult');
+    chartCfg = {
+      palette: JSON.parse(box.dataset.palette || '[]'),
+      kinds: JSON.parse(box.dataset.kinds || '{}')
+    };
+    return chartCfg;
+  }
+
+  function drawCharts() {
+    if (!result || !window.MeetingCharts) return;
+    var cfg = chartConfig();
+    // **要先攤開再畫** —— 隱藏中的容器量到的寬度是 0，圖會照預設值畫好之後
+    // 再被撐大（字跟著變大，2026-09-19 回報）。
+    // 「畫不畫得出來」用資料判斷就夠了，不必等畫完才知道。
+    el('msMapWrap').hidden = (result.mindmap || []).length < 2;
+    var drawn = window.MeetingCharts.render({
+      tr: tr, palette: cfg.palette, kinds: cfg.kinds,
+      data: {
+        mindmap: result.mindmap || [],
+        chapters: result.chapters || [],
+        speaker_stats: result.speaker_stats || {},
+        // 「誰在什麼時候講話」要逐段的位置，不是只有統計。
+        segments: segments || [],
+      },
+      into: { mindmap: el('msMap'), timeline: el('msTimeline') }
+    });
+    // 真的畫不出來（節點太少）就收回去 —— 上面那一行是為了量得到寬度
+    // 才先攤開的，不是最終決定。
+    el('msMapWrap').hidden = drawn.indexOf('mindmap') < 0;
+    return drawn;
+  }
+
+  async function loadCharts() {
+    drawCharts();
+    var r = await fetch(BASE + '/charts/' + encodeURIComponent(uploadId));
+    var names = r.ok ? (await r.json()).charts || [] : [];
+    el('msDlPng').hidden = names.length === 0;
+  }
+
+  // 容器寬度會變（視窗縮放、側欄收合）—— 圖跟著重畫。
+  // **要 debounce**：resize 一秒會連發幾十次，每次重畫整張心智圖很浪費。
+  var reflowTimer = null;
+  window.addEventListener('resize', function () {
+    if (reflowTimer) clearTimeout(reflowTimer);
+    reflowTimer = setTimeout(drawCharts, 180);
+  });
+
+  function renderScript() {
+    var html = '';
+    segments.forEach(function (s) {
+      html += '<div class="ms-line" id="ms-seg-' + esc(s.seq) + '">'
+            + '<span class="ms-seq">' + esc(s.seq) + '</span>'
+            + '<span class="ms-spk">' + esc(s.speaker || '') + '</span>'
+            + '<span>' + esc(s.text || '') + '</span></div>';
+    });
+    el('msScript').innerHTML = html;
+  }
+
+  // 引用與章節都用事件委派 —— 那些節點是之後才塞進來的
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-seq]') : null;
+    if (!btn || !btn.dataset.seq) return;
+    var line = el('ms-seg-' + btn.dataset.seq);
+    if (!line) return;
+    var prev = document.querySelector('.ms-line.hit');
+    if (prev) prev.classList.remove('hit');
+    line.classList.add('hit');
+    line.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
+
+  // ---------------------------------------------------------------- 下載
+  //
+  // PDF / 圖表 PNG / ZIP 是**按下去才產生的**（伺服器要把圖算成點陣圖再包起來），
+  // 一份會議要幾秒鐘。原本是純 `<a href download>` —— 瀏覽器在收到回應之前
+  // **畫面上什麼都不會變**，使用者按了以為沒反應，就會再按好幾次
+  // （2026-09-19 回報「這些按下去都沒有動作」「過好一下才出來」）。
+  //
+  // 改成自己抓回來：按下去立刻變「產生中…」並擋住重複點擊，
+  // 拿到檔案再觸發儲存。順便換到 `fetch`，伺服器出錯時看得到訊息
+  // —— 原本錯誤頁會被當成檔案存下來（擷取文字那支踩過同一個坑）。
+  /* PDF / Word / ODF 走同一支端點，差別只有 `fmt` 與版面主題。
+     **主題要跟著換網址** —— 選了主題卻下載到舊的那一份，
+     使用者會以為主題沒作用（而且完全看不出來）。 */
+  function setDocHrefs() {
+    if (!uploadId) return;
+    var u = encodeURIComponent(uploadId);
+    var th = encodeURIComponent((el('msTheme') || {}).value || 'report');
+    [['msDlPdf', 'pdf'], ['msDlDocx', 'docx'], ['msDlOdt', 'odt']].forEach(function (p) {
+      var a = el(p[0]);
+      if (a) a.href = BASE + '/download/' + u + '?fmt=' + p[1] + '&theme=' + th;
+    });
+  }
+  if (el('msTheme')) el('msTheme').addEventListener('change', setDocHrefs);
+
+  function wireDownload(a) {
+    a.addEventListener('click', async function (e) {
+      if (!a.href || a.dataset.busy) { e.preventDefault(); return; }
+      e.preventDefault();
+      var label = a.querySelector('span');
+      var orig = label ? label.textContent : '';
+      a.dataset.busy = '1';
+      a.classList.add('is-busy');
+      if (label) label.textContent = tr('產生中…');
+      try {
+        var r = await fetch(a.href);
+        if (!r.ok) {
+          showAlert(await window.friendlyServerError(r, tr('產生檔案失敗')));
+          return;
+        }
+        // 檔名以伺服器給的為準（`Content-Disposition` 帶 RFC 5987 的 UTF-8）。
+        var cd = r.headers.get('Content-Disposition') || '';
+        var m = /filename\*=utf-8''([^;]+)/i.exec(cd);
+        var name = m ? decodeURIComponent(m[1])
+                     : (/filename="?([^";]+)"?/i.exec(cd) || [])[1];
+        var blob = await r.blob();
+        var url = URL.createObjectURL(blob);
+        var tmp = document.createElement('a');
+        tmp.href = url;
+        tmp.download = name || 'meeting-summary';
+        document.body.appendChild(tmp);
+        tmp.click();
+        tmp.remove();
+        // **不要馬上 revoke** —— 有些瀏覽器還沒把檔案寫完就會拿不到內容。
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      } catch (err) {
+        showAlert(tr('產生檔案失敗'));
+      } finally {
+        delete a.dataset.busy;
+        a.classList.remove('is-busy');
+        if (label) label.textContent = orig;
+      }
+    });
+  }
+  ['msDlPdf', 'msDlDocx', 'msDlOdt', 'msDlMd', 'msDlPng', 'msDlZip',
+   'msDlJson'].forEach(function (id) {
+    wireDownload(el(id));
+  });
+
+  // 從「我的作業」按「開啟」回來（網址帶 `?job=…`）。
+  //
+  // ⚠ **只 `job.track()` 是不夠的**（2026-09-19 回報「進去後下面沒東西」）：
+  // 作業早就跑完了，輪詢第一次就讀到 `done` → `onDone()` → `loadResult()`，
+  // 但 `loadResult()` 第一行是 `if (!uploadId) return;` ——
+  // 而 `uploadId` 是**上傳當下**才有的，重新開一頁是空的，於是**安靜地什麼都不做**。
+  // 畫面上進度列寫著「完成」，下面一片空白，看起來像結果被清掉了。
+  //
+  // 作業自己記著 `meta.upload_id`，先把它拿回來再讀結果。
+  (async function () {
+    var jid = new URLSearchParams(location.search).get('job');
+    if (!jid) return;
+    var r = await fetch('/api/jobs/' + encodeURIComponent(jid));
+    if (!r.ok) { job.track(jid); return; }
+    var j = await r.json();
+    uploadId = (j.meta || {}).upload_id || null;
+    if ((j.status || '') !== 'done' || !uploadId) { job.track(jid); return; }
+    // 已經跑完了就直接把結果讀回來，不必再讓進度列跑一次。
+    el('msCancel').hidden = true;
+    await loadResult();
+  })();
+})();
+</script>
+{% endblock %}

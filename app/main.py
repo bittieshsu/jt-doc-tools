@@ -21,7 +21,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.15.59"
+VERSION = "1.15.93"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -296,6 +296,23 @@ def _tpl_workspace_extensions() -> str:
 
 templates.env.globals["workspace_extensions"] = _tpl_workspace_extensions
 
+def _tpl_workspace_accept() -> str:
+    """Jinja global：`<input accept>` 用的清單（例：``.docx,.md,.odg,…``）。
+
+    **不要在樣板裡寫死。** `my_workspace.html` 原本兩處各寫了一份
+    `application/pdf,image/png,.docx,…`，而伺服器端的 `ALLOWED` 之後又加了
+    型別 —— 兩邊沒有一起改的症狀是**檔案選擇器把收得下的檔案濾掉**，
+    使用者只會覺得「這個檔不能傳」，沒有任何錯誤訊息可循。
+    """
+    try:
+        from .core import workspace as _ws
+        return ",".join(sorted(set(_ws.ALLOWED.values())))
+    except Exception:
+        return ""
+
+
+templates.env.globals["workspace_accept"] = _tpl_workspace_accept
+
 
 def _tpl_cjk_font_status() -> dict:
     """Jinja global：本機有沒有可用的中文字型（給工具頁的提示用）。
@@ -360,6 +377,7 @@ _TOOL_ALIASES = {
     "pdf-metadata":       "metadata xmp author title strip clean remove producer creator 中繼資料 中繼 修訂歷史 去識別 metadata 清除 作者 標題 標籤 XMP",
     "pdf-hidden-scan":    "hidden content javascript js embedded launch uri whitetext offpage scan remove 隱藏 掃描 JavaScript 嵌入檔 白字 頁面外 外部連結 啟動 風險 資安",
     "pdf-attachments":    "attachment attachments embedded file extract pdf paperclip 附件 嵌入檔 萃取 取出 EmbeddedFiles",
+    "meeting-summary":    "meeting summary minutes transcript vtt srt subtitle speaker diarization decision action item risk chapter timeline 會議 摘要 會議記錄 會議紀錄 逐字稿 字幕 講者 決議 待辦 行動項 風險 章節 時間軸 語者 開會 紀要 重點 整理",
     "pdf-wordcount":      "wordcount word count words chars characters letter 字數 統計 字元 字數統計 統計圖表 chart histogram frequency 高頻詞 頻率 段落 句子 paragraph sentence 閱讀時間 reading time stats statistics analytics",
     "pdf-annotations":    "annotations annotation comments comment markup highlight underline strikeout sticky-note review todo extract export 註解 批註 標註 螢光筆 底線 刪除線 文字註解 圖章 自由文字 手繪 審閱 待辦 校稿 合約 修訂",
     "pdf-annotations-strip":   "strip remove delete clean annotations comments markup 註解 批註 移除 刪除 清除 清除註解 移除註解 校稿後清除",
@@ -723,6 +741,9 @@ app.include_router(_build_workspace_router(templates))
 # Shared asset images (logo / stamp / signature / watermark) — login-gated,
 # read-only. Lets non-admin users see asset thumbnails / previews in the
 # stamp / watermark / editor tools without exposing admin asset management.
+from .web.speech_routes import router as _speech_router  # noqa: E402
+app.include_router(_speech_router)
+
 from .web.asset_routes import build_router as _build_asset_router  # noqa: E402
 
 app.include_router(_build_asset_router())
@@ -1056,7 +1077,7 @@ async def ui_locale_dictionary(locale: str, request: Request):
     return Response(body, media_type="application/javascript", headers=headers)
 
 
-_PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/favicon.ico", "/2fa-verify", "/ui-locale"}
+_PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/readyz", "/favicon.ico", "/2fa-verify", "/ui-locale"}
 
 
 def _looks_like_xhr(request: Request) -> bool:
@@ -1401,10 +1422,37 @@ async def _api_token_gate(request: Request, call_next):
     if not presented:
         presented = request.query_params.get("token")
     has_bearer_attempt = bool(presented)
-    if not has_bearer_attempt and (not enforce or is_dual_access):
-        # 沒帶 token 時：enforce 關 → 維持舊行為（API 公開）；
-        # 雙重存取路徑 → 落回 session auth_gate 由瀏覽器 cookie 把關。
-        return await call_next(request)
+    # **沒帶 token 就一律落回 session**（issue #52）。
+    #
+    # 原本這裡只放行一份**手列的**「雙重存取路徑」（`/admin/**` 與
+    # pdf-to-office 那兩支預覽），於是強制檢查一開，網頁自己打的其他 `/api/`
+    # 全部 401：進度輪詢、取消作業、通知、收件匣、工作區清單……
+    # 頁面本身還開得起來、作業也真的在背景跑完了，所以症狀是**畫面卡住**
+    # —— 看起來像作業系統壞了，不像一個設定問題。
+    #
+    # **而設定頁自己寫著「web UI 本身仍照常運作（不走 token）」** ——
+    # 介面承諾了後端沒做到的事（本專案第 N 次）。
+    #
+    # 上面那段註解為了 `/admin/**` 已經把道理講對了：「管理區有 22 個路徑含
+    # `/api/`，把它們當成純 API 的話，管理員用瀏覽器開管理頁就會拿到 401」。
+    # **那個推理對整個網頁介面都成立**，只是當初只套用在管理區上。
+    #
+    # 判準：**這個請求是不是瀏覽器帶著我們自己發的 session 來的**。
+    # 是 → 交給 `_auth_gate` 用它原本那套權限檢查（不是放行，是換一條把關）。
+    # 不是（腳本、curl）→ 強制檢查照舊擋下來。
+    #
+    # **認證關閉時沒有 session 可以落回** —— 那時候整個站本來就是開的，
+    # 對 `/api/` 要求 token 保護不到任何東西，而讓畫面卡住是實際的傷害。
+    # 所以一併放行，並且把設定頁的說明改成事實。
+    if not has_bearer_attempt:
+        if not enforce or is_dual_access:
+            return await call_next(request)
+        from .core import auth_settings as _as_gate
+        if not _as_gate.is_enabled():
+            return await call_next(request)
+        from .core import sessions as _sess
+        if _sess.lookup(request.cookies.get(_sess.COOKIE_NAME) or ""):
+            return await call_next(request)
 
     # Accept: Authorization: Bearer <token>  OR  ?token=<token>
     auth = request.headers.get("Authorization") or ""

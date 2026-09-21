@@ -59,6 +59,12 @@ SKIP_DIRS = (
 
 #: 例外清單。**每一項都要寫明為什麼安全**，不可以只是「先讓測試綠燈」。
 EXEMPT: dict[tuple[str, str], str] = {
+    ("app/web/speech_routes.py", "speech_audio"):
+        "**存取控制就是簽章本身** —— 網址帶 `exp` 與 `sig`，簽章綁住"
+        "「檔案 id ＋ 到期時間」，驗不過一律當成找不到（404）。"
+        "這條路沒有『當前使用者』可以比對：拉檔的是外部服務，不帶 session "
+        "也不帶 token（見 `app/core/signed_url.py` 的說明）。"
+        "換句話說**知道 id 本身沒有用**，這比事後比對歸屬更強。",
     ("app/web/workspace_routes.py", "workspace_file"):
         "工作區的路徑由 `_entry_dir(request, file_id)` 從**當前使用者**的目錄解析，"
         "結構上就到不了別人的檔案（比事後檢查更強）",

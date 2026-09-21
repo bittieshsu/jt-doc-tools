@@ -131,17 +131,41 @@ def test_missing_file_raises_not_found(tmp_path):
         ws._office_thumbnail(d, ".odt", blocking=True)
 
 
-def test_all_workspace_office_types_are_covered():
-    """工作區收得下的每一種 Office / ODF 格式都要能走縮圖路徑。
+def test_every_workspace_type_has_a_decided_thumbnail_path():
+    """工作區收得下的**每一種**副檔名都要明確屬於某一條縮圖路徑。
 
-    漏一種的症狀就是「這個格式沒有縮圖」—— 正是使用者回報的那件事。
+    漏一種的症狀是「這個格式沒有縮圖」—— 正是使用者回報過的那件事。
+
+    原本的寫法是「除了 .pdf / .png 以外都必須在 `_OFFICE_THUMB_EXTS` 裡」，
+    那個排除清單是**寫死的**：v1.15.88 加純文字（沒有「第一頁」可以畫，
+    刻意回空白佔位圖）時它就紅了，而那並不是缺陷。
+
+    改成驗**分割**：四條路徑互不重疊，而且聯集剛好等於 `ALLOWED`。
+    這樣加新型別而沒有決定它的縮圖要怎麼辦時，這條一樣會紅 ——
+    但決定了「不做縮圖」也算決定。
     """
-    # ALLOWED 是 {mime: 副檔名} —— 要比對的是**副檔名**
-    office = {ext for ext in ws.ALLOWED.values()
-              if ext not in (".pdf", ".png")}
-    assert office, "抓不到工作區允許的格式，掃描邏輯可能改壞了"
-    missing = office - set(ws._OFFICE_THUMB_EXTS)
-    assert not missing, f"這些格式沒有縮圖：{sorted(missing)}"
+    paths = {
+        "圖片本身": {".png"},
+        "算 PDF 第一頁": {".pdf"},
+        "經 Office 引擎": set(ws._OFFICE_THUMB_EXTS),
+        "沒有縮圖（純文字）": set(ws._TEXT_EXTS),
+    }
+    allowed = set(ws.ALLOWED.values())
+    assert allowed, "抓不到工作區允許的格式，掃描邏輯可能改壞了"
+
+    seen: dict[str, str] = {}
+    for label, exts in paths.items():
+        for e in exts:
+            assert e not in seen, f"{e} 同時屬於「{seen[e]}」與「{label}」"
+            seen[e] = label
+
+    missing = allowed - set(seen)
+    assert not missing, (
+        f"這些格式沒有決定縮圖要怎麼辦：{sorted(missing)}。"
+        f"要嘛接上縮圖路徑，要嘛明確歸到「沒有縮圖」那一類。"
+    )
+    stale = set(seen) - allowed
+    assert not stale, f"這些副檔名工作區根本不收，清單過期了：{sorted(stale)}"
 
 
 def test_request_path_does_not_wait_for_conversion(tmp_path, small_odt,

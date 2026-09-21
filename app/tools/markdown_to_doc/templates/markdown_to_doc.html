@@ -25,6 +25,15 @@
 .md2-drop.has-file { border-color: #16a34a; background: #f0fdf4; border-style: solid; }
 .md2-drop b { color: #1e40af; }
 .md2-drop .hint { color: #94a3b8; font-size: 11px; margin-left: 6px; }
+.md2-formats { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 6px; }
+.md2-fmt {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 8px 14px; border: 2px solid #e2e8f0; border-radius: 8px;
+  background: #fff; white-space: nowrap;
+}
+.md2-fmt:hover { border-color: #cbd5e1; }
+.md2-fmt:has(input:checked) { border-color: #6366f1; background: #eef2ff; }
+
 .md2-themes {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px; margin-top: 8px;
@@ -207,10 +216,23 @@ def hello():
 </div>
 
 <div class="panel">
+  <h2 data-s="s53896af8">{{ tr('3. 輸出格式') }}</h2>
+  <p class="muted" data-s="se2907ccd">{{ tr('只轉你要的那幾種。每一種都要跑一次轉檔引擎，全選會花上好幾倍的時間。') }}</p>
+  <div class="md2-formats" id="md2Formats">
+    <label class="md2-fmt"><input type="checkbox" value="pdf" checked> PDF</label>
+    <label class="md2-fmt"><input type="checkbox" value="docx"> {{ tr('Word（.docx）') }}</label>
+    <label class="md2-fmt"><input type="checkbox" value="odt"> {{ tr('OpenDocument（.odt）') }}</label>
+  </div>
+  <p class="muted" data-s="se2907cce">{{ tr('頁面預覽是從 PDF 產生的；沒有勾 PDF 就不會有預覽。') }}</p>
+</div>
+
+<div class="panel">
   <div class="md2-actions">
     <button class="btn btn-primary" id="md2Convert">{{ icon('refresh', size=12) }} {{ tr('開始轉換') }}</button>
+    <button class="btn btn-danger" id="md2Cancel" type="button" hidden>{{ icon('close', size=14) }} {{ tr('停止轉換') }}</button>
     <span id="md2Status" data-s="s1c9d3d97"></span>
   </div>
+  {% with progress_id='md2Job' %}{% include "components/job_progress.html" %}{% endwith %}
   <div id="md2Error" class="md2-error" hidden></div>
 </div>
 
@@ -233,6 +255,7 @@ def hello():
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/custom_select.js"></script>
+<script src="/static/js/job_progress.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
 {% raw %}
 (function () {
@@ -337,36 +360,105 @@ def hello():
     fd.append('font', font);
     if (title) fd.append('title', title);
     fd.append('text', text);
+    const fmts = Array.from(document.querySelectorAll('#md2Formats input:checked'))
+                      .map(function (c) { return c.value; });
+    if (!fmts.length) {
+      $('md2Error').textContent = tr('請至少選一種輸出格式');
+      $('md2Error').hidden = false;
+      return;
+    }
+    fd.append('formats', fmts.join(','));
 
     const btn = $('md2Convert');
     btn.disabled = true;
     const orig = btn.innerHTML;
     btn.innerHTML = '<span class="md2-spinner"></span>轉換中…';
-    $('md2Status').innerHTML = '<span class="md2-spinner"></span>轉換中（PDF + DOCX + ODT，可能要 10-30 秒）';
+    // **不要承諾做不到的時間。** 每一種格式都要跑一次轉檔引擎，而引擎是
+    // 序列化的 —— 機器忙的時候一種就可能超過一分鐘（正式機實測過）。
+    $('md2Status').innerHTML = '<span class="md2-spinner"></span>'
+      + tr('轉換中（{0}），檔案大或主機忙時會久一點')
+        .replace('{0}', fmts.map(function (f) { return f.toUpperCase(); }).join(' + '));
     $('md2Error').hidden = true;
     $('md2ResultPanel').hidden = true;
 
     try {
       const r = await fetch('/tools/markdown-to-doc/convert', { method: 'POST', body: fd });
       if (!r.ok) {
-        const t = await r.text();
-        $('md2Error').textContent = tr('轉換失敗：') + t.slice(0, 400);
+        $('md2Error').textContent = await window.friendlyServerError(r, tr('轉換失敗'));
         $('md2Error').hidden = false;
         $('md2Status').textContent = '';
+        btn.disabled = false; btn.innerHTML = orig;
         return;
       }
       const j = await r.json();
-      lastResult = j;
-      _renderResult(j);
+      // **改成背景作業**：有進度、可以停、關掉這一頁也跑得完。
+      md2Uid = j.upload_id;
+      md2Btn = { el: btn, html: orig };
+      jp.show();
+      jp.track(j.job_id);
+      $('md2Cancel').hidden = false;
     } catch (e) {
       $('md2Error').textContent = tr('請求失敗：') + e;
       $('md2Error').hidden = false;
       $('md2Status').textContent = '';
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = orig;
+      btn.disabled = false; btn.innerHTML = orig;
     }
   });
+
+  let md2Uid = null;
+  let md2Btn = null;
+
+  function _md2Idle() {
+    $('md2Cancel').hidden = true;
+    if (md2Btn) { md2Btn.el.disabled = false; md2Btn.el.innerHTML = md2Btn.html; }
+  }
+
+  // 停止轉換：呼叫 cancel API + 停輪詢 + 還原畫面。
+  // **伺服器端會把轉檔程式整棵停掉**（v1.15.62）—— 只停輪詢的話，
+  // 畫面說停了而工作照樣跑完。
+  $('md2Cancel').addEventListener('click', async () => {
+    $('md2Cancel').disabled = true;
+    await jp.cancel();
+    $('md2Cancel').disabled = false;
+    _md2Idle();
+    jp.hide();
+    $('md2Status').textContent = tr('已停止');
+  });
+
+  const jp = new JobProgress($('md2Job'), {
+    onCancel: _md2Idle,
+    onError: () => { _md2Idle(); $('md2Status').textContent = ''; },
+    onReset: () => { _md2Idle(); $('md2ResultPanel').hidden = true; },
+    onDone: async () => {
+      _md2Idle();
+      $('md2Status').textContent = '';
+      try {
+        const rr = await fetch('/tools/markdown-to-doc/result/' + md2Uid);
+        if (!rr.ok) throw new Error(await window.friendlyServerError(rr, tr('讀取結果失敗')));
+        const data = await rr.json();
+        lastResult = data;
+        _renderResult(data);
+        jp.hide();
+      } catch (e) {
+        $('md2Error').textContent = String(e);
+        $('md2Error').hidden = false;
+      }
+    },
+  });
+
+  // 從「我的作業」按「開啟」回來時接得回去。
+  // **不接的話會落到一片空白頁**（本專案在文件翻譯上踩過）。
+  (function () {
+    const q = new URLSearchParams(location.search);
+    const jid = q.get('job');
+    const uid = q.get('uid');
+    if (jid) {
+      md2Uid = uid;
+      md2Btn = { el: $('md2Convert'), html: $('md2Convert').innerHTML };
+      jp.show();
+      jp.track(jid);
+    }
+  })();
 
   function _renderResult(j) {
     const fileSvg  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
@@ -442,6 +534,32 @@ def hello():
     const el = document.querySelector(`.md2-theme[data-theme="${id}"] .md2-theme-name`);
     return el ? el.textContent : id;
   }
+
+  // ----- 從別的工具轉送過來（?handoff=1）-----
+  //
+  // 內容放在 `sessionStorage`：同源、不經伺服器、關掉分頁就沒了。
+  // **不走「我的工作區」** —— 工作區不收 `.md`，那條路會一路失敗到
+  // 丟例外，而按鈕看起來只是「沒反應」（2026-09-18 使用者回報）。
+  //
+  // **讀完就刪**：留著的話下次開這一頁會莫名其妙被上一次的內容蓋掉。
+  (function () {
+    if (new URLSearchParams(location.search).get('handoff') !== '1') return;
+    let raw = null;
+    try {
+      raw = sessionStorage.getItem('jtdt_md_handoff');
+      sessionStorage.removeItem('jtdt_md_handoff');
+    } catch (e) { return; }
+    if (!raw) return;
+    let d;
+    try { d = JSON.parse(raw); } catch (e) { return; }
+    if (!d || !d.text) return;
+    $('md2Text').value = d.text;
+    if (d.title && !$('md2Title').value) { $('md2Title').value = d.title; }
+    $('md2Text').dispatchEvent(new Event('input', { bubbles: true }));
+    if (window.showToast) {
+      showToast(tr('已帶入 {0} 字').replace('{0}', d.text.length.toLocaleString()));
+    }
+  })();
 })();
 {% endraw %}
 </script>

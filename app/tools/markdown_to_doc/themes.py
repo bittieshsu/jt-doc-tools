@@ -43,10 +43,13 @@ code, kbd, samp {
   font-size: 0.88em;
 }
 pre {
-  padding: 12pt 14pt; border-radius: 5pt;
-  overflow-x: auto;
+  /* **`padding` 在 soffice 裡無效** —— 實測它被當成縮排（框和字一起右移，
+     中間還是沒有空隙），`div` 包起來連底色都不畫，包進單格表格則會讓長行
+     不折行、整塊超出頁面。三種都試過。
+     所以改成「整塊色帶往右縮排、不畫框線」：沒有框線就沒有「字貼著框」，
+     而縮排讓程式碼跟正文明顯分開。 */
+  margin: 0.8em 0 0.8em 12pt;
   font-size: 9.5pt; line-height: 1.55;
-  margin: 0.8em 0;
   page-break-inside: avoid;
 }
 pre code { background: transparent !important; padding: 0; font-size: inherit; }
@@ -71,6 +74,55 @@ sup.fn-ref a { font-size: 0.75em; vertical-align: super; text-decoration: none; 
 .task-list-item input { margin-right: 6px; }
 """
 
+#: 每個主題對應的 pygments 語法上色樣式。
+#:
+#: **`mono` 是 `None`（不上色）** —— 那個主題的承諾就是「純黑白配色，
+#: 無修飾，適合需要絕對中性視覺的場合」。在上面加顏色等於把它的用途毀掉，
+#: 而使用者選它的理由正是不要顏色。
+#: 行內 `code` 的顏色。**改成由渲染器寫成內嵌樣式，不再放 CSS 規則。**
+#:
+#: 原因是 soffice 的 HTML 匯入：只要 `code { color: X }` 這條規則存在，
+#: 它就把整個 `<code>` 當成一段字元樣式，**把裡面的上色 span 全部丟掉** ——
+#: 於是 HTML 預覽有顏色、轉出來的 PDF / DOCX 沒有，而且完全不會報錯。
+#:
+#: 實測過三種寫法：`!important` **soffice 不理**、
+#: `:not(pre) > code` **soffice 不支援、整條規則被丟掉**。
+#: **只有內嵌樣式會被帶過去。**
+INLINE_CODE_COLORS: dict[str, str] = {
+    "classic": "#be185d", "github": "#cf222e", "academic": "#444",
+    "book": "#8b3a00", "report": "#c53030", "mono": "#000",
+}
+
+
+#: 程式碼區塊的底色。**用 HTML 的 `bgcolor` 屬性套**，不走 CSS。
+CODE_BG: dict[str, str] = {
+    "classic": "#f1f5f9", "github": "#f6f8fa", "academic": "#f9f9f9",
+    "book": "#f3e9d5", "report": "#edf2f7", "mono": "#f5f5f5",
+}
+
+
+def code_bg(theme_id: str) -> str:
+    return CODE_BG.get(theme_id, "#f1f5f9")
+
+
+def inline_code_color(theme_id: str) -> str:
+    return INLINE_CODE_COLORS.get(theme_id, "#be185d")
+
+
+CODE_STYLES: dict[str, str | None] = {
+    "classic": "friendly",      # 柔和、白底
+    "github":  "default",       # 接近 GitHub README 的觀感
+    "academic": "bw",           # 論文/公文：只用粗體斜體，不用顏色
+    "book":    "friendly",
+    "report":  "vs",            # 商務：偏保守的藍綠
+    "mono":    None,            # 不上色
+}
+
+
+def code_style(theme_id: str) -> str | None:
+    return CODE_STYLES.get(theme_id, "friendly")
+
+
 THEMES: dict[str, dict] = {
     "classic": {
         "name": "清爽（預設）",
@@ -87,12 +139,11 @@ h3 { color: #1d4ed8; }
 h4, h5, h6 { color: #334155; }
 strong { color: #0f172a; }
 a { color: #2563eb; }
-code { color: #be185d; }
-pre { background: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; }
+pre { background: #f1f5f9; color: #1e293b;  }
 pre code { color: inherit; background: transparent; }
 table { font-size: 10.5pt; }
-th { background: #eff6ff; color: #1e3a8a; border: 1px solid #93c5fd; }
-td { border: 1px solid #cbd5e1; }
+th { background: #eff6ff; color: #1e3a8a;  }
+td {  }
 blockquote { background: #f8fafc; border-left: 4px solid #94a3b8; color: #475569; }
 hr { border-top: 1px dashed #cbd5e1; }
 """,
@@ -110,11 +161,10 @@ h1 { color: #1f2328; border-bottom: 1px solid #d0d7de; padding-bottom: 6pt; }
 h2 { color: #1f2328; border-bottom: 1px solid #d0d7de; padding-bottom: 4pt; }
 h3, h4, h5, h6 { color: #1f2328; }
 a { color: #0969da; }
-code { color: #cf222e; }
-pre { background: #f6f8fa; color: #24292f; border: 1px solid #d0d7de; }
+pre { background: #f6f8fa; color: #24292f;  }
 pre code { color: inherit; background: transparent; }
-table th { background: #f6f8fa; border: 1px solid #d0d7de; }
-table td { border: 1px solid #d0d7de; }
+table th { background: #f6f8fa;  }
+table td {  }
 blockquote { background: #f6f8fa; border-left: 4px solid #d0d7de; color: #59636e; }
 hr { border-top: 1px solid #d0d7de; }
 """,
@@ -136,12 +186,11 @@ h2 { color: #1c1c1c; border-bottom: 1.5px solid #1c1c1c; padding-bottom: 3pt; }
 h3 { color: #2c2c2c; }
 strong { font-weight: 700; }
 a { color: #1c1c1c; text-decoration: underline; }
-code { color: #444; font-size: 0.92em; }
-pre { background: #f9f9f9; color: #1c1c1c; border: 1px solid #d4d4d4; }
+pre { background: #f9f9f9; color: #1c1c1c;  }
 pre code { color: inherit; background: transparent; }
 table { font-size: 10.5pt; margin: 1em auto; }
-th, td { border-top: 1px solid #1c1c1c; border-bottom: 1px solid #1c1c1c; }
-th { border-bottom: 1.5px solid #1c1c1c; background: transparent; }
+th, td {  border-bottom: 1px solid #1c1c1c; }
+th {  background: transparent; }
 blockquote { border-left: 3px solid #444; color: #444; font-style: italic; background: transparent; }
 hr { border-top: 1px solid #1c1c1c; }
 """,
@@ -163,12 +212,11 @@ h3 { color: #b8743f; }
 h4, h5, h6 { color: #6f3a1e; }
 strong { color: #6f3a1e; }
 a { color: #8b4513; }
-code { color: #8b3a00; }
-pre { background: #f3e9d5; color: #3d2914; border: 1px solid #c9a87e; }
+pre { background: #f3e9d5; color: #3d2914;  }
 pre code { color: inherit; background: transparent; }
 table { font-size: 10.5pt; }
-th { background: #efe1c5; color: #6f3a1e; border: 1px solid #c9a87e; }
-td { border: 1px solid #c9a87e; }
+th { background: #efe1c5; color: #6f3a1e;  }
+td {  }
 blockquote { background: #f3e9d5; border-left: 4px solid #b8743f; color: #6f3a1e; font-style: italic; }
 hr { border-top: 1px solid #c9a87e; }
 """,
@@ -192,12 +240,11 @@ h3 { color: #2b6cb0; }
 h4 { color: #4a5568; }
 strong { color: #1a365d; }
 a { color: #2c5282; }
-code { color: #c53030; }
-pre { background: #edf2f7; color: #1a202c; border: 1px solid #cbd5e1; }
+pre { background: #edf2f7; color: #1a202c;  }
 pre code { color: inherit; background: transparent; }
 table { font-size: 10.5pt; box-shadow: 0 1pt 3pt rgba(0,0,0,0.08); }
-th { background: #2c5282; color: #ffffff; border: 1px solid #2c5282; font-weight: 600; }
-td { border: 1px solid #cbd5e1; }
+th { background: #2c5282; color: #ffffff;  font-weight: 600; }
+td {  }
 tbody tr:nth-child(even) td { background: #f7fafc; }
 blockquote { background: #edf2f7; border-left: 4px solid #2c5282; color: #2d3748; }
 hr { border-top: 2px solid #2c5282; }
@@ -217,11 +264,10 @@ h2 { border-bottom: 1.5px solid #000; padding-bottom: 3pt; }
 h3, h4, h5, h6 { color: #000; }
 strong { color: #000; }
 a { color: #000; text-decoration: underline; }
-code { color: #000; }
-pre { background: #f5f5f5; color: #000; border: 1.5px solid #000; }
+pre { background: #f5f5f5; color: #000;  }
 pre code { color: inherit; background: transparent; }
 table { font-size: 10.5pt; }
-th, td { border: 1px solid #000; }
+th, td {  }
 th { background: #e8e8e8; }
 blockquote { border-left: 4px solid #000; color: #333; background: transparent; }
 hr { border-top: 1.5px solid #000; }
@@ -306,3 +352,29 @@ def font_css_override(font_id: str) -> str:
         f"\nbody, h1, h2, h3, h4, h5, h6, p, li, td, th, blockquote "
         f"{{ font-family: {f['stack']}; }}\n"
     )
+
+
+#: **轉成 .odt / .docx 時要疊上去的覆寫。**
+#:
+#: soffice 的 HTML 匯入**會保留文字顏色、但丟掉段落底色**（實測：`report`
+#: 主題的 `h1 { color:#fff; background:#2c5282 }` 轉成 ODT 之後樣式裡只剩
+#: `fo:color="#ffffff"`，底色與內距都沒了）→ **白字白底，整個標題看不見**
+#: （2026-09-19 使用者回報「匯出 .odt 時 標題字是白色 結果看不到」）。
+#:
+#: **PDF 沒有這個問題**（底色畫得出來），所以不動主題本身 ——
+#: 那個橫幅在 PDF 上是好看的。只有文件格式疊這一層。
+#:
+#: **通則：不要讓可讀性依賴底色。** 底色是最容易在轉檔途中掉的東西，
+#: 而掉了之後的症狀是「什麼都看不到」，不是「顏色怪怪的」。
+_OFFICE_SAFE_CSS = """
+/* 轉成 .odt / .docx 時：底色會掉，所以淺色文字要改回深色 */
+h1 { color: #1a365d; background: transparent; padding: 0 0 6pt 0;
+     margin: 0 0 14pt 0; border-bottom: 3px solid #2c5282; }
+th { background: transparent; color: #1a365d;
+     border-bottom: 2px solid #2c5282; }
+"""
+
+
+def office_safe_css() -> str:
+    """疊在主題 CSS 後面，給 `.odt` / `.docx` 用（見 `_OFFICE_SAFE_CSS`）。"""
+    return _OFFICE_SAFE_CSS

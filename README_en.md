@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.15.59
+# Jason Tools Document Toolbox v1.15.93
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -25,7 +25,7 @@
 > `jtdt update` then works as usual. **Unaffected**: tarball installs, the Windows installer,
 > and anything installed after 2026-09-13. Fixed from v1.15.43 onwards.
 
-> An integrated PDF / Office document platform: 48 tools covering **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan assembly**, **de-identification**, **word counts**, **annotation reports**, **diffs**, **sentence-by-sentence translation**, **list processing**, **e-invoice handling**, **VAT number lookup**, **a page editor**, **encryption and decryption**, and more.
+> An integrated PDF / Office document platform. 49 tools cover **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan stitching**, **de-identification**, **word counts**, **annotation handling**, **diffing**, **sentence translation**, **list processing**, **e-invoice processing**, **VAT lookup**, **a page editor**, **encryption / decryption** and more.
 >
 > Enterprise features: **local / LDAP / AD multi-realm authentication**, **single sign-on** (OIDC + SAML, ready for M365 / Google / Keycloak), **RBAC roles and permissions**, **audit log**, **SIEM forwarding** (syslog / CEF / GELF), **font management**, **user workspace**, **background jobs with completion notices** and a **REST API**.
 >
@@ -36,7 +36,7 @@ Full introduction site: <https://jasoncheng7115.github.io/jt-doc-tools/index-en.
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![CodeQL](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml)
 [![OWASP Top 10 (2025)](https://img.shields.io/badge/OWASP%20Top%2010%20(2025)-A01--A10%20covered-success?logo=owasp)](SECURITY.md)
-[![Tests](https://img.shields.io/badge/pytest-8209%20passed-brightgreen?logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/pytest-9225%20passed-brightgreen?logo=pytest)](tests/)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-success?logo=dependabot)](.github/dependabot.yml)
 [![Python](https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white)](pyproject.toml)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](INSTALL.md)
@@ -95,7 +95,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 
 ---
 
-## The 48 tools at a glance
+## The 49 tools at a glance
 
 ### Forms and stamps
 - **Auto-fill forms**; field detection plus template values
@@ -116,6 +116,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 ### Content
 - **Extract text / images / attachments**; with optional LLM paragraph re-flow
 - **Word count** [needs OxOffice/LibreOffice]: tables, charts and an LLM summary; accepts PDF, office and plain-text files
+- **Meeting summary** [needs OxOffice/LibreOffice]: turns a meeting transcript (.vtt / .srt / .json / .txt / .docx / .odt) into a summary, decisions, action items, risks and chapters; **every entry points back to the segment it came from and who said it**, and clicking it jumps there. When timestamps are present it also computes the speaking share, directly from the times rather than estimated. The engine is only needed to export as PDF / Word / ODF
 - **Annotation report / removal / flattening**
 - **OCR**: run OCR on scanned PDFs and images so the text becomes searchable and selectable (the same idea as Live Text in macOS Preview); two engines (**EasyOCR** by default, strong on Chinese, Japanese and Korean; **Tesseract** as a fallback), with optional LLM typo correction. **An external GPU recognition server is supported** (DGX Spark / H100 / 4090 …): download `install.sh` from the admin interface to deploy it, taking a page from 8; 15 seconds on CPU down to 0.3; 0.8 seconds on GPU (**more than 10× faster**).
 - **Pre-submission check**: batch verification: page size, embedded fonts, complete fields, leftover personal data, hidden content
@@ -151,7 +152,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 
 ## User workspace (optional, administrators can turn it off)
 
-Keep the PDF / PNG / Word (.docx) / OpenDocument (.odt) files that tools produce on the server and hand them from tool to tool, instead of downloading and re-uploading between them.
+Files your tools produce (PDF / PNG, Word / Excel / PowerPoint, OpenDocument, plain text) can be parked on the server and handed between tools, without downloading and re-uploading in between.
 
 - **Save to workspace**; keep a tool's PDF / PNG / Word / ODT output on the server in one click, isolated per account and visible only to you.
 - **Load from workspace**; pull it back into any tool's upload area (OCR → stamp → redaction …) without hunting for the file.
@@ -167,7 +168,7 @@ Enabled by default; an administrator can turn it off at any time under “Settin
 
 Slow work (conversion, OCR, sentence translation, compressing large files …) is handed to the server when you submit it, so **you can close the tab** instead of watching a progress bar.
 
-- **Submit and it runs in the background**: 27 tools go through the job queue, among them PDF to word processor / presentation, format conversion, OCR, sentence-by-sentence translation, office documents to PDF, compression, merge, split, watermarks, stamping, seam stamps and the pre-submission check.
+- **Submit and it runs in the background** — 29 tools go through the job system, including PDF to office / slides, format conversion, OCR, sentence translation, office to PDF, compression, merge, split, watermarks, stamps, seam stamps and pre-submission checks.
 - **My jobs**: progress, queue position, elapsed time and the download are all on one page, and a running job can be cancelled. Tools whose output is not a single file (sentence translation, say) take you back to the original page to keep reading the comparison.
 - **Nothing vanishes on restart**; job state lives in the database; anything unfinished when the service restarts is marked as interrupted rather than silently disappearing.
 - **It will not take the machine down**; memory is estimated before dispatch, and a job that does not fit waits in the queue; the concurrency limits for jobs and Office conversion are both adjustable in the admin area.
@@ -214,7 +215,7 @@ Connecting is only the start: what actually goes wrong is the primary DC restart
 
 ## LLM AI extras (optional, off by default)
 
-Point it at an OpenAI-compatible backend (local Ollama / vLLM / LM Studio / DGX Spark) and **12 tools** gain smart options:
+Point it at an OpenAI-compatible backend (local Ollama / vLLM / LM Studio / DGX Spark) and **13 tools** gain smarter options:
 
 | Tool | What the LLM does | Mode |
 |---|---|---|
@@ -226,6 +227,7 @@ Point it at an OpenAI-compatible backend (local Ollama / vLLM / LM Studio / DGX 
 | Document redaction | customer codes, manager names and internal numbers that regex misses | text |
 | Text redaction | the same, for plain-text input | text |
 | Word count | adds a 3; 5 sentence summary and the top 10 keywords | text |
+| Meeting summary | Transcript to summary / decisions / action items / risks / chapters, each with a segment number you can check | text |
 | Annotation report | sorts many review comments into “major / normal / question” | text |
 | Document compare | beyond the line diff, a plain-language summary of which clauses changed | text |
 | e-Invoice processing | when rules do not match an item, the LLM decides the accounting category | text |
@@ -243,7 +245,7 @@ Point it at an OpenAI-compatible backend (local Ollama / vLLM / LM Studio / DGX 
 | **[AUTH.md](AUTH.md)** | Authentication / RBAC / built-in accounts (jtdt-admin / jtdt-auditor) / 2FA / SSO (OIDC+SAML) / Reverse Proxy SSO (Kerberos) / account lockout / emergency recovery |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO (Kerberos / SPNEGO) end-to-end deployment: AD service account, setspn, ktpass / keytab, nginx configuration, automatic browser sign-in, header spoofing protection |
 | **[API.md](API.md)** ([web version](https://jasoncheng7115.github.io/jt-doc-tools/api-en.html)) | REST API: bearer tokens, the endpoint list, upload and response formats, error codes, curl / Python examples, the job flow |
-| **[LLM.md](LLM.md)** | LLM AI extras (off by default): how the 12 tools use an LLM, examples, deployment options (Ollama / vLLM / DGX Spark) |
+| **[LLM.md](LLM.md)** | LLM add-on features (off by default): how the 13 tools use an LLM, worked examples, deployment options (Ollama / vLLM / DGX Spark) |
 | **[SECURITY.md](SECURITY.md)** | Security policy, OWASP Top 10 (2025) mapping, vulnerability reporting, GitHub native scan integration |
 | **[CHANGELOG.md](CHANGELOG.md)** | Full change log |
 | **[TEST_PLAN.md](TEST_PLAN.md)** | Test checklist and pre-release checks |

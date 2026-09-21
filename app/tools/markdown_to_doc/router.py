@@ -17,6 +17,8 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 from ...config import settings
+from ...core import atomic_json as _aj
+from ...core import job_manager as _jm
 from ...core import office_convert as _oc
 from ...core import upload_owner as _uo
 from ...core.safe_paths import require_uuid_hex
@@ -27,6 +29,11 @@ log = logging.getLogger("app.markdown_to_doc")
 router = APIRouter()
 
 _MAX_MARKDOWN_BYTES = 5 * 1024 * 1024   # 5 MB raw markdown
+
+#: 可以輸出的格式。**一次全轉很浪費** —— 三次 soffice 被鎖序列化，
+#: 每次上限 120 秒，最壞要 6 分鐘，而使用者可能只想要其中一種
+#: （使用者 2026-09-18 回報：正式機轉一份 43 KB 的 Markdown 卡超過兩分鐘）。
+_FORMATS = ("pdf", "docx", "odt")
 _PREVIEW_DPI = 96                        # preview PNG resolution
 _PREVIEW_MAX_PAGES = 50                  # cap to avoid huge memory hits
 
@@ -45,6 +52,53 @@ def _safe_stem(filename: str) -> str:
     return safe[:80]
 
 
+def _esc_attr(s: str) -> str:
+    return (s or "").replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+
+
+def _make_highlighter(theme_id: str):
+    """回一個給 markdown-it 用的語法上色函式（沒有語言或主題不上色時回 None）。
+
+    **用內嵌樣式（`noclasses=True`）不用 class** —— 產出的 HTML 要交給
+    soffice 轉成 PDF / DOCX / ODT，而**內嵌樣式是唯一確定會被帶過去的**。
+    靠 class ＋ `<style>` 的話，換一個 soffice 版本就可能整片變黑白，
+    而且**畫面上看起來完全正常**（HTML 預覽是對的，只有轉出來的檔案沒顏色）。
+
+    **上色失敗絕不可以讓轉檔失敗** —— 它是附屬品不是產出
+    （同 pdf2docx 逐頁進度那條）。認不得的語言就原樣輸出。
+    """
+    style = themes.code_style(theme_id)
+    if not style:
+        return None
+
+    def _hl(code: str, lang: str, _attrs: str) -> str:
+        if not lang:
+            return ""          # 回空字串 = 交給 markdown-it 用預設處理
+        try:
+            from pygments import highlight as _pyg_highlight
+            from pygments.formatters import HtmlFormatter
+            from pygments.lexers import get_lexer_by_name
+            from pygments.util import ClassNotFound
+            try:
+                lexer = get_lexer_by_name(lang, stripall=False)
+            except ClassNotFound:
+                return ""
+            # **`nowrap=True` 是必要的，不是風格選擇。**
+            # 預設會包一層 `<div class="highlight"><pre>…</pre></div>`，
+            # 而 markdown-it 看到回傳值不是 `<pre` 開頭就**再包一層
+            # `<pre><code>`** —— 變成 `<pre>` 巢在 `<pre>` 裡面。
+            # 那是不合法的 HTML，soffice 剖析時會把內層的顏色整個丟掉：
+            # **HTML 預覽有顏色、轉出來的 PDF 沒有**，而且完全不會報錯。
+            fmt = HtmlFormatter(style=style, noclasses=True, nowrap=True)
+            return _pyg_highlight(code, lexer, fmt)
+        except Exception:                                # noqa: BLE001
+            log.warning("語法上色失敗（語言 %s），改用未上色的區塊", lang,
+                        exc_info=True)
+            return ""
+
+    return _hl
+
+
 def _render_md_html(md_text: str, theme_id: str, title: str, font_id: str = "default") -> str:
     """Convert markdown text to a full HTML document with theme CSS applied.
 
@@ -52,10 +106,39 @@ def _render_md_html(md_text: str, theme_id: str, title: str, font_id: str = "def
     """
     from markdown_it import MarkdownIt
     md = (
-        MarkdownIt("commonmark", {"breaks": False, "linkify": True, "html": False})
+        MarkdownIt("commonmark", {"breaks": False, "linkify": True,
+                                  "html": False,
+                                  "highlight": _make_highlighter(theme_id)})
         .enable("table")
         .enable("strikethrough")
     )
+    # **行內 `code` 的顏色改用內嵌樣式** —— 放 CSS 規則的話，soffice 會把
+    # 整個 `<code>` 當成一段字元樣式、丟掉裡面的語法上色 span（實測）。
+    _ink = themes.inline_code_color(theme_id)
+
+    def _code_inline(self, tokens, idx, options, env):
+        import html as _html
+        return (f'<code style="color: {_ink}">'
+                f'{_html.escape(tokens[idx].content)}</code>')
+
+    md.add_render_rule("code_inline", _code_inline)
+
+    # ---- 表格框線與 cell 內距：**用 HTML 的表現屬性，不用 CSS** ----
+    #
+    # soffice 的 HTML 匯入基本上是 HTML 4 時代的實作。實測（都在真的 PDF 上量）：
+    #
+    # | 寫法 | 結果 |
+    # |---|---|
+    # | `td { border: 1px solid #ccc }` | **完全沒畫** |
+    # | `border-width` / `-style` / `-color` 拆開寫 | 有時候畫、有時候不畫（跟順序與同規則裡有沒有 `padding` 有關）|
+    # | **`<table border="1" cellpadding="5">`** | **穩定畫得出來**，0.75pt，看得見 |
+    #
+    # 所以框線與內距一律走屬性。CSS 留著給瀏覽器預覽用，兩者不衝突。
+    def _table_open(self, tokens, idx, options, env):
+        return ('<table border="1" cellpadding="5" cellspacing="0">')
+
+    md.add_render_rule("table_open", _table_open)
+
     body_html = md.render(md_text or "")
     theme = themes.get_theme(theme_id)
     font_css = themes.font_css_override(font_id or "default")
@@ -112,8 +195,15 @@ async def convert(
     theme: str = Form("classic"),
     font: str = Form("default"),
     title: str = Form(""),
+    formats: str = Form(""),
 ):
-    """Convert markdown (from text body or uploaded file) to PDF + DOCX + ODT.
+    """Convert markdown (from text body or uploaded file) to the requested formats.
+
+    `formats` 是逗號分隔的 `pdf` / `docx` / `odt`。
+
+    **空的時候維持三種全轉** —— 那是既有 API 呼叫者看到的行為，
+    悄悄改掉等於改公開契約（本專案在 `/load` 的 `file`→`files` 上踩過）。
+    網頁端一律明確送出選擇。
 
     Returns JSON with upload_id, page count, preview URLs, download URLs."""
     md_text = text or ""
@@ -137,86 +227,181 @@ async def convert(
     if not stem:
         stem = "document"
 
+    want = {f.strip().lower() for f in formats.split(",") if f.strip()}
+    bad = want - set(_FORMATS)
+    if bad:
+        raise HTTPException(400, f"不支援的輸出格式：{'、'.join(sorted(bad))}")
+    if not want:
+        want = set(_FORMATS)          # 沒指定＝照舊全轉（API 相容）
+
     uid = uuid.uuid4().hex
     _uo.record(uid, request)
     wdir = _work_dir(uid)
 
     # 保留原例外物件：缺 Office 引擎要回 503 不是 500，壓成字串就分辨不出來了
     exc_objs: dict = {}
-    def _do():
+    # **.docx 要先轉 .odt 當中介**（HTML 直轉 docx 的濾鏡鏈常失敗），
+    # 所以只勾 docx 時 odt 仍然會被產生 —— 但不會出現在下載清單裡。
+    need_odt = ("odt" in want) or ("docx" in want)
+
+    def _job(job):
+        """背景作業。**要能被取消**（使用者 2026-09-18 要求）。
+
+        原本是同步請求：三種格式各跑一次轉檔引擎、每次上限 120 秒，
+        使用者只能盯著「轉換中…」等，關掉分頁就白做。
+        改成背景作業之後：有進度、可以取消、關掉分頁也跑得完。
+        """
+        steps = len(want) + (1 if need_odt and "odt" not in want else 0) + 1
+        done_n = [0]
+
+        def step(msg: str) -> None:
+            job.progress = min(0.95, done_n[0] / max(steps, 1))
+            job.message = msg
+            done_n[0] += 1
         # 1. markdown → HTML with theme
+        step("產生版面…")
         html = _render_md_html(md_text, theme, stem, font)
         html_path = wdir / f"{stem}.html"
         html_path.write_text(html, encoding="utf-8")
+        # **`.odt` / `.docx` 要另一份 HTML** —— soffice 的 HTML 匯入保留文字
+        # 顏色但**丟掉段落底色**，於是「白字＋深色橫幅」的標題在文件格式裡
+        # 變成白字白底、整個看不見（2026-09-19 回報）。PDF 沒這問題，
+        # 所以只有文件格式疊那一層覆寫，橫幅在 PDF 上維持原樣。
+        html_office_path = wdir / f"{stem}.office.html"
+        html_office_path.write_text(
+            html.replace("</style>", themes.office_safe_css() + "</style>", 1),
+            encoding="utf-8")
         # 2. HTML → PDF + DOCX + ODT via soffice
         pdf_path = wdir / f"{stem}.pdf"
         docx_path = wdir / f"{stem}.docx"
         odt_path = wdir / f"{stem}.odt"
         errors: dict[str, str] = {}
-        try:
-            _oc.convert_to_pdf(html_path, pdf_path, timeout=120.0)
-        except Exception as e:
-            errors["pdf"] = str(e)
-            exc_objs["pdf"] = e
-            log.exception("md→pdf failed")
+        if "pdf" in want:
+            step("轉 PDF…")
+            try:
+                _oc.convert_to_pdf(html_path, pdf_path, timeout=120.0)
+            except Exception as e:
+                errors["pdf"] = str(e)
+                exc_objs["pdf"] = e
+                log.exception("md→pdf failed")
         # HTML → ODT 直轉 OK,DOCX 直轉 soffice filter chain 常失敗 →
         # 先 HTML → ODT,再 ODT → DOCX 兩段轉檔保險
-        try:
-            _oc.convert_to_odt(html_path, odt_path, timeout=120.0)
-        except Exception as e:
-            errors["odt"] = str(e)
-            exc_objs["odt"] = e
-            log.exception("md→odt failed")
-        try:
+        if need_odt:
+            step("轉 ODT…" if "odt" in want else "準備中介檔…")
+            try:
+                _oc.convert_to_odt(html_office_path, odt_path, timeout=120.0)
+            except Exception as e:
+                errors["odt"] = str(e)
+                exc_objs["odt"] = e
+                log.exception("md→odt failed")
+        if "docx" in want:
+          step("轉 DOCX…")
+          try:
             if odt_path.exists():
                 _oc.convert_to_docx(odt_path, docx_path, timeout=120.0)
             else:
                 # fallback:沒 ODT 中介，直接從 HTML 試一次
-                _oc.convert_to_docx(html_path, docx_path, timeout=120.0)
-        except Exception as e:
+                _oc.convert_to_docx(html_office_path, docx_path, timeout=120.0)
+          except Exception as e:
             errors["docx"] = str(e)
             exc_objs["docx"] = e
             log.exception("md→docx failed")
         # 3. Render PDF preview pages
+        # 預覽是從 PDF 算出來的 —— 沒有勾 PDF 就沒有預覽。
+        # **畫面上要講出這件事**，不然使用者會以為預覽壞了。
         previews: list[Path] = []
         if pdf_path.exists():
+            step("產生預覽…")
             try:
                 previews = _render_pdf_previews(pdf_path, wdir / "previews")
             except Exception as e:
                 log.exception("preview render failed")
                 errors["preview"] = str(e)
-        return pdf_path, docx_path, odt_path, previews, errors
+        produced = {"pdf": pdf_path.exists(), "docx": docx_path.exists(),
+                    "odt": odt_path.exists()}
+        if not any(produced[k] for k in want):
+            # **缺 Office 引擎是部署問題不是使用者的錯**：訊息要說得出裝什麼。
+            from ...core.office_convert import (OfficeUnavailableError,
+                                                OfficeSourceError)
+            for k in ("pdf", "odt", "docx"):
+                e = exc_objs.get(k)
+                if isinstance(e, (OfficeUnavailableError, OfficeSourceError)):
+                    raise e
+            first = next((errors[k] for k in ("pdf", "odt", "docx")
+                          if k in errors), "沒有產生任何檔案")
+            # **訊息不可以指錯方向。** 共用的逾時訊息寫的是「這份檔案可能已毀損…
+            # 請對方提供 PDF 版」—— 那是給「使用者上傳 Office 檔」那條路的。
+            # 這裡的中繼檔是**我們自己產的**，那句話對使用者沒有意義，
+            # 而他會照著做（同 `jtdt update` 印「已回復先前狀態」那次）。
+            if "卡住（超過" in first:
+                raise RuntimeError(
+                    "轉換逾時（超過 120 秒）。這通常是主機忙碌或文件較大造成的，"
+                    "不是你的 Markdown 有問題。"
+                    "可以只勾選需要的格式再試一次，或稍後再試。")
+            raise RuntimeError(f"轉檔失敗：{first}")
 
-    pdf_path, docx_path, odt_path, previews, errors = await asyncio.to_thread(_do)
+        payload = {
+            "ok": True,
+            "upload_id": uid,
+            "stem": stem,
+            "theme": theme,
+            "page_count": len(previews),
+            "char_count": len(md_text),
+            "preview_urls": [
+                f"/tools/markdown-to-doc/preview/{uid}/{i + 1}"
+                for i in range(len(previews))
+            ],
+            "downloads": {
+                # **只列使用者要的** —— odt 可能只是 docx 的中介產物。
+                "pdf":  f"/tools/markdown-to-doc/download/{uid}/pdf"
+                        if ("pdf" in want and produced["pdf"]) else None,
+                "docx": f"/tools/markdown-to-doc/download/{uid}/docx"
+                        if ("docx" in want and produced["docx"]) else None,
+                "odt":  f"/tools/markdown-to-doc/download/{uid}/odt"
+                        if ("odt" in want and produced["odt"]) else None,
+            },
+            "formats": sorted(want),
+            "errors": errors or None,
+        }
+        # **結果放檔案不放 `job.meta`** —— meta 有大小上限，超過會把大的欄位
+        # 丟掉（多半就是預覽圖清單），而那正是畫面要用的東西。
+        _aj.write_json(wdir / "result.json", payload)
 
-    if not pdf_path.exists() and "pdf" in errors:
-        # **缺 Office 引擎是部署問題不是使用者的錯** —— 讓它原樣冒上去由全域
-        # 處理器回 503。壓成 500 會讓人以為服務掛了而一直重試
-        # （2026-09-06 CI 在沒有 LibreOffice 的 runner 上抓到）。
-        from ...core.office_convert import OfficeUnavailableError, OfficeSourceError
-        e = exc_objs.get("pdf")
-        if isinstance(e, (OfficeUnavailableError, OfficeSourceError)):
-            raise e
-        raise HTTPException(500, f"轉檔失敗:{errors['pdf']}")
+        # **一定要設 `result_path`** —— 沒設的話「我的作業」會顯示已完成
+        # 卻沒有下載鈕，自動存入工作區與保留期清理也都不認得這份產出。
+        for k in ("pdf", "docx", "odt"):
+            q = {"pdf": pdf_path, "docx": docx_path, "odt": odt_path}[k]
+            if k in want and q.exists():
+                job.result_path = q
+                # 下載時看到的檔名。不設的話會退回內部檔名，
+                # 使用者存下來是一串看不懂的東西。
+                job.result_filename = f"{stem}.{k}"
+                break
+        job.progress = 1.0
+        job.message = f"完成 — {len(previews)} 頁預覽，{'、'.join(sorted(want)).upper()}"
+        return payload
 
-    return {
-        "ok": True,
-        "upload_id": uid,
-        "stem": stem,
-        "theme": theme,
-        "page_count": len(previews),
-        "char_count": len(md_text),
-        "preview_urls": [
-            f"/tools/markdown-to-doc/preview/{uid}/{i + 1}"
-            for i in range(len(previews))
-        ],
-        "downloads": {
-            "pdf":  f"/tools/markdown-to-doc/download/{uid}/pdf"  if pdf_path.exists() else None,
-            "docx": f"/tools/markdown-to-doc/download/{uid}/docx" if docx_path.exists() else None,
-            "odt":  f"/tools/markdown-to-doc/download/{uid}/odt"  if odt_path.exists() else None,
-        },
-        "errors": errors or None,
-    }
+    job = _jm.job_manager.submit("markdown-to-doc", _job,
+                                 meta={"upload_id": uid, "stem": stem,
+                                       "formats": sorted(want)},
+                                 request=request)
+    return {"job_id": job.id, "upload_id": uid}
+
+
+@router.get("/result/{upload_id}")
+async def result(request: Request, upload_id: str):
+    """轉檔完成後的完整結果（預覽網址、下載連結、統計）。
+
+    放在獨立端點而不是 `job.meta`：meta 有大小上限，
+    **超過會把大的欄位丟掉**，而預覽圖清單正好是最大的那一個。
+    """
+    require_uuid_hex(upload_id, "upload_id")
+    _uo.require(upload_id, request)
+    f = _work_dir(upload_id) / "result.json"
+    if not f.exists():
+        raise HTTPException(404, "結果不存在或已過期")
+    import json as _json
+    return _json.loads(f.read_text(encoding="utf-8"))
 
 
 @router.get("/preview/{upload_id}/{page}")

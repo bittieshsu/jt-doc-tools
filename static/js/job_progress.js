@@ -1,7 +1,8 @@
 // JobProgress: polls /api/jobs/{id} and shows status bar + download link(s).
 (function () {
   class JobProgress {
-    constructor(root, { downloadUrl, downloadPngUrl, onReset, onDone, onError, onCancel } = {}) {
+    constructor(root, { downloadUrl, downloadPngUrl, onReset, onDone, onError,
+                        onCancel, showDownload = true } = {}) {
       this.root = root;
       this.bar = root.querySelector('.job-bar-inner');
       this.status = root.querySelector('.job-status');
@@ -15,6 +16,9 @@
       this.onDone = onDone || (() => {});
       this.onError = onError || (() => {});
       this.onCancel = onCancel || (() => {});
+      // 有些工具的結果頁自己有一整排下載按鈕（PDF / Markdown / ZIP …），
+      // 這時再冒一顆「下載 .json」只會讓人以為那是別的東西。
+      this.showDownload = showDownload;
       this._timer = null;
       this._elapsedTimer = null;
       this._startedAt = 0;
@@ -26,16 +30,39 @@
     }
     show() { this.root.hidden = false; }
     stopPolling() { this._stop(); }
-    // 主動停止：呼叫 cancel API + 停輪詢（UI 端立即回饋）
+    // 主動停止：呼叫 cancel API + 停輪詢 + **把畫面切成「已停止」**
+    //
+    // ⚠ 原本只做前兩件，於是按下去之後：進度條停在原處、狀態文字還寫著
+    // 「擷取重點 4/5」、「可以關掉這一頁」還掛著 —— 跟「卡住了」長得一模一樣
+    // （2026-09-19 使用者回報「時間是沒走了，但是畫面看不出是停止的樣子」）。
+    //
+    // 停輪詢**正是**看不出來的原因：輪詢一停，就再也不會讀到伺服器回的
+    // `status: 'cancelled'`，而畫成「已停止」的程式碼就在那條路上。
+    // 所以要在這裡自己畫一次。
     async cancel() {
       const jid = this.jobId;
       this._stop();
+      this.markStopped();
       if (jid) {
         try { await fetch(`/api/jobs/${jid}/cancel`, { method: 'POST' }); } catch (_) {}
       }
     }
+    // 畫成「已停止」。**已過時間留著不清掉** —— 那是「跑了多久才停」，
+    // 是有用的資訊；清掉反而看起來像什麼都沒發生。
+    markStopped(msg, j) {
+      this.root.classList.add('jp-stopped');
+      this.status.textContent = msg || tr('已停止');
+      if (this.bgNote) this.bgNote.hidden = true;
+      if (this.dlBtn) this.dlBtn.hidden = true;
+      if (this.dlPngBtn) this.dlPngBtn.hidden = true;
+      if (this.saveWsBtn) this.saveWsBtn.hidden = true;
+      this.onCancel(j);
+    }
     hide() {
       this.root.hidden = true;
+      // **下一次作業要從乾淨的狀態開始** —— 不清掉的話再送一份檔案，
+      // 進度條一開始就是灰的而且寫著「已停止」。
+      this.root.classList.remove('jp-stopped');
       this.bar.style.width = '0%';
       this.status.textContent = tr('準備中…');
       if (this.elapsed) { this.elapsed.hidden = true; this.elapsed.textContent = ''; }
@@ -176,6 +203,10 @@
               this.dlPngBtn.hidden = !canPng;
               if (canPng) this.dlPngBtn.href = this.downloadPngUrl(jobId);
             }
+            if (!this.showDownload) {
+              this.dlBtn.hidden = true;
+              if (this.dlPngBtn) this.dlPngBtn.hidden = true;
+            }
             this._wireSaveWs(j);
             // 作業已經結束 —— 沒有「要不要繼續等」的問題了，收起提示
             if (this.bgNote) this.bgNote.hidden = true;
@@ -190,12 +221,11 @@
             this._stop();
             try { this.onError(j); } catch (_) {}
           } else if (j.status === 'cancelled') {
-            this.status.textContent = tr(j.message || tr('已停止'));
+            // 走同一支 —— 這條路是「別的地方取消的」（另一個分頁、管理頁），
+            // 畫面要跟自己按停止長得一樣。
             this._finishElapsed(tr('已過 {0}'));
-            // 作業已經結束 —— 沒有「要不要繼續等」的問題了，收起提示
-            if (this.bgNote) this.bgNote.hidden = true;
             this._stop();
-            try { this.onCancel(j); } catch (_) {}
+            try { this.markStopped(j.message ? tr(j.message) : null, j); } catch (_) {}
           } else if (j.status === 'interrupted') {
             // 服務在這個工作執行時重新啟動（多半是 `jtdt update` 升級）。
             // 少了這個分支，狀態會落到所有 if 之外 → 進度條**永遠轉下去**，

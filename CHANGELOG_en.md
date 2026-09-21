@@ -5,11 +5,1058 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (767 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (822 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.15.93] - 2026-09-21
+
+### Short-lived signed URLs: let an external service fetch one file, without handing over a credential
+
+Some external services only accept a **URL** — the file is not uploaded to them,
+they fetch it themselves from an address we provide.
+
+The obvious approach is to issue them an API token. **That road is closed**:
+`api_tokens` has no concept of scope, so one token unlocks every `/api/*`
+endpoint (jobs, notifications, workspace, every tool). Granting all of that so
+someone can fetch one file is not acceptable by this project's own standards.
+
+A signed URL is the other way round: **nothing is handed over**. The URL is the
+authorisation, it expires on its own, nothing needs revoking, and a leak is
+bounded to that one file until it expires.
+
+Three decisions:
+
+* **The expiry has to be inside the signature** — sign only the file id and
+  anyone can extend it indefinitely by editing `exp`.
+* **Anything that fails to verify returns 404, not 403** — a 403 tells the caller
+  "that id exists", and the id is the thing we did not want to leak. Malformed
+  id, wrong signature, expired, file missing: all four must look identical from
+  outside.
+* **The URL is built from a configured address, never the request's Host** — the
+  same service is reachable three ways (direct on the internal network, via the
+  reverse-proxied domain, on the test box). Building it from the request Host
+  means anyone arriving via the public domain submits a job carrying that domain,
+  which the other side's source allowlist correctly rejects — and the symptom is
+  "it works for some people and not others". A guard checks the source of that
+  function for `request` / `headers` / `url.hostname`.
+
+> This path **needs no change to any gate** (measured): a GET without a bearer
+> falls back to session auth, and `/api/` is in the public prefix list; CSRF only
+> guards unsafe methods. **POST is not like this** — CSRF is a pure-ASGI
+> middleware that runs before route matching, so any POST without a token gets
+> 403, including to paths that do not exist. The two paths sit behind completely
+> different gates; a conclusion about one does not carry to the other.
+
+## [1.15.92] - 2026-09-21
+
+### Meeting summary gains a fifth category: events and impact
+
+An external review noted that the summary never states the incident itself —
+what happened and how much it affected. **That was not a model limitation, it
+was our design**: the summary is written **only from verified items** and never
+sees the transcript, and "what happened" was not one of the four categories, so
+it structurally could not appear.
+
+### How you add it turns out to matter a great deal
+
+| Approach | Recall (4 kinds) | Fabrication (4 kinds) | Events and impact |
+|---|---|---|---|
+| Baseline (four kinds) | 100% | **5%** | — |
+| Five kinds in one call | 88-100% | **16-19%** | 2 (duplicates) |
+| Five kinds + explicit routing rules | 100% | **20%** (worse) | — |
+| Its own pass | 100% | 5-6% | 19 (half were progress reports) |
+| **Its own pass + mechanical boundary** | **100%** | **6%** | **7, every one correct** |
+
+**More rules produced more output, and more noise.** Reading the items showed
+why: the model did start noticing facts, but **filed them under decisions**
+("the API rate limit is sixty a minute", "they quoted 320,000 a year for
+maintenance"). The problem was never that the boundary was unclear — it was
+**judging five categories in one call**.
+
+So events and impact **runs as its own pass**: its own prompt, its own review,
+while the four-kind prompt and rules are **unchanged to the character**.
+**The zero regression is guaranteed by construction, not by tuning.**
+
+The cost was measured: extraction calls double (29 to 61, 147s to 303s for a
+160-minute meeting). So there is a switch, and **the trade-off is stated on the
+page** — leave it on for incident and status meetings, turn it off for purely
+forward-looking planning and the analysis takes about half as long.
+
+### The boundary has to be mechanical, not a matter of feel
+
+The first version said "personal progress reports do not count". **The model
+could not tell**, because "the config file has been sent out" genuinely is
+something that already happened. It became two mechanical rules:
+
+* Never write "done / sent / reviewed", nor "stuck / waiting / not ready yet".
+* Every entry must state **what was affected** or **a specific number** —
+  if it can state neither, do not write it.
+
+> **⚠ I opened a hole while closing one**: rewriting the rule replaced the
+> example "stuck because permissions were not granted" along with the paragraph
+> around it, and that whole class promptly reappeared (4 entries, with
+> duplicates). **Do not open one hole to close another** — the restored rule
+> sits alongside the new ones rather than replacing them.
+
+> **The first guard had no teeth**: `analyse` has two per-kind loops, and I only
+> checked that `MAIN_KINDS` appeared somewhere — changing just one of them back
+> to `KINDS` stayed green. The criterion had to become "**no loop may use
+> `KINDS`**".
+
+## [1.15.91] - 2026-09-20
+
+### Fixed: mindmap node text was cut off, so it read as if the analysis had lost content
+
+The node label was `text[:60]` — **60 characters, no marker of any kind**. On
+screen that produced "…set the environment variable (Environment Variable) to L"
+and "…deny them all de", while **the cards and the transcript held the full text
+all along**.
+
+The user cannot tell "shortened for display" from "the analysis lost the rest",
+and those two are worlds apart in severity.
+
+Three parts to the fix: **an ellipsis** so shortening is visible, **never cut a
+Latin identifier in half** (`LOG4J_FORMAT…`, `deployment.yaml`,
+`X-Forwarded-Proto` each count as one word), and **the tooltip now shows the full
+text** (it used to show the same truncated string).
+
+### The 60-character limit came from a corpus that could never reach it
+
+Of **868** items from earlier runs: median **18** characters, **longest 56** —
+**the limit was never once hit**, so the truncation never appeared in any
+measurement I had taken.
+
+Running a real committee transcript (54 items): **median 39, p90 = 101, longest
+379**.
+
+| Limit | Shown in full |
+|---:|---:|
+| 60 (before) | **77%** — roughly one in four cut |
+| 90 | 87% |
+| **120 (now)** | **94%** |
+| 160 | 98% |
+
+> **A corpus can be large and still the wrong shape.** The evaluation corpus is
+> synthetic short meetings; real items carry English terms and parenthetical
+> notes. Same lesson as "the class synthetic samples cannot reach".
+
+> **A guard must not share a definition with the code it guards**: my first
+> version used the product's own `_is_token_char` to check "did it cut an
+> identifier in half", so a mutation that emptied that definition **was not
+> caught at all** — the criterion moved with the mutation and stayed
+> self-consistent. The test now carries its own.
+>
+> The first version of that same test also used
+> `original.startswith(what_was_kept)`, which is **toothless**: `LOG4J` is a
+> prefix of `LOG4J_FORMAT…`, so **exactly the broken cut would be judged
+> correct**.
+
+## [1.15.90] - 2026-09-20
+
+### Fixed: half the meeting summary's "speaking time" figures are estimates, and the page did not say so
+
+Subtitle files (.vtt / .srt) and JSON carry an end time on **every** cue — those
+are measured. A plain-text transcript only records when each person *started*,
+so the end time is borrowed from the **next** segment's start, which means the
+speaking time **includes the pauses in between**.
+
+The two look identical on screen. The estimated kind now says so: the column
+header becomes "Speaking time (estimated)" and a line under the table explains
+how the figure is derived.
+
+> **The server decides** (from which parser ran); the front end must not guess
+> from the segments — "every end time equals the next start" can also be true of
+> a genuine subtitle file, so a guessed criterion would lie on some files.
+>
+> The guard **first proves the premise holds** (plain text really does borrow the
+> next start). If the parser ever stops filling it in, the expectation above
+> becomes a lie while staying green.
+
+### Empty cards no longer draw a conclusion about the meeting
+
+"This meeting had nothing of this kind" became "**the analysis did not find**
+anything of this kind **in the transcript**". Measured recall is 94-100%, not a
+guarantee of 100% — the first phrasing draws a conclusion about the meeting, the
+second states what we actually know.
+
+## [1.15.89] - 2026-09-20
+
+### Fixed: the submission-check row in "My jobs" had nothing to click
+
+That row has exactly two exits: **download** (`result_path`) and **open**
+(`view_url`). Submission check does not produce a file — it produces **a report
+filed under a case** — so it legitimately has no `result_path`; but it had no
+`view_url` either, so the row said "done" with nothing to click and the user had
+to work out for themselves to go back into the tool and find the case.
+
+The case page is already addressed by case id, already polls progress and
+already has its own access check, so pointing at it is enough — **no `?job=`
+restore work was needed**.
+
+**All 29 job-submitting tools were surveyed**: only three actually offer "open"
+(sentence translation, document translation, meeting summary) and all three
+restore correctly, so the "open lands on a blank page" bug fixed earlier does
+not exist anywhere else. This was the only tool with neither exit.
+
+> **⚠ My first survey was wrong.** I scanned for `"view_url" in source`, and
+> **`preview_url` contains `view_url`** — seven tools that merely show a preview
+> image were counted as having "open", three of which I briefly took for a bug.
+> Substring matching again (this project has been bitten by prefix and substring
+> matching several times). The guard now works on the AST, and **one test exists
+> purely to check it does not mistake `preview_url` for `view_url`**.
+
+> **The "prove the scan reaches something" check caught me too**: the first AST
+> matcher only recognised `_jm.job_manager.submit` (an `Attribute`), while most
+> tools do `from … import job_manager` and call it directly (a `Name`) — **it
+> reached 3 tools out of 29**. Without that check the guard would have quietly
+> examined three tools and stayed green.
+
+> **The criterion has to land on what "My jobs" actually receives**: `view_url`
+> is set *after* `submit()`, with a database write between it and the list. So
+> alongside the static guard there is one that really submits a job, waits for
+> it to land in the database, and confirms the list side can read it.
+
+## [1.15.88] - 2026-09-20
+
+### The workspace now takes plain text (.txt / .md)
+
+Transcripts from the meeting summary tool and output from the list tool could
+not be kept in the workspace.
+
+**The test is the content, not the file name.** Every other type the workspace
+takes has a clear signal (PDF and PNG by magic bytes, Office files by opening
+the zip and inspecting its structure); plain text has neither. Accepting by
+extension would let anything through by renaming it to `.txt`, which is exactly
+what the type check exists to prevent. The test is now "the whole file decodes
+as UTF-8 and contains no control characters other than tab, CR and LF", and the
+name only chooses **between .txt and .md**. A PNG renamed to `.txt` is still
+detected as a PNG.
+
+**The whole file is checked, not a sample of the first few KB** — a file whose
+first 8 KB are clean and whose tail is binary is easy to produce, and sampling
+would let it straight in.
+
+> Plain text has no first page to draw, so its thumbnail is the blank
+> placeholder — but it has to say so. Falling through to the "treat it as a PDF"
+> path makes it look for a `file.pdf` that does not exist, and the error becomes
+> "file not found", which reads as if the user's file had been lost.
+
+### Fixed: one more list written twice — the upload accept attribute
+
+The file picker in `my_workspace.html` hardcoded
+`application/pdf,image/png,.docx,…` in two places, while the server-side list
+gained spreadsheets and presentations back in v1.14.6. The symptom is that
+**the file picker filters out files the server would happily accept**: the user
+just finds a file "cannot be uploaded", with no error message to go on.
+
+The list is now computed on the server and passed into the template, the same
+way `data-ws-exts` already worked. The "PDF / PNG" wording on the page was
+reworded so it will not drift again either.
+
+## [1.15.87] - 2026-09-20
+
+### Fixed: the macro hardening around conversions had never taken effect
+
+Conversions handle files uploaded by users, so each one seeds a throwaway
+profile with `DisableMacrosExecution`. Measuring it showed every converter also
+passed `--safe-mode` — and that flag **resets the user profile at startup**, so
+the setting was gone by the time the run finished.
+
+The old comment said "`--safe-mode` has nothing to do with macros". That
+sentence is true; what it missed is that safe mode has everything to do with
+**the settings we seed**: it wipes the lot.
+
+> The criterion is "is the setting still there after the run", not "did we write
+> it out". The file was written every time, so checking the write would never
+> have shown this.
+
+Severity, stated plainly: LibreOffice ships with macro security set to High and
+headless conversion does not auto-execute macros, so this was **a layer of
+defence in depth that was not working**, not an exploitable hole.
+
+The two things `--safe-mode` guarded against are already covered: user
+customisations (every call gets a fresh throwaway profile) and the crash
+recovery prompt (`--norestore`). With it removed, three real documents (docx and
+xlsx) produce identical page counts, page sizes, character counts and per-page
+rendered pixel hashes.
+
+### Fixed: exported PDFs were Letter, not A4
+
+Taiwan prints A4. Letter is 18mm shorter and 6mm wider, so content laid out for
+A4 shifts. This affected every conversion whose source carries no page size:
+Markdown to office document, the meeting summary exports, plain text and CSV.
+
+* **CSS `@page { size: A4 }` is ignored** by LibreOffice's HTML import.
+* **`LANG` and `LC_PAPER` do nothing** — `LANG=zh_TW.UTF-8` only changes the
+  length unit (in to cm), the paper stays Letter, and most servers have no
+  zh_TW locale generated at all.
+
+What works is seeding `ooSetupSystemLocale` in the throwaway profile. **It must
+not be applied unconditionally**: it is also the system locale, so it changes
+CJK font fallback. On a real vendor form in docx, the leading spaces were then
+measured with a different font and the whole label **shifted about 10pt left**
+(identical ink and identical glyphs — purely the width of the whitespace). The
+form-filling tools are acutely sensitive to coordinate shifts, and their sources
+carry a page size already, so they do not need this at all.
+
+So the test is whether the source declares a page size: those that do not (HTML,
+plain text, CSV) get ours; those that do keep theirs — an .odt declaring Letter
+still comes out Letter, and a real docx renders to the same per-page pixel hash
+as before the change.
+
+## [1.15.86] - 2026-09-20
+
+### Fixed: a term that is not Taiwanese usage
+
+`估計` is Mainland-flavoured. Taiwan writes `預估` (an estimated reading time),
+`推估` (derived from another number) or `約` (about 800 MB). It is now on the
+banned-term list, scoped to text the user can see — `背景估計` in a comment is a
+technical term and stays.
+
+Adding the rule immediately found two places: the word-count tool's reading-time
+label (**the panel right next to it already used the correct form**, so both
+spellings sat on the same screen), and one sentence in the README about how
+memory is measured. The job list's `估 800 MB` became `約 800 MB` at the same time —
+**its English translation was already "about"**; only the Chinese half was the
+exception.
+
+> The general rule: when you ban a term, sweep the **synonyms already in the
+> code** in the same pass. Otherwise half the screen is new and half is old, and
+> nothing goes red.
+
+## [1.15.85] - 2026-09-20
+
+### Fixed: headings were invisible white text in exported .odt / .docx
+
+The business report theme draws its heading as white text on a dark banner, and
+the Office engine's HTML import **keeps the text colour but drops the paragraph
+background** — leaving white on white, so the whole line disappears. PDF is
+unaffected (it can paint the background).
+
+**"Markdown to office document" had the same bug**, just unreported. Both tools
+now share one override: document formats get dark text with a rule under it,
+while the PDF keeps its banner.
+
+> The general rule: **never let legibility depend on a background**. A background
+> is the first thing lost in a conversion, and when it goes the symptom is
+> "nothing is there", not "the colour looks off".
+
+### Meeting summary: a pasted transcript now takes its title from the background
+
+When text is pasted, the filename is one we invent ("pasted transcript.txt"), so
+the exported document was titled "pasted transcript — meeting record" — internal
+wording on a document meant to be sent out.
+
+The order is now: **the topic written in the meeting background → the filename →
+a plain "Meeting record"**. The download filename follows the same source.
+
+**The title is not guessed from the summary**: the summary is a paragraph, and
+truncating it cuts mid-sentence and changes with every run. The background field
+is where "Topic: …" belongs.
+
+### Other
+
+- The handoff button to "Markdown to office document" was removed (the result
+  panel already offers Word and ODF)
+- The LLM settings description for Meeting summary now recommends gemma4:26b or
+  larger, with qwen3.8:27b as a measured option when video memory is limited
+
+## [1.15.84] - 2026-09-19
+
+### Meeting summary: clicking a block in the distribution jumps to that moment
+
+The whole row shared one segment number (the speaker's first turn), so every
+block jumped to the same place — while what the reader sees is a block at a
+particular moment. Each block now carries its own segment number; clicking the
+empty track still falls back to the row's first. Hovering shows the time and
+segment for that block.
+
+### Meeting summary: the longest topic row no longer wraps its figures
+
+The bar competed with the text for width, so on the longest row the bar filled
+the space and the percentage and duration wrapped to a second line. The bar is
+now drawn inside a fixed-width track — the text always has room, and every row's
+proportion is measured against the same track rather than varying with the
+length of its label.
+
+## [1.15.83] - 2026-09-19
+
+### Meeting summary: exports to Word and ODF, with a choice of layout theme
+
+Besides PDF, the record now exports as **Word (.docx)** and **ODF (.odt)**, so it
+can be edited further or dropped into a company template.
+
+The download row gained a **layout theme** selector with six options (clean,
+GitHub style, academic, book, business report, minimal), defaulting to business
+report.
+
+All three formats and all six themes come straight from "Markdown to office
+document" — the renderer and the theme definitions are shared. Writing a second
+layout engine here would produce something worse, and themes added there would
+not appear here.
+
+## [1.15.82] - 2026-09-19
+
+### Fixed: the exported charts had not followed the screen
+
+The previous version merged the speaker bar chart into the table and replaced it
+with a "speaking distribution" column, **but exports use a separate set of charts
+rendered on the server** — so the page showed the distribution while the PDF still
+had the old bar chart, with unlabelled speakers still shown as `unknown`. **The
+same thing written in two places always drifts**; this time it drifted between
+screen and export.
+
+The server now draws "who spoke when" as well (one row per person, a block
+wherever they spoke), and the exported table matches the page's ordering and
+column names. When only the analysis is available and there are no segments (the
+public API), it still falls back to the bar chart.
+
+### Meeting summary: citations show just the number
+
+The cards are narrow and an item often carries three or four citations — in
+"segment 10", two of the three words are decoration repeated on every chip. The
+full wording stays in the tooltip and the screen-reader label.
+
+## [1.15.81] - 2026-09-19
+
+### Meeting summary: the length bar now sits close to its topic title
+
+A title and the bar beneath it are one thing; the gap between them made them read
+as two rows. The gap came from two places — the row's line height (1.5, meant for
+body text, which leaves three or four pixels under the title) and the bar's own
+top margin. **Adjusting only one of them is not enough.**
+
+## [1.15.80] - 2026-09-19
+
+### Meeting summary: charts no longer run off the page in the exported PDF
+
+Images were placed at their natural pixel size, and the discussion map is 980px
+wide — **the right-hand side was cut off**. `max-width: 100%` does nothing (the
+Office engine's HTML import ignores that CSS rule; measured, it still used 980),
+so the HTML `width` attribute is used instead.
+
+**Constraining the width alone is not enough**: scaled to the page width, the
+discussion map is still taller than one page, and the engine does not paginate an
+image — it places it and clips whatever does not fit (measured: the image bottom
+was 57pt past the page). Tall charts are now sliced so each piece fits a page.
+
+### Meeting summary: chart headings no longer appear twice
+
+The chart draws its own title, and the surrounding Markdown added a heading with
+the same text.
+
+## [1.15.79] - 2026-09-19
+
+### Fixed: the meeting summary PDF export had never once worked
+
+Reported as "it looks great on screen, why is the exported PDF so bad". What came
+out was three pages of charts with **not a single line of text**, on pages sized
+980×2640 — the charts' own dimensions, not paper.
+
+The conversion helper takes the **destination file** as its second argument and
+returns `None`. The old code passed a directory and treated the return value as
+the produced file, so that check **never once succeeded** and every export fell
+back to charts-only. And since returning `None` is not an exception, the `except`
+never fired — **nothing was logged, and the download was always 200**.
+
+The Markdown was also being handed straight to the Office engine, which **does not
+read Markdown**. It is now rendered to HTML first (sharing the renderer with
+"Markdown to office document"), and the export is a document with a title,
+summary, decisions, actions, risks, topics and the speaker table.
+
+**Falling back now always leaves a warning** saying which step failed — a
+charts-only PDF and a complete one look identical from the outside: a file
+downloaded.
+
+### Meeting summary: the document title no longer carries the file extension
+
+### Topics timeline: "chapters" renamed to "topics"
+
+"Chapter" is borrowed from video and books; nobody says it about a meeting. The
+card is now "Topics over time" and the chart below it "How long each topic took".
+
+That chart's heading had also **never been translated**: it was written as
+`tr(cond ? 'A' : 'B')`, so the key is computed at runtime and the extractor can
+never see it. The heading moved to HTML with each branch translated separately —
+which is also where a section icon fits.
+
+## [1.15.78] - 2026-09-19
+
+### Fixed: opening a meeting summary from "My jobs" showed nothing
+
+Coming back with a job id in the URL, the job had already finished — the progress
+bar said "done" but **everything below it was empty**, as if the result had been
+cleared.
+
+Reading the result needs the upload id, which only exists during the upload
+itself; on a fresh page it is empty, so that code **silently did nothing**. The
+job records that id, and it is now retrieved before reading the result.
+
+### Meeting summary: the speaking distribution is now part of the table
+
+It used to be a chart on the left and a table on the right, which had to line up
+row by row — same order, same row height, same starting point. Row height depends
+on the font and the browser, so even measured alignment was off by a few pixels,
+and "off by a little" is exactly what misalignment looks like.
+
+Merged, the alignment is guaranteed by structure: a row is a row. The
+distribution column is positioned in percentages, so it follows the column width
+on its own. Clicking a row jumps to where that person first spoke.
+
+## [1.15.77] - 2026-09-19
+
+### Meeting summary: the speaker chart is now "who spoke when"
+
+It used to be a bar chart of who talked most — which **the table beside it
+already says**, so drawing it again was the same numbers in another shape.
+
+It is now a timeline with one row per person: wherever they spoke, there is a
+block. Three things the table cannot show are visible at a glance — **who
+dominated** (most ink in that row; the share is still readable), **the rhythm**
+(spread through the meeting or concentrated in one stretch), and **who was absent
+from which part** (the gaps).
+
+It works without timestamps too: the horizontal axis becomes position in the
+transcript, which is still the progress of the meeting, just a different scale —
+and the chart says which one it is using.
+
+### Meeting summary: the numbers to the right of the charts are now aligned
+
+Percentage, time and turn count were one right-aligned string, so the first
+column was pushed around by the width of the last (`9.0%` and `13.8%` differ by a
+character, which skewed the whole column). Each is now its own right-aligned
+column, in tabular figures.
+
+### Meeting summary: the background field is styled
+
+It only had width, height and font size — no border, corners or padding, so it
+looked like a raw browser box.
+
+### Meeting summary: unlabelled speakers no longer show as `unknown`
+
+`unknown` is a placeholder the analysis inserts, not a name. The data keeps it
+(statistics, citations and exports all key off it); the screen now says
+"Unlabelled speaker".
+
+## [1.15.76] - 2026-09-19
+
+### Meeting summary: the four statistics now fill the row evenly
+
+Their width followed their contents, so the four boxes were different sizes,
+bunched to the left and did not line up with the full-width fields below them.
+They are now an even grid that fills the row and wraps when narrow.
+
+### Meeting summary: the layout hint no longer has nested parentheses
+
+The layout names already contain parentheses, so wrapping them added a second
+level. The hint now reads "Detected: …" without the outer pair.
+
+## [1.15.75] - 2026-09-19
+
+### Meeting summary: the speaker table now has grid lines
+
+Each row carries five numbers, and with only a very faint bottom rule and no
+vertical lines the eye could not follow across. Horizontal and vertical rules,
+alternating row tint, and a row highlight on hover were added.
+
+### Meeting summary: the table's "share" column is now "share by characters"
+
+The chart beside it is based on **speaking time**, while the table's share has
+always been based on **character count** — seeing 23.1% and 21.8% next to each
+other for the same person looked like one of them was wrong. The column heading
+now says which it is.
+
+## [1.15.74] - 2026-09-19
+
+### Fixed: downloads in Meeting summary blocked the whole site
+
+PDF / chart PNG / ZIP are **generated when you press the button** (rasterising
+the charts, zipping), and that CPU work ran directly on the web server's event
+loop — while one person downloaded, **nobody else could even open the home
+page**.
+
+It now runs on a worker thread. The existing "endpoints must not block the event
+loop" check cannot see this shape (the heavy work is inside called functions), so
+this endpoint is pinned in that test's explicit list.
+
+### Meeting summary: download buttons now say "Generating…"
+
+They were plain links, so nothing on screen changed until the file arrived — it
+looked like nothing happened and people pressed again. The button now switches to
+"Generating…" with a spinner and blocks repeat clicks until the file is ready.
+
+They also fetch the file themselves now, so server errors are shown as a message
+— previously the error page was saved as if it were the file.
+
+### Meeting summary: the chapter timeline spine was broken into segments
+
+The spine is drawn per row and only stretched to the row's *content* box, so the
+row's vertical padding left a gap between every pair of rows. The overhang is now
+tied to the same variable as the padding, so changing one cannot break the other.
+
+## [1.15.73] - 2026-09-19
+
+### Meeting summary: the upload card now follows the actual flow
+
+The background field used to sit **below** the submit button, so you only saw it
+after pressing. The order is now "paste the transcript → background → button",
+with the button last.
+
+The button is renamed from "Use this text" to "Parse transcript": what it does is
+parse the content into segments and speakers (pressing it shows the segment
+count, speaker count and the first few lines), and the label should say so.
+
+## [1.15.72] - 2026-09-19
+
+### Meeting summary: the background field looked like a separate block
+
+It was already inside the "1. Upload transcript" card, but it had its own border
+and background, so it read as **a card inside a card**. The box is gone; a single
+divider line now separates it — the same visual weight as "or paste the
+transcript directly", so it clearly belongs to the same card.
+
+## [1.15.71] - 2026-09-19
+
+### Meeting summary: you can now supply meeting background
+
+There is a new optional field below the upload area (collapsed by default) for
+**information that is not in the transcript** — the topic, date and place,
+attendees and their roles, terminology, or anything else you want to say.
+
+It makes the analysis more accurate: knowing who manages and who does the work is
+what lets "please ask X to handle it" resolve to an owner, and knowing your system
+codenames and abbreviations keeps the wording intact.
+
+**The background never becomes a source of items.** What you write there did not
+happen in the meeting; if it could produce a decision, this tool's guarantee that
+every item traces back to the transcript would be broken — invisibly. Three
+defences:
+
+1. The prompt says so, and **our rules bracket the user text on both sides** —
+   what you type could read like an instruction, so we must have the last word.
+2. **Citation verification**: an item must point back to transcript segments, and
+   the background is not part of what is compared.
+3. **Anything that closely matches the background and matches it noticeably
+   better than the transcript is dropped.**
+
+The third was added while writing the tests — the second turned out not to be
+enough on its own. What people put in the background (an agenda, a topic list) is
+exactly what the meeting was about, so a decision copied from the agenda still
+overlaps the transcript enough to pass the threshold.
+
+> This does not catch a sentence the model builds by blending background and
+> transcript wording. The background is still an input to treat with care.
+
+The public API accepts it too (`context`, up to 4000 characters).
+
+## [1.15.70] - 2026-09-19
+
+### Meeting summary: a pass over the charts and layout
+
+- **Chapters are now a timeline**: a spine down the left, a dot per chapter, and
+  a length bar next to each title. The old two-column "time | title" table left
+  most of the width empty; the same data now also shows which part ran longest.
+- **Hovering a bar lights up its legend row and dims the others.**
+- **The speaker chart and its table now sit side by side**, stacking when narrow.
+- **The post-upload statistics are now tinted blocks** (segments / speakers /
+  characters / duration).
+- Legend text is one size larger.
+
+### Fixed: chart text was sometimes too large, sometimes too small
+
+Both reports arrived the same day, and **they had the same cause**: the width a
+chart was drawn at did not match the width it actually occupied, so CSS scaled
+the whole chart — text included.
+
+Too large came from the discussion map being **still hidden when its width was
+measured** (measured 0, fell back to a default, then got stretched 1.7x); too
+small was the reverse.
+
+Charts are now drawn in real pixels, and **measured again after drawing**: if the
+actual width differs by more than 2%, the chart is redrawn once at the real
+width. There are many ways to mismeasure (the container still opening, fonts
+still loading, a scrollbar taking a few pixels), so rather than plugging each
+one, the chart checks itself in the mirror.
+
+### Fixed: hovering the items on the right of the discussion map did nothing
+
+The chapters on the left highlighted; the items on the right did not. Those boxes
+have a white background, and the effect was an opacity change — **which is
+invisible on a white page**. It now changes brightness, which shows on both white
+boxes and coloured bars.
+
+### Fixed: an extra "Download .json" button on the progress bar
+
+The meeting summary result panel already has a full row of download buttons (PDF
+/ Markdown / chart PNG / ZIP / JSON / hand off), and the shared progress bar
+added another one labelled "Download .json", which looked like something else.
+Tools can now tell the shared progress bar not to show that button.
+
+Spacing was also added between the progress bar buttons and the card below them
+(this applies to every tool with background jobs).
+
+## [1.15.69] - 2026-09-19
+
+### Fixed: pressing "Stop" did not look like it stopped
+
+After pressing stop the timer did freeze, but **the progress bar stayed where it
+was, the status still read "extracting 4/5", and the "you can close this page"
+note was still showing** — indistinguishable from a hung job.
+
+Stopping only did two things: stop polling and tell the server. The code that
+paints the "stopped" state was **on the polling path** (it ran when the server
+reported the job as cancelled), so once polling stopped it could never run.
+
+Pressing stop now immediately sets the status to "Stopped", greys out the bar and
+takes down the "you can close this page" note. **The elapsed time is kept** — how
+long it ran before stopping is useful information. This is the shared progress
+bar, so every tool with background jobs benefits.
+
+### Fixed: the paste box in Meeting summary printed `&#10;` in its hint text
+
+The hint text of the "paste the transcript directly" box showed a literal
+`&#10;` instead of a line break.
+
+The hint goes through the translation helper, and **translated text is
+auto-escaped** — the `&` became `&amp;`, so the browser displayed the six
+characters. All three language catalogues had copied the same markup, so all
+three were affected.
+
+## [1.15.68] - 2026-09-19
+
+### Meeting summary: charts are now drawn in the browser and are clickable
+
+The three charts (discussion structure, chapter share, speaker share) used to be
+images rendered on the server, so **nothing in them could be clicked** — even
+though the whole point of this tool is that every item traces back to the
+transcript. They are now drawn in the browser:
+
+- **Click any part of a chart and the transcript jumps to that segment and
+  highlights it** (the same logic the citation buttons use)
+- They are drawn to the width of their container and redrawn when the window
+  resizes, so there is no large empty gap on wide screens
+- Exported PNG / PDF and the images embedded in the exported Markdown are still
+  rendered on the server
+
+### Meeting summary: the right-hand side of the discussion map is no longer empty
+
+Decisions and action items cluster near the end of a meeting, so out of ten
+chapters only three typically have anything attached — leaving the right half of
+seven rows blank, which looked like a broken chart. Those chapters genuinely
+produced nothing, so rather than hiding them or inventing a node, they are now
+drawn as a full-width bar with "no decisions or actions" noted on the right. You
+can tell at a glance which topics were discussed without producing an outcome.
+
+### Fixed: chapter share said there were no timestamps when there were
+
+In a plain-text transcript, timestamps are `16:19`-style markers at the start of
+a line, and **not every line has one** (the header block, lines like
+"(brief silence)", and the final segment never get one). Chapter times were
+computed from "the start of the first segment" and "the end of the last segment",
+so if a chapter happened to begin or end on such a line, that whole chapter had
+no time — and a single chapter without a time made **the entire chart fall back
+to segment counts**, displaying "this transcript has no timestamps".
+
+Chapter times are now taken from the earliest and latest timestamps that are
+actually present in the chapter.
+
+### Meeting summary: the transcript is fully expanded, card headings stand out
+
+The transcript used to be trapped in its own scrollbar, so jumping to a citation
+meant scrolling inside a small window and the page scrollbar never reached the
+later content. It is now fully expanded. The headings of the four cards
+(decisions, actions, risks, open questions) are larger, have a background tint
+and a coloured left edge, and the counts are shown as badges.
+
+### Line endings in Windows batch files now have a guard
+
+`setup-python.cmd` (the batch file that sets up the Python environment during
+Windows installation) **must use CRLF line endings**. With LF endings, cmd.exe
+fails token by token, so anyone installing from the tarball on a machine
+without git gets a failed install. This was fixed in v1.12.8 / v1.12.10 with
+three separate safeguards (normalise before running, convert the file to CRLF,
+declare the rule in `.gitattributes`) — but **none of them had a test**.
+
+`tests/test_script_line_endings.py` now checks that every line of `.cmd` /
+`.bat` ends in CRLF, that `.sh` files contain no CR at all, and that the three
+`.gitattributes` rules are still there (that is what protects people who clone).
+
+People who clone never see this class of problem: checkout converts the file
+back to CRLF, so it always looks correct on a development machine.
+
+### Other
+
+- The deployment tarball is now built from an allow-list and verified after packing
+- Housekeeping in internal tools and guard tests
+
+## [1.15.67] - 2026-09-18
+
+### Fixed: all four download buttons in Extract text failed
+
+If the uploaded filename had a space before the extension (`minutes .pdf`, which
+is common when the name is copied from a web page), the TXT / Markdown / Word /
+ODT downloads **all failed**, and "Save to workspace" broke with them. The
+browser saved the error message as a file; the save dialog showed `txt.json`.
+
+The cause was that the file was **written under the original name but read back
+with the surrounding whitespace stripped**, so the two paths did not match. The
+message said "expired", which looks like the file was cleaned up rather than a
+filename mismatch.
+
+Downloads now also carry a plain ASCII fallback name: when only the UTF-8 name is
+sent, some browsers fall back to the last part of the URL.
+
+### Extract text: one-click copy on the preview
+
+It copies what the preview shows (the first 5000 characters); the button says how
+much was copied and points to Download TXT for the whole thing.
+
+### Meeting summary: a lot changed in this release
+
+**Transcript layout is detected automatically, and you can override it.** Eight
+common layouts are supported: a speaker header on its own line with the text
+below, one utterance per line, times at the start or in brackets, bullet-led
+lines, half-width colons and so on. The detected layout is shown, and you can
+pick a different one when the guess is wrong.
+
+**You can paste a transcript directly** instead of saving it to a file first.
+
+**Very long turns are split.** In committee records one person often speaks for
+minutes at a time, which used to be a single segment of twenty thousand
+characters: every citation pointed at "segment 1", and clicking it showed a wall
+of text, which is no citation at all. Segments are now capped at 400 characters
+(measured: a 26,907-character record went from 4 segments to 78).
+
+**Long meetings no longer go wrong.** What was sent to the model used to grow
+with the length of a turn, and once it exceeded what the model can read it was
+**silently truncated** — it looked successful while only part of the text had
+been read. What is sent is now bounded, and the review pass runs in batches so a
+failed batch costs only that batch.
+
+**The mind map, speaking share and chapter share are now drawn on the server**,
+so the page, the Markdown and the PDF all use the same image. The mind map is
+**assembled, not generated**: every node comes from an entry whose citation was
+verified, so each box points back to the transcript.
+
+**"Who spoke how much" works without timestamps** (turns and characters); the
+whole section used to disappear. Chapters likewise vanished without timings.
+
+**New exports**: PDF (the whole minutes), charts as PNG, and a ZIP with the
+Markdown plus images. The Markdown download embeds the images, so they survive
+being handed to "Markdown to office document".
+
+**Fixed**: the "Send to Markdown to office document" button did nothing. Every
+section and card now has an icon, and the export buttons are spaced away from the
+content below them.
+
+### The home page says how many tools there are
+
+"An integrated PDF / Office document platform, **49** tools" — the number is
+computed, so it follows along when tools are added.
+
+## [1.15.66] - 2026-09-18
+
+### Fixed: turning on "enforce API tokens" froze the web interface (issue #52)
+
+With enforcement on, the `/api/` requests the web interface makes for itself were
+all rejected with 401: progress polling, cancelling a job, notifications, the
+inbox, the workspace list. **The pages themselves still opened, and jobs really
+did finish in the background**, so it looked like "the progress bar is stuck" or
+"the button does nothing", nothing like a settings problem.
+
+The check recognised only a **hard-coded list of paths** (the admin area and two
+preview endpoints); everything else counted as an outside API call. It now looks
+at whether the request carries a logged-in **session** instead: if it does, the
+normal permission checks apply; only requests without one (scripts, `curl`) are
+blocked. There is no list to maintain any more, so new endpoints cannot be
+missed.
+
+The setting's description was also corrected: **it has no effect while
+authentication is off**, because with no identity required anywhere there is no
+way to tell the web interface apart from a script, so both are let through. To
+actually restrict outside callers, turn authentication on first. The old wording
+said calls "are rejected with 401", which was not true in that mode.
+
+## [1.15.65] - 2026-09-18
+
+### New tool: meeting summary
+
+Turns a meeting transcript into a **summary, decisions, action items, risks,
+open questions and chapters**.
+
+**Every entry points back to the segment it came from and who said it** — click
+it and the transcript jumps to that line. This is not decoration: minutes get
+used as the record of what was agreed, and **a decision with no source is worse
+than no decision at all**. Anything that cannot be found in the segment it
+claims is dropped, and the result page tells you how many were dropped.
+
+Accepted transcripts: subtitles (`.vtt` / `.srt`), transcript JSON, plain text
+(`.txt` / `.md`), Word and ODF (`.docx` / `.odt`). For plain text, one utterance
+per line; a `Name:` prefix is understood, and so are leading timestamps.
+
+**After the upload and before the analysis starts you see what was parsed** —
+segment count, speakers, the first few lines. If the speakers came out wrong you
+find out before spending the minutes, not after.
+
+When timestamps are present it also computes the **speaking share** directly from
+them (overlapping interjections counted once), not estimated. **Without
+timestamps that chart and the chapter timeline simply do not appear**, and the
+page says why — a guessed number would be worse than none.
+
+Also: the analysis can be stopped; it finishes even if you close the tab, and
+"My jobs" takes you back to it; the Markdown download can be handed straight to
+"Markdown to office document" for layout. Requires LLM to be enabled in the
+admin area.
+
+Tool count 48 to 49.
+
+## [1.15.64] - 2026-09-18
+
+### New `/readyz`: "the service is alive" and "nothing is missing" are two questions
+
+When a tool failed to load — usually a missing dependency — it left one line in
+the log and then quietly disappeared: one fewer entry in the sidebar, 404 on its
+URL, and `/healthz` still answering `{"ok":true}`. Administrators had nowhere to
+see it.
+
+`GET /readyz` is new (no login required, same as `/healthz`):
+
+- Tools missing → **200 with `degraded: true`**; the remaining tools still work
+- Data directory not writable, or the database unreachable → **503**, because
+  that is a service that genuinely cannot do its job
+- It never returns module names, exception text, or file paths — the endpoint is
+  public
+
+**Which tools failed and why** is shown at the top of the admin **System status**
+page (administrators only), and takes up no space at all when nothing failed.
+After installing the missing package, restart the service for the tool to load.
+
+`/healthz` is unchanged and deliberately ignores tool loading: service managers
+use it to decide whether to restart, and restarting in a loop because one tool is
+missing is worse than the problem. For the same reason `/readyz` does not return
+503 for missing tools — this product runs as a single web process, so marking the
+only instance unhealthy would show visitors a site-wide error page.
+
+Monitoring setup is documented in `OPS.md`. This came out of an external source
+code audit.
+
+## [1.15.63] - 2026-09-18
+
+### Markdown to office: runs in the background and can be stopped
+
+It used to be a synchronous request — all you could do was watch "converting…"
+with no way to stop, and closing the tab threw the work away.
+
+There is now a progress bar and a **Stop** button, the job finishes even if you
+close the page, and "My jobs" → **Open** reconnects to it. Stopping takes down the
+whole tree of conversion processes (the mechanism added in v1.15.62) rather than
+just hiding the progress bar.
+
+Finished jobs now also offer a download in "My jobs", named after the title you
+entered.
+
+## [1.15.62] - 2026-09-18
+
+### Fixes a regression from v1.15.61: code blocks ran off the page
+
+To put space between code and its frame, the previous release wrapped code blocks
+in a single-cell table. The result was that **long commands stopped wrapping and
+the whole block was pushed past the right edge of the page, cutting content off**.
+
+Content being cut off is far worse than text sitting against a frame, so that
+approach has been reverted. Three ways of getting the spacing were measured
+(`padding`, an outer container, a single-cell table) and the conversion engine
+honours none of them. Code blocks are now an indented tinted band with no frame —
+with no frame there is nothing for the text to touch, and the indent separates
+code from prose clearly.
+
+Table borders are unaffected and remain as added in the previous release.
+
+### Cancelling a job now actually stops the work
+
+The stop button in "My jobs" and on tool pages only changed the status to
+"stopped". A conversion spends its minutes waiting on an external program, so the
+cancellation checkpoints in our own code were never reached: the screen said
+stopped while **the server finished the conversion anyway**, still using CPU and
+memory.
+
+Cancelling now stops the entire tree of external programs that job started. This
+applies to every tool that shells out (text recognition, all conversions).
+
+Before stopping anything the process identity is verified — process numbers are
+reused on a long-running service, and without the check there is a chance of
+stopping something unrelated.
+
+## [1.15.61] - 2026-09-18
+
+### Markdown to office: tables now have visible borders, code no longer touches its frame
+
+Converted tables had no borders and awkward column widths, and text in code blocks
+sat right against the surrounding frame.
+
+The conversion engine supports only a narrow slice of CSS: `border: 1px solid …`
+draws **nothing at all**, and `padding` on a code block is treated as an indent
+(frame and text both move right, with no gap between them). Switching to HTML
+presentational attributes makes it reliable — table borders now measure 0.75pt
+(clearly visible) and code blocks have roughly 6pt between the text and the frame.
+
+The same document also lost a page (27 to 26), and the two overlapping sets of
+borders — one from the attributes, one drawn as hairlines from CSS — no longer
+fight each other.
+
+## [1.15.60] - 2026-09-18
+
+### Markdown to office: no more near-empty pages in the PDF
+
+Converted PDFs contained pages holding only a line or two, with tables broken so
+that a single row sat alone on a page. The cause: the HTML was converted using
+**web-view layout** instead of document layout. On the same file that meant
+36 pages with 3 near-empty ones; with document layout it is 25 pages with none,
+and the median characters per page went from 687 to 1029. Table column widths
+are better too.
+
+The other two outputs (.docx / .odt) already used document layout — only the PDF
+path had been missed.
+
+### Markdown to office: choose which formats to produce
+
+Every run used to produce PDF **and** DOCX **and** ODT. Each format runs the
+conversion engine once, the engine is serialised, and each run is capped at
+120 seconds — so on a busy host a few tens of KB of Markdown could take over two
+minutes and then fail, while the screen promised "10-30 seconds".
+
+There is now a format picker, defaulting to PDF only. The page also states that
+previews are rendered from the PDF, so without PDF there is no preview. The
+public API still produces all three when no format is given, so existing calls
+are unaffected.
+
+### Markdown to office: syntax highlighting in code blocks
+
+Code blocks are coloured according to the language tag, and inline code keeps its
+colour. The **Minimal black & white** theme deliberately stays uncoloured — a
+completely neutral look is the whole point of that theme.
+
+### A conversion that timed out did not actually stop
+
+On timeout only the outer launcher was stopped; the process actually parsing the
+file survived, kept burning CPU, and never exited on its own. Because conversion
+processes are deliberately given low priority (to keep the web UI responsive),
+each leftover process made every later conversion slower and more likely to time
+out. The whole process tree is now stopped.
+
+This affects all seven conversion paths (office to PDF, office to image, Markdown
+to office, and so on).
+
+### The timeout message no longer points in the wrong direction
+
+When a Markdown conversion timed out, the message said the file might be damaged
+and suggested asking the sender for a PDF — but the intermediate file on that
+path is generated by this tool itself and has nothing to do with what was
+uploaded. It now explains that a timeout usually means a busy host or a large
+document.
 
 ## [1.15.59] - 2026-09-17
 

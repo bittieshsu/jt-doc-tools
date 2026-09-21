@@ -1,6 +1,6 @@
 **繁體中文** ｜ [English](README_en.md) ｜ [日本語](README_ja.md)
 
-# Jason Tools 文件工具箱 v1.15.59
+# Jason Tools 文件工具箱 v1.15.93
 
 > ### ⚠ 2026-09-13 之前用 git 安裝的，這一版升級前要先跑一行
 >
@@ -25,7 +25,7 @@
 > 之後 `jtdt update` 恢復正常。**不受影響**：tarball 安裝、Windows 安裝程式、
 > 或 2026-09-13 之後才安裝的。v1.15.43 起已修正，不會再發生。
 
-> 整合式 PDF / Office 文件處理平台，48 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
+> 整合式 PDF / Office 文件處理平台，49 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
 >
 > 企業功能：**本機 / LDAP / AD 多領域認證**、**SSO 單一登入**(OIDC + SAML，可接 M365 / Google / Keycloak)、**RBAC 角色權限**、**稽核記錄**、**SIEM 轉送**(syslog / CEF / GELF)、**字型管理**、**使用者工作區**、**背景作業與完成通知**、**REST API**。
 >
@@ -36,7 +36,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![CodeQL](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml)
 [![OWASP Top 10 (2025)](https://img.shields.io/badge/OWASP%20Top%2010%20(2025)-A01--A10%20covered-success?logo=owasp)](SECURITY.md)
-[![Tests](https://img.shields.io/badge/pytest-8209%20passed-brightgreen?logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/pytest-9225%20passed-brightgreen?logo=pytest)](tests/)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-success?logo=dependabot)](.github/dependabot.yml)
 [![Python](https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white)](pyproject.toml)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](INSTALL.md)
@@ -95,7 +95,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ---
 
-## 48 個工具速覽
+## 49 個工具速覽
 
 ### 填單用印
 - **表單自動填寫** — 自動偵測欄位 + 模板填值
@@ -116,6 +116,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 ### 內容處理
 - **擷取文字 / 圖片 / 附件** — 含 LLM 段落重排選項
 - **字數統計** [需 OxOffice/LibreOffice] — 表格 + 圖表 + LLM 摘要；收 PDF / 辦公文件 / 純文字
+- **會議摘要** [需 OxOffice/LibreOffice] — 會議逐字稿（.vtt / .srt / .json / .txt / .docx / .odt）整理成摘要、決議、待辦、風險與章節；**每一條都指得回原文的第幾段、誰講的**，點下去就跳到那一段。有時間戳記時另外算語者發言佔比（由時間直接算，不是估的）。匯出成 PDF / Word / ODF 時需引擎
 - **註解整理 / 清除 / 平面化**
 - **OCR 文字辨識** — 掃描 PDF / 圖片跑 OCR 後變可搜尋、可滑鼠選取複製（同 macOS 預覽程式 Live Text 概念）；雙引擎（**EasyOCR** 預設，中日韓辨識準確度高；**Tesseract** 備援），可選 LLM 校正 typo。**支援外部 GPU 識別伺服器**（DGX Spark / H100 / 4090 等），管理介面下載 `install.sh` 即可一鍵部署，每頁辨識時間從 CPU 上的 8-15 秒降到 GPU 上的 0.3-0.8 秒（**速度 10× 以上**）。
 - **送件前檢核** — 批次驗收：頁面尺寸、字型嵌入、欄位完整、敏感資料殘留、隱藏內容
@@ -151,7 +152,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ## 使用者工作區（選用，管理員可開關）
 
-把各工具輸出的 PDF / PNG / Word (.docx) / OpenDocument (.odt) 暫存在伺服器、跨工具接力使用，不必在工具之間來回下載再上傳。
+把各工具輸出的檔案（PDF / PNG、Word / Excel / PowerPoint、OpenDocument、純文字）暫存在伺服器、跨工具接力使用，不必在工具之間來回下載再上傳。
 
 - **存至工作區** — 各工具輸出的 PDF / PNG / Word / ODT 一鍵保留在伺服器，綁帳號隔離，只有自己看得到。
 - **從工作區載入** — 任何工具的上傳區一鍵取回（OCR → 蓋章 → 去識別化 …），免重新找檔。
@@ -167,7 +168,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 耗時的工作（轉檔、OCR、逐句翻譯、大檔壓縮…）送出後就交給伺服器跑，**可以直接關掉分頁**，不必守著進度條。
 
-- **送出即背景執行** — 27 個工具走作業系統，包含 PDF 轉文書檔 / 轉簡報檔、格式互轉、OCR 文字辨識、逐句翻譯、辦公文件轉 PDF、壓縮、合併、分拆、浮水印、用印、騎縫章、送件前檢核等。
+- **送出即背景執行** — 29 個工具走作業系統，包含 PDF 轉文書檔 / 轉簡報檔、格式互轉、OCR 文字辨識、逐句翻譯、辦公文件轉 PDF、壓縮、合併、分拆、浮水印、用印、騎縫章、送件前檢核等。
 - **我的作業** — 進度、佇列位置、已過時間、結果下載都在同一頁；跑一半可取消。逐句翻譯這類「產出不是單一檔案」的工具，點回去會接回原本的頁面繼續看對照表。
 - **重開機不會憑空消失** — 作業狀態存在資料庫裡，服務重啟後未完成的會標示為中斷，而不是無聲無息不見。
 - **不會把機器打爆** — 派送前先估算這個作業要用多少記憶體，不夠就讓它留在佇列排隊；同時處理數與 Office 轉檔併行上限都可在管理區調整。
@@ -180,7 +181,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 - **全站作業一覽** — 誰送的、哪個工具、哪個檔、排第幾位、跑多久，可只看進行中；每一筆都能直接取消。
 - **暫停派送** — 維護前讓手上的跑完但不再開新的。（已在執行的轉檔是獨立子行程，凍結不了，只能取消該筆 —— 介面照實說明。）
-- **效能與歷史** — 執行中 / 排隊中數量、Office 轉檔佔用、CPU 與記憶體用量，點一下看歷史趨勢圖。記憶體是**實測子行程**的數字（真正吃記憶體的是 soffice，不是我們的執行緒），量不到才顯示估計值並標明。
+- **效能與歷史** — 執行中 / 排隊中數量、Office 轉檔佔用、CPU 與記憶體用量，點一下看歷史趨勢圖。記憶體是**實測子行程**的數字（真正吃記憶體的是 soffice，不是我們的執行緒），量不到才顯示推估值並標明。
 - **併行上限全部可調** — 同時處理數、Office 轉檔同時數、外部服務同時呼叫數、轉檔 CPU 上限、保留記憶體。**填再大也會被實際可用記憶體夾住**。
 
 ### 完成通知
@@ -214,7 +215,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ## LLM AI 加值（選用，預設關閉）
 
-接 OpenAI-compatible 後端（本機 Ollama / vLLM / LM Studio / DGX Spark）後，**12 個工具**自動多出聰明選項：
+接 OpenAI-compatible 後端（本機 Ollama / vLLM / LM Studio / DGX Spark）後，**13 個工具**自動多出聰明選項：
 
 | 工具 | LLM 做什麼 | 模式 |
 |---|---|---|
@@ -226,6 +227,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 | 文件去識別化 | regex 抓不到的客戶代號 / 主管姓名 / 內部編號 | text |
 | 文字去識別化 | 同上，純文字輸入版 | text |
 | 字數統計 | 額外生成 3-5 句摘要 + TOP 10 關鍵字 | text |
+| 會議摘要 | 逐字稿 → 摘要 / 決議 / 待辦 / 風險 / 章節，每一條都附段號可回查 | text |
 | 註解整理 | 多筆審閱意見自動分「重大 / 一般 / 提問」 | text |
 | 文件差異比對 | 行 diff 之外多給「主要修改了哪幾條條款」自然語言摘要 | text |
 | 電子發票處理 | 規則對不到的品項，用 LLM 判讀會計科目分類 | text |
@@ -243,7 +245,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 | **[AUTH.md](AUTH.md)** | 認證 / RBAC / 內建帳號(jtdt-admin / jtdt-auditor)/ 2FA / SSO(OIDC+SAML) / Reverse Proxy SSO(Kerberos) / 帳號鎖定 / 緊急復原 |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO（Kerberos / SPNEGO）完整部署：AD service account、setspn、ktpass / keytab、Nginx 設定、瀏覽器自動登入、標頭偽造防護 |
 | **[API.md](API.md)**（[線上網頁版](https://jasoncheng7115.github.io/jt-doc-tools/api.html)）| REST API:Bearer token、endpoint 一覽、上傳格式、回傳格式、錯誤碼、curl / Python 範例、Job 流程 |
-| **[LLM.md](LLM.md)** | LLM AI 加值功能（預設關閉）：12 個工具如何用 LLM、效果範例、部署選項（Ollama / vLLM / DGX Spark） |
+| **[LLM.md](LLM.md)** | LLM AI 加值功能（預設關閉）：13 個工具如何用 LLM、效果範例、部署選項（Ollama / vLLM / DGX Spark） |
 | **[SECURITY.md](SECURITY.md)** | 資安政策、OWASP Top 10 (2025) 對照、漏洞回報管道、GitHub native scan 整合 |
 | **[CHANGELOG.md](CHANGELOG.md)** | 完整更新記錄 |
 | **[TEST_PLAN.md](TEST_PLAN.md)** | 測試清單、發版前檢查 |

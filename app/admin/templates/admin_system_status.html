@@ -32,6 +32,18 @@
   display:flex; align-items:center; gap:6px; padding-bottom:6px;
   border-bottom:1px solid #f1f5f9; }
 .ss-metric { display:flex; align-items:baseline; gap:6px; }
+/* ---- 載入失敗的工具（只有真的有失敗時才會渲染出來）---- */
+.tlf { border:1px solid #fca5a5; background:#fef2f2; border-radius:10px;
+  padding:14px 16px; margin-bottom:16px; }
+.tlf h2 { margin:0 0 6px; font-size:14px; color:#b91c1c; display:flex;
+  align-items:center; gap:6px; }
+.tlf-lead { font-size:12.5px; line-height:1.7; color:#7f1d1d; margin:0 0 10px; }
+.tlf-table { width:100%; border-collapse:collapse; font-size:13px; }
+.tlf-table th, .tlf-table td { text-align:left; padding:6px 10px;
+  border-bottom:1px solid #fecaca; vertical-align:top; }
+.tlf-table th { font-size:12px; color:#991b1b; font-weight:600; }
+.tlf-why { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px;
+  word-break:break-word; }
 .ss-metric .num { font-size:24px; font-weight:700; color:#0f172a; line-height:1; }
 .ss-metric .unit { font-size:12px; color:#64748b; }
 .ss-bar { height:8px; background:#f1f5f9; border-radius:4px; overflow:hidden; position:relative; }
@@ -118,6 +130,25 @@
   <button class="btn" id="ssRefreshNow">{{ icon('refresh', size=14) }} {{ tr('立即刷新') }}</button>
   <span class="muted" id="ssLastUpdate"></span>
 </div>
+
+{% if tool_load_failures %}
+{# 工具載入失敗原本只留一行 ERROR 然後跳過 —— 服務照常啟動、`/healthz` 照樣 200，
+   使用者只發現「工具不見了」。少一個直接 import 的套件就會這樣。
+   這一塊**只有真的有失敗時才存在**，沒事的時候不占畫面。 #}
+<div class="tlf">
+  <h2>{{ icon('warn', size=18) }}
+    {{ tr('有工具沒有載入（{0} 支）').replace('{0}', tool_load_failures|length|string) }}</h2>
+  <p class="tlf-lead">{{ tr('這些工具在這個行程裡不存在 —— 側欄看不到、網址進去是 404。最常見的原因是缺少相依套件。補裝之後要重新啟動服務才會掛上來。') }}</p>
+  <table class="tlf-table">
+    <thead><tr><th>{{ tr('工具套件') }}</th><th>{{ tr('原因') }}</th></tr></thead>
+    <tbody>
+      {% for pkg, why in tool_load_failures %}
+      <tr><td>{{ pkg }}</td><td class="tlf-why">{{ why }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
 
 <div id="ssBanner"></div>
 

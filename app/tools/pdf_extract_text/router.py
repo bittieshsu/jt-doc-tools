@@ -16,6 +16,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from ...config import settings
+from ...core.http_utils import content_disposition
 from ...core.llm_settings import llm_settings
 
 
@@ -292,7 +293,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
     wdir = _work_dir(bid)
     src = wdir / "src.pdf"
     src.write_bytes(data)
-    stem = Path(file.filename or "document").stem
+    stem = _clean_stem(file.filename)
     request.state.upload_filename = file.filename or ""
 
     # CRITICAL: PyMuPDF / python-docx / soffice calls are sync C/IO work.
@@ -345,6 +346,38 @@ async def extract(request: Request, file: UploadFile = File(...)):
     }
 
 
+#: 產出檔名的主檔名（stem）。**寫入與讀取一定要用同一個值** ——
+#: 原本寫入用使用者原樣的檔名、讀取卻 `.strip()` 一次，只要使用者的檔名尾端
+#: 有空白（`會議紀錄逐字稿 .pdf` —— 從網頁複製檔名時很常見），
+#: 磁碟上是 `…逐字稿 .txt`、組出來的路徑是 `…逐字稿.txt`，**四個下載全部 404**，
+#: 而訊息寫的是「batch 不存在或已過期」—— 看起來像檔案被清掉了。
+#: 連「存至工作區」也一起失敗（它抓的是同一個網址），
+#: 而瀏覽器把那個 JSON 錯誤存成 `txt.json`（2026-09-18 使用者回報）。
+def _clean_stem(filename: str | None) -> str:
+    """把上傳檔名收成一個可以安全當檔名用的主檔名。
+
+    **尾端的空白與點號一定要去掉** —— 那種名字在 Windows 上根本建不出來
+    （系統會自己截掉），於是同一份程式在兩個平台上行為不同。
+    """
+    # `Path(...).stem` 本身就會去掉目錄，所以 `/` 不用管；
+    # **但反斜線在 POSIX 上不是分隔符**（`Path("a\\b.pdf").stem` 是 `a\\b`），
+    # 那個字元在 Windows 上又不能當檔名 —— 同一份程式兩個平台行為不同。
+    stem = Path(filename or "document").stem.replace("\\", "_")
+    # **前後的點號與空白都要去掉**：`.pdf` 這種名字 `Path.stem` 會原樣回
+    # `.pdf`（開頭是點的檔案被當成沒有副檔名），寫出來就是 `.pdf.txt`；
+    # 而開頭是點的檔名在很多系統上是隱藏檔。
+    return stem.strip(" .") or "document"
+
+
+def _read_stem(wdir: Path) -> str:
+    """讀回寫入時用的那個主檔名。**不要在這裡再做任何清理** ——
+    清理只能發生在寫入那一次，不然讀寫又會不一致。"""
+    try:
+        return (wdir / "stem.txt").read_text(encoding="utf-8") or "document"
+    except OSError:
+        return "document"
+
+
 @router.get("/download/{batch_id}/{fmt}")
 async def download(batch_id: str, fmt: str, request: Request):
     from app.core.safe_paths import require_uuid_hex
@@ -354,7 +387,7 @@ async def download(batch_id: str, fmt: str, request: Request):
     wdir = settings.temp_dir / f"ext_text_{batch_id}"
     if not wdir.exists():
         raise HTTPException(404, "batch 不存在或已過期")
-    stem = (wdir / "stem.txt").read_text(encoding="utf-8").strip() or "document"
+    stem = _read_stem(wdir)
     ext_map = {"txt": ("txt", "text/plain"),
                "md":  ("md",  "text/markdown"),
                "docx": ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
@@ -365,7 +398,13 @@ async def download(batch_id: str, fmt: str, request: Request):
     fp = wdir / f"{stem}.{ext}"
     if not fp.exists():
         raise HTTPException(404, "format 尚未產生")
-    return FileResponse(str(fp), media_type=mime, filename=fp.name)
+    # **不要用 `FileResponse(filename=…)`** —— Starlette 對非 ASCII 檔名只送
+    # `filename*=`，沒有 ASCII 的 `filename=` 退路。拿不到它的瀏覽器會改用
+    # 網址尾段當檔名（`…/download/<id>/txt` → `txt`），再依內容型別補副檔名，
+    # 使用者看到的是 `txt.json`（2026-09-18 回報）。
+    # 共用的 `content_disposition()` 兩個都送。
+    return FileResponse(str(fp), media_type=mime,
+                        headers={"Content-Disposition": content_disposition(fp.name)})
 
 
 # ----------------------------------------------- optional LLM paragraph reflow
@@ -444,7 +483,7 @@ async def llm_reflow(request: Request):
         ok = 0
         skipped = 0
         if total == 0:
-            stem = (wdir / "stem.txt").read_text(encoding="utf-8").strip() or "document"
+            stem = _read_stem(wdir)
             md = _render_md(doc)
             yield _sse({"type": "done", "preview_md": md[:5000],
                         "ok": 0, "skipped": 0, "total": 0})
@@ -515,7 +554,7 @@ async def llm_reflow(request: Request):
             yield _sse(ev)
 
         # Re-render outputs once every paragraph has been processed.
-        stem = (wdir / "stem.txt").read_text(encoding="utf-8").strip() or "document"
+        stem = _read_stem(wdir)
         (wdir / f"{stem}.txt").write_text(_render_txt(doc), encoding="utf-8")
         md = _render_md(doc)
         (wdir / f"{stem}.md").write_text(md, encoding="utf-8")

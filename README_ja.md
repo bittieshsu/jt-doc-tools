@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ [English](README_en.md) ｜ **日本語**
 
-# Jason Tools ドキュメントツールボックス v1.15.59
+# Jason Tools ドキュメントツールボックス v1.15.93
 
 > ### ⚠ 2026-09-13 より前に git でインストールした場合、このバージョンにアップグレードする前に 1 行実行してください
 >
@@ -25,7 +25,7 @@
 > 以降 `jtdt update` は通常どおり動作します。**影響を受けないもの**：tarball でのインストール、Windows インストーラー、
 > または 2026-09-13 より後にインストールしたもの。v1.15.43 以降は修正済みで、再発しません。
 
-> 統合型の PDF / Office 文書処理プラットフォーム。48 個のツールをまとめて解決します：**フォーム入力と押印**、**透かし**、**複数ページの結合 / 分割 / 回転 / 整理**、**形式変換**、**スキャンの合成**、**匿名化**、**文字数の集計**、**注釈の整理**、**差分比較**、**一文ずつ翻訳**、**リスト処理**、**電子請求書の処理**、**統一番号の照会**、**ページエディタ**、**暗号化 / 復号**など。
+> PDF / Office 文書の統合処理プラットフォーム。49 のツールで**フォーム入力と押印**、**透かし**、**結合 / 分割 / 回転 / 並べ替え**、**形式変換**、**スキャンの貼り合わせ**、**匿名化**、**文字数集計**、**注釈の整理**、**差分比較**、**文単位の翻訳**、**リスト処理**、**電子インボイス処理**、**統一番号の照会**、**ページエディタ**、**暗号化 / 復号**などに対応します。
 >
 > 企業向け機能：**ローカル / LDAP / AD の複数レルム認証**、**SSO シングルサインオン**(OIDC + SAML。M365 / Google / Keycloak に接続可)、**RBAC ロール権限**、**監査記録**、**SIEM 転送**(syslog / CEF / GELF)、**フォント管理**、**ユーザーのワークスペース**、**バックグラウンドジョブと完了通知**、**REST API**。
 >
@@ -36,7 +36,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![CodeQL](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/jasoncheng7115/jt-doc-tools/actions/workflows/codeql.yml)
 [![OWASP Top 10 (2025)](https://img.shields.io/badge/OWASP%20Top%2010%20(2025)-A01--A10%20covered-success?logo=owasp)](SECURITY.md)
-[![Tests](https://img.shields.io/badge/pytest-8209%20passed-brightgreen?logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/pytest-9225%20passed-brightgreen?logo=pytest)](tests/)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-success?logo=dependabot)](.github/dependabot.yml)
 [![Python](https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white)](pyproject.toml)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](INSTALL.md)
@@ -95,7 +95,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ---
 
-## 48 個のツール早わかり
+## 49 のツール一覧
 
 ### フォーム入力と押印
 - **フォームの自動入力** —— 項目の自動検出 + テンプレートによる入力
@@ -116,6 +116,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 ### 内容の処理
 - **テキスト / 画像 / 添付ファイルの抽出** —— LLM による段落の再構成オプション付き
 - **文字数の集計** [OxOffice/LibreOffice が必要] —— 表 + グラフ + LLM の要約。PDF / オフィス文書 / プレーンテキストを受け付けます
+- **会議の要約** [OxOffice/LibreOffice が必要] —— 会議の文字起こし（.vtt / .srt / .json / .txt / .docx / .odt）から要約・決定事項・タスク・リスク・章立てを作ります。**どの項目も元の発言と話者にたどれ**、クリックするとその箇所に移動します。タイムスタンプがある場合は発言割合も計算します（推定ではなく時間から直接）。PDF / Word / ODF に書き出す場合のみエンジンが必要です
 - **注釈の整理 / 消去 / フラット化**
 - **OCR 文字認識** —— スキャンした PDF / 画像を OCR にかけて、検索でき、マウスで選択してコピーできるようにします（macOS プレビューの Live Text と同じ考え方です）。2 つのエンジン（**EasyOCR** が既定で、日中韓の認識精度が高く、**Tesseract** が予備）を備え、LLM による typo の補正も選べます。**外部 GPU 認識サーバーに対応**（DGX Spark / H100 / 4090 など）。管理画面から `install.sh` をダウンロードすればワンクリックで配置でき、1 ページあたりの認識時間が CPU の 8-15 秒から GPU の 0.3-0.8 秒になります（**10 倍以上**）。
 - **送付前チェック** —— 一括での検収：ページサイズ、フォントの埋め込み、項目の欠落、機微情報の残留、隠れた内容
@@ -151,7 +152,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ## ユーザーのワークスペース（任意。管理者がオン/オフできます）
 
-各ツールが出力した PDF / PNG / Word (.docx) / OpenDocument (.odt) をサーバーに一時保存し、ツールをまたいで受け渡せます。ツール間でダウンロードし直してアップロードし直す必要はありません。
+各ツールが出力したファイル（PDF / PNG、Word / Excel / PowerPoint、OpenDocument、プレーンテキスト）をサーバー上に一時保存し、ツール間で受け渡せます。いちいちダウンロードして再アップロードする必要はありません。
 
 - **ワークスペースに保存** —— 各ツールが出力した PDF / PNG / Word / ODT をワンクリックでサーバーに残します。アカウント単位で分離され、本人だけが見られます。
 - **ワークスペースから読み込む** —— どのツールのアップロード欄からもワンクリックで取り出せます（OCR → 押印 → 匿名化 …）。ファイルを探し直す必要がありません。
@@ -167,7 +168,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 時間のかかる作業（形式変換、OCR、一文ずつ翻訳、大きなファイルの圧縮…）は、送信したらサーバーに任せられます。**そのままタブを閉じてかまわず**、進捗バーを見張る必要はありません。
 
-- **送信したらバックグラウンドで実行** —— 27 個のツールがジョブシステムを使います。PDF → 文書ファイル / プレゼンテーション、形式変換、OCR 文字認識、一文ずつ翻訳、オフィス文書 → PDF、圧縮、結合、分割、透かし、押印、割印、送付前チェックなどを含みます。
+- **送信すればバックグラウンドで実行** — 29 のツールがジョブシステムを通ります。PDF から文書 / スライドへの変換、形式変換、OCR、文単位の翻訳、オフィス文書から PDF、圧縮、結合、分割、透かし、押印、契印、提出前チェックなどです。
 - **マイジョブ** —— 進捗、キューの順番、経過時間、結果のダウンロードがすべて同じページにあります。途中でキャンセルもできます。一文ずつ翻訳のように「出力が単一ファイルでない」ツールでは、戻ると元のページに復帰して対照表の続きを確認できます。
 - **再起動しても消えません** —— ジョブの状態はデータベースに保存されるため、サービスの再起動後、未完了のものは中断として表示されます。音もなく消えることはありません。
 - **マシンを落としません** —— ディスパッチの前にそのジョブが必要とするメモリを見積もり、足りなければキューで順番待ちさせます。同時処理数と Office 変換の並列上限は管理エリアで変更できます。
@@ -214,7 +215,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ## LLM AI 付加機能（任意。既定は無効）
 
-OpenAI 互換のバックエンド（ローカルの Ollama / vLLM / LM Studio / DGX Spark）に接続すると、**12 個のツール**に賢い選択肢が自動で増えます：
+OpenAI 互換のバックエンド（ローカルの Ollama / vLLM / LM Studio / DGX Spark）に接続すると、**13 のツール**でスマートな選択肢が使えるようになります：
 
 | ツール | LLM が何をするか | モード |
 |---|---|---|
@@ -226,6 +227,7 @@ OpenAI 互換のバックエンド（ローカルの Ollama / vLLM / LM Studio /
 | 文書の匿名化 | 正規表現で拾えない顧客コード / 上司の氏名 / 社内番号 | text |
 | テキストの匿名化 | 上と同じ。プレーンテキスト入力版 | text |
 | 文字数の集計 | 3-5 文の要約 + TOP 10 キーワードを追加で生成 | text |
+| 会議の要約 | 文字起こし → 要約 / 決定事項 / タスク / リスク / 章立て。各項目に発言番号が付き、あとから確認できます | text |
 | 注釈の整理 | 複数のレビューコメントを「重大 / 一般 / 質問」に自動で仕分け | text |
 | 文書の差分比較 | 行 diff に加えて「主にどの条項が変わったか」の自然言語の要約 | text |
 | 電子請求書の処理 | ルールで対応できない品目の勘定科目を LLM で判定 | text |
@@ -243,7 +245,7 @@ OpenAI 互換のバックエンド（ローカルの Ollama / vLLM / LM Studio /
 | **[AUTH.md](AUTH.md)** | 認証 / RBAC / 組み込みアカウント(jtdt-admin / jtdt-auditor)/ 2FA / SSO(OIDC+SAML) / Reverse Proxy SSO(Kerberos) / アカウントのロック / 緊急復旧 |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO（Kerberos / SPNEGO）の完全な導入手順：AD サービスアカウント、setspn、ktpass / keytab、Nginx の設定、ブラウザーの自動ログイン、ヘッダー偽造への対策 |
 | **[API.md](API.md)**（[オンライン版](https://jasoncheng7115.github.io/jt-doc-tools/api.html)）| REST API:Bearer token、エンドポイント一覧、アップロード形式、レスポンス形式、エラーコード、curl / Python の例、Job の流れ |
-| **[LLM.md](LLM.md)** | LLM AI 付加機能（既定は無効）：12 個のツールでの LLM の使い方、効果の例、導入の選択肢（Ollama / vLLM / DGX Spark） |
+| **[LLM.md](LLM.md)** | LLM による付加機能（既定はオフ）：13 のツールでの LLM の使い方、効果の例、導入方法（Ollama / vLLM / DGX Spark） |
 | **[SECURITY.md](SECURITY.md)** | セキュリティポリシー、OWASP Top 10 (2025) との対応、脆弱性の報告窓口、GitHub native scan の統合 |
 | **[CHANGELOG.md](CHANGELOG.md)** | 完全な変更履歴 |
 | **[TEST_PLAN.md](TEST_PLAN.md)** | テスト一覧、リリース前のチェック |

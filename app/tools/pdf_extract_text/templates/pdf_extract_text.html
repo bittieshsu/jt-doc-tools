@@ -86,6 +86,12 @@
       <button type="button" class="pv-tab" data-view="reflowed" data-s="sbe8b86d6">{{ tr('LLM 重排') }}</button>
     </div>
     <span id="previewDiffHint" hidden class="muted" data-s="s6b9c179a"></span>
+    {# 預覽區的複製鈕。**預覽只有前 5000 字**（`preview_md[:5000]`），
+       所以按鈕要說得出複製到的是「預覽」還是「全文」—— 不講的話使用者
+       會以為複製到的是整份（本專案在「預覽不是產出」上踩過）。 #}
+    <button type="button" class="btn btn-small" id="btnCopyPreview" hidden>
+      {{ icon('copy', size=14) }} <span>{{ tr('複製') }}</span>
+    </button>
   </div>
   <div class="et-preview" id="preview"></div>
 </div>
@@ -184,8 +190,10 @@ function renderResult(d) {
   });
   // Reset preview state for the new batch — original known, reflowed empty.
   originalPreview = d.preview_md || '';
+  window.__etCharCount = d.char_count || 0;
   reflowedPreview = '';
   $('preview').textContent = originalPreview || tr('(沒有內容)');
+  $('btnCopyPreview').hidden = !originalPreview;
   $('previewToggle').hidden = true;
   $('previewDiffHint').hidden = true;
   if ($('llmRow')) $('llmRow').hidden = false;
@@ -300,5 +308,37 @@ document.getElementById('btnLlmReflow').addEventListener('click', async () => {
 const uploadRoot = document.getElementById('etUpload');
 let etFu = null;
 if (uploadRoot) etFu = new FileUpload(uploadRoot, (file) => handleUpload(file));
+
+// ---- 預覽區複製 -------------------------------------------------------
+// **預覽只有前 5000 字**，整份要用「下載 TXT」。按鈕自己要講出這件事，
+// 不然使用者會以為複製到的是全文（本專案在「預覽不是產出」上記過）。
+document.getElementById('btnCopyPreview').addEventListener('click', async function () {
+  const btn = this;
+  const text = document.getElementById('preview').textContent || '';
+  if (!text) { showToast(tr('沒有可複製的內容')); return; }
+  const label = btn.querySelector('span');
+  const orig = label.textContent;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      // 非 https / 舊瀏覽器的退路
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    label.textContent = tr('已複製');
+    setTimeout(() => { label.textContent = orig; }, 1500);
+    const full = !!(window.__etCharCount) && window.__etCharCount > text.length;
+    showToast(full
+      ? tr('已複製預覽的 {0} 字（整份請用「下載 TXT」）').replace('{0}', text.length.toLocaleString())
+      : tr('已複製 {0} 字').replace('{0}', text.length.toLocaleString()));
+  } catch (e) {
+    showToast(tr('複製失敗：{0}').replace('{0}', e.message));
+  }
+});
 </script>
 {% endblock %}

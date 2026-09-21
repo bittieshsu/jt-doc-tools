@@ -648,7 +648,7 @@
                                'CPU ' + j.usage.cpu_pct + '%'));
         }
       } else if (j.status === 'running' || j.status === 'pending') {
-        tdUse.appendChild(el('span', 'aj-usage-est', tr('估 ') + fmtMB(j.est_mb)));
+        tdUse.appendChild(el('span', 'aj-usage-est', tr('約 ') + fmtMB(j.est_mb)));
       } else {
         tdUse.appendChild(el('span', 'aj-usage-est', '—'));
       }

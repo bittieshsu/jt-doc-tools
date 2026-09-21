@@ -39,6 +39,10 @@ GUARDED = [
 MUST_OFFLOAD = [
     ("app/admin/auth_router.py", "users_delete"),
     ("app/admin/auth_router.py", "users_bulk_delete"),
+    # 會議摘要的下載：把圖算成 PNG（PyMuPDF）、打包 ZIP 都是 CPU 工作，
+    # 但重活藏在 `mc.to_png()` / `_report_pdf()` 裡面，**靜態掃描看不到**。
+    # 留在事件迴圈上的話，有人按下載就會卡住整個網站（2026-09-19 抓到）。
+    ("app/tools/meeting_summary/router.py", "download"),
 ]
 
 #: v1.14.56 起是 **0**：全站的 async 端點都不會在事件迴圈上做重活了。

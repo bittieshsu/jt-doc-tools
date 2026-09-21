@@ -7,7 +7,11 @@
     <img src="{{ branding_logo_url() or '/static/images/logo-on-light.png' }}" alt="{{ app_name }}" />
   </div>
   <h1 class="hero-title">{{ app_name }}</h1>
-  <p class="hero-sub">{{ tr('整合式 PDF / Office 文件處理平台 — 表單填寫、用印簽名、浮水印、N-up、合併分拆、轉檔、文字 / 圖片擷取、敏感資料去識別化、加密 / 解密、中繼資料清除、隱藏內容掃描、差異比對、頁面編輯…可選 LDAP / AD 認證 + 角色權限 + 稽核 + 記錄轉送。') }}</p>
+  {# **工具數用算的，不要寫死** —— 寫死的話加工具時這個數字會漂掉，
+     而畫面上完全看不出來（本專案在「文件數字」上踩過很多次）。
+     `tool_count` 是**整個註冊表**的數量，不是這位使用者看得到的幾支：
+     那是產品的規模，跟誰在看無關。 #}
+  <p class="hero-sub">{{ tr('整合式 PDF / Office 文件處理平台 {0} 支工具 — 表單填寫、用印簽名、浮水印、N-up、合併分拆、轉檔、文字 / 圖片擷取、敏感資料去識別化、加密 / 解密、中繼資料清除、隱藏內容掃描、差異比對、頁面編輯…可選 LDAP / AD 認證 + 角色權限 + 稽核 + 記錄轉送。').replace('{0}', tool_count|string) }}</p>
   <div class="hero-pills">
     <span class="hero-pill"><span class="dot dot-blue"></span> {{ tr('全方位文件處理') }}</span>
     <span class="hero-pill"><span class="dot dot-green"></span> {{ tr('帳號權限與稽核') }}</span>

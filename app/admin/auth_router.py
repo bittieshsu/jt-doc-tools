@@ -2362,10 +2362,14 @@ def build_auth_router(templates) -> APIRouter:
     async def system_status_page(request: Request):
         from ..core.upload_limits import app_side_limits
         from ..core import upload_settings as _upload_settings
+        from ..tool_registry import load_failures
         return templates.TemplateResponse(request,
             "admin_system_status.html",
             {"request": request, "upload_limits": app_side_limits(),
-             "upload_max_mb": _upload_settings.get()["max_upload_mb"]},
+             "upload_max_mb": _upload_settings.get()["max_upload_mb"],
+             # 載入失敗的工具。**細節只在這裡（需要管理員）** ——
+             # `/readyz` 是公開的，那邊只給數量，不吐模組名稱與例外訊息。
+             "tool_load_failures": sorted(load_failures().items())},
         )
 
     @router.post("/system-status/upload-limit")

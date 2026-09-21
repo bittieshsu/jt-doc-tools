@@ -197,7 +197,9 @@ class JobManager:
         #: 可用記憶體是**第一件還沒配記憶體之前**的數字 —— 兩件都會被放行。
         #: 預設併行 2 時最多多算一件（800 MB）；管理員調到 4~6 就是 2.4~4 GB。
         self._reserved: dict[str, tuple[int, float]] = {}
-        self._subprocs: dict[str, set[int]] = {}
+        #: {job_id: {pid: 身分指紋}} —— **指紋是為了取消時不要殺錯**
+        #: （長跑的服務 pid 會被重用，見 `proc_tree`）。
+        self._subprocs: dict[str, dict[int, str | None]] = {}
         self._lock = threading.RLock()
         self._max_concurrent = max(1, int(workers))
         self._paused = False
@@ -309,8 +311,10 @@ class JobManager:
         jid = _current_job_id.get()
         if not jid:
             return
+        from . import proc_tree
+        fp = proc_tree.fingerprint(int(pid))
         with self._lock:
-            self._subprocs.setdefault(jid, set()).add(int(pid))
+            self._subprocs.setdefault(jid, {})[int(pid)] = fp
 
     def unregister_subprocess(self, pid: int) -> None:
         jid = _current_job_id.get()
@@ -319,7 +323,7 @@ class JobManager:
         with self._lock:
             s = self._subprocs.get(jid)
             if s:
-                s.discard(int(pid))
+                s.pop(int(pid), None)
                 if not s:
                     self._subprocs.pop(jid, None)
 
@@ -334,11 +338,11 @@ class JobManager:
         except ImportError:
             return {}
         with self._lock:
-            snapshot = {j: set(p) for j, p in self._subprocs.items()}
+            snapshot = {j: dict(p) for j, p in self._subprocs.items()}
             running = set(self._running)
         out: dict[str, dict] = {}
         for jid in running:
-            pids = snapshot.get(jid) or set()
+            pids = snapshot.get(jid) or {}
             rss = 0
             cpu = 0.0
             alive = 0
@@ -670,11 +674,23 @@ class JobManager:
             try:
                 self._pending.remove(job_id)
             except ValueError:
-                pass          # 已經在跑了 —— 靠 job.cancelled checkpoint 收尾
+                # 已經在跑了 —— **光是標記 cancelled 不會讓 soffice 停下來**。
+                # checkpoint 只在我們自己的程式碼裡，而轉檔那幾分鐘整個卡在
+                # `proc.communicate()`：使用者按了取消、畫面說「已停止」，
+                # 而伺服器照樣把那次算完（本專案在「重繪中又有新動作」
+                # 那次記過同一條 —— 中止請求不等於中止工作）。
+                to_kill = dict(self._subprocs.get(job_id) or {})
             else:
                 # 排隊中就被取消 → 這個 callable 永遠不會執行，立刻放掉。
                 # （正在跑的那個要留著讓 `_run()` 收尾。）
                 self._forget(job_id)
+                to_kill = {}
+        if to_kill:
+            from . import proc_tree
+            killed = sum(1 for pid, fp in to_kill.items()
+                         if proc_tree.kill_tree(pid, fp))
+            if killed:
+                logger.info("job %s 取消：停掉 %d 個子行程", job_id, killed)
         self._persist(job)
         self._dispatch()
         return True

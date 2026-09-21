@@ -954,6 +954,10 @@ _DEPS = [
             ("markdown-it-py", "markdown-it-py", "markdown_it", "markdown-it-py",
              "markdown-to-doc 的 Markdown 解析（CommonMark + GFM）。",
              "Markdown parser for markdown-to-doc."),
+            ("Pygments", "Pygments", "pygments", "Pygments",
+             "markdown-to-doc 的程式碼語法上色。缺則程式碼區塊不上色，"
+             "其餘功能不受影響。",
+             "Syntax highlighting for code blocks in markdown-to-doc."),
         ]
     ],
     # ---- 認證 / SSO（依啟用的後端而定）----

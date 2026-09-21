@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["strip_js_comments", "strip_markup_comments"]
+__all__ = ["strip_js_comments", "strip_markup_comments", "strip_py_comments"]
 
 
 def _blank(text: str) -> str:
@@ -105,3 +105,39 @@ def strip_blocks(html: str, *tags: str, repl: str = " ") -> str:
     for tag in (tags or ("script", "style")):
         html = block_re(tag).sub(repl, html)
     return html
+
+
+def strip_py_comments(text: str) -> str:
+    """把 Python 的 `#` 註解換成等長空白（行號與位移不變）。
+
+    **為什麼要有這支**：靜態掃描一律不可以連註解一起掃 ——
+    說明文字裡會**引用**它要檢查的那個寫法當例子，於是掃描器把
+    「解釋規則的那句話」判成違規（本專案踩過很多次，2026-09-18 又一次：
+    `check_settings_export_coverage` 把註解裡的 `` `data_dir / "…"` ``
+    當成真的設定檔引用）。
+
+    **不能用正規式找 `#`** —— 字串裡的 `#` 不是註解
+    （`color = "#fff"`、`url = "http://x/#y"`）。用 `tokenize` 走一遍，
+    它自己認得字串與 f-string。剖析不過（語法錯誤）就原樣回傳 ——
+    掃描器的工作不是報語法錯。
+
+    **docstring 不算註解，這裡不動它** —— 要排除 docstring 的話走 AST，
+    那是另一件事（見 `tests/test_doc_deident_image_residue.py` 的做法）。
+    """
+    import io
+    import tokenize
+
+    try:
+        toks = list(tokenize.generate_tokens(io.StringIO(text).readline))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return text
+    lines = text.splitlines(keepends=True)
+    for tok in toks:
+        if tok.type != tokenize.COMMENT:
+            continue
+        row = tok.start[0] - 1
+        a, b = tok.start[1], tok.end[1]
+        if 0 <= row < len(lines):
+            ln = lines[row]
+            lines[row] = ln[:a] + " " * (b - a) + ln[b:]
+    return "".join(lines)

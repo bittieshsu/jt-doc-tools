@@ -24,6 +24,8 @@ from app.core.job_manager import TERMINAL, Job, JobManager
 def _data_dir(tmp_path, monkeypatch):
     d = tmp_path / "data"
     d.mkdir()
+    # 等全域作業佇列靜下來是 conftest 的 `_quiet_job_queue` 在做的
+    # —— 同一份邏輯不要在這裡再寫一次。
     monkeypatch.setattr("app.config.settings.data_dir", d)
     # 每個測試用自己的 jobs.sqlite（db 模組是 thread-local 連線快取，路徑換了
     # 就會開新連線）

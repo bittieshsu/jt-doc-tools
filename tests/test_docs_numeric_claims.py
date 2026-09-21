@@ -157,3 +157,36 @@ def test_readme_pytest_badge_is_not_stale():
         f"{defined} 個（參數化只會更多）—— 徽章已經漂掉，請更新成最近一次"
         f"完整跑出來的數字。"
     )
+
+
+_RELEASES_RE = {
+    "CHANGELOG_en.md": re.compile(r"complete history\*\* \(([\d,]+) releases\)"),
+    "CHANGELOG_ja.md": re.compile(r"が完全な履歴です\*\*（([\d,]+) リリース）"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_RELEASES_RE))
+def test_translated_changelogs_state_the_real_release_count(name):
+    """英 / 日版開頭那句「完整歷史（N 個版本）」要對得上中文版實際的版本數。
+
+    這一句講的是**現在**的中文 CHANGELOG 有多少版，不是歷史紀錄 ——
+    所以它會漂。2026-09-20 抓到時寫著 767，實際 815（差 48 版）。
+    讀的人會用這個數字判斷「英文版少看了多少」，寫錯等於給錯的印象。
+
+    **只驗標頭那一句**：內文的歷史條目裡也出現過這個數字，
+    那些是當時的事實，改掉等於竄改紀錄。
+    """
+    pub = _public_root(ROOT)
+    actual = len([l for l in (pub / "CHANGELOG.md")
+                  .read_text(encoding="utf-8").splitlines()
+                  if l.startswith("## [")])
+    assert actual > 0, "中文 CHANGELOG 一個版本條目都沒抓到 —— 判準本身壞了"
+
+    head = (pub / name).read_text(encoding="utf-8").split("---\n", 1)[0]
+    m = _RELEASES_RE[name].search(head)
+    assert m, f"{name} 的標頭找不到版本數那一句（格式改過就要一起改這條）"
+    claimed = int(m.group(1).replace(",", ""))
+    assert claimed == actual, (
+        f"{name} 標頭寫「{claimed} 個版本」，中文 CHANGELOG 實際有 {actual} 個。"
+        f"發版時順手改掉 —— 這個數字沒有人會主動去看。"
+    )

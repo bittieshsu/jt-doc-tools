@@ -765,8 +765,20 @@ details.panel > summary select {
   background: #eff6ff; color: #1e40af; font-size: 12.5px; line-height: 1.6; }
 .job-bg-note svg { flex: none; margin-top: 2px; }
 .job-bg-note a { color: inherit; font-weight: 600; }
-.job-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+/* 下面通常緊接著結果區 —— 沒有 margin-bottom 的話按鈕會貼著下一張卡片
+   （2026-09-19 使用者連報兩次）。 */
+.job-actions { display: flex; gap: 8px; margin-top: 12px; margin-bottom: 4px;
+  flex-wrap: wrap; }
+.job-actions:empty { margin: 0; }
 .job-status { font-size: 13px; color: var(--muted); min-width: 60px; white-space: nowrap; }
+/* 按下停止之後的樣子。
+   **只停輪詢是不夠的**：進度條停在原處、狀態文字還寫著「擷取重點 4/5」，
+   畫面跟「卡住了」長得一模一樣（2026-09-19 使用者回報「時間是沒走了，
+   但是畫面看不出是停止的樣子」）。灰掉 ＋ 明寫「已停止」才看得出來。 */
+.job-progress.jp-stopped .job-bar-inner { background: #94a3b8; }
+.job-progress.jp-stopped .job-status { color: #b91c1c; font-weight: 600; }
+.job-progress.jp-stopped .job-elapsed { opacity: .5; }
+
 /* 已過時間：等寬數字避免秒數跳動時左右晃動 */
 .job-elapsed { font-size: 12px; color: var(--muted); white-space: nowrap;
   font-variant-numeric: tabular-nums; opacity: .85; }

@@ -67,6 +67,8 @@ OFFICE_TOOL_IDS: frozenset[str] = frozenset({
     "translate-doc",
     # 字數統計收辦公文件後也會起 soffice（v1.14.94）
     "pdf-wordcount",
+    # 匯出 PDF 會走 soffice（Markdown → PDF，跟「Markdown 轉辦公文件」同一條路）
+    "meeting-summary",
 })
 
 #: 會做 OCR 的工具（本機 EasyOCR / Tesseract）。第一次載入模型要數十秒又吃記憶體，
@@ -82,6 +84,7 @@ REMOTE_TOOL_IDS: frozenset[str] = frozenset({
     "doc-deident", "doc-diff", "einvoice-scan", "pdf-annotations",
     "pdf-extract-text", "pdf-fill", "pdf-ocr", "pdf-wordcount",
     "submission-check", "text-deident", "translate-doc", "doc-translate",
+    "meeting-summary",
 })
 
 

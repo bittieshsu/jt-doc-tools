@@ -762,6 +762,28 @@ def _m26_grant_doc_straighten(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _m27_grant_meeting_summary(conn: sqlite3.Connection) -> None:
+    """v27：把 `meeting-summary`（會議摘要，v1.15.65 新增）補給既有角色。
+
+    理由同 `_m18`~`_m26`（seed 快照的 bootstrap 缺口）：從舊版升上來的安裝，
+    角色早就存在，而 `seed_builtin_roles()` 的差集 top-up 以快照為基準 ——
+    新工具不會自己長出來。
+
+    拿 `pdf-wordcount`（字數統計）當訊號：同一類的事（把一份文件丟給 LLM
+    產出摘要與重點），而且同樣**只讀不改**、產出是新的東西。
+    **不可以無條件補給所有角色** —— 那會把刻意收窄過的角色一起放寬
+    （文管那個角色就沒有任何 LLM 工具，是刻意的）。
+    """
+    conn.executescript("""
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'meeting-summary' FROM role_perms
+        WHERE tool_id = 'pdf-wordcount';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'meeting-summary'
+        FROM subject_perms WHERE tool_id = 'pdf-wordcount';
+    """)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -784,7 +806,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m23_canon_ou_subject_keys,
               _m24_index_group_members_user,
               _m25_grant_doc_translate,
-              _m26_grant_doc_straighten]
+              _m26_grant_doc_straighten,
+              _m27_grant_meeting_summary]
 
 
 def auth_db_path() -> Path:

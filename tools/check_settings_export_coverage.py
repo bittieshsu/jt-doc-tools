@@ -19,6 +19,11 @@ from __future__ import annotations
 
 import re
 import sys
+from pathlib import Path as _P
+
+sys.path.insert(0, str(_P(__file__).resolve().parent.parent))
+from tools.source_text import strip_py_comments as _strip_py_comments
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -39,6 +44,9 @@ _CONST_REF_RE = re.compile(_TAIL + r'([A-Z_][A-Za-z0-9_]*)\b')
 # 檢查靜音的地方，沒有理由的豁免等於把檢查關掉。
 EXEMPT: dict[str, str] = {
     "transit_proof_files": "使用者上傳的乘車證明原始檔（每位使用者一個目錄）——是使用者資料不是設定，而且含個資，不進設定備份。",
+    "speech_audio":         "要讓外部服務來拉的音檔 —— 是**使用者的會議錄音**"
+                            "不是設定，而且對應的簽章網址有到期時間，"
+                            "備份過去也拉不動。不進設定備份。",
     "temp":                 "上傳暫存，2 小時後自動清掉",
     "jobs":                 "工作結果暫存，有 TTL",
     "audit.sqlite":         "稽核記錄，量大且屬本機軌跡（要保留請用記錄轉送）",
@@ -72,6 +80,10 @@ def code_references() -> dict[str, set[str]]:
             src = py.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
+        # **先去註解** —— 說明文字裡會引用 `data_dir / "…"` 這個寫法當例子，
+        # 不去掉的話掃描器會把「解釋規則的那句話」判成一個沒人備份的設定檔
+        # （2026-09-18 實際踩到）。本專案在這件事上踩過很多次。
+        src = _strip_py_comments(src)
         rel = str(py.relative_to(ROOT))
         for first, second in _REF_RE.findall(src):
             name = f"{first}/{second}" if second else first

@@ -391,7 +391,8 @@ def test_every_html_page_appears_in_the_plan():
                                    "/assets", "/branding", "/i18n"))
         and "{" not in r.path
         and "GET" in (getattr(r, "methods", None) or set())
-        and r.path not in ("/healthz", "/favicon.ico", "/robots.txt",
+        # 探測端點與框架自帶的路由不是「頁面」—— 它們的驗收在 §4.7。
+        and r.path not in ("/healthz", "/readyz", "/favicon.ico", "/robots.txt",
                            "/openapi.json", "/docs", "/redoc",
                            "/docs/oauth2-redirect")
     })

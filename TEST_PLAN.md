@@ -526,7 +526,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       （功能完全正確，只是資料量大時慢）。
 - [ ] 升級**不可以卡住啟動**：大表加索引要能在合理時間內做完，或放到背景。
 
-- **`app/core/auth_db.py`**：`_m1_initial`、`_m2_username_source_unique`、`_m3_rename_pdf_diff_to_doc_diff`、`_m4_grant_image_to_pdf`、`_m5_grant_translate_doc`、`_m6_totp_columns`、`_m7_audit_seed_column`、`_m8_sso_sources`、`_m9_role_seed_snapshot`、`_m10_role_default_for_new`、`_m11_group_sync_cache`、`_m12_unprovision_mirrored_users`、`_m13_grant_pdf_to_slides`、`_m14_user_email`、`_m15_directory_presence`、`_m16_session_last_seen`、`_m17_directory_account_state`、`_m18_grant_transit_proof_and_border`、`_m19_grant_pdf_bookmark`、`_m20_grant_seam_stamp`、`_m21_grant_page_size`、`_m22_grant_office_convert`、`_m23_canon_ou_subject_keys`、`_m24_index_group_members_user`、`_m25_grant_doc_translate`、`_m26_grant_doc_straighten`
+- **`app/core/auth_db.py`**：`_m1_initial`、`_m2_username_source_unique`、`_m3_rename_pdf_diff_to_doc_diff`、`_m4_grant_image_to_pdf`、`_m5_grant_translate_doc`、`_m6_totp_columns`、`_m7_audit_seed_column`、`_m8_sso_sources`、`_m9_role_seed_snapshot`、`_m10_role_default_for_new`、`_m11_group_sync_cache`、`_m12_unprovision_mirrored_users`、`_m13_grant_pdf_to_slides`、`_m14_user_email`、`_m15_directory_presence`、`_m16_session_last_seen`、`_m17_directory_account_state`、`_m18_grant_transit_proof_and_border`、`_m19_grant_pdf_bookmark`、`_m20_grant_seam_stamp`、`_m21_grant_page_size`、`_m22_grant_office_convert`、`_m23_canon_ou_subject_keys`、`_m24_index_group_members_user`、`_m25_grant_doc_translate`、`_m26_grant_doc_straighten`、`_m27_grant_meeting_summary`
 - **`app/core/audit_db.py`**：`_m1_initial`
 - **`app/core/job_store.py`**：`_m1_initial`、`_m2_metrics`、`_m3_started_at`
 
@@ -543,7 +543,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **295 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **322 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -565,6 +565,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_api_doc_contract.py` | API 文件契約回歸測試 |
 | `test_api_doc_coverage.py` | 每個工具的 API 都要在 `github/API.md` 與 `TEST_PLAN.md` §4 出現 |
 | `test_api_doc_examples_run.py` | 照 `github/API.md` 的 curl 範例實際呼叫 —— 抓「照文件呼叫卻壞」 |
+| `test_api_enforce_does_not_break_the_web_ui.py` | 「API token 強制檢查」不可以把網頁自己的 `/api/` 擋掉（GitHub issue #52） |
 | `test_api_gate_and_csrf_edges.py` | API token 閘與 CSRF 豁免的邊界 |
 | `test_api_page_builder.py` | `github/build-api-page.py` 產出的 api.html 不可以毀損 |
 | `test_asset_image_acl.py` | ACL test for the login-gated shared-asset image endpoints (GitHub #28). |
@@ -590,6 +591,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_boxed_digits_and_sublabel.py` | 兩種讓欄位「有偵測到卻填不進去」的版型 |
 | `test_broken_input_no_500.py` | 任何工具端點收到壞輸入都不可以回 500 |
 | `test_button_icons_are_consistent.py` | 按鈕圖示的兩條守門 |
+| `test_cancel_actually_stops_the_work.py` | 按下取消要**真的把工作停掉**，不是只把狀態改成「已停止」 |
 | `test_changelog_does_not_quote_people.py` | 公開的更新記錄裡不可以引述使用者 / 客戶說的話 |
 | `test_cjk_font_notice.py` | 缺中文字型時，**一般使用者**在工具頁上看得到提示（v1.14.47） |
 | `test_cjk_font_renders.py` | 寫進 PDF 的中文**必須畫得出來** |
@@ -613,6 +615,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_demo_labels_come_from_the_shipped_defaults.py` | 示範資料的欄位標題必須取自出貨的那份預設清單 |
 | `test_dependency_declaration_sop.py` | 新增 Python 相依時的六處宣告，一處都不能漏 |
 | `test_dependency_declarations_agree.py` | 三份相依宣告必須互相對得上（外部稽核 F12，v1.15.30） |
+| `test_deploy_tarball_is_clean.py` | 部署 tarball 不可以夾帶客戶資料或內部往來文件 |
 | `test_dialog_strings_go_through_tr.py` | 對話框的訊息要走 `tr()`（v1.15.51） |
 | `test_dir_filter.py` | 目錄瀏覽「已選定」模式 filter 的純函式 + 設定測試 |
 | `test_directory_browser.py` | 目錄瀏覽（AD/LDAP OU treeview → 指派權限給 OU，2026-07-01） |
@@ -649,6 +652,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_einvoice_formatters.py` | Tests for einvoice-scan field formatters (M3.2). |
 | `test_einvoice_scan.py` | Tests for einvoice-scan tool — QR parser, buffer storage, HTTP endpoints. |
 | `test_error_message_scrub.py` | 錯誤訊息不可以把使用者送的字串原樣吐回去 |
+| `test_every_job_has_a_way_back.py` | 每一件背景作業都要有回到結果的路徑（下載，或「開啟」） |
+| `test_extract_text_download_filenames.py` | 擷取文字的下載：**寫檔名與讀檔名一定要是同一個值** |
 | `test_extract_text_glyph_repair.py` | 壞掉的文字對應表：擷取文字 / 字數統計 / 逐句翻譯也要能還原 |
 | `test_font_display_names.py` | 自訂上傳字型的顯示名稱 |
 | `test_format_terminology.py` | 格式用語要一致：「辦公文件」是統稱，「文書檔」是其中一類 |
@@ -657,15 +662,19 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_glyph_text_recovery.py` | 從字形反查還原文字 —— 對付壞掉的 ToUnicode 對照表 |
 | `test_heic_support.py` | HEIC / HEIF（iPhone 照片）要真的解得開（GitHub issue #49） |
 | `test_history_id_validation.py` | 歷史紀錄的 id 直接從網址進來 —— 一律先驗格式再組路徑 |
+| `test_home_tool_count_is_computed.py` | 首頁那句話的工具數**要用算的**（使用者 2026-09-18 要求） |
 | `test_host_stats_container.py` | 系統狀態 CPU 在容器(LXC/Docker)內要顯示容器自己的用量，不抓宿主機 |
 | `test_html_block_regexes_allow_whitespace.py` | 掃描器用的 `</script>` 正規式**一定要允許結束標籤裡有東西** |
+| `test_html_conversion_uses_writer_not_web.py` | HTML 轉檔一律走 **Writer** 篩選器，不可以落到 Writer/Web |
 | `test_i18n_catalog.py` | 語系檔與樣板的一致性守門 |
 | `test_i18n_dynamic_labels.py` | 程式端產生的顯示字串（`tr(變數)`）也必須有英文 |
 | `test_id_from_body_acl.py` | 「id 由使用者傳入」的端點一律要有 ACL —— 靜態全面掃描 |
+| `test_impacts_pass_is_separate.py` | 「事件與影響」必須自己走一輪 —— **零退步是由構造保證的，不是調出來的** |
 | `test_installer_languages.py` | Windows 安裝程式在英文 Windows 上要顯示英文（v1.15.27） |
 | `test_installer_output_is_not_garbled.py` | 安裝畫面上不可以出現亂碼（2026-09-15 客戶回報，Win11 25H2） |
 | `test_installer_product_name.py` | Windows 安裝程式的產品名稱多語系 + Linux 服務的安全強化（第 1 批，v1.15.31） |
 | `test_installer_silent_mode.py` | 安裝程式在**無介面模式**下不可以停下來等人按對話框 |
+| `test_internal_notes_stay_private.py` | `docs-share/` 的內部往來文件不可以出現在公開版（使用者 2026-09-17 指示） |
 | `test_job_acl.py` | Regression tests for the /api/jobs/* per-job ownership ACL (v1.12.61). |
 | `test_job_admission_reserve.py` | 記憶體准入：**已派送但還沒反映在 RSS 上的量要先記帳**（稽核 F06） |
 | `test_job_api_acl.py` | 「我的工作」/ 管理區工作監控的 API 與權限邊界 |
@@ -675,6 +684,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_job_manager_cancel_release.py` | 取消 / 清理之後不可以留著執行函式（外部稽核 F05，v1.15.28） |
 | `test_job_png_export.py` | PNG 匯出：不整份堆記憶體、暫存要有人清、要有併行上限（F09，v1.15.28） |
 | `test_job_priority.py` | 優先派送名單 —— 指定的使用者送出的作業會插到佇列最前面 |
+| `test_job_progress_cancel_shows_stopped.py` | 按下「停止」之後，畫面要看得出來停了 |
 | `test_job_queue.py` | 背景工作的佇列 / 持久化 / 記憶體准入 |
 | `test_job_timestamps.py` | 作業的三個時間點：送出 / 開始 / 結束 |
 | `test_js_set_attributes_go_through_tr.py` | JS 設定的**顯示屬性**（title / placeholder / aria-label / alt）要走 `tr()` |
@@ -689,6 +699,13 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_llm_stream_deadline.py` | 串流回應要有**整次生成的上限**，不是只有每個 chunk |
 | `test_llm_url_ssrf.py` | SSRF defence — admin-supplied LLM base URL must reject suspicious schemes |
 | `test_looks_garbled.py` | Regression tests for pdf_editor._looks_garbled(). |
+| `test_markdown_to_doc_formats.py` | Markdown 轉辦公文件：只轉使用者要的格式 ＋ 程式碼語法上色 |
+| `test_meeting_chart_style_has_one_source.py` | 圖的配色只有一份 —— 前端畫圖、伺服器畫匯出用的圖，顏色必須同源 |
+| `test_meeting_insight.py` | 會議分析的確定性部分（切視窗、解析、引用驗證、合併、語者統計） |
+| `test_meeting_node_labels.py` | 心智圖節點的文字：縮短可以，但**要看得出來是縮短** |
+| `test_meeting_speaking_time_says_its_basis.py` | 「發言時間」是量到的還是推估的，畫面上要講出來 |
+| `test_meeting_summary_e2e.py` | 會議摘要：**真的在瀏覽器裡跑一次** |
+| `test_meeting_summary_tool.py` | 會議摘要工具的端點 |
 | `test_migration_fk_cascade.py` | 重建資料表的 migration 一律要關掉外鍵，否則升級會**清空子表** |
 | `test_missing_office_engine_is_503.py` | 缺 Office 引擎要回 **503**，不可以回 500 |
 | `test_nav_visibility_and_whoami.py` | Tests for v1.1.5 - v1.1.7 visibility / identity changes. |
@@ -697,8 +714,11 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_new_tools_input_boundaries.py` | 三支新工具（書籤與目錄 / 騎縫章 / 頁面尺寸統一）的輸入邊界 |
 | `test_no_blocking_endpoints.py` | async 端點裡不可以直接做重活 —— 那會把整站鎖住 |
 | `test_no_dynamic_style_injection.py` | 前端 JS 不可以動態注入 `<style>` —— CSP 會把它整段擋掉 |
+| `test_no_entity_inside_tr.py` | 樣板的 `tr('…')` 裡面不可以寫 HTML 字元參照（`&#10;` / `&nbsp;` …） |
+| `test_no_internal_addresses_in_public.py` | 公開樹裡不可以出現**我們自己的**內網位址 |
 | `test_no_invalid_escape_sequences.py` | 原始碼裡不可以有無效的跳脫序列（`\-`、`` \` `` 這種） |
 | `test_no_native_dialogs.py` | 樣板裡不可以用瀏覽器原生的 alert / confirm / prompt（使用者要求） |
+| `test_no_partner_api_key_in_the_tree.py` | 第三方服務的 API 金鑰不可以出現在會公開或會部署出去的地方 |
 | `test_no_sample_names_in_public.py` | 測試樣本的檔名 / 客戶公司名不可以出現在會公開的檔案裡 |
 | `test_no_svg_dot_hidden.py` | SVG 元素不可以用 `.hidden` 開關顯示 |
 | `test_no_tr_shadowing.py` | `tr` 是表格列最自然的變數名，也是前端翻譯函式的名字 —— 撞名會讓整段 JS 當場死掉 |
@@ -709,7 +729,9 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_ocr_server_gpu_select.py` | Unit tests for jt-ocr-server's auto GPU selection (server_template.py). |
 | `test_office_convert.py` | 辦公文件格式互轉（office-convert） |
 | `test_office_convert_output_first.py` | soffice 的離開碼不可靠 —— 判準是「有沒有拿到可用的檔案」 |
+| `test_office_paper_and_profile.py` | soffice 的拋棄式設定檔：巨集硬化要真的生效，紙張預設要是 A4 |
 | `test_office_source_validation.py` | 辦公文件的**來源檔**壞掉時，要在送進 soffice 之前就擋下來 |
+| `test_office_timeout_kills_the_whole_tree.py` | soffice 逾時要殺掉**整棵行程樹**，不是只殺我們拿到的那個 PID |
 | `test_one_label_can_map_to_several_keys.py` | 一個標籤對應到**多個** canonical key 是刻意支援的，不要「修掉」 |
 | `test_one_shared_browser_probe.py` | 無頭瀏覽器的設定只能有**一份** |
 | `test_one_shared_lightbox.py` | 放大檢視（lightbox）只留一份共用實作 |
@@ -764,6 +786,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_proxy_scheme_mismatch.py` | 代理宣稱的協定 ≠ 瀏覽器實際的協定（客戶回報，v1.15.26） |
 | `test_proxy_sso.py` | Reverse-proxy (Kerberos/SPNEGO) SSO — app/core/proxy_sso.py + middleware. |
 | `test_public_tree_paths.py` | 測試不可以寫死 `github/` 這一層（2026-09-13，CI 在 main 上紅了才抓到） |
+| `test_readyz_reports_missing_tools.py` | 工具載入失敗要有地方看得到 —— `/healthz` 說正常不代表東西都在 |
 | `test_real_samples_smoke.py` | 拿**真實的**樣本檔掃過所有吃單一 PDF 的工具 |
 | `test_redos_ad_dn.py` | ReDoS regression for RE_AD_DN — closes CodeQL alert #13 |
 | `test_release_installer_must_be_signed.py` | Release 上掛的安裝程式**只能是簽章過的** |
@@ -778,6 +801,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_scan_merge_api.py` | 掃描拼合 (scan-merge) — 端點 / ACL / 公開 API 測試 |
 | `test_scan_merge_detector.py` | 掃描拼合 — 內容偵測 + 背景淨白 單元測試 |
 | `test_scheduled_export.py` | Scheduled settings export (v1.12.54). |
+| `test_script_line_endings.py` | Windows 批次檔一律 CRLF、Unix 腳本一律 LF |
 | `test_seal_zone_marker.py` | 用印區的排除條件：**標籤才算，說明句不算** |
 | `test_seam_preview_lightbox_e2e.py` | 騎縫章的預覽點下去要看到**真的比較大**的圖（使用者 2026-09-14 要求） |
 | `test_seam_preview_speed.py` | 騎縫章預覽：只蓋要看的那一頁 |
@@ -791,6 +815,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_single_web_process.py` | 這個服務只能用**單一 Web 行程**跑，被開成多 worker 時要講出來（稽核 F11） |
 | `test_smoke_routes.py` | Smoke tests: every public page renders 200, no 500s. |
 | `test_smtp_relay_modes.py` | 通知信的三種寄送方式 |
+| `test_speech_signed_audio_url.py` | 語音服務拉音檔的簽章網址：驗得過才給，**驗不過一律當成找不到** |
 | `test_sso.py` | Tests for the SSO feature (OIDC + SAML): settings encryption, JIT |
 | `test_sso_oidc_e2e.py` | Real end-to-end OIDC login against a self-hosted, spec-conformant mini IdP. |
 | `test_sso_saml_e2e.py` | Real end-to-end SAML login with a genuinely signed SAML Response. |
@@ -812,6 +837,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_tool_search_keywords.py` | 每一支工具都要有搜尋關鍵字（中文 + 英文） |
 | `test_tool_ui_locales.py` | 工具的介面語系白名單（`ToolMetadata.locales`） |
 | `test_tr_number_pattern_fallback.py` | `tr()` 查不到時，把數字換成 `{0}` 再查一次（v1.15.51） |
+| `test_transcript_parse.py` | 逐字稿解析：各種格式進來，段落出去 |
 | `test_transit_proof_api.py` | 乘車證明工具端點整合測試（合成 PDF，auth OFF = 單機） |
 | `test_transit_proof_files.py` | 乘車證明的**原始檔**：存得下、看得到、別人拿不到、刪掉就不見 |
 | `test_transit_proof_parser.py` | 乘車證明解析器單元測試（合成 fixture，不含真實票號 / 統編 / 站名資料） |
@@ -841,6 +867,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_windows_git_guidance.py` | Windows 缺 git 時的指引不可以只講 winget |
 | `test_windows_service_restart.py` | Windows 的 `jtdt restart` 必須真的把服務啟起來（2026-08-24 實機重現） |
 | `test_workspace.py` | Tests for the user-workspace core (app/core/workspace.py). |
+| `test_workspace_accepts_plain_text.py` | 工作區收純文字（.txt / .md）—— 判準是**內容**，不是副檔名 |
 | `test_workspace_api.py` | HTTP-level tests for the workspace endpoints (auth OFF / single mode). |
 | `test_workspace_office_thumbnail.py` | 工作區的 Office / ODF 檔要有第一頁縮圖 |
 | `test_workspace_ooxml_detect.py` | 工作區的型別判斷要以**內容型別**為準，不是主檔的路徑名 |
@@ -992,6 +1019,29 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] PDF / docx / odt / txt 四種來源都算得出來
 - [ ] 多檔批次有逐檔與跨檔總計
 - [ ] CSV 匯出欄位齊全
+
+#### 會議摘要 (meeting-summary)
+- [ ] **每一條決議 / 待辦 / 風險 / 未決問題都點得回原文那一段**，而且那一段
+      真的講了那件事 —— 這是這支工具的賣點，也是唯一不可退讓的判準。
+      一條沒有出處的決議比沒有那條更糟（會議記錄會被拿去當依據）。
+- [ ] **沒有發生的事不可以出現**：拿一份「只有寒暄、沒有任何決議」的逐字稿，
+      決議 / 待辦必須是**空的**，摘要要誠實說沒有結論 —— 不可以寫
+      「確認了後續方向」這種聽起來有結論的話。
+- [ ] 上傳之後、按「開始分析」**之前**看得到解析結果（段落數、講者、前幾段）：
+      講者判錯要在花掉那幾分鐘之前就看得出來。
+- [ ] 六種格式都讀得進來（.vtt / .srt / .json / .txt / .md / .docx / .odt），
+      而且 `王小明：內容` 這種前綴認得出是講者、
+      `我們下週要做三件事：A、B、C` **不可以**被當成講者。
+- [ ] **沒有時間戳記的逐字稿**（純文字）：摘要 / 決議 / 待辦照常有，
+      語者佔比與章節時間軸**不出現**（而不是畫一張空的圖或猜一個數字），
+      而且畫面上要說明為什麼。
+- [ ] 語者發言佔比是**由時間戳記算出來的**：重疊的插話只算一次
+      （每段長度直接相加會超過會議總長，那個數字一看就假）。
+- [ ] 分析中按「停止分析」真的停下來（不是只把畫面藏起來），
+      關掉分頁之後從「我的作業」按「開啟」接得回來、有下載鈕。
+- [ ] 下載的 Markdown 丟進「Markdown 轉辦公文件」排得出版面（那是交付路徑）。
+- [ ] 沒啟用 LLM 時工具頁說得出要去哪裡啟用，API 回 **503**（不是 500）。
+- [ ] 逐字稿讀不出東西回 **400**，訊息說得出支援哪些格式。
 
 #### 清單處理 (text-list)
 - [ ] 排序 / 去重 / 篩選 / 大小寫 / 取頭尾，操作可疊加
@@ -1441,7 +1491,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] Windows **沒有 `sudo`**：文件裡的指令要分平台寫
       （Linux/macOS `sudo jtdt update`；Windows 先開系統管理員 PowerShell）。
 
-## 4. API 覆蓋檢查 🆕（v1.8.55 起完整列出，現 48 個工具）
+## 4. API 覆蓋檢查 🆕（v1.8.55 起完整列出，現 49 個工具）
 
 每個工具至少 1 個 `/api/<tool-id>` endpoint（路徑：`/tools/<tool-id>/api/<tool-id>` 或 `/tools/<tool-id>/convert`）。發版前 curl 抽測：
 
@@ -1470,6 +1520,10 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `/tools/pdf-extract-images/api/pdf-extract-images` — POST file → ZIP
 - [ ] `/tools/pdf-attachments/api/pdf-attachments` — POST file → ZIP
 - [ ] `/tools/pdf-wordcount/api/pdf-wordcount` — POST file → JSON `{words, chars, ...}`
+- [ ] `/tools/meeting-summary/api/meeting-summary` — POST 逐字稿 → JSON
+      `{summary, items, chapters, mindmap, charts, speaker_stats, dropped_count}`。
+      判準：①`items` 裡每一條的 `segment_ids` 都指得到真的存在的段號
+      ②沒啟用 LLM 回 503 ③讀不出逐字稿回 400 ④`second_pass=0` 也做得完
 - [ ] `/tools/pdf-hidden-scan/api/pdf-hidden-scan` — POST file → JSON `{findings, totals}`
 - [ ] `/tools/pdf-metadata/api/pdf-metadata` — POST file + clear_* flags → cleaned PDF
 
@@ -1606,6 +1660,16 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 > `history` 這種字在四千行的文件裡**必然**找得到，所以那幾支端點從來沒有真的
 > 被檢查過（實算：84 支裡 8 支假通過）。判準已改成**完整路徑**。
 
+- [ ] `GET /api/speech/audio/{file_id}` —— 給外部服務拉檔的**簽章網址** 🆕 v1.15.93
+  - [ ] 簽對的網址拿得到檔案，**內容與 sha256 要對得上**
+        （對方會核對，對不上會退件）
+  - [ ] **下面四種在外面看起來要一模一樣，全部是 404**：
+        id 格式不對、簽章錯、已過期、檔案不存在
+        （回 403 等於告訴對方「這個 id 是存在的」）
+  - [ ] **改 `exp` 延期要失效** —— 到期時間在簽章裡
+  - [ ] 網址由**寫定的位址**組出來，不是請求的 Host
+        （照 Host 組的話，從對外網域進來的人送出的作業會被對方的白名單擋掉，
+        症狀是「有些人可以、有些人不行」）
 - [ ] `GET /workspace/api/count` —— 側欄的工作區檔案數
   - [ ] **未登入不可以回數字**（那會洩漏「這台有多少檔案」）
   - [ ] 工作區停用時回 0 或明確的停用狀態，**不可以 500**
@@ -1886,7 +1950,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 目前沒有自動化測試碰過，跑 `python tools/report_endpoint_test_coverage.py`，
 那份是**提示不是判決**。
 
-共 **266 支**（工具首頁不列，§2 已逐支驗收）。
+共 **275 支**（工具首頁不列，§2 已逐支驗收）。
 
 **全站（認證 / 帳號 / 工作區 / 介面語言）**
 
@@ -1901,7 +1965,16 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `GET/POST /auth/saml/sls`
 - [ ] `GET /branding/logo`
 - [ ] `POST /change-password`
-- [ ] `GET /healthz`
+- [ ] `GET /healthz` — **存活探測**。判準：固定回 `{"ok":true}`，
+      **而且工具載入失敗時它也要維持 200** —— 服務管理員拿它決定要不要重啟，
+      因為少一支工具而一直重啟比問題本身更糟。
+- [ ] `GET /readyz` — **這個行程實際上有沒有少東西**（外部稽核 2026-09-18）。
+      四條判準：①少幾支工具時回 **200 ＋ `degraded: true`**（本專案是單一 web
+      行程，把唯一的實例判成不健康，使用者看到的是整站錯誤頁）②資料目錄寫不進去
+      或資料庫開不起來時回 **503**（那才是真的不能工作）③**不可以吐模組名稱、
+      例外訊息或檔案路徑** —— 這支跟 healthz 一樣公開，細節只在管理區的系統狀態頁
+      ④啟用認證時照樣連得上（在 `_PUBLIC_EXACT` 裡）。
+      守門 `tests/test_readyz_reports_missing_tools.py`（五個方向變異驗證過）。
 - [ ] `POST /login`
 - [ ] `GET /login`
 - [ ] `POST /logout`
@@ -1992,9 +2065,33 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `GET /tools/image-to-pdf/thumb/{fid}`
 - [ ] `POST /tools/image-to-pdf/upload`
 
+**meeting-summary（會議摘要）**
+
+- [ ] `POST /tools/meeting-summary/upload` —— 收逐字稿、解析、回段落數 / 講者 / 前幾段預覽。
+      驗：①六種格式都讀得進來②讀不出東西回 **400** 且訊息說得出支援哪些格式
+      ③`王小明：內容` 認得出是講者、`我們下週要做三件事：…` 不可以被當成講者
+- [ ] `POST /tools/meeting-summary/start` —— 送出背景分析。
+      驗：①沒啟用 LLM 回 **503**②別人的 upload_id 拿不到（歸屬檢查）
+      ③回傳的作業在「我的作業」看得到、有下載鈕（`result_path` 有設）
+- [ ] `GET /tools/meeting-summary/result/{upload_id}` —— 取分析結果。
+      驗：①別人的拿不到②還沒分析完或過期回 **410** 不是 500
+- [ ] `GET /tools/meeting-summary/segments/{upload_id}` —— 取整份逐字稿（結果頁把段號還原成原文要用）。
+      驗：①別人的拿不到②段號與 `result` 裡的引用對得起來
+- [ ] `GET /tools/meeting-summary/charts/{upload_id}` —— 這場會議畫得出哪幾張圖。
+      判準：**由資料決定**（只有一個章節就不出章節佔比、只有一位講者就不出語者佔比）
+      —— 沒有內容的圖會讓人以為功能壞了。
+- [ ] `GET /tools/meeting-summary/chart/{upload_id}/{name}.{ext}` —— 單張圖（svg / png）。
+      判準：①`ext` 是別的值回 **400**②沒有那張圖回 **404** 不是 500
+      ③**畫面、Markdown、PDF 用的是同一份圖**（伺服器端產生，前端不重畫）
+      ④算圖之後要真的有墨水（中文字形畫得出來，不是缺字方框）
+- [ ] `GET /tools/meeting-summary/download/{upload_id}` —— `fmt=md` / `fmt=json`。
+      驗：①`fmt` 是別的值回 **400** 不是 500（`md` / `json` / `pdf` / `png` / `zip`）②中文檔名下載得下來（RFC 5987）
+      ③Markdown 丟進「Markdown 轉辦公文件」排得出版面
+
 **markdown-to-doc（Markdown 轉辦公文件）**
 
 - [ ] `POST /tools/markdown-to-doc/convert`
+- [ ] `GET /tools/markdown-to-doc/result/{upload_id}` —— 轉檔完成後取回預覽網址與下載連結。驗：①只回使用者勾選的格式②別人的 upload_id 拿不到（歸屬檢查）③過期或不存在回 404 不是 500
 - [ ] `GET /tools/markdown-to-doc/download/{upload_id}/{fmt}`
 - [ ] `GET /tools/markdown-to-doc/preview/{upload_id}/{page}`
 

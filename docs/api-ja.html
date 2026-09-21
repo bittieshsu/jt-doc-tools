@@ -138,6 +138,7 @@
             <a class="nav-ep" href="#pdf-附件擷取">PDF の添付ファイル抽出</a>
             <a class="nav-ep" href="#pdf-中繼資料">PDF のメタデータ</a>
             <a class="nav-ep" href="#pdf-字數統計">PDF の文字数集計</a>
+            <a class="nav-ep" href="#會議摘要">会議の要約</a>
             <a class="nav-ep" href="#pdf-ocr">PDF OCR</a>
             <a class="nav-ep" href="#pdf-註解整理">PDF の注釈の整理</a>
             <a class="nav-ep" href="#pdf-註解清除">PDF の注釈の消去</a>
@@ -223,6 +224,7 @@
             <a class="nav-ep" href="#企業-logo-狀態">企業ロゴの状態</a>
             <a class="nav-ep" href="#設定匯出清單">設定エクスポートの一覧</a>
             <a class="nav-ep" href="#token-管理">Token の管理</a>
+            <a class="nav-ep" href="#簽章網址取檔不是給人呼叫的">署名付き URL によるファイル取得（手動で呼ぶものではありません）</a>
             <a class="nav-ep" href="#管理介面自己用的-xhr-端點">管理画面自身が使う XHR エンドポイント</a>
           </div>
         </div>
@@ -703,6 +705,55 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;per_page_chars&quot;</span>: [<span class="hl-cmt">/* ... */</span>],
   <span class="hl-key">&quot;top_words_zh2&quot;</span>: [<span class="hl-cmt">/* ... */</span>], <span class="hl-key">&quot;top_words_en&quot;</span>: [<span class="hl-cmt">/* ... */</span>]
 }</code></pre>
+      </section>
+      <section class="doc-section" data-sec="會議摘要" data-title="会議の要約" hidden>
+<div class="doc-crumb">5. PDF 抽出・解析 API</div>
+<h4 id="會議摘要">会議の要約</h4>
+<p>会議の文字起こしから要約・決定事項・タスク・リスク・章立てを作り、<strong>各項目に発言番号を付けます</strong>。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-summary/api/meeting-summary</code></pre>
+<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>文字起こし：<code>.vtt</code> / <code>.srt</code> / <code>.json</code> / <code>.txt</code> / <code>.md</code> / <code>.docx</code> / <code>.odt</code></td></tr><tr><td><code>second_pass</code></td><td>string</td><td></td><td><code>1</code>（既定）2 回目の再確認を行う。<code>0</code> 1 回目のみ。速いが、取りこぼしも誤検出も増える</td></tr><tr><td><code>context</code></td><td>string</td><td></td><td><strong>会議の背景</strong>（任意、最大 4000 文字）：主題、出席者と役職、専門用語の説明、その他伝えたいこと</td></tr></tbody></table></div>
+<p><strong><code>context</code> は文字起こしを読み解くためだけに使われ、項目の出所にはなりません。</strong>「誰々は運用担当副社長で議長」と分かれば誰が指示し誰が担当かの判断に役立ちますが、背景に書かれた事柄は<strong>会議では起きていません</strong> —— 決議・タスク・リスク・未決事項は必ず文字起こしから抽出されます。プロンプトで明示するほか、二つの仕組みで担保しています。引用検証（項目は文字起こしの段落を指していなければならず、背景は比較対象に含まれません）と、「背景と非常に似ており、かつ文字起こしより明らかに似ている」ものを破棄する処理です。破棄されたものは <code>dropped_count</code> に計上されます。</p>
+<p><strong>この端点は同期処理です</strong>。2 時間の会議では数分かかります（モデルへのリクエストは約 30〜60 回）ので、呼び出し側のタイムアウトを長めにしてください。バックグラウンド処理が必要な場合は web 側の経路（<code>POST /upload</code> → <code>POST /start</code> → ジョブ ID を <code>/api/jobs/{id}</code> でポーリング）を使ってください。</p>
+<p>先に管理画面で LLM を有効にしてください。無効な場合は <strong>503</strong> を返します。文字起こしが読み取れない場合は <strong>400</strong> を返します（対応形式をメッセージで示します）。</p>
+<p><strong>タイムスタンプは任意です</strong>。時間のないテキストの文字起こしでも要約・決定事項・タスクは通常どおり得られますが、<code>speaker_stats</code> は空になり、<code>charts</code> に <code>speaker_share</code> と <code>timeline</code> は含まれません。どちらも時間から計算するもので、推測した数値は使えないからです。</p>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-summary/api/meeting-summary</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@meeting.vtt&quot;</span> \
+  <span class="hl-flag">--form-string</span> <span class="hl-str">&#x27;context=會議主題：第四季預算
+與會者
+王小明：財務部經理，會議主席
+李美華：法務專員&#x27;</span> | jq</code></pre>
+<p>レスポンス JSON（抜粋）：</p>
+<pre><code class="lang-json">{
+  <span class="hl-key">&quot;summary&quot;</span>: { <span class="hl-key">&quot;summary&quot;</span>: <span class="hl-str">&quot;這場會議確認了第四季的預算…&quot;</span> },
+  <span class="hl-key">&quot;items&quot;</span>: {
+    <span class="hl-key">&quot;decision&quot;</span>: [
+      { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;第四季預算維持原案&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">18</span>, <span class="hl-num">19</span>],
+        <span class="hl-key">&quot;speaker&quot;</span>: <span class="hl-str">&quot;王小明&quot;</span>, <span class="hl-key">&quot;quote&quot;</span>: <span class="hl-str">&quot;那就照原案走&quot;</span> }
+    ],
+    <span class="hl-key">&quot;action&quot;</span>: [
+      { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;月底前把修訂版寄給法務&quot;</span>, <span class="hl-key">&quot;owner&quot;</span>: <span class="hl-str">&quot;李美華&quot;</span>,
+        <span class="hl-key">&quot;due&quot;</span>: <span class="hl-str">&quot;月底&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">42</span>] }
+    ],
+    <span class="hl-key">&quot;risk&quot;</span>: [], <span class="hl-key">&quot;question&quot;</span>: []
+  },
+  <span class="hl-key">&quot;chapters&quot;</span>: [
+    { <span class="hl-key">&quot;title&quot;</span>: <span class="hl-str">&quot;預算討論&quot;</span>, <span class="hl-key">&quot;start_ms&quot;</span>: <span class="hl-num">0</span>, <span class="hl-key">&quot;end_ms&quot;</span>: <span class="hl-num">840000</span>, <span class="hl-key">&quot;start_seq&quot;</span>: <span class="hl-num">1</span> }
+  ],
+  <span class="hl-key">&quot;mindmap&quot;</span>: [
+    { <span class="hl-key">&quot;node_id&quot;</span>: <span class="hl-str">&quot;c1&quot;</span>, <span class="hl-key">&quot;parent_id&quot;</span>: <span class="hl-bool">null</span>, <span class="hl-key">&quot;label&quot;</span>: <span class="hl-str">&quot;預算討論&quot;</span>,
+      <span class="hl-key">&quot;type&quot;</span>: <span class="hl-str">&quot;topic&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">1</span>] }
+  ],
+  <span class="hl-key">&quot;charts&quot;</span>: [<span class="hl-str">&quot;timeline&quot;</span>, <span class="hl-str">&quot;topic_share&quot;</span>, <span class="hl-str">&quot;speaker_share&quot;</span>, <span class="hl-str">&quot;mindmap&quot;</span>],
+  <span class="hl-key">&quot;speaker_stats&quot;</span>: {
+    <span class="hl-key">&quot;王小明&quot;</span>: { <span class="hl-key">&quot;speaking_ms&quot;</span>: <span class="hl-num">512000</span>, <span class="hl-key">&quot;percentage&quot;</span>: <span class="hl-num">61.2</span>,
+                <span class="hl-key">&quot;turn_count&quot;</span>: <span class="hl-num">24</span>, <span class="hl-key">&quot;average_turn_ms&quot;</span>: <span class="hl-num">21333</span> }
+  },
+  <span class="hl-key">&quot;dropped_count&quot;</span>: <span class="hl-num">3</span>,
+  <span class="hl-key">&quot;llm_calls&quot;</span>: <span class="hl-num">41</span>,
+  <span class="hl-key">&quot;source&quot;</span>: { <span class="hl-key">&quot;filename&quot;</span>: <span class="hl-str">&quot;meeting.vtt&quot;</span>, <span class="hl-key">&quot;segments&quot;</span>: <span class="hl-num">186</span> }
+}</code></pre>
+<p><code>dropped_count</code> はい<strong>引用が文字起こしと一致せず除外された項目の数</strong>抽出した内容は、それが指す発言の中に必ず見つかる必要があります。見つからないものは残しません。この数値が大きいときはモデルが作り話をしている合図で、パラメータ調整よりモデルを替えるほうが有効です。</p>
       </section>
       <section class="doc-section" data-sec="pdf-ocr" data-title="PDF OCR" hidden>
 <div class="doc-crumb">5. PDF 抽出・解析 API</div>
@@ -1271,6 +1322,25 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;enforce&quot;:true}&#x27;</span></code></pre>
 <hr>
+      </section>
+      <section class="doc-section" data-sec="簽章網址取檔不是給人呼叫的" data-title="署名付き URL によるファイル取得（手動で呼ぶものではありません）" hidden>
+<div class="doc-crumb">11. 管理側 API</div>
+<h4 id="簽章網址取檔不是給人呼叫的">署名付き URL によるファイル取得（手動で呼ぶものではありません）</h4>
+<p>外部サービスの中には URL しか受け付けないものがあります。ファイルをこちらからアップロードするのではなく、こちらが渡したアドレスから相手が自分で取得します。その場合は API トークンではなく<strong>短命の署名付き URL</strong> を渡します：</p>
+<pre><code class="lang-text"><span class="hl-method">GET</span> /api/speech/audio/{file_id}?exp=&lt;到期的 unix 秒數&gt;&amp;sig=&lt;簽章&gt;</code></pre>
+<ul>
+<li><strong>URL そのものが認証</strong>であり、<code>Authorization</code> ヘッダーは付けません。署名はファイル ID と有効期限を結び付けているため、</li>
+</ul>
+<p>  そのため <code>exp</code> を延長すると署名が無効になります。</p>
+<ul>
+<li><strong>検証に失敗したものはすべて 404 を返します</strong> —— ID の形式違い・署名の誤り・期限切れ・ファイル不在の 4 つはいずれも外からは</li>
+</ul>
+<p>  外からは同一に見えます（403 は「その ID は存在する」と伝えることになります）。</p>
+<ul>
+<li>URL はサーバー側で生成され、<strong>署名を発行する公開エンドポイントはありません</strong> ——</li>
+</ul>
+<p>  この文書がどのエンドポイントも漏らさないために記載しているもので、呼び出すためのものではありません。</p>
+<p>取得時に 404 が返る場合、多くは<strong>URL の期限切れ</strong>であり、ファイルが失われたわけではありません。</p>
       </section>
       <section class="doc-section" data-sec="管理介面自己用的-xhr-端點" data-title="管理画面自身が使う XHR エンドポイント" hidden>
 <div class="doc-crumb">11. 管理側 API</div>
