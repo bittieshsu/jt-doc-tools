@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}{{ tr('語音服務（jtlw）') }} · {{ app_name }}{% endblock %}
+{% block content %}
+{# 標題列右邊掛全名 —— `jtlw` 是縮寫，管理員要知道自己在設定的是哪一套東西
+   （使用者 2026-09-21 要求）。**產品名不翻譯**（同品牌名那條規則），
+   所以這幾個字是純拉丁字母、不包 `tr()`；旁邊的說明才包。 #}
+<div class="jl-head">
+  <h1>{{ icon('phone', size=22) }} {{ tr('語音服務（jtlw）') }}</h1>
+  <span class="jl-fullname" title="{{ tr('這支整合對接的語音辨識服務') }}">
+    <code>jtlw</code> = <code>jt-live-whisper</code>
+    <a href="https://jasoncheng7115.github.io/jt-live-whisper/" target="_blank" rel="noopener noreferrer">{{ tr('專案說明') }}</a>
+  </span>
+</div>
+<p class="muted">{{ tr('把會議錄音送去 jtlw 轉成逐字稿（含發言者）。摘要、決議、待辦、心智圖與翻譯都留在本系統，不會送出去。') }}</p>
+
+{# `data-s` 是 CSP 安全的行內樣式替身（generated-inline.css）——
+   漏掉的話說明框沒有左側色條、清單也沒有縮排與行高，
+   看起來就是「樣式沒套好」（使用者 2026-09-21 截圖回報）。
+   其他管理頁的說明框都掛這兩個，不要自己另發明一組。 #}
+<div class="panel" data-s="s5fb956f2">
+  <b>{{ tr('說明：') }}</b>
+  <ul data-s="saa3893fb">
+    <li>{{ tr('沒有填好送件位址與金鑰之前，「會議錄音轉逐字稿」這支工具會反灰點不下去。') }}</li>
+    <li>{{ tr('「錄音檔對外位址」是 jtlw 回來拉錄音檔時看到的我們。這裡要填寫定的值，不會從瀏覽器的網址推算 —— 同一套服務可能有內網直連與反向代理兩種到達方式，推錯的話對方的來源白名單會擋掉。') }}</li>
+    <li>{{ tr('對方那側也有來源白名單，換過位址要請他們一起加。') }}</li>
+    <li>{{ tr('金鑰加密存放。已經存過的金鑰不會顯示出來，留空不動它。') }}</li>
+  </ul>
+</div>
+
+{# **啟用自己一塊** —— 它決定整支工具反不反灰，跟下面那幾個「填什麼」的欄位
+   不是同一個層級。擠在欄位清單第一列的話看起來像另一個普通欄位
+  （使用者 2026-09-21 回報「啟用鈕應該要明顯一點、獨立一點」）。 #}
+<div class="panel jl-enable-panel">
+  <label class="jl-enable">
+    <input type="checkbox" id="jl-enabled" {% if s.enabled %}checked{% endif %}>
+    <span class="jl-enable-text">
+      <b>{{ tr('啟用語音服務整合') }}</b>
+      <small>{{ tr('關閉或設定不完整時，「會議錄音轉逐字稿」會反灰點不下去。') }}</small>
+    </span>
+  </label>
+</div>
+
+<div class="panel">
+  <h2 data-s="s53896af7">{{ icon('gear', size=18) }} {{ tr('連線設定') }}</h2>
+
+  <div class="jl-warn" id="jlHttpWarn" hidden>
+    <b>{{ tr('這幾個位址走的是未加密的 http。') }}</b>
+    {{ tr('我們送出去的 API 金鑰會放在標頭裡，錄音檔內容也照這條路傳 —— 同一個網段上的人看得到。正式環境請兩邊都改成 https。') }}
+  </div>
+
+  <div class="form-row">
+    <label>{{ tr('送件位址') }}</label>
+    <input class="field" type="url" id="jl-base" value="{{ s.base_url }}" placeholder="https://speech.example.internal:8790/api/v1">
+  </div>
+  {# **範例文字要跟著「有沒有存過」走**：沒存過時顯示「留空＝不更動」是空話
+     （沒有東西可以不更動），而那正是它唯一會出現的時機 —— 存過之後欄位是
+     `__KEPT__` 不是空的，提示永遠被蓋住。對方 2026-09-22 指出這段文字不對。 #}
+  <div class="form-row">
+    <label>{{ tr('API 金鑰') }}</label>
+    <input class="field" type="password" id="jl-key" value="{{ s.api_key_enc }}" autocomplete="new-password"
+           placeholder="{% if s.api_key_enc %}{{ tr('（留空＝不更動）') }}{% else %}jtlw_…{% endif %}">
+  </div>
+  <p class="muted jl-hint jl-hint-ca">
+    {{ tr('這裡只貼金鑰本身，也就是對方給的那一串。') }}
+    {{ tr('Authorization: Bearer 這條標頭由我們自己組起來 —— 連前綴一起貼進來的話，對方回的是「金鑰無效」，而其實金鑰是對的。') }}
+  </p>
+  <div class="form-row">
+    <label>{{ tr('錄音檔對外位址') }}</label>
+    <input class="field" type="url" id="jl-audio" value="{{ s.audio_base_url }}" placeholder="https://doc.example.internal">
+  </div>
+  <p class="muted jl-hint jl-hint-ca" id="jlAudioGuess" hidden>
+    {{ tr('這是你現在連進來的位址，先幫你帶上。') }}
+    <b>{{ tr('存之前請確認對方那台連得到它') }}</b>
+    —— {{ tr('從內網直連或從測試機進來的話，帶出來的會是那條路的位址。') }}
+  </p>
+  {# **不要讓管理員打魔術字串** —— 清單由對方的 `/profiles` 給，
+     我們不抄一份（抄了就會漂，而且打錯要等送件才失敗）。
+     讀不到時保留目前的值並講出原因，不要變成空的下拉。
+
+     ⚠ 對方的 `name` / `description` 是**逐語言的物件**不是字串，
+     取值在 `admin/router._jtlw_pick`。直接 `str()` 會把 dict 的 repr
+     印到選單上（同 `progress` 那次：照自己以為的形狀寫）。
+
+     ⚠ 標籤原本叫「處理設定」（對方文件的用語），**使用者連問兩次這是什麼**
+     —— 代號本身（`meeting.balanced`）說不出任何事，而清單讀不到時
+     畫面上就只剩那個代號。改成「辨識模式」並在下面講出它是什麼。 #}
+  <div class="form-row">
+    <label>{{ tr('辨識模式') }}</label>
+    <select class="field" id="jl-profile" data-current="{{ s.profile_id }}">
+      {% if s.profile_id %}<option value="{{ s.profile_id }}" selected>{{ s.profile_id }}</option>{% endif %}
+    </select>
+    <span class="muted" id="jlProfileNote"></span>
+  </div>
+  <p class="muted jl-hint jl-hint-ca" id="jlProfileHelp">
+    {{ tr('這是語音服務那邊的一組辨識設定：用哪個模型、發言者分離做到多細、支援哪些語言。') }}
+    {{ tr('清單由對方提供，我們不自己維護一份 —— 對方的文件裡叫「處理設定 / profile」。') }}
+    <span id="jlProfileDesc"></span>
+  </p>
+  <div class="form-row">
+    <label>{{ tr('對方的憑證') }}</label>
+    <textarea class="field jl-pem" id="jl-ca" rows="4"
+              placeholder="-----BEGIN CERTIFICATE-----">{{ s.ca_cert_pem }}</textarea>
+  </div>
+  <p class="muted jl-hint jl-hint-ca">
+    {{ tr('對方用自簽憑證時，把憑證貼進來就好 —— 這是正解，不要改用關閉驗證。只影響這一條連線。') }}
+    <span id="jlFp" class="jl-fp" {% if not ca_fingerprint %}hidden{% endif %}>
+      {{ tr('指紋（SHA-256）') }}<code id="jlFpVal">{{ ca_fingerprint }}</code>
+      <b>{{ tr('請跟對方公布的值核對過再存') }}</b>
+    </span>
+  </p>
+  <div class="form-row">
+    <label>{{ tr('憑證驗證') }}</label>
+    <label class="switch-label"><input type="checkbox" id="jl-verify" {% if s.verify_tls %}checked{% endif %}>
+      {{ tr('驗證對方的 TLS 憑證（建議開著）') }}</label>
+  </div>
+  <p class="muted jl-hint" id="jlVerifyHint" hidden>
+    {{ tr('關掉之後任何人都可以冒充對方，而我們每次送件都會把 API 金鑰放在標頭裡交出去。對方用自簽憑證的話，建議先把內部 CA 裝進這台機器的信任庫 —— 那是一勞永逸的做法，全站每一條對外連線都受惠。') }}
+  </p>
+  <div class="form-row">
+    <label>{{ tr('送出逾時') }}</label>
+    <input class="field" type="number" id="jl-timeout" value="{{ s.request_timeout }}" min="5" max="300" data-s="s1a30558f"> {{ tr('秒（只等對方回應，辨識本身是非同步的）') }}
+  </div>
+  <p data-s="s553a645f">
+    <button class="btn btn-primary" id="jlSave">{{ icon('save', size=14) }} {{ tr('儲存設定') }}</button>
+    <button class="btn" id="jlTest" type="button">{{ icon('refresh', size=14) }} {{ tr('測試連線') }}</button>
+    <span id="jlStatus" class="muted" data-s="sf1fa4084"></span>
+  </p>
+</div>
+
+<div class="panel">
+  <h2 data-s="s53896af7">{{ icon('info', size=18) }} {{ tr('目前狀態') }}</h2>
+  <p class="muted" id="jlProbe">{{ tr('按「測試連線」查看對方的版本與上限。') }}</p>
+  <pre id="jlProbeOut" class="jl-out" hidden></pre>
+</div>
+
+<style nonce="{{ request.state.csp_nonce }}">
+  .switch-label { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#374151; }
+  /* 標題與全名同一列，全名靠右。視窗窄的時候讓它換到下一行 —— **不要縮字**，
+     縮到看不清楚就失去掛全名的意義了。 */
+  .jl-head { display:flex; align-items:baseline; justify-content:space-between;
+             gap:12px; flex-wrap:wrap; }
+  .jl-head h1 { margin-bottom:0; }
+  .jl-fullname { font-size:13px; color:#6b7280; white-space:nowrap; }
+  .jl-fullname code { font-size:12px; }
+  /* 啟用那一塊：自己一張卡、整塊可點，跟下面的欄位清單分開 */
+  .jl-enable-panel { padding:14px 16px; }
+  .jl-enable { display:flex; align-items:flex-start; gap:12px; cursor:pointer; }
+  .jl-enable input { width:18px; height:18px; margin-top:2px; flex:none; }
+  .jl-enable-text { display:flex; flex-direction:column; gap:2px; }
+  .jl-enable-text b { font-size:15px; }
+  .jl-enable-text small { color:#6b7280; font-size:12px; }
+  .jl-pem { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; }
+  .jl-hint-ca { color:#6b7280; }
+  .jl-fp { display:block; margin-top:4px; }
+  .jl-fp code { font-size:11px; word-break:break-all; }
+  .jl-fp b { color:#b45309; margin-left:6px; }
+  .jl-hint { margin:-6px 0 12px 116px; font-size:12px; color:#b45309; max-width:60ch; }
+  .jl-fullname a { margin-left:8px; }
+  .jl-warn { background:#fef3c7; border:1px solid #fcd34d; border-radius:6px;
+             padding:10px 12px; margin-bottom:14px; font-size:13px; color:#78350f; }
+  .jl-out { background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px;
+            padding:10px; font-size:12px; max-height:320px; overflow:auto; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+const $ = (id) => document.getElementById(id);
+const st = $('jlStatus');
+
+function say(msg, ok) { st.textContent = msg; st.style.color = ok ? '#16a34a' : '#dc2626'; }
+
+$('jlSave').addEventListener('click', async () => {
+  const body = {
+    enabled: $('jl-enabled').checked,
+    base_url: $('jl-base').value.trim(),
+    api_key_enc: $('jl-key').value,
+    audio_base_url: $('jl-audio').value.trim(),
+    profile_id: ($('jl-profile').value || '').trim(),
+    ca_cert_pem: $('jl-ca').value,
+    verify_tls: $('jl-verify').checked,
+    request_timeout: parseInt($('jl-timeout').value, 10),
+  };
+  const r = await fetch('/admin/api/jtlw/settings', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  if (r.ok) {
+    // 存完把指紋顯示出來，讓管理員當場跟對方公布的值核對
+    const j = await r.json().catch(() => ({}));
+    const fp = $('jlFp');
+    if (j.ca_fingerprint) { $('jlFpVal').textContent = j.ca_fingerprint; fp.hidden = false; }
+    else fp.hidden = true;
+
+    // **設定齊不齊翻轉了就重新載入** —— 側欄與首頁的反灰是伺服器渲染的，
+    // 在前端自己解鎖等於把那套判斷抄第二份（一定會漂）。
+    // **只在真的翻轉時重載**，不然每次存檔都把頁面抽掉。
+    if (typeof j.configured === 'boolean' && j.configured !== WAS_CONFIGURED) {
+      say(tr('已儲存，正在更新畫面…'), true);
+      window.location.reload();
+      return;
+    }
+    say(tr('已儲存'), true);
+    loadProfiles();          // 剛填好連線資訊時，清單這時候才讀得到
+  }
+  else say(await window.friendlyServerError(r, tr('儲存失敗')), false);
+});
+
+// ---- 對外位址沒填時，**帶入**目前連進來的位址 ----
+//
+// **只帶進輸入框，不是送件時去推算**（使用者 2026-09-21 建議）。
+// 送件時一律用存起來的值 —— 同一套服務有內網直連與反向代理兩種到達方式，
+// 照請求推算的話，從對外網域進來的人送出的作業會被對方的白名單擋掉，
+// 而症狀是「有些人可以、有些人不行」。
+//
+// 帶進來之後**要講出它是從哪來的**，不要默默填一個值讓人直接按儲存 ——
+// 管理員可能正從 localhost 或測試機進來。
+(function guessAudioBase() {
+  const el = $('jl-audio');
+  if (el.value.trim()) return;                 // 填過的不要動
+  el.value = window.location.origin;
+  $('jlAudioGuess').hidden = false;
+})();
+
+// ---- 未加密的 http 要講出代價（金鑰在標頭裡、錄音檔內容照這條路傳） ----
+function isPlainHttp(v) {
+  v = (v || '').trim().toLowerCase();
+  if (!v.startsWith('http://')) return false;
+  // 本機是瀏覽器與各家工具的安全來源例外，不必嚇人
+  return !/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(v);
+}
+function refreshHttpWarn() {
+  $('jlHttpWarn').hidden = !(isPlainHttp($('jl-base').value) || isPlainHttp($('jl-audio').value));
+}
+['jl-base', 'jl-audio'].forEach(function (id) {
+  $(id).addEventListener('input', refreshHttpWarn);
+});
+refreshHttpWarn();
+
+function refreshVerifyHint() { $('jlVerifyHint').hidden = $('jl-verify').checked; }
+$('jl-verify').addEventListener('change', refreshVerifyHint);
+refreshVerifyHint();
+
+//: 頁面載入當下「設定齊不齊」。存檔回來的值跟它不同就重新載入。
+const WAS_CONFIGURED = {{ 'true' if configured else 'false' }};
+
+// ---- 辨識模式的清單由對方給，我們不抄一份 ----
+async function loadProfiles() {
+  const sel = $('jl-profile');
+  const note = $('jlProfileNote');
+  const current = sel.dataset.current || '';
+  let r;
+  try { r = await fetch('/admin/api/jtlw/profiles'); } catch (e) { r = null; }
+  if (!r || !r.ok) { note.textContent = tr('讀不到清單，先維持目前的值'); return; }
+  const j = await r.json();
+  if (!j.ok || !(j.profiles || []).length) {
+    // **不要變成空的下拉** —— 那看起來像「沒有可選的」，而其實是連不上
+    note.textContent = j.error ? tr('讀不到清單：{0}').replace('{0}', j.error)
+                               : tr('讀不到清單，先維持目前的值');
+    return;
+  }
+  sel.innerHTML = '';
+  PROFILE_DESC = {};
+  let matched = false;
+  j.profiles.forEach(function (p) {
+    const o = document.createElement('option');
+    o.value = p.id;
+    // **名稱在前、代號在後** —— 代號說不出任何事（使用者連問兩次），
+    // 但它是存下來的值、也是對方文件與記錄裡的身分，所以留著。
+    // 名稱與敘述是**對方的資料不是我們的介面文字，一律不翻**
+    //（伺服器端已經依介面語言挑好那一份）。
+    o.textContent = (p.label && p.label !== p.id) ? (p.label + ' · ' + p.id) : p.id;
+    PROFILE_DESC[p.id] = [p.description || '', (p.languages || []).join(' / ')];
+    if (p.id === current) { o.selected = true; matched = true; }
+    sel.appendChild(o);
+  });
+  if (current && !matched) {
+    // 存著的值對方已經不提供了 —— 留著並講出來，不要無聲換掉管理員存的設定
+    const o = document.createElement('option');
+    o.value = current; o.textContent = current; o.selected = true;
+    sel.insertBefore(o, sel.firstChild);
+    note.textContent = tr('對方目前沒有提供這個辨識模式，請改選一個');
+  } else {
+    note.textContent = '';
+  }
+  showProfileDesc();
+}
+
+//: 每個辨識模式的敘述與語言，選到哪個就顯示哪個（對方給的資料，不翻）。
+let PROFILE_DESC = {};
+
+function showProfileDesc() {
+  const box = $('jlProfileDesc');
+  if (!box) return;
+  const row = PROFILE_DESC[$('jl-profile').value];
+  if (!row) { box.textContent = ''; return; }
+  const parts = [];
+  if (row[0]) parts.push(row[0]);
+  if (row[1]) parts.push(tr('可辨識：{0}').replace('{0}', row[1]));
+  box.textContent = parts.length ? ('　' + parts.join('　')) : '';
+}
+$('jl-profile').addEventListener('change', showProfileDesc);
+
+loadProfiles();
+
+$('jlTest').addEventListener('click', async () => {
+  say(tr('測試中…'), true);
+  const r = await fetch('/admin/api/jtlw/test', { method: 'POST' });
+  const out = $('jlProbeOut');
+  if (!r.ok) { say(await window.friendlyServerError(r, tr('測試失敗')), false); out.hidden = true; return; }
+  const j = await r.json();
+  if (!j.ok) { say(j.error || tr('測試失敗'), false); out.hidden = true; return; }
+  say(tr('連得上，而且金鑰有效'), true);
+  $('jlProbe').textContent = tr('介面版本 {0}').replace('{0}', j.api_revision || '?');
+  out.textContent = JSON.stringify(j.limits || {}, null, 2);
+  out.hidden = false;
+});
+</script>
+{% endblock %}

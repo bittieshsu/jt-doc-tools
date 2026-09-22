@@ -1,0 +1,659 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}{{ tr('會議錄音轉逐字稿') }} · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ icon('play', size=22) }} {{ tr('會議錄音轉逐字稿') }}</h1>
+<p class="muted">{{ tr('把會議錄音或錄影轉成帶時間與發言者的逐字稿。辨識在語音服務（jtlw）那側跑，摘要與決議留在本系統 —— 轉好之後可以一鍵交給「會議摘要」。') }}</p>
+
+{% if not configured %}
+<div class="info-box">
+  <b>{{ tr('還沒設定語音服務（jtlw）。') }}</b><br>
+  {{ tr('請管理員到「設定 → 語音服務（jtlw）」填好送件位址與金鑰，這支工具才能用。') }}
+</div>
+{% else %}
+
+<div class="panel">
+  <h2>{{ icon('upload', size=18) }} {{ tr('1. 上傳錄音') }}</h2>
+  <div class="info-box">
+    {{ tr('收得進來的格式：音訊（.m4a / .mp3 / .wav / .aac / .ogg / .opus / .flac）與影片（.mp4 / .mov / .mkv / .webm）。') }}<br>
+    {{ tr('手機原生錄音一小時大約 30 MB，三小時的會議不到 100 MB。') }}
+  </div>
+  {% with upload_id='mtUp', accept=accept_exts, hint='會議錄音或錄影' %}
+    {% include "components/file_upload.html" %}
+  {% endwith %}
+  <p class="muted" id="mtFileInfo" hidden></p>
+</div>
+
+<div class="panel" id="mtOpts" hidden>
+  <h2>{{ icon('gear', size=18) }} {{ tr('2. 選項') }}</h2>
+  <div class="form-row">
+    <label>{{ tr('語言') }}</label>
+    {# 用全站共用的下拉（`custom_select.js` ＋ `platform.css` 的樣式），
+       不要留瀏覽器原生的那個 —— 原生下拉在各家瀏覽器長得都不一樣，
+       跟站上其他欄位擺在一起特別突兀（使用者 2026-09-22 回報）。
+       **原本的 `<select>` 會留在 DOM 裡（隱藏）**，所以 `.value` 照常可用，
+       下面那段 JS 一個字都不用改。 #}
+    <select class="field jt-select" id="mtLang">
+      <option value="auto">{{ tr('自動判斷') }}</option>
+      <option value="zh">{{ tr('中文') }}</option>
+      <option value="en">{{ tr('英文') }}</option>
+      <option value="ja">{{ tr('日文') }}</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label>{{ tr('會發言的人數') }}</label>
+    <input class="field" type="number" id="mtSpk" min="0" max="20" value="0" data-s="s1a30558f">
+    <span class="muted">{{ tr('（0 = 讓它自己判斷）') }}</span>
+  </div>
+  {# ⚠ **不要寫成「與會人數」** —— 語音服務在完整 37 分鐘的 7 人中文會議上量過
+     （2026-09-22 修正後的版本，collar 0.25 計分重疊）：
+
+       不指定        發言者搞錯 22.90%（系統自己判出 3 位）
+       指定 7 人     發言者搞錯 30.15%   ← 填「正確答案」反而更差
+       指定 5~6 人   發言者搞錯 17.8%    ← 兩邊都贏
+
+     原因是發言量極度不平均：那 7 個人裡有 3 位分別只講了 28.6 / 56.2 / 94.8 秒，
+     **聲紋不足以成群的人硬湊一群給他，代價是把主要發言者拆散**
+     （最大的兩位正確率從 89.8% / 93.2% 掉到 56.5% / 55.8%）。
+
+     **兩個方向都有代價，而且付在不同地方**：填太多會拆散主要發言者；
+     不填則有 4/7 位發言者在輸出裡**完全不存在**（他們說的每一句都掛在別人名下）
+     —— 對我們的引用機制來說，後者才是最糟的那一種（標了一個錯的人）。
+
+     所以問的是「**發言量足以辨認**的人數」，不是「有出過聲的人數」，
+     而且明講不確定就留 0。語音服務 v1.9 原本的說法是「會發言的人數」，
+     v2.2 自己修正為這一版 —— 他們的自動判人數目前仍偏低（判 3、最佳 5~6），
+     正在處理中。 #}
+  <p class="info-box mt-hint">
+    {{ tr('不確定就留 0，讓系統自己判。') }}
+    {{ tr('這裡問的是發言量足以辨認的人數 —— 只講一兩句的人不要算進去，硬湊一群給他反而會把主要發言者拆散。') }}
+  </p>
+  <p>
+    <button class="btn btn-primary" id="mtStart">{{ icon('play', size=14) }} {{ tr('開始轉逐字稿') }}</button>
+    <button class="btn" id="mtCancel" type="button" hidden>{{ icon('pause', size=14) }} {{ tr('停止辨識') }}</button>
+  </p>
+  {# ⚠⚠ **不可以只放一個空的 `<div>`** —— `JobProgress` 是靠裡面的
+     `.job-reset` / `.job-bar-inner` / `.job-status` 接線的，
+     `root.querySelector('.job-reset')` 回 `null` 之後
+     `null.addEventListener` 直接丟 `TypeError`，**整段行內腳本停在那裡**，
+     於是「開始轉逐字稿」那顆按鈕從來沒有被接上事件 —— 按了完全沒反應。
+     v1.15.36 的「文件擺正」踩過一模一樣的，CLAUDE.md 也記著，還是又犯。 #}
+  {% with progress_id='mtJob' %}{% include "components/job_progress.html" %}{% endwith %}
+</div>
+
+<div class="panel" id="mtResult" hidden>
+  <h2>{{ icon('text', size=18) }} {{ tr('逐字稿') }}</h2>
+  {# **校正失敗時一定要講出來**（對方接入清單第 6 節）：畫面上的字是
+     原始辨識結果，標點與錯字都沒有修過。不講的話使用者會拿它去對摘要，
+     然後懷疑是摘要出了問題 —— 而真正的原因在上一步。 #}
+  <p class="info-box mt-hint" id="mtRaw" hidden>
+    {{ tr('這份逐字稿沒有經過校正 —— 你看到的是原始辨識結果，標點與錯字都還沒修。') }}
+    {{ tr('通常是校正那一步失敗了；重新送一次多半就會有。') }}
+  </p>
+  <p class="muted" id="mtSummary"></p>
+  <p class="muted" id="mtCorrection" hidden></p>
+
+  {# 播放器 ＋ 波形。**波形是為了「點到想聽的地方」** ——
+     逐字稿最常見的用法是「這句話我要回去聽一下」，
+     而一條沒有形狀的進度列在一小時的錄音上等於要用猜的。
+     波形畫不出來（檔案太大 / 瀏覽器解不開）時退成一條可點的時間軸，
+     **播放本身不受影響**。 #}
+  <div class="mt-player" id="mtPlayer" hidden>
+    {# 兩個圖示都畫出來、用 `<span>` 切換。
+       **不可以直接對 `<svg>` 設 `.hidden`** —— `SVGElement` 沒有那個 IDL 屬性
+       （v1.15.44 記過：那個四邊形從第一版起就沒出現過）。 #}
+    <button class="mt-play" id="mtPlay" type="button"
+            aria-label="{{ tr('播放 / 暫停') }}">
+      <span id="mtIcPlay">{{ icon('play', size=20) }}</span>
+      <span id="mtIcPause" hidden>{{ icon('pause', size=20) }}</span>
+    </button>
+    <canvas id="mtWave" class="mt-wave" height="72"></canvas>
+    {# 現在播到哪裡是**要一直看的數字**，總長度只是參考 ——
+       兩個同樣大小同樣顏色的話，眼睛每次都要重新找。 #}
+    <span class="mt-clock">
+      <b id="mtNow">00:00</b><i>/</i><span id="mtTot">00:00</span>
+    </span>
+  </div>
+  <audio id="mtAudio" preload="metadata"></audio>
+
+  <p>
+    <a class="btn" id="mtDownload" download>{{ icon('download', size=14) }} {{ tr('下載 JSON') }}</a>
+    <button class="btn" id="mtCopy" type="button">{{ icon('paperclip', size=14) }} {{ tr('複製純文字') }}</button>
+    {% if workspace_enabled(request) %}<button class="btn" id="mtSaveWs" type="button" hidden>{{ icon('archive', size=14) }} {{ tr('存至工作區') }}</button>{% endif %}
+    <button class="btn btn-primary" id="mtToSummary" type="button">{{ icon('clipboard-list', size=14) }} {{ tr('轉送會議摘要') }}</button>
+  </p>
+  <p class="muted mt-tip">{{ tr('點發言者的名字可以改名 —— 預設同一位全部一起改。') }}</p>
+  <div id="mtSegs" class="mt-segs"></div>
+</div>
+{% endif %}
+
+<style nonce="{{ request.state.csp_nonce }}">
+  .mt-segs { max-height:520px; overflow:auto; border:1px solid var(--border); border-radius:6px; }
+  .mt-row { display:grid; grid-template-columns:52px 110px 1fr; gap:8px; padding:5px 8px;
+            border-bottom:1px solid #f1f5f9; font-size:13px; }
+  .mt-row:last-child { border-bottom:none; }
+  .mt-hint { font-size:13px; }
+  .mt-t { color:#94a3b8; font-variant-numeric:tabular-nums; }
+  .mt-s { font-weight:600; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+  .mt-s:hover { text-decoration:underline dotted; }
+  /* 每位發言者一個顏色 —— 一整頁灰字很難看出「這裡換人講了」。
+     色票挑對比夠、而且彼此分得開的；超過就循環（超過 8 位的會議很少見，
+     而循環總比「大家都一樣」好）。 */
+  .mt-c0 { color:#2563eb; } .mt-c1 { color:#c2410c; } .mt-c2 { color:#15803d; }
+  .mt-c3 { color:#7c3aed; } .mt-c4 { color:#be123c; } .mt-c5 { color:#0f766e; }
+  .mt-c6 { color:#a16207; } .mt-c7 { color:#4338ca; }
+  .mt-row.mt-b0 { background:#eff6ff; } .mt-row.mt-b1 { background:#fff7ed; }
+  .mt-row.mt-b2 { background:#f0fdf4; } .mt-row.mt-b3 { background:#faf5ff; }
+  .mt-row.mt-b4 { background:#fff1f2; } .mt-row.mt-b5 { background:#f0fdfa; }
+  .mt-row.mt-b6 { background:#fefce8; } .mt-row.mt-b7 { background:#eef2ff; }
+  /* 正在播到的那一段 —— 左邊一條粗線 ＋ 明顯底色，捲動時一眼看得到 */
+  .mt-row.mt-now { box-shadow:inset 3px 0 0 #2563eb; background:#dbeafe !important;
+                   font-weight:500; }
+  .mt-player { display:flex; align-items:center; gap:14px; margin:12px 0 10px;
+               padding:10px 14px; border:1px solid var(--border); border-radius:12px;
+               background:linear-gradient(180deg,#ffffff,#f8fafc); }
+  .mt-wave { flex:1; min-width:0; height:72px; background:transparent;
+             border:0; border-radius:6px; cursor:pointer; }
+  /* 圓形的播放鍵 —— 播放器的主要動作，做成跟旁邊那排次要按鈕一樣的方框
+     會讓人找不到它（使用者 2026-09-22：「暫停按鈕很醜」）。 */
+  .mt-play { flex:0 0 46px; width:46px; height:46px; border:0; border-radius:50%;
+             background:#2563eb; color:#fff; cursor:pointer; padding:0;
+             display:flex; align-items:center; justify-content:center;
+             box-shadow:0 2px 6px rgba(37,99,235,.35);
+             transition:background .15s, box-shadow .15s, transform .08s; }
+  .mt-play:hover { background:#1d4ed8; box-shadow:0 3px 10px rgba(37,99,235,.45); }
+  .mt-play:active { transform:scale(.93); }
+  .mt-play:focus-visible { outline:3px solid rgba(37,99,235,.35); outline-offset:2px; }
+  .mt-play .ic { stroke-width:2.2; }
+  /* 播放鍵的三角形視覺重心偏左 —— 往右推 2px 才看起來在正中間 */
+  .mt-play #mtIcPlay { display:flex; margin-left:2px; }
+  .mt-play #mtIcPause { display:flex; }
+  .mt-clock { font-variant-numeric:tabular-nums; white-space:nowrap;
+              display:flex; align-items:baseline; gap:2px; }
+  .mt-clock b { font-size:17px; font-weight:600; color:#0f172a; letter-spacing:.2px; }
+  .mt-clock i { font-style:normal; color:#cbd5e1; margin:0 3px; }
+  .mt-clock span { font-size:13px; color:#94a3b8; }
+  .mt-tip { font-size:12px; margin:4px 0 8px; }
+  .mt-name-edit { width:100%; font-size:13px; padding:1px 4px; }
+  .mt-scope { display:flex; gap:6px; align-items:center; font-size:12px;
+              color:#475569; margin-top:2px; white-space:nowrap; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script>
+<script src="/static/js/job_progress.js"></script>
+<script src="/static/js/custom_select.js"></script>
+<script src="/static/js/workspace_picker.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  var el = function (id) { return document.getElementById(id); };
+  if (!el('mtUp')) return;                 // 還沒設定好時整段不跑
+  var BASE = '/tools/meeting-transcribe';
+  var uploadId = null, data = null;
+  //: 下載連結要用作業編號。**從 `?job=` 回來時 `job.jobId` 是空的**
+  //（那是輪詢時才設的），所以另外記一份。
+  var currentJobId = null;
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+  function mmss(ms) {
+    if (ms == null) return '';
+    var t = Math.round(ms / 1000);
+    return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+  }
+
+  var fu = new FileUpload(el('mtUp'), async function (_f, fs) {
+    var file = Array.isArray(fs) ? fs[0] : fs;
+    uploadId = null;
+    el('mtOpts').hidden = true;
+    el('mtResult').hidden = true;
+    if (!file) return;
+    var fd = new FormData();
+    fd.append('file', file);
+    var r = await fu.upload(BASE + '/upload', fd, { processingLabel: tr('收檔中…') });
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('上傳失敗'))); return; }
+    var d = await r.json();
+    uploadId = d.upload_id;
+    el('mtFileInfo').textContent =
+      tr('{0}（{1} MB）').replace('{0}', d.filename)
+                        .replace('{1}', (d.size_bytes / 1048576).toFixed(1));
+    el('mtFileInfo').hidden = false;
+    el('mtOpts').hidden = false;
+  });
+
+  var job = new JobProgress(el('mtJob'), {
+    showDownload: false,
+    onDone: function () { loadResult(); el('mtCancel').hidden = true; },
+    onError: function () { el('mtCancel').hidden = true; },
+    onCancel: function () { el('mtCancel').hidden = true; }
+  });
+
+  el('mtStart').addEventListener('click', async function () {
+    if (!uploadId) return;
+    var btn = this;
+    btn.disabled = true;
+    try {
+      var r = await fetch(BASE + '/start', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ upload_id: uploadId,
+                               language: el('mtLang').value,
+                               num_speakers: parseInt(el('mtSpk').value, 10) || 0 })
+      });
+      if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('無法送件'))); return; }
+      var d = await r.json();
+      el('mtCancel').hidden = false;
+      currentJobId = d.job_id;
+      job.track(d.job_id);
+    } finally { btn.disabled = false; }
+  });
+
+  el('mtCancel').addEventListener('click', function () { job.cancel(); });
+
+  // ---------------- 發言者：顏色、名字 ----------------
+  //
+  // 代號（`S1` / `S2`）是對方給的，**姓名對照是我們自己的事**
+  //（對方接入清單第 8 節寫明了）。改名有兩種範圍：
+  //  * **全部**（預設）：一場會議裡同一個人被標幾百次，一段一段改沒有意義。
+  //  * **只有這一段**：辨識偶爾會把某一段掛錯人，那條路也要留。
+  var speakerOrder = [];                   // 出現順序 → 配色用
+
+  function speakerIndex(id) {
+    if (!id) return -1;
+    var k = speakerOrder.indexOf(id);
+    if (k < 0) { speakerOrder.push(id); k = speakerOrder.length - 1; }
+    return k % 8;
+  }
+
+  function speakerName(s) {
+    var ov = (data.speaker_overrides || {})[String(s.seq)];
+    if (ov) return ov;
+    return (data.speaker_names || {})[s.speaker] || s.speaker || '';
+  }
+
+  async function saveSpeakers() {
+    var r = await fetch(BASE + '/speakers/' + uploadId, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ map: data.speaker_names || {},
+                             overrides: data.speaker_overrides || {} })
+    });
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('名字存不起來'))); }
+  }
+
+  // 點名字 → 就地改。**不要用 prompt()** —— 那個沒辦法同時問「範圍」，
+  // 而範圍正是這裡最重要的一件事。
+  function editSpeaker(cell, s) {
+    if (cell.querySelector('input')) return;
+    var before = cell.textContent;
+    cell.textContent = '';
+    var inp = document.createElement('input');
+    inp.className = 'mt-name-edit';
+    inp.value = before;
+    var scope = document.createElement('label');
+    scope.className = 'mt-scope';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true;
+    scope.appendChild(cb);
+    scope.appendChild(document.createTextNode(
+      tr('全部 {0}').replace('{0}', s.speaker || '')));
+    cell.appendChild(inp);
+    if (s.speaker) cell.appendChild(scope);
+    inp.focus(); inp.select();
+
+    function cancel() { render(); }
+    async function commit() {
+      var name = inp.value.trim();
+      data.speaker_names = data.speaker_names || {};
+      data.speaker_overrides = data.speaker_overrides || {};
+      if (!name) {                          // 清空 = 還原成代號
+        if (cb.checked && s.speaker) delete data.speaker_names[s.speaker];
+        delete data.speaker_overrides[String(s.seq)];
+      } else if (cb.checked && s.speaker) {
+        data.speaker_names[s.speaker] = name;
+        delete data.speaker_overrides[String(s.seq)];   // 整批蓋過單段
+      } else {
+        data.speaker_overrides[String(s.seq)] = name;
+      }
+      render();
+      await saveSpeakers();
+    }
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    });
+    inp.addEventListener('blur', function () { setTimeout(commit, 120); });
+  }
+
+  // ---------------- 逐字稿本體 ----------------
+
+  function render() {
+    var segs = data.segments || [];
+    var names = {};
+    segs.forEach(function (s) { if (s.speaker) names[speakerName(s)] = 1; });
+    el('mtSummary').textContent =
+      tr('共 {0} 段，{1} 位發言者').replace('{0}', String(segs.length))
+                                   .replace('{1}', String(Object.keys(names).length));
+
+    var box = el('mtSegs');
+    box.textContent = '';
+    segs.forEach(function (s) {
+      var ci = speakerIndex(s.speaker);
+      var row = document.createElement('div');
+      row.className = 'mt-row' + (ci >= 0 ? ' mt-b' + ci : '');
+      row.dataset.seq = String(s.seq);
+      if (s.start_ms != null) row.dataset.start = String(s.start_ms);
+      if (s.end_ms != null) row.dataset.end = String(s.end_ms);
+
+      var tcell = document.createElement('span');
+      tcell.className = 'mt-t';
+      tcell.textContent = mmss(s.start_ms);
+      if (s.start_ms != null) {
+        tcell.style.cursor = 'pointer';
+        tcell.title = tr('跳到這裡播放');
+        tcell.addEventListener('click', function () { seekTo(s.start_ms / 1000); });
+      }
+
+      var scell = document.createElement('span');
+      scell.className = 'mt-s' + (ci >= 0 ? ' mt-c' + ci : '');
+      scell.textContent = speakerName(s);
+      scell.title = tr('點一下改名字');
+      scell.addEventListener('click', function () { editSpeaker(scell, s); });
+
+      var body = document.createElement('span');
+      body.textContent = s.text;
+
+      row.appendChild(tcell); row.appendChild(scell); row.appendChild(body);
+      box.appendChild(row);
+    });
+  }
+
+  // ---------------- 播放器 ----------------
+
+  var audio = el('mtAudio'), wave = el('mtWave'), peaks = null, nowRow = null;
+  //: 游標在波形上的位置（畫布座標），離開時回 null。
+  var hoverX = null;
+
+  function seekTo(sec) {
+    if (!audio.src) return;
+    audio.currentTime = Math.max(0, sec);
+    if (audio.paused) audio.play().catch(function () {});
+  }
+
+  function drawWave() {
+    var w = wave.clientWidth || 600, h = wave.height;
+    var dpr = window.devicePixelRatio || 1;
+    wave.width = Math.round(w * dpr); wave.height = Math.round(h * dpr);
+    var g = wave.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    var dur = audio.duration || 0;
+    var played = dur ? (audio.currentTime / dur) : 0;
+    if (peaks && peaks.length) {
+      for (var x = 0; x < w; x++) {
+        var v = peaks[Math.floor(x / w * peaks.length)] || 0;
+        var bar = Math.max(2, v * (h - 4));
+        g.fillStyle = (x / w <= played) ? '#2563eb' : '#cbd5e1';
+        g.fillRect(x, (h - bar) / 2, 1, bar);
+      }
+    } else {
+      // **畫不出波形時退成一條可點的時間軸** —— 播放與跳播不受影響
+      g.fillStyle = '#e2e8f0'; g.fillRect(0, h / 2 - 2, w, 4);
+      g.fillStyle = '#2563eb'; g.fillRect(0, h / 2 - 2, w * played, 4);
+    }
+
+    // 目前播到的位置：一條細線，跟已播過的顏色分開
+    if (dur) {
+      g.fillStyle = '#1e40af';
+      g.fillRect(Math.min(w - 1, played * w), 0, 1, h);
+    }
+
+    // 游標跟隨線 ＋ 那個位置的時間 —— **要點下去之前就知道會跳到哪裡**
+    if (hoverX != null && dur) {
+      var hx = Math.max(0, Math.min(w - 1, hoverX));
+      g.fillStyle = 'rgba(15,23,42,.45)';
+      g.fillRect(hx, 0, 1, h);
+      var label = mmss(hx / w * dur * 1000);
+      g.font = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+      var tw = g.measureText(label).width + 10;
+      // 靠近右邊時把標籤翻到線的左邊，不然會被畫布切掉
+      var bx = (hx + tw + 4 > w) ? hx - tw - 4 : hx + 4;
+      g.fillStyle = 'rgba(15,23,42,.85)';
+      g.beginPath();
+      if (g.roundRect) g.roundRect(bx, 3, tw, 17, 4); else g.rect(bx, 3, tw, 17);
+      g.fill();
+      g.fillStyle = '#fff';
+      g.textBaseline = 'middle';
+      g.fillText(label, bx + 5, 12);
+    }
+  }
+
+  async function buildPeaks(url) {
+    // **大檔不解碼**：`decodeAudioData` 要把整份 PCM 放進記憶體
+    //（三小時的會議解開來是好幾 GB），瀏覽器會直接掛掉。
+    // 超過門檻就只播放、不畫波形 —— 那比讓分頁當掉好。
+    var size = (data.source && data.source.size_bytes) || 0;
+    if (size > 60 * 1024 * 1024) return null;
+    try {
+      var buf = await (await fetch(url)).arrayBuffer();
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      var pcm = await new Ctx().decodeAudioData(buf);
+      var ch = pcm.getChannelData(0), N = 1200, out = new Array(N), step = ch.length / N;
+      var top = 0;
+      for (var i = 0; i < N; i++) {
+        var a = Math.floor(i * step), b = Math.min(ch.length, Math.floor((i + 1) * step)), m = 0;
+        for (var k = a; k < b; k++) { var v = Math.abs(ch[k]); if (v > m) m = v; }
+        out[i] = m;
+        if (m > top) top = m;
+      }
+      // **一定要正規化**：一般的會議錄音峰值只有 0.1~0.3，
+      // 直接照絕對值畫出來就是畫面中央一條細線（使用者 2026-09-22 回報「波形怎麼那麼小」）。
+      // 再開個根號壓一下動態範圍 —— 不然安靜的段落會整片貼著中線看不出有聲音。
+      if (top > 0) {
+        for (var j = 0; j < N; j++) out[j] = Math.sqrt(out[j] / top);
+      }
+      return out;
+    } catch (e) { return null; }          // 格式解不開就退成時間軸
+  }
+
+  function clock() {
+    el('mtNow').textContent = mmss((audio.currentTime || 0) * 1000);
+    el('mtTot').textContent = mmss((audio.duration || 0) * 1000);
+  }
+
+  function highlight() {
+    var ms = (audio.currentTime || 0) * 1000;
+    var rows = el('mtSegs').children, hit = null;
+    for (var i = 0; i < rows.length; i++) {
+      var a = parseInt(rows[i].dataset.start || '-1', 10);
+      var b = parseInt(rows[i].dataset.end || '-1', 10);
+      if (a >= 0 && ms >= a && (b < 0 || ms < b)) { hit = rows[i]; break; }
+      if (a >= 0 && a > ms) break;                     // 已經過頭了
+      if (a >= 0) hit = rows[i];                       // 落在段與段之間 → 算前一段
+    }
+    if (hit === nowRow) return;
+    if (nowRow) nowRow.classList.remove('mt-now');
+    nowRow = hit;
+    if (!hit) return;
+    hit.classList.add('mt-now');
+
+    // **不可以用 `offsetTop`** —— 那是相對於「最近的**已定位**祖先」，
+    // 而 `.mt-segs` 只有 `overflow:auto`、沒有 `position`，
+    // 所以它量到的是「從面板頂端算起」，把上面的標題、波形、按鈕全算進去了
+    // —— 捲過去就會固定偏掉那一段（2026-09-22 使用者回報「捲到的不是我指的那一行」）。
+    //
+    // 用兩個 `getBoundingClientRect()` 相減 ＋ 目前的 `scrollTop`，
+    // **不依賴任何 CSS**：誰之後把 `position` 加上或拿掉都不會再壞。
+    var box = el('mtSegs');
+    var top = hit.getBoundingClientRect().top
+            - box.getBoundingClientRect().top + box.scrollTop;
+    var bh = box.clientHeight;
+    if (top < box.scrollTop || top + hit.offsetHeight > box.scrollTop + bh) {
+      box.scrollTop = Math.max(0, top - bh / 3);
+    }
+  }
+
+  async function setupPlayer() {
+    var url = BASE + '/audio/' + uploadId;
+    // **不要先用探測請求決定要不要顯示。**
+    //
+    // 第一版先送一個 HEAD 去問「檔案還在嗎」，而 `@router.get` 不會自動
+    // 收 HEAD（Starlette 的 `Route` 會，FastAPI 不會）—— 回 405，
+    // 於是播放器**永遠不出現**，畫面上沒有任何錯誤
+    //（2026-09-22 使用者回報「沒看到波形圖」）。
+    //
+    // 現在直接掛上去，讓 `<audio>` 自己說話：檔案被清掉、或這個格式
+    // 瀏覽器放不出來，都會觸發 `error` —— **那才是權威的訊號**，
+    // 而且少一次來回。
+    audio.src = url;
+    el('mtPlayer').hidden = false;
+    peaks = await buildPeaks(url);
+    drawWave();
+  }
+
+  audio.addEventListener('error', function () {
+    // 真的放不出來才收起來，並且講一句 —— 空白的播放器比沒有更難懂
+    el('mtPlayer').hidden = true;
+    var note = el('mtCorrection');
+    if (note && note.hidden) {
+      note.textContent = tr('錄音檔已經不在了，或是這個格式瀏覽器放不出來。');
+      note.hidden = false;
+    }
+  });
+
+  wave.addEventListener('mousemove', function (e) {
+    hoverX = e.clientX - wave.getBoundingClientRect().left;
+    drawWave();
+  });
+  wave.addEventListener('mouseleave', function () { hoverX = null; drawWave(); });
+  wave.addEventListener('click', function (e) {
+    var dur = audio.duration || 0;
+    if (!dur) return;
+    var r = wave.getBoundingClientRect();
+    seekTo((e.clientX - r.left) / r.width * dur);
+  });
+  function syncPlayIcon() {
+    var playing = !audio.paused && !audio.ended;
+    el('mtIcPlay').hidden = playing;
+    el('mtIcPause').hidden = !playing;
+  }
+  el('mtPlay').addEventListener('click', function () {
+    if (audio.paused) audio.play().catch(function () {}); else audio.pause();
+  });
+  audio.addEventListener('play', syncPlayIcon);
+  audio.addEventListener('pause', syncPlayIcon);
+  audio.addEventListener('ended', syncPlayIcon);
+  audio.addEventListener('timeupdate', function () { clock(); drawWave(); highlight(); });
+  audio.addEventListener('loadedmetadata', function () { clock(); drawWave(); });
+  window.addEventListener('resize', drawWave);
+
+  async function loadResult() {
+    var r = await fetch(BASE + '/result/' + uploadId);
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀不回逐字稿'))); return; }
+    data = await r.json();
+    speakerOrder = [];
+    render();
+
+    // 校正沒生效要明講（伺服器端判斷，前端不要自己猜）
+    el('mtRaw').hidden = !data.uncorrected;
+
+    // 校正統計 —— 「摘要怪怪的」時第一個要看的就是這個
+    //（對方接入清單第 8 節）。**沒有就整段不顯示**，不要印一排 0。
+    var c = (data.summary || {}).correction || {};
+    var lv = (data.summary || {}).correction_level || '';
+    var bits = [];
+    if (lv) bits.push(tr('校正力道：{0}').replace('{0}', lv));
+    if (typeof c.edited === 'number') {
+      bits.push(tr('改過 {0} 段').replace('{0}', String(c.edited)));
+    }
+    if (typeof c.unchanged === 'number') {
+      bits.push(tr('未改 {0} 段').replace('{0}', String(c.unchanged)));
+    }
+    if (typeof c.kept_original === 'number' && c.kept_original) {
+      bits.push(tr('保留原文 {0} 段').replace('{0}', String(c.kept_original)));
+    }
+    el('mtCorrection').textContent = bits.join('　');
+    el('mtCorrection').hidden = !bits.length;
+    el('mtDownload').href = '/api/jobs/' + (currentJobId || job.jobId) + '/download';
+    el('mtResult').hidden = false;
+
+    // 存至工作區 —— 存**純文字**（帶 `[mm:ss]` 與發言者）。
+    // 工作區收不下 `.json`（會被當成純文字改名），存文字反而讀得懂、
+    // 而且丟回「會議摘要」時時間軸還在。
+    if (el('mtSaveWs') && window.attachWorkspaceSave) {
+      window.attachWorkspaceSave(el('mtSaveWs'), function () {
+        var base = (data.source && data.source.filename ? data.source.filename : 'transcript')
+                     .replace(/\.[^.]+$/, '');
+        return { blob: new Blob([asPlainText()], { type: 'text/plain' }),
+                 name: base + '-逐字稿.txt', tool: 'meeting-transcribe' };
+      });
+    }
+    setupPlayer();
+  }
+
+  // **純文字也要帶時間。**
+  //
+  // 時間在資料裡一直都在（三層用 `seq` 對起來，`raw` 那層給的），
+  // 但這裡原本把它丟掉 —— 於是複製出去貼到別的地方就再也沒有時間了，
+  // 而我們自己的「會議摘要」**讀得懂行首的 `[mm:ss]`**
+  //（`transcript_parse.parse_plain`），丟掉等於自廢武功。
+  function asPlainText() {
+    return (data.segments || []).map(function (s) {
+      var head = s.start_ms == null ? '' : '[' + mmss(s.start_ms) + '] ';
+      return head + (s.speaker ? s.speaker + '：' : '') + s.text;
+    }).join('\n');
+  }
+
+  el('mtCopy').addEventListener('click', async function () {
+    try { await navigator.clipboard.writeText(asPlainText()); showToast(tr('已複製'), 'ok'); }
+    catch (e) { showAlert(tr('複製失敗，請手動選取')); }
+  });
+
+  // **轉送走既有的工作區中轉**（v1.14.24 就是為這個做的），不要另造一條路。
+  el('mtToSummary').addEventListener('click', function () {
+    // **要送 JSON 不是純文字。**
+    //
+    // 純文字會把 `start_ms` / `end_ms` 丟掉，而「會議摘要」那邊的
+    // 發言者發言佔比與章節時間軸**完全靠它們** —— 送純文字過去的話，
+    // 那兩張圖會顯示「這份逐字稿沒有時間戳記」，
+    // 而時間其實一直都在（2026-09-22 使用者回報「出來的沒有時間資訊」）。
+    //
+    // `transcript_parse.parse_json` 收得下我們存的那份（它會自己找 `segments`），
+    // 而且 `speaker` 也一起保住。
+    var name = (data.source && data.source.filename ? data.source.filename : 'transcript')
+                 .replace(/\.[^.]+$/, '') + '-逐字稿.json';
+    window.handoffToTool('meeting-summary',
+                         { blob: new Blob([JSON.stringify(data)],
+                                          { type: 'application/json' }) },
+                         name, 'meeting-transcribe');
+  });
+
+  // ---- 從「我的作業」按「開啟」回來 ----
+  //
+  // 作業的 `view_url` 是 `?job=<id>`，但這一頁原本**完全沒有讀它** ——
+  // 按「開啟」落到一個空白的上傳頁，看起來像結果被清掉了
+  //（2026-09-22 使用者回報）。結果要靠 `upload_id` 才讀得回來，
+  // 而它是上傳當下才有的，所以重新開一頁時要從作業的 `meta` 拿。
+  (async function resumeFromJob() {
+    var jid = new URLSearchParams(window.location.search).get('job');
+    if (!jid) return;
+    currentJobId = jid;
+    var r = await fetch('/api/jobs/' + encodeURIComponent(jid));
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀不回這件作業'))); return; }
+    var j = await r.json();
+    var uid = (j.meta || {}).upload_id;
+    if (!uid) {
+      // 失敗的作業沒有 upload_id —— 講出來，不要留一個空白畫面
+      job.show(); job.track(jid);
+      return;
+    }
+    uploadId = uid;
+    if ((j.meta || {}).filename) {
+      el('mtFileInfo').textContent = j.meta.filename;
+      el('mtFileInfo').hidden = false;
+    }
+    if (j.status === 'done') { await loadResult(); }
+    else { el('mtOpts').hidden = false; job.track(jid); }
+  })();
+})();
+</script>
+{% endblock %}

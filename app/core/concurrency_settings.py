@@ -81,6 +81,7 @@ OCR_TOOL_IDS: frozenset[str] = frozenset({
 #: 是對方那台機器的容量，所以走 `remote_limit` 另一條號誌。
 #: **新增用到 `llm_settings` / `llm_client` / 遠端 OCR 的工具要加進來**。
 REMOTE_TOOL_IDS: frozenset[str] = frozenset({
+    "meeting-transcribe",   # 送去 jtlw 轉逐字稿 —— 瓶頸在對方那台
     "doc-deident", "doc-diff", "einvoice-scan", "pdf-annotations",
     "pdf-extract-text", "pdf-fill", "pdf-ocr", "pdf-wordcount",
     "submission-check", "text-deident", "translate-doc", "doc-translate",

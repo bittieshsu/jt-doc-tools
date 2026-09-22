@@ -261,6 +261,20 @@ def _straighten_dpi_notes() -> list[str]:
     return _re.findall(r'"([^"]+)"', body)
 
 
+def _tool_lock_reasons() -> list[str]:
+    """工具反灰時滑鼠移上去看到的那句話。
+
+    **樣板寫的是 `tr(t.lock_reason)`** —— 掃字面 `tr('…')` 的守門看不到。
+    原本只有「語言不符」一種原因、那句話直接寫死在兩個樣板裡；
+    v1.15.94 加「外部服務還沒設定」這一種時改成由資料帶理由，
+    於是它就掉進這一類了。
+    """
+    import app.main as m
+    out = [m._LOCALE_LOCK_REASON]
+    out += [reason for (_nr, reason, _u) in m._SETUP_CHECKS.values()]
+    return out
+
+
 @pytest.mark.parametrize("name,getter", [
     ("去識別化樣態", _deident_labels),
     ("設定備份的類別", _settings_export_labels),
@@ -279,6 +293,7 @@ def _straighten_dpi_notes() -> list[str]:
     ("側欄管理區", _admin_nav_labels),
     ("去識別化的文件語言", _deident_doc_languages),
     ("掃描修正的解析度說明", _straighten_dpi_notes),
+    ("工具反灰的理由", _tool_lock_reasons),
 ])
 @pytest.mark.parametrize("locale", _locales())
 def test_dynamic_labels_are_translated(locale: str, name: str, getter):
@@ -311,6 +326,9 @@ _OPTION_RAW_OK = {
     ("llm_settings.html", "_v"): "模型名稱",
     # 語言選項的**自稱**：「日本語」在英文介面下也要是「日本語」
     ("login.html", "name"): "語言的自稱，翻掉就選不到自己的語言",
+    # 語音服務的「處理設定」代號（`meeting.balanced` 之類）：那是**對方的資料**，
+    # 由 `GET /profiles` 給，翻掉就送不出去了
+    ("admin_jtlw.html", "s.profile_id"): "對方的處理設定代號（ASCII）",
 }
 
 _OPTION_RE = re.compile(r"<option\b[^>]*>\s*\{\{\s*([^}]+?)\s*\}\}\s*</option>")

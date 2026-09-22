@@ -526,7 +526,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       （功能完全正確，只是資料量大時慢）。
 - [ ] 升級**不可以卡住啟動**：大表加索引要能在合理時間內做完，或放到背景。
 
-- **`app/core/auth_db.py`**：`_m1_initial`、`_m2_username_source_unique`、`_m3_rename_pdf_diff_to_doc_diff`、`_m4_grant_image_to_pdf`、`_m5_grant_translate_doc`、`_m6_totp_columns`、`_m7_audit_seed_column`、`_m8_sso_sources`、`_m9_role_seed_snapshot`、`_m10_role_default_for_new`、`_m11_group_sync_cache`、`_m12_unprovision_mirrored_users`、`_m13_grant_pdf_to_slides`、`_m14_user_email`、`_m15_directory_presence`、`_m16_session_last_seen`、`_m17_directory_account_state`、`_m18_grant_transit_proof_and_border`、`_m19_grant_pdf_bookmark`、`_m20_grant_seam_stamp`、`_m21_grant_page_size`、`_m22_grant_office_convert`、`_m23_canon_ou_subject_keys`、`_m24_index_group_members_user`、`_m25_grant_doc_translate`、`_m26_grant_doc_straighten`、`_m27_grant_meeting_summary`
+- **`app/core/auth_db.py`**：`_m1_initial`、`_m2_username_source_unique`、`_m3_rename_pdf_diff_to_doc_diff`、`_m4_grant_image_to_pdf`、`_m5_grant_translate_doc`、`_m6_totp_columns`、`_m7_audit_seed_column`、`_m8_sso_sources`、`_m9_role_seed_snapshot`、`_m10_role_default_for_new`、`_m11_group_sync_cache`、`_m12_unprovision_mirrored_users`、`_m13_grant_pdf_to_slides`、`_m14_user_email`、`_m15_directory_presence`、`_m16_session_last_seen`、`_m17_directory_account_state`、`_m18_grant_transit_proof_and_border`、`_m19_grant_pdf_bookmark`、`_m20_grant_seam_stamp`、`_m21_grant_page_size`、`_m22_grant_office_convert`、`_m23_canon_ou_subject_keys`、`_m24_index_group_members_user`、`_m25_grant_doc_translate`、`_m26_grant_doc_straighten`、`_m27_grant_meeting_summary`、`_m28_grant_meeting_transcribe`
 - **`app/core/audit_db.py`**：`_m1_initial`
 - **`app/core/job_store.py`**：`_m1_initial`、`_m2_metrics`、`_m3_started_at`
 
@@ -543,7 +543,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **322 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **327 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -599,6 +599,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_cli_health_check.py` | `jtdt update` 的健康檢查要探對地方，失敗要說得出原因 |
 | `test_cli_update_rollback.py` | 升級失敗時要真的回復，而且訊息要說出實際結果（外部稽核 F03，v1.15.28） |
 | `test_client_ip_audit.py` | Client-IP resolution for audit / history / display — app/core/client_ip.py. |
+| `test_commit_message_guard.py` | `tools/check_commit_message.py` 自己要有牙齒 |
 | `test_cookie_flags_on_delete.py` | 刪除 cookie 的回應也要帶安全旗標 |
 | `test_cookie_secure_flag.py` | 每一個 cookie 的 `secure` 旗標都要走同一支判斷 |
 | `test_cpu_limit.py` | CPU 限制（轉檔不影響網頁回應）的測試 |
@@ -644,6 +645,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_doc_translate.py` | 文件翻譯：產出**同格式、同版面**的檔案 |
 | `test_doc_translate_spreadsheet_view.py` | 試算表翻譯的兩件事：預覽要看得到東西、產出要開在內容的開頭 |
 | `test_docs_english_pages.py` | 介紹站與 API 手冊的英文版（GitHub Pages） |
+| `test_docs_lang_switch_is_restricted.py` | 介紹站的語言下拉只能跳到**同目錄的 `.html`** |
 | `test_docs_links.py` | 介紹網站與 API 手冊的連結不可以指向不存在的東西 |
 | `test_docs_numeric_claims.py` | 公開文件裡的數字宣稱要跟程式對得上 |
 | `test_docs_tool_categories.py` | 介紹站的工具分類要跟程式裡的一致 |
@@ -685,6 +687,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_job_png_export.py` | PNG 匯出：不整份堆記憶體、暫存要有人清、要有併行上限（F09，v1.15.28） |
 | `test_job_priority.py` | 優先派送名單 —— 指定的使用者送出的作業會插到佇列最前面 |
 | `test_job_progress_cancel_shows_stopped.py` | 按下「停止」之後，畫面要看得出來停了 |
+| `test_job_progress_markup_is_the_shared_component.py` | 載入 `job_progress.js` 的樣板**必須**放共用元件，不可以只放一個空的 `<div>` |
 | `test_job_queue.py` | 背景工作的佇列 / 持久化 / 記憶體准入 |
 | `test_job_timestamps.py` | 作業的三個時間點：送出 / 開始 / 結束 |
 | `test_js_set_attributes_go_through_tr.py` | JS 設定的**顯示屬性**（title / placeholder / aria-label / alt）要走 `tr()` |
@@ -706,6 +709,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_meeting_speaking_time_says_its_basis.py` | 「發言時間」是量到的還是推估的，畫面上要講出來 |
 | `test_meeting_summary_e2e.py` | 會議摘要：**真的在瀏覽器裡跑一次** |
 | `test_meeting_summary_tool.py` | 會議摘要工具的端點 |
+| `test_meeting_transcribe.py` | 會議錄音轉逐字稿 —— 端到端（對象是自己起的假 jtlw） |
 | `test_migration_fk_cascade.py` | 重建資料表的 migration 一律要關掉外鍵，否則升級會**清空子表** |
 | `test_missing_office_engine_is_503.py` | 缺 Office 引擎要回 **503**，不可以回 500 |
 | `test_nav_visibility_and_whoami.py` | Tests for v1.1.5 - v1.1.7 visibility / identity changes. |
@@ -800,6 +804,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_save_queue.py` | Tests for app.core.save_queue (v1.7.17). |
 | `test_scan_merge_api.py` | 掃描拼合 (scan-merge) — 端點 / ACL / 公開 API 測試 |
 | `test_scan_merge_detector.py` | 掃描拼合 — 內容偵測 + 背景淨白 單元測試 |
+| `test_scanner_regexes_are_linear.py` | 守門的正規式不可以有**重疊的分支** —— 那是指數級回溯 |
 | `test_scheduled_export.py` | Scheduled settings export (v1.12.54). |
 | `test_script_line_endings.py` | Windows 批次檔一律 CRLF、Unix 腳本一律 LF |
 | `test_seal_zone_marker.py` | 用印區的排除條件：**標籤才算，說明句不算** |
@@ -815,7 +820,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_single_web_process.py` | 這個服務只能用**單一 Web 行程**跑，被開成多 worker 時要講出來（稽核 F11） |
 | `test_smoke_routes.py` | Smoke tests: every public page renders 200, no 500s. |
 | `test_smtp_relay_modes.py` | 通知信的三種寄送方式 |
-| `test_speech_signed_audio_url.py` | 語音服務拉音檔的簽章網址：驗得過才給，**驗不過一律當成找不到** |
+| `test_speech_signed_audio_url.py` | 語音服務拉錄音檔的簽章網址：驗得過才給，**驗不過一律當成找不到** |
 | `test_sso.py` | Tests for the SSO feature (OIDC + SAML): settings encryption, JIT |
 | `test_sso_oidc_e2e.py` | Real end-to-end OIDC login against a self-hosted, spec-conformant mini IdP. |
 | `test_sso_saml_e2e.py` | Real end-to-end SAML login with a genuinely signed SAML Response. |
@@ -1019,6 +1024,32 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] PDF / docx / odt / txt 四種來源都算得出來
 - [ ] 多檔批次有逐檔與跨檔總計
 - [ ] CSV 匯出欄位齊全
+
+#### 會議錄音轉逐字稿 (meeting-transcribe) 🆕 v1.15.94
+- [ ] **沒在管理區設定好 jtlw 之前，這支在側欄與首頁都是反灰**，而且滑鼠移上去
+      說得出原因與該去哪裡設定。直接打網址進來時頁面要說同一句話，
+      **不可以是一個看起來正常、按下去才失敗的上傳區**。
+- [ ] **錄音檔是對方來拉的**：送出去的 `source.url` 用的是設定裡**寫定**的對外位址，
+      不是請求的 Host —— 從對外網域與內網直連兩條路送件，帶出去的網址要一樣。
+- [ ] 送件前算的 `sha256` 與 `size_bytes` 要跟檔案對得上（對方會核對，對不上退件）。
+- [ ] **ACK 在逐字稿落地之後才送**：模擬「寫檔失敗」時**不可以**送出 ACK
+      —— 送了就等於叫對方刪掉一份我們沒存到的東西。
+- [ ] **按停止要真的傳過去**：取消之後對方那件作業的狀態要變成 `cancelled`，
+      不是只有我們這邊停止輪詢（對方照算＝GPU 白燒）。
+- [ ] 失敗訊息**說得出是哪一項**（超過長度上限？檔案毀損？金鑰失效？）——
+      一句「處理失敗」等於什麼都沒說。
+- [ ] 排隊與處理中**分得出來**（「排隊中（前面還有 N 件）」vs「辨識中」）。
+- [ ] 三層（raw / final / speakers）靠 `seq` 對起來，**對不上的不可以硬湊** ——
+      寧可那一段沒有語者，也不要把 A 的語者貼到 B 的話上。
+- [ ] **「會發言的人數」不可以問成「與會人數」** —— 把不發言的與會者算進去
+      會讓講者分辨**變差**（語音服務實測：7 人的會議裡有 4 位發言不到 10 秒，
+      發言 1.5 秒的人聲紋根本不夠，指定 7 人時系統只能把主要講者的話切散來湊數）。
+      不確定要留 0。
+      **當初那組數字已由對方更正**（量在 3 分鐘節錄上、而且是後來修掉的版本），
+      **但守的是「問法」不是數字** —— 機制與那次修正無關。
+      **改回去不會有任何測試變紅，而結果會系統性地變差。**
+- [ ] 「轉送會議摘要」按下去之後，那一份逐字稿真的出現在會議摘要的上傳區
+      （走既有的工作區中轉，不是另造一條路）。
 
 #### 會議摘要 (meeting-summary)
 - [ ] **每一條決議 / 待辦 / 風險 / 未決問題都點得回原文那一段**，而且那一段
@@ -1491,7 +1522,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] Windows **沒有 `sudo`**：文件裡的指令要分平台寫
       （Linux/macOS `sudo jtdt update`；Windows 先開系統管理員 PowerShell）。
 
-## 4. API 覆蓋檢查 🆕（v1.8.55 起完整列出，現 49 個工具）
+## 4. API 覆蓋檢查 🆕（v1.8.55 起完整列出，現 50 個工具）
 
 每個工具至少 1 個 `/api/<tool-id>` endpoint（路徑：`/tools/<tool-id>/api/<tool-id>` 或 `/tools/<tool-id>/convert`）。發版前 curl 抽測：
 
@@ -1712,6 +1743,39 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `/admin/ocr-langs/install`
 - [ ] `/admin/ocr-langs/uninstall`
 
+#### 語音服務 jtlw（`/admin/api/jtlw/*`）🆕 v1.15.94
+
+設定頁本身是 `/admin/jtlw`：
+
+- [ ] 未登入 / 非管理員看不到
+- [ ] **已經存過的 API 金鑰不可以出現在原始碼裡**（畫面只顯示佔位，
+      `view-source` 也看不到）
+- [ ] 沒設定好的時候，「會議錄音轉逐字稿」在側欄與首頁都是**反灰**，
+      而且滑鼠移上去說得出原因與該去哪裡設定
+
+- [ ] `/admin/api/jtlw/settings`
+  - [ ] **金鑰欄位留空＝不更動**（管理頁不顯示已存的金鑰，
+        手滑清空再按儲存**不可以**把金鑰弄丟）
+  - [ ] 送件位址與錄音檔對外位址都要過 SSRF 檢查，不合法時**說得出是哪一個欄位**
+  - [ ] 存完之後 `is_configured()` 的結果要跟著變 —— 工具的反灰狀態靠它
+- [ ] **對方的憑證（自簽）**
+  - [ ] 貼上憑證之後，`httpx` 的 `verify` 真的拿到**那個檔案路徑**
+        —— 存了但沒接上去的話連線照樣走系統信任庫，而且**完全看不出來**
+  - [ ] **指紋要算得出來**（管理員得拿它跟對方公布的值核對才敢信任）
+  - [ ] 貼錯東西**當下**就擋（不然會在送件那一刻失敗，而訊息是 ssl 的
+        內部錯誤，看不出是設定頁貼壞了）
+  - [ ] 清掉設定之後回到系統信任庫，**磁碟上的憑證檔要跟著消失**
+- [ ] `/admin/api/jtlw/profiles` —— 取對方的處理設定清單給下拉用
+  - [ ] **我們這邊不抄一份清單**（抄了就會漂，而且管理員打錯要等送件才失敗）
+  - [ ] 對方連不上時**保留目前存著的值並講出原因**，
+        不可以變成一個空的下拉（那看起來像「沒有可選的」）
+  - [ ] 存著的值對方已經不提供了 → 留著並提示改選，
+        **不可以無聲換掉管理員存的設定**
+- [ ] `/admin/api/jtlw/test`
+  - [ ] **兩段都要跑**：`/health`（免認證，位址對不對）＋ `/capabilities`
+        （要金鑰，身分對不對）。只打 health 的話，**金鑰錯的時候也會回「連得上」**
+  - [ ] 連不上 / 金鑰被撤銷時回的是**看得懂的原因**，不是堆疊或一句「失敗」
+
 #### SSO 單一登入（`/admin/sso/*`）
 
 - [ ] `/admin/sso/proxy-save`
@@ -1903,8 +1967,19 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       夾帶密鑰**，以及中文檔名走 `content_disposition()`
       （寫這一行時我原本照直覺寫成「CSV 公式注入」—— 去看了實際的
       `media_type` 才發現是 zip / JSON。**計畫裡的斷言要查證過再寫**）
-- [ ] `/admin/ocr-langs/deploy/install.sh` / `uninstall.sh` —— 產生給遠端機器
-      執行的腳本，內容不可以夾帶未驗證的輸入
+- [ ] `/admin/ocr-langs/deploy/install.sh` 與 `/admin/ocr-langs/deploy/uninstall.sh`
+      —— 產生給遠端機器執行的腳本，內容不可以夾帶未驗證的輸入
+      （**兩支都要寫完整路徑** —— 原本第二支只寫了 `uninstall.sh`，
+      而守門當時是拿路徑尾段比對，等於沒檢查到它）
+- [ ] `/admin/directory/selected` —— 目錄瀏覽「已選的對象」清單
+  - [ ] 未登入 / 非管理員看不到，回的是 302 / 403 **不是空清單**
+        （空清單會讓人以為目錄真的是空的）
+  - [ ] 回傳內容只有指派權限需要的欄位，**不可以夾帶密碼雜湊 / SID /
+        二進位屬性**（`get_user_detail` 那條已經在過濾，這裡是同一條契約）
+- [ ] `/admin/system-status/users` —— 每位使用者的檔案用量
+  - [ ] **只有數字，沒有檔名** —— 管理員管容量，不看使用者的檔案內容
+        （工作區那條產品承諾）
+  - [ ] 認證關閉時不可以 500（那時候沒有「每位使用者」這個概念）
 - [ ] `/admin/users/{uid}/effective` / `/admin/groups/{gid}/members-ldap` /
       `member-count` / `/admin/directory/users` / `selected` /
       `/admin/groups/directory-sync/status` —— 目錄與權限查詢；
@@ -1950,7 +2025,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 目前沒有自動化測試碰過，跑 `python tools/report_endpoint_test_coverage.py`，
 那份是**提示不是判決**。
 
-共 **275 支**（工具首頁不列，§2 已逐支驗收）。
+共 **281 支**（工具首頁不列，§2 已逐支驗收）。
 
 **全站（認證 / 帳號 / 工作區 / 介面語言）**
 
@@ -2065,6 +2140,30 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `GET /tools/image-to-pdf/thumb/{fid}`
 - [ ] `POST /tools/image-to-pdf/upload`
 
+**meeting-transcribe（會議錄音轉逐字稿）** 🆕 v1.15.94
+
+- [ ] `POST /tools/meeting-transcribe/upload` —— 收錄音檔、算 sha256 與大小。
+      驗：①沒設定 jtlw 時回 **503**（部署問題不是使用者送錯東西）
+      ②不支援的副檔名回 **400**，訊息列得出支援哪些
+      ③空檔案回 400 而且**不留下半個檔案**
+      ④三小時的錄音不可以整個讀進記憶體（串流寫入）
+- [ ] `POST /tools/meeting-transcribe/start` —— 送件並開背景作業。
+      驗：①別人的 upload_id 拿不到（歸屬檢查）②沒填「錄音檔對外位址」時回 **503**
+      且訊息指得出是哪一項③`Idempotency-Key` 用我們自己的編號，重送不會變成兩件
+      ④回傳的作業在「我的作業」看得到、有下載鈕（`result_path` 有設而且是 `Path`）
+- [ ] `GET /tools/meeting-transcribe/result/{upload_id}` —— 取逐字稿。
+      驗：①別人的拿不到②還沒跑完或已過期回 **410** 不是 500
+- [ ] `GET|HEAD /tools/meeting-transcribe/audio/{upload_id}` —— 把原始錄音交回瀏覽器播放。
+      驗：①別人的拿不到（走 `upload_owner`，**不是**給對方拉檔用的那條短效簽章網址）
+      ②`Range` 要求回 **206** ＋ 正確的 `Content-Range`（拖進度列不可以整檔重拉）
+      ③**HEAD 也要答 200** —— `@router.get` 只註冊 GET，回 405 的話任何
+      「檔案還在嗎」的探測都會失敗，而失敗在畫面上跟「沒有錄音檔」長得一模一樣
+      ④錄音被清掉時回 410 / 404，畫面收起播放器並講得出原因
+- [ ] `POST /tools/meeting-transcribe/speakers/{upload_id}` —— 把發言者代號改成人名。
+      驗：①別人的改不到②`map` 是「同一位全部一起改」、`overrides` 是「只有這一段」
+      ③名字裡的換行 / 控制字元被清掉、長度有上限（會被寫進逐字稿與下載的檔案）
+      ④改完之後下載、複製、轉送「會議摘要」拿到的是同一份資料（不另開一個檔）
+
 **meeting-summary（會議摘要）**
 
 - [ ] `POST /tools/meeting-summary/upload` —— 收逐字稿、解析、回段落數 / 講者 / 前幾段預覽。
@@ -2077,6 +2176,12 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       驗：①別人的拿不到②還沒分析完或過期回 **410** 不是 500
 - [ ] `GET /tools/meeting-summary/segments/{upload_id}` —— 取整份逐字稿（結果頁把段號還原成原文要用）。
       驗：①別人的拿不到②段號與 `result` 裡的引用對得起來
+- [ ] `POST /tools/meeting-summary/speakers/{upload_id}` —— 把發言者代號改成人名。
+      驗：①別人的改不到②`map` 全部一起改、`overrides` 只改那一段
+      ③**發言統計要一起搬**（那張圖以代號當鍵 —— 不搬的話圖上是 `S1`、
+      逐字稿已經是人名，同一個畫面兩套名字）
+      ④**`seq` 一個都不可以動** —— 決議與待辦的引用綁的是 `seq`
+      ⑤名字裡的換行 / 控制字元被清掉、長度有上限
 - [ ] `GET /tools/meeting-summary/charts/{upload_id}` —— 這場會議畫得出哪幾張圖。
       判準：**由資料決定**（只有一個章節就不出章節佔比、只有一位講者就不出語者佔比）
       —— 沒有內容的圖會讓人以為功能壞了。

@@ -32,7 +32,10 @@ _CALL = re.compile(r"\b(showConfirm|showToast|showAlert|showModal)\s*\(\s*")
 _CJK = re.compile(r"[㐀-鿿]")
 
 #: `tr('…')` / `tr("…")` —— 挖掉這些之後剩下的中文才算違規。
-_TR_CALL = re.compile(r"""tr\(\s*(['"])(?:\\.|(?!\1).)*\1""", re.S)
+# **第二個分支要排除反斜線**（`[^\\]` 不是 `.`）—— 不然 `\x` 既可以配成
+# 一次 `\\.` 也可以配成兩次 `.`，配不上時就是指數級回溯（CodeQL 報的 ReDoS）。
+# 掃的是我們自己的原始碼、攻擊者碰不到，但守門卡住跟守門壞掉一樣難查。
+_TR_CALL = re.compile(r"""tr\(\s*(['"])(?:\\.|(?!\1)[^\\])*\1""", re.S)
 
 
 def _first_arg(src: str, start: int) -> str:

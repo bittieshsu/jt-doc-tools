@@ -641,3 +641,57 @@ def test_office_formats_do_not_leave_white_text_on_white():
         assert not white, (
             f"{fmt} 裡有 {len(white)} 個白字樣式 —— 底色在轉檔時會掉，"
             "白字白底整行看不見")
+
+
+def test_renaming_a_speaker_rewrites_the_transcript_and_the_stats(client, auth_off):
+    """**改名字要一次改完**：逐字稿、發言統計、下載的內容走的是同一份資料。
+
+    統計是**以代號當鍵**的 —— 不一起搬的話，圖上還是 `S1` 而逐字稿已經是人名，
+    同一個畫面上兩套名字（本專案「同一份東西寫在兩個地方」那一族）。
+
+    **`seq` 一個都不能動** —— 決議與待辦的引用綁的是 `seq`，
+    改名字不可以讓任何一條引用失效。
+    """
+    import importlib
+    import json
+    # **不可以 `from ... import router`** —— 套件的 `__init__` 做過
+    # `from .router import router`，那個名字把同名的子模組遮住了，
+    # 拿到的會是 `APIRouter` 物件（CLAUDE.md 記過同一課）。
+    ms = importlib.import_module("app.tools.meeting_summary.router")
+
+    uid = _upload(client).json()["upload_id"]
+    segs = [{"seq": 1, "speaker": "S1", "text": "第一句"},
+            {"seq": 2, "speaker": "S2", "text": "第二句"},
+            {"seq": 3, "speaker": "S1", "text": "第三句"}]
+    ms._seg_path(uid).write_text(json.dumps(segs, ensure_ascii=False), encoding="utf-8")
+    ms._out_path(uid).write_text(json.dumps(
+        {"speaker_stats": {"S1": {"chars": 6}, "S2": {"chars": 3}}},
+        ensure_ascii=False), encoding="utf-8")
+
+    r = client.post(f"/tools/meeting-summary/speakers/{uid}",
+                    json={"map": {"S1": "王小明"}, "overrides": {"2": "臨時來賓"}})
+    assert r.status_code == 200, r.text
+
+    after = json.loads(ms._seg_path(uid).read_text(encoding="utf-8"))
+    assert [s["speaker"] for s in after] == ["王小明", "臨時來賓", "王小明"]
+    assert [s["seq"] for s in after] == [1, 2, 3], "seq 被動到了 —— 引用會全部失效"
+
+    stats = json.loads(ms._out_path(uid).read_text(encoding="utf-8"))["speaker_stats"]
+    assert "王小明" in stats and "S1" not in stats, (
+        "統計還掛在舊代號上 —— 圖上會是 S1 而逐字稿已經是人名")
+    assert stats["王小明"] == {"chars": 6}, "搬鍵的時候把值弄丟了"
+
+
+def test_a_speaker_name_cannot_smuggle_newlines(client, auth_off):
+    """名字會被寫進逐字稿與下載的檔案 —— 換行會把一段拆成兩段。"""
+    import importlib
+    import json
+    ms = importlib.import_module("app.tools.meeting_summary.router")
+
+    uid = _upload(client).json()["upload_id"]
+    ms._seg_path(uid).write_text(json.dumps([{"seq": 1, "speaker": "S1", "text": "x"}]),
+                                 encoding="utf-8")
+    client.post(f"/tools/meeting-summary/speakers/{uid}",
+                json={"map": {"S1": "壞\n人\r\x00"}})
+    got = json.loads(ms._seg_path(uid).read_text(encoding="utf-8"))[0]["speaker"]
+    assert "\n" not in got and "\r" not in got and "\x00" not in got, got

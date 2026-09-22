@@ -690,7 +690,8 @@ class JobManager:
             killed = sum(1 for pid, fp in to_kill.items()
                          if proc_tree.kill_tree(pid, fp))
             if killed:
-                logger.info("job %s 取消：停掉 %d 個子行程", job_id, killed)
+                from .log_safe import safe_log
+                logger.info("job %s 取消：停掉 %d 個子行程", safe_log(job_id), killed)
         self._persist(job)
         self._dispatch()
         return True

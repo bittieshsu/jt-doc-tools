@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import socket
 import subprocess
@@ -72,10 +73,38 @@ pytestmark = pytest.mark.skipif(
     reason="沒有 chromium / websockets —— 這條要真的瀏覽器才驗得到")
 
 
+def _seed_setup_gated_tools(data: "pathlib.Path") -> None:
+    """**把需要外部設定的工具先設定好** —— 不然這一關永遠看不到它們的真正介面。
+
+    `requires_setup` 的工具（目前是「會議錄音轉逐字稿」）在沒設定時只渲染
+    一句「請先去設定」，連上傳區都不畫。所以這支掃描器在**沒有設定**的
+    拋棄式實例上，從頭到尾掃的都是那個空殼 —— 而真正的那一份
+    **從來沒有在瀏覽器裡開過**。
+
+    2026-09-22 就這樣漏掉一個：進度區只放了一個空的 `<div>`，
+    `JobProgress` 在 `null.addEventListener` 丟 `TypeError`，
+    整段行內腳本停住、「開始」按鈕沒有被接上事件 —— **按了完全沒反應**，
+    而這一關全綠（它看到的是空殼）。v1.15.36 的「文件擺正」是一模一樣的錯。
+
+    這裡只要讓 `is_configured()` 成立就好（它只看有沒有值），
+    位址故意指向一個不會有人接的埠 —— 我們要的是**介面畫出來**，
+    不是真的連得上。
+    """
+    (data / "jtlw_settings.json").write_text(json.dumps({
+        "enabled": True, "base_url": "http://127.0.0.1:1",
+        "api_key_enc": "seeded-for-the-page-boot-sweep",
+        "audio_base_url": "http://127.0.0.1:1",
+        "profile_id": "meeting.balanced",
+        "tasks": ["transcribe", "diarize", "correct"],
+        "verify_tls": True, "request_timeout": 30,
+    }, ensure_ascii=False), encoding="utf-8")
+
+
 @pytest.fixture(scope="module")
 def live():
     """跑一個拋棄式實例（auth 關閉、獨立資料目錄）＋ 一個無頭瀏覽器。"""
     data = tempfile.mkdtemp(prefix="pageboot-")
+    _seed_setup_gated_tools(pathlib.Path(data))
     port, cdp = _free_port(), _free_port()
     env = {**os.environ, "JTDT_DATA_DIR": data, "JTDT_CSRF_DISABLE": "1"}
     srv = subprocess.Popen(
@@ -212,3 +241,22 @@ def test_the_sweep_actually_opened_every_page(live):
     assert len(PATHS) > 40, f"只列出 {len(PATHS)} 頁，比對基準本身就不對"
     assert len(_VISITED) >= len(PATHS), (
         f"只走過 {len(_VISITED)} 頁，應該要有 {len(PATHS)} 頁")
+
+
+def test_the_setup_gated_tools_really_show_their_real_ui(live):
+    """**先證明種子有效** —— 沒有這一條，`_seed_setup_gated_tools` 哪天失效
+    （設定檔名改了、判準多一項）就會靜靜地退回掃空殼，
+    而上面那一輪照樣全綠（「掃 0 個檔」跟「掃過都乾淨」長得一樣，第 N 次）。
+
+    判準是**那個介面真的被畫出來**（上傳區與進度區的標記），
+    不是「頁面回 200」—— 未設定的版本也是 200。
+    """
+    port, _ = live
+    html = urllib.request.urlopen(
+        f"http://127.0.0.1:{port}/tools/meeting-transcribe/", timeout=10).read().decode()
+    assert 'id="mtUp"' in html, (
+        "「會議錄音轉逐字稿」還是渲染成「請先去設定」的空殼 —— "
+        "種子沒生效，這一關等於沒掃到它真正的介面")
+    assert "job-bar-inner" in html and "job-reset" in html, (
+        "進度區沒有共用元件的標記 —— `JobProgress` 會在 "
+        "`null.addEventListener` 丟 TypeError，而按鈕就此接不上")

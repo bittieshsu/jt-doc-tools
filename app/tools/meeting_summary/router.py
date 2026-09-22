@@ -257,6 +257,62 @@ async def segments(upload_id: str, request: Request):
     return {"segments": _read_json(_seg_path(upload_id), "逐字稿")}
 
 
+@router.post("/speakers/{upload_id}")
+async def rename_speakers(upload_id: str, request: Request):
+    """把發言者代號改成人名。
+
+    **直接改存下來的那一份**（逐字稿與分析結果的統計），不做另一層對照表：
+    畫面、下載、心智圖、發言佔比走的都是同一份資料，
+    分兩個地方存一定會漂（「會議錄音轉逐字稿」那邊是同一個做法）。
+
+    兩種範圍：`map` 是「這個代號以後都叫這個名字」（S1 → Jason），
+    `overrides` 是「只有這一段」（`seq` → 名字）——
+    辨識偶爾會把某一段掛錯人。
+
+    **`seq` 一個都不動** —— 決議與待辦的引用綁的是 `seq`，
+    改名字不可以讓任何一條引用失效。
+    """
+    _sp.require_uuid_hex(upload_id, "upload_id")
+    _uo.require(upload_id, request)
+    body = await request.json() or {}
+
+    def _clean(name: object) -> str:
+        # 名字會被寫進逐字稿、圖與下載的檔案 —— 控制字元與過長的值擋掉
+        s = str(name or "").replace("\n", " ").replace("\r", " ").strip()
+        return "".join(ch for ch in s if ch.isprintable())[:40]
+
+    names = {str(k): _clean(v) for k, v in (body.get("map") or {}).items() if _clean(v)}
+    overrides = {str(k): _clean(v) for k, v in (body.get("overrides") or {}).items()
+                 if _clean(v)}
+    if not names and not overrides:
+        return {"ok": True, "renamed": 0}
+
+    segs = _read_json(_seg_path(upload_id), "逐字稿")
+    n = 0
+    for s in segs:
+        want = overrides.get(str(s.get("seq"))) or names.get(str(s.get("speaker") or ""))
+        if want and want != s.get("speaker"):
+            s["speaker"] = want
+            n += 1
+    atomic_json.write_json(_seg_path(upload_id), segs)
+
+    # 分析結果裡的發言統計是**以代號當鍵**的 —— 不一起搬的話，
+    # 圖上還是舊代號，而逐字稿已經是人名了（同一個畫面兩套名字）。
+    out_path = _out_path(upload_id)
+    if out_path.exists():
+        try:
+            out = json.loads(out_path.read_text(encoding="utf-8"))
+        except ValueError:
+            out = None
+        if isinstance(out, dict) and isinstance(out.get("speaker_stats"), dict):
+            stats = {}
+            for k, v in out["speaker_stats"].items():
+                stats[names.get(str(k), str(k))] = v
+            out["speaker_stats"] = stats
+            atomic_json.write_json(out_path, out)
+    return {"ok": True, "renamed": n}
+
+
 # ------------------------------------------------------------------ 匯出
 
 #: 從會議背景裡找主題的寫法。**只認明寫的**，不要從內文猜 ——

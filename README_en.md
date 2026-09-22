@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.15.93
+# Jason Tools Document Toolbox v1.16.5
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -25,7 +25,7 @@
 > `jtdt update` then works as usual. **Unaffected**: tarball installs, the Windows installer,
 > and anything installed after 2026-09-13. Fixed from v1.15.43 onwards.
 
-> An integrated PDF / Office document platform. 49 tools cover **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan stitching**, **de-identification**, **word counts**, **annotation handling**, **diffing**, **sentence translation**, **list processing**, **e-invoice processing**, **VAT lookup**, **a page editor**, **encryption / decryption** and more.
+> An integrated PDF / Office document platform. 50 tools cover **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan stitching**, **de-identification**, **word counts**, **annotation handling**, **diffing**, **sentence translation**, **list processing**, **e-invoice processing**, **VAT lookup**, **a page editor**, **encryption / decryption** and more.
 >
 > Enterprise features: **local / LDAP / AD multi-realm authentication**, **single sign-on** (OIDC + SAML, ready for M365 / Google / Keycloak), **RBAC roles and permissions**, **audit log**, **SIEM forwarding** (syslog / CEF / GELF), **font management**, **user workspace**, **background jobs with completion notices** and a **REST API**.
 >
@@ -95,7 +95,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 
 ---
 
-## The 49 tools at a glance
+## The 50 tools at a glance
 
 ### Forms and stamps
 - **Auto-fill forms**; field detection plus template values
@@ -117,6 +117,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 - **Extract text / images / attachments**; with optional LLM paragraph re-flow
 - **Word count** [needs OxOffice/LibreOffice]: tables, charts and an LLM summary; accepts PDF, office and plain-text files
 - **Meeting summary** [needs OxOffice/LibreOffice]: turns a meeting transcript (.vtt / .srt / .json / .txt / .docx / .odt) into a summary, decisions, action items, risks and chapters; **every entry points back to the segment it came from and who said it**, and clicking it jumps there. When timestamps are present it also computes the speaking share, directly from the times rather than estimated. The engine is only needed to export as PDF / Word / ODF
+- **Meeting recording to transcript**: turns a meeting recording or video into a transcript with **timings and speakers**, ready to hand to Meeting summary in one click; recognition runs on an external speech service (jtlw), so **it only appears once an administrator has set that up** (greyed out until then)
 - **Annotation report / removal / flattening**
 - **OCR**: run OCR on scanned PDFs and images so the text becomes searchable and selectable (the same idea as Live Text in macOS Preview); two engines (**EasyOCR** by default, strong on Chinese, Japanese and Korean; **Tesseract** as a fallback), with optional LLM typo correction. **An external GPU recognition server is supported** (DGX Spark / H100 / 4090 …): download `install.sh` from the admin interface to deploy it, taking a page from 8; 15 seconds on CPU down to 0.3; 0.8 seconds on GPU (**more than 10× faster**).
 - **Pre-submission check**: batch verification: page size, embedded fonts, complete fields, leftover personal data, hidden content
@@ -168,7 +169,7 @@ Enabled by default; an administrator can turn it off at any time under “Settin
 
 Slow work (conversion, OCR, sentence translation, compressing large files …) is handed to the server when you submit it, so **you can close the tab** instead of watching a progress bar.
 
-- **Submit and it runs in the background** — 29 tools go through the job system, including PDF to office / slides, format conversion, OCR, sentence translation, office to PDF, compression, merge, split, watermarks, stamps, seam stamps and pre-submission checks.
+- **Submit and it runs in the background** — 30 tools go through the job system, including PDF to office / slides, format conversion, OCR, sentence translation, office to PDF, compression, merge, split, watermarks, stamps, seam stamps and pre-submission checks.
 - **My jobs**: progress, queue position, elapsed time and the download are all on one page, and a running job can be cancelled. Tools whose output is not a single file (sentence translation, say) take you back to the original page to keep reading the comparison.
 - **Nothing vanishes on restart**; job state lives in the database; anything unfinished when the service restarts is marked as interrupted rather than silently disappearing.
 - **It will not take the machine down**; memory is estimated before dispatch, and a job that does not fit waits in the queue; the concurrency limits for jobs and Office conversion are both adjustable in the admin area.

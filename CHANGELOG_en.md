@@ -5,11 +5,412 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (822 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (834 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.5] - 2026-09-22
+
+### Player polish
+
+Round primary play button (it used to look like the secondary buttons beside
+it, despite being the player's main action); the current position is now the
+prominent number and the total length the quiet one; and moving the pointer over
+the waveform draws a follow line with the time at that spot — **so you know
+where a click will take you before you click**.
+
+---
+
+## [1.16.4] - 2026-09-22
+
+### Renaming speakers in Meeting summary too
+
+Same behaviour and the same colour palette as the transcript tool — the same
+meeting should not show `S1` in blue in one tool and green in the other.
+Clicking a name renames every segment from that speaker by default; unticking
+the box changes only that one.
+
+**The stats move with it**: the speaking-share chart is keyed by the speaker
+code, so renaming only the transcript would leave `S1` on the chart and a real
+name in the text — two sets of names on one screen. **`seq` never changes** —
+decisions and action items cite `seq`, and renaming must not invalidate a
+single citation.
+
+---
+
+## [1.16.3] - 2026-09-22
+
+### Three fixes in the transcript player
+
+* The play icon now turns into a pause icon. Both icons are rendered and
+  toggled through wrapper `<span>`s — **you cannot set `.hidden` on an `<svg>`**
+  (`SVGElement` has no such property; this project lost a whole overlay to that
+  once).
+* **The waveform was tiny.** A normal meeting recording peaks at 0.1–0.3, so
+  drawing absolute values gives a thin line down the middle. Peaks are now
+  normalised against the loudest point and square-rooted so quiet passages stay
+  visible.
+* **Clicking a timestamp scrolled to the wrong row.** The code used `offsetTop`,
+  which is relative to the nearest *positioned* ancestor — the transcript box
+  only has `overflow:auto`, so it was measuring from the top of the whole panel
+  and always overshot by the height of everything above it. Now computed from
+  two `getBoundingClientRect()` calls plus `scrollTop`, which **depends on no
+  CSS at all**.
+
+---
+
+## [1.16.2] - 2026-09-22
+
+### The waveform and player never appeared — `@router.get` does not accept HEAD
+
+The page sent a HEAD request to ask whether the recording still existed, and
+only then showed the player. But **FastAPI's `@router.get` registers GET only**
+(Starlette's own `Route` adds HEAD; FastAPI does not), so the probe always
+returned **405** and the player was never shown — with no error anywhere.
+
+Both sides fixed: the endpoint now answers HEAD (with a guard), and the page no
+longer decides visibility from a probe — it attaches the audio and lets the
+`<audio>` element's own `error` event speak.
+
+> **Do not let a "let me just check" request decide whether a feature appears.**
+> A failed probe and "there is genuinely nothing there" look identical on
+> screen, and the probe is one more thing that can break.
+
+---
+
+## [1.16.1] - 2026-09-22
+
+### Listen while you read
+
+Waveform and player in the transcript card: click anywhere on the waveform (or
+on a timestamp) to play from there; the segment being played lights up and
+scrolls into view; **each speaker gets their own colour**; and clicking a
+speaker code renames them — every segment from that speaker by default, or just
+the one if you untick the box. There is also a **Save to workspace** button,
+which stores plain text carrying `[mm:ss]` and speaker names.
+
+The waveform is computed in the browser, so no ffmpeg is needed on the server.
+**Recordings over 60 MB are not decoded** — a three-hour meeting expands to
+several gigabytes of PCM and would kill the tab; those fall back to a plain,
+still-clickable timeline.
+
+> **Playback goes through the logged-in ownership check, not the signed URL.**
+> The signed URL exists so the speech service can fetch the file (short-lived,
+> no login); reusing it in the page would either expire or force us to make it
+> permanently public.
+
+### Terminology: `語者` became `發言者`
+
+Neither `語者` nor `講者` is how Taiwan refers to the person speaking in a
+meeting. Both are now `發言者` — one thing described by two words reads like two
+things. Search keywords keep the old forms so existing habits still work.
+
+---
+
+## [1.16.0] - 2026-09-22
+
+### Working through the speech service's integration checklist
+
+**One code-to-message table was only used by one of the two paths.** A rejection
+at submit time arrives as an exception; a terminal failure arrives in
+`errors[]` — and only the latter consulted the table. Since their v1.7 fetches
+the audio at submit time, source-related errors now mostly take the former path:
+production showed `jtlw rejected this request: source_not_allowed (field
+source.url)` when the table already held "ask your administrator to add the
+address to their allow-list". The wording now lives in one place, with a guard.
+
+Also added: a wall-clock ceiling on polling (**there was none** — if they
+stalled we would have polled forever), retry on `queue_full` using their
+`retry_after_ms`, saying out loud when correction failed and you are looking at
+raw recognition output, treating `task_not_requested` as "that layer is absent"
+rather than an error, fetching `/result` to show correction statistics, and
+sending `correction_level: punctuation_only`.
+
+### Timestamps were lost in the handoff, not in recognition
+
+A report that the transcript "has no time information" — the speech service
+thought we were reading only the corrected layer. **It was not that**: all 258
+segments stored in production carry start/end times and a speaker. The times
+were dropped when we flattened the transcript to plain text on the way to
+Meeting summary. Now it sends JSON, and copied plain text carries `[mm:ss]`.
+
+> **Their explanation sounded reasonable but did not match the file in our
+> hands.** One line — `sum(1 for x in segs if x.get("start_ms"))` — separates
+> "never received" from "received and then dropped". Do not change your own code
+> to match someone else's diagnosis.
+
+---
+
+## [1.15.99] - 2026-09-22
+
+### The button did nothing — the progress area was an empty `<div>`
+
+`JobProgress` wires itself to `.job-reset` / `.job-bar-inner` / `.job-status`
+inside its root. With a bare `<div>`, `root.querySelector('.job-reset')` returns
+`null` and `null.addEventListener` throws — **the rest of the inline script never
+runs**, so the "start" button was never given a click handler. Nothing looked
+wrong: the upload worked (it runs before the exception) and the options panel
+opened. The server log settled it — `POST /upload` present, `POST /start` never.
+
+**The browser boot sweep missed it** because this tool renders only a "configure
+it first" stub when the speech service is not set up, and the sweep uses a fresh
+throwaway instance that never is. The sweep now seeds that configuration (with a
+guard that the seeding still works), plus a static check for any template that
+constructs `JobProgress` without the shared component.
+
+---
+
+## [1.15.98] - 2026-09-22
+
+### The API key field showed its example text at the one moment it misleads
+
+We build the `Authorization: Bearer <key>` header ourselves, so the field only
+wants the key. Their documentation shows the whole header, though, and copying
+from it naturally brings the `Bearer ` prefix along.
+
+Tested against their production API:
+
+| Header we send | Result |
+|---|---|
+| `Bearer jtlw_…` (correct) | 200 |
+| `Bearer Bearer jtlw_…` | **401 "missing or invalid API key"** |
+| `Bearer Authorization: Bearer jtlw_…` | **401** (same) |
+
+**The message points the wrong way**: it blames the key, when the key was fine
+and only the prefix was extra. The prefix is now stripped on save — and only
+when `bearer` is actually followed by a space, so a real key that happens to
+start with those letters is not chewed short (which would look like a 401 too).
+
+The example text itself was also wrong. "Leave empty to keep the current key"
+was an unconditional placeholder, and a placeholder only shows when the field is
+empty — which here means **no key has been saved yet**, so there is nothing to
+keep. It now appears only once a key exists; before that the field shows the
+shape of a key, with a line below explaining to paste the key alone.
+
+### The speaker-count hint is narrower now: people who spoke enough to be told apart
+
+v1.15.97 changed "attendees" to "people who will speak". The speech service
+re-measured on the **full 37 minutes** of a seven-person Chinese meeting (the
+earlier figures were from a three-minute excerpt; they corrected them):
+
+| Setting | Speakers confused | Speakers separated |
+|---|---:|---:|
+| Not specified | 22.90% | **3 / 7** |
+| 7 (the right answer) | **30.15%** | 7 / 7 |
+| 5 or 6 | **17.8%** | 5–6 / 7 |
+
+**The conclusion did not flip** — giving the correct count is still worse — but
+that table alone leads to the wrong decision. Three of the seven spoke for only
+28.6, 56.2 and 94.8 seconds; **forcing a cluster for someone whose voice print
+is too thin costs you the main speakers instead**.
+
+Leaving it blank has its own cost, and it is the worse one: with no hint,
+**four of the seven speakers do not appear in the output at all** — every
+sentence they said is filed under someone else. For a citation mechanism that
+is not "a few seconds missing", it is "a decision attributed to the wrong
+person".
+
+So the hint now asks for the number of people who **spoke enough to be told
+apart**, with a line an organiser can actually judge ("leave out anyone who said
+only a sentence or two"). **If in doubt, still leave it at 0.**
+
+### Terminology: `運維` is a mainland word; Taiwan says `維運`
+
+Two places said `日常運維` — the `OPS.md` heading and the document index in
+README — while `AUTH.md` and two tools already said `維運`. Both spellings were
+sitting in the same product. Added to the banned-term list.
+
+### Dependencies: anyio raised to 4.14.2 (one critical, two others)
+
+| Advisory | Severity | What |
+|---|---|---|
+| GHSA-82r6-8w77-94w6 | **Critical** | `TLSStream` encodes host names with IDNA 2003, so certificate matching can be bypassed |
+| GHSA-5p39-cfhj-2xmp | Moderate | Process-pool workers block forever when stderr is never drained |
+| GHSA-3w57-8xmc-8v26 | High | `run_process` ignores `extra_groups` and can keep the parent's groups |
+
+All three are fixed in 4.14.2; we were on 4.13.0. anyio is a transitive
+dependency (`starlette` / `httpx` / `watchfiles`); we never import it directly.
+
+### Static analysis: three guard regexes were exponential
+
+In `(?:\\.|(?!\1).)*` the two alternatives **overlap** — `\a` can be one
+`\\.` or two `.` — so a failing match tries every split:
+
+| Consecutive `\a` | Before | With `[^\\]` |
+|---:|---:|---:|
+| 18 | 128 ms | 0.01 ms |
+| 22 | 1,056 ms | 0.01 ms |
+| 24 | **5,393 ms** | 0.01 ms |
+
+The input is our own source, so nobody can reach it — **but a guard that hangs
+is as hard to diagnose as a guard that is broken**. All three fixed, plus a
+guard so the shape cannot be copy-pasted back in.
+
+Two more hardenings in the same round: the language dropdown on the site now
+accepts only a plain `.html` filename in the same directory, and the 308
+redirect for renamed tool URLs re-encodes the path.
+
+---
+
+## [1.15.97] - 2026-09-21
+
+### Asking for "attendees" was the wrong question
+
+Meeting recording to transcript used to ask for the number of attendees, and the
+hint said that filling in the exact number made things more accurate. **A
+measurement disproved that.**
+
+The speech service ran a seven-person Chinese meeting: four of the seven spoke
+for less than ten seconds (the quietest said one sentence, 1.5 seconds, nowhere
+near enough voice to identify). Telling it the correct figure of seven made the
+**speaker error rate worse** — forced into seven clusters, the system can only
+split the main speakers' turns to make up the count. Its own
+guess of five was the sensible answer.
+
+The field now asks for the number of **people who will speak**, and says plainly
+to **leave it at 0 when unsure** (its own guess is usually better than a wrong
+hint).
+
+> **A literal guard pins this down**: changing it back would turn no test red,
+> and results would get **systematically worse** with the user none the wiser.
+> Same family as the IIS installation order in `OPS.md`: only the person
+> following the instructions ever hits it.
+>
+> It is also the same judgement as not deriving the audio address from the
+> request host: **an automation that looks obvious is systematically harmful
+> when its direction is wrong.** The obvious next step would have been to fill
+> the count in from the attendee list, and that would have made things worse.
+
+## [1.15.96] - 2026-09-21
+
+### Speech service settings page: a round of fixes
+
+* The Chinese word used for "audio file" was not the Taiwanese one; corrected in
+  39 places and added to the banned-terms list. The check has to **exclude the
+  correct longer form**, otherwise fixing it makes the guard fail (the same trap
+  as an earlier term whose correct form contains the wrong one).
+* **The processing profile was a free-text field** (`meeting.balanced` and the
+  like). An administrator had to remember a magic string and only found out at
+  submit time if it was wrong. It is now a dropdown **filled from the service**;
+  we do not keep a copy of the list (a copy drifts). If the list cannot be read
+  the current value is kept and the reason is shown, so it **never turns into an
+  empty dropdown** (which would read as "there is nothing to choose").
+* **The enable switch now sits on its own** — it decides whether the whole tool
+  is greyed out, which is not the same kind of thing as the fields below it.
+* **The full name and a project link** now sit to the right of the title; an
+  abbreviation does not tell you which service you are configuring.
+* **Plain http now raises a warning**: the API key travels in a header and the
+  recording goes the same way. Loopback addresses are not flagged (they are a
+  security-origin exception, and warning there would just be noise).
+
+* **The audio address is pre-filled with the address you are connected on**
+  when it is empty, with a note saying where that came from. It only fills the
+  **input**; what gets sent is always the stored value. One deployment can be
+  reached both directly on the LAN and through a reverse proxy, so deriving it
+  from the request would get submissions from the public name rejected by their
+  allow list, and the symptom would be "it works for some people".
+* The explanation panel was missing its layout hooks and looked unstyled.
+
+### Self-signed certificates: **paste the certificate**, do not turn verification off
+
+Internal services often use self-signed certificates. The switch to turn
+verification off is still there (on by default), but **the right answer is to
+paste their certificate**: it affects this one connection and nothing else.
+
+Saving computes the **SHA-256 fingerprint** and shows it, because **an
+administrator has to check it against the value they published before trusting
+it** — pasting an unchecked certificate hands the question of "who do I trust"
+to whoever pasted it. Anything that is not a certificate is rejected at save
+time (otherwise it fails at submission with an internal ssl error that gives no
+hint about where it went wrong).
+
+> The cost of turning verification off is stated on screen: **anyone can then
+> impersonate the service, and every submission hands over the API key.**
+
+## [1.15.95] - 2026-09-21
+
+### Meeting recording to transcript: the progress bar never moved
+
+Two fields from the speech service were wired up wrongly:
+
+* `progress` **is an object, not a number** (it holds `percent`,
+  `processed_audio_ms`, `total_audio_ms`). Treated as a number, the type check
+  never matched and the bar stayed put.
+* The stage lives in `progress.stage`; **there is no top-level `stage` field**
+  (the top-level one only appears inside an error object, to say which stage
+  failed). Its values are *stage* names (`fetch`, `normalize`, `asr`,
+  `diarization`, `correction`, `finalize`), not the task names I assumed, so the
+  label always fell back to the generic "processing".
+
+Together the symptom is **"nothing is happening"**: the job was running fine,
+the screen just could not show it.
+
+> **My own test could not catch it**: the fake server returned the shape I had
+> *guessed* (`progress: 1.0` plus a top-level `stage`), so it agreed with our
+> code and stayed green forever. Same family as the previous version's "checking
+> a value we computed against a value we computed": **a fake has to follow the
+> other side's documented contract, not the shape we imagined.** The fake now
+> reports "running" a few times first, which is the only way to see whether the
+> bar moves.
+
+### Failure messages now say something a person can act on
+
+With their error-code list in hand, each code is translated rather than printed
+raw (`audio_too_long` becomes "the recording is too long; their limit is six
+hours, please split it first").
+
+**One of them is especially misleading**: their "cannot reach the source" also
+covers **an expired URL**, and what we hand them is a short-lived signed URL.
+Taken literally, "file not found" sends the user looking for a file that is
+still there, so a 404 on a signed URL is always reported as "the link expired,
+most likely after a long queue".
+
+## [1.15.94] - 2026-09-21
+
+### New tool: Meeting recording to transcript (49 tools, now 50)
+
+Audio or video in, a transcript with **timings and speakers** out, ready to hand
+to Meeting summary in one click. Recognition, speaker separation and punctuation
+repair run on an external speech service (those need a GPU and the audio
+context); **summaries, decisions, action items, mind maps and translation all
+stay in this system**. That is why these are two tools rather than one: a
+customer with no speech service still gets Meeting summary.
+
+**Greyed out until it is set up.** This tool depends on an *external service*,
+not a local package, so you cannot tell by looking at the machine whether it is
+available; only the settings say. When greyed out it says why and where to go,
+and the page itself says the same thing: it must never be an upload box that
+looks fine and only fails once you press it.
+
+The lock reason also moved out of the templates. There used to be one reason
+only ("wrong interface language") and that sentence was hard-coded in two
+templates; adding a second reason would have made both of them say the wrong
+thing. The reason now travels with the data.
+
+### What this version ran into
+
+* **`safe_remote_base_url()` drops the path on purpose** — that is how it works
+  as an SSRF barrier (the caller appends its own fixed path). The first version
+  used the whole address the administrator typed, so requests went to `/jobs`
+  instead of `/api/v1/jobs` and came back 404 with nothing but "HTTP 404".
+  **Only a real request shows this**: unit tests agree with themselves, because
+  the string is one we computed. The fixed prefix is now ours.
+* **The admin-page guard matched on the last path segment** — `/admin/jtlw` never
+  appeared in the test plan at all; the tail `jtlw` happened to collide. Counting
+  them: **4 of 52** admin pages were passing that way, two of them with zero
+  occurrences of their full path. The same hole was fixed for the API list in
+  v1.15.30 and missed here. The criterion is now the full path.
+
+### Stance detection in Meeting summary is cancelled
+
+Getting "this person opposed that proposal" wrong is not a quality problem, it
+is a mistake that harms someone, and the reader has no reason to doubt it: it
+looks exactly like a decision card and carries a segment number too. It also has
+**no measurable criterion** — two people reading the same passage can label the
+stance differently. Every other part of that tool had its criterion before it
+had its feature.
 
 ## [1.15.93] - 2026-09-21
 

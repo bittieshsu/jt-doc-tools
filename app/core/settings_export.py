@@ -50,6 +50,10 @@ CATEGORIES: list[dict] = [
      "items": ["sso_settings.json"], "rekey": "sso",
      "desc": "OIDC / SAML 設定（含用戶端密鑰、SP 私鑰 — 敏感）",
      "default": True, "sensitive": True},
+    {"id": "jtlw", "label": "語音服務（jtlw）", "kind": "files",
+     "items": ["jtlw_settings.json"], "rekey": "jtlw",
+     "desc": "會議錄音送去轉逐字稿的送件位址與 API 金鑰（含金鑰 — 敏感）",
+     "default": True, "sensitive": True},
     {"id": "notify", "label": "通知設定", "kind": "files",
      "items": ["notify_settings.json"], "rekey": "notify",
      "desc": "作業完成通知的管道憑證（SMTP 帳密、bot token、webhook URL — 敏感）",
@@ -165,7 +169,10 @@ def _rekey_specs() -> dict:
     一樣的問題。共用同一套處理，新增這類檔案時只要在這裡加一列。
     """
     from . import notify_settings as _ns, sso_settings as _sso
+    from . import jtlw_settings as _jl
     return {
+        # jtlw_settings.json：祕密就在最上層（`api_key_enc` / `webhook_secret_enc`）
+        "jtlw_settings.json": (_jl, lambda d: [(d, f) for f in _jl._SECRET_FIELDS]),
         # sso_settings.json：祕密在 data["oidc"]["client_secret_enc"] 這種兩層結構
         "sso_settings.json": (_sso, lambda d: [
             (d.get(sec), fld) for sec, fld in _sso.SECRET_FIELDS

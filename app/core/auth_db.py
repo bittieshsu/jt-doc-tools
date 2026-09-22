@@ -784,6 +784,25 @@ def _m27_grant_meeting_summary(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _m28_grant_meeting_transcribe(conn: sqlite3.Connection) -> None:
+    """v28：把 `meeting-transcribe`（會議錄音轉逐字稿，v1.15.94 新增）補給既有角色。
+
+    理由同 `_m18`~`_m27`（seed 快照的 bootstrap 缺口）。
+
+    **拿 `meeting-summary` 當訊號**：這兩支是同一條流程的前後段
+    （錄音 → 逐字稿 → 摘要），能用後段的人本來就該能用前段。
+    **不可以無條件補給所有角色** —— 那會把刻意收窄過的角色一起放寬。
+    """
+    conn.executescript("""
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'meeting-transcribe' FROM role_perms
+        WHERE tool_id = 'meeting-summary';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'meeting-transcribe'
+        FROM subject_perms WHERE tool_id = 'meeting-summary';
+    """)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -807,7 +826,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m24_index_group_members_user,
               _m25_grant_doc_translate,
               _m26_grant_doc_straighten,
-              _m27_grant_meeting_summary]
+              _m27_grant_meeting_summary,
+              _m28_grant_meeting_transcribe]
 
 
 def auth_db_path() -> Path:

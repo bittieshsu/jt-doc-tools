@@ -1,11 +1,11 @@
-"""語音服務拉音檔的簽章網址：驗得過才給，**驗不過一律當成找不到**。
+"""語音服務拉錄音檔的簽章網址：驗得過才給，**驗不過一律當成找不到**。
 
 ## 由來（v1.15.93）
 
-外部語音服務的 `source.type` 只能是 `url` —— 音檔是**對方自己來拉**的。
+外部語音服務的 `source.type` 只能是 `url` —— 錄音檔是**對方自己來拉**的。
 最順手的做法是發一把 API Token 給對方，但**那條路不能走**：
 `api_tokens` 沒有 scope，一把 token 解鎖全部 `/api/*`
-（作業、通知、工作區、每一支工具），只為了讓對方抓一個音檔。
+（作業、通知、工作區、每一支工具），只為了讓對方抓一個錄音檔。
 
 簽章網址反過來：**沒有東西交出去**，過期自動失效，不需要撤銷。
 """
@@ -107,3 +107,41 @@ def test_the_url_is_built_from_a_configured_base_not_the_request_host():
     src = inspect.getsource(sr.sign_url)
     for banned in ("request", "headers", "url.hostname"):
         assert banned not in src, f"`sign_url` 用到了請求的東西：{banned}"
+
+
+def test_the_audio_endpoint_supports_range_requests(tmp_path, monkeypatch):
+    """**對方會續傳** —— 接入清單第 2 節：「支援 Range 要求」。
+
+    目前是 `FileResponse` 自己做的（Starlette 會回 206 ＋ `Content-Range`），
+    但那是實作細節。哪天有人為了加標頭或串流改寫這個端點，
+    續傳就會**安靜地退回整檔重拉** —— 大檔在不穩的線路上可能永遠拉不完，
+    而我們這側只會看到 `source_unreachable`，看不出是少了 Range。
+
+    所以判準放在**行為**上：206 ＋ 正確的 `Content-Range` ＋ 正確的位元組。
+    """
+    from fastapi.testclient import TestClient
+    from app.config import settings
+    from app.web import speech_routes as sr
+    from app.main import app
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path, raising=False)
+    sr.audio_dir().mkdir(parents=True, exist_ok=True)
+    body = bytes(range(256)) * 8                      # 2048 bytes
+    sr.audio_path(IDENT).write_bytes(body)
+
+    c = TestClient(app)
+    exp, sig = su.sign(KIND, IDENT)
+    url = f"/api/speech/audio/{IDENT}?exp={exp}&sig={sig}"
+
+    full = c.get(url)
+    assert full.status_code == 200
+    assert full.headers.get("accept-ranges") == "bytes", (
+        "沒有公告支援 Range —— 對方不會嘗試續傳")
+
+    part = c.get(url, headers={"Range": "bytes=100-199"})
+    assert part.status_code == 206, f"Range 要求沒有回 206（{part.status_code}）"
+    assert part.content == body[100:200], "回的位元組不對"
+    assert part.headers.get("content-range") == f"bytes 100-199/{len(body)}"
+
+    tail = c.get(url, headers={"Range": "bytes=2040-"})
+    assert tail.status_code == 206 and tail.content == body[2040:]

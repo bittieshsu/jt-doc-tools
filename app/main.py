@@ -21,7 +21,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.15.93"
+VERSION = "1.16.5"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -377,7 +377,8 @@ _TOOL_ALIASES = {
     "pdf-metadata":       "metadata xmp author title strip clean remove producer creator 中繼資料 中繼 修訂歷史 去識別 metadata 清除 作者 標題 標籤 XMP",
     "pdf-hidden-scan":    "hidden content javascript js embedded launch uri whitetext offpage scan remove 隱藏 掃描 JavaScript 嵌入檔 白字 頁面外 外部連結 啟動 風險 資安",
     "pdf-attachments":    "attachment attachments embedded file extract pdf paperclip 附件 嵌入檔 萃取 取出 EmbeddedFiles",
-    "meeting-summary":    "meeting summary minutes transcript vtt srt subtitle speaker diarization decision action item risk chapter timeline 會議 摘要 會議記錄 會議紀錄 逐字稿 字幕 講者 決議 待辦 行動項 風險 章節 時間軸 語者 開會 紀要 重點 整理",
+    "meeting-transcribe": "speech to text transcribe transcript asr audio video recording diarization speaker whisper jtlw voice meeting minutes subtitle 錄音 錄影 錄音檔 影片 語音 轉文字 轉逐字稿 逐字稿 聽打 辨識 發言者 語者 講者 會議 開會 字幕",
+    "meeting-summary":    "meeting summary minutes transcript vtt srt subtitle speaker diarization decision action item risk chapter timeline 會議 摘要 會議記錄 會議紀錄 逐字稿 字幕 講者 決議 待辦 行動項 風險 章節 時間軸 發言者 語者 開會 紀要 重點 整理",
     "pdf-wordcount":      "wordcount word count words chars characters letter 字數 統計 字元 字數統計 統計圖表 chart histogram frequency 高頻詞 頻率 段落 句子 paragraph sentence 閱讀時間 reading time stats statistics analytics",
     "pdf-annotations":    "annotations annotation comments comment markup highlight underline strikeout sticky-note review todo extract export 註解 批註 標註 螢光筆 底線 刪除線 文字註解 圖章 自由文字 手繪 審閱 待辦 校稿 合約 修訂",
     "pdf-annotations-strip":   "strip remove delete clean annotations comments markup 註解 批註 移除 刪除 清除 清除註解 移除註解 校稿後清除",
@@ -457,6 +458,8 @@ _nav_tool_items = [
         "color": _tool_color_map.get(t.metadata.id, 0),
         # 這支工具只在哪些介面語言底下列出來（空的＝全部）
         "locales": getattr(t.metadata, "locales", ()),
+        # 要先在管理區設定好外部服務才能用（空的＝不需要）
+        "requires_setup": getattr(t.metadata, "requires_setup", ""),
     }
     for t in tools
 ]
@@ -492,6 +495,10 @@ templates.env.globals["nav_settings"] = [
     {"icon": "building", "name": "公司資料", "description": "管理多公司基本資料",
      "url": "/admin/profile",
      "keywords": "company profile vendor info 廠商 公司"},
+    {"icon": "phone", "name": "語音服務（jtlw）", "description": "會議錄音送去轉逐字稿的送件位址與金鑰",
+     "url": "/admin/jtlw",
+     "keywords": "jtlw speech voice audio asr transcribe transcript diarize whisper meeting recording "
+                 "語音 聲音 錄音 錄音檔 逐字稿 轉錄 辨識 發言者 語者 會議"},
     {"icon": "book", "name": "翻譯對照字典", "description": "單位內部專有名詞怎麼翻（逐句翻譯 / 文件翻譯共用）",
      "url": "/admin/translation-glossary",
      "keywords": "glossary terminology term dictionary translate translation "
@@ -623,24 +630,63 @@ def _nav_settings_visible(request=None):
     return []
 
 
+#: 「這支工具要先設定好才能用」的準備度檢查。代號 → (還沒好嗎, 理由, 去哪裡設定)。
+#:
+#: **理由要由資料帶著，不可以寫在樣板裡** —— 原本只有「語言不符」一種原因，
+#: 那句話就直接寫死在 `base.html` 與 `home.html` 兩個地方；加第二種原因時
+#: 兩邊都會講錯話（本專案「同一份清單寫在兩個地方一定會漂」第 N 次）。
+_SETUP_CHECKS: dict[str, tuple] = {
+    "jtlw": (
+        lambda: not _jtlw_ready(),
+        "還沒設定語音服務（jtlw）。請管理員到「設定 → 語音服務」填好送件位址與金鑰。",
+        "/admin/jtlw",
+    ),
+}
+
+
+def _jtlw_ready() -> bool:
+    from .core import jtlw_settings as _j
+    try:
+        return _j.is_configured()
+    except Exception:          # 設定檔壞掉時當成沒設定，不要讓側欄整個掛掉
+        logger.warning("jtlw 設定讀不回來，工具先反灰", exc_info=True)
+        return False
+
+
+_LOCALE_LOCK_REASON = ("這支工具是為中文 / 台灣的文件與慣例設計的，"
+                       "介面語言切回繁體中文才能使用。")
+
+
 def _nav_groups_for_locale(request=None):
-    """依介面語言把「只在中文環境成立」的工具**標成停用**（`ToolMetadata.locales`）。
+    """把用不了的工具**標成停用**，並帶上「為什麼」。
+
+    兩種原因：
+    * **介面語言不符**（`ToolMetadata.locales`）—— 繁體中文底下不會有。
+    * **外部服務還沒設定**（`ToolMetadata.requires_setup`）—— 跟介面語言無關，
+      每一種語言都要檢查（使用者 2026-09-21 指示：沒設定好就反灰）。
 
     **不是藏起來，是反灰點不下去**（使用者要求）—— 看得到有這支工具、也看得到
-    它為什麼用不了，比整支消失好懂。繁體中文底下沒有任何一支會被標記。
+    它為什麼用不了，比整支消失好懂。
     """
     from .core import ui_locale as _loc
     lang = _loc.resolve(request)
-    if lang == _loc.DEFAULT_LOCALE:
+    # 準備度只跟設定有關，跟語言無關 → 先算一次，所有語言共用。
+    unready = {key for key, (not_ready, _r, _u) in _SETUP_CHECKS.items() if not_ready()}
+    if lang == _loc.DEFAULT_LOCALE and not unready:
         return _NAV_TOOL_GROUPS_ALL          # 最常見的路徑，不多做事
     out = []
     for g in _NAV_TOOL_GROUPS_ALL:
         items = []
         for t in g["tools"]:
-            if _loc.tool_visible(t.get("locales"), lang):
-                items.append(t)
+            need = t.get("requires_setup") or ""
+            if need in unready:
+                _nr, reason, url = _SETUP_CHECKS[need]
+                items.append({**t, "locked": True, "lock_reason": reason,
+                              "lock_setup_url": url})
+            elif not _loc.tool_visible(t.get("locales"), lang):
+                items.append({**t, "locked": True, "lock_reason": _LOCALE_LOCK_REASON})
             else:
-                items.append({**t, "locked": True})
+                items.append(t)
         out.append({"title": g["title"], "tools": items})
     return out
 
@@ -1515,7 +1561,11 @@ async def _redirect_pdf_diff(rest: str = ""):
 
     Use 308 — unlike 301/302, RFC 7538 says 308 MUST preserve method + body
     so a POST stays a POST instead of becoming a GET on the new URL."""
-    target = "/tools/doc-diff/" + rest if rest else "/tools/doc-diff/"
+    # `rest` 是使用者送來的路徑（Starlette 會把 `%2F` 解碼，見 v1.15.35 那條）。
+    # 前綴是常數所以組不出跨站網址，但**重新編碼**之後連換行與控制字元都進不來，
+    # 而且對正常的 `compare` / `preview/xxx` 完全沒有差別。
+    from urllib.parse import quote as _quote
+    target = "/tools/doc-diff/" + _quote(rest, safe="/") if rest else "/tools/doc-diff/"
     return RedirectResponse(target, status_code=308)
 
 

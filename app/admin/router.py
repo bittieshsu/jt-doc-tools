@@ -803,6 +803,143 @@ def build_router(templates) -> APIRouter:
         conv_settings.save_order([str(x) for x in order], [str(x) for x in custom])
         return {"ok": True}
 
+    # ---------- 語音服務（jtlw）整合設定 ----------
+    #
+    # **沒設定好 → 工具反灰**（使用者 2026-09-21 指示）。判準在
+    # `jtlw_settings.is_configured()`，側欄與首頁由 `main._SETUP_CHECKS` 取用 ——
+    # 這裡不要再寫第二份判斷。
+
+    @router.get("/jtlw", response_class=HTMLResponse)
+    async def jtlw_page(request: Request):
+        from ..core import jtlw_settings as _j
+        return templates.TemplateResponse(
+            request, "admin_jtlw.html",
+            {"request": request, "s": _j.get(),
+             # 指紋是算出來的不是存的 —— 存兩份一定會漂
+             "ca_fingerprint": _j.ca_fingerprint(),
+             # 側欄的反灰是**伺服器渲染**的。存檔之後設定齊不齊變了的話
+             # 要重新載入，不然使用者得自己按重新整理（2026-09-22 回報）。
+             # 前端拿它跟存檔回傳的 `configured` 比，**只在真的翻轉時才重載**。
+             "configured": _j.is_configured()})
+
+    @router.post("/api/jtlw/settings")
+    async def api_jtlw_save(request: Request):
+        from ..core import jtlw_settings as _j
+        from app.core.url_safety import safe_remote_base_url
+        body = await request.json() or {}
+        out: dict = {}
+        if "enabled" in body:
+            out["enabled"] = bool(body["enabled"])
+        for key in ("base_url", "audio_base_url"):
+            if key not in body:
+                continue
+            raw = (body.get(key) or "").strip()
+            if raw:
+                try:
+                    # 管理員填的位址是 SSRF 的入口 —— 走既有那一份判斷，
+                    # 不要在這裡另寫一套（遠端 OCR 走的同一道）。
+                    safe_remote_base_url(raw)
+                except ValueError as exc:
+                    label = "送件位址" if key == "base_url" else "錄音檔對外位址"
+                    return JSONResponse(
+                        {"ok": False, "error": f"{label}不合法：{exc}"}, status_code=400)
+            out[key] = raw
+        if "profile_id" in body:
+            out["profile_id"] = (body.get("profile_id") or "").strip() or _j.DEFAULT_PROFILE
+        if "ca_cert_pem" in body:
+            pem = (body.get("ca_cert_pem") or "").strip()
+            if pem:
+                # **貼進來的東西要先確認是一張憑證** —— 貼錯的話連線會在
+                # 送件當下才失敗，而訊息是 ssl 的內部錯誤，看不出是這裡貼壞了。
+                import ssl as _ssl
+                try:
+                    _ssl.PEM_cert_to_DER_cert(pem + "\n")
+                except (ValueError, TypeError):
+                    return JSONResponse(
+                        {"ok": False, "error": "這不是一張 PEM 憑證（要以 "
+                                               "-----BEGIN CERTIFICATE----- 開頭）"},
+                        status_code=400)
+            out["ca_cert_pem"] = pem
+        if "verify_tls" in body:
+            out["verify_tls"] = bool(body["verify_tls"])
+        if "request_timeout" in body:
+            try:
+                out["request_timeout"] = max(5, min(300, int(body["request_timeout"])))
+            except (TypeError, ValueError):
+                pass
+        # 金鑰：空字串代表「不更動」（管理頁不會把已存的金鑰顯示出來），
+        # 要清掉請用專屬的按鈕 —— 不然手滑清空欄位按儲存就把金鑰弄丟了。
+        key_in = body.get("api_key_enc")
+        if key_in:
+            out["api_key_enc"] = key_in if key_in == _j.SECRET_KEPT else str(key_in).strip()
+        _j.save(out)
+        return {"ok": True, "configured": _j.is_configured(),
+                "ca_fingerprint": _j.ca_fingerprint()}
+
+    def _jtlw_pick(value, locale: str) -> str:
+        """對方的 `name` / `description` 是**逐語言的物件**，不是字串。
+
+        ```json
+        "name": {"zh-Hant": "會議（平衡）", "en": "Meeting (balanced)", "ja": "…"}
+        ```
+
+        第一版直接 `str(...)` —— 那會把整個 dict 的 repr 印到下拉選單上
+        （`{'zh-Hant': '會議（平衡）', …}`）。**跟 `progress` 那次同一個病：
+        我照自己以為的形狀寫，而對方的文件早就寫著真正的形狀。**
+        """
+        if isinstance(value, dict):
+            for key in (locale, "zh-Hant", "en"):
+                if value.get(key):
+                    return str(value[key])
+            for v in value.values():
+                if v:
+                    return str(v)
+            return ""
+        return str(value or "")
+
+    @router.get("/api/jtlw/profiles")
+    async def api_jtlw_profiles():
+        """對方提供的處理設定清單。
+
+        **不在我們這邊抄一份** —— 抄了就會漂，而且管理員打錯要等到送件才失敗。
+        讀不到時回 `ok: false` 與原因，讓設定頁**保留目前的值**並講出為什麼，
+        不要變成一個空的下拉（那看起來像「沒有可選的」）。
+        """
+        from ..core import jtlw_client as _c
+        try:
+            rows = _c.JtlwClient(timeout=10).profiles()
+        except _c.JtlwError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=200)
+        from ..core.ui_locale import current_locale
+        loc = current_locale() or "zh-Hant"
+        out = []
+        for r in rows:
+            if isinstance(r, str):
+                out.append({"id": r, "label": r, "description": "", "languages": []})
+            elif isinstance(r, dict) and r.get("id"):
+                out.append({"id": str(r["id"]),
+                            "label": _jtlw_pick(r.get("name"), loc) or str(r["id"]),
+                            "description": _jtlw_pick(r.get("description"), loc),
+                            "deprecated": bool(r.get("deprecated")),
+                            "languages": r.get("languages") or []})
+        return {"ok": True, "profiles": out}
+
+    @router.post("/api/jtlw/test")
+    async def api_jtlw_test():
+        """連線測試。
+
+        **兩段都要跑**：`/health` 免認證（位址對不對），`/capabilities` 要金鑰
+        （身分對不對）。只打 health 的話，金鑰錯的時候也會回「連得上」。
+        """
+        from ..core import jtlw_client as _c
+        try:
+            client = _c.JtlwClient(timeout=10)
+            client.health()
+            cap = client.capabilities()
+        except _c.JtlwError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=200)
+        return {"ok": True, "api_revision": cap.api_revision, "limits": cap.limits}
+
     # ---------- LLM 校驗附加功能設定 ----------
     # All endpoints fail-soft: never raise to break the admin page even if
     # the LLM backend is unreachable.

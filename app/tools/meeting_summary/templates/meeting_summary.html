@@ -4,7 +4,7 @@
 {% block title %}{{ tr('會議摘要') }} · {{ app_name }}{% endblock %}
 {% block head %}{{ llm_gate_styles() }}
 <style nonce="{{ request.state.csp_nonce }}">
-/* 解析結果的預覽：使用者要在**花掉那幾分鐘之前**看出講者判對了沒有 */
+/* 解析結果的預覽：使用者要在**花掉那幾分鐘之前**看出發言者判對了沒有 */
 /* 統計做成有底色的區塊（2026-09-19 使用者要求）——
    原本是一排純文字，跟旁邊的說明文字混在一起，看不出那是「這份檔案的量」。
    四個各一個顏色，跟圖上的配色是同一組感覺。 */
@@ -180,7 +180,22 @@
 .ms-line { display:grid; grid-template-columns:52px 96px 1fr; gap:10px;
            padding:6px 12px; font-size:13px; border-bottom:1px solid #f8fafc; }
 .ms-line:last-child { border-bottom:0; }
-.ms-line.hit { background:#fef9c3; }
+.ms-line.hit { background:#fef9c3 !important; }
+/* 每位發言者一個顏色 —— 一整頁同色的字看不出「這裡換人講了」。
+   **跟「會議錄音轉逐字稿」用同一組色票**：同一場會議在兩支工具裡
+   換來換去時，S1 不應該一下子是藍的一下子是綠的。 */
+.ms-c0 { color:#2563eb; } .ms-c1 { color:#c2410c; } .ms-c2 { color:#15803d; }
+.ms-c3 { color:#7c3aed; } .ms-c4 { color:#be123c; } .ms-c5 { color:#0f766e; }
+.ms-c6 { color:#a16207; } .ms-c7 { color:#4338ca; }
+.ms-line.ms-b0 { background:#eff6ff; } .ms-line.ms-b1 { background:#fff7ed; }
+.ms-line.ms-b2 { background:#f0fdf4; } .ms-line.ms-b3 { background:#faf5ff; }
+.ms-line.ms-b4 { background:#fff1f2; } .ms-line.ms-b5 { background:#f0fdfa; }
+.ms-line.ms-b6 { background:#fefce8; } .ms-line.ms-b7 { background:#eef2ff; }
+.ms-spk { cursor:pointer; }
+.ms-spk:hover { text-decoration:underline dotted; }
+.ms-name-edit { width:100%; font-size:13px; padding:1px 4px; }
+.ms-scope { display:flex; gap:6px; align-items:center; font-size:12px;
+            color:#475569; margin-top:2px; white-space:nowrap; }
 @media (max-width:640px){ .ms-line { grid-template-columns:44px 1fr; }
   .ms-line .ms-spk { grid-column:2; } }
 .ms-actions { display:flex; gap:10px; flex-wrap:wrap; margin:14px 0 4px; }
@@ -304,14 +319,14 @@
     <div class="info-box">
       {{ tr('收得進來的格式：字幕檔（.vtt / .srt）、逐字稿的 JSON、純文字（.txt / .md）、Word 與 ODF（.docx / .odt）。') }}
       <br>
-      {{ tr('純文字的話一行一句話，前面可以寫「講者：」；有時間戳記也讀得到。') }}
+      {{ tr('純文字的話一行一句話，前面可以寫「發言者：」；有時間戳記也讀得到。') }}
     </div>
     {% with upload_id='msUp', accept=accept, hint='逐字稿檔案（.vtt / .srt / .json / .txt / .md / .docx / .odt）' %}
       {% include "components/file_upload.html" %}
     {% endwith %}
 
     <div class="ms-or">{{ tr('或者直接貼上逐字稿') }}</div>
-    <textarea id="msPasteBox" placeholder="{{ tr('王小明：各位早，今天要談三件事。') }}&#10;{{ tr('李美華：我看過草案了。') }}&#10;&#10;{{ tr('（一行一句話，前面可以寫「講者：」；有時間戳記也讀得到）') }}"></textarea>
+    <textarea id="msPasteBox" placeholder="{{ tr('王小明：各位早，今天要談三件事。') }}&#10;{{ tr('李美華：我看過草案了。') }}&#10;&#10;{{ tr('（一行一句話，前面可以寫「發言者：」；有時間戳記也讀得到）') }}"></textarea>
     <label class="ms-opt">
       <input type="checkbox" id="msImpacts" checked>
       <span>
@@ -343,15 +358,15 @@
     <div id="msParsed" hidden>
       <div class="ms-stats">
         <span><b id="msNSeg">0</b>{{ tr('段落') }}</span>
-        <span><b id="msNSpk">0</b>{{ tr('講者') }}</span>
+        <span><b id="msNSpk">0</b>{{ tr('發言者') }}</span>
         <span><b id="msNChar">0</b>{{ tr('字數') }}</span>
         <span id="msDurWrap" hidden><b id="msDur">—</b>{{ tr('總長') }}</span>
       </div>
       <div class="ms-warn" id="msNoTimes" hidden>
-        {{ tr('這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有，但「語者發言佔比」與「章節時間軸」不會出現（那兩個要靠時間算，猜出來的數字不能用）。') }}
+        {{ tr('這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有，但「發言者發言佔比」與「章節時間軸」不會出現（那兩個要靠時間算，猜出來的數字不能用）。') }}
       </div>
       <div class="ms-warn" id="msNoSpk" hidden>
-        {{ tr('沒有認出任何講者。如果你的逐字稿是「講者：內容」這種格式卻沒認出來，多半是名字只出現過一次 —— 分析照常可以做，只是不會有語者佔比。') }}
+        {{ tr('沒有認出任何發言者。如果你的逐字稿是「發言者：內容」這種格式卻沒認出來，多半是名字只出現過一次 —— 分析照常可以做，只是不會有發言者佔比。') }}
       </div>
       <div class="ms-shape">
         <span class="muted">{{ tr('逐字稿排法') }}</span>
@@ -431,7 +446,8 @@
 
     <section class="ms-sec">
       <h3>{{ icon('file-text', size=16) }} {{ tr('逐字稿') }}</h3>
-      <p class="muted">{{ tr('上面每一條引用都指得回這裡。') }}</p>
+      <p class="muted">{{ tr('上面每一條引用都指得回這裡。') }}
+        {{ tr('點發言者的名字可以改名 —— 預設同一位全部一起改。') }}</p>
       <div class="ms-script" id="msScript"></div>
     </section>
   </div>
@@ -495,7 +511,7 @@
     el('msNoTimes').hidden = !!d.has_times;
     el('msNoSpk').hidden = d.speakers.length > 0;
     el('msPrevNote').textContent =
-      tr('下面是前 {0} 段 —— 先確認講者與斷句是對的，再開始分析。')
+      tr('下面是前 {0} 段 —— 先確認發言者與斷句是對的，再開始分析。')
         .replace('{0}', String(d.preview.length));
     var html = '';
     d.preview.forEach(function (s) {
@@ -516,8 +532,8 @@
     lastShapeAuto = d.shape;
     el('msShapeNote').textContent = (sel.value === 'auto' && d.shape)
       // **不要再包一層括號** —— 排法的名字本身就帶括號
-      //（「一行一句（講者：內容）」），外面再包就變成
-      // 「（自動判斷為：一行一句（講者：內容））」兩層，很難讀
+      //（「一行一句（發言者：內容）」），外面再包就變成
+      // 「（自動判斷為：一行一句（發言者：內容））」兩層，很難讀
       //（2026-09-19 回報）。
       ? tr('自動判斷：{0}').replace('{0}', (d.shapes || {})[d.shape] || d.shape)
       : '';
@@ -630,12 +646,12 @@
     warn:  '<path d="M12 3l9 17H3z"/><path d="M12 10v5"/><path d="M12 17.5v.5"/>',
     search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'
   };
-  // **`unknown` 是我們自己塞的代號，不是講者的名字。**
+  // **`unknown` 是我們自己塞的代號，不是發言者的名字。**
   // 資料裡維持 `unknown`（統計、引用、匯出都靠它對應），
   // **只在顯示的時候換成看得懂的字**（2026-09-19 回報「中文介面不要用 unknown」）。
   // 這跟「欄位同義詞字典不可以翻」是一體兩面：**資料不翻，顯示要翻**。
   function spk(name) {
-    return (name === 'unknown' || !name) ? tr('未標示講者') : name;
+    return (name === 'unknown' || !name) ? tr('未標示發言者') : name;
   }
 
   function svgIcon(name) {
@@ -766,7 +782,7 @@
     });
   }
 
-  /* 語者的排序 —— **圖與表共用這一支**。
+  /* 發言者的排序 —— **圖與表共用這一支**。
      有發言時間就依時間（圖畫的就是時間），否則依字數。 */
   function speakerOrder(stats) {
     var names = Object.keys(stats || {}).filter(function (k) {
@@ -837,7 +853,7 @@
       (mine[k] = mine[k] || []).push(s);
     });
 
-    var head = '<tr><th>' + esc(tr('講者')) + '</th>'
+    var head = '<tr><th>' + esc(tr('發言者')) + '</th>'
              + (segs.length ? '<th>' + esc(tr('發言分布')) + '</th>' : '')
              + '<th>' + esc(tr('發言次數')) + '</th>'
              + '<th>' + esc(tr('字數')) + '</th>'
@@ -974,15 +990,102 @@
     reflowTimer = setTimeout(drawCharts, 180);
   });
 
-  function renderScript() {
-    var html = '';
-    segments.forEach(function (s) {
-      html += '<div class="ms-line" id="ms-seg-' + esc(s.seq) + '">'
-            + '<span class="ms-seq">' + esc(s.seq) + '</span>'
-            + '<span class="ms-spk">' + esc(s.speaker || '') + '</span>'
-            + '<span>' + esc(s.text || '') + '</span></div>';
+  // ---------------- 發言者：顏色與改名 ----------------
+  //
+  // 跟「會議錄音轉逐字稿」同一套做法與同一組色票 —— 同一場會議在兩支工具之間
+  // 換來換去時，S1 不應該一下子是藍的、一下子是綠的。
+  var msSpkOrder = [];
+
+  function msSpeakerIndex(id) {
+    if (!id) return -1;
+    var k = msSpkOrder.indexOf(id);
+    if (k < 0) { msSpkOrder.push(id); k = msSpkOrder.length - 1; }
+    return k % 8;
+  }
+
+  async function msSaveSpeakers(map, overrides) {
+    var r = await fetch(BASE + '/speakers/' + encodeURIComponent(uploadId), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ map: map || {}, overrides: overrides || {} })
     });
-    el('msScript').innerHTML = html;
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('名字存不起來'))); }
+  }
+
+  // 點名字 → 就地改。**不要用 prompt()** —— 那個沒辦法同時問「範圍」，
+  // 而範圍正是這裡最重要的一件事（一場會議裡同一個人被標幾百次）。
+  function msEditSpeaker(cell, s) {
+    if (cell.querySelector('input')) return;
+    var oldId = s.speaker || '';
+    cell.textContent = '';
+    var inp = document.createElement('input');
+    inp.className = 'ms-name-edit';
+    inp.value = oldId;
+    var scope = document.createElement('label');
+    scope.className = 'ms-scope';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true;
+    scope.appendChild(cb);
+    scope.appendChild(document.createTextNode(tr('全部 {0}').replace('{0}', oldId)));
+    cell.appendChild(inp);
+    if (oldId) cell.appendChild(scope);
+    inp.focus(); inp.select();
+
+    var done = false;
+    async function commit() {
+      if (done) return;
+      done = true;
+      var name = inp.value.trim();
+      if (!name || name === oldId) { renderScript(); return; }
+      var map = {}, ov = {};
+      if (cb.checked && oldId) {
+        map[oldId] = name;
+        segments.forEach(function (x) { if (x.speaker === oldId) x.speaker = name; });
+      } else {
+        ov[String(s.seq)] = name;
+        s.speaker = name;
+      }
+      // 統計是以代號當鍵的 —— 不一起搬的話，圖上還是舊代號而逐字稿已經是人名
+      if (map[oldId] && result && result.speaker_stats && result.speaker_stats[oldId]) {
+        result.speaker_stats[name] = result.speaker_stats[oldId];
+        delete result.speaker_stats[oldId];
+      }
+      msSpkOrder = [];
+      renderScript();
+      drawCharts();                      // 發言佔比那張圖跟著換名字
+      await msSaveSpeakers(map, ov);
+    }
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { e.preventDefault(); done = true; renderScript(); }
+    });
+    inp.addEventListener('blur', function () { setTimeout(commit, 120); });
+  }
+
+  function renderScript() {
+    var box = el('msScript');
+    box.textContent = '';
+    segments.forEach(function (s) {
+      var ci = msSpeakerIndex(s.speaker);
+      var row = document.createElement('div');
+      row.className = 'ms-line' + (ci >= 0 ? ' ms-b' + ci : '');
+      row.id = 'ms-seg-' + s.seq;
+
+      var q = document.createElement('span');
+      q.className = 'ms-seq';
+      q.textContent = s.seq;
+
+      var sp = document.createElement('span');
+      sp.className = 'ms-spk' + (ci >= 0 ? ' ms-c' + ci : '');
+      sp.textContent = s.speaker || '';
+      sp.title = tr('點一下改名字');
+      sp.addEventListener('click', function () { msEditSpeaker(sp, s); });
+
+      var body = document.createElement('span');
+      body.textContent = s.text || '';
+
+      row.appendChild(q); row.appendChild(sp); row.appendChild(body);
+      box.appendChild(row);
+    });
   }
 
   // 引用與章節都用事件委派 —— 那些節點是之後才塞進來的

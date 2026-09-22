@@ -92,16 +92,29 @@ def test_locked_tools_are_still_listed(tools, locale: str):
     groups = app_main._nav_groups_for_locale(_En())
     listed = {t["id"] for g in groups for t in g["tools"]}
     assert listed == {t.metadata.id for t in tools}, f"{locale} 底下不可以少列任何一支"
+
+    # **反灰有兩種原因，判準要分開**（v1.15.94 起）：
+    #   ① 介面語言不符（`ToolMetadata.locales`）—— 這條測試管的是這一種
+    #   ② 外部服務還沒設定（`ToolMetadata.requires_setup`）—— 跟語言無關，
+    #      繁中底下一樣會反灰，所以不可以混進上面那個相等判斷裡
+    # 混在一起的話，加一支需要設定的工具就會讓這條紅，而它根本沒動到語言那一半。
+    needs_setup = {t.metadata.id for t in tools if getattr(t.metadata, "requires_setup", "")}
     locked = {t["id"] for g in groups for t in g["tools"] if t.get("locked")}
-    assert locked == _TAIWAN_ONLY | _CHINESE, locked
+    assert locked - needs_setup == _TAIWAN_ONLY | _CHINESE, locked
 
     class _Zh:
         cookies: dict = {}
         headers: dict = {}
 
-    zh_locked = [t["id"] for g in app_main._nav_groups_for_locale(_Zh())
-                 for t in g["tools"] if t.get("locked")]
-    assert zh_locked == [], f"繁中底下不可以有工具被鎖住：{zh_locked}"
+    zh_locked = {t["id"] for g in app_main._nav_groups_for_locale(_Zh())
+                 for t in g["tools"] if t.get("locked")}
+    assert zh_locked - needs_setup == set(), f"繁中底下不可以因為語言被鎖住：{zh_locked}"
+
+    # 而且每一支反灰的都要說得出原因 —— 反灰卻不說為什麼比藏起來更糟。
+    for g in groups:
+        for t in g["tools"]:
+            if t.get("locked"):
+                assert t.get("lock_reason"), f"{t['id']} 反灰了卻沒有理由"
 
 
 def test_the_marks_use_the_shared_constants(tools):

@@ -644,7 +644,7 @@
              看得到有這支工具、也看得到為什麼用不了，比整支消失好懂。 #}
           <a class="sb-item{% if t.locked %} is-locked{% endif %}"
              {% if not t.locked %}href="{{ t.url }}"{% else %}aria-disabled="true"
-             title="{{ tr('這支工具是為中文 / 台灣的文件與慣例設計的，介面語言切回繁體中文才能使用。') }}"{% endif %}
+             title="{{ tr(t.lock_reason) }}"{% endif %}
              data-tool-id="{{ t.id }}" data-name="{{ tr(t.name) }} {{ tr(t.description) }} {{ t.keywords }}">
             <span class="sb-item-icon tile-color-{{ t.color|default(0) }}">{{ icon(t.icon or 'tool', size=18) }}</span>
             <span class="sb-item-text">

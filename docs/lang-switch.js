@@ -11,6 +11,10 @@
   var sel = document.getElementById('langSwitch');
   if (!sel || !sel.options) return;
   sel.addEventListener('change', function () {
-    if (this.value) window.location.href = this.value;
+    var v = this.value;
+    // **只接受同目錄的相對檔名**（`index-ja.html` 這種）。值是我們自己產生的
+    // `<option>`，但那是 DOM 裡的字串 —— 只要有人能改到它，
+    // `javascript:…` 就會在這裡被執行。限制成白名單形狀就沒有這條路。
+    if (/^[a-z0-9][a-z0-9-]*\.html$/i.test(v)) window.location.href = v;
   });
 })();

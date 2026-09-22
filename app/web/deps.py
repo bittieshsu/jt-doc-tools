@@ -36,7 +36,7 @@ def require_login(request: Request) -> dict:
 
 # v1.5.0 起改強職責分離：
 #
-# AUDITOR_SHARED：admin 與稽核員都看得到（系統運維 + 合規共同需要）
+# AUDITOR_SHARED：admin 與稽核員都看得到（系統維運 + 合規共同需要）
 #   - /admin/audit         登入 / 操作稽核紀錄
 #   - /admin/system-status CPU / RAM / 網路 / 各 user 檔案用量
 #

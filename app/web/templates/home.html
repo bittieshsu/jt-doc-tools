@@ -69,7 +69,7 @@
     {% for t in g.tools %}
     <a class="tool-card{% if t.locked %} is-locked{% endif %}"
        {% if not t.locked %}href="/tools/{{ t.id }}/"{% else %}aria-disabled="true"
-       title="{{ tr('這支工具是為中文 / 台灣的文件與慣例設計的，介面語言切回繁體中文才能使用。') }}"{% endif %}
+       title="{{ tr(t.lock_reason) }}"{% endif %}
        data-tool-id="{{ t.id }}">
       <div class="tool-icon tile-color-{{ t.color|default(0) }}">{{ icon(t.icon or 'tool', size=26) }}</div>
       <div class="tool-name">{{ tr(t.name) }}</div>

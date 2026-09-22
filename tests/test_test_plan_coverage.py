@@ -115,8 +115,14 @@ def test_admin_pages_appear_in_the_plan():
         and "GET" in (getattr(r, "methods", None) or set())
         and "/api/" not in r.path
     })
-    missing = [p for p in pages
-               if p not in text and p.rsplit("/", 1)[-1] not in text]
+    # **判準是完整路徑**，不是尾段。原本有 `p.rsplit("/", 1)[-1] in text`
+    # 的退路，而尾段（`users` / `selected` / `jtlw`）在四千行的文件裡必然撞得到
+    # —— 實算：52 支管理頁裡有 4 支是這樣假通過的，其中
+    # `/admin/directory/selected` 與 `/admin/system-status/users` 完整路徑
+    # 出現 0 次。同一個洞 v1.15.30 在 API 那條修過，管理頁這條當時漏掉了。
+    #
+    # **寬鬆的判準比沒有判準更糟**：報告全綠，而且沒有人會再去看那一塊。
+    missing = [p for p in pages if p not in text]
     assert not missing, (
         "這些管理頁在測試計畫裡沒提到：\n  " + "\n  ".join(missing))
 

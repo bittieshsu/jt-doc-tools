@@ -23,11 +23,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+# 引號內容的第二個分支要排除反斜線 —— 見 `test_dialog_strings_go_through_tr`
+# 裡的說明（分支重疊 ＝ 指數級回溯）。
 _ASSIGN = re.compile(
-    r"""\.(title|placeholder|ariaLabel|alt)\s*=\s*(['"`])((?:\\.|(?!\2).)*)\2""")
+    r"""\.(title|placeholder|ariaLabel|alt)\s*=\s*(['"`])((?:\\.|(?!\2)[^\\])*)\2""")
 _SETATTR = re.compile(
     r"""setAttribute\(\s*['"](title|placeholder|aria-label|alt)['"]\s*,"""
-    r"""\s*(['"`])((?:\\.|(?!\2).)*)\2""")
+    r"""\s*(['"`])((?:\\.|(?!\2)[^\\])*)\2""")
 _CJK = re.compile(r"[㐀-鿿]")
 
 

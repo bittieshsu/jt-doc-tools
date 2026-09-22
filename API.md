@@ -2013,6 +2013,9 @@ GET /api/speech/audio/{file_id}?exp=<到期的 unix 秒數>&sig=<簽章>
 | `/admin/jobs/api/concurrency` | POST | 作業佇列 —— 最大同時作業數 |
 | `/admin/jobs/api/priority-users` | GET / POST | 作業佇列 —— 優先派送名單（**順序就是優先序**）|
 | `/admin/jobs/api/user-search` | GET | 作業佇列 —— 指定優先使用者時的搜尋框 |
+| `/admin/api/jtlw/settings` | POST | 語音服務（jtlw）—— 存送件位址與金鑰 |
+| `/admin/api/jtlw/test` | POST | 語音服務（jtlw）—— 測連線（`/health` ＋ `/capabilities` 兩段）|
+| `/admin/api/jtlw/profiles` | GET | 語音服務（jtlw）—— 取對方提供的處理設定清單（下拉用）|
 
 ---
 

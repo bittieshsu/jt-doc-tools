@@ -233,7 +233,7 @@ def test_admin_blocked_from_auditor_exclusive_pages(admin_session):
 
 
 def test_admin_can_see_shared_pages(admin_session):
-    """admin 仍可看 audit / system-status（系統運維必要）。"""
+    """admin 仍可看 audit / system-status（系統維運必要）。"""
     client, _, _ = admin_session
     for path in ("/admin/audit", "/admin/system-status"):
         r = client.get(path, follow_redirects=False)
