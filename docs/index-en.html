@@ -1030,6 +1030,29 @@
       </div>
     </div>
 
+    <div class="spf">
+      <h3 class="spf-title">How the two connect</h3>
+      <p class="spf-sub">JTDT handles accounts, permissions, files and the result pages; jtlw only turns speech into text. The recording is handed over through a short-lived URL, and once the transcript is saved back here, jtlw can delete its copy.</p>
+      <div class="spf-net">
+        <span class="spf-net-tag">Your internal network (both can be self-hosted)</span>
+        <div class="spf-lanes">
+          <div class="spf-lane"><span class="spf-name">JTDT</span><span class="spf-role">This system: accounts, permissions, files, result pages</span></div>
+          <div class="spf-lane"><span class="spf-name">jtlw</span><span class="spf-role">Speech service: recognition, speaker separation, correction (GPU)</span></div>
+        </div>
+        <ol class="spf-rows">
+          <li class="spf-row spf-act spf-at-a"><span class="spf-dir">JTDT</span><div class="spf-card"><span class="spf-n">1</span><div><b>Upload the recording</b><span class="spf-d">Audio or video is stored here, with who uploaded it</span></div></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">2</span><div><b>Submit</b><span class="spf-d">Options such as language and number of speakers, plus the recording's download URL (authenticated with an API key)</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">3</span><div><b>jtlw fetches the recording</b><span class="spf-d">Downloaded through a short-lived signed URL: no account needed, it expires after 2 hours</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-act spf-at-b"><span class="spf-dir">jtlw</span><div class="spf-card"><span class="spf-n">4</span><div><b>Recognition</b><span class="spf-d">Queued first (the GPU takes one job at a time)</span><span class="spf-d">Then recognised, split by speaker and corrected</span></div></div></li>
+          <li class="spf-row spf-msg spf-both"><div class="spf-label"><span class="spf-n">5</span><div><b>Check progress</b><span class="spf-d">Asked every 3 to 15 seconds; the page shows "Queued (N ahead)" or the recognition progress</span></div></div><span class="spf-dir">JTDT ⇄ jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-a"><div class="spf-label"><span class="spf-n">6</span><div><b>Fetch the transcript</b><span class="spf-d">Text, timing and speakers, aligned by segment number</span></div></div><span class="spf-dir">jtlw → JTDT</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">7</span><div><b>Confirm receipt</b><span class="spf-d">Sent only after the transcript is safely saved; jtlw can then delete its copy (without it, jtlw clears the job after 72 hours)</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-act spf-at-a"><span class="spf-dir">JTDT</span><div class="spf-card"><span class="spf-n">8</span><div><b>Listen while reading, then hand over to Meeting summary</b><span class="spf-d">Rename speakers</span><span class="spf-d">Summary, decisions, action items and mind map are all produced in this system</span></div></div></li>
+        </ol>
+        <p class="spf-note">Arrows show where the data goes. JTDT opens every connection, except step 3, where jtlw connects back to download the recording.</p>
+      </div>
+    </div>
+
     <div class="sp-facts">
       <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 18a9 9 0 1 1 17 0" /><path d="M12 18l4.8-5.4" /><circle cx="12" cy="18" r="1.3" fill="currentColor" stroke="none" /><path d="M4.6 12.4l1.6.9M12 6.5V8.4M19.4 12.4l-1.6.9" /></svg></span><div><b>28.3 minutes in 112 seconds</b><span class="sp-fdesc">15x faster than real time (measured)</span></div></div>
       <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><rect x="7" y="12" width="3" height="6" /><rect x="12" y="8" width="3" height="10" /><rect x="17" y="4" width="3" height="14" /></svg></span><div><b>0.12 of a percentage point apart</b><span class="sp-fdesc">Measured against the reference answers of a public corpus; our whole pipeline and the speech service's own figure are all but identical</span></div></div>

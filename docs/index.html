@@ -1069,6 +1069,29 @@
       </div>
     </div>
 
+    <div class="spf">
+      <h3 class="spf-title">兩邊怎麼接起來</h3>
+      <p class="spf-sub">JTDT 管帳號、權限、檔案與結果畫面，jtlw 只負責把聲音轉成文字。錄音用短效網址交付，逐字稿存回本系統之後，jtlw 那份就可以刪掉。</p>
+      <div class="spf-net">
+        <span class="spf-net-tag">你的內網（兩邊都可以自架）</span>
+        <div class="spf-lanes">
+          <div class="spf-lane"><span class="spf-name">JTDT</span><span class="spf-role">本系統：帳號、權限、檔案、結果畫面</span></div>
+          <div class="spf-lane"><span class="spf-name">jtlw</span><span class="spf-role">語音服務：辨識、發言者分離、校正（GPU）</span></div>
+        </div>
+        <ol class="spf-rows">
+          <li class="spf-row spf-act spf-at-a"><span class="spf-dir">JTDT</span><div class="spf-card"><span class="spf-n">1</span><div><b>上傳錄音</b><span class="spf-d">音訊或影片存在本系統，記下是誰上傳的</span></div></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">2</span><div><b>送件</b><span class="spf-d">語言、發言人數等選項與錄音的下載網址（API 金鑰驗證身分）</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">3</span><div><b>jtlw 來拉錄音檔</b><span class="spf-d">用短效簽章網址下載：不需要帳號，2 小時後失效</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-act spf-at-b"><span class="spf-dir">jtlw</span><div class="spf-card"><span class="spf-n">4</span><div><b>辨識</b><span class="spf-d">先排隊（GPU 一次一件）</span><span class="spf-d">再辨識、分離發言者、校正</span></div></div></li>
+          <li class="spf-row spf-msg spf-both"><div class="spf-label"><span class="spf-n">5</span><div><b>查進度</b><span class="spf-d">每 3～15 秒問一次，畫面顯示「排隊中（前面 N 件）」或辨識進度</span></div></div><span class="spf-dir">JTDT ⇄ jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-a"><div class="spf-label"><span class="spf-n">6</span><div><b>取回逐字稿</b><span class="spf-d">文字、時間與發言者，依段號對齊</span></div></div><span class="spf-dir">jtlw → JTDT</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">7</span><div><b>回報已收到</b><span class="spf-d">確定存好之後才送，jtlw 收到就可以刪掉它那份（沒收到的話 72 小時後自己清掉）</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-act spf-at-a"><span class="spf-dir">JTDT</span><div class="spf-card"><span class="spf-n">8</span><div><b>邊聽邊看，交給會議摘要</b><span class="spf-d">改發言者名字</span><span class="spf-d">摘要、決議、待辦、心智圖都在本系統產生</span></div></div></li>
+        </ol>
+        <p class="spf-note">箭頭是資料的流向。連線都由 JTDT 發起，只有第 3 步是 jtlw 連回來下載錄音檔。</p>
+      </div>
+    </div>
+
     <div class="sp-facts">
       <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 18a9 9 0 1 1 17 0" /><path d="M12 18l4.8-5.4" /><circle cx="12" cy="18" r="1.3" fill="currentColor" stroke="none" /><path d="M4.6 12.4l1.6.9M12 6.5V8.4M19.4 12.4l-1.6.9" /></svg></span><div><b>28.3 分鐘 → 112 秒</b><span class="sp-fdesc">比即時快 15 倍（實測）</span></div></div>
       <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><rect x="7" y="12" width="3" height="6" /><rect x="12" y="8" width="3" height="10" /><rect x="17" y="4" width="3" height="14" /></svg></span><div><b>差 0.12 個百分點</b><span class="sp-fdesc">拿公開語料的標準答案量，整條管線與語音服務自己量的幾乎一致</span></div></div>

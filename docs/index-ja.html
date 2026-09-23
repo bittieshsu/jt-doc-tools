@@ -1030,6 +1030,29 @@
       </div>
     </div>
 
+    <div class="spf">
+      <h3 class="spf-title">2 つのシステムのつながり</h3>
+      <p class="spf-sub">JTDT はアカウント、権限、ファイル、結果画面を担当し、jtlw は音声を文字にすることだけを担当します。録音は有効期限の短い URL で渡し、文字起こしを本システムに保存したら、jtlw 側のコピーは削除できます。</p>
+      <div class="spf-net">
+        <span class="spf-net-tag">社内ネットワーク（どちらもセルフホスト可能）</span>
+        <div class="spf-lanes">
+          <div class="spf-lane"><span class="spf-name">JTDT</span><span class="spf-role">本システム：アカウント、権限、ファイル、結果画面</span></div>
+          <div class="spf-lane"><span class="spf-name">jtlw</span><span class="spf-role">音声サービス：認識、話者分離、校正（GPU）</span></div>
+        </div>
+        <ol class="spf-rows">
+          <li class="spf-row spf-act spf-at-a"><span class="spf-dir">JTDT</span><div class="spf-card"><span class="spf-n">1</span><div><b>録音をアップロード</b><span class="spf-d">音声や動画を本システムに保存し、アップロードした人を記録</span></div></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">2</span><div><b>送信</b><span class="spf-d">言語や話者数などのオプションと録音のダウンロード URL（API キーで認証）</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">3</span><div><b>jtlw が録音を取りに来る</b><span class="spf-d">有効期限の短い署名付き URL でダウンロード：アカウント不要、2 時間で失効</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-act spf-at-b"><span class="spf-dir">jtlw</span><div class="spf-card"><span class="spf-n">4</span><div><b>認識</b><span class="spf-d">まず順番待ち（GPU は一度に 1 件）</span><span class="spf-d">続いて認識、話者分離、校正</span></div></div></li>
+          <li class="spf-row spf-msg spf-both"><div class="spf-label"><span class="spf-n">5</span><div><b>進捗の確認</b><span class="spf-d">3～15 秒ごとに問い合わせ、画面には「順番待ち（前に N 件）」または認識の進捗を表示</span></div></div><span class="spf-dir">JTDT ⇄ jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-a"><div class="spf-label"><span class="spf-n">6</span><div><b>文字起こしの取得</b><span class="spf-d">テキスト、時刻、話者をセグメント番号で揃える</span></div></div><span class="spf-dir">jtlw → JTDT</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">7</span><div><b>受領の通知</b><span class="spf-d">保存を確定してから送信。jtlw は自分のコピーを削除できる（未着なら 72 時間後に自動削除）</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-act spf-at-a"><span class="spf-dir">JTDT</span><div class="spf-card"><span class="spf-n">8</span><div><b>聞きながら読み、「会議の要約」に渡す</b><span class="spf-d">話者名を変更</span><span class="spf-d">要約、決定事項、ToDo、マインドマップはすべて本システムで作成</span></div></div></li>
+        </ol>
+        <p class="spf-note">矢印はデータの流れる方向です。接続はすべて JTDT から開始し、手順 3 だけは jtlw が録音をダウンロードするために接続してきます。</p>
+      </div>
+    </div>
+
     <div class="sp-facts">
       <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 18a9 9 0 1 1 17 0" /><path d="M12 18l4.8-5.4" /><circle cx="12" cy="18" r="1.3" fill="currentColor" stroke="none" /><path d="M4.6 12.4l1.6.9M12 6.5V8.4M19.4 12.4l-1.6.9" /></svg></span><div><b>28.3 分を 112 秒で</b><span class="sp-fdesc">実時間の 15 倍速（実測）</span></div></div>
       <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><rect x="7" y="12" width="3" height="6" /><rect x="12" y="8" width="3" height="10" /><rect x="17" y="4" width="3" height="14" /></svg></span><div><b>差は 0.12 ポイント</b><span class="sp-fdesc">公開コーパスの正解データで測定。パイプライン全体の数値と、音声サービス自身が測定した数値はほぼ一致しました</span></div></div>
