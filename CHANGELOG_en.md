@@ -5,11 +5,31 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (840 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (841 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.12] - 2026-09-23
+
+### Updates no longer print uv's "`UV_NATIVE_TLS` is deprecated" warning
+
+To make uv use the operating system's trust store behind corporate TLS inspection, both the new and the
+old environment variables were set (`UV_SYSTEM_CERTS` and `UV_NATIVE_TLS`), assuming uv would ignore
+the one it did not know. Newer uv versions do know the old one and **print a deprecation warning every
+time**, in every `jtdt update` and install, which reads like the upgrade went wrong.
+
+* uv is now asked whether it supports the new flag, and **only the variable it understands is set**:
+  `UV_SYSTEM_CERTS` for newer uv, `UV_NATIVE_TLS` for older uv, and the old one if uv cannot be asked
+  (every version understands it). A value you set yourself is left alone.
+* Changed in `jtdt update`, the Linux / macOS install script and `setup-python.cmd`, which the Windows
+  installer runs. The Windows part was checked on a real `cmd.exe` with a new uv, an old uv and a
+  user-set value.
+* The update to this version may still show the warning once (the update is run by the old code); it is
+  gone from the next update on.
+* This feature had no tests since it was added in v1.12.12; it has now, including a run with a real uv
+  that checks the warning is gone.
 
 ## [1.16.11] - 2026-09-23
 

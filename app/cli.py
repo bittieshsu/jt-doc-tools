@@ -735,6 +735,30 @@ TROUBLESHOOT_URL_ZH = "https://jasoncheng7115.github.io/jt-doc-tools/troubleshoo
 TROUBLESHOOT_URL_EN = "https://jasoncheng7115.github.io/jt-doc-tools/troubleshooting-en.html"
 
 
+def _uv_tls_env(uv: str, env: dict) -> dict:
+    """讓 uv 用 OS 信任庫：**只設這支 uv 認得的那一個變數**。
+
+    ⚠ 原本新舊兩個都設（`UV_SYSTEM_CERTS` 與 `UV_NATIVE_TLS`），想說 uv 會忽略
+    不認得的那個 —— 但新版 uv **認得舊的那個，而且每次都印一行棄用警告**
+    （`UV_NATIVE_TLS … is deprecated`），出現在客戶每一次更新的輸出裡，
+    讀起來像升級出了錯（同 `locale.getdefaultlocale` 那段警告）。
+
+    判準是問 uv 自己（`uv sync --help` 有沒有 `--system-certs`），不寫死版本號。
+    問不到就退回舊變數：舊版一定認得、新版只是多一行警告 —— 反過來的話
+    舊版 uv 會不認得新變數，企業 TLS 環境就裝不了東西。
+    使用者自己設了任何一個就原樣尊重。
+    """
+    if "UV_NATIVE_TLS" in env or "UV_SYSTEM_CERTS" in env:
+        return env
+    try:
+        out = subprocess.run([uv, "sync", "--help"], capture_output=True,
+                             text=True, timeout=20).stdout
+    except Exception:  # noqa: BLE001 — 問不到就走保守的那一條
+        out = ""
+    env["UV_SYSTEM_CERTS" if "--system-certs" in out else "UV_NATIVE_TLS"] = "true"
+    return env
+
+
 def _troubleshoot_url() -> str:
     lang = (os.environ.get("LC_ALL") or os.environ.get("LC_MESSAGES")
             or os.environ.get("LANG") or "")
@@ -971,11 +995,8 @@ def svc_update() -> int:
     print("Syncing Python deps (uv sync) ...")
     # 企業 TLS 檢查設備（MITM proxy）會換掉 HTTPS 憑證；uv 預設用內建 webpki 根
     # 憑證不認那個 CA → uv sync 失敗。預設讓 uv 改用 OS 信任庫（企業 CA 通常在
-    # 那裡），新版 UV_SYSTEM_CERTS / 舊版 UV_NATIVE_TLS 都設，uv 忽略不認得的那個。
-    # 使用者可用環境變數覆寫（含 JTDT_TLS_INSECURE=1 最後手段停用驗證）。
-    uv_env = os.environ.copy()
-    uv_env.setdefault("UV_NATIVE_TLS", "true")
-    uv_env.setdefault("UV_SYSTEM_CERTS", "true")
+    # 那裡）。使用者可用環境變數覆寫（含 JTDT_TLS_INSECURE=1 最後手段停用驗證）。
+    uv_env = _uv_tls_env(uv, os.environ.copy())
     if os.environ.get("JTDT_TLS_INSECURE") == "1":
         uv_env.setdefault("UV_INSECURE_HOST",
                           "pypi.org files.pythonhosted.org github.com "

@@ -27,10 +27,12 @@ if not exist "%UV_EXE%" (
 
 REM 企業 TLS 檢查設備（MITM proxy）會把 HTTPS 憑證換成自家 CA；uv 預設用內建
 REM 根憑證不認那個 CA，下載 Python / 套件會失敗。改用作業系統信任庫（企業 CA
-REM 通常已裝在那裡）。新版 uv 用 UV_SYSTEM_CERTS、舊版用 UV_NATIVE_TLS，兩個都
-REM 設，uv 忽略不認得的那個。呼叫端 / 使用者已設定時不覆寫。
-if not defined UV_NATIVE_TLS set UV_NATIVE_TLS=true
-if not defined UV_SYSTEM_CERTS set UV_SYSTEM_CERTS=true
+REM 通常已裝在那裡）。只設這支 uv 認得的那一個：新版是 UV_SYSTEM_CERTS、舊版是
+REM UV_NATIVE_TLS。兩個都設的話，新版 uv 每次都印一行棄用警告。
+REM 問不到就退回舊的（舊版一定認得）。呼叫端 / 使用者已設定時不覆寫。
+if not defined UV_NATIVE_TLS if not defined UV_SYSTEM_CERTS (
+    "%UV_EXE%" sync --help 2>nul | findstr /c:"--system-certs" >nul && (set UV_SYSTEM_CERTS=true) || (set UV_NATIVE_TLS=true)
+)
 if "%JTDT_TLS_INSECURE%"=="1" (
     if not defined UV_INSECURE_HOST set UV_INSECURE_HOST=pypi.org files.pythonhosted.org github.com objects.githubusercontent.com astral.sh
 )

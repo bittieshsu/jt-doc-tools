@@ -234,13 +234,7 @@ require id
 HAS_GIT=0
 if command -v git >/dev/null 2>&1; then HAS_GIT=1; fi
 
-# uv TLS：企業 TLS 檢查設備（MITM proxy / 防火牆）會把 HTTPS 憑證換成自家 CA。
-# uv 預設用內建 webpki 根憑證、不認那個 CA → 下載 Python / 套件失敗（但 curl /
-# apt 用作業系統信任庫、企業 CA 通常已裝進去所以能動）。預設讓 uv 改用 OS 信任庫
-# （新版旗標 --system-certs / 舊版 --native-tls；env 兩個都設，uv 會忽略不認得的
-# 那個），安全且能解決多數企業代理情境。要關閉：UV_NATIVE_TLS=false 跑安裝。
-export UV_NATIVE_TLS="${UV_NATIVE_TLS:-true}"
-export UV_SYSTEM_CERTS="${UV_SYSTEM_CERTS:-true}"
+# uv TLS 的環境變數在 uv 裝好之後才設（見 set_uv_tls_env）—— 要先問 uv 自己認得哪一個。
 # 程式執行時的 Python HTTPS（下載 tessdata 等）也吃企業 CA：自動把 SSL_CERT_FILE
 # 指到 OS 系統 CA bundle（企業 CA 通常已在裡面，apt/curl 能動即代表有）。這樣完全
 # 不用客戶手動設定，照原本 install/update 跑就能在 TLS 替換環境下載成功。
@@ -689,6 +683,25 @@ install_uv() {
         env UV_INSTALL_DIR="$INSTALL_DIR/bin" UV_NO_MODIFY_PATH=1 sh >/dev/null
     [ -x "$INSTALL_DIR/bin/uv" ] || die "uv 安裝失敗"
     ok "uv 安裝在 $INSTALL_DIR/bin/uv"
+}
+
+# uv TLS：企業 TLS 檢查設備（MITM proxy / 防火牆）會把 HTTPS 憑證換成自家 CA。
+# uv 預設用內建 webpki 根憑證、不認那個 CA → 下載 Python / 套件失敗（但 curl /
+# apt 用作業系統信任庫、企業 CA 通常已裝進去所以能動）。預設讓 uv 改用 OS 信任庫。
+#
+# **只設這支 uv 認得的那一個**：新版旗標是 --system-certs（UV_SYSTEM_CERTS），
+# 舊版是 --native-tls（UV_NATIVE_TLS）。原本兩個都設，但新版 uv 看到舊的那個會
+# 每次印一行棄用警告，讀起來像安裝出了錯。問不到就退回舊的（舊版一定認得）。
+# 要關閉：UV_SYSTEM_CERTS=false（舊版 uv 用 UV_NATIVE_TLS=false）跑安裝。
+set_uv_tls_env() {
+    if [ -n "${UV_NATIVE_TLS:-}" ] || [ -n "${UV_SYSTEM_CERTS:-}" ]; then
+        return 0
+    fi
+    if "$INSTALL_DIR/bin/uv" sync --help 2>/dev/null | grep -q -- '--system-certs'; then
+        export UV_SYSTEM_CERTS=true
+    else
+        export UV_NATIVE_TLS=true
+    fi
 }
 
 # --------------------------------------------------------------------- 程式碼
@@ -1178,6 +1191,7 @@ main() {
     ensure_git
     fetch_code
     install_uv
+    set_uv_tls_env
     setup_python
     # 先裝 jtdt CLI — 它只是寫一個 /usr/local/bin/jtdt 包到 venv 的 wrapper，
     # 不需要資料目錄 / 服務 / 健康檢查。先裝好可確保即使後續步驟失敗

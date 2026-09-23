@@ -543,7 +543,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **338 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **339 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -876,6 +876,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_user_email.py` | 帳號上的信箱欄位（作業完成通知要寄給誰） |
 | `test_user_manager.py` | Tests for app.core.user_manager + app.core.group_manager. |
 | `test_users_bulk_ops.py` | 使用者批次操作（啟用 / 停用 / 指派角色）與伺服器端分頁 |
+| `test_uv_tls_env.py` | uv 的「用 OS 信任庫」變數：**只設這支 uv 認得的那一個**（v1.16.11） |
 | `test_v1_4_99_audit_2fa.py` | v1.4.99 — auditor role + TOTP 2FA + separation-of-duties tests. |
 | `test_vat_db.py` | Tests for vat_db (M4.a). |
 | `test_vat_upload_and_group_sync.py` | 2026-06-30 客戶回報兩項： |
@@ -4147,7 +4148,9 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       從 v1.15.11 ~ v1.16.10 升上來的那一次仍會誤報一次（跑檢查的是舊版程式），**升第二次**才驗得到
 - [ ] 健康檢查失敗時印的日誌是**服務真正的日誌**：Windows `C:\ProgramData\jt-doc-tools\Logs\jtdt-svc.err.log`、
       macOS `~/Library/Logs/jt-doc-tools.err`（錯誤在 stderr，不是 `.log`）、Linux `journalctl`
-- [ ] 更新的輸出裡**沒有 `DeprecationWarning`**
+- [ ] 更新的輸出裡**沒有 `DeprecationWarning`**，也**沒有 uv 的 `UV_NATIVE_TLS … is deprecated`**
+      （v1.16.12：只設這支 uv 認得的那一個變數；`pytest tests/test_uv_tls_env.py`，
+      含拿這台真的 uv 跑一次看 stderr）
 - [ ] LLM 停用、沒勾「停用時一併隱藏」→ 工具與選項**看得到、反灰**；勾了 → 看不到；
       LLM 啟用時勾著 → 完全不影響。**三種狀態都要驗**（只驗「勾了看不到」的話，把停用一律改成隱藏也會過）
 - [ ] 隱藏時各工具頁在真瀏覽器裡**沒有主控台錯誤**（藏的是 JS 會 `getElementById` 的元素）

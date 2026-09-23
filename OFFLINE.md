@@ -126,8 +126,9 @@ cd /opt/jt-doc-tools
 sudo -E bash install.sh                # -E 保留上面這些環境變數
 ```
 
-> 企業 TLS 檢查（代理換憑證）不必特別處理 —— 安裝腳本預設就已經
-> `UV_NATIVE_TLS=true`（改用作業系統信任庫），程式本身的 `net_ssl` 也是同一套。
+> 企業 TLS 檢查（代理換憑證）不必特別處理 —— 安裝腳本預設就會讓 uv 改用作業系統
+> 信任庫（新版 uv 設 `UV_SYSTEM_CERTS=true`、舊版設 `UV_NATIVE_TLS=true`，
+> 裝好 uv 之後先問它認得哪一個），程式本身的 `net_ssl` 也是同一套。
 
 ### B-3. 之後的更新
 
