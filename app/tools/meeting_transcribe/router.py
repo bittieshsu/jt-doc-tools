@@ -308,7 +308,7 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
     got: dict[str, int] = {}
     segments = _assemble(client, remote_id, got)
     if not segments:
-        raise RuntimeError("jtlw 回報成功，但一段逐字稿都沒有")
+        raise RuntimeError(jtlw_client.MESSAGES["empty_result"])
 
     # 摘要（`duration_ms` / `languages` / `speakers` / 各層筆數 / 校正統計）。
     # **拿不到不算失敗** —— 逐字稿本身已經在手上了，這只是補充資訊。

@@ -314,8 +314,10 @@ def _jtlw_error_texts() -> list[str]:
     這些字在**背景執行緒**裡產生（那時候沒有 request、不知道使用者的語言），
     所以只能送中文、由前端翻 —— 語系檔裡沒有就是原樣顯示中文。
     """
-    from app.core.jtlw_client import ERROR_TEXT
-    return list(ERROR_TEXT.values())
+    from app.core.jtlw_client import ERROR_TEXT, MESSAGES
+    # `MESSAGES` 是錯誤碼以外的固定訊息（401 / 403、網址過期、0 段）——
+    # 原本散寫在函式裡，這一類守門看不到（v1.16.8 收進來）。
+    return list(ERROR_TEXT.values()) + list(MESSAGES.values())
 
 
 def _chart_kind_labels() -> list[str]:

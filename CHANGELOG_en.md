@@ -5,9 +5,36 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (836 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (837 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
+
+---
+
+## [1.16.8] - 2026-09-23
+
+### Speech service error messages: two pointed the wrong way, one gave no next step
+
+While checking our troubleshooting page, the speech service side pointed out two mistakes,
+and **the product's own error messages had the same ones**:
+
+* **401 and 403 are now told apart.** One message used to say "check whether the key was
+  revoked or mistyped", but a 403 means the key **is correct** and simply lacks permission for
+  the action, so that advice finds nothing. A 403 now says to ask their administrator to grant
+  the permission; the missing permission is written to the service log.
+* **An expired link is not caused by queueing.** They fetch the file as soon as the job
+  arrives and never fetch that URL again. The old message said "usually because it waited in
+  the queue too long; ask the administrator to extend the link lifetime", which sent people to
+  suspect their queue and to change **a setting that does not exist**.
+* **Success with no transcript at all** can happen when their server restarts while sending
+  the result (fixed on their side, not yet everywhere). This system already treats it as a
+  failure and never hands over an empty transcript; the message now says submitting again
+  usually works.
+
+None of these messages had a test, and they sat outside the table the translation guard
+checks. They now live in the same table, both guards cover them, and behaviour tests were
+added (mutation-checked in both directions). The troubleshooting page was updated in all
+three languages, with a new entry for the empty-transcript case.
 
 ---
 

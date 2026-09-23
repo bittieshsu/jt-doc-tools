@@ -72,10 +72,11 @@
   <div class="ts-toc">
     <span class="ts-toc-label">Speech service (jtlw)</span>
     <a href="#jtlw-connect">Cannot reach jtlw / timed out</a>
-    <a href="#jtlw-key">jtlw rejects the API key</a>
+    <a href="#jtlw-key">API key rejected (401) / no permission (403)</a>
     <a href="#jtlw-allow">Our address is not on their allow list</a>
     <a href="#jtlw-fetch">They cannot fetch the recording / link expired</a>
     <a href="#jtlw-wait">No progress, then cancelled after a long wait</a>
+    <a href="#jtlw-empty">Reported success, but no transcript</a>
     <a href="#jtlw-grey">Meeting recording to transcript is greyed out</a>
   </div>
 
@@ -164,10 +165,10 @@
   </section>
 
   <section class="ts-item" id="jtlw-key">
-    <h2>“The speech service rejected this API key (401 / 403)”</h2>
-    <p class="ts-sym"><b>Symptom</b>　This message appears when testing the connection or submitting.</p>
-    <p><b>Cause</b>　The key is mistyped, was revoked on their side, or was pasted as a whole header. Their health check cannot reveal this because it does not check the key; that is why “Test the connection” also asks once with the key.</p>
-    <p><b>What to do</b>　Put only the key itself in “API key” (the string they gave you); this system builds the <code>Authorization: Bearer</code> header itself (a pasted prefix is removed automatically). If it is still 401 / 403 after checking, ask them to confirm the key is still valid.</p>
+    <h2>“The speech service rejected this API key (401)” or “it lacks permission for this action (403)”</h2>
+    <p class="ts-sym"><b>Symptom</b>　One of these appears when testing the connection or submitting.</p>
+    <p><b>Cause</b>　These are two different situations. <b>401</b>: the key is mistyped, was revoked on their side, or was pasted as a whole header. <b>403</b>: the key <b>is correct</b>, but it does not have permission for this action; checking for typos or revocation will not find anything. Their health check cannot reveal either, because it does not check the key; that is why “Test the connection” also asks once with the key.</p>
+    <p><b>What to do</b>　401: put only the key itself in “API key” (the string they gave you; this system builds the <code>Authorization: Bearer</code> header itself, and a pasted prefix is removed automatically), and if it is still rejected, ask them to confirm the key is still valid. 403: ask their administrator to grant the key the permission; which one is missing is written to this system's service log (<code>jtdt logs</code>).</p>
   </section>
 
   <section class="ts-item" id="jtlw-allow">
@@ -181,7 +182,7 @@
     <h2>“Could not reach our recording URL” or “the link had already expired”</h2>
     <p class="ts-sym"><b>Symptom</b>　Submitting a recording fails with “The speech service could not reach our recording URL”, “The link had already expired when the speech service came to fetch the recording”, or “We rejected the speech service when it came to fetch the recording (401 / 403)”.</p>
     <p><b>Cause</b>　The recording is not pushed to them; <b>they come back and fetch it</b>. This system hands them a short-lived signed URL (<code>/api/speech/audio/…?exp=…&amp;sig=…</code>, no sign-in, expires by itself). If the audio base address is a name only the browser machine can reach (such as <code>localhost</code>), a firewall or reverse proxy is in the way, or the reverse proxy puts a sign-in in front, they cannot fetch it.</p>
-    <p><b>What to do</b>　Fill in an audio base address that is <b>reachable from the speech service machine</b> (the settings page never derives it from the browser address; guessing wrong would make it work for some people and not others). If the reverse proxy puts SSO, Kerberos or another sign-in in front, let <code>/api/speech/audio/</code> through; it is already protected by the signature. An expired link usually means it waited or retried too long; submit again.</p>
+    <p><b>What to do</b>　Fill in an audio base address that is <b>reachable from the speech service machine</b> (the settings page never derives it from the browser address; guessing wrong would make it work for some people and not others). If the reverse proxy puts SSO, Kerberos or another sign-in in front, let <code>/api/speech/audio/</code> through; it is already protected by the signature. An expired link is <b>not caused by queueing</b>: they fetch the file as soon as the job arrives and never fetch that URL again, however long it waits. It usually means retrying or waiting too long before submitting; submit again.</p>
   </section>
 
   <section class="ts-item" id="jtlw-wait">
@@ -189,6 +190,13 @@
     <p class="ts-sym"><b>Symptom</b>　After submitting, the progress bar stays still for a long time and the job finally fails with the message above. You may also see “The speech service queue is full. Please submit again later.”</p>
     <p><b>Cause</b>　The speech service GPU <b>handles one job at a time and queues the rest</b>. While queued and while recognising, the progress they report does not move, so a still progress bar does not by itself mean it is stuck. This system waits for them up to a limit (counted from submission: the larger of 15 minutes and half the recording length, plus a 60-minute allowance for queueing); when several very long meetings happen to be ahead in the queue, the limit can still pass while queued, and this system asks them to cancel the job.</p>
     <p><b>What to do</b>　Submit again; for very long recordings, avoid times when someone else is sending a long meeting. If it keeps happening, ask the speech service side to check the queue and the GPU server.</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-empty">
+    <h2>“The speech service reported success but returned no transcript segments”</h2>
+    <p class="ts-sym"><b>Symptom</b>　Transcription fails with this message, even though people clearly speak in the recording.</p>
+    <p><b>Cause</b>　The speech service restarted (an update or a crash) while sending the recognition result back, and a partial result was taken as complete, most often with no segments at all. This system always treats zero segments as a failure; it never hands over an empty transcript as a success.</p>
+    <p><b>What to do</b>　Submitting again usually works. If it keeps happening, ask the speech service side whether the server is being updated or restarted.</p>
   </section>
 
   <section class="ts-item" id="jtlw-grey">

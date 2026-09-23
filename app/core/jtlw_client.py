@@ -77,6 +77,30 @@ ERROR_TEXT: dict[str, str] = {
 }
 
 
+#: 不屬於對方錯誤碼、但一樣會顯示給使用者的固定訊息。
+#:
+#: **收在這裡是為了讓翻譯守門看得到**：這些字在背景執行緒裡產生、送中文由前端翻
+#: （`tests/test_i18n_dynamic_labels.py` 的「語音服務的失敗原因」那一類），
+#: 原本散寫在函式裡，漏翻了也不會有任何測試紅。
+#: **不可以在尾巴接變數**（主機名、權限名）—— 接了之後整句在語系檔裡查不到，
+#: 英 / 日介面會退回中文。要給的細節寫進記錄。
+MESSAGES: dict[str, str] = {
+    # 401 與 403 是兩件事（對方 v2.9 指正）：401 是金鑰錯或被撤銷；
+    # 403 是金鑰**對**、但沒有這個動作的權限 —— 合成一句的話，遇到 403 的人
+    # 照著「打錯 / 撤銷」去查，會查不出問題。
+    "key_rejected": "jtlw 不接受這把金鑰（401）—— 請到設定頁確認金鑰有沒有打錯，或是不是已經被撤銷",
+    "key_no_permission": "jtlw 認得這把金鑰，但它沒有這個動作的權限（403）—— 請對方的管理員幫這把金鑰加上權限（缺哪一個權限寫在服務記錄裡）",
+    # **不是排隊造成的**（對方 v2.9 指正）：對方收到送件就立刻拉檔，之後排多久都
+    # 不會再拉這個網址。原本寫「多半是排隊太久；請管理員延長有效期」—— 前半句會讓
+    # 人去懷疑對方的佇列，後半句叫管理員去改一個**根本不存在的設定**（2 小時是刻意寫死的）。
+    "url_expired": "對方來拉錄音檔時網址已經過期 —— 對方收到送件就會拉檔，所以多半是送出之前重試或等了太久。請重新送一次。",
+    "source_unreachable": "對方連不到我們的錄音檔位址，請確認「錄音檔對外位址」從對方那台連得到",
+    # 對方的缺陷（v2.9 告知，`.223` 升級前都可能發生）：GPU 伺服器在傳結果途中重啟，
+    # 可能把 0 段當成功回給我們。我們拿到 0 段本來就判失敗，這裡讓使用者知道重送通常就好。
+    "empty_result": "jtlw 回報成功，但一段逐字稿都沒有 —— 可能是語音服務在傳結果的途中重啟過。錄音裡確實有人講話的話，請重新送一次。",
+}
+
+
 def describe_error(code: str, *, field: str = "", retryable: bool = False,
                    http_status: str = "", host: str = "") -> str:
     """把對方的錯誤碼講成使用者做得了下一步的話。
@@ -96,9 +120,8 @@ def describe_error(code: str, *, field: str = "", retryable: bool = False,
         # 而我們給的是短效簽章網址。404 ＋ 短效網址＝十之八九是過期，
         # 不是「檔案不見了」—— 照字面講的話使用者會去找一個還在的檔案。
         if str(http_status) == "404":
-            return ("對方來拉錄音檔時網址已經過期 —— 多半是排隊太久。"
-                    "請重新送一次；一直發生的話請管理員延長錄音檔網址的有效期。")
-        return "對方連不到我們的錄音檔位址，請確認「錄音檔對外位址」從對方那台連得到"
+            return MESSAGES["url_expired"]
+        return MESSAGES["source_unreachable"]
     if not code:
         return ""
     msg = ERROR_TEXT.get(code)
@@ -133,8 +156,14 @@ def _raise_for(resp: httpx.Response) -> None:
                                  host=str(details.get("host") or ""))
     except (json.JSONDecodeError, ValueError, AttributeError):
         pass
-    if resp.status_code in (401, 403):
-        msg = "jtlw 不接受這把金鑰（401 / 403）—— 請到設定頁確認金鑰是不是被撤銷或打錯了"
+    if resp.status_code == 401:
+        msg = MESSAGES["key_rejected"]
+    elif resp.status_code == 403:
+        msg = MESSAGES["key_no_permission"]
+        # 缺哪一個權限（`details.required_scope`）寫進記錄，不接在訊息尾巴 ——
+        # 接上變數的整句在語系檔裡查不到（見 `MESSAGES` 的說明）。
+        logger.warning("jtlw 403：這把金鑰缺少權限 %s",
+                       details.get("required_scope") or "（對方沒有說）")
     raise JtlwError(msg, code=code, category=category, field=field, details=details,
                     retryable=retryable, status=resp.status_code)
 
