@@ -44,7 +44,7 @@
       <option value="en">{{ tr('英文') }}</option>
       <option value="ja">{{ tr('日文') }}</option>
     </select>
-    <span class="field-unit">{{ tr('（已知整場使用的語言時，建議直接選取，辨識會更準）') }}</span>
+    <span class="field-unit">{{ tr('（已知整場的語言時請直接選取）') }}</span>
   </div>
   <div class="form-row">
     <label>{{ tr('會發言的人數') }}</label>
@@ -75,6 +75,19 @@
      「RTTM 標的人數」與「≥1.6 秒段落裡真的出現過的人數」**完全相同**
      （0/20 有差異）—— 要驗它需要「在場但幾乎沒開口」的素材，那份語料沒有。
      留著它是因為上面那條機制說得通，**不是因為量過了**。 #}
+  {# 語音服務 2026-09-23 量過（v2.12）：「自動判斷」**不是逐段判斷**，只看錄音開頭約
+     30 秒決定整場的語言。中文為主但開頭是英文的會議，自動判斷整場用英文辨識，
+     中文句錯誤率 15% → 88%。指定語言**不會比自動差**（猜對時兩者一模一樣），
+     所以不寫「會更準」—— 真正的差別是「不會整場猜錯」。
+     中英**整句**交錯時少數那種語言大多會被翻成主要語言；句子裡夾英文術語沒問題。
+     **不要寫「之後會支援逐段判斷」**（對方明確要求，沒有時程）。
+     **v2.13 更正：開頭的靜音、雜音、沒有人聲的音樂都不影響**（判斷前會先濾掉沒人講話的部分）；
+     只有「開頭有人先講另一種語言」會讓整場判錯，20 秒就夠。**不要寫音樂或靜音** ——
+     讀的人會去剪掉錄音開頭的靜音，那一點用也沒有。有人聲的歌曲對方沒量過，也不寫。 #}
+  <p class="info-box mt-hint">
+    {{ tr('「自動判斷」只看錄音開頭約 30 秒的講話來決定整場用哪一種語言 —— 開頭若有人先講另一種語言（例如先用英文開場），整場都可能辨識錯。開頭的靜音、雜音不影響。已知整場使用的語言時請直接選取。') }}
+    {{ tr('中英句子交錯的會議請選佔多數的語言：另一種語言的整句大多無法正確辨識（中文句子裡夾英文術語沒有問題）。') }}
+  </p>
   <p class="info-box mt-hint">
     {{ tr('不確定就留 0，讓系統自己判。') }}
     {{ tr('這裡問的是發言量足以辨認的人數 —— 只講一兩句的人不要算進去，硬湊一群給他反而會把主要發言者拆散。') }}
@@ -122,7 +135,15 @@
       <span id="mtIcPlay">{{ icon('play', size=20) }}</span>
       <span id="mtIcPause" hidden>{{ icon('pause', size=20) }}</span>
     </button>
-    <canvas id="mtWave" class="mt-wave" height="72"></canvas>
+    {# 游標旁的標籤是 **HTML 不是畫在 canvas 上**：時間 ＋ 那一刻是誰在講。
+       畫在 canvas 裡的字測試讀不到，只驗得了「有畫東西」。
+       「那一刻是哪一段」在 `static/js/meeting_wave_tip.js`（node 裡測邊界）。 #}
+    <div class="mt-wave-box">
+      <canvas id="mtWave" class="mt-wave" height="72"></canvas>
+      <div class="mt-wave-tip" id="mtWaveTip" hidden>
+        <b id="mtTipTime"></b><span class="mt-tip-dot" id="mtTipDot" hidden></span><span id="mtTipWho"></span>
+      </div>
+    </div>
     {# 現在播到哪裡是**要一直看的數字**，總長度只是參考 ——
        兩個同樣大小同樣顏色的話，眼睛每次都要重新找。 #}
     <span class="mt-clock">
@@ -167,8 +188,20 @@
   .mt-player { display:flex; align-items:center; gap:14px; margin:12px 0 10px;
                padding:10px 14px; border:1px solid var(--border); border-radius:12px;
                background:linear-gradient(180deg,#ffffff,#f8fafc); }
-  .mt-wave { flex:1; min-width:0; height:72px; background:transparent;
+  .mt-wave-box { flex:1; min-width:0; position:relative; }
+  .mt-wave { display:block; width:100%; height:72px; background:transparent;
              border:0; border-radius:6px; cursor:pointer; }
+  .mt-wave-tip { position:absolute; top:3px; left:0; pointer-events:none; white-space:nowrap;
+                 display:flex; align-items:center; gap:5px; padding:1px 6px; border-radius:4px;
+                 background:rgba(15,23,42,.85); color:#fff;
+                 font:600 11px/17px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .mt-wave-tip #mtTipWho { font-family:inherit; font-weight:600; }
+  .mt-tip-dot { width:8px; height:8px; border-radius:50%; flex:0 0 8px; }
+  /* 跟逐字稿發言者同一組顏色（`.mt-cN`），看得出是同一個人 */
+  .mt-tip-dot.mt-d0 { background:#60a5fa; } .mt-tip-dot.mt-d1 { background:#fb923c; }
+  .mt-tip-dot.mt-d2 { background:#4ade80; } .mt-tip-dot.mt-d3 { background:#a78bfa; }
+  .mt-tip-dot.mt-d4 { background:#fb7185; } .mt-tip-dot.mt-d5 { background:#2dd4bf; }
+  .mt-tip-dot.mt-d6 { background:#facc15; } .mt-tip-dot.mt-d7 { background:#818cf8; }
   /* 圓形的播放鍵 —— 播放器的主要動作，做成跟旁邊那排次要按鈕一樣的方框
      會讓人找不到它（使用者 2026-09-22：「暫停按鈕很醜」）。 */
   .mt-play { flex:0 0 46px; width:46px; height:46px; border:0; border-radius:50%;
@@ -198,6 +231,7 @@
 {% block scripts %}
 <script src="/static/js/file_upload.js"></script>
 <script src="/static/js/job_progress.js"></script>
+<script src="/static/js/meeting_wave_tip.js"></script>
 <script src="/static/js/custom_select.js"></script>
 <script src="/static/js/workspace_picker.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
@@ -340,8 +374,13 @@
 
   // ---------------- 逐字稿本體 ----------------
 
+  //: 有起訖時間的段落（依開始時間排好），游標標籤查「那一刻是誰在講」用。
+  //: **宣告要在 render 之前** —— 不然 render 算好的會被後面的初始化蓋回空陣列。
+  var timed = [];
+
   function render() {
     var segs = data.segments || [];
+    if (window.MtWaveTip) timed = window.MtWaveTip.index(segs);
     var names = {};
     segs.forEach(function (s) { if (s.speaker) names[speakerName(s)] = 1; });
     el('mtSummary').textContent =
@@ -421,24 +460,38 @@
       g.fillRect(Math.min(w - 1, played * w), 0, 1, h);
     }
 
-    // 游標跟隨線 ＋ 那個位置的時間 —— **要點下去之前就知道會跳到哪裡**
+    // 游標跟隨線 —— **要點下去之前就知道會跳到哪裡**。旁邊的標籤是 HTML（`showWaveTip`）
     if (hoverX != null && dur) {
       var hx = Math.max(0, Math.min(w - 1, hoverX));
       g.fillStyle = 'rgba(15,23,42,.45)';
       g.fillRect(hx, 0, 1, h);
-      var label = mmss(hx / w * dur * 1000);
-      g.font = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
-      var tw = g.measureText(label).width + 10;
-      // 靠近右邊時把標籤翻到線的左邊，不然會被畫布切掉
-      var bx = (hx + tw + 4 > w) ? hx - tw - 4 : hx + 4;
-      g.fillStyle = 'rgba(15,23,42,.85)';
-      g.beginPath();
-      if (g.roundRect) g.roundRect(bx, 3, tw, 17, 4); else g.rect(bx, 3, tw, 17);
-      g.fill();
-      g.fillStyle = '#fff';
-      g.textBaseline = 'middle';
-      g.fillText(label, bx + 5, 12);
     }
+  }
+
+  // 游標旁的標籤：時間 ＋ 那一刻是誰在講（使用者 2026-09-23 要求）。
+  // **兩段之間的空檔只顯示時間** —— 不猜一個人上去（判準在 meeting_wave_tip.js）。
+  var tip = el('mtWaveTip');
+  function showWaveTip() {
+    var dur = audio.duration || 0, w = wave.clientWidth || 0;
+    if (hoverX == null || !dur || !w) { tip.hidden = true; return; }
+    var hx = Math.max(0, Math.min(w - 1, hoverX));
+    var ms = hx / w * dur * 1000;
+    el('mtTipTime').textContent = mmss(ms);
+    var seg = window.MtWaveTip ? window.MtWaveTip.segmentAt(timed, ms) : null;
+    var dot = el('mtTipDot'), who = el('mtTipWho');
+    if (seg && seg.speaker) {
+      var ci = speakerIndex(seg.speaker);
+      dot.className = 'mt-tip-dot' + (ci >= 0 ? ' mt-d' + ci : '');
+      dot.hidden = false;
+      who.textContent = speakerName(seg);
+    } else {
+      dot.hidden = true;
+      who.textContent = '';
+    }
+    tip.hidden = false;
+    // 靠近右邊時翻到線的左邊，不然會被切掉
+    var tw = tip.offsetWidth;
+    tip.style.left = ((hx + tw + 4 > w) ? Math.max(0, hx - tw - 4) : hx + 4) + 'px';
   }
 
   async function buildPeaks(url) {
@@ -538,8 +591,9 @@
   wave.addEventListener('mousemove', function (e) {
     hoverX = e.clientX - wave.getBoundingClientRect().left;
     drawWave();
+    showWaveTip();
   });
-  wave.addEventListener('mouseleave', function () { hoverX = null; drawWave(); });
+  wave.addEventListener('mouseleave', function () { hoverX = null; drawWave(); showWaveTip(); });
   wave.addEventListener('click', function (e) {
     var dur = audio.duration || 0;
     if (!dur) return;

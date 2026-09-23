@@ -293,7 +293,21 @@ def _transcribe_stage_labels() -> list[str]:
     """
     import importlib
     m = importlib.import_module("app.tools.meeting_transcribe.router")
-    return list(m._STAGES.values()) + ["送件中", "取回逐字稿", "處理中", "排隊中"]
+    # `PROGRESS_TEMPLATES`：帶數字的作業訊息（排隊前面幾件、校正批數、逾時…）。
+    # 前端 `tr()` 把連續數字換成 `{0}` 再查，所以鍵是樣板本身 —— v1.16.10 之前
+    # 這幾句寫成 f-string，語系檔裡一條都沒有，英 / 日介面一直顯示中文。
+    return (list(m._STAGES.values()) + ["送件中", "取回逐字稿", "處理中", "排隊中"]
+            + list(m.PROGRESS_TEMPLATES))
+
+
+def _meeting_summary_progress() -> list[str]:
+    """會議摘要的進度訊息（`meeting_insight.PROGRESS_TEMPLATES`）。
+
+    背景作業送出「擷取重點 3/12」，前端 `tr()` 把數字換成 `{0}` `{1}` 再查 ——
+    v1.16.10 之前這幾句一條都不在語系檔裡，英 / 日介面的進度列一直是中文。
+    """
+    from app.core.meeting_insight import PROGRESS_TEMPLATES
+    return list(PROGRESS_TEMPLATES)
 
 
 def _meeting_kind_labels() -> list[str]:
@@ -353,6 +367,7 @@ def _chart_kind_labels() -> list[str]:
     ("逐字稿的排法", _transcript_shape_labels),
     ("轉逐字稿的階段", _transcribe_stage_labels),
     ("會議摘要的卡片分類", _meeting_kind_labels),
+    ("會議摘要的進度訊息", _meeting_summary_progress),
     ("語音服務的失敗原因", _jtlw_error_texts),
     ("圖上的節點類別", _chart_kind_labels),
 ])

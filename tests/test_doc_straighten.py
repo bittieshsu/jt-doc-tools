@@ -280,6 +280,81 @@ def test_an_out_of_range_page_is_a_404(tmp_path):
     assert r.status_code == 404, r.status_code
 
 
+def _pv_dims(c, url):
+    r = c.get(url)
+    assert r.status_code == 200, (url, r.status_code)
+    img = cv2.imdecode(np.frombuffer(r.content, np.uint8), cv2.IMREAD_UNCHANGED)
+    assert img is not None, "預覽圖解不開（讀到寫一半的檔？）"
+    return img.shape[:2]
+
+
+def test_each_preview_keeps_its_own_image(tmp_path):
+    """**每一次預覽一個檔**（v1.16.10，CI 上時好時壞抓到的）。
+
+    原本同一頁固定寫同一個檔。拖曳 / 轉向會連發好幾個請求，前端取消舊的，
+    **但伺服器那邊照樣算完、晚一點寫回同一個檔** —— 把最新那張蓋掉
+    （畫面顯示舊結果、狀態列卻寫新的），或讓瀏覽器讀到寫一半的檔。
+
+    判準：兩次預覽（不轉 / 轉 90°）之後，**第一次的網址拿到的仍然是第一次的圖**。
+    同一個檔名的話它會拿到第二次那張（長寬對調）。
+    """
+    c = _client()
+    uid = c.post("/tools/doc-straighten/load",
+                 files={"file": ("s.pdf", _tiny_pdf(tmp_path), "application/pdf")}
+                 ).json()["upload_id"]
+    a = c.post("/tools/doc-straighten/preview",
+               data={"upload_id": uid, "page": 1, "rotate": 0, "dpi": 150}).json()
+    b = c.post("/tools/doc-straighten/preview",
+               data={"upload_id": uid, "page": 1, "rotate": 90, "dpi": 150}).json()
+    assert a["url"] != b["url"], "兩次預覽用同一個網址 —— 晚寫完的會蓋掉新的"
+    ha, wa = _pv_dims(c, a["url"])
+    hb, wb = _pv_dims(c, b["url"])
+    assert (ha > wa) != (hb > wb), "素材要是長方形才分得出轉向"
+    assert _pv_dims(c, a["url"]) == (ha, wa), "第一次的網址拿到的是第二次的圖"
+
+
+def test_old_previews_are_pruned_but_not_to_one(tmp_path):
+    """同一頁只留最新的幾張。**不可以只留一張**：被取消的舊請求可能在新的之後
+    才寫完，只留一張的話它會把畫面正要載入的那張刪掉。"""
+    from app.config import settings
+    import importlib
+    R = importlib.import_module("app.tools.doc_straighten.router")
+    c = _client()
+    uid = c.post("/tools/doc-straighten/load",
+                 files={"file": ("s.pdf", _tiny_pdf(tmp_path), "application/pdf")}
+                 ).json()["upload_id"]
+    urls = [c.post("/tools/doc-straighten/preview",
+                   data={"upload_id": uid, "page": 1, "dpi": 150}).json()["url"]
+            for _ in range(R._PV_KEEP + 3)]
+    left = list(settings.temp_dir.glob(f"dspv_{uid}_1_*.png"))
+    assert 2 <= len(left) <= R._PV_KEEP, len(left)
+    assert c.get(urls[-1]).status_code == 200
+    assert c.get(urls[-2]).status_code == 200, "只留了一張 —— 晚寫完的會刪掉畫面要的那張"
+    assert not list(settings.temp_dir.glob(f"dspv_{uid}_1_*.part")), "留下寫一半的暫存檔"
+
+
+@pytest.mark.parametrize("v", ["../../etc", "ABCDEF123456", "abc", "0123456789abc"])
+def test_the_preview_version_is_validated(tmp_path, v):
+    c = _client()
+    uid = c.post("/tools/doc-straighten/load",
+                 files={"file": ("s.pdf", _tiny_pdf(tmp_path), "application/pdf")}
+                 ).json()["upload_id"]
+    # 那個檔真的存在也要拒絕 —— 不然拿掉格式檢查時，這條只是因為「找不到檔」而綠
+    from app.config import settings
+    if "/" not in v:
+        (settings.temp_dir / f"dspv_{uid}_1_{v}.png").write_bytes(b"x")
+    r = c.get(f"/tools/doc-straighten/preview-img/{uid}/1", params={"v": v})
+    assert r.status_code == 404, (v, r.status_code)
+
+
+def test_the_page_joins_the_cache_buster_with_an_ampersand():
+    """網址本身已經帶 `?v=` —— 再接 `?t=` 的話 `v` 會變成 `abc?t=123`，整張 404。"""
+    html = (pathlib.Path(__file__).resolve().parents[1] / "app" / "tools" / "doc_straighten"
+            / "templates" / "doc_straighten.html").read_text(encoding="utf-8")
+    assert "d.url + '?t='" not in html
+    assert "d.url.indexOf('?') >= 0 ? '&' : '?'" in html
+
+
 def test_the_dpi_is_clamped_server_side(tmp_path):
     """前端的下拉只是提示 —— API 呼叫者不受它拘束，1200 dpi 會吃掉幾百 MB。"""
     from app.tools.doc_straighten.router import _clamp_dpi

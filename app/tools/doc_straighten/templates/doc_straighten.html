@@ -597,7 +597,9 @@
         return;
       }
       const d = await r.json();
-      showImg('dsPvAfter', 'dsPhAfter', d.url + '?t=' + Date.now(),
+      // 網址本身已經帶 `?v=`（每一次預覽一個版本）—— 接在後面要用 `&`
+      showImg('dsPvAfter', 'dsPhAfter',
+              d.url + (d.url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now(),
               tr('產生預覽中…'), tr('預覽產生失敗'));
       // **殘留角是驗收指標**：轉錯方向時角度看起來「有動」，只有殘留角會現形
       const ovNow = overrides[page] || {};

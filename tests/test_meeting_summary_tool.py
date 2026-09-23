@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import json
+import pathlib
 
 import pytest
 
@@ -708,7 +709,149 @@ def test_renaming_a_speaker_rewrites_the_transcript_and_the_stats(client, auth_o
     stats = json.loads(ms._out_path(uid).read_text(encoding="utf-8"))["speaker_stats"]
     assert "王小明" in stats and "S1" not in stats, (
         "統計還掛在舊代號上 —— 圖上會是 S1 而逐字稿已經是人名")
-    assert stats["王小明"] == {"chars": 6}, "搬鍵的時候把值弄丟了"
+    # 統計是**依改名後的逐字稿重算**的（v1.16.10）：只搬鍵名的話，
+    # 單段改名（第 2 段 → 臨時來賓）的發言次數不會跟著移
+    assert stats["王小明"]["turn_count"] == 2 and stats["王小明"]["chars"] == 6
+    assert stats["臨時來賓"]["turn_count"] == 1, "單段改名的發言沒有算到新名字上"
+    assert "S2" not in stats, "S2 唯一的一段已經改名，統計裡卻還有它"
+
+
+def _rename_fixture(client, ms):
+    import json
+    uid = _upload(client).json()["upload_id"]
+    segs = [{"seq": 1, "speaker": "S1", "text": "預算照原案", "start_ms": 0, "end_ms": 4000},
+            {"seq": 2, "speaker": "S2", "text": "好", "start_ms": 4000, "end_ms": 5000},
+            {"seq": 3, "speaker": "S12", "text": "我補充", "start_ms": 5000, "end_ms": 7000},
+            {"seq": 4, "speaker": "S1", "text": "月底寄出", "start_ms": 7000, "end_ms": 9000}]
+    out = {
+        "summary": {"text": "S1 說明預算，S12 補充，S2 同意。"},
+        "items": {"decisions": [{"text": "依 S1 的提案維持預算", "segment_ids": [1]}],
+                  "actions": [{"text": "月底前寄修訂版", "owner": "S1",
+                               "segment_ids": [4]},
+                              {"text": "補充資料", "owner": "S12", "segment_ids": [3]}],
+                  "risks": [], "questions": []},
+        "chapters": [{"title": "S1 的預算報告", "segment_ids": [1, 2]}],
+        # 心智圖節點的 id 刻意用 `S1`：結構欄位不可以跟著被換掉
+        "mindmap": [{"node_id": "S1", "parent_id": None, "label": "S1 的預算報告",
+                     "type": "topic", "segment_ids": [1]},
+                    {"node_id": "i1", "parent_id": "S1", "label": "負責：S1",
+                     "type": "action", "segment_ids": [4]}],
+        "speaker_stats": ms.mi.speaker_stats(segs),
+        "source": {"filename": "S1 會議.txt"},
+        "context": "S1 是財務長",
+    }
+    ms._seg_path(uid).write_text(json.dumps(segs, ensure_ascii=False), encoding="utf-8")
+    ms._out_path(uid).write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    return uid
+
+
+def test_renaming_a_speaker_rewrites_every_section_of_the_result(client, auth_off):
+    """**改名要一路改到卡片、摘要、章節、心智圖**（v1.16.10，使用者回報：
+    逐字稿改成「陳協理」之後，待辦還寫「負責：S1」、「誰講了多少」還是 S1）。
+
+    回傳整份更新後的結果給前端重畫 —— 存下來的那份也要一起改，
+    不然重新整理 / 下載又變回 S1。
+    """
+    import importlib
+    import json
+    ms = importlib.import_module("app.tools.meeting_summary.router")
+    uid = _rename_fixture(client, ms)
+
+    r = client.post(f"/tools/meeting-summary/speakers/{uid}", json={"map": {"S1": "陳協理"}})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    saved = json.loads(ms._out_path(uid).read_text(encoding="utf-8"))
+    assert body["result"] == saved, "回給前端的跟存下來的不是同一份"
+    assert [s["speaker"] for s in body["segments"]] == ["陳協理", "S2", "S12", "陳協理"]
+
+    acts = saved["items"]["actions"]
+    assert acts[0]["owner"] == "陳協理", "待辦還寫「負責：S1」"
+    assert saved["items"]["decisions"][0]["text"] == "依 陳協理 的提案維持預算"
+    assert saved["summary"]["text"] == "陳協理 說明預算，S12 補充，S2 同意。"
+    assert saved["chapters"][0]["title"] == "陳協理 的預算報告"
+    assert saved["mindmap"][0]["label"] == "陳協理 的預算報告"
+    assert saved["mindmap"][1]["label"] == "負責：陳協理"
+    assert "陳協理" in saved["speaker_stats"] and "S1" not in saved["speaker_stats"]
+
+
+def test_renaming_does_not_touch_look_alike_codes_or_structure(client, auth_off):
+    """三個不可以動的地方：
+
+    * `S12` 不是 `S1` 的一截 —— 前後要有邊界
+    * 結構欄位（`node_id` / `parent_id`）—— 換掉的話心智圖的連線整個斷掉
+    * `source`（檔名）與 `context`（使用者自己貼的背景）—— 那是使用者的資料
+    """
+    import importlib
+    import json
+    ms = importlib.import_module("app.tools.meeting_summary.router")
+    uid = _rename_fixture(client, ms)
+    client.post(f"/tools/meeting-summary/speakers/{uid}", json={"map": {"S1": "陳協理"}})
+    saved = json.loads(ms._out_path(uid).read_text(encoding="utf-8"))
+
+    assert saved["items"]["actions"][1]["owner"] == "S12", "S12 被 S1 換掉了一截"
+    assert "S12" in saved["summary"]["text"]
+    assert saved["mindmap"][0]["node_id"] == "S1", "心智圖的節點 id 被換掉了"
+    assert saved["mindmap"][1]["parent_id"] == "S1", "心智圖的連線被換斷了"
+    assert saved["source"]["filename"] == "S1 會議.txt", "檔名被改了"
+    assert saved["context"] == "S1 是財務長", "使用者貼的背景被改了"
+
+
+def test_real_names_are_not_substring_replaced_in_free_text(client, auth_off):
+    """真人名字只換「整個欄位等於它」的地方：把「王」改名不可以連「王道」一起換。"""
+    import importlib
+    import json
+    ms = importlib.import_module("app.tools.meeting_summary.router")
+    uid = _upload(client).json()["upload_id"]
+    segs = [{"seq": 1, "speaker": "王", "text": "這才是王道"}]
+    ms._seg_path(uid).write_text(json.dumps(segs, ensure_ascii=False), encoding="utf-8")
+    ms._out_path(uid).write_text(json.dumps({
+        "summary": {"text": "王認為這才是王道"},
+        "items": {"actions": [{"text": "回報", "owner": "王", "segment_ids": [1]}]},
+        "speaker_stats": ms.mi.speaker_stats(segs)}, ensure_ascii=False), encoding="utf-8")
+
+    client.post(f"/tools/meeting-summary/speakers/{uid}", json={"map": {"王": "王大明"}})
+    saved = json.loads(ms._out_path(uid).read_text(encoding="utf-8"))
+    assert saved["items"]["actions"][0]["owner"] == "王大明"
+    assert saved["summary"]["text"] == "王認為這才是王道", "真人名字被當成子字串換了"
+
+
+def test_giving_two_codes_the_same_name_merges_their_stats(client, auth_off):
+    """辨識把同一個人拆成兩個代號很常見 —— 兩個都改成同一個名字時要合併成一位。"""
+    import importlib
+    import json
+    ms = importlib.import_module("app.tools.meeting_summary.router")
+    uid = _rename_fixture(client, ms)
+    client.post(f"/tools/meeting-summary/speakers/{uid}",
+                json={"map": {"S1": "陳協理", "S12": "陳協理"}})
+    stats = json.loads(ms._out_path(uid).read_text(encoding="utf-8"))["speaker_stats"]
+    assert set(stats) == {"陳協理", "S2"}, stats
+    assert stats["陳協理"]["turn_count"] == 3
+
+
+def test_a_single_segment_override_leaves_free_text_alone(client, auth_off):
+    """單段改名（這一段其實是別人講的）不改卡片與摘要裡的 S1 ——
+    文字裡的 S1 指的是整個人，不是那一段。"""
+    import importlib
+    import json
+    ms = importlib.import_module("app.tools.meeting_summary.router")
+    uid = _rename_fixture(client, ms)
+    client.post(f"/tools/meeting-summary/speakers/{uid}", json={"overrides": {"4": "林經理"}})
+    saved = json.loads(ms._out_path(uid).read_text(encoding="utf-8"))
+    assert saved["items"]["actions"][0]["owner"] == "S1"
+    assert saved["summary"]["text"].startswith("S1 ")
+    assert saved["speaker_stats"]["林經理"]["turn_count"] == 1
+    assert saved["speaker_stats"]["S1"]["turn_count"] == 1, "統計沒有跟著單段改名移動"
+
+
+def test_the_page_redraws_from_the_server_response_after_renaming():
+    """前端改完名要**拿伺服器回的整份結果重畫**（不在前端另外補一份換名邏輯）。"""
+    import re
+    html = (pathlib.Path(__file__).resolve().parents[1] / "app" / "tools" / "meeting_summary"
+            / "templates" / "meeting_summary.html").read_text(encoding="utf-8")
+    html = re.sub(r"\{#.*?#\}", "", html, flags=re.S)
+    assert re.search(r"return await r\.json\(\);", html), "存名字之後沒有把結果拿回來"
+    assert re.search(r"result = resp\.result;[\s\S]{0,160}render\(\);", html), (
+        "拿回結果之後沒有重畫 —— 卡片與表格會停在舊名字")
 
 
 def test_a_speaker_name_cannot_smuggle_newlines(client, auth_off):

@@ -86,3 +86,45 @@ def test_every_partial_preview_blocks_the_scroll_with_a_notice(tpl, cls):
 def test_the_translation_end_block_offers_the_download_right_there():
     """擋板上就要有下載鈕 —— 讓他往回捲找按鈕，還是有人會放棄。"""
     assert "下載翻譯後的檔案（共 {0} 頁）" in TPL
+
+
+# ---------------------------------------------------------------- 會議摘要
+#
+# 上傳逐字稿之後只列出前幾段給使用者確認發言者與斷句（`PREVIEW_SEGMENTS`）。
+# 原本是一行灰色小字「下面是前 N 段」—— v1.16.10 使用者要求要明顯標示：
+# 使用者會以為整份逐字稿只讀到這幾段。
+
+MS_TPL = Path("app/tools/meeting_summary/templates/meeting_summary.html").read_text(
+    encoding="utf-8")
+
+
+def _ms_body() -> str:
+    return re.sub(r"\{#.*?#\}", "", MS_TPL, flags=re.S)
+
+
+def test_meeting_summary_preview_note_is_a_box_not_grey_text():
+    body = _ms_body()
+    assert re.search(r'<div class="info-box" id="msPrevNote">', body), (
+        "「只列出前幾段」又變回灰色小字了")
+
+
+def test_meeting_summary_preview_says_both_numbers():
+    """「整份共 M 段，這裡只列出前 N 段」—— 只有一個數字看不出差別。"""
+    body = _ms_body()
+    assert "這裡只列出前 {0} 段（整份共 {1} 段）" in body
+    assert "分析會用整份逐字稿" in body
+    # 兩個數字都要真的填進去（第二個是整份段數，不是預覽長度）
+    assert re.search(r"\.replace\('\{1\}', String\(total\)\)", body)
+    assert re.search(r"total = Number\(d\.segments\)", body)
+
+
+def test_meeting_summary_preview_says_it_again_at_the_bottom():
+    """使用者是捲到清單尾巴才下判斷的 —— 那裡要再講一次還有幾段沒列出。"""
+    body = _ms_body()
+    assert "後面還有 {0} 段沒有列出" in body
+    assert re.search(r"if \(shown < total\)[\s\S]{0,120}ms-prev-more", body)
+
+
+def test_meeting_summary_preview_is_still_short():
+    MS = importlib.import_module("app.tools.meeting_summary.router")
+    assert 1 <= MS.PREVIEW_SEGMENTS <= 20, MS.PREVIEW_SEGMENTS

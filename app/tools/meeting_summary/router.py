@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -185,17 +186,14 @@ def _run_job(job, upload_id: str, context: str = "",
 
     # 進度要說得出**在做什麼** —— 一場三小時的會議跑好幾分鐘，
     # 只有百分比的話使用者不知道是在跑還是卡住（本專案記過很多次）。
-    stage_no = {name: i for i, name in enumerate(mi.STAGES)}
-
-    def on_stage(name: str, i: int, n: int) -> None:
-        base = stage_no.get(name, 0) / len(mi.STAGES)
-        span = 1.0 / len(mi.STAGES)
-        job.progress = round(base + span * (i / max(1, n)), 3)
-        job.message = f"{name} {i}/{n}" if n > 1 else name
+    # 百分比由 `full_analysis` 依「還要呼叫幾次模型」算 —— 完成之前不會到 100%。
+    def on_progress(frac: float, message: str) -> None:
+        job.progress = round(frac, 3)
+        job.message = message
 
     job.message = mi.STAGES[0]
     analysis = mi.full_analysis(segments, ask, context=context,
-                                with_impacts=with_impacts, on_stage=on_stage)
+                                with_impacts=with_impacts, on_progress=on_progress)
 
     out = analysis.to_public()
     # **背景要跟著結果存下來** —— 匯出時的文件標題會從它取主題，
@@ -304,21 +302,83 @@ async def rename_speakers(upload_id: str, request: Request):
             n += 1
     atomic_json.write_json(_seg_path(upload_id), segs)
 
-    # 分析結果裡的發言統計是**以代號當鍵**的 —— 不一起搬的話，
-    # 圖上還是舊代號，而逐字稿已經是人名了（同一個畫面兩套名字）。
+    # **分析結果裡每一個會出現發言者的地方都要跟著換**（v1.16.10，使用者回報：
+    # 逐字稿改成「陳協理」，待辦還寫「負責：S1」、「誰講了多少」還是 S1）。
+    # 回傳整份更新後的結果，前端直接拿去重畫 —— 不在前端另外補一份（兩份一定會漂）。
     out_path = _out_path(upload_id)
+    out = None
     if out_path.exists():
         try:
             out = json.loads(out_path.read_text(encoding="utf-8"))
         except ValueError:
             out = None
-        if isinstance(out, dict) and isinstance(out.get("speaker_stats"), dict):
-            stats = {}
-            for k, v in out["speaker_stats"].items():
-                stats[names.get(str(k), str(k))] = v
-            out["speaker_stats"] = stats
+        if isinstance(out, dict):
+            _rename_in_result(out, names, segs)
             atomic_json.write_json(out_path, out)
-    return {"ok": True, "renamed": n}
+    return {"ok": True, "renamed": n, "result": out, "segments": segs}
+
+
+#: 「代號形狀」的發言者名字：S1、S12、SPEAKER_00、speaker_1、Speaker 2。
+#: **只有這種會在自由文字裡被換掉** —— 真人名字做子字串取代的話，把「王」改名
+#: 會連「王道」的王一起換掉。
+_SPEAKER_CODE = re.compile(r"^(?:[A-Za-z]{1,3}\d{1,3}|(?:speaker|SPEAKER|Speaker)[ _-]?\d{1,3})$")
+
+
+#: 分析結果裡「不是給人讀的字」的欄位 —— 改名時一律不碰
+_STRUCTURAL_KEYS = frozenset({"id", "type", "kind", "color", "status"})
+
+
+def _rename_in_result(out: dict, names: dict, segs: list[dict]) -> None:
+    """把分析結果裡的發言者換成新名字（就地改）。
+
+    * **發言統計依改名後的逐字稿重算** —— 只搬鍵名的話，單段改名的發言次數與時間
+      不會跟著移，把兩個代號改成同一個人時也不會合併。
+    * `owner` / `speaker` 這類欄位**整個等於**舊名字 → 換（整位改名才算）。
+    * 自由文字（卡片內文、摘要、章節、心智圖節點）只換「代號形狀」的舊名字，
+      而且前後不可以緊接英數字（`S12` 不可以被 `S1` 換掉一截）。
+    * 單段改名（`overrides`）**不動自由文字** —— 文字裡的 S1 指的是整個人。
+    """
+    if "speaker_stats" in out:
+        out["speaker_stats"] = mi.speaker_stats(segs)
+    if not names:
+        return
+    exact = {str(k): str(v) for k, v in names.items()}
+    code_res = [(re.compile(r"(?<![A-Za-z0-9_])" + re.escape(k) + r"(?![A-Za-z0-9_])"), v)
+                for k, v in exact.items() if _SPEAKER_CODE.match(k)]
+
+    def _text(v: str) -> str:
+        for rx, new in code_res:
+            v = rx.sub(new, v)
+        return v
+
+    def _walk(node):
+        if isinstance(node, dict):
+            for k, v in list(node.items()):
+                # 結構用的欄位（`node_id: c1`、`type`）不是給人讀的字 ——
+                # 發言者代號剛好長得一樣時（`c1`）會把心智圖的連線弄斷
+                if k in _STRUCTURAL_KEYS or k.endswith(("_id", "_ids")):
+                    continue
+                if isinstance(v, str):
+                    if k in ("owner", "speaker", "who") and v in exact:
+                        node[k] = exact[v]
+                    else:
+                        node[k] = _text(v)
+                elif isinstance(v, (dict, list)):
+                    _walk(v)
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                if isinstance(v, str):
+                    node[i] = _text(v)
+                elif isinstance(v, (dict, list)):
+                    _walk(v)
+
+    # **只走這幾個區塊**：`source`（檔名）、`context`（使用者自己貼的背景）不可以動
+    for key in ("summary", "items", "chapters", "mindmap"):
+        if key in out:
+            if isinstance(out[key], str):
+                out[key] = _text(out[key])
+            else:
+                _walk(out[key])
 
 
 # ------------------------------------------------------------------ 匯出

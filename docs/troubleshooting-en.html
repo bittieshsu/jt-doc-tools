@@ -78,6 +78,7 @@
     <a href="#jtlw-wait">No progress, then cancelled after a long wait</a>
     <a href="#jtlw-empty">Reported success, but no transcript</a>
     <a href="#jtlw-lang">Language setting not accepted</a>
+    <a href="#jtlw-autolang">Recognised as the wrong language throughout</a>
     <a href="#jtlw-grey">Meeting recording to transcript is greyed out</a>
   </div>
 
@@ -187,10 +188,10 @@
   </section>
 
   <section class="ts-item" id="jtlw-wait">
-    <h2>Progress does not move, or “waited N minutes with no result; asked them to cancel”</h2>
-    <p class="ts-sym"><b>Symptom</b>　After submitting, the progress bar stays still for a long time and the job finally fails with the message above. You may also see “The speech service queue is full. Please submit again later.”</p>
-    <p><b>Cause</b>　The speech service GPU <b>handles one job at a time and queues the rest</b>. While queued, the progress they report does not move (the page still says recognising); once the job's turn comes, recognition and correction progress starts moving, so a still progress bar at the start does not by itself mean it is stuck. This system waits for them up to a limit (counted from submission: the larger of 15 minutes and half the recording length, plus a 60-minute allowance for queueing); when several very long meetings happen to be ahead in the queue, the limit can still pass while queued, and this system asks them to cancel the job.</p>
-    <p><b>What to do</b>　Submit again; for very long recordings, avoid times when someone else is sending a long meeting. If it keeps happening, ask the speech service side to check the queue and the GPU server.</p>
+    <h2>Stuck at “Queued (N ahead)”, or “Waited N minutes and the speech service has not reported a result, so the job was cancelled on their side”</h2>
+    <p class="ts-sym"><b>Symptom</b>　After submitting, the transcription keeps showing Queued; or once its turn comes it runs for a long time and finally fails with the message above. You may also see “The speech service queue is full; submit again later”.</p>
+    <p><b>Cause</b>　The speech service GPU <b>handles one job at a time and queues the rest</b>, and the jobs ahead include other people's. While queued, the page shows how many are ahead, and <b>that time does not count towards the waiting limit</b>; once its turn comes, recognition and correction progress moves. This system only starts timing after the job's turn comes (the larger of 15 minutes and half the recording length) and asks them to cancel the job once that is exceeded; the queue itself is waited on for at most 4 hours.</p>
+    <p><b>What to do</b>　While queued, wait for its turn; for very long recordings, avoid times when someone else is sending a long meeting. If it times out after its turn came, or queues for more than 4 hours, ask the speech service side to check the GPU server.</p>
   </section>
 
   <section class="ts-item" id="jtlw-empty">
@@ -206,6 +207,13 @@
     <p class="ts-sym"><b>Symptom</b>　After choosing a language, the job fails as soon as it is submitted.</p>
     <p><b>Cause</b>　The speech service only accepts the languages its current recognition mode supports. Before v1.16.8 the page sent Chinese as <code>zh</code>, while the service expects <code>zh-Hant</code>, so every job with Chinese selected was rejected (fixed in v1.16.9). If it still happens, the recognition mode chosen by the administrator most likely does not support that language (for example, the Taiwanese mode only accepts Taiwanese and Chinese).</p>
     <p><b>What to do</b>　Choose Detect automatically and submit again. If it keeps happening, ask your administrator to check which languages the current recognition mode supports under Speech service (jtlw) (they are listed once a recognition mode is selected).</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-autolang">
+    <h2>A Chinese meeting recognised as English throughout (or the other way round)</h2>
+    <p class="ts-sym"><b>Symptom</b>　Most of the transcript is wrong characters, or the whole meeting came out in another language; the language was set to Detect automatically.</p>
+    <p><b>Cause</b>　Detect automatically only listens to about the first 30 seconds of speech to decide which language to use for the whole recording. If someone speaks another language at the start (for example an English opening; 20 seconds is enough), the whole meeting is recognised in the wrong language. The speech service measured a meeting that was mostly Chinese but opened in English: the error rate on Chinese sentences went from 15% to 88%. Silence or background noise at the start does not matter, so there is no need to trim it.</p>
+    <p><b>What to do</b>　Set Language to the language used throughout the meeting and submit again. For meetings that alternate between Chinese and English sentences, pick the language used most: whole sentences in the other language are mostly not recognised correctly (English terms inside Chinese sentences are fine).</p>
   </section>
 
   <section class="ts-item" id="jtlw-grey">

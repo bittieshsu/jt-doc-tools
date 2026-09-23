@@ -108,7 +108,8 @@ def _js_blocks(path: pathlib.Path) -> list[str]:
     src = path.read_text(encoding="utf-8")
     if path.suffix != ".html":
         return [src]
-    return re.findall(r"<script\b[^>]*>(.*?)</script\b[^>]*>", src, re.S)
+    # `re.I`：`<SCRIPT>` 也是合法的標籤（CodeQL 以「過濾 HTML 的正規式漏掉大寫」報成 High）
+    return re.findall(r"<script\b[^>]*>(.*?)</script\b[^>]*>", src, re.S | re.I)
 
 
 def _bare_cjk_branches(js: str) -> list[str]:

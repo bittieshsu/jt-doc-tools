@@ -649,3 +649,102 @@ def test_clicking_a_block_jumps_to_that_moment_not_the_first_one(live):
     })()""")
     assert _wait(send, f"!!document.querySelector('#ms-seg-{got['b']}.hit')", 10), (
         f"點了第二格，逐字稿沒有跳到第 {got['b']} 段")
+
+
+def _scroll_state(send):
+    return _eval(send, """(() => {
+      const b = document.getElementById('msStart').getBoundingClientRect();
+      return {y: window.scrollY, top: b.top, bottom: b.bottom, h: window.innerHeight};
+    })()""")
+
+
+def test_arriving_from_the_transcribe_tool_scrolls_to_the_start_button(live):
+    """從「會議錄音轉逐字稿」按「轉送會議摘要」過來：解析完直接捲到「開始分析」
+    （使用者 2026-09-23 要求 —— 上面的上傳區與背景欄位都不用再看）。
+
+    工作區在認證關閉的測試實例裡用不了，所以**只把取檔那一步換掉**
+    （頁面載入前包一層 `fetch`，`/workspace/file/…` 直接回逐字稿），
+    網址參數、上傳元件接手、解析、畫面都是真的。
+    """
+    port, send, vtt = live
+    send("Page.enable"); send("Runtime.enable")
+    body = json.dumps(Path(vtt).read_text(encoding="utf-8"))
+    added = send("Page.addScriptToEvaluateOnNewDocument", {"source": """
+      (() => {
+        const real = window.fetch.bind(window);
+        window.fetch = (u, o) => String(u).startsWith('/workspace/file/')
+          ? Promise.resolve(new Response(%s, {status: 200,
+              headers: {'Content-Type': 'text/vtt'}}))
+          : real(u, o);
+      })();""" % body})
+    try:
+        send("Page.navigate", {"url": f"http://127.0.0.1:{port}/tools/meeting-summary/"
+                                       f"?from_ws={'a' * 32}&from_name=mse2e.vtt"})
+        assert _wait(send, "!!document.getElementById('msParsed') && "
+                           "!document.getElementById('msParsed').hidden", 60), "轉送來的逐字稿沒有解析出來"
+        time.sleep(1.5)                       # 平滑捲動要一點時間
+        st = _scroll_state(send)
+        assert st["y"] > 0, f"畫面沒有往下捲：{st}"
+        assert 0 <= st["top"] and st["bottom"] <= st["h"], f"「開始分析」不在畫面裡：{st}"
+    finally:
+        send("Page.removeScriptToEvaluateOnNewDocument",
+             {"identifier": added["result"]["identifier"]})
+
+
+def test_uploading_by_hand_does_not_jump_the_page(live):
+    """反向對照：自己拖檔案進來時**不可以**自己捲走 —— 只有轉送過來才捲。
+    只驗上一條的話，改成「每次解析完都捲」也會過。"""
+    port, send, vtt = live
+    send("Page.enable"); send("Runtime.enable"); send("DOM.enable")
+    send("Page.navigate", {"url": f"http://127.0.0.1:{port}/tools/meeting-summary/"})
+    assert _wait(send, "document.readyState === 'complete'", 30)
+    time.sleep(0.5)
+    _set_file(send, ".file-upload input[type=file]", vtt)
+    assert _wait(send, "!!document.getElementById('msParsed') && "
+                       "!document.getElementById('msParsed').hidden", 60)
+    time.sleep(1.5)
+    st = _scroll_state(send)
+    assert st["y"] == 0, f"自己上傳時畫面被捲走了：{st}"
+
+
+def test_renaming_in_the_transcript_updates_the_cards_and_the_table(live):
+    """**逐字稿改名，其他區塊要跟著換**（v1.16.10，使用者截圖回報：
+    逐字稿改成新名字之後，待辦卡片還寫「負責：舊名字」、「誰講了多少」也還是舊的）。
+
+    判準落在**畫面上**：伺服器改對了但前端沒重畫的話，使用者看到的一樣是舊名字。
+    """
+    port, send, vtt = live
+    send("Page.enable"); send("Runtime.enable"); send("DOM.enable")
+    send("Page.navigate", {"url": f"http://127.0.0.1:{port}/tools/meeting-summary/"})
+    assert _wait(send, "document.readyState === 'complete' && "
+                       "!!document.getElementById('msUp')", 30)
+    time.sleep(0.5)
+    _set_file(send, ".file-upload input[type=file]", vtt)
+    assert _wait(send, "!document.getElementById('msParsed').hidden", 60)
+    _eval(send, "document.getElementById('msStart').click(), 1")
+    assert _wait(send, "!document.getElementById('msResult').hidden", 180)
+    assert "李美華" in _eval(send, "document.querySelector('#msCards .k-action').textContent")
+
+    # 在逐字稿點「李美華」→ 改成「李經理」→ Enter（範圍預設是「全部」）
+    assert _eval(send, """(function(){
+      var sp = Array.prototype.find.call(
+        document.querySelectorAll('#msScript .ms-spk'),
+        function (e) { return e.textContent === '李美華'; });
+      if (!sp) return false;
+      sp.click();
+      var inp = sp.querySelector('input.ms-name-edit');
+      if (!inp) return false;
+      inp.value = '李經理';
+      inp.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+      return true;
+    })()"""), "逐字稿裡點不到「李美華」或改名框沒出現"
+
+    assert _wait(send, "document.querySelector('#msCards .k-action').textContent"
+                       ".indexOf('李經理') >= 0", 20), (
+        "待辦卡片還是舊名字 —— 改名只改到逐字稿")
+    assert "李美華" not in _eval(send,
+                                "document.querySelector('#msCards .k-action').textContent")
+    if not _eval(send, "document.getElementById('msSpkWrap').hidden"):
+        table = _eval(send, "document.getElementById('msSpkTable').textContent")
+        assert "李經理" in table and "李美華" not in table, (
+            f"「誰講了多少」沒有跟著換：{table[:120]!r}")

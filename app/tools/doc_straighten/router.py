@@ -21,6 +21,8 @@
 from __future__ import annotations
 
 import asyncio as _asyncio
+import os
+import re
 import uuid
 from pathlib import Path
 from typing import List
@@ -278,14 +280,23 @@ async def preview(request: Request, upload_id: str = Form(...),
                            interpolation=cv2.INTER_AREA)
         png = cv2.imencode(".png", cv2.cvtColor(small, cv2.COLOR_RGB2BGR)
                            if small.ndim == 3 else small)[1]
-        out = settings.temp_dir / f"{_PREFIX}pv_{upload_id}_{page}.png"
-        out.write_bytes(png.tobytes())
+        # **每一次預覽一個檔名，而且先寫暫存檔再換名**（v1.16.10，CI 抓到的時好時壞）。
+        # 原本同一頁固定寫同一個檔：拖曳 / 轉向會連發好幾個請求，前端取消舊的，
+        # 但**伺服器那邊照樣算完、晚一點寫回同一個檔** —— 蓋掉最新那張
+        # （畫面顯示的是舊的結果，狀態列卻寫著新的），或讓瀏覽器讀到寫一半的檔
+        # （圖載不出來，右邊一直是空的）。
+        ver = uuid.uuid4().hex[:12]
+        out = _pv_path(upload_id, page, ver)
+        tmp = out.with_name(out.name + ".part")
+        tmp.write_bytes(png.tobytes())
+        os.replace(tmp, out)
+        _prune_previews(upload_id, page, keep=out)
         # 自動抓到的四角也回給前端**當作拖曳的起點** —— 使用者只要修不滿意的
         # 那幾個角，不必四個重拉。`res.quad` 已經是正規化、轉向後的座標，
         # **這裡不可以再自己換算一次**（原本用未轉的長寬換算，轉 90° 之後
         # 畫面上的手柄會落在完全不相干的位置）。
         auto = res.quad
-        return {"url": f"/tools/doc-straighten/preview-img/{upload_id}/{page}",
+        return {"url": f"/tools/doc-straighten/preview-img/{upload_id}/{page}?v={ver}",
                 "angle": res.angle, "residual": res.residual,
                 "quad_found": res.quad_found, "ms": res.ms,
                 "rotate": res.rotate_deg, "quad": auto,
@@ -297,11 +308,40 @@ async def preview(request: Request, upload_id: str = Form(...),
     return await _asyncio.to_thread(_work)
 
 
+_PV_VER = re.compile(r"^[0-9a-f]{12}$")
+#: 同一頁留幾張預覽。拖曳時一秒可能連發好幾個請求，每一個都寫一張 ——
+#: 只留最新的幾張；**不可以只留一張**：被取消的舊請求可能在新的之後才寫完，
+#: 只留一張的話它會把畫面正要載入的那張刪掉。
+_PV_KEEP = 6
+
+
+def _pv_path(upload_id: str, page: int, ver: str | None = None) -> Path:
+    suffix = f"_{ver}" if ver else ""
+    return settings.temp_dir / f"{_PREFIX}pv_{upload_id}_{int(page)}{suffix}.png"
+
+
+def _prune_previews(upload_id: str, page: int, keep: Path) -> None:
+    try:
+        olds = sorted(settings.temp_dir.glob(f"{_PREFIX}pv_{upload_id}_{int(page)}_*.png"),
+                      key=lambda p: p.stat().st_mtime, reverse=True)
+    except OSError:
+        return
+    for p in olds[_PV_KEEP:]:
+        if p != keep:
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+
 @router.get("/preview-img/{upload_id}/{page}")
-async def preview_img(upload_id: str, page: int, request: Request):
+async def preview_img(upload_id: str, page: int, request: Request, v: str = ""):
     require_uuid_hex(upload_id, "upload_id")
     _uo.require(upload_id, request)
-    out = settings.temp_dir / f"{_PREFIX}pv_{upload_id}_{page}.png"
+    if v and not _PV_VER.match(v):
+        raise HTTPException(404, "預覽不存在（請重新產生）")
+    # 沒帶 `v` 的是舊版網址（升級前開著的分頁）—— 照舊找固定檔名
+    out = _pv_path(upload_id, page, v or None)
     if not out.exists():
         raise HTTPException(404, "預覽不存在（請重新產生）")
     return FileResponse(str(out), media_type="image/png",

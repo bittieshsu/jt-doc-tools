@@ -46,8 +46,11 @@ class FakeJtlw:
 
     def __init__(self, *, fail_with: dict | None = None, segments: int = 5,
                  running_polls: int = 0, reject_with: dict | None = None,
-                 duration_ms: int | None = None):
+                 duration_ms: int | None = None, queue_polls: int = 0,
+                 submit_status: int | None = None):
         self.seen: dict = {}
+        #: 送件當下回這個 HTTP 狀態（對方自己壞了，例如 500）
+        self.submit_status = submit_status
         #: `GET /result` 的 `duration_ms`；None 表示那一支回 404（摘要拿不到）。
         self.duration_ms = duration_ms
         self.acked: list[str] = []
@@ -59,6 +62,10 @@ class FakeJtlw:
         self.n = segments
         #: 先回幾次「執行中」再回成功 —— 用來驗進度真的會動。
         self.running_polls = running_polls
+        #: 在 `running_polls` 的前幾次回「GPU 排隊中」（api_revision 2.2 的 `waiting`）
+        self.queue_polls = queue_polls
+        #: 回過的每一個 `progress`，拿去跟對方的 schema 核對
+        self.progress_sent: list[dict] = []
         self.polls = 0
         self.app = self._build()
         self.port = _free_port()
@@ -84,6 +91,10 @@ class FakeJtlw:
 
         @app.post("/api/v1/jobs")
         async def create(request: Request):
+            if me.submit_status:
+                return JSONResponse({"error": {"code": "internal_error", "category": "server",
+                                               "retryable": True, "details": {}}},
+                                    status_code=me.submit_status)
             if me.reject_with:
                 return JSONResponse({"error": me.reject_with}, status_code=422)
             body = await request.json()
@@ -113,13 +124,19 @@ class FakeJtlw:
                 # —— 那是我猜的形狀，於是它**完全抓不到**我們接錯欄位這件事
                 # （進度條從頭到尾不會動）。是對方看到我們的說明才指出來的。
                 # **假伺服器要照對方文件的契約寫，不是照我們以為的樣子寫。**
-                return {"status": "running",
-                        "queue_position": None,
-                        "progress": {"stage": "asr", "stage_index": 3,
-                                     "stage_count": 6,
-                                     "processed_audio_ms": 30000,
-                                     "total_audio_ms": 60000,
-                                     "percent": 50.0}}
+                # api_revision 2.2（2026-09-23）：`running` 時 **`waiting` 這個鍵一定在**，
+                # 沒排隊時是 null（對方 v2.12 確認，並加了測試釘住）。
+                queued = me.polls <= me.queue_polls
+                prog = {"stage": "asr", "stage_index": 3, "stage_count": 6,
+                        "processed_audio_ms": 0 if queued else 30000,
+                        "total_audio_ms": 60000,
+                        "items_done": None, "items_total": None,
+                        "percent": 30.0 if queued else 50.0,
+                        "waiting": ({"reason": "gpu_queue", "ahead": 2,
+                                     "since": "2026-09-23T09:00:00Z"}
+                                    if queued else None)}
+                me.progress_sent.append(prog)
+                return {"status": "running", "queue_position": None, "progress": prog}
             return {"status": "succeeded",
                     "progress": {"stage": "finalize", "percent": 100.0},
                     "result": {"duration_s": 60, "language": "zh"}}
@@ -773,6 +790,35 @@ def test_renaming_a_speaker_defaults_to_all_of_them(client, unconfigured):
     assert got["segments"], "改名字把逐字稿弄不見了"
 
 
+def test_renamed_speakers_arrive_in_the_meeting_summary(client, unconfigured):
+    """**在轉逐字稿改好的名字，轉送到會議摘要之後要還在**（v1.16.10，使用者回報）。
+
+    轉送送的是畫面上那份逐字稿 JSON（含 `speaker_names` / `speaker_overrides`），
+    而摘要的 JSON 解析器原本只讀每一段的 `speaker`，名字全部變回 S1、S2。
+    這裡走真的路：轉完 → 改名（整位改一個、單段改一個）→ 把那份 JSON 丟給
+    **會議摘要的上傳端點** → 看摘要那邊的發言者。
+    """
+    with FakeJtlw() as fake:
+        _configure(fake)
+        uid = _upload(client)["upload_id"]
+        _run(client, uid)
+    # 假服務的發言者：第 1、3、5 段 S2，第 4 段 S1，第 2 段沒有
+    r = client.post(f"/tools/meeting-transcribe/speakers/{uid}",
+                    json={"map": {"S1": "陳協理"}, "overrides": {"3": "李副總"}})
+    assert r.status_code == 200, r.text
+    sent = client.get(f"/tools/meeting-transcribe/result/{uid}").content
+
+    r = client.post("/tools/meeting-summary/upload",
+                    files={"file": ("會議-逐字稿.json", sent, "application/json")},
+                    data={"shape": "auto"})
+    assert r.status_code == 200, r.text
+    speakers = set(r.json()["speakers"])
+    assert "陳協理" in speakers, f"整位改的名字沒帶過去：{speakers}"
+    assert "李副總" in speakers, f"單段改的名字沒帶過去：{speakers}"
+    assert "S1" not in speakers, f"S1 已經整位改名了，摘要那邊不該還有：{speakers}"
+    assert "S2" in speakers, "沒改名的要維持原本的代號"
+
+
 def test_a_speaker_name_cannot_smuggle_control_characters(client, unconfigured):
     """名字會被寫進逐字稿、下載的檔案與轉送給「會議摘要」的內容 ——
     換行會把一段拆成兩段（而我們自己的純文字剖析器是**逐行**讀的）。"""
@@ -912,3 +958,129 @@ def test_the_page_follows_the_server_on_the_tail_hint():
     assert "data.tail_hint" in html
     assert "60000" not in html and "_TAIL_GAP" not in html, "前端自己寫了門檻"
     assert not re.search(r"tail_gap_ms\s*[<>]=?", html), "前端自己拿秒數比大小"
+
+
+def test_the_language_hint_says_auto_only_listens_to_the_start():
+    """語音服務 2026-09-23 量過（v2.12）：「自動判斷」只看錄音開頭約 30 秒決定整場語言。
+
+    * 要講出這件事（中文為主但開頭是英文的會議，自動判斷整場用英文辨識，錯誤率 15% → 88%）
+    * **不可以寫「會更準」**：自動判斷猜對時兩者一模一樣，真正的差別是「不會整場猜錯」
+    * **不可以寫「之後會支援逐段判斷」**：對方明確要求，沒有時程
+    改回去不會有任何行為測試變紅，而使用者會照著錯的說明做選擇 —— 所以用字面釘住。
+    """
+    import re
+    html = re.sub(r"\{#.*?#\}", "", _TEMPLATE.read_text(encoding="utf-8"), flags=re.S)
+    m = re.search(r'id="mtLang".*?</select>(.*?)id="mtSpk"', html, re.S)
+    near = m.group(1) if m else ""
+    boxes = " ".join(re.findall(r'<p class="info-box mt-hint">(.*?)</p>', html, re.S))
+    text = near + boxes
+    assert "開頭" in boxes and "整場" in boxes, "沒講出「自動判斷只看開頭、整場沿用」"
+    assert "更準" not in text, "不要寫「會更準」—— 猜對時兩者一樣準"
+    for promise in ("之後會", "未來會", "將會支援", "逐段判斷"):
+        assert promise not in text, f"不可以承諾對方沒有時程的功能：{promise}"
+    # **v2.13 更正**：開頭的靜音、雜音、沒有人聲的音樂都不影響（判斷前先濾掉沒人講話的部分），
+    # 只有「開頭有人先講另一種語言」會。寫成「音樂或靜音會判錯」的話，讀的人會去剪掉
+    # 錄音開頭的靜音 —— 一點用也沒有，真正的原因反而被忽略。
+    assert "音樂" not in boxes, "不要說音樂會讓自動判斷判錯（對方量過：不影響）"
+    assert re.search(r"有人先講另一種語言", boxes), "沒講出真正會判錯的情況"
+    for m in re.finditer(r"靜音", boxes):
+        assert "不影響" in boxes[m.start():m.start() + 12], (
+            "提到靜音時要說它不影響 —— 不可以寫成靜音會讓自動判斷判錯")
+
+
+
+# ---------- 假的語音服務要照對方 schema 2.2 回應 ----------
+
+_SCHEMA = (Path(__file__).resolve().parents[1] / "docs-share" / "jtlw-integration"
+           / "from-jtlw" / "jtlw-api-v1.schema.json")
+
+
+def test_the_fake_speaks_schema_2_2_progress(client, unconfigured):
+    """假服務回的 `progress` 要符合對方 schema 的 `Progress`（欄位、必填、`waiting` 的形狀）。
+
+    **假的對方要照對方的契約寫，不是照我們以為的樣子寫**（v1.15.95 那次進度條從頭到尾
+    不動，就是因為假服務回的是我們猜的形狀）。schema 是往來文件、不進公開樹 ——
+    公開樹與 CI 上這一條會跳過，開發樹上一定要跑到。
+    """
+    if not _SCHEMA.is_file():
+        pytest.skip("沒有對方的 schema（公開樹）")
+    schema = json.loads(_SCHEMA.read_text(encoding="utf-8"))
+    spec = schema["$defs"]["Progress"]
+    props, required = spec["properties"], set(spec["required"])
+    wspec = props["waiting"]
+    with FakeJtlw(running_polls=3, queue_polls=2) as fake:
+        _configure(fake)
+        j = _run(client, _upload(client)["upload_id"])
+        assert j["status"] == "done", j.get("error")
+    assert fake.progress_sent, "假服務一次「執行中」都沒回 —— 這條沒驗到東西"
+    assert any(p["waiting"] for p in fake.progress_sent), "沒有模擬到排隊"
+    assert any(p["waiting"] is None for p in fake.progress_sent), "沒有模擬到輪到之後"
+    for p in fake.progress_sent:
+        assert set(p) <= set(props), f"schema 沒有的欄位：{set(p) - set(props)}"
+        assert required <= set(p), f"少了必填欄位：{required - set(p)}"
+        assert "waiting" in p, "2.2 起 running 時 waiting 這個鍵一定在"
+        w = p["waiting"]
+        if w is not None:
+            assert set(w) == set(wspec["required"]), w
+            assert w["reason"] in wspec["properties"]["reason"]["enum"], w
+
+
+# ---------- 同步 API（`/api/meeting-transcribe`）：照 API 手冊呼叫要照手冊回 ----------
+#
+# 這支端點原本**一條測試都沒有**。手冊寫「對方不支援時送件當下就回 400」，
+# 實際上 `JtlwError` 沒人接 —— 一路冒成 500（v1.16.10 查 jtlw v2.12 時發現）。
+# 500 會讓呼叫端以為服務壞了而一直重試，而其實是他送的參數不對。
+
+_M4A = b"\x00\x00\x00\x20ftypM4A " + b"x" * 5000
+
+
+def _api(client, **form):
+    return client.post("/tools/meeting-transcribe/api/meeting-transcribe",
+                       files={"file": ("會議.m4a", _M4A, "audio/mp4")}, data=form)
+
+
+def test_the_sync_api_returns_the_transcript(client, unconfigured):
+    with FakeJtlw() as fake:
+        _configure(fake)
+        r = _api(client, language="zh")
+        assert r.status_code == 200, r.text[:300]
+        assert fake.seen["body"]["language"] == "zh-Hant"
+    body = r.json()
+    assert body.get("segments"), body
+
+
+def test_the_sync_api_says_400_when_the_language_is_rejected(client, unconfigured):
+    """對方退回語言 → **400 並講要怎麼改**，不是 500。"""
+    with FakeJtlw() as fake:
+        _configure(fake)
+        r = _api(client, language="xx")
+        assert fake.seen.get("rejected_language") == "xx", "前提：假的對方真的退回了"
+    assert r.status_code == 400, (r.status_code, r.text[:200])
+    assert jtlw_client.MESSAGES["language_rejected"] in r.text
+
+
+def test_the_sync_api_does_not_blame_the_caller_for_our_side(client, unconfigured):
+    """反向對照：**對方掛了不是呼叫端送錯** —— 不可以一律回 400。"""
+    with FakeJtlw(submit_status=500) as fake:
+        _configure(fake)
+        r = _api(client, language="auto")
+    assert r.status_code == 502, (r.status_code, r.text[:200])
+
+
+def test_the_sync_api_says_503_when_the_service_is_not_set_up(client, unconfigured):
+    r = _api(client, language="auto")
+    assert r.status_code == 503, (r.status_code, r.text[:200])
+
+
+def test_the_sync_api_says_502_when_the_job_fails_on_their_side(client, unconfigured):
+    with FakeJtlw(fail_with={"code": "asr_failed", "message": "x"}) as fake:
+        _configure(fake)
+        r = _api(client, language="auto")
+    assert r.status_code == 502, (r.status_code, r.text[:200])
+
+
+def test_the_sync_api_says_503_when_the_service_cannot_be_reached(client, unconfigured):
+    """設定好了但連不上（對方關機、網路斷）—— 那是部署問題，503 不是 502。"""
+    _configure(FakeJtlw())            # 沒有啟動：那個埠上沒有人在聽
+    r = _api(client, language="auto")
+    assert r.status_code == 503, (r.status_code, r.text[:200])

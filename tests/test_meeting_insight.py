@@ -562,8 +562,77 @@ def test_stage_names_are_reported_for_progress():
     seen: list[str] = []
     M.full_analysis([seg(1, "那就改用立信")], _fake_model,
                     on_stage=lambda name, i, n: seen.append(name))
-    assert set(seen) <= set(M.STAGES) and seen
+    assert set(seen) <= set(M.ALL_STAGES) and seen
     assert M.STAGES[2] in seen and M.STAGES[3] in seen
+
+
+def _progress_trace(**kw):
+    """跑一次完整分析，記下「每一次叫模型的當下」進度列停在哪裡。"""
+    import re
+    seen: list[tuple[float, str]] = []
+    last = {"frac": 0.0, "msg": ""}
+    at_call: list[tuple[float, str, str]] = []
+
+    def on_progress(frac, msg):
+        seen.append((frac, msg))
+        last.update(frac=frac, msg=msg)
+
+    def model(prompt):
+        at_call.append((last["frac"], last["msg"], prompt))
+        return _fake_model(prompt)
+
+    # 十段、視窗切小 → 擷取與「事件與影響」各有好幾個視窗
+    segs = [seg(i, f"第 {i} 件事，那就改用立信，時程比較重要" * 3) for i in range(1, 11)]
+    M.full_analysis(segs, model, window_chars=120, overlap_chars=0,
+                    on_progress=on_progress, **kw)
+    return seen, at_call, re
+
+
+def test_progress_is_not_full_while_the_summary_is_still_being_written():
+    """**寫摘要還沒寫完，進度條不可以是滿的**（v1.16.10，使用者截圖回報）。
+
+    原本每階段各佔四分之一、而且把「開始第 i 件」當成「做完第 i 件」算，
+    寫摘要一開始就是 100%。判準落在**叫模型寫摘要的那一刻**進度在哪裡。
+    """
+    seen, at_call, _re = _progress_trace()
+    summary_calls = [c for c in at_call if "請寫一段" in c[2]]
+    assert summary_calls, "沒有走到寫摘要"
+    frac, msg, _p = summary_calls[-1]
+    assert msg == M.STAGES[3], msg
+    assert frac < 0.99 + 1e-9 and frac < 1.0
+    assert frac <= 0.95, f"寫摘要一開始就 {frac:.0%} —— 還有一次呼叫沒做"
+    assert all(f < 1.0 for f, _m in seen), "完成之前進度就到 100%"
+
+
+def test_progress_only_moves_forward_and_covers_every_phase():
+    """進度只往前走，而且**每一輪都要回報** —— 複審與「事件與影響」
+    原本沒有回報，進度條在同一格停很久（呼叫數跟擷取一樣多）。"""
+    seen, _calls, _re = _progress_trace()
+    fracs = [f for f, _m in seen]
+    assert fracs == sorted(fracs), f"進度往回跳：{fracs}"
+    names = {m.split(" ")[0] for _f, m in seen}
+    for want in (M.STAGES[0], M.STAGES[1], M.STAGE_IMPACTS, M.STAGES[2], M.STAGES[3]):
+        assert want in names, f"「{want}」這一段沒有回報進度：{sorted(names)}"
+    # 「事件與影響」那一輪要逐個視窗回報，不是只報一次
+    assert sum(1 for _f, m in seen if m.startswith(M.STAGE_IMPACTS)) > 1
+
+
+def test_extraction_does_not_eat_the_whole_bar():
+    """擷取重點是主要成本，但後面還有「事件與影響」一整輪 ——
+    擷取做完時進度不可以已經過半很多（原本做完擷取就算 25%，而那一輪根本沒算進來）。"""
+    seen, _calls, _re = _progress_trace()
+    first_after = next(f for f, m in seen if not m.startswith(M.STAGES[0]))
+    assert 0.2 < first_after < 0.6, first_after
+
+
+def test_every_progress_message_is_a_known_template():
+    """前端 `tr()` 查不到時會把數字換成 `{0}` `{1}` 再查 —— 所以伺服器送出的
+    每一句都要落在 `PROGRESS_TEMPLATES` 裡，那份清單才有語系檔守著。"""
+    seen, _calls, re = _progress_trace()
+    for _f, msg in seen:
+        n = iter(range(10))
+        key = re.sub(r"\d+", lambda _m: "{%d}" % next(n), msg)
+        assert key in M.PROGRESS_TEMPLATES, f"「{msg}」→「{key}」不在清單裡，英日介面會是中文"
 
 
 def test_review_sees_the_segments_around_the_citation():
@@ -1030,3 +1099,23 @@ def test_a_real_decision_about_an_agenda_item_is_not_mistaken_for_a_copy():
         assert M.looks_copied_from_context({"text": text, "segment_ids": ids},
                                            ctx, by), \
             f"從背景抄的沒被擋下來：{text!r}"
+
+
+def test_a_failed_summary_does_not_carry_the_exception_text():
+    """摘要寫不出來時，**例外的原文不可以進結果**（CodeQL 抓到的）。
+
+    這份結果會回給使用者、存檔、匯出；語言模型呼叫的例外常帶著模型伺服器的
+    內部位址。原因只寫進記錄，結果裡只放一個固定的代碼。
+    """
+    import json
+
+    def failing(prompt: str) -> str:
+        if "請寫一段" in prompt:
+            raise RuntimeError("connect to http://10.9.8.7:11434/v1 refused")
+        return _fake_model(prompt)
+
+    got = M.full_analysis([seg(1, "那就改用立信，時程比較重要")], failing)
+    blob = json.dumps(got.to_public(), ensure_ascii=False)
+    assert "10.9.8.7" not in blob and "refused" not in blob, "例外原文跑進結果了"
+    assert got.summary.get("error") == "llm_failed"
+    assert got.items["decisions"], "摘要失敗不可以讓其他結果消失"

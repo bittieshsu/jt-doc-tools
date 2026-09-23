@@ -77,6 +77,8 @@
 .ms-prev-row { display:grid; grid-template-columns:52px 96px 1fr; gap:10px;
                padding:7px 12px; font-size:13px; border-bottom:1px solid #f1f5f9; }
 .ms-prev-row:last-child { border-bottom:0; }
+.ms-prev-more { padding:9px 12px; background:#eff6ff; color:#1e3a8a; font-size:13px;
+                text-align:center; border-top:1px dashed #bfdbfe; }
 .ms-seq { color:#94a3b8; font-variant-numeric:tabular-nums; }
 .ms-spk { color:#4338ca; font-weight:600; overflow:hidden; text-overflow:ellipsis; }
 @media (max-width:640px){ .ms-prev-row { grid-template-columns:44px 1fr; }
@@ -373,7 +375,10 @@
         <select id="msShape" class="field"></select>
         <span class="muted" id="msShapeNote"></span>
       </div>
-      <p class="muted" id="msPrevNote"></p>
+      {# 「這裡只是前幾段」要**明顯**（v1.16.10，使用者要求）—— 原本是一行灰色小字，
+         使用者會以為整份逐字稿只讀到這幾段。框在上面講一次，清單最後一列再講一次
+         （使用者是捲到清單尾巴才下判斷的，文件翻譯那次學到的）。 #}
+      <div class="info-box" id="msPrevNote"></div>
       <div class="ms-prev" id="msPrev"></div>
       <div class="ms-actions">
         <button type="button" class="btn btn-primary" id="msStart">
@@ -490,6 +495,17 @@
     showParsed(await r.json());
   }
 
+  // **從別的工具轉送過來的**（網址帶 `from_ws` / `from_job`）：解析完直接捲到「開始分析」
+  // （使用者 2026-09-23：從轉逐字稿送過來時，上面的上傳區與背景欄位都不用再看）。
+  // **一定要在 `new FileUpload` 之前讀** —— 它接手之後會把這兩個參數從網址清掉。
+  // 只捲一次：之後換排法、重新上傳都不該讓畫面自己跳走。
+  var scrollToStartOnce = (function () {
+    try {
+      var q = new URLSearchParams(window.location.search);
+      return q.has('from_ws') || q.has('from_job');
+    } catch (_e) { return false; }
+  })();
+
   var fu = new FileUpload(el('msUp'), async function (_f, fs) {
     var file = Array.isArray(fs) ? fs[0] : fs;
     uploadId = null;
@@ -510,15 +526,24 @@
     if (d.has_times) el('msDur').textContent = mmss(d.duration_ms);
     el('msNoTimes').hidden = !!d.has_times;
     el('msNoSpk').hidden = d.speakers.length > 0;
-    el('msPrevNote').textContent =
-      tr('下面是前 {0} 段 —— 先確認發言者與斷句是對的，再開始分析。')
-        .replace('{0}', String(d.preview.length));
+    var shown = d.preview.length, total = Number(d.segments) || shown;
+    el('msPrevNote').textContent = shown < total
+      ? tr('這裡只列出前 {0} 段（整份共 {1} 段）—— 分析會用整份逐字稿。先確認發言者與斷句是對的，再開始分析。')
+          .replace('{0}', String(shown)).replace('{1}', String(total))
+      : tr('以下是全部 {0} 段 —— 先確認發言者與斷句是對的，再開始分析。')
+          .replace('{0}', String(total));
     var html = '';
     d.preview.forEach(function (s) {
       html += '<div class="ms-prev-row"><span class="ms-seq">' + esc(s.seq) + '</span>'
             + '<span class="ms-spk">' + esc(s.speaker || '') + '</span>'
             + '<span>' + esc(s.text || '') + '</span></div>';
     });
+    if (shown < total) {
+      html += '<div class="ms-prev-more">'
+            + esc(tr('…後面還有 {0} 段沒有列出，分析時會一併處理')
+                    .replace('{0}', String(total - shown)))
+            + '</div>';
+    }
     el('msPrev').innerHTML = html;
     // 用了哪一種排法 —— 判斷錯時使用者可以自己改（伺服器端是唯一來源）
     var sel = el('msShape');
@@ -541,6 +566,10 @@
       : '';
     el('msParsed').hidden = false;
     el('msResult').hidden = true;
+    if (scrollToStartOnce) {
+      scrollToStartOnce = false;
+      el('msStart').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
   }
 
   // 換排法就用同一份原始資料重新解析一次
@@ -1015,7 +1044,8 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ map: map || {}, overrides: overrides || {} })
     });
-    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('名字存不起來'))); }
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('名字存不起來'))); return null; }
+    return await r.json();
   }
 
   // 點名字 → 就地改。**不要用 prompt()** —— 那個沒辦法同時問「範圍」，
@@ -1059,7 +1089,16 @@
       msSpkOrder = [];
       renderScript();
       drawCharts();                      // 發言佔比那張圖跟著換名字
-      await msSaveSpeakers(map, ov);
+      // **其他區塊也要跟著換**（v1.16.10，使用者回報）：卡片的「負責：S1」、
+      // 內文裡的 S1、摘要、心智圖、「誰講了多少」。改名由伺服器端改那份存下來的
+      // 分析結果（`_rename_in_result`），這裡拿回整份重畫 —— 不在前端另外補一份。
+      var resp = await msSaveSpeakers(map, ov);
+      if (resp && resp.result) {
+        result = resp.result;
+        if (Array.isArray(resp.segments)) segments = resp.segments;
+        msSpkOrder = [];
+        render();
+      }
     }
     inp.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); commit(); }

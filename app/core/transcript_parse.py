@@ -65,15 +65,17 @@ def _ms(text: str) -> Optional[int]:
     return None
 
 
-_ARROW = re.compile(r"\s*-->\s*")
+#: WebVTT / SRT 的時間軸箭頭（`00:00:01.000 --> 00:00:06.000`）。
+#: **用字串切，不用正規式** —— 寫成正規式的話 CodeQL 會把它當成「過濾 HTML 註解」
+#: 的寫法報成 High（`-->` 剛好也是 HTML 註解的結尾）。這支剖析器一個 HTML 都不碰。
+_ARROW = "-->"
 
 
 def _cue_times(line: str) -> Optional[tuple[int, int]]:
-    if "-->" not in line:
+    head, arrow, tail = line.strip().partition(_ARROW)
+    if not arrow:
         return None
-    parts = _ARROW.split(line.strip(), 1)
-    if len(parts) != 2:
-        return None
+    parts = [head.strip(), tail.strip()]
     a = _ms(parts[0])
     # 結束時間後面可能跟著 VTT 的排版設定（`align:start position:10%`）
     b = _ms(parts[1].split()[0]) if parts[1].split() else None
@@ -289,6 +291,19 @@ def parse_json(data: bytes) -> list[dict]:
         obj = json.loads(data.decode("utf-8", "replace"))
     except ValueError as e:
         raise TranscriptError(f"JSON 讀不進來：{e}") from e
+    # **發言者改名要跟著走**（v1.16.10，使用者回報）：「會議錄音轉逐字稿」存的 JSON 帶著
+    # `speaker_names`（S1 → 陳協理，整位改）與 `speaker_overrides`（第 N 段 → 名字，
+    # 只改那一段）。原本這裡只讀每一段的 `speaker`，於是在轉逐字稿改好的名字，
+    # 轉送到會議摘要之後全部變回 S1、S2 —— 而轉送那側的說明還寫著「走的是同一份資料」。
+    names: dict = {}
+    overrides: dict = {}
+    if isinstance(obj, dict):
+        if isinstance(obj.get("speaker_names"), dict):
+            names = {str(k): str(v).strip() for k, v in obj["speaker_names"].items()
+                     if str(v or "").strip()}
+        if isinstance(obj.get("speaker_overrides"), dict):
+            overrides = {str(k): str(v).strip() for k, v in obj["speaker_overrides"].items()
+                         if str(v or "").strip()}
     if isinstance(obj, dict):
         for key in ("segments", "final_segments", "raw_segments", "data"):
             if isinstance(obj.get(key), list):
@@ -308,8 +323,12 @@ def parse_json(data: bytes) -> list[dict]:
             continue
         seg: dict = {"text": text}
         sp = row.get("speaker") or row.get("speaker_id")
-        if sp:
-            seg["speaker"] = str(sp)
+        # 單段的改名優先，其次整位的改名（跟轉逐字稿畫面上的 `speakerName()` 同一個順序）
+        named = overrides.get(str(row.get("seq"))) if row.get("seq") is not None else None
+        if not named and sp:
+            named = names.get(str(sp))
+        if named or sp:
+            seg["speaker"] = str(named or sp)
         for src, dst in (("start_ms", "start_ms"), ("end_ms", "end_ms"),
                          ("start", "start_ms"), ("end", "end_ms")):
             if dst in seg or row.get(src) is None:

@@ -940,7 +940,8 @@ def analyse(segments: Sequence[dict],
             second_pass: bool = True,
             with_impacts: bool = True,
             context: Optional[str] = None,
-            progress: Optional[Callable[[int, int], None]] = None) -> Result:
+            progress: Optional[Callable[[int, int], None]] = None,
+            on_phase: Optional[Callable[[str, int, int], None]] = None) -> Result:
     """`ask(prompt) -> 模型回覆`。抽成參數是為了測試，
     但**品質一定要拿真的模型量** —— 假模型只驗得到我們自己的程式。"""
     by_seq = {int(s["seq"]): s for s in segments}
@@ -953,6 +954,8 @@ def analyse(segments: Sequence[dict],
     for win in wins:
         if progress:
             progress(win.index + 1, len(wins))
+        if on_phase:
+            on_phase("extract", win.index + 1, len(wins))
         try:
             raw = ask(build_prompt(win, context))
         except Exception as e:            # noqa: BLE001
@@ -989,6 +992,8 @@ def analyse(segments: Sequence[dict],
     if second_pass:
         if progress:
             progress(len(wins) + 1, len(wins) + 1)
+        if on_phase:
+            on_phase("review", 1, 1)
         res.items, cut = review(res.items, by_seq, ask, kinds=MAIN_KINDS)
         res.dropped.extend(cut)
 
@@ -999,6 +1004,9 @@ def analyse(segments: Sequence[dict],
     if with_impacts:
         imp: list[dict] = []
         for win in wins:
+            # 這一輪的呼叫數跟主路徑一樣多 —— 不回報的話進度條會在同一格停很久
+            if on_phase:
+                on_phase("impacts", win.index + 1, len(wins))
             try:
                 raw = ask(build_impact_prompt(win, context))
             except Exception as e:                       # noqa: BLE001
@@ -1021,6 +1029,8 @@ def analyse(segments: Sequence[dict],
                                         "reason": chk.reason})
         res.items["impacts"] = merge_kind(imp)
         if second_pass and res.items["impacts"]:
+            if on_phase:
+                on_phase("impacts_review", 1, 1)
             only, cut = review({"impacts": res.items["impacts"]}, by_seq, ask,
                                kinds=("impacts",), rules=_IMPACT_REVIEW_RULES)
             res.items["impacts"] = only.get("impacts") or []
@@ -1476,7 +1486,9 @@ def build_summary(chapters: list[dict], items: dict,
         raw = ask(build_summary_prompt(chapters, items))
     except Exception as e:                      # noqa: BLE001
         logger.warning("會議分析：摘要失敗：%s", e)
-        return {"text": "", "grounded": True, "unsupported": [], "error": str(e)}
+        # **例外原文不可以放進結果** —— 這份結果會回給使用者（也會存檔、匯出），
+        # 而語言模型呼叫的例外常帶著模型伺服器的內部位址。原因只寫進記錄。
+        return {"text": "", "grounded": True, "unsupported": [], "error": "llm_failed"}
 
     txt = ""
     m = re.search(r"\{.*\}", re.sub(r"<0x[0-9A-Fa-f]{2}>", "", raw or ""), re.S)
@@ -1515,6 +1527,21 @@ class Analysis:
 #: 整條管線的階段。**進度要說得出在做什麼** —— 三小時的會議跑好幾分鐘，
 #: 只顯示百分比的話使用者不知道是在跑還是卡住（本專案記過很多次）。
 STAGES = ("擷取重點", "複審", "切章節", "寫摘要")
+#: 「事件與影響」自己一輪（呼叫數跟擷取重點一樣多）。
+STAGE_IMPACTS = "整理「事件與影響」"
+ALL_STAGES = STAGES[:2] + (STAGE_IMPACTS,) + STAGES[2:]
+
+
+def progress_message(name: str, i: int, n: int) -> str:
+    """進度列上的那一句。**樣板只能是 `PROGRESS_TEMPLATES` 裡那幾種** ——
+    前端的 `tr()` 查不到時會把數字換成 `{0}` `{1}` 再查一次，
+    所以這裡多一種寫法，英 / 日介面就會冒出中文。"""
+    return f"{name} {i}/{n}" if n > 1 else name
+
+
+#: 伺服器送出的每一種進度訊息（`test_i18n_dynamic_labels` 逐條對語系檔）。
+PROGRESS_TEMPLATES = ALL_STAGES + tuple(
+    f"{s} {{0}}/{{1}}" for s in (STAGES[0], STAGE_IMPACTS))
 
 
 def full_analysis(segments: Sequence[dict], ask: Callable[[str], str], *,
@@ -1524,7 +1551,8 @@ def full_analysis(segments: Sequence[dict], ask: Callable[[str], str], *,
                   second_pass: bool = True,
                   with_impacts: bool = True,
                   context: Optional[str] = None,
-                  on_stage: Optional[Callable[[str, int, int], None]] = None
+                  on_stage: Optional[Callable[[str, int, int], None]] = None,
+                  on_progress: Optional[Callable[[float, str], None]] = None
                   ) -> Analysis:
     """逐字稿 → 摘要 ／ 決議 ／ 待辦 ／ 風險 ／ 未決問題 ／ 章節 ／ 心智圖。
 
@@ -1541,26 +1569,59 @@ def full_analysis(segments: Sequence[dict], ask: Callable[[str], str], *,
         calls["n"] += 1
         return ask(prompt)
 
-    def stage(name: str, i: int, n: int) -> None:
+    # **進度照「還要呼叫幾次模型」分配**（v1.16.10，使用者回報「寫摘要還沒完成，
+    # 進度條卻已經全滿」）。原本每一階段各佔四分之一、而且回報的是「開始第 i 件」
+    # 卻當成「做完第 i 件」算 —— 寫摘要一開始就是 100%；複審與「事件與影響」
+    # 那一整輪（呼叫數跟擷取一樣多）根本沒有回報，進度條在 25% 停很久。
+    # 回報的是**開始**第 i 件，所以完成的是 i - 1 件；完成之前永遠不到 1.0。
+    n_win = max(1, len(make_windows(segments, window_chars=window_chars,
+                                    overlap_chars=overlap_chars)))
+    n_chap = max(1, len(make_windows(segments,
+                                     window_chars=DEFAULT_CHAPTER_WINDOW_CHARS,
+                                     overlap_chars=0)))
+    plan = [("extract", STAGES[0], n_win)]
+    if second_pass:
+        plan.append(("review", STAGES[1], 1))
+    if with_impacts:
+        plan.append(("impacts", STAGE_IMPACTS, n_win))
+        if second_pass:
+            plan.append(("impacts_review", STAGES[1], 1))
+    plan += [("chapters", STAGES[2], n_chap), ("summary", STAGES[3], 1)]
+    total = float(sum(w for _k, _n, w in plan))
+    offset: dict[str, float] = {}
+    acc = 0.0
+    for key, _name, w in plan:
+        offset[key] = acc
+        acc += w
+    names = {key: name for key, name, _w in plan}
+    weights = {key: w for key, _name, w in plan}
+
+    def phase(key: str, i: int, n: int) -> None:
+        name = names.get(key)
+        if name is None:
+            return
         if on_stage:
             on_stage(name, i, n)
+        if on_progress:
+            done = weights[key] * (max(0, i - 1) / max(1, n))
+            on_progress(min(0.99, (offset[key] + done) / total),
+                        progress_message(name, i, n))
 
     res = analyse(segments, counted, window_chars=window_chars,
                   overlap_chars=overlap_chars, threshold=threshold,
                   second_pass=second_pass, with_impacts=with_impacts,
-                  context=context,
-                  progress=lambda i, n: stage(STAGES[0], i, n))
+                  context=context, on_phase=phase)
 
     out = Analysis(items=res.items, dropped=res.dropped, stats=res.stats)
 
-    stage(STAGES[2], 1, 1)
+    phase("chapters", 1, 1)
     try:
         out.chapters = build_chapters(segments, counted)
     except Exception as e:                      # noqa: BLE001
         logger.warning("會議分析：章節整段失敗，其餘結果照常：%s", e)
         out.chapters = []
 
-    stage(STAGES[3], 1, 1)
+    phase("summary", 1, 1)
     out.summary = build_summary(out.chapters, out.items, counted)
     out.mindmap = build_mindmap(out.chapters, out.items)
     out.charts = suitable_charts(out.chapters, out.items, out.stats)

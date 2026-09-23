@@ -58,16 +58,50 @@ _POLL_FLOOR_S = 15 * 60.0
 #: 前面排一場 3 小時的中文會議要等約 18～30 分鐘，超過 15 分鐘的下限，碰到就會被
 #: 我們誤判逾時、還主動請對方取消。先多給 60 分鐘（前面排兩場長會議也撐得住）：
 #: 真的卡住要晚一小時才發現，但那只是等久一點；誤殺是整件白做。
-#: 對方上線 `progress.waiting` 之後改成「排隊不計入上限」，這一段就拿掉。
+#:
+#: **對方 api_revision 2.2（2026-09-23 上線）起不再需要**：排隊時 `progress.waiting`
+#: 有值，排隊時間直接不算進上限（見 `_run_job`）。這個寬限只留給**回應裡完全沒有
+#: `waiting` 這個鍵**的舊版服務。
 _QUEUE_GRACE_S = 60 * 60.0
 
+#: 排隊的**總**上限。排隊時間不算進處理上限，但不可以無限期排下去 ——
+#: GPU 伺服器掛住時，前面的作業永遠不會做完，我們這件會一直佔著一個「外部服務」名額。
+#: 對方單件錄音上限 6 小時、GPU 一次一件；4 小時是「前面排了好幾場長會議」也撐得住的長度。
+_QUEUE_CAP_S = 4 * 3600.0
 
-def _deadline_s(total_audio_ms: Optional[float]) -> float:
-    """從送件起算，最多等多久（秒）。輪詢迴圈的兩處都走這一支，不要各算一次。"""
+# 伺服器端產生、送到前端再翻譯的訊息（背景執行緒裡沒有 request，不知道使用者的語言）。
+# **前端 `tr()` 會把連續數字換成 `{0}` `{1}` 再查** —— 所以這幾句的鍵是下面的樣板，
+# 一律寫成常數，翻譯守門（`test_i18n_dynamic_labels`）才掃得到。
+_MSG_QUEUED_AHEAD = "排隊中（前面還有 {0} 件）"
+_MSG_CORRECTING_ITEMS = "校正中（已完成 {0} / {1} 批）"
+_MSG_QUEUE_FULL = "對方佇列滿了，{0} 秒後再試"
+_MSG_TIMEOUT = ("等了 {0} 分鐘，對方還沒有回報結果 —— 已經請對方取消。"
+                "請確認 jtlw 那側的佇列與工作機狀態。")
+_MSG_QUEUE_CAP = ("排隊超過 {0} 小時還沒輪到 —— 已經請對方取消。"
+                  "請稍後再送一次，或請語音服務那側確認佇列狀態。")
+PROGRESS_TEMPLATES = (_MSG_QUEUED_AHEAD, _MSG_CORRECTING_ITEMS, _MSG_QUEUE_FULL,
+                      _MSG_TIMEOUT, _MSG_QUEUE_CAP)
+
+
+def _work_budget_s(total_audio_ms: Optional[float]) -> float:
+    """處理本身最多花多久（秒）：15 分鐘與錄音長度的一半取大。**不含排隊。**"""
     work = _POLL_FLOOR_S
     if isinstance(total_audio_ms, (int, float)) and total_audio_ms > 0:
         work = max(_POLL_FLOOR_S, float(total_audio_ms) / 1000.0 * _POLL_FACTOR)
-    return work + _QUEUE_GRACE_S
+    return work
+
+
+def _deadline_s(total_audio_ms: Optional[float]) -> float:
+    """**舊版服務**（回應裡沒有 `waiting`）從送件起算最多等多久：處理上限 ＋ 排隊寬限。"""
+    return _work_budget_s(total_audio_ms) + _QUEUE_GRACE_S
+
+
+def _in_queue(info: dict) -> bool:
+    """這一刻對方是不是在排隊（jtlw 自己的佇列，或 GPU 伺服器的隊伍）。"""
+    if str(info.get("status") or "") == "queued":
+        return True
+    prog = info.get("progress")
+    return isinstance(prog, dict) and isinstance(prog.get("waiting"), dict)
 
 #: 佇列滿了最多重送幾次（依對方回的 `retry_after_ms` 等待）。
 _QUEUE_RETRIES = 3
@@ -276,6 +310,10 @@ def _assemble(client: jtlw_client.JtlwClient, remote_id: str,
     return out
 
 
+class TranscribeTimeout(RuntimeError):
+    """等太久（含排隊超過上限）。同步 API 要回 504，跟「對方說失敗了」分開。"""
+
+
 def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) -> None:
     meta = json.loads(_meta_path(upload_id).read_text(encoding="utf-8"))
     client = jtlw_client.JtlwClient()
@@ -300,7 +338,7 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
             except (TypeError, ValueError):
                 wait_ms = 0
             delay = min(60.0, max(5.0, wait_ms / 1000.0))
-            job.message = f"對方佇列滿了，{int(delay)} 秒後再試"
+            job.message = _MSG_QUEUE_FULL.format(int(delay))
             logger.info("jtlw queue_full，%.0f 秒後重送（第 %d 次）", delay, attempt + 1)
             time.sleep(delay)
     remote_id = str(created.get("job_id") or "")
@@ -313,21 +351,40 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
     # 不是整次生成」那一條）：對方卡住的話，我們這件作業會永遠輪詢下去，
     # 而症狀是「進度不動、不會失敗」——本專案最難查的那一類。
     #
-    # 上限照對方清單第 6 節：**含校正 = 音訊長度 × 0.5，下限 15 分鐘**，
-    # 再加排隊寬限（見 `_QUEUE_GRACE_S`）。音訊長度要等對方開始處理才知道
-    # （`progress.total_audio_ms`），所以先用下限，拿到長度再放寬。
+    # 上限照對方清單第 6 節：**含校正 = 音訊長度 × 0.5，下限 15 分鐘**。
+    # 音訊長度要等對方開始處理才知道（`progress.total_audio_ms`），先用下限。
+    #
+    # **排隊時間不算進上限**（對方 api_revision 2.2 起 `progress.waiting` 在 GPU
+    # 排隊時有值）：上一輪看到在排隊，這一段等待就記進 `queued_s`。排隊另有總上限
+    # （`_QUEUE_CAP_S`）。回應裡**從沒出現過 `waiting` 這個鍵**的是舊版服務 ——
+    # 分不出排隊與卡住，退回「從送件起算 ＋ 60 分鐘寬限」。
+    #
+    # **不拿「進度多久沒動」當取消條件**：對方說輪到之後 `waiting` 會晚幾秒才消失、
+    # 校正只在每批做完時更新、長會議的間隔沒量過 —— 用停多久來判卡住會誤殺長會議。
     started = time.monotonic()
-    deadline = started + _deadline_s(None)
+    last = started
+    queued_s = 0.0
+    in_queue = False
+    knows_waiting = False
+    total_ms: Optional[float] = None
     while True:
-        if time.monotonic() > deadline:
+        now = time.monotonic()
+        if in_queue:
+            queued_s += now - last
+        last = now
+        if knows_waiting:
+            timed_out = (now - started - queued_s) > _work_budget_s(total_ms)
+        else:
+            timed_out = (now - started) > _deadline_s(total_ms)
+        over_cap = queued_s > _QUEUE_CAP_S
+        if timed_out or over_cap:
             try:
                 client.cancel(remote_id)
             except jtlw_client.JtlwError:
                 logger.warning("逾時後取消 jtlw 作業 %s 失敗", remote_id, exc_info=True)
-            raise RuntimeError(
-                f"等了 {int((time.monotonic() - started) / 60)} 分鐘，"
-                "對方還沒有回報結果 —— 已經請對方取消。"
-                "請確認 jtlw 那側的佇列與工作機狀態。")
+            if over_cap:
+                raise TranscribeTimeout(_MSG_QUEUE_CAP.format(int(_QUEUE_CAP_S / 3600)))
+            raise TranscribeTimeout(_MSG_TIMEOUT.format(int((now - started) / 60)))
         if getattr(job, "cancelled", False):
             # **取消要真的傳過去** —— 只停輪詢的話對方照樣算完，
             # GPU 白燒（同「中止請求不等於中止工作」那條）。
@@ -344,10 +401,13 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
         pct = _percent(info)
         if pct is not None:
             job.progress = max(0.02, min(0.95, pct))
-        total_ms = ((info.get("progress") or {}).get("total_audio_ms")
-                    if isinstance(info.get("progress"), dict) else None)
-        if isinstance(total_ms, (int, float)) and total_ms > 0:
-            deadline = started + _deadline_s(total_ms)
+        prog = info.get("progress") if isinstance(info.get("progress"), dict) else {}
+        reported = prog.get("total_audio_ms")
+        if isinstance(reported, (int, float)) and reported > 0:
+            total_ms = reported
+        if "waiting" in prog:
+            knows_waiting = True
+        in_queue = _in_queue(info)
         job.message = _stage_label(info)
         if status in _TERMINAL:
             break
@@ -460,9 +520,22 @@ def _stage_label(info: dict) -> str:
     status = str(info.get("status") or "")
     if status == "queued":
         pos = info.get("queue_position")
-        return f"排隊中（前面還有 {pos} 件）" if pos else "排隊中"
+        return _MSG_QUEUED_AHEAD.format(pos) if pos else "排隊中"
     prog = info.get("progress")
-    stage = str((prog or {}).get("stage") or "") if isinstance(prog, dict) else ""
+    if not isinstance(prog, dict):
+        return "處理中"
+    # GPU 伺服器的隊伍（api_revision 2.2）：`status` 維持 running，排隊寫在這裡。
+    # `ahead` 含別人的作業、含正在跑的那一件。
+    waiting = prog.get("waiting")
+    if isinstance(waiting, dict):
+        ahead = waiting.get("ahead")
+        return (_MSG_QUEUED_AHEAD.format(ahead)
+                if isinstance(ahead, int) and ahead > 0 else "排隊中")
+    stage = str(prog.get("stage") or "")
+    if stage == "correction":
+        done, total = prog.get("items_done"), prog.get("items_total")
+        if isinstance(done, int) and isinstance(total, int) and total > 0:
+            return _MSG_CORRECTING_ITEMS.format(done, total)
     return _STAGES.get(stage, stage or "處理中")
 
 
@@ -571,8 +644,28 @@ async def api_meeting_transcribe(request: Request,
         result_path = None
         result_filename = ""
 
-    _run_job(_Sync(), file_id, _normalize_language(language), n)
+    # **失敗要照「是誰的問題」回狀態碼**（v1.16.10）。原本 `JtlwError` 沒人接，
+    # 一律冒成 500 —— 而 API 手冊寫的是「對方不支援的語言回 400」。
+    # 500 會讓呼叫端以為服務壞了而一直重試，其實是他送的參數要改。
+    try:
+        _run_job(_Sync(), file_id, _normalize_language(language), n)
+    except jtlw_client.JtlwUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except jtlw_client.JtlwError as exc:
+        # 呼叫端自己帶的參數被對方退回 → 他要改的是參數
+        if exc.field in _CALLER_FIELDS:
+            raise HTTPException(400, str(exc)) from exc
+        raise HTTPException(502, str(exc)) from exc
+    except TranscribeTimeout as exc:
+        raise HTTPException(504, str(exc)) from exc
+    except RuntimeError as exc:
+        # 對方回報辨識失敗、結果是空的 —— 是上游的結果，不是我們壞了
+        raise HTTPException(502, str(exc)) from exc
     return _read_json(_out_path(file_id), "逐字稿")
+
+
+#: 同步 API 裡**呼叫端自己帶的**參數 —— 對方退回這幾個欄位時回 400。
+_CALLER_FIELDS = frozenset({"language", "num_speakers"})
 
 
 #: **`@router.get` 不會自動加 HEAD**（Starlette 的 `Route` 會，FastAPI 不會）。

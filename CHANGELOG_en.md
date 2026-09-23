@@ -5,9 +5,109 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (838 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (839 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
+
+---
+
+## [1.16.10] - 2026-09-23
+
+### Meeting transcription: queueing is visible, and queue time no longer counts towards the limit
+
+Since the speech service upgrade on 2026-09-23, a job waiting in the GPU queue reports how many are
+ahead, and recognition and correction progress now moves.
+
+* While queued the page shows "Queued (N ahead)" (the count includes other people's jobs); during
+  correction it shows how many batches are done.
+* **Time spent queued no longer counts towards the waiting limit**: the limit only starts once the
+  job's turn comes (the larger of 15 minutes and half the recording length). A job behind several long
+  meetings is no longer cancelled by mistake, and the extra 60-minute queue allowance is gone.
+* The queue itself has an overall cap (4 hours), so a stuck GPU server cannot hold a slot forever.
+* **How long progress stays still is not used to cancel**: the service explained that the queue marker
+  lingers for a few seconds after the job's turn comes, correction only updates per batch, and long
+  meetings were not measured, so a stall rule would kill long meetings by mistake.
+* Speech services that have not been upgraded (no queue field in the response) keep the old behaviour.
+* Also fixed: a few messages sent by the server ("queue is full, trying again in N s", "waited N
+  minutes…") always showed in Chinese in the English and Japanese interfaces because the catalogues
+  had no entries for them. They are translated now and covered by the translation guard.
+
+### Meeting transcription: Detect automatically only listens to the start
+
+The speech service measured it: Detect automatically **does not decide per segment**. It listens to
+about the first 30 seconds of speech and uses that language for the whole recording. A meeting that is
+mostly Chinese but where someone speaks English first (20 seconds is enough) is recognised in English
+throughout, and the error rate on Chinese sentences goes from 15% to 88%. **Silence, background noise
+and music without vocals at the start do not matter** (the parts with no speech are filtered out first),
+so there is no need to trim them. Choosing the language is never worse than detecting it (when detection
+guesses right, the results are identical).
+
+* The note on the language option now says this, and the "more accurate" wording added in v1.16.9 is
+  gone: the real difference is not guessing the whole meeting wrong.
+* For meetings that alternate between Chinese and English sentences, pick the language used most; whole
+  sentences in the other language are mostly not recognised correctly, while English terms inside
+  Chinese sentences are fine.
+* The troubleshooting page has a new entry for a Chinese meeting recognised as English throughout, and
+  the queueing entry was rewritten for the new behaviour.
+
+### Meeting transcription: the waveform tooltip shows who is speaking
+
+The time label next to the cursor on the waveform now also shows the speaker at that moment (a dot in
+the same colour as the transcript, and the renamed name if the speaker was renamed). In a gap between
+segments it shows only the time rather than guessing; where two people overlap it shows the one who
+started later.
+
+### Meeting summary: renaming a speaker updates every section
+
+Previously only the transcript showed the new name; the action cards still said "Owner: S1", and the
+summary and the "Who spoke how much" table kept the old code.
+
+* Cards (owner and text), the summary, chapters, the mind map and "Who spoke how much" now follow the
+  rename, and so do the downloads.
+* In free text only **code-shaped** names (`S1`, `SPEAKER_00`) are replaced; a real name is only
+  replaced where the whole field equals it, and `S12` is never cut down by renaming `S1`.
+* "Who spoke how much" is recomputed from the renamed transcript: renaming a single segment moves that
+  segment's turns and time, and giving two codes the same name merges them into one person.
+* Renaming a single segment leaves the codes in cards and the summary alone, since `S1` there means the
+  whole person.
+
+### From meeting transcription to meeting summary: renamed speakers carry over
+
+Speaker names changed in the transcription tool used to turn back into `S1` after sending the
+transcript to the meeting summary. They now carry over (including single-segment renames), and the
+page scrolls straight to "Start the analysis".
+
+### Meeting summary: the progress bar was full while the summary was still being written
+
+Each of the four stages took a quarter of the bar and "starting item N" was counted as "item N done",
+so the bar hit 100% as soon as the summary started. The review pass and the whole "events and impact"
+round (as many model calls as extraction) did not report progress either.
+
+* Progress is now split by how many model calls are left, every stage reports, and **the bar does not
+  reach 100% before the job is done**.
+* The progress text was always Chinese in the English and Japanese interfaces; it is translated now.
+
+### Meeting summary: the preview after upload says clearly that it only lists the first segments
+
+It used to be a line of small grey text, easy to read as "only these segments were loaded". It is now a
+highlighted box that says how many segments the transcript has, how many are listed and that the
+analysis uses all of them, and the last row of the list repeats how many are not shown.
+
+### Meeting transcription: the synchronous API returned 500 when the speech service refused the request
+
+`POST /tools/meeting-transcribe/api/meeting-transcribe` returned 500 whenever the speech service
+rejected a request, while the API manual says 400. A 500 makes callers retry as if the service were
+broken. It now answers by cause: 400 when a parameter you sent is rejected, 502 when the speech service
+fails the job, 503 when it is not set up or cannot be reached, 504 when it takes too long. The web page
+path is not affected. The API manual now also says that Detect automatically only listens to the start.
+
+### Scan cleanup: the preview sometimes did not load, or showed an older result
+
+Every preview of a page was written to the same file. Dragging the corners or rotating fires several
+requests; the page cancels the older ones, but the server still finished them and wrote the same file
+later, so the newest preview was replaced by an older one (while the status line described the newer
+one), or the browser read a half-written file and the right side stayed empty. Each preview now gets its
+own file, is swapped in only when complete, and only the latest few are kept.
 
 ---
 
