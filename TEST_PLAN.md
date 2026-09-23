@@ -543,7 +543,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **340 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **341 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -747,6 +747,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_office_source_validation.py` | 辦公文件的**來源檔**壞掉時，要在送進 soffice 之前就擋下來 |
 | `test_office_timeout_kills_the_whole_tree.py` | soffice 逾時要殺掉**整棵行程樹**，不是只殺我們拿到的那個 PID |
 | `test_office_xml_namespaces.py` | 文件翻譯寫回檔案時，**命名空間的前綴與宣告要照原檔** |
+| `test_one_download_button_per_result.py` | 同一份結果只放一顆下載鈕（v1.16.14） |
 | `test_one_label_can_map_to_several_keys.py` | 一個標籤對應到**多個** canonical key 是刻意支援的，不要「修掉」 |
 | `test_one_shared_browser_probe.py` | 無頭瀏覽器的設定只能有**一份** |
 | `test_one_shared_lightbox.py` | 放大檢視（lightbox）只留一份共用實作 |

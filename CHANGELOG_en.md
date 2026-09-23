@@ -5,11 +5,27 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (842 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (843 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.14] - 2026-09-23
+
+### Document translation and PDF compression: one download button when the job finishes
+
+When these two tools finished, the progress bar at the top showed a download button and the result
+area below had another one. Both gave the same file with the same name, which made them look like two
+different things.
+
+* The one in the result area is gone; downloading always uses the row at the top ("Download / Save to
+  workspace / Process another file"), the same place as in every other tool.
+* Document translation keeps the "Download the translated file (N pages)" button where the preview
+  stops. It only appears when the document has more pages than the preview, so that "the preview shows
+  the first pages" is not mistaken for "only the first pages were translated".
+* An automatic check now requires any tool that uses the shared progress bar and adds its own download
+  button to hide the shared one, so new tools do not end up with two.
 
 ## [1.16.13] - 2026-09-23
 

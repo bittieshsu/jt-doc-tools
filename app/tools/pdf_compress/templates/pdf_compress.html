@@ -184,9 +184,7 @@
     <span class="saved">{{ tr('省下') }} <span id="rPct">—</span></span>
   </div>
   <div class="bar"><div id="rBar" data-s="s9c33ea5e"></div></div>
-  <div data-s="s5371db16">
-    <a class="btn btn-primary" id="rDownload" href="#">{{ icon('download') }} {{ tr('下載壓縮後的 PDF') }}</a>
-  </div>
+  {# 下載走上面進度列那一排，這裡不再放第二顆 —— 兩顆拿到的是同一個檔（v1.16.14） #}
 </div>
 
 {% endblock %}
@@ -266,7 +264,6 @@ const jp = new JobProgress($('cmpJob'), {
     $('rNew').textContent = fmt(sm.final_size);
     $('rPct').textContent = sm.saved_pct + '%';
     $('rBar').style.width = Math.min(100, Math.max(0, sm.saved_pct)) + '%';
-    $('rDownload').href = `/api/jobs/${jobData.id}/download`;
     $('resultPanel').hidden = false;
     $('resultPanel').scrollIntoView({behavior:'smooth', block:'end'});
   },

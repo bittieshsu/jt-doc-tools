@@ -166,7 +166,8 @@
 <div class="panel" id="dtResult" hidden>
   <h2 data-s="s_dt_2">{{ tr('2. 結果') }}</h2>
   <p class="muted dt-note" id="dtSummary"></p>
-  <p><a class="btn btn-primary" id="dtDownload" href="#" download>{{ icon('download') }} {{ tr('下載翻譯後的檔案') }}</a></p>
+  {# 下載走上面進度列那一排（「下載 .xlsx / 存至工作區 / 處理新檔案」），這裡不再放第二顆 ——
+     兩顆拿到的是同一個檔，使用者會以為是兩種東西（v1.16.14）。預覽停下來那裡另有一顆，見下方 JS。 #}
   <p class="muted dt-note" id="dtPrevNote"><b>{{ tr('以下只是預覽，不是完整內容') }}</b>{{ tr('——
     為了讓你') }}<b>{{ tr('並排比對版面有沒有跑掉') }}</b>{{ tr('，這裡只算前幾頁的圖（左邊原文、右邊譯文，
     點圖看大圖）。完整內容請按上面的下載鈕。') }}<span id="dtPrevCount"></span></p>
@@ -273,9 +274,6 @@ function showResult(job) {
       sum += '）';
     }
     document.getElementById('dtSummary').textContent = sum;
-    const dl = document.getElementById('dtDownload');
-    dl.href = m.download_url;
-    if (m.download_name) dl.setAttribute('download', m.download_name);
     const grid = document.getElementById('dtPrev');
     grid.textContent = '';
     const n = m.preview_pages || 0;
