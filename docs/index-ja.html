@@ -1000,11 +1000,11 @@
 </section>
 
 <!-- ======== Speech (jtlw) integration ======== -->
-<section id="speech" class="section">
+<section id="speech" class="section section-speech">
   <div class="container">
-    <div class="section-eyebrow">音声サービス連携（任意）</div>
+    <div class="section-eyebrow">音声サービス連携 / 任意（v1.15.94）</div>
     <h2 class="section-title">会議の録音を、そのまま使える議事録に</h2>
-    <p class="section-lede">
+    <p class="section-lead">
       録音は <a href="https://jasoncheng7115.github.io/jt-live-whisper/" target="_blank" rel="noopener">jtlw</a>
       （jt-live-whisper、<b>社内ネットワークに自前で立てられます</b>）へ渡して認識と発言者分離を行います。
       <b>要約・決定事項・タスク・マインドマップ・翻訳はすべて本システムに残ります</b>。
@@ -1012,24 +1012,29 @@
     </p>
 
     <div class="sp-steps">
-      <div class="sp-step"><span class="sp-n">1</span>
-        <b>一度だけ設定</b>
-        <span>管理画面で送信先アドレスと API キーを入力します。自己署名証明書の場合は、証明書を貼り付けるだけです。
-        <b>検証は無効にしないでください</b>設定が済むまで、このツールはグレーアウトのままです。</span></div>
-      <div class="sp-step"><span class="sp-n">2</span>
-        <b>録音をアップロード</b>
-        <span>音声でも動画でも受け付けます。変換が終わったら<b>ワンクリックで「会議要約」へ渡せます</b>。API 経由で他のシステムから利用することもできます。</span></div>
-      <div class="sp-step"><span class="sp-n">3</span>
-        <b>聞きながら読む</b>
-        <span>文字起こしにはタイムスタンプと発言者が付きます。波形をクリックすればその位置から再生され、再生中の行がハイライトされ、
-        発言者の記号をクリックすれば名前に変更できます。</span></div>
+      <div class="sp-step">
+        <div class="sp-head"><span class="sp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></span><span class="sp-n">1</span></div>
+        <h3 class="sp-title">一度だけ設定</h3>
+        <p class="sp-body">管理画面で送信先アドレスと API キーを入力します。自己署名証明書の場合は、証明書を貼り付けるだけです。<b>検証は無効にしないでください</b>。設定が済むまで、このツールはグレーアウトのままです。</p>
+      </div>
+      <div class="sp-step">
+        <div class="sp-head"><span class="sp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14l3-3 3 3" /><path d="M12 11v10" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /><path d="M16 7l-4-4-4 4" /><path d="M12 3v8" /></svg></span><span class="sp-n">2</span></div>
+        <h3 class="sp-title">録音をアップロード</h3>
+        <p class="sp-body">音声でも動画でも受け付けます。変換が終わったら<b>ワンクリックで「会議要約」へ渡せます</b>。API 経由で他のシステムから利用することもできます。</p>
+      </div>
+      <div class="sp-step">
+        <div class="sp-head"><span class="sp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l13 8-13 8V4z" /></svg></span><span class="sp-n">3</span></div>
+        <h3 class="sp-title">聞きながら読む</h3>
+        <p class="sp-body">文字起こしにはタイムスタンプと発言者が付きます。波形をクリックすればその位置から再生され、再生中の行がハイライトされ、
+        発言者の記号をクリックすれば名前に変更できます。</p>
+      </div>
     </div>
 
     <div class="sp-facts">
-      <div><b>28.3 分を 112 秒で</b><span>実時間の 15 倍速（実測）</span></div>
-      <div><b>差は 0.12 ポイント</b><span>公開コーパスの正解データで測定。パイプライン全体の数値と、音声サービス自身が測定した数値はほぼ一致しました</span></div>
-      <div><b>短時間有効な署名付き URL</b><span>録音ファイルはこの方式で受け渡します。アカウントや資格情報を相手に渡す必要はなく、期限が来れば自動的に失効します</span></div>
-      <div><b>引用は発言箇所の番号に紐づく</b><span>校正のやり直しや用語集の更新のあとも、すでに作成された決定事項やタスクは同じ音声箇所を指し続けます</span></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 18a9 9 0 1 1 17 0" /><path d="M12 18l4.8-5.4" /><circle cx="12" cy="18" r="1.3" fill="currentColor" stroke="none" /><path d="M4.6 12.4l1.6.9M12 6.5V8.4M19.4 12.4l-1.6.9" /></svg></span><div><b>28.3 分を 112 秒で</b><span class="sp-fdesc">実時間の 15 倍速（実測）</span></div></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><rect x="7" y="12" width="3" height="6" /><rect x="12" y="8" width="3" height="10" /><rect x="17" y="4" width="3" height="14" /></svg></span><div><b>差は 0.12 ポイント</b><span class="sp-fdesc">公開コーパスの正解データで測定。パイプライン全体の数値と、音声サービス自身が測定した数値はほぼ一致しました</span></div></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></span><div><b>短時間有効な署名付き URL</b><span class="sp-fdesc">録音ファイルはこの方式で受け渡します。アカウントや資格情報を相手に渡す必要はなく、期限が来れば自動的に失効します</span></div></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5L12 19.5a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5L10 17.5a2 2 0 0 1-3-3L15 6" /></svg></span><div><b>引用は発言箇所の番号に紐づく</b><span class="sp-fdesc">校正のやり直しや用語集の更新のあとも、すでに作成された決定事項やタスクは同じ音声箇所を指し続けます</span></div></div>
     </div>
 
     <p class="sp-foot">設定しなければ従来どおりで、<b>他の 49 個のツールにはまったく影響しません</b>。</p>

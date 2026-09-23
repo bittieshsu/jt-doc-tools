@@ -195,7 +195,16 @@ def _shape(s: str):
     return (tags, sorted(_HREF.findall(s)))
 
 
-@pytest.mark.parametrize("cat", ["index.en.json", "api.en.json", "readme.en.json"])
+#: **每一份文件語系檔、每一種語言都要驗**。原本只列了介紹站 / API 手冊 / README 的
+#: **英文版** —— 疑難排解頁與全部日文版都不在範圍內，於是英文疑難排解頁的第一則
+#: 從上線起標題就只剩「Upgrade stops at」、症狀那一行顯示成標題（譯文錯位貼到下一條鍵，
+#: 行內標籤數對不上，這條本來一眼就抓得到）—— 2026-09-23 加 jtlw 疑難排解時才發現。
+#: 範圍太窄跟沒有守門一樣；語言清單照慣例從 `_locales()` 讀，不寫死。
+_ALL_CATALOGUES = [f"{n}.{lang}.json" for lang in _locales()
+                   for n in ("index", "api", "readme", "troubleshooting")]
+
+
+@pytest.mark.parametrize("cat", _ALL_CATALOGUES)
 def test_translation_keeps_the_same_inline_tags_and_links(cat: str):
     data = json.loads((DOCS / "i18n" / cat).read_text(encoding="utf-8"))
     bad = [k for k, v in data.items() if v and _shape(k) != _shape(v)]
@@ -233,7 +242,7 @@ def _generator():
     return mod
 
 
-@pytest.mark.parametrize("name", ["index", "api"])
+@pytest.mark.parametrize("name", ["index", "api", "troubleshooting"])
 @pytest.mark.parametrize("lang", _locales())
 def test_no_block_starts_with_punctuation_unless_the_chinese_one_does(
         name: str, lang: str):
@@ -260,7 +269,7 @@ def test_no_block_starts_with_punctuation_unless_the_chinese_one_does(
         f"譯文貼錯鍵或句子被切碎了（第 {bad[:5]} 個區塊）")
 
 
-@pytest.mark.parametrize("cat", ["index.en.json", "api.en.json", "readme.en.json"])
+@pytest.mark.parametrize("cat", _ALL_CATALOGUES)
 def test_no_pure_punctuation_keys(cat: str):
     """整段只有標點的片段不可以進語系檔。
 

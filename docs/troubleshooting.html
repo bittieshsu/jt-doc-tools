@@ -70,6 +70,15 @@
     <a href="#office">缺 Office 引擎 / 中文變方框</a>
     <a href="#csrf">遠端使用者一上傳就 CSRF 失敗</a>
   </div>
+  <div class="ts-toc">
+    <span class="ts-toc-label">語音服務（jtlw）</span>
+    <a href="#jtlw-connect">連不上 jtlw / 連 jtlw 逾時</a>
+    <a href="#jtlw-key">jtlw 不接受這把金鑰</a>
+    <a href="#jtlw-allow">對方不接受我們這台的位址</a>
+    <a href="#jtlw-fetch">對方拉不到錄音檔 / 網址已經過期</a>
+    <a href="#jtlw-wait">進度不動、等了很久被取消</a>
+    <a href="#jtlw-grey">會議錄音轉逐字稿是反灰的</a>
+  </div>
 
   <section class="ts-item" id="tags">
     <h2>升級停在 <code>git fetch failed</code>（<code>would clobber existing tag</code>）</h2>
@@ -182,6 +191,74 @@
       <code>{HTTPS}</code> 翻成 <code>https</code>/<code>http</code>），
       或直接把站台改成 HTTPS。範例見
       <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener">OPS.md</a>。</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-connect">
+    <h2>「連不上 jtlw」或「連 jtlw 逾時」</h2>
+    <p class="ts-sym"><b>症狀</b>　語音服務設定頁按「測試連線」失敗；辨識模式的下拉顯示
+      「讀不到清單：連不上 jtlw」；或送出錄音時失敗。</p>
+    <p><b>原因</b>　送件位址填錯（主機、埠、<code>http</code> / <code>https</code>）、防火牆擋住、
+      對方的服務沒起來 —— <b>也可能是憑證驗證失敗</b>：對方用自簽憑證時，連線在 TLS 那一步就被拒，
+      畫面上一樣只寫「連不上」。</p>
+    <p><b>怎麼辦</b>　送件位址照對方給的整串貼（例：<code>https://主機:8790/api/v1</code>）。
+      在本系統那台機器上試 <code>curl https://主機:8790/api/v1/health</code>：
+      連不到就是網路或位址的問題；加上 <code>-k</code> 才連得到就是<b>憑證</b>的問題 ——
+      把對方的憑證（PEM）貼進「對方的憑證」欄位，<b>跟對方公布的 SHA-256 指紋核對過</b>再存。
+      <b>不要用關閉驗證來繞過</b>：每次送件都會把金鑰交出去，關掉驗證之後任何人都能冒充對方。</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-key">
+    <h2>「jtlw 不接受這把金鑰（401 / 403）」</h2>
+    <p class="ts-sym"><b>症狀</b>　「測試連線」或送件時出現這句話。</p>
+    <p><b>原因</b>　金鑰打錯、被對方撤銷，或貼成了整條標頭。只測對方的健康檢查是看不出來的
+      —— 那一支不驗金鑰，所以「測試連線」會另外用金鑰問一次。</p>
+    <p><b>怎麼辦</b>　「API 金鑰」只貼金鑰本身（對方給的那一串）；
+      <code>Authorization: Bearer</code> 這條標頭由本系統自己組（貼了前綴也會自動去掉）。
+      確認無誤還是 401 / 403，就請對方確認這把金鑰是否仍然有效。</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-allow">
+    <h2>「對方不接受我們這台的位址 —— 請管理員把『錄音檔對外位址』給對方加進允許清單」</h2>
+    <p class="ts-sym"><b>症狀</b>　送出錄音後失敗，訊息結尾附著一個主機名稱。</p>
+    <p><b>原因</b>　語音服務只從允許清單上的位址拉錄音檔，而本系統的「錄音檔對外位址」不在清單上。</p>
+    <p><b>怎麼辦</b>　把訊息結尾的那個主機名稱交給語音服務的管理員加進允許清單。
+      <b>換過「錄音檔對外位址」也要請對方一起加</b> —— 同一套服務可能有內網直連與反向代理兩種到達方式，
+      填哪一個，對方看到的就是哪一個。</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-fetch">
+    <h2>「對方連不到我們的錄音檔位址」或「網址已經過期」</h2>
+    <p class="ts-sym"><b>症狀</b>　送出錄音後失敗，訊息是「對方連不到我們的錄音檔位址」、
+      「對方來拉錄音檔時網址已經過期 —— 多半是排隊太久」，或「對方來拉錄音檔時被我們擋掉了（401 / 403）」。</p>
+    <p><b>原因</b>　錄音檔不是本系統推過去的，是<b>對方回頭來拉</b>：本系統交給對方一個短效的簽章網址
+      （<code>/api/speech/audio/…?exp=…&amp;sig=…</code>，免登入、到期自動失效）。
+      「錄音檔對外位址」填成只有瀏覽器那台才連得到的名稱（例如 <code>localhost</code>）、
+      中間的防火牆或反向代理擋住、或反向代理前面加了登入驗證，對方都拉不到。</p>
+    <p><b>怎麼辦</b>　「錄音檔對外位址」要填<b>從語音服務那台連得到</b>的位址（設定頁不會從瀏覽器的網址推算，
+      那樣推錯的話會「有些人可以、有些人不行」）。反向代理前面有 SSO / Kerberos 之類的登入驗證時，
+      <code>/api/speech/audio/</code> 這一段要放行 —— 它本身已經用簽章把關。
+      「網址已經過期」通常是排太久或重試太久，重新送一次即可。</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-wait">
+    <h2>進度一直不動，或「等了 N 分鐘，對方還沒有回報結果 —— 已經請對方取消」</h2>
+    <p class="ts-sym"><b>症狀</b>　轉逐字稿送出後進度條很久不動；最後失敗並顯示上面那句話。
+      也可能直接看到「對方的佇列滿了，請稍後再送一次」。</p>
+    <p><b>原因</b>　語音服務的 GPU <b>一次只處理一件、其餘排隊</b>。排隊時與辨識中，對方回報的進度都不會動
+      —— 所以「進度不動」本身不代表卡住。本系統等待對方回報有一個上限（從送出那一刻起算，
+      取 15 分鐘與錄音長度的一半兩者較大的那個），前面剛好排著很長的會議時，可能在排隊中就超過上限，
+      本系統會請對方取消這一件。</p>
+    <p><b>怎麼辦</b>　重新送一次；很長的錄音避開別人正在送長會議的時段。
+      一直發生的話請語音服務那側確認佇列與 GPU 伺服器的狀態。</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-grey">
+    <h2>「會議錄音轉逐字稿」是反灰的，或顯示「還沒設定語音服務（jtlw）」</h2>
+    <p class="ts-sym"><b>症狀</b>　側欄與首頁的那支工具點不下去；打開工具頁只看到一句設定提示。</p>
+    <p><b>原因</b>　這支工具依賴外部的語音服務，管理區沒有啟用、或送件位址與金鑰沒填完整時一律反灰
+      —— 刻意的，免得出現一個看起來正常、按下去才失敗的上傳區。</p>
+    <p><b>怎麼辦</b>　到管理區「語音服務（jtlw）」勾選啟用，填好送件位址、API 金鑰與錄音檔對外位址，
+      按「測試連線」確認之後儲存。其他 49 支工具不受影響。</p>
   </section>
 
   <section class="ts-item" id="more">

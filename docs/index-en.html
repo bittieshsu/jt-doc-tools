@@ -1000,11 +1000,11 @@
 </section>
 
 <!-- ======== Speech (jtlw) integration ======== -->
-<section id="speech" class="section">
+<section id="speech" class="section section-speech">
   <div class="container">
-    <div class="section-eyebrow">Speech integration (optional)</div>
+    <div class="section-eyebrow">Speech integration, optional (v1.15.94)</div>
     <h2 class="section-title">Turn a meeting recording into minutes you can actually use</h2>
-    <p class="section-lede">
+    <p class="section-lead">
       The recording goes to <a href="https://jasoncheng7115.github.io/jt-live-whisper/" target="_blank" rel="noopener">jtlw</a>
       (jt-live-whisper, <b>which you can host on your own network</b>) for recognition and speaker separation;
       <b>the summary, decisions, action items, mind map and translation all stay in this system</b>.
@@ -1012,24 +1012,29 @@
     </p>
 
     <div class="sp-steps">
-      <div class="sp-step"><span class="sp-n">1</span>
-        <b>Set it up once</b>
-        <span>Fill in the endpoint and API key in the admin area. For a self-signed certificate, just paste the certificate in:
-        <b>do not turn verification off</b>. Until it is set up, the tool stays greyed out.</span></div>
-      <div class="sp-step"><span class="sp-n">2</span>
-        <b>Upload the recording</b>
-        <span>Audio or video, both accepted. Once it is done, <b>hand it to Meeting summary in one click</b>, or go through the API so another system can pick it up.</span></div>
-      <div class="sp-step"><span class="sp-n">3</span>
-        <b>Listen and read together</b>
-        <span>The transcript carries timings and speakers: click the waveform to play from there, the matching line lights up as it plays, and
-        clicking a speaker code renames them.</span></div>
+      <div class="sp-step">
+        <div class="sp-head"><span class="sp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></span><span class="sp-n">1</span></div>
+        <h3 class="sp-title">Set it up once</h3>
+        <p class="sp-body">Fill in the endpoint and API key in the admin area. For a self-signed certificate, just paste the certificate in: <b>do not turn verification off</b>. Until it is set up, the tool stays greyed out.</p>
+      </div>
+      <div class="sp-step">
+        <div class="sp-head"><span class="sp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14l3-3 3 3" /><path d="M12 11v10" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /><path d="M16 7l-4-4-4 4" /><path d="M12 3v8" /></svg></span><span class="sp-n">2</span></div>
+        <h3 class="sp-title">Upload the recording</h3>
+        <p class="sp-body">Audio or video, both accepted. Once it is done, <b>hand it to Meeting summary in one click</b>, or go through the API so another system can pick it up.</p>
+      </div>
+      <div class="sp-step">
+        <div class="sp-head"><span class="sp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l13 8-13 8V4z" /></svg></span><span class="sp-n">3</span></div>
+        <h3 class="sp-title">Listen and read together</h3>
+        <p class="sp-body">The transcript carries timings and speakers: click the waveform to play from there, the matching line lights up as it plays, and
+        clicking a speaker code renames them.</p>
+      </div>
     </div>
 
     <div class="sp-facts">
-      <div><b>28.3 minutes in 112 seconds</b><span>15x faster than real time (measured)</span></div>
-      <div><b>0.12 of a percentage point apart</b><span>Measured against the reference answers of a public corpus; our whole pipeline and the speech service's own figure are all but identical</span></div>
-      <div><b>Short-lived signed URLs</b><span>This is how the recording is handed over: no account or credential is given to the other side, and the link expires by itself</span></div>
-      <div><b>Citations are bound to segment numbers</b><span>After a re-run of the correction step or a glossary update, decisions and action items that were already produced still point back to the same piece of audio</span></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 18a9 9 0 1 1 17 0" /><path d="M12 18l4.8-5.4" /><circle cx="12" cy="18" r="1.3" fill="currentColor" stroke="none" /><path d="M4.6 12.4l1.6.9M12 6.5V8.4M19.4 12.4l-1.6.9" /></svg></span><div><b>28.3 minutes in 112 seconds</b><span class="sp-fdesc">15x faster than real time (measured)</span></div></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><rect x="7" y="12" width="3" height="6" /><rect x="12" y="8" width="3" height="10" /><rect x="17" y="4" width="3" height="14" /></svg></span><div><b>0.12 of a percentage point apart</b><span class="sp-fdesc">Measured against the reference answers of a public corpus; our whole pipeline and the speech service's own figure are all but identical</span></div></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></span><div><b>Short-lived signed URLs</b><span class="sp-fdesc">This is how the recording is handed over: no account or credential is given to the other side, and the link expires by itself</span></div></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5L12 19.5a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5L10 17.5a2 2 0 0 1-3-3L15 6" /></svg></span><div><b>Citations are bound to segment numbers</b><span class="sp-fdesc">After a re-run of the correction step or a glossary update, decisions and action items that were already produced still point back to the same piece of audio</span></div></div>
     </div>
 
     <p class="sp-foot">Leave it unset and nothing changes: <b>the other 49 tools are entirely unaffected</b>.</p>

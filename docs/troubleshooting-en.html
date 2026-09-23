@@ -46,7 +46,7 @@
 </header>
 <main class="container ts-main">
   <h1 class="ts-h1">Install & upgrade troubleshooting</h1>
-  <p class="ts-lead">Every entry below <b>actually happened</b> — symptom, cause, what to do.</p>
+  <p class="ts-lead">Every entry below <b>actually happened</b>: symptom, cause, what to do. The install scripts and <code>jtdt update</code> print this page's address when they fail.</p>
 
   <div class="ts-search">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
@@ -58,7 +58,7 @@
   <p class="ts-empty" id="tsEmpty" hidden>Nothing matched. Try a word from the error message itself (for example <code>fetch failed</code>).</p>
 
   <div class="ts-toc">
-    <a href="#tags"> The install scripts and <code>jtdt update</code> print this page's address when they fail. <code>git fetch failed</code></a>
+    <a href="#tags">Upgrade stops at <code>git fetch failed</code></a>
     <a href="#health">Health check timed out</a>
     <a href="#tls">CERTIFICATE_VERIFY_FAILED</a>
     <a href="#nogit">An install without git cannot update</a>
@@ -69,10 +69,19 @@
     <a href="#office">Missing Office engine / Chinese renders as boxes</a>
     <a href="#csrf">Remote users fail CSRF on upload</a>
   </div>
+  <div class="ts-toc">
+    <span class="ts-toc-label">Speech service (jtlw)</span>
+    <a href="#jtlw-connect">Cannot reach jtlw / timed out</a>
+    <a href="#jtlw-key">jtlw rejects the API key</a>
+    <a href="#jtlw-allow">Our address is not on their allow list</a>
+    <a href="#jtlw-fetch">They cannot fetch the recording / link expired</a>
+    <a href="#jtlw-wait">No progress, then cancelled after a long wait</a>
+    <a href="#jtlw-grey">Meeting recording to transcript is greyed out</a>
+  </div>
 
   <section class="ts-item" id="tags">
-    <h2>Upgrade stops at</h2>
-    <p class="ts-sym">Upgrade stops at <code>git fetch failed</code> (<code>would clobber existing tag</code>)</p>
+    <h2>Upgrade stops at <code>git fetch failed</code> (<code>would clobber existing tag</code>)</h2>
+    <p class="ts-sym"><b>Symptom</b>　<code>jtdt update</code> prints <code>git fetch failed</code> and stops; the service is rolled back to the previous version, with no hint as to why.</p>
     <p><b>Cause</b>　This project's git history was rewritten on 2026-09-13 (to remove a piece of data that should never have been committed), so every tag now points at a new commit. While the local tags still point at the old ones, <code>git fetch --tags</code> (without <code>--force</code>) reports <code>would clobber existing tag</code> for each and exits with <b>code 1</b>.</p>
     <p><b>What to do</b>　Run this once and it is fixed for good (it only touches refs inside <code>.git</code> — <b>your data is never touched</b>):</p>
     <div class="cmd-block">
@@ -144,7 +153,49 @@
     <h2>Remote users get "CSRF token missing or incorrect" as soon as they upload</h2>
     <p class="ts-sym"><b>Symptom</b>　Everything works when tested on the server itself; only connections from another machine fail. Sign-in may also bounce back to the login page.</p>
     <p><b>Cause</b>　The reverse proxy sets <code>X-Forwarded-Proto</code> to a fixed <code>https</code> while the site is actually http — so the backend marks cookies <code>Secure</code> and the browser drops them over plain http. <code>http://localhost</code> is a secure-origin exception, which is why it cannot be reproduced on the server itself.</p>
-    <p><b>What to do</b>　Make the reverse proxy pass the real protocol (on IIS, use a <code>rewriteMap</code> to translate <code>{HTTPS}</code> into <code>https</code>/<code>http</code>), or serve the site over HTTPS. Examples are in</p>
+    <p><b>What to do</b>　Make the reverse proxy pass the real protocol (on IIS, use a <code>rewriteMap</code> to translate <code>{HTTPS}</code> into <code>https</code>/<code>http</code>), or serve the site over HTTPS. Examples are in <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener">OPS.md</a>.</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-connect">
+    <h2>“Cannot reach the speech service” or a connection timeout</h2>
+    <p class="ts-sym"><b>Symptom</b>　“Test the connection” fails on the speech service settings page; the recognition profile dropdown shows “Could not read the list: Cannot reach the speech service”; or submitting a recording fails.</p>
+    <p><b>Cause</b>　The endpoint is wrong (host, port, <code>http</code> or <code>https</code>), a firewall is in the way, or their service is down. <b>It can also be certificate verification</b>: when they use a self-signed certificate, the connection is refused at the TLS step, and the screen still only says it cannot reach them.</p>
+    <p><b>What to do</b>　Paste the endpoint exactly as they gave it (for example <code>https://host:8790/api/v1</code>). On the machine running this system, try <code>curl https://host:8790/api/v1/health</code>: if it cannot connect, the problem is the network or the address; if it only connects with <code>-k</code>, the problem is the <b>certificate</b>. Paste their certificate (PEM) into “Their certificate”, and save only after <b>checking it against the SHA-256 fingerprint they publish</b>. <b>Do not work around it by turning verification off</b>: every submission hands over the API key, and with verification off anyone can impersonate them.</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-key">
+    <h2>“The speech service rejected this API key (401 / 403)”</h2>
+    <p class="ts-sym"><b>Symptom</b>　This message appears when testing the connection or submitting.</p>
+    <p><b>Cause</b>　The key is mistyped, was revoked on their side, or was pasted as a whole header. Their health check cannot reveal this because it does not check the key; that is why “Test the connection” also asks once with the key.</p>
+    <p><b>What to do</b>　Put only the key itself in “API key” (the string they gave you); this system builds the <code>Authorization: Bearer</code> header itself (a pasted prefix is removed automatically). If it is still 401 / 403 after checking, ask them to confirm the key is still valid.</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-allow">
+    <h2>“The speech service does not accept this machine's address. Ask your administrator to add the public address for recordings to its allow list.”</h2>
+    <p class="ts-sym"><b>Symptom</b>　Submitting a recording fails, and the message ends with a host name.</p>
+    <p><b>Cause</b>　The speech service only fetches recordings from addresses on its allow list, and this system's audio base address is not on it.</p>
+    <p><b>What to do</b>　Give the host name at the end of the message to the speech service administrator to add to the allow list. <b>If you change the audio base address, ask them to add the new one too</b>: the same system may be reachable both directly on the internal network and through a reverse proxy, and whichever one you fill in is the one they see.</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-fetch">
+    <h2>“Could not reach our recording URL” or “the link had already expired”</h2>
+    <p class="ts-sym"><b>Symptom</b>　Submitting a recording fails with “The speech service could not reach our recording URL”, “The link had already expired when the speech service came to fetch the recording”, or “We rejected the speech service when it came to fetch the recording (401 / 403)”.</p>
+    <p><b>Cause</b>　The recording is not pushed to them; <b>they come back and fetch it</b>. This system hands them a short-lived signed URL (<code>/api/speech/audio/…?exp=…&amp;sig=…</code>, no sign-in, expires by itself). If the audio base address is a name only the browser machine can reach (such as <code>localhost</code>), a firewall or reverse proxy is in the way, or the reverse proxy puts a sign-in in front, they cannot fetch it.</p>
+    <p><b>What to do</b>　Fill in an audio base address that is <b>reachable from the speech service machine</b> (the settings page never derives it from the browser address; guessing wrong would make it work for some people and not others). If the reverse proxy puts SSO, Kerberos or another sign-in in front, let <code>/api/speech/audio/</code> through; it is already protected by the signature. An expired link usually means it waited or retried too long; submit again.</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-wait">
+    <h2>Progress does not move, or “waited N minutes with no result; asked them to cancel”</h2>
+    <p class="ts-sym"><b>Symptom</b>　After submitting, the progress bar stays still for a long time and the job finally fails with the message above. You may also see “The speech service queue is full. Please submit again later.”</p>
+    <p><b>Cause</b>　The speech service GPU <b>handles one job at a time and queues the rest</b>. While queued and while recognising, the progress they report does not move, so a still progress bar does not by itself mean it is stuck. This system waits for them up to a limit (counted from submission: the larger of 15 minutes and half the recording length); when a very long meeting happens to be ahead in the queue, the limit can pass while still queued, and this system asks them to cancel the job.</p>
+    <p><b>What to do</b>　Submit again; for very long recordings, avoid times when someone else is sending a long meeting. If it keeps happening, ask the speech service side to check the queue and the GPU server.</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-grey">
+    <h2>Meeting recording to transcript is greyed out, or says “The speech service is not set up yet”</h2>
+    <p class="ts-sym"><b>Symptom</b>　The tool cannot be opened from the sidebar or the home page; opening its page only shows a setup notice.</p>
+    <p><b>Cause</b>　The tool depends on an external speech service. While it is not enabled in the admin area, or the endpoint and API key are incomplete, it stays greyed out on purpose, so there is never an upload box that looks normal and only fails after you press it.</p>
+    <p><b>What to do</b>　In the admin area, open Speech service (jtlw), tick enable, fill in the endpoint, API key and audio base address, press “Test the connection”, then save. The other 49 tools are not affected.</p>
   </section>
 
   <section class="ts-item" id="more">

@@ -1037,11 +1037,11 @@
 </section>
 
 <!-- ======== Speech (jtlw) integration ======== -->
-<section id="speech" class="section">
+<section id="speech" class="section section-speech">
   <div class="container">
-    <div class="section-eyebrow">語音整合（選用）</div>
+    <div class="section-eyebrow">語音整合 / 選用（v1.15.94）</div>
     <h2 class="section-title">會議錄音變成可以拿去用的會議記錄</h2>
-    <p class="section-lede">
+    <p class="section-lead">
       錄音交給 <a href="https://jasoncheng7115.github.io/jt-live-whisper/" target="_blank" rel="noopener">jtlw</a>
       （jt-live-whisper，<b>可自架在內網</b>）做辨識與發言者分離；
       <b>摘要、決議、待辦、心智圖與翻譯全部留在本系統</b>。
@@ -1049,25 +1049,31 @@
     </p>
 
     <div class="sp-steps">
-      <div class="sp-step"><span class="sp-n">1</span>
-        <b>設定一次</b>
-        <span>管理區填送件位址與金鑰。自簽憑證把憑證貼進來就好 ——
-        <b>不要關掉驗證</b>。沒設定好時這支工具是反灰的。</span></div>
-      <div class="sp-step"><span class="sp-n">2</span>
-        <b>上傳錄音</b>
-        <span>音訊或影片都收。轉好之後<b>一鍵交給「會議摘要」</b>，
-        也可以走 API 讓別的系統接。</span></div>
-      <div class="sp-step"><span class="sp-n">3</span>
-        <b>邊聽邊看</b>
-        <span>逐字稿帶時間與發言者：點波形就從那裡播、播到哪一段就亮起來、
-        點代號直接改成人名。</span></div>
+      <div class="sp-step">
+        <div class="sp-head"><span class="sp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></span><span class="sp-n">1</span></div>
+        <h3 class="sp-title">設定一次</h3>
+        <p class="sp-body">管理區填送件位址與金鑰。自簽憑證把憑證貼進來就好 ——
+        <b>不要關掉驗證</b>。沒設定好時這支工具是反灰的。</p>
+      </div>
+      <div class="sp-step">
+        <div class="sp-head"><span class="sp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14l3-3 3 3" /><path d="M12 11v10" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /><path d="M16 7l-4-4-4 4" /><path d="M12 3v8" /></svg></span><span class="sp-n">2</span></div>
+        <h3 class="sp-title">上傳錄音</h3>
+        <p class="sp-body">音訊或影片都收。轉好之後<b>一鍵交給「會議摘要」</b>，
+        也可以走 API 讓別的系統接。</p>
+      </div>
+      <div class="sp-step">
+        <div class="sp-head"><span class="sp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l13 8-13 8V4z" /></svg></span><span class="sp-n">3</span></div>
+        <h3 class="sp-title">邊聽邊看</h3>
+        <p class="sp-body">逐字稿帶時間與發言者：點波形就從那裡播、播到哪一段就亮起來、
+        點代號直接改成人名。</p>
+      </div>
     </div>
 
     <div class="sp-facts">
-      <div><b>28.3 分鐘 → 112 秒</b><span>比即時快 15 倍（實測）</span></div>
-      <div><b>差 0.12 個百分點</b><span>拿公開語料的標準答案量，整條管線與語音服務自己量的幾乎一致</span></div>
-      <div><b>短效簽章網址</b><span>錄音檔這樣交付 —— 不必把帳號或憑證給對方，到期自動失效</span></div>
-      <div><b>引用綁段號</b><span>重跑校正或更新詞彙庫之後，已經產生的決議與待辦仍然指得回同一段原音</span></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 18a9 9 0 1 1 17 0" /><path d="M12 18l4.8-5.4" /><circle cx="12" cy="18" r="1.3" fill="currentColor" stroke="none" /><path d="M4.6 12.4l1.6.9M12 6.5V8.4M19.4 12.4l-1.6.9" /></svg></span><div><b>28.3 分鐘 → 112 秒</b><span class="sp-fdesc">比即時快 15 倍（實測）</span></div></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><rect x="7" y="12" width="3" height="6" /><rect x="12" y="8" width="3" height="10" /><rect x="17" y="4" width="3" height="14" /></svg></span><div><b>差 0.12 個百分點</b><span class="sp-fdesc">拿公開語料的標準答案量，整條管線與語音服務自己量的幾乎一致</span></div></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></span><div><b>短效簽章網址</b><span class="sp-fdesc">錄音檔這樣交付 —— 不必把帳號或憑證給對方，到期自動失效</span></div></div>
+      <div class="sp-fact"><span class="sp-ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5L12 19.5a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5L10 17.5a2 2 0 0 1-3-3L15 6" /></svg></span><div><b>引用綁段號</b><span class="sp-fdesc">重跑校正或更新詞彙庫之後，已經產生的決議與待辦仍然指得回同一段原音</span></div></div>
     </div>
 
     <p class="sp-foot">沒設定就跟以前一樣 —— <b>其餘 49 個工具完全不受影響</b>。</p>

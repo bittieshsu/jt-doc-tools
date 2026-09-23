@@ -527,17 +527,11 @@
  "六種匯出": "Six export formats",
  "會議摘要 — 決議與待辦每一條都帶段號可點回逐字稿，含議題時間軸與佔比": "Meeting summary: every decision and action item carries a segment number you can click back to, with a topic timeline and share chart",
  "<b>效果</b>：兩小時的會議，決議與待辦逐條列出來，每一條都查得到是誰在第幾段講的": "<b>Result</b>: for a two-hour meeting, the decisions and action items are listed one by one, and for each one you can look up who said it and where",
- "語音整合（選用）": "Speech integration (optional)",
+ "語音整合 / 選用（v1.15.94）": "Speech integration, optional (v1.15.94)",
  "會議錄音變成可以拿去用的會議記錄": "Turn a meeting recording into minutes you can actually use",
  "錄音交給 <a href=\"https://jasoncheng7115.github.io/jt-live-whisper/\" target=\"_blank\" rel=\"noopener\">jtlw</a>\n      （jt-live-whisper，<b>可自架在內網</b>）做辨識與發言者分離；\n      <b>摘要、決議、待辦、心智圖與翻譯全部留在本系統</b>。\n      <b>聲音不必離開你的網路。</b>": "The recording goes to <a href=\"https://jasoncheng7115.github.io/jt-live-whisper/\" target=\"_blank\" rel=\"noopener\">jtlw</a>\n      (jt-live-whisper, <b>which you can host on your own network</b>) for recognition and speaker separation;\n      <b>the summary, decisions, action items, mind map and translation all stay in this system</b>.\n      <b>The audio never has to leave your network.</b>",
  "設定一次": "Set it up once",
- "管理區填送件位址與金鑰。自簽憑證把憑證貼進來就好 ——": "Fill in the endpoint and API key in the admin area. For a self-signed certificate, just paste the certificate in:",
- "不要關掉驗證": "do not turn verification off",
- "。沒設定好時這支工具是反灰的。": ". Until it is set up, the tool stays greyed out.",
  "上傳錄音": "Upload the recording",
- "音訊或影片都收。轉好之後": "Audio or video, both accepted. Once it is done,",
- "一鍵交給「會議摘要」": "hand it to Meeting summary in one click",
- "，\n        也可以走 API 讓別的系統接。": ", or go through the API so another system can pick it up.",
  "邊聽邊看": "Listen and read together",
  "逐字稿帶時間與發言者：點波形就從那裡播、播到哪一段就亮起來、\n        點代號直接改成人名。": "The transcript carries timings and speakers: click the waveform to play from there, the matching line lights up as it plays, and\n        clicking a speaker code renames them.",
  "28.3 分鐘 → 112 秒": "28.3 minutes in 112 seconds",
@@ -548,5 +542,7 @@
  "錄音檔這樣交付 —— 不必把帳號或憑證給對方，到期自動失效": "This is how the recording is handed over: no account or credential is given to the other side, and the link expires by itself",
  "引用綁段號": "Citations are bound to segment numbers",
  "重跑校正或更新詞彙庫之後，已經產生的決議與待辦仍然指得回同一段原音": "After a re-run of the correction step or a glossary update, decisions and action items that were already produced still point back to the same piece of audio",
- "沒設定就跟以前一樣 —— <b>其餘 49 個工具完全不受影響</b>。": "Leave it unset and nothing changes: <b>the other 49 tools are entirely unaffected</b>."
+ "沒設定就跟以前一樣 —— <b>其餘 49 個工具完全不受影響</b>。": "Leave it unset and nothing changes: <b>the other 49 tools are entirely unaffected</b>.",
+ "管理區填送件位址與金鑰。自簽憑證把憑證貼進來就好 ——\n        <b>不要關掉驗證</b>。沒設定好時這支工具是反灰的。": "Fill in the endpoint and API key in the admin area. For a self-signed certificate, just paste the certificate in: <b>do not turn verification off</b>. Until it is set up, the tool stays greyed out.",
+ "音訊或影片都收。轉好之後<b>一鍵交給「會議摘要」</b>，\n        也可以走 API 讓別的系統接。": "Audio or video, both accepted. Once it is done, <b>hand it to Meeting summary in one click</b>, or go through the API so another system can pick it up."
 }
