@@ -228,7 +228,13 @@
                                      rx: 1.5, fill: cks.colour }));
         var cseq = (c.segment_ids && c.segment_ids[0] != null) ? c.segment_ids[0] : null;
         box.appendChild(text(col2x + 12, cy + 14,
-          cks.label + (cseq != null ? '・' + tr('第 {0} 段').replace('{0}', cseq) : ''),
+          // **兩半都要翻，而且分隔符交給譯文決定** —— `cks.label` 是
+          // 伺服器送來的中文（`data-kinds`），不包 `tr()` 的話英 / 日
+          // 介面下會變成「待辦・Segment 2」這種一半一半的東西。
+          (cseq != null
+            ? tr('{0}・第 {1} 段').replace('{0}', tr(cks.label))
+                                 .replace('{1}', cseq)
+            : tr(cks.label)),
           { 'font-size': 10, fill: cks.colour }));
         wrap(c.label || '', itemChars).forEach(function (ln, i) {
           box.appendChild(text(col2x + 12, cy + 29 + i * LINE_H, ln,

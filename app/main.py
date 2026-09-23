@@ -21,7 +21,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.5"
+VERSION = "1.16.6"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -2175,28 +2175,29 @@ def _unlink_quietly(path: Path) -> None:
 
 
 async def _sweep_temp_files_loop():
-    """Periodically delete files in temp_dir whose mtime is older than
-    ``temp_ttl_seconds``. Each user's upload is keyed by a UUID filename,
-    so this is safe across concurrent users — a file currently being
-    read stays valid even after unlink on POSIX. We skip files modified
-    within the TTL window to avoid deleting in-progress uploads."""
+    """每 30 分鐘清一次暫存區 —— **一律交給 `retention._sweep_temp_dir`**。
+
+    這支原本自己寫了一份清理：固定 2 小時（`config.temp_ttl_seconds`），
+    **不看管理頁的保留期設定、也不認得還在保留期內的作業**。v1.16.6 修
+    「我的作業寫 24 小時、實際 2 小時」時只改了 `retention` 那支，部署到
+    正式機之後，一件 2.1 小時前完成的作業檔案**照樣被這支刪掉** ——
+    測試全綠（測的是另一支），是在正式機上真的去看檔案還在不在才抓到的。
+
+    清理只留一個地方負責（同 job_manager 的 `_forget()` 那條）：兩份邏輯
+    一定會漂，而且漂的那一份會安靜地把另一份的保證吃掉。
+    檔案 I/O 丟到執行緒，不在事件迴圈上跑。
+    """
     import asyncio
-    import time as _time
+    from .core import retention as _ret
     interval = max(60, int(settings.cleanup_interval_seconds))
-    ttl = max(300, int(settings.temp_ttl_seconds))
     while True:
         try:
-            cutoff = _time.time() - ttl
-            removed = 0
-            for p in settings.temp_dir.iterdir():
-                try:
-                    if not p.is_file():
-                        continue
-                    if p.stat().st_mtime < cutoff:
-                        p.unlink(missing_ok=True)
-                        removed += 1
-                except Exception:
-                    continue
+            s = _ret.get()
+            hrs_t, hrs_j = int(s.get("temp_hours") or 0), int(s.get("jobs_hours") or 0)
+            removed = await asyncio.to_thread(
+                _ret._sweep_temp_dir,
+                hrs_t * 3600 if hrs_t > 0 else 0,
+                hrs_j * 3600 if hrs_j > 0 else 0)
             if removed:
                 logger.info("temp sweep: removed %d stale file(s)", removed)
         except Exception as e:  # pragma: no cover

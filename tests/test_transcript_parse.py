@@ -1,6 +1,6 @@
 """逐字稿解析：各種格式進來，段落出去。
 
-**這一層的錯會安靜地毀掉整個會議摘要**：講者判錯 → 語者佔比變垃圾；
+**這一層的錯會安靜地毀掉整個會議摘要**：發言者判錯 → 發言者佔比變垃圾；
 段落切太碎 → 引用指到半句話；讀不到東西卻回空清單 → 分析「成功」產出空摘要，
 而畫面上看起來完全正常。
 """
@@ -43,7 +43,7 @@ def test_vtt_gives_text_speaker_and_times():
     segs, _ = tp.parse(VTT.encode(), "a.vtt")
     assert [s["speaker"] for s in segs] == ["王小明", "李美華"]
     assert segs[0]["start_ms"] == 1000
-    assert segs[0]["end_ms"] == 7000, "同一個講者連續的段落，結束時間要取最後一段的"
+    assert segs[0]["end_ms"] == 7000, "同一個發言者連續的段落，結束時間要取最後一段的"
     assert "預算" in segs[0]["text"]
     assert [s["seq"] for s in segs] == [1, 2]
 
@@ -64,7 +64,7 @@ def test_a_long_gap_stops_the_merge():
 
 def test_srt_parses_and_ignores_the_index_lines():
     segs, _ = tp.parse(SRT.encode(), "a.srt")
-    assert len(segs) == 1                      # 同一段話（沒有講者、時間相鄰）
+    assert len(segs) == 1                      # 同一段話（沒有發言者、時間相鄰）
     assert "1" not in segs[0]["text"].split()  # 序號行不可以變成內容
     assert segs[0]["start_ms"] == 1000 and segs[0]["end_ms"] == 7000
 
@@ -75,7 +75,7 @@ def test_vtt_cue_settings_after_the_end_time_are_ignored():
     assert segs[0]["end_ms"] == 4000
 
 
-# ------------------------------------------------------------------ 講者判定
+# ------------------------------------------------------------------ 發言者判定
 
 def test_a_colon_inside_a_sentence_is_not_a_speaker():
     """**這條是這支解析器最容易錯的地方。**
@@ -93,11 +93,11 @@ def test_a_colon_inside_a_sentence_is_not_a_speaker():
 
 
 def test_a_one_off_prefix_is_kept_in_the_text():
-    """判成不是講者的時候，那段字要**留在內文裡**，不可以吃掉。"""
+    """判成不是發言者的時候，那段字要**留在內文裡**，不可以吃掉。"""
     text = "王小明：各位早。\n注意事項：請準時。\n王小明：開始吧。\n"
     segs, _ = tp.parse(text.encode(), "a.txt")
     joined = " ".join(s["text"] for s in segs)
-    assert "注意事項" in joined, "被判成不是講者的前綴不可以消失"
+    assert "注意事項" in joined, "被判成不是發言者的前綴不可以消失"
 
 
 def test_a_name_that_repeats_is_taken_as_a_speaker():
@@ -123,7 +123,7 @@ def test_plain_text_with_leading_timestamps():
 
 
 def test_plain_text_without_times_still_works():
-    """**沒有時間是正常情況** —— 語者佔比與時間軸自動不出現，不是失敗。"""
+    """**沒有時間是正常情況** —— 發言者佔比與時間軸自動不出現，不是失敗。"""
     segs, _ = tp.parse("第一句話\n第二句話\n第三句話\n".encode(), "a.txt")
     assert len(segs) >= 1
     assert all("start_ms" not in s for s in segs)
@@ -233,7 +233,7 @@ def test_a_one_off_name_is_judged_against_the_names_this_file_already_uses():
 
 
 def test_nothing_is_a_speaker_when_no_name_ever_repeats():
-    """沒有任何名字重複 = 這份檔案根本沒在用「講者：內容」的格式。"""
+    """沒有任何名字重複 = 這份檔案根本沒在用「發言者：內容」的格式。"""
     text = "第一件事：要做 A\n第二件事：要做 B\n第三件事：要做 C\n"
     segs, _ = tp.parse(text.encode(), "a.txt")
     assert all(s.get("speaker") is None for s in segs)
@@ -258,9 +258,9 @@ def test_a_sentence_ending_period_is_still_not_a_name():
 # ------------------------------------------------------------------ 界線：什麼時候不猜
 
 def test_a_transcript_that_already_names_the_speaker_is_never_guessed_at():
-    """**逐字稿自己帶講者時，一個字都不猜。**
+    """**逐字稿自己帶發言者時，一個字都不猜。**
 
-    語者分離（diarization）是語音服務的事 —— 它的產出每一段都帶 `speaker_id`。
+    發言者分離（diarization）是語音服務的事 —— 它的產出每一段都帶 `speaker_id`。
     我們這邊的判斷**只是給「不是語音服務產的」逐字稿用的退路**
     （Teams / Zoom 匯出的字幕、誰打字打出來的 .txt）。
 
@@ -276,7 +276,7 @@ def test_a_transcript_that_already_names_the_speaker_is_never_guessed_at():
          "start_ms": 5000, "end_ms": 8000}]}).encode()
     segs, _ = tp.parse(partner_json, "a.json")
     assert [s["speaker"] for s in segs] == ["S1", "S2"]
-    assert segs[0]["text"] == trap, "帶了講者就不該再去拆前綴"
+    assert segs[0]["text"] == trap, "帶了發言者就不該再去拆前綴"
 
     # ② WebVTT 的 <v>（字幕的標準寫法，也是結構化的）
     vtt = f"WEBVTT\n\n00:00:01.000 --> 00:00:05.000\n<v 王小明>{trap}\n"
@@ -286,8 +286,8 @@ def test_a_transcript_that_already_names_the_speaker_is_never_guessed_at():
 
 
 def test_only_plain_text_falls_back_to_guessing():
-    """反向對照：同一句話，沒有結構化講者時才會走判斷 ——
-    而且這一句**判斷的結果是「不是講者」**（見上面那幾條）。"""
+    """反向對照：同一句話，沒有結構化發言者時才會走判斷 ——
+    而且這一句**判斷的結果是「不是發言者」**（見上面那幾條）。"""
     trap = "我們下週要做三件事：設計、開發、測試"
     segs, _ = tp.parse(f"{trap}\n{trap}\n".encode(), "a.txt")
     assert all(s.get("speaker") is None for s in segs)
@@ -297,7 +297,7 @@ def test_only_plain_text_falls_back_to_guessing():
 # ================================================================== 多種排法
 #
 # 逐字稿的來源很多（會議軟體匯出、語音服務、人工打字），**每一家的排法都不一樣**。
-# 少認一種，那一份的講者就整個不見，而畫面上只顯示「沒有認出任何講者」——
+# 少認一種，那一份的發言者就整個不見，而畫面上只顯示「沒有認出任何發言者」——
 # 看不出是格式沒支援（2026-09-18 使用者回報：時間明明在檔案裡卻說沒有）。
 #
 # 下面每一種都是真的看過的排法。**加新格式時在這裡補一條**。
@@ -334,7 +334,7 @@ def test_every_known_transcript_shape_gets_speakers(shape):
     joined = " ".join(s["text"] for s in segs)
     assert "各位早" in joined or "morning" in joined or "先確認三件事" in joined, \
         f"{shape}：內容掉了"
-    # **講者名字不可以留在內文裡**（留著的話摘要會把它當成句子的一部分）
+    # **發言者名字不可以留在內文裡**（留著的話摘要會把它當成句子的一部分）
     assert "：各位早" not in joined and ": morning" not in joined
 
 
@@ -349,8 +349,8 @@ def test_the_shapes_that_carry_time_really_produce_time(shape):
 def test_markdown_headings_and_the_meeting_header_are_not_speakers():
     """逐字稿前面那段會議資訊（主題／時間／與會人員）**不是發言**。
 
-    不濾掉的話 `## 會議主題`、`* 與會人員` 會各自變成一位「講者」，
-    而它們後面那一大串名單會變成「發言」—— 語者佔比直接報廢。
+    不濾掉的話 `## 會議主題`、`* 與會人員` 會各自變成一位「發言者」，
+    而它們後面那一大串名單會變成「發言」—— 發言者佔比直接報廢。
     """
     text = (
         "## 會議主題：系統升級\n\n"
@@ -367,7 +367,7 @@ def test_markdown_headings_and_the_meeting_header_are_not_speakers():
     spk = {s.get("speaker") for s in segs if s.get("speaker")}
     assert spk == {"PM - 雅婷", "工程 - 凱文"}, f"多認了：{spk}"
     assert not any(s.get("speaker", "").startswith(("#", "*")) for s in segs)
-    # 會議資訊要留著給模型看（誰參加、談什麼），只是沒有講者
+    # 會議資訊要留著給模型看（誰參加、談什麼），只是沒有發言者
     joined = " ".join(s["text"] for s in segs)
     assert "系統升級" in joined and "雅婷" in joined
 
@@ -401,10 +401,10 @@ def test_the_user_can_force_a_shape():
     text = SHAPES["標頭自己一行＋時間"]
     auto, _ = tp.parse(text.encode(), "a.txt")
     assert any(s.get("speaker") for s in auto)
-    # 明講「這份沒有講者」→ 一個都不猜
+    # 明講「這份沒有發言者」→ 一個都不猜
     forced, shape = tp.parse(text.encode(), "a.txt", shape="plain")
     assert shape == "plain"
-    assert all(s.get("speaker") is None for s in forced), "指定 plain 就不該猜講者"
+    assert all(s.get("speaker") is None for s in forced), "指定 plain 就不該猜發言者"
     assert " ".join(s["text"] for s in forced), "內容不可以掉"
 
 

@@ -4,8 +4,8 @@
 1. 每頁的 PNG bytes 全放在一個 list，再做一份 BytesIO 的 zip，再寫一份到磁碟
    —— 一份大文件同時持有三份資料。
 2. `tempfile.mkdtemp(prefix="job_png_")` 建在**系統暫存目錄**，而我們的清理
-   迴圈只掃 `settings.temp_dir`、而且**只刪檔案跳過目錄** → 那些資料夾永遠
-   不會被清。`finally` 裡只有 `pass`。
+   迴圈只掃 `settings.temp_dir`、而且（當時）**只刪檔案跳過目錄** → 那些資料夾
+   永遠不會被清。`finally` 裡只有 `pass`。
 3. 這條路用 `to_thread` 直接跑，**不經過作業佇列的准入判斷**。
 """
 from __future__ import annotations
@@ -65,21 +65,32 @@ def test_the_served_file_is_deleted_after_streaming():
 
 
 def test_the_served_file_is_a_flat_file_in_temp_dir():
-    """清理迴圈**只刪檔案、跳過目錄** —— 產出不可以藏在子資料夾裡。"""
+    """產出平鋪在 temp_dir 底下。
+
+    當初的理由是「清理迴圈**只刪檔案、跳過目錄**」—— v1.16.6 起那支迴圈改走
+    `retention._sweep_temp_dir`，過期的目錄也會清，所以這條限制**可以放寬**了。
+    留著是因為平鋪本身沒有壞處（串流完就刪，中斷的話清理迴圈補刪）。"""
     fn = _func("_served_tmp_path")
     src = ast.get_source_segment(SRC, fn) or ""
     assert "settings.temp_dir /" in src, "產出不是平鋪在 temp_dir 底下"
     assert "mkdtemp" not in src
 
 
-def test_the_sweeper_only_deletes_files_so_the_flat_layout_matters():
-    """把上面那條的前提釘住：掃描迴圈真的跳過目錄。
+def test_the_30_minute_sweeper_is_the_retention_sweeper():
+    """把清理的前提釘住：每 30 分鐘那支迴圈**就是**保留期那一支，沒有自己的一份。
 
-    這條的用意是「如果哪天掃描改成會刪目錄，上面的限制就可以放寬」——
-    不寫下來的話，下一個人看不出為什麼要平鋪。
+    原本這條釘的是「掃描迴圈只刪檔案、跳過目錄」（所以產出要平鋪）。
+    v1.16.6 發現那支迴圈自己寫了一份固定 2 小時的清理、**不看管理頁的保留期
+    設定、也不認得還在保留期內的作業** —— 部署到正式機之後，作業結果照樣
+    2 小時就被刪。改成呼叫 `retention._sweep_temp_dir` 之後它也會清過期目錄，
+    上面那條「要平鋪」的限制就可以放寬了（這條原本寫下來就是為了這一天）。
+
+    **判準是「清理只有一個地方」**：迴圈裡不可以再出現自己的列目錄或刪除。
     """
     src = ast.get_source_segment(SRC, _func("_sweep_temp_files_loop")) or ""
-    assert "is_file()" in src
+    assert "_sweep_temp_dir" in src, "30 分鐘那支沒有走保留期的清理"
+    for own in (".iterdir(", ".unlink(", "rmtree("):
+        assert own not in src, f"30 分鐘那支又自己清了（{own}）—— 兩份清理一定會漂"
 
 
 def test_the_expensive_export_is_capped():

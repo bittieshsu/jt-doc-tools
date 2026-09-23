@@ -1,18 +1,13 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
+{% from "components/jtlw_name.html" import jtlw_name with context %}
 {% block title %}{{ tr('語音服務（jtlw）') }} · {{ app_name }}{% endblock %}
 {% block content %}
-{# 標題列右邊掛全名 —— `jtlw` 是縮寫，管理員要知道自己在設定的是哪一套東西
-   （使用者 2026-09-21 要求）。**產品名不翻譯**（同品牌名那條規則），
-   所以這幾個字是純拉丁字母、不包 `tr()`；旁邊的說明才包。 #}
-<div class="jl-head">
-  <h1>{{ icon('phone', size=22) }} {{ tr('語音服務（jtlw）') }}</h1>
-  <span class="jl-fullname" title="{{ tr('這支整合對接的語音辨識服務') }}">
-    <code>jtlw</code> = <code>jt-live-whisper</code>
-    <a href="https://jasoncheng7115.github.io/jt-live-whisper/" target="_blank" rel="noopener noreferrer">{{ tr('專案說明') }}</a>
-  </span>
-</div>
-<p class="muted">{{ tr('把會議錄音送去 jtlw 轉成逐字稿（含發言者）。摘要、決議、待辦、心智圖與翻譯都留在本系統，不會送出去。') }}</p>
+<h1>{{ icon('phone', size=22) }} {{ tr('語音服務（jtlw）') }}</h1>
+{# 全名與專案說明接在說明那一行後面（使用者 2026-09-21 要求寫出全名；
+   2026-09-23 回報原本放在標題列右上角「根本很難看到」）。
+   元件與工具頁共用 `components/jtlw_name.html`。 #}
+<p class="muted">{{ tr('把會議錄音送去 jtlw 轉成逐字稿（含發言者）。摘要、決議、待辦、心智圖與翻譯都留在本系統，不會送出去。') }} {{ jtlw_name() }}</p>
 
 {# `data-s` 是 CSP 安全的行內樣式替身（generated-inline.css）——
    漏掉的話說明框沒有左側色條、清單也沒有縮排與行高，
@@ -119,8 +114,12 @@
   </p>
   <div class="form-row">
     <label>{{ tr('送出逾時') }}</label>
-    <input class="field" type="number" id="jl-timeout" value="{{ s.request_timeout }}" min="5" max="300" data-s="s1a30558f"> {{ tr('秒（只等對方回應，辨識本身是非同步的）') }}
+    <input class="field field-num" type="number" id="jl-timeout" value="{{ s.request_timeout }}" min="5" max="300">
+    <span class="field-unit">{{ tr('秒') }}</span>
   </div>
+  {# 說明放在欄位下方的說明行 —— 原本是接在輸入框後面的裸文字，正文大小、
+     黑色、擠在右邊，跟同頁其他欄位的說明長得不一樣（使用者 2026-09-23 截圖回報）。 #}
+  <p class="muted jl-hint">{{ tr('只等對方回應的時間；辨識本身是非同步的，不受這個限制。') }}</p>
   <p data-s="s553a645f">
     <button class="btn btn-primary" id="jlSave">{{ icon('save', size=14) }} {{ tr('儲存設定') }}</button>
     <button class="btn" id="jlTest" type="button">{{ icon('refresh', size=14) }} {{ tr('測試連線') }}</button>
@@ -136,13 +135,6 @@
 
 <style nonce="{{ request.state.csp_nonce }}">
   .switch-label { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#374151; }
-  /* 標題與全名同一列，全名靠右。視窗窄的時候讓它換到下一行 —— **不要縮字**，
-     縮到看不清楚就失去掛全名的意義了。 */
-  .jl-head { display:flex; align-items:baseline; justify-content:space-between;
-             gap:12px; flex-wrap:wrap; }
-  .jl-head h1 { margin-bottom:0; }
-  .jl-fullname { font-size:13px; color:#6b7280; white-space:nowrap; }
-  .jl-fullname code { font-size:12px; }
   /* 啟用那一塊：自己一張卡、整塊可點，跟下面的欄位清單分開 */
   .jl-enable-panel { padding:14px 16px; }
   .jl-enable { display:flex; align-items:flex-start; gap:12px; cursor:pointer; }
@@ -156,7 +148,6 @@
   .jl-fp code { font-size:11px; word-break:break-all; }
   .jl-fp b { color:#b45309; margin-left:6px; }
   .jl-hint { margin:-6px 0 12px 116px; font-size:12px; color:#b45309; max-width:60ch; }
-  .jl-fullname a { margin-left:8px; }
   .jl-warn { background:#fef3c7; border:1px solid #fcd34d; border-radius:6px;
              padding:10px 12px; margin-bottom:14px; font-size:13px; color:#78350f; }
   .jl-out { background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px;
@@ -256,7 +247,10 @@ async function loadProfiles() {
   const j = await r.json();
   if (!j.ok || !(j.profiles || []).length) {
     // **不要變成空的下拉** —— 那看起來像「沒有可選的」，而其實是連不上
-    note.textContent = j.error ? tr('讀不到清單：{0}').replace('{0}', j.error)
+    // **伺服器送來的訊息也要過一次 `tr()`** —— 那句話是在請求裡產生的中文，
+    // 直接塞進來的話英 / 日介面會看到一句中文（逐頁掃描 2026-09-23 抓到）。
+    // 查不到就原樣顯示，最壞情況跟現在一樣。
+    note.textContent = j.error ? tr('讀不到清單：{0}').replace('{0}', tr(j.error))
                                : tr('讀不到清單，先維持目前的值');
     return;
   }

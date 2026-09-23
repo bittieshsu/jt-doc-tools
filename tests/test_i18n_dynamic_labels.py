@@ -275,6 +275,60 @@ def _tool_lock_reasons() -> list[str]:
     return out
 
 
+def _transcript_shape_labels() -> list[str]:
+    """逐字稿排法的下拉（`transcript_parse.SHAPES`）。
+
+    **伺服器算出來、JS 建 `<option>`** —— 樣板掃 `<option>` 字面的守門看不到
+    （2026-09-23 用有資料的實例拍英文截圖時，那一排整個是中文）。
+    """
+    from app.core.transcript_parse import SHAPES
+    return list(SHAPES.values())
+
+
+def _transcribe_stage_labels() -> list[str]:
+    """會議錄音轉逐字稿的階段文字（`_STAGES` ＋ 幾句固定的作業訊息）。
+
+    走 `job.message` → `job_progress.js` 的 `tr(j.message)` —— 那條路
+    **只在語系檔裡有這個鍵時才翻得動**，否則安靜地留著中文。
+    """
+    import importlib
+    m = importlib.import_module("app.tools.meeting_transcribe.router")
+    return list(m._STAGES.values()) + ["送件中", "取回逐字稿", "處理中", "排隊中"]
+
+
+def _meeting_kind_labels() -> list[str]:
+    """會議摘要五張卡片的標題（樣板 JS 的 `KINDS` 表）。
+
+    樣板寫的是 `tr(k[1])` —— **引數是變數**，掃字面 `tr('…')` 的守門看不到。
+    """
+    import re as _re
+    src = (REPO / "app" / "tools" / "meeting_summary" / "templates"
+           / "meeting_summary.html").read_text(encoding="utf-8")
+    body = src.split("var KINDS = [", 1)[1].split("];", 1)[0]
+    return _re.findall(r"'([^']*[\u3400-\u9fff][^']*)'", body)
+
+
+def _jtlw_error_texts() -> list[str]:
+    """語音服務回報的失敗原因（`jtlw_client.ERROR_TEXT`）。
+
+    這些字在**背景執行緒**裡產生（那時候沒有 request、不知道使用者的語言），
+    所以只能送中文、由前端翻 —— 語系檔裡沒有就是原樣顯示中文。
+    """
+    from app.core.jtlw_client import ERROR_TEXT
+    return list(ERROR_TEXT.values())
+
+
+def _chart_kind_labels() -> list[str]:
+    """心智圖 / 討論結構上的節點類別（`meeting_charts.KIND_STYLE`）。
+
+    **伺服器用 `data-kinds` 送給前端**，前端畫進 SVG —— 掃字面 `tr('…')`
+    的守門看不到。少包這一層的話，英文介面上會出現「待辦・Segment 2」
+    這種一半中文一半英文的節點（2026-09-23 拍英文截圖時抓到）。
+    """
+    from app.core.meeting_charts import KIND_STYLE
+    return [lab for _c, lab in KIND_STYLE.values() if lab]
+
+
 @pytest.mark.parametrize("name,getter", [
     ("去識別化樣態", _deident_labels),
     ("設定備份的類別", _settings_export_labels),
@@ -294,6 +348,11 @@ def _tool_lock_reasons() -> list[str]:
     ("去識別化的文件語言", _deident_doc_languages),
     ("掃描修正的解析度說明", _straighten_dpi_notes),
     ("工具反灰的理由", _tool_lock_reasons),
+    ("逐字稿的排法", _transcript_shape_labels),
+    ("轉逐字稿的階段", _transcribe_stage_labels),
+    ("會議摘要的卡片分類", _meeting_kind_labels),
+    ("語音服務的失敗原因", _jtlw_error_texts),
+    ("圖上的節點類別", _chart_kind_labels),
 ])
 @pytest.mark.parametrize("locale", _locales())
 def test_dynamic_labels_are_translated(locale: str, name: str, getter):

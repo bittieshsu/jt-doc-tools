@@ -5,9 +5,126 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (834 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (835 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
+
+---
+
+## [1.16.6] - 2026-09-23
+
+### "My jobs" said 24 hours; results were actually cleared after 2
+
+Opening a finished job gave **410 file expired**, while the job list said
+results are kept for 24 hours. On a production instance, a meeting summary
+finished less than five hours earlier still had its job record and a "done"
+status, but its result, transcript and ownership record were already gone.
+
+The **two retention periods did not line up**: every tool keeps its job result,
+and whatever "Open" reads back, in the temporary area (2 hours), while the job
+retention is 24 hours. v1.14.31 made the job-result directory use the job
+retention, **but no tool ever wrote its results there**, so that fix only went
+halfway. This affected **every background job**, not just meeting summaries.
+
+* When the temporary area is cleaned, files that belong to a job still inside
+  its retention (or still running) now follow the job retention: the result,
+  temp files named after the job, and the ownership record.
+* Files are matched by the job id embedded in their names, **not by each tool
+  registering its files**, which the next new tool would forget to do.
+* Old temp files that belong to no job are still cleared after 2 hours (there is
+  a reverse-control test for that).
+* **There were two cleanup paths.** Besides the retention sweep, a 30-minute loop
+  had its own fixed 2-hour rule and **ignored the admin's temp retention setting**.
+  The first version of this fix only changed the former; checking on production
+  after deploying showed a job just over 2 hours old still being cleared by the
+  latter. Both now go through the same code, and the setting actually applies.
+
+> Results that were already cleared cannot be recovered; the fix applies from
+> the upgrade on.
+
+### Layout: stretched number fields, a status split over two lines, a hard-to-find jtlw name
+
+* Five small number fields (the speech service timeout, three workspace
+  settings, the speaker count) stretched across the whole row with their unit
+  pushed to the far right. They now share one fixed-width style.
+* The user list's status could break into two lines when the table got tight;
+  earlier screenshots only ever showed an empty user list. Fixing only that
+  column pushed the squeeze into the next one (a role badge split in two), so
+  both now stay on one line.
+* **jtlw's full name (jt-live-whisper) and its project link** sat in the top
+  right corner of the settings page, and were missing from the transcription
+  tool altogether. Both now follow the description line, from one shared
+  component.
+
+> These are now measured **in a real browser** (field widths, the number of line
+> boxes, visible bounding boxes). The first version of the fix still measured
+> full width on the admin pages, because a higher-specificity rule was the real
+> culprit; the guard also caught itself passing vacuously on a hidden panel.
+
+### Server-side labels in the two meeting tools had never been translated
+
+Caught while taking English screenshots on an instance **with data in it**: the
+transcript-shape dropdown, every stage of the transcription job, the node kinds
+on the mind map and every failure reason the speech service reports were all
+**still Chinese** in the English and Japanese interfaces. What they have in
+common is that the text comes from server data, which the guard that scans for
+literal `tr('…')` calls in templates cannot see.
+
+* 66 entries added to each catalogue.
+* Five sources folded into the "labels computed by the program" guard, each one
+  mutation-verified to redden only its own row.
+* Job **failure text** now goes through `tr()` as well: like the progress
+  message it is Chinese produced on a background thread, and without that layer
+  the one line you most need to read stays in Chinese.
+
+> **The report only printed the first four items**, so everything after them
+> was invisible: "only 4 left" read as "only 4 were missed" when there were
+> actually 54. It now lists every one.
+
+### The Taiwanese term for "speaker", with a guard this time
+
+A correction the day before had been applied by hand; nothing was stopping it
+from coming back, and three more places had slipped through. Adding the word to
+the banned-terms table immediately caught four more in the documentation.
+
+### Pasted transcripts are identified by a flag, not by their filename
+
+The filename the browser attaches to a pasted transcript **is visible to the
+user** (job name, notifications), so it has to follow the interface language.
+The server used to compare that filename as a string to decide whether to use it
+as the document title; once translated, the comparison never matched and the
+title became "Pasted transcript meeting minutes", **with nothing on screen to
+show anything was wrong**.
+
+### Intro site: the language picker did not match the GitHub button
+
+They each worked out their own height, 12.2 px apart (30.2 vs 42.4), and were
+not vertically aligned either. **No padding numbers were nudged**: a different
+language or a font-size change would have knocked it out again. A browser guard
+measures all three language editions.
+
+### Speaker-count hint: one meeting became twenty, and the wording stays
+
+It used to cite **one** meeting. Re-measured by the speech service across all 20
+meetings of a public corpus, giving the correct count and leaving it unset are
+**indistinguishable** (13.24% vs 12.46%; the paired bootstrap 95% confidence
+interval crosses zero). So "when in doubt, leave it at 0" stays exactly as it
+was, and **was not strengthened** into "letting it decide is better".
+
+> The mechanism is firmer than that figure: across those same 20 meetings the
+> best number of clusters was **never larger than the actual number of people**.
+> Six people in the room does not mean six groups can be told apart acoustically.
+
+### Documentation
+
+A speech-service integration section in the README and on the intro site (how to
+use it, what you get, why the work is split this way), in all three languages;
+a Meeting summary screenshot in the showcase; shorter descriptions and the
+missing icons for the two new tools; and the new synchronous API documented.
+
+> The API coverage guard built its table from tools that **have** an `/api/`
+> path, so a tool with none was invisible to it. It now compares against the
+> tool registry.
 
 ---
 

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -377,6 +378,52 @@ def history(hours: int = 24, buckets: int = 96) -> list[dict]:
         for i in range(lo, hi + 1):
             out[i]["active"] += 1
     return out
+
+
+_HEX32 = re.compile(r"[0-9a-f]{32}")
+
+
+def keep_alive_keys(since_ts: float) -> tuple[set[str], set[str]]:
+    """還在作業保留期內（或還沒結束）的作業會用到哪些暫存檔 —— 給清理程式用。
+
+    回傳 `(識別碼, 結果檔的檔名)`。識別碼是**作業編號**與 **`meta.upload_id`**
+    （都是 32 碼十六進位）。
+
+    **為什麼需要這個**：全站的作業結果與「開啟」要讀的資料都放在 `data/temp/`
+    （保留 2 小時），而「我的作業」承諾的是**作業保留期**（預設 24 小時）。
+    兩個期限對不上，於是作業清單寫著「已完成」、按「開啟」卻是 410 ——
+    v1.16.6 使用者回報、正式機上證實（4 小時 50 分前完成的會議摘要，
+    結果、逐字稿、歸屬紀錄全部已經被清掉）。
+
+    **靠命名慣例認人，不靠每支工具自己登記**：暫存檔一律把其中一個識別碼
+    嵌進檔名（`ms_<upload_id>_result.json`、`trd_<job_id>.json`、
+    `.owners/<upload_id>.json`），所以清理程式只要比對檔名裡的 32 碼。
+    要各支工具自己登記「這些檔案屬於這件作業」的話，下一支新工具又會漏。
+    """
+    p = db_path()
+    if not p.exists():
+        return set(), set()
+    try:
+        rows = _db.fetchall(
+            _db.get_conn(p),
+            "SELECT id, result_path, meta FROM jobs "
+            " WHERE status IN ('pending','running') "
+            "    OR COALESCE(finished_at, updated_at) >= ?",
+            (float(since_ts),))
+    except sqlite3.Error as e:
+        logger.warning("job store: 讀不到保留期內的作業，暫存檔改用暫存的保留期：%s", e)
+        return set(), set()
+    ids: set[str] = set()
+    names: set[str] = set()
+    for r in rows:
+        if _HEX32.fullmatch(str(r["id"] or "")):
+            ids.add(r["id"])
+        uid = str(_load_meta(r["meta"]).get("upload_id") or "")
+        if _HEX32.fullmatch(uid):
+            ids.add(uid)
+        if r["result_path"]:
+            names.add(Path(r["result_path"]).name)
+    return ids, names
 
 
 def delete_older_than(cutoff_ts: float) -> int:

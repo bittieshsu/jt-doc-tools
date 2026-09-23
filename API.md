@@ -877,6 +877,72 @@ curl -X POST http://localhost:8765/tools/pdf-wordcount/api/pdf-wordcount \
 }
 ```
 
+### 會議錄音轉逐字稿
+
+把會議錄音或錄影轉成**帶時間與發言者**的逐字稿。辨識在外部語音服務（jtlw）
+那側跑 —— **要先在管理區「語音服務（jtlw）」設定好**，沒設定回 **503**。
+
+```text
+POST /tools/meeting-transcribe/api/meeting-transcribe
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | ✓ | 音訊 `.m4a` / `.mp3` / `.wav` / `.aac` / `.ogg` / `.opus` / `.flac`，影片 `.mp4` / `.mov` / `.mkv` / `.webm` |
+| `language` | string | | `auto`（預設）或 BCP-47（`zh-Hant` / `en` / `ja` …）。對方不支援時**送件當下**就回 400 |
+| `num_speakers` | string | | 預設 `0` ＝ 讓它自己判。**建議就留 0** |
+
+**`num_speakers` 問的是「發言量足以辨認的人數」，不是與會人數。**
+語音服務在 **20 場中文會議**（AISHELL-4 test，5~7 人）上量過：指定正確人數與
+不指定**分不出勝負**（13.24% vs 12.46%，配對 bootstrap 95% 信賴區間
+[−2.72, +4.10] 跨過 0）。**所以不要為了「更準」而去填它。**
+
+真正的理由是機制：同一批 20 場裡，**最佳的群數從來沒有大於實際人數**
+（10 場相等、10 場更少、0 場更多）。有 6 個人在場不代表聲學上分得出 6 群 ——
+硬要分成 6 群時，系統只能**把講最多的那個人拆開**，而那是最貴的錯。
+只講一兩句的人不要算進去；**不確定就留 0**。
+
+**這支是同步的** —— 37 分鐘的會議實測 7~8 分鐘（辨識 ＋ 發言者分離 ＋ 校正），
+呼叫端的逾時要放寬。要背景處理請走網頁那條路
+（`POST /upload` → `POST /start` → 拿作業編號輪詢 `/api/jobs/{id}`）。
+
+```bash
+curl -X POST http://localhost:8765/tools/meeting-transcribe/api/meeting-transcribe \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@meeting.m4a" \
+  -F "language=auto" \
+  -F "num_speakers=0" | jq
+```
+
+回應 JSON（節錄）：
+
+```json
+{
+  "source": {"filename": "meeting.m4a", "size_bytes": 17823213},
+  "remote_job_id": "job_01M34PVW581P2QD3Q0YFT5Y903",
+  "status": "succeeded",
+  "uncorrected": false,
+  "layers": {"raw": 1045, "final": 1045, "speakers": 1045},
+  "summary": {"correction_level": "punctuation_only", "correction": {"edited": 612}},
+  "segments": [
+    {"seq": 1, "text": "各位早，我們開始。", "speaker": "S1",
+     "start_ms": 1450, "end_ms": 2650}
+  ]
+}
+```
+
+**`segments` 是三層併起來的**：文字用校正後的、時間來自原始辨識層、
+發言者來自 speakers 層，三層以 `seq` 對應。對不上的段落**不會硬湊** ——
+寧可那一段沒有發言者，也不要把別人的名字貼上去。
+
+`uncorrected` 為 `true` 代表**校正那一步失敗了**，你拿到的是原始辨識結果
+（標點與錯字沒有修過）—— 這時候別把它當成校正過的內容去比對。
+
+`speaker` 是代號（`S1` / `S2`…）。姓名對照是呼叫端自己的事；
+網頁那條路可以點代號直接改成人名。
+
+---
+
 ### 會議摘要
 
 把會議逐字稿整理成摘要、決議、待辦、風險與章節，**每一條都附段號**。

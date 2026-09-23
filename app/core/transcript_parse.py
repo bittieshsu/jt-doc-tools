@@ -1,7 +1,7 @@
 """把各種逐字稿檔案讀成 `meeting_insight` 吃的段落。
 
 輸出的每一段是 `{"seq", "text"}`，有的話再加 `speaker` / `start_ms` / `end_ms`。
-**時間與講者是選用的** —— 沒有的話語者佔比與章節時間軸自動不出現
+**時間與發言者是選用的** —— 沒有的話發言者佔比與章節時間軸自動不出現
 （`meeting_insight.suitable_charts` 用資料判斷），而不是畫一張空的圖。
 
 支援：WebVTT、SRT、JSON（語音服務常見的段落陣列）、純文字、Word / ODF。
@@ -9,7 +9,7 @@
 **為什麼要自己合併相鄰的字幕**：VTT / SRT 的每一句常常只有一兩秒、半句話，
 一場會議會切出好幾千段。那樣不是跑不動（視窗是按字數切的），而是
 **引用會指到半句話** —— 而「每一條都要指得回逐字稿」正是這個功能的賣點。
-所以同一個講者連續的段落會合併到一個上限，時間取「第一段的開始、
+所以同一個發言者連續的段落會合併到一個上限，時間取「第一段的開始、
 最後一段的結束」。
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ MERGE_CHARS = 400
 #: 相鄰字幕之間隔超過這麼久就不合併（換話題了）。
 MERGE_GAP_MS = 3000
 
-#: 講者名稱的長度上限，**分中日韓與拉丁兩套** ——
+#: 發言者名稱的長度上限，**分中日韓與拉丁兩套** ——
 #: 中文名字是 2~4 個字（加頭銜像「王經理」「主席」也在 6 個字以內），
 #: 而拉丁名字光是 `Dr. Jennifer Rodriguez` 就 22 個字元。
 #: 用同一個數字的話，不是放掉「這是一段非常長的開場白」那種句子，
@@ -82,7 +82,7 @@ def _cue_times(line: str) -> Optional[tuple[int, int]]:
     return a, b
 
 
-# ------------------------------------------------------------------ 講者
+# ------------------------------------------------------------------ 發言者
 
 _VOICE = re.compile(r"^<v\s+([^>]{1,40})>(.*?)(?:</v>)?$", re.S)
 #: `王小明：` / `Alice:` / `[王小明]`
@@ -92,7 +92,7 @@ _NOT_A_NAME = re.compile(r"[。，！？；、,.!?;…「」『』（）()\n]")
 _CJK = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]")
 #: 名字裡的點號**只允許縮寫**（`Dr.` `Ms.` `J.R.R.`）——
 #: 句號前面接的是一個完整的字（`…a sentence.`），縮寫前面只有一兩個字母。
-#: 一律禁掉點號的話，`Dr. Jennifer Rodriguez：` 這種正式記錄一個講者都認不出來；
+#: 一律禁掉點號的話，`Dr. Jennifer Rodriguez：` 這種正式記錄一個發言者都認不出來；
 #: 一律放行的話，半句話會被當成名字。
 _ABBREV_DOT = re.compile(r"(?<![A-Za-z])[A-Za-z]{1,4}\.")
 
@@ -130,12 +130,12 @@ def _split_prefix(line: str) -> tuple[Optional[str], str]:
 
 def _confirm_speakers(rows: list[tuple[Optional[str], str]]
                       ) -> list[tuple[Optional[str], str]]:
-    """哪些前綴真的是講者。
+    """哪些前綴真的是發言者。
 
     `我們下週要做三件事：A、B、C` 的前半段也符合「冒號前面是一小段字」，
     **單看一行分不出來**。兩層判準：
 
-    1. **重複出現的名字一定是講者** —— 真正的講者在一場會議裡不會只出現一次，
+    1. **重複出現的名字一定是發言者** —— 真正的發言者在一場會議裡不會只出現一次，
        而且句子裡的冒號不會用同一段字重複。
     2. **只出現一次的，拿「已確認的名字有多長」當尺** —— 這場逐字稿自己
        用的名字是 3 個字，那 4 個字的「注意事項」就不是名字。
@@ -143,9 +143,9 @@ def _confirm_speakers(rows: list[tuple[Optional[str], str]]
        名字比較長的那些逐字稿會整批被判掉）。
 
     完全沒有名字重複時**一個都不採信** —— 那代表這份檔案根本沒有在用
-    「講者：內容」的格式，那些冒號都是句子的一部分。
+    「發言者：內容」的格式，那些冒號都是句子的一部分。
 
-    判不是講者的**要把那段字還原回內文**，不可以吃掉。
+    判不是發言者的**要把那段字還原回內文**，不可以吃掉。
     """
     seen: dict[str, int] = {}
     for name, _ in rows:
@@ -221,7 +221,7 @@ def _split_long(segs: list[dict]) -> list[dict]:
 
 
 def _merge(segs: list[dict]) -> list[dict]:
-    """同一個講者連續的段落合併起來，重新編號。"""
+    """同一個發言者連續的段落合併起來，重新編號。"""
     out: list[dict] = []
     for s in segs:
         text = (s.get("text") or "").strip()
@@ -271,7 +271,7 @@ def parse_cues(text: str) -> list[dict]:
         if speaker:
             cur["speaker"] = speaker
         cur["text"] = (cur["text"] + " " + body).strip()
-    # VTT 沒有 `<v>` 時，講者常寫成 `王小明：內容`
+    # VTT 沒有 `<v>` 時，發言者常寫成 `王小明：內容`
     rows = _confirm_speakers([(None, s["text"]) if s.get("speaker")
                               else _split_prefix(s["text"]) for s in segs])
     for s, (name, body) in zip(segs, rows):
@@ -331,17 +331,17 @@ _LEADING_TIME = re.compile(r"^\s*[\[(]?((?:\d+:)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?)[
 _TIME_AT_START = re.compile(
     r"^[\s\[\(【]*((?:\d+:)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?)[\]\)】]?\s*[-–—]?\s*")
 
-#: 講者標頭**單獨一行**（冒號後面什麼都沒有）：
+#: 發言者標頭**單獨一行**（冒號後面什麼都沒有）：
 #:
 #:     [00:00] PM - 雅婷：
 #:     好，那我們時間到了就直接開始。
 #:
 #: **這種行沒有歧義** —— 句子裡的冒號後面一定有字，冒號後面空著的只可能是標頭。
 #: 所以這裡的名字可以放寬到 40 個字（`Backend Lead - 凱文` 有 17 個），
-#: 不必擔心把半句話當成講者。
+#: 不必擔心把半句話當成發言者。
 _HEADER_ONLY = re.compile(r"^([^：:\n]{1,40}?)\s*[：:]\s*$")
 
-#: 講者寫在括號裡的時間前面：`雅婷 (00:12)：內容`
+#: 發言者寫在括號裡的時間前面：`雅婷 (00:12)：內容`
 _NAME_THEN_TIME = re.compile(
     r"^([^：:\n\(\[]{1,24}?)\s*[\(\[]((?:\d+:)?\d{1,2}:\d{2})[\)\]]\s*[：:]\s*(.*)$", re.S)
 
@@ -350,7 +350,7 @@ _BULLET = re.compile(r"^\s*(?:[-*•>]|\d{1,3}[.)])\s+")
 
 #: Markdown 標題／分隔線／清單那幾行不是發言 —— 逐字稿檔案前面常有一段
 #: 會議資訊（主題、時間、與會人員）。把它們當成發言的話，`## 會議主題`
-#: 會變成一位「講者」（2026-09-18 使用者實際遇到）。
+#: 會變成一位「發言者」（2026-09-18 使用者實際遇到）。
 _NOT_AN_UTTERANCE = re.compile(r"^\s*([-=_*]{3,}\s*$|\|)")
 #: Markdown 的井字號標題：**內容要留著**（會議主題是有用的脈絡），
 #: 只是它不是「發言」，所以把井字號去掉、當成前言的一部分。
@@ -366,14 +366,14 @@ def _strip_time(line: str) -> tuple[Optional[int], str]:
 
 def _plain_rows(text: str, shape: str = "auto"
                 ) -> tuple[list[tuple[Optional[int], Optional[str], str, bool]], str]:
-    """把純文字拆成 `(時間, 講者, 內容)`。**認得出好幾種常見的排法。**
+    """把純文字拆成 `(時間, 發言者, 內容)`。**認得出好幾種常見的排法。**
 
     使用者的逐字稿來源很多（會議軟體匯出、語音服務、人工打字），
-    格式各家不同 —— 少認一種，那一份的講者就整個不見，
-    而畫面上只會顯示「沒有認出任何講者」，看不出是格式沒支援。
+    格式各家不同 —— 少認一種，那一份的發言者就整個不見，
+    而畫面上只會顯示「沒有認出任何發言者」，看不出是格式沒支援。
     """
     raw = [ln.rstrip() for ln in text.splitlines()]
-    # 第四個欄位 `certain`：這個講者是不是**來自沒有歧義的形狀**（獨立的標頭行）。
+    # 第四個欄位 `certain`：這個發言者是不是**來自沒有歧義的形狀**（獨立的標頭行）。
     # 那種不必再過 `_confirm_speakers` 的「名字長度尺」—— 過了反而會把
     # `UI/UX Designer - 萱萱` 這種只出現一次的長名字判掉。
     rows: list[tuple[Optional[int], Optional[str], str, bool]] = []
@@ -388,13 +388,13 @@ def _plain_rows(text: str, shape: str = "auto"
         m = _HEADER_ONLY.match(rest)
         if m and not _NOT_A_NAME.search(m.group(1)):
             heads.append((i, ts, m.group(1).strip()))
-    # **哪些標頭是真的講者？用位置判，不要用出現次數。**
+    # **哪些標頭是真的發言者？用位置判，不要用出現次數。**
     #
     # 逐字稿前面那段會議資訊長得跟標頭一樣（`* 與會人員：`、`## 會議主題：`），
-    # 不濾掉的話它會變成一位「講者」，而後面那一大串參加者名單會變成它的
+    # 不濾掉的話它會變成一位「發言者」，而後面那一大串參加者名單會變成它的
     # 「發言」（2026-09-18 使用者實際遇到）。
     #
-    # 但**不能用「出現次數」濾** —— 只講過一次話的人也是講者
+    # 但**不能用「出現次數」濾** —— 只講過一次話的人也是發言者
     # （`李美華：` 只出現一次就被判掉的話，她的話會併到上一個人身上）。
     #
     # 判準：**只要有任何一個標頭帶時間戳記，那第一個帶時間的就是逐字稿的開始**，
@@ -416,10 +416,10 @@ def _plain_rows(text: str, shape: str = "auto"
             if body:
                 rows.append((ts, name or None, body, True))
         # **標頭之前的前言不是發言** —— 逐字稿檔案前面常有一段會議資訊
-        # （主題、時間、與會人員）。把它收成**一段沒有講者的文字**，
-        # 這樣模型看得到（誰參加、談什麼），但不會變成一位「講者」，
-        # 也不會污染語者佔比（2026-09-18 使用者實際遇到：
-        # `## 會議主題`、`* 會議時間` 都被當成講者）。
+        # （主題、時間、與會人員）。把它收成**一段沒有發言者的文字**，
+        # 這樣模型看得到（誰參加、談什麼），但不會變成一位「發言者」，
+        # 也不會污染發言者佔比（2026-09-18 使用者實際遇到：
+        # `## 會議主題`、`* 會議時間` 都被當成發言者）。
         pre = [_HEADING.sub("", _BULLET.sub("", ln)).strip()
                for ln in raw[:heads[0][0]]
                if ln.strip() and not _NOT_AN_UTTERANCE.match(ln)]
@@ -427,7 +427,7 @@ def _plain_rows(text: str, shape: str = "auto"
             rows.insert(0, (None, None, " ".join(pre), True))
         return rows, "header"
 
-    # ── 形狀二：一行一句（可能帶時間、可能帶講者） ──
+    # ── 形狀二：一行一句（可能帶時間、可能帶發言者） ──
     blocks = [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
     if len(blocks) <= 1:
         blocks = [ln.strip() for ln in raw if ln.strip()]
@@ -442,7 +442,7 @@ def _plain_rows(text: str, shape: str = "auto"
         ts, rest = _strip_time(b)
         name, body = _split_prefix(rest)
         if body.strip():
-            # `plain` 是使用者明講「這份沒有講者」—— 不要去猜
+            # `plain` 是使用者明講「這份沒有發言者」—— 不要去猜
             rows.append((ts, None if shape == "plain" else name, body.strip(), False))
     return rows, ("plain" if shape == "plain" else "inline")
 
@@ -513,13 +513,13 @@ def _office_text(data: bytes, ext: str) -> str:
 
 
 #: 純文字逐字稿的排法。**預設自動判斷，但要讓使用者可以指定** ——
-#: 自動判斷一定有猜錯的時候，而猜錯的症狀是「講者全不見」或「多出奇怪的講者」，
+#: 自動判斷一定有猜錯的時候，而猜錯的症狀是「發言者全不見」或「多出奇怪的發言者」，
 #: 使用者看得出來不對卻沒有任何辦法（2026-09-18 使用者要求）。
 SHAPES: dict[str, str] = {
     "auto":   "自動判斷",
-    "header": "講者標頭自己一行（下一行才是內容）",
-    "inline": "一行一句（講者：內容）",
-    "plain":  "純文字，沒有講者",
+    "header": "發言者標頭自己一行（下一行才是內容）",
+    "inline": "一行一句（發言者：內容）",
+    "plain":  "純文字，沒有發言者",
 }
 
 

@@ -1,9 +1,9 @@
 """會議摘要的端點。
 
 **分兩步是刻意的**：先上傳、看解析結果，再按「開始分析」。
-一場三小時的會議要跑幾分鐘的 LLM —— 如果講者判錯、或整份檔案根本沒讀對，
+一場三小時的會議要跑幾分鐘的 LLM —— 如果發言者判錯、或整份檔案根本沒讀對，
 使用者應該在**花那幾分鐘之前**就看得出來。所以 `/upload` 會回一段預覽
-（段落數、講者、總長、前幾段長什麼樣），分析是另一個動作。
+（段落數、發言者、總長、前幾段長什麼樣），分析是另一個動作。
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ router = APIRouter()
 
 TOOL_ID = "meeting-summary"
 
-#: 預覽給幾段。**夠看出「講者對不對、斷句對不對」就好** ——
+#: 預覽給幾段。**夠看出「發言者對不對、斷句對不對」就好** ——
 #: 整份倒出來的話使用者不會看，而看不完的預覽等於沒有預覽。
 PREVIEW_SEGMENTS = 8
 
@@ -77,7 +77,7 @@ def _summarise(segments: list[dict]) -> dict:
         "segments": len(segments),
         "speakers": speakers,
         "chars": chars,
-        # 沒有時間是正常的（純文字逐字稿）—— 這時候語者佔比與時間軸不會出現，
+        # 沒有時間是正常的（純文字逐字稿）—— 這時候發言者佔比與時間軸不會出現，
         # 而不是畫一張空的圖。要讓使用者事先知道。
         "duration_ms": max(times) if times else None,
         "has_times": bool(times),
@@ -111,7 +111,14 @@ async def index(request: Request):
 
 @router.post("/upload")
 async def upload(request: Request, file: UploadFile = File(...),
-                 shape: str = Form("auto")):
+                 shape: str = Form("auto"), pasted: bool = Form(False)):
+    """`pasted` ＝ 這份是從貼上框送來的，不是使用者的檔案。
+
+    **不要靠檔名判斷**：貼上時前端塞的檔名會照介面語言翻（畫面上那個名字
+    使用者看得到），拿它去比字串的話，英 / 日介面下比對永遠不成立，
+    標題就變成「Pasted transcript 會議記錄」—— 而畫面上完全看不出哪裡錯了
+    （本專案記過的「翻掉一個拿去比較的字串」那一類）。
+    """
     data = await file.read()
     if not data:
         raise HTTPException(400, "檔案是空的")
@@ -133,6 +140,7 @@ async def upload(request: Request, file: UploadFile = File(...),
     info["shapes"] = tp.SHAPES
     atomic_json.write_json(_meta_path(upload_id), {
         "filename": file.filename or "transcript",
+        "pasted": bool(pasted),
         "segments": info["segments"], "speakers": info["speakers"],
         "duration_ms": info["duration_ms"],
         # **「發言時間」是量到的還是推估的**，畫面上要講出來。
@@ -345,7 +353,12 @@ def meeting_title(out: dict) -> str:
                     v = line[len(key) + len(sep):].strip()
                     if v:
                         return v if v.endswith("會議記錄") else f"{v} 會議記錄"
-    name = Path(str((out.get("source") or {}).get("filename") or "")).stem.strip()
+    src = out.get("source") or {}
+    # **先看旗標**（v1.16.6 起）。`_PASTED` 那條是**舊資料的退路** ——
+    # 這個改動之前存下來的 meta 沒有這個欄位。
+    if src.get("pasted"):
+        return "會議記錄"
+    name = Path(str(src.get("filename") or "")).stem.strip()
     if name and name != _PASTED:
         return f"{name} 會議記錄"
     return "會議記錄"
@@ -438,7 +451,7 @@ def _md(out: dict, *, charts: bool = True, embed: bool = True,
             key=lambda kv: -((kv[1].get("speaking_ms") or 0) if by_time
                              else (kv[1].get("chars") or 0)))
         lines += ["## 誰講了多少", "",
-                  "| 講者 | 發言次數 | 字數 | 字數佔比 |"
+                  "| 發言者 | 發言次數 | 字數 | 字數佔比 |"
                   + ("  發言時間 |" if use_time else "")]
         lines.append("|---|---:|---:|---:|" + ("---:|" if use_time else ""))
         for name, v in ordered:

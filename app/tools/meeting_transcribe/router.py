@@ -155,9 +155,9 @@ def _assemble(client: jtlw_client.JtlwClient, remote_id: str,
               got: Optional[dict] = None) -> list[dict]:
     """把三層併成我們自己的 `{seq, text, speaker, start_ms, end_ms}`。
 
-    **`raw` 有時間、`final` 有校正過的文字、`speakers` 有語者** ——
+    **`raw` 有時間、`final` 有校正過的文字、`speakers` 有發言者** ——
     三層靠 `seq` 對起來（對方文件第 8 節）。
-    **對不上的 seq 不可以硬湊**：寧可那一段沒有語者，也不要把 A 的語者
+    **對不上的 seq 不可以硬湊**：寧可那一段沒有發言者，也不要把 A 的發言者
     貼到 B 的話上（同文件翻譯「段數對不上絕不硬湊」那條）。
     """
     got = got if got is not None else {}
@@ -353,7 +353,7 @@ _STAGES = {
     "fetch": "取得錄音檔中",
     "normalize": "轉檔中",
     "asr": "辨識中",
-    "diarization": "分辨語者中",
+    "diarization": "分辨發言者中",
     "correction": "校正中",
     "finalize": "整理結果中",
 }
@@ -435,6 +435,68 @@ async def start(request: Request):
                              meta={"filename": meta["filename"]}, request=request)
     job.meta["view_url"] = f"/tools/{TOOL_ID}/?job={job.id}"
     return {"job_id": job.id}
+
+
+@router.post("/api/meeting-transcribe")
+async def api_meeting_transcribe(request: Request,
+                                 file: UploadFile = File(...),
+                                 language: str = Form("auto"),
+                                 num_speakers: str = Form("0")):
+    """一次做完：上傳錄音 → 送件 → 等到好 → 回整份逐字稿。
+
+    **這是同步的**：37 分鐘的會議實測 7~8 分鐘（辨識 ＋ 發言者分離 ＋ 校正），
+    呼叫端的逾時要放寬。要背景處理請走網頁那條路
+    （`/upload` → `/start` → 拿作業編號輪詢 `/api/jobs/{id}`）。
+
+    **`num_speakers` 預設 0（讓對方自己判），而且建議就留 0** ——
+    這裡問的是「發言量足以辨認的人數」，不是與會人數。
+    20 場中文會議上，指定正確人數與不指定**分不出勝負**（信賴區間跨過 0）；
+    但同一批裡**最佳的群數從來沒有大於實際人數**，所以「填正確的人頭數」
+    本身就不是最佳解 —— 理由在樣板那段註解裡。
+    """
+    if not jtlw_settings.is_configured():
+        raise HTTPException(503, "還沒設定語音服務（jtlw）—— 請管理員先到設定頁填好")
+    name = file.filename or "recording"
+    ext = Path(name).suffix.lower()
+    if ext not in ACCEPT_EXTS:
+        raise HTTPException(400, f"收不下 {ext or '這種'} 檔案，支援的是："
+                                 + "、".join(ACCEPT_EXTS))
+    file_id = uuid.uuid4().hex
+    dest = _speech.audio_path(file_id)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    size = 0
+    with dest.open("wb") as f:                 # 串流寫入，三小時的會議不進記憶體
+        while chunk := await file.read(1 << 20):
+            size += len(chunk)
+            f.write(chunk)
+    if size == 0:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, "檔案是空的")
+    _uo.record(file_id, request)
+    facts = _speech.file_facts(file_id)
+    atomic_json.write_json(_meta_path(file_id), {
+        "filename": name,
+        "content_type": file.content_type or "application/octet-stream",
+        **facts,
+    })
+    try:
+        n = int(num_speakers or 0) or None
+    except (TypeError, ValueError):
+        n = None
+
+    class _Sync:
+        """`_run_job` 要一個作業物件放進度 —— 同步呼叫沒有那個東西，
+        給它一個只吞不吐的替身。**不要為了 API 另寫一條處理邏輯** ——
+        抄第二份就是抄錯的機會（本專案第 N 次）。"""
+        cancelled = False
+        message = ""
+        progress = 0.0
+        meta: dict = {}
+        result_path = None
+        result_filename = ""
+
+    _run_job(_Sync(), file_id, str(language or "auto")[:16], n)
+    return _read_json(_out_path(file_id), "逐字稿")
 
 
 #: **`@router.get` 不會自動加 HEAD**（Starlette 的 `Route` 會，FastAPI 不會）。

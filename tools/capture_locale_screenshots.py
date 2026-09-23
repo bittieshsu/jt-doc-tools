@@ -52,6 +52,7 @@ SHOTS: dict[str, str] = {
     "pdf-to-office": "/tools/pdf-to-office/",
     "einvoice-scan": "/tools/einvoice-scan/",
     "translate-doc": "/tools/translate-doc/",
+    "meeting-summary": "/tools/meeting-summary/",
     "deident-1": "/tools/doc-deident/",
     "deident-2": "/tools/text-deident/",
     "fonts": "/admin/fonts",
@@ -68,8 +69,13 @@ WIDTH, HEIGHT = 1400, 1020
 #: 欄位：
 #:   `file`   要上傳哪一份範例檔（`SAMPLES` 的鍵）
 #:   `before` 上傳前先做的事（JS，回傳值不看）
-#:   `submit` 上傳後要不要按主要按鈕
-#:   `wait`   按完等幾秒（轉檔類要久一點）
+#:   `submit` 上傳後要不要按主要按鈕。`True` ＝按「第一顆看得到的主要按鈕」；
+#:            也可以給一串選擇器，照順序按下去（**有些頁面的第一顆主要按鈕
+#:            不是送出** —— 會議摘要要先按「使用貼上的內容」才輪到「開始分析」）
+#:   `ready`  等到這段 JS 回 true 才算畫好。預設是「畫面上有沒有真的載進來的
+#:            圖」，但**不是每一支工具的結果都是圖**（會議摘要的圖是前端畫的
+#:            `<svg>`）—— 沒有這個欄位的話那種頁面一定等滿逾時
+#:   `wait`   最多等幾秒（轉檔類要久一點）
 #:
 #: **檔案一律塞 `.file-upload input[type=file]`** —— 不可以用
 #: `input[type=file]`：印章 / 浮水印頁**第一個** file input 是隱藏的
@@ -109,6 +115,43 @@ RECIPES: dict[str, dict] = {
         if (it) { it.click(); return true; }
         return false;
       })()""", "submit": False, "wait": 5, "scroll": False},
+    # 會議摘要：**要看到分析出來的東西**，不是只看到「解析好了，共 N 段」。
+    #
+    # **用貼上那條路不用上傳** —— 上傳是非同步的，按下去的那一刻
+    # `upload_id` 還沒回來，於是跳出「請先貼上逐字稿」的對話框
+    # （2026-09-23 第一次抓就是這樣，而**蓋著對話框的截圖就是拍壞的**）。
+    # 貼上是同步的，畫面狀態確定。
+    #
+    # 行首的 `[mm:ss]` 讀得到 —— **有時間才畫得出發言佔比與章節時間軸**，
+    # 而那兩張圖正是這支工具最值得看的地方。
+    # 內容全部虛構（跟 `seed_demo_data.py` 那份同一批假資料）。
+    # 一場短會議跑完大約 40~80 秒（幾十次模型請求），所以 `wait` 要夠久。
+    "meeting-summary": {"before": """(() => {
+        const box = document.getElementById('msPasteBox');
+        if (!box) return false;
+        box.value = [
+          '[00:01] 王小明：那我們開始。今天三件事：測試機的網路、防火牆告警、還有儲存的方案。',
+          '[00:10] 李美華：第一件我先講。測試機的 NAT 還沒開通，所以 7993 跟 7143 這兩個埠測不到。',
+          '[00:21] 王小明：那就先開通。網管那邊我來發單，這禮拜五以前會好。',
+          '[00:28] 陳大維：防火牆那邊比較麻煩。上禮拜維護的時候關了十二個小時，後來沒有再打開。',
+          '[00:40] 陳大維：告警系統一直顯示 inactive，我以為是誤報，查了才發現是真的沒開。',
+          '[00:52] 李美華：那我們要不要把它跟通知系統解開？每次維護都要記得手動開，遲早再出一次。',
+          '[01:02] 王小明：解開。之後防火牆的開關改成手動，維護完由值班的人確認一次。',
+          '[01:12] 陳大維：第三件是儲存。現在的環境還撐得住，明年如果效能不夠再提採購。',
+          '[01:24] 李美華：那 RAID 卡的部分呢？上次說要換的那張，現在還是用軟體的。',
+          '[01:33] 王小明：先用現有的環境測，不行再說。備份有做好，硬碟壞了立刻換就行。',
+          '[01:44] 陳大維：了解。那我把測試結果整理一份，下禮拜會議前寄給大家。',
+        ].join('\\n');
+        box.dispatchEvent(new Event('input', {bubbles: true}));
+        return true;
+      })()""",
+      # **第一顆主要按鈕不是送出**：要先按「使用貼上的內容」把文字收下來，
+      # 才輪到「開始分析」。
+      "submit": ["#msPasteGo", "#msStart"],
+      # 結果的圖是**前端畫的 `<svg>`**，不是 `<img>` 也不是 `<canvas>` ——
+      # 用預設判準會等滿逾時然後拍到還沒畫完的畫面。
+      "ready": "!!document.querySelector('#msCards .ms-card')",
+      "wait": 240, "focus": "#msCards"},
     "deident-1": {"file": "deident", "submit": True, "wait": 14},
     # 文字去識別化沒有檔案可放 —— 直接把範例文字貼進去（**內容全部虛構**，
     # 跟 `seed_demo_data.py` 那份是同一批假資料）。空白的輸入框當產品截圖
@@ -132,9 +175,10 @@ RECIPES: dict[str, dict] = {
 }
 
 #: 範例檔的檔名前綴，全部由 `tools/seed_demo_data.py` 合成。
-SAMPLES = ("doc", "form", "scan", "deident")
+SAMPLES = ("doc", "form", "scan", "deident", "meeting")
 _SAMPLE_FILE = {"doc": "quotation", "form": "vendor-form",
-                "scan": "scan", "deident": "deident"}
+                "scan": "scan", "deident": "deident",
+                "meeting": "meeting"}
 
 
 #: 瀏覽器是 snap 版時，**它讀不到 `/opt`，而且 `/tmp` 是它自己的那一個**
@@ -176,9 +220,12 @@ def sample_for(kind: str, locale: str) -> "Path | None":
     if not base:
         return None
     d = REPO / "temp" / "demo"
-    for f in (d / f"{base}.{locale}.pdf", d / f"{base}.pdf"):
-        if f.is_file():
-            return f
+    # **副檔名不要寫死 `.pdf`** —— 會議摘要收的是逐字稿（`.vtt`），
+    # 寫死的話它永遠找不到素材，而失敗的樣子是「截到一張空的上傳頁」。
+    for ext in (".pdf", ".vtt", ".txt", ".docx"):
+        for f in (d / f"{base}.{locale}{ext}", d / f"{base}{ext}"):
+            if f.is_file():
+                return f
     return None
 
 
@@ -309,7 +356,7 @@ def _not_demo_data(shot: str, texts: list[str]) -> list[str]:
     return [t for t in texts if not any(a in t for a in allow)]
 
 
-async def _capture(base: str, cdp_port: int, locale: str) -> list[str]:
+async def _capture(base: str, cdp_port: int, locale: str, only=None) -> list[str]:
     import httpx
     import websockets
 
@@ -369,6 +416,8 @@ async def _capture(base: str, cdp_port: int, locale: str) -> list[str]:
                 print(f"  {locale} 跳過（該語言下反灰的工具）：{sorted(skip)}")
             residual: dict[str, list[str]] = {}
             for name, path in SHOTS.items():
+                if only and name not in only:
+                    continue
                 if name in skip:
                     continue
                 await cmd("Page.navigate", {"url": base + path})
@@ -398,16 +447,33 @@ async def _capture(base: str, cdp_port: int, locale: str) -> list[str]:
                                 f"document.querySelector({sel!r})"
                                 ".dispatchEvent(new Event('change',{bubbles:true}))"})
                             await asyncio.sleep(4.0)
-                    if r.get("submit"):
+                    submit = r.get("submit")
+                    if submit is True:
                         await cmd("Runtime.evaluate", {"expression": _CLICK_PRIMARY})
+                    elif submit:
+                        # 逐顆按：第一顆多半只是「把輸入收下來」，送出在後面。
+                        for sel in submit:
+                            hit = await cmd("Runtime.evaluate", {
+                                "returnByValue": True, "expression": f"""
+                              (() => {{
+                                const b = document.querySelector({sel!r});
+                                if (!b || b.offsetParent === null || b.disabled)
+                                  return false;
+                                b.click(); return true;
+                              }})()"""})
+                            if not (hit.get("result", {}) or {}).get("value"):
+                                print(f"  ! {name}: 按不到 {sel}")
+                                break
+                            await asyncio.sleep(1.5)
                     # 等到結果真的畫出來（最多 `wait` 秒），不是死等。
+                    ready = r.get("ready") or _RESULT_READY
                     deadline = float(r.get("wait", 10))
                     waited = 0.0
                     while waited < deadline:
                         await asyncio.sleep(1.0)
                         waited += 1.0
                         ok = await cmd("Runtime.evaluate",
-                                       {"expression": _RESULT_READY,
+                                       {"expression": ready,
                                         "returnByValue": True})
                         if (ok.get("result", {}) or {}).get("value"):
                             await asyncio.sleep(1.5)   # 讓它畫完
@@ -447,8 +513,13 @@ async def _capture(base: str, cdp_port: int, locale: str) -> list[str]:
                 done.append(name)
             if residual:
                 print(f"  ! {locale} 這幾張的畫面上還有中文（送出後的結果區）：")
+                # **不要截斷** —— 只印前幾條的話，後面的永遠沒有人看到，
+                # 而「報告上只有 4 條」看起來就像「只漏了 4 條」
+                #（2026-09-23 實際踩到：卡片標題那一整組被截掉了）。
                 for k, v in residual.items():
-                    print(f"      {k}: {v[:4]}")
+                    print(f"      {k}（{len(v)} 條）：")
+                    for one in v:
+                        print(f"        - {one}")
         return done
     finally:
         proc.terminate()
@@ -462,8 +533,10 @@ def main() -> int:
     ap.add_argument("--locale", default="en", choices=langs)
     ap.add_argument("--base", default="http://127.0.0.1:8799")
     ap.add_argument("--cdp-port", type=int, default=9421)
+    ap.add_argument("--only", nargs="*", default=None)
     args = ap.parse_args()
-    done = asyncio.run(_capture(args.base, args.cdp_port, args.locale))
+    done = asyncio.run(_capture(args.base, args.cdp_port, args.locale,
+                                set(args.only) if args.only else None))
     print(f"抓了 {len(done)} 張 -> {_out_dir(args.locale)}")
     return 0
 

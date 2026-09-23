@@ -213,7 +213,12 @@
             this._stop();
             try { this.onDone(j); } catch (_) {}
           } else if (j.status === 'error') {
-            this.status.textContent = tr('失敗：') + (j.error || tr('未知錯誤'));
+            // **失敗原因也要翻** —— 它跟 `j.message` 一樣是伺服器在背景
+            // 執行緒裡產生的中文（那時候不知道使用者的語言）。少包這一層
+            // 的話，英 / 日介面下「工作失敗了」那一句永遠是中文，而那正是
+            // 最需要讀懂的一句。查不到就原樣回傳，最壞跟現在一樣。
+            this.status.textContent = tr('失敗：')
+              + (j.error ? tr(j.error) : tr('未知錯誤'));
             this._finishElapsed(tr('已過 {0}'));
             this.bar.style.background = '#dc2626';
             // 作業已經結束 —— 沒有「要不要繼續等」的問題了，收起提示

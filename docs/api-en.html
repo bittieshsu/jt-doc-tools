@@ -138,6 +138,7 @@
             <a class="nav-ep" href="#pdf-附件擷取">Extract PDF attachments</a>
             <a class="nav-ep" href="#pdf-中繼資料">PDF metadata</a>
             <a class="nav-ep" href="#pdf-字數統計">PDF word count</a>
+            <a class="nav-ep" href="#會議錄音轉逐字稿">Meeting recording to transcript</a>
             <a class="nav-ep" href="#會議摘要">Meeting summary</a>
             <a class="nav-ep" href="#pdf-ocr">PDF OCR</a>
             <a class="nav-ep" href="#pdf-註解整理">PDF annotation report</a>
@@ -705,6 +706,38 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;per_page_chars&quot;</span>: [<span class="hl-cmt">/* ... */</span>],
   <span class="hl-key">&quot;top_words_zh2&quot;</span>: [<span class="hl-cmt">/* ... */</span>], <span class="hl-key">&quot;top_words_en&quot;</span>: [<span class="hl-cmt">/* ... */</span>]
 }</code></pre>
+      </section>
+      <section class="doc-section" data-sec="會議錄音轉逐字稿" data-title="Meeting recording to transcript" hidden>
+<div class="doc-crumb">5. PDF extraction and analysis API</div>
+<h4 id="會議錄音轉逐字稿">Meeting recording to transcript</h4>
+<p>Turns a meeting recording or video into a transcript <strong>with timings and speakers</strong>. Recognition runs on the external speech service (jtlw), so <strong>it has to be set up under the admin area's speech service (jtlw) page first</strong>; without that it returns <strong>503</strong>.</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-transcribe/api/meeting-transcribe</code></pre>
+<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>Audio <code>.m4a</code> / <code>.mp3</code> / <code>.wav</code> / <code>.aac</code> / <code>.ogg</code> / <code>.opus</code> / <code>.flac</code>, video <code>.mp4</code> / <code>.mov</code> / <code>.mkv</code> / <code>.webm</code></td></tr><tr><td><code>language</code></td><td>string</td><td></td><td><code>auto</code> (the default) or BCP-47 (<code>zh-Hant</code> / <code>en</code> / <code>ja</code> …). When the speech service does not support it, <strong>at submission time</strong> it returns 400 right away</td></tr><tr><td><code>num_speakers</code></td><td>string</td><td></td><td>Defaults to <code>0</code>, which lets it decide for itself. <strong>Leaving it at 0 is the recommendation</strong></td></tr></tbody></table></div>
+<p><strong><code>num_speakers</code> asks how many people spoke enough to be identifiable, not how many attended.</strong> The speech service measured it over <strong>20 Chinese meetings</strong> (AISHELL-4 test, five to seven people): giving the correct count and leaving it unset are <strong>indistinguishable</strong> (13.24% vs 12.46%; the paired bootstrap 95% confidence interval [−2.72, +4.10] crosses zero). <strong>So do not fill it in hoping for a better result.</strong></p>
+<p>The real reason is mechanical: across those same 20 meetings, <strong>the best number of clusters was never larger than the actual number of people</strong> (equal in 10, smaller in 10, larger in none). Six people in the room does not mean six groups can be told apart acoustically; forced into six, the system can only <strong>split the person who spoke the most</strong>, and that is the most expensive mistake of all. Do not count people who said only a sentence or two; <strong>when in doubt, leave it at 0</strong>.</p>
+<p><strong>This endpoint is synchronous</strong>: a 37-minute meeting measured 7 to 8 minutes (recognition plus speaker separation plus correction), so give the caller a generous timeout. For background processing use the web path instead (<code>POST /upload</code> → <code>POST /start</code> → poll <code>/api/jobs/{id}</code> with the job id).</p>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-transcribe/api/meeting-transcribe</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@meeting.m4a&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;language=auto&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;num_speakers=0&quot;</span> | jq</code></pre>
+<p>JSON response (excerpt):</p>
+<pre><code class="lang-json">{
+  <span class="hl-key">&quot;source&quot;</span>: {<span class="hl-key">&quot;filename&quot;</span>: <span class="hl-str">&quot;meeting.m4a&quot;</span>, <span class="hl-key">&quot;size_bytes&quot;</span>: <span class="hl-num">17823213</span>},
+  <span class="hl-key">&quot;remote_job_id&quot;</span>: <span class="hl-str">&quot;job_01M34PVW581P2QD3Q0YFT5Y903&quot;</span>,
+  <span class="hl-key">&quot;status&quot;</span>: <span class="hl-str">&quot;succeeded&quot;</span>,
+  <span class="hl-key">&quot;uncorrected&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;layers&quot;</span>: {<span class="hl-key">&quot;raw&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;final&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;speakers&quot;</span>: <span class="hl-num">1045</span>},
+  <span class="hl-key">&quot;summary&quot;</span>: {<span class="hl-key">&quot;correction_level&quot;</span>: <span class="hl-str">&quot;punctuation_only&quot;</span>, <span class="hl-key">&quot;correction&quot;</span>: {<span class="hl-key">&quot;edited&quot;</span>: <span class="hl-num">612</span>}},
+  <span class="hl-key">&quot;segments&quot;</span>: [
+    {<span class="hl-key">&quot;seq&quot;</span>: <span class="hl-num">1</span>, <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;各位早，我們開始。&quot;</span>, <span class="hl-key">&quot;speaker&quot;</span>: <span class="hl-str">&quot;S1&quot;</span>,
+     <span class="hl-key">&quot;start_ms&quot;</span>: <span class="hl-num">1450</span>, <span class="hl-key">&quot;end_ms&quot;</span>: <span class="hl-num">2650</span>}
+  ]
+}</code></pre>
+<p><strong><code>segments</code> is three layers merged</strong>: the text comes from the corrected layer, the timings from the raw recognition layer and the speakers from the speakers layer, matched by <code>seq</code>. Segments that do not line up <strong>are not forced together</strong>: better to leave a segment without a speaker than to put somebody else's name on it.</p>
+<p><code>uncorrected</code> is <code>true</code> means <strong>the correction step failed</strong>, and what you get back is the raw recognition output (punctuation and misrecognitions unrepaired); do not compare it as though it had been corrected.</p>
+<p><code>speaker</code> is a code (<code>S1</code> / <code>S2</code>…). Mapping those to names is up to the caller; on the web path you can click a code and rename it.</p>
+<hr>
       </section>
       <section class="doc-section" data-sec="會議摘要" data-title="Meeting summary" hidden>
 <div class="doc-crumb">5. PDF extraction and analysis API</div>

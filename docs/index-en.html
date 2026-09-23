@@ -280,8 +280,8 @@
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg></span>
             <div class="fl-text"><span class="fn">Word count <span class="ofc-mark" title="Needs OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">Words, characters, paragraphs and sentences, four interactive charts and CSV / JSON / Markdown export; accepts PDF, office and plain-text files (office files are converted to PDF first)</span></div>
           </li>
-          <li><div class="fl-text"><span class="fn">Meeting summary <span class="ofc-mark" title="Needs OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">Turns a meeting transcript (.vtt / .srt / .json / .txt / .docx / .odt) into a summary, decisions, action items, risks and chapters; every entry points back to the segment it came from and who said it, and clicking it jumps there (the engine is only needed to export as PDF / Word / ODF)</span></div></li>
-          <li><div class="fl-text"><span class="fn">Meeting recording to transcript</span><span class="fd">Turns a meeting recording or video into a transcript with timings and speakers, ready to hand to Meeting summary in one click; recognition runs on an external speech service (jtlw), so it only appears once an administrator has set that up</span></div></li>
+          <li><span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 6H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-2"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg></span><div class="fl-text"><span class="fn">Meeting summary <span class="ofc-mark" title="Needs OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">Turns a transcript (.vtt / .srt / .json / .txt / .docx / .odt) into a summary, decisions, action items, risks and chapters; every entry points back to the segment it came from and who said it, and clicking it jumps there (PDF / Word / ODF export needs an engine)</span></div></li>
+          <li><span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4l13 8-13 8V4z"/></svg></span><div class="fl-text"><span class="fn">Meeting recording to transcript</span><span class="fd">Turns a recording or video into a transcript with timings and speakers, ready to hand straight to Meeting summary; recognition runs on the speech service (jtlw), which an administrator sets up first</span></div></li>
           <li>
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2h-3.5"/><path d="M15 3v6h6"/><path d="M9 12h4M9 16h2"/></svg></span>
             <div class="fl-text"><span class="fn">Annotation report</span><span class="fd">Extract PDF annotations as a full list, a review report or a to-do list (CSV / JSON / Markdown), filtered by type or author</span></div>
@@ -819,6 +819,24 @@
         </div>
       </figure>
 
+      <figure class="ss-row">
+        <div class="ss-text">
+          <div class="ss-num">13</div>
+          <h3>Meeting summary</h3>
+          <p>A transcript goes in; a summary plus events and impact, decisions, action items, risks and open questions come out. <b>Every entry carries the segment number and who said it, and clicking it jumps to that line of the transcript</b>: the nodes of the mind map and the timeline are clickable too, because those charts are <b>assembled from entries whose citations were already verified, not generated</b>. When nothing is found it says so plainly instead of drawing a conclusion on the meeting's behalf. Speaking time and topic share are computed from the timestamps, never guessed by the model. Export to PDF / Word / ODF / Markdown / chart PNG / JSON.</p>
+          <div class="ss-tags">
+            <span class="tag">Every entry traces back</span>
+            <span class="tag">Decisions / actions / risks</span>
+            <span class="tag">Topic timeline</span>
+            <span class="tag">Speaking share</span>
+            <span class="tag">Six export formats</span>
+          </div>
+        </div>
+        <div class="ss-img">
+          <img src="screenshots/en/meeting-summary.png" alt="Meeting summary: every decision and action item carries a segment number you can click back to, with a topic timeline and share chart" loading="lazy">
+        </div>
+      </figure>
+
     </div>
   </div>
 </section>
@@ -905,8 +923,13 @@
         <p class="llm-effect"><b>Result</b>: faced with an unfamiliar long document, read the LLM summary first and then decide whether to read it properly</p>
       </article>
       <article class="llm-card">
+        <div class="llm-card-head">
+          <span class="llm-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 6H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-2"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg></span>
+          <div class="llm-tag">text</div>
+        </div>
         <h3>Meeting summary</h3>
         <p>Turns a meeting transcript into a summary, decisions, action items, risks and chapters. Every entry carries a segment number; click it to jump back to that line. Minutes get used as the record of what was agreed, so a decision with no source is worse than no decision at all.</p>
+        <p class="llm-effect"><b>Result</b>: for a two-hour meeting, the decisions and action items are listed one by one, and for each one you can look up who said it and where</p>
       </article>
 
       <article class="llm-card">
@@ -973,6 +996,43 @@
         <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/LLM.md">LLM.md</a>.
       </p>
     </div>
+  </div>
+</section>
+
+<!-- ======== Speech (jtlw) integration ======== -->
+<section id="speech" class="section">
+  <div class="container">
+    <div class="section-eyebrow">Speech integration (optional)</div>
+    <h2 class="section-title">Turn a meeting recording into minutes you can actually use</h2>
+    <p class="section-lede">
+      The recording goes to <a href="https://jasoncheng7115.github.io/jt-live-whisper/" target="_blank" rel="noopener">jtlw</a>
+      (jt-live-whisper, <b>which you can host on your own network</b>) for recognition and speaker separation;
+      <b>the summary, decisions, action items, mind map and translation all stay in this system</b>.
+      <b>The audio never has to leave your network.</b>
+    </p>
+
+    <div class="sp-steps">
+      <div class="sp-step"><span class="sp-n">1</span>
+        <b>Set it up once</b>
+        <span>Fill in the endpoint and API key in the admin area. For a self-signed certificate, just paste the certificate in:
+        <b>do not turn verification off</b>. Until it is set up, the tool stays greyed out.</span></div>
+      <div class="sp-step"><span class="sp-n">2</span>
+        <b>Upload the recording</b>
+        <span>Audio or video, both accepted. Once it is done, <b>hand it to Meeting summary in one click</b>, or go through the API so another system can pick it up.</span></div>
+      <div class="sp-step"><span class="sp-n">3</span>
+        <b>Listen and read together</b>
+        <span>The transcript carries timings and speakers: click the waveform to play from there, the matching line lights up as it plays, and
+        clicking a speaker code renames them.</span></div>
+    </div>
+
+    <div class="sp-facts">
+      <div><b>28.3 minutes in 112 seconds</b><span>15x faster than real time (measured)</span></div>
+      <div><b>0.12 of a percentage point apart</b><span>Measured against the reference answers of a public corpus; our whole pipeline and the speech service's own figure are all but identical</span></div>
+      <div><b>Short-lived signed URLs</b><span>This is how the recording is handed over: no account or credential is given to the other side, and the link expires by itself</span></div>
+      <div><b>Citations are bound to segment numbers</b><span>After a re-run of the correction step or a glossary update, decisions and action items that were already produced still point back to the same piece of audio</span></div>
+    </div>
+
+    <p class="sp-foot">Leave it unset and nothing changes: <b>the other 49 tools are entirely unaffected</b>.</p>
   </div>
 </section>
 

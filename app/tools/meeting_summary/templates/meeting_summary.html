@@ -363,7 +363,7 @@
         <span id="msDurWrap" hidden><b id="msDur">—</b>{{ tr('總長') }}</span>
       </div>
       <div class="ms-warn" id="msNoTimes" hidden>
-        {{ tr('這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有，但「發言者發言佔比」與「章節時間軸」不會出現（那兩個要靠時間算，猜出來的數字不能用）。') }}
+        {{ tr('這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有，但「各發言者佔多少」與「章節時間軸」不會出現（那兩個要靠時間算，猜出來的數字不能用）。') }}
       </div>
       <div class="ms-warn" id="msNoSpk" hidden>
         {{ tr('沒有認出任何發言者。如果你的逐字稿是「發言者：內容」這種格式卻沒認出來，多半是名字只出現過一次 —— 分析照常可以做，只是不會有發言者佔比。') }}
@@ -525,7 +525,9 @@
     if (!sel.options.length && d.shapes) {
       Object.keys(d.shapes).forEach(function (k) {
         var o = document.createElement('option');
-        o.value = k; o.textContent = d.shapes[k];
+        // **伺服器送來的文字要自己包 `tr()`** —— 樣板掃字面的守門看不到
+        // 這一類（`<option>` 是 JS 建的），英 / 日介面會安靜留著中文。
+        o.value = k; o.textContent = tr(d.shapes[k]);
         sel.appendChild(o);
       });
     }
@@ -535,7 +537,7 @@
       //（「一行一句（發言者：內容）」），外面再包就變成
       // 「（自動判斷為：一行一句（發言者：內容））」兩層，很難讀
       //（2026-09-19 回報）。
-      ? tr('自動判斷：{0}').replace('{0}', (d.shapes || {})[d.shape] || d.shape)
+      ? tr('自動判斷：{0}').replace('{0}', tr((d.shapes || {})[d.shape] || d.shape))
       : '';
     el('msParsed').hidden = false;
     el('msResult').hidden = true;
@@ -597,7 +599,12 @@
     var text = el('msPasteBox').value.trim();
     if (!text) { showAlert(tr('請先貼上逐字稿')); return; }
     var fd = new FormData();
-    fd.append('file', new Blob([text], { type: 'text/plain' }), '貼上的逐字稿.txt');
+    // 這個檔名**使用者看得到**（作業名稱、通知），所以要翻；
+    // 「這份是貼上的」改由 `pasted` 旗標告訴伺服器 —— 拿翻過的檔名去比
+    // 字串的話，英 / 日介面下那個比對永遠不成立而且完全看不出來。
+    fd.append('file', new Blob([text], { type: 'text/plain' }),
+              tr('貼上的逐字稿') + '.txt');
+    fd.append('pasted', '1');
     fd.append('shape', shape || 'auto');
     var r = await fetch(BASE + '/upload', { method: 'POST', body: fd });
     if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀取失敗'))); return; }

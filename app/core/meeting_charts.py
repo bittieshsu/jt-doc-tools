@@ -15,7 +15,7 @@ from __future__ import annotations
 import html
 from typing import Optional, Sequence
 
-#: 圖的配色。**同一個語者在每張圖上要是同一個顏色** —— 不然兩張圖並排時
+#: 圖的配色。**同一個發言者在每張圖上要是同一個顏色** —— 不然兩張圖並排時
 #: 讀的人會以為是不同的人。
 PALETTE = ("#6366f1", "#10b981", "#f59e0b", "#ef4444", "#0ea5e9",
            "#8b5cf6", "#14b8a6", "#f97316", "#84cc16", "#ec4899",
@@ -82,12 +82,12 @@ def _svg(w: int, h: int, body: str, title: str = "") -> str:
             f'{t}<rect width="{w}" height="{h}" fill="#ffffff"/>{body}</svg>')
 
 
-# ------------------------------------------------------------------ 語者佔比
+# ------------------------------------------------------------------ 發言者佔比
 
 #: `unknown` 是分析時塞的代號不是名字 —— **資料裡留著**（統計、引用、
 #: 匯出都靠它對應），**只在顯示的時候換掉**。
 #: 這跟「欄位同義詞字典不可以翻」是一體兩面：資料不翻，顯示要翻。
-UNLABELLED = "未標示講者"
+UNLABELLED = "未標示發言者"
 
 
 def _spk(name: object) -> str:
@@ -108,7 +108,7 @@ def speaker_timeline(segments: Sequence[dict], stats: dict, *,
 
     ## ⚠ 這一支存在的理由：畫面改了，匯出沒跟著改
 
-    2026-09-19 前端把語者長條圖併進表格、換成發言分布，**但匯出用的是
+    2026-09-19 前端把發言者長條圖併進表格、換成發言分布，**但匯出用的是
     伺服器畫的這一份** —— 於是網頁上是分布、PDF 裡還是舊的長條圖，
     連 `unknown` 都還沒換成中文。使用者一眼就看到了。
     **「同一份東西寫在兩個地方一定會漂」在這裡又應驗一次。**
@@ -216,7 +216,7 @@ def speaker_share(stats: dict, *, width: int = 760) -> Optional[str]:
     bar_w = width - bar_x - 96
     unit = "發言時間" if use_time else "發言字數"
     body = [f'<text x="0" y="20" font-size="14" font-weight="700" fill="#0f172a">'
-            f'語者發言佔比（依{unit}）</text>',
+            f'各發言者佔多少（依{unit}）</text>',
             f'<text x="0" y="36" font-size="11" fill="#64748b">'
             f'{"重疊的插話只算一次" if use_time else "這份逐字稿沒有時間戳記，改用字數"}</text>']
     for i, (name, val, turns) in enumerate(rows):
@@ -231,7 +231,7 @@ def speaker_share(stats: dict, *, width: int = 760) -> Optional[str]:
             f'<rect x="{bar_x}" y="{y + 4}" width="{w}" height="14" rx="3" fill="{colour}"/>'
             f'<text x="{bar_x + w + 8}" y="{y + 15}" font-size="11.5" fill="#475569">'
             f'{pct:.1f}%　{_esc(shown)}　{turns} 次</text>')
-    return _svg(width, h, "".join(body), f"語者發言佔比（依{unit}）")
+    return _svg(width, h, "".join(body), f"各發言者佔多少（依{unit}）")
 
 
 # ------------------------------------------------------------------ 章節時間軸

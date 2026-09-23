@@ -1,7 +1,7 @@
 """會議摘要：**真的在瀏覽器裡跑一次**。
 
 **為什麼一定要有這一條**：這支工具的結果頁幾乎全部是 JS 產生的（四張卡片、
-章節、語者佔比的 SVG、討論結構的樹、逐字稿、以及點引用跳回原文）。
+章節、發言者佔比的 SVG、討論結構的樹、逐字稿、以及點引用跳回原文）。
 本專案一整個家族的 bug 都是「元素都在、沒有 JS 例外、畫面看起來正常，
 但那段程式根本沒跑」—— 只有真的跑一次 JS 才看得到。
 
@@ -237,7 +237,7 @@ def test_the_whole_flow_works_in_a_real_browser(live):
     assert _wait(send, "!document.getElementById('msParsed').hidden", 40), \
         "解析結果沒出現 —— 上傳那條路沒接上"
 
-    # **講者要認得出來**，不然語者佔比整個沒有意義
+    # **發言者要認得出來**，不然發言者佔比整個沒有意義
     assert _eval(send, "document.getElementById('msNSpk').textContent") == "2"
     assert int(_eval(send, "document.getElementById('msNSeg').textContent")) >= 3
     assert _eval(send,
@@ -352,7 +352,7 @@ def test_the_charts_are_not_scaled_by_css(live):
 def test_hovering_a_bar_lights_up_its_legend_row(live):
     """滑過長條，對應的圖例亮著、其餘變淡（2026-09-19 使用者要求）。
 
-    量的是**章節佔比**那張圖 —— 語者那張已經併進表格了。
+    量的是**章節佔比**那張圖 —— 發言者那張已經併進表格了。
     """
     port, send, vtt = live
     assert _wait(send, "!document.getElementById('msResult').hidden", 10)
@@ -453,7 +453,7 @@ def test_the_speaking_distribution_lives_in_the_table(live):
     port, send, vtt = live
     assert _wait(send, "!document.getElementById('msResult').hidden", 10)
     if _eval(send, "document.getElementById('msSpkWrap').hidden"):
-        pytest.skip("這份素材沒有語者區")
+        pytest.skip("這份素材沒有發言者區")
 
     assert _eval(send, "!!document.querySelector('#msSpkTable .ms-trk')"), \
         "「發言分布」沒有在表格裡 —— 合併沒有做到"
@@ -478,7 +478,7 @@ def test_the_speaking_distribution_lives_in_the_table(live):
     _eval(send, "document.querySelector('#msSpkTable tr[data-seq]')"
                 ".dispatchEvent(new MouseEvent('click',{bubbles:true})), 1")
     assert _wait(send, f"!!document.querySelector('#ms-seg-{seq}.hit')", 10), \
-        "點了語者那一列，逐字稿沒有跳過去"
+        "點了發言者那一列，逐字稿沒有跳過去"
 
 
 def test_opening_from_my_jobs_shows_the_result(live):
@@ -619,7 +619,7 @@ def test_clicking_a_block_jumps_to_that_moment_not_the_first_one(live):
     port, send, vtt = live
     assert _wait(send, "!document.getElementById('msResult').hidden", 10)
     if _eval(send, "document.getElementById('msSpkWrap').hidden"):
-        pytest.skip("這份素材沒有語者區")
+        pytest.skip("這份素材沒有發言者區")
     # **先找「色塊」，不要先要求它有段號** —— 用 `i[data-seq]` 當選擇器的話，
     # 沒有段號時找不到東西 → skip，而「跳過」跟「通過」在輸出裡長得一樣
     # （實測：拿掉每格的段號，這條只是 skip 不是紅）。

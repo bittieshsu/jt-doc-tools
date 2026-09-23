@@ -1,6 +1,6 @@
 """跟 jtlw（語音服務）講話的客戶端。
 
-**分工**：jtlw 只做「聲音 → 逐字稿（含語者）」。摘要、決議、待辦、心智圖、
+**分工**：jtlw 只做「聲音 → 逐字稿（含發言者）」。摘要、決議、待辦、心智圖、
 翻譯全部在 JTDT —— 所以這裡不會出現 `summarize` / `translate` 之類的任務，
 送過去也會被對方回 422 `task_not_supported`。
 
@@ -179,7 +179,8 @@ class JtlwClient:
         except httpx.TimeoutException as e:
             raise JtlwUnavailable(f"連 jtlw 逾時（{self._base}）") from e
         except httpx.HTTPError as e:
-            raise JtlwUnavailable(f"連不上 jtlw（{self._base}）") from e
+            raise JtlwUnavailable("連不上 jtlw",
+                                  details={"base": self._base}) from e
         _raise_for(resp)
         return resp
 
@@ -192,7 +193,8 @@ class JtlwClient:
             with httpx.Client(timeout=self._timeout, verify=self._verify) as c:
                 r = c.get(f"{self._base}/health")
         except httpx.HTTPError as e:
-            raise JtlwUnavailable(f"連不上 jtlw（{self._base}）") from e
+            raise JtlwUnavailable("連不上 jtlw",
+                                  details={"base": self._base}) from e
         _raise_for(r)
         return r.json()
 

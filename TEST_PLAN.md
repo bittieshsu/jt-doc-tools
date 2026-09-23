@@ -543,7 +543,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **327 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **330 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -647,6 +647,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_docs_english_pages.py` | 介紹站與 API 手冊的英文版（GitHub Pages） |
 | `test_docs_lang_switch_is_restricted.py` | 介紹站的語言下拉只能跳到**同目錄的 `.html`** |
 | `test_docs_links.py` | 介紹網站與 API 手冊的連結不可以指向不存在的東西 |
+| `test_docs_nav_controls_line_up.py` | 介紹站導覽列右邊那兩個控制項**高度要一樣** |
 | `test_docs_numeric_claims.py` | 公開文件裡的數字宣稱要跟程式對得上 |
 | `test_docs_tool_categories.py` | 介紹站的工具分類要跟程式裡的一致 |
 | `test_docx_textbox_translation.py` | 含**文字方塊**的 .docx 翻譯 —— 同一段文字會被收好幾次 |
@@ -694,6 +695,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_json_error_handling.py` | 非 JSON / 壞掉的 request body 應回 400（而非 500） |
 | `test_jtdt_reform_reports_page_progress.py` | `jtdt-reform` 引擎要**逐頁**回報進度 |
 | `test_latin_ext_garbled_recovery.py` | 擷取結果被映到拉丁擴充區、而且每個 span 都很短 —— 舊的判準抓不到 |
+| `test_layout_measured_in_browser.py` | 版面在**真的瀏覽器**裡量：欄位寬度、字有沒有被拆成兩行、該看得到的看不看得到 |
 | `test_ldap_attribute_portability.py` | LDAP 查詢的屬性清單不可以夾帶 AD 專屬屬性 |
 | `test_ldap_failover.py` | 多台 DC 容錯與連線逾時 |
 | `test_learn_synonym_reports_existing_mappings.py` | 按「學起來」時要**把後果講出來** |
@@ -704,7 +706,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_looks_garbled.py` | Regression tests for pdf_editor._looks_garbled(). |
 | `test_markdown_to_doc_formats.py` | Markdown 轉辦公文件：只轉使用者要的格式 ＋ 程式碼語法上色 |
 | `test_meeting_chart_style_has_one_source.py` | 圖的配色只有一份 —— 前端畫圖、伺服器畫匯出用的圖，顏色必須同源 |
-| `test_meeting_insight.py` | 會議分析的確定性部分（切視窗、解析、引用驗證、合併、語者統計） |
+| `test_meeting_insight.py` | 會議分析的確定性部分（切視窗、解析、引用驗證、合併、發言者統計） |
 | `test_meeting_node_labels.py` | 心智圖節點的文字：縮短可以，但**要看得出來是縮短** |
 | `test_meeting_speaking_time_says_its_basis.py` | 「發言時間」是量到的還是推估的，畫面上要講出來 |
 | `test_meeting_summary_e2e.py` | 會議摘要：**真的在瀏覽器裡跑一次** |
@@ -795,6 +797,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_redos_ad_dn.py` | ReDoS regression for RE_AD_DN — closes CodeQL alert #13 |
 | `test_release_installer_must_be_signed.py` | Release 上掛的安裝程式**只能是簽章過的** |
 | `test_restrict_stamp_render.py` | 個資限用章的渲染 —— 橫式 / 直式 / 對角線 |
+| `test_retention_keeps_job_artifacts.py` | 作業還在保留期內，它放在暫存區的東西就不可以先被清掉 |
 | `test_retention_periods.py` | 檔案保留期：**設定頁上的每一個數字都要真的生效** |
 | `test_roles.py` | Tests for app.core.roles. |
 | `test_roles_default_and_seed.py` | Tests for the new-user default role + seed-snapshot behaviour (v1.12.53). |
@@ -2159,6 +2162,10 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       ③**HEAD 也要答 200** —— `@router.get` 只註冊 GET，回 405 的話任何
       「檔案還在嗎」的探測都會失敗，而失敗在畫面上跟「沒有錄音檔」長得一模一樣
       ④錄音被清掉時回 410 / 404，畫面收起播放器並講得出原因
+- [ ] `POST /tools/meeting-transcribe/api/meeting-transcribe` —— 對外 API（同步）。
+      驗：①沒設定 jtlw 回 **503**②不支援的副檔名回 **400**③空檔案回 400
+      ④**走的是跟網頁同一條 `_run_job`**（不可以為了 API 另抄一份處理邏輯）
+      ⑤回傳的 `segments` 是三層併起來的（文字校正後、時間來自 raw、發言者來自 speakers）
 - [ ] `POST /tools/meeting-transcribe/speakers/{upload_id}` —— 把發言者代號改成人名。
       驗：①別人的改不到②`map` 是「同一位全部一起改」、`overrides` 是「只有這一段」
       ③名字裡的換行 / 控制字元被清掉、長度有上限（會被寫進逐字稿與下載的檔案）

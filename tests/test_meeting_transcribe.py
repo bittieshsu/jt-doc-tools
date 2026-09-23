@@ -4,7 +4,7 @@
 公開樹），測試不可以依賴它。這裡起一個最小的假服務，只實作我們真的會打的
 那幾支 —— 而且**順便驗我們送出去的請求長什麼樣**，那是假 mock 驗不到的。
 
-**已經用對方的 mock 實跑過一次**（115 段、2 位語者、ACK 有送），
+**已經用對方的 mock 實跑過一次**（115 段、2 位發言者、ACK 有送），
 當場抓到一個真 bug：`safe_remote_base_url()` 刻意把路徑丟掉，
 於是請求打到 `/jobs` 而不是 `/api/v1/jobs`，對方回 404。
 **只有真的送出去才看得到** —— 單元測試對得起來，因為那是我們自己算的字串。
@@ -118,7 +118,7 @@ class FakeJtlw:
                 elif layer == "final":
                     rows.append({"seq": i, "text": f"校正後第 {i} 句。"})
                 else:
-                    # **刻意讓第 2 段沒有語者** —— 三層對不上時不可以硬湊
+                    # **刻意讓第 2 段沒有發言者** —— 三層對不上時不可以硬湊
                     if i != 2:
                         rows.append({"seq": i, "speaker_id": f"S{(i % 2) + 1}"})
             return {"segments": rows, "has_more": False, "complete": True}
@@ -238,8 +238,8 @@ def test_the_whole_flow_against_a_fake_jtlw(client, unconfigured):
         # 只有真的從 `raw` 用 `seq` 對回去才會成立。
         assert segs[0]["text"] == "校正後第 1 句。"
         assert segs[0]["start_ms"] == 1000
-        # **對不上的不可以硬湊**：第 2 段沒有語者就是沒有
-        assert "speaker" not in segs[1], "把別人的語者貼到沒有語者的那一段上了"
+        # **對不上的不可以硬湊**：第 2 段沒有發言者就是沒有
+        assert "speaker" not in segs[1], "把別人的發言者貼到沒有發言者的那一段上了"
         assert segs[0]["speaker"] == "S2"
 
 
@@ -449,18 +449,18 @@ def test_the_speaker_count_field_asks_who_speaks_not_who_attends():
 
     語音服務在完整 37 分鐘的 7 人中文會議上量過（2026-09-22 修正後的版本）：
 
-    | 設定 | 講者搞錯 | 分出的講者 |
+    | 設定 | 發言者搞錯 | 分出的發言者 |
     |---|---:|---:|
     | 不指定 | 22.90% | 3 / 7 |
     | **指定 7 人（正確答案）** | **30.15%** | 7 / 7 |
     | 指定 5~6 人 | **17.8%** | 5~6 / 7 |
 
     那 7 個人裡有 3 位分別只講了 28.6 / 56.2 / 94.8 秒 ——
-    **聲紋不足以成群的人硬湊一群給他，代價是把主要講者拆散**
+    **聲紋不足以成群的人硬湊一群給他，代價是把主要發言者拆散**
     （最大的兩位正確率 89.8% / 93.2% → 56.5% / 55.8%）。
 
     **但「不填」也有代價，而且是我們最在意的那一種**：不指定時
-    **4/7 位講者在輸出裡完全不存在**，他們說的每一句都掛在別人名下 ——
+    **4/7 位發言者在輸出裡完全不存在**，他們說的每一句都掛在別人名下 ——
     對引用機制來說那不是「少了幾秒」，是「有一條決議、標了一個錯的人」。
 
     所以問的是「**發言量足以辨認**的人數」，不是「有出過聲的人數」，
@@ -484,11 +484,11 @@ def test_the_speaker_count_field_asks_who_speaks_not_who_attends():
 
     assert "會發言的人數" in body, "欄位標題要問「會發言的人數」"
     assert "與會人數" not in body, (
-        "欄位標題寫成「與會人數」了 —— 填進不發言的人會讓講者分辨更差")
+        "欄位標題寫成「與會人數」了 —— 填進不發言的人會讓發言者分辨更差")
     assert "不確定就留 0" in body, "要明講不確定就留 0（系統自己判通常比錯誤的提示好）"
     assert "發言量足以辨認" in body, (
         "說明要講出「發言量足以辨認」—— 只說「會發言」不夠，"
-        "講一兩句的人也算會發言，填進去反而會把主要講者拆散")
+        "講一兩句的人也算會發言，填進去反而會把主要發言者拆散")
     assert "只講一兩句" in body, "要給一個管理員估得出來的界線"
     assert "填了會比較準" not in body, (
         "舊的說明寫著「知道確切人數時填了會比較準」—— 那句話已經被量測推翻了")
@@ -625,7 +625,7 @@ def test_the_saved_transcript_round_trips_into_the_summary_tool():
     `start_ms` / `end_ms` / `speaker`，三層的 join 一直是對的。
 
     掉時間的地方在**交接**：轉送時把逐字稿攤平成純文字，而純文字裡沒有時間，
-    於是「會議摘要」那邊的語者佔比與章節時間軸就變成「這份逐字稿沒有時間戳記」。
+    於是「會議摘要」那邊的發言者佔比與章節時間軸就變成「這份逐字稿沒有時間戳記」。
 
     所以改送 JSON。這條驗的是那份 JSON **真的被對面讀得回來** ——
     只驗「有送 JSON」的話，格式不合也會過。
@@ -641,7 +641,7 @@ def test_the_saved_transcript_round_trips_into_the_summary_tool():
     segs = tp.parse_json(json.dumps(saved, ensure_ascii=False).encode("utf-8"))
     assert len(segs) == 2, segs
     assert [s.get("start_ms") for s in segs] == [1450, 6270], "時間掉了"
-    assert [s.get("speaker") for s in segs] == ["S1", "S2"], "語者掉了"
+    assert [s.get("speaker") for s in segs] == ["S1", "S2"], "發言者掉了"
 
 
 def test_the_handoff_sends_json_not_flattened_text():
@@ -680,8 +680,8 @@ def test_plain_text_copy_keeps_the_timestamps():
 
     # 而且真的解析得回來（格式對不對只有這樣才驗得到）
     #
-    # **素材要讓講者重複出現**：`parse_plain` 判斷「這是講者還是句子」的方式是
-    # 「同一個名字有沒有再出現」，所以每個人只講一句的逐字稿會被判成沒有講者。
+    # **素材要讓發言者重複出現**：`parse_plain` 判斷「這是發言者還是句子」的方式是
+    # 「同一個名字有沒有再出現」，所以每個人只講一句的逐字稿會被判成沒有發言者。
     # 那是啟發式的邊角，不是這條要驗的東西（真的會議一定會重複）。
     from app.core import transcript_parse as tp
     segs, used = tp.parse_plain(

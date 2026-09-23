@@ -138,6 +138,7 @@
             <a class="nav-ep" href="#pdf-附件擷取">PDF 附件擷取</a>
             <a class="nav-ep" href="#pdf-中繼資料">PDF 中繼資料</a>
             <a class="nav-ep" href="#pdf-字數統計">PDF 字數統計</a>
+            <a class="nav-ep" href="#會議錄音轉逐字稿">會議錄音轉逐字稿</a>
             <a class="nav-ep" href="#會議摘要">會議摘要</a>
             <a class="nav-ep" href="#pdf-ocr">PDF OCR</a>
             <a class="nav-ep" href="#pdf-註解整理">PDF 註解整理</a>
@@ -705,6 +706,38 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;per_page_chars&quot;</span>: [<span class="hl-cmt">/* ... */</span>],
   <span class="hl-key">&quot;top_words_zh2&quot;</span>: [<span class="hl-cmt">/* ... */</span>], <span class="hl-key">&quot;top_words_en&quot;</span>: [<span class="hl-cmt">/* ... */</span>]
 }</code></pre>
+      </section>
+      <section class="doc-section" data-sec="會議錄音轉逐字稿" data-title="會議錄音轉逐字稿" hidden>
+<div class="doc-crumb">5. PDF 擷取與分析 API</div>
+<h4 id="會議錄音轉逐字稿">會議錄音轉逐字稿</h4>
+<p>把會議錄音或錄影轉成<strong>帶時間與發言者</strong>的逐字稿。辨識在外部語音服務（jtlw） 那側跑 —— <strong>要先在管理區「語音服務（jtlw）」設定好</strong>，沒設定回 <strong>503</strong>。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-transcribe/api/meeting-transcribe</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>音訊 <code>.m4a</code> / <code>.mp3</code> / <code>.wav</code> / <code>.aac</code> / <code>.ogg</code> / <code>.opus</code> / <code>.flac</code>，影片 <code>.mp4</code> / <code>.mov</code> / <code>.mkv</code> / <code>.webm</code></td></tr><tr><td><code>language</code></td><td>string</td><td></td><td><code>auto</code>（預設）或 BCP-47（<code>zh-Hant</code> / <code>en</code> / <code>ja</code> …）。對方不支援時<strong>送件當下</strong>就回 400</td></tr><tr><td><code>num_speakers</code></td><td>string</td><td></td><td>預設 <code>0</code> ＝ 讓它自己判。<strong>建議就留 0</strong></td></tr></tbody></table></div>
+<p><strong><code>num_speakers</code> 問的是「發言量足以辨認的人數」，不是與會人數。</strong> 語音服務在 <strong>20 場中文會議</strong>（AISHELL-4 test，5~7 人）上量過：指定正確人數與 不指定<strong>分不出勝負</strong>（13.24% vs 12.46%，配對 bootstrap 95% 信賴區間 [−2.72, +4.10] 跨過 0）。<strong>所以不要為了「更準」而去填它。</strong></p>
+<p>真正的理由是機制：同一批 20 場裡，<strong>最佳的群數從來沒有大於實際人數</strong> （10 場相等、10 場更少、0 場更多）。有 6 個人在場不代表聲學上分得出 6 群 —— 硬要分成 6 群時，系統只能<strong>把講最多的那個人拆開</strong>，而那是最貴的錯。 只講一兩句的人不要算進去；<strong>不確定就留 0</strong>。</p>
+<p><strong>這支是同步的</strong> —— 37 分鐘的會議實測 7~8 分鐘（辨識 ＋ 發言者分離 ＋ 校正）， 呼叫端的逾時要放寬。要背景處理請走網頁那條路 （<code>POST /upload</code> → <code>POST /start</code> → 拿作業編號輪詢 <code>/api/jobs/{id}</code>）。</p>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-transcribe/api/meeting-transcribe</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@meeting.m4a&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;language=auto&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;num_speakers=0&quot;</span> | jq</code></pre>
+<p>回應 JSON（節錄）：</p>
+<pre><code class="lang-json">{
+  <span class="hl-key">&quot;source&quot;</span>: {<span class="hl-key">&quot;filename&quot;</span>: <span class="hl-str">&quot;meeting.m4a&quot;</span>, <span class="hl-key">&quot;size_bytes&quot;</span>: <span class="hl-num">17823213</span>},
+  <span class="hl-key">&quot;remote_job_id&quot;</span>: <span class="hl-str">&quot;job_01M34PVW581P2QD3Q0YFT5Y903&quot;</span>,
+  <span class="hl-key">&quot;status&quot;</span>: <span class="hl-str">&quot;succeeded&quot;</span>,
+  <span class="hl-key">&quot;uncorrected&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;layers&quot;</span>: {<span class="hl-key">&quot;raw&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;final&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;speakers&quot;</span>: <span class="hl-num">1045</span>},
+  <span class="hl-key">&quot;summary&quot;</span>: {<span class="hl-key">&quot;correction_level&quot;</span>: <span class="hl-str">&quot;punctuation_only&quot;</span>, <span class="hl-key">&quot;correction&quot;</span>: {<span class="hl-key">&quot;edited&quot;</span>: <span class="hl-num">612</span>}},
+  <span class="hl-key">&quot;segments&quot;</span>: [
+    {<span class="hl-key">&quot;seq&quot;</span>: <span class="hl-num">1</span>, <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;各位早，我們開始。&quot;</span>, <span class="hl-key">&quot;speaker&quot;</span>: <span class="hl-str">&quot;S1&quot;</span>,
+     <span class="hl-key">&quot;start_ms&quot;</span>: <span class="hl-num">1450</span>, <span class="hl-key">&quot;end_ms&quot;</span>: <span class="hl-num">2650</span>}
+  ]
+}</code></pre>
+<p><strong><code>segments</code> 是三層併起來的</strong>：文字用校正後的、時間來自原始辨識層、 發言者來自 speakers 層，三層以 <code>seq</code> 對應。對不上的段落<strong>不會硬湊</strong> —— 寧可那一段沒有發言者，也不要把別人的名字貼上去。</p>
+<p><code>uncorrected</code> 為 <code>true</code> 代表<strong>校正那一步失敗了</strong>，你拿到的是原始辨識結果 （標點與錯字沒有修過）—— 這時候別把它當成校正過的內容去比對。</p>
+<p><code>speaker</code> 是代號（<code>S1</code> / <code>S2</code>…）。姓名對照是呼叫端自己的事； 網頁那條路可以點代號直接改成人名。</p>
+<hr>
       </section>
       <section class="doc-section" data-sec="會議摘要" data-title="會議摘要" hidden>
 <div class="doc-crumb">5. PDF 擷取與分析 API</div>

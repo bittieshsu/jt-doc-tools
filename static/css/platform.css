@@ -499,6 +499,10 @@ html[lang]:not([lang="zh-Hant"]) td {
 html[lang]:not([lang="zh-Hant"]) li + li { margin-top: 6px; }
 html[lang]:not([lang="zh-Hant"]) p + p { margin-top: 8px; }
 .form-row .field { flex: 1 1 220px; min-width: 0; }
+/* jtlw 的全名與專案說明（`components/jtlw_name.html`）—— 接在說明那一行尾巴，
+   整段不斷行，視窗窄的時候整段換到下一行，不要把 `jt-live-whisper` 拆開。 */
+.jtlw-name { white-space: nowrap; margin-left: 4px; }
+.jtlw-name code { font-size: 12px; }
 @media (max-width: 640px) {
   .form-row { align-items: flex-start; }
   .form-row label { width: 100%; }
@@ -538,6 +542,15 @@ input.field:focus, select.field:focus, textarea.field:focus {
   outline: none; border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
 }
+/* 數字欄位後面接單位（`秒` / `MB` / `小時`）：**寬度固定，不可以被撐成整列寬**。
+   原本這幾格各自寫 `width:110px`，被**上面那條 `.form-row input[type=number]
+   { flex: 1 }`** 拉長（它的權重比 `.form-row .field` 高）—— 一個填「30」的欄位
+   看起來像要填一長串，單位字被推到最右邊（v1.16.6 截圖目視抓到，全站 5 處）。
+   **這一條要放在那條之後**（同權重，後寫的贏）；寫在前面的話量出來照樣是整列寬
+   （第一版就是這樣，瀏覽器量測的守門當場抓到）。
+   要固定寬度的數字欄位一律掛這個類別，**不要再各自寫一次寬度**。 */
+.form-row input.field-num { flex: 0 0 110px; width: 110px; }
+.form-row .field-unit { color: var(--muted); font-size: 13px; }
 
 /* In the narrow drag-editor side panel, give labels a tiny bit more room and
    cap input width so mm labels never wrap. */

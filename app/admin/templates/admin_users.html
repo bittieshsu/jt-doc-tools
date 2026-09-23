@@ -161,8 +161,11 @@
           <span class="src-badge src-{{ u.source }}">{{ u.source }}</span>
         </td>
         <td data-sort-key="{{ '1' if u.enabled else '0' }}">
-          {% if u.enabled %}<span data-s="sdeccf9e7">{{ tr('● 啟用') }}</span>
-          {% else %}<span data-s="sbc8099b4">{{ tr('● 停用') }}</span>{% endif %}
+          {# `uf-state` 不斷行：表格一寬，這一欄會被擠到只剩一個字寬，
+             「啟用」被拆成「啟 / 用」兩行（v1.16.6 用**有資料**的實例拍截圖才看到 ——
+             之前的截圖都是空的使用者清單）。 #}
+          {% if u.enabled %}<span class="uf-state" data-s="sdeccf9e7">{{ tr('● 啟用') }}</span>
+          {% else %}<span class="uf-state" data-s="sbc8099b4">{{ tr('● 停用') }}</span>{% endif %}
         </td>
         <td data-sort-key="{{ u.roles|join(',') }}">
           {% if u.roles_display %}
@@ -319,6 +322,7 @@
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
+  .uf-state { white-space: nowrap; }
   .user-table { width:100%; border-collapse:collapse; font-size:13px; }
   .user-table th, .user-table td { padding:6px 8px; border-bottom:1px solid #e5e7eb; text-align:left; }
   .user-table th { background:#f9fafb; font-size:12px; color:#6b7280; }
@@ -338,8 +342,11 @@
   .src-ldap  { background:#dbeafe; color:#1e40af; }
   .src-ad    { background:#ede9fe; color:#5b21b6; }
   /* Role chips inside the user list — small pill, separate from src-badge */
+  /* 角色徽章也不斷行 —— 只修「狀態」那一欄的話，擠的空間會換到這一欄：
+     「法務資安」變成「法務資 / 安」（v1.16.6 修完狀態欄重拍截圖才看到）。
+     多個角色之間照樣可以換行，只是一個徽章不可以被拆開。 */
   .role-chip {
-    display:inline-block; font-size:11.5px; padding:1px 7px; margin:1px 3px 1px 0;
+    display:inline-block; white-space:nowrap; font-size:11.5px; padding:1px 7px; margin:1px 3px 1px 0;
     background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; border-radius:4px;
   }
   /* Last-login: absolute on first line, relative dimmer on second */

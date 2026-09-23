@@ -31,7 +31,7 @@ def _upload(client, data=VTT.encode(), name="meeting.vtt"):
 # ------------------------------------------------------------------ 上傳
 
 def test_upload_returns_a_preview_before_any_llm_work(client, auth_off):
-    """**先看解析結果再花那幾分鐘** —— 講者判錯要在開始之前就看得出來。"""
+    """**先看解析結果再花那幾分鐘** —— 發言者判錯要在開始之前就看得出來。"""
     r = _upload(client)
     assert r.status_code == 200, r.text
     d = r.json()
@@ -439,8 +439,8 @@ def test_the_chart_headings_are_not_doubled():
 def test_the_exported_chart_matches_what_the_page_shows():
     """匯出的圖要跟畫面上看到的是同一件事（2026-09-19 使用者回報）。
 
-    畫面把語者長條圖併進表格、換成「發言分布」之後，**匯出用的是伺服器畫的
-    另一份** —— 於是網頁上是分布、PDF 裡還是舊的長條圖，連未標示的講者都
+    畫面把發言者長條圖併進表格、換成「發言分布」之後，**匯出用的是伺服器畫的
+    另一份** —— 於是網頁上是分布、PDF 裡還是舊的長條圖，連未標示的發言者都
     還顯示 `unknown`。**同一份東西寫在兩個地方一定會漂**，這次漂在
     「畫面」與「匯出」之間。
 
@@ -463,16 +463,16 @@ def test_the_exported_chart_matches_what_the_page_shows():
 
     charts = mc.build_all(out, segs)
     svg = charts.get("speaker_share")
-    assert svg, "有逐段資料時應該畫得出語者那張圖"
+    assert svg, "有逐段資料時應該畫得出發言者那張圖"
     assert "誰在什麼時候講話" in svg, (
-        "匯出的語者圖還是舊的長條圖 —— 畫面上早就換成發言分布了")
+        "匯出的發言者圖還是舊的長條圖 —— 畫面上早就換成發言分布了")
     assert "unknown" not in svg, "圖上顯示了 `unknown` 這個代號"
-    assert mc.UNLABELLED in svg, "未標示的講者沒有換成看得懂的字"
+    assert mc.UNLABELLED in svg, "未標示的發言者沒有換成看得懂的字"
 
     # 沒有逐段資料（公開 API 那條路）仍然要畫得出東西 —— 退回長條圖
     fallback = mc.build_all(out)
     assert fallback.get("speaker_share"), "沒有逐段資料時應該退回長條圖"
-    assert "語者發言佔比" in fallback["speaker_share"]
+    assert "各發言者佔多少" in fallback["speaker_share"]
     assert "unknown" not in fallback["speaker_share"]
 
 
@@ -489,7 +489,7 @@ def test_the_exported_table_does_not_show_the_placeholder_speaker():
            "source": {"filename": "t.txt", "segments": 12}, "llm_calls": 1}
     md = mod._md(out, charts=False, embed=False, segments=segs)
     assert "unknown" not in md, "匯出的表格裡出現了 `unknown` 這個代號"
-    assert "未標示講者" in md
+    assert "未標示發言者" in md
 
 
 @pytest.mark.parametrize("fmt", ["pdf", "docx", "odt"])
@@ -600,6 +600,35 @@ def test_the_title_falls_back_to_the_filename_then_to_a_plain_one():
     # 有真的檔名就用檔名（而且不帶副檔名）
     assert mod.meeting_title(_out_with("", "第四季預算會議.txt")) == "第四季預算會議 會議記錄"
     # 貼上、又沒填背景 —— **不要編一個主題出來**
+    assert mod.meeting_title(_out_with("", "貼上的逐字稿.txt")) == "會議記錄"
+
+
+def test_pasted_is_decided_by_the_flag_not_by_the_filename():
+    """判準是 `pasted` 旗標，**不是檔名**。
+
+    貼上時前端塞的檔名**使用者看得到**（作業名稱、通知），所以它會照介面
+    語言翻。拿翻過的檔名去比字串的話，英 / 日介面下那個比對永遠不成立 ——
+    標題就變成「Pasted transcript 會議記錄」，而畫面上完全看不出哪裡錯了
+    （本專案記過的「翻掉一個拿去比較的字串」那一類）。
+
+    舊資料的退路也要留著：這個旗標是 v1.16.6 才加的，在那之前存下來的
+    meta 沒有這個欄位，只能靠檔名認。
+    """
+    import importlib
+    mod = importlib.import_module("app.tools.meeting_summary.router")
+
+    # 檔名翻成英文了，但旗標說「這是貼上的」→ 不可以拿檔名當標題
+    out = _out_with("", "Pasted transcript.txt")
+    out["source"]["pasted"] = True
+    assert mod.meeting_title(out) == "會議記錄"
+
+    # 反過來：使用者真的上傳了一個叫這個名字的檔案，旗標是 False
+    # → 那就是他的檔名，要用
+    out2 = _out_with("", "Pasted transcript.txt")
+    out2["source"]["pasted"] = False
+    assert mod.meeting_title(out2) == "Pasted transcript 會議記錄"
+
+    # 舊資料（沒有旗標）仍然靠檔名認得出來
     assert mod.meeting_title(_out_with("", "貼上的逐字稿.txt")) == "會議記錄"
 
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import threading
 import time
@@ -184,6 +185,10 @@ def _audit_oldest_days() -> float | None:
 
 # ---------- sweepers ----------
 
+# 暫存檔名裡的作業編號 / upload_id（32 碼十六進位）
+_HEX32 = re.compile(r"[0-9a-f]{32}")
+
+
 def _sweep_temp_dir(temp_seconds: int, jobs_seconds: int) -> int:
     """清掉過期的暫存檔與作業結果檔。
 
@@ -198,6 +203,26 @@ def _sweep_temp_dir(temp_seconds: int, jobs_seconds: int) -> int:
     """
     from ..config import settings as _s
     n = 0
+
+    # **v1.14.31 只修了一半**：那次讓 `jobs/` 改用 `jobs_hours`，但全站沒有任何
+    # 一支工具把結果放進 `jobs/` —— 結果檔、「開啟」要讀的資料、歸屬紀錄全部
+    # 在 `temp/`，照樣 2 小時就清掉，「我的作業」上的 24 小時仍然是假的
+    # （v1.16.6 使用者回報：已完成的會議摘要按「開啟」得到 410）。
+    #
+    # 修法不是把 27 支工具的輸出路徑都搬家，而是**在這裡認出「還在作業保留期內
+    # 的作業」的東西**，讓它們照作業的保留期走（見 `job_store.keep_alive_keys`）。
+    keep_ids: set[str] = set()
+    keep_names: set[str] = set()
+    if temp_seconds > 0:
+        from . import job_store
+        since = time.time() - jobs_seconds if jobs_seconds > 0 else 0.0
+        keep_ids, keep_names = job_store.keep_alive_keys(since)
+
+    def _kept(p: Path) -> bool:
+        if p.name in keep_names:
+            return True
+        return any(tok in keep_ids for tok in _HEX32.findall(p.name))
+
     for sub, seconds in (("temp", temp_seconds), ("jobs", jobs_seconds)):
         if seconds <= 0:            # 0 或負數 = 永久保留
             continue
@@ -205,6 +230,7 @@ def _sweep_temp_dir(temp_seconds: int, jobs_seconds: int) -> int:
         d = _s.data_dir / sub
         if not d.exists():
             continue
+        protect = sub == "temp"
         for child in d.iterdir():
             # `.owners/` is a special dir for upload-owner ACL sidecars
             # — sweep individual records inside it (the dir itself stays
@@ -212,6 +238,8 @@ def _sweep_temp_dir(temp_seconds: int, jobs_seconds: int) -> int:
             if child.is_dir() and child.name == ".owners":
                 for owner_file in child.iterdir():
                     try:
+                        if protect and _kept(owner_file):
+                            continue
                         if owner_file.stat().st_mtime < cutoff:
                             owner_file.unlink(missing_ok=True)
                             n += 1
@@ -219,6 +247,8 @@ def _sweep_temp_dir(temp_seconds: int, jobs_seconds: int) -> int:
                         pass
                 continue
             try:
+                if protect and _kept(child):
+                    continue
                 if child.stat().st_mtime < cutoff:
                     if child.is_dir():
                         shutil.rmtree(child, ignore_errors=True)

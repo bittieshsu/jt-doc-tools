@@ -146,6 +146,13 @@ code {
   background-position: left 8px center, right 6px center;
   background-size: 14px 14px, 11px 11px;
 }
+/* **跟旁邊的 GitHub 按鈕一樣高。**
+   兩者原本各自算高度（下拉 13.5px/6px padding/1px 框 ≈ 30px、按鈕
+   14px/9px padding/1.5px 框 ≈ 38px），並排時差 8px（使用者 2026-09-23
+   截圖回報）。**不要去湊 padding 的數字** —— 換一種語言、改一次字級就又
+   會歪掉。`align-self: stretch` 讓它跟著這一列最高的那一個走，
+   之後誰改了按鈕都不必回來改這裡。 */
+.nav-lang { align-self: stretch; }
 .nav-lang:hover { border-color: var(--indigo); color: var(--indigo); }
 .nav-lang:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
 /* Hamburger toggle button — visible only on narrow screens */
@@ -1053,12 +1060,23 @@ code {
 .install-meta {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: 18px;
   font-size: 13.5px;
   color: var(--text-2);
   line-height: 1.7;
   border-top: 1px solid var(--border);
+  /* 上面那條線之前有一個藍色的提示框 —— 貼太近會像是提示框的一部分 */
+  margin-top: 34px;
   padding-top: 30px;
+}
+/* 三欄的字數天差地遠（系統需求長、反向代理只有兩行），只用 grid 的話
+   每一欄的底都各自停在不同高度，中間空一大塊。做成等高的卡片之後，
+   **空白落在卡片裡面**，看起來就是刻意留的邊距而不是排版漏掉。 */
+.install-meta > div {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
 }
 .install-meta strong {
   display: block;
@@ -1162,6 +1180,8 @@ code {
   .topnav a:hover { background: #f1f5f9; }
   /* 收進漢堡選單之後，語言選單佔滿整列（跟其他項目一樣好按） */
   .topnav .nav-lang {
+    /* 漢堡選單裡是自己一整列，沒有要跟誰對齊 —— 撤掉 stretch */
+    align-self: auto;
     display: block; width: 100%;
     margin: 4px 0;
     padding-top: 9px; padding-bottom: 9px;
@@ -1588,6 +1608,7 @@ code {
 
 /* 安裝區的「封閉網路」提示（連到 OFFLINE.md）。 */
 .offline-note { max-width: 900px; margin: 18px auto 0; padding: 14px 18px;
+  /* 下面接的是 `.install-meta` 的上框線 —— 沒有這段留白會貼在一起 */
   background: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #3b82f6;
   border-radius: 8px; font-size: 14px; line-height: 1.7; color: #1e3a5f; }
 .offline-note code { background: #dbeafe; padding: 1px 6px; border-radius: 4px; }
@@ -1633,3 +1654,29 @@ code {
 .ts-empty { color: #64748b; background: #f8fafc; border: 1px dashed #cbd5e1;
             border-radius: 8px; padding: 14px; margin: 0 0 18px; }
 [hidden] { display: none !important; }
+
+/* ===== 語音整合（jtlw）區塊 =====
+   三步驟 ＋ 四個事實。**數字要能對得起來**：每一格都是實測或可查的東西，
+   不放「大幅提升」這種說不出依據的話。 */
+.sp-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+  margin: 28px 0 22px; }
+.sp-step { position: relative; background: #fff; border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px 20px 18px; }
+.sp-step .sp-n { position: absolute; top: -13px; left: 20px; width: 26px; height: 26px;
+  border-radius: 50%; background: var(--brand, #4f46e5); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; }
+.sp-step b { display: block; margin: 6px 0 6px; font-size: 15.5px; color: var(--text); }
+.sp-step span { display: block; font-size: 13.5px; line-height: 1.75; color: var(--text-2); }
+.sp-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.sp-facts > div { background: #f8fafc; border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px; }
+.sp-facts b { display: block; font-size: 15px; color: var(--text); margin-bottom: 4px; }
+.sp-facts span { font-size: 12.5px; line-height: 1.65; color: var(--text-2); }
+.sp-foot { margin-top: 18px; font-size: 13.5px; color: var(--text-2); }
+@media (max-width: 1024px) {
+  .sp-steps, .sp-facts { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .sp-steps, .sp-facts { grid-template-columns: 1fr; }
+}

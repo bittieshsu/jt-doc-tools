@@ -280,8 +280,8 @@
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg></span>
             <div class="fl-text"><span class="fn">字數統計<span class="ofc-mark" title="需 OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">總字 / 字元 / 段落 / 句子 + 4 張互動圖表 + CSV/JSON/Markdown 匯出；收 PDF / 辦公文件 / 純文字（辦公文件先轉 PDF 再統計）</span></div>
           </li>
-          <li><div class="fl-text"><span class="fn">會議摘要<span class="ofc-mark" title="需 OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">會議逐字稿（.vtt / .srt / .json / .txt / .docx / .odt）整理成摘要、決議、待辦、風險與章節；每一條都指得回原文的第幾段、誰講的，點下去就跳到那一段（匯出成 PDF / Word / ODF 時需引擎）</span></div></li>
-          <li><div class="fl-text"><span class="fn">會議錄音轉逐字稿</span><span class="fd">把會議錄音或錄影轉成帶時間與語者的逐字稿，轉好可以一鍵交給「會議摘要」；辨識在外部語音服務（jtlw）那側跑，要先在管理區設定好才會出現</span></div></li>
+          <li><span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 6H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-2"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg></span><div class="fl-text"><span class="fn">會議摘要<span class="ofc-mark" title="需 OxOffice / LibreOffice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">逐字稿（.vtt / .srt / .json / .txt / .docx / .odt）整理成摘要、決議、待辦、風險與章節；每一條都指得回第幾段、誰講的，點下去就跳過去（匯出 PDF / Word / ODF 需引擎）</span></div></li>
+          <li><span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4l13 8-13 8V4z"/></svg></span><div class="fl-text"><span class="fn">會議錄音轉逐字稿</span><span class="fd">錄音或錄影轉成帶時間與發言者的逐字稿，可一鍵交給「會議摘要」；辨識在語音服務（jtlw）那側跑，要先在管理區設定</span></div></li>
           <li>
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2h-3.5"/><path d="M15 3v6h6"/><path d="M9 12h4M9 16h2"/></svg></span>
             <div class="fl-text"><span class="fn">註解整理</span><span class="fd">擷取 PDF 註解輸出完整清單 / 審閱報告 / 待辦清單（CSV / JSON / Markdown）；可依類型 / 作者篩選</span></div>
@@ -856,6 +856,24 @@
         </div>
       </figure>
 
+      <figure class="ss-row">
+        <div class="ss-text">
+          <div class="ss-num">15</div>
+          <h3>會議摘要</h3>
+          <p>逐字稿進來，摘要、事件與影響、決議、待辦、風險、未決問題出去。<b>每一條都帶著第幾段、誰講的，點下去就跳到逐字稿那一段</b> —— 心智圖與時間軸的節點也一樣點得動，因為圖是從已經驗證過引用的項目<b>組出來的，不是生成的</b>。找不到的時候會寫「分析沒有在逐字稿裡找到這一類的內容」，不會替會議下結論。發言時間與議題佔比由時間戳記算出來，不讓模型猜。匯出 PDF / Word / ODF / Markdown / 圖表 PNG / JSON。</p>
+          <div class="ss-tags">
+            <span class="tag">每條都指得回原文</span>
+            <span class="tag">決議 / 待辦 / 風險</span>
+            <span class="tag">議題時間軸</span>
+            <span class="tag">發言佔比</span>
+            <span class="tag">六種匯出</span>
+          </div>
+        </div>
+        <div class="ss-img">
+          <img src="screenshots/meeting-summary.png" alt="會議摘要 — 決議與待辦每一條都帶段號可點回逐字稿，含議題時間軸與佔比" loading="lazy">
+        </div>
+      </figure>
+
     </div>
   </div>
 </section>
@@ -942,8 +960,13 @@
         <p class="llm-effect"><b>效果</b>：拿到陌生長文，先看 LLM 摘要抓主軸再決定要不要細讀</p>
       </article>
       <article class="llm-card">
+        <div class="llm-card-head">
+          <span class="llm-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 6H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-2"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg></span>
+          <div class="llm-tag">text</div>
+        </div>
         <h3>會議摘要</h3>
         <p>會議逐字稿整理成摘要、決議、待辦、風險與章節。每一條都附段號，點下去跳回原文那一段 —— 會議記錄會被拿去當依據，一條沒有出處的決議比沒有那條更糟。</p>
+        <p class="llm-effect"><b>效果</b>：兩小時的會議，決議與待辦逐條列出來，每一條都查得到是誰在第幾段講的</p>
       </article>
 
       <article class="llm-card">
@@ -1010,6 +1033,44 @@
         <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/LLM.md">LLM.md</a>。
       </p>
     </div>
+  </div>
+</section>
+
+<!-- ======== Speech (jtlw) integration ======== -->
+<section id="speech" class="section">
+  <div class="container">
+    <div class="section-eyebrow">語音整合（選用）</div>
+    <h2 class="section-title">會議錄音變成可以拿去用的會議記錄</h2>
+    <p class="section-lede">
+      錄音交給 <a href="https://jasoncheng7115.github.io/jt-live-whisper/" target="_blank" rel="noopener">jtlw</a>
+      （jt-live-whisper，<b>可自架在內網</b>）做辨識與發言者分離；
+      <b>摘要、決議、待辦、心智圖與翻譯全部留在本系統</b>。
+      <b>聲音不必離開你的網路。</b>
+    </p>
+
+    <div class="sp-steps">
+      <div class="sp-step"><span class="sp-n">1</span>
+        <b>設定一次</b>
+        <span>管理區填送件位址與金鑰。自簽憑證把憑證貼進來就好 ——
+        <b>不要關掉驗證</b>。沒設定好時這支工具是反灰的。</span></div>
+      <div class="sp-step"><span class="sp-n">2</span>
+        <b>上傳錄音</b>
+        <span>音訊或影片都收。轉好之後<b>一鍵交給「會議摘要」</b>，
+        也可以走 API 讓別的系統接。</span></div>
+      <div class="sp-step"><span class="sp-n">3</span>
+        <b>邊聽邊看</b>
+        <span>逐字稿帶時間與發言者：點波形就從那裡播、播到哪一段就亮起來、
+        點代號直接改成人名。</span></div>
+    </div>
+
+    <div class="sp-facts">
+      <div><b>28.3 分鐘 → 112 秒</b><span>比即時快 15 倍（實測）</span></div>
+      <div><b>差 0.12 個百分點</b><span>拿公開語料的標準答案量，整條管線與語音服務自己量的幾乎一致</span></div>
+      <div><b>短效簽章網址</b><span>錄音檔這樣交付 —— 不必把帳號或憑證給對方，到期自動失效</span></div>
+      <div><b>引用綁段號</b><span>重跑校正或更新詞彙庫之後，已經產生的決議與待辦仍然指得回同一段原音</span></div>
+    </div>
+
+    <p class="sp-foot">沒設定就跟以前一樣 —— <b>其餘 49 個工具完全不受影響</b>。</p>
   </div>
 </section>
 

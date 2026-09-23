@@ -24,15 +24,15 @@
   </div>
   <div class="form-row">
     <label>{{ tr('每人容量額度') }}</label>
-    <input class="field" type="number" id="ws-quota" value="{{ settings.per_user_quota_mb }}" min="0" max="1048576" data-s="s1a30558f"> {{ tr('MB（0 = 不限）') }}
+    <input class="field field-num" type="number" id="ws-quota" value="{{ settings.per_user_quota_mb }}" min="0" max="1048576"> <span class="field-unit">{{ tr('MB（0 = 不限）') }}</span>
   </div>
   <div class="form-row">
     <label>{{ tr('單檔上限') }}</label>
-    <input class="field" type="number" id="ws-maxfile" value="{{ settings.max_file_mb }}" min="0" max="1048576" data-s="s1a30558f"> {{ tr('MB（0 = 不限）') }}
+    <input class="field field-num" type="number" id="ws-maxfile" value="{{ settings.max_file_mb }}" min="0" max="1048576"> <span class="field-unit">{{ tr('MB（0 = 不限）') }}</span>
   </div>
   <div class="form-row">
     <label>{{ tr('保留時數') }}</label>
-    <input class="field" type="number" id="ws-retention" value="{{ settings.retention_hours }}" min="-1" max="876000" data-s="s1a30558f"> {{ tr('小時（-1 = 永久）') }}
+    <input class="field field-num" type="number" id="ws-retention" value="{{ settings.retention_hours }}" min="-1" max="876000"> <span class="field-unit">{{ tr('小時（-1 = 永久）') }}</span>
   </div>
   <p data-s="s553a645f">
     <button class="btn btn-primary" id="saveBtn">{{ icon('save', size=14) }} {{ tr('儲存設定') }}</button>

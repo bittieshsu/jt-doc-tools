@@ -63,6 +63,14 @@ BANNED = {
     # 兩支工具的文件領域清單也是「網路 / IT 維運文件」，只有 `OPS.md`
     # 的標題與 README 那一列是反過來寫的（同「預估閱讀 / 閱讀時間估計」那次）。
     "運維": "維運",
+    # 「語者」是學術／大陸的說法，「講者」在台灣偏向「演講的人」——
+    # 用在會議逐字稿上是錯的（使用者 2026-09-22 當場糾正）。台灣說「發言者」。
+    # **同一件事用兩個詞，畫面上看起來就像兩件事**，所以兩個都禁。
+    # 判準要排掉**「母語者」**（那是正確的中文，只比對子字串的話會誤報）；
+    # 搜尋關鍵字刻意保留舊詞（習慣用舊詞找工具的人不該因為我們改用詞就
+    # 找不到），那一份走的是 `keywords` 那條豁免。
+    "語者": "發言者",
+    "講者": "發言者",
     "靜默": "無提示 / 沒有任何反應",
     "排查": "檢視 / 排除 / 追查",
     "查核": "查驗 / 核對 / 確認",
@@ -243,6 +251,16 @@ def _strip_comments(text: str, suffix: str) -> str:
                         skip.add(id(v))
             if isinstance(node, ast.keyword) and node.arg == "keywords":
                 skip.add(id(node.value))
+            # 搜尋別名表（`_TOOL_ALIASES`）跟 `keywords` 是同一回事：
+            # **刻意收錄舊詞與陸詞**，打「字體」要找得到字型管理、
+            # 打「語者」要找得到會議錄音轉逐字稿。改了用詞之後，習慣用舊詞
+            # 找工具的人不該因此找不到（改名 SOP 裡本來就寫著要留舊關鍵字）。
+            if isinstance(node, ast.Assign):
+                names = [x.id for x in node.targets if isinstance(x, ast.Name)]
+                if any("ALIAS" in n.upper() for n in names):
+                    for sub in ast.walk(node.value):
+                        if isinstance(sub, ast.Constant):
+                            skip.add(id(sub))
         keep = []
         for node in ast.walk(tree):
             if (isinstance(node, ast.Constant) and isinstance(node.value, str)
@@ -301,6 +319,7 @@ def _offences(text: str, path: str, suffix: str = "") -> list[str]:
 _ALLOW_WITHIN: dict[str, tuple[str, ...]] = {
     "在線": ("在線上",),
     "音檔": ("錄音檔", "音訊檔"),
+    "語者": ("母語者",),
 }
 
 

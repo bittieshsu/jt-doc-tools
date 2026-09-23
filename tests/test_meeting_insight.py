@@ -1,4 +1,4 @@
-"""會議分析的確定性部分（切視窗、解析、引用驗證、合併、語者統計）。
+"""會議分析的確定性部分（切視窗、解析、引用驗證、合併、發言者統計）。
 
 > **這些測試驗得到我們自己的程式，驗不到「模型會不會照做」。**
 > 「每一條都要附段號」是一個**要求模型照做**的設計，本專案在翻譯對照字典上
@@ -161,7 +161,7 @@ def test_merge_fills_in_missing_owner_and_due():
     assert got[0]["owner"] == "陳經理" and got[0]["due_text"] == "下週三"
 
 
-# ------------------------------------------------------------ 語者統計
+# ------------------------------------------------------------ 發言者統計
 
 def test_speaker_stats_takes_the_union_not_the_sum():
     """插話時區間會重疊 —— 直接相加會超過會議總長，那個數字一看就假。"""
@@ -382,7 +382,7 @@ def test_mindmap_puts_each_item_under_the_chapter_it_happened_in():
 # ------------------------------------------------------------------ 選圖
 
 def test_charts_are_chosen_from_the_data_not_by_the_model():
-    """一個主題的會議畫佔比圓餅、一個人的會議畫語者佔比 —— 都會讓人
+    """一個主題的會議畫佔比圓餅、一個人的會議畫發言者佔比 —— 都會讓人
     以為功能壞了。**沒有內容的圖不要畫。**"""
     one_ch = [{"title": "全部", "start_seq": 1, "end_seq": 30,
                "segment_ids": [1], "start_ms": 0, "end_ms": 1, "duration_ms": 1,
@@ -802,7 +802,7 @@ def test_timestamps_still_produce_times_when_they_are_there():
 def test_speaker_stats_work_with_no_timestamps_at_all():
     """**「誰講最多」不需要時間。**
 
-    2026-09-18 使用者上傳沒有時間戳記的會議紀錄，整個語者統計區塊消失 ——
+    2026-09-18 使用者上傳沒有時間戳記的會議紀錄，整個發言者統計區塊消失 ——
     而那個問題本來就答得出來：發言次數與字數都是確定性的。
     """
     segs = [{"seq": 1, "speaker": "主席", "text": "各位早" * 10},

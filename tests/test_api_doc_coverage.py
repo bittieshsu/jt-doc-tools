@@ -33,7 +33,12 @@ from tools.repo_paths import public_root as _public_root
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 #: 工具頁面本身沒有對外 API 的例外。加進來要寫清楚為什麼。
-_NO_PUBLIC_API: dict[str, str] = {}
+#: 沒有「工具前綴底下的 API」但**確實有對外 API** 的工具 —— 要寫下它在哪裡。
+_NO_PUBLIC_API: dict[str, str] = {
+    # 它的對外 API 是**全站層級**的 `POST /api/convert-to-pdf`（API.md 有寫），
+    # 不在 `/tools/office-to-pdf/` 底下 —— 那條路在有這個工具之前就存在了。
+    "office-to-pdf": "走全站的 POST /api/convert-to-pdf",
+}
 
 
 def _tool_api_paths() -> dict[str, set[str]]:
@@ -55,6 +60,29 @@ def tool_apis() -> dict[str, set[str]]:
     apis = _tool_api_paths()
     assert len(apis) > 30, f"路由表只掃到 {len(apis)} 個工具，比對基準本身就不對"
     return apis
+
+
+def test_every_tool_has_a_public_api():
+    """**每一支工具都要有對外 API**（本專案的長期規則：功能不可以只有網頁表單）。
+
+    ⚠ 下面那幾條守門**看不到這件事**：它們走的是「有 `/api/` 路徑的工具」
+    這份字典，所以**一支零個 API 的工具根本不會進到字典裡** ——
+    它不是不合格，它是不存在。2026-09-23 就這樣漏掉
+    「會議錄音轉逐字稿」（v1.15.94 加進來，四個版本之後才被使用者問出來）。
+
+    「掃 0 個檔」跟「掃過都乾淨」在 pytest 的輸出裡長得一模一樣，第 N 次。
+    """
+    from app.tool_registry import discover_tools
+
+    tools = {t.metadata.id for t in discover_tools()}
+    have = set(_tool_api_paths())
+    missing = sorted(tools - have - set(_NO_PUBLIC_API))
+    assert not missing, (
+        f"這幾支工具沒有對外 API：{missing}。"
+        "每支工具都要有 `/tools/<id>/api/<something>`（或 `/convert`）——"
+        "只有網頁表單的話，外部系統接不上去。"
+        "真的不該有的請加進 `_NO_PUBLIC_API` 並寫下理由。"
+    )
 
 
 def _missing_from(text: str, tool_apis: dict[str, set[str]]) -> list[str]:
