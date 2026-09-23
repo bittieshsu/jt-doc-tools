@@ -187,7 +187,7 @@
   <section class="ts-item" id="jtlw-wait">
     <h2>Progress does not move, or “waited N minutes with no result; asked them to cancel”</h2>
     <p class="ts-sym"><b>Symptom</b>　After submitting, the progress bar stays still for a long time and the job finally fails with the message above. You may also see “The speech service queue is full. Please submit again later.”</p>
-    <p><b>Cause</b>　The speech service GPU <b>handles one job at a time and queues the rest</b>. While queued and while recognising, the progress they report does not move, so a still progress bar does not by itself mean it is stuck. This system waits for them up to a limit (counted from submission: the larger of 15 minutes and half the recording length); when a very long meeting happens to be ahead in the queue, the limit can pass while still queued, and this system asks them to cancel the job.</p>
+    <p><b>Cause</b>　The speech service GPU <b>handles one job at a time and queues the rest</b>. While queued and while recognising, the progress they report does not move, so a still progress bar does not by itself mean it is stuck. This system waits for them up to a limit (counted from submission: the larger of 15 minutes and half the recording length, plus a 60-minute allowance for queueing); when several very long meetings happen to be ahead in the queue, the limit can still pass while queued, and this system asks them to cancel the job.</p>
     <p><b>What to do</b>　Submit again; for very long recordings, avoid times when someone else is sending a long meeting. If it keeps happening, ask the speech service side to check the queue and the GPU server.</p>
   </section>
 

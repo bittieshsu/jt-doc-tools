@@ -543,7 +543,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **330 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **331 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -712,6 +712,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_meeting_summary_e2e.py` | 會議摘要：**真的在瀏覽器裡跑一次** |
 | `test_meeting_summary_tool.py` | 會議摘要工具的端點 |
 | `test_meeting_transcribe.py` | 會議錄音轉逐字稿 —— 端到端（對象是自己起的假 jtlw） |
+| `test_meeting_transcribe_queue_grace.py` | 轉逐字稿的等待上限要留排隊的時間 —— 不可以把排在長會議後面的作業誤殺 |
 | `test_migration_fk_cascade.py` | 重建資料表的 migration 一律要關掉外鍵，否則升級會**清空子表** |
 | `test_missing_office_engine_is_503.py` | 缺 Office 引擎要回 **503**，不可以回 500 |
 | `test_nav_visibility_and_whoami.py` | Tests for v1.1.5 - v1.1.7 visibility / identity changes. |

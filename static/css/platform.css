@@ -520,6 +520,12 @@ input.field, select.field, textarea.field {
   box-sizing: border-box;
   transition: border-color 0.12s, box-shadow 0.12s;
 }
+/* 輸入格裡的範例文字（placeholder）要一眼看得出「還沒填」。瀏覽器預設是
+   `#757575`，而欄位裡真正的文字是 `#0f172a` —— 多行的範例（會議摘要的貼上框、
+   會議背景）看起來就跟已經填好的內容差不多（2026-09-23 使用者要求再淡一點）。
+   `opacity: 1` 是給 Firefox 的：它預設對 placeholder 另外打 0.54 的透明度，
+   不寫的話兩個瀏覽器的顏色會不一樣。**全站只有這一條**，不要在各頁再寫一份。 */
+input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 1; }
 input.field:hover, select.field:hover, textarea.field:hover {
   border-color: #94a3b8;
 }

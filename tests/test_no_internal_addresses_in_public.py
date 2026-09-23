@@ -33,7 +33,11 @@ _RFC1918 = re.compile(
 _SUFFIXES = (".py", ".sh", ".ps1", ".cmd", ".html", ".md", ".yaml", ".yml", ".nsi")
 
 # 掃描範圍刻意不含 tests/（理由見上面的 docstring）與 docs/screenshots/（圖檔）。
-_SKIP_DIRS = {"tests", "__pycache__", ".git", "node_modules", "vendor", "screenshots"}
+# **虛擬環境也不算公開樹**：CI 的「正式機相依版本」那個 job 在 repo 根目錄跑
+# `uv sync`，`.venv`（含第三方套件的原始碼）就長在這裡 —— 掃進去就是一堆
+# 別人的位址（2026-09-23 CI 排程測試紅，本機因為沒有 `.venv` 永遠是綠的）。
+_SKIP_DIRS = {"tests", "__pycache__", ".git", "node_modules", "vendor", "screenshots",
+              ".venv", "venv", "site-packages"}
 
 # 位址 → 為什麼它留著沒關係。一律是**文件上的示意值**，不是任何一台真的機器。
 _ALLOWED = {
@@ -44,9 +48,24 @@ _ALLOWED = {
 
 
 def _files() -> list[Path]:
+    """公開樹的檔案。
+
+    **是 git 工作區就只看被追蹤的檔案** —— 那才是真正公開出去的東西；
+    建置過程長出來的（`.venv`、快取）不算。開發樹沒有 `.git`，退回列目錄。
+    """
+    import subprocess
     root = public_root()
+    if (root / ".git").exists():
+        r = subprocess.run(["git", "-C", str(root), "ls-files", "-z"],
+                           capture_output=True, text=True, check=False)
+        if r.returncode == 0 and r.stdout:
+            cand = [root / n for n in r.stdout.split("\0") if n]
+        else:
+            cand = list(root.rglob("*"))
+    else:
+        cand = list(root.rglob("*"))
     out = []
-    for p in root.rglob("*"):
+    for p in cand:
         if not p.is_file() or p.suffix.lower() not in _SUFFIXES:
             continue
         if _SKIP_DIRS & set(p.relative_to(root).parts):

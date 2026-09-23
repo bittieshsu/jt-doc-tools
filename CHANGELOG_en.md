@@ -5,9 +5,52 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (835 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (836 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
+
+---
+
+## [1.16.7] - 2026-09-23
+
+### Transcription: 60 more minutes of waiting for the queue
+
+Since 2026-09-23 the speech service GPU **handles one job at a time and queues the
+rest**, and both while queued and while recognising it reports "running" with no
+progress at all, so this system cannot tell "queued" from "stuck". With a three-hour
+Chinese meeting ahead in the queue the wait is roughly 18 to 30 minutes, past the old
+15-minute floor: **the job was declared timed out, and this system asked them to
+cancel** a job that would have succeeded.
+
+* The limit is now the larger of 15 minutes and half the recording length, **plus a
+  60-minute allowance for queueing**. A job that is truly stuck is given up an hour
+  later; that only means waiting longer, while killing a healthy job wastes all of it.
+* The speech service will add a "queued, N ahead" signal; once it does, queueing will
+  stop counting against the limit and this allowance goes away.
+* Added a test that **actually runs the polling loop** (fake clock, a fake service that
+  always reports running with no progress). The limit had no test at all before.
+* The troubleshooting page was updated to match.
+
+### CI: the scheduled run failed in the production-dependencies job
+
+The "no internal addresses in the public tree" guard scanned the whole directory, and
+that job creates its virtual environment inside the repo with `uv sync`, so addresses in
+third-party package sources were reported as ours. It could never fail locally (the
+development tree has no virtual environment). It now scans **only files tracked by git**,
+which is what actually gets published, falling back to a directory walk only where there
+is no `.git`; both directions were checked on a real clone.
+
+### Lighter placeholder text in input fields
+
+The browser's default placeholder colour was nearly as dark as real input, so multi-line
+examples (the paste box and meeting background in Meeting summary) looked like content
+that had already been filled in. One lighter grey is now used site-wide, guarded by a
+real-browser check that it is lighter than the browser default (by luminance, not a
+hard-coded colour).
+
+> The first version of that guard passed vacuously: on the admin page it picked the
+> first `input[placeholder]`, which was the **sidebar search box** (white on purple,
+> already light). It now targets the actual field.
 
 ---
 

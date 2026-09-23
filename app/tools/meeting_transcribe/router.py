@@ -53,6 +53,21 @@ _POLL_MAX = 15.0
 #: 牆鐘上限（對方的接入清單第 6 節）：含校正 = 音訊長度 × 0.5、下限 15 分鐘。
 _POLL_FACTOR = 0.5
 _POLL_FLOOR_S = 15 * 60.0
+#: **排隊寬限**：對方的 GPU 一次只跑一件（2026-09-23 起），排隊時與辨識中都回
+#: `running`、進度完全不動（對方 v2.7 實測）—— 我們分不出「在排隊」與「卡住」。
+#: 前面排一場 3 小時的中文會議要等約 18～30 分鐘，超過 15 分鐘的下限，碰到就會被
+#: 我們誤判逾時、還主動請對方取消。先多給 60 分鐘（前面排兩場長會議也撐得住）：
+#: 真的卡住要晚一小時才發現，但那只是等久一點；誤殺是整件白做。
+#: 對方上線 `progress.waiting` 之後改成「排隊不計入上限」，這一段就拿掉。
+_QUEUE_GRACE_S = 60 * 60.0
+
+
+def _deadline_s(total_audio_ms: Optional[float]) -> float:
+    """從送件起算，最多等多久（秒）。輪詢迴圈的兩處都走這一支，不要各算一次。"""
+    work = _POLL_FLOOR_S
+    if isinstance(total_audio_ms, (int, float)) and total_audio_ms > 0:
+        work = max(_POLL_FLOOR_S, float(total_audio_ms) / 1000.0 * _POLL_FACTOR)
+    return work + _QUEUE_GRACE_S
 
 #: 佇列滿了最多重送幾次（依對方回的 `retry_after_ms` 等待）。
 _QUEUE_RETRIES = 3
@@ -246,11 +261,11 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
     # 不是整次生成」那一條）：對方卡住的話，我們這件作業會永遠輪詢下去，
     # 而症狀是「進度不動、不會失敗」——本專案最難查的那一類。
     #
-    # 上限照對方清單第 6 節：**含校正 = 音訊長度 × 0.5，下限 15 分鐘**。
-    # 音訊長度要等對方開始處理才知道（`progress.total_audio_ms`），
-    # 所以先用下限，拿到長度再放寬。
+    # 上限照對方清單第 6 節：**含校正 = 音訊長度 × 0.5，下限 15 分鐘**，
+    # 再加排隊寬限（見 `_QUEUE_GRACE_S`）。音訊長度要等對方開始處理才知道
+    # （`progress.total_audio_ms`），所以先用下限，拿到長度再放寬。
     started = time.monotonic()
-    deadline = started + _POLL_FLOOR_S
+    deadline = started + _deadline_s(None)
     while True:
         if time.monotonic() > deadline:
             try:
@@ -280,8 +295,7 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
         total_ms = ((info.get("progress") or {}).get("total_audio_ms")
                     if isinstance(info.get("progress"), dict) else None)
         if isinstance(total_ms, (int, float)) and total_ms > 0:
-            deadline = started + max(_POLL_FLOOR_S,
-                                     float(total_ms) / 1000.0 * _POLL_FACTOR)
+            deadline = started + _deadline_s(total_ms)
         job.message = _stage_label(info)
         if status in _TERMINAL:
             break

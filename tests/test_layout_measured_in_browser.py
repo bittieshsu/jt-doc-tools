@@ -238,3 +238,32 @@ def test_jtlw_full_name_is_where_people_read(live, path):
     assert "jt-live-whisper" in got["text"]
     assert got["href"] == "https://jasoncheng7115.github.io/jt-live-whisper/"
     assert not got["oldCorner"], "右上角那一份還在 —— 同一句話兩份會漂"
+
+
+def _luminance(rgb: str) -> float:
+    import re as _re
+    r, g, b = (int(x) / 255 for x in _re.findall(r"\d+", rgb)[:3])
+    f = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4  # noqa: E731
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+
+
+@pytest.mark.parametrize("path,sel", [
+    ("/tools/meeting-summary/", "#msPasteBox"),
+    # **要指定欄位**：第一版寫 `input[placeholder]`，對到的是側欄的搜尋框
+    # （紫底白字、本來就很亮）—— 把全站那條規則拿掉照樣會過，是空的。
+    ("/admin/jtlw", "#jl-audio"),
+])
+def test_placeholder_text_is_lighter_than_the_browser_default(live, path, sel):
+    """輸入格裡的範例文字要比瀏覽器預設（`#757575`）淡，一眼看得出「還沒填」。
+
+    多行的範例（會議摘要的貼上框、會議背景）用瀏覽器預設的灰，看起來跟已經填好的
+    內容差不多（2026-09-23 使用者要求再淡一點）。**判準用亮度不寫死色碼** ——
+    之後誰把顏色微調一點都不會誤報，改回預設或改深才會紅。
+    """
+    got = _measure(live, path, """(() => {
+      const el = document.querySelector(%s);
+      return el ? getComputedStyle(el, '::placeholder').color : null;
+    })()""" % json.dumps(sel))
+    assert got, f"{path} 找不到 {sel} —— 這條等於沒驗"
+    assert _luminance(got) > _luminance("rgb(117, 117, 117)") * 1.3, (
+        f"{path} 的範例文字是 {got}，跟瀏覽器預設（#757575）差不多或更深")
