@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 
 CSS = Path(__file__).resolve().parent.parent / "static" / "css" / "generated-inline.css"
-#: **掃描前一定要去掉註解** —— 本專案已經有好幾次守門測試把「說明裡引用的
+#: **掃描前一定要去掉註解** —— 本專案已經有好幾次自動檢查把「說明裡引用的
 #: 反例」當成真的違規（migration 的 FK 順序、fail-open 形狀都踩過）。
 _COMMENT = re.compile(r"/\*.*?\*/", re.S)
 _JS_EXPR = re.compile(r"'\s*\+|\+\s*'|\$\{")

@@ -134,10 +134,10 @@ def test_the_public_tree_does_not_explain_why_those_notes_are_private():
     for p in PUB.rglob("*"):
         if not p.is_file() or p.suffix.lower() not in {".md", ".html", ".txt", ""}:
             continue
-        if p.name.startswith("SIGNPATH-"):      # 那些筆記本身不在公開樹（另有守門）
+        if p.name.startswith("SIGNPATH-"):      # 那些筆記本身不在公開樹（另有檢查）
             continue
         rel = p.relative_to(PUB).as_posix()
-        if rel.startswith("tests/"):            # 守門自己要寫得出這些字
+        if rel.startswith("tests/"):            # 檢查自己要寫得出這些字
             continue
         try:
             text = p.read_text(encoding="utf-8")

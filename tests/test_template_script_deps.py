@@ -68,11 +68,11 @@ PAGES = _pages()
 
 
 def test_the_scan_reaches_real_pages_and_knows_the_baseline():
-    """**守門自己要有牙齒**：掃 0 個檔跟掃過都乾淨，在 pytest 輸出裡一模一樣。"""
+    """**檢查自己要有牙齒**：掃 0 個檔跟掃過都乾淨，在 pytest 輸出裡一模一樣。"""
     assert len(PAGES) > 50, f"只掃到 {len(PAGES)} 個模板，比對基準本身就不對"
     assert "toast.js" in ALWAYS, "base.html 的無條件載入清單解析錯了"
     assert "file_upload.js" not in ALWAYS, (
-        "file_upload.js 變成全站載入了？那這份守門的前提要重寫")
+        "file_upload.js 變成全站載入了？那這份檢查的前提要重寫")
 
 
 @pytest.mark.parametrize(

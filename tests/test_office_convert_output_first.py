@@ -134,7 +134,7 @@ def test_a_killed_process_says_so_instead_of_blaming_the_file(
 
 
 def test_the_fake_really_reproduces_the_old_behaviour(tmp_path, src, monkeypatch):
-    """**守門自己要有牙齒。** 這支假 soffice 必須真的造出「非零 ＋ 有產出」
+    """**檢查自己要有牙齒。** 這支假 soffice 必須真的造出「非零 ＋ 有產出」
     這個組合 —— 否則上面那幾條就是在驗一個不存在的情境。
     """
     import subprocess

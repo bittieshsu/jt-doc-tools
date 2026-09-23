@@ -31,7 +31,7 @@ def _catalog(locale: str = "en") -> dict:
 def _locales() -> list[str]:
     """要驗哪些語言 —— **唯一來源是 `ui_locale.SUPPORTED`**。
 
-    寫死 `en` 的話，加了第三種語言之後這整支守門會**安靜地只驗英文**。
+    寫死 `en` 的話，加了第三種語言之後這整支檢查會**安靜地只驗英文**。
     """
     from app.core.ui_locale import DEFAULT_LOCALE, SUPPORTED
     return [c for c in SUPPORTED if c != DEFAULT_LOCALE]
@@ -155,7 +155,7 @@ def _font_labels() -> list[str]:
     """只收**我們自己寫的**字型名稱。
 
     `list_fonts()` 也會列出管理員上傳的自訂字型（例如「業務用楷體」）——
-    那是**使用者資料**，不是介面文字，永遠不會在語系檔裡，收進來這條守門
+    那是**使用者資料**，不是介面文字，永遠不會在語系檔裡，收進來這條檢查
     就變成「只要有人上傳中文名字的字型就紅」。
     """
     from app.core.pdf_text_overlay import AVAILABLE_FONTS
@@ -191,7 +191,7 @@ def _llm_tool_labels() -> list[str]:
 
     那幾句說明是用 Python 的隱式字串串接寫成多行的，正規式只會抓到第一段 ——
     於是譯文用「第一段」當鍵存進語系檔，執行期查的是「整句」，永遠對不上，
-    而且守門還是綠的（它自己用同一個錯的鍵）。踩過一次。
+    而且檢查還是綠的（它自己用同一個錯的鍵）。踩過一次。
     """
     from app.core.llm_settings import LLMSettingsManager
     out: list[str] = []
@@ -206,7 +206,7 @@ def _llm_tool_labels() -> list[str]:
 def _database_labels() -> list[str]:
     """系統狀態頁的資料庫清單（`db_health.DATABASES` 的 `label`）。
 
-    畫面上是 JS 依 API 回傳的資料畫出來的 —— 樣板掃字面 `tr()` 的守門看不到
+    畫面上是 JS 依 API 回傳的資料畫出來的 —— 樣板掃字面 `tr()` 的檢查看不到
     （2026-09-14 日文版逐頁掃抓到「稽核記錄」「統編資料庫」兩條）。
     """
     import re as _re
@@ -228,7 +228,7 @@ def _admin_nav_labels() -> list[str]:
     """側欄管理區每一項的名稱與說明（`app/main.py` 的 `_NAV_SETTINGS_ALL`）。
 
     樣板端已經包了 `tr()`，缺的是**語系檔裡沒有那一條** —— 於是側欄在英文 /
-    日文介面下原樣顯示中文，而且**掃字面 `tr('…')` 的守門看不到**
+    日文介面下原樣顯示中文，而且**掃字面 `tr('…')` 的檢查看不到**
     （翻譯對照字典那一條從 v1.15.19 上線起就一直是中文，2026-09-14 逐頁掃
     才抓到）。
     """
@@ -264,7 +264,7 @@ def _straighten_dpi_notes() -> list[str]:
 def _tool_lock_reasons() -> list[str]:
     """工具反灰時滑鼠移上去看到的那句話。
 
-    **樣板寫的是 `tr(t.lock_reason)`** —— 掃字面 `tr('…')` 的守門看不到。
+    **樣板寫的是 `tr(t.lock_reason)`** —— 掃字面 `tr('…')` 的檢查看不到。
     原本只有「語言不符」一種原因、那句話直接寫死在兩個樣板裡；
     v1.15.94 加「外部服務還沒設定」這一種時改成由資料帶理由，
     於是它就掉進這一類了。
@@ -278,7 +278,7 @@ def _tool_lock_reasons() -> list[str]:
 def _transcript_shape_labels() -> list[str]:
     """逐字稿排法的下拉（`transcript_parse.SHAPES`）。
 
-    **伺服器算出來、JS 建 `<option>`** —— 樣板掃 `<option>` 字面的守門看不到
+    **伺服器算出來、JS 建 `<option>`** —— 樣板掃 `<option>` 字面的檢查看不到
     （2026-09-23 用有資料的實例拍英文截圖時，那一排整個是中文）。
     """
     from app.core.transcript_parse import SHAPES
@@ -313,7 +313,7 @@ def _meeting_summary_progress() -> list[str]:
 def _meeting_kind_labels() -> list[str]:
     """會議摘要五張卡片的標題（樣板 JS 的 `KINDS` 表）。
 
-    樣板寫的是 `tr(k[1])` —— **引數是變數**，掃字面 `tr('…')` 的守門看不到。
+    樣板寫的是 `tr(k[1])` —— **引數是變數**，掃字面 `tr('…')` 的檢查看不到。
     """
     import re as _re
     src = (REPO / "app" / "tools" / "meeting_summary" / "templates"
@@ -330,7 +330,7 @@ def _jtlw_error_texts() -> list[str]:
     """
     from app.core.jtlw_client import ERROR_TEXT, MESSAGES
     # `MESSAGES` 是錯誤碼以外的固定訊息（401 / 403、網址過期、0 段）——
-    # 原本散寫在函式裡，這一類守門看不到（v1.16.8 收進來）。
+    # 原本散寫在函式裡，這一類檢查看不到（v1.16.8 收進來）。
     return list(ERROR_TEXT.values()) + list(MESSAGES.values())
 
 
@@ -338,7 +338,7 @@ def _chart_kind_labels() -> list[str]:
     """心智圖 / 討論結構上的節點類別（`meeting_charts.KIND_STYLE`）。
 
     **伺服器用 `data-kinds` 送給前端**，前端畫進 SVG —— 掃字面 `tr('…')`
-    的守門看不到。少包這一層的話，英文介面上會出現「待辦・Segment 2」
+    的檢查看不到。少包這一層的話，英文介面上會出現「待辦・Segment 2」
     這種一半中文一半英文的節點（2026-09-23 拍英文截圖時抓到）。
     """
     from app.core.meeting_charts import KIND_STYLE
@@ -379,7 +379,7 @@ def test_dynamic_labels_are_translated(locale: str, name: str, getter):
 
 
 # ---------------------------------------------------------------------------
-# `<option>{{ 變數 }}</option>` —— 掃字面 `tr('…')` 的守門看不到的那一類
+# `<option>{{ 變數 }}</option>` —— 掃字面 `tr('…')` 的檢查看不到的那一類
 #
 # 2026-09-14 加日文時一次抓到四處：去識別化的文件語言（**兩支工具各一份，
 # 我只修了其中一支**）、掃描修正的解析度說明、登入頁的認證來源。

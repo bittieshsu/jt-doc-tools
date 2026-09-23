@@ -10,7 +10,7 @@
 ## 0. 全站頁面截圖 —— **每次發版都要逐張目視**（使用者要求，2026-08-28）
 
 > 自動化測試**看不出版面長歪**。`page_visual_check.py` 斷言的是「可見控制項有沒有
-> 消失」、樣板守門看的是原始碼形狀 —— v1.14.60 有一張卡片攤成整個視窗寬、左邊
+> 消失」、樣板檢查看的是原始碼形狀 —— v1.14.60 有一張卡片攤成整個視窗寬、左邊
 > 壓到側欄底下，這些檢查**全部照樣綠燈**，是使用者截圖回報才發現的。
 > 「畫面看起來不對」這一類只有真的用眼睛看才抓得到。
 
@@ -70,7 +70,7 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 >
 > ⚠ **解除安裝成功卻回傳 2**：交棒給 `%TEMP%` 那一份之後 NSIS 的 `Quit` 預設
 > 回報「被腳本中止」。腳本化的解除安裝（MDM、`Start-Process -Wait`）會判定失敗，
-> 而它其實完全成功了。已修（顯式 `SetErrorLevel 0`），守門
+> 而它其實完全成功了。已修（顯式 `SetErrorLevel 0`），檢查
 > `tests/test_installer_silent_mode.py::test_the_uninstall_handoff_reports_success`
 > —— 判準落在**那一段交棒邏輯**裡，不是整份檔案有沒有出現過那個指令。
 >
@@ -215,7 +215,7 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 
 - [ ] **對話框**：確認、提示、錯誤（`showConfirm` / `showToast` / `alert`）——
       標題、內文、兩顆按鈕都要看。
-      **訊息本身已經有靜態守門**（`tests/test_dialog_strings_go_through_tr.py`，
+      **訊息本身已經有靜態檢查**（`tests/test_dialog_strings_go_through_tr.py`，
       v1.15.51 加，第一次跑抓到 15 處）—— 人工看的是**版面與語氣**，
       不是「有沒有包 tr()」。
 - [ ] **側欄的帳號功能表**：我的帳號、語言、登出
@@ -242,7 +242,7 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
       公司名、會計科目規則的關鍵字、頁碼格式（會原樣印進 PDF）、格式預覽的範例、
       要複製去貼的組態檔範例 —— 這些顯示中文才是對的，容器上標 `data-i18n="skip"`。
 
-### ④ 下拉選單的文字（**掃字面 `tr('…')` 的守門一律看不到**）
+### ④ 下拉選單的文字（**掃字面 `tr('…')` 的檢查一律看不到**）
 
 2026-09-14 加日文時一次抓到五處，**每一處在英文介面下也一樣是中文**，
 其中翻譯對照字典那兩個下拉從 v1.15.19 上線起就沒對過。共同點是
@@ -273,7 +273,7 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 ### ⑤ 加新語言時額外要做的（2026-09-14 加日文的清單）
 
 - [ ] 語言清單只改 `app/core/ui_locale.SUPPORTED` 與 `LOCALE_NAMES`
-      —— **生成器與守門一律從那裡讀**，不可以再寫死一次 `en`
+      —— **生成器與檢查一律從那裡讀**，不可以再寫死一次 `en`
       （原本有八個地方各寫死一次，加第三種語言之後會安靜地只驗英文）
 - [ ] 截圖：`python tools/capture_locale_screenshots.py --locale <語言> --base …`
       —— 介紹站要用**該語言介面**的截圖（`screenshots/<語言>/`；中文放在
@@ -284,7 +284,7 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
       `python3 github/build-i18n-page.py` ＋ `python3 github/build-i18n-md.py`
 - [ ] 語言切換是**列出其他所有語言**不是「切換」——
       兩種語言時一顆按鈕就夠，三種之後站在 C 語言的頁上就沒有去 B 的出口了
-- [ ] **用詞守門要排掉語言版的檔案**（`README_ja.md` / `index-ja.html`）：
+- [ ] **用詞檢查要排掉語言版的檔案**（`README_ja.md` / `index-ja.html`）：
       日文的「保存」「字体」是正確的日文，卻在中文禁用詞清單上
 - [ ] **語系檔的「譯文不可以有漢字」那條對中日韓不成立**，要換一條判準
 - [ ] **介面有那個語言 ≠ 去識別化支援那個語言的文件**：文件語言的預設值
@@ -303,9 +303,9 @@ v1.15.19 加翻譯對照字典時，完整套件一次紅了四條，**全是這
 | 4 | 側欄項目補**中英搜尋關鍵字** | 管理員搜不到這一頁 |
 | 5 | 改了共用函式的**簽章或回傳形狀** → **回頭改測試裡的替身** | 兩天踩兩次：①假函式收不下新參數 → 正式碼的 `except` 吞掉 TypeError → 作業「完成但每筆都是空的」②回傳從 `int` 改成 tuple，`lambda: 0` 的替身讓 11 條測試紅。**改完先 `grep` 測試裡有沒有替身**，不要等完整套件 |
 
-> **這五條都有守門**（`test_template_head_block` / `test_settings_export` /
+> **這五條都有檢查**（`test_template_head_block` / `test_settings_export` /
 > `test_i18n_catalog` / `test_i18n_dynamic_labels` / `test_tool_search_keywords`）
-> —— 但守門是在**完整套件**才跑到的。做完先跑這幾支，不要等到最後。
+> —— 但檢查是在**完整套件**才跑到的。做完先跑這幾支，不要等到最後。
 
 ---
 
@@ -333,7 +333,7 @@ v1.15.19 加翻譯對照字典時，完整套件一次紅了四條，**全是這
 - [ ] 轉檔類：產出檔要**真的載得進**目標應用程式（見 pdf-to-slides 那條）
 - [ ] 預覽類：預覽與最終產出必須**位元組相同**（見騎縫章那條）
 
-**守門**：`tests/test_output_verification_coverage.py` 只釘死判得準的那條線 ——
+**檢查**：`tests/test_output_verification_coverage.py` 只釘死判得準的那條線 ——
 兩支去識別化工具的端到端測試要在，且最後一步必須是「把產出取回來、確認那段
 個資不在裡面」。其餘工具的輸出層驗收是人的判斷（有些走內部函式驗得更嚴，
 例如騎縫章逐頁比對位元組、字型改動一律算圖數墨水），**刻意不用啟發式自動判定**
@@ -538,17 +538,17 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 有沒有被守住只能自己去翻程式。
 
 所以這裡列全。**說明直接取自每支測試檔自己的開頭說明**（不是另外寫一份），
-改了程式說明就跟著變，不會漂。守門 `tests/test_test_plan_coverage.py` 會確認
+改了程式說明就跟著變，不會漂。檢查 `tests/test_test_plan_coverage.py` 會確認
 每一支測試檔都在這張表裡。
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **334 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **338 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
-> 會讓「一覽表過期」的守門在每次寫測試時都紅一次（純噪音）。
-> 要看實際跑了幾項看 pytest 的結尾摘要；README 的徽章另有守門。
+> 會讓「一覽表過期」的檢查在每次寫測試時都紅一次（純噪音）。
+> 要看實際跑了幾項看 pytest 的結尾摘要；README 的徽章另有檢查。
 
 | 測試檔 | 守的是什麼 |
 |---|---|
@@ -590,13 +590,14 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_badhost_path_gate.py` | Regression test for the Starlette BADHOST path-poisoning bypass |
 | `test_boxed_digits_and_sublabel.py` | 兩種讓欄位「有偵測到卻填不進去」的版型 |
 | `test_broken_input_no_500.py` | 任何工具端點收到壞輸入都不可以回 500 |
-| `test_button_icons_are_consistent.py` | 按鈕圖示的兩條守門 |
+| `test_button_icons_are_consistent.py` | 按鈕圖示的兩條檢查 |
 | `test_cancel_actually_stops_the_work.py` | 按下取消要**真的把工作停掉**，不是只把狀態改成「已停止」 |
 | `test_changelog_does_not_quote_people.py` | 公開的更新記錄裡不可以引述使用者 / 客戶說的話 |
 | `test_cjk_font_notice.py` | 缺中文字型時，**一般使用者**在工具頁上看得到提示（v1.14.47） |
 | `test_cjk_font_renders.py` | 寫進 PDF 的中文**必須畫得出來** |
 | `test_cli_data_dir_ownership.py` | 以 root 寫資料目錄的 CLI 指令，收尾**一定要把擁有者改回去** |
 | `test_cli_health_check.py` | `jtdt update` 的健康檢查要探對地方，失敗要說得出原因 |
+| `test_cli_service_logs.py` | `jtdt update` 健康檢查失敗時，要讀得到服務**真正的**記錄檔（v1.16.11，客戶回報） |
 | `test_cli_update_rollback.py` | 升級失敗時要真的回復，而且訊息要說出實際結果（外部稽核 F03，v1.15.28） |
 | `test_client_ip_audit.py` | Client-IP resolution for audit / history / display — app/core/client_ip.py. |
 | `test_commit_message_guard.py` | `tools/check_commit_message.py` 自己要有牙齒 |
@@ -669,7 +670,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_host_stats_container.py` | 系統狀態 CPU 在容器(LXC/Docker)內要顯示容器自己的用量，不抓宿主機 |
 | `test_html_block_regexes_allow_whitespace.py` | 掃描器用的 `</script>` 正規式**一定要允許結束標籤裡有東西** |
 | `test_html_conversion_uses_writer_not_web.py` | HTML 轉檔一律走 **Writer** 篩選器，不可以落到 Writer/Web |
-| `test_i18n_catalog.py` | 語系檔與樣板的一致性守門 |
+| `test_i18n_catalog.py` | 語系檔與樣板的一致性檢查 |
 | `test_i18n_dynamic_labels.py` | 程式端產生的顯示字串（`tr(變數)`）也必須有英文 |
 | `test_id_from_body_acl.py` | 「id 由使用者傳入」的端點一律要有 ACL —— 靜態全面掃描 |
 | `test_impacts_pass_is_separate.py` | 「事件與影響」必須自己走一輪 —— **零退步是由構造保證的，不是調出來的** |
@@ -701,6 +702,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_ldap_failover.py` | 多台 DC 容錯與連線逾時 |
 | `test_learn_synonym_reports_existing_mappings.py` | 按「學起來」時要**把後果講出來** |
 | `test_license_declaration.py` | 本專案宣告的授權必須處處一致（v1.14.48 起改為 AGPL-3.0-or-later） |
+| `test_llm_hidden_pages_boot.py` | LLM 停用 ＋「停用時一併隱藏」時，每一支有 LLM 功能的頁面在**真瀏覽器**裡開一次 |
+| `test_llm_hide_when_disabled.py` | LLM 停用時：**預設反灰**，管理員另外勾「停用時一併隱藏」才隱藏（v1.16.11） |
 | `test_llm_per_field_consensus.py` | LLM 逐欄校驗：連兩輪都指出同一個問題才採納 |
 | `test_llm_stream_deadline.py` | 串流回應要有**整次生成的上限**，不是只有每個 chunk |
 | `test_llm_url_ssrf.py` | SSRF defence — admin-supplied LLM base URL must reject suspicious schemes |
@@ -731,6 +734,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_no_sample_names_in_public.py` | 測試樣本的檔名 / 客戶公司名不可以出現在會公開的檔案裡 |
 | `test_no_svg_dot_hidden.py` | SVG 元素不可以用 `.hidden` 開關顯示 |
 | `test_no_tr_shadowing.py` | `tr` 是表格列最自然的變數名，也是前端翻譯函式的名字 —— 撞名會讓整段 JS 當場死掉 |
+| `test_no_undefined_names.py` | 程式碼裡不可以用到**從來沒定義過**的名稱（v1.16.11） |
 | `test_notify.py` | 作業完成通知：管道發送、設定分層、觸發條件 |
 | `test_notify_privacy.py` | 通知送出去的內容不可以外洩多餘的東西 |
 | `test_notify_settings_form.py` | 通知設定頁的兩件事：**存進去的值不可以被自動帶值蓋掉**、欄位要看得到內容 |
@@ -811,7 +815,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_save_queue.py` | Tests for app.core.save_queue (v1.7.17). |
 | `test_scan_merge_api.py` | 掃描拼合 (scan-merge) — 端點 / ACL / 公開 API 測試 |
 | `test_scan_merge_detector.py` | 掃描拼合 — 內容偵測 + 背景淨白 單元測試 |
-| `test_scanner_regexes_are_linear.py` | 守門的正規式不可以有**重疊的分支** —— 那是指數級回溯 |
+| `test_scanner_regexes_are_linear.py` | 檢查的正規式不可以有**重疊的分支** —— 那是指數級回溯 |
 | `test_scheduled_export.py` | Scheduled settings export (v1.12.54). |
 | `test_script_line_endings.py` | Windows 批次檔一律 CRLF、Unix 腳本一律 LF |
 | `test_seal_zone_marker.py` | 用印區的排除條件：**標籤才算，說明句不算** |
@@ -835,14 +839,14 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_static_image_budget.py` | 自家的介面圖片不可以大到離譜（v1.14.61） |
 | `test_submission_check_acl.py` | 送件檢核（submission-check）的案件 ACL 測試 |
 | `test_taiwan_terminology.py` | 使用者看得到的文字不可以用中國大陸用詞 |
-| `test_template_block_placement.py` | 兩個「看不到 JS 例外、只有畫面怪怪的」樣板雷的守門 |
+| `test_template_block_placement.py` | 兩個「看不到 JS 例外、只有畫面怪怪的」樣板雷的檢查 |
 | `test_template_css_is_effective.py` | 模板用到的 CSS 類別，在**那個情境下**必須真的有樣式 |
 | `test_template_head_block.py` | 工具模板的 `<style>` 一定要放在 base.html 真的有的區塊裡 |
 | `test_template_js_syntax.py` | Inline-JS syntax check for every Jinja2 template (v1.7.14). |
 | `test_template_renders.py` | 每一支模板都要**渲染得起來**，而且註解裡不可以寫出樣板標籤的字面寫法 |
 | `test_template_script_deps.py` | 模板用到的前端元件，那一頁必須自己載進來 |
 | `test_ternary_branches_go_through_tr.py` | 三元運算的**每一個分支**都要各自包 `tr()` |
-| `test_test_plan_coverage.py` | 測試計畫本身的守門：計畫沒涵蓋到的東西要紅燈 |
+| `test_test_plan_coverage.py` | 測試計畫本身的檢查：計畫沒涵蓋到的東西要紅燈 |
 | `test_text_deident_e2e.py` | 文字去識別化：走完整條路徑的驗收 |
 | `test_text_diff.py` | Tests for the new 文字差異比對 tool — paste-text variant of doc-diff. |
 | `test_text_list.py` | Tests for text-list tool — pipeline ops, file extraction, export formats. |
@@ -1410,6 +1414,10 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] 預設 enabled=False
 - [ ] 填 endpoint / model 後測試連線
 - [ ] 關閉時核心工具仍能正常運作
+- [ ] 「停用時一併隱藏」**預設不勾**；停用＋沒勾 → 側欄與首頁的逐句翻譯 / 文件翻譯 / 會議摘要**反灰並說明原因**，
+      各工具的 LLM 選項反灰；停用＋勾了 → 側欄、首頁、搜尋都找不到那三支，各工具的 LLM 選項藏起來；
+      啟用時勾著不影響任何東西
+- [ ] 頁面上的工具數是實算的（不是寫死的數字），說明寫「反灰」不寫「自動隱藏」
 
 #### API Token 🆕
 - [ ] 建立 / 列表 / 刪除 token
@@ -1531,6 +1539,11 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       （已經載進記憶體了），修好的行為要下一次更新才看得到。
 - [ ] 加了新相依之後：`jtdt update` 要真的把它裝起來，
       **部署後驗 `import <新模組>`，不能只看 `/healthz`**（延遲匯入會蓋掉缺相依）。
+- [ ] 更新最後一步要印 `Upgrade done`（v1.15.11 ~ v1.16.10 的健康檢查一律誤報失敗）。
+      服務起得慢時最多等 2 分鐘，每 15 秒印一次「還在等」。
+- [ ] `jtdt logs` 與健康檢查失敗時印的日誌要是**服務真正的日誌**：
+      Windows 讀 WinSW 的 `%ProgramData%\jt-doc-tools\Logs\jtdt-svc.err.log`（不是資料目錄）、
+      macOS 先讀 `~/Library/Logs/jt-doc-tools.err`、Linux 走 `journalctl`。
 
 ### 緊急復原（**服務沒跑也要能用**）
 - [ ] `jtdt auth show` / `jtdt auth disable` / `jtdt set-local`（= `jtdt auth set-local`）
@@ -1724,7 +1737,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 ### 4.6.1 之前靠「尾段字串」假通過的那幾支 🆕 v1.15.30
 
-> 涵蓋守門原本比對「`/api/` 之後那一截」—— `list` / `count` / `assets` /
+> 涵蓋檢查原本比對「`/api/` 之後那一截」—— `list` / `count` / `assets` /
 > `history` 這種字在四千行的文件裡**必然**找得到，所以那幾支端點從來沒有真的
 > 被檢查過（實算：84 支裡 8 支假通過）。判準已改成**完整路徑**。
 
@@ -1753,7 +1766,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 ## 4.8 管理區「會改狀態」的端點 🆕 v1.15.30
 
-> **為什麼補這一節**：涵蓋守門原本把整個 `/admin` 前綴跳過（只有
+> **為什麼補這一節**：涵蓋檢查原本把整個 `/admin` 前綴跳過（只有
 > `test_admin_pages_appear_in_the_plan` 守頁面本身），於是**103 支會改狀態的
 > 管理端點裡有 79 支一條驗收都沒有** —— 而這些正是「按下去會改到別人資料」
 > 的那些（刪使用者、清工作區、匯入設定、改權限矩陣）。
@@ -2007,7 +2020,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `/admin/ocr-langs/deploy/install.sh` 與 `/admin/ocr-langs/deploy/uninstall.sh`
       —— 產生給遠端機器執行的腳本，內容不可以夾帶未驗證的輸入
       （**兩支都要寫完整路徑** —— 原本第二支只寫了 `uninstall.sh`，
-      而守門當時是拿路徑尾段比對，等於沒檢查到它）
+      而檢查當時是拿路徑尾段比對，等於沒檢查到它）
 - [ ] `/admin/directory/selected` —— 目錄瀏覽「已選的對象」清單
   - [ ] 未登入 / 非管理員看不到，回的是 302 / 403 **不是空清單**
         （空清單會讓人以為目錄真的是空的）
@@ -2086,7 +2099,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       或資料庫開不起來時回 **503**（那才是真的不能工作）③**不可以吐模組名稱、
       例外訊息或檔案路徑** —— 這支跟 healthz 一樣公開，細節只在管理區的系統狀態頁
       ④啟用認證時照樣連得上（在 `_PUBLIC_EXACT` 裡）。
-      守門 `tests/test_readyz_reports_missing_tools.py`（五個方向變異驗證過）。
+      檢查 `tests/test_readyz_reports_missing_tools.py`（五個方向變異驗證過）。
 - [ ] `POST /login`
 - [ ] `GET /login`
 - [ ] `POST /logout`
@@ -2593,7 +2606,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
    python tools/api_doc_example_audit.py           # API.md 的每條 curl 實際打一遍
    ```
    **最後那一支要看「要看的」是不是 0**（v1.15.34 起）。它把 `API.md` 裡的
-   每一條 curl 解析出來實際送一次 —— 既有的對照層守門只驗「端點有沒有寫進
+   每一條 curl 解析出來實際送一次 —— 既有的對照層檢查只驗「端點有沒有寫進
    文件」與挑出來那幾支的參數，**不會把整條指令送出去**。第一次跑就抓到
    `/admin/api/llm/test-connection` 的範例沒帶 body 而端點回
    `400 Invalid JSON body`（照文件做的人會以為是自己送錯）。
@@ -2741,7 +2754,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       自動化改寫時縮排要從 AST 的 `col_offset` 取，寫死會產生
       `await outside async function`
 
-### 6.38 v1.14.56 — 測試計畫本身要有守門（每次發版必過）
+### 6.38 v1.14.56 — 測試計畫本身要有檢查（每次發版必過）
 
 發版門檻是照這份計畫跑的，**計畫漏了什麼那塊就等於沒驗過**，而且報告看起來
 仍然全綠。
@@ -3660,7 +3673,7 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       不可以整個方塊消失
 - [ ] 三處都要驗：通知下拉、`/my-jobs`、`/admin/jobs`
 
-#### 6.19.6 守門測試（會自動跑，但發版前確認有過）
+#### 6.19.6 自動檢查（會自動跑，但發版前確認有過）
 
 - [ ] `tests/test_api_doc_coverage.py` —— 以實際路由表反查 `API.md` 與本檔 §4
 - [ ] `tests/test_api_doc_examples_run.py` —— 文件範例裡那條**不帶 body** 的
@@ -3820,7 +3833,7 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 - [ ] `tests/test_office_convert.py` 的
       `test_good_output_wins_over_bad_exit_code` /
       `test_killed_process_says_so_instead_of_blaming_the_format` 綠
-- [ ] 同副檔名互轉（pptx→pptx）真的有轉（無聲跳過守門也在同一檔）
+- [ ] 同副檔名互轉（pptx→pptx）真的有轉（無聲跳過檢查也在同一檔）
 
 ### 6.33 v1.14.37 — 毀損檔案一律 400，不可 500（每次發版必過）
 
@@ -4010,7 +4023,7 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       i18n 的樣板函式當初叫 `t()`，而全站有十幾個樣板用 `t` 當工具的迴圈變數
       → 迴圈裡呼叫 `t('字')` 變成呼叫那個 dict，`'dict' object is not callable`
       **整頁 500**。改名 `tr()` 之後才沒事。
-- [ ] 守門：`tests/test_i18n_catalog.py` 釘死「樣板全域只註冊 `tr`，
+- [ ] 檢查：`tests/test_i18n_catalog.py` 釘死「樣板全域只註冊 `tr`，
       不可以再出現單字母的 `t`」—— 這種撞名不會有靜態警告，只會在
       「剛好那一頁有迴圈」的時候炸。
 
@@ -4031,20 +4044,20 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       而抽的時候把兩段**含 JS 字串運算**的樣式一起抽了進去
       （`background:' + avatarBg + ';`）→ 那兩條規則整條無效，
       **大頭照沒有底色**，而且**沒有任何錯誤訊息**（瀏覽器只是安靜跳過壞規則）。
-- [ ] 守門 `tests/test_generated_css_valid.py`：不可以出現 `' +` / `+ '`
+- [ ] 檢查 `tests/test_generated_css_valid.py`：不可以出現 `' +` / `+ '`
       這種字串串接的痕跡，也不可以有沒配對的引號。
 
 ### 6.59 v1.14.93~94 — 英文版文件是「生成」的（每次發版必過）
 
 - [ ] `docs/index-en.html`、`docs/api-en.html`、`README_en.md` **不可以有殘留中文**
-      （守門 `tests/test_docs_english_pages.py` 逐行檢查，程式區塊除外）。
+      （檢查 `tests/test_docs_english_pages.py` 逐行檢查，程式區塊除外）。
 - [ ] 改了中文版之後**要重跑生成器**（`build-i18n-page.py` / `build-i18n-md.py`），
       否則英文版停在舊內容 —— 這個專案已經吃過兩次虧
       （`github/TEST_PLAN.md` 手動複製漂了 182 行、介紹站的工具數與卡片對不上）。
 - [ ] 中英兩版最上面的語言切換要**互相指得到**（`README.md` ↔ `README_en.md`、
       `CHANGELOG.md` ↔ `CHANGELOG_en.md`、兩個網頁的 langSwitch）。
 - [ ] README 的 pytest 徽章不可以低於 `tests/` 裡 `def test_` 的個數
-      （守門 `test_readme_pytest_badge_is_not_stale`）—— 它曾經停在 **470**，
+      （檢查 `test_readme_pytest_badge_is_not_stale`）—— 它曾經停在 **470**，
       而實際是 5,9xx。
 
 ### 6.60 v1.14.94 — 字數統計收辦公文件（每次發版必過）
@@ -4096,7 +4109,7 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       **500 會讓人以為服務掛了而一直重試**。
 - [ ] **反向對照**：第 1 頁還是要畫得出圖而且不是空的。
       只驗「超範圍會被擋」的話，把端點改成永遠回 404 也會過。
-- [ ] 守門 `tests/test_preview_page_range.py`；修法是**全域處理器**
+- [ ] 檢查 `tests/test_preview_page_range.py`；修法是**全域處理器**
       （`PageOutOfRange` → 404），不是逐支端點改 —— 逐支改下一支新工具又會漏。
 
 ### 6.65 v1.15.1 — 英文介面要真的跑得動（每次發版必過）
@@ -4119,6 +4132,25 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       資料不是顯示文字（書籤的 `{title, page, level}`），翻掉是改壞資料。
 - [ ] 新畫的 SVG 圖示要**算圖確認過**才收（snap chromium 的 `--screenshot`
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
+
+---
+
+### 6.101 v1.16.11 — 更新的健康檢查、未定義名稱、LLM 停用時的隱藏選項（**每次發版必過**）
+
+- [ ] `pytest tests/test_no_undefined_names.py tests/test_cli_service_logs.py
+      tests/test_cli_health_check.py tests/test_llm_hide_when_disabled.py
+      tests/test_llm_hidden_pages_boot.py tests/test_js_set_attributes_go_through_tr.py` 綠燈
+- [ ] **程式碼不可以用到沒定義過的名稱**：v1.15.11 起 `cli.py` 的 `_safe_fetch` 從來沒 import，
+      `jtdt update` 的健康檢查在三個平台一律失敗；`main.py` 的 `html_mod` 讓友善錯誤頁變成 500。
+      NameError 被 `except` 吞掉或變成 500，**沒有任何測試會紅** —— 靠 `test_no_undefined_names.py` 擋
+- [ ] **實機跑一次 `jtdt update`**（Linux / Windows / macOS 各一台）：最後要印 `Upgrade done`。
+      從 v1.15.11 ~ v1.16.10 升上來的那一次仍會誤報一次（跑檢查的是舊版程式），**升第二次**才驗得到
+- [ ] 健康檢查失敗時印的日誌是**服務真正的日誌**：Windows `C:\ProgramData\jt-doc-tools\Logs\jtdt-svc.err.log`、
+      macOS `~/Library/Logs/jt-doc-tools.err`（錯誤在 stderr，不是 `.log`）、Linux `journalctl`
+- [ ] 更新的輸出裡**沒有 `DeprecationWarning`**
+- [ ] LLM 停用、沒勾「停用時一併隱藏」→ 工具與選項**看得到、反灰**；勾了 → 看不到；
+      LLM 啟用時勾著 → 完全不影響。**三種狀態都要驗**（只驗「勾了看不到」的話，把停用一律改成隱藏也會過）
+- [ ] 隱藏時各工具頁在真瀏覽器裡**沒有主控台錯誤**（藏的是 JS 會 `getElementById` 的元素）
 
 ---
 
@@ -4339,7 +4371,7 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > 而他多半不會回報，會以為是自己的環境有問題。
 
 - [ ] 凡是「照著做」的步驟（安裝順序、相依關係、前置條件），
-      改動時要用**字面守門**釘住，不能只靠 review
+      改動時要用**字面檢查**釘住，不能只靠 review
 
 ---
 
@@ -4423,7 +4455,7 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 - [ ] **不可以靠 prompt**：`_build_prompt_prefix()` 的輸出不因為字典而改變
       （翻繁中的指令已 1,179 字元、每批內容上限 1,200 —— 塞進去會把批次擠掉一半）
 - [ ] 拉丁詞的**前後邊界都要驗**：`Acer` 不可以命中 `Acerbic` **也不可以命中
-      `MyAcer`**（只驗一邊的話，拿掉另一邊守門照樣全綠）
+      `MyAcer`**（只驗一邊的話，拿掉另一邊檢查照樣全綠）
 - [ ] 中日韓詞用子字串（硬加 `\b` 會讓中文詞整個匹配不到）
 - [ ] **最長優先**：`Acer Chromebook` 要贏過 `Acer`
 - [ ] **產出裡絕對不可以殘留 `⟪1⟫`**：模型把標記弄丟 / 改壞 / 重複吐兩次，
@@ -4444,7 +4476,7 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 
 - [ ] 兩支工具都要有**跑完整條路徑、打開產出檔**的測試
 - [ ] 拉丁詞的邊界要**前後兩邊都驗**：只驗 `Acerbic`（後邊界）的話，
-      把前邊界拿掉守門照樣全綠 —— 要再加一個 `MyAcer`
+      把前邊界拿掉檢查照樣全綠 —— 要再加一個 `MyAcer`
 
 ---
 
@@ -4561,9 +4593,9 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 - [ ] **設定備份的匯入維持它自己那一套**（2 GiB / 512 MiB / zip-slip 白名單），
       不可以為了統一而換成通用判斷
 
-### ⚠ 涵蓋型守門要用 AST，不要用字串比對
+### ⚠ 涵蓋型檢查要用 AST，不要用字串比對
 
-> 這條守門第一版檢查「函式裡有沒有提到 `zip_guard`」，結果被**我自己寫的註解**
+> 這條檢查第一版檢查「函式裡有沒有提到 `zip_guard`」，結果被**我自己寫的註解**
 > 騙過去（註解裡就有那四個字），拿掉防護後照樣全綠。
 
 - [ ] 判斷「有沒有呼叫某個防護」一律走 AST 的 `Call` 節點
@@ -4649,9 +4681,9 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > 在收集階段就 `AttributeError` → pytest exit 2 → 兩分鐘內整個 job 紅。
 
 - [ ] `python tools/route_index.py` 印出的路由數與上一版相近（目前 536 條）
-- [ ] **逐路由參數化的守門都要先呼叫 `assert_sane(app)`**
+- [ ] **逐路由參數化的檢查都要先呼叫 `assert_sane(app)`**
       —— 新版底下頂層只看得到 **3 條** `/tools/` 路由，
-      「只跳過沒有 `.path` 的物件」會讓那些守門**縮成三條然後全綠**
+      「只跳過沒有 `.path` 的物件」會讓那些檢查**縮成三條然後全綠**
 - [ ] 六個讀路由表的地方都走 `tools/route_index.py`：
       `test_broken_input_no_500` / `test_api_doc_coverage` / `test_test_plan_coverage` /
       `i18n_untranslated_scan` / `i18n_zh_baseline` / `report_endpoint_test_coverage`
@@ -4728,34 +4760,34 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 - [ ] 用印限用章的字型下拉：`標楷體（自動找系統最佳）` 要翻，
       **使用者上傳的字型名稱不可以被翻**
 
-### 6.70 v1.15.8 — 守門自己失效的四種樣態（**每次發版必過**）
+### 6.70 v1.15.8 — 檢查自己失效的四種樣態（**每次發版必過**）
 
 > 這四種在 pytest 輸出裡**跟「全部通過」長得一模一樣**。
 
 - [ ] **寫死 `github/` 那一層** → 一律走 `tools/repo_paths.py` 的 `public_root()`
       （判準是檔案在不在，不是資料夾名字）。用**標準 clone** 跑一次
       `pytest tests/`，不能只在開發機跑
-- [ ] **逐類 / 逐檔參數化的守門要驗自己有收到檔案**
+- [ ] **逐類 / 逐檔參數化的檢查要驗自己有收到檔案**
       （`test_taiwan_terminology::test_the_scan_actually_reaches_every_class_of_file`、
       `test_no_tr_shadowing::test_the_scan_actually_reads_something`）
 - [ ] **跳過條件會不會因為環境而永遠成立** —— `test_pdf_watermark` 找的是
-      **Pillow 內附**的 DejaVuSans，而 Pillow 12.3 起不再內附，那條守門一直在跳過
+      **Pillow 內附**的 DejaVuSans，而 Pillow 12.3 起不再內附，那條檢查一直在跳過
 - [ ] **同步腳本要在最後一次編輯之後才跑**：`diff -rq` 對過 `sync-to-github.sh`
       的同步項目沒有差異才算數（v1.15.7 就是 19:51 同步、19:58 才改，
-      那兩條守門根本沒進公開版，而 CHANGELOG 已經寫著修好了）
+      那兩條檢查根本沒進公開版，而 CHANGELOG 已經寫著修好了）
 
 ### 6.71 v1.15.8 — Windows 上跑完整測試（**每次發版必過**）
 
 > 2026-09-06 **第一次**在 Windows 上跑完整套件：39 failed / 10 errors。
 > **一條產品 bug 都沒有**，全是測試自己不跨平台 —— 但每一條都代表
-> 那個守門在 Windows 上等於不存在。
+> 那個檢查在 Windows 上等於不存在。
 
 - [ ] 在 `.154` 跑 `pytest tests/ -q`，失敗數不可增加
 - [ ] 路徑當字串比對時一律 `.as_posix()`（`str(Path)` 在 Windows 給反斜線，
       豁免清單全用 `/` 寫 → 全部對不上 → 假陽性一大片）
 - [ ] `read_text()` / `write_text()` 一律帶 `encoding="utf-8"`（Windows 預設 cp950）
 - [ ] 暫存路徑用 `tempfile.gettempdir()`，**不可以寫死 `/tmp`**
-      （`test_owasp_top10` 那條**路徑穿越**的資安守門就是這樣在 Windows 上從沒執行過）
+      （`test_owasp_top10` 那條**路徑穿越**的資安檢查就是這樣在 Windows 上從沒執行過）
 - [ ] POSIX-only 的 API（`time.tzset` / `os.sched_setaffinity`）要 `hasattr` 防護
 
 ### 6.72 v1.15.8 — i18n 掃描器的兩個盲點（**每次發版必過**）
@@ -4788,7 +4820,7 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 ### 6.9.1 階段 1（v1.14.88）— 工具的語系白名單
 
 - [ ] `tests/test_tool_ui_locales.py` 六項全綠。第一條
-      `test_traditional_chinese_still_shows_every_tool` 就是最高原則的守門。
+      `test_traditional_chinese_still_shows_every_tool` 就是最高原則的檢查。
 - [ ] 起乾淨實例抓首頁：**繁中側欄 47 支**，`vat-lookup` / `einvoice-scan` /
       `pdf-fill` / `pdf-stamp` / `doc-deident` / `transit-proof` 一支都不可以少。
 - [ ] **反灰 ≠ 消失**（v1.14.93 起改成這樣）：語言不符的工具**仍然列在側欄與首頁**，
@@ -4846,7 +4878,7 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       不要累積到最後 —— 差異一多就分不出是哪一步弄壞的。
 - [ ] 語系檔的 key **一定是中文原文**（`test_catalog_entries_are_all_traditional_chinese_keys`）。
       抽 key 的正規式要有**前綴邊界** —— 沒有的話 Jinja 的 `selectattr('installed')`
-      會被當成 `tr('installed')` 收進語系檔（v1.14.96 踩到，被這條守門擋下）。
+      會被當成 `tr('installed')` 收進語系檔（v1.14.96 踩到，被這條檢查擋下）。
 - [ ] **含 `&` 的字串不要包**：`{{ tr('…') }}` 會經過自動跳脫，原本寫死的
       `&nbsp;` / `&amp;` 會變成看得見的字面。判準就是位元組比對會紅。
 - [ ] `{% block title %}` 與 `{% with hint='…' %}` 這兩種**不是文字節點**的位置

@@ -30,7 +30,7 @@ def _assign(name: str) -> ast.Assign:
                 isinstance(t, ast.Name) and t.id == name for t in node.targets):
             return node
     raise AssertionError(
-        f"`{SEED.name}` 裡找不到 `{name}` 的指派 —— 改名的話這支守門會安靜失效，"
+        f"`{SEED.name}` 裡找不到 `{name}` 的指派 —— 改名的話這支檢查會安靜失效，"
         "所以這裡要直接紅")
 
 

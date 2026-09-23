@@ -71,8 +71,12 @@
     {%- endif -%}
 
   {%- elif mode == 'augment' -%}
-    {# Pattern B — LLM 是加值。永遠顯示 checkbox，狀態依 llm_enabled 決定 #}
-    <div class="llm-gate-augment {% if not llm_enabled %}is-disabled{% endif %}">
+    {# Pattern B — LLM 是加值。停用時**預設反灰**（看得到、也看得到為什麼不能用）；
+       管理員勾了「停用時一併隱藏」才藏起來（`llm_hidden()`，v1.16.11）。
+       **藏的時候元素還是要在** —— 各工具的 JS 會 `getElementById(input_id)` 讀這個
+       勾選框，整段不輸出的話拿到 null、後面的程式整段停住（本專案踩過好幾次）。 #}
+    <div class="llm-gate-augment {% if not llm_enabled %}is-disabled{% endif %}"
+         {%- if not llm_enabled and llm_hidden() %} hidden{% endif %}>
       <label class="llm-gate-aug-label" {% if not llm_enabled %}title="{{ tr('LLM 服務尚未啟用，請聯絡管理員') }}"{% endif %}>
         <input type="checkbox"
                id="{{ input_id }}"

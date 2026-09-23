@@ -17,6 +17,8 @@ metadata = ToolMetadata(
     description="接地端 LLM 逐句翻譯，左原文右譯文並排。可上傳文字或辦公文件。",
     icon="globe",
     category="內容處理",
+    # 只靠 LLM：停用時側欄 / 首頁反灰，管理員另外勾「停用時一併隱藏」才整個不列出
+    requires_setup="llm",
 )
 
 tool = ToolModule(

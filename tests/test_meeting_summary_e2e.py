@@ -430,7 +430,7 @@ def test_the_chapter_timeline_spine_has_no_gaps(live):
     })()""")
     assert got, "量不到那三列"
     assert got["width"] > 0, "根本沒有畫出軸線"
-    assert got["padTop"] > 0, "列沒有上下內距的話，這條守門就沒有意義了"
+    assert got["padTop"] > 0, "列沒有上下內距的話，這條檢查就沒有意義了"
     assert got["lineTop"] <= -got["padTop"] + 0.5, (
         f"軸線上方少蓋了 {got['padTop'] + got['lineTop']:.1f}px 的內距 —— 線會斷開")
     assert got["lineBottom"] <= -got["padBottom"] + 0.5, (
@@ -634,7 +634,7 @@ def test_clicking_a_block_jumps_to_that_moment_not_the_first_one(live):
       }
       return null;
     })()""")
-    assert got, "沒有一列有兩格以上的色塊 —— 這條守門等於沒有執行"
+    assert got, "沒有一列有兩格以上的色塊 —— 這條檢查等於沒有執行"
     assert got["a"] and got["b"], (
         "色塊沒有自己的段號 —— 點下去只會跳到這個人第一次發言的地方")
     assert got["a"] != got["b"], (

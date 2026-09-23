@@ -63,7 +63,7 @@ DEMO_COMPANY = {
 #: 欄位標題（畫面上顯示用）。**一定要從出貨的那份取**，不可以在這裡自己再寫
 #: 一份 —— 同一份清單放兩個地方一定會漂：2026-09-16 實際漂了 6 個欄位，其中
 #: 兩個還漂成大陸用語「郵箱」（台灣要寫「信箱」），而示範資料正是要拿去拍
-#: 截圖公開的。守門 `tests/test_demo_labels_come_from_the_shipped_defaults.py`。
+#: 截圖公開的。檢查 `tests/test_demo_labels_come_from_the_shipped_defaults.py`。
 LABELS = {k: _SHIPPED_LABELS[k] for k in DEMO_COMPANY}
 
 #: 廠商資料表要填的欄位（標籤 → 右邊留白給工具填）。

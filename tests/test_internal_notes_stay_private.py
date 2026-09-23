@@ -10,7 +10,7 @@
 而「逐項列的清單一定會漏下一個」是本專案已經踩過的形狀。
 
 **刻意不擋對方的名字**：等整合出貨，README／API 手冊／安裝說明本來就會
-寫到它。擋字會讓這條守門在那一天變成錯的，而**錯的守門會被停掉**。
+寫到它。擋字會讓這條檢查在那一天變成錯的，而**錯的檢查會被停掉**。
 所以判準放在「**那些往來文件本身**」上：目錄、內容雜湊、
 以及只有書信才會有的標題形狀。（名字與完整由來記在開發樹的 CLAUDE.md。）
 """
@@ -88,7 +88,7 @@ def _text(p: Path) -> str:
 def test_the_scan_actually_reaches_the_public_tree():
     """「掃 0 個檔」跟「掃過都乾淨」在 pytest 輸出裡長得一模一樣。"""
     files = _public_files()
-    assert len(files) > 200, f"公開樹只掃到 {len(files)} 個檔，這條守門等於沒有執行"
+    assert len(files) > 200, f"公開樹只掃到 {len(files)} 個檔，這條檢查等於沒有執行"
 
 
 def test_no_private_correspondence_directory_in_the_public_tree():
@@ -139,7 +139,7 @@ def test_no_public_file_has_the_same_content_as_a_private_note():
 def test_no_public_file_carries_a_letter_heading():
     """擋「改了檔名、也改了幾個字，但整封信貼過去」那一種。
 
-    守門測試**說明**這條規則時會引用那個形狀（use vs mention，本專案踩過很多次），
+    自動檢查**說明**這條規則時會引用那個形狀（use vs mention，本專案踩過很多次），
     所以排除掉正在講這件事的測試檔本身。
     """
     tokens = _counterparty_tokens()
@@ -165,7 +165,7 @@ def test_the_letter_heading_check_knows_who_the_counterparty_is():
     tokens = _counterparty_tokens()
     assert tokens, (
         f"從 {PRIVATE_DIR} 的子目錄推不出任何合作對象名，"
-        "上一條守門等於沒有執行。目錄命名慣例是 `<對象>-integration/`。")
+        "上一條檢查等於沒有執行。目錄命名慣例是 `<對象>-integration/`。")
     pattern = _letter_title_re(tokens)
     assert pattern is not None
     assert pattern.search(f"# JTDT \u2192 {tokens[0]}\uff1a\u6e2c\u8a66"), "組出來的式子配不到書信標題"
@@ -178,7 +178,7 @@ def test_the_letter_heading_check_knows_who_the_counterparty_is():
 def test_that_guard_really_runs_in_the_development_tree():
     """「整份 skip」跟「整份通過」在 pytest 輸出裡長得一模一樣。
 
-    上面那條在 clone 上跳過是對的，但**開發樹上跳過就等於沒有守門** ——
+    上面那條在 clone 上跳過是對的，但**開發樹上跳過就等於沒有檢查** ——
     判準走 `public_root()`（它回的不是自己 ＝ 開發樹），那時同步腳本一定要在。
     **不可以自己寫死那一層的名字** —— 隔壁 `test_public_tree_paths.py`
     擋的正是那個寫法，我寫這條時當場被它抓到。
@@ -186,5 +186,5 @@ def test_that_guard_really_runs_in_the_development_tree():
     if PUB == ROOT:          # `public_root()` 回自己 ＝ 這是標準 clone
         pytest.skip("這裡不是開發樹")
     assert _SYNC_SCRIPT.is_file(), (
-        "開發樹上找不到 sync-to-github.sh —— 上面那條守門會被整條跳過，"
+        "開發樹上找不到 sync-to-github.sh —— 上面那條檢查會被整條跳過，"
         "而 pytest 的輸出看起來跟通過一樣")

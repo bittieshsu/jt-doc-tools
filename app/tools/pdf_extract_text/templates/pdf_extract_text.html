@@ -61,11 +61,16 @@
 
   <div class="et-download-group" id="dlGroup"></div>
 
-  {% if llm_enabled %}
+  {# LLM 停用時**反灰**（看得到、也看得到為什麼不能用）；管理員勾了「停用時一併隱藏」
+     才整段不輸出（v1.16.11）。這裡可以整段不輸出：下面的 JS 本來就處理「沒有這一列」
+     （停用時原本就是整段不輸出）。 #}
+  {% if not llm_hidden() %}
   <div class="et-llm-row" id="llmRow" hidden>
     <span>{{ icon('play', size=14) }}</span>
-    <span class="muted"><b>{{ tr('LLM 重排段落（附加功能）：') }}</b>{{ tr('PDF 版面常常把句子在行尾斷掉。開啟後會把每個段落丟給 LLM 重新銜接，標題不動。') }}</span>
-    <button class="btn" type="button" id="btnLlmReflow">{{ icon('refresh', size=14) }} {{ tr('交給 LLM 重排') }}</button>
+    <span class="muted"><b>{{ tr('LLM 重排段落（附加功能）：') }}</b>{{ tr('PDF 版面常常把句子在行尾斷掉。開啟後會把每個段落丟給 LLM 重新銜接，標題不動。') }}
+      {%- if not llm_enabled %} {{ tr('需要 LLM 服務，請管理員到「LLM 設定」啟用。') }}{% endif %}</span>
+    <button class="btn" type="button" id="btnLlmReflow"
+            {%- if not llm_enabled %} disabled title="{{ tr('LLM 服務尚未啟用，請聯絡管理員') }}"{% endif %}>{{ icon('refresh', size=14) }} {{ tr('交給 LLM 重排') }}</button>
   </div>
   {% endif %}
   <div id="llmProgressBox" hidden data-s="s3853a7c5">

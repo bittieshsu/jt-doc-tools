@@ -104,7 +104,7 @@
   </section>
 
   <section class="ts-item" id="health">
-    <h2>Health check timed out（但服務其實是好的）</h2>
+    <h2>Health check timed out / failed（但服務其實是好的）</h2>
     <p class="ts-sym"><b>症狀</b>　更新流程最後一步逾時，可是用瀏覽器打得開。</p>
     <p><b>原因</b>　改過監聽位址或連接埠（<code>jtdt bind</code>）之後，
       舊版的健康檢查從執行更新那個 shell 的環境變數讀位址 —— 那裡根本沒有設定，
@@ -113,6 +113,18 @@
     <p><b>怎麼辦</b>　v1.15.15 起已修（改讀服務管理員自己的設定、直連不走代理，
       並會印出探過哪些位址與日誌最後 20 行）。先升到該版以上；
       還是逾時的話看 <code>jtdt logs</code> 的最後幾行。</p>
+    <p class="ts-sym"><b>另一種</b>　從 v1.15.11 ~ v1.16.10 更新時，最後印
+      <code>Health check failed</code>，<code>Service state</code> 是
+      <code>RUNNING</code> / <code>active</code>，Windows 還會說找不到日誌。</p>
+    <p><b>原因</b>　那幾版的健康檢查本身有錯（少了一行 import），
+      不管服務好壞都判成失敗；Windows 與 macOS 也去錯的地方找日誌。</p>
+    <p><b>怎麼辦</b>　用瀏覽器打得開就代表更新成功，不需要處理。
+      v1.16.11 已修，但<b>更新到 v1.16.11 的那一次仍會看到這段訊息</b>
+      （跑檢查的是更新前那一版的程式），下一次起就正常。
+      日誌實際的位置：Windows 在 <code>C:\ProgramData\jt-doc-tools\Logs\</code>
+      （<code>jtdt-svc.err.log</code> 與 <code>jtdt-svc.out.log</code>）、
+      macOS 在 <code>~/Library/Logs/</code>（<code>jt-doc-tools.err</code> 與
+      <code>jt-doc-tools.log</code>）、Linux 用 <code>journalctl -u jt-doc-tools</code>。</p>
   </section>
 
   <section class="ts-item" id="tls">

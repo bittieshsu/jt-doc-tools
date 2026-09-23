@@ -52,7 +52,7 @@ def _code_lines() -> list[tuple[int, str]]:
 
     **行尾註解與字串裡的分號都要處理**（`MessageBox "a;b"`）—— 原本這裡用
     `split(" ;")`，對 `Var X ; 中文` 這種沒有空格差異的寫法不夠穩。
-    邏輯已收進 `tools/nsis_source`，兩支安裝程式的守門共用同一份。
+    邏輯已收進 `tools/nsis_source`，兩支安裝程式的檢查共用同一份。
     """
     from tools.nsis_source import code_lines as _cl
     return _cl(NSI.read_text(encoding="utf-8"))

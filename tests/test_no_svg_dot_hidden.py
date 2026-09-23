@@ -87,18 +87,18 @@ def test_svg_visibility_is_not_toggled_with_the_hidden_property(path: Path) -> N
 
 
 def test_the_author_stylesheet_really_does_hide_svg_too() -> None:
-    """這條規則存在，上面那條守門才有意義 —— 兩者要一起看。
+    """這條規則存在，上面那條檢查才有意義 —— 兩者要一起看。
 
     如果哪天 `platform.css` 的 `[hidden]` 規則被限定成只管 HTML
-    （例如改寫成 `:where(html|*)[hidden]`），上面的守門就可以放寬。
+    （例如改寫成 `:where(html|*)[hidden]`），上面的檢查就可以放寬。
     在那之前它必須是無命名空間的全域規則。
     """
     css = (ROOT / "static" / "css" / "platform.css").read_text(encoding="utf-8")
     rule = re.search(r"^\[hidden\]\s*\{[^}]*display:\s*none", css, re.M)
-    assert rule, "platform.css 少了全域的 [hidden] 規則？那上面那條守門的理由要重寫"
+    assert rule, "platform.css 少了全域的 [hidden] 規則？那上面那條檢查的理由要重寫"
 
 
 def test_the_scan_actually_reaches_a_template_that_has_an_svg_with_an_id() -> None:
     """空迴圈的 assert 永遠成立 —— 要確認掃描真的看得到目標形狀。"""
     seen = [p for p in _sources() if _svg_ids(p.read_text(encoding="utf-8"))]
-    assert seen, "一個帶 id 的 <svg> 都沒掃到，這份守門等於沒有在檢查"
+    assert seen, "一個帶 id 的 <svg> 都沒掃到，這份檢查等於沒有在檢查"

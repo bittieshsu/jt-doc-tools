@@ -5,11 +5,8 @@
 <div class="llm-page">
 <h1>{{ icon('gear', size=22) }} {{ tr('LLM 設定') }} <span class="addon-badge">{{ tr('附加功能') }}</span></h1>
 <p class="muted">
-  {{ tr('LLM AI 加值是') }}<strong>{{ tr('附加功能') }}</strong>{{ tr('，預設關閉。啟用後共 10 個工具（pdf-fill 視覺校驗、
-  doc-deident / text-deident 智慧分類、doc-diff / pdf-extract-text / pdf-wordcount /
-  pdf-annotations 內容摘要、pdf-ocr 文字校正、submission-check 送件檢核、translate-doc
-  逐句翻譯）可選擇性地把資料送給本機或 LAN 上的 LLM server (OpenAI-compat) 處理。
-  本機 / LAN 上需有運行中的 LLM backend (Ollama / vLLM / LM Studio / jan.ai 皆可)。') }}
+  {# 工具數由伺服器端實算（`llm_tool_count`）—— 原本寫死 10，側欄寫 12，實際 13 #}
+  {{ tr('LLM AI 加值是') }}<strong>{{ tr('附加功能') }}</strong>{{ tr('，預設關閉。啟用後共 {0} 個工具可以選擇性地把資料送給本機或 LAN 上的 LLM server（OpenAI 相容）處理，清單與各自使用的模型見下方「4. 各工具進階設定」。本機 / LAN 上需有運行中的 LLM backend（Ollama / vLLM / LM Studio / jan.ai 皆可）。')|replace('{0}', llm_tool_count) }}
 </p>
 
 <div data-s="s58ee086a">
@@ -41,7 +38,24 @@
         {{ tr('啟用 LLM AI 加值') }}
       </label>
       <div class="muted" data-s="s41f96333">
-        {{ tr('關閉時，所有 LLM 邏輯不會執行，pdf-fill / doc-deident / translate-doc 等 10 個工具的 AI 加值會自動隱藏，純規則處理不受影響。') }}
+        {# 原本寫「會自動隱藏」—— 實際一直是反灰。介面承諾了沒做到的事（v1.16.11 修正） #}
+        {{ tr('關閉時，所有 LLM 邏輯都不會執行；各工具的 LLM 加值會反灰（看得到，但不能用），純規則處理不受影響。') }}
+      </div>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>{{ tr('停用時') }}</label>
+    <div class="field">
+      <label data-s="s32a6345d">
+        <input type="checkbox" id="hide_when_disabled" {% if settings.hide_when_disabled %}checked{% endif %}>
+        {{ tr('停用時一併隱藏') }}
+      </label>
+      {%- set only_names -%}
+        {%- for n in llm_only_tool_names -%}{{ tr(n) }}{% if not loop.last %}{{ tr('、') }}{% endif %}{%- endfor -%}
+      {%- endset %}
+      <div class="muted" data-s="s41f96333">
+        {{ tr('勾選後，LLM 停用時各工具的 LLM 加值選項不顯示；只靠 LLM 的工具（{0}）也從側欄、首頁與搜尋拿掉。沒勾的話只是反灰 —— 看得到、也看得到為什麼不能用。')|replace('{0}', only_names) }}
+        <br>{{ tr('這個選項只在停用時有作用；LLM 啟用時勾著也不影響任何東西。') }}
       </div>
     </div>
   </div>
@@ -562,6 +576,7 @@ async function saveSettings() {
   });
   const body = {
     enabled:                  $('enabled').checked,
+    hide_when_disabled:       $('hide_when_disabled').checked,
     base_url:                 $('base_url').value.trim(),
     api_key:                  $('api_key').value.trim() || null,
     model:                    $('model').value,
@@ -590,7 +605,12 @@ async function saveSettings() {
   }
   if (window.showToast) window.showToast(tr('已儲存'), 'ok');
   else alert(tr('已儲存'));
+  // 側欄是**伺服器渲染**的：啟用 / 停用、隱藏與否改了，側欄的反灰或隱藏要重新載入
+  // 才會跟著變（同語音服務設定頁的做法）。只在真的變了的時候才重載。
+  const navNow = body.enabled + ':' + body.hide_when_disabled;
+  if (navNow !== _navState) setTimeout(() => location.reload(), 600);
 }
+const _navState = $('enabled').checked + ':' + $('hide_when_disabled').checked;
 
 $('btn-test').addEventListener('click', testConnection);
 // 模型描述內的「點此測試連線」inline link 也觸發同一個流程，

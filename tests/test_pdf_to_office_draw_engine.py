@@ -729,7 +729,7 @@ def test_raster_trigger_skewed_image(tmp_path):
 def test_e2e_docx_pagination_not_shifted(tmp_path):
     """多頁 → .docx 的內容必須落在正確的頁（不可整體位移）。
 
-    回歸守門：ODF 的「錨定到第 N 頁」在 OOXML 沒有對應概念，若用 fo:break-before
+    回歸檢查：ODF 的「錨定到第 N 頁」在 OOXML 沒有對應概念，若用 fo:break-before
     做分頁，分頁符會落在前一頁物件的同一段落內 → Word/Writer 把整批頁面錨定物件
     歸到同一頁：第 1 頁空白、內容往後位移（實測 [0,5,10]）。改成「每頁一個
     master page」才會匯出成 section break，分頁才正確。

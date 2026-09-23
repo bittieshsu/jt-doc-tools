@@ -131,7 +131,7 @@
         b.classList.toggle('active', p === this.page);
         const n = this.placements.filter(x => x.page === p).length;
         b.classList.toggle('has-items', n > 0);
-        b.title = n ? `第 ${p + 1} 頁（${n} 個）` : `第 ${p + 1} 頁`;
+        b.title = n ? tr('第 {0} 頁（{1} 個）').replace('{0}', p + 1).replace('{1}', n) : tr('第 {0} 頁').replace('{0}', p + 1);
       });
     }
 

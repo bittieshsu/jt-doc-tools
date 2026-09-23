@@ -37,7 +37,7 @@ _INJECT = re.compile(
 @pytest.mark.parametrize("path", JS_FILES, ids=lambda p: p.name)
 def test_no_dynamic_style_element(path):
     src = path.read_text(encoding="utf-8", errors="replace")
-    # 去掉註解 —— 說明裡引用「原本錯誤的寫法」當反例不算（本專案守門測試
+    # 去掉註解 —— 說明裡引用「原本錯誤的寫法」當反例不算（本專案自動檢查
     # 的既有慣例：掃程式碼，不掃說明）
     body = re.sub(r"//[^\n]*", "", src)
     body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)

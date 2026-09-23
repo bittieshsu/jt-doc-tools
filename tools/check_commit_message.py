@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""公開 repo 的 commit 訊息守門 —— 可以當 `commit-msg` hook 用。
+"""公開 repo 的 commit 訊息檢查 —— 可以當 `commit-msg` hook 用。
 
 **為什麼要做成機械擋的**：使用者 2026-09-13 明講過「不應該有 claude session
 在 github」，2026-09-21 再確認一次。但開發工具那一側**每個 session 都會提示
 要加 `Claude-Session:` 那一行**，而且措辭是「取代先前的署名指引」——
 只靠「記得不要加」的話，遲早有一次會加進去，而那是推上公開 repo 才看得到的。
-記了規則沒有守門，等於沒記。
+記了規則沒有檢查，等於沒記。
 
 擋兩類：
 

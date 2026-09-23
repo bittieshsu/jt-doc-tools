@@ -21,8 +21,8 @@
 **只驗「屬性有設」擋不住這一類。** 判準要是「那條線在畫面上真的佔了空間」
 （`getBoundingClientRect`），那是唯一同時涵蓋 display、尺寸與座標的訊號。
 
-`tests/test_no_svg_dot_hidden.py` 是同一件事的靜態守門（便宜、每次都跑）；
-這一支是行為守門，兩支都要 —— 靜態那支擋不住「換一種方式把它藏起來」。
+`tests/test_no_svg_dot_hidden.py` 是同一件事的靜態檢查（便宜、每次都跑）；
+這一支是行為檢查，兩支都要 —— 靜態那支擋不住「換一種方式把它藏起來」。
 """
 from __future__ import annotations
 

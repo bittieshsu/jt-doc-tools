@@ -30,7 +30,7 @@ PS1 = public_root(ROOT) / "packaging" / "windows" / "install_core.ps1"
 def _code_lines() -> list[tuple[int, str]]:
     r"""(行號, 整條指令)。
 
-    兩件事一定要做，少一件這條守門就是假的：
+    兩件事一定要做，少一件這條檢查就是假的：
 
     * **去掉 `#` 註解** —— 說明裡會**引用**那個錯誤寫法當反例。
     * **把接續行接起來**（PowerShell 用反引號結尾）—— `Start-Process` 與

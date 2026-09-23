@@ -35,7 +35,7 @@ def _submits_jobs(tree: ast.AST) -> bool:
     第一版只認 `_jm.job_manager.submit`（`Attribute`），而多數工具是
     `from ... import job_manager` 之後直接 `job_manager.submit`（`Name`）
     —— 29 支只掃到 3 支。**「先證明掃得到東西」那條當場抓到**；
-    沒有它的話這份守門會靜靜地只檢查三支工具，而且全綠。
+    沒有它的話這份檢查會靜靜地只檢查三支工具，而且全綠。
     """
     for n in ast.walk(tree):
         if not (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
@@ -101,7 +101,7 @@ def test_preview_url_is_not_mistaken_for_view_url():
     """判準不可以退回子字串比對。
 
     `preview_url` 含有 `view_url` —— 用 `in` 掃的話，**七支只有預覽圖的工具
-    會被判成「有開啟」**，這條守門就整個失去意義。這裡直接拿一段程式碼試。
+    會被判成「有開啟」**，這條檢查就整個失去意義。這裡直接拿一段程式碼試。
     """
     tree = ast.parse('x = {}\nx["preview_url"] = "/p.png"\n')
     assert _ways_back(tree) == set(), "preview_url 被誤判成 view_url 了"

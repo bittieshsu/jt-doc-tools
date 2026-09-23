@@ -224,7 +224,7 @@ def test_transit_proof_csv_export_is_neutralised():
 
 
 def test_all_xlsx_writers_go_through_the_helper():
-    """靜態守門：不可以再有人直接 `ws.cell(..., value=<字串>)` 寫資料列。
+    """靜態檢查：不可以再有人直接 `ws.cell(..., value=<字串>)` 寫資料列。
 
     只允許表頭 / 樣式那類寫死的字面值（那不是使用者輸入）。判斷方式是
     「value= 後面接的是不是字面字串」—— 變數就要走 helper。

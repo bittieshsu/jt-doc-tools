@@ -1,7 +1,7 @@
 """每一個 cookie 的 `secure` 旗標都要走同一支判斷。
 
 `auth_routes.is_https_request()` 的說明早就寫著「**所有 cookie 的 `secure`
-都要走這裡**」—— 但**沒有守門**，於是 `/ui-locale` 用的是
+都要走這裡**」—— 但**沒有檢查**，於是 `/ui-locale` 用的是
 `request.url.scheme == "https"`。本專案關掉了 uvicorn 的 `proxy_headers`
 （見 memory `client_ip_via_helper_not_client_host`），所以反向代理後面
 `request.url.scheme` **永遠是 http** → https 站台上那個 cookie 沒有 Secure。

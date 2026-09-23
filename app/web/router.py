@@ -6,7 +6,6 @@ from fastapi.responses import HTMLResponse
 from ..config import settings
 
 from ..core import auth_settings as _as, permissions as _perm
-from ..core import ui_locale as _ui_locale
 
 router = APIRouter()
 
@@ -14,47 +13,15 @@ router = APIRouter()
 def build_router(templates, tools, app_name: str, version: str) -> APIRouter:
     @router.get("/", response_class=HTMLResponse)
     async def home(request: Request):
-        # Reuse the color mapping injected into Jinja globals by main.py,
-        # so the home-page colored tile matches the sidebar tile for the
-        # same tool id instead of every tool rendering in the default
-        # (`.tile-color-0`) indigo.
-        nav_lookup = {
-            n["id"]: n.get("color", 0)
-            for n in (templates.env.globals.get("nav_tools") or [])
-        }
-        # Filter the tile list by what the viewer can actually use, so
-        # non-admins don't see tiles that 403 on click. Auth OFF → show all.
-        allowed: set[str] | str = "ALL"
-        if _as.is_enabled():
-            user = getattr(request.state, "user", None)
-            if not user:
-                allowed = set()
-            else:
-                allowed = _perm.effective_tools(user.get("user_id", 0))
-        tools_ctx = [
-            {
-                "id": t.metadata.id,
-                "name": t.metadata.name,
-                "description": t.metadata.description,
-                "icon": t.metadata.icon,
-                "category": t.metadata.category,
-                "color": nav_lookup.get(t.metadata.id, 0),
-                # 語言不符的工具**不藏起來，改成反灰點不下去**（跟側欄同一個規則）
-                "locked": not _ui_locale.tool_visible(
-                    getattr(t.metadata, "locales", ()), _ui_locale.resolve(request)),
-            }
-            for t in tools
-            if allowed == "ALL" or t.metadata.id in allowed
-        ]
-        # Group tools by category, preserving the order categories first appear
-        # in. Each group: {"title": str, "tools": [...]}.
-        groups_by_title: dict[str, list[dict]] = {}
-        for t in tools_ctx:
-            groups_by_title.setdefault(t["category"] or "其他", []).append(t)
+        # **跟側欄用同一份清單**（權限、語言不符、外部服務沒設定、LLM 停用時的
+        # 反灰或隱藏全在 `nav_tool_groups` 一個地方算）。原本首頁自己再算一份，
+        # 只算了「語言不符」—— 語音服務沒設定好時側欄反灰、首頁卻照常可以點，
+        # 而且反灰的卡片拿不到 `lock_reason`（滑鼠移上去是空的）。
         groups = [
-            {"title": title, "tools": items}
-            for title, items in groups_by_title.items()
+            {"title": g["title"], "tools": list(g["tools"])}
+            for g in templates.env.globals["nav_tool_groups"](request)
         ]
+        tools_ctx = [t for g in groups for t in g["tools"]]
         return templates.TemplateResponse(request, 
             "home.html",
             {
@@ -105,7 +72,7 @@ def build_router(templates, tools, app_name: str, version: str) -> APIRouter:
         data_dir_ok = False
         try:
             # **用臨時檔名、而且交給 `tempfile` 收尾** —— 固定檔名有兩個問題：
-            # ①例外時會留下殘骸 ②那個字面會被「設定備份涵蓋」的守門掃成
+            # ①例外時會留下殘骸 ②那個字面會被「設定備份涵蓋」的檢查掃成
             # 一個沒人備份的設定檔（它掃的是原始碼裡的 `data_dir / "…"`）。
             import tempfile
             with tempfile.NamedTemporaryFile(dir=settings.data_dir,

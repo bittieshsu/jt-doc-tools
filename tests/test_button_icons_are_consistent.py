@@ -1,8 +1,8 @@
-"""按鈕圖示的兩條守門。
+"""按鈕圖示的兩條檢查。
 
 使用者 2026-09-13 回報「這按鈕有兩個少 icon」—— 掃描修正的四顆旋轉鈕裡，
 前兩顆有圖示、後兩顆沒有。**元素都在、沒有 JS 例外、也沒有殘留中文**，
-既有的守門一條都抓不到，只有截圖看得出來。
+既有的檢查一條都抓不到，只有截圖看得出來。
 
 這裡釘兩條判準：
 
@@ -19,7 +19,7 @@
 兩條都**只認畫面上真的是一排動作鈕的情況**：下拉選單項目、分頁箭頭、
 分頁籤（`menu-item` / `dropdown` / `tab` / `pager` / `chip`）與純符號、
 純副檔名標籤（`.xlsx`、`Word (.docx)`、`‹`）排除 —— 那些本來就不配圖示，
-算進來只會讓這份清單變成雜訊而沒有人看（用詞守門那次的教訓）。
+算進來只會讓這份清單變成雜訊而沒有人看（用詞檢查那次的教訓）。
 """
 
 from __future__ import annotations
@@ -92,7 +92,7 @@ def test_buttons_in_one_row_agree_on_icons() -> None:
                 bad.append(f"{path.relative_to(ROOT)}:{line}  {shown}")
     # 掃 0 排跟「掃過都乾淨」在 pytest 輸出裡長得一樣 —— 釘住它真的有看到東西。
     assert checked >= 40, f"只檢查到 {checked} 排按鈕，判準可能失效了"
-    assert not bad, "同一排按鈕的圖示不一致（畫面上看得出來，其他守門抓不到）：\n" + "\n".join(bad)
+    assert not bad, "同一排按鈕的圖示不一致（畫面上看得出來，其他檢查抓不到）：\n" + "\n".join(bad)
 
 
 def test_iconed_buttons_are_not_overwritten_by_textcontent() -> None:

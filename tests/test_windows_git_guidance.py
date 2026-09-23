@@ -156,7 +156,7 @@ def test_setup_python_cmd_failure_guards_actually_exit():
     """
     cmd = (_public_root(ROOT) / "setup-python.cmd").read_text(encoding="utf-8")
     # **跳過註解** —— 說明裡引用「原本錯誤的寫法」當反例會誤報。這個專案的
-    # 守門已經因為「連說明一起掃」誤報過兩次，這裡不再犯第三次。
+    # 檢查已經因為「連說明一起掃」誤報過兩次，這裡不再犯第三次。
     bad = [ln.strip() for ln in cmd.splitlines()
            if "^&" in ln and "exit /b" in ln
            and not ln.strip().upper().startswith("REM")]

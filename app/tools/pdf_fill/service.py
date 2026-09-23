@@ -426,7 +426,7 @@ def fill_pdf(
                 # address slot horizontally AND whose y is within ±30pt of
                 # the slot's top (zip boxes usually sit just above the
                 # address text, inside the same cell).
-                best: list[CheckboxOption] | None = None
+                best: list[pdf_checkbox.CheckboxOption] | None = None
                 best_dy: float = 1e9
                 for cluster in blank_clusters:
                     if id(cluster) in used_cluster_ids:

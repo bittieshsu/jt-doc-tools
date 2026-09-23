@@ -68,14 +68,17 @@
         <span class="btn-label">{{ tr('預覽填寫結果') }}</span>
       </button>
     </div>
-    {% if llm_enabled %}
+    {# LLM 停用時**反灰**；管理員勾了「停用時一併隱藏」才整段不輸出（v1.16.11）。
+       JS 本來就處理「沒有這個勾選框」（停用時原本就是整段不輸出）。 #}
+    {% if not llm_hidden() %}
     <div class="llm-toggle-row">
-      <label data-s="s1f833120">
-        <input type="checkbox" id="useLlmReview">
+      <label data-s="s1f833120"{% if not llm_enabled %} title="{{ tr('LLM 服務尚未啟用，請聯絡管理員') }}"{% endif %}>
+        <input type="checkbox" id="useLlmReview"{% if not llm_enabled %} disabled{% endif %}>
         {{ tr('啟用 LLM 校驗（會多花約 30-60 秒）') }}
       </label>
       <span class="muted" data-s="s8b685211">
-        {{ tr('(附加功能；本地 / LAN LLM server 對填寫結果做品質檢查)') }}
+        {% if llm_enabled %}{{ tr('(附加功能；本地 / LAN LLM server 對填寫結果做品質檢查)') }}
+        {% else %}{{ tr('需要 LLM 服務，請管理員到「LLM 設定」啟用。') }}{% endif %}
       </span>
     </div>
     {% endif %}

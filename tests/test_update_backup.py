@@ -20,7 +20,7 @@ SRC = Path(cli.__file__).read_text(encoding="utf-8")
 TREE = ast.parse(SRC)
 
 #: 弄丟就回不來的東西 —— **永遠不可以**出現在跳過清單裡。
-#: 這條守門的用途就是擋住「為了省空間順手多跳過一個」。
+#: 這條檢查的用途就是擋住「為了省空間順手多跳過一個」。
 IRREPLACEABLE = {
     "auth.sqlite", "audit.sqlite", "jobs.sqlite",
     "auth_settings.json", "form_templates.json", "llm_settings.json",

@@ -105,4 +105,5 @@ def test_the_local_probe_does_not_go_through_a_proxy():
     import inspect
     src = inspect.getsource(safe_fetch.urlopen_direct)
     assert "ProxyHandler({})" in src
-    assert "urlopen_direct" in inspect.getsource(cli.svc_update)
+    assert "urlopen_direct" in inspect.getsource(cli._wait_healthy)
+    assert "_wait_healthy(" in inspect.getsource(cli.svc_update)

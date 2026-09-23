@@ -26,6 +26,13 @@ from ..config import settings
 DEFAULT_SETTINGS: dict = {
     # Master switch — must be explicitly turned on by an admin.
     "enabled": False,
+    #: **停用時一併隱藏**（v1.16.11，使用者 2026-09-23 定案）。
+    #: 預設 False ＝ 停用時**反灰**：看得到這些功能、也看得到為什麼不能用
+    #: （跟語音服務沒設定好時同一條規則）。管理員另外勾這個才隱藏：
+    #: 各工具的 LLM 加值選項不顯示、只靠 LLM 的工具從側欄 / 首頁 / 搜尋拿掉。
+    #: **只在停用時有作用** —— 啟用時勾著也不影響任何東西。
+    #: **不可以把預設改成 True**：停用不代表要隱藏（使用者原話）。
+    "hide_when_disabled": False,
     # OpenAI-compat backend. Default points at local Ollama; admin can change
     # to any reachable LLM endpoint via /admin/llm-settings.
     "base_url": "http://localhost:11434/v1",
@@ -112,6 +119,14 @@ class LLMSettingsManager:
 
     def is_enabled(self) -> bool:
         return bool(self.get().get("enabled"))
+
+    def is_hidden(self) -> bool:
+        """LLM 相關的介面要不要**整個不顯示**：停用 **而且** 管理員勾了「停用時一併隱藏」。
+
+        只影響畫面；API 照舊回「LLM 未啟用」（隱藏不是權限）。
+        """
+        s = self.get()
+        return (not s.get("enabled")) and bool(s.get("hide_when_disabled"))
 
     # ----- per-tool model resolution -----
     # 已知支援 LLM 的工具清單（admin UI 用此清單渲染 per-tool 模型選單）。

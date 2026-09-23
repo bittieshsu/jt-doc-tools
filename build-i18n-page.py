@@ -9,7 +9,7 @@
     python3 github/build-i18n-page.py --extract   # 抽出待翻字串到 i18n/index.<lang>.json
     python3 github/build-i18n-page.py             # 產生所有語言
     python3 github/build-i18n-page.py --lang ja   # 只做日文
-    python3 github/build-i18n-page.py --check     # 只檢查有沒有漏翻（給守門測試用）
+    python3 github/build-i18n-page.py --check     # 只檢查有沒有漏翻（給自動檢查用）
 
 **語言清單來自 `app.core.ui_locale.SUPPORTED`**，不在這裡另外寫一份 ——
 同一份清單放兩個地方一定會漂（本專案最常復發的那一類）。

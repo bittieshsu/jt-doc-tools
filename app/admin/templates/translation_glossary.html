@@ -97,7 +97,7 @@ function say(msg, cls) {
 
 function langOptions(sel) {
   // 語言名稱是**資料表算出來的**（`_LANG_NAMES`），樣板掃字面 `tr('…')` 的
-  // 守門看不到 —— 所以這裡要自己包，否則英文 / 日文介面下這排下拉全是中文
+  // 檢查看不到 —— 所以這裡要自己包，否則英文 / 日文介面下這排下拉全是中文
   // （2026-09-14 日文版逐頁掃抓到，英文版從這頁上線就一直是中文）。
   return LANGS.map(l =>
     `<option value="${l.code}"${l.code === sel ? ' selected' : ''}>${tr(l.name)}</option>`

@@ -138,8 +138,9 @@ SSO 是**附加**登入方式，與本機 / LDAP / AD **並存** —— 啟用�
 1. **稽核記錄**：`/admin/audit` 篩選事件 `login_fail`，detail 欄有
    「saml: …」/「oidc: …」的具體原因（簽章驗不過、Audience 不符、時間
    偏移、帳號開通失敗…）。
-2. **伺服器日誌**：`jtdt logs`（Linux 走 journalctl；Windows 讀
-   `<資料目錄>\logs\jt-doc-tools.log`）。搜 `SAML`，XML / 簽章 / 解密層
+2. **伺服器日誌**：`jtdt logs`（Linux 走 journalctl；Windows 是
+   `C:\ProgramData\jt-doc-tools\Logs\` 底下的 `jtdt-svc.out.log`；macOS 是
+   `~/Library/Logs/jt-doc-tools.log`）。搜 `SAML`，XML / 簽章 / 解密層
    的失敗連完整堆疊都在這裡。
 
 **ADFS 常見的五個原因**（IdP 端多半不會有錯誤記錄 —— 回應簽發成功，

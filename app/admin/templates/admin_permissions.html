@@ -365,7 +365,7 @@ function loadSubject(s) {
   document.querySelectorAll('button[data-bulk], button.picker-clear')
     .forEach(b => {
       b.disabled = isLocked;
-      b.title = isLocked ? '內建帳號權限固定不可修改' : '';
+      b.title = isLocked ? tr('內建帳號權限固定不可修改') : '';
     });
 
   // Roles picker

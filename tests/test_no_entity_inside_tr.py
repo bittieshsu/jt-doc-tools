@@ -14,7 +14,7 @@
 `&#10;` 放在 **`tr()` 外面**，那是樣板的原始 HTML，不會被跳脫。
 所以判準不是「不可以用字元參照」，是「**不可以寫在 `tr()` 的引數裡**」。
 
-## 為什麼要守門
+## 為什麼要檢查
 
 三種語言的語系檔裡**都已經跟著抄了那個 `&#10;`**（翻譯的時候原樣保留），
 所以這個錯會一路複製到每一種語言，而且**只有把那一頁打開來看才發現得了**
@@ -49,7 +49,7 @@ def _templates() -> list[pathlib.Path]:
 def test_the_scan_actually_reaches_the_templates():
     """「掃 0 個檔」跟「掃過都乾淨」在 pytest 輸出裡長得一模一樣。"""
     files = _templates()
-    assert len(files) > 50, f"只掃到 {len(files)} 份樣板，這條守門等於沒有執行"
+    assert len(files) > 50, f"只掃到 {len(files)} 份樣板，這條檢查等於沒有執行"
     hits = sum(len(_TR_ARG.findall(strip_markup_comments(p.read_text(encoding='utf-8'))))
                for p in files)
     assert hits > 200, f"整個 app/ 只找到 {hits} 個 tr() 引數，判準可能已經失效"

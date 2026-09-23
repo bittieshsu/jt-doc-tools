@@ -194,7 +194,7 @@ def test_default_consecutive_is_two():
 # ------------------------------------------------------------ 不再全收
 
 def test_accept_all_line_is_gone():
-    """靜態守門：`accepted = list(rr.corrections)` 不可以再出現在第一輪之後。
+    """靜態檢查：`accepted = list(rr.corrections)` 不可以再出現在第一輪之後。
 
     這一行就是原本的問題本身。留下的那一處是 `consecutive_required == 1`
     的退路，必須在明確的分支底下。

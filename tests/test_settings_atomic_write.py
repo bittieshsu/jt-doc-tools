@@ -10,12 +10,12 @@
 v1.15.20 為翻譯對照字典先補了這件事，當時記下「全站還有六支不是原子寫入」。
 六支補完之後又實算一次，發現**還有五支從來沒被列進那份清單**
 （`auth_settings` / `asset_manager` / `ocr_engine` / `llm_model_profile` /
-`workspace` 的檔案中繼資料）—— 所以這件事不能靠清單，要靠守門。
+`workspace` 的檔案中繼資料）—— 所以這件事不能靠清單，要靠檢查。
 
 ## 判準
 
 掃 AST 的 **Call 節點**，不掃字串也不掃註解。這個專案被自己寫的註解騙過
-不只一次（v1.15.14 的 zip 炸彈守門、v1.15.16 的 root chown 守門），
+不只一次（v1.15.14 的 zip 炸彈檢查、v1.15.16 的 root chown 檢查），
 所以這裡刻意用 `ast`：
 
 - `<expr>.write_text(json.dumps(...))` → 直接覆寫，紅。
@@ -98,7 +98,7 @@ def test_module_writes_json_atomically(path: pathlib.Path):
 
 
 def test_the_scan_actually_sees_the_shape_it_is_looking_for():
-    """**守門自己要有牙齒。** 逐檔參數化最常見的失敗是「一個都沒掃到」——
+    """**檢查自己要有牙齒。** 逐檔參數化最常見的失敗是「一個都沒掃到」——
     那時候 `assert not hits` 永遠成立，輸出看起來跟全部通過一樣。"""
     assert len(_scanned_files()) > 200, "掃到的檔案數不對，比對基準本身就壞了"
     sample = ast.parse(

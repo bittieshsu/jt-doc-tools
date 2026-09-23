@@ -268,7 +268,7 @@ def fixture(filename: str) -> tuple[bytes, str]:
 #: 合成素材 / 佔位值必然會回的 4xx —— 鍵是**正規化後的路徑**，值是為什麼。
 #:
 #: 這張表是為了讓輸出保持可讀。誤報一多這份檢查就會被當雜訊忽略
-#: （本專案在用詞守門上踩過），所以「預期的」與「要看的」要分開印。
+#: （本專案在用詞檢查上踩過），所以「預期的」與「要看的」要分開印。
 _EXPECTED: dict[str, str] = {
     "/tools/pdf-to-office/preview/{}/orig/{}": "作業還沒跑完（文件範例是接在 job 完成之後）",
     "/tools/pdf-to-office/preview/{}/result/{}": "同上",
@@ -293,7 +293,7 @@ def _norm_path(path: str) -> str:
 
 def _parse_md() -> list[dict]:
     """解析出所有 curl 範例。**解析不了的要出聲** —— 安靜跳過就會變成
-    「掃 0 條還全綠」，本專案在逐檔守門上踩過這個坑不只一次。"""
+    「掃 0 條還全綠」，本專案在逐檔檢查上踩過這個坑不只一次。"""
     md = (public_root(ROOT) / "API.md").read_text(encoding="utf-8")
     out: list[dict] = []
     unparsed: list[dict] = []

@@ -17,6 +17,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 from . import safe_fetch as _safe_fetch
+from ..logging_setup import get_logger
+
+log = get_logger(__name__)
 
 # 共用語言 catalog — pdf-ocr router + admin/ocr-langs 都引用同一份
 LANG_CATALOG: list[dict] = [

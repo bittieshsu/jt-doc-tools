@@ -38,7 +38,7 @@ def _run_a_job(sleep_s: float = 0.3) -> str:
         # 於是 `float <= None` 直接 TypeError。
         #
         # 這條在開發機上幾乎不會紅，是**排程跑的 CI**（機器忙、時序不同）
-        # 抓到的 —— 而偶爾紅的守門跟壞掉的守門一樣沒人信。
+        # 抓到的 —— 而偶爾紅的檢查跟壞掉的檢查一樣沒人信。
         row = next((r for r in job_store.list_jobs(limit=50)
                     if r["id"] == jid), None)
         if row and row["finished_at"] is not None:
@@ -81,7 +81,7 @@ def test_the_three_timestamps_are_in_order(store):
     #
     # **門檻刻意離 0.4 秒遠一點**：機器同時在跑別的東西時（本輪就撞到一次：
     # 完整測試 + 無頭瀏覽器抓圖同時跑），排程抖動會讓量到的時間略短於 sleep，
-    # 這條就會偶爾紅一次 —— 而**偶爾紅的守門跟壞掉的守門一樣沒人信**。
+    # 這條就會偶爾紅一次 —— 而**偶爾紅的檢查跟壞掉的檢查一樣沒人信**。
     #
     # 0.15 仍然擋得住「根本沒記 started_at」（差值趨近 0）。
     #
@@ -101,7 +101,7 @@ def test_waiting_for_a_job_waits_for_the_database_row(store, monkeypatch):
 
     這條在開發機上幾乎不會紅 —— 是**排程跑的 CI**（機器忙、時序不同）
     2026-09-07 抓到的，而同一個 commit 的 push 那次是綠的。
-    **偶爾紅的守門跟壞掉的守門一樣沒人信**，所以這裡把窗口拉寬，
+    **偶爾紅的檢查跟壞掉的檢查一樣沒人信**，所以這裡把窗口拉寬，
     讓它每次都會踩到。
     """
     real = job_store.upsert

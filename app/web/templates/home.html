@@ -216,9 +216,9 @@
     document.querySelectorAll('.tool-pin-btn').forEach(b => b.classList.remove('is-pinned'));
     grid.innerHTML = '';
     if (!pins.length) { grp.hidden = true; cnt.textContent = '0'; return; }
-    grp.hidden = false;
-    cnt.textContent = String(pins.length);
-    // 依 pins 順序找原始 card，clone 到釘選區
+    // 依 pins 順序找原始 card，clone 到釘選區。**數量數真的放進去的**
+    // （被藏起來或沒權限的工具找不到原本那張卡）。
+    let shown = 0;
     for (const tid of pins) {
       // 避開釘選區自己（grid 內 clone 的 card 也有 data-tool-id）
       const orig = document.querySelector(
@@ -231,7 +231,10 @@
       grid.appendChild(clone);
       const origBtn = orig.querySelector('.tool-pin-btn');
       if (origBtn) origBtn.classList.add('is-pinned');
+      shown++;
     }
+    grp.hidden = shown === 0;
+    cnt.textContent = String(shown);
   }
   function togglePin(tid) {
     const pins = loadPins();

@@ -10,7 +10,7 @@ root:root —— 服務是用 `jtdt` 帳號跑的，接下來會拿到
 「被鎖在門外」時的那條路，救完卻登不進去是最糟的失敗方式。
 
 v1.4.2 已經為 `jtdt auth disable` 踩過一次（設定檔變成 root:root 600，
-畫面上顯示預設值），當時加了 `_chown_data_files_back()`。這條守門是把
+畫面上顯示預設值），當時加了 `_chown_data_files_back()`。這條檢查是把
 那個保險釘死在**每一支會寫資料目錄的指令**上。
 """
 from __future__ import annotations

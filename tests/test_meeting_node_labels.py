@@ -31,7 +31,7 @@ JS = pathlib.Path(__file__).resolve().parent.parent / "static" / "js" / "meeting
 #:
 #: 第一版就是用它，結果把 `_TOKEN_EXTRA` 清空的變異**完全抓不到**：
 #: 判準跟著被變異的那個函式一起移動，永遠自洽。
-#: 守門的判準不可以跟被守的程式共用同一個定義。
+#: 檢查的判準不可以跟被守的程式共用同一個定義。
 _IDENT = re.compile(r"[A-Za-z0-9_.\-/:=+]")
 
 

@@ -65,7 +65,7 @@ def bucket_for(rel: str) -> str:
 def py_ui_strings(path: Path) -> list[str]:
     """Python 裡使用者看得到的字串：例外訊息、指定給 message / label 這類欄位的。
 
-    **排除 docstring**（跟用詞守門同一套做法）—— 註解與說明不是介面文字。
+    **排除 docstring**（跟用詞檢查同一套做法）—— 註解與說明不是介面文字。
     """
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))

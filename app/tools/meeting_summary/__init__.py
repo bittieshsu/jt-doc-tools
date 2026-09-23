@@ -19,6 +19,8 @@ metadata = ToolMetadata(
                 "每一條都指得回原文的第幾段、誰講的。",
     icon="clipboard-list",
     category="內容處理",
+    # 只靠 LLM：停用時側欄 / 首頁反灰，管理員另外勾「停用時一併隱藏」才整個不列出
+    requires_setup="llm",
 )
 
 tool = ToolModule(

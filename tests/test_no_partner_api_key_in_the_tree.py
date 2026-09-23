@@ -77,7 +77,7 @@ def test_the_working_tree_has_no_partner_key_outside_the_private_notes():
 
 
 def test_the_shape_really_matches_a_key_like_string():
-    """**先證明這個式子抓得到東西。** 抓不到任何形狀的守門等於沒有守門。"""
+    """**先證明這個式子抓得到東西。** 抓不到任何形狀的檢查等於沒有檢查。"""
     # 自己造一把長得像金鑰的字串（**不是任何真的金鑰**）
     # 自己造一把長得像金鑰的字串（**不是任何真的金鑰**）
     sample = "acme" + "_svc_" + "-bQx_pR3zK9TmW2aeVu-cJ7HdN4gYsZ1tL"

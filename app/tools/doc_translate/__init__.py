@@ -21,6 +21,8 @@ metadata = ToolMetadata(
                 "（只換文字，不重排版面）。",
     icon="translate",
     category="內容處理",
+    # 只靠 LLM：停用時側欄 / 首頁反灰，管理員另外勾「停用時一併隱藏」才整個不列出
+    requires_setup="llm",
 )
 
 tool = ToolModule(

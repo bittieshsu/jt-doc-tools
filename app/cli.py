@@ -30,6 +30,13 @@ import webbrowser
 from pathlib import Path
 from typing import Optional
 
+# ⚠ 這一行 v1.15.11 起一直不在：當時把 urllib 換成 safe_fetch，import 被插進
+# 檔案後面**一段產生出來的腳本字串**裡，模組本身從來沒有這個名字。
+# 健康檢查的 `except Exception` 把 NameError 吞掉 —— 三個平台的
+# `jtdt update` 一律印「健康檢查失敗」，而服務其實是好的。
+# 檢查：tests/test_no_undefined_names.py
+from .core import safe_fetch as _safe_fetch
+
 REPO_URL = "https://github.com/jasoncheng7115/jt-doc-tools"
 SERVICE_NAME = "jt-doc-tools"
 PLIST_LABEL = "com.jasontools.doctools"
@@ -393,26 +400,50 @@ def svc_logs(follow: bool) -> int:
         if follow:
             cmd.append("-f")
         return _run(cmd)
+    files = [f for f in _service_log_files() if f.exists()]
+    if not files:
+        print("No service log found. Looked for:", file=sys.stderr)
+        for f in _service_log_files():
+            print(f"  {f}", file=sys.stderr)
+        return 1
     if _is_macos():
-        log = _real_home() / "Library" / "Logs" / "jt-doc-tools.log"
-        if not log.exists():
-            print(f"log not found: {log}", file=sys.stderr)
-            return 1
         cmd = ["tail", "-n", "200"]
         if follow:
             cmd.append("-F")
-        cmd.append(str(log))
-        return _run(cmd)
+        return _run(cmd + [str(f) for f in files])
     if _is_windows():
-        log = _data_dir() / "logs" / "jt-doc-tools.log"
-        if not log.exists():
-            print(f"log not found: {log}", file=sys.stderr)
-            return 1
+        # 錯誤（含堆疊）在 err.log；-Wait 只能跟一個檔，跟最重要的那一個
+        paths = ",".join(f"'{f}'" for f in files)
+        cmd = f"Get-Content -Path {paths} -Tail 200"
         if follow:
-            print("(use Get-Content -Wait in PowerShell to follow)")
-        return _run(["powershell", "-NoProfile", "-Command",
-                     f"Get-Content -Path '{log}' -Tail 200" + (" -Wait" if follow else "")])
+            cmd = f"Get-Content -Path '{files[0]}' -Tail 200 -Wait"
+        return _run(["powershell", "-NoProfile", "-Command", cmd])
     return 1
+
+
+def _service_log_files() -> list[Path]:
+    """服務的記錄檔**實際寫在哪裡**（Linux 走 journal，不在這裡）。
+
+    ⚠ 這一支原本不存在，兩個地方各自寫死了一個路徑，**兩個都是錯的**：
+    Windows 讀 `<資料目錄>\\logs\\jt-doc-tools.log` —— 那個目錄從來不存在，
+    服務由 WinSW 包著，記錄寫在 `<logpath>`（`%ProgramData%\\jt-doc-tools\\Logs`）；
+    macOS 只讀 `jt-doc-tools.log` —— launcher 把 stdout 導去那裡、**stderr 導去
+    `.err`**。服務自己的記錄（`logging_setup` 寫 stdout）在 `.log`，
+    但 uvicorn 的啟動訊息與**沒被攔下的例外堆疊**在 stderr —— 服務起不來時
+    最需要的那幾行正好在沒讀的那一個（Windows 同理：`out.log` / `err.log`）。
+
+    兩個都要印。順序＝要先看的放前面（stderr → 包裝程式 → stdout）。
+    """
+    if _is_windows():
+        d = _log_dir_windows()
+        # WinSW 用包裝程式的檔名（jtdt-svc.exe）命名記錄檔。
+        # 舊的 NSSM 安裝在 jtdt update 時就換成 WinSW 了，不另外找。
+        return [d / "jtdt-svc.err.log", d / "jtdt-svc.wrapper.log",
+                d / "jtdt-svc.out.log"]
+    if _is_macos():
+        d = _real_home() / "Library" / "Logs"
+        return [d / "jt-doc-tools.err", d / "jt-doc-tools.log"]
+    return []
 
 
 def svc_open() -> int:
@@ -708,16 +739,37 @@ def _troubleshoot_url() -> str:
     lang = (os.environ.get("LC_ALL") or os.environ.get("LC_MESSAGES")
             or os.environ.get("LANG") or "")
     if not lang:
-        # Windows 不設那幾個環境變數 —— 改問系統的顯示語言
-        try:
-            import locale
-            lang = (locale.getdefaultlocale()[0] or "")   # noqa: DeprecationWarning
-        except Exception:  # noqa: BLE001 — 取不到就當英文
-            lang = ""
+        lang = _os_ui_language()
     low = lang.lower()
     return (TROUBLESHOOT_URL_ZH
             if low.startswith("zh") or "hant" in low or "hans" in low
+            or low.startswith("chinese")
             else TROUBLESHOOT_URL_EN)
+
+
+def _os_ui_language() -> str:
+    """作業系統的顯示語言（`zh_TW` / `en_US` …），取不到回空字串。
+
+    ⚠ 原本用 `locale.getdefaultlocale()` —— Python 3.11 起已棄用，
+    **每次更新結尾都印一段 DeprecationWarning**（客戶截圖裡那一段），
+    讀起來像升級出了錯。Windows 改問系統的 UI 語言，其餘退到 `getlocale()`
+    （Windows 上它回的是 `Chinese (Traditional)_Taiwan` 這種寫法，所以
+    上面要多認 `chinese` 開頭）。
+    """
+    import locale
+    if _is_windows():
+        try:
+            import ctypes
+            langid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+            name = locale.windows_locale.get(langid, "")
+            if name:
+                return name
+        except Exception:  # noqa: BLE001 — 取不到就退下一招
+            pass
+    try:
+        return locale.getlocale()[0] or ""
+    except Exception:  # noqa: BLE001 — 取不到就當英文
+        return ""
 
 
 def _print_help_url() -> None:
@@ -1049,25 +1101,50 @@ def svc_update() -> int:
         return rc
 
     # 6. Health check
-    import time
     urls = _health_urls()
     print(f"Health check ({urls[0]}) ...")
-    for _ in range(15):
+    if _wait_healthy(urls):
+        new = _read_version()
+        _sync_windows_display_version(new)
+        print(f"Upgrade done: v{cur} -> v{new}")
+        _print_system_deps_summary()
+        return 0
+    _report_health_failure(urls)
+    _print_system_deps_summary()
+    return 1
+
+
+#: 升級後等服務起來的上限（秒）。
+#:
+#: 原本是「15 輪 × 1 秒」—— 測試機上從啟動到 healthz 回 200 約 10 秒，
+#: 看起來夠；但**升級剛換過相依**，第一次啟動要重新編譯全部 .pyc，
+#: 客戶機器上的防毒還會逐檔掃剛落地的套件，15 秒很容易不夠。
+#: 逾時的後果是印「健康檢查失敗」而服務其實正在起來 —— 客戶回報過
+#: 「Service state: RUNNING」卻失敗的，就是這個形狀。
+#: 等久一點的代價只是真的壞掉時晚一分多鐘知道；誤報會讓人去修一個沒壞的東西。
+HEALTH_WAIT_S = 120
+
+
+def _wait_healthy(urls: list[str], max_s: float = HEALTH_WAIT_S) -> bool:
+    import time
+    start = time.monotonic()
+    next_note = 15.0
+    while True:
         for url in urls:
             try:
                 with _safe_fetch.urlopen_direct(url, timeout=2) as r:
                     if r.status == 200:
-                        new = _read_version()
-                        _sync_windows_display_version(new)
-                        print(f"Upgrade done: v{cur} -> v{new}")
-                        _print_system_deps_summary()
-                        return 0
+                        return True
             except Exception:
                 pass
+        waited = time.monotonic() - start
+        if waited >= max_s:
+            return False
+        if waited >= next_note:
+            # 沒有進度的等待看起來跟卡住一樣 —— 每 15 秒講一次還在等
+            print(f"  still waiting for the service to answer ({int(waited)}s) ...")
+            next_note += 15.0
         time.sleep(1)
-    _report_health_failure(urls)
-    _print_system_deps_summary()
-    return 1
 
 
 def _report_health_failure(urls: list[str]) -> None:
@@ -1100,19 +1177,43 @@ def _report_health_failure(urls: list[str]) -> None:
     _print_help_url()
 
 
+def _read_log_lines(log: Path) -> list[str]:
+    """讀記錄檔。Windows 上服務用系統的 ANSI 字碼頁寫（繁中 cp950），
+    整份以 UTF-8 讀會變亂碼 —— 先試 UTF-8，不行再用系統字碼頁。
+    只讀檔尾：記錄檔可以好幾 MB，健康檢查只要最後幾十行。"""
+    with open(log, "rb") as fh:
+        try:
+            fh.seek(-65536, os.SEEK_END)
+        except OSError:
+            fh.seek(0)
+        raw = fh.read()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        import locale
+        text = raw.decode(locale.getpreferredencoding(False) or "utf-8", errors="replace")
+    return text.splitlines()
+
+
 def _print_log_tail(n: int) -> None:
     try:
         if _is_linux():
             _run(["journalctl", "-u", SERVICE_NAME, "--no-pager", "-n", str(n)])
             return
-        log = (_real_home() / "Library" / "Logs" / "jt-doc-tools.log"
-               if _is_macos() else _data_dir() / "logs" / "jt-doc-tools.log")
-        if not log.exists():
-            print(f"  (no log at {log})", file=sys.stderr)
+        files = _service_log_files()
+        found = [f for f in files if f.exists()]
+        if not found:
+            print("  (no service log found; looked for:)", file=sys.stderr)
+            for f in files:
+                print(f"    {f}", file=sys.stderr)
             return
-        lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
-        for line in lines[-n:]:
-            print(f"  {line}", file=sys.stderr)
+        for log in found:
+            lines = _read_log_lines(log)
+            if not lines:
+                continue
+            print(f"  --- {log}", file=sys.stderr)
+            for line in lines[-n:]:
+                print(f"  {line}", file=sys.stderr)
     except Exception as e:          # noqa: BLE001 - 診斷用，不可以自己炸掉
         print(f"  (could not read the log: {e})", file=sys.stderr)
 

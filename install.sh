@@ -960,7 +960,7 @@ StandardError=journal
 # 安全強化 —— 與 packaging/jt-doc-tools.service 同一組設定。
 # 原本這份產生出來的 unit **只有 User=**，而附帶的範本有這五項：
 # 「附了一份硬化範本」不等於「一行安裝裝出來的服務有受到保護」（外部稽核 F02）。
-# 守門 tests/test_service_unit_hardening.py 比對兩邊的指令集合。
+# 檢查 tests/test_service_unit_hardening.py 比對兩邊的指令集合。
 #
 # 解析器（PDF / Office / 圖片）萬一被攻破時，這幾項限制它能做什麼：
 #   NoNewPrivileges — 不能再取得更高權限

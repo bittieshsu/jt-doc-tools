@@ -163,7 +163,7 @@ def test_settings_are_flushed_to_disk(env):
         "ext4 延遲配置下，斷電後可能留下 0 bytes 的認證設定檔，"
         "而那曾經等於「認證關閉」")
 
-    # 委派出去就要驗**被委派的那一支**真的有落地保證，否則這條守門等於斷線。
+    # 委派出去就要驗**被委派的那一支**真的有落地保證，否則這條檢查等於斷線。
     assert _fsyncs_a_file(atomic_json.write_text), (
         "`atomic_json.write_text()` 沒有對寫出去的檔案呼叫 os.fsync —— "
         "全站的設定檔都靠這一支，這裡漏掉等於每一支都漏掉")

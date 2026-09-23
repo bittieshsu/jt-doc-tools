@@ -48,7 +48,7 @@ def _fetch_calls() -> list[list[str]]:
 
 def test_tags_are_fetched_with_force():
     calls = _fetch_calls()
-    assert calls, "找不到任何 git fetch 呼叫 —— 這條守門的判準失效了"
+    assert calls, "找不到任何 git fetch 呼叫 —— 這條檢查的判準失效了"
     tagged = [c for c in calls if "--tags" in c]
     assert tagged, "沒有任何一個 fetch 帶 --tags"
     for c in tagged:

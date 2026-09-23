@@ -187,7 +187,7 @@ def test_submission_check_admin_stats_is_fail_closed(admin_session):
 
 
 def test_no_fail_open_user_is_none_shape_remains():
-    """靜態守門：`if not is_admin(u) and u is not None:` 這種形狀不可以再出現。
+    """靜態檢查：`if not is_admin(u) and u is not None:` 這種形狀不可以再出現。
 
     **用 AST 比對，不是用字串比對** —— 第一版是逐行 grep，結果把上面那個函式
     說明裡引用舊寫法的那句話也抓出來了（同樣的誤報在 migration 那份也踩過一次）。

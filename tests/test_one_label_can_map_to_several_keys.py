@@ -52,4 +52,4 @@ def test_the_real_catalog_actually_contains_a_shared_label():
     idx = _build_synonym_index(DEFAULT_LABEL_MAP)
     shared = {k: v for k, v in idx.items() if len(v) > 1}
     assert shared, ("預設對照表裡一個共用標籤都沒有 —— "
-                    "那這條守門守的東西可能已經不存在了，要重新檢討")
+                    "那這條檢查守的東西可能已經不存在了，要重新檢討")

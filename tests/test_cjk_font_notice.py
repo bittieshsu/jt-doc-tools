@@ -39,7 +39,7 @@ def _imports_cjk_font_path(py: Path) -> bool:
     """這個檔案有沒有真的 import 到會畫中文的模組。
 
     用 `ast` 看 import 節點，不做字串比對 —— 註解或說明裡提到模組名不算
-    （守門掃描連說明一起掃會誤報，本專案踩過兩次）。
+    （檢查掃描連說明一起掃會誤報，本專案踩過兩次）。
     """
     try:
         tree = ast.parse(py.read_text(encoding="utf-8"))

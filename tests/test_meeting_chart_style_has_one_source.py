@@ -80,6 +80,6 @@ def test_the_front_end_reads_them_instead_of_guessing():
 def test_the_scan_actually_reaches_the_files():
     """「掃 0 個檔」跟「掃過都乾淨」在 pytest 輸出裡長得一模一樣。"""
     for p in (JS, TPL, ROUTER):
-        assert p.is_file(), f"{p} 不在了 —— 檔案改名的話這份守門要跟著改"
+        assert p.is_file(), f"{p} 不在了 —— 檔案改名的話這份檢查要跟著改"
     assert len(_hex_colours(JS.read_text(encoding="utf-8"))) >= 3, (
         "在前端檔案裡一個顏色都掃不到，判準可能已經失效")

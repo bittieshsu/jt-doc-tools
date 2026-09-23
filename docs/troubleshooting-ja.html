@@ -104,7 +104,7 @@
   </section>
 
   <section class="ts-item" id="health">
-    <h2>Health check timed out（でもサービス自体は正常）</h2>
+    <h2>Health check timed out / failed（でもサービス自体は正常）</h2>
     <p class="ts-sym"><b>症状</b>　更新処理の最後でタイムアウトしますが、ブラウザーでは開けます。</p>
     <p><b>原因</b>　待ち受けアドレスやポートを変更したあと（<code>jtdt bind</code>）、
       古いバージョンのヘルスチェックは、更新を実行したシェルの環境変数からアドレスを読んでいました —— そこには何も設定されていないため、
@@ -113,6 +113,9 @@
     <p><b>対処</b>　v1.15.15 以降で修正済みです（サービスマネージャー自身の設定を読み、プロキシを経由せず直接接続し、
       調べたアドレスとログの最後 20 行を表示します）。まずそのバージョン以上にアップグレードしてください。
       それでもタイムアウトする場合は <code>jtdt logs</code> の最後の数行をご覧ください。</p>
+    <p class="ts-sym"><b>別のケース</b>　v1.15.11 ～ v1.16.10 から更新すると、最後に <code>Health check failed</code> と表示され、<code>Service state</code> は <code>RUNNING</code> / <code>active</code>。Windows ではログが見つからないとも表示されます。</p>
+    <p><b>原因</b>　これらのバージョンのヘルスチェック自体に不具合があり（import が 1 行抜けていた）、サービスの状態に関係なく失敗と判定していました。Windows と macOS はログの場所も間違えていました。</p>
+    <p><b>対処</b>　ブラウザで開ければ更新は成功しています。対応は不要です。v1.16.11 で修正済みですが、<b>v1.16.11 への更新そのものではまだ一度このメッセージが出ます</b>（チェックを実行するのは更新前のバージョンのため）。次回の更新からは出ません。ログの実際の場所：Windows は <code>C:\ProgramData\jt-doc-tools\Logs\</code>（<code>jtdt-svc.err.log</code> と <code>jtdt-svc.out.log</code>）、macOS は <code>~/Library/Logs/</code>（<code>jt-doc-tools.err</code> と <code>jt-doc-tools.log</code>）、Linux は <code>journalctl -u jt-doc-tools</code>。</p>
   </section>
 
   <section class="ts-item" id="tls">

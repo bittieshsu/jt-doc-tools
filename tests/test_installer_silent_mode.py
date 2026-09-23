@@ -51,7 +51,7 @@ def _statements(nsi: str) -> list[str]:
     """把 NSIS 的**續行**（行尾 `\\`）接起來再看。
 
     不接的話 `MessageBox MB_YESNO|MB_ICONQUESTION \\` 會被當成獨立一行，
-    而它的 `/SD IDNO` 在下一行 —— 守門就會誤報一條其實正確的程式碼
+    而它的 `/SD IDNO` 在下一行 —— 檢查就會誤報一條其實正確的程式碼
     （我第一版就是這樣紅的）。**解析器要認原始碼裡真正的寫法。**
     """
     out, cur = [], ""
@@ -83,7 +83,7 @@ def test_every_messagebox_has_a_silent_default(nsi):
 
 
 def test_the_scan_sees_the_messageboxes_at_all(nsi):
-    """守門自己要有牙齒：掃 0 個跟「都合格」在 pytest 輸出裡一模一樣。"""
+    """檢查自己要有牙齒：掃 0 個跟「都合格」在 pytest 輸出裡一模一樣。"""
     n = sum(1 for s in _statements(nsi) if s.startswith("MessageBox "))
     assert n >= 4, f"只掃到 {n} 個 MessageBox，比對基準本身就不對"
 

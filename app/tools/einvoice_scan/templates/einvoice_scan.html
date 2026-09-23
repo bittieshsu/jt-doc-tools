@@ -647,9 +647,11 @@
               title="{{ tr('對 buffer 內所有發票重新跑「賣方反查 + 會計科目分類」（不影響掃描資料，只更新自動帶入的賣方名稱 / 行業 / 科目）') }}">
         {{ icon('refresh', size=12) }} {{ tr('重抓科目') }}
       </button>
+      {# LLM 停用時反灰；管理員勾了「停用時一併隱藏」才藏（元素留著給 JS 抓） #}
       <button type="button" class="es-mini-btn es-desktop-only" id="btnLlmClassify"
+              {% if not llm_enabled and llm_hidden() %}hidden{% endif %}
               {% if not llm_enabled %}disabled
-              title="{{ tr('LLM 功能未啟用 — 請到 /admin/llm 設定') }}"
+              title="{{ tr('LLM 功能未啟用，請管理員到「LLM 設定」啟用') }}"
               {% else %}title="{{ tr('批次送 LLM 判讀所有發票科目（依據賣方統編 / 名稱 / 行業）') }}"
               {% endif %}>
         {{ icon('sparkles', size=12) }} {{ tr('LLM 判讀科目') }}

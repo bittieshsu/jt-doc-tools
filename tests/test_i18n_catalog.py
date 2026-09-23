@@ -1,4 +1,4 @@
-"""語系檔與樣板的一致性守門。
+"""語系檔與樣板的一致性檢查。
 
 **最高原則：加 i18n 不可以改壞現有功能。** 這支測試的第一條就是
 「繁體中文底下 `t()` 原樣回傳」—— 也就是**中文使用者永遠不受語系檔影響**，
@@ -17,13 +17,24 @@ from app.core.ui_locale import DEFAULT_LOCALE, SUPPORTED
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES = list((ROOT / "app").rglob("*.html"))
-_T_CALL = re.compile(r"\{\{\s*tr\('([^']+)'\)\s*\}\}")
+#: 樣板裡**任何位置**的 `tr('…')` —— 不只 `{{ tr('…') }}`。
+#:
+#: 原本只認 `{{ tr('…') }}` 這個整齊的形狀，於是 `{{ tr('…{0}…')|replace('{0}', n) }}`、
+#: `{{ tr('…')|safe }}`、`{{ tr('…') if x else … }}` 這些**一條都沒被檢查過**
+#: （v1.16.11 做 LLM 設定頁時發現：拿掉一條譯文，這個檢查照樣綠）。
+#: 當時補掃出 25 條，剛好都已經有譯文 —— 洞在，只是還沒掉東西進去。
+_T_CALL = re.compile(r"(?<![\w.])tr\('([^']+)'\)")
 
 
 def _keys_in_templates() -> set[str]:
     out: set[str] = set()
     for p in TEMPLATES:
-        out |= set(_T_CALL.findall(p.read_text(encoding="utf-8")))
+        src = p.read_text(encoding="utf-8")
+        # 註解裡常**引用**寫法當例子（use vs mention）；<script> 裡的 tr() 是 JS 的，
+        # 由下面 `_JS_CALL` 那一條管，這裡不重複收。
+        src = re.sub(r"\{#.*?#\}|<!--.*?-->", " ", src, flags=re.S)
+        src = re.sub(r"<script\b[^>]*>.*?</script\b[^>]*>", " ", src, flags=re.S | re.I)
+        out |= set(_T_CALL.findall(src))
     return out
 
 
@@ -49,7 +60,7 @@ def test_every_template_key_is_translated():
 #: 語言的**自稱**（endonym）—— 這幾條在任何語言底下都保持原樣。
 #: 英文使用者看到「Japanese」不知道那是不是他要的，看到「日本語」才認得；
 #: 這跟 `ui_locale.LOCALE_NAMES` 是同一條原則（那一份不經過語系檔，
-#: 所以只有文件語言下拉會撞到這條守門）。
+#: 所以只有文件語言下拉會撞到這條檢查）。
 _ENDONYMS = {"日本語"}
 
 
@@ -67,7 +78,7 @@ def test_catalog_entries_are_all_traditional_chinese_keys():
     """key 必須是**繁體中文原文**（gettext 的 msgid 做法）。
 
     用符號 key（`nav.jobs`）的話，`test_taiwan_terminology.py` 那類
-    「掃描使用者看得到的文字」的守門會變成永遠綠燈的假測試。
+    「掃描使用者看得到的文字」的檢查會變成永遠綠燈的假測試。
     """
     # 中文標點也算 —— `<b>A</b>，<b>B</b>` 中間那個逗號本身就是要翻的片段
     cjk = re.compile(r"[㐀-鿿、。，：；！？（）「」《》…—]")
@@ -94,7 +105,7 @@ def test_catalog_entries_are_all_traditional_chinese_keys():
 #: **`的` 一定不可以收**（我第一版收了，第一批就誤報三條）：日文的
 #: `一般的` / `自動的` / `現代的` 是形容動詞語尾，是**正確的日文**。
 #: 誤報一多，這份檢查就會被當雜訊忽略 —— 那比沒有檢查更糟
-#:（用詞守門那次的教訓）。
+#:（用詞檢查那次的教訓）。
 #: **唯一來源在掃描器裡** —— 瀏覽器逐頁掃也用同一份判準，
 #: 兩邊各寫一份一定會漂（本專案反覆踩過）。
 from tools.i18n_untranslated_scan import NOT_JAPANESE as _NOT_JAPANESE
@@ -228,7 +239,7 @@ def test_translation_keeps_the_trailing_colon_or_ellipsis():
     cat = catalog("en")
     # **只看短字串**。長句子以「：」結尾時，後面接的是另一個元素，英文很自然
     # 會以 "from" / "Download" 這種詞收尾而不需要冒號 —— 對那些誤報的話，
-    # 這條守門就會被當成雜訊忽略（本專案的老問題）。
+    # 這條檢查就會被當成雜訊忽略（本專案的老問題）。
     bad = [(k, v) for k, v in cat.items()
            if k and len(k) <= 20 and k[-1] in "：…" and v and v[-1] not in ": ….'"]
     assert not bad, ("原文以冒號 / 刪節號結尾但譯文沒有：\n  "
@@ -246,7 +257,7 @@ def _keys_in_scripts() -> set[str]:
     的 `window.tr`，跟樣板端的 `{{ tr() }}` 是兩條路，要分開收。
 
     **註解要先去掉**：解釋這條規則的註解裡常會寫 `tr('…')` 當例子，
-    不去註解的話那個例子會被當成一條真的鍵，然後這支守門就報「有一條沒翻」
+    不去註解的話那個例子會被當成一條真的鍵，然後這支檢查就報「有一條沒翻」
     —— 這正是本專案反覆記過的「掃描器被它要檢查的那個名字騙到」
     （2026-09-14 又踩一次，被自己新寫的註解報出來）。
     """
@@ -261,7 +272,7 @@ def _keys_in_scripts() -> set[str]:
     # （上傳、作業進度、工作區挑選、錯誤訊息）裡的 `tr('…')`
     # **從來沒有被檢查過** —— 2026-09-16 補上時當場抓到 22 條沒翻，
     # 而那幾支幾乎每一個工具頁都會載，等於每一頁都看得到中文。
-    # 範圍太窄跟沒有守門一樣。
+    # 範圍太窄跟沒有檢查一樣。
     for p in sorted(ROOT.glob("static/js/*.js")):
         out |= {k.group(2)
                 for k in _JS_CALL.finditer(strip_js_comments(p.read_text(encoding="utf-8")))}
@@ -323,7 +334,7 @@ def test_no_attribute_renders_the_helper_call_as_text():
 
 #: 這幾支的字串是**畫面上的說明文字**（相依檢查、LLM 工具清單、設定備份分類…）。
 #: LLM 的 prompt 也常寫 `**…**`，但那是給模型看的、不會出現在畫面上，所以
-#: 這條守門**只釘顯示用的模組**，不要整包 app/ 掃（會被 prompt 淹掉）。
+#: 這條檢查**只釘顯示用的模組**，不要整包 app/ 掃（會被 prompt 淹掉）。
 _DISPLAY_TEXT_MODULES = (
     "app/core/sys_deps.py",
     "app/core/llm_settings.py",
@@ -369,7 +380,7 @@ def test_templates_never_use_markdown_bold():
     """樣板 / JS 的字串也不可以寫 `**粗體**` —— 同上，星號會原樣顯示。
 
     註解裡寫 `**` 是給讀程式的人看的，掃描前要先去掉（Jinja 註解、HTML 註解、
-    JS 註解三種）—— 這個專案的守門「連說明一起掃」已經誤報過兩次。
+    JS 註解三種）—— 這個專案的檢查「連說明一起掃」已經誤報過兩次。
     """
     md = re.compile(r"\*\*[^*\n<>]+\*\*")
     bad: list[str] = []

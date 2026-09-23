@@ -110,7 +110,7 @@ def test_every_third_party_import_is_declared():
     `pytest.skip` 寫在迴圈裡會讓整條測試在第一個對應不到的模組就中止，
     後面一個都沒檢查 —— 而「全部 skip」在 pytest 輸出裡跟「全部通過」
     長得一模一樣。更糟的是：對應不到最常見的原因就是**那個套件沒裝**，
-    也就是這條守門要抓的那件事本身。
+    也就是這條檢查要抓的那件事本身。
     """
     declared = _declared()
     missing: list[str] = []

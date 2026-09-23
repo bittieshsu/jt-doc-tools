@@ -39,7 +39,7 @@ def tools():
 
 
 def test_traditional_chinese_still_shows_every_tool(tools):
-    """**這條是最高原則的守門**：繁中底下一支都不可以少。"""
+    """**這條是最高原則的檢查**：繁中底下一支都不可以少。"""
     hidden = [t.metadata.id for t in tools
               if not tool_visible(t.metadata.locales, DEFAULT_LOCALE)]
     assert hidden == [], f"繁體中文底下不應該有工具被藏起來：{hidden}"

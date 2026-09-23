@@ -70,7 +70,7 @@ def test_office_conversion_refuses_a_bomb(tmp_path):
 
 
 def test_every_user_facing_zip_read_is_guarded():
-    """**守門的守門**：新增一處讀使用者 zip 卻沒接防護時要紅。
+    """**檢查的檢查**：新增一處讀使用者 zip 卻沒接防護時要紅。
 
     判準是原始碼形狀 —— 掃出「開啟 zip 來讀」的地方，逐一確認同一個函式裡
     有呼叫防護。已知的例外寫在 `EXEMPT` 並附理由（設定匯入有自己更嚴格的
@@ -107,7 +107,7 @@ def test_every_user_facing_zip_read_is_guarded():
                 continue
             # **用 AST 找真正的呼叫，不要用字串比對** —— 第一版檢查
             # `"zip_guard" not in body`，結果被我自己寫的**註解**騙過去
-            # （註解裡就有 `zip_guard` 四個字），變異驗證時才發現守門是假的。
+            # （註解裡就有 `zip_guard` 四個字），變異驗證時才發現檢查是假的。
             # 這個坑本專案記過很多次：靜態掃描不可以連註解一起掃。
             reads = guarded = False
             for sub in ast.walk(node):

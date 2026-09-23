@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 # 整組設定備份 / 還原是死的）。檔案裡別處寫的是函式內 `import ... as _s`，
 # 所以 grep 得到字串卻沒有這個名字。
 from ..config import settings
+from ..logging_setup import get_logger
 from ..core.asset_manager import PositionPreset, asset_manager
 from ..core.conv_settings import BUILTIN_PATHS, conv_settings
 from ..core.profile_manager import profile_manager
@@ -33,6 +34,8 @@ from ..web.deps import require_admin
 
 from fastapi import Depends
 from ..core import safe_fetch as _safe_fetch
+
+logger = get_logger(__name__)
 
 
 def _export_stamp() -> str:
@@ -208,7 +211,7 @@ def build_router(templates) -> APIRouter:
         except ZipBombError:
             # 管理區一律**通用訊息**，細節進日誌（v1.12.86 的規矩）——
             # 即使這個例外的文字是我們自己寫的，也不要開這個口子。
-            log.warning("asset import rejected: zip bomb heuristics tripped")
+            logger.warning("asset import rejected: zip bomb heuristics tripped")
             raise HTTPException(
                 400, "這個備份檔解開後異常龐大，為了避免耗盡伺服器資源而拒絕匯入。")
         # 找 assets.json 在 zip 裡的位置（可能在 root，也可能在 assets/ 之類的
@@ -947,6 +950,13 @@ def build_router(templates) -> APIRouter:
     @router.get("/llm-settings", response_class=HTMLResponse)
     async def llm_settings_page(request: Request):
         from ..core.llm_settings import llm_settings, DEFAULT_SETTINGS, LLMSettingsManager
+        # **工具數從資料算，不寫死在文字裡** —— 這一頁原本寫著 10、側欄寫 12、
+        # 實際是 13，三處三個數字。`KNOWN_LLM_TOOLS` 裡有子項（`pdf-ocr-vision`
+        # 是 `pdf-ocr` 的視覺模型設定，不是另一支工具），所以只算真的註冊過的工具。
+        registered = {t["id"]: t for t in (templates.env.globals.get("nav_tools") or [])}
+        llm_ids = [k["id"] for k in LLMSettingsManager.KNOWN_LLM_TOOLS if k["id"] in registered]
+        llm_only = [registered[i]["name"] for i in registered
+                    if registered[i].get("requires_setup") == "llm"]
         return templates.TemplateResponse(request, 
             "llm_settings.html",
             {
@@ -954,6 +964,8 @@ def build_router(templates) -> APIRouter:
                 "settings": llm_settings.get(),
                 "defaults": DEFAULT_SETTINGS,
                 "known_llm_tools": LLMSettingsManager.KNOWN_LLM_TOOLS,
+                "llm_tool_count": len(llm_ids),
+                "llm_only_tool_names": llm_only,
             },
         )
 
@@ -995,6 +1007,10 @@ def build_router(templates) -> APIRouter:
         _clamp_int("doctr_batch_segments", 1, 100)
         _clamp_int("doctr_batch_chars", 200, 20000)
         _clamp_int("doctr_max_units", 100, 100000)
+        # 開關一律存成布林 —— 字串 "false" 在 Python 裡是真值，存進去就等於打開
+        for flag in ("enabled", "hide_when_disabled", "debug_log"):
+            if flag in body and not isinstance(body[flag], bool):
+                body[flag] = str(body[flag]).strip().lower() in ("1", "true", "on", "yes")
         # admin 改了 LLM 設定（base_url / model / 其他）— 把 model profile cache
         # 全部清掉，下次 LLM call 會重抓 capabilities
         try:

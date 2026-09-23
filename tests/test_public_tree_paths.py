@@ -5,7 +5,7 @@
 而開發機上一直是綠的。
 
 這條 CLAUDE.md 記過好幾次（v1.15.7 的外部評估一次紅了 70 支），
-但**沒有守門**，所以 v1.15.24 新寫的 `test_ops_iis_prereq_order.py` 又踩了
+但**沒有檢查**，所以 v1.15.24 新寫的 `test_ops_iis_prereq_order.py` 又踩了
 —— 而且是**推上 GitHub 之後 CI 才告訴我們**。
 
 判準走 AST：找 `Path("github/...")`、`ROOT / "github"` 這種寫法。

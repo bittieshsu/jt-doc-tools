@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio as _asyncio
+import html as html_mod
 import threading
 import time
 from pathlib import Path
@@ -21,7 +22,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.10"
+VERSION = "1.16.11"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -512,7 +513,7 @@ templates.env.globals["nav_settings"] = [
     {"icon": "gear", "name": "轉檔引擎設定", "description": "LibreOffice / OxOffice 路徑與順序",
      "url": "/admin/conversion",
      "keywords": "conversion office libreoffice oxoffice path engine 轉檔 引擎 路徑"},
-    {"icon": "gear", "name": "LLM 設定", "description": "12 個工具的 LLM AI 加值（附加功能，預設關閉）",
+    {"icon": "gear", "name": "LLM 設定", "description": "LLM AI 加值（附加功能，預設關閉）",
      "url": "/admin/llm-settings",
      "keywords": "llm ai ollama qwen vision review 校驗 模型 大語言模型"},
     {"icon": "gear", "name": "API Token", "description": "對外呼叫 /api/* 的認證 token",
@@ -641,7 +642,39 @@ _SETUP_CHECKS: dict[str, tuple] = {
         "還沒設定語音服務（jtlw）。請管理員到「設定 → 語音服務」填好送件位址與金鑰。",
         "/admin/jtlw",
     ),
+    # 只靠 LLM 的工具（逐句翻譯 / 文件翻譯 / 會議摘要）。LLM 停用時**預設反灰**，
+    # 管理員另外勾「停用時一併隱藏」才整個不列出（見 `_HIDE_WHEN_UNREADY`）。
+    "llm": (
+        lambda: not _llm_enabled(),
+        "LLM 服務還沒啟用。請管理員到「設定 → LLM 設定」啟用。",
+        "/admin/llm-settings",
+    ),
 }
+
+#: 準備度沒好時**整個不列出**、而不是反灰的條件。代號 → 判斷函式。
+#:
+#: **反灰是預設，隱藏要管理員自己選**（使用者 2026-09-23：「停用不代表要隱藏，
+#: 停用只是反灰；另外勾選隱藏才會隱藏」）。沒列在這裡的代號一律只反灰。
+_HIDE_WHEN_UNREADY: dict[str, "callable"] = {
+    "llm": lambda: _llm_hidden(),
+}
+
+
+def _llm_enabled() -> bool:
+    from .core.llm_settings import llm_settings as _ls
+    try:
+        return _ls.is_enabled()
+    except Exception:          # 設定檔壞掉時當成停用（反灰），不要讓側欄整個掛掉
+        logger.warning("LLM 設定讀不回來，相關工具先反灰", exc_info=True)
+        return False
+
+
+def _llm_hidden() -> bool:
+    from .core.llm_settings import llm_settings as _ls
+    try:
+        return _ls.is_hidden()
+    except Exception:          # 讀不到就不藏 —— 反灰至少看得到原因
+        return False
 
 
 def _jtlw_ready() -> bool:
@@ -674,11 +707,15 @@ def _nav_groups_for_locale(request=None):
     unready = {key for key, (not_ready, _r, _u) in _SETUP_CHECKS.items() if not_ready()}
     if lang == _loc.DEFAULT_LOCALE and not unready:
         return _NAV_TOOL_GROUPS_ALL          # 最常見的路徑，不多做事
+    hidden = {key for key in unready
+              if key in _HIDE_WHEN_UNREADY and _HIDE_WHEN_UNREADY[key]()}
     out = []
     for g in _NAV_TOOL_GROUPS_ALL:
         items = []
         for t in g["tools"]:
             need = t.get("requires_setup") or ""
+            if need in hidden:
+                continue                     # 管理員選了「停用時一併隱藏」
             if need in unready:
                 _nr, reason, url = _SETUP_CHECKS[need]
                 items.append({**t, "locked": True, "lock_reason": reason,
@@ -687,7 +724,8 @@ def _nav_groups_for_locale(request=None):
                 items.append({**t, "locked": True, "lock_reason": _LOCALE_LOCK_REASON})
             else:
                 items.append(t)
-        out.append({"title": g["title"], "tools": items})
+        if items:                            # 整組都被藏掉時，連分類標題也不要留
+            out.append({"title": g["title"], "tools": items})
     return out
 
 
@@ -757,6 +795,9 @@ templates.env.globals["ui_locales"] = _tpl_ui_locales
 # Override the static globals with callables that re-evaluate per request.
 templates.env.globals["nav_settings"] = _nav_settings_visible
 templates.env.globals["nav_tool_groups"] = _nav_tool_groups_visible
+# 各工具頁的 LLM 加值區塊要不要整塊藏起來（`components/llm_gate.html` 與幾支自己
+# 畫 LLM 選項的工具都問這一個）—— 判斷只在 `llm_settings.is_hidden()` 一個地方。
+templates.env.globals["llm_hidden"] = _llm_hidden
 
 # Make templates, asset manager, job manager available to routers via app state
 app.state.templates = templates

@@ -550,7 +550,7 @@
     if (!sel.options.length && d.shapes) {
       Object.keys(d.shapes).forEach(function (k) {
         var o = document.createElement('option');
-        // **伺服器送來的文字要自己包 `tr()`** —— 樣板掃字面的守門看不到
+        // **伺服器送來的文字要自己包 `tr()`** —— 樣板掃字面的檢查看不到
         // 這一類（`<option>` 是 JS 建的），英 / 日介面會安靜留著中文。
         o.value = k; o.textContent = tr(d.shapes[k]);
         sel.appendChild(o);

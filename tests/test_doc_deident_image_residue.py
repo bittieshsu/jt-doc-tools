@@ -144,7 +144,7 @@ def test_the_ui_warns_that_the_file_may_grow(tmp_path):
     root = pathlib.Path(__file__).resolve().parents[1]
     tpl = (root / "app" / "tools" / "doc_deident" / "templates"
            / "doc_deident.html").read_text(encoding="utf-8")
-    # **註解要先去掉**：這條守門第一版被寫在旁邊、解釋這件事的 Jinja 註解
+    # **註解要先去掉**：這條檢查第一版被寫在旁邊、解釋這件事的 Jinja 註解
     # 騙過去了（把提醒整行刪掉還是綠的）。CLAUDE.md 記過同一個坑。
     visible = re.sub(r"\{#.*?#\}", "", tpl, flags=re.S)
     visible = re.sub(r"<!--.*?-->", "", visible, flags=re.S)

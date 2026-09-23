@@ -71,7 +71,7 @@ _QUEUE_CAP_S = 4 * 3600.0
 
 # 伺服器端產生、送到前端再翻譯的訊息（背景執行緒裡沒有 request，不知道使用者的語言）。
 # **前端 `tr()` 會把連續數字換成 `{0}` `{1}` 再查** —— 所以這幾句的鍵是下面的樣板，
-# 一律寫成常數，翻譯守門（`test_i18n_dynamic_labels`）才掃得到。
+# 一律寫成常數，翻譯檢查（`test_i18n_dynamic_labels`）才掃得到。
 _MSG_QUEUED_AHEAD = "排隊中（前面還有 {0} 件）"
 _MSG_CORRECTING_ITEMS = "校正中（已完成 {0} / {1} 批）"
 _MSG_QUEUE_FULL = "對方佇列滿了，{0} 秒後再試"

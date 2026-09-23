@@ -97,10 +97,13 @@
   </section>
 
   <section class="ts-item" id="health">
-    <h2>Health check timed out (but the service is actually fine)</h2>
+    <h2>Health check timed out / failed (but the service is actually fine)</h2>
     <p class="ts-sym"><b>Symptom</b>　The last step of the upgrade times out, yet the site opens in a browser.</p>
     <p><b>Cause</b>　After changing the listen address or port (<code>jtdt bind</code>), older versions read the address from the environment of the shell running the upgrade — where it was never set — so they always probed <code>127.0.0.1:8765</code>. A corporate <code>http_proxy</code> can also send "connect to myself" through the proxy.</p>
     <p><b>What to do</b>　Fixed in v1.15.15 (it reads the service manager's own configuration, connects directly, and prints which addresses it probed plus the last 20 log lines). Upgrade to at least that version; if it still times out, read the end of <code>jtdt logs</code>.</p>
+    <p class="ts-sym"><b>Another case</b>　Updating from v1.15.11 through v1.16.10 ends with <code>Health check failed</code> while <code>Service state</code> says <code>RUNNING</code> / <code>active</code>; on Windows it also says no log was found.</p>
+    <p><b>Cause</b>　The health check in those versions was itself broken (a missing import), so it reported failure whether or not the service was up. Windows and macOS also looked for the log in the wrong place.</p>
+    <p><b>What to do</b>　If the page opens in a browser, the update succeeded and nothing needs fixing. Fixed in v1.16.11, but <b>the update to v1.16.11 itself still prints this message once</b> (the check is run by the version you are updating from); from the next update on it is gone. Where the logs actually are: Windows <code>C:\ProgramData\jt-doc-tools\Logs\</code> (<code>jtdt-svc.err.log</code> and <code>jtdt-svc.out.log</code>), macOS <code>~/Library/Logs/</code> (<code>jt-doc-tools.err</code> and <code>jt-doc-tools.log</code>), Linux <code>journalctl -u jt-doc-tools</code>.</p>
   </section>
 
   <section class="ts-item" id="tls">

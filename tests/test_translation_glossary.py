@@ -44,7 +44,7 @@ def _isolated(tmp_path, monkeypatch):
 def test_latin_terms_need_a_word_boundary_on_both_sides(text, hit, why):
     """**兩邊都要驗。**
 
-    只驗一邊的話，把另一邊的邊界拿掉這條守門照樣全綠 —— 第一次做變異
+    只驗一邊的話，把另一邊的邊界拿掉這條檢查照樣全綠 —— 第一次做變異
     驗證時就是這樣：拿掉前邊界，測試沒紅。
     """
     m = G.Matcher([_t("Acer", "宏碁")])
@@ -299,7 +299,7 @@ def test_the_prompt_never_carries_the_dictionary():
     """整份設計的前提：**指令部分不因為字典而變長**。
 
     翻成繁中的指令已經 1,179 字元、每批內容上限 1,200 —— 字典寫進 prompt
-    就會把批次擠掉一半。這條守門釘死那個前提。
+    就會把批次擠掉一半。這條檢查釘死那個前提。
     """
     R = importlib.import_module("app.tools.translate_doc.router")
     G.save([_t("Acer", "宏碁"), _t("Foxconn", "富士康")])

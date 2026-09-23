@@ -35,7 +35,7 @@ def _nsi_code() -> str:
 
     這支測試第一版只跳過「開頭是 `;`」的行，於是
     `Var SM_DIR      ; 這次安裝…` 這種行尾註解被判成「寫死的中文」。
-    這個專案的靜態守門已經被解釋規則的註解騙過四次，所以邏輯收成一份共用。
+    這個專案的靜態檢查已經被解釋規則的註解騙過四次，所以邏輯收成一份共用。
     """
     from tools.nsis_source import code_text
     return code_text(_nsi())

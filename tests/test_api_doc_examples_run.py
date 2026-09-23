@@ -2,7 +2,7 @@
 
 ## 為什麼要有這一份
 
-既有兩支守門管的是**對照層**：
+既有兩支檢查管的是**對照層**：
 - `test_api_doc_coverage.py`：程式有的端點文件有沒有寫（雙向）。
 - `test_api_doc_contract.py`：幾支挑出來的工具，參數名 / 值對不對。
 
@@ -57,7 +57,7 @@ def test_llm_test_connection_reports_missing_base_url(admin_session, monkeypatch
 
 
 def test_a_documented_example_still_calls_it_without_a_body():
-    """**守門要跟著文件走。**
+    """**檢查要跟著文件走。**
 
     上面那幾條守的是「文件裡那個不帶 body 的範例要能用」。如果哪天文件只剩
     帶 body 的版本，那幾條就是在守一個沒有人照著做的形狀 —— 所以這裡確認

@@ -152,7 +152,7 @@ def _rel(p: pathlib.Path) -> str:
 
 
 def test_the_scan_has_a_sane_baseline():
-    """守門自己要有牙齒：掃 0 個檔跟「都合格」在輸出裡一模一樣。"""
+    """檢查自己要有牙齒：掃 0 個檔跟「都合格」在輸出裡一模一樣。"""
     assert len(PAGES) > 50, f"只掃到 {len(PAGES)} 個模板"
     assert ".auth-form" not in RULES, "解析選擇器的方式變了"
     assert "af-field" in RULES, "platform.css 裡應該找得到 af-field（scoped 在 .auth-form）"
@@ -181,7 +181,7 @@ def test_every_class_in_the_page_actually_gets_styled(page: pathlib.Path):
             continue
         # `class="tile-color-{{ t.color }}"` 這種**在渲染時才組出來**的名字，
         # 去掉 `{{ }}` 之後只剩半截（`tile-color-`）。它是某個真類別的前綴，
-        # 不是「沒有樣式」——不放行的話守門會被自己的解析方式騙
+        # 不是「沒有樣式」——不放行的話檢查會被自己的解析方式騙
         # （第一版一次誤報 16 支）。
         if any(known.startswith(cls) for known in RULES) and cls not in RULES:
             continue

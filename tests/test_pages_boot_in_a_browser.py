@@ -237,7 +237,7 @@ def test_page_has_no_console_errors(live, path):
 
 
 def test_the_sweep_actually_opened_every_page(live):
-    """守門自己要有牙齒：確認真的逐頁走過，不是一頁都沒開。"""
+    """檢查自己要有牙齒：確認真的逐頁走過，不是一頁都沒開。"""
     assert len(PATHS) > 40, f"只列出 {len(PATHS)} 頁，比對基準本身就不對"
     assert len(_VISITED) >= len(PATHS), (
         f"只走過 {len(_VISITED)} 頁，應該要有 {len(PATHS)} 頁")

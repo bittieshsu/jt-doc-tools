@@ -877,7 +877,7 @@
                 cnt.dataset.total = cnt.textContent.trim();
               }
               cnt.textContent = q ? String(shown) : cnt.dataset.total;
-              cnt.title = q ? `符合搜尋 ${shown} 項（共 ${cnt.dataset.total} 項）` : '';
+              cnt.title = q ? tr('符合搜尋 {0} 項（共 {1} 項）').replace('{0}', shown).replace('{1}', cnt.dataset.total) : '';
             }
           });
         });
@@ -1013,10 +1013,10 @@
           grp.hidden = true; cnt.textContent = '0';
           return;
         }
-        grp.hidden = false;
-        cnt.textContent = String(pins.length);
-        cnt.dataset.total = String(pins.length);   // 搜尋清空後要還原成這個
-        // 依 pins 順序找對應的 sb-item，clone 到釘選群組
+        // 依 pins 順序找對應的 sb-item，clone 到釘選群組。
+        // **數量要數真的放進去的**：釘過、之後被藏起來（LLM 停用時一併隱藏）或沒權限的
+        // 工具找不到原本那一項，照 pins.length 顯示的話會寫 3、只看到 2 個。
+        let shown = 0;
         for (const tid of pins) {
           // 找原本的 sb-item（避開 sb-pinned 群組內 cloned 的）
           const orig = sb.querySelector('.sb-group:not(.sb-pinned) .sb-item[data-tool-id="' + tid + '"]');
@@ -1029,7 +1029,11 @@
           // 同步原本 group 內的按鈕狀態
           const origBtn = orig.querySelector('.sb-pin-btn');
           if (origBtn) origBtn.classList.add('is-pinned');
+          shown++;
         }
+        grp.hidden = shown === 0;
+        cnt.textContent = String(shown);
+        cnt.dataset.total = String(shown);   // 搜尋清空後要還原成這個
       }
       function togglePin(tid) {
         const pins = loadPins();

@@ -45,7 +45,7 @@ def _hrefs(text: str) -> list[str]:
 def test_repo_file_links_point_at_files_that_exist(doc: Path):
     """`blob/main/xxx` 的 xxx 要真的在發佈樹裡。
 
-    這條就是那個 404 的守門員：`blob/main/github/CHANGELOG.md` 在發佈樹裡
+    這條就是擋下那個 404 的檢查：`blob/main/github/CHANGELOG.md` 在發佈樹裡
     找不到 `github/CHANGELOG.md`（`github/` 是根，不是子目錄），會直接紅。
     """
     if not doc.exists():

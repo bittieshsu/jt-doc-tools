@@ -55,12 +55,49 @@ def test_the_scan_actually_finds_attribute_assignments():
     assert n >= 5, f"只找到 {n} 處屬性設定，掃描範圍大概錯了"
 
 
+#: 屬性賦值的**左邊**。右邊整段交給 `_rhs()` 取 —— 第一版只認「`=` 後面直接
+#: 是字串」，於是 `cnt.title = q ? `符合搜尋 ${n} 項` : ''` 這種三元運算
+#: 整條漏掉（v1.16.11 發現，側欄搜尋的計數提示在英日介面一直是中文）。
+_ASSIGN_LHS = re.compile(r"\.(title|placeholder|ariaLabel|alt)\s*=(?!=)\s*")
+_TR_CALL = re.compile(r"""tr\(\s*(['"])(?:\\.|(?!\1)[^\\])*\1""", re.S)
+
+
+def _rhs(src: str, start: int) -> str:
+    """從 `=` 後面取到這個敘述結束（頂層的 `;`、換行、或收尾的括號）。
+    要認得字串與樣板字面值 —— 裡面的 `;` 與換行不算結束。"""
+    depth, i, out, quote = 0, start, [], ""
+    while i < len(src) and i - start < 400:
+        ch = src[i]
+        if quote:
+            if ch == "\\":
+                out.append(src[i:i + 2]); i += 2; continue
+            if ch == quote:
+                quote = ""
+        elif ch in "'\"`":
+            quote = ch
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            if depth == 0:
+                break
+            depth -= 1
+        elif ch in ";\n" and depth == 0:
+            break
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def test_no_js_set_attribute_holds_raw_chinese():
     bad: list[str] = []
     for f, src in _sources():
-        for m in list(_ASSIGN.finditer(src)) + list(_SETATTR.finditer(src)):
+        for m in _SETATTR.finditer(src):
             if _CJK.search(m.group(3)):
                 bad.append(f"{f.relative_to(ROOT).as_posix()}: {m.group(0)[:76]}")
+        for m in _ASSIGN_LHS.finditer(src):
+            rhs = _rhs(src, m.end())
+            if _CJK.search(_TR_CALL.sub("", rhs)):
+                bad.append(f"{f.relative_to(ROOT).as_posix()}: {m.group(0)}{rhs.strip()[:70]}")
     assert not bad, (
         "這幾處 JS 設定的顯示屬性直接寫了中文（英文 / 日文介面會看到中文，"
         "而且要滑鼠移上去才發現）：\n" + "\n".join(bad))

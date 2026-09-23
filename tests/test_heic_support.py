@@ -58,7 +58,7 @@ def test_heif_decoder_is_registered():
 def test_every_advertised_format_actually_opens(ext):
     """**白名單自動列舉**：放行的每一種副檔名都要真的解得開。
 
-    這條就是 issue #49 的守門 —— 當時四個地方都放行 .heic，卻沒有任何一處
+    這條就是 issue #49 的檢查 —— 當時四個地方都放行 .heic，卻沒有任何一處
     接上解碼器。
     """
     fmt = ext.lstrip(".")

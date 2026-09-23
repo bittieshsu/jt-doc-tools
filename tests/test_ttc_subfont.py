@@ -138,7 +138,7 @@ def test_catalog_records_the_right_index():
 
 
 def test_scan_never_hardcodes_zero_for_system_fonts():
-    """靜態守門：系統字型掃描不可以再寫死 `idx: 0`。"""
+    """靜態檢查：系統字型掃描不可以再寫死 `idx: 0`。"""
     import inspect
     src = inspect.getsource(fc)
     i = src.index('"id": f"system:{p}"')

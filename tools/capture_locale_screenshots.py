@@ -324,7 +324,7 @@ CHROME = "/usr/bin/chromium-browser"
 #: `data-i18n="skip"`，這裡列的是它在別處出現的情況）。
 #:
 #: **不排除的話這幾條會永遠掛在報告上**，而誤報一多這份檢查就會被當雜訊
-#: 忽略（用詞守門那次的教訓）。
+#: 忽略（用詞檢查那次的教訓）。
 _DATA_SHOTS: dict[str, tuple[str, ...]] = {
     "stamp": ("範例之印",),
     "premissions": ("張家瑜", "陳美華", "黃大生"),

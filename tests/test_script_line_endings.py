@@ -9,10 +9,10 @@
 **所以開發機上怎麼測都是對的**。
 
 當時的修法是三件：①`install.ps1` / `install_core.ps1` 執行前正規化
-②把檔案改成 CRLF ③加 `.gitattributes`。**但沒有守門** ——
+②把檔案改成 CRLF ③加 `.gitattributes`。**但沒有檢查** ——
 於是 2026-09-19 我為了加一個 import 又把它改回 LF（用 Python 改檔案時
 `write_text` 預設就是 LF）。前兩道保險讓它沒有真的壞掉，
-但「記了規則沒有守門就會復發」在這個專案已經是常態。
+但「記了規則沒有檢查就會復發」在這個專案已經是常態。
 
 ## 判準
 
@@ -22,7 +22,7 @@
 * `*.sh` —— 一個 CR 都不可以有
 
 **兩種樹都成立**：clone 下來的是 git 依 `.gitattributes` 轉出來的（本來就對），
-開發樹的 `github/` 不在版控裡，靠這條守門盯著。
+開發樹的 `github/` 不在版控裡，靠這條檢查盯著。
 
 **另外釘住 `.gitattributes` 本身** —— 規則被拿掉的話，clone 那一側就沒有
 保護了，而那正是客戶走的路。
@@ -64,7 +64,7 @@ def test_the_scan_actually_reaches_those_files():
     missing += [n for n in _MUST_EXIST_LF if n not in found_sh]
     assert not missing, (
         f"公開樹（{ROOT}）裡找不到這幾支腳本：{missing}。"
-        "檔案改名或搬走了就把清單一起改，不要讓守門變成空迴圈。"
+        "檔案改名或搬走了就把清單一起改，不要讓檢查變成空迴圈。"
     )
 
 

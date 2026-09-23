@@ -5200,7 +5200,6 @@
   "，這裡只算前幾頁的圖（左邊原文、右邊譯文，\n    點圖看大圖）。完整內容請按上面的下載鈕。": ", only the first few pages are rendered (source on the left, translation on the right; click an image to enlarge). Use the download button above for the complete document.",
   "，適合對外定稿前的最後一步。": ", which suits the last step before a document goes out.",
   "，重新整理頁面…": ", reloading the page…",
-  "，預設關閉。啟用後共 10 個工具（pdf-fill 視覺校驗、\n  doc-deident / text-deident 智慧分類、doc-diff / pdf-extract-text / pdf-wordcount /\n  pdf-annotations 內容摘要、pdf-ocr 文字校正、submission-check 送件檢核、translate-doc\n  逐句翻譯）可選擇性地把資料送給本機或 LAN 上的 LLM server (OpenAI-compat) 處理。\n  本機 / LAN 上需有運行中的 LLM backend (Ollama / vLLM / LM Studio / jan.ai 皆可)。": ", off by default. With it on, ten tools can optionally send data to an LLM server on this machine or the LAN (OpenAI-compatible):\n  visual verification in auto-fill forms, smart classification in document and text redaction, content summaries in document compare, text extraction, word count and annotations,\n  text correction in OCR, the pre-submission check, and sentence-by-sentence translation.\n  A running LLM backend is required on this machine or the LAN (Ollama, vLLM, LM Studio or jan.ai all work).",
   "，首次使用某語言會自動下載 ~150MB 模型": ", and the first time a language is used its model (~150 MB) is downloaded automatically",
   "：Noto Sans/Serif TC、思源黑體、cwTeX、TW-Kai/Sung 等符合開放字型授權 (OFL) 的字型。建議裝 Noto TC 可以獲得最佳的繁中顯示效果。": ": Noto Sans/Serif TC, Source Han, cwTeX, TW-Kai/Sung and others under an open font licence (OFL). Installing Noto TC gives the best Traditional Chinese rendering.",
   "：PDF 裡沒有「段落」這種東西，\n    文字是一塊一塊定位好的碎片，換成長度不同的譯文之後版面一定跑掉。\n    要翻 PDF 請用": ": a PDF has no such thing as a paragraph.\n    Its text is positioned fragments, so replacing them with translations of a different length is bound to break the layout.\n    To translate a PDF, use",
@@ -5359,5 +5358,18 @@
   "這裡只列出前 {0} 段（整份共 {1} 段）—— 分析會用整份逐字稿。先確認發言者與斷句是對的，再開始分析。": "Only the first {0} segments are listed here (the transcript has {1}). The analysis uses the whole transcript. Check that the speakers and line breaks look right, then start the analysis.",
   "以下是全部 {0} 段 —— 先確認發言者與斷句是對的，再開始分析。": "All {0} segments are listed below. Check that the speakers and line breaks look right, then start the analysis.",
   "…後面還有 {0} 段沒有列出，分析時會一併處理": "…{0} more segments are not listed here; the analysis includes them",
-  "「自動判斷」只看錄音開頭約 30 秒的講話來決定整場用哪一種語言 —— 開頭若有人先講另一種語言（例如先用英文開場），整場都可能辨識錯。開頭的靜音、雜音不影響。已知整場使用的語言時請直接選取。": "\"Detect automatically\" only listens to about the first 30 seconds of speech to decide the language of the whole recording. If someone speaks another language at the start (for example an English opening), the whole meeting may be recognised wrongly. Silence or background noise at the start does not matter. If you know the language used throughout, pick it."
+  "「自動判斷」只看錄音開頭約 30 秒的講話來決定整場用哪一種語言 —— 開頭若有人先講另一種語言（例如先用英文開場），整場都可能辨識錯。開頭的靜音、雜音不影響。已知整場使用的語言時請直接選取。": "\"Detect automatically\" only listens to about the first 30 seconds of speech to decide the language of the whole recording. If someone speaks another language at the start (for example an English opening), the whole meeting may be recognised wrongly. Silence or background noise at the start does not matter. If you know the language used throughout, pick it.",
+  "LLM 功能未啟用，請管理員到「LLM 設定」啟用": "LLM is not enabled; ask an administrator to enable it under LLM settings",
+  "、": ", ",
+  "停用時": "When disabled",
+  "停用時一併隱藏": "Also hide when disabled",
+  "這個選項只在停用時有作用；LLM 啟用時勾著也不影響任何東西。": "This option only applies while LLM is disabled; while it is enabled, ticking it changes nothing.",
+  "關閉時，所有 LLM 邏輯都不會執行；各工具的 LLM 加值會反灰（看得到，但不能用），純規則處理不受影響。": "When off, no LLM logic runs at all; each tool's LLM options are greyed out (visible, but unusable). Rule-based processing is unaffected.",
+  "需要 LLM 服務，請管理員到「LLM 設定」啟用。": "Needs the LLM service; ask an administrator to enable it under LLM settings.",
+  "LLM AI 加值（附加功能，預設關閉）": "LLM assistance (an add-on, off by default)",
+  "LLM 服務還沒啟用。請管理員到「設定 → LLM 設定」啟用。": "The LLM service is not enabled yet. Ask an administrator to enable it under Settings → LLM settings.",
+  "，預設關閉。啟用後共 {0} 個工具可以選擇性地把資料送給本機或 LAN 上的 LLM server（OpenAI 相容）處理，清單與各自使用的模型見下方「4. 各工具進階設定」。本機 / LAN 上需有運行中的 LLM backend（Ollama / vLLM / LM Studio / jan.ai 皆可）。": "; it is off by default. Once enabled, {0} tools can optionally send data to an LLM server on this machine or the LAN (OpenAI compatible). The list, and the model each one uses, is in section 4 (per-tool settings) below. A running LLM backend is needed on this machine or the LAN (Ollama, vLLM, LM Studio or jan.ai all work).",
+  "勾選後，LLM 停用時各工具的 LLM 加值選項不顯示；只靠 LLM 的工具（{0}）也從側欄、首頁與搜尋拿掉。沒勾的話只是反灰 —— 看得到、也看得到為什麼不能用。": "When ticked, each tool's LLM options are not shown while LLM is disabled, and the tools that only work with LLM ({0}) are removed from the sidebar, the home page and search. Without it they are only greyed out, so people can see them and see why they cannot use them.",
+  "第 {0} 頁（{1} 個）": "Page {0} ({1} placed)",
+  "符合搜尋 {0} 項（共 {1} 項）": "{0} match the search ({1} in total)"
 }

@@ -27,6 +27,7 @@ zip。判斷寫在各處一定會漂（這個專案在「同一份清單寫兩�
 """
 from __future__ import annotations
 
+import os
 import zipfile
 from typing import Union
 
@@ -65,7 +66,7 @@ def check(zf: zipfile.ZipFile, *,
             "為了避免耗盡伺服器資源而拒絕處理。")
 
 
-def check_path(path: Union[str, "os.PathLike"]) -> None:  # noqa: F821
+def check_path(path: Union[str, "os.PathLike"]) -> None:
     """檢查一個 zip 檔（不是 zip 就直接放行，交給呼叫端自己判斷格式）。"""
     try:
         with zipfile.ZipFile(path) as zf:

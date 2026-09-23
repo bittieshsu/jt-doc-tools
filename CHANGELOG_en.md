@@ -5,11 +5,90 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (839 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (840 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.11] - 2026-09-23
+
+### `jtdt update` always ended with "Health check failed", although the service was fine
+
+Since v1.15.11, **the last step of `jtdt update` failed on Linux, Windows and macOS** even though
+the service had started normally. The download module the health check uses was never actually
+imported (the import line had landed inside a generated script string), so every probe raised an
+error that was then treated as "cannot connect".
+
+* The health check now really asks the service.
+* **The update to v1.16.11 itself still prints the message once**: the check is run by the version
+  you are updating from. If the page opens in a browser, the update succeeded; from the next update
+  on it is gone.
+* On Windows the version shown in "Programs and Features" is only updated after the health check
+  passes, so it stayed at the old number during this period. The next successful update fixes it.
+* The same cause also broke a few fallbacks, each of which only prints a warning and does not stop
+  the update: installing the VC++ runtime on Windows, the legacy Traditional Chinese OCR language
+  download, and the backup WinSW download.
+
+### When the health check fails, the real service log is shown
+
+* **Windows**: it used to look in `<data dir>\logs\jt-doc-tools.log`, a folder that never exists,
+  so it always printed "no log at …". The service log is in
+  `C:\ProgramData\jt-doc-tools\Logs\`: `jtdt-svc.err.log` (startup messages and tracebacks),
+  `jtdt-svc.out.log` (the service's own log) and `jtdt-svc.wrapper.log` (the service wrapper).
+* **macOS**: it only read `~/Library/Logs/jt-doc-tools.log` (the service's own log), but uvicorn's
+  startup messages and uncaught tracebacks go to **`jt-doc-tools.err`** in the same folder, which is
+  exactly what you need when the service does not come up. Both are now shown, `.err` first.
+* **Linux** uses `journalctl`, which was already right.
+* `jtdt logs` uses the same list. On Windows, logs written in the system code page (cp950 on
+  Traditional Chinese systems) are decoded correctly, and only the end of a large log is read.
+* The wait for the service to answer is now up to 2 minutes instead of about 15 seconds, with a
+  "still waiting" line every 15 seconds. The first start after an update recompiles everything and
+  antivirus scans the new files, so 15 seconds was often not enough: on an Apple M2 laptop updated
+  from a much older version, the service was still loading its tools when the check started.
+* The `DeprecationWarning` about `locale.getdefaultlocale` at the end of an update is gone; Windows
+  now asks the system display language to pick the Chinese or English troubleshooting page.
+* The health check entry on the troubleshooting page covers this case and lists the log location on
+  each platform.
+
+### Four more places used a name that was never defined
+
+A new automatic check over all the code found the same kind of mistake elsewhere:
+
+* **The friendly "please sign in / no permission / page not found" page in the browser came back as a
+  500** (since v1.14.16).
+* Importing an asset backup that trips the zip bomb check returned 500 instead of 400 (since v1.15.13).
+* Invalid VAT database schedule values returned 500 instead of 400 (since v1.14.51).
+* Switching the OCR language file variant raised an error instead of reporting failure (since v1.7.5).
+
+Every file under `app/` and `tools/` must now use only names it defines; the check is our own scope
+analysis and needs no extra package.
+
+### LLM disabled: greyed out by default, hidden only when you tick the new option
+
+* The LLM settings page has a new "hide when disabled" option, **off by default**: while disabled,
+  tools and options stay visible and greyed out, so you can see why they cannot be used. Tick it to
+  remove them from the screen. It has no effect while LLM is enabled.
+* The three tools that only work with an LLM (sentence translation, document translation, meeting
+  summary) are now greyed out with a reason in the sidebar and on the home page when LLM is disabled,
+  instead of looking normal until you open them. With the option ticked they disappear from the
+  sidebar, the home page and the search.
+* The LLM options of form filling and text extraction used to vanish when LLM was disabled; they are
+  now greyed out like everywhere else.
+* The settings page said AI extras are "hidden automatically" when disabled, which was never true.
+  The text now matches the behaviour, and the tool count (three places, three different numbers) is
+  computed.
+* The home page now uses the same tool list as the sidebar. Before, a tool greyed out in the sidebar
+  (for example meeting transcription without a speech service configured) looked normal on the home
+  page.
+
+### Other
+
+* Three tooltips set by JavaScript stayed in Chinese in the English and Japanese UI: the sidebar
+  search count, "the built-in account's permissions cannot be changed" in the permission matrix,
+  and the page thumbnails of the per-page stamp editor. The translation check only recognised a
+  string placed right after `=` and missed conditional expressions; it now looks at the whole value.
+* The translation key check only recognised `{{ tr('…') }}` and missed `tr('…')|replace(…)`; widened.
 
 ## [1.16.10] - 2026-09-23
 

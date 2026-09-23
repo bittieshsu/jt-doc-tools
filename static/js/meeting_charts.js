@@ -24,7 +24,7 @@
  *     `speaker_stats()` 的輸出），前端只負責排版。
  *   * **配色從伺服器送過來**（`data-palette` / `data-kinds`），
  *     不在這裡抄一份 —— 不然畫面上是藍的、下載的 PNG 是綠的。
- *   * 守門 `tests/test_meeting_chart_parity.py` 驗「兩邊畫出來的東西
+ *   * 檢查 `tests/test_meeting_chart_parity.py` 驗「兩邊畫出來的東西
  *     講的是同一件事」（同樣的章節、同樣的語者、同樣的段號）。
  *
  * 要把匯出也改成用畫面上這一份，得讓前端把 SVG 送回伺服器轉檔 ——
