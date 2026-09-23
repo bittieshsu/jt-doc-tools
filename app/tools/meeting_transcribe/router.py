@@ -173,8 +173,8 @@ async def upload(request: Request, file: UploadFile = File(...)):
 
 #: 常見但語音服務不收的寫法 → 它認得的 BCP-47。
 #:
-#: 對方的 `/profiles` 列的是 `zh-Hant` / `en` / `ja` / `und`（台語那組另有
-#: `nan-Hant`）。**不在這張表裡的值原樣送出**，由對方決定收不收 —— 我們不自己
+#: 對方的 `/profiles` 列的是 `zh-Hant` / `en` / `ja` / `ko` / `und`（台語那組是
+#: `nan-Hant` / `zh-Hant`；`ko` 是 `api_revision` 2.3 起才收的）。**不在這張表裡的值原樣送出**，由對方決定收不收 —— 我們不自己
 #: 維護一份「支援哪些語言」的清單（那份清單在對方，寫第二份一定會漂）。
 #: **簡體（`zh-CN` / `zh-Hans`）刻意不換成 `zh-Hant`**：那是不同的東西，
 #: 換掉等於替使用者做了一個他沒做的選擇。
@@ -216,8 +216,8 @@ def _normalize_language(value: object) -> str:
     low = v.lower()
     if low in _LANGUAGE_ALIASES:
         return _LANGUAGE_ALIASES[low]
-    # `en-US` / `ja-JP` 這類帶地區的：對方只列了 `en` / `ja`
-    for base in ("en", "ja"):
+    # `en-US` / `ja-JP` / `ko-KR` 這類帶地區的：對方只列了 `en` / `ja` / `ko`
+    for base in ("en", "ja", "ko"):
         if low.startswith(base + "-") or low.startswith(base + "_"):
             return base
     return v

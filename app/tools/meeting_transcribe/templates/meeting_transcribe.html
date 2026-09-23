@@ -36,13 +36,15 @@
        下面那段 JS 一個字都不用改。 #}
     <select class="field jt-select" id="mtLang">
       <option value="auto">{{ tr('自動判斷') }}</option>
-      {# 值要是語音服務認得的 BCP-47（它的 `/profiles` 列的是 `zh-Hant` / `en` / `ja`）。
+      {# 值要是語音服務認得的 BCP-47（它的 `/profiles` 列的是 `zh-Hant` / `en` / `ja` / `ko`；
+         韓文是對方 `api_revision` 2.3 起才收，2026-09-23）。
          原本寫 `zh`，選「中文」的每一件都在送件當下被對方以 `invalid_request`
          退回 —— 假的對方不檢查語言代碼，所以測試一直是綠的。伺服器端另外會把
          `zh` / `zh-TW` 這類常見寫法換成 `zh-Hant`（`_normalize_language`）。 #}
       <option value="zh-Hant">{{ tr('中文') }}</option>
       <option value="en">{{ tr('英文') }}</option>
       <option value="ja">{{ tr('日文') }}</option>
+      <option value="ko">{{ tr('韓文') }}</option>
     </select>
     <span class="field-unit">{{ tr('（已知整場的語言時請直接選取）') }}</span>
   </div>

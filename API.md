@@ -889,7 +889,7 @@ POST /tools/meeting-transcribe/api/meeting-transcribe
 | 參數 | 類型 | 必填 | 說明 |
 |---|---|---|---|
 | `file` | file | ✓ | 音訊 `.m4a` / `.mp3` / `.wav` / `.aac` / `.ogg` / `.opus` / `.flac`，影片 `.mp4` / `.mov` / `.mkv` / `.webm` |
-| `language` | string | | `auto`（預設）或 BCP-47（`zh-Hant` / `en` / `ja` …）。對方不支援時**送件當下**就回 400。`zh` / `zh-TW` 會換成 `zh-Hant` 再送出 |
+| `language` | string | | `auto`（預設）或 BCP-47（`zh-Hant` / `en` / `ja` / `ko` …）。對方不支援時**送件當下**就回 400。`zh` / `zh-TW` 會換成 `zh-Hant` 再送出 |
 | `num_speakers` | string | | 預設 `0` ＝ 讓它自己判。**建議就留 0** |
 
 **`num_speakers` 問的是「發言量足以辨認的人數」，不是與會人數。**

@@ -38,11 +38,20 @@ def _free_port() -> int:
 class FakeJtlw:
     """只做我們會打的那幾支。`seen` 留下收到的請求供斷言。"""
 
-    #: 對方正式 API 的 `/profiles`（預設那組，2026-09-23 實際查到的）認得的語言。
     #: **這支假伺服器一定要檢查語言代碼** —— 原本它什麼都收，於是頁面把「中文」
     #: 送成 `zh`（對方要 `zh-Hant`）這件事，測試全綠、正式機每一件都被退回。
-    #: 退回的形狀照正式 API 實際回的：400 `invalid_request`、`details.field=language`。
-    LANGUAGES = ("zh-Hant", "en", "ja", "und")
+    #:
+    #: 照正式 API（`api_revision` 2.3，2026-09-24 對正式服務打唯讀的 `GET /profiles`
+    #: 實際查到的）分兩層：
+    #: * 代碼不在 `LanguageTag` 列舉裡 → 400 `invalid_request`（`field=language`、`reason=enum`）
+    #: * 在列舉裡、但這個處理設定不支援 → 422 `language_not_supported`（`field=language`）
+    #: **語言清單以正式 API 回的為準**，不要照別的文件抄。
+    LANGUAGE_TAGS = ("zh-Hant", "nan-Hant", "en", "ja", "ko", "und")
+    PROFILE_LANGUAGES = {
+        "meeting.balanced": ("zh-Hant", "en", "ja", "ko", "und"),
+        "meeting.detailed": ("zh-Hant", "en", "ja", "ko", "und"),
+        "transcribe.taiwanese": ("nan-Hant", "zh-Hant"),
+    }
 
     def __init__(self, *, fail_with: dict | None = None, segments: int = 5,
                  running_polls: int = 0, reject_with: dict | None = None,
@@ -87,7 +96,7 @@ class FakeJtlw:
         async def caps(request: Request):
             if not request.headers.get("authorization", "").startswith("Bearer "):
                 return JSONResponse({"error": {"code": "unauthorized"}}, status_code=401)
-            return {"api_revision": "2.1", "limits": {"max_duration_s": 28800}}
+            return {"api_revision": "2.3", "limits": {"max_duration_s": 28800}}
 
         @app.post("/api/v1/jobs")
         async def create(request: Request):
@@ -99,12 +108,20 @@ class FakeJtlw:
                 return JSONResponse({"error": me.reject_with}, status_code=422)
             body = await request.json()
             lang = body.get("language", "auto")
-            if lang != "auto" and lang not in me.LANGUAGES:
+            if lang != "auto" and lang not in me.LANGUAGE_TAGS:
                 me.seen["rejected_language"] = lang
                 return JSONResponse({"error": {
                     "code": "invalid_request", "category": "request", "retryable": False,
-                    "details": {"field": "language", "reason": "unsupported"}}},
+                    "details": {"field": "language", "reason": "enum"}}},
                     status_code=400)
+            prof = body.get("profile_id") or "meeting.balanced"
+            if lang != "auto" and lang not in me.PROFILE_LANGUAGES.get(prof, ()):
+                me.seen["rejected_language"] = lang
+                me.seen["rejected_status"] = 422
+                return JSONResponse({"error": {
+                    "code": "language_not_supported", "category": "request", "retryable": False,
+                    "details": {"field": "language", "languages": lang}}},
+                    status_code=422)
             me.seen["body"] = body
             me.seen["idempotency_key"] = request.headers.get("idempotency-key")
             me.seen["auth"] = request.headers.get("authorization")
@@ -205,9 +222,13 @@ def unconfigured():
     js.invalidate_cache()
 
 
-def _configure(fake: FakeJtlw, *, audio_base: str = "http://audio.test:8765") -> None:
-    js.save({"enabled": True, "base_url": fake.base,
-             "api_key_enc": "jtlw_test_key", "audio_base_url": audio_base})
+def _configure(fake: FakeJtlw, *, audio_base: str = "http://audio.test:8765",
+               profile_id: str | None = None) -> None:
+    cfg = {"enabled": True, "base_url": fake.base,
+           "api_key_enc": "jtlw_test_key", "audio_base_url": audio_base}
+    if profile_id:
+        cfg["profile_id"] = profile_id
+    js.save(cfg)
     js.invalidate_cache()
 
 
@@ -871,7 +892,8 @@ def test_every_language_in_the_dropdown_is_accepted(client, unconfigured, value)
 
 @pytest.mark.parametrize("given,sent", [
     ("zh", "zh-Hant"), ("zh-TW", "zh-Hant"), ("zh_TW", "zh-Hant"), ("ZH-HANT", "zh-Hant"),
-    ("en-US", "en"), ("ja-JP", "ja"), ("", "auto"), (None, "auto"), ("auto", "auto"),
+    ("en-US", "en"), ("ja-JP", "ja"), ("ko-KR", "ko"), ("ko", "ko"),
+    ("", "auto"), (None, "auto"), ("auto", "auto"),
     # 簡體**不可以**被換成繁體 —— 那是替使用者做了一個他沒做的選擇
     ("zh-CN", "zh-CN"), ("zh-Hans", "zh-Hans"),
     # 不認得的原樣送出，由對方決定（我們不自己維護一份支援清單）
@@ -880,6 +902,25 @@ def test_every_language_in_the_dropdown_is_accepted(client, unconfigured, value)
 def test_common_language_spellings_are_normalized(given, sent):
     R = importlib.import_module("app.tools.meeting_transcribe.router")
     assert R._normalize_language(given) == sent
+
+
+def test_korean_is_in_the_dropdown():
+    """語音服務 2026-09-23 起（`api_revision` 2.3）收 `ko`。下拉原本只有中英日三個，
+    使用者選不到韓文 —— 而 `auto` 偵測到韓文早就會回 `ko` 了。"""
+    assert "ko" in _dropdown_languages()
+
+
+def test_the_taiwanese_profile_turns_korean_away_with_a_readable_message(client, unconfigured):
+    """台語那個處理設定不支援韓文，正式 API 回 422 `language_not_supported`。
+    畫面上要講得出該怎麼做，不是一串錯誤代碼。反向那條（會議設定收 `ko`）在
+    `test_every_language_in_the_dropdown_is_accepted` —— 兩邊都驗，這支假伺服器才不是
+    「什麼都收」或「什麼都退」。"""
+    with FakeJtlw() as fake:
+        _configure(fake, profile_id="transcribe.taiwanese")
+        j = _run(client, _upload(client)["upload_id"], language="ko")
+        assert fake.seen.get("rejected_status") == 422, "前提：假的對方真的依處理設定退回了"
+    assert j["status"] == "error", j
+    assert j.get("error") == jtlw_client.MESSAGES["language_rejected"], j.get("error")
 
 
 def test_api_callers_sending_zh_still_get_through(client, unconfigured):

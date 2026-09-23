@@ -5,11 +5,27 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (843 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (844 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.15] - 2026-09-24
+
+### Meeting transcription: Korean can be chosen as the language
+
+The speech service (JTLW) now supports Korean, so the language menu of the transcription tool has a
+"Korean" option. With "Detect automatically", Korean recordings were already recognised; now the
+language can be set directly.
+
+* Through the API, `language` accepts `ko`; a regional form such as `ko-KR` is reduced to `ko` before
+  it is sent (the same as `en-US` and `ja-JP`).
+* If an administrator switches the processing profile to the Taiwanese Hokkien one, that profile does
+  not support Korean; the job is turned away at submission with a message asking to choose "Detect
+  automatically" or another language.
+* Automatic detection still listens only to roughly the first 30 seconds of speech. When the whole
+  meeting is known to be in Korean, choose "Korean" directly.
 
 ## [1.16.14] - 2026-09-23
 
