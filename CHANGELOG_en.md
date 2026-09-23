@@ -5,11 +5,37 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (841 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (842 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.13] - 2026-09-23
+
+### The speech service's short name is now written in capitals: `JTLW`
+
+The abbreviation of jt-live-whisper was shown in lower case on screens and in the documentation, which
+next to `JTDT` looked like two different kinds of thing. The **text** on the settings page, the
+transcription page, error messages, the introduction site, the API manual, the README and the
+troubleshooting page now says `JTLW`.
+
+* **URLs, module names, settings file names and page anchors stay lower case** (for example
+  `/admin/jtlw`); changing them would break existing bookmarks, API calls and settings imports.
+* The English and Japanese interfaces are updated too, and an automatic check now stops the
+  abbreviation from drifting back to lower case (identifiers are exempt).
+
+### Introduction site: the GitHub button in the phone menu looked cut off at the top
+
+When the window is narrow and the navigation folds into a menu, the GitHub entry had square top corners
+and a top border that differed from the other three sides, so it looked as if its top had been sliced
+off. The style tried to draw a separator line above it, but the button already has a border on all four
+sides.
+
+* It now matches the language menu above it: same width, height, corner radius and border, with the
+  text centred vertically.
+* Measured in a browser at phone width with the menu open, in all three languages, and added to the
+  existing navigation check (same width, height and radius, and matching top and bottom borders).
 
 ## [1.16.12] - 2026-09-23
 
@@ -376,7 +402,7 @@ halfway. This affected **every background job**, not just meeting summaries.
 > Results that were already cleared cannot be recovered; the fix applies from
 > the upgrade on.
 
-### Layout: stretched number fields, a status split over two lines, a hard-to-find jtlw name
+### Layout: stretched number fields, a status split over two lines, a hard-to-find JTLW name
 
 * Five small number fields (the speech service timeout, three workspace
   settings, the speaker count) stretched across the whole row with their unit
@@ -385,7 +411,7 @@ halfway. This affected **every background job**, not just meeting summaries.
   earlier screenshots only ever showed an empty user list. Fixing only that
   column pushed the squeeze into the next one (a role badge split in two), so
   both now stay on one line.
-* **jtlw's full name (jt-live-whisper) and its project link** sat in the top
+* **JTLW's full name (jt-live-whisper) and its project link** sat in the top
   right corner of the settings page, and were missing from the transcription
   tool altogether. Both now follow the description line, from one shared
   component.
@@ -568,7 +594,7 @@ things. Search keywords keep the old forms so existing habits still work.
 at submit time arrives as an exception; a terminal failure arrives in
 `errors[]` — and only the latter consulted the table. Since their v1.7 fetches
 the audio at submit time, source-related errors now mostly take the former path:
-production showed `jtlw rejected this request: source_not_allowed (field
+production showed `JTLW rejected this request: source_not_allowed (field
 source.url)` when the table already held "ask your administrator to add the
 address to their allow-list". The wording now lives in one place, with a guard.
 

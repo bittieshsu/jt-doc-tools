@@ -1,6 +1,6 @@
 **繁體中文** ｜ [English](README_en.md) ｜ [日本語](README_ja.md)
 
-# Jason Tools 文件工具箱 v1.16.12
+# Jason Tools 文件工具箱 v1.16.13
 
 > ### ⚠ 2026-09-13 之前用 git 安裝的，這一版升級前要先跑一行
 >
@@ -117,7 +117,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 - **擷取文字 / 圖片 / 附件** — 含 LLM 段落重排選項
 - **字數統計** [需 OxOffice/LibreOffice] — 表格 + 圖表 + LLM 摘要；收 PDF / 辦公文件 / 純文字
 - **會議摘要** [需 OxOffice/LibreOffice] — 逐字稿（.vtt / .srt / .json / .txt / .docx / .odt）整理成摘要、決議、待辦、風險與章節；**每一條都指得回第幾段、誰講的**，點下去就跳過去。有時間戳記時另外算發言佔比。匯出 PDF / Word / ODF 時需引擎
-- **會議錄音轉逐字稿** — 錄音或錄影轉成**帶時間與發言者**的逐字稿，可一鍵交給「會議摘要」；辨識在語音服務（jtlw）那側跑，**要先在管理區設定好才會出現**
+- **會議錄音轉逐字稿** — 錄音或錄影轉成**帶時間與發言者**的逐字稿，可一鍵交給「會議摘要」；辨識在語音服務（JTLW）那側跑，**要先在管理區設定好才會出現**
 - **註解整理 / 清除 / 平面化**
 - **OCR 文字辨識** — 掃描 PDF / 圖片跑 OCR 後變可搜尋、可滑鼠選取複製（同 macOS 預覽程式 Live Text 概念）；雙引擎（**EasyOCR** 預設，中日韓辨識準確度高；**Tesseract** 備援），可選 LLM 校正 typo。**支援外部 GPU 識別伺服器**（DGX Spark / H100 / 4090 等），管理介面下載 `install.sh` 即可一鍵部署，每頁辨識時間從 CPU 上的 8-15 秒降到 GPU 上的 0.3-0.8 秒（**速度 10× 以上**）。
 - **送件前檢核** — 批次驗收：頁面尺寸、字型嵌入、欄位完整、敏感資料殘留、隱藏內容
@@ -241,12 +241,12 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 把**會議錄音**變成可以拿去用的會議記錄，而且**重要錄音不會離開你的網路**。
 
-錄音交給 **[jtlw](https://jasoncheng7115.github.io/jt-live-whisper/)**（jt-live-whisper，
+錄音交給 **[JTLW](https://jasoncheng7115.github.io/jt-live-whisper/)**（jt-live-whisper，
 可自架在內網）做辨識與發言者分離；**摘要、決議、待辦、心智圖與翻譯全部留在本系統**。
 
 ### 怎麼用
 
-1. 管理區 →「語音服務（jtlw）」填送件位址與金鑰（自簽憑證把憑證貼進來就好，
+1. 管理區 →「語音服務（JTLW）」填送件位址與金鑰（自簽憑證把憑證貼進來就好，
    **不要關掉驗證**）。沒設定好時「會議錄音轉逐字稿」是反灰的。
 2. 上傳錄音或錄影 → 轉好之後**一鍵交給「會議摘要」**。
 3. 也可以走 API：`POST /tools/meeting-transcribe/api/meeting-transcribe`。
@@ -262,7 +262,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ### 為什麼這樣分工
 
-- **聲音留在你的網路裡。** jtlw 自架，錄音不必送給任何雲端服務。
+- **聲音留在你的網路裡。** JTLW 自架，錄音不必送給任何雲端服務。
 - **錄音檔用短效簽章網址交付** —— 不必把帳號或憑證給對方，網址到期自動失效。
 - **摘要與決議留在本系統**，跟其他 13 個 LLM 加值工具用同一套設定與稽核。
 - **引用綁段號不綁文字**：重跑校正或更新詞彙庫之後，已經產生的決議與待辦

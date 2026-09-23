@@ -88,8 +88,8 @@ MESSAGES: dict[str, str] = {
     # 401 與 403 是兩件事（對方 v2.9 指正）：401 是金鑰錯或被撤銷；
     # 403 是金鑰**對**、但沒有這個動作的權限 —— 合成一句的話，遇到 403 的人
     # 照著「打錯 / 撤銷」去查，會查不出問題。
-    "key_rejected": "jtlw 不接受這把金鑰（401）—— 請到設定頁確認金鑰有沒有打錯，或是不是已經被撤銷",
-    "key_no_permission": "jtlw 認得這把金鑰，但它沒有這個動作的權限（403）—— 請對方的管理員幫這把金鑰加上權限（缺哪一個權限寫在服務記錄裡）",
+    "key_rejected": "JTLW 不接受這把金鑰（401）—— 請到設定頁確認金鑰有沒有打錯，或是不是已經被撤銷",
+    "key_no_permission": "JTLW 認得這把金鑰，但它沒有這個動作的權限（403）—— 請對方的管理員幫這把金鑰加上權限（缺哪一個權限寫在服務記錄裡）",
     # **不是排隊造成的**（對方 v2.9 指正）：對方收到送件就立刻拉檔，之後排多久都
     # 不會再拉這個網址。原本寫「多半是排隊太久；請管理員延長有效期」—— 前半句會讓
     # 人去懷疑對方的佇列，後半句叫管理員去改一個**根本不存在的設定**（2 小時是刻意寫死的）。
@@ -97,7 +97,7 @@ MESSAGES: dict[str, str] = {
     "source_unreachable": "對方連不到我們的錄音檔位址，請確認「錄音檔對外位址」從對方那台連得到",
     # 對方的缺陷（v2.9 告知，`.223` 升級前都可能發生）：GPU 伺服器在傳結果途中重啟，
     # 可能把 0 段當成功回給我們。我們拿到 0 段本來就判失敗，這裡讓使用者知道重送通常就好。
-    "empty_result": "jtlw 回報成功，但一段逐字稿都沒有 —— 可能是語音服務在傳結果的途中重啟過。錄音裡確實有人講話的話，請重新送一次。",
+    "empty_result": "JTLW 回報成功，但一段逐字稿都沒有 —— 可能是語音服務在傳結果的途中重啟過。錄音裡確實有人講話的話，請重新送一次。",
     # 送出的語言代碼對方不收（2026-09-23 正式機：頁面把「中文」送成 `zh`，
     # 對方要的是 `zh-Hant`，回 400 `invalid_request`、欄位 `language`）。
     # 原本畫面上印的是 `jtlw 回報：invalid_request（欄位 language）` —— 使用者看不懂，
@@ -136,7 +136,7 @@ def describe_error(code: str, *, field: str = "", retryable: bool = False,
     msg = ERROR_TEXT.get(code)
     if msg:
         return msg + ("（這一類可以再試一次）" if retryable else "")
-    msg = f"jtlw 回報：{code}"
+    msg = f"JTLW 回報：{code}"
     if field:
         msg += f"（欄位 {field}）"
     if retryable:
@@ -150,7 +150,7 @@ def _raise_for(resp: httpx.Response) -> None:
     code = category = field = ""
     details: dict = {}
     retryable = False
-    msg = f"jtlw 回了 HTTP {resp.status_code}"
+    msg = f"JTLW 回了 HTTP {resp.status_code}"
     try:
         err = (resp.json() or {}).get("error") or {}
         code = str(err.get("code") or "")
@@ -171,7 +171,7 @@ def _raise_for(resp: httpx.Response) -> None:
         msg = MESSAGES["key_no_permission"]
         # 缺哪一個權限（`details.required_scope`）寫進記錄，不接在訊息尾巴 ——
         # 接上變數的整句在語系檔裡查不到（見 `MESSAGES` 的說明）。
-        logger.warning("jtlw 403：這把金鑰缺少權限 %s",
+        logger.warning("JTLW 403：這把金鑰缺少權限 %s",
                        details.get("required_scope") or "（對方沒有說）")
     raise JtlwError(msg, code=code, category=category, field=field, details=details,
                     retryable=retryable, status=resp.status_code)
@@ -189,7 +189,7 @@ class JtlwClient:
 
     def __init__(self, *, timeout: Optional[float] = None):
         if not jtlw_settings.is_configured():
-            raise JtlwUnavailable("還沒設定語音服務（jtlw）")
+            raise JtlwUnavailable("還沒設定語音服務（JTLW）")
         self._base = jtlw_settings.base_url()          # 內含 SSRF 檢查
         self._key = jtlw_settings.api_key()
         t = float(timeout or jtlw_settings.get().get("request_timeout") or 30)
@@ -215,9 +215,9 @@ class JtlwClient:
                               verify=self._verify) as c:
                 resp = c.request(method, url, headers=self._headers(kw.pop("headers", None)), **kw)
         except httpx.TimeoutException as e:
-            raise JtlwUnavailable(f"連 jtlw 逾時（{self._base}）") from e
+            raise JtlwUnavailable(f"連 JTLW 逾時（{self._base}）") from e
         except httpx.HTTPError as e:
-            raise JtlwUnavailable("連不上 jtlw",
+            raise JtlwUnavailable("連不上 JTLW",
                                   details={"base": self._base}) from e
         _raise_for(resp)
         return resp
@@ -231,7 +231,7 @@ class JtlwClient:
             with httpx.Client(timeout=self._timeout, verify=self._verify) as c:
                 r = c.get(f"{self._base}/health")
         except httpx.HTTPError as e:
-            raise JtlwUnavailable("連不上 jtlw",
+            raise JtlwUnavailable("連不上 JTLW",
                                   details={"base": self._base}) from e
         _raise_for(r)
         return r.json()

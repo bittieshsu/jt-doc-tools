@@ -50,7 +50,7 @@ CATEGORIES: list[dict] = [
      "items": ["sso_settings.json"], "rekey": "sso",
      "desc": "OIDC / SAML 設定（含用戶端密鑰、SP 私鑰 — 敏感）",
      "default": True, "sensitive": True},
-    {"id": "jtlw", "label": "語音服務（jtlw）", "kind": "files",
+    {"id": "jtlw", "label": "語音服務（JTLW）", "kind": "files",
      "items": ["jtlw_settings.json"], "rekey": "jtlw",
      "desc": "會議錄音送去轉逐字稿的送件位址與 API 金鑰（含金鑰 — 敏感）",
      "default": True, "sensitive": True},

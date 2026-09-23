@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
 {% from "components/jtlw_name.html" import jtlw_name with context %}
-{% block title %}{{ tr('語音服務（jtlw）') }} · {{ app_name }}{% endblock %}
+{% block title %}{{ tr('語音服務（JTLW）') }} · {{ app_name }}{% endblock %}
 {% block content %}
-<h1>{{ icon('phone', size=22) }} {{ tr('語音服務（jtlw）') }}</h1>
+<h1>{{ icon('phone', size=22) }} {{ tr('語音服務（JTLW）') }}</h1>
 {# 全名與專案說明接在說明那一行後面（使用者 2026-09-21 要求寫出全名；
    2026-09-23 回報原本放在標題列右上角「根本很難看到」）。
    元件與工具頁共用 `components/jtlw_name.html`。 #}
-<p class="muted">{{ tr('把會議錄音送去 jtlw 轉成逐字稿（含發言者）。摘要、決議、待辦、心智圖與翻譯都留在本系統，不會送出去。') }} {{ jtlw_name() }}</p>
+<p class="muted">{{ tr('把會議錄音送去 JTLW 轉成逐字稿（含發言者）。摘要、決議、待辦、心智圖與翻譯都留在本系統，不會送出去。') }} {{ jtlw_name() }}</p>
 
 {# `data-s` 是 CSP 安全的行內樣式替身（generated-inline.css）——
    漏掉的話說明框沒有左側色條、清單也沒有縮排與行高，
@@ -17,7 +17,7 @@
   <b>{{ tr('說明：') }}</b>
   <ul data-s="saa3893fb">
     <li>{{ tr('沒有填好送件位址與金鑰之前，「會議錄音轉逐字稿」這支工具會反灰點不下去。') }}</li>
-    <li>{{ tr('「錄音檔對外位址」是 jtlw 回來拉錄音檔時看到的我們。這裡要填寫定的值，不會從瀏覽器的網址推算 —— 同一套服務可能有內網直連與反向代理兩種到達方式，推錯的話對方的來源白名單會擋掉。') }}</li>
+    <li>{{ tr('「錄音檔對外位址」是 JTLW 回來拉錄音檔時看到的我們。這裡要填寫定的值，不會從瀏覽器的網址推算 —— 同一套服務可能有內網直連與反向代理兩種到達方式，推錯的話對方的來源白名單會擋掉。') }}</li>
     <li>{{ tr('對方那側也有來源白名單，換過位址要請他們一起加。') }}</li>
     <li>{{ tr('金鑰加密存放。已經存過的金鑰不會顯示出來，留空不動它。') }}</li>
   </ul>

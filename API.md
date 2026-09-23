@@ -879,8 +879,8 @@ curl -X POST http://localhost:8765/tools/pdf-wordcount/api/pdf-wordcount \
 
 ### 會議錄音轉逐字稿
 
-把會議錄音或錄影轉成**帶時間與發言者**的逐字稿。辨識在外部語音服務（jtlw）
-那側跑 —— **要先在管理區「語音服務（jtlw）」設定好**，沒設定回 **503**。
+把會議錄音或錄影轉成**帶時間與發言者**的逐字稿。辨識在外部語音服務（JTLW）
+那側跑 —— **要先在管理區「語音服務（JTLW）」設定好**，沒設定回 **503**。
 
 ```text
 POST /tools/meeting-transcribe/api/meeting-transcribe
@@ -916,7 +916,7 @@ POST /tools/meeting-transcribe/api/meeting-transcribe
 |---|---|---|
 | **400** | 檔案格式不收、檔案是空的，或語音服務退回你帶的參數（`language` / `num_speakers`） | 改參數；語言不確定就用 `auto` |
 | **502** | 語音服務收下了但處理失敗（辨識失敗、結果是空的、它自己出錯） | 訊息裡有原因；一直發生請管理員查語音服務 |
-| **503** | 還沒設定語音服務，或連不上 | 請管理員檢查「語音服務（jtlw）」設定與連線 |
+| **503** | 還沒設定語音服務，或連不上 | 請管理員檢查「語音服務（JTLW）」設定與連線 |
 | **504** | 等太久還沒結果（排隊超過 4 小時，或辨識超過上限） | 已經請對方取消；稍後再送 |
 
 ```bash
@@ -2092,9 +2092,9 @@ GET /api/speech/audio/{file_id}?exp=<到期的 unix 秒數>&sig=<簽章>
 | `/admin/jobs/api/concurrency` | POST | 作業佇列 —— 最大同時作業數 |
 | `/admin/jobs/api/priority-users` | GET / POST | 作業佇列 —— 優先派送名單（**順序就是優先序**）|
 | `/admin/jobs/api/user-search` | GET | 作業佇列 —— 指定優先使用者時的搜尋框 |
-| `/admin/api/jtlw/settings` | POST | 語音服務（jtlw）—— 存送件位址與金鑰 |
-| `/admin/api/jtlw/test` | POST | 語音服務（jtlw）—— 測連線（`/health` ＋ `/capabilities` 兩段）|
-| `/admin/api/jtlw/profiles` | GET | 語音服務（jtlw）—— 取對方提供的處理設定清單（下拉用）|
+| `/admin/api/jtlw/settings` | POST | 語音服務（JTLW）—— 存送件位址與金鑰 |
+| `/admin/api/jtlw/test` | POST | 語音服務（JTLW）—— 測連線（`/health` ＋ `/capabilities` 兩段）|
+| `/admin/api/jtlw/profiles` | GET | 語音服務（JTLW）—— 取對方提供的處理設定清單（下拉用）|
 
 ---
 

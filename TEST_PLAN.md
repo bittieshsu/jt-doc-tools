@@ -543,7 +543,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **339 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **340 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -696,6 +696,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_json_error_handling.py` | 非 JSON / 壞掉的 request body 應回 400（而非 500） |
 | `test_jtdt_reform_reports_page_progress.py` | `jtdt-reform` 引擎要**逐頁**回報進度 |
 | `test_jtlw_error_texts.py` | 語音服務失敗時，畫面上那句話要**指向對的方向** |
+| `test_jtlw_name_is_uppercase.py` | jt-live-whisper 的縮寫在**使用者看得到的文字**裡一律寫 `JTLW`（使用者 2026-09-23 指示） |
 | `test_latin_ext_garbled_recovery.py` | 擷取結果被映到拉丁擴充區、而且每個 span 都很短 —— 舊的判準抓不到 |
 | `test_layout_measured_in_browser.py` | 版面在**真的瀏覽器**裡量：欄位寬度、字有沒有被拆成兩行、該看得到的看不看得到 |
 | `test_ldap_attribute_portability.py` | LDAP 查詢的屬性清單不可以夾帶 AD 專屬屬性 |
@@ -1038,7 +1039,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] CSV 匯出欄位齊全
 
 #### 會議錄音轉逐字稿 (meeting-transcribe) 🆕 v1.15.94
-- [ ] **沒在管理區設定好 jtlw 之前，這支在側欄與首頁都是反灰**，而且滑鼠移上去
+- [ ] **沒在管理區設定好 JTLW 之前，這支在側欄與首頁都是反灰**，而且滑鼠移上去
       說得出原因與該去哪裡設定。直接打網址進來時頁面要說同一句話，
       **不可以是一個看起來正常、按下去才失敗的上傳區**。
 - [ ] **錄音檔是對方來拉的**：送出去的 `source.url` 用的是設定裡**寫定**的對外位址，
@@ -1794,7 +1795,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `/admin/ocr-langs/install`
 - [ ] `/admin/ocr-langs/uninstall`
 
-#### 語音服務 jtlw（`/admin/api/jtlw/*`）🆕 v1.15.94
+#### 語音服務 JTLW（`/admin/api/jtlw/*`）🆕 v1.15.94
 
 設定頁本身是 `/admin/jtlw`：
 
@@ -2195,7 +2196,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 **meeting-transcribe（會議錄音轉逐字稿）** 🆕 v1.15.94
 
 - [ ] `POST /tools/meeting-transcribe/upload` —— 收錄音檔、算 sha256 與大小。
-      驗：①沒設定 jtlw 時回 **503**（部署問題不是使用者送錯東西）
+      驗：①沒設定 JTLW 時回 **503**（部署問題不是使用者送錯東西）
       ②不支援的副檔名回 **400**，訊息列得出支援哪些
       ③空檔案回 400 而且**不留下半個檔案**
       ④三小時的錄音不可以整個讀進記憶體（串流寫入）
@@ -2212,7 +2213,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       「檔案還在嗎」的探測都會失敗，而失敗在畫面上跟「沒有錄音檔」長得一模一樣
       ④錄音被清掉時回 410 / 404，畫面收起播放器並講得出原因
 - [ ] `POST /tools/meeting-transcribe/api/meeting-transcribe` —— 對外 API（同步）。
-      驗：①沒設定 jtlw 回 **503**②不支援的副檔名回 **400**③空檔案回 400
+      驗：①沒設定 JTLW 回 **503**②不支援的副檔名回 **400**③空檔案回 400
       ④**走的是跟網頁同一條 `_run_job`**（不可以為了 API 另抄一份處理邏輯）
       ⑤回傳的 `segments` 是三層併起來的（文字校正後、時間來自 raw、發言者來自 speakers）
 - [ ] `POST /tools/meeting-transcribe/speakers/{upload_id}` —— 把發言者代號改成人名。

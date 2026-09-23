@@ -251,7 +251,7 @@ def base_url() -> str:
     from app.core.url_safety import safe_remote_base_url
     raw = (_load().get("base_url") or "").strip()
     if not raw:
-        raise ValueError("還沒設定 jtlw 的送件位址")
+        raise ValueError("還沒設定 JTLW 的送件位址")
     return safe_remote_base_url(raw).rstrip("/") + API_PREFIX
 
 
@@ -274,7 +274,7 @@ def ca_cert_path() -> Path | None:
         if not p.is_file() or p.read_text(encoding="utf-8") != body:
             atomic_json.write_text(p, body) if hasattr(atomic_json, "write_text") else p.write_text(body, encoding="utf-8")
     except OSError:
-        logger.warning("jtlw: 憑證寫不出去，這次改用系統信任庫", exc_info=True)
+        logger.warning("JTLW: 憑證寫不出去，這次改用系統信任庫", exc_info=True)
         return None
     return p
 
@@ -324,5 +324,5 @@ def audio_base_url() -> str:
     try:
         return safe_remote_base_url(raw).rstrip("/")
     except ValueError:
-        logger.warning("jtlw 的錄音檔對外位址不合法，當成沒設定")
+        logger.warning("JTLW 的錄音檔對外位址不合法，當成沒設定")
         return ""

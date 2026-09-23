@@ -22,7 +22,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.12"
+VERSION = "1.16.13"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -378,7 +378,7 @@ _TOOL_ALIASES = {
     "pdf-metadata":       "metadata xmp author title strip clean remove producer creator 中繼資料 中繼 修訂歷史 去識別 metadata 清除 作者 標題 標籤 XMP",
     "pdf-hidden-scan":    "hidden content javascript js embedded launch uri whitetext offpage scan remove 隱藏 掃描 JavaScript 嵌入檔 白字 頁面外 外部連結 啟動 風險 資安",
     "pdf-attachments":    "attachment attachments embedded file extract pdf paperclip 附件 嵌入檔 萃取 取出 EmbeddedFiles",
-    "meeting-transcribe": "speech to text transcribe transcript asr audio video recording diarization speaker whisper jtlw voice meeting minutes subtitle 錄音 錄影 錄音檔 影片 語音 轉文字 轉逐字稿 逐字稿 聽打 辨識 發言者 語者 講者 會議 開會 字幕",
+    "meeting-transcribe": "speech to text transcribe transcript asr audio video recording diarization speaker whisper JTLW voice meeting minutes subtitle 錄音 錄影 錄音檔 影片 語音 轉文字 轉逐字稿 逐字稿 聽打 辨識 發言者 語者 講者 會議 開會 字幕",
     "meeting-summary":    "meeting summary minutes transcript vtt srt subtitle speaker diarization decision action item risk chapter timeline 會議 摘要 會議記錄 會議紀錄 逐字稿 字幕 講者 決議 待辦 行動項 風險 章節 時間軸 發言者 語者 開會 紀要 重點 整理",
     "pdf-wordcount":      "wordcount word count words chars characters letter 字數 統計 字元 字數統計 統計圖表 chart histogram frequency 高頻詞 頻率 段落 句子 paragraph sentence 閱讀時間 reading time stats statistics analytics",
     "pdf-annotations":    "annotations annotation comments comment markup highlight underline strikeout sticky-note review todo extract export 註解 批註 標註 螢光筆 底線 刪除線 文字註解 圖章 自由文字 手繪 審閱 待辦 校稿 合約 修訂",
@@ -496,9 +496,9 @@ templates.env.globals["nav_settings"] = [
     {"icon": "building", "name": "公司資料", "description": "管理多公司基本資料",
      "url": "/admin/profile",
      "keywords": "company profile vendor info 廠商 公司"},
-    {"icon": "phone", "name": "語音服務（jtlw）", "description": "會議錄音送去轉逐字稿的送件位址與金鑰",
+    {"icon": "phone", "name": "語音服務（JTLW）", "description": "會議錄音送去轉逐字稿的送件位址與金鑰",
      "url": "/admin/jtlw",
-     "keywords": "jtlw speech voice audio asr transcribe transcript diarize whisper meeting recording "
+     "keywords": "JTLW speech voice audio asr transcribe transcript diarize whisper meeting recording "
                  "語音 聲音 錄音 錄音檔 逐字稿 轉錄 辨識 發言者 語者 會議"},
     {"icon": "book", "name": "翻譯對照字典", "description": "單位內部專有名詞怎麼翻（逐句翻譯 / 文件翻譯共用）",
      "url": "/admin/translation-glossary",
@@ -639,7 +639,7 @@ def _nav_settings_visible(request=None):
 _SETUP_CHECKS: dict[str, tuple] = {
     "jtlw": (
         lambda: not _jtlw_ready(),
-        "還沒設定語音服務（jtlw）。請管理員到「設定 → 語音服務」填好送件位址與金鑰。",
+        "還沒設定語音服務（JTLW）。請管理員到「設定 → 語音服務」填好送件位址與金鑰。",
         "/admin/jtlw",
     ),
     # 只靠 LLM 的工具（逐句翻譯 / 文件翻譯 / 會議摘要）。LLM 停用時**預設反灰**，
@@ -682,7 +682,7 @@ def _jtlw_ready() -> bool:
     try:
         return _j.is_configured()
     except Exception:          # 設定檔壞掉時當成沒設定，不要讓側欄整個掛掉
-        logger.warning("jtlw 設定讀不回來，工具先反灰", exc_info=True)
+        logger.warning("JTLW 設定讀不回來，工具先反灰", exc_info=True)
         return False
 
 

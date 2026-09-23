@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.16.12
+# Jason Tools Document Toolbox v1.16.13
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -117,7 +117,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 - **Extract text / images / attachments**; with optional LLM paragraph re-flow
 - **Word count** [needs OxOffice/LibreOffice]: tables, charts and an LLM summary; accepts PDF, office and plain-text files
 - **Meeting summary** [needs OxOffice/LibreOffice] — turns a transcript (.vtt / .srt / .json / .txt / .docx / .odt) into a summary, decisions, action items, risks and chapters; **every entry points back to the segment it came from and who said it**, and clicking it jumps there. When timestamps are present it also works out the speaking share. Export to PDF / Word / ODF / Markdown / chart PNG / JSON
-- **Meeting recording to transcript** — turns a recording or video into a transcript **with timings and speakers**, ready to hand to Meeting summary in one click; recognition runs on the speech service (jtlw), so **it only appears once an administrator has set it up**
+- **Meeting recording to transcript** — turns a recording or video into a transcript **with timings and speakers**, ready to hand to Meeting summary in one click; recognition runs on the speech service (JTLW), so **it only appears once an administrator has set it up**
 - **Annotation report / removal / flattening**
 - **OCR**: run OCR on scanned PDFs and images so the text becomes searchable and selectable (the same idea as Live Text in macOS Preview); two engines (**EasyOCR** by default, strong on Chinese, Japanese and Korean; **Tesseract** as a fallback), with optional LLM typo correction. **An external GPU recognition server is supported** (DGX Spark / H100 / 4090 …): download `install.sh` from the admin interface to deploy it, taking a page from 8; 15 seconds on CPU down to 0.3; 0.8 seconds on GPU (**more than 10× faster**).
 - **Pre-submission check**: batch verification: page size, embedded fonts, complete fields, leftover personal data, hidden content
@@ -241,12 +241,12 @@ Point it at an OpenAI-compatible backend (local Ollama / vLLM / LM Studio / DGX 
 
 Turn a **meeting recording** into minutes you can actually use, and **your important recordings never leave your network**.
 
-The recording goes to **[jtlw](https://jasoncheng7115.github.io/jt-live-whisper/)** (jt-live-whisper,
+The recording goes to **[JTLW](https://jasoncheng7115.github.io/jt-live-whisper/)** (jt-live-whisper,
 which you can host on your own network) for recognition and speaker separation; **the summary, decisions, action items, mind map and translation all stay in this system**.
 
 ### How to use it
 
-1. Admin area → Speech service (jtlw): fill in the endpoint and API key (for a self-signed certificate, just paste the certificate in;
+1. Admin area → Speech service (JTLW): fill in the endpoint and API key (for a self-signed certificate, just paste the certificate in;
    **do not turn verification off**). Until it is set up, Meeting recording to transcript stays greyed out.
 2. Upload the recording or video, then **hand it to Meeting summary in one click**.
 3. Or go through the API: `POST /tools/meeting-transcribe/api/meeting-transcribe`.
@@ -262,7 +262,7 @@ which you can host on your own network) for recognition and speaker separation; 
 
 ### Why the work is split this way
 
-- **The audio stays on your network.** jtlw is self-hosted, so recordings never have to go to any cloud service.
+- **The audio stays on your network.** JTLW is self-hosted, so recordings never have to go to any cloud service.
 - **Recordings are handed over through short-lived signed URLs**: no account or credential is given to the other side, and the link expires by itself.
 - **The summary and decisions stay in this system**, using the same settings and audit trail as the other 13 LLM-assisted tools.
 - **Citations are bound to segment numbers, not to text**: after a re-run of the correction step or a glossary update, decisions and action items that were already

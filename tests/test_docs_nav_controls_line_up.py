@@ -47,10 +47,15 @@ MEASURE = """(() => {
   const s = document.querySelector('.nav-lang');
   const b = document.querySelector('.nav-github');
   if (!s || !b) return JSON.stringify({missing: true});
-  const r = (e) => { const x = e.getBoundingClientRect();
-    return {h: x.height, top: x.top, bottom: x.bottom}; };
+  const r = (e) => { const x = e.getBoundingClientRect(); const c = getComputedStyle(e);
+    return {h: x.height, top: x.top, bottom: x.bottom, w: x.width,
+            radius: c.borderTopLeftRadius, bt: c.borderTopWidth,
+            bb: c.borderBottomWidth, btc: c.borderTopColor, bbc: c.borderBottomColor}; };
   return JSON.stringify({lang: r(s), gh: r(b)});
 })()"""
+
+#: 手機寬度（漢堡選單）。選單要先打開，量到的才是使用者看到的那一格。
+PHONE_W = 390
 
 
 def _free_port() -> int:
@@ -109,9 +114,19 @@ def measure():
 
         send("Page.enable")
 
-        def one(page: str) -> dict:
+        def one(page: str, phone: bool = False) -> dict:
+            if phone:
+                send("Emulation.setDeviceMetricsOverride",
+                     {"width": PHONE_W, "height": 844, "deviceScaleFactor": 2,
+                      "mobile": True})
+            else:
+                send("Emulation.clearDeviceMetricsOverride")
             send("Page.navigate", {"url": f"http://127.0.0.1:{port}/{page}"})
             time.sleep(2.0)
+            if phone:
+                send("Runtime.evaluate", {"expression":
+                     "document.getElementById('navToggle').click()"})
+                time.sleep(0.5)
             r = send("Runtime.evaluate",
                      {"expression": MEASURE, "returnByValue": True})
             return json.loads(r["result"]["result"]["value"])
@@ -154,3 +169,28 @@ def test_the_measurement_really_reaches_all_three_pages(measure):
     """
     got = [p for p in PAGES if not measure(p).get("missing")]
     assert got == list(PAGES), f"只量到 {got}"
+
+
+# ---------------------------------------------------------------- 手機的漢堡選單
+
+@pytest.mark.parametrize("page", PAGES)
+def test_in_the_phone_menu_github_looks_like_the_language_picker(measure, page):
+    """手機選單裡 GitHub 那一格的上緣看起來像被切掉一截（2026-09-23 使用者
+    手機截圖回報）。原本的 CSS 想做「上面一條分隔線 ＋ 方角」，但按鈕本身帶著
+    四邊的框 —— 兩件事疊在一起就是上緣方角、上框線跟其他三邊不一樣。
+
+    判準落在畫面上：跟上面的語言下拉**同寬、同高、同一種圓角**，而且
+    **上下框線一樣**（被切掉的樣子就是上下不一樣）。"""
+    box = measure(page, phone=True)
+    assert not box.get("missing"), f"{page}：選單裡少了語言下拉或 GitHub 按鈕"
+    lang, gh = box["lang"], box["gh"]
+    assert gh["h"] > 20, f"{page}：GitHub 按鈕高 {gh['h']}px —— 選單大概沒打開"
+    assert abs(lang["h"] - gh["h"]) <= TOL, (
+        f"{page}：選單裡語言下拉 {lang['h']:.1f}px、GitHub {gh['h']:.1f}px")
+    assert abs(lang["w"] - gh["w"]) <= TOL, f"{page}：兩格不一樣寬"
+    assert gh["radius"] == lang["radius"], (
+        f"{page}：GitHub 圓角 {gh['radius']}、語言下拉 {lang['radius']}")
+    assert (gh["bt"], gh["btc"]) == (gh["bb"], gh["bbc"]), (
+        f"{page}：GitHub 上框線 {gh['bt']} {gh['btc']}、下框線 {gh['bb']} {gh['bbc']}"
+        " —— 上下不一樣就是那個「被切掉一截」的樣子")
+    assert gh["top"] >= lang["bottom"], f"{page}：GitHub 疊到語言下拉上面了"

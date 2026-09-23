@@ -55,13 +55,22 @@ def _counterparty_tokens() -> list[str]:
     return sorted(set(out))
 
 
+#: **判準要到「標題的分隔」為止，不可以只看兩個名字夾一個箭頭。**
+#: 整合出貨之後，產品文件本來就會畫方向 —— 介紹站的流程圖有
+#: `JTDT → JTLW` 這種方向標籤（v1.16.12 加的），只看箭頭的話那八格全被判成書信。
+#: 往來書信的標題一律是「兩個名字 ＋ 標題分隔（`：` `｜` `:` `|`）或『介面』」：
+#: `JTDT → <對象>｜2026-09-23（v2.5）`、`JTDT ↔ <對象> 介面：…`、`〈<對象> ↔ JTDT 介面回覆〉`。
+#: 中間容許粗體記號與空白（`**JTDT → <對象>**：`）。
+_TITLE_TAIL = r"(?:\*\*)?\s*(?:[：:｜|]|介面)"
+
+
 def _letter_title_re(tokens: list[str]) -> "re.Pattern[str] | None":
     if not tokens:
         return None
     alt = "|".join(re.escape(x) for x in tokens)
     return re.compile(
-        rf"(?i)(?:\bJTDT\b\s*(?:→|->|↔)\s*(?:{alt})\b"
-        rf"|\b(?:{alt})\b\s*(?:→|->|↔)\s*\bJTDT\b)")
+        rf"(?i)(?:\bJTDT\b\s*(?:→|->|↔)\s*(?:{alt})\b{_TITLE_TAIL}"
+        rf"|\b(?:{alt})\b\s*(?:→|->|↔)\s*\bJTDT\b{_TITLE_TAIL})")
 
 
 _SKIP_DIRS = {".git", "node_modules", "__pycache__", "vendor", ".venv"}
@@ -156,6 +165,49 @@ def test_no_public_file_carries_a_letter_heading():
             if pattern.search(line):
                 bad.append(f"{p.relative_to(PUB).as_posix()}:{i}")
     assert not bad, f"公開樹裡有往來書信的標題：{bad}"
+
+
+@pytest.mark.parametrize("line", [
+    "# JTDT → acme：第二輪（回覆確認）",
+    "# JTDT → ACME｜2026-09-23（v2.5）",
+    "# JTDT ↔ acme 介面：要一起談定的事",
+    "來源：對方交來的〈ACME ↔ JTDT 介面回覆〉v0.5",
+    "**JTDT → acme**：用什麼身分？",
+    "acme -> JTDT | v1.2",
+])
+def test_letter_headings_are_caught(line):
+    """收窄之後，書信標題的每一種寫法仍然要抓得到（對象名用虛構的 `acme`）。"""
+    assert _letter_title_re(["acme"]).search(line), line
+
+
+@pytest.mark.parametrize("line", [
+    '<span class="spf-dir">JTDT → ACME</span><div class="spf-line"></div>',
+    '<span class="spf-dir">ACME → JTDT</span>',
+    "箭頭是資料的流向：JTDT → ACME 送件，ACME → JTDT 回傳逐字稿",
+])
+def test_direction_labels_in_product_docs_are_not_letters(line):
+    """反向對照：產品文件本來就會畫方向（介紹站的流程圖）。
+    只看「兩個名字夾一個箭頭」的話，這些全部會被判成書信 —— 誤報一多這份檢查就會被停掉。"""
+    assert not _letter_title_re(["acme"]).search(line), line
+
+
+def test_every_real_letter_heading_still_matches():
+    """**判準收窄之後，拿真的往來文件驗一次**：`docs-share/` 裡每一個含兩個名字與箭頭的
+    Markdown 標題都要被抓到。不然收窄可能剛好漏掉某一種真實的寫法，而這裡永遠綠。"""
+    tokens = _counterparty_tokens()
+    pattern = _letter_title_re(tokens)
+    if pattern is None:
+        pytest.skip("沒有 docs-share/（公開 clone）")
+    alt = "|".join(re.escape(x) for x in tokens)
+    pair = re.compile(rf"(?i)\b(?:JTDT|{alt})\b\s*(?:→|->|↔)\s*\b(?:JTDT|{alt})\b")
+    headings = []
+    for p in PRIVATE_DIR.rglob("*.md"):
+        for line in _text(p).splitlines():
+            if line.startswith("#") and pair.search(line):
+                headings.append(line)
+    assert len(headings) >= 3, f"只找到 {len(headings)} 個書信標題 —— 素材的範圍大概錯了"
+    missed = [h for h in headings if not pattern.search(h)]
+    assert not missed, f"這些真的書信標題抓不到：{missed[:5]}"
 
 
 def test_the_letter_heading_check_knows_who_the_counterparty_is():

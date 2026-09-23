@@ -70,8 +70,8 @@
     <a href="#csrf">Remote users fail CSRF on upload</a>
   </div>
   <div class="ts-toc">
-    <span class="ts-toc-label">Speech service (jtlw)</span>
-    <a href="#jtlw-connect">Cannot reach jtlw / timed out</a>
+    <span class="ts-toc-label">Speech service (JTLW)</span>
+    <a href="#jtlw-connect">Cannot reach JTLW / timed out</a>
     <a href="#jtlw-key">API key rejected (401) / no permission (403)</a>
     <a href="#jtlw-allow">Our address is not on their allow list</a>
     <a href="#jtlw-fetch">They cannot fetch the recording / link expired</a>
@@ -209,7 +209,7 @@
     <h2>“The speech service does not accept this language setting”</h2>
     <p class="ts-sym"><b>Symptom</b>　After choosing a language, the job fails as soon as it is submitted.</p>
     <p><b>Cause</b>　The speech service only accepts the languages its current recognition mode supports. Before v1.16.8 the page sent Chinese as <code>zh</code>, while the service expects <code>zh-Hant</code>, so every job with Chinese selected was rejected (fixed in v1.16.9). If it still happens, the recognition mode chosen by the administrator most likely does not support that language (for example, the Taiwanese mode only accepts Taiwanese and Chinese).</p>
-    <p><b>What to do</b>　Choose Detect automatically and submit again. If it keeps happening, ask your administrator to check which languages the current recognition mode supports under Speech service (jtlw) (they are listed once a recognition mode is selected).</p>
+    <p><b>What to do</b>　Choose Detect automatically and submit again. If it keeps happening, ask your administrator to check which languages the current recognition mode supports under Speech service (JTLW) (they are listed once a recognition mode is selected).</p>
   </section>
 
   <section class="ts-item" id="jtlw-autolang">
@@ -223,7 +223,7 @@
     <h2>Meeting recording to transcript is greyed out, or says “The speech service is not set up yet”</h2>
     <p class="ts-sym"><b>Symptom</b>　The tool cannot be opened from the sidebar or the home page; opening its page only shows a setup notice.</p>
     <p><b>Cause</b>　The tool depends on an external speech service. While it is not enabled in the admin area, or the endpoint and API key are incomplete, it stays greyed out on purpose, so there is never an upload box that looks normal and only fails after you press it.</p>
-    <p><b>What to do</b>　In the admin area, open Speech service (jtlw), tick enable, fill in the endpoint, API key and audio base address, press “Test the connection”, then save. The other 49 tools are not affected.</p>
+    <p><b>What to do</b>　In the admin area, open Speech service (JTLW), tick enable, fill in the endpoint, API key and audio base address, press “Test the connection”, then save. The other 49 tools are not affected.</p>
   </section>
 
   <section class="ts-item" id="more">

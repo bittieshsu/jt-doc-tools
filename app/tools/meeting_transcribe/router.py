@@ -76,7 +76,7 @@ _MSG_QUEUED_AHEAD = "排隊中（前面還有 {0} 件）"
 _MSG_CORRECTING_ITEMS = "校正中（已完成 {0} / {1} 批）"
 _MSG_QUEUE_FULL = "對方佇列滿了，{0} 秒後再試"
 _MSG_TIMEOUT = ("等了 {0} 分鐘，對方還沒有回報結果 —— 已經請對方取消。"
-                "請確認 jtlw 那側的佇列與工作機狀態。")
+                "請確認 JTLW 那側的佇列與工作機狀態。")
 _MSG_QUEUE_CAP = ("排隊超過 {0} 小時還沒輪到 —— 已經請對方取消。"
                   "請稍後再送一次，或請語音服務那側確認佇列狀態。")
 PROGRESS_TEMPLATES = (_MSG_QUEUED_AHEAD, _MSG_CORRECTING_ITEMS, _MSG_QUEUE_FULL,
@@ -142,7 +142,7 @@ async def upload(request: Request, file: UploadFile = File(...)):
     """收錄音檔。**還不送件** —— 送件要先算雜湊、組簽章網址，那是下一步。"""
     if not jtlw_settings.is_configured():
         # 部署問題不是使用者送錯東西 → 503（同「缺相依回 503」那條）
-        raise HTTPException(503, "還沒設定語音服務（jtlw）—— 請管理員先到設定頁填好")
+        raise HTTPException(503, "還沒設定語音服務（JTLW）—— 請管理員先到設定頁填好")
     name = file.filename or "recording"
     ext = Path(name).suffix.lower()
     if ext not in ACCEPT_EXTS:
@@ -339,11 +339,11 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
                 wait_ms = 0
             delay = min(60.0, max(5.0, wait_ms / 1000.0))
             job.message = _MSG_QUEUE_FULL.format(int(delay))
-            logger.info("jtlw queue_full，%.0f 秒後重送（第 %d 次）", delay, attempt + 1)
+            logger.info("JTLW queue_full，%.0f 秒後重送（第 %d 次）", delay, attempt + 1)
             time.sleep(delay)
     remote_id = str(created.get("job_id") or "")
     if not remote_id:
-        raise RuntimeError("jtlw 沒有回作業編號")
+        raise RuntimeError("JTLW 沒有回作業編號")
     job.meta["remote_job_id"] = remote_id
 
     wait = _POLL_FIRST
@@ -381,7 +381,7 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
             try:
                 client.cancel(remote_id)
             except jtlw_client.JtlwError:
-                logger.warning("逾時後取消 jtlw 作業 %s 失敗", remote_id, exc_info=True)
+                logger.warning("逾時後取消 JTLW 作業 %s 失敗", remote_id, exc_info=True)
             if over_cap:
                 raise TranscribeTimeout(_MSG_QUEUE_CAP.format(int(_QUEUE_CAP_S / 3600)))
             raise TranscribeTimeout(_MSG_TIMEOUT.format(int((now - started) / 60)))
@@ -391,7 +391,7 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
             try:
                 client.cancel(remote_id)
             except jtlw_client.JtlwError:
-                logger.warning("取消 jtlw 作業 %s 失敗（已忽略）", remote_id, exc_info=True)
+                logger.warning("取消 JTLW 作業 %s 失敗（已忽略）", remote_id, exc_info=True)
             raise RuntimeError("已取消")
         time.sleep(wait)
         wait = min(_POLL_MAX, wait * 1.5)
@@ -427,7 +427,7 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
     try:
         summary = client.result(remote_id) or {}
     except jtlw_client.JtlwError:
-        logger.warning("取 jtlw 作業 %s 的摘要失敗（逐字稿已取回）", remote_id, exc_info=True)
+        logger.warning("取 JTLW 作業 %s 的摘要失敗（逐字稿已取回）", remote_id, exc_info=True)
         summary = {}
 
     # **校正失敗時要講出「你看到的是原始辨識結果」**（對方清單第 6 節）。
@@ -437,7 +437,7 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
 
     tail_gap = _tail_gap_ms(summary, segments)
     if tail_gap is not None:
-        logger.info("jtlw 作業 %s：錄音 %.1f 秒，最後一段之後 %.1f 秒沒有文字",
+        logger.info("JTLW 作業 %s：錄音 %.1f 秒，最後一段之後 %.1f 秒沒有文字",
                     remote_id, summary["duration_ms"] / 1000, tail_gap / 1000)
 
     out = {
@@ -462,7 +462,7 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
         client.ack(remote_id)
         out_acked = True
     except jtlw_client.JtlwError:
-        logger.warning("ACK jtlw 作業 %s 失敗 —— 逐字稿已經存好了，"
+        logger.warning("ACK JTLW 作業 %s 失敗 —— 逐字稿已經存好了，"
                        "對方會在 72 小時後自己清掉", remote_id, exc_info=True)
         out_acked = False
     job.meta["acked"] = out_acked
@@ -559,13 +559,13 @@ def _failure_text(info: dict) -> str:
         retryable=bool(err.get("retryable")),
         http_status=str(details.get("http_status") or ""),
         host=str(details.get("host") or ""))
-    return msg or "jtlw 回報失敗，但沒有說原因"
+    return msg or "JTLW 回報失敗，但沒有說原因"
 
 
 @router.post("/start")
 async def start(request: Request):
     if not jtlw_settings.is_configured():
-        raise HTTPException(503, "還沒設定語音服務（jtlw）")
+        raise HTTPException(503, "還沒設定語音服務（JTLW）")
     body = await request.json()
     upload_id = str(body.get("upload_id") or "").strip()
     _sp.require_uuid_hex(upload_id, "upload_id")
@@ -604,7 +604,7 @@ async def api_meeting_transcribe(request: Request,
     本身就不是最佳解 —— 理由在樣板那段註解裡。
     """
     if not jtlw_settings.is_configured():
-        raise HTTPException(503, "還沒設定語音服務（jtlw）—— 請管理員先到設定頁填好")
+        raise HTTPException(503, "還沒設定語音服務（JTLW）—— 請管理員先到設定頁填好")
     name = file.filename or "recording"
     ext = Path(name).suffix.lower()
     if ext not in ACCEPT_EXTS:

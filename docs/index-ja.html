@@ -281,7 +281,7 @@
             <div class="fl-text"><span class="fn">文字数の集計<span class="ofc-mark" title="OxOffice / LibreOffice が必要"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">総文字数 / 文字 / 段落 / 文 + 4 種類のインタラクティブなグラフ + CSV/JSON/Markdown のエクスポート。PDF / オフィス文書 / プレーンテキストを受け付けます（オフィス文書は先に PDF に変換してから集計します）</span></div>
           </li>
           <li><span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 6H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-2"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg></span><div class="fl-text"><span class="fn">会議の要約<span class="ofc-mark" title="OxOffice / LibreOffice が必要"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span></span><span class="fd">文字起こし（.vtt / .srt / .json / .txt / .docx / .odt）を要約・決定事項・タスク・リスク・章立てに整理します。各項目は元の発言箇所と話し手まで遡れ、クリックするとその箇所へ移動します（PDF / Word / ODF 書き出しにはエンジンが必要）</span></div></li>
-          <li><span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4l13 8-13 8V4z"/></svg></span><div class="fl-text"><span class="fn">会議録音の文字起こし</span><span class="fd">録音・録画をタイムスタンプと発言者付きの文字起こしに変換し、「会議要約」へそのまま渡せます。認識は音声サービス（jtlw）側で実行するため、管理画面での設定が先に必要です</span></div></li>
+          <li><span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4l13 8-13 8V4z"/></svg></span><div class="fl-text"><span class="fn">会議録音の文字起こし</span><span class="fd">録音・録画をタイムスタンプと発言者付きの文字起こしに変換し、「会議要約」へそのまま渡せます。認識は音声サービス（JTLW）側で実行するため、管理画面での設定が先に必要です</span></div></li>
           <li>
             <span class="fl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2h-3.5"/><path d="M15 3v6h6"/><path d="M9 12h4M9 16h2"/></svg></span>
             <div class="fl-text"><span class="fn">注釈の整理</span><span class="fd">PDF の注釈を抽出し、完全な一覧 / レビューレポート / やることリストとして出力します（CSV / JSON / Markdown）。種類 / 作成者で絞り込めます</span></div>
@@ -1005,7 +1005,7 @@
     <div class="section-eyebrow">音声サービス連携 / 任意（v1.15.94）</div>
     <h2 class="section-title">会議の録音を、そのまま使える議事録に</h2>
     <p class="section-lead">
-      録音は <a href="https://jasoncheng7115.github.io/jt-live-whisper/" target="_blank" rel="noopener">jtlw</a>
+      録音は <a href="https://jasoncheng7115.github.io/jt-live-whisper/" target="_blank" rel="noopener">JTLW</a>
       （jt-live-whisper、<b>社内ネットワークに自前で立てられます</b>）へ渡して認識と発言者分離を行います。
       <b>要約・決定事項・タスク・マインドマップ・翻訳はすべて本システムに残ります</b>。
       <b>重要な録音がネットワークの外へ出ることはありません。</b>
@@ -1032,24 +1032,24 @@
 
     <div class="spf">
       <h3 class="spf-title">2 つのシステムのつながり</h3>
-      <p class="spf-sub">JTDT はアカウント、権限、ファイル、結果画面を担当し、jtlw は音声を文字にすることだけを担当します。録音は有効期限の短い URL で渡し、文字起こしを本システムに保存したら、jtlw 側のコピーは削除できます。</p>
+      <p class="spf-sub">JTDT はアカウント、権限、ファイル、結果画面を担当し、JTLW は音声を文字にすることだけを担当します。録音は有効期限の短い URL で渡し、文字起こしを本システムに保存したら、JTLW 側のコピーは削除できます。</p>
       <div class="spf-net">
         <span class="spf-net-tag">社内ネットワーク（どちらもセルフホスト可能）</span>
         <div class="spf-lanes">
           <div class="spf-lane"><span class="spf-name">JTDT</span><span class="spf-role">本システム：アカウント、権限、ファイル、結果画面</span></div>
-          <div class="spf-lane"><span class="spf-name">jtlw</span><span class="spf-role">音声サービス：認識、話者分離、校正（GPU）</span></div>
+          <div class="spf-lane"><span class="spf-name">JTLW</span><span class="spf-role">音声サービス：認識、話者分離、校正（GPU）</span></div>
         </div>
         <ol class="spf-rows">
           <li class="spf-row spf-act spf-at-a"><span class="spf-dir">JTDT</span><div class="spf-card"><span class="spf-n">1</span><div><b>録音をアップロード</b><span class="spf-d">音声や動画を本システムに保存し、アップロードした人を記録</span></div></div></li>
-          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">2</span><div><b>送信</b><span class="spf-d">言語や話者数などのオプションと録音のダウンロード URL（API キーで認証）</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
-          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">3</span><div><b>jtlw が録音を取りに来る</b><span class="spf-d">有効期限の短い署名付き URL でダウンロード：アカウント不要、2 時間で失効</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
-          <li class="spf-row spf-act spf-at-b"><span class="spf-dir">jtlw</span><div class="spf-card"><span class="spf-n">4</span><div><b>認識</b><span class="spf-d">まず順番待ち（GPU は一度に 1 件）</span><span class="spf-d">続いて認識、話者分離、校正</span></div></div></li>
-          <li class="spf-row spf-msg spf-both"><div class="spf-label"><span class="spf-n">5</span><div><b>進捗の確認</b><span class="spf-d">3～15 秒ごとに問い合わせ、画面には「順番待ち（前に N 件）」または認識の進捗を表示</span></div></div><span class="spf-dir">JTDT ⇄ jtlw</span><div class="spf-line"></div></li>
-          <li class="spf-row spf-msg spf-to-a"><div class="spf-label"><span class="spf-n">6</span><div><b>文字起こしの取得</b><span class="spf-d">テキスト、時刻、話者をセグメント番号で揃える</span></div></div><span class="spf-dir">jtlw → JTDT</span><div class="spf-line"></div></li>
-          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">7</span><div><b>受領の通知</b><span class="spf-d">保存を確定してから送信。jtlw は自分のコピーを削除できる（未着なら 72 時間後に自動削除）</span></div></div><span class="spf-dir">JTDT → jtlw</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">2</span><div><b>送信</b><span class="spf-d">言語や話者数などのオプションと録音のダウンロード URL（API キーで認証）</span></div></div><span class="spf-dir">JTDT → JTLW</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">3</span><div><b>JTLW が録音を取りに来る</b><span class="spf-d">有効期限の短い署名付き URL でダウンロード：アカウント不要、2 時間で失効</span></div></div><span class="spf-dir">JTDT → JTLW</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-act spf-at-b"><span class="spf-dir">JTLW</span><div class="spf-card"><span class="spf-n">4</span><div><b>認識</b><span class="spf-d">まず順番待ち（GPU は一度に 1 件）</span><span class="spf-d">続いて認識、話者分離、校正</span></div></div></li>
+          <li class="spf-row spf-msg spf-both"><div class="spf-label"><span class="spf-n">5</span><div><b>進捗の確認</b><span class="spf-d">3～15 秒ごとに問い合わせ、画面には「順番待ち（前に N 件）」または認識の進捗を表示</span></div></div><span class="spf-dir">JTDT ⇄ JTLW</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-a"><div class="spf-label"><span class="spf-n">6</span><div><b>文字起こしの取得</b><span class="spf-d">テキスト、時刻、話者をセグメント番号で揃える</span></div></div><span class="spf-dir">JTLW → JTDT</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">7</span><div><b>受領の通知</b><span class="spf-d">保存を確定してから送信。JTLW は自分のコピーを削除できる（未着なら 72 時間後に自動削除）</span></div></div><span class="spf-dir">JTDT → JTLW</span><div class="spf-line"></div></li>
           <li class="spf-row spf-act spf-at-a"><span class="spf-dir">JTDT</span><div class="spf-card"><span class="spf-n">8</span><div><b>聞きながら読み、「会議の要約」に渡す</b><span class="spf-d">話者名を変更</span><span class="spf-d">要約、決定事項、ToDo、マインドマップはすべて本システムで作成</span></div></div></li>
         </ol>
-        <p class="spf-note">矢印はデータの流れる方向です。接続はすべて JTDT から開始し、手順 3 だけは jtlw が録音をダウンロードするために接続してきます。</p>
+        <p class="spf-note">矢印はデータの流れる方向です。接続はすべて JTDT から開始し、手順 3 だけは JTLW が録音をダウンロードするために接続してきます。</p>
       </div>
     </div>
 

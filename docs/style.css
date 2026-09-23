@@ -1149,6 +1149,8 @@ code {
    加語言或改導覽項目時要重量一次（原本寫 980px 是照中文長度定的，
    加了英文 / 日文之後整條導覽會折行、標題斷在詞中間）。 */
 @media (max-width: 1080px) {
+  /* 漢堡選單裡語言下拉與 GitHub 按鈕共用的高度 —— 只有一份，兩個跟著同一個數字走 */
+  :root { --menu-ctl-h: 42px; }
   .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
   .topnav {
     position: absolute; top: 100%; right: 16px;
@@ -1184,15 +1186,26 @@ code {
     align-self: auto;
     display: block; width: 100%;
     margin: 4px 0;
-    padding-top: 9px; padding-bottom: 9px;
+    height: var(--menu-ctl-h);
+    padding-top: 0; padding-bottom: 0;
     font-size: 14.5px;
   }
+  /* **跟上面的語言下拉是同一種框**：圓角、四邊一樣的框線、一樣高。
+     原本寫成「上面一條分隔線 ＋ 方角」，但按鈕本身帶著四邊的框 ——
+     兩件事疊在一起就是上緣方角、框線又比其他三邊細，看起來像被切掉一截
+     （2026-09-23 使用者手機截圖回報）。兩個共用 `--menu-ctl-h` 同一個高度（框線也一樣 1px），
+     判準在 `tests/test_docs_nav_controls_line_up.py` 的漢堡選單那兩條。 */
   .topnav .nav-github {
-    margin-top: 6px;
-    border-top: 1px solid var(--border);
-    border-radius: 0;
-    padding-top: 12px;
-    padding-bottom: 12px;
+    margin: 4px 0;
+    height: var(--menu-ctl-h);
+    /* `.topnav a { display: block }` 會蓋掉按鈕的 inline-flex，垂直置中就沒了 */
+    display: flex; align-items: center;
+    justify-content: flex-start;
+    line-height: 1.2;
+    padding: 0 12px;
+    border-width: 1px;
+    border-radius: 8px;
+    font-size: 14.5px;
   }
   .topbar-inner { position: relative; }
 }
