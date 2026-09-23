@@ -924,7 +924,9 @@ def build_router(templates) -> APIRouter:
                             "label": _jtlw_pick(r.get("name"), loc) or str(r["id"]),
                             "description": _jtlw_pick(r.get("description"), loc),
                             "deprecated": bool(r.get("deprecated")),
-                            "languages": r.get("languages") or []})
+                            "languages": r.get("languages") or [],
+                            # 設定頁要講得出「這個模式不做發言者分離」（台語模式）
+                            "capabilities": r.get("capabilities") or []})
         return {"ok": True, "profiles": out}
 
     @router.post("/api/jtlw/test")

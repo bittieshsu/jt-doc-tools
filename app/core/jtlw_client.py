@@ -70,7 +70,9 @@ ERROR_TEXT: dict[str, str] = {
     "audio_too_long": "錄音太長（超過對方的長度上限），請先分段",
     "language_not_supported": "對方不支援這個語言，請改選一個",
     "profile_not_found": "對方沒有這個辨識模式了 —— 請到設定頁重新挑一個",
-    "task_not_supported": "對方不支援這項工作",
+    # 台語模式沒有發言者分離（對方 v2.15）。送件前我們會照 `/profiles` 拿掉做不到的處理，
+    # 所以會走到這裡多半是當下讀不到清單 —— 重送就會重讀。
+    "task_not_supported": "語音服務目前的辨識模式做不到其中一項處理（例如台語模式不做發言者分離）。請重新送一次；一直發生的話，請管理員到語音服務設定換一個辨識模式。",
     "queue_full": "對方的佇列滿了，請稍後再送一次",
     "glossary_unreachable": "對方拉不到詞彙庫（與錄音檔無關）",
     "glossary_too_large": "詞彙庫太大（與錄音檔無關）",

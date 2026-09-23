@@ -729,6 +729,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;remote_job_id&quot;</span>: <span class="hl-str">&quot;job_01M34PVW581P2QD3Q0YFT5Y903&quot;</span>,
   <span class="hl-key">&quot;status&quot;</span>: <span class="hl-str">&quot;succeeded&quot;</span>,
   <span class="hl-key">&quot;uncorrected&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;diarize_skipped&quot;</span>: <span class="hl-bool">false</span>,
   <span class="hl-key">&quot;layers&quot;</span>: {<span class="hl-key">&quot;raw&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;final&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;speakers&quot;</span>: <span class="hl-num">1045</span>},
   <span class="hl-key">&quot;summary&quot;</span>: {<span class="hl-key">&quot;correction_level&quot;</span>: <span class="hl-str">&quot;punctuation_only&quot;</span>, <span class="hl-key">&quot;correction&quot;</span>: {<span class="hl-key">&quot;edited&quot;</span>: <span class="hl-num">612</span>}},
   <span class="hl-key">&quot;segments&quot;</span>: [
@@ -738,6 +739,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 }</code></pre>
 <p><strong><code>segments</code> 是三層併起來的</strong>：文字用校正後的、時間來自原始辨識層、 發言者來自 speakers 層，三層以 <code>seq</code> 對應。對不上的段落<strong>不會硬湊</strong> —— 寧可那一段沒有發言者，也不要把別人的名字貼上去。</p>
 <p><code>uncorrected</code> 為 <code>true</code> 代表<strong>校正那一步失敗了</strong>，你拿到的是原始辨識結果 （標點與錯字沒有修過）—— 這時候別把它當成校正過的內容去比對。</p>
+<p><code>diarize_skipped</code> 為 <code>true</code> 代表<strong>這次用的辨識模式不做發言者分離</strong>（例如台語模式）。 這時 <code>segments</code> 沒有 <code>speaker</code> 欄位，也不會把 <code>num_speakers</code> 送給語音服務。 辨識模式能做哪些處理以語音服務提供的清單為準，送件前會先查。</p>
 <p><code>speaker</code> 是代號（<code>S1</code> / <code>S2</code>…）。姓名對照是呼叫端自己的事； 網頁那條路可以點代號直接改成人名。</p>
 <hr>
       </section>

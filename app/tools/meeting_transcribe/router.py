@@ -223,16 +223,47 @@ def _normalize_language(value: object) -> str:
     return v
 
 
+def _tasks_for(client, profile_id: str, wanted: list[str]) -> tuple[list[str], list[str]]:
+    """依所選辨識模式**實際做得到的處理**決定要送哪些 `tasks`。回 (要送的, 拿掉的)。
+
+    **能做什麼以對方的 `/profiles` 為準，不在我們這裡抄一份。**
+    台語模式沒有發言者分離（`capabilities` 只有 `transcribe` / `correct`，對方 v2.15），
+    而我們一律送 `diarize` —— 管理員在設定頁的下拉選了台語，之後**每一件**都被
+    422 `task_not_supported` 退回。那個模式就擺在下拉裡，這不是邊角情況。
+
+    讀不到清單、找不到這個模式、或它沒寫 `capabilities` 時**照原樣送**，由對方決定：
+    猜錯的代價是安靜地少做一項處理（逐字稿沒有發言者，而且沒有任何錯誤訊息），
+    比被退回一次更難發現。`transcribe` 永遠不拿掉 —— 連轉錄都不做的模式，
+    送出去被退回才是對的。
+    """
+    wanted = list(wanted)
+    try:
+        rows = client.profiles()
+    except Exception:                          # 連不上、權限不足、舊版服務沒有這支
+        logger.warning("讀不到 JTLW 的辨識模式清單，照設定的處理送出：%s", wanted,
+                       exc_info=True)
+        return wanted, []
+    prof = next((r for r in rows if isinstance(r, dict) and r.get("id") == profile_id), None)
+    caps = prof.get("capabilities") if prof else None
+    if not isinstance(caps, list) or not caps:
+        return wanted, []
+    keep = [t for t in wanted if t == "transcribe" or t in caps]
+    return keep, [t for t in wanted if t not in keep]
+
+
 def _build_body(upload_id: str, meta: dict, *, language: str,
-                num_speakers: Optional[int]) -> dict:
+                num_speakers: Optional[int],
+                tasks: Optional[list[str]] = None) -> dict:
     base = jtlw_settings.audio_base_url()
     if not base:
         raise HTTPException(503, "還沒設定「錄音檔對外位址」—— "
                                  "對方要靠它回來拉錄音檔，請管理員到設定頁補上")
     cfg = jtlw_settings.get()
+    if tasks is None:
+        tasks = list(cfg.get("tasks") or jtlw_settings.DEFAULT_TASKS)
     body: dict = {
         "profile_id": cfg.get("profile_id") or jtlw_settings.DEFAULT_PROFILE,
-        "tasks": list(cfg.get("tasks") or jtlw_settings.DEFAULT_TASKS),
+        "tasks": list(tasks),
         "source": {
             "type": "url",
             "url": _speech.sign_url(upload_id, base),
@@ -247,7 +278,8 @@ def _build_body(upload_id: str, meta: dict, *, language: str,
         "correction_level": cfg.get("correction_level") or "punctuation_only",
         "external_ref": {"system": "jtdt", "job_id": upload_id},
     }
-    if num_speakers:
+    # 人數是**發言者分離的**提示 —— 沒要求分離時送出去沒有意義
+    if num_speakers and "diarize" in body["tasks"]:
         body["hints"] = {"num_speakers": int(num_speakers)}
     return body
 
@@ -320,7 +352,15 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
 
     job.message = "送件中"
     job.progress = 0.02
-    body = _build_body(upload_id, meta, language=language, num_speakers=num_speakers)
+    cfg = jtlw_settings.get()
+    tasks, dropped = _tasks_for(
+        client, cfg.get("profile_id") or jtlw_settings.DEFAULT_PROFILE,
+        list(cfg.get("tasks") or jtlw_settings.DEFAULT_TASKS))
+    if dropped:
+        logger.info("辨識模式 %s 做不到 %s，這一件不送", cfg.get("profile_id"), dropped)
+        job.meta["tasks_dropped"] = dropped
+    body = _build_body(upload_id, meta, language=language, num_speakers=num_speakers,
+                       tasks=tasks)
     idem = f"jtdt-{upload_id}"
     # **佇列滿了是「等一下」不是「失敗」**（對方的清單第 6 節：依
     # `retry_after_ms` 重試）。重送用同一把 `Idempotency-Key`，
@@ -450,6 +490,9 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
         # 伺服器端判斷要不要提示（同 `uncorrected`：前端不要自己猜門檻）
         "tail_gap_ms": tail_gap,
         "tail_hint": tail_gap is not None and tail_gap >= _TAIL_GAP_HINT_S * 1000,
+        # 這次的辨識模式不做發言者分離 —— **要講出來**，不然逐字稿沒有發言者
+        # 看起來像是分離失敗了（而其實根本沒做）
+        "diarize_skipped": "diarize" in dropped,
         "layers": got,
         "segments": segments,
     }

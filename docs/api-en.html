@@ -729,6 +729,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;remote_job_id&quot;</span>: <span class="hl-str">&quot;job_01M34PVW581P2QD3Q0YFT5Y903&quot;</span>,
   <span class="hl-key">&quot;status&quot;</span>: <span class="hl-str">&quot;succeeded&quot;</span>,
   <span class="hl-key">&quot;uncorrected&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;diarize_skipped&quot;</span>: <span class="hl-bool">false</span>,
   <span class="hl-key">&quot;layers&quot;</span>: {<span class="hl-key">&quot;raw&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;final&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;speakers&quot;</span>: <span class="hl-num">1045</span>},
   <span class="hl-key">&quot;summary&quot;</span>: {<span class="hl-key">&quot;correction_level&quot;</span>: <span class="hl-str">&quot;punctuation_only&quot;</span>, <span class="hl-key">&quot;correction&quot;</span>: {<span class="hl-key">&quot;edited&quot;</span>: <span class="hl-num">612</span>}},
   <span class="hl-key">&quot;segments&quot;</span>: [
@@ -738,6 +739,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 }</code></pre>
 <p><strong><code>segments</code> is three layers merged</strong>: the text comes from the corrected layer, the timings from the raw recognition layer and the speakers from the speakers layer, matched by <code>seq</code>. Segments that do not line up <strong>are not forced together</strong>: better to leave a segment without a speaker than to put somebody else's name on it.</p>
 <p><code>uncorrected</code> is <code>true</code> means <strong>the correction step failed</strong>, and what you get back is the raw recognition output (punctuation and misrecognitions unrepaired); do not compare it as though it had been corrected.</p>
+<p><code>diarize_skipped</code> is <code>true</code> means <strong>the recognition mode used this time does not separate speakers</strong> (for example, the Taiwanese mode). In that case <code>segments</code> has no <code>speaker</code> field, and <code>num_speakers</code> is not sent to the speech service. What a recognition mode can do follows the list the speech service provides, and it is checked before each submission.</p>
 <p><code>speaker</code> is a code (<code>S1</code> / <code>S2</code>…). Mapping those to names is up to the caller; on the web path you can click a code and rename it.</p>
 <hr>
       </section>

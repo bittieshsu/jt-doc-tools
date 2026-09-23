@@ -729,6 +729,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;remote_job_id&quot;</span>: <span class="hl-str">&quot;job_01M34PVW581P2QD3Q0YFT5Y903&quot;</span>,
   <span class="hl-key">&quot;status&quot;</span>: <span class="hl-str">&quot;succeeded&quot;</span>,
   <span class="hl-key">&quot;uncorrected&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;diarize_skipped&quot;</span>: <span class="hl-bool">false</span>,
   <span class="hl-key">&quot;layers&quot;</span>: {<span class="hl-key">&quot;raw&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;final&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;speakers&quot;</span>: <span class="hl-num">1045</span>},
   <span class="hl-key">&quot;summary&quot;</span>: {<span class="hl-key">&quot;correction_level&quot;</span>: <span class="hl-str">&quot;punctuation_only&quot;</span>, <span class="hl-key">&quot;correction&quot;</span>: {<span class="hl-key">&quot;edited&quot;</span>: <span class="hl-num">612</span>}},
   <span class="hl-key">&quot;segments&quot;</span>: [
@@ -738,6 +739,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 }</code></pre>
 <p><strong><code>segments</code> は 3 つのレイヤーを統合したものです</strong>。テキストは校正後のレイヤー、タイムスタンプは元の認識レイヤー、発言者は speakers レイヤーから取り、<code>seq</code> で対応づけます。対応しないセグメントは<strong>無理に結びつけません</strong>。そのセグメントに発言者が付かないほうが、他人の名前を貼り付けるよりましだからです。</p>
 <p><code>uncorrected</code> が <code>true</code> は<strong>校正のステップが失敗した</strong>ことを表し、返ってくるのは元の認識結果（句読点や誤認識は未修正）です。校正済みの内容として比較しないでください。</p>
+<p><code>diarize_skipped</code> が <code>true</code> は<strong>今回の認識モードは話者分離を行わないことを示します</strong>（例：台湾語モード）。この場合、 <code>segments</code> には <code>speaker</code> フィールドがなく、 <code>num_speakers</code> も音声サービスには送信されません。認識モードで実行できる処理は音声サービスが提供する一覧に従い、送信前に確認します。</p>
 <p><code>speaker</code> は記号（<code>S1</code> / <code>S2</code>…）です。名前との対応づけは呼び出し側の責任です。Web 側の経路では記号をクリックして名前に変更できます。</p>
 <hr>
       </section>

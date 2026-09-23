@@ -935,6 +935,7 @@ curl -X POST http://localhost:8765/tools/meeting-transcribe/api/meeting-transcri
   "remote_job_id": "job_01M34PVW581P2QD3Q0YFT5Y903",
   "status": "succeeded",
   "uncorrected": false,
+  "diarize_skipped": false,
   "layers": {"raw": 1045, "final": 1045, "speakers": 1045},
   "summary": {"correction_level": "punctuation_only", "correction": {"edited": 612}},
   "segments": [
@@ -950,6 +951,10 @@ curl -X POST http://localhost:8765/tools/meeting-transcribe/api/meeting-transcri
 
 `uncorrected` 為 `true` 代表**校正那一步失敗了**，你拿到的是原始辨識結果
 （標點與錯字沒有修過）—— 這時候別把它當成校正過的內容去比對。
+
+`diarize_skipped` 為 `true` 代表**這次用的辨識模式不做發言者分離**（例如台語模式）。
+這時 `segments` 沒有 `speaker` 欄位，也不會把 `num_speakers` 送給語音服務。
+辨識模式能做哪些處理以語音服務提供的清單為準，送件前會先查。
 
 `speaker` 是代號（`S1` / `S2`…）。姓名對照是呼叫端自己的事；
 網頁那條路可以點代號直接改成人名。

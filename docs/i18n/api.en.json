@@ -604,5 +604,10 @@
   "等太久還沒結果（排隊超過 4 小時，或辨識超過上限）": "No result after too long (queued for more than 4 hours, or recognition exceeded the limit)",
   "已經請對方取消；稍後再送": "The job has already been cancelled on the speech service; send it again later",
   "再送出": "before sending.",
-  "<strong><code>auto</code> 只看錄音開頭約 30 秒的講話，決定整場用哪一種語言</strong> —— 不是逐段判斷。 開頭若有人先講另一種語言（20 秒就夠），整場都可能辨識錯；開頭的靜音、雜音不影響。 已知整場的語言時請直接指定。 中英<strong>整句</strong>交錯的會議請指定佔多數的語言：另一種語言的整句大多無法正確辨識 （中文句子裡夾英文術語沒有問題）。": "<strong><code>auto</code> only listens to about the first 30 seconds of speech and uses that language for the whole meeting</strong>; it does not decide per segment. If someone speaks another language at the start (20 seconds is enough), the whole meeting may be recognised wrongly; silence or background noise at the start does not matter. When you know the language of the whole meeting, set it. For meetings where <strong>whole sentences</strong> alternate between Chinese and English, set the language used most: whole sentences in the other language are mostly not recognised correctly (English terms inside Chinese sentences are fine)."
+  "<strong><code>auto</code> 只看錄音開頭約 30 秒的講話，決定整場用哪一種語言</strong> —— 不是逐段判斷。 開頭若有人先講另一種語言（20 秒就夠），整場都可能辨識錯；開頭的靜音、雜音不影響。 已知整場的語言時請直接指定。 中英<strong>整句</strong>交錯的會議請指定佔多數的語言：另一種語言的整句大多無法正確辨識 （中文句子裡夾英文術語沒有問題）。": "<strong><code>auto</code> only listens to about the first 30 seconds of speech and uses that language for the whole meeting</strong>; it does not decide per segment. If someone speaks another language at the start (20 seconds is enough), the whole meeting may be recognised wrongly; silence or background noise at the start does not matter. When you know the language of the whole meeting, set it. For meetings where <strong>whole sentences</strong> alternate between Chinese and English, set the language used most: whole sentences in the other language are mostly not recognised correctly (English terms inside Chinese sentences are fine).",
+  "這次用的辨識模式不做發言者分離": "the recognition mode used this time does not separate speakers",
+  "沒有": "has no",
+  "（例如台語模式）。 這時": " (for example, the Taiwanese mode). In that case",
+  "欄位，也不會把": "field, and",
+  "送給語音服務。 辨識模式能做哪些處理以語音服務提供的清單為準，送件前會先查。": "is not sent to the speech service. What a recognition mode can do follows the list the speech service provides, and it is checked before each submission."
 }

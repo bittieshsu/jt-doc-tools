@@ -5,11 +5,30 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (844 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (845 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.16] - 2026-09-24
+
+### Meeting transcription: the Taiwanese recognition mode works
+
+The speech service's Taiwanese transcription mode does not separate speakers, but every job asked for
+speaker separation. Once an administrator switched the recognition mode to Taiwanese, **every** job was
+turned away.
+
+* Before sending a job, the tool checks the list of recognition modes the speech service provides and
+  only asks for what the chosen mode can do. The Taiwanese mode no longer gets a speaker-separation
+  request, and the number of speakers is not sent.
+* The result page says that the recognition mode used this time does not separate speakers, so a
+  transcript without speakers doesn't look like a failed separation.
+* The settings page marks a recognition mode that does not separate speakers.
+* If the list of recognition modes can't be read, the job is sent with the configured steps rather than
+  guessing. If it is still turned away, the message explains that the mode can't do one of the steps and
+  suggests sending again or picking another mode.
+* The API response has a new `diarize_skipped` field.
 
 ## [1.16.15] - 2026-09-24
 

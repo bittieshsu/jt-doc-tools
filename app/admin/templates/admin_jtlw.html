@@ -265,7 +265,11 @@ async function loadProfiles() {
     // 名稱與敘述是**對方的資料不是我們的介面文字，一律不翻**
     //（伺服器端已經依介面語言挑好那一份）。
     o.textContent = (p.label && p.label !== p.id) ? (p.label + ' · ' + p.id) : p.id;
-    PROFILE_DESC[p.id] = [p.description || '', (p.languages || []).join(' / ')];
+    // 第三格：這個模式**確定不做**發言者分離（對方的 `capabilities` 沒有 `diarize`）。
+    // 清單沒寫能力時不下結論 —— 沒寫不等於做不到。
+    const caps = p.capabilities || [];
+    PROFILE_DESC[p.id] = [p.description || '', (p.languages || []).join(' / '),
+                          caps.length > 0 && caps.indexOf('diarize') < 0];
     if (p.id === current) { o.selected = true; matched = true; }
     sel.appendChild(o);
   });
@@ -292,6 +296,7 @@ function showProfileDesc() {
   const parts = [];
   if (row[0]) parts.push(row[0]);
   if (row[1]) parts.push(tr('可辨識：{0}').replace('{0}', row[1]));
+  if (row[2]) parts.push(tr('不做發言者分離（逐字稿不會標出是誰說的）'));
   box.textContent = parts.length ? ('　' + parts.join('　')) : '';
 }
 $('jl-profile').addEventListener('change', showProfileDesc);

@@ -120,6 +120,11 @@
      把空白的長度寫出來：「最後 3 分鐘沒有字」比「可能不完整」好判斷 ——
      使用者自己知道錄音最後在做什麼。 #}
   <p class="info-box mt-hint" id="mtTail" hidden></p>
+  {# 辨識模式不做發言者分離（台語模式，JTLW v2.15）→ **講出來**：
+     不講的話，沒有發言者的逐字稿看起來像是分離失敗，而其實根本沒做。 #}
+  <p class="info-box mt-hint" id="mtNoSpk" hidden>
+    {{ tr('這次用的辨識模式不做發言者分離，所以逐字稿沒有標出是誰說的，「會發言的人數」也沒有作用。') }}
+  </p>
   <p class="muted" id="mtSummary"></p>
   <p class="muted" id="mtCorrection" hidden></p>
 
@@ -637,6 +642,9 @@
     } else {
       tailBox.hidden = true;
     }
+
+    // 這次沒做發言者分離（伺服器端判斷：送件前照 `/profiles` 拿掉的）
+    el('mtNoSpk').hidden = !data.diarize_skipped;
 
     // 校正統計 —— 「摘要怪怪的」時第一個要看的就是這個
     //（對方接入清單第 8 節）。**沒有就整段不顯示**，不要印一排 0。

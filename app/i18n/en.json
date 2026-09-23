@@ -5299,7 +5299,6 @@
   "錄音太長（超過對方的長度上限），請先分段": "The recording is longer than the speech service allows. Split it first.",
   "對方不支援這個語言，請改選一個": "The speech service does not support this language. Please pick another.",
   "對方沒有這個辨識模式了 —— 請到設定頁重新挑一個": "That recognition profile no longer exists on the speech service. Pick another one on the settings page.",
-  "對方不支援這項工作": "The speech service does not support this task.",
   "對方的佇列滿了，請稍後再送一次": "The speech service queue is full. Please submit again later.",
   "對方拉不到詞彙庫（與錄音檔無關）": "The speech service could not fetch the glossary (unrelated to the recording).",
   "詞彙庫太大（與錄音檔無關）": "The glossary is too large (unrelated to the recording).",
@@ -5371,5 +5370,8 @@
   "，預設關閉。啟用後共 {0} 個工具可以選擇性地把資料送給本機或 LAN 上的 LLM server（OpenAI 相容）處理，清單與各自使用的模型見下方「4. 各工具進階設定」。本機 / LAN 上需有運行中的 LLM backend（Ollama / vLLM / LM Studio / jan.ai 皆可）。": "; it is off by default. Once enabled, {0} tools can optionally send data to an LLM server on this machine or the LAN (OpenAI compatible). The list, and the model each one uses, is in section 4 (per-tool settings) below. A running LLM backend is needed on this machine or the LAN (Ollama, vLLM, LM Studio or jan.ai all work).",
   "勾選後，LLM 停用時各工具的 LLM 加值選項不顯示；只靠 LLM 的工具（{0}）也從側欄、首頁與搜尋拿掉。沒勾的話只是反灰 —— 看得到、也看得到為什麼不能用。": "When ticked, each tool's LLM options are not shown while LLM is disabled, and the tools that only work with LLM ({0}) are removed from the sidebar, the home page and search. Without it they are only greyed out, so people can see them and see why they cannot use them.",
   "第 {0} 頁（{1} 個）": "Page {0} ({1} placed)",
-  "符合搜尋 {0} 項（共 {1} 項）": "{0} match the search ({1} in total)"
+  "符合搜尋 {0} 項（共 {1} 項）": "{0} match the search ({1} in total)",
+  "語音服務目前的辨識模式做不到其中一項處理（例如台語模式不做發言者分離）。請重新送一次；一直發生的話，請管理員到語音服務設定換一個辨識模式。": "The speech service's current recognition mode can't do one of the requested steps (for example, the Taiwanese mode doesn't separate speakers). Please send it again; if it keeps happening, ask an administrator to pick a different recognition mode in the speech service settings.",
+  "這次用的辨識模式不做發言者分離，所以逐字稿沒有標出是誰說的，「會發言的人數」也沒有作用。": "The recognition mode used this time doesn't separate speakers, so the transcript doesn't show who said what, and the number of speakers had no effect.",
+  "不做發言者分離（逐字稿不會標出是誰說的）": "No speaker separation (the transcript won't show who said what)"
 }

@@ -52,12 +52,24 @@ class FakeJtlw:
         "meeting.detailed": ("zh-Hant", "en", "ja", "ko", "und"),
         "transcribe.taiwanese": ("nan-Hant", "zh-Hant"),
     }
+    #: **台語模式沒有發言者分離**（照正式 API 的 `GET /profiles`）。
+    #: 送了做不到的處理 → 422 `task_not_supported`。
+    #: 這裡寫成台語可以分離的話，「做不到的處理不送」這條路永遠測不到。
+    PROFILE_CAPABILITIES = {
+        "meeting.balanced": ("transcribe", "diarize", "correct"),
+        "meeting.detailed": ("transcribe", "diarize", "correct"),
+        "transcribe.taiwanese": ("transcribe", "correct"),
+    }
 
     def __init__(self, *, fail_with: dict | None = None, segments: int = 5,
                  running_polls: int = 0, reject_with: dict | None = None,
                  duration_ms: int | None = None, queue_polls: int = 0,
-                 submit_status: int | None = None):
+                 submit_status: int | None = None, profiles_status: int | None = None):
         self.seen: dict = {}
+        #: `GET /profiles` 回這個 HTTP 狀態（讀不到清單）
+        self.profiles_status = profiles_status
+        #: 送件時要求了哪些處理 —— 沒要求 `diarize` 的話，發言者那一層要回 400
+        self.requested_tasks: tuple = ()
         #: 送件當下回這個 HTTP 狀態（對方自己壞了，例如 500）
         self.submit_status = submit_status
         #: `GET /result` 的 `duration_ms`；None 表示那一支回 404（摘要拿不到）。
@@ -98,6 +110,19 @@ class FakeJtlw:
                 return JSONResponse({"error": {"code": "unauthorized"}}, status_code=401)
             return {"api_revision": "2.3", "limits": {"max_duration_s": 28800}}
 
+        @app.get("/api/v1/profiles")
+        async def profiles():
+            if me.profiles_status:
+                return JSONResponse({"error": {"code": "internal_error", "category": "server",
+                                               "retryable": True, "details": {}}},
+                                    status_code=me.profiles_status)
+            # 形狀照正式 API：`name` / `description` 是逐語言的物件
+            return [{"id": pid, "version": "2026-09-24.1",
+                     "name": {"zh-Hant": pid, "en": pid},
+                     "capabilities": list(me.PROFILE_CAPABILITIES[pid]),
+                     "languages": list(me.PROFILE_LANGUAGES[pid])}
+                    for pid in me.PROFILE_LANGUAGES]
+
         @app.post("/api/v1/jobs")
         async def create(request: Request):
             if me.submit_status:
@@ -107,6 +132,16 @@ class FakeJtlw:
             if me.reject_with:
                 return JSONResponse({"error": me.reject_with}, status_code=422)
             body = await request.json()
+            prof = body.get("profile_id") or "meeting.balanced"
+            # 處理先驗、語言後驗
+            bad = [t for t in body.get("tasks") or []
+                   if t not in me.PROFILE_CAPABILITIES.get(prof, ())]
+            if bad:
+                me.seen["rejected_tasks"] = bad
+                return JSONResponse({"error": {
+                    "code": "task_not_supported", "category": "request", "retryable": False,
+                    "details": {"profile_id": prof, "tasks": ",".join(bad)}}},
+                    status_code=422)
             lang = body.get("language", "auto")
             if lang != "auto" and lang not in me.LANGUAGE_TAGS:
                 me.seen["rejected_language"] = lang
@@ -114,7 +149,6 @@ class FakeJtlw:
                     "code": "invalid_request", "category": "request", "retryable": False,
                     "details": {"field": "language", "reason": "enum"}}},
                     status_code=400)
-            prof = body.get("profile_id") or "meeting.balanced"
             if lang != "auto" and lang not in me.PROFILE_LANGUAGES.get(prof, ()):
                 me.seen["rejected_language"] = lang
                 me.seen["rejected_status"] = 422
@@ -123,6 +157,7 @@ class FakeJtlw:
                     "details": {"field": "language", "languages": lang}}},
                     status_code=422)
             me.seen["body"] = body
+            me.requested_tasks = tuple(body.get("tasks") or ())
             me.seen["idempotency_key"] = request.headers.get("idempotency-key")
             me.seen["auth"] = request.headers.get("authorization")
             return JSONResponse({"job_id": "job_fake_1", "status": "queued"}, status_code=202)
@@ -162,6 +197,11 @@ class FakeJtlw:
         async def segs(job_id: str, layer: str, after_seq: int = 0, limit: int = 500):
             # 對方確認：鍵一定是 `segments`、`has_more` 一定會出現（布林），
             # **不是用空陣列表示結尾**。
+            if layer == "speakers" and "diarize" not in me.requested_tasks:
+                # 沒要求的層回 400 `task_not_requested`（對方的清單第 5 節）
+                return JSONResponse({"error": {
+                    "code": "task_not_requested", "category": "request", "retryable": False,
+                    "details": {"layer": layer}}}, status_code=400)
             if after_seq:                      # 只有一頁
                 return {"segments": [], "has_more": False, "complete": True}
             rows = []
@@ -224,10 +264,11 @@ def unconfigured():
 
 def _configure(fake: FakeJtlw, *, audio_base: str = "http://audio.test:8765",
                profile_id: str | None = None) -> None:
+    # **辨識模式一定要寫** —— `save()` 是合併，不寫的話上一條測試存的台語模式會留下來，
+    # 下一條就在台語模式底下跑（韓文那條留下的，因為 `zh-Hant` 兩種模式都收而一直沒被看到）。
     cfg = {"enabled": True, "base_url": fake.base,
-           "api_key_enc": "jtlw_test_key", "audio_base_url": audio_base}
-    if profile_id:
-        cfg["profile_id"] = profile_id
+           "api_key_enc": "jtlw_test_key", "audio_base_url": audio_base,
+           "profile_id": profile_id or js.DEFAULT_PROFILE}
     js.save(cfg)
     js.invalidate_cache()
 
@@ -922,6 +963,69 @@ def test_the_taiwanese_profile_turns_korean_away_with_a_readable_message(client,
     assert j["status"] == "error", j
     assert j.get("error") == jtlw_client.MESSAGES["language_rejected"], j.get("error")
 
+
+
+# ---------- 辨識模式做不到的處理不送（語音服務 v2.15：台語模式沒有發言者分離） ----------
+
+def test_a_mode_without_speaker_separation_is_not_asked_for_it(client, unconfigured):
+    """台語模式的 `capabilities` 只有 `transcribe` / `correct`。原本一律送 `diarize`，
+    管理員在設定頁的下拉選了台語之後，**每一件**都會被 422 `task_not_supported` 退回。"""
+    with FakeJtlw() as fake:
+        _configure(fake, profile_id="transcribe.taiwanese")
+        up = _upload(client)
+        j = _run(client, up["upload_id"], language="zh-Hant", num_speakers=3)
+        assert "rejected_tasks" not in fake.seen, f"送了做不到的處理：{fake.seen.get('rejected_tasks')}"
+        assert j["status"] == "done", j.get("error")
+        body = fake.seen["body"]
+    assert body["tasks"] == ["transcribe", "correct"]
+    assert "hints" not in body, "沒要求發言者分離，就不該送人數提示"
+    res = _result(client, up["upload_id"])
+    # 要講出來：沒有發言者的逐字稿，不講的話看起來像分離失敗
+    assert res["diarize_skipped"] is True
+    assert not any(seg.get("speaker") for seg in res["segments"])
+
+
+def test_a_meeting_mode_still_asks_for_speaker_separation(client, unconfigured):
+    """反向對照：只驗台語那條的話，把 `diarize` 一律拿掉也會過。"""
+    with FakeJtlw() as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"], num_speakers=3)
+        assert j["status"] == "done", j.get("error")
+        body = fake.seen["body"]
+    assert body["tasks"] == ["transcribe", "diarize", "correct"]
+    assert body["hints"] == {"num_speakers": 3}
+    res = _result(client, up["upload_id"])
+    assert res["diarize_skipped"] is False
+    assert any(seg.get("speaker") for seg in res["segments"])
+
+
+def test_an_unreadable_mode_list_sends_what_was_configured(client, unconfigured):
+    """讀不到 `/profiles` 時不猜 —— 照設定送，由對方決定。猜錯（多拿掉一項）的話，
+    逐字稿安靜地沒有發言者，比被退回一次更難發現。"""
+    with FakeJtlw(profiles_status=500) as fake:
+        _configure(fake)
+        j = _run(client, _upload(client)["upload_id"])
+        assert j["status"] == "done", j.get("error")
+        assert fake.seen["body"]["tasks"] == ["transcribe", "diarize", "correct"]
+
+
+def test_a_task_rejection_says_what_to_do():
+    """萬一還是被 `task_not_supported` 退回（送件當下讀不到清單），
+    畫面要講得出下一步，不是「對方不支援這項工作」。"""
+    msg = jtlw_client.describe_error("task_not_supported")
+    assert "辨識模式" in msg and "重新送" in msg, msg
+
+
+def test_the_settings_page_learns_which_modes_skip_speaker_separation(client, unconfigured):
+    """設定頁靠 `capabilities` 標出「這個模式不做發言者分離」—— 端點要把它帶出來。"""
+    with FakeJtlw() as fake:
+        _configure(fake)
+        r = client.get("/admin/api/jtlw/profiles")
+    assert r.status_code == 200, r.text
+    rows = {p["id"]: p for p in r.json()["profiles"]}
+    assert "diarize" not in rows["transcribe.taiwanese"]["capabilities"]
+    assert "diarize" in rows["meeting.balanced"]["capabilities"]
 
 def test_api_callers_sending_zh_still_get_through(client, unconfigured):
     """API 手冊寫的是 BCP-47，但照慣例送 `zh` 的呼叫端不該被退回。"""
