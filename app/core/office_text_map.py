@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import io
 import re
+import threading
 import zipfile
 from dataclasses import dataclass, field
 from typing import Callable, Optional
@@ -481,6 +482,112 @@ def _mirror_docx_fallback(root: ET.Element) -> None:
                 b.set(f"{{{_XML}}}space", space)
 
 
+# ---------- 輸出 XML 時保住原本的命名空間 ----------
+#
+# **ElementTree 輸出時會把沒註冊的命名空間前綴改名（`x14ac` → `ns3`），並丟掉沒有
+# 被用到的宣告**。對 XML 本身這不算錯，但 Office 有兩個地方是**用前綴的名字**指的：
+#
+# * `mc:Ignorable="x14ac xr xr2 xr3"`（Excel 工作表、Word 主文件都有）
+# * `<mc:Choice Requires="wps">`（Word 的文字方塊）
+#
+# 前綴被改名或宣告被丟掉之後，那幾個名字就指向不存在的東西 —— 依相容性規格
+# （ECMA-376 第 3 部）讀取端要報錯：**Excel 判定內容有問題、修復時把資料清掉**，
+# 使用者看到的是一份空白的試算表。**LibreOffice 不理這些屬性**，所以用它畫的
+# 預覽完全正常 —— 「預覽可以、下載後空白」（v1.16.9 客戶回報）。
+#
+# 這個洞從文件翻譯上線就在，一直沒被發現：我們手上所有的試算表樣本都是
+# OxOffice / LibreOffice 存的，**沒有 `mc:Ignorable`**，測不出來。
+#
+# 做法：①用原檔自己的前綴輸出（整份文件裡出現過的宣告都算）②根元素上原本有、
+# 輸出時被丟掉的宣告補回去 ③XML 宣告照原樣（`standalone="yes"`）。
+# `ET._namespace_map` 是全行程共用的，改動期間鎖住、輸出完整份還原。
+
+_DECL_RE = re.compile(rb'xmlns:([A-Za-z_][\w.-]*)\s*=\s*"([^"]*)"')
+_XML_DECL_RE = re.compile(rb"^\s*<\?xml[^>]*\?>")
+_SER_LOCK = threading.Lock()
+
+
+def _root_start_tag(data: bytes) -> bytes:
+    """根元素的開始標籤（跳過 XML 宣告、處理指令與註解）。"""
+    i = 0
+    while True:
+        j = data.find(b"<", i)
+        if j < 0:
+            return b""
+        if data.startswith(b"<!--", j):
+            i = data.find(b"-->", j) + 3
+            if i < 3:
+                return b""
+            continue
+        if data[j + 1:j + 2] in (b"?", b"!"):
+            i = data.find(b">", j) + 1
+            if i <= 0:
+                return b""
+            continue
+        k = data.find(b">", j)
+        return data[j:k + 1] if k > j else b""
+
+
+def _serialize(tree: ET.ElementTree, original: bytes) -> bytes:
+    """把改過的 XML 輸出成 bytes，前綴與宣告照原檔（理由見上方說明）。"""
+    # 整份文件出現過的宣告都當成「這個網址用這個前綴」—— 內層元素宣告的也算
+    # （ElementTree 會把它們一律提到根元素上）。同一個網址第一次出現的前綴為準。
+    decls = [(p.decode("utf-8", "replace"), u.decode("utf-8", "replace"))
+             for p, u in _DECL_RE.findall(original)]
+    all_prefixes = {p for p, _u in decls}
+    prefix_of: dict[str, str] = {}
+    taken: set[str] = set()
+    for prefix, uri in decls:
+        if prefix == "xml" or uri in prefix_of:
+            continue
+        if prefix in taken:
+            # 同一個前綴在不同層指向兩個網址（XML 允許內層重新宣告）。提到根元素
+            # 之後只能留一個，另一個換一個文件裡沒出現過的名字 —— 不然會輸出兩個
+            # 同名的 `xmlns:` 宣告，整份檔案讀不進去。
+            n = 2
+            while f"{prefix}{n}" in all_prefixes or f"{prefix}{n}" in taken:
+                n += 1
+            prefix = f"{prefix}{n}"
+        prefix_of[uri] = prefix
+        taken.add(prefix)
+    with _SER_LOCK:
+        saved = dict(ET._namespace_map)
+        try:
+            wanted = set(prefix_of.values())
+            # 同一個前綴不可以同時指向兩個網址（會輸出兩個同名宣告 = 壞掉的 XML）
+            for uri in [u for u, p in ET._namespace_map.items()
+                        if p in wanted and prefix_of.get(u) != p]:
+                del ET._namespace_map[uri]
+            ET._namespace_map.update(prefix_of)
+            buf = io.BytesIO()
+            tree.write(buf, encoding="UTF-8", xml_declaration=True)
+        finally:
+            ET._namespace_map.clear()
+            ET._namespace_map.update(saved)
+    out = buf.getvalue()
+
+    # 根元素上原本有、輸出時被丟掉的宣告補回去（`mc:Ignorable` 常常列著文件裡
+    # 沒用到的前綴，例如 `xr2 xr3` —— 它們一樣要有宣告）。
+    ostart = _root_start_tag(out)
+    if ostart:
+        have = {p for p, _u in _DECL_RE.findall(ostart)}
+        missing = [(p, u) for p, u in _DECL_RE.findall(_root_start_tag(original))
+                   if p not in have and p != b"xml"]
+        if missing:
+            add = b"".join(b' xmlns:' + p + b'="' + u + b'"' for p, u in missing)
+            end = len(ostart) - (2 if ostart.endswith(b"/>") else 1)
+            out = out.replace(ostart, ostart[:end] + add + ostart[end:], 1)
+
+    # XML 宣告照原樣 —— 只在原檔也是 UTF-8（或沒寫編碼）時，我們輸出的就是 UTF-8。
+    m1, m2 = _XML_DECL_RE.match(original), _XML_DECL_RE.match(out)
+    if m1 and m2:
+        decl = m1.group(0).strip()
+        enc = re.search(rb'encoding\s*=\s*["\']([^"\']+)', decl)
+        if enc is None or enc.group(1).lower().replace(b"-", b"") == b"utf8":
+            out = decl + out[m2.end():]
+    return out
+
+
 def rebuild(state: dict, translations: dict[int, str], units: list[TextUnit],
             target_lang: str = "") -> bytes:
     """把譯文寫回原檔，回傳新的檔案內容。
@@ -534,9 +641,9 @@ def rebuild(state: dict, translations: dict[int, str], units: list[TextUnit],
             if tree is not None and _XLSX_SHEET_PART.match(name):
                 _reset_sheet_scroll(tree.getroot())
             if tree is not None:
-                buf = io.BytesIO()
-                tree.write(buf, encoding="UTF-8", xml_declaration=True)
-                payload = buf.getvalue()
+                # **不可以直接 `tree.write()`** —— 前綴會被改名、宣告會被丟掉，
+                # Excel / Word 會把檔案當成毀損（見 `_serialize` 上方的說明）。
+                payload = _serialize(tree, state["raw"][name])
             else:
                 payload = state["raw"][name]
                 if ext == ".ods" and name == "settings.xml":

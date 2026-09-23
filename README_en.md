@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.16.8
+# Jason Tools Document Toolbox v1.16.9
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -239,7 +239,7 @@ Point it at an OpenAI-compatible backend (local Ollama / vLLM / LM Studio / DGX 
 
 ## Speech service integration (optional, off by default)
 
-Turn a **meeting recording** into minutes you can actually use, and **the audio never has to leave your network**.
+Turn a **meeting recording** into minutes you can actually use, and **your important recordings never leave your network**.
 
 The recording goes to **[jtlw](https://jasoncheng7115.github.io/jt-live-whisper/)** (jt-live-whisper,
 which you can host on your own network) for recognition and speaker separation; **the summary, decisions, action items, mind map and translation all stay in this system**.

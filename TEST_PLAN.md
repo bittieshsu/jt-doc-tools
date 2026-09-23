@@ -543,7 +543,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **332 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **333 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -740,6 +740,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_office_paper_and_profile.py` | soffice 的拋棄式設定檔：巨集硬化要真的生效，紙張預設要是 A4 |
 | `test_office_source_validation.py` | 辦公文件的**來源檔**壞掉時，要在送進 soffice 之前就擋下來 |
 | `test_office_timeout_kills_the_whole_tree.py` | soffice 逾時要殺掉**整棵行程樹**，不是只殺我們拿到的那個 PID |
+| `test_office_xml_namespaces.py` | 文件翻譯寫回檔案時，**命名空間的前綴與宣告要照原檔** |
 | `test_one_label_can_map_to_several_keys.py` | 一個標籤對應到**多個** canonical key 是刻意支援的，不要「修掉」 |
 | `test_one_shared_browser_probe.py` | 無頭瀏覽器的設定只能有**一份** |
 | `test_one_shared_lightbox.py` | 放大檢視（lightbox）只留一份共用實作 |
@@ -1037,6 +1038,12 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] **錄音檔是對方來拉的**：送出去的 `source.url` 用的是設定裡**寫定**的對外位址，
       不是請求的 Host —— 從對外網域與內網直連兩條路送件，帶出去的網址要一樣。
 - [ ] 送件前算的 `sha256` 與 `size_bytes` 要跟檔案對得上（對方會核對，對不上退件）。
+- [ ] **語言下拉的每一個選項都要真的送得出去**（v1.16.9）：選「中文」「英文」「日文」各送一次，
+      不可以在送件當下被退回。下拉送的要是對方認得的 BCP-47（`zh-Hant` 不是 `zh`）——
+      原本選中文的每一件都被退回，而測試用的假服務不檢查語言代碼，所以一直是綠的。
+- [ ] 對方不收某個語言時，畫面要講「改選自動判斷再送一次」，不是 `invalid_request（欄位 language）`。
+- [ ] **錄音最後超過一分鐘沒有文字時只提示、不判失敗**（v1.16.9）：提示寫出空白有多長；
+      作業照常完成、照常 ACK、逐字稿照常交出。30 秒左右的正常尾巴不可以提示。
 - [ ] **ACK 在逐字稿落地之後才送**：模擬「寫檔失敗」時**不可以**送出 ACK
       —— 送了就等於叫對方刪掉一份我們沒存到的東西。
 - [ ] **按停止要真的傳過去**：取消之後對方那件作業的狀態要變成 `cancelled`，
@@ -1118,6 +1125,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] 「不要翻譯」的詞（產品名 / 專案代號）在產出裡**原樣保留**
 - [ ] 勾選取消後就不會套用；結果摘要看得到「字典 N 條 / 退回 M 段」
 - [ ] **產出裡不可以出現 `⟪1⟫`** —— 全文搜一次，一個都不能有
+- [ ] **用 Excel / Word 存的檔案**翻完之後，**用 Excel / Word 打開**：不可以跳「內容有問題，
+      要修復嗎」、內容不可以是空白（預覽是 OxOffice 畫的，**看不出這個問題**，見 §6.99）
 
 #### 統編查詢 (vat-lookup)
 - [ ] 8 位統編反查毫秒回
@@ -4086,6 +4095,20 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       資料不是顯示文字（書籤的 `{title, page, level}`），翻掉是改壞資料。
 - [ ] 新畫的 SVG 圖示要**算圖確認過**才收（snap chromium 的 `--screenshot`
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
+
+---
+
+### 6.99 v1.16.9 — Office 檔寫回時要保住命名空間（**每次發版必過**）
+
+- [ ] `pytest tests/test_office_xml_namespaces.py` 綠燈
+- [ ] 被 `mc:Ignorable` / `Requires` 點名的前綴，在產出裡**每一個都有宣告**；
+      前綴不可以被改名成 `ns0` / `ns3`（Excel 會把整份內容判成毀損 → 空白試算表）
+- [ ] 素材要是 **Excel / Word 存出來的樣子** —— OxOffice / LibreOffice 存的檔案沒有
+      `mc:Ignorable`，拿它們測永遠是綠的（這個洞就是這樣活了很多版）
+- [ ] 有 Excel 的話，拿一份 Excel 存的 `.xlsx` 真的翻一次、用 Excel 打開
+- [ ] 同一版的另一條：會議錄音轉逐字稿的**語言下拉每一個值都真的送一次**
+      （`tests/test_meeting_transcribe.py::test_every_language_in_the_dropdown_is_accepted`）——
+      假的語音服務要跟正式 API 一樣退回不認得的語言代碼，不然這條沒有牙齒
 
 ---
 

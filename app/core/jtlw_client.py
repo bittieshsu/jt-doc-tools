@@ -98,6 +98,11 @@ MESSAGES: dict[str, str] = {
     # 對方的缺陷（v2.9 告知，`.223` 升級前都可能發生）：GPU 伺服器在傳結果途中重啟，
     # 可能把 0 段當成功回給我們。我們拿到 0 段本來就判失敗，這裡讓使用者知道重送通常就好。
     "empty_result": "jtlw 回報成功，但一段逐字稿都沒有 —— 可能是語音服務在傳結果的途中重啟過。錄音裡確實有人講話的話，請重新送一次。",
+    # 送出的語言代碼對方不收（2026-09-23 正式機：頁面把「中文」送成 `zh`，
+    # 對方要的是 `zh-Hant`，回 400 `invalid_request`、欄位 `language`）。
+    # 原本畫面上印的是 `jtlw 回報：invalid_request（欄位 language）` —— 使用者看不懂，
+    # 也不知道改選「自動判斷」就能送出去。
+    "language_rejected": "語音服務不接受這個語言設定 —— 請改選「自動判斷」再送一次；一直發生的話，請管理員確認語音服務支援哪些語言。",
 }
 
 
@@ -124,6 +129,10 @@ def describe_error(code: str, *, field: str = "", retryable: bool = False,
         return MESSAGES["source_unreachable"]
     if not code:
         return ""
+    # 對方把「語言代碼不認得」回成 `invalid_request`（實際正式 API 的行為），
+    # 文件上則寫 `language_not_supported` —— 兩個都認，判準是**欄位**。
+    if field == "language" and code in ("invalid_request", "language_not_supported"):
+        return MESSAGES["language_rejected"]
     msg = ERROR_TEXT.get(code)
     if msg:
         return msg + ("（這一類可以再試一次）" if retryable else "")

@@ -5,9 +5,74 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (837 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (838 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
+
+---
+
+## [1.16.9] - 2026-09-23
+
+### Document translation: spreadsheets saved by Excel came out blank in Excel
+
+The symptom: **the preview looked fine, but the downloaded file opened blank in Excel**
+(or Excel first offered to repair it, and the repair removed all the data).
+
+The cause was the step that writes the file back. The XML library we use **renames namespace
+prefixes it does not know** (`x14ac` became `ns3`) and **drops declarations the body never
+uses** (`xr2`, `xr3`). The XML is still valid, but Excel writes
+`mc:Ignorable="x14ac xr xr2 xr3"` at the top of each sheet, which refers to prefixes **by
+name**. Once the names no longer match a declaration, Excel treats the whole part as corrupt.
+
+* **The preview cannot show it**: the preview is drawn by OxOffice / LibreOffice, which
+  ignore that attribute.
+* **Files saved by Word and PowerPoint have the same problem**: the main document carries
+  `mc:Ignorable` too, and text boxes use `Requires="wps"`.
+* **Why it was never caught**: every spreadsheet sample we had was saved by OxOffice /
+  LibreOffice, which do not write that attribute. The new test material is made to look like
+  files saved by Excel and Word, and every real sample is run through it as well.
+
+Prefixes and declarations are now written exactly as in the original, and
+`standalone="yes"` is kept. **Files already translated are not repaired; translate them again.**
+
+Sentence-by-sentence translation does not accept spreadsheets and is not affected.
+
+### Meeting transcription: choosing Chinese made every job fail
+
+With the language set to Chinese, every job was rejected by the speech service at
+submission, showing `invalid_request` for the `language` field. The fault was ours: the
+dropdown sent `zh`, while the service expects the BCP-47 code `zh-Hant` (English and
+Japanese happened to send `en` / `ja`, so they worked). The API manual already said
+`zh-Hant`; only the dropdown on the page was wrong.
+
+* The dropdown now sends `zh-Hant`, and the server also maps common spellings such as
+  `zh` and `zh-TW` to it, so API callers sending `zh` are not rejected either.
+  **Simplified Chinese (`zh-CN`) is never turned into Traditional.**
+* When the service does not accept a language setting, the message now says what to do:
+  choose Detect automatically and submit again.
+* **Why the tests stayed green**: the fake speech service used in tests never checked the
+  language code. It now rejects unknown codes the way the real API does, and every option
+  in the dropdown is actually submitted once.
+* A note next to the language dropdown: if you know the language used throughout, pick it;
+  recognition is more accurate.
+
+### Meeting transcription: a hint when the end of the recording has no text
+
+The speech service side told us that if its server restarts while sending a result, a
+transcript that was only half sent can come back as a success (fixed on their side and deployed
+on 2026-09-23; the hint now mostly flags recordings that were left running, and the length of
+each gap is logged so we can decide later whether to keep it). A result with no segments at all was already treated as a failure; **one missing
+its last part** now gets a hint on the result page saying how long the silent tail is.
+
+* **A hint, not a failure**: a recording that was left running, or that ends with applause or
+  music, looks the same, and that transcript is complete. The hint states the length of the
+  gap, and the user knows what happened at the end of the recording.
+* The threshold is 60 seconds: across 25 recordings the service measured, the longest natural
+  gap was 41.8 seconds.
+
+### Project site
+
+* The speech section now says your important recordings never leave your network (README too).
 
 ---
 

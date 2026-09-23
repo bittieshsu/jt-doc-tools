@@ -11,8 +11,10 @@
 """
 from __future__ import annotations
 
+import importlib
 import json
 import pathlib
+from pathlib import Path
 import socket
 import threading
 import time
@@ -21,6 +23,7 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.core import jtlw_client
 from app.core import jtlw_settings as js
 
 
@@ -35,9 +38,18 @@ def _free_port() -> int:
 class FakeJtlw:
     """只做我們會打的那幾支。`seen` 留下收到的請求供斷言。"""
 
+    #: 對方正式 API 的 `/profiles`（預設那組，2026-09-23 實際查到的）認得的語言。
+    #: **這支假伺服器一定要檢查語言代碼** —— 原本它什麼都收，於是頁面把「中文」
+    #: 送成 `zh`（對方要 `zh-Hant`）這件事，測試全綠、正式機每一件都被退回。
+    #: 退回的形狀照正式 API 實際回的：400 `invalid_request`、`details.field=language`。
+    LANGUAGES = ("zh-Hant", "en", "ja", "und")
+
     def __init__(self, *, fail_with: dict | None = None, segments: int = 5,
-                 running_polls: int = 0, reject_with: dict | None = None):
+                 running_polls: int = 0, reject_with: dict | None = None,
+                 duration_ms: int | None = None):
         self.seen: dict = {}
+        #: `GET /result` 的 `duration_ms`；None 表示那一支回 404（摘要拿不到）。
+        self.duration_ms = duration_ms
         self.acked: list[str] = []
         self.cancelled: list[str] = []
         self.fail_with = fail_with
@@ -74,7 +86,15 @@ class FakeJtlw:
         async def create(request: Request):
             if me.reject_with:
                 return JSONResponse({"error": me.reject_with}, status_code=422)
-            me.seen["body"] = await request.json()
+            body = await request.json()
+            lang = body.get("language", "auto")
+            if lang != "auto" and lang not in me.LANGUAGES:
+                me.seen["rejected_language"] = lang
+                return JSONResponse({"error": {
+                    "code": "invalid_request", "category": "request", "retryable": False,
+                    "details": {"field": "language", "reason": "unsupported"}}},
+                    status_code=400)
+            me.seen["body"] = body
             me.seen["idempotency_key"] = request.headers.get("idempotency-key")
             me.seen["auth"] = request.headers.get("authorization")
             return JSONResponse({"job_id": "job_fake_1", "status": "queued"}, status_code=202)
@@ -122,6 +142,13 @@ class FakeJtlw:
                     if i != 2:
                         rows.append({"seq": i, "speaker_id": f"S{(i % 2) + 1}"})
             return {"segments": rows, "has_more": False, "complete": True}
+
+        @app.get("/api/v1/jobs/{job_id}/result")
+        async def result(job_id: str):
+            if me.duration_ms is None:
+                return JSONResponse({"error": {"code": "not_found"}}, status_code=404)
+            return {"result_schema_version": "2.0", "job_id": job_id,
+                    "status": "succeeded", "duration_ms": me.duration_ms}
 
         @app.post("/api/v1/jobs/{job_id}/ack")
         async def ack(job_id: str):
@@ -175,8 +202,9 @@ def _upload(client, name: str = "會議.m4a") -> dict:
     return r.json()
 
 
-def _run(client, upload_id: str, timeout: float = 60.0) -> dict:
-    r = client.post("/tools/meeting-transcribe/start", json={"upload_id": upload_id})
+def _run(client, upload_id: str, timeout: float = 60.0, **extra) -> dict:
+    r = client.post("/tools/meeting-transcribe/start",
+                    json={"upload_id": upload_id, **extra})
     assert r.status_code == 200, r.text
     job_id = r.json()["job_id"]
     t0 = time.time()
@@ -759,3 +787,128 @@ def test_a_speaker_name_cannot_smuggle_control_characters(client, unconfigured):
     assert "\n" not in got["speaker_names"]["S1"] and "\r" not in got["speaker_names"]["S1"]
     assert "\x00" not in got["speaker_names"]["S1"]
     assert len(got["speaker_names"]["S2"]) <= 40, "名字沒有長度上限"
+
+
+# ---------- 語言代碼（2026-09-23 正式機：選「中文」每一件都被退回）----------
+
+_TEMPLATE = (Path(__file__).resolve().parents[1] / "app" / "tools" / "meeting_transcribe"
+             / "templates" / "meeting_transcribe.html")
+
+
+def _dropdown_languages() -> list[str]:
+    import re
+    html = _TEMPLATE.read_text(encoding="utf-8")
+    m = re.search(r'<select[^>]*id="mtLang"[^>]*>(.*?)</select>', html, re.S)
+    assert m, "找不到語言下拉"
+    vals = re.findall(r'<option value="([^"]+)"', m.group(1))
+    assert len(vals) >= 3, f"語言下拉只有 {vals}"
+    return vals
+
+
+@pytest.mark.parametrize("value", _dropdown_languages())
+def test_every_language_in_the_dropdown_is_accepted(client, unconfigured, value):
+    """下拉裡的每一個值都要是對方收得下的 —— **真的送一次**，不是比對清單。
+
+    原本「中文」的值是 `zh`，對方要 `zh-Hant`：送件當下就被 400 退回。
+    這支假伺服器以前不檢查語言，所以測試一直是綠的。
+    """
+    with FakeJtlw() as fake:
+        _configure(fake)
+        j = _run(client, _upload(client)["upload_id"], language=value)
+        assert j["status"] == "done", f"選「{value}」送不出去：{j.get('error')}"
+        # **下拉的值本身就要是對方認得的碼**，不可以靠伺服器端換算救回來 ——
+        # 那層換算是給 API 呼叫端的保險。只驗「送得出去」的話，下拉改回 `zh`
+        # 也會全綠（變異驗證抓到的：換算把錯的值蓋掉了）。
+        assert fake.seen["body"]["language"] == value, (
+            f"下拉送的是 {value!r}，要靠伺服器換算成 {fake.seen['body']['language']!r} 才送得出去")
+
+
+@pytest.mark.parametrize("given,sent", [
+    ("zh", "zh-Hant"), ("zh-TW", "zh-Hant"), ("zh_TW", "zh-Hant"), ("ZH-HANT", "zh-Hant"),
+    ("en-US", "en"), ("ja-JP", "ja"), ("", "auto"), (None, "auto"), ("auto", "auto"),
+    # 簡體**不可以**被換成繁體 —— 那是替使用者做了一個他沒做的選擇
+    ("zh-CN", "zh-CN"), ("zh-Hans", "zh-Hans"),
+    # 不認得的原樣送出，由對方決定（我們不自己維護一份支援清單）
+    ("fr", "fr"),
+])
+def test_common_language_spellings_are_normalized(given, sent):
+    R = importlib.import_module("app.tools.meeting_transcribe.router")
+    assert R._normalize_language(given) == sent
+
+
+def test_api_callers_sending_zh_still_get_through(client, unconfigured):
+    """API 手冊寫的是 BCP-47，但照慣例送 `zh` 的呼叫端不該被退回。"""
+    with FakeJtlw() as fake:
+        _configure(fake)
+        j = _run(client, _upload(client)["upload_id"], language="zh")
+        assert j["status"] == "done", j.get("error")
+        assert fake.seen["body"]["language"] == "zh-Hant"
+
+
+def test_a_rejected_language_says_what_to_do(client, unconfigured):
+    """對方不收的語言：畫面上要講「改選自動判斷」，不是 `invalid_request（欄位 language）`。"""
+    with FakeJtlw() as fake:
+        _configure(fake)
+        j = _run(client, _upload(client)["upload_id"], language="xx")
+        assert fake.seen.get("rejected_language") == "xx", "前提：假的對方真的退回了"
+    assert j["status"] == "error", j
+    assert j.get("error") == jtlw_client.MESSAGES["language_rejected"], j.get("error")
+    assert "invalid_request" not in j["error"]
+
+
+# ---------- 尾端空白（語音服務 v2.10）：只提示，不判失敗 ----------
+
+def _result(client, upload_id: str) -> dict:
+    r = client.get(f"/tools/meeting-transcribe/result/{upload_id}")
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_a_long_silent_tail_is_hinted_but_the_job_still_succeeds(client, unconfigured):
+    """最後一段結束在 5.8 秒、錄音 125 秒 → 尾端 119 秒沒有字。
+
+    **不可以判失敗**：錄音忘了停、結尾是掌聲，都會長這樣 —— 那是完整的逐字稿。
+    """
+    with FakeJtlw(duration_ms=125_000) as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"])
+        assert j["status"] == "done", f"尾端空白被當成失敗了：{j.get('error')}"
+        assert fake.acked, "尾端空白不影響 ACK"
+    out = _result(client, up["upload_id"])
+    assert out["tail_gap_ms"] == 125_000 - 5_800
+    assert out["tail_hint"] is True
+    assert out["segments"], "逐字稿本身要照常交出去"
+
+
+def test_a_normal_tail_is_not_hinted(client, unconfigured):
+    """對方量的 25 場裡最長的自然空白是 41.8 秒 —— 30 秒左右的尾巴不可以提示。"""
+    with FakeJtlw(duration_ms=5_800 + 30_000) as fake:
+        _configure(fake)
+        up = _upload(client)
+        assert _run(client, up["upload_id"])["status"] == "done"
+    out = _result(client, up["upload_id"])
+    assert out["tail_gap_ms"] == 30_000
+    assert out["tail_hint"] is False
+
+
+def test_no_duration_means_no_guess(client, unconfigured):
+    """摘要拿不到錄音長度時不猜：沒有數字、不提示。"""
+    with FakeJtlw() as fake:
+        _configure(fake)
+        up = _upload(client)
+        assert _run(client, up["upload_id"])["status"] == "done"
+    out = _result(client, up["upload_id"])
+    assert out["tail_gap_ms"] is None
+    assert out["tail_hint"] is False
+
+
+def test_the_page_follows_the_server_on_the_tail_hint():
+    """門檻只在伺服器端（`_TAIL_GAP_HINT_S`）—— 前端照 `tail_hint` 顯示，不自己比秒數。"""
+    import re
+    # 說明文字會**提到**門檻在哪裡 —— 先拿掉樣板註解再看（use vs mention）
+    html = re.sub(r"\{#.*?#\}", "", _TEMPLATE.read_text(encoding="utf-8"), flags=re.S)
+    assert 'id="mtTail"' in html
+    assert "data.tail_hint" in html
+    assert "60000" not in html and "_TAIL_GAP" not in html, "前端自己寫了門檻"
+    assert not re.search(r"tail_gap_ms\s*[<>]=?", html), "前端自己拿秒數比大小"

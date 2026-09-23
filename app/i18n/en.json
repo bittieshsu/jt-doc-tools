@@ -5341,5 +5341,8 @@
   "這個檔案讀不開 —— 可能不是 Word / ODF 檔，或已經毀損。": "This file could not be opened. It may not be a Word / ODF file, or it may be damaged.",
   "這個檔案裡找不到文件內容。": "No document content was found in this file.",
   "未決": "Open",
-  "{0}・第 {1} 段": "{0} · segment {1}"
+  "{0}・第 {1} 段": "{0} · segment {1}",
+  "（已知整場使用的語言時，建議直接選取，辨識會更準）": "(if you know the language used throughout, pick it; recognition is more accurate)",
+  "語音服務不接受這個語言設定 —— 請改選「自動判斷」再送一次；一直發生的話，請管理員確認語音服務支援哪些語言。": "The speech service does not accept this language setting. Choose \"Detect automatically\" and submit again; if it keeps happening, ask your administrator which languages the speech service supports.",
+  "錄音最後 {0} 分 {1} 秒沒有任何文字。如果錄音到最後都有人在講話，這份逐字稿可能不完整，請重新送一次；如果是錄音忘了停、或結尾是掌聲或音樂，就不用理會。": "The last {0} min {1} s of the recording has no text at all. If people were still speaking until the end, this transcript may be incomplete, so submit it again; if the recording was simply left running, or it ends with applause or music, you can ignore this."
 }

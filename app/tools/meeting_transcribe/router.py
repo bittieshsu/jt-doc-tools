@@ -137,6 +137,58 @@ async def upload(request: Request, file: UploadFile = File(...)):
     return {"upload_id": upload_id, "filename": name, **facts}
 
 
+#: 常見但語音服務不收的寫法 → 它認得的 BCP-47。
+#:
+#: 對方的 `/profiles` 列的是 `zh-Hant` / `en` / `ja` / `und`（台語那組另有
+#: `nan-Hant`）。**不在這張表裡的值原樣送出**，由對方決定收不收 —— 我們不自己
+#: 維護一份「支援哪些語言」的清單（那份清單在對方，寫第二份一定會漂）。
+#: **簡體（`zh-CN` / `zh-Hans`）刻意不換成 `zh-Hant`**：那是不同的東西，
+#: 換掉等於替使用者做了一個他沒做的選擇。
+_LANGUAGE_ALIASES = {
+    "zh": "zh-Hant", "zh-tw": "zh-Hant", "zh_tw": "zh-Hant", "zh-hant": "zh-Hant",
+    "zh-hant-tw": "zh-Hant",
+}
+
+
+#: 錄音最後超過幾秒沒有任何文字，就在結果頁**提示**「可能不完整」。
+#:
+#: 由來（語音服務 2026-09-23 v2.9 / v2.10）：對方的 GPU 伺服器在傳結果途中重啟時，
+#: 可能把**只傳了一半**的逐字稿當成功回來（`.223` 升級後修掉）。0 段的我們本來就判
+#: 失敗；少一截的樣子是「最後一段停在切斷那一刻」。對方拿 25 場錄音量「錄音長度 −
+#: 最後一段結束時間」：中位數 12.4 秒、最長 41.8 秒 —— 60 秒時 0 誤報。
+#:
+#: **只提示，不判失敗**：那 25 場都是整理過的會議錄音，照不到「錄音忘了停」
+#: 「結尾是掌聲或音樂」—— 那種錄音尾端空白可以好幾分鐘，判失敗就是把一份完整的
+#: 逐字稿丟掉（比少一截更糟）。每一件的空白都寫進記錄，之後拿我們自己的真實作業
+#: 回頭校這個門檻。
+_TAIL_GAP_HINT_S = 60.0
+
+
+def _tail_gap_ms(summary: dict, segments: list[dict]) -> Optional[int]:
+    """錄音長度減掉最後一段的結束時間；拿不到其中一個就回 None（不猜）。"""
+    dur = (summary or {}).get("duration_ms")
+    ends = [s["end_ms"] for s in segments
+            if isinstance(s.get("end_ms"), (int, float))]
+    if not isinstance(dur, (int, float)) or dur <= 0 or not ends:
+        return None
+    return max(0, int(dur - max(ends)))
+
+
+def _normalize_language(value: object) -> str:
+    """請求裡的語言代碼 → 送給語音服務的值（空的一律 `auto`）。"""
+    v = str(value or "").strip()[:16]
+    if not v:
+        return "auto"
+    low = v.lower()
+    if low in _LANGUAGE_ALIASES:
+        return _LANGUAGE_ALIASES[low]
+    # `en-US` / `ja-JP` 這類帶地區的：對方只列了 `en` / `ja`
+    for base in ("en", "ja"):
+        if low.startswith(base + "-") or low.startswith(base + "_"):
+            return base
+    return v
+
+
 def _build_body(upload_id: str, meta: dict, *, language: str,
                 num_speakers: Optional[int]) -> dict:
     base = jtlw_settings.audio_base_url()
@@ -323,6 +375,11 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
     # —— 只看狀態的話，`final` 那一層拉不回來時畫面上仍然寫著「已校正」。
     uncorrected = status == "partially_succeeded" or not got.get("final")
 
+    tail_gap = _tail_gap_ms(summary, segments)
+    if tail_gap is not None:
+        logger.info("jtlw 作業 %s：錄音 %.1f 秒，最後一段之後 %.1f 秒沒有文字",
+                    remote_id, summary["duration_ms"] / 1000, tail_gap / 1000)
+
     out = {
         "source": {"filename": meta["filename"], "size_bytes": meta["size_bytes"]},
         "remote_job_id": remote_id,
@@ -330,6 +387,9 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
         "result": info.get("result") or {},
         "summary": summary,
         "uncorrected": uncorrected,
+        # 伺服器端判斷要不要提示（同 `uncorrected`：前端不要自己猜門檻）
+        "tail_gap_ms": tail_gap,
+        "tail_hint": tail_gap is not None and tail_gap >= _TAIL_GAP_HINT_S * 1000,
         "layers": got,
         "segments": segments,
     }
@@ -351,6 +411,8 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
     job.result_filename = f"{Path(meta['filename']).stem}-逐字稿.json"
     job.meta["upload_id"] = upload_id
     job.meta["segments"] = len(segments)
+    if tail_gap is not None:
+        job.meta["tail_gap_ms"] = tail_gap
     job.progress = 1.0
     job.message = "完成"
 
@@ -436,7 +498,7 @@ async def start(request: Request):
     _sp.require_uuid_hex(upload_id, "upload_id")
     _uo.require(upload_id, request)
     meta = _read_json(_meta_path(upload_id), "錄音檔資訊")
-    language = str(body.get("language") or "auto")[:16]
+    language = _normalize_language(body.get("language"))
     try:
         num_speakers = int(body.get("num_speakers") or 0) or None
     except (TypeError, ValueError):
@@ -509,7 +571,7 @@ async def api_meeting_transcribe(request: Request,
         result_path = None
         result_filename = ""
 
-    _run_job(_Sync(), file_id, str(language or "auto")[:16], n)
+    _run_job(_Sync(), file_id, _normalize_language(language), n)
     return _read_json(_out_path(file_id), "逐字稿")
 
 

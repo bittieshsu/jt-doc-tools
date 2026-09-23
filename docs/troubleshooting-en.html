@@ -77,6 +77,7 @@
     <a href="#jtlw-fetch">They cannot fetch the recording / link expired</a>
     <a href="#jtlw-wait">No progress, then cancelled after a long wait</a>
     <a href="#jtlw-empty">Reported success, but no transcript</a>
+    <a href="#jtlw-lang">Language setting not accepted</a>
     <a href="#jtlw-grey">Meeting recording to transcript is greyed out</a>
   </div>
 
@@ -188,7 +189,7 @@
   <section class="ts-item" id="jtlw-wait">
     <h2>Progress does not move, or “waited N minutes with no result; asked them to cancel”</h2>
     <p class="ts-sym"><b>Symptom</b>　After submitting, the progress bar stays still for a long time and the job finally fails with the message above. You may also see “The speech service queue is full. Please submit again later.”</p>
-    <p><b>Cause</b>　The speech service GPU <b>handles one job at a time and queues the rest</b>. While queued and while recognising, the progress they report does not move, so a still progress bar does not by itself mean it is stuck. This system waits for them up to a limit (counted from submission: the larger of 15 minutes and half the recording length, plus a 60-minute allowance for queueing); when several very long meetings happen to be ahead in the queue, the limit can still pass while queued, and this system asks them to cancel the job.</p>
+    <p><b>Cause</b>　The speech service GPU <b>handles one job at a time and queues the rest</b>. While queued, the progress they report does not move (the page still says recognising); once the job's turn comes, recognition and correction progress starts moving, so a still progress bar at the start does not by itself mean it is stuck. This system waits for them up to a limit (counted from submission: the larger of 15 minutes and half the recording length, plus a 60-minute allowance for queueing); when several very long meetings happen to be ahead in the queue, the limit can still pass while queued, and this system asks them to cancel the job.</p>
     <p><b>What to do</b>　Submit again; for very long recordings, avoid times when someone else is sending a long meeting. If it keeps happening, ask the speech service side to check the queue and the GPU server.</p>
   </section>
 
@@ -197,6 +198,14 @@
     <p class="ts-sym"><b>Symptom</b>　Transcription fails with this message, even though people clearly speak in the recording.</p>
     <p><b>Cause</b>　The speech service restarted (an update or a crash) while sending the recognition result back, and a partial result was taken as complete, most often with no segments at all. This system always treats zero segments as a failure; it never hands over an empty transcript as a success.</p>
     <p><b>What to do</b>　Submitting again usually works. If it keeps happening, ask the speech service side whether the server is being updated or restarted.</p>
+    <p><b>A long stretch with no text at the end</b>　When the last minute or more of a recording has no text at all, the result page says how long that gap is. Since 2026-09-23 the speech service no longer returns only the first part of a transcript, so this hint now mostly means the recording was left running, or it ends with applause or music. If people really were speaking during that time, submit again.</p>
+  </section>
+
+  <section class="ts-item" id="jtlw-lang">
+    <h2>“The speech service does not accept this language setting”</h2>
+    <p class="ts-sym"><b>Symptom</b>　After choosing a language, the job fails as soon as it is submitted.</p>
+    <p><b>Cause</b>　The speech service only accepts the languages its current recognition mode supports. Before v1.16.8 the page sent Chinese as <code>zh</code>, while the service expects <code>zh-Hant</code>, so every job with Chinese selected was rejected (fixed in v1.16.9). If it still happens, the recognition mode chosen by the administrator most likely does not support that language (for example, the Taiwanese mode only accepts Taiwanese and Chinese).</p>
+    <p><b>What to do</b>　Choose Detect automatically and submit again. If it keeps happening, ask your administrator to check which languages the current recognition mode supports under Speech service (jtlw) (they are listed once a recognition mode is selected).</p>
   </section>
 
   <section class="ts-item" id="jtlw-grey">

@@ -1,6 +1,6 @@
 **繁體中文** ｜ [English](README_en.md) ｜ [日本語](README_ja.md)
 
-# Jason Tools 文件工具箱 v1.16.8
+# Jason Tools 文件工具箱 v1.16.9
 
 > ### ⚠ 2026-09-13 之前用 git 安裝的，這一版升級前要先跑一行
 >
@@ -239,7 +239,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ## 語音服務整合（選用，預設關閉）
 
-把**會議錄音**變成可以拿去用的會議記錄，而且**聲音不必離開你的網路**。
+把**會議錄音**變成可以拿去用的會議記錄，而且**重要錄音不會離開你的網路**。
 
 錄音交給 **[jtlw](https://jasoncheng7115.github.io/jt-live-whisper/)**（jt-live-whisper，
 可自架在內網）做辨識與發言者分離；**摘要、決議、待辦、心智圖與翻譯全部留在本系統**。

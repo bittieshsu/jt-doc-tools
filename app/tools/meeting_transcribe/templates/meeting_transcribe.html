@@ -36,10 +36,15 @@
        下面那段 JS 一個字都不用改。 #}
     <select class="field jt-select" id="mtLang">
       <option value="auto">{{ tr('自動判斷') }}</option>
-      <option value="zh">{{ tr('中文') }}</option>
+      {# 值要是語音服務認得的 BCP-47（它的 `/profiles` 列的是 `zh-Hant` / `en` / `ja`）。
+         原本寫 `zh`，選「中文」的每一件都在送件當下被對方以 `invalid_request`
+         退回 —— 假的對方不檢查語言代碼，所以測試一直是綠的。伺服器端另外會把
+         `zh` / `zh-TW` 這類常見寫法換成 `zh-Hant`（`_normalize_language`）。 #}
+      <option value="zh-Hant">{{ tr('中文') }}</option>
       <option value="en">{{ tr('英文') }}</option>
       <option value="ja">{{ tr('日文') }}</option>
     </select>
+    <span class="field-unit">{{ tr('（已知整場使用的語言時，建議直接選取，辨識會更準）') }}</span>
   </div>
   <div class="form-row">
     <label>{{ tr('會發言的人數') }}</label>
@@ -96,6 +101,10 @@
     {{ tr('這份逐字稿沒有經過校正 —— 你看到的是原始辨識結果，標點與錯字都還沒修。') }}
     {{ tr('通常是校正那一步失敗了；重新送一次多半就會有。') }}
   </p>
+  {# 尾端空白太長 → **只提示不判失敗**（理由與門檻見 router 的 `_TAIL_GAP_HINT_S`）。
+     把空白的長度寫出來：「最後 3 分鐘沒有字」比「可能不完整」好判斷 ——
+     使用者自己知道錄音最後在做什麼。 #}
+  <p class="info-box mt-hint" id="mtTail" hidden></p>
   <p class="muted" id="mtSummary"></p>
   <p class="muted" id="mtCorrection" hidden></p>
 
@@ -561,6 +570,17 @@
 
     // 校正沒生效要明講（伺服器端判斷，前端不要自己猜）
     el('mtRaw').hidden = !data.uncorrected;
+
+    // 尾端空白：伺服器說要提示才提示（門檻在伺服器端，前端不要自己判斷）
+    var tailBox = el('mtTail');
+    if (data.tail_hint && data.tail_gap_ms) {
+      var tailSec = Math.round(data.tail_gap_ms / 1000);
+      tailBox.textContent = tr('錄音最後 {0} 分 {1} 秒沒有任何文字。如果錄音到最後都有人在講話，這份逐字稿可能不完整，請重新送一次；如果是錄音忘了停、或結尾是掌聲或音樂，就不用理會。')
+        .replace('{0}', Math.floor(tailSec / 60)).replace('{1}', tailSec % 60);
+      tailBox.hidden = false;
+    } else {
+      tailBox.hidden = true;
+    }
 
     // 校正統計 —— 「摘要怪怪的」時第一個要看的就是這個
     //（對方接入清單第 8 節）。**沒有就整段不顯示**，不要印一排 0。

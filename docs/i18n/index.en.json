@@ -529,7 +529,7 @@
  "<b>效果</b>：兩小時的會議，決議與待辦逐條列出來，每一條都查得到是誰在第幾段講的": "<b>Result</b>: for a two-hour meeting, the decisions and action items are listed one by one, and for each one you can look up who said it and where",
  "語音整合 / 選用（v1.15.94）": "Speech integration, optional (v1.15.94)",
  "會議錄音變成可以拿去用的會議記錄": "Turn a meeting recording into minutes you can actually use",
- "錄音交給 <a href=\"https://jasoncheng7115.github.io/jt-live-whisper/\" target=\"_blank\" rel=\"noopener\">jtlw</a>\n      （jt-live-whisper，<b>可自架在內網</b>）做辨識與發言者分離；\n      <b>摘要、決議、待辦、心智圖與翻譯全部留在本系統</b>。\n      <b>聲音不必離開你的網路。</b>": "The recording goes to <a href=\"https://jasoncheng7115.github.io/jt-live-whisper/\" target=\"_blank\" rel=\"noopener\">jtlw</a>\n      (jt-live-whisper, <b>which you can host on your own network</b>) for recognition and speaker separation;\n      <b>the summary, decisions, action items, mind map and translation all stay in this system</b>.\n      <b>The audio never has to leave your network.</b>",
+ "錄音交給 <a href=\"https://jasoncheng7115.github.io/jt-live-whisper/\" target=\"_blank\" rel=\"noopener\">jtlw</a>\n      （jt-live-whisper，<b>可自架在內網</b>）做辨識與發言者分離；\n      <b>摘要、決議、待辦、心智圖與翻譯全部留在本系統</b>。\n      <b>重要錄音不會離開你的網路。</b>": "The recording goes to <a href=\"https://jasoncheng7115.github.io/jt-live-whisper/\" target=\"_blank\" rel=\"noopener\">jtlw</a>\n      (jt-live-whisper, <b>which you can host on your own network</b>) for recognition and speaker separation;\n      <b>the summary, decisions, action items, mind map and translation all stay in this system</b>.\n      <b>Your important recordings never leave your network.</b>",
  "設定一次": "Set it up once",
  "上傳錄音": "Upload the recording",
  "邊聽邊看": "Listen and read together",
