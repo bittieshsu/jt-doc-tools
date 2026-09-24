@@ -130,6 +130,13 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] 跑完之後 Windows 上**不可以留著 soffice 行程**
       （`Get-CimInstance Win32_Process | ? Name -match soffice` 要是空的）
 - [ ] 第一次 OCR 的狀態文字要說明「正在下載辨識模型」，不是只寫「準備中」
+- [ ] **連送兩件 OCR**（第一件還在下載模型時再送第二件）：兩件都要用 EasyOCR 辨識完成，
+      服務記錄裡不可以有 `Bad CRC-32`、完成訊息不可以寫「退回 Tesseract」（v1.16.22：兩件一起下載到
+      同一個 temp.zip 會把模型弄壞）
+- [ ] **在一台沒有裝過 Office 的機器上裝**（Win10 或新的 VM）：OxOffice 要真的被裝上，
+      `installer.log` 要看到 `OxOffice installed`、**不可以**接著出現「Falling back to LibreOffice」。
+      原本的測試機早就裝過 Office，安裝程式一直跳過這一段 —— v1.16.22 以前這條路**一次都沒走過**，
+      一走就撞到兩個錯（下載不完整回 1625、3010 被當失敗）
 - [ ] 服務啟動後「設定 → 應用程式」的版本要等於實際版本
 - [ ] `%ProgramData%\jt-doc-tools\Logs\setup-python-sync.log` 要存在、看得到 uv 的輸出
 - [ ] 逐頁在瀏覽器開一次（含管理頁），主控台不可以有錯誤
@@ -571,7 +578,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **347 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **350 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -680,6 +687,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_docs_numeric_claims.py` | 公開文件裡的數字宣稱要跟程式對得上 |
 | `test_docs_tool_categories.py` | 介紹站的工具分類要跟程式裡的一致 |
 | `test_docx_textbox_translation.py` | 含**文字方塊**的 .docx 翻譯 —— 同一段文字會被收好幾次 |
+| `test_easyocr_reader_download_is_serialized.py` | EasyOCR 的 Reader 一次只建一個 —— 第一次建的時候它會下載模型 |
 | `test_effective_permissions.py` | 「這個人最終有哪些工具、從哪來」的檢視 |
 | `test_einvoice_formatters.py` | Tests for einvoice-scan field formatters (M3.2). |
 | `test_einvoice_scan.py` | Tests for einvoice-scan tool — QR parser, buffer storage, HTTP endpoints. |
@@ -769,6 +777,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_notify_privacy.py` | 通知送出去的內容不可以外洩多餘的東西 |
 | `test_notify_settings_form.py` | 通知設定頁的兩件事：**存進去的值不可以被自動帶值蓋掉**、欄位要看得到內容 |
 | `test_ocr_avx2_guard.py` | 本機 EasyOCR 在缺 AVX2 的 CPU 上會 SIGILL 打掛整個服務 |
+| `test_ocr_engine_note_on_both_paths.py` | OCR 完成訊息要講出「實際用了哪個引擎、有沒有退回」—— 網頁與 API 兩條路都要 |
 | `test_ocr_first_download_message.py` | 第一次用本機 EasyOCR 時，狀態文字要說「正在下載辨識模型」 |
 | `test_ocr_server_gpu_select.py` | Unit tests for jt-ocr-server's auto GPU selection (server_template.py). |
 | `test_office_convert.py` | 辦公文件格式互轉（office-convert） |
@@ -787,6 +796,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_ou_key_canon.py` | OU 授權的 DN 大小寫 / 空白正規化（v1.14.48） |
 | `test_output_verification_coverage.py` | 去識別化類工具**必須**驗到「產出本身」（使用者要求，2026-09-01） |
 | `test_owasp_top10.py` | OWASP Top 10 (2025) regression suite. |
+| `test_oxoffice_msi_download_and_exit.py` | Windows 安裝 OxOffice：下載要驗完整、msiexec 回 3010 要算成功 |
 | `test_oxoffice_msi_selection.py` | Windows 安裝時要真的挑得到 OxOffice 的 **64 位元** MSI |
 | `test_pages_boot_in_a_browser.py` | 每一頁都要在**真的瀏覽器**裡開得起來，而且主控台不可以有錯誤 |
 | `test_passwords.py` | Tests for app.core.passwords (scrypt hashing + policy). |

@@ -287,6 +287,7 @@ _EXPECTED: dict[str, str] = {
     "/api/jobs/{}/download": "同上",
     "/api/jobs/{}/download-png": "同上",
     "/tools/pdf-to-image/download/{}": "文件用的是佔位 upload_id（真的要接第 1 步回的那一個）",
+    "/tools/doc-diff/page-image/{}/b/{}": "文件用的是佔位的比對編號（真的要接 /compare 回的那一個）",
 }
 
 _PARAM_RE = re.compile(r"/(?:[0-9a-f]{8,}|abc123|12345678|\d+)(?=/|$)")
@@ -326,6 +327,12 @@ def main() -> int:
     if base:
         import httpx
         client = httpx.Client(base_url=base, timeout=900)
+        # 真的實例有 CSRF 檢查（行程內的 TestClient 是用環境變數關掉的）。
+        # 跟瀏覽器一樣：先開一頁拿 cookie 與 <meta> 裡的權杖，之後每個請求都帶著。
+        # 範例裡的 `Authorization` 已經拿掉（假 token 會被 token 那一關擋成 401）。
+        m = re.search(r'name="csrf-token" content="([^"]+)"', client.get("/").text)
+        if m:
+            client.headers["x-csrf-token"] = m.group(1)
         print(f"對象：{base}", file=sys.stderr)
     else:
         import app.main as app_main

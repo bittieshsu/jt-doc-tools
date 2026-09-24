@@ -24,6 +24,51 @@ def _work_dir() -> Path:
     return p
 
 
+def _ocr_engine_note(stats: dict) -> str:
+    """完成訊息裡「用了哪個 OCR 引擎、有沒有退回」那一段。
+
+    網頁與 API 兩條路共用 —— 原本只有網頁那條有，API 送出的作業在「我的作業」
+    上看不出模型下載失敗、其實是 Tesseract 辨識的（Win10 實機踩到：只寫
+    「插入 12 字」，看起來像這份掃描件本來就沒什麼字）。
+    """
+    extra = ""
+    # OCR 引擎使用情況(若有跑到 OCR engine — LLM 完整辨識可能完全跳過 OCR)
+    ocr_engine_pages = stats.get("ocr_engine_pages") or {}
+    ocr_engine_total_s = stats.get("ocr_engine_total_s", 0)
+    ocr_remote_url = stats.get("ocr_remote_url", "")
+    ocr_chosen_engine = stats.get("ocr_chosen_engine", "")
+    ocr_remote_on = stats.get("ocr_remote_on", False)
+    ENG_LABEL = {
+        "easyocr-remote": f"遠端 GPU EasyOCR @ {ocr_remote_url}",
+        "easyocr": "本機 EasyOCR (CPU)",
+        "tesseract": "本機 Tesseract (CPU)",
+    }
+    def _chosen_label() -> str:
+        if ocr_chosen_engine == "easyocr-remote":
+            return "遠端 GPU EasyOCR"
+        if ocr_chosen_engine == "easyocr":
+            return "本機 EasyOCR"
+        if ocr_chosen_engine == "tesseract":
+            return "本機 Tesseract"
+        return ocr_chosen_engine or "?"
+    if ocr_engine_pages:
+        # 多 engine 顯示細項；單一 engine 簡潔
+        if len(ocr_engine_pages) == 1:
+            eng = next(iter(ocr_engine_pages))
+            label = ENG_LABEL.get(eng, eng)
+            # 偵測退回：選用 (含 -remote 意圖) vs 實際 engine_used 不同 → 標示
+            if ocr_chosen_engine and eng != ocr_chosen_engine:
+                extra += f"，選用 {_chosen_label()} 失敗 → 退回 {label}, 用時 {ocr_engine_total_s}s"
+            else:
+                extra += f"，{label}, 用時 {ocr_engine_total_s}s"
+        else:
+            parts = []
+            for eng, n in ocr_engine_pages.items():
+                parts.append(f"{ENG_LABEL.get(eng, eng)}×{n}")
+            extra += f"，OCR 引擎: {' / '.join(parts)} ({ocr_engine_total_s}s)"
+    return extra
+
+
 def _starting_message() -> str:
     """作業剛開始時的狀態文字。**第一次用本機 EasyOCR 要先下載模型**，
     要講出來 —— 只寫「準備中」的話，網路慢時看起來跟當掉一樣。"""
@@ -553,40 +598,7 @@ async def run_ocr(upload_id: str, request: Request,
                 app_version=_app_version,
             )
             extra = ""
-            # OCR 引擎使用情況(若有跑到 OCR engine — LLM 完整辨識可能完全跳過 OCR)
-            ocr_engine_pages = stats.get("ocr_engine_pages") or {}
-            ocr_engine_total_s = stats.get("ocr_engine_total_s", 0)
-            ocr_remote_url = stats.get("ocr_remote_url", "")
-            ocr_chosen_engine = stats.get("ocr_chosen_engine", "")
-            ocr_remote_on = stats.get("ocr_remote_on", False)
-            ENG_LABEL = {
-                "easyocr-remote": f"遠端 GPU EasyOCR @ {ocr_remote_url}",
-                "easyocr": "本機 EasyOCR (CPU)",
-                "tesseract": "本機 Tesseract (CPU)",
-            }
-            def _chosen_label() -> str:
-                if ocr_chosen_engine == "easyocr-remote":
-                    return "遠端 GPU EasyOCR"
-                if ocr_chosen_engine == "easyocr":
-                    return "本機 EasyOCR"
-                if ocr_chosen_engine == "tesseract":
-                    return "本機 Tesseract"
-                return ocr_chosen_engine or "?"
-            if ocr_engine_pages:
-                # 多 engine 顯示細項；單一 engine 簡潔
-                if len(ocr_engine_pages) == 1:
-                    eng = next(iter(ocr_engine_pages))
-                    label = ENG_LABEL.get(eng, eng)
-                    # 偵測退回：選用 (含 -remote 意圖) vs 實際 engine_used 不同 → 標示
-                    if ocr_chosen_engine and eng != ocr_chosen_engine:
-                        extra += f"，選用 {_chosen_label()} 失敗 → 退回 {label}, 用時 {ocr_engine_total_s}s"
-                    else:
-                        extra += f"，{label}, 用時 {ocr_engine_total_s}s"
-                else:
-                    parts = []
-                    for eng, n in ocr_engine_pages.items():
-                        parts.append(f"{ENG_LABEL.get(eng, eng)}×{n}")
-                    extra += f"，OCR 引擎: {' / '.join(parts)} ({ocr_engine_total_s}s)"
+            extra += _ocr_engine_note(stats)
             if stats.get("llm_full_used"):
                 t = stats.get("llm_full_total_s", 0)
                 extra += f"，LLM 完整辨識 ({llm_full_model_used}, 用時 {t}s)"
@@ -700,7 +712,7 @@ async def api_pdf_ocr(
                 progress_cb=_progress,
             )
             job.message = (f"完成 — 處理 {stats['pages_ocrd']}/{stats['pages_total']} 頁，"
-                           f"插入 {stats['words_inserted']} 字")
+                           f"插入 {stats['words_inserted']} 字" + _ocr_engine_note(stats))
             job.meta = {"upload_id": upload_id, "stats": stats,
                         "langs": active_langs,
                         "download_url": f"/api/jobs/{job.id}/download"}

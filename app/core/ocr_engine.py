@@ -16,6 +16,8 @@ from __future__ import annotations
 import io
 import json
 import logging
+import threading
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -48,6 +50,19 @@ _TESS_TO_EASYOCR = {
 
 # Lazy-loaded EasyOCR Reader（per-langs cache，避免每次 OCR 都重建模型）
 _easyocr_readers: dict[tuple, object] = {}
+
+# 建 Reader 一定要排隊：第一次建的時候 EasyOCR 會下載模型，而它**固定**把壓縮檔
+# 下載到 `<模型目錄>/temp.zip`。兩件 OCR 作業同時第一次跑（併行上限預設就是 2），
+# 兩邊一起寫同一個 temp.zip → 解壓時 `Bad CRC-32`，整份模型白下載、這一件退回
+# Tesseract（Win10 實機在慢網路上重現過：第一件下載 15 分鐘還沒完，第二件又開始下載）。
+# 排隊之後第二件等第一件下載完，直接拿快取好的 Reader。
+_easyocr_reader_lock = threading.Lock()
+
+# 建不起來的組合記一下，這段時間內不再重試。一份 20 頁的 PDF 每一頁都會來要 Reader，
+# 不記的話模型下載失敗時**每一頁都重新下載一次**（約 300 MB，慢網路上一次十幾分鐘）。
+# 過了這段時間就再試（網路恢復之後不必重開服務）。
+_EASYOCR_RETRY_AFTER_S = 600
+_easyocr_failed_at: dict[tuple, float] = {}
 
 
 def get_default_engine() -> str:
@@ -202,18 +217,29 @@ def _get_easyocr_reader(easyocr_langs: tuple) -> Optional[object]:
     if not yet downloaded) — 5-30s 延遲。"""
     if easyocr_langs in _easyocr_readers:
         return _easyocr_readers[easyocr_langs]
-    try:
-        import easyocr
-        # gpu=False 安全預設（CPU 跑 — 有 GPU 客戶可在 admin 開啟）
-        # download_enabled=True 第一次自動下模型到 ~/.EasyOCR/model/
-        reader = easyocr.Reader(list(easyocr_langs), gpu=False,
-                                 verbose=False, download_enabled=True)
+    with _easyocr_reader_lock:
+        # 排隊等到的時候，前一個人可能已經建好了
+        if easyocr_langs in _easyocr_readers:
+            return _easyocr_readers[easyocr_langs]
+        failed_at = _easyocr_failed_at.get(easyocr_langs)
+        if failed_at is not None and time.monotonic() - failed_at < _EASYOCR_RETRY_AFTER_S:
+            return None
+        try:
+            import easyocr
+            # gpu=False 安全預設（CPU 跑 — 有 GPU 客戶可在 admin 開啟）
+            # download_enabled=True 第一次自動下模型到 ~/.EasyOCR/model/
+            reader = easyocr.Reader(list(easyocr_langs), gpu=False,
+                                     verbose=False, download_enabled=True)
+        except Exception as e:
+            _easyocr_failed_at[easyocr_langs] = time.monotonic()
+            log.warning("EasyOCR Reader init failed for %s: %s "
+                        "(will not retry for %ds; falling back to tesseract)",
+                        easyocr_langs, e, _EASYOCR_RETRY_AFTER_S)
+            return None
+        _easyocr_failed_at.pop(easyocr_langs, None)
         _easyocr_readers[easyocr_langs] = reader
         log.info("EasyOCR Reader loaded for langs=%s (cached)", easyocr_langs)
         return reader
-    except Exception as e:
-        log.warning("EasyOCR Reader init failed for %s: %s", easyocr_langs, e)
-        return None
 
 
 def _map_langs_to_easyocr(tess_langs: str) -> tuple:

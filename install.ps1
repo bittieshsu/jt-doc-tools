@@ -87,6 +87,39 @@ function Test-Office {
     return $false
 }
 
+# OxOffice 的 MSI 約 400 MB，而且放在 GitHub 的發行檔案上 —— 有些網路到那裡很慢，
+# 單一連線一路下載要四十幾分鐘。慢網路上 Invoke-WebRequest 可能交回一份**不完整**的檔案
+# 而不報錯，msiexec 對它回 1625「系統原則禁止這項安裝」（事件記錄 1008：「物件無法被信任」）
+# —— 看起來像權限問題，其實是檔案壞了（Win10 實機踩到）。
+# 所以下載完要驗：大小要等於 GitHub 回報的大小、簽章不可以是「內容被改過」，
+# 不合就重下，最多三次。檢查：tests/test_oxoffice_msi_selection.py
+function Save-VerifiedMsi($url, $size, $dst) {
+    for ($i = 1; $i -le 3; $i++) {
+        Remove-Item $dst -Force -ErrorAction SilentlyContinue
+        Log ("Downloading {0} ({1:N0} MB, attempt {2}/3)" -f $url, ($size / 1MB), $i)
+        try {
+            Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing -ErrorAction Stop
+        } catch {
+            Warn "Download failed: $_"
+            continue
+        }
+        $got = 0
+        if (Test-Path $dst) { $got = (Get-Item $dst).Length }
+        if ($size -and $got -ne $size) {
+            Warn "Downloaded $got of $size bytes (incomplete), retrying"
+            continue
+        }
+        $sig = Get-AuthenticodeSignature $dst
+        if ($sig.Status -eq 'HashMismatch') {
+            Warn 'Downloaded MSI is damaged (signature hash mismatch), retrying'
+            continue
+        }
+        return $true
+    }
+    Remove-Item $dst -Force -ErrorAction SilentlyContinue
+    return $false
+}
+
 function Install-OxOffice {
     Log "Trying OxOffice from GitHub release ..."
     try {
@@ -99,12 +132,17 @@ function Install-OxOffice {
         $asset = $rel.assets | Where-Object { $_.name -match '\.msi$' -and $_.name -match '(x86_64|x64|amd64|win64)' } | Select-Object -First 1
         if (-not $asset) { Warn "No Windows MSI asset found for OxOffice"; return $false }
         $tmp = Join-Path $env:TEMP "oxoffice-$(Get-Date -Format yyyyMMddHHmmss).msi"
-        Log "Downloading $($asset.browser_download_url)"
-        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tmp
+        if (-not (Save-VerifiedMsi $asset.browser_download_url $asset.size $tmp)) {
+            Warn 'OxOffice download failed three times'; return $false
+        }
         Log "Installing OxOffice (silent) ..."
-        $proc = Start-Process msiexec.exe -ArgumentList "/i `"$tmp`" /qn /norestart" -Wait -PassThru
+        $msiLog = Join-Path $env:TEMP 'jtdt-oxoffice-msi.log'
+        $proc = Start-Process msiexec.exe -ArgumentList "/i `"$tmp`" /qn /norestart /l*v `"$msiLog`"" -Wait -PassThru
         Remove-Item $tmp -Force -ErrorAction SilentlyContinue
-        if ($proc.ExitCode -ne 0) { Warn "OxOffice MSI exit code $($proc.ExitCode)"; return $false }
+        # 3010 = 裝好了、建議重新開機。soffice 不重開也能用 —— 原本把它當成失敗，
+        # 裝好的 OxOffice 被判成失敗、又多裝一套 LibreOffice。
+        if ($proc.ExitCode -eq 3010) { Ok 'OxOffice installed (Windows suggests a restart; not needed for conversion)' }
+        elseif ($proc.ExitCode -ne 0) { Warn "OxOffice MSI exit code $($proc.ExitCode) (details: $msiLog)"; return $false }
         return Test-Office
     } catch {
         Warn "OxOffice install failed: $_"
@@ -187,7 +225,7 @@ function Ensure-TesseractChiTra {
     # 補捉 PDF 字夠用。要更精準可改抓 tessdata_best 但檔案大很多 (~50MB)。
     $url = 'https://github.com/tesseract-ocr/tessdata_fast/raw/main/chi_tra.traineddata'
     $dst = Join-Path $tessdataDir 'chi_tra.traineddata'
-    Log "Downloading chi_tra.traineddata (~12MB) for Chinese OCR..."
+    Log "Downloading chi_tra.traineddata (~2.4 MB) for Chinese OCR..."
     try {
         Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop
         if (Test-Path $dst) {

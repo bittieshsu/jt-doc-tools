@@ -1576,7 +1576,7 @@ def _legacy_download_chi_tra_fast_only(binary: str) -> bool:
         return False
     url = "https://github.com/tesseract-ocr/tessdata_fast/raw/main/chi_tra.traineddata"
     dst = tessdata / "chi_tra.traineddata"
-    print(f"  Downloading chi_tra.traineddata (~12MB) → {dst} ...")
+    print(f"  Downloading chi_tra.traineddata (~2.4 MB) → {dst} ...")
     try:
         import urllib.request
         _safe_fetch.urlretrieve(url, str(dst))

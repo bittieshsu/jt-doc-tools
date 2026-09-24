@@ -25,6 +25,9 @@ def load_failures() -> dict[str, str]:
     return dict(_LOAD_FAILURES)
 
 
+_LOGGED_REGISTERED: set[str] = set()
+
+
 def discover_tools() -> list[ToolModule]:
     """Import every subpackage of app.tools and collect their exported `tool` attribute."""
     import app.tools as tools_pkg
@@ -49,7 +52,12 @@ def discover_tools() -> list[ToolModule]:
             logger.info("Tool %s is disabled", tool.metadata.id)
             continue
         found.append(tool)
-        logger.info("Registered tool: %s (%s)", tool.metadata.id, tool.metadata.name)
+        # 啟動時記一次就好。作業完成通知、權限頁也會呼叫這支拿工具清單 ——
+        # 每次都印的話，每完成一件作業日誌就多 50 行，真正的錯誤被擠到看不到
+        # （`jtdt update` 失敗時只印最後 20 行，那 20 行會全是這個）。
+        if tool.metadata.id not in _LOGGED_REGISTERED:
+            _LOGGED_REGISTERED.add(tool.metadata.id)
+            logger.info("Registered tool: %s (%s)", tool.metadata.id, tool.metadata.name)
     return found
 
 

@@ -5,11 +5,38 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (850 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (851 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.22] - 2026-09-25
+
+### Windows installer: OxOffice failed on slow networks, and a successful install counted as a failure
+
+* The OxOffice installer is about 400 MB and hosted on GitHub. On some networks the download is slow and can
+  end incomplete without any error; installing it then failed with 1625 ("forbidden by system policy"), which
+  looks like a permissions problem but was a damaged file. The download is now checked against the expected
+  size and its digital signature and retried (up to three times) before falling back to LibreOffice.
+* msiexec returning 3010 ("installed, restart suggested") was treated as a failure, so LibreOffice was installed
+  on top. It now counts as success (conversion does not need a restart).
+* The OxOffice install log is written to `%ProgramData%\jt-doc-tools\Logs\oxoffice-msi.log`.
+* These need the v1.16.22 installer; the command-line installer (`install.ps1`) is fixed as well.
+
+### OCR: two jobs running for the first time corrupted the downloaded model
+
+* The first OCR run downloads the recognition models (about 300 MB). If a second job started meanwhile
+  (clicking again after waiting too long, or dropping two files at once), both downloaded into the same
+  temporary file and overwrote each other; unpacking then failed with `Bad CRC-32`, the download was wasted,
+  and that job silently fell back to Tesseract (much weaker on Chinese). Now only one job downloads at a time;
+  the others wait and reuse the result.
+* When the model download failed, every page tried to download it again. Now it waits 10 minutes before
+  retrying (Tesseract is used in the meantime) and then tries again on its own.
+* OCR jobs submitted through the API now also say which engine was actually used and whether it fell back
+  to Tesseract (only the web page did before).
+* Service log: every finished job added about 50 `Registered tool` lines, pushing real errors out of view.
+  They are now logged once at startup.
 
 ## [1.16.21] - 2026-09-24
 
