@@ -1027,16 +1027,30 @@ def svc_update() -> int:
             _restore_ownership(root, owner)
             svc_start()
             return rc
-        # easyocr 軟性檢查 — 沒裝會 fallback tesseract，warn 不 die
-        eo_rc = subprocess.call([str(venv_py), "-c", "import easyocr"],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if eo_rc == 0:
-            print("  OK: EasyOCR available (主 OCR 引擎)")
+        # easyocr 軟性檢查 — 沒裝會 fallback tesseract，warn 不 die。
+        # 「沒裝」與「裝了但載不起來」要分開講：Windows 上 System32 的 VC++ 執行階段
+        # 被別的安裝程式換成舊版時，import 會 WinError 1114 —— 原本一律印「EasyOCR 未裝」，
+        # 管理員會去重裝 EasyOCR，而真正要修的是執行階段（下面的系統相依步驟會修）。
+        eo = subprocess.run([str(venv_py), "-c", "import easyocr"],
+                            capture_output=True, text=True, errors="replace")
+        if eo.returncode == 0:
+            print("  OK: EasyOCR available (primary OCR engine)")
         else:
-            print("  WARNING: EasyOCR 未裝（OCR 會自動 fallback tesseract，CJK 識別率較弱）",
-                  file=sys.stderr)
-            print("    手動補裝：sudo jtdt update  或  <venv>/bin/pip install easyocr",
-                  file=sys.stderr)
+            has_pkg = subprocess.call(
+                [str(venv_py), "-c",
+                 "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('easyocr') else 1)"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+            if has_pkg:
+                last = ((eo.stderr or "").strip().splitlines() or [""])[-1][:200]
+                print(f"  WARNING: EasyOCR is installed but failed to load: {last}", file=sys.stderr)
+                if _is_windows():
+                    print("    Usually the Visual C++ runtime in System32 was replaced by an older one;"
+                          " the system-deps step below repairs it.", file=sys.stderr)
+            else:
+                print("  WARNING: EasyOCR not installed (OCR falls back to tesseract, weaker on CJK)",
+                      file=sys.stderr)
+                print("    Install: sudo jtdt update  or  <venv>/bin/pip install easyocr",
+                      file=sys.stderr)
 
     # 4a. PDF.js vendor 完整性檢查 — 隨 git 來，這裡只驗有沒漏掉檔
     pdfjs_dir = root / "static" / "vendor" / "pdfjs"
@@ -1458,14 +1472,10 @@ def _ensure_system_deps_for_update() -> None:
             print(f"  warning: vc_redist install errored: {e}", file=sys.stderr)
 
 
-def _ensure_vc_redist_windows() -> None:
-    """Windows only — 確保 Microsoft Visual C++ Redistributable 14.40+ 已安裝。
-    PyTorch (EasyOCR 主依賴) 需要它，沒有會 c10.dll load failure。
-    符合條件就跳過；舊版或缺則無提示安裝（不需 reboot — 新 process 即可載 DLL）。"""
-    if not _is_windows():
-        return
+def _vc_redist_registry_version() -> tuple[str, tuple]:
+    """登錄檔登記的 VC++ Redistributable 版本 → (原字串, (主, 次))；沒有回 ("", ())。"""
     import winreg
-    needs_install = True
+    import re as _re
     for hive_path in (
         r"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64",
         r"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\X64",
@@ -1473,23 +1483,43 @@ def _ensure_vc_redist_windows() -> None:
         try:
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, hive_path) as k:
                 ver, _ = winreg.QueryValueEx(k, "Version")
-                # ver looks like "v14.40.33810.00" or "v14.0.23026.00"
-                import re as _re
-                m = _re.match(r"^v?(\d+)\.(\d+)", str(ver))
-                if m:
-                    major = int(m.group(1))
-                    minor = int(m.group(2))
-                    if major > 14 or (major == 14 and minor >= 40):
-                        print(f"  OK: VC++ Redistributable already current ({ver})")
-                        return
-                    print(f"  VC++ Redistributable too old ({ver}) — upgrading")
-                    break
-        except FileNotFoundError:
+        except Exception:                                  # noqa: BLE001
             continue
-        except Exception:
-            continue
+        # ver looks like "v14.40.33810.00" or "v14.0.23026.00"
+        m = _re.match(r"^v?(\d+)\.(\d+)", str(ver))
+        if m:
+            return str(ver), (int(m.group(1)), int(m.group(2)))
+    return "", ()
+
+
+def _ensure_vc_redist_windows() -> None:
+    """Windows only — 確保 Microsoft Visual C++ 執行階段 14.40+ **真的在 System32 裡**。
+
+    PyTorch（EasyOCR 的底層）需要它，太舊時 `c10.dll` 初始化失敗（WinError 1114），
+    OCR 一律退回 Tesseract。
+
+    **登錄檔與檔案要分開看**：OxOffice 11.0.5 的 MSI 會把 System32 的執行階段換成
+    它內含的 14.29（`REINSTALLMODE=dmus`），登錄檔卻還寫 14.44。這時 `/install`
+    會回 0 卻什麼都不做（它認為已經裝了）—— 要用 `/repair` 才會把檔案換回來。
+    Win10 實機驗過：`/repair` 回 3010，檔案回到 14.44，新開的行程不必重開機就載得起來。
+    """
+    if not _is_windows():
+        return
+    from .core.sys_deps import VC_RUNTIME_MIN, vc_runtime_file_version
+    reg_raw, reg = _vc_redist_registry_version()
+    reg_ok = bool(reg) and reg >= VC_RUNTIME_MIN
+    files = vc_runtime_file_version() or (0,)
+    files_ok = files[:2] >= VC_RUNTIME_MIN
+    shown = ".".join(str(x) for x in files)
+    if reg_ok and files_ok:
+        print(f"  OK: VC++ Redistributable already current ({reg_raw}; System32 {shown})")
+        return
+    if reg_ok:
+        print(f"  VC++ runtime files in System32 are {shown} although {reg_raw} is registered "
+              "(another installer replaced them); repairing")
+    elif reg:
+        print(f"  VC++ Redistributable too old ({reg_raw}); upgrading")
     print("  Installing Microsoft Visual C++ Redistributable (PyTorch dep, ~25MB)...")
-    import urllib.request
     import tempfile
     import subprocess as _sp
     tmp = Path(tempfile.gettempdir()) / "jtdt-vc_redist.x64.exe"
@@ -1497,15 +1527,28 @@ def _ensure_vc_redist_windows() -> None:
         _safe_fetch.urlretrieve(
             "https://aka.ms/vs/17/release/vc_redist.x64.exe", str(tmp),
         )
-        rc = _sp.call([str(tmp), "/install", "/quiet", "/norestart"])
-        if rc in (0, 3010):
-            print(f"  OK: VC++ Redistributable installed (exit {rc} — 新 process 可正常載入，不需重啟)")
+        action = "/repair" if reg_ok else "/install"
+        rc = _sp.call([str(tmp), action, "/quiet", "/norestart"])
+        if action == "/install" and (vc_runtime_file_version() or (0,))[:2] < VC_RUNTIME_MIN:
+            # 裝完檔案還是舊的（同版本已登記時 /install 什麼都不做）→ 再修復一次
+            rc = _sp.call([str(tmp), "/repair", "/quiet", "/norestart"])
+        after = vc_runtime_file_version() or (0,)
+        if rc in (0, 3010) and after[:2] >= VC_RUNTIME_MIN:
+            print(f"  OK: VC++ Redistributable {action.lstrip('/')} done (exit {rc}; "
+                  f"System32 {'.'.join(str(x) for x in after)}; no restart needed)")
+        elif rc == 3010:
+            # 同一次開機裡 vc_redist 已經回過 3010，它就不肯再做任何事
+            # （記錄寫 0x8007015e「要先重新開機」），卻照樣回 3010
+            print(f"  WARNING: System32 runtime is still {'.'.join(str(x) for x in after)}: "
+                  "restart Windows, then run 'jtdt update' again to repair it "
+                  "(until then OCR falls back to tesseract)", file=sys.stderr)
         else:
-            print(f"  WARNING: vc_redist exit {rc} — EasyOCR 可能載不起，OCR 會 fallback tesseract",
+            print(f"  WARNING: vc_redist exit {rc}, System32 runtime still "
+                  f"{'.'.join(str(x) for x in after)} ; EasyOCR may not load (OCR falls back to tesseract)",
                   file=sys.stderr)
     except Exception as e:
-        print(f"  WARNING: vc_redist 下載 / 安裝失敗：{e}", file=sys.stderr)
-        print("    手動補裝：開 https://aka.ms/vs/17/release/vc_redist.x64.exe", file=sys.stderr)
+        print(f"  WARNING: vc_redist download / install failed: {e}", file=sys.stderr)
+        print("    Install manually: https://aka.ms/vs/17/release/vc_redist.x64.exe", file=sys.stderr)
 
 
 def _ensure_tesseract_chi_tra(binary: str) -> bool:

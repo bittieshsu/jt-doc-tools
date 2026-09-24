@@ -137,6 +137,11 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
       `installer.log` 要看到 `OxOffice installed`、**不可以**接著出現「Falling back to LibreOffice」。
       原本的測試機早就裝過 Office，安裝程式一直跳過這一段 —— v1.16.22 以前這條路**一次都沒走過**，
       一走就撞到兩個錯（下載不完整回 1625、3010 被當失敗）
+- [ ] **裝完 OxOffice 之後 EasyOCR 還要載得起來**（v1.16.23）：`System32\msvcp140.dll` 的版本要是 14.40 以上
+      （`(Get-Item C:\Windows\System32\msvcp140.dll).VersionInfo.ProductVersion`），`installer.log` 要看到
+      `Visual C++ Redistributable ready` 或 `already current (...; System32 14.4x)`。OxOffice 11.0.5 的 MSI 會把它
+      換成 14.29，EasyOCR 就載不起來（WinError 1114）而**安靜地退回 Tesseract**；登錄檔仍寫 14.44，只看登錄檔會漏掉
+- [ ] 改了任何 `.ps1` 都要在 Windows 上 `[Parser]::ParseFile()` 一次 —— `"$變數:"` 這種錯在 Linux 上的測試全綠
 - [ ] 服務啟動後「設定 → 應用程式」的版本要等於實際版本
 - [ ] `%ProgramData%\jt-doc-tools\Logs\setup-python-sync.log` 要存在、看得到 uv 的輸出
 - [ ] 逐頁在瀏覽器開一次（含管理頁），主控台不可以有錯誤
@@ -578,7 +583,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **350 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **352 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -838,6 +843,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_pdf_watermark_batch.py` | pdf-watermark 逐檔順序上傳（issue #27） |
 | `test_pdf_wordcount.py` | Tests for the pdf-wordcount tool. |
 | `test_placeholder_extraction.py` | 擷取出來全是佔位字元（圓點 / 星號…）但畫面上其實是真的字 |
+| `test_powershell_scope_colon_in_strings.py` | PowerShell 的雙引號字串裡不可以寫 `"$變數:"` |
 | `test_preview_acl_failopen.py` | 預覽端點的 ACL 不可以「認不出 upload_id 就放行」 |
 | `test_preview_is_not_the_result.py` | **預覽只有前幾頁時，畫面一定要講出整份有幾頁。** |
 | `test_preview_page_range.py` | 縮圖 / 預覽的頁碼超出範圍要回 4xx，**不可以 500** |
@@ -926,6 +932,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_v1_4_99_audit_2fa.py` | v1.4.99 — auditor role + TOTP 2FA + separation-of-duties tests. |
 | `test_vat_db.py` | Tests for vat_db (M4.a). |
 | `test_vat_upload_and_group_sync.py` | 2026-06-30 客戶回報兩項： |
+| `test_vc_runtime_repair_after_downgrade.py` | VC++ 執行階段被別的安裝程式換成舊版時，要看得出來、而且修得回來 |
 | `test_version_consistency.py` | Release-time version consistency — every source agrees on `app/main.py:VERSION`. |
 | `test_windows_git_guidance.py` | Windows 缺 git 時的指引不可以只講 winget |
 | `test_windows_service_restart.py` | Windows 的 `jtdt restart` 必須真的把服務啟起來（2026-08-24 實機重現） |

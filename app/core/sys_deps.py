@@ -99,6 +99,58 @@ def configure_pytesseract() -> str:
     return path
 
 
+#: PyTorch（EasyOCR 的底層）要的 Visual C++ 執行階段最低版本。
+VC_RUNTIME_MIN = (14, 40)
+_VC_RUNTIME_FILES = ("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
+
+
+def vc_runtime_file_version() -> Optional[tuple]:
+    """Windows：System32 裡**實際的** VC++ 執行階段版本（三個檔案裡最舊的那個）。
+
+    **不可以只看登錄檔。** OxOffice 11.0.5 的 MSI 內含 14.29 的執行階段，安裝模式是
+    `REINSTALLMODE=dmus`（版本「不同」就覆蓋，連舊版也蓋上去）—— 裝完之後 System32 的
+    檔案變成 14.29，登錄檔卻還寫著 14.44。PyTorch 的 `c10.dll` 初始化失敗（WinError 1114），
+    EasyOCR 整個不能用、OCR 一律退回 Tesseract（Win10 實機踩到）。
+    已經在跑的服務不受影響（DLL 早就載入了），**下一次重啟才壞** —— 所以很難聯想到安裝 Office。
+
+    非 Windows 回 ``None``；缺檔或讀不到回 ``(0,)``。
+    """
+    if os.name != "nt":
+        return None
+    from .office_convert import _win_product_version
+    root = Path(os.environ.get("SystemRoot") or r"C:\Windows") / "System32"
+    worst: Optional[tuple] = None
+    for name in _VC_RUNTIME_FILES:
+        f = root / name
+        v = _win_product_version(str(f)) if f.exists() else ""
+        try:
+            t = tuple(int(x) for x in v.split(".")) if v else (0,)
+        except ValueError:
+            t = (0,)
+        if worst is None or t < worst:
+            worst = t
+    return worst or (0,)
+
+
+def vc_runtime_too_old() -> Optional[str]:
+    """System32 的執行階段比 PyTorch 要的舊時回傳人看得懂的版本字串，否則 ``None``。"""
+    v = vc_runtime_file_version()
+    if v is None or v[:2] >= VC_RUNTIME_MIN:
+        return None
+    return ".".join(str(x) for x in v) if v != (0,) else "（缺檔）"
+
+
+def _probe_easyocr() -> dict:
+    r = _probe_python_pkg("easyocr", heavy=True)
+    old = vc_runtime_too_old() if r.get("installed") else None
+    if old:
+        r = dict(r, ok=False,
+                 extra=(f"系統的 Visual C++ 執行階段是 {old}，PyTorch 需要 14.40 以上"
+                        "（常見原因：別的軟體的安裝程式把它換成舊版，例如 OxOffice 11.0.5）。"
+                        "OCR 會退回 Tesseract；執行 jtdt update 會自動修復。"))
+    return r
+
+
 _cpu_simd_cache: Optional[dict] = None
 
 
@@ -844,7 +896,7 @@ _DEPS = [
         "impact": "v1.7.2 起的主 OCR 引擎，中日韓辨識準確度明顯優於 tesseract（per-line bbox + LSTM-based）。沒裝會自動降回 tesseract。重型依賴：pulls in PyTorch (~700MB)。",
         "impact_en": "Primary OCR engine since v1.7.2 (CJK accuracy >> tesseract). Falls back to tesseract if missing.",
         "soft": True,
-        "probe": lambda: _probe_python_pkg("easyocr", heavy=True),
+        "probe": _probe_easyocr,
         "install_cmd": {
             "linux": f"{shutil.which('uv') or 'uv'} pip install easyocr  (auto-installs PyTorch ~700MB)",
             "macos": "uv pip install easyocr",

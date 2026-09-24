@@ -293,65 +293,69 @@ function Install-Tesseract {
     }
 }
 
-# uv
+# System32 裡**實際的** VC++ 執行階段版本（三個檔案裡最舊的那個）。**不可以只看登錄檔**：
+# OxOffice 11.0.5 的 MSI 內含 14.29 的執行階段、安裝模式是 REINSTALLMODE=dmus（版本「不同」
+# 就覆蓋，連舊版也蓋上去）—— 裝完 System32 的檔案變成 14.29，登錄檔卻還寫 14.44。
+# PyTorch 的 c10.dll 初始化失敗（WinError 1114），EasyOCR 整個不能用（Win10 實機踩到）。
+# 這時 vc_redist /install 回 0 卻什麼都不做（它認為已經裝了），要用 /repair 才會把檔案換回來。
+# 檢查：tests/test_vc_runtime_repair_after_downgrade.py
+function Get-VCRuntimeFileVersion {
+    $dir = Join-Path $env:SystemRoot 'System32'
+    if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess) {
+        $dir = Join-Path $env:SystemRoot 'Sysnative'
+    }
+    $worst = $null
+    foreach ($n in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+        $f = Join-Path $dir $n
+        $v = [version]'0.0'
+        if (Test-Path $f) {
+            $pv = (Get-Item $f).VersionInfo.ProductVersion
+            if ($pv -match '^(\d+\.\d+(\.\d+){0,2})') { try { $v = [version]$Matches[1] } catch {} }
+        }
+        if ($null -eq $worst -or $v -lt $worst) { $worst = $v }
+    }
+    return $worst
+}
 function Ensure-VCRedist {
-    # PyTorch 2.x（EasyOCR 主依賴）需要 Visual C++ Redistributable 2015-2022
-    # (14.40+)。沒裝會 c10.dll load failure (WinError 1114)，EasyOCR 完全
-    # 載不起來，OCR 會 silent fallback 到 tesseract。
-    #
-    # 即使 vc_redist installer 回 exit 3010 (suggests reboot)，PyTorch 仍可
-    # 在「之後新 spawn 的 process」載入 — 我們不 prompt user 重啟，後續
-    # uv sync + service restart 都是新 process，會抓到新 DLL。
-    Log "Checking Visual C++ Redistributable (PyTorch dep) ..."
-    $key  = "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64"
-    $key2 = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\X64"
-    $current = ""
-    foreach ($k in @($key, $key2)) {
+    Log 'Checking Visual C++ Redistributable (PyTorch dep) ...'
+    $current = ''
+    foreach ($k in @('HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64',
+                     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\X64')) {
         if (Test-Path $k) {
             try { $v = (Get-ItemProperty $k).Version; if ($v) { $current = $v; break } } catch {}
         }
     }
-    # 解析版本：v14.40+ 才符合現代 PyTorch；之前的（如 v14.0.23026 = 2015 RTM）不行
-    $needsInstall = $true
-    if ($current -match '^v?(\d+)\.(\d+)') {
-        $major = [int]$Matches[1]
-        $minor = [int]$Matches[2]
-        if ($major -gt 14 -or ($major -eq 14 -and $minor -ge 40)) {
-            $needsInstall = $false
-            Ok "Visual C++ Redistributable already current ($current)"
-        } else {
-            Log "Visual C++ Redistributable is old ($current) — upgrading to latest"
-        }
-    } else {
-        Log "Visual C++ Redistributable not found — installing latest"
-    }
-    if (-not $needsInstall) { return }
-
-    $vc = Join-Path $env:TEMP "jtdt-vc_redist.x64.exe"
+    $min = [version]'14.40'
+    $regOk = $false
+    if ($current -match '^v?(\d+)\.(\d+)') { $regOk = ([version]"$($Matches[1]).$($Matches[2])") -ge $min }
+    $files = Get-VCRuntimeFileVersion
+    if ($regOk -and $files -ge $min) { Ok "Visual C++ Redistributable already current ($current; System32 $files)"; return }
+    if ($regOk) { Warn "System32 runtime files are $files although $current is registered (replaced by another installer); repairing" }
+    elseif ($current) { Log "Visual C++ Redistributable is old ($current); upgrading" }
+    else { Log 'Visual C++ Redistributable not found; installing' }
+    $vc = Join-Path $env:TEMP 'jtdt-vc_redist.x64.exe'
     if (Test-Path $vc) { Remove-Item $vc -Force -ErrorAction SilentlyContinue }
     try {
-        Log "Downloading Microsoft Visual C++ Redistributable (~25 MB) ..."
-        Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" `
-            -OutFile $vc -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop
-        Log "Installing (silent, no reboot) ..."
-        $proc = Start-Process -FilePath $vc -ArgumentList "/install","/quiet","/norestart" `
-            -Wait -PassThru -ErrorAction Stop
-        if ($proc.ExitCode -eq 0) {
-            Ok "Visual C++ Redistributable installed"
-        } elseif ($proc.ExitCode -eq 3010) {
-            # 3010 = success but reboot recommended.PyTorch 仍可在新 process load
-            Ok "Visual C++ Redistributable installed (exit 3010 — 新 process 可正常 load，不需重啟)"
-        } else {
-            Warn "vc_redist exit $($proc.ExitCode) — EasyOCR 可能載不起，OCR 會 fallback tesseract"
+        Log 'Downloading Microsoft Visual C++ Redistributable (~25 MB) ...'
+        Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile $vc -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop
+        $action = if ($regOk) { '/repair' } else { '/install' }
+        $proc = Start-Process -FilePath $vc -ArgumentList $action,'/quiet','/norestart' -Wait -PassThru -ErrorAction Stop
+        $code = $proc.ExitCode
+        if ($action -eq '/install' -and (Get-VCRuntimeFileVersion) -lt $min) {
+            $proc = Start-Process -FilePath $vc -ArgumentList '/repair','/quiet','/norestart' -Wait -PassThru -ErrorAction Stop
+            $code = $proc.ExitCode
         }
-    } catch {
-        Warn "vc_redist 下載 / 安裝失敗：$_"
-        Warn "  EasyOCR 將無法載入；OCR 會自動 fallback tesseract（CJK 識別率較弱）"
-        Warn "  手動補裝：開啟 https://aka.ms/vs/17/release/vc_redist.x64.exe 安裝"
-    }
+        $after = Get-VCRuntimeFileVersion
+        # 3010 = done, restart suggested; new processes load the new DLLs without a restart
+        if (($code -eq 0 -or $code -eq 3010) -and $after -ge $min) { Ok "Visual C++ Redistributable ready (System32 $after, exit $code)" }
+        # 同一次開機裡 vc_redist 已經回過 3010，它就不肯再做任何事（記錄寫 0x8007015e「要先重新開機」），
+        # 卻照樣回 3010 —— 只看離開碼會以為修好了
+        elseif ($code -eq 3010) { Warn "System32 runtime is still $($after): restart Windows, then run 'jtdt update' to repair it (until then OCR uses tesseract)" }
+        else { Warn "vc_redist exit $code, System32 runtime still $after - EasyOCR may fall back to tesseract" }
+    } catch { Warn "vc_redist download/install failed: $_ (OCR falls back to tesseract)" }
 }
 
-
+# uv
 function Install-Uv {
     if (Test-Path $UvExe) { Ok "uv already present"; return }
     Log "Downloading uv ..."

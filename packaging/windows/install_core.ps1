@@ -334,6 +334,29 @@ function Install-Tesseract {
 # =====================================================================
 #  Visual C++ Redistributable (PyTorch dep, part of OCR component)
 # =====================================================================
+# System32 裡**實際的** VC++ 執行階段版本（三個檔案裡最舊的那個）。**不可以只看登錄檔**：
+# OxOffice 11.0.5 的 MSI 內含 14.29 的執行階段、安裝模式是 REINSTALLMODE=dmus（版本「不同」
+# 就覆蓋，連舊版也蓋上去）—— 裝完 System32 的檔案變成 14.29，登錄檔卻還寫 14.44。
+# PyTorch 的 c10.dll 初始化失敗（WinError 1114），EasyOCR 整個不能用（Win10 實機踩到）。
+# 這時 vc_redist /install 回 0 卻什麼都不做（它認為已經裝了），要用 /repair 才會把檔案換回來。
+# 檢查：tests/test_vc_runtime_repair_after_downgrade.py
+function Get-VCRuntimeFileVersion {
+    $dir = Join-Path $env:SystemRoot 'System32'
+    if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess) {
+        $dir = Join-Path $env:SystemRoot 'Sysnative'
+    }
+    $worst = $null
+    foreach ($n in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+        $f = Join-Path $dir $n
+        $v = [version]'0.0'
+        if (Test-Path $f) {
+            $pv = (Get-Item $f).VersionInfo.ProductVersion
+            if ($pv -match '^(\d+\.\d+(\.\d+){0,2})') { try { $v = [version]$Matches[1] } catch {} }
+        }
+        if ($null -eq $worst -or $v -lt $worst) { $worst = $v }
+    }
+    return $worst
+}
 function Ensure-VCRedist {
     Log 'Checking Visual C++ Redistributable (PyTorch dep) ...'
     $current = ''
@@ -343,23 +366,33 @@ function Ensure-VCRedist {
             try { $v = (Get-ItemProperty $k).Version; if ($v) { $current = $v; break } } catch {}
         }
     }
-    $needsInstall = $true
-    if ($current -match '^v?(\d+)\.(\d+)') {
-        $major = [int]$Matches[1]; $minor = [int]$Matches[2]
-        if ($major -gt 14 -or ($major -eq 14 -and $minor -ge 40)) {
-            $needsInstall = $false; Ok "Visual C++ Redistributable already current ($current)"
-        }
-    }
-    if (-not $needsInstall) { return }
+    $min = [version]'14.40'
+    $regOk = $false
+    if ($current -match '^v?(\d+)\.(\d+)') { $regOk = ([version]"$($Matches[1]).$($Matches[2])") -ge $min }
+    $files = Get-VCRuntimeFileVersion
+    if ($regOk -and $files -ge $min) { Ok "Visual C++ Redistributable already current ($current; System32 $files)"; return }
+    if ($regOk) { Warn "System32 runtime files are $files although $current is registered (replaced by another installer); repairing" }
+    elseif ($current) { Log "Visual C++ Redistributable is old ($current); upgrading" }
+    else { Log 'Visual C++ Redistributable not found; installing' }
     $vc = Join-Path $env:TEMP 'jtdt-vc_redist.x64.exe'
     if (Test-Path $vc) { Remove-Item $vc -Force -ErrorAction SilentlyContinue }
     try {
         Log 'Downloading Microsoft Visual C++ Redistributable (~25 MB) ...'
         Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile $vc -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop
-        $proc = Start-Process -FilePath $vc -ArgumentList '/install','/quiet','/norestart' -Wait -PassThru -ErrorAction Stop
-        if ($proc.ExitCode -eq 0)       { Ok 'Visual C++ Redistributable installed' }
-        elseif ($proc.ExitCode -eq 3010){ Ok 'Visual C++ Redistributable installed (reboot suggested; new process loads fine)' }
-        else { Warn "vc_redist exit $($proc.ExitCode) - EasyOCR may fall back to tesseract" }
+        $action = if ($regOk) { '/repair' } else { '/install' }
+        $proc = Start-Process -FilePath $vc -ArgumentList $action,'/quiet','/norestart' -Wait -PassThru -ErrorAction Stop
+        $code = $proc.ExitCode
+        if ($action -eq '/install' -and (Get-VCRuntimeFileVersion) -lt $min) {
+            $proc = Start-Process -FilePath $vc -ArgumentList '/repair','/quiet','/norestart' -Wait -PassThru -ErrorAction Stop
+            $code = $proc.ExitCode
+        }
+        $after = Get-VCRuntimeFileVersion
+        # 3010 = done, restart suggested; new processes load the new DLLs without a restart
+        if (($code -eq 0 -or $code -eq 3010) -and $after -ge $min) { Ok "Visual C++ Redistributable ready (System32 $after, exit $code)" }
+        # 同一次開機裡 vc_redist 已經回過 3010，它就不肯再做任何事（記錄寫 0x8007015e「要先重新開機」），
+        # 卻照樣回 3010 —— 只看離開碼會以為修好了
+        elseif ($code -eq 3010) { Warn "System32 runtime is still $($after): restart Windows, then run 'jtdt update' to repair it (until then OCR uses tesseract)" }
+        else { Warn "vc_redist exit $code, System32 runtime still $after - EasyOCR may fall back to tesseract" }
     } catch { Warn "vc_redist download/install failed: $_ (OCR falls back to tesseract)" }
 }
 

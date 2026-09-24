@@ -5,11 +5,27 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (851 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (852 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.23] - 2026-09-25
+
+### Windows: after installing OxOffice, Chinese OCR got much worse (EasyOCR could not load)
+
+* The OxOffice 11.0.5 installer replaces the system's Visual C++ runtime with the older copy it bundles (14.29).
+  EasyOCR needs 14.40 or later, so OCR fell back to Tesseract (much weaker on Chinese) and the page only said
+  that EasyOCR failed and Tesseract was used. The old check only read the registry (which still said the new
+  version), so it reported "already current" and repaired nothing. Machines where the v1.16.20 to v1.16.22
+  installers put OxOffice, and machines with OxOffice 11.0.5 installed separately, are affected.
+* The installer and `jtdt update` now check the actual file versions in System32 and repair a downgraded runtime
+  automatically (no restart needed). If a repair already ran during the same boot, they ask you to restart
+  Windows and run `jtdt update` again.
+* The dependency page flags this on the EasyOCR row.
+* `jtdt update` now tells "EasyOCR not installed" apart from "installed but cannot load" (it always said the former).
+* Already affected: run `jtdt update` once as administrator.
 
 ## [1.16.22] - 2026-09-25
 
