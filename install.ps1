@@ -316,6 +316,25 @@ function Get-VCRuntimeFileVersion {
     }
     return $worst
 }
+# 直接修復已安裝的 VC++ 執行階段 MSI（Minimum / Additional Runtime）。**不經過 vc_redist 的 Burn 外殼**：
+# 同一次開機裡 Burn 已經回過 3010 時它不肯再動（記錄寫 0x8007015e），直接對 MSI 做 /fomus 則照樣換得回來
+# （Win10 實機驗過：3010、檔案回 14.44、不必重開機）。也不用重新下載 25 MB。
+function Repair-VCRuntimeMsi {
+    $keys = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+              'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall')
+    $done = 0
+    foreach ($k in $keys) {
+        Get-ChildItem $k -ErrorAction SilentlyContinue | ForEach-Object {
+            $p = Get-ItemProperty $_.PsPath -ErrorAction SilentlyContinue
+            if ($_.PSChildName -match '^\{[0-9A-Fa-f-]+\}$' -and $p.DisplayName -match 'Visual C\+\+ 20\d\d X64 (Minimum|Additional) Runtime') {
+                $proc = Start-Process msiexec.exe -ArgumentList "/fomus $($_.PSChildName) /qn /norestart" -Wait -PassThru
+                Log "Repaired $($p.DisplayName) (exit $($proc.ExitCode))"
+                $done++
+            }
+        }
+    }
+    return $done
+}
 function Ensure-VCRedist {
     Log 'Checking Visual C++ Redistributable (PyTorch dep) ...'
     $current = ''
@@ -330,29 +349,31 @@ function Ensure-VCRedist {
     if ($current -match '^v?(\d+)\.(\d+)') { $regOk = ([version]"$($Matches[1]).$($Matches[2])") -ge $min }
     $files = Get-VCRuntimeFileVersion
     if ($regOk -and $files -ge $min) { Ok "Visual C++ Redistributable already current ($current; System32 $files)"; return }
-    if ($regOk) { Warn "System32 runtime files are $files although $current is registered (replaced by another installer); repairing" }
-    elseif ($current) { Log "Visual C++ Redistributable is old ($current); upgrading" }
+    $code = 0
+    if ($regOk) {
+        Warn "System32 runtime files are $files although $current is registered (replaced by another installer); repairing"
+        $null = Repair-VCRuntimeMsi
+    } elseif ($current) { Log "Visual C++ Redistributable is old ($current); upgrading" }
     else { Log 'Visual C++ Redistributable not found; installing' }
-    $vc = Join-Path $env:TEMP 'jtdt-vc_redist.x64.exe'
-    if (Test-Path $vc) { Remove-Item $vc -Force -ErrorAction SilentlyContinue }
-    try {
-        Log 'Downloading Microsoft Visual C++ Redistributable (~25 MB) ...'
-        Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile $vc -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop
-        $action = if ($regOk) { '/repair' } else { '/install' }
-        $proc = Start-Process -FilePath $vc -ArgumentList $action,'/quiet','/norestart' -Wait -PassThru -ErrorAction Stop
-        $code = $proc.ExitCode
-        if ($action -eq '/install' -and (Get-VCRuntimeFileVersion) -lt $min) {
-            $proc = Start-Process -FilePath $vc -ArgumentList '/repair','/quiet','/norestart' -Wait -PassThru -ErrorAction Stop
+    if ((Get-VCRuntimeFileVersion) -lt $min) {
+        $vc = Join-Path $env:TEMP 'jtdt-vc_redist.x64.exe'
+        if (Test-Path $vc) { Remove-Item $vc -Force -ErrorAction SilentlyContinue }
+        try {
+            Log 'Downloading Microsoft Visual C++ Redistributable (~25 MB) ...'
+            Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile $vc -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop
+            $action = if ($regOk) { '/repair' } else { '/install' }
+            $proc = Start-Process -FilePath $vc -ArgumentList $action,'/quiet','/norestart' -Wait -PassThru -ErrorAction Stop
             $code = $proc.ExitCode
-        }
-        $after = Get-VCRuntimeFileVersion
-        # 3010 = done, restart suggested; new processes load the new DLLs without a restart
-        if (($code -eq 0 -or $code -eq 3010) -and $after -ge $min) { Ok "Visual C++ Redistributable ready (System32 $after, exit $code)" }
-        # 同一次開機裡 vc_redist 已經回過 3010，它就不肯再做任何事（記錄寫 0x8007015e「要先重新開機」），
-        # 卻照樣回 3010 —— 只看離開碼會以為修好了
-        elseif ($code -eq 3010) { Warn "System32 runtime is still $($after): restart Windows, then run 'jtdt update' to repair it (until then OCR uses tesseract)" }
-        else { Warn "vc_redist exit $code, System32 runtime still $after - EasyOCR may fall back to tesseract" }
-    } catch { Warn "vc_redist download/install failed: $_ (OCR falls back to tesseract)" }
+            # /install 在同版本已登記時回 0 卻不動作；Burn 在同一次開機回過 3010 後也不肯再動 ——
+            # 這兩種情況直接修 MSI 都修得回來
+            if ((Get-VCRuntimeFileVersion) -lt $min) { $null = Repair-VCRuntimeMsi }
+        } catch { Warn "vc_redist download/install failed: $_ (OCR falls back to tesseract)" }
+    }
+    $after = Get-VCRuntimeFileVersion
+    if ($after -ge $min) { Ok "Visual C++ Redistributable ready (System32 $after)" }
+    # 3010 但檔案還是舊的：檔案被占用、要重開機才換得掉
+    elseif ($code -eq 3010) { Warn "System32 runtime is still $($after): restart Windows, then run 'jtdt update' to repair it (until then OCR uses tesseract)" }
+    else { Warn "vc_redist exit $code, System32 runtime still $after - EasyOCR may fall back to tesseract" }
 }
 
 # uv

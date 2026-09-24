@@ -5,11 +5,21 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (852 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (853 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.24] - 2026-09-25
+
+### Windows: repairing the VC++ runtime no longer needs a restart
+
+* v1.16.23 repaired a downgraded VC++ runtime through Microsoft's vc_redist installer, but once that installer
+  has reported "restart required" during a boot it refuses to do anything else, so the install could only ask
+  you to restart and run `jtdt update`. The runtime packages already installed on the system are now repaired
+  directly: no restart and no download. vc_redist is only used if that is not enough. Same for the installer,
+  the command-line installer and `jtdt update`.
 
 ## [1.16.23] - 2026-09-25
 

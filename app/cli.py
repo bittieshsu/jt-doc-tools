@@ -1492,6 +1492,45 @@ def _vc_redist_registry_version() -> tuple[str, tuple]:
     return "", ()
 
 
+def _repair_vc_runtime_msi() -> int:
+    """直接修復已安裝的 VC++ Minimum / Additional Runtime MSI（`msiexec /fomus {產品代碼}`）。
+
+    **不經過 vc_redist 的 Burn 外殼**：同一次開機裡 Burn 已經回過 3010 時它不肯再動
+    （記錄寫 0x8007015e），直接修 MSI 則照樣換得回來（Win10 實機驗過，不必重開機）；
+    也不用重新下載 25 MB。回傳修了幾個。
+    """
+    import re as _re
+    import subprocess as _sp
+    import winreg
+    done = 0
+    for root in (r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                 r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"):
+        try:
+            k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, root)
+        except OSError:
+            continue
+        with k:
+            i = 0
+            while True:
+                try:
+                    code = winreg.EnumKey(k, i)
+                except OSError:
+                    break
+                i += 1
+                if not _re.fullmatch(r"\{[0-9A-Fa-f-]+\}", code):
+                    continue
+                try:
+                    with winreg.OpenKey(k, code) as sub:
+                        name, _ = winreg.QueryValueEx(sub, "DisplayName")
+                except OSError:
+                    continue
+                if _re.search(r"Visual C\+\+ 20\d\d X64 (Minimum|Additional) Runtime", str(name)):
+                    rc = _sp.call(["msiexec.exe", "/fomus", code, "/qn", "/norestart"])
+                    print(f"  Repaired {name} (exit {rc})")
+                    done += 1
+    return done
+
+
 def _ensure_vc_redist_windows() -> None:
     """Windows only — 確保 Microsoft Visual C++ 執行階段 14.40+ **真的在 System32 裡**。
 
@@ -1499,56 +1538,60 @@ def _ensure_vc_redist_windows() -> None:
     OCR 一律退回 Tesseract。
 
     **登錄檔與檔案要分開看**：OxOffice 11.0.5 的 MSI 會把 System32 的執行階段換成
-    它內含的 14.29（`REINSTALLMODE=dmus`），登錄檔卻還寫 14.44。這時 `/install`
-    會回 0 卻什麼都不做（它認為已經裝了）—— 要用 `/repair` 才會把檔案換回來。
-    Win10 實機驗過：`/repair` 回 3010，檔案回到 14.44，新開的行程不必重開機就載得起來。
+    它內含的 14.29（`REINSTALLMODE=dmus`），登錄檔卻還寫 14.44。修法依序：
+    ①直接修已安裝的執行階段 MSI（不必下載，也不受 Burn「要先重開機」的限制）
+    ②還是舊的才下載 vc_redist（已登記 → `/repair`；沒登記 → `/install`，同版本已登記時它回 0 卻什麼都不做）
+    ③vc_redist 之後還是舊的，再直接修一次 MSI。判準一律是**修完之後的檔案版本**。
     """
     if not _is_windows():
         return
     from .core.sys_deps import VC_RUNTIME_MIN, vc_runtime_file_version
+
+    def _files() -> tuple:
+        return vc_runtime_file_version() or (0,)
+
     reg_raw, reg = _vc_redist_registry_version()
     reg_ok = bool(reg) and reg >= VC_RUNTIME_MIN
-    files = vc_runtime_file_version() or (0,)
-    files_ok = files[:2] >= VC_RUNTIME_MIN
+    files = _files()
     shown = ".".join(str(x) for x in files)
-    if reg_ok and files_ok:
+    if reg_ok and files[:2] >= VC_RUNTIME_MIN:
         print(f"  OK: VC++ Redistributable already current ({reg_raw}; System32 {shown})")
         return
+    rc = 0
     if reg_ok:
         print(f"  VC++ runtime files in System32 are {shown} although {reg_raw} is registered "
               "(another installer replaced them); repairing")
+        _repair_vc_runtime_msi()
     elif reg:
         print(f"  VC++ Redistributable too old ({reg_raw}); upgrading")
-    print("  Installing Microsoft Visual C++ Redistributable (PyTorch dep, ~25MB)...")
-    import tempfile
-    import subprocess as _sp
-    tmp = Path(tempfile.gettempdir()) / "jtdt-vc_redist.x64.exe"
-    try:
-        _safe_fetch.urlretrieve(
-            "https://aka.ms/vs/17/release/vc_redist.x64.exe", str(tmp),
-        )
-        action = "/repair" if reg_ok else "/install"
-        rc = _sp.call([str(tmp), action, "/quiet", "/norestart"])
-        if action == "/install" and (vc_runtime_file_version() or (0,))[:2] < VC_RUNTIME_MIN:
-            # 裝完檔案還是舊的（同版本已登記時 /install 什麼都不做）→ 再修復一次
-            rc = _sp.call([str(tmp), "/repair", "/quiet", "/norestart"])
-        after = vc_runtime_file_version() or (0,)
-        if rc in (0, 3010) and after[:2] >= VC_RUNTIME_MIN:
-            print(f"  OK: VC++ Redistributable {action.lstrip('/')} done (exit {rc}; "
-                  f"System32 {'.'.join(str(x) for x in after)}; no restart needed)")
-        elif rc == 3010:
-            # 同一次開機裡 vc_redist 已經回過 3010，它就不肯再做任何事
-            # （記錄寫 0x8007015e「要先重新開機」），卻照樣回 3010
-            print(f"  WARNING: System32 runtime is still {'.'.join(str(x) for x in after)}: "
-                  "restart Windows, then run 'jtdt update' again to repair it "
-                  "(until then OCR falls back to tesseract)", file=sys.stderr)
-        else:
-            print(f"  WARNING: vc_redist exit {rc}, System32 runtime still "
-                  f"{'.'.join(str(x) for x in after)} ; EasyOCR may not load (OCR falls back to tesseract)",
-                  file=sys.stderr)
-    except Exception as e:
-        print(f"  WARNING: vc_redist download / install failed: {e}", file=sys.stderr)
-        print("    Install manually: https://aka.ms/vs/17/release/vc_redist.x64.exe", file=sys.stderr)
+    if _files()[:2] < VC_RUNTIME_MIN:
+        print("  Installing Microsoft Visual C++ Redistributable (PyTorch dep, ~25MB)...")
+        import tempfile
+        import subprocess as _sp
+        tmp = Path(tempfile.gettempdir()) / "jtdt-vc_redist.x64.exe"
+        try:
+            _safe_fetch.urlretrieve(
+                "https://aka.ms/vs/17/release/vc_redist.x64.exe", str(tmp),
+            )
+            action = "/repair" if reg_ok else "/install"
+            rc = _sp.call([str(tmp), action, "/quiet", "/norestart"])
+            if _files()[:2] < VC_RUNTIME_MIN:
+                _repair_vc_runtime_msi()
+        except Exception as e:
+            print(f"  WARNING: vc_redist download / install failed: {e}", file=sys.stderr)
+            print("    Install manually: https://aka.ms/vs/17/release/vc_redist.x64.exe", file=sys.stderr)
+    after = _files()
+    after_s = ".".join(str(x) for x in after)
+    if after[:2] >= VC_RUNTIME_MIN:
+        print(f"  OK: VC++ runtime ready (System32 {after_s}; no restart needed)")
+    elif rc == 3010:
+        # 3010 但檔案還是舊的：檔案被占用，要重開機才換得掉
+        print(f"  WARNING: System32 runtime is still {after_s}: restart Windows, then run "
+              "'jtdt update' again to repair it (until then OCR falls back to tesseract)",
+              file=sys.stderr)
+    else:
+        print(f"  WARNING: vc_redist exit {rc}, System32 runtime still {after_s}; "
+              "EasyOCR may not load (OCR falls back to tesseract)", file=sys.stderr)
 
 
 def _ensure_tesseract_chi_tra(binary: str) -> bool:

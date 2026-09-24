@@ -36,7 +36,7 @@ OLD = (14, 29, 30157, 0)
 @pytest.fixture
 def fake_windows(monkeypatch):
     state = {"files": OLD, "reg": ("v14.44.35211.00", (14, 44)), "calls": [],
-             "fixes": {"/repair": True, "/install": False}, "downloads": 0}
+             "fixes": {"msi": True, "/repair": True, "/install": False}, "downloads": 0}
     monkeypatch.setattr(cli, "_is_windows", lambda: True)
     monkeypatch.setattr(cli, "_vc_redist_registry_version", lambda: state["reg"])
     monkeypatch.setattr(sys_deps, "vc_runtime_file_version", lambda: state["files"])
@@ -44,6 +44,13 @@ def fake_windows(monkeypatch):
     def _fetch(url, dst):
         state["downloads"] += 1
     monkeypatch.setattr(cli._safe_fetch, "urlretrieve", _fetch)
+
+    def _msi():
+        state["calls"].append("msi")
+        if state["fixes"]["msi"]:
+            state["files"] = NEW
+        return 2
+    monkeypatch.setattr(cli, "_repair_vc_runtime_msi", _msi)
 
     import subprocess
 
@@ -64,18 +71,33 @@ def test_current_registry_and_current_files_do_nothing(fake_windows, capsys):
     assert "already current" in capsys.readouterr().out
 
 
-def test_downgraded_files_behind_a_current_registry_get_repaired(fake_windows, capsys):
+def test_downgraded_files_are_repaired_through_the_msi_first(fake_windows, capsys):
+    """登錄檔寫 14.44、檔案卻是 14.29 → 直接修已安裝的 MSI，不必下載 vc_redist。"""
     cli._ensure_vc_redist_windows()
-    assert fake_windows["calls"] == ["/repair"], (
-        "登錄檔寫 14.44、檔案卻是 14.29 —— 要跑 /repair（/install 會回 0 卻什麼都不做）")
+    assert fake_windows["calls"] == ["msi"], fake_windows["calls"]
+    assert fake_windows["downloads"] == 0
     out = capsys.readouterr()
-    assert "repair" in out.out and "WARNING" not in out.err
+    assert "repairing" in out.out and "ready" in out.out and "WARNING" not in out.err
 
 
-def test_install_that_leaves_old_files_is_followed_by_a_repair(fake_windows):
+def test_when_the_msi_repair_is_not_enough_vc_redist_repairs(fake_windows):
+    fake_windows["fixes"]["msi"] = False
+    cli._ensure_vc_redist_windows()
+    assert fake_windows["calls"][:2] == ["msi", "/repair"], (
+        "已登記同版本時 vc_redist 要用 /repair（/install 會回 0 卻什麼都不做）")
+
+
+def test_burn_refusing_is_followed_by_another_msi_repair(fake_windows):
+    """Burn 在同一次開機回過 3010 後不肯再動 —— 之後還要再直接修一次 MSI。"""
+    fake_windows["fixes"].update({"msi": False, "/repair": False})
+    cli._ensure_vc_redist_windows()
+    assert fake_windows["calls"] == ["msi", "/repair", "msi"]
+
+
+def test_install_that_leaves_old_files_is_followed_by_an_msi_repair(fake_windows):
     fake_windows["reg"] = ("", ())
     cli._ensure_vc_redist_windows()
-    assert fake_windows["calls"] == ["/install", "/repair"]
+    assert fake_windows["calls"] == ["/install", "msi"]
 
 
 def test_a_clean_install_does_not_repair_for_nothing(fake_windows):
@@ -86,19 +108,18 @@ def test_a_clean_install_does_not_repair_for_nothing(fake_windows):
 
 
 def test_a_repair_that_does_not_help_is_reported(fake_windows, capsys):
-    fake_windows["fixes"]["/repair"] = False
+    fake_windows["fixes"].update({"msi": False, "/repair": False})
     cli._ensure_vc_redist_windows()
     err = capsys.readouterr().err
     assert "WARNING" in err and "14.29" in err, "修不好要講出來，不可以印 OK"
 
 
 def test_a_pending_restart_is_named_as_the_way_out(fake_windows, capsys):
-    """同一次開機裡 vc_redist 已經回過 3010 時它不肯再動（0x8007015e），卻照樣回 3010。"""
-    fake_windows["fixes"]["/repair"] = False          # 檔案沒換回來，離開碼仍是 3010
+    """vc_redist 回 3010 而檔案還是舊的（被占用）：要講出下一步。"""
+    fake_windows["fixes"].update({"msi": False, "/repair": False})
     cli._ensure_vc_redist_windows()
     err = capsys.readouterr().err
-    assert "restart Windows" in err and "jtdt update" in err, (
-        "要講出下一步：重新開機後再跑 jtdt update")
+    assert "restart Windows" in err and "jtdt update" in err
 
 
 # ------------------------------------------------------------------ 相依套件頁
@@ -154,11 +175,22 @@ def test_already_current_needs_both_registry_and_files(rel):
 @pytest.mark.parametrize("rel", _SCRIPTS)
 def test_a_registered_runtime_is_repaired_not_reinstalled(rel):
     body = _function(rel, "Ensure-VCRedist")
+    assert re.search(r"if \(\$regOk\) \{[^}]*Repair-VCRuntimeMsi", body, re.S), (
+        f"{rel}：登錄檔 OK 但檔案舊時，先直接修已安裝的 MSI（不必下載、不受 Burn 限制）")
     assert re.search(r"\$action = if \(\$regOk\) \{ '/repair' \} else \{ '/install' \}", body), (
-        f"{rel}：已登記同版本時要用 /repair（/install 會回 0 卻什麼都不做）")
-    assert re.search(r"-eq '/install' -and \(Get-VCRuntimeFileVersion\) -lt \$min", body), (
-        f"{rel}：/install 之後檔案還是舊的要再 /repair")
+        f"{rel}：已登記同版本時 vc_redist 要用 /repair（/install 會回 0 卻什麼都不做）")
+    after_vc = body[body.index("$action = if"):]
+    assert "Repair-VCRuntimeMsi" in after_vc, (
+        f"{rel}：vc_redist 之後檔案還是舊的要再直接修 MSI（Burn 在同一次開機回過 3010 後不肯再動）")
     assert re.search(r"\$after -ge \$min", body), f"{rel}：成功與否要看修完之後的檔案版本，不是只看離開碼"
+
+
+@pytest.mark.parametrize("rel", _SCRIPTS)
+def test_the_msi_repair_targets_the_x64_runtime_packages(rel):
+    body = _function(rel, "Repair-VCRuntimeMsi")
+    assert "/fomus" in body and "msiexec" in body
+    assert re.search(r"X64 \(Minimum\|Additional\) Runtime", body), f"{rel}：要對準 X64 的 Minimum / Additional Runtime"
+    assert "WOW6432Node" in body and "Uninstall" in body
 
 
 @pytest.mark.parametrize("rel", _SCRIPTS)
