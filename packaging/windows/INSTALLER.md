@@ -29,7 +29,7 @@ the one-liner, just driven from a GUI.
 | OCR engine | `-InstallOcr` | VC++ redist + tesseract chi_tra (~700 MB of deps via uv) |
 | Office engine | `-InstallOffice` | OxOffice silent MSI, LibreOffice fallback (~600 MB) |
 | Windows service | `-InstallService` | WinSW autostart service |
-| LAN access | `-InstallFirewall` | binds `0.0.0.0` + firewall inbound rule; otherwise localhost-only |
+| LAN access | `-InstallFirewall` | **unticked by default** (since v1.16.20). Ticked: binds `0.0.0.0` + firewall inbound rule; otherwise localhost-only. On upgrade the previous choice, host and port are kept (read from `bin\jtdt-svc.xml`) |
 
 ## Building locally
 

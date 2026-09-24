@@ -577,7 +577,33 @@ function Health-Check {
 # =====================================================================
 # LAN access => bind 0.0.0.0 so other machines on the subnet can connect.
 # Otherwise localhost-only (matches install.ps1 default).
-$EffectiveBind = if ($InstallFirewall) { '0.0.0.0' } else { '127.0.0.1' }
+#
+# **升級時沿用既有的監聽位址與 port**（WinSW 的設定檔在 bin\，Fetch-Code 不會清掉）。
+# 安裝程式不記得上一次的選擇：「區域網路存取」改成預設不勾之後，一台原本給整個
+# 單位共用的機器重跑安裝程式升級，會被改成只有本機連得到（2026-09-24 在 Win11
+# 實機用 v1.16.20 的安裝檔測到）；自訂過的 port 也會被改回 8765（一直都是錯的）。
+# installer.nsi 會在升級時先把那個選項勾起來；這裡再保留原本的位址（例如只綁
+# 在某一張網卡上）與 port。使用者在升級時**自己取消勾選**的話照他的意思改回本機。
+# 檢查：tests/test_installer_silent_mode.py
+$PrevHost = $null; $PrevPort = $null
+if (Test-Path $WinswXml) {
+    try {
+        $prevXml = Get-Content $WinswXml -Raw -ErrorAction Stop
+        if ($prevXml -match 'name="JTDT_HOST"\s+value="([^"]+)"') { $PrevHost = $Matches[1] }
+        if ($prevXml -match 'name="JTDT_PORT"\s+value="(\d+)"') { $PrevPort = [int]$Matches[1] }
+    } catch {}
+}
+if ($PrevPort -and -not $PSBoundParameters.ContainsKey('Port')) {
+    $Port = $PrevPort
+    Log "Keeping existing port $Port"
+}
+$Loopback = @('127.0.0.1', 'localhost', '::1')
+if ($InstallFirewall) {
+    $EffectiveBind = if ($PrevHost -and ($Loopback -notcontains $PrevHost)) { $PrevHost } else { '0.0.0.0' }
+} else {
+    $EffectiveBind = '127.0.0.1'
+}
+Log "Service will listen on $EffectiveBind`:$Port"
 
 if ($InstallOffice) { Ensure-Office } else { Log 'Office component skipped (user choice)' }
 if ($InstallOcr) {

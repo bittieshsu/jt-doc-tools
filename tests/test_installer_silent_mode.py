@@ -210,3 +210,39 @@ def test_lan_access_is_not_ticked_by_default(nsi):
     assert secs.get("LAN") is True, f"「區域網路存取」必須預設不勾（Section /o）：{secs}"
     for name in ("OCR", "Office", "Service"):
         assert secs.get(name) is False, f"{name} 應該維持預設打勾：{secs}"
+
+
+def test_an_upgrade_keeps_the_previous_lan_choice(nsi):
+    """升級時沿用上一次的「區域網路存取」（它預設不勾）。
+
+    v1.16.20 的安裝檔把預設改成不勾之後，2026-09-24 在 Win11 實機測到：一台原本
+    綁 0.0.0.0 的機器重跑安裝程式升級，**被改成只有本機連得到** —— 給整個單位
+    共用的伺服器，同事就這樣突然連不進去。安裝程式要讀服務自己的設定檔，
+    原本開著就預先勾起來（元件頁上看得到、也可以取消）。
+    """
+    stmts = _statements(nsi)
+    oninit = nsi[nsi.index("Function .onInit"):]
+    oninit = oninit[:oninit.index("FunctionEnd")]
+    assert "Call DetectPrevLan" in oninit, ".onInit 沒有偵測上一次的區域網路設定"
+    assert re.search(r"SelectSection \$\{SecFw\}", oninit), "偵測到了卻沒有把選項勾起來"
+    fn = nsi[nsi.index("Function DetectPrevLan"):]
+    fn = fn[:fn.index("FunctionEnd")]
+    assert "jtdt-svc.xml" in fn and "JTDT_HOST" in fn, "判準要讀服務自己的設定檔"
+    assert '"127.0.0.1"' in fn, "判準是「不是只綁本機」"
+
+
+def test_the_core_keeps_the_previous_host_and_port():
+    """install_core 升級時保留原本的監聽位址（例如只綁某一張網卡）與 port。
+
+    自訂過的 port 原本升級就會被改回 8765 —— 那一直都是錯的，這次一起修。
+    判準落在**真的會被執行的那幾行**（去掉註解之後），不是說明文字。
+    """
+    core = CORE.read_text(encoding="utf-8-sig")
+    code = "\n".join(ln for ln in core.splitlines() if not ln.lstrip().startswith("#"))
+    i = code.index("$EffectiveBind")
+    before, after = code[:i], code[i:]
+    assert "$PrevHost" in before and "$PrevPort" in before and "$WinswXml" in before, (
+        "決定監聽位址之前要先讀既有的 jtdt-svc.xml")
+    decide = after[:after.index("Log ")]
+    assert "$PrevHost" in decide, "開著區域網路時要沿用原本的位址，不是一律 0.0.0.0"
+    assert re.search(r"\$Port\s*=\s*\$PrevPort", code), "升級時沒有沿用原本的 port"

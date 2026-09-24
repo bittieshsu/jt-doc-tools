@@ -5,11 +5,25 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (849 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (850 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.21] - 2026-09-24
+
+### Windows installer: an upgrade keeps your "LAN access" setting
+
+* After the v1.16.20 installer made "LAN access" unticked by default, re-running it to upgrade a machine
+  that had LAN access switched it to local-only, so a machine shared by a whole team suddenly stopped
+  accepting connections from colleagues. An upgrade now reads the current service settings first and
+  ticks the option if it was on (visible on the components page, and you can untick it).
+* An upgrade also keeps the existing listening address (for example a single network card) and a custom
+  port; before, an upgrade reset the port to 8765.
+* Fresh installs still leave it unticked.
+* If the v1.16.20 installer already switched your machine to local-only, run the v1.16.21 installer again
+  and tick "LAN access" (your data is kept).
 
 ## [1.16.20] - 2026-09-24
 

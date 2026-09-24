@@ -67,6 +67,8 @@ ShowUninstDetails show
 !include "Sections.nsh"
 !include "x64.nsh"
 !include "FileFunc.nsh"
+!include "StrFunc.nsh"
+${StrStr}
 
 ; 解除安裝模式的狀態（同一支執行檔靠 `/uninstall` 分流）
 Var SM_DIR      ; 這次安裝實際建的開始功能表資料夾
@@ -421,6 +423,46 @@ Function .onInit
   SectionSetText ${SecOffice} "$(SEC_OFFICE)"
   SectionSetText ${SecSvc}    "$(SEC_SVC)"
   SectionSetText ${SecFw}     "$(SEC_FW)"
+
+  ; **升級時沿用上一次的「區域網路存取」**（它預設不勾，理由見 LAN 那一節）。
+  ; 不這樣做的話，一台原本給整個單位共用的機器重跑安裝程式升級，會被改成只有
+  ; 本機連得到 —— 2026-09-24 在 Win11 實機用 v1.16.20 的安裝檔測到。
+  ; 判準讀服務自己的設定檔（bin\jtdt-svc.xml 的 JTDT_HOST）：不是 127.0.0.1 就預先勾起來，
+  ; 元件頁上看得到、也可以取消（取消就照使用者的意思改回本機）。
+  Call DetectPrevLan
+  ${If} $R7 == "1"
+    !insertmacro SelectSection ${SecFw}
+  ${EndIf}
+FunctionEnd
+
+;; 上一次安裝是不是開著區域網路存取。回 $R7 = "1" / "0"。讀不到一律當成沒開。
+Function DetectPrevLan
+  StrCpy $R7 "0"
+  ReadRegStr $R5 HKLM "${ARP_KEY}" "InstallLocation"
+  ${If} $R5 == ""
+    StrCpy $R5 "$INSTDIR"
+  ${EndIf}
+  ClearErrors
+  FileOpen $R4 "$R5\bin\jtdt-svc.xml" r
+  ${If} ${Errors}
+    Return
+  ${EndIf}
+  prevlan_loop:
+    ClearErrors
+    FileRead $R4 $R6
+    ${If} ${Errors}
+      Goto prevlan_done
+    ${EndIf}
+    ${StrStr} $R3 $R6 "JTDT_HOST"
+    ${If} $R3 == ""
+      Goto prevlan_loop
+    ${EndIf}
+    ${StrStr} $R3 $R6 '"127.0.0.1"'
+    ${If} $R3 == ""
+      StrCpy $R7 "1"
+    ${EndIf}
+  prevlan_done:
+  FileClose $R4
 FunctionEnd
 
 ; =====================================================================
