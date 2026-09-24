@@ -170,3 +170,30 @@ def test_the_uninstall_handoff_reports_success(nsi):
     assert re.search(r"^\s*SetErrorLevel\s+0\s*$", seg, re.M), (
         "交棒離開前沒有 `SetErrorLevel 0` —— 解除安裝成功卻會回報非零離開碼"
     )
+
+
+def test_nsexec_never_streams_output_into_the_installer(nsi):
+    """**不可以用 `nsExec::ExecToLog` / `ExecToStack`**（上游 bug #1323）。
+
+    NSIS 3.09 起的 nsExec 在某一行輸出超過緩衝區、要擴充時會用到已釋放的記憶體
+    （3.12.1 才修，那一版還沒發佈）。安裝核心跑十幾分鐘、輸出很多，
+    **跑完之後** NSIS 卸載 nsExec 時當掉（0xC0000005，ntdll 的 RtlpAllocateHeap）——
+    「程式和功能」、開始功能表捷徑、解除安裝用的 setup.exe 全部沒建，服務卻好好的。
+
+    2026-09-24 在 Win11 實機上：原本的安裝檔 7 次崩潰 2 次（v1.15.53 也遇過一次），
+    改成 `nsExec::Exec`（不收輸出、不走那段程式碼）之後 12 次 0 次。
+    判準落在**去掉註解之後真的呼叫的指令**上 —— 說明裡一定會提到那個名字。
+    """
+    bad = [s for s in _statements(nsi)
+           if re.search(r"\bnsExec::ExecTo(Log|Stack)\b", s)]
+    assert not bad, (
+        "安裝程式又用了會把輸出串進畫面的 nsExec（上游 bug #1323 會讓安裝程式"
+        "在最後一步當掉）：\n  " + "\n  ".join(bad))
+
+
+def test_the_core_scripts_still_run_through_nsexec(nsi):
+    """反向對照：兩支核心腳本都還是由 `nsExec::Exec` 執行 ——
+    只驗「沒有 ExecToLog」的話，把整段呼叫刪掉也會過。"""
+    calls = [s for s in _statements(nsi) if s.startswith("nsExec::Exec ")]
+    assert any("install_core.ps1" in s for s in calls), "安裝核心沒有被執行"
+    assert any("uninstall_core.ps1" in s for s in calls), "解除安裝核心沒有被執行"

@@ -1,6 +1,10 @@
 r"""照 `github/API.md` 的每一條 curl 範例實際呼叫一遍。
 
     .venv/bin/python tools/api_doc_example_audit.py
+    JTDT_AUDIT_BASE_URL=http://<主機>:8765 .venv/bin/python tools/api_doc_example_audit.py
+
+第二種打一台**真的裝好的**實例（例如剛用安裝程式裝好的 Windows 機器），
+結果寫到 `results-remote.json`。
 
 ## 這支在守什麼
 
@@ -282,6 +286,7 @@ _EXPECTED: dict[str, str] = {
     "/api/jobs/{}": "文件用的是佔位 job id",
     "/api/jobs/{}/download": "同上",
     "/api/jobs/{}/download-png": "同上",
+    "/tools/pdf-to-image/download/{}": "文件用的是佔位 upload_id（真的要接第 1 步回的那一個）",
 }
 
 _PARAM_RE = re.compile(r"/(?:[0-9a-f]{8,}|abc123|12345678|\d+)(?=/|$)")
@@ -314,8 +319,17 @@ def _parse_md() -> list[dict]:
 
 def main() -> int:
     examples = _parse_md()
-    import app.main as app_main
-    client = TestClient(app_main.app)
+    # 設了 `JTDT_AUDIT_BASE_URL` 就打那一台**真的裝好的**實例（例如剛用安裝程式
+    # 裝好的 Windows 機器），不在行程內起 app —— 驗的是「那台機器照文件呼叫
+    # 會不會壞」，缺系統相依、路徑、服務帳號權限這些行程內測不到的東西都會現形。
+    base = os.environ.get("JTDT_AUDIT_BASE_URL", "").rstrip("/")
+    if base:
+        import httpx
+        client = httpx.Client(base_url=base, timeout=900)
+        print(f"對象：{base}", file=sys.stderr)
+    else:
+        import app.main as app_main
+        client = TestClient(app_main.app)
 
     last_job = None
     rows = []
@@ -371,7 +385,7 @@ def main() -> int:
         rows.append({**e, "status": r.status_code, "resolved": path,
                      "ctype": ctype, "note": body})
 
-    (OUT_DIR / "results.json").write_text(
+    (OUT_DIR / ("results-remote.json" if base else "results.json")).write_text(
         json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
 
     bad = [r for r in rows if isinstance(r["status"], int) and r["status"] >= 400]

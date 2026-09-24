@@ -66,35 +66,23 @@ def _generate_preview_pngs(src_pdf: Path, dst_doc: Path, work_dir: Path,
         logger.debug("orig PDF render failed: %s", e)
         return info
     # 2) docx/odt → PDF via soffice → PNG
-    import subprocess, shutil
-    soffice = None
-    # v1.8.94：優先 OxOffice
-    for candidate in (
-        "/opt/oxoffice/program/soffice",
-        "/Applications/OxOffice.app/Contents/MacOS/soffice",
-        "C:\\Program Files\\OxOffice\\program\\soffice.exe",
-        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
-        shutil.which("soffice"), shutil.which("libreoffice"),
-    ):
-        if candidate and Path(candidate).exists():
-            soffice = candidate
-            break
-    if not soffice:
+    #
+    # **一律走 office_convert**，不要自己組 soffice 指令。這裡原本自己寫
+    # `-env:UserInstallation=file://{profile_dir}` —— Linux 的路徑是 `/` 開頭，
+    # 剛好湊成合法的 `file:///…`；**Windows 上是 `file://C:\…`，不合法**，
+    # soffice 退回系統帳號的預設設定檔、在服務的工作階段裡卡住，180 秒逾時後
+    # 預覽變空白，還留下沒被殺掉的 soffice.bin（2026-09-24 Windows 實機測到：
+    # 一頁的 PDF 轉 Word 要 3 分鐘）。issue #5（v1.5.1）修的就是這個，
+    # 當時只修了 office_convert 裡的那幾支。
+    from ...core import office_convert as _oc
+    if not _oc.find_soffice():
         logger.debug("soffice not found, skip result preview")
         return info
     try:
         tmp_pdf_dir = work_dir / "_preview"
         tmp_pdf_dir.mkdir(exist_ok=True)
-        profile_dir = work_dir / "_so_profile"
-        profile_dir.mkdir(exist_ok=True)
-        subprocess.run(
-            [soffice, "--headless",
-             f"-env:UserInstallation=file://{profile_dir}",
-             "--convert-to", "pdf",
-             "--outdir", str(tmp_pdf_dir), str(dst_doc)],
-            capture_output=True, timeout=180,
-        )
         rendered_pdf = tmp_pdf_dir / (dst_doc.stem + ".pdf")
+        _oc.convert_to_pdf(dst_doc, rendered_pdf, timeout=180)
         if rendered_pdf.exists():
             d2 = fitz.open(str(rendered_pdf))
             n_result = len(d2)
@@ -118,11 +106,24 @@ def _generate_preview_pngs(src_pdf: Path, dst_doc: Path, work_dir: Path,
                 tmp_pdf_dir.rmdir()
             except Exception:
                 pass
-    except subprocess.TimeoutExpired:
-        logger.debug("soffice render timeout")
     except Exception as e:
         logger.debug("result render failed: %s", e)
     return info
+
+
+def _delivered_ext(result, requested: str) -> tuple[str, str]:
+    """回（副檔名, 要附在完成訊息後面的說明）——**用實際交出來的格式命名**。
+
+    引擎可能退回別的格式：jtdt-reform 的 ODT→docx 那一步失敗時改交 ODT。
+    照使用者要求的格式命名的話，ODT 的內容配上 `.docx` 的檔名，Word 打開說
+    檔案毀損，而畫面上寫的是「完成」（2026-09-24 Windows 實機測到）。
+    """
+    actual = (getattr(result, "output_format", "") or requested).lower()
+    ext = ".odt" if actual == "odt" else ".docx"
+    note = ""
+    if actual != requested.lower():
+        note = "Word 格式轉換沒有成功，改交 ODT 檔（Word 也能開啟）"
+    return ext, note
 
 
 def _src_path(uid: str) -> Path:
@@ -327,8 +328,8 @@ async def submit(request: Request):
         if job.cancelled:
             return
 
-        # 結果搬到 stable 名稱
-        ext = ".odt" if output_format == "odt" else ".docx"
+        # 結果搬到 stable 名稱 —— 副檔名照**實際交出來的**格式（見 _delivered_ext）
+        ext, fallback_note = _delivered_ext(result, output_format)
         dst_name = f"{stem}{ext}"
         dst = work_dir / dst_name
         if result.output_path and result.output_path != dst:
@@ -351,6 +352,8 @@ async def submit(request: Request):
         job.progress = 1.0
         report = result.report or {}
         msg_parts = [f"完成：{dst.stat().st_size // 1024} KB"]
+        if fallback_note:
+            msg_parts.append(fallback_note)
         if report.get("alignment"):
             mr = report["alignment"]["match_rate"]
             msg_parts.append(f"對齊率 {mr*100:.0f}%")
@@ -429,7 +432,7 @@ async def api_convert(request: Request,
         )
         if not result.ok:
             raise RuntimeError(result.error or "轉換失敗")
-        ext = ".odt" if fmt == "odt" else ".docx"
+        ext, fallback_note = _delivered_ext(result, fmt)
         dst_name = f"{stem}{ext}"
         dst = work_dir / dst_name
         if result.output_path and result.output_path != dst:
@@ -447,7 +450,7 @@ async def api_convert(request: Request,
         except Exception as e:
             logger.warning("api preview png generation failed: %s", e)
         job.progress = 1.0
-        job.message = "完成"
+        job.message = fallback_note or "完成"
 
     job = job_manager.submit("pdf-to-office", run,
                               meta={"filename": file.filename, "output_format": fmt,

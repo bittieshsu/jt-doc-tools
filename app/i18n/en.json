@@ -5377,5 +5377,7 @@
   "有 {0} 個欄位問不到 LLM（共 {1} 個），那幾個欄位沒有校驗到。": "{0} fields could not be asked (out of {1}); those fields were not checked.",
   "LLM 設定的位址格式不對，請到 LLM 設定頁確認。": "The address in the LLM settings is not valid. Please check the LLM settings page.",
   "已設定（加密存放，不會顯示出來）；要移除就把欄位清空再儲存。": "Set (stored encrypted and never shown). To remove it, clear the field and save.",
-  "LLM server / 模型 / 參數（含 API 金鑰，敏感）": "LLM server, model and parameters (includes the API key; sensitive)"
+  "LLM server / 模型 / 參數（含 API 金鑰，敏感）": "LLM server, model and parameters (includes the API key; sensitive)",
+  "Word 格式轉換沒有成功，改交 ODT 檔（Word 也能開啟）": "The Word conversion did not succeed, so an ODT file was delivered instead (Word can open it too)",
+  "第一次使用 OCR：正在下載辨識模型（約 300 MB，只需要一次）…": "First OCR run: downloading the recognition models (about 300 MB, only once)…"
 }

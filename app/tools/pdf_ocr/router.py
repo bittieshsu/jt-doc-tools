@@ -24,6 +24,18 @@ def _work_dir() -> Path:
     return p
 
 
+def _starting_message() -> str:
+    """作業剛開始時的狀態文字。**第一次用本機 EasyOCR 要先下載模型**，
+    要講出來 —— 只寫「準備中」的話，網路慢時看起來跟當掉一樣。"""
+    try:
+        from ...core.ocr_engine import easyocr_first_download_pending
+        if easyocr_first_download_pending():
+            return "第一次使用 OCR：正在下載辨識模型（約 300 MB，只需要一次）…"
+    except Exception:                                    # noqa: BLE001
+        pass
+    return "準備中…（載入引擎 / 連線遠端 OCR Server）"
+
+
 @router.get("/", response_class=HTMLResponse)
 async def page(request: Request) -> HTMLResponse:
     templates = request.app.state.templates
@@ -489,7 +501,7 @@ async def run_ocr(upload_id: str, request: Request,
     def _run(job: "_jm.Job") -> None:
         # 立刻設一個訊息，避免前端在 progress_cb 第一次呼叫前看到空白卡住
         # (遠端 GPU EasyOCR 首次載 model 可能 5-30 秒，這段時間需明示 user)
-        job.message = "準備中…（載入引擎 / 連線遠端 OCR Server）"
+        job.message = _starting_message()
         def _progress(cur, total, msg):
             # 使用者按「停止辨識」→ job.cancelled = True → raise 觸發 _run 跳出
             # JobManager._run 偵測 job.cancelled 後會把 status 設成 'cancelled'
@@ -674,7 +686,7 @@ async def api_pdf_ocr(
     dpi_val = max(72, min(int(dpi), 600))
 
     def _run(job: "_jm.Job") -> None:
-        job.message = "準備中…（載入引擎 / 連線遠端 OCR Server）"
+        job.message = _starting_message()
         def _progress(cur, total, msg):
             if job.cancelled:
                 raise RuntimeError("__cancelled_by_user__")

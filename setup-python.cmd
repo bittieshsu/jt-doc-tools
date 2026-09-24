@@ -71,8 +71,16 @@ REM our .venv\Lib\site-packages, leaving the venv empty.
 REM --reinstall forces re-install of all deps even if uv thinks they're already
 REM satisfied via cache (which can be wrong if previous install polluted base
 REM Python with editable install).
-"%UV_EXE%" sync --reinstall
+REM uv sync is the slowest step (it downloads ~1 GB) and its output used to
+REM reach only the installer window, never installer.log -- a failure left
+REM nothing to diagnose. Keep a copy in the log directory, then show it.
+set "SYNC_LOG=%ProgramData%\jt-doc-tools\Logs\setup-python-sync.log"
+if not exist "%ProgramData%\jt-doc-tools\Logs" mkdir "%ProgramData%\jt-doc-tools\Logs" 2>nul
+echo [%DATE% %TIME%] uv sync start > "%SYNC_LOG%" 2>nul
+"%UV_EXE%" sync --reinstall >> "%SYNC_LOG%" 2>&1
 set SYNC_RC=!ERRORLEVEL!
+echo [%DATE% %TIME%] uv sync exit=!SYNC_RC! >> "%SYNC_LOG%" 2>nul
+type "%SYNC_LOG%" 2>nul
 echo [debug] uv sync exit=!SYNC_RC!
 if not !SYNC_RC! equ 0 (
   popd

@@ -232,7 +232,6 @@
   "回應：PDF 二進位。": "Response: PDF binary.",
   "回應：PDF 二進位（<code>application/pdf</code>）。失敗 4xx + JSON <code>{&quot;detail&quot;: &quot;...&quot;}</code>。": "Response: the PDF itself (<code>application/pdf</code>). On failure, 4xx plus JSON <code>{&quot;detail&quot;: &quot;...&quot;}</code>.",
   "回應：切出的 PDF（多份打包 ZIP）。": "Response: the resulting PDFs (several come back as a ZIP).",
-  "回應：加上文字層的 PDF。": "Response: the PDF with a text layer.",
   "回應：加好書籤的 PDF。": "Response: the bookmarked PDF.",
   "回應：加完框線的 PDF。所有數值都會在伺服器端夾在安全範圍內。": "Response: the bordered PDF. Every value is clamped to a safe range on the server.",
   "回應：加完頁碼的 PDF。": "Response: the numbered PDF.",
@@ -241,7 +240,7 @@
   "回應：去識別化後的檔案。": "Response: the redacted file.",
   "回應：合併後的 PDF。": "Response: the merged PDF.",
   "回應：單張 A4 白底 PDF 二進位。": "Response: a single white A4 PDF binary.",
-  "回應：單頁回 PNG，多頁回 ZIP。": "Response: a PNG for one page, a ZIP for several.",
+  "回應：第 1 步回每一頁的資訊與 <code>upload_id</code>；第 2 步拿圖，單頁是 PNG、多頁是 ZIP。": "Response: step 1 returns each page's details and an <code>upload_id</code>; step 2 returns the images, a PNG for one page and a ZIP for several.",
   "回應：圖片打包 ZIP。": "Response: the images as a ZIP.",
   "回應：填好的 PDF。": "Response: the filled PDF.",
   "回應：壓縮後的 PDF。": "Response: the compressed PDF.",
@@ -366,7 +365,6 @@
   "查 job 狀態": "Check job status",
   "查詢的回應：": "The response to a poll:",
   "查進度，完成後到": "to check progress, then",
-  "格式樣板，例 <code>第 {n} 頁</code> / <code>{n} / {total}</code>": "Format template, e.g. <code>Page {n}</code> / <code>{n} / {total}</code>",
   "框線顏色 hex，預設 <code>#333333</code>": "Border colour as hex, default <code>#333333</code>",
   "標記已讀（<code>id</code> 或 <code>all=1</code>）": "Mark as read ( <code>id</code> or <code>all=1</code> )",
   "檔案數（側欄徽章用）": "File count (for the sidebar badge)",
@@ -613,5 +611,7 @@
   "：已設定時是": ": when a key is set it is",
   "，沒設定是空字串。 更新時送": ", and an empty string when none is set. When updating, sending",
   "或不送這個欄位＝不動，送新的字串＝換成這把（加密存放），送空字串＝移除。": "or leaving the field out keeps the key; a new string replaces it (stored encrypted); an empty string removes it.",
-  "同上，不給就用已存檔的。送 <code>&quot;__KEPT__&quot;</code> 時，<strong>只有 <code>base_url</code> 跟存檔的一樣才會帶上存著的金鑰</strong>": "Same as above; the saved key is used if omitted. When <code>&quot;__KEPT__&quot;</code> is sent, <strong>the saved key is only sent if <code>base_url</code> matches the saved one</strong>"
+  "同上，不給就用已存檔的。送 <code>&quot;__KEPT__&quot;</code> 時，<strong>只有 <code>base_url</code> 跟存檔的一樣才會帶上存著的金鑰</strong>": "Same as above; the saved key is used if omitted. When <code>&quot;__KEPT__&quot;</code> is sent, <strong>the saved key is only sent if <code>base_url</code> matches the saved one</strong>",
+  "回應：<code>job_id</code>（OCR 在背景跑）。用第 10 章的作業 API 輪詢，完成後從 <code>download_url</code> 下載加上文字層的 PDF。第一次使用會先下載辨識模型，要多等一段時間。": "Response: a <code>job_id</code> (OCR runs in the background). Poll it with the job API in chapter 10, then download the PDF with its new text layer from <code>download_url</code>. The first run downloads the recognition models, so allow extra time.",
+  "格式樣板：<code>{n}</code> 是目前頁碼、<code>{N}</code> 是總頁數（<code>{total}</code> 同 <code>{N}</code>），例 <code>第 {n} 頁</code> / <code>{n} / {N}</code>": "Format template: <code>{n}</code> is the current page number and <code>{N}</code> the total (<code>{total}</code> works the same as <code>{N}</code>), e.g. <code>Page {n}</code> / <code>{n} / {N}</code>"
 }

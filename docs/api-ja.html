@@ -352,13 +352,19 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <div class="doc-crumb">3. 文書変換 API</div>
 <h4 id="pdf-轉圖片">PDF → 画像</h4>
 <p>PDF の各ページを PNG に変換します（複数ページは自動で ZIP にまとめます）。</p>
-<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-to-image/convert</code></pre>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-to-image/convert
+<span class="hl-method">GET</span>  /tools/pdf-to-image/download/{upload_id}</code></pre>
 <div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>dpi</code></td><td>int</td><td></td><td>解像度。既定は <code>150</code></td></tr></tbody></table></div>
-<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-image/convert</span> \
+<pre><code class="lang-bash"><span class="hl-cmt"># 1. 上傳並轉換</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-image/convert</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
-  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@document.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;dpi=200&quot;</span> \
-  <span class="hl-flag">--output</span> pages.zip</code></pre>
-<p>レスポンス：1 ページなら PNG、複数ページなら ZIP を返します。</p>
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@document.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;dpi=200&quot;</span> | jq
+<span class="hl-cmt"># → {&quot;upload_id&quot;: &quot;...&quot;, &quot;page_count&quot;: 3, &quot;pages&quot;: [...]}</span>
+
+<span class="hl-cmt"># 2. 下載</span>
+curl <span class="hl-flag">-s</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-image/download/abc123</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">--output</span> pages.zip</code></pre>
+<p>応答：手順 1 は各ページの情報と <code>upload_id</code> を返します。手順 2 で画像を取得します（1 ページなら PNG、複数ページなら ZIP）。</p>
       </section>
       <section class="doc-section" data-sec="pdf-轉-office" data-title="PDF → Office" hidden>
 <div class="doc-crumb">3. 文書変換 API</div>
@@ -514,11 +520,11 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="pdf-加頁碼">PDF へのページ番号追加</h4>
 <p>ページの指定した位置にページ番号を追加します。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-pageno/api/pdf-pageno</code></pre>
-<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>position</code></td><td>str</td><td></td><td><code>bottom-center</code>（既定）/ <code>bottom-right</code> / <code>bottom-left</code> / <code>top-*</code></td></tr><tr><td><code>fmt</code></td><td>str</td><td></td><td>形式のテンプレート。例<code>第 {n} ページ</code> / <code>{n} / {total}</code></td></tr><tr><td><code>start</code></td><td>int</td><td></td><td>開始ページ番号。既定は <code>1</code></td></tr><tr><td><code>font_size</code></td><td>float</td><td></td><td>文字サイズ。既定は <code>10</code></td></tr><tr><td><code>margin_mm</code></td><td>float</td><td></td><td>余白（mm）</td></tr><tr><td><code>color</code></td><td>str</td><td></td><td>文字色の hex。例 <code>#000000</code></td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>position</code></td><td>str</td><td></td><td><code>bottom-center</code>（既定）/ <code>bottom-right</code> / <code>bottom-left</code> / <code>top-*</code></td></tr><tr><td><code>fmt</code></td><td>str</td><td></td><td>形式のテンプレート：<code>{n}</code> は現在のページ番号、<code>{N}</code> は総ページ数（<code>{total}</code> も <code>{N}</code> と同じ）。例<code>第 {n} ページ</code> / <code>{n} / {N}</code></td></tr><tr><td><code>start</code></td><td>int</td><td></td><td>開始ページ番号。既定は <code>1</code></td></tr><tr><td><code>font_size</code></td><td>float</td><td></td><td>文字サイズ。既定は <code>10</code></td></tr><tr><td><code>margin_mm</code></td><td>float</td><td></td><td>余白（mm）</td></tr><tr><td><code>color</code></td><td>str</td><td></td><td>文字色の hex。例 <code>#000000</code></td></tr></tbody></table></div>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-pageno/api/pdf-pageno</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@report.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;position=bottom-center&quot;</span> \
-  <span class="hl-flag">-F</span> <span class="hl-str">&quot;fmt=第 {n} / {total} 頁&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;start=1&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;fmt=第 {n} / {N} 頁&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;start=1&quot;</span> \
   <span class="hl-flag">--output</span> numbered.pdf</code></pre>
 <p>レスポンス：ページ番号を追加した PDF。</p>
       </section>
@@ -801,8 +807,9 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-ocr/api/pdf-ocr</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@scan.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;lang=chi_tra+eng&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;dpi=300&quot;</span> \
-  <span class="hl-flag">--output</span> ocr.pdf</code></pre>
-<p>レスポンス：テキストレイヤーを追加した PDF。</p>
+  | jq
+<span class="hl-cmt"># → {&quot;job_id&quot;: &quot;...&quot;, &quot;upload_id&quot;: &quot;...&quot;, &quot;download_url&quot;: &quot;/api/jobs/.../download&quot;}</span></code></pre>
+<p>応答：<code>job_id</code>（OCR はバックグラウンドで実行）。第 10 章のジョブ API で進捗を確認し、完了後に <code>download_url</code> から文字レイヤー付きの PDF をダウンロードします。初回は認識モデルのダウンロードがあるため時間がかかります。</p>
 <h5 id="外部-gpu-ocr-server">外部 GPU OCR Server</h5>
 <p>管理者は <code>admin/ocr-langs → 外部 GPU 認識サーバー</code>から <code>jt-ocr-server</code> を GPU ホストに配置できます。jtdt は HTTP でリモートの EasyOCR を呼び出し、CPU より 10 倍以上高速になります。設定関連の admin endpoints：</p>
 <pre><code class="lang-text"><span class="hl-method">GET</span>  /admin/ocr-langs/deploy/install.sh        <span class="hl-cmt"># 下載安裝腳本</span>

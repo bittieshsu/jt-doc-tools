@@ -258,14 +258,11 @@ def _probe_office() -> dict:
     if not binary:
         return {"installed": False, "version": "", "extra": "", "binary": "", "ok": False}
     flavor = "OxOffice" if "oxoffice" in binary.lower() or "OxOffice" in binary else "LibreOffice"
-    rc, out, _ = _run_capture([binary, "--version"], timeout=5)
-    version_line = (out or "").strip().splitlines()[0] if out else ""
-    # Strip the long build hash that OxOffice / LibreOffice append after the
-    # version, e.g. "OxOffice 11.0.4.1 855623c6c181122c9b97d204c8c74172e167cf75"
-    # → "OxOffice 11.0.4.1". Hash is noise for users; if they need it, the
-    # binary path is shown and they can re-run --version manually.
-    import re as _re
-    version = _re.sub(r"\s+[0-9a-f]{20,}.*$", "", version_line)
+    # 走 office_convert.soffice_version：Windows 上**不可以**執行
+    # `soffice --version`（服務身分下不會結束，每開一次這頁就留下 soffice.bin）。
+    # 建置雜湊也在那裡去掉了（"OxOffice 11.0.4.1 855623c6…" → "OxOffice 11.0.4.1"）。
+    from .office_convert import soffice_version
+    version = soffice_version(binary, timeout=5)
     # Impress 模組是「PDF 轉簡報」的必要條件，而且**缺它時的錯誤訊息極度誤導**：
     # soffice 只會回一句 "source file could not be loaded"，連正常的 .odp 都載不進來，
     # 看起來像我們產出的檔案壞掉（開發時在這上面卡了很久）→ 在相依檢查明確列出。

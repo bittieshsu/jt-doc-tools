@@ -135,7 +135,10 @@ def _draw_pageno(
     numbered_total = max(1, to_page - from_page + 1)
     numbered_idx = page_no - from_page        # 0-based within range
     shown = numbered_idx + start
-    text = fmt.replace("{n}", str(shown)).replace("{N}", str(numbered_total))
+    # `{total}` 是 `{N}` 的別名：API 手冊有一段時間寫的是 `{total}`，照著呼叫的人
+    # 拿到的是字面的「{total}」印在每一頁上（2026-09-24 Windows 實機測試抓到）。
+    text = (fmt.replace("{n}", str(shown)).replace("{N}", str(numbered_total))
+               .replace("{total}", str(numbered_total)))
     m_pt = mm_to_pt(margin_mm)
     # page.rect 含旋轉(visual rect)。insert_text 用內容座標(unrotated)。
     # 對旋轉過的頁(/Rotate 90/180/270),要把計算出的 visual 座標經

@@ -22,7 +22,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.19"
+VERSION = "1.16.20"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -2254,6 +2254,31 @@ async def _startup():
     # **只能單一 Web 行程**（稽核 F11）—— 只記錄不阻止，理由見那個模組。
     from .core.single_process import warn_if_multi_worker
     warn_if_multi_worker()
+    # Windows：「程式和功能」的版本改成**實際在跑的**版本。安裝程式是瘦
+    # bootstrapper，寫進登錄檔的是打包當天的版本（2026-09-24 實測：1.15.54 的
+    # 安裝檔裝出 1.16.19，清單上寫 1.15.54），原本要等第一次 `jtdt update`
+    # 才會更正。服務以系統帳號執行，寫得了 HKLM；其他平台是空操作、不會丟例外。
+    #
+    # **啟動當下同步一次不夠**：全新安裝時服務是在安裝程式**還沒寫登錄檔之前**
+    # 就啟動的（2026-09-24 實測：同步時那個鍵還不存在，安裝程式隨後寫進自己的
+    # 版本）。所以之後再補兩次；寫的是同一個值，重複寫沒有副作用。
+    try:
+        from .cli import _sync_windows_display_version
+        _sync_windows_display_version(VERSION)
+        import sys as _sys
+        if _sys.platform.startswith("win"):
+            import threading as _threading
+
+            def _later() -> None:
+                import time as _time
+                for delay in (90, 600):
+                    _time.sleep(delay)
+                    _sync_windows_display_version(VERSION)
+
+            _threading.Thread(target=_later, name="arp-version-sync",
+                              daemon=True).start()
+    except Exception:                                    # noqa: BLE001
+        pass
     # Initialise auth + audit DBs (idempotent; applies pending migrations).
     # We do this even when auth is disabled so that turning auth on later
     # has the schema ready.

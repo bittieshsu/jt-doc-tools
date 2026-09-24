@@ -203,6 +203,79 @@ def _kill_tree(proc) -> None:
         pass
 
 
+def _win_product_version(binary: str) -> str:
+    """讀 Windows 執行檔的「產品版本」資源（檔案內容裡就有，不必執行它）。
+
+    取不到一律回 ``""`` —— 這只是顯示用的資訊，不可以讓頁面因為它失敗。
+    """
+    try:
+        import ctypes
+        from ctypes import wintypes
+        ver = ctypes.WinDLL("version")
+        ver.GetFileVersionInfoSizeW.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(wintypes.DWORD)]
+        ver.GetFileVersionInfoSizeW.restype = wintypes.DWORD
+        ver.GetFileVersionInfoW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD,
+                                            wintypes.DWORD, ctypes.c_void_p]
+        ver.GetFileVersionInfoW.restype = wintypes.BOOL
+        ver.VerQueryValueW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR,
+                                       ctypes.POINTER(ctypes.c_void_p),
+                                       ctypes.POINTER(wintypes.UINT)]
+        ver.VerQueryValueW.restype = wintypes.BOOL
+        size = ver.GetFileVersionInfoSizeW(binary, None)
+        if not size:
+            return ""
+        buf = ctypes.create_string_buffer(size)
+        if not ver.GetFileVersionInfoW(binary, 0, size, buf):
+            return ""
+        ptr, n = ctypes.c_void_p(), wintypes.UINT()
+        if not ver.VerQueryValueW(buf, "\\", ctypes.byref(ptr), ctypes.byref(n)) or not n.value:
+            return ""
+        # VS_FIXEDFILEINFO：第 5、6 個 DWORD 是產品版本的高低位
+        dw = ctypes.cast(ptr, ctypes.POINTER(wintypes.DWORD * 6)).contents
+        ms, ls = dw[4], dw[5]
+        return f"{ms >> 16}.{ms & 0xFFFF}.{ls >> 16}.{ls & 0xFFFF}"
+    except Exception:                                    # noqa: BLE001
+        return ""
+
+
+def soffice_version(binary: str, timeout: float = 5.0) -> str:
+    """回 ``"OxOffice 11.0.5.1"`` 這種字串；取不到回 ``""``（只給畫面顯示用）。
+
+    **Windows 上不可以執行 `soffice --version`**：以服務帳號（沒有桌面的
+    工作階段）跑的時候它**不會自己結束**，逾時只殺得到外層的 soffice.exe，
+    真正的 soffice.bin 會一直留在背景 —— 2026-09-24 Windows 實機測試抓到兩支
+    從查版本那一刻起就掛著，而且畫面上的版本照樣是空的。改讀執行檔裡的版本資源。
+
+    其他平台照舊跑 `--version`，逾時時**整棵行程一起收**（`soffice` 是 shell
+    包裝腳本，只殺拿到的 PID 會留下 soffice.bin）。
+    """
+    import re as _re
+    import sys as _sys
+    if not binary:
+        return ""
+    if _sys.platform.startswith("win"):
+        v = _win_product_version(binary)
+        if not v:
+            return ""
+        name = "OxOffice" if "oxoffice" in binary.lower() else "LibreOffice"
+        return f"{name} {v}"
+    try:
+        kwargs = {"start_new_session": True}
+        proc = subprocess.Popen([binary, "--version"], stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, **kwargs)
+        try:
+            out, _ = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _kill_tree(proc)
+            return ""
+        line = (out or b"").decode("utf-8", "replace").strip().splitlines()
+        line = line[0] if line else ""
+        # 去掉 OxOffice / LibreOffice 版本後面那串建置雜湊（對使用者是雜訊）
+        return _re.sub(r"\s+[0-9a-f]{20,}.*$", "", line).strip()
+    except Exception:                                    # noqa: BLE001
+        return ""
+
+
 def _build_soffice_cmd(soffice: str, args: list[str]) -> tuple[list, dict]:
     """Build subprocess.Popen kwargs for cross-platform soffice invocation.
 

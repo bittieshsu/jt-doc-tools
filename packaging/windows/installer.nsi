@@ -262,8 +262,17 @@ Section "-DoInstall"
   IfFileExists "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" 0 +2
     StrCpy $2 "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
 
-  DetailPrint "Running installer core (downloads Python + source, please wait) ..."
-  nsExec::ExecToLog '"$2" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\install_core.ps1" -InstallDir "$INSTDIR"$0'
+  ; **不可以用 `nsExec::ExecToLog`**：NSIS 3.09 起的 ExecToLog 在某一行輸出
+  ; 超過緩衝區、要擴充時會用到已釋放的記憶體（上游 bug #1323，3.12.1 才修，
+  ; 那一版還沒發佈）。症狀是安裝核心已經跑完、NSIS 卸載 nsExec 時當掉
+  ; （0xC0000005，ntdll 的 RtlpAllocateHeap），於是「程式和功能」、開始功能表
+  ; 捷徑、解除安裝用的那份 setup.exe **都沒有建**，而服務其實好好的。
+  ; 2026-09-24 在 Win11 實機上量到約四成的安裝會中（v1.15.53 也遇過一次，
+  ; 當時查不出原因）。`Exec` 不收輸出、不會走到那段程式碼；
+  ; 詳細過程本來就寫在 installer.log。檢查：tests/test_installer_silent_mode.py
+  DetailPrint "Running installer core (downloads Python + source, 10-30 minutes) ..."
+  DetailPrint "Progress log: %ProgramData%\${SHORTNAME}\Logs\installer.log"
+  nsExec::Exec '"$2" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\install_core.ps1" -InstallDir "$INSTDIR"$0'
   Pop $1
   ${If} $1 != 0
     ; **`/SD IDOK` 不可以拿掉。** 無介面安裝（`/S`，或從 SSH / 遠端管理跑）
@@ -480,7 +489,8 @@ Section "-DoUninstall"
   core_found:
     FileWrite $4 "uninstall_core.ps1 found, running ...$\r$\n"
     DetailPrint "Running uninstall core ..."
-    nsExec::ExecToLog '"$2" -NoProfile -ExecutionPolicy Bypass -File "$UN_DIR\packaging\windows\uninstall_core.ps1" -InstallDir "$UN_DIR"$0'
+    ; `Exec` 不用 `ExecToLog`：理由見安裝那一段（上游 bug #1323）
+    nsExec::Exec '"$2" -NoProfile -ExecutionPolicy Bypass -File "$UN_DIR\packaging\windows\uninstall_core.ps1" -InstallDir "$UN_DIR"$0'
     Pop $1
     FileWrite $4 "nsExec exit=$1$\r$\n"
     Goto skip_uncore

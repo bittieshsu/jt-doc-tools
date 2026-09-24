@@ -188,6 +188,7 @@ curl -X POST http://localhost:8765/tools/image-to-pdf/api/image-to-pdf \
 
 ```text
 POST /tools/pdf-to-image/convert
+GET  /tools/pdf-to-image/download/{upload_id}
 ```
 
 | 參數 | 類型 | 必填 | 說明 |
@@ -196,13 +197,18 @@ POST /tools/pdf-to-image/convert
 | `dpi` | int | | 解析度，預設 `150` |
 
 ```bash
+# 1. 上傳並轉換
 curl -X POST http://localhost:8765/tools/pdf-to-image/convert \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -F "file=@document.pdf" -F "dpi=200" \
-  --output pages.zip
+  -F "file=@document.pdf" -F "dpi=200" | jq
+# → {"upload_id": "...", "page_count": 3, "pages": [...]}
+
+# 2. 下載
+curl -s http://localhost:8765/tools/pdf-to-image/download/abc123 \
+  -H "Authorization: Bearer YOUR_TOKEN" --output pages.zip
 ```
 
-回應：單頁回 PNG，多頁回 ZIP。
+回應：第 1 步回每一頁的資訊與 `upload_id`；第 2 步拿圖，單頁是 PNG、多頁是 ZIP。
 
 ### PDF 轉 Office
 
@@ -481,7 +487,7 @@ POST /tools/pdf-pageno/api/pdf-pageno
 |---|---|---|---|
 | `file` | file | ✓ | PDF |
 | `position` | str | | `bottom-center`（預設）/ `bottom-right` / `bottom-left` / `top-*` |
-| `fmt` | str | | 格式樣板，例 `第 {n} 頁` / `{n} / {total}` |
+| `fmt` | str | | 格式樣板：`{n}` 是目前頁碼、`{N}` 是總頁數（`{total}` 同 `{N}`），例 `第 {n} 頁` / `{n} / {N}` |
 | `start` | int | | 起始頁碼，預設 `1` |
 | `font_size` | float | | 字級，預設 `10` |
 | `margin_mm` | float | | 邊距（mm） |
@@ -491,7 +497,7 @@ POST /tools/pdf-pageno/api/pdf-pageno
 curl -X POST http://localhost:8765/tools/pdf-pageno/api/pdf-pageno \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -F "file=@report.pdf" -F "position=bottom-center" \
-  -F "fmt=第 {n} / {total} 頁" -F "start=1" \
+  -F "fmt=第 {n} / {N} 頁" -F "start=1" \
   --output numbered.pdf
 ```
 
@@ -1061,10 +1067,11 @@ POST /tools/pdf-ocr/api/pdf-ocr
 curl -X POST http://localhost:8765/tools/pdf-ocr/api/pdf-ocr \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -F "file=@scan.pdf" -F "lang=chi_tra+eng" -F "dpi=300" \
-  --output ocr.pdf
+  | jq
+# → {"job_id": "...", "upload_id": "...", "download_url": "/api/jobs/.../download"}
 ```
 
-回應：加上文字層的 PDF。
+回應：`job_id`（OCR 在背景跑）。用第 10 章的作業 API 輪詢，完成後從 `download_url` 下載加上文字層的 PDF。第一次使用會先下載辨識模型，要多等一段時間。
 
 #### 外部 GPU OCR Server
 

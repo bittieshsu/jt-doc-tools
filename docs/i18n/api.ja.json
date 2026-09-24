@@ -232,7 +232,6 @@
   "回應：PDF 二進位。": "レスポンス：PDF のバイナリ。",
   "回應：PDF 二進位（<code>application/pdf</code>）。失敗 4xx + JSON <code>{&quot;detail&quot;: &quot;...&quot;}</code>。": "レスポンス：PDF のバイナリ（<code>application/pdf</code>）。失敗時は 4xx + JSON <code>{&quot;detail&quot;: &quot;...&quot;}</code>。",
   "回應：切出的 PDF（多份打包 ZIP）。": "レスポンス：分割した PDF（複数の場合は ZIP にまとめます）。",
-  "回應：加上文字層的 PDF。": "レスポンス：テキストレイヤーを追加した PDF。",
   "回應：加好書籤的 PDF。": "レスポンス：しおりを追加した PDF。",
   "回應：加完框線的 PDF。所有數值都會在伺服器端夾在安全範圍內。": "レスポンス：枠線を追加した PDF。すべての数値はサーバー側で安全な範囲に収められます。",
   "回應：加完頁碼的 PDF。": "レスポンス：ページ番号を追加した PDF。",
@@ -241,7 +240,7 @@
   "回應：去識別化後的檔案。": "レスポンス：匿名化後のファイル。",
   "回應：合併後的 PDF。": "レスポンス：結合後の PDF。",
   "回應：單張 A4 白底 PDF 二進位。": "レスポンス：1 枚の A4 白地 PDF のバイナリ。",
-  "回應：單頁回 PNG，多頁回 ZIP。": "レスポンス：1 ページなら PNG、複数ページなら ZIP を返します。",
+  "回應：第 1 步回每一頁的資訊與 <code>upload_id</code>；第 2 步拿圖，單頁是 PNG、多頁是 ZIP。": "応答：手順 1 は各ページの情報と <code>upload_id</code> を返します。手順 2 で画像を取得します（1 ページなら PNG、複数ページなら ZIP）。",
   "回應：圖片打包 ZIP。": "レスポンス：画像をまとめた ZIP。",
   "回應：填好的 PDF。": "レスポンス：入力済みの PDF。",
   "回應：壓縮後的 PDF。": "レスポンス：圧縮後の PDF。",
@@ -366,7 +365,6 @@
   "查 job 狀態": "job の状態を照会",
   "查詢的回應：": "照会のレスポンス：",
   "查進度，完成後到": "、完了後は次で",
-  "格式樣板，例 <code>第 {n} 頁</code> / <code>{n} / {total}</code>": "形式のテンプレート。例 <code>第 {n} ページ</code> / <code>{n} / {total}</code>",
   "框線顏色 hex，預設 <code>#333333</code>": "枠線の色の hex。既定は <code>#333333</code>",
   "標記已讀（<code>id</code> 或 <code>all=1</code>）": "既読にする（<code>id</code> または <code>all=1</code>）",
   "檔案數（側欄徽章用）": "ファイル数（サイドバーのバッジ用）",
@@ -613,5 +611,7 @@
   "：已設定時是": "：設定済みのときは",
   "，沒設定是空字串。 更新時送": "、未設定のときは空文字列です。更新時に",
   "或不送這個欄位＝不動，送新的字串＝換成這把（加密存放），送空字串＝移除。": "を送るかこのフィールドを省略すると変更なし、新しい文字列を送るとそのキーに置き換え（暗号化して保存）、空文字列を送ると削除します。",
-  "同上，不給就用已存檔的。送 <code>&quot;__KEPT__&quot;</code> 時，<strong>只有 <code>base_url</code> 跟存檔的一樣才會帶上存著的金鑰</strong>": "同上。省略すると保存済みの値を使います。<code>&quot;__KEPT__&quot;</code> を送った場合、<strong>保存済みのキーは <code>base_url</code> が保存済みのものと同じときだけ送られます</strong>"
+  "同上，不給就用已存檔的。送 <code>&quot;__KEPT__&quot;</code> 時，<strong>只有 <code>base_url</code> 跟存檔的一樣才會帶上存著的金鑰</strong>": "同上。省略すると保存済みの値を使います。<code>&quot;__KEPT__&quot;</code> を送った場合、<strong>保存済みのキーは <code>base_url</code> が保存済みのものと同じときだけ送られます</strong>",
+  "回應：<code>job_id</code>（OCR 在背景跑）。用第 10 章的作業 API 輪詢，完成後從 <code>download_url</code> 下載加上文字層的 PDF。第一次使用會先下載辨識模型，要多等一段時間。": "応答：<code>job_id</code>（OCR はバックグラウンドで実行）。第 10 章のジョブ API で進捗を確認し、完了後に <code>download_url</code> から文字レイヤー付きの PDF をダウンロードします。初回は認識モデルのダウンロードがあるため時間がかかります。",
+  "格式樣板：<code>{n}</code> 是目前頁碼、<code>{N}</code> 是總頁數（<code>{total}</code> 同 <code>{N}</code>），例 <code>第 {n} 頁</code> / <code>{n} / {N}</code>": "形式のテンプレート：<code>{n}</code> は現在のページ番号、<code>{N}</code> は総ページ数（<code>{total}</code> も <code>{N}</code> と同じ）。例 <code>第 {n} ページ</code> / <code>{n} / {N}</code>"
 }

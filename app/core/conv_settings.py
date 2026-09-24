@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
-import subprocess
 import threading
 from pathlib import Path
 from typing import Optional
@@ -39,22 +37,13 @@ BUILTIN_PATHS: list[dict[str, str]] = [
 
 
 def _probe_version(path: str) -> str:
-    """Run ``<path> --version`` with a short timeout and pick out the version
-    text. Returns "" on any failure (used purely for display in the UI)."""
-    try:
-        proc = subprocess.run(
-            [path, "--version"],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            timeout=4.0,
-        )
-        out = proc.stdout.decode("utf-8", "replace").strip()
-        # Take the first line, strip the long git hash that LibreOffice
-        # appends so the UI stays compact.
-        line = out.splitlines()[0] if out else ""
-        line = re.sub(r"\s+[0-9a-f]{20,}.*$", "", line).strip()
-        return line
-    except Exception:
-        return ""
+    """版本文字，只給畫面顯示用；取不到回 ""。
+
+    走 `office_convert.soffice_version` —— Windows 上**不可以**執行
+    `soffice --version`（以服務身分跑時不會結束，會留下 soffice.bin）。
+    """
+    from .office_convert import soffice_version
+    return soffice_version(path, timeout=4.0)
 
 
 class _ConvSettings:

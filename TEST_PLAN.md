@@ -111,6 +111,31 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 > **這一關會讓測試機離線一段時間**，所以要挑有人看著的時候跑 —— 但
 > **不可以因此跳過**：安裝程式那條路從 v1.15.26 之後就沒有人走過。
 
+### 裝好之後要把工具真的跑一遍 🆕 v1.16.20
+
+> **「healthz ok、50 支工具都載入」不等於「一安裝就能用」。** 2026-09-24 在
+> `.154` 全新安裝後把工具實際跑一遍，抓到四個**只在 Windows 服務裡才發生**、
+> 開發機與 CI 上永遠是綠的問題（自己組的 soffice 設定檔網址 `file://C:\…` 不合法、
+> `soffice --version` 不會結束……），其中「PDF 轉文書檔」一頁要 3 分鐘、預覽空白。
+
+- [ ] **安裝程式離開碼是 0**，而且「程式和功能」、開始功能表捷徑都有建 ——
+      NSIS 在最後一步當掉時服務照樣是好的，只看 healthz 會漏掉
+      （上游 bug #1323，見 `tests/test_installer_silent_mode.py`；要連裝好幾次才抓得到）
+- [ ] 用**中文內容**跑常用的工具並**打開產出檢查**（Word／Excel 轉 PDF、頁碼、
+      浮水印、擷取文字、Markdown 三種格式、PDF 轉 Word 三顆引擎、PDF 轉圖片、OCR）
+- [ ] **一頁的 PDF 轉 Word 要在 30 秒內完成**，右邊的轉換後預覽要有圖
+- [ ] 跑完之後 Windows 上**不可以留著 soffice 行程**
+      （`Get-CimInstance Win32_Process | ? Name -match soffice` 要是空的）
+- [ ] 第一次 OCR 的狀態文字要說明「正在下載辨識模型」，不是只寫「準備中」
+- [ ] 服務啟動後「設定 → 應用程式」的版本要等於實際版本
+- [ ] `%ProgramData%\jt-doc-tools\Logs\setup-python-sync.log` 要存在、看得到 uv 的輸出
+- [ ] 逐頁在瀏覽器開一次（含管理頁），主控台不可以有錯誤
+
+> **安裝要下載約 1.1 GB**（Python 套件，其中 PyTorch 最大），另外 Office 引擎約 400 MB、
+> OCR 模型約 300 MB 都放在 GitHub。實測那天這邊到 GitHub 只有每秒 40 KB 左右，
+> 全新安裝花了 32 分鐘。**很多人要在同一時段開始用（教育訓練、整個單位一起部署）
+> 時要事先裝好，並且先跑一次 OCR**，不要讓所有人同時下載。
+
 ## 0.4 每一頁都要在真的瀏覽器裡「活著」 🆕 v1.15.36（使用者要求）
 
 > **「頁面渲染得出來」跟「頁面活著」是兩件事，而我們從來只驗前者。**
@@ -543,7 +568,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **343 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **347 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -741,6 +766,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_notify_privacy.py` | 通知送出去的內容不可以外洩多餘的東西 |
 | `test_notify_settings_form.py` | 通知設定頁的兩件事：**存進去的值不可以被自動帶值蓋掉**、欄位要看得到內容 |
 | `test_ocr_avx2_guard.py` | 本機 EasyOCR 在缺 AVX2 的 CPU 上會 SIGILL 打掛整個服務 |
+| `test_ocr_first_download_message.py` | 第一次用本機 EasyOCR 時，狀態文字要說「正在下載辨識模型」 |
 | `test_ocr_server_gpu_select.py` | Unit tests for jt-ocr-server's auto GPU selection (server_template.py). |
 | `test_office_convert.py` | 辦公文件格式互轉（office-convert） |
 | `test_office_convert_output_first.py` | soffice 的離開碼不可靠 —— 判準是「有沒有拿到可用的檔案」 |
@@ -758,6 +784,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_ou_key_canon.py` | OU 授權的 DN 大小寫 / 空白正規化（v1.14.48） |
 | `test_output_verification_coverage.py` | 去識別化類工具**必須**驗到「產出本身」（使用者要求，2026-09-01） |
 | `test_owasp_top10.py` | OWASP Top 10 (2025) regression suite. |
+| `test_oxoffice_msi_selection.py` | Windows 安裝時要真的挑得到 OxOffice 的 **64 位元** MSI |
 | `test_pages_boot_in_a_browser.py` | 每一頁都要在**真的瀏覽器**裡開得起來，而且主控台不可以有錯誤 |
 | `test_passwords.py` | Tests for app.core.passwords (scrypt hashing + policy). |
 | `test_path_traversal_audit.py` | Audit every tool router for unsafe path expressions. |
@@ -789,6 +816,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_pdf_to_office_c_fixers.py` | v1.8.61 C 階段強化 fixer 測試 |
 | `test_pdf_to_office_d_fixers.py` | v1.8.62 D 階段 fixer 測試 |
 | `test_pdf_to_office_draw_engine.py` | pdf-to-office 第三引擎 draw（版面重現）測試 |
+| `test_pdf_to_office_fallback_format.py` | 引擎退回別的格式時，**檔名要跟著實際內容走**，而且要講出來 |
 | `test_pdf_to_office_jtdt_reform.py` | v1.8.63 jtdt-reform engine 單元 + 端對端測試 |
 | `test_pdf_to_office_progress.py` | `pdf2docx` 那條路要回報**逐頁**進度 |
 | `test_pdf_to_slides.py` | pdf-to-slides（PDF 轉簡報）測試 |
@@ -835,6 +863,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_single_web_process.py` | 這個服務只能用**單一 Web 行程**跑，被開成多 worker 時要講出來（稽核 F11） |
 | `test_smoke_routes.py` | Smoke tests: every public page renders 200, no 500s. |
 | `test_smtp_relay_modes.py` | 通知信的三種寄送方式 |
+| `test_soffice_calls_go_through_office_convert.py` | 所有 soffice 轉檔都要走 `app/core/office_convert.py`；Windows 上不可以執行 |
 | `test_speech_signed_audio_url.py` | 語音服務拉錄音檔的簽章網址：驗得過才給，**驗不過一律當成找不到** |
 | `test_sso.py` | Tests for the SSO feature (OIDC + SAML): settings encryption, JIT |
 | `test_sso_oidc_e2e.py` | Real end-to-end OIDC login against a self-hosted, spec-conformant mini IdP. |

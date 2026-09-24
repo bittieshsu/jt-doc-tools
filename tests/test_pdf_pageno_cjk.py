@@ -46,3 +46,31 @@ def test_text_width_pt_counts_cjk_full_width():
     # CJK 全形 ≈ 1.0 em、半形 ≈ 0.55 em
     assert R._text_width_pt("AB", 10) == 10 * (0.55 + 0.55)
     assert R._text_width_pt("頁", 10) == 10 * 1.0
+
+
+def test_the_format_written_in_the_api_manual_works():
+    """API 手冊的範例是**照抄就要能用**的。
+
+    手冊曾寫 `第 {n} / {total} 頁`，程式只認 `{N}` —— 照著呼叫的人拿到的是
+    每一頁都印著字面的「{total}」（2026-09-24 在 Windows 實機上照手冊跑才抓到）。
+    現在兩種都認，並且直接拿手冊裡那一行的格式來驗，手冊改了這條跟著改。
+    """
+    import re
+    from tools.repo_paths import public_root
+    import pathlib
+    md = (public_root(pathlib.Path(__file__).resolve().parent.parent) / "API.md"
+          ).read_text(encoding="utf-8")
+    fmts = re.findall(r'-F "fmt=([^"]+)"', md)
+    assert fmts, "API.md 裡找不到頁碼的 fmt 範例 —— 這條什麼都沒驗到"
+    for fmt in fmts + ["{n} / {total}"]:
+        doc = fitz.open()
+        page = doc.new_page(width=595, height=842)
+        R._draw_pageno(
+            page, page_index=3, total=20, position="bc",
+            fmt=fmt, start=1, font_size=12,
+            margin_mm=10, color_hex="#000000", from_page=1, to_page=20,
+        )
+        txt = page.get_text()
+        assert "{" not in txt and "}" not in txt, f"{fmt!r} 印出了沒換掉的樣板：{txt!r}"
+        assert "20" in txt, f"{fmt!r} 沒有印出總頁數：{txt!r}"
+        doc.close()

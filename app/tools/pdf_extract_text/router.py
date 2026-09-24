@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 import time as _time
 import uuid
 from pathlib import Path
@@ -260,20 +259,21 @@ def _render_docx(doc: dict, out: Path) -> bool:
 
 
 def _render_odt_from_docx(docx_path: Path, out_dir: Path) -> Optional[Path]:
-    """Convert .docx → .odt using soffice (OxOffice / LibreOffice)."""
-    from ...core.office_convert import find_soffice
-    exe = find_soffice()
-    if not exe or not Path(exe).exists():
-        return None
-    try:
-        subprocess.run(
-            [exe, "--headless", "--convert-to", "odt",
-             "--outdir", str(out_dir), str(docx_path)],
-            check=True, capture_output=True, timeout=60,
-        )
-    except Exception:
+    """Convert .docx → .odt using soffice (OxOffice / LibreOffice).
+
+    **走 office_convert**：這裡原本自己呼叫 soffice、**完全沒有指定設定檔**，
+    於是用的是服務帳號的預設設定檔 —— Windows 服務（系統帳號、沒有桌面）第一次
+    啟動 soffice 會卡在初次設定，60 秒逾時後 ODT 輸出失敗，而且逾時只殺得到
+    外層的 soffice.exe。共用那支有獨立設定檔、整棵行程收尾與並行上限。
+    """
+    from ...core import office_convert as _oc
+    if not _oc.find_soffice():
         return None
     odt = out_dir / (docx_path.stem + ".odt")
+    try:
+        _oc.convert_to_odt(docx_path, odt, timeout=60)
+    except Exception:
+        return None
     return odt if odt.exists() else None
 
 

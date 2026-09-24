@@ -114,6 +114,67 @@ def is_tesseract_available() -> bool:
 
 # ---- EasyOCR backend ----
 
+#: EasyOCR 依語言挑的辨識模型檔 —— **照 `easyocr.Reader` 的判斷順序**
+#: （easyocr 1.7：泰 → 繁中 → 簡中 → 日 → 韓 …，最後是拉丁字母）。
+#: 只列我們的語言對照表會送出去的那幾種；對不上的不做判斷。
+_EASYOCR_RECOG_ORDER = (
+    ("th", "thai.pth"), ("ch_tra", "chinese.pth"), ("ch_sim", "zh_sim_g2.pth"),
+    ("ja", "japanese_g2.pth"), ("ko", "korean_g2.pth"),
+)
+_EASYOCR_RECOG_SETS = (
+    ({"ar", "fa", "ur", "ug"}, "arabic.pth"),
+    ({"hi", "mr", "ne"}, "devanagari.pth"),
+    ({"ru", "rs_cyrillic", "be", "bg", "uk", "mn"}, "cyrillic_g2.pth"),
+)
+
+
+def _easyocr_recog_file(easy_langs: tuple) -> Optional[str]:
+    langs = list(easy_langs)
+    if not langs:
+        return None
+    if langs == ["en"]:
+        return "english_g2.pth"
+    for code, fn in _EASYOCR_RECOG_ORDER:
+        if code in langs:
+            return fn
+    for codes, fn in _EASYOCR_RECOG_SETS:
+        if codes & set(langs):
+            return fn
+    return "latin_g2.pth"
+
+
+def easyocr_first_download_pending(tess_langs: str = "") -> bool:
+    """本機 EasyOCR **這一次要先下載模型**（每個約數十 MB，放在 GitHub）。
+
+    只給畫面講清楚「正在下載」用：模型是在辨識第一頁的當下才下載，網路慢時
+    可以等上好幾分鐘，而原本畫面寫的是「辨識中」—— 看起來跟當掉一樣
+    （2026-09-24 Windows 全新安裝實測：到 GitHub 每秒 40 KB，要半小時）。
+
+    看兩個檔：偵測模型（每種語言都要）與**這次語言要用的辨識模型** ——
+    只看前者的話，下載到一半被中斷過的機器（偵測模型有了、辨識模型還沒）
+    照樣會停在「辨識中」（實機碰到）。
+
+    **不 import easyocr**（那會把 PyTorch 一起載進來）。有設遠端 GPU 服務時不算
+    （模型在對方那台）。
+    """
+    import os
+    try:
+        if get_default_engine() != "easyocr" or not is_easyocr_available():
+            return False
+        from . import ocr_remote_settings as _ors
+        if _ors.is_enabled_and_configured():
+            return False
+    except Exception:                                    # noqa: BLE001
+        return False
+    base = (os.environ.get("EASYOCR_MODULE_PATH") or os.environ.get("MODULE_PATH")
+            or os.path.expanduser("~/.EasyOCR"))
+    model_dir = Path(base) / "model"
+    if not (model_dir / "craft_mlt_25k.pth").exists():
+        return True
+    recog = _easyocr_recog_file(_map_langs_to_easyocr(tess_langs)) if tess_langs else None
+    return bool(recog) and not (model_dir / recog).exists()
+
+
 def local_easyocr_safe() -> bool:
     """這台機器跑**本機** EasyOCR 會不會直接把行程打掛。
 

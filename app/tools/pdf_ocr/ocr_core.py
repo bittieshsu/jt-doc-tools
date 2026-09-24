@@ -866,7 +866,13 @@ def ocr_pdf_to_searchable(
             ocr_chosen_engine = "easyocr-remote" if remote_on else chosen_engine
             ocr_remote_on = remote_on
             engine_label = f"{chosen_engine}-remote(GPU)" if remote_on else chosen_engine
-            _emit(cp, f"OCR 辨識中({engine_label} {langs})…")
+            # 第一次用本機 EasyOCR 時，模型是在**辨識這一頁的當下**才下載（約 300 MB）——
+            # 狀態要寫那件事。寫「辨識中」的話，網路慢時畫面會停在這句好幾分鐘，
+            # 看起來跟當掉一樣（2026-09-24 Windows 實測：GitHub 每秒 40 KB）。
+            if chosen_engine == "easyocr" and not remote_on and _oe.easyocr_first_download_pending(langs):
+                _emit(cp, "第一次使用 OCR：正在下載辨識模型（約 300 MB，只需要一次）…")
+            else:
+                _emit(cp, f"OCR 辨識中({engine_label} {langs})…")
             import time as _t_ocr
             _t_ocr_start = _t_ocr.time()
             words, engine_used = _oe.recognize_image(png, langs, preprocess=True)

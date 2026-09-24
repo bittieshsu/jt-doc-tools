@@ -5,11 +5,53 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (848 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (849 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.20] - 2026-09-24
+
+### Windows: fixes found by running every tool after a fresh install
+
+A fresh install with the Windows installer, then each tool actually used:
+
+* **PDF to office document was slow and its "after" preview was blank.** The preview built its own Office
+  profile path, which is not a valid URL on Windows, so every conversion waited for a 180-second timeout:
+  three minutes for a one-page PDF. It now uses the shared conversion path and finishes in seconds.
+* **The `jtdt-reform` engine could not produce Word files on Windows.** The same cause made its ODT-to-Word
+  step time out, and the ODT it fell back to was named `.docx` while the screen said "done", so Word reported
+  the file as corrupt. Conversion now works; if it ever does fall back, the file is named `.odt` and the
+  message says so.
+* **Text extraction's ODT output** could hang on Windows; it now uses the shared conversion path too.
+* **Checking the Office version left processes behind.** On Windows the program started to report the
+  OxOffice / LibreOffice version never exited, so each check left one more. The version is now read from
+  the program file itself.
+* **The first OCR run** downloads the recognition models (about 300 MB) while the screen only said
+  "Preparing"; on a slow network it looked frozen. It now says it is downloading, and that this happens once.
+* Settings -> Apps now shows the installed version rather than the installer's build version.
+* The full output of the dependency download during installation is now written to
+  `%ProgramData%\jt-doc-tools\Logs\setup-python-sync.log`, so a failed install can be diagnosed.
+* The command-line installer (`install.ps1`) never matched the OxOffice installer file and installed
+  LibreOffice instead; fixed.
+
+### Windows installer: an occasional crash at the very last step (fixed in the next installer build)
+
+* About one install in four crashed after everything had been installed: the service was running, but
+  Settings -> Apps had no entry and the Start menu had no shortcuts. The NSIS component the installer
+  uses corrupts memory when a program writes a lot of output (a known NSIS issue whose fix is not yet
+  released). The installer now runs its core without capturing output; the full log is still written to
+  `%ProgramData%\jt-doc-tools\Logs\installer.log`. **This fix and the OxOffice auto-install fix take
+  effect with the next installer build**; if you hit the crash, the service still works at
+  `http://127.0.0.1:8765/`.
+
+### API manual: three examples that returned the wrong thing
+
+* The page-number total is `{N}`; the manual said `{total}`, which printed the literal text on every page.
+  Both are now accepted.
+* OCR returns a job id (it runs in the background), not a PDF.
+* PDF to images takes two steps: convert, then download with the returned `upload_id`.
 
 ## [1.16.19] - 2026-09-24
 

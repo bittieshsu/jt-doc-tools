@@ -91,7 +91,12 @@ function Install-OxOffice {
     Log "Trying OxOffice from GitHub release ..."
     try {
         $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/OSSII/OxOffice/releases/latest' -Headers @{ 'User-Agent' = 'jt-doc-tools-installer' }
-        $asset = $rel.assets | Where-Object { $_.name -match '\.msi$' -and ($_.name -match 'win|Windows|x64') } | Select-Object -First 1
+        # 只收 64 位元的 MSI。OxOffice 的檔名是 `OxOffice_x86_64-11.0.5.msi` 與
+        # `OxOffice_x86-11.0.5.msi`（32 位元）。原本比對 `win|Windows|x64`，
+        # 兩個都比不到（`x86_64` 裡沒有連續的 `x64`），於是一律退到 winget 裝
+        # LibreOffice —— OxOffice 從來沒有被自動裝上過。
+        # 檢查：tests/test_oxoffice_msi_selection.py
+        $asset = $rel.assets | Where-Object { $_.name -match '\.msi$' -and $_.name -match '(x86_64|x64|amd64|win64)' } | Select-Object -First 1
         if (-not $asset) { Warn "No Windows MSI asset found for OxOffice"; return $false }
         $tmp = Join-Path $env:TEMP "oxoffice-$(Get-Date -Format yyyyMMddHHmmss).msi"
         Log "Downloading $($asset.browser_download_url)"

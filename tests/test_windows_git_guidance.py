@@ -135,6 +135,27 @@ def test_update_syncs_the_add_remove_programs_version():
     cli._sync_windows_display_version("9.9.9")
 
 
+def test_service_startup_also_syncs_the_display_version():
+    """全新安裝不會跑 `jtdt update` —— 服務啟動時也要同步一次。
+
+    2026-09-24 用 1.15.54 的安裝檔全新安裝，裝出來是 1.16.19，
+    「程式和功能」上卻寫 1.15.54（安裝程式寫的是它自己打包那天的版本）。
+    """
+    import ast
+    tree = ast.parse((ROOT / "app" / "main.py").read_text(encoding="utf-8"))
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.AsyncFunctionDef) and n.name == "_startup")
+    called = {getattr(c.func, "id", getattr(c.func, "attr", ""))
+              for c in ast.walk(fn) if isinstance(c, ast.Call)}
+    assert "_sync_windows_display_version" in called, (
+        "服務啟動時沒有同步「程式和功能」的版本 —— 全新安裝會一直顯示安裝檔的版本")
+    # 全新安裝時服務比登錄檔先出現：只在啟動當下同步一次的話，那次一定落空，
+    # 安裝程式隨後寫進去的是它自己打包那天的版本（實機量到）。要有延遲的補同步。
+    delays = [n for n in ast.walk(fn) if isinstance(n, ast.Tuple) and n.elts
+              and all(isinstance(e, ast.Constant) and isinstance(e.value, int) for e in n.elts)]
+    assert delays, "沒有延遲補同步 —— 全新安裝那一次一定會落空"
+
+
 def test_setup_python_cmd_can_recover_from_a_leftover_venv():
     """安裝被中斷過的機器要能自己裝回來。
 
