@@ -48,18 +48,30 @@ body {
   scrollbar-width: none;
 }
 .sidebar-scroll::-webkit-scrollbar { width: 0; height: 0; background: transparent; }
-/* Floating custom scrollbar indicator, painted by JS on the sidebar (outside
-   the scroll container) so it visually sits on top of the active tile. */
+/* Floating custom scrollbar, painted by JS on the sidebar (outside the scroll
+   container) so it visually sits on top of the active tile.
+   **要拖得動**（v1.16.18，使用者回報）：原本是 `pointer-events: none` 的純裝飾，
+   看起來是捲軸、按下去卻穿過它選到底下整片文字。現在由 base.html 的 JS 接拖曳。 */
 .sidebar-scrollbar {
   position: absolute; right: 2px; top: 0;
   width: 6px; border-radius: 3px;
   background: rgba(148, 163, 184, 0.55);
-  opacity: 0; transition: opacity 0.2s;
-  pointer-events: none;
+  opacity: 0; transition: opacity 0.2s, background 0.15s;
+  cursor: default;
+  touch-action: none;
   z-index: 60;
 }
+/* 6px 太細、很難按中：看得到的寬度不變，可以按的範圍往左加寬 */
+.sidebar-scrollbar::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -6px; right: -2px;
+}
 .sidebar:hover .sidebar-scrollbar,
-.sidebar.scrolling .sidebar-scrollbar { opacity: 1; }
+.sidebar.scrolling .sidebar-scrollbar,
+.sidebar.sb-dragging .sidebar-scrollbar { opacity: 1; }
+.sidebar-scrollbar:hover,
+.sidebar.sb-dragging .sidebar-scrollbar { background: rgba(203, 213, 225, 0.9); }
+/* 拖動中不要選到文字（原本就是整片被反白） */
+.sidebar.sb-dragging, .sidebar.sb-dragging * { user-select: none; }
 .sidebar .brand {
   display: flex; align-items: center; gap: 10px;
   padding: 0 4px;

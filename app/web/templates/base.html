@@ -1083,6 +1083,27 @@
         scroller.addEventListener('scroll', () => { updateThumb(); flashScrolling(); });
         window.addEventListener('resize', updateThumb);
         updateThumb();
+        // **按住拖動**（v1.16.18）：原生捲軸藏起來了，這條是畫上去的 —— 原本拖不動，
+        // 按下去還會開始選取底下的文字。移動量依「可捲距離 ÷ 捲軸可走距離」換算。
+        thumb.addEventListener('pointerdown', function (e) {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          const startY = e.clientY, startTop = scroller.scrollTop;
+          const room = scroller.clientHeight - thumb.offsetHeight;
+          const ratio = (scroller.scrollHeight - scroller.clientHeight) / Math.max(1, room);
+          sb.classList.add('sb-dragging');
+          try { thumb.setPointerCapture(e.pointerId); } catch (_) {}
+          function move(ev) { scroller.scrollTop = startTop + (ev.clientY - startY) * ratio; }
+          function end() {
+            sb.classList.remove('sb-dragging');
+            thumb.removeEventListener('pointermove', move);
+            thumb.removeEventListener('pointerup', end);
+            thumb.removeEventListener('pointercancel', end);
+          }
+          thumb.addEventListener('pointermove', move);
+          thumb.addEventListener('pointerup', end);
+          thumb.addEventListener('pointercancel', end);
+        });
       }
     })();
   </script>

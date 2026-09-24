@@ -5,11 +5,25 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (846 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (847 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.18] - 2026-09-24
+
+### The left menu's scrollbar can be dragged
+
+When the left menu is taller than the window, a scrollbar appears on its right edge, but it was only
+drawn there: pressing it and dragging did nothing and started selecting the text underneath instead,
+highlighting the whole menu.
+
+* The scrollbar can now be held and dragged up and down; the distance dragged is converted into how far the
+  menu actually scrolls.
+* The area that can be pressed is a little wider than the visible bar, so it is easier to hit; the bar gets
+  brighter on hover and while dragging.
+* Dragging no longer selects the menu text.
 
 ## [1.16.17] - 2026-09-24
 

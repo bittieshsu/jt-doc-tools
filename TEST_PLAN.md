@@ -543,7 +543,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **342 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **343 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -830,6 +830,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_settings_export.py` | Category-based settings export / import (v1.12.54). |
 | `test_settings_export_roundtrip.py` | 設定備份：**匯出的檔案要匯得回去** |
 | `test_sidebar_active_match.py` | 側欄「使用中」只能標一支 —— 判準是整段路徑，不是前綴 |
+| `test_sidebar_scrollbar_drag.py` | 側欄的捲軸要**按得住、拖得動**（v1.16.18，使用者回報） |
 | `test_signpath_notes_are_private.py` | SignPath 的往來筆記不可以出現在公開版（v1.15.27） |
 | `test_single_web_process.py` | 這個服務只能用**單一 Web 行程**跑，被開成多 worker 時要講出來（稽核 F11） |
 | `test_smoke_routes.py` | Smoke tests: every public page renders 200, no 500s. |
@@ -1471,6 +1472,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] 工具卡片依分類分組
 - [ ] **每個工具有獨一無二的 icon 與顏色**（首頁與側欄一致）
 - [ ] **側欄 active tile 白底延伸到右邊內容區**（無紫色縫隙）
+- [ ] **側欄的捲軸按得住、拖得動**（v1.16.18）：視窗矮到側欄要捲時，滑鼠按住右緣那條捲軸上下拖，側欄要跟著捲，**不可以選到底下的文字**（原本是純裝飾，一拖就整片反白）
 - [ ] **側欄捲軸浮動**（只在 hover / 滾動時顯示）
 - [ ] **搜尋支援中英文**（輸入 `form` 或 `填寫` 都能找到 pdf-fill）
 - [ ] 視窗縮窄到 ≤ 900px：側欄收起、漢堡按鈕展開、項目正確點選
