@@ -5,11 +5,36 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (845 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (846 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.17] - 2026-09-24
+
+### LLM: services other than Ollama work, and the API key is stored encrypted
+
+The LLM add-ons were written with Ollama in mind. With other OpenAI-compatible services (vLLM, LM Studio,
+cloud services) several things went wrong, two of them in ways that were hard to notice:
+
+* **The per-field LLM check in form auto-fill only called Ollama's own endpoint and sent no API key.**
+  With other services no field could be asked, and "could not ask" was treated as "no problem", so the
+  result said the whole form was filled correctly. Services other than Ollama now use the standard
+  OpenAI-compatible endpoint with the configured key; when no answer at all comes back an error is shown,
+  and when some fields could not be asked the result says how many were not checked.
+* **Every request carried Ollama-only fields** (`think`, `reasoning_effort` and others used to switch off a
+  model's thinking). Services that reject unknown parameters turned every request away. The tool now checks
+  whether the service is Ollama first, and only Ollama gets those fields. Models that think may answer a
+  little more slowly on other services.
+* Streaming responses are read even when there is no space after `data:`. An error sent in the middle of a
+  stream now fails that call and the reason goes to the service log, instead of becoming an empty answer.
+  The body of 4xx / 5xx responses is logged as well.
+* **The LLM API key is stored encrypted**, like the SSO, notification and speech-service secrets: neither the
+  settings page nor the API shows the key itself, and only the service account can read the settings file.
+  A plaintext key saved by an earlier version is encrypted the first time it is read. Settings backups
+  re-key it on import to the new machine.
+* "Test connection" only sends the saved key to the address it was saved for.
 
 ## [1.16.16] - 2026-09-24
 

@@ -199,7 +199,6 @@
   "各有兩個目標可選，差別是": "each offer two targets; the difference is the",
   "同一次請求裡的檔案<strong>必須同屬一類</strong>（不能把試算表和文書檔混在一起送）， 而且要與 <code>target</code> 所屬的類一致，否則回 400。": "Files in one request <strong>must all be of the same kind</strong> (a spreadsheet and a word-processing file cannot be mixed) and must match the kind that <code>target</code> belongs to, otherwise the call returns 400.",
   "同一類文件之間互轉格式：文書檔↔文書檔、試算表↔試算表、簡報↔簡報。走 job 模式回 <code>job_id</code>。": "Converts between formats of the same kind: word processing ↔ word processing, spreadsheet ↔ spreadsheet, presentation ↔ presentation. Job mode; returns <code>job_id</code>.",
-  "同上，不給就用已存檔的": "Same; omit it and the saved key is used",
   "同上，但用 GET + path 參數。": "The same, but as GET with a path parameter.",
   "同步": "synchronous",
   "含發票 QR Code 的圖片 / PDF": "Image or PDF containing the invoice QR code",
@@ -609,5 +608,10 @@
   "沒有": "has no",
   "（例如台語模式）。 這時": " (for example, the Taiwanese mode). In that case",
   "欄位，也不會把": "field, and",
-  "送給語音服務。 辨識模式能做哪些處理以語音服務提供的清單為準，送件前會先查。": "is not sent to the speech service. What a recognition mode can do follows the list the speech service provides, and it is checked before each submission."
+  "送給語音服務。 辨識模式能做哪些處理以語音服務提供的清單為準，送件前會先查。": "is not sent to the speech service. What a recognition mode can do follows the list the speech service provides, and it is checked before each submission.",
+  "讀取時不會回傳金鑰本身": "is never returned as the key itself when read",
+  "：已設定時是": ": when a key is set it is",
+  "，沒設定是空字串。 更新時送": ", and an empty string when none is set. When updating, sending",
+  "或不送這個欄位＝不動，送新的字串＝換成這把（加密存放），送空字串＝移除。": "or leaving the field out keeps the key; a new string replaces it (stored encrypted); an empty string removes it.",
+  "同上，不給就用已存檔的。送 <code>&quot;__KEPT__&quot;</code> 時，<strong>只有 <code>base_url</code> 跟存檔的一樣才會帶上存著的金鑰</strong>": "Same as above; the saved key is used if omitted. When <code>&quot;__KEPT__&quot;</code> is sent, <strong>the saved key is only sent if <code>base_url</code> matches the saved one</strong>"
 }

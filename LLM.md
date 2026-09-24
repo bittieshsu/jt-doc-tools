@@ -153,11 +153,22 @@
 | **vLLM / LM Studio / jan.ai** | 偏好其他 OpenAI-compat 後端 | 視 backend 而定 |
 | **遠端 OpenAI / Anthropic** | 不在意資料外送的場景 | 預設**不**支援（專案精神是不上雲），但 OpenAI-compat URL 可設，風險自負 |
 
+### 接不是 Ollama 的服務
+
+每次連線前會先問對方是不是 Ollama（`GET /api/version`），**只有 Ollama 才會收到 Ollama 專屬的欄位**
+（`think`、`reasoning_effort`、`options`、`chat_template_kwargs`，用來關掉模型的思考）。
+其他 OpenAI 相容服務只收到標準欄位，所以檢查嚴格、不接受未知參數的服務也能用。
+
+* 代價：在其他服務上跑會思考的模型時，關不掉它的思考，回應會慢一些。
+* 表單自動填寫的逐欄校驗兩種都能用：Ollama 走它原生的 `/api/chat`，其他服務走 `/v1/chat/completions`。
+* 一個回答都沒拿到時，逐欄校驗會直接說出來，不會把「問不到」當成「都填對了」。
+* 對方回錯誤時，錯誤內容會寫進服務記錄（`jtdt logs`）。
+
 ## 啟用後 admin UI 看到什麼
 
 `/admin/llm-settings`:
 - Base URL 輸入框（預設 `http://localhost:11434/v1`)
-- API key（本機 Ollama 不需要，雲端供應商需要）
+- API key（本機 Ollama 不需要，雲端供應商需要）—— **加密存放，設定頁與 API 都不會顯示出來**；要移除就把欄位清空再儲存
 - Timeout 秒數
 - **預設模型** 下拉（從 `/v1/models` 拉清單）
 - **每個工具 override 預設**（例如 vision 模型用 gemma4，純文字用 gemma3）
@@ -170,5 +181,6 @@
 - **預設關閉**，核心工具不依賴
 - 啟用後也只有 admin 設定的 base URL 會被連到（SSRF 防護：URL allowlist + 雲端 metadata host blocklist，見 `app/core/url_safety.py`)
 - 內部 LAN IP（10/8、172.16/12、192.168/16、127/8）允許 — 內網 LLM 是常見部署
+- API key 加密存放（與 SSO、通知、語音服務的祕密同一把金鑰），設定檔權限 600；「測試連線」時存著的金鑰只會送給存檔時的那個位址
 - LLM 處理過的內容寫進 audit log（僅記 metadata：工具 ID、處理時間、輸入大小、是否成功；**不**記實際內容，因可能含隱私）
 - 一般 user 看不到完整 LLM server URL，只看到模型名稱（避免內網 IP 外洩給其他 user）

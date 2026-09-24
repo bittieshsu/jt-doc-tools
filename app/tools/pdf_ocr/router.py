@@ -261,7 +261,7 @@ async def run_ocr(upload_id: str, request: Request,
             from app.core.llm_client import LLMClient as _LC
             try:
                 client = _LC(base_url=s["base_url"],
-                             api_key=s.get("api_key") or None,
+                             api_key=llm_settings.api_key(),
                              timeout=OCR_LLM_TIMEOUT)
             except Exception:
                 client = llm_settings.make_client()

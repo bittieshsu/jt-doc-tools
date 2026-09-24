@@ -328,7 +328,6 @@
   "LINE Notify 已於 2025 年 3 月停止服務": "LINE Notify was shut down in March 2025",
   "LLM / 遠端 GPU OCR": "LLM / remote GPU OCR",
   "LLM AI 加值是": "LLM assistance is ",
-  "LLM server / 模型 / 參數": "LLM server, model and parameters",
   "LLM 伺服器連不上": "Cannot reach the LLM server",
   "LLM 判讀中…": "The LLM is deciding…",
   "LLM 判讀失敗：": "LLM classification failed: ",
@@ -5373,5 +5372,10 @@
   "符合搜尋 {0} 項（共 {1} 項）": "{0} match the search ({1} in total)",
   "語音服務目前的辨識模式做不到其中一項處理（例如台語模式不做發言者分離）。請重新送一次；一直發生的話，請管理員到語音服務設定換一個辨識模式。": "The speech service's current recognition mode can't do one of the requested steps (for example, the Taiwanese mode doesn't separate speakers). Please send it again; if it keeps happening, ask an administrator to pick a different recognition mode in the speech service settings.",
   "這次用的辨識模式不做發言者分離，所以逐字稿沒有標出是誰說的，「會發言的人數」也沒有作用。": "The recognition mode used this time doesn't separate speakers, so the transcript doesn't show who said what, and the number of speakers had no effect.",
-  "不做發言者分離（逐字稿不會標出是誰說的）": "No speaker separation (the transcript won't show who said what)"
+  "不做發言者分離（逐字稿不會標出是誰說的）": "No speaker separation (the transcript won't show who said what)",
+  "LLM 校驗沒有拿到任何回答（{0} 個欄位都問不到），不能當成都填對了。請到 LLM 設定頁按「測試連線」確認服務正常。": "The LLM check got no answer at all ({0} fields could not be asked), so this cannot be taken to mean everything was filled correctly. Go to the LLM settings page and use \"Test connection\" to check the service.",
+  "有 {0} 個欄位問不到 LLM（共 {1} 個），那幾個欄位沒有校驗到。": "{0} fields could not be asked (out of {1}); those fields were not checked.",
+  "LLM 設定的位址格式不對，請到 LLM 設定頁確認。": "The address in the LLM settings is not valid. Please check the LLM settings page.",
+  "已設定（加密存放，不會顯示出來）；要移除就把欄位清空再儲存。": "Set (stored encrypted and never shown). To remove it, clear the field and save.",
+  "LLM server / 模型 / 參數（含 API 金鑰，敏感）": "LLM server, model and parameters (includes the API key; sensitive)"
 }

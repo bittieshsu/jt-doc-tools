@@ -90,35 +90,33 @@ def _crop_tile(page_img: Image.Image, slot_pt: tuple) -> bytes:
 
 # --------------------------------------------------------------- LLM call --
 
-def _ollama_chat(base_url: str, model: str, prompt: str,
-                 png: bytes, timeout: float) -> tuple[str, str]:
-    """Native Ollama /api/chat call — single-shot, non-streaming, think:False.
-    Returns (content, error). On failure: content='', error=<short reason>."""
-    # Strip /v1 if the user's base_url is OpenAI-compat-style
-    base = base_url.rstrip("/")
-    if base.endswith("/v1"):
-        base = base[:-3]
-    payload = {
-        "model": model,
-        "stream": False,
-        "think": False,
-        "options": {"temperature": 0.0},
-        "messages": [{
-            "role": "user", "content": prompt,
-            "images": [base64.b64encode(png).decode()],
-        }],
-    }
+#: 使用者看得到的訊息。**不在尾巴接變數**（要查得到語系檔）—— 數字前端的 `tr()`
+#: 會自己換成 `{0}` 再查；錯誤的細節（HTTP 狀態碼、例外名稱）只寫進記錄。
+MESSAGES = {
+    "no_answer": "LLM 校驗沒有拿到任何回答（{0} 個欄位都問不到），不能當成都填對了。"
+                 "請到 LLM 設定頁按「測試連線」確認服務正常。",
+    "partial": "有 {0} 個欄位問不到 LLM（共 {1} 個），那幾個欄位沒有校驗到。",
+    "bad_config": "LLM 設定的位址格式不對，請到 LLM 設定頁確認。",
+}
+
+
+def _ask(client, model: str, prompt: str,
+         png: bytes, timeout: float) -> tuple[str, str]:
+    """問一格。回 (回答, 錯誤)；失敗時回答是空字串、錯誤是**類別**
+    （`timeout` / `HTTP 404` / 例外名稱）—— 不放例外訊息本身（可能帶內部位址）。
+
+    傳輸交給 `LLMClient.short_vision_answer`：Ollama 走原生 `/api/chat`，
+    其他 OpenAI 相容服務走 `/chat/completions`，而且會帶管理員設定的金鑰。
+    原本這裡自己打 Ollama 原生端點、不帶金鑰，**接別家服務時每一欄都 404**。
+    """
     try:
-        with httpx.Client(timeout=timeout) as c:
-            r = c.post(f"{base}/api/chat", json=payload)
-        if r.status_code != 200:
-            return "", f"HTTP {r.status_code}"
-        msg = r.json().get("message", {})
-        return msg.get("content", "").strip(), ""
+        return client.short_vision_answer(png, prompt, model, timeout=timeout), ""
     except httpx.TimeoutException:
         return "", "timeout"
+    except httpx.HTTPStatusError as e:
+        return "", f"HTTP {e.response.status_code}"
     except Exception as e:  # noqa: BLE001
-        return "", f"{type(e).__name__}: {e}"
+        return "", type(e).__name__
 
 
 # ------------------------------------------------------------- per-field --
@@ -229,7 +227,11 @@ def per_field_review(
         result.errors.append("LLM 校驗未啟用")
         return result
 
-    base_url = s.get("base_url") or ""
+    try:
+        client = llm_settings.make_client()
+    except ValueError:
+        result.errors.append(MESSAGES["bad_config"])
+        return result
     # Per-tool 覆寫優先（admin 在 LLM 設定頁可以給 pdf-fill 校驗指定模型）
     model = llm_settings.get_model_for("pdf-fill")
 
@@ -247,6 +249,9 @@ def per_field_review(
 
     rr = RoundResult(round=1, verdict="needs_correction")
     started = time.monotonic()
+    #: 第一輪問了幾格、幾格有回答。**「沒回答」不等於「沒問題」** —— 原本問不到的一律
+    #: 當成沒問題，服務整個連不上時報告就是「全部填對了」，而且沒有任何錯誤。
+    asked = {"n": 0, "answered": 0, "last_err": ""}
     #: 第一輪標記出來的欄位（`Correction.key()` → 欄位），第二輪只重問這些
     flagged_first: dict[tuple, object] = {}
 
@@ -266,11 +271,14 @@ def per_field_review(
         """
         png = _crop_tile(page_img, f.slot_pt)
 
-        ans2, err2 = _ollama_chat(base_url, model, _q2_value_match(f.value),
-                                   png, PER_FIELD_TIMEOUT)
-        # Treat timeout as "uncertain — not a flag" (ignore noisy errors)
-        if err2 == "timeout" or not ans2:
+        ans2, err2 = _ask(client, model, _q2_value_match(f.value),
+                          png, PER_FIELD_TIMEOUT)
+        asked["n"] += 1
+        # 問不到：這一格不標記（逾時多半是模型在忙），但**要算進「沒回答」**
+        if not ans2:
+            asked["last_err"] = err2 or "empty"
             return None
+        asked["answered"] += 1
 
         if ans2.upper().startswith("YES"):
             return None   # value matches what's in the box — all good
@@ -279,8 +287,8 @@ def per_field_review(
         # fuzzy-match rescue on Q2 false negatives (OCR noise like doubled
         # punctuation or whitespace causing Q2=NO when the value is
         # actually there). If actual ≈ expected, skip correction entirely.
-        ans4, _ = _ollama_chat(base_url, model, _q4_actual_text(),
-                                png, PER_FIELD_TIMEOUT)
+        ans4, _ = _ask(client, model, _q4_actual_text(),
+                       png, PER_FIELD_TIMEOUT)
         actual = None
         if ans4 and ans4.strip():
             a = ans4.strip()
@@ -299,8 +307,8 @@ def per_field_review(
             return None
 
         # Q3 — disambiguate wrong-cell vs value-mismatch
-        ans3, _ = _ollama_chat(base_url, model, _q3_label_fit(f.value),
-                                png, PER_FIELD_TIMEOUT)
+        ans3, _ = _ask(client, model, _q3_label_fit(f.value),
+                       png, PER_FIELD_TIMEOUT)
         is_wrong_cell = ans3 and not ans3.upper().startswith("YES")
 
         # Q5 — only when wrong-cell AND candidate_labels were supplied. Asks
@@ -311,9 +319,9 @@ def per_field_review(
             others = [c for c in candidate_labels
                       if c and c != (f.label_text or f.profile_key)][:8]
             if others:
-                ans5, _ = _ollama_chat(base_url, model,
-                                        _q5_label_pick(f.value, others),
-                                        png, PER_FIELD_TIMEOUT)
+                ans5, _ = _ask(client, model,
+                               _q5_label_pick(f.value, others),
+                               png, PER_FIELD_TIMEOUT)
                 if ans5 and ans5.strip():
                     letter = ans5.strip()[0].upper()
                     if letter.isalpha() and (ord(letter) - 65) < len(others):
@@ -351,6 +359,22 @@ def per_field_review(
 
     rr.elapsed_s = round(time.monotonic() - started, 2)
     rr.verdict = "all_clear" if not rr.corrections else "needs_correction"
+    missed = asked["n"] - asked["answered"]
+    if asked["n"] and not asked["answered"]:
+        # 一格都沒回答 → **不可以報「都填對了」**
+        logger.warning("pdf-fill LLM 校驗：%d 個欄位都沒有拿到回答（最後一次：%s）",
+                       asked["n"], asked["last_err"])
+        rr.verdict = "unverified"
+        result.rounds.append(rr)
+        result.errors.append(MESSAGES["no_answer"].replace("{0}", str(asked["n"])))
+        result.total_elapsed_s = rr.elapsed_s
+        notify(total, total, "完成（沒有拿到 LLM 的回答）")
+        return result
+    if missed:
+        logger.warning("pdf-fill LLM 校驗：%d/%d 個欄位問不到（最後一次：%s）",
+                       missed, asked["n"], asked["last_err"])
+        rr.error = (MESSAGES["partial"].replace("{0}", str(missed))
+                    .replace("{1}", str(asked["n"])))
     result.rounds.append(rr)
 
     # ---- 第二輪：**只**重問第一輪標記出來的欄位，連兩輪同錯才採納

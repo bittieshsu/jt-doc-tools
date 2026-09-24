@@ -1960,6 +1960,9 @@ curl -X POST http://localhost:8765/admin/api/llm/settings \
   -d '{"enabled":true,"base_url":"http://localhost:11434","model":"gemma4:26b"}'
 ```
 
+`api_key` **讀取時不會回傳金鑰本身**：已設定時是 `"__KEPT__"`，沒設定是空字串。
+更新時送 `"__KEPT__"` 或不送這個欄位＝不動，送新的字串＝換成這把（加密存放），送空字串＝移除。
+
 ### 測試 LLM 連線
 
 ```text
@@ -1969,7 +1972,7 @@ POST /admin/api/llm/test-connection
 | 參數 | 類型 | 必填 | 說明 |
 |---|---|---|---|
 | `base_url` | str | | 要測的位址。**不給就測目前已存檔的設定** |
-| `api_key` | str | | 同上，不給就用已存檔的 |
+| `api_key` | str | | 同上，不給就用已存檔的。送 `"__KEPT__"` 時，**只有 `base_url` 跟存檔的一樣才會帶上存著的金鑰** |
 | `timeout_seconds` | num | | 上限 30 秒（管理頁不能卡住） |
 
 JSON body。管理頁的「測試連線」按鈕會把**還沒存檔**的那組設定帶進來；

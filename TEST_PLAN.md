@@ -543,7 +543,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **341 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **342 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -705,6 +705,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_license_declaration.py` | 本專案宣告的授權必須處處一致（v1.14.48 起改為 AGPL-3.0-or-later） |
 | `test_llm_hidden_pages_boot.py` | LLM 停用 ＋「停用時一併隱藏」時，每一支有 LLM 功能的頁面在**真瀏覽器**裡開一次 |
 | `test_llm_hide_when_disabled.py` | LLM 停用時：**預設反灰**，管理員另外勾「停用時一併隱藏」才隱藏（v1.16.11） |
+| `test_llm_non_ollama_backends.py` | 接「不是 Ollama」的 LLM 服務（v1.16.17） |
 | `test_llm_per_field_consensus.py` | LLM 逐欄校驗：連兩輪都指出同一個問題才採納 |
 | `test_llm_stream_deadline.py` | 串流回應要有**整次生成的上限**，不是只有每個 chunk |
 | `test_llm_url_ssrf.py` | SSRF defence — admin-supplied LLM base URL must reject suspicious schemes |
@@ -1686,8 +1687,13 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 ### 管理區設定 API
 - [ ] `POST /admin/api/check-latest-version` — 回目前版本與最新版本；連不到網路時要回錯誤訊息，不可讓頁面一直轉
 - [ ] `GET|POST /admin/api/llm/settings` — 存檔後重新整理值要留著；數值欄位（逾時、並行數、句數上限）超範圍要被 clamp
+  - [ ] **API 金鑰加密存放**（v1.16.17）：`llm_settings.json` 裡看不到明文、權限 600；
+        設定頁原始碼、GET 與 POST 的回應都**不出現金鑰本身**（只有 `__KEPT__`）；
+        送 `__KEPT__` 不動、送空字串移除；舊版的明文第一次讀取就搬成密文
+  - [ ] 設定備份匯出 / 匯入：換一台機器匯入後金鑰照樣能用（匯出時解密、匯入時用本機金鑰重新加密）
 - [ ] `GET /admin/api/llm/models` — 列出遠端模型；伺服器連不上時回錯誤訊息不可拋例外
 - [ ] `POST /admin/api/llm/test-connection` — 成功 / 失敗都要有明確訊息（失敗訊息不可洩漏內部路徑或憑證）
+  - [ ] 表單上改了還沒存的位址再按「測試連線」，**存著的金鑰不可以送到那個位址**（v1.16.17）
 - [ ] `POST /admin/api/ocr-langs/set-engine` — 切換 easyocr / tesseract 後，OCR 工具實際用的引擎要跟著改
 - [ ] `POST /admin/api/ocr-langs/set-quality`、`POST /admin/api/ocr-langs/switch-active` — 設定有寫進去且重啟後仍在
 - [ ] `GET /admin/api/ocr-langs/external/status`、`POST /admin/api/ocr-langs/external/save`、
@@ -3578,6 +3584,19 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 - [ ] 只在其中一輪被指出的疑慮**仍然列得出來**，但不標成已採納
 - [ ] 管理區把「連續幾輪」設成 1 → 只跑一輪，行為與舊版相同
 - [ ] 第二輪只重問可疑欄位（看進度訊息「再確認 N/M」的 M 應**遠小於**總欄位數）
+- [ ] **接不是 Ollama 的服務也能校驗**（v1.16.17）：vLLM / LM Studio / 雲端服務走 `/v1/chat/completions`
+      並帶上設定的金鑰；Ollama 照舊走原生 `/api/chat`
+- [ ] **一個回答都沒拿到時要顯示錯誤**，不可以顯示「全部正確」（把 LLM 位址改成連不上的再跑一次驗）；
+      部分欄位問不到時要講出幾個沒校驗到
+
+#### 6.16.3 接不是 Ollama 的 LLM 服務（v1.16.17）
+
+自動化：`tests/test_llm_non_ollama_backends.py`（假服務刻意做成「不認得的參數一律 400」）。
+
+- [ ] 對檢查嚴格的 OpenAI 相容服務，送出去的請求**只有標準欄位**（沒有 `think` / `reasoning_effort` /
+      `options` / `chat_template_kwargs`）；對 Ollama 照舊送（gemma4 靠它關掉思考，實測回應 0.3 秒）
+- [ ] SSE 的 `data:` 後面沒有空白也讀得到；串流中途的錯誤要讓那次呼叫失敗，原因寫進服務記錄
+- [ ] 對方回 4xx / 5xx 時，服務記錄裡看得到對方回的內容（不是只有「HTTP 400」）
 
 ### 6.17 v1.14.19 — 中文字形與字型子集化（每次發版必過）
 

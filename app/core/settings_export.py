@@ -96,7 +96,8 @@ CATEGORIES: list[dict] = [
      "items": ["api_tokens.json"], "desc": "對外 API 存取權杖（敏感）",
      "default": True, "sensitive": True},
     {"id": "llm", "label": "LLM 設定", "kind": "files",
-     "items": ["llm_settings.json"], "desc": "LLM server / 模型 / 參數", "default": True},
+     "items": ["llm_settings.json"], "rekey": "llm",
+     "desc": "LLM server / 模型 / 參數（含 API 金鑰，敏感）", "default": True, "sensitive": True},
     {"id": "ocr", "label": "OCR 設定", "kind": "files",
      "items": ["ocr_settings.json", "ocr_remote.json"],
      "desc": "預設 OCR 引擎；遠端 GPU OCR 伺服器位址與存取權杖（敏感）",
@@ -170,7 +171,10 @@ def _rekey_specs() -> dict:
     """
     from . import notify_settings as _ns, sso_settings as _sso
     from . import jtlw_settings as _jl
+    from . import llm_settings as _ll
     return {
+        # llm_settings.json：`api_key_enc` 在最上層（v1.16.17 起加密存放）
+        "llm_settings.json": (_ll, lambda d: [(d, "api_key_enc")]),
         # jtlw_settings.json：祕密就在最上層（`api_key_enc` / `webhook_secret_enc`）
         "jtlw_settings.json": (_jl, lambda d: [(d, f) for f in _jl._SECRET_FIELDS]),
         # sso_settings.json：祕密在 data["oidc"]["client_secret_enc"] 這種兩層結構

@@ -88,11 +88,14 @@
   <div class="form-row">
     <label>API Key</label>
     <div class="field">
+      {# 金鑰**加密存放、不回傳到畫面**（v1.16.17）：已設定時欄位裡是一個代表「不要動」的
+         替身字串，按儲存會原樣送回。原本是明文填在 value 裡，看原始碼就看得到。 #}
       <input type="password" id="api_key" class="field field-wide"
-             value="{{ settings.api_key or '' }}"
+             value="{{ settings.api_key or '' }}" autocomplete="new-password"
              placeholder="{{ tr('(空白 — Ollama 不需要)') }}" />
       <div class="muted" data-s="s41f96333">
         {{ tr('雲端 OpenAI-compat 服務才需要；本地 Ollama / vLLM 留空。') }}
+        {% if settings.api_key %}{{ tr('已設定（加密存放，不會顯示出來）；要移除就把欄位清空再儲存。') }}{% endif %}
       </div>
     </div>
   </div>

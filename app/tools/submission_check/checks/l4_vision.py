@@ -120,7 +120,7 @@ def vision_check_file(file_path: Path, ground_truth_main: str = "",
         s = llm_settings.get()
         client = LLMClient(
             base_url=s["base_url"],
-            api_key=s.get("api_key") or None,
+            api_key=llm_settings.api_key(),
             timeout=float(timeout),
         )
     except Exception:

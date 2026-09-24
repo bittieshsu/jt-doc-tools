@@ -1034,7 +1034,7 @@ def build_router(templates) -> APIRouter:
         逐條實跑時抓到）。
         """
         from ..core.llm_client import LLMClient
-        from ..core.llm_settings import llm_settings
+        from ..core.llm_settings import llm_settings, SECRET_KEPT as _LLM_KEPT
         try:
             body = await request.json()
         except Exception:      # noqa: BLE001 — 空 body / 非 JSON 都退回存檔值
@@ -1043,7 +1043,16 @@ def build_router(templates) -> APIRouter:
             body = {}
         saved = llm_settings.get() if not body.get("base_url") else {}
         base_url = ((body.get("base_url") or saved.get("base_url") or "")).strip()
-        api_key = ((body.get("api_key") or saved.get("api_key") or "")).strip() or None
+        # 金鑰：頁面送來的是 `SECRET_KEPT`（沒改）或新的明文。**存著的金鑰只送給存檔時
+        # 的那個位址** —— 不然在表單上改一個還沒存的位址按「測試連線」，
+        # 就等於把金鑰交給任意一台主機（而頁面本身已經看不到金鑰了）。
+        raw_key = body.get("api_key") if body.get("base_url") else None
+        if raw_key == _LLM_KEPT or not body.get("base_url"):
+            same_host = (base_url.rstrip("/")
+                         == (llm_settings.get().get("base_url") or "").strip().rstrip("/"))
+            api_key = llm_settings.api_key() if same_host else None
+        else:
+            api_key = (str(raw_key or "")).strip() or None
         timeout = float(body.get("timeout_seconds")
                         or saved.get("timeout_seconds") or 10)
         if not base_url:

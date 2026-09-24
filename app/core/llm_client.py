@@ -152,6 +152,70 @@ def _check_deadline(t0: float, limit: float) -> None:
             f"單次生成超過 {limit:.0f} 秒仍未結束（模型可能停不下來）")
 
 
+#: `[DONE]` 的記號（SSE 串流的結尾）
+_SSE_DONE = object()
+
+
+def _sse_delta(line: str):
+    """SSE 的一行 → 這一段新增的文字；`[DONE]` 回 `_SSE_DONE`；不是資料行回空字串。
+
+    * **`data:` 後面的空白可有可無**（SSE 規格：冒號後若是一個空白就去掉）。原本只認
+      `data: `，送 `data:{…}` 的服務每一行都會被略過 —— 回來的是空字串，看起來像
+      模型什麼都沒說，而其實是我們丟掉的。
+    * **串流中途的 `{"error": …}` 要丟例外**，不可以當成空白略過：對方說了為什麼失敗，
+      略過的話呼叫端拿到空字串，原因就沒了。原因寫進記錄；例外訊息是固定的一句
+      （對方的訊息可能帶內部位址，不送到畫面上）。
+    """
+    if not line or not line.startswith("data:"):
+        return ""
+    data = line[5:]
+    if data.startswith(" "):
+        data = data[1:]
+    data = data.strip()
+    if data == "[DONE]":
+        return _SSE_DONE
+    try:
+        chunk = json.loads(data)
+    except json.JSONDecodeError:
+        return ""
+    if isinstance(chunk, dict) and chunk.get("error"):
+        err = chunk["error"]
+        detail = err.get("message") if isinstance(err, dict) else err
+        import logging as _lg
+        _lg.getLogger("app.llm.client").warning(
+            "LLM 服務在串流中途回報錯誤：%s", str(detail)[:500])
+        raise LLMError("LLM 服務在回覆途中回報錯誤（原因記在服務記錄）")
+    try:
+        return chunk["choices"][0].get("delta", {}).get("content") or ""
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return ""
+
+
+def _log_http_error(r: httpx.Response) -> None:
+    """4xx / 5xx 時把對方回的內容寫進記錄。
+
+    串流請求的 `raise_for_status()` 不會讀 body —— 例外只說「HTTP 400」，
+    而真正的原因（例如「Unrecognized request argument supplied: think」）在 body 裡。
+    """
+    if r.status_code < 400:
+        return
+    try:
+        r.read()
+        body = r.text[:500]
+    except Exception:          # noqa: BLE001 — 讀不到就算了，不可以蓋掉原本的錯誤
+        body = "(讀不到回應內容)"
+    import logging as _lg
+    _lg.getLogger("app.llm.client").warning(
+        "LLM 服務回 HTTP %d：%s", r.status_code, body)
+
+
+#: 「對方是不是 Ollama」的判斷結果，依 base_url 快取。
+#: 是的話保留 5 分鐘；不是 / 問不到只保留 30 秒（暫時連不上不要讓 Ollama 被當成別家太久）。
+_BACKEND_CACHE: dict[str, tuple[float, bool]] = {}
+_BACKEND_TTL_YES = 300.0
+_BACKEND_TTL_NO = 30.0
+
+
 class LLMClient:
     """Thin OpenAI-compat client. Stateless — safe to construct per-request."""
 
@@ -172,6 +236,78 @@ class LLMClient:
         if self.api_key:
             h["Authorization"] = f"Bearer {self.api_key}"
         return h
+
+    def _native_root(self) -> str:
+        """Ollama 原生 API 的根（`…/v1` 去掉 `/v1`）。"""
+        b = self.base_url.rstrip("/")
+        return b[:-3] if b.endswith("/v1") else b
+
+    def is_ollama(self) -> bool:
+        """對方是不是 Ollama —— **只有是的時候才送 Ollama 專屬的欄位**。
+
+        `think`、`reasoning_effort: "none"`、`options`、`chat_template_kwargs` 是為了
+        關掉 Ollama 上模型的思考（實測 gemma4 不關的話一段翻譯寫兩萬多字的思考）。
+        但檢查嚴格的 OpenAI 相容服務（OpenAI 官方、Azure、Gemini 相容層、預設設定的
+        LiteLLM）對不認得的參數回 400 —— **每一個 LLM 工具每一次都會失敗**。
+        原本的註解寫「OpenAI / LiteLLM 忽略不認的欄位」，那是沒驗證過的假設。
+
+        判準：`GET /api/version` 回 `{"version": …}`（Ollama 才有這支）。
+        問不到就當成不是 —— 最壞情況是模型多想一會兒，不會失敗。
+        """
+        now = time.monotonic()
+        hit = _BACKEND_CACHE.get(self.base_url)
+        if hit and now - hit[0] < (_BACKEND_TTL_YES if hit[1] else _BACKEND_TTL_NO):
+            return hit[1]
+        yes = False
+        try:
+            r = httpx.get(f"{self._native_root()}/api/version", headers=self._headers(),
+                          timeout=min(float(self.timeout or 5), 5.0))
+            d = r.json() if r.status_code == 200 else None
+            yes = isinstance(d, dict) and bool(d.get("version"))
+        except Exception:      # noqa: BLE001 — 連不上、不是 JSON 都算「不是」
+            yes = False
+        _BACKEND_CACHE[self.base_url] = (now, yes)
+        return yes
+
+    def short_vision_answer(self, png: bytes, prompt: str, model: str, *,
+                            timeout: float, max_tokens: int = 256) -> str:
+        """一張小圖 ＋ 一個短問題（是非題 / 讀出框裡的字），不串流，回純文字。
+
+        給表單填寫的逐欄校驗用（`llm_review_per_field`）。**原本只打 Ollama 原生的
+        `/api/chat`** —— 接 vLLM / LM Studio / 雲端服務時每一欄都 404，而呼叫端把
+        「沒回答」當成「沒問題」，於是報告整份都填對了（v1.16.17 修）。
+
+        * Ollama：照舊走原生 `/api/chat`（OpenAI 相容端點對影像有時不回內容，
+          見 `vision_query` 的 Fallback B；這條路是實測過穩定的那一條）。
+        * 其他：`/chat/completions`，影像用 `image_url`。
+        失敗一律丟 httpx 的例外，由呼叫端分類。
+        """
+        b64 = base64.b64encode(png).decode("ascii")
+        if self.is_ollama():
+            payload = {
+                "model": model, "stream": False, "think": False,
+                "options": {"temperature": 0.0},
+                "messages": [{"role": "user", "content": prompt, "images": [b64]}],
+            }
+            r = httpx.post(f"{self._native_root()}/api/chat", json=payload,
+                           headers=self._headers(), timeout=timeout)
+            _log_http_error(r)
+            r.raise_for_status()
+            return (((r.json() or {}).get("message") or {}).get("content") or "").strip()
+        payload = {
+            "model": model, "temperature": 0.0, "stream": False,
+            "max_tokens": int(max_tokens),
+            "messages": [{"role": "user", "content": [
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                {"type": "text", "text": prompt},
+            ]}],
+        }
+        r = httpx.post(f"{self.base_url}/chat/completions", json=payload,
+                       headers=self._headers(), timeout=timeout)
+        _log_http_error(r)
+        r.raise_for_status()
+        choices = (r.json() or {}).get("choices") or [{}]
+        return (((choices[0] or {}).get("message") or {}).get("content") or "").strip()
 
     # ----- /v1/models ----------------------------------------------------
 
@@ -276,16 +412,12 @@ class LLMClient:
             "stream": True,
             "messages": messages,
         }
-        if not think:
-            # Ollama / OpenAI-compat 服務對額外欄位的接受度不一：
-            # - Ollama: 看到 `options` / `chat_template_kwargs` 會印 WARN
-            #   "invalid option provided" (jtdt 客戶 Ollama log 觀察到)，
-            #   但 `think=false` 本身被 Ollama 0.4+ 支援
-            # - OpenAI / LiteLLM: 忽略不認的欄位
-            # 結論：只送 `think=false`（最 portable），其他 Ollama-specific
-            # 欄位移除避免 log 噪音 (v1.8.58+)
+        if not think and self.is_ollama():
+            # **只送給 Ollama**（v1.16.17）。這兩個欄位是 Ollama 關掉思考用的；
+            # 檢查嚴格的 OpenAI 相容服務會對不認得的參數回 400（見 `is_ollama`）。
+            # `options` / `chat_template_kwargs` 連 Ollama 都會印 WARN，文字這條路不送。
             payload["think"] = False
-            # Some OpenAI reasoning models honour reasoning_effort
+            # Ollama 0.33 起 gemma4 只認這個（`think:false` 已經關不掉）
             payload["reasoning_effort"] = "none"
         if max_tokens:
             payload["max_tokens"] = max_tokens
@@ -301,6 +433,7 @@ class LLMClient:
                 json=payload,
                 timeout=self.timeout,
             ) as r:
+                _log_http_error(r)
                 r.raise_for_status()
                 import time as _time
                 _t0 = _time.monotonic()
@@ -309,19 +442,9 @@ class LLMClient:
                     # `StreamDeadline`）。少了這一行，模型停不下來時整份
                     # 文件的翻譯會永遠卡住而且沒有錯誤訊息。
                     _check_deadline(_t0, self.timeout)
-                    if not line or not line.startswith("data: "):
-                        continue
-                    data_line = line[6:].strip()
-                    if data_line == "[DONE]":
+                    delta = _sse_delta(line)
+                    if delta is _SSE_DONE:
                         break
-                    try:
-                        chunk = json.loads(data_line)
-                    except json.JSONDecodeError:
-                        continue
-                    try:
-                        delta = chunk["choices"][0].get("delta", {}).get("content", "")
-                    except (KeyError, IndexError, TypeError):
-                        delta = ""
                     if delta:
                         parts.append(delta)
         except httpx.HTTPStatusError:
@@ -406,12 +529,14 @@ class LLMClient:
             payload["max_tokens"] = int(max_tokens)
         # 防 LLM 重複生成迴圈(qwen2.5vl 等在 temp=0 + OCR 任務常陷入重複)
         # OpenAI-compat: 用 frequency_penalty;Ollama 透過 options.repeat_penalty
+        ollama = self.is_ollama()
         if repeat_penalty and repeat_penalty != 1.0:
             # OpenAI frequency_penalty 範圍 -2.0~2.0,大致 (repeat_penalty - 1) * 2
             payload["frequency_penalty"] = max(-2.0, min(2.0, (repeat_penalty - 1.0) * 2.0))
-            payload.setdefault("options", {})["repeat_penalty"] = float(repeat_penalty)
-        # Ollama-specific knobs to disable thinking — 只對 thinking model 套用
-        if suppress_thinking:
+            if ollama:                    # `options` 是 Ollama 專屬（見 `is_ollama`）
+                payload.setdefault("options", {})["repeat_penalty"] = float(repeat_penalty)
+        # Ollama-specific knobs to disable thinking — 只對 thinking model、而且只對 Ollama 套用
+        if suppress_thinking and ollama:
             payload["think"] = False
             payload.setdefault("options", {})["think"] = False
             if profile.use_chat_template_kwargs:
@@ -420,7 +545,8 @@ class LLMClient:
             # 翻譯還是產生 794~23,650 字的思考內容，10 段的批次從 18 秒變成 151 秒）。
             # 關得掉的是 OpenAI 相容端點的 `reasoning_effort: "none"`
             # —— 實測 reasoning 0 字、0.3 秒。`low` 沒有用（仍然 1,161 字）。
-            # 真正的 OpenAI 不認得 "none"，所以 400 時會自動拿掉重送（見下面的 retry）。
+            # （原本這裡寫「真正的 OpenAI 不認得 "none"，400 時會自動拿掉重送」——
+            # **那個重送從來不存在**。v1.16.17 起改成只送給 Ollama。）
             payload["reasoning_effort"] = "none"
         parts: list[str] = []
         # 外部 LLM 的同時呼叫上限（預設 1）—— 見 remote_limit 的說明：真正的
@@ -434,6 +560,7 @@ class LLMClient:
                 json=payload,
                 timeout=self.timeout,
             ) as r:
+                _log_http_error(r)
                 r.raise_for_status()
                 import time as _time
                 _t0 = _time.monotonic()
@@ -442,19 +569,9 @@ class LLMClient:
                     # `StreamDeadline`）。少了這一行，模型停不下來時整份
                     # 文件的翻譯會永遠卡住而且沒有錯誤訊息。
                     _check_deadline(_t0, self.timeout)
-                    if not line or not line.startswith("data: "):
-                        continue
-                    data_line = line[6:].strip()
-                    if data_line == "[DONE]":
+                    delta = _sse_delta(line)
+                    if delta is _SSE_DONE:
                         break
-                    try:
-                        chunk = json.loads(data_line)
-                    except json.JSONDecodeError:
-                        continue
-                    try:
-                        delta = chunk["choices"][0].get("delta", {}).get("content", "")
-                    except (KeyError, IndexError, TypeError):
-                        delta = ""
                     if delta:
                         parts.append(delta)
         except httpx.HTTPStatusError:
@@ -497,7 +614,7 @@ class LLMClient:
         # Ollama OpenAI-compat 的 /v1/chat/completions 對 vision input 有時不傳
         # delta（GPU 確實有跑、但 SSE 內容為空）。原生 /api/chat 用 messages[].images
         # 欄位處理影像，多數 vision 模型在這條路上正常。
-        if not full_content.strip() and "/v1" in self.base_url:
+        if not full_content.strip() and ollama:
             ollama_base = self.base_url.rsplit("/v1", 1)[0]
             _llog.warning("vision_query OpenAI-compat empty, trying Ollama native /api/chat at %s", ollama_base)
             try:

@@ -1294,12 +1294,13 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;enabled&quot;:true,&quot;base_url&quot;:&quot;http://localhost:11434&quot;,&quot;model&quot;:&quot;gemma4:26b&quot;}&#x27;</span></code></pre>
+<p><code>api_key</code> <strong>讀取時不會回傳金鑰本身</strong>：已設定時是 <code>&quot;__KEPT__&quot;</code>，沒設定是空字串。 更新時送 <code>&quot;__KEPT__&quot;</code> 或不送這個欄位＝不動，送新的字串＝換成這把（加密存放），送空字串＝移除。</p>
       </section>
       <section class="doc-section" data-sec="測試-llm-連線" data-title="測試 LLM 連線" hidden>
 <div class="doc-crumb">11. 管理端 API</div>
 <h4 id="測試-llm-連線">測試 LLM 連線</h4>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /admin/api/llm/test-connection</code></pre>
-<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>base_url</code></td><td>str</td><td></td><td>要測的位址。<strong>不給就測目前已存檔的設定</strong></td></tr><tr><td><code>api_key</code></td><td>str</td><td></td><td>同上，不給就用已存檔的</td></tr><tr><td><code>timeout_seconds</code></td><td>num</td><td></td><td>上限 30 秒（管理頁不能卡住）</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>base_url</code></td><td>str</td><td></td><td>要測的位址。<strong>不給就測目前已存檔的設定</strong></td></tr><tr><td><code>api_key</code></td><td>str</td><td></td><td>同上，不給就用已存檔的。送 <code>&quot;__KEPT__&quot;</code> 時，<strong>只有 <code>base_url</code> 跟存檔的一樣才會帶上存著的金鑰</strong></td></tr><tr><td><code>timeout_seconds</code></td><td>num</td><td></td><td>上限 30 秒（管理頁不能卡住）</td></tr></tbody></table></div>
 <p>JSON body。管理頁的「測試連線」按鈕會把<strong>還沒存檔</strong>的那組設定帶進來； 命令列只想確認「現在這組通不通」時整個 body 都可以省略。</p>
 <pre><code class="lang-bash"><span class="hl-cmt"># 測目前存檔的設定</span>
 curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/admin/api/llm/test-connection</span> \

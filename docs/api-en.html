@@ -1294,12 +1294,13 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;enabled&quot;:true,&quot;base_url&quot;:&quot;http://localhost:11434&quot;,&quot;model&quot;:&quot;gemma4:26b&quot;}&#x27;</span></code></pre>
+<p><code>api_key</code> <strong>is never returned as the key itself when read</strong>: when a key is set it is <code>&quot;__KEPT__&quot;</code>, and an empty string when none is set. When updating, sending <code>&quot;__KEPT__&quot;</code> or leaving the field out keeps the key; a new string replaces it (stored encrypted); an empty string removes it.</p>
       </section>
       <section class="doc-section" data-sec="測試-llm-連線" data-title="Test the LLM connection" hidden>
 <div class="doc-crumb">11. Administration API</div>
 <h4 id="測試-llm-連線">Test the LLM connection</h4>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /admin/api/llm/test-connection</code></pre>
-<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>base_url</code></td><td>str</td><td></td><td>The address to test. <strong>Omit it and the saved settings are tested instead</strong></td></tr><tr><td><code>api_key</code></td><td>str</td><td></td><td>Same; omit it and the saved key is used</td></tr><tr><td><code>timeout_seconds</code></td><td>num</td><td></td><td>Capped at 30 seconds, so the admin page cannot hang</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>base_url</code></td><td>str</td><td></td><td>The address to test. <strong>Omit it and the saved settings are tested instead</strong></td></tr><tr><td><code>api_key</code></td><td>str</td><td></td><td>Same as above; the saved key is used if omitted. When <code>&quot;__KEPT__&quot;</code> is sent, <strong>the saved key is only sent if <code>base_url</code> matches the saved one</strong></td></tr><tr><td><code>timeout_seconds</code></td><td>num</td><td></td><td>Capped at 30 seconds, so the admin page cannot hang</td></tr></tbody></table></div>
 <p>A JSON body. The admin page’s "Test connection" button sends the settings that are <strong>not saved yet</strong>; from the command line, when you only want to know whether the current settings work, the whole body can be omitted.</p>
 <pre><code class="lang-bash"><span class="hl-cmt"># 測目前存檔的設定</span>
 curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/admin/api/llm/test-connection</span> \

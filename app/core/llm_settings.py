@@ -18,8 +18,21 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from . import atomic_json
+from . import atomic_json, secret_box
 from ..config import settings
+
+#: 管理頁 / API 看到的金鑰欄位：已設定就是這個字串，**不回傳金鑰本身**。
+#: 存檔時原樣送回＝「不要動」（同語音服務設定的做法）。
+SECRET_KEPT = "__KEPT__"
+
+
+def encrypt_secret(plaintext: str) -> str:
+    """設定匯入 / 匯出換金鑰時用（`settings_export._rekey_specs`）。"""
+    return secret_box.encrypt(plaintext)
+
+
+def decrypt_secret(ciphertext: str) -> str:
+    return secret_box.decrypt(ciphertext, label="llm_settings.api_key_enc")
 
 
 # Defaults. Order matters only for documentation; matching is by key.
@@ -36,7 +49,12 @@ DEFAULT_SETTINGS: dict = {
     # OpenAI-compat backend. Default points at local Ollama; admin can change
     # to any reachable LLM endpoint via /admin/llm-settings.
     "base_url": "http://localhost:11434/v1",
-    "api_key": None,                # Ollama doesn't need; reserved for cloud
+    #: **加密存放**（v1.16.17）。原本是明文 `api_key`、檔案權限 644，還原樣填回設定頁的
+    #: `value=` —— 語音服務 / SSO / 通知三組早就加密、只顯示「已設定」，只有這組沒跟上。
+    #: 對外（`get()`、管理頁、API）一律只看得到 `api_key`＝`SECRET_KEPT` 或空字串；
+    #: 要真正的金鑰走 `api_key()`。舊檔的明文 `api_key` 第一次讀取時就搬進來。
+    #: Ollama 不需要金鑰；雲端的 OpenAI 相容服務才需要。
+    "api_key_enc": "",
     # gemma4:26b MoE — validated SOTA on 4-PDF matrix (100% accuracy, ~11s avg).
     "model": "gemma4:26b",
     # 各工具個別模型 — admin 在 LLM 設定頁可以為支援 LLM 的工具個別指定模型，
@@ -87,6 +105,7 @@ class LLMSettingsManager:
             self._write(DEFAULT_SETTINGS.copy())
 
     def _read(self) -> dict:
+        """讀檔（**內部用，含密文**）。對外請用 `get()`。"""
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError):
@@ -97,25 +116,60 @@ class LLMSettingsManager:
         # Preserve metadata even though it's not in defaults
         if "updated_at" in data:
             merged["updated_at"] = data["updated_at"]
+        # 舊版存的明文金鑰：**讀到就搬**，不要等管理員下次按儲存 ——
+        # 沒人去動 LLM 設定頁的話，明文會一直躺在那裡。
+        legacy = data.get("api_key")
+        if isinstance(legacy, str) and legacy.strip() and not merged.get("api_key_enc"):
+            merged["api_key_enc"] = encrypt_secret(legacy.strip())
+            self._write(dict(merged))
+        elif "api_key" in data:
+            self._write(dict(merged))            # 空的舊欄位也順手拿掉
         return merged
 
     def _write(self, data: dict) -> None:
         data["updated_at"] = time.time()
-        atomic_json.write_json(self._path, data)
+        # 0600：裡面有密文，但也不必讓其他帳號讀得到（同語音服務設定）
+        atomic_json.write_json(self._path, data, mode=0o600)
+
+    @staticmethod
+    def _public(data: dict) -> dict:
+        """給畫面與 API 看的版本：金鑰只說「有沒有」，不給本身。"""
+        out = dict(data)
+        out["api_key"] = SECRET_KEPT if out.pop("api_key_enc", "") else ""
+        return out
 
     def get(self) -> dict:
         with self._lock:
-            return self._read()
+            return self._public(self._read())
+
+    def api_key(self) -> Optional[str]:
+        """真正的金鑰（解密後）。沒設定回 None —— 空的 `Bearer` 會被判成認證失敗。"""
+        with self._lock:
+            return decrypt_secret(self._read().get("api_key_enc", "")) or None
 
     def update(self, changes: dict) -> dict:
-        """Update only known keys; ignore unknown ones to avoid junk in file."""
+        """Update only known keys; ignore unknown ones to avoid junk in file.
+
+        `api_key`：`SECRET_KEPT` ＝ 不動、非空字串 ＝ 換成這把（加密後存）、
+        空字串 / None ＝ 清掉。金鑰欄位對 Ollama 是選填的，所以清空欄位就是移除。
+        """
         with self._lock:
             data = self._read()
-            for k, v in (changes or {}).items():
+            changes = dict(changes or {})
+            if "api_key" in changes:
+                val = changes.pop("api_key")
+                if val == SECRET_KEPT:
+                    pass
+                elif isinstance(val, str) and val.strip():
+                    data["api_key_enc"] = encrypt_secret(val.strip())
+                else:
+                    data["api_key_enc"] = ""
+            changes.pop("api_key_enc", None)     # 密文只由這裡產生，不收外面送來的
+            for k, v in changes.items():
                 if k in DEFAULT_SETTINGS:
                     data[k] = v
             self._write(data)
-            return data
+            return self._public(data)
 
     def is_enabled(self) -> bool:
         return bool(self.get().get("enabled"))
@@ -195,7 +249,7 @@ class LLMSettingsManager:
         from .llm_client import LLMClient
         return LLMClient(
             base_url=s["base_url"],
-            api_key=s.get("api_key") or None,
+            api_key=self.api_key(),
             timeout=float(s.get("timeout_seconds", 60)),
         )
 

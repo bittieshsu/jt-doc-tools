@@ -1249,11 +1249,12 @@ function llmErrorCard(raw) {
       hint: `到 <a href="/admin/llm-settings">${tr('LLM 設定')}</a> ${tr('勾選「啟用 LLM 校驗」再儲存。')}<`,
     });
   }
-  // Fallback
+  // Fallback —— 伺服器送來的是中文的固定句子（`llm_review_per_field.MESSAGES`），
+  // 過一次 `tr()`，英 / 日介面才不會冒出一句中文；查不到就原樣顯示。
   return msgCard({
     type: 'error',
     title: tr('LLM 校驗失敗'),
-    detail: raw,
+    detail: tr(String(raw || '')),
   });
 }
 

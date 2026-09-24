@@ -22,7 +22,7 @@
 
 ## 測試怎麼寫
 
-不 mock `per_field_review` 本身，而是**換掉最底層的 `_ollama_chat`**，用一個可以
+不 mock `per_field_review` 本身，而是**換掉最底層的 `_ask`**，用一個可以
 腳本化回答的假模型。這樣兩輪的流程、key 比對、回報都是真的在跑。
 """
 from __future__ import annotations
@@ -59,7 +59,7 @@ class _FakeLLM:
         self.calls: list[tuple[str, str]] = []
         self._last_val = ""
 
-    def __call__(self, base_url, model, prompt, png, timeout):
+    def __call__(self, client, model, prompt, png, timeout):
         if "exactly this value" in prompt:
             kind = "q2"
         elif "make sense for that label" in prompt:
@@ -93,6 +93,7 @@ def enabled(monkeypatch, tmp_path):
         "enabled": True, "base_url": "http://fake", "model": "m",
         "consecutive_required": 2})
     monkeypatch.setattr(pf.llm_settings, "get_model_for", lambda tool: "m")
+    monkeypatch.setattr(pf.llm_settings, "make_client", lambda: object())
     monkeypatch.setattr(pf, "_render_page", lambda p, i: b"PNG")
     monkeypatch.setattr(pf, "_crop_tile", lambda img, slot: b"TILE")
     return tmp_path / "x.pdf"
@@ -100,7 +101,7 @@ def enabled(monkeypatch, tmp_path):
 
 def _run(monkeypatch, pdf, plan, fields=None):
     fake = _FakeLLM(plan)
-    monkeypatch.setattr(pf, "_ollama_chat", fake)
+    monkeypatch.setattr(pf, "_ask", fake)
     res = pf.per_field_review(pdf, fields or _fields(), page_index=0)
     return res, fake
 

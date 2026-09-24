@@ -1294,12 +1294,13 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;enabled&quot;:true,&quot;base_url&quot;:&quot;http://localhost:11434&quot;,&quot;model&quot;:&quot;gemma4:26b&quot;}&#x27;</span></code></pre>
+<p><code>api_key</code> <strong>読み取り時にキーそのものは返されません</strong>：設定済みのときは <code>&quot;__KEPT__&quot;</code>、未設定のときは空文字列です。更新時に <code>&quot;__KEPT__&quot;</code> を送るかこのフィールドを省略すると変更なし、新しい文字列を送るとそのキーに置き換え（暗号化して保存）、空文字列を送ると削除します。</p>
       </section>
       <section class="doc-section" data-sec="測試-llm-連線" data-title="LLM 接続のテスト" hidden>
 <div class="doc-crumb">11. 管理側 API</div>
 <h4 id="測試-llm-連線">LLM 接続のテスト</h4>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /admin/api/llm/test-connection</code></pre>
-<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>base_url</code></td><td>str</td><td></td><td>テストするアドレス。<strong>指定しない場合は現在保存されている設定をテストします</strong></td></tr><tr><td><code>api_key</code></td><td>str</td><td></td><td>上と同じで、指定しない場合は保存済みのものを使います</td></tr><tr><td><code>timeout_seconds</code></td><td>num</td><td></td><td>上限は 30 秒です（管理ページが固まらないようにするためです）</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>base_url</code></td><td>str</td><td></td><td>テストするアドレス。<strong>指定しない場合は現在保存されている設定をテストします</strong></td></tr><tr><td><code>api_key</code></td><td>str</td><td></td><td>同上。省略すると保存済みの値を使います。<code>&quot;__KEPT__&quot;</code> を送った場合、<strong>保存済みのキーは <code>base_url</code> が保存済みのものと同じときだけ送られます</strong></td></tr><tr><td><code>timeout_seconds</code></td><td>num</td><td></td><td>上限は 30 秒です（管理ページが固まらないようにするためです）</td></tr></tbody></table></div>
 <p>JSON body。管理ページの「接続をテスト」ボタンは<strong>まだ保存していない</strong>設定を渡します。 コマンドラインから「今の設定でつながるか」だけを確認したい場合は、body 全体を省略できます。</p>
 <pre><code class="lang-bash"><span class="hl-cmt"># 測目前存檔的設定</span>
 curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/admin/api/llm/test-connection</span> \
