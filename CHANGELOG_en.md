@@ -36,15 +36,18 @@ A fresh install with the Windows installer, then each tool actually used:
 * The command-line installer (`install.ps1`) never matched the OxOffice installer file and installed
   LibreOffice instead; fixed.
 
-### Windows installer: an occasional crash at the very last step (fixed in the next installer build)
+### Windows installer (the v1.16.20 build): an occasional crash at the last step; LAN access now off by default
 
 * About one install in four crashed after everything had been installed: the service was running, but
   Settings -> Apps had no entry and the Start menu had no shortcuts. The NSIS component the installer
   uses corrupts memory when a program writes a lot of output (a known NSIS issue whose fix is not yet
   released). The installer now runs its core without capturing output; the full log is still written to
-  `%ProgramData%\jt-doc-tools\Logs\installer.log`. **This fix and the OxOffice auto-install fix take
-  effect with the next installer build**; if you hit the crash, the service still works at
-  `http://127.0.0.1:8765/`.
+  `%ProgramData%\jt-doc-tools\Logs\installer.log`. **This fix and the OxOffice auto-install fix live inside
+  the installer, so they need the v1.16.20 installer or later**; if an older installer crashes, the service
+  still works at `http://127.0.0.1:8765/`.
+* "LAN access" is now **unticked by default**. Ticked, it lets other computers on the same network connect,
+  and single-computer use has no sign-in. To share with your whole team, tick it during installation; for an
+  existing install, run the installer again and tick it (your data is kept).
 
 ### API manual: three examples that returned the wrong thing
 

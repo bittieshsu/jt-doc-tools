@@ -197,3 +197,16 @@ def test_the_core_scripts_still_run_through_nsexec(nsi):
     calls = [s for s in _statements(nsi) if s.startswith("nsExec::Exec ")]
     assert any("install_core.ps1" in s for s in calls), "安裝核心沒有被執行"
     assert any("uninstall_core.ps1" in s for s in calls), "解除安裝核心沒有被執行"
+
+
+def test_lan_access_is_not_ticked_by_default(nsi):
+    """「區域網路存取」預設**不勾**（使用者 2026-09-24 決定）。
+
+    勾了會綁 0.0.0.0 並開防火牆，而本機模式沒有登入 —— 同一個網路上的人
+    （例如教室的 Wi-Fi）都能打開這台的工具箱。其他選用元件維持預設打勾。
+    """
+    secs = {m.group(2): bool(m.group(1)) for m in
+            re.finditer(r'^Section\s+(/o\s+)?"(\w+)"\s+Sec\w+', nsi, re.M)}
+    assert secs.get("LAN") is True, f"「區域網路存取」必須預設不勾（Section /o）：{secs}"
+    for name in ("OCR", "Office", "Service"):
+        assert secs.get(name) is False, f"{name} 應該維持預設打勾：{secs}"

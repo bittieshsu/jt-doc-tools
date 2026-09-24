@@ -150,9 +150,9 @@ LangString DESC_Office  ${LANG_JAPANESE}    "Office 変換エンジン（OxOffic
 LangString DESC_Svc     ${LANG_TRADCHINESE} "註冊 Windows 服務，開機自動啟動。"
 LangString DESC_Svc     ${LANG_ENGLISH}     "Register a Windows service that starts automatically at boot."
 LangString DESC_Svc     ${LANG_JAPANESE}    "Windows サービスとして登録し、起動時に自動で開始します。"
-LangString DESC_Fw      ${LANG_TRADCHINESE} "允許區域網路其他電腦連入（防火牆例外；服務改綁 0.0.0.0）。不需要請取消。"
-LangString DESC_Fw      ${LANG_ENGLISH}     "Allow other LAN machines to connect (firewall rule; binds 0.0.0.0). Uncheck if not needed."
-LangString DESC_Fw      ${LANG_JAPANESE}    "社内 LAN の他の端末から接続できるようにします（ファイアウォールの例外、0.0.0.0 で待ち受け）。不要ならチェックを外してください。"
+LangString DESC_Fw      ${LANG_TRADCHINESE} "讓同一個網路上的其他電腦也能連進來（服務改綁 0.0.0.0 並開防火牆）。自己一台電腦用不需要勾；要給整個單位共用才勾。"
+LangString DESC_Fw      ${LANG_ENGLISH}     "Let other computers on the same network connect (binds 0.0.0.0 and opens the firewall). Not needed for use on this computer only; tick it to share with your whole team."
+LangString DESC_Fw      ${LANG_JAPANESE}    "同じネットワーク上の他のコンピューターからも接続できるようにします（0.0.0.0 で待ち受け、ファイアウォールを開放）。このコンピューターだけで使う場合は不要です。部署全体で共有する場合にチェックしてください。"
 
 ; 元件清單的項目名稱。NSIS 的 `Section "名字"` 是編譯期字面值，要多語得在
 ; .onInit 用 SectionSetText 覆寫（見下方）。原本寫成「中文 / English」並列，
@@ -192,7 +192,7 @@ LangString UN_NOT_OURS  ${LANG_ENGLISH}     "$UN_DIR does not look like a ${SHOR
 LangString UN_NOT_OURS  ${LANG_JAPANESE}    "$UN_DIR は ${SHORTNAME} のインストール先ではないようです。アンインストールを中止しました。"
 
 ; =====================================================================
-;  Sections  (all optional sections default to selected = 全勾)
+;  Sections  （選用元件預設打勾；只有「區域網路存取」預設不勾，理由見那一節）
 ; =====================================================================
 Section "Core" SecCore
   SectionIn RO
@@ -207,7 +207,11 @@ SectionEnd
 Section "Service" SecSvc
 SectionEnd
 
-Section "LAN" SecFw
+; **預設不勾**（`/o`）。勾了會綁 0.0.0.0 並開防火牆，而本機模式沒有登入 ——
+; 同一個網路上的人（例如教室的 Wi-Fi）都能打開這台的工具箱、看到上傳過的檔案。
+; 大多數人是自己一台電腦用；要給單位共用的，安裝時自己勾（重跑安裝程式也可以）。
+; 2026-09-24 使用者決定改成預設不勾。檢查：tests/test_installer_silent_mode.py
+Section /o "LAN" SecFw
 SectionEnd
 
 ; Hidden section that performs the actual install once component choices
