@@ -5,11 +5,23 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (847 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (848 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.19] - 2026-09-24
+
+### Meeting summary: the layout theme sits above the download buttons; exported tables read better
+
+* The "Layout theme" menu in the meeting summary result was the last item of the download-button row, so with
+  several buttons it wrapped onto the next line below them. It now has its own line above the buttons: pick the
+  layout, then download.
+* In exported PDF, Word and ODF files the table header colour only covered the text rather than the whole cell,
+  and the borders were heavy. The header now fills the cell, borders use the theme's light colour, body rows
+  get a light alternating background, and rows are no longer overly tall. "Markdown to office document" uses
+  the same layout and benefits too.
 
 ## [1.16.18] - 2026-09-24
 

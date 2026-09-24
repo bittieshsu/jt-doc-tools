@@ -242,9 +242,10 @@
 .ms-sec .ms-subhead + p.muted { margin:0 0 4px; font-size:12px; }
 /* 圖上的數字用等寬數字 —— 不然 1 比 8 窄，同一欄的小數點還是對不齊。 */
 .mc-num { font-variant-numeric:tabular-nums; }
-/* 版面主題：跟下載按鈕同一排，但看得出是「設定」不是「動作」。 */
+/* 版面主題：在下載按鈕**上面**自成一行 —— 先選版面、再按下載；看得出是「設定」不是「動作」。 */
+.ms-theme-row { margin:4px 0 8px; }
 .ms-theme { display:inline-flex; align-items:center; gap:7px; font-size:12.5px;
-            color:#475569; margin-left:4px; }
+            color:#475569; }
 .ms-theme label { display:inline-flex; align-items:center; gap:5px;
                   white-space:nowrap; }
 .ms-theme label .ic { color:#6366f1; }
@@ -398,14 +399,9 @@
      data-palette='{{ chart_palette }}' data-kinds='{{ chart_kinds }}'>
   <h2>{{ icon('clipboard-list', size=18) }} {{ tr('分析結果') }}</h2>
   <div>
-    <div class="ms-exports">
-      <a class="btn btn-primary" id="msDlPdf" download>{{ icon('download', size=16) }} <span>PDF</span></a>
-      <a class="btn btn-secondary" id="msDlDocx" download>{{ icon('download', size=16) }} <span>Word（.docx）</span></a>
-      <a class="btn btn-secondary" id="msDlOdt" download>{{ icon('download', size=16) }} <span>ODF（.odt）</span></a>
-      <a class="btn btn-secondary" id="msDlMd" download>{{ icon('download', size=16) }} <span>Markdown</span></a>
-      <a class="btn btn-secondary" id="msDlPng" download hidden>{{ icon('image', size=16) }} <span>{{ tr('圖表') }} PNG</span></a>
-      <a class="btn btn-secondary" id="msDlZip" download>{{ icon('layers', size=16) }} <span>Markdown ＋ {{ tr('圖') }}（ZIP）</span></a>
-      <a class="btn btn-secondary" id="msDlJson" download>{{ icon('hash', size=16) }} <span>JSON</span></a>
+    {# 版面主題放在按鈕**上面**（使用者 2026-09-24）：它決定下面那幾個檔案長什麼樣，
+       要先選再按。原本是那一排的最後一格，按鈕一多就被擠到下一行、跑到按鈕下方。 #}
+    <div class="ms-theme-row">
       <span class="ms-theme">
         <label for="msTheme">{{ icon('edit', size=14) }} {{ tr('版面主題') }}</label>
         <select class="field" id="msTheme">
@@ -414,6 +410,15 @@
           {% endfor %}
         </select>
       </span>
+    </div>
+    <div class="ms-exports">
+      <a class="btn btn-primary" id="msDlPdf" download>{{ icon('download', size=16) }} <span>PDF</span></a>
+      <a class="btn btn-secondary" id="msDlDocx" download>{{ icon('download', size=16) }} <span>Word（.docx）</span></a>
+      <a class="btn btn-secondary" id="msDlOdt" download>{{ icon('download', size=16) }} <span>ODF（.odt）</span></a>
+      <a class="btn btn-secondary" id="msDlMd" download>{{ icon('download', size=16) }} <span>Markdown</span></a>
+      <a class="btn btn-secondary" id="msDlPng" download hidden>{{ icon('image', size=16) }} <span>{{ tr('圖表') }} PNG</span></a>
+      <a class="btn btn-secondary" id="msDlZip" download>{{ icon('layers', size=16) }} <span>Markdown ＋ {{ tr('圖') }}（ZIP）</span></a>
+      <a class="btn btn-secondary" id="msDlJson" download>{{ icon('hash', size=16) }} <span>JSON</span></a>
     </div>
     <p class="muted ms-calls" id="msCalls"></p>
 

@@ -38,6 +38,17 @@ def mgr():
     m = JobManager(workers=1)
     yield m
     m.set_paused(False)
+    # **等這個佇列自己的工作真的收完**再換下一支測試。conftest 的 `_quiet_job_queue`
+    # 只等**全域**佇列；這裡的 worker 在測試最後 `release()` 之後才跑完、寫進度，
+    # 而 `job_store` 是呼叫當下才讀 `settings.data_dir` —— 那時已經換成下一支測試的
+    # 目錄，剛好撞上它的 `job_store.init()` 就是 `database is locked`
+    # （CI 2026-09-24，v1.16.18 那次；本機單跑、合跑都是綠的）。
+    # 先等執行中歸零，再 `shutdown(wait=True)` 讓 `_run` 收尾的那次寫入也做完；
+    # 等不到（刻意留著卡住的作業）就不等，免得整支測試卡死。
+    if _wait(lambda: not m.stats()["running"] and not m.stats()["queued"], timeout=10):
+        m._executor.shutdown(wait=True)
+    else:
+        m._executor.shutdown(wait=False)
 
 
 def _blocker():

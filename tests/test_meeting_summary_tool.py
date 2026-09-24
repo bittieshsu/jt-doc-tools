@@ -867,3 +867,15 @@ def test_a_speaker_name_cannot_smuggle_newlines(client, auth_off):
                 json={"map": {"S1": "壞\n人\r\x00"}})
     got = json.loads(ms._seg_path(uid).read_text(encoding="utf-8"))[0]["speaker"]
     assert "\n" not in got and "\r" not in got and "\x00" not in got, got
+
+
+def test_the_theme_picker_sits_above_the_download_buttons():
+    """版面主題要**先選再按下載**（使用者 2026-09-24 截圖回報）：原本它是那一排按鈕的
+    最後一格，按鈕一多就被擠到下一行、跑到按鈕下面。現在自成一行、在按鈕之前。"""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "app" / "tools" / "meeting_summary"
+           / "templates" / "meeting_summary.html").read_text(encoding="utf-8")
+    theme, first_btn = src.index('id="msTheme"'), src.index('id="msDlPdf"')
+    assert theme < first_btn, "版面主題跑到下載按鈕後面了"
+    exports = src.index('class="ms-exports"')
+    assert theme < exports, "版面主題不可以擺在按鈕那一排裡面（會被擠到下一行）"

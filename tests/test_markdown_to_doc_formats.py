@@ -232,7 +232,7 @@ def test_tables_carry_border_attributes_not_just_css():
     | **`<table border="1" cellpadding="5">`** | **穩定 0.75pt，看得見** |
     """
     html = R._render_md_html("| A | B |\n|---|---|\n| 1 | 2 |\n", "classic", "t", "")
-    assert '<table border="1" cellpadding="5" cellspacing="0">' in html
+    assert '<table border="1" cellpadding="5" cellspacing="0"' in html
 
 
 def test_code_blocks_are_indented_and_have_no_border():
@@ -339,3 +339,71 @@ def test_the_cancel_button_exists_and_is_wired():
     ).read_text(encoding="utf-8")
     assert 'id="md2Cancel"' in html
     assert "jp.cancel()" in html, "停止鈕要呼叫 cancel API，不是只把畫面藏起來"
+
+
+# ---------- 表格的配色走 HTML 屬性（v1.16.19，使用者截圖回報會議摘要匯出的表格） ----------
+
+_TABLE_MD = ("| 發言者 | 次數 | 字數 |\n|---|---:|---:|\n"
+             "| 陳經理 | 21 | 1,084 |\n| 許專員 | 23 | 873 |\n"
+             "| 吳副理 | 22 | 797 |\n| 林經理 | 18 | 758 |\n")
+
+
+def test_table_colours_are_html_attributes():
+    """soffice 把 `th { background }` 塗在**文字後面**、不填滿整格；隔行的
+    `nth-child` 完全不認。所以表頭底色、框線顏色、隔行底色都要是屬性。"""
+    ts = themes.table_style("report")
+    html = R._render_md_html(_TABLE_MD, "report", "t", "")
+    assert f'bordercolor="{ts["border"]}"' in html
+    ths = re.findall(r"<th\b[^>]*>", html)
+    assert ths and all(f'bgcolor="{ts["head_bg"]}"' in t for t in ths), ths
+    rows = re.findall(r"<tr>(.*?)</tr>", html, re.S)[1:]      # 去掉表頭那一列
+    zebra = [f'bgcolor="{ts["zebra"]}"' in r for r in rows]
+    assert zebra == [False, True, False, True], f"隔行底色要從第二列開始、一列隔一列：{zebra}"
+    # 不上色的主題就不要硬塞屬性
+    plain = R._render_md_html(_TABLE_MD, "academic", "t", "")
+    assert not re.search(r"<th\b[^>]*bgcolor", plain)
+    assert "bgcolor" not in "".join(re.findall(r"<td\b[^>]*>", plain))
+
+
+def test_the_header_colour_fills_the_whole_cell_in_the_pdf():
+    """**判準量在真的 PDF 上**：表頭底色的寬度要等於整張表的寬度。
+    原本是一小塊深色只包住字（截圖上看得到），而 HTML 看起來完全正常。"""
+    import fitz
+    from app.core import office_convert
+
+    if not office_convert.find_soffice():
+        pytest.skip("這台機器沒有 Office 引擎")
+    import tempfile
+    from pathlib import Path
+    ts = themes.table_style("report")
+    head = tuple(int(ts["head_bg"][i:i + 2], 16) / 255 for i in (1, 3, 5))
+    with tempfile.TemporaryDirectory() as td:
+        h = Path(td) / "t.html"
+        h.write_text(R._render_md_html(_TABLE_MD, "report", "t", ""), encoding="utf-8")
+        pdf = Path(td) / "t.pdf"
+        office_convert.convert_to_pdf(h, pdf, timeout=120)
+        page = fitz.open(pdf)[0]
+        draws = page.get_drawings()
+
+    def near(c, ref):
+        return c and all(abs(a - b) < 0.03 for a, b in zip(c, ref))
+
+    # 整張表的寬度：框線（線段）的左右極值
+    xs = [pt for d in draws if d.get("color") and not near(d["color"], head)
+          for it in d["items"] if it[0] == "l" for pt in (it[1].x, it[2].x)]
+    assert xs, "PDF 裡找不到表格框線"
+    table_w = max(xs) - min(xs)
+    # 表頭底色：跟表頭同色、夠高（排除標題底下那條細線）的填色區塊，合併成區間
+    spans = sorted((d["rect"].x0, d["rect"].x1) for d in draws
+                   if near(d.get("fill"), head) and d["rect"].height > 8)
+    assert spans, "PDF 裡找不到表頭底色"
+    covered, cur = 0.0, list(spans[0])
+    for a, b in spans[1:]:
+        if a <= cur[1] + 1:
+            cur[1] = max(cur[1], b)
+        else:
+            covered += cur[1] - cur[0]
+            cur = [a, b]
+    covered += cur[1] - cur[0]
+    assert covered >= table_w * 0.9, (
+        f"表頭底色只蓋到 {covered:.0f}pt，整張表 {table_w:.0f}pt —— 又變回只包住字了")

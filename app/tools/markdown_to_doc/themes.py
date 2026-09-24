@@ -54,7 +54,9 @@ pre {
 }
 pre code { background: transparent !important; padding: 0; font-size: inherit; }
 table { border-collapse: collapse; margin: 0.8em 0; width: auto; }
-th, td { padding: 5pt 10pt; vertical-align: top; }
+/* 表格的列高：soffice 把內文的行高與段落間距也套進儲存格，一列撐得很高、字貼在上面
+   （使用者 2026-09-24 截圖回報）。儲存格裡明確收掉。 */
+th, td { padding: 3pt 8pt; margin: 0; line-height: 1.35; vertical-align: top; }
 img { max-width: 100%; }
 hr { border: 0; margin: 1.4em 0; }
 blockquote {
@@ -103,6 +105,24 @@ CODE_BG: dict[str, str] = {
 
 def code_bg(theme_id: str) -> str:
     return CODE_BG.get(theme_id, "#f1f5f9")
+
+
+#: 表格的表頭底色 / 框線顏色 / 隔行底色。**用 HTML 屬性套**（`bgcolor` / `bordercolor`），
+#: 不走 CSS —— soffice 把 `th { background }` 套在**文字**上而不是整格，匯出的 PDF
+#: 表頭變成「一小塊深色只包住字」（使用者 2026-09-24 截圖回報會議摘要的「誰講了多少」）；
+#: `tbody tr:nth-child(even)` 的隔行底色則完全沒套上。`None` ＝ 不上色。
+TABLE_STYLES: dict[str, dict] = {
+    "classic":  {"head_bg": "#eff6ff", "border": "#cbd5e1", "zebra": "#f8fafc"},
+    "github":   {"head_bg": "#f6f8fa", "border": "#d0d7de", "zebra": "#f6f8fa"},
+    "academic": {"head_bg": None,      "border": "#555555", "zebra": None},
+    "book":     {"head_bg": "#efe1c5", "border": "#d6c3a0", "zebra": "#faf5ec"},
+    "report":   {"head_bg": "#2c5282", "border": "#cbd5e1", "zebra": "#f7fafc"},
+    "mono":     {"head_bg": "#e8e8e8", "border": "#999999", "zebra": None},
+}
+
+
+def table_style(theme_id: str) -> dict:
+    return TABLE_STYLES.get(theme_id, TABLE_STYLES["classic"])
 
 
 def inline_code_color(theme_id: str) -> str:

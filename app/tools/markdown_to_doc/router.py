@@ -134,10 +134,46 @@ def _render_md_html(md_text: str, theme_id: str, title: str, font_id: str = "def
     # | **`<table border="1" cellpadding="5">`** | **穩定畫得出來**，0.75pt，看得見 |
     #
     # 所以框線與內距一律走屬性。CSS 留著給瀏覽器預覽用，兩者不衝突。
+    #
+    # **表頭底色、框線顏色、隔行底色也一樣**（`themes.TABLE_STYLES`）：
+    # `th { background }` 在 soffice 只塗在文字後面、不填滿整格；
+    # `tbody tr:nth-child(even) td` 完全沒套上；框線用預設的灰色太重。
+    _ts = themes.table_style(theme_id)
+
     def _table_open(self, tokens, idx, options, env):
-        return ('<table border="1" cellpadding="5" cellspacing="0">')
+        return (f'<table border="1" cellpadding="5" cellspacing="0" '
+                f'bordercolor="{_ts["border"]}">')
+
+    def _th_open(self, tokens, idx, options, env):
+        if _ts.get("head_bg"):
+            tokens[idx].attrSet("bgcolor", _ts["head_bg"])
+        return self.renderToken(tokens, idx, options, env)
+
+    def _tbody_open(self, tokens, idx, options, env):
+        env["_jt_row"] = 0
+        return self.renderToken(tokens, idx, options, env)
+
+    def _td_open(self, tokens, idx, options, env):
+        # 隔行上色要設在**每一格**上（`<tr bgcolor>` soffice 不一定認）
+        if _ts.get("zebra") and env.get("_jt_row", 0) % 2 == 0:
+            tokens[idx].attrSet("bgcolor", _ts["zebra"])
+        return self.renderToken(tokens, idx, options, env)
+
+    def _tr_open(self, tokens, idx, options, env):
+        if "_jt_row" in env:
+            env["_jt_row"] += 1
+        return self.renderToken(tokens, idx, options, env)
+
+    def _thead_open(self, tokens, idx, options, env):
+        env.pop("_jt_row", None)            # 表頭那一列不算進隔行
+        return self.renderToken(tokens, idx, options, env)
 
     md.add_render_rule("table_open", _table_open)
+    md.add_render_rule("th_open", _th_open)
+    md.add_render_rule("thead_open", _thead_open)
+    md.add_render_rule("tbody_open", _tbody_open)
+    md.add_render_rule("tr_open", _tr_open)
+    md.add_render_rule("td_open", _td_open)
 
     body_html = md.render(md_text or "")
     theme = themes.get_theme(theme_id)
