@@ -5,11 +5,24 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (853 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (854 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.25] - 2026-09-27
+
+### Meeting transcription: a brief loss of contact with the speech service no longer fails the job
+
+* While waiting for JTLW to finish, a single failed status check (the speech service restarting for a few seconds,
+  or the network dropping briefly) marked the whole job as failed, even though the speech service was still working
+  on it, so a long meeting had to be transcribed again.
+* Status checks and transcript downloads now retry on connection errors, timeouts and temporary server responses
+  (429 / 502 / 503 / 504), and the screen says that JTLW is temporarily unreachable and when it will retry. The job
+  gives up only after **5 minutes without contact**, and says why. Other errors (for example the speech service
+  reporting that it cannot find the job) are still shown at once, without retrying.
+* Stopping the job still works while it is waiting to reconnect.
 
 ## [1.16.24] - 2026-09-25
 

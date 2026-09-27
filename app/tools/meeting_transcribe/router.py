@@ -79,8 +79,72 @@ _MSG_TIMEOUT = ("等了 {0} 分鐘，對方還沒有回報結果 —— 已經�
                 "請確認 JTLW 那側的佇列與工作機狀態。")
 _MSG_QUEUE_CAP = ("排隊超過 {0} 小時還沒輪到 —— 已經請對方取消。"
                   "請稍後再送一次，或請語音服務那側確認佇列狀態。")
+_MSG_RECONNECTING = "暫時連不上 JTLW，{0} 秒後重試"
+_MSG_OUTAGE = ("JTLW 連續 {0} 分鐘連不上，已停止等待。"
+               "請確認語音服務是否正常，稍後再送一次。")
 PROGRESS_TEMPLATES = (_MSG_QUEUED_AHEAD, _MSG_CORRECTING_ITEMS, _MSG_QUEUE_FULL,
-                      _MSG_TIMEOUT, _MSG_QUEUE_CAP)
+                      _MSG_TIMEOUT, _MSG_QUEUE_CAP, _MSG_RECONNECTING, _MSG_OUTAGE)
+
+#: 對方短暫連不上時，**只讀的查詢**（輪詢狀態、取逐字稿）要撐過去。
+#:
+#: 對方重啟服務約 5 秒（2026-09-27 v2.17 通知），網路也會閃一下 —— 原本輪詢碰到
+#: 一次連不上就把整件判失敗，而對方那邊其實還在跑：一場三小時的會議白轉，
+#: 我們也不會再回去取結果（沒 ACK，對方 72 小時後清掉）。
+#:
+#: **只重試「連不上 / 逾時 / 429 / 502 / 503 / 504」**：其他錯誤（找不到作業、
+#: 權限不對）重問一百次也一樣，照舊立刻失敗 —— 什麼都重試的話，真的壞掉要晚
+#: 5 分鐘才看得到，而且訊息會變成「連不上」而不是真正的原因。
+#: **送件（POST）不走這條** —— 那一段失敗時使用者當下就看得到，重送一次即可。
+_OUTAGE_GRACE_S = 5 * 60.0
+_OUTAGE_RETRY_FIRST = 3.0
+_OUTAGE_RETRY_MAX = 30.0
+_TRANSIENT_STATUS = frozenset({429, 502, 503, 504})
+
+
+def _is_transient(exc: "jtlw_client.JtlwError") -> bool:
+    return (isinstance(exc, jtlw_client.JtlwUnavailable)
+            or exc.status in _TRANSIENT_STATUS)
+
+
+def _through_outage(job, client, remote_id: str, call):
+    """呼叫 `call()`；對方暫時連不上就退避重試，連續斷超過 `_OUTAGE_GRACE_S` 才放棄。
+
+    斷線期間仍然看得到「取消」：使用者按停止時照樣把取消傳過去（傳不過去就記一行）。
+    """
+    down_since: Optional[float] = None
+    prev_msg = ""
+    wait = _OUTAGE_RETRY_FIRST
+    while True:
+        try:
+            out = call()
+        except jtlw_client.JtlwError as exc:
+            if not _is_transient(exc):
+                raise
+            now = time.monotonic()
+            if down_since is None:
+                down_since = now
+                prev_msg = getattr(job, "message", "")
+                logger.warning("JTLW 暫時連不上（作業 %s），重試中：%s", remote_id, exc)
+            if now - down_since >= _OUTAGE_GRACE_S:
+                raise jtlw_client.JtlwUnavailable(
+                    _MSG_OUTAGE.format(int(_OUTAGE_GRACE_S // 60)),
+                    status=exc.status) from exc
+            if getattr(job, "cancelled", False):
+                try:
+                    client.cancel(remote_id)
+                except jtlw_client.JtlwError:
+                    logger.warning("取消 JTLW 作業 %s 失敗（對方連不上）", remote_id,
+                                   exc_info=True)
+                raise RuntimeError("已取消")
+            job.message = _MSG_RECONNECTING.format(int(wait))
+            time.sleep(wait)
+            wait = min(_OUTAGE_RETRY_MAX, wait * 1.5)
+            continue
+        if down_since is not None:
+            logger.info("JTLW 恢復連線（作業 %s），斷了 %.0f 秒", remote_id,
+                        time.monotonic() - down_since)
+            job.message = prev_msg
+        return out
 
 
 def _work_budget_s(total_audio_ms: Optional[float]) -> float:
@@ -285,7 +349,7 @@ def _build_body(upload_id: str, meta: dict, *, language: str,
 
 
 def _assemble(client: jtlw_client.JtlwClient, remote_id: str,
-              got: Optional[dict] = None) -> list[dict]:
+              got: Optional[dict] = None, call=None) -> list[dict]:
     """把三層併成我們自己的 `{seq, text, speaker, start_ms, end_ms}`。
 
     **`raw` 有時間、`final` 有校正過的文字、`speakers` 有發言者** ——
@@ -294,13 +358,15 @@ def _assemble(client: jtlw_client.JtlwClient, remote_id: str,
     貼到 B 的話上（同文件翻譯「段數對不上絕不硬湊」那條）。
     """
     got = got if got is not None else {}
+    fetch = call or (lambda f: f())      # `_run_job` 傳進來的會撐過短暫斷線
     layers: dict[str, dict[int, dict]] = {}
     for layer in ("raw", "final", "speakers"):
         rows: dict[int, dict] = {}
         after = 0
         while True:
             try:
-                page = client.segments(remote_id, layer, after_seq=after, limit=500)
+                page = fetch(lambda: client.segments(remote_id, layer,
+                                                     after_seq=after, limit=500))
             except jtlw_client.JtlwError as exc:
                 # **沒要求過的層會回 400 `task_not_requested` —— 那不是錯誤**
                 #（對方的清單第 5 節明寫「不要當成錯誤重試」）。
@@ -435,7 +501,7 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
             raise RuntimeError("已取消")
         time.sleep(wait)
         wait = min(_POLL_MAX, wait * 1.5)
-        info = client.job(remote_id)
+        info = _through_outage(job, client, remote_id, lambda: client.job(remote_id))
         status = str(info.get("status") or "")
         # 進度照轉就好，不要自己再加密（對方最多每 5 秒一筆）
         pct = _percent(info)
@@ -458,7 +524,8 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
     job.message = "取回逐字稿"
     job.progress = 0.96
     got: dict[str, int] = {}
-    segments = _assemble(client, remote_id, got)
+    segments = _assemble(client, remote_id, got,
+                         call=lambda f: _through_outage(job, client, remote_id, f))
     if not segments:
         raise RuntimeError(jtlw_client.MESSAGES["empty_result"])
 
