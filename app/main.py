@@ -22,7 +22,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.25"
+VERSION = "1.16.26"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -362,7 +362,7 @@ _TOOL_ALIASES = {
     "office-to-pdf":      "convert convert-to-pdf office word excel powerpoint docx xlsx pptx odt ods odp 轉檔 轉成 文書 文件 辦公文件轉PDF 辦公文件轉 PDF 辦公文件 文書轉PDF 文書轉 PDF",
     "office-convert":     "convert format interconvert docx doc odt rtf txt xlsx xls ods csv pptx ppt odp 格式互轉 格式轉換 互轉 轉格式 轉檔 文書檔互轉 試算表互轉 簡報互轉 docx轉doc odt轉doc xlsx轉xls pptx轉odp 另存新檔 換格式 舊版格式 相容",
     "pdf-extract-images": "extract images pictures jpg png assets 擷取 提取 圖片 影像 抽圖",
-    "pdf-to-image":       "convert image images png jpg jpeg raster rasterize export office word excel powerpoint docx xlsx pptx odt ods odp 文書轉圖片 轉圖 轉圖片 轉png 轉成圖片 影像 匯出圖片 Word 轉圖 Excel 轉圖 PPT 轉圖 辦公文件轉圖片 辦公文件",
+    "pdf-to-image":       "convert image images png jpg jpeg raster rasterize export office word excel powerpoint docx xlsx pptx odt ods odp webp width resize thumbnail web 文書轉圖片 轉圖 轉圖片 轉png 轉webp 轉jpg 寬度 指定寬度 縮圖 網頁 轉成圖片 影像 匯出圖片 Word 轉圖 Excel 轉圖 PPT 轉圖 辦公文件轉圖片 辦公文件",
     "image-to-pdf":       "image images photos jpg jpeg png gif tiff webp heic combine merge convert scan a4 letter page size rotate reorder 圖片 照片 相片 掃描 轉 PDF 合併 排序 旋轉 頁面大小 A4",
     "scan-merge":         "scan merge combine composite id card front back two sided id-card overlay position place a4 white background crop detect color photo png jpg pdf 掃描 拼合 合併 疊合 證件 身分證 身份證 正面 反面 正反面 雙面 護照 駕照 健保卡 名片 同一張 白底 A4 位置 自動偵測 彩色 去背 淨白 拖曳",
     "pdf-editor":         "editor edit annotate annotation whiteout redact text textbox shape pencil draw highlight sticky note scribus 編輯 編輯器 標註 註記 塗黑 遮蓋 手繪 螢光筆 便箋 文字框 修圖",
@@ -1496,6 +1496,17 @@ async def _api_token_gate(request: Request, call_next):
         or path.endswith("/convert")  # pdf-to-image / pdf-to-office
         or is_dual_access
     )
+    # **工具底下帶了 `Authorization: Bearer` 的請求一律驗 token**（v1.16.26）。
+    # API.md 教人用 token 呼叫的不只 `/api/` 與 `/convert`：
+    # `/tools/pdf-to-image/download/…`、`/tools/doc-diff/page-image/…`、
+    # `/tools/translate-doc/start` / `job/…`、`/tools/office-convert/formats`。
+    # 它們不在上面那個判斷裡 → token 根本沒被看 → 啟用認證的機器上被
+    # `_auth_gate` 導去登入頁（302），照著手冊做的腳本拿到的是一頁 HTML。
+    # 手冊的逐條實跑一直是綠的，因為那支稽核跑在**認證關閉**的實例上。
+    # 只認標頭不認 `?token=` —— 瀏覽器從來不送 Bearer 標頭，網頁那條路完全不變。
+    if (not is_api and path.startswith("/tools/")
+            and (request.headers.get("Authorization") or "").lower().startswith("bearer ")):
+        is_api = True
     if not is_api:
         return await call_next(request)
     enforce = api_tokens.is_enforced()

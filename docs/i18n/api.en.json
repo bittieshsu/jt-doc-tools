@@ -240,7 +240,6 @@
   "回應：去識別化後的檔案。": "Response: the redacted file.",
   "回應：合併後的 PDF。": "Response: the merged PDF.",
   "回應：單張 A4 白底 PDF 二進位。": "Response: a single white A4 PDF binary.",
-  "回應：第 1 步回每一頁的資訊與 <code>upload_id</code>；第 2 步拿圖，單頁是 PNG、多頁是 ZIP。": "Response: step 1 returns each page's details and an <code>upload_id</code>; step 2 returns the images, a PNG for one page and a ZIP for several.",
   "回應：圖片打包 ZIP。": "Response: the images as a ZIP.",
   "回應：填好的 PDF。": "Response: the filled PDF.",
   "回應：壓縮後的 PDF。": "Response: the compressed PDF.",
@@ -307,7 +306,6 @@
   "把 PDF 反轉成 PowerPoint（.pptx）或 OpenDocument 簡報（.odp），<strong>一頁對一張投影片</strong>， 投影片尺寸沿用原稿（直向 PDF 也照樣還原）。走 job 模式回 <code>job_id</code>。": "Turns a PDF back into PowerPoint (.pptx) or an OpenDocument presentation (.odp), <strong>one page per slide</strong>, keeping the original slide size (portrait PDFs are reproduced too). Job mode; returns <code>job_id</code>.",
   "把 PDF 反轉成 Word（.docx）或 OpenDocument（.odt）。走 job 模式回 <code>job_id</code>。": "Turns a PDF back into Word (.docx) or OpenDocument (.odt). Job mode; returns <code>job_id</code>.",
   "把 PDF 抽成 Markdown。單次呼叫直接回內容，不走 job 模式。": "Extract a PDF as Markdown. A single call returns the content directly, without job mode.",
-  "把 PDF 每頁轉成 PNG（多頁自動打包 ZIP）。": "Turn every page of a PDF into a PNG (several pages come back as a ZIP).",
   "把 辦公文件 轉成 PDF（走 OxOffice / LibreOffice 引擎）。": "Convert an office document to PDF (via the OxOffice / LibreOffice engine).",
   "把一張或多張圖片合併成單一 PDF。": "Combine one or more images into a single PDF.",
   "把偵測到的資料換成另一個看起來正常、但不是真的值 —— 適合拿去測試系統、 給外部看的報表、教學範例。原文一樣是<strong>真的刪除</strong>。": "Replaces detected data with something that looks normal but is not real: useful for testing a system, reports that go outside, and teaching examples. The original is still <strong>genuinely deleted</strong>.",
@@ -449,7 +447,6 @@
   "要測的位址。<strong>不給就測目前已存檔的設定</strong>": "The address to test. <strong>Omit it and the saved settings are tested instead</strong>",
   "角度，預設 <code>0</code>": "Angle, default <code>0</code>",
   "解析一批台鐵 / 高鐵 / Uber 乘車證明 PDF，回結構化 JSON。<strong>只解析、不寫入使用者的清單</strong>。": "Parses a batch of Taiwan Railway, THSR or Uber ride receipt PDFs and returns structured JSON. <strong>Parsing only — nothing is written to the user's list.</strong>",
-  "解析度，預設 <code>150</code>": "Resolution, default <code>150</code>",
   "解析電子發票 QR Code 內容。": "Decode the contents of an e-invoice QR code.",
   "設定匯出清單": "Settings export list",
   "該頁的 pt 尺寸 <code>[寬, 高]</code>": "the page size in points, <code>[width, height]</code>",
@@ -613,5 +610,13 @@
   "或不送這個欄位＝不動，送新的字串＝換成這把（加密存放），送空字串＝移除。": "or leaving the field out keeps the key; a new string replaces it (stored encrypted); an empty string removes it.",
   "同上，不給就用已存檔的。送 <code>&quot;__KEPT__&quot;</code> 時，<strong>只有 <code>base_url</code> 跟存檔的一樣才會帶上存著的金鑰</strong>": "Same as above; the saved key is used if omitted. When <code>&quot;__KEPT__&quot;</code> is sent, <strong>the saved key is only sent if <code>base_url</code> matches the saved one</strong>",
   "回應：<code>job_id</code>（OCR 在背景跑）。用第 10 章的作業 API 輪詢，完成後從 <code>download_url</code> 下載加上文字層的 PDF。第一次使用會先下載辨識模型，要多等一段時間。": "Response: a <code>job_id</code> (OCR runs in the background). Poll it with the job API in chapter 10, then download the PDF with its new text layer from <code>download_url</code>. The first run downloads the recognition models, so allow extra time.",
-  "格式樣板：<code>{n}</code> 是目前頁碼、<code>{N}</code> 是總頁數（<code>{total}</code> 同 <code>{N}</code>），例 <code>第 {n} 頁</code> / <code>{n} / {N}</code>": "Format template: <code>{n}</code> is the current page number and <code>{N}</code> the total (<code>{total}</code> works the same as <code>{N}</code>), e.g. <code>Page {n}</code> / <code>{n} / {N}</code>"
+  "格式樣板：<code>{n}</code> 是目前頁碼、<code>{N}</code> 是總頁數（<code>{total}</code> 同 <code>{N}</code>），例 <code>第 {n} 頁</code> / <code>{n} / {N}</code>": "Format template: <code>{n}</code> is the current page number and <code>{N}</code> the total (<code>{total}</code> works the same as <code>{N}</code>), e.g. <code>Page {n}</code> / <code>{n} / {N}</code>",
+  "把 PDF 或辦公文件每頁轉成 PNG / WebP / JPEG（多頁自動打包 ZIP）。 大小可以用 DPI，也可以直接指定寬度（每一頁縮放成同一個寬度，高度依頁面比例）。": "Converts each page of a PDF or office document to PNG / WebP / JPEG (multiple pages are bundled into a ZIP). The size can be set by DPI or by a fixed width (every page is scaled to the same width; the height follows the page's proportions).",
+  "PDF 或辦公文件（非 PDF 會先轉成 PDF）": "PDF or office document (anything that is not a PDF is converted to PDF first)",
+  "輸出格式：<code>png</code>（預設）/ <code>webp</code> / <code>jpeg</code>（<code>jpg</code> 也收）；其他值回 400": "Output format: <code>png</code> (default) / <code>webp</code> / <code>jpeg</code> (<code>jpg</code> is accepted too); any other value returns 400",
+  "每一頁的寬度（像素，16～10000）；有給就不看 <code>dpi</code>。超出範圍回 400，不會安靜地改成別的寬度": "Width of every page in pixels (16 to 10000); when given, <code>dpi</code> is ignored. Out of range returns 400 rather than quietly using a different width",
+  "沒給 <code>width</code> 時的解析度，預設 <code>200</code>，範圍 72～600": "Resolution used when <code>width</code> is not given; default <code>200</code>, range 72 to 600",
+  "WebP / JPEG 的品質 1～100，預設 <code>80</code>；PNG 無損，不看這個值": "WebP / JPEG quality, 1 to 100, default <code>80</code>; PNG is lossless and ignores it",
+  "單頁超過 4000 萬像素（或 WebP 單邊超過 16383 像素，那是格式本身的限制）時會縮小輸出， 那一頁的 <code>reduced</code> 是 <code>true</code>，頂層的 <code>reduced_pages</code> 列出是哪幾頁。": "A page over 40 million pixels (or, in WebP, over 16383 px on either side, a limit of the format itself) is output smaller; that page has <code>reduced</code> set to <code>true</code>, and the top-level <code>reduced_pages</code> lists which pages.",
+  "回應：第 1 步回每一頁的資訊（<code>width_px</code> / <code>height_px</code> / <code>dpi</code> / <code>size_bytes</code> / <code>reduced</code>）與 <code>upload_id</code>；第 2 步拿圖，單頁是該格式的圖片、多頁是 ZIP（裡面每一頁的檔名像 <code>slides_p1.webp</code>）。": "Response: step 1 returns each page's details (<code>width_px</code> / <code>height_px</code> / <code>dpi</code> / <code>size_bytes</code> / <code>reduced</code>) and the <code>upload_id</code>; step 2 returns the images: a single image in the chosen format for one page, or a ZIP for several (each page named like <code>slides_p1.webp</code>)."
 }

@@ -24,6 +24,10 @@
 .p2i-progress-fill { height:100%; background:linear-gradient(90deg,#60a5fa,#2563eb); width:0%; transition: width 0.15s; }
 .p2i-progress-pct { font-family: ui-monospace, monospace; font-size:12px; color:#475569; min-width:42px; text-align:right; }
 .p2i-dpi-row { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+.p2i-width-presets { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+.p2i-width-presets .btn.is-active { border-color: var(--primary); color: var(--primary-dark); background:#f5f3ff; }
+.p2i-warn { margin: 6px 0 10px; color: #b45309; font-size: 13px; }
+.p2i-card .p2i-reduced { color: #b45309; }
 .p2i-dpi-row label { font-size:13px; display:flex; align-items:center; gap:5px; cursor:pointer; }
 .p2i-lightbox {
   position: fixed; inset: 0; background: rgba(15,23,42,0.85); z-index: 9000;
@@ -40,11 +44,61 @@
 {% endblock %}
 {% block content %}
 <h1>{{ icon('image', size=22) }} {{ tr('辦公文件轉圖片') }}</h1>
-<p class="muted">{{ tr('把 PDF 或') }}<b>{{ tr('辦公文件') }}</b>{{ tr('每一頁轉成 PNG 圖片。非 PDF 會先自動轉成 PDF 再轉圖。單頁直接下載 PNG、多頁自動打包 ZIP。') }}</p>
+<p class="muted">{{ tr('把 PDF 或') }}<b>{{ tr('辦公文件') }}</b>{{ tr('每一頁轉成圖片（PNG / WebP / JPEG），可以依解析度或指定寬度輸出。非 PDF 會先自動轉成 PDF 再轉圖。單頁直接下載、多頁自動打包 ZIP。') }}</p>
 
 <div class="panel">
   <h2 data-s="s53896af7">{{ tr('1. 設定') }}</h2>
   <div class="form-row">
+    <label>{{ tr('輸出格式') }}</label>
+    <div class="field option-cards">
+      <label class="option-card">
+        <span class="opt-ic">{{ icon('image', size=24) }}</span>
+        <span class="opt-label">PNG</span>
+        <span class="opt-desc">{{ tr('無損 · 檔案最大') }}</span>
+        <input type="radio" name="p2iFmt" value="png" checked>
+      </label>
+      <label class="option-card">
+        <span class="opt-ic">{{ icon('globe', size=24) }}</span>
+        <span class="opt-label">WebP</span>
+        <span class="opt-desc">{{ tr('放網頁用 · 檔案最小') }}</span>
+        <input type="radio" name="p2iFmt" value="webp">
+      </label>
+      <label class="option-card">
+        <span class="opt-ic">{{ icon('image', size=24) }}</span>
+        <span class="opt-label">JPEG</span>
+        <span class="opt-desc">{{ tr('相容性最好') }}</span>
+        <input type="radio" name="p2iFmt" value="jpeg">
+      </label>
+    </div>
+  </div>
+  <div class="form-row" id="p2iQualityRow" hidden>
+    <label for="p2iQuality">{{ tr('品質') }}</label>
+    <div class="field">
+      <select id="p2iQuality">
+        <option value="90">{{ tr('高畫質（90）') }}</option>
+        <option value="80" selected>{{ tr('標準（80）· 預設') }}</option>
+        <option value="65">{{ tr('小檔（65）') }}</option>
+      </select>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>{{ tr('圖片大小') }}</label>
+    <div class="field option-cards">
+      <label class="option-card">
+        <span class="opt-ic">{{ icon('gauge', size=24) }}</span>
+        <span class="opt-label">{{ tr('依解析度') }}</span>
+        <span class="opt-desc">{{ tr('大小隨頁面而定') }}</span>
+        <input type="radio" name="p2iSize" value="dpi" checked>
+      </label>
+      <label class="option-card">
+        <span class="opt-ic">{{ icon('aspect-ratio', size=24) }}</span>
+        <span class="opt-label">{{ tr('指定寬度') }}</span>
+        <span class="opt-desc">{{ tr('每一頁同一個寬度') }}</span>
+        <input type="radio" name="p2iSize" value="width">
+      </label>
+    </div>
+  </div>
+  <div class="form-row" id="p2iDpiRow">
     <label>{{ tr('解析度（DPI）') }}</label>
     <div class="field option-cards">
       <label class="option-card">
@@ -79,7 +133,20 @@
       </label>
     </div>
   </div>
-  <div class="muted" data-s="s789d4caf">{{ tr('DPI 越高每張圖檔越大、轉檔越慢。100 約幾十 KB / 頁，400 可能達 5 MB / 頁。') }}</div>
+  <div class="muted" id="p2iDpiHint" data-s="s789d4caf">{{ tr('DPI 越高每張圖檔越大、轉檔越慢。100 約幾十 KB / 頁，400 可能達 5 MB / 頁。') }}</div>
+  <div class="form-row" id="p2iWidthRow" hidden>
+    <label for="p2iWidth">{{ tr('寬度（像素）') }}</label>
+    <div class="field">
+      <div class="p2i-width-presets">
+        <button type="button" class="btn btn-sm" data-w="1920">1920</button>
+        <button type="button" class="btn btn-sm" data-w="1280">1280</button>
+        <button type="button" class="btn btn-sm" data-w="960">960</button>
+        <button type="button" class="btn btn-sm" data-w="480">480</button>
+        <input type="number" id="p2iWidth" class="field-num" min="16" max="10000" step="1" value="1920">
+      </div>
+      <p class="muted">{{ tr('每一頁都縮放成這個寬度，高度依頁面比例。網頁常用大圖 1920、縮圖 480。') }}</p>
+    </div>
+  </div>
 </div>
 
 <div class="panel">
@@ -161,9 +228,67 @@
     const sel = document.querySelector('input[name="p2iDpi"]:checked');
     return sel ? parseInt(sel.value, 10) : 200;
   }
+  function getFormat() {
+    const sel = document.querySelector('input[name="p2iFmt"]:checked');
+    return sel ? sel.value : 'png';
+  }
+  function byWidth() {
+    const sel = document.querySelector('input[name="p2iSize"]:checked');
+    return !!sel && sel.value === 'width';
+  }
+
+  // 格式名稱是專有名詞，不翻
+  const FMT_LABEL = { png: 'PNG', webp: 'WebP', jpeg: 'JPEG' };
+  const FMT_EXT = { png: 'png', webp: 'webp', jpeg: 'jpg' };
+
+  const qualityRow = document.getElementById('p2iQualityRow');
+  const qualityEl = document.getElementById('p2iQuality');
+  const dpiRow = document.getElementById('p2iDpiRow');
+  const dpiHint = document.getElementById('p2iDpiHint');
+  const widthRow = document.getElementById('p2iWidthRow');
+  const widthEl = document.getElementById('p2iWidth');
+  const presetBtns = Array.from(document.querySelectorAll('.p2i-width-presets [data-w]'));
+
+  function markPreset() {
+    presetBtns.forEach(function(b) {
+      b.classList.toggle('is-active', b.dataset.w === String(widthEl.value).trim());
+    });
+  }
+  function syncOptions() {
+    qualityRow.hidden = getFormat() === 'png';
+    const w = byWidth();
+    widthRow.hidden = !w;
+    dpiRow.hidden = w;
+    dpiHint.hidden = w;
+  }
+  document.querySelectorAll('input[name="p2iFmt"], input[name="p2iSize"]').forEach(function(el) {
+    el.addEventListener('change', syncOptions);
+  });
+  presetBtns.forEach(function(b) {
+    b.addEventListener('click', function() { widthEl.value = b.dataset.w; markPreset(); });
+  });
+  widthEl.addEventListener('input', markPreset);
+  syncOptions();
+  markPreset();
+
+  // 指定寬度時要在送出前擋下超出範圍的值 —— 伺服器也會擋，但使用者要先知道為什麼
+  function readWidth() {
+    const v = parseInt(String(widthEl.value).trim(), 10);
+    if (!Number.isFinite(v) || v < 16 || v > 10000) return null;
+    return v;
+  }
 
   async function handleUpload(file) {
     if (!file) return;
+    const fmt = getFormat();
+    const wantWidth = byWidth() ? readWidth() : null;
+    if (byWidth() && wantWidth === null) {
+      panelEl.hidden = false;
+      gridEl.innerHTML = '';
+      btnDownload.style.display = 'none';
+      statusEl.textContent = tr('寬度要是 16～10000 之間的整數像素。');
+      return;
+    }
     panelEl.hidden = false;
     gridEl.innerHTML = '';
     statusEl.textContent = '';
@@ -171,7 +296,10 @@
     setProgress(0, tr('上傳中…'));
     const fd = new FormData();
     fd.append('file', file);
-    fd.append('dpi', String(getDpi()));
+    fd.append('format', fmt);
+    if (fmt !== 'png') fd.append('quality', String(qualityEl.value));
+    if (wantWidth !== null) fd.append('width', String(wantWidth));
+    else fd.append('dpi', String(getDpi()));
     try {
       const r = await window.uploadWithProgress(
         '/tools/pdf-to-image/convert', fd,
@@ -192,7 +320,22 @@
       hideProgress();
       pageCountEl.textContent = d.page_count;
       totalSizeEl.textContent = fmtBytes(d.total_bytes || 0);
-      statusEl.textContent = tr('完成！') + d.page_count + tr(' 頁已轉為 PNG（') + d.dpi + tr(' DPI · 共 ') + fmtBytes(d.total_bytes || 0) + '）';
+      const fmtName = FMT_LABEL[d.format] || 'PNG';
+      const ext = FMT_EXT[d.format] || 'png';
+      const sizeText = d.size_mode === 'width'
+        ? tr('寬 {0} 像素').replace('{0}', d.width)
+        : d.dpi + ' DPI';
+      statusEl.textContent = tr('完成！{0} 頁已轉為 {1}（{2} · 共 {3}）')
+        .replace('{0}', d.page_count).replace('{1}', fmtName)
+        .replace('{2}', sizeText).replace('{3}', fmtBytes(d.total_bytes || 0));
+      const reducedN = (d.reduced_pages || []).length;
+      if (reducedN) {
+        const warn = document.createElement('div');
+        warn.className = 'p2i-warn';
+        warn.textContent = tr('有 {0} 頁超過單張圖片的像素上限，已縮小輸出（縮圖下方標著「已縮小」）。')
+          .replace('{0}', reducedN);
+        statusEl.appendChild(warn);
+      }
       d.pages.forEach(function(p) {
         const card = document.createElement('div');
         card.className = 'p2i-card';
@@ -201,26 +344,27 @@
             '<img src="' + p.preview_url + '" loading="lazy" />' +
           '</a>' +
           '<div class="p2i-meta">' +
-            tr('<span>第 ') + (p.index + 1) + tr(' 頁 · ') + p.width_px + '×' + p.height_px + ' · ' + fmtBytes(p.size_bytes || 0) + '</span>' +
-            '<a class="p2i-dl" href="' + p.preview_url + '" download="page_' + (p.index + 1) + '.png" title="' + tr('下載此頁 PNG') + '" aria-label="' + tr('下載此頁 PNG') + '">' + dlIcon + '</a>' +
+            '<span>' + tr('第 {0} 頁').replace('{0}', p.index + 1) + ' · ' + p.width_px + '×' + p.height_px + ' · ' + fmtBytes(p.size_bytes || 0) +
+              (p.reduced ? ' · <b class="p2i-reduced">' + tr('已縮小') + '</b>' : '') + '</span>' +
+            '<a class="p2i-dl" href="' + p.preview_url + '" download="page_' + (p.index + 1) + '.' + ext + '" title="' + tr('下載此頁') + '" aria-label="' + tr('下載此頁') + '">' + dlIcon + '</a>' +
           '</div>';
         gridEl.appendChild(card);
       });
       btnDownload.href = '/tools/pdf-to-image/download/' + d.upload_id;
       btnDownload.style.display = '';
-      // 工作區只收單一 PNG（多頁是 ZIP，不適用）
+      // 工作區只收單一 PNG（多頁是 ZIP；WebP / JPEG 工作區不收）
       const wsBtn = document.getElementById('wsSaveBtn');
       if (wsBtn) {
-        if (d.page_count === 1 && window.attachWorkspaceSave) {
+        if (d.page_count === 1 && d.format === 'png' && window.attachWorkspaceSave) {
           window.attachWorkspaceSave(wsBtn, () => ({
             url: '/tools/pdf-to-image/download/' + d.upload_id,
             name: 'page_1.png', tool: 'pdf-to-image' }));
         } else { wsBtn.hidden = true; }
       }
       const total = fmtBytes(d.total_bytes || 0);
-      btnDownload.innerHTML = dlIcon + (d.page_count === 1
-        ? tr(' 下載 PNG（') + total + '）'
-        : tr(' 下載全部 ZIP（') + d.page_count + tr(' 頁 · 約 ') + total + '）');
+      btnDownload.innerHTML = dlIcon + ' ' + (d.page_count === 1
+        ? tr('下載 {0}（{1}）').replace('{0}', fmtName).replace('{1}', total)
+        : tr('下載全部 ZIP（{0} 頁 · 約 {1}）').replace('{0}', d.page_count).replace('{1}', total));
     } catch (e) {
       statusEl.textContent = tr('錯誤：') + e.message;
       hideProgress();

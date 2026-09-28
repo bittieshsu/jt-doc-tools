@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ [English](README_en.md) ｜ **日本語**
 
-# Jason Tools ドキュメントツールボックス v1.16.25
+# Jason Tools ドキュメントツールボックス v1.16.26
 
 > ### ⚠ 2026-09-13 より前に git でインストールした場合、このバージョンにアップグレードする前に 1 行実行してください
 >
@@ -129,7 +129,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 ### 形式変換 [OxOffice/LibreOffice が必要]
 - **オフィス文書 → PDF** —— オフィス文書を一括で PDF に変換します
 - **オフィス文書の形式変換** —— 同じ種類の文書どうしの相互変換：文書ファイル（.odt / .docx / .doc / .rtf / .txt）、表計算（.ods / .xlsx / .xls / .csv）、プレゼンテーション（.odp / .pptx / .ppt）がそれぞれ相互変換できます。`.docx` / `.xlsx` / `.pptx` ではバージョンも指定できます（Word 2007 または Word 2010–365 など）
-- **オフィス文書 → 画像** —— PDF またはオフィス文書の各ページを PNG に変換します。複数ページは自動で ZIP にまとめます
+- **文書を画像に変換**：PDF やオフィス文書の各ページを PNG / WebP / JPEG に変換。DPI か幅を直接指定できます。複数ページは自動で ZIP にまとめます
 - **画像 → PDF**
 - **PDF → Markdown** —— PDF を構造化された Markdown に変換し、見出し / 表 / 太字を保持します。LLM や RAG の前処理に向いています
 - **Markdown → オフィス文書** [OxOffice/LibreOffice が必要] —— Markdown を貼り付けるかドラッグし、テーマを適用して PDF または文書ファイル（.docx / .odt）として出力します。全ページのプレビュー付きです

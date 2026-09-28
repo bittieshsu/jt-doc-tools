@@ -351,20 +351,27 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
       <section class="doc-section" data-sec="pdf-轉圖片" data-title="PDF 轉圖片" hidden>
 <div class="doc-crumb">3. 文件轉換 API</div>
 <h4 id="pdf-轉圖片">PDF 轉圖片</h4>
-<p>把 PDF 每頁轉成 PNG（多頁自動打包 ZIP）。</p>
+<p>把 PDF 或辦公文件每頁轉成 PNG / WebP / JPEG（多頁自動打包 ZIP）。 大小可以用 DPI，也可以直接指定寬度（每一頁縮放成同一個寬度，高度依頁面比例）。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-to-image/convert
 <span class="hl-method">GET</span>  /tools/pdf-to-image/download/{upload_id}</code></pre>
-<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>dpi</code></td><td>int</td><td></td><td>解析度，預設 <code>150</code></td></tr></tbody></table></div>
-<pre><code class="lang-bash"><span class="hl-cmt"># 1. 上傳並轉換</span>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF 或辦公文件（非 PDF 會先轉成 PDF）</td></tr><tr><td><code>format</code></td><td>string</td><td></td><td>輸出格式：<code>png</code>（預設）/ <code>webp</code> / <code>jpeg</code>（<code>jpg</code> 也收）；其他值回 400</td></tr><tr><td><code>width</code></td><td>int</td><td></td><td>每一頁的寬度（像素，16～10000）；有給就不看 <code>dpi</code>。超出範圍回 400，不會安靜地改成別的寬度</td></tr><tr><td><code>dpi</code></td><td>int</td><td></td><td>沒給 <code>width</code> 時的解析度，預設 <code>200</code>，範圍 72～600</td></tr><tr><td><code>quality</code></td><td>int</td><td></td><td>WebP / JPEG 的品質 1～100，預設 <code>80</code>；PNG 無損，不看這個值</td></tr></tbody></table></div>
+<p>單頁超過 4000 萬像素（或 WebP 單邊超過 16383 像素，那是格式本身的限制）時會縮小輸出， 那一頁的 <code>reduced</code> 是 <code>true</code>，頂層的 <code>reduced_pages</code> 列出是哪幾頁。</p>
+<pre><code class="lang-bash"><span class="hl-cmt"># 1. 上傳並轉換（網頁用：WebP、寬 1920）</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-image/convert</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@slides.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;format=webp&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;width=1920&quot;</span> | jq
+<span class="hl-cmt"># → {&quot;upload_id&quot;: &quot;...&quot;, &quot;page_count&quot;: 3, &quot;format&quot;: &quot;webp&quot;, &quot;size_mode&quot;: &quot;width&quot;,</span>
+<span class="hl-cmt">#    &quot;width&quot;: 1920, &quot;dpi&quot;: null, &quot;reduced_pages&quot;: [], &quot;pages&quot;: [{&quot;width_px&quot;: 1920, ...}]}</span>
+
+<span class="hl-cmt"># 依 DPI 轉 PNG</span>
 curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-image/convert</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@document.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;dpi=200&quot;</span> | jq
-<span class="hl-cmt"># → {&quot;upload_id&quot;: &quot;...&quot;, &quot;page_count&quot;: 3, &quot;pages&quot;: [...]}</span>
 
 <span class="hl-cmt"># 2. 下載</span>
 curl <span class="hl-flag">-s</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-image/download/abc123</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">--output</span> pages.zip</code></pre>
-<p>回應：第 1 步回每一頁的資訊與 <code>upload_id</code>；第 2 步拿圖，單頁是 PNG、多頁是 ZIP。</p>
+<p>回應：第 1 步回每一頁的資訊（<code>width_px</code> / <code>height_px</code> / <code>dpi</code> / <code>size_bytes</code> / <code>reduced</code>）與 <code>upload_id</code>；第 2 步拿圖，單頁是該格式的圖片、多頁是 ZIP（裡面每一頁的檔名像 <code>slides_p1.webp</code>）。</p>
       </section>
       <section class="doc-section" data-sec="pdf-轉-office" data-title="PDF 轉 Office" hidden>
 <div class="doc-crumb">3. 文件轉換 API</div>

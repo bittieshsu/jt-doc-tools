@@ -1,6 +1,6 @@
 **繁體中文** ｜ [English](README_en.md) ｜ [日本語](README_ja.md)
 
-# Jason Tools 文件工具箱 v1.16.25
+# Jason Tools 文件工具箱 v1.16.26
 
 > ### ⚠ 2026-09-13 之前用 git 安裝的，這一版升級前要先跑一行
 >
@@ -129,7 +129,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 ### 格式轉換 [需 OxOffice/LibreOffice]
 - **辦公文件轉 PDF** — 把辦公文件批次轉成 PDF
 - **辦公文件格式互轉** — 同一類文件之間互轉格式：文書檔（.odt / .docx / .doc / .rtf / .txt）、試算表（.ods / .xlsx / .xls / .csv）、簡報（.odp / .pptx / .ppt）各自互換；`.docx` / `.xlsx` / `.pptx` 還可以指定版本（Word 2007 或 Word 2010–365 等）
-- **辦公文件轉圖片** — PDF 或辦公文件每頁轉成 PNG；多頁自動打包 ZIP
+- **辦公文件轉圖片** — PDF 或辦公文件每頁轉成 PNG / WebP / JPEG，可依 DPI 或直接指定寬度；多頁自動打包 ZIP
 - **圖片轉 PDF**
 - **PDF 轉 Markdown** — PDF 轉結構化 Markdown，保留標題 / 表格 / 粗體，適合餵 LLM、RAG 預處理
 - **Markdown 轉辦公文件** [需 OxOffice/LibreOffice] — 貼上或拖入 Markdown，套用主題後輸出 PDF 或文書檔（.docx / .odt），含所有頁面預覽

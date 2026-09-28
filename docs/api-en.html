@@ -351,20 +351,27 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
       <section class="doc-section" data-sec="pdf-轉圖片" data-title="PDF to images" hidden>
 <div class="doc-crumb">3. Document conversion API</div>
 <h4 id="pdf-轉圖片">PDF to images</h4>
-<p>Turn every page of a PDF into a PNG (several pages come back as a ZIP).</p>
+<p>Converts each page of a PDF or office document to PNG / WebP / JPEG (multiple pages are bundled into a ZIP). The size can be set by DPI or by a fixed width (every page is scaled to the same width; the height follows the page's proportions).</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-to-image/convert
 <span class="hl-method">GET</span>  /tools/pdf-to-image/download/{upload_id}</code></pre>
-<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>dpi</code></td><td>int</td><td></td><td>Resolution, default <code>150</code></td></tr></tbody></table></div>
-<pre><code class="lang-bash"><span class="hl-cmt"># 1. 上傳並轉換</span>
+<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF or office document (anything that is not a PDF is converted to PDF first)</td></tr><tr><td><code>format</code></td><td>string</td><td></td><td>Output format: <code>png</code> (default) / <code>webp</code> / <code>jpeg</code> (<code>jpg</code> is accepted too); any other value returns 400</td></tr><tr><td><code>width</code></td><td>int</td><td></td><td>Width of every page in pixels (16 to 10000); when given, <code>dpi</code> is ignored. Out of range returns 400 rather than quietly using a different width</td></tr><tr><td><code>dpi</code></td><td>int</td><td></td><td>Resolution used when <code>width</code> is not given; default <code>200</code>, range 72 to 600</td></tr><tr><td><code>quality</code></td><td>int</td><td></td><td>WebP / JPEG quality, 1 to 100, default <code>80</code>; PNG is lossless and ignores it</td></tr></tbody></table></div>
+<p>A page over 40 million pixels (or, in WebP, over 16383 px on either side, a limit of the format itself) is output smaller; that page has <code>reduced</code> set to <code>true</code>, and the top-level <code>reduced_pages</code> lists which pages.</p>
+<pre><code class="lang-bash"><span class="hl-cmt"># 1. 上傳並轉換（網頁用：WebP、寬 1920）</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-image/convert</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@slides.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;format=webp&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;width=1920&quot;</span> | jq
+<span class="hl-cmt"># → {&quot;upload_id&quot;: &quot;...&quot;, &quot;page_count&quot;: 3, &quot;format&quot;: &quot;webp&quot;, &quot;size_mode&quot;: &quot;width&quot;,</span>
+<span class="hl-cmt">#    &quot;width&quot;: 1920, &quot;dpi&quot;: null, &quot;reduced_pages&quot;: [], &quot;pages&quot;: [{&quot;width_px&quot;: 1920, ...}]}</span>
+
+<span class="hl-cmt"># 依 DPI 轉 PNG</span>
 curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-image/convert</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@document.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;dpi=200&quot;</span> | jq
-<span class="hl-cmt"># → {&quot;upload_id&quot;: &quot;...&quot;, &quot;page_count&quot;: 3, &quot;pages&quot;: [...]}</span>
 
 <span class="hl-cmt"># 2. 下載</span>
 curl <span class="hl-flag">-s</span> <span class="hl-url">http://localhost:8765/tools/pdf-to-image/download/abc123</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">--output</span> pages.zip</code></pre>
-<p>Response: step 1 returns each page's details and an <code>upload_id</code>; step 2 returns the images, a PNG for one page and a ZIP for several.</p>
+<p>Response: step 1 returns each page's details (<code>width_px</code> / <code>height_px</code> / <code>dpi</code> / <code>size_bytes</code> / <code>reduced</code>) and the <code>upload_id</code>; step 2 returns the images: a single image in the chosen format for one page, or a ZIP for several (each page named like <code>slides_p1.webp</code>).</p>
       </section>
       <section class="doc-section" data-sec="pdf-轉-office" data-title="PDF to Office" hidden>
 <div class="doc-crumb">3. Document conversion API</div>

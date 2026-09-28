@@ -240,7 +240,6 @@
   "回應：去識別化後的檔案。": "レスポンス：匿名化後のファイル。",
   "回應：合併後的 PDF。": "レスポンス：結合後の PDF。",
   "回應：單張 A4 白底 PDF 二進位。": "レスポンス：1 枚の A4 白地 PDF のバイナリ。",
-  "回應：第 1 步回每一頁的資訊與 <code>upload_id</code>；第 2 步拿圖，單頁是 PNG、多頁是 ZIP。": "応答：手順 1 は各ページの情報と <code>upload_id</code> を返します。手順 2 で画像を取得します（1 ページなら PNG、複数ページなら ZIP）。",
   "回應：圖片打包 ZIP。": "レスポンス：画像をまとめた ZIP。",
   "回應：填好的 PDF。": "レスポンス：入力済みの PDF。",
   "回應：壓縮後的 PDF。": "レスポンス：圧縮後の PDF。",
@@ -307,7 +306,6 @@
   "把 PDF 反轉成 PowerPoint（.pptx）或 OpenDocument 簡報（.odp），<strong>一頁對一張投影片</strong>， 投影片尺寸沿用原稿（直向 PDF 也照樣還原）。走 job 模式回 <code>job_id</code>。": "PDF を PowerPoint（.pptx）または OpenDocument プレゼンテーション（.odp）に逆変換します。<strong>1 ページが 1 枚のスライドに対応</strong>し、 スライドサイズは原本のままです（縦向きの PDF もそのまま再現します）。job モードで <code>job_id</code> を返します。",
   "把 PDF 反轉成 Word（.docx）或 OpenDocument（.odt）。走 job 模式回 <code>job_id</code>。": "PDF を Word（.docx）または OpenDocument（.odt）に逆変換します。job モードで <code>job_id</code> を返します。",
   "把 PDF 抽成 Markdown。單次呼叫直接回內容，不走 job 模式。": "PDF を Markdown として抽出します。1 回の呼び出しでそのまま内容を返し、job モードは使いません。",
-  "把 PDF 每頁轉成 PNG（多頁自動打包 ZIP）。": "PDF の各ページを PNG に変換します（複数ページは自動で ZIP にまとめます）。",
   "把 辦公文件 轉成 PDF（走 OxOffice / LibreOffice 引擎）。": "オフィス文書を PDF に変換します（OxOffice / LibreOffice エンジンを使います）。",
   "把一張或多張圖片合併成單一 PDF。": "1 枚または複数の画像を 1 つの PDF に結合します。",
   "把偵測到的資料換成另一個看起來正常、但不是真的值 —— 適合拿去測試系統、 給外部看的報表、教學範例。原文一樣是<strong>真的刪除</strong>。": "検出したデータを、見た目は普通だが実際とは違う値に置き換えます —— システムのテスト、 外部に見せるレポート、教材の例に向いています。原文は同じく<strong>本当に削除されます</strong>。",
@@ -449,7 +447,6 @@
   "要測的位址。<strong>不給就測目前已存檔的設定</strong>": "テストするアドレス。<strong>指定しない場合は現在保存されている設定をテストします</strong>",
   "角度，預設 <code>0</code>": "角度。既定は <code>0</code>",
   "解析一批台鐵 / 高鐵 / Uber 乘車證明 PDF，回結構化 JSON。<strong>只解析、不寫入使用者的清單</strong>。": "台鉄 / 台湾高鉄 / Uber の乗車証明 PDF をまとめて解析し、構造化された JSON を返します。<strong>解析するだけで、ユーザーの一覧には書き込みません</strong>。",
-  "解析度，預設 <code>150</code>": "解像度。既定は <code>150</code>",
   "解析電子發票 QR Code 內容。": "電子請求書の QR コードの内容を解析します。",
   "設定匯出清單": "設定エクスポートの一覧",
   "該頁的 pt 尺寸 <code>[寬, 高]</code>": "そのページの pt 単位のサイズ <code>[幅, 高さ]</code>",
@@ -613,5 +610,13 @@
   "或不送這個欄位＝不動，送新的字串＝換成這把（加密存放），送空字串＝移除。": "を送るかこのフィールドを省略すると変更なし、新しい文字列を送るとそのキーに置き換え（暗号化して保存）、空文字列を送ると削除します。",
   "同上，不給就用已存檔的。送 <code>&quot;__KEPT__&quot;</code> 時，<strong>只有 <code>base_url</code> 跟存檔的一樣才會帶上存著的金鑰</strong>": "同上。省略すると保存済みの値を使います。<code>&quot;__KEPT__&quot;</code> を送った場合、<strong>保存済みのキーは <code>base_url</code> が保存済みのものと同じときだけ送られます</strong>",
   "回應：<code>job_id</code>（OCR 在背景跑）。用第 10 章的作業 API 輪詢，完成後從 <code>download_url</code> 下載加上文字層的 PDF。第一次使用會先下載辨識模型，要多等一段時間。": "応答：<code>job_id</code>（OCR はバックグラウンドで実行）。第 10 章のジョブ API で進捗を確認し、完了後に <code>download_url</code> から文字レイヤー付きの PDF をダウンロードします。初回は認識モデルのダウンロードがあるため時間がかかります。",
-  "格式樣板：<code>{n}</code> 是目前頁碼、<code>{N}</code> 是總頁數（<code>{total}</code> 同 <code>{N}</code>），例 <code>第 {n} 頁</code> / <code>{n} / {N}</code>": "形式のテンプレート：<code>{n}</code> は現在のページ番号、<code>{N}</code> は総ページ数（<code>{total}</code> も <code>{N}</code> と同じ）。例 <code>第 {n} ページ</code> / <code>{n} / {N}</code>"
+  "格式樣板：<code>{n}</code> 是目前頁碼、<code>{N}</code> 是總頁數（<code>{total}</code> 同 <code>{N}</code>），例 <code>第 {n} 頁</code> / <code>{n} / {N}</code>": "形式のテンプレート：<code>{n}</code> は現在のページ番号、<code>{N}</code> は総ページ数（<code>{total}</code> も <code>{N}</code> と同じ）。例 <code>第 {n} ページ</code> / <code>{n} / {N}</code>",
+  "把 PDF 或辦公文件每頁轉成 PNG / WebP / JPEG（多頁自動打包 ZIP）。 大小可以用 DPI，也可以直接指定寬度（每一頁縮放成同一個寬度，高度依頁面比例）。": "PDF やオフィス文書の各ページを PNG / WebP / JPEG に変換します（複数ページは ZIP にまとめます）。サイズは DPI で指定するか、幅を直接指定できます（すべてのページを同じ幅に拡大縮小し、高さはページの縦横比に合わせます）。",
+  "PDF 或辦公文件（非 PDF 會先轉成 PDF）": "PDF またはオフィス文書（PDF 以外はまず PDF に変換）",
+  "輸出格式：<code>png</code>（預設）/ <code>webp</code> / <code>jpeg</code>（<code>jpg</code> 也收）；其他值回 400": "出力形式：<code>png</code>（既定）/ <code>webp</code> / <code>jpeg</code>（<code>jpg</code> も可）。それ以外の値は 400",
+  "每一頁的寬度（像素，16～10000）；有給就不看 <code>dpi</code>。超出範圍回 400，不會安靜地改成別的寬度": "各ページの幅（ピクセル、16～10000）。指定すると <code>dpi</code> は無視します。範囲外は 400 を返し、黙って別の幅にはしません",
+  "沒給 <code>width</code> 時的解析度，預設 <code>200</code>，範圍 72～600": "<code>width</code> を指定しないときの解像度。既定 <code>200</code>、範囲 72～600",
+  "WebP / JPEG 的品質 1～100，預設 <code>80</code>；PNG 無損，不看這個值": "WebP / JPEG の画質 1～100、既定 <code>80</code>。PNG は可逆圧縮なので使いません",
+  "單頁超過 4000 萬像素（或 WebP 單邊超過 16383 像素，那是格式本身的限制）時會縮小輸出， 那一頁的 <code>reduced</code> 是 <code>true</code>，頂層的 <code>reduced_pages</code> 列出是哪幾頁。": "1 ページが 4000 万ピクセルを超える場合（WebP では一辺が 16383 ピクセルを超える場合。形式そのものの上限です）は縮小して出力し、そのページの <code>reduced</code> が <code>true</code> になります。どのページかはトップレベルの <code>reduced_pages</code> に列挙されます。",
+  "回應：第 1 步回每一頁的資訊（<code>width_px</code> / <code>height_px</code> / <code>dpi</code> / <code>size_bytes</code> / <code>reduced</code>）與 <code>upload_id</code>；第 2 步拿圖，單頁是該格式的圖片、多頁是 ZIP（裡面每一頁的檔名像 <code>slides_p1.webp</code>）。": "レスポンス：手順 1 は各ページの情報（<code>width_px</code> / <code>height_px</code> / <code>dpi</code> / <code>size_bytes</code> / <code>reduced</code>）と <code>upload_id</code> を返します。手順 2 で画像を取得します。1 ページなら選んだ形式の画像、複数ページなら ZIP です（各ページのファイル名は <code>slides_p1.webp</code> のようになります）。"
 }

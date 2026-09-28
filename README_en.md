@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.16.25
+# Jason Tools Document Toolbox v1.16.26
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -129,7 +129,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 ### Conversion [needs OxOffice/LibreOffice]
 - **Office to PDF**; batch convert office documents to PDF
 - **Office format conversion**; convert within the same kind: documents (.odt /.docx /.doc /.rtf /.txt), spreadsheets (.ods /.xlsx /.xls /.csv) and presentations (.odp /.pptx /.ppt); `.docx` / `.xlsx` / `.pptx` can also target a specific version (Word 2007 or Word 2010; 365, for example)
-- **Document to images**; every page of a PDF or office file becomes a PNG; several pages come back as a ZIP
+- **Document to images**: each page of a PDF or office document to PNG / WebP / JPEG, by DPI or at a fixed width; multiple pages are bundled into a ZIP
 - **Images to PDF**
 - **PDF to Markdown**: convert a PDF into structured Markdown, keeping headings, tables and bold; handy for LLM and RAG pipelines
 - **Markdown to office document** [needs OxOffice/LibreOffice]; paste or drop Markdown, apply a theme and export PDF or a word processing file (.docx /.odt), with a preview of every page

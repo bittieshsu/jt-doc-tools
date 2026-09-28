@@ -91,7 +91,6 @@
   "- **資料目錄獨立** — 不會跟使用者個人檔案混在一起，Windows 不 roam": "- **A separate data directory**; not mixed in with the user's own files, and it does not roam on Windows",
   "- **辦公文件格式互轉** — 同一類文件之間互轉格式：文書檔（.odt / .docx / .doc / .rtf / .txt）、試算表（.ods / .xlsx / .xls / .csv）、簡報（.odp / .pptx / .ppt）各自互換；`.docx` / `.xlsx` / `.pptx` 還可以指定版本（Word 2007 或 Word 2010–365 等）": "- **Office format conversion**; convert within the same kind: documents (.odt /.docx /.doc /.rtf /.txt), spreadsheets (.ods /.xlsx /.xls /.csv) and presentations (.odp /.pptx /.ppt); `.docx` / `.xlsx` / `.pptx` can also target a specific version (Word 2007 or Word 2010; 365, for example)",
   "- **辦公文件轉 PDF** — 把辦公文件批次轉成 PDF": "- **Office to PDF**; batch convert office documents to PDF",
-  "- **辦公文件轉圖片** — PDF 或辦公文件每頁轉成 PNG；多頁自動打包 ZIP": "- **Document to images**; every page of a PDF or office file becomes a PNG; several pages come back as a ZIP",
   "- **送件前檢核** — 批次驗收：頁面尺寸、字型嵌入、欄位完整、敏感資料殘留、隱藏內容": "- **Pre-submission check**: batch verification: page size, embedded fonts, complete fields, leftover personal data, hidden content",
   "- **逐句翻譯**": "- **Sentence translation**",
   "- **通訊軟體 / Webhook** — Telegram、Slack、Microsoft Teams、Discord、Zulip、Nextcloud Talk、LINE、通用 Webhook。**這些管道目前標示為開發階段**：載荷格式有單元測試，但尚未接上真實服務端到端驗證過；只有 Email 是實機寄送、收件者確認收過的。": "- **Chat and webhooks**: Telegram, Slack, Microsoft Teams, Discord, Zulip, Nextcloud Talk, LINE and a generic webhook. **These channels are currently marked as in development**: the payload format has unit tests but has not been verified end to end against the real services; only email has actually been sent and confirmed received.",
@@ -229,5 +228,6 @@
   "- **摘要與決議留在本系統**，跟其他 13 個 LLM 加值工具用同一套設定與稽核。": "- **The summary and decisions stay in this system**, using the same settings and audit trail as the other 13 LLM-assisted tools.",
   "- **引用綁段號不綁文字**：重跑校正或更新詞彙庫之後，已經產生的決議與待辦": "- **Citations are bound to segment numbers, not to text**: after a re-run of the correction step or a glossary update, decisions and action items that were already",
   "仍然指得回同一段原音。": "produced still point back to the same piece of audio.",
-  "沒設定就跟以前一樣 —— **其餘 49 個工具完全不受影響**。": "Leave it unset and nothing changes: **the other 49 tools are entirely unaffected**."
+  "沒設定就跟以前一樣 —— **其餘 49 個工具完全不受影響**。": "Leave it unset and nothing changes: **the other 49 tools are entirely unaffected**.",
+  "- **辦公文件轉圖片** — PDF 或辦公文件每頁轉成 PNG / WebP / JPEG，可依 DPI 或直接指定寬度；多頁自動打包 ZIP": "- **Document to images**: each page of a PDF or office document to PNG / WebP / JPEG, by DPI or at a fixed width; multiple pages are bundled into a ZIP"
 }

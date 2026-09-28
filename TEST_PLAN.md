@@ -583,7 +583,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **353 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **356 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -608,6 +608,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_api_enforce_does_not_break_the_web_ui.py` | 「API token 強制檢查」不可以把網頁自己的 `/api/` 擋掉（GitHub issue #52） |
 | `test_api_gate_and_csrf_edges.py` | API token 閘與 CSRF 豁免的邊界 |
 | `test_api_page_builder.py` | `github/build-api-page.py` 產出的 api.html 不可以毀損 |
+| `test_api_token_on_tool_paths.py` | API 手冊教人用 token 呼叫的工具路徑，在**啟用認證**的機器上也要通（v1.16.26） |
 | `test_asset_image_acl.py` | ACL test for the login-gated shared-asset image endpoints (GitHub #28). |
 | `test_asset_thumbnails_resolve.py` | 資產縮圖必須載入得到 — 防「import 後 file_key/thumb_key 與磁碟檔名不一致 |
 | `test_assets_and_image_utils.py` | Asset upload + crop + match-aspect + remove-bg auto-crop. |
@@ -828,7 +829,9 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_pdf_stamp_pages.py` | Regression tests for pdf-stamp per-page selection (`_resolve_pages`). |
 | `test_pdf_stamp_placements.py` | pdf-stamp「每頁獨立位置」placements 模式測試（issue #38 / Phase B） |
 | `test_pdf_stamp_rotated.py` | Regression: stamp placement must honour page /Rotate (GitHub #28 follow-up). |
+| `test_pdf_to_image_formats.py` | 辦公文件轉圖片：WebP / JPEG 輸出、指定寬度，以及選的 DPI 真的有效 |
 | `test_pdf_to_image_page_order.py` | 辦公文件轉圖片：ZIP 內檔名頁碼必須對應 PDF 實際頁數 |
+| `test_pdf_to_image_web_formats_e2e.py` | 辦公文件轉圖片：在真的瀏覽器裡選 WebP ＋ 指定寬度，轉出來的圖要真的是那樣（issue #53） |
 | `test_pdf_to_office_a_b_fixers.py` | Sprint B 二階段 5 個 fixer 單元測試（v1.8.60）： |
 | `test_pdf_to_office_api_engine.py` | 對外 API /tools/pdf-to-office/convert 的引擎參數與 meta 測試 |
 | `test_pdf_to_office_bbox_fixers.py` | Sprint B 新 fixer 單元測試： |
@@ -1252,6 +1255,16 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] PDF 每頁 → PNG
 - [ ] **Office 檔案（docx/xlsx/pptx/odt）先自動轉 PDF 再轉圖**
 - [ ] 單頁直接下 PNG、多頁自動 ZIP
+- [ ] **選的 DPI 真的有效**（v1.16.26 前最長邊被預覽用的上限壓在 1800 px）：A4 選 200 / 300 / 400
+      下載下來用看圖軟體量寬度，要是 1654 / 2480 / 3307 左右，三個不可以一樣
+- [ ] **WebP / JPEG**（issue #53）：選 WebP → 縮圖、單頁下載、ZIP 內每個檔都真的是 WebP
+      （副檔名與內容一致，用看圖軟體或 `file` 看）；品質那一列只在 WebP / JPEG 時出現
+- [ ] **指定寬度**：選「指定寬度」按 1920 → 16:9 簡報與直式 A4 混在一份裡，**每一頁都剛好 1920 寬**、
+      高度照比例；PNG / WebP / JPEG 三種格式都要能指定寬度；DPI 那一列要藏起來
+- [ ] 寬度打 15 或 10001 → 頁面當場擋下並講出範圍（API 直打回 400，不是安靜地改成別的寬度）
+- [ ] 窄長的頁（例如收據）選 WebP ＋ 很寬 → 那一頁縮圖下方標「已縮小」、結果上方講出幾頁被縮
+- [ ] 單頁 PNG 才出現「存至工作區」（工作區不收 WebP / JPEG）
+- [ ] 英文 / 日文介面：狀態列、下載鈕、每頁資訊都是該語言，格式名稱不翻
 
 #### 辦公文件格式互轉 (office-convert) 🆕 v1.14.34
 - [ ] 上傳 `.odt` → 只顯示文書檔那一組目標；換上傳 `.pptx` → 切到簡報那一組
@@ -1690,7 +1703,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `/tools/office-convert/formats` — GET → 可用家族與目標格式（target id 因安裝而異）
 - [ ] `/tools/office-convert/convert` — POST files[] + target → 原格式或 ZIP（async job）；
       跨類（試算表配文書檔的 target）與不存在的 target 都應是 400 不是 500
-- [ ] `/tools/pdf-to-image/convert` — POST file → ZIP/PNG
+- [ ] `/tools/pdf-to-image/convert` — POST file（＋ `format` png/webp/jpeg、`width`、`dpi`、`quality`）→ ZIP / 單張圖；`width` 超出 16～10000 回 400
 - [ ] `/tools/pdf-to-office/convert` — POST file → docx/odt（async job）
 - [ ] `/tools/image-to-pdf/api/image-to-pdf` — POST files[] → PDF
 - [ ] `/tools/scan-merge/api/scan-merge` — POST files[] → 單張 A4 白底 PDF

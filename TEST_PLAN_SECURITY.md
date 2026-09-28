@@ -70,6 +70,7 @@
 | `test_auditor_readonly.py` | 稽核員唯讀：讀得到但不可刪紀錄、不可觸發備份輪替 |
 | `test_roles_rbac.py` | 內建角色名實相符、工具 id 存在、升級步驟編號連續 |
 | `test_api_gate_and_csrf_edges.py` | API token 閘不可誤擋管理區；CSRF 豁免不可只看標頭 |
+| `test_api_token_on_tool_paths.py` | 手冊教人帶 token 呼叫的工具路徑（`/download`、`page-image`…）在**啟用認證**時也要驗 token；錯的 token 401、沒帶的照舊導登入、token 不繞過工具權限 |
 | `test_auth_modes_matrix.py` | 認證開 / 關兩種模式的行為都要對（很容易只顧一邊） |
 | `test_csv_injection.py` | 匯出的 CSV / xlsx 不可被試算表當公式執行；含「所有 xlsx 寫入都要走 helper」的靜態檢查 |
 | `test_upload_validation_parity.py` | 壞檔要回 400 不是 500；網頁介面與對外 API 判定一致；不可把伺服器回應塞進 innerHTML |
@@ -246,6 +247,7 @@ A / B，然後：
 | v1.14.6 | pdf-to-office 的改善報告沒有驗歸屬（隔壁的預覽有驗） | 滲透測試 §4c |
 | v1.14.6 | 稽核員可刪歷史紀錄、可輪替掉資料庫備份；管理員反而被擋 | `test_auditor_readonly.py` |
 | v1.14.6 | 「法務資安」角色實際等於「一般使用者」 | `test_roles_rbac.py` |
+| v1.16.26 | 帶 token 呼叫 `/tools/…/download` 等工具路徑，啟用認證時 token 沒被驗、直接 302 到登入頁（手冊實跑在認證關閉的實例上，看不到） | `test_api_token_on_tool_paths.py` |
 | v1.14.6 | API token 強制驗證開啟時管理區全壞（判斷用「路徑含 /api/」） | `test_api_gate_and_csrf_edges.py` |
 | v1.14.6 | 另外三個工具的預覽端點切出空 id 就跳過檢查（doc-deident / pdf-editor / pdf-to-image） | `test_preview_acl_failopen.py`（prefix 那組） |
 | v1.14.6 | `/workspace/save` 有自己一份歸屬判斷 → 無主作業可被任何登入者存走 | `test_job_id_acl.py::test_workspace_save_denies_ownerless_job` |

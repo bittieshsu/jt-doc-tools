@@ -5,11 +5,38 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (854 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (855 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.26] - 2026-09-28
+
+### Document to images: WebP / JPEG output and a fixed width (issue #53)
+
+* New output formats **WebP** and **JPEG** (it was PNG only). WebP suits web pages: for a 16:9 slide at 1920 px wide,
+  a page is about 479 KB as PNG and about 122 KB as WebP. WebP and JPEG have a quality setting (high 90, standard 80,
+  small 65).
+* New **fixed width** option: every page is scaled to the same width (for example 1920 or 480 px for a website) and
+  the height follows the page's proportions, so there is no need to work out which DPI gives that width. All three
+  formats can use it.
+* **Fixed: choosing 200 DPI or more had no effect.** The conversion borrowed the preview renderer, which caps the
+  longest side at 1800 px, so an A4 page came out the same at 200, 300 and 400 DPI, and a 16:9 slide could never reach
+  1920 px wide. The chosen DPI is now used, **so files at 200 DPI and above are larger than before** (that is the size
+  the option always promised).
+* A page over 40 million pixels (or wider or taller than 16383 px in WebP) is output smaller and marked "Reduced"
+  under its thumbnail, instead of quietly coming out smaller than requested.
+* API: `/tools/pdf-to-image/convert` has three new parameters, `format`, `width` and `quality`; without them the
+  output is PNG as before.
+
+### API: tool paths called with a token were redirected to the sign-in page
+
+* Several tool paths that the API manual shows being called with `Authorization: Bearer`
+  (`/tools/pdf-to-image/download/…`, `/tools/doc-diff/page-image/…`, `/tools/translate-doc/start` and `/job/…`,
+  `/tools/office-convert/formats`) never checked the token on an instance with sign-in enabled; they redirected to
+  the sign-in page, so a script got an HTML page back. A Bearer token on a tool path is now verified; requests without
+  one (the browser) are unchanged, and the token owner's tool permissions still apply.
 
 ## [1.16.25] - 2026-09-27
 

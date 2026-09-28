@@ -184,7 +184,8 @@ curl -X POST http://localhost:8765/tools/image-to-pdf/api/image-to-pdf \
 
 ### PDF 轉圖片
 
-把 PDF 每頁轉成 PNG（多頁自動打包 ZIP）。
+把 PDF 或辦公文件每頁轉成 PNG / WebP / JPEG（多頁自動打包 ZIP）。
+大小可以用 DPI，也可以直接指定寬度（每一頁縮放成同一個寬度，高度依頁面比例）。
 
 ```text
 POST /tools/pdf-to-image/convert
@@ -193,22 +194,34 @@ GET  /tools/pdf-to-image/download/{upload_id}
 
 | 參數 | 類型 | 必填 | 說明 |
 |---|---|---|---|
-| `file` | file | ✓ | PDF |
-| `dpi` | int | | 解析度，預設 `150` |
+| `file` | file | ✓ | PDF 或辦公文件（非 PDF 會先轉成 PDF） |
+| `format` | string | | 輸出格式：`png`（預設）/ `webp` / `jpeg`（`jpg` 也收）；其他值回 400 |
+| `width` | int | | 每一頁的寬度（像素，16～10000）；有給就不看 `dpi`。超出範圍回 400，不會安靜地改成別的寬度 |
+| `dpi` | int | | 沒給 `width` 時的解析度，預設 `200`，範圍 72～600 |
+| `quality` | int | | WebP / JPEG 的品質 1～100，預設 `80`；PNG 無損，不看這個值 |
+
+單頁超過 4000 萬像素（或 WebP 單邊超過 16383 像素，那是格式本身的限制）時會縮小輸出，
+那一頁的 `reduced` 是 `true`，頂層的 `reduced_pages` 列出是哪幾頁。
 
 ```bash
-# 1. 上傳並轉換
+# 1. 上傳並轉換（網頁用：WebP、寬 1920）
+curl -X POST http://localhost:8765/tools/pdf-to-image/convert \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@slides.pdf" -F "format=webp" -F "width=1920" | jq
+# → {"upload_id": "...", "page_count": 3, "format": "webp", "size_mode": "width",
+#    "width": 1920, "dpi": null, "reduced_pages": [], "pages": [{"width_px": 1920, ...}]}
+
+# 依 DPI 轉 PNG
 curl -X POST http://localhost:8765/tools/pdf-to-image/convert \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -F "file=@document.pdf" -F "dpi=200" | jq
-# → {"upload_id": "...", "page_count": 3, "pages": [...]}
 
 # 2. 下載
 curl -s http://localhost:8765/tools/pdf-to-image/download/abc123 \
   -H "Authorization: Bearer YOUR_TOKEN" --output pages.zip
 ```
 
-回應：第 1 步回每一頁的資訊與 `upload_id`；第 2 步拿圖，單頁是 PNG、多頁是 ZIP。
+回應：第 1 步回每一頁的資訊（`width_px` / `height_px` / `dpi` / `size_bytes` / `reduced`）與 `upload_id`；第 2 步拿圖，單頁是該格式的圖片、多頁是 ZIP（裡面每一頁的檔名像 `slides_p1.webp`）。
 
 ### PDF 轉 Office
 
