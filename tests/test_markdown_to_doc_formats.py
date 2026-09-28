@@ -302,8 +302,15 @@ def test_a_running_conversion_can_be_cancelled(api):
 
     改成背景作業之前，`/convert` 是同步請求 —— 畫面上只能盯著「轉換中…」，
     沒有任何辦法停下來，關掉分頁還會白做一次。
+
+    **沒有 Office 引擎的機器要跳過**（2026-09-28 CI 紅過一次）：那時作業一開始就以
+    「找不到 LibreOffice」失敗（`error`），取消先到就是 `cancelled`、作業先跑就是
+    `error` —— 結果看時序，這台快就綠、CI 慢就紅。沒有東西在跑，取消無從驗起。
     """
     import time
+    from app.core import office_convert
+    if not office_convert.find_soffice():
+        pytest.skip("這台機器沒有 Office 引擎 —— 沒有轉換在跑，取消無從驗起")
     r = _post(api, formats="pdf,docx,odt")      # 三種都轉，跑久一點好取消
     assert r.status_code == 200, r.text[:200]
     jid = r.json()["job_id"]
