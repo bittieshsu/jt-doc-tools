@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.16.27
+# Jason Tools Document Toolbox v1.16.29
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -292,16 +292,8 @@ Leave it unset and nothing changes: **the other 49 tools are entirely unaffected
 
 ## Privacy and security notes
 
-- **⚠ Not recommended for direct exposure to the public internet**; colleagues will mostly use it for company **internal and confidential documents**
-  (contracts, quotations, personal data, tax records), and exposing it directly puts those documents and the admin interface online together; a **risk of data
-  leakage**; on top of that the tool parses uploaded PDFs, Office files and images (MuPDF, LibreOffice and
-  Pillow underneath; memory-unsafe native code, a high-risk attack surface). **Use it on the internal network or over VPN by preference**; if
-  business needs force exposure, that is at your own risk, and at the very least use a reverse proxy + HTTPS + authentication + enforced 2FA + a WAF / rate limiting
-  + continuous dependency updates. See [OPS.md](OPS.md).
-- **⚠ Anything beyond local access goes through a reverse proxy with HTTPS**; unless it is “one person on this machine” (any network,
-  several people, internal network, external), **put it behind an nginx (or Caddy) reverse proxy with HTTPS and never expose
-  `:8765` to the network directly**. The application binds only to `127.0.0.1:8765` (plain HTTP, no TLS),
-  so exposing it directly means sending credentials and documents in the clear. See below and [OPS.md](OPS.md).
+- **⚠ Not recommended for direct exposure to the public internet**: colleagues will mostly use it for company **internal and confidential documents** (contracts, quotations, personal data, tax records). On the public internet anyone can try to sign in or upload crafted files, and a leaked account or address means a **risk of data leakage**; on the internal network only colleagues can reach it, and they have to sign in first. **Use it on the internal network or over VPN**; if business needs force exposure, that is at your own risk, and at the very least use a reverse proxy, HTTPS, authentication, enforced two-factor authentication, a WAF or rate limiting, and keep dependencies up to date. See [OPS.md](OPS.md).
+- **⚠ Anything beyond local access goes through a reverse proxy with HTTPS**: unless it is one person on this machine (several people, other computers on the internal network, or external access), **put it behind an nginx (or Caddy) reverse proxy with HTTPS and never expose `:8765` directly to the network**. By default the app only binds `127.0.0.1:8765` (plain HTTP, no TLS), so exposing it directly sends passwords and documents in clear text. See below and [OPS.md](OPS.md) for the right setup.
 - **No cloud; your data stays with you**; every file is processed on your own server
 - **A separate data directory**; not mixed in with the user's own files, and it does not roam on Windows
 - **Authentication is off by default** (single-machine mode); a fresh install works as before; enable it for a team or an internal deployment

@@ -5,11 +5,42 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (856 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (858 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.29] - 2026-09-29
+
+### Speech service settings: deprecated recognition modes are no longer listed
+
+* The speech service marked one recognition mode as deprecated (it actually processed audio the same way as the
+  balanced mode), and the settings page no longer lists deprecated modes in the recognition-mode dropdown.
+* Exception: **if the saved setting is the deprecated mode**, it stays in the dropdown with a note saying which mode
+  to use instead. Hiding it would silently switch the dropdown to another option, and saving would change the
+  setting without anyone noticing.
+
+## [1.16.28] - 2026-09-29
+
+### Security: two code-scanning alerts fixed
+
+* Document to images: finding each page's file on download now uses a fixed pattern instead of building a regular
+  expression from the upload ID in the URL. The ID was already validated first, so this was not exploitable; the
+  code is simply written the right way now.
+* OCR language packs: line breaks are stripped before a failed quality switch is written to the log.
+* Saving the speech-service settings page did not write an audit record (every other settings page does). It now
+  does, so you can see who changed the recognition mode, addresses and so on, and when. The key and certificate
+  themselves are never written to the record, only whether they changed.
+
+### Documentation
+
+* The deployment security notes were rewritten. They used to stress that the file-parsing components are a
+  high-risk surface, which read as if even the internal network were dangerous. The real point is **who can reach
+  it**: on the public internet anyone can try to sign in or upload files, while on the internal network only
+  colleagues can, after signing in. README, INSTALL.md, OPS.md and the website were updated together.
+* The website's "No cloud" section was redesigned: six feature cards and a single deployment note.
+* The offline installation guide's wording for bringing a Docker image into the internal network was corrected.
 
 ## [1.16.27] - 2026-09-29
 

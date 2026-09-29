@@ -46,6 +46,9 @@ MAX_PIXELS = 40_000_000
 #: WebP 格式本身的限制：單邊最多 16383 像素。
 WEBP_MAX_SIDE = 16383
 
+#: 轉出來的每一頁：`p2i_<upload_id>_p<頁碼>.<副檔名>`。
+_PAGE_FILE_RE = re.compile(r"^p2i_([0-9a-f]{32})_p(\d+)\.(png|webp|jpg)$")
+
 
 def _work_dir() -> Path:
     return settings.temp_dir
@@ -292,12 +295,14 @@ async def download(upload_id: str, request: Request):
     # from the filename — a plain string sort gives _p1, _p10, _p11 … _p2 …
     # which (combined with re-numbering) scrambled the ZIP filenames for any
     # PDF with ≥10 pages (page 10 got renamed _p2.png, etc.).
-    page_re = re.compile(rf"^p2i_{upload_id}_p(\d+)\.(png|webp|jpg)$")
+    #
+    # 正規式是**固定的**，編號比對放在外面 —— 不把網址上的值組進正規式
+    # （CodeQL #198；`upload_id` 雖然上面驗過是 32 碼十六進位，組進去仍是壞習慣）。
     pages: list[tuple[int, Path]] = []
     for p in work.glob(f"p2i_{upload_id}_p*"):
-        m = page_re.match(p.name)
-        if m:
-            pages.append((int(m.group(1)), p))
+        m = _PAGE_FILE_RE.match(p.name)
+        if m and m.group(1) == upload_id:
+            pages.append((int(m.group(2)), p))
     pages.sort(key=lambda x: x[0])
     if not pages:
         raise HTTPException(404, "沒有產生的圖片，請重新上傳")

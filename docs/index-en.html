@@ -1195,45 +1195,46 @@
       Every file is processed on your own server.<br>
       Run it on Linux for a whole office over the internal network, or on one machine locally; <b>nothing is uploaded to any cloud service</b>.
     </p>
-    <div style="max-width:760px;margin:0 auto 16px;padding:16px 20px;background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #b91c1c;border-radius:10px;text-align:left;color:#7f1d1d;line-height:1.7;">
-      <strong style="display:block;font-size:15px;margin-bottom:6px;">⚠ Not recommended for direct exposure to the public internet</strong>
-      Colleagues will mostly use it for company <b>internal and confidential documents</b> (contracts, quotations, personal data, tax records …), and exposing it directly puts those documents and the admin interface online together; a <b>risk of data leakage</b>; on top of that the tool parses uploaded PDFs, Office files and images (MuPDF, LibreOffice and Pillow underneath; memory-unsafe native code, which is a <b>high-risk attack surface</b>）。<b>Use it on the internal network or over VPN by preference</b>; if business needs force exposure, that is at your own risk, and at the very least put a reverse proxy + HTTPS + authentication + <b>Enforced 2FA</b> + a WAF, rate limiting and continuous dependency updates in front of it.
-    </div>
-    <div style="max-width:760px;margin:0 auto 28px;padding:16px 20px;background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:10px;text-align:left;color:#7f1d1d;line-height:1.7;">
-      <strong style="display:block;font-size:15px;margin-bottom:6px;">⚠ Anything beyond local access goes through an nginx reverse proxy with HTTPS</strong>
-      Unless it is “one person on this machine” <b>any network, several people, other machines on the LAN, or external access</b> put it behind
-      <b>an nginx (or Caddy) reverse proxy with HTTPS</b> and <b>never <code>:8765</code> exposed directly to the network</b>. The application binds only to <code>127.0.0.1:8765</code> (plain HTTP, no TLS); exposing that directly means sending usernames, passwords and document contents in the clear. The reverse proxy handles TLS termination, HSTS, certificates, hiding the version and security headers. Full examples (nginx / Caddy / Apache / HAProxy /
-      <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener" style="color:#b91c1c;text-decoration:underline;">the reverse proxy chapter of OPS.md</a>。
-    </div>
     <div class="privacy-points">
       <div class="privacy-point">
-        <strong>Reverse proxy + TLS (required beyond local use)</strong>
-        <span>The backend listens only on <code>127.0.0.1:8765</code>, with nginx or Caddy providing HTTPS to the outside. The backend sets CSP, HSTS, X-Frame-Options and other security headers itself (deciding https from <code>X-Forwarded-Proto</code> ); on nginx add <code>server_tokens off</code> so the version is not disclosed; security headers only need one source</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/></svg></span>
+        <strong>No cloud</strong>
+        <p>Files never leave your server: no third-party APIs, no external analytics, and no usage statistics sent back.</p>
       </div>
       <div class="privacy-point">
-        <strong>no cloud</strong>
-        <span>Files never leave your server: no third-party API, no external analytics, no telemetry</span>
-      </div>
-      <div class="privacy-point">
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
         <strong>A separate data directory</strong>
-        <span>All data lives under <code>data/</code> area, so it is not mixed in with the user's own files and does not roam (Windows)</span>
+        <p>All data lives in the system data directory (<code>data/</code>), apart from users' personal files, so there is one place to back up.</p>
       </div>
       <div class="privacy-point">
-        <strong>Audit can be forwarded</strong>
-        <span>With authentication on, every sensitive action is recorded and can be sent to an internal SIEM in real time for compliance</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
+        <strong>Audit logs can be forwarded</strong>
+        <p>With sign-in enabled, sensitive actions are logged and can be forwarded in real time to your internal SIEM for compliance audits.</p>
       </div>
       <div class="privacy-point">
-        <strong>LLM integration (still growing)</strong>
-        <span>Paragraph re-flow, assisted form-field recognition and more can call an LLM (Ollama or a local model); off by default, and still being extended</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4"/><path d="M12 17v4"/><path d="M3 12h4"/><path d="M17 12h4"/><path d="m5.6 5.6 2.8 2.8"/><path d="m15.6 15.6 2.8 2.8"/><path d="m5.6 18.4 2.8-2.8"/><path d="m15.6 8.4 2.8-2.8"/></svg></span>
+        <strong>AI features are optional</strong>
+        <p>Connect an in-house LLM (such as Ollama) to add AI to translation, summaries, form checks and more. It is off by default, and everything works without it.</p>
       </div>
       <div class="privacy-point">
-        <strong>Open, transparent, auditable</strong>
-        <span>AGPL-3.0 licensed, with the source published on <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">GitHub</a>, so you, your customers, internal audit or a third-party security consultant can read every line; no obfuscated binaries, no closed-source components</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span>
+        <strong>Open source, auditable line by line</strong>
+        <p>Licensed under AGPL-3.0 with the source code on <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">GitHub</a>. You, your customers, internal auditors or security consultants can review every line; there are no obfuscated binaries and no closed components.</p>
       </div>
       <div class="privacy-point">
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
         <strong>Built to security guidance</strong>
-        <span>All ten items of the OWASP Top 10 (2025) have automated tests (<a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/SECURITY.md" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">SECURITY.md</a>), plus CSP, scrypt password hashing, TOTP 2FA and separation of duties; GitHub Dependabot and CodeQL scan weekly for CVEs and with SAST</span>
+        <p>Every OWASP Top 10 (2025) item has matching automated tests (<a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/SECURITY.md" target="_blank" rel="noopener">SECURITY.md</a>). Security headers, scrypt password hashing and two-factor authentication are built in, with weekly automated vulnerability scans.</p>
       </div>
+    </div>
+
+    <div class="privacy-callout">
+      <div class="privacy-callout-h"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Before you deploy</div>
+      <ul>
+        <li><b>Use it on the internal network or over VPN only.</b> People will process contracts, quotes, personal data and other confidential documents with it. On the public internet anyone can try to sign in or upload crafted files; on the internal network only colleagues can reach it, and they have to sign in first.</li>
+        <li><b>Unless it is one person on the same machine, put it behind a reverse proxy.</b> By default the app only listens on <code>127.0.0.1:8765</code> (plain HTTP). For several users or access from other computers, have a reverse proxy such as nginx or Caddy provide HTTPS, and never expose <code>:8765</code> directly to the network.</li>
+        <li><b>If you must expose it publicly, you do so at your own risk.</b> At minimum add sign-in with mandatory two-factor authentication, a WAF or rate limiting, and keep dependencies up to date. Configuration examples for common reverse proxies are in the <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener">reverse proxy section of OPS.md</a>.</li>
+      </ul>
     </div>
   </div>
 </section>

@@ -1234,52 +1234,46 @@
       所有檔案處理只發生在你的伺服器上。<br>
       可在 Linux 架站給內網多人使用，或單機本地用，<b>不上傳任何雲端服務</b>。
     </p>
-    <div style="max-width:760px;margin:0 auto 16px;padding:16px 20px;background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #b91c1c;border-radius:10px;text-align:left;color:#7f1d1d;line-height:1.7;">
-      <strong style="display:block;font-size:15px;margin-bottom:6px;">⚠ 不建議直接對「公開網際網路」開放</strong>
-      同仁多半會用它處理公司<b>內部 / 機密文件</b>（合約、報價、個資、統編資料等），直接對外
-      開放等於把這些文件與後台一併暴露，有<b>資料外洩風險</b>；加上本工具會解析上傳的 PDF /
-      Office / 圖片（底層是 MuPDF / LibreOffice / Pillow 等記憶體不安全的原生程式，屬<b>高風險
-      攻擊面</b>）。<b>首選只在內網 / VPN 使用</b>；若因業務必須對外屬「風險自負」，至少要反向
-      代理 + HTTPS + 認證 + <b>強制 2FA</b> + WAF / 速率限制 + 持續更新相依套件。
-    </div>
-    <div style="max-width:760px;margin:0 auto 28px;padding:16px 20px;background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:10px;text-align:left;color:#7f1d1d;line-height:1.7;">
-      <strong style="display:block;font-size:15px;margin-bottom:6px;">⚠ 非本機存取一律走 nginx 反向代理 + HTTPS</strong>
-      只要不是「本機單人」使用 —— <b>任何網路 / 多人 / 內網其他電腦 / 對外</b> —— 一律放在
-      <b>nginx（或 Caddy）反向代理 + HTTPS</b> 後面，<b>絕不要把 <code>:8765</code> 直接對網路開放</b>。
-      應用程式預設只綁 <code>127.0.0.1:8765</code>（純 HTTP、無 TLS）；直接對外等於明文傳輸帳號密碼與
-      文件內容。反向代理負責 TLS 終結、HSTS、憑證、隱藏版本、安全標頭。完整範例（nginx / Caddy /
-      Apache / HAProxy / Traefik / IIS(ARR) / F5 BIG-IP）見
-      <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener" style="color:#b91c1c;text-decoration:underline;">OPS.md 反向代理章節</a>。
-    </div>
     <div class="privacy-points">
       <div class="privacy-point">
-        <strong>反向代理 + TLS（非本機必備）</strong>
-        <span>後端只聽 <code>127.0.0.1:8765</code>，對外由 nginx / Caddy 提供 HTTPS。後端自動設 CSP / HSTS / X-Frame-Options 等安全標頭（依 <code>X-Forwarded-Proto</code> 判斷 https）；nginx 加 <code>server_tokens off</code> 不洩版本，安全標頭擇一來源即可</span>
-      </div>
-      <div class="privacy-point">
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/></svg></span>
         <strong>不上雲</strong>
-        <span>檔案永遠不離開你的伺服器，沒有第三方 API、沒有外部分析、沒有 telemetry</span>
+        <p>檔案永遠不離開你的伺服器：不呼叫第三方 API、不做外部分析，也不回傳使用統計。</p>
       </div>
       <div class="privacy-point">
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
         <strong>資料目錄獨立</strong>
-        <span>所有資料在系統 <code>data/</code> 區，不跟使用者個人檔案混在一起，也不會 roam （Windows）</span>
+        <p>所有資料集中在系統的資料目錄（<code>data/</code>），不跟使用者的個人檔案混在一起，備份只要處理這一個地方。</p>
       </div>
       <div class="privacy-point">
-        <strong>稽核可轉發</strong>
-        <span>啟用認證後敏感操作全記下，可即時送到內部 SIEM 做合規稽核</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
+        <strong>稽核可轉送</strong>
+        <p>啟用認證後，敏感操作都會留下紀錄，並可即時轉送到內部的 SIEM 做合規稽核。</p>
       </div>
       <div class="privacy-point">
-        <strong>LLM 整合 （持續擴充中）</strong>
-        <span>段落重排、表單欄位輔助辨識等可選擇接入 LLM （Ollama / 本機模型）；預設關閉，相關功能持續擴充中</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4"/><path d="M12 17v4"/><path d="M3 12h4"/><path d="M17 12h4"/><path d="m5.6 5.6 2.8 2.8"/><path d="m15.6 15.6 2.8 2.8"/><path d="m5.6 18.4 2.8-2.8"/><path d="m15.6 8.4 2.8-2.8"/></svg></span>
+        <strong>AI 加值為選用</strong>
+        <p>可以接公司內部的 LLM（例如 Ollama），替翻譯、摘要、表單校驗等工具加值；預設關閉，不接也能完整使用。</p>
       </div>
       <div class="privacy-point">
-        <strong>開源透明可稽核</strong>
-        <span>AGPL-3.0 授權，原始碼公開在 <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">GitHub</a>，每一行您 / 客戶 / 內稽 / 第三方資安顧問都能逐行檢視；無 obfuscated binary、無 closed-source 元件</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span>
+        <strong>開源透明，可逐行稽核</strong>
+        <p>AGPL-3.0 授權，原始碼公開在 <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">GitHub</a>；您、客戶、內稽或資安顧問都能逐行檢視，沒有混淆過的執行檔，也沒有不公開的元件。</p>
       </div>
       <div class="privacy-point">
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
         <strong>依資安指引實作</strong>
-        <span>OWASP Top 10 (2025) 全 10 項對應有自動化測試（<a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/SECURITY.md" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">SECURITY.md</a>），CSP / scrypt 密碼 / TOTP 2FA / 職責分離；GitHub Dependabot + CodeQL 每週自動掃 CVE 與 SAST</span>
+        <p>OWASP Top 10（2025）每一項都有對應的自動化測試（<a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/SECURITY.md" target="_blank" rel="noopener">SECURITY.md</a>）；內建安全標頭、scrypt 密碼雜湊與雙因素驗證，每週自動掃描弱點。</p>
       </div>
+    </div>
+
+    <div class="privacy-callout">
+      <div class="privacy-callout-h"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>部署前請注意</div>
+      <ul>
+        <li><b>只在內網或 VPN 使用。</b>同仁會拿它處理合約、報價、個資等機密文件。放在公開網路上，任何人都能試著登入、上傳特製的檔案；放在內網，連得到的只有同仁，而且都要先登入。</li>
+        <li><b>不是本機一個人用，就放在反向代理後面。</b>應用程式預設只聽 <code>127.0.0.1:8765</code>（純 HTTP）；多人或從其他電腦使用時，請由 nginx、Caddy 等反向代理提供 HTTPS，不要把 <code>:8765</code> 直接開放到網路上。</li>
+        <li><b>一定要對外開放時，風險自負。</b>至少加上認證與強制雙因素驗證、WAF 或速率限制，並持續更新相依套件。各種反向代理的設定範例見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener">OPS.md 反向代理章節</a>。</li>
+      </ul>
     </div>
   </div>
 </section>

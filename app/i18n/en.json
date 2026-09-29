@@ -5406,5 +5406,7 @@
   "發言者時間軸": "Speaker timeline",
   "各議題時間佔比": "Share of time per topic",
   "各議題發言段數佔比": "Share of segments per topic",
-  "這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有；發言統計不會有發言時間，議題的長度改用發言段數算（猜出來的時間不能用）。": "This transcript has no timestamps. The summary, decisions and action items are unaffected, but the speaker statistics have no speaking time, and topic length is measured in segments instead (guessed times would be meaningless)."
+  "這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有；發言統計不會有發言時間，議題的長度改用發言段數算（猜出來的時間不能用）。": "This transcript has no timestamps. The summary, decisions and action items are unaffected, but the speaker statistics have no speaking time, and topic length is measured in segments instead (guessed times would be meaningless).",
+  "這個辨識模式已停用，建議改用「{0}」": "This recognition mode is deprecated; switch to \"{0}\"",
+  "這個辨識模式已停用，請改選一個": "This recognition mode is deprecated; please choose another"
 }

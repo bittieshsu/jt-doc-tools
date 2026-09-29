@@ -60,6 +60,8 @@ class FakeJtlw:
         "meeting.detailed": ("transcribe", "diarize", "correct"),
         "transcribe.taiwanese": ("transcribe", "correct"),
     }
+    #: 停用的模式 → 替代模式（對方 v2.22：仍收件、照替代模式處理，只是不該再讓人選）
+    DEPRECATED = {"meeting.detailed": "meeting.balanced"}
 
     def __init__(self, *, fail_with: dict | None = None, segments: int = 5,
                  running_polls: int = 0, reject_with: dict | None = None,
@@ -117,8 +119,11 @@ class FakeJtlw:
                                                "retryable": True, "details": {}}},
                                     status_code=me.profiles_status)
             # 形狀照正式 API：`name` / `description` 是逐語言的物件
-            return [{"id": pid, "version": "2026-09-24.1",
+            # `meeting.detailed` 自 2026-09-29（對方 v2.22）標為停用，替代是 `meeting.balanced`
+            return [{"id": pid, "version": "2026-09-29.1",
                      "name": {"zh-Hant": pid, "en": pid},
+                     "deprecated": pid in me.DEPRECATED,
+                     "replacement_profile_id": me.DEPRECATED.get(pid),
                      "capabilities": list(me.PROFILE_CAPABILITIES[pid]),
                      "languages": list(me.PROFILE_LANGUAGES[pid])}
                     for pid in me.PROFILE_LANGUAGES]
@@ -1026,6 +1031,30 @@ def test_the_settings_page_learns_which_modes_skip_speaker_separation(client, un
     rows = {p["id"]: p for p in r.json()["profiles"]}
     assert "diarize" not in rows["transcribe.taiwanese"]["capabilities"]
     assert "diarize" in rows["meeting.balanced"]["capabilities"]
+
+
+def test_a_deprecated_mode_is_not_offered(client, unconfigured):
+    """對方標為停用的模式（`meeting.detailed`）不列進下拉 —— 選了也只是照替代模式處理。"""
+    with FakeJtlw() as fake:
+        _configure(fake, profile_id="meeting.balanced")
+        j = client.get("/admin/api/jtlw/profiles").json()
+    ids = [p["id"] for p in j["profiles"]]
+    assert "meeting.detailed" not in ids, ids
+    assert "meeting.balanced" in ids and "transcribe.taiwanese" in ids
+    assert j["hidden_deprecated"] == 1
+    assert j["current_deprecated"] is None
+
+
+def test_a_deprecated_mode_that_is_saved_stays_and_says_what_to_use(client, unconfigured):
+    """**存著的就是停用的那個**：要留在下拉裡（不然一按儲存就被無聲換掉），並講出該改用哪一個。"""
+    with FakeJtlw() as fake:
+        _configure(fake, profile_id="meeting.detailed")
+        j = client.get("/admin/api/jtlw/profiles").json()
+    ids = [p["id"] for p in j["profiles"]]
+    assert "meeting.detailed" in ids, ids
+    cd = j["current_deprecated"]
+    assert cd and cd["id"] == "meeting.detailed" and cd["replacement_id"] == "meeting.balanced", cd
+    assert cd["replacement_label"], cd
 
 def test_api_callers_sending_zh_still_get_through(client, unconfigured):
     """API 手冊寫的是 BCP-47，但照慣例送 `zh` 的呼叫端不該被退回。"""

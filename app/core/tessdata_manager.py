@@ -332,7 +332,12 @@ def _set_active_variant(code: str, variant: str, tessdata: Path) -> bool:
         shutil.copy2(str(src), str(dst))
         return True
     except Exception as e:
-        log.warning("set active variant %s/%s failed: %s", code, variant, e)
+        # 寫進記錄前拿掉換行（CodeQL #197）。code / variant 在上面的 `_variant_path()`
+        # 已經過白名單，實際上只會是小寫字母與底線；例外訊息裡的路徑也含 code。
+        def _one_line(v) -> str:
+            return str(v).replace("\r", " ").replace("\n", " ")
+        log.warning("set active variant %s/%s failed: %s",
+                    _one_line(code), _one_line(variant), _one_line(e))
         return False
 
 

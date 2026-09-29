@@ -583,7 +583,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **356 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **357 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -739,6 +739,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_jtdt_reform_reports_page_progress.py` | `jtdt-reform` 引擎要**逐頁**回報進度 |
 | `test_jtlw_error_texts.py` | 語音服務失敗時，畫面上那句話要**指向對的方向** |
 | `test_jtlw_name_is_uppercase.py` | jt-live-whisper 的縮寫在**使用者看得到的文字**裡一律寫 `JTLW`（使用者 2026-09-23 指示） |
+| `test_jtlw_settings_audit.py` | 語音服務設定頁存檔要留稽核紀錄，而且**不可以把金鑰寫進去**（v1.16.28） |
 | `test_latin_ext_garbled_recovery.py` | 擷取結果被映到拉丁擴充區、而且每個 span 都很短 —— 舊的判準抓不到 |
 | `test_layout_measured_in_browser.py` | 版面在**真的瀏覽器**裡量：欄位寬度、字有沒有被拆成兩行、該看得到的看不看得到 |
 | `test_ldap_attribute_portability.py` | LDAP 查詢的屬性清單不可以夾帶 AD 專屬屬性 |
@@ -1109,6 +1110,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       也不帶人數提示；作業照常完成，結果頁寫出「這次用的辨識模式不做發言者分離」。
       原本一律送 `diarize`，選了台語之後**每一件**都被 422 `task_not_supported` 退回。
       反向：會議模式照舊帶 `diarize`；**讀不到辨識模式清單時照設定送、不猜**。
+- [ ] **停用的辨識模式不列**（v1.16.29，語音服務 v2.22）：`/admin/jtlw` 的辨識模式下拉看不到「會議（精細，已停用）」；
+      反向：把設定存成 `meeting.detailed` 再開頁 → 它**仍在下拉裡且被選著**，旁邊寫「已停用，建議改用…」（不可無聲換成別的）。
 - [ ] **錄音最後超過一分鐘沒有文字時只提示、不判失敗**（v1.16.9）：提示寫出空白有多長；
       作業照常完成、照常 ACK、逐字稿照常交出。30 秒左右的正常尾巴不可以提示。
 - [ ] **ACK 在逐字稿落地之後才送**：模擬「寫檔失敗」時**不可以**送出 ACK

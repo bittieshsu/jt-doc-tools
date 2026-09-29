@@ -1195,51 +1195,46 @@
       ファイルの処理はすべてあなたのサーバー上だけで行われます。<br>
       Linux にサイトを立てて社内ネットワークの複数人で使うことも、スタンドアロンでローカルに使うこともでき、<b>クラウドサービスには一切アップロードしません</b>。
     </p>
-    <div style="max-width:760px;margin:0 auto 16px;padding:16px 20px;background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #b91c1c;border-radius:10px;text-align:left;color:#7f1d1d;line-height:1.7;">
-      <strong style="display:block;font-size:15px;margin-bottom:6px;">⚠ 「公衆インターネット」への直接公開はおすすめしません</strong>
-      社員はこのツールで会社の次のようなものを扱うことが多く<b>社内 / 機密文書</b>（契約書、見積書、個人情報、統一番号データなど）、そのまま外部に
-      公開すると、これらの文書と管理画面もあわせて露出することになり、<b>情報漏えいのリスク</b>。さらに本ツールはアップロードされた PDF /
-      Office / 画像を解析します（基盤は MuPDF / LibreOffice / Pillow などメモリ安全でないネイティブのプログラムで、<b>高リスクな
-      攻撃面</b>）。<b>まずは社内ネットワーク / VPN でのみ使用してください</b>。業務上どうしても外部公開が必要な場合は「リスクは自己責任」となります。少なくともリバース
-      プロキシ + HTTPS + 認証 + <b>2FA の必須化</b> + WAF / レート制限 + 依存パッケージの継続的な更新を行ってください。
-    </div>
-    <div style="max-width:760px;margin:0 auto 28px;padding:16px 20px;background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:10px;text-align:left;color:#7f1d1d;line-height:1.7;">
-      <strong style="display:block;font-size:15px;margin-bottom:6px;">⚠ ローカル以外からのアクセスは必ず nginx リバースプロキシ + HTTPS 経由で</strong>
-      「ローカルで 1 人だけ」以外の使い方 —— <b>ネットワーク経由 / 複数人 / 社内の他のパソコン / 外部</b> —— はすべて次の後ろに置いてください
-      <b>nginx（または Caddy）リバースプロキシ + HTTPS</b> の後ろに、<b>決して次をしないでください <code>:8765</code> ネットワークに直接公開する</b>。
-      アプリケーションは既定で次にのみバインドします <code>127.0.0.1:8765</code>（純粋な HTTP で TLS なし）。そのまま外部に公開すると、アカウントとパスワード、文書の内容が平文で流れます。リバースプロキシが TLS 終端、HSTS、証明書、バージョンの隠蔽、セキュリティヘッダーを担当します。完全な例（nginx / Caddy /
-      Apache / HAProxy / Traefik / IIS(ARR) / F5 BIG-IP）は次をご覧ください
-      <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener" style="color:#b91c1c;text-decoration:underline;">OPS.md のリバースプロキシの章</a>。
-    </div>
     <div class="privacy-points">
       <div class="privacy-point">
-        <strong>リバースプロキシ + TLS（ローカル以外では必須）</strong>
-        <span>バックエンドは次だけを待ち受け <code>127.0.0.1:8765</code>、外部へは nginx / Caddy が HTTPS を提供します。バックエンドは CSP / HSTS / X-Frame-Options などのセキュリティヘッダーを自動で設定します（次にもとづいて <code>X-Forwarded-Proto</code> で https を判定）。nginx には次を追加します <code>server_tokens off</code> バージョンを漏らさず、セキュリティヘッダーはどちらか一方の提供元だけで十分です</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/></svg></span>
+        <strong>クラウドに出さない</strong>
+        <p>ファイルがサーバーの外に出ることはありません。外部 API の呼び出しも、外部の解析も、利用統計の送信もありません。</p>
       </div>
       <div class="privacy-point">
-        <strong>クラウドに出しません</strong>
-        <span>ファイルは決してあなたのサーバーから出ません。第三者 API も、外部の分析も、telemetry もありません</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+        <strong>データディレクトリを分離</strong>
+        <p>すべてのデータはシステムのデータディレクトリ（<code>data/</code>）にまとまり、ユーザーの個人ファイルとは混ざりません。バックアップはこの 1 か所だけで済みます。</p>
       </div>
       <div class="privacy-point">
-        <strong>データディレクトリが独立しています</strong>
-        <span>すべてのデータはシステムの <code>data/</code> の領域にあり、ユーザーの個人ファイルと混ざらず、roam もしません （Windows）</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
+        <strong>監査ログを転送可能</strong>
+        <p>認証を有効にすると、重要な操作はすべて記録され、社内の SIEM へリアルタイムに転送してコンプライアンス監査に使えます。</p>
       </div>
       <div class="privacy-point">
-        <strong>監査を転送できます</strong>
-        <span>認証を有効にすると機微な操作をすべて記録し、社内の SIEM へリアルタイムに送ってコンプライアンス監査に使えます</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4"/><path d="M12 17v4"/><path d="M3 12h4"/><path d="M17 12h4"/><path d="m5.6 5.6 2.8 2.8"/><path d="m15.6 15.6 2.8 2.8"/><path d="m5.6 18.4 2.8-2.8"/><path d="m15.6 8.4 2.8-2.8"/></svg></span>
+        <strong>AI 機能はオプション</strong>
+        <p>社内の LLM（Ollama など）を接続すると、翻訳・要約・フォームの検証などに AI 機能が加わります。既定ではオフで、接続しなくてもすべて使えます。</p>
       </div>
       <div class="privacy-point">
-        <strong>LLM 連携 （継続的に拡充中）</strong>
-        <span>段落の再構成、フォーム項目の認識補助などで LLM （Ollama / ローカルモデル）に接続できます。既定は無効で、関連機能は継続的に拡充しています</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span>
+        <strong>オープンソースで 1 行ずつ監査可能</strong>
+        <p>AGPL-3.0 ライセンスで、ソースコードは <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">GitHub</a> で公開しています。お客様、内部監査、セキュリティコンサルタントが 1 行ずつ確認でき、難読化したバイナリや非公開のコンポーネントはありません。</p>
       </div>
       <div class="privacy-point">
-        <strong>オープンソースで透明、監査できます</strong>
-        <span>AGPL-3.0 ライセンスで、ソースコードは次に公開されています <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">GitHub</a>。あなた / 顧客 / 内部監査 / 第三者のセキュリティコンサルタントの誰もが 1 行ずつ確認できます。obfuscated binary も closed-source のコンポーネントもありません</span>
+        <span class="pp-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        <strong>セキュリティ指針に準拠</strong>
+        <p>OWASP Top 10（2025）の各項目に対応する自動テストがあります（<a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/SECURITY.md" target="_blank" rel="noopener">SECURITY.md</a>）。セキュリティヘッダー、scrypt によるパスワードハッシュ、二要素認証を備え、脆弱性スキャンを毎週自動で行います。</p>
       </div>
-      <div class="privacy-point">
-        <strong>セキュリティガイドラインに沿った実装</strong>
-        <span>OWASP Top 10 (2025) の全 10 項目に対応する自動テストがあり（<a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/SECURITY.md" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">SECURITY.md</a>）、CSP / scrypt によるパスワード / TOTP 2FA / 職責分離を備えています。GitHub Dependabot + CodeQL が毎週自動で CVE と SAST をスキャンします</span>
-      </div>
+    </div>
+
+    <div class="privacy-callout">
+      <div class="privacy-callout-h"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>導入前の注意事項</div>
+      <ul>
+        <li><b>社内ネットワークか VPN 経由でのみ使ってください。</b>契約書、見積書、個人情報などの機密文書を扱います。インターネットに公開すると誰でもログインやファイルのアップロードを試せますが、社内ネットワークなら接続できるのは社員だけで、しかも先にログインが必要です。</li>
+        <li><b>同じマシンで 1 人だけで使う場合を除き、リバースプロキシの後ろに置いてください。</b>アプリは既定で <code>127.0.0.1:8765</code>（HTTP のみ）だけで待ち受けます。複数人や他のコンピューターから使うときは nginx や Caddy などのリバースプロキシで HTTPS を提供し、<code>:8765</code> をネットワークへ直接公開しないでください。</li>
+        <li><b>どうしても外部に公開する場合は自己責任です。</b>少なくとも認証と二要素認証の必須化、WAF またはレート制限を加え、依存パッケージを常に更新してください。各種リバースプロキシの設定例は <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener">OPS.md のリバースプロキシの章</a>を参照してください。</li>
+      </ul>
     </div>
   </div>
 </section>

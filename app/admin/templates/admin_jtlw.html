@@ -279,6 +279,12 @@ async function loadProfiles() {
     o.value = current; o.textContent = current; o.selected = true;
     sel.insertBefore(o, sel.firstChild);
     note.textContent = tr('對方目前沒有提供這個辨識模式，請改選一個');
+  } else if (j.current_deprecated) {
+    // 停用的模式只在「目前存著的就是它」時才列出來（伺服器端判斷），並講出該改用哪一個
+    const cd = j.current_deprecated;
+    note.textContent = cd.replacement_label
+      ? tr('這個辨識模式已停用，建議改用「{0}」').replace('{0}', cd.replacement_label)
+      : tr('這個辨識模式已停用，請改選一個');
   } else {
     note.textContent = '';
   }

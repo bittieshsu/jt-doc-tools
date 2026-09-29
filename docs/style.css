@@ -824,7 +824,7 @@ code {
 .privacy-inner {
   position: relative;
   text-align: center;
-  max-width: 920px;
+  max-width: 1040px;
 }
 .privacy-icon {
   display: inline-flex;
@@ -846,33 +846,77 @@ code {
 .privacy-lead b { color: #fff; }
 .privacy-points {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   text-align: left;
 }
 .privacy-point {
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 12px;
-  padding: 18px 22px;
+  border-radius: 14px;
+  padding: 20px 22px;
+}
+.privacy-point .pp-ic {
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: rgba(129,140,248,0.18);
+  border: 1px solid rgba(129,140,248,0.3);
+  color: #c7d2fe;
+  margin-bottom: 12px;
 }
 .privacy-point strong {
   display: block;
   color: #fff;
-  font-size: 15px;
-  margin-bottom: 4px;
+  font-size: 15.5px;
+  margin-bottom: 6px;
 }
-.privacy-point span {
+.privacy-point p {
+  margin: 0;
   font-size: 13.5px;
   color: #cbd5e1;
-  line-height: 1.65;
+  line-height: 1.7;
 }
-.privacy-point code {
-  background: rgba(255,255,255,0.1);
+.privacy-point code,
+.privacy-callout code {
+  background: rgba(255,255,255,0.12);
   color: #fff;
+}
+.privacy-point a { color: #e0e7ff; text-decoration: underline; }
+/* 部署提醒：跟深色底協調的琥珀色，不要再用整塊粉紅底 —— 原本兩塊紅框
+   在深藍背景上很刺眼，而且字擠成一大段。 */
+.privacy-callout {
+  max-width: 860px;
+  margin: 36px auto 0;
+  padding: 20px 26px 18px;
+  text-align: left;
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(251,191,36,0.32);
+  border-left: 4px solid #f59e0b;
+  border-radius: 12px;
+  color: #e2e8f0;
+}
+.privacy-callout-h {
+  display: flex; align-items: center; gap: 8px;
+  color: #fcd34d;
+  font-size: 16px; font-weight: 700;
+  margin-bottom: 10px;
+}
+.privacy-callout ul { margin: 0; padding-left: 1.25em; }
+.privacy-callout li {
+  font-size: 14.5px;
+  line-height: 1.75;
+  margin: 8px 0;
+}
+.privacy-callout li b { color: #fff; }
+.privacy-callout a { color: #fcd34d; text-decoration: underline; }
+@media (max-width: 980px) {
+  .privacy-points { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
   .privacy-points { grid-template-columns: 1fr; }
+  .privacy-callout { padding: 18px 18px 14px; }
 }
 
 /* ===== Install ===== */

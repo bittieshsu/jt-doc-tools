@@ -876,6 +876,21 @@ def build_router(templates) -> APIRouter:
         if key_in:
             out["api_key_enc"] = key_in if key_in == _j.SECRET_KEPT else str(key_in).strip()
         _j.save(out)
+        # **設定變更要留稽核紀錄**（其他設定頁都有，這一頁原本沒有 ——
+        # 2026-09-29 要查「有沒有人切過辨識模式」時才發現查不到）。
+        # 金鑰與憑證**本身絕不寫進紀錄**，只記有沒有動到。
+        from ..core import audit_db, client_ip as _cip
+        detail = {k: out[k] for k in ("enabled", "base_url", "audio_base_url", "profile_id",
+                                      "verify_tls", "request_timeout") if k in out}
+        if "ca_cert_pem" in out:
+            detail["ca_cert"] = "已更新" if out["ca_cert_pem"] else "已清除"
+        if "api_key_enc" in out:
+            detail["api_key_status"] = "不變" if out["api_key_enc"] == _j.SECRET_KEPT else "已更新"
+        user = getattr(request.state, "user", None)
+        audit_db.log_event("settings_change",
+                           username=(user or {}).get("username", ""),
+                           ip=_cip.real_client_ip(request), target="jtlw",
+                           details=detail)
         return {"ok": True, "configured": _j.is_configured(),
                 "ca_fingerprint": _j.ca_fingerprint()}
 
@@ -924,10 +939,26 @@ def build_router(templates) -> APIRouter:
                             "label": _jtlw_pick(r.get("name"), loc) or str(r["id"]),
                             "description": _jtlw_pick(r.get("description"), loc),
                             "deprecated": bool(r.get("deprecated")),
+                            "replacement_profile_id": r.get("replacement_profile_id") or "",
                             "languages": r.get("languages") or [],
                             # 設定頁要講得出「這個模式不做發言者分離」（台語模式）
                             "capabilities": r.get("capabilities") or []})
-        return {"ok": True, "profiles": out}
+        # **停用的模式不列進下拉**（對方 v2.22：`meeting.detailed` 標為停用，仍收件、照替代模式處理）
+        # —— 例外是**目前存著的就是它**：藏起來的話下拉會無聲換成別的值，管理員一按儲存就改掉了設定。
+        # 那時留著並講出該改用哪一個。判斷放在伺服器端（前端只照著畫），才測得到。
+        from ..core import jtlw_settings as _j
+        saved = str(_j.get().get("profile_id") or "")
+        labels = {p["id"]: p["label"] for p in out}
+        visible = [p for p in out if not p["deprecated"] or p["id"] == saved]
+        cur = next((p for p in out if p["id"] == saved and p["deprecated"]), None)
+        current_deprecated = None
+        if cur:
+            rep_id = cur["replacement_profile_id"]
+            current_deprecated = {"id": saved, "replacement_id": rep_id,
+                                  "replacement_label": labels.get(rep_id, rep_id)}
+        return {"ok": True, "profiles": visible,
+                "hidden_deprecated": len(out) - len(visible),
+                "current_deprecated": current_deprecated}
 
     @router.post("/api/jtlw/test")
     async def api_jtlw_test():

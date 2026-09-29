@@ -71,6 +71,7 @@
 | `test_roles_rbac.py` | 內建角色名實相符、工具 id 存在、升級步驟編號連續 |
 | `test_api_gate_and_csrf_edges.py` | API token 閘不可誤擋管理區；CSRF 豁免不可只看標頭 |
 | `test_api_token_on_tool_paths.py` | 手冊教人帶 token 呼叫的工具路徑（`/download`、`page-image`…）在**啟用認證**時也要驗 token；錯的 token 401、沒帶的照舊導登入、token 不繞過工具權限 |
+| `test_jtlw_settings_audit.py` | 語音服務設定存檔要留 `settings_change` 稽核紀錄；**送進來的金鑰字串絕不出現在紀錄裡**（紀錄會轉送到 SIEM） |
 | `test_auth_modes_matrix.py` | 認證開 / 關兩種模式的行為都要對（很容易只顧一邊） |
 | `test_csv_injection.py` | 匯出的 CSV / xlsx 不可被試算表當公式執行；含「所有 xlsx 寫入都要走 helper」的靜態檢查 |
 | `test_upload_validation_parity.py` | 壞檔要回 400 不是 500；網頁介面與對外 API 判定一致；不可把伺服器回應塞進 innerHTML |
