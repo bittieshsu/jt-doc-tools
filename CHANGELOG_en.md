@@ -5,11 +5,22 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (855 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (856 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.27] - 2026-09-29
+
+### Meeting summary: more formal section and chart titles
+
+* The speaker section now has a formal title, "Speaker statistics" (on screen and in exported files); the
+  on-screen topic chart is titled "Share of time per topic" (or "Share of segments per topic" without timestamps).
+* The titles drawn into the exported charts (which are in Chinese) were changed to the formal terms as well.
+* Fixed: when a transcript had no timestamps, the notice said the speaker share and the topic timeline would not
+  appear. Both still appear; the speaker statistics simply have no speaking time, and topic length is counted in
+  segments. The notice now says so.
 
 ## [1.16.26] - 2026-09-28
 

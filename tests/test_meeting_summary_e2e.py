@@ -709,7 +709,7 @@ def test_uploading_by_hand_does_not_jump_the_page(live):
 
 def test_renaming_in_the_transcript_updates_the_cards_and_the_table(live):
     """**逐字稿改名，其他區塊要跟著換**（v1.16.10，使用者截圖回報：
-    逐字稿改成新名字之後，待辦卡片還寫「負責：舊名字」、「誰講了多少」也還是舊的）。
+    逐字稿改成新名字之後，待辦卡片還寫「負責：舊名字」、「發言統計」也還是舊的）。
 
     判準落在**畫面上**：伺服器改對了但前端沒重畫的話，使用者看到的一樣是舊名字。
     """
@@ -747,4 +747,4 @@ def test_renaming_in_the_transcript_updates_the_cards_and_the_table(live):
     if not _eval(send, "document.getElementById('msSpkWrap').hidden"):
         table = _eval(send, "document.getElementById('msSpkTable').textContent")
         assert "李經理" in table and "李美華" not in table, (
-            f"「誰講了多少」沒有跟著換：{table[:120]!r}")
+            f"「發言統計」沒有跟著換：{table[:120]!r}")

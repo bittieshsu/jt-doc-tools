@@ -433,7 +433,7 @@ def test_the_chart_headings_are_not_doubled():
     import importlib
     mod = importlib.import_module("app.tools.meeting_summary.router")
     md = mod._md(_sample_analysis(), charts=True, embed=False)
-    assert "## 各議題佔多少時間" not in md, (
+    assert "## 各議題時間佔比" not in md, (
         "圖的標題被寫了兩次（一次在 Markdown 的 `##`、一次畫在圖裡）")
 
 
@@ -465,7 +465,7 @@ def test_the_exported_chart_matches_what_the_page_shows():
     charts = mc.build_all(out, segs)
     svg = charts.get("speaker_share")
     assert svg, "有逐段資料時應該畫得出發言者那張圖"
-    assert "誰在什麼時候講話" in svg, (
+    assert "發言者時間軸" in svg, (
         "匯出的發言者圖還是舊的長條圖 —— 畫面上早就換成發言分布了")
     assert "unknown" not in svg, "圖上顯示了 `unknown` 這個代號"
     assert mc.UNLABELLED in svg, "未標示的發言者沒有換成看得懂的字"
@@ -473,7 +473,7 @@ def test_the_exported_chart_matches_what_the_page_shows():
     # 沒有逐段資料（公開 API 那條路）仍然要畫得出東西 —— 退回長條圖
     fallback = mc.build_all(out)
     assert fallback.get("speaker_share"), "沒有逐段資料時應該退回長條圖"
-    assert "各發言者佔多少" in fallback["speaker_share"]
+    assert "發言佔比" in fallback["speaker_share"]
     assert "unknown" not in fallback["speaker_share"]
 
 
@@ -747,7 +747,7 @@ def _rename_fixture(client, ms):
 
 def test_renaming_a_speaker_rewrites_every_section_of_the_result(client, auth_off):
     """**改名要一路改到卡片、摘要、章節、心智圖**（v1.16.10，使用者回報：
-    逐字稿改成「陳協理」之後，待辦還寫「負責：S1」、「誰講了多少」還是 S1）。
+    逐字稿改成「陳協理」之後，待辦還寫「負責：S1」、「發言統計」還是 S1）。
 
     回傳整份更新後的結果給前端重畫 —— 存下來的那份也要一起改，
     不然重新整理 / 下載又變回 S1。

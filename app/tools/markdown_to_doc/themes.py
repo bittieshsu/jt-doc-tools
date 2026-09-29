@@ -109,7 +109,7 @@ def code_bg(theme_id: str) -> str:
 
 #: 表格的表頭底色 / 框線顏色 / 隔行底色。**用 HTML 屬性套**（`bgcolor` / `bordercolor`），
 #: 不走 CSS —— soffice 把 `th { background }` 套在**文字**上而不是整格，匯出的 PDF
-#: 表頭變成「一小塊深色只包住字」（使用者 2026-09-24 截圖回報會議摘要的「誰講了多少」）；
+#: 表頭變成「一小塊深色只包住字」（使用者 2026-09-24 截圖回報會議摘要的「發言統計」表）；
 #: `tbody tr:nth-child(even)` 的隔行底色則完全沒套上。`None` ＝ 不上色。
 TABLE_STYLES: dict[str, dict] = {
     "classic":  {"head_bg": "#eff6ff", "border": "#cbd5e1", "zebra": "#f8fafc"},

@@ -303,7 +303,7 @@ async def rename_speakers(upload_id: str, request: Request):
     atomic_json.write_json(_seg_path(upload_id), segs)
 
     # **分析結果裡每一個會出現發言者的地方都要跟著換**（v1.16.10，使用者回報：
-    # 逐字稿改成「陳協理」，待辦還寫「負責：S1」、「誰講了多少」還是 S1）。
+    # 逐字稿改成「陳協理」，待辦還寫「負責：S1」、「發言統計」還是 S1）。
     # 回傳整份更新後的結果，前端直接拿去重畫 —— 不在前端另外補一份（兩份一定會漂）。
     out_path = _out_path(upload_id)
     out = None
@@ -434,8 +434,8 @@ def _chart_md(out: dict, *, embed: bool,
     """
     import base64
     lines: list[str] = []
-    titles = {"mindmap": "討論結構", "speaker_share": "誰在什麼時候講話",
-              "timeline": "各議題佔多少時間"}
+    titles = {"mindmap": "討論結構", "speaker_share": "發言者時間軸",
+              "timeline": "各議題時間佔比"}
     for name, svg in (mc.build_all(out, segments) or {}).items():
         # **不要再加一個 `##` 標題** —— 伺服器畫的那幾張圖自己就有標題，
         # 外面再包一層會變成同一句話連著出現兩次（2026-09-19 使用者截圖）。
@@ -510,7 +510,7 @@ def _md(out: dict, *, charts: bool = True, embed: bool = True,
             stats.items(),
             key=lambda kv: -((kv[1].get("speaking_ms") or 0) if by_time
                              else (kv[1].get("chars") or 0)))
-        lines += ["## 誰講了多少", "",
+        lines += ["## 發言統計", "",
                   "| 發言者 | 發言次數 | 字數 | 字數佔比 |"
                   + ("  發言時間 |" if use_time else "")]
         lines.append("|---|---:|---:|---:|" + ("---:|" if use_time else ""))
@@ -742,7 +742,7 @@ async def download(upload_id: str, request: Request, fmt: str = "md",
         raise HTTPException(
             400, "fmt 只接受 md / json / png / zip / "
                  + " / ".join(DOC_FORMATS))
-    # **圖要跟畫面上看到的一樣** —— 「誰在什麼時候講話」需要逐段資料，
+    # **圖要跟畫面上看到的一樣** —— 「發言者時間軸」需要逐段資料，
     # 沒讀進來的話會退回舊的長條圖，而畫面上早就不是那張了
     # （2026-09-19 使用者回報「網頁改了 匯出時沒改到」）。
     try:

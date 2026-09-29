@@ -270,7 +270,7 @@
     //      **要逐個分支各自包 `tr()`，不要包整個三元運算。**
     var barY = 4, barH = 26;
     var h = barY + barH + 18 + 22 * chapters.length;
-    var s = svgRoot(width, h, tr('各議題佔多少時間'));
+    var s = svgRoot(width, h, tr('各議題時間佔比'));
     var g = document.createDocumentFragment();
     var x = 0;
     chapters.forEach(function (c, i) {

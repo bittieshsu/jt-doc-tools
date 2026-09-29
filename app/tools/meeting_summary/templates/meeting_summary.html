@@ -366,7 +366,7 @@
         <span id="msDurWrap" hidden><b id="msDur">—</b>{{ tr('總長') }}</span>
       </div>
       <div class="ms-warn" id="msNoTimes" hidden>
-        {{ tr('這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有，但「各發言者佔多少」與「章節時間軸」不會出現（那兩個要靠時間算，猜出來的數字不能用）。') }}
+        {{ tr('這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有；發言統計不會有發言時間，議題的長度改用發言段數算（猜出來的時間不能用）。') }}
       </div>
       <div class="ms-warn" id="msNoSpk" hidden>
         {{ tr('沒有認出任何發言者。如果你的逐字稿是「發言者：內容」這種格式卻沒認出來，多半是名字只出現過一次 —— 分析照常可以做，只是不會有發言者佔比。') }}
@@ -442,7 +442,7 @@
     </section>
 
     <section class="ms-sec" id="msSpkWrap" hidden>
-      <h3>{{ icon('user', size=16) }} {{ tr('誰講了多少') }}</h3>
+      <h3>{{ icon('user', size=16) }} {{ tr('發言統計') }}</h3>
       <p class="muted" id="msSpkNote"></p>
       <div class="ms-tablewrap" id="msSpkTableWrap"><table class="ms-table ms-spk" id="msSpkTable"></table></div>
       <p class="muted ms-note" id="msSpkNote" hidden></p>
@@ -809,7 +809,7 @@
     el('msChap').innerHTML = html;
     // 圖的標題搬到 HTML（才放得了 icon）—— 內容跟圖裡用的是同一個判斷。
     el('msTlTitle').textContent =
-      useTime ? tr('各議題佔多少時間') : tr('各議題佔多少發言段落');
+      useTime ? tr('各議題時間佔比') : tr('各議題發言段數佔比');
     el('msTlNote').textContent =
       useTime ? '' : tr('這份逐字稿沒有時間戳記，長度改用發言段數算');
     el('msTlNote').hidden = useTime;
@@ -1005,7 +1005,7 @@
         mindmap: result.mindmap || [],
         chapters: result.chapters || [],
         speaker_stats: result.speaker_stats || {},
-        // 「誰在什麼時候講話」要逐段的位置，不是只有統計。
+        // 「發言者時間軸」要逐段的位置，不是只有統計。
         segments: segments || [],
       },
       into: { mindmap: el('msMap'), timeline: el('msTimeline') }
@@ -1095,7 +1095,7 @@
       renderScript();
       drawCharts();                      // 發言佔比那張圖跟著換名字
       // **其他區塊也要跟著換**（v1.16.10，使用者回報）：卡片的「負責：S1」、
-      // 內文裡的 S1、摘要、心智圖、「誰講了多少」。改名由伺服器端改那份存下來的
+      // 內文裡的 S1、摘要、心智圖、「發言統計」。改名由伺服器端改那份存下來的
       // 分析結果（`_rename_in_result`），這裡拿回整份重畫 —— 不在前端另外補一份。
       var resp = await msSaveSpeakers(map, ov);
       if (resp && resp.result) {

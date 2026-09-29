@@ -1752,8 +1752,6 @@
   "各檔排行（依字數）": "Ranking by file (by word count)",
   "各自互換。\n上傳之後會依副檔名判斷是哪一類，只顯示轉得過去的目標格式。\n要轉成 PDF 請用": "between one another.\nAfter uploading, the file extension decides the category, and only the target formats it can convert to are shown.\nTo convert to PDF, use",
   "各自只影響特定工具": "each affect one tool only",
-  "各議題佔多少時間": "How long each topic took",
-  "各議題佔多少發言段落": "How many segments each topic took",
   "各階段詳細結果（": "Detailed results by stage (",
   "各類資料的保留天數與自動清理排程": "How many days each kind of data is kept, and the cleanup schedule",
   "合併段落": "Merge paragraphs",
@@ -4204,8 +4202,6 @@
   "說明": "Description",
   "說明：": "Notes: ",
   "誰上傳了什麼檔案到哪個工具": "Who uploaded which file to which tool",
-  "誰在什麼時候講話": "Who spoke when",
-  "誰講了多少": "Who spoke how much",
   "調低一點才不會擋住內文。": "Lower it so it does not hide the text.",
   "調整失敗": "The change failed",
   "請上傳 PDF": "Please upload a PDF",
@@ -4519,7 +4515,6 @@
   "這份逐字稿沒有時間戳記，橫軸改用逐字稿的順序": "This transcript has no timestamps, so the horizontal axis is transcript order",
   "這份逐字稿沒有時間戳記，長度改用發言段數算": "This transcript has no timestamps, so length is measured in segments",
   "這份逐字稿沒有時間戳記，長度改用發言段落算": "This transcript has no timestamps, so length is measured in segments",
-  "這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有，但「各發言者佔多少」與「章節時間軸」不會出現（那兩個要靠時間算，猜出來的數字不能用）。": "This transcript carries no timing information. The summary, decisions and action items still work, but the speaking share and the chapter timeline will not appear — both are computed from timestamps, and a guessed number would be worse than none.",
   "這個作業已經不存在（可能已過保留期）。": "This job no longer exists (its retention period may have passed).",
   "這個分類全部設為隱藏": "Hide everything in this category",
   "這個分類全部設為顯示": "Show everything in this category",
@@ -5406,5 +5401,10 @@
   "下載此頁": "Download this page",
   "下載 {0}（{1}）": "Download {0} ({1})",
   "下載全部 ZIP（{0} 頁 · 約 {1}）": "Download all as ZIP ({0} pages · about {1})",
-  "大小隨頁面而定": "Size follows each page"
+  "大小隨頁面而定": "Size follows each page",
+  "發言統計": "Speaker statistics",
+  "發言者時間軸": "Speaker timeline",
+  "各議題時間佔比": "Share of time per topic",
+  "各議題發言段數佔比": "Share of segments per topic",
+  "這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有；發言統計不會有發言時間，議題的長度改用發言段數算（猜出來的時間不能用）。": "This transcript has no timestamps. The summary, decisions and action items are unaffected, but the speaker statistics have no speaking time, and topic length is measured in segments instead (guessed times would be meaningless)."
 }
