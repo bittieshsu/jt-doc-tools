@@ -64,7 +64,13 @@ def test_every_streaming_loop_checks_the_deadline():
         if (isinstance(it, ast.Call) and isinstance(it.func, ast.Attribute)
                 and it.func.attr == "iter_lines"):
             loops.append(node)
-    assert len(loops) >= 2, f"只找到 {len(loops)} 個串流迴圈，掃描壞了"
+    # v1.16.30 起文字與影像共用 `_chat_stream` 一個迴圈（原本各寫一份）。
+    assert len(loops) >= 1, f"只找到 {len(loops)} 個串流迴圈，掃描壞了"
+    # **文字與影像都要真的走那一個迴圈** —— 哪天有人又自己寫一份串流，
+    # 上面「每個迴圈都要檢查」照樣會涵蓋到它；這裡另外確認兩條路沒有繞過共用的那一支。
+    for fn in ("text_query", "vision_query"):
+        src = inspect.getsource(getattr(llm_client.LLMClient, fn))
+        assert "self._chat_stream(" in src, f"{fn} 沒有走共用的 `_chat_stream`"
     for loop in loops:
         calls = {c.func.id for c in ast.walk(loop)
                  if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}

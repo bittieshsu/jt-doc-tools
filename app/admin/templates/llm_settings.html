@@ -83,6 +83,7 @@
     <label></label>
     <div class="field">
       <div id="conn-status" data-s="s524b7d3e"></div>
+      <div id="think-status" class="muted" hidden></div>
     </div>
   </div>
   <div class="form-row">
@@ -225,6 +226,13 @@
       <input type="number" id="translate_concurrency" min="1" max="16" step="1"
              value="{{ settings.translate_concurrency|default(4) }}" data-s="see0435f7" />
       <span class="muted" data-s="s6b9c179a">{{ tr('逐句翻譯時同時送 LLM 的 worker 數（1-16，預設 4）。本機 Ollama 建議 4-8；高 VRAM 可拉到 12+；雲端 API 設小一點避免被 rate-limit') }}</span>
+      {% if remote_limit_now %}
+      <span class="muted" data-s="s6b9c179a" id="concNote">{{ tr('實際同時送出的請求數，還受「作業佇列 → 外部服務同時呼叫數」限制（目前是 {0}），兩個取小的那個。要真的平行，兩個都要調（例如都設成 LLM 伺服器能同時處理的數量）。').replace('{0}', remote_limit_now|string) }}
+        <a href="/admin/jobs">{{ tr('前往作業佇列') }}</a></span>
+      {% if (settings.translate_concurrency|default(4)) > remote_limit_now %}
+      <span class="conc-warn" id="concWarn">{{ tr('⚠ 目前翻譯實際上一次只會送 {0} 個請求。').replace('{0}', remote_limit_now|string) }}</span>
+      {% endif %}
+      {% endif %}
     </div>
   </div>
   <div class="form-row">
@@ -319,6 +327,8 @@
 .conn-ok   { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; }
 .conn-fail { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
 .conn-pend { background:#dbeafe; color:#1e40af; border:1px solid #93c5fd; }
+#think-status { margin-top:6px; padding:8px 12px; border-radius:6px; font-size:13px; line-height:1.6; }
+.conc-warn { display:block; margin-top:4px; color:#b45309; font-weight:600; }
 /* 統一所有「短輸入」寬度 100px，整面對齊；hint 文字接在右邊。
    Override platform.css `.form-row input[type=number] { flex: 1 }`。
    有 .field-wide class 的不適用（base_url / api_key 要長） */
@@ -439,7 +449,7 @@
 <script nonce="{{ request.state.csp_nonce }}">
 const $ = (id) => document.getElementById(id);
 
-async function testConnection() {
+async function testConnection(probe) {
   const status = $('conn-status');
   const row    = $('conn-status-row');
   row.hidden = false;
@@ -451,6 +461,14 @@ async function testConnection() {
     api_key:         $('api_key').value.trim() || null,
     timeout_seconds: parseFloat($('timeout_seconds').value) || 10,
   };
+  // 按按鈕時才順便檢查模型有沒有在「思考」（開頁面時不做，會讓對方把模型載進 GPU）
+  const think = $('think-status');
+  think.hidden = true; think.textContent = '';
+  if (probe === true && $('model').value) {
+    body.probe_model = $('model').value;
+    think.hidden = false;
+    think.textContent = tr('正在檢查模型「{0}」是否會先思考…').replace('{0}', body.probe_model);
+  }
 
   try {
     const r = await fetch('/admin/api/llm/test-connection', {
@@ -467,9 +485,39 @@ async function testConnection() {
     status.className = 'conn-ok';
     status.innerHTML = tr('✅ 已連線（{0}ms） — 找到 {1} 個模型').replace('{0}', j.latency_ms).replace('{1}', j.models.length);
     fillModelDropdown(j.models);
+    showThinkingCheck(j.thinking_check, body.probe_model);
   } catch (e) {
     status.className = 'conn-fail';
     status.textContent = `❌ ${e.message}`;
+  }
+}
+
+// 思考檢查的結果。**思考沒關掉時翻譯會慢很多倍**，而工具畫面上完全看不出原因
+// （客戶經 LiteLLM 接 Ollama，415 KB 的文件翻了 400 分鐘）。
+function showThinkingCheck(tc, model) {
+  const el = $('think-status');
+  if (!tc) { el.hidden = true; return; }
+  el.hidden = false;
+  el.className = '';
+  if (tc.error) {
+    el.className = 'muted';
+    el.textContent = tr('無法檢查模型是否會先思考：{0}').replace('{0}', tr(tc.error));
+    return;
+  }
+  if (tc.thinking && tc.empty_answer && !tc.reasoning_chars) {
+    // 閘道沒把思考內容轉出來時，只看得到「回答是空的」（思考把字數額度用光了）
+    el.className = 'conn-fail';
+    el.textContent = tr('⚠ 模型「{0}」沒有回答（{1} 秒）—— 多半是回答前先思考、把字數額度用完了，翻譯等工具會慢很多倍。請在 LLM 伺服器那一側關閉思考（做法見 LLM.md「關閉思考」）。')
+      .replace('{0}', model).replace('{1}', tc.seconds);
+    return;
+  }
+  if (tc.thinking) {
+    el.className = 'conn-fail';
+    el.textContent = tr('⚠ 模型「{0}」回答前會先思考（這次 {1} 字、{2} 秒）—— 翻譯等工具會慢很多倍。我們已經送出關閉思考的參數，但 LLM 伺服器沒有照做，請在伺服器那一側關閉（做法見 LLM.md「關閉思考」）。')
+      .replace('{0}', model).replace('{1}', tc.reasoning_chars).replace('{2}', tc.seconds);
+  } else {
+    el.className = 'conn-ok';
+    el.textContent = tr('✓ 模型「{0}」回答前不會先思考（{1} 秒）').replace('{0}', model).replace('{1}', tc.seconds);
   }
 }
 
@@ -615,7 +663,7 @@ async function saveSettings() {
 }
 const _navState = $('enabled').checked + ':' + $('hide_when_disabled').checked;
 
-$('btn-test').addEventListener('click', testConnection);
+$('btn-test').addEventListener('click', () => testConnection(true));
 // 模型描述內的「點此測試連線」inline link 也觸發同一個流程，
 // 並把上方的測試連線按鈕短暫高亮，讓使用者知道狀態在哪呈現。
 $('lnkTestConn').addEventListener('click', (e) => {
@@ -626,7 +674,7 @@ $('lnkTestConn').addEventListener('click', (e) => {
     setTimeout(() => { tb.style.boxShadow = ''; }, 1400);
     tb.scrollIntoView({behavior: 'smooth', block: 'center'});
   }
-  testConnection();
+  testConnection(true);
 });
 $('btn-refresh-models').addEventListener('click', refreshModels);
 $('btn-save').addEventListener('click', saveSettings);

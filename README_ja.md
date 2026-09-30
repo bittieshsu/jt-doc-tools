@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ [English](README_en.md) ｜ **日本語**
 
-# Jason Tools ドキュメントツールボックス v1.16.29
+# Jason Tools ドキュメントツールボックス v1.16.30
 
 > ### ⚠ 2026-09-13 より前に git でインストールした場合、このバージョンにアップグレードする前に 1 行実行してください
 >
@@ -216,7 +216,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ## LLM AI 付加機能（任意。既定は無効）
 
-OpenAI 互換のバックエンド（ローカルの Ollama / vLLM / LM Studio / DGX Spark）に接続すると、**13 のツール**でスマートな選択肢が使えるようになります：
+OpenAI 互換のバックエンド（ローカルの Ollama、LiteLLM などの LLM ゲートウェイ、vLLM、LM Studio、DGX Spark）を接続すると、**13 個のツール**に自動でスマートな機能が加わります：
 
 | ツール | LLM が何をするか | モード |
 |---|---|---|
@@ -281,7 +281,7 @@ OpenAI 互換のバックエンド（ローカルの Ollama / vLLM / LM Studio /
 | **[AUTH.md](AUTH.md)** | 認証 / RBAC / 組み込みアカウント(jtdt-admin / jtdt-auditor)/ 2FA / SSO(OIDC+SAML) / Reverse Proxy SSO(Kerberos) / アカウントのロック / 緊急復旧 |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO（Kerberos / SPNEGO）の完全な導入手順：AD サービスアカウント、setspn、ktpass / keytab、Nginx の設定、ブラウザーの自動ログイン、ヘッダー偽造への対策 |
 | **[API.md](API.md)**（[オンライン版](https://jasoncheng7115.github.io/jt-doc-tools/api.html)）| REST API:Bearer token、エンドポイント一覧、アップロード形式、レスポンス形式、エラーコード、curl / Python の例、Job の流れ |
-| **[LLM.md](LLM.md)** | LLM による付加機能（既定はオフ）：13 のツールでの LLM の使い方、効果の例、導入方法（Ollama / vLLM / DGX Spark） |
+| **[LLM.md](LLM.md)** | LLM による AI 機能（既定でオフ）：13 個のツールでの LLM の使い方、効果の例、対応する LLM サーバーとゲートウェイ（Ollama / LiteLLM / vLLM…）、思考のオフと並列設定 |
 | **[SECURITY.md](SECURITY.md)** | セキュリティポリシー、OWASP Top 10 (2025) との対応、脆弱性の報告窓口、GitHub native scan の統合 |
 | **[CHANGELOG.md](CHANGELOG.md)** | 完全な変更履歴 |
 | **[TEST_PLAN.md](TEST_PLAN.md)** | テスト一覧、リリース前のチェック |

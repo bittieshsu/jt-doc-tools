@@ -849,8 +849,7 @@
     <div class="section-eyebrow">AI 付加機能（任意）</div>
     <h2 class="section-title">13 のツールが LLM AI に対応。速度と品質がさらに向上</h2>
     <p class="section-lede">
-      自前の LLM（ローカルの Ollama / vLLM / LM Studio / DGX Spark いずれも可）を指定すると、
-      これら 13 のツールでスマートな選択肢が使えます。<b>中核のツールは LLM に一切依存しません</b>。設定しなくても 100% 使えます。
+      自前の LLM（ローカルの Ollama、LiteLLM などの LLM ゲートウェイ、vLLM、LM Studio、DGX Spark など）を接続すると、この 13 個のツールでスマートな機能が使えます。<b>コアツールは LLM にまったく依存しません</b>。設定しなくても 100% 使えます。
     </p>
 
     <div class="llm-grid">
@@ -991,7 +990,7 @@
       <ul class="llm-deploy-list">
         <li><b>ローカルの Ollama</b> · 個人 / 小規模チームのお試し。コンシューマー向け GPU で gemma3:4b が動きます</li>
         <li><b>DGX Spark / ワークステーション</b> · 社内の単一 LLM サーバー。gemma4:26b を実行します（既定。ビジョンもテキストも可）</li>
-        <li><b>vLLM / LM Studio / jan.ai</b> · OpenAI 互換のバックエンドであれば何でも</li>
+        <li><b>LiteLLM などの LLM ゲートウェイ / vLLM / SGLang / llama.cpp / LM Studio / jan.ai</b> · OpenAI 互換のバックエンドならどれでも。モデルの「思考」は自動でオフにします</li>
       </ul>
       <p class="llm-deploy-note">
         既定は無効です。<code>/admin/llm-settings</code> で有効にすると SSRF 対策が働きます（URL の allowlist + クラウドの metadata ホストの blocklist）。社内 LAN の IP は許可されますが、クラウドの metadata IP は拒否されます。詳しくは次をご覧ください

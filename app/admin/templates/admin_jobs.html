@@ -94,6 +94,7 @@
         {% if conc.remote_services %}{{ tr('目前啟用：') }}{% for r in conc.remote_services %}{{ tr(r) }}{% if not loop.last %}、{% endif %}{% endfor %}{{ tr('。') }}{% endif %}
         {{ tr('真正的瓶頸在') }}<b>{{ tr('對方那台機器') }}</b>{{ tr('（一張 GPU 只載一個模型），本機的記憶體判斷擋不到。') }}
         <b>{{ tr('預設 1') }}</b> {{ tr('—— 一個一個過去、每個都在合理時間內完成，比全部一起去搶顯示記憶體到集體逾時好。') }}
+        {{ tr('LLM 設定頁的「翻譯並行數」也受這個數字限制 —— 兩個取小的那個；LLM 伺服器能同時處理幾個（例如 Ollama 的 OLLAMA_NUM_PARALLEL），這裡就可以設幾個。') }}
       </div>
     </div>
 

@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.16.29
+# Jason Tools Document Toolbox v1.16.30
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -216,7 +216,7 @@ Connecting is only the start: what actually goes wrong is the primary DC restart
 
 ## LLM AI extras (optional, off by default)
 
-Point it at an OpenAI-compatible backend (local Ollama / vLLM / LM Studio / DGX Spark) and **13 tools** gain smarter options:
+Connect an OpenAI-compatible backend (local Ollama, an LLM gateway such as LiteLLM, vLLM, LM Studio or a DGX Spark) and **13 tools** gain smart options automatically:
 
 | Tool | What the LLM does | Mode |
 |---|---|---|
@@ -281,7 +281,7 @@ Leave it unset and nothing changes: **the other 49 tools are entirely unaffected
 | **[AUTH.md](AUTH.md)** | Authentication / RBAC / built-in accounts (jtdt-admin / jtdt-auditor) / 2FA / SSO (OIDC+SAML) / Reverse Proxy SSO (Kerberos) / account lockout / emergency recovery |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO (Kerberos / SPNEGO) end-to-end deployment: AD service account, setspn, ktpass / keytab, nginx configuration, automatic browser sign-in, header spoofing protection |
 | **[API.md](API.md)** ([web version](https://jasoncheng7115.github.io/jt-doc-tools/api-en.html)) | REST API: bearer tokens, the endpoint list, upload and response formats, error codes, curl / Python examples, the job flow |
-| **[LLM.md](LLM.md)** | LLM add-on features (off by default): how the 13 tools use an LLM, worked examples, deployment options (Ollama / vLLM / DGX Spark) |
+| **[LLM.md](LLM.md)** | Optional LLM features (off by default): how 13 tools use an LLM, examples, supported LLM servers and gateways (Ollama / LiteLLM / vLLM…), turning thinking off and concurrency |
 | **[SECURITY.md](SECURITY.md)** | Security policy, OWASP Top 10 (2025) mapping, vulnerability reporting, GitHub native scan integration |
 | **[CHANGELOG.md](CHANGELOG.md)** | Full change log |
 | **[TEST_PLAN.md](TEST_PLAN.md)** | Test checklist and pre-release checks |

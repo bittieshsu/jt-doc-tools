@@ -849,8 +849,7 @@
     <div class="section-eyebrow">AI extras (optional)</div>
     <h2 class="section-title">13 tools support LLM AI, for better speed and quality</h2>
     <p class="section-lede">
-      Point it at your own LLM (local Ollama / vLLM / LM Studio / DGX Spark all work),
-      and these 13 tools gain smart options. <b>The core tools do not depend on an LLM at all</b>; without any of this they still work 100%.
+      Connect your own LLM (local Ollama, an LLM gateway such as LiteLLM, vLLM, LM Studio or a DGX Spark) to turn on smart options in these 13 tools. <b>The core tools do not depend on an LLM at all</b> and work 100% without one.
     </p>
 
     <div class="llm-grid">
@@ -991,7 +990,7 @@
       <ul class="llm-deploy-list">
         <li><b>Local Ollama</b> · for individuals and small teams; a consumer GPU can run gemma3:4b</li>
         <li><b>DGX Spark / workstation</b> · one LLM server inside the company, running gemma4:26b (the default; both vision and text)</li>
-        <li><b>vLLM / LM Studio / jan.ai</b> · any OpenAI-compatible backend</li>
+        <li><b>LLM gateways such as LiteLLM / vLLM / SGLang / llama.cpp / LM Studio / jan.ai</b> · any OpenAI-compatible backend; the model's "thinking" is turned off automatically</li>
       </ul>
       <p class="llm-deploy-note">
         Off by default. Once enabled at <code>/admin/llm-settings</code>, SSRF protection is built in (a URL allowlist plus a blocklist of cloud metadata hosts): private LAN addresses are allowed, cloud metadata addresses are refused. See

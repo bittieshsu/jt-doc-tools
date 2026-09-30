@@ -886,8 +886,7 @@
     <div class="section-eyebrow">AI 加值（選用）</div>
     <h2 class="section-title">13 個工具支援 LLM AI，效率與品質再升一級</h2>
     <p class="section-lede">
-      接你自己的 LLM（本機 Ollama / vLLM / LM Studio / DGX Spark 都可），
-      即可在這 13 個工具開啟智慧選項。<b>核心工具完全不依賴 LLM</b>，沒設定也照樣 100% 可用。
+      接你自己的 LLM（本機 Ollama、LiteLLM 等 LLM 閘道、vLLM、LM Studio、DGX Spark 都可），即可在這 13 個工具開啟智慧選項。<b>核心工具完全不依賴 LLM</b>，沒設定也照樣 100% 可用。
     </p>
 
     <div class="llm-grid">
@@ -1028,7 +1027,7 @@
       <ul class="llm-deploy-list">
         <li><b>本機 Ollama</b> · 個人 / 小團隊試用，消費級 GPU 可跑 gemma3:4b</li>
         <li><b>DGX Spark / 工作站</b> · 公司內部單一 LLM 伺服器，跑 gemma4:26b（預設；視覺 + 文字皆可）</li>
-        <li><b>vLLM / LM Studio / jan.ai</b> · 任何 OpenAI-compatible 後端</li>
+        <li><b>LiteLLM 等 LLM 閘道 / vLLM / SGLang / llama.cpp / LM Studio / jan.ai</b> · 任何 OpenAI-compatible 後端，模型的「思考」會自動關閉</li>
       </ul>
       <p class="llm-deploy-note">
         預設關閉。<code>/admin/llm-settings</code> 啟用後內建 SSRF 防護（URL allowlist + 雲端 metadata host blocklist），內網 LAN IP 允許但雲端 metadata IP 會被拒。詳見

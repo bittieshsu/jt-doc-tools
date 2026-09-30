@@ -5,11 +5,37 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (858 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (859 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.30] - 2026-09-30
+
+### LLM: a model's "thinking" is turned off through gateways such as LiteLLM too (translation back from 400 minutes to normal)
+
+* With an LLM gateway such as LiteLLM in front of Ollama, models that think before answering (gemma4 and others)
+  **were not having their thinking turned off**, so every request first produced thousands of characters of
+  reasoning; translating a 415 KB document took 400 minutes. Since v1.16.17 the thinking-off parameters were only
+  sent when Ollama could be detected directly, and it cannot be detected through a gateway.
+* Now, whatever server or gateway is in front (Ollama, LiteLLM, vLLM, SGLang, llama.cpp server, LM Studio or an
+  OpenAI-compatible cloud service), **the thinking-off parameters are sent every time**. If the server rejects one,
+  it is removed and the request resent, and that server is remembered so it is not retried. All 13 LLM tools go
+  through the same code, so they are all covered.
+* "Test connection" on the LLM settings page now also checks whether the selected model **thinks before
+  answering**, and if so says so and where to turn it off. If a tool finds the model still thinking, a warning is
+  written to the service log.
+* Tested against a real LiteLLM 1.103 in front of gemma4: both the `ollama/` and `ollama_chat/` prefixes turn
+  thinking off (a translation request went from 53.8 / 28.7 s to 2.4 s), so **nothing extra needs configuring in
+  LiteLLM**. LLM.md now covers each kind of server and gateway.
+
+### LLM: the translation concurrency setting says how many requests are really sent at once
+
+* The number of requests actually sent at once is also limited by "Job queue → Concurrent external service calls"
+  (default 1), and the smaller of the two applies, so without changing it translation sends one request at a time.
+  The settings page now shows the current value and warns when translation concurrency is higher; the job queue page
+  has the same note.
 
 ## [1.16.29] - 2026-09-29
 

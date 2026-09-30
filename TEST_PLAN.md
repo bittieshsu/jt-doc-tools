@@ -583,7 +583,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **357 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **358 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -751,6 +751,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_llm_non_ollama_backends.py` | 接「不是 Ollama」的 LLM 服務（v1.16.17） |
 | `test_llm_per_field_consensus.py` | LLM 逐欄校驗：連兩輪都指出同一個問題才採納 |
 | `test_llm_stream_deadline.py` | 串流回應要有**整次生成的上限**，不是只有每個 chunk |
+| `test_llm_thinking_off_any_backend.py` | 不管前面是哪一種 LLM 伺服器或閘道，思考都要關得掉（v1.16.30） |
 | `test_llm_url_ssrf.py` | SSRF defence — admin-supplied LLM base URL must reject suspicious schemes |
 | `test_looks_garbled.py` | Regression tests for pdf_editor._looks_garbled(). |
 | `test_markdown_to_doc_formats.py` | Markdown 轉辦公文件：只轉使用者要的格式 ＋ 程式碼語法上色 |
@@ -1493,6 +1494,12 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] pdf-editor 的字型 picker 能看到所有來源
 
 #### LLM 設定 🆕
+- [ ] **不管前面是哪一種 LLM 伺服器或閘道，思考都要關得掉**（v1.16.30，客戶經 LiteLLM 接 Ollama 翻一份文件 400 分鐘）：
+      按「測試連線」→ 下方顯示「✓ 模型『…』回答前不會先思考」；接一台沒關掉思考的伺服器時要顯示「⚠ 會先思考」並講出去哪裡關。
+      **開頁面時不做這項檢查**（會讓對方把模型載進 GPU），只有按按鈕才做
+- [ ] 經 LiteLLM（模型用 `ollama_chat/`）接 gemma4 翻一份文件：服務記錄沒有「還是先思考了」的警告、速度正常；
+      LiteLLM 不收的參數被拿掉重送一次之後，同一個模型的後續請求不再被拒（記錄裡「拿掉重送」只出現一次）
+- [ ] 「翻譯並行數」旁邊寫出實際受「外部服務同時呼叫數」限制與目前的值；翻譯並行數大於它時顯示「⚠ 目前翻譯實際上一次只會送 N 個請求」
 - [ ] 預設 enabled=False
 - [ ] 填 endpoint / model 後測試連線
 - [ ] 關閉時核心工具仍能正常運作

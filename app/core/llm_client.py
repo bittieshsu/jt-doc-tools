@@ -156,8 +156,13 @@ def _check_deadline(t0: float, limit: float) -> None:
 _SSE_DONE = object()
 
 
-def _sse_delta(line: str):
+def _sse_delta(line: str, stats: Optional[dict] = None):
     """SSE 的一行 → 這一段新增的文字；`[DONE]` 回 `_SSE_DONE`；不是資料行回空字串。
+
+    * 給了 `stats` 的話，順便數**思考內容**有幾個字：`reasoning_content`（vLLM、LiteLLM、
+      DeepSeek）、`reasoning`（Ollama 的 OpenAI 相容端點），以及寫在正文裡的 `<think>`。
+      思考沒被關掉時回應會慢很多倍，而**畫面上完全看不出來**（客戶 2026-09-30 經 LiteLLM
+      翻一份 415 KB 的文件要 400 分鐘，自己查了半天）。
 
     * **`data:` 後面的空白可有可無**（SSE 規格：冒號後若是一個空白就去掉）。原本只認
       `data: `，送 `data:{…}` 的服務每一行都會被略過 —— 回來的是空字串，看起來像
@@ -186,9 +191,18 @@ def _sse_delta(line: str):
             "LLM 服務在串流中途回報錯誤：%s", str(detail)[:500])
         raise LLMError("LLM 服務在回覆途中回報錯誤（原因記在服務記錄）")
     try:
-        return chunk["choices"][0].get("delta", {}).get("content") or ""
+        delta = chunk["choices"][0].get("delta", {}) or {}
     except (KeyError, IndexError, TypeError, AttributeError):
         return ""
+    content = delta.get("content") or ""
+    if stats is not None and isinstance(delta, dict):
+        for key in ("reasoning_content", "reasoning"):
+            r = delta.get(key)
+            if isinstance(r, str) and r:
+                stats["reasoning_chars"] = stats.get("reasoning_chars", 0) + len(r)
+        if isinstance(content, str) and "<think>" in content:
+            stats["think_tag"] = True
+    return content if isinstance(content, str) else ""
 
 
 def _log_http_error(r: httpx.Response) -> None:
@@ -207,6 +221,38 @@ def _log_http_error(r: httpx.Response) -> None:
     import logging as _lg
     _lg.getLogger("app.llm.client").warning(
         "LLM 服務回 HTTP %d：%s", r.status_code, body)
+
+
+def _body_text(r: httpx.Response) -> str:
+    """讀錯誤回應的內容（串流請求要先 `read()`）；讀不到回空字串。"""
+    try:
+        r.read()
+        return r.text[:2000]
+    except Exception:          # noqa: BLE001
+        return ""
+
+
+#: **關閉思考用的參數**。不同的 LLM 伺服器 / 閘道各認得其中一種，所以兩個都送：
+#:
+#: * `reasoning_effort: "none"` —— OpenAI 的標準參數。OpenAI、Azure OpenAI、LiteLLM
+#:   （`ollama_chat/` 會轉成 Ollama 的 `think:false`）、OpenRouter、Ollama 0.33+ 都認得。
+#: * `chat_template_kwargs: {"enable_thinking": false}` —— vLLM、SGLang、llama.cpp server、
+#:   LM Studio 這類直接套對話範本的伺服器，Qwen3 等混合思考模型靠它關掉思考。
+#:
+#: Ollama 另外送它自己的 `think: false`。**對方不收（HTTP 400 / 422）就拿掉重送**；
+#: 確定拿掉之後成功了，才記住「這個位址 ＋ 這個模型不收這個參數」（`_REJECT_TTL`）。
+#: 原本（v1.16.17）是「只對 Ollama 送」—— 經過 LiteLLM 等閘道時偵測不到 Ollama，
+#: 於是完全沒送，思考整個開著（客戶 2026-09-30：415 KB 的文件翻譯 400 分鐘）。
+_THINK_OFF_OLLAMA = (("think", False), ("reasoning_effort", "none"))
+_THINK_OFF_GENERIC = (("reasoning_effort", "none"),
+                      ("chat_template_kwargs", {"enable_thinking": False}))
+_REJECTED_PARAMS: dict[tuple[str, str], tuple[float, frozenset]] = {}
+_REJECT_TTL = 3600.0
+
+#: 最近一次看到模型在思考：(base_url, model) → (時間, 思考的字數)。管理頁的測試連線讀這個。
+_THINKING_SEEN: dict[tuple[str, str], tuple[float, int]] = {}
+_THINKING_WARN_EVERY = 600.0
+_THINKING_WARNED: dict[tuple[str, str], float] = {}
 
 
 #: 「對方是不是 Ollama」的判斷結果，依 base_url 快取。
@@ -269,6 +315,145 @@ class LLMClient:
         _BACKEND_CACHE[self.base_url] = (now, yes)
         return yes
 
+    # ----- 關閉思考：對方不收就拿掉重送 -----------------------------------
+
+    def _think_off(self, model: str, ollama: bool) -> dict:
+        """這一次要送的關閉思考參數（扣掉這個位址 ＋ 模型已知不收的）。"""
+        import copy
+        hit = _REJECTED_PARAMS.get((self.base_url, model))
+        rejected = hit[1] if hit and time.monotonic() - hit[0] < _REJECT_TTL else frozenset()
+        base = _THINK_OFF_OLLAMA if ollama else _THINK_OFF_GENERIC
+        return {k: copy.deepcopy(v) for k, v in base if k not in rejected}
+
+    def _remember_rejected(self, model: str, keys) -> None:
+        key = (self.base_url, model)
+        hit = _REJECTED_PARAMS.get(key)
+        old = hit[1] if hit else frozenset()
+        _REJECTED_PARAMS[key] = (time.monotonic(), frozenset(old | set(keys)))
+
+    @staticmethod
+    def _drop_rejected(r: httpx.Response, payload: dict, optional: list) -> list:
+        """對方回 400 / 422 時：它點名的參數拿掉；沒點名就把關閉思考的全部拿掉。回拿掉了哪些。"""
+        body = _body_text(r)
+        named = [k for k in optional if k in body]
+        drop = named or list(optional)
+        import logging as _lg
+        _lg.getLogger("app.llm.client").info(
+            "LLM 服務不收 %s（HTTP %d），拿掉重送", ", ".join(drop), r.status_code)
+        for k in drop:
+            payload.pop(k, None)
+        return drop
+
+    def _note_thinking(self, model: str, stats: dict) -> None:
+        """模型還是在思考的話記下來，並寫一行警告（同一個模型 10 分鐘一次）。"""
+        chars = int(stats.get("reasoning_chars") or 0)
+        if not chars and not stats.get("think_tag"):
+            return
+        key = (self.base_url, model)
+        now = time.monotonic()
+        _THINKING_SEEN[key] = (now, chars)
+        if now - _THINKING_WARNED.get(key, -1e9) >= _THINKING_WARN_EVERY:
+            _THINKING_WARNED[key] = now
+            import logging as _lg
+            _lg.getLogger("app.llm.client").warning(
+                "模型 %s 回答前還是先「思考」了（這次 %d 字%s）—— 翻譯等工具會慢很多倍。"
+                "我們已經送了關閉思考的參數（reasoning_effort / chat_template_kwargs），但 LLM 伺服器"
+                "或閘道沒有照做；請在伺服器那一側關閉（見 LLM.md「關閉思考」）",
+                model, chars, "，正文裡有 <think>" if stats.get("think_tag") else "")
+
+    def _chat_stream(self, payload: dict, optional: list, *, model: str) -> str:
+        """POST `/chat/completions`（串流），回完整的正文。
+
+        `optional`：payload 裡**可以拿掉**的鍵（關閉思考用的）。對方回 400 / 422 就拿掉重送；
+        拿掉之後成功了，才記住這個位址 ＋ 模型不收（別的原因造成的 400 不會被誤記）。
+        外部服務的同時呼叫上限（`remote_limit`）包住整段，重送不會多佔名額。
+        """
+        from . import remote_limit
+        stats: dict = {"reasoning_chars": 0, "think_tag": False}
+        optional = [k for k in optional if k in payload]
+        dropped: list = []
+        parts: list[str] = []
+        with remote_limit.slot():
+            while True:
+                with httpx.stream("POST", f"{self.base_url}/chat/completions",
+                                  headers=self._headers(), json=payload,
+                                  timeout=self.timeout) as r:
+                    if r.status_code in (400, 422) and optional:
+                        drop = self._drop_rejected(r, payload, optional)
+                        optional = [k for k in optional if k not in drop]
+                        dropped += drop
+                        continue
+                    _log_http_error(r)
+                    r.raise_for_status()
+                    if dropped:
+                        self._remember_rejected(model, dropped)
+                    t0 = time.monotonic()
+                    for line in r.iter_lines():
+                        # **整次生成也要有上限**，不是只有每個 chunk（見 `StreamDeadline`）。
+                        # 少了這一行，模型停不下來時整份文件的翻譯會永遠卡住而且沒有錯誤訊息。
+                        _check_deadline(t0, self.timeout)
+                        delta = _sse_delta(line, stats)
+                        if delta is _SSE_DONE:
+                            break
+                        if delta:
+                            parts.append(delta)
+                    break
+        self.last_stats = stats
+        self._note_thinking(model, stats)
+        return "".join(parts)
+
+    def _chat_post(self, payload: dict, optional: list, *, model: str,
+                   timeout: float) -> dict:
+        """POST `/chat/completions`（不串流），回 JSON。拿掉重送的規則同 `_chat_stream`。"""
+        optional = [k for k in optional if k in payload]
+        dropped: list = []
+        while True:
+            r = httpx.post(f"{self.base_url}/chat/completions", json=payload,
+                           headers=self._headers(), timeout=timeout)
+            if r.status_code in (400, 422) and optional:
+                drop = self._drop_rejected(r, payload, optional)
+                optional = [k for k in optional if k not in drop]
+                dropped += drop
+                continue
+            _log_http_error(r)
+            r.raise_for_status()
+            if dropped:
+                self._remember_rejected(model, dropped)
+            data = r.json() or {}
+            msg = ((data.get("choices") or [{}])[0] or {}).get("message") or {}
+            reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
+            content = msg.get("content") or ""
+            self._note_thinking(model, {
+                "reasoning_chars": len(reasoning) if isinstance(reasoning, str) else 0,
+                "think_tag": isinstance(content, str) and "<think>" in content})
+            return data
+
+    def thinking_probe(self, model: str) -> dict:
+        """問模型一個極短的問題，看它**有沒有先思考**（管理頁的測試連線用）。
+
+        `max_tokens` 給小一點：思考沒關的話，思考的內容也算在裡面，很快就會停，
+        不會為了一次檢查讓模型想上好幾分鐘。
+
+        **回答是空的也算在思考**：有些閘道**不把思考內容轉出來**（實測 LiteLLM 的 `ollama/`
+        開頭：思考開著時花了 54 秒，回來的思考字數卻是 0）。這時短問題的額度被思考用光，
+        回來的正文是空的 —— 只看思考欄位的話會誤報成「不會先思考」。
+        """
+        t0 = time.monotonic()
+        answer = self.text_query("Reply with exactly one word: OK", model, max_tokens=64)
+        stats = getattr(self, "last_stats", {}) or {}
+        hit = _REJECTED_PARAMS.get((self.base_url, model))
+        empty = not (answer or "").strip()
+        return {
+            "thinking": bool(stats.get("reasoning_chars") or stats.get("think_tag") or empty),
+            "reasoning_chars": int(stats.get("reasoning_chars") or 0),
+            "think_tag": bool(stats.get("think_tag")),
+            "empty_answer": empty,
+            "seconds": round(time.monotonic() - t0, 1),
+            "answer": (answer or "")[:40],
+            "rejected_params": sorted(hit[1]) if hit else [],
+            "ollama": self.is_ollama(),
+        }
+
     def short_vision_answer(self, png: bytes, prompt: str, model: str, *,
                             timeout: float, max_tokens: int = 256) -> str:
         """一張小圖 ＋ 一個短問題（是非題 / 讀出框裡的字），不串流，回純文字。
@@ -302,11 +487,10 @@ class LLMClient:
                 {"type": "text", "text": prompt},
             ]}],
         }
-        r = httpx.post(f"{self.base_url}/chat/completions", json=payload,
-                       headers=self._headers(), timeout=timeout)
-        _log_http_error(r)
-        r.raise_for_status()
-        choices = (r.json() or {}).get("choices") or [{}]
+        extras = self._think_off(model, ollama=False)
+        payload.update(extras)
+        data = self._chat_post(payload, list(extras), model=model, timeout=timeout)
+        choices = data.get("choices") or [{}]
         return (((choices[0] or {}).get("message") or {}).get("content") or "").strip()
 
     # ----- /v1/models ----------------------------------------------------
@@ -412,44 +596,17 @@ class LLMClient:
             "stream": True,
             "messages": messages,
         }
-        if not think and self.is_ollama():
-            # **只送給 Ollama**（v1.16.17）。這兩個欄位是 Ollama 關掉思考用的；
-            # 檢查嚴格的 OpenAI 相容服務會對不認得的參數回 400（見 `is_ollama`）。
-            # `options` / `chat_template_kwargs` 連 Ollama 都會印 WARN，文字這條路不送。
-            payload["think"] = False
-            # Ollama 0.33 起 gemma4 只認這個（`think:false` 已經關不掉）
-            payload["reasoning_effort"] = "none"
+        optional: list = []
+        if not think:
+            # **關閉思考的參數一律送**，不再只給偵測得到的 Ollama（v1.16.30）：
+            # 經過 LiteLLM 等閘道時偵測不到 Ollama，思考就整個開著。
+            # 對方不收的，`_chat_stream` 會拿掉重送並記住（見 `_THINK_OFF_GENERIC`）。
+            extras = self._think_off(model, self.is_ollama())
+            payload.update(extras)
+            optional = list(extras)
         if max_tokens:
             payload["max_tokens"] = max_tokens
-        parts: list[str] = []
-        # 外部 LLM 的同時呼叫上限（預設 1）—— 見 remote_limit 的說明：真正的
-        # 瓶頸在對方那台機器，本機的記憶體准入檢查擋不到。
-        from . import remote_limit
-        try:
-            with remote_limit.slot(), httpx.stream(
-                "POST",
-                f"{self.base_url}/chat/completions",
-                headers=self._headers(),
-                json=payload,
-                timeout=self.timeout,
-            ) as r:
-                _log_http_error(r)
-                r.raise_for_status()
-                import time as _time
-                _t0 = _time.monotonic()
-                for line in r.iter_lines():
-                    # **整次生成也要有上限**，不是只有每個 chunk（見
-                    # `StreamDeadline`）。少了這一行，模型停不下來時整份
-                    # 文件的翻譯會永遠卡住而且沒有錯誤訊息。
-                    _check_deadline(_t0, self.timeout)
-                    delta = _sse_delta(line)
-                    if delta is _SSE_DONE:
-                        break
-                    if delta:
-                        parts.append(delta)
-        except httpx.HTTPStatusError:
-            raise
-        return "".join(parts).strip()
+        return self._chat_stream(payload, optional, model=model).strip()
 
     def vision_query(
         self,
@@ -535,47 +692,22 @@ class LLMClient:
             payload["frequency_penalty"] = max(-2.0, min(2.0, (repeat_penalty - 1.0) * 2.0))
             if ollama:                    # `options` 是 Ollama 專屬（見 `is_ollama`）
                 payload.setdefault("options", {})["repeat_penalty"] = float(repeat_penalty)
-        # Ollama-specific knobs to disable thinking — 只對 thinking model、而且只對 Ollama 套用
-        if suppress_thinking and ollama:
-            payload["think"] = False
-            payload.setdefault("options", {})["think"] = False
-            if profile.use_chat_template_kwargs:
-                payload["chat_template_kwargs"] = {"enable_thinking": False}
-            # **Ollama 0.33 起 `think:false` 對 gemma4 已經沒有用**（實測：同一句
-            # 翻譯還是產生 794~23,650 字的思考內容，10 段的批次從 18 秒變成 151 秒）。
-            # 關得掉的是 OpenAI 相容端點的 `reasoning_effort: "none"`
-            # —— 實測 reasoning 0 字、0.3 秒。`low` 沒有用（仍然 1,161 字）。
-            # （原本這裡寫「真正的 OpenAI 不認得 "none"，400 時會自動拿掉重送」——
-            # **那個重送從來不存在**。v1.16.17 起改成只送給 Ollama。）
-            payload["reasoning_effort"] = "none"
-        parts: list[str] = []
-        # 外部 LLM 的同時呼叫上限（預設 1）—— 見 remote_limit 的說明：真正的
-        # 瓶頸在對方那台機器，本機的記憶體准入檢查擋不到。
-        from . import remote_limit
-        try:
-            with remote_limit.slot(), httpx.stream(
-                "POST",
-                f"{self.base_url}/chat/completions",
-                headers=self._headers(),
-                json=payload,
-                timeout=self.timeout,
-            ) as r:
-                _log_http_error(r)
-                r.raise_for_status()
-                import time as _time
-                _t0 = _time.monotonic()
-                for line in r.iter_lines():
-                    # **整次生成也要有上限**，不是只有每個 chunk（見
-                    # `StreamDeadline`）。少了這一行，模型停不下來時整份
-                    # 文件的翻譯會永遠卡住而且沒有錯誤訊息。
-                    _check_deadline(_t0, self.timeout)
-                    delta = _sse_delta(line)
-                    if delta is _SSE_DONE:
-                        break
-                    if delta:
-                        parts.append(delta)
-        except httpx.HTTPStatusError:
-            raise
+        # **關閉思考的參數一律送**（v1.16.30），不再看模型名稱 —— 名稱判斷漏掉的模型
+        # （或經過閘道改了名字的）思考就整個開著。對方不收的，`_chat_stream` 拿掉重送。
+        # * **Ollama 0.33 起 `think:false` 對 gemma4 已經沒有用**（實測：同一句翻譯
+        #   還是產生 794~23,650 字的思考內容）；關得掉的是 `reasoning_effort: "none"`
+        #   —— 實測 reasoning 0 字、0.3 秒。`low` 沒有用（仍然 1,161 字）。
+        # * `options.think` 是 Ollama 專屬、`options` 也裝著 repeat_penalty，所以不列入可拿掉的。
+        optional: list = []
+        if not think:
+            extras = self._think_off(model, ollama)
+            if ollama and suppress_thinking:
+                payload.setdefault("options", {})["think"] = False
+                if profile.use_chat_template_kwargs:
+                    extras.setdefault("chat_template_kwargs", {"enable_thinking": False})
+            payload.update(extras)
+            optional = list(extras)
+        parts = [self._chat_stream(payload, optional, model=model)]
         full_content = "".join(parts)
         # Diagnostic log: how many SSE chunks did we get? Helps catch
         # cases where Ollama opens the stream but never sends any deltas
@@ -583,8 +715,9 @@ class LLMClient:
         import logging as _lg
         _llog = _lg.getLogger("app.llm.client")
         _llog.info(
-            "vision_query: model=%s stream chunks=%d chars=%d",
-            model, len(parts), len(full_content),
+            "vision_query: model=%s chars=%d reasoning_chars=%d",
+            model, len(full_content),
+            int((getattr(self, "last_stats", {}) or {}).get("reasoning_chars") or 0),
         )
 
         # === Fallback A：streaming 0 chunks → 改用 non-streaming OpenAI-compat 重試 ===

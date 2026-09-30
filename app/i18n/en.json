@@ -5408,5 +5408,15 @@
   "各議題發言段數佔比": "Share of segments per topic",
   "這份逐字稿沒有時間資訊 —— 摘要、決議、待辦照常會有；發言統計不會有發言時間，議題的長度改用發言段數算（猜出來的時間不能用）。": "This transcript has no timestamps. The summary, decisions and action items are unaffected, but the speaker statistics have no speaking time, and topic length is measured in segments instead (guessed times would be meaningless).",
   "這個辨識模式已停用，建議改用「{0}」": "This recognition mode is deprecated; switch to \"{0}\"",
-  "這個辨識模式已停用，請改選一個": "This recognition mode is deprecated; please choose another"
+  "這個辨識模式已停用，請改選一個": "This recognition mode is deprecated; please choose another",
+  "正在檢查模型「{0}」是否會先思考…": "Checking whether model \"{0}\" thinks before answering…",
+  "無法檢查模型是否會先思考：{0}": "Could not check whether the model thinks first: {0}",
+  "⚠ 模型「{0}」回答前會先思考（這次 {1} 字、{2} 秒）—— 翻譯等工具會慢很多倍。我們已經送出關閉思考的參數，但 LLM 伺服器沒有照做，請在伺服器那一側關閉（做法見 LLM.md「關閉思考」）。": "⚠ Model \"{0}\" thinks before answering ({1} characters, {2} s this time), which makes translation and other tools many times slower. We sent the parameters that turn thinking off, but the LLM server did not apply them; please turn it off on the server side (see \"Turning thinking off\" in LLM.md).",
+  "✓ 模型「{0}」回答前不會先思考（{1} 秒）": "✓ Model \"{0}\" does not think before answering ({1} s)",
+  "檢查失敗（原因記在服務記錄）": "the check failed (the reason is in the service log)",
+  "實際同時送出的請求數，還受「作業佇列 → 外部服務同時呼叫數」限制（目前是 {0}），兩個取小的那個。要真的平行，兩個都要調（例如都設成 LLM 伺服器能同時處理的數量）。": "The number of requests actually sent at once is also limited by \"Job queue → Concurrent external service calls\" (currently {0}); the smaller of the two applies. To really run in parallel, raise both (for example to the number of requests your LLM server can handle at once).",
+  "前往作業佇列": "Go to the job queue",
+  "⚠ 目前翻譯實際上一次只會送 {0} 個請求。": "⚠ Translation currently sends only {0} request(s) at a time.",
+  "LLM 設定頁的「翻譯並行數」也受這個數字限制 —— 兩個取小的那個；LLM 伺服器能同時處理幾個（例如 Ollama 的 OLLAMA_NUM_PARALLEL），這裡就可以設幾個。": "The \"translation concurrency\" on the LLM settings page is also limited by this number; the smaller of the two applies. You can set this to however many requests your LLM server handles at once (for example Ollama's OLLAMA_NUM_PARALLEL).",
+  "⚠ 模型「{0}」沒有回答（{1} 秒）—— 多半是回答前先思考、把字數額度用完了，翻譯等工具會慢很多倍。請在 LLM 伺服器那一側關閉思考（做法見 LLM.md「關閉思考」）。": "⚠ Model \"{0}\" gave no answer ({1} s). It most likely thought before answering and used up its token allowance, which makes translation and other tools many times slower. Please turn thinking off on the LLM server side (see \"Turning thinking off\" in LLM.md)."
 }

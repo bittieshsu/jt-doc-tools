@@ -130,12 +130,14 @@ class FakeLLM:
                 break
             time.sleep(0.05)
         lc._BACKEND_CACHE.clear()
+        lc._REJECTED_PARAMS.clear()
         return self
 
     def __exit__(self, *exc):
         self._server.should_exit = True
         self._thread.join(timeout=5)
         lc._BACKEND_CACHE.clear()
+        lc._REJECTED_PARAMS.clear()
 
 
 @pytest.fixture
@@ -222,7 +224,12 @@ def test_field_review_works_on_a_non_ollama_service(monkeypatch):
     assert not res.errors, res.errors
     assert res.rounds[0].verdict == "all_clear"
     assert f.native_calls == 0
-    assert len(f.bodies) == 3, "每一欄都要真的問到"
+    # 每一欄都要真的問到：**被接受的**請求剛好三次。
+    accepted = [b for b in f.bodies if set(b) <= _STANDARD]
+    assert len(accepted) == 3, "每一欄都要真的問到"
+    # 關閉思考的兩個參數這台嚴格的服務都不收（v1.16.30 起一律先送）：第一欄拿掉兩次重送，
+    # 之後記住了，後面兩欄不再試 —— 所以總共 3 + 2，不是每一欄都多付兩次。
+    assert len(f.bodies) == 5, [sorted(set(b) - _STANDARD) for b in f.bodies]
     assert f.auth[-1] == "Bearer sk-test", "設定的金鑰要帶上（原本這條路完全不帶）"
     parts = f.bodies[-1]["messages"][0]["content"]
     assert any(p.get("type") == "image_url" for p in parts)

@@ -48,7 +48,9 @@ class ModelProfile:
 
 
 # ---- name heuristic patterns ----
-_THINKING_NAME_HINTS = ("qwen3", "qwq", "o1-", "r1", "gemma3", "gemma4", "deepseek-r1")
+# 名稱判斷只決定要不要加 `/no_think` 標記與系統提示；**關閉思考的參數一律送**（v1.16.30）。
+_THINKING_NAME_HINTS = ("qwen3", "qwq", "o1-", "r1", "gemma3", "gemma4", "deepseek-r1",
+                        "gpt-oss", "deepseek-v3.1", "magistral", "thinking", "reasoning")
 _VISION_NAME_HINTS = ("vl", "vision", "llava", "minicpm-v", "gemma3", "gemma4", "internvl")
 _QWEN_FAMILY_HINTS = ("qwen", "qwq")
 _GEMMA_FAMILY_HINTS = ("gemma",)

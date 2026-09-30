@@ -150,19 +150,56 @@
 |---|---|---|
 | **本機 Ollama** | 個人 / 小團隊試用 | `gemma3:4b`（消費級 GPU 可跑；vision 任務建議改跑 `gemma4:26b`） |
 | **DGX Spark / 工作站** | 公司內部單一 LLM 伺服器 | `gemma4:26b`（預設；視覺 + 文字皆可） |
-| **vLLM / LM Studio / jan.ai** | 偏好其他 OpenAI-compat 後端 | 視 backend 而定 |
+| **LiteLLM / vLLM / SGLang / llama.cpp server / LM Studio / jan.ai** | 公司已經有 LLM 閘道或其他 OpenAI 相容後端 | 視後端而定（支援方式見下方） |
 | **遠端 OpenAI / Anthropic** | 不在意資料外送的場景 | 預設**不**支援（專案精神是不上雲），但 OpenAI-compat URL 可設，風險自負 |
 
-### 接不是 Ollama 的服務
+### 支援的 LLM 伺服器與閘道
 
-每次連線前會先問對方是不是 Ollama（`GET /api/version`），**只有 Ollama 才會收到 Ollama 專屬的欄位**
-（`think`、`reasoning_effort`、`options`、`chat_template_kwargs`，用來關掉模型的思考）。
-其他 OpenAI 相容服務只收到標準欄位，所以檢查嚴格、不接受未知參數的服務也能用。
+任何 **OpenAI 相容**（`/v1/chat/completions`、`/v1/models`）的伺服器或閘道都可以接：
 
-* 代價：在其他服務上跑會思考的模型時，關不掉它的思考，回應會慢一些。
+| 伺服器 / 閘道 | 設定頁 Base URL 範例 | 思考怎麼關 |
+|---|---|---|
+| Ollama | `http://主機:11434/v1` | 自動（送 `think:false` 與 `reasoning_effort:"none"`） |
+| LiteLLM（前面接 Ollama） | `http://主機:4000/v1` | 自動送 `reasoning_effort:"none"`，LiteLLM 會轉給 Ollama。**`ollama/` 與 `ollama_chat/` 兩種寫法都有效**（實測 LiteLLM 1.103：一段翻譯 53.8 / 28.7 秒 → 2.4 秒），LiteLLM 那邊不必另外設定 |
+| LiteLLM（前面接其他後端） | 同上 | 自動送 `reasoning_effort:"none"`，由 LiteLLM 轉給後端 |
+| vLLM / SGLang | `http://主機:8000/v1` | 自動送 `chat_template_kwargs.enable_thinking=false`（Qwen3 等混合思考模型）；另外建議啟動時加 `--reasoning-parser`，思考內容才不會混進正文 |
+| llama.cpp server | `http://主機:8080/v1` | 自動送 `chat_template_kwargs`；也可以啟動時加 `--reasoning-budget 0` |
+| LM Studio / jan.ai | `http://主機:1234/v1` | 自動送；模型本身沒有關閉開關的，要在伺服器那一側選不思考的版本 |
+| OpenAI / Azure OpenAI / OpenRouter | 服務商給的網址 | 自動送 `reasoning_effort:"none"`（不支援 `none` 的模型會被拒，系統自動改送不帶這個參數的請求） |
+
+### 關閉思考（翻譯等工具會快很多倍）
+
+會「先思考再回答」的模型（gemma4、Qwen3、gpt-oss、DeepSeek-R1…）如果思考沒關掉，每一次請求都會先寫上千到上萬字的思考，
+**翻譯等工具會慢很多倍，而工具畫面上看不出原因**（實例：經 LiteLLM 接 Ollama，一份 415 KB 的文件翻譯要 400 分鐘，
+關掉思考後 62 秒）。
+
+* **系統每一次都會送關閉思考的參數**：`reasoning_effort:"none"` 與 `chat_template_kwargs.enable_thinking=false`（Ollama 另外送 `think:false`）。
+  不同的伺服器各認得其中一種。
+* **對方不收某個參數**（回 400 / 422）時，系統會拿掉那個參數重送，並記住這台伺服器 ＋ 這個模型不收（一小時），之後不再多試。
+  其他原因的錯誤（例如超出上下文長度）不會被誤記。
+* **怎麼知道有沒有關掉**：LLM 設定頁按「測試連線」，會用目前選的模型問一個極短的問題，並顯示「回答前不會先思考」或「⚠ 會先思考」。
+  有些閘道不把思考內容轉出來（例如 LiteLLM 的 `ollama/`），這時看到的是「模型沒有回答」—— 思考把字數額度用光了，同樣代表思考沒關掉。
+  工具實際執行時若看到模型還在思考，服務記錄（`jtdt logs`）也會留一行警告。
+* **顯示「會先思考」時**：代表伺服器沒有照我們送的參數做，要在伺服器那一側關閉 —— 見上表「思考怎麼關」那一欄。
+  `gpt-oss` 系列關不掉思考，只能設成 `low`。
+
+### 並行（同時送幾個請求）
+
+文件翻譯、逐句翻譯會把段落分批、同時送出多個請求。實際同時送出的數量受**兩個設定**限制，取小的那個：
+
+1. LLM 設定頁的「**翻譯並行數**」（預設 4）
+2. 作業佇列頁的「**外部服務同時呼叫數**」（預設 1 —— 所有用到 LLM / 遠端 OCR 的請求共用）
+
+第 2 項預設 1，所以**不調的話實際上一次只送一個**。LLM 伺服器能同時處理幾個（例如 Ollama 的 `OLLAMA_NUM_PARALLEL=4`），
+兩個就都設成幾個。實測假服務每個請求 0.5 秒、8 個請求：上限 1 要 4.9 秒，上限 4 是 1.3 秒。
+
+### 其他注意事項
+
 * 表單自動填寫的逐欄校驗兩種都能用：Ollama 走它原生的 `/api/chat`，其他服務走 `/v1/chat/completions`。
 * 一個回答都沒拿到時，逐欄校驗會直接說出來，不會把「問不到」當成「都填對了」。
 * 對方回錯誤時，錯誤內容會寫進服務記錄（`jtdt logs`）。
+* 文件翻譯每次請求最多合併 40 段或 1200 字（LLM 設定頁可調），加上約 1,250 字元的固定指令，
+  輸入大約兩三千 token；**`num_ctx` 16384 就夠**，調更大不會更快，只會多佔 GPU 記憶體。
 
 ## 啟用後 admin UI 看到什麼
 

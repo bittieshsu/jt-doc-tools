@@ -999,8 +999,19 @@ def build_router(templates) -> APIRouter:
                 "known_llm_tools": LLMSettingsManager.KNOWN_LLM_TOOLS,
                 "llm_tool_count": len(llm_ids),
                 "llm_only_tool_names": llm_only,
+                # 翻譯並行數旁邊要講出**實際**同時送出幾個：還受「外部服務同時呼叫數」限制，
+                # 兩個設定在不同頁、小的那個說了算（客戶 2026-09-30 問「未來能平行處理嗎」——
+                # 其實早就支援，只是被這個預設 1 卡住，畫面上沒講）。
+                "remote_limit_now": _remote_limit_now(),
             },
         )
+
+    def _remote_limit_now() -> int:
+        try:
+            from ..core import concurrency_settings as _cs
+            return int(_cs.get().get("max_remote_concurrent") or 1)
+        except Exception:      # noqa: BLE001 — 讀不到就不顯示那句
+            return 0
 
     @router.get("/api/llm/settings")
     async def api_llm_settings_get():
@@ -1104,10 +1115,22 @@ def build_router(templates) -> APIRouter:
             )
             return {"ok": False, "error": user_msg}
         result = client.test_connection()
+        # **順便檢查模型是不是還在「思考」**（只有管理員按按鈕時才做，開頁面不做 ——
+        # 會讓對方把模型載進 GPU）。思考沒被關掉時翻譯會慢很多倍，而畫面上完全看不出來。
+        thinking_check = None
+        probe_model = str(body.get("probe_model") or "").strip()
+        if result.ok and probe_model:
+            import asyncio as _aio
+            try:
+                thinking_check = await _aio.to_thread(client.thinking_probe, probe_model)
+            except Exception:  # noqa: BLE001 — 模型不存在、逾時…：不影響連線結果
+                logger.warning("思考檢查失敗（模型 %s）", probe_model[:80], exc_info=True)
+                thinking_check = {"error": "檢查失敗（原因記在服務記錄）"}
         return {
             "ok": result.ok,
             "latency_ms": result.latency_ms,
             "error": result.error,
+            "thinking_check": thinking_check,
             "models": [
                 {
                     "id": m.id,
