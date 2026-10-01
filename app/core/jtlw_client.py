@@ -186,6 +186,23 @@ class Capabilities:
     raw: dict[str, Any] = None             # type: ignore[assignment]
 
 
+def revision_at_least(revision: str, need: tuple[int, ...]) -> bool:
+    """`api_revision`（`"2.5"` 這種字串）是不是至少 `need`。
+
+    **讀不懂的一律當成「不夠新」** —— 對舊版送它不認得的欄位會被退回
+    （對方的 `hints` 是 `additionalProperties: false`），而少送一個選填欄位
+    只是照舊的做法。用字串比大小的話 `"2.10" < "2.5"`，所以要逐段轉成數字。
+    """
+    try:
+        got = tuple(int(p) for p in str(revision).strip().split("."))
+    except ValueError:
+        return False
+    if not got:
+        return False
+    width = max(len(got), len(need))
+    return got + (0,) * (width - len(got)) >= tuple(need) + (0,) * (width - len(need))
+
+
 class JtlwClient:
     """每次建立都重新讀設定；不要存成模組層級的單例。"""
 

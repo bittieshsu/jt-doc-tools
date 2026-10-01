@@ -49,7 +49,10 @@
     <span class="field-unit">{{ tr('（已知整場的語言時請直接選取）') }}</span>
   </div>
   <div class="form-row">
-    <label>{{ tr('會發言的人數') }}</label>
+    {# 問法跟著**這台語音服務實際會用的方法**走（`/speaker-mode`）：同一個數字在兩種方法下
+       意思相反 —— 原本的方法「填幾個就硬分成幾群」，Nemotron「填的數字只當上限」。
+       預設顯示 Nemotron 的問法；對方是 2.4 以前的版本時 JS 換成原本那一套。 #}
+    <label><span id="mtSpkLabelAuto">{{ tr('最多幾位發言者') }}</span><span id="mtSpkLabelLegacy" hidden>{{ tr('會發言的人數') }}</span></label>
     <input class="field field-num" type="number" id="mtSpk" min="0" max="20" value="0">
     <span class="field-unit">{{ tr('（0 = 讓它自己判斷）') }}</span>
   </div>
@@ -90,7 +93,17 @@
     {{ tr('「自動判斷」只看錄音開頭約 30 秒的講話來決定整場用哪一種語言 —— 開頭若有人先講另一種語言（例如先用英文開場），整場都可能辨識錯。開頭的靜音、雜音不影響。已知整場使用的語言時請直接選取。') }}
     {{ tr('中英句子交錯的會議請選佔多數的語言：另一種語言的整句大多無法正確辨識（中文句子裡夾英文術語沒有問題）。') }}
   </p>
-  <p class="info-box mt-hint">
+  {# Nemotron（JTLW `api_revision` 2.5 起，2026-10-01 對方 v2.23）把人數當**上限**。
+     AISHELL-4 test 20 場、真實辨識段落：不指定 2.92%、指定正確人數 2.91%（CI [−0.03, 0.00]，
+     **只能說「不輸」，不可以寫成「填了比較準」**）、多填一位 2.92%（20 場完全相同）、
+     **少填一位 6.89%（19 場變差）**。所以要講的是「寧可多填、不要少填」。
+     超過 8 位時對方自動改用原本的方法，原因會出現在結果頁（`mtDiarNote`）。 #}
+  <p class="info-box mt-hint" id="mtSpkHintAuto">
+    {{ tr('不確定就留 0，讓系統自己判。') }}
+    {{ tr('填的數字只當上限：寧可多填、不要少填 —— 填得比實際多沒有影響，填得比實際少會把不同的人併成同一位。') }}
+    {{ tr('超過 8 位發言者的會議會自動改用原本的分辨方法。') }}
+  </p>
+  <p class="info-box mt-hint" id="mtSpkHintLegacy" hidden>
     {{ tr('不確定就留 0，讓系統自己判。') }}
     {{ tr('這裡問的是發言量足以辨認的人數 —— 只講一兩句的人不要算進去，硬湊一群給他反而會把主要發言者拆散。') }}
   </p>
@@ -123,8 +136,11 @@
   {# 辨識模式不做發言者分離（台語模式，JTLW v2.15）→ **講出來**：
      不講的話，沒有發言者的逐字稿看起來像是分離失敗，而其實根本沒做。 #}
   <p class="info-box mt-hint" id="mtNoSpk" hidden>
-    {{ tr('這次用的辨識模式不做發言者分離，所以逐字稿沒有標出是誰說的，「會發言的人數」也沒有作用。') }}
+    {{ tr('這次用的辨識模式不做發言者分離，所以逐字稿沒有標出是誰說的，填的發言者人數也沒有作用。') }}
   </p>
+  {# 要求了 Nemotron、對方卻改用原本的方法（超過 8 人、GPU 伺服器連不上…）→ **講出來**，
+     原因照對方 `Result.diarization.note` 原樣附上（那是對方的資料，不翻）。 #}
+  <p class="info-box mt-hint" id="mtDiarNote" hidden></p>
   <p class="muted" id="mtSummary"></p>
   <p class="muted" id="mtCorrection" hidden></p>
 
@@ -257,6 +273,19 @@
     var t = Math.round(ms / 1000);
     return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
   }
+
+  // 人數那一格的問法跟著這台語音服務會用的方法走（伺服器端判斷，前端不猜版本）
+  function applySpeakerMode(engine) {
+    var legacy = engine !== 'auto';
+    el('mtSpkLabelAuto').hidden = legacy;
+    el('mtSpkLabelLegacy').hidden = !legacy;
+    el('mtSpkHintAuto').hidden = legacy;
+    el('mtSpkHintLegacy').hidden = !legacy;
+  }
+  fetch(BASE + '/speaker-mode')
+    .then(function (r) { return r.ok ? r.json() : { engine: 'legacy' }; })
+    .then(function (d) { applySpeakerMode(d.engine); })
+    .catch(function () { applySpeakerMode('legacy'); });
 
   var fu = new FileUpload(el('mtUp'), async function (_f, fs) {
     var file = Array.isArray(fs) ? fs[0] : fs;
@@ -645,6 +674,25 @@
 
     // 這次沒做發言者分離（伺服器端判斷：送件前照 `/profiles` 拿掉的）
     el('mtNoSpk').hidden = !data.diarize_skipped;
+
+    // 要求了 Nemotron、對方實際用了原本的方法 → 講出來並附上對方說的原因
+    var dz = data.diarization || {};
+    var noteBox = el('mtDiarNote');
+    var fb = data.diarize_fallback;
+    if (fb && fb.text) {
+      // 句子由伺服器端依對方的 `reason` 代碼挑（`DIARIZE_FALLBACK_TEXT`），這裡只翻譯；
+      // 不認得的代碼伺服器會給通用句子並附上對方的說明
+      noteBox.textContent = tr(fb.text)
+        + (fb.note ? ' ' + tr('語音服務的說明：') + fb.note : '');
+      noteBox.hidden = false;
+    } else if (data.speaker_engine === 'auto' && dz.engine === 'legacy') {
+      // v1.16.31 存下的結果沒有 `diarize_fallback`
+      noteBox.textContent = tr('這次的發言者改用原本的方法分辨，沒有用 Nemotron。')
+        + (dz.note ? ' ' + tr('語音服務的說明：') + dz.note : '');
+      noteBox.hidden = false;
+    } else {
+      noteBox.hidden = true;
+    }
 
     // 校正統計 —— 「摘要怪怪的」時第一個要看的就是這個
     //（對方接入清單第 8 節）。**沒有就整段不顯示**，不要印一排 0。

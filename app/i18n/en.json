@@ -5366,7 +5366,6 @@
   "第 {0} 頁（{1} 個）": "Page {0} ({1} placed)",
   "符合搜尋 {0} 項（共 {1} 項）": "{0} match the search ({1} in total)",
   "語音服務目前的辨識模式做不到其中一項處理（例如台語模式不做發言者分離）。請重新送一次；一直發生的話，請管理員到語音服務設定換一個辨識模式。": "The speech service's current recognition mode can't do one of the requested steps (for example, the Taiwanese mode doesn't separate speakers). Please send it again; if it keeps happening, ask an administrator to pick a different recognition mode in the speech service settings.",
-  "這次用的辨識模式不做發言者分離，所以逐字稿沒有標出是誰說的，「會發言的人數」也沒有作用。": "The recognition mode used this time doesn't separate speakers, so the transcript doesn't show who said what, and the number of speakers had no effect.",
   "不做發言者分離（逐字稿不會標出是誰說的）": "No speaker separation (the transcript won't show who said what)",
   "LLM 校驗沒有拿到任何回答（{0} 個欄位都問不到），不能當成都填對了。請到 LLM 設定頁按「測試連線」確認服務正常。": "The LLM check got no answer at all ({0} fields could not be asked), so this cannot be taken to mean everything was filled correctly. Go to the LLM settings page and use \"Test connection\" to check the service.",
   "有 {0} 個欄位問不到 LLM（共 {1} 個），那幾個欄位沒有校驗到。": "{0} fields could not be asked (out of {1}); those fields were not checked.",
@@ -5418,5 +5417,15 @@
   "前往作業佇列": "Go to the job queue",
   "⚠ 目前翻譯實際上一次只會送 {0} 個請求。": "⚠ Translation currently sends only {0} request(s) at a time.",
   "LLM 設定頁的「翻譯並行數」也受這個數字限制 —— 兩個取小的那個；LLM 伺服器能同時處理幾個（例如 Ollama 的 OLLAMA_NUM_PARALLEL），這裡就可以設幾個。": "The \"translation concurrency\" on the LLM settings page is also limited by this number; the smaller of the two applies. You can set this to however many requests your LLM server handles at once (for example Ollama's OLLAMA_NUM_PARALLEL).",
-  "⚠ 模型「{0}」沒有回答（{1} 秒）—— 多半是回答前先思考、把字數額度用完了，翻譯等工具會慢很多倍。請在 LLM 伺服器那一側關閉思考（做法見 LLM.md「關閉思考」）。": "⚠ Model \"{0}\" gave no answer ({1} s). It most likely thought before answering and used up its token allowance, which makes translation and other tools many times slower. Please turn thinking off on the LLM server side (see \"Turning thinking off\" in LLM.md)."
+  "⚠ 模型「{0}」沒有回答（{1} 秒）—— 多半是回答前先思考、把字數額度用完了，翻譯等工具會慢很多倍。請在 LLM 伺服器那一側關閉思考（做法見 LLM.md「關閉思考」）。": "⚠ Model \"{0}\" gave no answer ({1} s). It most likely thought before answering and used up its token allowance, which makes translation and other tools many times slower. Please turn thinking off on the LLM server side (see \"Turning thinking off\" in LLM.md).",
+  "最多幾位發言者": "Maximum speakers",
+  "填的數字只當上限：寧可多填、不要少填 —— 填得比實際多沒有影響，填得比實際少會把不同的人併成同一位。": "The number is only an upper limit, so err on the high side: a number above the real count has no effect, while a number below it merges different people into one speaker.",
+  "超過 8 位發言者的會議會自動改用原本的分辨方法。": "Meetings with more than 8 speakers automatically fall back to the original method.",
+  "這次的發言者改用原本的方法分辨，沒有用 Nemotron。": "Speakers in this transcript were identified with the original method, not Nemotron.",
+  "語音服務的說明：": "Speech service note:",
+  "這次用的辨識模式不做發言者分離，所以逐字稿沒有標出是誰說的，填的發言者人數也沒有作用。": "The recognition mode used this time doesn't separate speakers, so the transcript doesn't show who said what, and the number of speakers you entered had no effect.",
+  "指定的發言者超過 8 位，這次改用原本的方法分辨。": "More than 8 speakers were specified, so the original method was used this time.",
+  "偵測到 8 位以上的發言者，這次改用原本的方法分辨。": "8 or more speakers were detected, so the original method was used this time.",
+  "語音服務那側沒有新的發言者分辨模型，這次改用原本的方法分辨。": "The new speaker-separation model isn't available on the speech service, so the original method was used this time.",
+  "新的發言者分辨模型執行失敗，這次改用原本的方法分辨。": "The new speaker-separation model failed, so the original method was used this time."
 }

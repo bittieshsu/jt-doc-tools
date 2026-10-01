@@ -66,8 +66,17 @@ class FakeJtlw:
     def __init__(self, *, fail_with: dict | None = None, segments: int = 5,
                  running_polls: int = 0, reject_with: dict | None = None,
                  duration_ms: int | None = None, queue_polls: int = 0,
-                 submit_status: int | None = None, profiles_status: int | None = None):
+                 submit_status: int | None = None, profiles_status: int | None = None,
+                 api_revision: str = "2.6", caps_status: int | None = None,
+                 fallback_reason: str | None = None):
         self.seen: dict = {}
+        #: `GET /capabilities` 回的介面版本。**2.5 起才收 `hints.diarize_engine`**，
+        #: 舊版收到會 400（對方 `hints` 是 `additionalProperties: false`，v2.23）。
+        self.api_revision = api_revision
+        #: `GET /capabilities` 回這個 HTTP 狀態（問不到版本）
+        self.caps_status = caps_status
+        #: 送 `auto` 時一律回「改用原本的方法」，`reason` 是這個代碼（測不認得的代碼用）
+        self.fallback_reason = fallback_reason
         #: `GET /profiles` 回這個 HTTP 狀態（讀不到清單）
         self.profiles_status = profiles_status
         #: 送件時要求了哪些處理 —— 沒要求 `diarize` 的話，發言者那一層要回 400
@@ -94,6 +103,9 @@ class FakeJtlw:
         self.port = _free_port()
         self._server = None
 
+    def _revision(self) -> tuple:
+        return tuple(int(p) for p in self.api_revision.split("."))
+
     @property
     def base(self) -> str:
         return f"http://127.0.0.1:{self.port}"
@@ -110,7 +122,11 @@ class FakeJtlw:
         async def caps(request: Request):
             if not request.headers.get("authorization", "").startswith("Bearer "):
                 return JSONResponse({"error": {"code": "unauthorized"}}, status_code=401)
-            return {"api_revision": "2.3", "limits": {"max_duration_s": 28800}}
+            if me.caps_status:
+                return JSONResponse({"error": {"code": "internal_error", "category": "server",
+                                               "retryable": True, "details": {}}},
+                                    status_code=me.caps_status)
+            return {"api_revision": me.api_revision, "limits": {"max_duration_s": 28800}}
 
         @app.get("/api/v1/profiles")
         async def profiles():
@@ -161,6 +177,21 @@ class FakeJtlw:
                     "code": "language_not_supported", "category": "request", "retryable": False,
                     "details": {"field": "language", "languages": lang}}},
                     status_code=422)
+            # `hints` 照對方 schema：`additionalProperties: false`，`diarize_engine` 2.5 起才有、
+            # 值只有 legacy / auto（v2.23）。**判準自己寫一份**，不借產品的版本比較函式。
+            hints = body.get("hints")
+            if isinstance(hints, dict):
+                allowed = {"num_speakers"}
+                if me._revision() >= (2, 5):
+                    allowed.add("diarize_engine")
+                extra = sorted(set(hints) - allowed)
+                eng = hints.get("diarize_engine")
+                if extra or (eng is not None and eng not in ("legacy", "auto")):
+                    me.seen["rejected_hints"] = extra or [eng]
+                    return JSONResponse({"error": {
+                        "code": "invalid_request", "category": "request", "retryable": False,
+                        "details": {"field": "hints", "reason": "additionalProperties"
+                                    if extra else "enum"}}}, status_code=400)
             me.seen["body"] = body
             me.requested_tasks = tuple(body.get("tasks") or ())
             me.seen["idempotency_key"] = request.headers.get("idempotency-key")
@@ -226,8 +257,35 @@ class FakeJtlw:
         async def result(job_id: str):
             if me.duration_ms is None:
                 return JSONResponse({"error": {"code": "not_found"}}, status_code=404)
-            return {"result_schema_version": "2.0", "job_id": job_id,
-                    "status": "succeeded", "duration_ms": me.duration_ms}
+            out = {"result_schema_version": ("2.3" if me._revision() >= (2, 6) else
+                                             "2.2" if me._revision() >= (2, 5) else "2.0"),
+                   "job_id": job_id, "status": "succeeded", "duration_ms": me.duration_ms}
+            if me._revision() >= (2, 5):
+                # `Result.diarization`（2.5 起）：要求了 diarize 才有。`auto` 指定超過 8 人時
+                # 對方退回原本的方法，原因寫在 note（v2.23 第二節的例子）。
+                body = me.seen.get("body") or {}
+                if "diarize" in (body.get("tasks") or []):
+                    hints = body.get("hints") or {}
+                    req = hints.get("diarize_engine") or "legacy"
+                    n = int(hints.get("num_speakers") or 0)
+                    if req == "auto" and me.fallback_reason:
+                        out["diarization"] = {"requested": "auto", "engine": "legacy",
+                                              "note": "某個以後才會有的原因",
+                                              "reason": me.fallback_reason}
+                    elif req == "auto" and n > 8:
+                        out["diarization"] = {"requested": "auto", "engine": "legacy",
+                                              "note": f"指定 {n} 人，超過 Nemotron 上限 8 人",
+                                              "reason": "too_many_speakers"}
+                    else:
+                        out["diarization"] = {"requested": req,
+                                              "engine": "nemotron" if req == "auto" else "legacy",
+                                              "note": None, "reason": None}
+                    # `reason` 是 2.6 起才有的（對方 v2.24）；2.5 的服務沒有這個鍵
+                    if me._revision() < (2, 6):
+                        out["diarization"].pop("reason", None)
+                else:
+                    out["diarization"] = None
+            return out
 
         @app.post("/api/v1/jobs/{job_id}/ack")
         async def ack(job_id: str):
@@ -262,6 +320,11 @@ class FakeJtlw:
 def unconfigured():
     js.save({"enabled": False, "base_url": "", "api_key_enc": "", "audio_base_url": ""})
     js.invalidate_cache()
+    # 「上一次讀到的版本」與頁面快取都是依送件位址記在行程裡的 —— 假服務換測試會重用埠號，
+    # 不清的話前一條測試的版本會被這一條沿用（時好時壞）
+    _mtr = __import__("importlib").import_module("app.tools.meeting_transcribe.router")
+    _mtr._last_revision.clear()
+    _mtr._engine_cache.clear()
     yield
     js.save({"enabled": False, "base_url": "", "api_key_enc": "", "audio_base_url": ""})
     js.invalidate_cache()
@@ -999,7 +1062,7 @@ def test_a_meeting_mode_still_asks_for_speaker_separation(client, unconfigured):
         assert j["status"] == "done", j.get("error")
         body = fake.seen["body"]
     assert body["tasks"] == ["transcribe", "diarize", "correct"]
-    assert body["hints"] == {"num_speakers": 3}
+    assert body["hints"] == {"num_speakers": 3, "diarize_engine": "auto"}
     res = _result(client, up["upload_id"])
     assert res["diarize_skipped"] is False
     assert any(seg.get("speaker") for seg in res["segments"])
@@ -1258,3 +1321,195 @@ def test_the_sync_api_says_503_when_the_service_cannot_be_reached(client, unconf
     _configure(FakeJtlw())            # 沒有啟動：那個埠上沒有人在聽
     r = _api(client, language="auto")
     assert r.status_code == 503, (r.status_code, r.text[:200])
+
+
+# ------------------------------------------- 發言者分離改用 Nemotron（JTLW v2.23，api_revision 2.5）
+
+import importlib as _importlib
+
+_mt_router = _importlib.import_module("app.tools.meeting_transcribe.router")
+
+
+def test_a_2_5_service_is_asked_for_nemotron(client, unconfigured):
+    """對方 2.5 起收 `hints.diarize_engine`。同一批真實辨識段落、不指定人數時，
+    中文 20 場「發言者搞錯」18.52% → 2.92%（對方 v2.23）—— 所以要求了分離就送 `auto`。"""
+    with FakeJtlw() as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"])
+        assert j["status"] == "done", j.get("error")
+        body = fake.seen["body"]
+    # 沒填人數也要送 —— 方法跟人數是兩件事
+    assert body["hints"] == {"diarize_engine": "auto"}
+    res = _result(client, up["upload_id"])
+    assert res["speaker_engine"] == "auto"
+
+
+def test_an_older_service_is_not_sent_the_new_hint(client, unconfigured):
+    """**反向對照**：2.4 以前的服務收到 `diarize_engine` 會 400（`additionalProperties: false`）。
+    只驗 2.5 那條的話，把這個欄位一律送出去也會過 —— 而那會讓每一件在舊版服務上被退回。"""
+    with FakeJtlw(api_revision="2.4") as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"], num_speakers=3)
+        assert "rejected_hints" not in fake.seen, f"對舊版送了新欄位：{fake.seen.get('rejected_hints')}"
+        assert j["status"] == "done", j.get("error")
+        body = fake.seen["body"]
+    assert body["hints"] == {"num_speakers": 3}
+    assert _result(client, up["upload_id"])["speaker_engine"] == "legacy"
+
+
+def test_an_unknown_version_is_treated_as_old(client, unconfigured):
+    """問不到版本（對方 `/capabilities` 壞了）→ 當成舊版，照原本的方法。
+    送錯是整件被退回，少送一個選填欄位只是照舊。"""
+    with FakeJtlw(caps_status=500) as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"], num_speakers=3)
+        assert j["status"] == "done", j.get("error")
+        body = fake.seen["body"]
+    assert body["hints"] == {"num_speakers": 3}
+
+
+@pytest.mark.parametrize("rev,want", [("2.5", True), ("2.10", True), ("3.0", True), ("3", True),
+                                      ("2.4", False), ("2.4.9", False), ("", False),
+                                      ("abc", False), ("2.x", False)])
+def test_revision_comparison_is_numeric(rev, want):
+    """字串比大小的話 `"2.10" < "2.5"` —— 對方升到 2.10 那天我們會安靜地退回舊方法。"""
+    assert jtlw_client.revision_at_least(rev, (2, 5)) is want
+
+
+def test_a_fallback_to_the_original_method_is_shown(client, unconfigured):
+    """要求了 Nemotron、對方因為超過 8 人改用原本的方法 → 結果要帶著對方的原因，
+    頁面要講出來。不講的話，使用者會以為這一份是 Nemotron 分的。"""
+    with FakeJtlw(duration_ms=60000) as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"], num_speakers=10)
+        assert j["status"] == "done", j.get("error")
+    res = _result(client, up["upload_id"])
+    assert res["speaker_engine"] == "auto"
+    assert res["diarization"]["engine"] == "legacy"
+    assert "8" in res["diarization"]["note"]
+    # 2.6 起依 `reason` 代碼挑我們自己的句子（英日介面翻得動），不再附對方的中文說明
+    assert res["diarize_fallback"] == {
+        "reason": "too_many_speakers",
+        "text": _mt_router.DIARIZE_FALLBACK_TEXT["too_many_speakers"], "note": None}
+
+    import pathlib as _p
+    src = _p.Path("app/tools/meeting_transcribe/templates/meeting_transcribe.html").read_text(
+        encoding="utf-8")
+    assert 'id="mtDiarNote"' in src
+    assert "dz.engine === 'legacy'" in src and "dz.note" in src, (
+        "結果頁沒有讀 `diarization` —— 退回原本的方法時畫面上看不出來")
+
+
+def test_nemotron_is_reported_without_a_note(client, unconfigured):
+    """反向對照：真的用了 Nemotron 時不可以出現「改用原本的方法」的提示。"""
+    with FakeJtlw(duration_ms=60000) as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"], num_speakers=4)
+        assert j["status"] == "done", j.get("error")
+    res = _result(client, up["upload_id"])
+    assert res["diarization"] == {"requested": "auto", "engine": "nemotron", "note": None,
+                                  "reason": None}
+    assert res["diarize_fallback"] is None
+
+
+@pytest.mark.parametrize("rev,want", [("2.5", "auto"), ("2.4", "legacy")])
+def test_the_page_learns_which_wording_to_show(client, unconfigured, rev, want):
+    """**同一個人數在兩種方法下意思相反**，所以頁面要問伺服器「這台會用哪一種」。"""
+    _mt_router._engine_cache.clear()
+    with FakeJtlw(api_revision=rev) as fake:
+        _configure(fake)
+        r = client.get("/tools/meeting-transcribe/speaker-mode")
+    assert r.status_code == 200
+    assert r.json() == {"engine": want}
+
+
+def test_the_page_falls_back_to_the_original_wording_when_unconfigured(client, unconfigured):
+    _mt_router._engine_cache.clear()
+    r = client.get("/tools/meeting-transcribe/speaker-mode")
+    assert r.status_code == 200
+    assert r.json() == {"engine": "legacy"}
+
+
+def _block(src: str, elem_id: str) -> str:
+    import re
+    m = re.search(r'<p[^>]*id="' + elem_id + r'"[^>]*>(.*?)</p>', src, flags=re.S)
+    assert m, f"找不到 {elem_id}"
+    return m.group(1)
+
+
+def test_the_nemotron_wording_says_more_is_safer_than_fewer():
+    """Nemotron 把人數當**上限**（對方 v2.23，AISHELL-4 20 場）：多填一位 20 場完全相同、
+    **少填一位 19 場變差**。所以要講「寧可多填、不要少填」—— 原本那套「只講一兩句的不要算」
+    在 Nemotron 底下是**反方向**的建議（叫人少填）。
+
+    另外「指定正確人數」只比不指定好 0.01 個百分點（CI [−0.03, 0.00]），
+    **只能說「不輸」**：不可以寫成「填了比較準」。
+    """
+    import pathlib as _p
+    src = _p.Path("app/tools/meeting_transcribe/templates/meeting_transcribe.html").read_text(
+        encoding="utf-8")
+    auto = _block(src, "mtSpkHintAuto")
+    legacy = _block(src, "mtSpkHintLegacy")
+    assert "寧可多填" in auto and "少填" in auto
+    assert "上限" in auto
+    assert "發言量足以辨認" not in auto and "不要算進去" not in auto, (
+        "Nemotron 的說明裡出現了原本方法的建議（叫人少填）—— 方向相反")
+    assert "比較準" not in auto and "會更準" not in auto
+    assert "8" in auto, "超過 8 位會改用原本的方法，要先講"
+    # 原本的方法那一套照舊（對方 2.4 以前的服務還是這個意思）
+    assert "發言量足以辨認" in legacy
+    assert 'id="mtSpkLabelAuto"' in src and 'id="mtSpkLabelLegacy"' in src
+    assert "applySpeakerMode" in src and "/speaker-mode" in src
+
+
+def test_a_2_5_service_without_reason_codes_still_explains(client, unconfigured):
+    """2.5 的服務沒有 `reason`：用通用句子並附上對方的說明 —— 不可以因為沒有代碼就什麼都不說。"""
+    with FakeJtlw(api_revision="2.5", duration_ms=60000) as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"], num_speakers=10)
+        assert j["status"] == "done", j.get("error")
+    fb = _result(client, up["upload_id"])["diarize_fallback"]
+    assert fb["text"] == _mt_router._FALLBACK_GENERIC
+    assert fb["note"] and "8" in fb["note"]
+
+
+def test_an_unknown_reason_code_falls_back_to_the_generic_sentence(client, unconfigured):
+    """對方說日後會加代碼（v2.24）。不認得的代碼要當成一般的「改用原本的方法」並附上說明。"""
+    with FakeJtlw(duration_ms=60000, fallback_reason="something_added_later") as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"])
+        assert j["status"] == "done", j.get("error")
+    fb = _result(client, up["upload_id"])["diarize_fallback"]
+    assert fb["reason"] == "something_added_later"
+    assert fb["text"] == _mt_router._FALLBACK_GENERIC
+    assert fb["note"] == "某個以後才會有的原因"
+
+
+def test_a_momentarily_unreachable_capabilities_keeps_using_nemotron(client, unconfigured):
+    """對方 `/capabilities` 不快取、會即時去問後端；後端出狀況時可能慢或失敗（v2.24）。
+    原本那一刻就當成舊版 —— 那幾件會**沒有任何提示**地改用原本的方法。
+    問不到時沿用上一次讀到的版本（對方承諾版本不會往下掉）。"""
+    with FakeJtlw() as fake:
+        _configure(fake)
+        up = _upload(client)
+        assert _run(client, up["upload_id"])["status"] == "done"
+        fake.caps_status = 500                 # 這一刻問不到
+        up2 = _upload(client)
+        j = _run(client, up2["upload_id"], num_speakers=3)
+        assert j["status"] == "done", j.get("error")
+        body = fake.seen["body"]
+    assert body["hints"] == {"num_speakers": 3, "diarize_engine": "auto"}
+
+
+def test_the_page_waits_long_enough_for_capabilities():
+    """對方後端掛掉時 `/capabilities` 要 4～6 秒才回（v2.24）—— 頁面那次查詢原本只等 5 秒。"""
+    import inspect
+    assert _mt_router._PAGE_CAPS_TIMEOUT_S >= 10
+    assert "timeout=_PAGE_CAPS_TIMEOUT_S" in inspect.getsource(_mt_router._speaker_engine_for_page)

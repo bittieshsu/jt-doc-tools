@@ -19,6 +19,7 @@ webhook 之後當成最佳化加上去（也才有東西可以比對）。
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
@@ -201,6 +202,15 @@ async def index(request: Request):
     })
 
 
+@router.get("/speaker-mode")
+async def speaker_mode():
+    """頁面用：這台語音服務會用哪一種發言者分離 —— 決定人數那一格怎麼問。
+
+    **不放在頁面渲染時算**：那要連到對方，對方慢或連不上時整頁會跟著卡住。
+    """
+    return {"engine": await asyncio.to_thread(_speaker_engine_for_page)}
+
+
 @router.post("/upload")
 async def upload(request: Request, file: UploadFile = File(...)):
     """收錄音檔。**還不送件** —— 送件要先算雜湊、組簽章網址，那是下一步。"""
@@ -287,6 +297,100 @@ def _normalize_language(value: object) -> str:
     return v
 
 
+#: 發言者分離用 NVIDIA Nemotron（`hints.diarize_engine: "auto"`）。
+#:
+#: JTLW `api_revision` 2.5 起收這個欄位（2026-10-01，對方 v2.23）。同一批**真實辨識段落**、
+#: 不指定人數時，中文 AISHELL-4 20 場「發言者搞錯」18.52% → 2.92%、人數判對 2/20 → 18/20；
+#: 英文 AMI 16 場 12.31% → 4.65%。`auto` 在做不到時（指定超過 8 人、偵測到 8 人全部用滿、
+#: GPU 伺服器連不上而改在本機做）**由對方自動退回原本的方法**，原因寫在
+#: `Result.diarization.note` —— 我們顯示出來，不另外判斷。
+#:
+#: **同一個人數在兩種方法下的意思相反**：原本的方法是「填幾個就硬分成幾群」
+#:（填多了會把主要發言者拆開），Nemotron 是「填的數字只當上限」（填多了沒有影響、
+#: 填少了會把不同的人併在一起）。所以頁面的問法要跟著這裡決定的結果走（`/speaker-mode`）。
+_DIARIZE_ENGINE = "auto"
+_ENGINE_MIN_REVISION = (2, 5)
+#: 頁面問「會用哪一種」時的快取 —— 送件本身每次都重查，不吃這份。
+_ENGINE_CACHE_S = 300.0
+_engine_cache: dict[str, tuple[float, str]] = {}
+#: 頁面那次查詢的逾時。對方的 `/capabilities` **不快取、每次即時去問後端**（各 2 秒），
+#: 後端掛掉時要 4～6 秒才回（對方 v2.24）—— 原本設 5 秒，正好會在那種時候逾時。
+_PAGE_CAPS_TIMEOUT_S = 10
+#: 上一次成功讀到的介面版本（依送件位址）。問不到時**沿用它**，不要直接當舊版：
+#: 對方後端一時出狀況時，那幾件會沒有任何提示地改用原本的方法（對方 v2.24 指出）。
+#: 對方承諾升版前會通知、版本不會往下掉。只記在行程裡 —— 重啟後第一次要真的問得到。
+_last_revision: dict[str, str] = {}
+
+#: Nemotron 改用原本方法時，對方 `Result.diarization.reason` 的代碼 → 畫面上的句子
+#:（api_revision 2.6 起，對方 v2.24）。**認得的代碼才翻**；不認得的（對方日後會加）
+#: 一律用 `_FALLBACK_GENERIC` 並附上對方的 `note` —— 不可以因為不認得就什麼都不說。
+DIARIZE_FALLBACK_TEXT = {
+    "too_many_speakers": "指定的發言者超過 8 位，這次改用原本的方法分辨。",
+    "speakers_saturated": "偵測到 8 位以上的發言者，這次改用原本的方法分辨。",
+    "nemotron_unavailable": "語音服務那側沒有新的發言者分辨模型，這次改用原本的方法分辨。",
+    "nemotron_failed": "新的發言者分辨模型執行失敗，這次改用原本的方法分辨。",
+}
+_FALLBACK_GENERIC = "這次的發言者改用原本的方法分辨，沒有用 Nemotron。"
+
+
+def _diarize_fallback(requested: Optional[str], diar: object) -> Optional[dict]:
+    """要求了 Nemotron 卻改用原本的方法時，結果頁要講的話。沒退回就回 None。"""
+    if requested != _DIARIZE_ENGINE or not isinstance(diar, dict):
+        return None
+    if diar.get("engine") != "legacy":
+        return None
+    text = DIARIZE_FALLBACK_TEXT.get(str(diar.get("reason") or ""))
+    return {"reason": diar.get("reason"),
+            "text": text or _FALLBACK_GENERIC,
+            # 認得代碼時不重複附中文說明（它在英日介面不會翻）；不認得才附上
+            "note": None if text else (diar.get("note") or None)}
+
+
+def _speaker_engine(client) -> str:
+    """這台語音服務會用哪一種發言者分離：`auto`（Nemotron）或 `legacy`（原本的方法）。
+
+    **對 2.4 以前的服務送 `diarize_engine` 會被 400 退回**（對方的 `hints` 是
+    `additionalProperties: false`），所以先問版本。問不到時沿用上一次讀到的版本；
+    **連上一次都沒有才當舊版** —— 少送一個選填欄位只是照原本的方法做；送錯了是整件被退回。
+    """
+    try:
+        key = jtlw_settings.base_url()
+    except Exception:
+        key = ""
+    try:
+        rev = client.capabilities().api_revision
+        if rev:
+            _last_revision[key] = rev
+    except Exception:                          # 連不上、逾時、權限不足、舊版服務沒有這支
+        rev = _last_revision.get(key, "")
+        if rev:
+            logger.warning("讀不到 JTLW 的介面版本，沿用上一次讀到的 %s", rev, exc_info=True)
+        else:
+            logger.warning("讀不到 JTLW 的介面版本，這一件照原本的方法分辨發言者",
+                           exc_info=True)
+            return "legacy"
+    if jtlw_client.revision_at_least(rev, _ENGINE_MIN_REVISION):
+        return _DIARIZE_ENGINE
+    return "legacy"
+
+
+def _speaker_engine_for_page() -> str:
+    """給頁面決定問法用（有快取）。沒設定或連不上一律 `legacy`，跟送件時的判斷一致。"""
+    if not jtlw_settings.is_configured():
+        return "legacy"
+    key = jtlw_settings.base_url()
+    hit = _engine_cache.get(key)
+    now = time.monotonic()
+    if hit and now - hit[0] < _ENGINE_CACHE_S:
+        return hit[1]
+    try:
+        engine = _speaker_engine(jtlw_client.JtlwClient(timeout=_PAGE_CAPS_TIMEOUT_S))
+    except jtlw_client.JtlwError:
+        engine = "legacy"
+    _engine_cache[key] = (now, engine)
+    return engine
+
+
 def _tasks_for(client, profile_id: str, wanted: list[str]) -> tuple[list[str], list[str]]:
     """依所選辨識模式**實際做得到的處理**決定要送哪些 `tasks`。回 (要送的, 拿掉的)。
 
@@ -317,7 +421,8 @@ def _tasks_for(client, profile_id: str, wanted: list[str]) -> tuple[list[str], l
 
 def _build_body(upload_id: str, meta: dict, *, language: str,
                 num_speakers: Optional[int],
-                tasks: Optional[list[str]] = None) -> dict:
+                tasks: Optional[list[str]] = None,
+                diarize_engine: Optional[str] = None) -> dict:
     base = jtlw_settings.audio_base_url()
     if not base:
         raise HTTPException(503, "還沒設定「錄音檔對外位址」—— "
@@ -342,9 +447,16 @@ def _build_body(upload_id: str, meta: dict, *, language: str,
         "correction_level": cfg.get("correction_level") or "punctuation_only",
         "external_ref": {"system": "jtdt", "job_id": upload_id},
     }
-    # 人數是**發言者分離的**提示 —— 沒要求分離時送出去沒有意義
-    if num_speakers and "diarize" in body["tasks"]:
-        body["hints"] = {"num_speakers": int(num_speakers)}
+    # 人數與分離方法都是**發言者分離的**提示 —— 沒要求分離時送出去沒有意義
+    hints: dict = {}
+    if "diarize" in body["tasks"]:
+        if num_speakers:
+            hints["num_speakers"] = int(num_speakers)
+        # `legacy` 就是不送（對方的預設），對舊版服務才不會因為多一個欄位被退回
+        if diarize_engine and diarize_engine != "legacy":
+            hints["diarize_engine"] = diarize_engine
+    if hints:
+        body["hints"] = hints
     return body
 
 
@@ -425,8 +537,9 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
     if dropped:
         logger.info("辨識模式 %s 做不到 %s，這一件不送", cfg.get("profile_id"), dropped)
         job.meta["tasks_dropped"] = dropped
+    engine = _speaker_engine(client) if "diarize" in tasks else None
     body = _build_body(upload_id, meta, language=language, num_speakers=num_speakers,
-                       tasks=tasks)
+                       tasks=tasks, diarize_engine=engine)
     idem = f"jtdt-{upload_id}"
     # **佇列滿了是「等一下」不是「失敗」**（對方的清單第 6 節：依
     # `retry_after_ms` 重試）。重送用同一把 `Idempotency-Key`，
@@ -560,6 +673,14 @@ def _run_job(job, upload_id: str, language: str, num_speakers: Optional[int]) ->
         # 這次的辨識模式不做發言者分離 —— **要講出來**，不然逐字稿沒有發言者
         # 看起來像是分離失敗了（而其實根本沒做）
         "diarize_skipped": "diarize" in dropped,
+        # 這一件要求的分離方法（`auto` / `legacy`），以及對方實際用了哪一種
+        #（`Result.diarization`，api_revision 2.5 起才有）。`auto` 退回原本的方法時
+        # 對方會在 `note` 寫原因（例如超過 8 人）—— 畫面要講出來，不然使用者會以為
+        # 用的是 Nemotron。
+        "speaker_engine": engine,
+        "diarization": (summary.get("diarization")
+                        if isinstance(summary.get("diarization"), dict) else None),
+        "diarize_fallback": _diarize_fallback(engine, summary.get("diarization")),
         "layers": got,
         "segments": segments,
     }
@@ -707,11 +828,10 @@ async def api_meeting_transcribe(request: Request,
     呼叫端的逾時要放寬。要背景處理請走網頁那條路
     （`/upload` → `/start` → 拿作業編號輪詢 `/api/jobs/{id}`）。
 
-    **`num_speakers` 預設 0（讓對方自己判），而且建議就留 0** ——
-    這裡問的是「發言量足以辨認的人數」，不是與會人數。
-    20 場中文會議上，指定正確人數與不指定**分不出勝負**（信賴區間跨過 0）；
-    但同一批裡**最佳的群數從來沒有大於實際人數**，所以「填正確的人頭數」
-    本身就不是最佳解 —— 理由在樣板那段註解裡。
+    **`num_speakers` 預設 0（讓對方自己判），而且建議就留 0。**
+    它的意思跟著分離方法走（`_speaker_engine`）：Nemotron 下只當**上限**
+    （寧可多填、不要少填），原本的方法下是「硬分成那麼多群」（只講一兩句的人不要算）。
+    兩種方法下指定正確人數都只是「不輸」，理由在樣板那兩段註解裡。
     """
     if not jtlw_settings.is_configured():
         raise HTTPException(503, "還沒設定語音服務（JTLW）—— 請管理員先到設定頁填好")

@@ -911,15 +911,18 @@ POST /tools/meeting-transcribe/api/meeting-transcribe
 | `language` | string | | `auto`（預設）或 BCP-47（`zh-Hant` / `en` / `ja` / `ko` …）。對方不支援時**送件當下**就回 400。`zh` / `zh-TW` 會換成 `zh-Hant` 再送出 |
 | `num_speakers` | string | | 預設 `0` ＝ 讓它自己判。**建議就留 0** |
 
-**`num_speakers` 問的是「發言量足以辨認的人數」，不是與會人數。**
-語音服務在 **20 場中文會議**（AISHELL-4 test，5~7 人）上量過：指定正確人數與
-不指定**分不出勝負**（13.24% vs 12.46%，配對 bootstrap 95% 信賴區間
-[−2.72, +4.10] 跨過 0）。**所以不要為了「更準」而去填它。**
+**發言者分離用哪一種方法，看語音服務的版本**（v1.16.31 起）：語音服務的介面版本是 2.5 以上時，本系統會要求用 NVIDIA Nemotron 分辨發言者；2.4 以前（或問不到版本）時用原本的方法。回應的 `speaker_engine` 寫出這一件要求的是哪一種。語音服務在同一批真實辨識結果上量過（不指定人數）：中文 20 場「發言者搞錯」18.52% → 2.92%、英文 16 場 12.31% → 4.65%。
 
-真正的理由是機制：同一批 20 場裡，**最佳的群數從來沒有大於實際人數**
-（10 場相等、10 場更少、0 場更多）。有 6 個人在場不代表聲學上分得出 6 群 ——
-硬要分成 6 群時，系統只能**把講最多的那個人拆開**，而那是最貴的錯。
-只講一兩句的人不要算進去；**不確定就留 0**。
+**同一個 `num_speakers` 在兩種方法下的意思相反**：
+
+| | Nemotron（`speaker_engine` = `auto`） | 原本的方法（`legacy`） |
+|---|---|---|
+| 填的數字 | **只當上限**：分出來的人比它多才合併，比它少不動 | **硬分成那麼多群** |
+| 填得比實際多 | 沒有影響 | 把主要發言者拆開 |
+| 填得比實際少 | 把不同的人併成同一位 | 把不同的人併成同一位 |
+| 建議 | 不確定就留 0；**寧可多填、不要少填** | 不確定就留 0；只講一兩句的人不要算進去 |
+
+Nemotron 下指定正確人數與不指定的差距只有 0.01 個百分點（20 場、95% 信賴區間 [−0.03, 0.00]），**只能說「不輸」，不要為了「更準」去填它**。超過 8 位發言者時語音服務會自動改用原本的方法，原因寫在回應的 `diarization.note`。
 
 **`auto` 只看錄音開頭約 30 秒的講話，決定整場用哪一種語言** —— 不是逐段判斷。
 開頭若有人先講另一種語言（20 秒就夠），整場都可能辨識錯；開頭的靜音、雜音不影響。
@@ -955,6 +958,9 @@ curl -X POST http://localhost:8765/tools/meeting-transcribe/api/meeting-transcri
   "status": "succeeded",
   "uncorrected": false,
   "diarize_skipped": false,
+  "speaker_engine": "auto",
+  "diarization": {"requested": "auto", "engine": "nemotron", "note": null, "reason": null},
+  "diarize_fallback": null,
   "layers": {"raw": 1045, "final": 1045, "speakers": 1045},
   "summary": {"correction_level": "punctuation_only", "correction": {"edited": 612}},
   "segments": [
@@ -974,6 +980,10 @@ curl -X POST http://localhost:8765/tools/meeting-transcribe/api/meeting-transcri
 `diarize_skipped` 為 `true` 代表**這次用的辨識模式不做發言者分離**（例如台語模式）。
 這時 `segments` 沒有 `speaker` 欄位，也不會把 `num_speakers` 送給語音服務。
 辨識模式能做哪些處理以語音服務提供的清單為準，送件前會先查。
+
+回應裡的 `speaker_engine` 是這一件**要求的**分離方法（`auto` 是 Nemotron、`legacy` 是原本的方法，沒做分離時是 `null`），`diarization` 是語音服務回報**實際用了哪一種**（介面版本 2.5 起才有，舊版是 `null`）。要求了 `auto` 而 `engine` 是 `legacy` 時，`note` 寫著原因（例如指定超過 8 人）。
+
+回應裡的 `diarize_fallback` 只在要求了 Nemotron 卻改用原本的方法時才有，其他情況是 `null`：`reason` 是語音服務給的代碼（介面版本 2.6 起），`text` 是本系統依代碼挑的說明句子；代碼不認得或語音服務沒有給代碼時，`text` 是通用句子，`note` 附上語音服務的原文說明。
 
 `speaker` 是代號（`S1` / `S2`…）。姓名對照是呼叫端自己的事；
 網頁那條路可以點代號直接改成人名。

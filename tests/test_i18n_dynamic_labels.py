@@ -296,8 +296,11 @@ def _transcribe_stage_labels() -> list[str]:
     # `PROGRESS_TEMPLATES`：帶數字的作業訊息（排隊前面幾件、校正批數、逾時…）。
     # 前端 `tr()` 把連續數字換成 `{0}` 再查，所以鍵是樣板本身 —— v1.16.10 之前
     # 這幾句寫成 f-string，語系檔裡一條都沒有，英 / 日介面一直顯示中文。
+    # `DIARIZE_FALLBACK_TEXT`：Nemotron 改用原本方法時結果頁的句子（依對方 `reason` 代碼挑，
+    # 前端 `tr(fb.text)`）—— 引數是變數，樣板掃描看不到（v1.16.32）。
     return (list(m._STAGES.values()) + ["送件中", "取回逐字稿", "處理中", "排隊中"]
-            + list(m.PROGRESS_TEMPLATES))
+            + list(m.PROGRESS_TEMPLATES)
+            + list(m.DIARIZE_FALLBACK_TEXT.values()) + [m._FALLBACK_GENERIC])
 
 
 def _meeting_summary_progress() -> list[str]:

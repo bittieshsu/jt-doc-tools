@@ -5,11 +5,42 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (859 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (861 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.32] - 2026-10-01
+
+### Meeting transcription: fallback reasons in your language; a momentary version lookup failure no longer drops back silently
+
+- When Nemotron was requested but the speech service used the original method, the result page now explains why
+  based on the speech service's reason code (interface version 2.6 and later), in English and Japanese too.
+  Unknown codes show a general explanation plus the speech service's own wording.
+- Looking up the speech service version before submitting can be slow or fail while its back end has trouble.
+  Previously that moment was treated as an old version, so those jobs silently used the original method; now the
+  last version read is reused. The page's lookup now waits up to 10 seconds instead of 5.
+- API: responses add `diarize_fallback` (reason code, explanation sentence and the speech service's wording).
+
+## [1.16.31] - 2026-10-01
+
+### Meeting transcription: speakers are now told apart with NVIDIA Nemotron
+
+- When the speech service (JTLW) is on interface version 2.5 or later, jobs ask for NVIDIA Nemotron speaker
+  separation. On the same real recognition output with no speaker count given, the speech service measured
+  speaker errors dropping from 18.52% to 2.92% on 20 Chinese meetings (correct speaker count 2/20 → 18/20)
+  and from 12.31% to 4.65% on 16 English meetings.
+- **The speaker-count field now follows the method.** Nemotron treats the number as an upper limit: too high
+  has no effect, too low merges different people. The field is now "Maximum number of speakers" and says to
+  err on the high side. The original method splits into exactly that many groups, which is the opposite advice;
+  older speech services (2.4 and earlier, or when the version can't be read) keep the original method and wording.
+- With more than 8 speakers the speech service falls back to the original method; the result page says so and
+  shows the reason.
+- **Re-transcribing the same recording may give different speaker labels and speaking statistics than before.**
+  Existing transcripts are unchanged.
+- API: responses add `speaker_engine` (the method requested) and `diarization` (what the speech service actually
+  used); the API manual explains what `num_speakers` means under each method.
 
 ## [1.16.30] - 2026-09-30
 
