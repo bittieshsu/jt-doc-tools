@@ -5,11 +5,23 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (861 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (862 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.33] - 2026-10-02
+
+### Security: PyJWT upgraded to 2.15.1 (OIDC single sign-on)
+
+- PyJWT 2.13.0 and earlier have 12 public advisories (1 critical, 5 high) affecting how OIDC sign-in verifies
+  identity tokens: HMAC/public-key confusion, following redirects when fetching the key set, fetching the key set
+  repeatedly before verification, and malformed tokens crashing the parser. Fixed in 2.14 / 2.15; the minimum is
+  now 2.15.1.
+- This system already accepts only asymmetric signing algorithms, so tokens can't be downgraded to HMAC, but the
+  upgrade is applied anyway. Installations without OIDC sign-in are not affected.
+- Existing installations pick it up with `jtdt update`.
 
 ## [1.16.32] - 2026-10-01
 
