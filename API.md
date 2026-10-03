@@ -329,7 +329,7 @@ POST /tools/markdown-to-doc/api/markdown-to-doc
 | `file` | file | △ | Markdown 檔。與 `text` 擇一 |
 | `text` | str | △ | 直接帶 Markdown 內容。與 `file` 擇一 |
 | `format` | str | | `pdf`（預設）/ `docx` / `odt`。其他值回 400 |
-| `theme` | str | | 版面主題，預設 `classic` |
+| `theme` | str | | 版面主題，預設 `classic`。可用的值：`classic` / `github` / `academic` / `book` / `report` / `mono` / `teal` / `indigo` / `forest` / `coral` / `navy-gold` / `magazine`。不認得的值改用 `classic` |
 | `font` | str | | 字型，預設 `default` |
 | `title` | str | | 文件標題 |
 
@@ -910,6 +910,13 @@ POST /tools/meeting-transcribe/api/meeting-transcribe
 | `file` | file | ✓ | 音訊 `.m4a` / `.mp3` / `.wav` / `.aac` / `.ogg` / `.opus` / `.flac`，影片 `.mp4` / `.mov` / `.mkv` / `.webm` |
 | `language` | string | | `auto`（預設）或 BCP-47（`zh-Hant` / `en` / `ja` / `ko` …）。對方不支援時**送件當下**就回 400。`zh` / `zh-TW` 會換成 `zh-Hant` 再送出 |
 | `num_speakers` | string | | 預設 `0` ＝ 讓它自己判。**建議就留 0** |
+| `terms` | string | | **專有名詞或會議背景**（選填）：與會者姓名、公司與產品名稱、術語，一行一個，或用頓號 / 逗號 / 分號分隔；已知的聽錯寫法寫成「聽錯的寫法 → 正確寫法」一行；也可以寫幾句會議背景 |
+
+**專有名詞**（v1.16.39 起）送給語音服務當專有名詞表，**用在校正**：寫對的照原樣保留，拼法相近的誤聽改成你寫的寫法（語音服務介面版本 2.8 起，只修標點的校正也會改）。一行寫一個最好（`Proxmox`、`PVE`、`Proxmox VE` 各一行）；聽成拼法差很多的寫法時校正不一定改得回來。**辨識時不參考這份清單**：語音服務實測過，清單上的詞沒出現在那場會議時，辨識會把它憑空插進逐字稿，所以不採用。重複的（不分大小寫）只留第一個、順序照你給的。最多 500 個，超過回 **400**，**不會安靜截掉**（被截掉的詞不會被用到，而呼叫端會以為送出去了）。
+
+**已知的聽錯寫法**（v1.16.49 起）：已經知道會聽錯成什麼的，寫成一行「聽錯的寫法 → 正確寫法」（箭頭也可以寫 `->` 或 `=>`；好幾個聽錯的寫法用頓號 / 逗號分隔），例如 `Proksmox、Proxmux → Proxmox`。語音服務在校正之前照表換掉：不經過語言模型、任何校正等級都做，原始辨識層不變；拼法差很多、校正認不出來的誤聽靠這個才改得回來。英文要整個詞相符才換、不分大小寫，中文照字面 —— 中文的聽錯寫法太短的話可能換到別的詞裡面，請寫具體一點。正確寫法也會當成專有名詞送出。規則照語音服務：每個詞最多 20 個聽錯的寫法、每個 2～200 字；箭頭右邊只能寫一個詞；聽錯的寫法不可以是清單上的另一個詞（照表換會把寫對的換掉）；同一個聽錯的寫法不可以對到兩個詞。違反時回 **400** 並講出是哪一行，不會送出去。一行有兩個以上箭頭、`#` 開頭或寫成句子的，照舊當會議背景。語音服務介面版本 2.9 起才收；舊版（或問不到版本）時不送，回應的 `variants_sent` 是 `false`。
+
+寫成句子的行**不當成專有名詞送出**（v1.16.44 起）：有句號、驚嘆號、問號，或拆開之後有一段超過 40 字 / 10 個漢字的那一行，整行當會議背景 —— 一整句當成專有名詞，校正時照原樣保留、拿去比對拼法都沒有意義。「與會者：王小明、Bianca」這種行，冒號前面的標籤不送、後面照一串詞送；只有標籤的那一行（「與會人員如下：」）不送；`#` 開頭的標題行、一個字母都沒有的日期 / 時間 / 純數字也不送（v1.16.48）。整段原文放在回應的 `context`，轉送會議摘要時帶進會議背景。
 
 **發言者分離用哪一種方法，看語音服務的版本**（v1.16.31 起）：語音服務的介面版本是 2.5 以上時，本系統會要求用 NVIDIA Nemotron 分辨發言者；2.4 以前（或問不到版本）時用原本的方法。回應的 `speaker_engine` 寫出這一件要求的是哪一種。語音服務在同一批真實辨識結果上量過（不指定人數）：中文 20 場「發言者搞錯」18.52% → 2.92%、英文 16 場 12.31% → 4.65%。
 
@@ -922,7 +929,9 @@ POST /tools/meeting-transcribe/api/meeting-transcribe
 | 填得比實際少 | 把不同的人併成同一位 | 把不同的人併成同一位 |
 | 建議 | 不確定就留 0；**寧可多填、不要少填** | 不確定就留 0；只講一兩句的人不要算進去 |
 
-Nemotron 下指定正確人數與不指定的差距只有 0.01 個百分點（20 場、95% 信賴區間 [−0.03, 0.00]），**只能說「不輸」，不要為了「更準」去填它**。超過 8 位發言者時語音服務會自動改用原本的方法，原因寫在回應的 `diarization.note`。
+Nemotron 下指定正確人數與不指定的差距只有 0.01 個百分點（20 場、95% 信賴區間 [−0.03, 0.00]），**只能說「不輸」，不要為了「更準」去填它**。
+
+新方法最多分出 8 位發言者。指定超過 8 位時，語音服務一定改用原本的方法；沒有指定時，只有新方法 8 個位置都用滿、而且原本的方法分出超過 8 位才會改用，否則照用新方法、最多分出 8 位。改用時原因寫在回應的 `diarization.reason`（代碼）與 `diarization.note`（說明）。確定超過 8 位的會議請指定人數。
 
 **`auto` 只看錄音開頭約 30 秒的講話，決定整場用哪一種語言** —— 不是逐段判斷。
 開頭若有人先講另一種語言（20 秒就夠），整場都可能辨識錯；開頭的靜音、雜音不影響。
@@ -936,7 +945,7 @@ Nemotron 下指定正確人數與不指定的差距只有 0.01 個百分點（20
 
 | 狀態碼 | 意思 | 要做什麼 |
 |---|---|---|
-| **400** | 檔案格式不收、檔案是空的，或語音服務退回你帶的參數（`language` / `num_speakers`） | 改參數；語言不確定就用 `auto` |
+| **400** | 檔案格式不收、檔案是空的、專有名詞太多、聽錯的寫法寫得不對，或語音服務退回你帶的參數（`language` / `num_speakers` / 專有名詞） | 改參數；語言不確定就用 `auto` |
 | **502** | 語音服務收下了但處理失敗（辨識失敗、結果是空的、它自己出錯） | 訊息裡有原因；一直發生請管理員查語音服務 |
 | **503** | 還沒設定語音服務，或連不上 | 請管理員檢查「語音服務（JTLW）」設定與連線 |
 | **504** | 等太久還沒結果（排隊超過 4 小時，或辨識超過上限） | 已經請對方取消；稍後再送 |
@@ -946,7 +955,8 @@ curl -X POST http://localhost:8765/tools/meeting-transcribe/api/meeting-transcri
   -H "Authorization: Bearer YOUR_TOKEN" \
   -F "file=@meeting.m4a" \
   -F "language=auto" \
-  -F "num_speakers=0" | jq
+  -F "num_speakers=0" \
+  -F "terms=王小明、Bianca、Proxmox VE" | jq
 ```
 
 回應 JSON（節錄）：
@@ -961,8 +971,19 @@ curl -X POST http://localhost:8765/tools/meeting-transcribe/api/meeting-transcri
   "speaker_engine": "auto",
   "diarization": {"requested": "auto", "engine": "nemotron", "note": null, "reason": null},
   "diarize_fallback": null,
+  "diarize_saturated": false,
+  "terms": ["王小明", "Bianca", "Proxmox VE"],
+  "glossary": {"entries": 3, "keep_terms": 3, "asr_bias_terms": 0, "variants": 0},
+  "variants": {},
+  "variants_sent": false,
+  "asr": {"model": "large-v3-turbo", "location": "gpu_server", "device": "cuda"},
+  "context": "第四季備份規劃會議。\n王小明\nBianca\nProxmox VE",
   "layers": {"raw": 1045, "final": 1045, "speakers": 1045},
-  "summary": {"correction_level": "punctuation_only", "correction": {"edited": 612}},
+  "tasks": ["transcribe", "diarize", "correct"],
+  "summary": {"correction_level": "punctuation_only",
+              "correction": {"edited": 612, "variant_replacements": 0}},
+  "upload_id": "3f9c0a1e5b7d4c2a9e8f6b1d0c3a5e7f",
+  "retry_until": 1790000000.0,
   "segments": [
     {"seq": 1, "text": "各位早，我們開始。", "speaker": "S1",
      "start_ms": 1450, "end_ms": 2650}
@@ -985,8 +1006,59 @@ curl -X POST http://localhost:8765/tools/meeting-transcribe/api/meeting-transcri
 
 回應裡的 `diarize_fallback` 只在要求了 Nemotron 卻改用原本的方法時才有，其他情況是 `null`：`reason` 是語音服務給的代碼（介面版本 2.6 起），`text` 是本系統依代碼挑的說明句子；代碼不認得或語音服務沒有給代碼時，`text` 是通用句子，`note` 附上語音服務的原文說明。
 
+回應裡的 `diarize_saturated` 為 `true` 代表**新方法（Nemotron）的 8 個位置都用滿了**：實際發言者可能更多，有些人會被併進別人名下。確定超過 8 位時請帶 `num_speakers` 重送（語音服務介面版本 2.7 起才有這個訊號，舊版一律 `false`）。
+
+回應裡的 `terms` 是這一件送出去的專有名詞（整理過的清單），`glossary` 是語音服務回報的用法：`entries` 收到幾個、`keep_terms` 幾個照原樣保持、`asr_bias_terms` 辨識時參考了幾個（平常是 0：辨識時不參考；只有語音服務的 GPU 伺服器不能用、改在服務本機辨識時才會大於 0）。沒送專有名詞時 `terms` 是空陣列、`glossary` 是 `null`。`context` 是 `terms` 那一欄的原文（含沒當成專有名詞的句子），沒填時是空字串。回應裡的 `asr` 是語音服務回報的辨識模型（`model`）、在哪裡跑（`location`：`gpu_server` 或 `api_host`）與裝置（`device`），語音服務介面版本 2.8 起才有，舊版或辨識失敗時是 `null`。
+
+回應裡的 `variants` 是這一件寫的聽錯寫法（`{"Proxmox": ["Proksmox", "Proxmux"]}`，沒寫時是空物件），`variants_sent` 是有沒有真的送給語音服務（介面版本 2.9 起才收；`false` 時逐字稿沒有照表換）。換了幾處在 `summary.correction.variant_replacements`，語音服務收下幾個聽錯的寫法在 `glossary.variants`（這兩個也是 2.9 起才有）。
+
 `speaker` 是代號（`S1` / `S2`…）。姓名對照是呼叫端自己的事；
 網頁那條路可以點代號直接改成人名。
+
+#### 補專有名詞、只重跑校正
+
+轉完才發現人名或術語寫錯時，可以補專有名詞、**只重跑校正**（v1.16.41 起）：不重新辨識，`seq`、時間與發言者都不變，只有文字換成新的校正結果。
+
+存好逐字稿之後，語音服務那邊會**再保留最多 24 小時**給你重跑（管理員可以在「語音服務（JTLW）」設定頁改短，0 ＝ 存好就請它刪除、不能重跑），之後本系統自動請它刪除。回應的 `retry_until` 是最晚還能重跑的時間（UNIX 秒；不能重跑時是 `null`），`upload_id` 是下面兩支要帶的編號。
+
+```text
+POST /tools/meeting-transcribe/retry
+```
+
+| 參數（JSON） | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `upload_id` | string | ✓ | 同步 API 回應裡的 `upload_id` |
+| `terms` | string 或 string[] | ✓ | 專有名詞（**整份**，不是只有新增的，聽錯的寫法也要一起帶 —— 語音服務會用這一份取代原本的清單）；規則同送件時 |
+
+回 `{"job_id": "…"}`，用 `/api/jobs/{id}` 輪詢；做完後 `GET /tools/meeting-transcribe/result/{upload_id}` 拿新的逐字稿（`retry.count` 是重跑過幾次）。
+
+重跑只動校正，不重新辨識。聽成拼法差很多的寫法、校正認不出來的，寫成「聽錯的寫法 → 正確寫法」一行一起帶（語音服務介面版本 2.9 起照表換）。
+
+| 狀態碼 | 意思 |
+|---|---|
+| **400** | 沒帶專有名詞、專有名詞太多，或聽錯的寫法寫得不對 |
+| **409** | 不能重跑：已經請語音服務刪除（超過保留時間或已經按過「不用再改了」）、這次的辨識模式沒有校正、離刪除不到 15 分鐘，或正在重跑 —— 訊息會講是哪一種 |
+| **503** | 還沒設定語音服務 |
+
+```bash
+curl -X POST http://localhost:8765/tools/meeting-transcribe/retry \
+  -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"upload_id": "UPLOAD_ID", "terms": ["王小明", "Bianca", "Proxmox VE", "Proksmox → Proxmox"]}'
+```
+
+不需要再重跑時，請語音服務**現在就刪除**它那份逐字稿（本系統這邊的逐字稿不受影響）：
+
+```text
+POST /tools/meeting-transcribe/done
+```
+
+```bash
+curl -X POST http://localhost:8765/tools/meeting-transcribe/done \
+  -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"upload_id": "UPLOAD_ID"}'
+```
+
+回 `{"ok": true, "acked": true}`。`acked` 是 `false` 代表暫時連不上語音服務，本系統稍後會自動再通知一次。
 
 ---
 
@@ -1003,6 +1075,7 @@ POST /tools/meeting-summary/api/meeting-summary
 | `file` | file | ✓ | 逐字稿：`.vtt` / `.srt` / `.json` / `.txt` / `.md` / `.docx` / `.odt` |
 | `second_pass` | string | | `1`（預設）跑第二輪複審；`0` 只跑第一輪，快但漏抓與誤抓都會多 |
 | `context` | string | | **會議背景**（選填，上限 4000 字）：主題、與會者與職稱、專有名詞說明，或你自己要交代的話 |
+| `replacements` | string | | **分析前先換掉的寫法**（選填）：JSON 陣列 `[{"from": "Bianka", "to": "Bianca"}]`，通常是從下面 `/api/term-suggestions` 的建議裡挑的。不是 JSON 陣列回 **400** |
 
 **`context` 只拿來讀懂逐字稿，不會變成項目的來源。**
 知道「某某是營運副總、會議主席」對判斷誰在交辦、誰是負責人很有幫助，
@@ -1037,20 +1110,22 @@ curl -X POST http://localhost:8765/tools/meeting-summary/api/meeting-summary \
 
 ```json
 {
-  "summary": { "summary": "這場會議確認了第四季的預算…" },
+  "summary": { "text": "這場會議確認了第四季的預算…",
+               "grounded": true, "unsupported": [] },
   "items": {
-    "decision": [
-      { "text": "第四季預算維持原案", "segment_ids": [18, 19],
-        "speaker": "王小明", "quote": "那就照原案走" }
+    "decisions": [
+      { "text": "第四季預算維持原案", "segment_ids": [18, 19] }
     ],
-    "action": [
+    "actions": [
       { "text": "月底前把修訂版寄給法務", "owner": "李美華",
-        "due": "月底", "segment_ids": [42] }
+        "due_text": "月底", "segment_ids": [42] }
     ],
-    "risk": [], "question": []
+    "risks": [], "questions": [], "impacts": []
   },
   "chapters": [
-    { "title": "預算討論", "start_ms": 0, "end_ms": 840000, "start_seq": 1 }
+    { "title": "預算討論", "start_seq": 1, "end_seq": 60,
+      "start_ms": 0, "end_ms": 840000, "duration_ms": 840000,
+      "segment_ids": [1, 2, 3], "percentage": 38.5 }
   ],
   "mindmap": [
     { "node_id": "c1", "parent_id": null, "label": "預算討論",
@@ -1059,17 +1134,70 @@ curl -X POST http://localhost:8765/tools/meeting-summary/api/meeting-summary \
   "charts": ["timeline", "topic_share", "speaker_share", "mindmap"],
   "speaker_stats": {
     "王小明": { "speaking_ms": 512000, "percentage": 61.2,
-                "turn_count": 24, "average_turn_ms": 21333 }
+                "turn_count": 24, "average_turn_ms": 21333,
+                "chars": 4210, "char_pct": 58.3, "first_seq": 1 }
   },
   "dropped_count": 3,
   "llm_calls": 41,
+  "context": "會議主題：第四季預算\n與會者\n王小明：財務部經理，會議主席\n李美華：法務專員",
   "source": { "filename": "meeting.vtt", "segments": 186 }
 }
 ```
 
+摘要的 `grounded` 表示摘要裡的數字與英文詞**在逐字稿裡都找得到**，找不到的列在 `unsupported`（中文的講法是否忠實只能靠人看與段號）。
+
+回應裡的 `context` 是送進來的會議背景（去掉頭尾空白），**沒送就沒有這個欄位**；網頁匯出的文件會把它原文放在標題之後、摘要之前。
+
 `dropped_count` 是**引用對不上原文而被丟掉的項目數** —— 每一條抽出來的內容
 都要在它宣稱的段落裡找得到，找不到就不留。這個數字偏高時代表模型在編，
 換一個模型會比調參數有效。
+
+#### 依會議背景修正逐字稿的專有名詞
+
+逐字稿常把人名、產品名寫錯（`Bianca` 寫成 `Bianka`、王小明寫成王曉明）。會議背景裡寫了正確的寫法時，這支可以找出逐字稿裡**可能**寫錯的地方，**只建議、不改、不存**，也不需要 LLM：
+
+```text
+POST /tools/meeting-summary/api/term-suggestions
+```
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `file` | file | ✓ | 逐字稿（同上） |
+| `context` | string | | 會議背景；沒給就沒有建議 |
+
+```bash
+curl -X POST http://localhost:8765/tools/meeting-summary/api/term-suggestions \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@meeting.vtt" \
+  -F "context=與會者：王小明（財務長）、Bianca（PM）" | jq
+```
+
+```json
+{
+  "terms": ["王小明", "Bianca"],
+  "suggestions": [
+    {"from": "Bianka", "to": "Bianca", "count": 2, "seqs": [2],
+     "example": "報價我已經寄給 Bianka 了，Bianka 會再確認。"},
+    {"from": "王曉明", "to": "王小明", "count": 1, "seqs": [1],
+     "example": "王曉明今天要報告第四季的預算。"}
+  ]
+}
+```
+
+比對規則是固定的，寧可少建議也不亂建議：英文差一兩個字母、或中間多了空白 / 連字號；中文三到八個字、**每個字讀音都對得上**（同音不同字）。只差大小寫、單複數、兩個字的詞、背景自己就這樣寫的、像兩個詞都說得通的，一律不建議。
+
+挑好的放進 `/api/meeting-summary` 的 `replacements`，**分析之前**套用：英文照整個詞換（`Biankas` 不會被換掉一截），回應多一個 `replacements`（實際換了什麼、各幾處，一處都沒換到的不列）。網頁那條路匯出的 `.json` 附著逐字稿，換過的段落把原文留在 `orig_text`。
+
+建議抓不到的寫法（辨識聽錯差太多，例如 `Groxmoxity` 應為 `Proxmox`）也可以自己放進 `replacements`，規則相同；英文換的時候**分大小寫**，要連小寫的 `groxmoxity` 一起換就另外放一組。
+
+```bash
+curl -X POST http://localhost:8765/tools/meeting-summary/api/meeting-summary \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@meeting.vtt" \
+  -F "context=與會者：王小明（財務長）、Bianca（PM）" \
+  --form-string 'replacements=[{"from": "Bianka", "to": "Bianca"}]' | jq '.replacements'
+# → [{"from": "Bianka", "to": "Bianca", "count": 2}]
+```
 
 ### PDF OCR
 

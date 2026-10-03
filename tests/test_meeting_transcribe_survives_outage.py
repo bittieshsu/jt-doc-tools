@@ -107,6 +107,8 @@ def harness(monkeypatch, tmp_path):
     monkeypatch.setattr(R.time, "sleep", lambda s: clock.__setitem__("t", clock["t"] + s))
     monkeypatch.setattr(R, "_build_body", lambda *a, **k: {})
     monkeypatch.setattr(R, "_tasks_for", lambda client, prof, tasks: (tasks, []))
+    # 保留時間 0 ＝ 存好就 ACK：這裡驗的是撐過斷線，延後 ACK 那條路另有測試
+    monkeypatch.setattr(R.jtlw_ack, "window_hours", lambda: 0.0)
     meta = tmp_path / "meta.json"
     meta.write_text(json.dumps({"filename": "會議.m4a", "size_bytes": 1234}), encoding="utf-8")
     monkeypatch.setattr(R, "_meta_path", lambda _u: meta)

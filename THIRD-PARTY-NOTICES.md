@@ -99,6 +99,11 @@ Jason Tools 文件工具箱 使用以下第三方開源套件。本程式遵守�
 - 用途：pdf-to-office 的 docx ↔ PDFTruth 模糊比對引擎（取代 difflib，速度快 10×+）
 - Copyright © Max Bachmann
 
+### pypinyin  · MIT License
+- 專案：https://github.com/mozillazg/python-pinyin
+- 用途：會議摘要的「建議替換」—— 比對中文詞的讀音，找出逐字稿裡同音寫錯的專有名詞
+- Copyright © mozillazg, 闲耘
+
 ### pyzbar  · MIT License
 - 專案：https://github.com/NaturalHistoryMuseum/pyzbar
 - 用途：einvoice-scan QR Code 解碼 Python wrapper（Linux/macOS 需另裝 zbar shared lib）

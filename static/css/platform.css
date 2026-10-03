@@ -786,6 +786,11 @@ details.panel > summary select {
 
 /* Job progress */
 .job-progress { margin-top: 16px; }
+/* 進度列夾在兩張卡片中間（上傳 → 進度 → 結果）時，`.panel + .panel` 那條接不到 ——
+   進度列藏起來的時候（還沒送出、或從「我的作業」打開），兩張卡片就貼在一起
+   （2026-10-02 使用者回報「分析結果卡片跟上一個卡片太近了」）。會議摘要、轉逐字稿、
+   文件翻譯三支都是這個形狀。 */
+.job-progress + .panel { margin-top: 16px; }
 .job-row { display: flex; gap: 12px; align-items: center; }
 .job-bar { flex: 1; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
 .job-bar-inner { height: 100%; width: 0%; background: var(--primary); transition: width .25s; }
@@ -945,6 +950,25 @@ select.jt-select-native {
 .jt-select-option.disabled {
   color: #cbd5e1; cursor: not-allowed; pointer-events: none;
 }
+/* 選項前面的一排色票（`<option data-swatches="#a,#b,#c">`，例如版面主題）。
+   色塊的顏色由 JS 走 CSSOM 設，這裡只管大小與邊。 */
+.jt-select-swatches { display: inline-flex; gap: 3px; flex: none; }
+.jt-select-swatch {
+  width: 12px; height: 12px; border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.14);
+}
+.jt-select-trigger .jt-select-swatches { margin-right: -2px; }
+.jt-select-wrap.has-swatches .jt-select-option-main {
+  display: flex; align-items: center; gap: 8px;
+}
+/* 說明對齊名稱文字（色票 3 × 12px ＋ 2 × 3px ＋ 8px 間距）、可以折行 */
+.jt-select-wrap.has-swatches .jt-select-option-sub {
+  margin-left: 50px; white-space: normal; line-height: 1.45;
+}
+.jt-select-wrap.has-swatches .jt-select-panel {
+  min-width: max(100%, min(340px, calc(100vw - 32px))); max-height: 380px;
+}
+.jt-select-wrap.has-swatches .jt-select-option { padding-top: 7px; padding-bottom: 7px; }
 
 /* 「編輯時顯示輔助框底色」開關（1c 區塊；那層淡色不會印進 PDF）。 */
 .rs-tint-row { display:grid; grid-template-columns:auto 1fr; gap:2px 8px; align-items:start; margin:10px 0 4px; font-size:13px; cursor:pointer; }

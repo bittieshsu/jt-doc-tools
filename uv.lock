@@ -710,7 +710,7 @@ wheels = [
 
 [[package]]
 name = "jt-doc-tools"
-version = "1.16.33"
+version = "1.16.50"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
@@ -743,6 +743,7 @@ dependencies = [
     { name = "pymupdf" },
     { name = "pymupdf4llm" },
     { name = "pyotp" },
+    { name = "pypinyin" },
     { name = "pytesseract" },
     { name = "python-docx" },
     { name = "python-multipart" },
@@ -797,6 +798,7 @@ requires-dist = [
     { name = "pymupdf", specifier = ">=1.26.0,<2" },
     { name = "pymupdf4llm", specifier = ">=0.3.0,<0.4" },
     { name = "pyotp", specifier = ">=2.9,<3" },
+    { name = "pypinyin", specifier = ">=0.50,<1" },
     { name = "pytesseract", specifier = ">=0.3.10,<0.4" },
     { name = "python-docx", specifier = ">=1.0.0" },
     { name = "python-multipart", specifier = ">=0.0.32,<0.1" },
@@ -2030,6 +2032,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/30/52/06a6358856374ae4400ee1ad0ddaa01d5c31fcd6e8f4577e6a3ed1c40343/pypdfium2-5.7.1-py3-none-win32.whl", hash = "sha256:4f6bbe1211c5883c8fc9ce11008347e5b96ec6571456d959ae289cecdb2867f0", size = 3629154, upload-time = "2026-04-20T15:00:56.916Z" },
     { url = "https://files.pythonhosted.org/packages/6f/13/e0dbc9377d976d8b03ed0dd07fe9892e06d09fcf4f6a0e66df49366227d7/pypdfium2-5.7.1-py3-none-win_amd64.whl", hash = "sha256:fdf117af26bd310f4f176b3cf0e2e23f0f800e48dcf2bcf6c2cca0de3326f5cb", size = 3747295, upload-time = "2026-04-20T15:00:59.15Z" },
     { url = "https://files.pythonhosted.org/packages/bc/67/4759522f5bca0ac4cda9f42c7f3f818aa826568793bd8b4532d2d2ffa515/pypdfium2-5.7.1-py3-none-win_arm64.whl", hash = "sha256:622821698fcc30fc560bd4eead6df9e6b846de9876b82861bed0091c09a4c27b", size = 3540903, upload-time = "2026-04-20T15:01:00.994Z" },
+]
+
+[[package]]
+name = "pypinyin"
+version = "0.55.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/a4/784cf98c09e0dc22776b0d7d8a4a5b761218bcae4608c2416ce1e167c8af/pypinyin-0.55.0.tar.gz", hash = "sha256:b5711b3a0c6f76e67408ec6b2e3c4987a3a806b7c528076e7c7b86fcf0eaa66b", size = 839836, upload-time = "2025-07-20T12:01:50.657Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/7b/4cabc76fcc21c3c7d5c671d8783984d30ac9d3bb387c4ba784fca3cdfa3a/pypinyin-0.55.0-py2.py3-none-any.whl", hash = "sha256:d53b1e8ad2cdb815fb2cb604ed3123372f5a28c6f447571244aca36fc62a286f", size = 840203, upload-time = "2025-07-20T12:01:48.535Z" },
 ]
 
 [[package]]

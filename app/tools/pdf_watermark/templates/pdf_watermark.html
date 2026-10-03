@@ -596,12 +596,16 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
       let ar;
       try { ar = await fetch(`/tools/pdf-watermark/batch/${batchId}/add`, { method: 'POST', body: afd }); }
       catch (e) {
-        alert(`上傳第 ${i + 1}/${total} 份時連線中斷。\n單一檔案仍過大或網路不穩，請重試或檢查該檔。`);
+        // 檔案太大時，有些反向代理會直接斷線而不回 413 —— 這時只能講出兩種可能
+        alert(tr('上傳第 {0}/{1} 份時連線中斷。').replace('{0}', i + 1).replace('{1}', total) + '\n'
+              + tr('檔案太大時，網站前面的反向代理有時會直接中斷連線而不回錯誤；也可能是網路不穩。請重試，或請管理員確認反向代理的上傳上限。'));
         return;
       }
       if (!ar.ok) {
-        if (ar.status === 413) { alert(`第 ${i + 1} 份單檔過大（HTTP 413），請調高反向代理 client_max_body_size。`); return; }
-        alert(`上傳第 ${i + 1}/${total} 份失敗：` + (await ar.text().catch(() => 'HTTP ' + ar.status)));
+        // 「檔案太大」是哪一段擋的（反向代理 / 本系統全站 / 這項功能）由共用函式判斷，
+        // 原本這裡一律說成反向代理 —— 本系統自己的上限擋下時也這樣說
+        alert(tr('上傳第 {0}/{1} 份失敗：').replace('{0}', i + 1).replace('{1}', total)
+              + await window.friendlyServerError(ar, tr('上傳失敗')));
         return;
       }
     }

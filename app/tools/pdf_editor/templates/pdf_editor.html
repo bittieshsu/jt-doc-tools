@@ -798,49 +798,10 @@ async function doAutoSave() {
 
 const $ = (id) => document.getElementById(id);
 
-// v1.7.33：把後端 / reverse proxy 的錯誤回應轉成「人話」訊息給訊息列用。
-// 原本任何 fetch fail 都把 await r.text() 整段塞進 setStatus，碰到 nginx
-// 502/504 HTML、FastAPI 500 stacktrace 之類就會看到一大串 `<html>...` 亂碼。
-// 規則：
-//   ①HTTP status 對應到一句中文提示（503 / 502 / 504 → 後端異常；413 →
-//     檔案太大；401/403 → 權限；500 → 內部錯誤）。
-//   ②如果 backend 回的是 application/json，且有 .detail / .error 欄位就
-//     拿來補充（FastAPI 慣例）。
-//   ③HTML / stacktrace / 過長純文字一律抽到 console.error，訊息列只放
-//     簡短描述加 status code。
-async function friendlyServerError(r, fallback) {
-  const code = r ? r.status : 0;
-  const codeMap = {
-    400: tr('請求格式錯誤'), 401: tr('未登入或登入逾期'), 403: tr('權限不足'),
-    404: tr('找不到資源'), 408: tr('請求逾時'), 410: tr('檔案已過期'),
-    413: tr('檔案太大'), 422: tr('參數驗證失敗'), 429: tr('請求過於頻繁'),
-    500: tr('伺服器內部錯誤'), 502: tr('後端服務無回應'), 503: tr('服務暫時不可用'),
-    504: tr('後端逾時'),
-  };
-  const base = codeMap[code] || (fallback || tr('操作失敗'));
-  let detail = '';
-  try {
-    const ct = (r.headers && r.headers.get && r.headers.get('content-type')) || '';
-    if (ct.indexOf('application/json') >= 0) {
-      const j = await r.json();
-      const d = (j && (j.detail || j.error || j.message));
-      if (typeof d === 'string' && d.length && d.length < 200) detail = d;
-      // 若 detail 是 array (FastAPI validation)，挑第一筆的 msg
-      else if (Array.isArray(d) && d[0] && d[0].msg) detail = String(d[0].msg).slice(0, 200);
-    } else {
-      // 純文字錯誤 — 取前 120 字非空白，且不能像 HTML
-      const t = await r.text();
-      if (t && t.indexOf('<') !== 0 && t.length < 200 && !/\n/.test(t)) {
-        detail = t;
-      } else if (t) {
-        // HTML / stacktrace → 寫 console，訊息列只放代碼
-        try { console.error('[pdf-editor] server error body:', t.slice(0, 1500)); } catch (_) {}
-      }
-    }
-  } catch (_) {}
-  const codeTag = code ? `（${code}）` : '';
-  return detail ? `${base}${codeTag}：${detail}` : `${base}${codeTag}`;
-}
+// 後端 / 反向代理的錯誤回應轉成人話：用全站共用的 `window.friendlyServerError`
+//（static/js/friendly_error.js）。這裡原本自己抄了一份 —— v1.16.34 共用那份學會分辨
+// 「檔案太大是哪一段擋的」時，這一頁就會漏掉（同一份東西寫兩份一定會漂）。
+const friendlyServerError = (r, fallback) => window.friendlyServerError(r, fallback);
 
 function setStatus(msg, kind) {
   const el = $('peStatus');

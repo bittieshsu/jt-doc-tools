@@ -93,6 +93,8 @@ sup.fn-ref a { font-size: 0.75em; vertical-align: super; text-decoration: none; 
 INLINE_CODE_COLORS: dict[str, str] = {
     "classic": "#be185d", "github": "#cf222e", "academic": "#444",
     "book": "#8b3a00", "report": "#c53030", "mono": "#000",
+    "teal": "#0f766e", "indigo": "#7c3aed", "forest": "#15803d",
+    "coral": "#c2410c", "navy-gold": "#8a6d1f", "magazine": "#e11d48",
 }
 
 
@@ -100,6 +102,8 @@ INLINE_CODE_COLORS: dict[str, str] = {
 CODE_BG: dict[str, str] = {
     "classic": "#f1f5f9", "github": "#f6f8fa", "academic": "#f9f9f9",
     "book": "#f3e9d5", "report": "#edf2f7", "mono": "#f5f5f5",
+    "teal": "#f0fdfa", "indigo": "#f5f3ff", "forest": "#f0fdf4",
+    "coral": "#fff7ed", "navy-gold": "#f8f6f0", "magazine": "#f9fafb",
 }
 
 
@@ -118,6 +122,12 @@ TABLE_STYLES: dict[str, dict] = {
     "book":     {"head_bg": "#efe1c5", "border": "#d6c3a0", "zebra": "#faf5ec"},
     "report":   {"head_bg": "#2c5282", "border": "#cbd5e1", "zebra": "#f7fafc"},
     "mono":     {"head_bg": "#e8e8e8", "border": "#999999", "zebra": None},
+    "teal":     {"head_bg": "#ccfbf1", "border": "#99f6e4", "zebra": "#f0fdfa"},
+    "indigo":   {"head_bg": "#e0e7ff", "border": "#c7d2fe", "zebra": "#f5f7ff"},
+    "forest":   {"head_bg": "#166534", "border": "#bbf7d0", "zebra": "#f0fdf4"},
+    "coral":    {"head_bg": "#ffedd5", "border": "#fed7aa", "zebra": "#fffaf5"},
+    "navy-gold": {"head_bg": "#0f2a4a", "border": "#d4c9a8", "zebra": "#faf8f2"},
+    "magazine": {"head_bg": "#111827", "border": "#e5e7eb", "zebra": "#f9fafb"},
 }
 
 
@@ -136,6 +146,31 @@ CODE_STYLES: dict[str, str | None] = {
     "book":    "friendly",
     "report":  "vs",            # 商務：偏保守的藍綠
     "mono":    None,            # 不上色
+    "teal":    "friendly",
+    "indigo":  "friendly",
+    "forest":  "friendly",
+    "coral":   "friendly",
+    "navy-gold": "vs",          # 正式文件：保守的配色
+    "magazine": "default",
+}
+
+
+#: 選主題時看的配色（標題色、強調色、表頭底色）—— 會議摘要的主題下拉與
+#: 「Markdown 轉辦公文件」的主題卡片都用這一份，**不在畫面那一側另寫一份**
+#: （顏色寫兩份遲早會漂，選的時候看到的跟拿到的檔案就對不上）。
+SWATCHES: dict[str, tuple[str, str, str]] = {
+    "classic":   ("#1e3a8a", "#3b82f6", "#eff6ff"),
+    "github":    ("#1f2328", "#0969da", "#f6f8fa"),
+    "academic":  ("#1c1c1c", "#555555", "#ffffff"),
+    "book":      ("#8b4513", "#b8743f", "#efe1c5"),
+    "report":    ("#2c5282", "#2b6cb0", "#edf2f7"),
+    "mono":      ("#000000", "#999999", "#e8e8e8"),
+    "teal":      ("#115e59", "#14b8a6", "#ccfbf1"),
+    "indigo":    ("#312e81", "#6366f1", "#e0e7ff"),
+    "forest":    ("#14532d", "#16a34a", "#166534"),
+    "coral":     ("#9a3412", "#f97316", "#ffedd5"),
+    "navy-gold": ("#0f2a4a", "#b8860b", "#0f2a4a"),
+    "magazine":  ("#111827", "#e11d48", "#111827"),
 }
 
 
@@ -293,6 +328,154 @@ blockquote { border-left: 4px solid #000; color: #333; background: transparent; 
 hr { border-top: 1.5px solid #000; }
 """,
     },
+
+    # ---- 2026-10-03 新增（使用者：「請多點好看一點主題配色與樣式」）。
+    # 都是白底、深色內文；**可讀性不依賴段落底色**（轉 .odt / .docx 時段落底色會掉，
+    # 見 `_OFFICE_SAFE_CSS`）。表頭底色、框線、隔行底色在 `TABLE_STYLES`（HTML 屬性才保得住）。
+    "teal": {
+        "name": "青綠清新",
+        "desc": "白底、青綠標題與表頭，清新明亮，適合週報與內部簡報。",
+        "css": _BASE + _EXTRAS + """
+body {
+  font-family: 'Noto Sans TC', -apple-system, 'PingFang TC',
+               'Microsoft JhengHei', sans-serif;
+  color: #1f2937; background: #ffffff;
+}
+h1 { color: #115e59; border-bottom: 3px solid #14b8a6; padding-bottom: 6pt; }
+h2 { color: #0f766e; border-bottom: 1px solid #99f6e4; padding-bottom: 3pt; }
+h3 { color: #0d9488; }
+h4, h5, h6 { color: #334155; }
+strong { color: #134e4a; }
+a { color: #0f766e; }
+pre { background: #f0fdfa; color: #134e4a; }
+pre code { color: inherit; background: transparent; }
+table { font-size: 10.5pt; }
+th { color: #134e4a; }
+blockquote { background: #f0fdfa; border-left: 4px solid #2dd4bf; color: #115e59; }
+hr { border-top: 1px dashed #5eead4; }
+""",
+    },
+    "indigo": {
+        "name": "靛藍現代",
+        "desc": "靛藍標題、淡紫表頭，俐落有現代感，適合技術文件與產品規劃。",
+        "css": _BASE + _EXTRAS + """
+body {
+  font-family: 'Noto Sans TC', -apple-system, 'PingFang TC',
+               'Microsoft JhengHei', sans-serif;
+  color: #1f2937; background: #ffffff;
+}
+h1 { color: #312e81; border-bottom: 3px solid #6366f1; padding-bottom: 6pt; letter-spacing: 0.02em; }
+h2 { color: #3730a3; border-bottom: 1px solid #c7d2fe; padding-bottom: 3pt; }
+h3 { color: #4f46e5; }
+h4, h5, h6 { color: #3f3f46; }
+strong { color: #1e1b4b; }
+a { color: #4f46e5; }
+pre { background: #f5f3ff; color: #1e1b4b; }
+pre code { color: inherit; background: transparent; }
+table { font-size: 10.5pt; }
+th { color: #312e81; }
+blockquote { background: #eef2ff; border-left: 4px solid #818cf8; color: #3730a3; }
+hr { border-top: 1px solid #c7d2fe; }
+""",
+    },
+    "forest": {
+        "name": "森林綠",
+        "desc": "深綠標題、深綠表頭白字，沉穩自然，適合營運與永續報告。",
+        "css": _BASE + _EXTRAS + """
+body {
+  font-family: 'Noto Sans TC', -apple-system, 'PingFang TC',
+               'Microsoft JhengHei', sans-serif;
+  color: #1f2937; background: #ffffff;
+}
+h1 { color: #14532d; border-bottom: 3px solid #16a34a; padding-bottom: 6pt; }
+h2 { color: #166534; border-bottom: 1px solid #86efac; padding-bottom: 3pt; }
+h3 { color: #15803d; }
+h4, h5, h6 { color: #365314; }
+strong { color: #14532d; }
+a { color: #15803d; }
+pre { background: #f0fdf4; color: #14532d; }
+pre code { color: inherit; background: transparent; }
+table { font-size: 10.5pt; }
+th { color: #ffffff; font-weight: 600; }
+blockquote { background: #f0fdf4; border-left: 4px solid #16a34a; color: #14532d; }
+hr { border-top: 2px solid #16a34a; }
+""",
+    },
+    "coral": {
+        "name": "珊瑚暖橘",
+        "desc": "暖橘標題、杏色表頭，溫暖有活力，適合活動企劃與提案。",
+        "css": _BASE + _EXTRAS + """
+body {
+  font-family: 'Noto Sans TC', -apple-system, 'PingFang TC',
+               'Microsoft JhengHei', sans-serif;
+  color: #292524; background: #ffffff;
+}
+h1 { color: #9a3412; border-bottom: 3px solid #f97316; padding-bottom: 6pt; }
+h2 { color: #c2410c; border-bottom: 1px solid #fdba74; padding-bottom: 3pt; }
+h3 { color: #ea580c; }
+h4, h5, h6 { color: #57534e; }
+strong { color: #7c2d12; }
+a { color: #c2410c; }
+pre { background: #fff7ed; color: #431407; }
+pre code { color: inherit; background: transparent; }
+table { font-size: 10.5pt; }
+th { color: #7c2d12; }
+blockquote { background: #fff7ed; border-left: 4px solid #fb923c; color: #9a3412; }
+hr { border-top: 1px dashed #fdba74; }
+""",
+    },
+    "navy-gold": {
+        "name": "藏青燙金",
+        "desc": "藏青標題配金色細線、襯線標題字，正式典雅，適合對外正式文件與董事會報告。",
+        "css": _BASE + _EXTRAS + """
+@page { margin: 24mm 22mm; }
+body {
+  font-family: 'Noto Sans TC', -apple-system, 'PingFang TC',
+               'Microsoft JhengHei', sans-serif;
+  color: #1f2937; background: #ffffff;
+}
+h1, h2, h3 {
+  font-family: 'Noto Serif TC', 'Source Han Serif TC', 'Songti TC',
+               Georgia, 'Times New Roman', serif;
+}
+h1 { color: #0b1f3a; text-align: center; letter-spacing: 0.06em;
+     border-bottom: 2px solid #b8860b; padding-bottom: 8pt; }
+h2 { color: #0f2a4a; border-bottom: 1px solid #d4b483; padding-bottom: 3pt; }
+h3 { color: #1e3a5f; }
+h4, h5, h6 { color: #8a6d1f; }
+strong { color: #0b1f3a; }
+a { color: #1e3a5f; }
+pre { background: #f8f6f0; color: #1f2937; }
+pre code { color: inherit; background: transparent; }
+table { font-size: 10.5pt; }
+th { color: #ffffff; font-weight: 600; }
+blockquote { background: #fbf8ef; border-left: 3px solid #b8860b; color: #3f3a2c; }
+hr { border-top: 1px solid #d4b483; }
+""",
+    },
+    "magazine": {
+        "name": "雜誌風",
+        "desc": "大字標題、左側色條、玫瑰紅點綴，層次分明，適合電子報與專題報導。",
+        "css": _BASE + _EXTRAS + """
+body {
+  font-family: 'Noto Sans TC', -apple-system, 'PingFang TC',
+               'Microsoft JhengHei', sans-serif;
+  color: #111827; background: #ffffff;
+}
+h1 { font-size: 28pt; color: #111827; border-bottom: 6px solid #e11d48; padding-bottom: 6pt; }
+h2 { color: #111827; border-left: 6px solid #e11d48; padding-left: 8pt; }
+h3 { color: #be123c; }
+h4, h5, h6 { color: #374151; }
+strong { color: #111827; }
+a { color: #e11d48; }
+pre { background: #f9fafb; color: #111827; }
+pre code { color: inherit; background: transparent; }
+table { font-size: 10.5pt; }
+th { color: #ffffff; font-weight: 600; }
+blockquote { background: #fff1f2; border-left: 4px solid #e11d48; color: #881337; font-style: italic; }
+hr { border-top: 2px solid #111827; }
+""",
+    },
 }
 
 
@@ -303,7 +486,8 @@ def get_theme(name: str) -> dict:
 
 def theme_options() -> list[dict]:
     """For UI: list of {id, name, desc} suitable for a select/radio."""
-    return [{"id": k, "name": v["name"], "desc": v["desc"]}
+    return [{"id": k, "name": v["name"], "desc": v["desc"],
+             "swatch": list(SWATCHES.get(k, SWATCHES["classic"]))}
             for k, v in THEMES.items()]
 
 
@@ -386,12 +570,15 @@ def font_css_override(font_id: str) -> str:
 #:
 #: **通則：不要讓可讀性依賴底色。** 底色是最容易在轉檔途中掉的東西，
 #: 而掉了之後的症狀是「什麼都看不到」，不是「顏色怪怪的」。
+#:
+#: **表頭不在這裡改**（v1.16.37）：v1.16.19 起表頭底色改用 HTML 的 `bgcolor` 屬性，
+#: `.odt` / `.docx` 也保得住 —— 這裡原本那條「表頭改深藍字」反而變成
+#: **深藍字壓在深藍底上**，整列表頭看不到（2026-10-02 使用者截圖）。
+#: 底色保得住就讓主題自己的字色（白字）照用。
 _OFFICE_SAFE_CSS = """
-/* 轉成 .odt / .docx 時：底色會掉，所以淺色文字要改回深色 */
+/* 轉成 .odt / .docx 時：段落底色會掉，所以淺色文字要改回深色 */
 h1 { color: #1a365d; background: transparent; padding: 0 0 6pt 0;
      margin: 0 0 14pt 0; border-bottom: 3px solid #2c5282; }
-th { background: transparent; color: #1a365d;
-     border-bottom: 2px solid #2c5282; }
 """
 
 

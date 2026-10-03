@@ -429,12 +429,28 @@ def test_no_chart_in_the_exported_pdf_runs_off_the_page():
 
 
 def test_the_chart_headings_are_not_doubled():
-    """圖自己畫著標題，Markdown 不要再加一個 `##`（2026-09-19 使用者截圖）。"""
+    """每張圖的標題**只出現一次**：文件裡是正式的章節標題，圖裡不再畫一行小字標題。
+
+    * 2026-09-19：圖自己畫著標題、Markdown 又加一個 `##` —— 同一句話出現兩次。
+    * 2026-10-02：改成只留圖裡那一行之後，文件裡的圖標題是一行 14px 的小字，
+      看起來不像章節標題（使用者回報「討論結構 標題不對」）。
+    所以現在反過來：文件用章節標題，匯出用的圖 `titled=False`。
+    """
     import importlib
+    import re
+    from app.core import meeting_charts as mc
     mod = importlib.import_module("app.tools.meeting_summary.router")
-    md = mod._md(_sample_analysis(), charts=True, embed=False)
-    assert "## 各議題時間佔比" not in md, (
-        "圖的標題被寫了兩次（一次在 Markdown 的 `##`、一次畫在圖裡）")
+    out = _sample_analysis()
+    md = mod._md(out, charts=True, embed=False)
+    heads = re.findall(r"^#+ (.+)$", md, flags=re.M)
+    for h in ("議題時間軸", "討論結構"):
+        assert heads.count(h) == 1, f"「{h}」的章節標題應該剛好一個：{heads}"
+    for name, svg in mc.build_all(out, titled=False).items():
+        drawn = re.findall(r'font-weight="700"[^>]*>([^<]+)</text>', svg)
+        assert not drawn, f"文件用的 {name} 圖裡還畫著標題：{drawn}"
+    # 單獨下載的圖（PNG / 圖表）照舊有標題 —— 那時候圖外面沒有任何說明
+    titled = mc.build_all(out)
+    assert any(re.search(r'font-weight="700"', v) for v in titled.values())
 
 
 def test_the_exported_chart_matches_what_the_page_shows():
@@ -560,7 +576,7 @@ def test_the_theme_list_comes_from_the_markdown_tool():
     import importlib
     from app.tools.markdown_to_doc import themes as th
     mod = importlib.import_module("app.tools.meeting_summary.router")
-    got = dict(mod._doc_themes())
+    got = {t["id"]: t for t in mod._doc_themes()}
     assert set(got) == set(th.THEMES), (
         "主題清單跟「Markdown 轉辦公文件」對不起來 —— 有人自己抄了一份")
 
@@ -642,7 +658,26 @@ def test_the_title_does_not_guess_from_the_summary():
     assert mod.meeting_title(out) == "會議記錄", "從摘要截字當標題了"
 
 
-def test_office_formats_do_not_leave_white_text_on_white():
+# 深色表頭（白字）的主題全部要驗；`teal` 是淺色表頭的反向對照 ——
+# 它一個白字都不可以有。新加深色表頭的主題要加進來（另一條檢查會擋漏列）。
+_DARK_HEAD_THEMES = ("report", "forest", "navy-gold", "magazine")
+
+
+def test_the_dark_header_list_is_complete():
+    """表頭字色是白的主題都要在 `_DARK_HEAD_THEMES` 裡 —— 漏列的話它的 `.odt` 沒人驗。"""
+    import re
+    from app.tools.markdown_to_doc import themes
+    white = set()
+    for tid, th in themes.THEMES.items():
+        for sel, body in re.findall(r"([^{}]+)\{([^}]*)\}", th["css"]):
+            if "th" in [x.strip() for x in sel.split(",")] and re.search(
+                    r"(?<![-\w])color\s*:\s*#(?:fff|ffffff)\b", body, re.I):
+                white.add(tid)
+    assert white == set(_DARK_HEAD_THEMES), sorted(white ^ set(_DARK_HEAD_THEMES))
+
+
+@pytest.mark.parametrize("theme", _DARK_HEAD_THEMES + ("teal",))
+def test_office_formats_do_not_leave_white_text_on_white(theme):
     """`.odt` / `.docx` 裡不可以有白字（2026-09-19 使用者回報「標題字是白色」）。
 
     soffice 的 HTML 匯入**保留文字顏色、但丟掉段落底色** ——
@@ -660,17 +695,35 @@ def test_office_formats_do_not_leave_white_text_on_white():
 
     if not office_convert.find_soffice():
         pytest.skip("這台機器沒有 Office 引擎")
+    from app.tools.markdown_to_doc import themes
     mod = importlib.import_module("app.tools.meeting_summary.router")
+    head_bg = themes.table_style(theme)["head_bg"]
     for fmt in ("odt", "docx"):
-        data, _m, _e = mod._report_doc(_sample_analysis(), "t", fmt, "report")
+        data, _m, _e = mod._report_doc(_sample_analysis(), "t", fmt, theme)
         z = zipfile.ZipFile(io.BytesIO(data))
         blob = "".join(z.read(n).decode("utf-8", "replace")
                        for n in z.namelist()
                        if n.endswith(".xml") and ("styles" in n or "document" in n))
-        white = re.findall(r'(?:fo:color|w:color w:val)="#?[fF]{6}"', blob)
-        assert not white, (
-            f"{fmt} 裡有 {len(white)} 個白字樣式 —— 底色在轉檔時會掉，"
-            "白字白底整行看不見")
+        # 標題（段落）不可以是白字 —— 段落底色在轉檔時會掉
+        heads = re.findall(r'<w:pStyle w:val="Heading1"/>.*?</w:p>', blob, flags=re.S)
+        for h in heads:
+            assert not re.search(r'w:color w:val="[fF]{6}"', h), f"{fmt} 的標題是白字"
+        if fmt == "odt":
+            # 白字只可以是**表頭**的段落樣式，而且表頭格子要有深色底
+            # （表頭底色用 HTML 屬性，轉檔保得住；段落底色保不住）
+            xml = "".join(z.read(n).decode("utf-8", "replace")
+                          for n in ("styles.xml", "content.xml"))
+            white_styles = set(re.findall(
+                r'<style:style style:name="([^"]+)"(?:(?!</style:style>).){0,800}?'
+                r'fo:color="#ffffff"', xml, flags=re.S))
+            assert white_styles <= {"Table_20_Heading"}, (
+                f"{theme}：odt 裡表頭以外的地方有白字：{sorted(white_styles)}")
+            if theme not in _DARK_HEAD_THEMES:
+                assert not white_styles, f"{theme} 是淺色表頭，不該有白字"
+                continue
+            assert white_styles, f"{theme} 的表頭應該是白字 —— 這條檢查沒有東西可驗"
+            assert re.search(r'fo:background-color="%s"' % head_bg.lower(), xml.lower()), (
+                f"{theme}：表頭是白字、但找不到 {head_bg} 底的格子 —— 白字白底整行看不見")
 
 
 def test_renaming_a_speaker_rewrites_the_transcript_and_the_stats(client, auth_off):
@@ -879,3 +932,26 @@ def test_the_theme_picker_sits_above_the_download_buttons():
     assert theme < first_btn, "版面主題跑到下載按鈕後面了"
     exports = src.index('class="ms-exports"')
     assert theme < exports, "版面主題不可以擺在按鈕那一排裡面（會被擠到下一行）"
+
+
+def test_every_card_kind_has_an_icon():
+    """五張卡片的標題圖示來自頁面自己的一份圖示表（`ICONS`）—— 名字查不到時畫的是
+    **空的 `<svg>`，不會報錯**。「事件與影響」加進來時指定了 `shield` 卻沒補進表裡，
+    那張卡（連同匯出的 HTML）從那時起就一直沒有圖示。"""
+    import re
+    root = pathlib.Path(__file__).resolve().parents[1]
+    src = (root / "app" / "tools" / "meeting_summary" / "templates"
+           / "meeting_summary.html").read_text(encoding="utf-8")
+    kinds = re.search(r"var KINDS = \[(.*?)\];", src, re.S).group(1)
+    wanted = re.findall(r"\[\s*'\w+',\s*'[^']*',\s*'[\w-]+',\s*'(\w+)'\s*\]", kinds)
+    assert len(wanted) >= 5, f"只收到 {len(wanted)} 類 —— KINDS 的寫法變了，這條檢查沒在驗東西"
+    table = re.search(r"var ICONS = \{(.*?)\n  \};", src, re.S).group(1)
+    have = dict(re.findall(r"^\s*(\w+)\s*:\s*'([^']+)'", table, re.M))
+    missing = [n for n in wanted if not have.get(n)]
+    assert not missing, f"這幾類的圖示在 ICONS 裡查不到（畫出來是空的）：{missing}"
+    # 用的是全站同一個圖示（`components/icons.html`），不是另外畫一個長得像的
+    macro = (root / "app" / "web" / "templates" / "components" / "icons.html").read_text(
+        encoding="utf-8")
+    shield = re.search(r"name == 'shield' -%\}\s*(.*?)\s*\{%-", macro, re.S).group(1)
+    norm = lambda s: re.sub(r"\s*/>", "/>", s.strip())
+    assert norm(have["shield"]) == norm(shield), "事件與影響的圖示跟全站的 shield 不一樣"

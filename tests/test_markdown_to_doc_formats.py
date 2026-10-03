@@ -284,6 +284,71 @@ def test_every_theme_declares_a_code_background():
         assert themes.code_bg(tid).startswith("#")
 
 
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def test_every_theme_has_a_table_style_and_a_swatch():
+    """**漏掉 `TABLE_STYLES` 不會報錯** —— `table_style()` 安靜地退回 classic，
+    新主題的表格就變成另一個主題的藍色。色票漏掉則是下拉清單上那個主題沒有顏色。"""
+    for tid in themes.THEMES:
+        assert tid in themes.TABLE_STYLES, f"{tid} 沒有表格配色（會安靜退回 classic）"
+        sw = themes.SWATCHES.get(tid)
+        assert sw and len(sw) == 3 and all(_HEX.match(c) for c in sw), (
+            f"{tid} 的色票要是三個 #rrggbb：{sw}")
+    opts = {o["id"]: o for o in themes.theme_options()}
+    assert set(opts) == set(themes.THEMES)
+    for tid, o in opts.items():
+        assert o["swatch"] == list(themes.SWATCHES[tid]), tid
+        assert o["name"] and o["desc"], tid
+
+
+def _lum(hex_: str) -> float:
+    def ch(v: int) -> float:
+        c = v / 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    h = hex_.lstrip("#")
+    if len(h) == 3:
+        h = "".join(x * 2 for x in h)
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
+
+
+def _contrast(a: str, b: str) -> float:
+    la, lb = sorted((_lum(a), _lum(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+def _rule_color(css: str, selector: str) -> str | None:
+    """最後一條**選擇器剛好是 `selector`** 的規則裡的 `color`（後寫的蓋掉先寫的）。"""
+    found = None
+    for sel, body in re.findall(r"([^{}]+)\{([^}]*)\}", css):
+        if [s.strip() for s in sel.split(",")].count(selector):
+            m = re.search(r"(?<![-\w])color\s*:\s*(#[0-9a-fA-F]{3,6})", body)
+            if m:
+                found = m.group(1)
+    return found
+
+
+def test_table_header_text_is_readable_on_its_own_background():
+    """表頭字色對表頭底色要有 4.5:1（WCAG AA 一般文字）。
+
+    表頭底色走 HTML 屬性、字色走 CSS，**兩個寫在不同地方** —— 只改其中一邊
+    就可能變成深字深底（`.odt` 那次的白字白底是同一族）。"""
+    for tid, th in themes.THEMES.items():
+        css = th["css"]
+        fg = _rule_color(css, "th") or _rule_color(css, "body") or "#000000"
+        bg = themes.table_style(tid)["head_bg"] or "#ffffff"
+        ratio = _contrast(fg, bg)
+        assert ratio >= 4.5, f"{tid} 的表頭 {fg} on {bg} 對比只有 {ratio:.2f}"
+
+
+def test_the_contrast_check_has_teeth():
+    """反向對照：深字深底一定要被抓到。"""
+    assert _contrast("#134e4a", "#166534") < 4.5
+    assert _contrast("#ffffff", "#166534") >= 4.5
+    assert _rule_color("body { color: #111111; }\nth { color: #ffffff; }", "th") == "#ffffff"
+
+
 def test_blank_lines_inside_code_blocks_survive():
     """使用者問「是不是把空行全吃了」—— 沒有。空行在 HTML 裡就保留著，
     PDF 的行距也看得出來（實測 Δ33.8 vs 正常 17.1）。

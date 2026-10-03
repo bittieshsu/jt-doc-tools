@@ -52,7 +52,23 @@
       }
     } catch (_) {}
     const codeTag = code ? `（${code}）` : '';
-    return detail ? `${base}${codeTag}：${detail}` : `${base}${codeTag}`;
+    // **檔案太大要說得出是哪一段擋的**（使用者 2026-10-02：300 MB 的錄音被網站前面的
+    // 反向代理擋下，畫面只寫「檔案太大」，看不出該去哪裡改）。本系統回的 413 都帶
+    // `x-jtdt-limit`（site＝全站上限、tool＝這項功能自己的上限，見 app/main.py）；
+    // **沒帶、也沒有我們的 JSON 說明的，就是前面的反向代理擋的**。
+    if (code === 413) {
+      const layer = (r.headers && r.headers.get && r.headers.get('x-jtdt-limit')) || '';
+      if (layer === 'site') {
+        const mb = (r.headers.get('x-jtdt-limit-mb') || '').replace(/[^0-9]/g, '');
+        return `${base}${codeTag}：` + tr('本系統的單次上傳上限是 {0} MB。請分批上傳，或請管理員到「系統狀態 → 可上傳的檔案大小」調整。').replace('{0}', mb || '?');
+      }
+      if (layer === 'tool' || detail) {
+        return `${base}${codeTag}：` + tr('本系統這項功能的上限') + (detail ? ` —— ${detail}` : '');
+      }
+      return `${base}${codeTag}：` + tr('這是網站前面的反向代理擋下的，不是本系統的上限。請管理員調高反向代理的上傳上限（nginx 是 client_max_body_size），目前的上限可以在「系統狀態 → 可上傳的檔案大小」實測。');
+    }
+    // 伺服器的說明是中文原文 —— 語系檔裡有那一句的話照介面語言顯示（查不到 `tr` 原樣回傳）
+    return detail ? `${base}${codeTag}：${tr(detail)}` : `${base}${codeTag}`;
   }
   window.friendlyServerError = friendlyServerError;
 })();

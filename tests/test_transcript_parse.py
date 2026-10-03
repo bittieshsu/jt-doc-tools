@@ -417,3 +417,54 @@ def test_an_unknown_shape_falls_back_to_auto_instead_of_failing():
 def test_the_shape_list_is_the_single_source_for_the_ui():
     assert "auto" in tp.SHAPES and tp.SHAPES["auto"]
     assert all(isinstance(v, str) and v for v in tp.SHAPES.values())
+
+
+# ------------------------------------------------------------------ 內容是 JSON、檔名是 .txt
+
+#: 「會議錄音轉逐字稿」的結果 —— 轉送會議摘要時整份經工作區中轉，
+#: 而工作區只收 `.txt` / `.md` 兩種文字檔名，存進去就變成 `…-逐字稿.txt`。
+TRANSCRIBE_RESULT = {
+    "source": {"filename": "錄音.mp3", "size_bytes": 1000},
+    "summary": {"correction_level": "punctuation_only"},
+    "layers": {"raw": 3, "final": 3, "speakers": 3},
+    "segments": [
+        {"seq": 1, "text": "各位早，今天要談三件事。", "speaker": "S1",
+         "start_ms": 1000, "end_ms": 4000},
+        {"seq": 2, "text": "預算我看過了。", "speaker": "S2",
+         "start_ms": 4200, "end_ms": 7000},
+        {"seq": 3, "text": "那就照原案走。", "speaker": "S1",
+         "start_ms": 7500, "end_ms": 9000},
+    ],
+    "speaker_names": {"S1": "王小明"},
+}
+
+
+@pytest.mark.parametrize("name", ["錄音-逐字稿.txt", "錄音-逐字稿.md"])
+@pytest.mark.parametrize("bom", [b"", b"\xef\xbb\xbf"])
+def test_json_saved_under_a_text_name_is_read_as_json(name, bom):
+    """2026-10-02 使用者從工作區載入那個 `.txt`：照副檔名當純文字切，
+    一行 JSON 變一段、發言者 0 位、沒有時間 —— 而那些資料都在檔案裡。"""
+    data = bom + json.dumps(TRANSCRIBE_RESULT, ensure_ascii=False).encode("utf-8")
+    segs, used = tp.parse(data, name)
+    assert used == "json", used
+    assert [s["text"] for s in segs] == [s["text"] for s in TRANSCRIBE_RESULT["segments"]]
+    assert {s.get("speaker") for s in segs} == {"王小明", "S2"}, "發言者沒有跟著讀進來（含改名）"
+    assert segs[0]["start_ms"] == 1000 and segs[-1]["end_ms"] == 9000
+
+
+def test_the_bracketed_timestamp_plain_text_is_still_plain_text():
+    """反向對照：`[00:12] S1：…`（轉逐字稿自己的純文字格式）也是 `[` 開頭 ——
+    不可以因為開頭像 JSON 就被丟掉或讀壞。"""
+    # 每位都出現兩次 —— 只出現一次的名字本來就不認成發言者（避免把句子裡的冒號當名字）
+    text = ("[00:01] 王小明：各位早，今天要談三件事。\n[00:04] 李美華：預算我看過了。\n"
+            "[00:09] 王小明：那就照原案走。\n[00:12] 李美華：好。\n")
+    segs, used = tp.parse(text.encode("utf-8"), "逐字稿.txt")
+    assert used != "json"
+    assert [s.get("speaker") for s in segs] == ["王小明", "李美華", "王小明", "李美華"]
+    assert [s["start_ms"] for s in segs] == [1000, 4000, 9000, 12000]
+
+
+def test_json_that_is_not_a_transcript_falls_back_to_text():
+    """內容是 JSON 但讀不出段落 → 照原本的純文字讀，不可以變成錯誤。"""
+    segs, used = tp.parse(b'{"note": "hello"}', "x.txt")
+    assert used != "json" and segs

@@ -53,7 +53,11 @@
   content: '✓'; position: absolute; top: 8px; right: 10px;
   color: #3b82f6; font-weight: 700; font-size: 14px;
 }
-.md2-theme-name { font-weight: 600; font-size: 13px; color: #1e293b; margin-bottom: 3px; }
+.md2-theme-name { font-weight: 600; font-size: 13px; color: #1e293b; margin-bottom: 3px;
+                  display: flex; align-items: center; gap: 8px; padding-right: 16px; }
+.md2-sw { display: inline-flex; gap: 3px; flex: none; }
+.md2-sw > i { width: 12px; height: 12px; border-radius: 3px;
+              box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.14); }
 .md2-theme-desc { font-size: 11px; color: #64748b; line-height: 1.5; }
 .md2-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; align-items: center; }
 /* 4 個 chip:檔名 50%,其餘 3 個共享 50% (每個 ~16.6%)。窄畫面下自動降為 2 欄 / 1 欄。 */
@@ -196,7 +200,8 @@ def hello():
     {% for t in themes %}
     <label class="md2-theme{% if loop.first %} selected{% endif %}" data-theme="{{ t.id }}">
       <input type="radio" name="md2-theme" value="{{ t.id }}"{% if loop.first %} checked{% endif %}>
-      <div class="md2-theme-name">{{ tr(t.name) }}</div>
+      {# 色票（標題 ／ 強調 ／ 表頭）—— 顏色由下面的腳本走 CSSOM 設（CSP 擋行內 style） #}
+      <div class="md2-theme-name"><span class="md2-sw" data-swatches="{{ t.swatch|join(',') }}" aria-hidden="true"></span>{{ tr(t.name) }}</div>
       <div class="md2-theme-desc">{{ tr(t.desc) }}</div>
     </label>
     {% endfor %}
@@ -260,6 +265,12 @@ def hello():
 {% raw %}
 (function () {
   const $ = (id) => document.getElementById(id);
+  // 主題卡片的色票：只收 #rgb / #rrggbb，走 CSSOM（行內 style 屬性會被 CSP 丟掉）
+  document.querySelectorAll('.md2-sw[data-swatches]').forEach(box => {
+    box.dataset.swatches.split(',').map(c => c.trim())
+      .filter(c => /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c))
+      .forEach(c => { const d = document.createElement('i'); d.style.backgroundColor = c; box.appendChild(d); });
+  });
   let lastResult = null;
   let pickedFilename = '';  // remember last loaded file name to derive download stem
   let _lbUrls = [];     // preview image URLs for lightbox

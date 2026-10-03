@@ -521,7 +521,6 @@
  "取回逐字稿": "Fetch the transcript",
  "文字、時間與發言者，依段號對齊": "Text, timing and speakers, aligned by segment number",
  "回報已收到": "Confirm receipt",
- "確定存好之後才送，JTLW 收到就可以刪掉它那份（沒收到的話 72 小時後自己清掉）": "Sent only after the transcript is safely saved; JTLW can then delete its copy (without it, JTLW clears the job after 72 hours)",
  "邊聽邊看，交給會議摘要": "Listen while reading, then hand over to Meeting summary",
  "改發言者名字": "Rename speakers",
  "摘要、決議、待辦、心智圖都在本系統產生": "Summary, decisions, action items and mind map are all produced in this system",
@@ -543,5 +542,6 @@
  "<b>一定要對外開放時，風險自負。</b>至少加上認證與強制雙因素驗證、WAF 或速率限制，並持續更新相依套件。各種反向代理的設定範例見 <a href=\"https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md\" target=\"_blank\" rel=\"noopener\">OPS.md 反向代理章節</a>。": "<b>If you must expose it publicly, you do so at your own risk.</b> At minimum add sign-in with mandatory two-factor authentication, a WAF or rate limiting, and keep dependencies up to date. Configuration examples for common reverse proxies are in the <a href=\"https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md\" target=\"_blank\" rel=\"noopener\">reverse proxy section of OPS.md</a>.",
  "<b>只在內網或 VPN 使用。</b>同仁會拿它處理合約、報價、個資等機密文件。放在公開網路上，任何人都能試著登入、上傳特製的檔案；放在內網，連得到的只有同仁，而且都要先登入。": "<b>Use it on the internal network or over VPN only.</b> People will process contracts, quotes, personal data and other confidential documents with it. On the public internet anyone can try to sign in or upload crafted files; on the internal network only colleagues can reach it, and they have to sign in first.",
  "接你自己的 LLM（本機 Ollama、LiteLLM 等 LLM 閘道、vLLM、LM Studio、DGX Spark 都可），即可在這 13 個工具開啟智慧選項。<b>核心工具完全不依賴 LLM</b>，沒設定也照樣 100% 可用。": "Connect your own LLM (local Ollama, an LLM gateway such as LiteLLM, vLLM, LM Studio or a DGX Spark) to turn on smart options in these 13 tools. <b>The core tools do not depend on an LLM at all</b> and work 100% without one.",
- "<b>LiteLLM 等 LLM 閘道 / vLLM / SGLang / llama.cpp / LM Studio / jan.ai</b> · 任何 OpenAI-compatible 後端，模型的「思考」會自動關閉": "<b>LLM gateways such as LiteLLM / vLLM / SGLang / llama.cpp / LM Studio / jan.ai</b> · any OpenAI-compatible backend; the model's \"thinking\" is turned off automatically"
+ "<b>LiteLLM 等 LLM 閘道 / vLLM / SGLang / llama.cpp / LM Studio / jan.ai</b> · 任何 OpenAI-compatible 後端，模型的「思考」會自動關閉": "<b>LLM gateways such as LiteLLM / vLLM / SGLang / llama.cpp / LM Studio / jan.ai</b> · any OpenAI-compatible backend; the model's \"thinking\" is turned off automatically",
+ "存好之後最多 24 小時內送（這段時間可以補專有名詞、只重跑校正），JTLW 收到就刪掉它那份（沒收到的話 7 天後自己清掉）": "Sent within 24 hours of saving the transcript (until then, terms can be added and only the correction re-run); JTLW then deletes its copy (without it, JTLW clears the job after 7 days)"
 }

@@ -51,6 +51,12 @@ def _user_id(request: Request) -> Optional[int]:
         return None
 
 
+def current_user_id(request: Request) -> Optional[int]:
+    """這個請求是誰（伺服器端認出的使用者編號；認證關閉時是 None）。
+    給「每個人各存一份」的功能用 —— 跟上傳歸屬同一套認人的方法，不另寫一份。"""
+    return _user_id(request)
+
+
 def _is_admin(uid: int) -> bool:
     try:
         from . import permissions as _perm

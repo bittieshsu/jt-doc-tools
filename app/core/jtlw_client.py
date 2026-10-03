@@ -105,11 +105,27 @@ MESSAGES: dict[str, str] = {
     # 原本畫面上印的是 `jtlw 回報：invalid_request（欄位 language）` —— 使用者看不懂，
     # 也不知道改選「自動判斷」就能送出去。
     "language_rejected": "語音服務不接受這個語言設定 —— 請改選「自動判斷」再送一次；一直發生的話，請管理員確認語音服務支援哪些語言。",
+    # 補專有名詞、只重跑校正（v1.16.41）。**每一句都要講得出下一步** —— 能不能重跑
+    # 使用者自己判斷不了（到期時間、有沒有校正這一步都是伺服器端才知道的事）。
+    "content_cleared": "JTLW 已經刪除它那份逐字稿（超過保留時間，或已經按過「不用再改了」），沒辦法再重跑校正 —— 要改專有名詞，請重新送件。",
+    "retry_no_correct": "這次的辨識模式沒有校正這一步，補專有名詞也沒有東西可以重跑 —— 要讓專有名詞生效，請重新送件。",
+    "retry_too_late": "再過不到 15 分鐘就會請 JTLW 刪除它那份逐字稿，來不及重跑校正了 —— 要改專有名詞，請重新送件。",
+    "retry_running": "這份逐字稿正在重跑校正，請等它做完。",
+    "retry_refused": "JTLW 現在不能重跑這一件（可能還在處理中）—— 請稍後再試；一直不行的話，請重新送件。",
+    # 已知的錯寫法被退回（v2.28，`api_revision` 2.9；`details.reason`）。我們送件前已經照同一套規則擋過，
+    # 走到這裡多半是對方規則改了 —— **不接變數**（接了整句在語系檔查不到，英日退回中文）
+    "variants_need_single_term": "語音服務不收這組聽錯的寫法：箭頭右邊只能寫一個正確的寫法。",
+    "variant_is_a_glossary_term": "語音服務不收這組聽錯的寫法：其中有一個也是清單上的專有名詞（照表換會把寫對的換掉）。",
+    "ambiguous_variant": "語音服務不收這組聽錯的寫法：同一個聽錯的寫法對到了兩個不同的專有名詞。",
 }
+
+#: 對方退回錯寫法時 `details.reason` 的代碼（v2.28）
+_VARIANT_REASONS = frozenset({"variants_need_single_term", "variant_is_a_glossary_term",
+                              "ambiguous_variant"})
 
 
 def describe_error(code: str, *, field: str = "", retryable: bool = False,
-                   http_status: str = "", host: str = "") -> str:
+                   http_status: str = "", host: str = "", reason: str = "") -> str:
     """把對方的錯誤碼講成使用者做得了下一步的話。
 
     `http_status` 是**對方拉我們的檔案時**拿到的碼（在 `details` 裡），
@@ -135,6 +151,8 @@ def describe_error(code: str, *, field: str = "", retryable: bool = False,
     # 文件上則寫 `language_not_supported` —— 兩個都認，判準是**欄位**。
     if field == "language" and code in ("invalid_request", "language_not_supported"):
         return MESSAGES["language_rejected"]
+    if field.startswith("glossary") and reason in _VARIANT_REASONS:
+        return MESSAGES[reason]
     msg = ERROR_TEXT.get(code)
     if msg:
         return msg + ("（這一類可以再試一次）" if retryable else "")
@@ -164,7 +182,8 @@ def _raise_for(resp: httpx.Response) -> None:
             # **走共用的那一份** —— 不要在這裡再寫一次措辭
             msg = describe_error(code, field=field, retryable=retryable,
                                  http_status=str(details.get("http_status") or ""),
-                                 host=str(details.get("host") or ""))
+                                 host=str(details.get("host") or ""),
+                                 reason=str(details.get("reason") or ""))
     except (json.JSONDecodeError, ValueError, AttributeError):
         pass
     if resp.status_code == 401:
@@ -290,6 +309,16 @@ class JtlwClient:
 
     def cancel(self, job_id: str) -> dict:
         return self._request("POST", f"/jobs/{job_id}/cancel").json()
+
+    def retry(self, job_id: str, body: dict) -> dict:
+        """只重跑校正（帶新的 `glossary`）。辨識與發言者分離不重做，`seq` 不變。
+
+        **ACK 之後不行** —— 對方回 409 `invalid_request`、`details.reason = content_cleared`
+        （v2.26.7 起；更舊的版本只有 `details.status`）。作業還在跑、或送件時沒要 `correct`
+        的，也是 409。
+        """
+        return self._request("POST", f"/jobs/{job_id}/retry", json=body,
+                             headers={"Content-Type": "application/json"}).json()
 
     def ack(self, job_id: str) -> dict:
         """**只能在內容已經落地之後送** —— `ack` 的意思是「你可以刪了」。

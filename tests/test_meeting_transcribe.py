@@ -15,6 +15,7 @@ import importlib
 import json
 import pathlib
 from pathlib import Path
+import re
 import socket
 import threading
 import time
@@ -68,8 +69,25 @@ class FakeJtlw:
                  duration_ms: int | None = None, queue_polls: int = 0,
                  submit_status: int | None = None, profiles_status: int | None = None,
                  api_revision: str = "2.6", caps_status: int | None = None,
-                 fallback_reason: str | None = None):
+                 fallback_reason: str | None = None, saturated: bool = False,
+                 retry_polls: int = 1, heard: str | None = None,
+                 variant_reject: str | None = None):
         self.seen: dict = {}
+        #: 每一段校正後的文字都帶著這個**聽錯的寫法**（2.9 起照 `variants` 換掉，測試才看得出換了）
+        self.heard = heard
+        #: 有 `variants` 就回 400 ＋ 這個 `details.reason`（測「對方退回錯寫法」的訊息）
+        self.variant_reject = variant_reject
+        #: ACK 之後對方清掉內容（v2.26.7）：之後的 retry 回 409 ＋ `reason: content_cleared`。
+        #: 測試也可以直接設 True，模擬對方自己到期清掉。
+        self.cleared = False
+        #: 收到的 retry 內容（依序）；retry 之後先回幾次「執行中」再回成功
+        self.retries: list[dict] = []
+        self.retry_polls = retry_polls
+        self._retry_left = 0
+        #: ACK 回這個 HTTP 狀態（模擬對方暫時連不上）
+        self.ack_status: int | None = None
+        #: Nemotron 的 8 個位置全部用到（api_revision 2.7 的 `Result.diarization.saturated`）
+        self.saturated = saturated
         #: `GET /capabilities` 回的介面版本。**2.5 起才收 `hints.diarize_engine`**，
         #: 舊版收到會 400（對方 `hints` 是 `additionalProperties: false`，v2.23）。
         self.api_revision = api_revision
@@ -105,6 +123,63 @@ class FakeJtlw:
 
     def _revision(self) -> tuple:
         return tuple(int(p) for p in self.api_revision.split("."))
+
+    #: `GlossaryEntry` 的欄位（照對方 schema，`additionalProperties: false`）；
+    #: `variants` 是 2.9 起才有的（v2.28），舊版收到整件 400
+    def _entry_keys(self) -> set:
+        keys = {"source", "mode", "target", "src_lang", "tgt_lang", "case_sensitive"}
+        if self._revision() >= (2, 9):
+            keys.add("variants")
+        return keys
+
+    def _variants_error(self, ents: list):
+        """錯寫法的三條規則（v2.28）—— **判準自己寫一份**，不借產品的 `parse_glossary`。
+        有問題回 400 的回應，沒問題回 None。"""
+        def bad(i, reason, variant=None):
+            self.seen["rejected_variants"] = reason
+            return JSONResponse({"error": {
+                "code": "invalid_request", "category": "request", "retryable": False,
+                "details": {"field": f"glossary.entries[{i}].variants", "reason": reason,
+                            **({"variant": variant} if variant else {})}}}, status_code=400)
+        sources = {e["source"].casefold() for e in ents}
+        owner: dict = {}
+        for i, e in enumerate(ents):
+            vs = e.get("variants")
+            if vs is None:
+                continue
+            if self.variant_reject:
+                return bad(i, self.variant_reject)
+            if (not isinstance(vs, list) or len(vs) > 20
+                    or any(not isinstance(v, str) or not 2 <= len(v) <= 200 for v in vs)):
+                return bad(i, "schema")
+            if re.search(r"[、，,；;]|\s/\s", e["source"]):
+                return bad(i, "variants_need_single_term")
+            for v in vs:
+                k = v.casefold()
+                if k in sources:
+                    return bad(i, "variant_is_a_glossary_term", v)
+                if k in owner and owner[k] != e["source"]:
+                    return bad(i, "ambiguous_variant", v)
+                owner[k] = e["source"]
+        return None
+
+    def _final_text(self, i: int) -> tuple:
+        """第 i 段校正後的文字，與照錯寫法換了幾處（2.9 起，要求了 `correct` 才換）。"""
+        ents = ((self.retries[-1].get("glossary") or {}).get("entries")
+                if self.retries else None)
+        extra = f"（{ents[0]['source']}）" if ents else ""
+        text = f"校正後第 {i} 句{' ' + self.heard if self.heard else ''}{extra}。"
+        n = 0
+        if self._revision() >= (2, 9) and "correct" in self.requested_tasks:
+            cur = ((self.seen.get("body") or {}).get("glossary") or {}).get("entries") or []
+            for e in cur:
+                for v in e.get("variants") or []:
+                    # 有英文字母的整個詞才換、不分大小寫（對方的規則）
+                    pat = re.compile(r"(?<![A-Za-z0-9])" + re.escape(v) + r"(?![A-Za-z0-9])",
+                                     re.I)
+                    text, k = pat.subn(e["source"], text)
+                    n += k
+        return text, n
 
     @property
     def base(self) -> str:
@@ -192,6 +267,34 @@ class FakeJtlw:
                         "code": "invalid_request", "category": "request", "retryable": False,
                         "details": {"field": "hints", "reason": "additionalProperties"
                                     if extra else "enum"}}}, status_code=400)
+            # `glossary` 照對方 schema（v0.4 / v0.5）：只有 `entries`、最多 500 筆（多了 422
+            # `glossary_too_large`）；每筆 `source` 1~200 字、`mode` 只有 keep / translate、
+            # 其餘欄位只收 target / src_lang / tgt_lang / case_sensitive。**判準自己寫一份。**
+            glo = body.get("glossary")
+            if glo is not None:
+                ents = glo.get("entries") if isinstance(glo, dict) else None
+                if isinstance(ents, list) and len(ents) > 500:
+                    return JSONResponse({"error": {
+                        "code": "glossary_too_large", "category": "request", "retryable": False,
+                        "details": {"max_inline_entries": 500, "entries": len(ents)}}},
+                        status_code=422)
+                ok_keys = me._entry_keys()
+                bad_entry = (not isinstance(glo, dict) or set(glo) != {"entries"}
+                             or not isinstance(ents, list)
+                             or any(not isinstance(e, dict) or set(e) - ok_keys
+                                    or not isinstance(e.get("source"), str)
+                                    or not 1 <= len(e["source"]) <= 200
+                                    or e.get("mode") not in ("keep", "translate")
+                                    for e in ents))
+                if bad_entry:
+                    me.seen["rejected_glossary"] = glo
+                    return JSONResponse({"error": {
+                        "code": "invalid_request", "category": "request", "retryable": False,
+                        "details": {"field": "glossary", "reason": "schema"}}},
+                        status_code=400)
+                err = me._variants_error(ents)
+                if err:
+                    return err
             me.seen["body"] = body
             me.requested_tasks = tuple(body.get("tasks") or ())
             me.seen["idempotency_key"] = request.headers.get("idempotency-key")
@@ -201,6 +304,11 @@ class FakeJtlw:
         @app.get("/api/v1/jobs/{job_id}")
         async def job(job_id: str):
             me.polls += 1
+            if me._retry_left > 0:
+                # 重跑校正中：對方只跑校正那一段
+                me._retry_left -= 1
+                return {"status": "running", "queue_position": None,
+                        "progress": {"stage": "correction", "percent": 80.0, "waiting": None}}
             if me.fail_with:
                 # 終態的錯誤在 `errors` 陣列裡（對方 2026-09-21 給的實際欄位）
                 return {"status": "failed", "errors": [me.fail_with]}
@@ -225,9 +333,26 @@ class FakeJtlw:
                                     if queued else None)}
                 me.progress_sent.append(prog)
                 return {"status": "running", "queue_position": None, "progress": prog}
-            return {"status": "succeeded",
+            done = {"status": "succeeded",
                     "progress": {"stage": "finalize", "percent": 100.0},
+                    # 對方的 `Job` 帶著辨識模式與它的版本
+                    "profile_id": (me.seen.get("body") or {}).get("profile_id") or "meeting.balanced",
+                    "profile_version": "2026.09.1",
                     "result": {"duration_s": 60, "language": "zh"}}
+            ents = ((me.seen.get("body") or {}).get("glossary") or {}).get("entries")
+            if ents:
+                # 對方的 `GlossarySummary`。2.8 起（v2.27）`asr_bias_terms` 照實回報：
+                # 走 GPU 伺服器辨識時專有名詞根本傳不過去，是 **0**（對方 mock 平常也回 0）；
+                # 2.8 以前一律照詞數回報（前 50 筆）
+                done["glossary"] = {"entries": len(ents),
+                                    "keep_terms": sum(1 for e in ents if e["mode"] == "keep"),
+                                    "asr_bias_terms": (0 if me._revision() >= (2, 8)
+                                                       else min(50, len(ents)))}
+                if me._revision() >= (2, 9):
+                    # 收下幾個錯寫法（v2.28）
+                    done["glossary"]["variants"] = sum(len(e.get("variants") or [])
+                                                       for e in ents)
+            return done
 
         @app.get("/api/v1/jobs/{job_id}/segments")
         async def segs(job_id: str, layer: str, after_seq: int = 0, limit: int = 500):
@@ -246,7 +371,8 @@ class FakeJtlw:
                     rows.append({"seq": i, "text": f"原始第 {i} 句",
                                  "start_ms": i * 1000, "end_ms": i * 1000 + 800})
                 elif layer == "final":
-                    rows.append({"seq": i, "text": f"校正後第 {i} 句。"})
+                    # 重跑校正之後換成新的校正結果（帶第一個新的專有名詞，測試才看得出換了）
+                    rows.append({"seq": i, "text": me._final_text(i)[0]})
                 else:
                     # **刻意讓第 2 段沒有發言者** —— 三層對不上時不可以硬湊
                     if i != 2:
@@ -257,9 +383,18 @@ class FakeJtlw:
         async def result(job_id: str):
             if me.duration_ms is None:
                 return JSONResponse({"error": {"code": "not_found"}}, status_code=404)
-            out = {"result_schema_version": ("2.3" if me._revision() >= (2, 6) else
+            out = {"result_schema_version": ("2.4" if me._revision() >= (2, 7) else
+                                             "2.3" if me._revision() >= (2, 6) else
                                              "2.2" if me._revision() >= (2, 5) else "2.0"),
                    "job_id": job_id, "status": "succeeded", "duration_ms": me.duration_ms}
+            if me._revision() >= (2, 9) and "correct" in me.requested_tasks:
+                # `Result.correction.variant_replacements`（2.9 起，v2.28）：照錯寫法換了幾處
+                out["correction"] = {"variant_replacements":
+                                     sum(me._final_text(i)[1] for i in range(1, me.n + 1))}
+            if me._revision() >= (2, 8):
+                # `Result.asr`（2.8 起，v2.27）：整場一個值；辨識失敗或舊作業是 null
+                out["asr"] = {"model": "large-v3-turbo", "location": "gpu_server",
+                              "device": "cuda"}
             if me._revision() >= (2, 5):
                 # `Result.diarization`（2.5 起）：要求了 diarize 才有。`auto` 指定超過 8 人時
                 # 對方退回原本的方法，原因寫在 note（v2.23 第二節的例子）。
@@ -283,14 +418,65 @@ class FakeJtlw:
                     # `reason` 是 2.6 起才有的（對方 v2.24）；2.5 的服務沒有這個鍵
                     if me._revision() < (2, 6):
                         out["diarization"].pop("reason", None)
+                    # `saturated` 是 2.7 起才有的（對方 v2.26）：**一定有值**；沒指定人數、
+                    # 8 個位置全部用到時為 true（照用新方法、或因此退回原本的方法都是 true）
+                    if me._revision() >= (2, 7):
+                        d = out["diarization"]
+                        out["diarization"]["saturated"] = bool(
+                            me.saturated and req == "auto" and not n
+                            and (d["engine"] == "nemotron"
+                                 or d.get("reason") == "speakers_saturated"))
                 else:
                     out["diarization"] = None
             return out
 
         @app.post("/api/v1/jobs/{job_id}/ack")
         async def ack(job_id: str):
+            if me.ack_status:
+                return JSONResponse({"error": {"code": "internal_error", "category": "server",
+                                               "retryable": True, "details": {}}},
+                                    status_code=me.ack_status)
+            if me._retry_left > 0:
+                # 作業還在跑時 ACK 會被退回（照對方的契約）
+                return JSONResponse({"error": {
+                    "code": "invalid_request", "category": "request", "retryable": False,
+                    "details": {"status": "running"}}}, status_code=409)
             me.acked.append(job_id)
+            me.cleared = True
             return {"ok": True}
+
+        @app.post("/api/v1/jobs/{job_id}/retry")
+        async def retry(job_id: str, request: Request):
+            # 照對方的契約（v2.26.7）：先驗內容，再看內容還在不在、作業能不能重跑
+            body = await request.json()
+            glo = body.get("glossary")
+            ents = glo.get("entries") if isinstance(glo, dict) else None
+            if (set(body) - {"glossary", "glossary_url", "correction_level"}
+                    or not isinstance(ents, list)
+                    or any(not isinstance(e, dict) or e.get("mode") not in ("keep", "translate")
+                           or set(e) - me._entry_keys()
+                           or not isinstance(e.get("source"), str) for e in ents)):
+                return JSONResponse({"error": {
+                    "code": "invalid_request", "category": "request", "retryable": False,
+                    "details": {"field": "glossary", "reason": "schema"}}}, status_code=400)
+            err = me._variants_error(ents)
+            if err:
+                return err
+            if me.cleared:
+                return JSONResponse({"error": {
+                    "code": "invalid_request", "category": "request", "retryable": False,
+                    "details": {"status": "succeeded", "reason": "content_cleared"}}},
+                    status_code=409)
+            if me._retry_left > 0 or "correct" not in me.requested_tasks:
+                return JSONResponse({"error": {
+                    "code": "invalid_request", "category": "request", "retryable": False,
+                    "details": {"status": "running" if me._retry_left else "succeeded"}}},
+                    status_code=409)
+            me.retries.append(body)
+            me._retry_left = me.retry_polls
+            # 對方的 `GlossarySummary` 跟著換成這次的詞
+            (me.seen.setdefault("body", {}))["glossary"] = glo
+            return JSONResponse({"job_id": job_id, "status": "queued"}, status_code=202)
 
         @app.post("/api/v1/jobs/{job_id}/cancel")
         async def cancel(job_id: str):
@@ -318,25 +504,37 @@ class FakeJtlw:
 
 @pytest.fixture
 def unconfigured():
-    js.save({"enabled": False, "base_url": "", "api_key_enc": "", "audio_base_url": ""})
+    js.save({"enabled": False, "base_url": "", "api_key_enc": "", "audio_base_url": "",
+             "retry_window_hours": 24, "tasks": list(js.DEFAULT_TASKS)})
     js.invalidate_cache()
+    # 延後 ACK 的清單與「正在重跑」都要清 —— 前一條測試留下的會讓這一條的判斷不一樣
+    _ack = __import__("importlib").import_module("app.core.jtlw_ack")
+    _ack._path().unlink(missing_ok=True)
     # 「上一次讀到的版本」與頁面快取都是依送件位址記在行程裡的 —— 假服務換測試會重用埠號，
     # 不清的話前一條測試的版本會被這一條沿用（時好時壞）
     _mtr = __import__("importlib").import_module("app.tools.meeting_transcribe.router")
     _mtr._last_revision.clear()
     _mtr._engine_cache.clear()
+    _mtr._RETRYING.clear()
     yield
-    js.save({"enabled": False, "base_url": "", "api_key_enc": "", "audio_base_url": ""})
+    js.save({"enabled": False, "base_url": "", "api_key_enc": "", "audio_base_url": "",
+             "retry_window_hours": 24, "tasks": list(js.DEFAULT_TASKS)})
     js.invalidate_cache()
+    _ack._path().unlink(missing_ok=True)
+    _mtr._RETRYING.clear()
 
 
 def _configure(fake: FakeJtlw, *, audio_base: str = "http://audio.test:8765",
-               profile_id: str | None = None) -> None:
+               profile_id: str | None = None, retry_window_hours: int = 24,
+               tasks: list[str] | None = None) -> None:
     # **辨識模式一定要寫** —— `save()` 是合併，不寫的話上一條測試存的台語模式會留下來，
     # 下一條就在台語模式底下跑（韓文那條留下的，因為 `zh-Hant` 兩種模式都收而一直沒被看到）。
+    # 保留時間與處理清單同理（每次都寫滿）。
     cfg = {"enabled": True, "base_url": fake.base,
            "api_key_enc": "jtlw_test_key", "audio_base_url": audio_base,
-           "profile_id": profile_id or js.DEFAULT_PROFILE}
+           "profile_id": profile_id or js.DEFAULT_PROFILE,
+           "retry_window_hours": retry_window_hours,
+           "tasks": list(tasks or js.DEFAULT_TASKS)}
     js.save(cfg)
     js.invalidate_cache()
 
@@ -416,6 +614,8 @@ def test_the_whole_flow_against_a_fake_jtlw(client, unconfigured):
         # **對不上的不可以硬湊**：第 2 段沒有發言者就是沒有
         assert "speaker" not in segs[1], "把別人的發言者貼到沒有發言者的那一段上了"
         assert segs[0]["speaker"] == "S2"
+        # 這份逐字稿是在什麼條件下產生的：辨識模式與版本要記在檔案裡（2026-10-03 使用者問）
+        assert out.get("profile") == {"id": "meeting.balanced", "version": "2026.09.1"}, out.get("profile")
 
 
 def test_the_submitted_url_comes_from_the_configured_address_not_the_request(client, unconfigured):
@@ -438,12 +638,14 @@ def test_the_submitted_url_comes_from_the_configured_address_not_the_request(cli
 
 
 def test_ack_is_sent_and_only_after_the_transcript_is_on_disk(client, unconfigured):
-    """`ack` 的意思是「你可以刪了」—— 順序必須是「寫完 → 才 ACK」。"""
+    """`ack` 的意思是「你可以刪了」—— 順序必須是「寫完 → 才 ACK」。
+
+    保留時間 0 ＝ 存好就 ACK（延後 ACK 那一條路在 `test_meeting_transcribe_retry.py`）。"""
     with FakeJtlw() as fake:
-        _configure(fake)
+        _configure(fake, retry_window_hours=0)
         up = _upload(client)
         _run(client, up["upload_id"])
-        assert fake.acked == ["job_fake_1"], "沒有送 ACK，對方會留 72 小時才清"
+        assert fake.acked == ["job_fake_1"], "沒有送 ACK，對方會留 7 天才清"
         # ACK 送出去的時候，檔案一定已經在了
         r = client.get(f"/tools/meeting-transcribe/result/{up['upload_id']}")
         assert r.status_code == 200
@@ -532,7 +734,8 @@ def test_an_empty_file_leaves_nothing_behind(client, unconfigured):
         assert after == before, "空檔案被擋下來了，但半個檔案留在磁碟上"
 
 
-def test_no_ack_when_writing_the_transcript_fails(client, unconfigured, monkeypatch):
+@pytest.mark.parametrize("window", [0, 24])
+def test_no_ack_when_writing_the_transcript_fails(client, unconfigured, monkeypatch, window):
     """**這一條才分得出順序。**
 
     上面那條只驗「兩件事都發生了」—— 把 `ack()` 搬到寫檔**之前**，它照樣全綠。
@@ -549,12 +752,14 @@ def test_no_ack_when_writing_the_transcript_fails(client, unconfigured, monkeypa
         raise OSError("磁碟滿了")
 
     with FakeJtlw() as fake:
-        _configure(fake)
+        # 0 ＝ 存好就 ACK 那條路；24 ＝ 延後 ACK 那條路 —— 兩條都不可以在寫檔之前動手
+        _configure(fake, retry_window_hours=window)
         up = _upload(client)
         monkeypatch.setattr(mt.atomic_json, "write_json", boom)
         job = _run(client, up["upload_id"])
         assert job["status"] == "error", "寫檔失敗了卻回報成功"
         assert fake.acked == [], "逐字稿沒寫進去卻送了 ACK —— 對方會把它刪掉"
+        assert mt.jtlw_ack.due_at("job_fake_1") is None, "逐字稿沒寫進去卻排進了延後 ACK"
 
 
 # --------------------------------------------------- 對方的自簽憑證
@@ -1157,7 +1362,8 @@ def test_a_long_silent_tail_is_hinted_but_the_job_still_succeeds(client, unconfi
         up = _upload(client)
         j = _run(client, up["upload_id"])
         assert j["status"] == "done", f"尾端空白被當成失敗了：{j.get('error')}"
-        assert fake.acked, "尾端空白不影響 ACK"
+        # 尾端空白不影響 ACK（要過校正的作業延後 ACK，排進清單就算）
+        assert __import__("app.core.jtlw_ack", fromlist=["due_at"]).due_at("job_fake_1")
     out = _result(client, up["upload_id"])
     assert out["tail_gap_ms"] == 125_000 - 5_800
     assert out["tail_hint"] is True
@@ -1417,6 +1623,177 @@ def test_nemotron_is_reported_without_a_note(client, unconfigured):
     assert res["diarize_fallback"] is None
 
 
+@pytest.mark.parametrize("saturated,reason,want", [
+    (True, None, True),                       # 用滿、照用新方法 → 提醒
+    (False, None, False),                     # 沒用滿 → 不提醒（反向對照）
+    (True, "speakers_saturated", False),      # 用滿、改用原本的方法 → 由退回那句講，不重複
+])
+def test_eight_full_slots_on_the_new_method_are_pointed_out(client, unconfigured,
+                                                            saturated, reason, want):
+    """JTLW `api_revision` 2.7（對方 v2.26）：沒指定人數、新方法的 8 個位置用滿而且照用新方法時，
+    實際超過 8 人的話會有人被併在一起，結果卻跟一般的一樣 —— 要提醒「實際更多人時填人數重送」。
+    判斷式照對方給的 `saturated && engine == "nemotron"`。"""
+    with FakeJtlw(api_revision="2.7", duration_ms=60000, saturated=saturated,
+                  fallback_reason=reason) as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"])
+        assert j["status"] == "done", j.get("error")
+    res = _result(client, up["upload_id"])
+    assert res["diarization"]["saturated"] is (saturated and True)
+    assert res["diarize_saturated"] is want
+    if want:
+        assert res["diarize_fallback"] is None
+
+    import pathlib as _p
+    src = _p.Path("app/tools/meeting_transcribe/templates/meeting_transcribe.html").read_text(
+        encoding="utf-8")
+    assert "data.diarize_saturated" in src, "結果頁沒有讀 `diarize_saturated` —— 畫面上不會提醒"
+
+
+# ---------- 專有名詞 → 送件時帶 `glossary`（2026-10-02 使用者決定：專有名詞拿來修錯字） ----------
+
+def test_terms_are_sent_as_a_keep_glossary_in_the_order_given(client, unconfigured):
+    """一行一個；頓號 / 逗號也收。**照使用者的順序送**（對方取前面的詞當辨識提示）、
+    不分大小寫去重、一律 `keep`（校正時不可以改）。結果要帶回送了什麼、對方怎麼用。"""
+    with FakeJtlw(duration_ms=60000) as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"],
+                 terms="王小明\nBianca、Acme-Kevin, bianca\n\n  Proxmox   VE  ")
+        assert j["status"] == "done", j.get("error")
+        sent = fake.seen["body"]["glossary"]
+    assert sent == {"entries": [{"source": t, "mode": "keep"} for t in
+                                ["王小明", "Bianca", "Acme-Kevin", "Proxmox VE"]]}
+    res = _result(client, up["upload_id"])
+    assert res["terms"] == ["王小明", "Bianca", "Acme-Kevin", "Proxmox VE"]
+    assert res["glossary"] == {"entries": 4, "keep_terms": 4, "asr_bias_terms": 4}
+
+
+def test_no_terms_means_no_glossary(client, unconfigured):
+    """反向對照：沒填就不送這個欄位（空的 `entries` 也不送）。"""
+    with FakeJtlw(duration_ms=60000) as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"], terms="  \n 、 ")
+        assert j["status"] == "done", j.get("error")
+        assert "glossary" not in fake.seen["body"]
+    assert _result(client, up["upload_id"])["terms"] == []
+
+
+@pytest.mark.parametrize("terms,word", [
+    ("\n".join(f"詞{i}" for i in range(501)), "500"),
+])
+def test_bad_terms_are_refused_before_anything_is_sent(client, unconfigured, terms, word):
+    """太多回 400 而且講出上限 —— **不可以安靜地截掉**（被截掉的詞不會被參考，
+    畫面上卻像是送出去了）。也不可以送出去讓對方退回（那是整件作業失敗）。
+
+    （一行很長原本也是 400；2026-10-03 這一欄改成「專有名詞或會議背景」之後，
+    很長的一行是會議背景 —— 不送去辨識、不擋，見下面那幾條。）"""
+    with FakeJtlw(duration_ms=60000) as fake:
+        _configure(fake)
+        up = _upload(client)
+        r = client.post("/tools/meeting-transcribe/start",
+                        json={"upload_id": up["upload_id"], "terms": terms})
+        assert r.status_code == 400, r.text
+        assert word in r.json()["detail"]
+        assert "body" not in fake.seen
+
+
+# ---------- 「專有名詞或會議背景」（2026-10-03 使用者把這一欄改名）----------
+
+@pytest.mark.parametrize("raw,want", [
+    # 一串詞：照舊
+    ("王小明\nBianca、Acme-Kevin", ["王小明", "Bianca", "Acme-Kevin"]),
+    # 「標籤：一串詞」—— 冒號前面的標籤不送
+    ("與會者：王小明、Bianca", ["王小明", "Bianca"]),
+    ("Attendees: Paul, Dennis", ["Paul", "Dennis"]),
+    # 只有標籤的那一行是標題（下一行起才是名單）—— 不送
+    ("與會人員如下:\n宏範 Carol\n範例 Dora", ["宏範 Carol", "範例 Dora"]),
+    ("與會者：", []),
+    # 網址的冒號不是標籤
+    ("https://pve.example.com", ["https://pve.example.com"]),
+    # 句子（有句號 / 問號）整行不送 —— 連同裡面的名字（要送請一行一個）
+    ("今天是第四季規劃會議，與會者有王小明。", []),
+    ("Can Bianca join next week?", []),
+    # 有一段太長（超過 10 個漢字）→ 整行當背景，不拆一半送出去
+    ("這次主要討論備份架構與異地備援的方向，王小明", []),
+    ("x" * 201, []),
+    # 句子與詞混著寫：只有詞那幾行送
+    ("今天討論 PBS 的備份方案。\n宏範 Carol\n範例 Dora", ["宏範 Carol", "範例 Dora"]),
+    # `#` 開頭是標題（從 Markdown 筆記貼過來），日期不是專有名詞 —— 2026-10-03 正式機真的送出去過
+    ("# 2026/10/02\nProxmox", ["Proxmox"]),
+    ("## 與會者\n王小明", ["王小明"]),
+    ("2026/10/02\n10:30、PVE", ["PVE"]),
+    # 反向：有字母的照送（型號、帶數字的產品名、漢字也算字母）
+    ("PVE 8、Windows 11、第3會議室", ["PVE 8", "Windows 11", "第3會議室"]),
+    ("C#、F#", ["C#", "F#"]),
+])
+def test_sentences_are_background_not_terms(raw, want):
+    """寫成句子的行**不當成專有名詞送出** —— 校正時照原樣保留一整句、拿一整句比對拼法都沒有意義。"""
+    assert _mt_router.parse_terms(raw) == want
+
+
+def test_the_whole_text_is_kept_as_context_in_the_transcript(client, unconfigured):
+    """**整段原文**（含沒送去辨識的句子）存進逐字稿 —— 轉送會議摘要時帶進會議背景。"""
+    raw = "今天是第四季規劃會議，談備份。\n與會者：王小明、Bianca"
+    with FakeJtlw() as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"], terms=raw)
+        assert j["status"] == "done", j.get("error")
+        assert [e["source"] for e in fake.seen["body"]["glossary"]["entries"]] == [
+            "王小明", "Bianca"], "句子被當成專有名詞送出去了"
+    res = _result(client, up["upload_id"])
+    assert res["context"] == raw
+    assert res["terms"] == ["王小明", "Bianca"]
+
+
+def test_resending_without_text_clears_the_old_context(client, unconfigured):
+    """同一個上傳重送時沒填 —— 上一次的背景不可以留著被帶到摘要。"""
+    with FakeJtlw() as fake:
+        _configure(fake)
+        up = _upload(client)
+        _run(client, up["upload_id"], terms="舊的背景，這一次不要。")
+        _run(client, up["upload_id"], terms="")
+    assert _result(client, up["upload_id"])["context"] == ""
+
+
+def test_the_sync_api_keeps_the_context_too(client, unconfigured):
+    with FakeJtlw() as fake:
+        _configure(fake)
+        r = _api(client, terms="這是一場備份規劃會議。\nBianca")
+        assert r.status_code == 200, r.text[:300]
+    assert r.json()["context"] == "這是一場備份規劃會議。\nBianca"
+    assert r.json()["terms"] == ["Bianca"]
+
+
+def test_a_retry_appends_new_terms_to_the_context():
+    m = _mt_router
+    assert m._merge_context("會議背景。\nBianca", ["bianca", "Proxmox VE"]) == \
+        "會議背景。\nBianca\nProxmox VE"
+    assert m._merge_context(None, ["王小明"]) == "王小明"
+
+
+def test_the_sync_api_takes_terms_too(client, unconfigured):
+    with FakeJtlw() as fake:
+        _configure(fake)
+        r = _api(client, terms="Bianca\nProxmox VE")
+        assert r.status_code == 200, r.text[:300]
+        assert [e["source"] for e in fake.seen["body"]["glossary"]["entries"]] == [
+            "Bianca", "Proxmox VE"]
+    assert r.json()["terms"] == ["Bianca", "Proxmox VE"]
+
+
+def test_the_page_sends_the_terms_and_says_how_they_were_used():
+    import pathlib as _p
+    src = _p.Path("app/tools/meeting_transcribe/templates/meeting_transcribe.html").read_text(
+        encoding="utf-8")
+    assert 'id="mtTerms"' in src
+    assert "terms: el('mtTerms').value" in src, "頁面沒有把專有名詞送出去"
+    assert "data.terms" in src and "asr_bias_terms" in src, "結果頁沒有講專有名詞怎麼用"
+
+
 @pytest.mark.parametrize("rev,want", [("2.5", "auto"), ("2.4", "legacy")])
 def test_the_page_learns_which_wording_to_show(client, unconfigured, rev, want):
     """**同一個人數在兩種方法下意思相反**，所以頁面要問伺服器「這台會用哪一種」。"""
@@ -1461,6 +1838,11 @@ def test_the_nemotron_wording_says_more_is_safer_than_fewer():
         "Nemotron 的說明裡出現了原本方法的建議（叫人少填）—— 方向相反")
     assert "比較準" not in auto and "會更準" not in auto
     assert "8" in auto, "超過 8 位會改用原本的方法，要先講"
+    # 對方 v2.25（jtlw v2.26.4）起，沒指定人數時只有「8 個位置用滿而且原本的方法分出超過 8 位」
+    # 才改用 —— 否則照用新方法、最多 8 位，而且結果分不出來。所以不可以承諾「會自動改用」，
+    # 要叫確定超過 8 位的人自己填人數（填了超過 8 就一定改用：`too_many_speakers`）。
+    assert "自動改用" not in auto, "沒指定人數時不一定會改用原本的方法，不可以這樣承諾"
+    assert "最多" in auto and "填人數" in auto
     # 原本的方法那一套照舊（對方 2.4 以前的服務還是這個意思）
     assert "發言量足以辨認" in legacy
     assert 'id="mtSpkLabelAuto"' in src and 'id="mtSpkLabelLegacy"' in src
@@ -1513,3 +1895,58 @@ def test_the_page_waits_long_enough_for_capabilities():
     import inspect
     assert _mt_router._PAGE_CAPS_TIMEOUT_S >= 10
     assert "timeout=_PAGE_CAPS_TIMEOUT_S" in inspect.getsource(_mt_router._speaker_engine_for_page)
+
+
+
+# ---------- 語音服務 v2.27（`api_revision` 2.8）：`Result.asr`、專有名詞只用在校正 ----------
+
+def test_the_recognition_model_is_kept_in_the_transcript(client, unconfigured):
+    """我們 2026-10-03 請對方附上語音辨識用的模型 → 存進逐字稿 JSON 的最上層 `asr`
+    （**只存不顯示**），走 GPU 伺服器時 `asr_bias_terms` 照實是 0。"""
+    with FakeJtlw(duration_ms=60000, api_revision="2.8") as fake:
+        _configure(fake)
+        up = _upload(client)
+        j = _run(client, up["upload_id"], terms="Proxmox\nPVE")
+        assert j["status"] == "done", j.get("error")
+    res = _result(client, up["upload_id"])
+    assert res["asr"] == {"model": "large-v3-turbo", "location": "gpu_server", "device": "cuda"}
+    assert res["glossary"] == {"entries": 2, "keep_terms": 2, "asr_bias_terms": 0}
+
+
+def test_an_older_service_leaves_asr_empty(client, unconfigured):
+    """反向對照：2.8 以前的對方沒有這個欄位 → `asr` 是 null，不可以編一個出來。"""
+    with FakeJtlw(duration_ms=60000) as fake:          # 預設 2.6
+        _configure(fake)
+        up = _upload(client)
+        assert _run(client, up["upload_id"])["status"] == "done"
+    assert _result(client, up["upload_id"])["asr"] is None
+
+
+@pytest.mark.parametrize("summary,want", [
+    ({"asr": {"model": "large-v3-turbo", "location": "api_host", "device": None,
+              "extra": "x"}},
+     {"model": "large-v3-turbo", "location": "api_host", "device": None}),
+    ({"asr": {"model": "breeze-asr-26", "location": 3, "device": "cpu"}},
+     {"model": "breeze-asr-26", "location": None, "device": "cpu"}),
+    ({"asr": None}, None),
+    ({"asr": {"model": ""}}, None),
+    ({"asr": {"model": {"x": 1}}}, None),
+    ({"asr": "large-v3"}, None),
+    ({}, None),
+    (None, None),
+])
+def test_asr_keeps_only_three_plain_strings(summary, want):
+    """對方的資料不原樣存：只留三個欄位、只收字串（多的欄位與型別會一路帶進匯出與工作區）。"""
+    assert _mt_router._asr(summary) == want
+
+
+def test_the_terms_hint_does_not_promise_recognition_bias():
+    """**辨識時不參考專有名詞清單**（對方 2026-10-03 實測後決定不做：沒出現在會議裡的詞會被
+    憑空插進逐字稿）。說明不可以再寫「辨識時會優先認這些詞」—— 那會讓使用者以為填了清單辨識就會認得，
+    而對方回報的 `asr_bias_terms` 平常是 0。"""
+    src = pathlib.Path("app/tools/meeting_transcribe/templates/meeting_transcribe.html").read_text(
+        encoding="utf-8")
+    shown = re.sub(r"\{#.*?#\}", "", src, flags=re.S)
+    assert "辨識時會優先認" not in shown
+    assert "這份清單用在校正" in shown
+    assert "（只用在校正）" in shown, "結果頁沒有處理 asr_bias_terms 是 0 的情況"

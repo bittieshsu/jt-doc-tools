@@ -99,10 +99,16 @@ def _make_highlighter(theme_id: str):
     return _hl
 
 
-def _render_md_html(md_text: str, theme_id: str, title: str, font_id: str = "default") -> str:
+def _render_md_html(md_text: str, theme_id: str, title: str, font_id: str = "default",
+                    table_opts: dict | None = None) -> str:
     """Convert markdown text to a full HTML document with theme CSS applied.
 
     font_id 為 'default' 時用主題內建字型；其他字型 ID 會 append 覆蓋 body CSS。
+
+    `table_opts`（選用，給會議記錄這類**我們自己產生**的表格用）：
+    `width`（例如 "100%"）、`cellpadding`、`rules`（"rows" ＝ 只畫橫線）、
+    `align_th`（表頭跟欄位同向對齊）、`valign`（內文格的垂直對齊）。**不給就跟原本一模一樣** ——
+    「Markdown 轉辦公文件」的表格是使用者自己的內容，不替他改樣子。
     """
     from markdown_it import MarkdownIt
     md = (
@@ -140,13 +146,32 @@ def _render_md_html(md_text: str, theme_id: str, title: str, font_id: str = "def
     # `tbody tr:nth-child(even) td` 完全沒套上；框線用預設的灰色太重。
     _ts = themes.table_style(theme_id)
 
+    _to = table_opts or {}
+
     def _table_open(self, tokens, idx, options, env):
-        return (f'<table border="1" cellpadding="5" cellspacing="0" '
-                f'bordercolor="{_ts["border"]}">')
+        extra = ""
+        if _to.get("width"):
+            extra += f' width="{_to["width"]}"'
+        if _to.get("rules"):
+            # `frame="hsides"`：外框只留上下兩條，跟「只畫橫線」一致
+            extra += f' rules="{_to["rules"]}" frame="hsides"'
+        return (f'<table border="1" cellpadding="{int(_to.get("cellpadding", 5))}" '
+                f'cellspacing="0" bordercolor="{_ts["border"]}"{extra}>')
+
+    def _align_attr(tok):
+        # markdown-it 把 `---:` 寫成 `style="text-align:right"`；soffice 對表頭
+        # 不理那個 style（表頭一律置中），所以另外補 HTML 的 `align` 屬性。
+        st = tok.attrGet("style") or ""
+        for a in ("right", "center", "left"):
+            if f"text-align:{a}" in st.replace(" ", ""):
+                return a
+        return "left"
 
     def _th_open(self, tokens, idx, options, env):
         if _ts.get("head_bg"):
             tokens[idx].attrSet("bgcolor", _ts["head_bg"])
+        if _to.get("align_th"):
+            tokens[idx].attrSet("align", _align_attr(tokens[idx]))
         return self.renderToken(tokens, idx, options, env)
 
     def _tbody_open(self, tokens, idx, options, env):
@@ -157,6 +182,14 @@ def _render_md_html(md_text: str, theme_id: str, title: str, font_id: str = "def
         # 隔行上色要設在**每一格**上（`<tr bgcolor>` soffice 不一定認）
         if _ts.get("zebra") and env.get("_jt_row", 0) % 2 == 0:
             tokens[idx].attrSet("bgcolor", _ts["zebra"])
+        if _to.get("align_th"):
+            # 內文格也補 `align`：瀏覽器的主題預覽在 CSP 底下不吃行內 `style`，
+            # 不補的話預覽裡數字欄是靠左的，跟實際檔案不一樣
+            tokens[idx].attrSet("align", _align_attr(tokens[idx]))
+        if _to.get("valign"):
+            # 多行的列（逐字稿）段號與發言者要靠上，才對得到內容的第一行。
+            # CSS 的 `vertical-align` soffice 不理，要用 HTML 屬性。
+            tokens[idx].attrSet("valign", _to["valign"])
         return self.renderToken(tokens, idx, options, env)
 
     def _tr_open(self, tokens, idx, options, env):

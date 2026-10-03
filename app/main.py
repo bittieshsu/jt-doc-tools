@@ -22,7 +22,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.33"
+VERSION = "1.16.50"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -70,6 +70,19 @@ class _UploadSizeLimitMiddleware:
     async def __call__(self, scope, receive, send):
         if scope.get("type") != "http":
             return await self.app(scope, receive, send)
+
+        # **每一個 413 都要說得出是哪一段擋的**（使用者 2026-10-02）。本系統回的 413
+        # 一律帶 `x-jtdt-limit`：`site`＝這裡的全站上限、`tool`＝個別工具自己的上限。
+        # 沒帶這個標頭的 413 就是**網站前面的反向代理**擋的 —— 那種回應連到不了我們，
+        # 只能由前端從「沒有這個標記」反推（`static/js/friendly_error.js`）。
+        async def send_marked(message):
+            if message.get("type") == "http.response.start" and message.get("status") == 413:
+                headers = list(message.get("headers") or [])
+                if not any(k.lower() == b"x-jtdt-limit" for k, _ in headers):
+                    headers.append((b"x-jtdt-limit", b"tool"))
+                    message = {**message, "headers": headers}
+            await send(message)
+
         limit = 0
         try:
             from app.core.upload_settings import max_upload_bytes
@@ -84,8 +97,9 @@ class _UploadSizeLimitMiddleware:
                             import json as _j
                             mb = limit // (1024 * 1024)
                             body = _j.dumps(
-                                {"detail": f"檔案太大 —— 這個站台的單次上傳上限是 "
-                                           f"{mb} MB。請分批上傳，或請管理員調整。"},
+                                {"detail": f"檔案太大 —— 本系統的單次上傳上限是 {mb} MB。"
+                                           f"請分批上傳，或請管理員到「系統狀態 → "
+                                           f"可上傳的檔案大小」調整。"},
                                 ensure_ascii=False).encode("utf-8")
                             await send({"type": "http.response.start",
                                         "status": 413,
@@ -93,13 +107,15 @@ class _UploadSizeLimitMiddleware:
                                             (b"content-type",
                                              b"application/json; charset=utf-8"),
                                             (b"content-length",
-                                             str(len(body)).encode())]})
+                                             str(len(body)).encode()),
+                                            (b"x-jtdt-limit", b"site"),
+                                            (b"x-jtdt-limit-mb", str(mb).encode())]})
                             await send({"type": "http.response.body", "body": body})
                             return
                     except ValueError:
                         pass
                     break
-        return await self.app(scope, receive, send)
+        return await self.app(scope, receive, send_marked)
 
 
 app.add_middleware(_UploadSizeLimitMiddleware)
@@ -2406,6 +2422,13 @@ async def _startup():
             _dirsync.start_scheduler()
         except Exception:
             logger.exception("directory_sync scheduler start failed")
+        # 延後的 JTLW ACK：轉逐字稿存好之後留最多 24 小時給使用者重跑校正，
+        # 到期由這支送出（每 10 分鐘看一次，會提早一個間隔送，絕不超過 24 小時）。
+        try:
+            from .core import jtlw_ack as _jtlw_ack
+            _jtlw_ack.start_scheduler()
+        except Exception:
+            logger.exception("jtlw_ack scheduler start failed")
     except Exception as exc:
         logger.exception("auth/audit init failed: %s", exc)
     # Background sweeper for ephemeral uploads

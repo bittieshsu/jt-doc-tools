@@ -147,3 +147,44 @@ def test_the_upload_accept_list_is_not_hardcoded_in_the_template():
     accept = _tpl_workspace_accept()
     assert ".txt" in accept and ".md" in accept, accept
     assert set(accept.split(",")) == set(ws.ALLOWED.values())
+
+
+# ------------------------------------------------------------------ JSON（v1.16.42）
+# 2026-10-03 使用者回報：從工作區下載「轉逐字稿轉送過來的檔」，內容是 JSON、副檔名卻是 `.txt`。
+# 工作區原本只認 `.txt` / `.md`，JSON 一存進來就被改名。
+
+def test_a_json_file_keeps_its_name(wsenv):
+    req = _user()
+    meta = ws.save_bytes(req, '{"segments": [{"text": "大家好"}]}'.encode(), "逐字稿.json", "t")
+    assert (meta["ext"], meta["mime"]) == (".json", "application/json")
+    assert meta["name"] == "逐字稿.json"
+    # 下載拿到的也是 .json（檔名與型別都對）
+    fp, got = ws.get_file(req, meta["file_id"])
+    assert fp.suffix == ".json" and got["mime"] == "application/json"
+    assert fp.read_bytes() == '{"segments": [{"text": "大家好"}]}'.encode()
+
+
+def test_only_real_json_becomes_json():
+    """**檔名說 `.json` 但讀不進 JSON** → 照舊收成 `.txt`（不給使用者一個打不開的 .json）；
+    **內容是 JSON 但檔名是 `.txt`** → 維持 `.txt`（使用者存成什麼就是什麼）；
+    **不是文字的東西改名成 `.json`** 一樣進不來（判準仍然是內容）。"""
+    assert ws.detect_kind(b'{"a": 1}', "x.json") == ("application/json", ".json")
+    assert ws.detect_kind(b"\xef\xbb\xbf[1, 2]", "x.JSON") == ("application/json", ".json")
+    assert ws.detect_kind(b'{"a": ', "x.json") == ("text/plain", ".txt")
+    assert ws.detect_kind(b'{"a": 1}', "x.txt") == ("text/plain", ".txt")
+    assert ws.detect_kind(b"\x00\x01\x02" * 10, "x.json") is None
+    assert ws.detect_kind(PNG_BYTES, "x.json") == ("image/png", ".png")
+
+
+def test_the_front_end_lists_include_json():
+    from app.main import _tpl_workspace_accept, _tpl_workspace_extensions
+    assert "json" in _tpl_workspace_extensions().split()
+    assert ".json" in _tpl_workspace_accept().split(",")
+
+
+def test_json_has_no_preview(wsenv):
+    req = _user()
+    meta = ws.save_bytes(req, b'{"a": 1}', "a.json", "t")
+    with pytest.raises(ws.WorkspaceError) as e:
+        ws.get_thumbnail(req, meta["file_id"])
+    assert not isinstance(e.value, ws.NotFound)

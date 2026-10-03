@@ -5,11 +5,195 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (862 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (879 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.50] - 2026-10-03
+
+- **Meeting summary: the "Events and impact" card heading had no icon.** On the result page and in the exported HTML, that card's heading had no icon while the other four did. All five card headings now show their icons, and a new check stops a future category from shipping without one.
+
+## [1.16.49] - 2026-10-03
+
+- **Meeting transcription: known misheard spellings are replaced as listed (following the speech service's 2026-10-03 update).** In "Terms or meeting background" you can write a line "misheard spelling → correct spelling" (for example `Proksmox, Proxmux → Proxmox`; the arrow can also be `->` or `=>`), and the speech service replaces them before correction. Misheard words spelled very differently, which correction cannot recognise, can be fixed this way. The correct spelling is also sent as a term, and only the correct spelling goes into the meeting background. A malformed line (two terms right of the arrow, a missing side, a misheard spelling that is another term on the list, or one misheard spelling pointing to two terms) is refused before anything is sent, naming the line. Lines with two or more arrows (such as a written-out process) used to be sent whole as one term; like sentences, they now stay in the meeting background. "Add terms and re-run the correction" accepts the same lines, and its box brings back the arrow lines you wrote (on a re-run the speech service replaces its list with the whole new one). The result page says how many places were replaced, or that the misheard spellings were not sent when the speech service is too old to accept them. API: `terms` takes the same syntax; the response adds `variants` and `variants_sent`, and the number of replacements is in `summary.correction.variant_replacements`.
+
+## [1.16.48] - 2026-10-03
+
+- **Layout themes: six more colour schemes, and the theme list uses this system's own dropdown.** The layout themes shared by the meeting-summary export and Markdown to Office go from 6 to 12: Teal, Indigo modern, Forest green, Coral, Navy and gold, and Magazine. Each was checked in PDF, Word and ODF; themes with a dark table header keep white text on the dark header after conversion to Word or ODF. In the meeting summary, the theme picker is now this system's own dropdown instead of the browser's: each theme shows three colour swatches (headings, accent, table header) and a one-line description. The dropdown has a fixed width, so the "Include the full transcript" box next to it no longer shifts when the theme changes. The theme cards in Markdown to Office show the same swatches.
+- **Meeting transcription: heading lines and dates are no longer sent as terms.** In "Terms or meeting background", lines starting with `#` (such as a date heading pasted from notes) and pieces with no letters at all (dates, times, plain numbers) stay in the meeting background and are not sent as terms.
+
+## [1.16.47] - 2026-10-03
+
+- **Meeting transcription: terms are used only in correction (following the speech service's 2026-10-03 update).** Words in "Terms or meeting background" are now used in correction: correct spellings are kept, and misheard spellings that are close are changed to yours; words misheard as something spelled very differently may not be fixed. One term per line works best. Recognition does not use the list: the speech service measured that listed words that do not occur in a meeting get inserted into the transcript anyway, in places that look normal. The hint under the field used to say recognition prefers these words; that is corrected. The result page used to say recognition used "the first 0" terms (the service now reports 0 truthfully); it now says the terms were used only in correction. The transcript JSON also records the recognition model (name, where it ran, device); it is not shown on screen.
+
+## [1.16.46] - 2026-10-03
+
+- **Meeting transcription: the "Terms or meeting background" label ran into its text box in the Chinese interface.** Chinese field labels have a fixed width sized for four to six characters and do not wrap; this one has nine, so the text overlapped the box on its right. The label can now wrap onto two balanced lines next to the multi-line box. The English and Japanese labels already wrapped and are unchanged. A new browser check measures every field label on every tool page so that a longer label cannot run into the control next to it again.
+
+## [1.16.45] - 2026-10-03
+
+- **Meeting summary: add your own replacements.** For words that recognition got wrong and the suggested term fixes do not catch (for example `Groxmoxity` for `Proxmox`, `POWPOYNT` for `PowerPoint`), type "as written → change to" under the meeting background and click Add. The whole transcript is searched first: English whole words, ignoring case (typing `groxmoxity` also finds `Groxmoxity`), with every spelling actually found and how many times; if nothing is found it says so and nothing is added. Ticked rows are applied before the analysis together with the suggestions, the original is kept (replaced segments have a dotted underline; hover to see the original), and the result page and exports list what was replaced. When the same spelling is both suggested and added by you, yours wins. Opening the job again from My jobs brings your rows back in the order you added them, still ticked. The note now reads "These spellings were replaced in the transcript" (your own rows do not necessarily come from the background). Why the mistake happens: it is the speech recognition mishearing; "Terms" only biases recognition and protects correct spellings from correction, it does not fix misheard ones. We have asked the speech service whether correction can use the term list for near misses; until then this is the reliable fix.
+
+## [1.16.44] - 2026-10-03
+
+- **Meeting transcription: long WAV recordings had only a flat line instead of a waveform.** An hour of WAV is over 300 MB; the browser only decoded files under 60 MB, so larger ones showed a plain timeline with no explanation. WAV waveforms are now read on the server (any size, about half a second for an hour, cached), so the browser does not download the whole file. Large files in other formats still get no waveform, but the page now says why; playback and click-to-seek work as before.
+- **Meeting transcription: "Terms" is now "Terms or meeting background", and it goes into Meeting summary's background.** Lines with one term each are sent for recognition as before; lines written as sentences (with a full stop or question mark, or very long) are not, because recognition only uses the first few terms and sentences would push real names out. For "Attendees: Wang Xiaoming, Bianca" the label is dropped and the names are sent; a line that is only a label is not sent. When you send the transcript to Meeting summary, the whole text fills the meeting background (unless the box already has text or this transcript had a background last time); you can edit it or click "Remove". A very long line used to be refused; it is now treated as background.
+- **Meeting summary: the export buttons line up.** They form a table: buttons in the same column have the same width and line up across both the "Download" and "Save to workspace" cards; the card descriptions fit on one line and the note about re-opening the JSON moved below the buttons. The heading of the suggested term fixes now says the whole transcript is checked (only the first few lines are listed for you to check speakers and line breaks).
+
+## [1.16.43] - 2026-10-03
+
+- **Meeting summary: the background you entered last time comes back for the same transcript.** Each analysis kept its meeting background only in that analysis's result, so uploading the same transcript again started with an empty box. The upload now recognises a transcript you have analysed before, fills in the background you used last time and says when it was from; you can edit it, or click "Remove" so it is not filled in again. If the box already holds other text it is left alone and you get "Use the earlier one" instead. Analysing with an empty box also stops it being filled in next time. "The same transcript" means the same spoken words: speaker names, times and how segments are split do not count, so the JSON sent over from meeting transcription, the plain text saved to the workspace and a copy saved after renaming speakers are all recognised. Each person keeps their own; someone else uploading the same transcript does not get yours, and it is deleted with the account. Up to 200 per person, oldest dropped first.
+- **Meeting summary: the result in My jobs and the copy saved to the workspace are now the full version.** When an analysis finishes after you have left the page, the result is saved to the workspace automatically; that copy and the My jobs download used to leave out the transcript, so they opened but citations could not jump to the original text. They are now the same file as "Download JSON" (with the whole transcript and the meeting background); after you rename speakers, the My jobs download has the new names (a copy already saved to the workspace does not change).
+
+## [1.16.42] - 2026-10-03
+
+- **Meeting summary: a previous result loaded from the workspace was read as a transcript.** When an analysis finishes after you have left the page, the result is saved to the workspace as `…-會議摘要.txt` (the workspace used to take only `.txt` / `.md` text names; it now keeps `.json` too, see below). Picking it with "Load from workspace" used to parse it as a transcript, one line of JSON per segment, because only `.json` names were recognised as an exported result. The content is checked now: an exported result opens as the result, with its meeting background. The auto-saved copy has no transcript attached, so citations cannot jump to the original text; the copy from "Download JSON" or "Save to workspace" can.
+- **Load from workspace: the picker shows when each file was saved.** Two files with the same name (for example two transcripts of the same meeting) could not be told apart; each card now shows its save time, the same format as on My workspace. This applies to every tool.
+- **The workspace keeps JSON files.** A transcript JSON or an exported meeting-summary JSON saved to the workspace used to be renamed to `.txt` while its content was JSON. A file whose name ends in `.json` and whose content really is JSON now keeps its `.json` name. Files already stored as `.txt` are not renamed, and the meeting summary still reads them correctly.
+- **Meeting transcription: speaker chips.** The name and the segment count are two buttons now: click the name to rename that speaker (all of their segments), click "N segments" to jump to where that speaker first talks (the row is highlighted, and if the recording is still there the player moves to that point without starting playback).
+- **Meeting transcription: "Maybe Wendy" on speakers who introduced themselves.** When an unnamed speaker says something like "Hi, I'm Wendy" or "This is Tom from Contoso" (or the Chinese and Japanese equivalents), their chip offers "Maybe Wendy"; one click applies and saves the name, and hovering shows which segment it came from. It is only a suggestion, never applied by itself: getting it wrong would put one person's words under someone else's name, so ordinary phrases are not taken for names.
+- **Meeting transcription: save to the workspace again after renaming.** After one save the button stayed on "Saved to workspace"; renaming a speaker now re-enables it (each save is a new copy). The plain text that is saved or copied now uses the new names instead of S1 and S2.
+- **Meeting transcription: the result file records the recognition profile.** The downloaded transcript JSON has a `profile` (id and version, e.g. `meeting.balanced` / `2026.09.1`). The correction model (`summary.correction.model`) and the diarization method (`diarization.engine`) were already recorded; the speech service does not report the name of its speech recognition model.
+- **Meeting summary: the export area has two cards, Download and Save to workspace.** Formats are rows inside each card, and every button carries the same icon as its card's title. The two cards sit side by side on wide screens.
+
+## [1.16.41] - 2026-10-02
+
+### Meeting transcription: add terms after the fact and re-run only the correction
+
+- If a name or term turns out to be wrong, "Add terms and re-run the correction" on the result page sends the terms to the speech service (JTLW), which re-runs only the correction, not the recognition. Times, speakers and renamed speakers stay as they are; only the text is replaced by the new correction. Words that recognition misheard completely and that correction cannot recognise still need a new submission.
+- To make that possible the speech service now **keeps its copy for up to 24 hours** after the transcript is saved, then is asked to delete it; "No more changes" deletes it at once. The transcript here is not affected. Administrators can shorten the window on the "Speech service (JTLW)" settings page (0 = delete as soon as it is saved, no re-runs), and the new window also applies to transcripts already waiting. Nothing is kept when the recognition mode has no correction step.
+- When a re-run is not possible the page says why and what to do (already deleted, less than 15 minutes left, already re-running, no correction this time).
+- Public API: new `/tools/meeting-transcribe/retry` and `/tools/meeting-transcribe/done`; the synchronous API response gains `upload_id` and `retry_until`.
+
+### Server error details follow the interface language
+
+- Error details returned by the server were always shown as sent; those that are in the language catalogue are now shown translated in the English and Japanese interfaces.
+
+## [1.16.40] - 2026-10-02
+
+### Meeting summary: a transcript handed over from transcription lost its speakers and times when loaded from the workspace
+
+- "Send to meeting summary" in meeting transcription passes the whole transcript (JSON) through the workspace, and the workspace only keeps `.txt` / `.md` names for text, so it is stored as `…-逐字稿.txt`. Loading that file from the workspace later made the meeting summary split it as plain text: one line of JSON per segment, 0 speakers, no times.
+- Transcripts are now recognised by their content: a `.txt` / `.md` file whose content is JSON is read as JSON, so speakers (including renamed ones) and times come back. Files already in the workspace work without being regenerated. Plain text such as `[00:12] Speaker: …` is still read as plain text.
+
+### Meeting summary: the export area is grouped by format
+
+- The export area used to have one row per action (download / save to workspace / other formats), and "other formats" did not say whether it downloaded or saved. It is now three groups, documents (PDF, Word, ODF), web page and plain text (HTML, Markdown) and charts and data (charts PNG, Markdown with images, JSON), and each group says "Download" or "Save to workspace". Download buttons all carry the download icon and save buttons the archive icon.
+- The cards fill the width on the right; when it is narrow the group name moves above the buttons, and on wide screens the three groups sit side by side.
+
+## [1.16.39] - 2026-10-02
+
+### Meeting transcription: proper nouns can be given up front
+
+- The options have a new "Proper nouns" box: attendee names, company and product names, jargon, one per line. They are sent to the speech service (JTLW) as a glossary: recognition uses the first few as hints and correction keeps all of them exactly as written, so put the most important ones first. The result page says how many were sent and how many were used for recognition.
+- Up to 500 terms of up to 200 characters each; going over names the offending term instead of cutting anything off silently.
+- The public API takes a new `terms` parameter; the response gains `terms` and `glossary`.
+
+### Meeting transcription: a reminder when all 8 slots of the new method are used
+
+- When speakers are separated with Nemotron and all 8 slots are used, the result page says to fill in the number of speakers and resend if there are more. Without it, the extra people are silently merged into someone else. Needs speech service interface version 2.7 or later; the response gains `diarize_saturated`.
+
+### Meeting summary: fixing proper nouns in the transcript from the meeting background
+
+- When the meeting background has the right spelling (for example `Bianca`) and the transcript has it wrong (`Bianka`, or a Chinese name written with a same-sounding character), the places that are probably misspelled are listed under the background box with a count and an example. **They are only suggestions and start unticked**; the ticked ones are replaced before the analysis starts.
+- Replaced segments are underlined with dots in the transcript and show the original text on hover; the result page and every export say which spellings were replaced. Unticking and analysing again brings the original back.
+- The matching rules are fixed and use no AI: in English, one or two letters off, or an extra space or hyphen in the middle; in Chinese, three to eight characters where every character has a matching pronunciation. Differences only in case, singular and plural forms, two-character words and spellings the background itself uses are never suggested.
+- Public API: new `/tools/meeting-summary/api/term-suggestions` (suggests only, stores nothing); `/tools/meeting-summary/api/meeting-summary` takes a new `replacements` parameter.
+
+### Dependencies
+
+- New: `pypinyin` (MIT), used to compare Chinese pronunciations. `jtdt update` installs it automatically.
+
+## [1.16.38] - 2026-10-02
+
+### Meeting summary: "Start the analysis" was missing when opened from My jobs
+
+- Opening a finished analysis from My jobs (or from a notification) loaded only the result; the parse section above it, including "Start the analysis", stayed hidden, so changing the meeting background and running again meant uploading the transcript again. The parse section is now shown and the meeting background is restored into its box.
+
+### Meeting summary: an exported .json can be loaded back
+
+- The JSON download now includes the full transcript and a format marker. Upload it back to the meeting summary and the result appears directly, without new model requests; citations still jump to the transcript, and "Start the analysis" is available to run it again.
+- A .json exported by an earlier version (without the transcript) also opens, but citations have no transcript to jump to.
+- The uploaded content is rebuilt rather than stored as-is: only known fields are kept, strings are length-limited and malformed entries are dropped. A file that cannot be read returns a clear error instead of being treated as a transcript and sent for analysis.
+
+### Meeting summary: exported documents and .json carry the meeting background
+
+- When a meeting background was entered, the exported PDF / Word / ODF / Markdown / HTML has a "Meeting background" section right after the title and before the summary, copied verbatim (line breaks kept, not read as formatting); it is left out when there is none. Files saved to the workspace get it too.
+- The result page shows the same section.
+- The exported .json already carried the background; loading it back puts the background back in its box.
+- The public API (`/tools/meeting-summary/api/meeting-summary`) result has a `context` field; it is absent when no background was sent.
+- The response example in the API reference now uses the real field names (`summary.text`, `items.decisions`, `items.actions[].due_text` and so on). The old example used outdated names, so code written against it found nothing.
+
+### Meeting summary: export area laid out again
+
+- On the left, an A4-proportioned colour preview (a thumbnail of one page instead of a small scrolling window); on the right, one row per task: layout theme, download, save to workspace and other formats, with aligned labels and one button style.
+- The save-to-workspace buttons keep their labels after saving (each used to turn into "Saved to the workspace", so the four could no longer be told apart).
+- The analysis-result card has a gap above it again (it touched the card above while the progress bar was hidden).
+
+## [1.16.37] - 2026-10-02
+
+### Meeting summary: exported minutes reworked — full transcript included, tidy tables and charts
+
+- **PDF / Word / ODF / Markdown exports now include the full transcript** as a table (segment / time / speaker / text), so every "segment N" cited by a decision or action can be checked in the same document. Untick "Include the full transcript" to leave it out.
+- Tables are laid out again: full page width, horizontal rules only, centred headers, text aligned to the top. The speaking statistics table follows the same style.
+- In `.odt` the table header was dark text on a dark background; it is now white.
+- Each chart sits under its own section (topic timeline, share of time per topic, speaking statistics, discussion structure). The heading is in the document, so the chart no longer repeats it.
+- The topic timeline chart was missing from exports; it is now included.
+- "Share of time per topic" is sorted from largest to smallest: the list top to bottom and the bar left to right, on the page and in exports. Colours still follow the topic, so they match the topic timeline.
+- Charts in Word / ODF were placed at full size and ran off the right edge of the page; they now fit the page width.
+- English words inside charts are no longer broken in half.
+- **New HTML export**: saves the page as shown (cards, charts, transcript). It opens without a connection to the server, and citations still jump to the transcript.
+- Exported files can be **saved to the workspace** (PDF / Word / ODF / Markdown).
+- The layout theme now has a **colour preview**. The default is back to "Clean" (the option labelled default was not the one selected), and the theme you choose is remembered in this browser.
+
+### Meeting summary: English names in the summary wrongly flagged as unsupported
+
+- When an action's text ended in English and its owner had an English name, the two were joined without a space before checking, so both names were flagged as having no source. Each part is now checked separately.
+
+### Meeting transcription: rename a speaker by clicking it
+
+- Under "N segments, N speakers" the results page lists each speaker with their segment count; click one to rename that speaker in every segment, and the change is saved.
+- The correction level is shown in plain words instead of the speech service's code.
+
+## [1.16.36] - 2026-10-02
+
+### Meeting summary: "Meeting background (optional)" now reads as one group
+
+- The heading, explanation and input box sat loose inside the "1. Upload the transcript" card, separated only by a rule,
+  so they did not look like one unit. The section now has a light background and a coloured bar on the left, and the
+  explanation and input box line up with the heading text; collapsed, the single heading line still looks like one section.
+- There is deliberately no four-sided border or shadow, which would make it look like a separate card inside the card.
+- On phone-width screens nothing is indented and the input box uses the full width.
+
+## [1.16.35] - 2026-10-02
+
+### Meeting transcription: the more-than-8-speakers wording now matches what the speech service does
+
+- The speech service changed what happens when the new method fills all 8 speaker slots: it used to always fall back to the
+  original method; now it re-runs the original method and falls back only if that finds more than 8 speakers, otherwise
+  it keeps the new method (at most 8 speakers).
+- The page used to say meetings with more than 8 speakers automatically fall back to the original method, which no longer
+  always holds when no number is entered. It now says the new method separates at most 8 speakers and asks you to enter
+  the number when you are sure there are more than 8; entering a number above 8 always uses the original method.
+- The result page's fallback note now says "more than 8" instead of "8 or more"; the API manual describes the
+  specified and unspecified cases separately.
+
+## [1.16.34] - 2026-10-02
+
+### When an upload is rejected as too large, the message says which limit did it
+
+- Previously a too-large upload only said "The file is too large (413)", with no way to tell whether the reverse
+  proxy in front of the site or this system's own limit rejected it. The message now distinguishes three cases:
+  - **The reverse proxy**: says it is not this system's limit and asks an administrator to raise the proxy's upload
+    limit (`client_max_body_size` in nginx); the current limit can be measured under "System status → How large an
+    upload can be".
+  - **This system's per-upload limit**: states the limit in MB and where an administrator changes it.
+  - **A feature's own limit**: says it is that feature's limit and includes its explanation.
+- Batch watermark uploads always blamed the reverse proxy (even when this system's limit applied) and now use the
+  same logic; the PDF editor's separate copy of the error-message handling now uses the shared one.
+- Every 413 this system returns carries an `x-jtdt-limit` header (`site` / `tool`), so API callers can tell too.
 
 ## [1.16.33] - 2026-10-02
 

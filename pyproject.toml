@@ -1,6 +1,6 @@
 [project]
 name = "jt-doc-tools"
-version = "1.16.33"
+version = "1.16.50"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
@@ -110,6 +110,9 @@ dependencies = [
     "defusedxml>=0.7,<1",
     # rapidfuzz — pdf-to-office 的 docx↔PDFTruth alignment 模糊比對引擎（比 difflib 快 10x+）。
     "rapidfuzz>=3.0,<4",
+    # pypinyin — 會議摘要「建議替換」比對中文詞的讀音（逐字稿把「王小明」辨識成「王曉明」）。
+    # 只看讀音能把「王曉明」跟「王小姐」分開；只看字形做不到。純 Python、MIT 授權。
+    "pypinyin>=0.50,<1",
     # opencv-python-headless — 「文件拉正」的核心（去不勻底色、裁紙張、
     # 估歪斜角、透視校正）。**headless 版沒有 GUI 相依**（不需要 X11 / Qt），
     # 伺服器上裝得起來。Apache-2.0，與 AGPL 相容。

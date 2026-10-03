@@ -435,7 +435,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="markdown-轉辦公文件">Markdown 轉辦公文件</h4>
 <p>把 Markdown 轉成 PDF / Word / OpenDocument。內容可用 <code>file</code> 上傳，也可以直接用 <code>text</code> 帶進來。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/markdown-to-doc/api/markdown-to-doc</code></pre>
-<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>△</td><td>Markdown 檔。與 <code>text</code> 擇一</td></tr><tr><td><code>text</code></td><td>str</td><td>△</td><td>直接帶 Markdown 內容。與 <code>file</code> 擇一</td></tr><tr><td><code>format</code></td><td>str</td><td></td><td><code>pdf</code>（預設）/ <code>docx</code> / <code>odt</code>。其他值回 400</td></tr><tr><td><code>theme</code></td><td>str</td><td></td><td>版面主題，預設 <code>classic</code></td></tr><tr><td><code>font</code></td><td>str</td><td></td><td>字型，預設 <code>default</code></td></tr><tr><td><code>title</code></td><td>str</td><td></td><td>文件標題</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>△</td><td>Markdown 檔。與 <code>text</code> 擇一</td></tr><tr><td><code>text</code></td><td>str</td><td>△</td><td>直接帶 Markdown 內容。與 <code>file</code> 擇一</td></tr><tr><td><code>format</code></td><td>str</td><td></td><td><code>pdf</code>（預設）/ <code>docx</code> / <code>odt</code>。其他值回 400</td></tr><tr><td><code>theme</code></td><td>str</td><td></td><td>版面主題，預設 <code>classic</code>。可用的值：<code>classic</code> / <code>github</code> / <code>academic</code> / <code>book</code> / <code>report</code> / <code>mono</code> / <code>teal</code> / <code>indigo</code> / <code>forest</code> / <code>coral</code> / <code>navy-gold</code> / <code>magazine</code>。不認得的值改用 <code>classic</code></td></tr><tr><td><code>font</code></td><td>str</td><td></td><td>字型，預設 <code>default</code></td></tr><tr><td><code>title</code></td><td>str</td><td></td><td>文件標題</td></tr></tbody></table></div>
 <pre><code class="lang-bash"><span class="hl-cmt"># 檔案轉 PDF</span>
 curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/markdown-to-doc/api/markdown-to-doc</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
@@ -725,19 +725,24 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="會議錄音轉逐字稿">會議錄音轉逐字稿</h4>
 <p>把會議錄音或錄影轉成<strong>帶時間與發言者</strong>的逐字稿。辨識在外部語音服務（JTLW） 那側跑 —— <strong>要先在管理區「語音服務（JTLW）」設定好</strong>，沒設定回 <strong>503</strong>。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-transcribe/api/meeting-transcribe</code></pre>
-<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>音訊 <code>.m4a</code> / <code>.mp3</code> / <code>.wav</code> / <code>.aac</code> / <code>.ogg</code> / <code>.opus</code> / <code>.flac</code>，影片 <code>.mp4</code> / <code>.mov</code> / <code>.mkv</code> / <code>.webm</code></td></tr><tr><td><code>language</code></td><td>string</td><td></td><td><code>auto</code>（預設）或 BCP-47（<code>zh-Hant</code> / <code>en</code> / <code>ja</code> / <code>ko</code> …）。對方不支援時<strong>送件當下</strong>就回 400。<code>zh</code> / <code>zh-TW</code> 會換成 <code>zh-Hant</code> 再送出</td></tr><tr><td><code>num_speakers</code></td><td>string</td><td></td><td>預設 <code>0</code> ＝ 讓它自己判。<strong>建議就留 0</strong></td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>音訊 <code>.m4a</code> / <code>.mp3</code> / <code>.wav</code> / <code>.aac</code> / <code>.ogg</code> / <code>.opus</code> / <code>.flac</code>，影片 <code>.mp4</code> / <code>.mov</code> / <code>.mkv</code> / <code>.webm</code></td></tr><tr><td><code>language</code></td><td>string</td><td></td><td><code>auto</code>（預設）或 BCP-47（<code>zh-Hant</code> / <code>en</code> / <code>ja</code> / <code>ko</code> …）。對方不支援時<strong>送件當下</strong>就回 400。<code>zh</code> / <code>zh-TW</code> 會換成 <code>zh-Hant</code> 再送出</td></tr><tr><td><code>num_speakers</code></td><td>string</td><td></td><td>預設 <code>0</code> ＝ 讓它自己判。<strong>建議就留 0</strong></td></tr><tr><td><code>terms</code></td><td>string</td><td></td><td><strong>專有名詞或會議背景</strong>（選填）：與會者姓名、公司與產品名稱、術語，一行一個，或用頓號 / 逗號 / 分號分隔；已知的聽錯寫法寫成「聽錯的寫法 → 正確寫法」一行；也可以寫幾句會議背景</td></tr></tbody></table></div>
+<p><strong>專有名詞</strong>（v1.16.39 起）送給語音服務當專有名詞表，<strong>用在校正</strong>：寫對的照原樣保留，拼法相近的誤聽改成你寫的寫法（語音服務介面版本 2.8 起，只修標點的校正也會改）。一行寫一個最好（<code>Proxmox</code>、<code>PVE</code>、<code>Proxmox VE</code> 各一行）；聽成拼法差很多的寫法時校正不一定改得回來。<strong>辨識時不參考這份清單</strong>：語音服務實測過，清單上的詞沒出現在那場會議時，辨識會把它憑空插進逐字稿，所以不採用。重複的（不分大小寫）只留第一個、順序照你給的。最多 500 個，超過回 <strong>400</strong>，<strong>不會安靜截掉</strong>（被截掉的詞不會被用到，而呼叫端會以為送出去了）。</p>
+<p><strong>已知的聽錯寫法</strong>（v1.16.49 起）：已經知道會聽錯成什麼的，寫成一行「聽錯的寫法 → 正確寫法」（箭頭也可以寫 <code>-&gt;</code> 或 <code>=&gt;</code>；好幾個聽錯的寫法用頓號 / 逗號分隔），例如 <code>Proksmox、Proxmux → Proxmox</code>。語音服務在校正之前照表換掉：不經過語言模型、任何校正等級都做，原始辨識層不變；拼法差很多、校正認不出來的誤聽靠這個才改得回來。英文要整個詞相符才換、不分大小寫，中文照字面 —— 中文的聽錯寫法太短的話可能換到別的詞裡面，請寫具體一點。正確寫法也會當成專有名詞送出。規則照語音服務：每個詞最多 20 個聽錯的寫法、每個 2～200 字；箭頭右邊只能寫一個詞；聽錯的寫法不可以是清單上的另一個詞（照表換會把寫對的換掉）；同一個聽錯的寫法不可以對到兩個詞。違反時回 <strong>400</strong> 並講出是哪一行，不會送出去。一行有兩個以上箭頭、<code>#</code> 開頭或寫成句子的，照舊當會議背景。語音服務介面版本 2.9 起才收；舊版（或問不到版本）時不送，回應的 <code>variants_sent</code> 是 <code>false</code>。</p>
+<p>寫成句子的行<strong>不當成專有名詞送出</strong>（v1.16.44 起）：有句號、驚嘆號、問號，或拆開之後有一段超過 40 字 / 10 個漢字的那一行，整行當會議背景 —— 一整句當成專有名詞，校正時照原樣保留、拿去比對拼法都沒有意義。「與會者：王小明、Bianca」這種行，冒號前面的標籤不送、後面照一串詞送；只有標籤的那一行（「與會人員如下：」）不送；<code>#</code> 開頭的標題行、一個字母都沒有的日期 / 時間 / 純數字也不送（v1.16.48）。整段原文放在回應的 <code>context</code>，轉送會議摘要時帶進會議背景。</p>
 <p><strong>發言者分離用哪一種方法，看語音服務的版本</strong>（v1.16.31 起）：語音服務的介面版本是 2.5 以上時，本系統會要求用 NVIDIA Nemotron 分辨發言者；2.4 以前（或問不到版本）時用原本的方法。回應的 <code>speaker_engine</code> 寫出這一件要求的是哪一種。語音服務在同一批真實辨識結果上量過（不指定人數）：中文 20 場「發言者搞錯」18.52% → 2.92%、英文 16 場 12.31% → 4.65%。</p>
 <p><strong>同一個 <code>num_speakers</code> 在兩種方法下的意思相反</strong>：</p>
 <div class="table-wrap"><table><thead><tr><th></th><th>Nemotron（<code>speaker_engine</code> = <code>auto</code>）</th><th>原本的方法（<code>legacy</code>）</th></tr></thead><tbody><tr><td>填的數字</td><td><strong>只當上限</strong>：分出來的人比它多才合併，比它少不動</td><td><strong>硬分成那麼多群</strong></td></tr><tr><td>填得比實際多</td><td>沒有影響</td><td>把主要發言者拆開</td></tr><tr><td>填得比實際少</td><td>把不同的人併成同一位</td><td>把不同的人併成同一位</td></tr><tr><td>建議</td><td>不確定就留 0；<strong>寧可多填、不要少填</strong></td><td>不確定就留 0；只講一兩句的人不要算進去</td></tr></tbody></table></div>
-<p>Nemotron 下指定正確人數與不指定的差距只有 0.01 個百分點（20 場、95% 信賴區間 [−0.03, 0.00]），<strong>只能說「不輸」，不要為了「更準」去填它</strong>。超過 8 位發言者時語音服務會自動改用原本的方法，原因寫在回應的 <code>diarization.note</code>。</p>
+<p>Nemotron 下指定正確人數與不指定的差距只有 0.01 個百分點（20 場、95% 信賴區間 [−0.03, 0.00]），<strong>只能說「不輸」，不要為了「更準」去填它</strong>。</p>
+<p>新方法最多分出 8 位發言者。指定超過 8 位時，語音服務一定改用原本的方法；沒有指定時，只有新方法 8 個位置都用滿、而且原本的方法分出超過 8 位才會改用，否則照用新方法、最多分出 8 位。改用時原因寫在回應的 <code>diarization.reason</code>（代碼）與 <code>diarization.note</code>（說明）。確定超過 8 位的會議請指定人數。</p>
 <p><strong><code>auto</code> 只看錄音開頭約 30 秒的講話，決定整場用哪一種語言</strong> —— 不是逐段判斷。 開頭若有人先講另一種語言（20 秒就夠），整場都可能辨識錯；開頭的靜音、雜音不影響。 已知整場的語言時請直接指定。 中英<strong>整句</strong>交錯的會議請指定佔多數的語言：另一種語言的整句大多無法正確辨識 （中文句子裡夾英文術語沒有問題）。</p>
 <p><strong>這支是同步的</strong> —— 37 分鐘的會議實測 7~8 分鐘（辨識 ＋ 發言者分離 ＋ 校正）， 呼叫端的逾時要放寬。要背景處理請走網頁那條路 （<code>POST /upload</code> → <code>POST /start</code> → 拿作業編號輪詢 <code>/api/jobs/{id}</code>）。</p>
-<div class="table-wrap"><table><thead><tr><th>狀態碼</th><th>意思</th><th>要做什麼</th></tr></thead><tbody><tr><td><strong>400</strong></td><td>檔案格式不收、檔案是空的，或語音服務退回你帶的參數（<code>language</code> / <code>num_speakers</code>）</td><td>改參數；語言不確定就用 <code>auto</code></td></tr><tr><td><strong>502</strong></td><td>語音服務收下了但處理失敗（辨識失敗、結果是空的、它自己出錯）</td><td>訊息裡有原因；一直發生請管理員查語音服務</td></tr><tr><td><strong>503</strong></td><td>還沒設定語音服務，或連不上</td><td>請管理員檢查「語音服務（JTLW）」設定與連線</td></tr><tr><td><strong>504</strong></td><td>等太久還沒結果（排隊超過 4 小時，或辨識超過上限）</td><td>已經請對方取消；稍後再送</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>狀態碼</th><th>意思</th><th>要做什麼</th></tr></thead><tbody><tr><td><strong>400</strong></td><td>檔案格式不收、檔案是空的、專有名詞太多、聽錯的寫法寫得不對，或語音服務退回你帶的參數（<code>language</code> / <code>num_speakers</code> / 專有名詞）</td><td>改參數；語言不確定就用 <code>auto</code></td></tr><tr><td><strong>502</strong></td><td>語音服務收下了但處理失敗（辨識失敗、結果是空的、它自己出錯）</td><td>訊息裡有原因；一直發生請管理員查語音服務</td></tr><tr><td><strong>503</strong></td><td>還沒設定語音服務，或連不上</td><td>請管理員檢查「語音服務（JTLW）」設定與連線</td></tr><tr><td><strong>504</strong></td><td>等太久還沒結果（排隊超過 4 小時，或辨識超過上限）</td><td>已經請對方取消；稍後再送</td></tr></tbody></table></div>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-transcribe/api/meeting-transcribe</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@meeting.m4a&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;language=auto&quot;</span> \
-  <span class="hl-flag">-F</span> <span class="hl-str">&quot;num_speakers=0&quot;</span> | jq</code></pre>
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;num_speakers=0&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;terms=王小明、Bianca、Proxmox VE&quot;</span> | jq</code></pre>
 <p>回應 JSON（節錄）：</p>
 <pre><code class="lang-json">{
   <span class="hl-key">&quot;source&quot;</span>: {<span class="hl-key">&quot;filename&quot;</span>: <span class="hl-str">&quot;meeting.m4a&quot;</span>, <span class="hl-key">&quot;size_bytes&quot;</span>: <span class="hl-num">17823213</span>},
@@ -748,8 +753,19 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;speaker_engine&quot;</span>: <span class="hl-str">&quot;auto&quot;</span>,
   <span class="hl-key">&quot;diarization&quot;</span>: {<span class="hl-key">&quot;requested&quot;</span>: <span class="hl-str">&quot;auto&quot;</span>, <span class="hl-key">&quot;engine&quot;</span>: <span class="hl-str">&quot;nemotron&quot;</span>, <span class="hl-key">&quot;note&quot;</span>: <span class="hl-bool">null</span>, <span class="hl-key">&quot;reason&quot;</span>: <span class="hl-bool">null</span>},
   <span class="hl-key">&quot;diarize_fallback&quot;</span>: <span class="hl-bool">null</span>,
+  <span class="hl-key">&quot;diarize_saturated&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;terms&quot;</span>: [<span class="hl-str">&quot;王小明&quot;</span>, <span class="hl-str">&quot;Bianca&quot;</span>, <span class="hl-str">&quot;Proxmox VE&quot;</span>],
+  <span class="hl-key">&quot;glossary&quot;</span>: {<span class="hl-key">&quot;entries&quot;</span>: <span class="hl-num">3</span>, <span class="hl-key">&quot;keep_terms&quot;</span>: <span class="hl-num">3</span>, <span class="hl-key">&quot;asr_bias_terms&quot;</span>: <span class="hl-num">0</span>, <span class="hl-key">&quot;variants&quot;</span>: <span class="hl-num">0</span>},
+  <span class="hl-key">&quot;variants&quot;</span>: {},
+  <span class="hl-key">&quot;variants_sent&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;asr&quot;</span>: {<span class="hl-key">&quot;model&quot;</span>: <span class="hl-str">&quot;large-v3-turbo&quot;</span>, <span class="hl-key">&quot;location&quot;</span>: <span class="hl-str">&quot;gpu_server&quot;</span>, <span class="hl-key">&quot;device&quot;</span>: <span class="hl-str">&quot;cuda&quot;</span>},
+  <span class="hl-key">&quot;context&quot;</span>: <span class="hl-str">&quot;第四季備份規劃會議。\n王小明\nBianca\nProxmox VE&quot;</span>,
   <span class="hl-key">&quot;layers&quot;</span>: {<span class="hl-key">&quot;raw&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;final&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;speakers&quot;</span>: <span class="hl-num">1045</span>},
-  <span class="hl-key">&quot;summary&quot;</span>: {<span class="hl-key">&quot;correction_level&quot;</span>: <span class="hl-str">&quot;punctuation_only&quot;</span>, <span class="hl-key">&quot;correction&quot;</span>: {<span class="hl-key">&quot;edited&quot;</span>: <span class="hl-num">612</span>}},
+  <span class="hl-key">&quot;tasks&quot;</span>: [<span class="hl-str">&quot;transcribe&quot;</span>, <span class="hl-str">&quot;diarize&quot;</span>, <span class="hl-str">&quot;correct&quot;</span>],
+  <span class="hl-key">&quot;summary&quot;</span>: {<span class="hl-key">&quot;correction_level&quot;</span>: <span class="hl-str">&quot;punctuation_only&quot;</span>,
+              <span class="hl-key">&quot;correction&quot;</span>: {<span class="hl-key">&quot;edited&quot;</span>: <span class="hl-num">612</span>, <span class="hl-key">&quot;variant_replacements&quot;</span>: <span class="hl-num">0</span>}},
+  <span class="hl-key">&quot;upload_id&quot;</span>: <span class="hl-str">&quot;3f9c0a1e5b7d4c2a9e8f6b1d0c3a5e7f&quot;</span>,
+  <span class="hl-key">&quot;retry_until&quot;</span>: <span class="hl-num">1790000000.0</span>,
   <span class="hl-key">&quot;segments&quot;</span>: [
     {<span class="hl-key">&quot;seq&quot;</span>: <span class="hl-num">1</span>, <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;各位早，我們開始。&quot;</span>, <span class="hl-key">&quot;speaker&quot;</span>: <span class="hl-str">&quot;S1&quot;</span>,
      <span class="hl-key">&quot;start_ms&quot;</span>: <span class="hl-num">1450</span>, <span class="hl-key">&quot;end_ms&quot;</span>: <span class="hl-num">2650</span>}
@@ -760,7 +776,27 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <p><code>diarize_skipped</code> 為 <code>true</code> 代表<strong>這次用的辨識模式不做發言者分離</strong>（例如台語模式）。 這時 <code>segments</code> 沒有 <code>speaker</code> 欄位，也不會把 <code>num_speakers</code> 送給語音服務。 辨識模式能做哪些處理以語音服務提供的清單為準，送件前會先查。</p>
 <p>回應裡的 <code>speaker_engine</code> 是這一件<strong>要求的</strong>分離方法（<code>auto</code> 是 Nemotron、<code>legacy</code> 是原本的方法，沒做分離時是 <code>null</code>），<code>diarization</code> 是語音服務回報<strong>實際用了哪一種</strong>（介面版本 2.5 起才有，舊版是 <code>null</code>）。要求了 <code>auto</code> 而 <code>engine</code> 是 <code>legacy</code> 時，<code>note</code> 寫著原因（例如指定超過 8 人）。</p>
 <p>回應裡的 <code>diarize_fallback</code> 只在要求了 Nemotron 卻改用原本的方法時才有，其他情況是 <code>null</code>：<code>reason</code> 是語音服務給的代碼（介面版本 2.6 起），<code>text</code> 是本系統依代碼挑的說明句子；代碼不認得或語音服務沒有給代碼時，<code>text</code> 是通用句子，<code>note</code> 附上語音服務的原文說明。</p>
+<p>回應裡的 <code>diarize_saturated</code> 為 <code>true</code> 代表<strong>新方法（Nemotron）的 8 個位置都用滿了</strong>：實際發言者可能更多，有些人會被併進別人名下。確定超過 8 位時請帶 <code>num_speakers</code> 重送（語音服務介面版本 2.7 起才有這個訊號，舊版一律 <code>false</code>）。</p>
+<p>回應裡的 <code>terms</code> 是這一件送出去的專有名詞（整理過的清單），<code>glossary</code> 是語音服務回報的用法：<code>entries</code> 收到幾個、<code>keep_terms</code> 幾個照原樣保持、<code>asr_bias_terms</code> 辨識時參考了幾個（平常是 0：辨識時不參考；只有語音服務的 GPU 伺服器不能用、改在服務本機辨識時才會大於 0）。沒送專有名詞時 <code>terms</code> 是空陣列、<code>glossary</code> 是 <code>null</code>。<code>context</code> 是 <code>terms</code> 那一欄的原文（含沒當成專有名詞的句子），沒填時是空字串。回應裡的 <code>asr</code> 是語音服務回報的辨識模型（<code>model</code>）、在哪裡跑（<code>location</code>：<code>gpu_server</code> 或 <code>api_host</code>）與裝置（<code>device</code>），語音服務介面版本 2.8 起才有，舊版或辨識失敗時是 <code>null</code>。</p>
+<p>回應裡的 <code>variants</code> 是這一件寫的聽錯寫法（<code>{&quot;Proxmox&quot;: [&quot;Proksmox&quot;, &quot;Proxmux&quot;]}</code>，沒寫時是空物件），<code>variants_sent</code> 是有沒有真的送給語音服務（介面版本 2.9 起才收；<code>false</code> 時逐字稿沒有照表換）。換了幾處在 <code>summary.correction.variant_replacements</code>，語音服務收下幾個聽錯的寫法在 <code>glossary.variants</code>（這兩個也是 2.9 起才有）。</p>
 <p><code>speaker</code> 是代號（<code>S1</code> / <code>S2</code>…）。姓名對照是呼叫端自己的事； 網頁那條路可以點代號直接改成人名。</p>
+<h5 id="補專有名詞只重跑校正">補專有名詞、只重跑校正</h5>
+<p>轉完才發現人名或術語寫錯時，可以補專有名詞、<strong>只重跑校正</strong>（v1.16.41 起）：不重新辨識，<code>seq</code>、時間與發言者都不變，只有文字換成新的校正結果。</p>
+<p>存好逐字稿之後，語音服務那邊會<strong>再保留最多 24 小時</strong>給你重跑（管理員可以在「語音服務（JTLW）」設定頁改短，0 ＝ 存好就請它刪除、不能重跑），之後本系統自動請它刪除。回應的 <code>retry_until</code> 是最晚還能重跑的時間（UNIX 秒；不能重跑時是 <code>null</code>），<code>upload_id</code> 是下面兩支要帶的編號。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-transcribe/retry</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數（JSON）</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>upload_id</code></td><td>string</td><td>✓</td><td>同步 API 回應裡的 <code>upload_id</code></td></tr><tr><td><code>terms</code></td><td>string 或 string[]</td><td>✓</td><td>專有名詞（<strong>整份</strong>，不是只有新增的，聽錯的寫法也要一起帶 —— 語音服務會用這一份取代原本的清單）；規則同送件時</td></tr></tbody></table></div>
+<p>回 <code>{&quot;job_id&quot;: &quot;…&quot;}</code>，用 <code>/api/jobs/{id}</code> 輪詢；做完後 <code>GET /tools/meeting-transcribe/result/{upload_id}</code> 拿新的逐字稿（<code>retry.count</code> 是重跑過幾次）。</p>
+<p>重跑只動校正，不重新辨識。聽成拼法差很多的寫法、校正認不出來的，寫成「聽錯的寫法 → 正確寫法」一行一起帶（語音服務介面版本 2.9 起照表換）。</p>
+<div class="table-wrap"><table><thead><tr><th>狀態碼</th><th>意思</th></tr></thead><tbody><tr><td><strong>400</strong></td><td>沒帶專有名詞、專有名詞太多，或聽錯的寫法寫得不對</td></tr><tr><td><strong>409</strong></td><td>不能重跑：已經請語音服務刪除（超過保留時間或已經按過「不用再改了」）、這次的辨識模式沒有校正、離刪除不到 15 分鐘，或正在重跑 —— 訊息會講是哪一種</td></tr><tr><td><strong>503</strong></td><td>還沒設定語音服務</td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-transcribe/retry</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;upload_id&quot;: &quot;UPLOAD_ID&quot;, &quot;terms&quot;: [&quot;王小明&quot;, &quot;Bianca&quot;, &quot;Proxmox VE&quot;, &quot;Proksmox → Proxmox&quot;]}&#x27;</span></code></pre>
+<p>不需要再重跑時，請語音服務<strong>現在就刪除</strong>它那份逐字稿（本系統這邊的逐字稿不受影響）：</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-transcribe/done</code></pre>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-transcribe/done</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;upload_id&quot;: &quot;UPLOAD_ID&quot;}&#x27;</span></code></pre>
+<p>回 <code>{&quot;ok&quot;: true, &quot;acked&quot;: true}</code>。<code>acked</code> 是 <code>false</code> 代表暫時連不上語音服務，本系統稍後會自動再通知一次。</p>
 <hr>
       </section>
       <section class="doc-section" data-sec="會議摘要" data-title="會議摘要" hidden>
@@ -768,7 +804,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="會議摘要">會議摘要</h4>
 <p>把會議逐字稿整理成摘要、決議、待辦、風險與章節，<strong>每一條都附段號</strong>。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-summary/api/meeting-summary</code></pre>
-<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>逐字稿：<code>.vtt</code> / <code>.srt</code> / <code>.json</code> / <code>.txt</code> / <code>.md</code> / <code>.docx</code> / <code>.odt</code></td></tr><tr><td><code>second_pass</code></td><td>string</td><td></td><td><code>1</code>（預設）跑第二輪複審；<code>0</code> 只跑第一輪，快但漏抓與誤抓都會多</td></tr><tr><td><code>context</code></td><td>string</td><td></td><td><strong>會議背景</strong>（選填，上限 4000 字）：主題、與會者與職稱、專有名詞說明，或你自己要交代的話</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>逐字稿：<code>.vtt</code> / <code>.srt</code> / <code>.json</code> / <code>.txt</code> / <code>.md</code> / <code>.docx</code> / <code>.odt</code></td></tr><tr><td><code>second_pass</code></td><td>string</td><td></td><td><code>1</code>（預設）跑第二輪複審；<code>0</code> 只跑第一輪，快但漏抓與誤抓都會多</td></tr><tr><td><code>context</code></td><td>string</td><td></td><td><strong>會議背景</strong>（選填，上限 4000 字）：主題、與會者與職稱、專有名詞說明，或你自己要交代的話</td></tr><tr><td><code>replacements</code></td><td>string</td><td></td><td><strong>分析前先換掉的寫法</strong>（選填）：JSON 陣列 <code>[{&quot;from&quot;: &quot;Bianka&quot;, &quot;to&quot;: &quot;Bianca&quot;}]</code>，通常是從下面 <code>/api/term-suggestions</code> 的建議裡挑的。不是 JSON 陣列回 <strong>400</strong></td></tr></tbody></table></div>
 <p><strong><code>context</code> 只拿來讀懂逐字稿，不會變成項目的來源。</strong> 知道「某某是營運副總、會議主席」對判斷誰在交辦、誰是負責人很有幫助， 但背景裡寫的事情<strong>沒有在會議上發生過</strong> —— 決議 / 待辦 / 風險 / 未決問題 一律只從逐字稿產生。除了提示裡明講之外，還有兩道機制擋著： 引用驗證（項目必須指得回逐字稿的段落，背景不在被比對的範圍裡）， 以及「跟背景很像、而且明顯比跟逐字稿更像」就丟掉。 被丟掉的會計進 <code>dropped_count</code>。</p>
 <p><strong>這支是同步的</strong> —— 一場兩小時的會議要跑幾分鐘（約 30~60 次模型請求）， 呼叫端的逾時要放寬。要背景處理請走網頁那條路 （<code>POST /upload</code> → <code>POST /start</code> → 拿作業編號輪詢 <code>/api/jobs/{id}</code>）。</p>
 <p>需要先在管理區啟用 LLM；沒啟用回 <strong>503</strong>。逐字稿讀不出東西回 <strong>400</strong> （訊息會說得出支援哪些格式）。</p>
@@ -782,20 +818,22 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 李美華：法務專員&#x27;</span> | jq</code></pre>
 <p>回應 JSON（節錄）：</p>
 <pre><code class="lang-json">{
-  <span class="hl-key">&quot;summary&quot;</span>: { <span class="hl-key">&quot;summary&quot;</span>: <span class="hl-str">&quot;這場會議確認了第四季的預算…&quot;</span> },
+  <span class="hl-key">&quot;summary&quot;</span>: { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;這場會議確認了第四季的預算…&quot;</span>,
+               <span class="hl-key">&quot;grounded&quot;</span>: <span class="hl-bool">true</span>, <span class="hl-key">&quot;unsupported&quot;</span>: [] },
   <span class="hl-key">&quot;items&quot;</span>: {
-    <span class="hl-key">&quot;decision&quot;</span>: [
-      { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;第四季預算維持原案&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">18</span>, <span class="hl-num">19</span>],
-        <span class="hl-key">&quot;speaker&quot;</span>: <span class="hl-str">&quot;王小明&quot;</span>, <span class="hl-key">&quot;quote&quot;</span>: <span class="hl-str">&quot;那就照原案走&quot;</span> }
+    <span class="hl-key">&quot;decisions&quot;</span>: [
+      { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;第四季預算維持原案&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">18</span>, <span class="hl-num">19</span>] }
     ],
-    <span class="hl-key">&quot;action&quot;</span>: [
+    <span class="hl-key">&quot;actions&quot;</span>: [
       { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;月底前把修訂版寄給法務&quot;</span>, <span class="hl-key">&quot;owner&quot;</span>: <span class="hl-str">&quot;李美華&quot;</span>,
-        <span class="hl-key">&quot;due&quot;</span>: <span class="hl-str">&quot;月底&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">42</span>] }
+        <span class="hl-key">&quot;due_text&quot;</span>: <span class="hl-str">&quot;月底&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">42</span>] }
     ],
-    <span class="hl-key">&quot;risk&quot;</span>: [], <span class="hl-key">&quot;question&quot;</span>: []
+    <span class="hl-key">&quot;risks&quot;</span>: [], <span class="hl-key">&quot;questions&quot;</span>: [], <span class="hl-key">&quot;impacts&quot;</span>: []
   },
   <span class="hl-key">&quot;chapters&quot;</span>: [
-    { <span class="hl-key">&quot;title&quot;</span>: <span class="hl-str">&quot;預算討論&quot;</span>, <span class="hl-key">&quot;start_ms&quot;</span>: <span class="hl-num">0</span>, <span class="hl-key">&quot;end_ms&quot;</span>: <span class="hl-num">840000</span>, <span class="hl-key">&quot;start_seq&quot;</span>: <span class="hl-num">1</span> }
+    { <span class="hl-key">&quot;title&quot;</span>: <span class="hl-str">&quot;預算討論&quot;</span>, <span class="hl-key">&quot;start_seq&quot;</span>: <span class="hl-num">1</span>, <span class="hl-key">&quot;end_seq&quot;</span>: <span class="hl-num">60</span>,
+      <span class="hl-key">&quot;start_ms&quot;</span>: <span class="hl-num">0</span>, <span class="hl-key">&quot;end_ms&quot;</span>: <span class="hl-num">840000</span>, <span class="hl-key">&quot;duration_ms&quot;</span>: <span class="hl-num">840000</span>,
+      <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">1</span>, <span class="hl-num">2</span>, <span class="hl-num">3</span>], <span class="hl-key">&quot;percentage&quot;</span>: <span class="hl-num">38.5</span> }
   ],
   <span class="hl-key">&quot;mindmap&quot;</span>: [
     { <span class="hl-key">&quot;node_id&quot;</span>: <span class="hl-str">&quot;c1&quot;</span>, <span class="hl-key">&quot;parent_id&quot;</span>: <span class="hl-bool">null</span>, <span class="hl-key">&quot;label&quot;</span>: <span class="hl-str">&quot;預算討論&quot;</span>,
@@ -804,13 +842,43 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;charts&quot;</span>: [<span class="hl-str">&quot;timeline&quot;</span>, <span class="hl-str">&quot;topic_share&quot;</span>, <span class="hl-str">&quot;speaker_share&quot;</span>, <span class="hl-str">&quot;mindmap&quot;</span>],
   <span class="hl-key">&quot;speaker_stats&quot;</span>: {
     <span class="hl-key">&quot;王小明&quot;</span>: { <span class="hl-key">&quot;speaking_ms&quot;</span>: <span class="hl-num">512000</span>, <span class="hl-key">&quot;percentage&quot;</span>: <span class="hl-num">61.2</span>,
-                <span class="hl-key">&quot;turn_count&quot;</span>: <span class="hl-num">24</span>, <span class="hl-key">&quot;average_turn_ms&quot;</span>: <span class="hl-num">21333</span> }
+                <span class="hl-key">&quot;turn_count&quot;</span>: <span class="hl-num">24</span>, <span class="hl-key">&quot;average_turn_ms&quot;</span>: <span class="hl-num">21333</span>,
+                <span class="hl-key">&quot;chars&quot;</span>: <span class="hl-num">4210</span>, <span class="hl-key">&quot;char_pct&quot;</span>: <span class="hl-num">58.3</span>, <span class="hl-key">&quot;first_seq&quot;</span>: <span class="hl-num">1</span> }
   },
   <span class="hl-key">&quot;dropped_count&quot;</span>: <span class="hl-num">3</span>,
   <span class="hl-key">&quot;llm_calls&quot;</span>: <span class="hl-num">41</span>,
+  <span class="hl-key">&quot;context&quot;</span>: <span class="hl-str">&quot;會議主題：第四季預算\n與會者\n王小明：財務部經理，會議主席\n李美華：法務專員&quot;</span>,
   <span class="hl-key">&quot;source&quot;</span>: { <span class="hl-key">&quot;filename&quot;</span>: <span class="hl-str">&quot;meeting.vtt&quot;</span>, <span class="hl-key">&quot;segments&quot;</span>: <span class="hl-num">186</span> }
 }</code></pre>
+<p>摘要的 <code>grounded</code> 表示摘要裡的數字與英文詞<strong>在逐字稿裡都找得到</strong>，找不到的列在 <code>unsupported</code>（中文的講法是否忠實只能靠人看與段號）。</p>
+<p>回應裡的 <code>context</code> 是送進來的會議背景（去掉頭尾空白），<strong>沒送就沒有這個欄位</strong>；網頁匯出的文件會把它原文放在標題之後、摘要之前。</p>
 <p><code>dropped_count</code> 是<strong>引用對不上原文而被丟掉的項目數</strong> —— 每一條抽出來的內容 都要在它宣稱的段落裡找得到，找不到就不留。這個數字偏高時代表模型在編， 換一個模型會比調參數有效。</p>
+<h5 id="依會議背景修正逐字稿的專有名詞">依會議背景修正逐字稿的專有名詞</h5>
+<p>逐字稿常把人名、產品名寫錯（<code>Bianca</code> 寫成 <code>Bianka</code>、王小明寫成王曉明）。會議背景裡寫了正確的寫法時，這支可以找出逐字稿裡<strong>可能</strong>寫錯的地方，<strong>只建議、不改、不存</strong>，也不需要 LLM：</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-summary/api/term-suggestions</code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>逐字稿（同上）</td></tr><tr><td><code>context</code></td><td>string</td><td></td><td>會議背景；沒給就沒有建議</td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-summary/api/term-suggestions</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@meeting.vtt&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;context=與會者：王小明（財務長）、Bianca（PM）&quot;</span> | jq</code></pre>
+<pre><code class="lang-json">{
+  <span class="hl-key">&quot;terms&quot;</span>: [<span class="hl-str">&quot;王小明&quot;</span>, <span class="hl-str">&quot;Bianca&quot;</span>],
+  <span class="hl-key">&quot;suggestions&quot;</span>: [
+    {<span class="hl-key">&quot;from&quot;</span>: <span class="hl-str">&quot;Bianka&quot;</span>, <span class="hl-key">&quot;to&quot;</span>: <span class="hl-str">&quot;Bianca&quot;</span>, <span class="hl-key">&quot;count&quot;</span>: <span class="hl-num">2</span>, <span class="hl-key">&quot;seqs&quot;</span>: [<span class="hl-num">2</span>],
+     <span class="hl-key">&quot;example&quot;</span>: <span class="hl-str">&quot;報價我已經寄給 Bianka 了，Bianka 會再確認。&quot;</span>},
+    {<span class="hl-key">&quot;from&quot;</span>: <span class="hl-str">&quot;王曉明&quot;</span>, <span class="hl-key">&quot;to&quot;</span>: <span class="hl-str">&quot;王小明&quot;</span>, <span class="hl-key">&quot;count&quot;</span>: <span class="hl-num">1</span>, <span class="hl-key">&quot;seqs&quot;</span>: [<span class="hl-num">1</span>],
+     <span class="hl-key">&quot;example&quot;</span>: <span class="hl-str">&quot;王曉明今天要報告第四季的預算。&quot;</span>}
+  ]
+}</code></pre>
+<p>比對規則是固定的，寧可少建議也不亂建議：英文差一兩個字母、或中間多了空白 / 連字號；中文三到八個字、<strong>每個字讀音都對得上</strong>（同音不同字）。只差大小寫、單複數、兩個字的詞、背景自己就這樣寫的、像兩個詞都說得通的，一律不建議。</p>
+<p>挑好的放進 <code>/api/meeting-summary</code> 的 <code>replacements</code>，<strong>分析之前</strong>套用：英文照整個詞換（<code>Biankas</code> 不會被換掉一截），回應多一個 <code>replacements</code>（實際換了什麼、各幾處，一處都沒換到的不列）。網頁那條路匯出的 <code>.json</code> 附著逐字稿，換過的段落把原文留在 <code>orig_text</code>。</p>
+<p>建議抓不到的寫法（辨識聽錯差太多，例如 <code>Groxmoxity</code> 應為 <code>Proxmox</code>）也可以自己放進 <code>replacements</code>，規則相同；英文換的時候<strong>分大小寫</strong>，要連小寫的 <code>groxmoxity</code> 一起換就另外放一組。</p>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-summary/api/meeting-summary</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@meeting.vtt&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;context=與會者：王小明（財務長）、Bianca（PM）&quot;</span> \
+  <span class="hl-flag">--form-string</span> <span class="hl-str">&#x27;replacements=[{&quot;from&quot;: &quot;Bianka&quot;, &quot;to&quot;: &quot;Bianca&quot;}]&#x27;</span> | jq <span class="hl-str">&#x27;.replacements&#x27;</span>
+<span class="hl-cmt"># → [{&quot;from&quot;: &quot;Bianka&quot;, &quot;to&quot;: &quot;Bianca&quot;, &quot;count&quot;: 2}]</span></code></pre>
       </section>
       <section class="doc-section" data-sec="pdf-ocr" data-title="PDF OCR" hidden>
 <div class="doc-crumb">5. PDF 擷取與分析 API</div>

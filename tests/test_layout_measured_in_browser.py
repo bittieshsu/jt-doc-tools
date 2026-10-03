@@ -108,8 +108,11 @@ def live():
         shutil.rmtree(data, ignore_errors=True)
 
 
-def _measure(live, path: str, js: str):
-    """開一頁（自己的分頁、固定寬度），等載入完跑一段 JS，回傳它的值。"""
+def _measure(live, path, js: str, width: int = _WIDTH, locale: str | None = None):
+    """開一頁（自己的分頁、固定寬度），等載入完跑一段 JS，回傳它的值。
+
+    `path` 給一串的話，同一個分頁依序開每一頁、回傳 `{路徑: 值}`（掃整批頁面時用，
+    不然每一頁開一個分頁太慢）。`locale` 設介面語言的 cookie。"""
     import websockets.sync.client as wsc
 
     port, cdp = live
@@ -132,22 +135,31 @@ def _measure(live, path: str, js: str):
                         return m
 
             send("Emulation.setDeviceMetricsOverride",
-                 {"width": _WIDTH, "height": 900, "deviceScaleFactor": 1,
-                  "mobile": False})
+                 {"width": width, "height": 900, "deviceScaleFactor": 1,
+                  "mobile": width < 600})
             send("Page.enable")
-            send("Page.navigate", {"url": f"http://127.0.0.1:{port}{path}"})
-            deadline = time.time() + 20
-            while time.time() < deadline:
-                r = send("Runtime.evaluate", {
-                    "expression": "document.readyState", "returnByValue": True})
-                if r.get("result", {}).get("result", {}).get("value") == "complete":
-                    break
-                time.sleep(0.2)
-            time.sleep(0.5)       # 讓 DOMContentLoaded 之後的接線跑完
-            r = send("Runtime.evaluate", {"expression": js, "returnByValue": True})
-            res = r.get("result", {})
-            assert "exceptionDetails" not in res, res.get("exceptionDetails")
-            return res.get("result", {}).get("value")
+            if locale:
+                send("Network.setCookie", {"name": "jtdt_locale", "value": locale,
+                                           "domain": "127.0.0.1", "path": "/"})
+
+            def one(p):
+                send("Page.navigate", {"url": f"http://127.0.0.1:{port}{p}"})
+                deadline = time.time() + 20
+                while time.time() < deadline:
+                    r = send("Runtime.evaluate", {
+                        "expression": "document.readyState", "returnByValue": True})
+                    if r.get("result", {}).get("result", {}).get("value") == "complete":
+                        break
+                    time.sleep(0.2)
+                time.sleep(0.5)       # 讓 DOMContentLoaded 之後的接線跑完
+                r = send("Runtime.evaluate", {"expression": js, "returnByValue": True})
+                res = r.get("result", {})
+                assert "exceptionDetails" not in res, (p, res.get("exceptionDetails"))
+                return res.get("result", {}).get("value")
+
+            if isinstance(path, str):
+                return one(path)
+            return {p: one(p) for p in path}
     finally:
         try:
             urllib.request.urlopen(
@@ -267,3 +279,179 @@ def test_placeholder_text_is_lighter_than_the_browser_default(live, path, sel):
     assert got, f"{path} 找不到 {sel} —— 這條等於沒驗"
     assert _luminance(got) > _luminance("rgb(117, 117, 117)") * 1.3, (
         f"{path} 的範例文字是 {got}，跟瀏覽器預設（#757575）差不多或更深")
+
+
+_CTX_JS = """(() => {
+  const d = document.getElementById('msCtxWrap');
+  if (!d) return null;
+  d.open = true;
+  const cs = getComputedStyle(d);
+  const card = d.closest('.panel') || d.parentElement;
+  const sum = d.querySelector('summary');
+  const txt = [...sum.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).pop();
+  const rg = document.createRange(); rg.selectNodeContents(txt);
+  const ta = document.getElementById('msCtxBox').getBoundingClientRect();
+  const p = d.querySelector('p').getBoundingClientRect();
+  const r = d.getBoundingClientRect();
+  return {bg: cs.backgroundColor, cardBg: getComputedStyle(card).backgroundColor,
+          left: parseFloat(cs.borderLeftWidth), top: parseFloat(cs.borderTopWidth),
+          right: parseFloat(cs.borderRightWidth), bottom: parseFloat(cs.borderBottomWidth),
+          shadow: cs.boxShadow, textLeft: rg.getBoundingClientRect().left,
+          ta: [ta.left, ta.right, ta.top, ta.bottom], p: [p.left, p.right],
+          box: [r.left, r.right, r.top, r.bottom], padR: parseFloat(cs.paddingRight)};
+})()"""
+
+
+def test_meeting_context_reads_as_one_group_not_a_card(live):
+    """會議背景（選填）的標題、說明、輸入框要看得出是**一組**（使用者 2026-10-02），
+    但**不可以變成卡片裡的另一張卡片**（使用者 2026-09-19：四邊框讓它看起來不在
+    「1. 上傳逐字稿」裡面）。兩次回報要同時成立，所以判準兩邊都量：
+
+    * 有自己的底色（跟所在卡片不同）＋ 左邊一條色線 —— 分組的訊號；
+    * 另外三邊沒有框線、沒有陰影 —— 那兩樣是「卡片」的訊號；
+    * 說明與輸入框都在這一塊**裡面**，輸入框左緣對齊標題文字（看得出是標題底下的內容），
+      而且**不超出右緣**（寬度 100% 加上左縮排會撐出去）。
+    """
+    g = _measure(live, "/tools/meeting-summary/", _CTX_JS)
+    assert g, "找不到會議背景那一區 —— 這條等於沒驗"
+    assert g["bg"] not in ("rgba(0, 0, 0, 0)", "transparent"), "沒有底色，看不出是一組"
+    assert g["bg"] != g["cardBg"], f"底色跟所在卡片一樣（{g['bg']}），看不出是一組"
+    assert g["left"] >= 2, "左邊沒有色線"
+    assert g["top"] == g["right"] == g["bottom"] == 0, (
+        "畫了四邊框 —— 會變成「卡片裡又一張卡片」（2026-09-19 回報過）")
+    assert g["shadow"] in ("none", ""), "加了陰影 —— 那是卡片的訊號"
+    bl, br, bt, bb = g["box"]
+    tl, tr, tt, tb = g["ta"]
+    assert bl <= g["p"][0] and g["p"][1] <= br, "說明跑到這一塊外面"
+    assert bl < tl and tr <= br - g["padR"] + 1 and bt < tt and tb < bb, (
+        f"輸入框不在這一塊裡面：框 {g['box']}、輸入框 {g['ta']}")
+    assert abs(tl - g["textLeft"]) <= 2, (
+        f"輸入框左緣 {tl:.0f} 沒對齊標題文字 {g['textLeft']:.0f}")
+
+
+def test_meeting_context_on_a_phone_uses_the_full_width(live):
+    """窄螢幕不縮排：輸入框要撐到這一塊的右緣 —— 縮排與寬度若各自覆寫，
+    寫在後面的輸入框規則會把寬度蓋回去（第一版就是這樣，手機上窄了 39px）。"""
+    g = _measure(live, "/tools/meeting-summary/", _CTX_JS, width=390)
+    assert g, "找不到會議背景那一區 —— 這條等於沒驗"
+    bl, br, _, _ = g["box"]
+    tl, tr, _, _ = g["ta"]
+    assert tr <= br - g["padR"] + 1, f"輸入框超出右緣：框 {g['box']}、輸入框 {g['ta']}"
+    assert br - g["padR"] - tr <= 2, f"手機上輸入框沒有撐滿（右邊空了 {br - g['padR'] - tr:.0f}px）"
+    assert tl - bl <= 20, f"手機上還在縮排（左邊空了 {tl - bl:.0f}px）"
+
+
+#: 「結果」卡片跟它上面那一張卡片之間的距離。量的時候把結果卡片攤開、進度列維持藏著
+#: （還沒送出、或從「我的作業」打開時的樣子）。
+_GAP_JS = """(id => {
+  const b = document.getElementById(id);
+  if (!b) return null;
+  let a = b.previousElementSibling;
+  while (a && !a.classList.contains('panel')) a = a.previousElementSibling;
+  if (!a) return null;
+  // 兩張都攤開（轉逐字稿的選項卡片在上傳之前也是藏著的，量到 0 就等於沒量）
+  a.removeAttribute('hidden');
+  b.removeAttribute('hidden');
+  document.querySelectorAll('.job-progress').forEach(j => j.setAttribute('hidden', ''));
+  const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+  if (!ra.height || !rb.height) return null;
+  return Math.round(rb.top - ra.bottom);
+})(%s)"""
+
+
+@pytest.mark.parametrize("path,result_id", [
+    ("/tools/meeting-summary/", "msResult"),
+    ("/tools/meeting-transcribe/", "mtResult"),
+    ("/tools/doc-translate/", "dtResult"),
+])
+def test_the_result_card_is_not_glued_to_the_card_above(live, path, result_id):
+    """「分析結果」卡片跟上一張卡片之間要有間距（2026-10-02 使用者截圖回報「太近了」）。
+
+    會議摘要的進度列夾在兩張卡片**中間**，`.panel + .panel` 那條接不到，進度列藏著時
+    兩張卡片就貼在一起；另外兩支的進度列在第一張卡片**裡面**，本來就沒事 ——
+    三支一起量，以後誰把進度列搬出來也會被抓到。"""
+    gap = _measure(live, path, _GAP_JS % json.dumps(result_id))
+    assert gap is not None, f"{path} 找不到結果卡片或它上面那一張 —— 這條等於沒驗"
+    assert gap >= 12, f"{path} 結果卡片跟上一張卡片只隔 {gap}px"
+
+
+# ---------------------------------------------------------------- 欄位標題不可以伸進輸入框
+# 2026-10-03 使用者截圖：轉逐字稿的「專有名詞或會議背景」九個字，超過中文欄位標題的 96px
+# （`platform.css` 的 `.form-row label` 不換行），字伸到右邊的輸入框上。中文的寬度是照四到六個字
+# 定的，**之後誰把標題寫長一點就會再發生一次** —— 所以全站工具頁一起量，不只量這一頁。
+#
+# 判準是「標題的字（`scrollWidth`）有沒有伸進**同一列**下一個元件的範圍」，不是單看
+# `scrollWidth > clientWidth`：勾選框整個包在 label 裡、後面沒有別的元件的那種，字超出
+# 標題欄也沒有蓋到東西（掃全站時有三處是這樣，畫面上看不出問題）。
+# 攤開藏起來的區塊時**只攤開那一列的祖先**，不動列裡面的東西 —— 轉逐字稿的人數標題裡
+# 有兩段互斥的文字（一段藏著），全部攤開的話兩段會接在一起、量出一個不存在的溢出。
+
+_LABEL_OVERLAP_JS = r"""(() => {
+  const out = {measured: 0, bad: [], lang: document.documentElement.lang};
+  document.querySelectorAll('.form-row').forEach(row => {
+    for (let a = row.closest('[hidden]'); a; a = row.closest('[hidden]')) a.removeAttribute('hidden');
+    for (let d = row.closest('details:not([open])'); d; d = row.closest('details:not([open])')) d.open = true;
+  });
+  document.querySelectorAll('.form-row > label').forEach(l => {
+    const r = l.getBoundingClientRect();
+    const n = l.nextElementSibling;
+    if (!r.width || !n) return;
+    const nr = n.getBoundingClientRect();
+    if (!nr.width || nr.top >= r.bottom - 1 || nr.bottom <= r.top + 1) return;   // 不在同一列
+    out.measured++;
+    const over = Math.round(r.left + l.scrollWidth - nr.left);
+    if (over > 1) out.bad.push([l.textContent.trim().slice(0, 30), over]);
+  });
+  return out;
+})()"""
+
+
+def _tool_pages() -> list[str]:
+    from app.tool_registry import discover_tools
+    return sorted(f"/tools/{t.metadata.id}/" for t in discover_tools())
+
+
+def test_no_field_label_runs_into_its_field_on_any_tool_page(live):
+    """中文介面（標題欄寬度固定、不換行的那一個）逐頁量全站工具頁。"""
+    got = _measure(live, _tool_pages(), _LABEL_OVERLAP_JS)
+    measured = sum(v["measured"] for v in got.values() if v)
+    # 「量了 0 個」跟「全部合格」在輸出裡長得一樣 —— 2026-10-03 實量 50 頁 48 個，取一半當下限
+    assert measured >= 24, f"只量到 {measured} 個欄位標題，掃描本身可能壞了"
+    bad = {p: v["bad"] for p, v in got.items() if v and v["bad"]}
+    assert not bad, f"欄位標題的字伸進了旁邊的輸入框（溢出 px）：{bad}"
+
+
+@pytest.mark.parametrize("locale", ["zh-Hant", "en", "ja"])
+def test_the_terms_label_stays_out_of_the_textarea(live, locale):
+    """轉逐字稿的「專有名詞或會議背景」三種語言都要量 —— 英日文的標題欄比較寬、會換行，
+    中文的不換行，三種的壞法不一樣。"""
+    got = _measure(live, "/tools/meeting-transcribe/", _LABEL_OVERLAP_JS, locale=locale)
+    assert got["lang"].startswith(locale.split("-")[0]), (
+        f"介面語言沒有切過去（{got['lang']}）—— 這一條等於量了中文")
+    assert got["measured"] >= 3, f"轉逐字稿只量到 {got['measured']} 個欄位標題"
+    assert not got["bad"], f"{locale}：欄位標題的字伸進了輸入框：{got['bad']}"
+
+
+_SWATCH_JS = """(function(){
+  var t = function (d) { var c = getComputedStyle(d).backgroundColor;
+                         return c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent'; };
+  return Array.from(document.querySelectorAll('.md2-theme')).map(function (card) {
+    var dots = Array.from(card.querySelectorAll('.md2-sw > i'));
+    var r = dots.length ? dots[0].getBoundingClientRect() : {width: 0, height: 0};
+    return {id: card.dataset.theme, n: dots.length, colored: dots.filter(t).length,
+            w: Math.round(r.width), h: Math.round(r.height)};
+  });
+})()"""
+
+
+def test_markdown_theme_cards_show_their_colours(live):
+    """「Markdown 轉辦公文件」每張主題卡片前面一排三個色票（2026-10-03 加主題時一起做）。
+
+    **顏色要真的畫出來**：色票走 CSSOM 設 —— 寫成行內 `style` 屬性會被 CSP 丟掉，
+    色塊還在、大小也對，只是透明的。所以判準是算出來的底色，不是元素在不在。"""
+    from app.tools.markdown_to_doc import themes
+    got = _measure(live, "/tools/markdown-to-doc/", _SWATCH_JS)
+    assert [c["id"] for c in got] == list(themes.THEMES), got
+    for c in got:
+        assert c["n"] == 3 and c["colored"] == 3, f"{c['id']} 的色票沒畫出來：{c}"
+        assert c["w"] >= 10 and c["h"] >= 10, f"{c['id']} 的色票太小：{c}"

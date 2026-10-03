@@ -8,6 +8,8 @@
       this.select = selectEl;
       if (selectEl.dataset.jtSelectMounted) return;
       selectEl.dataset.jtSelectMounted = '1';
+      // 讓頁面程式拿得到這個實例（用程式改 `.value` 之後要 `refresh()`）
+      selectEl._jtSelect = this;
 
       // Build wrapper so native + custom DOM live together
       const wrap = document.createElement('div');
@@ -43,6 +45,8 @@
       wrap.appendChild(this.panel);
 
       this.wrap = wrap;
+      // 選項帶色票時面板放寬、說明可以折行（版面主題那種「名稱 ＋ 一句說明」）
+      if (selectEl.querySelector('option[data-swatches]')) wrap.classList.add('has-swatches');
       this._buildPanel();
       this._sync();
       this._bind();
@@ -73,7 +77,15 @@
       // 主標籤(可套 data-preview-style 預覽字型) + 可選次標籤(data-sub)
       const main = document.createElement('div');
       main.className = 'jt-select-option-main';
-      main.textContent = opt.textContent;
+      const sw = this._swatches(opt);
+      if (sw) {
+        main.appendChild(sw);
+        const txt = document.createElement('span');
+        txt.textContent = opt.textContent;
+        main.appendChild(txt);
+      } else {
+        main.textContent = opt.textContent;
+      }
       const previewStyle = opt.getAttribute('data-preview-style');
       if (previewStyle) main.style.cssText = previewStyle;
       item.appendChild(main);
@@ -91,6 +103,26 @@
       });
       this.panel.appendChild(item);
       return item;
+    }
+
+    // `data-swatches="#1e3a8a,#3b82f6,#eff6ff"` → 一排小色塊。
+    // **顏色走 CSSOM、而且只收 #rgb / #rrggbb**：CSP 擋行內 style 屬性，
+    // 而這個值來自頁面的 HTML，不收任意字串（`url(...)` 之類）。
+    _swatches(opt) {
+      const raw = opt ? (opt.getAttribute('data-swatches') || '') : '';
+      const cols = raw.split(',').map(c => c.trim())
+        .filter(c => /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c));
+      if (!cols.length) return null;
+      const box = document.createElement('span');
+      box.className = 'jt-select-swatches';
+      box.setAttribute('aria-hidden', 'true');
+      cols.forEach(c => {
+        const d = document.createElement('span');
+        d.className = 'jt-select-swatch';
+        d.style.backgroundColor = c;
+        box.appendChild(d);
+      });
+      return box;
     }
 
     _pick(value) {
@@ -113,6 +145,8 @@
       // 而面板展開後那份走 CSSOM（`main.style.cssText`）反而是好的，於是
       // 「打開看得到預覽、收起來就沒了」。改用 DOM API + CSSOM 兩者一致。
       this.trigger.textContent = '';
+      const sw = this._swatches(opt);
+      if (sw) this.trigger.appendChild(sw);
       const lab = document.createElement('span');
       lab.className = 'jt-select-label';
       lab.textContent = label;
@@ -168,6 +202,8 @@
           }
         }
       });
+      // 頁面自己送 change（例如還原上次的選擇）時也要跟著更新顯示
+      this.select.addEventListener('change', () => this._sync());
       // External programmatic .value change should re-sync
       const obs = new MutationObserver(() => this._sync());
       obs.observe(this.select, { attributes: true, attributeFilter: ['value'] });

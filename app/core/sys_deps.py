@@ -845,6 +845,20 @@ _DEPS = [
         },
     },
     {
+        "key": "pypinyin",
+        "label": "pypinyin (中文讀音比對)",
+        "category": "文書處理",
+        "impact": "會議摘要「依會議背景修正逐字稿的專有名詞」用它比對中文的讀音（王曉明 / 王小明這種同音不同字）。缺了它，中文那一半只剩「一模一樣才算」，同音的錯字不會被建議 —— 而且畫面上看不出來；英文的比對與其他功能不受影響。",
+        "impact_en": "Compares Chinese pronunciations for the meeting summary's \"fix proper nouns in the transcript from the meeting background\" (same-sounding characters). Without it, Chinese names written with a same-sounding character are not suggested, and nothing on screen says so; English matching and everything else are unaffected.",
+        "soft": True,
+        "probe": lambda: _probe_python_pkg("pypinyin", dist_name="pypinyin"),
+        "install_cmd": {
+            "linux": "uv sync（或 sudo jtdt update；純 Python 套件，不需編譯）",
+            "macos": "uv sync",
+            "windows": "jtdt update（以系統管理員身分開啟 PowerShell）",
+        },
+    },
+    {
         "key": "pillow-heif",
         "label": "pillow-heif (HEIC / HEIF)",
         "category": "影像",

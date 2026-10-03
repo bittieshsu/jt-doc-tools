@@ -12,6 +12,15 @@
     while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
     return (i === 0 ? v : v.toFixed(1)) + ' ' + u[i];
   }
+  // 存入時間：**同名檔案只能靠它分辨**（2026-10-03 使用者回報工作區裡有兩個同名的逐字稿，
+  // 挑選視窗只列檔名與大小，不知道要選哪一個）。格式跟「我的工作區」那一頁相同。
+  function fmtTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts * 1000);
+    const p = (x) => String(x).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' '
+      + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
   function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 
   // 這個上傳框收得下、而且工作區供應得了的副檔名交集。
@@ -116,13 +125,27 @@
     status.hidden = true;
     grid.innerHTML = files.map(f => {
       const ext = (f.ext || '').replace('.', '');
-      const thumb = '<img src="/workspace/thumb/' + f.file_id + '" alt="" loading="lazy" ' +
-        'onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement(\'span\'),{className:\'ws-pick-badge\',textContent:\'' + ext.toUpperCase() + '\'}))">';
-      return '<div class="ws-pick-card" data-id="' + f.file_id + '">' +
+      // 縮圖載不到就換成副檔名徽章 —— **不可以寫成 `onerror="…"` 屬性**：CSP 不收行內事件，
+      // 那段永遠不會執行，畫面留一張破圖（下面用 addEventListener 接）。
+      const thumb = '<img src="/workspace/thumb/' + f.file_id + '" alt="" loading="lazy" data-ext="'
+        + esc(ext.toUpperCase()) + '">';
+      const tool = f.source_tool_name || f.source_tool || '';
+      return '<div class="ws-pick-card" data-id="' + f.file_id + '"'
+        + (tool ? ' title="' + esc(tr(tool)) + '"' : '') + '>' +
         '<div class="ws-pick-thumb">' + thumb + '</div>' +
         '<div class="ws-pick-info"><div class="ws-pick-name">' + esc(f.name) + '</div>' +
-        '<div class="ws-pick-meta">' + fmtBytes(f.size) + '</div></div></div>';
+        '<div class="ws-pick-meta">' + fmtBytes(f.size) + '</div>' +
+        (f.saved_at ? '<div class="ws-pick-meta ws-pick-time">' + esc(fmtTime(f.saved_at)) + '</div>' : '') +
+        '</div></div>';
     }).join('');
+    grid.querySelectorAll('.ws-pick-thumb img').forEach(img => {
+      img.addEventListener('error', () => {
+        const b = document.createElement('span');
+        b.className = 'ws-pick-badge';
+        b.textContent = img.dataset.ext || '';
+        img.replaceWith(b);
+      }, { once: true });
+    });
     grid.querySelectorAll('.ws-pick-card').forEach(card => {
       card.addEventListener('click', async () => {
         const id = card.dataset.id;

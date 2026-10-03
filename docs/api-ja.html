@@ -435,7 +435,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="markdown-轉辦公文件">Markdown → オフィス文書</h4>
 <p>Markdown を PDF / Word / OpenDocument に変換します。内容は <code>file</code> でアップロードしても、<code>text</code> で直接渡してもかまいません。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/markdown-to-doc/api/markdown-to-doc</code></pre>
-<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>△</td><td>Markdown ファイル。<code>text</code> とはどちらか一方</td></tr><tr><td><code>text</code></td><td>str</td><td>△</td><td>Markdown の内容を直接渡します。<code>file</code> とはどちらか一方</td></tr><tr><td><code>format</code></td><td>str</td><td></td><td><code>pdf</code>（既定）/ <code>docx</code> / <code>odt</code>。それ以外の値は 400 を返します</td></tr><tr><td><code>theme</code></td><td>str</td><td></td><td>レイアウトのテーマ。既定は <code>classic</code></td></tr><tr><td><code>font</code></td><td>str</td><td></td><td>フォント。既定は <code>default</code></td></tr><tr><td><code>title</code></td><td>str</td><td></td><td>文書のタイトル</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>△</td><td>Markdown ファイル。<code>text</code> とはどちらか一方</td></tr><tr><td><code>text</code></td><td>str</td><td>△</td><td>Markdown の内容を直接渡します。<code>file</code> とはどちらか一方</td></tr><tr><td><code>format</code></td><td>str</td><td></td><td><code>pdf</code>（既定）/ <code>docx</code> / <code>odt</code>。それ以外の値は 400 を返します</td></tr><tr><td><code>theme</code></td><td>str</td><td></td><td>レイアウトのテーマ。既定は <code>classic</code>。使える値：<code>classic</code> / <code>github</code> / <code>academic</code> / <code>book</code> / <code>report</code> / <code>mono</code> / <code>teal</code> / <code>indigo</code> / <code>forest</code> / <code>coral</code> / <code>navy-gold</code> / <code>magazine</code>。不明な値は <code>classic</code> になります</td></tr><tr><td><code>font</code></td><td>str</td><td></td><td>フォント。既定は <code>default</code></td></tr><tr><td><code>title</code></td><td>str</td><td></td><td>文書のタイトル</td></tr></tbody></table></div>
 <pre><code class="lang-bash"><span class="hl-cmt"># 檔案轉 PDF</span>
 curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/markdown-to-doc/api/markdown-to-doc</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
@@ -725,19 +725,24 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="會議錄音轉逐字稿">会議録音の文字起こし</h4>
 <p>会議の録音・録画を<strong>タイムスタンプと発言者付き</strong>の文字起こしに変換します。認識は外部の音声サービス（JTLW）側で実行するため、<strong>先に管理画面の「音声サービス（JTLW）」で設定しておく必要があります</strong>。未設定の場合は <strong>503</strong> を返します。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-transcribe/api/meeting-transcribe</code></pre>
-<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>音声 <code>.m4a</code> / <code>.mp3</code> / <code>.wav</code> / <code>.aac</code> / <code>.ogg</code> / <code>.opus</code> / <code>.flac</code>、動画 <code>.mp4</code> / <code>.mov</code> / <code>.mkv</code> / <code>.webm</code></td></tr><tr><td><code>language</code></td><td>string</td><td></td><td><code>auto</code>（既定）または BCP-47（<code>zh-Hant</code> / <code>en</code> / <code>ja</code> / <code>ko</code> …）。音声サービスが対応していない場合は<strong>送信した時点で</strong>400 を返します。<code>zh</code> / <code>zh-TW</code> は <code>zh-Hant</code> に変換して送信します。</td></tr><tr><td><code>num_speakers</code></td><td>string</td><td></td><td>既定は <code>0</code> で、サービス側の判断に任せます。<strong>0 のままを推奨します</strong></td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>音声 <code>.m4a</code> / <code>.mp3</code> / <code>.wav</code> / <code>.aac</code> / <code>.ogg</code> / <code>.opus</code> / <code>.flac</code>、動画 <code>.mp4</code> / <code>.mov</code> / <code>.mkv</code> / <code>.webm</code></td></tr><tr><td><code>language</code></td><td>string</td><td></td><td><code>auto</code>（既定）または BCP-47（<code>zh-Hant</code> / <code>en</code> / <code>ja</code> / <code>ko</code> …）。音声サービスが対応していない場合は<strong>送信した時点で</strong>400 を返します。<code>zh</code> / <code>zh-TW</code> は <code>zh-Hant</code> に変換して送信します。</td></tr><tr><td><code>num_speakers</code></td><td>string</td><td></td><td>既定は <code>0</code> で、サービス側の判断に任せます。<strong>0 のままを推奨します</strong></td></tr><tr><td><code>terms</code></td><td>string</td><td></td><td><strong>固有名詞または会議の背景</strong>（任意）：出席者の氏名、会社名・製品名、用語を 1 行に 1 つ、または読点・カンマ・セミコロン区切りで。既知の聞き間違いは「聞き間違えた表記 → 正しい表記」の形で 1 行に。会議の背景を数文書いてもかまいません</td></tr></tbody></table></div>
+<p><strong>固有名詞</strong>（v1.16.39 から）は音声サービスに用語集として送り、<strong>校正で使います</strong>。正しい表記はそのまま残し、つづりの近い聞き間違いは書いた表記に直します（音声サービスのインターフェース版 2.8 から、句読点のみの校正でも直します）。1 行に 1 語が最適です（<code>Proxmox</code>、<code>PVE</code>、<code>Proxmox VE</code> をそれぞれ 1 行）。つづりが大きく違う聞き間違いは校正で直せないことがあります。<strong>認識ではこのリストを参考にしません</strong>。音声サービスの実測で、リストの語がその会議に出てこないと、認識がその語を文字起こしに勝手に挿入することがわかったため採用していません。重複（大文字小文字を区別しない）は最初の 1 つだけ、順序は指定どおりです。最大 500 個で、超えると <strong>400</strong> を返し、<strong>黙って切り捨てることはありません</strong>（切り捨てた語は使われないのに、呼び出し側は送ったと思ってしまうため）。</p>
+<p><strong>既知の聞き間違い</strong>（v1.16.49 から）：聞き間違え方が分かっている語は「聞き間違えた表記 → 正しい表記」の形で 1 行に書きます（矢印は <code>-&gt;</code> や <code>=&gt;</code> でも可。聞き間違えた表記が複数あるときは読点かカンマで区切ります）。例：<code>Proksmox、Proxmux → Proxmox</code>。音声サービスが校正の前に表のとおり置き換えます。言語モデルを通さず、どの校正レベルでも行い、元の認識層は変わりません。つづりが大きく違って校正では認識できない聞き間違いは、この方法でしか直せません。英語は語全体が一致したときだけ、大文字小文字を区別せずに置き換え、中国語は文字どおりに置き換えます。中国語の聞き間違えた表記が短すぎると別の語の一部まで置き換わることがあるため、具体的に書いてください。正しい表記も固有名詞として送ります。規則は音声サービスに合わせています。1 語につき聞き間違えた表記は最大 20 個、それぞれ 2～200 文字。矢印の右側は 1 語だけ。聞き間違えた表記がリスト上の別の固有名詞であってはいけません（置き換えると正しく書かれた語まで変わるため）。同じ聞き間違えた表記を 2 つの語に対応させることもできません。これに反する行は <strong>400</strong> を返してどの行かを示し、送信しません。矢印が 2 つ以上ある行、<code>#</code> で始まる行、文になっている行は、これまでどおり会議の背景として扱います。音声サービスのインターフェース版 2.9 から受け付けます。それより古い版（または版を取得できないとき）は送信せず、応答の <code>variants_sent</code> が <code>false</code> になります。</p>
+<p>文として書いた行は<strong>固有名詞として送りません</strong>（v1.16.44 から）。句点・感嘆符・疑問符がある行や、区切った一部が 40 文字 / 漢字 10 文字を超える行は、会議の背景として扱います。文全体を固有名詞にしても、校正でそのまま残したり、つづりの比較に使ったりする意味がないためです。「與會者：王小明、Bianca」のような行は、コロンの前のラベルは送らず、後ろを語の並びとして送ります。ラベルだけの行（「與會人員如下：」）は送りません。<code>#</code> で始まる見出し行と、文字を含まない日付・時刻・数字だけの部分も送りません（v1.16.48）。全文は応答の <code>context</code> に入り、会議の要約へ送るときに会議の背景に入ります。</p>
 <p><strong>発言者分離の方式は音声サービスのバージョンで決まります</strong>（v1.16.31 から）：音声サービスのインターフェース版が 2.5 以上なら、本システムは NVIDIA Nemotron での識別を依頼します。2.4 以前（または版を取得できない）場合は従来の方式です。レスポンスの <code>speaker_engine</code> に、このジョブで依頼した方式が入ります。音声サービスが同じ実際の認識結果で測定した値（人数指定なし）：中国語の会議 20 件で話者の誤りが 18.52% → 2.92%、英語の会議 16 件で 12.31% → 4.65%。</p>
 <p><strong>同じ <code>num_speakers</code> でも、2 つの方式では意味が逆になります</strong>：</p>
 <div class="table-wrap"><table><thead><tr><th></th><th>Nemotron（<code>speaker_engine</code> = <code>auto</code>）</th><th>従来の方式（<code>legacy</code>）</th></tr></thead><tbody><tr><td>入力した数</td><td><strong>上限としてのみ使われる</strong>：検出した人数がそれより多いときだけ統合し、少ないときはそのまま</td><td><strong>必ずその数のグループに分ける</strong></td></tr><tr><td>実際より多い</td><td>影響なし</td><td>主な発言者が分割される</td></tr><tr><td>実際より少ない</td><td>別の人が同じ話者にまとめられる</td><td>別の人が同じ話者にまとめられる</td></tr><tr><td>おすすめ</td><td>不明なら 0 のまま。<strong>少なめより多めに</strong></td><td>不明なら 0 のまま。一言二言しか話さない人は数えない</td></tr></tbody></table></div>
-<p>Nemotron では、正しい人数を指定しても指定しない場合との差は 0.01 ポイントだけです（20 件、95% 信頼区間 [−0.03, 0.00]）。<strong>「劣らない」としか言えないので、精度を上げるために入力する必要はありません</strong>。発言者が 8 人を超えると音声サービスは自動的に従来の方式に切り替え、理由はレスポンスの <code>diarization.note</code> に入ります。</p>
+<p>Nemotron では、正しい人数を指定しても指定しない場合との差は 0.01 ポイントだけです（20 件、95% 信頼区間 [−0.03, 0.00]）。<strong>「劣らない」としか言えないので、精度を上げるために入力する必要はありません</strong>。</p>
+<p>新しい方法で識別できる発言者は最大 8 人です。8 人を超える人数を指定すると、音声サービスは必ず従来の方法に切り替えます。指定しない場合は、新しい方法の 8 人分の枠がすべて埋まり、かつ従来の方法で 8 人を超えて識別されたときだけ切り替え、それ以外は新しい方法のまま最大 8 人で識別します。切り替えた場合、理由はレスポンスの <code>diarization.reason</code>（コード）と <code>diarization.note</code>（説明）に入ります。8 人を超えることが確実な会議では人数を指定してください。</p>
 <p><strong><code>auto</code> は録音の冒頭約 30 秒の発話だけを聞いて、会議全体の言語を決めます</strong>。区間ごとに判定するわけではありません。冒頭で誰かが別の言語を話すと（20 秒で十分です）、会議全体が誤って認識されることがあります。冒頭の無音や雑音は影響しません。会議全体の言語が分かっている場合は指定してください。中国語と英語の<strong>文全体</strong>が入れ替わる会議では、多く使われている方の言語を指定してください。もう一方の言語の文はほとんど正しく認識されません（中国語の文の中に英語の用語が混ざる程度なら問題ありません）。</p>
 <p><strong>このエンドポイントは同期処理です</strong>。37 分の会議で実測 7〜8 分（認識 ＋ 発言者分離 ＋ 校正）かかるため、呼び出し側のタイムアウトは長めにしてください。バックグラウンド処理が必要な場合は Web 側の経路（<code>POST /upload</code> → <code>POST /start</code> → ジョブ ID で <code>/api/jobs/{id}</code> をポーリング）を使ってください。</p>
-<div class="table-wrap"><table><thead><tr><th>ステータスコード</th><th>意味</th><th>対処</th></tr></thead><tbody><tr><td><strong>400</strong></td><td>受け付けないファイル形式、空のファイル、または送ったパラメータ（<code>language</code> / <code>num_speakers</code>）を音声サービスが拒否した</td><td>パラメータを直してください。言語が分からない場合は <code>auto</code> を使います</td></tr><tr><td><strong>502</strong></td><td>音声サービスは受け付けたが処理に失敗した（認識の失敗、結果が空、サービス自体のエラー）</td><td>理由はメッセージに書かれています。繰り返し起きる場合は管理者に音声サービスの確認を依頼してください</td></tr><tr><td><strong>503</strong></td><td>音声サービスが未設定、または接続できない</td><td>管理者に「音声サービス（JTLW）」の設定と接続を確認してもらってください</td></tr><tr><td><strong>504</strong></td><td>時間がかかりすぎて結果が出ない（順番待ちが 4 時間を超えた、または認識が上限を超えた）</td><td>音声サービス側ではすでに取り消し済みです。しばらくしてから送り直してください</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>ステータスコード</th><th>意味</th><th>対処</th></tr></thead><tbody><tr><td><strong>400</strong></td><td>ファイル形式が対象外、ファイルが空、固有名詞が多すぎる、聞き間違いの行の書き方が正しくない、または音声サービスが送った引数（<code>language</code> / <code>num_speakers</code> / 固有名詞）を拒否した</td><td>パラメータを直してください。言語が分からない場合は <code>auto</code> を使います</td></tr><tr><td><strong>502</strong></td><td>音声サービスは受け付けたが処理に失敗した（認識の失敗、結果が空、サービス自体のエラー）</td><td>理由はメッセージに書かれています。繰り返し起きる場合は管理者に音声サービスの確認を依頼してください</td></tr><tr><td><strong>503</strong></td><td>音声サービスが未設定、または接続できない</td><td>管理者に「音声サービス（JTLW）」の設定と接続を確認してもらってください</td></tr><tr><td><strong>504</strong></td><td>時間がかかりすぎて結果が出ない（順番待ちが 4 時間を超えた、または認識が上限を超えた）</td><td>音声サービス側ではすでに取り消し済みです。しばらくしてから送り直してください</td></tr></tbody></table></div>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-transcribe/api/meeting-transcribe</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@meeting.m4a&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;language=auto&quot;</span> \
-  <span class="hl-flag">-F</span> <span class="hl-str">&quot;num_speakers=0&quot;</span> | jq</code></pre>
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;num_speakers=0&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;terms=王小明、Bianca、Proxmox VE&quot;</span> | jq</code></pre>
 <p>レスポンス JSON（抜粋）：</p>
 <pre><code class="lang-json">{
   <span class="hl-key">&quot;source&quot;</span>: {<span class="hl-key">&quot;filename&quot;</span>: <span class="hl-str">&quot;meeting.m4a&quot;</span>, <span class="hl-key">&quot;size_bytes&quot;</span>: <span class="hl-num">17823213</span>},
@@ -748,8 +753,19 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;speaker_engine&quot;</span>: <span class="hl-str">&quot;auto&quot;</span>,
   <span class="hl-key">&quot;diarization&quot;</span>: {<span class="hl-key">&quot;requested&quot;</span>: <span class="hl-str">&quot;auto&quot;</span>, <span class="hl-key">&quot;engine&quot;</span>: <span class="hl-str">&quot;nemotron&quot;</span>, <span class="hl-key">&quot;note&quot;</span>: <span class="hl-bool">null</span>, <span class="hl-key">&quot;reason&quot;</span>: <span class="hl-bool">null</span>},
   <span class="hl-key">&quot;diarize_fallback&quot;</span>: <span class="hl-bool">null</span>,
+  <span class="hl-key">&quot;diarize_saturated&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;terms&quot;</span>: [<span class="hl-str">&quot;王小明&quot;</span>, <span class="hl-str">&quot;Bianca&quot;</span>, <span class="hl-str">&quot;Proxmox VE&quot;</span>],
+  <span class="hl-key">&quot;glossary&quot;</span>: {<span class="hl-key">&quot;entries&quot;</span>: <span class="hl-num">3</span>, <span class="hl-key">&quot;keep_terms&quot;</span>: <span class="hl-num">3</span>, <span class="hl-key">&quot;asr_bias_terms&quot;</span>: <span class="hl-num">0</span>, <span class="hl-key">&quot;variants&quot;</span>: <span class="hl-num">0</span>},
+  <span class="hl-key">&quot;variants&quot;</span>: {},
+  <span class="hl-key">&quot;variants_sent&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;asr&quot;</span>: {<span class="hl-key">&quot;model&quot;</span>: <span class="hl-str">&quot;large-v3-turbo&quot;</span>, <span class="hl-key">&quot;location&quot;</span>: <span class="hl-str">&quot;gpu_server&quot;</span>, <span class="hl-key">&quot;device&quot;</span>: <span class="hl-str">&quot;cuda&quot;</span>},
+  <span class="hl-key">&quot;context&quot;</span>: <span class="hl-str">&quot;第四季備份規劃會議。\n王小明\nBianca\nProxmox VE&quot;</span>,
   <span class="hl-key">&quot;layers&quot;</span>: {<span class="hl-key">&quot;raw&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;final&quot;</span>: <span class="hl-num">1045</span>, <span class="hl-key">&quot;speakers&quot;</span>: <span class="hl-num">1045</span>},
-  <span class="hl-key">&quot;summary&quot;</span>: {<span class="hl-key">&quot;correction_level&quot;</span>: <span class="hl-str">&quot;punctuation_only&quot;</span>, <span class="hl-key">&quot;correction&quot;</span>: {<span class="hl-key">&quot;edited&quot;</span>: <span class="hl-num">612</span>}},
+  <span class="hl-key">&quot;tasks&quot;</span>: [<span class="hl-str">&quot;transcribe&quot;</span>, <span class="hl-str">&quot;diarize&quot;</span>, <span class="hl-str">&quot;correct&quot;</span>],
+  <span class="hl-key">&quot;summary&quot;</span>: {<span class="hl-key">&quot;correction_level&quot;</span>: <span class="hl-str">&quot;punctuation_only&quot;</span>,
+              <span class="hl-key">&quot;correction&quot;</span>: {<span class="hl-key">&quot;edited&quot;</span>: <span class="hl-num">612</span>, <span class="hl-key">&quot;variant_replacements&quot;</span>: <span class="hl-num">0</span>}},
+  <span class="hl-key">&quot;upload_id&quot;</span>: <span class="hl-str">&quot;3f9c0a1e5b7d4c2a9e8f6b1d0c3a5e7f&quot;</span>,
+  <span class="hl-key">&quot;retry_until&quot;</span>: <span class="hl-num">1790000000.0</span>,
   <span class="hl-key">&quot;segments&quot;</span>: [
     {<span class="hl-key">&quot;seq&quot;</span>: <span class="hl-num">1</span>, <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;各位早，我們開始。&quot;</span>, <span class="hl-key">&quot;speaker&quot;</span>: <span class="hl-str">&quot;S1&quot;</span>,
      <span class="hl-key">&quot;start_ms&quot;</span>: <span class="hl-num">1450</span>, <span class="hl-key">&quot;end_ms&quot;</span>: <span class="hl-num">2650</span>}
@@ -760,7 +776,27 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <p><code>diarize_skipped</code> が <code>true</code> は<strong>今回の認識モードは話者分離を行わないことを示します</strong>（例：台湾語モード）。この場合、 <code>segments</code> には <code>speaker</code> フィールドがなく、 <code>num_speakers</code> も音声サービスには送信されません。認識モードで実行できる処理は音声サービスが提供する一覧に従い、送信前に確認します。</p>
 <p>レスポンスの <code>speaker_engine</code> はこのジョブで<strong>依頼した</strong>分離方式（<code>auto</code> は Nemotron、<code>legacy</code> は従来の方式、分離しなかった場合は <code>null</code>）、<code>diarization</code> は音声サービスが報告する<strong>実際に使った方式</strong>です（インターフェース版 2.5 から。古い版では <code>null</code>）。<code>auto</code> を依頼したのに <code>engine</code> が <code>legacy</code> の場合、<code>note</code> に理由が入ります（例：8 人を超える人数を指定した）。</p>
 <p>レスポンスの <code>diarize_fallback</code> は、Nemotron を依頼したのに従来の方式が使われた場合にのみ入り、それ以外は <code>null</code> です。<code>reason</code> は音声サービスのコード（インターフェース版 2.6 から）、<code>text</code> はそのコードに応じて本システムが選ぶ説明文です。コードが不明な場合や音声サービスがコードを返さなかった場合、<code>text</code> は一般的な説明文になり、<code>note</code> に音声サービスの原文が入ります。</p>
+<p>レスポンスの <code>diarize_saturated</code> が <code>true</code> のときは、<strong>新方式（Nemotron）の 8 つの枠がすべて使われた</strong>ことを示します。実際の話者はもっと多い可能性があり、一部の人は他の人にまとめられています。8 人を超えるとわかっている場合は <code>num_speakers</code> を付けて送り直してください（音声サービスのインターフェース 2.7 以降でのみ返され、それより前は常に <code>false</code>）。</p>
+<p>応答の <code>terms</code> はこの件で送った固有名詞（整理後の一覧）、<code>glossary</code> は音声サービスからの使い方の報告です。<code>entries</code> は受け取った数、<code>keep_terms</code> は書いたとおりに残した数、<code>asr_bias_terms</code> は認識で参考にした数（通常は 0：認識では参考にしません。音声サービスの GPU サーバーが使えず、サービス本体で認識したときだけ 0 より大きくなります）。固有名詞を送らなかったときは <code>terms</code> が空の配列、<code>glossary</code> が <code>null</code> です。<code>context</code> は <code>terms</code> 欄の原文（固有名詞として扱わなかった文も含む）で、入力がなければ空文字列です。応答の <code>asr</code> は音声サービスが報告する認識モデル（<code>model</code>）、実行場所（<code>location</code>：<code>gpu_server</code> または <code>api_host</code>）、デバイス（<code>device</code>）で、音声サービスのインターフェース版 2.8 から入ります。それ以前の版や認識に失敗したときは <code>null</code> です。</p>
+<p>応答の <code>variants</code> はこの件で書いた聞き間違いの表記（<code>{&quot;Proxmox&quot;: [&quot;Proksmox&quot;, &quot;Proxmux&quot;]}</code>、なければ空のオブジェクト）、<code>variants_sent</code> は実際に音声サービスへ送ったかどうかです（インターフェース版 2.9 から受け付けます。<code>false</code> のときは文字起こしを表のとおり置き換えていません）。置き換えた箇所数は <code>summary.correction.variant_replacements</code>、音声サービスが受け付けた聞き間違いの数は <code>glossary.variants</code> にあります（どちらも 2.9 から）。</p>
 <p><code>speaker</code> は記号（<code>S1</code> / <code>S2</code>…）です。名前との対応づけは呼び出し側の責任です。Web 側の経路では記号をクリックして名前に変更できます。</p>
+<h5 id="補專有名詞只重跑校正">固有名詞を追加して校正だけやり直す</h5>
+<p>文字起こしの後で人名や用語の誤りに気づいたら、固有名詞を追加して<strong>校正だけをやり直せます</strong>（v1.16.41 以降）。認識はやり直さず、<code>seq</code>・時刻・話者はそのままで、テキストだけが新しい校正結果に置き換わります。</p>
+<p>文字起こしの保存後、音声サービス側に<strong>最大 24 時間</strong>残してやり直せるようにし（管理者は「音声サービス（JTLW）」設定ページで短くでき、0 ＝ 保存したらすぐ削除・やり直し不可）、その後に削除を依頼します。応答の <code>retry_until</code> はやり直せる最後の時刻（UNIX 秒。やり直せないときは <code>null</code>）、<code>upload_id</code> は下の 2 つの呼び出しで指定する ID です。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-transcribe/retry</code></pre>
+<div class="table-wrap"><table><thead><tr><th>パラメーター（JSON）</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>upload_id</code></td><td>string</td><td>✓</td><td>同期 API の応答にある <code>upload_id</code></td></tr><tr><td><code>terms</code></td><td>string または string[]</td><td>✓</td><td>固有名詞（追加分だけでなく<strong>全部</strong>。聞き間違いの行も含めます。音声サービスはこの一覧で元の一覧を置き換えます）。規則は送信時と同じ</td></tr></tbody></table></div>
+<p><code>{&quot;job_id&quot;: &quot;…&quot;}</code> を返します。<code>/api/jobs/{id}</code> をポーリングし、完了したら <code>GET /tools/meeting-transcribe/result/{upload_id}</code> で新しい文字起こしを取得します（<code>retry.count</code> はやり直した回数）。</p>
+<p>やり直すのは校正だけで、認識はやり直しません。つづりが大きく違って校正では認識できない聞き間違いは、「聞き間違えた表記 → 正しい表記」の行を一緒に送ってください（音声サービスのインターフェース版 2.9 から表のとおり置き換えます）。</p>
+<div class="table-wrap"><table><thead><tr><th>ステータスコード</th><th>意味</th></tr></thead><tbody><tr><td><strong>400</strong></td><td>固有名詞がない、多すぎる、または聞き間違いの行の書き方が正しくない</td></tr><tr><td><strong>409</strong></td><td>やり直せない：音声サービスに削除を依頼済み（保持期間が過ぎた、または「これ以上修正しない」が押された）、今回の認識モードに校正がない、削除まで 15 分未満、またはやり直し中。どれに当たるかはメッセージに表示されます</td></tr><tr><td><strong>503</strong></td><td>音声サービスがまだ設定されていません</td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-transcribe/retry</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;upload_id&quot;: &quot;UPLOAD_ID&quot;, &quot;terms&quot;: [&quot;王小明&quot;, &quot;Bianca&quot;, &quot;Proxmox VE&quot;, &quot;Proksmox → Proxmox&quot;]}&#x27;</span></code></pre>
+<p>これ以上やり直さないときは、音声サービス側の文字起こしを<strong>今すぐ削除</strong>するよう依頼します（こちらの文字起こしには影響しません）：</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-transcribe/done</code></pre>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-transcribe/done</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;upload_id&quot;: &quot;UPLOAD_ID&quot;}&#x27;</span></code></pre>
+<p><code>{&quot;ok&quot;: true, &quot;acked&quot;: true}</code> を返します。<code>acked</code> が <code>false</code> のときは音声サービスに一時的に接続できないため、後で自動的にもう一度通知します。</p>
 <hr>
       </section>
       <section class="doc-section" data-sec="會議摘要" data-title="会議の要約" hidden>
@@ -768,7 +804,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="會議摘要">会議の要約</h4>
 <p>会議の文字起こしから要約・決定事項・タスク・リスク・章立てを作り、<strong>各項目に発言番号を付けます</strong>。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-summary/api/meeting-summary</code></pre>
-<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>文字起こし：<code>.vtt</code> / <code>.srt</code> / <code>.json</code> / <code>.txt</code> / <code>.md</code> / <code>.docx</code> / <code>.odt</code></td></tr><tr><td><code>second_pass</code></td><td>string</td><td></td><td><code>1</code>（既定）2 回目の再確認を行う。<code>0</code> 1 回目のみ。速いが、取りこぼしも誤検出も増える</td></tr><tr><td><code>context</code></td><td>string</td><td></td><td><strong>会議の背景</strong>（任意、最大 4000 文字）：主題、出席者と役職、専門用語の説明、その他伝えたいこと</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>文字起こし：<code>.vtt</code> / <code>.srt</code> / <code>.json</code> / <code>.txt</code> / <code>.md</code> / <code>.docx</code> / <code>.odt</code></td></tr><tr><td><code>second_pass</code></td><td>string</td><td></td><td><code>1</code>（既定）2 回目の再確認を行う。<code>0</code> 1 回目のみ。速いが、取りこぼしも誤検出も増える</td></tr><tr><td><code>context</code></td><td>string</td><td></td><td><strong>会議の背景</strong>（任意、最大 4000 文字）：主題、出席者と役職、専門用語の説明、その他伝えたいこと</td></tr><tr><td><code>replacements</code></td><td>string</td><td></td><td><strong>分析の前に置き換える表記</strong>（任意）：JSON 配列 <code>[{&quot;from&quot;: &quot;Bianka&quot;, &quot;to&quot;: &quot;Bianca&quot;}]</code>。通常は下の <code>/api/term-suggestions</code> の提案から選びます。JSON 配列でない場合は <strong>400</strong></td></tr></tbody></table></div>
 <p><strong><code>context</code> は文字起こしを読み解くためだけに使われ、項目の出所にはなりません。</strong>「誰々は運用担当副社長で議長」と分かれば誰が指示し誰が担当かの判断に役立ちますが、背景に書かれた事柄は<strong>会議では起きていません</strong> —— 決議・タスク・リスク・未決事項は必ず文字起こしから抽出されます。プロンプトで明示するほか、二つの仕組みで担保しています。引用検証（項目は文字起こしの段落を指していなければならず、背景は比較対象に含まれません）と、「背景と非常に似ており、かつ文字起こしより明らかに似ている」ものを破棄する処理です。破棄されたものは <code>dropped_count</code> に計上されます。</p>
 <p><strong>この端点は同期処理です</strong>。2 時間の会議では数分かかります（モデルへのリクエストは約 30〜60 回）ので、呼び出し側のタイムアウトを長めにしてください。バックグラウンド処理が必要な場合は web 側の経路（<code>POST /upload</code> → <code>POST /start</code> → ジョブ ID を <code>/api/jobs/{id}</code> でポーリング）を使ってください。</p>
 <p>先に管理画面で LLM を有効にしてください。無効な場合は <strong>503</strong> を返します。文字起こしが読み取れない場合は <strong>400</strong> を返します（対応形式をメッセージで示します）。</p>
@@ -782,20 +818,22 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 李美華：法務專員&#x27;</span> | jq</code></pre>
 <p>レスポンス JSON（抜粋）：</p>
 <pre><code class="lang-json">{
-  <span class="hl-key">&quot;summary&quot;</span>: { <span class="hl-key">&quot;summary&quot;</span>: <span class="hl-str">&quot;這場會議確認了第四季的預算…&quot;</span> },
+  <span class="hl-key">&quot;summary&quot;</span>: { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;這場會議確認了第四季的預算…&quot;</span>,
+               <span class="hl-key">&quot;grounded&quot;</span>: <span class="hl-bool">true</span>, <span class="hl-key">&quot;unsupported&quot;</span>: [] },
   <span class="hl-key">&quot;items&quot;</span>: {
-    <span class="hl-key">&quot;decision&quot;</span>: [
-      { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;第四季預算維持原案&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">18</span>, <span class="hl-num">19</span>],
-        <span class="hl-key">&quot;speaker&quot;</span>: <span class="hl-str">&quot;王小明&quot;</span>, <span class="hl-key">&quot;quote&quot;</span>: <span class="hl-str">&quot;那就照原案走&quot;</span> }
+    <span class="hl-key">&quot;decisions&quot;</span>: [
+      { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;第四季預算維持原案&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">18</span>, <span class="hl-num">19</span>] }
     ],
-    <span class="hl-key">&quot;action&quot;</span>: [
+    <span class="hl-key">&quot;actions&quot;</span>: [
       { <span class="hl-key">&quot;text&quot;</span>: <span class="hl-str">&quot;月底前把修訂版寄給法務&quot;</span>, <span class="hl-key">&quot;owner&quot;</span>: <span class="hl-str">&quot;李美華&quot;</span>,
-        <span class="hl-key">&quot;due&quot;</span>: <span class="hl-str">&quot;月底&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">42</span>] }
+        <span class="hl-key">&quot;due_text&quot;</span>: <span class="hl-str">&quot;月底&quot;</span>, <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">42</span>] }
     ],
-    <span class="hl-key">&quot;risk&quot;</span>: [], <span class="hl-key">&quot;question&quot;</span>: []
+    <span class="hl-key">&quot;risks&quot;</span>: [], <span class="hl-key">&quot;questions&quot;</span>: [], <span class="hl-key">&quot;impacts&quot;</span>: []
   },
   <span class="hl-key">&quot;chapters&quot;</span>: [
-    { <span class="hl-key">&quot;title&quot;</span>: <span class="hl-str">&quot;預算討論&quot;</span>, <span class="hl-key">&quot;start_ms&quot;</span>: <span class="hl-num">0</span>, <span class="hl-key">&quot;end_ms&quot;</span>: <span class="hl-num">840000</span>, <span class="hl-key">&quot;start_seq&quot;</span>: <span class="hl-num">1</span> }
+    { <span class="hl-key">&quot;title&quot;</span>: <span class="hl-str">&quot;預算討論&quot;</span>, <span class="hl-key">&quot;start_seq&quot;</span>: <span class="hl-num">1</span>, <span class="hl-key">&quot;end_seq&quot;</span>: <span class="hl-num">60</span>,
+      <span class="hl-key">&quot;start_ms&quot;</span>: <span class="hl-num">0</span>, <span class="hl-key">&quot;end_ms&quot;</span>: <span class="hl-num">840000</span>, <span class="hl-key">&quot;duration_ms&quot;</span>: <span class="hl-num">840000</span>,
+      <span class="hl-key">&quot;segment_ids&quot;</span>: [<span class="hl-num">1</span>, <span class="hl-num">2</span>, <span class="hl-num">3</span>], <span class="hl-key">&quot;percentage&quot;</span>: <span class="hl-num">38.5</span> }
   ],
   <span class="hl-key">&quot;mindmap&quot;</span>: [
     { <span class="hl-key">&quot;node_id&quot;</span>: <span class="hl-str">&quot;c1&quot;</span>, <span class="hl-key">&quot;parent_id&quot;</span>: <span class="hl-bool">null</span>, <span class="hl-key">&quot;label&quot;</span>: <span class="hl-str">&quot;預算討論&quot;</span>,
@@ -804,13 +842,43 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-key">&quot;charts&quot;</span>: [<span class="hl-str">&quot;timeline&quot;</span>, <span class="hl-str">&quot;topic_share&quot;</span>, <span class="hl-str">&quot;speaker_share&quot;</span>, <span class="hl-str">&quot;mindmap&quot;</span>],
   <span class="hl-key">&quot;speaker_stats&quot;</span>: {
     <span class="hl-key">&quot;王小明&quot;</span>: { <span class="hl-key">&quot;speaking_ms&quot;</span>: <span class="hl-num">512000</span>, <span class="hl-key">&quot;percentage&quot;</span>: <span class="hl-num">61.2</span>,
-                <span class="hl-key">&quot;turn_count&quot;</span>: <span class="hl-num">24</span>, <span class="hl-key">&quot;average_turn_ms&quot;</span>: <span class="hl-num">21333</span> }
+                <span class="hl-key">&quot;turn_count&quot;</span>: <span class="hl-num">24</span>, <span class="hl-key">&quot;average_turn_ms&quot;</span>: <span class="hl-num">21333</span>,
+                <span class="hl-key">&quot;chars&quot;</span>: <span class="hl-num">4210</span>, <span class="hl-key">&quot;char_pct&quot;</span>: <span class="hl-num">58.3</span>, <span class="hl-key">&quot;first_seq&quot;</span>: <span class="hl-num">1</span> }
   },
   <span class="hl-key">&quot;dropped_count&quot;</span>: <span class="hl-num">3</span>,
   <span class="hl-key">&quot;llm_calls&quot;</span>: <span class="hl-num">41</span>,
+  <span class="hl-key">&quot;context&quot;</span>: <span class="hl-str">&quot;會議主題：第四季預算\n與會者\n王小明：財務部經理，會議主席\n李美華：法務專員&quot;</span>,
   <span class="hl-key">&quot;source&quot;</span>: { <span class="hl-key">&quot;filename&quot;</span>: <span class="hl-str">&quot;meeting.vtt&quot;</span>, <span class="hl-key">&quot;segments&quot;</span>: <span class="hl-num">186</span> }
 }</code></pre>
+<p>要約の <code>grounded</code> は、要約中の数字と英単語が<strong>すべて文字起こしの中に見つかる</strong>ことを表します。見つからないものは <code>unsupported</code> に並びます（言い回しが忠実かどうかは、段番号を手がかりに人が確認するしかありません）。</p>
+<p>応答の <code>context</code> は送られた会議の背景（前後の空白を除いたもの）で、<strong>送らなかった場合はこの項目がありません</strong>。Web ページからエクスポートした文書では、タイトルの後・要約の前に原文のまま載ります。</p>
 <p><code>dropped_count</code> はい<strong>引用が文字起こしと一致せず除外された項目の数</strong>抽出した内容は、それが指す発言の中に必ず見つかる必要があります。見つからないものは残しません。この数値が大きいときはモデルが作り話をしている合図で、パラメータ調整よりモデルを替えるほうが有効です。</p>
+<h5 id="依會議背景修正逐字稿的專有名詞">会議の背景をもとに文字起こしの固有名詞を直す</h5>
+<p>文字起こしでは人名や製品名がよく間違えられます（<code>Bianca</code> が <code>Bianka</code> に、王小明が王曉明に）。会議の背景に正しい表記があれば、文字起こしの中で間違っている<strong>可能性がある</strong>箇所を見つけます。<strong>提案するだけで、何も変更せず、保存もしません</strong>。LLM も不要です：</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/meeting-summary/api/term-suggestions</code></pre>
+<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>文字起こし（同上）</td></tr><tr><td><code>context</code></td><td>string</td><td></td><td>会議の背景。ない場合は提案もありません</td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-summary/api/term-suggestions</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@meeting.vtt&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;context=與會者：王小明（財務長）、Bianca（PM）&quot;</span> | jq</code></pre>
+<pre><code class="lang-json">{
+  <span class="hl-key">&quot;terms&quot;</span>: [<span class="hl-str">&quot;王小明&quot;</span>, <span class="hl-str">&quot;Bianca&quot;</span>],
+  <span class="hl-key">&quot;suggestions&quot;</span>: [
+    {<span class="hl-key">&quot;from&quot;</span>: <span class="hl-str">&quot;Bianka&quot;</span>, <span class="hl-key">&quot;to&quot;</span>: <span class="hl-str">&quot;Bianca&quot;</span>, <span class="hl-key">&quot;count&quot;</span>: <span class="hl-num">2</span>, <span class="hl-key">&quot;seqs&quot;</span>: [<span class="hl-num">2</span>],
+     <span class="hl-key">&quot;example&quot;</span>: <span class="hl-str">&quot;報價我已經寄給 Bianka 了，Bianka 會再確認。&quot;</span>},
+    {<span class="hl-key">&quot;from&quot;</span>: <span class="hl-str">&quot;王曉明&quot;</span>, <span class="hl-key">&quot;to&quot;</span>: <span class="hl-str">&quot;王小明&quot;</span>, <span class="hl-key">&quot;count&quot;</span>: <span class="hl-num">1</span>, <span class="hl-key">&quot;seqs&quot;</span>: [<span class="hl-num">1</span>],
+     <span class="hl-key">&quot;example&quot;</span>: <span class="hl-str">&quot;王曉明今天要報告第四季的預算。&quot;</span>}
+  ]
+}</code></pre>
+<p>照合のルールは固定で、提案しすぎないほうに倒してあります。英語は 1～2 文字違い、または途中に空白やハイフンが入ったもの。中国語は 3～8 文字で、<strong>すべての文字の読みが一致する</strong>もの（同音異字）。大文字・小文字だけの違い、単数・複数、2 文字の語、背景自体がその表記を使っているもの、2 つの語のどちらとも取れるものは提案しません。</p>
+<p>選んだものを <code>/api/meeting-summary</code> の <code>replacements</code> に入れると<strong>分析の前に</strong>適用されます。英語は単語単位で置き換え（<code>Biankas</code> の一部が置き換わることはありません）、レスポンスに <code>replacements</code>（実際に置き換えた内容と件数。1 件も一致しなかったものは含みません）が加わります。Web 画面からエクスポートした <code>.json</code> には文字起こしが含まれ、置き換えた段落は元の文を <code>orig_text</code> に残します。</p>
+<p>提案で見つからない表記（認識の聞き間違いが大きい場合。例：<code>Proxmox</code> が <code>Groxmoxity</code> になっている）も、自分で <code>replacements</code> に入れられます。規則は同じです。英語の置き換えは<strong>大文字小文字を区別する</strong>ため、小文字の <code>groxmoxity</code> も置き換えるには別に 1 組追加してください。</p>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/meeting-summary/api/meeting-summary</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@meeting.vtt&quot;</span> \
+  <span class="hl-flag">-F</span> <span class="hl-str">&quot;context=與會者：王小明（財務長）、Bianca（PM）&quot;</span> \
+  <span class="hl-flag">--form-string</span> <span class="hl-str">&#x27;replacements=[{&quot;from&quot;: &quot;Bianka&quot;, &quot;to&quot;: &quot;Bianca&quot;}]&#x27;</span> | jq <span class="hl-str">&#x27;.replacements&#x27;</span>
+<span class="hl-cmt"># → [{&quot;from&quot;: &quot;Bianka&quot;, &quot;to&quot;: &quot;Bianca&quot;, &quot;count&quot;: 2}]</span></code></pre>
       </section>
       <section class="doc-section" data-sec="pdf-ocr" data-title="PDF OCR" hidden>
 <div class="doc-crumb">5. PDF 抽出・解析 API</div>

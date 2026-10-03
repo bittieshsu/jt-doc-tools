@@ -29,10 +29,13 @@
    我原本收起來是怕它看起來像必填，但收起來的代價更大：
    **使用者根本不知道有這個欄位**，而它正是讓分析變準的關鍵。
    標題已經寫著「（選填）」，那句話比折疊更能表達「可以不填」。
-   **不要給它邊框與底色**：這一區在「1. 上傳逐字稿」那張卡片**裡面**，
-   再包一層框就變成「卡片裡又一張卡片」，看起來像另一個獨立區塊
-   （2026-09-19 回報「會議背景 移進 1.上傳逐字稿卡片裡」—— 它其實一直
-   都在裡面，是這層框讓它看起來不在）。用一條分隔線收邊就夠。 */
+   **兩次回報要同時成立**：
+   ① 2026-09-19「會議背景 移進 1.上傳逐字稿卡片裡」—— 它一直都在裡面，是**四邊框線**
+      讓它看起來像「卡片裡又一張卡片」、像另一個獨立區塊。
+   ② 2026-10-02「跟下面的輸入區要有一個明顯的區域感，一看就知道是一體的」—— 只用一條
+      分隔線收邊時，標題、說明、輸入框散在卡片裡，看不出是同一組。
+   所以用**淺底 ＋ 左邊一條色線**分組，**不畫四邊框、不加陰影**（那兩樣才是「卡片」的訊號）；
+   說明與輸入框縮排到跟標題文字對齊，看得出是標題底下的內容。窄螢幕不縮排（空間比對齊重要）。 */
 /* 表格底下的來源說明（發言時間是量到的還是推估的）。
    **自己開的類別名一定要補樣式** —— 少了的話它會是沒有樣式的純文字，
    緊貼在表格下緣，看起來像排版壞掉（本專案 v1.14.21 記過這一條）。 */
@@ -46,22 +49,33 @@
 .ms-opt > span { color:var(--muted); }
 .ms-opt b { color:var(--fg); font-weight:600; }
 
-.ms-ctx { border:0; border-top:1px solid var(--border); padding:0;
-          margin:14px 0 16px; background:none; }
-.ms-ctx > summary { cursor:pointer; padding:12px 0 10px; font-size:13.5px;
+/* 縮排＝箭頭寬 ＋ 間距 ＋ 圖示寬 ＋ 間距，讓說明與輸入框的左緣對齊標題文字。
+   四個數字都在下面寫死成同一組，改其中一個就要一起改。 */
+.ms-ctx { --ctx-indent: calc(10px + 7px + 15px + 7px);
+          border:0; border-left:3px solid #a5b4fc; border-radius:8px;
+          background:#f6f7fd; padding:2px 14px 12px 12px; margin:16px 0; }
+.ms-ctx:not([open]) { padding-bottom:2px; }
+.ms-ctx:focus-within { border-left-color:#6366f1; }
+.ms-ctx > summary { cursor:pointer; padding:10px 0 8px; font-size:13.5px;
                     font-weight:600; color:#334155; display:flex;
                     align-items:center; gap:7px; list-style:none; }
 .ms-ctx > summary::-webkit-details-marker { display:none; }
 /* 自己畫收合箭頭（拿掉原生標記之後要有東西告訴使用者這裡點得開） */
 .ms-ctx > summary::before { content:'▸'; color:#94a3b8; font-size:12px;
+                            width:10px; text-align:center; flex:0 0 auto;
                             transition:transform .15s; display:inline-block; }
 .ms-ctx[open] > summary::before { transform:rotate(90deg); }
 .ms-ctx > summary:hover { color:#4338ca; }
-.ms-ctx > summary .ic { color:#6366f1; }
-.ms-ctx > p.muted { margin:0 0 8px; font-size:12.5px; line-height:1.7; }
+.ms-ctx > summary .ic { color:#6366f1; flex:0 0 auto; }
+.ms-ctx > :not(summary) { margin-left:var(--ctx-indent); }
+.ms-ctx > p.muted { margin-top:0; margin-bottom:8px; font-size:12.5px; line-height:1.7; }
+/* 窄螢幕不縮排：只改變數 —— 縮排與輸入框寬度都從它算，不必各自覆寫
+   （各自覆寫時，寫在後面的輸入框規則權重相同，會把寬度蓋回去）。 */
+@media (max-width: 640px) { .ms-ctx { --ctx-indent: 0px; } }
 /* **要跟貼上框長一樣** —— 原本只設了寬高與字級，邊框、圓角、內距都沒有，
    看起來是瀏覽器的預設方框（2026-09-19 回報「輸入框沒有套用到樣式」）。 */
-.ms-ctx textarea { width:100%; box-sizing:border-box; resize:vertical;
+/* 有左縮排時寬度要扣掉縮排，不然 100% ＋ 左邊界會超出卡片右緣。 */
+.ms-ctx textarea { width:calc(100% - var(--ctx-indent)); box-sizing:border-box; resize:vertical;
                    min-height:120px; font-size:13px; line-height:1.75;
                    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
                    padding:10px 12px; border:1px solid var(--border);
@@ -70,6 +84,39 @@
 .ms-ctx textarea:focus { outline:none; border-color:#6366f1;
                          box-shadow:0 0 0 3px rgba(99,102,241,.15); }
 .ms-ctx-foot { display:flex; justify-content:flex-end; padding:6px 0 2px; }
+/* 「已帶入上一次填的背景」：淺色一列、跟背景同一組，按鈕排在字的後面（窄螢幕自然換行） */
+.ms-ctx-mem { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:6px;
+              padding:6px 10px; border-radius:6px; background:#eef2ff; color:#3730a3;
+              font-size:12.5px; line-height:1.6; width:calc(100% - var(--ctx-indent));
+              box-sizing:border-box; }
+.ms-ctx-mem .ms-ctx-mem-text { flex:1 1 18em; }
+/* 依會議背景找出的「建議替換」：跟背景同一組（沒有自己的框），一條一行，例句淡一點 */
+.ms-tf { margin-top:4px; padding-top:10px; border-top:1px dashed #c7d2fe; }
+.ms-tf-head { display:flex; align-items:center; gap:6px; margin:0 0 6px;
+              font-size:13px; font-weight:600; color:#334155; }
+.ms-tf-head .ic { color:#6366f1; }
+.ms-tf-list { list-style:none; margin:0; padding:0; }
+.ms-tf-list li { padding:5px 0; border-bottom:1px solid #e5e7f5; font-size:13px; line-height:1.6; }
+.ms-tf-list li:last-child { border-bottom:0; }
+.ms-tf-list label { display:inline-flex; align-items:center; gap:6px; cursor:pointer; flex-wrap:wrap; }
+.ms-tf-list code { background:#fee2e2; color:#991b1b; border-radius:4px; padding:0 5px;
+                   text-decoration:line-through; text-decoration-color:rgba(153,27,27,.45); }
+.ms-tf-list b { color:#065f46; }
+.ms-tf-eg { display:block; margin-left:22px; color:#64748b; font-size:12px; overflow-wrap:anywhere; }
+.ms-tf-note { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+              margin:8px 0 0; font-size:12.5px; }
+.ms-tf-none { margin:6px 0 0; font-size:12.5px; }
+/* 自己加替換：跟上面的建議同一種樣子（同一個清單樣式），多一列輸入 */
+.ms-mr { margin-top:10px; padding-top:10px; border-top:1px dashed #c7d2fe; }
+.ms-mr-hint { margin:0 0 8px; font-size:12px; }
+.ms-mr-form { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.ms-mr-form .field { width:13em; max-width:100%; font-size:13px; padding:5px 8px; }
+.ms-mr-arrow { color:#64748b; }
+.ms-mr-msg { margin:6px 0 0; font-size:12.5px; }
+.ms-mr-list { margin-top:6px; }
+.ms-mr-del { margin-left:4px; padding:0 6px; font-size:12px; line-height:20px; border:0;
+             background:transparent; color:#64748b; cursor:pointer; border-radius:4px; }
+.ms-mr-del:hover { background:#fee2e2; color:#991b1b; }
 
 .ms-warn { border:1px solid #fcd34d; background:#fffbeb; border-radius:8px;
            padding:10px 12px; font-size:12.5px; line-height:1.7; margin:10px 0; }
@@ -177,6 +224,8 @@
 /* **不要設 max-height** —— 區塊內捲軸會讓「點引用跳到那一段」變成
    在一個小視窗裡捲動，而且使用者用頁面捲軸找不到後面的內容
    （2026-09-19 回報「逐字稿要全展開 不要區塊有捲軸」）。 */
+/* 依會議背景換過字的段落：虛線底線，滑過看原文 */
+.ms-fixed { text-decoration:underline dotted #94a3b8; text-underline-offset:3px; cursor:help; }
 .ms-script { border:1px solid var(--border);
              border-radius:8px; }
 .ms-line { display:grid; grid-template-columns:52px 96px 1fr; gap:10px;
@@ -208,6 +257,12 @@
 /* 每一段自己成一塊，段與段之間留開，標題帶 icon */
 .ms-sec { margin-top:30px; }
 .ms-sec:first-of-type { margin-top:18px; }
+/* 會議背景沒填時那一節藏著，它後面的摘要才是看得到的第一節 */
+#msCtxSec[hidden] + .ms-sec { margin-top:18px; }
+/* 會議背景原文照錄：使用者自己分行列的與會者、專有名詞要照原樣分行 */
+.ms-ctx-view { white-space:pre-wrap; overflow-wrap:anywhere; margin:0;
+               padding:10px 14px; border-left:3px solid #c7d2fe; background:#f8fafc;
+               border-radius:0 6px 6px 0; font-size:13.5px; line-height:1.7; color:#334155; }
 .ms-sec > h3 { display:flex; align-items:center; gap:7px; margin:0 0 10px;
                font-size:15px; color:#0f172a; }
 .ms-sec > h3 .ic { color:#6366f1; }
@@ -242,14 +297,107 @@
 .ms-sec .ms-subhead + p.muted { margin:0 0 4px; font-size:12px; }
 /* 圖上的數字用等寬數字 —— 不然 1 比 8 窄，同一欄的小數點還是對不齊。 */
 .mc-num { font-variant-numeric:tabular-nums; }
-/* 版面主題：在下載按鈕**上面**自成一行 —— 先選版面、再按下載；看得出是「設定」不是「動作」。 */
-.ms-theme-row { margin:4px 0 8px; }
-.ms-theme { display:inline-flex; align-items:center; gap:7px; font-size:12.5px;
-            color:#475569; }
-.ms-theme label { display:inline-flex; align-items:center; gap:5px;
-                  white-space:nowrap; }
-.ms-theme label .ic { color:#6366f1; }
-.ms-theme select { font-size:12.5px; padding:4px 8px; }
+/* 匯出區：左邊一張紙、右邊分「下載」與「存至工作區」兩張卡片（2026-10-03 使用者要求）。
+   右邊的排法見下面 `.ms-ex-main` 那一段。 */
+.ms-export-box { container:msex / inline-size;
+                 display:grid; grid-template-columns:210px minmax(0,1fr); gap:16px 24px;
+                 align-items:start; margin:4px 0 12px; padding:16px 18px;
+                 border:1px solid var(--border); border-radius:var(--radius); background:#f8fafc; }
+.ms-ex-preview { margin:0; }
+/* A4 的比例（1 : 1.414）—— 看起來就是「印出來那一頁」 */
+.ms-ex-paper { width:210px; height:297px; overflow:hidden; background:#fff;
+               border:1px solid var(--border); border-radius:4px;
+               box-shadow:0 1px 2px rgba(15,23,42,.06), 0 6px 16px rgba(15,23,42,.07); }
+/* 預覽是一張縮圖不是一個小視窗：不捲動、不能點 */
+.ms-ex-paper iframe { display:block; width:100%; height:100%; border:0; pointer-events:none; }
+.ms-ex-preview figcaption { margin:7px 2px 0; font-size:11px; line-height:1.5; }
+/* 右邊兩張白卡：「下載」與「存至工作區」（2026-10-03 使用者要求依動作分組；上一版依格式分三張），
+   卡片裡依格式分行。卡片拉滿右邊的寬度。
+   **按鈕排成一張表**（2026-10-03 使用者：「分類對了，但看起來還是有點亂」—— 每顆按鈕寬度不同，
+   上下對不齊）：格線是「動作 ｜ 格式 ｜ 第一顆 ｜ 第二顆 ｜ 第三顆 ｜ 剩下的空間」，
+   **按鈕那三欄各自取那一欄最寬的按鈕**（`max-content`），同一欄的按鈕一樣寬、上下對齊；
+   卡片用 subgrid 接上去，兩張卡片共用同一組欄寬。不寫死寬度 —— 英 / 日的字比中文長。
+   格式那一欄用 `fit-content`：名稱太長（英文「Web and text」）就折行，不把按鈕擠出去。
+   不支援 subgrid 的瀏覽器退回每張卡片自己的欄寬（先寫的那一行），只是不跨卡片對齊。 */
+.ms-ex-main { display:grid;
+              grid-template-columns:minmax(9em, 12.5em) fit-content(10em) repeat(3, max-content) minmax(0,1fr);
+              gap:10px 14px; align-content:start; font-size:13px; }
+.ms-ex-group { grid-column:1 / -1; display:grid; gap:8px 14px; align-items:start;
+               grid-template-columns:minmax(9em, 12.5em) minmax(0,1fr);
+               grid-template-columns:subgrid;
+               padding:12px 14px; background:#fff; border:1px solid var(--border);
+               border-radius:var(--radius); }
+/* 版面設定那一列沒有卡片外框，但留同樣的內距 —— 標題才會跟卡片標題對齊 */
+.ms-ex-group.ms-ex-setting { background:transparent; border-color:transparent;
+                             padding-top:0; padding-bottom:0; align-items:center; }
+.ms-ex-setting .ms-ex-ctl { grid-column:2 / -1; display:flex; flex-wrap:wrap;
+                            align-items:center; gap:8px; }
+/* 主題名稱長短不一 —— 下拉固定寬度，換主題時旁邊的勾選框才不會跟著左右跳 */
+.ms-ex-setting .jt-select-wrap { width:220px; }
+.ms-ex-head { grid-column:1; display:flex; flex-direction:column; gap:2px;
+              line-height:1.35; color:#0f172a; padding-top:5px; }
+/* **圖示與名稱綁在一起**：名稱長（日文「ワークスペースに保存」）時圖示不可以自己留在上一行 */
+.ms-ex-title { display:flex; align-items:flex-start; gap:7px; }
+.ms-ex-title .ic { color:#6366f1; flex:none; margin-top:1px; }
+.ms-ex-head b { font-size:13.5px; }
+.ms-ex-head small { font-size:11.5px; line-height:1.5; }
+.ms-ex-acts { grid-column:2 / -1; display:grid; row-gap:8px; column-gap:8px;
+              grid-template-columns:fit-content(10em) repeat(3, max-content) minmax(0,1fr);
+              grid-template-columns:subgrid; }
+/* 每一行（格式名稱 ＋ 那幾顆按鈕）都直接排進上面那張表：名稱固定在第一欄，按鈕接著往右排 */
+.ms-ex-act, .ms-ex-main .ms-ex-act .ms-exports { display:contents; }
+/* **格式名稱對齊按鈕的文字（baseline）** */
+.ms-ex-label { grid-column:1; font-size:12.5px; font-weight:600; color:#475569;
+               align-self:baseline; padding-top:7px; padding-right:6px; }
+/* 按鈕撐滿那一欄（同一欄一樣寬），圖示與文字靠左 —— 圖示也上下排成一直線 */
+.ms-ex-acts .btn { justify-content:flex-start; }
+/* 卡片最下面一行小字（例如 JSON 可以再傳回來），從按鈕那一欄起頭 */
+.ms-ex-foot { grid-column:2 / -1; margin:0; font-size:11.5px; line-height:1.5; }
+/* 匯出區的按鈕比一般按鈕緊一點 */
+.ms-ex-main .btn { padding:6px 12px; font-size:13px; gap:6px; }
+.ms-ex-main .ms-exports { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0; }
+.ms-ex-main select { font-size:13px; padding:6px 8px; min-width:150px; }
+.ms-opt-inline { display:inline-flex; align-items:center; gap:6px; font-size:12.5px;
+                 color:#475569; cursor:pointer; margin-left:6px; }
+/* 右邊不夠寬時（1280 的筆電加上側欄；英 / 日的字也比較長）動作名稱改放卡片上方，
+   按鈕才拿得到整張卡片的寬度 —— 動作名稱放左邊的話最後一顆按鈕會被擠到第二行。
+   **看匯出區自己的寬度，不看視窗**：側欄收起來、或視窗很寬時，同一個視窗寬度下
+   右邊的空間差很多。門檻是量出來的（三欄時英文版在 1040 以下開始折行）。 */
+@container msex (max-width: 1040px) {
+  .ms-ex-main { grid-template-columns:fit-content(10em) repeat(3, max-content) minmax(0,1fr); }
+  .ms-ex-group { grid-template-columns:fit-content(10em) minmax(0,1fr);
+                 grid-template-columns:subgrid; }
+  .ms-ex-group:not(.ms-ex-setting) > .ms-ex-head { grid-column:1 / -1; padding-top:0;
+                                                  flex-direction:row; flex-wrap:wrap;
+                                                  align-items:baseline; gap:2px 10px; }
+  .ms-ex-acts { grid-column:1 / -1; }
+}
+/* 右邊很寬時（大螢幕）兩張卡片並排 —— 一張一行的話卡片拉得很長、按鈕只佔左半邊，
+   右半邊又空了。下載的按鈕比較多，分到比較寬的那一欄；工作區停用時下載那張自己佔滿。
+   並排時兩張卡片各自一張表（左右放著，不需要上下對齊）。 */
+@container msex (min-width: 1400px) {
+  .ms-ex-main { grid-template-columns:minmax(0,4fr) minmax(0,3fr); gap:12px; }
+  .ms-ex-main:not(:has(.ms-ex-ws:not([hidden]))) .ms-ex-dl { grid-column:1 / -1; }
+  .ms-ex-group.ms-ex-setting { grid-template-columns:max-content minmax(0,1fr); }
+  .ms-ex-group:not(.ms-ex-setting) { grid-column:auto; display:flex; flex-direction:column;
+                                     gap:10px; padding:14px 16px; }
+  .ms-ex-group:not(.ms-ex-setting) > .ms-ex-head { padding-top:0; flex-direction:row;
+                                                  flex-wrap:wrap; align-items:baseline; gap:2px 10px; }
+  .ms-ex-acts { grid-template-columns:fit-content(10em) repeat(3, max-content) minmax(0,1fr); }
+}
+@media (max-width:760px) {
+  .ms-export-box { grid-template-columns:1fr; padding:14px; }
+  .ms-ex-preview { justify-self:center; }
+  .ms-ex-main, .ms-ex-group, .ms-ex-acts { display:block; }
+  .ms-ex-group { margin-top:10px; }
+  .ms-ex-group.ms-ex-setting { margin-top:0; padding:0; }
+  .ms-ex-setting .ms-ex-ctl { margin-top:6px; }
+  .ms-ex-head { padding-top:0; margin-bottom:8px; }
+  /* 手機上一行一格式：名稱一行、按鈕接著折行排 */
+  .ms-ex-act { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .ms-ex-label { flex-basis:100%; padding-top:0; margin-bottom:-3px; }
+  .ms-ex-foot { margin-top:8px; }
+}
 /* 「發言分布」那一欄：一條底軌 ＋ 幾段色塊，位置用**百分比**。
    合併進表格之後就沒有對齊問題了 —— 一列就是一列。
    欄寬變了色塊自己跟著變，不需要重畫、不需要量。 */
@@ -324,7 +472,7 @@
       <br>
       {{ tr('純文字的話一行一句話，前面可以寫「發言者：」；有時間戳記也讀得到。') }}
     </div>
-    {% with upload_id='msUp', accept=accept, hint='逐字稿檔案（.vtt / .srt / .json / .txt / .md / .docx / .odt）' %}
+    {% with upload_id='msUp', accept=accept, hint='逐字稿檔案（.vtt / .srt / .json / .txt / .md / .docx / .odt），或先前從這裡匯出的 .json' %}
       {% include "components/file_upload.html" %}
     {% endwith %}
 
@@ -345,9 +493,46 @@
       <p class="muted">
         {{ tr('這段內容只拿來讀懂逐字稿 —— 事件與影響、決議、待辦、風險、未決問題一律只會從逐字稿產生，背景裡寫的事不會被寫成項目。') }}
       </p>
+      <p class="muted">
+        {{ tr('同一份逐字稿再分析時，會自動帶入你上一次填的背景。') }}
+      </p>
       <textarea id="msCtxBox" rows="7"
         placeholder="{{ tr('會議主題：電商平台營運穩定度與大促容量整備') }}&#10;{{ tr('會議日期：2026 年 9 月 19 日') }}&#10;&#10;{{ tr('與會者') }}&#10;{{ tr('趙明哲：營運副總經理，會議主席') }}&#10;{{ tr('林冠宇：基礎架構部經理') }}"></textarea>
+      {# 這份逐字稿上一次分析時填的背景（伺服器端認出「同一份」，前端只照著顯示）—— 可以改、可以清掉 #}
+      <div class="ms-ctx-mem" id="msCtxMem" hidden>
+        <span class="ms-ctx-mem-text" id="msCtxMemText"></span>
+        <button type="button" class="btn btn-secondary btn-small" id="msCtxMemUse" hidden>{{ tr('改用上一次的') }}</button>
+        <button type="button" class="btn btn-secondary btn-small" id="msCtxMemClear">{{ tr('清除') }}</button>
+      </div>
       <div class="ms-ctx-foot"><span class="muted" id="msCtxCount"></span></div>
+      {# 依會議背景找出逐字稿裡可能寫錯的專有名詞（2026-10-02 使用者決定：專有名詞拿來修錯字）。
+         **只建議**，使用者勾選才在分析前替換，原文保留 —— 判斷是確定性的（英文看拼寫、
+         中文看讀音），不讓模型改寫逐字稿，理由寫在 `app/core/term_fix.py`。 #}
+      <div class="ms-tf" id="msTermFix" hidden>
+        <p class="ms-tf-head">{{ icon('edit', size=14) }} <span id="msTermFixHead"></span></p>
+        <ul class="ms-tf-list" id="msTermFixList"></ul>
+        <p class="muted ms-tf-note">
+          <span>{{ tr('勾選的會在開始分析前換掉；原文保留，匯出的文件也會註明換了哪些。') }}</span>
+          <button type="button" class="btn btn-secondary btn-small" id="msTermFixAll">{{ tr('全部勾選') }}</button>
+        </p>
+      </div>
+      <p class="muted ms-tf-none" id="msTermFixNone" hidden>{{ tr('會議背景裡的專有名詞，在逐字稿裡的寫法都對得上。') }}</p>
+      {# **自己加替換**（2026-10-03 使用者：「POWPOYNT 應該是 PowerPoint」「Proximity 應該是 Proxmox」）——
+         辨識聽錯、上面的建議又抓不到的（判斷規則刻意保守：英文差 3 個字母、或短到 3 個字母的都不建議）。
+         伺服器先在整份逐字稿找（跟套用同一套比對），找得到才加進清單；勾著的跟建議一起在開始分析前換掉，
+         原文保留、匯出會註明。 #}
+      <div class="ms-mr" id="msManRep" hidden>
+        <p class="ms-tf-head">{{ icon('edit', size=14) }} <span>{{ tr('自己加替換') }}</span></p>
+        <p class="muted ms-mr-hint">{{ tr('辨識聽錯、上面沒有列出來的（例如 Groxmoxity → Proxmox），自己加在這裡；整份逐字稿一起換，原文保留。') }}</p>
+        <div class="ms-mr-form">
+          <input class="field" id="msMrFrom" maxlength="100" placeholder="{{ tr('原本的寫法') }}" aria-label="{{ tr('原本的寫法') }}">
+          <span class="ms-mr-arrow" aria-hidden="true">→</span>
+          <input class="field" id="msMrTo" maxlength="100" placeholder="{{ tr('改成') }}" aria-label="{{ tr('改成') }}">
+          <button type="button" class="btn btn-secondary btn-small" id="msMrAdd">{{ icon('plus', size=14) }} <span>{{ tr('加入') }}</span></button>
+        </div>
+        <p class="muted ms-mr-msg" id="msMrMsg" hidden></p>
+        <ul class="ms-tf-list ms-mr-list" id="msMrList"></ul>
+      </div>
     </details>
 
     <div class="ms-paste-row">
@@ -371,7 +556,7 @@
       <div class="ms-warn" id="msNoSpk" hidden>
         {{ tr('沒有認出任何發言者。如果你的逐字稿是「發言者：內容」這種格式卻沒認出來，多半是名字只出現過一次 —— 分析照常可以做，只是不會有發言者佔比。') }}
       </div>
-      <div class="ms-shape">
+      <div class="ms-shape" id="msShapeRow">
         <span class="muted">{{ tr('逐字稿排法') }}</span>
         <select id="msShape" class="field"></select>
         <span class="muted" id="msShapeNote"></span>
@@ -399,28 +584,104 @@
      data-palette='{{ chart_palette }}' data-kinds='{{ chart_kinds }}'>
   <h2>{{ icon('clipboard-list', size=18) }} {{ tr('分析結果') }}</h2>
   <div>
-    {# 版面主題放在按鈕**上面**（使用者 2026-09-24）：它決定下面那幾個檔案長什麼樣，
-       要先選再按。原本是那一排的最後一格，按鈕一多就被擠到下一行、跑到按鈕下方。 #}
-    <div class="ms-theme-row">
-      <span class="ms-theme">
-        <label for="msTheme">{{ icon('edit', size=14) }} {{ tr('版面主題') }}</label>
-        <select class="field" id="msTheme">
-          {% for tid, th in doc_themes %}
-          <option value="{{ tid }}"{% if tid == 'report' %} selected{% endif %}>{{ tr(th) }}</option>
-          {% endfor %}
-        </select>
-      </span>
-    </div>
-    <div class="ms-exports">
-      <a class="btn btn-primary" id="msDlPdf" download>{{ icon('download', size=16) }} <span>PDF</span></a>
-      <a class="btn btn-secondary" id="msDlDocx" download>{{ icon('download', size=16) }} <span>Word（.docx）</span></a>
-      <a class="btn btn-secondary" id="msDlOdt" download>{{ icon('download', size=16) }} <span>ODF（.odt）</span></a>
-      <a class="btn btn-secondary" id="msDlMd" download>{{ icon('download', size=16) }} <span>Markdown</span></a>
-      <a class="btn btn-secondary" id="msDlPng" download hidden>{{ icon('image', size=16) }} <span>{{ tr('圖表') }} PNG</span></a>
-      <a class="btn btn-secondary" id="msDlZip" download>{{ icon('layers', size=16) }} <span>Markdown ＋ {{ tr('圖') }}（ZIP）</span></a>
-      <a class="btn btn-secondary" id="msDlJson" download>{{ icon('hash', size=16) }} <span>JSON</span></a>
+    {# 匯出區（2026-10-02 使用者回報「預覽、存至工作區排得不好看」）：左邊一張**頁面大小**的
+       配色預覽（不捲動，就是一頁紙的縮圖），右邊先選版面主題，再分「下載」與「存至工作區」兩張卡片，
+       卡片裡依格式分行。
+       版面主題仍然在下載按鈕**上面**（先選再按，使用者 2026-09-24）。 #}
+    <div class="ms-export-box">
+      <figure class="ms-ex-preview">
+        <div class="ms-ex-paper">
+          <iframe id="msThemePreview" title="{{ tr('版面主題預覽') }}" loading="lazy" tabindex="-1"></iframe>
+        </div>
+        <figcaption class="muted">{{ tr('預覽是瀏覽器畫的，配色與實際檔案相同；字距與換行可能略有差異。') }}</figcaption>
+      </figure>
+      <div class="ms-ex-main">
+        {# 版面設定（套用在下面的文件與 Markdown）—— 在按鈕**上面**，先選再按（使用者 2026-09-24）。
+           跟下面的卡片排在同一個格線上，標題與卡片標題對齊。 #}
+        <div class="ms-ex-group ms-ex-setting">
+          <label class="ms-ex-head" for="msTheme"><b>{{ tr('版面主題') }}</b></label>
+          <div class="ms-ex-ctl">
+            {# 用本專案的下拉（`jt-select`），不用瀏覽器原生的（使用者 2026-10-03）：
+               每個主題前面一排色票（標題 ／ 強調 ／ 表頭），下面一句說明。 #}
+            <select class="field jt-select" id="msTheme">
+              {% for t in doc_themes %}
+              <option value="{{ t.id }}"{% if t.id == default_theme %} selected{% endif %}
+                      data-sub="{{ tr(t.desc) }}"
+                      data-swatches="{{ t.swatch|join(',') }}">{{ tr(t.name) }}</option>
+              {% endfor %}
+            </select>
+            <label class="ms-opt-inline">
+              <input type="checkbox" id="msWithScript" checked>
+              <span>{{ tr('附上完整逐字稿') }}</span>
+            </label>
+          </div>
+        </div>
+        {# **依動作分組：一張「下載」、一張「存至工作區」**（2026-10-03 使用者要求）；卡片裡再依格式
+           分行（文件 ／ 網頁與純文字 ／ 圖表與資料）。動作寫在卡片標題，標題的圖示跟卡片裡每一顆
+           按鈕的圖示相同（下載一律下載圖示、存至工作區一律收納圖示）—— 按鈕本身就講得出動作。
+           上一版（v1.16.40）是依格式分組、每組各寫一次下載 / 存至工作區，同一個動作散在三張卡片裡。 #}
+        <section class="ms-ex-group ms-ex-dl">
+          <div class="ms-ex-head"><span class="ms-ex-title">{{ icon('download', size=16) }}<b>{{ tr('下載') }}</b></span>
+            <small class="muted">{{ tr('存到這台電腦') }}</small></div>
+          <div class="ms-ex-acts">
+            <div class="ms-ex-act">
+              <span class="ms-ex-label">{{ tr('文件') }}</span>
+              <div class="ms-exports">
+                <a class="btn btn-primary" id="msDlPdf" download>{{ icon('download', size=16) }} <span>PDF</span></a>
+                <a class="btn btn-secondary" id="msDlDocx" download>{{ icon('download', size=16) }} <span>Word（.docx）</span></a>
+                <a class="btn btn-secondary" id="msDlOdt" download>{{ icon('download', size=16) }} <span>ODF（.odt）</span></a>
+              </div>
+            </div>
+            <div class="ms-ex-act">
+              <span class="ms-ex-label">{{ tr('網頁與純文字') }}</span>
+              <div class="ms-exports">
+                <button type="button" class="btn btn-secondary" id="msDlHtml">{{ icon('download', size=16) }} <span>HTML</span></button>
+                <a class="btn btn-secondary" id="msDlMd" download>{{ icon('download', size=16) }} <span>Markdown</span></a>
+              </div>
+            </div>
+            <div class="ms-ex-act">
+              <span class="ms-ex-label">{{ tr('圖表與資料') }}</span>
+              <div class="ms-exports">
+                <a class="btn btn-secondary" id="msDlPng" download hidden>{{ icon('download', size=16) }} <span>{{ tr('圖表') }} PNG</span></a>
+                <a class="btn btn-secondary" id="msDlZip" download>{{ icon('download', size=16) }} <span>Markdown ＋ {{ tr('圖') }}（ZIP）</span></a>
+                <a class="btn btn-secondary" id="msDlJson" download>{{ icon('download', size=16) }} <span>JSON</span></a>
+              </div>
+            </div>
+            <p class="muted ms-ex-foot">{{ tr('JSON 可以再傳回來重新打開這份結果') }}</p>
+          </div>
+        </section>
+        {% if workspace_enabled(request) %}
+        <section class="ms-ex-group ms-ex-ws">
+          <div class="ms-ex-head"><span class="ms-ex-title">{{ icon('archive', size=16) }}<b>{{ tr('存至工作區') }}</b></span>
+            <small class="muted">{{ tr('其他工具可以直接載入') }}</small></div>
+          <div class="ms-ex-acts">
+            <div class="ms-ex-act">
+              <span class="ms-ex-label">{{ tr('文件') }}</span>
+              <div class="ms-exports">
+                <button type="button" class="btn btn-secondary" data-ws-fmt="pdf">{{ icon('archive', size=16) }} <span>PDF</span></button>
+                <button type="button" class="btn btn-secondary" data-ws-fmt="docx">{{ icon('archive', size=16) }} <span>Word（.docx）</span></button>
+                <button type="button" class="btn btn-secondary" data-ws-fmt="odt">{{ icon('archive', size=16) }} <span>ODF（.odt）</span></button>
+              </div>
+            </div>
+            <div class="ms-ex-act">
+              <span class="ms-ex-label">{{ tr('純文字') }}</span>
+              <div class="ms-exports">
+                <button type="button" class="btn btn-secondary" data-ws-fmt="md">{{ icon('archive', size=16) }} <span>Markdown</span></button>
+              </div>
+            </div>
+          </div>
+        </section>
+        {% endif %}
+      </div>
     </div>
     <p class="muted ms-calls" id="msCalls"></p>
+
+    {# 會議背景原文照錄（2026-10-02 使用者要求：存 JSON、存至工作區時背景也要在）。
+       放在結果頁上，HTML 匯出（整頁複製）才帶得到；沒填就整節藏著。 #}
+    <section class="ms-sec" id="msCtxSec" hidden>
+      <h3>{{ icon('info', size=16) }} {{ tr('會議背景') }}</h3>
+      <p class="ms-ctx-view" id="msCtxView" data-i18n="skip"></p>
+    </section>
 
     <section class="ms-sec">
       <h3>{{ icon('sparkles', size=16) }} {{ tr('摘要') }}</h3>
@@ -456,6 +717,8 @@
 
     <section class="ms-sec">
       <h3>{{ icon('file-text', size=16) }} {{ tr('逐字稿') }}</h3>
+      {# 依會議背景換過哪些寫法 —— 讀的人看到的逐字稿不是辨識的原樣，要講出來 #}
+      <p class="muted" id="msReplNote" hidden></p>
       <p class="muted">{{ tr('上面每一條引用都指得回這裡。') }}
         {{ tr('點發言者的名字可以改名 —— 預設同一位全部一起改。') }}</p>
       <div class="ms-script" id="msScript"></div>
@@ -468,11 +731,12 @@
 <script src="/static/js/file_upload.js"></script>
 <script src="/static/js/job_progress.js"></script>
 <script src="/static/js/meeting_charts.js"></script>
+<script src="/static/js/custom_select.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
 (function () {
   'use strict';
   var BASE = '/tools/meeting-summary';
-  var uploadId = null, segments = [], result = null;
+  var uploadId = null, segments = [], result = null, segInfo = null;
 
   var el = function (id) { return document.getElementById(id); };
   var esc = function (s) {
@@ -497,7 +761,37 @@
     var r = await fu.upload(BASE + '/upload', fd,
                             { processingLabel: tr('讀取逐字稿…') });
     if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀取失敗'))); return; }
-    showParsed(await r.json());
+    var d = await r.json();
+    if (d.imported) { await showImported(d); return; }
+    showParsed(d);
+  }
+
+  // 傳回來的是**先前匯出的分析結果**（2026-10-02 使用者問「匯出過的 .json 可以再傳回來
+  // 呈現嗎」）：直接呈現，不再送模型。有附逐字稿的話解析區（連同「開始分析」）也畫出來，
+  // 想改背景重跑一次也可以；換排法對它沒有意義，那一列收起來。
+  async function showImported(d) {
+    lastFile = null;
+    uploadId = d.upload_id;
+    if (d.has_transcript) showParsed(d, true);
+    else el('msParsed').hidden = true;
+    await loadResult();
+    restoreContext();
+    if (window.showToast) window.showToast(d.has_transcript
+      ? tr('已載入先前匯出的分析結果。')
+      : tr('已載入先前匯出的分析結果；這份檔案沒有附逐字稿，引用點不到原文。'), 'ok');
+  }
+
+  // 背景跟著結果存著 —— 打開舊結果（從「我的作業」、或傳回匯出的 JSON）時帶回來，
+  // 不然重跑一次等於把背景丟掉。框裡已經有字就不動（那是使用者剛打的）。
+  function restoreContext() {
+    var box = el('msCtxBox');
+    if (result && result.context && box && !box.value.trim()) {
+      box.value = result.context;
+      box.dispatchEvent(new Event('input'));
+      // 收著的話使用者看不到「背景已經帶回來了」—— 有內容就打開
+      var det = box.closest('details');
+      if (det) det.open = true;
+    }
   }
 
   // **從別的工具轉送過來的**（網址帶 `from_ws` / `from_job`）：解析完直接捲到「開始分析」
@@ -522,7 +816,84 @@
     await sendFile(file, 'auto');
   });
 
-  function showParsed(d) {
+  // ---- 上一次分析這份逐字稿時填的會議背景（2026-10-03 使用者要求）----
+  //
+  // 框是空的 → 直接帶入並講出是哪一次的；框裡已經有別的字（例如上一份逐字稿的背景）→
+  // **不覆蓋**，改給「改用上一次的」。「清除」把記住的那一段丟掉（之後不再帶入）；
+  // 帶入的那一段還在框裡的話一起清空，使用者自己打的字不動。
+  var memCtx = null, memFilled = false;
+  function fmtWhen(ts) {
+    var d = new Date((Number(ts) || 0) * 1000);
+    if (!ts || isNaN(d.getTime())) return '';
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate())
+         + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+  //: 帶進框裡的背景是哪裡來的：'memory'（上一次分析這份逐字稿時填的）/
+  //: 'transcribe'（轉逐字稿時填的「專有名詞或會議背景」，2026-10-03 使用者要求）
+  var memSource = 'memory';
+  function showRemembered(rc, source) {
+    var wrap = el('msCtxMem'), box = el('msCtxBox');
+    memSource = source || 'memory';
+    memCtx = (rc && rc.context) ? rc : null;
+    if (!memCtx || !box) { wrap.hidden = true; memFilled = false; return; }
+    var cur = box.value.trim(), when = fmtWhen(memCtx.saved_at);
+    var fromT = memSource === 'transcribe';
+    if (!cur || cur === memCtx.context.trim()) {
+      if (!cur) {
+        box.value = memCtx.context;
+        box.dispatchEvent(new Event('input'));
+      }
+      memFilled = true;
+      var det = box.closest('details');
+      if (det) det.open = true;
+      el('msCtxMemText').textContent = fromT
+        ? tr('已帶入轉逐字稿時填的「專有名詞或會議背景」，可以直接修改；不需要的話按「清除」。')
+        : tr('已帶入上一次分析這份逐字稿時填的會議背景（{0}），可以直接修改；不需要的話按「清除」。')
+            .replace('{0}', when);
+      el('msCtxMemUse').hidden = true;
+    } else {
+      memFilled = false;
+      el('msCtxMemText').textContent = fromT
+        ? tr('轉逐字稿時另外填了「專有名詞或會議背景」。')
+        : tr('這份逐字稿上一次分析時填的是另一段會議背景（{0}）。').replace('{0}', when);
+      el('msCtxMemUse').hidden = false;
+    }
+    wrap.hidden = false;
+  }
+  el('msCtxMemUse').addEventListener('click', function () {
+    if (!memCtx) return;
+    var box = el('msCtxBox');
+    box.value = memCtx.context;
+    box.dispatchEvent(new Event('input'));
+    showRemembered(memCtx, memSource);
+  });
+  el('msCtxMemClear').addEventListener('click', async function () {
+    if (!uploadId) return;
+    var btn = this;
+    btn.disabled = true;
+    try {
+      // 轉逐字稿帶來的背景沒有「記住」這回事 —— 清掉框就好，不必問伺服器
+      if (memSource !== 'transcribe') {
+        var r = await fetch(BASE + '/forget-context', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ upload_id: uploadId })
+        });
+        if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('清除失敗'))); return; }
+      }
+      if (memFilled) {
+        var box = el('msCtxBox');
+        box.value = '';
+        box.dispatchEvent(new Event('input'));
+      }
+      var wasMemory = memSource !== 'transcribe';
+      memCtx = null; memFilled = false;
+      el('msCtxMem').hidden = true;
+      if (wasMemory && window.showToast) window.showToast(tr('已清除記住的會議背景。'), 'ok');
+    } finally { btn.disabled = false; }
+  });
+
+  function showParsed(d, keepResult) {
     uploadId = d.upload_id;
     el('msNSeg').textContent = d.segments;
     el('msNSpk').textContent = d.speakers.length;
@@ -569,8 +940,22 @@
       //（2026-09-19 回報）。
       ? tr('自動判斷：{0}').replace('{0}', tr((d.shapes || {})[d.shape] || d.shape))
       : '';
+    // 換排法要重新解析**原始資料** —— 從「我的作業」打開時手上沒有原檔也沒有貼上的內容，
+    // 那一列留著只會是一個按了沒反應的下拉，所以收起來。
+    el('msShapeRow').hidden = !lastFile && !el('msPasteBox').value.trim();
     el('msParsed').hidden = false;
-    el('msResult').hidden = true;
+    if (!keepResult) el('msResult').hidden = true;
+    // 這份逐字稿上一次分析時填的背景 —— **要在重新比對之前填好**（比對看的是框裡的字）
+    showRemembered(d.remembered_context);
+    resetManualReplacements(d.manual_replacements);
+    // 沒有記住的背景時，帶入轉逐字稿時填的「專有名詞或會議背景」（記住的那一份優先 ——
+    // 那是使用者在這裡最後用的）
+    if (!memCtx && d.transcript_context) {
+      showRemembered({ context: d.transcript_context }, 'transcribe');
+    }
+    // 換了一份逐字稿 → 舊的勾選不算數，重新比一次
+    tfChecked = {};
+    scheduleTermFix();
     if (scrollToStartOnce) {
       scrollToStartOnce = false;
       el('msStart').scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -603,7 +988,9 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ upload_id: uploadId,
                                context: el('msCtxBox').value.trim(),
-                               with_impacts: el('msImpacts').checked ? '1' : '0' })
+                               with_impacts: el('msImpacts').checked ? '1' : '0',
+                               replacements: manualPairs().concat(checkedReplacements()),
+                               manual_replacements: manualRows() })
       });
       if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('無法開始分析'))); return; }
       var d = await r.json();
@@ -621,6 +1008,212 @@
     var n = this.value.trim().length;
     el('msCtxCount').textContent = n
       ? tr('{0} 字').replace('{0}', n.toLocaleString()) : '';
+    scheduleTermFix();
+  });
+
+  // ---------------------------------------------------------------- 建議替換
+  // 依會議背景找出逐字稿裡可能寫錯的專有名詞（伺服器端判斷，`app/core/term_fix.py`）。
+  // **只建議**：勾選的在開始分析前換掉，原文保留。打字時等停下來 0.7 秒才問一次，
+  // 晚到的舊回應丟掉（`tfSeq`）—— 不然先問的慢、後問的快時，畫面會停在舊的清單。
+  var tfTimer = null, tfSeq = 0, tfChecked = {};
+  function tfKey(s) { return s.from + '\u0000' + s.to; }
+  function scheduleTermFix() {
+    clearTimeout(tfTimer);
+    tfTimer = setTimeout(refreshTermFix, 700);
+  }
+  function clearTermFix() {
+    el('msTermFixList').textContent = '';
+    el('msTermFix').hidden = true;
+    el('msTermFixNone').hidden = true;
+  }
+  async function refreshTermFix() {
+    var my = ++tfSeq;
+    var ctx = el('msCtxBox').value.trim();
+    if (!uploadId || !ctx) { clearTermFix(); return; }
+    try {
+      var r = await fetch(BASE + '/suggest-terms', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ upload_id: uploadId, context: ctx })
+      });
+      if (my !== tfSeq) return;
+      if (!r.ok) { clearTermFix(); return; }
+      var d = await r.json();
+      if (my !== tfSeq) return;
+      // 上一次分析時換過的，重新打開時預先勾回來（使用者自己取消過的不再勾）
+      (d.applied || []).forEach(function (a) {
+        if (!(tfKey(a) in tfChecked)) tfChecked[tfKey(a)] = true;
+      });
+      renderTermFix(d);
+    } catch (_e) { if (my === tfSeq) clearTermFix(); }
+  }
+  function renderTermFix(d) {
+    var list = el('msTermFixList');
+    list.textContent = '';
+    var sug = d.suggestions || [];
+    el('msTermFix').hidden = !sug.length;
+    el('msTermFixNone').hidden = !!sug.length || !(d.terms || []).length;
+    if (!sug.length) return;
+    el('msTermFixHead').textContent = tr('逐字稿裡可能寫錯的專有名詞（依會議背景比對整份逐字稿，共 {0} 項）')
+      .replace('{0}', String(sug.length));
+    sug.forEach(function (s) {
+      var li = document.createElement('li');
+      var lab = document.createElement('label');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.dataset.from = s.from;
+      cb.dataset.to = s.to;
+      cb.checked = !!tfChecked[tfKey(s)];
+      cb.addEventListener('change', function () { tfChecked[tfKey(s)] = cb.checked; });
+      var a = document.createElement('code');
+      a.textContent = s.from;
+      var b = document.createElement('b');
+      b.textContent = s.to;
+      var n = document.createElement('span');
+      n.className = 'muted';
+      n.textContent = tr('{0} 處').replace('{0}', String(s.count));
+      lab.appendChild(cb);
+      lab.appendChild(a);
+      lab.appendChild(document.createTextNode('→'));
+      lab.appendChild(b);
+      lab.appendChild(n);
+      li.appendChild(lab);
+      if (s.example) {
+        var eg = document.createElement('span');
+        eg.className = 'ms-tf-eg';
+        eg.textContent = s.example;
+        li.appendChild(eg);
+      }
+      list.appendChild(li);
+    });
+  }
+  function checkedReplacements() {
+    if (el('msTermFix').hidden) return [];
+    var out = [];
+    document.querySelectorAll('#msTermFixList input[type=checkbox]').forEach(function (cb) {
+      if (cb.checked) out.push({ from: cb.dataset.from, to: cb.dataset.to });
+    });
+    return out;
+  }
+  // ---------------------------------------------------------------- 自己加替換
+  // 辨識聽錯、上面的建議又抓不到的（2026-10-03 使用者：「POWPOYNT 應該是 PowerPoint」）。
+  // 伺服器先在整份逐字稿找（`/find-term`，跟套用同一套比對），找得到才加進清單；
+  // 英文不分大小寫找，實際出現的每一種寫法（`variants`）各送一組替換。
+  var mrRows = [], mrSeq = 0;
+  function mrMsg(text) {
+    var m = el('msMrMsg');
+    m.textContent = text || '';
+    m.hidden = !text;
+  }
+  function renderMr() {
+    var list = el('msMrList');
+    list.textContent = '';
+    mrRows.forEach(function (r, i) {
+      var li = document.createElement('li');
+      var lab = document.createElement('label');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = r.on;
+      cb.addEventListener('change', function () { r.on = cb.checked; });
+      var a = document.createElement('code');
+      a.textContent = r.variants.join('、');
+      var b = document.createElement('b');
+      b.textContent = r.to;
+      var n = document.createElement('span');
+      n.className = 'muted';
+      n.textContent = tr('{0} 處').replace('{0}', String(r.count));
+      lab.appendChild(cb);
+      lab.appendChild(a);
+      lab.appendChild(document.createTextNode('→'));
+      lab.appendChild(b);
+      lab.appendChild(n);
+      li.appendChild(lab);
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'ms-mr-del';
+      del.textContent = tr('移除');
+      del.addEventListener('click', function () { mrRows.splice(i, 1); renderMr(); });
+      li.appendChild(del);
+      if (r.example) {
+        var eg = document.createElement('span');
+        eg.className = 'ms-tf-eg';
+        eg.textContent = r.example;
+        li.appendChild(eg);
+      }
+      list.appendChild(li);
+    });
+  }
+  // 回 true ＝ 加進去了；找不到或填得不對時講出原因
+  async function addManual(from, to, on) {
+    from = (from || '').trim(); to = (to || '').trim();
+    if (from.length < 2) { mrMsg(tr('原本的寫法至少要 2 個字。')); return false; }
+    if (!to || to === from) { mrMsg(tr('請填要改成什麼。')); return false; }
+    var my = mrSeq;
+    var r = await fetch(BASE + '/find-term', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ upload_id: uploadId, from: from })
+    });
+    if (my !== mrSeq) return false;                   // 中途換了一份逐字稿
+    if (!r.ok) { mrMsg(await window.friendlyServerError(r, tr('查詢失敗'))); return false; }
+    var d = await r.json();
+    if (!d.count) {
+      mrMsg(tr('整份逐字稿裡找不到「{0}」。').replace('{0}', from));
+      return false;
+    }
+    var key = from.toLowerCase();
+    mrRows = mrRows.filter(function (x) { return x.from.toLowerCase() !== key; });
+    mrRows.push({ from: from, to: to, variants: d.variants, count: d.count,
+                  example: d.example, on: on !== false });
+    mrMsg('');
+    renderMr();
+    return true;
+  }
+  async function resetManualReplacements(saved) {
+    mrSeq++;
+    mrRows = [];
+    mrMsg('');
+    renderMr();
+    el('msManRep').hidden = !uploadId;
+    for (var i = 0; i < (saved || []).length; i++) {
+      await addManual(saved[i].from, saved[i].to, true);
+    }
+  }
+  // 送給 /start 時排在建議前面：同一個寫法兩邊都有時，伺服器取第一個 ——
+  // 自己打的是明確的指定，比依背景猜的建議優先
+  function manualPairs() {
+    var out = [];
+    mrRows.forEach(function (r) {
+      if (!r.on) return;
+      r.variants.forEach(function (v) { out.push({ from: v, to: r.to }); });
+    });
+    return out;
+  }
+  function manualRows() {
+    return mrRows.filter(function (r) { return r.on; })
+                 .map(function (r) { return { from: r.from, to: r.to }; });
+  }
+  el('msMrAdd').addEventListener('click', async function () {
+    if (!uploadId) return;
+    var btn = this;
+    btn.disabled = true;
+    try {
+      if (await addManual(el('msMrFrom').value, el('msMrTo').value, true)) {
+        el('msMrFrom').value = '';
+        el('msMrTo').value = '';
+        el('msMrFrom').focus();
+      }
+    } finally { btn.disabled = false; }
+  });
+  ['msMrFrom', 'msMrTo'].forEach(function (id) {
+    el(id).addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); el('msMrAdd').click(); }
+    });
+  });
+
+  el('msTermFixAll').addEventListener('click', function () {
+    document.querySelectorAll('#msTermFixList input[type=checkbox]').forEach(function (cb) {
+      cb.checked = true;
+      tfChecked[cb.dataset.from + '\u0000' + cb.dataset.to] = true;
+    });
   });
 
   el('msPasteBox').addEventListener('input', function () {
@@ -661,7 +1254,9 @@
     if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀取結果失敗'))); return; }
     result = await r.json();
     var rs = await fetch(BASE + '/segments/' + encodeURIComponent(uploadId));
-    segments = rs.ok ? (await rs.json()).segments : [];
+    var sd = rs.ok ? await rs.json() : {};
+    segments = sd.segments || [];
+    segInfo = sd.info || null;
     render();
   }
 
@@ -680,8 +1275,11 @@
     ['questions', '未決問題', 'k-question', 'search']
   ];
 
-  // 圖示：跟樣板的 `{{ icon() }}` 同一組線條（stroke 1.6、16×16）
+  // 圖示：跟樣板的 `{{ icon() }}` 同一組線條（stroke 1.6、16×16）。
+  // **KINDS 第四欄用到的名字這裡都要有** —— 查不到時畫的是空的 `<svg>`，不會報錯：
+  // 「事件與影響」加進來時指定了 shield 卻沒補，那張卡（含匯出的 HTML）一直沒有圖示。
   var ICONS = {
+    shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
     check: '<path d="M5 12l5 5L20 7"/>',
     pin:   '<path d="M12 2v8"/><circle cx="12" cy="14" r="4"/><path d="M12 18v4"/><path d="M8 14h8"/>',
     warn:  '<path d="M12 3l9 17H3z"/><path d="M12 10v5"/><path d="M12 17.5v.5"/>',
@@ -710,13 +1308,26 @@
   function render() {
     el('msResult').hidden = false;
     var u = encodeURIComponent(uploadId);
-    el('msDlMd').href   = BASE + '/download/' + u + '?fmt=md';
-    setDocHrefs();
+    setDocHrefs();          // PDF / Word / ODF / Markdown / ZIP —— 跟著主題與「附上逐字稿」
     el('msDlPng').href  = BASE + '/download/' + u + '?fmt=png';
-    el('msDlZip').href  = BASE + '/download/' + u + '?fmt=zip';
     el('msDlJson').href = BASE + '/download/' + u + '?fmt=json';
     el('msCalls').textContent =
       tr('共送出 {0} 次模型請求。').replace('{0}', String(result.llm_calls || 0));
+
+    // 會議背景是使用者自己寫的，原文照錄（textContent，不當 HTML）
+    var ctx = (typeof result.context === 'string') ? result.context.trim() : '';
+    el('msCtxView').textContent = ctx;
+    el('msCtxSec').hidden = !ctx;
+
+    var reps = Array.isArray(result.replacements) ? result.replacements : [];
+    var rn = el('msReplNote');
+    rn.hidden = !reps.length;
+    rn.textContent = reps.length
+      ? tr('逐字稿換過這些寫法：{0}。畫虛線的段落滑過去可以看原文。').replace('{0}',
+          reps.map(function (x) {
+            return x.from + ' → ' + x.to + tr('（{0} 處）').replace('{0}', String(x.count));
+          }).join('、'))
+      : '';
 
     var sm = result.summary || {};
     el('msSummary').textContent = sm.text || tr('（沒有產生摘要）');
@@ -1133,11 +1744,86 @@
 
       var body = document.createElement('span');
       body.textContent = s.text || '';
+      if (typeof s.orig_text === 'string' && s.orig_text !== s.text) {
+        // 依會議背景換過字 —— 滑過看原文（伺服器把原文留在 `orig_text`）
+        body.className = 'ms-fixed';
+        body.title = tr('原文：{0}').replace('{0}', s.orig_text);
+      }
 
       row.appendChild(q); row.appendChild(sp); row.appendChild(body);
       box.appendChild(row);
     });
   }
+
+  // ---------------------------------------------------------------- 匯出 HTML
+  //
+  // 「開起來就跟在 JTDT 上看到的一模一樣」（2026-10-02 使用者要求）。
+  // **直接拿畫面上已經畫好的那一份**（同一份 DOM、同一份樣式表），
+  // 不在伺服器另外排一次 —— 另外排的那一份遲早會跟畫面不一樣
+  //（本專案「同一份東西寫兩個地方一定會漂」）。
+  // 檔案裡帶一小段腳本：點引用、點議題照樣跳到逐字稿那一段。
+  async function exportHtml() {
+    var btn = el('msDlHtml'), label = btn.querySelector('span'), orig = label.textContent;
+    if (btn.dataset.busy) return;
+    btn.dataset.busy = '1'; label.textContent = tr('產生中…');
+    try {
+      var css = [];
+      var links = document.querySelectorAll('link[rel="stylesheet"]');
+      for (var i = 0; i < links.length; i++) {
+        var r = await fetch(links[i].href);
+        if (r.ok) css.push(await r.text());
+      }
+      document.querySelectorAll('style').forEach(function (st) { css.push(st.textContent); });
+      var box = el('msResult').cloneNode(true);
+      box.removeAttribute('hidden');
+      // 畫面上的操作（下載、存檔、主題、預覽）在檔案裡沒有作用 —— 拿掉
+      ['.ms-export-box', '#msCalls']
+        .forEach(function (q) { box.querySelectorAll(q).forEach(function (n) { n.remove(); }); });
+      var title = result.title || tr('會議記錄');
+      var head = box.querySelector('h2');
+      if (head) head.textContent = title;
+      var jump = "document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-seq]');"
+        + "if(!b||!b.dataset.seq)return;var l=document.getElementById('ms-seg-'+b.dataset.seq);if(!l)return;"
+        + "var p=document.querySelector('.ms-line.hit');if(p)p.classList.remove('hit');"
+        + "l.classList.add('hit');l.scrollIntoView({block:'center',behavior:'smooth'});});";
+      // **用一份分離的文件組，不用字串拼 HTML** —— 不必自己跳脫，也不會在頁面的程式碼裡
+      // 出現看起來像標籤的字串。這份文件沒有掛在畫面上，CSP 管不到它（它只是拿來序列化）。
+      var doc = document.implementation.createHTMLDocument(title);
+      doc.documentElement.setAttribute('lang', document.documentElement.lang || 'zh-Hant');
+      var cs = doc.createElement('meta');
+      cs.setAttribute('charset', 'utf-8');
+      doc.head.insertBefore(cs, doc.head.firstChild);
+      var vp = doc.createElement('meta');
+      vp.setAttribute('name', 'viewport');
+      vp.setAttribute('content', 'width=device-width, initial-scale=1');
+      doc.head.appendChild(vp);
+      var st = doc.createElement('style');
+      st.textContent = css.join('\n').replace(/<\/style/gi, '<\\/style')
+        + '\nbody{background:var(--bg,#f5f6f8);margin:0;}'
+        + '.ms-export{max-width:1180px;margin:0 auto;padding:24px 16px;}';
+      doc.head.appendChild(st);
+      var wrap = doc.createElement('div');
+      wrap.className = 'ms-export';
+      wrap.appendChild(doc.importNode(box, true));
+      doc.body.appendChild(wrap);
+      var sc = doc.createElement('script');
+      sc.textContent = jump;
+      doc.body.appendChild(sc);
+      var htmlDoc = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+      var blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = title.replace(/[\\/:*?"<>|]/g, '_') + '.html';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+    } catch (err) {
+      showAlert(tr('產生檔案失敗'));
+    } finally {
+      delete btn.dataset.busy; label.textContent = orig;
+    }
+  }
+  if (el('msDlHtml')) el('msDlHtml').addEventListener('click', exportHtml);
 
   // 引用與章節都用事件委派 —— 那些節點是之後才塞進來的
   document.addEventListener('click', function (e) {
@@ -1164,16 +1850,90 @@
   /* PDF / Word / ODF 走同一支端點，差別只有 `fmt` 與版面主題。
      **主題要跟著換網址** —— 選了主題卻下載到舊的那一份，
      使用者會以為主題沒作用（而且完全看不出來）。 */
+  //: 主題記在這台瀏覽器（只是個人方便）—— 讀寫失敗（無痕、被擋）就用預設值，不影響任何功能。
+  var THEME_KEY = 'jtdt.meetingSummary.theme';
+  (function restoreTheme() {
+    var sel = el('msTheme'), saved = null;
+    if (!sel) return;
+    try { saved = window.localStorage.getItem(THEME_KEY); } catch (e) { saved = null; }
+    if (saved && sel.querySelector('option[value="' + saved.replace(/[^a-z0-9_-]/gi, '') + '"]')) {
+      sel.value = saved;
+      // 用程式改 `.value` 不會觸發任何事件 —— 下拉顯示的那一份要自己更新，
+      // 不然畫面寫「清爽」、下載的卻是上次選的主題
+      if (sel._jtSelect) sel._jtSelect.refresh();
+    }
+  })();
+
+  function docQuery(fmt) {
+    var th = encodeURIComponent((el('msTheme') || {}).value || 'classic');
+    var withScript = !el('msWithScript') || el('msWithScript').checked;
+    return '?fmt=' + fmt + '&theme=' + th + '&transcript=' + (withScript ? '1' : '0');
+  }
+
   function setDocHrefs() {
     if (!uploadId) return;
     var u = encodeURIComponent(uploadId);
-    var th = encodeURIComponent((el('msTheme') || {}).value || 'report');
-    [['msDlPdf', 'pdf'], ['msDlDocx', 'docx'], ['msDlOdt', 'odt']].forEach(function (p) {
+    [['msDlPdf', 'pdf'], ['msDlDocx', 'docx'], ['msDlOdt', 'odt'],
+     ['msDlMd', 'md'], ['msDlZip', 'zip']].forEach(function (p) {
       var a = el(p[0]);
-      if (a) a.href = BASE + '/download/' + u + '?fmt=' + p[1] + '&theme=' + th;
+      if (a) a.href = BASE + '/download/' + u + docQuery(p[1]);
     });
   }
-  if (el('msTheme')) el('msTheme').addEventListener('change', setDocHrefs);
+
+  function showThemePreview() {
+    var f = el('msThemePreview'), sel = el('msTheme');
+    if (!f || !sel) return;
+    f.src = BASE + '/theme-preview/' + encodeURIComponent(sel.value);
+  }
+
+  if (el('msTheme')) el('msTheme').addEventListener('change', function () {
+    try { window.localStorage.setItem(THEME_KEY, el('msTheme').value); } catch (e) { /* 只是方便 */ }
+    setDocHrefs();
+    showThemePreview();
+  });
+  if (el('msWithScript')) el('msWithScript').addEventListener('change', setDocHrefs);
+  showThemePreview();
+
+  // 檔名以伺服器給的為準（`Content-Disposition` 帶 RFC 5987 的 UTF-8）。
+  function nameFrom(r) {
+    var cd = r.headers.get('Content-Disposition') || '';
+    var m = /filename\*=utf-8''([^;]+)/i.exec(cd);
+    return m ? decodeURIComponent(m[1])
+             : (/filename="?([^";]+)"?/i.exec(cd) || [])[1];
+  }
+
+  // 存至工作區（2026-10-02 使用者要求）：跟下載拿的是**同一份檔案**（同一個網址、
+  // 同一個主題、同一個「附上逐字稿」設定），只是送進工作區而不是存到電腦。
+  //
+  // **自己接，不用 `attachWorkspaceSave`** —— 那支存完會把按鈕整個換成「已存至工作區」，
+  // 四顆按鈕之後就分不出哪一顆是哪個格式、圖示也不見了。這裡只在按的當下改字，
+  // 結果用提示講，按鈕本身維持原樣。
+  if (!window.saveToWorkspace) {
+    document.querySelectorAll('.ms-ex-ws').forEach(function (r) { r.hidden = true; });
+  }
+  document.querySelectorAll('.ms-ex-ws [data-ws-fmt]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      if (btn.dataset.busy) return;
+      var label = btn.querySelector('span'), orig = label ? label.textContent : '';
+      btn.dataset.busy = '1'; btn.disabled = true;
+      if (label) label.textContent = tr('產生中…');
+      try {
+        if (!uploadId) throw new Error(tr('還沒有分析結果'));
+        var r = await fetch(BASE + '/download/' + encodeURIComponent(uploadId)
+                            + docQuery(btn.dataset.wsFmt));
+        if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('產生檔案失敗')));
+        var name = nameFrom(r) || ('meeting.' + btn.dataset.wsFmt);
+        var res = await window.saveToWorkspace({ blob: await r.blob() }, name, 'meeting-summary');
+        if (window.showToast) window.showToast(res && res.duplicate
+          ? tr('已存至工作區（工作區已有同名檔，已另存一份）') : tr('已存至工作區'), 'ok');
+      } catch (err) {
+        (window.showAlert || window.alert)((err && err.message) || tr('存至工作區失敗'));
+      } finally {
+        delete btn.dataset.busy; btn.disabled = false;
+        if (label) label.textContent = orig;
+      }
+    });
+  });
 
   function wireDownload(a) {
     a.addEventListener('click', async function (e) {
@@ -1190,11 +1950,7 @@
           showAlert(await window.friendlyServerError(r, tr('產生檔案失敗')));
           return;
         }
-        // 檔名以伺服器給的為準（`Content-Disposition` 帶 RFC 5987 的 UTF-8）。
-        var cd = r.headers.get('Content-Disposition') || '';
-        var m = /filename\*=utf-8''([^;]+)/i.exec(cd);
-        var name = m ? decodeURIComponent(m[1])
-                     : (/filename="?([^";]+)"?/i.exec(cd) || [])[1];
+        var name = nameFrom(r);
         var blob = await r.blob();
         var url = URL.createObjectURL(blob);
         var tmp = document.createElement('a');
@@ -1239,6 +1995,12 @@
     // 已經跑完了就直接把結果讀回來，不必再讓進度列跑一次。
     el('msCancel').hidden = true;
     await loadResult();
+    // **「開始分析」也要回來**（2026-10-02 使用者回報「分析那個按鈕怎麼不見了」）：
+    // 原本這條路只讀結果，解析區（連同開始分析）一直藏著 —— 想改一下會議背景再跑一次，
+    // 只能把逐字稿重新上傳。逐字稿本來就在伺服器上，直接把那一區畫出來就好。
+    // 背景也一起帶回來（它跟著結果存著），不然重跑等於把背景丟掉。
+    if (segInfo) showParsed(segInfo, true);
+    restoreContext();
   })();
 })();
 </script>

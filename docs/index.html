@@ -1086,7 +1086,7 @@
           <li class="spf-row spf-act spf-at-b"><span class="spf-dir">JTLW</span><div class="spf-card"><span class="spf-n">4</span><div><b>辨識</b><span class="spf-d">先排隊（GPU 一次一件）</span><span class="spf-d">再辨識、分離發言者、校正</span></div></div></li>
           <li class="spf-row spf-msg spf-both"><div class="spf-label"><span class="spf-n">5</span><div><b>查進度</b><span class="spf-d">每 3～15 秒問一次，畫面顯示「排隊中（前面 N 件）」或辨識進度</span></div></div><span class="spf-dir">JTDT ⇄ JTLW</span><div class="spf-line"></div></li>
           <li class="spf-row spf-msg spf-to-a"><div class="spf-label"><span class="spf-n">6</span><div><b>取回逐字稿</b><span class="spf-d">文字、時間與發言者，依段號對齊</span></div></div><span class="spf-dir">JTLW → JTDT</span><div class="spf-line"></div></li>
-          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">7</span><div><b>回報已收到</b><span class="spf-d">確定存好之後才送，JTLW 收到就可以刪掉它那份（沒收到的話 72 小時後自己清掉）</span></div></div><span class="spf-dir">JTDT → JTLW</span><div class="spf-line"></div></li>
+          <li class="spf-row spf-msg spf-to-b"><div class="spf-label"><span class="spf-n">7</span><div><b>回報已收到</b><span class="spf-d">存好之後最多 24 小時內送（這段時間可以補專有名詞、只重跑校正），JTLW 收到就刪掉它那份（沒收到的話 7 天後自己清掉）</span></div></div><span class="spf-dir">JTDT → JTLW</span><div class="spf-line"></div></li>
           <li class="spf-row spf-act spf-at-a"><span class="spf-dir">JTDT</span><div class="spf-card"><span class="spf-n">8</span><div><b>邊聽邊看，交給會議摘要</b><span class="spf-d">改發言者名字</span><span class="spf-d">摘要、決議、待辦、心智圖都在本系統產生</span></div></div></li>
         </ol>
         <p class="spf-note">箭頭是資料的流向。連線都由 JTDT 發起，只有第 3 步是 JTLW 連回來下載錄音檔。</p>

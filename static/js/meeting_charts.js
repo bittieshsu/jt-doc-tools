@@ -52,19 +52,32 @@
 
   /* 跟 `meeting_charts._wrap` 同一條規則：中文沒有詞界，按字數折；
      遇到空白優先斷在空白處，拉丁字才不會被切在單字中間。 */
+  // **英數字連成一串當一個單位、照實際字寬算**（伺服器端 `_wrap` 同一條規則）——
+  // 原本逐字數到上限就切，「OfflineMirror」被切成「OfflineMirro / r」。
+  // `per` 以中文字計；英數字與標點大約 0.6 個字寬。
+  function wid(t) {
+    var n = 0;
+    for (var i = 0; i < t.length; i++) n += t.charCodeAt(i) < 0x2E80 ? 0.6 : 1;
+    return n;
+  }
   function wrap(s, per) {
     s = String(s == null ? '' : s).split(/\s+/).join(' ').trim();
     if (!s) return [];
+    var units = s.match(/[A-Za-z0-9_.\-\/+%]+|\s|./g) || [];
     var out = [], cur = '';
-    for (var i = 0; i < s.length; i++) {
-      cur += s[i];
-      if (cur.length >= per) {
-        var cut = cur.lastIndexOf(' ');
-        if (cut > per * 0.5) { out.push(cur.slice(0, cut)); cur = cur.slice(cut + 1); }
-        else { out.push(cur); cur = ''; }
+    units.forEach(function (u) {
+      if (u === ' ' && !cur) return;
+      if (wid(cur) + wid(u) <= per) { cur += u; return; }
+      if (cur.trim()) out.push(cur.replace(/\s+$/, ''));
+      cur = u === ' ' ? '' : u;
+      while (wid(cur) > per) {
+        var k = cur.length;
+        while (k > 1 && wid(cur.slice(0, k)) > per) k--;
+        out.push(cur.slice(0, k));
+        cur = cur.slice(k);
       }
-    }
-    if (cur) out.push(cur);
+    });
+    if (cur.trim()) out.push(cur.replace(/\s+$/, ''));
     return out;
   }
 
@@ -261,6 +274,11 @@
       return useTime ? c.duration_ms : (c.segment_ids || []).length;
     });
     var total = vals.reduce(function (a, b) { return a + b; }, 0) || 1;
+    // **依佔比由高到低排**：長條由左到右、清單由上到下都照這個順序
+    //（2026-10-02 使用者要求）。**顏色與 hover 的編號仍用原本的章節順序** ——
+    // 同一個議題在「議題時間軸」與這張圖上要是同一個顏色。伺服器端同一條規則。
+    var order = vals.map(function (v, i) { return i; })
+                    .sort(function (a, b) { return (vals[b] - vals[a]) || (a - b); });
 
     // **標題與說明不畫在圖裡**，改放 HTML：
     //   ① SVG 裡放不了共用的圖示元件，而每個區塊都要有 icon
@@ -273,7 +291,8 @@
     var s = svgRoot(width, h, tr('各議題時間佔比'));
     var g = document.createDocumentFragment();
     var x = 0;
-    chapters.forEach(function (c, i) {
+    order.forEach(function (i) {
+      var c = chapters[i];
       var w = Math.max(2, Math.round(width * vals[i] / total));
       var seq = (c.segment_ids || [])[0];
       var bar = el('g');
@@ -282,8 +301,9 @@
       g.appendChild(clickable(bar, seq == null ? null : seq, c.title || '', i));
       x += w;
     });
-    chapters.forEach(function (c, i) {
-      var y = barY + barH + 22 + i * 22;
+    order.forEach(function (i, k) {
+      var c = chapters[i];
+      var y = barY + barH + 22 + k * 22;
       var seq = (c.segment_ids || [])[0];
       var row = el('g');
       row.appendChild(el('rect', { x: 0, y: y - 9, width: 10, height: 10,

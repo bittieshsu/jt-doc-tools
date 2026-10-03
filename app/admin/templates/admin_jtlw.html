@@ -120,6 +120,12 @@
   {# 說明放在欄位下方的說明行 —— 原本是接在輸入框後面的裸文字，正文大小、
      黑色、擠在右邊，跟同頁其他欄位的說明長得不一樣（使用者 2026-09-23 截圖回報）。 #}
   <p class="muted jl-hint">{{ tr('只等對方回應的時間；辨識本身是非同步的，不受這個限制。') }}</p>
+  <div class="form-row">
+    <label>{{ tr('重跑校正保留') }}</label>
+    <input class="field field-num" type="number" id="jl-retry" value="{{ s.retry_window_hours }}" min="0" max="24">
+    <span class="field-unit">{{ tr('小時') }}</span>
+  </div>
+  <p class="muted jl-hint">{{ tr('存好逐字稿之後，JTLW 那邊再保留這麼久，讓使用者補專有名詞、只重跑校正（不重新辨識）。0 ＝ 存好就請 JTLW 刪除，不能重跑。最多 24 小時 —— 那是會議內容。') }}</p>
   <p data-s="s553a645f">
     <button class="btn btn-primary" id="jlSave">{{ icon('save', size=14) }} {{ tr('儲存設定') }}</button>
     <button class="btn" id="jlTest" type="button">{{ icon('refresh', size=14) }} {{ tr('測試連線') }}</button>
@@ -172,6 +178,7 @@ $('jlSave').addEventListener('click', async () => {
     ca_cert_pem: $('jl-ca').value,
     verify_tls: $('jl-verify').checked,
     request_timeout: parseInt($('jl-timeout').value, 10),
+    retry_window_hours: parseInt($('jl-retry').value, 10),
   };
   const r = await fetch('/admin/api/jtlw/settings', {
     method: 'POST', headers: {'Content-Type': 'application/json'},

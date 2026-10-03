@@ -1017,9 +1017,9 @@ def svc_update() -> int:
     if not venv_py.exists() and _is_windows():
         venv_py = root / ".venv" / "Scripts" / "python.exe"
     if venv_py.exists():
-        print("Verifying critical deps (fastapi / fitz / ldap3 / PIL / pdfplumber / docx / odf / pyzipper / pdf2docx / rapidfuzz / defusedxml) ...")
+        print("Verifying critical deps (fastapi / fitz / ldap3 / PIL / pdfplumber / docx / odf / pyzipper / pdf2docx / rapidfuzz / defusedxml / pypinyin) ...")
         rc = subprocess.call([str(venv_py), "-c",
-            "import fastapi, fitz, ldap3, PIL, pillow_heif, pdfplumber, docx, odf, openpyxl, pyzipper, httpx, psutil, pyotp, qrcode, pdf2docx, rapidfuzz, fontTools, numpy, cv2, lxml, pymupdf4llm, markdown_it, pygments, jwt, onelogin.saml2.auth, xmlsec, truststore, dns.resolver, defusedxml.ElementTree"])
+            "import fastapi, fitz, ldap3, PIL, pillow_heif, pdfplumber, docx, odf, openpyxl, pyzipper, httpx, psutil, pyotp, qrcode, pdf2docx, rapidfuzz, fontTools, numpy, cv2, lxml, pymupdf4llm, markdown_it, pygments, jwt, onelogin.saml2.auth, xmlsec, truststore, dns.resolver, defusedxml.ElementTree, pypinyin"])
         if rc != 0:
             print("Dep import failed — the upgrade is incomplete.", file=sys.stderr)
             print("  " + _rollback_code(root, git_exe, git_env, pre_sha, uv, uv_env),

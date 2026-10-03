@@ -97,15 +97,36 @@
      AISHELL-4 test 20 場、真實辨識段落：不指定 2.92%、指定正確人數 2.91%（CI [−0.03, 0.00]，
      **只能說「不輸」，不可以寫成「填了比較準」**）、多填一位 2.92%（20 場完全相同）、
      **少填一位 6.89%（19 場變差）**。所以要講的是「寧可多填、不要少填」。
-     超過 8 位時對方自動改用原本的方法，原因會出現在結果頁（`mtDiarNote`）。 #}
+     **指定**超過 8 位時對方一定改用原本的方法（`too_many_speakers`）；**沒指定**時，對方 v2.25
+     （jtlw v2.26.4）起只在新方法 8 個位置用滿、**而且**原本的方法分出超過 8 位才改用 ——
+     否則照用新方法、最多 8 位，`reason` 是 null，跟一般結果分不出來。所以不可以寫成
+     「超過 8 位會自動改用」，要叫確定超過 8 位的人自己填人數。原因會出現在結果頁（`mtDiarNote`）。 #}
   <p class="info-box mt-hint" id="mtSpkHintAuto">
     {{ tr('不確定就留 0，讓系統自己判。') }}
     {{ tr('填的數字只當上限：寧可多填、不要少填 —— 填得比實際多沒有影響，填得比實際少會把不同的人併成同一位。') }}
-    {{ tr('超過 8 位發言者的會議會自動改用原本的分辨方法。') }}
+    {{ tr('新方法最多分出 8 位發言者；確定超過 8 位時請填人數，會改用原本的方法分辨。') }}
   </p>
   <p class="info-box mt-hint" id="mtSpkHintLegacy" hidden>
     {{ tr('不確定就留 0，讓系統自己判。') }}
     {{ tr('這裡問的是發言量足以辨認的人數 —— 只講一兩句的人不要算進去，硬湊一群給他反而會把主要發言者拆散。') }}
+  </p>
+  {# 專有名詞 → 送件時帶給語音服務當 `glossary`（2026-10-02 使用者決定：專有名詞拿來修錯字）。
+     **只用在校正**：寫對的保持原樣、拼法相近的誤聽改成清單上的寫法（對方 v2.27）。
+     **辨識時不參考** —— 對方 2026-10-03 實測：清單上沒出現在會議裡的詞會被憑空插進逐字稿，
+     所以決定不做（理由寫在 router 的 `MAX_TERMS` 上面）。說明不可以再寫「辨識時會優先認這些詞」。
+     2026-10-03 改成「專有名詞或會議背景」：寫成句子的行不當成專有名詞送出（判斷在 router 的
+     `_line_terms`），整段原文轉送會議摘要時帶進會議背景。 #}
+  <div class="form-row mt-terms-row">
+    <label for="mtTerms">{{ tr('專有名詞或會議背景') }}</label>
+    <textarea class="field" id="mtTerms" rows="4" maxlength="20000"
+              placeholder="{{ tr('例如：王小明、Bianca、Proxmox VE（一行一個）；也可以寫幾句會議背景') }}"></textarea>
+  </div>
+  {# 已知的錯寫法（JTLW v2.28，`api_revision` 2.9）：「錯寫法 → 正確寫法」一行，校正前照表換掉。
+     範例的錯寫法是**編的**（不可以用真實會議裡聽錯的詞 —— 那對得回那場會議）。 #}
+  <p class="info-box mt-hint">
+    {{ tr('選填。與會者姓名、公司與產品名稱、術語，一行一個（例如 Proxmox、PVE、Proxmox VE 各一行）。這份清單用在校正：寫對的照原樣保留，拼法相近的誤聽會改成你寫的寫法；聽成拼法差很多的寫法時不一定改得回來。') }}
+    {{ tr('已經知道會聽錯成什麼的，可以寫成「聽錯的寫法 → 正確寫法」一行（例如 Proksmox、Proxmux → Proxmox），校正前會照表換掉；中文的聽錯寫法太短的話可能換到別的詞裡面，請寫具體一點。') }}
+    {{ tr('寫成句子的會議背景（有句號、問號，或一行很長）不當成專有名詞；整段在轉送會議摘要時會帶進「會議背景」。') }}
   </p>
   <p>
     <button class="btn btn-primary" id="mtStart">{{ icon('play', size=14) }} {{ tr('開始轉逐字稿') }}</button>
@@ -142,6 +163,10 @@
      原因照對方 `Result.diarization.note` 原樣附上（那是對方的資料，不翻）。 #}
   <p class="info-box mt-hint" id="mtDiarNote" hidden></p>
   <p class="muted" id="mtSummary"></p>
+  {# 每位發言者一個標籤，點了就地改名（改的是那一位的**全部段落**）——
+     2026-10-02 使用者要求：八位發言者在上面列出來、直接在這裡把 S1 S2 改成人名，
+     不必在上千段的逐字稿裡找。逐字稿裡點名字仍然可以只改那一段。 #}
+  <div class="mt-chips" id="mtSpkChips" hidden></div>
   <p class="muted" id="mtCorrection" hidden></p>
 
   {# 播放器 ＋ 波形。**波形是為了「點到想聽的地方」** ——
@@ -174,6 +199,9 @@
     </span>
   </div>
   <audio id="mtAudio" preload="metadata"></audio>
+  {# 畫不出波形時講出原因 —— 只剩一條時間軸、什麼都不說的話，看起來像壞掉了
+     （2026-10-03 使用者回報「波形圖怎麼只剩一條線」）。 #}
+  <p class="muted mt-wave-note" id="mtWaveNote" hidden></p>
 
   <p>
     <a class="btn" id="mtDownload" download>{{ icon('download', size=14) }} {{ tr('下載 JSON') }}</a>
@@ -181,7 +209,27 @@
     {% if workspace_enabled(request) %}<button class="btn" id="mtSaveWs" type="button" hidden>{{ icon('archive', size=14) }} {{ tr('存至工作區') }}</button>{% endif %}
     <button class="btn btn-primary" id="mtToSummary" type="button">{{ icon('clipboard-list', size=14) }} {{ tr('轉送會議摘要') }}</button>
   </p>
-  <p class="muted mt-tip">{{ tr('點發言者的名字可以改名 —— 預設同一位全部一起改。') }}</p>
+  {# **補專有名詞、只重跑校正**（v1.16.41，JTLW `POST /jobs/{id}/retry`）。
+     存好逐字稿之後先不請 JTLW 刪除，保留最多 24 小時給使用者補 —— JTLW 的條件是
+     「最多 24 小時、使用者不需要了就立刻刪」，所以「不用再改了」這顆按鈕不是裝飾。
+     能不能重跑、為什麼不能，**一律由伺服器端判斷**（`retry_state`），這裡只照著顯示。
+     收折起來：多數人不需要，攤開的話會把逐字稿往下推一大段。 #}
+  <details class="mt-retry" id="mtRetry" hidden>
+    <summary>{{ icon('refresh', size=14) }} {{ tr('補專有名詞，重跑校正') }} <small id="mtRetryUntil"></small></summary>
+    <div class="mt-retry-body">
+      <p class="muted">{{ tr('轉完才發現人名或術語寫錯？把專有名詞補進下面（一行一個，整份都要列），JTLW 只重跑校正、不重新辨識，時間與發言者都不變。') }}</p>
+      <textarea class="field" id="mtRetryTerms" rows="3" maxlength="20000"
+                placeholder="{{ tr('例如：王小明、Bianca、Proxmox VE（一行一個）') }}"></textarea>
+      <p class="muted">{{ tr('聽錯成拼法差很多的寫法（校正認不出來的），寫成「聽錯的寫法 → 正確寫法」一行就會照表換掉，例如 Proksmox → Proxmox。') }}</p>
+      <div class="mt-retry-acts">
+        <button class="btn btn-primary" id="mtRetryGo" type="button">{{ icon('refresh', size=14) }} {{ tr('重跑校正') }}</button>
+        <button class="btn" id="mtRetryDone" type="button">{{ icon('check', size=14) }} {{ tr('不用再改了') }}</button>
+      </div>
+      {% with progress_id='mtRetryJob' %}{% include "components/job_progress.html" %}{% endwith %}
+    </div>
+  </details>
+  <p class="muted mt-hint" id="mtRetryGone" hidden></p>
+  <p class="muted mt-tip">{{ tr('點發言者的名字可以改名 —— 預設同一位全部一起改；點上面標籤的段數，跳到那一位第一次說話的地方。') }}</p>
   <div id="mtSegs" class="mt-segs"></div>
 </div>
 {% endif %}
@@ -192,6 +240,15 @@
             border-bottom:1px solid #f1f5f9; font-size:13px; }
   .mt-row:last-child { border-bottom:none; }
   .mt-hint { font-size:13px; }
+  /* 多行的欄位：標題對齊第一行，不要飄在中間 */
+  .mt-terms-row { align-items:flex-start; }
+  .mt-terms-row > label { padding-top:7px; }
+  /* 「專有名詞或會議背景」九個字超過中文欄位標題的 96px（`platform.css` 那條是不換行），
+     會溢到右邊的輸入框上（2026-10-03 使用者截圖）。旁邊是多行的輸入框，標題折兩行剛好；
+     `balance` 讓它平均折成「專有名詞或／會議背景」，不會剩一兩個字掉到第二行。
+     只放寬換行、不改寬度 —— 同一張卡片的其他標題跟它對齊同一條線。 */
+  .mt-terms-row > label { white-space:normal; text-wrap:balance; line-height:1.35; }
+  .mt-terms-row textarea { resize:vertical; min-height:64px; }
   .mt-t { color:#94a3b8; font-variant-numeric:tabular-nums; }
   .mt-s { font-weight:600; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
   .mt-s:hover { text-decoration:underline dotted; }
@@ -212,6 +269,7 @@
                padding:10px 14px; border:1px solid var(--border); border-radius:12px;
                background:linear-gradient(180deg,#ffffff,#f8fafc); }
   .mt-wave-box { flex:1; min-width:0; position:relative; }
+  .mt-wave-note { margin:-4px 0 10px; font-size:12.5px; }
   .mt-wave { display:block; width:100%; height:72px; background:transparent;
              border:0; border-radius:6px; cursor:pointer; }
   .mt-wave-tip { position:absolute; top:3px; left:0; pointer-events:none; white-space:nowrap;
@@ -245,9 +303,46 @@
   .mt-clock i { font-style:normal; color:#cbd5e1; margin:0 3px; }
   .mt-clock span { font-size:13px; color:#94a3b8; }
   .mt-tip { font-size:12px; margin:4px 0 8px; }
+  .mt-chips { display:flex; flex-wrap:wrap; gap:6px 8px; margin:0 0 10px; }
+  /* 一位一個標籤，裡面兩顆按鈕（2026-10-03 使用者要求）：名字（含代號）＝改名、
+     「N 段」＝跳到這一位第一次說話的地方。兩顆分開，點哪裡做哪件事一看就知道。 */
+  .mt-chip { display:inline-flex; align-items:center; gap:0; padding:0;
+             border:1px solid var(--border); border-radius:999px; background:#fff;
+             font-size:12.5px; line-height:1.6; white-space:nowrap; }
+  .mt-chip:hover { border-color:#94a3b8; }
+  .mt-chip > button { border:0; background:transparent; font:inherit; color:inherit;
+                      cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  /* 寫成 `.mt-chip > .mt-chip-…`：權重要高過上面那條 `.mt-chip > button`（不靠 !important） */
+  .mt-chip > .mt-chip-name { padding:3px 8px; border-radius:999px 0 0 999px; }
+  .mt-chip > .mt-chip-name:hover b { text-decoration:underline dotted; }
+  .mt-chip > .mt-chip-jump { padding:3px 10px 3px 7px; border-left:1px solid var(--border);
+                             border-radius:0 999px 999px 0; color:#64748b; font-size:11px; }
+  .mt-chip > .mt-chip-jump:hover { color:#2563eb; text-decoration:underline; }
+  /* 「可能是 Wendy」：琥珀色虛線，看得出是建議、不是已經改好的名字 */
+  .mt-chip > .mt-chip-hint { padding:1px 8px; margin:2px 2px 2px 0; border:1px dashed #f59e0b;
+                             border-radius:999px; background:#fffbeb; color:#92400e; font-size:12px; }
+  .mt-chip > .mt-chip-hint:hover { background:#fef3c7; border-style:solid; }
+  .mt-chip > button:focus-visible { outline:2px solid rgba(37,99,235,.45); outline-offset:-2px; }
+  .mt-chip b { font-weight:600; }
+  .mt-chip small { color:#94a3b8; font-size:11px; }
+  .mt-chip .mt-tip-dot { flex:0 0 8px; }
+  .mt-chip input { width:9em; font-size:12.5px; padding:0 4px; margin:2px 6px; }
+  /* 從標籤跳過來的那一段：閃一下，看得出是哪一行 */
+  .mt-row.mt-jump { box-shadow:inset 3px 0 0 #f59e0b; background:#fef3c7 !important; }
   .mt-name-edit { width:100%; font-size:13px; padding:1px 4px; }
   .mt-scope { display:flex; gap:6px; align-items:center; font-size:12px;
               color:#475569; margin-top:2px; white-space:nowrap; }
+  /* 補專有名詞、重跑校正：淺底 ＋ 左邊色線（不畫四邊框 —— 卡片裡再一張卡片很雜） */
+  .mt-retry { margin:0 0 10px; padding:8px 12px; background:#f8fafc;
+              border-left:3px solid #93c5fd; border-radius:0 6px 6px 0; }
+  .mt-retry > summary { cursor:pointer; font-size:13.5px; font-weight:600; color:#0f172a;
+                        display:list-item; }
+  .mt-retry > summary .ic { vertical-align:-2px; }
+  .mt-retry > summary small { font-weight:400; color:#64748b; margin-left:4px; }
+  .mt-retry-body { margin-top:8px; display:grid; gap:8px; max-width:760px; }
+  .mt-retry-body p { margin:0; font-size:13px; }
+  .mt-retry-body textarea { resize:vertical; min-height:64px; }
+  .mt-retry-acts { display:flex; flex-wrap:wrap; gap:8px; }
 </style>
 {% endblock %}
 
@@ -322,7 +417,8 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ upload_id: uploadId,
                                language: el('mtLang').value,
-                               num_speakers: parseInt(el('mtSpk').value, 10) || 0 })
+                               num_speakers: parseInt(el('mtSpk').value, 10) || 0,
+                               terms: el('mtTerms').value })
       });
       if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('無法送件'))); return; }
       var d = await r.json();
@@ -341,6 +437,9 @@
   //  * **全部**（預設）：一場會議裡同一個人被標幾百次，一段一段改沒有意義。
   //  * **只有這一段**：辨識偶爾會把某一段掛錯人，那條路也要留。
   var speakerOrder = [];                   // 出現順序 → 配色用
+  //: 發言者自己報過的名字（伺服器端 `self_intro` 從「我是 Wendy」這種話找出來的，只是建議）。
+  //: **不放在 `data` 裡** —— `data` 會整份轉送給會議摘要，建議不是逐字稿的一部分。
+  var nameHints = {};
 
   function speakerIndex(id) {
     if (!id) return -1;
@@ -399,12 +498,134 @@
         data.speaker_overrides[String(s.seq)] = name;
       }
       render();
+      armWsSave();
       await saveSpeakers();
     }
     inp.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); commit(); }
       if (e.key === 'Escape') { e.preventDefault(); cancel(); }
     });
+    inp.addEventListener('blur', function () { setTimeout(commit, 120); });
+  }
+
+  // 上方的發言者標籤：一位一個，顏色跟逐字稿裡那一位一樣。裡面兩顆按鈕：
+  //  * 名字（含代號）→ 就地改名，**範圍固定是「這一位的全部段落」**（要只改一段，在逐字稿裡點那一段的名字）
+  //  * 「N 段」→ 跳到這一位第一次說話的地方（2026-10-03 使用者要求）
+  function renderChips(segs) {
+    var box = el('mtSpkChips');
+    var count = {}, order = [];
+    segs.forEach(function (s) {
+      if (!s.speaker) return;
+      if (!(s.speaker in count)) { count[s.speaker] = 0; order.push(s.speaker); }
+      count[s.speaker] += 1;
+    });
+    box.textContent = '';
+    box.hidden = order.length === 0;
+    order.forEach(function (code) {
+      var ci = speakerIndex(code);
+      var chip = document.createElement('span');
+      chip.className = 'mt-chip';
+      chip.dataset.speaker = code;
+      var nameBtn = document.createElement('button');
+      nameBtn.type = 'button';
+      nameBtn.className = 'mt-chip-name';
+      nameBtn.title = tr('點一下改這一位的名字（全部段落一起改）');
+      var dot = document.createElement('span');
+      dot.className = 'mt-tip-dot mt-d' + ci;
+      var name = (data.speaker_names || {})[code];
+      var b = document.createElement('b');
+      b.className = 'mt-c' + ci;
+      b.textContent = name || code;
+      nameBtn.appendChild(dot); nameBtn.appendChild(b);
+      if (name) {
+        var c = document.createElement('small');
+        c.textContent = code;
+        nameBtn.appendChild(c);
+      }
+      var jump = document.createElement('button');
+      jump.type = 'button';
+      jump.className = 'mt-chip-jump';
+      jump.title = tr('跳到這一位第一次說話的地方');
+      jump.textContent = tr('{0} 段').replace('{0}', String(count[code]));
+      nameBtn.addEventListener('click', function () { editChip(chip, code); });
+      jump.addEventListener('click', function () { jumpToSpeaker(code); });
+      chip.appendChild(nameBtn);
+      // 這一位在會議裡報過名字（「我是 Wendy」）、而且還沒改名 → 「可能是 Wendy」，按一下就換進去。
+      // **只建議不自動換**：判錯會把一個人的話掛到另一個人名下，那要由看得懂這場會議的人決定。
+      var hint = nameHints[code];
+      if (!name && hint && hint.name && hint.name !== code) {
+        var hb = document.createElement('button');
+        hb.type = 'button';
+        hb.className = 'mt-chip-hint';
+        hb.textContent = tr('可能是 {0}').replace('{0}', hint.name);
+        hb.title = tr('第 {0} 段說：「{1}」—— 按一下把這一位改成這個名字')
+                     .replace('{0}', String(hint.seq)).replace('{1}', hint.text || '');
+        hb.addEventListener('click', function () { applyHint(code, hint.name); });
+        chip.appendChild(hb);
+      }
+      chip.appendChild(jump);
+      box.appendChild(chip);
+    });
+  }
+
+  // 跳到這一位第一次說話的那一段：逐字稿捲過去、那一行閃一下；
+  // 錄音還在的話播放位置也移過去（**不自動開始播** —— 正在播就從那裡接著播）。
+  var jumpTimer = null;
+  function jumpToSpeaker(code) {
+    var segs = data.segments || [];
+    var first = null;
+    for (var i = 0; i < segs.length; i++) {
+      if (segs[i].speaker === code) { first = segs[i]; break; }
+    }
+    if (!first) return;
+    var box = el('mtSegs');
+    var row = box.querySelector('.mt-row[data-seq="' + String(first.seq) + '"]');
+    if (!row) return;
+    // 捲動算法跟播放時的標示同一套（兩個 getBoundingClientRect 相減，不靠 offsetTop）
+    var top = row.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    box.scrollTop = Math.max(0, top - box.clientHeight / 3);
+    box.scrollIntoView({ block: 'nearest' });
+    box.querySelectorAll('.mt-row.mt-jump').forEach(function (r) { r.classList.remove('mt-jump'); });
+    row.classList.add('mt-jump');
+    clearTimeout(jumpTimer);
+    jumpTimer = setTimeout(function () { row.classList.remove('mt-jump'); }, 2000);
+    if (audio.src && first.start_ms != null) audio.currentTime = Math.max(0, first.start_ms / 1000);
+  }
+
+  async function applyHint(code, name) {
+    data.speaker_names = data.speaker_names || {};
+    data.speaker_names[code] = name;
+    render();
+    armWsSave();
+    await saveSpeakers();
+  }
+
+  function editChip(chip, code) {
+    if (chip.querySelector('input')) return;
+    var cur = (data.speaker_names || {})[code] || '';
+    chip.textContent = '';
+    var inp = document.createElement('input');
+    inp.value = cur || code;
+    inp.setAttribute('aria-label', tr('發言者名字'));
+    chip.appendChild(inp);
+    inp.focus(); inp.select();
+    var done = false;
+    async function commit() {
+      if (done) return; done = true;
+      var name = inp.value.trim();
+      data.speaker_names = data.speaker_names || {};
+      if (!name || name === code) delete data.speaker_names[code];   // 清空 = 還原成代號
+      else data.speaker_names[code] = name;
+      render();
+      armWsSave();
+      await saveSpeakers();
+    }
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { e.preventDefault(); done = true; render(); }
+    });
+    // 按鈕本身的 click 不可以再觸發一次編輯
+    inp.addEventListener('click', function (e) { e.stopPropagation(); });
     inp.addEventListener('blur', function () { setTimeout(commit, 120); });
   }
 
@@ -422,6 +643,7 @@
     el('mtSummary').textContent =
       tr('共 {0} 段，{1} 位發言者').replace('{0}', String(segs.length))
                                    .replace('{1}', String(Object.keys(names).length));
+    renderChips(segs);
 
     var box = el('mtSegs');
     box.textContent = '';
@@ -530,33 +752,63 @@
     tip.style.left = ((hx + tw + 4 > w) ? Math.max(0, hx - tw - 4) : hx + 4) + 'px';
   }
 
+  // **畫面怎麼放大峰值只在這裡做一份** —— 伺服器（WAV）與瀏覽器解碼兩條路都給原始峰值（0~1），
+  // 兩邊各放大一次的話，同一份錄音換一條路就長得不一樣。
+  //
+  // **一定要正規化**：一般的會議錄音峰值只有 0.1~0.3，
+  // 直接照絕對值畫出來就是畫面中央一條細線（使用者 2026-09-22 回報「波形怎麼那麼小」）。
+  // 再開個根號壓一下動態範圍 —— 不然安靜的段落會整片貼著中線看不出有聲音。
+  function shapePeaks(raw) {
+    var top = 0, out = new Array(raw.length);
+    for (var i = 0; i < raw.length; i++) { var v = +raw[i] || 0; if (v > top) top = v; }
+    for (var j = 0; j < raw.length; j++) out[j] = top > 0 ? Math.sqrt((+raw[j] || 0) / top) : 0;
+    return out;
+  }
+
+  //: 畫不出波形的原因（畫面講出來用）：'big' 檔案太大 / 'decode' 瀏覽器解不開
+  var waveWhy = '';
+
   async function buildPeaks(url) {
-    // **大檔不解碼**：`decodeAudioData` 要把整份 PCM 放進記憶體
+    waveWhy = '';
+    // 1) **先問伺服器**：WAV 由伺服器直接讀（不論多大），瀏覽器不必下載整份
+    //（2026-10-03：363 MB、63 分鐘的 WAV 原本只剩一條線）。其他格式伺服器回 null。
+    try {
+      var r = await fetch(BASE + '/peaks/' + uploadId);
+      if (r.ok) {
+        var j = await r.json();
+        if (j && Array.isArray(j.peaks) && j.peaks.length) return shapePeaks(j.peaks);
+      }
+    } catch (e) { /* 照下面的方式退 */ }
+    // 2) **大檔不解碼**：`decodeAudioData` 要把整份 PCM 放進記憶體
     //（三小時的會議解開來是好幾 GB），瀏覽器會直接掛掉。
     // 超過門檻就只播放、不畫波形 —— 那比讓分頁當掉好。
     var size = (data.source && data.source.size_bytes) || 0;
-    if (size > 60 * 1024 * 1024) return null;
+    if (size > 60 * 1024 * 1024) { waveWhy = 'big'; return null; }
     try {
       var buf = await (await fetch(url)).arrayBuffer();
       var Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return null;
+      if (!Ctx) { waveWhy = 'decode'; return null; }
       var pcm = await new Ctx().decodeAudioData(buf);
       var ch = pcm.getChannelData(0), N = 1200, out = new Array(N), step = ch.length / N;
-      var top = 0;
       for (var i = 0; i < N; i++) {
         var a = Math.floor(i * step), b = Math.min(ch.length, Math.floor((i + 1) * step)), m = 0;
         for (var k = a; k < b; k++) { var v = Math.abs(ch[k]); if (v > m) m = v; }
         out[i] = m;
-        if (m > top) top = m;
       }
-      // **一定要正規化**：一般的會議錄音峰值只有 0.1~0.3，
-      // 直接照絕對值畫出來就是畫面中央一條細線（使用者 2026-09-22 回報「波形怎麼那麼小」）。
-      // 再開個根號壓一下動態範圍 —— 不然安靜的段落會整片貼著中線看不出有聲音。
-      if (top > 0) {
-        for (var j = 0; j < N; j++) out[j] = Math.sqrt(out[j] / top);
-      }
-      return out;
-    } catch (e) { return null; }          // 格式解不開就退成時間軸
+      return shapePeaks(out);
+    } catch (e) { waveWhy = 'decode'; return null; }          // 格式解不開就退成時間軸
+  }
+
+  function showWaveNote() {
+    var note = el('mtWaveNote');
+    if (!note) return;
+    if (peaks && peaks.length) { note.hidden = true; return; }
+    var size = (data.source && data.source.size_bytes) || 0;
+    note.textContent = waveWhy === 'big'
+      ? tr('錄音檔較大（{0} MB），為了不拖垮瀏覽器，這個格式不畫波形；播放與點選跳播照常。')
+          .replace('{0}', String(Math.round(size / 1048576)))
+      : tr('這個格式瀏覽器解不開，沒有畫波形；播放與點選跳播照常。');
+    note.hidden = !waveWhy;
   }
 
   function clock() {
@@ -612,11 +864,13 @@
     el('mtPlayer').hidden = false;
     peaks = await buildPeaks(url);
     drawWave();
+    showWaveNote();
   }
 
   audio.addEventListener('error', function () {
     // 真的放不出來才收起來，並且講一句 —— 空白的播放器比沒有更難懂
     el('mtPlayer').hidden = true;
+    el('mtWaveNote').hidden = true;
     var note = el('mtCorrection');
     if (note && note.hidden) {
       note.textContent = tr('錄音檔已經不在了，或是這個格式瀏覽器放不出來。');
@@ -655,6 +909,8 @@
     var r = await fetch(BASE + '/result/' + uploadId);
     if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀不回逐字稿'))); return; }
     data = await r.json();
+    nameHints = data.name_hints || {};
+    delete data.name_hints;
     speakerOrder = [];
     render();
 
@@ -685,6 +941,10 @@
       noteBox.textContent = tr(fb.text)
         + (fb.note ? ' ' + tr('語音服務的說明：') + fb.note : '');
       noteBox.hidden = false;
+    } else if (data.diarize_saturated) {
+      // 新方法 8 個位置用滿、照用新方法（判斷在伺服器端，JTLW api_revision 2.7）
+      noteBox.textContent = tr('新方法的 8 個位置都用滿了；實際發言者更多時，請填人數後重送。');
+      noteBox.hidden = false;
     } else if (data.speaker_engine === 'auto' && dz.engine === 'legacy') {
       // v1.16.31 存下的結果沒有 `diarize_fallback`
       noteBox.textContent = tr('這次的發言者改用原本的方法分辨，沒有用 Nemotron。')
@@ -699,7 +959,9 @@
     var c = (data.summary || {}).correction || {};
     var lv = (data.summary || {}).correction_level || '';
     var bits = [];
-    if (lv) bits.push(tr('校正力道：{0}').replace('{0}', lv));
+    // 代碼照對方文件翻成白話（`punctuation_only` / `standard`）；不認得的才原樣顯示
+    var LV = { punctuation_only: tr('只修標點與明顯錯字'), standard: tr('一般校正') };
+    if (lv) bits.push(tr('校正力道：{0}').replace('{0}', LV[lv] || lv));
     if (typeof c.edited === 'number') {
       bits.push(tr('改過 {0} 段').replace('{0}', String(c.edited)));
     }
@@ -709,23 +971,66 @@
     if (typeof c.kept_original === 'number' && c.kept_original) {
       bits.push(tr('保留原文 {0} 段').replace('{0}', String(c.kept_original)));
     }
+    if (data.retry && data.retry.count) {
+      bits.push(tr('補專有名詞重跑過 {0} 次').replace('{0}', String(data.retry.count)));
+    }
+    // 送出去的專有名詞與對方怎麼用（`glossary.asr_bias_terms`＝辨識時參考了幾個）。
+    // 平常走 GPU 伺服器是 0（辨識時不參考，只用在校正 —— 對方 v2.27）；
+    // GPU 伺服器不能用、改在對方本機辨識時才大於 0，那時沒全用到才講前幾個。
+    // **0 不可以寫成「辨識時參考前 0 個」**（v2.27 照實回報之後畫面上就是這一句）。
+    var terms = Array.isArray(data.terms) ? data.terms : [];
+    if (terms.length) {
+      var g = data.glossary || {};
+      var t = tr('專有名詞 {0} 個').replace('{0}', String(terms.length));
+      if (g.asr_bias_terms === 0) {
+        t += tr('（只用在校正）');
+      } else if (typeof g.asr_bias_terms === 'number' && g.asr_bias_terms < terms.length) {
+        t += tr('（辨識時參考前 {0} 個，校正時全部都用）').replace('{0}', String(g.asr_bias_terms));
+      }
+      bits.push(t);
+    }
+    // 已知的錯寫法（JTLW 2.9）：換了幾處，或對方版本較舊沒有送出 —— **兩種都要講**，
+    // 不然使用者寫了替換、逐字稿卻沒變，看不出是沒送還是沒找到
+    var vmap = data.variants || {};
+    if (Object.keys(vmap).length) {
+      if (data.variants_sent === false) {
+        bits.push(tr('語音服務版本較舊，聽錯的寫法沒有送出'));
+      } else if (typeof c.variant_replacements === 'number') {
+        bits.push(tr('照聽錯的寫法換了 {0} 處').replace('{0}', String(c.variant_replacements)));
+      }
+    }
+    // 寫成句子的會議背景沒當成專有名詞送出 —— 講出來，不然使用者會以為整段都送出去了
+    if (data.context && data.context.split('\n').some(function (ln) {
+          ln = ln.trim(); return ln && !terms.some(function (w) { return ln.indexOf(w) >= 0; });
+        })) {
+      bits.push(tr('會議背景轉送會議摘要時會帶過去'));
+    }
     el('mtCorrection').textContent = bits.join('　');
     el('mtCorrection').hidden = !bits.length;
     el('mtDownload').href = '/api/jobs/' + (currentJobId || job.jobId) + '/download';
     el('mtResult').hidden = false;
+    showRetry();
 
-    // 存至工作區 —— 存**純文字**（帶 `[mm:ss]` 與發言者）。
-    // 工作區收不下 `.json`（會被當成純文字改名），存文字反而讀得懂、
-    // 而且丟回「會議摘要」時時間軸還在。
-    if (el('mtSaveWs') && window.attachWorkspaceSave) {
-      window.attachWorkspaceSave(el('mtSaveWs'), function () {
-        var base = (data.source && data.source.filename ? data.source.filename : 'transcript')
-                     .replace(/\.[^.]+$/, '');
-        return { blob: new Blob([asPlainText()], { type: 'text/plain' }),
-                 name: base + '-逐字稿.txt', tool: 'meeting-transcribe' };
-      });
-    }
+    armWsSave();
     setupPlayer();
+  }
+
+  // 存至工作區 —— 存**純文字**（帶 `[mm:ss]` 與發言者）。
+  // 工作區收不下 `.json`（會被當成純文字改名），存文字反而讀得懂、
+  // 而且丟回「會議摘要」時時間軸還在。
+  //
+  // **改過名字之後要能再存一次**（2026-10-03 使用者回報：存完才發現人名錯了，改完按鈕卻停在
+  // 「已存至工作區」按不下去）。共用元件存完會把按鈕鎖住（產出不會再變的工具是對的），
+  // 這裡的內容會變 —— 改名後重新接一次，按鈕回到「存至工作區」。再存是**另存一份**，
+  // 不刪工作區裡先前那一份（挑選視窗看得到存入時間）。
+  function armWsSave() {
+    if (!el('mtSaveWs') || !window.attachWorkspaceSave) return;
+    window.attachWorkspaceSave(el('mtSaveWs'), function () {
+      var base = (data.source && data.source.filename ? data.source.filename : 'transcript')
+                   .replace(/\.[^.]+$/, '');
+      return { blob: new Blob([asPlainText()], { type: 'text/plain' }),
+               name: base + '-逐字稿.txt', tool: 'meeting-transcribe' };
+    });
   }
 
   // **純文字也要帶時間。**
@@ -734,10 +1039,14 @@
   // 但這裡原本把它丟掉 —— 於是複製出去貼到別的地方就再也沒有時間了，
   // 而我們自己的「會議摘要」**讀得懂行首的 `[mm:ss]`**
   //（`transcript_parse.parse_plain`），丟掉等於自廢武功。
+  //
+  // **發言者寫改過的名字**（`speakerName`：單段改的優先、再來是整位改的、最後才是代號）——
+  // 原本寫的是代號，改了名字再存／複製，出去的還是 S1 S2（2026-10-03 一起抓到的）。
   function asPlainText() {
     return (data.segments || []).map(function (s) {
       var head = s.start_ms == null ? '' : '[' + mmss(s.start_ms) + '] ';
-      return head + (s.speaker ? s.speaker + '：' : '') + s.text;
+      var who = s.speaker ? speakerName(s) : '';
+      return head + (who ? who + '：' : '') + s.text;
     }).join('\n');
   }
 
@@ -765,6 +1074,95 @@
                          name, 'meeting-transcribe');
   });
 
+  // ---- 補專有名詞、只重跑校正（v1.16.41） ----
+  //
+  // 能不能重跑由伺服器端判斷（`retry_state`）：`possible` / `reason`
+  // （running 正在重跑、no_correct 這次沒有校正、cleared 已經請 JTLW 刪除、too_late 離刪除不到 15 分鐘）。
+  var retryJob = new JobProgress(el('mtRetryJob'), {
+    showDownload: false,
+    onDone: function () { loadResult(); },
+    onError: function () { loadResult(); },
+    onCancel: function () { loadResult(); }
+  });
+
+  function fmtWhen(sec) {
+    try {
+      return new Date(sec * 1000).toLocaleString(document.documentElement.lang || undefined,
+        { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return ''; }
+  }
+
+  // 補專有名詞的框要帶回**整份**清單（JTLW 的 retry 是取代不是累加）——
+  // 有錯寫法的詞寫回「聽錯的寫法 → 正確寫法」，不然重跑一次錯寫法就不見了
+  function termsText(d) {
+    var vmap = d.variants || {};
+    return (Array.isArray(d.terms) ? d.terms : []).map(function (t) {
+      var w = Array.isArray(vmap[t]) ? vmap[t] : [];
+      return w.length ? w.join('、') + ' → ' + t : t;
+    }).join('\n');
+  }
+
+  function showRetry() {
+    var st = data.retry_state || {};
+    var box = el('mtRetry'), gone = el('mtRetryGone');
+    box.hidden = true;
+    gone.hidden = true;
+    if (st.possible || st.reason === 'running') {
+      box.hidden = false;
+      var ta = el('mtRetryTerms');
+      if (!ta.dataset.touched) ta.value = termsText(data);
+      el('mtRetryUntil').textContent = st.due_at
+        ? tr('（可以補到 {0}）').replace('{0}', fmtWhen(st.due_at)) : '';
+      el('mtRetryGo').disabled = !st.possible;
+      el('mtRetryDone').disabled = !st.possible;
+      if (st.reason === 'running' && st.job_id) {
+        box.open = true;
+        retryJob.track(st.job_id);
+      }
+    } else if (st.reason === 'cleared') {
+      gone.textContent = tr('JTLW 已經刪除它那份逐字稿，不能再補專有名詞重跑校正；要改專有名詞，請重新送件。');
+      gone.hidden = false;
+    } else if (st.reason === 'too_late') {
+      gone.textContent = tr('再過不到 15 分鐘就會請 JTLW 刪除它那份逐字稿，來不及重跑校正了；要改專有名詞，請重新送件。');
+      gone.hidden = false;
+    }
+  }
+
+  el('mtRetryTerms').addEventListener('input', function () { this.dataset.touched = '1'; });
+
+  el('mtRetryGo').addEventListener('click', async function () {
+    var btn = el('mtRetryGo');
+    btn.disabled = true;
+    el('mtRetryDone').disabled = true;
+    var r = await fetch(BASE + '/retry', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ upload_id: uploadId, terms: el('mtRetryTerms').value })
+    });
+    if (!r.ok) {
+      showAlert(await window.friendlyServerError(r, tr('沒辦法重跑校正')));
+      await loadResult();
+      return;
+    }
+    var d = await r.json();
+    retryJob.track(d.job_id);
+  });
+
+  el('mtRetryDone').addEventListener('click', async function () {
+    var ok = await showConfirm(
+      tr('請 JTLW 刪除它那份逐字稿之後，就不能再補專有名詞重跑校正了（要改只能重新送件）。這裡的逐字稿不受影響。'),
+      { title: tr('不用再改了？'), okText: tr('請 JTLW 刪除') });
+    if (!ok) return;
+    var r = await fetch(BASE + '/done', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ upload_id: uploadId })
+    });
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('通知 JTLW 失敗'))); return; }
+    var d = await r.json();
+    if (d.acked) showToast(tr('已請 JTLW 刪除它那份逐字稿'), 'ok');
+    else showToast(tr('暫時連不上 JTLW，稍後會自動再通知一次'), 'warn');
+    await loadResult();
+  });
+
   // ---- 從「我的作業」按「開啟」回來 ----
   //
   // 作業的 `view_url` 是 `?job=<id>`，但這一頁原本**完全沒有讀它** ——
@@ -789,7 +1187,7 @@
       el('mtFileInfo').textContent = j.meta.filename;
       el('mtFileInfo').hidden = false;
     }
-    if (j.status === 'done') { await loadResult(); }
+    if (j.status === 'done' || (j.meta || {}).retry) { await loadResult(); }
     else { el('mtOpts').hidden = false; job.track(jid); }
   })();
 })();

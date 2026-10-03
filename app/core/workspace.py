@@ -47,6 +47,10 @@ ALLOWED: dict[str, str] = {
     # 純文字沒有魔術位元組，判準見 `_looks_like_text()`。
     "text/plain": ".txt",
     "text/markdown": ".md",
+    # JSON 也是純文字，**多一道「整份讀得進 JSON」才收成 `.json`**（2026-10-03 使用者回報：
+    # 從工作區下載轉逐字稿送來的檔，內容是 JSON、副檔名卻是 `.txt`）。原本工作區只認
+    # `.txt` / `.md`，JSON 一存進來就被改名 —— 會議摘要載回來還被當成逐字稿（v1.16.40 / v1.16.42）。
+    "application/json": ".json",
 }
 
 _SINGLE_KEY = "__single__"  # auth-OFF shared workspace
@@ -346,8 +350,21 @@ def detect_kind(data: bytes, name: str = "") -> Optional[tuple[str, str]]:
         low = (name or "").lower()
         if low.endswith(".md") or low.endswith(".markdown"):
             return "text/markdown", ".md"
+        # **檔名說是 `.json`、內容也真的讀得進 JSON 才算** —— 讀不進的照舊是 `.txt`
+        #（寧可多一個 `.txt`，也不要讓下載的人拿到一個打不開的 `.json`）。
+        # 檔名不是 `.json` 的不改：使用者存成 `.txt` 就是要 `.txt`。
+        if low.endswith(".json") and _parses_as_json(data):
+            return "application/json", ".json"
         return "text/plain", ".txt"
     return None
+
+
+def _parses_as_json(data: bytes) -> bool:
+    try:
+        json.loads(data.decode("utf-8-sig"))
+        return True
+    except (ValueError, UnicodeDecodeError):
+        return False
 
 
 def _clean_display_name(name: str, ext: str) -> str:
@@ -464,7 +481,7 @@ def save_bytes_for_key(key: str, data: bytes, display_name: str,
         raise UnsupportedType(
             "工作區接受 PDF / PNG、Word (.docx) / Excel (.xlsx) / "
             "PowerPoint (.pptx)、OpenDocument (.odt / .ods / .odp / .odg)、"
-            "純文字 (.txt / .md)")
+            "純文字 (.txt / .md / .json)")
     mime, ext = kind
     s = get_settings()
     max_file_mb = int(s.get("max_file_mb") or 0)
@@ -552,7 +569,7 @@ def get_file(request: Request, file_id: str) -> tuple[Path, dict[str, Any]]:
 #: 需要先轉成 PDF 才畫得出第一頁的格式。
 _OFFICE_THUMB_EXTS = (".docx", ".odt", ".xlsx", ".ods", ".pptx", ".odp", ".odg")
 #: 純文字：沒有可以畫的「第一頁」，縮圖一律回空白佔位圖。
-_TEXT_EXTS = (".txt", ".md")
+_TEXT_EXTS = (".txt", ".md", ".json")
 
 #: 超過這個大小就不做縮圖。
 #:

@@ -870,6 +870,12 @@ def build_router(templates) -> APIRouter:
                 out["request_timeout"] = max(5, min(300, int(body["request_timeout"])))
             except (TypeError, ValueError):
                 pass
+        if "retry_window_hours" in body:
+            # 最多 24 小時（JTLW 的條件：那是會議內容）；0 ＝ 存好就請它刪除
+            try:
+                out["retry_window_hours"] = max(0, min(24, int(body["retry_window_hours"])))
+            except (TypeError, ValueError):
+                pass
         # 金鑰：空字串代表「不更動」（管理頁不會把已存的金鑰顯示出來），
         # 要清掉請用專屬的按鈕 —— 不然手滑清空欄位按儲存就把金鑰弄丟了。
         key_in = body.get("api_key_enc")
@@ -881,7 +887,8 @@ def build_router(templates) -> APIRouter:
         # 金鑰與憑證**本身絕不寫進紀錄**，只記有沒有動到。
         from ..core import audit_db, client_ip as _cip
         detail = {k: out[k] for k in ("enabled", "base_url", "audio_base_url", "profile_id",
-                                      "verify_tls", "request_timeout") if k in out}
+                                      "verify_tls", "request_timeout", "retry_window_hours")
+                  if k in out}
         if "ca_cert_pem" in out:
             detail["ca_cert"] = "已更新" if out["ca_cert_pem"] else "已清除"
         if "api_key_enc" in out:
