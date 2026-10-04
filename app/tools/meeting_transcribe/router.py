@@ -487,7 +487,47 @@ MAX_VARIANTS = 20
 VARIANT_MIN, VARIANT_MAX = 2, 200
 TERM_MAX = 200
 _VARIANTS_MIN_REVISION = (2, 9)
-_MULTI_TERM_SLASH = re.compile(r"\s/\s")
+#: **JTLW 怎麼把一筆 `source` 拆成好幾個詞**（對方 2026-10-04 回覆 v1.16.49 給的規則）：
+#: `、` `，` `,` `；` `;` `|` `｜` `／` 與換行一律拆；半形 `/` **一邊有空白就拆**（`TCP/IP`、`I/O` 不拆）；
+#: 一般空白與括號不拆。拆完去掉頭尾的空白與引號、包住整個詞的那一對括號與落單的半邊括號，
+#: **只剩一個字的不算**。照這個判斷才擋得到對方會退回的那幾種（他們的 `variants_need_single_term`、
+#: `variant_is_a_glossary_term` 比的都是拆開之後的詞）。
+_JTLW_SPLIT = re.compile(r"[、，,；;|｜／\n]|\s/|/\s")
+_JTLW_QUOTES = "\"'「」『』"
+_BRACKETS = {"(": ")", "（": "）", "[": "]", "【": "】"}
+_CLOSERS = {v: k for k, v in _BRACKETS.items()}
+
+
+def _balanced(s: str) -> bool:
+    return all(s.count(o) == s.count(c) for o, c in _BRACKETS.items())
+
+
+def _strip_brackets(p: str) -> str:
+    """包住整個詞的那一對、與落單的半邊括號拿掉；詞裡成對的（`Proxmox (PVE)`）留著。"""
+    p = p.strip()
+    while p:
+        o, c = p[0], p[-1]
+        if o in _BRACKETS and c == _BRACKETS[o] and _balanced(p[1:-1]):
+            p = p[1:-1].strip()
+        elif o in _BRACKETS and p.count(o) > p.count(_BRACKETS[o]):
+            p = p[1:].strip()
+        elif c in _CLOSERS and p.count(c) > p.count(_CLOSERS[c]):
+            p = p[:-1].strip()
+        else:
+            break
+    return p
+
+
+def _jtlw_pieces(term: str) -> list[str]:
+    """一筆專有名詞在 JTLW 那邊會被拆成哪幾個詞（不分大小寫去重、只剩一個字的不算）。"""
+    out: list[str] = []
+    seen: set[str] = set()
+    for piece in _JTLW_SPLIT.split(term):
+        piece = _strip_brackets(piece.strip().strip(_JTLW_QUOTES).strip())
+        if len(piece) > 1 and piece.casefold() not in seen:
+            seen.add(piece.casefold())
+            out.append(piece)
+    return out
 
 
 def _line_terms(line: str) -> list[str]:
@@ -537,16 +577,19 @@ def _variant_line(line: str) -> Optional[tuple[str, list[str]]]:
     left, right = _VARIANT_ARROW.split(line, maxsplit=1)
     target = " ".join(right.split())
     wrongs: list[str] = []
-    for piece in _TERM_SPLIT.split(left):
+    for piece in _JTLW_SPLIT.split(left):
         w = " ".join(piece.split())
         if w and w.casefold() not in {x.casefold() for x in wrongs}:
             wrongs.append(w)
     if not target or not wrongs:
         raise HTTPException(400, f"「{line}」：箭頭左邊寫聽錯的寫法、右邊寫正確的寫法，兩邊都要有")
-    # 「Proxmox VE / PVE」也是好幾個詞（JTLW 會拆開、回 `variants_need_single_term`）——
-    # 斜線兩邊要有空白才算，`TCP/IP` 這種是一個詞
-    if _TERM_SPLIT.search(target) or _MULTI_TERM_SLASH.search(target):
+    # 「Proxmox VE / PVE」「Proxmox|PVE」也是好幾個詞（JTLW 會拆開、回 `variants_need_single_term`）——
+    # 斜線一邊有空白就算，`TCP/IP` 這種是一個詞。**比對方嚴一點**：右邊有分隔就擋
+    # （對方會把只剩一個字的那一段丟掉、照收；那種寫法多半是打錯，擋下來講清楚比較好）
+    if _JTLW_SPLIT.search(target):
         raise HTTPException(400, f"「{line}」：箭頭右邊只能寫一個正確的寫法（不知道要換成哪一個）")
+    if len(_jtlw_pieces(target)) != 1:
+        raise HTTPException(400, f"「{line}」：箭頭右邊的正確寫法至少要兩個字")
     if len(target) > TERM_MAX:
         raise HTTPException(400, f"「{target[:20]}…」太長了（專有名詞最多 {TERM_MAX} 字）")
     for w in wrongs:
@@ -590,12 +633,14 @@ def parse_glossary(raw: object) -> tuple[list[str], dict[str, list[str]]]:
     if len(out) > MAX_TERMS:
         raise HTTPException(400, f"專有名詞最多 {MAX_TERMS} 個（目前 {len(out)} 個）")
     owner: dict[str, str] = {}
+    # 「清單上的詞」照 JTLW 拆開之後算：另一行寫了 `Proxmox VE / PVE` 的話，`PVE` 也是清單上的詞
+    listed = seen | {x.casefold() for t in out for x in _jtlw_pieces(t)}
     for term, wrongs in variants.items():
         if len(wrongs) > MAX_VARIANTS:
             raise HTTPException(400, f"「{term}」的聽錯寫法最多 {MAX_VARIANTS} 個（目前 {len(wrongs)} 個）")
         for w in wrongs:
             key = w.casefold()
-            if key in seen:
+            if key in listed:
                 raise HTTPException(400, f"「{w}」也是清單上的專有名詞，不能同時當成聽錯的寫法"
                                          "（照表換會把寫對的換掉）")
             if key in owner and owner[key] != term:

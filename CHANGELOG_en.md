@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (879 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (880 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.51] - 2026-10-04
+
+- **Meeting transcription: misheard-spelling lines are checked with the speech service's own term-splitting rules.** In a "misheard spelling → correct spelling" line, a right-hand side separated by `|`, `｜`, `／` or a `/` with a space on either side now also counts as several terms and is refused before sending, naming the line (`TCP/IP` is still one term). Previously only enumeration commas, commas, semicolons and a `/` with spaces on both sides were caught here; the rest were only rejected by the speech service after sending. The rule that a misheard spelling must not be a term on the list now compares against the split terms: a list line written as `Proxmox VE / PVE` makes `PVE` a listed term too. Several misheard spellings on the left can also be separated with `|`. A one-character correct spelling is refused.
 
 ## [1.16.50] - 2026-10-03
 

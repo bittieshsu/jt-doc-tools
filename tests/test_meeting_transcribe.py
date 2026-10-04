@@ -141,7 +141,22 @@ class FakeJtlw:
                 "code": "invalid_request", "category": "request", "retryable": False,
                 "details": {"field": f"glossary.entries[{i}].variants", "reason": reason,
                             **({"variant": variant} if variant else {})}}}, status_code=400)
-        sources = {e["source"].casefold() for e in ents}
+        # 對方的拆詞規則（2026-10-04 給的）：這些分隔一律拆、半形斜線一邊有空白就拆；
+        # 頭尾的引號與括號拿掉、只剩一個字的不算。**判準自己寫一份**，不借產品的 `_jtlw_pieces`。
+        def pieces(src):
+            out = []
+            for part in re.split(r"[、，,；;|｜／\n]|\s/|/\s", src):
+                part = part.strip().strip("\"'「」『』").strip()
+                if part[:1] in "(（[【" and part[-1:] in ")）]】":
+                    part = part[1:-1].strip()
+                part = part.lstrip("(（[【") if part.count("(") + part.count("（") > \
+                    part.count(")") + part.count("）") else part
+                part = part.rstrip(")）]】") if part.count(")") + part.count("）") > \
+                    part.count("(") + part.count("（") else part
+                if len(part) > 1 and part.casefold() not in {x.casefold() for x in out}:
+                    out.append(part)
+            return out
+        sources = {x.casefold() for e in ents for x in pieces(e["source"])}
         owner: dict = {}
         for i, e in enumerate(ents):
             vs = e.get("variants")
@@ -152,7 +167,7 @@ class FakeJtlw:
             if (not isinstance(vs, list) or len(vs) > 20
                     or any(not isinstance(v, str) or not 2 <= len(v) <= 200 for v in vs)):
                 return bad(i, "schema")
-            if re.search(r"[、，,；;]|\s/\s", e["source"]):
+            if len(pieces(e["source"])) != 1:
                 return bad(i, "variants_need_single_term")
             for v in vs:
                 k = v.casefold()

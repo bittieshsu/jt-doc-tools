@@ -70,8 +70,13 @@ def _wait(client, job_id: str, timeout: float = 60.0) -> dict:
      ["Proxmox"], {"Proxmox": ["Proksmox", "Proxmux"]}),
     # 中文的錯寫法照字面
     ("王曉明 → 王小明", ["王小明"], {"王小明": ["王曉明"]}),
-    # 斜線沒有空白的是一個詞（TCP/IP）
+    # 斜線沒有空白的是一個詞（TCP/IP、I/O）
     ("TCP-IP → TCP/IP", ["TCP/IP"], {"TCP/IP": ["TCP-IP"]}),
+    ("I-O → I/O", ["I/O"], {"I/O": ["I-O"]}),
+    # 詞裡成對的括號是一個詞（JTLW v2.26.10 起照表換進去的也是完整的 `Proxmox (PVE)`）
+    ("Proximity → Proxmox (PVE)", ["Proxmox (PVE)"], {"Proxmox (PVE)": ["Proximity"]}),
+    # 左邊的錯寫法照 JTLW 的分隔拆（`|` 也算）
+    ("Proksmox | Proxmux → Proxmox", ["Proxmox"], {"Proxmox": ["Proksmox", "Proxmux"]}),
     # 兩個以上箭頭是流程 —— 背景，不可以整行當成一個詞
     ("上傳 → 轉檔 → 下載\nPVE", ["PVE"], {}),
     # `#` 標題與句子裡的箭頭也是背景
@@ -90,6 +95,17 @@ def test_the_arrow_lines_become_variants(raw, terms, variants):
     # 右邊寫了好幾個（對方的 `variants_need_single_term`）
     ("Proksmox → Proxmox、PVE", "只能寫一個"),
     ("Proksmox → Proxmox VE / PVE", "只能寫一個"),
+    # JTLW 2026-10-04 給的拆詞規則：這幾種也是好幾個詞（斜線一邊有空白就算）
+    ("Proksmox → Proxmox|PVE", "只能寫一個"),
+    ("Proksmox → Proxmox｜PVE", "只能寫一個"),
+    ("Proksmox → Proxmox／PVE", "只能寫一個"),
+    ("Proksmox → Proxmox/ PVE", "只能寫一個"),
+    ("Proksmox → Proxmox /PVE", "只能寫一個"),
+    # 只剩一個字的不算詞
+    ("Proksmox → X", "至少要兩個字"),
+    # 「清單上的詞」照拆開之後算：另一行寫了 `Proxmox VE / PVE`，`PVE` 就是清單上的詞
+    ("Proxmox VE / PVE\nPVE → Proxmox", "清單上的專有名詞"),
+    ("(Bianca)\nBianca → Bianco", "清單上的專有名詞"),
     # 太短（對方每個錯寫法 2~200 字）
     ("X → Proxmox", "2～200"),
     # 錯寫法剛好是清單上的詞（或就是自己）—— 照表換會把寫對的換掉（`variant_is_a_glossary_term`）
