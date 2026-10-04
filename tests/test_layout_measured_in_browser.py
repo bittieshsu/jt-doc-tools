@@ -108,11 +108,14 @@ def live():
         shutil.rmtree(data, ignore_errors=True)
 
 
-def _measure(live, path, js: str, width: int = _WIDTH, locale: str | None = None):
+def _measure(live, path, js: str, width: int = _WIDTH, locale: str | None = None,
+             mobile: bool | None = None):
     """開一頁（自己的分頁、固定寬度），等載入完跑一段 JS，回傳它的值。
 
     `path` 給一串的話，同一個分頁依序開每一頁、回傳 `{路徑: 值}`（掃整批頁面時用，
-    不然每一頁開一個分頁太慢）。`locale` 設介面語言的 cookie。"""
+    不然每一頁開一個分頁太慢）。`locale` 設介面語言的 cookie。
+    `mobile` 預設照寬度判斷；量**沒有 viewport 宣告的頁面**（例如主題預覽）時要給 False ——
+    行動模式下那種頁面的版面寬度是 980px，量到的不是框裡看到的樣子。"""
     import websockets.sync.client as wsc
 
     port, cdp = live
@@ -136,7 +139,7 @@ def _measure(live, path, js: str, width: int = _WIDTH, locale: str | None = None
 
             send("Emulation.setDeviceMetricsOverride",
                  {"width": width, "height": 900, "deviceScaleFactor": 1,
-                  "mobile": width < 600})
+                  "mobile": (width < 600) if mobile is None else mobile})
             send("Page.enable")
             if locale:
                 send("Network.setCookie", {"name": "jtdt_locale", "value": locale,
@@ -455,3 +458,33 @@ def test_markdown_theme_cards_show_their_colours(live):
     for c in got:
         assert c["n"] == 3 and c["colored"] == 3, f"{c['id']} 的色票沒畫出來：{c}"
         assert c["w"] >= 10 and c["h"] >= 10, f"{c['id']} 的色票太小：{c}"
+
+
+#: 主題預覽：每個元素都要落在預覽框裡（`html` 是 `overflow:hidden`，伸出去的部分直接被切掉）。
+#: 跟 `html` 的框比，兩邊在同一個座標系 —— 預覽有 `zoom`，拿視窗寬度比會差一個倍率。
+_PREVIEW_CLIP_JS = """(function(){
+  var H = document.documentElement.getBoundingClientRect(), bad = [], n = 0;
+  Array.from(document.body.querySelectorAll('*')).forEach(function (e) {
+    var r = e.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return;
+    n++;
+    if (r.left < H.left - 1 || r.right > H.right + 1)
+      bad.push(e.tagName + ' ' + Math.round(r.left - H.left) + '..' + Math.round(r.right - H.left)
+               + ' / ' + Math.round(H.width) + ' ' + (e.textContent || '').trim().slice(0, 12));
+  });
+  return {n: n, bad: bad.slice(0, 5), total: bad.length};
+})()"""
+
+
+def test_theme_previews_keep_everything_inside_the_frame(live):
+    """會議摘要的版面主題預覽（210 寬的縮圖）不可以有東西伸出框外被切掉。
+
+    商務報告的標題色帶寫的是「往左右各伸 `PAGE_MARGIN_X` 到頁邊」—— 在文件裡那是頁邊距，
+    預覽沒有頁邊距、只有 body 的內距，照原樣伸出去就把標題的第一個字切掉了
+    （2026-10-04 使用者截圖回報）。**判準是畫面上的框**，不是 CSS 寫了什麼。"""
+    from app.tools.markdown_to_doc import themes
+    paths = [f"/tools/meeting-summary/theme-preview/{t}" for t in themes.THEMES]
+    got = _measure(live, paths, _PREVIEW_CLIP_JS, width=210, mobile=False)
+    for p, g in got.items():
+        assert g and g["n"] >= 20, f"{p} 只量到 {g and g['n']} 個元素 —— 預覽沒有畫出來"
+        assert not g["total"], f"{p} 有 {g['total']} 個元素伸出預覽框：{g['bad']}"

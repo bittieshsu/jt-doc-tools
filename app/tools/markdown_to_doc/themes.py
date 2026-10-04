@@ -11,10 +11,15 @@ host has installed.
 """
 from __future__ import annotations
 
+#: 左右頁邊距。主題裡「伸到頁邊」的元素（商務報告的標題色帶）用同一個值往外伸 ——
+#: 會議摘要的主題預覽沒有頁邊距、只有自己的內距，它照這個值把伸出去的距離換成內距
+#: （換不到的話標題的第一個字會被切掉，2026-10-04 使用者截圖回報）。
+PAGE_MARGIN_X = "20mm"
+
 # Shared base used by every theme — resets, code styling, table baseline,
 # print page setup. Theme-specific colours / fonts come on top.
 _BASE = """
-@page { size: A4; margin: 22mm 20mm 22mm 20mm; }
+@page { size: A4; margin: 22mm """ + PAGE_MARGIN_X + " 22mm " + PAGE_MARGIN_X + """; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
@@ -287,7 +292,7 @@ body {
 }
 h1 {
   color: #ffffff; background: #2c5282;
-  padding: 12pt 18pt; margin: 0 0 18pt -20mm; margin-right: -20mm;
+  padding: 12pt 18pt; margin: 0 0 18pt -""" + PAGE_MARGIN_X + """; margin-right: -""" + PAGE_MARGIN_X + """;
   font-size: 22pt; letter-spacing: 0.04em;
 }
 h2 { color: #2c5282; border-bottom: 2px solid #2c5282; padding-bottom: 4pt; }

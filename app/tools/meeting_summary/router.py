@@ -1249,6 +1249,10 @@ async def charts_list(upload_id: str, request: Request):
         mc.build_all(_read_json(_out_path(upload_id), "分析結果"), _segs))}
 
 
+#: 主題預覽左右的內距（縮放之前的 px）。主題裡伸到頁邊的元素在預覽裡伸這麼多。
+_PREVIEW_PAD_X = 26
+
+
 @router.get("/theme-preview/{theme}", response_class=HTMLResponse)
 async def theme_preview(theme: str, request: Request):
     """版面主題的配色預覽（2026-10-02 使用者要求：選之前要看得出會長怎樣）。
@@ -1269,9 +1273,16 @@ async def theme_preview(theme: str, request: Request):
     # 預覽框是 210 × 297（A4 比例），縮放 .385 之後版面寬約 545px，
     # 標題、摘要、待辦、表格剛好落在第一頁 —— 要看的是配色，不是讀內文。
     html = html.replace("<style>", f'<style nonce="{nonce}">')
+    # 主題裡「伸到頁邊」的元素（商務報告的標題色帶）在文件裡伸的是頁邊距；
+    # 預覽沒有頁邊距、邊距是 body 的內距 —— 照原樣伸出去的話，`overflow:hidden`
+    # 把標題的第一個字切掉（2026-10-04 使用者截圖回報）。只換主題 CSS 那一段。
+    cut = html.find("</style>")
+    if cut > 0:
+        html = (html[:cut].replace(f"-{_themes.PAGE_MARGIN_X}", f"-{_PREVIEW_PAD_X}px")
+                + html[cut:])
     html = html.replace("</head>",
                         f'<style nonce="{nonce}">html{{zoom:.385;overflow:hidden}}'
-                        f'body{{margin:0 !important;padding:22px 26px !important;'
+                        f'body{{margin:0 !important;padding:22px {_PREVIEW_PAD_X}px !important;'
                         f'overflow:hidden}}</style></head>', 1)
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 

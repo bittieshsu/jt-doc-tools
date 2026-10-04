@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (880 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (881 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.52] - 2026-10-04
+
+- **Meeting summary: the "Business report" theme preview cut off the left of the title.** In the export area's layout theme preview, the title's dark blue band reached out past the left edge of the preview frame and the first character was cut off. In the document that band extends to the page edge, but the preview has no page margins; it now stops at the edge of the preview frame. Exported documents are unchanged (the layout is exactly as before). A new check makes sure nothing in any theme preview reaches outside the frame.
 
 ## [1.16.51] - 2026-10-04
 
