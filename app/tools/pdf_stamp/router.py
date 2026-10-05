@@ -1078,43 +1078,75 @@ from fastapi.responses import FileResponse as _FileResponse  # noqa: E402
 async def api_pdf_stamp(
     request: Request,
     file: UploadFile = File(...),
-    stamp_image: UploadFile = File(...),
-    x_mm: float = Form(105.0),
-    y_mm: float = Form(250.0),
-    width_mm: float = Form(30.0),
-    height_mm: float = Form(30.0),
-    rotation_deg: float = Form(0.0),
+    stamp_image: Optional[UploadFile] = File(None),
+    asset_id: Optional[str] = Form(None),
+    x_mm: Optional[float] = Form(None),
+    y_mm: Optional[float] = Form(None),
+    width_mm: Optional[float] = Form(None),
+    height_mm: Optional[float] = Form(None),
+    rotation_deg: Optional[float] = Form(None),
     page_mode: str = Form("all"),  # all | first | last
     pages_json: Optional[str] = Form(None),  # 指定頁：JSON 陣列, 0-based index
     placements_json: Optional[str] = Form(None),  # 每頁獨立位置（選用）
 ):
-    """單次上傳 PDF + 印章圖檔（PNG / JPG），蓋章後回 PDF。
+    """上傳 PDF，蓋章後回 PDF。
+
+    印章二選一：上傳 `stamp_image`（PNG / JPG），或用 `asset_id` 指定資產庫裡的
+    印章 / 簽名 / Logo。用 `asset_id` 時沒給的位置欄位取那顆章在資產庫設好的位置；
+    上傳圖時沒給的取預設 105 / 250 / 30 / 30（跟原本一樣）。
 
     placements_json（選用）：每頁獨立位置模式。JSON 陣列，每個物件
     `{"page":0,"x_mm":150,"y_mm":240,"width_mm":19,"height_mm":19,"rotation_deg":0}`
-    → 同一頁可放多個、不同頁可放不同位置，圖用上傳的 stamp_image。
-    **有帶就忽略 x_mm/y_mm/page_mode/pages_json；沒帶則行為與舊版完全相同。**"""
+    → 同一頁可放多個、不同頁可放不同位置；每一處可以自帶 `asset_id`，
+    沒帶的用上面那顆章。**有帶就忽略 x_mm/y_mm/page_mode/pages_json。**
+
+    **蓋好的檔案跟網頁版一樣存進「用印簽名歷史」**（原檔與成品）——
+    2026-10-05 以前 API 蓋的章只有稽核記錄，查不到原檔與成品。"""
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(400, "只支援 PDF")
-    img_ext = Path(stamp_image.filename or "stamp.png").suffix.lower()
-    if img_ext not in _TEMP_ASSET_ALLOWED_EXT:
-        raise HTTPException(400, f"印章圖檔格式必須是 {_TEMP_ASSET_ALLOWED_EXT}")
+    # 稽核記錄（`tool_invoke`）的檔名預設是中介層從表單抓的**第一個**檔名 ——
+    # 呼叫端先送印章圖的話會記成印章圖。這裡明確指定成被蓋章的那份文件。
+    request.state.upload_filename = file.filename or ""
+    if stamp_image is not None and asset_id:
+        raise HTTPException(400, "stamp_image 與 asset_id 只能給一個")
     pdf_data = await file.read()
     if not pdf_data or pdf_data[:4] != b"%PDF":
         raise HTTPException(400, "不是有效的 PDF")
-    img_data = await stamp_image.read()
-    if not img_data:
-        raise HTTPException(400, "印章圖檔為空")
-    if len(img_data) > _TEMP_ASSET_MAX_BYTES:
-        raise HTTPException(400, f"印章圖檔超過 {_TEMP_ASSET_MAX_BYTES // 1024 // 1024} MB")
     uid = uuid.uuid4().hex
     from ...core import upload_owner as _uo
     _uo.record(uid, request)
     src = settings.temp_dir / f"stamp_api_{uid}_in.pdf"
-    src.write_bytes(pdf_data)
-    stamp_png = settings.temp_dir / f"stamp_api_{uid}{img_ext}"
-    stamp_png.write_bytes(img_data)
     out = settings.temp_dir / f"stamp_api_{uid}_out.pdf"
+    # 主印章：上傳的圖，或資產庫的章（型別檢查跟網頁版同一支）
+    stamp_png: Optional[Path] = None
+    preset: dict = {}
+    extra: dict = {"source": "api"}
+    if asset_id:
+        # 資產 id 一律是 32 位十六進位（`asset_manager` 只用 uuid4().hex 建）；
+        # 不合格的一律當成找不到 —— 網頁內部用的兩個代號（臨時上傳 / 不蓋章）也在這裡擋掉。
+        from app.core.safe_paths import is_uuid_hex
+        if not is_uuid_hex(asset_id):
+            raise HTTPException(400, "stamp not found")
+        stamp_png, preset = await _resolve_stamp_source(asset_id, None, request)
+        extra["asset_id"] = asset_id
+    elif stamp_image is not None:
+        img_ext = Path(stamp_image.filename or "stamp.png").suffix.lower()
+        if img_ext not in _TEMP_ASSET_ALLOWED_EXT:
+            raise HTTPException(400, f"印章圖檔格式必須是 {_TEMP_ASSET_ALLOWED_EXT}")
+        img_data = await stamp_image.read()
+        if not img_data:
+            raise HTTPException(400, "印章圖檔為空")
+        if len(img_data) > _TEMP_ASSET_MAX_BYTES:
+            raise HTTPException(400, f"印章圖檔超過 {_TEMP_ASSET_MAX_BYTES // 1024 // 1024} MB")
+        stamp_png = settings.temp_dir / f"stamp_api_{uid}{img_ext}"
+        stamp_png.write_bytes(img_data)
+        # 圖不另外存檔（成品上就看得到），但留指紋 —— 事後才對得出蓋的是哪一張
+        import hashlib as _hl
+        extra["stamp_image_sha256"] = _hl.sha256(img_data).hexdigest()[:16]
+    elif not placements_json:
+        raise HTTPException(
+            400, "需要印章：上傳 stamp_image，或用 asset_id 指定資產庫裡的章")
+    src.write_bytes(pdf_data)
     stem = Path(file.filename or "document.pdf").stem
     import fitz as _fitz
     with _fitz.open(str(src)) as d:
@@ -1123,12 +1155,31 @@ async def api_pdf_stamp(
         items = _parse_placements(placements_json, settings.temp_dir, stamp_png)
         await asyncio.to_thread(
             _apply_placements, src, out, items, settings.temp_dir, n)
+        extra["placements"] = len(items)
     else:
+        def _pick(v: Optional[float], key: str, default: float) -> float:
+            return float(v) if v is not None else float(preset.get(key, default))
+        pos = {"x_mm": _pick(x_mm, "x_mm", 105.0), "y_mm": _pick(y_mm, "y_mm", 250.0),
+               "width_mm": _pick(width_mm, "width_mm", 30.0),
+               "height_mm": _pick(height_mm, "height_mm", 30.0),
+               "rotation_deg": _pick(rotation_deg, "rotation_deg", 0.0)}
         pages_arg = _resolve_pages(page_mode, pages_json, n)
-        params = service.StampParams(
-            x_mm=x_mm, y_mm=y_mm, width_mm=width_mm, height_mm=height_mm,
-            rotation_deg=rotation_deg, pages=pages_arg,
-        )
+        params = service.StampParams(pages=pages_arg, **pos)
         await asyncio.to_thread(service.stamp, src, out, stamp_png, params)
+        extra.update(pos)
+    # ---- 用印簽名歷史（跟網頁版同一份）----
+    # 存不進去不可以讓蓋章失敗（同網頁版），但要留記錄。
+    from ...core import sessions as _sessions
+    try:
+        from ...core.history_manager import stamp_history
+        await asyncio.to_thread(
+            stamp_history.save,
+            original_path=src, filled_path=out, preview_path=None,
+            original_filename=file.filename or "document.pdf",
+            username=_sessions.user_label(getattr(request.state, "user", None)),
+            extra=extra)
+    except Exception:
+        import logging as _lg
+        _lg.getLogger(__name__).exception("stamp_history.save failed (api)")
     return _FileResponse(str(out), media_type="application/pdf",
                          filename=f"{stem}_stamped.pdf")

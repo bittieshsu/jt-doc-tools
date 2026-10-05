@@ -583,7 +583,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **370 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **371 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -834,6 +834,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_pdf_page_size.py` | 頁面尺寸統一 |
 | `test_pdf_pageno_cjk.py` | pdf-pageno 中文頁碼字型回歸 |
 | `test_pdf_seam_stamp.py` | 騎縫章 |
+| `test_pdf_stamp_api_history.py` | 用印 API 補齊跟網頁版一樣的紀錄與用法（2026-10-05） |
 | `test_pdf_stamp_blend.py` | Regression tests for the Multiply blend mode applied to pdf-stamp output. |
 | `test_pdf_stamp_date_resolution.py` | Regression: the handwriting date stamp must render crisp, not blurry. |
 | `test_pdf_stamp_pages.py` | Regression tests for pdf-stamp per-page selection (`_resolve_pages`). |
@@ -1857,6 +1858,9 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 ### 用印 / 簽名 / 浮水印 / 表單
 - [ ] `/tools/pdf-stamp/api/pdf-stamp` — POST file + stamp_image → PDF
+  - [ ] 改用 `asset_id`（不上傳圖、不給位置）→ 章蓋在資產庫設好的位置；給了位置就照給的蓋；`stamp_image` 與 `asset_id` 同時給、兩個都沒給、id 不存在或是浮水印 → 400
+  - [ ] 蓋完到管理區的「用印簽名歷史」看得到這一筆（原檔與成品都打得開、成品有章、記著呼叫的帳號）；被退回的呼叫不留歷史
+  - [ ] 啟用認證時稽核記錄的檔名是被蓋章的 PDF（就算呼叫端先送印章圖）
 - [ ] `/tools/pdf-watermark/api/pdf-watermark` — POST file + text → PDF
 - [ ] `/tools/pdf-fill/api/pdf-fill` — POST file + company_id → PDF
 

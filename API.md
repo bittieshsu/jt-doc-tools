@@ -1367,11 +1367,12 @@ POST /tools/pdf-stamp/api/pdf-stamp
 | 參數 | 類型 | 必填 | 說明 |
 |---|---|---|---|
 | `file` | file | ✓ | PDF |
-| `stamp_image` | file | ✓ | 印章 / 簽名圖（透明 PNG 佳） |
-| `x_mm` | float | ✓ | 左下角 X 位置（mm） |
-| `y_mm` | float | ✓ | 左下角 Y 位置（mm） |
-| `width_mm` | float | ✓ | 寬度（mm） |
-| `height_mm` | float | ✓ | 高度（mm） |
+| `stamp_image` | file | | 印章 / 簽名圖（透明 PNG 佳）。跟 `asset_id` 二選一 |
+| `asset_id` | str | | 改用資產庫裡的印章 / 簽名 / Logo（id 請向管理員取得：管理區的資產管理，或 `GET /admin/api/assets`）。跟 `stamp_image` 二選一 |
+| `x_mm` | float | | 左下角 X 位置（mm） |
+| `y_mm` | float | | 左下角 Y 位置（mm） |
+| `width_mm` | float | | 寬度（mm） |
+| `height_mm` | float | | 高度（mm） |
 | `rotation_deg` | float | | 旋轉角度，預設 `0` |
 | `page_mode` | str | | `all`（每頁）/ `first` / `last`，預設 `all` |
 | `pages_json` | str | | 指定頁：JSON 陣列，0 起算頁碼（如 `[0,2,4]`）。提供時優先於 `page_mode`；超出範圍的頁碼會被忽略 |
@@ -1388,6 +1389,18 @@ curl -X POST http://localhost:8765/tools/pdf-stamp/api/pdf-stamp \
 
 回應：蓋章後的 PDF。
 
+位置欄位沒給時：用 `asset_id` 就照那顆章在資產庫設好的位置，上傳圖則是 105 / 250 / 30 / 30 mm。
+
+```bash
+# 用資產庫裡的公司大章，位置照資產庫的設定
+curl -X POST http://localhost:8765/tools/pdf-stamp/api/pdf-stamp \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@contract.pdf" -F "asset_id=ASSET_ID" \
+  --output stamped.pdf
+```
+
+透過 API 蓋的章跟網頁版一樣會存進「用印簽名歷史」（原檔與成品，稽核員可查）；上傳的印章圖不另外存檔，只記下指紋。
+
 **每頁獨立位置（placements）**：適合多頁合約 / 續保單這種「每頁簽名位置不同、同一頁要簽好幾處」的情境。
 
 | placement 欄位 | 類型 | 必填 | 說明 |
@@ -1396,7 +1409,7 @@ curl -X POST http://localhost:8765/tools/pdf-stamp/api/pdf-stamp \
 | `x_mm` / `y_mm` | float | ✓ | 位置（mm） |
 | `width_mm` / `height_mm` | float | | 尺寸（mm），預設 30×30 |
 | `rotation_deg` | float | | 旋轉角度，預設 `0` |
-| `asset_id` | str | | 改用某個共用資產的圖（預設用上傳的 `stamp_image`） |
+| `asset_id` | str | | 這一處改用資產庫裡的某一顆章（沒給就用上面的 `stamp_image` 或 `asset_id`）。每一處都有自己的 `asset_id` 時不必上傳圖 |
 
 ```bash
 # 第 1 頁蓋 2 處、第 3 頁蓋 1 處，第 2 頁不蓋

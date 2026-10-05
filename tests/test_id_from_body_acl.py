@@ -83,6 +83,10 @@ EXEMPT: dict[tuple[str, str], str] = {
     ("app/tools/submission_check/router.py", "api_delete_self_entity"): "同上",
     ("app/tools/pdf_stamp/router.py", "tool_preview"):
         "未實作的佔位端點，主體只有 `raise HTTPException(404)`",
+    ("app/tools/pdf_stamp/router.py", "api_pdf_stamp"):
+        "asset_id 是管理員維護的**共用**資產庫（印章 / 簽名 / Logo），網頁版有用印權限的人"
+        "本來就能挑任何一顆（`/submit` 的 stamp_id 同一批）；整支端點由用印工具權限把關，"
+        "型別限印章 / 簽名 / Logo（`_resolve_stamp_source`）",
 }
 
 

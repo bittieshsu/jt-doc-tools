@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (881 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (882 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.53] - 2026-10-05
+
+- **Stamp API: saved to the stamp history, and can use a stamp from the asset library.** Stamps applied through the API are now saved to the Stamp and signature history like the web version (the original and the stamped file, which auditors can review), together with the calling account. Previously there was only an audit entry, with no way to see which document was stamped or what the result looked like. An uploaded stamp image is not stored separately; only its fingerprint is recorded. The new `asset_id` parameter names a stamp, signature or logo from the asset library, so no image upload is needed; when no position is given, the stamp goes where that asset is set up in the library. `stamp_image` is now optional (use one of the two), and placements that each name an asset need no upload either. The audit entry's file name is always the stamped PDF (if the caller sent the stamp image first, it used to record the image's name). The existing way of calling (upload an image, no position) gives exactly the same result as before.
 
 ## [1.16.52] - 2026-10-04
 
