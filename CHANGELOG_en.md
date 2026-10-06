@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (886 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (887 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.58] - 2026-10-06
+
+- **Dependency: fsspec upgraded to 2026.9.0.** fsspec comes in with PyTorch (used by the EasyOCR text recognition). Versions before 2026.6.0 have a security advisory (GHSA-27vj-qcqg-25rc: `ReferenceFileSystem` can run arbitrary code when it reads a crafted reference file). This system does not use that feature and never lets users choose what fsspec reads, so it cannot be reached here; it is upgraded anyway so scanners stop flagging it. Only this one package changed. `jtdt update` picks it up; the Windows installer is unaffected.
 
 ## [1.16.57] - 2026-10-06
 
