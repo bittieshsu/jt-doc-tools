@@ -473,7 +473,7 @@ _TERM_SPLIT = re.compile(r"[、，,；;]+")
 _SENTENCE_END = re.compile(r"[。！？!?]")
 #: 「與會者：王小明、Bianca」—— 冒號前面那個短標籤拿掉，後面照一串詞處理（`://` 不算）
 _LINE_LABEL = re.compile(r"^\s*[^：:]{1,10}[：:](?!//)\s*")
-_CJK_CHAR = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
+_CJK_CHAR = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
 MAX_TERM_LIKE = 40
 MAX_TERM_CJK = 10
 #: **已知的錯寫法**（JTLW v2.28，`api_revision` 2.9）：一行寫成「錯寫法 → 正確寫法」，
@@ -481,7 +481,10 @@ MAX_TERM_CJK = 10
 #: `final` 層換掉。拼法差很多的誤聽（校正認不出來的）靠這個才改得回來。
 #: 方向跟會議摘要的「自己加替換」一樣（左邊是逐字稿裡的、右邊是要換成的）。
 #: 一行只能有**一個**箭頭（兩個以上多半是在寫流程，當背景）；`#` 開頭與句子照舊當背景。
-_VARIANT_ARROW = re.compile(r"\s*(?:→|->|=>|⇒)\s*")
+#: **箭頭兩旁的空白不寫進式子**（兩邊各自 strip）：寫成 `\s*(?:→|…)\s*` 的話，一行很長的空白、
+#: 又沒有箭頭時，每個起點都要把後面的空白吃完再失敗 —— 時間跟行長的平方成正比
+#: （16,000 個空白要 5.4 秒），而這三支端點是 async、直接在事件迴圈上跑，等於整個網站停住。
+_VARIANT_ARROW = re.compile(r"→|->|=>|⇒")
 #: 對方的上限（v2.28）：每筆最多 20 個錯寫法、每個 2~200 字
 MAX_VARIANTS = 20
 VARIANT_MIN, VARIANT_MAX = 2, 200
@@ -577,9 +580,11 @@ def _variant_line(line: str) -> Optional[tuple[str, list[str]]]:
     left, right = _VARIANT_ARROW.split(line, maxsplit=1)
     target = " ".join(right.split())
     wrongs: list[str] = []
+    seen_w: set[str] = set()                # 每加一個就重建一次集合的話，一行寫幾萬個是平方級
     for piece in _JTLW_SPLIT.split(left):
         w = " ".join(piece.split())
-        if w and w.casefold() not in {x.casefold() for x in wrongs}:
+        if w and w.casefold() not in seen_w:
+            seen_w.add(w.casefold())
             wrongs.append(w)
     if not target or not wrongs:
         raise HTTPException(400, f"「{line}」：箭頭左邊寫聽錯的寫法、右邊寫正確的寫法，兩邊都要有")
@@ -588,10 +593,11 @@ def _variant_line(line: str) -> Optional[tuple[str, list[str]]]:
     # （對方會把只剩一個字的那一段丟掉、照收；那種寫法多半是打錯，擋下來講清楚比較好）
     if _JTLW_SPLIT.search(target):
         raise HTTPException(400, f"「{line}」：箭頭右邊只能寫一個正確的寫法（不知道要換成哪一個）")
-    if len(_jtlw_pieces(target)) != 1:
-        raise HTTPException(400, f"「{line}」：箭頭右邊的正確寫法至少要兩個字")
+    # 長度要在拆詞**之前**擋：拆詞時一次剝一個括號、每剝一次就數一遍，一長串括號是平方級
     if len(target) > TERM_MAX:
         raise HTTPException(400, f"「{target[:20]}…」太長了（專有名詞最多 {TERM_MAX} 字）")
+    if len(_jtlw_pieces(target)) != 1:
+        raise HTTPException(400, f"「{line}」：箭頭右邊的正確寫法至少要兩個字")
     for w in wrongs:
         if not VARIANT_MIN <= len(w) <= VARIANT_MAX:
             raise HTTPException(400, f"「{w[:20]}」：聽錯的寫法要 {VARIANT_MIN}～{VARIANT_MAX} 個字")
@@ -608,24 +614,26 @@ def parse_glossary(raw: object) -> tuple[list[str], dict[str, list[str]]]:
     詞超過上限時回 400、講出數字 —— **不可以安靜地截掉**。
     """
     out: list[str] = []
-    seen: set[str] = set()
+    first: dict[str, str] = {}              # casefold → 第一次寫的那個（重複的詞不必回頭掃清單）
     variants: dict[str, list[str]] = {}
+    have_keys: dict[str, set[str]] = {}
 
     def add(term: str) -> str:
         key = term.casefold()
-        if key not in seen:
-            seen.add(key)
+        if key not in first:
+            first[key] = term
             out.append(term)
-            return term
-        return next(t for t in out if t.casefold() == key)
+        return first[key]
 
     for line in _raw_lines(raw):
         hit = _variant_line(line)
         if hit:
             term = add(hit[0])
             have = variants.setdefault(term, [])
+            keys = have_keys.setdefault(term, set())
             for w in hit[1]:
-                if w.casefold() not in {x.casefold() for x in have}:
+                if w.casefold() not in keys:
+                    keys.add(w.casefold())
                     have.append(w)
             continue
         for term in _line_terms(line):
@@ -634,7 +642,7 @@ def parse_glossary(raw: object) -> tuple[list[str], dict[str, list[str]]]:
         raise HTTPException(400, f"專有名詞最多 {MAX_TERMS} 個（目前 {len(out)} 個）")
     owner: dict[str, str] = {}
     # 「清單上的詞」照 JTLW 拆開之後算：另一行寫了 `Proxmox VE / PVE` 的話，`PVE` 也是清單上的詞
-    listed = seen | {x.casefold() for t in out for x in _jtlw_pieces(t)}
+    listed = set(first) | {x.casefold() for t in out for x in _jtlw_pieces(t)}
     for term, wrongs in variants.items():
         if len(wrongs) > MAX_VARIANTS:
             raise HTTPException(400, f"「{term}」的聽錯寫法最多 {MAX_VARIANTS} 個（目前 {len(wrongs)} 個）")

@@ -606,7 +606,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **379 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **380 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -787,6 +787,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_looks_garbled.py` | Regression tests for pdf_editor._looks_garbled(). |
 | `test_markdown_to_doc_formats.py` | Markdown 轉辦公文件：只轉使用者要的格式 ＋ 程式碼語法上色 |
 | `test_meeting_chart_style_has_one_source.py` | 圖的配色只有一份 —— 前端畫圖、伺服器畫匯出用的圖，顏色必須同源 |
+| `test_meeting_glossary_parse_is_linear.py` | 「專有名詞或會議背景」的解析不可以是平方級（v1.16.59，CodeQL #200～#203、#199） |
 | `test_meeting_insight.py` | 會議分析的確定性部分（切視窗、解析、引用驗證、合併、發言者統計） |
 | `test_meeting_node_labels.py` | 心智圖節點的文字：縮短可以，但**要看得出來是縮短** |
 | `test_meeting_speaking_time_says_its_basis.py` | 「發言時間」是量到的還是推估的，畫面上要講出來 |
@@ -4495,6 +4496,17 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
 
 ---
+
+### 6.106 v1.16.59 — 轉逐字稿「專有名詞或會議背景」的解析不可以是平方級（**每次發版必過**）
+
+> CodeQL #200～#203、#199。這三支端點是 async、直接在事件迴圈上跑 —— 一個請求卡住就是整個網站停住。
+
+- [ ] `pytest tests/test_meeting_glossary_parse_is_linear.py tests/test_meeting_transcribe_variants.py` 綠燈
+- [ ] 箭頭的式子不帶 `\s*`（形狀檢查）；一行 20 萬個空白、沒有箭頭 → 3 秒內回來
+- [ ] 箭頭右邊一長串括號 → 先講「太長了」（長度在拆詞之前擋），不是卡住
+- [ ] 幾萬個重複的詞、一行幾萬個錯寫法 → 3 秒內回 400 並講出上限（不可以先卡幾十秒）
+- [ ] 漢字那一類只含中日韓漢字：韓文音節、彝文、私用區不算（原本第三段起點打成一般的「豈」U+8C48）
+- [ ] 語言模型設定頁「測試連線」的思考檢查失敗時，記錄裡的模型名稱沒有換行（頁面送來的值）
 
 ### 6.105 v1.16.57 — Windows 安裝程式：所需空間、已安裝的應用程式的大小、解除安裝不留東西（**每次發版必過**）
 

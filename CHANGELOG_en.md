@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (887 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (888 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.59] - 2026-10-06
+
+- **Meeting transcription: a very long "Terms or meeting background" entry no longer stalls the whole site.** When a line in that box had a long run of spaces and no "wrong spelling → right spelling" arrow, checking the line took time that grew with the square of its length (about 5 seconds for 16,000 spaces), and the check ran on the same path that serves every web request, so one submission froze the site. Any length is now checked at once. Three other shapes in the same box behaved the same way and are fixed too: a long run of brackets to the right of an arrow (now reported as too long straight away), tens of thousands of misheard spellings on one line, and tens of thousands of repeated terms (both now report the limit immediately). When deciding whether a piece of text is a sentence, the count of Chinese characters also counted Korean, Yi and private-use characters because the start of one range was mistyped; it now counts CJK ideographs only. When the "thinking" check on the LLM settings page fails, the model name written to the service log no longer carries line breaks.
 
 ## [1.16.58] - 2026-10-06
 

@@ -1131,7 +1131,10 @@ def build_router(templates) -> APIRouter:
             try:
                 thinking_check = await _aio.to_thread(client.thinking_probe, probe_model)
             except Exception:  # noqa: BLE001 — 模型不存在、逾時…：不影響連線結果
-                logger.warning("思考檢查失敗（模型 %s）", probe_model[:80], exc_info=True)
+                # 模型名稱是頁面送來的：換行拿掉，不然可以在記錄裡偽造一行
+                logger.warning("思考檢查失敗（模型 %s）",
+                               probe_model[:80].replace("\r", " ").replace("\n", " "),
+                               exc_info=True)
                 thinking_check = {"error": "檢查失敗（原因記在服務記錄）"}
         return {
             "ok": result.ok,
