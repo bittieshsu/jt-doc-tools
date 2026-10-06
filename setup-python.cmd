@@ -76,10 +76,13 @@ REM reach only the installer window, never installer.log -- a failure left
 REM nothing to diagnose. Keep a copy in the log directory, then show it.
 set "SYNC_LOG=%ProgramData%\jt-doc-tools\Logs\setup-python-sync.log"
 if not exist "%ProgramData%\jt-doc-tools\Logs" mkdir "%ProgramData%\jt-doc-tools\Logs" 2>nul
-echo [%DATE% %TIME%] uv sync start > "%SYNC_LOG%" 2>nul
+REM Time only: %DATE% carries the weekday in the user's language (e.g. Chinese),
+REM and cmd writes the file in the OEM code page -- on a machine whose
+REM non-Unicode locale is English that weekday became "??" in the log.
+echo [%TIME%] uv sync start > "%SYNC_LOG%" 2>nul
 "%UV_EXE%" sync --reinstall >> "%SYNC_LOG%" 2>&1
 set SYNC_RC=!ERRORLEVEL!
-echo [%DATE% %TIME%] uv sync exit=!SYNC_RC! >> "%SYNC_LOG%" 2>nul
+echo [%TIME%] uv sync exit=!SYNC_RC! >> "%SYNC_LOG%" 2>nul
 type "%SYNC_LOG%" 2>nul
 echo [debug] uv sync exit=!SYNC_RC!
 if not !SYNC_RC! equ 0 (
@@ -99,7 +102,7 @@ REM EasyOCR 是 v1.7.2 主 OCR 引擎；deps 重（PyTorch ~700MB）— 失敗 w
 if !ERRORLEVEL! equ 0 (
     echo [OK] EasyOCR available
 ) else (
-    echo [WARN] EasyOCR not installed - OCR will fall back to tesseract (lower CJK accuracy)
+    echo [WARN] EasyOCR not installed - OCR will fall back to tesseract ^(lower CJK accuracy^)
     echo [WARN]   Manual install: "%UV_EXE%" sync   or  "%VENV_PY%" -m pip install easyocr
 )
 

@@ -65,7 +65,7 @@ if ($svc) {
 }
 
 # 3) Make sure no orphan python is still holding port 8765 (WinSW stop can
-#    leave a child behind -- the .154 deploy hazard documented in CLAUDE.md).
+#    leave a child behind -- the Windows deploy hazard documented in CLAUDE.md).
 try {
     $conns = Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue
     foreach ($c in $conns) {

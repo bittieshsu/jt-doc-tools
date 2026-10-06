@@ -197,7 +197,14 @@ def test_the_msi_repair_targets_the_x64_runtime_packages(rel):
 def test_the_runtime_check_runs_after_office_is_installed(rel):
     """Office 的 MSI 會把執行階段換掉 —— 檢查要排在它後面，不然剛修好又被蓋掉。"""
     text = _strip_comments((PUB / rel).read_text(encoding="utf-8-sig"))
-    calls = [m.start() for m in re.finditer(r"^\s*(if \(\$\w+\)\s*\{\s*)?Ensure-Office\b", text, re.M)]
-    vc = [m.start() for m in re.finditer(r"^\s*(if \(\$\w+\)\s*\{\s*)?Ensure-VCRedist\b", text, re.M)]
+    # 呼叫點＝名字出現、但不是 `function 名字` 的定義。不要綁呼叫那一行的寫法：
+    # v1.16.55 改成 `if ($InstallOcr) { Set-Status 'vcredist'; Ensure-VCRedist }`
+    # 之後，原本只認「行首或 if 區塊開頭」的式子一個呼叫都找不到，這條就紅了 ——
+    # 而順序其實是對的。
+    def _calls(name: str) -> list[int]:
+        return [m.start() for m in re.finditer(
+            r"(?<!function )(?<![\w-])" + re.escape(name) + r"(?![\w-])", text)]
+    calls = _calls("Ensure-Office")
+    vc = _calls("Ensure-VCRedist")
     assert calls and vc, f"{rel}：找不到 Ensure-Office / Ensure-VCRedist 的呼叫"
     assert max(calls) < min(vc), f"{rel}：Ensure-VCRedist 要在 Ensure-Office 之後"

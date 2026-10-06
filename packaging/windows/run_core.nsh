@@ -79,3 +79,25 @@ Function ShowInstallStatus
   !endif
   SetDetailsPrint both
 FunctionEnd
+
+; ---- 在背景啟動一支程式、不開視窗、不等它 ------------------------------------
+; 解除安裝結束後刪掉 %TEMP% 裡那一份自己用的。**不可以用 `Exec`**：`Exec` 會把
+; cmd 的主控台視窗開出來，而那支 cmd 要在背景等到我們結束（最多十分鐘），
+; 使用者會看到一個開著不關的黑色視窗。
+; 輸入：$R5 = 完整的命令列。
+Function RunDetachedHidden
+  System::Alloc 68                       ; STARTUPINFOW
+  Pop $R6
+  System::Call '*$R6(i 68)'
+  System::Alloc 16                       ; PROCESS_INFORMATION
+  Pop $R7
+  ; 0x08000000 = CREATE_NO_WINDOW
+  System::Call 'kernel32::CreateProcessW(p 0, w R5, p 0, p 0, i 0, i 0x08000000, p 0, p 0, p R6, p R7) i .R4'
+  ${If} $R4 != 0
+    System::Call '*$R7(p .R2, p .R3, i, i)'
+    System::Call 'kernel32::CloseHandle(p R2)'
+    System::Call 'kernel32::CloseHandle(p R3)'
+  ${EndIf}
+  System::Free $R6
+  System::Free $R7
+FunctionEnd

@@ -43,7 +43,7 @@ Unicode true
 ;:
 ;: **為什麼清理要列出全部語言**：資料夾名同時是路徑。登錄檔只記得住
 ;: 「最後一次安裝建的那一個」，所以「先用語言 A 裝、再用語言 B 裝、然後
-;: 解除安裝」會把 A 的資料夾孤兒化 —— 2026-09-16 在 `.154` 實機上真的發生了
+;: 解除安裝」會把 A 的資料夾孤兒化 —— 2026-09-16 在 Windows 實機上真的發生了
 ;: （英文的 `Jason Tools Document Toolbox` 被留下來刪不掉）。
 !define SM_FOLDER_ZH "Jason Tools 文件工具箱"
 !define SM_FOLDER_EN "Jason Tools Document Toolbox"
@@ -62,6 +62,9 @@ RequestExecutionLevel admin    ; system-level install (matches install.ps1)
 SetCompressor /SOLID lzma
 ShowInstDetails show
 ShowUninstDetails show
+; 視窗底部那一行。沒寫的話是建置工具的名字與版本（「Nullsoft Install System
+; v3.09-4」），使用者看了不知道那是什麼。
+BrandingText "jt-doc-tools ${VERSION}"
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
@@ -76,6 +79,7 @@ Var SM_DIR      ; 這次安裝實際建的開始功能表資料夾
 Var UNMODE
 Var UN_PURGE
 Var UN_DIR
+Var UN_FROMTEMP ; "1"＝這一份是複製到 %TEMP% 的解除安裝副本（結束後要刪掉自己）
 ; 視窗標題、進度頁標題與完成頁的文字 —— 安裝與解除安裝**共用同一組頁面**，
 ; 所以這幾個不可以寫死成安裝的字（2026-10-06 使用者解除安裝時，最後一頁寫著
 ; 「即將完成安裝」、還勾著「開啟網頁介面」）。在 .onInit 依模式填入。
@@ -158,15 +162,15 @@ LangString UNINST_TOP   ${LANG_TRADCHINESE} "這會移除 $(APP_DISPLAY)。使�
 LangString UNINST_TOP   ${LANG_ENGLISH}     "This will remove $(APP_DISPLAY). User data (bank accounts, signatures, history) is kept by default; you can choose to delete it next."
 LangString UNINST_TOP   ${LANG_JAPANESE}    "$(APP_DISPLAY) を削除します。利用者データ（口座番号・署名・履歴）は既定で残ります。次の画面で一緒に削除するか選べます。"
 
-LangString DESC_Core    ${LANG_TRADCHINESE} "核心程式與 Python 執行環境（必要）。"
-LangString DESC_Core    ${LANG_ENGLISH}     "Core program and Python runtime (required)."
-LangString DESC_Core    ${LANG_JAPANESE}    "本体プログラムと Python 実行環境（必須）。"
-LangString DESC_Ocr     ${LANG_TRADCHINESE} "OCR 文字辨識引擎（PyTorch + EasyOCR + 中文訓練檔，約 700MB）。"
-LangString DESC_Ocr     ${LANG_ENGLISH}     "OCR engine (PyTorch + EasyOCR + Chinese data, ~700MB)."
-LangString DESC_Ocr     ${LANG_JAPANESE}    "OCR 文字認識エンジン（PyTorch + EasyOCR + 中国語データ、約 700MB）。"
-LangString DESC_Office  ${LANG_TRADCHINESE} "Office 文件轉檔引擎（OxOffice，約 600MB）。"
-LangString DESC_Office  ${LANG_ENGLISH}     "Office conversion engine (OxOffice, ~600MB)."
-LangString DESC_Office  ${LANG_JAPANESE}    "Office 変換エンジン（OxOffice、約 600MB）。"
+LangString DESC_Core    ${LANG_TRADCHINESE} "核心程式與 Python 執行環境（必要，約 2.2 GB，含 PyTorch 與下載快取）。"
+LangString DESC_Core    ${LANG_ENGLISH}     "Core program and Python runtime (required; about 2.2 GB including PyTorch and the download cache)."
+LangString DESC_Core    ${LANG_JAPANESE}    "本体プログラムと Python 実行環境（必須。PyTorch とダウンロードキャッシュを含め約 2.2 GB）。"
+LangString DESC_Ocr     ${LANG_TRADCHINESE} "OCR 文字辨識引擎（Tesseract、VC++ 執行階段，以及第一次辨識時下載的模型，約 560 MB）。"
+LangString DESC_Ocr     ${LANG_ENGLISH}     "OCR engine (Tesseract, the VC++ runtime and the models downloaded on first use; about 560 MB)."
+LangString DESC_Ocr     ${LANG_JAPANESE}    "OCR 文字認識エンジン（Tesseract、VC++ ランタイム、初回認識時にダウンロードするモデル。約 560 MB）。"
+LangString DESC_Office  ${LANG_TRADCHINESE} "Office 文件轉檔引擎（OxOffice，約 650 MB）。"
+LangString DESC_Office  ${LANG_ENGLISH}     "Office conversion engine (OxOffice, about 650 MB)."
+LangString DESC_Office  ${LANG_JAPANESE}    "Office 変換エンジン（OxOffice、約 650 MB）。"
 LangString DESC_Svc     ${LANG_TRADCHINESE} "註冊 Windows 服務，開機自動啟動。"
 LangString DESC_Svc     ${LANG_ENGLISH}     "Register a Windows service that starts automatically at boot."
 LangString DESC_Svc     ${LANG_JAPANESE}    "Windows サービスとして登録し、起動時に自動で開始します。"
@@ -240,6 +244,19 @@ LangString CORE_LOG     ${LANG_JAPANESE}    "詳細ログ：%ProgramData%\${SHOR
 LangString UN_ASK_PURGE ${LANG_TRADCHINESE} "是否一併刪除使用者資料（銀行帳號、簽名、歷史記錄）？$\r$\n$\r$\n選「否」會保留資料，下次重新安裝可沿用。"
 LangString UN_ASK_PURGE ${LANG_ENGLISH}     "Also delete user data (bank accounts, signatures, history)?$\r$\n$\r$\nChoose No to keep it; a future reinstall will pick it up again."
 LangString UN_ASK_PURGE ${LANG_JAPANESE}    "利用者データ（口座番号・署名・履歴）も削除しますか？$\r$\n$\r$\n「いいえ」を選ぶと残ります。次回の再インストールでそのまま使えます。"
+; 解除安裝進度清單上的字（原本寫死英文：「Running uninstall core ...」）
+LangString UN_RUNNING   ${LANG_TRADCHINESE} "正在停止服務並移除程式…"
+LangString UN_RUNNING   ${LANG_ENGLISH}     "Stopping the service and removing the program..."
+LangString UN_RUNNING   ${LANG_JAPANESE}    "サービスを停止し、プログラムを削除しています…"
+LangString UN_DONE_KEPT ${LANG_TRADCHINESE} "使用者資料保留在 $UN_DATA_DIR。"
+LangString UN_DONE_KEPT ${LANG_ENGLISH}     "User data kept in $UN_DATA_DIR."
+LangString UN_DONE_KEPT ${LANG_JAPANESE}    "利用者データは $UN_DATA_DIR に残しました。"
+LangString UN_DONE_PURGED ${LANG_TRADCHINESE} "使用者資料已刪除。"
+LangString UN_DONE_PURGED ${LANG_ENGLISH}     "User data deleted."
+LangString UN_DONE_PURGED ${LANG_JAPANESE}    "利用者データを削除しました。"
+LangString UN_SM_REFUSED ${LANG_TRADCHINESE} "開始功能表的路徑看起來不對，沒有刪除：$SM_DIR"
+LangString UN_SM_REFUSED ${LANG_ENGLISH}     "Start menu path looks wrong; not deleted: $SM_DIR"
+LangString UN_SM_REFUSED ${LANG_JAPANESE}    "スタートメニューのパスが正しくないため削除しませんでした：$SM_DIR"
 LangString UN_NO_DIR    ${LANG_TRADCHINESE} "找不到安裝目錄，已中止解除安裝。"
 LangString UN_NO_DIR    ${LANG_ENGLISH}     "Installation directory not found; uninstall aborted."
 LangString UN_NO_DIR    ${LANG_JAPANESE}    "インストール先が見つからないため、アンインストールを中止しました。"
@@ -250,14 +267,27 @@ LangString UN_NOT_OURS  ${LANG_JAPANESE}    "$UN_DIR は ${SHORTNAME} のイン�
 ; =====================================================================
 ;  Sections  （選用元件預設打勾；只有「區域網路存取」預設不勾，理由見那一節）
 ; =====================================================================
+; ---- 各元件要的磁碟空間（AddSize，單位 KB）--------------------------------
+; 這支是瘦安裝程式，真正的東西都是安裝時才下載的 —— 沒寫 AddSize 的話，
+; 元件頁與資料夾頁的「所需空間」只算得到安裝程式自己帶的兩支腳本（56 KB），
+; 磁碟不夠的機器也照樣讓人按下一步，裝到一半才失敗。
+; 數字是 2026-10-06 在 Windows 實機量的，往上取整：
+;   核心   程式與 Python 套件 1.19 GB ＋ Python 63 MB ＋ 下載快取 0.98 GB（裝完留著）
+;   OCR    Tesseract 240 MB ＋ 第一次辨識時下載的模型約 300 MB ＋ VC++ 執行階段
+;   Office OxOffice 裝好約 650 MB
+; 已經裝過 Office 的機器會高估 —— 寧可高估，不要讓磁碟不夠的機器裝到一半。
+; 檢查：tests/test_installer_sizes_and_cleanup.py
 Section "Core" SecCore
   SectionIn RO
+  AddSize 2304000
 SectionEnd
 
 Section "OCR" SecOcr
+  AddSize 573440
 SectionEnd
 
 Section "Office" SecOffice
+  AddSize 716800
 SectionEnd
 
 Section "Service" SecSvc
@@ -376,6 +406,14 @@ Section "-DoInstall"
   WriteRegStr   HKLM "${ARP_KEY}" "QuietUninstallString" "$\"$INSTDIR\${SHORTNAME}-setup.exe$\" /S /uninstall"
   WriteRegDWORD HKLM "${ARP_KEY}" "NoModify" 1
   WriteRegDWORD HKLM "${ARP_KEY}" "NoRepair" 1
+  ; 「已安裝的應用程式」那一列的大小（KB）。v1.16.56 以前沒寫，那一列沒有大小。
+  ; 之後 `jtdt update` 換了套件，服務啟動後會自己更新（app/cli.py 的
+  ; _sync_windows_estimated_size）。
+  ClearErrors
+  ${GetSize} "$INSTDIR" "/S=0K" $R0 $R1 $R2
+  ${IfNot} ${Errors}
+    WriteRegDWORD HKLM "${ARP_KEY}" "EstimatedSize" $R0
+  ${EndIf}
 
   ; Start menu shortcut (browser link to the local UI).
   ; **把實際建出來的資料夾寫進登錄檔** —— 解除安裝時讀它，不要重算。
@@ -423,6 +461,7 @@ Function .onInit
   ; ---- `/uninstall` → 走解除安裝流程（同一支執行檔）--------------------
   StrCpy $UNMODE "0"
   StrCpy $UN_PURGE "0"
+  StrCpy $UN_FROMTEMP "0"
   ${GetParameters} $R0
   ClearErrors
   ${GetOptions} $R0 "/uninstall" $R1
@@ -455,7 +494,11 @@ Function .onInit
     ClearErrors
     ${GetOptions} $R0 "/fromtemp" $R3
     ${If} ${Errors}
-      StrCpy $R4 "$TEMP\jtdt-uninstall-$${VERSION}.exe"
+      ; 先清掉以前留下的副本（舊版從來不刪，名字還少了版本號的第一段）
+      Delete "$TEMP\jtdt-uninstall-*.exe"
+      ; **不可以寫成 `$${VERSION}`**：`$$` 是字面的 `$`，於是變成執行期的 `$1`
+      ; 暫存器加上「.16.55」—— 檔名一直是 `jtdt-uninstall-.16.55.exe`。
+      StrCpy $R4 "$TEMP\jtdt-uninstall-${VERSION}.exe"
       System::Call 'kernel32::CopyFile(t "$EXEPATH", t "$R4", i 0) i .r0'   ; 同上：不走 shell
       IfFileExists "$R4" 0 un_no_copy
         ${If} ${Silent}
@@ -466,11 +509,13 @@ Function .onInit
         ; 交棒給 %TEMP% 那一份之後就離開。**離開碼要顯式設 0** ——
         ; NSIS 的 `Quit` 預設回報「被腳本中止」= 2，於是腳本化的解除安裝
         ; （MDM／`Start-Process -Wait`）會判定失敗，而它其實完全成功了
-        ; （2026-09-13 在 .154 實測：服務、登錄檔、安裝目錄全清掉、使用者
+        ; （2026-09-13 在 Windows 實機實測：服務、登錄檔、安裝目錄全清掉、使用者
         ; 資料完整保留，回傳碼卻是 2）。
         SetErrorLevel 0
         Quit
       un_no_copy:
+    ${Else}
+      StrCpy $UN_FROMTEMP "1"
     ${EndIf}
 
     ; 「要不要一併刪掉使用者資料」**在解除安裝那一段開頭才問**，不在這裡問：
@@ -478,6 +523,9 @@ Function .onInit
     ; （上面那行 `Caption` 用的變數這時還沒有值；Windows 實機實測）。
     Return          ; 解除安裝不需要選語言 / 元件
   ${EndIf}
+
+  ; 以前的解除安裝留在 %TEMP% 的副本（v1.16.56 以前從來不刪）
+  Delete "$TEMP\jtdt-uninstall-*.exe"
 
   !insertmacro MUI_LANGDLL_DISPLAY
 
@@ -625,7 +673,7 @@ Section "-DoUninstall"
   IfFileExists "$UN_DIR\packaging\windows\uninstall_core.ps1" core_found core_missing
   core_found:
     FileWrite $4 "uninstall_core.ps1 found, running ...$\r$\n"
-    DetailPrint "Running uninstall core ..."
+    DetailPrint "$(UN_RUNNING)"
     ; `Exec` 不用 `ExecToLog`：理由見安裝那一段（上游 bug #1323）
     nsExec::Exec '"$2" -NoProfile -ExecutionPolicy Bypass -File "$UN_DIR\packaging\windows\uninstall_core.ps1" -InstallDir "$UN_DIR"$0'
     Pop $1
@@ -653,13 +701,13 @@ Section "-DoUninstall"
       RMDir /r "$SM_DIR"
     ${Else}
       ; 這裡已經 `FileClose $4` 了，不要寫那個記錄檔（會無聲失敗）。
-      DetailPrint "refusing to delete suspicious start menu path: $SM_DIR"
+      DetailPrint "$(UN_SM_REFUSED)"
     ${EndIf}
   ${EndIf}
   ; 退路：**每一種語言的名字都要試一次**，加上 v1.15.30 以前寫死的那個。
   ;
   ; 登錄檔只記得住「最後一次安裝建的那一個」。先用語言 A 裝、再用語言 B 裝、
-  ; 然後解除安裝 —— A 的資料夾就變成刪不掉的孤兒（2026-09-16 在 `.154` 實機
+  ; 然後解除安裝 —— A 的資料夾就變成刪不掉的孤兒（2026-09-16 在 Windows 實機
   ; 上真的發生了）。**這幾條不可以省。**
   ;
   ; 每一個都走同一道「必須在 `$SMPROGRAMS\` 底下」的檢查 —— 不是我們的東西
@@ -684,8 +732,17 @@ Section "-DoUninstall"
     Exec 'cmd /c ping -n 3 127.0.0.1 >nul & rmdir /s /q "$UN_DIR"'
 
   ${If} $UN_PURGE == "1"
-    DetailPrint "User data purged."
+    DetailPrint "$(UN_DONE_PURGED)"
   ${Else}
-    DetailPrint "User data kept at %ProgramData%\${SHORTNAME}."
+    DetailPrint "$(UN_DONE_KEPT)"
+  ${EndIf}
+
+  ; 我們自己（%TEMP% 裡那一份）在結束之後也要刪掉 —— 原本從來不刪，每解除安裝一次
+  ; %TEMP% 就多一支。行程還在跑時刪不掉自己，所以交給一個不開視窗、在背景等我們
+  ; 結束的 cmd：每兩秒試一次，最多十分鐘（使用者可能停在完成頁）。還是沒刪掉的，
+  ; 下一次安裝或解除安裝開始時會一起清（.onInit）。
+  ${If} $UN_FROMTEMP == "1"
+    StrCpy $R5 '"$SYSDIR\cmd.exe" /d /c for /L %i in (1,1,300) do @(ping -n 3 127.0.0.1 >nul & del /f /q "$EXEPATH" 2>nul & if not exist "$EXEPATH" exit)'
+    Call RunDetachedHidden
   ${EndIf}
 SectionEnd

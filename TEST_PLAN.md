@@ -606,7 +606,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **375 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **379 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -666,6 +666,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_cli_service_logs.py` | `jtdt update` 健康檢查失敗時，要讀得到服務**真正的**記錄檔（v1.16.11，客戶回報） |
 | `test_cli_update_rollback.py` | 升級失敗時要真的回復，而且訊息要說出實際結果（外部稽核 F03，v1.15.28） |
 | `test_client_ip_audit.py` | Client-IP resolution for audit / history / display — app/core/client_ip.py. |
+| `test_cmd_block_parens.py` | 批次檔（.cmd / .bat）裡，區塊中的 echo 不可以有沒跳脫的右括號；記錄裡不寫 %DATE% |
 | `test_commit_message_guard.py` | `tools/check_commit_message.py` 自己要有牙齒 |
 | `test_cookie_flags_on_delete.py` | 刪除 cookie 的回應也要帶安全旗標 |
 | `test_cookie_secure_flag.py` | 每一個 cookie 的 `secure` 旗標都要走同一支判斷 |
@@ -747,6 +748,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_installer_product_name.py` | Windows 安裝程式的產品名稱多語系 + Linux 服務的安全強化（第 1 批，v1.15.31） |
 | `test_installer_progress_status.py` | Windows 安裝程式要看得到「現在在做什麼」，而且不可以是亂碼（v1.16.55） |
 | `test_installer_silent_mode.py` | 安裝程式在**無介面模式**下不可以停下來等人按對話框 |
+| `test_installer_sizes_and_cleanup.py` | Windows 安裝程式：磁碟空間、「已安裝的應用程式」的大小、解除安裝留下的東西（v1.16.57） |
 | `test_installer_uninstall_pages.py` | 解除安裝時，畫面上的字要是「解除安裝」，不可以是安裝的字（v1.16.55） |
 | `test_internal_notes_stay_private.py` | `docs-share/` 的內部往來文件不可以出現在公開版（使用者 2026-09-17 指示） |
 | `test_job_acl.py` | Regression tests for the /api/jobs/* per-job ownership ACL (v1.12.61). |
@@ -781,6 +783,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_llm_stream_deadline.py` | 串流回應要有**整次生成的上限**，不是只有每個 chunk |
 | `test_llm_thinking_off_any_backend.py` | 不管前面是哪一種 LLM 伺服器或閘道，思考都要關得掉（v1.16.30） |
 | `test_llm_url_ssrf.py` | SSRF defence — admin-supplied LLM base URL must reject suspicious schemes |
+| `test_logging_survives_non_utf8_console.py` | 服務的記錄在「非 Unicode 程式語系」是英文的 Windows 上，中文訊息不可以消失（v1.16.56） |
 | `test_looks_garbled.py` | Regression tests for pdf_editor._looks_garbled(). |
 | `test_markdown_to_doc_formats.py` | Markdown 轉辦公文件：只轉使用者要的格式 ＋ 程式碼語法上色 |
 | `test_meeting_chart_style_has_one_source.py` | 圖的配色只有一份 —— 前端畫圖、伺服器畫匯出用的圖，顏色必須同源 |
@@ -818,6 +821,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_no_tr_shadowing.py` | `tr` 是表格列最自然的變數名，也是前端翻譯函式的名字 —— 撞名會讓整段 JS 當場死掉 |
 | `test_no_undefined_names.py` | 程式碼裡不可以用到**從來沒定義過**的名稱（v1.16.11） |
 | `test_notify.py` | 作業完成通知：管道發送、設定分層、觸發條件 |
+| `test_notify_link_uses_browser_origin.py` | 通知裡的「我的作業」要是連結 —— 管理員沒填「站台網址」也一樣（v1.16.57） |
 | `test_notify_privacy.py` | 通知送出去的內容不可以外洩多餘的東西 |
 | `test_notify_settings_form.py` | 通知設定頁的兩件事：**存進去的值不可以被自動帶值蓋掉**、欄位要看得到內容 |
 | `test_ocr_avx2_guard.py` | 本機 EasyOCR 在缺 AVX2 的 CPU 上會 SIGILL 打掛整個服務 |
@@ -4491,6 +4495,39 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
 
 ---
+
+### 6.105 v1.16.57 — Windows 安裝程式：所需空間、已安裝的應用程式的大小、解除安裝不留東西（**每次發版必過**）
+
+> 安裝檔本身的改動 —— 要打 tag、請使用者去 SignPath 按 Approve，**用 Release 上那支在 Windows 實機驗**。
+> 「已安裝的應用程式」的大小另外由服務啟動後更新，既有安裝 `jtdt update` 之後就看得到。
+
+- [ ] `pytest tests/test_installer_sizes_and_cleanup.py tests/test_installer_languages.py tests/test_installer_silent_mode.py` 綠燈
+- [ ] 元件頁與資料夾頁的「所需空間」是 GB 等級（全選約 3.4 GB），**不是 56.0 KB**；取消 OCR / Office 時數字跟著變小
+- [ ] 「設定 → 應用程式 → 已安裝的應用程式」那一列有大小（約 1.2 GB）；登錄檔 ARP 鍵有 `EstimatedSize`（KB）
+- [ ] 用 `jtdt update` 更新的既有安裝：服務啟動約 90 秒後 `EstimatedSize` 補上（不必重新安裝）
+- [ ] 解除安裝之後 `%TEMP%` **沒有** `jtdt-uninstall-*.exe`（有畫面的：按完成後幾秒內消失；`/S`：結束後幾秒內消失）；
+      以前留下的（`jtdt-uninstall-.16.xx.exe`）在下一次安裝或解除安裝時被清掉；**全程沒有黑色主控台視窗跳出來**
+- [ ] 解除安裝的進度清單是介面語言的字（「正在停止服務並移除程式…」「使用者資料保留在 C:\ProgramData\jt-doc-tools。」），
+      沒有 `Running uninstall core ...` 這種英文
+- [ ] 全新安裝的 `installer.log` 沒有 `[!] … not a git repo`（改成 `Fresh install: fetching source ...`）；
+      安裝目錄裡真的有舊檔時才有 `[!] … removing N leftover item(s)`
+- [ ] 視窗底部寫 `jt-doc-tools 1.16.57`，不是「Nullsoft Install System v3.09-4」
+- [ ] **通知裡的「我的作業」是連結**（`pytest tests/test_notify_link_uses_browser_origin.py`）：通知設定的「站台網址」
+      **留空**時，連結用送出作業那一刻瀏覽器所在的網址（作業的 `meta.origin`）；填了就一律用站台網址；
+      Slack / Zulip / Teams 的文字版也附網址；`javascript:`、帶帳密、`null` 的 Origin 一律不用、兩者都沒有就不放連結
+
+### 6.104 v1.16.56 — 英文系統地區的 Windows：服務記錄的中文不可以消失、安裝記錄不可以說反話（**每次發版必過**）
+
+> 在**顯示語言中文、但「非 Unicode 程式語系」是英文（字碼頁 1252）**的 Windows 上才看得到 ——
+> 中文版 Windows（950）一律正常，所以之前的 Windows 測試機一直看不到 —— 要找一台這種組合的 Windows 驗。
+
+- [ ] `pytest tests/test_logging_survives_non_utf8_console.py tests/test_cmd_block_parens.py tests/test_cli_service_logs.py` 綠燈
+- [ ] 服務重新啟動後，`C:\ProgramData\jt-doc-tools\Logs\jtdt-svc.err.log` **沒有新的 `--- Logging error ---`**；
+      `jtdt-svc.out.log` 看得到中文的「Registered tool」等記錄（原本每次啟動掉 50 行以上，換成一段段堆疊）
+- [ ] `jtdt logs` 在 Windows 上中文正常（讀檔帶 `-Encoding UTF8`）；`jtdt update` 失敗時印的記錄尾巴不是亂碼
+- [ ] 安裝完的 `installer.log`：`[OK] EasyOCR available` 之後**不可以**緊接著「Manual install … pip install easyocr」
+      （批次檔區塊裡 echo 的 `)` 會提早關掉區塊 —— 要寫 `^)`）；真的沒裝成功時兩行 `[WARN]` 都要印、括號完整
+- [ ] `setup-python-sync.log` 的時間戳記是 `[15:16:25.98]` 這種純時間，不是 `[?? 2026/10/06 …]`
 
 ### 6.103 v1.16.55 — Windows 安裝程式的畫面文字（**每次發版必過**）
 

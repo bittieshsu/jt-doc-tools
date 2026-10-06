@@ -115,8 +115,13 @@ def _uid_of(user: Optional[dict]) -> Optional[int]:
         return None
 
 
-def set_current_actor(user: Optional[dict], client_ip: str = "") -> None:
-    """由中介層在每個請求開頭呼叫，讓之後的 `submit()` 知道是誰送的工作。"""
+def set_current_actor(user: Optional[dict], client_ip: str = "",
+                      origin: str = "") -> None:
+    """由中介層在每個請求開頭呼叫，讓之後的 `submit()` 知道是誰送的工作。
+
+    `origin` 是送出者瀏覽器所在的網址（`http_utils.browser_origin`），通知信用它組
+    「我的作業」的連結 —— 管理員沒填「站台網址」時，連結仍然連得回使用者自己進來的地方。
+    """
     try:
         from .sessions import user_label
         label = user_label(user) if user else ""
@@ -126,6 +131,7 @@ def set_current_actor(user: Optional[dict], client_ip: str = "") -> None:
         "owner_id": _uid_of(user),
         "owner_label": label,
         "client_ip": client_ip or "",
+        "origin": origin or "",
     })
 
 
@@ -433,10 +439,12 @@ class JobManager:
             try:
                 from .client_ip import real_client_ip
                 from .sessions import user_label
+                from .http_utils import browser_origin
                 user = getattr(request.state, "user", None)
                 actor = {"owner_id": _uid_of(user),
                          "owner_label": user_label(user) if user else "",
-                         "client_ip": real_client_ip(request)}
+                         "client_ip": real_client_ip(request),
+                         "origin": browser_origin(request.headers)}
             except Exception:  # noqa: BLE001 — 取不到歸屬不該擋下轉檔
                 actor = None
         if actor is None:
@@ -445,6 +453,9 @@ class JobManager:
             job.owner_id = actor.get("owner_id")
             job.owner_label = actor.get("owner_label") or ""
             job.client_ip = actor.get("client_ip") or ""
+            if actor.get("origin"):
+                # 放在 meta：會跟著作業存進資料庫，服務重啟後寄的通知照樣組得出連結
+                job.meta.setdefault("origin", actor["origin"])
 
     def _dispatch(self) -> None:
         """把排隊中的工作派出去 —— 直到達到併行上限**或記憶體不夠**。"""

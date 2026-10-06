@@ -667,7 +667,6 @@
   "—— 它在閱讀器左側的「書籤 / 大綱」面板，\n      不在頁面內容裡。這裡預覽的是": "; it lives in the reader's \"Bookmarks / Outline\" panel on the left,\n      not in the page content. What is previewed here is",
   "—— 完成後到": "when it finishes, download it from",
   "—— 已經發生的事與它造成的影響（哪個系統、多少人、多少金額）。事故與狀態會議建議開著；純規劃的會議可以關掉，分析時間大約少一半。": "— what has already happened and what it affected (which system, how many people, how much money). Worth leaving on for incident and status meetings; for purely forward-looking planning meetings you can turn it off and the analysis takes about half as long.",
-  "—— 放一個指向 localhost 的連結比沒有連結更糟。": "a link pointing at localhost is worse than no link at all.",
   "—— 標案、年報這種十幾個檔\n合成幾百頁的文件最有感。也可以自動偵測標題，或直接貼上現成的目錄清單。": "; most useful for tenders and annual reports, where a dozen files\nbecome a few hundred pages. Headings can also be detected automatically, or you can paste a table of contents you already have.",
   "—— 每一種原始尺寸的處理結果都不一樣。": "; every original page size ends up handled differently.",
   "—— 每位使用者登入時是從他當下在": "when a user signs in, their permissions are resolved from their live groups in",
@@ -3446,7 +3445,6 @@
   "留空保留現有 token": "leave blank to keep the current token",
   "留空則使用時間戳": "Left blank, a timestamp is used",
   "留空則依進來的請求推導（直連 / 開發用）。有反向代理時": "Left blank it is derived from the incoming request (direct access / development). Behind a reverse proxy you ",
-  "留空就不放按鈕": "Leave it blank and no button is included",
   "留空＝只走個人一對一對話": "Blank = one-to-one conversations only",
   "留空＝只走個人私訊": "Blank = direct messages only",
   "留給作業系統與資料庫": "left for the operating system and the database",
@@ -4543,7 +4541,6 @@
   "通用 Webhook": "Generic webhook",
   "通知": "Notifications",
   "通知信的「直接投遞」寄送方式要查收件網域的 MX 紀錄 —— 標準函式庫沒有 MX 查詢。缺了它，通知設定裡選「直接投遞」會送不出去；另外兩種寄送方式（外部 SMTP 帳號、內部轉送主機 relay）不受影響。": "Direct delivery of notification mail has to look up the MX record of the recipient domain, and the standard library has no MX lookup. Without it, choosing direct delivery cannot send; the other two methods (an external SMTP account, or an internal relay host) are unaffected.",
-  "通知信裡「開啟我的作業」按鈕要用。伺服器不知道使用者是從哪個網址進來的（可能經反向代理、也可能是內網 IP），所以要在這裡填。": "Used by the \"open my jobs\" button in the notification email. The server does not know which address people reach it from (it may be behind a reverse proxy, or an internal IP), so it has to be set here. ",
   "通知時機": "When to notify",
   "通知管道": "Notification channels",
   "通知設定": "Notifications",
@@ -5539,5 +5536,8 @@
   "已經知道會聽錯成什麼的，可以寫成「聽錯的寫法 → 正確寫法」一行（例如 Proksmox、Proxmux → Proxmox），校正前會照表換掉；中文的聽錯寫法太短的話可能換到別的詞裡面，請寫具體一點。": "If you already know how a word gets misheard, write one line \"misheard spelling → correct spelling\" (for example Proksmox, Proxmux → Proxmox); those are replaced as listed before correction. A very short Chinese misheard spelling may be replaced inside other words, so make it specific.",
   "資產庫的印章與簽名要有「用印與簽名」的使用權限才能使用，請洽管理員": "Stamps and signatures in the asset library require permission for the \"Stamp and sign\" tool. Please contact an administrator",
   "資產庫的印章與簽名要有「用印與簽名」的使用權限才能使用，請洽管理員。仍可切到「上傳新圖片」使用自己的圖。": "Stamps and signatures in the asset library require permission for the \"Stamp and sign\" tool. Please contact an administrator. You can still switch to \"Upload a new image\" to use your own image.",
-  "這種資產不能用在編輯器": "This kind of asset cannot be used in the editor"
+  "這種資產不能用在編輯器": "This kind of asset cannot be used in the editor",
+  "通知裡「我的作業」的連結與按鈕要用。": "Used for the \"My jobs\" link and button in notifications. ",
+  "留空時": "When left blank",
+  "用使用者送出作業時瀏覽器所在的網址（也就是他自己進來的那個網址）；填了就一律用這裡的，例如希望大家都經同一個對外網址進來時。": ", the link uses the address the person's browser was on when they submitted the job (the address they came in through); fill it in to always use this one, for example when everyone should come in through the same public address."
 }

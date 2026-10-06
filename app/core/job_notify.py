@@ -91,10 +91,14 @@ def build_message(job: Any) -> tuple[str, str]:
         lines.append(f"原因：{_safe_reason(job.error)}")
     ws = (job.meta or {}).get("workspace") or {}
     if ok:
+        # 有網址就把網址寫在後面 —— Slack / Zulip / Teams 收到的是這個純文字版，
+        # 它們會自己把網址變成連結
         if ws.get("saved"):
-            lines.append("結果已自動存入「我的工作區」。")
+            url = _site_url("/workspace", job)
+            lines.append("結果已自動存入「我的工作區」" + (f"：{url}" if url else "。"))
         else:
-            lines.append("可到「我的作業」頁下載結果。")
+            url = _site_url("/my-jobs", job)
+            lines.append("可到「我的作業」頁下載結果" + (f"：{url}" if url else "。"))
     return subject, "\n".join(lines)
 
 
@@ -141,8 +145,8 @@ def build_html(job: Any) -> str:
             elapsed=_fmt_elapsed(job.elapsed()),
             error=str(job.error or "") if not ok else "",
             note_kind=note_kind,
-            workspace_url=_site_url("/workspace"),
-            action_url=_site_url("/my-jobs"),
+            workspace_url=_site_url("/workspace", job),
+            action_url=_site_url("/my-jobs", job),
             logo_cid=LOGO_CID,
             icon_cid=ICON_CID,
         )
@@ -151,18 +155,30 @@ def build_html(job: Any) -> str:
         return ""
 
 
-def _site_url(path: str) -> str:
+def _site_url(path: str, job: Any = None) -> str:
     """組出對外可點的網址。
 
-    伺服器自己**不知道**使用者是從哪個網址進來的（可能經反向代理、也可能是
-    內網 IP），所以要由管理員在通知設定填「站台網址」。沒填就不放按鈕 ——
-    放一個指向 `localhost` 的連結比沒有連結更糟。
+    伺服器自己**不知道**對外網址（可能經反向代理、也可能是內網 IP）。依序用：
+
+    1. 管理員在通知設定填的「站台網址」—— 明確設定的優先。
+    2. 送出這件作業時，**使用者瀏覽器所在的網址**（`job.meta["origin"]`，送出那一刻
+       由 `Origin` 標頭記下）。那正是這位使用者連得回來的網址，而這封通知只寄給他本人。
+       v1.16.57 以前沒有這一層，管理員沒填站台網址的話，信裡「我的作業」就只是純文字。
+    3. 都沒有就不放連結 —— 放一個指向 `localhost` 的連結比沒有連結更糟。
+
+    從資料庫讀回來的作業，`origin` 要再驗一次形狀（不信任存著的字串）。
     """
     try:
         from . import notify_settings
         base = (notify_settings.get().get("site_url") or "").strip()
     except Exception:  # noqa: BLE001
         base = ""
+    if not base and job is not None:
+        try:
+            from .http_utils import browser_origin
+            base = browser_origin({"origin": str((job.meta or {}).get("origin") or "")})
+        except Exception:  # noqa: BLE001
+            base = ""
     if not base:
         return ""
     return base.rstrip("/") + path

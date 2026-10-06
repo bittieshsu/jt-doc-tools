@@ -413,10 +413,12 @@ def svc_logs(follow: bool) -> int:
         return _run(cmd + [str(f) for f in files])
     if _is_windows():
         # 錯誤（含堆疊）在 err.log；-Wait 只能跟一個檔，跟最重要的那一個
+        # -Encoding UTF8：服務 v1.16.56 起用 UTF-8 寫記錄；PowerShell 5.1 不指定的話
+        # 照系統字碼頁讀，中文會變亂碼
         paths = ",".join(f"'{f}'" for f in files)
-        cmd = f"Get-Content -Path {paths} -Tail 200"
+        cmd = f"Get-Content -Path {paths} -Tail 200 -Encoding UTF8"
         if follow:
-            cmd = f"Get-Content -Path '{files[0]}' -Tail 200 -Wait"
+            cmd = f"Get-Content -Path '{files[0]}' -Tail 200 -Wait -Encoding UTF8"
         return _run(["powershell", "-NoProfile", "-Command", cmd])
     return 1
 
@@ -600,6 +602,66 @@ def _sync_windows_display_version(version: str) -> None:
                 winreg.SetValueEx(k, "DisplayVersion", 0, winreg.REG_SZ, version)
                 print(f"  Add/Remove Programs version: {current} -> {version}")
     except Exception:      # noqa: BLE001 - never break an upgrade over this
+        pass
+
+
+def _tree_size_kb(root: Path) -> int:
+    """Total size of the files under ``root`` in KiB (rounded up).
+
+    Symlinks and junctions are not followed -- counting what they point at
+    would double-count or wander outside the install. Unreadable entries are
+    skipped; this number is shown to the user, not used for any decision.
+    """
+    total = 0
+    stack = [str(root)]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    try:
+                        # Windows 的目錄連接點（junction）不算 symlink，要另外認
+                        if entry.is_symlink() or getattr(entry, "is_junction", lambda: False)():
+                            continue
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(entry.path)
+                        elif entry.is_file(follow_symlinks=False):
+                            total += entry.stat(follow_symlinks=False).st_size
+                    except OSError:
+                        continue
+        except OSError:
+            continue
+    return (total + 1023) // 1024
+
+
+def _sync_windows_estimated_size() -> None:
+    """Windows: show the install size in Settings -> Apps.
+
+    Windows reads it from ``EstimatedSize`` (KiB) in the Add/Remove Programs
+    key, which no installer up to 1.16.56 wrote -- the entry showed no size at
+    all. The installer now writes it, but existing installs are updated in
+    place by ``jtdt update`` and never re-run the installer, so the service
+    keeps it current here. Walking the tree takes a few seconds, so callers run
+    this off the startup path. Never raises.
+    """
+    if not _is_windows():
+        return
+    try:
+        import winreg  # noqa: PLC0415  (Windows-only import)
+
+        key_path = (r"SOFTWARE\Microsoft\Windows\CurrentVersion"
+                    r"\Uninstall\jt-doc-tools")
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path, 0,
+                            winreg.KEY_READ | winreg.KEY_SET_VALUE) as k:
+            size_kb = min(_tree_size_kb(_install_root()), 0xFFFFFFFF)
+            try:
+                current, _ = winreg.QueryValueEx(k, "EstimatedSize")
+            except OSError:
+                current = None
+            # 差不到 1% 就不寫 —— 每次啟動都寫一次登錄檔沒有意義
+            if not isinstance(current, int) or abs(current - size_kb) > size_kb // 100:
+                winreg.SetValueEx(k, "EstimatedSize", 0, winreg.REG_DWORD, size_kb)
+    except Exception:      # noqa: BLE001 - a size label must never break anything
         pass
 
 
@@ -1213,15 +1275,22 @@ def _report_health_failure(urls: list[str]) -> None:
 
 
 def _read_log_lines(log: Path) -> list[str]:
-    """讀記錄檔。Windows 上服務用系統的 ANSI 字碼頁寫（繁中 cp950），
-    整份以 UTF-8 讀會變亂碼 —— 先試 UTF-8，不行再用系統字碼頁。
-    只讀檔尾：記錄檔可以好幾 MB，健康檢查只要最後幾十行。"""
+    """讀記錄檔。v1.16.56 起服務一律用 UTF-8 寫記錄（logging_setup）；更早的版本
+    在 Windows 上用系統的 ANSI 字碼頁寫（繁中 cp950）—— 先試 UTF-8，不行再用系統字碼頁。
+    只讀檔尾：記錄檔可以好幾 MB，健康檢查只要最後幾十行。
+    從檔尾往回跳的位置可能切在一個中文字中間，那一行殘片要丟掉 —— 不然整段
+    UTF-8 解碼失敗、退回系統字碼頁，好好的 UTF-8 記錄全變亂碼。"""
     with open(log, "rb") as fh:
         try:
             fh.seek(-65536, os.SEEK_END)
+            cut = True
         except OSError:
             fh.seek(0)
+            cut = False
         raw = fh.read()
+    if cut:
+        nl = raw.find(b"\n")
+        raw = raw[nl + 1:] if nl >= 0 else raw
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:

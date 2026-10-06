@@ -680,9 +680,16 @@ function Fetch-Code {
         return
     }
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Warn "$InstallDir not a git repo; cleaning non-bin files (keeping bin/) ..."
-    Get-ChildItem $InstallDir -Force | Where-Object { $_.Name -ne 'bin' } |
-        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    # 全新安裝時這裡只有前面幾步放進來的 bin/ —— 那不是「舊的、不是 git 的安裝」，
+    # 不可以印警告（2026-10-06 Windows 實機：全新安裝的記錄裡出現 `[!] … not a git repo`，
+    # 讀的人會以為哪裡裝壞了）。只有真的有別的東西時才是警告。
+    $leftover = @(Get-ChildItem $InstallDir -Force | Where-Object { $_.Name -ne 'bin' })
+    if ($leftover.Count -gt 0) {
+        Warn "$InstallDir is not a git repo; removing $($leftover.Count) leftover item(s) (keeping bin/) ..."
+        $leftover | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    } else {
+        Log 'Fresh install: fetching source ...'
+    }
     if (Test-Path "$InstallDir\.venv") {
         Start-Sleep -Seconds 2
         Remove-Item "$InstallDir\.venv" -Recurse -Force -ErrorAction SilentlyContinue

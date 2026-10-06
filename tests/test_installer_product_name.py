@@ -94,8 +94,12 @@ def test_the_recorded_path_is_validated_before_deleting():
     code = _nsi_code()
     assert 'StrCpy $R9 "$SM_DIR" $R8' in code, (
         '刪除前沒有檢查那個路徑是不是在開始功能表底下')
-    assert 'DetailPrint "refusing to delete' in code, (
+    assert 'DetailPrint "$(UN_SM_REFUSED)"' in code, (
         '路徑可疑時要留下痕跡（那時 $4 記錄檔已經關了，要用 DetailPrint）')
+    # v1.16.57 起這一行跟著介面語言（原本寫死英文）—— 每一種語言都要講出是哪個路徑
+    refused = [ln for ln in code.splitlines() if ln.startswith("LangString UN_SM_REFUSED")]
+    assert refused and all("$SM_DIR" in ln for ln in refused), (
+        "UN_SM_REFUSED 每一種語言都要帶出那個被擋下來的路徑（$SM_DIR）")
 
 
 def test_every_language_folder_name_is_cleaned_up_on_uninstall():

@@ -84,10 +84,10 @@ _DEFAULTS: dict[str, Any] = {
     # 而通知的價值正是「久到你已經去做別的事了」
     "min_seconds": 60,
     "notify_on": ["done", "error"],
-    # 對外可點的站台網址（例如 https://doc.example.com）。
-    # 伺服器自己不知道使用者是從哪個網址進來的（可能經反向代理、也可能是內網
-    # IP），所以通知信裡的「開啟我的作業」按鈕要靠這個。沒填就不放按鈕 ——
-    # 放一個指向 localhost 的連結比沒有連結更糟。
+    # 對外可點的站台網址（例如 https://doc.example.com）。填了就一律用它組通知裡
+    # 「我的作業」的連結；沒填時用送出作業那一刻使用者瀏覽器所在的網址
+    # （job_notify._site_url），兩個都沒有才不放連結 —— 放一個指向 localhost
+    # 的連結比沒有連結更糟。
     "site_url": "",
     "channels": {},
 }

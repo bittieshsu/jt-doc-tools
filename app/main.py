@@ -22,7 +22,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.55"
+VERSION = "1.16.57"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -1345,9 +1345,10 @@ async def _auth_gate(request: Request, call_next):
     from .core import auth_settings, sessions, permissions
     from .core.client_ip import real_client_ip
     from .core.job_manager import set_current_actor
+    from .core.http_utils import browser_origin
     if not auth_settings.is_enabled():
         # 認證關閉時仍要記來源 IP —— 管理區的工作監控要看得出是誰送的
-        set_current_actor(None, real_client_ip(request))
+        set_current_actor(None, real_client_ip(request), browser_origin(request.headers))
         return await call_next(request)
     # Use the RAW ASGI scope path, not request.url.path: request.url is rebuilt
     # from the Host header, which a crafted "Host: x/../" can poison so url.path
@@ -1413,7 +1414,7 @@ async def _auth_gate(request: Request, call_next):
     # 讓這個請求裡送出的背景工作知道歸屬。放在 contextvar 而不是要求 25 個工具
     # 各自把 request 傳進 job_manager.submit()：那樣新工具很容易忘記傳，而少了
     # 歸屬的作業就不會出現在「我的作業」裡（使用者會以為作業丟了）。
-    set_current_actor(user, real_client_ip(request))
+    set_current_actor(user, real_client_ip(request), browser_origin(request.headers))
 
     # Per-tool permission gating: any path under /tools/<tool_id>/... requires
     # the user to have that tool granted (via roles or direct grant). admin
@@ -2289,8 +2290,12 @@ async def _startup():
     # **啟動當下同步一次不夠**：全新安裝時服務是在安裝程式**還沒寫登錄檔之前**
     # 就啟動的（2026-09-24 實測：同步時那個鍵還不存在，安裝程式隨後寫進自己的
     # 版本）。所以之後再補兩次；寫的是同一個值，重複寫沒有副作用。
+    #
+    # 同一條執行緒順便更新「安裝大小」（`EstimatedSize`）：v1.16.56 以前沒有任何人寫，
+    # 「已安裝的應用程式」那一列沒有大小。要走過整個安裝目錄（約 1 GB、幾秒鐘），
+    # 所以不放在啟動當下。
     try:
-        from .cli import _sync_windows_display_version
+        from .cli import _sync_windows_display_version, _sync_windows_estimated_size
         _sync_windows_display_version(VERSION)
         import sys as _sys
         if _sys.platform.startswith("win"):
@@ -2301,6 +2306,7 @@ async def _startup():
                 for delay in (90, 600):
                     _time.sleep(delay)
                     _sync_windows_display_version(VERSION)
+                    _sync_windows_estimated_size()
 
             _threading.Thread(target=_later, name="arp-version-sync",
                               daemon=True).start()
