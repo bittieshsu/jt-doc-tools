@@ -28,7 +28,9 @@ def load_asset(asset_id: str) -> bytes:
     """
     from ...core.asset_manager import asset_manager
     a = asset_manager.get(asset_id)
-    if not a:
+    # 只收印章（issue #54）：畫面上只列印章，而簽名要有「用印與簽名」權限才能用
+    # （`asset_access`）—— 只有騎縫章權限的人送簽名的編號進來，等於繞過那條規則。
+    if not a or a.type != "stamp":
         raise ValueError("找不到這個印章資產")
     path = asset_manager.file_path(a)
     if not path or not path.exists():

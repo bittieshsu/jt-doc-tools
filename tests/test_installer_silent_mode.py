@@ -41,10 +41,30 @@ NSI = PKG / "installer.nsi"
 CORE = PKG / "install_core.ps1"
 
 
+def _with_local_includes(text: str) -> str:
+    """把 `!include "xxx.nsh"`（同目錄、我們自己的檔）接在後面一起看。
+
+    執行安裝核心的那一段在 v1.16.55 搬進 `run_core.nsh` —— 只讀 installer.nsi 的話，
+    那裡面的 MessageBox 與 nsExec 這兩條檢查都看不到（掃不到跟沒問題長得一樣）。
+    """
+    extra = []
+    for name in re.findall(r'^\s*!include\s+"([^"]+\.nsh)"', text, re.M):
+        f = PKG / name
+        if f.is_file():
+            extra.append(f.read_text(encoding="utf-8-sig", errors="ignore"))
+    return "\n".join([text] + extra)
+
+
 @pytest.fixture(scope="module")
 def nsi() -> str:
     assert NSI.exists(), f"找不到 {NSI}"
-    return code_text(NSI.read_text(encoding="utf-8", errors="ignore"))
+    return code_text(_with_local_includes(NSI.read_text(encoding="utf-8", errors="ignore")))
+
+
+def test_the_fixture_reads_the_included_run_core():
+    """先證明上面那支真的把 run_core.nsh 接進來了（不然後面幾條會靜靜地少看一個檔）。"""
+    text = _with_local_includes(NSI.read_text(encoding="utf-8", errors="ignore"))
+    assert "Function RunInstallCore" in text, "installer.nsi 引入的 run_core.nsh 沒有被接進來檢查"
 
 
 def _statements(nsi: str) -> list[str]:
@@ -191,12 +211,21 @@ def test_nsexec_never_streams_output_into_the_installer(nsi):
         "在最後一步當掉）：\n  " + "\n  ".join(bad))
 
 
-def test_the_core_scripts_still_run_through_nsexec(nsi):
-    """反向對照：兩支核心腳本都還是由 `nsExec::Exec` 執行 ——
-    只驗「沒有 ExecToLog」的話，把整段呼叫刪掉也會過。"""
-    calls = [s for s in _statements(nsi) if s.startswith("nsExec::Exec ")]
-    assert any("install_core.ps1" in s for s in calls), "安裝核心沒有被執行"
+def test_the_core_scripts_still_run(nsi):
+    """反向對照：兩支核心腳本都真的有被執行 ——
+    只驗「沒有 ExecToLog」的話，把整段呼叫刪掉也會過。
+
+    安裝核心從 v1.16.55 起由 `RunInstallCore`（run_core.nsh）在背景啟動、邊跑邊讀進度；
+    啟動不起來時退回 `nsExec::Exec`（一樣不收輸出）。解除安裝核心照舊走 `nsExec::Exec`。
+    """
+    st = _statements(nsi)
+    calls = [s for s in st if s.startswith("nsExec::Exec ")]
     assert any("uninstall_core.ps1" in s for s in calls), "解除安裝核心沒有被執行"
+    cmd = [s for s in st if s.startswith("StrCpy $R5 ") and "install_core.ps1" in s]
+    assert cmd, "找不到組安裝核心命令列的那一行"
+    i = st.index(cmd[0])
+    assert "Call RunInstallCore" in st[i + 1:i + 3], "組好命令列之後沒有執行安裝核心"
+    assert "nsExec::Exec $R5" in calls, "背景啟動失敗時沒有退回 nsExec::Exec"
 
 
 def test_lan_access_is_not_ticked_by_default(nsi):

@@ -170,7 +170,7 @@ def _page(live, job: str = _JOB):
                             "params": {"expression": expr, "returnByValue": True,
                                        "awaitPromise": True}}))
         while True:
-            m = json.loads(ws.recv())
+            m = json.loads(ws.recv(timeout=180))
             if m.get("id") == n[0]:
                 res = m.get("result", {})
                 assert "exceptionDetails" not in res, res.get("exceptionDetails")

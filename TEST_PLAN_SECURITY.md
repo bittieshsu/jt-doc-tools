@@ -249,6 +249,7 @@ A / B，然後：
 | v1.14.6 | 稽核員可刪歷史紀錄、可輪替掉資料庫備份；管理員反而被擋 | `test_auditor_readonly.py` |
 | v1.14.6 | 「法務資安」角色實際等於「一般使用者」 | `test_roles_rbac.py` |
 | v1.16.26 | 帶 token 呼叫 `/tools/…/download` 等工具路徑，啟用認證時 token 沒被驗、直接 302 到登入頁（手冊實跑在認證關閉的實例上，看不到） | `test_api_token_on_tool_paths.py` |
+| v1.16.54 | 沒有用印權限的一般使用者在 PDF 編輯器挑得到資產庫的公司印章並蓋進 PDF；印章圖檔網址登入即可下載（issue #54） | `test_asset_access_by_permission.py` |
 | v1.14.6 | API token 強制驗證開啟時管理區全壞（判斷用「路徑含 /api/」） | `test_api_gate_and_csrf_edges.py` |
 | v1.14.6 | 另外三個工具的預覽端點切出空 id 就跳過檢查（doc-deident / pdf-editor / pdf-to-image） | `test_preview_acl_failopen.py`（prefix 那組） |
 | v1.14.6 | `/workspace/save` 有自己一份歸屬判斷 → 無主作業可被任何登入者存走 | `test_job_id_acl.py::test_workspace_save_denies_ownerless_job` |
@@ -377,3 +378,19 @@ A / B，然後：
 
 - [ ] 逐頁掃 CSP 違規 → 0 條（`temp/seam-ui/cdp_csp_violations.py`）
 - [ ] 沒有重複 id、沒有 JS 例外（`temp/seam-ui/cdp_frontend_fixes.py`）
+
+### v1.16.54 — 資產庫的印章與簽名照用印權限給（每次發版必過）
+
+自動化：`tests/test_asset_access_by_permission.py`（13，12 個變異各自紅）、
+`tests/test_asset_image_acl.py`。規則只寫在 `app/core/asset_access.py` 一份。
+
+- [ ] 一般使用者（沒有「用印與簽名」）：`GET /tools/pdf-editor/assets` 只有 Logo、`restricted` 為真
+- [ ] 同一個人 `GET /assets/<印章或簽名>/file` 與 `/thumb` → **403**（不可以下載下來再用「上傳新圖片」貼回去）
+- [ ] 同一個人 `POST /tools/pdf-editor/save` 帶印章的 `asset_id` → **403**，暫存目錄裡沒有產出檔
+- [ ] 只有「文管」角色的人拿浮水印圖 → 403；Logo → 200
+- [ ] 有權限的人 → 200，而且編輯器手動存檔寫進用印簽名歷史
+- [ ] 騎縫章的 `/stamp-preview`、`/preview`、`/submit` 帶簽名 / 浮水印 / Logo 的 `asset_id` → **400**（騎縫章只收印章；只有騎縫章權限的人不可以拿它把簽名蓋出去）
+- [ ] **未啟用認證時全部照舊**
+
+> 這一類的通則：**藏起清單不等於擋住** —— 存檔端點與圖檔網址都是可以自己組請求打的。
+> 新增「會用到資產庫圖」的工具時，三個地方都要走 `asset_access.can_use()`。

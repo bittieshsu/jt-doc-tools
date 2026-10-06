@@ -681,12 +681,25 @@ async def detect_objects(request: Request):
     return {"kind": None}
 
 
+#: 編輯器的「套印 / 簽名」可以用的資產種類（浮水印另有工具，不在這裡）。
+EDITOR_ASSET_TYPES = ("stamp", "signature", "logo")
+
+
 @router.get("/assets")
-async def list_assets():
-    """Return all stamp/signature/logo assets usable in the editor."""
+async def list_assets(request: Request):
+    """Return the stamp/signature/logo assets this user may use in the editor.
+
+    沒有用印權限的人看不到資產庫的印章與簽名（issue #54），只看得到 Logo；
+    `restricted` 為真時畫面講出原因，不讓人以為資產庫是空的。"""
+    from ...core import asset_access
     out = []
-    for t in ("stamp", "signature", "logo"):
-        for a in asset_manager.list(type=t):
+    restricted = False
+    for t in EDITOR_ASSET_TYPES:
+        items = asset_manager.list(type=t)
+        if not asset_access.can_use(request, t):
+            restricted = restricted or bool(items)
+            continue
+        for a in items:
             out.append({
                 "id": a.id,
                 "name": a.name,
@@ -695,7 +708,7 @@ async def list_assets():
                 "file_url": f"/assets/{a.id}/file",
                 "preset": {"width_mm": a.preset.width_mm, "height_mm": a.preset.height_mm},
             })
-    return {"assets": out}
+    return {"assets": out, "restricted": restricted}
 
 
 def _resolve_fonts_for_pref(
@@ -1339,6 +1352,67 @@ async def original_file(upload_id: str, request: Request):
     return FileResponse(str(src), media_type="application/pdf")
 
 
+def _library_stamps(pages, request) -> list[dict]:
+    """存檔前檢查用到的資產庫圖（issue #54）。
+
+    種類不是印章 / 簽名 / Logo → 400；沒有那種資產的使用權限 → 403
+    （整筆擋下，不會產出半成品）。只藏清單不夠 —— 自己組存檔請求一樣蓋得上去。
+    回傳用到的印章與簽名（寫用印歷史用；Logo 不算用印）。"""
+    from ...core import asset_access
+    used: list[dict] = []
+    for pg in pages if isinstance(pages, list) else []:
+        if not isinstance(pg, dict):
+            continue
+        for obj in pg.get("objects") or []:
+            if not isinstance(obj, dict) or obj.get("type") != "image":
+                continue
+            asset_id = obj.get("asset_id") or ""
+            if not asset_id or not isinstance(asset_id, str):
+                continue
+            a = asset_manager.get(asset_id)
+            if a is None:
+                continue            # 跟原本一樣：找不到的資產在畫的時候略過
+            if a.type not in EDITOR_ASSET_TYPES:
+                raise HTTPException(400, "這種資產不能用在編輯器")
+            if not asset_access.can_use(request, a.type):
+                raise HTTPException(403, asset_access.DENIED_MESSAGE)
+            if a.type in ("stamp", "signature"):
+                used.append({"asset_id": a.id, "type": a.type, "page": pg.get("page")})
+    return used
+
+
+def _record_editor_stamp(upload_id: str, pages, used: list[dict],
+                         out: Path, actor: str) -> None:
+    """編輯器蓋了資產庫的印章或簽名 → 跟用印工具一樣寫進用印簽名歷史。
+
+    只在**手動**存檔時呼叫（自動存檔每拖一下就一次，寫進歷史只會是雜訊），
+    而且編輯內容跟上一次寫進歷史的一樣就不再寫 —— 按好幾次「儲存並預覽」不會多出好幾筆；
+    之後改了任何東西再存，就是新的一筆（歷史裡要是實際交出去的那一版）。"""
+    import hashlib
+    try:
+        key = hashlib.sha256(json.dumps(pages, sort_keys=True, ensure_ascii=False)
+                             .encode("utf-8")).hexdigest()
+        mark = _work_dir() / f"pe_{upload_id}_stamphist.txt"
+        if mark.exists() and mark.read_text(encoding="utf-8").strip() == key:
+            return
+        try:
+            name = (_work_dir() / f"pe_{upload_id}_name.txt").read_text(encoding="utf-8").strip()
+        except OSError:
+            name = "document.pdf"
+        from ...core.history_manager import stamp_history
+        stamp_history.save(
+            original_path=_work_dir() / f"pe_{upload_id}_src.pdf", filled_path=out,
+            preview_path=None, original_filename=name or "document.pdf", username=actor,
+            extra={"source": "editor",
+                   "asset_ids": sorted({u["asset_id"] for u in used}),
+                   "placements": len(used)})
+        mark.write_text(key, encoding="utf-8")
+    except Exception:
+        # 寫不進歷史不可以讓存檔失敗（同用印工具），但要留記錄
+        import logging as _lg
+        _lg.getLogger(__name__).exception("pdf-editor: stamp_history.save failed")
+
+
 @router.post("/save")
 async def save(request: Request):
     """Accept the editor JSON model + upload_id. Burn overlay objects into
@@ -1388,6 +1462,10 @@ async def save(request: Request):
     src = _work_dir() / f"pe_{upload_id}_src.pdf"
     if not src.exists():
         raise HTTPException(404, "upload expired or missing")
+    # 資產庫的印章 / 簽名：沒有用印權限就擋（issue #54），手動存檔時記進用印歷史
+    library_stamps = _library_stamps(pages, request)
+    from ...core import sessions as _sessions
+    actor = _sessions.user_label(getattr(request.state, "user", None))
 
     # Wrap the heavy flatten (defined as the rest of this function body via the
     # _do_flatten closure) in save_queue: per-upload Lock serializes rapid /save
@@ -1915,6 +1993,8 @@ async def save(request: Request):
                 doc.save(str(out), garbage=4, deflate=True)
         finally:
             doc.close()
+        if library_stamps and not is_auto_save:
+            _record_editor_stamp(upload_id, pages, library_stamps, out, actor)
 
         # Re-render previews. v1.7.18: only render pages in `dirty_pages`
         # (frontend tracks which page got edited), reuse existing PNG file

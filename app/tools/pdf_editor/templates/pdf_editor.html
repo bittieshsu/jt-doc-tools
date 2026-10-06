@@ -26,6 +26,8 @@
   })();
 </script>
 <style nonce="{{ request.state.csp_nonce }}">
+/* 資產挑選視窗：沒有用印權限時的說明，橫跨整列（不是一格縮圖） */
+.ap-restricted { grid-column: 1 / -1; padding: 8px 2px; line-height: 1.6; }
 .pe-wrap { display: flex; gap: 12px; height: calc(100vh - 220px); min-height: 500px; }
 /* 全視窗模式：撐滿側欄右側整個 main 區域（保留左側 nav）。
    body.pe-max-window 由 #btnMaxView 切換，整個 #editor-panel 變 flex column
@@ -2894,7 +2896,16 @@ function openAssetPicker(onPick) {
   const grid = $('assetGrid');
   grid.innerHTML = tr('載入中…');
   fetch('/tools/pdf-editor/assets').then(r => r.json()).then(data => {
+    // 沒有「用印與簽名」權限時，資產庫的印章與簽名不會列出來（issue #54）——
+    // 要講出原因，不然看起來像資產庫是空的。
+    const restrictedNote = () => {
+      const n = document.createElement('div');
+      n.className = 'muted ap-restricted';
+      n.textContent = tr('資產庫的印章與簽名要有「用印與簽名」的使用權限才能使用，請洽管理員。仍可切到「上傳新圖片」使用自己的圖。');
+      return n;
+    };
     if (!data.assets?.length) {
+      if (data.restricted) { grid.innerHTML = ''; grid.appendChild(restrictedNote()); return; }
       grid.innerHTML = '<div class="muted" data-s="s1b9b41ec">' + tr('尚無資產，請切到「上傳新圖片」或到「管理資產」新增印章 / 簽名 / Logo。') + '</div>';
       return;
     }
@@ -2913,6 +2924,7 @@ function openAssetPicker(onPick) {
       });
       grid.appendChild(div);
     });
+    if (data.restricted) grid.appendChild(restrictedNote());
   });
 }
 $('assetCancel').addEventListener('click', () => {

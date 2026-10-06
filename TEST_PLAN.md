@@ -146,6 +146,28 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 - [ ] `%ProgramData%\jt-doc-tools\Logs\setup-python-sync.log` 要存在、看得到 uv 的輸出
 - [ ] 逐頁在瀏覽器開一次（含管理頁），主控台不可以有錯誤
 
+### 安裝畫面上的字 🆕 v1.16.55
+
+> 安裝核心跑 10～30 分鐘，原本畫面只有兩行固定的字。現在逐步顯示，但**中文 / 日文顯示**、
+> **解除安裝那幾頁的文字**只有在 Windows 上叫出來才看得到 —— 自動檢查驗的是寫法。
+> 沒有桌面（SSH、`/S`）時用 `makensis -DSTATUS_ECHO_FILE=<檔案路徑>` 編一份測試版，
+> 畫面上顯示過的每一行也會寫進那個檔案（UTF-16LE）。看解除安裝的頁面可以在 SSH 的工作階段裡
+> 列出安裝程式視窗的子元件（`EnumWindows` 依行程找 `#32770`、`GetWindowText`、
+> `GWL_STYLE` 的 `WS_VISIBLE`、勾選框送 `BM_GETCHECK`）—— 那個工作階段沒有桌面，
+> `IsWindowVisible` 一律是 false，**要看元件本身的樣式旗標**。
+
+- [ ] 安裝畫面逐步出現「正在檢查網路連線…」「正在下載程式碼…」「正在安裝 Python 與相依套件…」
+      「正在註冊並啟動 Windows 服務…」「安裝核心已完成」，**中文、日文都不是亂碼**
+- [ ] 全新安裝時下載 OxOffice 會顯示「已下載量 / 總量、速度、約剩幾分鐘」，而且**每秒更新同一行**，
+      不是每秒多一行
+- [ ] 全新安裝時安裝 Python 套件會顯示正在下載哪一個；升級（套件都在快取裡）時顯示「下載完成，安裝中…」
+- [ ] `installer.log` 看得到 `Prepared N packages` / `Installed N packages`（uv 的輸出，原本是空的）
+- [ ] 安裝失敗時畫面最後一行是「安裝失敗（詳情見 installer.log）」，接著跳出錯誤對話框
+- [ ] **解除安裝**：視窗標題是「… 解除安裝」、詢問「是否一併刪除使用者資料」的對話框標題**不是空白**、
+      進度頁寫「正在解除安裝」、最後一頁寫「已解除安裝」並講出資料留在 `C:\ProgramData\jt-doc-tools`
+      （選了一併刪除則寫已刪除），**沒有**「開啟網頁介面」勾選框與介紹網站連結
+- [ ] **安裝**的最後一頁照舊：「即將完成安裝」、勾著「開啟網頁介面」、視窗標題「… 安裝」（不可以是空白）
+
 > **安裝要下載約 1.1 GB**（Python 套件，其中 PyTorch 最大），另外 Office 引擎約 400 MB、
 > OCR 模型約 300 MB 都放在 GitHub。實測那天這邊到 GitHub 只有每秒 40 KB 左右，
 > 全新安裝花了 32 分鐘。**很多人要在同一時段開始用（教育訓練、整個單位一起部署）
@@ -434,6 +456,7 @@ v1.15.19 加翻譯對照字典時，完整套件一次紅了四條，**全是這
 
 ### 1.6 資產縮圖載入 (`tests/test_asset_thumbnails_resolve.py`)
 - 每個已登錄資產的 `/assets/{id}/thumb` 與 `/file` 都回 200（印章/簽名 picker 不破圖）
+- 啟用認證時圖檔網址照工具權限給（v1.16.54，issue #54）：印章要「用印與簽名」或「騎縫章」、簽名要「用印與簽名」、浮水印要「浮水印」、Logo 登入即可；擋下時回 403 並講出要什麼權限（`tests/test_asset_access_by_permission.py`）。用印、騎縫章、浮水印三支工具頁自己列出的資產，使用者本來就有對應權限，縮圖不會因此破圖
 - 匯出 → 合併匯入（會重新分配 id）後縮圖仍載入得到（防 import 沒同步 file_key/thumb_key → 縮圖 404 破圖,2026-06-27 客戶回報）
 - file_key/thumb_key 指向不存在的檔時退回 `{id}.png`
 
@@ -583,7 +606,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **371 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **375 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -609,6 +632,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_api_gate_and_csrf_edges.py` | API token 閘與 CSRF 豁免的邊界 |
 | `test_api_page_builder.py` | `github/build-api-page.py` 產出的 api.html 不可以毀損 |
 | `test_api_token_on_tool_paths.py` | API 手冊教人用 token 呼叫的工具路徑，在**啟用認證**的機器上也要通（v1.16.26） |
+| `test_asset_access_by_permission.py` | 資產庫的圖照工具權限給（GitHub issue #54，2026-10-05） |
 | `test_asset_image_acl.py` | ACL test for the login-gated shared-asset image endpoints (GitHub #28). |
 | `test_asset_thumbnails_resolve.py` | 資產縮圖必須載入得到 — 防「import 後 file_key/thumb_key 與磁碟檔名不一致 |
 | `test_assets_and_image_utils.py` | Asset upload + crop + match-aspect + remove-bg auto-crop. |
@@ -694,6 +718,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_docs_numeric_claims.py` | 公開文件裡的數字宣稱要跟程式對得上 |
 | `test_docs_tool_categories.py` | 介紹站的工具分類要跟程式裡的一致 |
 | `test_docx_textbox_translation.py` | 含**文字方塊**的 .docx 翻譯 —— 同一段文字會被收好幾次 |
+| `test_e2e_waits_are_bounded.py` | 瀏覽器測試等回覆時一定要有上限 |
 | `test_easyocr_reader_download_is_serialized.py` | EasyOCR 的 Reader 一次只建一個 —— 第一次建的時候它會下載模型 |
 | `test_effective_permissions.py` | 「這個人最終有哪些工具、從哪來」的檢視 |
 | `test_einvoice_formatters.py` | Tests for einvoice-scan field formatters (M3.2). |
@@ -720,7 +745,9 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_installer_languages.py` | Windows 安裝程式在英文 Windows 上要顯示英文（v1.15.27） |
 | `test_installer_output_is_not_garbled.py` | 安裝畫面上不可以出現亂碼（2026-09-15 客戶回報，Win11 25H2） |
 | `test_installer_product_name.py` | Windows 安裝程式的產品名稱多語系 + Linux 服務的安全強化（第 1 批，v1.15.31） |
+| `test_installer_progress_status.py` | Windows 安裝程式要看得到「現在在做什麼」，而且不可以是亂碼（v1.16.55） |
 | `test_installer_silent_mode.py` | 安裝程式在**無介面模式**下不可以停下來等人按對話框 |
+| `test_installer_uninstall_pages.py` | 解除安裝時，畫面上的字要是「解除安裝」，不可以是安裝的字（v1.16.55） |
 | `test_internal_notes_stay_private.py` | `docs-share/` 的內部往來文件不可以出現在公開版（使用者 2026-09-17 指示） |
 | `test_job_acl.py` | Regression tests for the /api/jobs/* per-job ownership ACL (v1.12.61). |
 | `test_job_admission_reserve.py` | 記憶體准入：**已派送但還沒反映在 RSS 上的量要先記帳**（稽核 F06） |
@@ -1008,6 +1035,12 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] **整份換字型**：右側面板按鈕一鍵替換全文字物件字型
 - [ ] 復原 / 重做
 - [ ] 存檔後重新開啟，物件保留或已 redact（destructive 項目）
+- [ ] **資產庫的印章 / 簽名照「用印與簽名」權限給**（v1.16.54，issue #54；自動化 `tests/test_asset_access_by_permission.py`）：
+  - [ ] 啟用認證，用一般使用者（預設沒有用印權限）開「套印 / 簽名」→ 只看得到 Logo，畫面寫出「要有用印與簽名權限、請洽管理員」，「上傳新圖片」仍可用
+  - [ ] 同一個人自己組存檔請求、帶印章或簽名的資產編號 → **403**，而且不產出檔案；帶 Logo → 照常蓋上
+  - [ ] 有用印權限的人（例如財務角色）看得到印章、簽名、Logo；帶浮水印的資產編號存檔 → 400
+  - [ ] 有權限的人蓋了資產庫的章後按「儲存」→ 管理區「用印簽名歷史」多一筆，標明來自編輯器、原檔與成品都打得開、成品有章；**自動存檔不記**、內容沒變再按一次不多一筆、移動位置再存多一筆；只放 Logo 不記
+  - [ ] 認證關閉時一切照舊（清單、存檔、圖檔網址都不擋）
 
 #### 合併 (pdf-merge)
 - [ ] 2 份以上 PDF 依序合併
@@ -1449,6 +1482,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] 旋轉在切片**之前**（先切再各自轉會對不起來）；切片寬度累進取整無殘條
 - [ ] 同一組內位置與角度完全一致；亂數種子有回報可重現
 - [ ] 一般使用者權限與「用印與簽名」一致（`test_roles_rbac.py` 守著）
+- [ ] **只收資產庫的印章**（v1.16.54）：自己組請求帶簽名 / 浮水印 / Logo 的資產編號 → 400；
+      畫面上的資產清單本來就只列印章（`tests/test_asset_access_by_permission.py`）
 - [ ] **章外圍的透明留白要先裁掉**：拿一張「章周圍留一圈透明」的 PNG，
       設 40 mm → 印出來**還是 40 mm**（沒裁的話留白 25% 時只剩 26.8 mm，
       而且換一張來源就換一個大小）
@@ -4454,6 +4489,59 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
       資料不是顯示文字（書籤的 `{title, page, level}`），翻掉是改壞資料。
 - [ ] 新畫的 SVG 圖示要**算圖確認過**才收（snap chromium 的 `--screenshot`
       要寫到 `~/snap/chromium/common/`，寫 `/tmp` 會落在它自己的沙箱裡）。
+
+---
+
+### 6.103 v1.16.55 — Windows 安裝程式的畫面文字（**每次發版必過**）
+
+> 動到 `installer.nsi` / `install_core.ps1` / `uninstall_core.ps1` / `run_core.nsh` 之後才生效 ——
+> 要打 tag、請使用者去 SignPath 按 Approve，**用 Release 上那支在 Windows 實機驗**（§0.3「安裝畫面上的字」）。
+
+- [ ] `pytest tests/test_installer_progress_status.py tests/test_installer_uninstall_pages.py
+      tests/test_installer_silent_mode.py tests/test_oxoffice_msi_download_and_exit.py` 綠燈
+      （含 `makensis` 真的編得過那一條）
+- [ ] **安裝畫面逐步顯示正在做什麼**（檢查網路 → 下載程式碼 → 安裝 Python 與相依套件 → 註冊服務 → 安裝核心已完成），
+      繁中 / 日文 / 英文 Windows 都**不是亂碼**。原本 10～30 分鐘裡只有兩行固定的字
+- [ ] **不可以改回 `nsExec::ExecToLog`**（上游 bug #1323，安裝程式會在最後一步當掉）——
+      進度走狀態檔：寫的一邊 UTF-16LE 不加 BOM、讀的一邊 `FileReadUTF16LE`，任何一邊換掉就是亂碼
+- [ ] 狀態檔換新的那一行是 `[IO.File]::Replace(..., [NullString]::Value)` —— 寫成 `$null` 的話
+      PowerShell 會傳空字串，第二次起每次都安靜失敗，**畫面停在第一步**（2026-10-06 實機抓到）
+- [ ] 下載 OxOffice（沒裝過 Office 的機器才走得到）每秒更新**同一行**：已下載量 / 總量、速度、約剩幾分鐘；
+      安裝 Python 套件時顯示正在下載哪一個，升級（套件都在快取裡）時顯示「下載完成，安裝中…」
+- [ ] `installer.log` 看得到 uv 的 `Prepared N packages` / `Installed N packages`（原本是空的）
+- [ ] 安裝失敗時畫面最後一行是「安裝失敗（詳情見 installer.log）」，接著照樣跳錯誤對話框、`/S` 時不卡住
+- [ ] **解除安裝的畫面要是解除安裝的字**：視窗標題「… 解除安裝」、進度頁「正在解除安裝」、
+      最後一頁「已解除安裝」並講出資料留在 `C:\ProgramData\jt-doc-tools`（選了一併刪除則寫已刪除），
+      **沒有**「開啟網頁介面」勾選框與介紹網站連結。原本最後一頁寫「即將完成安裝」、還勾著開啟網頁
+- [ ] 藏勾選框要在完成頁的 **SHOW** 回呼 —— PRE 的時候控制項還沒建立，藏了個空、而且看不出來
+- [ ] 「是否一併刪除使用者資料」的對話框**標題不是空白**（在 `.onInit` 問的話標題是空的，
+      所以改在解除安裝開始執行時、確認過安裝目錄之後才問）
+- [ ] **安裝**的畫面照舊：標題「… 安裝」（**不可以是空白** —— `Caption` 指令蓋掉的就是 `^SetupCaption`，
+      拿它來填等於自己填自己）、最後一頁「即將完成安裝」、勾著「開啟網頁介面」；
+      在中文 Windows 上選英文，標題也要是英文（安裝模式的字要在選完語言之後才填）
+- [ ] 沒有桌面（SSH / `/S`）時怎麼驗：測試編譯 `makensis -DSTATUS_ECHO_FILE=<路徑>` 會把畫面上每一行
+      寫進檔案；頁面元件用 `EnumWindows` 依行程找 `#32770`、看 `GWL_STYLE` 的 `WS_VISIBLE`
+      （那個工作階段 `IsWindowVisible` 一律是 false）、勾選框送 `BM_GETCHECK`
+- [ ] 改了任何 `.ps1` 都在 Windows 上 `[Parser]::ParseFile()` 一次，而且檔案要有 UTF-8 BOM
+
+---
+
+### 6.102 v1.16.54 — 資產庫的印章與簽名照用印權限給，瀏覽器測試不可以無限等（**每次發版必過**）
+
+- [ ] `pytest tests/test_asset_access_by_permission.py tests/test_asset_image_acl.py
+      tests/test_e2e_waits_are_bounded.py` 綠燈
+- [ ] **啟用認證、沒有用印權限的一般使用者**：PDF 編輯器「套印 / 簽名」**看不到**資產庫的印章與簽名
+      （Logo 照舊），畫面講出原因；「上傳新圖片」照常可用（issue #54）
+- [ ] 同一個人**自己組請求**帶印章的資產編號存檔 → **403、不產出檔案**；
+      `/assets/{id}/file`、`/assets/{id}/thumb` 拿印章 / 簽名 → 403 並講出要什麼權限
+- [ ] 有用印權限的人（財務角色）看得到、蓋得上；**手動存檔**寫一筆用印簽名歷史（標明來自編輯器），
+      自動存檔不寫、內容沒變再存不重複、移動位置再存多一筆；**只放 Logo 不寫**
+- [ ] 騎縫章送簽名 / 浮水印 / Logo 的資產編號 → **400**（只收印章，不然只有騎縫章權限的人能把簽名蓋出去）
+- [ ] 用印、騎縫章、浮水印三支工具頁自己列出的資產縮圖**不破圖**
+- [ ] **認證關閉**（單機模式）一切照舊，四種資產都看得到、用得到
+- [ ] 新增資產種類時要決定它歸誰管 —— 不在 `asset_access.ASSET_TOOLS` 表上的種類**一律不給**
+- [ ] **瀏覽器測試每一個 `ws.recv()` 都要帶逾時** —— 有一條沒帶的話，瀏覽器不回應時整套測試**卡住而不是紅**
+      （v1.16.54 完整測試卡了將近一小時、被殺掉時連摘要都沒有）
 
 ---
 

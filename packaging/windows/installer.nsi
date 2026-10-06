@@ -55,6 +55,7 @@ Unicode true
 
 ; NSIS 的 `Name` 吃語言字串（每個語言各有一份），所以標題可以隨語系變。
 Name "$(APP_DISPLAY) ${VERSION}"
+Caption "$WIN_CAPTION"
 OutFile "jt-doc-tools-${VERSION}-setup.exe"
 InstallDir "$PROGRAMFILES64\${SHORTNAME}"
 RequestExecutionLevel admin    ; system-level install (matches install.ps1)
@@ -75,6 +76,17 @@ Var SM_DIR      ; 這次安裝實際建的開始功能表資料夾
 Var UNMODE
 Var UN_PURGE
 Var UN_DIR
+; 視窗標題、進度頁標題與完成頁的文字 —— 安裝與解除安裝**共用同一組頁面**，
+; 所以這幾個不可以寫死成安裝的字（2026-10-06 使用者解除安裝時，最後一頁寫著
+; 「即將完成安裝」、還勾著「開啟網頁介面」）。在 .onInit 依模式填入。
+Var WIN_CAPTION
+Var IF_HDR
+Var IF_SUB
+Var IF_FIN_HDR
+Var IF_FIN_SUB
+Var FIN_TITLE
+Var FIN_TEXT
+Var UN_DATA_DIR
 
 ; ---- branding -------------------------------------------------------
 !define MUI_ICON   "assets\jtdt.ico"
@@ -94,10 +106,16 @@ Var UN_DIR
 !insertmacro MUI_PAGE_COMPONENTS
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipWhenUninstalling
 !insertmacro MUI_PAGE_DIRECTORY
+!define MUI_PAGE_HEADER_TEXT "$IF_HDR"
+!define MUI_PAGE_HEADER_SUBTEXT "$IF_SUB"
+!define MUI_INSTFILESPAGE_FINISHHEADER_TEXT "$IF_FIN_HDR"
+!define MUI_INSTFILESPAGE_FINISHHEADER_SUBTEXT "$IF_FIN_SUB"
 !insertmacro MUI_PAGE_INSTFILES
 
 ; finish page: offer to open the web UI
-!define MUI_PAGE_CUSTOMFUNCTION_PRE FinishPagePre
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW FinishPageShow
+!define MUI_FINISHPAGE_TITLE "$FIN_TITLE"
+!define MUI_FINISHPAGE_TEXT "$FIN_TEXT"
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_TEXT "$(FINISH_OPEN)"
 !define MUI_FINISHPAGE_RUN_FUNCTION "OpenWebUI"
@@ -183,6 +201,42 @@ LangString SEC_FW       ${LANG_JAPANESE}    "LAN からの接続"
 LangString ERR_INSTALL  ${LANG_TRADCHINESE} "安裝失敗 (install_core.ps1 exit code $1)。$\r$\n請查看 $\"%ProgramData%\${SHORTNAME}\Logs\installer.log$\" 以取得詳情。$\r$\n$\r$\n安裝與升級疑難排解：https://jasoncheng7115.github.io/jt-doc-tools/troubleshooting.html"
 LangString ERR_INSTALL  ${LANG_ENGLISH}     "Installation failed (install_core.ps1 exit code $1).$\r$\nSee $\"%ProgramData%\${SHORTNAME}\Logs\installer.log$\" for details.$\r$\n$\r$\nTroubleshooting: https://jasoncheng7115.github.io/jt-doc-tools/troubleshooting-en.html"
 LangString ERR_INSTALL  ${LANG_JAPANESE}    "インストールに失敗しました (install_core.ps1 exit code $1)。$\r$\n詳細は $\"%ProgramData%\${SHORTNAME}\Logs\installer.log$\" をご確認ください。$\r$\n$\r$\nインストールと更新の困ったときは：https://jasoncheng7115.github.io/jt-doc-tools/troubleshooting-ja.html"
+; 安裝模式的視窗標題。**不可以用 `$(^SetupCaption)`** —— 上面那行 `Caption` 指令
+; 蓋掉的正是那個字串，拿它來還原＝拿自己還原自己，標題變成空白（Windows 實機實測）。
+; 內容照 NSIS 語言檔原本的寫法。
+LangString INST_CAPTION  ${LANG_TRADCHINESE} "$(^Name) 安裝"
+LangString INST_CAPTION  ${LANG_ENGLISH}     "$(^Name) Setup"
+LangString INST_CAPTION  ${LANG_JAPANESE}    "$(^Name) セットアップ"
+; 解除安裝模式的頁面文字（MUI 內建的解除安裝文字只在用了它的解除安裝頁面時才有，
+; 我們是同一支 exe、共用安裝的頁面，所以自己寫）
+LangString UN_HDR        ${LANG_TRADCHINESE} "解除安裝"
+LangString UN_HDR        ${LANG_ENGLISH}     "Uninstalling"
+LangString UN_HDR        ${LANG_JAPANESE}    "アンインストール"
+LangString UN_SUB        ${LANG_TRADCHINESE} "正在解除安裝 $(APP_DISPLAY)，請稍候。"
+LangString UN_SUB        ${LANG_ENGLISH}     "Please wait while $(APP_DISPLAY) is being uninstalled."
+LangString UN_SUB        ${LANG_JAPANESE}    "$(APP_DISPLAY) をアンインストールしています。しばらくお待ちください。"
+LangString UN_FIN_HDR    ${LANG_TRADCHINESE} "解除安裝完成"
+LangString UN_FIN_HDR    ${LANG_ENGLISH}     "Uninstall complete"
+LangString UN_FIN_HDR    ${LANG_JAPANESE}    "アンインストール完了"
+LangString UN_FIN_SUB    ${LANG_TRADCHINESE} "已解除安裝。"
+LangString UN_FIN_SUB    ${LANG_ENGLISH}     "Uninstall finished."
+LangString UN_FIN_SUB    ${LANG_JAPANESE}    "アンインストールが終わりました。"
+LangString UN_FIN_TITLE  ${LANG_TRADCHINESE} "已解除安裝 $(APP_DISPLAY)"
+LangString UN_FIN_TITLE  ${LANG_ENGLISH}     "$(APP_DISPLAY) has been uninstalled"
+LangString UN_FIN_TITLE  ${LANG_JAPANESE}    "$(APP_DISPLAY) をアンインストールしました"
+LangString UN_FIN_KEPT   ${LANG_TRADCHINESE} "程式已從這台電腦移除。$\r$\n$\r$\n使用者資料保留在 $UN_DATA_DIR，下次重新安裝可以沿用；不需要的話可以手動刪除這個資料夾。$\r$\n$\r$\n按「完成」關閉。"
+LangString UN_FIN_KEPT   ${LANG_ENGLISH}     "The program has been removed from this computer.$\r$\n$\r$\nYour data is kept in $UN_DATA_DIR so a reinstall can pick it up; delete that folder yourself if you no longer need it.$\r$\n$\r$\nClick Finish to close."
+LangString UN_FIN_KEPT   ${LANG_JAPANESE}    "プログラムをこのコンピューターから削除しました。$\r$\n$\r$\n利用者データは $UN_DATA_DIR に残してあり、再インストールするとそのまま使えます。不要であればこのフォルダーを手動で削除してください。$\r$\n$\r$\n［完了］を押して閉じてください。"
+LangString UN_FIN_PURGED ${LANG_TRADCHINESE} "程式與使用者資料都已從這台電腦移除。$\r$\n$\r$\n按「完成」關閉。"
+LangString UN_FIN_PURGED ${LANG_ENGLISH}     "The program and your data have been removed from this computer.$\r$\n$\r$\nClick Finish to close."
+LangString UN_FIN_PURGED ${LANG_JAPANESE}    "プログラムと利用者データをこのコンピューターから削除しました。$\r$\n$\r$\n［完了］を押して閉じてください。"
+; 安裝核心開始時的兩行（之後的進度由 install_core.ps1 寫進狀態檔、這裡讀出來顯示）
+LangString CORE_RUNNING ${LANG_TRADCHINESE} "正在安裝（會下載 Python 與程式，約需 10～30 分鐘，視網路速度而定）…"
+LangString CORE_RUNNING ${LANG_ENGLISH}     "Installing (downloads Python and the program; about 10-30 minutes depending on your network)..."
+LangString CORE_RUNNING ${LANG_JAPANESE}    "インストールしています（Python とプログラムをダウンロードします。ネットワークにより約 10～30 分）…"
+LangString CORE_LOG     ${LANG_TRADCHINESE} "詳細記錄：%ProgramData%\${SHORTNAME}\Logs\installer.log"
+LangString CORE_LOG     ${LANG_ENGLISH}     "Detailed log: %ProgramData%\${SHORTNAME}\Logs\installer.log"
+LangString CORE_LOG     ${LANG_JAPANESE}    "詳細ログ：%ProgramData%\${SHORTNAME}\Logs\installer.log"
 LangString UN_ASK_PURGE ${LANG_TRADCHINESE} "是否一併刪除使用者資料（銀行帳號、簽名、歷史記錄）？$\r$\n$\r$\n選「否」會保留資料，下次重新安裝可沿用。"
 LangString UN_ASK_PURGE ${LANG_ENGLISH}     "Also delete user data (bank accounts, signatures, history)?$\r$\n$\r$\nChoose No to keep it; a future reinstall will pick it up again."
 LangString UN_ASK_PURGE ${LANG_JAPANESE}    "利用者データ（口座番号・署名・履歴）も削除しますか？$\r$\n$\r$\n「いいえ」を選ぶと残ります。次回の再インストールでそのまま使えます。"
@@ -215,6 +269,8 @@ SectionEnd
 ; 2026-09-24 使用者決定改成預設不勾。檢查：tests/test_installer_silent_mode.py
 Section /o "LAN" SecFw
 SectionEnd
+
+!include "run_core.nsh"
 
 ; Hidden section that performs the actual install once component choices
 ; are known. The '-' prefix hides it from the components list.
@@ -276,10 +332,10 @@ Section "-DoInstall"
   ; 2026-09-24 在 Win11 實機上量到約四成的安裝會中（v1.15.53 也遇過一次，
   ; 當時查不出原因）。`Exec` 不收輸出、不會走到那段程式碼；
   ; 詳細過程本來就寫在 installer.log。檢查：tests/test_installer_silent_mode.py
-  DetailPrint "Running installer core (downloads Python + source, 10-30 minutes) ..."
-  DetailPrint "Progress log: %ProgramData%\${SHORTNAME}\Logs\installer.log"
-  nsExec::Exec '"$2" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\install_core.ps1" -InstallDir "$INSTDIR"$0'
-  Pop $1
+  DetailPrint "$(CORE_RUNNING)"
+  DetailPrint "$(CORE_LOG)"
+  StrCpy $R5 '"$2" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\install_core.ps1" -InstallDir "$INSTDIR" -StatusFile "$PLUGINSDIR\status.txt" -UiLang $LANGUAGE$0'
+  Call RunInstallCore
   ${If} $1 != 0
     ; **`/SD IDOK` 不可以拿掉。** 無介面安裝（`/S`，或從 SSH / 遠端管理跑）
     ; 沒有桌面可以按這個對話框 —— 少了 `/SD` 它會**永遠等下去**：安裝程式
@@ -356,6 +412,8 @@ Function OpenWebUI
 FunctionEnd
 
 Function .onInit
+  ; 先給視窗標題一個值 —— 下面任何一個對話框的標題用的都是它，空的話標題列是空白
+  StrCpy $WIN_CAPTION "$(INST_CAPTION)"
   ${IfNot} ${RunningX64}
     MessageBox MB_ICONSTOP "32-bit Windows is not supported." /SD IDOK
     Abort
@@ -373,6 +431,16 @@ Function .onInit
   ${EndIf}
 
   ${If} $UNMODE == "1"
+    ; 解除安裝模式的頁面文字（視窗標題、進度頁、完成頁）
+    SetShellVarContext all
+    StrCpy $UN_DATA_DIR "$APPDATA\${SHORTNAME}"
+    StrCpy $WIN_CAPTION "$(^UninstallCaption)"
+    StrCpy $IF_HDR      "$(UN_HDR)"
+    StrCpy $IF_SUB      "$(UN_SUB)"
+    StrCpy $IF_FIN_HDR  "$(UN_FIN_HDR)"
+    StrCpy $IF_FIN_SUB  "$(UN_FIN_SUB)"
+    StrCpy $FIN_TITLE   "$(UN_FIN_TITLE)"
+
     ; 安裝目錄：`/instdir=` 指定（從 %TEMP% 重跑時），否則就是自己所在的目錄
     ClearErrors
     ${GetOptions} $R0 "/instdir=" $R2
@@ -405,17 +473,23 @@ Function .onInit
       un_no_copy:
     ${EndIf}
 
-    ; 要不要一併刪掉使用者資料。`/SD IDNO`：無介面模式預設**保留**。
-    MessageBox MB_YESNO|MB_ICONQUESTION \
-      "$(UN_ASK_PURGE)" \
-      /SD IDNO IDYES un_purge_yes IDNO un_purge_done
-    un_purge_yes:
-      StrCpy $UN_PURGE "1"
-    un_purge_done:
+    ; 「要不要一併刪掉使用者資料」**在解除安裝那一段開頭才問**，不在這裡問：
+    ; NSIS 在 .onInit 之前就把視窗標題算好了，這裡跳出的對話框標題列是空白的
+    ; （上面那行 `Caption` 用的變數這時還沒有值；Windows 實機實測）。
     Return          ; 解除安裝不需要選語言 / 元件
   ${EndIf}
 
   !insertmacro MUI_LANGDLL_DISPLAY
+
+  ; 頁面文字＝MUI 原本的安裝文字（安裝的畫面跟以前一模一樣）。**要在選完語言之後**才填 ——
+  ; 填得太早的話，在中文 Windows 上選英文，標題仍是中文。
+  StrCpy $WIN_CAPTION "$(INST_CAPTION)"
+  StrCpy $IF_HDR      "$(MUI_TEXT_INSTALLING_TITLE)"
+  StrCpy $IF_SUB      "$(MUI_TEXT_INSTALLING_SUBTITLE)"
+  StrCpy $IF_FIN_HDR  "$(MUI_TEXT_FINISH_TITLE)"
+  StrCpy $IF_FIN_SUB  "$(MUI_TEXT_FINISH_SUBTITLE)"
+  StrCpy $FIN_TITLE   "$(MUI_TEXT_FINISH_INFO_TITLE)"
+  StrCpy $FIN_TEXT    "$(MUI_TEXT_FINISH_INFO_TEXT)"
 
   ; 語言確定之後才填元件名稱（使用者在對話框改過語言也算數）
   SectionSetText ${SecCore}   "$(SEC_CORE)"
@@ -485,10 +559,12 @@ Function SkipWhenUninstalling
   ${EndIf}
 FunctionEnd
 
-;; 完成頁：解除安裝模式不要顯示「開啟網頁介面」。
-Function FinishPagePre
+;; 完成頁：解除安裝模式不要顯示「開啟網頁介面」與介紹網站連結。
+;; **要在 SHOW 不可以在 PRE**：PRE 的時候控制項還沒建立，`$mui.FinishPage.Run`
+;; 是空的，藏了個空 —— 原本就是寫在 PRE，所以解除安裝的最後一頁一直勾著
+;; 「開啟網頁介面」（服務已經移除了，勾著按完成只會打開一個連不上的網頁）。
+Function FinishPageShow
   ${If} $UNMODE == "1"
-    ; 服務已經移除了，開網頁只會得到連不上
     SendMessage $mui.FinishPage.Run ${BM_SETCHECK} 0 0
     ShowWindow $mui.FinishPage.Run 0
     ShowWindow $mui.FinishPage.Link 0
@@ -510,6 +586,21 @@ Section "-DoUninstall"
     MessageBox MB_ICONSTOP "$(UN_NOT_OURS)" /SD IDOK
     Abort
   un_dir_ok:
+  ; 要不要一併刪掉使用者資料。`/SD IDNO`：無介面模式預設**保留**。
+  ; 放在確認過安裝目錄之後問 —— 目錄不對就不會走到這裡，也就不必問資料的事。
+  MessageBox MB_YESNO|MB_ICONQUESTION \
+    "$(UN_ASK_PURGE)" \
+    /SD IDNO IDYES un_purge_yes IDNO un_purge_done
+  un_purge_yes:
+    StrCpy $UN_PURGE "1"
+  un_purge_done:
+  ; 完成頁的內文要看有沒有一併刪資料
+  ${If} $UN_PURGE == "1"
+    StrCpy $FIN_TEXT "$(UN_FIN_PURGED)"
+  ${Else}
+    StrCpy $FIN_TEXT "$(UN_FIN_KEPT)"
+  ${EndIf}
+
   SetDetailsPrint both
   SetRegView 64
   SetShellVarContext all   ; 要跟安裝時同一個情境，捷徑才刪得掉

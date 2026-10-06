@@ -171,7 +171,7 @@ def _visit(cdp: int, url: str) -> list[str]:
                 ws.send(json.dumps({"id": n[0], "method": method,
                                     "params": params or {}}))
                 while True:
-                    m = json.loads(ws.recv())
+                    m = json.loads(ws.recv(timeout=180))
                     if m.get("id") == n[0]:
                         return m
                     _collect(m, errs)

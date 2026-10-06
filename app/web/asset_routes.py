@@ -14,12 +14,17 @@ This router exposes the same two read-only image endpoints under `/assets/...`,
 gated only by `require_login` (auth OFF → everyone passes, identical to before).
 It exposes **images only** — no list / upload / edit / delete — so non-admins
 can view shared assets but not manage them.
+
+**登入不等於看得到每一種資產**（issue #54，2026-10-05）：公司印章與簽名的圖只給
+有用印權限的人，浮水印給有浮水印權限的人（規則在 `core.asset_access`）。只要登入
+就給的話，沒有用印權限的人拿到印章 PNG 再貼進 PDF 編輯器，權限就形同虛設。
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 
+from ..core import asset_access
 from ..core.asset_manager import asset_manager
 from .deps import require_login
 
@@ -31,6 +36,8 @@ async def asset_file(asset_id: str, request: Request, _user: dict = Depends(requ
     asset = asset_manager.get(asset_id)
     if not asset:
         raise HTTPException(404, "asset not found")
+    if not asset_access.can_use(request, asset.type):
+        raise HTTPException(403, asset_access.DENIED_MESSAGE)
     path = asset_manager.file_path(asset)
     if not path.exists():
         raise HTTPException(404, "asset file missing")
@@ -42,6 +49,8 @@ async def asset_thumb(asset_id: str, request: Request, _user: dict = Depends(req
     asset = asset_manager.get(asset_id)
     if not asset:
         raise HTTPException(404, "asset not found")
+    if not asset_access.can_use(request, asset.type):
+        raise HTTPException(403, asset_access.DENIED_MESSAGE)
     path = asset_manager.thumb_path(asset)
     if not path.exists():
         # Fall back to the full image if the thumbnail is somehow missing.

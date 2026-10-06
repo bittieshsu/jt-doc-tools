@@ -5,11 +5,19 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (882 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (884 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.55] - 2026-10-06
+
+- **Windows installer: you can see what it is doing, and the uninstaller's last page now talks about uninstalling.** The wizard now shows each step as it happens (checking the network, downloading the code, installing Python and its packages, downloading OxOffice, registering the service...). The OxOffice download shows how much is done, the speed and the estimated time left; installing the Python packages shows which one is being downloaded. Before, the window showed the same two lines for the whole 10 to 30 minutes. Chinese, Japanese and English text all display correctly: progress now travels through a Unicode status file instead of the system ANSI code page that used to garble child-process output. The output of the Python package step is now also kept in `installer.log`. After uninstalling, the last page used to say the installation was about to finish, the window title said Setup and "Open the web interface" was ticked; it now says the program was uninstalled and where your data was kept (or that it was deleted), without the checkbox and the website link. The "also delete your data?" question is now asked when the uninstall starts (its title bar used to show the setup title), after the install folder has been checked. These changes are inside the installer, so they show up from the 1.16.55 installer on; one-line installs and `jtdt update` are unaffected.
+
+## [1.16.54] - 2026-10-05
+
+- **Stamps and signatures from the asset library now follow the Stamp and sign permission (issue #54).** With sign-in enabled, people without permission to use Stamp and sign no longer see the library's stamps and signatures under the PDF editor's stamp / signature picker (logos are unchanged); the picker explains why, and Upload a new image still works. Previously an ordinary user (who has no stamping permission by default) could pick the company stamp in the editor and put it on a PDF. Saving checks too: a hand-built request naming a stamp asset is refused with 403 and produces no file. The asset image addresses (`/assets/{id}/file` and `/assets/{id}/thumb`) follow the same rule: a stamp needs Stamp and sign or Seam stamp, a signature needs Stamp and sign, a watermark needs Watermark, and a logo only needs sign-in. They used to be open to anyone signed in, so downloading an image and uploading it again got around the permission. The seam stamp tool only takes stamps from the library: a hand-built request naming a signature, watermark or logo is refused (with only seam stamp permission, a signature could previously be stamped across pages). Stamping with a library stamp or signature in the PDF editor is now saved to the Stamp and signature history on a manual save, like the stamp tool, marked as coming from the editor; autosaves are not recorded, and saving again with nothing changed adds no entry. Nothing changes with sign-in turned off (single-user mode).
 
 ## [1.16.53] - 2026-10-05
 

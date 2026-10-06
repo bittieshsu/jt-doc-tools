@@ -37,7 +37,9 @@ param(
     [switch]$InstallService,    # register WinSW Windows service (autostart)
     [switch]$InstallFirewall,   # allow LAN access (binds 0.0.0.0 + firewall rule)
     [string]$RepoUrl       = 'https://github.com/jasoncheng7115/jt-doc-tools',
-    [string]$RepoBranch    = 'main'
+    [string]$RepoBranch    = 'main',
+    [string]$StatusFile    = '',   # 安裝畫面讀的狀態檔（見下方「安裝畫面上的狀態」）
+    [string]$UiLang        = ''    # NSIS 的 $LANGUAGE（1028 繁中 / 1033 英文 / 1041 日文）
 )
 
 # Continue on native-command stderr; we judge native failures by $LASTEXITCODE
@@ -72,7 +74,170 @@ function Ok   ($m) { _w '[OK]' $m 'Green'  }
 function Warn ($m) { _w '[!] ' $m 'Yellow' }
 function Die  ($m, $code) {
     _w '[X] ' $m 'Red'
+    Set-Status 'failed'
     exit $code
+}
+
+# --- 安裝畫面上的狀態（給 installer.nsi 讀）---------------------------
+# 安裝視窗原本整段只顯示兩行固定的字（十幾二十分鐘完全不動，2026-10-06 使用者在
+# 新的 Win11 上裝時問「跑好久還在跑」）—— 因為 NSIS 的 `nsExec::ExecToLog` 會讓安裝
+# 程式在最後一步當掉（上游 bug #1323），只能改用不收輸出的方式執行這支腳本。
+# 現在改成：這裡把「目前在做什麼」寫進一個狀態檔，installer.nsi 每半秒讀一次，
+# 內容有變就顯示在安裝視窗上。
+#
+# **為什麼不會亂碼**：之前的亂碼出在「子行程的輸出被 NSIS 用系統 ANSI 字碼頁解」
+# （繁中 CP950、日文 CP932）。這條路不經過那裡 —— 狀態檔一律寫 **UTF-16LE、不加 BOM**，
+# NSIS 用 `FileReadUTF16LE` 讀，兩邊都是 Unicode，所以可以直接顯示中文與日文。
+# （`Log` / `Ok` / `Warn` / `Die` 照舊只寫英文，那些會進 installer.log 與主控台。）
+#
+# 檔案內容是一行：第一個字元是種類 —— `S` 換到下一步（安裝視窗的清單多一行）、
+# `P` 同一步的進度（只更新清單上方那一行，不然下載進度每秒一行會洗版）。
+# 檢查：tests/test_installer_progress_status.py
+$UiLangKey = switch ($UiLang) { '1028' { 'zh' } '1041' { 'ja' } default { 'en' } }
+$Utf16NoBom = New-Object System.Text.UnicodeEncoding($false, $false)
+$StatusText = @{
+    'network'        = @{ zh = '正在檢查網路連線…'
+                          en = 'Checking the network connection...'
+                          ja = 'ネットワーク接続を確認しています…' }
+    'office_check'   = @{ zh = '正在檢查 Office 轉檔引擎…'
+                          en = 'Checking for an Office conversion engine...'
+                          ja = 'Office 変換エンジンを確認しています…' }
+    'office_dl_start'= @{ zh = '正在下載 OxOffice（{0} MB）…'
+                          en = 'Downloading OxOffice ({0} MB)...'
+                          ja = 'OxOffice をダウンロードしています（{0} MB）…' }
+    'office_dl'      = @{ zh = '正在下載 OxOffice：{0} / {1} MB（每秒 {2} MB，約剩 {3}）'
+                          en = 'Downloading OxOffice: {0} / {1} MB ({2} MB/s, about {3} left)'
+                          ja = 'OxOffice をダウンロード中：{0} / {1} MB（毎秒 {2} MB、残り約 {3}）' }
+    'office_dl_retry'= @{ zh = 'OxOffice 下載不完整，重新下載（第 {0} 次）…'
+                          en = 'The OxOffice download was incomplete, retrying (attempt {0})...'
+                          ja = 'OxOffice のダウンロードが不完全なため再試行しています（{0} 回目）…' }
+    'office_install' = @{ zh = '正在安裝 OxOffice（約需幾分鐘）…'
+                          en = 'Installing OxOffice (takes a few minutes)...'
+                          ja = 'OxOffice をインストールしています（数分かかります）…' }
+    'libreoffice'    = @{ zh = '正在用 winget 安裝 LibreOffice（約需幾分鐘）…'
+                          en = 'Installing LibreOffice via winget (takes a few minutes)...'
+                          ja = 'winget で LibreOffice をインストールしています（数分かかります）…' }
+    'tesseract'      = @{ zh = '正在安裝 Tesseract OCR…'
+                          en = 'Installing Tesseract OCR...'
+                          ja = 'Tesseract OCR をインストールしています…' }
+    'git'            = @{ zh = '正在檢查 Git…'
+                          en = 'Checking for Git...'
+                          ja = 'Git を確認しています…' }
+    'uv'             = @{ zh = '正在下載 Python 套件管理工具（uv）…'
+                          en = 'Downloading the Python package manager (uv)...'
+                          ja = 'Python パッケージ管理ツール（uv）をダウンロードしています…' }
+    'code'           = @{ zh = '正在下載程式碼…'
+                          en = 'Downloading the program code...'
+                          ja = 'プログラムをダウンロードしています…' }
+    'winsw'          = @{ zh = '正在準備 Windows 服務元件…'
+                          en = 'Preparing the Windows service wrapper...'
+                          ja = 'Windows サービスの部品を準備しています…' }
+    'vcredist'       = @{ zh = '正在檢查 Visual C++ 執行階段…'
+                          en = 'Checking the Visual C++ runtime...'
+                          ja = 'Visual C++ ランタイムを確認しています…' }
+    'python'         = @{ zh = '正在安裝 Python 與相依套件（約 1 GB，這一步最久）…'
+                          en = 'Installing Python and its packages (about 1 GB, the longest step)...'
+                          ja = 'Python と関連パッケージをインストールしています（約 1 GB、最も時間がかかります）…' }
+    'python_dl'      = @{ zh = '正在安裝 Python 與相依套件：下載 {0}（{1}），已完成 {2} 個'
+                          en = 'Installing Python packages: downloading {0} ({1}), {2} done'
+                          ja = 'Python パッケージをインストール中：{0}（{1}）をダウンロード、{2} 個完了' }
+    'python_unpack'  = @{ zh = '正在安裝 Python 與相依套件：下載完成，安裝中…'
+                          en = 'Installing Python packages: downloads finished, installing...'
+                          ja = 'Python パッケージをインストール中：ダウンロード完了、インストールしています…' }
+    'data'           = @{ zh = '正在準備資料目錄…'
+                          en = 'Preparing the data folder...'
+                          ja = 'データフォルダーを準備しています…' }
+    'service'        = @{ zh = '正在註冊並啟動 Windows 服務…'
+                          en = 'Registering and starting the Windows service...'
+                          ja = 'Windows サービスを登録して起動しています…' }
+    'done'           = @{ zh = '安裝核心已完成'
+                          en = 'Installer core finished'
+                          ja = 'インストールの主な処理が完了しました' }
+    'failed'         = @{ zh = '安裝失敗（詳情見 installer.log）'
+                          en = 'Installation failed (see installer.log)'
+                          ja = 'インストールに失敗しました（詳細は installer.log）' }
+    'eta_sec'        = @{ zh = '{0} 秒';   en = '{0} s';   ja = '{0} 秒' }
+    'eta_min'        = @{ zh = '{0} 分鐘'; en = '{0} min'; ja = '{0} 分' }
+}
+function _status_text([string]$Key, [object[]]$Values) {
+    $t = $StatusText[$Key]
+    if (-not $t) { return $null }
+    $msg = $t[$UiLangKey]
+    if (-not $msg) { $msg = $t['en'] }
+    if ($Values -and $Values.Count) { $msg = $msg -f $Values }
+    return $msg
+}
+function _status([string]$Kind, [string]$Key, [object[]]$Values) {
+    if (-not $StatusFile) { return }            # 不是由安裝程式呼叫（例如手動執行）
+    $msg = _status_text $Key $Values
+    if (-not $msg) { return }
+    # 先寫暫存檔再換上去：安裝程式隨時可能在讀，不可以讓它讀到寫一半的內容。
+    # 換不過去（剛好被安裝程式開著）就稍等再試，失敗也不影響安裝本身。
+    $tmp = "$StatusFile.tmp"
+    for ($i = 0; $i -lt 5; $i++) {
+        try {
+            [System.IO.File]::WriteAllText($tmp, $Kind + $msg, $Utf16NoBom)
+            if (Test-Path -LiteralPath $StatusFile) {
+                # **不可以寫 `$null`**：PowerShell 傳 `$null` 給 .NET 的字串參數時會換成空字串，
+                # Replace 對空字串丟例外 —— 第一次寫得出來、之後每一次都安靜地失敗，
+                # 畫面就停在第一步（2026-10-06 在 Windows 實機上抓到）。
+                [System.IO.File]::Replace($tmp, $StatusFile, [NullString]::Value)
+            } else {
+                [System.IO.File]::Move($tmp, $StatusFile)
+            }
+            return
+        } catch { Start-Sleep -Milliseconds 60 }
+    }
+}
+function Set-Status  ([string]$Key, [object[]]$Values = @()) { _status 'S' $Key $Values }
+function Set-Progress([string]$Key, [object[]]$Values = @()) { _status 'P' $Key $Values }
+
+# 下載並顯示進度。`Invoke-WebRequest` 拿不到進度（打開它的進度列在 PowerShell 5.1
+# 又會慢上好幾倍），所以自己讀串流：每秒更新一次已下載量、速度與預估剩餘時間。
+# `ReadWriteTimeout` 讓斷線時兩分鐘內失敗，不會永遠卡住。
+function Format-Eta([double]$Seconds) {
+    if ($Seconds -lt 60) { return (_status_text 'eta_sec' @([int][Math]::Ceiling($Seconds))) }
+    return (_status_text 'eta_min' @([int][Math]::Ceiling($Seconds / 60)))
+}
+function Save-UrlWithProgress([string]$Url, [string]$Dst, [long]$Total) {
+    try {
+        [Net.ServicePointManager]::SecurityProtocol =
+            [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    } catch {}
+    $req = [System.Net.HttpWebRequest]::Create($Url)
+    $req.UserAgent = 'jt-doc-tools-installer'
+    $req.Timeout = 60000
+    $req.ReadWriteTimeout = 120000
+    $resp = $req.GetResponse()
+    $in = $null; $out = $null
+    try {
+        if ($Total -le 0) { $Total = $resp.ContentLength }
+        $totalMb = [Math]::Round($Total / 1MB)
+        Set-Progress 'office_dl_start' @($totalMb)
+        $in  = $resp.GetResponseStream()
+        $out = [System.IO.File]::Create($Dst)
+        $buf = New-Object byte[] 262144
+        $got = [long]0
+        $sw  = [System.Diagnostics.Stopwatch]::StartNew()
+        $lastTick = 0
+        while (($n = $in.Read($buf, 0, $buf.Length)) -gt 0) {
+            $out.Write($buf, 0, $n)
+            $got += $n
+            $secs = $sw.Elapsed.TotalSeconds
+            $tick = [int][Math]::Floor($secs)
+            if ($tick -ne $lastTick -and $secs -gt 0) {
+                $lastTick = $tick
+                $speed = $got / $secs
+                $eta = if ($Total -gt 0 -and $speed -gt 0) { Format-Eta (($Total - $got) / $speed) } else { '?' }
+                Set-Progress 'office_dl' @([Math]::Round($got / 1MB), $totalMb,
+                                          ('{0:N1}' -f ($speed / 1MB)), $eta)
+            }
+        }
+    } finally {
+        if ($out) { $out.Close() }
+        if ($in)  { $in.Close() }
+        $resp.Close()
+    }
 }
 
 # --- winget：**輸出一律導進記錄檔，不要流進安裝畫面** ----------------
@@ -149,6 +314,7 @@ function Test-Internet {
     return $false
 }
 Log 'Checking network ...'
+Set-Status 'network'
 if (-not (Test-Internet)) {
     Die 'Cannot reach the internet (github.com / cdn.jsdelivr.net / astral.sh). Check VPN / firewall / DNS and retry.' 11
 }
@@ -188,8 +354,9 @@ function Save-VerifiedMsi($url, $size, $dst) {
     for ($i = 1; $i -le 3; $i++) {
         Remove-Item $dst -Force -ErrorAction SilentlyContinue
         Log ("Downloading {0} ({1:N0} MB, attempt {2}/3)" -f $url, ($size / 1MB), $i)
+        if ($i -gt 1) { Set-Status 'office_dl_retry' @($i) }
         try {
-            Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing -ErrorAction Stop
+            Save-UrlWithProgress $url $dst $size
         } catch {
             Warn "Download failed: $_"
             continue
@@ -227,6 +394,7 @@ function Install-OxOffice {
             Warn 'OxOffice download failed three times'; return $false
         }
         Log 'Installing OxOffice (silent) ...'
+        Set-Status 'office_install'
         $msiLog = Join-Path $LogDir 'oxoffice-msi.log'
         $proc = Start-Process msiexec.exe -ArgumentList "/i `"$tmp`" /qn /norestart /l*v `"$msiLog`"" -Wait -PassThru
         Remove-Item $tmp -Force -ErrorAction SilentlyContinue
@@ -239,6 +407,7 @@ function Install-OxOffice {
 }
 function Install-LibreOffice {
     Log 'Falling back to LibreOffice via winget ...'
+    Set-Status 'libreoffice'
     try {
         if (Get-Command winget -ErrorAction SilentlyContinue) {
             $code = Invoke-Winget 'TheDocumentFoundation.LibreOffice' 'LibreOffice'
@@ -249,6 +418,7 @@ function Install-LibreOffice {
     } catch { Warn "LibreOffice install failed: $_"; return $false }
 }
 function Ensure-Office {
+    Set-Status 'office_check'
     if (Test-Office) { Ok 'Office engine detected'; return }
     Log 'No OxOffice / LibreOffice detected'
     if (Install-OxOffice)    { Ok 'OxOffice installed';    return }
@@ -541,6 +711,71 @@ function Fetch-Code {
     Ok 'Source code ready'
 }
 
+# setup-python.cmd 裡的 `uv sync` 要跑十幾分鐘（約 1 GB），原本整段畫面不動。
+# uv 自己會印「Downloading torch (180.0MiB)」與「 Downloaded torch」（輸出不是終端機
+# 也會印，2026-10-06 用 uv 0.11 實測），setup-python.cmd 把它們寫進
+# setup-python-sync.log —— 這裡在背景跑它、每秒讀一次那份記錄，
+# 把「正在下載哪個套件」轉進安裝畫面。
+function Read-SharedText([string]$Path) {
+    # 那份記錄正被 uv 寫著 —— 要用 ReadWrite 共用模式開，不然會被拒絕。
+    try {
+        $fs = [System.IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite')
+        try { return (New-Object System.IO.StreamReader($fs)).ReadToEnd() } finally { $fs.Close() }
+    } catch { return $null }
+}
+function Get-UvDownloadState([string]$Text) {
+    if (-not $Text) { return $null }
+    $order = New-Object System.Collections.Generic.List[string]
+    $size = @{}; $done = @{}; $prepared = $false
+    foreach ($line in ($Text -split "`r?`n")) {
+        if ($line -match '^\s*Downloading (\S+) \(([^)]+)\)') {
+            if (-not $size.ContainsKey($Matches[1])) { $order.Add($Matches[1]) }
+            $size[$Matches[1]] = $Matches[2]
+        } elseif ($line -match '^\s*Downloaded (\S+)\s*$') {
+            $done[$Matches[1]] = $true
+        } elseif ($line -match '^\s*Prepared \d+ package') {
+            # 升級時套件都在快取裡，一個 Downloading 都沒有 —— 看到這行就是進入安裝階段了
+            $prepared = $true
+        }
+    }
+    # 最後一個開始、還沒下載完的那個 —— 同時有好幾個在下載時，顯示最新的一個就夠了。
+    for ($i = $order.Count - 1; $i -ge 0; $i--) {
+        $name = $order[$i]
+        if (-not $done.ContainsKey($name)) {
+            return [pscustomobject]@{ Key = 'python_dl'; Vals = @($name, $size[$name], $done.Count) }
+        }
+    }
+    if ($done.Count -gt 0 -or $prepared) { return [pscustomobject]@{ Key = 'python_unpack'; Vals = @() } }
+    return $null
+}
+function Invoke-SetupPython([string]$SetupBat) {
+    $syncLog = Join-Path $LogDir 'setup-python-sync.log'
+    Remove-Item -LiteralPath $syncLog -Force -ErrorAction SilentlyContinue   # 不要讀到上一次的
+    $out = Join-Path $env:TEMP ("jtdt-setup-python-{0}.log" -f [guid]::NewGuid())
+    $err = "$out.err"
+    $p = Start-Process cmd.exe -ArgumentList "/c `"`"$SetupBat`" `"$InstallDir`"`"" `
+            -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+    $null = $p.Handle      # 不先拿 Handle 的話，結束之後讀不到 ExitCode（PowerShell 5.1 的老問題）
+    while (-not $p.WaitForExit(1000)) {
+        $s = Get-UvDownloadState (Read-SharedText $syncLog)
+        if ($s) { Set-Progress $s.Key $s.Vals }
+    }
+    $p.WaitForExit()
+    # 輸出原本只到安裝畫面（而安裝畫面早就不收輸出了）—— 留一份在 installer.log。
+    # **這裡不可以用 Write-Output**：函式的輸出會跟回傳值混在一起，回傳的就不是離開碼了。
+    foreach ($f in @($out, $err)) {
+        if (Test-Path $f) {
+            $txt = Get-Content $f -Raw
+            if ($txt) {
+                Write-Host $txt
+                try { Add-Content -Path $InstallLog -Value $txt -Encoding UTF8 } catch {}
+            }
+            Remove-Item $f -Force -ErrorAction SilentlyContinue
+        }
+    }
+    return $p.ExitCode
+}
+
 function Setup-Python {
     Log 'Setting up isolated Python environment (uv sync) ...'
     $env:UV_PYTHON_PREFERENCE = 'only-managed'
@@ -558,8 +793,9 @@ function Setup-Python {
     } catch {
         Warn "Could not normalize setup-python.cmd line endings: $_"
     }
-    cmd /c "`"$setupBat`" `"$InstallDir`" 2>&1" | ForEach-Object { Write-Output $_ }
-    switch ($LASTEXITCODE) {
+    Set-Status 'python'
+    $setupRc = Invoke-SetupPython $setupBat
+    switch ($setupRc) {
         0 { Ok "Python environment ready: $InstallDir\.venv" }
         2 { Die 'uv venv failed' 22 }
         3 { Die 'uv sync failed' 22 }
@@ -703,16 +939,18 @@ if ($InstallOcr) {
         Warn 'ARM64 detected: EasyOCR (PyTorch) wheels may be unavailable on Windows ARM64;'
         Warn '  OCR will fall back to tesseract (lighter, CJK accuracy lower). tesseract still installs.'
     }
+    Set-Status 'tesseract'
     Install-Tesseract
 } else { Log 'OCR component skipped (user choice)' }
-Install-Git
-Install-Uv
-Fetch-Code
-Install-Winsw
-if ($InstallOcr)    { Ensure-VCRedist }
+Set-Status 'git';   Install-Git
+Set-Status 'uv';    Install-Uv
+Set-Status 'code';  Fetch-Code
+Set-Status 'winsw'; Install-Winsw
+if ($InstallOcr)    { Set-Status 'vcredist'; Ensure-VCRedist }
 Setup-Python
-Prepare-Data
+Set-Status 'data';  Prepare-Data
 if ($InstallService) {
+    Set-Status 'service'
     Install-Service -BindAddr $EffectiveBind -SvcPort $Port
     Install-Cli
     if ($InstallFirewall) { Install-Firewall -SvcPort $Port }
@@ -747,6 +985,7 @@ function Sync-DisplayVersion {
     } catch { Log "could not sync DisplayVersion: $($_.Exception.Message)" }
 }
 Sync-DisplayVersion
+Set-Status 'done'
 
 Ok 'Install complete!'
 exit 0

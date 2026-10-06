@@ -12,6 +12,7 @@ installer is an additional, isolated path for Windows desktop users.
 | `installer.nsi` | NSIS (MUI2) script — wizard, components page, registry, uninstaller |
 | `install_core.ps1` | Standalone, non-interactive install logic invoked by the wizard |
 | `uninstall_core.ps1` | Standalone uninstall logic invoked by the NSIS uninstaller |
+| `run_core.nsh` | Runs `install_core.ps1` in the background and shows its progress in the wizard (included by `installer.nsi`) |
 | `assets/jtdt.ico` | Multi-resolution app icon (generated from `docs/favicon-512.png`) |
 | `winsw.exe` | Bundled Windows service wrapper (shared with `install.ps1`) |
 
@@ -20,6 +21,17 @@ PowerShell scripts + LICENSE + icon (well under 1 MB). At runtime
 `install_core.ps1` downloads uv-managed Python, clones the repo, runs
 `uv sync`, and registers the WinSW service — exactly the same end state as
 the one-liner, just driven from a GUI.
+
+### Progress in the wizard (since v1.16.55)
+
+`install_core.ps1` writes the current step to a one-line **status file**
+(UTF-16LE, no BOM; first character `S` = new step, `P` = progress within the
+step), and `run_core.nsh` reads it every half second with `FileReadUTF16LE`.
+The whole path stays Unicode, so Chinese and Japanese text never goes through
+the system ANSI code page (which is what used to garble child-process output).
+The core is still **not** run through `nsExec::ExecToLog` (upstream bug #1323).
+Build with `-DSTATUS_ECHO_FILE=<path>` to also append every displayed line to
+a file, so a headless (SSH / `/S`) test run can see what the wizard showed.
 
 ## Components (all default-checked)
 

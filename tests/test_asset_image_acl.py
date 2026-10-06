@@ -7,14 +7,18 @@ by admins, but the *image files* are rendered by ordinary tool pages
 non-admin user (who can legitimately use the stamp / watermark tools) got 403
 and saw blank pickers + an empty editor preview.
 
-The new `/assets/{id}/file` and `/assets/{id}/thumb` endpoints are gated only by
-require_login, so any authenticated user can *view* shared assets (but not
-manage them — no list / upload / delete here). Auth OFF → everyone passes,
-exactly as before.
+The new `/assets/{id}/file` and `/assets/{id}/thumb` endpoints let a logged-in
+non-admin *view* shared assets (but not manage them — no list / upload /
+delete here). Auth OFF → everyone passes, exactly as before.
+
+Since issue #54 (v1.16.54) viewing also follows the tool permission: a stamp
+or signature needs 用印與簽名, a watermark needs 浮水印, a logo is open — see
+`app/core/asset_access.py` and `tests/test_asset_access_by_permission.py`.
+So the non-admin here is one who may stamp (the finance role).
 
 Test list:
   - auth OFF: anyone can fetch /assets/{id}/file + /thumb            → 200
-  - auth ON, non-admin logged in: can fetch /assets/{id}/file+/thumb → 200
+  - auth ON, non-admin who may stamp: /assets/{id}/file+/thumb       → 200
   - auth ON, non-admin logged in: /admin/assets/{id}/file STILL 403  (unchanged)
   - auth ON, unauthenticated: /assets/{id}/file is NOT served        → 401/302
   - unknown asset id                                                 → 404
@@ -35,12 +39,14 @@ def _make_stamp_asset(stamp_png: bytes):
     return asset.id
 
 
-def _non_admin_client(username: str = "userA") -> TestClient:
-    """Create a non-admin local user (default-user role), issue a session, and
-    return a TestClient carrying its cookie. Assumes auth=local is already
-    enabled (call under the admin_session fixture)."""
-    from app.core import user_manager, sessions
+def _non_admin_client(username: str = "userA", role: str | None = None) -> TestClient:
+    """Create a non-admin local user (default-user role, plus `role` if given),
+    issue a session, and return a TestClient carrying its cookie. Assumes
+    auth=local is already enabled (call under the admin_session fixture)."""
+    from app.core import user_manager, sessions, permissions
     uid = user_manager.create_local(username, username, "UserPass1234")
+    if role:
+        permissions.set_subject_roles("user", str(uid), [role])
     token, _ = sessions.issue(uid, remember=False, ip="127.0.0.1", ua="pytest")
     c = TestClient(app_main.app)
     c.cookies.set(sessions.COOKIE_NAME, token)
@@ -59,7 +65,7 @@ def test_auth_off_anyone_can_view_asset_images(auth_off, stamp_png):
 
 def test_auth_on_non_admin_can_view_asset_images(admin_session, stamp_png):
     asset_id = _make_stamp_asset(stamp_png)
-    c = _non_admin_client()
+    c = _non_admin_client(role="finance")   # 財務角色有「用印與簽名」
     for suffix in ("file", "thumb"):
         r = c.get(f"/assets/{asset_id}/{suffix}", follow_redirects=False)
         assert r.status_code == 200, (

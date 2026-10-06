@@ -56,7 +56,19 @@ def test_the_msi_is_not_downloaded_without_verification(rel):
 @pytest.mark.parametrize("rel", _SCRIPTS)
 def test_the_verifier_checks_size_and_signature_and_retries(rel):
     body = _function(rel, "Save-VerifiedMsi")
-    assert re.search(r"-ErrorAction Stop", body), f"{rel}：下載失敗要丟得出例外，不然會拿半份檔案往下走"
+    if "Save-UrlWithProgress" in body:
+        # 圖形安裝程式改成自己下載（才能把進度顯示在畫面上，v1.16.55）：
+        # 下載函式裡 .NET 丟的例外要一路傳回這裡的 try / catch —— 只有設定 TLS 那一行
+        # 可以吞掉例外，其餘任何 catch 都會讓斷線變成「下載完成」，拿半份檔案往下走。
+        dl = _function(rel, "Save-UrlWithProgress")
+        dl_wo_tls = re.sub(r"try \{\s*\[Net\.ServicePointManager\].*?\} catch \{\}", "", dl, flags=re.S)
+        assert "GetResponse()" in dl and "catch" not in dl_wo_tls, (
+            f"{rel}：Save-UrlWithProgress 把下載失敗吞掉了（只有設定 TLS 那一段可以 catch）")
+        assert "ReadWriteTimeout" in dl, f"{rel}：下載卡住不動時要逾時，不然安裝會一直停在那裡"
+        assert re.search(r"try \{\s*Save-UrlWithProgress[^}]*\} catch \{[^}]*continue", body, re.S), (
+            f"{rel}：下載失敗要接住、再試一次")
+    else:
+        assert re.search(r"-ErrorAction Stop", body), f"{rel}：下載失敗要丟得出例外，不然會拿半份檔案往下走"
     assert re.search(r"\$got\s+-ne\s+\$size", body), f"{rel}：沒有比對下載大小"
     assert "Get-AuthenticodeSignature" in body and "HashMismatch" in body, (
         f"{rel}：沒有檢查簽章的雜湊（同樣大小但內容壞掉的檔案）")

@@ -108,7 +108,7 @@ def measure():
             i = n[0]
             ws.send(json.dumps({"id": i, "method": method, "params": params or {}}))
             while True:
-                m = json.loads(ws.recv())
+                m = json.loads(ws.recv(timeout=180))
                 if m.get("id") == i:
                     return m
 

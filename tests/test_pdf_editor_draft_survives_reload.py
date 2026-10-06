@@ -165,7 +165,7 @@ def editor():
             ws.send(_json.dumps({"id": i, "method": method,
                                  "params": params or {}}))
             while True:
-                m = _json.loads(ws.recv())
+                m = _json.loads(ws.recv(timeout=180))
                 if m.get("id") == i:
                     return m
 
