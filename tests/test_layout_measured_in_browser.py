@@ -499,13 +499,17 @@ _HANGING = r"""(function(){
     if (!ic || ic.tagName.toLowerCase() !== 'svg' || !box.offsetParent) return;
     var r = document.createRange();
     r.setStartAfter(ic); r.setEnd(box, box.childNodes.length);
-    var lines = {};
-    Array.from(r.getClientRects()).forEach(function(c){
+    // 同一行裡字級不同（粗體標題接小字說明）的兩段，各自的框頂端差一兩個像素 ——
+    // 依「垂直中線落在同一行裡」歸成一行，不是照頂端四捨五入（那樣一行會被算成兩行）。
+    var lines = [];
+    Array.from(r.getClientRects()).sort(function(a, b){ return a.top - b.top; }).forEach(function(c){
       if (c.width < 1 || c.height < 1) return;
-      var k = Math.round(c.top);
-      lines[k] = Math.min(lines[k] === undefined ? 1e9 : lines[k], c.left);
+      var mid = c.top + c.height / 2;
+      var hit = lines.find(function(l){ return mid >= l.top && mid <= l.bottom; });
+      if (hit) { hit.left = Math.min(hit.left, c.left); hit.bottom = Math.max(hit.bottom, c.bottom); }
+      else lines.push({top: c.top, bottom: c.bottom, left: c.left});
     });
-    var lefts = Object.keys(lines).sort(function(a, b){ return a - b; }).map(function(k){ return lines[k]; });
+    var lefts = lines.map(function(l){ return l.left; });
     var ir = ic.getBoundingClientRect(), br = box.getBoundingClientRect();
     out.push({icon: [ir.left, ir.top, ir.right, ir.bottom], box: [br.left, br.top, br.right, br.bottom],
               lefts: lefts, text: box.textContent.trim().slice(0, 20)});

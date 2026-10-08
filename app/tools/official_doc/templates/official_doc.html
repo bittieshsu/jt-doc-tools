@@ -120,6 +120,11 @@
 .od-extra-cards .option-card { min-width:0; padding:12px 10px; }
 .od-extra-cards .opt-label, .od-extra-cards .opt-desc { overflow-wrap:anywhere; text-wrap:balance; }
 .od-extra-letter { display:contents; }
+/* 管理員還沒準備的資料 */
+.od-setup-who { font-size:12px; color:#92400e; margin-left:4px; font-weight:400; }
+.od-setup-list { margin-top:4px; line-height:1.7; }
+.od-setup-list p { margin:2px 0 0; }
+.od-setup-list a { white-space:nowrap; margin-left:4px; }
 /* 改寫方式：同一種卡片，一次選一種；一律同樣大小排成格子 */
 .option-cards.od-rw-cards { display:grid; gap:8px; margin-top:10px;
                             grid-template-columns:repeat(auto-fit, minmax(min(100%, 104px), 1fr)); }
@@ -364,6 +369,28 @@
 </div>
 
 {{ llm_gate('official-doc', llm_enabled, llm_model, mode='only', llm_url=llm_url) }}
+
+{# 管理員還沒準備的資料（只有管理員看得到）：範本、地址簿、政府公開資料都不隨程式散布，要管理員按下載 #}
+{% if setup_todo %}
+<div class="warn-box" id="odSetup">
+  {{ icon('warn', size=16) }}
+  <b>{{ tr('還有資料要管理員先下載') }}</b><span class="od-setup-who">{{ tr('（只有管理員看得到這個提醒）') }}</span>
+  <div class="od-setup-list">
+    {% if 'templates' in setup_todo or 'orgs' in setup_todo %}
+    <p>
+      {% if 'templates' in setup_todo and 'orgs' in setup_todo %}{{ tr('公文範本與機關地址簿還沒下載：匯出時沒有機關範本可以套用，填受文者時也不會建議機關全銜。') }}
+      {% elif 'templates' in setup_todo %}{{ tr('公文範本還沒下載：匯出時沒有機關範本可以套用。') }}
+      {% else %}{{ tr('機關地址簿還沒下載：填受文者時不會建議機關全銜。') }}{% endif %}
+      <a href="/admin/official-doc">{{ tr('前往公文撰擬設定') }}</a>
+    </p>
+    {% endif %}
+    {% if 'gov' in setup_todo %}
+    <p>{{ tr('法規與文書規範還沒匯入公文知識庫：撰擬時沒有法規可以參考，也不會提醒引用了已廢止的法規。') }}
+      <a href="/admin/knowledge/gov">{{ tr('前往政府公開資料') }}</a></p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 <div class="info-box">
   {{ icon('info', size=14) }}

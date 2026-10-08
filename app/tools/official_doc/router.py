@@ -609,6 +609,38 @@ def _resolve_template(key: str, mode: str) -> bytes:
     return data
 
 
+def _setup_todo(user_id: Optional[int]) -> list[str]:
+    """管理員還沒準備的資料（2026-10-08 使用者：「公文撰擬上面，要提醒管理員需要去設定下載匯入
+    公文範本資料集」）。這幾份資料不隨程式散布，要管理員自己按下載；沒做的話一般使用者只會覺得
+    「範本那一格怎麼沒有」，不知道是缺資料。
+
+    * `templates`：公文範本（公文撰擬設定）；`orgs`：機關地址簿（公文撰擬設定）；
+      `gov`：政府公開資料（法規、文書規範）還沒匯入公文知識庫。
+    * **只給管理員**（只有管理員做得了這件事）；認證關閉＝單人模式，也給。
+    * 只讀狀態、不連外；**公文知識庫的資料庫還不存在時不去開它**（開了就會建出一個空的）。
+    """
+    if _uo.auth_enabled() and not _uo.is_admin(user_id):
+        return []
+    todo: list[str] = []
+    try:
+        from ...core import official_doc_sources as ods
+        if not ods.list_templates():
+            todo.append("templates")
+        if not ods.has_address_book():
+            todo.append("orgs")
+    except Exception as e:  # noqa: BLE001 — 提醒算不出來不可以讓整頁壞掉
+        logger.warning("official-doc：讀資料來源狀態失敗（%s）：%s", type(e).__name__, e)
+    try:
+        from ...core.kb import gov as _gov, store as _kbs
+        imported = _kbs.db_path().exists() and any(
+            s.get("dataset_id") for gid in _gov.GROUPS for s in _kbs.gov_items(gid).values())
+        if not imported:
+            todo.append("gov")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("official-doc：讀政府公開資料狀態失敗（%s）：%s", type(e).__name__, e)
+    return todo
+
+
 def _page_extras(user_id: Optional[int]) -> dict:
     """工具頁要的、會讀檔的那幾項（一起丟到執行緒）。"""
     try:
@@ -620,6 +652,7 @@ def _page_extras(user_id: Optional[int]) -> dict:
         logger.warning("official-doc：讀資料來源狀態失敗（%s）：%s", type(e).__name__, e)
         orgs_ok, attrib = False, {"templates": [], "orgs": []}
     return {"kb_available": _kb_available(user_id), "org_templates": _org_templates(),
+            "setup_todo": _setup_todo(user_id),
             "orgs_available": orgs_ok, "attribution": attrib,
             "ref_purposes": _ref_purpose_labels()}
 

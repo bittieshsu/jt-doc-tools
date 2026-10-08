@@ -451,7 +451,12 @@ def open_original(version_id: str, *, user_id: Optional[int]) -> Optional[dict]:
 
 
 def list_datasets(*, user_id: Optional[int]) -> list[dict]:
-    """這個人看得到、而且**有啟用中文件**的資料集。"""
+    """這個人看得到、而且**有啟用中文件**的資料集。
+
+    資料庫檔還不存在（從來沒用過知識庫）就是沒有資料集 —— 不要為了回答這一句把它建出來
+    （公文撰擬頁每次打開都會問）。"""
+    if not store.db_path().exists():
+        return []
     vis = access.visible_dataset_ids(user_id)
     c = store.conn()
     rows = c.execute(

@@ -1145,7 +1145,7 @@
   "你的收件信箱": "Your email address",
   "你送出的轉換進度與結果": "Progress and results of the jobs you submitted",
   "併行度設定": "Concurrency settings",
-  "使用": ": use a",
+  "使用": ": use a ",
   "使用 Google Authenticator / Microsoft Authenticator / Authy / 1Password 等 TOTP App 在登入時提供 6 位數驗證碼，提升帳號安全。": "Use a TOTP app such as Google Authenticator, Microsoft Authenticator, Authy or 1Password to give a 6-digit code at sign-in.",
   "使用 TLS": "Use TLS",
   "使用中": "In use",
@@ -4320,7 +4320,7 @@
   "變更後其他裝置 / 瀏覽器的登入 session 都會被登出；目前這個視窗會保留。": "Sessions on other devices and browsers are signed out; this window stays signed in.",
   "變更這個字型在工具裡顯示的名稱（PDF 編輯器的字型下拉會用到）": "Change the name this font shows under in the tools (used by the PDF editor's font menu)",
   "讓尺寸比例對齊圖片": "Match the proportions to the image",
-  "讓檔案內容只在公司內網流動。指向雲端 API 會把所有送 LLM 的": "Pointing at a cloud API sends the",
+  "讓檔案內容只在公司內網流動。指向雲端 API 會把所有送 LLM 的": "Pointing at a cloud API sends the ",
   "負責人": "Person in charge",
   "負責人身分證字號": "Representative's national ID no.",
   "負責：": "Owner: ",
@@ -6759,5 +6759,12 @@
   "自己寫要怎麼改": "Write how you want it changed",
   "貼上或拖進來的是機關來文的全文": "What you pasted or dropped in is the full incoming document",
   "自己摘的重點，大綱沒寫到的細節不會被補上": "Your own summary of the key points; details it leaves out are not filled in",
-  "測試信跟作業完成時寄出的通知是同一個版面（內容是範例），可以直接看它在讀信軟體裡的樣子。": "The test message uses the same layout as the job notifications (with sample content), so you can see how it looks in your mail client."
+  "測試信跟作業完成時寄出的通知是同一個版面（內容是範例），可以直接看它在讀信軟體裡的樣子。": "The test message uses the same layout as the job notifications (with sample content), so you can see how it looks in your mail client.",
+  "還有資料要管理員先下載": "Some data has to be downloaded by an administrator first",
+  "（只有管理員看得到這個提醒）": " (only administrators see this notice)",
+  "公文範本與機關地址簿還沒下載：匯出時沒有機關範本可以套用，填受文者時也不會建議機關全銜。": "The official document templates and the agency address book have not been downloaded: no agency template can be applied when exporting, and full agency names are not suggested for the recipient.",
+  "公文範本還沒下載：匯出時沒有機關範本可以套用。": "The official document templates have not been downloaded: no agency template can be applied when exporting.",
+  "機關地址簿還沒下載：填受文者時不會建議機關全銜。": "The agency address book has not been downloaded: full agency names are not suggested for the recipient.",
+  "前往公文撰擬設定": "Go to official document drafting settings",
+  "法規與文書規範還沒匯入公文知識庫：撰擬時沒有法規可以參考，也不會提醒引用了已廢止的法規。": "Laws and document-handling rules have not been imported into the official document knowledge base: drafting has no laws to refer to, and citing an abolished law is not flagged."
 }

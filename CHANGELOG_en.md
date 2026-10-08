@@ -5,7 +5,7 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (895 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (896 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
@@ -14,7 +14,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 ## [1.16.67] - 2026-10-09
 
 - **The e-mail "Send test" in notification settings now sends the real notification layout** (a sample job-completion message with the card, icons and the "My jobs" link, subject marked `[測試]`), so you can see how it looks in your mail client without waiting for a long job. Other channels still get plain text.
-- **Intro site**: more formal section headings and descriptions (AD / LDAP, meeting recordings, auditor and compliance), a shorter official document drafting description, and fewer em dashes.
+- **Official document drafting reminds administrators to download the reference data first**: the office templates, the agency address book and the government open data (laws and writing rules) are not shipped with the program. Administrators now see a list of what is still missing at the top of the page, with links to the settings pages; it disappears once everything is in place. Regular users do not see it. Opening the page no longer creates an empty knowledge-base database.
+- The "use a local LLM server" notice at the top of LLM tools had two words run together in English; fixed.
+- **Intro site**: more formal section headings and descriptions (why self-host, My workspace, background jobs, LLM, AD / LDAP, meeting recordings, auditor and compliance), a shorter official document drafting description, and fewer em dashes.
 
 ---
 
