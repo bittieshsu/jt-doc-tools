@@ -9,6 +9,11 @@
 
 同一個洞還有兩處（**報告沒提到**）：`_trim_memory()` 與 `cleanup_expired()`
 丟掉 `_jobs` 那一列時，也沒有丟 `_fns` / `_subprocs`。
+
+`cleanup_expired()` 後來整支拿掉了 —— 從來沒有人呼叫，而且它的期限
+（`config.job_ttl_seconds` 6 小時）跟管理頁的保留期對不上：接上的話「我的作業」
+的紀錄會在 6 小時後消失。原本驗它的那一條也一起拿掉（它只在驗死碼）；
+「不可以再長出第二條清理路徑」改由 `tests/test_job_view_ok.py` 檢查。
 """
 from __future__ import annotations
 
@@ -65,18 +70,6 @@ def test_trimming_memory_also_drops_the_callables():
     assert m._fns == {}
     # 被裁掉的列不可以在 _subprocs 裡留下孤兒
     assert all(jid in m._jobs for jid in m._subprocs)
-
-
-def test_expiry_cleanup_also_drops_the_callables(monkeypatch):
-    m = _mgr()
-    ids = _submit(m, 5)
-    for jid in ids:
-        m.cancel(jid)
-    for jid in ids:                  # 假裝它們已經過期
-        m._jobs[jid].updated_at = 0.0
-    removed = m.cleanup_expired()
-    assert removed == 5
-    assert m._jobs == {} and m._fns == {}
 
 
 def test_every_place_that_drops_a_job_row_goes_through_forget():

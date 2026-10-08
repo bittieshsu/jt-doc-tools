@@ -104,6 +104,17 @@ def due_at(remote_id: str) -> Optional[float]:
     return _effective_due(row) if row else None
 
 
+def upload_id_for(remote_id: str) -> Optional[str]:
+    """還在等 ACK 的那一件是我們哪一份逐字稿（轉逐字稿的 `upload_id`）；不在清單上回 None。
+
+    會議摘要「把替換送回轉逐字稿」靠它從 JTLW 的作業編號找回那件作業 —— 只認這份清單，
+    不認使用者送來的任何編號（送回去之前另外驗那件作業是不是他送的）。"""
+    with _LOCK:
+        row = _load().get(str(remote_id or ""))
+    uid = row.get("upload_id") if isinstance(row, dict) else None
+    return uid if isinstance(uid, str) and uid else None
+
+
 def forget(remote_id: str) -> None:
     """從清單拿掉（對方說內容已經清掉了，例如 retry 回 `content_cleared`）。"""
     with _LOCK:

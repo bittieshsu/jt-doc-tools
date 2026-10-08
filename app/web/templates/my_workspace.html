@@ -3,7 +3,7 @@
 {% block title %}我的工作區 · {{ app_name }}{% endblock %}
 {% block content %}
 <h1>{{ icon('archive', size=22) }} {{ tr('我的工作區') }}</h1>
-<p class="muted">{{ tr('這裡存放你從各工具按「存至工作區」保留的檔案（PDF / PNG、辦公文件、純文字），只有你的帳號看得到。在任何工具的上傳區可按「從工作區載入」取回使用。') }}</p>
+<p class="muted">{{ tr('這裡存放你從各工具按「存至工作區」保留的檔案（PDF / PNG、辦公文件、純文字、錄音 / 錄影檔），只有你的帳號看得到。在任何工具的上傳區可按「從工作區載入」取回使用。') }}</p>
 
 <div class="panel">
   <h2 data-s="s53896af7">{{ tr('容量') }}</h2>
@@ -18,7 +18,7 @@
 
 <div class="panel">
   <h2 data-s="s53896af7">{{ tr('上傳到工作區') }}</h2>
-  <p class="muted" data-s="se2907ccc">{{ tr('直接把 PDF / PNG、辦公文件或純文字拖進來，或點選挑選，存到自己的工作區。') }}</p>
+  <p class="muted" data-s="se2907ccc">{{ tr('直接把 PDF / PNG、辦公文件、純文字或錄音 / 錄影檔拖進來，或點選挑選，存到自己的工作區。') }}</p>
   <div class="file-upload" id="wsUpload" data-accept="{{ workspace_accept() }}">
     <label class="drop-zone" for="wsUpload-input">
       <div class="drop-zone-inner">
@@ -71,6 +71,7 @@
 .ws-check { position: absolute; top: 8px; left: 8px; z-index: 2; width: 18px; height: 18px; cursor: pointer; }
 .ws-card.selected { outline: 2px solid var(--primary); outline-offset: -2px; }
 .ws-thumb { height: 150px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 1px solid var(--border); cursor: zoom-in; }
+.ws-thumb.no-preview { cursor: default; background: #f8fafc; }
 .ws-lightbox { position: fixed; inset: 0; z-index: 9998; background: rgba(15,23,42,.8); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; }
 .ws-lightbox img { max-width: 92vw; max-height: 80vh; object-fit: contain; background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.4); border-radius: 4px; }
 .ws-lb-close { position: absolute; top: 16px; right: 20px; background: rgba(255,255,255,.15); border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -177,10 +178,14 @@ async function wsLoad() {
     const ext = (f.ext || '').replace('.', '');
     // First-page preview for PDF (rendered server-side) + the image itself for
     // PNG. Falls back to a coloured badge if the thumbnail can't be produced.
-    const thumb = `<img src="/workspace/thumb/${f.file_id}" alt="" loading="lazy">`;
+    // 錄音 / 錄影與純文字沒有預覽圖（伺服器端說 `preview: false`）→ 直接畫圖示，
+    // 不去要一張註定空白的縮圖，點了也不開放大檢視（放大一張空白圖沒有意義）。
+    const noPrev = f.preview === false;
+    const thumb = noPrev ? window.workspaceNoPreviewHtml(f)
+      : `<img src="/workspace/thumb/${f.file_id}" alt="" loading="lazy">`;
     return `<div class="ws-card" data-id="${f.file_id}">
       <input type="checkbox" class="ws-check" data-id="${f.file_id}" aria-label="${tr('選取')}">
-      <div class="ws-thumb" data-id="${f.file_id}" data-ext="${ext}">${thumb}</div>
+      <div class="ws-thumb${noPrev ? ' no-preview' : ''}" data-id="${f.file_id}" data-ext="${ext}">${thumb}</div>
       <div class="ws-body">
         <div class="ws-name">${WS.esc(f.name)}</div>
         <div class="ws-meta">${WS.fmtBytes(f.size)} · ${WS.esc(tr(f.source_tool_name || f.source_tool || '—'))}</div>
@@ -236,7 +241,7 @@ function _wsRetryBlankThumbs() {
 // 點縮圖 → lightbox 放大
 document.getElementById('ws-grid').addEventListener('click', (e) => {
   const thumb = e.target.closest('.ws-thumb');
-  if (!thumb) return;
+  if (!thumb || thumb.classList.contains('no-preview')) return;
   const id = thumb.dataset.id;
   const lb = document.getElementById('ws-lightbox');
   document.getElementById('ws-lb-img').src = '/workspace/thumb/' + id;
@@ -309,7 +314,9 @@ if (window.FileUpload) {
       const fd = new FormData();
       fd.append('file', f, f.name);
       fd.append('source_tool', tr('手動上傳'));
-      const r = await fetch('/workspace/save', { method: 'POST', body: fd });
+      // 走共用元件的上傳（XHR）才看得到進度 —— 錄音檔動輒上百 MB，fetch 傳的話
+      // 畫面上只有一個轉圈，看不出是在傳還是卡住。
+      const r = await wsUp.upload('/workspace/save', fd);
       if (!r.ok) { alert(await window.friendlyServerError(r, tr('上傳失敗'))); break; }
       try { if ((await r.json()).duplicate) dup++; } catch (_e) {}
     }
@@ -319,6 +326,9 @@ if (window.FileUpload) {
   });
 }
 
-wsLoad();
+// **等整頁的 script 都跑完再畫清單**：這段在 content 區塊裡，比 base.html 底下載入的
+// `workspace_picker.js`（沒有預覽圖時畫的圖示在那裡）早執行。
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wsLoad);
+else wsLoad();
 </script>
 {% endblock %}

@@ -35,7 +35,7 @@ from PIL import Image, ImageDraw
 from .llm_review import (
     FilledField, ReviewResult, RoundResult, Correction,
 )
-from .llm_settings import llm_settings
+from .llm_settings import LLMServerUnavailable, llm_settings
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +228,11 @@ def per_field_review(
         return result
 
     try:
-        client = llm_settings.make_client()
+        client = llm_settings.make_client("pdf-fill")
+    except LLMServerUnavailable as exc:
+        # 指定的另一台伺服器不見了：**明確失敗，不退回全站那一台**
+        result.errors.append(exc.MESSAGE)
+        return result
     except ValueError:
         result.errors.append(MESSAGES["bad_config"])
         return result

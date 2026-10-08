@@ -344,8 +344,13 @@ class LLMClient:
             payload.pop(k, None)
         return drop
 
-    def _note_thinking(self, model: str, stats: dict) -> None:
-        """模型還是在思考的話記下來，並寫一行警告（同一個模型 10 分鐘一次）。"""
+    def _note_thinking(self, model: str, stats: dict, *, wanted: bool = False) -> None:
+        """模型還是在思考的話記下來，並寫一行警告（同一個模型 10 分鐘一次）。
+
+        `wanted`：呼叫端自己要求思考（`think=True`）—— 那不是「關不掉」，不記也不警告
+        （不然設定頁會說這個模型關不掉思考、記錄裡多一行說我們送了關閉參數的假話）。"""
+        if wanted:
+            return
         chars = int(stats.get("reasoning_chars") or 0)
         if not chars and not stats.get("think_tag"):
             return
@@ -361,7 +366,8 @@ class LLMClient:
                 "或閘道沒有照做；請在伺服器那一側關閉（見 LLM.md「關閉思考」）",
                 model, chars, "，正文裡有 <think>" if stats.get("think_tag") else "")
 
-    def _chat_stream(self, payload: dict, optional: list, *, model: str) -> str:
+    def _chat_stream(self, payload: dict, optional: list, *, model: str, stop_when=None,
+                     thinking_wanted: bool = False) -> str:
         """POST `/chat/completions`（串流），回完整的正文。
 
         `optional`：payload 裡**可以拿掉**的鍵（關閉思考用的）。對方回 400 / 422 就拿掉重送；
@@ -397,9 +403,14 @@ class LLMClient:
                             break
                         if delta:
                             parts.append(delta)
+                            # 呼叫端可以叫它提早停（例如模型在打轉）：每 32 段看一次最後一截
+                            if stop_when and len(parts) % 32 == 0 and \
+                                    stop_when("".join(parts[-1024:])):
+                                stats["stopped_early"] = True
+                                break
                     break
         self.last_stats = stats
-        self._note_thinking(model, stats)
+        self._note_thinking(model, stats, wanted=thinking_wanted)
         return "".join(parts)
 
     def _chat_post(self, payload: dict, optional: list, *, model: str,
@@ -427,6 +438,94 @@ class LLMClient:
                 "reasoning_chars": len(reasoning) if isinstance(reasoning, str) else 0,
                 "think_tag": isinstance(content, str) and "<think>" in content})
             return data
+
+    # ----- 上下文長度（Ollama）-------------------------------------------------
+    #
+    # Ollama 出廠的上下文長度不大（舊版 2048、之後 4096），**提示超過時它安靜地截掉開頭** ——
+    # 被截掉的正是指令，結果亂掉而且沒有任何錯誤。實測（2026-10-08，Ollama 0.33.3）：
+    # * `/api/ps` 的 `context_length` 是模型**實際載入**的大小（`.40` 是 131072，伺服器設了環境變數）；
+    # * OpenAI 相容端點（我們用的那一支）**不理** `options.num_ctx` —— 只有原生 API 理，而那會讓
+    #   模型照新的大小重新載入，跟同一台的其他程式（OpenWebUI…）用不同大小時會來回重載；
+    # * 用 `/api/create` 從原模型建一個帶 `num_ctx` 參數的**新名字**（權重共用、不複製），
+    #   經 OpenAI 相容端點呼叫時就是那個大小，原模型不受影響。
+
+    #: 公文撰擬（需求 4,000 字＋參考資料＋指令）、會議摘要、文件翻譯一次送的提示加上輸出，
+    #: 抓 16K 才夠；低於這個就在設定頁提醒
+    CONTEXT_RECOMMENDED = 16384
+
+    def context_probe(self, model: str) -> dict:
+        """這個模型在 Ollama 上的上下文長度（設定頁「測試連線」用）。
+
+        回 `{"ollama": bool, "loaded": int|None, "param": int|None, "max": int|None,
+        "effective": int|None, "low": bool}`：`loaded` 是現在載入的大小（沒載入時 None）、
+        `param` 是模型自己的 `num_ctx` 參數、`max` 是模型最多支援多少。不是 Ollama 就只回
+        `{"ollama": False}`（閘道後面看不到，無從判斷）。"""
+        import re as _re
+        if not self.is_ollama():
+            return {"ollama": False}
+        root = self._native_root()
+        t = min(float(self.timeout or 10), 10.0)
+        loaded = param = mx = None
+        want = model if ":" in model else model + ":latest"
+        try:
+            r = httpx.get(f"{root}/api/ps", headers=self._headers(), timeout=t)
+            for m in (r.json().get("models") or []) if r.status_code == 200 else []:
+                if m.get("name") in (model, want) or m.get("model") in (model, want):
+                    v = m.get("context_length")
+                    loaded = int(v) if isinstance(v, int) and v > 0 else None
+        except Exception:      # noqa: BLE001 — 問不到就不知道，不影響其他檢查
+            pass
+        try:
+            r = httpx.post(f"{root}/api/show", headers=self._headers(), json={"model": model}, timeout=t)
+            d = r.json() if r.status_code == 200 else {}
+            m = _re.search(r"(?m)^\s*num_ctx\s+(\d+)", str(d.get("parameters") or ""))
+            param = int(m.group(1)) if m else None
+            for k, v in (d.get("model_info") or {}).items():
+                if str(k).endswith(".context_length") and isinstance(v, int):
+                    mx = v
+        except Exception:      # noqa: BLE001
+            pass
+        eff = loaded or param
+        return {"ollama": True, "loaded": loaded, "param": param, "max": mx, "effective": eff,
+                "low": bool(eff and eff < self.CONTEXT_RECOMMENDED)}
+
+    #: 建新版本時給選的大小（K）—— 白名單，不收任意數字
+    CONTEXT_CHOICES = (16384, 32768, 65536, 131072)
+
+    @staticmethod
+    def context_variant_name(model: str, num_ctx: int) -> str:
+        """`gemma4:26b` + 32768 → `gemma4:26b-ctx32k`（沒寫 tag 的補 `latest`）。"""
+        name, _, tag = model.partition(":")
+        return f"{name}:{tag or 'latest'}-ctx{num_ctx // 1024}k"
+
+    def make_context_variant(self, model: str, num_ctx: int) -> str:
+        """在 Ollama 上建一個帶 `num_ctx` 的新名字（`/api/create`，權重共用），回新名字。
+
+        原本那個模型**不動**（同一台的其他程式照用它原本的大小）。失敗丟 `LLMError`（固定訊息）。"""
+        import re as _re
+        if num_ctx not in self.CONTEXT_CHOICES:
+            raise LLMError("上下文長度只能選 16K、32K、64K、128K")
+        if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._\-/]*(:[A-Za-z0-9._\-]+)?", model or "") \
+                or len(model) > 200:
+            raise LLMError("模型名稱不合法")
+        if not self.is_ollama():
+            raise LLMError("這台不是 Ollama（或經過閘道看不到），只能在伺服器那一側設定")
+        new = self.context_variant_name(model, num_ctx)
+        try:
+            r = httpx.post(f"{self._native_root()}/api/create", headers=self._headers(),
+                           json={"model": new, "from": model, "parameters": {"num_ctx": num_ctx},
+                                 "stream": False},
+                           timeout=max(float(self.timeout or 60), 60.0))
+        except httpx.HTTPError as exc:
+            import logging as _lg
+            _lg.getLogger("app.llm.client").warning("建立上下文版本失敗：%s", type(exc).__name__)
+            raise LLMError("連不上 Ollama，沒有建立") from exc
+        if r.status_code != 200 or '"error"' in (r.text or ""):
+            import logging as _lg
+            _lg.getLogger("app.llm.client").warning(
+                "建立上下文版本失敗（HTTP %d）：%s", r.status_code, (r.text or "")[:300])
+            raise LLMError("Ollama 沒有建立（原因記在服務記錄）")
+        return new
 
     def thinking_probe(self, model: str) -> dict:
         """問模型一個極短的問題，看它**有沒有先思考**（管理頁的測試連線用）。
@@ -553,10 +652,16 @@ class LLMClient:
         max_tokens: int | None = None,
         think: bool = False,
         system: str | None = None,
+        stop_when=None,
     ) -> str:
         """Send a plain-text prompt (no images), return the raw model
         output. Used by features like paragraph reflow that expect prose
         back, not JSON.
+
+        ``stop_when``: optional ``Callable[[str], bool]`` called on the tail of
+        the text streamed so far; ``True`` stops the generation early and
+        returns what has arrived (a model stuck repeating itself would
+        otherwise run all the way to ``max_tokens``).
 
         ``think=False`` (default) tries to suppress chain-of-thought on
         models that support it. This is a best-effort belt-and-braces:
@@ -606,7 +711,8 @@ class LLMClient:
             optional = list(extras)
         if max_tokens:
             payload["max_tokens"] = max_tokens
-        return self._chat_stream(payload, optional, model=model).strip()
+        return self._chat_stream(payload, optional, model=model, stop_when=stop_when,
+                                 thinking_wanted=think).strip()
 
     def vision_query(
         self,
@@ -707,7 +813,7 @@ class LLMClient:
                     extras.setdefault("chat_template_kwargs", {"enable_thinking": False})
             payload.update(extras)
             optional = list(extras)
-        parts = [self._chat_stream(payload, optional, model=model)]
+        parts = [self._chat_stream(payload, optional, model=model, thinking_wanted=think)]
         full_content = "".join(parts)
         # Diagnostic log: how many SSE chunks did we get? Helps catch
         # cases where Ollama opens the stream but never sends any deltas

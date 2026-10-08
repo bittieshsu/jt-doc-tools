@@ -1,6 +1,6 @@
 **繁體中文** ｜ [English](README_en.md) ｜ [日本語](README_ja.md)
 
-# Jason Tools 文件工具箱 v1.16.59
+# Jason Tools 文件工具箱 v1.16.66
 
 > ### ⚠ 2026-09-13 之前用 git 安裝的，這一版升級前要先跑一行
 >
@@ -25,7 +25,7 @@
 > 之後 `jtdt update` 恢復正常。**不受影響**：tarball 安裝、Windows 安裝程式、
 > 或 2026-09-13 之後才安裝的。v1.15.43 起已修正，不會再發生。
 
-> 整合式 PDF / Office 文件處理平台，50 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
+> 整合式 PDF / Office 文件處理平台，51 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
 >
 > 企業功能：**本機 / LDAP / AD 多領域認證**、**SSO 單一登入**(OIDC + SAML，可接 M365 / Google / Keycloak)、**RBAC 角色權限**、**稽核記錄**、**SIEM 轉送**(syslog / CEF / GELF)、**字型管理**、**使用者工作區**、**背景作業與完成通知**、**REST API**。
 >
@@ -95,7 +95,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ---
 
-## 50 個工具速覽
+## 51 個工具速覽
 
 ### 填單用印
 - **表單自動填寫** — 自動偵測欄位 + 模板填值
@@ -118,6 +118,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 - **字數統計** [需 OxOffice/LibreOffice] — 表格 + 圖表 + LLM 摘要；收 PDF / 辦公文件 / 純文字
 - **會議摘要** [需 OxOffice/LibreOffice] — 逐字稿（.vtt / .srt / .json / .txt / .docx / .odt）整理成摘要、決議、待辦、風險與章節；**每一條都指得回第幾段、誰講的**，點下去就跳過去。有時間戳記時另外算發言佔比。匯出 PDF / Word / ODF 時需引擎
 - **會議錄音轉逐字稿** — 錄音或錄影轉成**帶時間與發言者**的逐字稿，可一鍵交給「會議摘要」；辨識在語音服務（JTLW）那側跑，**要先在管理區設定好才會出現**
+- **公文撰擬**（Beta）[需 OxOffice/LibreOffice] — 白話需求寫成「簽」（主旨 / 說明 / 擬辦）或「函」（稱謂與期望語依行文關係決定），或依來文與你的辦理方向擬「簽辦意見」；**格式由程式排、內容由 LLM 寫**，金額、日期、法規、條號、文號與「業經核准」這類說法都拿去跟你給的內容比，找不到依據的標出來，沒提供的標〔待補〕。可以逐段改寫、留版本、在**歷史案件**重新打開以前寫的、參考管理員建的**公文知識庫**（只有「業務依據」算依據），匯出時可套用政府資料開放平臺的公文範本（管理員下載後才有）。**檢查驗不到語意**（因果、結論），草稿送出前一定要人工核對。產出一律是繁體中文的臺灣公文格式，英文 / 日文介面也能用。匯出純文字 / ODT（不需引擎）/ Word / PDF（Word 與 PDF 需引擎）
 - **註解整理 / 清除 / 平面化**
 - **OCR 文字辨識** — 掃描 PDF / 圖片跑 OCR 後變可搜尋、可滑鼠選取複製（同 macOS 預覽程式 Live Text 概念）；雙引擎（**EasyOCR** 預設，中日韓辨識準確度高；**Tesseract** 備援），可選 LLM 校正 typo。**支援外部 GPU 識別伺服器**（DGX Spark / H100 / 4090 等），管理介面下載 `install.sh` 即可一鍵部署，每頁辨識時間從 CPU 上的 8-15 秒降到 GPU 上的 0.3-0.8 秒（**速度 10× 以上**）。
 - **送件前檢核** — 批次驗收：頁面尺寸、字型嵌入、欄位完整、敏感資料殘留、隱藏內容
@@ -169,7 +170,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 耗時的工作（轉檔、OCR、逐句翻譯、大檔壓縮…）送出後就交給伺服器跑，**可以直接關掉分頁**，不必守著進度條。
 
-- **送出即背景執行** — 30 個工具走作業系統，包含 PDF 轉文書檔 / 轉簡報檔、格式互轉、OCR 文字辨識、逐句翻譯、辦公文件轉 PDF、壓縮、合併、分拆、浮水印、用印、騎縫章、送件前檢核等。
+- **送出即背景執行** — 31 個工具走作業系統，包含 PDF 轉文書檔 / 轉簡報檔、格式互轉、OCR 文字辨識、逐句翻譯、辦公文件轉 PDF、壓縮、合併、分拆、浮水印、用印、騎縫章、送件前檢核等。
 - **我的作業** — 進度、佇列位置、已過時間、結果下載都在同一頁；跑一半可取消。逐句翻譯這類「產出不是單一檔案」的工具，點回去會接回原本的頁面繼續看對照表。
 - **重開機不會憑空消失** — 作業狀態存在資料庫裡，服務重啟後未完成的會標示為中斷，而不是無聲無息不見。
 - **不會把機器打爆** — 派送前先估算這個作業要用多少記憶體，不夠就讓它留在佇列排隊；同時處理數與 Office 轉檔併行上限都可在管理區調整。
@@ -216,11 +217,12 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 
 ## LLM AI 加值（選用，預設關閉）
 
-接 OpenAI-compatible 後端（本機 Ollama、LiteLLM 等 LLM 閘道、vLLM、LM Studio、DGX Spark）後，**13 個工具**自動多出聰明選項：
+接 OpenAI-compatible 後端（本機 Ollama、LiteLLM 等 LLM 閘道、vLLM、LM Studio、DGX Spark）後，**14 個工具**自動多出聰明選項：
 
 | 工具 | LLM 做什麼 | 模式 |
 |---|---|---|
 | 逐句翻譯 | 翻譯時保留排版 + 領域專業用詞 | text |
+| 文件翻譯 | 整份辦公文件翻成另一種語言，產出同格式、同版面的檔案 | text |
 | 擷取文字 | 把 PDF 雙欄切斷的句子重新接回 | text |
 | OCR 文字辨識 | 校正 OCR typo（同 word count 才套用，避免幻覺改字） | text |
 | 表單自動填寫 | 填完後 LLM 看 PNG 校驗欄位錯位 / 截斷 | **vision** |
@@ -229,6 +231,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 | 文字去識別化 | 同上，純文字輸入版 | text |
 | 字數統計 | 額外生成 3-5 句摘要 + TOP 10 關鍵字 | text |
 | 會議摘要 | 逐字稿 → 摘要 / 決議 / 待辦 / 風險 / 章節，每一條都附段號可回查 | text |
+| 公文撰擬 | 白話需求 → 簽（主旨 / 說明 / 擬辦）或函、來文 → 簽辦意見、逐段改寫、歷史案件；可參考公文知識庫；格式由程式排，事實由程式比對 | text |
 | 註解整理 | 多筆審閱意見自動分「重大 / 一般 / 提問」 | text |
 | 文件差異比對 | 行 diff 之外多給「主要修改了哪幾條條款」自然語言摘要 | text |
 | 電子發票處理 | 規則對不到的品項，用 LLM 判讀會計科目分類 | text |
@@ -268,7 +271,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 - **引用綁段號不綁文字**：重跑校正或更新詞彙庫之後，已經產生的決議與待辦
   仍然指得回同一段原音。
 
-沒設定就跟以前一樣 —— **其餘 49 個工具完全不受影響**。
+沒設定就跟以前一樣 —— **其餘 50 個工具完全不受影響**。
 
 ---
 
@@ -277,11 +280,11 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 | 文件 | 內容 |
 |---|---|
 | **[INSTALL.md](INSTALL.md)** | 三平台詳細安裝、必要工具、安裝位置、系統需求、解除安裝 |
-| **[OPS.md](OPS.md)** | 日常維運：`jtdt` 指令、升級、反向代理(nginx/Caddy)、監聽位置、備份還原、排程清理 |
+| **[OPS.md](OPS.md)** | 日常維運：`jtdt` 指令、升級、反向代理(nginx/Caddy)、監聽位置、備份還原、搬到另一台主機、排程清理 |
 | **[AUTH.md](AUTH.md)** | 認證 / RBAC / 內建帳號(jtdt-admin / jtdt-auditor)/ 2FA / SSO(OIDC+SAML) / Reverse Proxy SSO(Kerberos) / 帳號鎖定 / 緊急復原 |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO（Kerberos / SPNEGO）完整部署：AD service account、setspn、ktpass / keytab、Nginx 設定、瀏覽器自動登入、標頭偽造防護 |
 | **[API.md](API.md)**（[線上網頁版](https://jasoncheng7115.github.io/jt-doc-tools/api.html)）| REST API:Bearer token、endpoint 一覽、上傳格式、回傳格式、錯誤碼、curl / Python 範例、Job 流程 |
-| **[LLM.md](LLM.md)** | LLM AI 加值功能（預設關閉）：13 個工具如何用 LLM、效果範例、支援的 LLM 伺服器與閘道（Ollama / LiteLLM / vLLM…）、關閉思考與並行設定 |
+| **[LLM.md](LLM.md)** | LLM AI 加值功能（預設關閉）：14 個工具如何用 LLM、效果範例、支援的 LLM 伺服器與閘道（Ollama / LiteLLM / vLLM…）、關閉思考與並行設定 |
 | **[SECURITY.md](SECURITY.md)** | 資安政策、OWASP Top 10 (2025) 對照、漏洞回報管道、GitHub native scan 整合 |
 | **[CHANGELOG.md](CHANGELOG.md)** | 完整更新記錄 |
 | **[TEST_PLAN.md](TEST_PLAN.md)** | 測試清單、發版前檢查 |

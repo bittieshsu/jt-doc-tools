@@ -169,7 +169,9 @@ def _extract_text_from_odf(data: bytes, kind: str) -> str:
             with zf.open("content.xml") as fp:
                 tree = ET.parse(fp)
     except (zipfile.BadZipFile, KeyError, DefusedXmlException) as e:
-        raise HTTPException(400, f"{kind.upper()} parse failed: {e}")
+        # 例外字串不回給使用者（可能帶路徑或內部細節），原因只進記錄
+        logger.info("%s parse failed: %s", kind, e)
+        raise HTTPException(400, "這份檔案讀不出文字（檔案可能毀損，或不是有效的 ODF 文件）。")
     text_ns = "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}"
     raw_paras: list[str] = []
     for el in tree.iter():
@@ -233,7 +235,8 @@ def _extract_text_from_file(filename: str, data: bytes) -> str:
                         paras.append(chunk)
                 return "\n\n".join(_merge_list_markers(paras))
         except Exception as e:
-            raise HTTPException(400, f"PDF parse failed: {e}")
+            logger.info("PDF parse failed: %s", e)
+            raise HTTPException(400, "這份 PDF 讀不出文字（檔案可能毀損或加密）。")
     # Office / ODF：交給 soffice 匯出 UTF-8 文字（等同「打開→另存為純文字」），
     # 段落結構跟使用者在 OxOffice/LibreOffice 看到的一致。比直接 parse XML
     # 多 ~1-2 秒 subprocess，但結果穩定 — 列表編號、表格、註腳都正常。
@@ -253,8 +256,8 @@ def _extract_text_from_file(filename: str, data: bytes) -> str:
             # 不要再包一層「office 檔解析失敗：」那種開發者術語。
             raise
         except Exception as e:
-            raise HTTPException(
-                400, f"這份檔案的文字擷取失敗，Office 引擎回報：{e}")
+            logger.warning("office text extraction failed: %s", e)
+            raise HTTPException(400, "這份檔案的文字擷取失敗，請確認檔案能用 Office 軟體開啟。")
         finally:
             try:
                 src_path.unlink()
@@ -535,7 +538,7 @@ def _translate_sentences(
     sentences: list[str], source_lang: str, target_lang: str,
     domain: str = "", use_glossary: bool = True,
 ) -> list[dict]:
-    client = llm_settings.make_client()
+    client = llm_settings.make_client("translate-doc")
     if client is None:
         raise HTTPException(503, "LLM 服務未啟用，請到「設定 → LLM 設定」開啟")
     # Per-tool 模型覆寫優先；admin 在 LLM 設定頁可以給 translate-doc 指定
@@ -582,7 +585,7 @@ async def index(request: Request):
             "llm_enabled": bool(s.get("enabled")),
             "llm_model": llm_settings.get_model_for("translate-doc"),
             "llm_default_model": s.get("model", ""),
-            "llm_url": s.get("base_url", ""),
+            "llm_url": llm_settings.base_url_for("translate-doc"),
             "office_engine": detect_engine(),
             "glossary_pairs": _gloss.pair_counts(),
             # 逐句翻譯上限 + 分頁大小（admin 可在 LLM 設定調整）
@@ -745,7 +748,7 @@ def _trd_run_job(job, sentences: list[str], source_lang: str,
     """背景執行：逐句翻譯並持續回報進度。"""
     from concurrent.futures import ThreadPoolExecutor
 
-    client = llm_settings.make_client()
+    client = llm_settings.make_client("translate-doc")
     if client is None:
         raise RuntimeError("LLM 服務未啟用")
     model = llm_settings.get_model_for("translate-doc")

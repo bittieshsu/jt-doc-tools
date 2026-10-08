@@ -310,18 +310,28 @@ async def run_ocr(upload_id: str, request: Request,
         use_llm_vision = False
     # OCR 用獨立 LLM client，timeout 縮到 120s（避免單頁掛太久使用者沒回饋）
     OCR_LLM_TIMEOUT = 120.0
+    # 文字校正（pdf-ocr）與視覺類（pdf-ocr-vision）是**兩組設定**，管理員可以把它們指到
+    # 不同的 LLM 伺服器 —— 各建各的 client。指定的那一台不見了就**明確失敗**（503），
+    # 不可以退回全站那一台，也不可以安靜地只跑 OCR（使用者勾了 LLM，會以為校正過了）。
+    from app.core.llm_settings import LLMServerUnavailable as _LSU, llm_settings as _lls
+    if _lls.is_enabled():
+        _want = []
+        if use_llm:
+            _want.append("pdf-ocr")
+        if use_llm_vision or use_llm_direct or use_llm_align or use_llm_full:
+            _want.append("pdf-ocr-vision")
+        for _tid in _want:
+            if _lls.server_problem(_tid):
+                raise HTTPException(503, _LSU.MESSAGE)
     try:
         from app.core.llm_settings import llm_settings
         if (use_llm or use_llm_vision or use_llm_direct or use_llm_align or use_llm_full) and llm_settings.is_enabled():
-            # 重建 client：相同 base_url / api_key，但 timeout 縮到 OCR_LLM_TIMEOUT
-            s = llm_settings.get()
-            from app.core.llm_client import LLMClient as _LC
-            try:
-                client = _LC(base_url=s["base_url"],
-                             api_key=llm_settings.api_key(),
-                             timeout=OCR_LLM_TIMEOUT)
-            except Exception:
-                client = llm_settings.make_client()
+            # 重建 client：同一台伺服器，但 timeout 縮到 OCR_LLM_TIMEOUT
+            client = (llm_settings.make_client("pdf-ocr", timeout=OCR_LLM_TIMEOUT)
+                      if use_llm else None)
+            vclient = (llm_settings.make_client("pdf-ocr-vision", timeout=OCR_LLM_TIMEOUT)
+                       if (use_llm_vision or use_llm_direct or use_llm_align or use_llm_full)
+                       else None)
             if use_llm and client:
                 llm_model_used = llm_settings.get_model_for("pdf-ocr")
                 if llm_model_used:
@@ -356,7 +366,7 @@ async def run_ocr(upload_id: str, request: Request,
                             _ocrlog.warning("text LLM call FAILED in %.1fs: %s", _t.time()-t0, e)
                             raise
                     llm_cb = _llm_cb
-            if use_llm_vision and client:
+            if use_llm_vision and vclient:
                 llm_vision_model_used = llm_settings.get_model_for("pdf-ocr-vision")
                 if llm_vision_model_used:
                     import logging as _lg
@@ -388,7 +398,7 @@ async def run_ocr(upload_id: str, request: Request,
                             # think=False：對 gemma4 / qwen3 thinking model 抑制
                                 # 推理 trace（不然 max_tokens 全花在 <thinking> 上、actual
                                 # 答案部分為空，user 會看到「無回傳內容」）
-                            r = client.vision_query(png_bytes=png_bytes, prompt=prompt,
+                            r = vclient.vision_query(png_bytes=png_bytes, prompt=prompt,
                                                     model=llm_vision_model_used, temperature=0.0,
                                                     max_tokens=2048, parse_json=False,
                                                     think=False) or ""
@@ -401,7 +411,7 @@ async def run_ocr(upload_id: str, request: Request,
                             # 「呼叫失敗：…」比預設「無回傳內容」更有資訊
                             raise
                     llm_vision_cb = _llm_vision_cb
-            if use_llm_direct and client:
+            if use_llm_direct and vclient:
                 # 直接辨識用 vision 模型（跟視覺校對共用 model 設定 key）
                 llm_direct_model_used = llm_settings.get_model_for("pdf-ocr-vision")
                 if llm_direct_model_used:
@@ -429,7 +439,7 @@ async def run_ocr(upload_id: str, request: Request,
                         _ocrlog3.info("direct LLM call start: model=%s img=%dB",
                                       llm_direct_model_used, len(png_bytes))
                         try:
-                            r = client.vision_query(png_bytes=png_bytes, prompt=prompt,
+                            r = vclient.vision_query(png_bytes=png_bytes, prompt=prompt,
                                                     model=llm_direct_model_used,
                                                     temperature=0.0, max_tokens=4096,
                                                     parse_json=False, think=False,
@@ -446,7 +456,7 @@ async def run_ocr(upload_id: str, request: Request,
                             _ocrlog3.warning("direct LLM call FAILED in %.1fs: %s", _t.time()-t0, e)
                             raise
                     llm_direct_cb = _llm_direct_cb
-            if use_llm_align and client:
+            if use_llm_align and vclient:
                 # 對位辨識：同個 vision model,同個 prompt(只看圖獨立 OCR),
                 # 但回到 ocr_core 後會跟 EasyOCR bbox 對齊。共用 pdf-ocr-vision 設定 key。
                 llm_align_model_used = llm_settings.get_model_for("pdf-ocr-vision")
@@ -472,7 +482,7 @@ async def run_ocr(upload_id: str, request: Request,
                         _ocrlog4.info("align LLM call start: model=%s img=%dB",
                                       llm_align_model_used, len(png_bytes))
                         try:
-                            r = client.vision_query(png_bytes=png_bytes, prompt=prompt,
+                            r = vclient.vision_query(png_bytes=png_bytes, prompt=prompt,
                                                     model=llm_align_model_used,
                                                     temperature=0.0, max_tokens=4096,
                                                     parse_json=False, think=False,
@@ -489,7 +499,7 @@ async def run_ocr(upload_id: str, request: Request,
                             _ocrlog4.warning("align LLM call FAILED in %.1fs: %s", _t.time()-t0, e)
                             raise
                     llm_align_cb = _llm_align_cb
-            if use_llm_full and client:
+            if use_llm_full and vclient:
                 # 完整辨識：LLM 同時回文字 + bbox JSON,不跑 OCR 引擎。
                 # 共用 pdf-ocr-vision 設定 key。
                 llm_full_model_used = llm_settings.get_model_for("pdf-ocr-vision")
@@ -524,7 +534,7 @@ async def run_ocr(upload_id: str, request: Request,
                         t0 = _t.time()
                         _ocrlog5.info("full LLM call start: model=%s img=%dB", llm_full_model_used, len(png_bytes))
                         try:
-                            r = client.vision_query(png_bytes=png_bytes, prompt=prompt,
+                            r = vclient.vision_query(png_bytes=png_bytes, prompt=prompt,
                                                     model=llm_full_model_used,
                                                     temperature=0.0, max_tokens=8192,
                                                     parse_json=False, think=False,
@@ -565,7 +575,7 @@ async def run_ocr(upload_id: str, request: Request,
                 try:
                     from app.core.llm_model_profile import get_profile as _get_prof
                     from app.core.llm_settings import llm_settings as _ls
-                    _prof = _get_prof(llm_vision_model_used, _ls.get().get("base_url", ""))
+                    _prof = _get_prof(llm_vision_model_used, _ls.base_url_for("pdf-ocr-vision"))
                     vis_img_max = _prof.preferred_image_max
                 except Exception:
                     pass
@@ -575,7 +585,7 @@ async def run_ocr(upload_id: str, request: Request,
                 try:
                     from app.core.llm_model_profile import get_profile as _get_prof
                     from app.core.llm_settings import llm_settings as _ls
-                    _prof = _get_prof(chosen_vision_model, _ls.get().get("base_url", ""))
+                    _prof = _get_prof(chosen_vision_model, _ls.base_url_for("pdf-ocr-vision"))
                     vis_img_max = _prof.preferred_image_max
                 except Exception:
                     pass

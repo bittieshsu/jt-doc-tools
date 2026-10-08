@@ -34,6 +34,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from ...config import settings
 from ...core import atomic_json, jtlw_ack, jtlw_client, jtlw_settings
+from ...core import audio_formats as _audio_formats
 from ...core import audio_peaks as _audio_peaks
 from ...core import safe_paths as _sp, upload_owner as _uo
 from ...core import meeting_insight as _mi
@@ -50,8 +51,9 @@ TOOL_ID = "meeting-transcribe"
 #: 收得下的副檔名。**伺服器端是唯一來源**，用 `data-*` 送進 DOM ——
 #: 前端自己抄一份的話，檔案選擇器會把收得下的檔案濾掉，而且沒有錯誤訊息
 #: （工作區那次就是這樣，v1.15.88）。
-ACCEPT_EXTS = (".m4a", ".mp3", ".wav", ".aac", ".ogg", ".opus", ".flac",
-               ".mp4", ".mov", ".mkv", ".webm")
+#: **清單本身在 `audio_formats`**：「我的工作區」收錄音檔也是照那一份，
+#: 兩邊各寫一份的話，工作區存得進去、這裡卻挑不到（或反過來）。
+ACCEPT_EXTS = _audio_formats.AUDIO_EXTS
 
 #: 輪詢節奏：一開始密一點（短檔案幾十秒就好了），之後拉長。
 _POLL_FIRST = 3.0
@@ -246,6 +248,69 @@ async def upload(request: Request, file: UploadFile = File(...)):
     facts = _speech.file_facts(file_id)
     atomic_json.write_json(_meta_path(upload_id), {
         "filename": name, "content_type": file.content_type or "application/octet-stream",
+        **facts,
+    })
+    return {"upload_id": upload_id, "filename": name, **facts}
+
+
+def _place_workspace_audio(src: Path, dest: Path) -> None:
+    """把工作區裡的錄音檔放到送件用的位置。
+
+    能硬連結就硬連結（同一個磁碟，不多佔空間、上百 MB 也是瞬間），不行才複製。
+    **不可以直接指向工作區那一份**：工作區的保留期到了、或使用者自己刪掉，
+    送件中的那一件會突然拉不到檔。兩個名字各自獨立，刪哪一個都不影響另一個。
+    先寫到暫存名再換上，中途失敗不會留下半個檔。
+    """
+    import os
+    import shutil
+    tmp = dest.with_name(dest.name + ".part")
+    tmp.unlink(missing_ok=True)
+    try:
+        os.link(src, tmp)
+    except OSError:
+        shutil.copyfile(src, tmp)
+    os.replace(tmp, dest)
+
+
+@router.post("/from-workspace")
+async def from_workspace(request: Request):
+    """從「我的工作區」挑的錄音檔 —— 檔案本來就在本機，**不必再上傳一次**。
+
+    原本「從工作區載入」是先把檔案下載到瀏覽器、再整份上傳回來；錄音檔動輒上百 MB，
+    等於同一份檔案在網路上來回兩趟。這裡直接在伺服器端接過去。
+
+    **歸屬一律由工作區自己判斷**：`workspace.get_file()` 只在**請求者自己的**
+    工作區目錄底下找，拿別人的 `file_id` 一樣是「找不到」（不說「不是你的」——
+    那等於確認這個編號存在）。前端不做任何判斷。
+    """
+    if not jtlw_settings.is_configured():
+        raise HTTPException(503, "還沒設定語音服務（JTLW）—— 請管理員先到設定頁填好")
+    try:
+        body = await request.json()
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(400, "格式錯誤")
+    file_id = str((body or {}).get("file_id") or "") if isinstance(body, dict) else ""
+    from ...core import workspace as _ws
+    try:
+        src, wmeta = _ws.get_file(request, file_id)
+    except _ws.WorkspaceDisabled:
+        raise HTTPException(404, "工作區功能未啟用")
+    except _ws.WorkspaceError:
+        raise HTTPException(404, "工作區裡找不到這個檔案（可能已刪除或過期）")
+    ext = str(wmeta.get("ext") or "").lower()
+    if ext not in ACCEPT_EXTS:
+        raise HTTPException(400, "這個工作區檔案不是錄音或錄影檔")
+
+    upload_id = uuid.uuid4().hex
+    dest = _speech.audio_path(upload_id)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    await asyncio.to_thread(_place_workspace_audio, src, dest)
+    _uo.record(upload_id, request)
+    facts = await asyncio.to_thread(_speech.file_facts, upload_id)
+    name = str(wmeta.get("name") or ("recording" + ext))
+    atomic_json.write_json(_meta_path(upload_id), {
+        "filename": name,
+        "content_type": str(wmeta.get("mime") or "application/octet-stream"),
         **facts,
     })
     return {"upload_id": upload_id, "filename": name, **facts}
@@ -1329,6 +1394,17 @@ async def retry(request: Request):
     terms, variants = parse_glossary(body.get("terms"))
     if not terms:
         raise HTTPException(400, "請至少填一個專有名詞")
+    return {"job_id": submit_retry(request, upload_id, data, terms, variants)}
+
+
+def submit_retry(request: Request, upload_id: str, data: dict, terms: list[str],
+                 variants: Optional[dict] = None, *, meta: Optional[dict] = None) -> str:
+    """送出「只重跑校正」的作業，回作業編號。**這一頁的「重跑校正」與會議摘要的
+    「送回轉逐字稿」共用**（`resend.py`）—— 「能不能重跑」與「同一時間只跑一件」的判斷
+    只能有一份，抄兩份的話其中一份一定會漏掉某一道。
+
+    `terms` / `variants` 是**整份**（JTLW 的 retry 是取代不是累加）；呼叫端負責歸屬檢查。
+    """
     state = _retry_state(upload_id, data)
     if not state["possible"]:
         raise HTTPException(409, jtlw_client.MESSAGES[_RETRY_REFUSED[state["reason"]]])
@@ -1343,7 +1419,7 @@ async def retry(request: Request):
             _run_retry(job, upload_id, terms, variants)
 
         job = job_manager.submit(TOOL_ID, run, meta={"filename": filename, "retry": True,
-                                                     "upload_id": upload_id},
+                                                     "upload_id": upload_id, **(meta or {})},
                                  request=request)
     except BaseException:
         with _RETRY_LOCK:
@@ -1353,7 +1429,7 @@ async def retry(request: Request):
         if _RETRYING.get(upload_id) == "pending":
             _RETRYING[upload_id] = job.id
     job.meta["view_url"] = f"/tools/{TOOL_ID}/?job={job.id}"
-    return {"job_id": job.id}
+    return job.id
 
 
 @router.post("/done")
@@ -1399,8 +1475,12 @@ async def start(request: Request):
     def run(job) -> None:
         _run_job(job, upload_id, language, num_speakers, terms, ctx, variants)
 
+    # **`upload_id` 送件當下就寫進 meta**（不是做完才寫）：暫存檔的清理只認得「保留期內或還沒結束的
+    # 作業」meta 裡的編號（`job_store.keep_alive_keys`）—— 排隊或辨識超過暫存保留時數（預設 2 小時）
+    # 的話，錄音檔資訊與歸屬紀錄（`.owners/<id>.json`）會在作業還沒做完時就被清掉，做完也打不開。
     job = job_manager.submit(TOOL_ID, run,
-                             meta={"filename": meta["filename"]}, request=request)
+                             meta={"filename": meta["filename"], "upload_id": upload_id},
+                             request=request)
     job.meta["view_url"] = f"/tools/{TOOL_ID}/?job={job.id}"
     return {"job_id": job.id}
 

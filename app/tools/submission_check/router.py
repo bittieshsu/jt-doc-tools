@@ -802,9 +802,14 @@ def _build_report_l1(case: dict, version: str, job: "_jm.Job") -> dict:
     # L5: LLM 文字 — 變體合併
     l3_used = False
     _llm_model_name = ""
+    # 指定的另一台 LLM 伺服器不見了 / 位址不合格時，L5 / L6 要講出是**設定的問題** ——
+    # 不可以安靜地顯示「LLM 未設定」，更不可以改送全站那一台（`make_client` 會丟例外）。
+    _llm_server_error = None
     try:
         from app.core.llm_settings import llm_settings as _ls
         _llm_model_name = _ls.get_model_for("submission-check")
+        if _ls.is_enabled():
+            _llm_server_error = _ls.server_problem("submission-check")
     except Exception:
         pass
     if _l3.llm_available():
@@ -895,6 +900,8 @@ def _build_report_l1(case: dict, version: str, job: "_jm.Job") -> dict:
 
     if l3_used:
         _set_layer_status(job, "L5", "done", "LLM 文字分析完成")
+    elif _llm_server_error:
+        _set_layer_status(job, "L5", "error", _llm_server_error)
     else:
         _set_layer_status(job, "L5", "skipped", "LLM 未設定")
 
@@ -932,6 +939,8 @@ def _build_report_l1(case: dict, version: str, job: "_jm.Job") -> dict:
             from app.core.llm_settings import llm_settings
             if not llm_settings.is_enabled():
                 _set_layer_status(job, "L6", "skipped", "LLM 未設定")
+            elif _llm_server_error:
+                _set_layer_status(job, "L6", "error", _llm_server_error)
             else:
                 _set_layer_status(job, "L6", "skipped", "目前 LLM 模型非 vision")
         except Exception:

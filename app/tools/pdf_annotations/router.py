@@ -276,7 +276,7 @@ async def _llm_group_annots(annots: list[dict[str, Any]]) -> dict[str, Any]:
     'idx' (assigned during _read_annotations)."""
     from ...core.llm_settings import llm_settings as _llms
     import asyncio as _asyncio
-    client = _llms.make_client()
+    client = _llms.make_client("pdf-annotations")
     if client is None:
         return {}
     model = _llms.get_model_for("pdf-annotations")

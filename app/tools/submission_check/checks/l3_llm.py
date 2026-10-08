@@ -20,7 +20,7 @@ def _get_client_and_model():
         from app.core.llm_settings import llm_settings
         if not llm_settings.is_enabled():
             return None, None
-        client = llm_settings.make_client()
+        client = llm_settings.make_client("submission-check")
         model = llm_settings.get_model_for("submission-check")
         return client, model
     except Exception:

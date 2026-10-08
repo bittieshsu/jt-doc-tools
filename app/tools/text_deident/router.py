@@ -425,7 +425,7 @@ def _llm_extra_findings(full_text: str, already_known: list[str]) -> list[dict]:
     """Ask LLM to find sensitive entities the regex missed.
     Returns a list of {text, type} dicts; caller resolves text → char span."""
     from ...core.llm_settings import llm_settings as _llms
-    client = _llms.make_client()
+    client = _llms.make_client("text-deident")
     if client is None:
         return []
     model = _llms.get_model_for("text-deident")

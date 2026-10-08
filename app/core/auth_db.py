@@ -803,6 +803,32 @@ def _m28_grant_meeting_transcribe(conn: sqlite3.Connection) -> None:
     """)
 
 
+
+def _m29_grant_official_doc(conn: sqlite3.Connection) -> None:
+    """v29：把 `official-doc`（公文撰擬）補給既有角色。
+
+    理由同 `_m18`~`_m28`（seed 快照的 bootstrap 缺口）：從舊版升上來的安裝，
+    角色早就存在，而 `seed_builtin_roles()` 的差集 top-up 以快照為基準 ——
+    新工具不會自己長出來。
+
+    **拿 `meeting-summary`（會議摘要）當訊號**：同一類的事 —— 把使用者自己寫的
+    文字交給 LLM，產出一份可以拿去用的新文件（會議記錄 / 簽稿），而且同樣
+    **只讀不改**、內容只送到管理員設定的同一個 LLM 服務。能用會議摘要的人
+    用這支沒有額外風險。`pdf-wordcount` 當訊號也說得通，但那支 LLM 只是加值、
+    文管角色以外幾乎人人都有，訊號太寬。
+    **不可以無條件補給所有角色** —— 那會把刻意收窄過的角色一起放寬
+    （文管那個角色沒有任何 LLM 工具，是刻意的）。
+    """
+    conn.executescript("""
+    INSERT OR IGNORE INTO role_perms(role_id, tool_id)
+        SELECT role_id, 'official-doc' FROM role_perms
+        WHERE tool_id = 'meeting-summary';
+    INSERT OR IGNORE INTO subject_perms(subject_type, subject_key, tool_id)
+        SELECT subject_type, subject_key, 'official-doc'
+        FROM subject_perms WHERE tool_id = 'meeting-summary';
+    """)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -827,7 +853,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m25_grant_doc_translate,
               _m26_grant_doc_straighten,
               _m27_grant_meeting_summary,
-              _m28_grant_meeting_transcribe]
+              _m28_grant_meeting_transcribe,
+              _m29_grant_official_doc]
 
 
 def auth_db_path() -> Path:

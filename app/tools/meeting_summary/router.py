@@ -96,7 +96,8 @@ async def index(request: Request):
         "request": request,
         "llm_enabled": llm_settings.is_enabled(),
         "llm_model": llm_settings.get_model_for(TOOL_ID),
-        "llm_url": (llm_settings.get() or {}).get("base_url", ""),
+        # 這支工具實際送去的那一台（可能是另外指定的伺服器，不一定是全站那一台）
+        "llm_url": llm_settings.base_url_for(TOOL_ID),
         "accept": ",".join(tp.SUPPORTED),
         "supported": tp.SUPPORTED,
         # **配色只有一份**：前端畫圖、伺服器畫匯出用的圖，兩邊用同一組顏色
@@ -292,24 +293,44 @@ def _try_import_export(data: bytes, filename: str):
     return out, segs
 
 
-def _transcript_context(data: bytes) -> str:
+def _json_obj(data: bytes) -> Optional[dict]:
+    """內容是 JSON 物件就讀出來（看內容不看副檔名），不是回 None。"""
+    head = data.lstrip(b"\xef\xbb\xbf \t\r\n")[:1]
+    if head != b"{":
+        return None
+    try:
+        obj = json.loads(data.decode("utf-8-sig"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return obj if isinstance(obj, dict) else None
+
+
+def _transcript_context(obj: Optional[dict]) -> str:
     """轉逐字稿送來的 JSON 裡的 `context`（使用者在「專有名詞或會議背景」寫的原文）。
 
     看內容不看副檔名 —— 經工作區中轉時檔名會變成 `.txt`（v1.16.40 / v1.16.42 同一個家族）。
     **只讀這一個欄位**，逐字稿怎麼解析仍然是 `transcript_parse` 的事（那支 JTLW 也在用，
     不為了這件事改它）。"""
-    head = data.lstrip(b"\xef\xbb\xbf \t\r\n")[:1]
-    if head != b"{":
-        return ""
-    try:
-        obj = json.loads(data.decode("utf-8-sig"))
-    except (ValueError, UnicodeDecodeError):
-        return ""
     ctx = obj.get("context") if isinstance(obj, dict) else None
     if not isinstance(ctx, str):
         return ""
     lines = ["".join(ch for ch in ln if ch.isprintable()).rstrip() for ln in ctx.splitlines()]
     return "\n".join(lines).strip()[:mi.MAX_CONTEXT_CHARS]
+
+
+#: 轉逐字稿那件作業在 JTLW 的編號（`remote_job_id`，像 `job_01J…`）只收這種字元。
+#: 它**只拿來查我們自己的延後 ACK 清單**，不會照著打給 JTLW（打出去的編號一律取自
+#: 轉逐字稿那邊存的逐字稿）。
+_REMOTE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}")
+
+
+def _transcript_source(obj: Optional[dict]) -> Optional[str]:
+    """轉逐字稿送來的 JSON 是哪一件 JTLW 作業 —— 「自己加替換」送回那件作業時用。
+
+    **只是提示**：檔案是使用者上傳的，這個編號誰都寫得出來。送回去之前伺服器端還要確認
+    那件作業真的是這個人送的（`meeting_transcribe/resend.py`）。"""
+    rid = obj.get("remote_job_id") if isinstance(obj, dict) else None
+    return rid if isinstance(rid, str) and _REMOTE_ID.fullmatch(rid) else None
 
 
 @router.post("/upload")
@@ -348,9 +369,14 @@ async def upload(request: Request, file: UploadFile = File(...),
     # **轉逐字稿時填的「專有名詞或會議背景」**（2026-10-03 使用者要求）—— 轉送過來的逐字稿
     # JSON 帶著它。上一次分析這份逐字稿時填過背景的話，畫面以那一份為準（那是使用者在
     # 會議摘要這邊最後用的）；這一份只在框是空的、也沒有記住的背景時才帶進去。
-    tctx = _transcript_context(data)
+    obj = _json_obj(data)
+    tctx = _transcript_context(obj)
     if tctx:
         info["transcript_context"] = tctx
+    # **轉逐字稿那件作業的編號**（「自己加替換」可以送回那件作業重跑校正，v1.16.66）——
+    # 只記下來當提示，能不能送由 `/resend-variants` 每次在伺服器端重新判斷
+    src_rid = _transcript_source(obj)
+    info["from_transcribe"] = bool(src_rid)
     # **告訴使用者用了哪一種排法**，並附上可以改的清單 ——
     # 自動判斷錯的時候要有路可走（使用者 2026-09-18 要求）。
     info["shape"] = shape_used
@@ -368,7 +394,8 @@ async def upload(request: Request, file: UploadFile = File(...),
         # 補上去的（見 `transcript_parse.parse_plain`），所以算出來的發言時間
         # 把中間的停頓也算了進去。
         # 不講的話，那一欄看起來就跟量到的一樣 —— 介面承諾了沒做到的事。
-        "times_are_measured": shape_used in _MEASURED_SHAPES})
+        "times_are_measured": shape_used in _MEASURED_SHAPES,
+        **({"jtlw_remote_job_id": src_rid} if src_rid else {})})
     return {"upload_id": upload_id} | info
 
 
@@ -385,12 +412,17 @@ def _store_import(request: Request, out: dict, segs: list[dict], filename: str) 
             "times_are_measured": bool(src.get("times_are_measured")),
             "imported": True,
             "replacements": out.get("replacements") or []}
+    # 分析的逐字稿是從轉逐字稿來的話，那件作業的編號跟著回來（照樣只是提示，見 `_transcript_source`）
+    src_rid = _transcript_source({"remote_job_id": src.get("jtlw_remote_job_id")})
+    if src_rid and segs:
+        meta["jtlw_remote_job_id"] = src_rid
     out["source"] = meta
     atomic_json.write_json(_seg_path(upload_id), segs)
     atomic_json.write_json(_meta_path(upload_id), meta)
     atomic_json.write_json(_out_path(upload_id), out)
     return ({"upload_id": upload_id, "imported": True, "has_transcript": bool(segs),
-             "shapes": tp.SHAPES, "shape": None} | info)
+             "shapes": tp.SHAPES, "shape": None,
+             "from_transcribe": bool(meta.get("jtlw_remote_job_id"))} | info)
 
 
 #: 每一段都帶著自己的結束時間的來源 —— 那些的發言時間是**量到的**。
@@ -405,7 +437,7 @@ def _ask_for(job) -> callable:
     它不知道作業被取消了 —— 但它每一次都會回來問我們。所以判斷放在這裡，
     被取消就丟例外把整條管線中斷掉。
     """
-    client = llm_settings.make_client()
+    client = llm_settings.make_client(TOOL_ID)
     if client is None:
         raise RuntimeError("LLM 服務未啟用")
     model = llm_settings.get_model_for(TOOL_ID)
@@ -515,9 +547,13 @@ async def start(request: Request):
     def run(job) -> None:
         _run_job(job, upload_id, context, with_impacts)
 
+    # **`upload_id` 送出當下就寫進 meta**（不是做完才寫）：暫存檔的清理只認得「保留期內或還沒結束的
+    # 作業」meta 裡的編號（`job_store.keep_alive_keys`）—— 排隊加分析超過暫存保留時數（預設 2 小時）
+    # 的話，逐字稿與歸屬紀錄（`.owners/<id>.json`）會在作業還沒做完時就被清掉，做完也打不開。
     job = job_manager.submit(
         TOOL_ID, run,
-        meta={"filename": meta["filename"], "segments": meta["segments"]},
+        meta={"filename": meta["filename"], "segments": meta["segments"],
+              "upload_id": upload_id},
         request=request,
     )
     job.meta["view_url"] = f"/tools/{TOOL_ID}/?job={job.id}"
@@ -578,6 +614,46 @@ async def find_term(request: Request):
                                    body.get("from"))
 
 
+def _resend():
+    """「送回轉逐字稿」的判斷在轉逐字稿那邊（那件作業的資料與規則都在那裡）。
+    **用的時候才載入**：工具是逐支註冊的，模組載入時就去拉另一支工具不必要。"""
+    import importlib
+    return importlib.import_module("app.tools.meeting_transcribe.resend")
+
+
+@router.get("/resend-variants/{upload_id}")
+async def resend_variants_state(upload_id: str, request: Request):
+    """「自己加替換」能不能送回轉逐字稿那件作業（JTLW `variants`）、為什麼不能、上一次換了幾處。
+
+    **判斷全在伺服器端**（`meeting_transcribe/resend.state`），頁面照著顯示 ——
+    不能送時不畫一顆按了才失敗的按鈕。`available: false` ＝ 這份逐字稿不是從轉逐字稿來的。"""
+    _sp.require_uuid_hex(upload_id, "upload_id")
+    _uo.require(upload_id, request)
+    meta = _read_json(_meta_path(upload_id), "逐字稿")
+    # 會問 JTLW 的版本（有快取）—— 不在事件迴圈上等
+    return await asyncio.to_thread(_resend().state, meta.get("jtlw_remote_job_id"), request)
+
+
+@router.post("/resend-variants")
+async def resend_variants(request: Request):
+    """把「自己加替換」當成**已知的錯寫法**送回轉逐字稿那件作業，請 JTLW 只重跑校正
+    （v1.16.66；JTLW v2.28 建議的那條路）。回作業編號（工具是「會議錄音轉逐字稿」）。
+
+    `rows`：`[{from, to}]`（畫面上勾著的那幾列）。送出去的是那件作業**整份**的專有名詞與錯寫法
+    再加上這幾條 —— JTLW 的 retry 是取代不是累加。這裡的逐字稿與分析不受影響。"""
+    body = await request.json() or {}
+    upload_id = str(body.get("upload_id") or "").strip()
+    _sp.require_uuid_hex(upload_id, "upload_id")
+    _uo.require(upload_id, request)
+    meta = _read_json(_meta_path(upload_id), "逐字稿")
+    segs = _read_json(_seg_path(upload_id), "逐字稿")
+    rs = _resend()
+    upload_mt, data, terms, variants = await asyncio.to_thread(
+        rs.prepare, meta.get("jtlw_remote_job_id"), request, body.get("rows"),
+        segs if isinstance(segs, list) else [])
+    return {"job_id": rs.submit(request, upload_mt, data, terms, variants)}
+
+
 @router.post("/forget-context")
 async def forget_context(request: Request):
     """清掉「這份逐字稿上一次分析時填的會議背景」—— 背景框旁的「清除」。
@@ -629,7 +705,8 @@ async def segments(upload_id: str, request: Request):
                                "replacements": tfx.normalise_applied(
                                    meta.get("replacements")) or [],
                                "manual_replacements": tfx.clean_rows(
-                                   meta.get("manual_replacements"))}
+                                   meta.get("manual_replacements")),
+                               "from_transcribe": bool(meta.get("jtlw_remote_job_id"))}
     return {"segments": segs, "info": info}
 
 
@@ -1395,7 +1472,7 @@ async def api_meeting_summary(request: Request,
     if pairs:
         segs, applied = tfx.apply(segs, pairs)
 
-    client = llm_settings.make_client()
+    client = llm_settings.make_client(TOOL_ID)
     if client is None:
         raise HTTPException(503, "LLM 服務未啟用")
     model = llm_settings.get_model_for(TOOL_ID)

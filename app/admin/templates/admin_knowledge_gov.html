@@ -1,0 +1,1025 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}{{ tr('政府公開資料') }} · {{ tr('公文知識庫') }} · {{ app_name }}{% endblock %}
+
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+  .gv-back { font-size: 13px; margin: 0 0 6px; }
+  .gv-points { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.75; color: #334155; }
+  .gv-run { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; }
+  .gv-run-bar { flex: 1 1 200px; height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; min-width: 120px; }
+  .gv-run-bar > span { display: block; height: 100%; width: 0; background: var(--primary); transition: width .3s; }
+  .gv-card h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .gv-badge { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11px; font-weight: 600;
+    line-height: 1.6; background: #eef2ff; color: #3730a3; white-space: nowrap; }
+  .gv-badge.gv-warn { background: #fef3c7; color: #92400e; }
+  .gv-badge.gv-muted { background: #f1f5f9; color: #475569; }
+  .gv-badge.gv-ok { background: #dcfce7; color: #166534; }
+  .gv-about { font-size: 13px; color: #475569; margin: 4px 0 8px; }
+  /* 2026-10-08 使用者：「已下載 跟 已匯入 之類的顯示 再清楚排版一點」—— 三格數字（清單 → 勾選 → 匯入，
+     中間的箭頭是流程順序）＋ 最近一次的結果（狀態標籤 ＋ 動作 ＋ 時間）。 */
+  .gv-status { margin: 10px 0 12px; max-width: 760px; }
+  .gv-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .gv-stat { position: relative; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 12px; background: #f8fafc; }
+  .gv-stat + .gv-stat::before { content: ''; position: absolute; left: -9px; top: 50%; width: 7px; height: 7px;
+    border-top: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; transform: translate(-50%, -50%) rotate(45deg); }
+  .gv-stat-top { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #475569; line-height: 1.35; }
+  .gv-stat-top svg { flex: 0 0 auto; color: var(--primary); }
+  .gv-stat-label { min-width: 0; overflow-wrap: anywhere; }
+  .gv-stat-num { font-size: 24px; font-weight: 700; color: #0f172a; line-height: 1.25; margin-top: 4px;
+    font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .gv-stat-sub { font-size: 12px; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+  .gv-stat-sub.gv-t-warn, .gv-stat-sub .gv-t-warn { color: #92400e; }
+  .gv-stat.gv-stat-empty .gv-stat-num { color: #94a3b8; }
+  .gv-stat.gv-stat-done { border-color: #bbf7d0; background: #f0fdf4; }
+  .gv-stat.gv-stat-done .gv-stat-top svg { color: var(--success); }
+  .gv-last { margin-top: 10px; padding: 8px 12px; font-size: 13px; background: #f8fafc;
+    border: 1px solid var(--border); border-left: 3px solid #94a3b8; border-radius: var(--radius); }
+  .gv-last[data-state="ok"] { border-left-color: var(--success); }
+  .gv-last[data-state="err"] { border-left-color: var(--danger); }
+  .gv-last[data-state="run"] { border-left-color: var(--primary); }
+  .gv-last-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+  .gv-last-cap { font-size: 12px; color: var(--muted); }
+  .gv-last-act { font-weight: 600; color: #0f172a; }
+  .gv-last-time { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .gv-last-msg { margin-top: 4px; color: #334155; overflow-wrap: anywhere; }
+  .gv-last[data-state="err"] .gv-last-msg { color: #991b1b; }
+  .gv-last-note { margin-top: 4px; font-size: 12.5px; color: #475569; overflow-wrap: anywhere; }
+  .gv-last-note.gv-t-err { color: #991b1b; }
+  .gv-st { display: inline-flex; align-items: center; gap: 4px; padding: 1px 9px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; line-height: 1.75; white-space: nowrap; }
+  .gv-st svg { width: 13px; height: 13px; }
+  .gv-st .gv-spinner { width: 10px; height: 10px; }
+  .gv-st-ok { background: #dcfce7; color: #166534; }
+  .gv-st-err { background: #fee2e2; color: #991b1b; }
+  .gv-st-run { background: #dbeafe; color: #1e40af; }
+  .gv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .gv-chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 1px 9px; border: 1px solid var(--border);
+    border-radius: 999px; font-size: 12px; background: #fff; color: #475569; white-space: nowrap; }
+  .gv-chip b { color: #0f172a; font-variant-numeric: tabular-nums; }
+  .gv-chip.gv-chip-ok { border-color: #bbf7d0; background: #f0fdf4; }
+  .gv-chip.gv-chip-ok b { color: #166534; }
+  .gv-chip.gv-chip-err { border-color: #fecaca; background: #fef2f2; }
+  .gv-chip.gv-chip-err b { color: #991b1b; }
+  .gv-miss { margin: 8px 0 0; font-size: 12.5px; max-width: 760px; }
+  .gv-miss > summary { cursor: pointer; color: #92400e; width: max-content; max-width: 100%; }
+  .gv-miss p { margin: 4px 0 0; color: #475569; overflow-wrap: anywhere; }
+  @media (max-width: 560px) {
+    .gv-stats { gap: 12px; }
+    .gv-stat { padding: 8px 9px; }
+    .gv-stat + .gv-stat::before { left: -6px; width: 5px; height: 5px; }
+    .gv-stat-num { font-size: 20px; }
+  }
+  .gv-pkgs { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+  .gv-pkg { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; background: #f8fafc; }
+  .gv-pkg-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 13px; }
+  .gv-pkg-name { font-weight: 600; color: #0f172a; }
+  .gv-pkg-info { font-size: 12.5px; color: #475569; overflow-wrap: anywhere; }
+  /* 網址兩格：標籤一欄、輸入框一欄（兩列的標籤對齊）；窄螢幕改成標籤在上 */
+  .gv-url-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center;
+    gap: 6px 10px; margin-top: 8px; }
+  .gv-url-label { font-size: 12px; font-weight: 600; color: #374151; }
+  .gv-url-grid input.field { width: 100%; max-width: 100%; min-width: 0; height: 32px; font-size: 12.5px; }
+  @media (max-width: 640px) {
+    .gv-url-grid { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .gv-url-grid input.field + .gv-url-label { margin-top: 6px; }
+  }
+  .gv-pkg-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+  .gv-pkg-last { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12px; color: #475569; margin-top: 8px; }
+  .gv-pkg-last .gv-last-msg { margin-top: 0; }
+  .gv-pkg-last.gv-err .gv-last-msg { color: #991b1b; }
+  .gv-upload { margin-top: 8px; font-size: 12.5px; }
+  .gv-upload > summary { cursor: pointer; color: #475569; width: max-content; max-width: 100%; }
+  .gv-up { margin-top: 6px; }
+  /* 共用上傳元件（components/file_upload.html）放在卡片裡：縮小一點 */
+  .gv-up .file-upload .drop-zone { padding: 14px 12px; background: #fff; }
+  .gv-up .drop-zone-icon svg { width: 26px; height: 26px; }
+  .gv-up .drop-zone-text { font-size: 13px; margin-top: 2px; }
+  .gv-up-note { margin-top: 6px; font-size: 12.5px; color: #475569; overflow-wrap: anywhere; }
+  .gv-up-note.gv-t-ok { color: #166534; }
+  .gv-up-note.gv-t-err { color: #991b1b; }
+  .gv-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .gv-picker { border-top: 1px solid #eef2f7; margin-top: 10px; padding-top: 10px; }
+  .gv-h3 { font-size: 14px; margin: 0 0 6px; }
+  .gv-searchbar { display: flex; gap: 8px; align-items: center; }
+  .gv-searchbar input { flex: 1 1 auto; min-width: 0; }
+  .gv-list { list-style: none; margin: 8px 0; padding: 0; max-height: 360px; overflow: auto;
+    border: 1px solid #eef2f7; border-radius: 6px; }
+  .gv-list:empty { display: none; }
+  .gv-list li { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-bottom: 1px dashed #e2e8f0; font-size: 13px; }
+  .gv-list li:last-child { border-bottom: 0; }
+  .gv-list label { display: flex; align-items: flex-start; gap: 8px; flex: 1 1 auto; min-width: 0; cursor: pointer; }
+  .gv-item-name { font-weight: 600; color: #0f172a; overflow-wrap: anywhere; }
+  .gv-item-sub { font-size: 12px; color: #64748b; }
+  .gv-item-badges { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 4px; }
+  .gv-count { font-size: 12.5px; color: #475569; margin: 4px 0; }
+  /* 要匯入的項目（2026-10-08 使用者：「說169項，可是我看只有四項可以勾」「要有個全選吧」）：
+     「全部清單 / 已勾選」切換、法規位階篩選、搜尋、翻頁、全選 / 取消全選（目前看到的範圍）。 */
+  .gv-tabs { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 4px 0 8px; }
+  .gv-tab { appearance: none; border: 0; background: #fff; padding: 5px 12px; font-size: 13px; color: #334155;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .gv-tab + .gv-tab { border-left: 1px solid var(--border); }
+  .gv-tab b { font-variant-numeric: tabular-nums; font-weight: 600; color: #0f172a; }
+  .gv-tab.is-on { background: var(--primary); color: #fff; }
+  .gv-tab.is-on b { color: #fff; }
+  .gv-levels { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .gv-levels:empty { display: none; }
+  .gv-level { appearance: none; border: 1px solid var(--border); background: #fff; border-radius: 999px;
+    padding: 1px 10px; font-size: 12.5px; color: #475569; cursor: pointer; }
+  .gv-level.is-on { border-color: var(--primary); background: #eff6ff; color: var(--primary-dark); font-weight: 600; }
+  .gv-listhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; margin: 8px 0 0; }
+  .gv-listhead .gv-count { margin: 0; }
+  .gv-bulk { display: flex; flex-wrap: wrap; gap: 6px; }
+  .gv-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: #475569; margin: 0 0 6px; }
+  .gv-pager[hidden] { display: none; }
+  .gv-pager .gv-pager-text { font-variant-numeric: tabular-nums; }
+  .gv-list-note { font-size: 12.5px; color: #475569; margin: 6px 0 0; }
+  .gv-list-note:empty { display: none; }
+  .gv-attr { font-size: 11.5px; color: #64748b; line-height: 1.6; margin: 10px 0 0; overflow-wrap: anywhere; }
+  .gv-link-card p { font-size: 13px; color: #334155; }
+  .gv-spinner { width: 12px; height: 12px; border: 2px solid #cbd5e1; border-top-color: #2563eb;
+    border-radius: 50%; display: inline-block; animation: gv-spin 0.9s linear infinite; flex: 0 0 auto; }
+  @keyframes gv-spin { to { transform: rotate(360deg); } }
+  /* 2026-10-08 使用者：「做簡單一點」「卡片靠太近了」—— 卡片放在 #govGroups / #govLinks 容器裡，
+     共用的 `.panel + .panel` 接不到說明框與容器之間、兩個容器之間的距離，要自己給。 */
+  .gv-intro { margin-bottom: 18px; }
+  .gv-steps { margin: 6px 0 0; padding-left: 22px; line-height: 1.8; }
+  .gv-more { margin-top: 6px; }
+  .gv-more > summary { cursor: pointer; width: max-content; max-width: 100%; }
+  .gv-more .gv-points { margin-top: 4px; }
+  #govRunPanel { margin-bottom: 16px; }
+  #govLinks:not(:empty) { margin-top: 16px; }
+  .gv-src { margin: 10px 0 0; font-size: 13px; }
+  .gv-src > summary { cursor: pointer; color: #475569; width: max-content; max-width: 100%; }
+  .gv-src[open] > summary { margin-bottom: 4px; }
+  .gv-pick-later { font-size: 13px; color: #475569; margin: 4px 0; }
+  .gv-link-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<p class="gv-back"><a href="/admin/knowledge">{{ icon('book', size=14) }} {{ tr('回到公文知識庫') }}</a></p>
+<h1>{{ icon('globe', size=22) }} {{ tr('政府公開資料') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h1>
+<p class="muted">{{ tr('把全國法規資料庫、國發會行政規則、行政院文書處理相關釋例匯入公文知識庫，讓「公文撰擬」查得到出處。') }}</p>
+
+<div class="info-box gv-intro">
+  <b>{{ icon('info', size=14) }}{{ tr('怎麼用') }}</b>
+  <ol class="gv-steps">
+    <li>{{ tr('按「下載並匯入」：取得最新的清單，並匯入勾選的項目（已經預先勾好建議的；打開這一頁不會連外）。') }}</li>
+    <li>{{ tr('要別的法規或規則：在「要匯入的項目」勾選、按「儲存選取」，再按一次「下載並匯入」。') }}</li>
+    <li>{{ tr('完成後在「公文撰擬」勾「參考公文知識庫」就查得到出處。') }}</li>
+  </ol>
+  <details class="gv-more">
+    <summary>{{ tr('更多說明') }}</summary>
+    <ul class="gv-points">
+      <li>{{ tr('法規一條一段（條號就是出處），用途是「業務依據」；行政規則與釋例是「格式與用語參考」。') }}</li>
+      <li>{{ tr('每次按「下載並匯入」都會重新下載並比對每一項自己的異動日期，日期變了才建新版本；舊版本停用但保留，已廢止的停用並標示，不刪除。') }}</li>
+      <li>{{ tr('這些資料依政府資料開放授權條款第1版提供，每個匯入的版本都附上出處；法規內容以各主管機關公布者為準。') }}</li>
+      <li>{{ tr('伺服器不能連外時，可以在別台電腦下載同一個檔案，再用「上傳檔案」放進來（同一套檢查，上傳之後一樣接著匯入）。') }}</li>
+    </ul>
+  </details>
+</div>
+
+<div class="panel" id="govRunPanel" hidden>
+  <div class="gv-run">
+    <span class="gv-spinner"></span>
+    <b id="govRunTitle"></b>
+    <span class="gv-run-bar"><span id="govRunBar"></span></span>
+    <span id="govRunMsg" class="muted"></span>
+    <button class="btn btn-small btn-danger" id="govRunStop" type="button">{{ icon('close', size=14) }} <span>{{ tr('停止') }}</span></button>
+  </div>
+</div>
+
+{# JS 建的按鈕要圖示：伺服器先畫好，JS 複製進去（不在 JS 裡手寫 SVG） #}
+<template id="gvIcons">
+  {% for n in ['download', 'check', 'refresh', 'save', 'reset', 'upload', 'search', 'globe', 'book', 'list', 'warn', 'back', 'next', 'close'] %}<span data-ic="{{ n }}">{{ icon(n, size=14) }}</span>{% endfor %}
+</template>
+{# 「不能連外？上傳檔案」用全站共用的上傳元件；每個檔案複製一份、換掉 id（JS 那邊） #}
+<template id="gvUploadTpl">
+  {% with upload_id='gvUpTpl', accept='', hint='' %}{% include "components/file_upload.html" %}{% endwith %}
+</template>
+
+<div id="govGroups"><p class="muted">{{ tr('讀取中…') }}</p></div>
+
+<div id="govLinks"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const API = '/admin/knowledge/api/gov';
+  let ST = null;
+  let jobId = null;
+  let pollTimer = null;
+  const SEL = {};      // gid -> Map(key -> item)
+  const DIRTY = {};    // gid -> bool
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function ic(name) {
+    const s = $('gvIcons').content.querySelector('[data-ic="' + name + '"] svg');
+    return s ? s.cloneNode(true) : null;
+  }
+  function withIcon(b, text, icName) {
+    const svg = icName ? ic(icName) : null;
+    if (svg) b.appendChild(svg);
+    b.appendChild(el('span', null, text));
+    return b;
+  }
+  function btn(text, cls, onClick, icName) {
+    const b = withIcon(el('button', 'btn btn-small' + (cls ? ' ' + cls : '')), text, icName);
+    b.type = 'button';
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function badge(text, cls) { return el('span', 'gv-badge' + (cls ? ' ' + cls : ''), text); }
+  function fmtTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts * 1000);
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function fmtMB(n) { return (n / 1024 / 1024).toFixed(1) + ' MB'; }
+  function fmtNum(n) { return Number(n || 0).toLocaleString(); }
+  function fmtSize(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+  // 狀態標籤：ok 成功（綠）/ err 失敗（紅）/ run 進行中（藍）
+  function stateBadge(state) {
+    const b = el('span', 'gv-st gv-st-' + state);
+    if (state === 'run') b.appendChild(el('span', 'gv-spinner'));
+    else { const s = ic(state === 'ok' ? 'check' : 'warn'); if (s) b.appendChild(s); }
+    b.appendChild(el('span', null, state === 'ok' ? tr('成功') : (state === 'err' ? tr('失敗') : tr('進行中'))));
+    return b;
+  }
+  async function call(url, opts) {
+    const r = await fetch(url, opts || {});
+    if (r.status === 409) {
+      let j = null;
+      try { j = await r.clone().json(); } catch (e) { j = null; }
+      if (j && j.need_confirm) return {needConfirm: true, detail: j.detail};
+    }
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
+    return r.json();
+  }
+  function post(url, body) {
+    return call(url, {method: 'POST', headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify(body || {})});
+  }
+
+  // 畫面上只有「下載並匯入」（update）；上傳＝離線版的下載並匯入。download / import 是 API 與舊紀錄用的。
+  const ACTION = {download: tr('下載資料'), import: tr('匯入選取的項目'), update: tr('下載並匯入'), install: tr('上傳並匯入')};
+  // 舊版的上傳只換清單、不匯入（沒有匯入結果）：照實寫「上傳資料檔」
+  function actionLabel(act, summary) {
+    if (act === 'install' && !(summary && typeof summary.new === 'number')) return tr('上傳資料檔');
+    return ACTION[act] || '';
+  }
+
+  // ---- 進行中的作業
+  async function pollJob() {
+    clearTimeout(pollTimer);
+    try { ST = await call(API + '/status'); } catch (e) { /* 下一輪再試 */ }
+    const run = ST && ST.running;
+    if (run && run.job_id) jobId = run.job_id;
+    showRunning();
+    updateStatus();
+    if (jobId) {
+      try {
+        const j = await call('/api/jobs/' + encodeURIComponent(jobId));
+        $('govRunPanel').hidden = false;
+        $('govRunBar').style.width = Math.round((j.progress || 0) * 100) + '%';
+        $('govRunMsg').textContent = (j.message ? tr(j.message) : '');
+        if (['done', 'error', 'cancelled', 'interrupted'].includes(j.status)) {
+          jobId = null;
+          $('govRunPanel').hidden = true;
+          if (j.status === 'error') window.showAlert((j.error ? tr(j.error) : tr('操作失敗')), {kind: 'error'});
+          else if (j.status === 'done') window.showToast((j.message ? tr(j.message) : tr('完成')), 'ok');
+          await refresh();
+          return;
+        }
+      } catch (e) { jobId = null; }
+    }
+    if (!run && !jobId) { $('govRunPanel').hidden = true; await refresh(); return; }
+    pollTimer = setTimeout(pollJob, 1500);
+  }
+  $('govRunStop').addEventListener('click', async () => {
+    if (!jobId) return;
+    try { await post('/api/jobs/' + encodeURIComponent(jobId) + '/cancel'); }
+    catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+  });
+  function showRunning() {
+    const r = ST && ST.running;
+    if (!r) { if (!jobId) $('govRunPanel').hidden = true; return; }
+    $('govRunPanel').hidden = false;
+    const g = ST.groups.find((x) => x.id === r.group);
+    $('govRunTitle').textContent = (g ? tr(g.name) : '') + '：' + (ACTION[r.action] || r.action);
+  }
+
+  async function start(gid, action) {
+    if (DIRTY[gid] && (action === 'import' || action === 'update' || action === 'install')) {
+      const ok = await saveSelection(gid);
+      if (!ok) return;
+    }
+    try {
+      const j = await post(API + '/' + encodeURIComponent(gid) + '/' + action);
+      jobId = j.job_id;
+      window.showToast(tr('已開始，可以關掉這一頁，完成後在「我的作業」看得到。'), 'ok');
+      pollJob();
+    } catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+  }
+
+  // ---- 選取
+  async function loadSelection(gid) {
+    const j = await call(API + '/' + encodeURIComponent(gid) + '/selection');
+    const m = new Map();
+    j.items.forEach((it) => m.set(it.key, it));
+    SEL[gid] = m;
+    DIRTY[gid] = false;
+    return j;
+  }
+  async function saveSelection(gid, confirmed) {
+    const keys = [...(SEL[gid] || new Map()).keys()];
+    try {
+      const j = await post(API + '/' + encodeURIComponent(gid) + '/selection', {keys: keys, confirm: !!confirmed});
+      if (j.needConfirm) {
+        const ok = await window.showConfirm(tr(j.detail), {title: tr('選取的量很大'), okText: tr('確定')});
+        if (!ok) return false;
+        return saveSelection(gid, true);
+      }
+      DIRTY[gid] = false;
+      window.showToast(tr('已儲存選取的項目'), 'ok');
+      await refresh();
+      return true;
+    } catch (e) { window.showAlert(e.message, {kind: 'error'}); return false; }
+  }
+
+  function itemRow(gid, it, onToggle) {
+    const li = el('li');
+    const lab = el('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = (SEL[gid] || new Map()).has(it.key);
+    cb.addEventListener('change', () => onToggle(it, cb.checked, cb));
+    lab.appendChild(cb);
+    const box = el('div');
+    const name = el('span', 'gv-item-name', it.name);
+    name.dataset.i18n = 'skip';
+    box.appendChild(name);
+    const bs = el('span', 'gv-item-badges');
+    if (it.missing) bs.appendChild(badge(tr('清單裡找不到'), 'gv-warn'));
+    if (it.pending) bs.appendChild(badge(tr('還沒有下載'), 'gv-muted'));
+    if (it.abolished) bs.appendChild(badge(tr('已廢止'), 'gv-warn'));
+    if (it.needs_update) bs.appendChild(badge(tr('有新版'), 'gv-warn'));
+    else if (it.imported) bs.appendChild(badge(tr('已匯入'), 'gv-ok'));
+    box.appendChild(bs);
+    const subParts = [];
+    if (it.level) subParts.push(tr(it.level));
+    if (it.modified_roc) subParts.push(tr('異動：') + it.modified_roc);
+    if (it.articles) subParts.push(tr('{0} 條').replace('{0}', it.articles));
+    if (it.key && !String(it.key).startsWith('N:')) subParts.push(it.key);
+    const sub = el('div', 'gv-item-sub', subParts.join(' · '));
+    sub.dataset.i18n = 'skip';
+    box.appendChild(sub);
+    lab.appendChild(box);
+    li.appendChild(lab);
+    return li;
+  }
+
+  // ---- 要匯入的項目：整份清單翻頁看（預設）或只看已勾選的；勾選記在 SEL（還沒儲存的也算）
+  const PAGE = 100;
+  const VIEW = {};     // gid -> {mode: 'all' | 'sel', q, level, offset, total, levels, tok}
+  function view(gid) {
+    return VIEW[gid] || (VIEW[gid] = {mode: 'all', q: '', level: '', offset: 0, total: 0, levels: {}, tok: 0});
+  }
+  function maxSel() { return (ST && ST.limits && ST.limits.max_selected) || 1000; }
+  function toggler(gid, card) {
+    return (x, on, cb) => {
+      const m = SEL[gid] || (SEL[gid] = new Map());
+      if (on && !m.has(x.key) && m.size >= maxSel()) {
+        if (cb) cb.checked = false;
+        window.showAlert(tr('最多只能選 {0} 項').replace('{0}', maxSel()), {kind: 'error'});
+        return;
+      }
+      if (on) m.set(x.key, x); else m.delete(x.key);
+      DIRTY[gid] = true;
+      syncCounts(gid, card);
+      if (view(gid).mode === 'sel' && !on) renderList(gid, card);
+    };
+  }
+
+  function renderSelected(gid, card) {
+    syncCounts(gid, card);
+    renderList(gid, card);
+  }
+
+  // 數字：已選幾項（約幾字）、兩個切換鈕上的數字、「已勾選」那一格
+  function syncCounts(gid, card) {
+    const m = SEL[gid] || (SEL[gid] = new Map());
+    const g = ST.groups.find((x) => x.id === gid);
+    let chars = 0;
+    if (g && g.kind !== 'pdfs') m.forEach((it) => { chars += it.chars || 0; });
+    const cnt = card.querySelector('.gv-sel-count');
+    if (cnt) {
+      cnt.textContent = (g && g.kind === 'pdfs'
+        ? tr('已選 {0} 項').replace('{0}', m.size)
+        : tr('已選 {0} 項，約 {1} 字').replace('{0}', m.size).replace('{1}', chars.toLocaleString()))
+        + (DIRTY[gid] ? tr('（還沒儲存）') : '');
+    }
+    const tsel = card.querySelector('.gv-tab[data-view="sel"] b');
+    if (tsel) tsel.textContent = fmtNum(m.size);
+    const tall = card.querySelector('.gv-tab[data-view="all"] b');
+    if (tall && g) tall.textContent = fmtNum(g.available);
+    syncSelTile(gid, card);
+  }
+
+  function renderList(gid, card) {
+    const g = ST.groups.find((x) => x.id === gid);
+    const list = card.querySelector('.gv-items');
+    if (!list || !g) return;
+    const m = SEL[gid] || (SEL[gid] = new Map());
+    if (g.kind === 'pdfs') {
+      // 釋例只有兩份：兩份都列出來，勾選狀態照選取
+      list.textContent = '';
+      g.packages.forEach((p) => {
+        const it = m.get(p.id) || {key: p.id};
+        list.appendChild(itemRow(gid, {...it, key: p.id, name: tr(p.name), missing: false,
+                                       pending: !p.downloaded}, (x, on) => {
+          if (on) m.set(x.key, {key: x.key, name: x.name}); else m.delete(x.key);
+          DIRTY[gid] = true;
+          renderSelected(gid, card);
+        }));
+      });
+      return;
+    }
+    const v = view(gid);
+    card.querySelectorAll('.gv-tab').forEach((b) => {
+      const on = b.dataset.view === v.mode;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    const sa = card.querySelector('.gv-selall');
+    if (sa) sa.hidden = v.mode === 'sel';
+    if (v.mode === 'sel' || !g.downloaded) {
+      list.textContent = '';
+      m.forEach((it) => list.appendChild(itemRow(gid, it, toggler(gid, card))));
+      card.querySelector('.gv-pager').hidden = true;
+      card.querySelector('.gv-list-note').textContent = m.size ? '' : tr('還沒有選任何項目。');
+      renderLevels(gid, card);
+      return;
+    }
+    fetchPage(gid, card);
+  }
+
+  async function fetchPage(gid, card) {
+    const v = view(gid);
+    const tok = ++v.tok;
+    const note = card.querySelector('.gv-list-note');
+    const qs = new URLSearchParams({browse: '1', q: v.q, level: v.level, offset: String(v.offset), limit: String(PAGE)});
+    let j;
+    try { j = await call(API + '/' + encodeURIComponent(gid) + '/search?' + qs.toString()); }
+    catch (e) { note.textContent = e.message; return; }
+    if (tok !== v.tok) return;        // 翻頁 / 搜尋按得快：晚到的舊結果不要蓋掉新的
+    v.total = j.total;
+    v.levels = j.levels || {};
+    v.levelNotes = j.level_notes || {};
+    const list = card.querySelector('.gv-items');
+    list.textContent = '';
+    j.items.forEach((it) => list.appendChild(itemRow(gid, it, toggler(gid, card))));
+    list.scrollTop = 0;
+    note.textContent = j.total ? '' : (v.q ? tr('找不到符合的項目') : tr('清單是空的'));
+    renderPager(gid, card);
+    renderLevels(gid, card);
+  }
+
+  function renderPager(gid, card) {
+    const v = view(gid);
+    const pg = card.querySelector('.gv-pager');
+    const from = v.total ? v.offset + 1 : 0;
+    const to = Math.min(v.offset + PAGE, v.total);
+    pg.hidden = !v.total;
+    pg.querySelector('.gv-pager-text').textContent = (v.q
+      ? tr('找到 {2} 項，第 {0}–{1} 項') : tr('共 {2} 項，第 {0}–{1} 項'))
+      .replace('{0}', fmtNum(from)).replace('{1}', fmtNum(to)).replace('{2}', fmtNum(v.total));
+    pg.querySelector('.gv-prev').disabled = v.offset <= 0;
+    pg.querySelector('.gv-next').disabled = to >= v.total;
+  }
+
+  // 法規位階（法律 / 命令…）：清單裡有兩種以上才出現；只在「全部清單」有用
+  function renderLevels(gid, card) {
+    const v = view(gid);
+    const box = card.querySelector('.gv-levels');
+    box.textContent = '';
+    const lv = Object.entries(v.levels || {});
+    if (v.mode !== 'all' || lv.length < 2) return;
+    // 名稱由伺服器整理過（國發會的檔案寫的是代碼「05:行政規則§159,II,1」）；依據放在滑鼠提示
+    const mk = (val, label, n) => {
+      const b = el('button', 'gv-level' + (v.level === val ? ' is-on' : ''), label + (n != null ? '（' + fmtNum(n) + '）' : ''));
+      b.type = 'button';
+      const note = val && (v.levelNotes || {})[val];
+      if (note) b.title = tr(note);
+      b.addEventListener('click', () => { v.level = val; v.offset = 0; renderList(gid, card); });
+      box.appendChild(b);
+    };
+    mk('', tr('全部類別'));
+    lv.slice(0, 8).forEach(([k, n]) => mk(k, tr(k), n));
+  }
+
+  function doSearch(gid, card) {
+    const v = view(gid);
+    v.q = card.querySelector('.gv-q').value.trim();
+    v.mode = 'all';
+    v.offset = 0;
+    card.querySelector('.gv-qclear').hidden = !v.q;
+    renderList(gid, card);
+  }
+
+  // 全選 / 取消全選：範圍是**目前看到的**（整份清單、或搜尋 / 篩選出來的那些，不只這一頁）
+  async function bulk(gid, card, on) {
+    const v = view(gid);
+    const m = SEL[gid] || (SEL[gid] = new Map());
+    if (v.mode === 'sel') {
+      if (!on && m.size) { m.clear(); DIRTY[gid] = true; renderSelected(gid, card); }
+      return;
+    }
+    if (on && v.total > maxSel()) {
+      window.showAlert(tr('目前的範圍有 {0} 項，超過一次最多能選的 {1} 項。請先搜尋或用類別篩選縮小範圍。')
+        .replace('{0}', fmtNum(v.total)).replace('{1}', fmtNum(maxSel())), {kind: 'error'});
+      return;
+    }
+    const qs = new URLSearchParams({keys_only: '1', q: v.q, level: v.level});
+    let j;
+    try { j = await call(API + '/' + encodeURIComponent(gid) + '/search?' + qs.toString()); }
+    catch (e) { window.showAlert(e.message, {kind: 'error'}); return; }
+    if (on) {
+      const items = j.items || [];
+      const add = items.filter((it) => !m.has(it.key)).length;
+      if (m.size + add > maxSel()) {
+        window.showAlert(tr('最多只能選 {0} 項').replace('{0}', maxSel()), {kind: 'error'});
+        return;
+      }
+      items.forEach((it) => { if (!m.has(it.key)) m.set(it.key, it); });
+      if (add) DIRTY[gid] = true;
+    } else {
+      let n = 0;
+      (j.keys || []).forEach((k) => { if (m.delete(k)) n += 1; });
+      if (n) DIRTY[gid] = true;
+    }
+    renderSelected(gid, card);
+  }
+
+  // 「已勾選」那一格照畫面上的勾選走（還沒儲存的也算，另外註明）
+  function syncSelTile(gid, card) {
+    const tile = card.querySelector('.gv-stat[data-stat="selected"]');
+    if (!tile) return;
+    const m = SEL[gid] || new Map();
+    const g = ST.groups.find((x) => x.id === gid);
+    let chars = 0;
+    if (g && g.kind !== 'pdfs') m.forEach((it) => { chars += it.chars || 0; });
+    tile.querySelector('.gv-stat-num').textContent = fmtNum(m.size);
+    const parts = [];
+    if (chars) parts.push(tr('約 {0} 字').replace('{0}', fmtNum(chars)));
+    if (DIRTY[gid]) parts.push(tr('還沒儲存'));
+    const sub = tile.querySelector('.gv-stat-sub');
+    sub.textContent = parts.join(' · ');
+    sub.className = 'gv-stat-sub' + (DIRTY[gid] ? ' gv-t-warn' : '');
+  }
+
+  // ---- 狀態：三格數字 ＋ 最近一次
+  function statTile(key, icName, label, num, cls) {
+    const t = el('div', 'gv-stat' + (cls ? ' ' + cls : ''));
+    t.dataset.stat = key;
+    const top = el('div', 'gv-stat-top');
+    const svg = ic(icName);
+    if (svg) top.appendChild(svg);
+    top.appendChild(el('span', 'gv-stat-label', label));
+    t.appendChild(top);
+    t.appendChild(el('div', 'gv-stat-num', num));
+    t.appendChild(el('div', 'gv-stat-sub'));
+    return t;
+  }
+  function tileSub(t, text, cls) {
+    if (!text) return;
+    const s = t.querySelector('.gv-stat-sub');
+    const line = el('div', cls || null, text);
+    s.appendChild(line);
+  }
+
+  function statusBlock(g) {
+    const box = el('div', 'gv-status');
+    const stats = el('div', 'gv-stats');
+    let t;
+    if (g.kind === 'pdfs') {
+      const got = g.packages.filter((p) => p.downloaded).length;
+      t = statTile('available', 'list', tr('已下載的檔案'), got + ' / ' + g.packages.length, got ? '' : 'gv-stat-empty');
+      if (!got) tileSub(t, tr('還沒下載'));
+    } else if (g.downloaded) {
+      t = statTile('available', 'list', tr('清單項目'), fmtNum(g.available));
+      tileSub(t, tr('可以挑選'));
+    } else {
+      t = statTile('available', 'list', tr('清單項目'), '—', 'gv-stat-empty');
+      tileSub(t, tr('還沒下載'));
+    }
+    stats.appendChild(t);
+    stats.appendChild(statTile('selected', 'check', tr('已勾選'), fmtNum(g.selected_count)));
+    t = statTile('imported', 'book', tr('已匯入'), fmtNum(g.imported_count), g.imported_count ? 'gv-stat-done' : '');
+    if (g.needs_update_count) {
+      tileSub(t, tr('{0} 項有新版').replace('{0}', g.needs_update_count), 'gv-t-warn');
+      t.title = tr('{0} 項有新版（按「下載並匯入」）').replace('{0}', g.needs_update_count);
+    }
+    if (g.abolished_count) tileSub(t, tr('{0} 項已廢止').replace('{0}', g.abolished_count));
+    stats.appendChild(t);
+    box.appendChild(stats);
+    const last = lastRun(g);
+    if (last) box.appendChild(last);
+    return box;
+  }
+
+  function lastRun(g) {
+    const run = (ST && ST.running && ST.running.group === g.id) ? ST.running : null;
+    if (!run && !g.last) return null;
+    const state = run ? 'run' : (g.last.ok ? 'ok' : 'err');
+    const box = el('div', 'gv-last');
+    box.dataset.state = state;
+    const head = el('div', 'gv-last-head');
+    head.appendChild(el('span', 'gv-last-cap', tr('最近一次')));
+    head.appendChild(stateBadge(state));
+    const act = run ? run.action : g.last.action;
+    head.appendChild(el('span', 'gv-last-act', run ? (ACTION[act] || '') : actionLabel(act, g.last.summary)));
+    head.appendChild(el('span', 'gv-last-time', fmtTime(run ? run.started_at : g.last.at)));
+    box.appendChild(head);
+    if (run) return box;
+    const sm = g.last.summary || {};
+    if (typeof sm.new === 'number') {
+      // 匯入的結果：四個數字各一顆，不是 0 的才上色
+      const chips = el('div', 'gv-chips');
+      // 數字要粗體、而且各語言的位置不同（英文在前）：照譯文的 {0} 切開再組
+      [['new', tr('新匯入 {0} 項'), 'gv-chip-ok'], ['updated', tr('更新 {0} 項'), 'gv-chip-ok'],
+       ['unchanged', tr('沒有變動 {0} 項'), ''], ['failed', tr('失敗 {0} 項'), 'gv-chip-err']].forEach(([k, label, hot]) => {
+        const c = el('span', 'gv-chip' + (sm[k] && hot ? ' ' + hot : ''));
+        c.dataset.k = k;
+        const parts = label.split('{0}');
+        if (parts[0].trim()) c.appendChild(el('span', null, parts[0].trim()));
+        c.appendChild(el('b', null, fmtNum(sm[k])));
+        if (parts.length > 1 && parts[1].trim()) c.appendChild(el('span', null, parts[1].trim()));
+        chips.appendChild(c);
+      });
+      box.appendChild(chips);
+    } else if (g.last.message) {
+      box.appendChild(el('div', 'gv-last-msg', tr(g.last.message)));
+    }
+    if (sm.stale_list) box.appendChild(el('div', 'gv-last-note gv-t-err', tr('這次下載失敗，用的是這台上次下載的清單（原因在「下載來源」裡）。')));
+    if (sm.abolished) box.appendChild(el('div', 'gv-last-note', tr('其中 {0} 項已廢止：已停用並標示，沒有刪除。').replace('{0}', sm.abolished)));
+    if (sm.missing && sm.missing.length) {
+      const d = el('div', 'gv-last-note gv-t-err', tr('選取的項目裡有 {0} 項不在下載的清單裡（可能改了代碼或已移除）：').replace('{0}', sm.missing.length) + sm.missing.join('、'));
+      d.dataset.i18n = 'skip';
+      box.appendChild(d);
+    }
+    if (sm.failed_names && sm.failed_names.length) {
+      const d = el('div', 'gv-last-note gv-t-err', tr('匯入失敗：') + sm.failed_names.join('、'));
+      d.dataset.i18n = 'skip';
+      box.appendChild(d);
+    }
+    return box;
+  }
+
+  // 背景作業進行中：只換掉每張卡片的狀態區與按鈕可不可以按（不整頁重畫 —— 打開的「下載來源」不會被收起來）
+  function updateStatus() {
+    if (!ST) return;
+    const busy = !!ST.running;
+    ST.groups.forEach((g) => {
+      const card = document.querySelector('section.gv-card[data-gid="' + g.id + '"]');
+      if (!card) return;
+      const old = card.querySelector('.gv-status');
+      if (old) {
+        old.replaceWith(statusBlock(g));
+        syncSelTile(g.id, card);
+      }
+      card.querySelectorAll('.gv-actions button[data-act]').forEach((b) => {
+        b.disabled = busy;
+      });
+    });
+  }
+
+  // ---- 畫面
+  function pkgBox(g, p) {
+    const box = el('div', 'gv-pkg');
+    const head = el('div', 'gv-pkg-head');
+    head.appendChild(el('span', 'gv-pkg-name', tr(p.name)));
+    head.appendChild(p.downloaded ? badge(tr('已下載'), 'gv-ok') : badge(tr('還沒有下載'), 'gv-muted'));
+    if (p.downloaded) {
+      const info = [tr('{0} 項').replace('{0}', fmtNum(p.count))];
+      if (p.update_roc) info.push(tr('資料更新日期：{0}').replace('{0}', p.update_roc));
+      info.push(fmtMB(p.size), fmtTime(p.installed_at));
+      if (p.origin === 'upload') info.push(tr('上傳的檔案'));
+      else if (p.origin === 'alt_url') info.push(tr('備用網址'));
+      head.appendChild(el('span', 'gv-pkg-info', info.join(' · ')));
+    }
+    box.appendChild(head);
+    // 網址兩格排成一張表：標籤一欄、輸入框一欄（輸入框照卡片寬度縮，不會超出右緣）
+    const grid = el('div', 'gv-url-grid');
+    const mkRow = (label, value, cls) => {
+      const inp = document.createElement('input');
+      inp.type = 'url';
+      inp.className = 'field ' + cls;
+      inp.id = cls + '-' + p.id;
+      inp.maxLength = 2048;
+      inp.value = value || '';
+      const lab = el('label', 'gv-url-label', label);
+      lab.htmlFor = inp.id;
+      grid.appendChild(lab);
+      grid.appendChild(inp);
+      return inp;
+    };
+    const url = mkRow(tr('下載網址'), p.url, 'gv-url');
+    const alt = (p.default_alt_url || p.alt_url) ? mkRow(tr('備用網址'), p.alt_url, 'gv-alt') : null;
+    box.appendChild(grid);
+    const acts = el('div', 'gv-pkg-actions');
+    acts.appendChild(btn(tr('儲存網址'), '', async () => {
+      const body = {url: url.value};
+      if (alt) body.alt_url = alt.value;
+      try { await post(API + '/packages/' + encodeURIComponent(p.id), body); window.showToast(tr('已儲存'), 'ok'); await refresh(); }
+      catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+    }, 'save'));
+    if (p.customized) {
+      acts.appendChild(btn(tr('還原預設網址'), '', async () => {
+        try { await post(API + '/packages/' + encodeURIComponent(p.id) + '/reset'); await refresh(); }
+        catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+      }, 'reset'));
+      acts.appendChild(el('span', 'gv-badge gv-muted', tr('網址改過')));
+    }
+    box.appendChild(acts);
+    if (p.last) {
+      const last = el('div', 'gv-pkg-last' + (p.last.ok ? '' : ' gv-err'));
+      last.appendChild(stateBadge(p.last.ok ? 'ok' : 'err'));
+      last.appendChild(el('span', 'gv-last-time', fmtTime(p.last.at)));
+      last.appendChild(el('span', 'gv-last-msg', tr(p.last.message || '')));
+      box.appendChild(last);
+    }
+    const up = el('details', 'gv-upload');
+    up.appendChild(el('summary', null, tr('不能連外？上傳檔案')));
+    up.appendChild(uploadBox(g, p));
+    box.appendChild(up);
+    return box;
+  }
+
+  // 不能連外時手動上傳：全站共用的上傳元件（拖曳或點選、檔名與大小、上傳進度），
+  // 伺服器先在 <template> 畫好一份，這裡複製並換掉 id（每個檔案一份，label 才對得到自己的輸入框）
+  function uploadBox(g, p) {
+    const wrap = el('div', 'gv-up');
+    const root = $('gvUploadTpl').content.querySelector('.file-upload').cloneNode(true);
+    const ws = root.querySelector('.fu-ws-row');
+    if (ws) ws.remove();                       // 工作區收不到這些資料檔
+    root.id = 'gvUp-' + p.id;
+    const inp = root.querySelector('input[type=file]');
+    inp.id = root.id + '-input';
+    root.querySelector('label.drop-zone').htmlFor = inp.id;
+    if (g.kind === 'pdfs') inp.setAttribute('accept', '.pdf,application/pdf');
+    else inp.removeAttribute('accept');        // 法規 / 規則：zip、xml、json，副檔名不一定（伺服器看內容）
+    root.dataset.accept = inp.getAttribute('accept') || '';
+    root.querySelector('.drop-zone-hint').textContent = (g.kind === 'pdfs'
+      ? tr('PDF 檔，上限 {0} MB') : tr('zip、xml 或 json 檔，上限 {0} MB')).replace('{0}', p.max_mb);
+    wrap.appendChild(root);
+    const note = el('div', 'gv-up-note');
+    note.setAttribute('role', 'status');
+    note.hidden = true;
+    wrap.appendChild(note);
+    const say = (text, cls) => {
+      note.textContent = text || '';
+      note.className = 'gv-up-note' + (cls ? ' ' + cls : '');
+      note.hidden = !text;
+    };
+    const fu = new window.FileUpload(root, async (file) => {
+      root.querySelector('.drop-zone-filename').textContent = file.name + ' · ' + fmtSize(file.size);
+      if (!file.size) { say(tr('檔案是空的'), 'gv-t-err'); return; }
+      if (file.size > p.max_mb * 1024 * 1024) {
+        say(tr('檔案太大（上限 {0} MB）').replace('{0}', p.max_mb), 'gv-t-err');
+        return;
+      }
+      say('');
+      // 上傳之後會接著匯入勾選的項目：畫面上改了還沒存的勾選先存起來（同「下載並匯入」）
+      if (DIRTY[g.id] && !(await saveSelection(g.id))) return;
+      const fd = new FormData();
+      fd.append('file', file);
+      let r;
+      try {
+        r = await fu.upload(API + '/packages/' + encodeURIComponent(p.id) + '/upload', fd,
+                            {processingLabel: tr('檔案已送出，正在交給背景作業…')});
+      } catch (e) { say(tr('上傳失敗：連線中斷，請再試一次。'), 'gv-t-err'); return; }
+      if (!r.ok) { say(await window.friendlyServerError(r, tr('上傳失敗')), 'gv-t-err'); return; }
+      let j = null;
+      try { j = await r.json(); } catch (e) { j = null; }
+      if (!j || !j.job_id) { say(tr('上傳失敗'), 'gv-t-err'); return; }
+      say(tr('已收到檔案，正在背景檢查、換上並匯入勾選的項目；完成後這一頁會自動更新。'), 'gv-t-ok');
+      jobId = j.job_id;
+      pollJob();
+    });
+    return wrap;
+  }
+
+  function groupCard(g) {
+    const card = el('section', 'panel gv-card');
+    card.dataset.gid = g.id;
+    const h = el('h2');
+    h.appendChild(el('span', null, tr(g.name)));
+    h.appendChild(badge(tr(g.category_label) + '（' + tr(g.purpose_label) + '）'));
+    card.appendChild(h);
+    card.appendChild(el('p', 'gv-about', tr(g.about)));
+
+    // 三格數字（清單 → 勾選 → 匯入）＋ 最近一次；作業進行中時 updateStatus() 只換掉這一塊
+    card.appendChild(statusBlock(g));
+    if (g.missing_defaults && g.missing_defaults.length) {
+      // 很少發生、而且清單可能很長：只講一句，細節收起來
+      const d = el('details', 'gv-miss');
+      d.appendChild(el('summary', null, tr('預設建議裡有 {0} 項在下載的清單裡找不到').replace('{0}', g.missing_defaults.length)));
+      const ls = el('p', null, g.missing_defaults.join('、'));
+      ls.dataset.i18n = 'skip';
+      d.appendChild(ls);
+      card.appendChild(d);
+    }
+
+    // 一顆按鈕（2026-10-08 使用者：「請改為下載並匯入 不要分兩步」）：重新下載清單、接著匯入勾選的項目
+    const acts = el('div', 'gv-actions');
+    const b1 = btn(tr('下載並匯入'), 'btn-primary', () => start(g.id, 'update'), 'download');
+    b1.dataset.act = 'update';
+    b1.disabled = !!(ST && ST.running);
+    acts.appendChild(b1);
+    card.appendChild(acts);
+
+    const pick = el('div', 'gv-picker');
+    pick.appendChild(el('h3', 'gv-h3', tr('要匯入的項目')));
+    // 還沒下載清單時沒有東西可以挑：只講一句、列出會預先勾選並匯入的，其餘收起來
+    const later = !g.downloaded && g.kind !== 'pdfs';
+    const body = el('div', 'gv-pick-body');
+    body.hidden = later;
+    if (later) {
+      pick.appendChild(el('p', 'gv-pick-later', tr('按「下載並匯入」之後，就能在這裡挑其他要匯入的項目。')));
+      if (g.default_hint && g.default_hint.length) {
+        const dh = el('p', 'muted', tr('第一次會預先勾選並匯入：') + g.default_hint.join('、'));
+        dh.dataset.i18n = 'skip';
+        pick.appendChild(dh);
+      }
+    }
+    pick.appendChild(body);
+    if (g.kind === 'pdfs') {
+      body.appendChild(el('p', 'muted', tr('兩份都可以匯入；取消勾選的不會匯入（已經匯入的不會被刪掉）。')));
+    } else {
+      body.appendChild(el('p', 'muted', g.selection_is_default
+        ? tr('目前是預設建議（可以改）。勾選太多會讓檢索查到很多不相干的條文：超過 {0} 項或 {1} 字要確認。').replace('{0}', ST.limits.warn_items).replace('{1}', ST.limits.warn_chars.toLocaleString())
+        : tr('勾選太多會讓檢索查到很多不相干的條文：超過 {0} 項或 {1} 字要確認。').replace('{0}', ST.limits.warn_items).replace('{1}', ST.limits.warn_chars.toLocaleString())));
+      const v = view(g.id);
+      // 「全部清單 / 已勾選」
+      const tabs = el('div', 'gv-tabs');
+      tabs.setAttribute('role', 'group');
+      [['all', tr('全部清單')], ['sel', tr('已勾選')]].forEach(([k, label]) => {
+        const b = el('button', 'gv-tab');
+        b.type = 'button';
+        b.dataset.view = k;
+        b.appendChild(el('span', null, label));
+        b.appendChild(el('b', null, '0'));
+        b.addEventListener('click', () => { v.mode = k; v.offset = 0; renderList(g.id, card); });
+        tabs.appendChild(b);
+      });
+      body.appendChild(tabs);
+      const bar = el('div', 'gv-searchbar');
+      const q = document.createElement('input');
+      q.type = 'text';
+      q.className = 'field gv-q';
+      q.maxLength = 100;
+      q.value = v.q;
+      q.placeholder = tr('輸入名稱或代碼搜尋（例：公文、A0030018）');
+      q.disabled = !g.downloaded;
+      q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(g.id, card); } });
+      bar.appendChild(q);
+      const sb = btn(tr('搜尋'), '', () => doSearch(g.id, card), 'search');
+      sb.disabled = !g.downloaded;
+      bar.appendChild(sb);
+      const qc = btn(tr('清除搜尋'), 'gv-qclear', () => { q.value = ''; doSearch(g.id, card); }, 'reset');
+      qc.hidden = !v.q;
+      bar.appendChild(qc);
+      body.appendChild(bar);
+      body.appendChild(el('div', 'gv-levels'));
+    }
+    const head = el('div', 'gv-listhead');
+    head.appendChild(el('div', 'gv-count gv-sel-count'));
+    if (g.kind !== 'pdfs') {
+      const bk = el('div', 'gv-bulk');
+      const all = btn(tr('全選'), 'gv-selall', () => bulk(g.id, card, true), 'check');
+      all.title = tr('勾選目前看到的全部項目（整份清單，或搜尋、篩選出來的那些，不只這一頁）');
+      bk.appendChild(all);
+      const none = btn(tr('取消全選'), 'gv-selnone', () => bulk(g.id, card, false), 'close');
+      none.title = tr('取消勾選目前看到的全部項目');
+      bk.appendChild(none);
+      bk.hidden = !g.downloaded;
+      head.appendChild(bk);
+    }
+    body.appendChild(head);
+    if (g.kind !== 'pdfs') {
+      const pg = el('div', 'gv-pager');
+      pg.hidden = true;
+      const prev = btn(tr('上一頁'), 'gv-prev', () => { const v = view(g.id); v.offset = Math.max(0, v.offset - PAGE); renderList(g.id, card); }, 'back');
+      const next = btn(tr('下一頁'), 'gv-next', () => { const v = view(g.id); v.offset += PAGE; renderList(g.id, card); }, 'next');
+      pg.appendChild(prev);
+      pg.appendChild(el('span', 'gv-pager-text'));
+      pg.appendChild(next);
+      body.appendChild(pg);
+    }
+    body.appendChild(el('ul', 'gv-list gv-items'));
+    body.appendChild(el('p', 'gv-list-note'));
+    const sa = el('div', 'gv-actions');
+    sa.appendChild(btn(tr('儲存選取'), 'btn-primary', () => saveSelection(g.id), 'save'));
+    sa.appendChild(btn(tr('恢復預設建議'), '', async () => {
+      try { await post(API + '/' + encodeURIComponent(g.id) + '/selection/reset'); await loadSelection(g.id); await refresh(); }
+      catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+    }, 'reset'));
+    body.appendChild(sa);
+    card.appendChild(pick);
+
+    // 網址設定、離線上傳、每個檔案的下載狀態與出處：平常用不到，收起來；最後一次下載失敗時自動打開
+    const src = el('details', 'gv-src');
+    src.appendChild(el('summary', null, tr('下載來源（網址、不能連外時上傳）')));
+    const pk = el('div', 'gv-pkgs');
+    g.packages.forEach((p) => pk.appendChild(pkgBox(g, p)));
+    src.appendChild(pk);
+    [...new Set(g.packages.map((p) => p.attribution).filter(Boolean))].forEach((t) => {
+      const at = el('p', 'gv-attr', t);
+      at.dataset.i18n = 'skip';
+      src.appendChild(at);
+    });
+    src.open = g.packages.some((p) => p.last && !p.last.ok);
+    card.appendChild(src);
+    const lic = el('p', 'gv-attr');
+    const a = el('a', null, tr(g.license));
+    a.href = g.license_url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    lic.appendChild(document.createTextNode(tr('授權：')));
+    lic.appendChild(a);
+    lic.appendChild(document.createTextNode(' · '));
+    const home = el('a', null, tr('資料來源網頁'));
+    home.href = g.home; home.target = '_blank'; home.rel = 'noopener noreferrer';
+    lic.appendChild(home);
+    card.appendChild(lic);
+    return card;
+  }
+
+  function renderLinks() {
+    const box = $('govLinks');
+    box.textContent = '';
+    (ST.link_only || []).forEach((x) => {
+      const card = el('section', 'panel gv-link-card');
+      const h = el('h2');
+      h.appendChild(el('span', null, tr(x.name)));
+      h.appendChild(badge(tr('只提供連結，不下載'), 'gv-muted'));
+      card.appendChild(h);
+      card.appendChild(el('p', null, tr(x.publisher) + ' · ' + tr(x.edition)));
+      card.appendChild(el('p', null, tr(x.note)));
+      const la = el('div', 'gv-link-acts');
+      const a = withIcon(el('a', 'btn btn-small'), tr('到行政院網頁看'), 'globe');
+      a.href = x.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      la.appendChild(a);
+      const kb = withIcon(el('a', 'btn btn-small'), tr('回到公文知識庫上傳'), 'book');
+      kb.href = '/admin/knowledge';
+      la.appendChild(kb);
+      card.appendChild(la);
+      box.appendChild(card);
+    });
+  }
+
+  function render() {
+    if (!ST) return;
+    const box = $('govGroups');
+    box.textContent = '';
+    ST.groups.forEach((g) => {
+      const card = groupCard(g);
+      box.appendChild(card);
+      renderSelected(g.id, card);
+    });
+    renderLinks();
+    showRunning();
+  }
+
+  async function refresh() {
+    try { ST = await call(API + '/status'); }
+    catch (e) { $('govGroups').textContent = e.message; return; }
+    for (const g of ST.groups) {
+      if (!DIRTY[g.id]) {
+        try { await loadSelection(g.id); } catch (e) { SEL[g.id] = SEL[g.id] || new Map(); }
+      }
+    }
+    render();
+  }
+
+  (async () => {
+    await refresh();
+    if (ST && ST.running) pollJob();
+  })();
+})();
+</script>
+{% endblock %}

@@ -40,7 +40,7 @@ def _fake_llm(monkeypatch):
     trd = importlib.import_module("app.tools.translate_doc.router")
 
     monkeypatch.setattr(trd.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(trd.llm_settings, "make_client", lambda: object())
+    monkeypatch.setattr(trd.llm_settings, "make_client", lambda *a, **k: object())
     monkeypatch.setattr(trd.llm_settings, "get_model_for", lambda _t: "fake-model")
     monkeypatch.setattr(trd.llm_settings, "get", lambda: {"translate_concurrency": 2})
     monkeypatch.setattr(trd, "_warmup_llm", lambda *a, **k: None)

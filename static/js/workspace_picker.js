@@ -23,6 +23,24 @@
   }
   function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 
+  // 沒有預覽圖的檔案（錄音 / 錄影、純文字）在卡片上畫的圖示。
+  // **哪些型別沒有預覽圖由伺服器端說**（清單 API 的 `preview` / `kind`），這裡只負責畫。
+  // 「我的工作區」那一頁也用這一份，不另寫。樣式在 platform.css 的 `.ws-noprev`。
+  const NOPREV_ICONS = {
+    audio: '<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v3"/>',
+    video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>',
+    text: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/>',
+  };
+  function noPreviewHtml(f) {
+    const kind = NOPREV_ICONS[f && f.kind] ? f.kind : 'text';
+    const ext = String((f && f.ext) || '').replace('.', '').toUpperCase();
+    return '<div class="ws-noprev ws-noprev-' + kind + '" role="img" aria-label="'
+      + esc(tr('沒有預覽圖')) + '">'
+      + '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
+      + NOPREV_ICONS[kind] + '</svg>'
+      + '<span class="ws-noprev-ext">' + esc(ext) + '</span></div>';
+  }
+
   // 這個上傳框收得下、而且工作區供應得了的副檔名交集。
   //
   // **工作區那半邊的清單一律讀 `data-ws-exts`（伺服器端給），不可寫死。**
@@ -42,6 +60,17 @@
       || (e === 'pdf' && a.includes('pdf'))
       || (e === 'png' && a.includes('image/')));
     return out;
+  }
+
+  // 工作區有沒有開 —— `base.html` 的 `<meta name="jt-workspace">`（伺服器端給）。
+  //
+  // 這支檔案不只 base.html 在載：幾支工具自己也載（為了「轉送」），所以工作區被管理員停用時
+  // 照樣在。那時「存至工作區」「從工作區載入」不可以出現（按下去只會 404），轉送要直接走
+  // 作業結果（2026-10-08 客戶回報：工作區沒開，轉逐字稿按「轉送會議摘要」沒反應）。
+  // 沒有這個 meta 的頁面照舊當成有開（舊行為）。
+  function workspaceOn() {
+    const m = document.querySelector('meta[name="jt-workspace"]');
+    return !m || m.getAttribute('content') !== 'off';
   }
 
   async function workspaceFileAsFile(fileId, meta) {
@@ -127,8 +156,11 @@
       const ext = (f.ext || '').replace('.', '');
       // 縮圖載不到就換成副檔名徽章 —— **不可以寫成 `onerror="…"` 屬性**：CSP 不收行內事件，
       // 那段永遠不會執行，畫面留一張破圖（下面用 addEventListener 接）。
-      const thumb = '<img src="/workspace/thumb/' + f.file_id + '" alt="" loading="lazy" data-ext="'
-        + esc(ext.toUpperCase()) + '">';
+      // 沒有預覽圖的型別（錄音檔、純文字）由伺服器端說（`preview: false`），直接畫圖示，
+      // 不去要一張註定是空白的縮圖。
+      const thumb = f.preview === false ? noPreviewHtml(f)
+        : '<img src="/workspace/thumb/' + f.file_id + '" alt="" loading="lazy" data-ext="'
+          + esc(ext.toUpperCase()) + '">';
       const tool = f.source_tool_name || f.source_tool || '';
       return '<div class="ws-pick-card" data-id="' + f.file_id + '"'
         + (tool ? ' title="' + esc(tr(tool)) + '"' : '') + '>' +
@@ -162,7 +194,7 @@
   // blob: URL just as well as a server URL, so the same anchor.href works for
   // both client-blob and server-file downloads.
   function attachWorkspaceSave(btn, specFn) {
-    if (!btn || !window.saveToWorkspace) { if (btn) btn.hidden = true; return; }
+    if (!btn || !window.saveToWorkspace || !workspaceOn()) { if (btn) btn.hidden = true; return; }
     btn.hidden = false;
     btn.disabled = false;
     const orig = btn.dataset.wsOrig || (btn.dataset.wsOrig = btn.innerHTML);
@@ -188,7 +220,10 @@
   // and dispatches a 'change' event, so the tool's existing handler runs.
   function attachWorkspaceLoadButton(btn, inputEl, opts) {
     opts = opts || {};
-    if (!btn || !inputEl || !window.openWorkspacePicker) { if (btn) btn.hidden = true; return; }
+    if (!btn || !inputEl || !window.openWorkspacePicker || !workspaceOn()) {
+      if (btn) btn.hidden = true;
+      return;
+    }
     const exts = (opts.accept && opts.accept.length)
       ? opts.accept : workspaceAcceptExts(inputEl.getAttribute('accept') || '',
           (btn.dataset && btn.dataset.wsExts) || '');
@@ -213,31 +248,40 @@
   // 重啟後也不在，所以只當退路。
   //
   //   spec: {jobId} | {blob} | {url}   —— 與 saveToWorkspace 相同
+  //         另外可以帶 `fallbackJobId`：送 blob / url 的工具，工作區沒開時改帶這件作業的結果
+  //         （轉逐字稿送的是畫面上那份 JSON，作業結果是同一個檔，改過的發言者名字也在裡面）
+  //
+  // 帶不過去時**丟出錯誤**，呼叫端要接住並講出來 —— 沒接的話使用者按了沒反應。
   async function handoffToTool(toolId, spec, name, fromTool) {
     const qs = new URLSearchParams();
     if (name) qs.set('from_name', name);
     let usedWorkspace = false;
-    try {
-      const res = await saveToWorkspace(spec, name, fromTool || '');
-      const fid = res && res.file && (res.file.id || res.file.file_id);
-      if (fid) { qs.set('from_ws', fid); usedWorkspace = true; }
-    } catch (_e) {
-      // 工作區停用或存檔失敗 —— 不要卡住使用者，改走作業結果
+    if (workspaceOn()) {
+      try {
+        const res = await saveToWorkspace(spec, name, fromTool || '');
+        const fid = res && res.file && (res.file.id || res.file.file_id);
+        if (fid) { qs.set('from_ws', fid); usedWorkspace = true; }
+      } catch (_e) {
+        // 存檔失敗（額度滿了、格式不收…）—— 不要卡住使用者，改走作業結果
+      }
     }
     if (!usedWorkspace) {
-      if (!spec || !spec.jobId) {
-        throw new Error(tr('沒有可以帶過去的檔案'));
+      const jid = spec && (spec.jobId || spec.fallbackJobId);
+      if (!jid) {
+        throw new Error(tr('工作區沒有開，這份內容帶不過去 —— 請先下載，再到那個工具上傳。'));
       }
-      qs.set('from_job', spec.jobId);
+      qs.set('from_job', jid);
     }
     window.location.href = '/tools/' + toolId + '/?' + qs.toString();
   }
 
   window.handoffToTool = handoffToTool;
+  window.workspaceOn = workspaceOn;
   window.openWorkspacePicker = openWorkspacePicker;
   window.attachWorkspaceSave = attachWorkspaceSave;
   window.attachWorkspaceLoadButton = attachWorkspaceLoadButton;
   window.workspaceFileAsFile = workspaceFileAsFile;
   window.saveToWorkspace = saveToWorkspace;
   window.workspaceAcceptExts = workspaceAcceptExts;
+  window.workspaceNoPreviewHtml = noPreviewHtml;
 })();

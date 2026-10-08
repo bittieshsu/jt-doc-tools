@@ -382,23 +382,42 @@
     .then(function (d) { applySpeakerMode(d.engine); })
     .catch(function () { applySpeakerMode('legacy'); });
 
-  var fu = new FileUpload(el('mtUp'), async function (_f, fs) {
-    var file = Array.isArray(fs) ? fs[0] : fs;
-    uploadId = null;
-    el('mtOpts').hidden = true;
-    el('mtResult').hidden = true;
-    if (!file) return;
-    var fd = new FormData();
-    fd.append('file', file);
-    var r = await fu.upload(BASE + '/upload', fd, { processingLabel: tr('收檔中…') });
-    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('上傳失敗'))); return; }
-    var d = await r.json();
+  // 收到檔案之後（上傳或從工作區接過來）畫面都走這一段，不寫兩份。
+  function useReceived(d) {
     uploadId = d.upload_id;
     el('mtFileInfo').textContent =
       tr('{0}（{1} MB）').replace('{0}', d.filename)
                         .replace('{1}', (d.size_bytes / 1048576).toFixed(1));
     el('mtFileInfo').hidden = false;
     el('mtOpts').hidden = false;
+  }
+  function resetReceived() {
+    uploadId = null;
+    el('mtOpts').hidden = true;
+    el('mtResult').hidden = true;
+  }
+
+  var fu = new FileUpload(el('mtUp'), async function (_f, fs) {
+    var file = Array.isArray(fs) ? fs[0] : fs;
+    resetReceived();
+    if (!file) return;
+    var fd = new FormData();
+    fd.append('file', file);
+    var r = await fu.upload(BASE + '/upload', fd, { processingLabel: tr('收檔中…') });
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('上傳失敗'))); return; }
+    useReceived(await r.json());
+  }, {
+    // 「從工作區載入」：錄音檔本來就在伺服器上，**不必下載到瀏覽器再傳回來**
+    //（三小時的錄影要來回兩趟）。伺服器端照工作區自己的歸屬判斷取檔，前端不判斷。
+    onWorkspacePick: async function (id) {
+      resetReceived();
+      var r = await fetch(BASE + '/from-workspace', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_id: id })
+      });
+      if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('從工作區載入失敗'))); return; }
+      useReceived(await r.json());
+    }
   });
 
   var job = new JobProgress(el('mtJob'), {
@@ -1056,7 +1075,7 @@
   });
 
   // **轉送走既有的工作區中轉**（v1.14.24 就是為這個做的），不要另造一條路。
-  el('mtToSummary').addEventListener('click', function () {
+  el('mtToSummary').addEventListener('click', async function () {
     // **要送 JSON 不是純文字。**
     //
     // 純文字會把 `start_ms` / `end_ms` 丟掉，而「會議摘要」那邊的
@@ -1068,10 +1087,17 @@
     // 而且 `speaker` 也一起保住。
     var name = (data.source && data.source.filename ? data.source.filename : 'transcript')
                  .replace(/\.[^.]+$/, '') + '-逐字稿.json';
-    window.handoffToTool('meeting-summary',
-                         { blob: new Blob([JSON.stringify(data)],
-                                          { type: 'application/json' }) },
-                         name, 'meeting-transcribe');
+    // 工作區沒開時改帶這件作業的結果（同一份 JSON，改過的發言者名字也在）——
+    // 沒有這個退路的話按了沒反應（2026-10-08 客戶回報）。帶不過去要講出來，不可以安靜失敗。
+    try {
+      await window.handoffToTool('meeting-summary',
+                                 { blob: new Blob([JSON.stringify(data)],
+                                                  { type: 'application/json' }),
+                                   fallbackJobId: currentJobId || job.jobId },
+                                 name, 'meeting-transcribe');
+    } catch (e) {
+      showAlert((e && e.message) || tr('轉送失敗'));
+    }
   });
 
   // ---- 補專有名詞、只重跑校正（v1.16.41） ----

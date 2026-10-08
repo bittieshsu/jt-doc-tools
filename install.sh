@@ -800,6 +800,21 @@ fetch_code() {
     fi
 }
 
+# 既有的 venv 還能用嗎：Python 在、而且版本跟建的時候一樣（pyvenv.cfg 的 version_info）
+venv_ok() {
+    local py="$INSTALL_DIR/.venv/bin/python" cfg="$INSTALL_DIR/.venv/pyvenv.cfg" want got
+    [ -x "$py" ] && [ -f "$cfg" ] || return 1
+    want="$(sed -n 's/^version_info *= *\([0-9]*\.[0-9]*\).*/\1/p' "$cfg" | head -1)"
+    [ -n "$want" ] || want="$(sed -n 's/^version *= *\([0-9]*\.[0-9]*\).*/\1/p' "$cfg" | head -1)"
+    got="$("$py" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)" || return 1
+    [ -z "$want" ] || [ "$want" = "$got" ] || return 1
+    # Python 在某個人的家目錄裡（root 跑得動、服務帳號讀不到）也算壞的
+    case "$(sed -n 's/^home *= *//p' "$cfg" | head -1)" in
+        /root/*|/home/*) return 1 ;;
+    esac
+    return 0
+}
+
 setup_python() {
     log "建立獨立 Python 環境並安裝依賴 (uv sync) ..."
     cd "$INSTALL_DIR"
@@ -830,6 +845,20 @@ setup_python() {
         if [ -z "$UV_EXTRA_ARGS" ]; then
             warn "  ARM brew python 全 broken — 讓 uv 自己挑（可能會抓 Intel rosetta 走 x86_64 wheel）"
             warn "  建議：brew install python@3.12  然後重跑 install.sh"
+        fi
+    fi
+    # Linux：venv 底下那一個 Python 放在安裝目錄裡（$INSTALL_DIR/python），不跟系統共用。
+    # 建在系統 Python 上的話，作業系統升級換掉 /usr/bin/python3（例如 3.10 → 3.12）之後
+    # 套件全部看不到、服務起不來。已經好好的環境不動它（重建要重新下載所有相依）；
+    # 全新安裝或環境已經壞掉時才用安裝目錄裡的 Python 建。
+    if [ "$PLATFORM" = "linux" ]; then
+        export UV_PYTHON_INSTALL_DIR="$INSTALL_DIR/python"
+        if venv_ok; then
+            export UV_PYTHON_PREFERENCE=managed
+        else
+            export UV_PYTHON_PREFERENCE=only-managed
+            UV_EXTRA_ARGS="--python 3.12"
+            log "  Python：用安裝目錄裡自己的 Python 3.12（$INSTALL_DIR/python）"
         fi
     fi
     # 注意：絕不能用 --frozen — 那會盲信 uv.lock，若 lockfile 漏了某個 dep

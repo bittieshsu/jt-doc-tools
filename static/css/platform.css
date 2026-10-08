@@ -357,6 +357,25 @@ h1 .ic { color: var(--primary); flex-shrink: 0; }
 }
 .option-card:has(input[type=radio]:checked) .opt-ic { color: var(--primary); }
 .option-card:has(input[type=radio]:checked) .opt-label { color: var(--primary-dark); }
+/* 同一種卡片也可以是**複選**（裡面放 checkbox，例如公文撰擬的「版面加註」）：
+   選中的樣子跟單選一樣，右上角另外一個小勾，看得出可以同時選好幾張、再點一次取消。
+   勾選框藏起來但仍然拿得到焦點（Tab 走得到、空白鍵切換），焦點在卡片上畫外框。 */
+.option-card input[type=checkbox] { position: absolute; opacity: 0; pointer-events: none; }
+.option-card:has(input[type=checkbox]:checked) {
+  border-color: var(--primary); background: #eef2ff;
+  box-shadow: 0 4px 12px rgba(99,102,241,0.15);
+}
+.option-card:has(input[type=checkbox]:checked) .opt-ic { color: var(--primary); }
+.option-card:has(input[type=checkbox]:checked) .opt-label { color: var(--primary-dark); }
+.option-card:has(input[type=checkbox])::after {
+  content: ""; position: absolute; top: 7px; right: 7px; width: 14px; height: 14px;
+  box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 4px; background: #fff;
+  font-size: 11px; line-height: 11px; font-weight: 700; text-align: center; color: #fff;
+}
+.option-card:has(input[type=checkbox]:checked)::after {
+  content: "\2713"; border-color: var(--primary); background: var(--primary);
+}
+.option-card:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
 h2 { font-size: 18px; margin: 20px 0 10px; }
 .muted { color: var(--muted); font-size: 14px; }
 
@@ -399,6 +418,16 @@ h2 { font-size: 18px; margin: 20px 0 10px; }
   font-size: 13px; margin: 10px 0 18px;
 }
 .warn-box svg { vertical-align: -2px; margin-right: 4px; }
+/* 開頭是圖示的說明框：圖示自己一欄，換行時第二行起跟第一行的字對齊，不鑽到圖示底下
+   （2026-10-08 使用者：「換行時 第二行起文字要縮進去 跟第一行在 icon 後齊」）。
+   圖示是方框內第一個元素才套（圖示在 `<b>` 裡、或前面先有字的不算）。 */
+.info-box:has(> svg.ic:first-child),
+.warn-box:has(> svg.ic:first-child) { position: relative; padding-left: 34px; }
+.info-box > svg.ic:first-child,
+.warn-box > svg.ic:first-child {
+  position: absolute; left: 12px; margin: 0;
+  top: 12px; top: calc(10px + (1lh - 16px) / 2);
+}
 
 .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
 .panel + .panel { margin-top: 16px; }
@@ -912,12 +941,20 @@ select.jt-select-native {
   padding: 4px;
 }
 .jt-select-panel[hidden] { display: none; }
+/* 分組標題整條有底色 ＋ 左邊主色條（2026-10-08 使用者：「要整條有背景色 才有明顯」，
+   比照 PDF 編輯器字型選單的 `.fp-group`）。面板有 4px 內距，左右用負的外距撐滿整條；
+   捲動時貼在上面（sticky），一眼看得出目前在哪一組。 */
 .jt-select-group {
-  padding: 6px 10px 4px;
-  font-size: 11px; color: #94a3b8;
-  font-weight: 600; letter-spacing: 0.04em;
+  margin: 4px -4px 2px; padding: 7px 12px 7px 14px;
+  font-size: 12px; color: #1e40af;
+  font-weight: 700; letter-spacing: 0.04em;
   text-transform: none;
+  background: #dbeafe;
+  border-top: 1px solid #93c5fd; border-bottom: 1px solid #93c5fd;
+  box-shadow: inset 4px 0 0 0 #2563eb;
+  position: sticky; top: -4px; z-index: 1;
 }
+.jt-select-panel > .jt-select-group:first-child { margin-top: -4px; border-top: none; }
 .jt-select-option {
   padding: 6px 28px 6px 10px;
   border-radius: 4px;
@@ -1259,6 +1296,13 @@ select.jt-select-native {
 .ws-pick-info{padding:8px 10px;font-size:12px;}
 .ws-pick-name{font-weight:600;color:#1e293b;word-break:break-all;line-height:1.3;}
 .ws-pick-meta{color:#94a3b8;font-size:11px;margin-top:2px;}
+/* 沒有預覽圖的檔案（錄音 / 錄影、純文字）：圖示 ＋ 副檔名。工作區挑選視窗與「我的工作區」共用
+   （畫法在 workspace_picker.js 的 noPreviewHtml）。 */
+.ws-noprev{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;height:100%;color:#64748b;}
+.ws-noprev svg{flex:none;}
+.ws-noprev-audio{color:#7c3aed;}
+.ws-noprev-video{color:#0d9488;}
+.ws-noprev-ext{font-size:11px;font-weight:700;letter-spacing:.04em;color:#475569;}
 
 
 /* ===== 版本檢查：更新指令（admin/sys-deps）=====
@@ -1325,3 +1369,45 @@ select.jt-select-native {
 .jt-lb-nav[disabled] { opacity: .28; cursor: not-allowed; }
 .jt-lb-nav.prev { left: 12px; border-radius: 0 6px 6px 0; }
 .jt-lb-nav.next { right: 12px; border-radius: 6px 0 0 6px; }
+
+/* 試用中的工具：名稱旁的「Beta」（ToolMetadata.beta）。側欄、首頁卡片、工具頁標題共用。 */
+.tool-beta { display: inline-block; vertical-align: middle; margin-left: 6px;
+  padding: 0 6px; border-radius: 999px; border: 1px solid #fcd34d;
+  background: #fef3c7; color: #92400e; font-size: 10px; font-weight: 700;
+  line-height: 15px; letter-spacing: .02em; white-space: nowrap; }
+h1 .tool-beta { font-size: 11px; line-height: 17px; margin-left: 8px; }
+
+/* ===== 單行欄位的「之前填過的」（static/js/field_history.js） =====
+   按鈕放在輸入框**後面**（不包一層），用絕對定位疊進輸入框的右緣；位置由 JS 照輸入框
+   實際的位置算（走 CSSOM —— CSP 擋行內 style 屬性）。清單是本站樣式，不是原生 datalist。 */
+.fh-host { position: relative; }
+input.field.fh-input { padding-right: 34px; }
+.fh-btn {
+  position: absolute; top: 0; right: 3px; z-index: 2;
+  width: 28px; height: 28px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 5px; background: transparent; color: #94a3b8;
+  cursor: pointer;
+}
+.fh-btn:hover, .fh-btn.open { background: #f1f5f9; color: #334155; }
+.fh-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25); color: #334155; }
+.fh-panel {
+  position: absolute; z-index: 1000; min-width: 200px; max-width: calc(100vw - 32px);
+  max-height: 280px; overflow-y: auto; padding: 4px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+}
+.fh-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 4px 4px 10px; border-radius: 4px;
+  font-size: 13px; color: #1e293b; cursor: pointer;
+}
+.fh-row:hover, .fh-row:focus { background: #f1f5f9; outline: none; }
+.fh-val { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fh-del {
+  flex: 0 0 auto; width: 24px; height: 24px; padding: 0;
+  border: 0; border-radius: 4px; background: transparent;
+  color: #94a3b8; font-size: 16px; line-height: 1; cursor: pointer;
+}
+.fh-del:hover { background: #fee2e2; color: #b91c1c; }
+.fh-empty { padding: 8px 10px; font-size: 12.5px; color: var(--muted); }

@@ -42,6 +42,7 @@ _NON_ADMIN_TOOL_IDS = [
     "pdf-editor", "translate-doc", "doc-translate", "pdf-ocr", "text-list", "einvoice-scan", "transit-proof",
     "vat-lookup", "pdf-to-office", "pdf-to-slides", "pdf-to-markdown", "markdown-to-doc",
     "pdf-wordcount", "submission-check", "meeting-summary", "meeting-transcribe",
+    "official-doc",
     "pdf-annotations", "pdf-annotations-flatten", "pdf-annotations-strip",
     # Sensitive — not in default-user; granted explicitly by finance/sales.
     # "pdf-fill", "pdf-stamp",

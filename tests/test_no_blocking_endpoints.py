@@ -43,6 +43,11 @@ MUST_OFFLOAD = [
     # 但重活藏在 `mc.to_png()` / `_report_pdf()` 裡面，**靜態掃描看不到**。
     # 留在事件迴圈上的話，有人按下載就會卡住整個網站（2026-09-19 抓到）。
     ("app/tools/meeting_summary/router.py", "download"),
+    # 公文撰擬的資料來源：上傳要解 zip 裡每一份 odt、地址簿第一次查詢要讀
+    # 整份 JSON（約 5 MB）—— 重活都藏在 `official_doc_sources` 裡，掃描看不到。
+    ("app/admin/official_doc_routes.py", "official_doc_upload"),
+    ("app/admin/official_doc_routes.py", "official_doc_search_orgs"),
+    ("app/admin/official_doc_routes.py", "official_doc_download"),
 ]
 
 #: v1.14.56 起是 **0**：全站的 async 端點都不會在事件迴圈上做重活了。

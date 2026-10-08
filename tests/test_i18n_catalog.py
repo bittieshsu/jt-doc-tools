@@ -109,6 +109,7 @@ def test_catalog_entries_are_all_traditional_chinese_keys():
 #: **唯一來源在掃描器裡** —— 瀏覽器逐頁掃也用同一份判準，
 #: 兩邊各寫一份一定會漂（本專案反覆踩過）。
 from tools.i18n_untranslated_scan import NOT_JAPANESE as _NOT_JAPANESE
+from tools.source_text import block_re as _block_re
 
 
 def test_the_japanese_catalog_is_not_just_chinese_left_in_place():
@@ -330,6 +331,112 @@ def test_no_attribute_renders_the_helper_call_as_text():
                      + "\n  ".join(bad)
                      + "\n樣板字面用 {{ tr('…') }}；template literal 用 "
                        "title=\"${tr('…')}\"；一般字串用 title=\"' + tr('…') + '\"")
+
+
+def _concat_inside_template_literal(js: str) -> list[int]:
+    """template literal（反引號）裡、`${}` 外面出現 `' + tr(` 的行號（相對於 `js` 開頭）。
+
+    逐字元走（不用正規式配引號 —— 會把兩個不相干的引號配成一對）：
+    字串裡的反引號、`${}` 裡面的字串都要分得出來。
+    """
+    out: list[int] = []
+    stack = ["code"]          # code / ' / " / ` / ${（在 template literal 裡的運算式）
+    i, n, line = 0, len(js), 1
+    while i < n:
+        ch = js[i]
+        top = stack[-1]
+        if ch == "\n":
+            line += 1
+        if top in ("'", '"'):
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == top or ch == "\n":
+                stack.pop()
+        elif top == "`":
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == "`":
+                stack.pop()
+            elif js.startswith("${", i):
+                stack.append("${")
+                i += 2
+                continue
+            elif ch in "'\"" and re.match(r"""['"]\s*\+\s*tr\(""", js[i:i + 40]):
+                out.append(line)
+        else:                 # code 或 ${
+            if js.startswith("//", i):
+                j = js.find("\n", i)
+                i = n if j < 0 else j
+                continue
+            if js.startswith("/*", i):
+                j = js.find("*/", i + 2)
+                line += js.count("\n", i, n if j < 0 else j)
+                i = n if j < 0 else j + 2
+                continue
+            if ch == "/" and re.search(r"[(,=:\[!&|?{};+]\s*$", js[max(0, i - 40):i]):
+                # 正規式字面（`/"/g`）：裡面的引號不是字串的開頭
+                j, in_cls = i + 1, False
+                while j < n and js[j] != "\n":
+                    if js[j] == "\\":
+                        j += 2
+                        continue
+                    if js[j] == "[":
+                        in_cls = True
+                    elif js[j] == "]":
+                        in_cls = False
+                    elif js[j] == "/" and not in_cls:
+                        break
+                    j += 1
+                i = j + 1
+                continue
+            if ch in "'\"`":
+                stack.append(ch)
+            elif ch == "{" and top == "${":
+                stack.append("{")
+            elif ch == "}" and top in ("${", "{"):
+                stack.pop()
+        i += 1
+    return out
+
+
+def test_template_literals_never_concatenate_the_helper():
+    """`` `<b title="' + tr('刪除') + '">` `` —— 反引號裡寫成一般字串的接法，畫面上會原樣
+    顯示 `' + tr('刪除') + '`（2026-10-08 使用者在 PDF 編輯器的字型搜尋框看到；
+    同一個錯另外還有六支頁面的滑鼠提示）。template literal 要寫 `${tr('…')}`。
+
+    上一條檢查只看「屬性直接等於 tr(」，這種寫法它看不到。
+    """
+    bad: list[str] = []
+    scanned = 0
+    for p in sorted(ROOT.glob("app/**/*.html")) + sorted(ROOT.glob("static/js/*.js")):
+        text = p.read_text(encoding="utf-8")
+        if p.suffix == ".html":
+            parts = []
+            for m in _block_re("script").finditer(text):
+                parts.append((text.count("\n", 0, m.start(1)), m.group(1)))
+        else:
+            parts = [(0, text)]
+        for base, js in parts:
+            scanned += 1
+            for ln in _concat_inside_template_literal(js):
+                bad.append(f"{p.relative_to(ROOT)}:{base + ln}")
+    assert scanned > 100, f"只掃到 {scanned} 段程式 —— 掃描範圍不對"
+    assert not bad, ("template literal 裡用了 `' + tr(…) + '`（畫面會原樣顯示程式碼），改成 ${tr('…')}：\n  "
+                     + "\n  ".join(bad))
+
+
+def test_the_template_literal_scan_has_teeth():
+    """判準自己要驗：該抓的抓得到、正確的寫法不誤報。"""
+    assert _concat_inside_template_literal("x = `<b title=\"' + tr('刪') + '\">`;") == [1]
+    ok = ("a = '<b title=\"' + tr('刪') + '\">';\n"
+          "b = `<b title=\"${tr('刪')}\">`;\n"
+          "c = `${x || ('<i>' + tr('空') + '</i>')}`;\n"
+          "// `' + tr(` 在註解裡\n"
+          "d = `${s.replace(/\"/g, '&quot;')}`;\n"
+          "e = ok ? `<i>${n}</i>` : '<span>' + tr('無') + '</span>';\n")
+    assert _concat_inside_template_literal(ok) == []
 
 
 #: 這幾支的字串是**畫面上的說明文字**（相依檢查、LLM 工具清單、設定備份分類…）。

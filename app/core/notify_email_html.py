@@ -15,6 +15,19 @@ jt-glogarch 的通知信比較 —— 那邊已經是 multipart（純文字 + �
 * **深色模式會反轉顏色** → 每個區塊都明確指定背景色與文字色，不要靠預設值。
 * **使用者提供的內容一定要跳脫** —— 檔名是使用者自己取的，直接塞進 HTML 就是
   一封可被注入的信。
+* **卡片要跟著讀信窗格縮**（使用者回報：窗格拉窄，白色卡片停在 560px、右邊被切掉）。
+  用 email 業界的「fluid hybrid」寫法，三層各管一種讀信軟體：
+  外層 `<div style="max-width:560px">`（有些讀信軟體不認表格上的 max-width）、
+  卡片表格 `width="100%"` ＋ `style="width:100%;max-width:560px"`（兩邊都寫：
+  有的消毒程式只留屬性、有的只留 style）。
+  **刻意不給 Outlook 桌面版固定 560 寬的外框**（`<!--[if mso]>`，業界常見寫法）：
+  Outlook 不認 max-width，給了固定寬度它就照寫 —— 讀信窗格比 584px 窄時出現橫向捲動，
+  正是使用者回報的那個問題。不給的話 Outlook 是整個窗格寬（卡片比較寬，但永遠不會被切）。
+  **不可以出現比 320 寬的固定寬度**；寬度 100% 的表格不可以再帶左右
+  padding（內容盒模型的讀信軟體會多出 24px 而超出窗格）—— padding 放在格子上。
+  長檔名 / 長原因用 `word-break:break-word` ＋ `overflow-wrap:anywhere` 折行，
+  欄位表 `table-layout:fixed`：不支援折行的讀信軟體也只會在格子裡溢出，
+  不會把整張卡片撐寬。
 
 所以這裡不用任何模板引擎、不引外部 CSS，就是一份把上述限制寫死的字串組裝。
 
@@ -38,6 +51,11 @@ _MUTED = "#64748b"
 _LINE = "#e5e7eb"
 _OK_BG, _OK_FG = "#ecfdf5", "#047857"
 _ERR_BG, _ERR_FG = "#fef2f2", "#b91c1c"
+#: 卡片的最大寬度（max-width；不認 max-width 的 Outlook 桌面版是整個窗格寬）。
+_CARD_MAX = 560
+#: 長字串折行：`break-word` 給多數讀信軟體，`overflow-wrap:anywhere` 讓表格的
+#: 最小寬度也跟著縮（只寫 `overflow-wrap:break-word` 的話，表格會先被長檔名撐寬）。
+_WRAP = "word-break:break-word;overflow-wrap:anywhere;word-wrap:break-word"
 
 
 def _row(label: str, value: str) -> str:
@@ -47,8 +65,7 @@ def _row(label: str, value: str) -> str:
         f'<td style="padding:7px 0;color:{_MUTED};font-size:13px;'
         'white-space:nowrap;vertical-align:top;width:72px">'
         f'{escape(label)}</td>'
-        f'<td style="padding:7px 0;color:{_INK};font-size:14px;'
-        'word-break:break-all">'
+        f'<td style="padding:7px 0;color:{_INK};font-size:14px;{_WRAP}">'
         f'{escape(value)}</td>'
         '</tr>'
     )
@@ -84,7 +101,7 @@ def _note_box(kind: str, fallback: str, workspace_url: str,
     return (
         f'<div style="margin-top:14px;padding:11px 13px;background:#f8fafc;'
         f'border:1px solid {_LINE};border-radius:8px;color:{_MUTED};'
-        f'font-size:13px;line-height:1.6">{body}</div>'
+        f'font-size:13px;line-height:1.6;{_WRAP}">{body}</div>'
     )
 
 
@@ -111,7 +128,7 @@ def _header(site_name: str, logo_cid: str) -> str:
         '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
         + (f'<td style="padding-right:10px">{logo}</td>' if logo else '')
         + '<td style="color:#ffffff;font-size:14px;font-weight:600;'
-          f'vertical-align:middle">{escape(site_name)}</td>'
+          f'vertical-align:middle;{_WRAP}">{escape(site_name)}</td>'
         '</tr></table></td></tr>'
     )
 
@@ -130,7 +147,7 @@ def _headline(headline: str, icon_cid: str) -> str:
         '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
         + icon +
         f'<td style="font-size:19px;font-weight:700;color:{_TITLE};'
-        f'line-height:1.4;vertical-align:middle">{escape(headline)}</td>'
+        f'line-height:1.4;vertical-align:middle;{_WRAP}">{escape(headline)}</td>'
         '</tr></table>'
     )
 
@@ -170,26 +187,40 @@ def render(*, site_name: str, ok: bool, tool: str, filename: str,
     # 用 list + join，不要靠字串隱式相接 —— 中間夾了函式呼叫時，
     # 隱式相接會變成語法錯誤（改這裡時踩過一次）。
     parts = [
-        '<!DOCTYPE html><html><body style="margin:0;padding:0;'
-        'background:#f1f5f9">',
+        # viewport：手機上的讀信軟體沒有它會用 980px 的虛擬寬度排版再縮放。
+        # Gmail 會丟掉整個 <head>，那不影響 —— 版面本身就是流動的。
+        '<!DOCTYPE html><html><head>'
+        '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<meta name="x-apple-disable-message-reformatting">'
+        '</head><body style="margin:0;padding:0;width:100%;'
+        'background:#f1f5f9;-webkit-text-size-adjust:100%;'
+        '-ms-text-size-adjust:100%">',
+        # 外層灰底：padding 放在格子上，不放在 width=100% 的表格上
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-        'style="background:#f1f5f9;padding:24px 12px">',
-        '<tr><td align="center">',
+        'border="0" style="width:100%;background:#f1f5f9">',
+        '<tr><td align="center" style="padding:24px 12px">',
+        # 不認表格 max-width 的讀信軟體靠這一層 div 收窄
+        f'<div style="max-width:{_CARD_MAX}px;margin:0 auto">',
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-        'style="max-width:560px;background:#ffffff;border-radius:12px;'
+        f'border="0" style="width:100%;max-width:{_CARD_MAX}px;margin:0 auto;'
+        'background:#ffffff;border-radius:12px;'
         f'overflow:hidden;border:1px solid {_LINE};'
         'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\','
         '\'Noto Sans TC\',sans-serif">',
 
         _header(site_name, logo_cid),
 
-        '<tr><td style="padding:22px 24px">',
+        f'<tr><td style="padding:22px 24px;{_WRAP}">',
         _headline(headline, icon_cid),
         f'<div style="display:inline-block;margin-top:10px;padding:4px 11px;'
         f'border-radius:999px;background:{status_bg};color:{status_fg};'
         f'font-size:12.5px;font-weight:600">{escape(status_text)}</div>',
+        # table-layout:fixed：欄寬照第一列（標籤 72px、其餘給值），長檔名在不支援
+        # 折行的讀信軟體裡也只會在格子裡溢出，不會把卡片撐寬
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-        f'style="margin-top:14px;border-top:1px solid {_LINE}">',
+        'border="0" style="width:100%;table-layout:fixed;margin-top:14px;'
+        f'border-top:1px solid {_LINE}">',
         "".join(rows),
         '</table>',
         action,
@@ -198,11 +229,13 @@ def render(*, site_name: str, ok: bool, tool: str, filename: str,
 
         f'<tr><td style="padding:14px 24px;border-top:1px solid {_LINE};'
         'border-radius:0 0 12px 12px;'
-        f'color:{_MUTED};font-size:11.5px;line-height:1.6">'
+        f'color:{_MUTED};font-size:11.5px;line-height:1.6;{_WRAP}">'
         '這封信只包含工具名稱、檔名與狀態，<b>不含檔案內容</b>。<br>'
         '不想再收到可到「我的作業 → 通知設定」關閉。'
         '</td></tr>',
 
-        '</table></td></tr></table></body></html>',
+        '</table>',
+        '</div>',
+        '</td></tr></table></body></html>',
     ]
     return "".join(parts)

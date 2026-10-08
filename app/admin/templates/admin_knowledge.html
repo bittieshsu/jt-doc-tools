@@ -1,0 +1,802 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}{{ tr('公文知識庫') }} · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ icon('book', size=22) }} {{ tr('公文知識庫') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h1>
+<p class="muted">{{ tr('上傳文書處理手冊、機關規定、業務法規、核准範例，讓「公文撰擬」可以查到出處。文件在這台伺服器上抽字、切段、建索引，不會送到外部。') }}</p>
+
+<div class="panel" data-s="s5fb956f2">
+  <b>{{ tr('說明：') }}</b>
+  <ul data-s="saa3893fb">
+    <li>{{ tr('上傳之後會在背景抽字、切段、建索引；處理完是「可以啟用」，要你按「啟用」才會被查到。') }}</li>
+    <li>{{ tr('類別決定用途：文書規範與機關規定是格式與用語參考、業務法規是業務依據、公文範例只是寫作範例（不是依據）。') }}</li>
+    <li>{{ tr('來源網址只是記錄，不會去抓那個網址。') }}</li>
+    <li>{{ tr('檢索的分數只代表排序，不是正確率或法律效力的判斷。') }}</li>
+    <li>{{ tr('公文知識庫的文件不在「設定備份」裡（量大，而且索引綁著 embedding 模型）；搬機後請重新上傳。') }}</li>
+  </ul>
+</div>
+
+<div class="panel">
+  <h2 data-s="s53896af7">{{ icon('globe', size=18) }} {{ tr('政府公開資料') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h2>
+  <p class="muted">{{ tr('從全國法規資料庫、國發會行政規則、行政院文書處理相關釋例挑選要的項目匯入：每一項建一個資料集、附上出處；之後再按一次「下載並匯入」就會更新。只有按「下載並匯入」才會連外。') }}</p>
+  {% if gov_sum %}
+  <div class="kb-gov-sum" id="kbGovSum">
+    <div class="kb-gov-tile">
+      <div class="kb-gov-num" data-gov-available>{{ "{:,}".format(gov_sum.available) }}</div>
+      <div class="kb-gov-lab">{{ tr('總共可以匯入（項）') }}</div>
+      {% if gov_sum.not_downloaded %}<div class="kb-gov-note">{{ tr('還有 {0} 個來源沒下載清單，不在這個數字裡').replace('{0}', gov_sum.not_downloaded|string) }}</div>{% endif %}
+    </div>
+    <div class="kb-gov-tile is-done">
+      <div class="kb-gov-num" data-gov-imported>{{ "{:,}".format(gov_sum.imported) }}</div>
+      <div class="kb-gov-lab">{{ tr('目前已下載並匯入（項）') }}</div>
+      {% if gov_sum.needs_update %}<div class="kb-gov-note">{{ tr('其中 {0} 項來源有更新，按「下載並匯入」就會更新').replace('{0}', gov_sum.needs_update|string) }}</div>{% endif %}
+    </div>
+  </div>
+  <ul class="kb-gov-src">
+    {% for g in gov_sum.groups %}
+    <li>
+      <span class="kb-gov-src-name">{{ tr(g.name) }}</span>
+      {% if g.downloaded %}
+      <span class="kb-gov-src-n">{{ tr('可以匯入 {0} 項').replace('{0}', "{:,}".format(g.available)) }} · {{ tr('已匯入 {0} 項').replace('{0}', "{:,}".format(g.imported)) }}</span>
+      {% else %}
+      <span class="kb-gov-src-n muted">{{ tr('還沒下載清單') }}</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% if gov_sum.running %}<p class="muted kb-msg">{{ tr('正在下載或匯入，完成後數字會更新。') }}</p>{% endif %}
+  {% endif %}
+  <p class="kb-toolbar"><a class="btn" id="kbGovGo" href="/admin/knowledge/gov">{{ icon('globe', size=14) }} <span>{{ tr('前往政府公開資料') }}</span></a></p>
+</div>
+
+<div class="panel">
+  <h2 data-s="s53896af7">{{ icon('info', size=18) }} {{ tr('公文知識庫目前狀態') }}</h2>
+  {# 三格數字（檢索方式 / 啟用中的段落 / 嵌入服務）＋ 要處理的事一格一格列出來（2026-10-08 使用者：
+     「這區也要改好看一點」—— 原本是五行灰字）。「分數只代表排序」那一句上面的說明已經有，不重複。
+     Embedding（嵌入服務）的設定在「LLM 設定」頁；**重建索引與停用向量檢索留在這裡**：
+     它們動的是知識庫的索引，而狀態就寫著「請按『重建索引』」—— 按鈕要在講這句話的地方。 #}
+  <div id="kbStatus" aria-live="polite"><p class="muted">{{ tr('讀取中…') }}</p></div>
+  <div class="kb-st-actions">
+    <a class="btn" id="kbEmbGo" href="/admin/llm-settings#embedding">{{ icon('gear', size=14) }} <span>{{ tr('前往 Embedding 設定') }}</span></a>
+    <button class="btn btn-primary" id="kbRebuild" type="button" hidden>{{ icon('refresh', size=14) }} <span>{{ tr('重建索引') }}</span></button>
+    <button class="btn btn-danger" id="kbVecOff" type="button" hidden>{{ icon('pause', size=14) }} <span>{{ tr('停用向量檢索') }}</span></button>
+    <span class="muted kb-st-where">{{ tr('嵌入服務（Embedding）在「LLM 設定」頁設定。') }}</span>
+  </div>
+  <template id="kbStIcons">
+    <span data-ic="search">{{ icon('search', size=15) }}</span>
+    <span data-ic="archive">{{ icon('archive', size=15) }}</span>
+    <span data-ic="globe">{{ icon('globe', size=15) }}</span>
+    <span data-ic="warn">{{ icon('warn', size=15) }}</span>
+    <span data-ic="refresh">{{ icon('refresh', size=15) }}</span>
+  </template>
+  <p id="kbEmbMsg" class="muted kb-msg"></p>
+</div>
+
+<div class="panel">
+  <h2 data-s="s53896af7">{{ icon('archive', size=18) }} {{ tr('資料集') }}</h2>
+  <p class="kb-toolbar">
+    <button class="btn btn-primary" id="kbNewDs" type="button">{{ icon('plus', size=14) }} <span>{{ tr('新增資料集') }}</span></button>
+  </p>
+  <form id="kbDsForm" class="auth-form kb-form" hidden>
+    <fieldset class="auth-section">
+      <legend>{{ icon('gear', size=14) }} <span id="kbDsFormTitle">{{ tr('新增資料集') }}</span></legend>
+      <div class="auth-field">
+        <label class="af-label" for="kbDsName">{{ tr('名稱') }}</label>
+        <input id="kbDsName" class="field" type="text" maxlength="100">
+      </div>
+      <div class="auth-field">
+        <label class="af-label" for="kbDsCat">{{ tr('類別') }}</label>
+        <select id="kbDsCat" class="field">
+          {% for cid, c in categories.items() %}
+          <option value="{{ cid }}">{{ tr(c[0]) }}（{{ tr(purposes[c[1]]) }}）</option>
+          {% endfor %}
+        </select>
+        <div class="af-hint">{{ tr('用途由類別決定，不另外選 —— 避免把寫作範例設成業務依據。') }}</div>
+      </div>
+      <div class="auth-field">
+        <label class="af-label" for="kbDsDesc">{{ tr('說明（選填）') }}</label>
+        <textarea id="kbDsDesc" class="field kb-textarea" rows="2" maxlength="1000"></textarea>
+      </div>
+      <div class="auth-field af-checks">
+        <label><input type="radio" name="kbDsAccess" value="all" checked> {{ tr('全站都看得到') }}</label>
+        <label><input type="radio" name="kbDsAccess" value="groups"> {{ tr('只有指定的群組') }}</label>
+      </div>
+      <div class="auth-field" id="kbGroupBox" hidden>
+        <label class="af-label" for="kbGroupQ">{{ tr('群組') }}</label>
+        <input id="kbGroupQ" class="field" type="text" maxlength="60" placeholder="{{ tr('輸入群組名稱搜尋') }}">
+        <div id="kbGroupHits" class="kb-chips"></div>
+        <div class="af-hint">{{ tr('已選：') }}</div>
+        <div id="kbGroupSel" class="kb-chips"></div>
+        <div class="af-hint" id="kbAuthOffNote" hidden>{{ tr('目前沒有啟用認證：所有人都看得到全部資料集，群組設定要等啟用認證才有作用。') }}</div>
+      </div>
+      <div class="auth-field af-checks">
+        <label><input type="checkbox" id="kbDsEnabled" checked> {{ tr('啟用這個資料集（關閉時裡面的文件都不會被查到）') }}</label>
+      </div>
+      <p>
+        <button class="btn btn-primary" id="kbDsSave" type="button">{{ icon('save', size=14) }} <span>{{ tr('儲存') }}</span></button>
+        <button class="btn" id="kbDsCancel" type="button">{{ icon('close', size=14) }} <span>{{ tr('取消') }}</span></button>
+      </p>
+    </fieldset>
+  </form>
+  <div class="kb-tablewrap">
+    <table class="kb-table">
+      <thead><tr>
+        <th>{{ tr('名稱') }}</th><th>{{ tr('類別（用途）') }}</th><th>{{ tr('存取範圍') }}</th>
+        <th>{{ tr('文件（啟用／全部）') }}</th><th>{{ tr('段數') }}</th><th>{{ tr('狀態') }}</th><th></th>
+      </tr></thead>
+      <tbody id="kbDsRows"></tbody>
+    </table>
+  </div>
+  <p class="muted" id="kbDsEmpty" hidden>{{ tr('還沒有資料集。先新增一個，再上傳文件。') }}</p>
+</div>
+
+<div class="panel" id="kbDocPanel" hidden>
+  <h2 data-s="s53896af7">{{ icon('page', size=18) }} <span id="kbDocTitle">{{ tr('文件') }}</span></h2>
+  <form id="kbUpForm" class="auth-form kb-form">
+    <fieldset class="auth-section">
+      <legend>{{ icon('upload', size=14) }} {{ tr('上傳文件') }}</legend>
+      <div class="auth-field">
+        <label class="af-label" for="kbFiles">{{ tr('檔案（可以一次選好幾份）') }}</label>
+        <input id="kbFiles" class="field" type="file" multiple accept="{{ accept }}">
+        <div class="af-hint">{{ tr('收 PDF、Word（.docx）、ODF（.odt）、純文字（.txt）、Markdown（.md）。掃描的圖片檔請先用「OCR 文字辨識」轉成可搜尋的 PDF。') }}
+          {{ tr('每份最多') }} {{ max_file_mb }} MB，{{ tr('一次最多') }} {{ max_files }} {{ tr('份。') }}</div>
+      </div>
+      <div class="af-attrs">
+        <div class="auth-field">
+          <label class="af-label" for="kbVerLabel">{{ tr('版本標籤（選填）') }}</label>
+          <input id="kbVerLabel" class="field" type="text" maxlength="100" placeholder="{{ tr('例：112 年修正') }}">
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="kbPublisher">{{ tr('發布機關（選填）') }}</label>
+          <input id="kbPublisher" class="field" type="text" maxlength="100">
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="kbPubOn">{{ tr('發布日期（選填）') }}</label>
+          <input id="kbPubOn" class="field" type="date">
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="kbEffOn">{{ tr('生效日期（未知就留空）') }}</label>
+          <input id="kbEffOn" class="field" type="date">
+        </div>
+      </div>
+      <div class="auth-field">
+        <label class="af-label" for="kbSrcUrl">{{ tr('來源網址（選填，只是記錄）') }}</label>
+        <input id="kbSrcUrl" class="field" type="url" maxlength="1000" placeholder="https://">
+      </div>
+      <p>
+        <button class="btn btn-primary" id="kbUpload" type="button">{{ icon('upload', size=14) }} <span>{{ tr('上傳並處理') }}</span></button>
+        <span id="kbUpStatus" class="muted kb-msg"></span>
+      </p>
+    </fieldset>
+  </form>
+  <div class="kb-tablewrap">
+    <table class="kb-table">
+      <thead><tr>
+        <th>{{ tr('文件') }}</th><th>{{ tr('版本／日期') }}</th><th>{{ tr('狀態') }}</th>
+        <th>{{ tr('段數／頁數') }}</th><th>{{ tr('上傳／啟用') }}</th><th></th>
+      </tr></thead>
+      <tbody id="kbVerRows"></tbody>
+    </table>
+  </div>
+  <p class="muted" id="kbVerEmpty" hidden>{{ tr('這個資料集還沒有文件。') }}</p>
+
+  <form id="kbMetaForm" class="auth-form kb-form" hidden>
+    <fieldset class="auth-section">
+      <legend>{{ icon('gear', size=14) }} {{ tr('文件資料') }}</legend>
+      <div class="auth-field">
+        <label class="af-label" for="kbMetaTitle">{{ tr('標題') }}</label>
+        <input id="kbMetaTitle" class="field" type="text" maxlength="200">
+      </div>
+      <div class="af-attrs">
+        <div class="auth-field">
+          <label class="af-label" for="kbMetaVer">{{ tr('版本標籤') }}</label>
+          <input id="kbMetaVer" class="field" type="text" maxlength="100">
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="kbMetaPub">{{ tr('發布機關') }}</label>
+          <input id="kbMetaPub" class="field" type="text" maxlength="100">
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="kbMetaPubOn">{{ tr('發布日期') }}</label>
+          <input id="kbMetaPubOn" class="field" type="date">
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="kbMetaEffOn">{{ tr('生效日期（未知就留空）') }}</label>
+          <input id="kbMetaEffOn" class="field" type="date">
+        </div>
+      </div>
+      <div class="auth-field">
+        <label class="af-label" for="kbMetaUrl">{{ tr('來源網址') }}</label>
+        <input id="kbMetaUrl" class="field" type="url" maxlength="1000">
+      </div>
+      <p>
+        <button class="btn btn-primary" id="kbMetaSave" type="button">{{ icon('save', size=14) }} <span>{{ tr('儲存') }}</span></button>
+        <button class="btn" id="kbMetaCancel" type="button">{{ icon('close', size=14) }} <span>{{ tr('取消') }}</span></button>
+      </p>
+    </fieldset>
+  </form>
+
+  <div id="kbPreview" class="kb-preview" hidden>
+    <h3 id="kbPreviewTitle" class="kb-h3"></h3>
+    <div id="kbPreviewList"></div>
+    <p><button class="btn btn-small" id="kbPreviewMore" type="button">{{ tr('再多看幾段') }}</button></p>
+  </div>
+</div>
+
+<div class="panel">
+  <h2 data-s="s53896af7">{{ icon('search', size=18) }} {{ tr('檢索測試') }}</h2>
+  <p class="muted">{{ tr('輸入一個問題，看會查到哪幾段、出自哪裡。只會查啟用中的文件。') }}</p>
+  <div class="kb-searchbar">
+    <input id="kbQ" class="field" type="text" maxlength="500" placeholder="{{ tr('例：函的期望語對上級機關怎麼寫') }}">
+    <button class="btn btn-primary" id="kbSearch" type="button">{{ icon('search', size=14) }} <span>{{ tr('查詢') }}</span></button>
+  </div>
+  <div id="kbSearchDs" class="kb-chips"></div>
+  <p id="kbSearchNote" class="muted kb-msg"></p>
+  <div id="kbResults"></div>
+</div>
+
+<style nonce="{{ request.state.csp_nonce }}">
+  .kb-st-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin:4px 0 0; }
+  .kb-st-tile { min-width:0; border:1px solid var(--border); border-radius:10px; padding:12px 14px; background:#fff; }
+  .kb-st-tile.is-ok { border-color:#bbf7d0; background:#f0fdf4; }
+  .kb-st-tile.is-off { background:#f8fafc; }
+  .kb-st-top { display:flex; align-items:center; gap:6px; font-size:12.5px; color:#475569; }
+  .kb-st-top svg { flex:0 0 auto; color:var(--primary); }
+  .kb-st-tile.is-ok .kb-st-top svg { color:#16a34a; }
+  .kb-st-val { font-size:20px; font-weight:700; color:#0f172a; line-height:1.3; margin-top:4px;
+               font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+  .kb-st-tile.is-off .kb-st-val { color:#64748b; }
+  .kb-st-sub { font-size:12px; color:var(--muted); line-height:1.5; margin-top:2px; overflow-wrap:anywhere; }
+  .kb-st-sub.is-warn { color:#92400e; }
+  .kb-st-notes { list-style:none; margin:12px 0 0; padding:0; display:grid; gap:6px; }
+  .kb-st-notes li { display:flex; align-items:flex-start; gap:8px; font-size:13px; line-height:1.55;
+                    padding:8px 12px; border-radius:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
+  .kb-st-notes li.is-info { background:#eff6ff; color:#1e3a8a; border-color:#bfdbfe; }
+  .kb-st-notes li.is-bad { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
+  .kb-st-notes li svg { flex:0 0 auto; margin-top:2px; }
+  .kb-st-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:14px 0 0; }
+  .kb-st-actions .kb-st-where { font-size:12.5px; }
+  @media (max-width:640px) { .kb-st-val { font-size:18px; } }
+  .kb-toolbar { margin:0 0 10px; }
+  .kb-gov-sum { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin:4px 0 12px; }
+  .kb-gov-tile { border:1px solid #bfdbfe; border-left:4px solid var(--primary); border-radius:10px;
+                 background:#eff6ff; padding:12px 14px; }
+  .kb-gov-tile.is-done { border-color:#bbf7d0; border-left-color:#16a34a; background:#f0fdf4; }
+  .kb-gov-num { font-size:28px; font-weight:700; line-height:1.15; color:var(--primary-dark);
+                font-variant-numeric:tabular-nums; }
+  .kb-gov-tile.is-done .kb-gov-num { color:#166534; }
+  .kb-gov-lab { font-size:13px; color:#334155; margin-top:2px; }
+  .kb-gov-note { font-size:12px; color:var(--muted); margin-top:4px; }
+  .kb-gov-src { list-style:none; margin:0 0 12px; padding:0; font-size:13px; }
+  .kb-gov-src li { display:flex; flex-wrap:wrap; gap:2px 12px; justify-content:space-between;
+                   padding:6px 0; border-bottom:1px dashed #e5e7eb; }
+  .kb-gov-src li:last-child { border-bottom:0; }
+  .kb-gov-src-name { font-weight:600; color:#1e293b; }
+  .kb-gov-src-n { color:#334155; font-variant-numeric:tabular-nums; }
+  .kb-form { margin-bottom:14px; }
+  .kb-textarea { width:100%; box-sizing:border-box; font:inherit; }
+  .kb-tablewrap { overflow-x:auto; }
+  .kb-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .kb-table th, .kb-table td { text-align:left; padding:6px 8px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
+  .kb-table th { font-size:12px; color:#6b7280; font-weight:600; white-space:nowrap; }
+  .kb-chips { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+  .kb-msg { font-size:12.5px; margin:6px 0; }
+  .kb-preview { margin-top:14px; border-top:1px solid #e5e7eb; padding-top:10px; }
+  .kb-h3 { font-size:14px; margin:0 0 8px; }
+  .kb-searchbar { display:flex; gap:8px; align-items:center; }
+  .kb-searchbar input { flex:1 1 auto; min-width:0; }
+  /* 下面這幾個類別是 JS 建出來的元素用的 */
+  .kb-actions { display:flex; flex-wrap:wrap; gap:4px; }
+  .kb-chunk { border:1px solid #e5e7eb; border-radius:6px; padding:8px 10px; margin:8px 0; background:#fff; }
+  .kb-chunk-head { font-size:12px; color:#6b7280; margin-bottom:4px; }
+  .kb-chunk-text { white-space:pre-wrap; font-size:13px; line-height:1.6; max-height:260px; overflow:auto; }
+  .kb-ds-pick { display:inline-flex; align-items:center; gap:4px; font-size:13px; margin-right:10px; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const API = '/admin/knowledge/api';
+  let OV = null;           // overview
+  let curDs = null;        // 目前選的資料集
+  let editDs = null;       // 編輯中的資料集 id（null = 新增）
+  let selGroups = [];      // [{id,name}]
+  let previewVer = null, previewOffset = 0;
+  let editVer = null;
+  let pollTimer = null;
+
+  // ---- 小工具：DOM 一律用 textContent 建，不用 innerHTML 塞資料
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function btn(text, cls, onClick) {
+    const b = el('button', 'btn btn-small' + (cls ? ' ' + cls : ''), text);
+    b.type = 'button';
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function fmtTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts * 1000);
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  async function call(url, opts) {
+    const r = await fetch(url, opts || {});
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
+    return r.json();
+  }
+  function post(url, body) {
+    return call(url, {method: 'POST', headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify(body || {})});
+  }
+  function say(node, msg, ok) {
+    node.textContent = msg || '';
+    node.style.color = ok === false ? '#dc2626' : (ok ? '#16a34a' : '');
+  }
+
+  const STATUS = {
+    uploaded: tr('排隊中'), indexing: tr('處理中'), ready: tr('可以啟用'),
+    active: tr('啟用中'), failed: tr('失敗'), inactive: tr('已停用'),
+  };
+
+  // ---- 狀態：三格數字 ＋ 要處理的事
+  function stIcon(name) {
+    // <template> 的內容不在文件樹裡，要從 .content 取（document.querySelector 找不到）
+    const tpl = document.getElementById('kbStIcons');
+    const t = tpl && tpl.content.querySelector('[data-ic="' + name + '"] svg');
+    return t ? t.cloneNode(true) : document.createElement('span');
+  }
+  function stTile(icName, label, val, sub, cls, subWarn) {
+    const t = el('div', 'kb-st-tile' + (cls ? ' ' + cls : ''));
+    const top = el('div', 'kb-st-top');
+    top.appendChild(stIcon(icName));
+    top.appendChild(el('span', null, label));
+    t.appendChild(top);
+    t.appendChild(el('div', 'kb-st-val', val));
+    if (sub) t.appendChild(el('div', 'kb-st-sub' + (subWarn ? ' is-warn' : ''), sub));
+    return t;
+  }
+  function renderStatus() {
+    const s = OV.status, e = s.embedding, box = $('kbStatus');
+    const cfg = OV.embedding || {};
+    box.textContent = '';
+    const tiles = el('div', 'kb-st-tiles');
+    tiles.appendChild(e.vector_ready
+      ? stTile('search', tr('檢索方式'), tr('關鍵字＋向量'),
+               tr('模型 {0}、維度 {1}').replace('{0}', e.model).replace('{1}', e.dim), 'is-ok')
+      : stTile('search', tr('檢索方式'), tr('只有關鍵字'), tr('還沒有建立向量索引'), 'is-off'));
+    tiles.appendChild(stTile('archive', tr('啟用中的段落'), Number(s.active_chunks || 0).toLocaleString(),
+      e.vectors_missing ? tr('有 {0} 段還沒有向量').replace('{0}', Number(e.vectors_missing).toLocaleString()) : '',
+      s.active_chunks ? '' : 'is-off', !!e.vectors_missing));
+    const model = (cfg.embed && cfg.embed.model) || '';
+    tiles.appendChild(cfg.configured
+      ? stTile('globe', tr('嵌入服務'), tr('已設定'), tr('模型 {0}').replace('{0}', model), e.vector_ready ? 'is-ok' : '')
+      : stTile('globe', tr('嵌入服務'), tr('還沒設定'), tr('沒有設定時只用關鍵字找'), 'is-off'));
+    box.appendChild(tiles);
+
+    const notes = [];
+    const rb = OV.rebuild || {};
+    if (rb.running) notes.push(['is-info', 'refresh', tr('重建索引中：{0}／{1}').replace('{0}', rb.done || 0).replace('{1}', rb.total || 0)]);
+    else if (rb.error) notes.push(['is-bad', 'warn', tr('上一次重建失敗（原本的索引沒有動）：') + tr(rb.error)]);
+    if (e.needs_rebuild && !rb.running) notes.push(['', 'warn', tr('embedding 設定跟目前的索引不同，請按「重建索引」。')]);
+    if (e.vectors_missing && !rb.running) notes.push(['', 'warn', tr('有 {0} 段還沒有向量（只能用關鍵字找到），請按「重建索引」補上。').replace('{0}', e.vectors_missing)]);
+    if (notes.length) {
+      const ul = el('ul', 'kb-st-notes');
+      notes.forEach(([cls, ic, t]) => {
+        const li = el('li', cls || null);
+        li.appendChild(stIcon(ic));
+        li.appendChild(el('span', null, t));
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+    }
+    if (e.fingerprint) box.title = tr('索引編號：{0}').replace('{0}', e.fingerprint);
+  }
+
+  // ---- 資料集
+  function renderDatasets() {
+    const tb = $('kbDsRows');
+    tb.textContent = '';
+    $('kbDsEmpty').hidden = OV.datasets.length > 0;
+    OV.datasets.forEach((d) => {
+      const tr_ = el('tr');
+      tr_.appendChild(el('td', null, d.name));
+      tr_.appendChild(el('td', null, tr(d.category_label) + '（' + tr(d.purpose_label) + '）'));
+      tr_.appendChild(el('td', null, d.access === 'all' ? tr('全站')
+        : tr('指定群組：') + d.groups.map((g) => g.name).join('、')));
+      tr_.appendChild(el('td', null, (d.doc_counts.active || 0) + ' ／ ' + d.docs_total));
+      tr_.appendChild(el('td', null, String(d.active_chunks)));
+      tr_.appendChild(el('td', null, d.enabled ? tr('啟用') : tr('已停用')));
+      const act = el('td');
+      const box = el('div', 'kb-actions');
+      box.appendChild(btn(tr('文件'), 'btn-primary', () => openDataset(d)));
+      box.appendChild(btn(tr('編輯'), '', () => openDsForm(d)));
+      box.appendChild(btn(tr('刪除'), 'btn-danger', () => deleteDataset(d)));
+      act.appendChild(box);
+      tr_.appendChild(act);
+      tb.appendChild(tr_);
+    });
+    renderSearchDs();
+  }
+
+  function openDsForm(d) {
+    editDs = d ? d.id : null;
+    $('kbDsFormTitle').textContent = d ? tr('編輯資料集') : tr('新增資料集');
+    $('kbDsName').value = d ? d.name : '';
+    $('kbDsCat').value = d ? d.category : 'writing_rules';
+    $('kbDsDesc').value = d ? d.description : '';
+    document.querySelectorAll('input[name="kbDsAccess"]').forEach((r) => {
+      r.checked = r.value === (d ? d.access : 'all');
+    });
+    $('kbDsEnabled').checked = d ? d.enabled : true;
+    selGroups = d ? d.groups.slice() : [];
+    renderGroupSel();
+    syncAccess();
+    $('kbDsForm').hidden = false;
+    $('kbDsName').focus();
+  }
+  function syncAccess() {
+    const v = (document.querySelector('input[name="kbDsAccess"]:checked') || {}).value;
+    $('kbGroupBox').hidden = v !== 'groups';
+    $('kbAuthOffNote').hidden = !!(OV && OV.auth_enabled);
+  }
+  document.querySelectorAll('input[name="kbDsAccess"]').forEach((r) => r.addEventListener('change', syncAccess));
+
+  function renderGroupSel() {
+    const box = $('kbGroupSel');
+    box.textContent = '';
+    selGroups.forEach((g) => {
+      box.appendChild(btn(g.name + ' ✕', '', () => {
+        selGroups = selGroups.filter((x) => x.id !== g.id);
+        renderGroupSel();
+      }));
+    });
+  }
+  let gTimer = null;
+  $('kbGroupQ').addEventListener('input', () => {
+    clearTimeout(gTimer);
+    gTimer = setTimeout(async () => {
+      const q = $('kbGroupQ').value.trim();
+      const box = $('kbGroupHits');
+      box.textContent = '';
+      if (!q) return;
+      try {
+        const j = await call(API + '/groups?q=' + encodeURIComponent(q));
+        j.groups.forEach((g) => {
+          if (selGroups.some((x) => x.id === g.id)) return;
+          box.appendChild(btn('+ ' + g.name, '', () => {
+            selGroups.push({id: g.id, name: g.name});
+            renderGroupSel();
+            box.textContent = '';
+            $('kbGroupQ').value = '';
+          }));
+        });
+        if (!j.groups.length) box.appendChild(el('span', 'muted', tr('找不到符合的群組')));
+      } catch (e) { box.appendChild(el('span', 'muted', e.message)); }
+    }, 250);
+  });
+
+  $('kbNewDs').addEventListener('click', () => openDsForm(null));
+  $('kbDsCancel').addEventListener('click', () => { $('kbDsForm').hidden = true; });
+  $('kbDsSave').addEventListener('click', async () => {
+    const body = {
+      name: $('kbDsName').value.trim(),
+      category: $('kbDsCat').value,
+      description: $('kbDsDesc').value,
+      access: (document.querySelector('input[name="kbDsAccess"]:checked') || {}).value || 'all',
+      group_ids: selGroups.map((g) => g.id),
+      enabled: $('kbDsEnabled').checked,
+    };
+    try {
+      await post(API + '/datasets' + (editDs ? '/' + encodeURIComponent(editDs) : ''), body);
+      $('kbDsForm').hidden = true;
+      window.showToast(tr('已儲存'), 'ok');
+      await refresh();
+    } catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+  });
+
+  async function deleteDataset(d) {
+    const ok = await window.showConfirm(
+      tr('刪除資料集「{0}」？裡面的文件、原檔與索引會一起刪掉，不能復原。').replace('{0}', d.name),
+      {title: tr('刪除資料集'), okText: tr('刪除'), kind: 'danger'});
+    if (!ok) return;
+    try {
+      await post(API + '/datasets/' + encodeURIComponent(d.id) + '/delete');
+      if (curDs && curDs.id === d.id) { curDs = null; $('kbDocPanel').hidden = true; }
+      await refresh();
+    } catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+  }
+
+  // ---- 文件
+  async function openDataset(d) {
+    curDs = d;
+    $('kbDocTitle').textContent = tr('文件：') + d.name;
+    $('kbDocPanel').hidden = false;
+    $('kbPreview').hidden = true;
+    $('kbMetaForm').hidden = true;
+    await loadVersions();
+    $('kbDocPanel').scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+
+  async function loadVersions() {
+    if (!curDs) return;
+    let j;
+    try { j = await call(API + '/datasets/' + encodeURIComponent(curDs.id) + '/versions'); }
+    catch (e) { say($('kbUpStatus'), e.message, false); return; }
+    const tb = $('kbVerRows');
+    tb.textContent = '';
+    $('kbVerEmpty').hidden = j.versions.length > 0;
+    let busy = false;
+    j.versions.forEach((v) => {
+      if (v.status === 'uploaded' || v.status === 'indexing') busy = true;
+      const row = el('tr');
+      const c1 = el('td');
+      c1.appendChild(el('div', null, v.title));
+      c1.appendChild(el('div', 'muted', v.filename + ' · sha256 ' + v.sha256_short));
+      if (v.source_url && /^https?:\/\//i.test(v.source_url)) {
+        const a = el('a', null, tr('來源'));
+        a.href = v.source_url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        c1.appendChild(a);
+      }
+      row.appendChild(c1);
+      const c2 = el('td');
+      c2.appendChild(el('div', null, v.version_label || '—'));
+      c2.appendChild(el('div', 'muted', tr('發布：') + (v.published_on || tr('未提供'))));
+      c2.appendChild(el('div', 'muted', tr('生效：') + (v.effective_on || tr('未提供'))));
+      row.appendChild(c2);
+      const c3 = el('td');
+      c3.appendChild(el('div', null, STATUS[v.status] || v.status));
+      if (v.note) c3.appendChild(el('div', 'muted', tr(v.note)));
+      if (v.error) c3.appendChild(el('div', 'muted', tr(v.error)));
+      if (v.warning) c3.appendChild(el('div', 'muted', tr(v.warning)));
+      if (v.gov) {
+        // 政府公開資料匯入的版本：出處（顯名文字是資料，不翻）與施行日期說明
+        const src = el('div', 'muted', tr('出處：') + v.gov.attribution);
+        src.dataset.i18n = 'skip';
+        c1.appendChild(src);
+        if (v.gov.abolished) c3.appendChild(el('div', 'muted', tr('已廢止')));
+        if (v.gov.notice) {
+          const nt = el('div', 'muted', v.gov.notice);
+          nt.dataset.i18n = 'skip';
+          c3.appendChild(nt);
+        }
+      }
+      row.appendChild(c3);
+      row.appendChild(el('td', null, v.chunk_count + ' ／ ' + (v.page_count || '—')));
+      const c5 = el('td');
+      c5.appendChild(el('div', 'muted', (v.uploaded_by || '—') + ' ' + fmtTime(v.uploaded_at)));
+      if (v.activated_at) c5.appendChild(el('div', 'muted', tr('啟用：') + (v.activated_by || '—') + ' ' + fmtTime(v.activated_at)));
+      row.appendChild(c5);
+      const c6 = el('td');
+      const box = el('div', 'kb-actions');
+      if (v.status === 'ready' || v.status === 'inactive')
+        box.appendChild(btn(tr('啟用'), 'btn-primary', () => verAction(v, 'activate')));
+      if (v.status === 'active')
+        box.appendChild(btn(tr('停用'), '', () => verAction(v, 'deactivate')));
+      if (v.chunk_count) box.appendChild(btn(tr('預覽'), '', () => showPreview(v, 0)));
+      box.appendChild(btn(tr('編輯資料'), '', () => openMeta(v)));
+      if (v.status === 'failed' || v.status === 'ready' || v.status === 'inactive')
+        box.appendChild(btn(tr('重新處理'), '', () => verAction(v, 'reprocess')));
+      const dl = el('a', 'btn btn-small', tr('下載原檔'));
+      dl.href = API + '/versions/' + encodeURIComponent(v.id) + '/file';
+      box.appendChild(dl);
+      if (v.status !== 'uploaded' && v.status !== 'indexing')
+        box.appendChild(btn(tr('刪除'), 'btn-danger', () => deleteVersion(v)));
+      c6.appendChild(box);
+      row.appendChild(c6);
+      tb.appendChild(row);
+    });
+    clearTimeout(pollTimer);
+    if (busy) pollTimer = setTimeout(async () => { await loadVersions(); }, 2000);
+    else await refreshOverviewOnly();
+  }
+
+  async function verAction(v, action) {
+    try {
+      await post(API + '/versions/' + encodeURIComponent(v.id) + '/' + action);
+      await loadVersions();
+    } catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+  }
+  async function deleteVersion(v) {
+    const ok = await window.showConfirm(
+      tr('刪除文件「{0}」？原檔與索引會一起刪掉，不能復原。').replace('{0}', v.title),
+      {title: tr('刪除文件'), okText: tr('刪除'), kind: 'danger'});
+    if (!ok) return;
+    try {
+      await post(API + '/versions/' + encodeURIComponent(v.id) + '/delete');
+      if (previewVer === v.id) $('kbPreview').hidden = true;
+      await loadVersions();
+    } catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+  }
+
+  function openMeta(v) {
+    editVer = v.id;
+    $('kbMetaTitle').value = v.title;
+    $('kbMetaVer').value = v.version_label || '';
+    $('kbMetaPub').value = v.publisher || '';
+    $('kbMetaPubOn').value = v.published_on || '';
+    $('kbMetaEffOn').value = v.effective_on || '';
+    $('kbMetaUrl').value = v.source_url || '';
+    $('kbMetaForm').hidden = false;
+    $('kbMetaTitle').focus();
+  }
+  $('kbMetaCancel').addEventListener('click', () => { $('kbMetaForm').hidden = true; });
+  $('kbMetaSave').addEventListener('click', async () => {
+    try {
+      await post(API + '/versions/' + encodeURIComponent(editVer) + '/meta', {
+        title: $('kbMetaTitle').value, version_label: $('kbMetaVer').value,
+        publisher: $('kbMetaPub').value, published_on: $('kbMetaPubOn').value,
+        effective_on: $('kbMetaEffOn').value, source_url: $('kbMetaUrl').value,
+      });
+      $('kbMetaForm').hidden = true;
+      await loadVersions();
+    } catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+  });
+
+  function chunkCard(c, extra) {
+    const card = el('div', 'kb-chunk');
+    const head = [];
+    if (extra) head.push(extra);
+    if (c.page_from) head.push(c.page_to && c.page_to !== c.page_from
+      ? tr('第 {0}～{1} 頁').replace('{0}', c.page_from).replace('{1}', c.page_to)
+      : tr('第 {0} 頁').replace('{0}', c.page_from));
+    if (c.heading) head.push(c.heading);
+    if (c.parent_ref) head.push(tr('母條文：') + c.parent_ref + (c.parts > 1 ? '（' + c.part + '／' + c.parts + '）' : ''));
+    card.appendChild(el('div', 'kb-chunk-head', head.join(' · ')));
+    card.appendChild(el('div', 'kb-chunk-text', c.text));
+    return card;
+  }
+
+  async function showPreview(v, offset) {
+    previewVer = v.id;
+    previewOffset = offset;
+    try {
+      const j = await call(API + '/versions/' + encodeURIComponent(v.id) + '/preview?offset=' + offset + '&limit=10');
+      $('kbPreviewTitle').textContent = tr('擷取預覽：') + v.title;
+      const list = $('kbPreviewList');
+      if (offset === 0) list.textContent = '';
+      j.chunks.forEach((c) => list.appendChild(chunkCard(c, '#' + (c.seq + 1))));
+      $('kbPreviewMore').hidden = j.chunks.length < 10;
+      $('kbPreview').hidden = false;
+    } catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+  }
+  $('kbPreviewMore').addEventListener('click', () => {
+    if (previewVer) showPreview({id: previewVer, title: $('kbPreviewTitle').textContent}, previewOffset + 10);
+  });
+
+  $('kbUpload').addEventListener('click', async () => {
+    if (!curDs) return;
+    const files = $('kbFiles').files;
+    if (!files || !files.length) { say($('kbUpStatus'), tr('請先選擇檔案。'), false); return; }
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+    fd.append('version_label', $('kbVerLabel').value);
+    fd.append('publisher', $('kbPublisher').value);
+    fd.append('published_on', $('kbPubOn').value);
+    fd.append('effective_on', $('kbEffOn').value);
+    fd.append('source_url', $('kbSrcUrl').value);
+    const b = $('kbUpload');
+    b.disabled = true;
+    say($('kbUpStatus'), tr('上傳中…'));
+    try {
+      const j = await call(API + '/datasets/' + encodeURIComponent(curDs.id) + '/upload', {method: 'POST', body: fd});
+      const parts = [tr('已收 {0} 份，背景處理中。').replace('{0}', j.created.length)];
+      j.skipped.forEach((s) => parts.push(s.filename + '：' + tr(s.reason)));
+      say($('kbUpStatus'), parts.join(' '), j.created.length > 0);
+      $('kbFiles').value = '';
+      await loadVersions();
+    } catch (e) {
+      say($('kbUpStatus'), e.message, false);
+    } finally { b.disabled = false; }
+  });
+
+  // ---- 檢索測試
+  function renderSearchDs() {
+    const box = $('kbSearchDs');
+    const prev = new Set([...box.querySelectorAll('input:checked')].map((x) => x.value));
+    box.textContent = '';
+    OV.datasets.forEach((d) => {
+      const lab = el('label', 'kb-ds-pick');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = d.id;
+      cb.checked = prev.has(d.id);
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(' ' + d.name));
+      box.appendChild(lab);
+    });
+    if (OV.datasets.length) box.appendChild(el('span', 'muted', tr('（都不勾＝全部資料集）')));
+  }
+
+  $('kbSearch').addEventListener('click', doSearch);
+  $('kbQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
+  async function doSearch() {
+    const q = $('kbQ').value.trim();
+    if (!q) return;
+    const ds = [...$('kbSearchDs').querySelectorAll('input:checked')].map((x) => x.value);
+    const box = $('kbResults');
+    box.textContent = '';
+    say($('kbSearchNote'), tr('查詢中…'));
+    try {
+      const j = await post(API + '/search', {query: q, dataset_ids: ds.length ? ds : null, k: 8});
+      const mode = j.mode === 'hybrid' ? tr('關鍵字＋向量') : tr('只有關鍵字');
+      const parts = [tr('檢索方式：') + mode];
+      if (j.note) parts.push(tr(j.note));
+      parts.push(tr(j.score_note));
+      say($('kbSearchNote'), parts.join(' '));
+      if (!j.results.length) {
+        box.appendChild(el('p', 'muted', tr('沒有找到相關的段落（不會為了湊數放進不相關的內容）。')));
+        return;
+      }
+      j.results.forEach((r) => {
+        const how = r.matched_by.map((m) => m === 'keyword' ? tr('關鍵字') : tr('向量')).join('＋');
+        const label = '#' + r.rank + ' · ' + r.dataset_name + '（' + tr(r.purpose_label) + '）· ' + r.title
+          + (r.version_label ? ' · ' + r.version_label : '') + ' · ' + tr('排序分數') + ' ' + r.score + ' · ' + how;
+        box.appendChild(chunkCard({text: r.text, page_from: (r.locator.pages || [])[0],
+          page_to: (r.locator.pages || [])[1], heading: r.heading, parent_ref: r.parent_ref,
+          part: r.part, parts: r.parts}, label));
+      });
+    } catch (e) { say($('kbSearchNote'), e.message, false); }
+  }
+
+  // ---- 索引（嵌入服務的設定在「LLM 設定」頁；這裡只管索引：重建、停用）
+  function renderEmbedding() {
+    // 重建要有設定好的嵌入服務；沒設定時按了只會得到一句錯誤 —— 不如不給按鈕，
+    // 上面那一行「前往 Embedding 設定」就是下一步。
+    $('kbRebuild').hidden = !(OV.embedding.configured);
+    $('kbVecOff').hidden = !(OV.embedding.active);
+  }
+  $('kbRebuild').addEventListener('click', async () => {
+    try {
+      await post(API + '/rebuild');
+      say($('kbEmbMsg'), tr('已開始重建索引，可以關掉這一頁，完成後在「我的作業」看得到。'), true);
+      pollRebuild();
+    } catch (e) { say($('kbEmbMsg'), e.message, false); }
+  });
+  $('kbVecOff').addEventListener('click', async () => {
+    const ok = await window.showConfirm(tr('停用向量檢索？之後只用關鍵字找，要恢復請重建索引。'),
+      {title: tr('停用向量檢索'), okText: tr('停用'), kind: 'danger'});
+    if (!ok) return;
+    try { await post(API + '/vectors/disable'); await refreshOverviewOnly(); }
+    catch (e) { window.showAlert(e.message, {kind: 'error'}); }
+  });
+
+  let rbTimer = null;
+  async function pollRebuild() {
+    clearTimeout(rbTimer);
+    await refreshOverviewOnly();
+    if (OV && OV.rebuild && OV.rebuild.running) rbTimer = setTimeout(pollRebuild, 2000);
+  }
+
+  async function refreshOverviewOnly() {
+    try {
+      OV = await call(API + '/overview');
+      renderStatus();
+      renderEmbedding();
+    } catch (e) { $('kbStatus').textContent = e.message; }
+  }
+  async function refresh() {
+    try {
+      OV = await call(API + '/overview');
+    } catch (e) { $('kbStatus').textContent = e.message; return; }
+    renderStatus();
+    renderDatasets();
+    renderEmbedding();
+    if (curDs) {
+      const d = OV.datasets.find((x) => x.id === curDs.id);
+      if (d) { curDs = d; $('kbDocTitle').textContent = tr('文件：') + d.name; }
+    }
+    if (OV.rebuild && OV.rebuild.running) pollRebuild();
+  }
+  refresh();
+})();
+</script>
+{% endblock %}

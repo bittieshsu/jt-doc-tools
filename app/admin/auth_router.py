@@ -1990,10 +1990,13 @@ def build_auth_router(templates) -> APIRouter:
     @router.get("/retention", response_class=HTMLResponse)
     async def retention_page(request: Request):
         from ..core import retention as _ret
+        # 用量要走過整個暫存區、查作業資料庫（認出哪些檔案屬於保留期內的作業）
+        # —— 丟到執行緒，不在事件迴圈上跑。
+        stats = await _asyncio.to_thread(_ret.collect_stats)
         return templates.TemplateResponse(request, "admin_retention.html", {
             "request": request,
             "settings": _ret.get(),
-            "stats": _ret.collect_stats(),
+            "stats": stats,
         })
 
     @router.post("/retention/save")
@@ -2121,14 +2124,18 @@ def build_auth_router(templates) -> APIRouter:
         # 的排隊結果看起來變了。
         from ..core import job_priority as _jp
         prio_rank = {uid: i for i, uid in enumerate(_jp.get_ordered())}
+        from ..core import job_labels as _jl
         out = []
         for r in rows:
             meta = r.get("meta") or {}
             lv = live.get(r["id"]) or {}
+            # 知識庫這類**不是工具**的作業：名稱、圖示、資源標籤都照它自己的代號
+            # （舊資料借用了公文撰擬的代號，會被標成 Office ＋ 外部服務）
+            tid = _jl.display_id(r["tool_id"], meta)
             out.append({
                 "id": r["id"],
-                "tool_id": r["tool_id"],
-                "tool_name": names.get(r["tool_id"], r["tool_id"]),
+                "tool_id": tid,
+                "tool_name": _jl.display_name(r["tool_id"], meta, names),
                 "status": lv.get("status", r["status"]),
                 "progress": lv.get("progress", r["progress"]),
                 "message": lv.get("message") or r["message"],
@@ -2150,10 +2157,10 @@ def build_auth_router(templates) -> APIRouter:
                 "finished_at": r["finished_at"],
                 "elapsed": round(max(0.0, (r["finished_at"] or time.time())
                                      - r["created_at"]), 1),
-                "is_office": r["tool_id"] in _cs.OFFICE_TOOL_IDS,
+                "is_office": tid in _cs.OFFICE_TOOL_IDS,
                 # 這個作業會跟別人搶哪些共用資源（Office / OCR / 外部服務）——
                 # 「為什麼排這麼久」的答案通常就在這裡
-                "resources": _cs.resource_tags(r["tool_id"]),
+                "resources": _cs.resource_tags(tid),
                 # 優先派送（管理員指定的名單）
                 "priority": bool(live.get(r["id"], {}).get("priority")),
                 # 排隊順序取自實際的派送佇列，不是拿時間去猜
@@ -2161,7 +2168,7 @@ def build_auth_router(templates) -> APIRouter:
                 # 實測的子行程用量（soffice 才是真正吃記憶體的那個）；
                 # 量不到就給 None，前端顯示估計值並標示為估計，不混為一談
                 "usage": usage.get(r["id"]),
-                "est_mb": _cs.estimated_job_mb(r["tool_id"]),
+                "est_mb": _cs.estimated_job_mb(tid),
             })
         # 排隊中的排最前面且**照派送順序**（其餘維持新到舊）—— 管理員最關心的
         # 是「接下來會跑誰」，用建立時間倒序會把佇列頭尾顛倒過來。
@@ -2320,6 +2327,8 @@ def build_auth_router(templates) -> APIRouter:
             "request": request,
             "settings": _ws.get_settings(),
             "stats": _ws.collect_stats(),
+            # 收哪些格式**從程式實算**（說明原本寫死「只接受 PDF 與 PNG 檔」，早就不對了）
+            "accepted_groups": _ws.accepted_type_groups(),
         })
 
     @router.post("/workspace/save")

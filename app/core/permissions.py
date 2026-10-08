@@ -164,16 +164,6 @@ def revoke_tool(subject_type: str, subject_key: str, tool_id: str) -> None:
     invalidate_cache()
 
 
-def list_roles_for_subject(subject_type: str, subject_key: str) -> list[str]:
-    subject_key = canon_subject_key(subject_type, subject_key)
-    conn = auth_db.conn()
-    rows = conn.execute(
-        "SELECT role_id FROM subject_roles WHERE subject_type=? AND subject_key=? "
-        "ORDER BY role_id", (subject_type, subject_key),
-    ).fetchall()
-    return [r["role_id"] for r in rows]
-
-
 def list_direct_tools_for_subject(subject_type: str, subject_key: str) -> list[str]:
     subject_key = canon_subject_key(subject_type, subject_key)
     conn = auth_db.conn()

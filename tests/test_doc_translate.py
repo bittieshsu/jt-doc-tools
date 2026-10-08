@@ -152,7 +152,7 @@ def test_job_produces_a_translated_file(tmp_path, monkeypatch):
             return f"<{src}>"
 
     monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _FakeClient())
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda *a, **k: _FakeClient())
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "fake-model")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 2})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
@@ -268,7 +268,7 @@ def test_job_uses_batching_and_keeps_segments_aligned(tmp_path, monkeypatch):
             return "\n".join(f"⟦{n}⟧譯[{s}]" for n, s in segs)
 
     monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _Batch())
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda *a, **k: _Batch())
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 2})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
@@ -322,7 +322,7 @@ def test_cancelled_job_produces_no_file(tmp_path, monkeypatch):
             return "⟦1⟧甲"
 
     monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _Slow())
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda *a, **k: _Slow())
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 1})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
@@ -362,7 +362,7 @@ def test_line_breaks_inside_a_cell_survive(tmp_path, monkeypatch):
             return "\n".join(f"⟦{n}⟧譯[{s}]" for n, s in segs)
 
     monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _PerLine())
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda *a, **k: _PerLine())
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 1})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
@@ -417,7 +417,7 @@ def test_per_line_colour_survives_the_translation(tmp_path, monkeypatch):
             return "\n".join(f"⟦{n}⟧譯[{s}]" for n, s in segs)
 
     monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _PerLine())
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda *a, **k: _PerLine())
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {"translate_concurrency": 1})
     monkeypatch.setattr(R, "_warmup_llm", lambda *a, **k: None)
@@ -494,7 +494,7 @@ def test_mismatched_batch_is_halved_not_dropped_to_one_by_one(tmp_path, monkeypa
 
     client = _PickyClient()
     monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(R.llm_settings, "make_client", lambda: client)
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda *a, **k: client)
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {
         "translate_concurrency": 1, "doctr_batch_segments": 12,
@@ -575,7 +575,7 @@ def test_progress_counts_batches_not_just_segments(tmp_path, monkeypatch):
             return "\n".join(f"⟦{n}⟧譯[{s}]" for n, s in segs)
 
     monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(R.llm_settings, "make_client", lambda: _Client())
+    monkeypatch.setattr(R.llm_settings, "make_client", lambda *a, **k: _Client())
     monkeypatch.setattr(R.llm_settings, "get_model_for", lambda _t: "m")
     monkeypatch.setattr(R.llm_settings, "get", lambda: {
         "translate_concurrency": 1, "doctr_batch_segments": 2,
@@ -727,3 +727,30 @@ def test_fit_to_width_leaves_a_broken_file_alone():
     """改不動就原樣回傳 —— 預覽是附屬品，不可以因為它讓整個作業失敗。"""
     R = _R()
     assert R._fit_to_width(b"not a zip") == b"not a zip"
+
+
+def test_start_records_the_upload_id_before_the_job_runs(client, monkeypatch):
+    """`upload_id` 一送出就要在作業的 meta 裡 —— 清理暫存檔時靠它認出「排隊中 / 跑到一半的作業的檔案」。
+    等跑完才記的話，排隊超過暫存保留時間（預設 2 小時）時原檔與歸屬紀錄會先被清掉（2026-10-08 盤點抓到）。"""
+    import importlib
+    R = importlib.import_module("app.tools.doc_translate.router")
+    seen = {}
+
+    class _Job:
+        id = "0" * 32
+        meta: dict = {}
+
+    def fake_submit(tool, fn, meta=None, request=None, **kw):
+        seen.update(meta or {})
+        j = _Job()
+        j.meta = dict(meta or {})
+        return j
+
+    monkeypatch.setattr(R.llm_settings, "is_enabled", lambda: True)
+    monkeypatch.setattr(R.job_manager, "submit", fake_submit)
+    up = client.post("/tools/doc-translate/upload",
+                     files={"file": ("a.docx", _minimal_docx(), "application/octet-stream")})
+    uid = up.json()["upload_id"]
+    r = client.post("/tools/doc-translate/start", json={"upload_id": uid, "target_lang": "en"})
+    assert r.status_code == 200, r.text
+    assert seen.get("upload_id") == uid, seen

@@ -5,6 +5,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="csrf-token" content="{{ request.state.csrf_token }}">
+  {# 給 workspace_picker.js 看：幾支工具自己載那支檔案（為了「轉送」），工作區被停用時它照樣在 #}
+  <meta name="jt-workspace" content="{{ 'on' if workspace_enabled(request) else 'off' }}">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
   {% set _brand_logo = branding_logo_url() %}
   <link rel="icon" type="image/png" href="{{ _brand_logo or '/static/images/logo-on-light.png' }}" />
@@ -648,7 +650,7 @@
              data-tool-id="{{ t.id }}" data-name="{{ tr(t.name) }} {{ tr(t.description) }} {{ t.keywords }}">
             <span class="sb-item-icon tile-color-{{ t.color|default(0) }}">{{ icon(t.icon or 'tool', size=18) }}</span>
             <span class="sb-item-text">
-              <span class="sb-item-name">{{ tr(t.name) }}</span>
+              <span class="sb-item-name">{{ tr(t.name) }}{% if t.beta %}<span class="tool-beta">Beta</span>{% endif %}</span>
               {% if t.description %}<span class="sb-item-desc">{{ tr(t.description) }}</span>{% endif %}
             </span>
             {% if not t.locked %}<button class="sb-pin-btn" type="button" tabindex="-1"
@@ -673,7 +675,7 @@
           <a class="sb-item" href="{{ s.url }}" data-name="{{ s.name }} {{ s.description }} {{ s.keywords }}{% if ui_locale(request) != 'zh-Hant' %} {{ tr(s.name) }} {{ tr(s.description) }}{% endif %}">
             <span class="sb-item-icon">{{ icon(s.icon, size=18) }}</span>
             <span class="sb-item-text">
-              <span class="sb-item-name">{{ tr(s.name)|ucfirst }}</span>
+              <span class="sb-item-name">{{ tr(s.name)|ucfirst }}{% if s.beta %}<span class="tool-beta">Beta</span>{% endif %}</span>
               <span class="sb-item-desc">{{ tr(s.description) }}</span>
             </span>
           </a>

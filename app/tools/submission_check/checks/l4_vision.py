@@ -38,7 +38,7 @@ def _get_vision_client_and_model():
         ))
         if not looks_vision:
             return None, None
-        client = llm_settings.make_client()
+        client = llm_settings.make_client("submission-check")
         return client, model
     except Exception:
         return None, None
@@ -113,16 +113,12 @@ def vision_check_file(file_path: Path, ground_truth_main: str = "",
     client, model = _get_vision_client_and_model()
     if not client or not model:
         return []
-    # 換成自己的短 timeout client，避免吃 default 300s
+    # 換成自己的短 timeout client，避免吃 default 300s。
+    # **一樣要走這支工具的伺服器**（管理員可能把送件前檢核指到另一台）—— 原本直接拿
+    # 全站的 base_url 自己組 client，指定的伺服器在這一段會被繞過。
     try:
         from app.core.llm_settings import llm_settings
-        from app.core.llm_client import LLMClient
-        s = llm_settings.get()
-        client = LLMClient(
-            base_url=s["base_url"],
-            api_key=llm_settings.api_key(),
-            timeout=float(timeout),
-        )
+        client = llm_settings.make_client("submission-check", timeout=float(timeout)) or client
     except Exception:
         pass
     log.info("L6 vision: calling %s for %s (timeout=%ss)", model, file_path.name, timeout)

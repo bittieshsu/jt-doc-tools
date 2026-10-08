@@ -13,12 +13,14 @@ class Settings(BaseSettings):
     project_root: Path = Path(__file__).resolve().parent.parent
     data_dir: Path = Path(__file__).resolve().parent.parent / "data"
 
-    job_ttl_seconds: int = 60 * 60 * 6
+    # 清理迴圈多久跑一次（`main._sweep_temp_files_loop`）。
+    #
+    # **保留多久不在這裡設** —— 暫存檔與作業結果檔的保留期在管理頁「檔案保留 /
+    # 清理」（`data/retention.json`，`retention.get()`）。以前這裡另有
+    # `job_ttl_seconds`（6 小時）與 `temp_ttl_seconds`（2 小時）兩個期限，
+    # 跟管理頁的設定對不上，而且最後都沒有任何程式在讀 —— 拿掉了，免得有人
+    # 以為設環境變數改得動它們。
     cleanup_interval_seconds: int = 60 * 30
-    # Uploaded source files & intermediate previews live under temp_dir.
-    # Anything untouched for this many seconds is swept by the cleanup
-    # task. Keep shorter than job_ttl so users don't get broken previews.
-    temp_ttl_seconds: int = 60 * 60 * 2  # 2 hours
 
     default_paper_mm: tuple[float, float] = (210.0, 297.0)
 

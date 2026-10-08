@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-import asyncio as _asyncio
+# 一定要在任何第三方套件之前：系統 Python 被作業系統升級換掉時，venv 的套件全部看不到，
+# 下面那幾行 import 會直接 ModuleNotFoundError —— 先講清楚原因與怎麼修（見 venv_check）
+from .venv_check import exit_if_mismatched as _venv_guard
+
+_venv_guard()
+
+import asyncio as _asyncio  # noqa: E402
 import html as html_mod
 import threading
 import time
@@ -22,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.59"
+VERSION = "1.16.66"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -395,6 +401,7 @@ _TOOL_ALIASES = {
     "pdf-hidden-scan":    "hidden content javascript js embedded launch uri whitetext offpage scan remove 隱藏 掃描 JavaScript 嵌入檔 白字 頁面外 外部連結 啟動 風險 資安",
     "pdf-attachments":    "attachment attachments embedded file extract pdf paperclip 附件 嵌入檔 萃取 取出 EmbeddedFiles",
     "meeting-transcribe": "speech to text transcribe transcript asr audio video recording diarization speaker whisper JTLW voice meeting minutes subtitle 錄音 錄影 錄音檔 影片 語音 轉文字 轉逐字稿 逐字稿 聽打 辨識 發言者 語者 講者 會議 開會 字幕",
+    "official-doc":       "official document government memo endorsement draft sign petition writing clerk civil service 公文 簽 簽稿 簽辦 簽辦意見 擬辦 主旨 說明 函 發函 行文 受文者 正本 副本 期望語 辦法 陳核 陳閱 核示 撰擬 擬稿 草稿 公務 機關 行政 承辦 來文 收文 批示 公文寫作 letter",
     "meeting-summary":    "meeting summary minutes transcript vtt srt subtitle speaker diarization decision action item risk chapter timeline 會議 摘要 會議記錄 會議紀錄 逐字稿 字幕 講者 決議 待辦 行動項 風險 章節 時間軸 發言者 語者 開會 紀要 重點 整理",
     "pdf-wordcount":      "wordcount word count words chars characters letter 字數 統計 字元 字數統計 統計圖表 chart histogram frequency 高頻詞 頻率 段落 句子 paragraph sentence 閱讀時間 reading time stats statistics analytics",
     "pdf-annotations":    "annotations annotation comments comment markup highlight underline strikeout sticky-note review todo extract export 註解 批註 標註 螢光筆 底線 刪除線 文字註解 圖章 自由文字 手繪 審閱 待辦 校稿 合約 修訂",
@@ -455,10 +462,18 @@ def _tpl_tool_tiles() -> list[dict]:
     所以由樣板先把用得到的圖示畫進隱藏區，JS 再複製對應的節點 —— 不要在 JS 裡
     另外抄一份 path，那遲早會跟 macro 長得不一樣。
     """
-    return [{"id": t.metadata.id, "name": t.metadata.name,
-             "icon": getattr(t.metadata, "icon", "tool") or "tool",
-             "color": _tool_color_map.get(t.metadata.id, 0)}
-            for t in tools]
+    out = [{"id": t.metadata.id, "name": t.metadata.name,
+            "icon": getattr(t.metadata, "icon", "tool") or "tool",
+            "color": _tool_color_map.get(t.metadata.id, 0)}
+           for t in tools]
+    # 不是工具、但也走作業佇列的背景作業（知識庫）—— 清單與通知信要有它自己的
+    # 圖示，不然會退回通用圖示（通知信則會少一張圖）。不進側欄 / 首頁：那兩處
+    # 不讀這份清單。
+    from .core.job_labels import NON_TOOL_JOBS as _non_tool
+    out += [{"id": jid, "name": v["name"], "icon": v["icon"],
+             "color": _preferred_color_index(jid)}
+            for jid, v in _non_tool.items()]
+    return out
 
 
 templates.env.globals["tool_tiles"] = _tpl_tool_tiles
@@ -477,6 +492,8 @@ _nav_tool_items = [
         "locales": getattr(t.metadata, "locales", ()),
         # 要先在管理區設定好外部服務才能用（空的＝不需要）
         "requires_setup": getattr(t.metadata, "requires_setup", ""),
+        # 試用中：名稱旁標「Beta」（只是告知，不影響列出與權限）
+        "beta": bool(getattr(t.metadata, "beta", False)),
     }
     for t in tools
 ]
@@ -520,6 +537,14 @@ templates.env.globals["nav_settings"] = [
      "url": "/admin/translation-glossary",
      "keywords": "glossary terminology term dictionary translate translation "
                  "brand proper noun 字典 對照 術語 專有名詞 翻譯 品牌 不要翻"},
+    # `beta`：名稱旁標「Beta」（同工具的 `ToolMetadata.beta`，只是告知，不影響列出與權限）
+    {"icon": "book", "name": "公文知識庫", "description": "公文撰擬查得到的規範、法規與範例（資料集、文件、檢索測試、重建索引）",
+     "url": "/admin/knowledge", "beta": True,
+     "keywords": "knowledge base rag retrieval embedding vector search dataset document "
+                 "handbook regulation law example 公文知識庫 知識庫 檢索 向量 嵌入 資料集 文書處理手冊 "
+                 "法規 規範 範例 公文 引用 出處 "
+                 # 政府公開資料（/admin/knowledge/gov）也從這一頁進去
+                 "open data opendata moj 政府公開資料 開放資料 全國法規資料庫 行政規則 釋例"},
     {"icon": "book", "name": "同義詞", "description": "PDF 標籤對應字典",
      "url": "/admin/synonyms",
      "keywords": "synonym synonyms alias dictionary label mapping 字典 同義 詞"},
@@ -531,7 +556,9 @@ templates.env.globals["nav_settings"] = [
      "keywords": "conversion office libreoffice oxoffice path engine 轉檔 引擎 路徑"},
     {"icon": "gear", "name": "LLM 設定", "description": "LLM AI 加值（附加功能，預設關閉）",
      "url": "/admin/llm-settings",
-     "keywords": "llm ai ollama qwen vision review 校驗 模型 大語言模型"},
+     # 知識庫的 Embedding（向量檢索）設定也在這一頁（`#embedding`）—— 搜「嵌入」要找得到
+     "keywords": "llm ai ollama qwen vision review 校驗 模型 大語言模型 "
+                 "embedding embed vector rag knowledge 嵌入 向量 向量檢索 知識庫 重建索引"},
     {"icon": "gear", "name": "API Token", "description": "對外呼叫 /api/* 的認證 token",
      "url": "/admin/api-tokens",
      "keywords": "api token bearer auth authentication 認證 令牌"},
@@ -544,6 +571,10 @@ templates.env.globals["nav_settings"] = [
     {"icon": "id-card", "name": "統編資料庫", "description": "公司 / 政府機關 / 學校統編反查（財政部 BGMOPEN + 補充來源）",
      "url": "/admin/vat-db",
      "keywords": "vat tax id business registry company taiwan einvoice einvoice-scan bgmopen vat-lookup 統編 統一編號 公司 商業 登記 反查 賣方 發票 財政部 行政院 地方政府 機關 學校"},
+    {"icon": "official-doc", "name": "公文撰擬設定", "description": "官方公文範本與機關地址簿的下載來源（預設不下載）",
+     "url": "/admin/official-doc",
+     "keywords": "official document government template address book agency open data download "
+                 "odt archives 公文 撰擬 範本 表單 函 簽 地址簿 機關 受文者 全銜 開放資料 檔案管理局 下載 上傳"},
     # ---- v1.1.0 auth / perm / audit pages ----
     # 認證設定 always visible — that's where admin enables auth in the first place.
     {"icon": "lock", "name": "認證設定", "description": "啟用本機 / LDAP / AD 認證",
@@ -860,6 +891,10 @@ _admin = _build_admin_router(templates)
 from .admin.auth_router import build_auth_router as _build_admin_auth_router  # noqa: E402
 
 _admin.include_router(_build_admin_auth_router(templates))
+# 知識庫（資料集、文件、檢索測試、embedding）—— 掛在 _admin 底下，繼承 require_admin
+from .admin.knowledge_routes import build_knowledge_router as _build_admin_kb_router  # noqa: E402
+
+_admin.include_router(_build_admin_kb_router(templates))
 app.include_router(_admin, prefix="/admin", tags=["admin"])
 
 # Tool routes
@@ -1049,6 +1084,17 @@ async def _bad_office_source_exc(request: Request, exc: Exception):
 @app.exception_handler(_OfficeUnavailableError)
 async def _office_unavailable_exc(request: Request, exc: Exception):
     return _JSONResponse({"detail": str(exc)}, status_code=503)
+
+
+# 工具指定的「另一台 LLM 伺服器」不見了 / 位址不合格 —— 一樣是**部署設定**的問題，回 503。
+# 訊息是固定的一句（`LLMServerUnavailable.MESSAGE`），是哪一支工具、哪一台寫在服務記錄。
+# **不退回全站那一台**是 `make_client()` 的事；這裡只是讓沒有自己接住的端點不要變成 500。
+from .core.llm_settings import LLMServerUnavailable as _LLMServerUnavailable  # noqa: E402
+
+
+@app.exception_handler(_LLMServerUnavailable)
+async def _llm_server_unavailable_exc(request: Request, exc: Exception):
+    return _JSONResponse({"detail": _LLMServerUnavailable.MESSAGE}, status_code=503)
 
 
 # 縮圖 / 預覽端點的頁碼在**路徑上**，所以「第 0 頁」「第 99 頁」這種是
@@ -1708,7 +1754,7 @@ async def api_my_inbox(request: Request, limit: int = 10):
     改用「上次查看時間」推導未讀，作業被清掉時通知自動跟著消失，不會留下
     點了 404 的項目。
     """
-    from .core import job_store, notify_settings as _ns
+    from .core import job_labels as _jl, job_store, notify_settings as _ns
     scope = _job_scope(request)
     if scope["mode"] == "user" and scope["owner_id"] is None:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
@@ -1725,10 +1771,11 @@ async def api_my_inbox(request: Request, limit: int = 10):
         is_new = fin > seen
         if is_new:
             unread += 1
+        # 知識庫這類**不是工具**的作業要顯示自己的名稱與圖示（`job_labels`）
         items.append({
             "id": r["id"],
-            "tool_id": r["tool_id"],
-            "tool_name": tool_names.get(r["tool_id"], r["tool_id"]),
+            "tool_id": _jl.display_id(r["tool_id"], r.get("meta")),
+            "tool_name": _jl.display_name(r["tool_id"], r.get("meta"), tool_names),
             "filename": _job_display_name(r.get("meta") or {},
                                           r["result_filename"]),
             "status": r["status"],
@@ -1873,7 +1920,7 @@ async def api_job_list(request: Request, active: bool = False,
     在這之前 job_id 只活在該分頁的 JS 變數裡，關掉分頁就等於結果檔遺失（檔案還
     在 temp，但沒有任何人知道它的 id）。
     """
-    from .core import job_store
+    from .core import job_labels as _jl, job_store
     scope = _job_scope(request)
     if scope["mode"] == "user" and scope["owner_id"] is None:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
@@ -1886,14 +1933,22 @@ async def api_job_list(request: Request, active: bool = False,
     # 進度條永遠是 0
     live = job_manager.live_snapshot()
     qpos = job_manager.queue_positions()
+    # 「開啟」按下去還打得開嗎 —— 過了保留期資料被清掉的那幾列不可以再給一顆
+    # 按下去 410 的鈕。規則在 `job_files.view_ok_map`（跟清理程式用同一套認人
+    # 的方式）；要列一次暫存區，丟到執行緒，不在事件迴圈上跑。
+    from .core import job_files as _jf
+    view_ok = await _asyncio.to_thread(
+        _jf.view_ok_map, rows,
+        {k: v.get("status") for k, v in live.items() if v.get("status")})
     out = []
     for r in rows:
         meta = r.get("meta") or {}
         lv = live.get(r["id"]) or {}
         out.append({
             "id": r["id"],
-            "tool_id": r["tool_id"],
-            "tool_name": tool_names.get(r["tool_id"], r["tool_id"]),
+            # 知識庫這類**不是工具**的作業要顯示自己的名稱與圖示（`job_labels`）
+            "tool_id": _jl.display_id(r["tool_id"], meta),
+            "tool_name": _jl.display_name(r["tool_id"], meta, tool_names),
             "status": lv.get("status", r["status"]),
             "progress": lv.get("progress", r["progress"]),
             "message": lv.get("message") or r["message"],
@@ -1918,6 +1973,9 @@ async def api_job_list(request: Request, active: bool = False,
             # 有些工具的產出不是一個檔案，而是一頁對照表（逐句翻譯）——
             # 那種作業要能點回原本那一頁看結果，而不是給一顆下載鈕。
             "view_url": _safe_view_url(meta.get("view_url")),
+            # **不可以用 `has_result` 代替** —— 逐句翻譯的結果沒有 `result_path`
+            # （`trd_<作業編號>.json`），用它判斷的話逐句翻譯的「開啟」會整個消失。
+            "view_ok": bool(view_ok.get(r["id"])),
         })
     # 工作區停用時不會自動存 → 告訴使用者結果還剩多久，讓他知道要在什麼時候
     # 之前取走（而不是隔天回來才發現不見了）

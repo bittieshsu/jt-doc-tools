@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.16.59
+# Jason Tools Document Toolbox v1.16.66
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -25,7 +25,7 @@
 > `jtdt update` then works as usual. **Unaffected**: tarball installs, the Windows installer,
 > and anything installed after 2026-09-13. Fixed from v1.15.43 onwards.
 
-> An integrated PDF / Office document platform. 50 tools cover **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan stitching**, **de-identification**, **word counts**, **annotation handling**, **diffing**, **sentence translation**, **list processing**, **e-invoice processing**, **VAT lookup**, **a page editor**, **encryption / decryption** and more.
+> An integrated PDF / Office document platform. 51 tools cover **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan stitching**, **de-identification**, **word counts**, **annotation handling**, **diffing**, **sentence translation**, **list processing**, **e-invoice processing**, **VAT lookup**, **a page editor**, **encryption / decryption** and more.
 >
 > Enterprise features: **local / LDAP / AD multi-realm authentication**, **single sign-on** (OIDC + SAML, ready for M365 / Google / Keycloak), **RBAC roles and permissions**, **audit log**, **SIEM forwarding** (syslog / CEF / GELF), **font management**, **user workspace**, **background jobs with completion notices** and a **REST API**.
 >
@@ -95,7 +95,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 
 ---
 
-## The 50 tools at a glance
+## The 51 tools at a glance
 
 ### Forms and stamps
 - **Auto-fill forms**; field detection plus template values
@@ -118,6 +118,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 - **Word count** [needs OxOffice/LibreOffice]: tables, charts and an LLM summary; accepts PDF, office and plain-text files
 - **Meeting summary** [needs OxOffice/LibreOffice] — turns a transcript (.vtt / .srt / .json / .txt / .docx / .odt) into a summary, decisions, action items, risks and chapters; **every entry points back to the segment it came from and who said it**, and clicking it jumps there. When timestamps are present it also works out the speaking share. Export to PDF / Word / ODF / Markdown / chart PNG / JSON
 - **Meeting recording to transcript** — turns a recording or video into a transcript **with timings and speakers**, ready to hand to Meeting summary in one click; recognition runs on the speech service (JTLW), so **it only appears once an administrator has set it up**
+- **Official document drafting** (Beta) [needs OxOffice/LibreOffice]: turns a plain-language request into an approval memo (`簽`: subject, explanation, proposed action) or a letter (`函`: forms of address and closing phrases follow the relationship between sender and recipient), or drafts the handling note (`簽辦意見`) for an incoming document from how you plan to handle it; **the program lays out the format and the LLM writes the content**. Amounts, dates, laws, article numbers, document numbers and claims such as "already approved" are compared with what you provided: anything without support is flagged, and anything missing is marked as to be filled in. You can rewrite a paragraph, keep versions, reopen earlier drafts in **Case history**, and use the **official document knowledge base** set up by the administrator (only "substantive basis" material counts as a basis); exports can use the official document templates from the government open data platform (once the administrator has downloaded them). **The checks cannot verify meaning** (causes, conclusions), so always review a draft before sending it. Output is always a Traditional Chinese Taiwan official document, and the English / Japanese interface works too. Exports plain text / ODT (no engine needed) / Word / PDF (Word and PDF need the engine)
 - **Annotation report / removal / flattening**
 - **OCR**: run OCR on scanned PDFs and images so the text becomes searchable and selectable (the same idea as Live Text in macOS Preview); two engines (**EasyOCR** by default, strong on Chinese, Japanese and Korean; **Tesseract** as a fallback), with optional LLM typo correction. **An external GPU recognition server is supported** (DGX Spark / H100 / 4090 …): download `install.sh` from the admin interface to deploy it, taking a page from 8; 15 seconds on CPU down to 0.3; 0.8 seconds on GPU (**more than 10× faster**).
 - **Pre-submission check**: batch verification: page size, embedded fonts, complete fields, leftover personal data, hidden content
@@ -169,7 +170,7 @@ Enabled by default; an administrator can turn it off at any time under “Settin
 
 Slow work (conversion, OCR, sentence translation, compressing large files …) is handed to the server when you submit it, so **you can close the tab** instead of watching a progress bar.
 
-- **Submit and it runs in the background** — 30 tools go through the job system, including PDF to office / slides, format conversion, OCR, sentence translation, office to PDF, compression, merge, split, watermarks, stamps, seam stamps and pre-submission checks.
+- **Submit and it runs in the background** — 31 tools go through the job system, including PDF to office / slides, format conversion, OCR, sentence translation, office to PDF, compression, merge, split, watermarks, stamps, seam stamps and pre-submission checks.
 - **My jobs**: progress, queue position, elapsed time and the download are all on one page, and a running job can be cancelled. Tools whose output is not a single file (sentence translation, say) take you back to the original page to keep reading the comparison.
 - **Nothing vanishes on restart**; job state lives in the database; anything unfinished when the service restarts is marked as interrupted rather than silently disappearing.
 - **It will not take the machine down**; memory is estimated before dispatch, and a job that does not fit waits in the queue; the concurrency limits for jobs and Office conversion are both adjustable in the admin area.
@@ -216,11 +217,12 @@ Connecting is only the start: what actually goes wrong is the primary DC restart
 
 ## LLM AI extras (optional, off by default)
 
-Connect an OpenAI-compatible backend (local Ollama, an LLM gateway such as LiteLLM, vLLM, LM Studio or a DGX Spark) and **13 tools** gain smart options automatically:
+Connect an OpenAI-compatible backend (local Ollama, an LLM gateway such as LiteLLM, vLLM, LM Studio or a DGX Spark) and **14 tools** gain smart options automatically:
 
 | Tool | What the LLM does | Mode |
 |---|---|---|
 | Sentence translation | keeps the layout and uses domain vocabulary | text |
+| Document translation | Translates a whole office document into another language, producing a file with the same format and layout | text |
 | Extract text | rejoins sentences that a two-column PDF cut apart | text |
 | OCR | fixes OCR typos (applied only when the word count matches, to prevent hallucinated edits) | text |
 | Auto-fill forms | after filling, the LLM inspects the PNG for misplaced or truncated values | **vision** |
@@ -229,6 +231,7 @@ Connect an OpenAI-compatible backend (local Ollama, an LLM gateway such as LiteL
 | Text redaction | the same, for plain-text input | text |
 | Word count | adds a 3; 5 sentence summary and the top 10 keywords | text |
 | Meeting summary | Transcript to summary / decisions / action items / risks / chapters, each with a segment number you can check | text |
+| Official document drafting | Plain-language request to an approval memo or letter, incoming document to a handling note, paragraph rewriting, case history; can use the official document knowledge base; the program lays out the format and checks the facts | text |
 | Annotation report | sorts many review comments into “major / normal / question” | text |
 | Document compare | beyond the line diff, a plain-language summary of which clauses changed | text |
 | e-Invoice processing | when rules do not match an item, the LLM decides the accounting category | text |
@@ -268,7 +271,7 @@ which you can host on your own network) for recognition and speaker separation; 
 - **Citations are bound to segment numbers, not to text**: after a re-run of the correction step or a glossary update, decisions and action items that were already
   produced still point back to the same piece of audio.
 
-Leave it unset and nothing changes: **the other 49 tools are entirely unaffected**.
+Leave it unset and nothing changes: **the other 50 tools are entirely unaffected**.
 
 ---
 
@@ -277,11 +280,11 @@ Leave it unset and nothing changes: **the other 49 tools are entirely unaffected
 | Document | Contents |
 |---|---|
 | **[INSTALL.md](INSTALL.md)** | Detailed installation on all three platforms, required tools, install locations, system requirements, uninstalling |
-| **[OPS.md](OPS.md)** | Day-to-day operations: the `jtdt` command, upgrades, reverse proxies (nginx/Caddy), listen address, backup and restore, scheduled cleanup |
+| **[OPS.md](OPS.md)** | Day-to-day operations: the `jtdt` command, upgrades, reverse proxies (nginx/Caddy), listen address, backup and restore, moving to another host, scheduled cleanup |
 | **[AUTH.md](AUTH.md)** | Authentication / RBAC / built-in accounts (jtdt-admin / jtdt-auditor) / 2FA / SSO (OIDC+SAML) / Reverse Proxy SSO (Kerberos) / account lockout / emergency recovery |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO (Kerberos / SPNEGO) end-to-end deployment: AD service account, setspn, ktpass / keytab, nginx configuration, automatic browser sign-in, header spoofing protection |
 | **[API.md](API.md)** ([web version](https://jasoncheng7115.github.io/jt-doc-tools/api-en.html)) | REST API: bearer tokens, the endpoint list, upload and response formats, error codes, curl / Python examples, the job flow |
-| **[LLM.md](LLM.md)** | Optional LLM features (off by default): how 13 tools use an LLM, examples, supported LLM servers and gateways (Ollama / LiteLLM / vLLM…), turning thinking off and concurrency |
+| **[LLM.md](LLM.md)** | Optional LLM features (off by default): how 14 tools use an LLM, examples, supported LLM servers and gateways (Ollama / LiteLLM / vLLM…), turning thinking off and concurrency |
 | **[SECURITY.md](SECURITY.md)** | Security policy, OWASP Top 10 (2025) mapping, vulnerability reporting, GitHub native scan integration |
 | **[CHANGELOG.md](CHANGELOG.md)** | Full change log |
 | **[TEST_PLAN.md](TEST_PLAN.md)** | Test checklist and pre-release checks |

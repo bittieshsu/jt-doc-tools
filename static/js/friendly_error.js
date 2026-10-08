@@ -63,7 +63,8 @@
         return `${base}${codeTag}：` + tr('本系統的單次上傳上限是 {0} MB。請分批上傳，或請管理員到「系統狀態 → 可上傳的檔案大小」調整。').replace('{0}', mb || '?');
       }
       if (layer === 'tool' || detail) {
-        return `${base}${codeTag}：` + tr('本系統這項功能的上限') + (detail ? ` —— ${detail}` : '');
+        // 伺服器的說明一樣過 `tr()`（例：工作區的「錄音檔超過單檔上限 500 MB…」），不然英日介面是中文
+        return `${base}${codeTag}：` + tr('本系統這項功能的上限') + (detail ? ` —— ${tr(detail)}` : '');
       }
       return `${base}${codeTag}：` + tr('這是網站前面的反向代理擋下的，不是本系統的上限。請管理員調高反向代理的上傳上限（nginx 是 client_max_body_size），目前的上限可以在「系統狀態 → 可上傳的檔案大小」實測。');
     }

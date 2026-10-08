@@ -51,7 +51,7 @@ class FakeClient:
 def llm(monkeypatch):
     from app.core import llm_settings as ls
     monkeypatch.setattr(ls.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(ls.llm_settings, "make_client", lambda: FakeClient())
+    monkeypatch.setattr(ls.llm_settings, "make_client", lambda *a, **k: FakeClient())
     monkeypatch.setattr(ls.llm_settings, "get_model_for", lambda _t: "fake")
 
 

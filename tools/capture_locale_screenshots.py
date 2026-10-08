@@ -53,6 +53,7 @@ SHOTS: dict[str, str] = {
     "einvoice-scan": "/tools/einvoice-scan/",
     "translate-doc": "/tools/translate-doc/",
     "meeting-summary": "/tools/meeting-summary/",
+    "official-doc": "/tools/official-doc/",
     "deident-1": "/tools/doc-deident/",
     "deident-2": "/tools/text-deident/",
     "fonts": "/admin/fonts",
@@ -152,6 +153,23 @@ RECIPES: dict[str, dict] = {
       # 用預設判準會等滿逾時然後拍到還沒畫完的畫面。
       "ready": "!!document.querySelector('#msCards .ms-card')",
       "wait": 240, "focus": "#msCards"},
+    # 公文撰擬：**要看到真的寫出來的草稿與右邊的預覽圖**。載入產品內建的範例
+    # （`examples.py` 的 SIGN-01，內容虛構）再按「產生草稿」；預覽圖走 Office 引擎轉，
+    # 轉圈收掉、圖真的載進來才算畫好。需要接得上的 LLM（實例的 LLM 設定要先填）。
+    "official-doc": {"before": """(() => {
+        const s = document.getElementById('odExample');
+        if (!s) return false;
+        s.value = 'SIGN-01';
+        s.dispatchEvent(new Event('change', {bubbles: true}));
+        return true;
+      })()""",
+      "submit": ["#odGo"],
+      "ready": """(() => { const i = document.querySelector('#odPreview img');
+        return !!i && i.naturalWidth > 0 && document.getElementById('odPvSpin').hidden; })()""",
+      # 草稿與預覽圖要並排（內容區至少 1100px 才排兩欄）：用寬一點的視窗拍，
+      # 再縮成跟其他截圖一樣的大小；捲到「草稿」那一行標題（上緣對齊）。
+      "wait": 240, "focus": "#odResult .od-draft-grid", "focus_block": "start",
+      "viewport": (1600, 1166)},
     "deident-1": {"file": "deident", "submit": True, "wait": 14},
     # 文字去識別化沒有檔案可放 —— 直接把範例文字貼進去（**內容全部虛構**，
     # 跟 `seed_demo_data.py` 那份是同一批假資料）。空白的輸入框當產品截圖
@@ -420,9 +438,12 @@ async def _capture(base: str, cdp_port: int, locale: str, only=None) -> list[str
                     continue
                 if name in skip:
                     continue
+                r = RECIPES.get(name)
+                vw, vh = (r or {}).get("viewport") or (WIDTH, HEIGHT)
+                await cmd("Emulation.setDeviceMetricsOverride",
+                          {"width": vw, "height": vh, "deviceScaleFactor": 1, "mobile": False})
                 await cmd("Page.navigate", {"url": base + path})
                 await asyncio.sleep(2.0)
-                r = RECIPES.get(name)
                 if r:
                     sample = sample_for(r.get("file", ""), locale)
                     if r.get("before"):
@@ -489,7 +510,7 @@ async def _capture(base: str, cdp_port: int, locale: str, only=None) -> list[str
                           (() => {{
                             const el = document.querySelector({r['focus']!r});
                             if (!el) return false;
-                            el.scrollIntoView({{block: 'center'}});
+                            el.scrollIntoView({{block: {r.get('focus_block', 'center')!r}}});
                             return true;
                           }})()"""})
                         await asyncio.sleep(1.2)
@@ -509,7 +530,16 @@ async def _capture(base: str, cdp_port: int, locale: str, only=None) -> list[str
                     if left:
                         residual[name] = left
                 shot = await cmd("Page.captureScreenshot", {})
-                (out / f"{name}.png").write_bytes(base64.b64decode(shot["data"]))
+                png = base64.b64decode(shot["data"])
+                if (vw, vh) != (WIDTH, HEIGHT):
+                    # 寬視窗拍的縮回統一大小（介紹站每張卡片一樣大）
+                    import io
+                    from PIL import Image
+                    im = Image.open(io.BytesIO(png)).convert("RGB").resize((WIDTH, HEIGHT), Image.LANCZOS)
+                    buf = io.BytesIO()
+                    im.save(buf, "PNG", optimize=True)
+                    png = buf.getvalue()
+                (out / f"{name}.png").write_bytes(png)
                 done.append(name)
             if residual:
                 print(f"  ! {locale} 這幾張的畫面上還有中文（送出後的結果區）：")

@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 .pytest_cache/
 .venv/
+/python/
 *.egg-info/
 
 # Runtime / user data — never publish

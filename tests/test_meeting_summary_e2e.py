@@ -68,9 +68,13 @@ def _fake_llm(port: int) -> ThreadingHTTPServer:
                                  "due_text": "月底", "segment_ids": [3]}],
                     "risks": [], "questions": []}, ensure_ascii=False)
             elif "切成" in prompt and "章節" in prompt:
-                content = json.dumps({"chapters": [
-                    {"title": "第四季預算", "start_seq": 1, "end_seq": 3}]},
-                    ensure_ascii=False)
+                chapters = [{"title": "第四季預算", "start_seq": 1, "end_seq": 3}]
+                # 兩個議題的那份素材（`VTT_TWO_TOPICS`）切成兩章 —— 只有一章的話
+                # 「各議題佔比」那張圖根本不畫（一章就是 100%，畫了也沒有資訊），
+                # 滑過長條的那條檢查就一路 skip（而 skip 跟通過在輸出裡長得一樣）。
+                if "機房搬遷" in prompt:
+                    chapters.append({"title": "機房搬遷", "start_seq": 4, "end_seq": 5})
+                content = json.dumps({"chapters": chapters}, ensure_ascii=False)
             elif "三到五句" in prompt:
                 content = json.dumps(
                     {"summary": "會議確認第四季行銷預算不加，修訂版月底前送法務。"},
@@ -349,31 +353,95 @@ def test_the_charts_are_not_scaled_by_css(live):
             "被 CSS 縮放了，字級會跟著跑掉")
 
 
+#: 兩個議題的會議 —— 假模型看到「機房搬遷」會切成兩章（見 `_fake_llm`）。
+#: **前三段跟 `VTT` 一字不差**：之後的測試撈「最新一件已完成的分析」來驗，
+#: 撈到這一件也要對得起來（決議引用第 3 段、發言者同樣兩位）。
+VTT_TWO_TOPICS = VTT + """
+00:00:21.000 --> 00:00:30.000
+<v 李美華>另外機房搬遷排在下個月，機櫃要先清點。
+
+00:00:31.000 --> 00:00:40.000
+<v 王小明>機房搬遷那天停機四小時，公告下週發。
+"""
+
+
 def test_hovering_a_bar_lights_up_its_legend_row(live):
     """滑過長條，對應的圖例亮著、其餘變淡（2026-09-19 使用者要求）。
 
     量的是**章節佔比**那張圖 —— 發言者那張已經併進表格了。
+
+    **這條以前一直是 skip**（「章節圖上只有 0 個可對應的列」）：假模型只切得出一章，
+    而一章的會議那張圖本來就不畫（`meeting_charts.js` 的 `timeline` 要兩章以上）——
+    不是圖壞了，是素材不夠。現在用兩個議題的素材自己跑一件，**一定要真的量到**：
+    量不到就紅，不 skip。
+
+    **滑鼠是真的移過去**（CDP `Input.dispatchMouseEvent`），判準落在畫面上：
+    其餘的列真的變淡（算出來的不透明度），不是只看 class —— 樣式那一條被拿掉的話，
+    class 照樣切換、畫面卻一點變化都沒有。
     """
-    port, send, vtt = live
-    assert _wait(send, "!document.getElementById('msResult').hidden", 10)
-    if _eval(send, "document.getElementById('msChapWrap').hidden"):
-        pytest.skip("這份素材沒有章節")
+    port, send, _vtt = live
+    path = Path(browser_probe.uploadable_dir()) / "mse2e-two-topics.vtt"
+    path.write_text(VTT_TWO_TOPICS, encoding="utf-8")
+    _fresh_upload(port, send, str(path))
+    _eval(send, "document.getElementById('msStart').click(), 1")
+    assert _wait(send, "!document.getElementById('msResult').hidden && "
+                       "!document.getElementById('msChapWrap').hidden && "
+                       "document.querySelectorAll('#msTimeline .mc-row').length >= 4", 180), (
+        "兩個議題的會議，「各議題佔比」那張圖沒有畫出來（應該有兩條長條＋兩列圖例）")
     n = _eval(send, "document.querySelectorAll('#msTimeline .mc-row').length")
-    if not n or n < 2:
-        pytest.skip(f"章節圖上只有 {n} 個可對應的列")
-    out = _eval(send, """(function(){
+    assert n == 4, f"兩章應該是兩條長條＋兩列圖例，實際 {n} 個"
+
+    # 圖畫完會「照鏡子」：量到的寬度跟畫的差太多就重畫一次（整張 SVG 換掉）—— 滑鼠移上去之後
+    # 才換掉的話，亮著的狀態跟著舊的那張一起不見。先等那張圖穩定下來（同一個節點維持 1 秒）。
+    _eval(send, "window.__tlSvg = document.querySelector('#msTimeline svg'), 1")
+    stable_since = time.time()
+    end = time.time() + 15
+    while time.time() < end and time.time() - stable_since < 1.0:
+        time.sleep(0.2)
+        if not _eval(send, "document.querySelector('#msTimeline svg') === window.__tlSvg"):
+            _eval(send, "window.__tlSvg = document.querySelector('#msTimeline svg'), 1")
+            stable_since = time.time()
+
+    state = """(function(){
       var rows = document.querySelectorAll('#msTimeline .mc-row');
-      rows[0].dispatchEvent(new MouseEvent('mouseover', {bubbles:true}));
-      var lit = 0, faded = 0;
+      var lit = 0, faded = 0, fadedOpacity = [];
       for (var i=0;i<rows.length;i++){
         if (rows[i].classList.contains('mc-lit')) lit++;
-        if (rows[i].classList.contains('mc-faded')) faded++;
+        if (rows[i].classList.contains('mc-faded')) {
+          faded++;
+          fadedOpacity.push(parseFloat(getComputedStyle(rows[i]).opacity));
+        }
       }
-      return {lit: lit, faded: faded, total: rows.length};
-    })()""")
-    assert out["lit"] >= 1, "滑過去之後沒有任何一列亮起來"
-    assert out["faded"] >= 1, "其餘的列沒有變淡 —— 那就看不出在對應哪一個"
-    assert out["lit"] + out["faded"] == out["total"], "有列兩種狀態都沒有"
+      return {lit: lit, faded: faded, total: rows.length, fadedOpacity: fadedOpacity};
+    })()"""
+    # 把第一條長條捲進畫面，量它在視窗裡的位置，**真的把滑鼠移過去**（先移到別處，
+    # 確定這一次是「移進來」—— 滑鼠本來就停在那個位置的話，瀏覽器不會再發一次 mouseover）
+    out = None
+    for _attempt in range(3):
+        pos = _eval(send, """(function(){
+          var bar = document.querySelector('#msTimeline .mc-row rect');
+          bar.scrollIntoView({block: 'center'});
+          var r = bar.getBoundingClientRect();
+          return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width};
+        })()""")
+        assert pos and pos["w"] > 0, f"長條沒有佔到空間：{pos}"
+        send("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": 2, "y": 2})
+        send("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": pos["x"], "y": pos["y"]})
+        # 不透明度有 0.12 秒的轉場 —— 等它落定
+        if _wait(send, "(function(){ var f = document.querySelector('#msTimeline .mc-row.mc-faded');"
+                       " return !!f && parseFloat(getComputedStyle(f).opacity) < 0.5; })()", 3):
+            break
+    out = _eval(send, state)
+    assert out["lit"] == 2, f"滑過去之後，那一個議題的長條與圖例應該一起亮著：{out}"
+    assert out["faded"] == 2, f"其餘的列沒有變淡 —— 那就看不出在對應哪一個：{out}"
+    assert out["lit"] + out["faded"] == out["total"], f"有列兩種狀態都沒有：{out}"
+    assert all(o < 0.5 for o in out["fadedOpacity"]), (
+        f"class 換了，畫面上卻沒有變淡（樣式沒有套上）：{out['fadedOpacity']}")
+
+    # 滑鼠移開 → 全部恢復
+    send("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": 2, "y": 2})
+    assert _wait(send, "document.querySelectorAll('#msTimeline .mc-row.mc-faded, "
+                       "#msTimeline .mc-row.mc-lit').length === 0", 5), "滑鼠移開之後沒有恢復"
 
 
 def test_the_shared_download_button_is_not_duplicated(live):

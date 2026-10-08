@@ -275,7 +275,7 @@ function renderGrid(pages) {
       <div class="page-num">第 ${p.page} 頁<span class="mode-tag" data-mode-tag hidden></span></div>
       <div class="page-tools">
         ${VALID_MODES.map(m => `<button type="button" data-pm="${m}">${MODE_SHORT[m]}</button>`).join('')}
-        <button type="button" class="clear-btn" data-pm="none" title="' + tr('清除') + '">─</button>
+        <button type="button" class="clear-btn" data-pm="none" title="${tr('清除')}">─</button>
       </div>
     </div>`).join('');
   grid.querySelectorAll('[data-pm]').forEach(btn => {

@@ -3,9 +3,15 @@
 {% block title %}{{ tr('設定備份 / 匯入') }} · {{ app_name }}{% endblock %}
 {% block content %}
 <h1>{{ icon('archive', size=22) }} {{ tr('設定備份 / 匯入') }}</h1>
-<p class="muted">{{ tr('把 admin 設定打包成單一壓縮檔備份 / 搬遷到另一台機器；或從備份檔還原。
-匯出與匯入都可') }}<b>{{ tr('逐項勾選') }}</b>{{ tr('要包含 / 還原哪些設定。匯入時會自動把現有設定備份成') }}
+<p class="muted">{{ tr('把管理區的設定打包成單一壓縮檔備份，或把設定複製到另一套；也可以從備份檔還原。匯出與匯入都可') }}<b>{{ tr('逐項勾選') }}</b>{{ tr('要包含 / 還原哪些設定。匯入時會自動把現有設定備份成') }}
 <code>.bak.&lt;{{ tr('時間') }}&gt;</code>{{ tr('（在') }} <code>data/</code> {{ tr('下），失敗可手動 rollback。') }}</p>
+
+{# issue #55：拿設定備份搬整台主機會少掉帳號與使用者資料（實測過）—— 要講清楚該怎麼搬 #}
+<div class="info-box" id="expMoveHost">
+  {{ icon('info', size=14) }}
+  <span><b>{{ tr('要把整台搬到另一台主機？') }}</b>{{ tr('請複製整個資料夾（帳號、歷史紀錄、工作區、公文知識庫都在裡面），步驟見') }}
+  <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md#搬到另一台主機" target="_blank" rel="noopener">{{ tr('維運指南「搬到另一台主機」') }}</a>{{ tr('。這裡的備份不含本機帳號與密碼；用使用者編號存的個人資料（工作區、通知偏好等）匯入時照帳號名稱對到這台的帳號，對不上的不還原並列出來。') }}</span>
+</div>
 
 <div class="panel">
   <h2 class="exp-h2">{{ icon('download', size=18) }} {{ tr('1. 匯出設定') }}</h2>
@@ -27,7 +33,7 @@
     </label>
     {% endfor %}
   </div>
-  <p class="muted exp-note">{{ tr('說明：') }}<b>{{ tr('認證設定') }}</b>{{ tr('含 LDAP / SSO / Reverse Proxy SSO；') }}<b>{{ tr('角色與權限') }}</b>{{ tr('含角色定義、工具權限、新使用者預設角色與 OU 權限規則（') }}<b>{{ tr('不含使用者帳號 / 密碼') }}</b>{{ tr('，換機後帳號請另建或由 AD / LDAP 同步）。') }}</p>
+  <p class="muted exp-note">{{ tr('說明：') }}<b>{{ tr('認證設定') }}</b>{{ tr('含 LDAP / SSO / Reverse Proxy SSO；') }}<b>{{ tr('角色與權限') }}</b>{{ tr('含角色定義、工具權限、新使用者預設角色、OU 權限規則，以及指派給個人與群組的角色（照帳號 / 群組名稱對到這台；管理員與稽核員不從備份給）（') }}<b>{{ tr('不含使用者帳號 / 密碼') }}</b>{{ tr('，換機後帳號請另建或由 AD / LDAP 同步）。') }}</p>
   <div class="exp-actions">
     <button class="btn btn-primary" id="btnExport">{{ icon('download', size=14) }} {{ tr('下載備份壓縮檔') }}</button>
     <span id="exportStatus" class="muted"></span>
@@ -47,6 +53,7 @@
     <button class="btn btn-danger" id="btnImport">{{ icon('upload', size=14) }} {{ tr('匯入勾選的類別') }}</button>
     <span id="importStatus" class="muted"></span>
   </div>
+  <div id="importSkipped" class="imp-skip" role="status" hidden></div>
 </div>
 
 <div class="panel">
@@ -75,6 +82,10 @@
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
+.imp-skip { margin:10px 0 0; padding:10px 12px; border:1px solid #fde68a; border-left:4px solid #d97706;
+            border-radius:8px; background:#fffbeb; font-size:13px; color:#78350f; }
+.imp-skip .imp-skip-title { font-weight:600; margin-bottom:4px; }
+.imp-skip ul { margin:0; padding-left:20px; line-height:1.7; }
   .exp-h2 { display:flex; align-items:center; gap:6px; }
   .exp-toolbar { display:flex; gap:6px; margin:8px 0; }
   .cat-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:8px; margin:8px 0; }
@@ -194,6 +205,27 @@ $('btnImport').addEventListener('click', async () => {
     if (!r.ok) { $('importStatus').textContent = await window.friendlyServerError(r, tr('匯入失敗')); return; }
     const j = await r.json();
     $('importStatus').textContent = tr('已匯入 ') + j.imported_files + tr(' 個檔案') + (j.rbac ? (tr('、角色/權限 ') + j.rbac.roles + tr(' 個')) : '') + tr('，原檔已備份。建議重啟服務套用新設定。');
+    // 沒有還原的項目逐條列出（樣板＋參數：伺服器端的 SKIP_MESSAGES）
+    const box = $('importSkipped');
+    box.textContent = '';
+    const sk = Array.isArray(j.skipped) ? j.skipped : [];
+    box.hidden = !sk.length;
+    if (sk.length) {
+      const h = document.createElement('div');
+      h.className = 'imp-skip-title';
+      h.textContent = tr('下面這些沒有還原：');
+      box.appendChild(h);
+      const ul = document.createElement('ul');
+      sk.forEach((it) => {
+        let t = tr(it.template || it.text || '');
+        (it.args || []).forEach((a, i) => { t = t.split('{' + i + '}').join(tr(String(a))); });
+        if (it.count > 1) t += tr('（{0} 個檔案）').replace('{0}', it.count);
+        const li = document.createElement('li');
+        li.textContent = t;
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+    }
     importToken = null;
   } catch (e) {
     $('importStatus').textContent = tr('錯誤：') + e.message;

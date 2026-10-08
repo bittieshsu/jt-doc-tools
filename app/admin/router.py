@@ -1062,6 +1062,23 @@ def build_router(templates) -> APIRouter:
         for flag in ("enabled", "hide_when_disabled", "debug_log"):
             if flag in body and not isinstance(body[flag], bool):
                 body[flag] = str(body[flag]).strip().lower() in ("1", "true", "on", "yes")
+        # 其他 LLM 伺服器與各工具的伺服器：檢查（位址、名稱、有工具指到不存在的那一台）在
+        # `llm_settings.update()` 裡做，不合格就**整筆不存**、回固定訊息（不回例外字串）。
+        from ..core.llm_settings import LLMSettingsError, SERVER_ERRORS
+        rep: dict = {}
+        try:
+            out = llm_settings.update(body, report=rep)
+        except LLMSettingsError as exc:
+            code = next((c for c in SERVER_ERRORS if c == exc.code), "server_list")
+            resp = {"ok": False, "error": SERVER_ERRORS[code], "code": code}
+            if code == "server_in_use":
+                # 哪幾支工具：照送來的設定重算（不從例外帶出去）
+                srv_ids = {str((x or {}).get("id") or "") for x in (body.get("servers") or [])
+                           if isinstance(x, dict)}
+                spt = body.get("server_per_tool") or {}
+                resp["tools"] = sorted(str(t) for t, v in (spt.items() if isinstance(spt, dict) else [])
+                                       if v and str(v) not in srv_ids)
+            return JSONResponse(resp, status_code=400)
         # admin 改了 LLM 設定（base_url / model / 其他）— 把 model profile cache
         # 全部清掉，下次 LLM call 會重抓 capabilities
         try:
@@ -1069,7 +1086,24 @@ def build_router(templates) -> APIRouter:
             _lmp.invalidate(None)
         except Exception:
             pass
-        return llm_settings.update(body)
+        # **設定變更要留稽核紀錄**（同語音服務設定頁）。金鑰本身絕不寫進紀錄，
+        # 只記「不變 / 已更新 / 已清除」—— 全站那一把與每一台伺服器的都一樣。
+        try:
+            from ..core import audit_db, client_ip as _cip
+            detail = {k: out.get(k) for k in ("enabled", "base_url", "model", "timeout_seconds")
+                      if k in body}
+            for k in ("model_per_tool", "server_per_tool"):
+                if k in body:
+                    detail[k] = out.get(k) or {}
+            detail.update(rep)
+            user = getattr(request.state, "user", None)
+            audit_db.log_event("settings_change",
+                               username=(user or {}).get("username", ""),
+                               ip=_cip.real_client_ip(request), target="llm",
+                               details=detail)
+        except Exception:      # noqa: BLE001 — 稽核寫不進去不可以讓存檔失敗
+            logger.warning("LLM 設定的稽核紀錄寫入失敗", exc_info=True)
+        return out
 
     @router.post("/api/llm/test-connection")
     async def api_llm_test_connection(request: Request):
@@ -1090,16 +1124,31 @@ def build_router(templates) -> APIRouter:
             body = {}
         if not isinstance(body, dict):
             body = {}
-        saved = llm_settings.get() if not body.get("base_url") else {}
+        # `server_id`：測的是「其他 LLM 伺服器」裡的那一台（沒給＝全站那一台）。
+        sid = str(body.get("server_id") or "").strip().lower()
+        if sid:
+            saved_srv = llm_settings.server(sid)
+            if saved_srv is None and not body.get("base_url"):
+                return {"ok": False, "error": "找不到這台 LLM 伺服器（可能還沒儲存）"}
+            saved_target = saved_srv or {}
+        else:
+            saved_target = llm_settings.get()
+        saved = saved_target if not body.get("base_url") else {}
         base_url = ((body.get("base_url") or saved.get("base_url") or "")).strip()
         # 金鑰：頁面送來的是 `SECRET_KEPT`（沒改）或新的明文。**存著的金鑰只送給存檔時
         # 的那個位址** —— 不然在表單上改一個還沒存的位址按「測試連線」，
         # 就等於把金鑰交給任意一台主機（而頁面本身已經看不到金鑰了）。
+        # 「其他 LLM 伺服器」每一台也一樣：只有位址跟**那一台**存檔時的一樣才帶它的金鑰。
         raw_key = body.get("api_key") if body.get("base_url") else None
         if raw_key == _LLM_KEPT or not body.get("base_url"):
             same_host = (base_url.rstrip("/")
-                         == (llm_settings.get().get("base_url") or "").strip().rstrip("/"))
-            api_key = llm_settings.api_key() if same_host else None
+                         == (saved_target.get("base_url") or "").strip().rstrip("/"))
+            if not same_host:
+                api_key = None
+            elif sid:
+                api_key = llm_settings.server_api_key(sid)
+            else:
+                api_key = llm_settings.api_key()
         else:
             api_key = (str(raw_key or "")).strip() or None
         timeout = float(body.get("timeout_seconds")
@@ -1121,7 +1170,7 @@ def build_router(templates) -> APIRouter:
                 "Base URL 格式錯誤"
             )
             return {"ok": False, "error": user_msg}
-        result = client.test_connection()
+        result = await _asyncio.to_thread(client.test_connection)
         # **順便檢查模型是不是還在「思考」**（只有管理員按按鈕時才做，開頁面不做 ——
         # 會讓對方把模型載進 GPU）。思考沒被關掉時翻譯會慢很多倍，而畫面上完全看不出來。
         thinking_check = None
@@ -1136,11 +1185,23 @@ def build_router(templates) -> APIRouter:
                                probe_model[:80].replace("\r", " ").replace("\n", " "),
                                exc_info=True)
                 thinking_check = {"error": "檢查失敗（原因記在服務記錄）"}
+        # 上下文長度（Ollama 才看得到）：上面那一問已經把模型載入，這時 `/api/ps` 讀得到實際大小。
+        # 太小時長一點的文件會被**安靜地截掉開頭的指令**，結果亂掉而沒有錯誤（2026-10-08 使用者要求提示）。
+        context_check = None
+        if result.ok and probe_model:
+            import asyncio as _aio
+            try:
+                context_check = await _aio.to_thread(client.context_probe, probe_model)
+                context_check["recommended"] = client.CONTEXT_RECOMMENDED
+            except Exception:  # noqa: BLE001
+                logger.warning("上下文長度檢查失敗", exc_info=True)
+                context_check = None
         return {
             "ok": result.ok,
             "latency_ms": result.latency_ms,
             "error": result.error,
             "thinking_check": thinking_check,
+            "context_check": context_check,
             "models": [
                 {
                     "id": m.id,
@@ -1152,15 +1213,81 @@ def build_router(templates) -> APIRouter:
             ],
         }
 
-    @router.get("/api/llm/models")
-    async def api_llm_models():
-        """List models from the *currently saved* settings. Returns empty
-        list if not enabled / connection fails."""
+    @router.post("/api/llm/context-variant")
+    async def api_llm_context_variant(request: Request):
+        """在 Ollama 上建一個上下文較大的版本（`<模型>-ctx32k`），回新名字。
+
+        **只對已存檔的伺服器**（全站那一台，或 `server_id` 那一台）—— 不收頁面送來的位址：
+        這支會在對方伺服器上建東西，不可以變成「替任意主機建模型」。原本的模型不動。
+        建好之後要不要改用、存不存檔由管理員在頁面上決定。"""
+        from ..core.llm_client import LLMClient, LLMError
         from ..core.llm_settings import llm_settings
-        client = llm_settings.make_client()
-        if client is None:
-            return {"ok": False, "error": "LLM 未啟用", "models": []}
-        result = client.test_connection()
+        try:
+            body = await request.json()
+        except Exception:      # noqa: BLE001
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        sid = str(body.get("server_id") or "").strip().lower()
+        if sid:
+            srv = llm_settings.server(sid)
+            if srv is None:
+                return JSONResponse({"ok": False, "error": "找不到這台 LLM 伺服器（可能還沒儲存）"}, 404)
+            base_url, api_key = (srv.get("base_url") or "").strip(), llm_settings.server_api_key(sid)
+        else:
+            base_url, api_key = (llm_settings.get().get("base_url") or "").strip(), llm_settings.api_key()
+        if not base_url:
+            return JSONResponse({"ok": False, "error": "LLM 伺服器位址還沒存檔"}, 400)
+        model = str(body.get("model") or "").strip()
+        try:
+            num_ctx = int(body.get("num_ctx") or 0)
+        except (TypeError, ValueError):
+            num_ctx = 0
+        try:
+            client = LLMClient(base_url=base_url, api_key=api_key, timeout=120)
+            new = await _asyncio.to_thread(client.make_context_variant, model, num_ctx)
+        except (ValueError, LLMError) as exc:
+            # 訊息是我們自己寫的固定句子（make_context_variant 裡），不含位址與例外內容
+            return JSONResponse({"ok": False, "error": str(exc) if isinstance(exc, LLMError)
+                                 else "LLM 伺服器位址不合法"}, 400)
+        try:
+            from ..core import audit_db, client_ip as _cip
+            user = getattr(request.state, "user", None)
+            audit_db.log_event(
+                "settings_change", username=(user or {}).get("username", ""),
+                ip=_cip.real_client_ip(request), target="llm_context_variant",
+                details={"model": model[:200], "num_ctx": num_ctx, "created": new,
+                         "server_id": sid or "default"})
+        except Exception:      # noqa: BLE001 — 稽核失敗不影響結果
+            logger.warning("寫稽核紀錄失敗", exc_info=True)
+        return {"ok": True, "model": new}
+
+    @router.get("/api/llm/models")
+    async def api_llm_models(server: str = ""):
+        """List models from the *currently saved* settings. Returns empty
+        list if not enabled / connection fails.
+
+        `?server=<編號>`：列「其他 LLM 伺服器」裡那一台（**已存檔**的位址與金鑰）的模型 ——
+        各工具選了那一台之後，模型下拉要列的是那一台的清單。這個不看 LLM 是否啟用：
+        管理員在設定的時候就要看得到。
+        """
+        import asyncio as _aio
+        from ..core.llm_settings import llm_settings
+        if server:
+            sid = server.strip().lower()
+            if not re.fullmatch(r"[0-9a-f]{12}", sid):
+                return {"ok": False, "error": "找不到這台 LLM 伺服器（可能還沒儲存）", "models": []}
+            try:
+                client = llm_settings.make_server_client(sid, timeout=30)
+            except ValueError:
+                return {"ok": False, "error": "這台 LLM 伺服器的位址不合格", "models": []}
+            if client is None:
+                return {"ok": False, "error": "找不到這台 LLM 伺服器（可能還沒儲存）", "models": []}
+        else:
+            client = llm_settings.make_client()
+            if client is None:
+                return {"ok": False, "error": "LLM 未啟用", "models": []}
+        result = await _aio.to_thread(client.test_connection)
         return {
             "ok": result.ok,
             "error": result.error,
@@ -1983,5 +2110,10 @@ def build_router(templates) -> APIRouter:
         from ..core import vat_db as _vatdb
         _vatdb.clear_db()
         return {"ok": True}
+
+    # 公文撰擬的資料來源（官方範本 / 機關地址簿）—— 端點在自己的檔案裡，
+    # 併進來之後一樣吃這個 router 的管理員閘。
+    from .official_doc_routes import build_router as _build_official_doc_router
+    router.include_router(_build_official_doc_router(templates))
 
     return router

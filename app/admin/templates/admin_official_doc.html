@@ -1,0 +1,733 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}{{ tr('公文撰擬設定') }} · {{ app_name }}{% endblock %}
+
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+  .od-points { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.75; color: #334155; }
+  .od-points code { font-size: 12px; word-break: break-all; }
+  .od-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .od-say { font-size: 12.5px; }
+  .od-say.ok { color: var(--success); }
+  .od-say.err { color: #b91c1c; }
+  /* ===== 資料來源：一個來源一張卡片 =====
+     原本是一張六欄的表（名稱／網址／最後下載／狀態／啟用／動作），每一列底下再接
+     一列整寬的出處 —— 網址框被擠到只剩半截、時間底下多一個孤零零的「下載」、
+     三顆按鈕疊成參差的一柱（2026-10-08 使用者截圖回報版面仍然雜亂）。
+     改成卡片：標題列（名稱＋標籤｜啟用）→ 狀態一行 → 網址整寬 → 範本清單 →
+     頁腳（顯名小字｜一排按鈕）。
+     **外層仍是 table 與 tr[data-sid]**：別支測試用 `#odRows > tr[data-sid]` 找來源，
+     所以只把表格元素改成 display:block，role=presentation 拿掉表格語意。
+     寬窄看的是卡片自己的寬度（container query），不是視窗 —— 側欄收合會差兩百多像素。 */
+  .od-cards { display: block; width: 100%; }
+  .od-cards > tbody { display: flex; flex-direction: column; gap: 12px; }
+  .od-card, .od-card > td { display: block; }
+  .od-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+  .od-card > td { padding: 14px 16px 12px; container: odcard / inline-size; }
+  .od-card.is-off { background: #f8fafc; }
+  .od-card.is-off .od-src-name { color: var(--muted); }
+
+  .od-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 16px; }
+  .od-card-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+  .od-src-name { font-weight: 600; font-size: 15px; color: #0f172a; overflow-wrap: anywhere; text-wrap: balance; }
+  .od-badges { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; }
+  .od-badge { display: inline-block; padding: 1px 7px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; line-height: 1.6; background: #eef2ff; color: #3730a3; white-space: nowrap; }
+  .od-badge.od-kind { background: #f1f5f9; color: #475569; }
+
+  /* 啟用：同一個 checkbox（data-act="toggle" 的掛勾不變），畫成開關。 */
+  .od-switch { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; cursor: pointer;
+    font-size: 13px; font-weight: 600; color: #334155; user-select: none; padding-top: 1px; }
+  .od-switch input { appearance: none; -webkit-appearance: none; margin: 0; flex: 0 0 auto;
+    position: relative; width: 34px; height: 20px; border-radius: 999px; background: #cbd5e1;
+    cursor: pointer; transition: background-color .15s; }
+  .od-switch input::before { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .25); transition: transform .15s; }
+  .od-switch input:checked { background: var(--primary); }
+  .od-switch input:checked::before { transform: translateX(14px); }
+  .od-switch input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+  /* 狀態一行：「成功 · 88 份範本 · 略過 1 個檔案 · 最後下載：…」。分隔點是 CSS 畫的。 */
+  .od-meta { margin-top: 6px; font-size: 13px; color: #475569; }
+  .od-meta-line { display: flex; flex-wrap: wrap; align-items: baseline; row-gap: 2px; }
+  .od-meta-line > * + *::before { content: "·"; margin: 0 8px; color: #94a3b8; }
+  .od-status-main { white-space: nowrap; font-variant-numeric: tabular-nums; color: #334155; }
+  .od-status-skip { white-space: nowrap; color: #92400e; }
+  .od-when { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .od-ok { color: #166534; font-weight: 600; }
+  .od-err { color: #b91c1c; font-weight: 600; }
+  .od-none { color: var(--muted); }
+  .od-run { color: #1d4ed8; display: inline-flex; align-items: center; gap: 6px; }
+  .od-msg { font-size: 12.5px; line-height: 1.5; margin-top: 3px; color: #475569; }
+  .od-msg.od-msg-err { color: #991b1b; }
+
+  /* 網址：整張卡片寬；標籤在左、改過才出現「儲存網址」。 */
+  .od-url-row { display: flex; align-items: center; gap: 6px 10px; margin-top: 12px; }
+  .od-url-label { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: #374151; }
+  .auth-form .od-url-row input.field.od-url-input { flex: 1 1 auto; width: auto; min-width: 0;
+    height: 32px; font-size: 13px; }
+  .od-url-save { flex: 0 0 auto; white-space: nowrap; }
+
+  .od-details { margin-top: 8px; }
+  .od-details summary { cursor: pointer; font-size: 12.5px; color: #475569; padding: 2px 0; width: max-content; max-width: 100%; }
+
+  /* 頁腳：左邊顯名小字（授權條款要求的出處），右邊一排同高的按鈕。 */
+  .od-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px 20px;
+    margin-top: 12px; padding-top: 10px; border-top: 1px solid #eef2f7; }
+  .od-prov { margin: 0; flex: 1 1 auto; min-width: 0; font-size: 11.5px; color: #64748b;
+    line-height: 1.6; overflow-wrap: anywhere; }
+  .od-prov-link { color: var(--primary); white-space: nowrap; }
+  .od-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: 0 0 auto; }
+  .od-actions .btn { white-space: nowrap; justify-content: center; }
+  /* 刪除：低調的紅框，不是一整塊紅（按錯的代價大，但不需要搶眼）。 */
+  .od-actions .btn.od-del { background: transparent; color: var(--danger); border-color: #fecaca; }
+  .od-actions .btn.od-del:hover { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+  /* 卡片窄了（手機、或側欄打開的小視窗）：狀態一項一行、網址標籤在上、
+     頁腳上下疊，按鈕平分整列。 */
+  @container odcard (max-width: 560px) {
+    /* 標題列：名稱與開關同一行，標籤整列放在下面（不跟開關搶寬度）。 */
+    .od-card-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: start; }
+    .od-card-title { display: contents; }
+    .od-src-name { grid-column: 1; grid-row: 1; }
+    .od-switch { grid-column: 2; grid-row: 1; }
+    .od-badges { grid-column: 1 / -1; grid-row: 2; }
+    .od-meta-line { flex-direction: column; align-items: flex-start; }
+    .od-meta-line > * + *::before { content: none; }
+    .od-url-row { flex-wrap: wrap; }
+    .od-url-label { flex-basis: 100%; }
+    .auth-form .od-url-row input.field.od-url-input { flex-basis: 100%; }
+    .od-card-foot { flex-direction: column; align-items: stretch; }
+    .od-actions { justify-content: flex-start; }
+    .od-actions .btn { flex: 1 1 auto; }
+  }
+  @media (max-width: 640px) {
+    .od-card > td { padding: 12px 12px 10px; }
+  }
+  .od-usage-go { margin: 12px 0 0; }
+  .od-spinner { width: 12px; height: 12px; border: 2px solid #cbd5e1; border-top-color: #2563eb;
+    border-radius: 50%; display: inline-block; animation: od-spin 0.9s linear infinite; flex: 0 0 auto; }
+  @keyframes od-spin { to { transform: rotate(360deg); } }
+  .od-tpl-cat { font-size: 12px; font-weight: 700; color: #334155; margin: 8px 0 2px; }
+  .od-tpl-list { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.7; columns: 3 220px; }
+  .od-skip { font-size: 12px; color: #92400e; margin-top: 6px; }
+  .od-empty { margin: 8px 0 0; }
+  .od-orgs { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; }
+  .od-orgs li { padding: 4px 0; border-bottom: 1px dashed #e2e8f0; display: flex; gap: 12px; }
+  .od-org-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #64748b;
+    font-size: 12px; min-width: 150px; }
+  .od-hidden { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{{ icon('official-doc', size=22) }} {{ tr('公文撰擬設定') }}</h1>
+<p class="muted">{{ tr('「公文撰擬」可以使用政府開放資料的官方公文範本與機關地址簿。這一頁管理這些資料從哪裡來。') }}</p>
+
+<div class="panel">
+  <ul class="od-points">
+    <li><b>{{ tr('預設不下載。') }}</b>{{ tr('新安裝不會自己連外，要由管理員在下方按「下載／更新」才會連到資料來源。') }}</li>
+    <li>{{ tr('不能連外的機關：在可以上網的電腦下載同一個檔案，再用「上傳檔案」放進來，檢查方式跟下載一樣。') }}</li>
+    <li>{{ tr('網址可以修改（資料集可能搬家）、可以新增或刪除來源；「還原預設」會把內建的兩個來源放回來，不動自訂的。') }}</li>
+    <li>{{ tr('下載的檔案存在') }} <code>{{ initial.storage_dir }}</code>{{ tr('（每個來源一個資料夾）。下載或上傳失敗時保留上一份。') }}</li>
+    <li>{{ tr('資料來源與授權：內建的兩個來源都由國家發展委員會檔案管理局依「政府資料開放授權條款－第1版」提供，可以重製、改作、散布與商業使用，條件是顯名（提供機關、資料名稱、授權條款版本）。公文撰擬的畫面與匯出會附上各來源的顯名文字。') }}</li>
+  </ul>
+</div>
+
+<div class="panel" id="odUsage">
+  <h2>{{ icon('info', size=18) }} {{ tr('下載之後會用在哪裡') }}</h2>
+  <ul class="od-points">
+    <li>{{ tr('公文範本：在「公文撰擬」產生「簽」或「函」的草稿之後，匯出區會多一個「版面」下拉，可以改用官方範本的版面匯出 ODT、Word、PDF。目前只開放「簽」與「函」兩份範本 —— 其他範本實測填不對（例如「簽(上行簽)」會留著範本的示範字），先不開放。') }}</li>
+    <li>{{ tr('機關地址簿：在「公文撰擬」選「函」時，「發文機關全銜」與「受文者」打兩個字以上，會列出完整的機關名稱讓你選。下方「試查機關地址簿」可以先試。') }}</li>
+  </ul>
+  <p class="od-usage-go"><a class="btn" href="/tools/official-doc/">{{ icon('official-doc') }}{{ tr('前往公文撰擬') }}</a></p>
+</div>
+
+<div class="panel auth-form">
+  <fieldset class="auth-section">
+    <legend>{{ icon('archive', size=14) }} {{ tr('資料來源') }}</legend>
+    <div class="od-toolbar">
+      <button class="btn" id="odAddToggle" type="button">{{ icon('plus') }}{{ tr('新增來源') }}</button>
+      <button class="btn" id="odRestore" type="button">{{ icon('reset') }}{{ tr('還原預設') }}</button>
+      <button class="btn" id="odRefresh" type="button">{{ icon('refresh') }}{{ tr('重新整理') }}</button>
+      <span class="muted od-say" id="odSay"></span>
+    </div>
+    {# 一個來源一張卡片（JS 畫）。外層留著 table / tr[data-sid] 的結構，只改成 block 排版。 #}
+    <table class="od-cards" role="presentation">
+      <tbody id="odRows"></tbody>
+    </table>
+    <p class="muted od-empty" id="odEmpty" hidden>{{ tr('目前沒有任何資料來源。按「還原預設」可以把內建的兩個放回來。') }}</p>
+  </fieldset>
+
+  <fieldset class="auth-section" id="odAddBox" hidden>
+    <legend>{{ icon('plus', size=14) }} {{ tr('新增來源') }}</legend>
+    <div class="af-attrs">
+      <div class="af-field">
+        <label class="af-label" for="odNewKind">{{ tr('類型') }}</label>
+        <div class="af-ctl">
+          <select class="field" id="odNewKind">
+            {% for k in kinds %}<option value="{{ k.id }}">{{ tr(k.label) }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="af-field">
+        <label class="af-label" for="odNewName">{{ tr('名稱') }}</label>
+        <div class="af-ctl"><input class="field" id="odNewName" type="text" maxlength="80"></div>
+      </div>
+      <div class="af-field af-field-wide">
+        <label class="af-label" for="odNewUrl">{{ tr('下載網址') }}</label>
+        <div class="af-ctl"><input class="field" id="odNewUrl" type="url" placeholder="https://"></div>
+        <small class="af-note">{{ tr('只接受公開網路上的 http / https 網址；指向本機或內部網路的網址在下載時會被擋下。網址裡的中文可以直接貼。') }}</small>
+      </div>
+      <div class="af-field af-field-wide">
+        <label class="af-label" for="odNewDataset">{{ tr('資料集網頁（選填）') }}</label>
+        <div class="af-ctl"><input class="field" id="odNewDataset" type="url" placeholder="https://data.gov.tw/dataset/"></div>
+      </div>
+      <div class="af-field">
+        <label class="af-label" for="odNewPublisher">{{ tr('提供機關') }}</label>
+        <div class="af-ctl"><input class="field" id="odNewPublisher" type="text" maxlength="80"></div>
+      </div>
+      <div class="af-field">
+        <label class="af-label" for="odNewLicense">{{ tr('授權條款') }}</label>
+        <div class="af-ctl"><input class="field" id="odNewLicense" type="text" maxlength="120" value="{{ default_license }}"></div>
+        <small class="af-note">{{ tr('顯名用：畫面與匯出會寫出提供機關、資料名稱與這裡的授權條款。') }}</small>
+      </div>
+    </div>
+    <div class="od-toolbar">
+      <button class="btn btn-primary" id="odAddSubmit" type="button">{{ icon('plus') }}{{ tr('新增') }}</button>
+      <button class="btn" id="odAddCancel" type="button">{{ icon('close') }}{{ tr('取消') }}</button>
+    </div>
+  </fieldset>
+
+  <fieldset class="auth-section">
+    <legend>{{ icon('search', size=14) }} {{ tr('試查機關地址簿') }}</legend>
+    <div class="auth-field">
+      <label class="af-label" for="odOrgQ">{{ tr('機關名稱或代碼') }}</label>
+      <input class="field" id="odOrgQ" type="text" maxlength="200" autocomplete="off">
+      <div class="af-hint">{{ tr('逐字比對，「台」「臺」通用，空白分開的幾個詞要全部出現；名稱完全相同的排最前面（全銜優先）。只查已下載而且啟用中的地址簿。') }}</div>
+    </div>
+    <p class="muted" id="odOrgSay"></p>
+    <ul class="od-orgs" id="odOrgs"></ul>
+  </fieldset>
+</div>
+<input type="file" id="odFile" class="od-hidden">
+{# 動作按鈕是 JS 畫的：圖示從這裡複製（同一個 icon() 巨集），不在 JS 裡手寫 SVG。 #}
+<template id="odIcons">
+  <span data-icon="refresh">{{ icon('refresh') }}</span>
+  <span data-icon="download">{{ icon('download') }}</span>
+  <span data-icon="upload">{{ icon('upload') }}</span>
+  <span data-icon="trash">{{ icon('trash') }}</span>
+  <span data-icon="save">{{ icon('save') }}</span>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  let state = {{ initial|tojson }};
+  const KINDS = {{ kinds|tojson }};
+  const BASE = '/admin/official-doc';
+  const rowsEl = document.getElementById('odRows');
+  const sayEl = document.getElementById('odSay');
+  const emptyEl = document.getElementById('odEmpty');
+  const fileEl = document.getElementById('odFile');
+  const urlDrafts = {};      // 正在改、還沒存的網址（輪詢重畫時要留著）
+  const openTpl = {};        // 展開中的範本清單
+  const tplCache = {};       // sid → {stamp, data}
+  let pollTimer = null;
+  let wasRunning = new Set(state.sources.filter(s => s.running).map(s => s.id));
+  let uploadTarget = null;
+
+  function say(msg, cls) {
+    sayEl.textContent = msg || '';
+    sayEl.className = 'muted od-say ' + (cls || '');
+  }
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+
+  // 圖示從頁面上的 <template id="odIcons"> 複製（伺服器用 icon() 畫好的）。
+  const ICONS = document.getElementById('odIcons').content;
+  function iconEl(name) {
+    const svg = ICONS.querySelector('[data-icon="' + name + '"] svg');
+    return svg ? svg.cloneNode(true) : null;
+  }
+
+  // 有圖示的按鈕：文字放自己的 <span>（之後要改字只改那個 span，
+  // 不可以改整顆按鈕的 textContent —— 會把 <svg> 一起洗掉）。
+  function iconBtn(cls, iconName, label) {
+    const b = el('button', 'btn btn-small ' + (cls || ''));
+    b.type = 'button';
+    const ic = iconEl(iconName);
+    if (ic) b.appendChild(ic);
+    b.appendChild(el('span', 'od-btn-label', label));
+    return b;
+  }
+
+  // 不帶秒：只要看得出是哪一天幾點。
+  function fmtTime(sec) {
+    if (!sec) return '';
+    try {
+      return new Date(sec * 1000).toLocaleString(undefined, {
+        year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return ''; }
+  }
+
+  function fmtMb(n) {
+    return (n / 1024 / 1024).toFixed(1) + ' MB';
+  }
+
+  // 「最後下載：…」或「最後上傳：…」（手動上傳的）—— 時間與來源寫成一句，
+  // 不再在時間底下另起一行孤零零的「下載」。
+  function whenText(la) {
+    return (la.origin === 'upload' ? tr('最後上傳：{0}') : tr('最後下載：{0}'))
+      .replace('{0}', fmtTime(la.at));
+  }
+
+  function unitText(src, n) {
+    return (src.kind === 'templates_zip' ? tr('{0} 份範本') : tr('{0} 個機關'))
+      .replace('{0}', Number(n || 0).toLocaleString());
+  }
+
+  function safeHref(u) {
+    return (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : '';
+  }
+
+  // 一個來源一張卡片：標題列（名稱＋標籤｜啟用）→ 狀態一行 → 網址 →
+  // 範本清單 → 頁腳（顯名小字｜按鈕）。外層仍是 <tr data-sid>（見樣式的說明）。
+  function headPart(src) {
+    const head = el('div', 'od-card-head');
+    const title = el('div', 'od-card-title');
+    title.appendChild(el('span', 'od-src-name', src.name));
+    const badges = el('span', 'od-badges');
+    badges.appendChild(el('span', 'od-badge od-kind', tr(src.kind_label)));
+    if (src.builtin) badges.appendChild(el('span', 'od-badge', tr('內建')));
+    title.appendChild(badges);
+    head.appendChild(title);
+    head.appendChild(enabledSwitch(src));
+    return head;
+  }
+
+  // 同一個 checkbox（data-act="toggle"、data-sid），外觀畫成開關。
+  function enabledSwitch(src) {
+    const lab = el('label', 'od-switch');
+    lab.title = tr('停用的來源不會出現在公文撰擬裡（資料保留）');
+    const cb = el('input');
+    cb.type = 'checkbox';
+    cb.checked = !!src.enabled;
+    cb.dataset.act = 'toggle';
+    cb.dataset.sid = src.id;
+    lab.appendChild(cb);
+    lab.appendChild(el('span', 'od-switch-text', tr('啟用')));
+    return lab;
+  }
+
+  // 狀態一行：「成功 · 88 份範本」＋（略過幾個檔案）＋「最後下載：…」，
+  // 失敗的原因另起一行。分隔點是 CSS 畫的，這裡只放各段。
+  function metaPart(src) {
+    const box = el('div', 'od-meta');
+    const line = el('div', 'od-meta-line');
+    box.appendChild(line);
+    const la = src.last_attempt;
+    const lo = src.last_ok;
+    const addWhen = () => {
+      if (la) line.appendChild(el('span', 'od-when', whenText(la)));
+      if (la && !la.ok && lo) line.appendChild(el('span', 'od-when', tr('上次成功：') + fmtTime(lo.at)));
+    };
+    if (src.running) {
+      const p = src.progress || {};
+      const run = el('span', 'od-run');
+      run.appendChild(el('span', 'od-spinner'));
+      let txt;
+      if (p.stage === 'install') txt = tr('檢查並匯入中…');
+      else if (p.total) txt = tr('下載中… {0} / {1}').replace('{0}', fmtMb(p.received || 0)).replace('{1}', fmtMb(p.total));
+      else if (p.received) txt = tr('下載中… {0}').replace('{0}', fmtMb(p.received));
+      else txt = tr('連線中…');
+      run.appendChild(document.createTextNode(txt));
+      line.appendChild(run);
+      addWhen();
+      return box;
+    }
+    const main = el('span', 'od-status-main');
+    line.appendChild(main);
+    if (!la) {
+      // 沒有下載紀錄：有資料（舊版留下的）就寫數量，否則「尚未下載」
+      if (src.installed) main.textContent = unitText(src, src.count);
+      else { main.classList.add('od-none'); main.textContent = tr('尚未下載'); }
+      return box;
+    }
+    if (la.ok) {
+      main.appendChild(el('span', 'od-ok', tr('成功')));
+      if (src.installed) {
+        main.appendChild(document.createTextNode(' · ' + unitText(src, src.count)));
+        // 伺服器的訊息是「已取得 N 份範本，略過 K 個檔案」：數量已經在上面，
+        // 只把略過的那一段另外列（原因在「列出範本」裡）。
+        const m = /略過\s*(\d+)\s*個檔案/.exec(la.message || '');
+        if (m) {
+          line.appendChild(el('span', 'od-status-skip',
+            tr('略過 {0} 個檔案').replace('{0}', Number(m[1]).toLocaleString())));
+        }
+        addWhen();
+      } else {
+        addWhen();
+        if (la.message) box.appendChild(el('div', 'od-msg', tr(la.message)));
+      }
+      return box;
+    }
+    main.appendChild(el('span', 'od-err', tr('失敗')));
+    addWhen();
+    if (la.message) box.appendChild(el('div', 'od-msg od-msg-err', tr(la.message)));
+    if (src.installed) {
+      box.appendChild(el('div', 'od-msg od-none', tr('先前的資料照常可用。')));
+    }
+    return box;
+  }
+
+  function urlPart(src) {
+    const row = el('div', 'od-url-row');
+    const id = 'odUrl-' + src.id;
+    const lab = el('label', 'od-url-label', tr('下載網址'));
+    lab.htmlFor = id;
+    const inp = el('input', 'field od-url-input');
+    inp.type = 'url';
+    inp.id = id;
+    inp.dataset.sid = src.id;
+    inp.value = (src.id in urlDrafts) ? urlDrafts[src.id] : src.url;
+    inp.title = src.url;          // 網址長、框裡看不完時，滑鼠移上去看得到全文
+    const btn = iconBtn('od-url-save', 'save', tr('儲存網址'));
+    btn.dataset.act = 'save-url';
+    btn.dataset.sid = src.id;
+    btn.hidden = !(src.id in urlDrafts && urlDrafts[src.id] !== src.url);
+    inp.addEventListener('input', () => {
+      urlDrafts[src.id] = inp.value;
+      btn.hidden = inp.value === src.url;
+    });
+    row.appendChild(lab);
+    row.appendChild(inp);
+    row.appendChild(btn);
+    return row;
+  }
+
+  // 已下載的範本來源才有「列出範本」。
+  function templatesPart(src) {
+    if (src.kind !== 'templates_zip' || !src.installed) return null;
+    const det = el('details', 'od-details');
+    det.dataset.sid = src.id;
+    det.appendChild(el('summary', '', tr('列出範本（{0} 份）').replace('{0}', src.count)));
+    const body = el('div');
+    det.appendChild(body);
+    det.addEventListener('toggle', () => {
+      openTpl[src.id] = det.open;
+      if (det.open) loadTemplates(src, body);
+    });
+    if (openTpl[src.id]) {
+      det.open = true;
+      loadTemplates(src, body);
+    }
+    return det;
+  }
+
+  // 頁腳：左邊顯名（授權條款要求的提供機關、資料名稱、授權版本都在裡面）＋
+  // 資料集網頁，右邊一排按鈕。
+  function footPart(src) {
+    const foot = el('div', 'od-card-foot');
+    const prov = el('p', 'od-prov', tr('顯名：') + src.attribution);
+    const href = safeHref(src.dataset_url);
+    if (href) {
+      // 連結直接接在顯名後面，中間一個普通空白：換行時空白留在上一行尾端，
+      // 不會像「·」或 margin 那樣在新的一行開頭多出一截。
+      prov.appendChild(document.createTextNode(' '));
+      const a = el('a', 'od-prov-link', tr('資料集網頁'));
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      prov.appendChild(a);
+    }
+    foot.appendChild(prov);
+    const box = el('div', 'od-actions');
+    const mk = (act, iconName, label, cls) => {
+      const b = iconBtn(cls, iconName, label);
+      b.dataset.act = act;
+      b.dataset.sid = src.id;
+      b.disabled = !!src.running;
+      return b;
+    };
+    box.appendChild(src.installed
+      ? mk('download', 'refresh', tr('更新'), 'btn-primary')
+      : mk('download', 'download', tr('下載'), 'btn-primary'));
+    box.appendChild(mk('upload', 'upload', tr('上傳檔案')));
+    box.appendChild(mk('delete', 'trash', tr('刪除'), 'od-del'));
+    foot.appendChild(box);
+    return foot;
+  }
+
+  function sourceCard(src) {
+    const rowEl = el('tr', 'od-card' + (src.enabled ? '' : ' is-off'));
+    rowEl.dataset.sid = src.id;
+    const td = el('td');
+    td.appendChild(headPart(src));
+    td.appendChild(metaPart(src));
+    td.appendChild(urlPart(src));
+    const det = templatesPart(src);
+    if (det) td.appendChild(det);
+    td.appendChild(footPart(src));
+    rowEl.appendChild(td);
+    return rowEl;
+  }
+
+  async function loadTemplates(src, body) {
+    const stamp = String(src.installed_at || '');
+    const cached = tplCache[src.id];
+    if (cached && cached.stamp === stamp) { drawTemplates(body, cached.data); return; }
+    body.textContent = tr('讀取中…');
+    try {
+      const r = await fetch(BASE + '/sources/' + encodeURIComponent(src.id) + '/templates');
+      if (!r.ok) { body.textContent = await window.friendlyServerError(r, tr('讀取失敗')); return; }
+      const data = await r.json();
+      tplCache[src.id] = { stamp: stamp, data: data };
+      drawTemplates(body, data);
+    } catch (e) {
+      body.textContent = tr('讀取失敗');
+    }
+  }
+
+  function drawTemplates(body, data) {
+    body.textContent = '';
+    const groups = new Map();
+    (data.templates || []).forEach(t => {
+      const k = t.category || tr('未分類');
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(t);
+    });
+    groups.forEach((list, cat) => {
+      body.appendChild(el('div', 'od-tpl-cat', cat + '（' + list.length + '）'));
+      const ul = el('ul', 'od-tpl-list');
+      list.forEach(t => ul.appendChild(el('li', '', t.name)));
+      body.appendChild(ul);
+    });
+    const sk = data.skipped || [];
+    if (sk.length) {
+      const div = el('div', 'od-skip',
+        tr('略過 {0} 個檔案：').replace('{0}', sk.length) +
+        sk.slice(0, 20).map(s => (s.path ? s.path + '（' + tr(s.reason) + '）' : tr(s.reason))).join('、') +
+        (sk.length > 20 ? '…' : ''));
+      body.appendChild(div);
+    }
+  }
+
+  function render() {
+    const focused = document.activeElement;
+    const focusSid = focused && focused.classList && focused.classList.contains('od-url-input')
+      ? focused.dataset.sid : null;
+    const selStart = focusSid ? focused.selectionStart : null;
+    rowsEl.textContent = '';
+    state.sources.forEach(src => rowsEl.appendChild(sourceCard(src)));
+    emptyEl.hidden = state.sources.length > 0;
+    if (focusSid) {
+      const inp = rowsEl.querySelector('input.od-url-input[data-sid="' + CSS.escape(focusSid) + '"]');
+      if (inp) {
+        inp.focus();
+        try { if (selStart !== null) inp.setSelectionRange(selStart, selStart); } catch (e) {}
+      }
+    }
+  }
+
+  function schedule() {
+    clearTimeout(pollTimer);
+    if (state.sources.some(s => s.running)) pollTimer = setTimeout(refresh, 1500);
+  }
+
+  async function refresh() {
+    try {
+      const r = await fetch(BASE + '/status');
+      if (r.ok) {
+        state = await r.json();
+        announceFinished();
+        render();
+      }
+    } catch (e) { /* 下一輪再試 */ }
+    schedule();
+  }
+
+  function announceFinished() {
+    const now = new Set(state.sources.filter(s => s.running).map(s => s.id));
+    wasRunning.forEach(sid => {
+      if (now.has(sid)) return;
+      const src = state.sources.find(s => s.id === sid);
+      const la = src && src.last_attempt;
+      if (src && la && window.showToast) {
+        window.showToast(src.name + '：' + (la.message ? tr(la.message) : (la.ok ? tr('成功') : tr('失敗'))),
+                         la.ok ? 'ok' : 'err');
+      }
+    });
+    wasRunning = now;
+  }
+
+  async function post(path, body) {
+    const opt = { method: 'POST' };
+    if (body !== undefined) {
+      opt.headers = { 'Content-Type': 'application/json' };
+      opt.body = JSON.stringify(body);
+    }
+    return fetch(BASE + path, opt);
+  }
+
+  async function act(kind, sid, extra) {
+    const src = state.sources.find(s => s.id === sid);
+    if (!src) return;
+    const enc = encodeURIComponent(sid);
+    if (kind === 'download') {
+      say(tr('開始下載…'));
+      const r = await post('/sources/' + enc + '/download');
+      if (!r.ok) { say(await window.friendlyServerError(r, tr('無法開始下載')), 'err'); return; }
+      say('');
+      wasRunning.add(sid);
+      await refresh();
+    } else if (kind === 'upload') {
+      uploadTarget = sid;
+      fileEl.accept = src.kind === 'templates_zip'
+        ? '.zip,application/zip'
+        : '.json,.csv,application/json,text/csv';
+      fileEl.value = '';
+      fileEl.click();
+    } else if (kind === 'delete') {
+      const ok = await window.showConfirm(
+        tr('確定要刪除「{0}」？已下載的資料會一起刪除。').replace('{0}', src.name),
+        { title: tr('刪除資料來源'), okText: tr('刪除') });
+      if (!ok) return;
+      const r = await post('/sources/' + enc + '/delete');
+      if (!r.ok) { say(await window.friendlyServerError(r, tr('刪除失敗')), 'err'); return; }
+      delete urlDrafts[sid];
+      say(tr('已刪除'), 'ok');
+      await refresh();
+    } else if (kind === 'save-url') {
+      const r = await post('/sources/' + enc, { url: urlDrafts[sid] || '' });
+      if (!r.ok) { say(await window.friendlyServerError(r, tr('儲存失敗')), 'err'); return; }
+      delete urlDrafts[sid];
+      say(tr('網址已儲存，按「下載」或「更新」才會用新網址重新下載'), 'ok');
+      await refresh();
+    } else if (kind === 'toggle') {
+      const r = await post('/sources/' + enc, { enabled: !!extra });
+      if (!r.ok) { say(await window.friendlyServerError(r, tr('儲存失敗')), 'err'); }
+      await refresh();
+    }
+  }
+
+  rowsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-act]');
+    if (!b || b.disabled) return;
+    act(b.dataset.act, b.dataset.sid);
+  });
+  rowsEl.addEventListener('change', (e) => {
+    const cb = e.target.closest('input[data-act="toggle"]');
+    if (cb) act('toggle', cb.dataset.sid, cb.checked);
+  });
+
+  fileEl.addEventListener('change', async () => {
+    const f = fileEl.files && fileEl.files[0];
+    const sid = uploadTarget;
+    if (!f || !sid) return;
+    const src = state.sources.find(s => s.id === sid);
+    if (src && f.size > src.max_mb * 1024 * 1024) {
+      say(tr('檔案太大（上限 {0} MB）').replace('{0}', src.max_mb), 'err');
+      return;
+    }
+    say(tr('上傳並檢查中…'));
+    const fd = new FormData();
+    fd.append('file', f);
+    try {
+      const r = await fetch(BASE + '/sources/' + encodeURIComponent(sid) + '/upload',
+                            { method: 'POST', body: fd });
+      if (!r.ok) {
+        say(await window.friendlyServerError(r, tr('上傳失敗')), 'err');
+      } else {
+        const j = await r.json();
+        say((j.message ? tr(j.message) : tr('已匯入')), 'ok');
+      }
+    } catch (e) {
+      say(tr('上傳失敗'), 'err');
+    }
+    fileEl.value = '';
+    await refresh();
+  });
+
+  document.getElementById('odRefresh').addEventListener('click', () => refresh());
+
+  document.getElementById('odRestore').addEventListener('click', async () => {
+    const ok = await window.showConfirm(
+      tr('把內建的兩個來源放回來（網址也回到預設）？自訂的來源不會動。'),
+      { title: tr('還原預設'), okText: tr('還原') });
+    if (!ok) return;
+    const r = await post('/restore-defaults');
+    if (!r.ok) { say(await window.friendlyServerError(r, tr('還原失敗')), 'err'); return; }
+    say(tr('已還原內建的來源'), 'ok');
+    await refresh();
+  });
+
+  const addBox = document.getElementById('odAddBox');
+  document.getElementById('odAddToggle').addEventListener('click', () => {
+    addBox.hidden = !addBox.hidden;
+    if (!addBox.hidden) document.getElementById('odNewName').focus();
+  });
+  document.getElementById('odAddCancel').addEventListener('click', () => { addBox.hidden = true; });
+  document.getElementById('odAddSubmit').addEventListener('click', async () => {
+    const val = (id) => document.getElementById(id).value.trim();
+    const body = {
+      kind: document.getElementById('odNewKind').value,
+      name: val('odNewName'), url: val('odNewUrl'), dataset_url: val('odNewDataset'),
+      publisher: val('odNewPublisher'), license: val('odNewLicense'),
+    };
+    const r = await post('/sources', body);
+    if (!r.ok) { say(await window.friendlyServerError(r, tr('新增失敗')), 'err'); return; }
+    ['odNewName', 'odNewUrl', 'odNewDataset', 'odNewPublisher']
+      .forEach(id => { document.getElementById(id).value = ''; });
+    addBox.hidden = true;
+    say(tr('已新增，按「下載」才會開始下載'), 'ok');
+    await refresh();
+  });
+
+  // ---- 試查地址簿 ----
+  const qEl = document.getElementById('odOrgQ');
+  const orgsEl = document.getElementById('odOrgs');
+  const orgSayEl = document.getElementById('odOrgSay');
+  let qTimer = null;
+  let qSeq = 0;
+  qEl.addEventListener('input', () => {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(searchOrgs, 250);
+  });
+  async function searchOrgs() {
+    const q = qEl.value.trim();
+    const seq = ++qSeq;
+    orgsEl.textContent = '';
+    if (!q) { orgSayEl.textContent = ''; return; }
+    const hasBook = state.sources.some(s => s.kind === 'address_book' && s.installed && s.enabled);
+    if (!hasBook) { orgSayEl.textContent = tr('還沒有已下載而且啟用中的地址簿。'); return; }
+    try {
+      const r = await fetch(BASE + '/search-orgs?limit=20&q=' + encodeURIComponent(q));
+      if (seq !== qSeq) return;
+      if (!r.ok) { orgSayEl.textContent = await window.friendlyServerError(r, tr('查詢失敗')); return; }
+      const j = await r.json();
+      if (seq !== qSeq) return;
+      const res = j.results || [];
+      orgSayEl.textContent = res.length ? tr('前 {0} 筆').replace('{0}', res.length) : tr('查無符合的機關');
+      res.forEach(o => {
+        const li = el('li');
+        li.appendChild(el('span', 'od-org-id', o.orgId || '—'));
+        li.appendChild(el('span', '', o.orgName));
+        orgsEl.appendChild(li);
+      });
+    } catch (e) {
+      orgSayEl.textContent = tr('查詢失敗');
+    }
+  }
+
+  render();
+  schedule();
+})();
+</script>
+{% endblock %}

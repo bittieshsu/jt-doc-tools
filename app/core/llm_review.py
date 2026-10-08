@@ -29,7 +29,7 @@ import fitz  # PyMuPDF
 from PIL import Image, ImageDraw, ImageFont
 
 from . import pdf_preview
-from .llm_settings import llm_settings
+from .llm_settings import LLMServerUnavailable, llm_settings
 
 
 logger = logging.getLogger(__name__)
@@ -517,7 +517,12 @@ def review(
         result.errors.append("LLM 校驗未啟用")
         return result
 
-    client = llm_settings.make_client()
+    try:
+        client = llm_settings.make_client("pdf-fill")
+    except LLMServerUnavailable as exc:
+        # 指定的另一台伺服器不見了：**明確失敗，不退回全站那一台**
+        result.errors.append(exc.MESSAGE)
+        return result
     if client is None:
         result.errors.append("LLM client 初始化失敗")
         return result

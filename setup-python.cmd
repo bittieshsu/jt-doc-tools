@@ -40,6 +40,11 @@ if "%JTDT_TLS_INSECURE%"=="1" (
 REM uv may exit 1 saying "already installed" when Python 3.12 is present.
 REM That's not an error, ignore.
 echo ==^> Installing managed Python 3.12 via uv ...
+REM Keep the managed Python inside the install dir, not the installing
+REM user's %APPDATA%\uv\python: the service runs as SYSTEM, and when that
+REM user's profile is removed the venv loses its base interpreter.
+REM The venv is rebuilt with --clear below, so a re-run moves old installs too.
+set "UV_PYTHON_INSTALL_DIR=%INSTALL_DIR%\python"
 set UV_PYTHON_PREFERENCE=only-managed
 "%UV_EXE%" python install 3.12
 echo [debug] uv python install exit=!ERRORLEVEL!

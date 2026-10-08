@@ -84,6 +84,11 @@
     <div class="field">
       <div id="conn-status" data-s="s524b7d3e"></div>
       <div id="think-status" class="muted" hidden></div>
+      {# 上下文長度（Ollama 才看得到）：太小時長文件的指令會被安靜截掉（見 LLM.md「上下文長度」） #}
+      <div id="ctx-status" hidden>
+        <span id="ctx-text"></span>
+        <button type="button" class="btn btn-secondary btn-small" id="ctx-make" hidden></button>
+      </div>
     </div>
   </div>
   <div class="form-row">
@@ -114,6 +119,24 @@
         詳見') }} <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md#504-gateway-timeout-排錯流程" target="_blank">{{ tr('OPS.md 504 排錯流程') }}</a>。
       </div>
     </div>
+  </div>
+
+  <div class="srv-section" id="srvSection">
+    <div class="per-tool-header">
+      <h3>{{ tr('其他 LLM 伺服器') }} <span class="muted">{{ tr('（可選）') }}</span></h3>
+    </div>
+    <p class="muted srv-intro">
+      {{ tr('上面那一台是全站共用的。有些工具的資料只能送到特定的伺服器（例如另一台地端伺服器）時，在這裡另外登錄，再到下方「各工具個別模型」把那支工具指過去。') }}
+    </p>
+    <p class="muted srv-intro srv-rule">
+      <b>{{ tr('指定的伺服器連不上或被刪掉時，那支工具會直接失敗，不會改用全站伺服器或其他伺服器。') }}</b>
+    </p>
+    <div id="srvList" class="srv-list"></div>
+    <p class="muted srv-empty" id="srvEmpty">{{ tr('還沒有另外登錄的伺服器。') }}</p>
+    <button class="btn" id="btnAddSrv" type="button">{{ icon('plus', size=14) }} {{ tr('新增伺服器') }}</button>
+    {# 每一台伺服器那一列是前端建的；按鈕的圖示從這裡複製（樣板巨集在前端用不到） #}
+    <template id="tplIcoTest">{{ icon('refresh', size=14) }}</template>
+    <template id="tplIcoDel">{{ icon('trash', size=14) }}</template>
   </div>
 </div>
 
@@ -149,6 +172,9 @@
         {{ tr('依工具用途指定不同模型 — 純文字翻譯可用文字模型、PDF 校驗用視覺模型。
         選「（用上方預設）」就跟隨預設。重新整理清單後，新抓回的 model 會自動出現在下拉。') }}
       </p>
+      <p class="muted">
+        {{ tr('「伺服器」可以把某一支工具改送到上方「其他 LLM 伺服器」登錄的那一台；模型清單會改列那一台的。清單抓不到時可以選「手動輸入…」直接填模型名稱。改一支工具不會影響其他工具。') }}
+      </p>
     </div>
     <div class="per-tool-cards">
       {% for t in known_llm_tools %}
@@ -161,14 +187,35 @@
           <code class="ptc-id">{{ t.id }}</code>
         </div>
         <div class="ptc-desc">{{ tr(t.use) }}</div>
-        <div class="ptc-select">
-          <select class="field per-tool-model" data-tool-id="{{ t.id }}" data-kind="{{ t.kind }}">
-            <option value="">{{ tr('（用上方預設：') }}{{ settings.model }}）</option>
-            {% if _v and _v != settings.model %}
-            <option value="{{ _v }}" selected>{{ _v }}</option>
-            {% endif %}
-          </select>
+        {% set _sv = settings.server_per_tool.get(t.id, '') if settings.server_per_tool else '' %}
+        {% set _sv_known = settings.servers|selectattr('id', 'equalto', _sv)|list %}
+        <div class="ptc-pick">
+          <label class="ptc-sub">
+            <span class="ptc-sub-label">{{ tr('伺服器') }}</span>
+            <select class="field per-tool-server" data-tool-id="{{ t.id }}">
+              <option value="">{{ tr('沿用全站伺服器') }}</option>
+              {% for srv in settings.servers %}
+              <option value="{{ srv.id }}" {% if srv.id == _sv %}selected{% endif %}>{{ srv.name }}</option>
+              {% endfor %}
+              {% if _sv and not _sv_known %}
+              <option value="{{ _sv }}" selected>{{ tr('（已不存在的伺服器）') }}</option>
+              {% endif %}
+            </select>
+          </label>
+          <label class="ptc-sub ptc-select">
+            <span class="ptc-sub-label">{{ tr('模型') }}</span>
+            <select class="field per-tool-model" data-tool-id="{{ t.id }}" data-kind="{{ t.kind }}">
+              <option value="">{{ tr('（用上方預設：') }}{{ settings.model }}）</option>
+              {% if _v and _v != settings.model %}
+              <option value="{{ _v }}" selected>{{ _v }}</option>
+              {% endif %}
+            </select>
+            <input type="text" class="field per-tool-model-manual" data-tool-id="{{ t.id }}"
+                   autocomplete="off" hidden
+                   placeholder="{{ tr('輸入模型名稱，例如 gemma4:26b') }}" />
+          </label>
         </div>
+        <div class="ptc-note muted" data-tool-id="{{ t.id }}" hidden></div>
       </div>
       {% endfor %}
     </div>
@@ -312,11 +359,134 @@
   </div>
 </div>
 
-<div data-s="s37941ba4">
-  <button class="btn btn-primary" id="btn-save">{{ icon('save') }}{{ tr('儲存') }}</button>
-  <a class="btn" href="/admin">{{ icon('back') }}{{ tr('回管理') }}</a>
-</div>
 </div><!-- /.llm-page -->
+
+{# ===== Embedding（向量檢索）設定 —— 知識庫用（v1.16.65 從知識庫頁搬過來）=====
+   自己的表單、自己的一段程式（頁尾第二段）。設定檔與端點都還是知識庫的
+   （`/admin/knowledge/api/embedding*`、`knowledge_settings.json`），跟上面的 LLM 設定分開存：
+   換聊天模型不可以動到向量索引（`app/core/kb/embed.py` 開頭）。
+   **儲存只有一顆**（頁面最下面那一列，2026-10-08 使用者：「原本已有一個儲存，embedding 加入後
+   又有一個儲存，怪怪的」）：先存 LLM 設定，這一區有改才接著存這一區；這一區存不進去時分開講。
+   一頁兩顆儲存的話，填完兩區按了其中一顆，另一區就安靜地沒存。 #}
+<div class="panel emb-panel" id="embedding">
+  <h2 data-s="s53896af7">{{ tr('Embedding（向量檢索）設定') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h2>
+  <p class="muted emb-intro">{{ tr('給「公文知識庫」的向量檢索用（公文撰擬勾「參考公文知識庫」時查資料會用到）。預設沿用上面設定的 LLM 伺服器（公文撰擬指定了專屬伺服器時就用那一台），只要填嵌入用的模型；換聊天用的模型不會動到索引。') }}</p>
+  <p class="muted emb-intro">{{ tr('沒有設定時只用關鍵字找。設定好之後按「重建索引」，完成而且驗證過才會切換；失敗的話原本的索引照舊。換模型要重建；換伺服器位址、金鑰不用。') }}</p>
+  <div id="kbEmbIndex" class="emb-index muted">{{ tr('讀取中…') }}</div>
+  <form id="kbEmbForm" class="auth-form">
+    <fieldset class="auth-section">
+      <legend>{{ icon('globe', size=14) }} {{ tr('嵌入服務') }}</legend>
+      {# 預設沿用上面那台 LLM 伺服器（2026-10-08 使用者：「預設 繼承上面有設的 llm server設定」）：
+         勾著時位址、金鑰、API 種類都不必填（存檔時問一次對方是不是 Ollama），只填模型。
+         不加前綴（使用者：「有講過不要用前綴」）—— 前綴欄位與「套用建議前綴」都拿掉了。 #}
+      <label class="emb-inherit" for="kbEmbInherit">
+        <input type="checkbox" id="kbEmbInherit">
+        <span>{{ tr('沿用上面設定的 LLM 伺服器（預設）') }}</span>
+      </label>
+      <div id="kbEmbSrc" class="emb-src" role="status"></div>
+      <div class="af-attrs" id="kbEmbOwn">
+        <div class="auth-field">
+          <label class="af-label" for="kbEmbKind">{{ tr('API 種類') }}</label>
+          <select id="kbEmbKind" class="field">
+            <option value="ollama">{{ tr('Ollama（/api/embed）') }}</option>
+            <option value="openai">{{ tr('OpenAI 相容（/v1/embeddings）') }}</option>
+          </select>
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="kbEmbUrl">{{ tr('伺服器位址') }}</label>
+          <input id="kbEmbUrl" class="field" type="text" maxlength="300" placeholder="http://ollama.example.internal:11434">
+          <div class="af-hint">{{ tr('只用「http(s)://主機:埠」，路徑由系統接上。') }}</div>
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="kbEmbKey">{{ tr('API 金鑰（選填）') }}</label>
+          <input id="kbEmbKey" class="field" type="password" autocomplete="new-password">
+          <div class="af-hint" id="kbEmbKeyHint"></div>
+        </div>
+      </div>
+      {# 模型從伺服器的清單挑（2026-10-08 使用者：「應該是列出 llm server 上符合的 model 不是自己填」）：
+         Ollama 會說哪些模型能做嵌入，只列那幾個；OpenAI 相容的只給名稱，名稱像嵌入模型的排前面。
+         抓不到清單時才多一個「手動輸入…」。 #}
+      <div class="auth-field emb-model">
+        <label class="af-label" for="kbEmbModel">{{ tr('嵌入模型') }}</label>
+        <div class="emb-model-row">
+          <select id="kbEmbModel" class="field"></select>
+          <button class="btn" id="kbEmbModels" type="button">{{ icon('refresh', size=14) }} <span>{{ tr('重新整理清單') }}</span></button>
+        </div>
+        <input id="kbEmbModelManual" class="field emb-model-manual" type="text" maxlength="200" hidden
+               aria-label="{{ tr('模型名稱') }}" placeholder="{{ tr('模型名稱') }}">
+        <div class="af-hint emb-model-note" id="kbEmbModelNote" role="status"></div>
+        <div class="af-hint">{{ tr('只列伺服器上專門做嵌入（embedding）的模型，聊天用的模型不行。換模型要重建索引。') }}</div>
+      </div>
+      <div class="af-attrs">
+        <div class="auth-field">
+          <label class="af-label" for="kbEmbBatch">{{ tr('批次大小') }}</label>
+          <input id="kbEmbBatch" class="field" type="number" min="1" max="128">
+        </div>
+        <div class="auth-field">
+          <label class="af-label" for="kbEmbTimeout">{{ tr('逾時（秒）') }}</label>
+          <input id="kbEmbTimeout" class="field" type="number" min="5" max="1800">
+        </div>
+      </div>
+      <p class="emb-actions">
+        <button class="btn" id="kbEmbTest" type="button">{{ icon('refresh', size=14) }} <span>{{ tr('測試連線') }}</span></button>
+        <button class="btn" id="kbRebuild" type="button">{{ icon('refresh', size=14) }} <span>{{ tr('重建索引') }}</span></button>
+      </p>
+      <p id="kbEmbMsg" class="emb-msg muted" role="status"></p>
+    </fieldset>
+  </form>
+  <p class="emb-kb-link">
+    <span class="muted">{{ tr('資料集、文件與索引狀態（含停用向量檢索）在「公文知識庫」頁。') }}</span>
+    <a class="btn btn-small" href="/admin/knowledge">{{ icon('book', size=14) }} <span>{{ tr('前往公文知識庫') }}</span></a>
+  </p>
+</div>
+
+{# 整頁唯一的儲存：貼在視窗底部（這一頁很長，改完上面的不必捲到最下面找按鈕）。 #}
+<div class="llm-savebar" id="llmSaveBar">
+  <button class="btn btn-primary" id="btn-save" type="button">{{ icon('save') }}<span>{{ tr('儲存') }}</span></button>
+  <a class="btn" href="/admin">{{ icon('back') }}{{ tr('回管理') }}</a>
+  <span class="llm-dirty" id="llmDirty" hidden>{{ icon('warn', size=14) }} {{ tr('有變更還沒儲存') }}</span>
+  <span class="muted llm-save-scope">{{ tr('儲存這一頁的所有設定（含 Embedding）') }}</span>
+</div>
+<style nonce="{{ request.state.csp_nonce }}">
+  .llm-savebar { position: sticky; bottom: 0; z-index: 20; display: flex; flex-wrap: wrap;
+    align-items: center; gap: 8px 12px; margin: 18px 0 0; padding: 10px 14px;
+    background: rgba(255,255,255,.97); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: 0 -4px 16px rgba(15,23,42,.08); }
+  .llm-savebar .llm-dirty { display: inline-flex; align-items: center; gap: 4px;
+    color: #b45309; font-weight: 600; font-size: 13px; }
+  .llm-savebar .llm-dirty[hidden] { display: none; }
+  .llm-savebar .llm-save-scope { font-size: 12.5px; margin-left: auto; }
+  @media (max-width: 640px) { .llm-savebar .llm-save-scope { margin-left: 0; flex-basis: 100%; } }
+  .emb-panel { margin-top: 22px; }
+  .emb-panel .emb-intro { margin: 0 0 6px; font-size: 13px; line-height: 1.6; }
+  .emb-panel .emb-index { font-size: 13px; line-height: 1.8; margin: 0 0 12px; display: grid; gap: 6px; }
+  .emb-panel .emb-n { line-height: 1.55; padding: 7px 12px; border-radius: 8px; border: 1px solid #fde68a;
+    background: #fffbeb; color: #92400e; }
+  .emb-panel .emb-n.emb-n-info { background: #eff6ff; color: #1e3a8a; border-color: #bfdbfe; }
+  .emb-panel .emb-n.emb-n-bad { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+  .emb-panel .emb-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 0; }
+  .emb-panel .emb-msg { font-size: 12.5px; margin: 8px 0 0; min-height: 1em; }
+  .emb-panel .emb-msg.emb-ok { color: #16a34a; }
+  .emb-panel .emb-msg.emb-err { color: #dc2626; }
+  .emb-panel .emb-inherit { display: inline-flex; align-items: center; gap: 8px; font-weight: 600;
+    font-size: 14px; color: #1e293b; cursor: pointer; margin: 2px 0 6px; }
+  .emb-panel .emb-inherit input { width: 16px; height: 16px; margin: 0; }
+  .emb-panel .emb-src { font-size: 13px; line-height: 1.6; margin: 0 0 12px; padding: 8px 12px;
+    border-radius: 8px; background: #f1f5f9; color: #334155; overflow-wrap: anywhere; }
+  .emb-panel .emb-src:empty, .emb-panel .emb-src[hidden] { display: none; }
+  .emb-panel .emb-src.emb-src-bad { background: #fef2f2; color: #991b1b; }
+  .emb-panel .emb-src code { font-size: 12.5px; background: transparent; padding: 0; }
+  .emb-panel #kbEmbOwn[hidden] { display: none; }
+  .emb-panel .emb-model { max-width: 560px; }
+  .emb-panel .emb-model-row { display: flex; gap: 8px; align-items: center; }
+  .emb-panel .emb-model-row select { flex: 1 1 auto; min-width: 0; }
+  .emb-panel .emb-model-row .btn { flex: 0 0 auto; white-space: nowrap; }
+  .emb-panel .emb-model-manual { margin-top: 6px; }
+  .emb-panel .emb-model-note:empty { display: none; }
+  .emb-panel .emb-model-note.emb-err { color: #dc2626; }
+  .emb-panel .emb-kb-link { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    font-size: 13px; margin: 12px 0 0; }
+</style>
 
 <style nonce="{{ request.state.csp_nonce }}">
 .addon-badge {
@@ -328,6 +498,8 @@
 .conn-fail { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
 .conn-pend { background:#dbeafe; color:#1e40af; border:1px solid #93c5fd; }
 #think-status { margin-top:6px; padding:8px 12px; border-radius:6px; font-size:13px; line-height:1.6; }
+#ctx-status { margin-top:6px; padding:8px 12px; border-radius:6px; font-size:13px; line-height:1.6; }
+#ctx-status #ctx-make { margin-left:8px; vertical-align:baseline; }
 .conc-warn { display:block; margin-top:4px; color:#b45309; font-weight:600; }
 /* 統一所有「短輸入」寬度 100px，整面對齊；hint 文字接在右邊。
    Override platform.css `.form-row input[type=number] { flex: 1 }`。
@@ -441,6 +613,57 @@
 .llm-page .tool-section-h code { font-size: 11.5px; }
 .llm-page .form-row input[type=text]   { flex: 1 1 auto; }
 .llm-page .form-row label              { min-width: 160px; width: auto; }
+
+/* 其他 LLM 伺服器：跟「各工具個別模型」同一種外框，左邊對齊欄位起點 */
+.llm-page .srv-section {
+  margin: 18px 0 0 208px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.llm-page .srv-intro { margin: 0 0 8px 0; font-size: 12px; line-height: 1.55; }
+.llm-page .srv-rule { color: #92400e; }
+.llm-page .srv-list { display: grid; gap: 10px; margin: 10px 0; }
+.llm-page .srv-empty { margin: 8px 0; font-size: 12px; }
+.llm-page .srv-card {
+  background: #fff; border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.llm-page .srv-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.llm-page .srv-head .srv-name { flex: 1 1 180px; min-width: 0; font-weight: 600; }
+.llm-page .srv-head .btn { white-space: nowrap; }
+.llm-page .srv-grid {
+  display: grid; gap: 8px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 110px);
+}
+.llm-page .srv-f { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.llm-page .srv-f > span { font-size: 11.5px; color: #64748b; }
+.llm-page .srv-f input { width: 100%; min-width: 0; }
+.llm-page .srv-status { font-size: 12.5px; padding: 6px 10px; border-radius: 6px; }
+.llm-page .srv-models { font-size: 11.5px; color: #64748b; }
+
+/* 各工具：伺服器 ＋ 模型兩欄 */
+.llm-page .ptc-pick {
+  display: grid; gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+}
+.llm-page .ptc-sub { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.llm-page .ptc-sub-label { font-size: 11.5px; color: #64748b; }
+.llm-page .ptc-sub select, .llm-page .ptc-sub input { width: 100%; min-width: 0; }
+.llm-page .per-tool-model-manual { margin-top: 4px; }
+.llm-page .ptc-note { font-size: 11.5px; line-height: 1.45; color: #92400e; }
+
+/* 手機寬度：拿掉跟欄位起點對齊的左縮排，欄位改成一欄 */
+@media (max-width: 760px) {
+  .llm-page .per-tool-section,
+  .llm-page .srv-section,
+  .llm-page .model-hint { margin-left: 0; }
+  .llm-page .srv-grid,
+  .llm-page .ptc-pick { grid-template-columns: minmax(0, 1fr); }
+  .llm-page .ptc-id { margin-left: 0; }
+}
 </style>
 
 {% endblock %}
@@ -448,6 +671,12 @@
 {% block scripts %}
 <script nonce="{{ request.state.csp_nonce }}">
 const $ = (id) => document.getElementById(id);
+// 「其他 LLM 伺服器」：伺服器端送來的是公開版 —— 金鑰欄位只有「已設定」的替身字串，不含金鑰本身
+const SAVED_SERVERS = {{ settings.servers|tojson }};
+// 模型下拉的「手動輸入…」選項（清單抓不到時也能直接填模型名稱）
+const MANUAL = '__manual__';
+// 每一台伺服器的模型清單：'' ＝ 全站那一台，其他是伺服器編號
+const modelsBySrv = {};
 
 async function testConnection(probe) {
   const status = $('conn-status');
@@ -483,9 +712,10 @@ async function testConnection(probe) {
       return;
     }
     status.className = 'conn-ok';
-    status.innerHTML = tr('✅ 已連線（{0}ms） — 找到 {1} 個模型').replace('{0}', j.latency_ms).replace('{1}', j.models.length);
+    status.textContent = tr('✅ 已連線（{0}ms） — 找到 {1} 個模型').replace('{0}', j.latency_ms).replace('{1}', j.models.length);
     fillModelDropdown(j.models);
     showThinkingCheck(j.thinking_check, body.probe_model);
+    showContextCheck(j.context_check, body.probe_model);
   } catch (e) {
     status.className = 'conn-fail';
     status.textContent = `❌ ${e.message}`;
@@ -521,14 +751,79 @@ function showThinkingCheck(tc, model) {
   }
 }
 
+// 上下文長度：**太小時 Ollama 安靜地截掉提示的開頭**（被截掉的是工具的指令，結果亂掉而沒有錯誤）。
+// 太小時給一顆按鈕：在 Ollama 上建一個較大的版本（新名字、權重共用、原模型不動）並選為預設模型 ——
+// 建的對象是**已存檔**的伺服器，所以位址改過還沒存時先擋下來。
+const SAVED_BASE_URL = $('base_url').value.trim();
+function showContextCheck(cc, model) {
+  const box = $('ctx-status'), text = $('ctx-text'), btn = $('ctx-make');
+  btn.hidden = true;
+  if (!cc) { box.hidden = true; return; }
+  box.hidden = false;
+  if (!cc.ollama) {
+    box.className = 'muted';
+    text.textContent = tr('上下文長度：這台不是 Ollama（或經過閘道），系統看不到 —— 請在伺服器那一側確認至少 {0}（見 LLM.md「上下文長度」）。')
+      .replace('{0}', cc.recommended);
+    return;
+  }
+  if (!cc.effective) {
+    box.className = 'muted';
+    text.textContent = tr('上下文長度：模型「{0}」還沒載入，看不出來。').replace('{0}', model);
+    return;
+  }
+  const mx = cc.max ? tr('（模型最多 {0}）').replace('{0}', cc.max) : '';
+  if (!cc.low) {
+    box.className = 'conn-ok';
+    text.textContent = tr('✓ 上下文長度 {0}{1}').replace('{0}', cc.effective).replace('{1}', mx);
+    return;
+  }
+  box.className = 'conn-fail';
+  text.textContent = tr('⚠ 模型「{0}」目前的上下文長度只有 {1}{2}，建議 {3} 以上 —— 長一點的文件會被安靜地截掉前面的指令，結果會亂。可以在 Ollama 伺服器設 OLLAMA_CONTEXT_LENGTH，或建立一個較大的版本：')
+    .replace('{0}', model).replace('{1}', cc.effective).replace('{2}', mx).replace('{3}', cc.recommended);
+  const n = (!cc.max || cc.max >= 32768) ? 32768 : 16384;
+  btn.textContent = tr('建立 {0}K 版本並改用').replace('{0}', n / 1024);
+  btn.hidden = false;
+  btn.onclick = async () => {
+    if ($('base_url').value.trim() !== SAVED_BASE_URL) {
+      showAlert(tr('伺服器位址改過還沒儲存 —— 請先按「儲存」，再建立。'));
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const r = await fetch('/admin/api/llm/context-variant', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({model: model, num_ctx: n}),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) { showAlert((j.error ? tr(j.error) : tr('建立失敗'))); return; }
+      const sel = $('model');
+      if (![...sel.options].some(o => o.value === j.model)) {
+        const o = document.createElement('option');
+        o.value = j.model; o.textContent = j.model;
+        sel.appendChild(o);
+      }
+      sel.value = j.model;
+      sel.dispatchEvent(new Event('change', {bubbles: true}));
+      box.className = 'conn-ok';
+      text.textContent = tr('已在 Ollama 上建立「{0}」（上下文 {1}）並選為預設模型 —— 按下方「儲存」才生效；原本的「{2}」沒有動。')
+        .replace('{0}', j.model).replace('{1}', n).replace('{2}', model);
+      btn.hidden = true;
+    } finally {
+      btn.disabled = false;
+    }
+  };
+}
+
+// 全站那一台的模型清單：灌進預設模型，以及**沿用全站伺服器**的那幾支工具。
+// 指到別台伺服器的工具不可以拿全站的清單 —— 那一台上不一定有這些模型。
 function fillModelDropdown(models) {
-  // 1. 預設模型 select
+  modelsBySrv[''] = models;
   const sel = $('model');
   _fillSelectGrouped(sel, models, /* includeBlank */ false, sel.value);
-  // 2. 每個 per-tool select — 各自記住已選值，並插入「（用預設）」blank option
   const defaultModel = sel.value;
   document.querySelectorAll('.per-tool-model').forEach(s => {
-    _fillSelectGrouped(s, models, /* includeBlank */ true, s.value, defaultModel);
+    if (_toolServer(s.dataset.toolId) !== '') return;
+    _fillToolModels(s, models, defaultModel);
   });
 }
 
@@ -556,7 +851,7 @@ function _fillSelectGrouped(sel, models, includeBlank, preserveValue, defaultMod
   if (others.length) {
     const grp = document.createElement('optgroup');
     // 視覺工具：把非視覺模型整組標示為「不可用」
-    grp.label = requiresVision ? '文字 / 其他模型（此工具需視覺模型，無法使用）' : tr('文字 / 其他模型');
+    grp.label = requiresVision ? tr('文字 / 其他模型（此工具需視覺模型，無法使用）') : tr('文字 / 其他模型');
     others.forEach(m => grp.appendChild(makeOpt(m, /* disabled */ requiresVision)));
     sel.appendChild(grp);
   }
@@ -593,6 +888,248 @@ function makeOpt(m, disabled) {
   return o;
 }
 
+// ---------------------------------------------------------- 各工具：伺服器 ＋ 模型
+function _q(cls, toolId) {
+  return document.querySelector(`.${cls}[data-tool-id="${CSS.escape(toolId)}"]`);
+}
+function _toolServer(toolId) { const s = _q('per-tool-server', toolId); return s ? s.value : ''; }
+function _toolName(toolId) {
+  const s = _q('per-tool-model', toolId);
+  const card = s && s.closest('.ptc-card');
+  const nm = card && card.querySelector('.ptc-name');
+  return nm ? nm.textContent.trim() : toolId;
+}
+// 這支工具目前的模型（選「手動輸入…」時取輸入框的值；空字串＝用上方預設）
+function _toolModelValue(toolId) {
+  const sel = _q('per-tool-model', toolId);
+  const man = _q('per-tool-model-manual', toolId);
+  if (!sel) return '';
+  if (sel.value === MANUAL) return ((man && man.value) || '').trim();
+  return (sel.value || '').trim();
+}
+function _appendManualOpt(sel) {
+  if ([...sel.options].some(o => o.value === MANUAL)) return;
+  const o = document.createElement('option');
+  o.value = MANUAL;
+  o.textContent = tr('手動輸入…');
+  sel.appendChild(o);
+}
+function _setManual(sel, on, value) {
+  const man = _q('per-tool-model-manual', sel.dataset.toolId);
+  if (!man) return;
+  if (on) {
+    sel.value = MANUAL;
+    if (value !== undefined) man.value = value;
+  }
+  man.hidden = !on;
+}
+// 用某一台的清單重灌一支工具的模型下拉。目前的值**不可以因為清單裡沒有就丟掉** ——
+// 改成手動輸入、照樣留著（清單抓不到 / 名稱不同時，管理員填的模型不能無聲消失）。
+function _fillToolModels(sel, models, defaultModel) {
+  const current = _toolModelValue(sel.dataset.toolId);
+  _fillSelectGrouped(sel, models, /* includeBlank */ true, null, defaultModel);
+  _appendManualOpt(sel);
+  if (!current) { sel.value = ''; _setManual(sel, false); return; }
+  const opt = [...sel.options].find(o => o.value === current && !o.disabled);
+  if (opt) { sel.value = current; _setManual(sel, false); }
+  else { _setManual(sel, true, current); }
+  sel.dataset.prev = sel.value;
+}
+function _note(toolId, text) {
+  const el = _q('ptc-note', toolId);
+  if (!el) return;
+  el.hidden = !text;
+  el.textContent = text || '';
+}
+// 工具換了伺服器：模型清單改列那一台的。抓不到就讓管理員手動輸入。
+async function loadToolModels(toolId) {
+  const sid = _toolServer(toolId);
+  const sel = _q('per-tool-model', toolId);
+  if (!sel) return;
+  _note(toolId, '');
+  if (modelsBySrv[sid]) { _fillToolModels(sel, modelsBySrv[sid], $('model').value); return; }
+  if (sid === '') return;              // 全站那一台還沒抓過清單：維持原樣
+  const card = _srvCards().find(c => c.dataset.srvId === sid);
+  if (card && card.dataset.saved === '1' && card.dataset.urlDirty !== '1') {
+    _note(toolId, tr('正在抓取這台伺服器的模型清單…'));
+    try {
+      const r = await fetch('/admin/api/llm/models?server=' + encodeURIComponent(sid));
+      const j = await r.json();
+      if (j.ok) {
+        modelsBySrv[sid] = j.models;
+        _note(toolId, '');
+        if (_toolServer(toolId) === sid) _fillToolModels(sel, j.models, $('model').value);
+        return;
+      }
+      _note(toolId, tr('抓不到這台伺服器的模型清單（{0}）。可以選「手動輸入…」直接填模型名稱。')
+        .replace('{0}', j.error ? tr(j.error) : tr('連線失敗')));
+    } catch (e) {
+      _note(toolId, tr('抓不到這台伺服器的模型清單（{0}）。可以選「手動輸入…」直接填模型名稱。')
+        .replace('{0}', e.message));
+    }
+  } else {
+    _note(toolId, tr('這台伺服器還沒儲存，或位址改過還沒儲存：按它的「測試連線」就會列出模型，也可以選「手動輸入…」直接填模型名稱。'));
+  }
+  _appendManualOpt(sel);
+}
+function _refillToolsOn(sid) {
+  document.querySelectorAll('.per-tool-server').forEach(s => {
+    if (s.value !== sid) return;
+    const sel = _q('per-tool-model', s.dataset.toolId);
+    if (sel) { _note(s.dataset.toolId, ''); _fillToolModels(sel, modelsBySrv[sid] || [], $('model').value); }
+  });
+}
+
+// ---------------------------------------------------------- 其他 LLM 伺服器
+function _srvCards() { return [...document.querySelectorAll('#srvList .srv-card')]; }
+function _randId() {
+  const a = new Uint8Array(6);
+  crypto.getRandomValues(a);
+  return [...a].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function _syncEmpty() { $('srvEmpty').hidden = _srvCards().length > 0; }
+function _iconBtn(tplId, text) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'btn';
+  b.appendChild($(tplId).content.cloneNode(true));
+  const sp = document.createElement('span');
+  sp.textContent = ' ' + text;
+  b.appendChild(sp);
+  return b;
+}
+function _srvField(label, input) {
+  const w = document.createElement('label');
+  w.className = 'srv-f';
+  const sp = document.createElement('span');
+  sp.textContent = label;
+  w.append(sp, input);
+  return w;
+}
+function _input(type, cls, value, placeholder) {
+  const i = document.createElement('input');
+  i.type = type;
+  i.className = cls;
+  i.value = value == null ? '' : String(value);
+  if (placeholder) i.placeholder = placeholder;
+  return i;
+}
+function addServerRow(srv, saved) {
+  const card = document.createElement('div');
+  card.className = 'srv-card';
+  card.dataset.srvId = srv.id;
+  card.dataset.saved = saved ? '1' : '0';
+  const head = document.createElement('div');
+  head.className = 'srv-head';
+  const name = _input('text', 'field srv-name', srv.name, tr('伺服器名稱'));
+  name.maxLength = 60;
+  name.setAttribute('aria-label', tr('伺服器名稱'));
+  const bTest = _iconBtn('tplIcoTest', tr('測試連線'));
+  bTest.classList.add('srv-test');
+  const bDel = _iconBtn('tplIcoDel', tr('刪除'));
+  bDel.classList.add('srv-del');
+  head.append(name, bTest, bDel);
+
+  const grid = document.createElement('div');
+  grid.className = 'srv-grid';
+  const url = _input('text', 'field srv-url', srv.base_url, 'http://llm.example.internal:11434/v1');
+  const key = _input('password', 'field srv-key', srv.api_key, tr('(空白 — Ollama 不需要)'));
+  key.autocomplete = 'new-password';
+  const to = _input('number', 'field srv-timeout', srv.timeout_seconds || 600);
+  to.min = '10'; to.max = '1800'; to.step = '5';
+  grid.append(_srvField('Base URL', url), _srvField('API Key', key), _srvField(tr('單次 Timeout（秒）'), to));
+
+  const st = document.createElement('div');
+  st.className = 'srv-status';
+  st.hidden = true;
+  card.append(head, grid, st);
+
+  name.addEventListener('input', refreshServerOptions);
+  // 位址改了：之前抓的清單、存著的金鑰都不再屬於它（金鑰只送給存檔時的那個位址）
+  url.addEventListener('input', () => { card.dataset.urlDirty = '1'; delete modelsBySrv[srv.id]; });
+  bTest.addEventListener('click', () => testServer(card));
+  bDel.addEventListener('click', () => deleteServer(card));
+  $('srvList').appendChild(card);
+  _syncEmpty();
+  return card;
+}
+function collectServers() {
+  return _srvCards().map(c => ({
+    id:              c.dataset.srvId,
+    name:            c.querySelector('.srv-name').value.trim(),
+    base_url:        c.querySelector('.srv-url').value.trim(),
+    api_key:         c.querySelector('.srv-key').value.trim() || null,
+    timeout_seconds: parseFloat(c.querySelector('.srv-timeout').value) || 600,
+  }));
+}
+// 各工具的「伺服器」下拉跟著這裡的清單（新增、改名、刪除都要馬上反映）
+function refreshServerOptions() {
+  const cards = _srvCards();
+  document.querySelectorAll('.per-tool-server').forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = '';
+    sel.appendChild(new Option(tr('沿用全站伺服器'), ''));
+    let found = cur === '';
+    cards.forEach(c => {
+      const nm = c.querySelector('.srv-name').value.trim() || tr('（未命名）');
+      sel.appendChild(new Option(nm, c.dataset.srvId));
+      if (c.dataset.srvId === cur) found = true;
+    });
+    if (!found) sel.appendChild(new Option(tr('（已不存在的伺服器）'), cur));
+    sel.value = cur;
+  });
+}
+async function testServer(card) {
+  const st = card.querySelector('.srv-status');
+  st.hidden = false;
+  st.className = 'srv-status conn-pend';
+  st.textContent = tr('連線中…');
+  // 金鑰欄位沒動（替身字串）時，伺服器端只在位址跟**這一台**存檔時一樣才帶它的金鑰
+  const body = {
+    server_id:       card.dataset.srvId,
+    base_url:        card.querySelector('.srv-url').value.trim(),
+    api_key:         card.querySelector('.srv-key').value.trim() || null,
+    timeout_seconds: parseFloat(card.querySelector('.srv-timeout').value) || 10,
+  };
+  try {
+    const r = await fetch('/admin/api/llm/test-connection', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!j.ok) {
+      st.className = 'srv-status conn-fail';
+      st.textContent = `❌ ${j.error ? tr(j.error) : tr('連線失敗')}`;
+      return;
+    }
+    st.className = 'srv-status conn-ok';
+    st.textContent = tr('✅ 已連線（{0}ms） — 找到 {1} 個模型').replace('{0}', j.latency_ms).replace('{1}', j.models.length);
+    modelsBySrv[card.dataset.srvId] = j.models;
+    _refillToolsOn(card.dataset.srvId);
+  } catch (e) {
+    st.className = 'srv-status conn-fail';
+    st.textContent = `❌ ${e.message}`;
+  }
+}
+// 有工具正在用這一台就**擋下來**：刪掉之後那些工具會直接失敗（不會改用全站那一台）
+async function deleteServer(card) {
+  const id = card.dataset.srvId;
+  const users = [...document.querySelectorAll('.per-tool-server')]
+    .filter(s => s.value === id).map(s => _toolName(s.dataset.toolId));
+  if (users.length) {
+    await window.showAlert(tr('這台伺服器正被以下工具使用：{0}。請先把那些工具改成別的伺服器，再刪除這台。')
+      .replace('{0}', users.join(tr('、'))));
+    return;
+  }
+  if (!(await window.showConfirm(tr('要刪除這台伺服器嗎？按「儲存」之後才會生效。'),
+                                 {okText: tr('刪除'), kind: 'danger'}))) return;
+  card.remove();
+  delete modelsBySrv[id];
+  refreshServerOptions();
+  _syncEmpty();
+}
+
 async function refreshModels() {
   // Use saved settings (i.e. /api/llm/models endpoint)
   const status = $('conn-status');
@@ -606,7 +1143,7 @@ async function refreshModels() {
     const j = await r.json();
     if (!j.ok) {
       status.className = 'conn-fail';
-      status.textContent = `❌ ${j.error || tr('抓取失敗')} — 請先測試連線並儲存`;
+      status.textContent = `❌ ${j.error || tr('抓取失敗')} — ` + tr('請先測試連線並儲存');
       return;
     }
     fillModelDropdown(j.models);
@@ -619,11 +1156,32 @@ async function refreshModels() {
 }
 
 async function saveSettings() {
+  const btn = $('btn-save');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try { await _saveAll(); } finally { btn.disabled = false; }
+}
+
+// 「有變更還沒儲存」：這一頁的任何欄位（含 Embedding 那一區）改過就亮
+function _markDirty(on) { $('llmDirty').hidden = !on; }
+document.addEventListener('input', (ev) => {
+  if (ev.target.closest && ev.target.closest('.llm-page, #embedding')) _markDirty(true);
+});
+document.addEventListener('change', (ev) => {
+  if (ev.target.closest && ev.target.closest('.llm-page, #embedding')) _markDirty(true);
+});
+
+async function _saveAll() {
   // Per-tool 模型：只送有指定值的（空字串 = 跟隨預設，不存到 dict）
   const perTool = {};
+  const srvPerTool = {};
   document.querySelectorAll('.per-tool-model').forEach(s => {
-    const v = (s.value || '').trim();
+    const v = _toolModelValue(s.dataset.toolId);
     if (v) perTool[s.dataset.toolId] = v;
+  });
+  // 各工具的伺服器：空字串＝沿用全站伺服器，不存
+  document.querySelectorAll('.per-tool-server').forEach(s => {
+    if (s.value) srvPerTool[s.dataset.toolId] = s.value;
   });
   const body = {
     enabled:                  $('enabled').checked,
@@ -632,6 +1190,8 @@ async function saveSettings() {
     api_key:                  $('api_key').value.trim() || null,
     model:                    $('model').value,
     model_per_tool:           perTool,
+    servers:                  collectServers(),
+    server_per_tool:          srvPerTool,
     timeout_seconds:          parseFloat($('timeout_seconds').value),
     default_review_rounds:    parseInt($('default_review_rounds').value),
     confidence_threshold:     parseFloat($('confidence_threshold').value),
@@ -651,9 +1211,46 @@ async function saveSettings() {
     body: JSON.stringify(body),
   });
   if (!r.ok) {
-    alert(tr('儲存失敗'));
+    let msg = tr('儲存失敗');
+    try {
+      const j = await r.json();
+      if (j && j.error) {
+        msg = tr(j.error);
+        if (j.tools && j.tools.length) {
+          msg += '\n' + tr('受影響的工具：{0}').replace('{0}', j.tools.map(_toolName).join(tr('、')));
+        }
+      }
+    } catch (e) { /* 不是 JSON：維持「儲存失敗」 */ }
+    alert(msg);
     return;
   }
+  // LLM 設定存好了；Embedding 那一區**有改才存**（它自己的設定檔與端點，見那一段的說明）。
+  // 那一區存不進去的話分開講 —— 不可以讓「已儲存」蓋過去
+  let embErr = '';
+  const emb = window.jtEmbeddingSettings;
+  if (emb && emb.dirty()) {
+    try { await emb.save(); }
+    catch (e) { embErr = (e && e.message) || tr('儲存失敗'); }
+  }
+  // 存好之後伺服器那一區照伺服器端回來的重畫（金鑰欄位變回「已設定」的替身字串）
+  try {
+    const out = await r.json();
+    if (out && Array.isArray(out.servers)) {
+      $('srvList').innerHTML = '';
+      out.servers.forEach(srv => addServerRow(srv, true));
+      refreshServerOptions();
+      _syncEmpty();
+    }
+  } catch (e) { /* 舊版回應沒有 servers：不影響已存檔 */ }
+  if (embErr) {
+    _markDirty(true);
+    const m = tr('LLM 設定已儲存；Embedding 設定沒有存進去：') + embErr;
+    if (window.showToast) window.showToast(m, 'err'); else alert(m);
+    $('embedding').classList.remove('collapsed');
+    $('embedding').scrollIntoView({block: 'start', behavior: 'smooth'});
+    return;
+  }
+  _markDirty(false);
   if (window.showToast) window.showToast(tr('已儲存'), 'ok');
   else alert(tr('已儲存'));
   // 側欄是**伺服器渲染**的：啟用 / 停用、隱藏與否改了，側欄的反灰或隱藏要重新載入
@@ -662,6 +1259,35 @@ async function saveSettings() {
   if (navNow !== _navState) setTimeout(() => location.reload(), 600);
 }
 const _navState = $('enabled').checked + ':' + $('hide_when_disabled').checked;
+
+// ---- 初始化 ----
+SAVED_SERVERS.forEach(srv => addServerRow(srv, true));
+_syncEmpty();
+$('btnAddSrv').addEventListener('click', () => {
+  const n = _srvCards().length + 1;
+  const card = addServerRow({id: _randId(), name: tr('LLM 伺服器 {0}').replace('{0}', n),
+                             base_url: '', api_key: '', timeout_seconds: 600}, false);
+  refreshServerOptions();
+  const u = card.querySelector('.srv-url');
+  if (u) u.focus();
+});
+document.querySelectorAll('.per-tool-model').forEach(sel => {
+  _appendManualOpt(sel);
+  sel.dataset.prev = sel.value;
+  sel.addEventListener('change', () => {
+    if (sel.value === MANUAL) {
+      _setManual(sel, true);
+      const man = _q('per-tool-model-manual', sel.dataset.toolId);
+      if (man) { if (!man.value) man.value = sel.dataset.prev || ''; man.focus(); }
+    } else {
+      _setManual(sel, false);
+      sel.dataset.prev = sel.value;
+    }
+  });
+});
+document.querySelectorAll('.per-tool-server').forEach(sel => {
+  sel.addEventListener('change', () => loadToolModels(sel.dataset.toolId));
+});
 
 $('btn-test').addEventListener('click', () => testConnection(true));
 // 模型描述內的「點此測試連線」inline link 也觸發同一個流程，
@@ -678,5 +1304,265 @@ $('lnkTestConn').addEventListener('click', (e) => {
 });
 $('btn-refresh-models').addEventListener('click', refreshModels);
 $('btn-save').addEventListener('click', saveSettings);
+</script>
+{# Embedding（向量檢索）那一區自己的程式：包在函式裡，不碰上面那一段的任何名字。 #}
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  const byId = (id) => document.getElementById(id);
+  if (!byId('kbEmbForm')) return;
+  const API = '/admin/knowledge/api';
+  let ST = null;           // GET /embedding：設定（金鑰只說有沒有）、沿用的 LLM 伺服器、重建進度
+  let savedBody = '';      // 畫面上那一份跟已儲存的一不一樣（重建索引用的是已儲存的那一份）
+  let rbTimer = null;
+
+  async function call(url, opts) {
+    const r = await fetch(url, opts || {});
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
+    return r.json();
+  }
+  function post(url, body) {
+    return call(url, {method: 'POST', headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify(body || {})});
+  }
+  function say(msg, ok) {
+    const n = byId('kbEmbMsg');
+    n.textContent = msg || '';
+    n.classList.toggle('emb-ok', ok === true);
+    n.classList.toggle('emb-err', ok === false);
+  }
+
+  function renderIndex() {
+    const box = byId('kbEmbIndex');
+    box.textContent = '';
+    const act = ST.active;
+    // 第一行講目前的檢索方式；要處理的事（要重建、重建中、上次失敗）各自一行、用顏色分
+    const lines = [];
+    lines.push(['', act && act.fingerprint
+      ? tr('檢索方式：關鍵字＋向量（模型 {0}、維度 {1}）').replace('{0}', act.model).replace('{1}', act.dim)
+      : tr('檢索方式：只有關鍵字（還沒有建立向量索引）')]);
+    const rb = ST.rebuild || {};
+    if (rb.running) lines.push(['emb-n-info', tr('重建索引中：{0}／{1}').replace('{0}', rb.done || 0).replace('{1}', rb.total || 0)]);
+    else if (rb.error) lines.push(['emb-n-bad', tr('上一次重建失敗（原本的索引沒有動）：') + tr(rb.error)]);
+    if (ST.needs_rebuild && !rb.running) lines.push(['emb-n-warn', tr('embedding 設定跟目前的索引不同，請按「重建索引」。')]);
+    lines.forEach(([cls, t]) => {
+      const d = document.createElement('div');
+      if (cls) d.className = 'emb-n ' + cls;
+      d.textContent = t;
+      box.appendChild(d);
+    });
+    byId('kbRebuild').disabled = !!rb.running;
+  }
+  // 沿用 LLM 伺服器：講出會送到哪一台（以已儲存的 LLM 設定為準）；不沿用時收起來
+  function renderSource() {
+    const on = byId('kbEmbInherit').checked;
+    byId('kbEmbOwn').hidden = on;
+    const box = byId('kbEmbSrc');
+    box.textContent = '';
+    box.classList.remove('emb-src-bad');
+    box.hidden = !on;
+    if (!on) return;
+    const src = ST && ST.llm_server;
+    if (!src) { box.textContent = tr('讀不到 LLM 設定。'); box.classList.add('emb-src-bad'); return; }
+    if (src.problem) { box.textContent = tr(src.problem); box.classList.add('emb-src-bad'); return; }
+    if (!src.base_url) { box.textContent = tr('上面還沒有設定 LLM 伺服器。'); box.classList.add('emb-src-bad'); return; }
+    const lead = src.pinned
+      ? tr('會送到公文撰擬指定的 LLM 伺服器「{0}」：').replace('{0}', src.name)
+      : tr('會送到上面設定的 LLM 伺服器：');
+    box.appendChild(document.createTextNode(lead));
+    const c = document.createElement('code');
+    c.textContent = src.base_url;
+    box.appendChild(c);
+    box.appendChild(document.createTextNode(tr('（位址與金鑰以已儲存的 LLM 設定為準）')));
+  }
+  function renderForm() {
+    const e = ST.embed;
+    byId('kbEmbInherit').checked = !!e.use_llm_server;
+    byId('kbEmbKind').value = e.kind || 'ollama';
+    byId('kbEmbUrl').value = e.base_url || '';
+    byId('kbEmbKey').value = e.api_key || '';
+    byId('kbEmbKeyHint').textContent = e.api_key ? tr('已設定（加密存放，不會顯示出來）。要換就直接輸入新的。') : tr('Ollama 不需要金鑰。');
+    setModelValue(e.model || '');
+    byId('kbEmbBatch').value = e.batch_size || 16;
+    byId('kbEmbTimeout').value = e.timeout_seconds || 120;
+    renderSource();
+    savedBody = JSON.stringify(embBody());
+  }
+  function embBody() {
+    return {
+      use_llm_server: byId('kbEmbInherit').checked,
+      kind: byId('kbEmbKind').value, base_url: byId('kbEmbUrl').value.trim(),
+      api_key: byId('kbEmbKey').value, model: modelValue(),
+      batch_size: parseInt(byId('kbEmbBatch').value, 10), timeout_seconds: parseInt(byId('kbEmbTimeout').value, 10),
+    };
+  }
+  function dirty() { return !!ST && JSON.stringify(embBody()) !== savedBody; }
+
+  // ---- 嵌入模型的下拉：選項從伺服器的清單來；抓不到才給「手動輸入…」
+  const MANUAL = '__manual__';
+  let modelTok = 0;
+  function modelValue() {
+    const sel = byId('kbEmbModel');
+    return sel.value === MANUAL ? byId('kbEmbModelManual').value.trim() : (sel.value || '').trim();
+  }
+  function opt(value, text) {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = text;
+    o.dataset.i18n = 'skip';        // 模型名稱是資料
+    return o;
+  }
+  function syncManual() {
+    const on = byId('kbEmbModel').value === MANUAL;
+    byId('kbEmbModelManual').hidden = !on;
+  }
+  // 存著的值一定要選得到（清單還沒回來、或伺服器上已經沒有那個模型）
+  function setModelValue(v) {
+    const sel = byId('kbEmbModel');
+    if (![...sel.options].some(o => o.value === v)) {
+      sel.insertBefore(v ? opt(v, v) : opt('', tr('（請選擇）')), sel.firstChild);
+    }
+    sel.value = v;
+    byId('kbEmbModelManual').value = '';
+    syncManual();
+  }
+  function modelText(m) {
+    const parts = [m.id];
+    if (m.dim) parts.push(tr('{0} 維').replace('{0}', m.dim));
+    if (m.ctx) parts.push(tr('上下文 {0}').replace('{0}', Number(m.ctx).toLocaleString()));
+    return parts.join(' · ');
+  }
+  // `keep` 在填的當下才讀：清單回來之前使用者可能已經換了選擇（不可以被舊的值蓋回去）
+  function fillModels(models, known, offerManual) {
+    const keep = modelValue();
+    const sel = byId('kbEmbModel');
+    sel.textContent = '';
+    if (!keep) sel.appendChild(opt('', tr('（請選擇）')));
+    const ids = new Set(models.map(m => m.id));
+    if (keep && !ids.has(keep)) sel.appendChild(opt(keep, keep + (models.length ? tr('（伺服器上找不到）') : '')));
+    const likely = models.filter(m => m.embedding), other = models.filter(m => !m.embedding);
+    if (known || !other.length || !likely.length) {
+      models.forEach(m => sel.appendChild(opt(m.id, modelText(m))));
+    } else {
+      const g1 = document.createElement('optgroup');
+      g1.label = tr('名稱看起來是嵌入模型');
+      likely.forEach(m => g1.appendChild(opt(m.id, modelText(m))));
+      const g2 = document.createElement('optgroup');
+      g2.label = tr('其他模型（請按「測試連線」確認）');
+      other.forEach(m => g2.appendChild(opt(m.id, modelText(m))));
+      sel.appendChild(g1);
+      sel.appendChild(g2);
+    }
+    if (offerManual) sel.appendChild(opt(MANUAL, tr('手動輸入…')));
+    sel.value = keep;
+    syncManual();
+  }
+  function modelNote(text, bad) {
+    const n = byId('kbEmbModelNote');
+    n.textContent = text || '';
+    n.classList.toggle('emb-err', !!bad);
+  }
+  async function loadModels() {
+    const tok = ++modelTok;
+    const body = embBody();
+    if (body.use_llm_server) {
+      const src = ST && ST.llm_server;
+      if (!src || src.problem || !src.base_url) {
+        fillModels([], false, true);
+        modelNote(tr('上面的 LLM 伺服器設定好之後，這裡就會列出它的嵌入模型。'), true);
+        return;
+      }
+    } else if (!body.base_url) {
+      fillModels([], false, true);
+      modelNote(tr('填好伺服器位址之後，這裡就會列出它的嵌入模型。'));
+      return;
+    }
+    modelNote(tr('正在抓取模型清單…'));
+    let j;
+    try {
+      j = await post(API + '/embedding/models', body);
+    } catch (e) { j = {ok: false, error: e.message, models: []}; }
+    if (tok !== modelTok) return;          // 這段時間又改了設定：以最新那一次為準
+    if (!j.ok) {
+      fillModels([], false, true);
+      modelNote(tr('抓不到模型清單（{0}）。可以選「手動輸入…」直接填模型名稱。')
+        .replace('{0}', j.error ? tr(j.error) : tr('連線失敗')), true);
+      return;
+    }
+    const models = j.models || [];
+    fillModels(models, !!j.capability_known, !models.length);
+    if (!models.length) {
+      modelNote(j.capability_known
+        ? tr('這台伺服器上沒有嵌入模型，請先在伺服器上下載一個（例如 ollama pull granite-embedding:278m）。')
+        : tr('這台伺服器沒有列出任何模型。'), true);
+    } else if (j.capability_known) {
+      modelNote(tr('伺服器上有 {0} 個嵌入模型。').replace('{0}', models.length));
+    } else {
+      modelNote(tr('這台伺服器沒有說哪些模型能做嵌入：名稱看起來像的排在前面，選好之後可以按「測試連線」確認。'));
+    }
+  }
+
+  async function load(fillForm) {
+    try {
+      ST = await call(API + '/embedding');
+    } catch (e) { byId('kbEmbIndex').textContent = e.message; return; }
+    renderIndex();
+    if (fillForm) renderForm();
+  }
+  async function pollRebuild() {
+    clearTimeout(rbTimer);
+    await load(false);          // 只更新狀態，不蓋掉正在改的欄位
+    if (ST && ST.rebuild && ST.rebuild.running) rbTimer = setTimeout(pollRebuild, 2000);
+  }
+
+  byId('kbEmbInherit').addEventListener('change', () => { renderSource(); loadModels(); });
+  byId('kbEmbModel').addEventListener('change', syncManual);
+  byId('kbEmbModels').addEventListener('click', loadModels);
+  byId('kbEmbUrl').addEventListener('change', loadModels);
+  byId('kbEmbKind').addEventListener('change', loadModels);
+  // 整頁唯一的「儲存」（頁面最下面那一列）存完 LLM 設定之後叫這裡 —— 這一區有改才存。
+  // 失敗就丟出去（訊息也寫在這一區），由那邊講出「LLM 已存、這一區沒存」。
+  window.jtEmbeddingSettings = {
+    dirty: dirty,
+    save: async function () {
+      if (!dirty()) return false;
+      try {
+        await post(API + '/embedding', embBody());
+      } catch (e) { say(e.message, false); throw e; }
+      await load(true);         // 金鑰欄位變回「已設定」的替身字串
+      say(tr('已儲存。'), true);
+      return true;
+    },
+  };
+  byId('kbEmbTest').addEventListener('click', async () => {
+    say(tr('測試中…'));
+    try {
+      const j = await post(API + '/embedding/test', embBody());
+      if (j.ok) say(tr('連線成功：維度 {0}、耗時 {1} 毫秒。').replace('{0}', j.dim).replace('{1}', j.ms), true);
+      else say(tr(j.error), false);
+    } catch (e) { say(e.message, false); }
+  });
+  byId('kbRebuild').addEventListener('click', async () => {
+    // 重建用的是**已儲存**的設定：畫面上改了還沒存就按，重建出來的不是眼前這一份
+    if (dirty()) { say(tr('設定還沒儲存：重建索引用的是已儲存的設定，請先按頁面最下面的「儲存」。'), false); return; }
+    try {
+      await post(API + '/rebuild');
+      say(tr('已開始重建索引，可以關掉這一頁，完成後在「我的作業」看得到。'), true);
+      pollRebuild();
+    } catch (e) { say(e.message, false); }
+  });
+  // 從知識庫頁的「前往 Embedding 設定」過來（#embedding）：這一區之前被收起來的話要打開，
+  // 不然跳到一個只剩標題的卡片。收折是 toast.js 在 DOMContentLoaded 套上的，要排在它後面。
+  function openIfLinked() {
+    if (location.hash === '#embedding') byId('embedding').classList.remove('collapsed');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', openIfLinked);
+  else openIfLinked();
+
+  load(true).then(() => {
+    if (!ST) return;
+    loadModels();
+    if (ST.rebuild && ST.rebuild.running) pollRebuild();
+  });
+})();
 </script>
 {% endblock %}

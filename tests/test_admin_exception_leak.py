@@ -31,7 +31,16 @@ WEB = ROOT / "app" / "web"
 #: 這些例外類別是**我們自己的**，訊息由我們撰寫（「帳號不能空白」這類），
 #: 顯示給管理員是刻意的設計，不在此限。
 OWN_EXCEPTIONS = {"ValueError", "auth_ldap.AuthError", "auth_settings.BootstrapError",
-                  "(_auth.AuthError, auth_local.AuthError)", "AuthError"}
+                  "(_auth.AuthError, auth_local.AuthError)", "AuthError",
+                  # 知識庫（v1.16.61）：`KBError` 是 `ValueError` 的子類別，每一處 raise 都是
+                  # 固定句子（欄位名也是我們寫死的）；`EmbedError` 也一樣 —— 連不上 / 逾時 /
+                  # HTTP 錯誤都換成固定句子，只帶 HTTP 狀態碼，不帶對方回的內容或位址
+                  "store.KBNotFound", "store.KBError", "embed.EmbedError",
+                  # 知識庫「政府公開資料」（v1.16.66）：`GovError` 與子類別每一處 raise 都是
+                  # 我們寫的句子；包進來的 `PackageError` / `safe_fetch` / `zip_guard` /
+                  # `ExtractError` 也全是固定句子（只帶管理員自己填的主機名與上限數字），
+                  # 索引失敗的代碼另外換成句子（`gov._INDEX_ERRORS`）。原因細節走 logger。
+                  "gov.GovNotFound", "gov.GovBusy", "gov.GovError", "gov.NeedsConfirm"}
 
 
 def _leaky_handlers(path: Path) -> list[tuple[int, str]]:

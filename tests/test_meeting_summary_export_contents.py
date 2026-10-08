@@ -433,7 +433,7 @@ def test_the_api_result_carries_the_background(client, auth_off, monkeypatch):
             return json.dumps({"keep": [1], "drop": [], "split": []})
 
     monkeypatch.setattr(ls.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(ls.llm_settings, "make_client", lambda: FakeClient())
+    monkeypatch.setattr(ls.llm_settings, "make_client", lambda *a, **k: FakeClient())
     monkeypatch.setattr(ls.llm_settings, "get_model_for", lambda _t: "fake")
     url = "/tools/meeting-summary/api/meeting-summary"
     r = client.post(url, files={"file": ("m.vtt", io.BytesIO(_VTT), "text/vtt")},

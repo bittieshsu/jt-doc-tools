@@ -17,7 +17,13 @@ Storage layout::
 OFF (a single shared workspace for the one local operator). Cross-user access
 is structurally prevented: every read/write resolves under the *requesting*
 user's own directory, and ``file_id`` is validated as 32-hex so it can never
-escape the directory. Only PDF + PNG are accepted (validated by magic bytes).
+escape the directory. Accepted types (PDF / PNG / Office / plain text /
+recordings) are validated by content, never by the file name.
+
+錄音 / 錄影檔（給「會議錄音轉逐字稿」從工作區載入用）有三件跟其他型別不一樣的事：
+①格式判定只讀檔頭（`audio_formats.sniff_stream`），**不整份讀進記憶體**；
+②單檔上限另外一個（`max_audio_mb`）—— 三小時會議的 AAC 約 90 MB，一般型別的
+50 MB 會直接擋掉；③沒有預覽圖，畫面上顯示圖示（`has_preview()`）。
 """
 from __future__ import annotations
 
@@ -31,6 +37,7 @@ import time
 import uuid
 
 from . import atomic_json
+from . import audio_formats
 from pathlib import Path
 from typing import Any, Optional
 
@@ -64,6 +71,10 @@ _DEFAULTS: dict[str, Any] = {
     "enabled": True,           # admin master switch — off hides everything
     "per_user_quota_mb": 500,  # 0/-1 = unlimited
     "max_file_mb": 50,         # 0/-1 = unlimited
+    # 錄音 / 錄影檔另一個上限：三小時會議的 AAC 約 90 MB、錄影更大，套一般型別
+    # 的 50 MB 會直接擋掉。預設跟全站上傳上限（`upload_settings`）一樣。
+    # 錄音檔只讀檔頭判斷格式、串流寫入，不會整份進記憶體，所以可以比一般型別大。
+    "max_audio_mb": 500,       # 0/-1 = unlimited
     "retention_hours": 24,     # -1 = keep forever
     "updated_at": 0.0,
 }
@@ -260,6 +271,60 @@ _OOXML_MAIN_TYPES = (
 # 把 Office 型別併進 ALLOWED，維持單一事實來源 —— 兩邊各寫一份遲早會不一致
 ALLOWED.update({m: e for m, e in _ODF_KINDS.items()})
 ALLOWED.update({m: e for _p, m, e in _OOXML_KINDS})
+# 錄音 / 錄影：清單**只有一份**，在 `audio_formats`（「會議錄音轉逐字稿」也從那裡拿）。
+# 這裡再寫一份的話，症狀是工作區存得進去、轉逐字稿卻挑不到（或反過來），沒有錯誤訊息。
+ALLOWED.update({audio_formats.MIME_BY_EXT[e]: e for e in audio_formats.AUDIO_EXTS})
+
+#: 錄音 / 錄影檔的副檔名（來自 `audio_formats`）。
+AUDIO_EXTS = frozenset(audio_formats.AUDIO_EXTS)
+
+
+def is_audio_ext(ext: str) -> bool:
+    return (ext or "").lower() in AUDIO_EXTS
+
+
+def kind_of(ext: str) -> str:
+    """畫面上用來挑圖示的大類：pdf / image / office / text / audio / video。"""
+    ext = (ext or "").lower()
+    if ext in AUDIO_EXTS:
+        return "video" if ext in audio_formats.VIDEO_EXTS else "audio"
+    if ext in _TEXT_EXTS:
+        return "text"
+    if ext == ".png":
+        return "image"
+    if ext == ".pdf":
+        return "pdf"
+    return "office"
+
+
+def has_preview(ext: str) -> bool:
+    """這種檔案畫不畫得出縮圖。
+
+    **由伺服器端說**，前端不自己判斷：純文字與錄音檔沒有「第一頁」可以畫，
+    前端照這個旗標直接顯示圖示，不去要一張註定是空白的縮圖（原本純文字拿到的是
+    一張 1×1 的透明圖，畫面上是一塊什麼都沒有的空白）。
+    """
+    ext = (ext or "").lower()
+    return not (ext in _TEXT_EXTS or ext in AUDIO_EXTS)
+
+
+def accepted_type_groups() -> list[tuple[str, list[str]]]:
+    """工作區收哪些格式，**依類別分組、從 `ALLOWED` 實算** —— 給說明文字用。
+
+    設定頁原本寫死「只接受 PDF 與 PNG 檔」，工作區早就收辦公文件與純文字，
+    那句話一直沒人改（清單寫兩份一定會漂）。這裡算出來的分組，每一個副檔名都
+    來自 `ALLOWED`，而且全部都會出現在某一組裡（測試釘住）。
+    """
+    exts = sorted(set(ALLOWED.values()))
+    av = [e for e in audio_formats.AUDIO_EXTS if e in exts]
+    groups = [
+        ("PDF 文件", [e for e in exts if e == ".pdf"]),
+        ("圖片", [e for e in exts if e == ".png"]),
+        ("辦公文件", [e for e in exts if kind_of(e) == "office"]),
+        ("純文字", [e for e in exts if kind_of(e) == "text"]),
+        ("錄音 / 錄影", av),
+    ]
+    return [(label, items) for label, items in groups if items]
 
 
 #: 純文字裡**允許**出現的控制字元。其餘 C0 與 DEL 一律視為「不是文字」。
@@ -343,6 +408,11 @@ def detect_kind(data: bytes, name: str = "") -> Optional[tuple[str, str]]:
                             return mime, ext
         except Exception:  # noqa: BLE001 — malformed zip → unsupported
             return None
+    # 錄音 / 錄影：只看檔頭（判準與理由在 `audio_formats`）。放在純文字前面 ——
+    # 文字的判斷要解整份 UTF-8，錄音檔不必白跑那一趟。
+    av = audio_formats.sniff(data, name)
+    if av is not None:
+        return av
     # 純文字放最後：上面每一種都有明確的訊號，文字是「都不像，但內容說得通」。
     # **`name` 只在兩種文字型別之間二選一**，不可以讓不是文字的東西過關 ——
     # 先過 `_looks_like_text()` 才輪得到它。
@@ -478,38 +548,126 @@ def save_bytes_for_key(key: str, data: bytes, display_name: str,
         raise WorkspaceError("檔案為空")
     kind = detect_kind(data, display_name)
     if kind is None:
-        raise UnsupportedType(
-            "工作區接受 PDF / PNG、Word (.docx) / Excel (.xlsx) / "
-            "PowerPoint (.pptx)、OpenDocument (.odt / .ods / .odp / .odg)、"
-            "純文字 (.txt / .md / .json)")
+        raise UnsupportedType(UNSUPPORTED_MESSAGE)
     mime, ext = kind
-    s = get_settings()
-    max_file_mb = int(s.get("max_file_mb") or 0)
-    if max_file_mb > 0 and len(data) > max_file_mb * 1024 * 1024:
-        raise QuotaExceeded(f"單檔超過上限 {max_file_mb} MB")
-    u = usage_for_key(key)
-    if u["quota_bytes"] and u["used_bytes"] + len(data) > u["quota_bytes"]:
-        quota_mb = u["quota_bytes"] // 1024 // 1024
-        raise QuotaExceeded(f"工作區容量已滿（額度 {quota_mb} MB），請先刪除舊檔")
-
-    file_id = uuid.uuid4().hex
-    base = _root() / key
-    base.mkdir(parents=True, exist_ok=True)
-    d = base / file_id
-    d.mkdir(parents=True, exist_ok=True)
+    _check_room(key, ext, len(data))
+    d = _new_entry_dir(key)
     (d / f"file{ext}").write_bytes(data)
+    return _write_meta(d, display_name, ext, mime, len(data), source_tool, user_label)
+
+
+#: 不支援的型別 —— 列出來的格式由 `ALLOWED` 實算（見 `accepted_type_groups`）。
+#: 原本這句是寫死的，工作區收了新型別之後它就說謊了。
+UNSUPPORTED_MESSAGE = "工作區接受的格式：PDF / PNG、辦公文件、純文字、錄音 / 錄影檔"
+
+#: 被大小上限擋下時**一定要講出是上限、不是格式**（錄音檔最容易踩到：
+#: 三小時的會議錄音被擋下，使用者會以為是格式不支援而去轉檔）。
+TOO_BIG_MESSAGE = "單檔超過上限 {0} MB（這是大小上限，不是格式問題）"
+TOO_BIG_AUDIO_MESSAGE = "錄音檔超過單檔上限 {0} MB（這是大小上限，不是格式問題；可以請管理員到「工作區設定」調整）"
+QUOTA_FULL_MESSAGE = "工作區容量已滿（額度 {0} MB），請先刪除舊檔"
+
+
+def max_bytes_for(ext: str) -> int:
+    """這種型別的單檔上限（bytes），0 = 不限。錄音 / 錄影檔用 `max_audio_mb`。"""
+    s = get_settings()
+    key = "max_audio_mb" if is_audio_ext(ext) else "max_file_mb"
+    mb = int(s.get(key) or 0)
+    return mb * 1024 * 1024 if mb > 0 else 0
+
+
+def _check_room(key: str, ext: str, size: int) -> None:
+    """單檔上限與每人額度。**寫入之前**就要擋，不要寫到一半才發現。"""
+    lim = max_bytes_for(ext)
+    if lim and size > lim:
+        tpl = TOO_BIG_AUDIO_MESSAGE if is_audio_ext(ext) else TOO_BIG_MESSAGE
+        raise QuotaExceeded(tpl.replace("{0}", str(lim // 1024 // 1024)))
+    u = usage_for_key(key)
+    if u["quota_bytes"] and u["used_bytes"] + size > u["quota_bytes"]:
+        raise QuotaExceeded(QUOTA_FULL_MESSAGE.replace(
+            "{0}", str(u["quota_bytes"] // 1024 // 1024)))
+
+
+def _new_entry_dir(key: str) -> Path:
+    file_id = uuid.uuid4().hex
+    d = _root() / key / file_id
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _write_meta(d: Path, display_name: str, ext: str, mime: str, size: int,
+                source_tool: str, user_label: str) -> dict[str, Any]:
     meta = {
-        "file_id": file_id,
+        "file_id": d.name,
         "name": _clean_display_name(display_name, ext),
         "ext": ext,
         "mime": mime,
-        "size": len(data),
+        "size": size,
         "source_tool": (source_tool or "")[:64],
         "saved_at": time.time(),
         "user_label": user_label,
     }
     atomic_json.write_json(_meta_path(d), meta)
     return meta
+
+
+def _head_is_in_memory_kind(head: bytes) -> bool:
+    """檔頭看起來是不是 PDF / PNG / zip / 純文字 —— 只用來決定「太大」時講哪一句。"""
+    if head[:4] in (b"%PDF", b"PK\x03\x04") or head[:8] == b"\x89PNG\r\n\x1a\n":
+        return True
+    # 檔頭可能剛好切在一個中文字的中間 —— 退幾個位元組再判斷
+    for cut in range(4):
+        part = head[:len(head) - cut] if cut else head
+        if part and _looks_like_text(part):
+            return True
+    return False
+
+
+def save_stream_for_key(key: str, fobj, display_name: str, source_tool: str = "",
+                        user_label: str = "") -> dict[str, Any]:
+    """從一個**可 seek 的檔案物件**存進工作區（網頁上傳走這條）。
+
+    跟 `save_bytes_for_key` 的差別只在**錄音檔不整份讀進記憶體**：
+    格式只看檔頭、大小用 seek 量、內容串流寫進去。其他型別（PDF / Office /
+    純文字）判斷時本來就要看整份（開 zip、解 UTF-8），所以**先擋大小**、
+    再讀進來交給 `save_bytes_for_key` —— 驗證邏輯仍只有那一份。
+    """
+    if not is_enabled():
+        raise WorkspaceDisabled("工作區功能未啟用")
+    fobj.seek(0, os.SEEK_END)
+    size = fobj.tell()
+    fobj.seek(0)
+    if size == 0:
+        raise WorkspaceError("檔案為空")
+    av = audio_formats.sniff_stream(fobj, display_name)
+    if av is None:
+        lim = max_bytes_for(".pdf")
+        if lim and size > lim:
+            head = fobj.read(audio_formats.HEAD_BYTES)
+            fobj.seek(0)
+            if not _head_is_in_memory_kind(head):
+                raise UnsupportedType(UNSUPPORTED_MESSAGE)
+            raise QuotaExceeded(TOO_BIG_MESSAGE.replace("{0}", str(lim // 1024 // 1024)))
+        return save_bytes_for_key(key, fobj.read(), display_name, source_tool, user_label)
+
+    mime, ext = av
+    _check_room(key, ext, size)
+    d = _new_entry_dir(key)
+    part = d / f"file{ext}.part"
+    try:
+        fobj.seek(0)
+        with part.open("wb") as out:
+            shutil.copyfileobj(fobj, out, 1 << 20)
+        os.replace(part, d / f"file{ext}")
+    except BaseException:
+        shutil.rmtree(d, ignore_errors=True)
+        raise
+    return _write_meta(d, display_name, ext, mime, size, source_tool, user_label)
+
+
+def save_stream(request: Request, fobj, display_name: str,
+                source_tool: str = "") -> dict[str, Any]:
+    return save_stream_for_key(user_key(request), fobj, display_name, source_tool,
+                               user_label=_user_label(request))
 
 
 def list_files(request: Request) -> list[dict[str, Any]]:
@@ -524,6 +682,11 @@ def list_files(request: Request) -> list[dict[str, Any]]:
             continue
         meta = _read_meta(d)
         if meta:
+            # 畫面要知道畫不畫得出縮圖、該用哪個圖示 —— 由這裡說，前端不自己判斷。
+            # （算出來的，不寫回 meta.json。）
+            ext = meta.get("ext", "")
+            meta["preview"] = has_preview(ext)
+            meta["kind"] = kind_of(ext)
             out.append(meta)
     out.sort(key=lambda m: m.get("saved_at", 0), reverse=True)
     return out
@@ -688,6 +851,10 @@ def get_thumbnail(request: Request, file_id: str) -> tuple[Path, str]:
         # 「當成 PDF」的路 —— 那會去找一個不存在的 `file.pdf`，
         # 錯誤訊息變成「檔案不存在」，看起來像檔案掉了。
         raise WorkspaceError("純文字沒有預覽圖")
+    if ext in AUDIO_EXTS:
+        # 同上：錄音 / 錄影沒有預覽圖（前端照 `has_preview()` 直接顯示圖示）。
+        # 不可以掉到下面「當成 PDF」那條路 —— 那會說「檔案不存在」。
+        raise WorkspaceError("錄音檔沒有預覽圖")
     if ext in _OFFICE_THUMB_EXTS:
         return _office_thumbnail(d, ext)
     # PDF → render first page (cache thumb.png).
@@ -795,25 +962,40 @@ def collect_stats() -> dict[str, Any]:
     users: list[dict[str, Any]] = []
     total_bytes = 0
     total_count = 0
+    total_audio = 0
+    total_audio_bytes = 0
     if root.exists():
         for udir in sorted(root.iterdir()):
             if not udir.is_dir():
                 continue
             cnt = 0
             label = ""
+            audio = 0
+            audio_bytes = 0
             for d in udir.iterdir():
                 if d.is_dir() and _meta_path(d).exists():
                     cnt += 1
+                    meta = _read_meta(d) or {}
                     if not label:
-                        label = (_read_meta(d) or {}).get("user_label", "")
+                        label = meta.get("user_label", "")
+                    # **錄音是敏感資料**（會議內容、人聲）—— 管理員看不到檔案內容，
+                    # 但要看得到「誰的工作區裡放著錄音、佔多少」，才知道要不要清。
+                    if is_audio_ext(meta.get("ext", "")):
+                        audio += 1
+                        audio_bytes += int(meta.get("size") or 0)
             size = _dir_size(udir)
             total_bytes += size
             total_count += cnt
+            total_audio += audio
+            total_audio_bytes += audio_bytes
             users.append({
                 "key": udir.name,
                 "label": label or (udir.name if udir.name != _SINGLE_KEY else "（單機模式）"),
                 "count": cnt,
                 "bytes": size,
+                "audio_count": audio,
+                "audio_bytes": audio_bytes,
             })
     users.sort(key=lambda u: u["bytes"], reverse=True)
-    return {"users": users, "total_bytes": total_bytes, "total_count": total_count}
+    return {"users": users, "total_bytes": total_bytes, "total_count": total_count,
+            "audio_count": total_audio, "audio_bytes": total_audio_bytes}

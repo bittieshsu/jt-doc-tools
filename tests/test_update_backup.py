@@ -27,7 +27,7 @@ IRREPLACEABLE = {
     "api_tokens.json", "label_synonyms.json",
     "fill_history", "stamp_history", "watermark_history",
     "assets", "fonts", "workspace", "branding",
-    "transit_proof_files", "submission_check",
+    "transit_proof_files", "submission_check", "official_doc_cases",
 }
 
 

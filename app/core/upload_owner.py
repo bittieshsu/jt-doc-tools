@@ -73,6 +73,30 @@ def _auth_enabled() -> bool:
         return False
 
 
+def auth_enabled() -> bool:
+    """認證有沒有開（給自己保存歸屬的工具用：公文撰擬的案件把擁有者記在案件裡，
+    判斷規則仍要跟這裡一致 —— 不另外讀一次認證設定）。"""
+    return _auth_enabled()
+
+
+def is_admin(uid: Optional[int]) -> bool:
+    return uid is not None and _is_admin(uid)
+
+
+def owner_of(upload_id: str) -> Optional[int]:
+    """歸屬紀錄裡的擁有者（沒有紀錄、讀不到回 None）。給「把舊的暫存資料搬到正式位置」用：
+    搬過去時擁有者要照**原本的紀錄**，不是照打開它的那個人（管理員打開別人的舊案件時，
+    不可以把案件變成管理員的）。"""
+    if not is_uuid_hex(upload_id):
+        return None
+    try:
+        f = _owners_dir() / f"{upload_id}.json"
+        v = int(json.loads(f.read_text(encoding="utf-8")).get("user_id") or 0)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+    return v or None
+
+
 def record(upload_id: str, request: Request) -> None:
     """Record that this upload_id belongs to the request's user. Best-effort
     (errors swallowed). Skipped when auth is off (single-user mode)."""
@@ -186,6 +210,29 @@ def require(upload_id: str, request: Request) -> None:
     endpoints; equivalent to `if not check(...): raise HTTPException(403)`."""
     if not check(upload_id, request):
         raise HTTPException(403, "access denied")
+
+
+def is_owner(upload_id: str, request: Request) -> bool:
+    """**嚴格**判斷這個請求的人是不是這份上傳的擁有者 —— 管理員也不例外。
+
+    `check()` 讓管理員越權**讀**別人的檔案（支援情境，見 `ADMIN_MAY_READ_USER_FILES`）；
+    這一支給「拿別人的作業做事」的動作用（例如會議摘要把替換送回轉逐字稿那件作業、
+    請 JTLW 重跑校正）—— 那不是讀，管理員也不可以替別人做。
+    認證關閉時一律 True（單機模式沒有「別人」）；沒有歸屬紀錄一律 False。
+    """
+    if not is_uuid_hex(upload_id):
+        return False
+    if not _auth_enabled():
+        return True
+    cur_uid = _user_id(request)
+    if cur_uid is None:
+        return False
+    f = _owners_dir() / f"{upload_id}.json"
+    try:
+        owner = int(json.loads(f.read_text(encoding="utf-8")).get("user_id") or 0)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+    return owner == cur_uid
 
 
 def extract_upload_id(filename: str) -> str:

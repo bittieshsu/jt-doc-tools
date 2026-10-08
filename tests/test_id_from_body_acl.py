@@ -43,6 +43,7 @@ ACL_PATTERNS = (
     r"\b_require_access\(",        # pdf-annotations 系列
     r"\b_require_own_upload\(",    # pdf-nup（id 藏在 pydantic 模型欄位裡）
     r"\b_check_case_acl\(",        # submission-check
+    r"\b_require_case\b",          # 公文撰擬（案件；多半寫成 to_thread(_require_case, …)）
     r"\b_job_access\(",            # 作業 API / pdf-to-office 預覽與報告
     r"\brequire_admin\b", r"\b_require_admin\b",
     r"\b_require_tool\(",
@@ -301,6 +302,11 @@ FAILOPEN_EXEMPT: dict[tuple[str, str], str] = {
         "存的是呼叫者自己送上來的內容，沒有既有資料可被越權存取",
     ("app/web/workspace_routes.py", "build_router"):
         "同上 —— 這是包住 workspace_save 的工廠函式，AST 掃描會一併掃到外層",
+    ("app/tools/official_doc/router.py", "_require_case"):
+        "`if meta is None:` 是 v1.16.66 以前還在暫存區的舊案件（沒有 meta.json），走原本的歸屬紀錄"
+        "（`upload_owner.check`，不通過一律 404）；另一條路徑是有 meta.json 的案件，同一支函式接著"
+        "依擁有者 / 管理員判斷、其餘一律 404 —— 兩條都檢查，沒有一條是直接放行"
+        "（`tests/test_official_doc_cases.py` 驗別人、不存在、已刪除都是同一個 404）",
 }
 
 

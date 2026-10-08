@@ -10,7 +10,11 @@
   <ul data-s="saa3893fb">
     <li><b>{{ tr('停用') }}</b>{{ tr('後整個功能完全隱藏：各工具的「存至工作區」「從工作區載入」按鈕與「我的工作區」頁面都不會出現。') }}</li>
     <li>{{ tr('認證關閉（單機模式）時，工作區為單一共用（即該台機器的使用者）。') }}</li>
-    <li>{{ tr('只接受 PDF 與 PNG 檔。') }}</li>
+    {# 收哪些格式由程式實算（`workspace.accepted_type_groups()`），不在這裡寫死 ——
+       原本寫的「只接受 PDF 與 PNG 檔」在工作區收辦公文件與純文字之後一直沒人改。 #}
+    <li>{{ tr('接受的格式（依檔案內容判斷，不看副檔名）：') }}
+      {%- for label, exts in accepted_groups %}<span class="ws-type-group"><b>{{ tr(label) }}</b> {{ exts|join(' / ') }}</span>{% endfor %}</li>
+    <li>{{ tr('錄音 / 錄影檔（給「會議錄音轉逐字稿」從工作區載入用）另有單檔上限，其他格式用「單檔上限」。錄音是敏感資料：一樣照保留時數自動清除，下方也看得到每個人存了多少錄音、可以清空。') }}</li>
     <li>{{ tr('保留時數到期由背景排程（每 6 小時）清理；填') }} <code>-1</code> {{ tr('表示永久保留。') }}</li>
     <li>{{ tr('容量 / 單檔上限填') }} <code>0</code> {{ tr('表示不限制。') }}</li>
   </ul>
@@ -31,6 +35,10 @@
     <input class="field field-num" type="number" id="ws-maxfile" value="{{ settings.max_file_mb }}" min="0" max="1048576"> <span class="field-unit">{{ tr('MB（0 = 不限）') }}</span>
   </div>
   <div class="form-row">
+    <label>{{ tr('錄音檔上限') }}</label>
+    <input class="field field-num" type="number" id="ws-maxaudio" value="{{ settings.max_audio_mb }}" min="0" max="1048576"> <span class="field-unit">{{ tr('MB（0 = 不限）') }}</span>
+  </div>
+  <div class="form-row">
     <label>{{ tr('保留時數') }}</label>
     <input class="field field-num" type="number" id="ws-retention" value="{{ settings.retention_hours }}" min="-1" max="876000"> <span class="field-unit">{{ tr('小時（-1 = 永久）') }}</span>
   </div>
@@ -42,13 +50,15 @@
 
 <div class="panel">
   <h2 data-s="s53896af7">{{ icon('gauge', size=18) }} {{ tr('目前佔用') }}</h2>
-  <p class="muted" data-s="s3044b600">{{ tr('總計') }} {{ stats.total_count }} {{ tr('個檔案，') }}{{ '%.1f'|format(stats.total_bytes / 1048576) }} MB。</p>
+  <p class="muted" data-s="s3044b600">{{ tr('總計') }} {{ stats.total_count }} {{ tr('個檔案，') }}{{ '%.1f'|format(stats.total_bytes / 1048576) }} MB。
+    {%- if stats.audio_count %} {{ tr('其中錄音 / 錄影檔 {0} 個，{1} MB。')|replace('{0}', stats.audio_count|string)|replace('{1}', '%.1f'|format(stats.audio_bytes / 1048576)) }}{% endif %}</p>
   {% if stats.users %}
   <table class="ws-table">
-    <thead><tr><th>{{ tr('使用者') }}</th><th>{{ tr('檔案數') }}</th><th>{{ tr('佔用') }}</th><th></th></tr></thead>
+    <thead><tr><th>{{ tr('使用者') }}</th><th>{{ tr('檔案數') }}</th><th>{{ tr('佔用') }}</th><th>{{ tr('其中錄音檔') }}</th><th></th></tr></thead>
     <tbody>
       {% for u in stats.users %}
       <tr><td><b>{{ u.label }}</b></td><td class="muted">{{ u.count }}</td><td class="muted">{{ '%.1f'|format(u.bytes / 1048576) }} MB</td>
+        <td class="muted">{% if u.audio_count %}{{ u.audio_count }}（{{ '%.1f'|format(u.audio_bytes / 1048576) }} MB）{% else %}—{% endif %}</td>
         <td><button class="btn btn-small ws-clear-user" data-key="{{ u.key }}" data-label="{{ u.label }}" type="button">{{ tr('清空') }}</button></td></tr>
       {% endfor %}
     </tbody>
@@ -65,6 +75,7 @@
   .ws-table th, .ws-table td { padding:6px 8px; border-bottom:1px solid #e5e7eb; text-align:left; }
   .ws-table th { background:#f9fafb; font-size:11px; color:#6b7280; }
   .switch-label { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#374151; }
+  .ws-type-group { display:inline-block; margin:2px 0 0 10px; white-space:nowrap; }
 </style>
 {% endblock %}
 
@@ -75,6 +86,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     enabled: document.getElementById('ws-enabled').checked,
     per_user_quota_mb: parseInt(document.getElementById('ws-quota').value, 10),
     max_file_mb: parseInt(document.getElementById('ws-maxfile').value, 10),
+    max_audio_mb: parseInt(document.getElementById('ws-maxaudio').value, 10),
     retention_hours: parseInt(document.getElementById('ws-retention').value, 10),
   };
   const r = await fetch('/admin/workspace/save', {

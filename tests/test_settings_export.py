@@ -84,7 +84,10 @@ def test_read_manifest_rejects_non_export(tmp_path):
 
 # ---------------- import selection ----------------
 
-def test_import_only_selected_category(data_dir, tmp_path):
+def test_import_only_selected_category(data_dir, tmp_path, monkeypatch):
+    # 這一條驗「只還原勾選的類別」；這台要有本機管理員，認證設定才會套用
+    # （沒有的話匯入會擋下來 —— 見 test_settings_export_identity.py）
+    monkeypatch.setattr(settings_export, "_has_local_admin", lambda: True)
     _write(data_dir, "auth_settings.json", {"backend": "local"})
     _write(data_dir, "llm_settings.json", {"model": "orig"})
     out = tmp_path / "exp.zip"
@@ -200,9 +203,12 @@ def test_rbac_import_cannot_escalate(auth_off, tmp_path):
 def test_rbac_excludes_users(auth_off, tmp_path):
     """The RBAC dump must never contain user rows / password hashes."""
     dump = settings_export._rbac_dump()
+    # v1.16.66 起多帶個人與群組的指派（鍵是編號，匯入時靠 identity.json 換成那一台的編號）
     assert set(dump.keys()) == {
         "roles", "role_perms", "role_seed_snapshot",
-        "ou_subject_roles", "ou_subject_perms"}
+        "ou_subject_roles", "ou_subject_perms",
+        "user_subject_roles", "group_subject_roles",
+        "user_subject_perms", "group_subject_perms"}
     blob = json.dumps(dump)
     assert "password" not in blob.lower()
 

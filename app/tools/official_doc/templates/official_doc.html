@@ -1,0 +1,2924 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% from "components/llm_gate.html" import llm_gate, llm_gate_styles with context %}
+{% block title %}{{ tr('公文撰擬') }} · {{ app_name }}{% endblock %}
+{% block head %}{{ llm_gate_styles() }}
+<style nonce="{{ request.state.csp_nonce }}">
+/* 欄位一律「標題在上、輸入框在下」，不用 `.form-row`：那裡的標題是照中文四到六個字
+   定的 96px 固定寬，「陳核對象」「承辦／協辦單位」在英文介面下會蓋到輸入框。 */
+.od-modes { margin:4px 0 16px; }
+.od-modes .option-card { flex:1 1 220px; }
+.od-grid { display:grid; gap:14px 18px; margin-top:14px;
+           grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
+.od-f { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.od-f > .od-lab { font-size:13.5px; font-weight:600; color:#334155; }
+.od-f .od-req { color:#b91c1c; font-weight:600; margin-left:2px; }
+.od-f input.field, .od-f select.field, .od-f textarea.field { width:100%; max-width:100%; }
+.od-f textarea.field { resize:vertical; line-height:1.75; font-family:inherit; font-size:14px; }
+.od-big { min-height:150px; }
+.od-mid { min-height:90px; }
+.od-foot { display:flex; justify-content:space-between; align-items:center; gap:6px 10px;
+           flex-wrap:wrap; font-size:12.5px; }
+.od-count { color:var(--muted); font-variant-numeric:tabular-nums; }
+.od-count.is-over { color:#b91c1c; font-weight:600; }
+.od-hint { margin:0; font-size:12.5px; line-height:1.65; color:var(--muted); }
+/* 版面加註下面那句「按了會即時預覽」：做成提示框＋按鈕（2026-10-08 使用者：「明顯一點」）。 */
+.od-live-tip { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:10px 0 0; }
+.od-live-tip > svg { flex:none; margin:0; }
+.od-live-txt { flex:1; min-width:200px; }
+.od-live-tip .btn { white-space:nowrap; }
+.od-pv-box.od-pv-flash { animation:odPvFlash 1.4s ease-out; }
+@keyframes odPvFlash { 0%,35% { box-shadow:0 0 0 3px #3b82f6; } 100% { box-shadow:0 0 0 0 rgba(59,130,246,0); } }
+.od-quick { display:flex; flex-wrap:wrap; gap:6px; }
+.od-check { display:flex; gap:8px; align-items:flex-start; font-size:13.5px; line-height:1.6; }
+.od-check > input { margin-top:4px; flex:0 0 auto; }
+/* 來文是全文 / 大綱：兩張一樣大的卡片並排（窄的時候上下疊） */
+.option-cards.od-src-cards { display:grid; gap:10px; margin-top:12px;
+                             grid-template-columns:repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.od-src-cards .option-card { min-width:0; padding:12px 12px; }
+.od-src-cards .opt-label, .od-src-cards .opt-desc { overflow-wrap:anywhere; text-wrap:balance; }
+.od-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; align-items:center; }
+.od-grid-gap { margin-top:14px; }
+/* 複製的退路用：要在畫面外但**不可以是 display:none**（那樣選不到文字） */
+.od-offscreen { position:fixed; left:-9999px; top:0; width:1px; height:1px; }
+/* 結果區自己有一整排匯出鈕（照改過之後的文字），進度列那排（下載原始草稿 /
+   存至工作區 / 處理新檔案）拿掉，不然同一份草稿會有兩組按鈕 */
+#odJob .job-actions { display:none !important; }
+
+/* 結果 */
+.od-sec { margin:4px 0 22px; }
+.od-sec > h3 { font-size:15px; margin:0 0 8px; display:flex; align-items:center; gap:6px; }
+.od-facts { border:1px solid var(--border); border-radius:8px; overflow:hidden; background:#fff; }
+.od-fr { display:grid; grid-template-columns:minmax(6em, 10em) minmax(0, 1fr) auto;
+         gap:8px 12px; align-items:center; padding:8px 12px; border-bottom:1px solid #f1f5f9; }
+.od-fr:last-child { border-bottom:0; }
+.od-fr.is-edited { background:#f8fafc; }
+.od-fr-label { font-size:13px; font-weight:600; color:#334155; overflow-wrap:anywhere; }
+.od-fr input.field { width:100%; min-width:0; }
+.od-badge { font-size:12px; padding:2px 9px; border-radius:999px; white-space:nowrap;
+            border:1px solid currentColor; line-height:1.6; }
+.od-b-provided  { color:#047857; background:#ecfdf5; }
+.od-b-inferred  { color:#b45309; background:#fffbeb; }
+.od-b-missing   { color:#64748b; background:#f8fafc; }
+.od-b-conflict  { color:#b91c1c; background:#fef2f2; }
+.od-b-confirmed { color:#1d4ed8; background:#eff6ff; }
+@media (max-width:640px) {
+  .od-fr { grid-template-columns:minmax(0, 1fr) auto; }
+  .od-fr .od-fr-label { grid-column:1; grid-row:1; }
+  .od-fr .od-badge { grid-column:2; grid-row:1; }
+  .od-fr input.field { grid-column:1 / -1; grid-row:2; }
+}
+/* 草稿本身：公文慣用楷體，行距放寬（看起來接近印出來的樣子） */
+.od-draft { width:100%; max-width:100%; box-sizing:border-box; min-height:380px; resize:vertical;
+            font-family:"標楷體", "DFKai-SB", "TW-Kai", "AR PL UKai TW", "BiauKai", serif;
+            font-size:16px; line-height:1.9; }
+.od-dirty { margin:6px 0 0; font-size:12.5px; color:#b45309; }
+.od-iss { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.od-iss li { border:1px solid; border-left-width:4px; border-radius:6px; }
+.od-iss .od-iss-btn { display:block; width:100%; text-align:left; background:transparent; border:0;
+                      padding:8px 12px; font:inherit; font-size:13.5px; line-height:1.6;
+                      color:inherit; cursor:pointer; overflow-wrap:anywhere; }
+.od-iss .od-iss-btn:hover { text-decoration:underline; text-decoration-color:rgba(15,23,42,.3); }
+.od-iss-tag { font-weight:600; margin-right:8px; white-space:nowrap; }
+.od-sev-error { border-color:#fecaca; border-left-color:#dc2626; background:#fef2f2; color:#7f1d1d; }
+.od-sev-todo  { border-color:#fde68a; border-left-color:#d97706; background:#fffbeb; color:#78350f; }
+.od-sev-hint  { border-color:#bfdbfe; border-left-color:#2563eb; background:#eff6ff; color:#1e3a8a; }
+.od-iss-sum { margin:0; font-size:13px; line-height:1.65; }
+/* 草稿下面那幾節（參考資料、檢查結果、版本、匯出）：一節一張卡片 —— 標題列 ＋ 內容。
+   卡片是版面查詢的容器（`odbox`）：匯出那張表、版本清單依**卡片自己的寬度**換排法，
+   不看視窗（側欄開著的筆電上視窗寬、內容區窄；英 / 日的字也比中文長）。 */
+.od-sec.od-box { margin:0 0 16px; border:1px solid var(--border); border-radius:var(--radius);
+                 background:#fff; container:odbox / inline-size; }
+.od-sec.od-box:last-child { margin-bottom:0; }
+.od-box-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
+               gap:6px 12px; min-height:44px; padding:7px 16px; background:#f8fafc;
+               border-bottom:1px solid var(--border); border-radius:var(--radius) var(--radius) 0 0; }
+.od-box-head > h3 { font-size:15px; margin:0; display:flex; align-items:center; gap:6px; }
+.od-box-body { padding:14px 16px 16px; min-width:0; }
+.od-box-body > :first-child { margin-top:0; }
+
+/* 匯出：一張表。第一欄是每一列的標題，第二欄是格式（文件 ／ 圖片 ／ 文字），接著三欄按鈕
+   （各取那一欄最寬的按鈕 —— 同一欄一樣寬、上下對齊），最後一欄吃掉剩下的寬度。
+   設定那幾列（版面、版面加註）的控制項從第二欄跨到最後。不寫死寬度：英 / 日的字比中文長，
+   標題欄用 `fit-content`，太長就折行，不把右邊擠出去。 */
+.od-xp { display:grid; align-items:start; gap:12px 14px;
+         grid-template-columns:fit-content(9.5em) fit-content(7em) repeat(3, max-content) minmax(0, 1fr); }
+.od-xp-row { display:contents; }
+.od-xp-lab { grid-column:1; font-size:13px; font-weight:600; color:#334155; line-height:1.4;
+             padding-top:8px; overflow-wrap:anywhere; }
+.od-xp-ctl { grid-column:2 / -1; min-width:0; display:flex; flex-direction:column; gap:8px; }
+.od-xp-note { margin-top:-6px; gap:2px; }
+.od-xp-sep { grid-column:1 / -1; border-top:1px solid #eef1f5; }
+.od-xp-kind { display:contents; }
+.od-xp-kname { grid-column:2; font-size:12.5px; color:#64748b; line-height:1.4; padding-top:9px;
+               overflow-wrap:anywhere; }
+.od-xp .od-xp-kind > .btn { justify-content:flex-start; white-space:nowrap; }
+#odTplRow .jt-select-wrap { display:block; width:26em; max-width:100%; }
+/* 版面加註：共用的選項卡片（`.option-card`），一律同樣大小排成格子 */
+.option-cards.od-extra-cards { display:grid; gap:10px;
+                               grid-template-columns:repeat(auto-fill, minmax(min(100%, 168px), 1fr)); }
+.od-extra-cards .option-card { min-width:0; padding:12px 10px; }
+.od-extra-cards .opt-label, .od-extra-cards .opt-desc { overflow-wrap:anywhere; text-wrap:balance; }
+.od-extra-letter { display:contents; }
+/* 改寫方式：同一種卡片，一次選一種；一律同樣大小排成格子 */
+.option-cards.od-rw-cards { display:grid; gap:8px; margin-top:10px;
+                            grid-template-columns:repeat(auto-fit, minmax(min(100%, 104px), 1fr)); }
+.od-rw-cards .option-card { min-width:0; padding:10px 8px; }
+.od-rw-cards .opt-label, .od-rw-cards .opt-desc { overflow-wrap:anywhere; text-wrap:balance; }
+/* 勾了卡片才出現的那幾格：一格的寬度有上限（地址那一格不會被擠成一小格，也不會拉成整列寬） */
+.od-extras-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+                  gap:10px 16px; max-width:920px; }
+/* 勾了卡片才出現的那幾格；一格都沒有時整塊不佔位置 */
+.od-extra-fields:not(:has(> .od-f:not([hidden]))) { display:none; }
+.od-todo { margin:0 0 14px; }
+/* 卡片窄（手機、窄視窗）：標題在上、控制項在下；格式一行、按鈕接著往下折 */
+@container odbox (max-width: 700px) {
+  .od-box-head { padding:7px 12px; }
+  .od-box-body { padding:12px; }
+  /* 手機上一列兩張卡片（一張一列的話七張要捲很久） */
+  .option-cards.od-extra-cards { grid-template-columns:repeat(auto-fill, minmax(min(100%, 120px), 1fr)); gap:8px; }
+  .od-extra-cards .option-card { padding:10px 8px; }
+  .od-xp { display:block; }
+  .od-xp-row { display:block; margin-top:16px; }
+  .od-xp > .od-xp-row:first-child, .od-xp > [hidden] + .od-xp-row { margin-top:0; }
+  .od-xp-lab { display:block; padding-top:0; margin-bottom:8px; }
+  .od-xp-note { margin-top:6px; }
+  .od-xp-sep { margin-top:16px; }
+  .od-xp-kind { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px; }
+  .od-xp-lab + .od-xp-kind { margin-top:0; }
+  .od-xp-kname { flex:0 0 100%; padding-top:0; margin-bottom:-2px; }
+}
+/* 參考資料（知識庫）*/
+.od-kb { margin-top:18px; padding-top:14px; border-top:1px dashed var(--border); }
+.od-refs { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.od-ref { border:1px solid var(--border); border-radius:6px; padding:8px 12px; background:#fff;
+          font-size:13.5px; line-height:1.6; }
+.od-ref-head { display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; }
+.od-ref-id { font-weight:600; color:#334155; font-variant-numeric:tabular-nums; }
+.od-ref-title { font-weight:600; overflow-wrap:anywhere; }
+.od-ref-where { color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; }
+.od-ref details { margin-top:4px; }
+.od-ref-notice { margin:4px 0 0; font-size:12.5px; line-height:1.6; color:#92400e; }
+.od-ref-attr { margin:4px 0 0; font-size:12px; line-height:1.6; color:var(--muted); overflow-wrap:anywhere; }
+.od-ref summary { cursor:pointer; font-size:12.5px; color:var(--muted); }
+.od-ref-text { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px;
+               color:#334155; background:#f8fafc; border-radius:4px; padding:6px 8px; }
+.od-b-basis  { color:#047857; background:#ecfdf5; }
+.od-b-format { color:#1d4ed8; background:#eff6ff; }
+.od-b-style  { color:#64748b; background:#f8fafc; }
+.od-b-used   { color:#7c2d12; background:#fff7ed; }
+.od-attrib { margin:6px 0 0; font-size:12px; line-height:1.6; color:var(--muted); overflow-wrap:anywhere; }
+#odTpl { min-width:14em; max-width:100%; }
+/* 函：草稿會用的稱謂（規則在伺服器端，這裡只顯示） */
+.od-salute { margin:14px 0 0; padding:8px 12px; border:1px solid var(--border); border-radius:8px;
+             background:#f8fafc; font-size:13.5px; line-height:1.7; display:flex; flex-wrap:wrap;
+             gap:2px 18px; }
+.od-salute b { color:#1d4ed8; font-weight:600; }
+.od-warn-hint { color:#b45309; }
+
+/* 同一列的輸入框與下拉要**一樣高**（2026-10-07 使用者：「這邊的框要整齊」）——
+   瀏覽器預設的 select 比 input 高幾 px，兩種都給同一個高度（border-box，全站樣式已設）。
+   **多行的欄位不放進 .od-grid**：陳核對象改成單行（多位用「、」隔開，核心會拆成一行一位）；
+   函的聯絡資訊自成一列。量法在 `test_form_controls_in_a_row_line_up`。 */
+.od-grid input.field, .od-grid select.field, .od-rw-row .field { height:38px; line-height:1.4; }
+.od-rw-row .btn { height:38px; }
+/* 上傳區（共用元件）：這裡是「把檔案的文字帶進上面那一格」，比其他工具的主上傳區矮一點 */
+.od-f .file-upload .drop-zone { padding:14px 16px; }
+.od-f .file-upload .drop-zone-icon svg { width:28px; height:28px; }
+.od-f .file-upload .fu-ws-row { margin-top:8px; }
+
+/* 逐段改寫 */
+.od-rw { margin-top:14px; border:1px solid var(--border); border-radius:8px; padding:12px 14px;
+         background:#f8fafc; }
+.od-rw-head { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:baseline; }
+.od-rw-head .od-lab { font-size:13.5px; font-weight:600; color:#334155; display:inline-flex;
+                      align-items:center; gap:6px; white-space:nowrap; }
+.od-rw-target { font-size:12.5px; line-height:1.65; color:var(--muted); overflow-wrap:anywhere; }
+.od-rw-target.is-warn { color:#b45309; }
+.od-rw-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:center; }
+.od-rw-row input.field { flex:1 1 240px; min-width:0; }
+.od-rw-out { margin-top:12px; }
+.od-diff { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
+.od-diff-col { border:1px solid var(--border); border-radius:8px; background:#fff; overflow:hidden; min-width:0; }
+.od-diff-h { font-size:12.5px; font-weight:600; color:#475569; padding:6px 10px;
+             border-bottom:1px solid #f1f5f9; background:#f8fafc; }
+.od-diff-body { padding:10px 12px; font-family:"標楷體", "DFKai-SB", "TW-Kai", "AR PL UKai TW", "BiauKai", serif; font-size:15px; line-height:1.9;
+                white-space:pre-wrap; overflow-wrap:anywhere; }
+.od-diff-body del { color:#b91c1c; background:#fee2e2; text-decoration:line-through;
+                    text-decoration-thickness:1.5px; }
+.od-diff-body ins { color:#14532d; background:#bbf7d0; text-decoration:none; border-radius:2px; }
+.od-rw-stat { margin:8px 0 0; }
+.od-rw-out .od-actions { margin-top:12px; }
+.od-iss .od-iss-static { padding:8px 12px; font-size:13.5px; line-height:1.6; overflow-wrap:anywhere; }
+@media (max-width:720px) { .od-diff { grid-template-columns:minmax(0, 1fr); } }
+
+/* 版本：標題列右邊是「目前是第 N 版」＋「儲存這個版本」。清單是一張只跟內容一樣寬的小表
+   （版次與來源 ｜ 時間與字數 ｜ 動作，`subgrid` 讓每一列的三欄上下對齊）——
+   「看這一版」緊接在時間後面，不會在寬螢幕上孤零零地掛在整列最右邊。 */
+.od-rev-bar { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; margin-left:auto; }
+.od-rev-bar .btn { background:#fff; }
+.od-rev-state { font-size:13px; color:#334155; }
+.od-rev-state.is-dirty { color:#b45309; }
+.od-rev-conflict { margin:12px 0 0; }
+.od-rev-conflict p { margin:0; }
+.od-rev-conflict .od-actions { margin-top:10px; }
+.od-revs { list-style:none; margin:10px 0 0; padding:0; border:1px solid var(--border);
+           border-radius:8px; overflow:hidden; background:#fff;
+           display:grid; column-gap:20px; width:fit-content; max-width:100%;
+           grid-template-columns:fit-content(30em) max-content max-content; }
+.od-rev { grid-column:1 / -1; display:grid; column-gap:20px; row-gap:4px; align-items:center;
+          grid-template-columns:fit-content(30em) max-content max-content;
+          grid-template-columns:subgrid;
+          padding:8px 14px; border-bottom:1px solid #f1f5f9; }
+.od-rev:last-child { border-bottom:0; }
+.od-rev.is-latest { background:#f8fafc; }
+.od-rev-main { grid-column:1; display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; font-size:13.5px; min-width:0; }
+.od-rev-no { font-weight:600; color:#0f172a; white-space:nowrap; }
+.od-rev-detail { color:#334155; overflow-wrap:anywhere; min-width:0; }
+.od-rev-sub { grid-column:2; grid-row:1; font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums;
+              white-space:nowrap; }
+.od-rev-act { grid-column:3; grid-row:1; display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-start; }
+.od-rev-latest { color:#047857; font-weight:600; }
+.od-src { font-size:12px; padding:1px 8px; border-radius:999px; border:1px solid currentColor;
+          white-space:nowrap; line-height:1.6; }
+.od-src-ai { color:#6d28d9; background:#f5f3ff; }
+.od-src-edit { color:#0f766e; background:#f0fdfa; }
+.od-src-rewrite { color:#1d4ed8; background:#eff6ff; }
+.od-rev-view { margin-top:10px; border:1px solid var(--border); border-radius:8px; background:#fff; }
+.od-rev-view-head { display:flex; flex-wrap:wrap; gap:6px 10px; justify-content:space-between;
+                    align-items:center; padding:8px 12px; border-bottom:1px solid #f1f5f9; }
+.od-rev-view-title { font-size:13.5px; font-weight:600; color:#0f172a; }
+.od-rev-view-act { display:flex; gap:6px; flex-wrap:wrap; }
+.od-rev-text { margin:0; padding:10px 12px; max-height:360px; overflow:auto; white-space:pre-wrap;
+               overflow-wrap:anywhere; font-family:"標楷體", "DFKai-SB", "TW-Kai", "AR PL UKai TW", "BiauKai", serif; font-size:15px; line-height:1.85; }
+/* 卡片窄的時候：一列疊成三行（版次 ／ 時間 ／ 動作），清單拉滿卡片的寬度 */
+@container odbox (max-width: 640px) {
+  .od-revs { display:block; width:auto; }
+  .od-rev { display:grid; grid-template-columns:minmax(0, 1fr); }
+  .od-rev-main, .od-rev-sub, .od-rev-act { grid-column:1; grid-row:auto; }
+  .od-rev-sub { white-space:normal; }
+}
+
+/* 本頁的下拉一律是本站樣式（`jt-select`，2026-10-08 使用者：「展開的清單要用本站樣式」）。
+   欄位裡的下拉跟同一列的輸入框**一樣寬、一樣高**；寬度固定，換選項時不跳。 */
+.od-f .jt-select-wrap { display:block; width:100%; }
+.od-grid .jt-select-trigger, #odTplRow .jt-select-trigger {
+  height:38px; font-size:14px; color:#0f172a; border-color:var(--border); border-radius:6px; }
+.jt-select-trigger:disabled { background:#f8fafc; color:var(--muted); cursor:not-allowed; }
+/* 載入範例：需求敘述正下方（字數那一列的左邊） */
+.od-ex-slot { min-width:0; }
+/* 要看得出來（2026-10-08 使用者：「載入範例 區 做明顯一點」）：淺藍底 ＋ 左邊色線 ＋ 圖示，
+   跟同一列灰色的字數分得開。下拉白底，看得出那是可以點的地方。 */
+.od-toplinks { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin:-4px 0 14px; font-size:13px; }
+.od-ex { display:inline-flex; align-items:center; gap:6px 10px; flex-wrap:wrap; max-width:100%;
+         padding:6px 8px 6px 10px; border:1px solid #bfdbfe; border-left:4px solid var(--primary);
+         border-radius:8px; background:#eff6ff; }
+.od-ex-lab { display:inline-flex; align-items:center; gap:6px; font-size:13.5px; font-weight:700;
+             color:var(--primary-dark); white-space:nowrap; }
+.od-ex-lab svg { color:var(--primary); flex:0 0 auto; }
+.od-ex-tip { font-size:12px; color:#1e3a8a; white-space:nowrap; }
+.od-ex .jt-select-wrap { width:260px; max-width:100%; }
+.od-ex .jt-select-trigger { padding-top:5px; padding-bottom:5px; background:#fff; border-color:#93c5fd; }
+@media (max-width: 640px) {
+  .od-ex { display:flex; width:100%; }
+  .od-ex .jt-select-wrap { width:100%; }
+  .od-ex-tip { white-space:normal; }
+}
+
+/* 重新產生中：舊的草稿反灰、不能操作（`inert` 由程式設），作業結束才解除 */
+.od-busy-note { position:sticky; top:8px; z-index:5; display:flex; align-items:center; gap:8px;
+                margin:0 0 12px; padding:8px 12px; border:1px solid #bfdbfe;
+                border-left:4px solid #2563eb; border-radius:8px; background:#eff6ff;
+                color:#1e3a8a; font-size:13.5px; line-height:1.6;
+                box-shadow:0 2px 8px rgba(15, 23, 42, .08); }
+.od-busy-note .spinner { flex:0 0 auto; margin-right:0; }
+#odResult.is-busy .od-result-body { pointer-events:none; user-select:none; }
+/* 草稿那一塊另外蓋轉圈（不跟著淡掉）；正在跑的那顆「重新產生」也不淡，看得到轉圈 */
+#odResult.is-busy .od-sec > :not(.od-draft-cq):not(.od-regen-row),
+#odResult.is-busy .od-draft-col > :not(.od-draft-wrap):not(.od-col-head),
+#odResult.is-busy .od-draft-left > .od-rw,
+#odResult.is-busy .od-pv {
+  opacity:.45; filter:grayscale(.6); transition:opacity .15s, filter .15s; }
+/* 草稿上的轉圈（產生、重新產生、逐段改寫共用 `draftBusy()`） */
+.od-draft-wrap { position:relative; }
+.od-draft-wrap.is-busy > .od-draft { background:#f1f5f9; color:#94a3b8; }
+.od-draft-busy { position:absolute; inset:0; z-index:3; display:flex; align-items:center;
+                 justify-content:center; padding:16px; border-radius:6px;
+                 background:rgba(248, 250, 252, .55); cursor:progress; }
+.od-draft-busy-pill { display:inline-flex; align-items:center; gap:10px; padding:10px 18px;
+                      border:1px solid #bfdbfe; border-radius:999px; background:#fff;
+                      color:#1e3a8a; font-size:14px; font-weight:600;
+                      box-shadow:0 4px 14px rgba(15, 23, 42, .12); }
+.od-draft-busy .spinner, .od-pv-spin .spinner { width:20px; height:20px; border-width:3px;
+                                                 margin-right:0; color:#2563eb; }
+.od-src-regen { color:#b45309; background:#fffbeb; }
+
+/* 草稿＋預覽圖：內容區夠寬（≥ 1100px）並排，不夠寬疊起來（預覽在下面） */
+.od-draft-cq { container-type:inline-size; }
+.od-draft-grid { display:grid; grid-template-columns:minmax(0, 1fr); gap:16px; align-items:start; }
+@container (min-width: 1100px) {
+  .od-draft-grid { grid-template-columns:minmax(0, 1fr) minmax(380px, .8fr); align-items:stretch; }
+  .od-pv-pages { max-height:820px; overflow-y:auto; }
+  /* 左欄（草稿 ＋ 改寫一段）跟右邊的預覽一樣高：草稿框往下長，不留一大塊空白（2026-10-08 使用者） */
+  .od-draft-left { display:flex; flex-direction:column; }
+  .od-draft-left > .od-draft-col { flex:1 1 auto; display:flex; flex-direction:column; }
+  .od-draft-left .od-draft-wrap { flex:1 1 auto; display:flex; flex-direction:column; }
+  .od-draft-left .od-draft { flex:1 1 auto; }
+}
+/* 改寫一段緊接在草稿下面、預覽上面（2026-10-08 使用者） */
+.od-draft-left { min-width:0; }
+.od-draft-left > .od-rw { min-width:0; }
+.od-draft-col { min-width:0; }
+.od-pv { min-width:0; }
+/* 兩欄的標題列同一個高度：草稿框與預覽框的上緣對齊（2026-10-08 使用者） */
+.od-col-head { display:flex; align-items:center; min-height:28px; margin:0 0 8px; }
+.od-col-head > h3 { font-size:15px; margin:0; display:flex; align-items:center; gap:6px; }
+.od-pv-note { margin:0 0 8px; font-size:12.5px; color:var(--muted); text-align:center; }
+.od-pv-note:empty { display:none; }
+.od-pv-box { position:relative; min-height:220px; border:1px solid var(--border); border-radius:8px;
+             background:#f1f5f9; padding:10px; }
+.od-pv-pages { display:flex; flex-direction:column; align-items:center; gap:10px; }
+.od-pv-pages img { display:block; width:100%; max-width:640px; height:auto; background:#fff;
+                   border:1px solid #cbd5e1; box-shadow:0 2px 8px rgba(15, 23, 42, .10); cursor:zoom-in; }
+.od-pv-box.is-busy .od-pv-pages { opacity:.4; }
+.od-pv-spin { position:absolute; inset:0; z-index:3; display:flex; align-items:flex-start;
+              justify-content:center; padding-top:80px; }
+.od-pv-msg { margin:0; padding:24px 12px; text-align:center; font-size:13px; line-height:1.7;
+             color:var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+{# 「之前填過的」按鈕：放在輸入框**後面**（不包一層 —— 版面量測靠 `.od-f > input.field`），
+   由 static/js/field_history.js 疊到輸入框裡的右緣。紀錄存在這個瀏覽器（localStorage）。 #}
+{% macro hist_btn(target) -%}
+<button type="button" class="fh-btn" data-fh-for="{{ target }}" data-fh-key="jtdt.od.hist.{{ target }}"
+        title="{{ tr('之前填過的') }}" aria-label="{{ tr('之前填過的') }}"
+        aria-haspopup="listbox" aria-expanded="false">{{ icon('clock', size=15) }}</button>
+{%- endmacro %}
+<h1>{{ icon('official-doc', size=22) }} {{ tr('公文撰擬') }}<span class="tool-beta" title="{{ tr('試用中：產出請多看一眼，功能還可能調整') }}">Beta</span></h1>
+<p class="muted">{{ tr('把白話需求寫成「簽」或「函」，或依來文與你的辦理方向擬「簽辦意見」。格式照公文慣例排好，金額、日期與辦理方向照你寫的，沒提供的標成待補。') }}</p>
+<div class="od-toplinks">
+  <a class="btn" href="/tools/official-doc/cases" id="odCasesLink">{{ icon('clock', size=14) }} {{ tr('歷史案件') }}</a>
+  <span class="muted">{{ tr('撰擬過的公文都會留著，可以重新打開接著改') }}</span>
+</div>
+
+{{ llm_gate('official-doc', llm_enabled, llm_model, mode='only', llm_url=llm_url) }}
+
+<div class="info-box">
+  {{ icon('info', size=14) }}
+  {{ tr('這裡產生的是草稿。金額、日期、法規名稱與條號、文號、「已核准」這類狀態，系統會拿去跟你提供的內容比對，找不到依據的會標出來；但因果、結論這類語意系統驗不到，送出前請自己核對。') }}
+  {# 用哪個模型寫的：正上方共用的 `llm_gate` 那一列已經寫著（管理員另外看得到伺服器位址），
+     這裡不再寫一次 —— 兩行之內出現兩次同一個名字，看起來像兩件事。 #}
+</div>
+
+<div class="panel" id="odRoot"
+     data-max-field="{{ max_field }}" data-max-edit="{{ max_edit }}">
+  <h2>{{ icon('edit', size=18) }} {{ tr('1. 撰擬內容') }}</h2>
+  <div>
+    <div class="option-cards od-modes" role="radiogroup" aria-label="{{ tr('要寫哪一種') }}">
+      <label class="option-card">
+        <input type="radio" name="odMode" value="sign" checked>
+        <span class="opt-ic">{{ icon('official-doc', size=22) }}</span>
+        <span class="opt-label">{{ tr('簽') }}</span>
+        <span class="opt-desc">{{ tr('用白話寫你要辦的事，整理成主旨、說明、擬辦') }}</span>
+      </label>
+      <label class="option-card">
+        <input type="radio" name="odMode" value="endorse">
+        <span class="opt-ic">{{ icon('edit', size=22) }}</span>
+        <span class="opt-label">{{ tr('簽辦意見') }}</span>
+        <span class="opt-desc">{{ tr('貼上來文，寫下你打算怎麼辦，擬成簽辦意見') }}</span>
+      </label>
+      <label class="option-card">
+        <input type="radio" name="odMode" value="letter">
+        <span class="opt-ic">{{ icon('mail', size=22) }}</span>
+        <span class="opt-label">{{ tr('函') }}</span>
+        <span class="opt-desc">{{ tr('寫給其他機關、單位或民眾，整理成主旨、說明、辦法') }}</span>
+      </label>
+    </div>
+
+    {# ---------------- 簽 ---------------- #}
+    <div id="odSign">
+      <div class="od-f">
+        <label class="od-lab" for="odNarrative">{{ tr('需求敘述') }}<span class="od-req">*</span></label>
+        <textarea id="odNarrative" class="field od-big" data-max="{{ max_narrative }}"
+          placeholder="{{ tr('例如：資訊室的兩台印表機已經用了八年，常卡紙，維修廠商說零件停產。想用今年度的設備費新臺幣 6 萬元汰換 2 台雷射印表機，預計 11 月底前完成採購。') }}"></textarea>
+        <div class="od-foot">
+          <span class="od-ex-slot" data-ex-slot="sign">
+            {# 載入範例：**整頁只有一個**，切換模式時由程式搬到那個模式的需求敘述下面
+               （三份一模一樣的下拉各自記狀態，只會多出不一致的機會）。
+               範例的文字是輸入資料（`examples.py`），不翻譯；名稱走 tr()。 #}
+            <span class="od-ex" id="odEx">
+              <span class="od-ex-lab">{{ icon('sparkles', size=16) }}{{ tr('載入範例') }}</span>
+              <select id="odExample" class="field jt-select" aria-label="{{ tr('載入範例') }}"
+                      data-examples='{{ examples|tojson }}'>
+                <option value="">{{ tr('（選一個範例載入）') }}</option>
+                {% for m, gname, items in example_groups %}
+                <optgroup label="{{ tr(gname) }}">
+                  {% for ex in items %}
+                  <option value="{{ ex.key }}">{{ tr(ex.category) }}｜{{ tr(ex.label) }}</option>
+                  {% endfor %}
+                </optgroup>
+                {% endfor %}
+              </select>
+              <span class="od-ex-tip">{{ tr('不知道怎麼寫？先載一個範例看看') }}</span>
+            </span>
+          </span>
+          <span class="od-count" id="odNarrativeCount"></span>
+        </div>
+        {# 拖曳 / 點選 / 從工作區載入：**全站共用的上傳元件**（樣式與接線跟其他工具一樣）。
+           收的格式是抽文字那支實際認得的（`EXTRACT_EXTS`，伺服器端那一份）；
+           「從工作區載入」收哪幾種由元件自己跟工作區的清單取交集。 #}
+        {% with upload_id='odNarrativeUp', accept=accept, hint=tr('拖進來的檔案只抽出文字，放進上面的「需求敘述」；檔案本身不會留存。') ~ '<br>' ~ tr('收得進來的格式：{0}')|replace('{0}', extract_exts_label) %}{% include "components/file_upload.html" %}{% endwith %}
+        <p class="od-hint">{{ tr('金額、數量、日期、經費來源寫得越清楚，草稿越少「待補」。沒寫到的不會被編出來，會標成〔待補：…〕。') }}</p>
+      </div>
+      <div class="od-grid">
+        <div class="od-f">
+          <label class="od-lab" for="odUnit">{{ tr('承辦單位') }}</label>
+          <input type="text" id="odUnit" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('例如：資訊室') }}">
+          {{ hist_btn('odUnit') }}
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odAddressee">{{ tr('陳核對象') }}</label>
+          {# **單行**（跟同一列的欄位一樣高）。多位用「、」隔開 —— 核心的
+             `split_addressees` 會拆成「敬陳」下面一行一位。 #}
+          <input type="text" id="odAddressee" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('例：主任秘書、局長（多位用、隔開）') }}">
+          {{ hist_btn('odAddressee') }}
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odClosing">{{ tr('主旨結語') }}</label>
+          <select id="odClosing" class="field jt-select">
+            <option value="核示">{{ tr('簽請　核示') }}</option>
+            <option value="鑒核">{{ tr('簽請　鑒核') }}</option>
+            <option value="核准">{{ tr('簽請　核准') }}</option>
+            <option value="none">{{ tr('不加結語') }}</option>
+          </select>
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odLength">{{ tr('篇幅') }}</label>
+          <select id="odLength" class="field jt-select">
+            <option value="short">{{ tr('精簡') }}</option>
+            <option value="normal" selected>{{ tr('一般') }}</option>
+            <option value="long">{{ tr('詳細') }}</option>
+          </select>
+        </div>
+      </div>
+      <label class="od-check od-grid-gap">
+        <input type="checkbox" id="odWithDate">
+        <span>{{ tr('抬頭下加今天的日期') }}</span>
+      </label>
+    </div>
+
+    {# ---------------- 簽辦意見 ---------------- #}
+    <div id="odEndorse" hidden>
+      <div class="od-f">
+        <label class="od-lab" for="odSource">{{ tr('來文內容') }}<span class="od-req">*</span></label>
+        <textarea id="odSource" class="field od-big" data-max="{{ max_source }}"
+          placeholder="{{ tr('貼上來文的全文，或你自己整理的重點（誰來文、要求什麼、期限）。') }}"></textarea>
+        <div class="od-foot">
+          <span class="od-ex-slot" data-ex-slot="endorse"></span>
+          <span class="od-count" id="odSourceCount"></span>
+        </div>
+        {% with upload_id='odSourceUp', accept=accept, hint=tr('拖進來的檔案只抽出文字，放進上面的「來文內容」；檔案本身不會留存。') ~ '<br>' ~ tr('收得進來的格式：{0}')|replace('{0}', extract_exts_label) %}{% include "components/file_upload.html" %}{% endwith %}
+        {# 來文是全文還是自己整理的大綱：大一點的二選一卡片（2026-10-08 使用者：「做成大塊一點的切換」），
+           同一種 `.option-card`。選大綱時，提示會叫模型不要假設大綱沒寫到的細節。 #}
+        <div class="option-cards od-src-cards" role="radiogroup" aria-label="{{ tr('來文內容是') }}">
+          <label class="option-card">
+            <input type="radio" name="odSrcKind" value="full" checked>
+            <span class="opt-ic">{{ icon('file-text', size=20) }}</span>
+            <span class="opt-label">{{ tr('這是完整來文') }}</span>
+            <span class="opt-desc">{{ tr('貼上或拖進來的是機關來文的全文') }}</span>
+          </label>
+          <label class="option-card">
+            <input type="radio" name="odSrcKind" value="outline">
+            <span class="opt-ic">{{ icon('list', size=20) }}</span>
+            <span class="opt-label">{{ tr('這是我自己整理的大綱') }}</span>
+            <span class="opt-desc">{{ tr('自己摘的重點，大綱沒寫到的細節不會被補上') }}</span>
+          </label>
+        </div>
+      </div>
+      <div class="od-f od-grid-gap">
+        <label class="od-lab" for="odDirection">{{ tr('辦理方向') }}<span class="od-req">*</span></label>
+        <textarea id="odDirection" class="field od-mid" data-max="{{ max_direction }}"
+          placeholder="{{ tr('例如：擬照辦，由資訊室於期限內填報後函復。') }}"></textarea>
+        <div class="od-foot">
+          {# 快選只是**把字插進上面的框**，要怎麼辦還是使用者決定 ——
+            系統不替你決定照辦、存查或函復。插進去的是公文用語本身（不翻譯）。 #}
+          <div class="od-quick" id="odQuick">
+            <button type="button" class="btn btn-secondary btn-small" data-od-insert="擬照辦">{{ tr('擬照辦') }}</button>
+            <button type="button" class="btn btn-secondary btn-small" data-od-insert="擬存查">{{ tr('擬存查') }}</button>
+            <button type="button" class="btn btn-secondary btn-small" data-od-insert="擬函復">{{ tr('擬函復') }}</button>
+            <button type="button" class="btn btn-secondary btn-small" data-od-insert="擬移請相關單位辦理">{{ tr('擬移請相關單位辦理') }}</button>
+            <button type="button" class="btn btn-secondary btn-small" data-od-insert="擬簽會相關單位">{{ tr('擬簽會相關單位') }}</button>
+          </div>
+          <span class="od-count" id="odDirectionCount"></span>
+        </div>
+        <p class="od-hint">{{ tr('辦理方向是你的決定，系統照寫、不會改（寫存查就不會變成函復）。沒指定的承辦單位會標成待補，不會自己指派。') }}</p>
+      </div>
+      <div class="od-grid">
+        <div class="od-f">
+          <label class="od-lab" for="odUnits">{{ tr('承辦／協辦單位') }}</label>
+          <input type="text" id="odUnits" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('例如：資訊室主辦，總務科協辦') }}">
+          {{ hist_btn('odUnits') }}
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odDeadline">{{ tr('內部期限') }}</label>
+          <input type="text" id="odDeadline" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('例如：10月20日前') }}">
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odFmt">{{ tr('格式') }}</label>
+          <select id="odFmt" class="field jt-select">
+            <option value="compact">{{ tr('精簡一段') }}</option>
+            <option value="list">{{ tr('條列') }}</option>
+          </select>
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odLength2">{{ tr('篇幅') }}</label>
+          <select id="odLength2" class="field jt-select">
+            <option value="short">{{ tr('精簡') }}</option>
+            <option value="normal" selected>{{ tr('一般') }}</option>
+            <option value="long">{{ tr('詳細') }}</option>
+          </select>
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odEndClosing">{{ tr('結尾') }}</label>
+          <select id="odEndClosing" class="field jt-select">
+            <option value="陳核">{{ tr('陳核') }}</option>
+            <option value="陳閱">{{ tr('陳閱') }}</option>
+            <option value="none">{{ tr('不加') }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    {# ---------------- 函 ----------------
+       行文關係、期望語、速別的清單**只有一份：核心那一份**（`official_doc.RELATIONS` /
+       `LETTER_CLOSINGS` / `LETTER_SPEEDS`）。期望語要依行文關係過濾，整份以 JSON 放在
+       `data-closings` —— 前端不另寫一份清單。 #}
+    <div id="odLetter" hidden data-closings='{{ letter_closings|tojson }}'>
+      <div class="od-f">
+        <label class="od-lab" for="odLetterNarrative">{{ tr('需求敘述') }}<span class="od-req">*</span></label>
+        <textarea id="odLetterNarrative" class="field od-big" data-max="{{ max_narrative }}"
+          placeholder="{{ tr('例如：本局訂於11月15日辦理資訊安全研習，想請各區公所轉知同仁報名，每單位以2人為限，請於10月31日前回傳報名表。') }}"></textarea>
+        <div class="od-foot">
+          <span class="od-ex-slot" data-ex-slot="letter"></span>
+          <span class="od-count" id="odLetterNarrativeCount"></span>
+        </div>
+        {% with upload_id='odLetterNarrativeUp', accept=accept, hint=tr('拖進來的檔案只抽出文字，放進上面的「需求敘述」；檔案本身不會留存。') ~ '<br>' ~ tr('收得進來的格式：{0}')|replace('{0}', extract_exts_label) %}{% include "components/file_upload.html" %}{% endwith %}
+        <p class="od-hint">{{ tr('寫清楚要請對方做什麼、期限與附件。沒寫到的不會被編出來，會標成〔待補：…〕。') }}</p>
+      </div>
+      {# 發文身分：機關發的函，或企業發給政府機關的函（範例集 v1.1 第 9 點）。企業的函仍是「函」，
+         差在自稱（本公司）、稱謂（貴○）、期望語與抬頭欄位 —— 規則在核心，這裡只切換欄位的寫法。
+         企業時行文關係固定（伺服器端也一樣，送什麼都不看），所以那一格藏起來。 #}
+      <div class="od-grid">
+        <div class="od-f">
+          <label class="od-lab" for="odIssuer">{{ tr('發文身分') }}</label>
+          <select id="odIssuer" class="field jt-select">
+            {% for key, label in issuers %}
+            <option value="{{ key }}">{{ tr(label) }}</option>
+            {% endfor %}
+          </select>
+          <p class="od-hint" id="odIssuerHint" hidden>{{ tr('企業發給政府機關：自稱「本公司」、稱對方「貴○」，沒有上行、下行之分；申請的事寫成請求，不會寫成已核准。') }}</p>
+        </div>
+      </div>
+      <div class="od-grid">
+        <div class="od-f">
+          <label class="od-lab" for="odOrg" id="odOrgLab"
+                 data-agency="{{ tr('發文機關全銜') }}" data-company="{{ tr('公司名稱') }}">{{ tr('發文機關全銜') }}</label>
+          <input type="text" id="odOrg" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('例如：嘉禾市資訊局') }}"
+                 data-ph-agency="{{ tr('例如：嘉禾市資訊局') }}" data-ph-company="{{ tr('例如：○○資訊股份有限公司') }}"{% if orgs_available %} list="odOrgList" autocomplete="off"{% endif %}>
+          {{ hist_btn('odOrg') }}
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odReceiver">{{ tr('受文者') }}</label>
+          <input type="text" id="odReceiver" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('例如：嘉禾市東湖區公所') }}"{% if orgs_available %} list="odOrgList" autocomplete="off"{% endif %}>
+          {{ hist_btn('odReceiver') }}
+        </div>
+        <div class="od-f" id="odRelationRow">
+          <label class="od-lab" for="odRelation">{{ tr('行文關係') }}<span class="od-req">*</span></label>
+          <select id="odRelation" class="field jt-select">
+            <option value="">{{ tr('（請選擇）') }}</option>
+            {% for key, label in relations %}
+            <option value="{{ key }}">{{ tr(label) }}</option>
+            {% endfor %}
+          </select>
+          <p class="od-hint od-warn-hint" id="odRelationHint" hidden>{{ tr('不確定的話，草稿的期望語與稱謂會標成〔待確認〕，送出前要確認。') }}</p>
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odLetterClosing">{{ tr('期望語') }}</label>
+          {# 選項是**原樣寫進草稿**的公文用語（「請　查照」），不翻譯 #}
+          <select id="odLetterClosing" class="field jt-select" data-i18n="skip" disabled>
+            <option value="">{{ tr('（先選行文關係）') }}</option>
+          </select>
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odSpeed">{{ tr('速別') }}</label>
+          <select id="odSpeed" class="field jt-select">
+            {% for s in letter_speeds %}
+            <option value="{{ s }}">{{ tr(s) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odLength3">{{ tr('篇幅') }}</label>
+          <select id="odLength3" class="field jt-select">
+            <option value="short">{{ tr('精簡') }}</option>
+            <option value="normal" selected>{{ tr('一般') }}</option>
+            <option value="long">{{ tr('詳細') }}</option>
+          </select>
+        </div>
+      </div>
+      {% if orgs_available %}
+      {# 機關名稱建議：公文電子交換系統地址簿（管理員下載的）。只是建議 —— 打什麼都收。 #}
+      <datalist id="odOrgList"></datalist>
+      <p class="od-hint">{{ tr('發文機關與受文者輸入兩個字以上，會從機關地址簿列出建議的全銜。') }}</p>
+      {% for a in attribution.orgs %}<p class="od-attrib" data-i18n="skip">{{ tr('資料來源：') }}{{ a }}</p>{% endfor %}
+      {% endif %}
+      <p class="od-salute" id="odSalute" hidden>
+        <span>{{ tr('草稿會稱對方：') }}<b id="odSaluteTerm" data-i18n="skip"></b></span>
+        <span>{{ tr('自稱：') }}<b id="odSaluteSelf" data-i18n="skip"></b></span>
+      </p>
+      <div class="od-grid">
+        {# 發文字號：選填（2026-10-08 使用者）。企業自己編號、機關已經取好號的直接填；
+           沒填就跟以前一樣留空 —— 草稿不會自己編一個。每一份都不同，所以**不記在瀏覽器裡**。 #}
+        <div class="od-f">
+          <label class="od-lab" for="odDocNo">{{ tr('發文字號') }}</label>
+          <input type="text" id="odDocNo" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('選填，例如：○字第1150000001號') }}">
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odCopies">{{ tr('正本') }}</label>
+          <input type="text" id="odCopies" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('留空＝同受文者') }}">
+          {{ hist_btn('odCopies') }}
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odCc">{{ tr('副本') }}</label>
+          <input type="text" id="odCc" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('例如：本局資訊安全科') }}">
+          {{ hist_btn('odCc') }}
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odAttachments">{{ tr('附件') }}</label>
+          <input type="text" id="odAttachments" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('例如：報名表1份') }}">
+        </div>
+        <div class="od-f">
+          <label class="od-lab" for="odSignature">{{ tr('署名') }}</label>
+          <input type="text" id="odSignature" class="field" maxlength="{{ max_field }}"
+                 placeholder="{{ tr('例如：局長　王○○') }}"
+                 data-ph-agency="{{ tr('例如：局長　王○○') }}" data-ph-company="{{ tr('例如：○○股份有限公司　負責人　王○○') }}">
+          {{ hist_btn('odSignature') }}
+        </div>
+      </div>
+      <div class="od-f od-grid-gap">
+        <label class="od-lab" for="odContact">{{ tr('聯絡資訊') }}</label>
+        <textarea id="odContact" class="field od-mid" maxlength="{{ max_contact }}" rows="4"
+                  placeholder="{{ tr('地址') }}：…&#10;{{ tr('聯絡人') }}：…&#10;{{ tr('電話') }}：…&#10;{{ tr('傳真') }}：…&#10;{{ tr('電子信箱') }}：…"
+                  data-ph-agency="{{ tr('地址') }}：…&#10;{{ tr('聯絡人') }}：…&#10;{{ tr('電話') }}：…&#10;{{ tr('傳真') }}：…&#10;{{ tr('電子信箱') }}：…"
+                  data-ph-company="{{ tr('地址') }}：…&#10;{{ tr('統一編號') }}：…&#10;{{ tr('聯絡人') }}：…&#10;{{ tr('電話') }}：…&#10;{{ tr('電子信箱') }}：…"></textarea>
+        <p class="od-hint" id="odContactHint" data-agency="{{ tr('一行一項，原樣放在機關名稱下面。發文機關、聯絡資訊、署名、副本會記在這個瀏覽器裡，下次自動帶入。') }}"
+           data-company="{{ tr('一行一項，原樣放在公司名稱下面；沒填的話草稿會標出地址、統一編號、聯絡人待補。公司名稱、聯絡資訊、署名、副本會記在這個瀏覽器裡（跟機關的分開記），下次自動帶入。') }}">{{ tr('一行一項，原樣放在機關名稱下面。發文機關、聯絡資訊、署名、副本會記在這個瀏覽器裡，下次自動帶入。') }}</p>
+      </div>
+    </div>
+
+    {# 參考知識庫：只有這個人看得到至少一個資料集時才出現（勾了也查不到東西的話，
+       不如不給這個選項）。預設不勾 —— 沒要求就不拿任何資料進來。 #}
+    {% if kb_available %}
+    <div class="od-kb">
+      <label class="od-check">
+        <input type="checkbox" id="odUseKb">
+        <span>{{ tr('參考公文知識庫') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></span>
+      </label>
+      <p class="od-hint">{{ tr('先在公文知識庫裡找跟這件事相關的資料（只會用到你看得到的資料集）再撰寫。只有「業務依據」那一類算草稿的依據；格式手冊與範例公文只參考寫法，裡面的金額、日期、法規不會被當成這件事的事實。') }}</p>
+    </div>
+    {% endif %}
+
+    <div class="od-actions">
+      <button type="button" class="btn btn-primary" id="odGo">
+        {{ icon('sparkles', size=16) }} <span>{{ tr('產生草稿') }}</span>
+      </button>
+      <button type="button" class="btn btn-secondary" id="odCancel" hidden>
+        {{ icon('close', size=16) }} <span>{{ tr('停止') }}</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+{% with progress_id='odJob' %}{% include "components/job_progress.html" %}{% endwith %}
+
+<div class="panel" id="odResult" hidden>
+  <h2>{{ icon('official-doc', size=18) }} {{ tr('草稿') }}</h2>
+  {# 已經有草稿、又按了一次產生：下面整塊反灰而且不能操作（`inert`），作業結束才解除 ——
+     成功換成新的一份；失敗或按停止，這一份原樣還回來。這一行在 `inert` 那塊**外面**
+     （inert 的內容不會被輔助科技唸出來）。 #}
+  <p class="od-busy-note" id="odBusyNote" role="status" hidden>
+    <span class="spinner" aria-hidden="true"></span>
+    <span>{{ tr('正在重新產生草稿…完成後會換成新的一份；停止或失敗時，這一份會原樣保留。') }}</span>
+  </p>
+  <div class="od-result-body" id="odResultBody">
+    <section class="od-sec">
+      <h3>{{ icon('list', size=16) }} {{ tr('整理出來的資料') }}</h3>
+      <p class="od-hint">{{ tr('「原文有」是在你提供的內容裡找得到的；「推論」是模型自己判斷的，請確認；改過的值會用在重新產生的草稿上。') }}</p>
+      <div class="od-facts" id="odFacts"></div>
+      <div class="od-actions od-regen-row">
+        <button type="button" class="btn btn-secondary" id="odRegen">
+          {{ icon('refresh', size=16) }} <span>{{ tr('依修改後的資料重新產生') }}</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="od-sec">
+      {# 草稿在左、預覽圖在右（版面夠寬時；不夠寬就疊在下面），「改寫一段」緊接在草稿下面、預覽上面。預覽圖走跟匯出 PDF 同一條路，
+         不用等匯出才看得到效果（2026-10-08 使用者）。`.od-draft-cq` 是版面查詢的容器 ——
+         依**這一塊自己的寬度**排，不是視窗寬度（側欄開著的筆電上視窗寬、內容區窄）。
+         兩欄各自一行標題（`.od-col-head`，同一個高度），草稿框與預覽框的上緣才對得齊（2026-10-08 使用者）。 #}
+      <div class="od-draft-cq">
+        <div class="od-draft-grid">
+          <div class="od-draft-left">
+          <div class="od-draft-col">
+            <div class="od-col-head">
+              <h3>{{ icon('edit', size=16) }} {{ tr('草稿（可以直接修改）') }}</h3>
+            </div>
+            {# 產生、重新產生、逐段改寫進行中：草稿上蓋一層轉圈（`draftBusy()`，三條路共用一支），
+               草稿暫時唯讀 —— 結束後還原成原本的狀態。 #}
+            <div class="od-draft-wrap" id="odDraftWrap">
+              <textarea id="odDraft" class="field od-draft" spellcheck="false"
+                        aria-label="{{ tr('草稿') }}" data-max="{{ max_edit }}"></textarea>
+              <div class="od-draft-busy" id="odDraftBusy" hidden>
+                <span class="od-draft-busy-pill"><span class="spinner" aria-hidden="true"></span><span id="odDraftBusyLabel"></span></span>
+              </div>
+            </div>
+            <div class="od-foot">
+              <button type="button" class="btn btn-secondary btn-small" id="odRecheck">
+                {{ icon('check', size=14) }} <span>{{ tr('重新檢查') }}</span>
+              </button>
+              <span class="od-count" id="odDraftCount"></span>
+            </div>
+            <p class="od-dirty" id="odDirty" hidden>{{ tr('草稿改過了 —— 按「重新檢查」更新下面的檢查結果。') }}</p>
+          </div>
+          {# 逐段改寫：改寫的範圍是「選取的文字」，沒有選取就是游標所在的那一段。找「那一段」的
+             規則跟伺服器端讀草稿的規則同一份（`data-seg`，核心 `parse_text` 的正規式）——
+             抬頭、日期、受文者、正副本、署名這些格式欄位不送去改寫；主旨結尾的結語 / 期望語
+             （使用者在表單上選的）不送給模型、換回來時原樣留著。 #}
+          <div class="od-rw" id="odRw" data-seg='{{ segment_rules|tojson }}'
+               data-max="{{ max_rewrite }}">
+            <div class="od-rw-head">
+              <span class="od-lab">{{ icon('sparkles', size=14) }} {{ tr('改寫一段') }}</span>
+              <span class="od-rw-target" id="odRwTarget">{{ tr('在草稿裡選取一段文字，或把游標放在要改的那一行。') }}</span>
+            </div>
+            {# 改寫方式排成卡片（同「版面加註」那一排的 `.option-card`；2026-10-08 使用者要求），一次選一種 #}
+            <div class="option-cards od-rw-cards" id="odRwKinds" role="radiogroup" aria-label="{{ tr('改寫方式') }}">
+              {% for key, label, ic, desc in rewrite_kinds %}
+              <label class="option-card">
+                <input type="radio" name="odRwKind" value="{{ key }}"{% if loop.first %} checked{% endif %}>
+                <span class="opt-ic">{{ icon(ic, size=20) }}</span>
+                <span class="opt-label">{{ tr(label) }}</span>
+                <span class="opt-desc">{{ tr(desc) }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div class="od-rw-row">
+              <input type="text" id="odRwInstr" class="field" maxlength="{{ max_instruction }}" hidden
+                     aria-label="{{ tr('改寫要求') }}"
+                     placeholder="{{ tr('例如：語氣委婉一點，期限與金額不要動') }}">
+              <button type="button" class="btn btn-secondary" id="odRwGo">
+                {{ icon('sparkles', size=16) }} <span>{{ tr('改寫') }}</span>
+              </button>
+            </div>
+            <div class="od-rw-out" id="odRwOut" hidden>
+              <div class="od-diff">
+                <div class="od-diff-col">
+                  <div class="od-diff-h">{{ tr('原本') }}</div>
+                  <div class="od-diff-body" id="odRwBefore" data-i18n="skip"></div>
+                </div>
+                <div class="od-diff-col">
+                  <div class="od-diff-h">{{ tr('改寫後') }}</div>
+                  <div class="od-diff-body" id="odRwAfter" data-i18n="skip"></div>
+                </div>
+              </div>
+              <p class="od-hint od-rw-stat" id="odRwStat"></p>
+              <p class="od-iss-sum" id="odRwIssueSum"></p>
+              <ul class="od-iss" id="odRwIssues"></ul>
+              <div class="od-actions">
+                <button type="button" class="btn btn-primary" id="odRwAccept">
+                  {{ icon('check', size=16) }} <span>{{ tr('採用') }}</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="odRwReject">
+                  {{ icon('close', size=16) }} <span>{{ tr('不用') }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          </div>
+          <div class="od-pv" id="odPvPane">
+            <div class="od-col-head">
+              <h3>{{ icon('eye', size=16) }} {{ tr('預覽') }}</h3>
+            </div>
+            {# 文字先出來，圖之後才補上；圖還沒到之前蓋一層轉圈（換新的時候舊圖留著、變淡）。
+               點一頁看大圖（共用的 lightbox）。說明（只畫了前幾頁、範本讀不懂）放在框裡第一行，
+               不放標題列 —— 放標題列會讓這一欄的標題比草稿那一欄高，兩個框就對不齊。 #}
+            <div class="od-pv-box" id="odPvBox">
+              <p class="od-pv-note" id="odPvNote"></p>
+              <div class="od-pv-pages" id="odPreview" data-lightbox></div>
+              <div class="od-pv-spin" id="odPvSpin" hidden>
+                <span class="od-draft-busy-pill"><span class="spinner" aria-hidden="true"></span><span>{{ tr('產生預覽圖中…') }}</span></span>
+              </div>
+              <p class="od-pv-msg" id="odPvMsg" hidden></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# 草稿下面的幾節（參考資料、檢查結果、版本、匯出）各是一張卡片：上面一條標題列
+       （`.od-box-head`，版本那一張的右邊放「目前是第 N 版」與「儲存這個版本」），下面是內容
+       （`.od-box-body`）。兩個都是 `.od-sec` 的直接子元素 —— 重新產生時的反灰規則
+       （`#odResult.is-busy .od-sec > …`）照樣蓋得到。2026-10-08 使用者：「下半部排整齊一點」。 #}
+    {# 這份草稿參考了哪些資料：沒勾知識庫的話整節不出現 #}
+    <section class="od-sec od-box" id="odRefSec" hidden
+             data-purposes='{{ ref_purposes|tojson }}' data-notes='{{ kb_notes|tojson }}'>
+      <div class="od-box-head"><h3>{{ icon('book', size=16) }} {{ tr('參考資料') }}</h3></div>
+      <div class="od-box-body">
+        <p class="od-hint" id="odRefNote"></p>
+        <ul class="od-refs" id="odRefs"></ul>
+      </div>
+    </section>
+
+    <section class="od-sec od-box">
+      <div class="od-box-head"><h3>{{ icon('warn', size=16) }} {{ tr('檢查結果') }}</h3></div>
+      <div class="od-box-body">
+        <p class="od-iss-sum muted" id="odIssueSum"></p>
+        <ul class="od-iss" id="odIssues"></ul>
+      </div>
+    </section>
+
+    {# 版本：存在伺服器上（每個案件一份清單），不是這個瀏覽器裡。存新版要帶「從第幾版改的」，
+       不是最新版就 409 —— 兩個分頁同時改的時候不會安靜地蓋掉另一邊。
+       「目前是第 N 版」與「儲存這個版本」放在標題列右邊（一行）；清單是一張只跟內容一樣寬的小表，
+       「看這一版」緊接在時間後面那一欄，不會孤零零地掛在整列最右邊。 #}
+    <section class="od-sec od-box" id="odRevSec">
+      <div class="od-box-head">
+        <h3>{{ icon('clock', size=16) }} {{ tr('版本') }}</h3>
+        <div class="od-rev-bar">
+          <span class="od-rev-state" id="odRevState"></span>
+          <button type="button" class="btn btn-secondary btn-small" id="odRevSave">
+            {{ icon('save', size=14) }} <span>{{ tr('儲存這個版本') }}</span>
+          </button>
+        </div>
+      </div>
+      <div class="od-box-body">
+      <p class="od-hint">{{ tr('「儲存這個版本」、採用改寫、還原都會留下一版；還原也是另存一版，不會刪掉後面的版本。每份草稿最多保留 {0} 版（第一版一定留著）。')|replace('{0}', max_revisions|string) }}</p>
+      <div class="warn-box od-rev-conflict" id="odRevConflict" hidden>
+        <p id="odRevConflictMsg"></p>
+        <div class="od-actions">
+          <button type="button" class="btn btn-secondary" id="odRevLoadLatest">
+            {{ icon('refresh', size=16) }} <span>{{ tr('載入最新版') }}</span>
+          </button>
+          <button type="button" class="btn btn-primary" id="odRevForce">
+            {{ icon('save', size=16) }} <span>{{ tr('仍然儲存為新版本（以最新版為基礎）') }}</span>
+          </button>
+        </div>
+      </div>
+      <ol class="od-revs" id="odRevs" reversed></ol>
+      <div class="od-rev-view" id="odRevView" hidden>
+        <div class="od-rev-view-head">
+          <span class="od-rev-view-title" id="odRevViewTitle"></span>
+          <span class="od-rev-view-act">
+            <button type="button" class="btn btn-secondary btn-small" id="odRevViewRestore">
+              {{ icon('reset', size=14) }} <span>{{ tr('還原成這一版') }}</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-small" id="odRevViewClose">
+              {{ icon('close', size=14) }} <span>{{ tr('關閉') }}</span>
+            </button>
+          </span>
+        </div>
+        <pre class="od-rev-text" id="odRevViewText" data-i18n="skip"></pre>
+      </div>
+      </div>
+    </section>
+
+    {# 匯出：一張表（`.od-xp`；`.od-ex` 是上面「載入範例」那一塊，不要混用）—— 每一列左邊同一欄是標題（版面 ／ 版面加註 ／ 下載 ／ 存至工作區），
+       右邊是控制項。下載與存至工作區依格式分行（文件 ／ 圖片 ／ 文字），按鈕排進同一組欄位：
+       同一欄的按鈕一樣寬、上下對齊，存至工作區的 ODT / DOCX 對在下載的 ODT / DOCX 下面。
+       卡片自己不夠寬（手機、窄視窗）時改成標題在上、按鈕往下折（看卡片的寬度，不看視窗）。 #}
+    <section class="od-sec od-box" id="odExportSec">
+      <div class="od-box-head"><h3>{{ icon('download', size=16) }} {{ tr('匯出') }}</h3></div>
+      <div class="od-box-body">
+      <div class="warn-box od-todo" id="odTodo" hidden></div>
+      <div class="od-xp">
+      {# 套用機關範本：管理員下載了範本才出現；能選哪幾份由伺服器依文別決定（`data-tpls`）。 #}
+      {% if org_templates %}
+      <div class="od-xp-row" id="odTplRow" hidden data-tpls='{{ org_templates|tojson }}'>
+        <label class="od-xp-lab" for="odTpl">{{ tr('版面') }}</label>
+        <div class="od-xp-ctl">
+          <select id="odTpl" class="field jt-select">
+            <option value="">{{ tr('內建版面') }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="od-xp-ctl od-xp-note" id="odTplNote" hidden>
+        <p class="od-hint">{{ tr('套用政府資料開放平臺的公文範本（只用在 ODT、DOCX、PDF 與圖片）。範本讀不懂時會改用內建版面，並在下載後告訴你。') }}</p>
+        {% for a in attribution.templates %}<p class="od-attrib" data-i18n="skip">{{ tr('範本來源：') }}{{ a }}</p>{% endfor %}
+      </div>
+      {% endif %}
+      {# 版面加註（2026-10-08 使用者）：頁首的「草稿」、頁碼、裝訂線、左上角的正本／副本與發文方式、
+         分層負責決行、受文者地址（開窗信封）。**不寫進草稿文字**、只出現在 ODT / DOCX / PDF / 圖片與預覽圖上；
+         選項的清單在伺服器（`official_doc_odt.COPY_MARKS` / `SEND_METHODS`），這裡不另寫。
+         正本／副本、發文方式、受文者地址只有函才有；分層負責只有機關發的函。
+         每一項是一張可以勾的卡片（共用的 `.option-card`，跟「辦公文件轉圖片」同一種），裡面是真的勾選框。
+         函那四項要再填一個值：勾了卡片，下面才出現那一格；取消勾選＝不印（值清空，跟原本的「不標示」／
+         「空著」是同一件事，送給伺服器的仍然是那幾個欄位）。 #}
+      <div class="od-xp-row" id="odExtras">
+        <span class="od-xp-lab">{{ tr('版面加註') }}</span>
+        <div class="od-xp-ctl">
+          <div class="option-cards od-extra-cards">
+            <label class="option-card">
+              <input type="checkbox" id="odDraftMark" checked>
+              <span class="opt-ic">{{ icon('watermark', size=24) }}</span>
+              <span class="opt-label">{{ tr('草稿標示') }}</span>
+              <span class="opt-desc">{{ tr('頁首印「草稿」兩字') }}</span>
+            </label>
+            <label class="option-card">
+              <input type="checkbox" id="odPageNo" checked>
+              <span class="opt-ic">{{ icon('hash', size=24) }}</span>
+              <span class="opt-label">{{ tr('頁碼') }}</span>
+              <span class="opt-desc">{{ tr('第○頁　共○頁') }}</span>
+            </label>
+            <label class="option-card">
+              <input type="checkbox" id="odBinding">
+              <span class="opt-ic">{{ icon('paperclip', size=24) }}</span>
+              <span class="opt-label">{{ tr('裝訂線') }}</span>
+              <span class="opt-desc">{{ tr('左側虛線與「裝訂線」字樣') }}</span>
+            </label>
+            <div class="od-extra-letter" id="odExtrasLetter" hidden>
+              <label class="option-card">
+                <input type="checkbox" id="odCopyMarkOn" data-od-extra="odCopyMark">
+                <span class="opt-ic">{{ icon('copy', size=24) }}</span>
+                <span class="opt-label">{{ tr('正本／副本標示') }}</span>
+                <span class="opt-desc">{{ tr('左上角印正本、副本或抄本') }}</span>
+              </label>
+              <label class="option-card">
+                <input type="checkbox" id="odSendMethodOn" data-od-extra="odSendMethod">
+                <span class="opt-ic">{{ icon('mail', size=24) }}</span>
+                <span class="opt-label">{{ tr('發文方式') }}</span>
+                <span class="opt-desc">{{ tr('左上角印郵寄、電子交換等') }}</span>
+              </label>
+              <label class="option-card" id="odDelegateRow">
+                <input type="checkbox" id="odDelegateOn" data-od-extra="odDelegate">
+                <span class="opt-ic">{{ icon('stamp', size=24) }}</span>
+                <span class="opt-label">{{ tr('分層負責決行') }}</span>
+                <span class="opt-desc">{{ tr('署名下方印授權決行') }}</span>
+              </label>
+              <label class="option-card">
+                <input type="checkbox" id="odRecvAddrOn" data-od-extra="odRecvAddr">
+                <span class="opt-ic">{{ icon('pin-map', size=24) }}</span>
+                <span class="opt-label">{{ tr('受文者地址') }}</span>
+                <span class="opt-desc">{{ tr('對準開窗信封的窗口') }}</span>
+              </label>
+            </div>
+            {# 簽辦意見單獨列印時才用：上面「簽辦意見」與來文、下面承辦人簽章與日期。預設不勾 ——
+               簽辦意見多半貼進公文系統的簽辦欄或寫在來文空白處，多出這幾行反而要刪（2026-10-08 使用者）。
+               沿用 `.od-extra-letter` 的排法（display:contents，卡片直接排進同一張格子）。 #}
+            <div class="od-extra-letter" id="odExtrasEndorse" hidden>
+              <label class="option-card">
+                <input type="checkbox" id="odEndorseFrame">
+                <span class="opt-ic">{{ icon('form', size=24) }}</span>
+                <span class="opt-label">{{ tr('抬頭與承辦人欄') }}</span>
+                <span class="opt-desc">{{ tr('單獨列印時用：印「簽辦意見」與來文，下面留承辦人簽章與日期') }}</span>
+              </label>
+            </div>
+          </div>
+          {# 勾了上面那張卡片才出現的那一格（`odXxxF`）；顯示與否由 `paintExtraFields()` 決定 #}
+          <div class="od-extras-grid od-extra-fields">
+            <div class="od-f" id="odCopyMarkF" hidden>
+              <label class="od-lab" for="odCopyMark">{{ tr('正本／副本標示') }}</label>
+              {# 選項是**原樣印在文件上**的公文用語，不翻譯（同期望語） #}
+              <select id="odCopyMark" class="field jt-select" data-i18n="skip">
+                <option value="">{{ tr('不標示') }}</option>
+                {% for c in copy_marks %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="od-f" id="odSendMethodF" hidden>
+              <label class="od-lab" for="odSendMethod">{{ tr('發文方式') }}</label>
+              <select id="odSendMethod" class="field jt-select" data-i18n="skip">
+                <option value="">{{ tr('不標示') }}</option>
+                {% for m in send_methods %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="od-f" id="odDelegateF" hidden>
+              <label class="od-lab" for="odDelegate">{{ tr('分層負責決行') }}</label>
+              <input type="text" id="odDelegate" class="field" maxlength="{{ max_delegate }}" list="odDelegateList"
+                     autocomplete="off" placeholder="{{ tr('例如：業務主管') }}">
+              <datalist id="odDelegateList">{% for d in delegate_suggestions %}<option value="{{ d }}"></option>{% endfor %}</datalist>
+              <p class="od-hint">{{ tr('署名下方印「本案依分層負責規定授權○○決行」。空著就不印。') }}</p>
+            </div>
+            <div class="od-f" id="odRecvAddrF" hidden>
+              <label class="od-lab" for="odRecvAddr">{{ tr('受文者地址（開窗信封）') }}</label>
+              <input type="text" id="odRecvAddr" class="field" maxlength="{{ max_address }}"
+                     placeholder="{{ tr('例如：100000 嘉禾市中正路1號') }}">
+              <p class="od-hint">{{ tr('郵遞區號與地址印在「受文者」上面，對準開窗信封的窗口。') }}</p>
+            </div>
+          </div>
+          <p class="od-hint">{{ tr('這些只加在匯出的檔案、圖片與預覽圖上，不會寫進草稿文字。') }}</p>
+          <div class="info-box od-live-tip" id="odLiveTip">
+            {{ icon('eye') }}
+            <span class="od-live-txt"><b>{{ tr('即時預覽') }}</b> {{ tr('勾選或填寫後，上方草稿旁的預覽圖會立即更新。') }}</span>
+            <button type="button" class="btn btn-secondary btn-small" id="odLiveGo">{{ icon('image') }}{{ tr('往上看預覽') }}</button>
+          </div>
+        </div>
+      </div>
+      <div class="od-xp-sep" aria-hidden="true"></div>
+      <div class="od-xp-row" id="odDlRow">
+        <span class="od-xp-lab">{{ tr('下載') }}</span>
+        <div class="od-xp-kind">
+          <span class="od-xp-kname">{{ tr('文件') }}</span>
+          <button type="button" class="btn btn-primary" data-od-dl="odt">{{ icon('download', size=16) }} <span>ODT</span></button>
+          <button type="button" class="btn btn-secondary" data-od-dl="docx">{{ icon('download', size=16) }} <span>DOCX</span></button>
+          <button type="button" class="btn btn-secondary" data-od-dl="pdf">{{ icon('download', size=16) }} <span>PDF</span></button>
+        </div>
+        <div class="od-xp-kind">
+          <span class="od-xp-kname">{{ tr('圖片') }}</span>
+          <button type="button" class="btn btn-secondary" data-od-dl="png" title="{{ tr('多頁時一頁一張，打包成 zip') }}">{{ icon('download', size=16) }} <span>{{ tr('PNG 圖片') }}</span></button>
+          <button type="button" class="btn btn-secondary" data-od-dl="svg" title="{{ tr('多頁時一頁一張，打包成 zip；文字轉成外框，沒有標楷體的電腦也長得一樣') }}">{{ icon('download', size=16) }} <span>{{ tr('SVG 圖片') }}</span></button>
+        </div>
+        <div class="od-xp-kind">
+          <span class="od-xp-kname">{{ tr('文字') }}</span>
+          <button type="button" class="btn btn-secondary" data-od-dl="txt">{{ icon('download', size=16) }} <span>{{ tr('純文字') }}</span></button>
+          <button type="button" class="btn btn-secondary" data-od-dl="json">{{ icon('download', size=16) }} <span>JSON</span></button>
+          <button type="button" class="btn btn-secondary" id="odCopy">{{ icon('copy', size=16) }} <span>{{ tr('複製純文字') }}</span></button>
+        </div>
+      </div>
+      {% if workspace_enabled(request) %}
+      {# 跟「下載」分開：兩列都是格式按鈕，沒有線的話看起來像同一組（使用者 2026-10-08）。跟著那一列一起顯示 / 隱藏。 #}
+      <div class="od-xp-sep" id="odWsSep" aria-hidden="true" hidden></div>
+      <div class="od-xp-row" id="odWsRow" hidden>
+        <span class="od-xp-lab">{{ tr('存至工作區') }}</span>
+        <div class="od-xp-kind">
+          <span class="od-xp-kname">{{ tr('文件') }}</span>
+          <button type="button" class="btn btn-secondary" id="odWsOdt">{{ icon('archive', size=16) }} <span>ODT</span></button>
+          <button type="button" class="btn btn-secondary" id="odWsDocx">{{ icon('archive', size=16) }} <span>DOCX</span></button>
+        </div>
+      </div>
+      {% endif %}
+      </div>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/file_upload.js"></script>
+<script src="/static/js/job_progress.js"></script>
+<script src="/static/js/custom_select.js"></script>
+<script src="/static/js/field_history.js"></script>
+<script src="/static/js/lightbox.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  'use strict';
+  var BASE = '/tools/official-doc';
+  var el = function (id) { return document.getElementById(id); };
+  var root = el('odRoot');
+  var MAX_FIELD = Number(root.dataset.maxField) || 200;
+  var MAX_EDIT = Number(root.dataset.maxEdit) || 30000;
+  var mode = 'sign', caseId = null, result = null, restoreOnDone = false;
+
+  // 本頁的下拉都是本站樣式（`jt-select`）。**原生的 <select> 仍然是唯一的值來源**
+  // （讀 `.value`、聽 `change` 照舊），但用程式改 `.value` 或重畫選項之後，畫面上那一份
+  // 不會自己知道 —— 要叫它重畫一次；停用狀態也要帶過去（元件本身不看 `disabled`）。
+  // 先在這裡掛上（不等 DOMContentLoaded），下面一開始畫期望語時就拿得到 `_jtSelect`。
+  if (window.enhanceJtSelects) window.enhanceJtSelects();
+  function syncSelect(sel) {
+    var js = sel && sel._jtSelect;
+    if (!js) return;
+    js.refresh();
+    js.trigger.disabled = !!sel.disabled;
+  }
+  function syncAllSelects() {
+    document.querySelectorAll('select.jt-select').forEach(syncSelect);
+  }
+
+  // ---------------------------------------------------------------- 小工具
+
+  // 按鈕在處理中：停用 ＋ 轉圈 ＋ 換字。回傳「還原」的函式。
+  // **不經過 innerHTML**：原本的子節點留著，還原時原樣放回去。
+  function busy(btn, label) {
+    var kids = Array.prototype.slice.call(btn.childNodes);
+    var sp = document.createElement('span');
+    sp.className = 'spinner';
+    btn.disabled = true;
+    btn.replaceChildren(sp, document.createTextNode(label));
+    return function () {
+      btn.replaceChildren.apply(btn, kids);
+      btn.disabled = false;
+    };
+  }
+  function toast(msg, kind) { if (window.showToast) window.showToast(msg, kind || ''); }
+  function nameFrom(r) {
+    var cd = r.headers.get('Content-Disposition') || '';
+    var m = /filename\*=utf-8''([^;]+)/i.exec(cd);
+    return m ? decodeURIComponent(m[1]) : (/filename="?([^";]+)"?/i.exec(cd) || [])[1];
+  }
+  function postJson(path, body) {
+    return fetch(BASE + path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  }
+
+  // ---------------------------------------------------------------- 模式
+
+  function setMode(m) {
+    mode = (m === 'endorse' || m === 'letter') ? m : 'sign';
+    el('odSign').hidden = mode !== 'sign';
+    el('odEndorse').hidden = mode !== 'endorse';
+    el('odLetter').hidden = mode !== 'letter';
+    document.querySelectorAll('input[name="odMode"]').forEach(function (r) {
+      r.checked = (r.value === mode);
+    });
+    // 「載入範例」整頁只有一個，跟著模式搬到那個模式的需求敘述 / 來文內容正下方
+    var slot = document.querySelector('.od-ex-slot[data-ex-slot="' + mode + '"]'), exBox = el('odEx');
+    if (slot && exBox && exBox.parentNode !== slot) slot.appendChild(exBox);
+  }
+  document.querySelectorAll('input[name="odMode"]').forEach(function (r) {
+    r.addEventListener('change', function () { if (r.checked) setMode(r.value); });
+  });
+
+  // ---------------------------------------------------------------- 字數
+
+  function wireCount(taId, countId) {
+    var ta = el(taId), c = el(countId), max = Number(ta.dataset.max) || 0;
+    function paint() {
+      var n = ta.value.trim().length;
+      c.textContent = tr('{0} / {1} 字').replace('{0}', n.toLocaleString())
+                                         .replace('{1}', max.toLocaleString());
+      c.classList.toggle('is-over', max > 0 && n > max);
+    }
+    ta.addEventListener('input', paint);
+    paint();
+  }
+  wireCount('odNarrative', 'odNarrativeCount');
+  wireCount('odSource', 'odSourceCount');
+  wireCount('odDirection', 'odDirectionCount');
+  wireCount('odLetterNarrative', 'odLetterNarrativeCount');
+
+  // ---------------------------------------------------------------- 從檔案帶入文字
+  //
+  // 上傳區是全站共用的元件（拖曳、點選、從工作區載入都一樣）。檔案只送去抽文字，
+  // 抽出來的字放進那一格；**框裡已經有字時先問**「取代還是接在後面」—— 不可以
+  // 安靜地蓋掉使用者打的字。關掉詢問視窗也算「接在後面」（不會丟掉任何字）。
+  function wireUpload(rootId, taId, fieldName) {
+    var ta = el(taId);
+    var fu = new FileUpload(el(rootId), async function (f) {
+      if (!f) return;
+      var fd = new FormData();
+      fd.append('file', f);
+      var r;
+      try {
+        r = await fu.upload(BASE + '/extract-text', fd, { processingLabel: tr('抽取文字中…') });
+      } catch (e) {
+        fu.reset();
+        showAlert(tr('讀取檔案失敗'));
+        return;
+      }
+      if (!r.ok) {
+        fu.reset();
+        showAlert(await window.friendlyServerError(r, tr('讀取檔案失敗')));
+        return;
+      }
+      var d = await r.json();
+      if (!d.text) {
+        fu.reset();
+        showAlert(tr('這份檔案抽不到文字 —— 可能是掃描檔，請先用「OCR 文字辨識」轉成可以選取的文字。'));
+        return;
+      }
+      var append = false;
+      if (ta.value.trim()) {
+        var replace = await window.showConfirm(
+          tr('「{0}」裡已經有文字。要用檔案的內容取代，還是接在原本的文字後面？（關掉這個視窗也會接在後面，原本的文字不會被蓋掉。）')
+            .replace('{0}', fieldName),
+          { title: tr('從檔案帶入文字'), okText: tr('取代'), cancelText: tr('接在後面'),
+            cancelIcon: false });
+        append = !replace;
+      }
+      ta.value = append ? (ta.value.replace(/\s+$/, '') + '\n\n' + d.text) : d.text;
+      ta.dispatchEvent(new Event('input'));
+      var max = Number(ta.dataset.max) || 0, n = ta.value.trim().length;
+      if (max && n > max) {
+        // **不截斷** —— 講出來，讓使用者自己刪
+        showAlert(tr('「{0}」現在有 {1} 字，超過 {2} 字的上限 —— 請刪掉不需要的部分再產生草稿（系統不會自動截斷）。')
+          .replace('{0}', fieldName).replace('{1}', n.toLocaleString())
+          .replace('{2}', max.toLocaleString()));
+      } else {
+        toast((append ? tr('已接在後面：{0} 字') : tr('已帶入 {0} 字'))
+          .replace('{0}', Number(d.chars).toLocaleString()), 'ok');
+      }
+    });
+  }
+  wireUpload('odNarrativeUp', 'odNarrative', tr('需求敘述'));
+  wireUpload('odSourceUp', 'odSource', tr('來文內容'));
+  wireUpload('odLetterNarrativeUp', 'odLetterNarrative', tr('需求敘述'));
+
+  // ---------------------------------------------------------------- 函：行文關係、期望語、稱謂
+
+  // 各行文關係可選的期望語 —— 伺服器送來的那一份（核心的 `LETTER_CLOSINGS`），這裡不另寫
+  var CLOSINGS = {};
+  try { CLOSINGS = JSON.parse(el('odLetter').dataset.closings || '{}') || {}; } catch (e) { CLOSINGS = {}; }
+
+  // 發文身分：機關或企業（企業發給政府機關）。企業時行文關係固定是 `company`
+  // （核心的 `COMPANY_RELATION`；伺服器端也一樣固定，這裡只是讓畫面跟著變）
+  function issuer() { return el('odIssuer').value === 'company' ? 'company' : 'agency'; }
+  function curRelation() { return issuer() === 'company' ? 'company' : el('odRelation').value; }
+
+  // 依行文關係重畫期望語。`keep`：要保留的值（從「我的作業」放回表單時用）
+  function paintClosings(keep) {
+    var sel = el('odLetterClosing'), rel = curRelation();
+    var list = Array.isArray(CLOSINGS[rel]) ? CLOSINGS[rel] : [];
+    var prev = (keep != null) ? String(keep) : sel.value;
+    sel.replaceChildren();
+    if (!list.length) {
+      var ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = rel ? tr('（行文關係不確定，草稿會標〔待確認〕）') : tr('（先選行文關係）');
+      sel.appendChild(ph);
+      sel.disabled = true;
+    } else {
+      list.forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = c;
+        o.textContent = c;          // 原樣寫進草稿的公文用語，不翻譯
+        sel.appendChild(o);
+      });
+      sel.disabled = false;
+      if (list.indexOf(prev) >= 0) sel.value = prev;
+    }
+    syncSelect(sel);
+    el('odRelationHint').hidden = rel !== 'unknown';
+  }
+
+  // 依發文身分切換欄位的寫法：行文關係那一格（企業時藏起來）、公司名稱 / 發文機關全銜、
+  // 範例文字、聯絡資訊的說明，以及「之前填過的」用哪一組紀錄（公司名稱跟機關全銜分開記）。
+  // 機關地址簿只給機關名稱用 —— 企業時「公司名稱」不掛建議清單（受文者照樣掛，對方是機關）。
+  function applyIssuer() {
+    var co = issuer() === 'company', k = co ? 'company' : 'agency';
+    el('odRelationRow').hidden = co;
+    el('odIssuerHint').hidden = !co;
+    var lab = el('odOrgLab');
+    lab.textContent = lab.dataset[k] || lab.textContent;
+    ['odOrg', 'odSignature', 'odContact'].forEach(function (id) {
+      var f = el(id), ph = f.dataset[co ? 'phCompany' : 'phAgency'];
+      if (ph) f.placeholder = ph;
+    });
+    var hint = el('odContactHint');
+    hint.textContent = hint.dataset[k] || hint.textContent;
+    var org = el('odOrg');
+    if (el('odOrgList')) {
+      if (co) org.removeAttribute('list'); else org.setAttribute('list', 'odOrgList');
+    }
+    ['odOrg', 'odSignature'].forEach(function (id) {
+      var b = document.querySelector('.fh-btn[data-fh-for="' + id + '"]');
+      if (b) b.dataset.fhKey = 'jtdt.od.hist.' + id + (co ? '.company' : '');
+    });
+    paintClosings();
+    refreshSalute();
+  }
+
+  // 草稿會怎麼稱呼對方、怎麼自稱：規則在伺服器端（核心的 `salutation` / `self_term`），
+  // 這裡只問、只顯示。打字時等一下再問，晚到的舊回應丟掉。
+  var saluteTimer = null, saluteSeq = 0;
+  function refreshSalute() {
+    clearTimeout(saluteTimer);
+    saluteTimer = setTimeout(async function () {
+      var rel = curRelation(), box = el('odSalute');
+      var my = ++saluteSeq;
+      if (!rel) { box.hidden = true; return; }
+      var q = new URLSearchParams({
+        receiver: el('odReceiver').value.trim(), relation: rel, org: el('odOrg').value.trim()
+      });
+      try {
+        var r = await fetch(BASE + '/salutation?' + q.toString());
+        if (my !== saluteSeq) return;
+        if (!r.ok) { box.hidden = true; return; }
+        var d = await r.json();
+        if (my !== saluteSeq) return;
+        el('odSaluteTerm').textContent = d.term || '';
+        el('odSaluteSelf').textContent = d.self || '';
+        box.hidden = false;
+      } catch (e) {
+        if (my === saluteSeq) box.hidden = true;
+      }
+    }, 250);
+  }
+  el('odRelation').addEventListener('change', function () { paintClosings(); refreshSalute(); });
+  ['odReceiver', 'odOrg'].forEach(function (id) { el(id).addEventListener('input', refreshSalute); });
+
+  // 發文機關、聯絡資訊、署名、副本每一份函都一樣 —— 記在這個瀏覽器裡（只是便利，
+  // 讀寫失敗、私密視窗、被清掉都不影響頁面，一律 try/catch）
+  // 機關與企業**各記一份**（公司名稱不可以被帶進機關的函，反過來也一樣）；發文身分本身也記
+  // （寫企業函的人幾乎每次都是企業）。
+  var REMEMBER_BASE = 'jtdt.officialDoc.letter';
+  var ISSUER_KEY = 'jtdt.officialDoc.issuer';
+  var REMEMBER = { org: 'odOrg', contact: 'odContact', signature: 'odSignature', cc: 'odCc' };
+  function rememberKey(who) { return REMEMBER_BASE + (who === 'company' ? '.company' : ''); }
+  function loadRemembered(who, overwrite) {
+    var saved = null;
+    try { saved = JSON.parse(window.localStorage.getItem(rememberKey(who)) || 'null'); } catch (e) { saved = null; }
+    if (!saved || typeof saved !== 'object') saved = {};
+    Object.keys(REMEMBER).forEach(function (k) {
+      var f = el(REMEMBER[k]);
+      if (!f || (f.value && !overwrite)) return;
+      f.value = typeof saved[k] === 'string' ? saved[k].slice(0, f.maxLength > 0 ? f.maxLength : 500) : '';
+    });
+  }
+  function saveRemembered(who) {
+    var out = {};
+    Object.keys(REMEMBER).forEach(function (k) { out[k] = el(REMEMBER[k]).value; });
+    try { window.localStorage.setItem(rememberKey(who || issuer()), JSON.stringify(out)); } catch (e) { /* 只是便利 */ }
+  }
+  Object.keys(REMEMBER).forEach(function (k) {
+    el(REMEMBER[k]).addEventListener('change', function () { saveRemembered(); });
+  });
+  // 換發文身分：先把目前的那一份記到原本的身分，再換成另一個身分記的那一份
+  var lastIssuer = issuer();
+  el('odIssuer').addEventListener('change', function () {
+    var now = issuer();
+    if (now !== lastIssuer) {
+      saveRemembered(lastIssuer);
+      loadRemembered(now, true);
+      lastIssuer = now;
+      try { window.localStorage.setItem(ISSUER_KEY, now); } catch (e) { /* 只是便利 */ }
+    }
+    applyIssuer();
+  });
+  (function () {
+    var who = null;
+    try { who = window.localStorage.getItem(ISSUER_KEY); } catch (e) { who = null; }
+    if (who === 'company' || who === 'agency') { el('odIssuer').value = who; lastIssuer = who; }
+  })();
+  loadRemembered(issuer(), false);
+  applyIssuer();
+  syncSelect(el('odIssuer'));
+
+  // 快選：**只把字插進辦理方向框**，要怎麼辦還是使用者自己決定
+  document.querySelectorAll('[data-od-insert]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var ta = el('odDirection'), add = b.dataset.odInsert || '';
+      var cur = ta.value.replace(/\s+$/, '');
+      ta.value = cur ? (cur + (/[。，；、]$/.test(cur) ? '' : '，') + add) : add;
+      ta.dispatchEvent(new Event('input'));
+      ta.focus();
+    });
+  });
+
+  // ---------------------------------------------------------------- 送出
+
+  // ---------------------------------------------------------------- 載入範例
+  //
+  // 需求敘述下面的下拉（本站樣式，依簽 / 簽辦意見 / 函分組）。範例的文字是**輸入資料**
+  // （`examples.py`），不翻譯。選了：切到那個模式（點使用者會點的那顆模式鈕，切換模式的程式
+  // 照樣跑）、填進欄位、送 input / change 事件讓字數與期望語跟著更新 —— **不送出**；
+  // 下拉回到「選一個範例」，同一份可以再載一次。那幾格已經有**不一樣**的字時先問，取消就什麼都不動。
+  var EXAMPLES = [];
+  try { EXAMPLES = JSON.parse(el('odExample').dataset.examples || '[]') || []; } catch (e) { EXAMPLES = []; }
+  // 範例的欄位名稱（跟 `/start` 收的同一套）→ 畫面上的欄位。只有這裡列的會被填
+  // （`tests/test_official_doc_regen_busy.py` 驗範例用到的鍵這裡都有）。
+  var EX_FIELDS = {
+    sign: { narrative: 'odNarrative', unit: 'odUnit', addressee: 'odAddressee',
+            closing: 'odClosing', length: 'odLength' },
+    letter: { issuer: 'odIssuer', narrative: 'odLetterNarrative', org: 'odOrg', receiver: 'odReceiver',
+              relation: 'odRelation', speed: 'odSpeed', length: 'odLength3' },
+    endorse: { source: 'odSource', direction: 'odDirection', units: 'odUnits',
+               internal_deadline: 'odDeadline', fmt: 'odFmt', length: 'odLength2' }
+  };
+  async function loadExample(key) {
+    var ex = null;
+    EXAMPLES.forEach(function (x) { if (x && x.key === key) ex = x; });
+    if (!ex || !EX_FIELDS[ex.mode]) return;
+    var map = EX_FIELDS[ex.mode], fields = ex.fields || {};
+    var keys = Object.keys(fields).filter(function (k) { return map[k] && el(map[k]); });
+    var clash = keys.some(function (k) {
+      var f = el(map[k]);
+      if (f.tagName === 'SELECT') return false;
+      var cur = f.value.trim();
+      return !!cur && cur !== String(fields[k]).trim();
+    });
+    if (clash) {
+      var ok = await window.showConfirm(tr('目前填的內容會被範例取代，要繼續嗎？'),
+        { title: tr('載入範例'), okText: tr('取代') });
+      if (!ok) return;
+    }
+    var radio = document.querySelector('input[name="odMode"][value="' + ex.mode + '"]');
+    if (radio && !radio.checked) radio.click();
+    else setMode(ex.mode);
+    keys.forEach(function (k) {
+      var f = el(map[k]);
+      f.value = String(fields[k]);
+      f.dispatchEvent(new Event(f.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
+    });
+  }
+  el('odExample').addEventListener('change', function () {
+    var sel = el('odExample'), key = sel.value;
+    sel.value = '';             // 回到「選一個範例」—— 同一份可以再選一次
+    syncSelect(sel);
+    if (key) loadExample(key);
+  });
+
+  function params() {
+    if (mode === 'sign') {
+      return {
+        mode: 'sign', narrative: el('odNarrative').value, unit: el('odUnit').value,
+        addressee: el('odAddressee').value, closing: el('odClosing').value,
+        length: el('odLength').value, with_date: el('odWithDate').checked
+      };
+    }
+    if (mode === 'letter') {
+      return {
+        mode: 'letter', issuer: issuer(), narrative: el('odLetterNarrative').value,
+        org: el('odOrg').value, receiver: el('odReceiver').value,
+        relation: curRelation(), closing: el('odLetterClosing').value,
+        speed: el('odSpeed').value, copies: el('odCopies').value, cc: el('odCc').value,
+        doc_no: el('odDocNo').value,
+        signature: el('odSignature').value, contact: el('odContact').value,
+        attachments: el('odAttachments').value, length: el('odLength3').value
+      };
+    }
+    var kind = document.querySelector('input[name="odSrcKind"]:checked');
+    return {
+      mode: 'endorse', source: el('odSource').value,
+      outline: !!kind && kind.value === 'outline',
+      direction: el('odDirection').value, units: el('odUnits').value,
+      internal_deadline: el('odDeadline').value, fmt: el('odFmt').value,
+      length: el('odLength2').value, closing: el('odEndClosing').value
+    };
+  }
+
+  // 必填與上限先在這裡講一次（伺服器照樣會再擋 —— 這裡只是讓人不必等來回）
+  function checkInputs(p) {
+    var need = p.mode === 'sign'
+      ? [['odNarrative', tr('請先用白話寫下這份簽要辦的事（需求敘述）。')]]
+      : p.mode === 'letter'
+      ? [['odLetterNarrative', tr('請先用白話寫下這份函要辦的事（需求敘述）。')]].concat(
+          p.issuer === 'company' ? []
+            : [['odRelation', tr('請選擇行文關係（不確定的話選「不確定」）—— 期望語與稱謂都要依它決定。')]])
+      : [['odSource', tr('請貼上來文內容（或你整理的來文大綱）。')],
+         ['odDirection', tr('請先寫下你打算怎麼辦理（辦理方向）。')]];
+    for (var i = 0; i < need.length; i++) {
+      var ta = el(need[i][0]);
+      if (!ta.value.trim()) { showAlert(need[i][1]); ta.focus(); return false; }
+    }
+    var areas = p.mode === 'sign' ? ['odNarrative']
+      : p.mode === 'letter' ? ['odLetterNarrative'] : ['odSource', 'odDirection'];
+    for (var j = 0; j < areas.length; j++) {
+      var a = el(areas[j]), max = Number(a.dataset.max) || 0;
+      if (max && a.value.trim().length > max) {
+        showAlert(tr('這一欄超過 {0} 字的上限（目前 {1} 字），系統不會自動截斷，請精簡後再送出。')
+          .replace('{0}', max.toLocaleString()).replace('{1}', a.value.trim().length.toLocaleString()));
+        a.focus();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function running(on) {
+    el('odGo').disabled = on;
+    el('odRegen').disabled = on;
+    el('odCancel').hidden = !on;
+  }
+
+  // ---------------------------------------------------------------- 處理中：反灰＋轉圈
+  //
+  // `draftBusy(on, label)`：草稿上蓋一層轉圈、草稿暫時唯讀。**三條路共用這一支**
+  // （產生草稿、依修改後的資料重新產生、改寫一段）—— 各寫一份的話，總會有一條漏掉還原。
+  // 可能同時有兩件（改寫還沒回來就按了產生）：依 label 記帳，全部結束才拿掉；
+  // 唯讀**還原成開始前的狀態**（原本就唯讀的不會被打開）。
+  var draftBusyOn = {}, draftWasReadonly = false;
+  function draftBusy(on, label) {
+    var ta = el('odDraft');
+    if (on) {
+      if (!Object.keys(draftBusyOn).length) draftWasReadonly = ta.readOnly;
+      draftBusyOn[label] = (draftBusyOn[label] || 0) + 1;
+      ta.readOnly = true;
+      el('odDraftBusyLabel').textContent = label;
+    } else {
+      if (!draftBusyOn[label]) return;
+      if (--draftBusyOn[label] <= 0) delete draftBusyOn[label];
+      var rest = Object.keys(draftBusyOn);
+      if (rest.length) el('odDraftBusyLabel').textContent = rest[rest.length - 1];
+      else ta.readOnly = draftWasReadonly;
+    }
+    var now = Object.keys(draftBusyOn).length > 0;
+    el('odDraftBusy').hidden = !now;
+    el('odDraftWrap').classList.toggle('is-busy', now);
+    if (now) el('odDraftWrap').setAttribute('aria-busy', 'true');
+    else el('odDraftWrap').removeAttribute('aria-busy');
+  }
+
+  // `setBusy(on)`：已經有草稿、又按了一次產生（「產生草稿」或「依修改後的資料重新產生」）——
+  // 下面整塊反灰、不能操作（`inert`），草稿上轉圈。**作業結束（成功、失敗、停止）一律走這一支
+  // 還原**：成功換成新的一份；失敗或停止，原本那一份原樣還回來、照常能用。
+  // 第一次產生還沒有草稿 —— 照舊，什麼都不做。
+  var GEN_LABEL = tr('重新產生中…'), genBusy = false;
+  function setBusy(on) {
+    var box = el('odResult');
+    if (on && (genBusy || box.hidden)) return;
+    if (!on && !genBusy) return;
+    genBusy = !!on;
+    box.classList.toggle('is-busy', genBusy);
+    if (genBusy) box.setAttribute('aria-busy', 'true'); else box.removeAttribute('aria-busy');
+    el('odResultBody').toggleAttribute('inert', genBusy);
+    el('odBusyNote').hidden = !genBusy;
+    draftBusy(genBusy, GEN_LABEL);
+  }
+
+  // ---------------------------------------------------------------- 之前填過的
+  //
+  // 單行欄位旁的按鈕由 static/js/field_history.js 接（存在這個瀏覽器）。**草稿產生成功之後才存**：
+  // 送出當下記下這一份用到的值，作業成功才寫進紀錄 —— 打錯又沒產生的字不會被記住；
+  // 作業進行中改了欄位，記的也是當初送出的那一份。
+  var histPending = null;
+  function histSnapshot(m) {
+    var box = el(m === 'letter' ? 'odLetter' : (m === 'endorse' ? 'odEndorse' : 'odSign'));
+    return Array.prototype.map.call(box.querySelectorAll('.fh-btn[data-fh-key]'), function (b) {
+      var f = el(b.dataset.fhFor);
+      return [b.dataset.fhKey, f ? f.value : ''];
+    });
+  }
+  function histCommit() {
+    var list = histPending;
+    histPending = null;
+    if (!list || !window.FieldHistory) return;
+    list.forEach(function (kv) { window.FieldHistory.push(kv[0], kv[1]); });
+  }
+
+  // ---------------------------------------------------------------- 送出
+
+  // 送出那顆按鈕（產生草稿 / 依修改後的資料重新產生）**整件作業期間**都轉圈，作業結束才還原
+  var jobBtnDone = null, jobIsRegen = false;
+  function endJob() {
+    running(false);
+    if (jobBtnDone) { jobBtnDone(); jobBtnDone = null; }
+  }
+
+  async function submit(extra, btn) {
+    var p = params();
+    if (!checkInputs(p)) return;
+    p.use_kb = !!(el('odUseKb') && el('odUseKb').checked);
+    if (extra) Object.keys(extra).forEach(function (k) { p[k] = extra[k]; });
+    if (p.mode === 'letter') saveRemembered();
+    var done = busy(btn, tr('送出中…'));
+    var ok = false;
+    setBusy(true);
+    try {
+      var r = await postJson('/start', p);
+      if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('無法產生草稿'))); return; }
+      var d = await r.json();
+      ok = true;
+      done();
+      jobBtnDone = busy(btn, tr('產生中…'));
+      jobIsRegen = !!p.case_id;
+      histPending = histSnapshot(p.mode);
+      restoreOnDone = false;
+      running(true);
+      job.track(d.job_id);
+    } catch (e) {
+      showAlert(tr('無法產生草稿'));
+    } finally { if (!ok) { done(); setBusy(false); } }
+  }
+
+  // 作業沒有成功（失敗、停止、被中斷、查不到狀態）：原本那一份草稿原樣還回來
+  function jobFailed() {
+    endJob();
+    histPending = null;
+    jobIsRegen = false;
+    setBusy(false);
+  }
+
+  var job = new JobProgress(el('odJob'), {
+    // 結果區自己有一整排匯出鈕（照**改過之後**的文字匯出）；進度列那顆下載的是
+    // 原始草稿，兩顆放在一起會讓人以為是同一份 —— 只留結果區那一排。
+    showDownload: false,
+    onDone: function (j) {
+      endJob();
+      histCommit();
+      // 案件編號：`case_id`（v1.16.66 起）；更早的作業記在 `upload_id`
+      var cid = ((j && j.meta) || {}).case_id || ((j && j.meta) || {}).upload_id;
+      var restore = restoreOnDone, regen = jobIsRegen;
+      restoreOnDone = false;
+      jobIsRegen = false;
+      if (!cid) { setBusy(false); return; }
+      var prev = caseId;
+      caseId = cid;
+      var regenRev = ((j && j.meta) || {}).regen_rev;
+      loadResult(restore).then(function (shown) {
+        // 新的那份讀不回來：畫面上還是原本那一份，案件編號也要對得上它
+        if (!shown && prev) caseId = prev;
+        else if (shown && regen) {
+          // 重新產生**接在同一個案件後面**，伺服器已經把新的草稿存成下一版
+          if (regenRev) toast(tr('已儲存為第 {0} 版').replace('{0}', regenRev), 'ok');
+          else if (REV.latest) toast(tr('內容跟第 {0} 版相同，沒有另存新版本').replace('{0}', REV.latest));
+        }
+      }, function () {
+        if (prev) caseId = prev;
+        showAlert(tr('讀不到這份草稿'));
+      }).then(function () { setBusy(false); });
+    },
+    onError: jobFailed,
+    onCancel: jobFailed,
+    // 「處理新檔案」那顆在本頁藏起來了；萬一按得到，也要把畫面還原
+    onReset: jobFailed
+  });
+
+  el('odGo').addEventListener('click', function () { submit(null, el('odGo')); });
+  el('odCancel').addEventListener('click', function () { job.cancel(); });
+
+  // ---------------------------------------------------------------- 結果
+
+  var STATUS = {
+    provided: tr('原文有'), inferred: tr('推論（請確認）'), missing: tr('未提供'),
+    conflict: tr('矛盾'), confirmed: tr('已確認')
+  };
+  var SEV = { error: tr('需要確認的事實'), todo: tr('待補'), hint: tr('建議') };
+
+  // 回傳 true＝新的結果畫出來了（重新產生的作業結束時要知道：讀不回來就留著原本那一份）
+  async function loadResult(restoreForm) {
+    if (!caseId) return false;
+    var r = await fetch(BASE + '/result/' + encodeURIComponent(caseId));
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀不到這份草稿'))); return false; }
+    result = await r.json();
+    if (restoreForm) fillForm(result.mode, result.inputs || {});
+    await render();
+    return true;
+  }
+
+  // 從「我的作業」打開時，把當初填的內容放回表單 —— 不然「依修改後的資料重新產生」
+  // 會拿一個空白的表單去送，被伺服器擋下來。
+  function fillForm(m, inp) {
+    setMode(m);
+    function put(id, v) { var e = el(id); if (e && v != null) e.value = String(v); }
+    if (m === 'sign') {
+      // 陳核對象現在是單行；舊案件存的是一行一位 —— 用「、」接起來（核心照樣拆得回來）
+      put('odNarrative', inp.narrative); put('odUnit', inp.unit);
+      put('odAddressee', String(inp.addressee || '').split(/\s*\n\s*/).filter(Boolean).join('、'));
+      put('odClosing', inp.closing); put('odLength', inp.length);
+      el('odWithDate').checked = !!inp.with_date;
+    } else if (m === 'letter') {
+      // 發文身分先放（舊案件沒有這個欄位：行文關係是 company 的就是企業）；
+      // 這裡**不換**記住的公司 / 機關資料 —— 放回來的是當初那一份
+      var who = inp.issuer || (inp.relation === 'company' ? 'company' : 'agency');
+      put('odIssuer', who); lastIssuer = who;
+      put('odLetterNarrative', inp.narrative); put('odOrg', inp.org); put('odReceiver', inp.receiver);
+      if (who !== 'company') put('odRelation', inp.relation);
+      put('odSpeed', inp.speed); put('odCopies', inp.copies); put('odDocNo', inp.doc_no);
+      put('odCc', inp.cc); put('odSignature', inp.signature); put('odContact', inp.contact);
+      put('odAttachments', inp.attachments); put('odLength3', inp.length);
+      applyIssuer();
+      paintClosings(inp.closing || '');
+      refreshSalute();
+    } else {
+      put('odSource', inp.source); put('odDirection', inp.direction); put('odUnits', inp.units);
+      put('odDeadline', inp.internal_deadline); put('odFmt', inp.fmt);
+      put('odLength2', inp.length); put('odEndClosing', inp.closing);
+      document.querySelectorAll('input[name="odSrcKind"]').forEach(function (x) {
+        x.checked = (x.value === (inp.outline ? 'outline' : 'full'));
+      });
+    }
+    if (el('odUseKb')) el('odUseKb').checked = !!inp.use_kb;
+    ['odNarrative', 'odSource', 'odDirection', 'odLetterNarrative'].forEach(function (id) {
+      el(id).dispatchEvent(new Event('input'));
+    });
+    syncAllSelects();
+  }
+
+  // 範本選單依「這份草稿的文別」重畫（簽只能套簽的範本）；沒有可套的就整列藏起來
+  function paintTemplates() {
+    var row = el('odTplRow');
+    if (!row) return;
+    var all = JSON.parse(row.dataset.tpls || '{}');
+    var list = all[(result && result.mode) || ''] || [];
+    var sel = el('odTpl'), keep = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    list.forEach(function (t) {
+      var o = document.createElement('option');
+      o.value = t.key;
+      o.textContent = t.category ? (t.label + '（' + t.category + '）') : t.label;
+      o.setAttribute('data-i18n', 'skip');
+      sel.appendChild(o);
+    });
+    sel.value = list.some(function (t) { return t.key === keep; }) ? keep : '';
+    syncSelect(sel);
+    row.hidden = !list.length;
+    el('odTplNote').hidden = !list.length;
+  }
+
+  function render() {
+    var d = (result && result.draft) || {};
+    paintTemplates();
+    paintExtras();
+    renderFacts(d.facts || []);
+    el('odDraft').value = d.text || '';
+    paintDraft();
+    el('odDirty').hidden = true;
+    renderIssues(d.issues || []);
+    renderRefs(d.references || [], result.kb_note || '');
+    closeRewrite();
+    resetRevisions(d.text || '');
+    el('odResult').hidden = false;
+    armWorkspace();
+    el('odResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // 存過的版本：草稿顯示**最新那一版**（不是模型原本那一份）。文字先出來，
+    // 版本讀完（草稿可能換成最新那一版）才要預覽圖。
+    return loadRevisions(true).then(function () { schedulePreview(0); });
+  }
+
+  // 參考資料：標題、版本、位置一律走 textContent（知識庫的內容是上傳的文件，不是我們寫的）
+  var REF_SEC = el('odRefSec');
+  var REF_PURPOSES = JSON.parse(REF_SEC.dataset.purposes || '{}');
+  var KB_NOTES = JSON.parse(REF_SEC.dataset.notes || '{}');
+  var REF_BADGE = { substantive_basis: 'basis', format_reference: 'format', style_example: 'style' };
+
+  function renderRefs(refs, note) {
+    var ul = el('odRefs');
+    ul.replaceChildren();
+    var used = (result && result.inputs && result.inputs.use_kb) || refs.length || note;
+    REF_SEC.hidden = !used;
+    if (!used) return;
+    el('odRefNote').textContent = note ? tr(KB_NOTES[note] || '')
+      : tr('撰寫時參考了下面這些資料。標「業務依據」的才算草稿的依據；標「草稿有引用」的是模型說它用到的。');
+    refs.forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = 'od-ref';
+      var head = document.createElement('div');
+      head.className = 'od-ref-head';
+      var id = document.createElement('span');
+      id.className = 'od-ref-id';
+      id.textContent = r.id || '';
+      var badge = document.createElement('span');
+      badge.className = 'od-badge od-b-' + (REF_BADGE[r.purpose] || 'style');
+      badge.textContent = tr(REF_PURPOSES[r.purpose] || REF_PURPOSES.style_example || '');
+      var title = document.createElement(r.source_url ? 'a' : 'span');
+      title.className = 'od-ref-title';
+      title.textContent = r.title || r.dataset_name || '';
+      title.setAttribute('data-i18n', 'skip');
+      if (r.source_url) {
+        title.href = r.source_url;
+        title.target = '_blank';
+        title.rel = 'noopener noreferrer';
+      }
+      head.append(id, badge, title);
+      var where = [r.version_label, r.locator_text, r.heading].filter(Boolean).join('　');
+      if (where) {
+        var w = document.createElement('span');
+        w.className = 'od-ref-where';
+        w.textContent = where;
+        w.setAttribute('data-i18n', 'skip');
+        head.appendChild(w);
+      }
+      if (r.used) {
+        var u = document.createElement('span');
+        u.className = 'od-badge od-b-used';
+        u.textContent = tr('草稿有引用');
+        head.appendChild(u);
+      }
+      li.appendChild(head);
+      // 政府公開資料匯入的那幾份：「施行日期由行政院定之」這類說明，與出處（授權條款要求顯名）
+      if (r.notice) {
+        var nt = document.createElement('p');
+        nt.className = 'od-ref-notice';
+        nt.textContent = r.notice;
+        nt.setAttribute('data-i18n', 'skip');
+        li.appendChild(nt);
+      }
+      if (r.attribution) {
+        var at = document.createElement('p');
+        at.className = 'od-ref-attr';
+        at.textContent = r.attribution;
+        at.setAttribute('data-i18n', 'skip');
+        li.appendChild(at);
+      }
+      var det = document.createElement('details');
+      var sum = document.createElement('summary');
+      sum.textContent = tr('看內容');
+      var pre = document.createElement('p');
+      pre.className = 'od-ref-text';
+      pre.textContent = r.text || '';
+      pre.setAttribute('data-i18n', 'skip');
+      det.append(sum, pre);
+      li.appendChild(det);
+      ul.appendChild(li);
+    });
+  }
+
+  // 機關名稱建議：打字停下來 250 ms 才查（每打一個字查一次會把地址簿查詢塞滿）
+  (function wireOrgList() {
+    var list = el('odOrgList');
+    if (!list) return;
+    var timer = null, lastQ = '';
+    function fill(names) {
+      list.replaceChildren();
+      names.forEach(function (n) {
+        var o = document.createElement('option');
+        o.value = n;
+        list.appendChild(o);
+      });
+    }
+    async function lookup(q) {
+      if (q === lastQ) return;
+      lastQ = q;
+      try {
+        var r = await fetch(BASE + '/orgs?q=' + encodeURIComponent(q));
+        if (!r.ok || q !== lastQ) return;
+        var d = await r.json();
+        fill((d.orgs || []).map(function (x) { return x.name; }).filter(Boolean));
+      } catch (e) { /* 建議而已，查不到就不顯示 */ }
+    }
+    ['odOrg', 'odReceiver'].forEach(function (id) {
+      el(id).addEventListener('input', function () {
+        var q = el(id).value.trim();
+        clearTimeout(timer);
+        if (q.length < 2) { fill([]); lastQ = ''; return; }
+        timer = setTimeout(function () { lookup(q); }, 250);
+      });
+    });
+  })();
+
+  function renderFacts(facts) {
+    var box = el('odFacts');
+    box.replaceChildren();
+    if (!facts.length) {
+      var p = document.createElement('p');
+      p.className = 'od-hint';
+      p.textContent = tr('這一份沒有整理出資料。');
+      box.appendChild(p);
+      return;
+    }
+    facts.forEach(function (f) {
+      var row = document.createElement('div');
+      row.className = 'od-fr';
+      var lab = document.createElement('label');
+      lab.className = 'od-fr-label';
+      lab.htmlFor = 'odF_' + f.key;
+      // 欄位名稱是伺服器送來的（事由、金額…）—— 固定那幾個有譯文；模型自己取的名稱查不到就原樣顯示
+      lab.textContent = tr(f.label || f.key);
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'field';
+      inp.id = 'odF_' + f.key;
+      inp.maxLength = MAX_FIELD;
+      inp.value = f.value || '';
+      if (f.status === 'conflict') {
+        inp.placeholder = tr('兩種說法：{0}').replace('{0}', (f.values || []).join(' ／ '));
+      } else if (f.status === 'missing') {
+        inp.placeholder = tr('（未提供，可以在這裡補上）');
+      }
+      var badge = document.createElement('span');
+      badge.className = 'od-badge od-b-' + (STATUS[f.status] ? f.status : 'inferred');
+      badge.textContent = STATUS[f.status] || f.status || '';
+      if (f.status === 'provided' && f.quote) {
+        badge.title = inp.title = tr('原文：{0}').replace('{0}', f.quote);
+      } else if (f.status === 'confirmed' && f.was) {
+        badge.title = tr('原本是：{0}').replace('{0}', f.was);
+      }
+      var orig = (f.value || '').trim();
+      inp.addEventListener('input', function () {
+        row.classList.toggle('is-edited', inp.value.trim() !== orig);
+      });
+      row.append(lab, inp, badge);
+      box.appendChild(row);
+    });
+  }
+
+  // 使用者改過的列、以及已經是「已確認」的列 —— 伺服器會把送回去的資料表重新判斷狀態
+  // （「已確認」不會被直接收下），所以確認過的值要另外當成修改再送一次。
+  function collectOverrides() {
+    var o = {};
+    ((result && result.draft && result.draft.facts) || []).forEach(function (f) {
+      var inp = el('odF_' + f.key);
+      if (!inp) return;
+      var v = inp.value.trim();
+      if (v !== (f.value || '').trim() || f.status === 'confirmed') o[f.key] = v;
+    });
+    return o;
+  }
+
+  // 重新產生**接在同一個案件後面**（`case_id`）：伺服器把新的草稿存成下一版（來源「重新產生」），
+  // 版本清單不會重新從第 1 版開始。畫面上的草稿有還沒存的修改 —— 先存成一版再送，
+  // 不然那些修改就這樣被新的草稿蓋掉；存不了（另一個分頁存過，衝突的畫面已經出來）就不送。
+  el('odRegen').addEventListener('click', async function () {
+    if (!result) return;
+    if (caseId && isRevDirty() && el('odDraft').value.trim()) {
+      if (!(await saveRevision({ source: 'edit' }))) return;
+    }
+    setMode(result.mode);
+    submit({ facts: (result.draft && result.draft.facts) || [], overrides: collectOverrides(),
+             case_id: caseId }, el('odRegen'));
+  });
+
+  // ---------------------------------------------------------------- 預覽圖
+  //
+  // 草稿旁的預覽圖：伺服器走跟匯出 PDF 同一條路再算成圖（`/preview`）。**文字先出來，圖後補**；
+  // 圖還沒到之前蓋一層轉圈，換新的時候舊圖留著、變淡。草稿改了等停手 1.5 秒再要（範本、草稿
+  // 標示換了馬上要）。晚到的舊回應一律丟掉（AbortController ＋ 序號）—— 不可以拿舊的蓋掉新的。
+  // 這台沒有 Office 引擎（503）：預覽區講一句平靜的說明，不跳對話框（匯出 ODT 照樣能用）。
+  var pvCtl = null, pvTimer = null, pvSeq = 0;
+  var PV_DELAY = 1500;
+  function pvBusy(on) {
+    el('odPvSpin').hidden = !on;
+    el('odPvBox').classList.toggle('is-busy', !!on);
+    if (on) el('odPvBox').setAttribute('aria-busy', 'true');
+    else el('odPvBox').removeAttribute('aria-busy');
+  }
+  function pvMessage(msg) {
+    el('odPreview').replaceChildren();
+    delete el('odPreview').dataset.hash;
+    el('odPvNote').textContent = '';
+    el('odPvMsg').textContent = msg;
+    el('odPvMsg').hidden = !msg;
+  }
+  function schedulePreview(delay) {
+    clearTimeout(pvTimer);
+    if (!caseId || el('odResult').hidden) return;
+    pvTimer = setTimeout(refreshPreview, delay == null ? PV_DELAY : delay);
+  }
+  function pvLoaded(img) {
+    return new Promise(function (resolve) {
+      if (img.complete && img.naturalWidth) { resolve(); return; }
+      img.addEventListener('load', function () { resolve(); }, { once: true });
+      img.addEventListener('error', function () { resolve(); }, { once: true });
+    });
+  }
+  async function refreshPreview() {
+    clearTimeout(pvTimer);
+    if (!caseId) return;
+    var text = el('odDraft').value;
+    if (pvCtl) pvCtl.abort();
+    var my = ++pvSeq;
+    if (!text.trim()) { pvCtl = null; pvBusy(false); pvMessage(tr('草稿是空的，沒有可以預覽的內容。')); return; }
+    var ctl = pvCtl = new AbortController();
+    pvBusy(true);
+    var tpl = (el('odTpl') && !el('odTplRow').hidden) ? el('odTpl').value : '';
+    try {
+      var r = await fetch(BASE + '/preview', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+        body: JSON.stringify({ case_id: caseId, text: text, title: (result && result.title) || '',
+                               draft_mark: el('odDraftMark').checked, template: tpl,
+                               extras: exportExtras() })
+      });
+      if (my !== pvSeq) return;
+      if (r.status === 503) {
+        pvMessage(tr('這台沒有 Office 引擎，無法產生預覽圖（匯出 ODT 仍可用）。'));
+        return;
+      }
+      if (!r.ok) { pvMessage(await window.friendlyServerError(r, tr('預覽圖產生失敗'))); return; }
+      var d = await r.json();
+      if (my !== pvSeq) return;
+      var imgs = (d.pages || []).map(function (u, i) {
+        var img = document.createElement('img');
+        img.alt = tr('第 {0} 頁').replace('{0}', i + 1);
+        img.src = u;
+        return img;
+      });
+      // 新的圖**全部載好**才換上去（換的那一刻不會閃一片空白）
+      await Promise.all(imgs.map(pvLoaded));
+      if (my !== pvSeq) return;
+      el('odPvMsg').hidden = true;
+      el('odPreview').replaceChildren.apply(el('odPreview'), imgs);
+      el('odPreview').dataset.hash = d.hash || '';
+      el('odPvNote').textContent = (d.total > imgs.length)
+        ? tr('只畫了前 {0} 頁（共 {1} 頁），完整內容請匯出。')
+            .replace('{0}', imgs.length).replace('{1}', d.total)
+        : (d.template === 'fallback' ? tr('這份範本讀不懂，預覽用的是內建版面。') : '');
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      if (my === pvSeq) pvMessage(tr('預覽圖產生失敗'));
+    } finally {
+      if (my === pvSeq) { pvBusy(false); pvCtl = null; }
+    }
+  }
+  el('odDraftMark').addEventListener('change', function () { schedulePreview(0); });
+  if (el('odTpl')) el('odTpl').addEventListener('change', function () { schedulePreview(0); });
+
+  // ---------------------------------------------------------------- 版面加註
+  //
+  // 送給 /export 與 /preview 的 `extras`。伺服器再依文別過濾一次（簽不會有正本標示）——
+  // 這裡依文別藏起來只是讓畫面不出現用不到的選項。頁碼、裝訂線、正副本、發文方式、
+  // 分層負責記在這個瀏覽器；受文者地址每一份不同，不記。
+  var EXTRAS_KEY = 'jtdt.officialDoc.extras';
+  var EXTRAS_REMEMBER = { page_numbers: 'odPageNo', binding_line: 'odBinding', copy_mark: 'odCopyMark',
+                          send_method: 'odSendMethod', delegate: 'odDelegate', endorse_frame: 'odEndorseFrame' };
+  function isLetterCase() { return !!(result && result.mode === 'letter'); }
+  function isEndorseCase() { return !!(result && result.mode === 'endorse'); }
+  function isCompanyCase() {
+    return isLetterCase() && !!(result.inputs && (result.inputs.relation === 'company' || result.inputs.issuer === 'company'));
+  }
+  function exportExtras() {
+    var o = { page_numbers: el('odPageNo').checked, binding_line: el('odBinding').checked };
+    if (isLetterCase()) {
+      o.copy_mark = el('odCopyMark').value;
+      o.send_method = el('odSendMethod').value;
+      o.receiver_address = el('odRecvAddr').value.trim();
+      if (!isCompanyCase()) o.delegate = el('odDelegate').value.trim();
+    }
+    if (isEndorseCase()) o.endorse_frame = el('odEndorseFrame').checked;
+    return o;
+  }
+  function paintExtras() {
+    el('odExtrasLetter').hidden = !isLetterCase();
+    el('odExtrasEndorse').hidden = !isEndorseCase();
+    el('odDelegateRow').hidden = isCompanyCase();
+    syncSelect(el('odCopyMark'));
+    syncSelect(el('odSendMethod'));
+    paintExtraFields();
+  }
+  // 函的四項加註是選項卡片：卡片上的勾選框（`data-od-extra` 指向真正送出去的那一格）。
+  // 勾了才顯示那一格（`<id>F`）；取消勾選＝不印 —— 把值清空，再照原本的事件通知
+  // （記住選擇、更新預覽），所以送給伺服器的仍然是原本那幾個欄位，空值就是不印。
+  // 下拉選回「不標示」時卡片也跟著取消勾選。
+  var EXTRA_TOGGLES = Array.prototype.slice.call(document.querySelectorAll('[data-od-extra]'));
+  function paintExtraFields() {
+    var letter = !el('odExtrasLetter').hidden;
+    EXTRA_TOGGLES.forEach(function (cb) {
+      var card = cb.closest('.option-card');
+      el(cb.dataset.odExtra + 'F').hidden = !(letter && cb.checked && !(card && card.hidden));
+    });
+  }
+  EXTRA_TOGGLES.forEach(function (cb) {
+    var f = el(cb.dataset.odExtra), isSel = f.tagName === 'SELECT';
+    cb.addEventListener('change', function () {
+      if (cb.checked) {
+        if (isSel && !f.value) {
+          var first = Array.prototype.find.call(f.options, function (o) { return !!o.value; });
+          if (first) { f.value = first.value; syncSelect(f); f.dispatchEvent(new Event('change')); }
+        }
+        paintExtraFields();
+        if (!isSel) f.focus();
+      } else {
+        if (f.value) {
+          f.value = '';
+          if (isSel) syncSelect(f);
+          f.dispatchEvent(new Event(isSel ? 'change' : 'input'));
+        }
+        paintExtraFields();
+      }
+    });
+    if (isSel) f.addEventListener('change', function () { cb.checked = !!f.value; paintExtraFields(); });
+  });
+  function saveExtras() {
+    var out = {};
+    Object.keys(EXTRAS_REMEMBER).forEach(function (k) {
+      var f = el(EXTRAS_REMEMBER[k]);
+      out[k] = f.type === 'checkbox' ? f.checked : f.value;
+    });
+    try { window.localStorage.setItem(EXTRAS_KEY, JSON.stringify(out)); } catch (e) { /* 只是便利 */ }
+  }
+  (function loadExtras() {
+    var saved = null;
+    try { saved = JSON.parse(window.localStorage.getItem(EXTRAS_KEY) || 'null'); } catch (e) { saved = null; }
+    if (!saved || typeof saved !== 'object') return;
+    Object.keys(EXTRAS_REMEMBER).forEach(function (k) {
+      var f = el(EXTRAS_REMEMBER[k]);
+      if (!(k in saved)) return;
+      if (f.type === 'checkbox') { f.checked = !!saved[k]; return; }
+      var v = typeof saved[k] === 'string' ? saved[k] : '';
+      if (f.tagName === 'SELECT' && v && !Array.prototype.some.call(f.options, function (o) { return o.value === v; })) return;
+      f.value = v.slice(0, f.maxLength > 0 ? f.maxLength : 40);
+    });
+  })();
+  ['odPageNo', 'odBinding', 'odCopyMark', 'odSendMethod', 'odEndorseFrame'].forEach(function (id) {
+    el(id).addEventListener('change', function () { saveExtras(); schedulePreview(0); });
+  });
+  ['odDelegate', 'odRecvAddr'].forEach(function (id) {
+    el(id).addEventListener('input', function () { if (id === 'odDelegate') saveExtras(); schedulePreview(); });
+  });
+  // 上面記住的值放回來之後：有值的那幾項，卡片就是勾著的
+  EXTRA_TOGGLES.forEach(function (cb) { cb.checked = !!el(cb.dataset.odExtra).value.trim(); });
+  // 「往上看預覽」：捲到草稿旁的預覽圖，並閃一下框線讓眼睛找得到。
+  el('odLiveGo').addEventListener('click', function () {
+    var box = el('odPvBox');
+    el('odPvPane').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    box.classList.remove('od-pv-flash'); void box.offsetWidth; box.classList.add('od-pv-flash');
+    setTimeout(function () { box.classList.remove('od-pv-flash'); }, 1500);
+  });
+  paintExtraFields();
+
+  // ---------------------------------------------------------------- 草稿與檢查
+
+  var PLACEHOLDER = /〔(待補|待確認)：[^〕]{1,30}〕/g;
+  function paintDraft() {
+    schedulePreview();
+    var v = el('odDraft').value;
+    el('odDraftCount').textContent = tr('{0} 字').replace('{0}', v.trim().length.toLocaleString());
+    var n = (v.match(PLACEHOLDER) || []).length;
+    var box = el('odTodo');
+    box.hidden = !n;
+    box.textContent = n ? tr('還有 {0} 項待補（〔待補：…〕／〔待確認：…〕）—— 匯出不會擋，但送出前要補上。')
+      .replace('{0}', n) : '';
+  }
+  el('odDraft').addEventListener('input', function () {
+    paintDraft();
+    el('odDirty').hidden = false;
+    armWorkspace();
+    paintRevState();
+  });
+
+  // 一條檢查結果。`clickable`：點了在草稿裡選取那一段（改寫的結果還沒放進草稿，不能點）
+  function issueItem(it, clickable) {
+    var sev = SEV[it.severity] ? it.severity : 'hint';
+    var li = document.createElement('li');
+    li.className = 'od-sev-' + sev;
+    var b = document.createElement(clickable ? 'button' : 'div');
+    if (clickable) b.type = 'button';
+    b.className = clickable ? 'od-iss-btn' : 'od-iss-static';
+    var tag = document.createElement('span');
+    tag.className = 'od-iss-tag';
+    tag.textContent = SEV[sev];
+    var msg = document.createElement('span');
+    // 訊息是「樣板＋參數」：先翻樣板再填參數（組好的中文句子在英日介面查不到譯文）
+    var line = tr(it.template || it.message || '');
+    (it.args || []).forEach(function (a, n) { line = line.split('{' + n + '}').join(a); });
+    msg.textContent = line;
+    b.append(tag, msg);
+    if (clickable) b.addEventListener('click', function () { selectSnippet(it.snippet || ''); });
+    li.appendChild(b);
+    return { li: li, sev: sev };
+  }
+
+  function renderIssues(issues) {
+    var ul = el('odIssues');
+    ul.replaceChildren();
+    var c = { error: 0, todo: 0, hint: 0 };
+    issues.forEach(function (it) {
+      var x = issueItem(it, true);
+      c[x.sev]++;
+      ul.appendChild(x.li);
+    });
+    el('odIssueSum').textContent = issues.length
+      ? tr('需要確認的事實 {0} 項、待補 {1} 項、建議 {2} 項。點一條就會在草稿裡選取那一段。')
+          .replace('{0}', c.error).replace('{1}', c.todo).replace('{2}', c.hint)
+      : tr('沒有找到需要確認的地方。但因果、結論這類語意系統驗不到，送出前仍要自己核對。');
+  }
+
+  // 在草稿裡選取那一段；找不到（使用者改過了）就不動
+  function selectSnippet(snip) {
+    var ta = el('odDraft');
+    var i = snip ? ta.value.indexOf(snip) : -1;
+    if (i < 0) {
+      toast(tr('草稿裡找不到這一段（可能已經改過），請按「重新檢查」。'));
+      return;
+    }
+    ta.focus();
+    ta.setSelectionRange(i, i + snip.length);
+    var line = ta.value.slice(0, i).split('\n').length - 1;
+    var lh = parseFloat(window.getComputedStyle(ta).lineHeight) || 28;
+    ta.scrollTop = Math.max(0, line * lh - ta.clientHeight / 3);
+    ta.scrollIntoView({ block: 'nearest' });
+  }
+
+  el('odRecheck').addEventListener('click', async function () {
+    if (!caseId) return;
+    var btn = this, done = busy(btn, tr('檢查中…'));
+    try {
+      var r = await postJson('/check', { case_id: caseId, text: el('odDraft').value });
+      if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('檢查失敗'))); return; }
+      var d = await r.json();
+      renderIssues(d.issues || []);
+      el('odDirty').hidden = true;
+      toast(tr('已重新檢查'), 'ok');
+    } catch (e) {
+      showAlert(tr('檢查失敗'));
+    } finally { done(); }
+  });
+
+  // 換了一份文字（載入存過的版本）之後，檢查結果照那份重算 —— 不呼叫模型。
+  // 失敗就留著「草稿改過了」的提示，讓使用者自己按重新檢查。
+  async function recheckQuiet() {
+    if (!caseId) return;
+    try {
+      var r = await postJson('/check', { case_id: caseId, text: el('odDraft').value });
+      if (!r.ok) { el('odDirty').hidden = false; return; }
+      var d = await r.json();
+      renderIssues(d.issues || []);
+      el('odDirty').hidden = true;
+    } catch (e) { el('odDirty').hidden = false; }
+  }
+
+  // ---------------------------------------------------------------- 逐段改寫
+  //
+  // **要改哪一段**：
+  //   * 有選取 → 就是選取的那幾個字（去掉頭尾空白）。
+  //   * 沒有選取 → 游標所在的那一行。照伺服器讀草稿的規則（核心 `parse_text`，正規式由
+  //     伺服器放在 `data-seg`，這裡不另寫一份）一行一行往下判斷它是哪一種：
+  //       - 「主旨：」「說明：」這種段名行 → 段名後面的內文
+  //       - 「一、」「（一）」「1、」「（1）」項次行 → 項次後面的內文
+  //       - 一般段落 → 整行
+  //       - 抬頭（簽　於…）、日期行、函的標題與欄位（受文者、速別、正副本…）、
+  //         「敬陳」與之後的陳核對象、正副本之後的署名 → **不改寫**（那些是格式，不是內文）
+  //     內文結尾若是程式加的結語 / 期望語（「，簽請　核示。」「，請　查照。」「，陳核。」），
+  //     那一截不送給模型，換回來時原樣留著（結語是使用者在表單上選的）。
+  var rwBox = el('odRw');
+  var SEG = {};
+  try { SEG = JSON.parse(rwBox.dataset.seg || '{}') || {}; } catch (e) { SEG = {}; }
+  function rx(p) { try { return p ? new RegExp(p) : null; } catch (e) { return null; } }
+  var RX = {
+    label: rx(SEG.label), head: rx(SEG.head), meta: rx(SEG.meta),
+    title: rx(SEG.title), date: rx(SEG.date),
+    items: (Array.isArray(SEG.items) ? SEG.items : []).map(rx).filter(Boolean)
+  };
+  var TAILS = Array.isArray(SEG.tails) ? SEG.tails : [];
+  var MAX_RW = Number(rwBox.dataset.max) || 2000;
+  var pendingRw = null;
+
+  // 一行屬於哪一種（state 跨行：「敬陳」之後、正副本之後都是結尾）。
+  // 回 {kind, body}：body 是可以改寫的那一截在這一行（去掉頭尾空白之後）裡的起點。
+  function classifyLine(line, st) {
+    if (!line) return { kind: 'blank' };
+    if (st.ending || line === '敬陳') { st.ending = true; return { kind: 'ending' }; }
+    var m = RX.meta && RX.meta.exec(line);
+    if (m) {
+      var key = m[1].replace(/\s/g, '');
+      if (key === '正本' || key === '副本') st.afterCopies = true;
+      return { kind: 'meta' };
+    }
+    if (st.afterCopies) return { kind: 'ending' };
+    if (RX.title && RX.title.test(line)) return { kind: 'title' };
+    m = RX.label && RX.label.exec(line);
+    if (m) return { kind: 'label', body: line.length - m[2].length };
+    if (RX.head && RX.head.test(line)) return { kind: 'head' };
+    if (RX.date && RX.date.test(line)) return { kind: 'date' };
+    for (var i = 0; i < RX.items.length; i++) {
+      m = RX.items[i].exec(line);
+      if (m) return { kind: 'item', body: line.length - m[2].length };
+    }
+    return { kind: 'para', body: 0 };
+  }
+
+  // 草稿逐行分類（state 跨行，跟游標模式同一套）：[{ls, raw, line, lead, c}]
+  function scanLines(v) {
+    var out = [], pos = 0, st = { ending: false, afterCopies: false };
+    v.split('\n').forEach(function (raw) {
+      var line = raw.trim();
+      out.push({ ls: pos, raw: raw, line: line,
+                 lead: raw.length - raw.replace(/^\s+/, '').length,
+                 c: classifyLine(line, st) });
+      pos += raw.length + 1;
+    });
+    return out;
+  }
+  function rowAt(rows, p) {
+    for (var i = rows.length - 1; i >= 0; i--) if (rows[i].ls <= p) return i;
+    return 0;
+  }
+  // 內文結尾若是程式加的結語（「，簽請　核示。」），那一截不送給模型 —— 回新的結尾位置
+  function cutTail(v, bs, be) {
+    for (var k = 0; k < TAILS.length; k++) {
+      var tl = TAILS[k];
+      if (be - bs > tl.length && v.slice(be - tl.length, be) === tl) return be - tl.length;
+    }
+    return be;
+  }
+
+  // 回 {start, end, text, where, tail} 或 {error: 'format'|'empty'|'toolong'|'span'}
+  function rewriteTarget() {
+    var ta = el('odDraft'), v = ta.value;
+    var s = ta.selectionStart || 0, e = ta.selectionEnd || 0, t;
+    if (e > s) {
+      var sel = v.slice(s, e);
+      var lead = sel.length - sel.replace(/^\s+/, '').length;
+      var trail = sel.length - sel.replace(/\s+$/, '').length;
+      if (lead + trail >= sel.length) return { error: 'empty' };
+      var s0 = s + lead, e0 = e - trail, rows = scanLines(v);
+      var fi = rowAt(rows, s0), li = rowAt(rows, e0 - 1), tailSel = false;
+      // 選取從段名或項次開始的（「一、汰換…」）：段名與項次是格式，留在草稿裡不送去改寫 ——
+      // 不然模型不會寫項次（提示也叫它不要寫），換回來時「一、」就不見了（使用者 2026-10-07 回報）。
+      // 段名單獨一行（「說明：」）、內文在下一行的，往下一行接著看。
+      while (true) {
+        var r0 = rows[fi], c0 = r0.c;
+        if ((c0.kind === 'label' || c0.kind === 'item') && c0.body != null) {
+          var bs0 = r0.ls + r0.lead + c0.body;
+          while (bs0 < r0.ls + r0.raw.length && /\s/.test(v.charAt(bs0))) bs0++;
+          if (s0 < bs0) s0 = bs0;
+          if (s0 >= r0.ls + r0.lead + r0.line.length && fi < li) {
+            fi++;
+            s0 = rows[fi].ls + rows[fi].lead;
+            continue;
+          }
+        }
+        break;
+      }
+      // 一次跨了好幾個段落或項次：改寫成一段之後，後面的段名與項次會不見 —— 不改寫
+      for (var ri = fi + 1; ri <= li; ri++) {
+        var kk = rows[ri].c.kind;
+        if (kk !== 'para' && kk !== 'blank') return { error: 'span' };
+      }
+      // 選到這一行的結尾、而結尾是程式加的結語：結語留在草稿裡
+      var rl = rows[li], le = rl.ls + rl.lead + rl.line.length;
+      if (e0 >= le) {
+        var cut = cutTail(v, s0, le);
+        if (cut < le) { e0 = cut; tailSel = true; }
+      }
+      if (e0 <= s0) return { error: 'empty' };
+      t = { start: s0, end: e0, where: 'selection', tail: tailSel };
+    } else {
+      var lines = v.split('\n'), pos = 0, st = { ending: false, afterCopies: false };
+      for (var i = 0; i < lines.length; i++) {
+        var raw = lines[i], ls = pos;
+        pos += raw.length + 1;
+        var line = raw.trim();
+        var c = classifyLine(line, st);
+        if (s < ls || s > ls + raw.length) continue;
+        if (c.kind === 'blank') return { error: 'empty' };
+        if (c.body == null) return { error: 'format' };
+        var lead2 = raw.length - raw.replace(/^\s+/, '').length;
+        var bs = ls + lead2 + c.body, be = ls + lead2 + line.length;
+        // 段名後面的空白不算內文（「主旨：　…」）
+        while (bs < be && /\s/.test(v.charAt(bs))) bs++;
+        var cutAt = cutTail(v, bs, be), tail = cutAt < be;
+        be = cutAt;
+        if (be <= bs) return { error: 'empty' };
+        t = { start: bs, end: be, where: 'line', tail: tail };
+        break;
+      }
+      if (!t) return { error: 'empty' };
+    }
+    t.text = v.slice(t.start, t.end);
+    if (t.text.length > MAX_RW) return { error: 'toolong' };
+    return t;
+  }
+
+  function shortText(x, n) {
+    var a = Array.from(String(x || '').replace(/\s+/g, ' '));
+    return a.length > n ? a.slice(0, n).join('') + '…' : a.join('');
+  }
+  function targetMessage(t) {
+    if (t.error === 'format') {
+      return tr('游標所在的這一行是格式欄位（抬頭、日期、受文者、正副本、署名…），不能改寫。請把游標放在主旨、說明或擬辦的內文上，或直接選取要改的文字。');
+    }
+    if (t.error === 'span') {
+      return tr('選取的範圍跨了好幾個段落或項次，改寫後後面的項次會不見。請一次改寫一項。');
+    }
+    if (t.error === 'toolong') {
+      return tr('這一段超過 {0} 字，請選取其中一部分再改寫。').replace('{0}', MAX_RW.toLocaleString());
+    }
+    if (t.error) return tr('游標所在的這一行沒有可以改寫的內文。請把游標放在內文上，或直接選取要改的文字。');
+    return (t.where === 'selection'
+      ? tr('要改寫你選取的 {0} 字：「{1}」')
+      : tr('要改寫游標所在的這一段：「{1}」'))
+      .replace('{0}', Array.from(t.text).length.toLocaleString()).replace('{1}', shortText(t.text, 28));
+  }
+  var targetFrame = 0;
+  function paintTarget() {
+    cancelAnimationFrame(targetFrame);
+    targetFrame = requestAnimationFrame(function () {
+      var t = rewriteTarget(), box = el('odRwTarget');
+      box.textContent = targetMessage(t);
+      box.classList.toggle('is-warn', !!t.error);
+    });
+  }
+  ['select', 'keyup', 'mouseup', 'focus'].forEach(function (ev) {
+    el('odDraft').addEventListener(ev, paintTarget);
+  });
+
+  // 改寫方式是一排卡片（單選）
+  function rwKind() {
+    var c = document.querySelector('input[name="odRwKind"]:checked');
+    return c ? c.value : 'shorter';
+  }
+  el('odRwKinds').addEventListener('change', function () {
+    var custom = rwKind() === 'custom';
+    el('odRwInstr').hidden = !custom;
+    if (custom) el('odRwInstr').focus();
+  });
+
+  // 字元級的差異（不加相依）：先去掉頭尾相同的部分，中間用最長共同子序列。
+  // 中間那段太大就整段當成「刪掉＋新增」—— 段落上限 2000 字，正常用不到這條退路。
+  var DIFF_CELLS = 4000000;
+  function charDiff(a, b) {
+    var A = Array.from(a), B = Array.from(b), ops = [];
+    function push(op, ch) {
+      var last = ops[ops.length - 1];
+      if (last && last[0] === op) last[1] += ch; else ops.push([op, ch]);
+    }
+    var pre = 0;
+    while (pre < A.length && pre < B.length && A[pre] === B[pre]) pre++;
+    var suf = 0;
+    while (suf < A.length - pre && suf < B.length - pre &&
+           A[A.length - 1 - suf] === B[B.length - 1 - suf]) suf++;
+    if (pre) push('=', A.slice(0, pre).join(''));
+    var a2 = A.slice(pre, A.length - suf), b2 = B.slice(pre, B.length - suf);
+    var n = a2.length, m = b2.length;
+    if (n * m > DIFF_CELLS) {
+      if (n) push('-', a2.join(''));
+      if (m) push('+', b2.join(''));
+    } else if (n || m) {
+      var W = m + 1, L = new Uint16Array((n + 1) * W);
+      for (var i = n - 1; i >= 0; i--) {
+        for (var j = m - 1; j >= 0; j--) {
+          L[i * W + j] = a2[i] === b2[j] ? L[(i + 1) * W + j + 1] + 1
+            : Math.max(L[(i + 1) * W + j], L[i * W + j + 1]);
+        }
+      }
+      var x = 0, y = 0;
+      while (x < n && y < m) {
+        if (a2[x] === b2[y]) { push('=', a2[x]); x++; y++; }
+        else if (L[(x + 1) * W + y] >= L[x * W + y + 1]) { push('-', a2[x]); x++; }
+        else { push('+', b2[y]); y++; }
+      }
+      while (x < n) push('-', a2[x++]);
+      while (y < m) push('+', b2[y++]);
+    }
+    if (suf) push('=', A.slice(A.length - suf).join(''));
+    return ops;
+  }
+  // 左邊：原本（刪掉的字劃線）；右邊：改寫後（新增的字有底色）。一律 textContent，不經 innerHTML。
+  function paintDiff(before, after) {
+    var ops = charDiff(before, after), L = el('odRwBefore'), R = el('odRwAfter');
+    L.replaceChildren(); R.replaceChildren();
+    ops.forEach(function (o) {
+      if (o[0] === '=') {
+        L.appendChild(document.createTextNode(o[1]));
+        R.appendChild(document.createTextNode(o[1]));
+      } else {
+        var node = document.createElement(o[0] === '-' ? 'del' : 'ins');
+        node.textContent = o[1];
+        (o[0] === '-' ? L : R).appendChild(node);
+      }
+    });
+  }
+
+  function closeRewrite() {
+    pendingRw = null;
+    el('odRwOut').hidden = true;
+    el('odRwBefore').replaceChildren();
+    el('odRwAfter').replaceChildren();
+    el('odRwIssues').replaceChildren();
+  }
+
+  var RW_LABEL = tr('改寫中…');
+  el('odRwGo').addEventListener('click', async function () {
+    if (!caseId) return;
+    var t = rewriteTarget();
+    if (t.error) { showAlert(targetMessage(t)); return; }
+    var kind = rwKind(), instr = el('odRwInstr').value.trim();
+    if (kind === 'custom' && !instr) {
+      showAlert(tr('請寫下要怎麼改。'));
+      el('odRwInstr').focus();
+      return;
+    }
+    var btn = this, done = busy(btn, tr('改寫中…'));
+    draftBusy(true, RW_LABEL);
+    try {
+      var r = await postJson('/rewrite', {
+        case_id: caseId, paragraph: t.text, kind: kind,
+        instruction: kind === 'custom' ? instr : ''
+      });
+      if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('改寫失敗'))); return; }
+      var d = await r.json();
+      pendingRw = { start: t.start, end: t.end, original: t.text, text: String(d.text || ''),
+                    kind: kind, instruction: kind === 'custom' ? instr : '', tail: t.tail };
+      paintDiff(t.text, pendingRw.text);
+      el('odRwStat').textContent = tr('原本 {0} 字 → 改寫後 {1} 字')
+        .replace('{0}', Array.from(t.text).length.toLocaleString())
+        .replace('{1}', Array.from(pendingRw.text.replace(/\n/g, '')).length.toLocaleString());
+      var ul = el('odRwIssues'), issues = d.issues || [];
+      ul.replaceChildren();
+      issues.forEach(function (it) { ul.appendChild(issueItem(it, false).li); });
+      el('odRwIssueSum').textContent = issues.length
+        ? tr('改寫後有 {0} 個地方要確認（下面列出）。採用之前請看過。').replace('{0}', issues.length)
+        : tr('改寫後沒有找到需要確認的地方。');
+      el('odRwOut').hidden = false;
+      el('odRwOut').scrollIntoView({ block: 'nearest' });
+    } catch (e) {
+      showAlert(tr('改寫失敗'));
+    } finally { done(); draftBusy(false, RW_LABEL); }
+  });
+
+  el('odRwReject').addEventListener('click', function () { closeRewrite(); });
+
+  // 採用：換的是**原本那一段**。改寫期間草稿被改過的話，照原文找回那一段；
+  // 找不到（或出現不只一次、分不出是哪一個）就不換，請使用者重新選。
+  el('odRwAccept').addEventListener('click', async function () {
+    var p = pendingRw;
+    if (!p) return;
+    var ta = el('odDraft'), v = ta.value, s = p.start, e = p.end;
+    if (v.slice(s, e) !== p.original) {
+      var i = v.indexOf(p.original);
+      if (i < 0 || v.indexOf(p.original, i + 1) >= 0) {
+        showAlert(tr('改寫期間草稿改過了，找不到原本那一段。請重新選取再改寫一次。'));
+        return;
+      }
+      s = i;
+      e = i + p.original.length;
+    }
+    var txt = p.text;
+    // 後面接著程式加的結語（「，簽請　核示。」）—— 改寫結果自己的句號拿掉，不然變成「。，簽請」
+    if (p.tail) txt = txt.replace(/[。，、；.,\s]+$/, '');
+    ta.value = v.slice(0, s) + txt + v.slice(e);
+    ta.dispatchEvent(new Event('input'));
+    ta.focus();
+    ta.setSelectionRange(s, s + txt.length);
+    closeRewrite();
+    paintTarget();
+    // 採用＝一個新的版本（來源：逐段改寫）
+    await saveRevision({ source: 'rewrite', kind: p.kind, note: p.instruction });
+  });
+
+  // ---------------------------------------------------------------- 版本
+  //
+  // 清單存在伺服器上。`REV.cur`：畫面上這份草稿是從第幾版開始改的（存新版時帶給伺服器，
+  // 不是最新版就會被 409 擋下 —— 兩個分頁同時改的時候不會安靜地蓋掉另一邊）。
+  var REV = { cur: 0, latest: 0, list: [], baseText: '', conflict: null, conflictOpts: null };
+  var SRC = { ai: tr('模型產生'), regen: tr('重新產生'), edit: tr('手動修改'), rewrite: tr('逐段改寫') };
+  var KIND_NAME = {};
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="odRwKind"]'), function (o) {
+    KIND_NAME[o.value] = o.closest('.option-card').querySelector('.opt-label').textContent.trim();
+  });
+
+  function fmtWhen(ts) {
+    var d = new Date((Number(ts) || 0) * 1000);
+    if (!ts || isNaN(d.getTime())) return '';
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) +
+      ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+  function isRevDirty() { return REV.cur > 0 && el('odDraft').value !== REV.baseText; }
+
+  function resetRevisions(text) {
+    REV.cur = 0; REV.latest = 0; REV.list = []; REV.baseText = text || '';
+    REV.conflict = null; REV.conflictOpts = null;
+    el('odRevConflict').hidden = true;
+    el('odRevView').hidden = true;
+    paintRevs();
+  }
+
+  function paintRevState() {
+    var box = el('odRevState');
+    if (!REV.cur) { box.textContent = ''; box.classList.remove('is-dirty'); return; }
+    var dirty = isRevDirty();
+    box.textContent = (dirty ? tr('從第 {0} 版改過，還沒有儲存。') : tr('目前是第 {0} 版。'))
+      .replace('{0}', REV.cur);
+    box.classList.toggle('is-dirty', dirty);
+  }
+
+  function revDetail(r) {
+    var parts = [];
+    if (r.source === 'rewrite' && r.kind) parts.push(KIND_NAME[r.kind] || r.kind);
+    if (r.restored_from) parts.push(tr('還原自第 {0} 版').replace('{0}', r.restored_from));
+    return parts.join('・');
+  }
+
+  function paintRevs() {
+    var ol = el('odRevs');
+    ol.replaceChildren();
+    REV.list.slice().reverse().forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = 'od-rev' + (r.rev === REV.latest ? ' is-latest' : '');
+      li.dataset.rev = r.rev;
+      var main = document.createElement('div');
+      main.className = 'od-rev-main';
+      var no = document.createElement('span');
+      no.className = 'od-rev-no';
+      no.textContent = tr('第 {0} 版').replace('{0}', r.rev);
+      var src = document.createElement('span');
+      var sk = SRC[r.source] ? r.source : 'edit';
+      src.className = 'od-src od-src-' + sk;
+      src.textContent = SRC[sk];
+      main.append(no, src);
+      var det = revDetail(r);
+      if (det) {
+        var dd = document.createElement('span');
+        dd.className = 'od-rev-detail';
+        dd.textContent = det;
+        main.appendChild(dd);
+      }
+      if (r.note) {
+        // 使用者自己寫的（自訂改寫的要求）—— 原樣顯示、不翻譯
+        var nt = document.createElement('span');
+        nt.className = 'od-rev-detail';
+        nt.dataset.i18n = 'skip';
+        nt.textContent = '「' + r.note + '」';
+        main.appendChild(nt);
+      }
+      var sub = document.createElement('div');
+      sub.className = 'od-rev-sub';
+      sub.textContent = fmtWhen(r.created_at) + ' · ' +
+        tr('{0} 字').replace('{0}', Number(r.chars || 0).toLocaleString());
+      if (r.rev === REV.latest) {
+        var lt = document.createElement('span');
+        lt.className = 'od-rev-latest';
+        lt.textContent = ' · ' + tr('最新');
+        sub.appendChild(lt);
+      }
+      var act = document.createElement('div');
+      act.className = 'od-rev-act';
+      var view = document.createElement('button');
+      view.type = 'button';
+      view.className = 'btn btn-secondary btn-small';
+      view.dataset.odRevView = r.rev;
+      view.textContent = tr('看這一版');
+      act.appendChild(view);
+      if (r.rev !== REV.latest) {
+        var rs = document.createElement('button');
+        rs.type = 'button';
+        rs.className = 'btn btn-secondary btn-small';
+        rs.dataset.odRevRestore = r.rev;
+        rs.textContent = tr('還原成這一版');
+        act.appendChild(rs);
+      }
+      li.append(main, sub, act);
+      ol.appendChild(li);
+    });
+    paintRevState();
+  }
+
+  async function fetchRev(n) {
+    var r = await fetch(BASE + '/revisions/' + encodeURIComponent(caseId) + '/' + encodeURIComponent(n));
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('讀不到這一版'))); return null; }
+    return await r.json();
+  }
+
+  async function loadRevisions(applyLatest) {
+    if (!caseId) return;
+    var my = caseId;
+    try {
+      var r = await fetch(BASE + '/revisions/' + encodeURIComponent(caseId));
+      if (my !== caseId) return;
+      if (!r.ok) {
+        el('odRevState').textContent = await window.friendlyServerError(r, tr('版本記錄讀不到'));
+        return;
+      }
+      var d = await r.json();
+      REV.list = d.revisions || [];
+      REV.latest = d.latest || 0;
+      if (applyLatest) {
+        REV.cur = REV.latest;
+        if (REV.latest > 1) {
+          var x = await fetchRev(REV.latest);
+          if (x && my === caseId) {
+            el('odDraft').value = x.text || '';
+            REV.baseText = x.text || '';
+            paintDraft();
+            armWorkspace();
+            recheckQuiet();
+          }
+        }
+      }
+      paintRevs();
+    } catch (e) {
+      el('odRevState').textContent = tr('版本記錄讀不到');
+    }
+  }
+
+  function showConflict(c, opts) {
+    if (!c || !c.latest) { showAlert(tr('另一個分頁已經存過新版本。')); return; }
+    REV.conflict = c.latest;
+    REV.conflictOpts = opts;
+    if (Array.isArray(c.revisions)) REV.list = c.revisions;
+    REV.latest = c.latest.rev;
+    el('odRevConflictMsg').textContent = tr('另一個分頁已經存過新版本（第 {0} 版，{1}）。你畫面上的草稿還沒有儲存 —— 要載入最新版，還是把畫面上這一份另存成新的一版？兩份都會留在版本清單裡。')
+      .replace('{0}', c.latest.rev).replace('{1}', fmtWhen(c.latest.created_at));
+    el('odRevConflict').hidden = false;
+    paintRevs();
+    el('odRevConflict').scrollIntoView({ block: 'nearest' });
+  }
+  function hideConflict() {
+    REV.conflict = null; REV.conflictOpts = null;
+    el('odRevConflict').hidden = true;
+  }
+
+  // 存成新的一版。`baseRev`：409 之後「以最新版為基礎另存」時才給
+  async function saveRevision(opts, baseRev) {
+    if (!caseId) return false;
+    var text = el('odDraft').value;
+    if (!text.trim()) { showAlert(tr('草稿是空的，沒有可以儲存的內容。')); return false; }
+    if (text.length > MAX_EDIT) {
+      showAlert(tr('草稿超過 {0} 字的上限').replace('{0}', MAX_EDIT.toLocaleString()));
+      return false;
+    }
+    var body = { case_id: caseId, text: text, base_rev: baseRev != null ? baseRev : REV.cur,
+                 source: opts.source || 'edit', note: opts.note || '' };
+    if (opts.kind) body.kind = opts.kind;
+    if (opts.restored_from) body.restored_from = opts.restored_from;
+    var r;
+    try { r = await postJson('/revisions', body); } catch (e) { showAlert(tr('儲存版本失敗')); return false; }
+    if (r.status === 409) {
+      var c = null;
+      try { c = await r.json(); } catch (e) { c = null; }
+      showConflict(c, opts);
+      return false;
+    }
+    if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('儲存版本失敗'))); return false; }
+    var d = await r.json();
+    REV.cur = d.rev;
+    REV.latest = d.latest;
+    REV.list = d.revisions || REV.list;
+    REV.baseText = text;
+    hideConflict();
+    paintRevs();
+    toast((d.unchanged ? tr('內容跟第 {0} 版相同，沒有另存新版本') : tr('已儲存為第 {0} 版'))
+      .replace('{0}', d.rev), d.unchanged ? '' : 'ok');
+    return true;
+  }
+
+  el('odRevSave').addEventListener('click', async function () {
+    var btn = this, done = busy(btn, tr('儲存中…'));
+    try { await saveRevision({ source: 'edit' }); } finally { done(); }
+  });
+
+  el('odRevLoadLatest').addEventListener('click', async function () {
+    var c = REV.conflict;
+    if (!c) return;
+    if (isRevDirty() || el('odDraft').value !== (c.text || '')) {
+      var ok = await window.showConfirm(
+        tr('載入最新版會換掉畫面上還沒儲存的修改。要兩份都留著的話，請改按「仍然儲存為新版本」。'),
+        { title: tr('載入最新版'), okText: tr('換成最新版') });
+      if (!ok) return;
+    }
+    el('odDraft').value = c.text || '';
+    REV.cur = c.rev;
+    REV.baseText = c.text || '';
+    hideConflict();
+    paintDraft();
+    armWorkspace();
+    paintRevs();
+    recheckQuiet();
+  });
+
+  el('odRevForce').addEventListener('click', async function () {
+    var c = REV.conflict;
+    if (!c) return;
+    var btn = this, done = busy(btn, tr('儲存中…'));
+    try { await saveRevision(REV.conflictOpts || { source: 'edit' }, c.rev); } finally { done(); }
+  });
+
+  var viewing = 0;
+  async function viewRev(n) {
+    var x = await fetchRev(n);
+    if (!x) return;
+    viewing = n;
+    el('odRevViewTitle').textContent = tr('第 {0} 版').replace('{0}', n) + ' · ' +
+      (SRC[x.source] || '') + (fmtWhen(x.created_at) ? ' · ' + fmtWhen(x.created_at) : '');
+    el('odRevViewText').textContent = x.text || '';
+    el('odRevViewRestore').hidden = (n === REV.latest);
+    el('odRevView').hidden = false;
+    el('odRevView').scrollIntoView({ block: 'nearest' });
+  }
+
+  // 還原也是**存成新的一版**（`restored_from` 記著從哪一版），不刪後面的版本
+  async function restoreRev(n) {
+    var x = await fetchRev(n);
+    if (!x) return;
+    if (isRevDirty()) {
+      var ok = await window.showConfirm(
+        tr('畫面上的草稿有還沒儲存的修改，還原會換掉它們（已儲存的版本都不會刪）。要還原嗎？'),
+        { title: tr('還原成第 {0} 版').replace('{0}', n), okText: tr('還原') });
+      if (!ok) return;
+    }
+    el('odDraft').value = x.text || '';
+    el('odDraft').dispatchEvent(new Event('input'));
+    el('odRevView').hidden = true;
+    await saveRevision({ source: 'edit', restored_from: n });
+  }
+
+  el('odRevs').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button');
+    if (!b) return;
+    if (b.dataset.odRevView) viewRev(Number(b.dataset.odRevView));
+    else if (b.dataset.odRevRestore) restoreRev(Number(b.dataset.odRevRestore));
+  });
+  el('odRevViewClose').addEventListener('click', function () { el('odRevView').hidden = true; });
+  el('odRevViewRestore').addEventListener('click', function () { if (viewing) restoreRev(viewing); });
+
+  // ---------------------------------------------------------------- 匯出
+
+  function warnTodo() {
+    var n = (el('odDraft').value.match(PLACEHOLDER) || []).length;
+    if (n) toast(tr('還有 {0} 項待補').replace('{0}', n));
+  }
+
+  async function fetchExport(fmt) {
+    var text = el('odDraft').value;
+    if (!text.trim()) throw new Error(tr('沒有可以匯出的內容'));
+    if (text.length > MAX_EDIT) throw new Error(tr('草稿超過 {0} 字的上限').replace('{0}', MAX_EDIT.toLocaleString()));
+    var tpl = (el('odTpl') && !el('odTplRow').hidden) ? el('odTpl').value : '';
+    var r = await postJson('/export', {
+      text: text, fmt: fmt, title: (result && result.title) || '',
+      draft_mark: el('odDraftMark').checked, case_id: caseId, template: tpl,
+      extras: exportExtras()
+    });
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('匯出失敗')));
+    if (r.headers.get('X-Jtdt-Template') === 'fallback') {
+      // 這件事要讀得到（短暫的提示一閃就過）—— 檔案照樣交出去，對話框不擋下載
+      setTimeout(function () {
+        showAlert(tr('這份範本讀不懂（可能資料集改版了），這次用內建版面匯出。'));
+      }, 0);
+    }
+    return { blob: await r.blob(), name: nameFrom(r) || ('official-doc.' + fmt) };
+  }
+
+  document.querySelectorAll('[data-od-dl]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      if (btn.disabled) return;
+      warnTodo();
+      var done = busy(btn, tr('產生中…'));
+      try {
+        var x = await fetchExport(btn.dataset.odDl);
+        var url = URL.createObjectURL(x.blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = x.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        // 不要馬上 revoke —— 有些瀏覽器還沒寫完檔案就會拿不到內容
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      } catch (e) {
+        showAlert((e && e.message) || tr('匯出失敗'));
+      } finally { done(); }
+    });
+  });
+
+  el('odCopy').addEventListener('click', async function () {
+    var text = el('odDraft').value;
+    warnTodo();
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      var t = document.createElement('textarea');
+      t.value = text;
+      t.className = 'od-offscreen';
+      document.body.appendChild(t);
+      t.select();
+      try { document.execCommand('copy'); } catch (_e) { /* 交給下面的提示 */ }
+      t.remove();
+    }
+    toast(tr('已複製純文字'), 'ok');
+  });
+
+  // 存至工作區：照目前（可能改過）的文字產生檔案。草稿一改就重新接一次，
+  // 不然按鈕會停在「已存至工作區」、存不了改過的那一份。
+  function armWorkspace() {
+    var row = el('odWsRow');
+    if (!row) return;
+    var sep = el('odWsSep');
+    if (!window.attachWorkspaceSave || !window.saveToWorkspace) { row.hidden = true; if (sep) sep.hidden = true; return; }
+    row.hidden = false;
+    if (sep) sep.hidden = false;
+    [['odWsOdt', 'odt'], ['odWsDocx', 'docx']].forEach(function (p) {
+      window.attachWorkspaceSave(el(p[0]), async function () {
+        warnTodo();
+        var x = await fetchExport(p[1]);
+        return { blob: x.blob, name: x.name, tool: 'official-doc' };
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------- 重新打開一個案件
+  //
+  // `?case=<案件編號>`（歷史案件、「我的作業」、通知信的連結）：問伺服器這個案件的最近一件作業 ——
+  // 還在跑就接著追進度，跑完了就把草稿讀回來（連同當初填的表單）。
+  // `?job=<作業編號>`（v1.16.66 以前的作業紀錄與通知）：作業記著案件編號（`case_id`，更早的
+  // 是 `upload_id`），先拿回來再讀結果。**只 `job.track()` 不夠** —— 會議摘要踩過：作業早就
+  // 跑完了，輪詢第一次就讀到 done，而讀結果要的編號是送出當下才有的，重新開一頁是空的。
+  function followJob(jid, status) {
+    restoreOnDone = true;
+    if (status === 'running' || status === 'pending') running(true);
+    job.track(jid);
+  }
+
+  (async function () {
+    var qs = new URLSearchParams(window.location.search);
+    var cidParam = qs.get('case'), jid = qs.get('job');
+    try {
+      if (cidParam) {
+        var rc = await fetch(BASE + '/case/' + encodeURIComponent(cidParam));
+        if (!rc.ok) { showAlert(await window.friendlyServerError(rc, tr('讀不到這份草稿'))); return; }
+        var info = await rc.json();
+        var jb = info.job || null;
+        if (jb && (jb.status === 'running' || jb.status === 'pending')) { followJob(jb.id, jb.status); return; }
+        if (!info.has_result) { showAlert(tr('這個案件還沒有草稿（產生的作業沒有完成）。請重新產生一次。')); return; }
+        caseId = cidParam;
+        await loadResult(true);
+        return;
+      }
+      if (!jid) return;
+      var r = await fetch('/api/jobs/' + encodeURIComponent(jid));
+      if (!r.ok) { job.track(jid); return; }
+      var j = await r.json();
+      var cid = (j.meta || {}).case_id || (j.meta || {}).upload_id || null;
+      if ((j.status || '') !== 'done' || !cid) { followJob(jid, j.status); return; }
+      caseId = cid;
+      await loadResult(true);
+    } catch (e) {
+      showAlert(tr('讀不到這份草稿'));
+    }
+  })();
+})();
+</script>
+{% endblock %}

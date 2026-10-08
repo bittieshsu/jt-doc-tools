@@ -6,19 +6,27 @@ location and deleting entries older than the cutoff.
 
 Categories:
   - transit_proof      (data/transit_proof_files/) — 乘車證明的原始檔
+  - official_doc_cases (data/official_doc_cases/) — 公文撰擬的歷史案件（已刪除的從刪除那天起算）
   - fill_history       (data/fill_history/)
   - stamp_history      (data/stamp_history/)
   - watermark_history  (data/watermark_history/)
   - temp               (data/temp/) — short TTL (hours, not days)
-  - jobs               (data/jobs/) — also short TTL
+  - jobs               files owned by a job still within jobs_hours — the
+                       result file and the temp files its「開啟」reads
+                       (mostly in data/temp/, plus anything in data/jobs/);
+                       see `job_store.keep_alive_keys` / `job_files.usage`
   - audit              (data/audit.sqlite — DELETE rows by ts)
+
+**這是全站唯一清作業檔案的地方**：`_sweep_temp_dir` 由這裡的 6 小時排程與
+`app/main.py` 的 30 分鐘迴圈呼叫（兩條路同一支函式）。`job_manager` 曾經有
+一支自己的 `cleanup_expired()`（用另一個期限、還會刪資料庫的作業紀錄），
+從來沒有人呼叫，已經拿掉 —— 不要再加回第二條清理路徑。
 """
 from __future__ import annotations
 
 import json
 import logging
 import os
-import re
 import shutil
 import threading
 import time
@@ -36,11 +44,14 @@ _DEFAULTS: dict[str, Any] = {
     # 報帳單據的性質跟填寫歷史一樣是「事後可能要翻出來對」，所以同樣預設一年。
     # 這些是**使用者上傳的原始憑證**，含個資 —— 保留期到了就該清掉。
     "transit_proof_days":     365,
+    # 公文撰擬的歷史案件（輸入、草稿、版本）。跟填寫歷史同性質（事後要翻出來看），
+    # 一樣預設一年；最後修改超過保留期就整個案件刪掉。
+    "official_doc_cases_days": 365,
     "fill_history_days":      365,
     "stamp_history_days":     365,
     "watermark_history_days": 365,
     "temp_hours":             2,        # data/temp/
-    "jobs_hours":             24,       # data/jobs/
+    "jobs_hours":             24,       # 作業擁有的檔案（多半在 data/temp/，見 job_files）
     # 工作紀錄（jobs.sqlite 的列，不是結果檔）。結果檔照 jobs_hours 清掉之後，
     # 紀錄仍保留一段時間，讓使用者在「我的工作」看得到做過什麼、管理員查得到
     # 誰在什麼時候轉了什麼。**這張表沒有人清就會無限長大** —— 8000 人規模下
@@ -138,13 +149,25 @@ def collect_stats() -> dict[str, Any]:
     for key, sub in [("fill_history", "fill_history"),
                      ("stamp_history", "stamp_history"),
                      ("watermark_history", "watermark_history"),
-                     ("transit_proof", "transit_proof_files"),
-                     ("temp", "temp"), ("jobs", "jobs")]:
+                     ("transit_proof", "transit_proof_files")]:
         d = _s.data_dir / sub
         stats[key] = {
             "size_mb": _dir_size(d) / 1024 / 1024,
             "oldest_days": _oldest_entry_age_days(d),
         }
+    # 「暫存」與「作業結果檔」**依檔案歸誰的保留期分**，不是依目錄分。
+    #
+    # 原本「作業結果檔」量的是 `data/jobs/` —— 全站沒有任何一支工具把結果放在
+    # 那裡，那一列永遠是 0 MB；真正的作業檔案在 `data/temp/`，照作業的保留期
+    # 留著，卻被算在「暫存」那一列。認人的規則跟清理程式是同一份
+    # （`job_files.usage` → `job_store.keep_alive_keys` / `owns_file`）。
+    from . import official_doc_cases
+    stats["official_doc_cases"] = official_doc_cases.stats()
+    from . import job_files
+    s = get()
+    split = job_files.usage(s["jobs_hours"] * 3600 if s["jobs_hours"] > 0 else 0)
+    stats["temp"] = split["temp"]
+    stats["jobs"] = split["jobs"]
     stats["audit"] = {
         "size_mb": db.db_size_bytes(audit_db.audit_db_path()) / 1024 / 1024,
         "oldest_days": _audit_oldest_days(),
@@ -185,10 +208,6 @@ def _audit_oldest_days() -> float | None:
 
 # ---------- sweepers ----------
 
-# 暫存檔名裡的作業編號 / upload_id（32 碼十六進位）
-_HEX32 = re.compile(r"[0-9a-f]{32}")
-
-
 def _sweep_temp_dir(temp_seconds: int, jobs_seconds: int) -> int:
     """清掉過期的暫存檔與作業結果檔。
 
@@ -219,9 +238,10 @@ def _sweep_temp_dir(temp_seconds: int, jobs_seconds: int) -> int:
         keep_ids, keep_names = job_store.keep_alive_keys(since)
 
     def _kept(p: Path) -> bool:
-        if p.name in keep_names:
-            return True
-        return any(tok in keep_ids for tok in _HEX32.findall(p.name))
+        # 認人的規則只有一份（`job_store.owns_file`）——「我的作業」的開啟鈕與
+        # 管理頁的用量也用它，清理認得的檔案那兩邊一定也認得。
+        from . import job_store
+        return job_store.owns_file(p.name, keep_ids, keep_names)
 
     for sub, seconds in (("temp", temp_seconds), ("jobs", jobs_seconds)):
         if seconds <= 0:            # 0 或負數 = 永久保留
@@ -362,6 +382,12 @@ def sweep_all() -> dict[str, Any]:
     except Exception:
         logger.exception("workspace sweep failed")
     report["transit_proof"] = _sweep_transit_proof(s["transit_proof_days"])
+    try:
+        from . import official_doc_cases
+        report["official_doc_cases"] = official_doc_cases.purge_older_than(
+            s["official_doc_cases_days"])
+    except Exception:
+        logger.exception("official-doc cases sweep failed")
     report["audit"] = _sweep_audit(s["audit_days"])
     report["job_records"] = _sweep_job_records(s["job_records_days"])
     # 資料庫熱備份。掛在既有的 6 小時排程上（而不是另開一個排程執行緒），並用

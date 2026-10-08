@@ -24,12 +24,16 @@
     });
   }
   class FileUpload {
-    constructor(root, onFile) {
+    // opts.onWorkspacePick(fileId, meta)：選填。工具自己能在伺服器端直接取用工作區
+    // 裡的檔案時給這個 —— 「從工作區載入」就不再把檔案下載到瀏覽器、再整份上傳回去
+    // （錄音檔動輒上百 MB，同一份檔案在網路上來回兩趟）。歸屬一樣由伺服器判斷。
+    constructor(root, onFile, opts) {
       this.root = root;
       this.input = root.querySelector('input[type=file]');
       this.dropZone = root.querySelector('.drop-zone');
       this.nameEl = root.querySelector('.drop-zone-filename');
       this.onFile = onFile || (() => {});
+      this.onWorkspacePick = (opts && opts.onWorkspacePick) || null;
       this.multiple = !!this.input.multiple;
       this._bind();
       this._wireWorkspaceLoad();
@@ -116,6 +120,13 @@
         window.openWorkspacePicker({
           accept: exts,
           onPick: async (id, meta) => {
+            if (this.onWorkspacePick) {
+              if (this.nameEl) this.nameEl.textContent = (meta && meta.name) || '';
+              this.setBusy(true);
+              try { await this.onWorkspacePick(id, meta); }
+              finally { this.setBusy(false); }
+              return;
+            }
             const file = await window.workspaceFileAsFile(id, meta);
             this.loadFiles([file]);
           },

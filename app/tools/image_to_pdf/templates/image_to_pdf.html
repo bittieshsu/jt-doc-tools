@@ -277,15 +277,15 @@ function render() {
     const rotStyle = p.rotation ? `transform: rotate(${p.rotation}deg);` : '';
     return `<div class="i2p-card" data-idx="${idx}" data-fid="${p.file_id}" draggable="true">
       <span class="drag-hint">⠿</span>
-      <button type="button" class="del-corner" data-act="delete" title="' + tr('刪除') + '">×</button>
+      <button type="button" class="del-corner" data-act="delete" title="${tr('刪除')}">×</button>
       <div class="i2p-thumb-wrap" data-act="zoom">
         <img class="i2p-thumb" src="${p.thumb_url}" data-style="${rotStyle}" alt="${escapeHtml(p.filename)}" loading="lazy" />
       </div>
       <div class="i2p-num">第 ${idx + 1} 頁</div>
       <div class="i2p-fname" title="${escapeHtml(p.filename)}">${escapeHtml(p.filename)}</div>
       <div class="i2p-actions">
-        <button type="button" class="i2p-btn" data-act="rotate-l" title="' + tr('逆時針 90°') + '">↺</button>
-        <button type="button" class="i2p-btn" data-act="rotate-r" title="' + tr('順時針 90°') + '">↻</button>
+        <button type="button" class="i2p-btn" data-act="rotate-l" title="${tr('逆時針 90°')}">↺</button>
+        <button type="button" class="i2p-btn" data-act="rotate-r" title="${tr('順時針 90°')}">↻</button>
       </div>
     </div>`;
   }).join('');

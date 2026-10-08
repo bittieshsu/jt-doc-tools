@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+
+{% block title %}{{ tr('公文撰擬') }} — {{ tr('歷史案件') }} · {{ app_name }}{% endblock %}
+
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+.odc-bar { display:flex; flex-wrap:wrap; gap:10px 12px; align-items:center; justify-content:space-between; margin:0 0 14px; }
+.odc-search { display:flex; flex-wrap:wrap; gap:8px; align-items:center; flex:1 1 420px; min-width:0; }
+.odc-search input[type=search] { flex:1 1 220px; min-width:0; }
+.odc-search .jt-select-wrap { width:9em; }
+.odc-count { font-size:13px; color:var(--muted); margin:0 0 8px; }
+.odc-tbl { width:100%; border-collapse:collapse; font-size:13.5px; }
+.odc-tbl th, .odc-tbl td { padding:10px 10px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
+.odc-tbl th { background:#f8fafc; color:#475569; font-weight:600; font-size:12.5px; white-space:nowrap; }
+.odc-tbl tbody tr:hover { background:#f9fafb; }
+.odc-name a { font-weight:600; color:var(--primary-dark); text-decoration:none; }
+.odc-name a:hover { text-decoration:underline; }
+.odc-sub { margin-top:3px; font-size:12px; color:var(--muted); overflow-wrap:anywhere; }
+.odc-mode { display:inline-block; padding:2px 9px; border-radius:999px; background:#eff6ff; color:#1d4ed8;
+            font-size:12px; font-weight:600; white-space:nowrap; }
+.odc-iss { display:flex; flex-wrap:wrap; gap:4px; }
+.odc-chip { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; white-space:nowrap; }
+.odc-chip.error { background:#fee2e2; color:#991b1b; }
+.odc-chip.todo { background:#fef3c7; color:#92400e; }
+.odc-chip.ok { background:#dcfce7; color:#166534; }
+.odc-time { white-space:nowrap; color:#334155; }
+.odc-act { display:flex; gap:4px; justify-content:flex-end; white-space:nowrap; }
+.odc-act .btn { padding:4px 8px; }
+.odc-del { color:#dc2626; }
+.odc-del:hover { background:#fee2e2; border-color:#fecaca; }
+.odc-tbl tr.odc-deleted { opacity:.6; }
+.odc-gone { display:inline-block; padding:1px 8px; border-radius:999px; background:#fee2e2; color:#991b1b; font-size:12px; }
+.odc-empty { text-align:center; padding:44px 16px; color:var(--muted); }
+.odc-empty .btn { margin-top:12px; }
+@media (max-width: 760px) {
+  .odc-tbl thead { display:none; }
+  .odc-tbl, .odc-tbl tbody, .odc-tbl tr, .odc-tbl td { display:block; width:100%; }
+  .odc-tbl tr { border:1px solid var(--border); border-radius:10px; padding:6px 4px; margin:0 0 10px; }
+  .odc-tbl td { border:0; padding:4px 8px; }
+  .odc-tbl td[data-label]::before { content:attr(data-label); display:inline-block; min-width:5.5em;
+                                     color:var(--muted); font-size:12px; }
+  .odc-act { justify-content:flex-start; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{{ icon('official-doc', size=22) }} {{ tr('公文撰擬') }} — {{ tr('歷史案件') }}</h1>
+<p class="muted">{{ tr('你撰擬過的每一份公文都留在這裡，可以重新打開接著改、改名或刪除。') }}{% if show_owner %} {{ tr('你是管理員，這裡列出每個人的案件；已刪除的反灰顯示。') }}{% endif %}</p>
+
+<div class="odc-bar">
+  <form method="get" action="cases" class="odc-search" role="search">
+    <input type="search" class="field" name="q" value="{{ q or '' }}" maxlength="100"
+           placeholder="{{ tr('搜尋案件名稱或標題') }}" aria-label="{{ tr('搜尋案件名稱或標題') }}">
+    <select name="mode" class="field jt-select" aria-label="{{ tr('文別') }}">
+      <option value="">{{ tr('所有文別') }}</option>
+      {% for k, v in modes %}
+      <option value="{{ k }}" {% if mode_filter == k %}selected{% endif %}>{{ tr(v) }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn">{{ icon('search', size=14) }} {{ tr('搜尋') }}</button>
+    {% if q or mode_filter %}<a class="btn" href="cases">{{ icon('close', size=14) }} {{ tr('清除') }}</a>{% endif %}
+  </form>
+  <a class="btn btn-primary" href="/tools/official-doc/">{{ icon('plus', size=14) }} {{ tr('撰擬新公文') }}</a>
+</div>
+
+<div class="panel" id="odcPanel">
+  {% if cases %}
+  <p class="odc-count">{{ tr('共 {0} 件').replace('{0}', cases|length|string) }}{% if cases|length >= limit %} · {{ tr('只列出最近 {0} 件，較舊的請用搜尋').replace('{0}', limit|string) }}{% endif %}</p>
+  <table class="odc-tbl">
+    <thead><tr>
+      <th>{{ tr('案件') }}</th>
+      <th>{{ tr('文別') }}</th>
+      <th>{{ tr('版本') }}</th>
+      <th>{{ tr('檢查結果') }}</th>
+      <th>{{ tr('最後修改') }}</th>
+      {% if show_owner %}<th>{{ tr('擁有者') }}</th>{% endif %}
+      <th aria-label="{{ tr('動作') }}"></th>
+    </tr></thead>
+    <tbody>
+    {% for c in cases %}
+      <tr data-case-id="{{ c.case_id }}" data-name="{{ c.name }}" {% if c.deleted %}class="odc-deleted"{% endif %}>
+        <td class="odc-name">
+          {% if c.deleted %}<span>{{ c.name or c.title or tr(c.mode_name) }}</span>
+          {% else %}<a href="/tools/official-doc/?case={{ c.case_id }}" data-odc-title>{{ c.name or c.title or tr(c.mode_name) }}</a>{% endif %}
+          {% if c.name and c.title %}<div class="odc-sub" data-odc-sub>{{ c.title }}</div>{% endif %}
+          {% if c.deleted %}<div class="odc-sub"><span class="odc-gone">{{ tr('已刪除') }}</span>
+            {{ tr('{0} 由 {1} 刪除').replace('{0}', c.deleted_at|localdt).replace('{1}', c.deleted_by or '?') }}</div>{% endif %}
+        </td>
+        <td data-label="{{ tr('文別') }}"><span class="odc-mode">{{ tr(c.mode_name) }}</span></td>
+        <td data-label="{{ tr('版本') }}">{% if c.latest_rev %}{{ tr('第 {0} 版').replace('{0}', c.latest_rev|string) }}{% else %}—{% endif %}</td>
+        <td data-label="{{ tr('檢查結果') }}">
+          <div class="odc-iss">
+            {% if c.issues.error %}<span class="odc-chip error">{{ tr('需要確認 {0}').replace('{0}', c.issues.error|string) }}</span>{% endif %}
+            {% if c.issues.todo %}<span class="odc-chip todo">{{ tr('待補 {0}').replace('{0}', c.issues.todo|string) }}</span>{% endif %}
+            {% if not c.issues.error and not c.issues.todo %}{% if c.latest_rev %}<span class="odc-chip ok">{{ tr('沒有需要確認的事實') }}</span>{% else %}—{% endif %}{% endif %}
+          </div>
+        </td>
+        <td data-label="{{ tr('最後修改') }}" class="odc-time"><time datetime="{{ c.updated_at|localiso }}">{{ c.updated_at|localdt }}</time></td>
+        {% if show_owner %}<td data-label="{{ tr('擁有者') }}">{{ c.owner or '—' }}</td>{% endif %}
+        <td>
+          <div class="odc-act">
+            {% if not c.deleted %}
+            <a class="btn" href="/tools/official-doc/?case={{ c.case_id }}" title="{{ tr('打開') }}">{{ icon('eye', size=14) }} {{ tr('打開') }}</a>
+            <button type="button" class="btn" data-odc-rename title="{{ tr('改名') }}" aria-label="{{ tr('改名') }}">{{ icon('edit', size=14) }}</button>
+            <button type="button" class="btn odc-del" data-odc-delete title="{{ tr('刪除') }}" aria-label="{{ tr('刪除') }}">{{ icon('trash', size=14) }}</button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="odc-empty">
+    {% if q or mode_filter %}{{ tr('沒有符合的案件。') }}{% else %}{{ tr('還沒有案件。撰擬的公文會自動留在這裡。') }}{% endif %}
+    <div><a class="btn btn-primary" href="/tools/official-doc/">{{ icon('plus', size=14) }} {{ tr('撰擬新公文') }}</a></div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{# 「文別」下拉用本站樣式（`jt-select`）—— 這支不是全站載入，每一頁自己載 #}
+<script src="/static/js/custom_select.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  var panel = document.getElementById('odcPanel');
+  if (!panel) return;
+  var MAX_NAME = {{ max_name|int }};
+
+  async function rename(row) {
+    var cur = row.dataset.name || '';
+    var name = await window.showPrompt(
+      tr('案件名稱（最多 {0} 字；留空就用草稿的標題）').replace('{0}', MAX_NAME),
+      { title: tr('改名'), defaultValue: cur, okText: tr('儲存') });
+    if (name === null || name === undefined) return;
+    try {
+      var r = await fetch('case/' + encodeURIComponent(row.dataset.caseId) + '/rename', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: String(name) })
+      });
+      if (!r.ok) { window.showAlert(await window.friendlyServerError(r, tr('改名失敗'))); return; }
+      var got = await r.json();
+      row.dataset.name = got.name || '';
+      var a = row.querySelector('[data-odc-title]');
+      if (a) a.textContent = got.name || got.title || tr(got.mode_name);
+      var sub = row.querySelector('[data-odc-sub]');
+      if (got.name && got.title) {
+        if (!sub) {
+          sub = document.createElement('div');
+          sub.className = 'odc-sub';
+          sub.setAttribute('data-odc-sub', '');
+          a.parentNode.insertBefore(sub, a.nextSibling);
+        }
+        sub.textContent = got.title;
+      } else if (sub) { sub.remove(); }
+      window.showToast(tr('已改名'), 'ok');
+    } catch (e) { window.showAlert(tr('改名失敗')); }
+  }
+
+  async function del(row) {
+    var ok = await window.showConfirm(
+      tr('刪除這個案件？刪除之後你的清單上不再出現，也打不開了。'),
+      { title: tr('刪除案件'), kind: 'danger', okText: tr('刪除') });
+    if (!ok) return;
+    try {
+      var r = await fetch('case/' + encodeURIComponent(row.dataset.caseId), { method: 'DELETE' });
+      if (!r.ok) { window.showAlert(await window.friendlyServerError(r, tr('刪除失敗'))); return; }
+      row.remove();
+      window.showToast(tr('已刪除'), 'ok');
+    } catch (e) { window.showAlert(tr('刪除失敗')); }
+  }
+
+  panel.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-odc-rename], [data-odc-delete]');
+    if (!b) return;
+    var row = b.closest('tr[data-case-id]');
+    if (!row) return;
+    if (b.hasAttribute('data-odc-rename')) rename(row); else del(row);
+  });
+})();
+</script>
+{% endblock %}

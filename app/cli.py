@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -373,6 +374,10 @@ def svc_status() -> int:
     print(f"  install : {_install_root()}")
     print(f"  data    : {_data_dir()}")
     print(f"  url     : {_server_url()}")
+    bad = _venv_python_mismatch(_install_root())
+    if bad:
+        print(f"  python  : PROBLEM - environment built with {bad[0]}, now {bad[1]}; "
+              f"run `sudo jtdt update` to rebuild it")
     print()
     if _is_linux():
         rc, out = _run_capture(["systemctl", "is-active", SERVICE_NAME])
@@ -797,6 +802,72 @@ TROUBLESHOOT_URL_ZH = "https://jasoncheng7115.github.io/jt-doc-tools/troubleshoo
 TROUBLESHOOT_URL_EN = "https://jasoncheng7115.github.io/jt-doc-tools/troubleshooting-en.html"
 
 
+#: Linux 上 venv 底下那一個 Python 放在安裝目錄裡（`<安裝目錄>/python`），不跟系統共用。
+#: 系統升級換掉 `/usr/bin/python3` 時服務就不會跟著壞；也不會落到 root 的家目錄
+#: （`/root/.local/share/uv/python` —— 服務帳號讀不到）。實測：環境壞掉時沒設這個，
+#: `uv sync` 會拿 root 家目錄裡的 Python 重建。
+MANAGED_PYTHON = "3.12"
+
+
+def _venv_python_mismatch(root: Path) -> Optional[tuple[str, str]]:
+    """`<root>/.venv` 的 Python 跑不起來或版本跟建的時候不同 → `(建的版本, 現在的版本)`；正常回 None。"""
+    from .venv_check import built_version
+    venv = root / ".venv"
+    py = venv / ("Scripts/python.exe" if _is_windows() else "bin/python")
+    built = built_version(venv)
+    if not py.exists() or not built:
+        return (built or "?", "missing") if venv.exists() else None
+    try:
+        out = subprocess.run([str(py), "-c", "import sys;print('%d.%d' % sys.version_info[:2])"],
+                             capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return (built, "broken")
+    cur = (out.stdout or "").strip()
+    if out.returncode != 0 or not cur:
+        return (built, "broken")
+    if cur != built:
+        return (built, cur)
+    # Python 在某個人的家目錄裡（舊版 `jtdt update` 用 root 跑 `uv sync` 可能拿
+    # `/root/.local/share/uv/python` 重建）：root 跑得動、服務帳號讀不到 —— 也要重建
+    if _is_linux():
+        home = ""
+        try:
+            m = re.search(r"(?m)^\s*home\s*=\s*(.+?)\s*$",
+                          (venv / "pyvenv.cfg").read_text(encoding="utf-8", errors="replace"))
+            home = m.group(1) if m else ""
+        except OSError:
+            pass
+        if home.startswith(("/root/", "/home/")):
+            return (built, "home-dir")
+    return None
+
+
+def _python_for_sync(root: Path, env: dict) -> tuple[dict, list]:
+    """`uv sync` 用哪一個 Python（Linux）：回 `(env, 額外參數)`。
+
+    * 一律把 uv 自己管的 Python 放在安裝目錄裡（`UV_PYTHON_INSTALL_DIR`）。
+    * **環境好好的就不動它**（`managed`：只在要新建時才偏好安裝目錄裡的）—— 實測設成
+      `only-managed` 的話，uv 會把**正常的**系統 Python 環境也整個重建，每台升級都重新下載
+      所有相依（Linux 的 torch 是好幾 GB）。
+    * 環境已經壞了（系統 Python 被換掉）才改用安裝目錄裡的 Python 3.12 重建。
+    """
+    env = dict(env)
+    if not _is_linux():
+        return env, []
+    env["UV_PYTHON_INSTALL_DIR"] = str(root / "python")
+    bad = _venv_python_mismatch(root)
+    if bad:
+        built, cur = bad
+        print(f"The Python environment was built with Python {built} but now runs on {cur} "
+              f"(operating-system upgrade?).")
+        print(f"Rebuilding it with a private Python {MANAGED_PYTHON} under {root / 'python'} - "
+              f"all dependencies are downloaded again, this can take a while ...")
+        env["UV_PYTHON_PREFERENCE"] = "only-managed"
+        return env, ["--python", MANAGED_PYTHON]
+    env.setdefault("UV_PYTHON_PREFERENCE", "managed")
+    return env, []
+
+
 def _uv_tls_env(uv: str, env: dict) -> dict:
     """讓 uv 用 OS 信任庫：**只設這支 uv 認得的那一個變數**。
 
@@ -1063,7 +1134,8 @@ def svc_update() -> int:
         uv_env.setdefault("UV_INSECURE_HOST",
                           "pypi.org files.pythonhosted.org github.com "
                           "objects.githubusercontent.com astral.sh")
-    rc = subprocess.call([uv, "sync"], cwd=str(root), env=uv_env)
+    uv_env, py_args = _python_for_sync(root, uv_env)
+    rc = subprocess.call([uv, "sync", *py_args], cwd=str(root), env=uv_env)
     if rc != 0:
         print("uv sync failed.", file=sys.stderr)
         _print_help_url()

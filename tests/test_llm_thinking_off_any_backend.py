@@ -276,6 +276,18 @@ def test_thinking_that_the_server_ignores_is_detected(caplog):
     assert any("思考" in r.getMessage() for r in caplog.records), "要在服務記錄留一行警告"
 
 
+def test_thinking_the_caller_asked_for_is_not_reported_as_a_failure(caplog):
+    """呼叫端自己要求思考（`think=True`）時，模型思考是照做 —— 不可以寫「我們送了關閉參數、
+    伺服器沒照做」那句警告，也不可以記成「這個模型關不掉思考」（設定頁會照那個記錄講）。"""
+    with Gateway("ollama") as g:
+        c = _client(g)
+        with caplog.at_level("WARNING", logger="app.llm.client"):
+            c.text_query("translate this", "gemma4:26b", think=True)
+        assert c.last_stats["reasoning_chars"] > 0, "前提：要求思考時模型真的思考了"
+        assert not lc._THINKING_SEEN, lc._THINKING_SEEN
+    assert not [r for r in caplog.records if "思考" in r.getMessage()]
+
+
 def test_thinking_that_is_hidden_by_the_gateway_is_still_detected():
     """閘道不把思考內容轉出來時，只看得到「回答是空的」—— 那也要算成在思考，不可以報「不會先思考」。"""
     with Gateway("hidden") as g:

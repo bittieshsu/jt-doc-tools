@@ -26,7 +26,8 @@ CSS = ROOT / "static" / "css" / "platform.css"
 TPL = ROOT / "app" / "admin" / "templates"
 
 #: 用這套表單樣式的設定頁。新的設定頁請一併加進來。
-FORM_PAGES = ["admin_auth_settings.html", "admin_sso.html"]
+FORM_PAGES = ["admin_auth_settings.html", "admin_sso.html",
+              "admin_official_doc.html"]
 
 
 def test_shared_form_styles_live_in_platform_css():

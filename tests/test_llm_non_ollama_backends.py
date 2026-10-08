@@ -212,7 +212,7 @@ def _review(monkeypatch, fake: FakeLLM, key: str | None = None):
         "enabled": True, "base_url": fake.base, "consecutive_required": 2})
     monkeypatch.setattr(pf.llm_settings, "get_model_for", lambda tool: "gemma4:26b")
     monkeypatch.setattr(pf.llm_settings, "make_client",
-                        lambda: lc.LLMClient(fake.base, api_key=key, timeout=10))
+                        lambda *a, **k: lc.LLMClient(fake.base, api_key=key, timeout=10))
     monkeypatch.setattr(pf, "_render_page", lambda p, i: None)
     monkeypatch.setattr(pf, "_crop_tile", lambda img, slot: b"TILE")
     return pf.per_field_review(Path("x.pdf"), _fields(), page_index=0)

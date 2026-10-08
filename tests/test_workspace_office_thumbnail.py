@@ -149,6 +149,8 @@ def test_every_workspace_type_has_a_decided_thumbnail_path():
         "算 PDF 第一頁": {".pdf"},
         "經 Office 引擎": set(ws._OFFICE_THUMB_EXTS),
         "沒有縮圖（純文字）": set(ws._TEXT_EXTS),
+        # 錄音 / 錄影（給轉逐字稿從工作區載入用）：沒有「第一頁」可以畫，畫面上顯示圖示
+        "沒有縮圖（錄音 / 錄影）": set(ws.AUDIO_EXTS),
     }
     allowed = set(ws.ALLOWED.values())
     assert allowed, "抓不到工作區允許的格式，掃描邏輯可能改壞了"

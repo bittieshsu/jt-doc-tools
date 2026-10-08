@@ -348,6 +348,52 @@ def _chart_kind_labels() -> list[str]:
     return [lab for _c, lab in KIND_STYLE.values() if lab]
 
 
+def _official_doc_texts() -> list[str]:
+    """公文撰擬：檢查訊息的樣板、資料表欄位名稱、進度與失敗訊息。
+
+    檢查訊息是**樣板＋參數**（`official_doc.MESSAGES`），前端 `tr(template)` 再填參數 ——
+    原本是組好的中文句子，英日介面查不到譯文、只能原樣顯示中文（2026-10-07 做的時候就改掉）。
+    """
+    import importlib
+    from app.core import official_doc as od
+    # `from app.tools.official_doc import router` 拿到的是 APIRouter 物件不是模組
+    r = importlib.import_module("app.tools.official_doc.router")
+    return (list(od.MESSAGES.values())
+            + [lab for _k, lab in od.SIGN_FACT_LABELS + od.ENDORSE_FACT_LABELS
+               + od.LETTER_FACT_LABELS]
+            + list(od.RELATIONS.values()) + list(od.ISSUERS.values()) + list(od.LETTER_SPEEDS)
+            + list(od.STAGES) + [f"{s}（{{0}}/{{1}}）" for s in od.STAGES]
+            + [r._MODEL_FAILED, r._DRAFT_FAILED]
+            # 參考知識庫：進度、查不到 / 失敗的說明、參考資料的用途標籤；範本不能用的訊息
+            + [r.KB_STAGE, r.TEMPLATE_GONE] + list(r.KB_NOTES.values())
+            + list(od.REF_PURPOSES.values()) + list(_kb_purposes()))
+
+
+def _kb_purposes() -> list[str]:
+    from app.core.kb import store
+    return list(store.PURPOSES.values())
+
+
+def _official_doc_example_texts() -> list[str]:
+    """公文撰擬「載入範例」下拉：分組名稱、分類、標題（`tr(變數)`，靜態掃描看不到）。
+    範例的需求文字本身**不翻**（那是要送去產生中文公文的輸入）。"""
+    from app.tools.official_doc import examples
+    return ([g[-1] for g in examples.GROUPS]
+            + [e["category"] for e in examples.EXAMPLES] + [e["label"] for e in examples.EXAMPLES])
+
+
+def _official_doc_source_texts() -> list[str]:
+    """公文撰擬設定（範本 / 地址簿的下載來源）：資料類型與伺服器回的訊息。"""
+    from app.core import official_doc_sources as ods
+    return list(ods.KIND_LABELS.values()) + list(ods.MESSAGES.values())
+
+
+def _meeting_resend_messages() -> list[str]:
+    """會議摘要「送回轉逐字稿，重跑校正」能不能送的理由（伺服器端給，前端 `tr()`）。"""
+    import importlib
+    return list(importlib.import_module("app.tools.meeting_transcribe.resend").MESSAGES)
+
+
 @pytest.mark.parametrize("name,getter", [
     ("去識別化樣態", _deident_labels),
     ("設定備份的類別", _settings_export_labels),
@@ -373,6 +419,10 @@ def _chart_kind_labels() -> list[str]:
     ("會議摘要的進度訊息", _meeting_summary_progress),
     ("語音服務的失敗原因", _jtlw_error_texts),
     ("圖上的節點類別", _chart_kind_labels),
+    ("公文撰擬的檢查與資料表", _official_doc_texts),
+    ("公文撰擬的資料來源", _official_doc_source_texts),
+    ("公文撰擬的範例下拉", _official_doc_example_texts),
+    ("會議摘要送回轉逐字稿的理由", _meeting_resend_messages),
 ])
 @pytest.mark.parametrize("locale", _locales())
 def test_dynamic_labels_are_translated(locale: str, name: str, getter):
@@ -403,11 +453,16 @@ _OPTION_RAW_OK = {
     ("admin_audit.html", "e"): "事件代號（ASCII）",
     ("llm_settings.html", "settings.model"): "模型名稱",
     ("llm_settings.html", "_v"): "模型名稱",
+    ("llm_settings.html", "srv.name"): "管理員自己取的 LLM 伺服器名稱",
     # 語言選項的**自稱**：「日本語」在英文介面下也要是「日本語」
     ("login.html", "name"): "語言的自稱，翻掉就選不到自己的語言",
     # 語音服務的「處理設定」代號（`meeting.balanced` 之類）：那是**對方的資料**，
     # 由 `GET /profiles` 給，翻掉就送不出去了
     ("admin_jtlw.html", "s.profile_id"): "對方的處理設定代號（ASCII）",
+    # 公文撰擬匯出的「正本／副本標示」「發文方式」：選項是**原樣印在文件上**的公文用語
+    # （同期望語），英日介面下也要看得到會印出什麼字
+    ("official_doc.html", "c"): "原樣印在公文上的正本／副本標示",
+    ("official_doc.html", "m"): "原樣印在公文上的發文方式",
 }
 
 _OPTION_RE = re.compile(r"<option\b[^>]*>\s*\{\{\s*([^}]+?)\s*\}\}\s*</option>")

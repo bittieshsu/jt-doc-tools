@@ -93,7 +93,7 @@ def enabled(monkeypatch, tmp_path):
         "enabled": True, "base_url": "http://fake", "model": "m",
         "consecutive_required": 2})
     monkeypatch.setattr(pf.llm_settings, "get_model_for", lambda tool: "m")
-    monkeypatch.setattr(pf.llm_settings, "make_client", lambda: object())
+    monkeypatch.setattr(pf.llm_settings, "make_client", lambda *a, **k: object())
     monkeypatch.setattr(pf, "_render_page", lambda p, i: b"PNG")
     monkeypatch.setattr(pf, "_crop_tile", lambda img, slot: b"TILE")
     return tmp_path / "x.pdf"

@@ -383,6 +383,47 @@ def history(hours: int = 24, buckets: int = 96) -> list[dict]:
 _HEX32 = re.compile(r"[0-9a-f]{32}")
 
 
+# ---------- 一件作業「擁有」哪些暫存檔（**全站只有這一份規則**）----------
+#
+# 三個地方要回答同一個問題，**都走這裡**：
+#   * 清理（`retention._sweep_temp_dir`）——「這個檔還不能刪」
+#   * 「我的作業」的開啟鈕（`job_files.view_ok_map`）——「按下去還打得開嗎」
+#   * 管理頁的「作業結果檔」用量（`job_files.usage`）——「作業的檔案佔多少」
+#
+# 三份各寫一套的話一定會漂：清理認得、開啟鈕卻認不得，畫面就會在檔案還在時
+# 把「開啟」藏起來（或反過來，檔案沒了還留著一顆按下去 410 的鈕）。
+
+def name_tokens(name: str) -> list[str]:
+    """檔名（或網址）裡出現的 32 碼識別碼。"""
+    return _HEX32.findall(str(name or ""))
+
+
+def file_keys(job_id, meta, result_path) -> tuple[set[str], set[str]]:
+    """一件作業的 `(識別碼, 結果檔的檔名)`。
+
+    識別碼是**作業編號**與 **`meta.upload_id`**（都要是 32 碼十六進位，
+    其他形狀的一律不算 —— 拿任意字串去比對檔名會誤認別人的檔案）。
+    """
+    ids: set[str] = set()
+    names: set[str] = set()
+    jid = str(job_id or "")
+    if _HEX32.fullmatch(jid):
+        ids.add(jid)
+    uid = str((meta or {}).get("upload_id") or "")
+    if _HEX32.fullmatch(uid):
+        ids.add(uid)
+    if result_path:
+        names.add(Path(str(result_path)).name)
+    return ids, names
+
+
+def owns_file(name: str, ids: set[str], names: set[str]) -> bool:
+    """這個暫存檔是不是屬於 `(ids, names)` 那幾件作業的。"""
+    if name in names:
+        return True
+    return any(tok in ids for tok in name_tokens(name))
+
+
 def keep_alive_keys(since_ts: float) -> tuple[set[str], set[str]]:
     """還在作業保留期內（或還沒結束）的作業會用到哪些暫存檔 —— 給清理程式用。
 
@@ -416,13 +457,9 @@ def keep_alive_keys(since_ts: float) -> tuple[set[str], set[str]]:
     ids: set[str] = set()
     names: set[str] = set()
     for r in rows:
-        if _HEX32.fullmatch(str(r["id"] or "")):
-            ids.add(r["id"])
-        uid = str(_load_meta(r["meta"]).get("upload_id") or "")
-        if _HEX32.fullmatch(uid):
-            ids.add(uid)
-        if r["result_path"]:
-            names.add(Path(r["result_path"]).name)
+        i, n = file_keys(r["id"], _load_meta(r["meta"]), r["result_path"])
+        ids |= i
+        names |= n
     return ids, names
 
 

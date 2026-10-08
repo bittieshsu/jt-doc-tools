@@ -117,6 +117,13 @@
 .ms-mr-del { margin-left:4px; padding:0 6px; font-size:12px; line-height:20px; border:0;
              background:transparent; color:#64748b; cursor:pointer; border-radius:4px; }
 .ms-mr-del:hover { background:#fee2e2; color:#991b1b; }
+/* 送回轉逐字稿：跟「自己加替換」同一組，淡淡隔開一條線 */
+.ms-mr-send { margin-top:8px; padding-top:8px; border-top:1px dotted #c7d2fe; }
+.ms-mr-send p { margin:0 0 6px; font-size:12.5px; line-height:1.6; }
+.ms-mr-send-acts { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; }
+.ms-mr-send-last { color:#065f46; }
+/* 那一顆「處理新檔案」在這裡沒有意義（重跑的是轉逐字稿那件作業） */
+#msMrSendJob .job-reset { display:none; }
 
 .ms-warn { border:1px solid #fcd34d; background:#fffbeb; border-radius:8px;
            padding:10px 12px; font-size:12.5px; line-height:1.7; margin:10px 0; }
@@ -532,6 +539,19 @@
         </div>
         <p class="muted ms-mr-msg" id="msMrMsg" hidden></p>
         <ul class="ms-tf-list ms-mr-list" id="msMrList"></ul>
+        {# **送回轉逐字稿**（v1.16.66，JTLW `variants`）：這份逐字稿是「會議錄音轉逐字稿」轉的、
+           那件作業還在保留時間內時，勾著的替換可以當成「聽錯的寫法」送回去、請 JTLW 只重跑校正 ——
+           轉逐字稿那邊下載與存進工作區的那一份也一起改好。能不能送、為什麼不能**一律由伺服器端判斷**
+           （`/resend-variants`），這裡只照著顯示；不能送時不畫按鈕（按了才失敗的按鈕比沒有更糟）。 #}
+        <div class="ms-mr-send" id="msMrSend" hidden>
+          <p class="muted" id="msMrSendNote"></p>
+          <p class="ms-mr-send-acts" id="msMrSendActs" hidden>
+            <button type="button" class="btn btn-secondary btn-small" id="msMrSendGo">{{ icon('refresh', size=14) }} <span>{{ tr('送回轉逐字稿，重跑校正') }}</span></button>
+            <span class="muted">{{ tr('中文的寫法太短（兩個字）時可能換到別的詞裡面，寫具體一點比較安全。') }}</span>
+          </p>
+          <p class="ms-mr-send-last" id="msMrSendLast" hidden></p>
+          {% with progress_id='msMrSendJob' %}{% include "components/job_progress.html" %}{% endwith %}
+        </div>
       </div>
     </details>
 
@@ -948,6 +968,9 @@
     // 這份逐字稿上一次分析時填的背景 —— **要在重新比對之前填好**（比對看的是框裡的字）
     showRemembered(d.remembered_context);
     resetManualReplacements(d.manual_replacements);
+    // 轉逐字稿那件作業能不能把這裡的替換送回去 —— 伺服器端判斷（`/resend-variants`）
+    fromTranscribe = !!d.from_transcribe;
+    refreshResend();
     // 沒有記住的背景時，帶入轉逐字稿時填的「專有名詞或會議背景」（記住的那一份優先 ——
     // 那是使用者在這裡最後用的）
     if (!memCtx && d.transcript_context) {
@@ -1113,7 +1136,7 @@
       var cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = r.on;
-      cb.addEventListener('change', function () { r.on = cb.checked; });
+      cb.addEventListener('change', function () { r.on = cb.checked; syncResendBtn(); });
       var a = document.createElement('code');
       a.textContent = r.variants.join('、');
       var b = document.createElement('b');
@@ -1141,6 +1164,7 @@
       }
       list.appendChild(li);
     });
+    syncResendBtn();
   }
   // 回 true ＝ 加進去了；找不到或填得不對時講出原因
   async function addManual(from, to, on) {
@@ -1191,6 +1215,82 @@
     return mrRows.filter(function (r) { return r.on; })
                  .map(function (r) { return { from: r.from, to: r.to }; });
   }
+
+  // ---------------------------------------------------------------- 送回轉逐字稿
+  // 這份逐字稿是「會議錄音轉逐字稿」轉的、那件作業還在保留時間內時，勾著的替換可以當成
+  // 「聽錯的寫法」送回去（JTLW `variants`），請 JTLW 只重跑校正 —— 轉逐字稿那邊下載與
+  // 存進工作區的那一份也一起改好。**能不能送、為什麼不能、上次換了幾處，全由伺服器端判斷**
+  // （`/resend-variants/<id>`）；不能送時不畫按鈕。這裡的逐字稿與分析不受影響。
+  var fromTranscribe = false, rsSeq = 0, rsState = null, rsBusy = false;
+  var resendJob = new JobProgress(el('msMrSendJob'), {
+    showDownload: false,
+    onDone: function () { rsBusy = false; refreshResend(true); },
+    onError: function () { rsBusy = false; refreshResend(); },
+    onCancel: function () { rsBusy = false; refreshResend(); }
+  });
+  function syncResendBtn() {
+    var go = el('msMrSendGo');
+    if (!go) return;
+    go.disabled = rsBusy || !(rsState && rsState.possible)
+                  || !mrRows.some(function (r) { return r.on; });
+  }
+  function lastText(last) {
+    if (!last) return '';
+    // 對方版本較舊、錯寫法沒送出 —— **也要講**，不然使用者以為送了、逐字稿卻沒變
+    if (last.variants_sent === false) {
+      return tr('轉逐字稿那件作業最近一次重跑校正時，語音服務版本較舊，聽錯的寫法沒有送出。');
+    }
+    if (typeof last.variant_replacements !== 'number') return '';
+    return tr('轉逐字稿那件作業最近一次重跑校正（{0}）：照聽錯的寫法換了 {1} 處，下載與存進工作區的那一份是新的。')
+      .replace('{0}', fmtWhen(last.at)).replace('{1}', String(last.variant_replacements));
+  }
+  async function refreshResend(justFinished) {
+    var my = ++rsSeq, box = el('msMrSend');
+    if (!uploadId || !fromTranscribe) { box.hidden = true; rsState = null; return; }
+    var st = null;
+    try {
+      var r = await fetch(BASE + '/resend-variants/' + encodeURIComponent(uploadId));
+      if (my !== rsSeq) return;
+      if (r.ok) st = await r.json();
+    } catch (_e) { st = null; }
+    if (my !== rsSeq) return;
+    rsState = st;
+    if (!st || !st.available) { box.hidden = true; return; }
+    box.hidden = false;
+    // **伺服器送來的說明要自己包 `tr()`**（那幾句是 `resend.REASONS` 的常數）
+    el('msMrSendNote').textContent = st.possible
+      ? tr('這份逐字稿是「會議錄音轉逐字稿」轉的。勾著的替換可以當成「聽錯的寫法」送回那件作業，JTLW 只重跑校正，轉逐字稿那邊下載與存進工作區的那一份也會一起改好（可以送到 {0}）。')
+          .replace('{0}', fmtWhen(st.due_at))
+      : tr(st.message || '');
+    el('msMrSendActs').hidden = !st.possible;
+    var lt = lastText(st.last);
+    el('msMrSendLast').textContent = lt;
+    el('msMrSendLast').hidden = !lt;
+    if (justFinished && lt && window.showToast) window.showToast(lt, 'ok');
+    // 正在重跑（例如從轉逐字稿那一頁送的、或這一頁重新整理過）→ 接上那件作業的進度
+    if (st.reason === 'running' && st.job_id && !rsBusy) {
+      rsBusy = true;
+      resendJob.track(st.job_id);
+    }
+    syncResendBtn();
+  }
+  el('msMrSendGo').addEventListener('click', async function () {
+    if (!uploadId || rsBusy) return;
+    rsBusy = true;
+    syncResendBtn();
+    var r = await fetch(BASE + '/resend-variants', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ upload_id: uploadId, rows: manualRows() })
+    });
+    if (!r.ok) {
+      rsBusy = false;
+      showAlert(await window.friendlyServerError(r, tr('沒辦法送回轉逐字稿')));
+      await refreshResend();
+      return;
+    }
+    var d = await r.json();
+    resendJob.track(d.job_id);
+  });
   el('msMrAdd').addEventListener('click', async function () {
     if (!uploadId) return;
     var btn = this;

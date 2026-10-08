@@ -7,6 +7,7 @@ workspace is completely invisible (the UI also hides its buttons via the
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -108,7 +109,6 @@ def build_router(templates) -> APIRouter:
         - file:   the browser POSTs the produced PDF/PNG bytes directly.
         """
         _require_enabled()
-        data: bytes
         disp_name = name or ""
         if job_id:
             if not is_uuid_hex(job_id):
@@ -134,16 +134,24 @@ def build_router(templates) -> APIRouter:
                 disp_name = job.result_filename or job.result_path.name
             if not source_tool:
                 source_tool = job.tool_id
+            try:
+                meta = ws.save_bytes(request, data, disp_name, source_tool or "")
+            except ws.WorkspaceError as e:
+                raise _err_to_http(e)
         elif file is not None:
-            data = await file.read()
             if not disp_name:
                 disp_name = file.filename or ""
+            # **不可以 `await file.read()`**：錄音檔動輒上百 MB，整份讀進記憶體
+            # 只為了認格式。上傳的內容已經被 multipart 解析器放在暫存檔裡
+            # （`file.file`），格式只看檔頭、內容串流寫進工作區 —— 都是同步的檔案
+            # I/O，丟到執行緒去做，不卡事件迴圈。
+            try:
+                meta = await asyncio.to_thread(
+                    ws.save_stream, request, file.file, disp_name, source_tool or "")
+            except ws.WorkspaceError as e:
+                raise _err_to_http(e)
         else:
             raise HTTPException(400, "需要 job_id 或 file")
-        try:
-            meta = ws.save_bytes(request, data, disp_name, source_tool or "")
-        except ws.WorkspaceError as e:
-            raise _err_to_http(e)
         # Non-blocking duplicate hint: another file with the same display name
         # already exists (we still keep this new copy).
         dup = any(f["name"] == meta["name"] and f["file_id"] != meta["file_id"]

@@ -488,3 +488,88 @@ def test_theme_previews_keep_everything_inside_the_frame(live):
     for p, g in got.items():
         assert g and g["n"] >= 20, f"{p} 只量到 {g and g['n']} 個元素 —— 預覽沒有畫出來"
         assert not g["total"], f"{p} 有 {g['total']} 個元素伸出預覽框：{g['bad']}"
+
+
+# 開頭是圖示的說明框：換行時第二行起跟第一行的字對齊、不鑽到圖示底下
+# （2026-10-08 使用者：「換行時 第二行起文字要縮進去 跟第一行在 icon 後齊」）
+_HANGING = r"""(function(){
+  var out = [];
+  document.querySelectorAll('.info-box, .warn-box').forEach(function(box){
+    var ic = box.firstElementChild;
+    if (!ic || ic.tagName.toLowerCase() !== 'svg' || !box.offsetParent) return;
+    var r = document.createRange();
+    r.setStartAfter(ic); r.setEnd(box, box.childNodes.length);
+    var lines = {};
+    Array.from(r.getClientRects()).forEach(function(c){
+      if (c.width < 1 || c.height < 1) return;
+      var k = Math.round(c.top);
+      lines[k] = Math.min(lines[k] === undefined ? 1e9 : lines[k], c.left);
+    });
+    var lefts = Object.keys(lines).sort(function(a, b){ return a - b; }).map(function(k){ return lines[k]; });
+    var ir = ic.getBoundingClientRect(), br = box.getBoundingClientRect();
+    out.push({icon: [ir.left, ir.top, ir.right, ir.bottom], box: [br.left, br.top, br.right, br.bottom],
+              lefts: lefts, text: box.textContent.trim().slice(0, 20)});
+  });
+  return out;})()"""
+
+
+def test_info_box_text_wraps_past_the_icon(live):
+    pages = ["/tools/official-doc/", "/tools/transit-proof/", "/tools/doc-straighten/"]
+    got = _measure(live, pages, _HANGING, width=760)
+    wrapped = 0
+    for path, boxes in got.items():
+        for b in boxes or []:
+            if len(b["lefts"]) >= 2:
+                wrapped += 1
+                assert max(b["lefts"]) - min(b["lefts"]) <= 1.5, (path, "第二行起沒有跟第一行對齊", b)
+            if b["lefts"]:
+                il, it, ir, ib = b["icon"]
+                bl, bt, br, bb = b["box"]
+                assert bl <= il and ir <= min(b["lefts"]) + 0.5, (path, "圖示要在框裡、字的左邊", b)
+                assert bt <= it and ib <= bt + 40, (path, "圖示要在第一行的高度", b)
+    assert wrapped >= 2, f"量到的說明框沒有換行（素材太短，驗不到）：{got}"
+
+
+# 下拉的分組標題整條有底色（2026-10-08 使用者：「要整條有背景色 才有明顯」）
+_GROUP = r"""(function(){
+  var s = document.createElement('select');
+  s.innerHTML = '<optgroup label="第一組"><option>a</option></optgroup><optgroup label="第二組"><option>b</option></optgroup>';
+  document.querySelector('main, body').appendChild(s);
+  new window.JtSelect(s);
+  var panels = document.querySelectorAll('.jt-select-panel');
+  var panel = panels[panels.length - 1];
+  panel.hidden = false;
+  var g = panel.querySelectorAll('.jt-select-group')[1];
+  var pr = panel.getBoundingClientRect(), gr = g.getBoundingClientRect();
+  var cs = getComputedStyle(g);
+  return {bg: cs.backgroundColor, panel: [pr.left, pr.right], group: [gr.left, gr.right],
+          border: parseFloat(getComputedStyle(panel).borderLeftWidth)};})()"""
+
+
+def test_select_group_headers_are_full_width_bars(live):
+    r = _measure(live, "/tools/official-doc/", _GROUP)
+    assert r["bg"] not in ("rgba(0, 0, 0, 0)", "transparent", "rgb(255, 255, 255)"), ("分組標題沒有底色", r)
+    inner = (r["panel"][0] + r["border"], r["panel"][1] - r["border"])
+    assert abs(r["group"][0] - inner[0]) <= 1 and abs(r["group"][1] - inner[1]) <= 1, \
+        ("分組標題的底色沒有撐滿整條", r)
+
+
+# 來文是全文 / 大綱：兩張一樣大的卡片並排、點了就選中（2026-10-08 使用者：「做成大塊一點的切換」）
+_SRC_CARDS = r"""(function(){
+  document.querySelector('input[name=odMode][value=endorse]').click();
+  var cards = Array.from(document.querySelectorAll('.od-src-cards .option-card'));
+  var r = cards.map(function(c){ var b = c.getBoundingClientRect(); return [b.left, b.top, b.width, b.height]; });
+  cards[1].querySelector('.opt-label').click();
+  var picked = (document.querySelector('input[name=odSrcKind]:checked') || {}).value;
+  return {rects: r, picked: picked};})()"""
+
+
+@pytest.mark.parametrize("width", [1280, 390])
+def test_source_kind_cards_are_a_big_toggle(live, width):
+    r = _measure(live, "/tools/official-doc/", _SRC_CARDS, width=width)
+    (l1, t1, w1, h1), (l2, t2, w2, h2) = r["rects"]
+    assert h1 >= 60 and h2 >= 60, ("卡片要大一點", r)
+    assert abs(w1 - w2) <= 1, ("兩張要一樣寬", r)
+    if width >= 1000:
+        assert abs(t1 - t2) <= 1 and l2 > l1, ("寬螢幕要並排", r)
+    assert r["picked"] == "outline", "點了「大綱」那張沒有選中"

@@ -504,6 +504,84 @@ sudo jtdt restart
 
 `jtdt update` 升級時自動 snapshot，最近 3 份保留在 `data/.backup-YYYYMMDD-HHMMSS/`。
 
+## 搬到另一台主機
+
+舊主機要另作他用、換新硬體、換作業系統時，**複製整個資料夾**：帳號與密碼、權限、印章與簽名、各種歷史紀錄、
+工作區、公文知識庫、公文撰擬的歷史案件、稽核記錄都在裡面，搬過去就是原本那一套。
+
+> **不要用管理區的「設定備份 / 匯入」搬整台。** 它只帶設定，不含本機帳號與密碼、稽核記錄、作業紀錄、
+> 公文知識庫的文件、公文撰擬的歷史案件、乘車證明的原始檔。全新的主機匯入之後，認證設定會因為沒有管理員帳號而不套用；
+> 工作區、通知偏好這類個人資料只還原給新主機上同名的帳號。
+>
+> **也不要複製程式資料夾**（`C:\Program Files\jt-doc-tools`、`/opt/jt-doc-tools`、`/usr/local/jt-doc-tools`）：
+> 那裡只有程式和 Python 環境，資料不在那裡；新主機用安裝程式裝一份就好。
+
+| OS | 要複製的資料夾 |
+|---|---|
+| Windows | `C:\ProgramData\jt-doc-tools\Data` |
+| Linux | `/var/lib/jt-doc-tools/data` |
+| macOS | `~/Library/Application Support/jt-doc-tools/data`（安裝時那個帳號的家目錄） |
+
+### 步驟
+
+1. **新主機先安裝**（[INSTALL.md](INSTALL.md) 的一行安裝指令，或 Windows 安裝程式）。新主機的版本要**跟舊主機一樣或比較新**：
+   安裝程式抓的是最新版；資料是舊版的沒關係，第一次啟動時會自動升級資料庫。反過來（新主機比舊主機舊）不行。
+2. **兩台都停服務。** 服務執行中複製，資料庫可能不完整。
+3. **把舊主機的資料夾整個複製到新主機的同一個位置**，取代新主機剛裝好的那一份。整個資料夾都要，包括
+   `.session_secret`（加密存放的金鑰、API Token 的對照都要靠它解開）。
+4. **啟動新主機的服務**，打開 `http://新主機:埠/readyz` 確認回 200。
+
+Windows（以系統管理員身分執行 PowerShell）：
+
+```powershell
+# 兩台都先停
+net stop jt-doc-tools
+# 把舊主機的 C:\ProgramData\jt-doc-tools\Data 整個複製到新主機同一個位置
+# （隨身碟、共用資料夾都可以；用 robocopy 的話：robocopy 來源 C:\ProgramData\jt-doc-tools\Data /MIR）
+# 新主機
+net start jt-doc-tools
+```
+
+Linux：
+
+```bash
+# 舊主機
+sudo jtdt stop
+sudo tar -czf jtdt-data.tgz -C /var/lib/jt-doc-tools data
+# 把 jtdt-data.tgz 傳到新主機（scp 等）之後，在新主機：
+sudo jtdt stop
+sudo mv /var/lib/jt-doc-tools/data /var/lib/jt-doc-tools/data.fresh   # 剛裝好的那一份，確認沒問題再刪
+sudo tar -xzf jtdt-data.tgz -C /var/lib/jt-doc-tools
+sudo chown -R jtdt:jtdt /var/lib/jt-doc-tools                         # 服務帳號要讀得到
+sudo jtdt start
+```
+
+macOS：
+
+```bash
+# 舊主機
+sudo jtdt stop
+tar -czf jtdt-data.tgz -C "$HOME/Library/Application Support/jt-doc-tools" data
+# 新主機（同一個帳號登入）
+sudo jtdt stop
+mv "$HOME/Library/Application Support/jt-doc-tools/data" "$HOME/Library/Application Support/jt-doc-tools/data.fresh"
+tar -xzf jtdt-data.tgz -C "$HOME/Library/Application Support/jt-doc-tools"
+sudo jtdt start
+```
+
+跨作業系統（例如 Windows → Linux）也可以：資料庫與設定檔都是通用格式。只有下面「自訂的路徑」那幾項要照新主機改。
+
+### 搬完要檢查的
+
+- **監聽位址與連接埠**：記在服務設定裡，不在資料夾裡。舊主機有開放區網連線的話，新主機要再設一次：
+  Windows 重跑安裝程式勾「區域網路存取」（會一併開防火牆）；Linux / macOS 用 `sudo jtdt bind 0.0.0.0:8765`，防火牆自己開。
+- **反向代理**改指到新主機；**SSO**：網址變了的話，IdP 上登記的回呼網址也要改；**AD / LDAP**：新主機要連得到網域控制站。
+- **通知設定的「站台網址」**：通知信裡的連結用它，換網址了要改。
+- **自訂的路徑**：Office 引擎路徑（管理區「轉檔引擎設定」）、排程備份的輸出資料夾，在新主機上要存在。
+- **外部服務**：LLM 伺服器、遠端 OCR、語音服務（JTLW）、嵌入服務，新主機要連得到；有用 IP 白名單的，把新主機加進去。
+- 統編資料庫、公文範本與機關地址簿已經在資料夾裡，不用重新下載。
+- **確認新主機沒問題之前，舊主機的資料不要刪；兩台不要同時對外服務**（同一份資料兩邊各自改，之後合不回來）。
+
 ## 排程清理
 
 啟用認證後可在 `/admin/retention` 設定每類資料保留天數：

@@ -170,7 +170,7 @@ function makeRow(key = '', label = '', value = '') {
     <input class="k" type="text" value="${esc(key)}" placeholder="key" />
     <input class="lbl" type="text" value="${esc(label)}" placeholder="${tr('顯示名稱')}" />
     <textarea class="v" rows="1">${esc(value)}</textarea>
-    <button class="btn-icon btn-danger" data-act="del" type="button" title="' + tr('刪除') + '">🗑</button>
+    <button class="btn-icon btn-danger" data-act="del" type="button" title="${tr('刪除')}">🗑</button>
   `;
   return div;
 }

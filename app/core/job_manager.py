@@ -47,8 +47,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional
 
-from ..config import settings
-
 logger = logging.getLogger("app.job_manager")
 
 JobStatus = Literal["pending", "running", "done", "error", "cancelled",
@@ -576,9 +574,9 @@ class JobManager:
         排隊工作再也不會進 `_run()`（外部稽核 F05，實測連續取消 400 件後
         `_fns` 還留著 400 筆）。
 
-        同一個洞也出現在 `_trim_memory()` 與 `cleanup_expired()` —— 它們丟掉
-        `_jobs` 那一列，卻沒有丟 `_fns` / `_subprocs`。所以**所有「這件工作
-        結束了」的路徑都要走這裡**，不要各自 pop。
+        同一個洞也出現在 `_trim_memory()`（與當時還在、後來拿掉的
+        `cleanup_expired()`）—— 它們丟掉 `_jobs` 那一列，卻沒有丟 `_fns` /
+        `_subprocs`。所以**所有「這件工作結束了」的路徑都要走這裡**，不要各自 pop。
         """
         self._fns.pop(job_id, None)
         self._subprocs.pop(job_id, None)
@@ -727,26 +725,17 @@ class JobManager:
             for _, jid in done[:len(self._jobs) - _MEM_KEEP]:
                 self._forget(jid, drop_row=True)
 
-    def cleanup_expired(self) -> int:
-        cutoff = time.time() - settings.job_ttl_seconds
-        removed = 0
-        with self._lock:
-            for jid in list(self._jobs.keys()):
-                j = self._jobs[jid]
-                if j.updated_at < cutoff and j.status in TERMINAL:
-                    if j.result_path and j.result_path.exists():
-                        try:
-                            j.result_path.unlink()
-                        except OSError:
-                            pass
-                    self._forget(jid, drop_row=True)
-                    removed += 1
-        try:
-            from . import job_store
-            job_store.delete_older_than(cutoff)
-        except Exception:  # noqa: BLE001
-            pass
-        return removed
+    # **這裡刻意沒有「清掉過期作業的檔案」的方法。**
+    #
+    # 以前有一支 `cleanup_expired()`：照 `config.job_ttl_seconds`（6 小時）刪結果檔、
+    # 再照同一個期限刪資料庫的作業紀錄 —— 跟管理頁的保留期（作業結果檔
+    # `jobs_hours`、作業紀錄 `job_records_days` 30 天）**完全對不上**。它從來沒有
+    # 人呼叫，所以沒有造成傷害；但只要有人把它接上，「我的作業」上的紀錄就會在
+    # 6 小時後消失、保留期內的結果檔也會被刪。
+    #
+    # 作業的檔案一律由 `retention._sweep_temp_dir` 清（6 小時排程與 `main` 的
+    # 30 分鐘迴圈都呼叫它），作業紀錄由 `retention._sweep_job_records` 清；
+    # 記憶體裡的作業列由 `_trim_memory()` 裁。清理只留一個地方負責。
 
 
 # ---------- 記憶體准入判斷 ----------

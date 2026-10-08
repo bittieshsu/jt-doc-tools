@@ -1844,6 +1844,233 @@ curl -s "http://localhost:8765/tools/translate-doc/job/$JOB" \
 * 取消請用共用的作業端點：`POST /api/jobs/{job_id}/cancel`。
 * 歸屬與其他作業端點一致：非擁有者一律 `404`。
 
+### 公文撰擬
+
+把白話需求寫成「簽」或「函」，或依來文與辦理方向擬「簽辦意見」。**回傳的是草稿**：段名、項次、結語、稱謂由程式排，內容由模型寫；草稿裡的金額、日期、法規、條號、文號與「業經核准」這類說法都拿去跟你送進來的內容比，找不到依據的放在 `issues`（不刪）。網頁介面在中文、英文、日文介面都可以用；不論介面語言，產出一律是繁體中文的臺灣公文格式。
+
+```text
+POST /tools/official-doc/api/official-doc
+```
+
+Body（JSON），三種模式共用：
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `mode` | str | | 模式：`sign`（簽，預設）/ `letter`（函）/ `endorse`（簽辦意見） |
+| `length` | str | | 篇幅：`short`（精簡）/ `normal`（一般，預設）/ `long`（詳細） |
+| `use_kb` | bool | | 設成 `true` 時先在公文知識庫裡找跟這件事相關的資料再撰寫（預設不查）。查得到哪些資料集依這把 Token 的使用者決定；只有用途是「業務依據」的資料算草稿的依據 |
+
+簽（`mode=sign`）：
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `narrative` | str | ✓ | 需求敘述：用白話寫要辦的事（為什麼、要做什麼、多少錢、什麼時候），上限 4,000 字 |
+| `unit` | str | | 承辦單位，寫進抬頭「簽　　於〇〇」 |
+| `addressee` | str | | 陳核對象，一行一個（接在「敬陳」後面） |
+| `closing` | str | | 主旨結語：`核示`（預設，「，簽請　核示。」）/ `鑒核` / `核准` / `none`（只加句號） |
+| `with_date` | bool | | 設成 `true` 時，在抬頭下面加上今天的民國日期 |
+
+函（`mode=letter`）：
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `narrative` | str | ✓ | 需求敘述：要請對方做什麼、期限、附件，上限 4,000 字 |
+| `issuer` | str | | 發文身分：`agency`（公務機關，預設）/ `company`（企業發給政府機關）。企業時 `relation` 固定是 `company`（送什麼都不看），自稱「本公司」、稱對方 `貴〇`（看不出來時 `貴機關`），不用 `鈞〇`、不套簽的寫法；抬頭不寫檔號、保存年限、密等，地址、統一編號、聯絡人、署名用印沒填就標 `〔待補：…〕` |
+| `org` | str | | 發文機關全銜（企業時是公司名稱），寫進標題 `〇〇〇　函` |
+| `receiver` | str | | 受文者。稱謂取受文者名稱的最後一個字（`東湖區公所` → `貴所`） |
+| `relation` | str | | 行文關係：`up`（上行，對上級機關）/ `peer`（平行）/ `down`（下行，對所屬機關）/ `people`（對人民或團體）/ `unknown`（不確定，預設）。稱謂與期望語都依它決定；`unknown` 時草稿把期望語與稱謂標成 `〔待確認：…〕`。企業發函由 `issuer=company` 決定，這裡不用送 |
+| `closing` | str | | 期望語，**要屬於那個行文關係**（見下表），空的＝該行文關係的第一個；`relation=unknown` 時不收 |
+| `speed` | str | | 速別：`普通件`（預設）/ `速件` / `最速件` |
+| `doc_no` | str | | 發文字號（選填），例如 `府資字第1150000001號`，上限 200 字。沒送就留空，草稿不會自己編一個 |
+| `copies` | str | | 正本（空的＝同受文者） |
+| `cc` | str | | 副本 |
+| `signature` | str | | 署名，例如 `局長　王○○` |
+| `contact` | str | | 聯絡資訊，一行一項（地址、承辦人、電話、電子信箱），上限 500 字 |
+| `attachments` | str | | 附件 |
+
+| `relation` | 稱謂 | 可用的期望語 |
+|---|---|---|
+| `up` | `鈞〇`（`鈞府`、`鈞部`） | `請　鑒核` / `請　核示` / `請　鑒察` / `請　核備` |
+| `peer` | `貴〇` | `請　查照` / `請　查照辦理` / `請　查照見復` / `請　惠允見復` / `請　同意見復` |
+| `down` | `貴〇` | `請　照辦` / `請　查照` / `請　轉知` / `請　確實辦理` |
+| `people` | `台端`（團體用 `貴〇`） | `請　查照` / `請　照辦` |
+| `company` | `貴〇`（看不出來時 `貴機關`） | `請　查照` / `請　惠予審查` / `請　惠予辦理` / `請　惠予同意` / `請　惠復` |
+
+稱謂前空一格（挪抬）、`擬請　貴局` 與 `請求　貴局` 改成 `請　貴局` 都由程式處理。發文日期、檔號、密等**留空** —— 那些由公文系統發文時給；發文字號只寫你送的 `doc_no`，沒送也留空。
+
+簽辦意見（`mode=endorse`）：
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `source` | str | ✓ | 來文內容（或你整理的來文大綱），上限 12,000 字 |
+| `direction` | str | ✓ | 辦理方向：你打算怎麼辦理，上限 2,000 字。**沒填回 400** —— 同意、駁回或存查是你的決定，不替你決定 |
+| `outline` | bool | | 設成 `true` 表示 `source` 是你整理的大綱，不是來文全文 |
+| `units` | str | | 承辦／協辦單位 |
+| `internal_deadline` | str | | 內部期限（跟來文的期限分開寫） |
+| `fmt` | str | | 格式：`compact`（精簡一段，預設）/ `list`（條列） |
+| `closing` | str | | 結尾：`陳核`（預設）/ `陳閱` / `none` |
+
+依修改後的資料重新產生（三種模式都收，選填）：
+
+| 欄位 | 類型 | 說明 |
+|---|---|---|
+| `facts` | array | 上一次回應的 `facts`（可以改過）。帶了就不再請模型整理資料，只撰寫一次。**伺服器會重新判斷每一項的狀態**：標成 `provided` 的，`quote` 要真的在 `narrative` / `source` 裡找得到，不然降成 `inferred` |
+| `overrides` | object | 以欄位代號對應新的值，例如 `{"budget_source": "115年度資訊設備費"}`。改過的那一項狀態變成 `confirmed`，檢查拿它當依據；給空字串表示「沒有這項資料」 |
+
+承辦單位、陳核對象等短欄位與 `overrides` 的值上限 200 字。**超過上限一律回 400 並講出上限與目前字數，不會自動截斷**（截掉的部分可能正好是期限或條件）；選項不在清單裡也回 400。
+
+```bash
+curl -X POST http://localhost:8765/tools/official-doc/api/official-doc \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "sign", "unit": "資訊室", "addressee": "主任秘書\n局長",
+       "narrative": "本局資訊室兩台印表機已使用8年，經常卡紙，維修廠商表示零件已停產。擬以115年度資訊設備費新臺幣6萬元汰換雷射印表機2台，預計11月30日前完成採購。"}' | jq
+```
+
+回應 JSON（`facts` 節錄；這份草稿的說明多寫了一條你沒提到的法規，所以 `issues` 有兩條）：
+
+```json
+{
+  "mode": "sign",
+  "text": "簽　　於資訊室\n主旨：汰換資訊室雷射印表機2台，簽請　核示。\n說明：\n一、本局資訊室印表機已使用8年，經常卡紙，維修廠商表示零件已停產。\n二、經費由115年度資訊設備費支應，並依政府採購法第49條辦理。\n擬辦：擬購置雷射印表機2台，預算新臺幣6萬元，於11月30日前完成採購。\n敬陳\n主任秘書\n局長",
+  "facts": [
+    { "key": "amount", "label": "金額", "value": "新臺幣6萬元",
+      "quote": "新臺幣6萬元", "status": "provided" },
+    { "key": "budget_source", "label": "經費來源", "value": "115年度資訊設備費",
+      "quote": "115年度資訊設備費", "status": "provided" }
+  ],
+  "issues": [
+    { "code": "law_unsupported", "severity": "error",
+      "message": "法規「政府採購法」不是你提供的，請確認是否適用，或刪除。",
+      "template": "法規「{0}」不是你提供的，請確認是否適用，或刪除。",
+      "args": ["政府採購法"], "snippet": "政府採購法" },
+    { "code": "article_unsupported", "severity": "error",
+      "message": "「第49條」不是你提供的條號，請確認或刪除。",
+      "template": "「{0}」不是你提供的條號，請確認或刪除。",
+      "args": ["第49條"], "snippet": "第49條" }
+  ],
+  "llm_calls": 2
+}
+```
+
+簽辦意見：
+
+```bash
+curl -X POST http://localhost:8765/tools/official-doc/api/official-doc \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "endorse", "units": "資訊室", "direction": "擬由資訊室填報後函復",
+       "source": "嘉禾市政府115年10月1日府資字第1150012345號函：請各機關於115年10月20日前填報資訊設備盤點資料，逾期視同無資料。"}' | jq '.text'
+# → "嘉禾市政府函請各機關於115年10月20日前填報資訊設備盤點資料，擬由資訊室填報後函復，陳核。"
+```
+
+函：
+
+```bash
+curl -X POST http://localhost:8765/tools/official-doc/api/official-doc \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "letter", "org": "嘉禾市資訊局", "receiver": "嘉禾市東湖區公所",
+       "relation": "down", "closing": "請\u3000照辦", "cc": "本局資訊管理科",
+       "signature": "局長\u3000王○○", "attachments": "資訊資產清冊1份",
+       "contact": "地址：嘉禾市文化路1號\n承辦人：王小明\n電話：(02)1234-5678",
+       "narrative": "請各區公所於115年10月20日前填報資訊資產清冊，以電子郵件回傳。"}' | jq -r '.text'
+```
+
+回應欄位：
+
+| 欄位 | 說明 |
+|---|---|
+| `text` | 草稿全文（純文字，可以直接貼進公文系統）。沒提供的必要資料寫成 `〔待補：…〕`、互相矛盾的寫成 `〔待確認：…〕`，不會自行補上或擇一 |
+| `facts` | 資料表，每一項是 `{key, label, value, quote, status}`。狀態有五種：`provided`（原文有，`quote` 是原文裡的那一段）、`inferred`（模型推論的，要確認）、`missing`（未提供）、`conflict`（矛盾，另有 `values` 列出各種寫法）、`confirmed`（你在 `overrides` 改過的，原本的值記在 `was`） |
+| `issues` | 檢查結果，依嚴重度排序。嚴重度有三種：`error`（找不到依據，或草稿還寫著你改掉的舊值）、`todo`（待補、待確認）、`hint`（建議）。每一條的 `message` 是填好的中文，`template` 與 `args` 是同一句的樣板與參數（要自己翻譯時用），`snippet` 是草稿裡的那一段原文 |
+| `llm_calls` | 這次呼叫了模型幾次（回答不合格式而重問也算） |
+| `references` | 有 `use_kb` 時參考了哪些資料：`{id, title, dataset_name, version_label, locator_text, heading, purpose, text, source_url, used}`。`purpose` 是 `substantive_basis`（業務依據，**只有這一種算依據**）/ `format_reference`（格式與用語參考）/ `style_example`（寫作範例）；`used` 是模型說它有引用。沒用公文知識庫時是空陣列 |
+| `kb_note` | 公文知識庫的狀況：空字串（正常，或沒用公文知識庫）/ `none`（找不到相關資料）/ `failed`（查詢失敗；草稿照樣產生，只是沒有參考資料，原因寫在服務記錄） |
+
+| `code` | 意思 |
+|---|---|
+| `qty_unsupported` / `date_unsupported` | 金額、數量或日期在你給的內容裡找不到（萬元換算、中文數字、民國與西元都會換算後再比） |
+| `law_unsupported` / `article_unsupported` / `docno_unsupported` | 法規名稱、條號、文號不是你提供的 |
+| `claim_unsupported` | 「業經核准」「已決標」「依法應」「驗收合格」「免罰」「不可抗力」這類把事情寫成已確定的說法，你沒有這樣寫。你在需求裡寫的「不要寫成已經核准」是寫作指示，不算你有寫 |
+| `word_unsupported` | 草稿寫了「含稅」「未稅」，你提供的內容裡沒有 |
+| `placeholder` | 草稿裡的 `〔待補：…〕` / `〔待確認：…〕`，送出前要補上 |
+| `missing_fact` | 缺了該有的資料：要花錢卻沒寫金額或經費來源、沒寫目的或辦理方式、沒寫期程；函還有沒填受文者或發文機關（企業發函是公司名稱） |
+| `relation_unknown` | 函的行文關係是「不確定」，期望語與稱謂要送出前確認 |
+| `salutation` | 函的稱謂跟行文關係不合（上行文寫了 `貴〇`、非上行文或企業發的函寫了 `鈞〇`） |
+| `company_wording` | 企業發的函寫了機關內部簽的用語（`擬辦`、`簽請`、`陳核`）或機關的自稱（`本局`） |
+| `action_not_in_direction` / `action_negated` | 簽辦意見的 `擬…` 裡出現你的辦理方向沒有的動作，或你明講不要的動作（例如方向寫 `不用轉知`，草稿寫 `擬轉知`） |
+| `missing_section` | 簽沒有「主旨」段（`error`）或「擬辦」段（`hint`） |
+| `long_subject` | 主旨超過 120 字 |
+| `omitted` | 原文提到的數字、日期或你自己寫的條號，草稿裡沒寫到 |
+| `proposal_no_approval` | 簽的擬辦沒有寫請主管同意什麼（`擬請同意…`） |
+| `weekday_mismatch` | 日期與星期對不上（沒寫年份的以今年算，訊息會講出來）；不會替你改 |
+| `date_past` | 期限已經過了（寫成 `…前` 的期限；`原本預計…前` 這種舊期限不算） |
+| `attachment_mentioned` | 函：你的內容提到要附東西，附件欄卻是空的 |
+| `stale_value` | 你在 `overrides` 改過的值，草稿還寫著舊的 |
+| `injection_suspect` | 來文裡有一段像是寫給 AI 的指令。那一句在送模型之前已經拿掉，也不拿來當依據；草稿仍要逐句核對 |
+
+**檢查驗不到語意**：因果寫反、結論寫錯只能靠人看；`issues` 是空的不代表草稿是對的，送出前一定要人工核對。
+
+狀態碼：欄位不對（必填沒填、超過上限、選項不在清單裡）回 **400**；LLM 沒啟用回 **503**；模型呼叫失敗，或連問兩次都沒照格式回答，回 **502**（訊息是固定的一句，原因只寫進服務記錄）。
+
+**這支是同步的**（一份約 2～4 次模型請求），呼叫端的逾時要放寬。要背景處理、或要改完草稿再檢查與匯出，走下面網頁用的那條路。
+
+#### 背景作業與匯出（網頁用的那條路）
+
+這幾支一樣可以帶 Bearer token 呼叫；**每一支都要帶案件編號（`case_id`），而且只拿得到自己的案件**。
+
+| 端點 | 說明 |
+|---|---|
+| `POST /tools/official-doc/start` | 欄位同上（JSON）。回 `{"job_id": "...", "case_id": "..."}`；用 `/api/jobs/{job_id}` 查進度，完成後作業的結果檔是 ODT 草稿（`/api/jobs/{job_id}/download`） |
+| `GET /tools/official-doc/result/{case_id}` | 取結果：`{case_id, mode, inputs, title, draft, created_at}`，`draft` 是 `{mode, text, facts, issues, content, llm_calls}`；過期或被清掉回 **410** |
+| `POST /tools/official-doc/check` | 送 `{"case_id": "...", "text": "改過的草稿"}`，回 `{"issues": [...]}`：拿目前的文字重新檢查，**不呼叫模型**；依據是建立案件時你送進來的內容 |
+| `POST /tools/official-doc/export` | 送 `{"case_id": "...", "text": "...", "fmt": "odt", "title": "...", "draft_mark": true, "extras": {...}}`，回檔案。格式（`fmt`）有 `txt` / `odt` / `docx` / `pdf` / `png` / `svg` / `json`；照**送來的文字**匯出，也就是你改過的版本 |
+| `POST /tools/official-doc/extract-text` | multipart `file` → `{"text": "...", "chars": 11, "filename": "..."}`：從 PDF、Word（`.docx` / `.doc`）、ODT、RTF、純文字（`.txt` / `.md`）抽出文字給你貼進欄位，**檔案不留**；上限 20 MB |
+| `GET /tools/official-doc/api/cases` | 歷史案件清單：`{"cases": [...], "show_owner": false, "limit": 500}`，新的在前。查詢參數 `q`（比對名稱、標題、案件編號）與 `mode`（`sign` / `letter` / `endorse`）都選填。每一筆有 `case_id`、`name`、`title`、`mode`、`latest_rev`、`issues`、`created_at`、`updated_at`、`deleted`；管理員拿到的是每個人的（含已刪除），多一個 `owner` |
+| `GET /tools/official-doc/case/{case_id}` | 一個案件的清單資料，加上 `has_result` 與 `job`（最近一件作業的 `{id, status}`，還在跑時可以接著查進度） |
+| `POST /tools/official-doc/case/{case_id}/rename` | 送 `{"name": "..."}` 改名（最多 80 字，超過回 **400**，不截斷）；空字串＝用草稿的標題 |
+| `DELETE /tools/official-doc/case/{case_id}` | 刪除案件：之後本人查不到、打不開；真的從磁碟移除照「檔案保留 / 清理」的公文撰擬案件保留期（預設 365 天，從刪除那天起算） |
+
+案件（輸入、草稿、版本）存在伺服器上，照「檔案保留 / 清理」的保留期留著，不跟著暫存檔的保留期走。
+別人的、不存在的、已刪除的案件一律回同一個 **404**（分得出來的話，就能拿任意編號問「這個案件存不存在」）。
+
+匯出的細節：
+
+* ODT 由程式直接產生，**不需要 Office 引擎**；Word 與 PDF（`docx` / `pdf`）經 Office 引擎轉，沒有引擎時回 **503**。
+* 頁首預設標「草稿」，`draft_mark` 設成 `false` 就不標。檔名用 `title`（最長 40 字，檔名不能用的字元會拿掉），下載的檔名是 `<title>-草稿.<fmt>`。
+* 字型用標楷體；伺服器上沒有標楷體時，PDF 改用其他楷體，再沒有就用明體。
+* JSON 帶 `"format": "jtdt-official-doc"` 與 `"format_version": 1`，內容是整份案件；`draft.text` 換成送來的文字，`draft.issues` 依那份文字重新檢查。
+* 圖片（`png` / `svg`）跟 PDF 同一個版面：一頁時回那一張（PNG 200 dpi；SVG 的字轉成外框，沒有標楷體的電腦也長得一樣），多頁時一頁一張打包成 zip（`<title>-草稿-png.zip`），最多 30 頁。
+
+版面加註（`extras`，選填；只用在 `odt` / `docx` / `pdf` / `png` / `svg`，**不會寫進草稿文字**，預覽圖也照著畫）：
+
+| 欄位 | 說明 |
+|---|---|
+| `page_numbers` | 設成 `true` 時頁尾加「第○頁　共○頁」 |
+| `binding_line` | 設成 `true` 時左側加裝訂線（虛線與「裝」「訂」「線」） |
+| `copy_mark` | 左上角的標示：`正本` / `副本` / `抄本`；只有函才有 |
+| `send_method` | 左上角的「發文方式：…」：`電子交換` / `郵寄` / `掛號郵寄` / `專差送達` / `親自送達` / `傳真` / `電子郵件`；只有函才有 |
+| `delegate` | 署名下方印「本案依分層負責規定授權○○決行」的那幾個字（例如 `業務主管`），最多 20 字；只有機關發的函才有 |
+| `receiver_address` | 受文者的郵遞區號與地址（開窗信封），印在「受文者」上面，最多 80 字；只有函才有 |
+| `endorse_frame` | 設成 `true` 時加上單獨列印用的抬頭與承辦人欄：最上面 `簽辦意見` 與來文那一行（機關與文號），最下面承辦人與日期；只有簽辦意見才有。來文那一行由伺服器從案件的資料表取，送來的不收 |
+
+選項不在清單上、字數超過回 **400**；不適用的欄位（例如簽送來 `copy_mark`）直接不用。
+
+```bash
+# 改完草稿之後重新檢查，再匯出 ODT
+curl -X POST http://localhost:8765/tools/official-doc/check \
+  -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"case_id": "CASE_ID", "text": "簽　　於資訊室\n主旨：…"}' | jq '.issues'
+
+curl -X POST http://localhost:8765/tools/official-doc/export \
+  -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"case_id": "CASE_ID", "text": "簽　　於資訊室\n主旨：…", "fmt": "odt", "title": "汰換印表機"}' \
+  -o draft.odt
+```
+
+需要先在管理區啟用 LLM（`/admin/llm-settings`）。`check`、`export`、`result` 與 `extract-text` 不呼叫模型。
+
 ---
 
 ## 9. 商務查詢 API
@@ -2093,6 +2320,16 @@ curl http://localhost:8765/api/jobs/abc123/download-png \
 
 回應：把 job 的 PDF 結果 render 成 PNG（多頁 / 多檔自動打 ZIP）。
 
+### 列出自己的作業（「我的作業」）
+
+```text
+GET /api/jobs?active=false&limit=50&offset=0
+```
+
+「我的作業」頁用的清單，只列自己的作業（`active=true` 只列排隊中與進行中的）。每一列有 `status`、`progress`、`has_result`（下載檔還在不在）、`view_url`（「開啟」要去的那一頁）與 `view_ok`。
+
+回應裡的 `view_ok` 是 `view_url` 那一頁現在還打不打得開：`view_url` 有值但 `view_ok` 是 `false`，代表資料已過保留期被清掉。判斷要不要給「開啟」請用 `view_ok`，**不可以用 `has_result` 代替**（逐句翻譯沒有下載檔，但「開啟」打得開）。
+
 ---
 
 ## 11. 管理端 API
@@ -2261,6 +2498,7 @@ GET /api/speech/audio/{file_id}?exp=<到期的 unix 秒數>&sig=<簽章>
 |---|---|---|
 | `/admin/api/check-latest-version` | POST | 系統狀態 —— 檢查有沒有新版 |
 | `/admin/api/upload-limit/probe` | POST | 系統狀態 —— 量反向代理的上傳上限 |
+| `/admin/api/llm/context-variant` | POST | LLM 設定 —— 在 Ollama 上建一個上下文較大的版本（`model` 與 `num_ctx`，回新名字，例如 `gemma4:26b-ctx32k`；只對已存檔的伺服器建，原本的模型不動）|
 | `/admin/api/ocr-langs/set-engine` | POST | OCR 語言包 —— 切換預設引擎 |
 | `/admin/api/ocr-langs/set-quality` | POST | OCR 語言包 —— 切換辨識品質 |
 | `/admin/api/ocr-langs/switch-active` | POST | OCR 語言包 —— 切換啟用的語言 |
@@ -2274,6 +2512,40 @@ GET /api/speech/audio/{file_id}?exp=<到期的 unix 秒數>&sig=<簽章>
 | `/admin/api/jtlw/settings` | POST | 語音服務（JTLW）—— 存送件位址與金鑰 |
 | `/admin/api/jtlw/test` | POST | 語音服務（JTLW）—— 測連線（`/health` ＋ `/capabilities` 兩段）|
 | `/admin/api/jtlw/profiles` | GET | 語音服務（JTLW）—— 取對方提供的處理設定清單（下拉用）|
+| `/admin/knowledge/api/overview` | GET | 公文知識庫 —— 資料集、段數、目前的檢索方式 |
+| `/admin/knowledge/api/datasets` | POST | 公文知識庫 —— 建立資料集 |
+| `/admin/knowledge/api/datasets/{dataset_id}` | POST | 公文知識庫 —— 修改資料集（名稱、類別、用途、可見群組）|
+| `/admin/knowledge/api/datasets/{dataset_id}/delete` | POST | 公文知識庫 —— 刪除資料集（連同版本與段落）|
+| `/admin/knowledge/api/datasets/{dataset_id}/versions` | GET | 公文知識庫 —— 資料集裡的文件版本 |
+| `/admin/knowledge/api/datasets/{dataset_id}/upload` | POST | 公文知識庫 —— 上傳文件（背景處理）|
+| `/admin/knowledge/api/versions/{version_id}/activate` | POST | 公文知識庫 —— 啟用這一版 |
+| `/admin/knowledge/api/versions/{version_id}/deactivate` | POST | 公文知識庫 —— 停用這一版 |
+| `/admin/knowledge/api/versions/{version_id}/delete` | POST | 公文知識庫 —— 刪除這一版 |
+| `/admin/knowledge/api/versions/{version_id}/reprocess` | POST | 公文知識庫 —— 重新切段 |
+| `/admin/knowledge/api/versions/{version_id}/meta` | POST | 公文知識庫 —— 改版本資訊（版本、日期、發布機關、出處網址）|
+| `/admin/knowledge/api/versions/{version_id}/preview` | GET | 公文知識庫 —— 看切出來的段落 |
+| `/admin/knowledge/api/versions/{version_id}/file` | GET | 公文知識庫 —— 下載原檔 |
+| `/admin/knowledge/api/search` | POST | 公文知識庫 —— 試查 |
+| `/admin/knowledge/api/embedding` | GET / POST | 公文知識庫 —— 嵌入服務設定（`use_llm_server` 預設 `true`：沿用 LLM 設定裡公文撰擬用的那台；金鑰不回傳；GET 另附沿用的那台 `llm_server` 與重建進度 `rebuild`；畫面在 LLM 設定頁）|
+| `/admin/knowledge/api/embedding/test` | POST | 公文知識庫 —— 測嵌入服務連線 |
+| `/admin/knowledge/api/embedding/models` | POST | 公文知識庫 —— 列出伺服器上的嵌入模型（給「嵌入模型」下拉用；Ollama 只列能做嵌入的）|
+| `/admin/knowledge/api/rebuild` | POST | 公文知識庫 —— 重建向量索引（背景）|
+| `/admin/knowledge/api/vectors/disable` | POST | 公文知識庫 —— 停用向量檢索（退回關鍵字檢索）|
+| `/admin/knowledge/api/groups` | GET | 公文知識庫 —— 設定可見群組用的群組清單 |
+| `/admin/knowledge/api/gov/status` | GET | 公文知識庫 → 政府公開資料 —— 來源、下載檔、選取與匯入的狀態（不連外）|
+| `/admin/knowledge/api/gov/{gid}/search` | GET | 公文知識庫 → 政府公開資料 —— 在已下載的清單裡搜尋（`q`、`limit`、`offset`；`browse=1` 沒有關鍵字時回整份清單、`level` 依位階篩選、`keys_only=1` 回整個範圍的代碼給全選用）|
+| `/admin/knowledge/api/gov/{gid}/selection` | GET / POST | 公文知識庫 → 政府公開資料 —— 選取的項目（POST `{keys, confirm}`；量大回 409 `need_confirm`）|
+| `/admin/knowledge/api/gov/{gid}/selection/reset` | POST | 公文知識庫 → 政府公開資料 —— 選取回到預設建議 |
+| `/admin/knowledge/api/gov/packages/{pid}` | POST | 公文知識庫 → 政府公開資料 —— 改下載網址 / 備用網址 |
+| `/admin/knowledge/api/gov/packages/{pid}/reset` | POST | 公文知識庫 → 政府公開資料 —— 網址還原預設 |
+| `/admin/knowledge/api/gov/packages/{pid}/upload` | POST | 公文知識庫 → 政府公開資料 —— 手動上傳下載檔，換上之後接著匯入選取的項目（背景處理）|
+| `/admin/knowledge/api/gov/{gid}/download` | POST | 公文知識庫 → 政府公開資料 —— 下載清單（背景，不匯入）|
+| `/admin/knowledge/api/gov/{gid}/import` | POST | 公文知識庫 → 政府公開資料 —— 匯入選取的項目（背景）|
+| `/admin/knowledge/api/gov/{gid}/update` | POST | 公文知識庫 → 政府公開資料 —— **下載並匯入**（畫面上唯一的按鈕）：重新下載 ＋ 匯入選取的項目，有異動的才建新版本；全部下載失敗但有上次的清單時照那份匯入（結果 `summary.stale_list`）（背景）|
+
+政府公開資料那幾支的 `{gid}` 是 `moj`（全國法規資料庫）/ `ndc`（國發會行政規則）/ `ey`（行政院釋例），`{pid}` 是 `moj-law`、`moj-order`、`ndc-rules-1`、`ndc-rules-2`、`ey-mailbox`、`ey-interp`。
+
+另外 `GET /admin/knowledge/api/datasets/{dataset_id}/versions` 的回應多了選用欄位 `gov`（政府公開資料匯入的版本才有：`group`、`group_name`、`key`、`license`、`attribution`、`notice`、`abolished`）。
 
 ---
 
@@ -2412,15 +2684,16 @@ sudo systemctl start jt-doc-tools
 | 端點 | 方法 | 說明 |
 |---|---|---|
 | `/workspace` | GET | 「我的工作區」頁面 |
-| `/workspace/api/list` | GET | 列出自己的檔案（`?accept=pdf,png` 過濾）+ 容量 + 保留時數 |
+| `/workspace/api/list` | GET | 列出自己的檔案（`?accept=pdf,png` 過濾）+ 容量 + 保留時數；每個檔案多 `preview`（有沒有縮圖）與 `kind`（`pdf` / `image` / `office` / `text` / `audio` / `video`） |
 | `/workspace/api/count` | GET | 檔案數（側欄徽章用） |
-| `/workspace/save` | POST | 存檔：`job_id`（伺服器端複製 job 結果）或 `file`（直接上傳 bytes）；僅 PDF / PNG |
+| `/workspace/save` | POST | 存檔：`job_id`（伺服器端複製 job 結果）或 `file`（直接上傳 bytes）。格式依內容判斷：PDF / PNG、辦公文件、純文字、錄音 / 錄影檔（.m4a / .mp3 / .wav / .aac / .ogg / .opus / .flac / .mp4 / .mov / .mkv / .webm）；錄音檔另有單檔上限（`max_audio_mb`），超過回 413 |
 | `/workspace/file/{file_id}` | GET | 取檔（`?dl=1` 下載）|
-| `/workspace/thumb/{file_id}` | GET | 縮圖（PDF 首頁渲染 / PNG 原圖）|
+| `/workspace/thumb/{file_id}` | GET | 縮圖（PDF 首頁渲染 / PNG 原圖）；純文字與錄音檔回 1×1 透明佔位圖（`Cache-Control: no-store`），請照 `preview` 判斷，不要拿它當縮圖 |
 | `/workspace/delete` | POST | 刪除（`file_id`）|
 | `/workspace/rename` | POST | 重新命名（`file_id`、`name`）|
+| `/tools/meeting-transcribe/from-workspace` | POST | 把自己工作區裡的錄音檔交給轉逐字稿（JSON `{"file_id": "…"}`，不重新上傳），回的內容同 `/tools/meeting-transcribe/upload`；別人的檔案 / 不存在 → 404、不是錄音 → 400、語音服務沒設定 → 503 |
 
-容量額度、單檔上限、保留時數、啟用 / 停用由 admin 在 `/admin/workspace` 設定（全站統一，無個人特例）。
+容量額度、單檔上限、錄音檔上限、保留時數、啟用 / 停用由 admin 在 `/admin/workspace` 設定（全站統一，無個人特例）。
 
 ---
 

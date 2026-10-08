@@ -214,6 +214,30 @@
     return tile;
   }
 
+  // 這一列有哪些出口 —— **純函式**（只看伺服器給的欄位、不碰 DOM），
+  // 測試會把它抽出來在 node 裡跑（tests/test_job_view_ok.py）。
+  //
+  // * 「開啟」要伺服器說**打得開**（`view_ok`）才給。過了保留期、資料已經被
+  //   清掉的那一列，原本同時掛著「開啟」與「結果已逾期清除」，按下去是 410。
+  //   **不可以改用 `has_result` 判斷** —— 逐句翻譯沒有結果檔（產出是一頁
+  //   對照表），那樣改的話它的「開啟」會整個消失。
+  // * 「結果已逾期清除」只在**真的什麼都不剩**時才說 —— 打得開的那一列不可以
+  //   同時掛著這句（逐句翻譯、送件前檢核原本在保留期內也會出現這句）。
+  function exitsFor(j) {
+    const out = [];
+    const openable = !!(j.view_url && j.view_ok);
+    if (openable) out.push('open');
+    if (j.has_result) {
+      out.push('download');
+      if (!(j.workspace && j.workspace.saved)) out.push('save');
+    } else if (j.status === 'done' && j.workspace && j.workspace.saved) {
+      out.push('workspace');
+    } else if (j.status === 'done' && !openable) {
+      out.push('gone');
+    }
+    return out;
+  }
+
   function render(data) {
     const jobs = data.jobs || [];
     list.textContent = '';
@@ -322,9 +346,10 @@
                           LABEL[j.status] || j.status));
 
       const acts = el('div', 'mj-actions');
+      const exits = exitsFor(j);
       // 產出是「一頁對照表」而不是檔案的工具（逐句翻譯）——
       // 給「開啟」而不是「下載」，點回去就能看到進度 / 結果。
-      if (j.view_url) {
+      if (exits.includes('open')) {
         const v = el('a', 'btn btn-small btn-primary');
         v.appendChild(svgIcon(ICON_OPEN));
         v.appendChild(document.createTextNode(
@@ -332,7 +357,7 @@
         v.href = j.view_url;
         acts.appendChild(v);
       }
-      if (j.has_result) {
+      if (exits.includes('download')) {
         const a = el('a', 'btn btn-small btn-primary');
         a.appendChild(svgIcon(ICON_DOWNLOAD));
         a.appendChild(document.createTextNode(tr('下載')));
@@ -341,7 +366,7 @@
         // 「存至工作區」只在**還沒存進去**時才出現 —— 已經自動存好了還放這顆鈕
         // 是多餘的，按下去只會存出重複的第二份。它的角色是補救（自動存失敗、
         // 或工作區當時是停用的），不是預設動作。
-        if (window.attachWorkspaceSave && !(j.workspace && j.workspace.saved)) {
+        if (window.attachWorkspaceSave && exits.includes('save')) {
           const w = el('button', 'btn btn-small');
           w.type = 'button';
           w.appendChild(svgIcon(ICON_ARCHIVE));
@@ -353,7 +378,7 @@
           }));
           acts.appendChild(w);
         }
-      } else if (j.status === 'done' && w && w.saved) {
+      } else if (exits.includes('workspace')) {
         // 暫存的結果檔被保留期限清掉了，但檔案已經在工作區 —— 給出路，
         // 不要只說「已逾期清除」（那句話對使用者沒有任何幫助，而且他上面才
         // 剛看到「已自動存入我的工作區」，兩句話擺在一起像自相矛盾）
@@ -362,7 +387,7 @@
         a.appendChild(document.createTextNode(tr('到工作區取用')));
         a.href = '/workspace';
         acts.appendChild(a);
-      } else if (j.status === 'done') {
+      } else if (exits.includes('gone')) {
         // 真的什麼都不剩了才說逾期。做成 chip 而不是裸文字 —— 裸文字塞在按鈕
         // 那一欄，寬度與基線都跟其他列對不齊，看起來就是歪的。
         acts.appendChild(el('span', 'mj-gone', tr('結果已逾期清除')));

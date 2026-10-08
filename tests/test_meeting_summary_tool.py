@@ -106,7 +106,7 @@ def test_the_analysis_runs_end_to_end_and_every_citation_resolves(client, auth_o
                               ensure_ascii=False)
 
     monkeypatch.setattr(ls.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(ls.llm_settings, "make_client", lambda: FakeClient())
+    monkeypatch.setattr(ls.llm_settings, "make_client", lambda *a, **k: FakeClient())
     monkeypatch.setattr(ls.llm_settings, "get_model_for", lambda _t: "fake")
 
     uid = _upload(client).json()["upload_id"]
@@ -162,7 +162,7 @@ def test_the_markdown_export_carries_the_citations(client, auth_off, monkeypatch
                               ensure_ascii=False)
 
     monkeypatch.setattr(ls.llm_settings, "is_enabled", lambda: True)
-    monkeypatch.setattr(ls.llm_settings, "make_client", lambda: FakeClient())
+    monkeypatch.setattr(ls.llm_settings, "make_client", lambda *a, **k: FakeClient())
     monkeypatch.setattr(ls.llm_settings, "get_model_for", lambda _t: "fake")
 
     uid = _upload(client).json()["upload_id"]

@@ -168,7 +168,7 @@ async def index(request: Request):
         # 使用者才知道翻譯是送到哪裡、換模型要找誰。
         "llm_model": llm_settings.get_model_for("doc-translate"),
         # server 位址只有管理員看得到（樣板裡判斷）
-        "llm_url": (llm_settings.get() or {}).get("base_url", ""),
+        "llm_url": llm_settings.base_url_for("doc-translate"),
         "langs": _LANG_NAMES,
         "accept": ",".join(otm.SUPPORTED_EXTS),
         "preview_pages": PREVIEW_PAGES,
@@ -269,8 +269,10 @@ async def start(request: Request):
 
     job = job_manager.submit(
         "doc-translate", run,
+        # `upload_id` 一送出就要記：清理暫存檔時靠它認出「這是排隊中 / 跑到一半的作業的檔案」——
+        # 等跑完才記的話，排隊超過暫存保留時間（預設 2 小時）時原檔會先被清掉
         meta={"filename": meta["filename"], "total": meta["units"],
-              "target_lang": target_lang},
+              "target_lang": target_lang, "upload_id": upload_id},
         request=request,
     )
     job.meta["view_url"] = f"/tools/doc-translate/?job={job.id}"
@@ -282,7 +284,7 @@ def _run_job(job, upload_id: str, meta: dict, source_lang: str,
              use_glossary: bool = True) -> None:
     from concurrent.futures import ThreadPoolExecutor
 
-    client = llm_settings.make_client()
+    client = llm_settings.make_client("doc-translate")
     if client is None:
         raise RuntimeError("LLM 服務未啟用")
     model = llm_settings.get_model_for("doc-translate")

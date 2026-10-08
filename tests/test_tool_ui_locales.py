@@ -26,6 +26,10 @@ _TAIWAN_ONLY = {
     "vat-lookup", "einvoice-scan", "transit-proof", "submission-check",
     "pdf-fill",
 }
+#: 刻意**不**限介面語言的 —— 曾經被限過、判斷錯了的那幾支，留著名字免得有人再限一次。
+#: 公文撰擬（2026-10-07 解除）：產出是臺灣公文，但換成英文 / 日文介面照樣寫得出正確的中文公文，
+#: 不是「放進去會無聲失敗」那一類。
+_NEVER_LOCKED = {"official-doc", "pdf-stamp", "pdf-seam-stamp"}
 #: 靠華人文書慣例（印章）—— 曾經限成中文，2026-09-05 使用者指示**解除**：
 #: 蓋章 / 簽名 / 跨頁防抽換不是華人專有，英文環境一樣會蓋公司章、貼簽名圖。
 #: 這個集合現在是空的，但**留著不刪** —— 下一支「靠華人慣例」的工具還是會用到
@@ -100,7 +104,9 @@ def test_locked_tools_are_still_listed(tools, locale: str):
     # 混在一起的話，加一支需要設定的工具就會讓這條紅，而它根本沒動到語言那一半。
     needs_setup = {t.metadata.id for t in tools if getattr(t.metadata, "requires_setup", "")}
     locked = {t["id"] for g in groups for t in g["tools"] if t.get("locked")}
-    assert locked - needs_setup == _TAIWAN_ONLY | _CHINESE, locked
+    # 兩種原因**同時成立**的工具（只靠 LLM、又只給繁中介面）—— 只扣掉
+    # 「單純因為沒設定」的那些，不然語言那一半的鎖會被一起扣掉、驗不到
+    assert locked - (needs_setup - (_TAIWAN_ONLY | _CHINESE)) == _TAIWAN_ONLY | _CHINESE, locked
 
     class _Zh:
         cookies: dict = {}
@@ -115,6 +121,18 @@ def test_locked_tools_are_still_listed(tools, locale: str):
         for t in g["tools"]:
             if t.get("locked"):
                 assert t.get("lock_reason"), f"{t['id']} 反灰了卻沒有理由"
+
+
+@pytest.mark.parametrize("locale", _non_chinese_locales())
+def test_tools_that_work_in_any_language_are_not_locked(tools, locale: str):
+    """公文撰擬、用印、騎縫章：產出跟台灣有關，但換了介面語言照樣做得對 —— 不可以反灰。
+
+    只驗「該鎖的有鎖」的話，把它們加回鎖定清單也會過（相等判斷那條會一起被改掉）。
+    """
+    locked = {t.metadata.id for t in tools if not tool_visible(t.metadata.locales, locale)}
+    present = {t.metadata.id for t in tools}
+    assert _NEVER_LOCKED & present == _NEVER_LOCKED, "名單上的工具不見了，名單要跟著改"
+    assert not (locked & _NEVER_LOCKED), (locale, locked & _NEVER_LOCKED)
 
 
 def test_the_marks_use_the_shared_constants(tools):

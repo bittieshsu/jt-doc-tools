@@ -65,20 +65,22 @@ def _fmt_elapsed(sec: float) -> str:
     return f"{m} 分 {s} 秒" if m else f"{s} 秒"
 
 
-def _tool_name(tool_id: str) -> str:
+def _tool_name(tool_id: str, meta: Any = None) -> str:
+    """信件 / 訊息上的「工具」名稱。
+
+    知識庫這類**不是工具**的作業走 `job_labels`（原本借用公文撰擬的代號，
+    通知信就寫成「[完成] 公文撰擬：知識庫・…」）。
+    """
     try:
-        from ..tool_registry import discover_tools
-        for t in discover_tools():
-            if t.metadata.id == tool_id:
-                return t.metadata.name
+        from .job_labels import display_name
+        return display_name(tool_id, meta)
     except Exception:  # noqa: BLE001
-        pass
-    return tool_id
+        return tool_id
 
 
 def build_message(job: Any) -> tuple[str, str]:
     """組出 (標題, 內文)。刻意只放 metadata，不放檔案內容。"""
-    tool = _tool_name(job.tool_id)
+    tool = _tool_name(job.tool_id, job.meta)
     fname = (job.meta or {}).get("filename") or job.result_filename or ""
     ok = job.status == "done"
     subject = f"[{'完成' if ok else '失敗'}] {tool}" + (f"：{fname}" if fname else "")
@@ -115,7 +117,8 @@ def build_images(job: Any) -> dict[str, bytes]:
         logo = assets.site_logo_png()
         if logo:
             out[LOGO_CID] = logo
-        icon = assets.tool_icon_png(job.tool_id)
+        from .job_labels import display_id
+        icon = assets.tool_icon_png(display_id(job.tool_id, job.meta))
         if icon:
             out[ICON_CID] = icon
     except Exception as e:  # noqa: BLE001
@@ -140,7 +143,7 @@ def build_html(job: Any) -> str:
         return notify_email_html.render(
             site_name=branding.get_site_name("Jason Tools 文件工具箱"),
             ok=ok,
-            tool=_tool_name(job.tool_id),
+            tool=_tool_name(job.tool_id, job.meta),
             filename=(job.meta or {}).get("filename") or job.result_filename or "",
             elapsed=_fmt_elapsed(job.elapsed()),
             error=str(job.error or "") if not ok else "",

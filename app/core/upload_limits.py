@@ -153,6 +153,7 @@ def app_side_limits() -> list[dict]:
     s = ws.get_settings() if hasattr(ws, "get_settings") else {}
     per_user = int(s.get("per_user_quota_mb") or 0)
     max_file = int(s.get("max_file_mb") or 0)
+    max_audio = int(s.get("max_audio_mb") or 0)
 
     def mb(n: int) -> float:
         return round(n / 1024 / 1024, 1)
@@ -172,6 +173,9 @@ def app_side_limits() -> list[dict]:
         {"key": "ws_file", "label": "工作區單檔上限",
          "value_mb": max_file if max_file > 0 else None, "configurable": True,
          "note": "0 或 -1 = 不限。在「工作區設定」調整。"},
+        {"key": "ws_audio_file", "label": "工作區錄音 / 錄影檔單檔上限",
+         "value_mb": max_audio if max_audio > 0 else None, "configurable": True,
+         "note": "0 或 -1 = 不限。在「工作區設定」調整。錄音檔另有這個上限，會議錄音動輒上百 MB。"},
         {"key": "ws_quota", "label": "工作區每人總額度",
          "value_mb": per_user if per_user > 0 else None, "configurable": True,
          "note": "0 或 -1 = 不限。在「工作區設定」調整。"},

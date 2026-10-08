@@ -451,7 +451,7 @@ async def llm_reflow(request: Request):
         raise HTTPException(410, "結構資料已過期，請重新擷取。")
     doc = _json.loads(model_path.read_text(encoding="utf-8"))
 
-    client = llm_settings.make_client()
+    client = llm_settings.make_client("pdf-extract-text")
     if client is None:
         raise HTTPException(503, "LLM client 未就緒")
     # Per-tool 模型覆寫優先（admin 在 LLM 設定頁可指定）

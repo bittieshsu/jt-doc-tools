@@ -276,7 +276,7 @@ def llm_classify_buffer(user: Optional[Any]) -> dict:
         raise RuntimeError(f"LLM module 載入失敗：{e}")
     if not _ls.llm_settings.is_enabled():
         raise RuntimeError("LLM 功能未啟用，請到 /admin/llm 設定")
-    client = _ls.llm_settings.make_client()
+    client = _ls.llm_settings.make_client("einvoice-scan")
     if not client:
         raise RuntimeError("LLM client 建立失敗（檢查 base_url / api_key）")
     model = _ls.llm_settings.get_model_for("einvoice-scan")

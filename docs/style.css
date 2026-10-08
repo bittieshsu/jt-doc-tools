@@ -1834,3 +1834,9 @@ code {
 @media (max-width: 640px) {
   .sp-steps, .sp-facts { grid-template-columns: 1fr; }
 }
+
+/* 試用中的工具：名稱旁的「Beta」（跟應用程式裡的 .tool-beta 同一個樣子） */
+.beta-mark { display: inline-block; vertical-align: middle; margin-left: 6px;
+  padding: 0 6px; border-radius: 999px; border: 1px solid #fcd34d;
+  background: #fef3c7; color: #92400e; font-size: 10px; font-weight: 700;
+  line-height: 15px; letter-spacing: .02em; white-space: nowrap; }

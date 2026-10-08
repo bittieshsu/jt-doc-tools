@@ -392,7 +392,7 @@ async def llm_review_start(
         meta={
             "upload_id": upload_id,
             "model": _model,
-            "base_url": _s.get("base_url", ""),
+            "base_url": llm_settings.base_url_for("pdf-fill"),
         },
     )
     return {"job_id": job.id, "model": _s.get("model", "?")}

@@ -72,7 +72,7 @@
        title="{{ tr(t.lock_reason) }}"{% endif %}
        data-tool-id="{{ t.id }}">
       <div class="tool-icon tile-color-{{ t.color|default(0) }}">{{ icon(t.icon or 'tool', size=26) }}</div>
-      <div class="tool-name">{{ tr(t.name) }}</div>
+      <div class="tool-name">{{ tr(t.name) }}{% if t.beta %}<span class="tool-beta">Beta</span>{% endif %}</div>
       <div class="tool-desc">{{ tr(t.description) }}</div>
       <button class="tool-pin-btn" type="button" tabindex="-1"
               data-pin-tool="{{ t.id }}"

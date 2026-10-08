@@ -44,7 +44,7 @@ async def _llm_summarize_diff(pages_out: list[dict], totals: dict,
     """
     from ...core.llm_settings import llm_settings as _llms
     import asyncio as _asyncio
-    client = _llms.make_client()
+    client = _llms.make_client("doc-diff")
     if client is None:
         return {}
     model = _llms.get_model_for("doc-diff")

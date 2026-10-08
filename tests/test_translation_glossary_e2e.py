@@ -84,7 +84,7 @@ def _xlsx(*texts: str) -> bytes:
 
 def _run_doc(env, monkeypatch, *, mangle=False, use_glossary=True,
              texts=("The Acer server runs Foxconn firmware.",)) -> tuple[list[str], dict]:
-    monkeypatch.setattr(DT.llm_settings, "make_client", lambda: _Fake(mangle))
+    monkeypatch.setattr(DT.llm_settings, "make_client", lambda *a, **k: _Fake(mangle))
     uid = "a" * 32
     DT._src_path(uid).write_bytes(_xlsx(*texts))
     job = _Job()
@@ -130,7 +130,7 @@ def test_a_model_that_mangles_the_markers_never_leaks_one(env, monkeypatch,
 
 
 def test_sentence_translation_uses_the_dictionary(env, monkeypatch):
-    monkeypatch.setattr(TRD.llm_settings, "make_client", lambda: _Fake())
+    monkeypatch.setattr(TRD.llm_settings, "make_client", lambda *a, **k: _Fake())
     res = TRD._translate_sentences(["The Acer server runs Foxconn firmware."],
                                    "en", "zh-TW")
     assert "宏碁" in res[0]["translated"]
@@ -138,14 +138,14 @@ def test_sentence_translation_uses_the_dictionary(env, monkeypatch):
 
 
 def test_sentence_translation_respects_the_flag(env, monkeypatch):
-    monkeypatch.setattr(TRD.llm_settings, "make_client", lambda: _Fake())
+    monkeypatch.setattr(TRD.llm_settings, "make_client", lambda *a, **k: _Fake())
     res = TRD._translate_sentences(["The Acer server."], "en", "zh-TW",
                                    use_glossary=False)
     assert "Acer" in res[0]["translated"]
 
 
 def test_sentence_translation_falls_back_and_reports(env, monkeypatch):
-    monkeypatch.setattr(TRD.llm_settings, "make_client", lambda: _Fake(mangle=True))
+    monkeypatch.setattr(TRD.llm_settings, "make_client", lambda *a, **k: _Fake(mangle=True))
     res = TRD._translate_sentences(["The Acer server."], "en", "zh-TW")
     assert not G.has_placeholder(res[0]["translated"])
     assert res[0]["glossary"]["fallback"] is True
