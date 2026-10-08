@@ -609,7 +609,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **432 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **433 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -857,6 +857,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_notify_link_uses_browser_origin.py` | 通知裡的「我的作業」要是連結 —— 管理員沒填「站台網址」也一樣（v1.16.57） |
 | `test_notify_privacy.py` | 通知送出去的內容不可以外洩多餘的東西 |
 | `test_notify_settings_form.py` | 通知設定頁的兩件事：**存進去的值不可以被自動帶值蓋掉**、欄位要看得到內容 |
+| `test_notify_test_sends_real_layout.py` | 通知設定的「傳送測試」：Email 寄的是**跟作業完成通知同一個版面**的範例信 |
 | `test_ocr_avx2_guard.py` | 本機 EasyOCR 在缺 AVX2 的 CPU 上會 SIGILL 打掛整個服務 |
 | `test_ocr_engine_note_on_both_paths.py` | OCR 完成訊息要講出「實際用了哪個引擎、有沒有退回」—— 網頁與 API 兩條路都要 |
 | `test_ocr_first_download_message.py` | 第一次用本機 EasyOCR 時，狀態文字要說「正在下載辨識模型」 |
@@ -2633,7 +2634,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 #### 通知設定（`/admin/notify/*`）
 
 - [ ] `/admin/notify/save`
-- [ ] `/admin/notify/test/{channel}`
+- [ ] `/admin/notify/test/{channel}`：Email 寄的是跟作業完成通知同一個版面的範例信（卡片、圖示、「我的作業」連結用按測試那個瀏覽器的網址，標題標「[測試]」）；其他管道照舊純文字（`tests/test_notify_test_sends_real_layout.py`）
 
 #### 公文撰擬設定（`/admin/official-doc/*`）🆕 v1.16.61
 

@@ -6758,5 +6758,6 @@
   "口語換成公文用語與句型": "Replace everyday wording with official-document phrasing",
   "自己寫要怎麼改": "Write how you want it changed",
   "貼上或拖進來的是機關來文的全文": "What you pasted or dropped in is the full incoming document",
-  "自己摘的重點，大綱沒寫到的細節不會被補上": "Your own summary of the key points; details it leaves out are not filled in"
+  "自己摘的重點，大綱沒寫到的細節不會被補上": "Your own summary of the key points; details it leaves out are not filled in",
+  "測試信跟作業完成時寄出的通知是同一個版面（內容是範例），可以直接看它在讀信軟體裡的樣子。": "The test message uses the same layout as the job notifications (with sample content), so you can see how it looks in your mail client."
 }

@@ -11,6 +11,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ---
 
+## [1.16.67] - 2026-10-09
+
+- **The e-mail "Send test" in notification settings now sends the real notification layout** (a sample job-completion message with the card, icons and the "My jobs" link, subject marked `[測試]`), so you can see how it looks in your mail client without waiting for a long job. Other channels still get plain text.
+- **Intro site**: more formal section headings and descriptions (AD / LDAP, meeting recordings, auditor and compliance), a shorter official document drafting description, and fewer em dashes.
+
+---
+
 ## [1.16.66] - 2026-10-08
 
 - **Fix: "Send to Meeting summary" did nothing when the workspace is turned off.** The job result is carried over instead (same transcript, renamed speakers included); if it really can't be carried, it says so. Tools that load the workspace script themselves no longer show workspace buttons while the workspace is off. Queued or running meeting-summary, transcription and document-translation jobs no longer risk having their input cleaned up before they finish.

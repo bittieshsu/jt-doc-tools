@@ -2072,11 +2072,18 @@ def build_auth_router(templates) -> APIRouter:
                   "zulip_to", "nextcloud_to"):
             if body.get(f):
                 cfg[f] = body[f]
+        subject, text, html, images = ("[測試] Jason Tools 文件工具箱",
+                                       "這是一則測試通知，看到就代表這個管道設定正確。", "", {})
+        if channel == "email":
+            # 測試信用**真的通知信那個版面**（範例內容）：讀信軟體裡卡片長怎樣，
+            # 不必等一件超過門檻秒數的作業才看得到（2026-10-08 使用者要求）
+            from ..core import job_notify as _jn
+            from ..core.http_utils import browser_origin as _bo
+            subject, text, html, images = await _asyncio.to_thread(
+                _jn.build_sample, _bo(request.headers))
         try:
             await _asyncio.to_thread(
-                _nc.send_one, cfg, channel,
-                "[測試] Jason Tools 文件工具箱",
-                "這是一則測試通知，看到就代表這個管道設定正確。")
+                _nc.send_one, cfg, channel, subject, text, html or None, images or None)
         except Exception as e:  # noqa: BLE001
             # 「測試」按鈕的用途就是告訴管理員哪裡不對，所以要給原因 ——
             # 但**不可原樣吐出例外訊息**：通知管道的錯誤裡常帶 webhook URL

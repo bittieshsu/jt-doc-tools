@@ -187,6 +187,37 @@ def _site_url(path: str, job: Any = None) -> str:
     return base.rstrip("/") + path
 
 
+class _SampleJob:
+    """「傳送測試」用的假作業：只帶通知信用得到的欄位。"""
+
+    def __init__(self, origin: str = ""):
+        self.id = "sample"
+        self.tool_id = "doc-translate"
+        self.status = "done"
+        self.error = None
+        self.result_filename = ""
+        self.owner_id = None
+        self.meta = {"filename": "測試通知範例.docx", "origin": origin or ""}
+
+    def elapsed(self) -> float:
+        return 83.0
+
+
+def build_sample(origin: str = "") -> tuple[str, str, str, dict[str, bytes]]:
+    """管理頁「傳送測試」寄的信：**跟作業完成時寄出的同一個版面**，內容是範例
+    （2026-10-08 使用者：測試信只有一行純文字，要等一件超過 60 秒的作業才看得到卡片在
+    讀信軟體裡長怎樣）。`origin` 是按測試的那個瀏覽器所在的網址（信裡「我的作業」連得回來）。
+
+    回 `(標題, 純文字, HTML, 內嵌圖片)`；HTML 組不出來時是空字串（照樣寄純文字）。
+    """
+    job = _SampleJob(origin)
+    subject, text = build_message(job)
+    subject = "[測試] " + subject
+    text = "這是一封測試信，版面跟作業完成時寄出的通知一樣（內容是範例）。\n\n" + text
+    html = build_html(job)
+    return subject, text, html, (build_images(job) if html else {})
+
+
 def on_job_finished(job: Any) -> None:
     """作業結束時呼叫。**絕不丟例外。**"""
     try:

@@ -404,12 +404,18 @@ _SENDERS: dict[str, Callable[[dict, str, Optional[str]], None]] = {
 
 
 def send_one(cfg: dict[str, Any], channel: str, subject: str,
-             text: str | None) -> None:
-    """送單一管道（測試按鈕用）。失敗丟例外，讓管理員看得到原因。"""
+             text: str | None, html: str | None = None,
+             images: dict[str, bytes] | None = None) -> None:
+    """送單一管道（測試按鈕用）。失敗丟例外，讓管理員看得到原因。
+
+    Email 給了 `html` 就寄 HTML 版（跟真的通知信同一個版面），其他管道照樣只收純文字。"""
     fn = _SENDERS.get(channel)
     if fn is None:
         raise RuntimeError(f"未知的通知管道：{channel}")
-    fn(cfg, subject, text)
+    if channel == "email" and html:
+        fn(cfg, subject, text, html, images)
+    else:
+        fn(cfg, subject, text)
 
 
 def broadcast(cfg: dict[str, Any], channels: list[str], subject: str,
