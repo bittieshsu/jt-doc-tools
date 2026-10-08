@@ -63,3 +63,28 @@ def uploadable_dir(prefix: str = "jtdt-test") -> str:
         d = tempfile.mkdtemp(prefix=f"{prefix}-")
     os.makedirs(d, exist_ok=True)
     return d
+
+
+_RUNS: dict[str, bool] = {}
+
+
+def browser_runs(path: str | None = None, timeout: float = 45.0) -> bool:
+    """那支瀏覽器**在這台真的跑得起來**嗎（開一頁空白、印得出 DOM）。
+
+    找得到執行檔不代表跑得起來：GitHub 的 Ubuntu 機器上 `/usr/bin/chromium-browser`
+    是 snap 的空殼，snap 沒有在跑 —— 一叫就卡住（2026-10-08 CI 上等滿 120 秒變紅，
+    其他用瀏覽器的測試在那種情況是 skip）。結果依路徑快取。
+    """
+    import subprocess
+    b = path or browser()
+    if not b:
+        return False
+    if b not in _RUNS:
+        try:
+            r = subprocess.run([b, "--headless", "--disable-gpu", "--no-sandbox",
+                                "--dump-dom", "about:blank"],
+                               capture_output=True, text=True, timeout=timeout)
+            _RUNS[b] = r.returncode == 0 and "<html" in (r.stdout or "").lower()
+        except (OSError, subprocess.SubprocessError):
+            _RUNS[b] = False
+    return _RUNS[b]

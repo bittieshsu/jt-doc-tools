@@ -134,8 +134,9 @@ ENDPOINTS = [
 def test_endpoint_list_covers_every_knowledge_route():
     """上面那份清單要跟真的路由一樣 —— 新增端點忘了加進來，下面那條就沒驗到它。"""
     import app.main as m
+    from tools.route_index import iter_routes
     real = set()
-    for r in m.app.routes:
+    for r in iter_routes(m.app):     # 新版 FastAPI 的 include_router 不再攤平在 app.routes
         p = getattr(r, "path", "")
         if p.startswith("/admin/knowledge"):
             for meth in getattr(r, "methods", set()) - {"HEAD"}:

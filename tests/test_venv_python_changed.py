@@ -28,12 +28,17 @@ CUR = "%d.%d" % sys.version_info[:2]
 OTHER = "3.10" if CUR != "3.10" else "3.11"
 
 
-def _fake_venv(where: Path, built: str) -> Path:
+#: 假環境的 `home`：**不可以用跑測試的那個 Python 的目錄** —— CI 上它在 `/home/runner/…`，
+#: 剛好被「Python 在某人家目錄裡」那條判成壞的（2026-10-08 只有 CI 紅）。`home` 只拿來比路徑，不會去執行。
+_NEUTRAL_HOME = "/usr/local/lib/jtdt-test-python/bin"
+
+
+def _fake_venv(where: Path, built: str, home: str = _NEUTRAL_HOME) -> Path:
     """一個 venv：bin/python 指到這個測試正在跑的 Python，pyvenv.cfg 寫 `built` 那一版。"""
     venv = where / ".venv"
     (venv / "bin").mkdir(parents=True)
     (venv / "pyvenv.cfg").write_text(
-        f"home = {Path(sys.executable).parent}\nimplementation = CPython\n"
+        f"home = {home}\nimplementation = CPython\n"
         f"version_info = {built}.12\ninclude-system-site-packages = false\n", encoding="utf-8")
     (venv / "bin" / "python").symlink_to(Path(sys.executable).resolve())
     return venv
@@ -175,13 +180,12 @@ def test_a_python_in_someones_home_counts_as_broken(tmp_path, monkeypatch):
     """舊版 `jtdt update` 用 root 跑 `uv sync`，可能拿 `/root/.local/share/uv/python` 重建：
     root 跑得動（所以版本檢查是好的），服務帳號讀不到 —— 也要重建。"""
     monkeypatch.setattr(cli, "_is_linux", lambda: True)
-    venv = _fake_venv(tmp_path, CUR)
-    cfg = venv / "pyvenv.cfg"
-    cfg.write_text(cfg.read_text(encoding="utf-8").replace(
-        f"home = {Path(sys.executable).parent}", "home = /root/.local/share/uv/python/cpython-3.12/bin"),
-        encoding="utf-8")
+    _fake_venv(tmp_path, CUR, home="/root/.local/share/uv/python/cpython-3.12/bin")
     assert cli._venv_python_mismatch(tmp_path) == (CUR, "home-dir")
     assert _venv_ok_rc(tmp_path) != 0, "install.sh 也要認得"
+    other = tmp_path / "u"
+    _fake_venv(other, CUR, home="/home/someone/.local/share/uv/python/cpython-3.12/bin")
+    assert cli._venv_python_mismatch(other) == (CUR, "home-dir")
 
 
 # ---------------- Windows ----------------

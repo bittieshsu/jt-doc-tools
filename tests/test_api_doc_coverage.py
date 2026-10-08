@@ -153,8 +153,12 @@ def _norm(path: str) -> str:
 
 def _all_api_routes() -> set[str]:
     import app.main as app_main
-    return {r.path for r in app_main.app.routes
-            if "/api/" in getattr(r, "path", "")}
+    from tools.route_index import iter_routes
+    # 不可以直接讀 app.routes：新版 FastAPI 把 include_router 包成 `_IncludedRouter`，
+    # 直接讀只看得到頂層幾條 —— 這條檢查會**安靜地少驗**大部分端點（CI 用新版時就是這樣）
+    routes = {r.path for r in iter_routes(app_main.app) if "/api/" in getattr(r, "path", "")}
+    assert len(routes) > 100, f"只列到 {len(routes)} 支 /api/ 端點 —— 路由沒有攤開"
+    return routes
 
 
 def test_every_api_route_is_mentioned_in_api_md():

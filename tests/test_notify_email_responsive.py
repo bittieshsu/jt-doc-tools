@@ -165,13 +165,15 @@ def test_content_is_unchanged_by_the_layout():
 
 def _browser():
     try:
-        from tools.browser_probe import browser
+        from tools.browser_probe import browser, browser_runs
     except Exception:  # noqa: BLE001
         return None
-    return browser()
+    b = browser()
+    # 找得到執行檔不代表跑得起來（CI 機器上是 snap 的空殼，一叫就卡住）
+    return b if b and browser_runs(b) else None
 
 
-@pytest.mark.skipif(_browser() is None, reason="沒有 chromium —— 這條要真的瀏覽器才量得到")
+@pytest.mark.skipif(_browser() is None, reason="這台沒有跑得起來的 chromium —— 這條要真的瀏覽器才量得到")
 def test_card_shrinks_with_the_reading_pane_in_a_browser():
     """四種窗格寬度：不可以橫向捲動、卡片右緣不超出窗格、寬的時候剛好 560。
 

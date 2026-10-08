@@ -609,7 +609,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **431 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **432 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -958,6 +958,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_roles.py` | Tests for app.core.roles. |
 | `test_roles_default_and_seed.py` | Tests for the new-user default role + seed-snapshot behaviour (v1.12.53). |
 | `test_roles_rbac.py` | 內建角色（RBAC）的完整性檢查 |
+| `test_routes_go_through_route_index.py` | 列路由一律走 `tools.route_index.iter_routes`，不可以直接讀 `app.routes` |
 | `test_safe_paths_and_owner.py` | Tests for app.core.safe_paths and app.core.upload_owner. |
 | `test_same_as_ref.py` | 把「同上」「同登記地址」展開成實際內容 |
 | `test_save_queue.py` | Tests for app.core.save_queue (v1.7.17). |
