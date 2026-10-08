@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import time
+import uuid
 
 import pytest
 
@@ -38,6 +40,15 @@ def _clean_state():
     conn.execute("DELETE FROM forward_state")
     conn.commit()
     af._DEST_STATE.clear()
+
+
+def _flush_audit(timeout: float = 10.0) -> None:
+    """稽核寫入走背景佇列：等它寫完再數，不然數到的是「還沒落地」的狀態。"""
+    q = getattr(audit_db, "_WRITE_Q", None)
+    end = time.time() + timeout
+    while q is not None and time.time() < end and not q.empty():
+        time.sleep(0.05)
+    time.sleep(0.2)
 
 
 def _skip_backoff():
@@ -115,7 +126,11 @@ def test_failure_events_are_never_forwarded(monkeypatch, _clean_state):
     """
     base = _clean_state
     _seed(1)
-    bad = _dest("bad", False)
+    # 目的地用**這一條專屬的代號**，只數記在它名下的失敗事件：只用 `id > base` 的話，
+    # 前一條測試（目的地也叫 bad）的失敗事件會在起點之後才從背景佇列落地、被算進來
+    # （2026-10-08 CI 的「照 uv.lock 安裝」那個 job 看到 2 筆）。
+    did = "bad-" + uuid.uuid4().hex[:8]
+    bad = _dest(did, False)
     monkeypatch.setattr(af, "get", lambda: {"destinations": [bad]})
     monkeypatch.setattr(af, "_send_with_retry",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("x")))
@@ -124,16 +139,15 @@ def test_failure_events_are_never_forwarded(monkeypatch, _clean_state):
     for _ in range(3):
         _skip_backoff()                 # 跳過退避，但冷卻要留著
         af._drain_once()
+    _flush_audit()
 
-    n = conn.execute("SELECT COUNT(*) c FROM audit_events "
-                     "WHERE event_type='audit_forward_failed' AND id > ?",
-                     (base,)).fetchone()["c"]
-    assert n <= 1, f"連跑三輪產生了 {n} 筆失敗事件（冷卻沒生效）"
+    mine = ("FROM audit_events WHERE event_type='audit_forward_failed' AND id > ? AND target = ?",
+            (base, did))
+    n = conn.execute("SELECT COUNT(*) c " + mine[0], mine[1]).fetchone()["c"]
+    assert n == 1, f"連跑三輪產生了 {n} 筆失敗事件（要剛好一筆：冷卻內不重記，但第一次要記）"
 
     # 就算資料庫裡有失敗事件，也不可以被撈出來送
-    rows = conn.execute(
-        "SELECT id FROM audit_events WHERE event_type='audit_forward_failed' "
-        "AND id > ?", (base,)).fetchall()
+    rows = conn.execute("SELECT id " + mine[0], mine[1]).fetchall()
     if rows:
         picked = []
         monkeypatch.setattr(af, "_send_with_retry",
