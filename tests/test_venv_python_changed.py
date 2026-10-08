@@ -57,14 +57,18 @@ def test_mismatch_is_detected(tmp_path):
 
 
 def test_the_service_stops_with_a_clear_message(tmp_path):
-    """真的用那個 venv 的 python 跑一次：結束碼 78、訊息講出兩個版本與 `sudo jtdt update`。"""
-    venv = _fake_venv(tmp_path, OTHER)
+    """真的用那個 venv 的 python 跑一次：結束碼 78、訊息講出兩個版本與 `sudo jtdt update`。
+
+    這條**真的執行**假環境的 python，`home` 要是那個 Python 真正的目錄（找得到標準函式庫）；
+    這裡只比版本、不看「家目錄」那條，所以 CI 上在 `/home/runner` 也沒關係。"""
+    real = str(Path(sys.executable).resolve().parent)
+    venv = _fake_venv(tmp_path, OTHER, home=real)
     code = f"import sys; sys.path.insert(0, {str(ROOT)!r}); import app.venv_check as v; v.exit_if_mismatched()"
     out = subprocess.run([str(venv / "bin" / "python"), "-c", code], capture_output=True, text=True,
                          timeout=60)
     assert out.returncode == venv_check.EXIT_CODE, (out.returncode, out.stderr)
     assert f"Python {OTHER}" in out.stderr and f"now {CUR}" in out.stderr and "sudo jtdt update" in out.stderr
-    ok = _fake_venv(tmp_path / "ok", CUR)
+    ok = _fake_venv(tmp_path / "ok", CUR, home=real)
     out = subprocess.run([str(ok / "bin" / "python"), "-c", code], capture_output=True, text=True,
                          timeout=60)
     assert out.returncode == 0, out.stderr

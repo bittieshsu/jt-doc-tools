@@ -163,17 +163,80 @@ def test_content_is_unchanged_by_the_layout():
 
 # ---------- 真的瀏覽器量 ----------
 
-def _browser():
+def _runnable_browser():
     try:
         from tools.browser_probe import browser, browser_runs
     except Exception:  # noqa: BLE001
         return None
+    import importlib.util
+    if importlib.util.find_spec("websockets") is None:
+        return None
     b = browser()
-    # 找得到執行檔不代表跑得起來（CI 機器上是 snap 的空殼，一叫就卡住）
+    # 找得到執行檔不代表跑得起來（snap 的空殼一叫就卡住）
     return b if b and browser_runs(b) else None
 
 
-@pytest.mark.skipif(_browser() is None, reason="這台沒有跑得起來的 chromium —— 這條要真的瀏覽器才量得到")
+def _read_out_via_cdp(fn: str, prof: str) -> str:
+    """開那一頁、等 `#out` 寫好、讀回來。走 CDP（跟其他瀏覽器測試同一套），
+    不用 `--dump-dom --virtual-time-budget`：那種用法在 CI 的 chromium 上載入這一頁會卡住
+    （2026-10-08 CI 連兩次等滿 120 秒），本機卻正常 —— 判斷不出是誰的問題的寫法不要用。
+    瀏覽器起不來（除錯埠 30 秒內沒開）→ skip，跟其他瀏覽器測試同一條規則。"""
+    import socket
+    import time
+    import urllib.request
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    proc = subprocess.Popen(
+        [_runnable_browser(), "--headless=new", "--disable-gpu", "--no-sandbox",
+         f"--user-data-dir={prof}", f"--remote-debugging-port={port}",
+         "--remote-allow-origins=*", "--window-size=1400,900", "about:blank"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        for _ in range(60):
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=1)
+                break
+            except Exception:  # noqa: BLE001
+                time.sleep(0.5)
+        else:
+            pytest.skip("瀏覽器的除錯埠 30 秒內沒有開 —— 這台跑不起來")
+        import websockets.sync.client as wsc
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/json/new?about:blank", method="PUT")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            tab = json.loads(r.read())
+        with wsc.connect(tab["webSocketDebuggerUrl"], max_size=None, open_timeout=10) as ws:
+            n = [0]
+
+            def send(method, params=None):
+                n[0] += 1
+                ws.send(json.dumps({"id": n[0], "method": method, "params": params or {}}))
+                while True:
+                    m = json.loads(ws.recv(timeout=60))
+                    if m.get("id") == n[0]:
+                        return m
+
+            send("Page.enable")
+            send("Page.navigate", {"url": "file://" + fn})
+            deadline = time.time() + 60
+            while time.time() < deadline:
+                v = send("Runtime.evaluate", {"expression": "(document.getElementById('out') || {}).textContent || ''",
+                                              "returnByValue": True})
+                txt = ((v.get("result") or {}).get("result") or {}).get("value") or ""
+                if txt.startswith("RES"):
+                    return txt
+                time.sleep(0.3)
+            return ""
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
+@pytest.mark.skipif(_runnable_browser() is None, reason="這台沒有跑得起來的 chromium —— 這條要真的瀏覽器才量得到")
 def test_card_shrinks_with_the_reading_pane_in_a_browser():
     """四種窗格寬度：不可以橫向捲動、卡片右緣不超出窗格、寬的時候剛好 560。
 
@@ -210,17 +273,12 @@ def test_card_shrinks_with_the_reading_pane_in_a_browser():
     with open(fn, "w", encoding="utf-8") as f:
         f.write(page)
     try:
-        out = subprocess.run(
-            [_browser(), "--headless", "--disable-gpu", "--no-sandbox",
-             f"--user-data-dir={prof}", "--window-size=1400,900",
-             "--virtual-time-budget=5000", "--dump-dom", "file://" + fn],
-            capture_output=True, text=True, timeout=120).stdout
+        out = _read_out_via_cdp(fn, prof)
     finally:
         os.unlink(fn)
         shutil.rmtree(prof, ignore_errors=True)
-    m = re.search(r"RES(\{[^<]*\})", out)
-    assert m, f"瀏覽器沒有量到東西：{out[-400:]}"
-    res = json.loads(_html.unescape(m.group(1)))
+    assert out.startswith("RES"), f"瀏覽器沒有量到東西：{out[-400:]}"
+    res = json.loads(out[3:])
     for k in mails:
         for w in widths:
             g = res[f"{k}{w}"]
