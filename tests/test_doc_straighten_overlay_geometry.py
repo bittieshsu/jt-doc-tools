@@ -34,6 +34,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.browser_probe import browser as _browser  # noqa: E402
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 
 
 
@@ -88,7 +89,7 @@ def live():
     photo = _sample_photo(shot)
     br = subprocess.Popen(
         [_browser(), "--headless=new", "--no-sandbox", "--disable-gpu",
-         "--window-size=1500,2200", f"--remote-debugging-port={cdp}",
+         "--window-size=1500,2200", _profile_arg(), f"--remote-debugging-port={cdp}",
          "--remote-allow-origins=*", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:

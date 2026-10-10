@@ -182,6 +182,7 @@ def test_create_variant_bad_input_is_400_and_creates_nothing(client):
 # ------------------------------------------------------------------ 真的瀏覽器：設定頁
 
 from tools.browser_probe import browser as _browser  # noqa: E402
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 
 _needs_browser = pytest.mark.skipif(
     _browser() is None or __import__("importlib").util.find_spec("websockets") is None,
@@ -210,7 +211,7 @@ def test_settings_page_warns_and_creates_a_bigger_version():
                                 "--port", str(port), "--log-level", "warning"], cwd=str(root), env=env,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         br = subprocess.Popen([_browser(), "--headless=new", "--no-sandbox", "--disable-gpu",
-                               f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
+                               _profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         t = None
         try:

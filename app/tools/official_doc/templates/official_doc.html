@@ -475,7 +475,7 @@ a.od-ref-title:hover { text-decoration:underline; }
         title="{{ tr('之前填過的') }}" aria-label="{{ tr('之前填過的') }}"
         aria-haspopup="listbox" aria-expanded="false">{{ icon('clock', size=15) }}</button>
 {%- endmacro %}
-<h1>{{ icon('official-doc', size=22) }} {{ tr('公文撰擬') }}<span class="tool-beta" title="{{ tr('試用中：產出請多看一眼，功能還可能調整') }}">Beta</span></h1>
+<h1>{{ icon('official-doc', size=22) }} {{ tr('公文撰擬') }}</h1>
 <p class="muted">{{ tr('把白話需求寫成「簽」或「函」，或依來文與你的辦理方向擬「簽辦意見」。格式照公文慣例排好，金額、日期與辦理方向照你寫的，沒提供的標成待補。') }}</p>
 <div class="od-toplinks">
   <a class="btn" href="/tools/official-doc/cases" id="odCasesLink">{{ icon('clock', size=14) }} {{ tr('歷史案件') }}</a>
@@ -800,11 +800,20 @@ a.od-ref-title:hover { text-decoration:underline; }
       </p>
       <div class="od-grid">
         {# 發文字號：選填（2026-10-08 使用者）。企業自己編號、機關已經取好號的直接填；
-           沒填就跟以前一樣留空 —— 草稿不會自己編一個。每一份都不同，所以**不記在瀏覽器裡**。 #}
+           沒填就跟以前一樣留空 —— 草稿不會自己編一個。
+           旁邊的按鈕是**用過的發文代字**（2026-10-10 使用者核准）：依發文機關記住「字第」前面
+           那段（府資字第），點了才填進去、不自動填；**號碼不記**（每一份都不同，由公文系統給）。
+           紀錄鍵跟著發文機關那一格走（field_history.js 的 data-fh-key-from）。 #}
         <div class="od-f">
           <label class="od-lab" for="odDocNo">{{ tr('發文字號') }}</label>
           <input type="text" id="odDocNo" class="field" maxlength="{{ max_field }}"
                  placeholder="{{ tr('選填，例如：○字第1150000001號') }}">
+          <button type="button" class="fh-btn" data-fh-for="odDocNo" data-fh-key-from="odOrg"
+                  data-fh-key-prefix="jtdt.od.docword." data-fh-take="docword"
+                  data-fh-empty="{{ tr('這個發文單位還沒有用過的代字；產生草稿後會記住「字第」前面那段。') }}"
+                  data-fh-nokey="{{ tr('先填發文單位的名稱，才看得到它用過的代字。') }}"
+                  title="{{ tr('用過的發文代字') }}" aria-label="{{ tr('用過的發文代字') }}"
+                  aria-haspopup="listbox" aria-expanded="false">{{ icon('clock', size=15) }}</button>
         </div>
         <div class="od-f">
           <label class="od-lab" for="odCopies">{{ tr('正本') }}</label>
@@ -1880,12 +1889,20 @@ a.od-ref-title:hover { text-decoration:underline; }
   // 送出當下記下這一份用到的值，作業成功才寫進紀錄 —— 打錯又沒產生的字不會被記住；
   // 作業進行中改了欄位，記的也是當初送出的那一份。
   var histPending = null;
+  // 發文代字：「字第」（含）前面那段，至少一個字；佔位的「○字第」不算，沒有「字第」就不記。
+  function docWord(v) {
+    var m = /^\s*(\S[^\n]{0,29}?字第)/.exec(String(v || ''));
+    return m && !/[○〇]/.test(m[1]) ? m[1] : '';
+  }
   function histSnapshot(m) {
     var box = el(m === 'letter' ? 'odLetter' : (m === 'endorse' ? 'odEndorse' : 'odSign'));
-    return Array.prototype.map.call(box.querySelectorAll('.fh-btn[data-fh-key]'), function (b) {
-      var f = el(b.dataset.fhFor);
-      return [b.dataset.fhKey, f ? f.value : ''];
-    });
+    var keyOf = window.FieldHistory ? window.FieldHistory.keyOf
+                                    : function (b) { return b.dataset.fhKey || ''; };
+    return Array.prototype.map.call(box.querySelectorAll('.fh-btn[data-fh-for]'), function (b) {
+      var f = el(b.dataset.fhFor), v = f ? f.value : '';
+      if (b.dataset.fhTake === 'docword') v = docWord(v);
+      return [keyOf(b), v];
+    }).filter(function (kv) { return kv[0] && kv[1]; });
   }
   function histCommit() {
     var list = histPending;

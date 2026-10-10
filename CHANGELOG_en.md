@@ -5,11 +5,30 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (900 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (902 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.73] - 2026-10-10
+
+- **Official document drafting remembers reference prefixes**: a new button next to the reference number field lists the prefixes each issuing organisation (or company) has used, that is, the part before the serial number. Click one to fill it in, then type the number. Nothing is filled in automatically and the numbers themselves are not stored. The list is kept only in your browser and is updated after a draft is generated successfully.
+- Official document drafting: after switching the issuer to a company, the "Previously entered" lists next to the company name and signature still showed the government agency entries. They now switch too.
+- Official document drafting: the tool description on the home card and in sidebar search is now one short sentence, about as long as the other tools'. The details are still at the top of the tool page.
+- Website: every page's navigation bar now links to the compliance page, including the phone menu. Before, it was reachable only from the audit section on the home page and from the footer.
+- Website: on phones, the menu button on the troubleshooting and compliance pages did nothing (the script that opens the menu was missing). Fixed.
+- Website: the navigation items are closer together, and the bar switches to the menu button below 1200px (was 1080px), so the English and Japanese bars still fit with the extra item.
+
+## [1.16.72] - 2026-10-10
+
+- **Official document drafting is no longer marked Beta** (sidebar, home card, page title, website and README). The official document knowledge base is still marked Beta.
+- **The compliance page now maps to ISO/IEC 27001:2022 and ISO/IEC 42001:2023 clauses and controls**: each section lists the related ISO/IEC 27001:2022 and ISO/IEC 42001:2023 clauses and Annex A controls, each linking to its row in a new "Clause and control mapping" section. That section lists, clause by clause and control by control, which features support it and where in the document they are described, plus the clauses and controls left to your management system. It can be used directly when writing a Statement of Applicability.
+- The compliance page also covers a few existing features it did not mention: salted scrypt hashes for local passwords, background jobs queuing by available memory, watermarks and the restricted-use stamp, CodeQL and Dependabot, audit log entries for AI tool use and LLM setting changes, and the evaluation tools for drafting and meeting summaries.
+- The website, README and guides always name the edition of the two standards (ISO/IEC 27001:2022, ISO/IEC 42001:2023).
+- Screenshots on the compliance page declare their size, so jumping to a section from the contents at the top or from a mapping tag no longer lands in the wrong place while images above are still loading.
+- Development: browser tests now give Chromium its own profile directory on every launch and delete it afterwards. Previously Chromium created a temporary profile of about 11 MB that was not removed when tests stopped the browser, and these piled up on the development machine.
+- Development: the browser tests for meeting summaries and official document drafting sometimes timed out at the upload step. They put the file in before the page had finished loading, so the upload control was not ready yet and nothing was sent. They now wait for the page to load and check that the file actually went in.
 
 ## [1.16.71] - 2026-10-09
 
@@ -4572,8 +4591,8 @@ moderate alert goes with it.
 
 | Machine | Configuration | Result |
 |---|---|---|
-| `.30` | Linux / Python 3.10 / `+cu130` (the production configuration) | **line for line identical** to 2.11 |
-| `.154` | Windows / Python 3.12 / `+cpu` | **line for line identical** to 2.11 |
+| Production server | Linux / Python 3.10 / `+cu130` (the production configuration) | **line for line identical** to 2.11 |
+| Windows test machine | Windows / Python 3.12 / `+cpu` | **line for line identical** to 2.11 |
 
 The test image has six mixed Chinese/English/numeric lines (company ID, invoice
 number, amount, address, email, restricted-use wording) — and **even the mistakes
@@ -4587,7 +4606,7 @@ not.
 > dead**. This project uses the default PyPI index, where both resolve together,
 > but anyone installing by hand can hit it.
 
-> ⚠ **OCR cannot be verified on dev1**: that machine is a QEMU VM whose **CPU has
+> ⚠ **OCR cannot be verified on the development machine**: that machine is a QEMU VM whose **CPU has
 > no AVX2**, so `readtext` dumps core. A control run showed **the current 2.11
 > does exactly the same there** — it is the CPU, not the version. Without that
 > control I would have blamed the upgrade.

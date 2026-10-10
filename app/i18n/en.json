@@ -6895,5 +6895,9 @@
   "原本的聯絡資訊有幾行對不到欄位，不會放進草稿，請填到對應的欄位：": "Some lines of the earlier contact details do not match any field and will not go into the draft. Please enter them in the right field:",
   "有填的欄位才會出現在草稿上機關名稱的下面，欄位名稱由系統寫。發文機關、聯絡資訊、署名、副本會記在這個瀏覽器裡，下次自動帶入。": "Only the fields you fill in appear below the agency name in the draft, with field names written by the system. The issuing agency, contact details, signature and copies are remembered in this browser and filled in next time.",
   "有填的欄位才會出現在草稿上公司名稱的下面，欄位名稱由系統寫；全部沒填的話草稿會標出地址、統一編號、聯絡人待補。公司名稱、聯絡資訊、署名、副本會記在這個瀏覽器裡（跟機關的分開記），下次自動帶入。": "Only the fields you fill in appear below the company name in the draft, with field names written by the system; if all are empty, the draft marks the address, company ID (VAT) and contact person as to be filled in. The company name, contact details, signature and copies are remembered in this browser (separately from the agency ones) and filled in next time.",
-  "聯絡資訊的格式不正確（contact_fields 要是物件）。": "The contact details are in the wrong format (contact_fields must be an object)."
+  "聯絡資訊的格式不正確（contact_fields 要是物件）。": "The contact details are in the wrong format (contact_fields must be an object).",
+  "用過的發文代字": "Previously used reference prefixes",
+  "這個發文單位還沒有用過的代字；產生草稿後會記住「字第」前面那段。": "No reference prefix used by this issuer yet. Once a draft is generated, the prefix of its reference number (everything before the serial number) is remembered.",
+  "先填發文單位的名稱，才看得到它用過的代字。": "Fill in the issuing organisation first to see the prefixes it has used.",
+  "把白話需求擬成簽、函或簽辦意見，格式照公文慣例排好，沒提供的資料標成待補。": "Draft approval memos, official letters or handling notes from a plain-language request. Drafts are in Traditional Chinese, Taiwan government format; anything missing is marked to be filled in."
 }

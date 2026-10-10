@@ -222,6 +222,7 @@ def test_the_use_kb_checkbox_is_marked_beta(client, auth_off, monkeypatch):
 
 sys.path.insert(0, str(ROOT))
 from tools.browser_probe import browser as _browser  # noqa: E402
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 
 _needs_browser = pytest.mark.skipif(
     _browser() is None or __import__("importlib").util.find_spec("websockets") is None,
@@ -260,7 +261,7 @@ def live():
         cwd=str(ROOT), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     br = subprocess.Popen(
         [_browser(), "--headless=new", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
+         _profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     fe = FakeEmbed("ollama").__enter__()
     try:

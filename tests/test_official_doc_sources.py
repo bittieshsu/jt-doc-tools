@@ -689,7 +689,7 @@ def test_admin_page_runs_in_a_real_browser(monkeypatch):
     """管理頁在真的瀏覽器裡開一次：有資料的狀態下展開範本清單、試查地址簿、
     打開新增表單 —— 主控台不可以有任何錯誤（含 CSP 違規）。"""
     sys.path.insert(0, str(ROOT))
-    from tools.browser_probe import browser as _browser
+    from tools.browser_probe import browser as _browser, profile_arg as _profile_arg
     if _browser() is None:
         pytest.skip("沒有 chromium —— 這條要真的瀏覽器")
     try:
@@ -715,7 +715,7 @@ def test_admin_page_runs_in_a_real_browser(monkeypatch):
         cwd=str(ROOT), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     br = subprocess.Popen(
         [_browser(), "--headless=new", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
+         _profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(120):

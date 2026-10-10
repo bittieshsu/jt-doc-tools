@@ -1,6 +1,6 @@
 [project]
 name = "jt-doc-tools"
-version = "1.16.71"
+version = "1.16.73"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
@@ -62,8 +62,8 @@ dependencies = [
     # 升完 setuptools 就能到 84，那條告警跟著消掉。
     #
     # 兩台實機驗過**辨識結果一模一樣**（同一張中英數混排測試圖，連 OCR 自己
-    # 認錯的地方都一樣）：`.30` Linux / Python 3.10 / `+cu130`（正式機的組態）、
-    # `.154` Windows / Python 3.12 / `+cpu`。
+    # 認錯的地方都一樣）：正式機 Linux / Python 3.10 / `+cu130`（正式機的組態）、
+    # Windows 實機 / Python 3.12 / `+cpu`。
     #
     # ⚠ **torchvision 一定要跟 torch 同一個 index**。PyPI 的 torchvision 配上
     # `download.pytorch.org/whl/cpu` 的 torch → `RuntimeError: operator

@@ -78,3 +78,53 @@ def test_the_sync_script_checks_before_publishing():
     code = "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("#"))
     assert re.search(r'check_private_names\.py"?\s+"\$GH"', code), "同步腳本沒有掃公開樹"
     assert "exit 1" in code[code.index("check_private_names"):], "命中了也沒有停下來"
+
+
+# ── 內部主機代號（2026-10-10 使用者核准）─────────────────────────────────
+# 程式註解、測試、測試計畫、更新記錄原本會寫內部機器的代號（IP 最後一段、機器名稱）。
+# 既有的「不可以有內網 IP」檢查只認完整的位址，抓不到簡寫，所以每一版都會再帶進去幾處。
+# 代號放在開發樹的另一份私有清單（不是名單那一份：名單也給合作對象的推送前檢查讀，
+# 他們的文件會寫他們自己機器的代號）。**這裡不寫任何代號**，正反兩面的樣本都從私有清單推出來。
+
+def _sample_codes() -> set[str]:
+    codes = set()
+    for s in cpn.host_samples():
+        codes.update(re.findall(r"(?<![0-9])\.(\d{2,3})(?![0-9])", s))
+    return codes
+
+
+def test_the_host_list_exists_in_the_development_tree():
+    assert len(cpn.load_host_patterns()) >= 4, "主機代號清單不見了或被清空了？"
+    assert len(cpn.host_samples()) >= 5, "主機代號清單裡沒有測試樣本 —— 下面兩條會變成什麼都沒驗"
+    assert len(_sample_codes()) >= 3
+
+
+def test_every_sample_in_the_host_list_is_caught():
+    """式子寫錯一個字元就會安靜地什麼都擋不到 —— 拿清單自己附的樣本驗。"""
+    pats = cpn.load_host_patterns()
+    missed = [s for s in cpn.host_samples() if not any(p.search(s) for p in pats)]
+    assert not missed, f"這些樣本沒有被擋下：{missed}"
+
+
+def test_ordinary_numbers_are_not_mistaken_for_host_codes():
+    """反向對照：版本號、小數、CSS 與 SVG 的透明度、完整 IP 的最後一段都不算。
+    擋太寬的話更新記錄的版本號會整片被擋，這條檢查就會被關掉。"""
+    pats = cpn.load_host_patterns()
+    for n in sorted(_sample_codes()):
+        for text in (f"v1.16.{n}", f"0.{n}", f"KW_MIN = 0.{n}", f"rgba(15, 23, 42, .{n})",
+                     f'fill-opacity=".{n}"', f"約 1.{n} 秒"):
+            assert not any(p.search(text) for p in pats), f"誤判：{text!r}"
+
+
+def test_no_internal_host_code_is_in_what_gets_published():
+    hits = cpn.scan(_publish_roots(), cpn.load_host_patterns())
+    shown = [f"{f.relative_to(ROOT).as_posix()}:{n}" for f, n in hits]
+    assert not shown, ("會公開的檔案裡寫了內部主機代號（改成「正式機」「Windows 實機」"
+                       "「開發機」「推論機」這類說法）：\n" + "\n".join(shown[:50]))
+
+
+def test_the_sync_gate_reads_the_host_list_too():
+    """推送前那一道（同步腳本跑的 main）也要擋主機代號，不只測試擋。"""
+    import inspect
+    src = inspect.getsource(cpn.main)
+    assert "load_host_patterns()" in src

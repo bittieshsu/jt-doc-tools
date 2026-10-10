@@ -68,10 +68,12 @@ async def _capture(base: str, cdp_port: int, outdir: Path,
                    locale: str = "") -> list[dict]:
     import httpx
     import websockets
+    sys.path.insert(0, str(REPO))
+    from tools.browser_probe import profile_arg as _profile_arg
 
     proc = subprocess.Popen(
         ["/usr/bin/chromium-browser", "--headless", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp_port}", "--remote-allow-origins=*",
+         _profile_arg(), f"--remote-debugging-port={cdp_port}", "--remote-allow-origins=*",
          "--hide-scrollbars", "--window-size=1440,1000", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:

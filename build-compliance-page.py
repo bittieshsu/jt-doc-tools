@@ -19,9 +19,9 @@ LAYOUT = HERE / "docs" / "troubleshooting.html"
 DST = HERE / "docs" / "compliance.html"
 REPO = "https://github.com/jasoncheng7115/jt-doc-tools/blob/main/"
 
-DESC = ("Jason Tools 文件工具箱的 ISO/IEC 27001 與 ISO/IEC 42001 合規支援："
+DESC = ("Jason Tools 文件工具箱的 ISO/IEC 27001:2022 與 ISO/IEC 42001:2023 合規支援："
         "本工具提供的控制功能，以及導入單位如何使用、在哪裡留下紀錄。")
-TITLE = "合規支援 ISO/IEC 27001 與 42001 | Jason Tools 文件工具箱"
+TITLE = "合規支援 ISO/IEC 27001:2022 與 42001:2023 | Jason Tools 文件工具箱"
 
 
 #: 圖示（Lucide 的線條圖示，同介紹站其他區塊的畫法）
@@ -47,19 +47,43 @@ _IC = {
     "list": '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/>'
             '<path d="M3 12h.01"/><path d="M3 18h.01"/>',
     "check": '<path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    "grid": '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/>'
+            '<path d="M9 3v18"/>',
     "clip": '<rect x="8" y="2" width="8" height="4" rx="1"/>'
             '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
 }
 
 #: 大節與小節標題的圖示（照標題文字對；新增小節時要補一個，不然測試會擋）
 HEAD_ICONS = {
-    "ISO/IEC 27001：資訊安全": "shield", "ISO/IEC 42001：人工智慧": "box", "導入時的檢查清單": "clip",
+    "ISO/IEC 27001:2022 資訊安全": "shield", "ISO/IEC 42001:2023 人工智慧": "box", "導入時的檢查清單": "clip",
     "身分認證": "lock", "帳號生命週期": "users", "存取控制與職責分離": "shield", "使用者資料隔離": "layers",
     "稽核記錄": "log", "資料留存與清除": "clock", "資料保留與清除": "clock", "機密設定的保護": "key",
     "文件處理的隔離": "box", "敏感資料處理工具": "eyeoff", "備份與復原": "db", "網頁與傳輸安全": "globe",
     "安全開發與測試": "test", "AI 功能清冊": "list", "降低 AI 產出錯誤的機制": "check",
-    "導入單位的做法": "clip",
+    "導入單位的做法": "clip", "條文與控制項對照": "grid",
+    "ISO/IEC 27001:2022 條文": "shield", "ISO/IEC 27001:2022 附錄 A 控制項": "shield",
+    "ISO/IEC 42001:2023 條文": "box", "ISO/IEC 42001:2023 附錄 A 控制項": "box",
 }
+
+#: 各節開頭的「對應條文 / 對應控制項」一行：md 寫 `**對應控制項**：A.5.16、A.8.5`，
+#: 網頁畫成一排小標籤，每一個連到「條文與控制項對照」裡那一列。
+_MAP_LINE = re.compile(r"^\*\*(對應條文|對應控制項)\*\*：(.+)$")
+#: 對照表第一欄開頭的編號（`A.5.16 身分管理`、`6.1.3、8.3 AI 風險處理`）
+_CODE = re.compile(r"^((?:A\.)?\d+(?:\.\d+)+)")
+
+
+def _std_of(title: str):
+    """標題講的是哪一份標準（`27` / `42`），都不是回 None。"""
+    if "27001" in title:
+        return "27"
+    if "42001" in title:
+        return "42"
+    return None
+
+
+def anchor(std: str, code: str) -> str:
+    """對照表那一列的 id：附錄 A 控制項是 `a27-A.5.16`、條文是 `c42-6.1.3`。"""
+    return f"{'a' if code.startswith('A.') else 'c'}{std}-{code}"
 
 #: 小節後面放的畫面截圖（介紹站既有的那幾張；英文、日文版由 build-i18n-page.py 換成該語言的截圖）
 FIGS = {
@@ -77,7 +101,7 @@ def _icon(name: str, size: int = 20) -> str:
 
 
 def _head_key(title: str) -> str:
-    """「1. 身分認證」「一、ISO/IEC 27001：資訊安全」→ 拿掉前面的編號。"""
+    """「1. 身分認證」「一、ISO/IEC 27001:2022 資訊安全」→ 拿掉前面的編號。"""
     return re.sub(r"^(?:\d+\.\s*|[一二三四五六七八九十]+、)", "", title).strip()
 
 
@@ -103,12 +127,23 @@ HERO_SVG = (
 )
 
 
+def _png_size(path: Path) -> tuple[int, int]:
+    """PNG 的寬高（讀檔頭，不需要 Pillow）。
+
+    圖片要寫明寬高，瀏覽器才會先留好位置：沒寫的話，從左側目錄跳到下面某一節時，
+    上方延遲載入的截圖載進來會把整頁往下推，停在錯的那一節。"""
+    import struct
+    with open(path, "rb") as f:
+        head = f.read(24)
+    return struct.unpack(">II", head[16:24])
+
+
 def _inline(s: str) -> str:
     s = html.escape(s, quote=False)
     s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
     s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
     # 文件裡提到的另外幾份說明連到 GitHub 上那一份
-    return re.sub(r"<code>((?:TEST_PLAN_SECURITY|OPS|CHANGELOG)\.md)</code>",
+    return re.sub(r"<code>((?:TEST_PLAN_SECURITY|OPS|CHANGELOG|LLM)\.md)</code>",
                   lambda m: f'<a href="{REPO}{m.group(1)}" target="_blank" rel="noopener">'
                             f"<code>{m.group(1)}</code></a>", s)
 
@@ -130,40 +165,59 @@ def _body(md: str) -> str:
         """上一個小節的截圖放在小節最後（表格下面）。"""
         if pending[0]:
             img, cap = pending[0]
+            w, h = _png_size(HERE / "docs" / "screenshots" / img)
             out.append(f'<figure class="cp-fig"><img src="screenshots/{img}" alt="{html.escape(cap)}" '
-                       f'loading="lazy"><figcaption>{_inline(cap)}</figcaption></figure>')
+                       f'width="{w}" height="{h}" loading="lazy"><figcaption>{_inline(cap)}</figcaption></figure>')
             pending[0] = None
 
-    i, n = 0, 0
+    i, n, m = 0, 0, 0
+    std = [None]          # 目前這一節講的是哪一份標準
+    in_map = [False]      # 是不是在「條文與控制項對照」那一大節
     while i < len(lines):
         ln = lines[i]
+        mm = _MAP_LINE.match(ln)
         if ln.startswith("# "):
             out.append(f'<h1 class="ts-h1">{_inline(ln[2:])}</h1>')
         elif ln.startswith("## "):
             close()
             flush()
-            n += 1
-            toc.append((f"cp{n}", ln[3:]))
+            n, m = n + 1, 0
+            toc.append((f"cp{n}", ln[3:], 2))
+            std[0] = _std_of(ln[3:])
+            in_map[0] = _head_key(ln[3:]) == "條文與控制項對照"
             ic = _icon(HEAD_ICONS[_head_key(ln[3:])], 24)
             out.append(f'<h2 class="cp-h2" id="cp{n}"><span class="cp-h-ic">{ic}</span>{_inline(ln[3:])}</h2>')
         elif ln.startswith("### "):
             close()
             flush()
+            m += 1
+            toc.append((f"cp{n}-{m}", ln[4:], 3))
+            if in_map[0]:
+                std[0] = _std_of(ln[4:])
             key = _head_key(ln[4:])
             ic = _icon(HEAD_ICONS[key], 18)
-            out.append(f'<h3 class="cp-h3"><span class="cp-h-ic">{ic}</span>{_inline(ln[4:])}</h3>')
+            out.append(f'<h3 class="cp-h3" id="cp{n}-{m}"><span class="cp-h-ic">{ic}</span>{_inline(ln[4:])}</h3>')
             pending[0] = FIGS.get(key)
+        elif mm:
+            close()
+            codes = [c.strip() for c in mm.group(2).split("、") if c.strip()]
+            chips = "".join(f'<a class="cp-ctl" href="#{anchor(std[0], c)}">{html.escape(c)}</a>'
+                            for c in codes)
+            out.append(f'<div class="cp-map"><span class="cp-map-k">{mm.group(1)}</span>{chips}</div>')
         elif ln.startswith("|"):
             close()
             rows = []
             while i < len(lines) and lines[i].startswith("|"):
                 rows.append([c.strip() for c in lines[i].strip().strip("|").split("|")])
                 i += 1
-            t = ['<div class="cp-table-wrap"><table class="cp-table"><thead><tr>']
+            wrap = "cp-table-wrap cp-maptab" if in_map[0] else "cp-table-wrap"
+            t = [f'<div class="{wrap}"><table class="cp-table"><thead><tr>']
             t += [f"<th>{_inline(h)}</th>" for h in rows[0]]
             t.append("</tr></thead><tbody>")
             for r in rows[2:]:
-                t.append("<tr>" + "".join(f"<td>{_inline(c)}</td>" for c in r) + "</tr>")
+                code = _CODE.match(r[0]) if in_map[0] and std[0] else None
+                rid = f' id="{anchor(std[0], code.group(1))}"' if code else ""
+                t.append(f"<tr{rid}>" + "".join(f"<td>{_inline(c)}</td>" for c in r) + "</tr>")
             t.append("</tbody></table></div>")
             out.append("".join(t))
             continue
@@ -195,7 +249,7 @@ def _body(md: str) -> str:
     # 三大節的目錄放在開頭兩段說明之後
     nav = ('<div class="ts-toc cp-toc">'
            + "".join(f'<a href="#{sid}">{_icon(HEAD_ICONS[_head_key(t)], 15)}{_inline(t)}</a>'
-                     for sid, t in toc) + "</div>")
+                     for sid, t, lv in toc if lv == 2) + "</div>")
     out.insert(out.index("</div>", out.index(HERO_SVG)) + 1, nav)
     return "\n".join(out)
 

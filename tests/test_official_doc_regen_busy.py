@@ -390,7 +390,7 @@ def live():
         cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     br = subprocess.Popen(
         [br_path, "--headless=new", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
+         browser_probe.profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     ws = None
     try:
@@ -875,6 +875,113 @@ def test_field_history_remembers_values_after_a_successful_draft(live):
     assert _eval(send, "!!document.querySelector('.fh-btn[data-fh-for=odReceiver]')")
     assert not errs, "主控台有 JS 例外：\n  " + "\n  ".join(errs)
 
+
+
+#: 發文代字的紀錄：鍵＝前綴＋發文機關（NFKC、去空白）。測試自己寫一份，不借產品的函式。
+_DW = "jtdt.od.docword."
+_DOCNO_BTN = ".fh-btn[data-fh-for=odDocNo]"
+_DOCNO_ROWS = ("Array.from(document.querySelectorAll('#odDocNo ~ .fh-panel .fh-row .fh-val'))"
+               ".map(function(x){return x.textContent;})")
+
+
+def _dismiss_modal(send):
+    """這個實例沒有機關地址簿：第一次在機關欄位打字會跳一次「地址簿還沒下載」的提醒
+    （正確行為），蓋住後面的按鈕 —— 照使用者那樣按確定。"""
+    if _until(send, "!!document.querySelector('.modal-overlay .modal-ok')", 2):
+        _eval(send, "document.querySelector('.modal-overlay .modal-ok').click(), 1")
+        assert _until(send, "!document.querySelector('.modal-overlay')", 5)
+
+
+_STARTS = "window.__fx.filter(function(u){return u.indexOf('/start') >= 0;}).length"
+
+
+def _letter_done(send):
+    """送出並等**這一次**做完。結果區上一份還開著，只看「有主旨」的話第二次送出立刻就成立
+    （變異驗證時抓到：後面幾次根本沒等到）—— 要看到這一次的送出、進行中、結束。"""
+    n = _eval(send, _STARTS)
+    _eval(send, "document.getElementById('odGo').click(), 1")
+    assert _until(send, f"{_STARTS} > {n}", 10), "沒有送出"
+    assert _until(send, "!document.getElementById('odCancel').hidden", 10), "沒有看到進行中"
+    assert _until(send, "document.getElementById('odCancel').hidden", 60)
+    assert _eval(send, "document.getElementById('odDraft').value.indexOf('主旨：') >= 0"), "函沒有產生出來"
+
+
+def test_doc_word_is_remembered_per_issuing_org_and_only_suggested(live):
+    """發文代字（2026-10-10 使用者核准）：依發文機關記住「字第」前面那段，在發文字號旁
+    當建議，**不自動填**、**不記號碼**（號碼是公文系統給的）。"""
+    from tests.test_official_doc_tool import LETTER_DRAFT, LETTER_FACTS, LETTER_NARRATIVE
+    port, send, errs, fake, ctl = live
+    _open(port, send)
+    _eval(send, "Object.keys(localStorage).forEach(function(k){"
+                "if (k.indexOf('jtdt.od.') === 0 || k.indexOf('jtdt.officialDoc') === 0) localStorage.removeItem(k);}), 1")
+    _open(port, send)
+    fake.letter_facts, fake.letter_draft = dict(LETTER_FACTS), dict(LETTER_DRAFT)
+    ctl["delay"] = 0.5          # 每次呼叫模型慢一點，「進行中」才看得到
+    _eval(send, "document.querySelector('input[name=odMode][value=letter]').click(), 1")
+    _set(send, "odLetterNarrative", LETTER_NARRATIVE)
+    _eval(send, "(function(){var s=document.getElementById('odRelation'); s.value='up';"
+                "s.dispatchEvent(new Event('change')); return 1;})()")
+    _set(send, "odOrg", "嘉禾市 資訊局")              # 中間的空白不影響是哪一個機關
+    _set(send, "odReceiver", "嘉禾市政府")
+    _set(send, "odDocNo", "嘉資字第1150000123號")
+    _letter_done(send)
+    assert _eval(send, "JSON.parse(localStorage.getItem(%s) || '[]')" % _js(_DW + "嘉禾市資訊局")) == ["嘉資字第"]
+    dump = _eval(send, "JSON.stringify(Object.keys(localStorage).map(function(k){return [k, localStorage.getItem(k)];}))")
+    assert "1150000123" not in dump, "發文字號的號碼被記在瀏覽器裡了"
+
+    # 沒有「字第」的（企業自己的編號）不記；佔位的○字第也不記
+    _set(send, "odOrg", "嘉禾市環保局")
+    for docno in ("A-2026-001", "○字第1150000001號"):
+        _set(send, "odDocNo", docno)
+        _letter_done(send)
+    assert _eval(send, "localStorage.getItem(%s)" % _js(_DW + "嘉禾市環保局")) is None
+
+    # ---- 重新開頁：不自動填；按鈕裡只有這個機關用過的 ----
+    _open(port, send)
+    _eval(send, "document.querySelector('input[name=odMode][value=letter]').click(), 1")
+    _set(send, "odOrg", "嘉禾市資訊局")
+    _dismiss_modal(send)
+    _set(send, "odDocNo", "")
+    time.sleep(0.3)
+    assert _eval(send, "document.getElementById('odDocNo').value") == "", "發文字號被自動填了"
+    _click(send, _DOCNO_BTN)
+    assert _until(send, "!document.querySelector('#odDocNo ~ .fh-panel').hidden", 5), "代字清單點不開"
+    assert _eval(send, _DOCNO_ROWS) == ["嘉資字第"]
+    _click(send, "#odDocNo ~ .fh-panel .fh-row .fh-val")
+    assert _until(send, "document.getElementById('odDocNo').value === '嘉資字第'", 5), "點了代字沒有填進去"
+
+    # 別的機關：看不到嘉禾市資訊局的，講出「還沒有用過」
+    _set(send, "odOrg", "嘉禾市環保局")
+    _click(send, _DOCNO_BTN)
+    assert _until(send, "!document.querySelector('#odDocNo ~ .fh-panel').hidden", 5)
+    assert _eval(send, _DOCNO_ROWS) == [], "別的機關看到了不是它的代字"
+    empty = _eval(send, "document.querySelector('#odDocNo ~ .fh-panel .fh-empty').textContent")
+    assert empty == _eval(send, "document.querySelector('%s').dataset.fhEmpty" % _DOCNO_BTN) and "代字" in empty
+    _key(send, "Escape", vk=27)
+    # 還沒填機關：講出要先填
+    _set(send, "odOrg", "")
+    _click(send, _DOCNO_BTN)
+    assert _until(send, "!document.querySelector('#odDocNo ~ .fh-panel').hidden", 5)
+    nokey = _eval(send, "document.querySelector('#odDocNo ~ .fh-panel .fh-empty').textContent")
+    assert nokey == _eval(send, "document.querySelector('%s').dataset.fhNokey" % _DOCNO_BTN), nokey
+    _key(send, "Escape", vk=27)
+
+    # ---- 切換成企業：「之前填過的」要讀企業那一組（按鈕的紀錄鍵是執行中才換的）----
+    _eval(send, "window.FieldHistory.push('jtdt.od.hist.odOrg', '嘉禾市資訊局'), 1")
+    _eval(send, "window.FieldHistory.push('jtdt.od.hist.odOrg.company', '範例資訊股份有限公司'), 1")
+    _eval(send, "(function(){var s=document.getElementById('odIssuer'); s.value='company';"
+                "s.dispatchEvent(new Event('change')); return 1;})()")
+    _click(send, ".fh-btn[data-fh-for=odOrg]")
+    assert _until(send, "!document.querySelector('#odOrg ~ .fh-panel').hidden", 5)
+    rows = _eval(send, "Array.from(document.querySelectorAll('#odOrg ~ .fh-panel .fh-row .fh-val'))"
+                       ".map(function(x){return x.textContent;})")
+    assert rows == ["範例資訊股份有限公司"], f"切換成企業之後清單還是機關那一組：{rows}"
+    _key(send, "Escape", vk=27)
+    _eval(send, "(function(){var s=document.getElementById('odIssuer'); s.value='agency';"
+                "s.dispatchEvent(new Event('change')); return 1;})()")
+    _eval(send, "Object.keys(localStorage).forEach(function(k){"
+                "if (k.indexOf('jtdt.od.') === 0 || k.indexOf('jtdt.officialDoc') === 0) localStorage.removeItem(k);}), 1")
+    assert not errs, "主控台有 JS 例外：\n  " + "\n  ".join(errs)
 
 _RW_KIND = "(document.querySelector('input[name=odRwKind]:checked') || {}).value"
 

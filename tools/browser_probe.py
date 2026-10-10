@@ -13,12 +13,26 @@
 Ubuntu 的 `/usr/bin/chromium-browser` **是一支 shell 包裝腳本**（不是符號連結），
 真正跑的是 snap 版。snap 版**讀不到 `/opt`，而且它看到的 `/tmp` 是它自己的**
 —— 所以要判斷 snap 只能**讀那支檔案的內容**，看路徑看不出來。
+
+## 每次啟動都要給自己的設定檔目錄（`profile_arg()`）
+
+沒給 `--user-data-dir` 時，無頭 Chromium 自己建一個暫存設定檔（snap 版放在
+`~/snap/chromium/common/chromium-headless/scoped_dir*`），**只有正常結束才會刪**。
+我們的測試一律用 `terminate()` / `kill()` 收尾 —— 實測兩種都留下來，一個約 11 MB，
+全套測試跑幾輪就是幾千個、幾十 GB（2026-10-10 同一台機器上的另一個專案查到 55 GB）。
+
+所以每次啟動都用 `profile_arg()` 給一個**我們自己的**目錄：建在 `jtdt-profiles/` 底下、
+名稱開頭是建立它的行程編號，行程結束時（`atexit`）刪掉自己建的；建立新目錄時順便刪掉
+**建立者已經不在**的舊目錄（上次被中斷沒收到尾的）。snap 自己的 `chromium-headless`
+一律不碰 —— 那裡可能有別人正在用的設定檔。
 """
 from __future__ import annotations
 
+import atexit
 import os
 import shutil
 import tempfile
+import time
 
 #: 依序試這幾個位置。
 BROWSERS = ("/usr/bin/chromium-browser", "/usr/bin/chromium",
@@ -82,9 +96,82 @@ def browser_runs(path: str | None = None, timeout: float = 45.0) -> bool:
     if b not in _RUNS:
         try:
             r = subprocess.run([b, "--headless", "--disable-gpu", "--no-sandbox",
-                                "--dump-dom", "about:blank"],
+                                profile_arg(), "--dump-dom", "about:blank"],
                                capture_output=True, text=True, timeout=timeout)
             _RUNS[b] = r.returncode == 0 and "<html" in (r.stdout or "").lower()
         except (OSError, subprocess.SubprocessError):
             _RUNS[b] = False
     return _RUNS[b]
+
+
+#: 這個行程建過的設定檔目錄（結束時刪掉）。
+_MINE: list[str] = []
+_ATEXIT = [False]
+
+
+def profile_root() -> str:
+    """放設定檔目錄的地方：snap 版要放它讀得到的位置。"""
+    if is_snap():
+        return os.path.expanduser("~/snap/chromium/common/jtdt-profiles")
+    return os.path.join(tempfile.gettempdir(), "jtdt-profiles")
+
+
+def _pid_alive(pid: int) -> bool:
+    # 不用 `os.kill(pid, 0)`：Windows 上那等於結束那個行程。
+    try:
+        import psutil
+        return psutil.pid_exists(pid)
+    except Exception:  # noqa: BLE001 — 判斷不了就當它還在（寧可不刪）
+        return True
+
+
+def sweep_stale(root: str | None = None) -> int:
+    """刪掉建立者已經不在的設定檔目錄（上一次被中斷、沒收到尾的）。"""
+    root = root or profile_root()
+    n = 0
+    try:
+        names = os.listdir(root)
+    except OSError:
+        return 0
+    for name in names:
+        head = name.split("-", 1)[0]
+        if not head.isdigit():
+            continue                        # 不是照我們的規則建的，不動
+        pid = int(head)
+        if pid == os.getpid() or _pid_alive(pid):
+            continue
+        shutil.rmtree(os.path.join(root, name), ignore_errors=True)
+        n += 1
+    return n
+
+
+def cleanup_profiles() -> None:
+    """刪掉這個行程建過的設定檔目錄（瀏覽器要先關掉）。
+
+    剛被 terminate、還沒完全結束的瀏覽器會在刪掉之後再寫幾個檔，把目錄長回來 ——
+    刪完還在就等一下再刪，最多三次。"""
+    while _MINE:
+        d = _MINE.pop()
+        for _ in range(3):
+            shutil.rmtree(d, ignore_errors=True)
+            if not os.path.exists(d):
+                break
+            time.sleep(0.5)
+
+
+def profile_dir() -> str:
+    """建一個這次啟動專用的設定檔目錄。"""
+    root = profile_root()
+    os.makedirs(root, exist_ok=True)
+    if not _ATEXIT[0]:
+        _ATEXIT[0] = True
+        sweep_stale(root)
+        atexit.register(cleanup_profiles)
+    d = tempfile.mkdtemp(prefix=f"{os.getpid()}-", dir=root)
+    _MINE.append(d)
+    return d
+
+
+def profile_arg() -> str:
+    """`--user-data-dir=<這次啟動專用的目錄>`，放進啟動瀏覽器的參數裡。"""
+    return f"--user-data-dir={profile_dir()}"

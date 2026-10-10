@@ -2,7 +2,7 @@
 
 Why: Python's pytest collection catches Python SyntaxErrors immediately, but
 HTML templates with `<script>...</script>` blocks have no such guard. v1.7.14
-慘案: an extra `}` in `pdf_editor.html` shipped to .30 / .154 → console
+慘案: an extra `}` in `pdf_editor.html` shipped to both test servers → console
 "Unexpected token 'finally'" → savePdf undefined → drag-drop dead.
 
 Approach: extract every inline `<script>` block (NOT `<script src=...>`) from

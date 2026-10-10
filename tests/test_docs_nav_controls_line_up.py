@@ -29,6 +29,7 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 from tools.browser_probe import browser as _browser  # noqa: E402
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 from tools.repo_paths import public_root  # noqa: E402
 
 pytestmark = pytest.mark.skipif(
@@ -78,7 +79,7 @@ def measure():
         cwd=str(docs), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     br = subprocess.Popen(
         [_browser(), "--headless=new", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp}", "--remote-allow-origins=*",
+         _profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*",
          "--window-size=1440,900", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     ws = None

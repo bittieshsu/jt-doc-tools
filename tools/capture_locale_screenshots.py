@@ -33,6 +33,7 @@ from tools.repo_paths import public_root as _public_root
 
 REPO = Path(__file__).resolve().parent.parent
 _sys.path.insert(0, str(REPO))
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 
 
 def _out_dir(locale: str) -> Path:
@@ -383,7 +384,7 @@ async def _capture(base: str, cdp_port: int, locale: str, only=None) -> list[str
         print("  瀏覽器是 snap 版 —— 範例檔改放到它讀得到的地方")
     proc = subprocess.Popen(
         [CHROME, "--headless", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp_port}", "--remote-allow-origins=*",
+         _profile_arg(), f"--remote-debugging-port={cdp_port}", "--remote-allow-origins=*",
          "--hide-scrollbars", f"--window-size={WIDTH},{HEIGHT}", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     done: list[str] = []
@@ -552,7 +553,13 @@ async def _capture(base: str, cdp_port: int, locale: str, only=None) -> list[str
                         print(f"        - {one}")
         return done
     finally:
+        # 等它真的結束：沒等的話瀏覽器在設定檔目錄被刪掉之後還會寫幾個檔，留下殘骸
         proc.terminate()
+        try:
+            proc.wait(timeout=15)
+        except Exception:  # noqa: BLE001
+            proc.kill()
+            proc.wait(timeout=15)
 
 
 def main() -> int:

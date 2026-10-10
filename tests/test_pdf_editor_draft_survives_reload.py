@@ -29,6 +29,7 @@ from tools.browser_probe import (  # noqa: E402
     browser as _browser,
     uploadable_dir as _uploadable_dir,
 )
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 
 sys.path.insert(0, str(ROOT))
 
@@ -137,7 +138,7 @@ def editor():
                      "--log-level", "warning"],
                     cwd=ROOT, env=env, stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
     br = _sp.Popen([br_path, "--headless=new", "--no-sandbox", "--disable-gpu",
-                    f"--remote-debugging-port={cdp}", "--remote-allow-origins=*",
+                    _profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*",
                     "about:blank"], stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
     ws = None
     try:

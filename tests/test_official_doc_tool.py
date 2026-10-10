@@ -778,23 +778,39 @@ def test_rewrite_each_kind(client, rw_case, fake_llm, kind):
     assert all(set(i) >= {"code", "severity", "template", "args", "snippet"} for i in d["issues"])
 
 
-def test_the_tool_is_marked_beta_in_the_sidebar_the_home_card_and_the_title(client, auth_off):
-    """使用者 2026-10-07 指示公文撰擬標 Beta。只有標了 `beta=True` 的工具有，別的工具不可以被一起標上。"""
+def _tools_area(home: str) -> str:
+    """首頁去掉側欄的「設定」那一組（管理頁）—— 那一組另有自己的 Beta（公文知識庫，
+    `nav_settings` 的 `beta`），不算在工具裡。"""
+    tools_only = re.sub(r'<details class="sb-group"[^>]*data-sbkey="設定".*?</details>', "", home,
+                        flags=re.S)
+    assert tools_only != home, "找不到側欄的「設定」那一組（樣板改了？）"
+    return tools_only
+
+
+def test_the_tool_is_no_longer_marked_beta(client, auth_off):
+    """2026-10-07 起標 Beta，2026-10-10 使用者指示拿掉：側欄、首頁卡片、工具頁標題都不再標。
+    （頁面上「參考公文知識庫」旁的 Beta 是知識庫的，留著。）"""
     from app.tools.official_doc import metadata
-    assert metadata.beta is True
+    assert metadata.beta is False
+    home = client.get("/").text
+    assert 'class="tool-beta"' not in _tools_area(home)
+    page = client.get(f"{BASE}/").text
+    h1 = re.search(r"<h1>(.*?)</h1>", page, re.S).group(1)
+    assert "Beta" not in h1
+
+
+def test_a_tool_marked_beta_still_shows_it_in_the_sidebar_and_on_its_card(client, auth_off, monkeypatch):
+    """標示的機制本身留著（之後別的工具試用時用得到）：只有標了 `beta=True` 的工具有，
+    別的工具不可以被一起標上。"""
+    import app.main as main_mod
+    # 側欄與首頁的工具清單是啟動時從 `ToolMetadata.beta` 算好的，這裡直接標那一列
+    item = next(t for t in main_mod._nav_tool_items if t["id"] == "official-doc")
+    monkeypatch.setitem(item, "beta", True)
     home = client.get("/").text
     for m in re.finditer(r'data-tool-id="([a-z0-9-]+)"(.*?)</a>', home, re.S):
         has = 'class="tool-beta"' in m.group(2)
         assert has == (m.group(1) == "official-doc"), m.group(1)
-    # 側欄的「設定」那一組（管理頁）另有自己的 Beta（知識庫，`nav_settings` 的 `beta`），
-    # 不算在工具裡 —— 先拿掉那一組再數
-    tools_only = re.sub(r'<details class="sb-group"[^>]*data-sbkey="設定".*?</details>', "", home,
-                        flags=re.S)
-    assert tools_only != home, "找不到側欄的「設定」那一組（樣板改了？）"
-    assert tools_only.count('class="tool-beta"') == 2, "側欄與首頁卡片各一個"
-    page = client.get(f"{BASE}/").text
-    h1 = re.search(r"<h1>(.*?)</h1>", page, re.S).group(1)
-    assert 'class="tool-beta"' in h1
+    assert _tools_area(home).count('class="tool-beta"') == 2, "側欄與首頁卡片各一個"
 
 
 def test_rewrite_endpoint_keeps_the_item_number(client, rw_case, fake_llm):
@@ -1223,7 +1239,7 @@ def live():
         cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     br = subprocess.Popen(
         [br_path, "--headless=new", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
+         browser_probe.profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     ws = None
     try:
@@ -1287,7 +1303,13 @@ def _until(send, expr, secs=60):
 
 
 def _set_file(send, selector, path):
-    # 整棵樹要抓（depth -1），而且要重試 —— 節點表可能剛好被作廢（會議摘要的 e2e 記過）
+    # 整棵樹要抓（depth -1），而且要重試 —— 節點表可能剛好被作廢（會議摘要的 e2e 記過）。
+    # 頁面要整頁載完才塞，塞完確認 input 真的拿到檔案（會議摘要 e2e 2026-10-10 查到：
+    # 太早塞的話上傳元件還沒接上，input 裡 0 個檔案、一筆上傳都沒送出）。
+    _until(send, "document.readyState === 'complete'", 30)
+    has = ("(function(){var i=document.querySelector(%s);if(!i)return false;"
+           "var r=i.closest('.file-upload'),n=r&&r.querySelector('.drop-zone-filename');"
+           "return !!((i.files&&i.files.length)||(n&&n.textContent.trim()));})()" % json.dumps(selector))
     last = None
     for _ in range(8):
         doc = send("DOM.getDocument", {"depth": -1})
@@ -1300,7 +1322,10 @@ def _set_file(send, selector, path):
         nid = node.get("result", {}).get("nodeId")
         if nid:
             send("DOM.setFileInputFiles", {"files": [path], "nodeId": nid})
-            return
+            if _until(send, has, 3):
+                return
+            last = "塞了檔案但 input 裡沒有"
+            continue
         last = node
         time.sleep(0.5)
     raise AssertionError(f"找不到 {selector}：{last}")

@@ -122,7 +122,7 @@ def test_clicking_a_user_opens_the_breakdown_in_a_browser(tmp_path):
                             "--port", str(port), "--log-level", "warning"],
                            cwd=root, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     br = subprocess.Popen([br_path, "--headless=new", "--no-sandbox", "--disable-gpu",
-                           f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
+                           browser_probe.profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(120):

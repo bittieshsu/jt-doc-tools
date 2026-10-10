@@ -36,6 +36,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 
 CJK = re.compile("[㐀-鿿]")
 
@@ -217,7 +218,7 @@ async def _scan(base: str, cdp_port: int, paths: list[str],
 
     proc = subprocess.Popen(
         ["/usr/bin/chromium-browser", "--headless", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp_port}", "--remote-allow-origins=*",
+         _profile_arg(), f"--remote-debugging-port={cdp_port}", "--remote-allow-origins=*",
          "--window-size=1440,1000", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:

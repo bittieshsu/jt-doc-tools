@@ -23,6 +23,7 @@ import urllib.request
 import pytest
 
 from tests import test_pages_boot_in_a_browser as boot
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 
 ROOT = boot.ROOT
 
@@ -55,7 +56,7 @@ def live_hidden():
         cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     br = subprocess.Popen(
         [boot._browser(), "--headless=new", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp}", "--remote-allow-origins=*",
+         _profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*",
          "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(120):

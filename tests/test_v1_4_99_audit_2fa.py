@@ -841,7 +841,7 @@ def test_admin_reset_totp_endpoint(admin_session):
 
 
 def test_admin_reset_totp_then_login_shows_qr_again(admin_session):
-    """Regression for the `Bug #6` user hit on .30: after admin resets
+    """Regression for the `Bug #6` user hit on the production server: after admin resets
     TOTP, next login should show QR (forced_setup branch)."""
     from app.core import totp, permissions
     pw = "Pass12345678"

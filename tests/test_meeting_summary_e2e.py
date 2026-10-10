@@ -29,6 +29,7 @@ from app.core import meeting_insight as mi
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from tools import browser_probe  # noqa: E402
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 
 VTT = """WEBVTT
 
@@ -132,7 +133,7 @@ def live():
         cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     br = subprocess.Popen(
         [br_path, "--headless=new", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
+         _profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     ws = None
     try:
@@ -210,6 +211,16 @@ def _set_file(send, selector, path):
     # 而它可能剛好落在 `getDocument` 與 `querySelector` 之間，
     # 症狀是 `Could not find node with given id`，**時好時壞**。
     # 看到這種「單跑會過、合跑會壞」的指紋就先懷疑共用狀態（本專案第 N 次）。
+    #
+    # **頁面要整頁載完才塞檔案**（2026-10-10 查到的偶發）：`msUp` 一出現就塞的話，
+    # 頁尾的腳本可能還沒跑 —— 上傳元件還沒接上 `change`，或那個 input 之後被換掉，
+    # 結果 input 裡 0 個檔案、伺服器一筆上傳都沒收到，測試等 40 秒判「解析結果沒出現」。
+    # 所以先等 `readyState` 是 complete，塞完再確認 input 真的拿到檔案，沒有就重塞。
+    _wait(send, "document.readyState === 'complete'", 30)
+    # 上傳元件拿到檔案會把檔名寫進 `.drop-zone-filename` —— 兩個都看，元件清空 input 也不會被當成沒塞進去而重送
+    has = ("(function(){var i=document.querySelector(%s);if(!i)return false;"
+           "var r=i.closest('.file-upload'),n=r&&r.querySelector('.drop-zone-filename');"
+           "return !!((i.files&&i.files.length)||(n&&n.textContent.trim()));})()" % json.dumps(selector))
     last = None
     for _ in range(8):
         doc = send("DOM.getDocument", {"depth": -1})
@@ -222,7 +233,10 @@ def _set_file(send, selector, path):
         nid = node.get("result", {}).get("nodeId")
         if nid:
             send("DOM.setFileInputFiles", {"files": [path], "nodeId": nid})
-            return
+            if _wait(send, has, 3):
+                return
+            last = "塞了檔案但 input 裡沒有"
+            continue
         last = node
         time.sleep(0.5)
     raise AssertionError(f"找不到 {selector}：{last}")

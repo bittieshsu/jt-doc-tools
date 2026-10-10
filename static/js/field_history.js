@@ -15,6 +15,12 @@
 // `.od-f > input.field` 找輸入框的，包一層就量不到了。所以按鈕用絕對定位疊上去，
 // 位置照輸入框實際的位置算（標題折成兩行、模式切換才顯示，都會重算）。
 //
+// **紀錄鍵每次用的時候才讀**（`keyOf`），不在接上時記下來：頁面會在執行中換鍵（公文撰擬
+// 切換成企業時，公司名稱跟機關全銜分開記）—— 接上時記下來的話，清單一直讀舊的那一組。
+// 鍵也可以跟著另一格走：`data-fh-key-from="odOrg"` ＋ `data-fh-key-prefix="…"`＝前綴＋那一格的值
+// （NFKC、去空白）；那一格空著就沒有鍵，清單顯示 `data-fh-nokey` 的說明。
+// `data-fh-empty` 換掉「還沒有填過的紀錄」（說明文字由樣板寫、走 tr()）。
+//
 // 紀錄存在**這個瀏覽器**（localStorage，只是個人方便）—— 讀寫失敗（無痕、被擋、被清掉）
 // 一律當成沒有紀錄，頁面照常。**什麼時候存由頁面決定**（`FieldHistory.push`）：
 // 公文撰擬是「草稿產生成功之後」才存，打錯又沒送出的字不會被記住。
@@ -58,14 +64,28 @@
     write(key, read(key).filter(function (x) { return x !== value; }));
   }
 
+  // ---------------------------------------------------------------- 紀錄鍵
+
+  function keyOf(btn) {
+    if (!btn) return '';
+    var from = btn.dataset.fhKeyFrom;
+    if (from) {
+      var src = document.getElementById(from);
+      var v = src ? String(src.value || '') : '';
+      if (v.normalize) v = v.normalize('NFKC');
+      v = v.replace(/\s+/g, '');
+      return v ? (btn.dataset.fhKeyPrefix || '') + v : '';
+    }
+    return btn.dataset.fhKey || '';
+  }
+
   // ---------------------------------------------------------------- 一顆按鈕
 
   function attach(btn) {
     if (!btn || btn.dataset.fhMounted) return;
     var input = document.getElementById(btn.dataset.fhFor || '');
-    var key = btn.dataset.fhKey || '';
     var host = btn.parentNode;
-    if (!input || !key || !host) return;
+    if (!input || !host) return;
     btn.dataset.fhMounted = '1';
     host.classList.add('fh-host');
     input.classList.add('fh-input');
@@ -101,12 +121,14 @@
     function rows() { return Array.prototype.slice.call(panel.querySelectorAll('.fh-row')); }
 
     function render(focusIdx) {
-      var list = read(key);
+      var key = keyOf(btn);
+      var list = key ? read(key) : [];
       panel.replaceChildren();
       if (!list.length) {
         var empty = document.createElement('div');
         empty.className = 'fh-empty';
-        empty.textContent = tr('還沒有填過的紀錄');
+        empty.textContent = (!key && btn.dataset.fhNokey) || btn.dataset.fhEmpty
+                            || tr('還沒有填過的紀錄');
         panel.appendChild(empty);
       }
       list.forEach(function (v) {
@@ -171,7 +193,8 @@
       btn.classList.remove('open');
       if (open === api) open = null;
     }
-    var api = { close: close, open: openPanel, render: render, input: input, key: key };
+    var api = { close: close, open: openPanel, render: render, input: input,
+                key: function () { return keyOf(btn); } };
 
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -192,7 +215,7 @@
       } else if (e.key === 'Enter' && i >= 0) { e.preventDefault(); pick(rs[i].dataset.value); }
       else if (e.key === 'Delete' && i >= 0) {
         e.preventDefault();
-        remove(key, rs[i].dataset.value);
+        remove(keyOf(btn), rs[i].dataset.value);
         render(i);
       } else if (e.key === 'Tab') close();
     });
@@ -208,7 +231,7 @@
   document.addEventListener('click', function () { if (open) open.close(); });
 
   window.FieldHistory = { attach: attach, attachAll: attachAll, push: push, list: read,
-                          remove: remove, MAX_ITEMS: MAX_ITEMS, MAX_LEN: MAX_LEN };
+                          remove: remove, keyOf: keyOf, MAX_ITEMS: MAX_ITEMS, MAX_LEN: MAX_LEN };
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () { attachAll(); });
   } else {

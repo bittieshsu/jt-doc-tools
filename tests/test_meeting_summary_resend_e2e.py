@@ -27,6 +27,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from tools import browser_probe  # noqa: E402
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 
 pytestmark = pytest.mark.skipif(
     browser_probe.browser() is None
@@ -91,7 +92,7 @@ def live():
         cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     br = subprocess.Popen(
         [browser_probe.browser(), "--headless=new", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
+         _profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     ws = None
     try:

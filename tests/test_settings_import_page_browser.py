@@ -21,6 +21,7 @@ import pytest
 
 from tests.test_kb_embedding_settings_location import _Tab, _free_port, _needs_browser
 from tools import browser_probe
+from tools.browser_probe import profile_arg as _profile_arg  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -36,7 +37,7 @@ def live():
         cwd=str(ROOT), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     br = subprocess.Popen(
         [browser_probe.browser(), "--headless=new", "--no-sandbox", "--disable-gpu",
-         f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
+         _profile_arg(), f"--remote-debugging-port={cdp}", "--remote-allow-origins=*", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(120):

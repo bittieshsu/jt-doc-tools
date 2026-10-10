@@ -18,6 +18,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 NAMES_FILE = REPO / "docs-share" / "private-names.txt"
+#: 內部主機代號（IP 最後一段、機器名稱）。跟名單分開放：名單 JTLW 的推送前檢查也讀，
+#: 他們的文件會寫他們自己機器的代號。這一份只有我們讀。
+HOSTS_FILE = REPO / "docs-share" / "private-hosts.txt"
 
 #: 開發樹裡會被 `sync-to-github.sh` 同步出去的部分（跟它的 ITEMS 對齊）＋ 公開樹自己的檔案
 DEFAULT_ROOTS = ("app", "static", "tests", "tools", "scripts",
@@ -37,6 +40,21 @@ def load_patterns(path: Path = NAMES_FILE) -> list[re.Pattern]:
         if s and not s.startswith("#"):
             out.append(re.compile(s))
     return out
+
+
+def load_host_patterns(path: Path = HOSTS_FILE) -> list[re.Pattern]:
+    """內部主機代號的式子（格式跟名單一樣）。"""
+    return load_patterns(path)
+
+
+def host_samples(path: Path = HOSTS_FILE) -> list[str]:
+    """主機代號那份檔案裡的測試樣本（`#sample: ` 開頭的註解行）。樣本放在私有檔案裡，
+    公開的測試才不必寫出任何代號。"""
+    if not path.is_file():
+        return []
+    return [line.strip()[len("#sample:"):].strip()
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip().startswith("#sample:")]
 
 
 def iter_files(roots):
@@ -72,7 +90,7 @@ def scan(roots, patterns) -> list[tuple[Path, int]]:
 
 
 def main(argv: list[str]) -> int:
-    patterns = load_patterns()
+    patterns = load_patterns() + load_host_patterns()
     if not patterns:
         print("（沒有名單，略過）")
         return 0
@@ -85,7 +103,8 @@ def main(argv: list[str]) -> int:
             shown = f.as_posix()
         print(f"{shown}:{no}")
     if hits:
-        print(f"✗ {len(hits)} 行有名單上的字（客戶名稱、人名或真實會議裡的詞），不可以公開", file=sys.stderr)
+        print(f"✗ {len(hits)} 行有名單上的字（客戶名稱、人名、真實會議裡的詞或內部主機代號），不可以公開",
+              file=sys.stderr)
         return 1
     print(f"✓ 名單上 {len(patterns)} 個字，要公開的檔案裡都沒有")
     return 0

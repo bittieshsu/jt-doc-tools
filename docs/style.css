@@ -83,6 +83,7 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 24px;            /* 品牌與導覽列至少隔這麼多，不然塞不下時會貼在一起 */
   height: 64px;
 }
 .brand {
@@ -109,8 +110,10 @@ code {
               white-space: nowrap; }
 .brand-sub  { font-size: 11px; color: var(--muted); line-height: 1.25;
               white-space: nowrap; }
+/* 項目之間 20px：28px 時九個連結＋語言＋GitHub 光間距就 280px，加了「合規」之後
+   英文與日文在容器最寬（1180px）時也塞不下（2026-10-10 量過）。 */
 .topnav {
-  display: flex; gap: 28px; align-items: center;
+  display: flex; gap: 20px; align-items: center;
 }
 .topnav a {
   color: var(--text-2); font-size: 14px; font-weight: 500;
@@ -1191,8 +1194,12 @@ code {
    加上品牌區最窄 126px 與 28px 間距 —— 英文在 1060px 就塞不下、1100px 還放得下。
    取 **1080px**：三種語言在那之上都是一整排，之下一律收成漢堡選單。
    加語言或改導覽項目時要重量一次（原本寫 980px 是照中文長度定的，
-   加了英文 / 日文之後整條導覽會折行、標題斷在詞中間）。 */
-@media (max-width: 1080px) {
+   加了英文 / 日文之後整條導覽會折行、標題斷在詞中間）。
+   **2026-10-10 加了「合規」重量**：項目間距 28 → 20px 之後，英文導覽列 955px、
+   日文 879px、中文 781px；英文在視窗 1186px（含捲軸）才放得下且跟品牌隔 24px
+   —— 取 **1200px**，留一點給其他作業系統的字寬。
+   檢查 `tests/test_docs_nav_fits.py`（切換點上下各量一次）。 */
+@media (max-width: 1200px) {
   /* 漢堡選單裡語言下拉與 GitHub 按鈕共用的高度 —— 只有一份，兩個跟著同一個數字走 */
   :root { --menu-ctl-h: 42px; }
   .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
@@ -1843,6 +1850,17 @@ code {
 
 /* ---- 合規支援頁（compliance.html，由 build-compliance-page.py 從 COMPLIANCE.md 產生） ---- */
 .cp-main { max-width: 980px; }
+.cp-main [id] { scroll-margin-top: 84px; }
+/* 各節的「對應條文 / 對應控制項」：一排小標籤，點了跳到對照表那一列 */
+.cp-map { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 13px; }
+.cp-map-k { color: var(--muted); font-weight: 600; margin-right: 2px; }
+.cp-ctl { display: inline-block; padding: 1px 9px; border-radius: 999px; border: 1px solid #c7d2fe;
+          background: #eef2ff; color: #3730a3; font-size: 12.5px; line-height: 1.6; text-decoration: none;
+          font-variant-numeric: tabular-nums; }
+.cp-ctl:hover { background: #e0e7ff; border-color: #6366f1; text-decoration: none; }
+.cp-maptab .cp-table td:first-child { width: 27%; }
+.cp-maptab .cp-table td:last-child { width: 22%; color: #475569; }
+.cp-maptab tr:target td { background: #fef9c3; }
 .cp-p { color: #334155; line-height: 1.85; margin: 0 0 12px; }
 .cp-h2 { font-size: 22px; margin: 34px 0 6px; padding-top: 18px; border-top: 1px solid #e2e8f0;
          scroll-margin-top: 80px; color: #0f172a; }
@@ -1865,7 +1883,8 @@ code {
 .cp-cta h3 { margin: 0 0 4px; font-size: 17px; color: #312e81; }
 .cp-cta p { margin: 0; color: #3730a3; font-size: 14px; line-height: 1.7; }
 @media (max-width: 640px) {
-  .cp-table td:first-child { width: auto; }
+  .cp-table td:first-child,
+  .cp-maptab .cp-table td:first-child, .cp-maptab .cp-table td:last-child { width: auto; }
   .cp-cta .btn { width: 100%; justify-content: center; }
 }
 .cp-hero { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 12px 32px; align-items: center;

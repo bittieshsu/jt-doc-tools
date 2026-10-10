@@ -8,7 +8,7 @@
 時間戳 / 動態內容太吵，所以本工具的主檢查是「可見互動元素清單」比對 + 關鍵
 狀態斷言，截圖僅供人工對照。
 
-需要：一個 headless chromium（dev1：chromium-browser）+ 一個 auth-off 的
+需要：一個 headless chromium（開發機：chromium-browser）+ 一個 auth-off 的
 本機實例（見 TEST_PLAN.md §1.8），且該實例工作區內要有一個 PDF 供 pdf-editor
 狀態檢查（腳本會自動注入）。
 
