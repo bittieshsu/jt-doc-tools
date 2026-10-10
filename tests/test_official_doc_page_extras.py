@@ -182,7 +182,7 @@ def _export(client, cid, fmt, **kw):
 
 def test_bad_extras_are_a_400(client, letter_case):
     r = _export(client, letter_case, "odt", extras={"copy_mark": "影本"})
-    assert r.status_code == 400 and "正本／副本標示" in r.text
+    assert r.status_code == 400 and "正本/副本標示" in r.text
 
 
 def test_letter_export_carries_the_extras(client, letter_case):
@@ -253,3 +253,105 @@ def test_preview_cache_key_includes_the_extras(client, letter_case, monkeypatch)
         h.append(r.json()["hash"])
     assert h[0] != h[1] and h[1] == h[2]
     assert len(calls) == 2 and calls[1].page_numbers
+
+
+# ------------------------------------------------------------------ 套範本時加註的字型
+
+def _official_shape_tpl(with_fonts: bool = True) -> bytes:
+    """照官方「簽」範本的形狀：styles.xml 只有一個沒寫字型的預設樣式、沒有字型宣告；
+    字型宣告與「標楷體」都寫在 content.xml 每一段的自動樣式上。"""
+    from tests.test_official_doc_template import _DECL
+    tp = ('<style:text-properties style:font-name="標楷體" style:font-name-asian="標楷體" fo:font-size="16pt"/>'
+          if with_fonts else '<style:text-properties fo:font-size="16pt"/>')
+    faces = ('<office:font-face-decls><style:font-face style:name="標楷體" svg:font-family="標楷體" '
+             'style:font-family-generic="script"/><style:font-face style:name="Times New Roman" '
+             'svg:font-family="\'Times New Roman\'" style:font-family-generic="roman"/></office:font-face-decls>'
+             if with_fonts else "")
+    body = "".join(f'<text:p text:style-name="P1">{t}</text:p>' for t in
+                   ("主旨：範例主旨，簽請　核示。", "說明：", "一、範例說明。", "擬辦：", "一、範例擬辦。"))
+    content = (f'<?xml version="1.0" encoding="UTF-8"?><office:document-content {_DECL} office:version="1.3">'
+               f'{faces}<office:automatic-styles><style:style style:name="P1" style:family="paragraph">'
+               f'{tp}</style:style></office:automatic-styles>'
+               f'<office:body><office:text>{body}</office:text></office:body></office:document-content>')
+    styles = (f'<?xml version="1.0" encoding="UTF-8"?><office:document-styles {_DECL} office:version="1.3">'
+              '<office:styles><style:default-style style:family="paragraph">'
+              '<style:text-properties style:language-asian="zh"/></style:default-style></office:styles>'
+              '<office:automatic-styles><style:page-layout style:name="Mpm1">'
+              '<style:page-layout-properties fo:page-width="21.00cm" fo:page-height="29.70cm" '
+              'fo:margin-top="2.00cm" fo:margin-bottom="2.00cm" fo:margin-left="2.50cm" '
+              'fo:margin-right="2.21cm"/></style:page-layout></office:automatic-styles>'
+              '<office:master-styles><style:master-page style:name="Standard" '
+              'style:page-layout-name="Mpm1"/></office:master-styles></office:document-styles>')
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr(zipfile.ZipInfo("mimetype"), "application/vnd.oasis.opendocument.text",
+                   compress_type=zipfile.ZIP_STORED)
+        z.writestr("content.xml", content)
+        z.writestr("styles.xml", styles)
+        z.writestr("META-INF/manifest.xml",
+                   '<?xml version="1.0" encoding="UTF-8"?><manifest:manifest '
+                   'xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"/>')
+    return buf.getvalue()
+
+
+_SIGN = od.assemble_sign({"subject": "辦理測試一案", "explanation": ["測試說明。"],
+                          "proposal": ["擬請同意。"]}, unit="資訊室")
+_SIGN_EXTRAS = {"page_numbers": True, "binding_line": True}
+
+
+def _styles_of(data: bytes, names):
+    from lxml import etree
+    S = "urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+    root = etree.fromstring(zipfile.ZipFile(io.BytesIO(data)).read("styles.xml"))
+    out = {}
+    for st in root.iter("{%s}style" % S):
+        if st.get("{%s}name" % S) in names:
+            tp = st.find("{%s}text-properties" % S)
+            out[st.get("{%s}name" % S)] = (None if tp is None else
+                                          (tp.get("{%s}font-name" % S), tp.get("{%s}font-name-asian" % S)))
+    faces = [ff.get("{%s}name" % S) for ff in root.iter("{%s}font-face" % S)]
+    order = [el.tag.split("}")[1] for el in root]
+    return out, faces, order
+
+
+def test_template_extras_use_the_body_font_not_the_office_default():
+    """官方範本的預設樣式沒有字型：「草稿」、裝訂線的字、頁碼原本跟著預設樣式走，轉 PDF 時退到
+    Office 自己的黑體，跟本文的楷體不一樣（2026-10-09 使用者截圖）。要跟本文用同一個字型，
+    而且 styles.xml 自己要宣告那個字型（範本只在 content.xml 宣告）。"""
+    data = odx.build_from_template(_SIGN, _official_shape_tpl(), draft_mark=True,
+                                   extras=odx.page_extras(_SIGN_EXTRAS))
+    st, faces, order = _styles_of(data, {"OD_TplHeader", "OD_BindChar", "OD_Footer"})
+    assert set(st) == {"OD_TplHeader", "OD_BindChar", "OD_Footer"}, st
+    for name, fonts in st.items():
+        assert fonts == ("標楷體", "標楷體"), (name, fonts)
+    assert "標楷體" in faces, faces
+    assert order.index("font-face-decls") < order.index("styles"), order
+    # 範本本文沒寫字型時照舊：不寫字型名稱、也不憑空宣告
+    plain = odx.build_from_template(_SIGN, _official_shape_tpl(with_fonts=False), draft_mark=True,
+                                    extras=odx.page_extras(_SIGN_EXTRAS))
+    st2, faces2, _ = _styles_of(plain, {"OD_TplHeader", "OD_BindChar"})
+    assert all(v == (None, None) for v in st2.values()), st2
+    assert "標楷體" not in faces2
+
+
+def test_template_extras_render_in_the_body_font():
+    """算圖確認：「草稿」「裝」「訂」「線」與頁碼的字型跟主旨那一行一樣。"""
+    _soffice_or_skip()
+    import fitz
+    from app.core import office_convert
+    import tempfile
+    from pathlib import Path
+    font = odx.pick_font(odx.PDF_FONT)
+    data = odx.build_from_template(_SIGN, _official_shape_tpl(), draft_mark=True, font_family=font,
+                                   extras=odx.page_extras(_SIGN_EXTRAS))
+    with tempfile.TemporaryDirectory() as td:
+        src, dst = Path(td) / "s.odt", Path(td) / "s.pdf"
+        src.write_bytes(data)
+        office_convert.convert_to_pdf(src, dst)
+        d = fitz.open(dst)
+        spans = [s for b in d[0].get_text("dict")["blocks"] for l in b.get("lines", []) for s in l["spans"]]
+    body = next(s["font"] for s in spans if s["text"].startswith("主旨"))
+    marks = {s["text"].strip(): s["font"] for s in spans
+             if s["text"].strip() in ("草稿", "裝", "訂", "線") or "頁" in s["text"]}
+    assert {"草稿", "裝", "訂", "線"} <= set(marks), marks
+    assert all(f == body for f in marks.values()), f"本文是 {body}，加註是 {marks}"

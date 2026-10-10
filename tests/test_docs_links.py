@@ -198,3 +198,33 @@ def test_compose_builds_from_source_not_a_nonexistent_image():
     bad = re.findall(r"^\s*image:\s*(jt-doc-tools:(?!local)\S+)", text, re.MULTILINE)
     assert not bad, (f"compose 引用了不存在的映像 {bad} —— 本專案不發佈預建映像，"
                      "請改成 image: jt-doc-tools:local 並保留 build:")
+
+
+def _all_site_pages() -> list[Path]:
+    return sorted((PUB / "docs").glob("*.html"))
+
+
+def test_the_scan_reaches_every_site_page():
+    """先證明下面那條真的掃得到東西 —— 掃 0 頁跟掃過都乾淨長得一樣。"""
+    names = {p.name for p in _all_site_pages()}
+    for must in ("index.html", "api.html", "troubleshooting.html",
+                 "compliance.html", "index-en.html", "index-ja.html"):
+        assert must in names, f"介紹站少了 {must}，或路徑解析錯了"
+
+
+@pytest.mark.parametrize("doc", _all_site_pages(), ids=lambda p: p.name)
+def test_external_links_have_a_real_host(doc: Path):
+    """對外連結的主機名稱要是真的網域，不可以是佔位字。
+
+    頁尾作者連結從 v1.9.102 起寫成 `https://[網址]`（每一頁、三種語言都是），
+    點下去是壞連結，而既有檢查只看 repo 內的檔案與站內錨點，看不到這一類。
+    """
+    bad = []
+    for href in _hrefs(doc.read_text(encoding="utf-8")):
+        m = re.match(r"https?://([^/?#]*)", href)
+        if not m:
+            continue
+        host = m.group(1)
+        if not re.fullmatch(r"[A-Za-z0-9.-]+(:\d+)?", host) or "." not in host:
+            bad.append(href)
+    assert not bad, f"{doc.name} 有主機名稱不像網域的連結：{sorted(set(bad))}"

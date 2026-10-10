@@ -40,7 +40,8 @@ def org_data(monkeypatch):
     monkeypatch.setattr(ods, "attribution",
                         lambda kind=None: [f"國家發展委員會檔案管理局「{kind}」（示範出處）。"])
     monkeypatch.setattr(ods, "search_orgs",
-                        lambda q, limit=20: [{"orgId": "A15000000E", "orgName": "嘉禾市政府"}])
+                        lambda q, limit=20: [{"orgId": "A15000000E", "orgName": "嘉禾市政府",
+                                              "nameMarks": [[0, 2]], "idMarks": []}])
     return state
 
 
@@ -87,7 +88,9 @@ def test_only_templates_that_fill_correctly_are_offered(client, auth_off, org_da
 def test_attribution_is_shown_next_to_the_data(client, auth_off, org_data):
     html = client.get(f"{BASE}/").text
     assert "示範出處" in html, "政府資料開放授權條款要求標示出處"
-    assert 'id="odOrgList"' in html and 'list="odOrgList"' in html
+    # 機關名稱改由本站樣式的清單挑（v1.16.68，`static/js/org_picker.js`）；原生 datalist 拿掉了
+    assert 'data-org-pick="single"' in html and '/static/js/org_picker.js' in html
+    assert 'id="odOrgList"' not in html
 
 
 def test_a_broken_sources_module_does_not_break_the_page(client, auth_off, monkeypatch):
@@ -157,11 +160,14 @@ def test_template_is_ignored_for_text_exports(client, case_id, org_data, fake_ex
 def test_orgs_suggestions(client, auth_off, org_data):
     r = client.get(f"{BASE}/orgs", params={"q": "嘉禾"})
     assert r.status_code == 200
-    assert r.json() == {"orgs": [{"name": "嘉禾市政府", "id": "A15000000E"}]}
+    # `exact`：名稱完全相同而且只有一筆時的代碼（v1.16.68）；這裡查的是名稱的一部分，所以是空的
+    # `marks`：符合處的字元位置（畫面標亮用），照伺服器比對的結果原樣帶過去
+    assert r.json() == {"orgs": [{"name": "嘉禾市政府", "id": "A15000000E", "marks": [[0, 2]]}],
+                        "exact": ""}
 
 
 def test_orgs_empty_query_and_too_long(client, auth_off, org_data):
-    assert client.get(f"{BASE}/orgs", params={"q": "  "}).json() == {"orgs": []}
+    assert client.get(f"{BASE}/orgs", params={"q": "  "}).json() == {"orgs": [], "exact": ""}
     assert client.get(f"{BASE}/orgs", params={"q": "字" * 60}).status_code == 400
 
 
@@ -170,7 +176,7 @@ def test_orgs_failure_is_just_no_suggestion(client, auth_off, monkeypatch):
         raise OSError("地址簿壞掉")
     monkeypatch.setattr(ods, "search_orgs", boom)
     r = client.get(f"{BASE}/orgs", params={"q": "嘉禾"})
-    assert r.status_code == 200 and r.json() == {"orgs": []}
+    assert r.status_code == 200 and r.json() == {"orgs": [], "exact": ""}
 
 
 def test_real_attribution_text_names_the_licence():

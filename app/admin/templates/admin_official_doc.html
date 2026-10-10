@@ -11,11 +11,13 @@
   .od-say.ok { color: var(--success); }
   .od-say.err { color: #b91c1c; }
   /* ===== 資料來源：一個來源一張卡片 =====
-     原本是一張六欄的表（名稱／網址／最後下載／狀態／啟用／動作），每一列底下再接
-     一列整寬的出處 —— 網址框被擠到只剩半截、時間底下多一個孤零零的「下載」、
-     三顆按鈕疊成參差的一柱（2026-10-08 使用者截圖回報版面仍然雜亂）。
-     改成卡片：標題列（名稱＋標籤｜啟用）→ 狀態一行 → 網址整寬 → 範本清單 →
-     頁腳（顯名小字｜一排按鈕）。
+     第三版（2026-10-09 使用者截圖：「這區看起來還是有點雜亂」）。前一版每張卡片同時攤開
+     兩個標籤、一整條百分比編碼的長網址、兩行顯名文字與三顆不同顏色的按鈕，眼睛沒有落點。
+     現在每張卡片只留三層：
+       1. 標題：類型圖示＋名稱，名稱下一行小字寫類型與「內建」，右邊「啟用」開關；
+       2. 狀態與主要動作同一列：狀態點＋數量＋最後下載時間｜「更新」「上傳檔案」；
+       3. 收起來的「列出範本」與「來源設定」（下載網址、刪除）；最後一行出處小字。
+     下載失敗時「來源設定」自動打開（多半要改網址）。「新增來源」「還原預設」移到卡片下面。
      **外層仍是 table 與 tr[data-sid]**：別支測試用 `#odRows > tr[data-sid]` 找來源，
      所以只把表格元素改成 display:block，role=presentation 拿掉表格語意。
      寬窄看的是卡片自己的寬度（container query），不是視窗 —— 側欄收合會差兩百多像素。 */
@@ -23,21 +25,23 @@
   .od-cards > tbody { display: flex; flex-direction: column; gap: 12px; }
   .od-card, .od-card > td { display: block; }
   .od-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
-  .od-card > td { padding: 14px 16px 12px; container: odcard / inline-size; }
+  .od-card > td { padding: 14px 18px; container: odcard / inline-size; }
   .od-card.is-off { background: #f8fafc; }
   .od-card.is-off .od-src-name { color: var(--muted); }
+  .od-card.is-off .od-card-icon { background: #f1f5f9; color: #94a3b8; }
 
-  .od-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 16px; }
-  .od-card-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
-  .od-src-name { font-weight: 600; font-size: 15px; color: #0f172a; overflow-wrap: anywhere; text-wrap: balance; }
-  .od-badges { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; }
-  .od-badge { display: inline-block; padding: 1px 7px; border-radius: 4px;
-    font-size: 11px; font-weight: 600; line-height: 1.6; background: #eef2ff; color: #3730a3; white-space: nowrap; }
-  .od-badge.od-kind { background: #f1f5f9; color: #475569; }
+  .od-card-head { display: flex; align-items: center; gap: 12px; }
+  .od-card-icon { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center; background: #eef2ff; color: #4338ca; }
+  .od-card-title { flex: 1 1 auto; min-width: 0; }
+  .od-src-name { display: block; font-weight: 600; font-size: 15px; color: #0f172a;
+    overflow-wrap: anywhere; text-wrap: balance; }
+  .od-src-sub { display: block; margin-top: 1px; font-size: 12.5px; color: var(--muted); }
+  .od-src-sub a { color: var(--primary); white-space: nowrap; }
 
   /* 啟用：同一個 checkbox（data-act="toggle" 的掛勾不變），畫成開關。 */
   .od-switch { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; cursor: pointer;
-    font-size: 13px; font-weight: 600; color: #334155; user-select: none; padding-top: 1px; }
+    font-size: 13px; font-weight: 600; color: #334155; user-select: none; }
   .od-switch input { appearance: none; -webkit-appearance: none; margin: 0; flex: 0 0 auto;
     position: relative; width: 34px; height: 20px; border-radius: 999px; background: #cbd5e1;
     cursor: pointer; transition: background-color .15s; }
@@ -47,59 +51,74 @@
   .od-switch input:checked::before { transform: translateX(14px); }
   .od-switch input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-  /* 狀態一行：「成功 · 88 份範本 · 略過 1 個檔案 · 最後下載：…」。分隔點是 CSS 畫的。 */
-  .od-meta { margin-top: 6px; font-size: 13px; color: #475569; }
+  /* 標題以下的內容對齊名稱（讓開左邊的圖示）。 */
+  .od-card-body { margin-left: 46px; }
+
+  /* 狀態與主要動作同一列：左邊狀態（點的顏色就是結果），右邊兩顆按鈕。 */
+  .od-card-main { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px;
+    margin-top: 10px; }
+  .od-meta { min-width: 0; font-size: 13px; color: #475569; }
   .od-meta-line { display: flex; flex-wrap: wrap; align-items: baseline; row-gap: 2px; }
   .od-meta-line > * + *::before { content: "·"; margin: 0 8px; color: #94a3b8; }
-  .od-status-main { white-space: nowrap; font-variant-numeric: tabular-nums; color: #334155; }
+  .od-status-main { white-space: nowrap; font-variant-numeric: tabular-nums; color: #334155;
+    display: inline-flex; align-items: center; }
+  .od-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; background: #cbd5e1; }
+  .od-dot.ok { background: #16a34a; }
+  .od-dot.err { background: #dc2626; }
   .od-status-skip { white-space: nowrap; color: #92400e; }
   .od-when { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
-  .od-ok { color: #166534; font-weight: 600; }
   .od-err { color: #b91c1c; font-weight: 600; }
   .od-none { color: var(--muted); }
   .od-run { color: #1d4ed8; display: inline-flex; align-items: center; gap: 6px; }
   .od-msg { font-size: 12.5px; line-height: 1.5; margin-top: 3px; color: #475569; }
   .od-msg.od-msg-err { color: #991b1b; }
+  .od-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: 0 0 auto; }
+  .od-actions .btn { white-space: nowrap; justify-content: center; }
 
-  /* 網址：整張卡片寬；標籤在左、改過才出現「儲存網址」。 */
-  .od-url-row { display: flex; align-items: center; gap: 6px 10px; margin-top: 12px; }
+  /* 收起來的兩項並排；打開的那一項佔整列。 */
+  .od-more { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 2px 20px; margin-top: 8px; }
+  .od-more > details[open] { flex-basis: 100%; }
+  .od-more summary { cursor: pointer; font-size: 12.5px; color: #475569; padding: 2px 0;
+    width: max-content; max-width: 100%; }
+  .od-cfg-body { margin-top: 6px; padding: 12px; border: 1px solid #e5e9f0; border-radius: 8px; background: #f8fafc; }
+
+  /* 網址：標籤在左、改過才出現「儲存網址」。 */
+  .od-url-row { display: flex; align-items: center; gap: 6px 10px; }
   .od-url-label { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: #374151; }
   .auth-form .od-url-row input.field.od-url-input { flex: 1 1 auto; width: auto; min-width: 0;
     height: 32px; font-size: 13px; }
   .od-url-save { flex: 0 0 auto; white-space: nowrap; }
-
-  .od-details { margin-top: 8px; }
-  .od-details summary { cursor: pointer; font-size: 12.5px; color: #475569; padding: 2px 0; width: max-content; max-width: 100%; }
-
-  /* 頁腳：左邊顯名小字（授權條款要求的出處），右邊一排同高的按鈕。 */
-  .od-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px 20px;
-    margin-top: 12px; padding-top: 10px; border-top: 1px solid #eef2f7; }
-  .od-prov { margin: 0; flex: 1 1 auto; min-width: 0; font-size: 11.5px; color: #64748b;
-    line-height: 1.6; overflow-wrap: anywhere; }
-  .od-prov-link { color: var(--primary); white-space: nowrap; }
-  .od-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: 0 0 auto; }
-  .od-actions .btn { white-space: nowrap; justify-content: center; }
+  .od-cfg-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 10px; }
+  .od-cfg-note { font-size: 12px; color: var(--muted); }
   /* 刪除：低調的紅框，不是一整塊紅（按錯的代價大，但不需要搶眼）。 */
-  .od-actions .btn.od-del { background: transparent; color: var(--danger); border-color: #fecaca; }
-  .od-actions .btn.od-del:hover { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+  .btn.od-del { background: transparent; color: var(--danger); border-color: #fecaca; white-space: nowrap; }
+  .btn.od-del:hover { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
 
-  /* 卡片窄了（手機、或側欄打開的小視窗）：狀態一項一行、網址標籤在上、
-     頁腳上下疊，按鈕平分整列。 */
+  /* 出處（授權條款要求的顯名）：最後一行小字。 */
+  .od-prov { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid #eef2f7; font-size: 11.5px;
+    color: #64748b; line-height: 1.6; overflow-wrap: anywhere; }
+
+  .od-src-tools { margin: 14px 0 0; }
+
+  /* 卡片窄了（手機、或側欄打開的小視窗）：內容不再讓開圖示、狀態一項一行、
+     按鈕在狀態下面平分整列、網址標籤在上。 */
   @container odcard (max-width: 560px) {
-    /* 標題列：名稱與開關同一行，標籤整列放在下面（不跟開關搶寬度）。 */
-    .od-card-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: start; }
+    /* 標題：圖示拿掉，名稱與開關同一行，類型那一行放在下面整列。 */
+    .od-card-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: start; }
+    .od-card-icon { display: none; }
     .od-card-title { display: contents; }
     .od-src-name { grid-column: 1; grid-row: 1; }
     .od-switch { grid-column: 2; grid-row: 1; }
-    .od-badges { grid-column: 1 / -1; grid-row: 2; }
+    .od-src-sub { grid-column: 1 / -1; grid-row: 2; }
+    .od-card-body { margin-left: 0; }
+    .od-card-main { flex-direction: column; align-items: stretch; }
     .od-meta-line { flex-direction: column; align-items: flex-start; }
     .od-meta-line > * + *::before { content: none; }
+    .od-actions { justify-content: flex-start; }
+    .od-actions .btn { flex: 1 1 auto; }
     .od-url-row { flex-wrap: wrap; }
     .od-url-label { flex-basis: 100%; }
     .auth-form .od-url-row input.field.od-url-input { flex-basis: 100%; }
-    .od-card-foot { flex-direction: column; align-items: stretch; }
-    .od-actions { justify-content: flex-start; }
-    .od-actions .btn { flex: 1 1 auto; }
   }
   @media (max-width: 640px) {
     .od-card > td { padding: 12px 12px 10px; }
@@ -114,6 +133,8 @@
   .od-empty { margin: 8px 0 0; }
   .od-orgs { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; }
   .od-orgs li { padding: 4px 0; border-bottom: 1px dashed #e2e8f0; display: flex; gap: 12px; }
+  mark.od-hl { background: #fde68a; color: inherit; border-radius: 2px; padding: 0 1px;
+               box-shadow: 0 0 0 1px #fcd34d inset; }
   .od-org-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #64748b;
     font-size: 12px; min-width: 150px; }
   .od-hidden { display: none; }
@@ -126,9 +147,9 @@
 
 <div class="panel">
   <ul class="od-points">
-    <li><b>{{ tr('預設不下載。') }}</b>{{ tr('新安裝不會自己連外，要由管理員在下方按「下載／更新」才會連到資料來源。') }}</li>
+    <li><b>{{ tr('預設不下載。') }}</b>{{ tr('新安裝不會自己連外，要由管理員在下方按「下載/更新」才會連到資料來源。') }}</li>
     <li>{{ tr('不能連外的機關：在可以上網的電腦下載同一個檔案，再用「上傳檔案」放進來，檢查方式跟下載一樣。') }}</li>
-    <li>{{ tr('網址可以修改（資料集可能搬家）、可以新增或刪除來源；「還原預設」會把內建的兩個來源放回來，不動自訂的。') }}</li>
+    <li>{{ tr('網址在各來源的「來源設定」裡修改（資料集可能搬家），刪除也在那裡；「還原預設」會把內建的兩個來源放回來，不動自訂的。') }}</li>
     <li>{{ tr('下載的檔案存在') }} <code>{{ initial.storage_dir }}</code>{{ tr('（每個來源一個資料夾）。下載或上傳失敗時保留上一份。') }}</li>
     <li>{{ tr('資料來源與授權：內建的兩個來源都由國家發展委員會檔案管理局依「政府資料開放授權條款－第1版」提供，可以重製、改作、散布與商業使用，條件是顯名（提供機關、資料名稱、授權條款版本）。公文撰擬的畫面與匯出會附上各來源的顯名文字。') }}</li>
   </ul>
@@ -146,17 +167,17 @@
 <div class="panel auth-form">
   <fieldset class="auth-section">
     <legend>{{ icon('archive', size=14) }} {{ tr('資料來源') }}</legend>
-    <div class="od-toolbar">
-      <button class="btn" id="odAddToggle" type="button">{{ icon('plus') }}{{ tr('新增來源') }}</button>
-      <button class="btn" id="odRestore" type="button">{{ icon('reset') }}{{ tr('還原預設') }}</button>
-      <button class="btn" id="odRefresh" type="button">{{ icon('refresh') }}{{ tr('重新整理') }}</button>
-      <span class="muted od-say" id="odSay"></span>
-    </div>
     {# 一個來源一張卡片（JS 畫）。外層留著 table / tr[data-sid] 的結構，只改成 block 排版。 #}
     <table class="od-cards" role="presentation">
       <tbody id="odRows"></tbody>
     </table>
     <p class="muted od-empty" id="odEmpty" hidden>{{ tr('目前沒有任何資料來源。按「還原預設」可以把內建的兩個放回來。') }}</p>
+    {# 不常用的兩個動作放在卡片下面；「重新整理」拿掉了（下載中會自己更新，每個動作做完也會重讀）。 #}
+    <div class="od-toolbar od-src-tools">
+      <button class="btn" id="odAddToggle" type="button">{{ icon('plus') }}{{ tr('新增來源') }}</button>
+      <button class="btn" id="odRestore" type="button">{{ icon('reset') }}{{ tr('還原預設') }}</button>
+      <span class="muted od-say" id="odSay"></span>
+    </div>
   </fieldset>
 
   <fieldset class="auth-section" id="odAddBox" hidden>
@@ -218,6 +239,8 @@
   <span data-icon="upload">{{ icon('upload') }}</span>
   <span data-icon="trash">{{ icon('trash') }}</span>
   <span data-icon="save">{{ icon('save') }}</span>
+  <span data-icon="templates_zip">{{ icon('file-text', size=18) }}</span>
+  <span data-icon="address_book">{{ icon('building', size=18) }}</span>
 </template>
 {% endblock %}
 
@@ -233,12 +256,20 @@
   const fileEl = document.getElementById('odFile');
   const urlDrafts = {};      // 正在改、還沒存的網址（輪詢重畫時要留著）
   const openTpl = {};        // 展開中的範本清單
+  const openCfg = {};        // 展開中的「來源設定」（使用者自己開或關過的，重畫時照舊）
   const tplCache = {};       // sid → {stamp, data}
   let pollTimer = null;
   let wasRunning = new Set(state.sources.filter(s => s.running).map(s => s.id));
   let uploadTarget = null;
 
+  // 結果（成功／失敗）跳通知 —— 工具列在卡片下面，捲在上面操作時看不到；
+  // 進行中的說明才寫在工具列旁邊。
   function say(msg, cls) {
+    if (msg && (cls === 'ok' || cls === 'err') && window.showToast) {
+      window.showToast(msg, cls);
+      sayEl.textContent = '';
+      return;
+    }
     sayEl.textContent = msg || '';
     sayEl.className = 'muted od-say ' + (cls || '');
   }
@@ -297,16 +328,29 @@
     return (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : '';
   }
 
-  // 一個來源一張卡片：標題列（名稱＋標籤｜啟用）→ 狀態一行 → 網址 →
-  // 範本清單 → 頁腳（顯名小字｜按鈕）。外層仍是 <tr data-sid>（見樣式的說明）。
+  // 一個來源一張卡片：標題（圖示＋名稱，下一行類型｜啟用）→ 狀態與主要按鈕同一列 →
+  // 收起來的「列出範本」「來源設定」→ 出處一行。外層仍是 <tr data-sid>（見樣式的說明）。
   function headPart(src) {
     const head = el('div', 'od-card-head');
+    const ic = el('span', 'od-card-icon');
+    const svg = iconEl(src.kind);
+    if (svg) ic.appendChild(svg);
+    head.appendChild(ic);
     const title = el('div', 'od-card-title');
     title.appendChild(el('span', 'od-src-name', src.name));
-    const badges = el('span', 'od-badges');
-    badges.appendChild(el('span', 'od-badge od-kind', tr(src.kind_label)));
-    if (src.builtin) badges.appendChild(el('span', 'od-badge', tr('內建')));
-    title.appendChild(badges);
+    // 類型、「內建」與資料集網頁寫成名稱下面一行小字（不再是兩個標籤擠在名稱旁邊）
+    const sub = el('span', 'od-src-sub',
+      tr(src.kind_label) + (src.builtin ? '・' + tr('內建') : ''));
+    const href = safeHref(src.dataset_url);
+    if (href) {
+      sub.appendChild(document.createTextNode('・'));
+      const a = el('a', 'od-src-link', tr('資料集網頁'));
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      sub.appendChild(a);
+    }
+    title.appendChild(sub);
     head.appendChild(title);
     head.appendChild(enabledSwitch(src));
     return head;
@@ -326,8 +370,14 @@
     return lab;
   }
 
-  // 狀態一行：「成功 · 88 份範本」＋（略過幾個檔案）＋「最後下載：…」，
-  // 失敗的原因另起一行。分隔點是 CSS 畫的，這裡只放各段。
+  function dot(kind, title) {
+    const d = el('span', 'od-dot' + (kind ? ' ' + kind : ''));
+    if (title) d.title = title;
+    return d;
+  }
+
+  // 狀態一行：狀態點（綠＝成功、紅＝失敗、灰＝沒有資料）＋數量＋（略過幾個檔案）＋
+  // 「最後下載：…」，失敗的原因另起一行。分隔點是 CSS 畫的，這裡只放各段。
   function metaPart(src) {
     const box = el('div', 'od-meta');
     const line = el('div', 'od-meta-line');
@@ -356,14 +406,20 @@
     line.appendChild(main);
     if (!la) {
       // 沒有下載紀錄：有資料（舊版留下的）就寫數量，否則「尚未下載」
-      if (src.installed) main.textContent = unitText(src, src.count);
-      else { main.classList.add('od-none'); main.textContent = tr('尚未下載'); }
+      if (src.installed) {
+        main.appendChild(dot('ok', tr('成功')));
+        main.appendChild(document.createTextNode(unitText(src, src.count)));
+      } else {
+        main.classList.add('od-none');
+        main.appendChild(dot('', ''));
+        main.appendChild(document.createTextNode(tr('尚未下載')));
+      }
       return box;
     }
     if (la.ok) {
-      main.appendChild(el('span', 'od-ok', tr('成功')));
       if (src.installed) {
-        main.appendChild(document.createTextNode(' · ' + unitText(src, src.count)));
+        main.appendChild(dot('ok', tr('成功')));
+        main.appendChild(document.createTextNode(unitText(src, src.count)));
         // 伺服器的訊息是「已取得 N 份範本，略過 K 個檔案」：數量已經在上面，
         // 只把略過的那一段另外列（原因在「列出範本」裡）。
         const m = /略過\s*(\d+)\s*個檔案/.exec(la.message || '');
@@ -373,17 +429,37 @@
         }
         addWhen();
       } else {
+        main.appendChild(dot('', ''));
+        main.appendChild(document.createTextNode(tr('尚未下載')));
         addWhen();
         if (la.message) box.appendChild(el('div', 'od-msg', tr(la.message)));
       }
       return box;
     }
+    main.appendChild(dot('err', ''));
     main.appendChild(el('span', 'od-err', tr('失敗')));
     addWhen();
     if (la.message) box.appendChild(el('div', 'od-msg od-msg-err', tr(la.message)));
     if (src.installed) {
       box.appendChild(el('div', 'od-msg od-none', tr('先前的資料照常可用。')));
     }
+    return box;
+  }
+
+  // 主要動作：下載（或更新）與上傳檔案。刪除不放這裡（在「來源設定」裡）。
+  function actionsPart(src) {
+    const box = el('div', 'od-actions');
+    const mk = (act, iconName, label, cls) => {
+      const b = iconBtn(cls, iconName, label);
+      b.dataset.act = act;
+      b.dataset.sid = src.id;
+      b.disabled = !!src.running;
+      return b;
+    };
+    box.appendChild(src.installed
+      ? mk('download', 'refresh', tr('更新'), 'btn-primary')
+      : mk('download', 'download', tr('下載'), 'btn-primary'));
+    box.appendChild(mk('upload', 'upload', tr('上傳檔案')));
     return box;
   }
 
@@ -431,38 +507,34 @@
     return det;
   }
 
-  // 頁腳：左邊顯名（授權條款要求的提供機關、資料名稱、授權版本都在裡面）＋
-  // 資料集網頁，右邊一排按鈕。
-  function footPart(src) {
-    const foot = el('div', 'od-card-foot');
-    const prov = el('p', 'od-prov', tr('顯名：') + src.attribution);
-    const href = safeHref(src.dataset_url);
-    if (href) {
-      // 連結直接接在顯名後面，中間一個普通空白：換行時空白留在上一行尾端，
-      // 不會像「·」或 margin 那樣在新的一行開頭多出一截。
-      prov.appendChild(document.createTextNode(' '));
-      const a = el('a', 'od-prov-link', tr('資料集網頁'));
-      a.href = href;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      prov.appendChild(a);
-    }
-    foot.appendChild(prov);
-    const box = el('div', 'od-actions');
-    const mk = (act, iconName, label, cls) => {
-      const b = iconBtn(cls, iconName, label);
-      b.dataset.act = act;
-      b.dataset.sid = src.id;
-      b.disabled = !!src.running;
-      return b;
-    };
-    box.appendChild(src.installed
-      ? mk('download', 'refresh', tr('更新'), 'btn-primary')
-      : mk('download', 'download', tr('下載'), 'btn-primary'));
-    box.appendChild(mk('upload', 'upload', tr('上傳檔案')));
-    box.appendChild(mk('delete', 'trash', tr('刪除'), 'od-del'));
-    foot.appendChild(box);
-    return foot;
+  // 「來源設定」：下載網址與刪除。平常收起來；最後一次失敗、或網址改了還沒存時自動打開。
+  function cfgPart(src) {
+    const det = el('details', 'od-cfg');
+    det.dataset.sid = src.id;
+    det.appendChild(el('summary', '', tr('來源設定')));
+    const body = el('div', 'od-cfg-body');
+    body.appendChild(urlPart(src));
+    const foot = el('div', 'od-cfg-foot');
+    const del = iconBtn('od-del', 'trash', tr('刪除這個來源'));
+    del.dataset.act = 'delete';
+    del.dataset.sid = src.id;
+    del.disabled = !!src.running;
+    foot.appendChild(del);
+    foot.appendChild(el('span', 'od-cfg-note', src.builtin
+      ? tr('內建的來源刪除之後，可以按「還原預設」放回來。')
+      : tr('已下載的資料會一起刪除。')));
+    body.appendChild(foot);
+    det.appendChild(body);
+    const failed = !!(src.last_attempt && !src.last_attempt.ok && !src.running);
+    const pending = (src.id in urlDrafts) && urlDrafts[src.id] !== src.url;
+    det.open = (src.id in openCfg) ? (openCfg[src.id] || pending) : (failed || pending);
+    det.addEventListener('toggle', () => { openCfg[src.id] = det.open; });
+    return det;
+  }
+
+  // 出處（授權條款要求的提供機關、資料名稱、授權版本都在裡面）。資料集網頁的連結在標題下面那一行。
+  function provPart(src) {
+    return el('p', 'od-prov', tr('出處：') + src.attribution);
   }
 
   function sourceCard(src) {
@@ -470,11 +542,18 @@
     rowEl.dataset.sid = src.id;
     const td = el('td');
     td.appendChild(headPart(src));
-    td.appendChild(metaPart(src));
-    td.appendChild(urlPart(src));
+    const body = el('div', 'od-card-body');
+    const main = el('div', 'od-card-main');
+    main.appendChild(metaPart(src));
+    main.appendChild(actionsPart(src));
+    body.appendChild(main);
+    const more = el('div', 'od-more');
     const det = templatesPart(src);
-    if (det) td.appendChild(det);
-    td.appendChild(footPart(src));
+    if (det) more.appendChild(det);
+    more.appendChild(cfgPart(src));
+    body.appendChild(more);
+    body.appendChild(provPart(src));
+    td.appendChild(body);
     rowEl.appendChild(td);
     return rowEl;
   }
@@ -655,8 +734,6 @@
     await refresh();
   });
 
-  document.getElementById('odRefresh').addEventListener('click', () => refresh());
-
   document.getElementById('odRestore').addEventListener('click', async () => {
     const ok = await window.showConfirm(
       tr('把內建的兩個來源放回來（網址也回到預設）？自訂的來源不會動。'),
@@ -700,6 +777,21 @@
     clearTimeout(qTimer);
     qTimer = setTimeout(searchOrgs, 250);
   });
+  // 符合處標亮（2026-10-09 使用者：「搜尋有符合的 該字串要高亮」）。位置是伺服器算的
+  // （跟比對同一套正規化：台臺、全形半形），以 code point 計 —— 一律 Array.from 切，不用 slice。
+  function marked(cls, text, marks) {
+    const box = el('span', cls);
+    const chars = Array.from(text || '');
+    let at = 0;
+    (marks || []).forEach(([s, e]) => {
+      if (s < at || e > chars.length || s >= e) return;
+      if (s > at) box.appendChild(document.createTextNode(chars.slice(at, s).join('')));
+      box.appendChild(el('mark', 'od-hl', chars.slice(s, e).join('')));
+      at = e;
+    });
+    if (at < chars.length) box.appendChild(document.createTextNode(chars.slice(at).join('')));
+    return box;
+  }
   async function searchOrgs() {
     const q = qEl.value.trim();
     const seq = ++qSeq;
@@ -717,8 +809,8 @@
       orgSayEl.textContent = res.length ? tr('前 {0} 筆').replace('{0}', res.length) : tr('查無符合的機關');
       res.forEach(o => {
         const li = el('li');
-        li.appendChild(el('span', 'od-org-id', o.orgId || '—'));
-        li.appendChild(el('span', '', o.orgName));
+        li.appendChild(marked('od-org-id', o.orgId || '—', o.orgId ? o.idMarks : []));
+        li.appendChild(marked('', o.orgName, o.nameMarks));
         orgsEl.appendChild(li);
       });
     } catch (e) {

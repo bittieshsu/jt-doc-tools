@@ -151,7 +151,7 @@ def test_permission_is_set_before_the_rename(tmp_path):
 
     **判準是呼叫順序，不是最後的權限位元。** Windows 沒有 POSIX 權限，
     `os.chmod` 只能切換唯讀旗標、`st_mode` 讀回來是 0o666 —— 第一版驗
-    `st_mode == 0o600`，在 Linux 綠、在 `.154` 上紅（v1.15.34 實測）。
+    `st_mode == 0o600`，在 Linux 綠、在 Windows 實機上紅（v1.15.34 實測）。
     驗順序在兩個平台都成立，而且守的正是那個「有沒有窗口」的問題。
     """
     import os as _os

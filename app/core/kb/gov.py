@@ -173,15 +173,21 @@ FETCH_DEADLINE_S = 900.0
 #: 全匯進去的話任何問題都會查到一堆不相干的條文。
 WARN_ITEMS = 100
 WARN_CHARS = 1_500_000
-#: 選取的硬上限。
-MAX_SELECTED = 1000
+#: 選取的硬上限（項數與字數）。照「整個『法律』類別選得下、整個『命令』類別選不下」定
+#: （2026-10-09 使用者：「要全選只能 1000，可是一筆一筆選很痛苦」—— 法律有 1,338 部）。
+#: 實際部署上量到的清單：法律 1,338 部、約 590 萬字、4.7 萬條；命令 10,451 部、約 2,484 萬字、17.5 萬條。
+#: 一條一段、每段一個向量（4096 維約 16 KB，網頁服務整份放在記憶體裡比對）：
+#: 法律全部匯入約 770 MB；命令全部約 2.9 GB，而且每個問題都會撈到一堆不相干的條文。
+MAX_SELECTED = 3000
+MAX_CHARS = 8_000_000
 
 MESSAGES = {
     "not_found": "找不到這個資料來源",
     "busy": "已經有一件政府公開資料的作業在進行，請等它完成",
     "not_downloaded": "還沒有下載資料，請先按「下載並匯入」",
     "too_many": "最多只能選 {0} 項",
-    "confirm": "選了 {0} 項（約 {1} 字），量很大：檢索時會查到很多不相干的條文。確定要這樣選嗎？",
+    "too_many_chars": "選取的內容太多（約 {0} 字），最多 {1} 字",
+    "confirm": "選了 {0} 項（約 {1} 字），量很大：檢索時會查到很多不相干的條文，第一次匯入與建索引也要比較久。確定要這樣選嗎？",
     "bad_key": "選取的項目格式不正確",
     "unknown_key": "有選取的項目不在已下載的清單裡",
     "unexpected": "處理失敗（未預期的錯誤，詳細原因已寫入服務記錄）",
@@ -374,6 +380,9 @@ def set_selection(gid: str, keys: Any, *, confirm: bool = False) -> list[str]:
         if bad:
             raise GovError(MESSAGES["unknown_key"])
     chars = sum(idx[k]["chars"] for k in out if k in idx)
+    if chars > MAX_CHARS:
+        raise GovError(MESSAGES["too_many_chars"].replace("{0}", str(chars))
+                       .replace("{1}", str(MAX_CHARS)))
     if not confirm and (len(out) > WARN_ITEMS or chars > WARN_CHARS):
         raise NeedsConfirm(MESSAGES["confirm"].replace("{0}", str(len(out)))
                            .replace("{1}", f"{chars:,}"), len(out), chars)
@@ -453,8 +462,8 @@ def search(gid: str, q: str = "", *, limit: int = 50, offset: int = 0, browse: b
     * `q` 空白：`browse` 為真時**整份清單**照名稱排（翻頁看；2026-10-08 使用者：「這邊說169項，
       可是我看只有四項可以勾」）—— 已廢止的排最後；`browse` 為假時只回選取的（舊行為）。
     * `level`：只看這一種「法規位階」（法律 / 命令…）；回應的 `levels` 是整份清單各有幾項（畫面的篩選）。
-    * `keys_only`：「全選 / 取消全選」用 —— 回這個範圍（不分頁）的全部代碼；不超過選取上限時
-      另附名稱與字數（畫面算「已選幾項、約幾字」要用）。
+    * `keys_only`：「全選 / 取消全選」用 —— 回這個範圍（不分頁）的全部代碼，另附名稱、字數與是否
+      已廢止（畫面據此略過已廢止的、算「已選幾項、約幾字」、判斷有沒有超過選取上限）。
     """
     g = _group_or_404(gid)
     try:
@@ -502,15 +511,14 @@ def search(gid: str, q: str = "", *, limit: int = 50, offset: int = 0, browse: b
     base = {"group": gid, "query": q, "total": total, "offset": offset, "level": level,
             "levels": dict(sorted(levels.items(), key=lambda x: (-x[1], x[0]))),
             "level_notes": level_notes,
-            "downloaded": bool(idx), "kind": g["kind"], "max_selected": MAX_SELECTED}
+            "downloaded": bool(idx), "kind": g["kind"], "max_selected": MAX_SELECTED,
+            "max_chars": MAX_CHARS}
     if keys_only:
         keys = hits[:KEYS_ONLY_MAX]
-        out = {**base, "keys": keys, "truncated": total > len(keys)}
-        if total <= MAX_SELECTED:
-            out["items"] = [{"key": k, "name": idx[k]["name"], "chars": idx[k].get("chars", 0),
-                             "level": lv_of[k], "abolished": bool(idx[k].get("abolished"))}
-                            for k in keys]
-        return out
+        return {**base, "keys": keys, "truncated": total > len(keys),
+                "items": [{"key": k, "name": idx[k]["name"], "chars": idx[k].get("chars", 0),
+                           "level": lv_of[k], "abolished": bool(idx[k].get("abolished"))}
+                          for k in keys]}
     keys = hits[offset:offset + limit]
     items = store.gov_items(gid)
     return {**base, "limit": limit,
@@ -568,7 +576,7 @@ def attribution_for(gid: str, *, pkg: Optional[str] = None, update_date: str = "
     """顯名文字（政府資料開放授權條款要求：提供機關、資料名稱、授權條款版本）。"""
     roc = _roc_from_update(update_date)
     if gid == "moj":
-        label = PACKAGES.get(pkg or "", {}).get("file_label") or "中文法規法律／命令資料檔"
+        label = PACKAGES.get(pkg or "", {}).get("file_label") or "中文法規法律/命令資料檔"
         when = f"（資料更新日期 {roc}）" if roc else ""
         return (f"資料來源：法務部全國法規資料庫（https://law.moj.gov.tw），{label}{when}，"
                 f"依{LICENSE}（{LICENSE_URL}）提供。法規內容以各主管機關公布者為準。")
@@ -812,6 +820,13 @@ def _version_meta(gid: str, pid: str, e: dict, rec: Optional[dict]) -> dict:
 
 def sync(gid: str, *, actor: str = "", job=None) -> dict:
     """把選取的項目匯入知識庫（新的建資料集；異動日期變了才建新版本）。同步；背景作業裡呼叫。"""
+    from . import retrieval
+    # 一部一部寫向量；包住它，查詢沿用手上的向量矩陣，不必每匯入一部就整份重載
+    with retrieval.bulk_update():
+        return _sync(gid, actor=actor, job=job)
+
+
+def _sync(gid: str, *, actor: str, job) -> dict:
     from . import indexer
     g = _group_or_404(gid)
     cancelled = (lambda: bool(job and job.cancelled))
@@ -1174,6 +1189,8 @@ def status() -> dict:
         imported = [s for s in items.values() if s.get("dataset_id")]
         needs = sum(1 for k, s in items.items() if s.get("dataset_id") and k in idx
                     and idx[k]["modified"] != s["modified_on"] and k in sel)
+        # 勾了（而且在清單上）但還沒匯入的：儲存選取不會匯入，要再按「下載並匯入」—— 畫面要講出來
+        pending = sum(1 for k in sel if k in idx and not (items.get(k) or {}).get("dataset_id"))
         groups.append({
             "id": gid, "name": g["name"], "publisher": g["publisher"], "kind": g["kind"],
             "about": g["about"], "home": g["home"], "category": g["category"],
@@ -1191,12 +1208,13 @@ def status() -> dict:
             "imported_count": len(imported),
             "abolished_count": sum(1 for s in imported if s.get("abolished")),
             "needs_update_count": needs,
+            "pending_count": pending,
             "last": (st.get(gid) or {}).get("last"),
             "running": bool(run and run.get("group") == gid),
         })
     return {"groups": groups, "link_only": [dict(x) for x in LINK_ONLY], "running": run,
             "limits": {"warn_items": WARN_ITEMS, "warn_chars": WARN_CHARS,
-                       "max_selected": MAX_SELECTED}}
+                       "max_selected": MAX_SELECTED, "max_chars": MAX_CHARS}}
 
 
 # ---------------------------------------------------------------- 給工具用

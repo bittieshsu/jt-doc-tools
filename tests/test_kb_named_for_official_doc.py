@@ -61,3 +61,17 @@ def test_the_new_name_is_translated():
         d = json.loads(Path(f"app/i18n/{lang}.json").read_text(encoding="utf-8"))
         assert d["公文知識庫"] == word
         assert "參考公文知識庫" in d and "公文知識庫目前狀態" in d
+
+
+def test_the_two_official_doc_settings_sit_next_to_each_other_in_the_sidebar(admin_session, kb_isolated):
+    """側欄「設定」裡「公文撰擬設定」緊接在「公文知識庫」上面（2026-10-09 使用者：
+    「請把 公文撰擬設定 跟 公文知識庫 排在上下 不要離很多項」）。
+
+    判準看畫出來的側欄（使用者看到的是那個），不看清單：兩個連結之間不可以夾著別的管理頁。
+    """
+    c, _, _ = admin_session
+    html = c.get("/admin/knowledge").text
+    links = re.findall(r'<a[^>]*href="(/admin/[^"#?]*)"', html)
+    assert "/admin/official-doc" in links and "/admin/knowledge" in links, links
+    i, j = links.index("/admin/official-doc"), links.index("/admin/knowledge")
+    assert j == i + 1, f"中間夾著：{links[i + 1:j] if j > i else links[j:i + 1]}"

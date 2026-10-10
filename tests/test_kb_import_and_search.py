@@ -1,4 +1,4 @@
-"""知識庫：匯入流程（狀態、重複、中斷）、逐字索引（台／臺）、檢索門檻與 RRF。"""
+"""知識庫：匯入流程（狀態、重複、中斷）、逐字索引（台／臺）、檢索門檻與排序（向量優先）。"""
 from __future__ import annotations
 
 import hashlib
@@ -119,7 +119,7 @@ def test_field_validation(ds):
         store.create_dataset({"name": "y", "category": "examples", "access": "groups", "group_ids": []})
 
 
-# ---------------------------------------------------------------- 門檻與 RRF
+# ---------------------------------------------------------------- 門檻與排序
 def test_irrelevant_questions_return_nothing_without_vectors(ds):
     add_doc(ds["id"], HANDBOOK_TXT.encode("utf-8"), ".txt")
     for q in ("如何烤出好吃的戚風蛋糕", "Python 的 list comprehension 怎麼寫"):
@@ -174,12 +174,47 @@ def test_hybrid_search_fuses_both_routes_and_reports_how(ds):
     assert scores == sorted(scores, reverse=True)
 
 
-def test_rrf_rank_math():
-    # 兩路都第一名的，一定排在只有一路第一名的前面
-    k = retrieval.RRF_K
-    both = 1 / (k + 1) + 1 / (k + 1)
-    one = 1 / (k + 1)
-    assert both > one + 1 / (k + 2)
+def _chunk_ids(contains: str) -> list[str]:
+    rows = store.conn().execute("SELECT id, text FROM kb_chunks").fetchall()
+    return [r["id"] for r in rows if contains in r["text"]]
+
+
+def test_vector_order_wins_and_keyword_only_fills_the_gap(ds, monkeypatch):
+    """有向量時照向量的名次排，關鍵字只在向量不到 k 筆時補在後面（2026-10-09 量過：
+    等權合併 nDCG@6 0.787、只照向量 0.885，見 retrieval 的模組說明）。"""
+    _many_docs(ds["id"])
+    a, b = _chunk_ids("會計業務")[0], _chunk_ids("人事業務")[0]
+    kw_target = _chunk_ids("採購業務")[0]
+    allowed = retrieval._allowed_versions(None, None)
+    kw = retrieval.keyword_hits("採購業務的作業說明", allowed)
+    assert kw and kw[0]["id"] == kw_target and kw[0]["strong"], kw    # 前提：關鍵字第一名是「採購」
+    # 向量那一路（替身）：會計、人事，沒有採購
+    monkeypatch.setattr(retrieval, "vector_hits",
+                        lambda *a_, **k_: [{"id": a, "cos": 0.9}, {"id": b, "cos": 0.8}])
+    with FakeEmbed() as fe:
+        setup_embed(fe.base)
+        indexer.rebuild()
+        got = retrieval.search_detail("採購業務的作業說明", user_id=None, k=8)
+        two = retrieval.search_detail("採購業務的作業說明", user_id=None, k=2)
+    ids = [r["chunk_id"] for r in got["results"]]
+    assert ids[:2] == [a, b], ids                       # 關鍵字第一名不會插到向量前面
+    assert kw_target in ids[2:], ids                    # 向量不夠 k 筆，關鍵字補在後面
+    assert got["results"][2]["matched_by"] == ["keyword"]
+    assert [r["chunk_id"] for r in two["results"]] == [a, b]   # 向量已經夠 k 筆：不補
+    scores = [r["score"] for r in got["results"]]
+    assert scores == sorted(scores, reverse=True) and len(set(scores)) == len(scores)
+
+
+def test_a_vector_hit_also_found_by_keyword_says_both(ds, monkeypatch):
+    _many_docs(ds["id"])
+    target = _chunk_ids("採購業務")[0]
+    monkeypatch.setattr(retrieval, "vector_hits", lambda *a_, **k_: [{"id": target, "cos": 0.9}])
+    with FakeEmbed() as fe:
+        setup_embed(fe.base)
+        indexer.rebuild()
+        got = retrieval.search_detail("採購業務的作業說明", user_id=None)
+    top = got["results"][0]
+    assert top["chunk_id"] == target and top["matched_by"] == ["vector", "keyword"], top
 
 
 def _common_word_corpus(ds_id: str) -> None:

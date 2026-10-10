@@ -9,7 +9,8 @@
 * `download` / `import` 兩個動作 API 照舊收（腳本不壞）。
 * 搜尋 `browse`：沒有關鍵字時回**整份清單**（翻頁），已廢止的排最後；`level` 篩選；`levels` 是各位階幾項。
   不帶 `browse` 的舊呼叫照舊只回選取的。
-* `keys_only`：「全選 / 取消全選」要的整個範圍；超過選取上限時不附名稱（畫面據此擋下全選）。
+* `keys_only`：「全選 / 取消全選」要的整個範圍，每一項附字數與是否已廢止（畫面全選時略過已廢止的，
+  再依項數與字數上限判斷 —— 2026-10-09 使用者：「要全選只能 1000，可是一筆一筆選很痛苦」）。
 """
 from __future__ import annotations
 
@@ -131,10 +132,12 @@ def test_keys_only_covers_the_whole_view_for_select_all(g, allow_fake, srv, monk
     r = gov.search("moj", "", keys_only=True)
     assert r["total"] == 4 and len(r["keys"]) == 4 and not r["truncated"]
     assert {i["key"] for i in r["items"]} == set(r["keys"]) and all("chars" in i for i in r["items"])
+    assert {i["key"] for i in r["items"] if i["abolished"]} == {"T0000003"}, "全選要靠它略過已廢止的"
     assert gov.search("moj", "", keys_only=True, level="命令")["keys"] == ["T0000010"]
     monkeypatch.setattr(gov, "MAX_SELECTED", 2)
     big = gov.search("moj", "", keys_only=True)
-    assert "items" not in big and len(big["keys"]) == 4, "超過選取上限：只給代碼（取消全選用），不給全選的資料"
+    assert len(big["items"]) == 4 and big["max_selected"] == 2, \
+        "範圍比上限大也要給資料：畫面略過已廢止的之後可能就放得下，由畫面算"
     monkeypatch.setattr(gov, "KEYS_ONLY_MAX", 3)
     assert gov.search("moj", "", keys_only=True)["truncated"] is True
 
@@ -147,4 +150,46 @@ def test_search_route_passes_the_new_parameters(g, allow_fake, srv, admin_sessio
               params={"browse": "1", "offset": "1", "limit": "2", "level": "法律"}).json()
     assert j["total"] == 3 and j["offset"] == 1 and len(j["items"]) == 2 and j["level"] == "法律"
     k = c.get("/admin/knowledge/api/gov/moj/search", params={"keys_only": "1", "q": "範例"}).json()
-    assert len(k["keys"]) == 4 and k["max_selected"] == gov.MAX_SELECTED
+    assert len(k["keys"]) == 4 and k["max_selected"] == gov.MAX_SELECTED and k["max_chars"] == gov.MAX_CHARS
+
+
+def test_the_limits_fit_every_law_but_not_every_regulation():
+    """上限是照實際部署那份清單量的（2026-10-09）：法律 1,338 項 / 約 590 萬字（已廢止 320 項）要放得下，
+    命令 10,451 項 / 約 2,480 萬字不行 —— 一個 4096 維的向量約 16 KB，法律全部約 770 MB 在網頁行程裡，
+    命令全部約 2.9 GB。數字改了要重量，不是隨手調大。"""
+    assert gov.MAX_SELECTED >= 1338 and gov.MAX_CHARS >= 5_900_000
+    assert gov.MAX_SELECTED < 10451 and gov.MAX_CHARS < 24_800_000
+
+
+def test_too_many_characters_is_refused_and_says_how_many(g, allow_fake, srv, monkeypatch):
+    _serve_moj(srv)
+    _download("moj")
+    chars = sum(gov.merged_index("moj")[k]["chars"] for k in ("T0000001", "T0000010"))
+    monkeypatch.setattr(gov, "MAX_CHARS", chars - 1)
+    with pytest.raises(gov.GovError) as e:
+        gov.set_selection("moj", ["T0000001", "T0000010"], confirm=True)
+    msg = str(e.value)
+    assert str(chars) in msg and str(chars - 1) in msg, msg
+    assert gov.selection_is_default("moj"), "擋下來的不可以存進去"
+    monkeypatch.setattr(gov, "MAX_CHARS", chars)
+    assert gov.set_selection("moj", ["T0000001", "T0000010"], confirm=True) == ["T0000001", "T0000010"]
+
+
+def test_status_counts_ticked_items_that_are_not_imported_yet(g, allow_fake, srv, admin_session):
+    """「儲存選取」只記下勾了哪些，不會匯入 —— 畫面要講出還有幾項沒匯入（2026-10-09 使用者：
+    「勾選更多 按了儲存選取成功後 要提示 再按下載並匯入 才會有」）。數字由伺服器算：
+    勾了、在清單上、還沒匯入的。已經匯入的不算，不在清單上的也不算（匯入時本來就找不到）。"""
+    c, _, _ = admin_session
+    _serve_moj(srv)
+    _download("moj")
+    live = sorted(k for k, e in gov.merged_index("moj").items() if not e.get("abolished"))
+    assert len(live) >= 3, live
+    gov.set_selection("moj", live[:2])
+    m = _moj(c.get("/admin/knowledge/api/gov/status").json())
+    assert m["selected_count"] == 2 and m["pending_count"] == 2 and m["imported_count"] == 0, m
+    assert c.post("/admin/knowledge/api/gov/moj/update").status_code == 200
+    m = _moj(_wait_idle(c))
+    assert m["imported_count"] == 2 and m["pending_count"] == 0, m
+    gov.set_selection("moj", live[:3])
+    m = _moj(c.get("/admin/knowledge/api/gov/status").json())
+    assert m["pending_count"] == 1, "已經匯入的那兩項不算，只有新勾的那一項"

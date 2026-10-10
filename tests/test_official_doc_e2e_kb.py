@@ -38,6 +38,21 @@ v = store.create_version(ds["id"], title="資訊設備汰換作業要點", filen
 assert indexer.process_version(v["id"]).get("ok")
 store.transition(v["id"], allowed_from=("ready",), to="active", activated_by="seed")
 
+# 一部法規（政府公開資料匯入的格式：一條一段、帶條號與章節）。名稱是編的
+from app.core.kb import law_text
+law = ("# 範例設備管理法\n- 法規位階：法律\n---\n## 第 四 章 財物管理\n### 第 59 條\n"
+       "資訊室印表機等資訊設備使用年限屆滿、零件停產者，得以設備費汰換。\n")
+ds2 = store.create_dataset({"name": "範例設備管理法", "category": "business_law"})
+d2 = law.encode("utf-8")
+v2 = store.create_version(ds2["id"], title="範例設備管理法", filename="law.md", ext=".md",
+                          data=d2, sha256=hashlib.sha256(d2).hexdigest(),
+                          meta={"version_label": "民國114年1月1日修正"})
+store.put_gov_version(v2["id"], group_id="moj-law", item_key="X0000001", fmt=law_text.FORMAT_LAW,
+                      modified_on="20250101", license="政府資料開放授權條款第1版",
+                      attribution="資料來源：範例法規資料庫（示範出處）。")
+assert indexer.process_version(v2["id"]).get("ok")
+store.transition(v2["id"], allowed_from=("ready",), to="active", activated_by="seed")
+
 buf = io.BytesIO()
 with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
     z.writestr("一般公文表單/簽.odt", SIGN_TPL)
@@ -185,7 +200,81 @@ def test_kb_checkbox_sends_use_kb_and_the_references_show_up(live):
     # 用途標籤跟知識庫管理頁同一份（不是另寫一份）
     from app.core.kb import store
     assert store.PURPOSES["substantive_basis"] in text
+    _check_law_card(send)
     assert not errs, errs
+
+
+def _check_law_card(send):
+    """參考資料卡片（2026-10-09 使用者：「裡面文字很多」「他有找到法條 那可以幹嘛? 我這樣看不出來」）：
+    法規名稱旁邊標條號、章節只寫一次（不帶法規名稱）、條文只露開頭、出處在最下面寫一次；
+    下面有可以做的事：草稿寫到這部法規時講出第幾行並可以標出來、複製「名稱＋條號」、看全文。"""
+    card = _js(send, """(function () {
+        var li = Array.from(document.querySelectorAll('#odRefs .od-ref')).find(function (x) {
+            return x.querySelector('.od-ref-title').textContent === '範例設備管理法'; });
+        if (!li) return null;
+        var ex = li.querySelector('.od-ref-excerpt');
+        return {art: (li.querySelector('.od-ref-art') || {}).textContent || '',
+                where: (li.querySelector('.od-ref-where') || {}).textContent || '',
+                exLines: Math.round(ex.getBoundingClientRect().height / parseFloat(getComputedStyle(ex).lineHeight)),
+                full: li.querySelector('.od-ref-text').hidden,
+                acts: Array.from(li.querySelectorAll('.od-ref-acts button')).filter(function (b) {
+                    return !b.hidden; }).map(function (b) { return b.dataset.act; }),
+                attrInCard: li.textContent.indexOf('示範出處') >= 0,
+                attrs: document.getElementById('odRefAttrs').hidden ? '' : document.getElementById('odRefAttrs').textContent,
+                legend: document.getElementById('odRefLegend').textContent}; })()""")
+    assert card, "沒有那一部法規的卡片（檢索沒查到？）"
+    assert card["art"] == "第59條", card
+    assert card["where"] == "第四章 財物管理・民國114年1月1日修正", card
+    assert card["exLines"] <= 2 and card["full"], card
+    assert not card["attrInCard"] and card["attrs"].count("示範出處") == 1, card
+    assert "可以當草稿的依據" in card["legend"], card["legend"]
+    assert "copy" in card["acts"] and "full" in card["acts"] and "show" not in card["acts"], card
+    import os
+    if os.environ.get("JTDT_REF_SHOT"):
+        import base64
+        send("Emulation.setDeviceMetricsOverride", {"width": 1280, "height": 900, "deviceScaleFactor": 1,
+                                                    "mobile": False})
+        _js(send, "document.getElementById('odDraft').value += '\\n依範例設備管理法第59條規定辦理。';"
+                  "document.getElementById('odDraft').dispatchEvent(new Event('input'));"
+                  "document.getElementById('odRefSec').scrollIntoView(); true")
+        time.sleep(0.8)
+        r = send("Page.captureScreenshot", {"format": "png"})
+        open(os.environ["JTDT_REF_SHOT"], "wb").write(base64.b64decode(r["result"]["data"]))
+        _js(send, "var ta=document.getElementById('odDraft'); ta.value = ta.value.replace("
+                  "'\\n依範例設備管理法第59條規定辦理。', ''); ta.dispatchEvent(new Event('input')); true")
+        time.sleep(0.5)
+    # 草稿寫到這部法規 → 講出第幾行、可以在草稿中標出來
+    _js(send, """(function () { var ta = document.getElementById('odDraft');
+        ta.value = ta.value + '\\n依範例設備管理法第59條規定辦理。';
+        ta.dispatchEvent(new Event('input')); return true; })()""")
+    found = _wait(send, """(function () {
+        var li = Array.from(document.querySelectorAll('#odRefs .od-ref')).find(function (x) {
+            return x.querySelector('.od-ref-title').textContent === '範例設備管理法'; });
+        var f = li.querySelector('.od-ref-found');
+        return !f.hidden && f.textContent; })()""", timeout=10)
+    lines = _js(send, "document.getElementById('odDraft').value.split('\\n').length")
+    assert found == f"草稿第 {lines} 行寫到這部法規", (found, lines)
+    _js(send, """(function () {
+        var li = Array.from(document.querySelectorAll('#odRefs .od-ref')).find(function (x) {
+            return x.querySelector('.od-ref-title').textContent === '範例設備管理法'; });
+        li.querySelector('button[data-act="show"]').click(); return true; })()""")
+    sel = _js(send, """(function () { var ta = document.getElementById('odDraft');
+        return ta.value.slice(ta.selectionStart, ta.selectionEnd); })()""")
+    assert sel == "範例設備管理法第59條", sel
+    # 看全文 → 攤開、開頭那兩行收起來
+    _js(send, """(function () {
+        var li = Array.from(document.querySelectorAll('#odRefs .od-ref')).find(function (x) {
+            return x.querySelector('.od-ref-title').textContent === '範例設備管理法'; });
+        li.querySelector('button[data-act="full"]').click(); return true; })()""")
+    assert _js(send, """(function () {
+        var li = Array.from(document.querySelectorAll('#odRefs .od-ref')).find(function (x) {
+            return x.querySelector('.od-ref-title').textContent === '範例設備管理法'; });
+        return !li.querySelector('.od-ref-text').hidden &&
+               getComputedStyle(li.querySelector('.od-ref-excerpt')).display === 'none'; })()""")
+    # 改回原本的草稿，不影響後面的測試
+    _js(send, """(function () { var ta = document.getElementById('odDraft');
+        ta.value = ta.value.replace('\\n依範例設備管理法第59條規定辦理。', '');
+        ta.dispatchEvent(new Event('input')); return true; })()""")
 
 
 def test_template_select_lists_only_what_fits_and_export_applies_it(live):
@@ -224,9 +313,10 @@ def test_receiver_suggestions_come_from_the_address_book(live):
         r.value = '嘉禾';
         r.dispatchEvent(new Event('input'));
         return true; })()""")
-    names = _wait(send, "Array.from(document.querySelectorAll('#odOrgList option'))"
-                        ".map(function(o){return o.value}).join('|')", timeout=10)
+    # 本站樣式的清單（v1.16.68，`org_picker.js`）：每列名稱＋機關代碼；原生 datalist 已經拿掉
+    names = _wait(send, "Array.from(document.querySelectorAll('#odReceiverOrgList .op-name'))"
+                        ".map(function(o){return o.textContent}).join('|')", timeout=10)
     assert names and "嘉禾市東湖區公所" in names, names
-    assert _js(send, "document.getElementById('odReceiver').getAttribute('list')") == "odOrgList"
+    assert not _js(send, "document.getElementById('odReceiver').getAttribute('list')")
     assert "政府資料開放授權條款" in _js(send, "document.getElementById('odLetter').textContent")
     assert not errs, errs

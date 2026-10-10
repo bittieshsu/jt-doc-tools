@@ -500,16 +500,42 @@ def get_user_file_stats(force: bool = False) -> dict:
     return result
 
 
+def _tool_names() -> dict[str, str]:
+    """工具 id → 顯示名稱（給用量明細的「近 30 天上傳（依工具）」）。讀不到就回空的（照 id 顯示）。"""
+    try:
+        from ..tool_registry import discover_tools
+        return {t.metadata.id: t.metadata.name for t in discover_tools()}
+    except Exception:  # noqa: BLE001 — 只是顯示名稱
+        return {}
+
+
+#: 用量明細的類別（畫面依這個順序與名稱顯示；`host_stats` 只回 key）
+USAGE_CATEGORIES = (
+    ("temp", "暫存檔（處理中的上傳與產出）"),
+    ("workspace", "我的工作區"),
+    ("cases", "公文撰擬案件"),
+    ("speech", "會議錄音"),
+    ("fill_history", "表單填寫歷史"),
+    ("stamp_history", "用印簽名歷史"),
+    ("watermark_history", "浮水印歷史"),
+)
+
+
 def _compute_user_file_stats() -> dict:
     """實際 walk filesystem 並合併出每位 user 的 (count, bytes)。耗時操作；
     不要直接被 endpoint 呼叫，走上面 cached `get_user_file_stats()`。"""
     from ..config import settings as _s
     users_count: dict[str, int] = {}
     users_bytes: dict[str, int] = {}
+    # 每位使用者依類別分開（2026-10-09 使用者：「可以再往下點入深看該使用者的各種類的使用量」）
+    users_cats: dict[str, dict[str, list[int]]] = {}
 
-    def _add(username: str, count: int, sz: int) -> None:
+    def _add(username: str, count: int, sz: int, cat: str = "temp") -> None:
         users_count[username] = users_count.get(username, 0) + count
         users_bytes[username] = users_bytes.get(username, 0) + sz
+        c = users_cats.setdefault(username, {}).setdefault(cat, [0, 0])
+        c[0] += count
+        c[1] += sz
 
     # --- 1) /temp/.owners/<upload_id>.json → 找該 upload 的所有檔
     temp_dir = _s.temp_dir
@@ -517,6 +543,7 @@ def _compute_user_file_stats() -> dict:
     # 預先 build upload_id → file list 對映（避免 N²）— 不論 owners_dir 是否
     # 存在都建，方便算「未追蹤的孤兒檔案」總和
     files_by_uid: dict[str, list[Path]] = {}
+    owner_by_uid: dict[str, str] = {}     # upload_id → 使用者（會議錄音也照這份認人）
     matched_files: set[Path] = set()  # 已歸屬到 user 的檔案，剩下是孤兒
     if temp_dir.exists():
         for f in temp_dir.iterdir():
@@ -551,6 +578,7 @@ def _compute_user_file_stats() -> dict:
             if user_id is None:
                 continue
             username = _resolve_username_for_uid(int(user_id))
+            owner_by_uid[uid] = username
             count, sz = 0, 0
             for f in files_by_uid.get(uid, []):
                 matched_files.add(f)
@@ -594,19 +622,20 @@ def _compute_user_file_stats() -> dict:
                     n2, s2 = _dir_size(d)
                     orphan_count += n2; orphan_bytes += s2
     if orphan_count or orphan_bytes:
-        _add("(未追蹤暫存)", orphan_count, orphan_bytes)
+        _add("(未追蹤暫存)", orphan_count, orphan_bytes, "temp")
 
     # 抓近 30 天 audit 上傳活動量（即使 temp file 已清掉、history 沒記錄
     # 也能還原該 user 用過多少）。audit_events 預設保留 90 天，所以最多
     # 看到過去 90 天。size_bytes 從 details_json 抽。
     activity_30d_bytes: dict[str, int] = {}
     activity_30d_count: dict[str, int] = {}
+    activity_30d_tools: dict[str, dict[str, list[int]]] = {}
     try:
         from . import audit_db
         cutoff_30d = time.time() - 30 * 86400
         conn = audit_db.conn()
         rows = conn.execute(
-            "SELECT username, details_json FROM audit_events "
+            "SELECT username, target, details_json FROM audit_events "
             "WHERE event_type='tool_invoke' AND ts > ?",
             (cutoff_30d,),
         ).fetchall()
@@ -621,8 +650,58 @@ def _compute_user_file_stats() -> dict:
                 continue
             activity_30d_bytes[uname] = activity_30d_bytes.get(uname, 0) + sz
             activity_30d_count[uname] = activity_30d_count.get(uname, 0) + 1
+            tc = activity_30d_tools.setdefault(uname, {}).setdefault(str(row["target"] or ""), [0, 0])
+            tc[0] += 1
+            tc[1] += sz
     except Exception:
         pass
+
+    # --- 1c) 會議錄音（`speech_audio/<upload_id>.bin`，歸屬跟上傳同一份紀錄）
+    sp = _s.data_dir / "speech_audio"
+    if sp.exists():
+        try:
+            for f in sp.iterdir():
+                if not f.is_file():
+                    continue
+                try:
+                    sz = f.stat().st_size
+                except OSError:
+                    continue
+                _add(owner_by_uid.get(f.stem.split(".")[0], "(匿名)"), 1, sz, "speech")
+        except OSError:
+            pass
+
+    # --- 1d) 我的工作區（`workspace/u<id>/`）
+    ws = _s.data_dir / "workspace"
+    if ws.exists():
+        try:
+            for d in ws.iterdir():
+                if d.is_dir() and d.name[:1] == "u" and d.name[1:].isdigit():
+                    n2, s2 = _dir_size(d)
+                    if n2 or s2:
+                        _add(_resolve_username_for_uid(int(d.name[1:])), n2, s2, "workspace")
+        except OSError:
+            pass
+
+    # --- 1e) 公文撰擬案件（`official_doc_cases/<案件>/meta.json` 的 owner_uid）
+    oc = _s.data_dir / "official_doc_cases"
+    if oc.exists():
+        try:
+            for d in oc.iterdir():
+                if not d.is_dir():
+                    continue
+                uname = "(匿名)"
+                try:
+                    owner = json.loads((d / "meta.json").read_text(encoding="utf-8")).get("owner_uid")
+                    if owner is not None:
+                        uname = _resolve_username_for_uid(int(owner))
+                except (OSError, ValueError, TypeError):
+                    pass
+                n2, s2 = _dir_size(d)
+                if n2 or s2:
+                    _add(uname, n2, s2, "cases")
+        except OSError:
+            pass
 
     # --- 2) history dirs — meta.json 內 username 欄位
     for sub in ("fill_history", "stamp_history", "watermark_history"):
@@ -645,19 +724,32 @@ def _compute_user_file_stats() -> dict:
                         pass
                 count, sz = _dir_size(entry_dir)
                 if count or sz:
-                    _add(username, count, sz)
+                    _add(username, count, sz, sub)
         except OSError:
             pass
 
     # 排序：bytes 大的在前。同時併入 30 天 activity 資料，即使該 user 目前
     # 沒檔案佔用也會出現在表裡（admin 才看得到「他這個月上傳過多少」）
     all_users = set(users_bytes) | set(activity_30d_bytes)
+    names = _tool_names()
+
+    def _cats(u: str) -> list[dict]:
+        return sorted(({"key": k, "count": v[0], "bytes": v[1]} for k, v in users_cats.get(u, {}).items()),
+                      key=lambda x: (-x["bytes"], x["key"]))
+
+    def _tools(u: str) -> list[dict]:
+        return sorted(({"tool": k, "name": names.get(k, k), "count": v[0], "bytes": v[1]}
+                       for k, v in activity_30d_tools.get(u, {}).items()),
+                      key=lambda x: (-x["bytes"], x["tool"]))
+
     rows = sorted(
         [{"username": u,
           "count": users_count.get(u, 0),
           "bytes": users_bytes.get(u, 0),
           "activity_30d_count": activity_30d_count.get(u, 0),
-          "activity_30d_bytes": activity_30d_bytes.get(u, 0)}
+          "activity_30d_bytes": activity_30d_bytes.get(u, 0),
+          "categories": _cats(u),
+          "tools_30d": _tools(u)}
          for u in all_users],
         key=lambda r: -(r["bytes"] + r["activity_30d_bytes"]),
     )

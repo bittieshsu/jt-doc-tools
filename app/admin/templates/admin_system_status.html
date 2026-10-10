@@ -54,6 +54,21 @@
 .ss-row { display:flex; justify-content:space-between; font-size:12px; color:#475569; }
 .ss-sub { font-size:11px; color:#94a3b8; }
 .ss-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
+.ss-user-btn { display:inline-flex; align-items:center; gap:6px; border:0; background:none; padding:0;
+               font:inherit; color:#1d4ed8; cursor:pointer; text-align:left; }
+.ss-user-btn:hover { text-decoration:underline; }
+.ss-user-btn .ss-chev { display:inline-block; width:0; height:0; border-left:5px solid currentColor;
+                        border-top:4px solid transparent; border-bottom:4px solid transparent; transition:transform .15s; }
+.ss-user-btn[aria-expanded="true"] .ss-chev { transform:rotate(90deg); }
+.ss-table tr.ss-detail > td { background:#f8fafc; padding:10px 14px 14px; }
+.ss-detail-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:12px 20px; }
+.ss-detail h4 { margin:0 0 6px; font-size:12.5px; color:#475569; }
+.ss-mini { width:100%; border-collapse:collapse; font-size:12.5px; background:#fff; border:1px solid #e2e8f0; border-radius:6px; }
+.ss-mini td { padding:5px 10px; border-bottom:1px solid #f1f5f9; }
+.ss-mini td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ss-mini .ss-mini-bar { width:30%; }
+.ss-mini .ss-mini-bar span { display:block; height:6px; border-radius:3px; background:#93c5fd; }
+.ss-detail .muted { font-size:12.5px; }
 .ss-table th, .ss-table td { text-align:left; padding:6px 10px; border-bottom:1px solid #f1f5f9; }
 .ss-table th { background:#f8fafc; font-weight:600; color:#475569; font-size:11.5px;
   text-transform: uppercase; letter-spacing: 0.04em;
@@ -162,9 +177,7 @@
   <div data-s="se0fca1a9">
     <div>
       <p class="muted" data-s="s51c48588">
-        {{ tr('包含暫存上傳檔（owner ACL 紀錄追蹤）+ 表單填寫 / 用印 / 浮水印歷史目錄。
-        匿名 / 未追蹤的檔案歸到「(匿名)」列。檔案多時統計約需數秒～數十秒，
-        結果會 cache 60 秒。') }}
+        {{ tr('包含暫存上傳檔、我的工作區、公文撰擬案件、會議錄音，以及表單填寫 / 用印 / 浮水印歷史。按使用者名稱可以看各類別的明細。匿名 / 未追蹤的檔案歸到「(匿名)」列。檔案多時統計約需數秒～數十秒，結果會 cache 60 秒。') }}
       </p>
     </div>
     <div data-s="sc445ac64">
@@ -172,7 +185,10 @@
       <button class="btn" id="ssUserRefresh">{{ icon('refresh', size=14) }} {{ tr('重新統計') }}</button>
     </div>
   </div>
-  <div id="ssUserStats" data-s="s5371db16">
+  {# 點使用者名稱展開明細：目前佔用依類別、近 30 天上傳依工具（2026-10-09 使用者：
+     「可以再往下點入深看該使用者的各種類的使用量是多少嗎」）。類別名稱由伺服器送來（只有一份）。 #}
+  <div id="ssUserStats" data-s="s5371db16"
+       data-cats='{{ usage_categories|map(attribute="key")|list|tojson }}'>
     <div class="ss-skeleton">
       <div class="ss-skel-bar"></div>
       <div class="ss-skel-bar"></div>
@@ -183,6 +199,8 @@
     </div>
   </div>
 </div>
+
+<template id="ssCatLabels">{% for c in usage_categories %}<span data-k="{{ c.key }}">{{ tr(c.label) }}</span>{% endfor %}</template>
 
 <div class="panel">
   <h2 class="ssdb-head">{{ icon('archive', size=18) }} {{ tr('資料庫健康狀態') }}
@@ -448,6 +466,38 @@ let sortKey = 'bytes';   // 'username' | 'count' | 'bytes'
 let sortDir = -1;        // 1 = asc, -1 = desc
 let _lastUsersData = null;
 
+// 展開明細的使用者（重新統計、換排序之後照樣開著）
+const ssOpenUsers = new Set();
+const SS_CAT_ORDER = JSON.parse($('ssUserStats').dataset.cats || '[]');
+const SS_CAT_LABEL = {};
+document.getElementById('ssCatLabels').content.querySelectorAll('[data-k]').forEach(s => {
+  SS_CAT_LABEL[s.dataset.k] = s.textContent;
+});
+function miniTable(rows, labelOf) {
+  const max = Math.max(...rows.map(x => x.bytes || 0), 1);
+  return '<table class="ss-mini"><tbody>' + rows.map(x => `<tr>
+      <td>${escapeHTML(labelOf(x))}</td>
+      <td class="num">${(x.count || 0).toLocaleString()} ${tr('個')}</td>
+      <td class="num">${fmtBytes(x.bytes || 0)}</td>
+      <td class="ss-mini-bar"><span data-style="width:${((x.bytes || 0) / max * 100).toFixed(1)}%"></span></td>
+    </tr>`).join('') + '</tbody></table>';
+}
+function detailRow(r) {
+  const cats = (r.categories || []).slice().sort((a, b) =>
+    (b.bytes - a.bytes) || (SS_CAT_ORDER.indexOf(a.key) - SS_CAT_ORDER.indexOf(b.key)));
+  const tools = r.tools_30d || [];
+  const left = cats.length
+    ? miniTable(cats, x => SS_CAT_LABEL[x.key] || x.key)
+    : `<p class="muted">${tr('目前沒有佔用任何檔案。')}</p>`;
+  const right = tools.length
+    ? miniTable(tools, x => x.name ? tr(x.name) : x.tool)
+    : `<p class="muted">${tr('近 30 天沒有上傳紀錄。')}</p>`;
+  return `<tr class="ss-detail"><td colspan="6"><div class="ss-detail-grid">
+      <div><h4>${tr('目前佔用（依類別）')}</h4>${left}</div>
+      <div><h4>${tr('近 30 天上傳（依工具）')}</h4>${right}</div>
+    </div></td></tr>`;
+}
+
 function renderUsers(users) {
   _lastUsersData = users;
   if (!users || !users.users) {
@@ -497,9 +547,12 @@ function renderUsers(users) {
     if (barPct >= 80) barCls = 'crit';
     else if (barPct >= 50) barCls = 'warn';
     const hint = SS_ROW_HINTS[r.username];
+    const open = ssOpenUsers.has(r.username);
+    const btn = `<button type="button" class="ss-user-btn" data-user="${escapeHTML(r.username)}" aria-expanded="${open}">`
+      + `<span class="ss-chev"></span>${escapeHTML(r.username)}</button>`;
     const nameCell = hint
-      ? `<td class="ss-hint-cell">${escapeHTML(r.username)}<span class="ss-hint-mark">?</span><span class="ss-hint-pop">${escapeHTML(hint)}</span></td>`
-      : `<td>${escapeHTML(r.username)}</td>`;
+      ? `<td class="ss-hint-cell">${btn}<span class="ss-hint-mark">?</span><span class="ss-hint-pop">${escapeHTML(hint)}</span></td>`
+      : `<td>${btn}</td>`;
     html += `<tr>
       ${nameCell}
       <td class="num">${(r.count || 0).toLocaleString()}</td>
@@ -510,6 +563,7 @@ function renderUsers(users) {
         <div class="bar-fill ${barCls}" data-style="width:${barPct.toFixed(1)}%"></div>
       </div></td>
     </tr>`;
+    if (open) html += detailRow(r);
   }
   // 合計列原本「近 30 天上傳次數」是空的 —— 同一列其他三欄都有數字，
   // 空一格看起來像壞掉。這一欄的合計就是畫面上各列的和（沒有分頁，加得完）。
@@ -523,6 +577,13 @@ function renderUsers(users) {
     <td></td>
   </tr></tfoot></table>`;
   $('ssUserStats').innerHTML = html;
+  $('ssUserStats').querySelectorAll('.ss-user-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      const u = b.dataset.user;
+      if (ssOpenUsers.has(u)) ssOpenUsers.delete(u); else ssOpenUsers.add(u);
+      renderUsers(_lastUsersData);
+    });
+  });
   // Wire up header clicks for sorting
   $('ssUserStats').querySelectorAll('th[data-sort-key]').forEach(th => {
     th.addEventListener('click', () => {

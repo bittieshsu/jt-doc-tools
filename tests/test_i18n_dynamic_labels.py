@@ -363,15 +363,33 @@ def _official_doc_texts() -> list[str]:
                + od.LETTER_FACT_LABELS]
             + list(od.RELATIONS.values()) + list(od.ISSUERS.values()) + list(od.LETTER_SPEEDS)
             + list(od.STAGES) + [f"{s}（{{0}}/{{1}}）" for s in od.STAGES]
+            # 叫模型時的進度（「已送到 LLM 伺服器…」）：只有整理資料、撰寫草稿兩段會叫模型。
+            # 字數與段號由前端 `tr()` 的數字退路換成 `{0}` `{1}`…，鍵就是換完的樣子
+            + [_number_key(r.llm_message(k, s, 1, 3, 25))
+               for k in r.LLM_MESSAGES for s in od.STAGES[:2]]
             + [r._MODEL_FAILED, r._DRAFT_FAILED]
             # 參考知識庫：進度、查不到 / 失敗的說明、參考資料的用途標籤；範本不能用的訊息
             + [r.KB_STAGE, r.TEMPLATE_GONE] + list(r.KB_NOTES.values())
+            + [r.HISTORY_STAGE] + list(r.HISTORY_NOTES.values())
             + list(od.REF_PURPOSES.values()) + list(_kb_purposes()))
+
+
+def _number_key(s: str) -> str:
+    """照 `static/js/i18n.js` 的數字退路把連續數字換成 `{0}` `{1}`…（判準自己寫一份）。"""
+    import itertools
+    n = itertools.count()
+    return re.sub(r"\d[\d,.]*", lambda m: "{%d}" % next(n), s)
 
 
 def _kb_purposes() -> list[str]:
     from app.core.kb import store
     return list(store.PURPOSES.values())
+
+
+def _official_doc_di_texts() -> list[str]:
+    """DI 檔的注意事項（`official_doc_di.MESSAGES`，樣板＋參數，前端 `tr(樣板)` 再填）。"""
+    from app.core import official_doc_di as di
+    return list(di.MESSAGES.values())
 
 
 def _official_doc_example_texts() -> list[str]:
@@ -394,7 +412,14 @@ def _meeting_resend_messages() -> list[str]:
     return list(importlib.import_module("app.tools.meeting_transcribe.resend").MESSAGES)
 
 
+def _usage_category_labels() -> list[str]:
+    """系統狀態「使用者檔案用量」明細的類別名稱（伺服器端給，樣板 `tr(c.label)`）。"""
+    from app.core.host_stats import USAGE_CATEGORIES
+    return [v for _, v in USAGE_CATEGORIES]
+
+
 @pytest.mark.parametrize("name,getter", [
+    ("使用者檔案用量的類別", _usage_category_labels),
     ("去識別化樣態", _deident_labels),
     ("設定備份的類別", _settings_export_labels),
     ("相依套件說明", _sys_deps_labels),
@@ -422,6 +447,7 @@ def _meeting_resend_messages() -> list[str]:
     ("公文撰擬的檢查與資料表", _official_doc_texts),
     ("公文撰擬的資料來源", _official_doc_source_texts),
     ("公文撰擬的範例下拉", _official_doc_example_texts),
+    ("公文撰擬的 DI 檔注意事項", _official_doc_di_texts),
     ("會議摘要送回轉逐字稿的理由", _meeting_resend_messages),
 ])
 @pytest.mark.parametrize("locale", _locales())
@@ -463,6 +489,7 @@ _OPTION_RAW_OK = {
     # （同期望語），英日介面下也要看得到會印出什麼字
     ("official_doc.html", "c"): "原樣印在公文上的正本／副本標示",
     ("official_doc.html", "m"): "原樣印在公文上的發文方式",
+    ("official_doc.html", "lab"): "原樣寫進公文的聯絡資訊欄位名稱（聯絡人／承辦人）",
 }
 
 _OPTION_RE = re.compile(r"<option\b[^>]*>\s*\{\{\s*([^}]+?)\s*\}\}\s*</option>")

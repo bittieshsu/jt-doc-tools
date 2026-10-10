@@ -35,7 +35,10 @@ def test_the_page_draws_attribution_and_notice_as_text():
     src = (ROOT / "app/tools/official_doc/templates/official_doc.html").read_text(encoding="utf-8")
     body = src[src.index("function renderRefs"):]
     body = body[:body.index("\n  }\n")]
-    assert re.search(r"at\.textContent\s*=\s*r\.attribution", body), "出處沒有畫出來"
+    # 出處（授權條款要求顯名）：2026-10-09 起每個來源在整節最下面寫一次（不在每一筆重複），
+    # 一樣走 textContent。畫面上真的看得到由 test_official_doc_e2e_kb 驗。
+    assert re.search(r"attrs\.push\(r\.attribution\)", body), "出處沒有收進來"
+    assert re.search(r"ap\.textContent\s*=\s*attrs\.join", body), "出處沒有畫出來"
     assert re.search(r"nt\.textContent\s*=\s*r\.notice", body)
     assert "innerHTML" not in body
 

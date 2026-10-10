@@ -56,7 +56,15 @@ def test_the_form_lives_on_the_llm_settings_page(admin_session, kb_isolated):
     for fid in GONE_IDS:
         assert f'id="{fid}"' not in html, f"前綴的欄位 {fid} 又回來了"
     sec = html[html.index('id="embedding"'):]
-    assert "前綴" not in sec.split('id="llmSaveBar"')[0], "畫面上不可以再有前綴"
+    # 管理員不能自己填前綴；「前綴」兩個字只可以出現在說明裡（Nemotron-3-Embed 的前綴由系統
+    # 自動套用，2026-10-09 起說明要講出來），不可以是欄位或欄位標題
+    form = sec.split('id="llmSaveBar"')[0]
+    for lab in re.findall(r"<label\b[^>]*>(.*?)</label>", form, re.S):
+        assert "前綴" not in lab, f"前綴又變成可以填的欄位：{lab!r}"
+    for tag in re.findall(r"<(?:input|textarea)\b[^>]*>", form):
+        assert "prefix" not in tag.lower() and "前綴" not in tag, f"前綴又變成可以填的欄位：{tag}"
+    no_advice = re.sub(r'<div class="info-box emb-advice">.*?</div>', "", form, flags=re.S)
+    assert "前綴" not in no_advice, "前綴只可以出現在建議模型那一段說明裡"
     h2 = _h("h2", sec)
     assert "Embedding（向量檢索）設定" in h2 and 'class="tool-beta"' in h2, "那一區的標題要標 Beta"
     # 同一套表單樣式（管理區的設定頁一致）
@@ -361,8 +369,10 @@ def _pick_model(t: _Tab, name: str) -> None:
     assert t.wait_for(f"[...document.getElementById('kbEmbModel').options].some(o => o.value === {json.dumps(name)})"), \
         f"模型清單沒有列出 {name}：{_options(t)} / " + (t.js("document.getElementById('kbEmbModelNote').textContent") or "")
     assert "gemma4:26b" not in _options(t), "聊天用的模型不可以列進嵌入模型的清單"
-    t.js(f"const s = document.getElementById('kbEmbModel'); s.value = {json.dumps(name)};"
-         "s.dispatchEvent(new Event('change', {bubbles: true}));")
+    # 包在函式裡：頂層的 `const` 會留在頁面上，同一個分頁挑第二次就「已經宣告過」而整段不執行
+    t.js(f"(function () {{ const s = document.getElementById('kbEmbModel'); s.value = {json.dumps(name)};"
+         "s.dispatchEvent(new Event('change', {bubbles: true})); })()")
+    assert t.js(f"document.getElementById('kbEmbModel').value === {json.dumps(name)}"), f"沒有選到 {name}"
 
 
 @_needs_browser
@@ -545,3 +555,33 @@ def test_inheriting_the_llm_server_works_in_a_browser(live):
         _post(port, "/admin/knowledge/api/embedding",
               {"use_llm_server": False, "base_url": before["base_url"], "model": before["model"]})
         p.write_text(old, encoding="utf-8")
+
+
+@_needs_browser
+def test_picking_nemotron_says_what_is_added_automatically(live):
+    """選了 Nemotron-3-Embed：模型下方講出系統自動加的前綴與上下文長度（伺服器算好的 `usage`）；
+    換回別的模型那一行就收起來。建議模型的說明一直在（2026-10-09 使用者：「說明文字也要補充」）。"""
+    port, cdp, _, _ = live
+    nemo = "hf.co/Abiray/Nemotron-3-Embed-8B-GGUF:Q8_0"
+    with FakeEmbed("ollama", models=[(nemo, ["embedding"]), ("embeddinggemma:300m", ["embedding"])]) as fe2:
+        t = _Tab(cdp)
+        try:
+            t.go(f"http://127.0.0.1:{port}/admin/llm-settings")
+            assert t.wait_for("!!(document.getElementById('kbEmbIndex').textContent || '').trim()"
+                              " && !(document.getElementById('kbEmbIndex').textContent || '').includes('讀取中')")
+            advice = t.js("document.querySelector('#embedding .emb-advice').textContent") or ""
+            assert "建議使用 NVIDIA Nemotron-3-Embed-8B" in advice and "ollama pull" in advice, advice
+            t.js("(function () { const c = document.getElementById('kbEmbInherit'); if (c.checked) c.click(); })()")
+            t.js(f"""(function () {{ const u = document.getElementById('kbEmbUrl'); u.value = {json.dumps(fe2.base)};
+                     u.dispatchEvent(new Event('change', {{bubbles: true}})); }})()""")
+            _pick_model(t, nemo)
+            assert t.wait_for("!document.getElementById('kbEmbUsage').hidden"), "選了 Nemotron 沒有講出自動加的前綴"
+            txt = t.js("document.getElementById('kbEmbUsage').textContent") or ""
+            assert '"query: "' in txt and '"passage: "' in txt, txt
+            assert re.search(r"8,?192", txt), txt
+            _pick_model(t, "embeddinggemma:300m")
+            assert t.wait_for("document.getElementById('kbEmbUsage').hidden"), "換成別的模型那一行要收起來"
+            t.drain()
+            assert not t.errs, "主控台有錯誤：\n  " + "\n  ".join(t.errs)
+        finally:
+            t.close()

@@ -39,6 +39,18 @@
 .od-src-cards .opt-label, .od-src-cards .opt-desc { overflow-wrap:anywhere; text-wrap:balance; }
 .od-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; align-items:center; }
 .od-grid-gap { margin-top:14px; }
+/* 聯絡資訊：一組子欄位（fieldset 不要瀏覽器預設的框線與內距；地址佔整列） */
+.od-contact { border:0; padding:0; margin:14px 0 0; min-width:0; }
+.od-contact > legend { padding:0; margin:0; font-size:13.5px; font-weight:600; color:#334155; }
+.od-opt { font-weight:400; color:var(--muted); font-size:12.5px; margin-left:6px; }
+.od-ct-grid { margin-top:8px; }
+.od-ct-wide { grid-column:1 / -1; }
+.od-ct-person { display:flex; gap:6px; min-width:0; }
+.od-ct-person > .jt-select-wrap, .od-ct-person > select { flex:0 0 96px; }
+.od-ct-person > input { flex:1 1 auto; min-width:0; }
+.od-f > .od-sublab { font-size:12.5px; font-weight:600; color:#475569; }
+.od-ct-unplaced { margin:10px 0 0; }
+.od-ct-unplaced ul { margin:4px 0 0; padding-left:20px; }
 /* 複製的退路用：要在畫面外但**不可以是 display:none**（那樣選不到文字） */
 .od-offscreen { position:fixed; left:-9999px; top:0; width:1px; height:1px; }
 /* 結果區自己有一整排匯出鈕（照改過之後的文字），進度列那排（下載原始草稿 /
@@ -155,22 +167,39 @@
 }
 /* 參考資料（知識庫）*/
 .od-kb { margin-top:18px; padding-top:14px; border-top:1px dashed var(--border); }
-.od-refs { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
-.od-ref { border:1px solid var(--border); border-radius:6px; padding:8px 12px; background:#fff;
-          font-size:13.5px; line-height:1.6; }
-.od-ref-head { display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; }
-.od-ref-id { font-weight:600; color:#334155; font-variant-numeric:tabular-nums; }
-.od-ref-title { font-weight:600; overflow-wrap:anywhere; }
-.od-ref-where { color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; }
-.od-ref details { margin-top:4px; }
+.od-ref-legend { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px 16px;
+                 font-size:12.5px; color:#475569; }
+.od-ref-legend li { display:inline-flex; align-items:center; gap:6px; }
+.od-refs { list-style:none; margin:10px 0 0; padding:0; display:grid; gap:10px; }
+.od-ref { border:1px solid var(--border); border-left:3px solid #cbd5e1; border-radius:8px; padding:10px 14px;
+          background:#fff; font-size:13.5px; line-height:1.6; min-width:0; }
+.od-ref.is-basis { border-left-color:#10b981; }
+.od-ref.is-past { border-left-color:#8b5cf6; }
+.od-ref-top { display:flex; align-items:center; gap:8px; }
+.od-ref-id { font-size:12px; font-weight:600; color:#64748b; font-variant-numeric:tabular-nums; }
+.od-ref-top .od-b-used { margin-left:auto; display:inline-flex; align-items:center; gap:3px; }
+.od-ref-name { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 10px; margin-top:4px; }
+.od-ref-title { font-size:15px; font-weight:700; color:#0f172a; overflow-wrap:anywhere; }
+a.od-ref-title { color:#1d4ed8; text-decoration:none; }
+a.od-ref-title:hover { text-decoration:underline; }
+.od-ref-art { font-size:14px; font-weight:700; color:#047857; white-space:nowrap; }
+.od-ref-where { margin-top:1px; color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; }
 .od-ref-notice { margin:4px 0 0; font-size:12.5px; line-height:1.6; color:#92400e; }
-.od-ref-attr { margin:4px 0 0; font-size:12px; line-height:1.6; color:var(--muted); overflow-wrap:anywhere; }
-.od-ref summary { cursor:pointer; font-size:12.5px; color:var(--muted); }
+.od-ref-excerpt { margin:6px 0 0; font-size:13px; line-height:1.65; color:#334155; overflow-wrap:anywhere;
+                  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.od-ref.is-open .od-ref-excerpt { display:none; }
 .od-ref-text { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px;
-               color:#334155; background:#f8fafc; border-radius:4px; padding:6px 8px; }
+               color:#334155; background:#f8fafc; border-radius:6px; padding:8px 10px; }
+.od-ref-acts { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-top:8px; }
+.od-ref-acts .btn { height:28px; padding:0 10px; font-size:12.5px; display:inline-flex; align-items:center; gap:4px; }
+.od-ref-found { font-size:12.5px; color:#047857; display:inline-flex; align-items:center; gap:4px; }
+.od-ref-found.is-none { color:var(--muted); }
+.od-ref-attrs { margin:10px 0 0; font-size:12px; line-height:1.6; color:var(--muted); overflow-wrap:anywhere; }
 .od-b-basis  { color:#047857; background:#ecfdf5; }
 .od-b-format { color:#1d4ed8; background:#eff6ff; }
 .od-b-style  { color:#64748b; background:#f8fafc; }
+.od-b-past   { color:#6d28d9; background:#f5f3ff; }
+.od-check-next { margin-top:12px; }
 .od-b-used   { color:#7c2d12; background:#fff7ed; }
 .od-attrib { margin:6px 0 0; font-size:12px; line-height:1.6; color:var(--muted); overflow-wrap:anywhere; }
 #odTpl { min-width:14em; max-width:100%; }
@@ -202,6 +231,11 @@
 .od-rw-target.is-warn { color:#b45309; }
 .od-rw-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:center; }
 .od-rw-row input.field { flex:1 1 240px; min-width:0; }
+.od-rw-ready { display:inline-flex; align-items:center; gap:4px; font-size:13px; font-weight:600; color:#1d4ed8; }
+#odRwGo.is-ready { animation:odRwReady 1.4s ease-out 2; }
+@keyframes odRwReady { 0% { box-shadow:0 0 0 0 rgba(37,99,235,.55); }
+                       70% { box-shadow:0 0 0 10px rgba(37,99,235,0); } 100% { box-shadow:0 0 0 0 rgba(37,99,235,0); } }
+@media (prefers-reduced-motion: reduce) { #odRwGo.is-ready { animation:none; } }
 .od-rw-out { margin-top:12px; }
 .od-diff { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
 .od-diff-col { border:1px solid var(--border); border-radius:8px; background:#fff; overflow:hidden; min-width:0; }
@@ -350,6 +384,86 @@
               justify-content:center; padding-top:80px; }
 .od-pv-msg { margin:0; padding:24px 12px; text-align:center; font-size:13px; line-height:1.7;
              color:var(--muted); }
+/* ===== DI 檔匯出預覽（檢視器）：遮罩 ＋ 固定高度的卡片，內容區自己捲動 ===== */
+.od-di { position:fixed; inset:0; z-index:1500; background:rgba(15, 23, 42, .45);
+         display:flex; align-items:center; justify-content:center; padding:16px; }
+.od-di[hidden] { display:none; }
+.od-di-card { width:min(1000px, 100%); height:min(88vh, 900px); background:#fff; border-radius:12px;
+              box-shadow:0 20px 50px rgba(15, 23, 42, .30); display:flex; flex-direction:column; overflow:hidden; }
+.od-di-head { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); }
+.od-di-head h3 { margin:0; font-size:16px; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.od-di-name { flex:1 1 auto; min-width:0; font-size:12.5px; color:var(--muted); overflow:hidden;
+              text-overflow:ellipsis; white-space:nowrap; }
+.od-di-x { border:0; background:transparent; color:#64748b; width:32px; height:32px; border-radius:6px;
+           cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+.od-di-x:hover { background:#f1f5f9; color:#0f172a; }
+.od-di-status { padding:10px 16px 0; display:flex; flex-direction:column; gap:6px; }
+.od-di-badge { display:inline-flex; align-items:center; gap:6px; align-self:flex-start; font-size:12.5px;
+               font-weight:600; padding:3px 10px; border-radius:999px; }
+.od-di-badge.ok { background:#dcfce7; color:#166534; }
+.od-di-badge.bad { background:#fee2e2; color:#991b1b; }
+.od-di-notes { margin:0; padding-left:20px; font-size:13px; color:#92400e; line-height:1.6; }
+.od-di-errs { margin:0; font-size:12px; color:#991b1b; font-family:ui-monospace, monospace; white-space:pre-wrap; }
+.od-di-tabs { display:flex; gap:4px; padding:10px 16px 0; border-bottom:1px solid var(--border); }
+.od-di-tab { display:inline-flex; align-items:center; gap:6px; border:1px solid transparent; border-bottom:0;
+             background:transparent; padding:8px 14px; font-size:13.5px; color:#475569; border-radius:8px 8px 0 0;
+             cursor:pointer; margin-bottom:-1px; font-family:inherit; }
+.od-di-tab:hover { background:#f8fafc; color:#0f172a; }
+.od-di-tab.active { background:#fff; border-color:var(--border); color:#1d4ed8; font-weight:600; }
+.od-di-body { flex:1 1 auto; min-height:0; overflow:auto; background:#f8fafc; }
+.od-di-pane { padding:16px; }
+.od-di-pane[hidden] { display:none; }
+.od-di-foot { display:flex; align-items:center; gap:8px; padding:10px 16px; border-top:1px solid var(--border); }
+.od-di-hint { flex:1 1 auto; font-size:12.5px; }
+/* 公文預覽：照公文的樣子排（標楷體、段名懸掛、項次逐層內縮），內容全部取自 DI 檔 */
+.od-di-doc { max-width:720px; margin:0 auto; background:#fff; border:1px solid #cbd5e1;
+             box-shadow:0 2px 8px rgba(15, 23, 42, .08); padding:36px 44px; color:#0f172a;
+             font-family:"標楷體", "DFKai-SB", "TW-Kai", "Noto Serif CJK TC", serif; font-size:16px; line-height:1.8; }
+.od-di-doc .dd-title { text-align:center; font-size:22px; letter-spacing:.1em; margin:0 0 12px; }
+.od-di-doc .dd-head { display:flex; justify-content:space-between; gap:16px; font-size:18px; margin:0 0 12px; }
+.od-di-doc .dd-contact { margin:0 0 10px auto; width:fit-content; max-width:60%; font-size:13px; line-height:1.6; }
+.od-di-doc .dd-meta { margin:0; font-size:14px; }
+.od-di-doc .dd-label { margin:10px 0 0; padding-left:3em; text-indent:-3em; }
+.od-di-doc .dd-item { margin:0; }
+.od-di-doc .dd-empty { color:#94a3b8; font-size:13px; }
+.od-di-doc .dd-copies { margin:16px 0 0; font-size:14px; }
+.od-di-doc .dd-sign { margin:24px 0 0 50%; }
+.od-di-doc .dd-todo, .od-di-fields .df-todo { background:#fef3c7; border-radius:2px; }
+/* 欄位：每個欄位一列；機關代碼與留空的欄位標出來 */
+.od-di-fields { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--border); font-size:13.5px; }
+.od-di-fields th, .od-di-fields td { padding:8px 12px; border-bottom:1px solid #eef1f5; text-align:left; vertical-align:top; }
+.od-di-fields th { width:11em; background:#f8fafc; color:#334155; font-weight:600; }
+.od-di-fields .df-tag { display:block; font-weight:400; font-size:11.5px; color:#94a3b8;
+                        font-family:ui-monospace, monospace; }
+.od-di-fields .df-empty { color:#94a3b8; }
+.od-di-fields .df-code { display:inline-block; margin-left:8px; font-size:11.5px; padding:1px 8px; border-radius:999px;
+                         background:#e0f2fe; color:#075985; font-family:ui-monospace, monospace; }
+.od-di-fields .df-code.miss { background:#fef3c7; color:#92400e; font-family:inherit; }
+.od-di-fields ul { margin:4px 0 0; padding-left:0; list-style:none; }
+.od-di-fields li { margin:2px 0; }
+.od-di-fields .df-no { color:#64748b; margin-right:4px; }
+/* XML 原始碼：色彩標示（宣告、標籤、屬性、值、文字、實體），〔待補〕另外標底色，左邊行號 */
+.od-di-xml { margin:0; background:#0f172a; color:#e2e8f0; border-radius:8px; padding:14px 16px; font-size:13px;
+             line-height:1.65; white-space:pre-wrap; word-break:break-all; counter-reset:ln;
+             font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono CJK TC", monospace; }
+.od-di-xml .x-ln { display:block; padding-left:3.2em; position:relative; }
+.od-di-xml .x-ln::before { counter-increment:ln; content:counter(ln); position:absolute; left:0; width:2.4em;
+                           text-align:right; color:#475569; }
+.od-di-xml .x-decl { color:#94a3b8; }
+.od-di-xml .x-punc { color:#64748b; }
+.od-di-xml .x-tag { color:#7dd3fc; }
+.od-di-xml .x-attr { color:#c4b5fd; }
+.od-di-xml .x-val { color:#fbbf24; }
+.od-di-xml .x-text { color:#e2e8f0; }
+.od-di-xml .x-ent { color:#f472b6; }
+.od-di-xml .x-todo { background:rgba(251, 191, 36, .25); color:#fde68a; border-radius:3px; }
+@media (max-width: 640px) {
+  .od-di { padding:0; }
+  .od-di-card { height:100vh; border-radius:0; }
+  .od-di-doc { padding:20px 16px; }
+  .od-di-fields th { width:auto; }
+  .od-di-hint { display:none; }
+}
 </style>
 {% endblock %}
 
@@ -546,7 +660,7 @@
       </div>
       <div class="od-grid">
         <div class="od-f">
-          <label class="od-lab" for="odUnits">{{ tr('承辦／協辦單位') }}</label>
+          <label class="od-lab" for="odUnits">{{ tr('承辦/協辦單位') }}</label>
           <input type="text" id="odUnits" class="field" maxlength="{{ max_field }}"
                  placeholder="{{ tr('例如：資訊室主辦，總務科協辦') }}">
           {{ hist_btn('odUnits') }}
@@ -618,13 +732,14 @@
                  data-agency="{{ tr('發文機關全銜') }}" data-company="{{ tr('公司名稱') }}">{{ tr('發文機關全銜') }}</label>
           <input type="text" id="odOrg" class="field" maxlength="{{ max_field }}"
                  placeholder="{{ tr('例如：嘉禾市資訊局') }}"
-                 data-ph-agency="{{ tr('例如：嘉禾市資訊局') }}" data-ph-company="{{ tr('例如：○○資訊股份有限公司') }}"{% if orgs_available %} list="odOrgList" autocomplete="off"{% endif %}>
+                 data-ph-agency="{{ tr('例如：嘉禾市資訊局') }}" data-ph-company="{{ tr('例如：○○資訊股份有限公司') }}"
+                 data-org-pick="single" autocomplete="off">
           {{ hist_btn('odOrg') }}
         </div>
         <div class="od-f">
           <label class="od-lab" for="odReceiver">{{ tr('受文者') }}</label>
           <input type="text" id="odReceiver" class="field" maxlength="{{ max_field }}"
-                 placeholder="{{ tr('例如：嘉禾市東湖區公所') }}"{% if orgs_available %} list="odOrgList" autocomplete="off"{% endif %}>
+                 placeholder="{{ tr('例如：嘉禾市東湖區公所') }}" data-org-pick="single" autocomplete="off">
           {{ hist_btn('odReceiver') }}
         </div>
         <div class="od-f" id="odRelationRow">
@@ -661,10 +776,22 @@
           </select>
         </div>
       </div>
+      {# 機關名稱從「公文電子交換系統地址簿」挑（static/js/org_picker.js）：本站樣式的清單、挑了一起記機關代碼
+         （電子公文要用）。只是建議 —— 打什麼都收。地址簿沒下載或太久沒更新：下面講出來，第一次用時再提醒一次。 #}
+      <div id="orgPickerCfg" hidden data-endpoint="/tools/official-doc/orgs"
+           data-installed="{{ '1' if orgs_info.installed else '0' }}" data-stale="{{ '1' if orgs_info.stale else '0' }}"
+           data-days="{{ orgs_info.days }}" data-updated="{{ orgs_info.updated }}"
+           data-admin="{{ '1' if orgs_info.admin else '0' }}" data-settings="/admin/official-doc"></div>
+      {% if orgs_info.installed and not orgs_info.stale %}
+      <p class="od-hint">{{ tr('機關名稱打兩個字以上，或按輸入框右邊的 ▼，從機關地址簿挑全銜；從清單挑的會一起記下機關代碼（電子公文要用）。') }}{% if orgs_info.updated %}{{ tr('地址簿更新日期：') }}{{ orgs_info.updated }}{% endif %}</p>
+      {% elif orgs_info.installed %}
+      <p class="od-hint od-warn-hint" id="odOrgStale">{{ tr('機關地址簿已經 {0} 天沒更新（最後更新 {1}），機關改名或改制之後可能查不到。')|replace('{0}', orgs_info.days|string)|replace('{1}', orgs_info.updated) }}
+        {% if orgs_info.admin %}<a href="/admin/official-doc">{{ tr('前往公文撰擬設定') }}</a>{% else %}{{ tr('請通知管理員到「公文撰擬設定」下載或更新。') }}{% endif %}</p>
+      {% else %}
+      <p class="od-hint od-warn-hint" id="odOrgMissing">{{ tr('機關地址簿還沒下載，挑不到機關，也帶不出機關代碼（電子公文要用）。') }}
+        {% if orgs_info.admin %}<a href="/admin/official-doc">{{ tr('前往公文撰擬設定') }}</a>{% else %}{{ tr('請通知管理員到「公文撰擬設定」下載或更新。') }}{% endif %}</p>
+      {% endif %}
       {% if orgs_available %}
-      {# 機關名稱建議：公文電子交換系統地址簿（管理員下載的）。只是建議 —— 打什麼都收。 #}
-      <datalist id="odOrgList"></datalist>
-      <p class="od-hint">{{ tr('發文機關與受文者輸入兩個字以上，會從機關地址簿列出建議的全銜。') }}</p>
       {% for a in attribution.orgs %}<p class="od-attrib" data-i18n="skip">{{ tr('資料來源：') }}{{ a }}</p>{% endfor %}
       {% endif %}
       <p class="od-salute" id="odSalute" hidden>
@@ -682,13 +809,13 @@
         <div class="od-f">
           <label class="od-lab" for="odCopies">{{ tr('正本') }}</label>
           <input type="text" id="odCopies" class="field" maxlength="{{ max_field }}"
-                 placeholder="{{ tr('留空＝同受文者') }}">
+                 placeholder="{{ tr('留空＝同受文者') }}" data-org-pick="multi" autocomplete="off">
           {{ hist_btn('odCopies') }}
         </div>
         <div class="od-f">
           <label class="od-lab" for="odCc">{{ tr('副本') }}</label>
           <input type="text" id="odCc" class="field" maxlength="{{ max_field }}"
-                 placeholder="{{ tr('例如：本局資訊安全科') }}">
+                 placeholder="{{ tr('例如：本局資訊安全科') }}" data-org-pick="multi" autocomplete="off">
           {{ hist_btn('odCc') }}
         </div>
         <div class="od-f">
@@ -704,26 +831,80 @@
           {{ hist_btn('odSignature') }}
         </div>
       </div>
-      <div class="od-f od-grid-gap">
-        <label class="od-lab" for="odContact">{{ tr('聯絡資訊') }}</label>
-        <textarea id="odContact" class="field od-mid" maxlength="{{ max_contact }}" rows="4"
-                  placeholder="{{ tr('地址') }}：…&#10;{{ tr('聯絡人') }}：…&#10;{{ tr('電話') }}：…&#10;{{ tr('傳真') }}：…&#10;{{ tr('電子信箱') }}：…"
-                  data-ph-agency="{{ tr('地址') }}：…&#10;{{ tr('聯絡人') }}：…&#10;{{ tr('電話') }}：…&#10;{{ tr('傳真') }}：…&#10;{{ tr('電子信箱') }}：…"
-                  data-ph-company="{{ tr('地址') }}：…&#10;{{ tr('統一編號') }}：…&#10;{{ tr('聯絡人') }}：…&#10;{{ tr('電話') }}：…&#10;{{ tr('電子信箱') }}：…"></textarea>
-        <p class="od-hint" id="odContactHint" data-agency="{{ tr('一行一項，原樣放在機關名稱下面。發文機關、聯絡資訊、署名、副本會記在這個瀏覽器裡，下次自動帶入。') }}"
-           data-company="{{ tr('一行一項，原樣放在公司名稱下面；沒填的話草稿會標出地址、統一編號、聯絡人待補。公司名稱、聯絡資訊、署名、副本會記在這個瀏覽器裡（跟機關的分開記），下次自動帶入。') }}">{{ tr('一行一項，原樣放在機關名稱下面。發文機關、聯絡資訊、署名、副本會記在這個瀏覽器裡，下次自動帶入。') }}</p>
-      </div>
+      {# 聯絡資訊：一格一個欄位，欄位名稱由程式寫（2026-10-10 使用者：原本的多行文字框讓人自己寫
+         欄位名稱，寫成「住址」「地　　址」就認不出是地址、某一行以「說明：」開頭整段排錯）。
+         每一欄都是選填；統一編號只有企業才有。鍵與欄位名稱是核心的 `CONTACT_FIELDS`。 #}
+      <fieldset class="od-contact" id="odContact" data-ct-aliases='{{ contact_aliases|tojson }}'>
+        <legend class="od-lab">{{ tr('聯絡資訊') }}<span class="od-opt">{{ tr('（每一欄都可以不填）') }}</span></legend>
+        <div class="od-grid od-ct-grid">
+          <div class="od-f od-ct-wide">
+            <label class="od-sublab" for="odCtAddress">{{ tr('地址') }}</label>
+            <input type="text" id="odCtAddress" class="field" data-ct="address" maxlength="{{ contact_max.address }}"
+                   placeholder="{{ tr('例如：嘉禾市文化路1號') }}">
+          </div>
+          <div class="od-f" id="odCtTaxIdRow" hidden>
+            <label class="od-sublab" for="odCtTaxId">{{ tr('統一編號') }}</label>
+            <input type="text" id="odCtTaxId" class="field" data-ct="tax_id" maxlength="{{ contact_max.tax_id }}"
+                   inputmode="numeric" placeholder="{{ tr('例如：12345678') }}">
+          </div>
+          <div class="od-f">
+            <label class="od-sublab" for="odCtPerson">{{ tr('聯絡人') }}</label>
+            {# 欄位名稱「聯絡人 / 承辦人」原樣寫進草稿 → 選項不翻譯 #}
+            <div class="od-ct-person">
+              <select id="odCtPersonLabel" class="field jt-select" data-i18n="skip"
+                      aria-label="{{ tr('草稿上的欄位名稱') }}">
+                {% for lab in contact_person_labels %}<option value="{{ lab }}">{{ lab }}</option>{% endfor %}
+              </select>
+              <input type="text" id="odCtPerson" class="field" data-ct="person" maxlength="{{ contact_max.person }}"
+                     placeholder="{{ tr('例如：王○○') }}">
+            </div>
+          </div>
+          <div class="od-f">
+            <label class="od-sublab" for="odCtPhone">{{ tr('電話') }}</label>
+            <input type="text" id="odCtPhone" class="field" data-ct="phone" maxlength="{{ contact_max.phone }}"
+                   inputmode="tel" placeholder="{{ tr('例如：(02)1234-5678 分機 123') }}">
+          </div>
+          <div class="od-f">
+            <label class="od-sublab" for="odCtFax">{{ tr('傳真') }}</label>
+            <input type="text" id="odCtFax" class="field" data-ct="fax" maxlength="{{ contact_max.fax }}"
+                   inputmode="tel" placeholder="{{ tr('例如：(02)1234-5679') }}">
+          </div>
+          <div class="od-f">
+            <label class="od-sublab" for="odCtEmail">{{ tr('電子信箱') }}</label>
+            <input type="text" id="odCtEmail" class="field" data-ct="email" maxlength="{{ contact_max.email }}"
+                   inputmode="email" placeholder="{{ tr('例如：name@example.gov.tw') }}">
+          </div>
+        </div>
+        {# 舊的一行一項資料（升級前的案件、之前記在瀏覽器裡的）分欄時對不到欄位的那幾行：
+           不放進草稿，講出來讓使用者自己填到對的欄位 #}
+        <div class="warn-box od-ct-unplaced" id="odCtUnplaced" hidden>
+          <span>{{ tr('原本的聯絡資訊有幾行對不到欄位，不會放進草稿，請填到對應的欄位：') }}</span>
+          <ul id="odCtUnplacedList"></ul>
+        </div>
+        <p class="od-hint" id="odContactHint" data-agency="{{ tr('有填的欄位才會出現在草稿上機關名稱的下面，欄位名稱由系統寫。發文機關、聯絡資訊、署名、副本會記在這個瀏覽器裡，下次自動帶入。') }}"
+           data-company="{{ tr('有填的欄位才會出現在草稿上公司名稱的下面，欄位名稱由系統寫；全部沒填的話草稿會標出地址、統一編號、聯絡人待補。公司名稱、聯絡資訊、署名、副本會記在這個瀏覽器裡（跟機關的分開記），下次自動帶入。') }}">{{ tr('有填的欄位才會出現在草稿上機關名稱的下面，欄位名稱由系統寫。發文機關、聯絡資訊、署名、副本會記在這個瀏覽器裡，下次自動帶入。') }}</p>
+      </fieldset>
     </div>
 
     {# 參考知識庫：只有這個人看得到至少一個資料集時才出現（勾了也查不到東西的話，
-       不如不給這個選項）。預設不勾 —— 沒要求就不拿任何資料進來。 #}
-    {% if kb_available %}
+       不如不給這個選項）。預設不勾 —— 沒要求就不拿任何資料進來。
+       參考歷史案件：只有這個人自己有寫過的案件時才出現；只查得到自己的（伺服器端判斷）。 #}
+    {% if kb_available or history_available %}
     <div class="od-kb">
+      {% if kb_available %}
       <label class="od-check">
         <input type="checkbox" id="odUseKb">
         <span>{{ tr('參考公文知識庫') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></span>
       </label>
-      <p class="od-hint">{{ tr('先在公文知識庫裡找跟這件事相關的資料（只會用到你看得到的資料集）再撰寫。只有「業務依據」那一類算草稿的依據；格式手冊與範例公文只參考寫法，裡面的金額、日期、法規不會被當成這件事的事實。') }}</p>
+      <p class="od-hint">{{ tr('產生草稿時會用需求敘述（簽辦意見是辦理方向與來文開頭）自動查公文知識庫，不用另外輸入關鍵字；只查你看得到的資料集。只有「業務依據」那一類算草稿的依據，格式手冊與範例公文只參考寫法。') }}</p>
+      {% endif %}
+      {% if history_available %}
+      <label class="od-check{% if kb_available %} od-check-next{% endif %}">
+        <input type="checkbox" id="odUseHistory">
+        <span>{{ tr('參考我的歷史案件') }}</span>
+      </label>
+      <p class="od-hint">{{ tr('產生草稿時會用需求敘述找你自己先前寫過、內容相近的案件（最多 3 件，取最新一版），只參考寫法與用語；機關、數字、日期、文號一律以這次寫的為準。只查得到你自己的案件。') }}</p>
+      {% endif %}
     </div>
     {% endif %}
 
@@ -815,9 +996,13 @@
               <input type="text" id="odRwInstr" class="field" maxlength="{{ max_instruction }}" hidden
                      aria-label="{{ tr('改寫要求') }}"
                      placeholder="{{ tr('例如：語氣委婉一點，期限與金額不要動') }}">
+              {# 選了改寫方式之後按鈕變成主要按鈕、閃一下，旁邊講出還要按它（2026-10-09 使用者：
+                 「選要做那一種，改寫按鈕要有變換效果或顏色，讓使用者一看就知道還要按下改寫鈕才會動作」）。
+                 按鈕上寫出選的是哪一種。 #}
               <button type="button" class="btn btn-secondary" id="odRwGo">
-                {{ icon('sparkles', size=16) }} <span>{{ tr('改寫') }}</span>
+                {{ icon('sparkles', size=16) }} <span id="odRwGoLabel">{{ tr('改寫') }}</span>
               </button>
+              <span class="od-rw-ready" id="odRwReady" hidden>{{ icon('back', size=14) }} {{ tr('選好了，按這個按鈕開始改寫') }}</span>
             </div>
             <div class="od-rw-out" id="odRwOut" hidden>
               <div class="od-diff">
@@ -870,12 +1055,26 @@
        （`#odResult.is-busy .od-sec > …`）照樣蓋得到。2026-10-08 使用者：「下半部排整齊一點」。 #}
     {# 這份草稿參考了哪些資料：沒勾知識庫的話整節不出現 #}
     <section class="od-sec od-box" id="odRefSec" hidden
-             data-purposes='{{ ref_purposes|tojson }}' data-notes='{{ kb_notes|tojson }}'>
+             data-purposes='{{ ref_purposes|tojson }}' data-notes='{{ kb_notes|tojson }}'
+             data-hnotes='{{ history_notes|tojson }}'>
       <div class="od-box-head"><h3>{{ icon('book', size=16) }} {{ tr('參考資料') }}</h3></div>
       <div class="od-box-body">
+        {# 2026-10-09 使用者：「裡面文字很多」「他有找到法條 那可以幹嘛? 我這樣看不出來」：
+           每一筆只留名稱＋條號、章節與版本一行、條文開頭兩行，下面是可以做的事
+           （在草稿裡標出寫到的地方、複製引用、看全文）。用途在上面一列圖例講一次，
+           出處（授權條款要求顯名）在最下面每個來源寫一次，不在每一筆重複。 #}
         <p class="od-hint" id="odRefNote"></p>
+        <ul class="od-ref-legend" id="odRefLegend" hidden></ul>
         <ul class="od-refs" id="odRefs"></ul>
+        <p class="od-ref-attrs" id="odRefAttrs" hidden></p>
       </div>
+      <template id="odRefIcons">
+        <span data-ic="search">{{ icon('search', size=13) }}</span>
+        <span data-ic="copy">{{ icon('copy', size=13) }}</span>
+        <span data-ic="eye">{{ icon('eye', size=13) }}</span>
+        <span data-ic="check">{{ icon('check', size=12) }}</span>
+        <span data-ic="globe">{{ icon('globe', size=13) }}</span>
+      </template>
     </section>
 
     <section class="od-sec od-box">
@@ -988,7 +1187,7 @@
               <label class="option-card">
                 <input type="checkbox" id="odCopyMarkOn" data-od-extra="odCopyMark">
                 <span class="opt-ic">{{ icon('copy', size=24) }}</span>
-                <span class="opt-label">{{ tr('正本／副本標示') }}</span>
+                <span class="opt-label">{{ tr('正本/副本標示') }}</span>
                 <span class="opt-desc">{{ tr('左上角印正本、副本或抄本') }}</span>
               </label>
               <label class="option-card">
@@ -1025,7 +1224,7 @@
           {# 勾了上面那張卡片才出現的那一格（`odXxxF`）；顯示與否由 `paintExtraFields()` 決定 #}
           <div class="od-extras-grid od-extra-fields">
             <div class="od-f" id="odCopyMarkF" hidden>
-              <label class="od-lab" for="odCopyMark">{{ tr('正本／副本標示') }}</label>
+              <label class="od-lab" for="odCopyMark">{{ tr('正本/副本標示') }}</label>
               {# 選項是**原樣印在文件上**的公文用語，不翻譯（同期望語） #}
               <select id="odCopyMark" class="field jt-select" data-i18n="skip">
                 <option value="">{{ tr('不標示') }}</option>
@@ -1081,6 +1280,15 @@
           <button type="button" class="btn btn-secondary" data-od-dl="json">{{ icon('download', size=16) }} <span>JSON</span></button>
           <button type="button" class="btn btn-secondary" id="odCopy">{{ icon('copy', size=16) }} <span>{{ tr('複製純文字') }}</span></button>
         </div>
+        {# 電子公文：DI 檔（文書本文檔，XML），匯入機關自己的公文系統用。簽辦意見不是一種文別，這一組藏起來；
+           文字裡找不到「主旨：」時反灰（主旨是 DTD 的必填欄位）。 #}
+        <div class="od-xp-kind" id="odDiKind" hidden>
+          <span class="od-xp-kname">{{ tr('電子公文') }}</span>
+          <button type="button" class="btn btn-secondary" data-od-dl="di"
+                  data-title="{{ tr('政府電子公文的本文檔（DI，XML 格式）：匯入機關的公文系統後，照常取號、簽核、發文') }}">{{ icon('download', size=16) }} <span>{{ tr('DI 檔') }}</span></button>
+          <button type="button" class="btn btn-secondary" id="odDiPreview"
+                  data-title="{{ tr('打開檢視器，看 DI 檔裡每個欄位放了什麼') }}">{{ icon('eye', size=16) }} <span>{{ tr('匯出預覽') }}</span></button>
+        </div>
       </div>
       {% if workspace_enabled(request) %}
       {# 跟「下載」分開：兩列都是格式按鈕，沒有線的話看起來像同一組（使用者 2026-10-08）。跟著那一列一起顯示 / 隱藏。 #}
@@ -1099,6 +1307,39 @@
     </section>
   </div>
 </div>
+
+{# DI 檔的匯出預覽（2026-10-09 使用者：「匯出功能旁邊做一個匯出預覽，可以彈出檢視器看 di 檔內容，可以切換
+   視覺化檢視、預覽檢視，xml 要色彩標示」）。跟下載同一支產生器（`/di-preview`）—— 看到的就是下載拿到的那一份。
+   三種檢視：照公文排的樣子、每個欄位一列（代碼與空白標出來）、XML 原始碼（色彩標示、行號）。 #}
+<div class="od-di" id="odDi" hidden data-notes='{{ di_notes|tojson }}'>
+  <div class="od-di-card" role="dialog" aria-modal="true" aria-labelledby="odDiTitle">
+    <div class="od-di-head">
+      <h3 id="odDiTitle">{{ icon('eye', size=18) }} <span>{{ tr('匯出預覽：DI 檔') }}</span></h3>
+      <span class="od-di-name" id="odDiName" data-i18n="skip"></span>
+      <button type="button" class="od-di-x" id="odDiClose" title="{{ tr('關閉') }}" aria-label="{{ tr('關閉') }}">{{ icon('close', size=18) }}</button>
+    </div>
+    <div class="od-di-status" id="odDiStatus"></div>
+    <div class="od-di-tabs" role="tablist">
+      <button type="button" role="tab" class="od-di-tab active" data-od-di-tab="doc" aria-selected="true">{{ icon('file-text', size=15) }} <span>{{ tr('公文預覽') }}</span></button>
+      <button type="button" role="tab" class="od-di-tab" data-od-di-tab="fields" aria-selected="false">{{ icon('list', size=15) }} <span>{{ tr('欄位') }}</span></button>
+      <button type="button" role="tab" class="od-di-tab" data-od-di-tab="xml" aria-selected="false">{{ icon('text', size=15) }} <span>{{ tr('XML 原始碼') }}</span></button>
+    </div>
+    <div class="od-di-body">
+      <div class="od-di-pane" data-od-di-pane="doc"><div class="od-di-doc" id="odDiDoc"></div></div>
+      <div class="od-di-pane" data-od-di-pane="fields" hidden><table class="od-di-fields"><tbody id="odDiFields"></tbody></table></div>
+      <div class="od-di-pane" data-od-di-pane="xml" hidden><pre class="od-di-xml" id="odDiXml" data-i18n="skip"></pre></div>
+    </div>
+    <div class="od-di-foot">
+      <span class="muted od-di-hint">{{ tr('預覽與下載是同一份檔案。匯入公文系統之後，再照常取號、簽核、發文。') }}</span>
+      <button type="button" class="btn btn-secondary" id="odDiCopy">{{ icon('copy', size=16) }} <span>{{ tr('複製 XML') }}</span></button>
+      <button type="button" class="btn btn-primary" id="odDiDownload">{{ icon('download', size=16) }} <span>{{ tr('下載 DI 檔') }}</span></button>
+    </div>
+  </div>
+  <template id="odDiIcons">
+    <span data-ic="check">{{ icon('check', size=14) }}</span>
+    <span data-ic="warn">{{ icon('warn', size=14) }}</span>
+  </template>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -1106,6 +1347,7 @@
 <script src="/static/js/job_progress.js"></script>
 <script src="/static/js/custom_select.js"></script>
 <script src="/static/js/field_history.js"></script>
+<script src="/static/js/org_picker.js"></script>
 <script src="/static/js/lightbox.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
 (function () {
@@ -1299,16 +1541,13 @@
     el('odIssuerHint').hidden = !co;
     var lab = el('odOrgLab');
     lab.textContent = lab.dataset[k] || lab.textContent;
-    ['odOrg', 'odSignature', 'odContact'].forEach(function (id) {
+    ['odOrg', 'odSignature'].forEach(function (id) {
       var f = el(id), ph = f.dataset[co ? 'phCompany' : 'phAgency'];
       if (ph) f.placeholder = ph;
     });
+    el('odCtTaxIdRow').hidden = !co;          // 統一編號只有企業才有
     var hint = el('odContactHint');
     hint.textContent = hint.dataset[k] || hint.textContent;
-    var org = el('odOrg');
-    if (el('odOrgList')) {
-      if (co) org.removeAttribute('list'); else org.setAttribute('list', 'odOrgList');
-    }
     ['odOrg', 'odSignature'].forEach(function (id) {
       var b = document.querySelector('.fh-btn[data-fh-for="' + id + '"]');
       if (b) b.dataset.fhKey = 'jtdt.od.hist.' + id + (co ? '.company' : '');
@@ -1350,19 +1589,87 @@
   // 讀寫失敗、私密視窗、被清掉都不影響頁面，一律 try/catch）
   // 機關與企業**各記一份**（公司名稱不可以被帶進機關的函，反過來也一樣）；發文身分本身也記
   // （寫企業函的人幾乎每次都是企業）。
+  // ---------------------------------------------------------------- 聯絡資訊（一格一個欄位）
+  // 鍵跟核心的 `CONTACT_FIELDS` 一樣；欄位名稱由伺服器組進草稿，這裡只送值。
+  var CT_IDS = { address: 'odCtAddress', tax_id: 'odCtTaxId', person_label: 'odCtPersonLabel',
+                 person: 'odCtPerson', phone: 'odCtPhone', fax: 'odCtFax', email: 'odCtEmail' };
+  function contactFields() {
+    var out = {};
+    Object.keys(CT_IDS).forEach(function (k) { out[k] = el(CT_IDS[k]).value; });
+    return out;
+  }
+  function putContact(fields) {
+    Object.keys(CT_IDS).forEach(function (k) {
+      el(CT_IDS[k]).value = fields && typeof fields[k] === 'string' ? fields[k] : '';
+    });
+    var lab = el('odCtPersonLabel');
+    if (!lab.value) lab.selectedIndex = 0;     // 舊資料沒有這個鍵
+    syncSelect(lab);
+  }
+  function showUnplaced(lines) {
+    var box = el('odCtUnplaced'), ul = el('odCtUnplacedList');
+    ul.textContent = '';
+    (lines || []).forEach(function (t) {
+      var li = document.createElement('li');
+      li.textContent = String(t);
+      ul.appendChild(li);
+    });
+    box.hidden = !(lines && lines.length);
+  }
+  // 升級前記在這個瀏覽器裡的是一行一項的文字 → 搬進各欄。欄位名稱對照是伺服器那一份
+  // （`split_contact` 用的同一份，經 data-ct-aliases 送來）；對不到的行列出來，不丟進任何一欄。
+  function splitLegacyContact(text, company) {
+    var aliases = {};
+    try { aliases = JSON.parse(el('odContact').dataset.ctAliases || '{}'); } catch (e) { aliases = {}; }
+    var fields = {}, unplaced = [], last = null;
+    String(text || '').split(/\r?\n/).forEach(function (line) {
+      line = line.trim();
+      if (!line) return;
+      var m = /^\s*([^：:]{1,12}?)\s*[：:]\s*(.*)$/.exec(line);
+      var key = m ? aliases[m[1].replace(/\s+/g, '').toLowerCase()] : null;
+      if (!m && last === 'address') { fields.address = (fields.address || '') + line; return; }
+      last = null;
+      if (!key || (key === 'tax_id' && !company)) { unplaced.push(line); return; }
+      var v = m[2].trim();
+      if (!v) return;
+      if (key === 'person' && !fields.person) {
+        var lab = m[1].replace(/\s+/g, '');
+        fields.person_label = lab === '承辦人' ? '承辦人' : '聯絡人';
+      }
+      fields[key] = fields[key] ? fields[key] + '、' + v : v;
+      last = key;
+    });
+    return { fields: fields, unplaced: unplaced };
+  }
+
   var REMEMBER_BASE = 'jtdt.officialDoc.letter';
   var ISSUER_KEY = 'jtdt.officialDoc.issuer';
-  var REMEMBER = { org: 'odOrg', contact: 'odContact', signature: 'odSignature', cc: 'odCc' };
+  var REMEMBER = { org: 'odOrg', signature: 'odSignature', cc: 'odCc' };
+  Object.keys(CT_IDS).forEach(function (k) { REMEMBER['ct_' + k] = CT_IDS[k]; });
   function rememberKey(who) { return REMEMBER_BASE + (who === 'company' ? '.company' : ''); }
   function loadRemembered(who, overwrite) {
     var saved = null;
     try { saved = JSON.parse(window.localStorage.getItem(rememberKey(who)) || 'null'); } catch (e) { saved = null; }
     if (!saved || typeof saved !== 'object') saved = {};
+    var hasFields = Object.keys(CT_IDS).some(function (k) { return typeof saved['ct_' + k] === 'string'; });
+    var unplaced = [];
+    if (!hasFields && typeof saved.contact === 'string' && saved.contact.trim()) {
+      var got = splitLegacyContact(saved.contact, who === 'company');
+      Object.keys(got.fields).forEach(function (k) { saved['ct_' + k] = got.fields[k]; });
+      unplaced = got.unplaced;
+    }
+    var touched = false;
     Object.keys(REMEMBER).forEach(function (k) {
       var f = el(REMEMBER[k]);
-      if (!f || (f.value && !overwrite)) return;
+      // 下拉（聯絡人 / 承辦人）一定有值，不能拿「有沒有值」判斷使用者動過沒有
+      if (!f || (f.value && !overwrite && f.tagName !== 'SELECT')) return;
+      if (k.indexOf('ct_') === 0) touched = true;
       f.value = typeof saved[k] === 'string' ? saved[k].slice(0, f.maxLength > 0 ? f.maxLength : 500) : '';
     });
+    var pl = el('odCtPersonLabel');
+    if (!pl.value) pl.selectedIndex = 0;
+    syncSelect(pl);
+    if (touched) showUnplaced(unplaced);
   }
   function saveRemembered(who) {
     var out = {};
@@ -1472,8 +1779,10 @@
         relation: curRelation(), closing: el('odLetterClosing').value,
         speed: el('odSpeed').value, copies: el('odCopies').value, cc: el('odCc').value,
         doc_no: el('odDocNo').value,
-        signature: el('odSignature').value, contact: el('odContact').value,
-        attachments: el('odAttachments').value, length: el('odLength3').value
+        signature: el('odSignature').value, contact_fields: contactFields(),
+        attachments: el('odAttachments').value, length: el('odLength3').value,
+        // 從地址簿挑的機關代碼（電子公文要用）；伺服器會再驗一次
+        org_codes: window.OrgPicker ? window.OrgPicker.collect() : {}
       };
     }
     var kind = document.querySelector('input[name="odSrcKind"]:checked');
@@ -1598,6 +1907,7 @@
     var p = params();
     if (!checkInputs(p)) return;
     p.use_kb = !!(el('odUseKb') && el('odUseKb').checked);
+    p.use_history = !!(el('odUseHistory') && el('odUseHistory').checked);
     if (extra) Object.keys(extra).forEach(function (k) { p[k] = extra[k]; });
     if (p.mode === 'letter') saveRemembered();
     var done = busy(btn, tr('送出中…'));
@@ -1704,8 +2014,11 @@
       put('odLetterNarrative', inp.narrative); put('odOrg', inp.org); put('odReceiver', inp.receiver);
       if (who !== 'company') put('odRelation', inp.relation);
       put('odSpeed', inp.speed); put('odCopies', inp.copies); put('odDocNo', inp.doc_no);
-      put('odCc', inp.cc); put('odSignature', inp.signature); put('odContact', inp.contact);
+      put('odCc', inp.cc); put('odSignature', inp.signature);
+      // 聯絡資訊：升級前的案件只有一行一項的文字，伺服器在 /result 那裡分好欄
+      putContact(inp.contact_fields || {}); showUnplaced(inp.contact_unplaced || []);
       put('odAttachments', inp.attachments); put('odLength3', inp.length);
+      if (window.OrgPicker) window.OrgPicker.restore(inp.org_codes || {});
       applyIssuer();
       paintClosings(inp.closing || '');
       refreshSalute();
@@ -1718,6 +2031,7 @@
       });
     }
     if (el('odUseKb')) el('odUseKb').checked = !!inp.use_kb;
+    if (el('odUseHistory')) el('odUseHistory').checked = !!inp.use_history;
     ['odNarrative', 'odSource', 'odDirection', 'odLetterNarrative'].forEach(function (id) {
       el(id).dispatchEvent(new Event('input'));
     });
@@ -1754,7 +2068,7 @@
     paintDraft();
     el('odDirty').hidden = true;
     renderIssues(d.issues || []);
-    renderRefs(d.references || [], result.kb_note || '');
+    renderRefs(d.references || [], result.kb_note || '', result.history_note || '');
     closeRewrite();
     resetRevisions(d.text || '');
     el('odResult').hidden = false;
@@ -1769,53 +2083,202 @@
   var REF_SEC = el('odRefSec');
   var REF_PURPOSES = JSON.parse(REF_SEC.dataset.purposes || '{}');
   var KB_NOTES = JSON.parse(REF_SEC.dataset.notes || '{}');
-  var REF_BADGE = { substantive_basis: 'basis', format_reference: 'format', style_example: 'style' };
+  var HISTORY_NOTES = JSON.parse(REF_SEC.dataset.hnotes || '{}');
+  var REF_BADGE = { substantive_basis: 'basis', format_reference: 'format', style_example: 'style',
+                    past_case: 'past' };
 
-  function renderRefs(refs, note) {
+  function fmtDay(ts) {
+    if (!ts) return '';
+    var d = new Date(ts * 1000);
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+  }
+
+  function refIcon(name) {
+    var tpl = el('odRefIcons');
+    var s = tpl && tpl.content.querySelector('[data-ic="' + name + '"] svg');
+    return s ? s.cloneNode(true) : document.createElement('span');
+  }
+  function refBtn(icName, label) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-secondary';
+    b.appendChild(refIcon(icName));
+    var s = document.createElement('span');
+    s.textContent = label;
+    b.appendChild(s);
+    return b;
+  }
+  // 章節：「審計法 ＞ 第 四 章 財物審計」→「第四章 財物審計」（法規名稱已經是標題；
+  // 「第 四 章」這種章節號中間的空白收起來，章節號與章名之間的空白留著）
+  function refSection(r) {
+    var parts = String(r.heading || '').split(/\s*[>＞]\s*/).map(function (x) { return x.trim(); })
+      .filter(Boolean);
+    if (parts.length && parts[0] === (r.title || '')) parts.shift();
+    return parts.map(function (x) {
+      return x.replace(/第\s*([一二三四五六七八九十百千零〇0-9]+)\s*(編|章|節|款|目)/g, '第$1$2');
+    }).join(' ＞ ');
+  }
+  // 草稿裡寫到這一筆的地方（法規名稱，有條號時優先找「名稱＋條號」；空白不計）。回 {start, end, line}
+  function refInDraft(r) {
+    var title = (r.title || '').replace(/\s+/g, '');
+    if (!title || r.purpose === 'past_case') return null;
+    var ta = el('odDraft'), v = ta ? ta.value : '';
+    var chars = [], pos = [];
+    for (var i = 0; i < v.length; i++) {
+      if (!/\s/.test(v[i])) { chars.push(v[i]); pos.push(i); }
+    }
+    var flat = chars.join('');
+    var want = [title + (r.article || ''), title];
+    for (var k = 0; k < want.length; k++) {
+      if (!want[k]) continue;
+      var at = flat.indexOf(want[k]);
+      if (at < 0) continue;
+      var s = pos[at], e = pos[at + want[k].length - 1] + 1;
+      return { start: s, end: e, line: v.slice(0, s).split('\n').length };
+    }
+    return null;
+  }
+  function showInDraft(r) {
+    var hit = refInDraft(r);
+    if (!hit) { toast(tr('草稿裡已經沒有寫到這一筆。')); return; }
+    var ta = el('odDraft');
+    ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    ta.focus({ preventScroll: true });
+    ta.setSelectionRange(hit.start, hit.end);
+    ta.dispatchEvent(new Event('select'));
+  }
+  async function copyRef(text) {
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) {
+      var x = document.createElement('textarea');
+      x.value = text;
+      x.className = 'od-offscreen';
+      document.body.appendChild(x);
+      x.select();
+      try { document.execCommand('copy'); } catch (_e) { /* 交給下面的提示 */ }
+      x.remove();
+    }
+    toast(tr('已複製「{0}」').replace('{0}', text), 'ok');
+  }
+
+  // 每一筆「草稿第 N 行寫到」：草稿一改就重算（改寫採用、自己打字都算）
+  var REF_HITS = [];
+  function paintRefHits() {
+    REF_HITS.forEach(function (h) {
+      var hit = refInDraft(h.r);
+      h.found.hidden = h.mark.hidden = !hit;
+      if (hit) h.label.textContent = tr('草稿第 {0} 行寫到這部法規').replace('{0}', hit.line);
+    });
+  }
+  var refHitTimer = 0;
+  el('odDraft').addEventListener('input', function () {
+    clearTimeout(refHitTimer);
+    refHitTimer = setTimeout(paintRefHits, 300);
+  });
+
+  function renderRefs(refs, note, hnote) {
     var ul = el('odRefs');
     ul.replaceChildren();
-    var used = (result && result.inputs && result.inputs.use_kb) || refs.length || note;
+    REF_HITS = [];
+    var inp0 = (result && result.inputs) || {};
+    var used = inp0.use_kb || inp0.use_history || refs.length || note || hnote;
     REF_SEC.hidden = !used;
     if (!used) return;
-    el('odRefNote').textContent = note ? tr(KB_NOTES[note] || '')
-      : tr('撰寫時參考了下面這些資料。標「業務依據」的才算草稿的依據；標「草稿有引用」的是模型說它用到的。');
+    var notes = [];
+    if (note) notes.push(tr(KB_NOTES[note] || ''));
+    if (hnote) notes.push(tr(HISTORY_NOTES[hnote] || ''));
+    if (refs.length) notes.push(tr('產生草稿時，下面這 {0} 筆資料一起交給模型參考。').replace('{0}', refs.length));
+    el('odRefNote').textContent = notes.join(' ');
+    // 圖例：這次出現的用途各講一次能拿來做什麼
+    var legend = el('odRefLegend');
+    legend.replaceChildren();
+    var MEANING = {
+      substantive_basis: tr('可以當草稿的依據：草稿寫到的法規名稱、條號，檢查時拿它核對'),
+      format_reference: tr('只參考格式與用語，不算依據'),
+      style_example: tr('只參考寫法，不算依據'),
+      past_case: tr('你先前寫過的案件，只參考寫法與用語')
+    };
+    var seen = {};
+    refs.forEach(function (r) {
+      var p = REF_BADGE[r.purpose] ? r.purpose : 'style_example';
+      if (seen[p]) return;
+      seen[p] = 1;
+      var li = document.createElement('li');
+      var b = document.createElement('span');
+      b.className = 'od-badge od-b-' + REF_BADGE[p];
+      b.textContent = tr(REF_PURPOSES[p] || '');
+      li.append(b, document.createTextNode(MEANING[p] || ''));
+      legend.appendChild(li);
+    });
+    legend.hidden = !refs.length;
+    // 出處：同一個來源只寫一次
+    var attrs = [];
+    refs.forEach(function (r) { if (r.attribution && attrs.indexOf(r.attribution) < 0) attrs.push(r.attribution); });
+    var ap = el('odRefAttrs');
+    ap.textContent = attrs.join(' ');      // 顯名文字本身就以「資料來源：」開頭
+    ap.hidden = !attrs.length;
+    ap.setAttribute('data-i18n', 'skip');
+
     refs.forEach(function (r) {
       var li = document.createElement('li');
-      li.className = 'od-ref';
-      var head = document.createElement('div');
-      head.className = 'od-ref-head';
+      var p = REF_BADGE[r.purpose] ? r.purpose : 'style_example';
+      li.className = 'od-ref' + (p === 'substantive_basis' ? ' is-basis' : p === 'past_case' ? ' is-past' : '');
+      // 第一行：編號、用途、（右邊）草稿有引用
+      var top = document.createElement('div');
+      top.className = 'od-ref-top';
       var id = document.createElement('span');
       id.className = 'od-ref-id';
       id.textContent = r.id || '';
       var badge = document.createElement('span');
-      badge.className = 'od-badge od-b-' + (REF_BADGE[r.purpose] || 'style');
-      badge.textContent = tr(REF_PURPOSES[r.purpose] || REF_PURPOSES.style_example || '');
-      var title = document.createElement(r.source_url ? 'a' : 'span');
-      title.className = 'od-ref-title';
-      title.textContent = r.title || r.dataset_name || '';
-      title.setAttribute('data-i18n', 'skip');
-      if (r.source_url) {
-        title.href = r.source_url;
-        title.target = '_blank';
-        title.rel = 'noopener noreferrer';
-      }
-      head.append(id, badge, title);
-      var where = [r.version_label, r.locator_text, r.heading].filter(Boolean).join('　');
-      if (where) {
-        var w = document.createElement('span');
-        w.className = 'od-ref-where';
-        w.textContent = where;
-        w.setAttribute('data-i18n', 'skip');
-        head.appendChild(w);
-      }
+      badge.className = 'od-badge od-b-' + REF_BADGE[p];
+      badge.textContent = tr(REF_PURPOSES[p] || '');
+      top.append(id, badge);
       if (r.used) {
         var u = document.createElement('span');
         u.className = 'od-badge od-b-used';
-        u.textContent = tr('草稿有引用');
-        head.appendChild(u);
+        u.title = tr('模型說它寫草稿時用到了這一筆');
+        u.append(refIcon('check'), document.createTextNode(tr('草稿有引用')));
+        top.appendChild(u);
       }
-      li.appendChild(head);
-      // 政府公開資料匯入的那幾份：「施行日期由行政院定之」這類說明，與出處（授權條款要求顯名）
+      li.appendChild(top);
+      // 名稱＋條號
+      var caseUrl = (p === 'past_case' && /^[0-9a-f]{32}$/.test(r.case_id || ''))
+        ? '/tools/official-doc/?case=' + r.case_id : '';
+      var href = caseUrl || r.source_url || '';
+      var nameRow = document.createElement('div');
+      nameRow.className = 'od-ref-name';
+      var title = document.createElement(href ? 'a' : 'span');
+      title.className = 'od-ref-title';
+      title.textContent = r.title || r.dataset_name || '';
+      title.setAttribute('data-i18n', 'skip');
+      if (href) {
+        title.href = href;
+        title.target = '_blank';
+        title.rel = 'noopener noreferrer';
+        title.title = caseUrl ? tr('打開那個案件') : tr('開啟原文');
+      }
+      nameRow.appendChild(title);
+      if (r.article) {
+        var art = document.createElement('span');
+        art.className = 'od-ref-art';
+        art.textContent = r.article;
+        art.setAttribute('data-i18n', 'skip');
+        nameRow.appendChild(art);
+      }
+      li.appendChild(nameRow);
+      // 章節與版本（同一個字串只寫一次）
+      var where = p === 'past_case'
+        ? [fmtDay(r.case_updated), r.case_rev ? tr('第 {0} 版').replace('{0}', r.case_rev) : '']
+        : [refSection(r), r.locator_text && r.locator_text !== r.heading ? r.locator_text : '', r.version_label];
+      where = where.filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join('・');
+      if (where) {
+        var w = document.createElement('div');
+        w.className = 'od-ref-where';
+        w.textContent = where;
+        w.setAttribute('data-i18n', 'skip');
+        li.appendChild(w);
+      }
       if (r.notice) {
         var nt = document.createElement('p');
         nt.className = 'od-ref-notice';
@@ -1823,58 +2286,55 @@
         nt.setAttribute('data-i18n', 'skip');
         li.appendChild(nt);
       }
-      if (r.attribution) {
-        var at = document.createElement('p');
-        at.className = 'od-ref-attr';
-        at.textContent = r.attribution;
-        at.setAttribute('data-i18n', 'skip');
-        li.appendChild(at);
+      // 內容：平常只露前兩行，「看全文」才攤開
+      var body = String(r.text || '');
+      var ex = document.createElement('p');
+      ex.className = 'od-ref-excerpt';
+      ex.textContent = body.replace(/\s+/g, ' ').trim();
+      ex.setAttribute('data-i18n', 'skip');
+      var full = document.createElement('p');
+      full.className = 'od-ref-text';
+      full.textContent = body;
+      full.hidden = true;
+      full.setAttribute('data-i18n', 'skip');
+      li.append(ex, full);
+      // 可以做的事
+      var acts = document.createElement('div');
+      acts.className = 'od-ref-acts';
+      if (p !== 'past_case' && r.title) {
+        var found = document.createElement('span');
+        found.className = 'od-ref-found';
+        var flab = document.createElement('span');
+        found.append(refIcon('check'), flab);
+        var mark = refBtn('search', tr('在草稿中標出'));
+        mark.dataset.act = 'show';
+        mark.addEventListener('click', function () { showInDraft(r); });
+        acts.append(found, mark);
+        REF_HITS.push({ r: r, found: found, mark: mark, label: flab });
       }
-      var det = document.createElement('details');
-      var sum = document.createElement('summary');
-      sum.textContent = tr('看內容');
-      var pre = document.createElement('p');
-      pre.className = 'od-ref-text';
-      pre.textContent = r.text || '';
-      pre.setAttribute('data-i18n', 'skip');
-      det.append(sum, pre);
-      li.appendChild(det);
+      var cite = (r.title || '') + (r.article || '');
+      if (p !== 'past_case' && cite) {
+        var cp = refBtn('copy', r.article ? tr('複製「{0}」').replace('{0}', cite) : tr('複製名稱'));
+        cp.dataset.act = 'copy';
+        cp.addEventListener('click', function () { copyRef(cite); });
+        acts.appendChild(cp);
+      }
+      var tg = refBtn('eye', tr('看全文'));
+      tg.dataset.act = 'full';
+      tg.setAttribute('aria-expanded', 'false');
+      tg.addEventListener('click', function () {
+        var open = full.hidden;
+        full.hidden = !open;
+        li.classList.toggle('is-open', open);
+        tg.setAttribute('aria-expanded', String(open));
+        tg.querySelector('span').textContent = open ? tr('收起全文') : tr('看全文');
+      });
+      acts.appendChild(tg);
+      li.appendChild(acts);
       ul.appendChild(li);
     });
+    paintRefHits();
   }
-
-  // 機關名稱建議：打字停下來 250 ms 才查（每打一個字查一次會把地址簿查詢塞滿）
-  (function wireOrgList() {
-    var list = el('odOrgList');
-    if (!list) return;
-    var timer = null, lastQ = '';
-    function fill(names) {
-      list.replaceChildren();
-      names.forEach(function (n) {
-        var o = document.createElement('option');
-        o.value = n;
-        list.appendChild(o);
-      });
-    }
-    async function lookup(q) {
-      if (q === lastQ) return;
-      lastQ = q;
-      try {
-        var r = await fetch(BASE + '/orgs?q=' + encodeURIComponent(q));
-        if (!r.ok || q !== lastQ) return;
-        var d = await r.json();
-        fill((d.orgs || []).map(function (x) { return x.name; }).filter(Boolean));
-      } catch (e) { /* 建議而已，查不到就不顯示 */ }
-    }
-    ['odOrg', 'odReceiver'].forEach(function (id) {
-      el(id).addEventListener('input', function () {
-        var q = el(id).value.trim();
-        clearTimeout(timer);
-        if (q.length < 2) { fill([]); lastQ = ''; return; }
-        timer = setTimeout(function () { lookup(q); }, 250);
-      });
-    });
-  })();
 
   function renderFacts(facts) {
     var box = el('odFacts');
@@ -1901,7 +2361,7 @@
       inp.maxLength = MAX_FIELD;
       inp.value = f.value || '';
       if (f.status === 'conflict') {
-        inp.placeholder = tr('兩種說法：{0}').replace('{0}', (f.values || []).join(' ／ '));
+        inp.placeholder = tr('兩種說法：{0}').replace('{0}', (f.values || []).join(' / '));
       } else if (f.status === 'missing') {
         inp.placeholder = tr('（未提供，可以在這裡補上）');
       }
@@ -2139,13 +2599,14 @@
 
   var PLACEHOLDER = /〔(待補|待確認)：[^〕]{1,30}〕/g;
   function paintDraft() {
+    paintDi();
     schedulePreview();
     var v = el('odDraft').value;
     el('odDraftCount').textContent = tr('{0} 字').replace('{0}', v.trim().length.toLocaleString());
     var n = (v.match(PLACEHOLDER) || []).length;
     var box = el('odTodo');
     box.hidden = !n;
-    box.textContent = n ? tr('還有 {0} 項待補（〔待補：…〕／〔待確認：…〕）—— 匯出不會擋，但送出前要補上。')
+    box.textContent = n ? tr('還有 {0} 項待補（〔待補：…〕/〔待確認：…〕）—— 匯出不會擋，但送出前要補上。')
       .replace('{0}', n) : '';
   }
   el('odDraft').addEventListener('input', function () {
@@ -2417,10 +2878,27 @@
     var c = document.querySelector('input[name="odRwKind"]:checked');
     return c ? c.value : 'shorter';
   }
+  // 按鈕上寫出選的是哪一種；使用者換了方式就把按鈕變成主要按鈕並閃一下，提示還要按它
+  function rwKindLabel() {
+    var c = document.querySelector('input[name="odRwKind"]:checked');
+    var lab = c && c.closest('.option-card') ? c.closest('.option-card').querySelector('.opt-label') : null;
+    return lab ? lab.textContent.trim() : '';
+  }
+  function paintRwGo(ready) {
+    var b = el('odRwGo'), name = rwKindLabel();
+    el('odRwGoLabel').textContent = name ? tr('改寫：{0}').replace('{0}', name) : tr('改寫');
+    b.classList.toggle('btn-primary', !!ready);
+    b.classList.toggle('btn-secondary', !ready);
+    b.classList.remove('is-ready');
+    if (ready) { void b.offsetWidth; b.classList.add('is-ready'); }   // 重新觸發動畫
+    el('odRwReady').hidden = !ready;
+  }
+  paintRwGo(false);
   el('odRwKinds').addEventListener('change', function () {
     var custom = rwKind() === 'custom';
     el('odRwInstr').hidden = !custom;
     if (custom) el('odRwInstr').focus();
+    paintRwGo(true);
   });
 
   // 字元級的差異（不加相依）：先去掉頭尾相同的部分，中間用最長共同子序列。
@@ -2498,6 +2976,7 @@
       el('odRwInstr').focus();
       return;
     }
+    paintRwGo(false);
     var btn = this, done = busy(btn, tr('改寫中…'));
     draftBusy(true, RW_LABEL);
     try {
@@ -2869,6 +3348,374 @@
         showAlert((e && e.message) || tr('匯出失敗'));
       } finally { done(); }
     });
+  });
+
+  // ---------------------------------------------------------------- DI 檔（電子公文）
+  //
+  // 下載走上面那一組（`data-od-dl="di"` → /export fmt=di）；「匯出預覽」打開檢視器（/di-preview，
+  // 同一支產生器）。簽辦意見沒有 DI 檔，那一組藏起來；文字裡找不到「主旨：」時反灰並講出原因
+  // （伺服器端也會擋：400）。
+  var diBox = el('odDi');
+  var DI_NOTES = {};
+  try { DI_NOTES = JSON.parse((diBox && diBox.dataset.notes) || '{}') || {}; } catch (e) { DI_NOTES = {}; }
+  var DI_SUBJECT = /^\s*主旨[：:]/m;
+  function paintDi() {
+    var kind = el('odDiKind');
+    if (!kind) return;
+    kind.hidden = !result || isEndorseCase();
+    var ok = DI_SUBJECT.test(el('odDraft').value || '');
+    kind.querySelectorAll('button').forEach(function (b) {
+      b.disabled = !ok;
+      b.title = ok ? (b.dataset.title || '') : tr('找不到「主旨：」那一行，產生不了 DI 檔（主旨是必填欄位）。');
+    });
+  }
+
+  function diIcon(name) {
+    var tpl = el('odDiIcons');
+    var t = tpl && tpl.content.querySelector('[data-ic="' + name + '"] svg');
+    return t ? t.cloneNode(true) : document.createElement('span');
+  }
+  function mk(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  // 文字裡的〔待補：…〕〔待確認：…〕另外標底色（textContent 建，不用 innerHTML）
+  var DI_TODO = /〔(?:待補|待確認)：[^〕]{0,30}〕/g;
+  function withTodo(parent, text, cls) {
+    var s = String(text || ''), last = 0, m;
+    DI_TODO.lastIndex = 0;
+    while ((m = DI_TODO.exec(s))) {
+      if (m.index > last) parent.appendChild(document.createTextNode(s.slice(last, m.index)));
+      parent.appendChild(mk('span', cls, m[0]));
+      last = DI_TODO.lastIndex;
+    }
+    if (last < s.length) parent.appendChild(document.createTextNode(s.slice(last)));
+    return parent;
+  }
+  function diNoteText(n) {
+    var s = tr(DI_NOTES[n.code] || n.code);
+    (n.args || []).forEach(function (a, i) { s = s.replace('{' + i + '}', a); });
+    return s;
+  }
+
+  // ---- XML 原始碼：逐行、逐個標記上色
+  function xAdd(parent, cls, text) { if (text) parent.appendChild(mk('span', cls, text)); }
+  function xText(parent, text) {
+    var re = /(&[A-Za-z#0-9]+;)|(〔(?:待補|待確認)：[^〕]{0,30}〕)/g, last = 0, m;
+    while ((m = re.exec(text))) {
+      xAdd(parent, 'x-text', text.slice(last, m.index));
+      xAdd(parent, m[1] ? 'x-ent' : 'x-todo', m[0]);
+      last = re.lastIndex;
+    }
+    xAdd(parent, 'x-text', text.slice(last));
+  }
+  function xLine(ln, line) {
+    var i = 0;
+    while (i < line.length) {
+      var lt = line.indexOf('<', i);
+      if (lt < 0) { xText(ln, line.slice(i)); break; }
+      if (lt > i) xText(ln, line.slice(i, lt));
+      var gt = line.indexOf('>', lt);
+      if (gt < 0) { xText(ln, line.slice(lt)); break; }
+      var tag = line.slice(lt, gt + 1);
+      var m = /^<(\/?)([^\s\/>]+)([^>]*?)(\/?)>$/.exec(tag);
+      if (/^<[?!]/.test(tag) || !m) {
+        xAdd(ln, m ? 'x-decl' : 'x-decl', tag);
+      } else {
+        xAdd(ln, 'x-punc', '<' + m[1]);
+        xAdd(ln, 'x-tag', m[2]);
+        var rest = m[3], re = /(\s+)([^\s=]+)(=)("[^"]*"|'[^']*')/g, last = 0, a;
+        while ((a = re.exec(rest))) {
+          xAdd(ln, 'x-text', rest.slice(last, a.index) + a[1]);
+          xAdd(ln, 'x-attr', a[2]);
+          xAdd(ln, 'x-punc', a[3]);
+          xAdd(ln, 'x-val', a[4]);
+          last = re.lastIndex;
+        }
+        xAdd(ln, 'x-text', rest.slice(last));
+        xAdd(ln, 'x-punc', m[4] + '>');
+      }
+      i = gt + 1;
+    }
+  }
+  function renderXml(xml) {
+    var pre = el('odDiXml');
+    pre.replaceChildren();
+    String(xml || '').replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n').forEach(function (line) {
+      var ln = mk('span', 'x-ln');
+      xLine(ln, line);
+      if (!ln.childNodes.length) ln.appendChild(document.createTextNode(' '));
+      pre.appendChild(ln);
+    });
+  }
+
+  // ---- 讀 DI 的小工具（DOMParser 讀出來的元素名稱就是中文標籤名）
+  function kids(node, name) {
+    return Array.prototype.filter.call((node && node.children) || [], function (c) {
+      return !name || c.tagName === name;
+    });
+  }
+  function first(node, name) { return kids(node, name)[0] || null; }
+  function val(node, name) {
+    var c = name ? first(node, name) : node;
+    return c ? (c.textContent || '').replace(/\s+/g, ' ').trim() : '';
+  }
+  function attr(node, name, a) {
+    var c = name ? first(node, name) : node;
+    return c ? (c.getAttribute(a) || '') : '';
+  }
+  function names(node) {
+    var out = [];
+    kids(node).forEach(function (c) {
+      if (c.tagName === '含附件') { if (out.length) out[out.length - 1] += '（含附件）'; }
+      else if (val(c)) out.push(val(c));
+    });
+    return out;
+  }
+  // 段落 → [{no, text, kids}]
+  function items(node) {
+    return kids(node, '條列').map(function (c) {
+      return { no: c.getAttribute('序號') || '', text: val(c, '文字'), kids: items(c) };
+    });
+  }
+
+  var DI_EMPTY = {
+    '發文日期': '（空白，公文系統發文時填）', '發文字號': '（空白，取號時填）', '文號': '（空白，取號時填）',
+    '年月日': '（空白）', '署名': '（空白）'
+  };
+
+  // ---- 欄位：每個欄位一列
+  function fieldRow(tb, label, tag, td) {
+    var row = mk('tr');
+    var th = mk('th', null, label);
+    th.appendChild(mk('span', 'df-tag', tag));
+    row.appendChild(th);
+    td.dataset.i18n = 'skip';        // 內容是使用者的資料
+    row.appendChild(td);
+    tb.appendChild(row);
+  }
+  function emptyCell(key) { return mk('span', 'df-empty', tr(DI_EMPTY[key] || '（空白）')); }
+  function textCell(s, key) {
+    var td = mk('td');
+    if (s) withTodo(td, s, 'df-todo'); else td.appendChild(emptyCell(key));
+    return td;
+  }
+  function codeChip(code, want) {
+    if (code) return mk('span', 'df-code', code);
+    return want ? mk('span', 'df-code miss', tr('沒有機關代碼')) : null;
+  }
+  function itemList(list) {
+    var ul = mk('ul');
+    list.forEach(function (it) {
+      var li = mk('li');
+      li.appendChild(mk('span', 'df-no', it.no));
+      withTodo(li, it.text, 'df-todo');
+      if (it.kids.length) li.appendChild(itemList(it.kids));
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+  function renderFields(root, mode) {
+    var tb = el('odDiFields');
+    tb.replaceChildren();
+    kids(root).forEach(function (n) {
+      var tag = n.tagName, td;
+      if (tag === '發文機關' || tag === '受文者') {
+        td = mk('td');
+        var nm = val(n, '全銜') || val(n, '單位名');
+        if (nm) withTodo(td, nm, 'df-todo'); else td.appendChild(emptyCell(tag));
+        // 簽的發文機關是承辦單位（本來就沒有機關代碼），不標「沒有代碼」
+        var chip = codeChip(val(n, '機關代碼'), !(mode === 'sign' && tag === '發文機關'));
+        if (chip) td.appendChild(chip);
+        fieldRow(tb, tr(tag), '<' + tag + '>', td);
+      } else if (tag === '函類別' || tag === '速別') {
+        fieldRow(tb, tr(tag), '<' + tag + '>', textCell(n.getAttribute('代碼') || '', tag));
+      } else if (tag === '密等及解密條件或保密期限') {
+        var sec = attr(n, '密等', '代碼'), cond = val(n, '解密條件或保密期限');
+        fieldRow(tb, tr(tag), '<' + tag + '>', textCell([sec, cond].filter(Boolean).join('　'), tag));
+      } else if (tag === '發文日期') {
+        fieldRow(tb, tr(tag), '<' + tag + '>', textCell(val(n, '年月日'), tag));
+      } else if (tag === '發文字號' || tag === '文號') {
+        var no = first(n, '文字') ? val(n, '文字') : val(n);
+        fieldRow(tb, tr(tag), '<' + tag + '>', textCell(no, tag));
+      } else if (tag === '附件' || tag === '主旨') {
+        fieldRow(tb, tr(tag), '<' + tag + '>', textCell(val(n, '文字'), tag));
+      } else if (tag === '段落') {
+        var name = (n.getAttribute('段名') || '').replace(/[：:]$/, '');
+        td = mk('td');
+        var lead = val(n, '文字');
+        if (lead) withTodo(td.appendChild(mk('div')), lead, 'df-todo');
+        var list = items(n);
+        if (list.length) td.appendChild(itemList(list));
+        if (!lead && !list.length) td.appendChild(emptyCell(tag));
+        fieldRow(tb, name ? tr(name) : tr('沒有段名的段落'), '<段落 段名="' + (n.getAttribute('段名') || '') + '">', td);
+      } else if (tag === '正本' || tag === '副本' || tag === '敬陳') {
+        var ns = names(n);
+        td = mk('td');
+        if (ns.length) withTodo(td, ns.join('、'), 'df-todo'); else td.appendChild(emptyCell(tag));
+        fieldRow(tb, tr(tag), '<' + tag + '>', td);
+      } else {
+        fieldRow(tb, tr(tag), '<' + tag + '>', textCell(val(n), tag));
+      }
+    });
+  }
+
+  // ---- 公文預覽：照公文的樣子排（內容全部取自 DI 檔，不是畫面上的草稿）
+  function docLine(box, cls, label, text) {
+    var p = mk('p', cls);
+    if (label) p.appendChild(document.createTextNode(label));
+    if (text) withTodo(p, text, 'dd-todo');
+    box.appendChild(p);
+    return p;
+  }
+  function docItems(box, list, depth) {
+    list.forEach(function (it) {
+      var p = mk('p', 'dd-item');
+      var pad = 2 * depth;               // 每一層往內縮兩個字，項次懸掛
+      p.style.paddingLeft = (pad + 2) + 'em';
+      p.style.textIndent = '-2em';
+      p.appendChild(document.createTextNode(it.no));
+      withTodo(p, it.text, 'dd-todo');
+      box.appendChild(p);
+      docItems(box, it.kids, depth + 1);
+    });
+  }
+  function docEmpty(p, key) { p.appendChild(mk('span', 'dd-empty', tr(DI_EMPTY[key] || '（空白）'))); }
+  function renderDoc(root, mode) {
+    var box = el('odDiDoc');
+    box.replaceChildren();
+    var org = val(first(root, '發文機關'), '全銜') || val(first(root, '發文機關'), '單位名');
+    if (mode === 'letter') {
+      box.appendChild(mk('p', 'dd-title', (org || '') + '　函'));
+      var contact = mk('div', 'dd-contact');
+      var addr = val(root, '地址');
+      if (addr) contact.appendChild(mk('div', null, '地址：' + addr));
+      kids(root, '聯絡方式').forEach(function (c) { if (val(c)) contact.appendChild(mk('div', null, val(c))); });
+      if (contact.childNodes.length) box.appendChild(contact);
+      docLine(box, 'dd-meta', '受文者：', val(first(root, '受文者'), '全銜'));
+      var dp = docLine(box, 'dd-meta', '發文日期：', val(first(root, '發文日期'), '年月日'));
+      if (!val(first(root, '發文日期'), '年月日')) docEmpty(dp, '發文日期');
+      var nn = first(root, '發文字號'), noText = nn ? (first(nn, '文字') ? val(nn, '文字') : val(nn)) : '';
+      var np = docLine(box, 'dd-meta', '發文字號：', noText);
+      if (!noText) docEmpty(np, '發文字號');
+      if (first(root, '速別')) docLine(box, 'dd-meta', '速別：', attr(root, '速別', '代碼'));
+      var secN = first(root, '密等及解密條件或保密期限');
+      if (secN) docLine(box, 'dd-meta', '密等及解密條件或保密期限：',
+                        [attr(secN, '密等', '代碼'), val(secN, '解密條件或保密期限')].filter(Boolean).join('　'));
+      if (first(root, '附件')) docLine(box, 'dd-meta', '附件：', val(first(root, '附件'), '文字'));
+    } else {
+      var head = mk('div', 'dd-head');
+      head.appendChild(mk('span', null, '簽　於' + (org || '')));
+      var ymd = val(root, '年月日');
+      if (ymd) head.appendChild(mk('span', null, ymd));
+      box.appendChild(head);
+    }
+    docLine(box, 'dd-label', '主旨：', val(first(root, '主旨'), '文字'));
+    kids(root, '段落').forEach(function (n) {
+      docLine(box, 'dd-label', n.getAttribute('段名') || '', val(n, '文字'));
+      docItems(box, items(n), 0);
+    });
+    if (mode === 'letter') {
+      var copies = mk('div', 'dd-copies');
+      docLine(copies, 'dd-meta', '正本：', names(first(root, '正本')).join('、'));
+      if (first(root, '副本')) docLine(copies, 'dd-meta', '副本：', names(first(root, '副本')).join('、'));
+      box.appendChild(copies);
+      kids(root, '署名').forEach(function (s) { if (val(s)) docLine(box, 'dd-sign', '', val(s)); });
+    } else {
+      var jc = first(root, '敬陳');
+      if (jc) {
+        docLine(box, 'dd-label', '敬陳', '');
+        names(jc).forEach(function (t) { docLine(box, 'dd-item', '', t); });
+      }
+    }
+  }
+
+  function renderStatus(d) {
+    var box = el('odDiStatus');
+    box.replaceChildren();
+    var b = mk('span', 'od-di-badge ' + (d.valid ? 'ok' : 'bad'));
+    b.appendChild(diIcon(d.valid ? 'check' : 'warn'));
+    b.appendChild(mk('span', null, d.valid
+      ? tr('符合 104 版 DTD（{0}）').replace('{0}', d.dtd || '')
+      : tr('沒有通過 104 版 DTD 檢查（{0}）').replace('{0}', d.dtd || '')));
+    box.appendChild(b);
+    if (!d.valid && d.errors && d.errors.length) {
+      var pre = mk('pre', 'od-di-errs', d.errors.join('\n'));
+      pre.dataset.i18n = 'skip';
+      box.appendChild(pre);
+    }
+    if (d.notes && d.notes.length) {
+      var ul = mk('ul', 'od-di-notes');
+      d.notes.forEach(function (n) { ul.appendChild(mk('li', null, diNoteText(n))); });
+      box.appendChild(ul);
+    }
+  }
+
+  function diTab(name) {
+    document.querySelectorAll('[data-od-di-tab]').forEach(function (b) {
+      var on = b.dataset.odDiTab === name;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-od-di-pane]').forEach(function (p) {
+      p.hidden = p.dataset.odDiPane !== name;
+    });
+  }
+  document.querySelectorAll('[data-od-di-tab]').forEach(function (b) {
+    b.addEventListener('click', function () { diTab(b.dataset.odDiTab); });
+  });
+
+  var diXml = '', diLastFocus = null;
+  function closeDi() {
+    diBox.hidden = true;
+    if (diLastFocus && diLastFocus.focus) diLastFocus.focus();
+  }
+  async function openDi() {
+    var text = el('odDraft').value;
+    var r = await postJson('/di-preview', { text: text, title: (result && result.title) || '', case_id: caseId });
+    if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('產生 DI 檔失敗')));
+    var d = await r.json();
+    diXml = d.xml || '';
+    el('odDiName').textContent = d.filename || '';
+    renderStatus(d);
+    renderXml(diXml);
+    var doc = new DOMParser().parseFromString(diXml, 'application/xml');
+    var root = doc.documentElement;
+    if (!root || doc.getElementsByTagName('parsererror').length) {
+      el('odDiFields').replaceChildren();
+      el('odDiDoc').replaceChildren(mk('p', 'dd-empty', tr('XML 讀不出來，請看「XML 原始碼」。')));
+      diTab('xml');
+    } else {
+      renderFields(root, d.mode);
+      renderDoc(root, d.mode);
+      diTab('doc');
+    }
+    diLastFocus = document.activeElement;
+    diBox.hidden = false;
+    el('odDiClose').focus();
+  }
+  el('odDiPreview').addEventListener('click', async function () {
+    var btn = el('odDiPreview');
+    if (btn.disabled) return;
+    var done = busy(btn, tr('產生中…'));
+    try { await openDi(); }
+    catch (e) { showAlert((e && e.message) || tr('產生 DI 檔失敗')); }
+    finally { done(); }
+  });
+  el('odDiClose').addEventListener('click', closeDi);
+  diBox.addEventListener('click', function (e) { if (e.target === diBox) closeDi(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !diBox.hidden) { e.preventDefault(); closeDi(); }
+  });
+  el('odDiDownload').addEventListener('click', function () {
+    var b = document.querySelector('[data-od-dl="di"]');
+    if (b) b.click();
+  });
+  el('odDiCopy').addEventListener('click', async function () {
+    try { await navigator.clipboard.writeText(diXml); toast(tr('已複製 XML'), 'ok'); }
+    catch (e) { showAlert(tr('瀏覽器不讓網頁寫入剪貼簿，請在「XML 原始碼」裡自己選取複製。')); }
   });
 
   el('odCopy').addEventListener('click', async function () {

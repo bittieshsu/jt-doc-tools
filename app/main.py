@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.67"
+VERSION = "1.16.71"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -537,6 +537,11 @@ templates.env.globals["nav_settings"] = [
      "url": "/admin/translation-glossary",
      "keywords": "glossary terminology term dictionary translate translation "
                  "brand proper noun 字典 對照 術語 專有名詞 翻譯 品牌 不要翻"},
+    # 公文撰擬設定與公文知識庫排在一起（同一支工具的兩頁設定，使用者 2026-10-09 要求不要分開）
+    {"icon": "official-doc", "name": "公文撰擬設定", "description": "官方公文範本與機關地址簿的下載來源（預設不下載）",
+     "url": "/admin/official-doc",
+     "keywords": "official document government template address book agency open data download "
+                 "odt archives 公文 撰擬 範本 表單 函 簽 地址簿 機關 受文者 全銜 開放資料 檔案管理局 下載 上傳"},
     # `beta`：名稱旁標「Beta」（同工具的 `ToolMetadata.beta`，只是告知，不影響列出與權限）
     {"icon": "book", "name": "公文知識庫", "description": "公文撰擬查得到的規範、法規與範例（資料集、文件、檢索測試、重建索引）",
      "url": "/admin/knowledge", "beta": True,
@@ -571,10 +576,6 @@ templates.env.globals["nav_settings"] = [
     {"icon": "id-card", "name": "統編資料庫", "description": "公司 / 政府機關 / 學校統編反查（財政部 BGMOPEN + 補充來源）",
      "url": "/admin/vat-db",
      "keywords": "vat tax id business registry company taiwan einvoice einvoice-scan bgmopen vat-lookup 統編 統一編號 公司 商業 登記 反查 賣方 發票 財政部 行政院 地方政府 機關 學校"},
-    {"icon": "official-doc", "name": "公文撰擬設定", "description": "官方公文範本與機關地址簿的下載來源（預設不下載）",
-     "url": "/admin/official-doc",
-     "keywords": "official document government template address book agency open data download "
-                 "odt archives 公文 撰擬 範本 表單 函 簽 地址簿 機關 受文者 全銜 開放資料 檔案管理局 下載 上傳"},
     # ---- v1.1.0 auth / perm / audit pages ----
     # 認證設定 always visible — that's where admin enables auth in the first place.
     {"icon": "lock", "name": "認證設定", "description": "啟用本機 / LDAP / AD 認證",
@@ -1313,6 +1314,13 @@ async def _security_headers(request: Request, call_next):
     return response
 
 
+def _wants_upload_filename(path: str) -> bool:
+    """哪些上傳要抓檔名給稽核：`/tools/` 底下全部，加上根層級的 `/api/`
+    工具端點（它們不經過 `_auth_gate`，由 `access_audit` 補記 `tool_invoke`）。"""
+    from .core.access_audit import ROOT_API_TOOLS
+    return path.startswith("/tools/") or path in ROOT_API_TOOLS
+
+
 @app.middleware("http")
 async def _capture_upload_filename(request: Request, call_next):
     """Sniff multipart bodies for `filename="..."` so audit / log forwarding
@@ -1327,7 +1335,7 @@ async def _capture_upload_filename(request: Request, call_next):
     ctype = (request.headers.get("content-type") or "").lower()
     if (request.method in ("POST", "PUT")
             and ctype.startswith("multipart/form-data")
-            and (request.scope.get("path") or request.url.path).startswith("/tools/")):
+            and _wants_upload_filename(request.scope.get("path") or request.url.path)):
         clen_str = request.headers.get("content-length") or "0"
         try:
             clen = int(clen_str)
@@ -1508,6 +1516,12 @@ async def _auth_gate(request: Request, call_next):
             if v is not None:
                 # Trim the audit key prefix for readability in the JSON dump.
                 details[k.replace("upload_", "")] = v
+        # 用 API Token 呼叫的（`/tools/<工具>/api/<工具>`）要分得出來，
+        # 並寫出是哪一張 Token。名稱由 `_api_token_gate` 驗過之後放進來。
+        _tok_label = getattr(request.state, "api_token_label", None)
+        if _tok_label is not None:
+            details["via"] = "api_token"
+            details["token"] = str(_tok_label)[:64]
         _ad.log_event(
             "tool_invoke",
             username=user["username"],
@@ -1631,6 +1645,9 @@ async def _api_token_gate(request: Request, call_next):
              "detail": "需要有效的 API token（Authorization: Bearer ...）"},
             status_code=401,
         )
+    # 稽核記錄要寫得出「這筆是用哪一張 Token 呼叫的」（`tool_invoke` 與
+    # `file_download` 都會帶上）。只放名稱，不放 Token 本身。
+    request.state.api_token_label = token_row.get("label") or ""
     # When auth is on, attach the token's owning user to request.state.user
     # so downstream perm checks (if any) are scoped to that user. Tokens
     # without an owner are treated as having no permission when auth is on
@@ -1661,6 +1678,21 @@ async def _api_token_gate(request: Request, call_next):
             "source": urow["source"],
         }
     return await call_next(request)
+
+
+# ---- 下載成品與根層級 API 呼叫的稽核 ----
+# **一定要定義在 `_api_token_gate` 之後**：後定義的中介層包在外層，
+# 才看得到內層（`_auth_gate` / `_api_token_gate` / 處理函式）放進
+# `request.state` 的使用者與 Token 名稱。判準與理由寫在 `access_audit`。
+@app.middleware("http")
+async def _audit_access(request: Request, call_next):
+    response = await call_next(request)
+    try:
+        from .core import access_audit
+        access_audit.after_response(request, response)
+    except Exception:  # noqa: BLE001 — 稽核寫不進去不可以讓使用者拿不到檔案
+        logger.exception("下載 / API 稽核記錄寫入失敗")
+    return response
 
 
 # ---- Legacy redirects (renamed tools) ----

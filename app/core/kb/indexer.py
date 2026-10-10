@@ -160,6 +160,11 @@ def submit_import(version_ids: list[str], *, request=None) -> Optional[str]:
         return None
 
     def run(job) -> None:
+        from . import retrieval
+        with retrieval.bulk_update():      # 一份一份寫向量，查詢不必每份都整份重載
+            _run_import(job, ids)
+
+    def _run_import(job, ids) -> None:
         n = len(ids)
         failed = 0
         for i, vid in enumerate(ids):
@@ -217,7 +222,8 @@ def _save_state(**kw) -> None:
 
 def rebuild(job=None, *, snapshot: Optional[dict] = None) -> dict:
     """重建向量索引（同步；背景作業裡呼叫）。成功回 `{"ok": True, …}`，失敗丟 `RebuildError`。"""
-    with _INDEX_LOCK:
+    from . import retrieval
+    with _INDEX_LOCK, retrieval.bulk_update():
         return _rebuild_locked(job, snapshot=snapshot)
 
 

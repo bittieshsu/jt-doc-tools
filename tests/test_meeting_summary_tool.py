@@ -240,7 +240,7 @@ def test_old_installs_get_the_tool_through_a_migration():
 # **右半邊整片空白**，看起來像圖畫壞了。
 #
 # 那些章節**確實沒有產出**（是真的資料不是缺陷），所以做法不是隱藏、
-# 更不是編一個節點出來，而是換一種畫法：整寬的扁條 ＋ 右邊註明「無決議／待辦」。
+# 更不是編一個節點出來，而是換一種畫法：整寬的扁條 ＋ 右邊註明「無決議/待辦」。
 #
 # **判準要落在版面上（框有多寬），不是落在「有沒有畫出東西」** ——
 # 只驗「畫得出 SVG」的話，退回兩欄版面照樣全綠。
@@ -266,7 +266,7 @@ def test_a_chapter_with_no_items_spans_the_full_width():
     assert full in widths, (
         f"沒有子節點的章節應該畫成整寬（{full}px）的扁條，實際看到的寬度是 {sorted(widths)}。"
         "留在窄欄的話右半邊會是一片空白，使用者會以為圖壞了。")
-    assert "無決議／待辦" in svg, "整寬的那幾條要說得出「為什麼右邊沒有東西」"
+    assert "無決議/待辦" in svg, "整寬的那幾條要說得出「為什麼右邊沒有東西」"
 
 
 def test_a_chapter_that_has_items_keeps_the_two_column_tree():
@@ -285,7 +285,7 @@ def test_a_chapter_that_has_items_keeps_the_two_column_tree():
     assert 230 in widths, (
         f"有子節點的章節要留在左欄（230px）畫成樹，實際寬度 {sorted(widths)}")
     assert 980 - 14 * 2 not in widths, "每一個章節都有子節點時，不該出現整寬的扁條"
-    assert "無決議／待辦" not in svg, "有子節點就不該說它沒有決議"
+    assert "無決議/待辦" not in svg, "有子節點就不該說它沒有決議"
 
 
 # ---------------------------------------------------------------------------

@@ -1,17 +1,34 @@
-"""知識庫檢索：先過濾（權限、資料集、啟用中的版本），再關鍵字 ＋ 向量，RRF 合併。
+"""知識庫檢索：先過濾（權限、資料集、啟用中的版本），再關鍵字 ＋ 向量，向量優先。
 
 ## 順序（規格 12）
 
 1. **過濾在前**：只看這個人看得到、資料集開著、版本是「啟用」的段落。
    過濾放在檢索之後的話，「前 20 筆」可能全是他看不到的，結果變成空的。
 2. 關鍵字（FTS5 逐字）與向量各取最多 `PER_ROUTE` 筆。
-3. RRF（Reciprocal Rank Fusion）合併：`Σ 1 / (RRF_K + 名次)`。
-   兩路的分數尺度完全不同（覆蓋率與 cosine），RRF 只看名次，不必調權重。
+3. **有向量索引時照向量的名次排**；關鍵字那一路只在向量找到的（過了下限的）不到 `k` 筆時
+   補在後面。沒有向量索引、或嵌入服務這次沒回應時，只用關鍵字。
 4. 回最多 `k` 段。**不為了湊數塞無關的**：過不了下面門檻的不會進候選。
+
+### 為什麼不是兩路合併（RRF）
+
+原本是關鍵字與向量等權的 RRF（`Σ 1 / (RRF_K + 名次)`）。2026-10-09 用實際部署的公文知識庫
+（1,503 段、Nemotron-3-Embed-8B）量 42 題語意題（前 6 筆全部盲判過）＋ 22 題條號查詢：
+
+| 做法 | nDCG@6 | 中篇需求 | 條號查詢 MRR |
+|---|---|---|---|
+| 只照向量 | **0.885** | **0.884** | 0.880 |
+| 等權 RRF（原本） | 0.787 | 0.733 | 0.909 |
+| 關鍵字權重 0.3 | 0.847 | 0.810 | 0.955 |
+| 關鍵字權重 0.1 | 0.872 | 0.850 | 0.917 |
+
+**每一種關鍵字權重都輸只照向量**（先前 qwen3-embedding、EmbeddingGemma 也一樣）。
+條號查詢（「訴願法第 25 條」）每一種做法的前 6 筆都找得到那一條，只差排第幾。
+另外試過「問題寫第 N 條時，把關鍵字幾乎全中的那一段放第一」，條號 MRR 反而掉到 0.856 ——
+關鍵字全中的常常是別的法規的同號條文，沒有採用。
 
 ## 分數不是正確率
 
-`score` 只代表**檢索排序**（RRF 值），不是「這段話支持你的論點的機率」。
+`score` 只代表**檢索排序**（由名次換算，`1 / (RRF_K + 名次)`），不是「這段話支持你的論點的機率」。
 畫面與文件都要這樣講 —— 規格：「相似度只能表示檢索排序，不能標成法律正確率」。
 
 ## 門檻（`tools/kb_eval/` 用《文書處理手冊》20 題 ＋ 5 題無關問題量出來的）
@@ -43,9 +60,12 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import math
+import re
 import threading
+import time
 from typing import Optional
 
 from ...logging_setup import get_logger
@@ -56,7 +76,7 @@ logger = get_logger(__name__)
 
 #: 每一路最多取幾筆候選。
 PER_ROUTE = 20
-#: RRF 的平滑常數（文獻慣用 60）。
+#: 名次換成排序分數用的常數（`1 / (RRF_K + 名次)`；原本 RRF 合併用的，數值沿用，分數尺度不變）。
 RRF_K = 60
 #: 問題最長幾個字（再長也只是更多雜訊；也防有人塞一整份文件進來）。
 MAX_QUERY = 500
@@ -98,6 +118,11 @@ NULL_QUERIES = (
 NULL_MARGIN = 0.02
 
 SCORE_NOTE = "分數只代表檢索排序，不是正確率或法律效力的判斷。"
+
+#: 標出符合處（檢索測試的高亮）：出現在超過這個比例段落裡的詞太常見，單獨出現時不標 ——
+#: 實際部署的公文知識庫實測「機關」在 77% 的段落、「條」在 79%，照標的話滿頁都是。
+#: 它跟別的詞接在一起時（「上級機關」）照樣一起標。
+HL_COMMON = 0.5
 
 
 # ---------------------------------------------------------------- 允許的版本
@@ -197,36 +222,119 @@ def keyword_hits(q: str, allowed: dict[str, dict], limit: int = PER_ROUTE) -> li
 
 
 # ---------------------------------------------------------------- 向量
+#
+# 向量整份放在記憶體（一個 numpy 矩陣），每次查詢對全部算一次內積。
+# 規模是量過的（2026-10-09，現行法律＋命令全部匯入＝161,781 段、4096 維）：
+# 矩陣 2.65 GB、整份乘一次 0.08 秒。原本的寫法有三個地方在那個規模下撐不住：
+#
+# * 查詢時先挑出看得到的列（`mat[idx]`）再乘 —— **每次複製一份 2.65 GB**，
+#   一次查詢 7～9 秒、記憶體多 2.65 GB（兩個人同時查，10 GB 的主機就不夠）。
+#   現在先整份乘、再把看不到的分數設成負無限大。
+# * 載入時 `fetchall` 把每一列的位元組留著、再 `vstack` 複製一份 —— 常駐 5.3 GB（兩倍）。
+#   現在先算列數、配好陣列、逐列填進去；**停用的版本不載**（查不到的東西不必佔記憶體）。
+#   要重載時**先放掉舊的**再載新的（新舊同時在記憶體也是兩倍），而且只讓一個執行緒載。
+# * 每寫一批向量、每匯入一份文件，世代計數就加一，下一次查詢整份重載（那個規模要 18 秒）。
+#   大量寫入（政府資料匯入、文件匯入、重建索引）期間沿用手上的矩陣，最久 `BULK_RELOAD_EVERY` 秒
+#   才重載一次；做完之後下一次查詢再載。這段時間新加的段落先只有關鍵字找得到。
+#   **沿用舊矩陣不會放出看不到的東西**：結果最後照資料庫目前的狀態過濾（`search_detail`）。
 _VEC_LOCK = threading.Lock()
-_VEC_CACHE: dict[tuple[str, str], tuple] = {}
+_VEC_BUILD_LOCK = threading.Lock()
+_VEC_CACHE: dict[tuple[str, str], dict] = {}
+
+#: 大量寫入期間，向量矩陣最久沿用多少秒才重載。
+BULK_RELOAD_EVERY = 600.0
+_BULK = 0
+_BULK_LOCK = threading.Lock()
 
 
-def _load_vectors(fp: str, dim: int):
-    """回 (段落 id 清單, 版本 id 清單, 矩陣)。依世代計數快取在記憶體。"""
+@contextlib.contextmanager
+def bulk_update():
+    """大量寫入期間包住它：查詢沿用手上的向量矩陣，不必每寫一筆就整份重載。"""
+    global _BULK
+    with _BULK_LOCK:
+        _BULK += 1
+    try:
+        yield
+    finally:
+        with _BULK_LOCK:
+            _BULK -= 1
+
+
+def _usable(hit: Optional[dict], dim: int, gen: int) -> bool:
+    if not hit or hit["dim"] != dim:
+        return False
+    if hit["gen"] == gen:
+        return True
+    return _BULK > 0 and time.monotonic() - hit["loaded_at"] < BULK_RELOAD_EVERY
+
+
+def _build_entry(fp: str, dim: int, gen: int) -> dict:
+    """從資料庫讀出這個 fingerprint、啟用中版本的向量，逐列填進預先配好的矩陣。"""
     import numpy as np
+    c = store.conn()
+    where = ("FROM kb_vectors v JOIN kb_chunks k ON k.id = v.chunk_id "
+             "JOIN kb_versions ver ON ver.id = k.version_id "
+             "WHERE v.fingerprint=? AND v.dim=? AND ver.status='active'")
+    n = int(c.execute("SELECT count(*) " + where, (fp, dim)).fetchone()[0])
+    mat = np.empty((n, dim), dtype=np.float32)
+    codes = np.empty(n, dtype=np.int32)
+    ids: list[str] = []
+    vids: list[str] = []
+    vid_code: dict[str, int] = {}
+    extra: list = []          # 算完列數之後又多出來的（同時有匯入）
+    need = dim * 4
+    i = 0
+    for r in c.execute("SELECT v.chunk_id, k.version_id, v.vec " + where, (fp, dim)):
+        blob = r[2]
+        if len(blob) != need:
+            continue
+        code = vid_code.setdefault(r[1], len(vid_code))
+        row = np.frombuffer(blob, dtype=np.float32)
+        if i < n:
+            mat[i] = row
+            codes[i] = code
+        else:
+            extra.append((row.copy(), code))
+        ids.append(r[0])
+        vids.append(r[1])
+        i += 1
+    if extra:
+        mat = np.vstack([mat, np.stack([x[0] for x in extra])])
+        codes = np.concatenate([codes, np.asarray([x[1] for x in extra], dtype=np.int32)])
+    elif i < n:
+        mat, codes = mat[:i], codes[:i]
+    return {"gen": gen, "dim": dim, "ids": ids, "vids": vids, "mat": mat, "codes": codes,
+            "vid_code": vid_code, "loaded_at": time.monotonic(), "floor": None}
+
+
+def _entry(fp: str, dim: int) -> dict:
     key = (str(store.db_path()), fp)
     gen = store.generation()
     with _VEC_LOCK:
         hit = _VEC_CACHE.get(key)
-        if hit and hit[0] == gen and hit[4] == dim:
-            return hit[1], hit[2], hit[3]
-    rows = store.conn().execute(
-        "SELECT v.chunk_id, k.version_id, v.dim, v.vec FROM kb_vectors v "
-        "JOIN kb_chunks k ON k.id = v.chunk_id WHERE v.fingerprint=?", (fp,)).fetchall()
-    ids, vids, vecs = [], [], []
-    for r in rows:
-        if r["dim"] != dim:
-            continue      # 維度不同的向量不可以拿來比（fingerprint 本來就排除，這是第二道）
-        ids.append(r["chunk_id"])
-        vids.append(r["version_id"])
-        vecs.append(np.frombuffer(r["vec"], dtype=np.float32))
-    mat = np.vstack(vecs) if vecs else np.zeros((0, dim), dtype=np.float32)
-    with _VEC_LOCK:
-        _VEC_CACHE[key] = (gen, ids, vids, mat, dim)
-        # 舊的 fingerprint 不會再用到，順手丟掉（重建之後換 fingerprint）
-        for k in [k for k in _VEC_CACHE if k[0] == key[0] and k[1] != fp]:
-            _VEC_CACHE.pop(k, None)
-    return ids, vids, mat
+    if _usable(hit, dim, gen):
+        return hit
+    hit = None
+    with _VEC_BUILD_LOCK:          # 同時好幾個查詢進來，只讓一個去載
+        gen = store.generation()
+        with _VEC_LOCK:
+            hit = _VEC_CACHE.get(key)
+            if _usable(hit, dim, gen):
+                return hit
+            # 先放掉手上的舊矩陣（含換模型前的 fingerprint）再載 —— 新舊同時在記憶體會是兩倍。
+            # 正式環境只有一份資料庫，所以整份清掉就是「放掉舊的」。
+            _VEC_CACHE.clear()
+        hit = None
+        e = _build_entry(fp, dim, gen)
+        with _VEC_LOCK:
+            _VEC_CACHE[key] = e
+        return e
+
+
+def _load_vectors(fp: str, dim: int):
+    """回 (段落 id 清單, 版本 id 清單, 矩陣)。依世代計數快取在記憶體（只含啟用中的版本）。"""
+    e = _entry(fp, dim)
+    return e["ids"], e["vids"], e["mat"]
 
 
 def null_vectors(cli, fp: str):
@@ -253,16 +361,20 @@ def null_vectors(cli, fp: str):
 def vector_floor(cli, fp: str, dim: int) -> Optional[float]:
     """這份索引的 cosine 下限：無關問題第一名 cosine 的最大值 ＋ 餘裕。
 
-    用**整份**知識庫的段落算（不是這個人看得到的那幾段）—— 下限不該因為誰在查而不同。
+    用**整份**知識庫（啟用中的段落）算，不是這個人看得到的那幾段 —— 下限不該因為誰在查而不同。
+    跟著載入的矩陣算一次就記住（整份乘十幾個無關問題，十六萬段要零點幾秒，不必每次查詢都算）。
     """
-    ids, _vids, mat = _load_vectors(fp, dim)
-    if not ids:
+    e = _entry(fp, dim)
+    if not e["ids"]:
         return None
+    if e["floor"] is not None:
+        return e["floor"]
     nv = null_vectors(cli, fp)
-    if nv.shape[1] != mat.shape[1]:
+    if nv.shape[1] != e["mat"].shape[1]:
         return None
-    top = (mat @ nv.T).max(axis=0)
-    return float(top.max()) + NULL_MARGIN
+    top = (e["mat"] @ nv.T).max(axis=0)
+    e["floor"] = float(top.max()) + NULL_MARGIN
+    return e["floor"]
 
 
 def vector_hits(qv, fp: str, allowed: dict[str, dict], limit: int = PER_ROUTE,
@@ -270,25 +382,35 @@ def vector_hits(qv, fp: str, allowed: dict[str, dict], limit: int = PER_ROUTE,
     """回 `[{id, cos}]`，依 cosine 由高到低，只留 ≥ `floor` 的。
 
     **只用 fingerprint 相同的向量**（換過模型的舊向量一筆都不會被拿來比）。
+    **不複製子矩陣**：整份乘一次，看不到的分數設成負無限大（理由見本節開頭）。
     """
     import numpy as np
     if not allowed:
         return []
-    ids, vids, mat = _load_vectors(fp, int(qv.shape[0]))
-    if not ids:
+    e = _entry(fp, int(qv.shape[0]))
+    if not e["ids"]:
         return []
-    mask = np.fromiter((v in allowed for v in vids), dtype=bool, count=len(vids))
-    if not mask.any():
+    want = [e["vid_code"][v] for v in allowed if v in e["vid_code"]]
+    if not want:
         return []
-    idx = np.nonzero(mask)[0]
-    sims = mat[idx] @ qv.astype(np.float32)
-    order = np.argsort(-sims)
+    mask = np.isin(e["codes"], np.asarray(want, dtype=np.int32))
+    n_ok = int(mask.sum())
+    if not n_ok:
+        return []
+    sims = e["mat"] @ np.asarray(qv, dtype=np.float32)
+    sims[~mask] = -np.inf
+    k = min(int(limit), n_ok)
+    if k <= 0:
+        return []
+    top = np.argpartition(-sims, k - 1)[:k]
+    top = top[np.argsort(-sims[top], kind="stable")]
+    ids = e["ids"]
     out = []
-    for j in order[:limit]:
+    for j in top:
         cos = float(sims[j])
         if floor is not None and cos < floor:
             break
-        out.append({"id": ids[idx[j]], "cos": cos})
+        out.append({"id": ids[int(j)], "cos": cos})
     return out
 
 
@@ -339,10 +461,106 @@ def result_dict(ch: dict, info: dict, *, active: bool = True) -> dict:
     }
 
 
+# ---------------------------------------------------------------- 標出符合處
+def _doc_freqs(c, terms: list[str]) -> dict[str, int]:
+    """每個檢索詞出現在幾段裡（跟關鍵字那一路同一套比對）。"""
+    out: dict[str, int] = {}
+    if store.has_fts(c):
+        for t in terms:
+            try:
+                out[t] = c.execute("SELECT count(*) FROM kb_fts WHERE kb_fts MATCH ?",
+                                   (cjk_fts.term_to_phrase(t),)).fetchone()[0]
+            except Exception:
+                out[t] = 0
+        return out
+    comp_all = [cjk_fts.compact((r["heading"] or "") + "\n" + r["text"])
+                for r in c.execute("SELECT heading, text FROM kb_chunks").fetchall()]
+    return {t: sum(1 for x in comp_all if t in x) for t in terms}
+
+
+def highlight_terms(query: str) -> dict[str, float]:
+    """問題拆出的檢索詞 → 它在知識庫裡出現的比例（0～1）。知識庫裡根本沒有的詞不回。"""
+    terms = cjk_fts.query_terms(query)
+    if not terms:
+        return {}
+    c = store.conn()
+    n = c.execute("SELECT count(*) FROM kb_chunks").fetchone()[0] or 1
+    return {t: df / n for t, df in _doc_freqs(c, terms).items() if df > 0}
+
+
+def _word_char(ch: str) -> bool:
+    return bool(re.fullmatch(r"[0-9a-z]+", cjk_fts.normalize(ch) or ""))
+
+
+def highlight_spans(text: str, terms: dict[str, float]) -> list[list[int]]:
+    """這段內文裡哪幾段字要標出來：`[[起, 迄), ...]`，位置是**原文**的字元索引。
+
+    比對跟關鍵字那一路相同（正規化、拿掉空白之後比子字串），所以換行或空白夾在
+    兩個字中間照樣標得到；換算回原文時，一段標記從第一個字涵蓋到最後一個字。
+    一段連在一起的符合處，至少要有一個「兩個字以上、而且不是太常見」的詞才標
+    （見 `HL_COMMON`）—— 單獨一個字、或單獨一個到處都有的詞不標。
+    英數詞要整個詞符合（`2` 不標在 `2026` 裡面）。
+    """
+    if not text or not terms:
+        return []
+    chars: list[str] = []
+    where: list[int] = []
+    for i, ch in enumerate(text):
+        if ch.isspace():
+            continue
+        for nc in cjk_fts.normalize(ch):
+            if not nc.isspace():
+                chars.append(nc)
+                where.append(i)
+    s = "".join(chars)
+    if not s:
+        return []
+    hit = [False] * len(s)
+    strong = [False] * len(s)
+    for t, ratio in terms.items():
+        if not t:
+            continue
+        word = t.isascii()
+        good = len(t) >= 2 and ratio <= HL_COMMON
+        start = s.find(t)
+        while start >= 0:
+            end = start + len(t)
+            # 英數詞的邊界要看**原文**：拿掉空白之後「vmware esxi」的 esxi 前面緊接著 e
+            a0, b0 = where[start], where[end - 1]
+            if not word or ((a0 == 0 or not _word_char(text[a0 - 1]))
+                            and (b0 + 1 >= len(text) or not _word_char(text[b0 + 1]))):
+                for k in range(start, end):
+                    hit[k] = True
+                    if good:
+                        strong[k] = True
+            start = s.find(t, start + 1)
+    spans: list[list[int]] = []
+    k = 0
+    while k < len(s):
+        if not hit[k]:
+            k += 1
+            continue
+        j = k
+        while j + 1 < len(s) and hit[j + 1]:
+            j += 1
+        if any(strong[k:j + 1]):
+            a, b = where[k], where[j] + 1
+            if spans and spans[-1][1] >= a:
+                spans[-1][1] = max(spans[-1][1], b)
+            else:
+                spans.append([a, b])
+        k = j + 1
+    return spans
+
+
 def search_detail(query: str, *, user_id: Optional[int],
-                  dataset_ids: Optional[list] = None, k: int = 8) -> dict:
+                  dataset_ids: Optional[list] = None, k: int = 8,
+                  highlight: bool = False) -> dict:
     """完整版：`{"results": [...], "mode": "hybrid"|"keyword", "note": "...",
-    "score_note": SCORE_NOTE}`。`mode` 講出這次有沒有用到向量。"""
+    "score_note": SCORE_NOTE}`。`mode` 講出這次有沒有用到向量。
+
+    `highlight=True`（檢索測試頁）：每一筆另附 `highlights`（`highlight_spans`）。
+    公文撰擬查參考資料時不用（多幾次計數查詢，畫面也用不到）。"""
     from . import embed
     q = (query or "").strip()[:MAX_QUERY]
     k = max(1, min(int(k or 8), MAX_K))
@@ -374,31 +592,37 @@ def search_detail(query: str, *, user_id: Optional[int],
             logger.warning("知識庫檢索：向量那一路失敗，只用關鍵字（%s）", e)
             out["note"] = "嵌入服務這次沒有回應，只用關鍵字找。"
 
+    # 弱命中只有在向量那一路也找到時才算（兩路都說有關才比較可能真的有關）
     vec_ids = {h["id"] for h in vec}
-    scores: dict[str, float] = {}
+    kw_ok = [h for h in kw if h["strong"] or h["id"] in vec_ids]
+    kw_ids = {h["id"] for h in kw_ok}
     via: dict[str, list[str]] = {}
-    for rank, h in enumerate(kw, start=1):
-        # 弱命中只有在向量那一路也找到時才算（兩路都說有關才比較可能真的有關）
-        if not h["strong"] and h["id"] not in vec_ids:
-            continue
-        scores[h["id"]] = scores.get(h["id"], 0.0) + 1.0 / (RRF_K + rank)
-        via.setdefault(h["id"], []).append("keyword")
-    for rank, h in enumerate(vec, start=1):
-        scores[h["id"]] = scores.get(h["id"], 0.0) + 1.0 / (RRF_K + rank)
-        via.setdefault(h["id"], []).append("vector")
-    ranked = sorted(scores.items(), key=lambda kv: -kv[1])[:k]
+    order: list[str] = []
+    # 有向量時照向量的名次（理由與量測見模組說明「為什麼不是兩路合併」）
+    for h in vec:
+        order.append(h["id"])
+        via[h["id"]] = ["vector"] + (["keyword"] if h["id"] in kw_ids else [])
+    # 關鍵字補在後面：向量找到的不到 k 筆時才看得到；沒有向量時就是全部
+    for h in kw_ok:
+        if h["id"] not in via:
+            order.append(h["id"])
+            via[h["id"]] = ["keyword"]
+    ranked = [(cid, 1.0 / (RRF_K + n)) for n, cid in enumerate(order[:k], start=1)]
     if not ranked:
         return out
     c = store.conn()
     rows = c.execute("SELECT * FROM kb_chunks WHERE id IN (SELECT value FROM json_each(?))",
                      (json.dumps([cid for cid, _ in ranked]),)).fetchall()
     by_id = {r["id"]: store.chunk_row(r) for r in rows}
+    hl = highlight_terms(q) if highlight else {}
     for i, (cid, sc) in enumerate(ranked, start=1):
         ch = by_id.get(cid)
         if not ch or ch["version_id"] not in allowed:
             continue
         d = result_dict(ch, allowed[ch["version_id"]])
         d.update(rank=i, score=round(sc, 6), matched_by=via.get(cid, []), mode=out["mode"])
+        if highlight:
+            d["highlights"] = highlight_spans(d["text"], hl)
         out["results"].append(d)
     return out
 

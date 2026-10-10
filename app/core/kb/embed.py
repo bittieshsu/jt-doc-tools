@@ -31,15 +31,17 @@ API 種類在存檔時問一次對方是不是 Ollama（`LLMClient.is_ollama()`�
 舊設定檔沒有這個欄位：已經填了位址的 → 當成「另外指定」（不改掉管理員填好的）；
 沒填的 → 沿用。
 
-## 不加前綴（2026-10-08 使用者：「有講過不要用前綴」）
+## 前綴：管理員不設，照模型自動套用（2026-10-09 使用者：「換nemotron，參數或前綴請調整好」）
 
-查詢與文件**原樣**送去嵌入，上層標題接在本文前面。原本的「查詢前綴 / 文件前綴」欄位與
-「套用建議前綴」拿掉了；舊設定檔裡的前綴讀進來就丟掉。fingerprint 裡前綴那兩格一律是空字串
-—— 沒設過前綴的既有索引 fingerprint 不變、不必重建；設過的會被判成要重建一次。
+2026-10-08 使用者說過不要用前綴：「查詢前綴 / 文件前綴」欄位與「套用建議前綴」拿掉了，舊設定檔裡的
+前綴讀進來就丟掉。少數模型是**照固定前綴訓練的**（官方模型卡寫明），不加的話檢索明顯變差 ——
+那幾族由程式照官方寫法自動加（`MODEL_PROFILES`），管理員不必也不能自己填，畫面講出用了什麼。
+其他模型照舊原樣送，上層標題接在本文前面。
 
 ## index fingerprint
 
-`模型 ＋ API 種類 ＋ 向量維度 ＋ 切段版本` 的雜湊（前綴那兩格固定是空字串，見上）。**只有 fingerprint
+`模型 ＋ API 種類 ＋ 自動套用的前綴 ＋ 向量維度 ＋ 切段版本` 的雜湊（沒有前綴的模型那兩格是空字串，
+跟拿掉前綴設定之前建的索引一樣）。**只有 fingerprint
 相同的向量可以互相比較**。伺服器位址、金鑰、批次大小、逾時不算在內 —— 換一台跑
 同一個模型的伺服器不需要重建。
 """
@@ -49,6 +51,7 @@ import copy
 import hashlib
 import json
 import math
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -81,6 +84,50 @@ DEFAULT_EMBED: dict = {
 
 BATCH_RANGE = (1, 128)
 TIMEOUT_RANGE = (5, 1800)
+
+
+# ---------------------------------------------------------------- 依模型自動套用的用法
+#: 照固定前綴訓練的嵌入模型（官方模型卡寫明要加）。**只收量過的家族**，不推廣：
+#:
+#: * NVIDIA Nemotron-3-Embed（`nvidia/Nemotron-3-Embed-8B-BF16` 模型卡與它的
+#:   `config_sentence_transformers.json`：查詢 `query: `、文件 `passage: `）。2026-10-09 拿實際部署的
+#:   公文知識庫實測（42 題、1,503 段）：8B 不加前綴 R@6 0.705、加了 0.881（長篇查詢 0.615 → 0.800）。
+#:   同一套前綴套在**上一代** llama-nemotron-embed-1b-v2 上反而略差（0.746 → 0.727），所以比對的是
+#:   「Nemotron-3-Embed」這幾個字，不是「nemotron」。
+#:
+#: `num_ctx`：Ollama 載入這個模型時的上下文長度（只對 Ollama 原生 API 送，OpenAI 相容的端點不理它）。
+#: 不送的話照伺服器的預設 —— 推論機設成 131072 時 Nemotron-3-Embed-8B 一載入就佔 28.3 GB，
+#: 8192 只要 10.7 GB，嵌出來的向量一樣。一段最多 800 字、查詢最多 500 字，遠在 8192 tokens 以內；
+#: 真的超過時 `truncate: false` 會明講失敗，不會安靜截掉。
+MODEL_PROFILES: tuple = (
+    {"family": "nemotron3embed", "label": "NVIDIA Nemotron-3-Embed",
+     "query_prefix": "query: ", "document_prefix": "passage: ", "num_ctx": 8192},
+)
+
+_NO_PROFILE = {"family": "", "label": "", "query_prefix": "", "document_prefix": "", "num_ctx": 0}
+
+
+def _family_key(model: str) -> str:
+    """模型名稱只留英數字、轉小寫：`hf.co/Abiray/Nemotron-3-Embed-8B-GGUF:Q8_0` →
+    `hfcoabiraynemotron3embed8bggufq80`（各家上傳者的命名不同，比對家族名稱就好）。"""
+    return re.sub(r"[^a-z0-9]", "", str(model or "").lower())
+
+
+def model_profile(model: str) -> dict:
+    """這個模型要自動套用的前綴與載入參數；不在表上的回空的（原樣送、照伺服器預設載入）。"""
+    key = _family_key(model)
+    for p in MODEL_PROFILES:
+        if p["family"] in key:
+            return dict(p)
+    return dict(_NO_PROFILE)
+
+
+def usage_public(model: str) -> Optional[dict]:
+    """給畫面講「這個模型會自動加什麼」；不在表上的回 None。"""
+    p = model_profile(model)
+    if not p["family"]:
+        return None
+    return {k: p[k] for k in ("label", "query_prefix", "document_prefix", "num_ctx")}
 
 
 class EmbedError(RuntimeError):
@@ -151,6 +198,8 @@ def get_public() -> dict:
         "configured": is_complete(d["embed"]),
         "needs_rebuild": needs_rebuild(d),
         "chunker_version": CHUNKER_VERSION,
+        # 已儲存的模型會自動加什麼前綴（不在表上的是 None）
+        "usage": usage_public(d["embed"].get("model") or ""),
         # 沿用的那台（畫面講出會送去哪裡）；金鑰只說有沒有
         "llm_server": ({"base_url": src["base_url"], "name": src["name"],
                         "pinned": src["pinned"], "has_key": bool(src["secret"]),
@@ -305,10 +354,15 @@ def save(changes: dict) -> dict:
 
 # ---------------------------------------------------------------- fingerprint
 def basis(cfg: dict) -> str:
-    """fingerprint 不含維度的那一部分（維度要真的嵌入一次才知道）。"""
-    return json.dumps({"kind": cfg.get("kind"), "model": (cfg.get("model") or "").strip(),
-                       # 前綴已拿掉；兩格留著（固定空字串）讓沒設過前綴的既有索引 fingerprint 不變
-                       "qp": "", "dp": "",
+    """fingerprint 不含維度的那一部分（維度要真的嵌入一次才知道）。
+
+    前綴只看**模型自動套用的那一套**（`model_profile`）—— 設定檔或快照裡留著的舊前綴不算。
+    沒有前綴的模型兩格是空字串，跟拿掉前綴設定之前建的索引 fingerprint 一樣、不必重建。
+    `num_ctx` 不算在內（不改變向量；一段放不下時會明講失敗）。"""
+    model = (cfg.get("model") or "").strip()
+    prof = model_profile(model)
+    return json.dumps({"kind": cfg.get("kind"), "model": model,
+                       "qp": prof["query_prefix"], "dp": prof["document_prefix"],
                        "chunker": CHUNKER_VERSION}, ensure_ascii=False, sort_keys=True)
 
 
@@ -374,6 +428,10 @@ class EmbedClient:
     api_key: str = ""
     batch_size: int = 16
     timeout: float = 120.0
+    #: 照模型自動套用（`model_profile`），不從設定檔讀
+    query_prefix: str = ""
+    document_prefix: str = ""
+    num_ctx: int = 0
 
     @classmethod
     def from_snapshot(cls, snap: dict) -> "EmbedClient":
@@ -383,18 +441,22 @@ class EmbedClient:
             base = validate_base_url(snap.get("base_url") or "")
         except ValueError as e:
             raise EmbedError("嵌入服務的位址不合格（只收 http / https，不可以是雲端中繼資料位址）。") from e
-        return cls(kind=snap["kind"], base=base, model=(snap.get("model") or "").strip(),
+        model = (snap.get("model") or "").strip()
+        prof = model_profile(model)
+        return cls(kind=snap["kind"], base=base, model=model,
                    api_key=snap.get("secret") or "",
                    batch_size=_clamp(snap.get("batch_size"), *BATCH_RANGE, 16),
-                   timeout=float(_clamp(snap.get("timeout_seconds"), *TIMEOUT_RANGE, 120)))
+                   timeout=float(_clamp(snap.get("timeout_seconds"), *TIMEOUT_RANGE, 120)),
+                   query_prefix=prof["query_prefix"], document_prefix=prof["document_prefix"],
+                   num_ctx=int(prof["num_ctx"] or 0))
 
     # ---- 文字前處理
     def query_text(self, q: str) -> str:
-        return q
+        return self.query_prefix + q
 
     def document_text(self, text: str, title: str = "") -> str:
-        """上層標題接在本文前面一起嵌入（不加前綴，見模組說明）。"""
-        return ((title.strip() + "\n") if title and title.strip() else "") + text
+        """上層標題接在本文前面一起嵌入；照模型自動套用的文件前綴放在最前面（見模組說明）。"""
+        return self.document_prefix + ((title.strip() + "\n") if title and title.strip() else "") + text
 
     # ---- 呼叫
     def _headers(self) -> dict:
@@ -408,6 +470,8 @@ class EmbedClient:
         if self.kind == "ollama":
             url = self.base + "/api/embed"
             payload = {"model": self.model, "input": texts, "truncate": False}
+            if self.num_ctx:
+                payload["options"] = {"num_ctx": self.num_ctx}
         else:
             url = self.base + "/v1/embeddings"
             payload = {"model": self.model, "input": texts}
@@ -496,7 +560,7 @@ def probe(snap: dict, sample: str = "公文處理手冊的函稿撰擬原則") -
     cos = float((m[0] * m[1]).sum())
     return {"ok": True, "dim": int(m.shape[1]), "ms": round(ms, 1),
             "self_similarity": round(cos, 4) if not math.isnan(cos) else None,
-            "model": cli.model, "kind": cli.kind}
+            "model": cli.model, "kind": cli.kind, "usage": usage_public(cli.model)}
 
 
 # ---------------------------------------------------------------- 伺服器上有哪些嵌入模型
@@ -573,4 +637,6 @@ def list_models(snap: dict) -> dict:
         for m in out:
             m["embedding"] = _looks_embedding(m["id"])
     out.sort(key=lambda m: (not m["embedding"], m["id"].lower()))
+    for m in out:
+        m["usage"] = usage_public(m["id"])       # 選了這個模型會自動加什麼（畫面講出來）
     return {"ok": True, "models": out, "capability_known": known, "kind": snap["kind"]}

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--  電子交換標籤集   104_exchange_utf8.ent    1999.12.1  修改日期:2020.10.12  -->
+<!ELEMENT  星期              (#PCDATA)>
+<!ELEMENT  總稱        (#PCDATA)>
+<!ELEMENT  電話          (#PCDATA)>
+<!ELEMENT  聯絡方式         (#PCDATA)>
+<!ELEMENT  地址            (#PCDATA)>
+<!ELEMENT  條列            (文字?,條列*)>
+<!ATTLIST   條列  序號   CDATA   "">
+<!ELEMENT  段落            (文字?,條列*) >
+<!ATTLIST   段落  段名   CDATA   "">
+<!ELEMENT  單位名          (#PCDATA)>
+<!ELEMENT  署名            (#PCDATA)>
+<!ELEMENT  附件          (文字,附件檔名*)>
+<!ELEMENT  附件檔名      EMPTY>
+<!ATTLIST    附件檔名  附件名   ENTITIES  #REQUIRED>
+<!ELEMENT  含附件            (#PCDATA)>
+<!ELEMENT  速別     EMPTY>
+<!ATTLIST  速別  代碼     (普通件|速件|最速件)   #IMPLIED>
+<!ELEMENT  發文機關       ((全銜,機關代碼)|(單位名,(機關代碼,單位代碼)))>
+<!ELEMENT  傳送機關       ((全銜,機關代碼)|(單位名,(機關代碼,單位代碼)))>
+<!ELEMENT  單位           (單位名,單位代碼?)>
+<!ELEMENT  交換表     (#PCDATA)>
+<!ATTLIST  交換表  交換表單   ENTITY  #REQUIRED>
+<!ELEMENT  跨機關陳核會稿交換表      EMPTY >
+<!ATTLIST  跨機關陳核會稿交換表   跨機關陳核會稿交換表單   ENTITY  #REQUIRED>
+<!ELEMENT  跨機關陳核會稿文號      (文號)>
+<!ELEMENT  壓縮檔案名稱       (檔案名稱)>
+<!ELEMENT  會陳狀態        EMPTY>
+<!ATTLIST  會陳狀態 代碼  (1|2|3|4)   "1" >
+<!ELEMENT  文書訊息代碼   EMPTY>
+<!ATTLIST  文書訊息代碼 代碼 (1|2|3|4|5|6)   "1" >
+<!ELEMENT  訊息備註 (#PCDATA)>
+<!ELEMENT  正本       ((姓名,職稱?)|全銜|單位名|總稱)+>
+<!ELEMENT  副本       (((姓名,職稱?)|全銜|單位名|總稱),含附件?)*>
+<!ELEMENT  聯絡人及電話      ((姓名,職稱?),電話)+>
+<!ELEMENT  主持人        ((姓名,職稱?)+)>
+<!ELEMENT  敬陳          ((職稱,姓名?)+)>
+<!ELEMENT  出席者       ((姓名,職稱?)|全銜|單位名|總稱)+>
+<!ELEMENT  列席者       ((姓名,職稱?)|全銜|單位名|總稱)*>
+<!ELEMENT  開會時間     (年月日,星期,時分)>
+<!ELEMENT  開會事由     (文字)>
+<!ELEMENT  開會地點     (文字)>
+<!ELEMENT  會勘時間     (年月日,星期,時分)>
+<!ELEMENT  會勘事由     (文字)>
+<!ELEMENT  會勘地點     (文字)>
+<!ELEMENT  主旨         (文字)>
+<!ELEMENT  備註         (段落)>
+<!ELEMENT  發文者       ((全銜,機關代碼?)|(單位名,(機關代碼,單位代碼)?)|姓名)>
+<!ELEMENT  來文者       ((姓名,職稱?)|單位|機關)>
+<!ELEMENT  受會單位     (單位名)>
+<!ELEMENT  收會時間     (年月日,時分?)>
+<!ELEMENT  會畢時間     (年月日,時分?)>
+<!ELEMENT  會核意見         (段落)>
+<!ELEMENT  會辦機關        (全銜,決行,審核,承辦,會辦,收文日期,收文字號,發文日期,發文字號)>
+<!ELEMENT  主辦機關        (全銜,決行,審核,承辦,會辦,收文日期,收文字號,發文日期,發文字號)>
+<!ELEMENT  內含本文與附件之可攜式文件檔名 (#PCDATA)>
+<!ELEMENT  擬辦方式        EMPTY>
+<!ATTLIST  擬辦方式 代碼  (1|2|3|4|5|6)   "1" >

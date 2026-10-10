@@ -378,7 +378,8 @@
       <legend>{{ icon('globe', size=14) }} {{ tr('嵌入服務') }}</legend>
       {# 預設沿用上面那台 LLM 伺服器（2026-10-08 使用者：「預設 繼承上面有設的 llm server設定」）：
          勾著時位址、金鑰、API 種類都不必填（存檔時問一次對方是不是 Ollama），只填模型。
-         不加前綴（使用者：「有講過不要用前綴」）—— 前綴欄位與「套用建議前綴」都拿掉了。 #}
+         前綴不給管理員填（使用者：「有講過不要用前綴」）；照固定前綴訓練的模型（Nemotron-3-Embed）
+         由伺服器照官方寫法自動加（`embed.MODEL_PROFILES`），選了就在模型下面講出來（`#kbEmbUsage`）。 #}
       <label class="emb-inherit" for="kbEmbInherit">
         <input type="checkbox" id="kbEmbInherit">
         <span>{{ tr('沿用上面設定的 LLM 伺服器（預設）') }}</span>
@@ -387,7 +388,7 @@
       <div class="af-attrs" id="kbEmbOwn">
         <div class="auth-field">
           <label class="af-label" for="kbEmbKind">{{ tr('API 種類') }}</label>
-          <select id="kbEmbKind" class="field">
+          <select id="kbEmbKind" class="field jt-select">
             <option value="ollama">{{ tr('Ollama（/api/embed）') }}</option>
             <option value="openai">{{ tr('OpenAI 相容（/v1/embeddings）') }}</option>
           </select>
@@ -409,13 +410,22 @@
       <div class="auth-field emb-model">
         <label class="af-label" for="kbEmbModel">{{ tr('嵌入模型') }}</label>
         <div class="emb-model-row">
-          <select id="kbEmbModel" class="field"></select>
+          <select id="kbEmbModel" class="field jt-select" data-i18n="skip"></select>
           <button class="btn" id="kbEmbModels" type="button">{{ icon('refresh', size=14) }} <span>{{ tr('重新整理清單') }}</span></button>
         </div>
         <input id="kbEmbModelManual" class="field emb-model-manual" type="text" maxlength="200" hidden
                aria-label="{{ tr('模型名稱') }}" placeholder="{{ tr('模型名稱') }}">
         <div class="af-hint emb-model-note" id="kbEmbModelNote" role="status"></div>
+        <div class="af-hint" id="kbEmbUsage" hidden></div>
         <div class="af-hint">{{ tr('只列伺服器上專門做嵌入（embedding）的模型，聊天用的模型不行。換模型要重建索引。') }}</div>
+        {# 建議的模型（2026-10-09 使用者：「因為我們有一個新的也可以考慮，說明文字也要補充」）。
+           數字來自 2026-10-09 拿實際部署的公文知識庫實測（`embed.MODEL_PROFILES` 的註解）。 #}
+        <div class="info-box emb-advice">
+          {{ icon('info', size=14) }}
+          <p><b>{{ tr('建議使用 NVIDIA Nemotron-3-Embed-8B') }}</b>{{ tr('：以公文知識庫實測（42 題、1,503 段），在試過的嵌入模型中找回率最高，長篇的需求敘述也找得準。') }}</p>
+          <p>{{ tr('Ollama 下載：') }}<code data-i18n="skip">ollama pull hf.co/Abiray/Nemotron-3-Embed-8B-GGUF:Q8_0</code>{{ tr('（第三方轉成 GGUF 的版本；檔案約 8.5 GB，載入後約佔 11 GB 記憶體）。') }}</p>
+          <p>{{ tr('選了這個模型時，查詢與文件的前綴、載入參數由系統照官方用法自動設定，不必另外調整。記憶體不夠時可改用較小的嵌入模型（例如 EmbeddingGemma），找回率會低一些。') }}</p>
+        </div>
       </div>
       <div class="af-attrs">
         <div class="auth-field">
@@ -480,9 +490,18 @@
   .emb-panel .emb-model { max-width: 560px; }
   .emb-panel .emb-model-row { display: flex; gap: 8px; align-items: center; }
   .emb-panel .emb-model-row select { flex: 1 1 auto; min-width: 0; }
+  /* 嵌入的兩個下拉用本站樣式（2026-10-09 使用者：「嵌入模型下拉清單 要用本站樣式」），跟同一區的輸入框一樣寬、一樣高 */
+  .emb-panel .auth-field .jt-select-wrap { display: block; width: 100%; }
+  .emb-panel .emb-model-row .jt-select-wrap { flex: 1 1 auto; min-width: 0; }
+  .emb-panel .jt-select-trigger { min-height: 34px; font-size: 14px; color: #0f172a;
+    border-color: var(--border); border-radius: 6px; }
   .emb-panel .emb-model-row .btn { flex: 0 0 auto; white-space: nowrap; }
   .emb-panel .emb-model-manual { margin-top: 6px; }
   .emb-panel .emb-model-note:empty { display: none; }
+  .emb-panel .emb-advice { margin-top: 10px; }
+  .emb-panel .emb-advice p { margin: 0 0 4px; }
+  .emb-panel .emb-advice p:last-child { margin-bottom: 0; }
+  .emb-panel .emb-advice code { word-break: break-all; }
   .emb-panel .emb-model-note.emb-err { color: #dc2626; }
   .emb-panel .emb-kb-link { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
     font-size: 13px; margin: 12px 0 0; }
@@ -669,6 +688,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/custom_select.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
 const $ = (id) => document.getElementById(id);
 // 「其他 LLM 伺服器」：伺服器端送來的是公開版 —— 金鑰欄位只有「已設定」的替身字串，不含金鑰本身
@@ -1341,7 +1361,7 @@ $('btn-save').addEventListener('click', saveSettings);
       ? tr('檢索方式：關鍵字＋向量（模型 {0}、維度 {1}）').replace('{0}', act.model).replace('{1}', act.dim)
       : tr('檢索方式：只有關鍵字（還沒有建立向量索引）')]);
     const rb = ST.rebuild || {};
-    if (rb.running) lines.push(['emb-n-info', tr('重建索引中：{0}／{1}').replace('{0}', rb.done || 0).replace('{1}', rb.total || 0)]);
+    if (rb.running) lines.push(['emb-n-info', tr('重建索引中：{0}/{1}').replace('{0}', rb.done || 0).replace('{1}', rb.total || 0)]);
     else if (rb.error) lines.push(['emb-n-bad', tr('上一次重建失敗（原本的索引沒有動）：') + tr(rb.error)]);
     if (ST.needs_rebuild && !rb.running) lines.push(['emb-n-warn', tr('embedding 設定跟目前的索引不同，請按「重建索引」。')]);
     lines.forEach(([cls, t]) => {
@@ -1378,6 +1398,7 @@ $('btn-save').addEventListener('click', saveSettings);
     const e = ST.embed;
     byId('kbEmbInherit').checked = !!e.use_llm_server;
     byId('kbEmbKind').value = e.kind || 'ollama';
+    jtRefresh(byId('kbEmbKind'));
     byId('kbEmbUrl').value = e.base_url || '';
     byId('kbEmbKey').value = e.api_key || '';
     byId('kbEmbKeyHint').textContent = e.api_key ? tr('已設定（加密存放，不會顯示出來）。要換就直接輸入新的。') : tr('Ollama 不需要金鑰。');
@@ -1397,9 +1418,36 @@ $('btn-save').addEventListener('click', saveSettings);
   }
   function dirty() { return !!ST && JSON.stringify(embBody()) !== savedBody; }
 
+  // 程式改了選項或 `.value` 之後，本站樣式的下拉要重畫（`jt-select` 只會自己跟上使用者點的）
+  function jtRefresh(sel) { if (sel && sel._jtSelect) sel._jtSelect.refresh(); }
   // ---- 嵌入模型的下拉：選項從伺服器的清單來；抓不到才給「手動輸入…」
   const MANUAL = '__manual__';
   let modelTok = 0;
+  // 模型 → 會自動加的前綴（伺服器算好的，見 `embed.model_profile`；前端不自己比對模型名稱）
+  let USAGE = {};
+  function renderUsage() {
+    const box = byId('kbEmbUsage');
+    const m = modelValue();
+    let u = Object.prototype.hasOwnProperty.call(USAGE, m) ? USAGE[m] : undefined;
+    if (u === undefined && ST && ST.embed && ST.embed.model === m) u = ST.usage;
+    box.textContent = '';
+    box.hidden = !u;
+    if (!u) return;
+    // 程式碼片段用 <code>，前綴裡的空白才看得出來
+    const parts = tr('這個模型會自動照 {0} 官方的用法：查詢前面加 {1}、文件前面加 {2}，並以 {3} tokens 的上下文長度載入（省記憶體）。')
+      .split(/(\{[0-3]\})/);
+    const vals = {'{0}': u.label, '{1}': u.query_prefix, '{2}': u.document_prefix,
+                  '{3}': Number(u.num_ctx || 0).toLocaleString()};
+    parts.forEach(p => {
+      if (p === '{1}' || p === '{2}') {
+        const c = document.createElement('code');
+        c.textContent = JSON.stringify(vals[p]);
+        box.appendChild(c);
+      } else {
+        box.appendChild(document.createTextNode(Object.prototype.hasOwnProperty.call(vals, p) ? vals[p] : p));
+      }
+    });
+  }
   function modelValue() {
     const sel = byId('kbEmbModel');
     return sel.value === MANUAL ? byId('kbEmbModelManual').value.trim() : (sel.value || '').trim();
@@ -1414,6 +1462,7 @@ $('btn-save').addEventListener('click', saveSettings);
   function syncManual() {
     const on = byId('kbEmbModel').value === MANUAL;
     byId('kbEmbModelManual').hidden = !on;
+    renderUsage();
   }
   // 存著的值一定要選得到（清單還沒回來、或伺服器上已經沒有那個模型）
   function setModelValue(v) {
@@ -1424,6 +1473,7 @@ $('btn-save').addEventListener('click', saveSettings);
     sel.value = v;
     byId('kbEmbModelManual').value = '';
     syncManual();
+    jtRefresh(sel);
   }
   function modelText(m) {
     const parts = [m.id];
@@ -1455,6 +1505,7 @@ $('btn-save').addEventListener('click', saveSettings);
     if (offerManual) sel.appendChild(opt(MANUAL, tr('手動輸入…')));
     sel.value = keep;
     syncManual();
+    jtRefresh(sel);
   }
   function modelNote(text, bad) {
     const n = byId('kbEmbModelNote');
@@ -1489,10 +1540,12 @@ $('btn-save').addEventListener('click', saveSettings);
       return;
     }
     const models = j.models || [];
+    USAGE = {};
+    models.forEach(m => { USAGE[m.id] = m.usage || null; });
     fillModels(models, !!j.capability_known, !models.length);
     if (!models.length) {
       modelNote(j.capability_known
-        ? tr('這台伺服器上沒有嵌入模型，請先在伺服器上下載一個（例如 ollama pull granite-embedding:278m）。')
+        ? tr('這台伺服器上沒有嵌入模型，請先在伺服器上下載一個（建議的模型與下載指令見下方說明）。')
         : tr('這台伺服器沒有列出任何模型。'), true);
     } else if (j.capability_known) {
       modelNote(tr('伺服器上有 {0} 個嵌入模型。').replace('{0}', models.length));

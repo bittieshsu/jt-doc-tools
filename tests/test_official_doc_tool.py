@@ -205,6 +205,8 @@ def test_page_renders_all_three_modes(client, auth_off):
                   "odLetterNarrativeUp-input", "odLetterNarrativeCount", "odOrg", "odReceiver",
                   "odRelation", "odRelationHint", "odLetterClosing", "odSpeed", "odLength3",
                   "odCopies", "odCc", "odAttachments", "odSignature", "odContact",
+                  "odCtAddress", "odCtTaxId", "odCtTaxIdRow", "odCtPersonLabel", "odCtPerson",
+                  "odCtPhone", "odCtFax", "odCtEmail", "odCtUnplaced", "odCtUnplacedList",
                   "odSalute", "odSaluteTerm", "odSaluteSelf"):
         assert f'id="{el_id}"' in html, f"頁面少了 #{el_id}"
     # 函的區塊一開始是藏起來的（預設是簽）
@@ -684,7 +686,8 @@ def test_sync_api_returns_text_and_issues(client, auth_off, fake_llm):
         "mode": "sign", "narrative": NARRATIVE, "unit": "資訊室", "closing": "鑒核"})
     assert r.status_code == 200, r.text
     d = r.json()
-    assert set(d) == {"mode", "text", "facts", "issues", "llm_calls", "references", "kb_note"}
+    assert set(d) == {"mode", "text", "facts", "issues", "llm_calls", "references", "kb_note",
+                      "history_note", "contact_unplaced"}
     assert "簽請　鑒核" in d["text"]
     assert d["llm_calls"] == 2
     assert isinstance(d["issues"], list)
@@ -1391,8 +1394,29 @@ def _rewrite_and_revisions_flow(send):
                         "return x.indexOf('本案業經核准') >= 0 && x.indexOf('擬辦：') < 0;})()", 10), \
         "游標所在那一段沒有認對（要是「擬辦：」後面的內文）"
     before = _eval(send, "document.getElementById('odDraft').value")
+    # 選了改寫方式之後「改寫」按鈕要變成主要按鈕、閃一下、寫出選的是哪一種，旁邊講出還要按它
+    # （2026-10-09 使用者：讓使用者一看就知道還要按下「改寫」才會動作）
+    go = ("(function(){var b=document.getElementById('odRwGo'), h=document.getElementById('odRwReady');"
+          "var cs=getComputedStyle(b);"
+          "return {primary:b.classList.contains('btn-primary'), ready:b.classList.contains('is-ready'),"
+          "label:document.getElementById('odRwGoLabel').textContent, hint:!h.hidden && h.offsetWidth>0,"
+          "anim:cs.animationName, bg:cs.backgroundColor};})()")
+    g0 = _eval(send, go)
+    assert not g0["primary"] and not g0["hint"], f"還沒選之前按鈕維持次要樣式：{g0}"
+    assert g0["label"] == "改寫：精簡", g0
+    _eval(send, "document.querySelector('input[name=odRwKind][value=formal]').click(), 1")
+    g1 = _eval(send, go)
+    assert g1["primary"] and g1["ready"] and g1["hint"], f"選了方式之後按鈕要變醒目、旁邊要提示：{g1}"
+    assert g1["anim"] == "odRwReady", g1
+    assert g1["label"] == "改寫：更正式", g1
+    assert g1["bg"] != g0["bg"], f"按鈕顏色要真的換掉：{g0['bg']} → {g1['bg']}"
     _eval(send, "document.querySelector('input[name=odRwKind][value=shorter]').click(), 1")
+    assert _eval(send, go)["label"] == "改寫：精簡"
     _eval(send, "document.getElementById('odRwGo').click(), 1")
+    # 改寫中按鈕換成轉圈（標籤暫時不在畫面上），所以這裡只看提示與閃動收起來了沒
+    g2 = _eval(send, "(function(){var b=document.getElementById('odRwGo'), h=document.getElementById('odRwReady');"
+                     "return {ready:b.classList.contains('is-ready'), hint:!h.hidden};})()")
+    assert not g2["hint"] and not g2["ready"], f"按下去之後提示要收起來：{g2}"
     assert _until(send, "!document.getElementById('odRwOut').hidden && "
                         "document.querySelectorAll('#odRwBefore del').length > 0", 30), \
         "改寫之後沒有顯示前後對照（刪掉的字要劃線）"
@@ -1671,7 +1695,7 @@ def _letter_flow(port, send):
     # ---- 填欄位；稱謂即時顯示（伺服器算的） ----
     for el_id, v in (("odLetterNarrative", LETTER_NARRATIVE), ("odOrg", "嘉禾市資訊局"),
                      ("odReceiver", "嘉禾市政府"), ("odSignature", "局長　王○○"),
-                     ("odCc", "本局資訊安全科"), ("odContact", "地址：嘉禾市中正路1號")):
+                     ("odCc", "本局資訊安全科"), ("odCtAddress", "嘉禾市中正路1號")):
         _eval(send, "(function(){var e=document.getElementById(%s); e.value=%s;"
                     "e.dispatchEvent(new Event('input')); e.dispatchEvent(new Event('change'));"
                     "return 1;})()" % (_js(el_id), _js(v)))
@@ -1698,9 +1722,9 @@ def _letter_flow(port, send):
     remembered = _eval(send, "[document.getElementById('odOrg').value,"
                              "document.getElementById('odSignature').value,"
                              "document.getElementById('odCc').value,"
-                             "document.getElementById('odContact').value]")
+                             "document.getElementById('odCtAddress').value]")
     assert remembered == ["嘉禾市資訊局", "局長　王○○", "本局資訊安全科",
-                          "地址：嘉禾市中正路1號"], remembered
+                          "嘉禾市中正路1號"], remembered
     assert _eval(send, "document.getElementById('odReceiver').value") == "", \
         "受文者每一份都不同，不可以記住"
 

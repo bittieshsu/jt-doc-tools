@@ -577,3 +577,21 @@ def test_source_kind_cards_are_a_big_toggle(live, width):
     if width >= 1000:
         assert abs(t1 - t2) <= 1 and l2 > l1, ("寬螢幕要並排", r)
     assert r["picked"] == "outline", "點了「大綱」那張沒有選中"
+
+
+@pytest.mark.parametrize("width", [390, 1280])
+def test_the_progress_bar_stays_visible_with_a_long_status(live, width):
+    """作業進度列：狀態文字很長（公文撰擬叫模型時的「…AI 正在回覆，已收到 134 字（1/3）」）
+    時，進度條不可以被擠到看不見、已過時間不可以跑出框外。手機上原本只剩 14px（2026-10-10 量到）。"""
+    got = _measure(live, "/tools/official-doc/", """(function(){
+        var j = document.getElementById('odJob'); j.hidden = false;
+        j.querySelectorAll('[hidden]').forEach(function(e){ e.hidden = false; });
+        j.querySelector('.job-status').textContent = '整理資料：AI 正在回覆，已收到 134 字（1/3）';
+        j.querySelector('.job-elapsed').textContent = '已過 0:02';
+        var r = function(s){ return j.querySelector(s).getBoundingClientRect(); };
+        var box = j.getBoundingClientRect();
+        return {bar: r('.job-bar').width, box: box.width,
+                right: Math.max(r('.job-status').right, r('.job-elapsed').right) - box.right};
+    })()""", width=width)
+    assert got["bar"] >= min(200, got["box"] * 0.5), got
+    assert got["right"] <= 1, got

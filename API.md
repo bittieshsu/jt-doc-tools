@@ -634,7 +634,7 @@ curl -X POST http://localhost:8765/tools/pdf-seam-stamp/api/pdf-seam-stamp \
 ### 掃描修正
 
 把拍歪、掃歪的文件裁掉黑邊、拉正、去除不勻的底色。手機翻拍時會抓出紙張的
-四個角做透視校正。**完全不用 AI 也不用 GPU**（傳統影像處理，CPU 約 0.8 秒／頁
+四個角做透視校正。**完全不用 AI 也不用 GPU**（傳統影像處理，CPU 約 0.8 秒/頁
 @200 dpi）。
 
 ```text
@@ -1859,6 +1859,7 @@ Body（JSON），三種模式共用：
 | `mode` | str | | 模式：`sign`（簽，預設）/ `letter`（函）/ `endorse`（簽辦意見） |
 | `length` | str | | 篇幅：`short`（精簡）/ `normal`（一般，預設）/ `long`（詳細） |
 | `use_kb` | bool | | 設成 `true` 時先在公文知識庫裡找跟這件事相關的資料再撰寫（預設不查）。查得到哪些資料集依這把 Token 的使用者決定；只有用途是「業務依據」的資料算草稿的依據 |
+| `use_history` | bool | | 設成 `true` 時先在**這把 Token 的使用者自己**的歷史案件裡找內容相近的（最多 3 件，取最新一版）當寫法參考（預設不查）。查不到別人的案件，管理員也一樣；歷史案件不算草稿的依據 |
 
 簽（`mode=sign`）：
 
@@ -1885,8 +1886,10 @@ Body（JSON），三種模式共用：
 | `copies` | str | | 正本（空的＝同受文者） |
 | `cc` | str | | 副本 |
 | `signature` | str | | 署名，例如 `局長　王○○` |
-| `contact` | str | | 聯絡資訊，一行一項（地址、承辦人、電話、電子信箱），上限 500 字 |
+| `contact_fields` | object | | 聯絡資訊，一欄一個鍵（每一欄都可以不送）：`address` 地址、`tax_id` 統一編號（只有 `issuer=company` 才用）、`person` 聯絡人姓名、`person_label` 那一欄在草稿上的名稱（`聯絡人`（預設）或 `承辦人`）、`phone` 電話、`fax` 傳真、`email` 電子信箱。欄位名稱與順序由系統寫，沒送的欄不出現；值裡的換行收成一行 |
+| `contact` | str | | 舊寫法：一行一項的文字，上限 500 字。有送 `contact_fields` 時不看這一欄。認得的行（地址、住址、聯絡人、承辦人、電話、傳真、電子信箱、統一編號…）分進各欄，**認不得的行不放進草稿**，列在回應的 `contact_unplaced` |
 | `attachments` | str | | 附件 |
+| `org_codes` | object | | 機關名稱對機關代碼的對照（選填）：鍵是機關全銜、值是機關代碼（例如 `Q1000000`），最多 40 筆，匯出 DI 檔時用。只存名稱寫在發文機關、受文者、正本或副本裡，而且公文電子交換系統地址簿裡那個代碼就是這個名稱的；對不上的不存（不回錯） |
 
 | `relation` | 稱謂 | 可用的期望語 |
 |---|---|---|
@@ -1905,7 +1908,7 @@ Body（JSON），三種模式共用：
 | `source` | str | ✓ | 來文內容（或你整理的來文大綱），上限 12,000 字 |
 | `direction` | str | ✓ | 辦理方向：你打算怎麼辦理，上限 2,000 字。**沒填回 400** —— 同意、駁回或存查是你的決定，不替你決定 |
 | `outline` | bool | | 設成 `true` 表示 `source` 是你整理的大綱，不是來文全文 |
-| `units` | str | | 承辦／協辦單位 |
+| `units` | str | | 承辦/協辦單位 |
 | `internal_deadline` | str | | 內部期限（跟來文的期限分開寫） |
 | `fmt` | str | | 格式：`compact`（精簡一段，預設）/ `list`（條列） |
 | `closing` | str | | 結尾：`陳核`（預設）/ `陳閱` / `none` |
@@ -1973,7 +1976,8 @@ curl -X POST http://localhost:8765/tools/official-doc/api/official-doc \
   -d '{"mode": "letter", "org": "嘉禾市資訊局", "receiver": "嘉禾市東湖區公所",
        "relation": "down", "closing": "請\u3000照辦", "cc": "本局資訊管理科",
        "signature": "局長\u3000王○○", "attachments": "資訊資產清冊1份",
-       "contact": "地址：嘉禾市文化路1號\n承辦人：王小明\n電話：(02)1234-5678",
+       "contact_fields": {"address": "嘉禾市文化路1號", "person_label": "承辦人",
+                          "person": "王小明", "phone": "(02)1234-5678"},
        "narrative": "請各區公所於115年10月20日前填報資訊資產清冊，以電子郵件回傳。"}' | jq -r '.text'
 ```
 
@@ -1985,8 +1989,10 @@ curl -X POST http://localhost:8765/tools/official-doc/api/official-doc \
 | `facts` | 資料表，每一項是 `{key, label, value, quote, status}`。狀態有五種：`provided`（原文有，`quote` 是原文裡的那一段）、`inferred`（模型推論的，要確認）、`missing`（未提供）、`conflict`（矛盾，另有 `values` 列出各種寫法）、`confirmed`（你在 `overrides` 改過的，原本的值記在 `was`） |
 | `issues` | 檢查結果，依嚴重度排序。嚴重度有三種：`error`（找不到依據，或草稿還寫著你改掉的舊值）、`todo`（待補、待確認）、`hint`（建議）。每一條的 `message` 是填好的中文，`template` 與 `args` 是同一句的樣板與參數（要自己翻譯時用），`snippet` 是草稿裡的那一段原文 |
 | `llm_calls` | 這次呼叫了模型幾次（回答不合格式而重問也算） |
-| `references` | 有 `use_kb` 時參考了哪些資料：`{id, title, dataset_name, version_label, locator_text, heading, purpose, text, source_url, used}`。`purpose` 是 `substantive_basis`（業務依據，**只有這一種算依據**）/ `format_reference`（格式與用語參考）/ `style_example`（寫作範例）；`used` 是模型說它有引用。沒用公文知識庫時是空陣列 |
+| `references` | 有 `use_kb` 或 `use_history` 時參考了哪些資料：`{id, title, dataset_name, version_label, locator_text, heading, purpose, text, source_url, used}`。`purpose` 是 `substantive_basis`（業務依據，**只有這一種算依據**）/ `format_reference`（格式與用語參考）/ `style_example`（寫作範例）/ `past_case`（自己的歷史案件，另有 `case_id`、`case_rev`、`case_updated`）；`used` 是模型說它有引用。兩個都沒用時是空陣列 |
 | `kb_note` | 公文知識庫的狀況：空字串（正常，或沒用公文知識庫）/ `none`（找不到相關資料）/ `failed`（查詢失敗；草稿照樣產生，只是沒有參考資料，原因寫在服務記錄） |
+| `history_note` | 歷史案件的狀況：空字串（正常，或沒用歷史案件）/ `none`（自己的案件裡沒有相近的）/ `failed`（查詢失敗；草稿照樣產生） |
+| `contact_unplaced` | 用舊寫法 `contact` 送的聯絡資訊裡，對不到任何欄位、沒有放進草稿的那幾行（陣列；都對得到時是空陣列） |
 
 | `code` | 意思 |
 |---|---|
@@ -2022,10 +2028,12 @@ curl -X POST http://localhost:8765/tools/official-doc/api/official-doc \
 
 | 端點 | 說明 |
 |---|---|
-| `POST /tools/official-doc/start` | 欄位同上（JSON）。回 `{"job_id": "...", "case_id": "..."}`；用 `/api/jobs/{job_id}` 查進度，完成後作業的結果檔是 ODT 草稿（`/api/jobs/{job_id}/download`） |
+| `POST /tools/official-doc/start` | 欄位同上（JSON）。回 `{"job_id": "...", "case_id": "...", "contact_unplaced": [...]}`；用 `/api/jobs/{job_id}` 查進度，完成後作業的結果檔是 ODT 草稿（`/api/jobs/{job_id}/download`） |
 | `GET /tools/official-doc/result/{case_id}` | 取結果：`{case_id, mode, inputs, title, draft, created_at}`，`draft` 是 `{mode, text, facts, issues, content, llm_calls}`；過期或被清掉回 **410** |
 | `POST /tools/official-doc/check` | 送 `{"case_id": "...", "text": "改過的草稿"}`，回 `{"issues": [...]}`：拿目前的文字重新檢查，**不呼叫模型**；依據是建立案件時你送進來的內容 |
-| `POST /tools/official-doc/export` | 送 `{"case_id": "...", "text": "...", "fmt": "odt", "title": "...", "draft_mark": true, "extras": {...}}`，回檔案。格式（`fmt`）有 `txt` / `odt` / `docx` / `pdf` / `png` / `svg` / `json`；照**送來的文字**匯出，也就是你改過的版本 |
+| `POST /tools/official-doc/export` | 送 `{"case_id": "...", "text": "...", "fmt": "odt", "title": "...", "draft_mark": true, "extras": {...}}`，回檔案。格式（`fmt`）有 `txt` / `odt` / `docx` / `pdf` / `png` / `svg` / `json` / `di`；照**送來的文字**匯出，也就是你改過的版本 |
+| `POST /tools/official-doc/di-preview` | 送 `{"case_id": "...", "text": "...", "title": "..."}`，回 `{filename, mode, root, dtd, xml, notes, valid, errors}`：跟匯出 `di` 同一支產生器，`xml` 就是下載拿到的那一份；`valid` 是有沒有通過 DTD 檢查，`notes` 是注意事項（`{code, args}`，例如沒對到機關代碼的機關） |
+| `GET /tools/official-doc/orgs` | 查機關名稱（公文電子交換系統地址簿，管理員下載過才有）：參數 `q`（名稱或代碼開頭）與 `limit`（1 到 20，預設 10），回 `{"orgs": [{"name": "...", "id": "..."}], "exact": "..."}`；`exact` 是名稱完全相同而且只有一筆時的機關代碼，同名好幾個就是空的 |
 | `POST /tools/official-doc/extract-text` | multipart `file` → `{"text": "...", "chars": 11, "filename": "..."}`：從 PDF、Word（`.docx` / `.doc`）、ODT、RTF、純文字（`.txt` / `.md`）抽出文字給你貼進欄位，**檔案不留**；上限 20 MB |
 | `GET /tools/official-doc/api/cases` | 歷史案件清單：`{"cases": [...], "show_owner": false, "limit": 500}`，新的在前。查詢參數 `q`（比對名稱、標題、案件編號）與 `mode`（`sign` / `letter` / `endorse`）都選填。每一筆有 `case_id`、`name`、`title`、`mode`、`latest_rev`、`issues`、`created_at`、`updated_at`、`deleted`；管理員拿到的是每個人的（含已刪除），多一個 `owner` |
 | `GET /tools/official-doc/case/{case_id}` | 一個案件的清單資料，加上 `has_result` 與 `job`（最近一件作業的 `{id, status}`，還在跑時可以接著查進度） |
@@ -2041,6 +2049,7 @@ curl -X POST http://localhost:8765/tools/official-doc/api/official-doc \
 * 頁首預設標「草稿」，`draft_mark` 設成 `false` 就不標。檔名用 `title`（最長 40 字，檔名不能用的字元會拿掉），下載的檔名是 `<title>-草稿.<fmt>`。
 * 字型用標楷體；伺服器上沒有標楷體時，PDF 改用其他楷體，再沒有就用明體。
 * JSON 帶 `"format": "jtdt-official-doc"` 與 `"format_version": 1`，內容是整份案件；`draft.text` 換成送來的文字，`draft.issues` 依那份文字重新檢查。
+* 電子公文 DI 檔（`di`）是政府電子公文的文書本文檔（XML），格式照檔案管理局〈文書及檔案管理電腦化作業規範〉104 版 DTD（函 `104_2_utf8.dtd`、簽 `104_5_utf8.dtd`），給承辦人匯入機關自己的公文系統，再照常取號、簽核、發文。發文日期、發文字號、文號留空就留空，有填就整串照放；機關代碼先用 `org_codes`，沒有才照名稱查地址簿（名稱完全相同而且只有一筆才填）。簽辦意見沒有 DI 檔，找不到「主旨：」那一行也產生不了，兩種都回 **400**。回應標頭 `X-Jtdt-Di-Valid` 是有沒有通過 DTD 檢查（`1` 或 `0`），`X-Jtdt-Di-Notes` 是注意事項幾條。
 * 圖片（`png` / `svg`）跟 PDF 同一個版面：一頁時回那一張（PNG 200 dpi；SVG 的字轉成外框，沒有標楷體的電腦也長得一樣），多頁時一頁一張打包成 zip（`<title>-草稿-png.zip`），最多 30 頁。
 
 版面加註（`extras`，選填；只用在 `odt` / `docx` / `pdf` / `png` / `svg`，**不會寫進草稿文字**，預覽圖也照著畫）：
@@ -2067,6 +2076,12 @@ curl -X POST http://localhost:8765/tools/official-doc/export \
   -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
   -d '{"case_id": "CASE_ID", "text": "簽　　於資訊室\n主旨：…", "fmt": "odt", "title": "汰換印表機"}' \
   -o draft.odt
+
+# 匯出電子公文 DI 檔（匯入機關的公文系統用）
+curl -X POST http://localhost:8765/tools/official-doc/export \
+  -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"case_id": "CASE_ID", "text": "嘉禾市資訊局　函\n…\n主旨：…", "fmt": "di", "title": "盤點"}' \
+  -o draft.di
 ```
 
 需要先在管理區啟用 LLM（`/admin/llm-settings`）。`check`、`export`、`result` 與 `extract-text` 不呼叫模型。
@@ -2528,7 +2543,7 @@ GET /api/speech/audio/{file_id}?exp=<到期的 unix 秒數>&sig=<簽章>
 | `/admin/knowledge/api/search` | POST | 公文知識庫 —— 試查 |
 | `/admin/knowledge/api/embedding` | GET / POST | 公文知識庫 —— 嵌入服務設定（`use_llm_server` 預設 `true`：沿用 LLM 設定裡公文撰擬用的那台；金鑰不回傳；GET 另附沿用的那台 `llm_server` 與重建進度 `rebuild`；畫面在 LLM 設定頁）|
 | `/admin/knowledge/api/embedding/test` | POST | 公文知識庫 —— 測嵌入服務連線 |
-| `/admin/knowledge/api/embedding/models` | POST | 公文知識庫 —— 列出伺服器上的嵌入模型（給「嵌入模型」下拉用；Ollama 只列能做嵌入的）|
+| `/admin/knowledge/api/embedding/models` | POST | 公文知識庫 —— 列出伺服器上的嵌入模型（給「嵌入模型」下拉用；Ollama 只列能做嵌入的；每個模型附 `usage`：系統會自動加的前綴與載入參數，沒有的是 `null`）|
 | `/admin/knowledge/api/rebuild` | POST | 公文知識庫 —— 重建向量索引（背景）|
 | `/admin/knowledge/api/vectors/disable` | POST | 公文知識庫 —— 停用向量檢索（退回關鍵字檢索）|
 | `/admin/knowledge/api/groups` | GET | 公文知識庫 —— 設定可見群組用的群組清單 |

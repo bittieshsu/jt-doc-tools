@@ -89,7 +89,7 @@
             {{ tr('{0} 由 {1} 刪除').replace('{0}', c.deleted_at|localdt).replace('{1}', c.deleted_by or '?') }}</div>{% endif %}
         </td>
         <td data-label="{{ tr('文別') }}"><span class="odc-mode">{{ tr(c.mode_name) }}</span></td>
-        <td data-label="{{ tr('版本') }}">{% if c.latest_rev %}{{ tr('第 {0} 版').replace('{0}', c.latest_rev|string) }}{% else %}—{% endif %}</td>
+        <td data-label="{{ tr('版本') }}">{% if c.latest_rev %}{{ c.latest_rev }}{% else %}—{% endif %}</td>
         <td data-label="{{ tr('檢查結果') }}">
           <div class="odc-iss">
             {% if c.issues.error %}<span class="odc-chip error">{{ tr('需要確認 {0}').replace('{0}', c.issues.error|string) }}</span>{% endif %}

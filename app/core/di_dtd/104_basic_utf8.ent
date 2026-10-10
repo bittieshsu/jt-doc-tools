@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 基本標籤集   104_basic_utf8.ent   1999.12.1  修改日期:2020.10.12  -->
+<!ELEMENT  年月日    (#PCDATA)>
+<!--  例: <年月日>中華民國90年12月1日</年月日>  -->
+<!ELEMENT  字    (#PCDATA)>
+<!ELEMENT  文號    (年度,流水號,支號?)>
+<!ELEMENT  年度     (#PCDATA)>
+<!ELEMENT  流水號    (#PCDATA)>
+<!ELEMENT  支號     (#PCDATA)>
+<!ELEMENT  時分     (#PCDATA)>
+<!--  例: <時分>8時30分</時分>  -->
+<!--  例: <時分>上午8時30分</時分>  -->
+<!--  例: <時分>下午20時30分</時分>  -->
+<!ELEMENT  文字    (#PCDATA)>
+<!ELEMENT  姓名     (#PCDATA)>
+<!ELEMENT  職稱    (#PCDATA)>
+<!ELEMENT  全銜     (#PCDATA)>
+<!ELEMENT  機關代碼   (#PCDATA)>
+<!ELEMENT  單位代碼   (#PCDATA)>
+<!ELEMENT  收發處理本別   EMPTY>
+<!ATTLIST  收發處理本別  代碼   (正本|副本|抄本|影本|譯本|稿本|草稿|定稿|底圖|藍圖)  "正本">
+<!ELEMENT  公文類別    EMPTY>
+<!ATTLIST  公文類別      代碼  (令|函|公告|開會通知單|簽|簽稿會核單|會銜公文會辦單|公文時效統計|會勘通知單|便簽|其他)  "函">
+<!ELEMENT  令類別 EMPTY>
+<!ATTLIST  令類別  代碼       (令|獎懲令)   "獎懲令">
+<!ELEMENT  函類別    EMPTY>
+<!ATTLIST  函類別  代碼       (函|書函|交辦案件通知單|交議案件通知單|催辦案件通知單|移文單|機密文書機密等級變更或註銷建議單|機密文書機密等級變更或註銷通知單|執行命令|獎懲建議函)    "函">
+<!ELEMENT  其他類別   EMPTY>
+<!ATTLIST   其他類別   代碼   (公務電話紀錄|手令或手諭|報告|箋函或便簽|聘書|證明書|證書或執照|契約書|提案|紀錄|節略|說帖|代電|原本|判決書|起訴書|處分書|定型化表單) "公務電話紀錄">
+<!ELEMENT  密等及解密條件或保密期限  (密等,解密條件或保密期限)>
+<!ELEMENT  密等     EMPTY>
+<!ATTLIST  密等  代碼      (密|機密|極機密|絕對機密)  #IMPLIED >
+<!ELEMENT  解密條件或保密期限  (#PCDATA)>
+<!ELEMENT  保存年限    (#PCDATA)>
+<!ELEMENT  功能     EMPTY>
+<!ATTLIST  功能  代碼   (新增|修改|刪除)   "新增">
+<!ELEMENT  應用限制   EMPTY>
+<!ATTLIST  應用限制  代碼   (開放|不開放|限制開放)   "開放">
+<!ELEMENT  年度號     (#PCDATA)>
+<!ELEMENT  分類號     (#PCDATA)>
+<!ELEMENT  案次號     (#PCDATA)>
+<!ELEMENT  卷次號     (#PCDATA)>
+<!ELEMENT  目次號     (#PCDATA)>
+<!ELEMENT  媒體型式   EMPTY>
+<!ATTLIST  媒體型式  代碼   (1|2|3|4|5|6|7|8|9|A|B|C|D|E|F|Z)   "1">
+<!ELEMENT  機關     (全銜,機關代碼?)>
+<!ELEMENT  發文日期    (年月日)>
+<!ELEMENT  發文字號    ((字,文號)|(文字))>
+<!ELEMENT  受文者   ((((姓名,職稱?,機關代碼,單位代碼?)|(全銜,機關代碼)|(單位名,機關代碼,單位代碼)),含附件?,內含本文與附件之可攜式文件檔名?)|交換表)>
+<!ELEMENT  文別         (公文類別,(函類別|令類別|其他類別)?)>
+<!ELEMENT  本別    (收發處理本別)>
+<!ELEMENT  收文字號     ((字,文號)|(文字))>
+<!ELEMENT  來文字號     ((字,文號)|(文字))>
+<!ELEMENT  辦畢日期     (年月日)>
+<!ELEMENT  來文日期     (年月日)>
+<!ELEMENT  附件名稱     (附件)>
+<!ELEMENT  附件媒體型式   (媒體型式)>
+<!ELEMENT  承辦單位   (單位名)>
+<!ELEMENT  案情摘要   (文字)>
+<!ELEMENT  附件數量     (#PCDATA)> 
+<!ELEMENT  檔案路徑         (#PCDATA)>
+<!ELEMENT  檔案名稱         (#PCDATA)>
+<!ELEMENT  檔案大小         (#PCDATA)>
+<!ELEMENT 檔案格式   (#PCDATA) >
+<!ELEMENT  檔案來源別    EMPTY>
+<!ATTLIST  檔案來源別  代碼   (1|2|3|4)   "1">
+<!ELEMENT  頁數            (#PCDATA) >

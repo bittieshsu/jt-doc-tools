@@ -1679,7 +1679,7 @@ code {
 .upg-warn code { background: rgba(0,0,0,.06); padding: 1px 4px; border-radius: 3px; }
 
 /* ── 安裝與升級疑難排解頁 ───────────────────────────────── */
-.ts-main { padding: 32px 0 56px; max-width: 900px; }
+.ts-main { padding-top: 32px; padding-bottom: 56px; max-width: 900px; }   /* 左右沿用 .container 的 24px（原本寫成 0，手機上字貼著螢幕邊） */
 .ts-h1 { font-size: 30px; margin: 0 0 6px; }
 .ts-lead { color: #475569; margin: 0 0 22px; line-height: 1.8; }
 .ts-toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 28px;
@@ -1840,3 +1840,49 @@ code {
   padding: 0 6px; border-radius: 999px; border: 1px solid #fcd34d;
   background: #fef3c7; color: #92400e; font-size: 10px; font-weight: 700;
   line-height: 15px; letter-spacing: .02em; white-space: nowrap; }
+
+/* ---- 合規支援頁（compliance.html，由 build-compliance-page.py 從 COMPLIANCE.md 產生） ---- */
+.cp-main { max-width: 980px; }
+.cp-p { color: #334155; line-height: 1.85; margin: 0 0 12px; }
+.cp-h2 { font-size: 22px; margin: 34px 0 6px; padding-top: 18px; border-top: 1px solid #e2e8f0;
+         scroll-margin-top: 80px; color: #0f172a; }
+.cp-h3 { font-size: 16.5px; margin: 22px 0 8px; color: #312e81; }
+.cp-table-wrap { overflow-x: auto; margin: 0 0 8px; }
+.cp-table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.7; background: #fff;
+            border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+.cp-table th { text-align: left; background: #f8fafc; color: #475569; font-weight: 600; font-size: 13px;
+               padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
+.cp-table td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: #1e293b;
+              overflow-wrap: anywhere; }
+.cp-table tr:last-child td { border-bottom: 0; }
+.cp-table td:first-child { width: 55%; }
+.cp-table code, .cp-list code, .cp-p code { background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 3px;
+            font-size: 12.5px; }
+.cp-list { line-height: 1.9; color: #1e293b; padding-left: 22px; margin: 0 0 12px; }
+.cp-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px;
+          margin: 28px 0 0; padding: 18px 22px; border: 1px solid #c7d2fe; border-left: 4px solid #4f46e5;
+          border-radius: 12px; background: #eef2ff; }
+.cp-cta h3 { margin: 0 0 4px; font-size: 17px; color: #312e81; }
+.cp-cta p { margin: 0; color: #3730a3; font-size: 14px; line-height: 1.7; }
+@media (max-width: 640px) {
+  .cp-table td:first-child { width: auto; }
+  .cp-cta .btn { width: 100%; justify-content: center; }
+}
+.cp-hero { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 12px 32px; align-items: center;
+           margin: 0 0 6px; }
+.cp-hero-art { width: 220px; height: auto; display: block; }
+.cp-h-ic { display: inline-flex; align-items: center; justify-content: center; vertical-align: -4px;
+           margin-right: 10px; color: #4f46e5; }
+.cp-h2 .cp-h-ic { width: 38px; height: 38px; border-radius: 10px; background: #eef2ff; vertical-align: -9px; }
+.cp-h3 .cp-h-ic { width: 30px; height: 30px; border-radius: 8px; background: #f1f5f9; color: #4338ca;
+                  vertical-align: -8px; }
+.cp-toc a { display: inline-flex; align-items: center; gap: 6px; }
+.cp-toc a .cp-ic { color: #6366f1; }
+.cp-fig { margin: 14px 0 6px; }
+.cp-fig img { display: block; width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 10px;
+              box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.08); }
+.cp-fig figcaption { margin-top: 8px; font-size: 13px; color: #64748b; text-align: center; }
+@media (max-width: 760px) {
+  .cp-hero { grid-template-columns: 1fr; }
+  .cp-hero-art { width: 160px; margin: 0 auto; order: -1; }
+}

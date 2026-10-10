@@ -135,6 +135,33 @@ _OVERRIDE_LOG_WINDOW = 300.0
 _OVERRIDE_LOGGED: dict[tuple[int, str], float] = {}
 
 
+def _override_actor(cur_uid: int, request: Request = None) -> str:
+    """稽核那一列的「使用者」欄。
+
+    v1.16.71 以前這一列**沒有填使用者與 IP**（只在 details 裡放 `admin_user_id`），
+    於是在稽核記錄頁依帳號篩選時，管理員讀別人檔案的紀錄一筆都篩不出來 ——
+    而這一筆存在的目的正是「誰讀了誰的東西」。格式跟其他事件一樣（`sessions.user_label`）。
+    """
+    try:
+        from . import sessions as _ses
+        user = getattr(getattr(request, "state", None), "user", None) if request else None
+        if isinstance(user, dict):
+            return _ses.user_label(user) or user.get("username") or str(cur_uid)
+    except Exception:  # noqa: BLE001
+        pass
+    return str(cur_uid)
+
+
+def _override_ip(request: Request = None) -> str:
+    if request is None:
+        return ""
+    try:
+        from . import client_ip as _cip
+        return _cip.real_client_ip(request)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def admin_override_allowed(cur_uid: int, resource: str, owner_id=None,
                            request: Request = None) -> bool:
     """管理員的越權讀取要不要放行 —— **兩條路都走這裡**。
@@ -159,6 +186,8 @@ def admin_override_allowed(cur_uid: int, resource: str, owner_id=None,
             from . import audit_db
             audit_db.log_event(
                 "admin_file_override",
+                username=_override_actor(cur_uid, request),
+                ip=_override_ip(request),
                 target=str(resource),
                 details={"owner_id": owner_id, "admin_user_id": cur_uid},
             )

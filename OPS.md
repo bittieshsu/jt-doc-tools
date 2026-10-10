@@ -591,8 +591,12 @@ sudo jtdt start
 | 表單填寫歷史 | 365 天 | `data/fill_history/` |
 | 用印簽名歷史 | 365 天 | `data/stamp_history/` |
 | 浮水印歷史 | 365 天 | `data/watermark_history/` |
+| 乘車證明原始檔 | 365 天 | `data/transit_proof_files/` |
+| 公文撰擬案件 | 365 天 | `data/official_doc_cases/` |
+| 會議錄音（還在排隊或辨識中的不刪） | 30 天 | `data/speech_audio/` |
 | 暫存上傳 / 工作檔 | 2 小時 | `data/temp/` |
+| 作業結果檔（結果與「開啟」要讀的資料） | 24 小時 | 多半在 `data/temp/` |
+| 作業紀錄（我的作業） | 30 天 | `data/jobs.sqlite` |
 | 稽核記錄 | 90 天 | `data/audit.sqlite` |
-| Job 結果 | 24 小時 | `data/jobs/` |
 
 排程：啟動時跑一次 + 每 6 小時跑一次。`-1` = 永久保留。

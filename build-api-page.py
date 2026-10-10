@@ -337,7 +337,7 @@ PAGE = """\
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Jason Tools 文件工具箱 API 使用手冊：所有工具的 REST API 端點、認證方式、請求／回應格式與整合範例（cURL / Python / Node.js / CI）。">
+<meta name="description" content="Jason Tools 文件工具箱 API 使用手冊：所有工具的 REST API 端點、認證方式、請求/回應格式與整合範例（cURL / Python / Node.js / CI）。">
 <title>API 使用手冊 — Jason Tools 文件工具箱</title>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
@@ -622,13 +622,14 @@ __SECTIONS__
       <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">原始碼庫</a>
       <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
       <a href="troubleshooting.html">安裝與升級疑難排解</a>
+      <a href="compliance.html">合規支援（ISO 27001 / 42001）</a>
       <a href="https://github.com/jasoncheng7115/jt-doc-tools/issues" target="_blank" rel="noopener">回報問題</a>
     </div>
     <div class="footer-col">
       <div class="footer-h">作者</div>
       <p>
         <strong>Jason Cheng</strong><br>
-        <a href="https://[網址]" target="_blank" rel="noopener">Jason Tools</a>
+        <a href="https://www.jason.tools" target="_blank" rel="noopener">Jason Tools</a>
       </p>
     </div>
     <div class="footer-col">

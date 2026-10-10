@@ -306,12 +306,18 @@ def test_gov_page_boots_searches_selects_and_imports(live):
         assert sel["num"] == f"{sel0 + 1:,}" and "還沒儲存" in sel["sub"], (sel0, sel)
 
         # 「要有個全選吧」：範圍是目前看到的（清掉搜尋＝整份清單，不只這一頁）；取消全選一樣
+        # 已廢止的不跟著全選（匯入後也是停用、查不到）—— 而且要講出略過了幾項
+        # （2026-10-09 使用者：「要全選只能 1000，可是一筆一筆選很痛苦」）
         assert click_text(moj, "清除搜尋")
         assert wait_for(items + ".length === 4")
         assert click_text(moj, "全選")
         assert wait_for("document.querySelector('section[data-gid=\"moj\"] .gv-stat[data-stat=\"selected\"] .gv-stat-num')"
-                        f".textContent.trim() === '{sel0 + 4:,}'"), js(_STATUS_JS)["moj"]["selected"]
-        assert js("[...document.querySelectorAll('section[data-gid=\"moj\"] .gv-items li input')].every((i) => i.checked)")
+                        f".textContent.trim() === '{sel0 + 3:,}'"), js(_STATUS_JS)["moj"]["selected"]
+        ticks = js("[...document.querySelectorAll('section[data-gid=\"moj\"] .gv-items li')].map((li) =>"
+                   " [li.textContent.includes('已廢止範例條例'), li.querySelector('input').checked])")
+        assert sorted(ticks) == [[False, True]] * 3 + [[True, False]], ticks
+        assert wait_for("[...document.querySelectorAll('#toast-host .toast')].some((t) =>"
+                        " t.textContent.includes('1 項已廢止'))"), "略過已廢止的要講出來"
         assert click_text(moj, "取消全選")
         assert wait_for("document.querySelector('section[data-gid=\"moj\"] .gv-stat[data-stat=\"selected\"] .gv-stat-num')"
                         f".textContent.trim() === '{sel0:,}'")
@@ -501,3 +507,111 @@ def test_status_tiles_and_url_rows_fit_the_card(live, width):
     finally:
         t.close()
     assert not t.errs, "\n  ".join(t.errs)
+
+
+def test_source_cards_collapse_on_title_click_and_remember_it(live):
+    """來源卡片是**資料讀回來之後才由程式建的**：標題有收折箭頭，點了要真的收起來，重新整理也記得
+    （2026-10-09 使用者：「點了卡片標題 怎麼不能收折」—— 原本收折只掛在頁面載入當下已經有的卡片上）。"""
+    port, cdp = live
+    t = _Tab(cdp)
+    js, wait_for = t.js, t.wait_for
+    card = "document.querySelector('section.gv-card[data-gid=\"moj\"]')"
+    key = "'panel-collapsed:/admin/knowledge/gov:' + " + card + ".querySelector('h2').textContent.trim()"
+    try:
+        t.send("Page.navigate", {"url": f"http://127.0.0.1:{port}/admin/knowledge/gov"})
+        assert wait_for("document.querySelectorAll('section.gv-card').length === 3")
+        js(f"localStorage.removeItem({key}); true")
+        body_shown = f"!!{card}.querySelector('.gv-status') && {card}.querySelector('.gv-status').getClientRects().length > 0"
+        assert js(body_shown), "卡片內容一開始就看不到"
+        js(f"{card}.querySelector('h2').click(); true")
+        assert js(f"{card}.classList.contains('collapsed')"), "點了標題沒有收起來"
+        assert not js(body_shown), "標了收折，內容卻還看得到"
+        # 重新整理：卡片重新由程式建出來，記住的狀態要套上去
+        t.send("Page.reload", {})
+        assert wait_for(f"!!{card} && {card}.classList.contains('collapsed')"), "重新整理後沒有記住收折"
+        js(f"{card}.querySelector('h2').click(); true")
+        assert wait_for(body_shown), "再點一次沒有展開"
+        t.drain()
+        assert not t.errs, t.errs
+    finally:
+        try:
+            js(f"localStorage.removeItem({key}); true")
+        except Exception:
+            pass
+        t.close()
+
+
+def test_saving_a_selection_says_it_still_needs_download_and_import(live):
+    """2026-10-09 使用者：「勾選更多 按了儲存選取成功後 要提示 再按下載並匯入 才會有」。
+    「儲存選取」只記下勾了哪些，不會匯入 —— 存好之後還有沒匯入的就問要不要現在開始；
+    按「稍後再匯入」的話，按鈕旁一直留著「還有 N 項勾了但還沒匯入」；按「下載並匯入」就真的開始。
+    （「下載並匯入」之前順手存選取的那一次不問 —— 主流程那條測試走的就是那條路。）"""
+    port, cdp = live
+    moj = 'section[data-gid=\\"moj\\"]'
+    # 不連外：主要網址與備用網址都指到連不到的位址（只換主要的話會改試備用 —— 真的連到外面，踩過）
+    for pid in ("moj-law", "moj-order"):
+        _req(port, "POST", f"/admin/knowledge/api/gov/packages/{pid}",
+             {"url": f"http://127.0.0.1:9/{pid}.zip", "alt_url": f"http://127.0.0.1:9/{pid}-alt.zip"})
+    pk = {p["id"]: p for g_ in _req(port, "GET", "/admin/knowledge/api/gov/status")["groups"] for p in g_["packages"]}
+    for pid in ("moj-law", "moj-order"):
+        assert all(not pk[pid].get(k) or pk[pid][k].startswith("http://127.0.0.1:9/") for k in ("url", "alt_url"))
+    _req(port, "POST", "/admin/knowledge/api/gov/moj/selection", {"keys": []})
+    imported0 = {g_["id"]: g_ for g_ in _req(port, "GET", "/admin/knowledge/api/gov/status")["groups"]}["moj"]["imported_count"]
+
+    t = _Tab(cdp)
+    js, wait_for = t.js, t.wait_for
+
+    def click_text(sel, text):
+        return js("(() => { const b = [...document.querySelectorAll('" + sel + " button')]"
+                  ".find((x) => x.textContent.trim() === " + json.dumps(text) + ");"
+                  " if (!b) return false; b.click(); return true; })()")
+
+    pending_js = ("(() => { const n = document.querySelector('" + moj + " .gv-actions .gv-pending');"
+                  " return n ? {hidden: n.hidden, text: n.textContent, svg: !!n.querySelector('svg')} : null; })()")
+    modal_js = ("(() => { const o = document.querySelector('.modal-overlay:not(.closing)'); if (!o) return null;"
+                " return {title: o.querySelector('.modal-title-text').textContent, body: o.querySelector('.modal-body').textContent,"
+                " ok: o.querySelector('.modal-ok').textContent.trim(),"
+                " cancel: (o.querySelector('.modal-cancel') || {}).textContent}; })()")
+    try:
+        t.send("Page.navigate", {"url": f"http://127.0.0.1:{port}/admin/knowledge/gov"})
+        assert wait_for("document.querySelectorAll('section.gv-card').length === 3")
+        p0 = js(pending_js)
+        assert p0 is not None and p0["hidden"], ("一項都沒勾時不可以出現提醒", p0)
+
+        assert wait_for("document.querySelectorAll('" + moj + " .gv-items li').length === 4")
+        assert click_text(moj, "全選")
+        assert wait_for("[...document.querySelectorAll('" + moj + " .gv-items li input')].filter((i) => i.checked).length === 3")
+        assert click_text(moj, "儲存選取")
+        assert wait_for(modal_js + " !== null", timeout=15), "存好之後沒有提示要再按「下載並匯入」"
+        m = _req(port, "GET", "/admin/knowledge/api/gov/status")
+        mm = {g_["id"]: g_ for g_ in m["groups"]}["moj"]
+        pending = mm["pending_count"]
+        assert mm["selected_count"] == 3 and pending >= 1, mm      # 前提：真的有還沒匯入的
+        d = js(modal_js)
+        assert d["title"] == "已儲存選取的項目", d
+        assert "下載並匯入" in d["body"] and f"還有 {pending} 項" in d["body"], d
+        assert d["ok"] == "下載並匯入" and d["cancel"].strip() == "稍後再匯入", d
+        assert not m["running"], "只是存選取，還不可以開始匯入"
+
+        # 稍後再匯入：不開始，按鈕旁留著提醒（數字跟伺服器一樣）
+        js("document.querySelector('.modal-overlay .modal-cancel').click()")
+        assert wait_for("!document.querySelector('.modal-overlay')", timeout=5)
+        assert wait_for("(() => { const p = " + pending_js + "; return !!p && !p.hidden; })()", timeout=10), js(pending_js)
+        p1 = js(pending_js)
+        assert f"還有 {pending} 項" in p1["text"] and "下載並匯入" in p1["text"] and p1["svg"], p1
+        time.sleep(0.5)
+        assert not _req(port, "GET", "/admin/knowledge/api/gov/status")["running"]
+        assert {g_["id"]: g_ for g_ in _req(port, "GET", "/admin/knowledge/api/gov/status")["groups"]}["moj"]["imported_count"] == imported0
+
+        # 再存一次、這次按「下載並匯入」：真的開始，匯入完提醒收起來
+        assert click_text(moj, "儲存選取")
+        assert wait_for(modal_js + " !== null", timeout=15)
+        js("document.querySelector('.modal-overlay .modal-ok').click()")
+        st = _wait_idle(port)
+        mm = {g_["id"]: g_ for g_ in st["groups"]}["moj"]
+        assert mm["imported_count"] == imported0 + pending and mm["pending_count"] == 0, mm
+        assert wait_for("(() => { const p = " + pending_js + "; return !!p && p.hidden; })()", timeout=20), js(pending_js)
+        t.drain()
+    finally:
+        t.close()
+    assert not t.errs, "主控台有錯誤：\n  " + "\n  ".join(t.errs)

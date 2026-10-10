@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import os
 import secrets
 import threading
 import time
@@ -88,6 +89,20 @@ class ApiTokenManager:
                 "enforce": False,    # grace period: start disabled so existing UI still works
                 "updated_at": time.time(),
             })
+        self._tighten()
+
+    def _tighten(self) -> None:
+        """Token 是明文存的：檔案只給服務帳號讀（0600）。
+
+        原本寫檔時沒有指定權限，照 umask 變成 0644，同一台機器的其他帳號讀得到每一張 Token
+        （2026-10-09 為合規說明逐項查證時發現）。舊安裝的檔案在這裡收緊一次；Windows 沒有這種權限位元，略過。"""
+        if os.name != "posix":
+            return
+        try:
+            if self._path.exists() and self._path.stat().st_mode & 0o077:
+                os.chmod(self._path, 0o600)
+        except OSError:
+            pass
 
     def _read(self) -> dict:
         try:
@@ -97,7 +112,7 @@ class ApiTokenManager:
 
     def _write(self, data: dict) -> None:
         data["updated_at"] = time.time()
-        atomic_json.write_json(self._path, data)
+        atomic_json.write_json(self._path, data, mode=0o600)
 
     # ---- Public API ----
 

@@ -7,6 +7,7 @@ location and deleting entries older than the cutoff.
 Categories:
   - transit_proof      (data/transit_proof_files/) — 乘車證明的原始檔
   - official_doc_cases (data/official_doc_cases/) — 公文撰擬的歷史案件（已刪除的從刪除那天起算）
+  - speech_audio       (data/speech_audio/) — 轉逐字稿上傳的原始錄音（還在排隊或辨識中的不刪）
   - fill_history       (data/fill_history/)
   - stamp_history      (data/stamp_history/)
   - watermark_history  (data/watermark_history/)
@@ -47,6 +48,13 @@ _DEFAULTS: dict[str, Any] = {
     # 公文撰擬的歷史案件（輸入、草稿、版本）。跟填寫歷史同性質（事後要翻出來看），
     # 一樣預設一年；最後修改超過保留期就整個案件刪掉。
     "official_doc_cases_days": 365,
+    # 會議錄音轉逐字稿上傳的**原始錄音**（`data/speech_audio/<編號>.bin`）。
+    # 原本沒有任何保留期，永遠不刪 —— 錄音是聲音本身，比逐字稿更敏感，
+    # 而且一場會議動輒上百 MB。用得到它的只有三件事：語音服務來拉檔（送件當下）、
+    # 結果頁播放（跟著逐字稿，逐字稿照「作業結果檔」的保留期清）、
+    # 重跑校正（不需要錄音，對方用的是自己那份）。所以預設 30 天已經很寬。
+    # 這個欄位 v1.16.71 才加：舊安裝升級後第一次清理就會套用 30 天。
+    "speech_audio_days":      30,
     "fill_history_days":      365,
     "stamp_history_days":     365,
     "watermark_history_days": 365,
@@ -163,6 +171,7 @@ def collect_stats() -> dict[str, Any]:
     # （`job_files.usage` → `job_store.keep_alive_keys` / `owns_file`）。
     from . import official_doc_cases
     stats["official_doc_cases"] = official_doc_cases.stats()
+    stats["speech_audio"] = _speech_audio_stats()
     from . import job_files
     s = get()
     split = job_files.usage(s["jobs_hours"] * 3600 if s["jobs_hours"] > 0 else 0)
@@ -358,6 +367,63 @@ def _sweep_transit_proof(days: int) -> int:
     return removed
 
 
+def _sweep_speech_audio(days: int) -> int:
+    """清掉超過保留期的**會議錄音**（`data/speech_audio/`）。
+
+    `days <= 0` = 永久保留。判準用檔案的 mtime（上傳或從工作區接過來的那一刻寫進去，
+    之後不再動）。**還在排隊或辨識中的作業的錄音一律不刪**：語音服務是排到才來拉檔，
+    刪掉的話那一件會變成「來源連不上」。只認 `<32 碼十六進位>.bin`（與寫到一半的
+    `.part`），目錄裡別的東西不碰。
+    """
+    if days <= 0:
+        return 0
+    from ..config import settings as _s
+    root = _s.data_dir / "speech_audio"
+    if not root.is_dir():
+        return 0
+    try:
+        from . import job_store
+        active, _ = job_store.keep_alive_keys(time.time())
+    except Exception:
+        logger.exception("speech audio sweep: 讀不到進行中的作業，這一輪不刪錄音")
+        return 0
+    cutoff = time.time() - days * 86400
+    removed = 0
+    for f in root.iterdir():
+        stem = f.name.split(".", 1)[0]
+        if not (len(stem) == 32 and all(c in "0123456789abcdef" for c in stem)):
+            continue
+        if f.name not in (stem + ".bin", stem + ".bin.part") or stem in active:
+            continue
+        try:
+            if f.is_file() and f.stat().st_mtime < cutoff:
+                f.unlink()
+                removed += 1
+        except OSError:
+            pass
+    return removed
+
+
+def _speech_audio_stats() -> dict[str, Any]:
+    from ..config import settings as _s
+    root = _s.data_dir / "speech_audio"
+    size, n, oldest = 0, 0, None
+    if root.is_dir():
+        for f in root.iterdir():
+            try:
+                if not f.is_file():
+                    continue
+                st = f.stat()
+            except OSError:
+                continue
+            size += st.st_size
+            n += 1
+            if oldest is None or st.st_mtime < oldest:
+                oldest = st.st_mtime
+    return {"size_mb": size / 1024 / 1024, "files": n,
+            "oldest_days": (time.time() - oldest) / 86400.0 if oldest else None}
+
+
 def sweep_all() -> dict[str, Any]:
     """Run every sweeper once, return a report dict."""
     s = get()
@@ -388,6 +454,7 @@ def sweep_all() -> dict[str, Any]:
             s["official_doc_cases_days"])
     except Exception:
         logger.exception("official-doc cases sweep failed")
+    report["speech_audio"] = _sweep_speech_audio(s["speech_audio_days"])
     report["audit"] = _sweep_audit(s["audit_days"])
     report["job_records"] = _sweep_job_records(s["job_records_days"])
     # 資料庫熱備份。掛在既有的 6 小時排程上（而不是另開一個排程執行緒），並用

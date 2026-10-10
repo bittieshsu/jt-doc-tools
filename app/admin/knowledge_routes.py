@@ -341,7 +341,7 @@ def build_knowledge_router(templates) -> APIRouter:
         except (TypeError, ValueError):
             k = 8
         return await asyncio.to_thread(retrieval.search_detail, q, user_id=_uid(request),
-                                       dataset_ids=ds or None, k=k)
+                                       dataset_ids=ds or None, k=k, highlight=True)
 
     # ---------------------------------------------------------- embedding
     # 設定的畫面在「LLM 設定」頁（`/admin/llm-settings#embedding`）；端點留在這裡不搬 ——

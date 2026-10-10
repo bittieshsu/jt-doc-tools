@@ -201,7 +201,7 @@ def _shape(s: str):
 #: 行內標籤數對不上，這條本來一眼就抓得到）—— 2026-09-23 加 jtlw 疑難排解時才發現。
 #: 範圍太窄跟沒有檢查一樣；語言清單照慣例從 `_locales()` 讀，不寫死。
 _ALL_CATALOGUES = [f"{n}.{lang}.json" for lang in _locales()
-                   for n in ("index", "api", "readme", "troubleshooting")]
+                   for n in ("index", "api", "readme", "troubleshooting", "compliance")]
 
 
 @pytest.mark.parametrize("cat", _ALL_CATALOGUES)
@@ -242,7 +242,7 @@ def _generator():
     return mod
 
 
-@pytest.mark.parametrize("name", ["index", "api", "troubleshooting"])
+@pytest.mark.parametrize("name", ["index", "api", "troubleshooting", "compliance"])
 @pytest.mark.parametrize("lang", _locales())
 def test_no_block_starts_with_punctuation_unless_the_chinese_one_does(
         name: str, lang: str):
@@ -403,7 +403,7 @@ def test_japanese_pages_do_not_leave_a_stray_space_around_inline_tags():
     pats = [re.compile(rf"{ja_ch}(?:{tag})+ (?={ja_ch})"),
             re.compile(rf"{ja_ch} (?:{tag})+(?={ja_ch})")]
     bad: list[str] = []
-    for name in ("index", "api", "troubleshooting"):
+    for name in ("index", "api", "troubleshooting", "compliance"):
         f = DOCS / f"{name}-ja.html"
         if not f.is_file():
             continue
@@ -427,7 +427,7 @@ def test_japanese_pages_do_not_leave_a_stray_space_around_inline_tags():
 _BRAND_NAME = re.compile(r'<div class="brand-name">(.*?)</div>', re.S)
 
 
-@pytest.mark.parametrize("page", ["index", "api", "troubleshooting"])
+@pytest.mark.parametrize("page", ["index", "api", "troubleshooting", "compliance"])
 def test_the_brand_first_line_is_the_same_in_every_language(page: str):
     langs = ["zh-Hant"] + _locales()
     seen = {}

@@ -145,7 +145,7 @@ def test_install_sh_function_really_picks_one(tmp_path, help_text, want):
 
 def test_setup_python_cmd_asks_uv_first():
     """Windows 那一支（安裝時從 main 抓下來跑，不在 exe 裡）。
-    cmd.exe 的行為在 .154 實機驗過三種情況；這裡釘住寫法不要退回「兩個都設」。"""
+    cmd.exe 的行為在 Windows 實機驗過三種情況；這裡釘住寫法不要退回「兩個都設」。"""
     src = (PUB / "setup-python.cmd").read_text(encoding="utf-8")
     assert not re.search(r"^if not defined UV_NATIVE_TLS set UV_NATIVE_TLS=true",
                          src, re.M | re.I), "又無條件設了舊變數"

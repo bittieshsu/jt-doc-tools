@@ -1065,12 +1065,46 @@ def get_template(source_id: str, name: str) -> Optional[bytes]:
             return None
 
 
+def match_marks(text: str, terms: list[str]) -> list[list[int]]:
+    """`text` 裡符合 `terms`（已經 `cjk_fts.normalize` 過）的位置，回原文的字元位置
+    `[[開始, 結束), …]`（以 code point 計，畫面要用 `Array.from` 切）。
+
+    逐字正規化再比對，所以「台」對得到「臺」、全形對得到半形；重疊或相鄰的併成一段。
+    給畫面標出符合處用（2026-10-09 使用者：「搜尋有符合的 該字串要高亮」）。"""
+    if not text or not terms:
+        return []
+    norm, owner = [], []
+    for i, ch in enumerate(text):
+        n = cjk_fts.normalize(ch)
+        norm.append(n)
+        owner.extend([i] * len(n))
+    joined = "".join(norm)
+    spans: list[list[int]] = []
+    for term in terms:
+        if not term:
+            continue
+        start = joined.find(term)
+        while start >= 0:
+            end = start + len(term)
+            spans.append([owner[start], owner[end - 1] + 1])
+            start = joined.find(term, start + 1)
+    spans.sort()
+    merged: list[list[int]] = []
+    for s, e in spans:
+        if merged and s <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+    return merged
+
+
 def search_orgs(q: str, limit: int = 20) -> list[dict]:
     """查機關（逐字比對；啟用中的地址簿才查）：`[{"orgId","orgName"}]`。
 
     * 空白分開的幾個詞要**全部**出現（AND）。
     * 「台」「臺」、全形半形視為相同（`cjk_fts.normalize`）。
     * 只打一個詞時也比對機關代碼的開頭（`A15` → `A15000000E`）。
+    * 每一筆另附 `nameMarks` / `idMarks`：符合處的字元位置（畫面標亮用，見 `match_marks`）。
     * 排序（全銜優先）：名稱**完全相同** → 以查詢開頭 → 其餘；同一級裡名稱短
       的在前（「嘉禾市政府」排在「嘉禾市政府秘書處」前面）、再依代碼長度
       （上級機關的代碼比所屬單位短）。
@@ -1111,7 +1145,96 @@ def search_orgs(q: str, limit: int = 20) -> list[dict]:
             rank = 0 if (n == joined or nids[i] == first) else (1 if n.startswith(first) else 2)
             found.append((rank, len(n), len(ids[i]), n, ids[i], names[i]))
     found.sort()
-    return [{"orgId": r[4], "orgName": r[5]} for r in found[:limit]]
+    out = []
+    for r in found[:limit]:
+        item = {"orgId": r[4], "orgName": r[5], "nameMarks": match_marks(r[5], terms)}
+        # 只打一個詞、比對到代碼開頭時，代碼前面那一段也標出來
+        item["idMarks"] = (match_marks(r[4], [first])[:1]
+                           if single and cjk_fts.normalize(r[4] or "").startswith(first) else [])
+        out.append(item)
+    return out
+
+
+def _org_maps(sid: str) -> Optional[tuple[dict, dict]]:
+    """(正規化名稱 → 代碼集合, 正規化代碼 → 正規化名稱)，跟著 `_org_index` 一起失效。"""
+    idx = _org_index(sid)
+    if not idx:
+        return None
+    key = ("orgmap", sid)
+    with _CACHE_LOCK:
+        hit = _CACHE.get(key)
+        if hit and hit[0] is idx:
+            return hit[1]
+    ids, _names, norms, nids = idx
+    by_name: dict[str, set] = {}
+    by_code: dict[str, str] = {}
+    for oid, norm, nid in zip(ids, norms, nids):
+        if not oid:
+            continue
+        by_name.setdefault(norm, set()).add(oid)
+        by_code.setdefault(nid, norm)
+    maps = (by_name, by_code)
+    with _CACHE_LOCK:
+        _CACHE[key] = (idx, maps)
+    return maps
+
+
+def exact_org_code(name: str) -> str:
+    """名稱**完全相同**（「台」「臺」、全形半形視為相同）而且只對到**一個**代碼 → 那個代碼；
+    找不到、同名有好幾個、地址簿沒下載 → 空字串。
+
+    電子公文的機關代碼填錯，公文會交換到別的機關或被退件 —— **比空著糟**，所以不猜：
+    只認名稱一字不差的那一筆，名稱的一部分或相近的都不算。"""
+    if not isinstance(name, str):
+        return ""
+    norm = cjk_fts.normalize(name.strip())
+    if not norm:
+        return ""
+    codes: set = set()
+    for s in _enabled_installed(KIND_ADDRESS_BOOK):
+        maps = _org_maps(s["id"])
+        if maps:
+            codes |= maps[0].get(norm, set())
+    return next(iter(codes)) if len(codes) == 1 else ""
+
+
+def org_code_matches(name: str, code: str) -> bool:
+    """這個代碼在地址簿裡**就是這個名稱**（畫面送來的「名稱 → 代碼」存進案件之前驗一次，
+    不讓前端送一個對不上的代碼進來）。"""
+    if not isinstance(name, str) or not isinstance(code, str):
+        return False
+    norm, nid = cjk_fts.normalize(name.strip()), code.strip().lower()
+    if not norm or not nid:
+        return False
+    for s in _enabled_installed(KIND_ADDRESS_BOOK):
+        maps = _org_maps(s["id"])
+        if maps and maps[1].get(nid) == norm:
+            return True
+    return False
+
+
+def address_book_info() -> dict:
+    """工具頁的地址簿提醒用：`{"installed", "updated_at", "count"}`。只讀狀態、不連外。
+
+    `updated_at` 是最後一次**成功**取得的時間（狀態檔讀不到就用 `orgs.json` 的修改時間）；
+    有好幾個啟用中的地址簿時取最新的那個 —— 提醒的是「手上有沒有夠新的資料可以查」。"""
+    srcs = _enabled_installed(KIND_ADDRESS_BOOK)
+    if not srcs:
+        return {"installed": False, "updated_at": None, "count": 0}
+    stamps: list[float] = []
+    count = 0
+    for s in srcs:
+        at = (_read_status(s["id"]).get("last_ok") or {}).get("at")
+        if not isinstance(at, (int, float)) or at <= 0:
+            try:
+                at = (_source_dir(s["id"]) / "current" / "orgs.json").stat().st_mtime
+            except (OSError, SourceError):
+                at = None
+        if at:
+            stamps.append(float(at))
+        idx = _org_index(s["id"])
+        count += len(idx[0]) if idx else 0
+    return {"installed": True, "updated_at": max(stamps) if stamps else None, "count": count}
 
 
 def attribution(kind: Optional[str] = None) -> list[str]:

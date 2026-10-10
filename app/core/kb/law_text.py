@@ -42,6 +42,14 @@
 * 條號只有數字（命令裡約 900 條，例如 `1`）：內文開頭若是「一、」「（一）」，
   那就是點次本身（不另外加標題）；不是的話（多半是表格）就不寫條號。
 
+## 已刪除的條文
+
+條文內容只有「（刪除）」的（全國法規資料庫保留條號、內容寫「（刪除）」）**不切成段落**：
+那一段沒有任何可以引用的內容，卻會出現在檢索結果裡（「行政程序法第 44 條」查得到一段
+「（刪除）」），還佔掉參考資料的名額。原檔照樣保留那一條（下載原檔看得到條號被刪除），
+只是不進索引。判準是**整條內容**只有「刪除」兩個字（可帶括號與句號）——
+內文裡提到「刪除」的條文（「前項所稱刪除…」）照常切段。
+
 ## 硬換行
 
 命令的 XML 把條文內容**照固定寬度斷行**、下一行縮排四格（「…如期實施憲政\\n
@@ -65,7 +73,7 @@ FORMATS = (FORMAT_LAW, FORMAT_RULES)
 
 #: 這兩種切法自己的版本。**改了 `law_chunks()` / `rules_chunks()` 的規則就加一** ——
 #: 存進資料庫的 `chunker_version` 是「一般切段版本 ＋ 這個」，重建索引時版本不同的會重新切段。
-FORMAT_VERSIONS = {FORMAT_LAW: "law1", FORMAT_RULES: "rules1"}
+FORMAT_VERSIONS = {FORMAT_LAW: "law2", FORMAT_RULES: "rules1"}
 
 _HEAD_END = "---"
 _META_RE = re.compile(r"^- ([^：]{1,20})：(.*)$")
@@ -81,6 +89,8 @@ _BIG_RE = re.compile(rf"^第\s*[\d{_CN_NUM}]+\s*(編|章|節|款|目)")
 _BIG_RANK = {"編": 0, "章": 1, "節": 2, "款": 3, "目": 4}
 _ART_HYPHEN_RE = re.compile(r"^第\s*(\d+)\s*-\s*(\d+)\s*條$")
 _ART_PLAIN_RE = re.compile(r"^第\s*(\d+)\s*條$")
+#: 已刪除的條文：整條內容只有「刪除」（可帶全形或半形括號、句號）。law2 起不切成段落。
+_DELETED_RE = re.compile(r"[（(]?\s*刪\s*除\s*[)）]?\s*[。.]?")
 
 
 # ---------------------------------------------------------------- 日期
@@ -355,6 +365,11 @@ def _ref_of(label: str, paras: list[str]) -> str:
     return ""
 
 
+def _is_deleted(paras: list[str]) -> bool:
+    """整條內容只有「（刪除）」（見模組說明「已刪除的條文」）。"""
+    return _DELETED_RE.fullmatch("".join(p.strip() for p in paras)) is not None
+
+
 def law_chunks(text: str) -> list[dict]:
     """法規原檔 → 段落清單（一條一段；太長才拆，拆出來的每一塊都帶同一個條號）。"""
     doc = parse_law(text)
@@ -391,6 +406,8 @@ def law_chunks(text: str) -> list[dict]:
         else:
             _, label, paras = it
             if not paras and not label:
+                continue
+            if paras and _is_deleted(paras):
                 continue
             body = (label + " " + paras[0] if label and paras else (label or paras[0]))
             if len(paras) > 1:

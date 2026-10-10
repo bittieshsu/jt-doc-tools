@@ -1,6 +1,6 @@
 """作業系統升級換掉系統 Python 之後（例如 Ubuntu 22.04 → 24.04，3.10 → 3.12）。
 
-舊的 Linux 安裝把 venv 建在系統 Python 上（`.30` 就是：`.venv/bin/python -> /usr/bin/python3`，
+舊的 Linux 安裝把 venv 建在系統 Python 上（正式機就是：`.venv/bin/python -> /usr/bin/python3`，
 pyvenv.cfg 寫 3.10.12）。系統 Python 換了之後套件全部看不到，服務每次啟動都失敗，記錄裡看不出原因。
 
 * 服務一啟動就檢查，對不上就寫一行講清楚（`venv_check`，在任何第三方套件 import 之前）。

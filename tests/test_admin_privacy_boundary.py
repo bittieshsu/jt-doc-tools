@@ -99,3 +99,26 @@ def test_reading_your_own_file_is_not_an_override(monkeypatch, tmp_path):
 
     assert uo.check(uid, None) is True
     assert not logged, "讀自己的檔案被記成越權了"
+
+
+def test_the_override_record_names_the_admin_and_the_address(monkeypatch):
+    """稽核記錄頁依帳號篩選時要篩得出來 —— 那一列的「使用者」與 IP 不可以是空的。
+
+    v1.16.71 以前只在 details 放 `admin_user_id`，使用者欄與 IP 欄都是空字串：
+    這一筆存在的目的正是「誰讀了誰的東西」，篩不出來等於沒記。
+    """
+    from starlette.requests import Request
+    logged = []
+    import app.core.audit_db as adb
+    monkeypatch.setattr(adb, "log_event", lambda ev, **kw: logged.append((ev, kw)))
+    uo._OVERRIDE_LOGGED.clear()
+    req = Request({"type": "http", "method": "GET", "path": "/x", "headers": [],
+                   "query_string": b"", "client": ("10.9.8.7", 5555),
+                   "state": {"user": {"user_id": 7, "username": "boss", "source": "local"}}})
+    uo.admin_override_allowed(7, "upload:named", owner_id=3, request=req)
+    if not uo.ADMIN_MAY_READ_USER_FILES:
+        return
+    ev, kw = logged[0]
+    assert ev == "admin_file_override"
+    assert "boss" in kw.get("username", ""), f"使用者欄是 {kw.get('username')!r}"
+    assert kw.get("ip") == "10.9.8.7", f"IP 欄是 {kw.get('ip')!r}"

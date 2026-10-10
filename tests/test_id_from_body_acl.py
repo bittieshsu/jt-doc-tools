@@ -371,6 +371,10 @@ _OWNERSHIP_HOME = (
     "app/core/workspace.py",                        # 以使用者目錄分隔
     "app/tools/submission_check/router.py",         # _check_case_acl（案件）
     "app/tools/submission_check/case_manager.py",
+    # 公文撰擬案件：單一案件的讀寫一律走 router 的 `_require_case()`；這支是案件庫自己
+    # 「只列我的」那一層（清單與「參考我的歷史案件」），比 `_require_case` 更嚴（管理員也
+    # 只看得到自己的），認不出是誰時回空的，不會退回「全部」。
+    "app/core/official_doc_cases.py",
 )
 
 _HANDROLLED = re.compile(

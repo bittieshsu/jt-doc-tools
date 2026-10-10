@@ -367,18 +367,22 @@ class LLMClient:
                 model, chars, "，正文裡有 <think>" if stats.get("think_tag") else "")
 
     def _chat_stream(self, payload: dict, optional: list, *, model: str, stop_when=None,
-                     thinking_wanted: bool = False) -> str:
+                     thinking_wanted: bool = False, on_progress=None) -> str:
         """POST `/chat/completions`（串流），回完整的正文。
 
         `optional`：payload 裡**可以拿掉**的鍵（關閉思考用的）。對方回 400 / 422 就拿掉重送；
         拿掉之後成功了，才記住這個位址 ＋ 模型不收（別的原因造成的 400 不會被誤記）。
         外部服務的同時呼叫上限（`remote_limit`）包住整段，重送不會多佔名額。
+
+        `on_progress(已收到的正文字數)`：收到第一段正文時呼叫一次，之後每 32 段一次。
+        給畫面講「AI 正在回覆」用；它丟例外不可以讓生成失敗（那只是進度）。
         """
         from . import remote_limit
         stats: dict = {"reasoning_chars": 0, "think_tag": False}
         optional = [k for k in optional if k in payload]
         dropped: list = []
         parts: list[str] = []
+        received = 0
         with remote_limit.slot():
             while True:
                 with httpx.stream("POST", f"{self.base_url}/chat/completions",
@@ -403,6 +407,14 @@ class LLMClient:
                             break
                         if delta:
                             parts.append(delta)
+                            received += len(delta)
+                            if on_progress and (len(parts) == 1 or len(parts) % 32 == 0):
+                                try:
+                                    on_progress(received)
+                                except Exception:  # noqa: BLE001 — 進度壞了不可以讓生成失敗
+                                    import logging as _lg
+                                    _lg.getLogger(__name__).debug("on_progress 失敗",
+                                                                  exc_info=True)
                             # 呼叫端可以叫它提早停（例如模型在打轉）：每 32 段看一次最後一截
                             if stop_when and len(parts) % 32 == 0 and \
                                     stop_when("".join(parts[-1024:])):
@@ -443,7 +455,7 @@ class LLMClient:
     #
     # Ollama 出廠的上下文長度不大（舊版 2048、之後 4096），**提示超過時它安靜地截掉開頭** ——
     # 被截掉的正是指令，結果亂掉而且沒有任何錯誤。實測（2026-10-08，Ollama 0.33.3）：
-    # * `/api/ps` 的 `context_length` 是模型**實際載入**的大小（`.40` 是 131072，伺服器設了環境變數）；
+    # * `/api/ps` 的 `context_length` 是模型**實際載入**的大小（我們的推論機是 131072，伺服器設了環境變數）；
     # * OpenAI 相容端點（我們用的那一支）**不理** `options.num_ctx` —— 只有原生 API 理，而那會讓
     #   模型照新的大小重新載入，跟同一台的其他程式（OpenWebUI…）用不同大小時會來回重載；
     # * 用 `/api/create` 從原模型建一個帶 `num_ctx` 參數的**新名字**（權重共用、不複製），
@@ -653,6 +665,7 @@ class LLMClient:
         think: bool = False,
         system: str | None = None,
         stop_when=None,
+        on_progress=None,
     ) -> str:
         """Send a plain-text prompt (no images), return the raw model
         output. Used by features like paragraph reflow that expect prose
@@ -662,6 +675,9 @@ class LLMClient:
         the text streamed so far; ``True`` stops the generation early and
         returns what has arrived (a model stuck repeating itself would
         otherwise run all the way to ``max_tokens``).
+
+        ``on_progress``: optional ``Callable[[int], None]`` told how many
+        characters of the answer have arrived (first chunk, then every 32).
 
         ``think=False`` (default) tries to suppress chain-of-thought on
         models that support it. This is a best-effort belt-and-braces:
@@ -712,7 +728,7 @@ class LLMClient:
         if max_tokens:
             payload["max_tokens"] = max_tokens
         return self._chat_stream(payload, optional, model=model, stop_when=stop_when,
-                                 thinking_wanted=think).strip()
+                                 thinking_wanted=think, on_progress=on_progress).strip()
 
     def vision_query(
         self,

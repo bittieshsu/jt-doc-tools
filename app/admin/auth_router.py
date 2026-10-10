@@ -2374,6 +2374,10 @@ def build_auth_router(templates) -> APIRouter:
 
     # ---------- /admin/system-status ----------
 
+    def _usage_categories():
+        from ..core.host_stats import USAGE_CATEGORIES
+        return USAGE_CATEGORIES
+
     @router.get("/system-status", response_class=HTMLResponse)
     async def system_status_page(request: Request):
         from ..core.upload_limits import app_side_limits
@@ -2385,7 +2389,9 @@ def build_auth_router(templates) -> APIRouter:
              "upload_max_mb": _upload_settings.get()["max_upload_mb"],
              # 載入失敗的工具。**細節只在這裡（需要管理員）** ——
              # `/readyz` 是公開的，那邊只給數量，不吐模組名稱與例外訊息。
-             "tool_load_failures": sorted(load_failures().items())},
+             "tool_load_failures": sorted(load_failures().items()),
+             # 使用者檔案用量的明細類別（key → 名稱；畫面照這份順序與名稱顯示）
+             "usage_categories": [{"key": k, "label": v} for k, v in _usage_categories()]},
         )
 
     @router.post("/system-status/upload-limit")

@@ -68,6 +68,15 @@
     <span data-ic="globe">{{ icon('globe', size=15) }}</span>
     <span data-ic="warn">{{ icon('warn', size=15) }}</span>
     <span data-ic="refresh">{{ icon('refresh', size=15) }}</span>
+    <span data-ic="file-text">{{ icon('file-text', size=14) }}</span>
+    <span data-ic="edit">{{ icon('edit', size=14) }}</span>
+    <span data-ic="trash">{{ icon('trash', size=14) }}</span>
+    <span data-ic="check">{{ icon('check', size=14) }}</span>
+    <span data-ic="pause">{{ icon('pause', size=14) }}</span>
+    <span data-ic="eye">{{ icon('eye', size=14) }}</span>
+    <span data-ic="download">{{ icon('download', size=14) }}</span>
+    <span data-ic="clock">{{ icon('clock', size=14) }}</span>
+    <span data-ic="close">{{ icon('close', size=14) }}</span>
   </template>
   <p id="kbEmbMsg" class="muted kb-msg"></p>
 </div>
@@ -122,7 +131,7 @@
     <table class="kb-table">
       <thead><tr>
         <th>{{ tr('名稱') }}</th><th>{{ tr('類別（用途）') }}</th><th>{{ tr('存取範圍') }}</th>
-        <th>{{ tr('文件（啟用／全部）') }}</th><th>{{ tr('段數') }}</th><th>{{ tr('狀態') }}</th><th></th>
+        <th>{{ tr('文件（啟用/全部）') }}</th><th>{{ tr('段數') }}</th><th>{{ tr('狀態') }}</th><th></th>
       </tr></thead>
       <tbody id="kbDsRows"></tbody>
     </table>
@@ -172,8 +181,8 @@
   <div class="kb-tablewrap">
     <table class="kb-table">
       <thead><tr>
-        <th>{{ tr('文件') }}</th><th>{{ tr('版本／日期') }}</th><th>{{ tr('狀態') }}</th>
-        <th>{{ tr('段數／頁數') }}</th><th>{{ tr('上傳／啟用') }}</th><th></th>
+        <th>{{ tr('文件') }}</th><th>{{ tr('版本/日期') }}</th><th>{{ tr('狀態') }}</th>
+        <th>{{ tr('段數/頁數') }}</th><th>{{ tr('上傳/啟用') }}</th><th></th>
       </tr></thead>
       <tbody id="kbVerRows"></tbody>
     </table>
@@ -230,8 +239,32 @@
     <input id="kbQ" class="field" type="text" maxlength="500" placeholder="{{ tr('例：函的期望語對上級機關怎麼寫') }}">
     <button class="btn btn-primary" id="kbSearch" type="button">{{ icon('search', size=14) }} <span>{{ tr('查詢') }}</span></button>
   </div>
-  <div id="kbSearchDs" class="kb-chips"></div>
+  {# 查詢範圍要醒目（2026-10-09 使用者：「（都不勾＝全部資料集）這要醒目一點 會被忽略」）：
+     講出這次實際會查哪些，勾了幾個就改成黃色並給「改回全部」。 #}
+  {# 資料集一多（政府公開資料匯入上千部法規）就不能整片攤開勾選框（2026-10-09 使用者：「排列一下 太亂了」）：
+     平常收起來，按「挑選資料集」才展開；展開後可以打字篩選、依類別分組、對齊排成格子。 #}
+  <div id="kbScope" class="kb-scope" hidden>{{ icon('layers', size=16) }}
+    <span id="kbScopeText"></span>
+    <span id="kbScopeTip" class="kb-scope-tip">{{ tr('（想只查其中幾個，按「挑選資料集」）') }}</span>
+    <span class="kb-scope-btns">
+      <button class="btn btn-small" id="kbScopePick" type="button" aria-expanded="false" aria-controls="kbPick">{{ icon('list', size=13) }} <span>{{ tr('挑選資料集') }}</span></button>
+      <button class="btn btn-small" id="kbScopeAll" type="button" hidden>{{ icon('reset', size=13) }} <span>{{ tr('改回全部') }}</span></button>
+    </span>
+  </div>
+  <div id="kbPick" class="kb-pick" hidden>
+    <div class="kb-pick-bar">
+      <input id="kbPickQ" class="field kb-pick-q" type="search" maxlength="100"
+             placeholder="{{ tr('篩選資料集名稱') }}" aria-label="{{ tr('篩選資料集名稱') }}">
+      <label class="kb-pick-only"><input type="checkbox" id="kbPickOnly"> {{ tr('只看已勾選的') }}</label>
+      <span class="muted kb-pick-count" id="kbPickCount"></span>
+      <button class="btn btn-small" id="kbPickShown" type="button">{{ icon('check', size=13) }} <span>{{ tr('勾選目前列出的') }}</span></button>
+    </div>
+    <div class="kb-pick-cats" id="kbPickCats" role="group" aria-label="{{ tr('類別') }}"></div>
+    <div id="kbSearchDs" class="kb-pick-list"></div>
+    <p class="muted kb-pick-none" id="kbPickNone" hidden>{{ tr('沒有符合的資料集。') }}</p>
+  </div>
   <p id="kbSearchNote" class="muted kb-msg"></p>
+  <p id="kbHlNote" class="kb-hl-note" hidden><mark class="kb-hl">{{ tr('黃底') }}</mark> {{ tr('標出問題裡的詞在這一段出現的位置（只靠向量找到的段落可能沒有標記）。') }}</p>
   <div id="kbResults"></div>
 </div>
 
@@ -287,10 +320,53 @@
   .kb-searchbar input { flex:1 1 auto; min-width:0; }
   /* 下面這幾個類別是 JS 建出來的元素用的 */
   .kb-actions { display:flex; flex-wrap:wrap; gap:4px; }
+  .kb-actions .btn { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+  .kb-state { display:inline-flex; align-items:center; gap:4px; font-size:13px; white-space:nowrap; font-weight:500; }
+  .kb-state svg { flex:none; }
+  .kb-state-on { color:#15803d; }
+  .kb-state-off { color:#64748b; }
+  .kb-state-busy { color:#1d4ed8; }
+  .kb-state-bad { color:#b91c1c; }
   .kb-chunk { border:1px solid #e5e7eb; border-radius:6px; padding:8px 10px; margin:8px 0; background:#fff; }
   .kb-chunk-head { font-size:12px; color:#6b7280; margin-bottom:4px; }
   .kb-chunk-text { white-space:pre-wrap; font-size:13px; line-height:1.6; max-height:260px; overflow:auto; }
-  .kb-ds-pick { display:inline-flex; align-items:center; gap:4px; font-size:13px; margin-right:10px; }
+  /* 挑選資料集：篩選列、類別、分組的格子（每一格同寬，名稱太長就省略，滑鼠移上去看全名） */
+  .kb-pick { margin:6px 0 10px; border:1px solid var(--border); border-radius:8px; background:#fff; }
+  .kb-pick-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:10px 12px 6px; }
+  .kb-pick-q { flex:1 1 220px; min-width:0; max-width:360px; height:34px; }
+  .kb-pick-only { display:inline-flex; align-items:center; gap:4px; font-size:13px; white-space:nowrap; }
+  .kb-pick-count { font-size:12.5px; white-space:nowrap; }
+  .kb-pick-bar .btn { margin-left:auto; }
+  .kb-pick-cats { display:flex; flex-wrap:wrap; gap:6px; padding:0 12px 10px; border-bottom:1px solid var(--border); }
+  .kb-pick-cat { display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 10px; border:1px solid var(--border);
+                 border-radius:999px; background:#fff; font-size:12.5px; color:#334155; cursor:pointer; }
+  .kb-pick-cat .kb-pick-n { font-variant-numeric:tabular-nums; color:#64748b; }
+  .kb-pick-cat[aria-pressed="true"] { background:#2563eb; border-color:#2563eb; color:#fff; }
+  .kb-pick-cat[aria-pressed="true"] .kb-pick-n { color:#dbeafe; }
+  .kb-pick-list { max-height:360px; overflow-y:auto; padding:0 12px 8px; }
+  .kb-pick-gh { position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:6px; margin:0 -12px;
+                padding:8px 12px 4px; background:#fff; font-size:12.5px; font-weight:600; color:#475569; }
+  .kb-pick-gh .kb-pick-n { font-weight:400; color:#94a3b8; font-variant-numeric:tabular-nums; }
+  .kb-pick-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:2px 12px; }
+  .kb-ds-pick { display:flex; align-items:center; gap:6px; min-width:0; padding:4px 6px; border-radius:6px;
+                font-size:13px; line-height:1.4; cursor:pointer; }
+  .kb-ds-pick:hover { background:#f1f5f9; }
+  .kb-ds-pick:has(input:checked) { background:#eff6ff; color:#1e40af; }
+  .kb-ds-pick input { flex:none; margin:0; }
+  .kb-ds-pick-name { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .kb-ds-pick-off { flex:none; font-size:11px; color:#94a3b8; }
+  .kb-ds-pick.is-off .kb-ds-pick-name { color:#94a3b8; }
+  .kb-pick-none { margin:10px 12px; font-size:13px; }
+  .kb-scope { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin:10px 0 4px; padding:8px 12px;
+              border:1px solid #bfdbfe; border-left:4px solid #2563eb; border-radius:8px; background:#eff6ff;
+              color:#1e3a8a; font-size:13.5px; font-weight:600; }
+  .kb-scope .ic { flex:none; }
+  .kb-scope.is-limited { border-color:#fcd34d; border-left-color:#d97706; background:#fffbeb; color:#92400e; }
+  .kb-scope-tip { font-weight:400; color:#1e40af; }
+  .kb-scope-btns { display:inline-flex; flex-wrap:wrap; gap:6px; margin-left:auto; }
+  .kb-scope-btns .btn { font-weight:400; }
+  mark.kb-hl { background:#fde68a; color:inherit; border-radius:2px; padding:0 1px; box-shadow:0 0 0 1px #fcd34d inset; }
+  .kb-hl-note { font-size:12.5px; color:#6b7280; margin:4px 0 6px; }
 </style>
 {% endblock %}
 
@@ -314,11 +390,22 @@
     if (text != null) e.textContent = text;
     return e;
   }
-  function btn(text, cls, onClick) {
-    const b = el('button', 'btn btn-small' + (cls ? ' ' + cls : ''), text);
+  function btn(text, cls, onClick, icName) {
+    const b = el('button', 'btn btn-small' + (cls ? ' ' + cls : ''));
     b.type = 'button';
+    // 圖示 ＋ 文字放自己的 span（2026-10-09 使用者：表格右邊的按鈕「要有 icon」）
+    if (icName) b.appendChild(stIcon(icName));
+    b.appendChild(el('span', null, text));
     b.addEventListener('click', onClick);
     return b;
+  }
+  // 狀態：圖示 ＋ 文字，顏色分得出好壞（`kb-state-on` 啟用、`-off` 停用、`-busy` 處理中、`-bad` 失敗）
+  function stateBadge(text, kind) {
+    const ic = {on: 'check', off: 'pause', busy: 'clock', bad: 'close'}[kind] || 'check';
+    const s = el('span', 'kb-state kb-state-' + kind);
+    s.appendChild(stIcon(ic));
+    s.appendChild(el('span', null, text));
+    return s;
   }
   function fmtTime(ts) {
     if (!ts) return '';
@@ -382,7 +469,7 @@
 
     const notes = [];
     const rb = OV.rebuild || {};
-    if (rb.running) notes.push(['is-info', 'refresh', tr('重建索引中：{0}／{1}').replace('{0}', rb.done || 0).replace('{1}', rb.total || 0)]);
+    if (rb.running) notes.push(['is-info', 'refresh', tr('重建索引中：{0}/{1}').replace('{0}', rb.done || 0).replace('{1}', rb.total || 0)]);
     else if (rb.error) notes.push(['is-bad', 'warn', tr('上一次重建失敗（原本的索引沒有動）：') + tr(rb.error)]);
     if (e.needs_rebuild && !rb.running) notes.push(['', 'warn', tr('embedding 設定跟目前的索引不同，請按「重建索引」。')]);
     if (e.vectors_missing && !rb.running) notes.push(['', 'warn', tr('有 {0} 段還沒有向量（只能用關鍵字找到），請按「重建索引」補上。').replace('{0}', e.vectors_missing)]);
@@ -410,14 +497,16 @@
       tr_.appendChild(el('td', null, tr(d.category_label) + '（' + tr(d.purpose_label) + '）'));
       tr_.appendChild(el('td', null, d.access === 'all' ? tr('全站')
         : tr('指定群組：') + d.groups.map((g) => g.name).join('、')));
-      tr_.appendChild(el('td', null, (d.doc_counts.active || 0) + ' ／ ' + d.docs_total));
+      tr_.appendChild(el('td', null, (d.doc_counts.active || 0) + ' / ' + d.docs_total));
       tr_.appendChild(el('td', null, String(d.active_chunks)));
-      tr_.appendChild(el('td', null, d.enabled ? tr('啟用') : tr('已停用')));
+      const stc = el('td');
+      stc.appendChild(d.enabled ? stateBadge(tr('啟用'), 'on') : stateBadge(tr('已停用'), 'off'));
+      tr_.appendChild(stc);
       const act = el('td');
       const box = el('div', 'kb-actions');
-      box.appendChild(btn(tr('文件'), 'btn-primary', () => openDataset(d)));
-      box.appendChild(btn(tr('編輯'), '', () => openDsForm(d)));
-      box.appendChild(btn(tr('刪除'), 'btn-danger', () => deleteDataset(d)));
+      box.appendChild(btn(tr('文件'), 'btn-primary', () => openDataset(d), 'file-text'));
+      box.appendChild(btn(tr('編輯'), '', () => openDsForm(d), 'edit'));
+      box.appendChild(btn(tr('刪除'), 'btn-danger', () => deleteDataset(d), 'trash'));
       act.appendChild(box);
       tr_.appendChild(act);
       tb.appendChild(tr_);
@@ -553,7 +642,8 @@
       c2.appendChild(el('div', 'muted', tr('生效：') + (v.effective_on || tr('未提供'))));
       row.appendChild(c2);
       const c3 = el('td');
-      c3.appendChild(el('div', null, STATUS[v.status] || v.status));
+      const stKind = {active: 'on', inactive: 'off', ready: 'off', uploaded: 'busy', indexing: 'busy', failed: 'bad'}[v.status] || 'off';
+      c3.appendChild(el('div')).appendChild(stateBadge(STATUS[v.status] || v.status, stKind));
       if (v.note) c3.appendChild(el('div', 'muted', tr(v.note)));
       if (v.error) c3.appendChild(el('div', 'muted', tr(v.error)));
       if (v.warning) c3.appendChild(el('div', 'muted', tr(v.warning)));
@@ -570,7 +660,7 @@
         }
       }
       row.appendChild(c3);
-      row.appendChild(el('td', null, v.chunk_count + ' ／ ' + (v.page_count || '—')));
+      row.appendChild(el('td', null, v.chunk_count + ' / ' + (v.page_count || '—')));
       const c5 = el('td');
       c5.appendChild(el('div', 'muted', (v.uploaded_by || '—') + ' ' + fmtTime(v.uploaded_at)));
       if (v.activated_at) c5.appendChild(el('div', 'muted', tr('啟用：') + (v.activated_by || '—') + ' ' + fmtTime(v.activated_at)));
@@ -578,18 +668,20 @@
       const c6 = el('td');
       const box = el('div', 'kb-actions');
       if (v.status === 'ready' || v.status === 'inactive')
-        box.appendChild(btn(tr('啟用'), 'btn-primary', () => verAction(v, 'activate')));
+        box.appendChild(btn(tr('啟用'), 'btn-primary', () => verAction(v, 'activate'), 'check'));
       if (v.status === 'active')
-        box.appendChild(btn(tr('停用'), '', () => verAction(v, 'deactivate')));
-      if (v.chunk_count) box.appendChild(btn(tr('預覽'), '', () => showPreview(v, 0)));
-      box.appendChild(btn(tr('編輯資料'), '', () => openMeta(v)));
+        box.appendChild(btn(tr('停用'), '', () => verAction(v, 'deactivate'), 'pause'));
+      if (v.chunk_count) box.appendChild(btn(tr('預覽'), '', () => showPreview(v, 0), 'eye'));
+      box.appendChild(btn(tr('編輯資料'), '', () => openMeta(v), 'edit'));
       if (v.status === 'failed' || v.status === 'ready' || v.status === 'inactive')
-        box.appendChild(btn(tr('重新處理'), '', () => verAction(v, 'reprocess')));
-      const dl = el('a', 'btn btn-small', tr('下載原檔'));
+        box.appendChild(btn(tr('重新處理'), '', () => verAction(v, 'reprocess'), 'refresh'));
+      const dl = el('a', 'btn btn-small');
+      dl.appendChild(stIcon('download'));
+      dl.appendChild(el('span', null, tr('下載原檔')));
       dl.href = API + '/versions/' + encodeURIComponent(v.id) + '/file';
       box.appendChild(dl);
       if (v.status !== 'uploaded' && v.status !== 'indexing')
-        box.appendChild(btn(tr('刪除'), 'btn-danger', () => deleteVersion(v)));
+        box.appendChild(btn(tr('刪除'), 'btn-danger', () => deleteVersion(v), 'trash'));
       c6.appendChild(box);
       row.appendChild(c6);
       tb.appendChild(row);
@@ -649,10 +741,33 @@
       ? tr('第 {0}～{1} 頁').replace('{0}', c.page_from).replace('{1}', c.page_to)
       : tr('第 {0} 頁').replace('{0}', c.page_from));
     if (c.heading) head.push(c.heading);
-    if (c.parent_ref) head.push(tr('母條文：') + c.parent_ref + (c.parts > 1 ? '（' + c.part + '／' + c.parts + '）' : ''));
+    if (c.parent_ref) head.push(tr('母條文：') + c.parent_ref + (c.parts > 1 ? '（' + c.part + '/' + c.parts + '）' : ''));
     card.appendChild(el('div', 'kb-chunk-head', head.join(' · ')));
-    card.appendChild(el('div', 'kb-chunk-text', c.text));
+    card.appendChild(highlighted(c.text, c.highlights));
     return card;
+  }
+
+  // 內文＋符合處：伺服器給 `[[起, 迄), ...]`（原文的字元位置），這裡只切字串、
+  // 一律用文字節點與 <mark> 組，不經過 HTML（內文是使用者上傳的文件）。
+  // 位置是 Python 的字元（code point）索引：JS 字串是 UTF-16，罕用字（擴充區的人名用字）
+  // 佔兩格，直接 slice 會整段錯開 —— 先切成一個字一格再取。
+  function highlighted(text, spans) {
+    const box = el('div', 'kb-chunk-text');
+    const t = Array.from(String(text || ''));
+    const part = (a, b) => t.slice(a, b).join('');
+    let at = 0;
+    (Array.isArray(spans) ? spans : []).forEach((sp) => {
+      const a = Math.max(at, Number(sp[0]) || 0), b = Math.min(t.length, Number(sp[1]) || 0);
+      if (b <= a) return;
+      if (a > at) box.appendChild(document.createTextNode(part(at, a)));
+      const m = document.createElement('mark');
+      m.className = 'kb-hl';
+      m.textContent = part(a, b);
+      box.appendChild(m);
+      at = b;
+    });
+    if (at < t.length) box.appendChild(document.createTextNode(part(at, t.length)));
+    return box;
   }
 
   async function showPreview(v, offset) {
@@ -699,22 +814,124 @@
   });
 
   // ---- 檢索測試
+  // 資料集清單：依類別分組、對齊成格子；可以打字篩選、只看已勾選、按類別篩。
+  // 勾選框一律留在 #kbSearchDs 裡（篩掉的只是藏起來，勾選狀態不變）。
+  let pickCat = '';
+  function normName(s) { return String(s || '').toLowerCase().replace(/台/g, '臺').replace(/\s+/g, ''); }
   function renderSearchDs() {
     const box = $('kbSearchDs');
     const prev = new Set([...box.querySelectorAll('input:checked')].map((x) => x.value));
     box.textContent = '';
-    OV.datasets.forEach((d) => {
-      const lab = el('label', 'kb-ds-pick');
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.value = d.id;
-      cb.checked = prev.has(d.id);
-      lab.appendChild(cb);
-      lab.appendChild(document.createTextNode(' ' + d.name));
-      box.appendChild(lab);
+    const cats = OV.categories || [];
+    const byCat = {};
+    OV.datasets.forEach((d) => { (byCat[d.category] = byCat[d.category] || []).push(d); });
+    const order = cats.map((c) => c.id).concat(Object.keys(byCat).filter((k) => !cats.some((c) => c.id === k)));
+    const catBox = $('kbPickCats');
+    catBox.textContent = '';
+    const chip = (id, label, n) => {
+      const b = el('button', 'kb-pick-cat');
+      b.type = 'button';
+      b.dataset.cat = id;
+      b.setAttribute('aria-pressed', String(pickCat === id));
+      b.appendChild(el('span', null, label));
+      b.appendChild(el('span', 'kb-pick-n', String(n)));
+      b.addEventListener('click', () => { pickCat = id; renderPickCats(); filterPick(); });
+      catBox.appendChild(b);
+    };
+    chip('', tr('全部'), OV.datasets.length);
+    order.forEach((cid) => {
+      const list = byCat[cid];
+      if (!list || !list.length) return;
+      const cat = cats.find((c) => c.id === cid);
+      const label = cat ? tr(cat.label) : cid;
+      chip(cid, label, list.length);
+      const g = el('div', 'kb-pick-group');
+      g.dataset.cat = cid;
+      const h = el('div', 'kb-pick-gh');
+      h.appendChild(el('span', null, label));
+      h.appendChild(el('span', 'kb-pick-n'));
+      g.appendChild(h);
+      const grid = el('div', 'kb-pick-grid');
+      list.forEach((d) => {
+        const lab = el('label', 'kb-ds-pick' + (d.enabled ? '' : ' is-off'));
+        lab.title = d.name;
+        lab.dataset.key = normName(d.name);
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = d.id;
+        cb.checked = prev.has(d.id);
+        lab.appendChild(cb);
+        lab.appendChild(el('span', 'kb-ds-pick-name', d.name));
+        if (!d.enabled) lab.appendChild(el('span', 'kb-ds-pick-off', tr('停用')));
+        grid.appendChild(lab);
+      });
+      g.appendChild(grid);
+      box.appendChild(g);
     });
-    if (OV.datasets.length) box.appendChild(el('span', 'muted', tr('（都不勾＝全部資料集）')));
+    if (pickCat && !byCat[pickCat]) pickCat = '';
+    renderPickCats();
+    filterPick();
+    renderScope();
   }
+  function renderPickCats() {
+    $('kbPickCats').querySelectorAll('.kb-pick-cat').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.cat === pickCat));
+    });
+  }
+  function filterPick() {
+    const q = normName($('kbPickQ').value);
+    const only = $('kbPickOnly').checked;
+    let shown = 0;
+    $('kbSearchDs').querySelectorAll('.kb-pick-group').forEach((g) => {
+      let n = 0;
+      const catOk = !pickCat || g.dataset.cat === pickCat;
+      g.querySelectorAll('.kb-ds-pick').forEach((lab) => {
+        const ok = catOk && (!q || lab.dataset.key.indexOf(q) >= 0) &&
+          (!only || lab.querySelector('input').checked);
+        lab.hidden = !ok;
+        if (ok) n++;
+      });
+      g.hidden = n === 0;
+      g.querySelector('.kb-pick-gh .kb-pick-n').textContent = String(n);
+      shown += n;
+    });
+    $('kbPickCount').textContent = tr('列出 {0} 個').replace('{0}', shown);
+    $('kbPickNone').hidden = shown > 0;
+    $('kbPickShown').disabled = shown === 0;
+  }
+  function renderScope() {
+    const n = OV.datasets.length;
+    const picked = $('kbSearchDs').querySelectorAll('input:checked').length;
+    $('kbScope').hidden = !n;
+    $('kbScope').classList.toggle('is-limited', picked > 0);
+    $('kbScopeText').textContent = picked
+      ? tr('查詢範圍：只查勾選的 {0} 個資料集').replace('{0}', picked)
+      : tr('查詢範圍：全部 {0} 個資料集').replace('{0}', n);
+    $('kbScopeTip').hidden = picked > 0;
+    $('kbScopeAll').hidden = !picked;
+  }
+  $('kbSearchDs').addEventListener('change', () => {
+    renderScope();
+    if ($('kbPickOnly').checked) filterPick();
+  });
+  $('kbScopeAll').addEventListener('click', () => {
+    $('kbSearchDs').querySelectorAll('input:checked').forEach((x) => { x.checked = false; });
+    renderScope();
+    filterPick();
+  });
+  $('kbScopePick').addEventListener('click', () => {
+    const open = $('kbPick').hidden;
+    $('kbPick').hidden = !open;
+    $('kbScopePick').setAttribute('aria-expanded', String(open));
+    if (open) $('kbPickQ').focus();
+  });
+  $('kbPickQ').addEventListener('input', filterPick);
+  $('kbPickOnly').addEventListener('change', filterPick);
+  $('kbPickShown').addEventListener('click', () => {
+    $('kbSearchDs').querySelectorAll('.kb-pick-group:not([hidden]) .kb-ds-pick:not([hidden]) input')
+      .forEach((x) => { x.checked = true; });
+    renderScope();
+  });
 
   $('kbSearch').addEventListener('click', doSearch);
   $('kbQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
@@ -724,6 +941,7 @@
     const ds = [...$('kbSearchDs').querySelectorAll('input:checked')].map((x) => x.value);
     const box = $('kbResults');
     box.textContent = '';
+    $('kbHlNote').hidden = true;
     say($('kbSearchNote'), tr('查詢中…'));
     try {
       const j = await post(API + '/search', {query: q, dataset_ids: ds.length ? ds : null, k: 8});
@@ -742,8 +960,9 @@
           + (r.version_label ? ' · ' + r.version_label : '') + ' · ' + tr('排序分數') + ' ' + r.score + ' · ' + how;
         box.appendChild(chunkCard({text: r.text, page_from: (r.locator.pages || [])[0],
           page_to: (r.locator.pages || [])[1], heading: r.heading, parent_ref: r.parent_ref,
-          part: r.part, parts: r.parts}, label));
+          part: r.part, parts: r.parts, highlights: r.highlights}, label));
       });
+      $('kbHlNote').hidden = !j.results.some((r) => (r.highlights || []).length);
     } catch (e) { say($('kbSearchNote'), e.message, false); }
   }
 

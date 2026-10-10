@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Jason Tools ドキュメントツールボックスの ISO/IEC 27001 と ISO/IEC 42001 への対応：本ツールが提供する管理機能、導入組織での使い方、記録の残る場所。">
+<title>コンプライアンス対応 ISO/IEC 27001 と 42001 | Jason Tools ドキュメントツールボックス</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+<script src="lang-switch.js" defer></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" href="index-ja.html#top">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">Jason Tools</div>
+        <div class="brand-sub">文書ツールボックス</div>
+      </div>
+    </a>
+    <nav class="topnav" id="topnav">
+      <a href="index-ja.html#features" class="nav-link">機能</a>
+      <a href="index-ja.html#install" class="nav-link">インストール</a>
+      <a href="api-ja.html" class="nav-link">API</a>
+      <a href="troubleshooting-ja.html" class="nav-link">トラブルシューティング</a>
+      <select id="langSwitch" class="nav-lang" aria-label="Language"><option value="compliance.html" lang="zh-Hant">繁體中文</option><option value="compliance-en.html" lang="en">English</option><option value="compliance-ja.html" lang="ja" selected>日本語</option></select>
+      <a class="btn btn-outline nav-github" href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.4 3.6 1 .1-.8.4-1.4.8-1.7-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2 0-.4-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg>
+        GitHub
+      </a>
+    </nav>
+    <button class="nav-toggle" id="navToggle" type="button" aria-label="メニューを展開" aria-controls="topnav" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+  </div>
+</header>
+<main class="container ts-main cp-main">
+<div class="cp-hero"><div class="cp-hero-text">
+<h1 class="ts-h1">コンプライアンス対応：ISO/IEC 27001 と ISO/IEC 42001</h1>
+<p class="cp-p">ISO/IEC 27001（情報セキュリティマネジメント）と ISO/IEC 42001（AI マネジメント）の認証対象は<b>組織のマネジメントシステム</b>であり、ソフトウェアではありません。本ページは Jason Tools ドキュメントツールボックス（以下、本ツール）がすでに提供している管理機能と、導入組織での使い方、記録の残る場所をまとめたもので、仕組みづくりと監査証跡の準備の参考になります。</p>
+<p class="cp-p">各項目はプログラムの実際の動作と照合済みです。設定箇所は管理画面のページ名で示します。</p>
+</div>
+<svg class="cp-hero-art" viewBox="0 0 240 180" role="img" aria-hidden="true"><rect x="34" y="18" width="110" height="140" rx="12" fill="#eef2ff" stroke="#6366f1" stroke-width="3"/><rect x="52" y="40" width="74" height="8" rx="4" fill="#a5b4fc"/><rect x="52" y="60" width="60" height="6" rx="3" fill="#c7d2fe"/><rect x="52" y="76" width="68" height="6" rx="3" fill="#c7d2fe"/><rect x="52" y="92" width="50" height="6" rx="3" fill="#c7d2fe"/><path d="M52 116l7 7 13-14" fill="none" stroke="#10b981" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="80" y="113" width="40" height="6" rx="3" fill="#c7d2fe"/><path d="M168 52c14 6 28 8 40 8v34c0 26-18 44-40 54-22-10-40-28-40-54V60c12 0 26-2 40-8z" fill="#4f46e5" stroke="#312e81" stroke-width="3" stroke-linejoin="round"/><path d="M152 98l11 11 21-23" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="150" y="128" width="62" height="40" rx="9" fill="#fff" stroke="#f59e0b" stroke-width="3"/><text x="181" y="154" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#b45309">AI</text><path d="M160 128v-6M172 128v-6M190 128v-6M202 128v-6M160 168v6M172 168v6M190 168v6M202 168v6" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/></svg>
+</div>
+<div class="ts-toc cp-toc"><a href="#cp1"><svg class="cp-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>1. ISO/IEC 27001：情報セキュリティ</a><a href="#cp2"><svg class="cp-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>2. ISO/IEC 42001：AI</a><a href="#cp3"><svg class="cp-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>3. 導入時のチェックリスト</a></div>
+<h2 class="cp-h2" id="cp1"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>1. ISO/IEC 27001：情報セキュリティ</h2>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>1.1 認証</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本ツールが提供するもの</th><th>導入組織での運用と記録</th></tr></thead><tbody><tr><td>ローカルアカウント、LDAP、Active Directory、OIDC と SAML のシングルサインオン（ローカルアカウントと併用可）</td><td>「認証設定」と「SSO シングルサインオン」で社内ディレクトリまたは ID プロバイダーに接続し、アカウントのライフサイクルをディレクトリで一元管理</td></tr><tr><td>2 段階認証（TOTP）。監査担当がパスワードでログインする場合は必須</td><td>ポリシーに従って有効化を求める。監査担当のアカウントは別に作成し 2 段階認証を有効化</td></tr><tr><td>ログイン失敗時のロック：同じアカウントで 10 分以内に 5 回、または同じ IP から 20 回失敗すると 15 分間ロック（管理者が調整可）</td><td>ロックと解除は監査ログに記録（<code>login_fail</code>、<code>account_locked</code>、<code>user_unlock</code>）</td></tr><tr><td>ログインの有効期間は 7 日、「ログイン状態を保持」で 30 日。管理者はアカウントのすべてのログインを即時に無効化できる</td><td>ポリシーに従って有効期間を調整。漏えいが疑われる場合はまずすべてのログインを無効化</td></tr></tbody></table></div>
+<figure class="cp-fig"><img src="screenshots/ja/users-multi-realm.png" alt="ユーザー管理：ローカル、LDAP / AD、シングルサインオンのアカウントを併用し、それぞれの出所を表示" loading="lazy"><figcaption>ユーザー管理：ローカル、LDAP / AD、シングルサインオンのアカウントを併用し、それぞれの出所を表示</figcaption></figure>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>1.2 アカウントのライフサイクル</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本ツールが提供するもの</th><th>導入組織での運用と記録</th></tr></thead><tbody><tr><td>アカウントを無効にすると、そのアカウントのすべてのセッションが即時に無効になる</td><td>退職・異動の手続きでアカウントを無効化。監査ログに <code>user_update</code></td></tr><tr><td>認証が有効な場合、無効化または削除されたアカウントの API トークンはすべて拒否される</td><td>トークンを個別に取り消さなくても、使えるアクセスは残らない</td></tr><tr><td>ディレクトリ同期で、ディレクトリ側で無効化・削除されたアカウントを自動で無効化できる（既定はオフ。1 回の変更が 20% を超える場合は誤停止を防ぐため全体を中止）</td><td>「グループ管理」の定期ディレクトリ同期で有効化。実行ごとに <code>user_auto_disable</code> を記録</td></tr><tr><td>アカウントを削除すると、そのワークスペースのファイルも削除される</td><td>監査ログに <code>user_delete</code></td></tr></tbody></table></div>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>1.3 アクセス制御と職務分離</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本ツールが提供するもの</th><th>導入組織での運用と記録</th></tr></thead><tbody><tr><td>ツールごとにロールで権限を付与し、個人・グループ・AD の組織単位（OU）に割り当てられる。管理者、一般ユーザー、文書管理、財務、営業、法務・セキュリティなどの組み込みロールあり</td><td>職務に応じてロールを設計。「権限マトリクス」ページで誰がどのツールを使えるかを確認</td></tr><tr><td>監査担当ロール：監査ログと履歴の閲覧のみで、ツールは使えない。監査担当を割り当てると他のロールは自動で外れる</td><td>監査と管理を別の担当者が行う</td></tr><tr><td>フォーム入力・押印・透かしの履歴ファイルとアップロード記録は監査担当のみ閲覧でき、管理者は閲覧できない</td><td>監査担当の閲覧はすべて監査ログに記録（<code>auditor_view</code>）</td></tr><tr><td>管理者が他のユーザーのファイル、ジョブ結果、公文書案件を読むと監査ログに記録（<code>admin_file_override</code>）</td><td>これらの記録を定期的に確認</td></tr><tr><td>ロールと権限の変更はすべて監査ログに記録（<code>perm_change</code>、<code>role_*</code>、<code>user_update</code> など）</td><td>アクセス権レビューの際は「設定のバックアップ」でその時点のロールと権限を保存</td></tr></tbody></table></div>
+<figure class="cp-fig"><img src="screenshots/ja/premissions.png" alt="権限マトリクス：ロール、グループ、組織単位ごとにツールの権限を割り当て" loading="lazy"><figcaption>権限マトリクス：ロール、グループ、組織単位ごとにツールの権限を割り当て</figcaption></figure>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg></span>1.4 ユーザー間のデータ分離</h3>
+<p class="cp-p">アップロードしたファイル、バックグラウンドジョブとその結果、マイワークスペース、公文書案件、会議要約と文字起こしには所有者が記録されます。他のアカウントは閲覧・ダウンロード・取り消し・変更ができず、ID の推測によるアクセスもすべて拒否されます。これらのルールは自動テストで 1 項目ずつ検証しています（<a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/TEST_PLAN_SECURITY.md" target="_blank" rel="noopener"><code>TEST_PLAN_SECURITY.md</code></a> を参照）。</p>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></span>1.5 監査ログ</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本ツールが提供するもの</th><th>導入組織での運用と記録</th></tr></thead><tbody><tr><td>サインインの成功と失敗、ロック、サインアウト、アカウント・グループ・ロールの変更、権限の変更、設定の変更、ツールの利用、成果物のダウンロード、管理者による他ユーザーのファイル閲覧、監査担当者の閲覧、データベースのバックアップと破損、保持期間による削除を記録</td><td>「監査ログ」ページでユーザー・イベント種別・期間で絞り込み、CSV を出力</td></tr><tr><td>ツールの利用はファイル名・サイズ・操作・結果のみを記録し、<b>ファイルの内容は記録しない</b></td><td>記録を必要最小限に保つ</td></tr><tr><td>成果物のダウンロード（マイジョブ、ツールの結果画面、ワークスペース）を <code>file_download</code> に記録：アカウント、接続元 IP、ファイル名、サイズ。同じ人が同じファイルを 5 分以内に再度ダウンロードしても 1 件のみ記録し、プレビューとサムネイルは記録しない</td><td>ファイルがいつ、誰によってシステムから持ち出されたかは、イベント種別 <code>file_download</code> で絞り込んで確認</td></tr><tr><td>API トークンによる呼び出しでは、ツール利用とダウンロードの記録にトークン名（<code>via: api_token</code>）も記録し、アカウントはトークンの所有者として記録</td><td>各トークンを専用アカウントに割り当て、識別しやすい名前を付ける</td></tr><tr><td>画面から監査ログを変更・削除する機能はなく、保存期間に従って自動で削除されるのみ。保存期間の変更自体も記録される</td><td>ポリシーに従って保存期間を設定（既定 90 日）</td></tr><tr><td>SIEM への転送：syslog（RFC 5424）、CEF、GELF。複数の宛先を同時に設定可。送信失敗時は自動で再試行し、ローカルに <code>audit_forward_failed</code> を記録</td><td>「ログ転送」で設定し、長期保存は SIEM に任せる</td></tr></tbody></table></div>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>1.6 データの保存と削除</h3>
+<p class="cp-p">次のデータには保存期間を設定でき（「ファイル保存 / 削除」ページ）、6 時間ごとに自動で削除されます。管理者がすぐに削除することもできます。</p>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>データ</th><th>既定の保存期間</th></tr></thead><tbody><tr><td>一時アップロードと処理中の出力</td><td>2 時間</td></tr><tr><td>バックグラウンドジョブの結果</td><td>24 時間</td></tr><tr><td>ジョブ記録</td><td>30 日</td></tr><tr><td>マイワークスペース（「ワークスペース設定」で調整）</td><td>24 時間</td></tr><tr><td>フォーム入力・押印・透かしの履歴</td><td>各 365 日</td></tr><tr><td>公文書案件（削除済みのものは削除日から起算）</td><td>365 日</td></tr><tr><td>会議録音の文字起こし用にアップロードされた元の録音（文字起こし中のものは削除しない）</td><td>30 日</td></tr><tr><td>乗車証明の整理</td><td>365 日</td></tr><tr><td>監査ログ</td><td>90 日</td></tr></tbody></table></div>
+<p class="cp-p">「システム状態」ページで、ユーザーごとの現在のファイル数と容量、種類別の内訳を確認できます。</p>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg></span>1.7 機密設定の保護</h3>
+<p class="cp-p">LLM サーバーと埋め込みサービスのキー、音声サービスのキー、OIDC クライアントシークレットと SAML 秘密鍵、通知チャネルのパスワードとトークンは暗号化して保存され（Fernet）、鍵ファイルはサービスアカウントのみが読み取れます。</p>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></span>1.8 文書処理の分離</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本ツールが提供するもの</th></tr></thead><tbody><tr><td>Office 変換は毎回新しい使い捨てのプロファイルを使い、マクロの実行を無効にする</td></tr><tr><td>変換には時間の上限があり、超過するとすべての子プロセスとともに終了する。低い優先度と限られた CPU コアで実行し、画面の応答に影響しない</td></tr><tr><td>PDF の隠しコンテンツ検査は別プロセスで解析する</td></tr><tr><td>破損したファイルにはエラーメッセージを返し、サーバーエラーにはならない</td></tr><tr><td>Linux では専用のサービスアカウントで実行し、systemd の保護設定（<code>NoNewPrivileges</code>、<code>PrivateTmp</code>、<code>ProtectSystem=strict</code>、<code>ProtectHome</code>）を適用。プログラムのディレクトリはサービス自身から読み取り専用</td></tr></tbody></table></div>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="m1 1 22 22"/></svg></span>1.9 機密データ処理ツール</h3>
+<ul class="cp-list">
+<li><b>文書の匿名化</b>：墨消しでは範囲内の画像のピクセルも消去するため、出力ファイルから元の内容を復元できません（スキャン文書や OCR 後のファイルも同様）。</li>
+<li><b>テキストの匿名化</b>、<b>メタデータの消去</b>、<b>隠しコンテンツ検査</b>、<b>PDF のパスワード保護</b>。</li>
+</ul>
+<figure class="cp-fig"><img src="screenshots/ja/deident-1.png" alt="文書の匿名化：検出した個人データを 1 件ずつ一覧にし、確認してから墨消し" loading="lazy"><figcaption>文書の匿名化：検出した個人データを 1 件ずつ一覧にし、確認してから墨消し</figcaption></figure>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg></span>1.10 バックアップと復旧</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本ツールが提供するもの</th><th>導入組織での運用と記録</th></tr></thead><tbody><tr><td>ユーザーと権限、監査ログの 2 つのデータベースを毎日自動でホットバックアップし、7 世代を保持</td><td><code>db_backups</code> を別のホストまたはバックアップシステムに複製して保管</td></tr><tr><td>コマンドラインツール <code>jtdt db-check</code>、<code>jtdt db-backup</code>、<code>jtdt db-restore</code> で、画面が使えないときも検査と復元ができる</td><td>定期的に復元を演習し、結果を記録</td></tr><tr><td><code>jtdt update</code> でのアップグレード時は、ディスク容量を確認してデータディレクトリをバックアップ（3 世代を保持）。失敗したらプログラムのバージョンを自動で戻す</td><td>アップグレードの記録は CHANGELOG と照合</td></tr><tr><td>「設定のバックアップ / インポート」：サイト全体の設定をまとめて出力し、別のホストに取り込める</td><td>移設・再構築の際に使用（手順は <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener"><code>OPS.md</code></a>）</td></tr></tbody></table></div>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>1.11 Web と通信のセキュリティ</h3>
+<ul class="cp-list">
+<li>すべての書き込み操作に CSRF トークンが必要です。コンテンツセキュリティポリシー（CSP）はリクエストごとの nonce でスクリプトとスタイルの読み込み元を制限します。</li>
+<li>HTTPS 接続では HSTS を送ります。ログイン用 cookie は <code>HttpOnly</code> で、HTTPS 接続ではさらに <code>Secure</code> になります。</li>
+<li>導入手順では、リバースプロキシで HTTPS を提供し、サービス自体はローカルホストのみで待ち受けることを推奨しています（<a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener"><code>OPS.md</code></a> を参照）。</li>
+</ul>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg></span>1.12 セキュアな開発とテスト</h3>
+<ul class="cp-list">
+<li>各リリースの前に OWASP ZAP でスキャン（未ログインとログイン後）し、高・中・低リスクの項目が 0 になってからリリースします。</li>
+<li>bandit による静的解析と OWASP Top 10 の回帰テストを実施しています。セキュリティテストの項目は <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/TEST_PLAN_SECURITY.md" target="_blank" rel="noopener"><code>TEST_PLAN_SECURITY.md</code></a> にまとめています。</li>
+<li>各バージョンの変更は <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener"><code>CHANGELOG.md</code></a> に記録しています。</li>
+</ul>
+<h2 class="cp-h2" id="cp2"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></span>2. ISO/IEC 42001：AI</h2>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>2.1 AI 機能の一覧</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本ツールが提供するもの</th><th>導入組織での運用と記録</th></tr></thead><tbody><tr><td>LLM 機能は<b>既定でオフ</b>で、管理者が「LLM 設定」で有効にする</td><td>「LLM 設定」ページを AI 機能の一覧として使い、有効なツール・モデル・サーバーを記録</td></tr><tr><td>LLM を呼び出すツールはすべて「LLM 設定」に表示：文単位の翻訳、文書翻訳、テキスト抽出（段落の再構成）、フォーム自動入力（検証）、文書・テキストの匿名化（補完検出）、会議要約、公文書作成、文字数カウント、注釈の整理、文書比較、提出前チェック、OCR、電子インボイス</td><td>用途ごとに承認し、不要なツールは有効にしない</td></tr><tr><td>ツールごとに使う LLM サーバーを指定でき、指定したサーバーが使えないときは処理を止め、<b>他のサーバーには送らない</b></td><td>機密性の高い文書を扱うツールにはオンプレミスのサーバーを指定</td></tr><tr><td>OCR は既定でローカルで認識（EasyOCR）。別途構築する GPU OCR サーバーは任意で、既定はオフ</td><td>有効にする前にサーバーの場所を確認</td></tr><tr><td>会議録音の文字起こしは別途構築した音声サービスを使う。音声サービスは 2 時間有効な署名付きリンクで録音を取得し、文字起こしを取得・保存した後に削除を通知する（最長 24 時間以内）</td><td>音声サービスの場所と保存方法をデータフローの記録に含める</td></tr></tbody></table></div>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>2.2 AI の誤りを減らす仕組み</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>機能</th><th>本ツールが提供するもの</th></tr></thead><tbody><tr><td>公文書作成</td><td>書式はプログラムが整え、モデルは内容だけを書く。下書きの金額・数量・日付・時刻・法令名・条番号・文書番号・承認状況を自動で確認し、原文に根拠のないものを示す。不足している情報は補記欄として示す。参考資料には用途と出典を表示し、「業務上の根拠」のみを下書きの根拠とする。変更のたびに新しい版として保存</td></tr><tr><td>会議要約</td><td>決定事項・タスク・リスクはすべて文字起こしの段落を示す必要があり、示せないものは載せない。要約は検証済みの項目だけから書き、数字と英単語が原文にあるかを確認</td></tr><tr><td>翻訳</td><td>原文と訳文を文ごと、または並べて表示し、確認しやすくする</td></tr><tr><td>OCR の補正</td><td>行ごとに照合し、行数や文字数の差が大きい行にはモデルの補正を適用しない</td></tr><tr><td>プロンプトインジェクション</td><td>公文書作成では、文書に含まれる AI 向けの指示をモデルに送る前に取り除き、ユーザーに知らせる。公文書作成と会議要約のプロンプトは文書の内容をデータ欄に置き、それが指示ではなくデータであることを明示</td></tr></tbody></table></div>
+<figure class="cp-fig"><img src="screenshots/ja/official-doc.png" alt="公文書作成：下書きの横に確認結果と参考資料を表示し、根拠のない箇所を示す" loading="lazy"><figcaption>公文書作成：下書きの横に確認結果と参考資料を表示し、根拠のない箇所を示す</figcaption></figure>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg></span>2.3 導入組織での運用</h3>
+<ul class="cp-list">
+<li>AI の利用方針を定める：どのツールを使えるか、どの種類の文書をどのモデルサーバーに送れるか。</li>
+<li>本ツールの確認結果を人による確認に組み込む：公文書作成の確認結果、会議要約の段落の引用、翻訳の対照表示。正式な文書は担当者が確認してから使う。</li>
+<li>モデルの変更やアップグレードの前に、自組織の代表的な文書で再実行して結果を保存し、変更の記録とする。</li>
+<li>用途ごとに、誤りが影響しうる相手（文書の受け手、個人データの本人、従業員）を評価し、AI 影響評価に含める。</li>
+</ul>
+<h2 class="cp-h2" id="cp3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg></span>3. 導入時のチェックリスト</h2>
+<ol class="cp-list">
+<li>認証を有効にし、社内ディレクトリまたはシングルサインオンに接続する。監査担当のアカウントを別に作成し 2 段階認証を有効にする。</li>
+<li>職務に応じてロールとツールの権限を設定し、アクセス権レビューのたびに「設定のバックアップ」で設定を保存する。</li>
+<li>監査ログを SIEM に転送し、ポリシーに従って各データの保存期間を設定する。</li>
+<li>リバースプロキシで HTTPS を提供し、サービス自体はローカルホストのみで待ち受ける。</li>
+<li>データベースと設定のバックアップを別のホストに複製して保管し、定期的に復元を演習する。</li>
+<li>LLM を有効にする前にツールごとのサーバーを決め、「LLM 設定」ページを AI 機能の一覧として使う。</li>
+<li>アップグレード時は該当バージョンの <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener"><code>CHANGELOG.md</code></a> の説明を保存し、変更管理の記録とする。</li>
+</ol>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-col">
+      <div class="footer-brand">Jason Tools ドキュメントツールボックス</div>
+      <p class="footer-tag">PDF / Office の統合型文書処理プラットフォーム：クラウドに出さず、データは自分の手元に残ります。</p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">リンク</div>
+      <a href="index-ja.html">紹介サイト</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">ソースコードリポジトリ</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+      <a href="troubleshooting-ja.html">インストールとアップグレードのトラブルシューティング</a>
+      <a href="compliance-ja.html">コンプライアンス対応（ISO 27001 / 42001）</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools/issues" target="_blank" rel="noopener">問題を報告</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">作成者</div>
+      <p>
+        <strong>Jason Cheng</strong><br>
+        <a href="https://www.jason.tools" target="_blank" rel="noopener">Jason Tools</a>
+      </p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">ライセンス</div>
+      <p>GNU Affero General Public License v3.0</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">
+      © 2026 Jason Tools · Built with HTML & CSS, hosted on GitHub Pages
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -436,6 +436,30 @@ def test_law_text_round_trip_escapes_markdown_lookalikes():
     assert len(ch) == 1 and ch[0]["text"].startswith("第 1 條 # 號不是標題")
 
 
+def test_deleted_articles_are_not_indexed():
+    """全國法規資料庫保留條號、內容只寫「（刪除）」的條文不切成段落（law2 起）：
+    沒有可以引用的內容，卻會出現在檢索結果裡、佔掉參考資料的名額。"""
+    rec = {"key": "T1", "name": "範例條例", "level": "法律", "modified": "20200101",
+           "articles": [
+               {"type": "A", "no": "第 1 條", "content": "本條例依公文程式訂定之。"},
+               {"type": "A", "no": "第 2 條", "content": "（刪除）"},
+               {"type": "A", "no": "第 3 條", "content": "(刪除)"},
+               {"type": "A", "no": "第 4 條", "content": "（ 刪除 ）。"},
+               {"type": "A", "no": "第 5 條", "content": "刪除"},
+               # 內文提到刪除的照常切段
+               {"type": "A", "no": "第 6 條", "content": "前項資料應於期滿後刪除。"},
+               {"type": "A", "no": "第 7 條", "content": "（刪除）\n本條自公布日施行。"},
+               {"type": "A", "no": "第 8 條", "content": "刪除之。"},
+           ]}
+    md = law_text.render_law(rec, attribution="出處")
+    refs = [c["parent_ref"] for c in law_text.law_chunks(md)]
+    assert refs == ["第1條", "第6條", "第7條", "第8條"], refs
+    # 原檔照樣保留那幾條（下載原檔看得到條號被刪除），只是不進索引
+    assert [it[1] for it in law_text.parse_law(md)["items"]] == [
+        f"第 {n} 條" for n in range(1, 9)]
+    assert law_text.FORMAT_VERSIONS["law"] == "law2", "改了切段規則要加版本，既有安裝才會重新切段"
+
+
 # ---------------------------------------------------------------- 4. 版本資訊與顯名
 def test_version_meta_attribution_and_purpose(g, allow_fake, srv):
     _serve_moj(srv)
@@ -782,12 +806,12 @@ def test_rebuild_rechunks_only_when_the_law_format_version_changes(g, allow_fake
         setup_embed(fe.base)
         indexer.rebuild()
         assert calls == [], "版本沒變不可以重新切段"
-        monkeypatch.setitem(law_text.FORMAT_VERSIONS, "law", "law2")
+        monkeypatch.setitem(law_text.FORMAT_VERSIONS, "law", "law99")
         indexer.rebuild()
         assert calls == ["law"]
     vers = {r["chunker_version"] for r in store.conn().execute(
         "SELECT chunker_version FROM kb_versions").fetchall()}
-    assert vers == {"1", "1+law2"}
+    assert vers == {"1", "1+law99"}
     assert [c["parent_ref"] for c in _chunks("範例公文條例")][:3] == ["第1條", "第2條", "第12條之1"]
 
 

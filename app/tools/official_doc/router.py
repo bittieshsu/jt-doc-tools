@@ -65,13 +65,21 @@ MAX_EDIT_CHARS = 30_000
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 EXTRACT_EXTS = (".pdf", ".docx", ".doc", ".odt", ".rtf", ".txt", ".md")
 ENDORSE_FORMATS = ("compact", "list")
-EXPORT_FORMATS = ("txt", "odt", "docx", "pdf", "png", "svg", "json")
+EXPORT_FORMATS = ("txt", "odt", "docx", "pdf", "png", "svg", "json", "di")
 #: 圖片匯出：跟 PDF 同一個版面（同一條路產生 PDF 再算圖）；多頁時一頁一張、打包成 zip
 IMAGE_FORMATS = ("png", "svg")
 IMAGE_DPI = 200
 IMAGE_MAX_PAGES = 30
 #: 匯出的 JSON 帶這個標記（之後要讀回來時才認得出是本工具匯出的）
 EXPORT_FORMAT = "jtdt-official-doc"
+#: 機關地址簿超過幾天沒更新就提醒（2026-10-09 使用者核可 30 天：官方每天更新，機關改制改名不會天天有）
+ORG_STALE_DAYS = 30
+#: 「機關名稱 → 機關代碼」一份案件最多記幾筆（發文機關、受文者、正本、副本加起來）
+MAX_ORG_CODES = 40
+#: 機關代碼的長相：英數 2~32 字（地址簿裡實際是 8~17 字，例如 A15000000E、200000000AUA00000）
+_ORG_CODE_RE = re.compile(r"^[0-9A-Za-z]{2,32}$")
+#: 正本、副本一格好幾個機關時的分隔（跟頁面上的元件同一組）
+_ORG_SEP_RE = re.compile(r"[、，,；;]")
 EXPORT_VERSION = 1
 
 #: 模型呼叫失敗（連不上、逾時、對方回錯誤）時給使用者的話。**原因只進記錄** ——
@@ -84,7 +92,7 @@ _DRAFT_FAILED = ("模型沒有照格式回答（連問兩次都讀不出內容�
 
 _FIELD_NAMES = {
     "narrative": "需求敘述", "source": "來文內容", "direction": "辦理方向",
-    "unit": "承辦單位", "addressee": "陳核對象", "units": "承辦／協辦單位",
+    "unit": "承辦單位", "addressee": "陳核對象", "units": "承辦/協辦單位",
     "internal_deadline": "內部期限",
     "org": "發文機關", "receiver": "受文者", "copies": "正本", "cc": "副本",
     "signature": "署名", "contact": "聯絡資訊", "attachments": "附件", "doc_no": "發文字號",
@@ -350,6 +358,9 @@ def _parse_inputs(body: dict) -> dict:
     # 參考知識庫：**預設不查**（使用者勾了才查）。查什麼由伺服器依案件內容決定，
     # 查得到哪些資料集由伺服器依登入的人決定 —— 前端只送一個開關。
     inputs["use_kb"] = _flag(body.get("use_kb"))
+    # 參考歷史案件：同樣預設不查。查的是**送出的這個人自己的**案件 —— 誰是「自己」由伺服器認，
+    # 前端只送開關（送不了「查誰的」）
+    inputs["use_history"] = _flag(body.get("use_history"))
     return inputs
 
 
@@ -418,7 +429,7 @@ def _parse_letter(body: dict, length: str) -> dict:
     else:
         relation = _choice(body, "relation", tuple(k for k in od.RELATIONS if k != od.COMPANY_RELATION),
                            "unknown", "行文關係")
-    return {
+    out = {
         "mode": "letter",
         "issuer": issuer,
         "narrative": _text(body, "narrative", od.MAX_NARRATIVE_CHARS, required=True,
@@ -431,11 +442,84 @@ def _parse_letter(body: dict, length: str) -> dict:
         "copies": _text(body, "copies", od.MAX_FIELD_CHARS),
         "cc": _text(body, "cc", od.MAX_FIELD_CHARS),
         "signature": _text(body, "signature", od.MAX_FIELD_CHARS),
-        "contact": _text(body, "contact", MAX_CONTACT_CHARS),
         "attachments": _text(body, "attachments", od.MAX_FIELD_CHARS),
         "doc_no": _text(body, "doc_no", od.MAX_FIELD_CHARS),
         "length": length,
     }
+    out.update(_contact_inputs(body, issuer == "company"))
+    out["org_codes"] = _org_codes(body, out)
+    return out
+
+
+def _contact_inputs(body: dict, company: bool) -> dict:
+    """聯絡資訊：畫面送一格一格的 `contact_fields`（欄位名稱由程式寫，見 `od.CONTACT_FIELDS`）；
+    舊的呼叫端（API、升級前的案件）送一行一項的 `contact` 文字，認得的行分進各欄，
+    **認不得的行不放進草稿**、列在 `contact_unplaced` 讓呼叫端與畫面講出來。
+    `contact` 存的是組好的那幾行（草稿、匯出、DI 檔都用它）。"""
+    raw = body.get("contact_fields")
+    if raw is not None:
+        if not isinstance(raw, dict):
+            raise HTTPException(400, "聯絡資訊的格式不正確（contact_fields 要是物件）。")
+        fields, unplaced = od.clean_contact_fields(raw, company), []
+    else:
+        legacy = _text(body, "contact", MAX_CONTACT_CHARS)
+        fields, unplaced = od.split_contact(legacy, company)
+    return {"contact_fields": fields, "contact": od.contact_text(fields, company),
+            "contact_unplaced": unplaced}
+
+
+def _contact_for_reopen(inputs: dict) -> dict:
+    """重新開啟案件時表單要的聯絡資訊：升級前的案件只有一行一項的文字，現場分欄。"""
+    if not isinstance(inputs, dict) or inputs.get("mode") != "letter" \
+            or isinstance(inputs.get("contact_fields"), dict):
+        return inputs
+    company = inputs.get("issuer") == "company" or inputs.get("relation") == od.COMPANY_RELATION
+    fields, unplaced = od.split_contact(str(inputs.get("contact") or ""), company)
+    return {**inputs, "contact_fields": fields, "contact_unplaced": unplaced}
+
+
+def _org_names(inputs: dict) -> set[str]:
+    """這份函裡實際寫到的機關名稱（發文機關、受文者、正本、副本；正副本照「、」分段）。"""
+    names: set[str] = set()
+    for key in ("org", "receiver"):
+        v = str(inputs.get(key) or "").strip()
+        if v:
+            names.add(v)
+    for key in ("copies", "cc"):
+        for part in _ORG_SEP_RE.split(str(inputs.get(key) or "")):
+            if part.strip():
+                names.add(part.strip())
+    return names
+
+
+def _org_codes(body: dict, inputs: dict) -> dict:
+    """畫面從地址簿挑的「機關名稱 → 機關代碼」（電子公文 DI 檔要用）。
+
+    格式不對（不是對照、太多筆、代碼長得不像代碼）→ 400；**格式對但驗不過的安靜丟掉**：
+    名稱不在這份函裡、或地址簿裡那個代碼不是這個名稱（前端送什麼都不直接信）。
+    地址簿讀不到時一筆都不記 —— 驗不了的代碼比沒有代碼糟（交換到別的機關或被退件）。"""
+    raw = body.get("org_codes")
+    if raw in (None, "", {}):
+        return {}
+    if not isinstance(raw, dict):
+        raise HTTPException(400, "「org_codes」要是「機關名稱 → 機關代碼」的對照。")
+    if len(raw) > MAX_ORG_CODES:
+        raise HTTPException(400, f"「org_codes」最多 {MAX_ORG_CODES} 筆。")
+    pairs: dict[str, str] = {}
+    for k, v in raw.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            raise HTTPException(400, "「org_codes」的名稱與代碼都要是文字。")
+        k, v = k.strip(), v.strip()
+        if not k or len(k) > od.MAX_FIELD_CHARS or not _ORG_CODE_RE.match(v):
+            raise HTTPException(400, "「org_codes」裡有名稱或機關代碼的格式不對。")
+        pairs[k] = v
+    present = _org_names(inputs)
+    try:
+        from ...core import official_doc_sources as ods
+        return {k: v for k, v in pairs.items() if k in present and ods.org_code_matches(k, v)}
+    except Exception as e:  # noqa: BLE001 — 驗不了就不記，不讓整份草稿失敗
+        logger.warning("official-doc：驗證機關代碼失敗（%s）：%s", type(e).__name__, e)
+        return {}
 
 
 def _parse_facts(body: dict, inputs: dict) -> tuple[Optional[list], Optional[dict]]:
@@ -539,18 +623,89 @@ def _kb_query(inputs: dict) -> str:
     return str(inputs.get("narrative") or "")
 
 
-def _kb_lookup(inputs: dict, user_id: Optional[int]) -> tuple[list, str]:
+def _kb_lookup(inputs: dict, user_id: Optional[int], k: int = KB_MAX_RESULTS) -> tuple[list, str]:
     """回 `(檢索結果, 說明代碼)`。`user_id` 是**伺服器端**認出的那個人（`/start` 當下取），
     看得到哪些資料集由知識庫自己判斷 —— 這裡不另外過濾。"""
     if not inputs.get("use_kb"):
         return [], ""
     try:
         from ...core import kb
-        hits = kb.search(_kb_query(inputs), user_id=user_id, k=KB_MAX_RESULTS)
+        hits = kb.search(_kb_query(inputs), user_id=user_id, k=k)
     except Exception as e:  # noqa: BLE001 — 知識庫壞了不可以讓整份草稿失敗
         logger.warning("official-doc：查詢知識庫失敗（%s）：%s", type(e).__name__, e)
         return [], "failed"
     return (hits, "") if hits else ([], "none")
+
+
+# ------------------------------------------------------------------ 參考歷史案件
+
+HISTORY_STAGE = "查詢歷史案件"
+HISTORY_NOTES = {
+    "none": "你的歷史案件裡沒有找到跟這件事相近的案件，這份草稿沒有參考歷史案件。",
+    "failed": "查詢歷史案件失敗，這份草稿沒有參考歷史案件（原因已記錄，請洽管理員）。",
+}
+
+
+def _history_background() -> list[str]:
+    """比對時算「詞有多常見」的背景文字：內建範例的需求敘述（程式附的，不是任何人的資料）。"""
+    out = []
+    for ex in _examples.EXAMPLES:
+        f = ex.get("fields") or {}
+        out.append(str(f.get("narrative") or "") + "\n" + str(f.get("direction") or "")
+                   + "\n" + str(f.get("source") or "")[:300])
+    return out
+
+
+_HISTORY_BG: Optional[list[str]] = None
+
+
+def _history_lookup(inputs: dict, user_id: Optional[int],
+                    exclude: Optional[str] = None) -> tuple[list, str]:
+    """回 `(參考資料, 說明代碼)`。**只查 `user_id` 自己的案件**（管理員也一樣），
+    `user_id` 是伺服器端認出的那個人；`exclude` 是這一件本身（重新產生時不拿自己當參考）。"""
+    global _HISTORY_BG
+    if not inputs.get("use_history"):
+        return [], ""
+    try:
+        if _HISTORY_BG is None:
+            _HISTORY_BG = _history_background()
+        found = _cs.search_own(_kb_query(inputs), owner_uid=user_id, auth_on=_uo.auth_enabled(),
+                               exclude=exclude, background=_HISTORY_BG)
+    except Exception as e:  # noqa: BLE001 — 歷史案件讀不到不可以讓整份草稿失敗
+        logger.warning("official-doc：查詢歷史案件失敗（%s）：%s", type(e).__name__, e)
+        return [], "failed"
+    refs = [{"purpose": od.PAST_CASE, "title": h["title"] or od.MODE_NAMES.get(h["mode"], ""),
+             "text": h["text"], "case_id": h["case_id"], "case_rev": h["rev"],
+             "case_updated": h["updated_at"]} for h in found]
+    return (refs, "") if refs else ([], "none")
+
+
+def _refs_lookup(inputs: dict, user_id: Optional[int], exclude: Optional[str] = None,
+                 on_stage: Optional[Callable[[str], None]] = None) -> tuple[list, str, str]:
+    """知識庫＋歷史案件 → `(參考資料, 知識庫說明, 歷史案件說明)`。
+
+    兩個都勾時，歷史案件先查（只讀幾個小檔），知識庫的名額讓出歷史案件用掉的那幾個 ——
+    參考資料總共 `od.MAX_REFS` 段，知識庫照舊排前面（業務依據在前）。"""
+    hist, hist_note = [], ""
+    if inputs.get("use_history"):
+        if on_stage:
+            on_stage(HISTORY_STAGE)
+        hist, hist_note = _history_lookup(inputs, user_id, exclude)
+    hits, kb_note = [], ""
+    if inputs.get("use_kb"):
+        if on_stage:
+            on_stage(KB_STAGE)
+        hits, kb_note = _kb_lookup(inputs, user_id, k=max(1, KB_MAX_RESULTS - len(hist)))
+    return hits + hist, kb_note, hist_note
+
+
+def _history_available(user_id: Optional[int]) -> bool:
+    """這個人有沒有自己的歷史案件 —— 沒有的話勾選框不出現。"""
+    try:
+        return _cs.has_own(user_id, _uo.auth_enabled())
+    except Exception as e:  # noqa: BLE001
+        logger.warning("official-doc：讀歷史案件失敗（%s）：%s", type(e).__name__, e)
+        return False
 
 
 def _kb_available(user_id: Optional[int]) -> bool:
@@ -651,10 +806,38 @@ def _page_extras(user_id: Optional[int]) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("official-doc：讀資料來源狀態失敗（%s）：%s", type(e).__name__, e)
         orgs_ok, attrib = False, {"templates": [], "orgs": []}
-    return {"kb_available": _kb_available(user_id), "org_templates": _org_templates(),
-            "setup_todo": _setup_todo(user_id),
+    return {"kb_available": _kb_available(user_id), "history_available": _history_available(user_id),
+            "org_templates": _org_templates(),
+            "setup_todo": _setup_todo(user_id), "orgs_info": _orgs_info(user_id),
             "orgs_available": orgs_ok, "attribution": attrib,
             "ref_purposes": _ref_purpose_labels()}
+
+
+def _orgs_info(user_id: Optional[int]) -> dict:
+    """機關地址簿的狀態（欄位下方的說明與第一次使用時的提醒）。只讀狀態、不連外。
+
+    `admin`：看得到「前往公文撰擬設定」連結的人（管理員；認證關閉＝單人模式也算）——
+    其他人看到的是「請通知管理員」，因為只有管理員能下載或更新。"""
+    admin = (not _uo.auth_enabled()) or _uo.is_admin(user_id)
+    try:
+        from ...core import official_doc_sources as ods
+        info = ods.address_book_info()
+    except Exception as e:  # noqa: BLE001 — 狀態讀不到就當成沒有，不讓整頁壞掉
+        logger.warning("official-doc：讀地址簿狀態失敗（%s）：%s", type(e).__name__, e)
+        info = {"installed": False, "updated_at": None, "count": 0}
+    at = info.get("updated_at")
+    days = int(max(0.0, time.time() - at) // 86400) if at else None
+    return {"installed": bool(info.get("installed")),
+            "updated": time.strftime("%Y/%m/%d", time.localtime(at)) if at else "",
+            "days": days if days is not None else "",
+            "stale": bool(info.get("installed")) and days is not None and days > ORG_STALE_DAYS,
+            "count": int(info.get("count") or 0), "admin": admin}
+
+
+def _di_messages() -> dict:
+    """DI 檔注意事項的樣板（前端 `tr(樣板)` 再填參數）。"""
+    from ...core import official_doc_di as di
+    return dict(di.MESSAGES)
 
 
 def _ref_purpose_labels() -> dict:
@@ -667,13 +850,23 @@ def _ref_purpose_labels() -> dict:
         return dict(od.REF_PURPOSES)
 
 
-def _search_orgs(q: str) -> list[dict]:
+def _search_orgs(q: str, limit: int = 10) -> list[dict]:
     try:
         from ...core import official_doc_sources as ods
-        return ods.search_orgs(q, limit=10)
+        return ods.search_orgs(q, limit=limit)
     except Exception as e:  # noqa: BLE001 — 查不到就是沒有建議，不是錯誤
         logger.warning("official-doc：查機關名稱失敗（%s）：%s", type(e).__name__, e)
         return []
+
+
+def _search_orgs_exact(q: str, limit: int) -> tuple[list[dict], str]:
+    rows = _search_orgs(q, limit)
+    try:
+        from ...core import official_doc_sources as ods
+        return rows, ods.exact_org_code(q)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("official-doc：比對機關全銜失敗（%s）：%s", type(e).__name__, e)
+        return rows, ""
 
 
 def _abolished_law_names() -> tuple[list[str], list[str]]:
@@ -764,21 +957,51 @@ def _title_for(mode: str, draft: od.Draft) -> str:
     return fallback
 
 
-def _ask_for(job) -> Callable[[str], str]:
+#: 叫模型時的進度文字（`job.message`）。使用者要看得出**資料送到 LLM 伺服器了、AI 正在回覆**
+#: —— 原本整段只顯示「撰寫草稿（2/3）」，二十秒裡看起來跟程式自己在跑沒有兩樣。
+#: 前端 `tr()` 的數字退路會把數字換成 `{0}` `{1}`… 再查譯文，所以字數不可以帶千分位。
+#: 「檢查草稿」那一段不叫模型（程式比對原文），不會出現這幾句。
+LLM_MESSAGES = {
+    "wait": "{stage}：已送到 LLM 伺服器，等待 AI 回應（{i}/{n}）",
+    "stream": "{stage}：AI 正在回覆，已收到 {chars} 字（{i}/{n}）",
+    "retry": "{stage}：AI 回覆的格式不對，重新詢問（{i}/{n}）",
+}
+
+
+def llm_message(kind: str, stage: str, i: int, n: int, chars: int = 0) -> str:
+    return LLM_MESSAGES[kind].format(stage=stage, i=i, n=n, chars=int(chars))
+
+
+def _ask_for(job, on_status: Optional[Callable[[str, int], None]] = None) -> Callable[[str], str]:
     """送給 `official_doc` 的 `ask`。**取消要真的停下來**：被取消就丟例外，
-    中斷整條管線（`official_doc` 不知道作業被取消了，但它每一次都會回來問）。"""
+    中斷整條管線（`official_doc` 不知道作業被取消了，但它每一次都會回來問）。
+
+    `on_status(種類, 已收到字數)`：送出時 `wait`、重問時 `retry`、AI 回覆中 `stream`
+    （給進度文字用，見 `LLM_MESSAGES`）。"""
     client = llm_settings.make_client(TOOL_ID)
     if client is None:
         raise RuntimeError("LLM 服務未啟用")
     model = llm_settings.get_model_for(TOOL_ID)
 
+    def _status(kind: str, chars: int = 0) -> None:
+        if on_status is None:
+            return
+        try:
+            on_status(kind, chars)
+        except Exception:  # noqa: BLE001 — 進度文字壞了不可以讓草稿產不出來
+            logger.debug("official-doc：進度文字更新失敗", exc_info=True)
+
+    def _stream(n: int) -> None:
+        _status("stream", n)
+
     def ask(prompt: str) -> str:
         if getattr(job, "cancelled", False):
             raise RuntimeError("已取消")
+        _status("wait")
         # 按停止或模型打轉時不必等生成跑完（打轉的模型會一路寫到輸出上限）
         out = client.text_query(prompt, model=model, think=False, max_tokens=od.MAX_OUTPUT_TOKENS,
                                 stop_when=lambda t: bool(getattr(job, "cancelled", False))
-                                or od.is_runaway(t))
+                                or od.is_runaway(t), on_progress=_stream)
         if getattr(job, "cancelled", False):
             raise RuntimeError("已取消")
         return out
@@ -787,10 +1010,11 @@ def _ask_for(job) -> Callable[[str], str]:
         # 格式不對而重問：換一點溫度（溫度 0 打轉時，重問同一個提示多半一模一樣）
         if getattr(job, "cancelled", False):
             raise RuntimeError("已取消")
+        _status("retry")
         return client.text_query(prompt, model=model, think=False, max_tokens=od.MAX_OUTPUT_TOKENS,
                                  temperature=od.RETRY_TEMPERATURE,
                                  stop_when=lambda t: bool(getattr(job, "cancelled", False))
-                                 or od.is_runaway(t))
+                                 or od.is_runaway(t), on_progress=_stream)
 
     ask.retry = retry
     return ask
@@ -828,18 +1052,26 @@ def _append_regen_revision(case_id: str, text: str, created_at: float) -> Option
 def _run_job(job, case_id: str, inputs: dict, facts: Optional[list],
              overrides: Optional[dict], user_id: Optional[int] = None,
              regen: bool = False) -> None:
-    ask = _ask_for(job)
     n = len(od.STAGES)
+    # 現在在第幾段（叫模型時的進度文字要帶著段名）；已經有整理好的資料就從撰寫草稿開始
+    cur = {"i": 0 if facts is None else 1}
 
     # 進度要說得出**在做什麼**（整理資料 / 撰寫草稿 / 檢查），不是只有百分比
     def on_stage(i: int, name: str) -> None:
+        cur["i"] = i
         job.progress = round(max(0.05, i / n), 3)
         job.message = f"{name}（{i + 1}/{n}）"
 
-    hits, kb_note = [], ""
-    if inputs.get("use_kb"):
-        job.message = KB_STAGE
-        hits, kb_note = _kb_lookup(inputs, user_id)
+    def on_llm(kind: str, chars: int) -> None:
+        i = cur["i"]
+        job.message = llm_message(kind, od.STAGES[i], i + 1, n, chars)
+
+    ask = _ask_for(job, on_llm)
+
+    def on_lookup(name: str) -> None:
+        job.message = name
+
+    hits, kb_note, history_note = _refs_lookup(inputs, user_id, exclude=case_id, on_stage=on_lookup)
     job.message = od.STAGES[0] if facts is None else od.STAGES[1]
     draft = _draft_safely(inputs, facts, overrides, ask, on_stage,
                           cancelled=lambda: bool(getattr(job, "cancelled", False)),
@@ -847,7 +1079,8 @@ def _run_job(job, case_id: str, inputs: dict, facts: Optional[list],
     title = _title_for(inputs["mode"], draft)
     pub = draft.to_public()
     out = {"case_id": case_id, "mode": inputs["mode"], "inputs": inputs,
-           "title": title, "draft": pub, "kb_note": kb_note, "created_at": time.time()}
+           "title": title, "draft": pub, "kb_note": kb_note, "history_note": history_note,
+           "created_at": time.time()}
     if regen:
         # 依修改後的資料重新產生（同一個案件）：新的草稿存成下一版 ——
         # **先接版本、再覆寫結果**（理由見 `_append_regen_revision`）。輸入也換成這一次的。
@@ -1001,6 +1234,8 @@ async def index(request: Request):
     return templates.TemplateResponse(request, "official_doc.html", {
         **extras,
         "kb_notes": KB_NOTES,
+        "history_notes": HISTORY_NOTES,
+        "di_notes": _di_messages(),
         "request": request,
         "llm_enabled": llm_settings.is_enabled(),
         "llm_model": llm_settings.get_model_for(TOOL_ID),
@@ -1011,7 +1246,10 @@ async def index(request: Request):
         "max_direction": od.MAX_DIRECTION_CHARS,
         "max_field": od.MAX_FIELD_CHARS,
         "max_edit": MAX_EDIT_CHARS,
-        "max_contact": MAX_CONTACT_CHARS,
+        "contact_max": od.CONTACT_FIELD_MAX,
+        "contact_person_labels": od.CONTACT_PERSON_LABELS,
+        # 舊的一行一項資料（瀏覽器裡記的）分欄用：欄位名稱 → 鍵（跟伺服器的 `split_contact` 同一份）
+        "contact_aliases": od.contact_aliases(),
         "accept": ",".join(EXTRACT_EXTS),
         # 上傳區下面那一行「收得進來的格式」—— 跟 `accept` 同一份清單，不在樣板另寫
         "extract_exts_label": " ".join(EXTRACT_EXTS),
@@ -1052,15 +1290,21 @@ async def salutation(receiver: str = "", relation: str = "unknown", org: str = "
 
 
 @router.get("/orgs")
-async def orgs(q: str = ""):
-    """受文者 / 發文機關的輸入建議（公文電子交換系統地址簿）。沒下載地址簿時回空清單。"""
+async def orgs(q: str = "", limit: int = 10):
+    """機關名稱的輸入建議（公文電子交換系統地址簿）。沒下載地址簿時回空清單。
+
+    `exact`：查詢字串**就是**某個機關的全銜（台臺、全形半形視為相同）而且只有一個代碼時，那個代碼 ——
+    使用者自己打完整名稱、沒從清單挑時，畫面用它記代碼。同名好幾個就是空的（不猜）。"""
     q = q.strip()
     if len(q) > MAX_ORG_QUERY:
         raise HTTPException(400, f"查詢字串超過 {MAX_ORG_QUERY} 字的上限。")
     if not q:
-        return {"orgs": []}
-    rows = await asyncio.to_thread(_search_orgs, q)
-    return {"orgs": [{"name": r.get("orgName") or "", "id": r.get("orgId") or ""} for r in rows]}
+        return {"orgs": [], "exact": ""}
+    limit = max(1, min(int(limit), 20))
+    rows, exact = await asyncio.to_thread(_search_orgs_exact, q, limit)
+    return {"orgs": [{"name": r.get("orgName") or "", "id": r.get("orgId") or "",
+                      "marks": r.get("nameMarks") or []} for r in rows],
+            "exact": exact}
 
 
 @router.post("/extract-text")
@@ -1131,13 +1375,17 @@ async def start(request: Request):
     # 「開啟」按案件定址：作業紀錄過期之後照樣打得開（頁面再從案件找出還在跑的那件作業）
     job.meta["view_url"] = f"/tools/{TOOL_ID}/?case={case_id}"
     await asyncio.to_thread(_touch_case, case_id, job_id=job.id)
-    return {"job_id": job.id, "case_id": case_id}
+    return {"job_id": job.id, "case_id": case_id,
+            "contact_unplaced": inputs.get("contact_unplaced") or []}
 
 
 @router.get("/result/{case_id}")
 async def result(case_id: str, request: Request):
     await asyncio.to_thread(_require_case, case_id, request)
-    return await asyncio.to_thread(_read_json, _result_path(case_id), "這份草稿")
+    out = await asyncio.to_thread(_read_json, _result_path(case_id), "這份草稿")
+    if isinstance(out, dict) and isinstance(out.get("inputs"), dict):
+        out = {**out, "inputs": _contact_for_reopen(out["inputs"])}
+    return out
 
 
 # ------------------------------------------------------------------ 歷史案件
@@ -1375,6 +1623,30 @@ def _images(pdf: bytes, fmt: str, base: str) -> tuple[bytes, str, str]:
     return buf.getvalue(), "application/zip", f"{base}-{fmt}.zip"
 
 
+def _di_build(case_id: str, text: str) -> tuple[bytes, list, bool, list, str]:
+    """草稿文字 → DI 檔：(位元組, 注意事項, 驗得過 DTD 嗎, 前幾條錯誤, 文別)。阻塞呼叫。
+
+    機關代碼先用案件存著的（使用者從地址簿挑的），沒有才照名稱查地址簿（名稱完全相同而且只有一筆）。
+    簽辦意見、找不到主旨 → `DiNotApplicable`（呼叫端回 400）。驗不過 DTD 是**我們的錯**（產生器照
+    DTD 的順序組），照樣交檔、記警告、預覽畫面講出來。"""
+    from ...core import official_doc_di as di
+    out = _read_json(_result_path(case_id), "這份草稿")
+    mode = str(out.get("mode") or "")
+    codes = (out.get("inputs") or {}).get("org_codes") or {}
+    try:
+        from ...core import official_doc_sources as ods
+        book, lookup = ods.has_address_book(), ods.exact_org_code
+    except Exception as e:  # noqa: BLE001 — 地址簿讀不到就是沒有代碼
+        logger.warning("official-doc：讀地址簿失敗（%s）：%s", type(e).__name__, e)
+        book, lookup = False, None
+    data, notes = di.build(text, mode, org_codes=codes if isinstance(codes, dict) else {},
+                           lookup=lookup, book_available=book)
+    ok, errors = di.validate(data, mode)
+    if not ok:
+        logger.warning("official-doc：DI 檔沒通過 DTD 檢查（%s）：%s", case_id, "; ".join(errors)[:300])
+    return data, notes, ok, errors, mode
+
+
 @router.post("/export")
 async def export(request: Request):
     """照**目前的文字**（使用者可能改過）匯出。純文字只有草稿本身，不夾任何說明。
@@ -1404,6 +1676,16 @@ async def export(request: Request):
 
     if fmt == "txt":
         data, media = text.encode("utf-8"), "text/plain; charset=utf-8"
+    elif fmt == "di":
+        from ...core import official_doc_di as di
+        try:
+            data, notes, ok, _errs, _mode = await asyncio.to_thread(_di_build, case_id, text)
+        except di.DiNotApplicable as e:
+            raise HTTPException(400, str(e))
+        media = di.MEDIA_TYPE + "; charset=utf-8"
+        headers["Content-Disposition"] = content_disposition(f"{title}-草稿.di")
+        headers["X-Jtdt-Di-Notes"] = str(len(notes))
+        headers["X-Jtdt-Di-Valid"] = "1" if ok else "0"
     elif fmt == "json":
         def _build_json() -> bytes:
             out = _read_json(_result_path(case_id), "這份草稿")
@@ -1434,6 +1716,27 @@ async def export(request: Request):
             _office_bytes, case_id, text, fmt, title, draft_mark, tpl_key, extras)
         headers["X-Jtdt-Template"] = applied
     return Response(content=data, media_type=media, headers=headers)
+
+
+@router.post("/di-preview")
+async def di_preview(request: Request):
+    """匯出預覽：照**目前的文字**產生 DI 檔，回內容（XML）、注意事項與 DTD 檢查結果給檢視器。
+    跟 `/export` 同一支產生器、同一套歸屬檢查 —— 預覽看到的就是下載拿到的那一份。"""
+    from ...core import official_doc_di as di
+    body = await _json_body(request)
+    case_id = str(body.get("case_id") or "").strip()
+    await asyncio.to_thread(_require_case, case_id, request)
+    text = _edit_text(body)
+    if not text.strip():
+        raise HTTPException(400, "沒有可以匯出的內容。")
+    title = _clean_title(str(body.get("title") or ""), 40) or "公文"
+    try:
+        data, notes, ok, errors, mode = await asyncio.to_thread(_di_build, case_id, text)
+    except di.DiNotApplicable as e:
+        raise HTTPException(400, str(e))
+    return {"filename": f"{title}-草稿.di", "mode": mode, "root": di.ROOTS.get(mode, ""),
+            "dtd": di.DTD_FILES.get(mode, ""), "xml": data.decode("utf-8"),
+            "notes": notes, "valid": ok, "errors": errors}
 
 
 def _write_atomic(path: Path, data: bytes) -> None:
@@ -1735,7 +2038,8 @@ async def api_official_doc(request: Request):
     facts, overrides = _parse_facts(body, inputs)
     _require_llm()
     ask = _plain_ask()
-    hits, kb_note = await asyncio.to_thread(_kb_lookup, inputs, _uo.current_user_id(request))
+    hits, kb_note, history_note = await asyncio.to_thread(
+        _refs_lookup, inputs, _uo.current_user_id(request))
     try:
         draft = await asyncio.to_thread(_draft_safely, inputs, facts, overrides, ask,
                                         None, lambda: False, hits)
@@ -1749,4 +2053,5 @@ async def api_official_doc(request: Request):
     pub = draft.to_public()
     return {"mode": pub["mode"], "text": pub["text"], "facts": pub["facts"],
             "issues": pub["issues"], "llm_calls": pub["llm_calls"],
-            "references": pub["references"], "kb_note": kb_note}
+            "references": pub["references"], "kb_note": kb_note, "history_note": history_note,
+            "contact_unplaced": inputs.get("contact_unplaced") or []}

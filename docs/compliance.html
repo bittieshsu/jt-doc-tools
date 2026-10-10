@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Jason Tools 文件工具箱的 ISO/IEC 27001 與 ISO/IEC 42001 合規支援：本工具提供的控制功能，以及導入單位如何使用、在哪裡留下紀錄。">
+<title>合規支援 ISO/IEC 27001 與 42001 | Jason Tools 文件工具箱</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+<script src="lang-switch.js" defer></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" href="index.html#top">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">Jason Tools</div>
+        <div class="brand-sub">文件工具箱</div>
+      </div>
+    </a>
+    <nav class="topnav" id="topnav">
+      <a href="index.html#features" class="nav-link">功能</a>
+      <a href="index.html#install" class="nav-link">安裝</a>
+      <a href="api.html" class="nav-link">API</a>
+      <a href="troubleshooting.html" class="nav-link">疑難排解</a>
+      <select id="langSwitch" class="nav-lang" aria-label="Language"><option value="compliance.html" lang="zh-Hant" selected>繁體中文</option><option value="compliance-en.html" lang="en">English</option><option value="compliance-ja.html" lang="ja">日本語</option></select>
+      <a class="btn btn-outline nav-github" href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.4 3.6 1 .1-.8.4-1.4.8-1.7-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2 0-.4-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg>
+        GitHub
+      </a>
+    </nav>
+    <button class="nav-toggle" id="navToggle" type="button" aria-label="展開選單" aria-controls="topnav" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+  </div>
+</header>
+<main class="container ts-main cp-main">
+<div class="cp-hero"><div class="cp-hero-text">
+<h1 class="ts-h1">合規支援：ISO/IEC 27001 與 ISO/IEC 42001</h1>
+<p class="cp-p">ISO/IEC 27001（資訊安全管理）與 ISO/IEC 42001（人工智慧管理）驗證的對象是<b>組織的管理制度</b>，不是軟體。本文件整理 Jason Tools 文件工具箱（以下稱本工具）已經提供的控制功能，以及導入單位如何使用這些功能、在哪裡留下紀錄，作為建立制度與準備稽核證據時的參考。</p>
+<p class="cp-p">每一項都對照過程式實際的行為；設定位置以管理區的頁面名稱標示。</p>
+</div>
+<svg class="cp-hero-art" viewBox="0 0 240 180" role="img" aria-hidden="true"><rect x="34" y="18" width="110" height="140" rx="12" fill="#eef2ff" stroke="#6366f1" stroke-width="3"/><rect x="52" y="40" width="74" height="8" rx="4" fill="#a5b4fc"/><rect x="52" y="60" width="60" height="6" rx="3" fill="#c7d2fe"/><rect x="52" y="76" width="68" height="6" rx="3" fill="#c7d2fe"/><rect x="52" y="92" width="50" height="6" rx="3" fill="#c7d2fe"/><path d="M52 116l7 7 13-14" fill="none" stroke="#10b981" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="80" y="113" width="40" height="6" rx="3" fill="#c7d2fe"/><path d="M168 52c14 6 28 8 40 8v34c0 26-18 44-40 54-22-10-40-28-40-54V60c12 0 26-2 40-8z" fill="#4f46e5" stroke="#312e81" stroke-width="3" stroke-linejoin="round"/><path d="M152 98l11 11 21-23" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="150" y="128" width="62" height="40" rx="9" fill="#fff" stroke="#f59e0b" stroke-width="3"/><text x="181" y="154" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#b45309">AI</text><path d="M160 128v-6M172 128v-6M190 128v-6M202 128v-6M160 168v6M172 168v6M190 168v6M202 168v6" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/></svg>
+</div>
+<div class="ts-toc cp-toc"><a href="#cp1"><svg class="cp-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>一、ISO/IEC 27001：資訊安全</a><a href="#cp2"><svg class="cp-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>二、ISO/IEC 42001：人工智慧</a><a href="#cp3"><svg class="cp-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>三、導入時的檢查清單</a></div>
+<h2 class="cp-h2" id="cp1"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>一、ISO/IEC 27001：資訊安全</h2>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>1. 身分認證</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本工具提供</th><th>導入單位的做法與紀錄</th></tr></thead><tbody><tr><td>本機帳號、LDAP、Active Directory、OIDC 與 SAML 單一登入（可與本機帳號並存）</td><td>在「認證設定」與「SSO 單一登入」接上公司目錄或身分提供者，帳號生命週期由目錄統一管理</td></tr><tr><td>兩步驟驗證（TOTP）；稽核員以帳號密碼登入時一律要求</td><td>依政策要求使用者啟用；稽核員帳號另外建立並啟用兩步驟驗證</td></tr><tr><td>登入失敗鎖定：同一帳號 10 分鐘內失敗 5 次、或同一來源 IP 失敗 20 次，鎖定 15 分鐘（管理員可調整）</td><td>鎖定與解鎖都寫入稽核記錄（<code>login_fail</code>、<code>account_locked</code>、<code>user_unlock</code>）</td></tr><tr><td>登入有效期 7 天，勾選「記住我」為 30 天；管理員可以讓某個帳號的所有登入立即失效</td><td>依政策調整有效期；帳號疑似外洩時先讓所有登入失效</td></tr></tbody></table></div>
+<figure class="cp-fig"><img src="screenshots/users-multi-realm.png" alt="使用者管理：本機、LDAP / AD 與單一登入的帳號並存，標出各自的來源" loading="lazy"><figcaption>使用者管理：本機、LDAP / AD 與單一登入的帳號並存，標出各自的來源</figcaption></figure>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>2. 帳號生命週期</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本工具提供</th><th>導入單位的做法與紀錄</th></tr></thead><tbody><tr><td>停用帳號時，該帳號所有已登入的工作階段立即失效</td><td>離職或調職流程中停用帳號；稽核記錄有 <code>user_update</code></td></tr><tr><td>啟用認證時，帳號被停用或刪除後，屬於該帳號的 API Token 一律被拒</td><td>不必另外撤銷 Token 也不會留下可用的存取</td></tr><tr><td>目錄同步可自動停用目錄中已停用或已移除的帳號（預設關閉；單次異動超過 20% 時整批中止，避免誤停）</td><td>在「群組管理」的排程目錄同步開啟；每次執行記錄 <code>user_auto_disable</code></td></tr><tr><td>刪除帳號時一併清除該帳號的工作區檔案</td><td>稽核記錄有 <code>user_delete</code></td></tr></tbody></table></div>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>3. 存取控制與職責分離</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本工具提供</th><th>導入單位的做法與紀錄</th></tr></thead><tbody><tr><td>以角色授權每一支工具，可指派給個人、群組或 AD 組織單位（OU）；內建管理員、一般使用者、文管、財務、業務、法務資安等角色</td><td>依職務設計角色；「權限矩陣」頁可檢視誰能用哪些工具</td></tr><tr><td>稽核員角色：只能查看稽核記錄與歷史紀錄，不能使用任何工具；指派稽核員時自動移除其他角色</td><td>稽核與管理由不同人員擔任</td></tr><tr><td>表單填寫、用印簽名、浮水印的歷史檔案與上傳記錄只有稽核員能查看，管理員不能查看</td><td>稽核員每次查看都寫入稽核記錄（<code>auditor_view</code>）</td></tr><tr><td>管理員讀取其他使用者的檔案、作業結果或公文案件時寫入稽核記錄（<code>admin_file_override</code>）</td><td>定期檢視這類紀錄</td></tr><tr><td>角色與權限的每次變更都寫入稽核記錄（<code>perm_change</code>、<code>role_*</code>、<code>user_update</code> 等）</td><td>存取權限審查時以「設定備份匯出」留存當時的角色與權限設定</td></tr></tbody></table></div>
+<figure class="cp-fig"><img src="screenshots/premissions.png" alt="權限矩陣：依角色、群組或組織單位指派工具權限" loading="lazy"><figcaption>權限矩陣：依角色、群組或組織單位指派工具權限</figcaption></figure>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg></span>4. 使用者資料隔離</h3>
+<p class="cp-p">上傳的檔案、背景作業與結果、我的工作區、公文撰擬案件、會議摘要與逐字稿都記錄擁有者。其他帳號無法查看、下載、取消或修改；以編號猜測他人資料一律被拒。這些規則有自動化測試逐項驗證（見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/TEST_PLAN_SECURITY.md" target="_blank" rel="noopener"><code>TEST_PLAN_SECURITY.md</code></a>）。</p>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></span>5. 稽核記錄</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本工具提供</th><th>導入單位的做法與紀錄</th></tr></thead><tbody><tr><td>記錄登入成功與失敗、鎖定、登出、帳號與群組與角色變更、權限變更、設定變更、工具使用、下載成品、管理員讀取他人檔案、稽核員查看、資料庫備份與毀損、保留期清理</td><td>「稽核記錄」頁可依使用者、事件類型、時間篩選並匯出 CSV</td></tr><tr><td>工具使用只記錄檔名、大小、操作與結果，<b>不記錄檔案內容</b></td><td>符合紀錄最小化</td></tr><tr><td>下載成品（我的作業、工具結果頁、工作區的下載）寫入 <code>file_download</code>：帳號、來源 IP、檔名、大小。同一人同一份檔案五分鐘內只記一筆，預覽與縮圖不記</td><td>查檔案何時、由誰帶離系統時，以事件類型 <code>file_download</code> 篩選</td></tr><tr><td>以 API Token 呼叫時，工具使用與下載紀錄會另外寫出 Token 名稱（<code>via: api_token</code>），帳號記為 Token 的持有者</td><td>每張 Token 指派給專責帳號，並取容易辨識的名稱</td></tr><tr><td>網頁上沒有修改或刪除稽核記錄的功能，只依保留期限自動清理；調整保留期限本身也會留下紀錄</td><td>依政策設定保留期限（預設 90 天）</td></tr><tr><td>轉送到 SIEM：syslog（RFC 5424）、CEF、GELF，可同時設定多個目的地；送不出去時自動重試，並在本機寫一筆 <code>audit_forward_failed</code></td><td>在「記錄轉送」設定，長期留存交由 SIEM</td></tr></tbody></table></div>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>6. 資料留存與清除</h3>
+<p class="cp-p">下列資料有可設定的保留期限（「檔案保留 / 清理」頁），每 6 小時自動清理一次，管理員也可以立即清理：</p>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>資料</th><th>預設保留期限</th></tr></thead><tbody><tr><td>暫存上傳檔與處理中的產出</td><td>2 小時</td></tr><tr><td>背景作業結果</td><td>24 小時</td></tr><tr><td>作業紀錄</td><td>30 天</td></tr><tr><td>我的工作區（在「工作區設定」調整）</td><td>24 小時</td></tr><tr><td>表單填寫、用印簽名、浮水印歷史</td><td>各 365 天</td></tr><tr><td>公文撰擬案件（已刪除的從刪除日起算）</td><td>365 天</td></tr><tr><td>會議錄音轉逐字稿上傳的原始錄音（還在辨識中的不刪）</td><td>30 天</td></tr><tr><td>乘車證明整理</td><td>365 天</td></tr><tr><td>稽核記錄</td><td>90 天</td></tr></tbody></table></div>
+<p class="cp-p">「系統狀態」頁列出每位使用者目前佔用的檔案數與容量，可以展開看各類別的明細。</p>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg></span>7. 機密設定的保護</h3>
+<p class="cp-p">LLM 伺服器與嵌入服務的金鑰、語音服務的金鑰、OIDC 用戶端密碼與 SAML 私鑰、通知管道的密碼與權杖，都以加密方式存放（Fernet），金鑰檔僅限服務帳號讀取。</p>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></span>8. 文件處理的隔離</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本工具提供</th></tr></thead><tbody><tr><td>Office 轉檔每次使用全新的拋棄式設定檔，並關閉巨集執行</td></tr><tr><td>轉檔有時間上限，逾時連同所有子行程一起終止；以較低的執行優先權與限定的 CPU 核心執行，不影響網頁回應</td></tr><tr><td>PDF 隱藏內容掃描在獨立的行程中解析</td></tr><tr><td>毀損的檔案一律回覆錯誤訊息，不會造成伺服器錯誤</td></tr><tr><td>Linux 安裝以專用的服務帳號執行，並套用 systemd 的保護設定（<code>NoNewPrivileges</code>、<code>PrivateTmp</code>、<code>ProtectSystem=strict</code>、<code>ProtectHome</code>），程式目錄對服務本身唯讀</td></tr></tbody></table></div>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="m1 1 22 22"/></svg></span>9. 敏感資料處理工具</h3>
+<ul class="cp-list">
+<li><b>文件去識別化</b>：編修模式會連同遮蔽範圍內的圖片像素一起清除，產出的檔案無法還原被遮蔽的內容（掃描檔與 OCR 後的檔案也一樣）。</li>
+<li><b>文字去識別化</b>、<b>中繼資料清除</b>、<b>隱藏內容掃描</b>、<b>PDF 密碼保護</b>。</li>
+</ul>
+<figure class="cp-fig"><img src="screenshots/deident-1.png" alt="文件去識別化：偵測到的個資逐項列出，確認後再編修" loading="lazy"><figcaption>文件去識別化：偵測到的個資逐項列出，確認後再編修</figcaption></figure>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg></span>10. 備份與復原</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本工具提供</th><th>導入單位的做法與紀錄</th></tr></thead><tbody><tr><td>使用者與權限、稽核記錄兩個資料庫每天自動熱備份，保留 7 份</td><td>將 <code>db_backups</code> 複製到另一台主機或備份系統留存</td></tr><tr><td>命令列工具 <code>jtdt db-check</code>、<code>jtdt db-backup</code>、<code>jtdt db-restore</code>：網頁無法使用時也能檢查與還原</td><td>定期演練還原並記錄結果</td></tr><tr><td>以 <code>jtdt update</code> 升級時，先檢查磁碟空間並備份資料目錄（保留 3 份）；升級失敗時自動還原程式版本</td><td>升級紀錄以 CHANGELOG 對照</td></tr><tr><td>「設定備份 / 匯入」：全站設定打包匯出，可在另一台主機匯入</td><td>搬遷與重建時使用（步驟見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener"><code>OPS.md</code></a>）</td></tr></tbody></table></div>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>11. 網頁與傳輸安全</h3>
+<ul class="cp-list">
+<li>所有寫入操作都要求 CSRF 權杖；內容安全政策（CSP）以每次請求產生的 nonce 限制腳本與樣式來源。</li>
+<li>經 HTTPS 連線時送出 HSTS；登入用的 cookie 標示 <code>HttpOnly</code>，經 HTTPS 連線時另外標示 <code>Secure</code>。</li>
+<li>部署說明建議以反向代理提供 HTTPS，服務本身只綁本機（見 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/OPS.md" target="_blank" rel="noopener"><code>OPS.md</code></a>）。</li>
+</ul>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg></span>12. 安全開發與測試</h3>
+<ul class="cp-list">
+<li>每次發行前執行 OWASP ZAP 掃描（未登入與已登入），高、中、低風險項目修正為 0 才發行。</li>
+<li>以 bandit 做靜態掃描，並有 OWASP Top 10 回歸測試；資安測試項目整理在 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/TEST_PLAN_SECURITY.md" target="_blank" rel="noopener"><code>TEST_PLAN_SECURITY.md</code></a>。</li>
+<li>每一版的變更記錄在 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener"><code>CHANGELOG.md</code></a>。</li>
+</ul>
+<h2 class="cp-h2" id="cp2"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></span>二、ISO/IEC 42001：人工智慧</h2>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>1. AI 功能清冊</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>本工具提供</th><th>導入單位的做法與紀錄</th></tr></thead><tbody><tr><td>LLM 加值功能<b>預設關閉</b>，由管理員在「LLM 設定」啟用</td><td>以「LLM 設定」頁作為 AI 功能清冊，記錄啟用的工具、模型與伺服器</td></tr><tr><td>會呼叫 LLM 的工具都列在「LLM 設定」：逐句翻譯、文件翻譯、擷取文字（段落重排）、表單自動填寫（校驗）、文件與文字去識別化（補偵測）、會議摘要、公文撰擬、字數統計、註解整理、文件差異比對、送件前檢核、OCR 文字辨識、電子發票</td><td>依用途核准；不需要的工具不啟用</td></tr><tr><td>每支工具可指定使用哪一台 LLM 伺服器；指定的伺服器不可用時直接停止，<b>不會改送到其他伺服器</b></td><td>機密等級高的工具指定地端伺服器</td></tr><tr><td>OCR 預設在本機辨識（EasyOCR）；另外架設的 GPU OCR 伺服器為選用，預設關閉</td><td>啟用前確認伺服器位置</td></tr><tr><td>會議錄音轉逐字稿使用另外架設的語音服務：對方以 2 小時內有效的簽章網址取得錄音，逐字稿取回並存檔後通知對方刪除（最晚 24 小時）</td><td>語音服務的位置與留存方式列入資料流紀錄</td></tr></tbody></table></div>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>2. 降低 AI 產出錯誤的機制</h3>
+<div class="cp-table-wrap"><table class="cp-table"><thead><tr><th>功能</th><th>本工具提供</th></tr></thead><tbody><tr><td>公文撰擬</td><td>格式由程式排定，模型只寫內容；自動檢查草稿裡的金額、數量、日期、時間、法規名稱、條號、文號與核准狀態，原文找不到依據的標出來；缺少的資料標成〔待補〕；參考資料標示用途與出處，只有「業務依據」算草稿的依據；每次修改都存成新版本</td></tr><tr><td>會議摘要</td><td>每一條決議、待辦、風險都要指回逐字稿的段落，指不回去的不列出；摘要只根據已驗證的項目撰寫，並檢查數字與英文詞在原文裡是否出現</td></tr><tr><td>翻譯</td><td>原文與譯文逐句或並排對照，方便覆核</td></tr><tr><td>OCR 校正</td><td>逐行對齊比對，行數或字數差太多的行不套用模型的修正</td></tr><tr><td>提示詞注入</td><td>公文撰擬在送給模型前移除夾帶在文件裡、寫給 AI 的指令並提醒使用者；公文撰擬與會議摘要的提示把文件內容放在資料區，並聲明那是資料不是指令</td></tr></tbody></table></div>
+<figure class="cp-fig"><img src="screenshots/official-doc.png" alt="公文撰擬：草稿旁邊列出檢查結果與參考資料，找不到依據的地方會標出來" loading="lazy"><figcaption>公文撰擬：草稿旁邊列出檢查結果與參考資料，找不到依據的地方會標出來</figcaption></figure>
+<h3 class="cp-h3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg></span>3. 導入單位的做法</h3>
+<ul class="cp-list">
+<li>訂定 AI 使用政策：哪些工具可以用、哪一類文件可以送到哪一台模型伺服器。</li>
+<li>把本工具的檢查結果納入人工覆核：公文撰擬的「檢查結果」、會議摘要的段落引用、翻譯的對照。正式文件由承辦人確認後才使用。</li>
+<li>換模型或升級版本前，用自己的代表性文件重跑一次並留存結果，作為變更紀錄。</li>
+<li>依用途評估錯誤可能影響的對象（文件的收受者、個資當事人、員工），列入 AI 影響評估。</li>
+</ul>
+<h2 class="cp-h2" id="cp3"><span class="cp-h-ic"><svg class="cp-ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg></span>三、導入時的檢查清單</h2>
+<ol class="cp-list">
+<li>啟用認證，接上公司目錄或單一登入；另外建立稽核員帳號並啟用兩步驟驗證。</li>
+<li>依職務設定角色與工具權限；以「設定備份匯出」留存每次存取審查時的設定。</li>
+<li>設定稽核記錄轉送到 SIEM，並依政策設定各類資料的保留期限。</li>
+<li>以反向代理提供 HTTPS，服務本身只綁本機。</li>
+<li>將資料庫備份與設定備份複製到另一台主機留存，定期演練還原。</li>
+<li>啟用 LLM 前決定每支工具使用的伺服器，以「LLM 設定」頁作為 AI 功能清冊。</li>
+<li>升級時留存 <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener"><code>CHANGELOG.md</code></a> 對應版本的說明，作為變更管理紀錄。</li>
+</ol>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-col">
+      <div class="footer-brand">Jason Tools 文件工具箱</div>
+      <p class="footer-tag">PDF / Office 整合式文件處理平台：不上雲，資料留在自己手中。</p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">連結</div>
+      <a href="index.html">介紹網站</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">原始碼庫</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+      <a href="troubleshooting.html">安裝與升級疑難排解</a>
+      <a href="compliance.html">合規支援（ISO 27001 / 42001）</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools/issues" target="_blank" rel="noopener">回報問題</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">作者</div>
+      <p>
+        <strong>Jason Cheng</strong><br>
+        <a href="https://www.jason.tools" target="_blank" rel="noopener">Jason Tools</a>
+      </p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">授權</div>
+      <p>GNU Affero General Public License v3.0</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">
+      © 2026 Jason Tools · Built with HTML & CSS, hosted on GitHub Pages
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

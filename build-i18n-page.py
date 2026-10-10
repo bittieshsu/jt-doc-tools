@@ -294,7 +294,7 @@ def build(src: Path, cat_path: Path, dst: Path, lang: str = "en") -> int:
 
 #: 站內頁面。**同語言的頁要連同語言的頁** —— 原本英文版的導覽連的是
 #: `api.html`（中文頁），讀者一點就掉回中文（使用者 2026-09-14 指出）。
-_SITE_PAGES = ("index", "api", "troubleshooting")
+_SITE_PAGES = ("index", "api", "troubleshooting", "compliance")
 
 
 def _rewrite_internal_links(html: str, lang: str) -> str:

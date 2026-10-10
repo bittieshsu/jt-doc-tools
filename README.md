@@ -1,6 +1,6 @@
 **繁體中文** ｜ [English](README_en.md) ｜ [日本語](README_ja.md)
 
-# Jason Tools 文件工具箱 v1.16.67
+# Jason Tools 文件工具箱 v1.16.71
 
 > ### ⚠ 2026-09-13 之前用 git 安裝的，這一版升級前要先跑一行
 >
@@ -118,7 +118,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 - **字數統計** [需 OxOffice/LibreOffice] — 表格 + 圖表 + LLM 摘要；收 PDF / 辦公文件 / 純文字
 - **會議摘要** [需 OxOffice/LibreOffice] — 逐字稿（.vtt / .srt / .json / .txt / .docx / .odt）整理成摘要、決議、待辦、風險與章節；**每一條都指得回第幾段、誰講的**，點下去就跳過去。有時間戳記時另外算發言佔比。匯出 PDF / Word / ODF 時需引擎
 - **會議錄音轉逐字稿** — 錄音或錄影轉成**帶時間與發言者**的逐字稿，可一鍵交給「會議摘要」；辨識在語音服務（JTLW）那側跑，**要先在管理區設定好才會出現**
-- **公文撰擬**（Beta）[需 OxOffice/LibreOffice] — 白話需求寫成「簽」（主旨 / 說明 / 擬辦）或「函」（稱謂與期望語依行文關係決定），或依來文與你的辦理方向擬「簽辦意見」；**格式由程式排、內容由 LLM 寫**，金額、日期、法規、條號、文號與「業經核准」這類說法都拿去跟你給的內容比，找不到依據的標出來，沒提供的標〔待補〕。可以逐段改寫、留版本、在**歷史案件**重新打開以前寫的、參考管理員建的**公文知識庫**（只有「業務依據」算依據），匯出時可套用政府資料開放平臺的公文範本（管理員下載後才有）。**檢查驗不到語意**（因果、結論），草稿送出前一定要人工核對。產出一律是繁體中文的臺灣公文格式，英文 / 日文介面也能用。匯出純文字 / ODT（不需引擎）/ Word / PDF（Word 與 PDF 需引擎）
+- **公文撰擬**（Beta）[需 OxOffice/LibreOffice] — 白話需求寫成「簽」（主旨 / 說明 / 擬辦）或「函」（稱謂與期望語依行文關係決定），或依來文與你的辦理方向擬「簽辦意見」；**格式由程式排、內容由 LLM 寫**，金額、日期、法規、條號、文號與「業經核准」這類說法都拿去跟你給的內容比，找不到依據的標出來，沒提供的標〔待補〕。可以逐段改寫、留版本、在**歷史案件**重新打開以前寫的、參考管理員建的**公文知識庫**（只有「業務依據」算依據），匯出時可套用政府資料開放平臺的公文範本（管理員下載後才有）。**檢查驗不到語意**（因果、結論），草稿送出前一定要人工核對。產出一律是繁體中文的臺灣公文格式，英文 / 日文介面也能用。匯出純文字 / ODT（不需引擎）/ Word / PDF（Word 與 PDF 需引擎），也可以匯出電子公文 DI 檔（XML，匯入機關的公文系統用；受文者等機關代碼從地址簿帶入）
 - **註解整理 / 清除 / 平面化**
 - **OCR 文字辨識** — 掃描 PDF / 圖片跑 OCR 後變可搜尋、可滑鼠選取複製（同 macOS 預覽程式 Live Text 概念）；雙引擎（**EasyOCR** 預設，中日韓辨識準確度高；**Tesseract** 備援），可選 LLM 校正 typo。**支援外部 GPU 識別伺服器**（DGX Spark / H100 / 4090 等），管理介面下載 `install.sh` 即可一鍵部署，每頁辨識時間從 CPU 上的 8-15 秒降到 GPU 上的 0.3-0.8 秒（**速度 10× 以上**）。
 - **送件前檢核** — 批次驗收：頁面尺寸、字型嵌入、欄位完整、敏感資料殘留、隱藏內容
@@ -286,6 +286,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 | **[API.md](API.md)**（[線上網頁版](https://jasoncheng7115.github.io/jt-doc-tools/api.html)）| REST API:Bearer token、endpoint 一覽、上傳格式、回傳格式、錯誤碼、curl / Python 範例、Job 流程 |
 | **[LLM.md](LLM.md)** | LLM AI 加值功能（預設關閉）：14 個工具如何用 LLM、效果範例、支援的 LLM 伺服器與閘道（Ollama / LiteLLM / vLLM…）、關閉思考與並行設定 |
 | **[SECURITY.md](SECURITY.md)** | 資安政策、OWASP Top 10 (2025) 對照、漏洞回報管道、GitHub native scan 整合 |
+| **[COMPLIANCE.md](COMPLIANCE.md)**（[線上網頁版](https://jasoncheng7115.github.io/jt-doc-tools/compliance.html)）| 合規支援：ISO/IEC 27001 與 ISO/IEC 42001，本工具提供的控制功能、導入單位怎麼使用、在哪裡留下紀錄 |
 | **[CHANGELOG.md](CHANGELOG.md)** | 完整更新記錄 |
 | **[TEST_PLAN.md](TEST_PLAN.md)** | 測試清單、發版前檢查 |
 | **[OFFLINE.md](OFFLINE.md)** | 封閉網路 / 離線安裝（用 Docker 映像檔帶進內網、走公司 PyPI 代理） |

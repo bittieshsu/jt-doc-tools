@@ -99,7 +99,11 @@
   .gv-up-note { margin-top: 6px; font-size: 12.5px; color: #475569; overflow-wrap: anywhere; }
   .gv-up-note.gv-t-ok { color: #166534; }
   .gv-up-note.gv-t-err { color: #991b1b; }
-  .gv-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .gv-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; align-items: center; }
+  .gv-pending { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #92400e;
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius); padding: 4px 10px; }
+  .gv-pending[hidden] { display: none; }
+  .gv-pending svg { flex: 0 0 auto; color: #d97706; }
   .gv-picker { border-top: 1px solid #eef2f7; margin-top: 10px; padding-top: 10px; }
   .gv-h3 { font-size: 14px; margin: 0 0 6px; }
   .gv-searchbar { display: flex; gap: 8px; align-items: center; }
@@ -168,7 +172,7 @@
   <ol class="gv-steps">
     <li>{{ tr('按「下載並匯入」：取得最新的清單，並匯入勾選的項目（已經預先勾好建議的；打開這一頁不會連外）。') }}</li>
     <li>{{ tr('要別的法規或規則：在「要匯入的項目」勾選、按「儲存選取」，再按一次「下載並匯入」。') }}</li>
-    <li>{{ tr('完成後在「公文撰擬」勾「參考公文知識庫」就查得到出處。') }}</li>
+    <li>{{ tr('完成後在「公文撰擬」勾「參考公文知識庫」：產生草稿時會用需求敘述自動查詢，不用另外輸入關鍵字。') }}</li>
   </ol>
   <details class="gv-more">
     <summary>{{ tr('更多說明') }}</summary>
@@ -266,7 +270,7 @@
     if (r.status === 409) {
       let j = null;
       try { j = await r.clone().json(); } catch (e) { j = null; }
-      if (j && j.need_confirm) return {needConfirm: true, detail: j.detail};
+      if (j && j.need_confirm) return {needConfirm: true, detail: j.detail, count: j.count, chars: j.chars};
     }
     if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));
     return r.json();
@@ -326,7 +330,7 @@
 
   async function start(gid, action) {
     if (DIRTY[gid] && (action === 'import' || action === 'update' || action === 'install')) {
-      const ok = await saveSelection(gid);
+      const ok = await saveSelection(gid, false, true);
       if (!ok) return;
     }
     try {
@@ -346,20 +350,46 @@
     DIRTY[gid] = false;
     return j;
   }
-  async function saveSelection(gid, confirmed) {
+  // quiet：「下載並匯入」與上傳之前順手存的那一次 —— 接著就要匯入了，不必再問
+  async function saveSelection(gid, confirmed, quiet) {
     const keys = [...(SEL[gid] || new Map()).keys()];
     try {
       const j = await post(API + '/' + encodeURIComponent(gid) + '/selection', {keys: keys, confirm: !!confirmed});
       if (j.needConfirm) {
-        const ok = await window.showConfirm(tr(j.detail), {title: tr('選取的量很大'), okText: tr('確定')});
+        // 句子在這裡組（伺服器的句子帶著「1,338」這種有千分位的數字，英日介面查不到譯文）
+        const msg = tr('選了 {0} 項（約 {1} 字），量很大：檢索時會查到很多不相干的條文，第一次匯入與建索引也要比較久。確定要這樣選嗎？')
+          .replace('{0}', fmtNum(j.count)).replace('{1}', fmtNum(j.chars));
+        const ok = await window.showConfirm(msg, {title: tr('選取的量很大'), okText: tr('確定')});
         if (!ok) return false;
-        return saveSelection(gid, true);
+        return saveSelection(gid, true, quiet);
       }
       DIRTY[gid] = false;
-      window.showToast(tr('已儲存選取的項目'), 'ok');
       await refresh();
+      const g = ST && ST.groups.find((x) => x.id === gid);
+      const pending = (g && g.pending_count) || 0;
+      if (quiet || !pending || (ST && ST.running)) {
+        window.showToast(tr('已儲存選取的項目'), 'ok');
+        return true;
+      }
+      // 儲存選取只是記下勾了哪些，不會匯入（2026-10-09 使用者：要提示再按「下載並匯入」才會有）
+      const go = await window.showConfirm(
+        tr('勾選的項目要按「下載並匯入」才會匯入公文知識庫，目前還有 {0} 項沒有匯入。現在開始嗎？').replace('{0}', fmtNum(pending)),
+        {title: tr('已儲存選取的項目'), okText: tr('下載並匯入'), cancelText: tr('稍後再匯入')});
+      if (go) await start(gid, 'update');
       return true;
     } catch (e) { window.showAlert(e.message, {kind: 'error'}); return false; }
+  }
+
+  // 按鈕旁一直留著：還有勾了沒匯入的（確認框按了「稍後」、或之前存的）
+  function pendingNote(g) {
+    const n = el('span', 'gv-pending');
+    n.hidden = !(g.pending_count && !(ST && ST.running));
+    if (!n.hidden) {
+      const s = ic('warn');
+      if (s) n.appendChild(s);
+      n.appendChild(el('span', null, tr('還有 {0} 項勾了但還沒匯入，按「下載並匯入」才會匯入。').replace('{0}', fmtNum(g.pending_count))));
+    }
+    return n;
   }
 
   function itemRow(gid, it, onToggle) {
@@ -400,7 +430,8 @@
   function view(gid) {
     return VIEW[gid] || (VIEW[gid] = {mode: 'all', q: '', level: '', offset: 0, total: 0, levels: {}, tok: 0});
   }
-  function maxSel() { return (ST && ST.limits && ST.limits.max_selected) || 1000; }
+  function maxSel() { return (ST && ST.limits && ST.limits.max_selected) || 3000; }
+  function maxChars() { return (ST && ST.limits && ST.limits.max_chars) || 8000000; }
   function toggler(gid, card) {
     return (x, on, cb) => {
       const m = SEL[gid] || (SEL[gid] = new Map());
@@ -550,24 +581,31 @@
       if (!on && m.size) { m.clear(); DIRTY[gid] = true; renderSelected(gid, card); }
       return;
     }
-    if (on && v.total > maxSel()) {
-      window.showAlert(tr('目前的範圍有 {0} 項，超過一次最多能選的 {1} 項。請先搜尋或用類別篩選縮小範圍。')
-        .replace('{0}', fmtNum(v.total)).replace('{1}', fmtNum(maxSel())), {kind: 'error'});
-      return;
-    }
     const qs = new URLSearchParams({keys_only: '1', q: v.q, level: v.level});
     let j;
     try { j = await call(API + '/' + encodeURIComponent(gid) + '/search?' + qs.toString()); }
     catch (e) { window.showAlert(e.message, {kind: 'error'}); return; }
     if (on) {
-      const items = j.items || [];
-      const add = items.filter((it) => !m.has(it.key)).length;
-      if (m.size + add > maxSel()) {
-        window.showAlert(tr('最多只能選 {0} 項').replace('{0}', maxSel()), {kind: 'error'});
+      // 已廢止的不跟著全選：匯入之後也是停用、查不到，只是白白下載與建索引（要的話自己勾）
+      // （2026-10-09 使用者：「要全選只能 1000，可是一筆一筆選很痛苦」）
+      const fresh = (j.items || []).filter((it) => !m.has(it.key));
+      const add = fresh.filter((it) => !it.abolished);
+      const skipped = fresh.length - add.length;
+      let chars = 0;
+      m.forEach((it) => { chars += it.chars || 0; });
+      add.forEach((it) => { chars += it.chars || 0; });
+      if (m.size + add.length > maxSel() || chars > maxChars()) {
+        window.showAlert(tr('全選之後會有 {0} 項、約 {1} 字，超過一次最多能選的 {2} 項、{3} 字。請先搜尋或用類別篩選縮小範圍。')
+          .replace('{0}', fmtNum(m.size + add.length)).replace('{1}', fmtNum(chars))
+          .replace('{2}', fmtNum(maxSel())).replace('{3}', fmtNum(maxChars())), {kind: 'error'});
         return;
       }
-      items.forEach((it) => { if (!m.has(it.key)) m.set(it.key, it); });
-      if (add) DIRTY[gid] = true;
+      add.forEach((it) => m.set(it.key, it));
+      if (add.length) DIRTY[gid] = true;
+      if (skipped) {
+        window.showToast(tr('已全選 {0} 項；{1} 項已廢止的沒有勾（匯入後也是停用、查不到），要的話可以自己勾。')
+          .replace('{0}', fmtNum(add.length)).replace('{1}', fmtNum(skipped)), 'ok');
+      }
     } else {
       let n = 0;
       (j.keys || []).forEach((k) => { if (m.delete(k)) n += 1; });
@@ -706,6 +744,8 @@
       card.querySelectorAll('.gv-actions button[data-act]').forEach((b) => {
         b.disabled = busy;
       });
+      const pn = card.querySelector('.gv-pending');
+      if (pn) pn.replaceWith(pendingNote(g));
     });
   }
 
@@ -806,7 +846,7 @@
       }
       say('');
       // 上傳之後會接著匯入勾選的項目：畫面上改了還沒存的勾選先存起來（同「下載並匯入」）
-      if (DIRTY[g.id] && !(await saveSelection(g.id))) return;
+      if (DIRTY[g.id] && !(await saveSelection(g.id, false, true))) return;
       const fd = new FormData();
       fd.append('file', file);
       let r;
@@ -852,6 +892,7 @@
     b1.dataset.act = 'update';
     b1.disabled = !!(ST && ST.running);
     acts.appendChild(b1);
+    acts.appendChild(pendingNote(g));
     card.appendChild(acts);
 
     const pick = el('div', 'gv-picker');

@@ -222,7 +222,7 @@ def page_extras(raw: Any) -> PageExtras:
         raise ValueError(f"「分層負責決行」超過 {MAX_DELEGATE_CHARS} 字的上限。")
     return PageExtras(
         page_numbers=flag("page_numbers"), binding_line=flag("binding_line"),
-        copy_mark=choice("copy_mark", COPY_MARKS, "正本／副本標示"),
+        copy_mark=choice("copy_mark", COPY_MARKS, "正本/副本標示"),
         send_method=choice("send_method", SEND_METHODS, "發文方式"),
         delegate=delegate,
         receiver_address=text("receiver_address", MAX_ADDRESS_CHARS, "受文者地址"),
@@ -1438,7 +1438,7 @@ def build_from_template(text: str, template: bytes, *, title: str = "",
                 ff.set("{%s}font-family" % _ODF_NS["svg"], _font_family_attr(font_family))
     _swap_fonts(root)
     _swap_fonts(sroot)
-    _add_template_page_extras(sroot, draft_mark, extras)
+    _add_template_page_extras(sroot, draft_mark, extras, body_fonts=_template_body_fonts(root))
 
     # ---- 中繼資料與縮圖：**範本的不跟出去**。機關範本的 meta.xml 常帶著範本作者、
     # 原機關名稱；縮圖是範本範例內容的畫面（檔案總管會顯示成「臺北市政府 函」那一頁）。
@@ -1532,7 +1532,38 @@ def _to_cm(v: str) -> Optional[float]:
     return {"cm": n, "mm": n / 10, "in": n * 2.54, "pt": n * 2.54 / 72}[m.group(2)]
 
 
-def _add_template_page_extras(sroot, draft_mark: bool, extras: PageExtras) -> None:
+def _template_body_fonts(root) -> dict:
+    """範本本文用的字型（內文段落最常用的那一個；西文與中文各一）。
+
+    官方「簽」「函」範本的預設樣式**沒有任何字型**，字型是寫在每一段本文的自動樣式上
+    （「標楷體」）。我們加上去的「草稿」、裝訂線的字、頁碼要跟本文同一個字型 ——
+    跟著預設樣式走的話，轉 PDF 時會退到 Office 自己的預設黑體（2026-10-09 使用者截圖：
+    「左邊裝訂線跟右上草稿兩字的字型是不是正確」）。回 `{"western": 名稱, "asian": 名稱,
+    "faces": {名稱: font-face 元素}}`；範本沒寫字型就回空的（照舊跟著預設）。"""
+    import collections
+    S = _ODF_NS["style"]
+    faces = {ff.get("{%s}name" % S): ff for ff in root.iter("{%s}font-face" % S) if ff.get("{%s}name" % S)}
+    cnt = {"western": collections.Counter(), "asian": collections.Counter()}
+    for tp in root.iter("{%s}text-properties" % S):
+        w = tp.get("{%s}font-name" % S)
+        a = tp.get("{%s}font-name-asian" % S)
+        if w in faces:
+            cnt["western"][w] += 1
+        if a in faces:
+            cnt["asian"][a] += 1
+    out: dict = {"faces": {}}
+    for k in ("western", "asian"):
+        if cnt[k]:
+            name = cnt[k].most_common(1)[0][0]
+            out[k] = name
+            out["faces"][name] = faces[name]
+    if "asian" in out and "western" not in out:
+        out["western"] = out["asian"]
+    return out
+
+
+def _add_template_page_extras(sroot, draft_mark: bool, extras: PageExtras,
+                              body_fonts: Optional[dict] = None) -> None:
     """範本的頁面設定加上頁首（「草稿」、裝訂線、正本／副本、發文方式）與頁尾（頁碼）。
 
     **只在頁面設定裡加 `header-style` / `footer-style` 才會畫出來** —— 第一版只在 master-page
@@ -1540,6 +1571,7 @@ def _add_template_page_extras(sroot, draft_mark: bool, extras: PageExtras) -> No
     （算圖看得到：頁面上沒有「草稿」）。頁首、頁尾放在上下緣的邊界裡（跟內建版面同一套），
     本文起點與底線不跟著移；邊界不夠放就照樣加（本文往內縮一點，總比沒有好）。
     範本自己已經有頁首（或頁尾）的，那一邊不動 —— 不蓋掉機關自己的版面。"""
+    import copy
     from lxml import etree
     S, FO = _ODF_NS["style"], _ODF_NS["fo"]
     need_header = draft_mark or extras.header_items
@@ -1573,10 +1605,32 @@ def _add_template_page_extras(sroot, draft_mark: bool, extras: PageExtras) -> No
         '<style:text-properties fo:font-size="10pt" fo:color="#888888"/></style:style>'
         f'</office:styles><office:automatic-styles>{_furniture_styles()}</office:automatic-styles></x>',
         _safe_parser())
-    # 範本沒有宣告我們的字型（OD_Font）—— 拿掉字型名稱，跟著範本預設的字型走（字級留著）
-    for tp in frag.iter("{%s}text-properties" % S):
+    # 範本沒有宣告我們的字型（OD_Font）：換成範本本文用的字型（字級留著）。
+    # 範本本文沒寫字型才拿掉名稱、跟著範本預設走。
+    bf = body_fonts or {}
+    for tp in list(frag.iter("{%s}text-properties" % S)):
         for k in ("font-name", "font-name-asian", "font-name-complex"):
             tp.attrib.pop("{%s}%s" % (S, k), None)
+        if bf.get("asian"):
+            tp.set("{%s}font-name" % S, bf["western"])
+            tp.set("{%s}font-name-asian" % S, bf["asian"])
+            tp.set("{%s}font-name-complex" % S, bf["asian"])
+    if bf.get("faces"):
+        # styles.xml 的樣式只認 styles.xml 自己宣告的字型（範本只在 content.xml 宣告）
+        decls = sroot.find("office:font-face-decls", _ODF_NS)
+        if decls is None:
+            decls = etree.Element("{%s}font-face-decls" % _ODF_NS["office"])
+            first = next((el for el in sroot if el.tag in (
+                "{%s}styles" % _ODF_NS["office"], "{%s}automatic-styles" % _ODF_NS["office"],
+                "{%s}master-styles" % _ODF_NS["office"])), None)
+            if first is not None:
+                first.addprevious(decls)
+            else:
+                sroot.append(decls)
+        have = {ff.get("{%s}name" % S) for ff in decls}
+        for name, ff in bf["faces"].items():
+            if name not in have:
+                decls.append(copy.deepcopy(ff))
     for part in ("office:styles", "office:automatic-styles"):
         dst = sroot.find(part, _ODF_NS)
         if dst is None:

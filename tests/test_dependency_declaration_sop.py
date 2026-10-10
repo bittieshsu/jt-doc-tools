@@ -26,7 +26,7 @@ def _p(path: str) -> pathlib.Path:
     """把 `github/xxx` 解析到**公開樹**，其餘維持 repo 根。
 
     開發樹的公開檔在 `github/` 底下，clone 下來就在根目錄。寫死 `github/`
-    的話這幾條在公開版與正式機上一律 file not found —— 2026-09-06 在 `.30`
+    的話這幾條在公開版與正式機上一律 file not found —— 2026-09-06 在正式機
     實跑時就是這樣紅的（外部評估修過 11 支，這兩支是漏網的）。
     """
     if path.startswith("github/"):

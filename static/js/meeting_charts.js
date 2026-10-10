@@ -197,7 +197,7 @@
           row.appendChild(text(pad + 14, y + 21 + i * LINE_H, ln,
             { 'font-size': 13, 'font-weight': 600, fill: ks.colour }));
         });
-        row.appendChild(text(width - pad - 12, y + h0 / 2 + 4, tr('無決議／待辦'),
+        row.appendChild(text(width - pad - 12, y + h0 / 2 + 4, tr('無決議/待辦'),
           { 'font-size': 11, 'text-anchor': 'end', fill: '#94a3b8' }));
         g.appendChild(clickable(row, seq, root.label_full || label));
         y += h0 + 10;

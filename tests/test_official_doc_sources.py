@@ -364,12 +364,17 @@ def test_address_book_json_search(clean, allow_fake, srv):
     names = [o["orgName"] for o in ods.search_orgs("嘉禾")]
     assert names[:2] == ["嘉禾市政府", "嘉禾市政府秘書處"], names   # 全銜優先、短的在前
     assert "臺東縣嘉禾區公所" in names
-    assert ods.search_orgs("嘉禾市政府")[0] == {"orgId": "Q1000000", "orgName": "嘉禾市政府"}
-    # 台 / 臺 通用
-    assert [o["orgName"] for o in ods.search_orgs("台北示範")] == ["臺北示範局"]
-    assert [o["orgName"] for o in ods.search_orgs("臺東 公所")] == ["臺東縣嘉禾區公所"]
-    # 代碼開頭
-    assert ods.search_orgs("q3000")[0]["orgName"] == "臺北示範局"
+    assert ods.search_orgs("嘉禾市政府")[0] == {"orgId": "Q1000000", "orgName": "嘉禾市政府",
+                                              "nameMarks": [[0, 5]], "idMarks": []}
+    # 台 / 臺 通用；標亮的位置是**原文**那幾個字（「臺北示範」）
+    hit = ods.search_orgs("台北示範")
+    assert [o["orgName"] for o in hit] == ["臺北示範局"] and hit[0]["nameMarks"] == [[0, 4]]
+    # 好幾個詞：每一個都標
+    hit = ods.search_orgs("臺東 公所")
+    assert [o["orgName"] for o in hit] == ["臺東縣嘉禾區公所"] and hit[0]["nameMarks"] == [[0, 2], [6, 8]]
+    # 代碼開頭：標的是代碼那一段，名稱沒有符合的字就不標
+    hit = ods.search_orgs("q3000")[0]
+    assert hit["orgName"] == "臺北示範局" and hit["idMarks"] == [[0, 5]] and hit["nameMarks"] == []
     assert ods.search_orgs("不存在的機關") == []
     assert ods.search_orgs("   ") == []
     assert len(ods.search_orgs("嘉禾", limit=1)) == 1
@@ -603,7 +608,7 @@ def test_upload_goes_through_the_same_checks(clean, auth_off):
     r = c.post(f"{base}/{A}/upload", files={"file": ("ab.json", BOOK_JSON, "application/json")})
     assert r.status_code == 200 and r.json()["count"] == 4
     assert c.get("/admin/official-doc/search-orgs", params={"q": "嘉禾"}).json()["results"][0] \
-        == {"orgId": "Q1000000", "orgName": "嘉禾市政府"}
+        == {"orgId": "Q1000000", "orgName": "嘉禾市政府", "nameMarks": [[0, 2]], "idMarks": []}
 
     st = {s["id"]: s for s in c.get("/admin/official-doc/status").json()["sources"]}
     assert st[A]["last_ok"]["filename"] == "ab.json"
@@ -812,3 +817,15 @@ def test_admin_page_runs_in_a_real_browser(monkeypatch):
             br.kill()
             srv.kill()
         shutil.rmtree(data, ignore_errors=True)
+
+
+def test_match_marks_positions_are_in_the_original_text():
+    """符合處的位置以**原文**的字元（code point）計：台臺、全形半形照比對的規則對得上；
+    擴充 B 區的字（UTF-16 佔兩格）不會讓後面的位置錯開；重疊的併成一段。"""
+    from app.core import cjk_fts
+    n = cjk_fts.normalize
+    assert ods.match_marks("臺北市政府財政局", [n("台北"), n("財政")]) == [[0, 2], [5, 7]]
+    assert ods.match_marks("𠀋財政局", [n("財政")]) == [[1, 3]]
+    assert ods.match_marks("ＡＢＣ局", [n("abc")]) == [[0, 3]]
+    assert ods.match_marks("財政局財政", [n("財政"), n("政局")]) == [[0, 5]]
+    assert ods.match_marks("嘉禾市政府", []) == [] and ods.match_marks("", [n("嘉")]) == []
