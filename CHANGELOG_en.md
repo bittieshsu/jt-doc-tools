@@ -5,16 +5,20 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (907 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (908 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
 
+## [1.16.79] - 2026-10-11
+
+- The built-in logo option is now named "Jason Tools Logo".
+
 ## [1.16.78] - 2026-10-11
 
 - **Sidebar colours**: choose from 10 schemes on the company logo / branding page, 5 gradients (including the original indigo, still the default) and 5 solids (3 dark, 2 light). Each card shows a miniature sidebar preview and a one-line description, and clicking one applies it across the site at once. Text colours follow the background: white on dark, dark on light; the 9 new schemes all reach at least 4.5:1 text contrast, and the default indigo is unchanged.
-- **Built-in logo**: choose the Jason Tools company logo (the original default) or the document icon from the project website. Without an uploaded company logo, the sidebar, browser tab, home page, sign-in page and notification emails change together; with a light sidebar the company logo switches to its light-background version.
+- **Built-in logo**: choose the Jason Tools logo (the original default) or the document icon from the project website. Without an uploaded company logo, the sidebar, browser tab, home page, sign-in page and notification emails change together; with a light sidebar the Jason Tools logo switches to its light-background version.
 - After the logo changes, notification emails use the new logo straight away (previously this needed a service restart).
 - **API tokens are no longer stored in plain text** (CodeQL #208): the file keeps only a hash for matching and an encrypted copy of each token (same key as the LLM secrets), so the admin page can still show and copy them. Files from older versions are converted when the service starts; settings backups decrypt on export and re-encrypt with the new host's key on import, and older backups are converted on import. If the encryption key changes, tokens keep working but can no longer be shown.
 - Official document drafting splits contact lines ("label: value") without a regular expression, so very long runs of spaces cannot cause heavy backtracking (CodeQL #209, #210); the results were checked against the old pattern and are identical.

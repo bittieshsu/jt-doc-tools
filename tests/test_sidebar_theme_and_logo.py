@@ -5,7 +5,7 @@
 * 預設（靛紫）的顏色跟改版前一模一樣；其他配色的文字對比 4.5:1 以上（這裡先用 CSS 的值算一次，
   不必開瀏覽器）。
 * 側欄的樣式裡不再有寫死的白字、白色半透明底（不然淺色配色上會看不到字）。
-* 內建 Logo 兩個：公司 Logo（側欄依背景深淺換深色版 / 淺色版）、介紹網站的文件圖示；
+* 內建 Logo 兩個：Jason Tools Logo（側欄依背景深淺換深色版 / 淺色版）、介紹網站的文件圖示；
   上傳過企業 Logo 一律用那張。通知信夾的 Logo 跟著換，換完不必重啟。
 * 端點：送錯代號 400；改了寫稽核記錄；一般使用者不能改；設定備份帶得走。
 """
@@ -70,6 +70,12 @@ def test_ten_themes_five_gradient_five_solid():
     assert [t[1] for t in b.SIDEBAR_THEMES].count("solid") == 5
     assert b.DEFAULT_SIDEBAR_THEME == "indigo" and ids[0] == "indigo"
     assert all(t[3] and t[4] for t in b.SIDEBAR_THEMES), "每一種都要有名稱與一句說明"
+
+
+def test_the_builtin_logo_names():
+    """名稱照使用者定的寫（2026-10-11 改：不加「公司」二字）。"""
+    names = {x["id"]: x["name"] for x in _br().builtin_logo_list()}
+    assert names == {"jt": "Jason Tools Logo", "doc": "文件圖示（介紹網站）"}
 
 
 def test_every_theme_has_its_colours_in_the_css_and_the_kind_matches():
@@ -183,7 +189,7 @@ def test_logo_follows_the_choice_and_the_sidebar_tone(br_dir, monkeypatch):
     assert b.logo_url("sidebar").endswith("logo-on-dark.png")
     assert b.logo_url("icon").endswith("logo-on-light.png")
     b.set_appearance(sidebar_theme="silver")
-    assert b.logo_url("sidebar").endswith("logo-on-light.png"), "淺色背景要用白底那一版的公司 Logo"
+    assert b.logo_url("sidebar").endswith("logo-on-light.png"), "淺色背景要用白底那一版的 Jason Tools Logo"
     b.set_appearance(builtin_logo="doc")
     assert {b.logo_url(s) for s in ("sidebar", "icon", "page")} == {"/static/images/logo-doc.png"}
     assert b.builtin_logo_file().is_file()

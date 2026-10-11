@@ -146,11 +146,11 @@ def has_custom_site_name() -> bool:
 # 每一頁都會讀（base.html 的 Logo 與 `<html data-sb-theme>`），所以照檔案修改時間快取。
 
 #: 內建 Logo：沒有上傳企業 Logo 時用哪一個。
-#: `jt` 是 Jason Tools 公司 Logo（原本的預設，側欄依背景深淺換深色版 / 淺色版）；
+#: `jt` 是 Jason Tools Logo（原本的預設，側欄依背景深淺換深色版 / 淺色版）；
 #: `doc` 是介紹網站左上角那個文件圖示（自帶底色，深淺背景都用同一張）。
 BUILTIN_LOGOS = ("jt", "doc")
 DEFAULT_BUILTIN_LOGO = "jt"
-_BUILTIN_LOGO_NAMES = {"jt": "Jason Tools 公司 Logo", "doc": "文件圖示（介紹網站）"}
+_BUILTIN_LOGO_NAMES = {"jt": "Jason Tools Logo", "doc": "文件圖示（介紹網站）"}
 _JT_ON_DARK = "/static/images/logo-on-dark.png"
 _JT_ON_LIGHT = "/static/images/logo-on-light.png"
 _DOC_LOGO = "/static/images/logo-doc.png"

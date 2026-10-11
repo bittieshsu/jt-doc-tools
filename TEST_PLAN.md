@@ -3963,12 +3963,12 @@ grep -rnE "回滾|軟依賴|硬依賴|系統依賴(?!\s*$)|圖像(?![幾何])|�
 - [ ] 點「還原預設」→ 確認 → logo 變回內建
 - [ ] `GET /branding/logo` 公開 endpoint：未設自訂回 404，有設回 PNG
 - [ ] `/branding/` 路徑 prefix 在 `_PUBLIC_PREFIXES`（login 頁能讀到自訂 logo）
-- [ ] **內建 Logo 二選一**（v1.16.78）：「Jason Tools 公司 Logo」與「文件圖示（介紹網站）」；點了當場換，側欄、頁籤圖示、首頁、登入頁、
+- [ ] **內建 Logo 二選一**（v1.16.78）：「Jason Tools Logo」與「文件圖示（介紹網站）」；點了當場換，側欄、頁籤圖示、首頁、登入頁、
       通知信都跟著換（通知信不必重啟）。上傳過企業 Logo 時以上傳的為準，畫面上有提示。
       `tests/test_sidebar_theme_and_logo.py`、`tests/test_sidebar_theme_browser.py`
 - [ ] **左側選單配色**（v1.16.78）：10 張卡片（漸層 5 種、純色 5 種），每張有迷你側欄的預覽、名稱、一句說明，選中的右上角打勾；
       點一下全站當場換色、重新整理照舊。預設（靛紫）跟改版前一模一樣；其他 9 種的站台名稱、分類列、工具名稱與說明、版本
-      對比都在 4.5:1 以上（瀏覽器實量）。淺灰、淡藍是深色字，公司 Logo 自動換成白底用的那一版。
+      對比都在 4.5:1 以上（瀏覽器實量）。淺灰、淡藍是深色字，Jason Tools Logo 自動換成白底用的那一版。
       手機寬度一排兩張、沒有橫向捲動。設定存在 `data/branding/appearance.json`，設定備份「品牌 Logo」那一類帶得走。
       `tests/test_sidebar_theme_and_logo.py`、`tests/test_sidebar_theme_browser.py`
 

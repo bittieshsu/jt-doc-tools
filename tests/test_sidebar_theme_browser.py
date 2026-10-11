@@ -7,7 +7,7 @@
   - 新的 9 種：站台名稱、分類列、工具名稱、工具說明、版本都要 4.5:1 以上，搜尋框的提示字 3:1 以上；
   - 預設（靛紫）**跟改版前一模一樣**（背景、文字顏色逐一比對原本寫死的值）。
 * 設定頁點一張配色卡：不重新整理，側欄當場換色、`<html data-sb-theme>` 跟著換；重新整理之後照舊。
-  淺色背景時公司 Logo 換成白底用的那一版。
+  淺色背景時 Jason Tools Logo 換成白底用的那一版。
 * 每張配色卡都有預覽（迷你側欄的背景就是那一種配色）、名稱、一句說明。
 * 內建 Logo 選「文件圖示」：側欄、頁籤圖示都換成 `logo-doc.png`，而且那張圖真的載得到。
 * 手機寬度：設定頁沒有橫向捲動。
@@ -249,7 +249,7 @@ def test_the_document_logo_replaces_the_builtin_one_everywhere(live):
                 loaded: side.complete && side.naturalWidth > 0}; })()""")
     assert got["side"].endswith("logo-doc.png") and got["icon"].endswith("logo-doc.png"), got
     assert got["ok"] and got["type"] == "image/png" and got["size"] > 1000 and got["loaded"], got
-    # 換回公司 Logo
+    # 換回 Jason Tools Logo
     open_page(send, base + "/admin/branding", "[data-builtin-logo]")
     js(send, "document.querySelector('[data-builtin-logo=\"jt\"]').click(), true")
     assert wait(send, "document.querySelector('.sidebar .brand-logo').getAttribute('src').indexOf('logo-on-') >= 0", 10)
