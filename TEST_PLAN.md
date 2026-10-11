@@ -623,7 +623,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **457 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **461 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -650,7 +650,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_api_gate_and_csrf_edges.py` | API token 閘與 CSRF 豁免的邊界 |
 | `test_api_page_builder.py` | `github/build-api-page.py` 產出的 api.html 不可以毀損 |
 | `test_api_token_on_tool_paths.py` | API 手冊教人用 token 呼叫的工具路徑，在**啟用認證**的機器上也要通（v1.16.26） |
-| `test_api_tokens_file_mode.py` | API Token 檔（明文存 Token）只給服務帳號讀：0600 |
+| `test_api_tokens_encrypted_at_rest.py` | API Token 不再明文存放（CodeQL #208；2026-10-11 決定：加密存放，管理頁照樣可以「顯示」） |
+| `test_api_tokens_file_mode.py` | API Token 檔只給服務帳號讀：0600 |
 | `test_asset_access_by_permission.py` | 資產庫的圖照工具權限給（GitHub issue #54，2026-10-05） |
 | `test_asset_image_acl.py` | ACL test for the login-gated shared-asset image endpoints (GitHub #28). |
 | `test_asset_thumbnails_resolve.py` | 資產縮圖必須載入得到 — 防「import 後 file_key/thumb_key 與磁碟檔名不一致 |
@@ -897,6 +898,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_official_doc_cases_table_browser.py` | 歷史案件表格 —— 真的在瀏覽器裡跑一次（2026-10-10 使用者：「案件名稱如果字多 要截斷搭配... 移過去才顯示全文」 |
 | `test_official_doc_company_letter.py` | 公文撰擬：企業發給政府機關的函（使用者 2026-10-08「公文撰擬內也要加入企業發函的應用」， |
 | `test_official_doc_contact_fields.py` | 公文撰擬（函）：聯絡資訊改成一格一個欄位、欄位名稱由程式寫（v1.16.71） |
+| `test_official_doc_contact_label_split.py` | 聯絡資訊「欄位名稱：值」的拆法（CodeQL #209、#210：多項式回溯的正規式用在使用者輸入上） |
 | `test_official_doc_core.py` | 公文撰擬的核心（`app/core/official_doc.py`） |
 | `test_official_doc_di.py` | 公文撰擬匯出 DI 檔（政府電子公文的文書本文檔，XML）＋ 機關名稱從地址簿挑、帶機關代碼 |
 | `test_official_doc_di_cases.py` | 公文撰擬的歷史案件：下載 DI 檔、批次下載、上傳 DI 檔變成案件 |
@@ -1017,6 +1019,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_settings_import_page_browser.py` | 設定備份頁：匯入之後「沒有還原的項目」真的列在畫面上（issue #55） |
 | `test_sidebar_active_match.py` | 側欄「使用中」只能標一支 —— 判準是整段路徑，不是前綴 |
 | `test_sidebar_scrollbar_drag.py` | 側欄的捲軸要**按得住、拖得動**（v1.16.18，使用者回報） |
+| `test_sidebar_theme_and_logo.py` | 「企業 Logo / 識別」的左側選單配色與內建 Logo（2026-10-11 加入；瀏覽器實量在 `test_sidebar_theme_browser.py`） |
+| `test_sidebar_theme_browser.py` | 左側選單配色與內建 Logo —— 真的在瀏覽器裡量（2026-10-11 加入） |
 | `test_signpath_notes_are_private.py` | SignPath 的往來筆記不可以出現在公開版（v1.15.27） |
 | `test_single_web_process.py` | 這個服務只能用**單一 Web 行程**跑，被開成多 worker 時要講出來（稽核 F11） |
 | `test_smoke_routes.py` | Smoke tests: every public page renders 200, no 500s. |
@@ -2076,6 +2080,14 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 #### API Token 🆕
 - [ ] 建立 / 列表 / 刪除 token
 - [ ] 用 bearer 呼叫 `/api/*` 成功；無 token 回 401
+- [ ] **Token 不以明文存放**（v1.16.78，CodeQL #208）：`cat data/api_tokens.json` 只看得到 `token_sha256`、`token_enc`、`preview`，
+      找不到任何一張 Token 的原文；管理頁「顯示」「複製」照樣拿到原文；拿 Token 呼叫 API 照常通過、撤銷後 401。
+      **舊版升級**：放一份舊格式（`"token": "…"`）的檔案 → 重啟服務 → 檔案轉成雜湊＋密文、原本的 Token 照樣能用、權限 0600。
+      **設定備份換機**：匯出 → 另一台匯入 → Token 能用、管理頁顯示得出原文；匯入舊版備份 → 檔案當場轉換。
+      **金鑰換過**（換掉 `.session_secret`）：Token 照樣能用，管理頁該列顯示「無法顯示原文（加密金鑰換過）；仍可使用」、可以撤銷。
+      `tests/test_api_tokens_encrypted_at_rest.py`、`tests/test_settings_export_identity.py`
+- [ ] **公文撰擬聯絡資訊的拆法**（v1.16.78，CodeQL #209、#210）：「電話：04-…」「地　　址：…」照常拆到對的欄位；
+      貼一行幾十萬個空白的聯絡資訊，公文撰擬照樣瞬間回應。`tests/test_official_doc_contact_label_split.py`
 
 #### 工作區設定 (admin/workspace) 🆕
 - [ ] 啟用 / 停用切換；停用後重新整理任一工具頁，「存至工作區」「從工作區載入」按鈕與側欄「我的工作區」全部消失
@@ -2643,6 +2655,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 #### 品牌外觀（`/admin/branding/*`）
 
+- [ ] `/admin/branding/appearance`（v1.16.78：左側選單配色與內建 Logo；不認得的代號 400、寫稽核記錄）
 - [ ] `/admin/branding/reset`
 - [ ] `/admin/branding/site-name`
 - [ ] `/admin/branding/upload`
@@ -3950,6 +3963,14 @@ grep -rnE "回滾|軟依賴|硬依賴|系統依賴(?!\s*$)|圖像(?![幾何])|�
 - [ ] 點「還原預設」→ 確認 → logo 變回內建
 - [ ] `GET /branding/logo` 公開 endpoint：未設自訂回 404，有設回 PNG
 - [ ] `/branding/` 路徑 prefix 在 `_PUBLIC_PREFIXES`（login 頁能讀到自訂 logo）
+- [ ] **內建 Logo 二選一**（v1.16.78）：「Jason Tools 公司 Logo」與「文件圖示（介紹網站）」；點了當場換，側欄、頁籤圖示、首頁、登入頁、
+      通知信都跟著換（通知信不必重啟）。上傳過企業 Logo 時以上傳的為準，畫面上有提示。
+      `tests/test_sidebar_theme_and_logo.py`、`tests/test_sidebar_theme_browser.py`
+- [ ] **左側選單配色**（v1.16.78）：10 張卡片（漸層 5 種、純色 5 種），每張有迷你側欄的預覽、名稱、一句說明，選中的右上角打勾；
+      點一下全站當場換色、重新整理照舊。預設（靛紫）跟改版前一模一樣；其他 9 種的站台名稱、分類列、工具名稱與說明、版本
+      對比都在 4.5:1 以上（瀏覽器實量）。淺灰、淡藍是深色字，公司 Logo 自動換成白底用的那一版。
+      手機寬度一排兩張、沒有橫向捲動。設定存在 `data/branding/appearance.json`，設定備份「品牌 Logo」那一類帶得走。
+      `tests/test_sidebar_theme_and_logo.py`、`tests/test_sidebar_theme_browser.py`
 
 #### 6.9.7 用印與簽名臨時資產（#7）
 

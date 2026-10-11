@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+  <!-- 介紹網站左上角的文件圖示（github/docs/style.css 的 .brand-mark：40px 圓角方塊、
+       var(--indigo) → var(--navy-2) 斜向漸層、28px 白色文件圖示置中）。
+       logo-doc.png 由這一份產生（tools/build_logo_doc.py）。 -->
+  <defs>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="40" y2="40">
+      <stop offset="0" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#1e3a8a"/>
+    </linearGradient>
+  </defs>
+  <rect width="40" height="40" rx="8" fill="url(#g)"/>
+  <g transform="translate(6 6) scale(1.1666667)" fill="none" stroke="#ffffff" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <path d="M14 2v6h6"/>
+  </g>
+</svg>

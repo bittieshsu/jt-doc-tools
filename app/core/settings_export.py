@@ -105,7 +105,7 @@ CATEGORIES: list[dict] = [
     {"id": "form_templates", "label": "表單範本", "kind": "files",
      "items": ["form_templates.json"], "desc": "pdf-fill 表單範本", "default": True},
     {"id": "api_tokens", "label": "API Token", "kind": "files",
-     "items": ["api_tokens.json"], "desc": "對外 API 存取權杖（敏感）",
+     "items": ["api_tokens.json"], "rekey": "api_tokens", "desc": "對外 API 存取權杖（敏感）",
      "default": True, "sensitive": True},
     {"id": "llm", "label": "LLM 設定", "kind": "files",
      "items": ["llm_settings.json"], "rekey": "llm",
@@ -197,7 +197,13 @@ def _rekey_specs() -> dict:
     from . import notify_settings as _ns, sso_settings as _sso
     from . import jtlw_settings as _jl
     from . import llm_settings as _ll
+    from . import api_tokens as _at
     return {
+        # api_tokens.json：每一張 Token 的密文（data["tokens"][i]["token_enc"]，v1.16.78 起）；
+        # 比對用的雜湊與金鑰無關，搬過去照樣能用。舊版備份裡是明文 `token` 欄位、沒有標記 ——
+        # 原樣寫回，由 api_tokens 第一次讀到時轉成雜湊＋密文。
+        "api_tokens.json": (_at, lambda d: [
+            (t, "token_enc") for t in (d.get("tokens") or []) if isinstance(t, dict)]),
         # llm_settings.json：`api_key_enc` 在最上層（v1.16.17 起加密存放），
         # 「其他 LLM 伺服器」每一台各有一把（data["servers"][i]["api_key_enc"]）
         "llm_settings.json": (_ll, lambda d: [(d, "api_key_enc")] + [
@@ -454,7 +460,9 @@ def _remap_token_owners(path: Path, idm: _IdentityMap) -> list[dict]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return notes
-    changed = False
+    # 舊版備份裡的 Token 是明文欄位：匯入當下就換成雜湊＋密文，不要等服務下一次讀到
+    from . import api_tokens as _at
+    changed = _at._convert(data) if isinstance(data, dict) else False
     for t in data.get("tokens") or []:
         if not isinstance(t, dict) or t.get("owner_user_id") is None:
             continue

@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.77"
+VERSION = "1.16.78"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -924,6 +924,23 @@ def _branding_logo_url() -> str:
 
 
 templates.env.globals["branding_logo_url"] = _branding_logo_url
+
+
+def _brand_logo(spot: str = "page") -> str:
+    """Jinja global：這個位置實際要用的 Logo 網址（企業 Logo，否則選的內建 Logo）。
+    `sidebar` 會依左側選單背景的深淺挑內建 Logo 的版本；`icon` / `page` 是白底用的。"""
+    from .core import branding as _branding
+    return _branding.logo_url(spot)
+
+
+def _sidebar_theme() -> str:
+    """Jinja global：左側選單配色的代號（寫在 `<html data-sb-theme>`）。"""
+    from .core import branding as _branding
+    return _branding.sidebar_theme()
+
+
+templates.env.globals["brand_logo"] = _brand_logo
+templates.env.globals["sidebar_theme"] = _sidebar_theme
 
 
 # ---- Friendly HTML error pages for 401/403/404 (browser navigations only) ----

@@ -226,6 +226,7 @@
             <a class="nav-ep" href="#抓-llm-模型清單">LLM モデル一覧の取得</a>
             <a class="nav-ep" href="#系統相依套件狀態">システムの依存パッケージの状態</a>
             <a class="nav-ep" href="#企業-logo-狀態">企業ロゴの状態</a>
+            <a class="nav-ep" href="#左側選單配色與內建-logo">サイドバーの配色と内蔵ロゴ</a>
             <a class="nav-ep" href="#設定匯出清單">設定エクスポートの一覧</a>
             <a class="nav-ep" href="#token-管理">Token の管理</a>
             <a class="nav-ep" href="#簽章網址取檔不是給人呼叫的">署名付き URL によるファイル取得（手動で呼ぶものではありません）</a>
@@ -1541,6 +1542,16 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <pre><code class="lang-text"><span class="hl-method">GET</span> /admin/api/branding</code></pre>
 <pre><code class="lang-bash">curl <span class="hl-url">http://localhost:8765/admin/api/branding</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> | jq</code></pre>
+<p>企業ロゴをアップロードしたかどうか、サイト名、現在のサイドバーの配色（<code>sidebar_theme</code>）と内蔵ロゴ（<code>builtin_logo</code>）を返します。<code>sidebar_themes</code> には 10 種類の配色（<code>id</code>、<code>kind</code> は <code>gradient</code> か <code>solid</code>、<code>tone</code> は <code>dark</code> か <code>light</code>、名称、説明）、<code>builtin_logos</code> には 2 つの内蔵ロゴ（<code>jt</code> 社のロゴ、<code>doc</code> 文書アイコン）が入ります。</p>
+      </section>
+      <section class="doc-section" data-sec="左側選單配色與內建-logo" data-title="サイドバーの配色と内蔵ロゴ" hidden>
+<div class="doc-crumb">11. 管理側 API</div>
+<h4 id="左側選單配色與內建-logo">サイドバーの配色と内蔵ロゴ</h4>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /admin/branding/appearance</code></pre>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/admin/branding/appearance</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;sidebar_theme&quot;: &quot;ocean&quot;, &quot;builtin_logo&quot;: &quot;doc&quot;}&#x27;</span></code></pre>
+<p><code>sidebar_theme</code> と <code>builtin_logo</code> のどちらか、または両方を送ります。ID は前の節の一覧のとおりで、知らない ID は <strong>400</strong> を返します。変更後の設定に加えて、<code>sidebar_tone</code>（<code>dark</code> / <code>light</code>）と、サイドバーとタブのアイコンにいま使うロゴの URL（<code>sidebar_logo</code>、<code>icon_logo</code>）を返します。企業ロゴをアップロードしているときは常にそれを使い、内蔵ロゴの選択は既定に戻したあとに有効になります。変更するたびに監査ログ（<code>settings_change</code>、対象 <code>branding</code>）を記録します。</p>
       </section>
       <section class="doc-section" data-sec="設定匯出清單" data-title="設定エクスポートの一覧" hidden>
 <div class="doc-crumb">11. 管理側 API</div>
@@ -1690,8 +1701,8 @@ console.log(j.results);
 <pre><code class="lang-bash"><span class="hl-cmt"># 列出</span>
 sudo jtdt auth show
 
-<span class="hl-cmt"># 直接讀檔可看（unhash 不可逆）：</span>
-sudo cat /var/lib/jt-doc-tools/data/api_tokens.json
+<span class="hl-cmt"># 檔案裡只有雜湊與密文（v1.16.78 起），讀檔看不到 Token 原文；</span>
+<span class="hl-cmt"># 要看原文請到管理頁「API Token」按「顯示」</span>
 
 <span class="hl-cmt"># 撤銷（CLI 沒提供撤銷，必要時直接清掉檔案後重啟服務）：</span>
 sudo systemctl stop jt-doc-tools

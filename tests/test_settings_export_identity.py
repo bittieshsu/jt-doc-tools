@@ -208,6 +208,9 @@ def test_token_owner_is_mapped_or_cleared(env, tmp_path):
     assert got["legacy"] is None
     assert any("carol-script" in s["text"] and "重新指定擁有者" in s["text"] for s in r["skipped"]), r["skipped"]
     assert bob not in got.values()
+    # 舊版備份裡是 Token 原文：匯入當下就換成雜湊＋密文（v1.16.78）
+    raw = (env / "api_tokens.json").read_text(encoding="utf-8")
+    assert not any(c * 43 in raw for c in "ACD"), "匯入舊備份之後檔案裡還有 Token 原文"
 
 
 # ------------------------------------------------------------------ 個人與群組的角色指派

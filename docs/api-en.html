@@ -226,6 +226,7 @@
             <a class="nav-ep" href="#抓-llm-模型清單">Fetch the LLM model list</a>
             <a class="nav-ep" href="#系統相依套件狀態">System dependency status</a>
             <a class="nav-ep" href="#企業-logo-狀態">Company logo status</a>
+            <a class="nav-ep" href="#左側選單配色與內建-logo">Sidebar colours and built-in logo</a>
             <a class="nav-ep" href="#設定匯出清單">Settings export list</a>
             <a class="nav-ep" href="#token-管理">Token management</a>
             <a class="nav-ep" href="#簽章網址取檔不是給人呼叫的">Signed-URL file fetch (not meant to be called by hand)</a>
@@ -1541,6 +1542,16 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <pre><code class="lang-text"><span class="hl-method">GET</span> /admin/api/branding</code></pre>
 <pre><code class="lang-bash">curl <span class="hl-url">http://localhost:8765/admin/api/branding</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> | jq</code></pre>
+<p>Returns whether a company logo has been uploaded, the site name, and the current sidebar colours (<code>sidebar_theme</code>) and built-in logo (<code>builtin_logo</code>). The <code>sidebar_themes</code> list has the 10 schemes (<code>id</code>, <code>kind</code> is <code>gradient</code> or <code>solid</code>, <code>tone</code> is <code>dark</code> or <code>light</code>, name, description), and <code>builtin_logos</code> lists the two built-in logos (<code>jt</code> company logo, <code>doc</code> document icon).</p>
+      </section>
+      <section class="doc-section" data-sec="左側選單配色與內建-logo" data-title="Sidebar colours and built-in logo" hidden>
+<div class="doc-crumb">11. Administration API</div>
+<h4 id="左側選單配色與內建-logo">Sidebar colours and built-in logo</h4>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /admin/branding/appearance</code></pre>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/admin/branding/appearance</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;sidebar_theme&quot;: &quot;ocean&quot;, &quot;builtin_logo&quot;: &quot;doc&quot;}&#x27;</span></code></pre>
+<p>Send <code>sidebar_theme</code>, <code>builtin_logo</code> or both, using the IDs from the list in the previous section; unknown IDs return <strong>400</strong>. Returns the updated settings plus <code>sidebar_tone</code> (<code>dark</code> / <code>light</code>) and the logo URLs the sidebar and browser tab should now use (<code>sidebar_logo</code>, <code>icon_logo</code>). An uploaded company logo always wins; the built-in logo choice applies once it is reset. Each change writes an audit record (<code>settings_change</code>, target <code>branding</code>).</p>
       </section>
       <section class="doc-section" data-sec="設定匯出清單" data-title="Settings export list" hidden>
 <div class="doc-crumb">11. Administration API</div>
@@ -1690,8 +1701,8 @@ console.log(j.results);
 <pre><code class="lang-bash"><span class="hl-cmt"># 列出</span>
 sudo jtdt auth show
 
-<span class="hl-cmt"># 直接讀檔可看（unhash 不可逆）：</span>
-sudo cat /var/lib/jt-doc-tools/data/api_tokens.json
+<span class="hl-cmt"># 檔案裡只有雜湊與密文（v1.16.78 起），讀檔看不到 Token 原文；</span>
+<span class="hl-cmt"># 要看原文請到管理頁「API Token」按「顯示」</span>
 
 <span class="hl-cmt"># 撤銷（CLI 沒提供撤銷，必要時直接清掉檔案後重啟服務）：</span>
 sudo systemctl stop jt-doc-tools

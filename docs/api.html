@@ -226,6 +226,7 @@
             <a class="nav-ep" href="#抓-llm-模型清單">抓 LLM 模型清單</a>
             <a class="nav-ep" href="#系統相依套件狀態">系統相依套件狀態</a>
             <a class="nav-ep" href="#企業-logo-狀態">企業 logo 狀態</a>
+            <a class="nav-ep" href="#左側選單配色與內建-logo">左側選單配色與內建 Logo</a>
             <a class="nav-ep" href="#設定匯出清單">設定匯出清單</a>
             <a class="nav-ep" href="#token-管理">Token 管理</a>
             <a class="nav-ep" href="#簽章網址取檔不是給人呼叫的">簽章網址取檔（不是給人呼叫的）</a>
@@ -1541,6 +1542,16 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <pre><code class="lang-text"><span class="hl-method">GET</span> /admin/api/branding</code></pre>
 <pre><code class="lang-bash">curl <span class="hl-url">http://localhost:8765/admin/api/branding</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> | jq</code></pre>
+<p>回傳有沒有上傳企業 Logo、站台名稱，以及目前的左側選單配色（<code>sidebar_theme</code>）與內建 Logo（<code>builtin_logo</code>）；清單 <code>sidebar_themes</code> 列出 10 種配色（<code>id</code>、<code>kind</code> 是 <code>gradient</code> 或 <code>solid</code>、<code>tone</code> 是 <code>dark</code> 或 <code>light</code>、名稱、說明），清單 <code>builtin_logos</code> 列出兩個內建 Logo（<code>jt</code> 公司 Logo、<code>doc</code> 文件圖示）。</p>
+      </section>
+      <section class="doc-section" data-sec="左側選單配色與內建-logo" data-title="左側選單配色與內建 Logo" hidden>
+<div class="doc-crumb">11. 管理端 API</div>
+<h4 id="左側選單配色與內建-logo">左側選單配色與內建 Logo</h4>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /admin/branding/appearance</code></pre>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/admin/branding/appearance</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;sidebar_theme&quot;: &quot;ocean&quot;, &quot;builtin_logo&quot;: &quot;doc&quot;}&#x27;</span></code></pre>
+<p>送 <code>sidebar_theme</code> 與 <code>builtin_logo</code> 其中一項或兩項，代號見上一節的清單；不認得的代號回 <strong>400</strong>。回改完之後的設定，加上 <code>sidebar_tone</code>（<code>dark</code> / <code>light</code>）與側欄、頁籤圖示現在該用的 Logo 網址（<code>sidebar_logo</code>、<code>icon_logo</code>）。上傳過企業 Logo 時一律用那一張，內建 Logo 的選擇在還原預設之後才生效。改了寫一筆稽核記錄（<code>settings_change</code>，對象 <code>branding</code>）。</p>
       </section>
       <section class="doc-section" data-sec="設定匯出清單" data-title="設定匯出清單" hidden>
 <div class="doc-crumb">11. 管理端 API</div>
@@ -1690,8 +1701,8 @@ console.log(j.results);
 <pre><code class="lang-bash"><span class="hl-cmt"># 列出</span>
 sudo jtdt auth show
 
-<span class="hl-cmt"># 直接讀檔可看（unhash 不可逆）：</span>
-sudo cat /var/lib/jt-doc-tools/data/api_tokens.json
+<span class="hl-cmt"># 檔案裡只有雜湊與密文（v1.16.78 起），讀檔看不到 Token 原文；</span>
+<span class="hl-cmt"># 要看原文請到管理頁「API Token」按「顯示」</span>
 
 <span class="hl-cmt"># 撤銷（CLI 沒提供撤銷，必要時直接清掉檔案後重啟服務）：</span>
 sudo systemctl stop jt-doc-tools

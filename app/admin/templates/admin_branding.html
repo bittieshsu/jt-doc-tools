@@ -13,7 +13,7 @@
       {% if has_custom %}
       <img id="logoImg" src="{{ logo_url }}?v={{ range(100000) | random }}" alt="{{ tr('目前 Logo') }}" />
       {% else %}
-      <img id="logoImg" src="/static/images/logo-on-light.png" alt="{{ tr('預設 Logo') }}" />
+      <img id="logoImg" src="{{ brand_logo('page') }}" alt="{{ tr('預設 Logo') }}" />
       <div class="muted" data-s="s67fed56e">{{ tr('（使用內建預設）') }}</div>
       {% endif %}
     </div>
@@ -93,6 +93,53 @@
     {% if has_custom_site_name %}<span data-s="s2282d3a4">{{ tr('（自訂）') }}</span>{% else %}<span data-s="s88652408">{{ tr('（預設）') }}</span>{% endif %}
   </div>
   <div id="nameStatus" data-s="sf14019df"></div>
+</div>
+
+<div class="panel" id="builtinLogoPanel">
+  <h3 class="br-h3">{{ icon('image', size=18) }} {{ tr('內建 Logo') }}</h3>
+  <p class="muted br-lead">{{ tr('沒有上傳企業 Logo 時使用；上傳了就以上傳的為準。側欄、瀏覽器頁籤、首頁、登入頁與通知信一起換。') }}</p>
+  <div class="br-logo-opts" role="radiogroup" aria-label="{{ tr('內建 Logo') }}">
+    {% for l in builtin_logos %}
+    <button type="button" class="br-logo-opt{% if l.id == appearance.builtin_logo %} is-on{% endif %}"
+            data-builtin-logo="{{ l.id }}" role="radio"
+            aria-checked="{{ 'true' if l.id == appearance.builtin_logo else 'false' }}">
+      <img src="{{ l.url }}" alt="" width="52" height="52" />
+      <span class="br-opt-name">{{ tr(l.name) }}</span>
+      <span class="br-opt-tick">{{ icon('check', size=14) }}</span>
+    </button>
+    {% endfor %}
+  </div>
+  {% if has_custom %}
+  <p class="muted br-note">{{ tr('目前使用上傳的企業 Logo；按上方的「還原預設」之後才會換成這裡選的內建 Logo。') }}</p>
+  {% endif %}
+  <div class="br-status" id="logoOptStatus" aria-live="polite"></div>
+</div>
+
+<div class="panel" id="sidebarThemePanel">
+  <h3 class="br-h3">{{ icon('layers', size=18) }} {{ tr('左側選單配色') }}</h3>
+  <p class="muted br-lead">{{ tr('點一下就套用到全站。文字顏色會配合背景調整：深色背景用白字，淺色背景用深色字。') }}</p>
+  {% for kind, label in (('gradient', '漸層'), ('solid', '純色')) %}
+  <h4 class="br-th-k">{{ tr(label) }}</h4>
+  <div class="br-themes" role="radiogroup" aria-label="{{ tr('左側選單配色') }}：{{ tr(label) }}">
+    {% for t in sidebar_themes if t.kind == kind %}
+    <button type="button" class="br-theme{% if t.id == appearance.sidebar_theme %} is-on{% endif %}"
+            data-theme-pick="{{ t.id }}" role="radio"
+            aria-checked="{{ 'true' if t.id == appearance.sidebar_theme else 'false' }}">
+      {# 預覽用同一份 CSS 變數（data-sb-theme），跟實際的側欄一模一樣 #}
+      <span class="br-mini" data-sb-theme="{{ t.id }}" aria-hidden="true">
+        <span class="br-mini-head"><span class="br-mini-logo"></span><span class="br-mini-title">{{ app_name }}</span></span>
+        <span class="br-mini-group">{{ tr('文件轉換') }}</span>
+        <span class="br-mini-item"><span class="br-mini-ic"></span><span class="br-mini-tx"><b>{{ tr('檔案合併') }}</b><small>{{ tr('多份合成一份') }}</small></span></span>
+        <span class="br-mini-item"><span class="br-mini-ic is-b"></span><span class="br-mini-tx"><b>{{ tr('PDF 壓縮') }}</b><small>{{ tr('縮小檔案') }}</small></span></span>
+      </span>
+      <span class="br-opt-tick br-theme-tick">{{ icon('check', size=13) }}</span>
+      <span class="br-theme-name">{{ tr(t.name) }}</span>
+      <span class="br-theme-desc">{{ tr(t.desc) }}</span>
+    </button>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <div class="br-status" id="themeStatus" aria-live="polite"></div>
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
@@ -187,6 +234,59 @@
     outline-offset: -1px; border-color: transparent; }
   .br-name-default { font-size: 12px; color: #94a3b8; margin-top: 6px; }
   .br-name-default code { background: #f1f5f9; padding: 1px 6px; border-radius: 3px; font-size: 11.5px; }
+
+  /* === 內建 Logo 與左側選單配色 === */
+  .br-h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+  .br-lead { margin: 0 0 14px; }
+  .br-note { margin: 10px 0 0; font-size: 12.5px; }
+  .br-status { min-height: 20px; margin-top: 10px; font-size: 13px; color: #15803d; }
+  .br-status.is-err { color: #b91c1c; }
+  .br-logo-opts { display: flex; flex-wrap: wrap; gap: 12px; }
+  .br-logo-opt { position: relative; display: flex; align-items: center; gap: 12px; min-width: 240px;
+    padding: 10px 40px 10px 12px; border: 2px solid #e2e8f0; border-radius: 12px; background: #fff;
+    cursor: pointer; font: inherit; color: #0f172a; text-align: left; transition: border-color .15s, box-shadow .15s; }
+  .br-logo-opt:hover { border-color: #a5b4fc; }
+  .br-logo-opt img { width: 52px; height: 52px; object-fit: contain; flex: none; }
+  .br-logo-opt.is-on, .br-theme.is-on { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+  .br-opt-name { font-size: 13.5px; font-weight: 600; }
+  .br-opt-tick { display: none; align-items: center; justify-content: center; width: 20px; height: 20px;
+    border-radius: 999px; background: #4f46e5; color: #fff; flex: none; }
+  .br-logo-opt .br-opt-tick { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+  .br-logo-opt.is-on .br-opt-tick, .br-theme.is-on .br-opt-tick { display: inline-flex; }
+  .br-th-k { margin: 16px 0 8px; font-size: 12.5px; font-weight: 700; color: #64748b; letter-spacing: .04em; }
+  /* 一張卡片＝上面一個迷你側欄的預覽、下面名稱與一句說明；選中的在右上角打勾 */
+  .br-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .br-theme { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 10px 10px 12px;
+    border: 2px solid #e2e8f0; border-radius: 12px; background: #fff; cursor: pointer; font: inherit;
+    text-align: left; transition: border-color .15s, box-shadow .15s; }
+  .br-theme:hover { border-color: #a5b4fc; }
+  .br-theme .br-mini { margin-bottom: 7px; }
+  .br-theme-tick { position: absolute; top: 4px; right: 4px; box-shadow: 0 0 0 2px #fff; }
+  .br-theme-name { font-size: 13.5px; font-weight: 700; color: #0f172a; padding: 0 2px; }
+  .br-theme-desc { font-size: 11.5px; line-height: 1.45; color: #64748b; padding: 0 2px; }
+  @media (max-width: 640px) {
+    .br-themes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .br-logo-opt { min-width: 0; flex: 1 1 100%; }
+  }
+  /* 迷你側欄：顏色全部取自 platform.css 的 --sb-* 變數 */
+  .br-mini { display: flex; flex-direction: column; gap: 5px; padding: 0 0 8px; border-radius: 8px; overflow: hidden;
+    background: var(--sb-bg); color: var(--sb-fg); }
+  .br-mini-head { display: flex; align-items: center; gap: 6px; padding: 7px 8px; background: var(--sb-header-bg);
+    border-bottom: 1px solid var(--sb-line); }
+  .br-mini-logo { width: 14px; height: 14px; border-radius: 4px; flex: none;
+    background: linear-gradient(135deg, #38bdf8, #f59e0b); }
+  .br-mini-title { font-size: 11px; font-weight: 700; color: var(--sb-fg-strong); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .br-mini-group { margin: 2px 8px 0; padding: 3px 6px; border-radius: 5px; font-size: 10px; font-weight: 700;
+    color: var(--sb-fg-strong); background: var(--sb-group-bg); border: 1px solid var(--sb-group-border); }
+  .br-mini-item { display: flex; align-items: center; gap: 6px; margin: 0 8px; padding: 4px 6px; border-radius: 5px;
+    background: var(--sb-item-bg); border: 1px solid var(--sb-item-border); color: var(--sb-fg-strong); }
+  .br-mini-ic { width: 14px; height: 14px; border-radius: 4px; flex: none; background: linear-gradient(135deg, #f472b6, #db2777); }
+  .br-mini-ic.is-b { background: linear-gradient(135deg, #34d399, #059669); }
+  .br-mini-tx { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+  .br-mini-tx b { font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .br-mini-tx small { font-size: 9px; color: var(--sb-desc); opacity: var(--sb-desc-opacity); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
 </style>
 {% endblock %}
 
@@ -513,6 +613,72 @@ btnUpload.addEventListener('click', async () => {
     status.textContent = tr('錯誤：') + e.message;
     btnUpload.disabled = false;
   }
+});
+
+// ---- 內建 Logo 與左側選單配色：點一下就送出，畫面當場換（不重新整理） ----
+const HAS_CUSTOM_LOGO = {{ 'true' if has_custom else 'false' }};
+async function saveAppearance(payload, statusEl, okText) {
+  statusEl.classList.remove('is-err');
+  statusEl.textContent = tr('套用中…');
+  try {
+    const r = await fetch('/admin/branding/appearance', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+    if (!r.ok) {
+      statusEl.classList.add('is-err');
+      statusEl.textContent = await window.friendlyServerError(r, tr('套用失敗'));
+      return null;
+    }
+    const j = await r.json();
+    statusEl.textContent = okText;
+    return j;
+  } catch (e) {
+    statusEl.classList.add('is-err');
+    statusEl.textContent = tr('錯誤：') + e.message;
+    return null;
+  }
+}
+function applyLogos(j) {
+  // 上傳過企業 Logo 時各處都是那一張，不必換
+  if (HAS_CUSTOM_LOGO || !j) return;
+  const side = document.querySelector('.sidebar .brand-logo');
+  if (side && j.sidebar_logo) side.src = j.sidebar_logo;
+  document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]').forEach(function (l) {
+    if (j.icon_logo) l.href = j.icon_logo;
+  });
+  if (previewImg && j.icon_logo) previewImg.src = j.icon_logo;
+}
+function markOn(buttons, btn) {
+  buttons.forEach(function (b) {
+    const on = b === btn;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+}
+const themeBtns = Array.from(document.querySelectorAll('[data-theme-pick]'));
+themeBtns.forEach(function (btn) {
+  btn.addEventListener('click', async function () {
+    if (btn.classList.contains('is-on')) return;
+    const id = btn.dataset.themePick;
+    const name = btn.querySelector('.br-theme-name').textContent.trim();
+    const j = await saveAppearance({sidebar_theme: id}, document.getElementById('themeStatus'),
+                                   tr('已套用：') + name);
+    if (!j) return;
+    document.documentElement.setAttribute('data-sb-theme', j.sidebar_theme);
+    markOn(themeBtns, btn);
+    applyLogos(j);              // 深 / 淺背景要換公司 Logo 的深色版 / 淺色版
+  });
+});
+const logoBtns = Array.from(document.querySelectorAll('[data-builtin-logo]'));
+logoBtns.forEach(function (btn) {
+  btn.addEventListener('click', async function () {
+    if (btn.classList.contains('is-on')) return;
+    const name = btn.querySelector('.br-opt-name').textContent.trim();
+    const j = await saveAppearance({builtin_logo: btn.dataset.builtinLogo},
+                                   document.getElementById('logoOptStatus'), tr('已套用：') + name);
+    if (!j) return;
+    markOn(logoBtns, btn);
+    applyLogos(j);
+  });
 });
 
 btnReset.addEventListener('click', async () => {

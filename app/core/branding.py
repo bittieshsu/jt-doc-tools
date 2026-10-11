@@ -139,3 +139,128 @@ def set_site_name(name: str) -> None:
 
 def has_custom_site_name() -> bool:
     return _site_name_path().exists() and _site_name_path().stat().st_size > 0
+
+
+# ----- 內建 Logo 與左側選單配色（v1.16.78 起）-----
+# 存在 `data/branding/appearance.json`（整個 branding 目錄本來就在設定備份裡）。
+# 每一頁都會讀（base.html 的 Logo 與 `<html data-sb-theme>`），所以照檔案修改時間快取。
+
+#: 內建 Logo：沒有上傳企業 Logo 時用哪一個。
+#: `jt` 是 Jason Tools 公司 Logo（原本的預設，側欄依背景深淺換深色版 / 淺色版）；
+#: `doc` 是介紹網站左上角那個文件圖示（自帶底色，深淺背景都用同一張）。
+BUILTIN_LOGOS = ("jt", "doc")
+DEFAULT_BUILTIN_LOGO = "jt"
+_BUILTIN_LOGO_NAMES = {"jt": "Jason Tools 公司 Logo", "doc": "文件圖示（介紹網站）"}
+_JT_ON_DARK = "/static/images/logo-on-dark.png"
+_JT_ON_LIGHT = "/static/images/logo-on-light.png"
+_DOC_LOGO = "/static/images/logo-doc.png"
+
+#: 左側選單配色：(代號, 種類, 背景深淺, 名稱, 一句說明)。顏色本身只寫在 `static/css/platform.css`
+#: 的 `[data-sb-theme="…"]` 區塊（一份）；測試會比對兩邊的代號與深淺一致，並量文字對比。
+SIDEBAR_THEMES = (
+    ("indigo", "gradient", "dark", "靛紫（預設）", "原本的配色，靛紫漸層"),
+    ("ocean", "gradient", "dark", "海洋藍", "藍色漸層，沉穩專業"),
+    ("forest", "gradient", "dark", "森林綠", "深綠漸層，柔和護眼"),
+    ("wine", "gradient", "dark", "酒紅", "酒紅漸層，醒目有個性"),
+    ("graphite", "gradient", "dark", "石墨黑", "灰黑漸層，低調俐落"),
+    ("navy", "solid", "dark", "海軍藍", "深藍純色，正式穩重"),
+    ("teal", "solid", "dark", "墨綠", "墨綠純色，清爽沉靜"),
+    ("charcoal", "solid", "dark", "炭黑", "近黑純色，文字對比最高"),
+    ("silver", "solid", "light", "淺灰", "淺灰底深色字，明亮簡潔"),
+    ("mist", "solid", "light", "淡藍", "淡藍底深藍字，清新柔和"),
+)
+DEFAULT_SIDEBAR_THEME = "indigo"
+_THEME_IDS = tuple(t[0] for t in SIDEBAR_THEMES)
+_THEME_TONE = {t[0]: t[2] for t in SIDEBAR_THEMES}
+
+_appearance_cache: tuple[float, dict] = (-1.0, {})
+
+
+def _appearance_path() -> Path:
+    return settings.branding_dir / "appearance.json"
+
+
+def get_appearance() -> dict:
+    """{"sidebar_theme", "builtin_logo"}；檔案沒有、壞掉或代號不認得都回預設。"""
+    global _appearance_cache
+    p = _appearance_path()
+    try:
+        mtime = p.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    if mtime and _appearance_cache[0] == mtime:
+        return dict(_appearance_cache[1])
+    data: dict = {}
+    if mtime:
+        try:
+            import json
+            raw = json.loads(p.read_text(encoding="utf-8"))
+            data = raw if isinstance(raw, dict) else {}
+        except Exception:
+            data = {}
+    out = {
+        "sidebar_theme": data.get("sidebar_theme") if data.get("sidebar_theme") in _THEME_IDS
+        else DEFAULT_SIDEBAR_THEME,
+        "builtin_logo": data.get("builtin_logo") if data.get("builtin_logo") in BUILTIN_LOGOS
+        else DEFAULT_BUILTIN_LOGO,
+    }
+    _appearance_cache = (mtime, out)
+    return dict(out)
+
+
+def set_appearance(*, sidebar_theme: Optional[str] = None,
+                   builtin_logo: Optional[str] = None) -> dict:
+    """改其中一項或兩項；代號不認得丟 ValueError（呼叫端回 400）。回改完之後的設定。"""
+    cur = get_appearance()
+    if sidebar_theme is not None:
+        if sidebar_theme not in _THEME_IDS:
+            raise ValueError("unknown sidebar theme")
+        cur["sidebar_theme"] = sidebar_theme
+    if builtin_logo is not None:
+        if builtin_logo not in BUILTIN_LOGOS:
+            raise ValueError("unknown builtin logo")
+        cur["builtin_logo"] = builtin_logo
+    from . import atomic_json
+    settings.branding_dir.mkdir(parents=True, exist_ok=True)
+    atomic_json.write_json(_appearance_path(), cur)
+    global _appearance_cache
+    _appearance_cache = (-1.0, {})
+    return get_appearance()
+
+
+def sidebar_theme() -> str:
+    return get_appearance()["sidebar_theme"]
+
+
+def sidebar_tone(theme: Optional[str] = None) -> str:
+    """`dark`（白字）或 `light`（深色字）。"""
+    return _THEME_TONE.get(theme or sidebar_theme(), "dark")
+
+
+def theme_list() -> list[dict]:
+    return [{"id": i, "kind": k, "tone": tone, "name": n, "desc": d} for i, k, tone, n, d in SIDEBAR_THEMES]
+
+
+def builtin_logo_list() -> list[dict]:
+    return [{"id": i, "name": _BUILTIN_LOGO_NAMES[i], "url": builtin_logo_url(i)} for i in BUILTIN_LOGOS]
+
+
+def builtin_logo_url(logo: Optional[str] = None, spot: str = "page") -> str:
+    """內建 Logo 的網址。`spot` 是 `sidebar`（看選單背景深淺挑版本）或其他位置（白底）。"""
+    logo = logo or get_appearance()["builtin_logo"]
+    if logo == "doc":
+        return _DOC_LOGO
+    if spot == "sidebar" and sidebar_tone() == "dark":
+        return _JT_ON_DARK
+    return _JT_ON_LIGHT
+
+
+def logo_url(spot: str = "page") -> str:
+    """各位置實際要用的 Logo：上傳過企業 Logo 就用那張，否則用選的內建 Logo。"""
+    return custom_logo_url() or builtin_logo_url(spot=spot)
+
+
+def builtin_logo_file(logo: Optional[str] = None) -> Path:
+    """內建 Logo 的檔案（通知信要把圖夾進信裡；信件底色是白的）。"""
+    rel = builtin_logo_url(logo, spot="page").lstrip("/")
+    return Path(__file__).resolve().parent.parent.parent / rel

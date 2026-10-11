@@ -2453,6 +2453,22 @@ curl http://localhost:8765/admin/api/branding \
   -H "Authorization: Bearer ADMIN_TOKEN" | jq
 ```
 
+回傳有沒有上傳企業 Logo、站台名稱，以及目前的左側選單配色（`sidebar_theme`）與內建 Logo（`builtin_logo`）；清單 `sidebar_themes` 列出 10 種配色（`id`、`kind` 是 `gradient` 或 `solid`、`tone` 是 `dark` 或 `light`、名稱、說明），清單 `builtin_logos` 列出兩個內建 Logo（`jt` 公司 Logo、`doc` 文件圖示）。
+
+### 左側選單配色與內建 Logo
+
+```text
+POST /admin/branding/appearance
+```
+
+```bash
+curl -X POST http://localhost:8765/admin/branding/appearance \
+  -H "Authorization: Bearer ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"sidebar_theme": "ocean", "builtin_logo": "doc"}'
+```
+
+送 `sidebar_theme` 與 `builtin_logo` 其中一項或兩項，代號見上一節的清單；不認得的代號回 **400**。回改完之後的設定，加上 `sidebar_tone`（`dark` / `light`）與側欄、頁籤圖示現在該用的 Logo 網址（`sidebar_logo`、`icon_logo`）。上傳過企業 Logo 時一律用那一張，內建 Logo 的選擇在還原預設之後才生效。改了寫一筆稽核記錄（`settings_change`，對象 `branding`）。
+
 ### 設定匯出清單
 
 ```text
@@ -2669,8 +2685,8 @@ console.log(j.results);
 # 列出
 sudo jtdt auth show
 
-# 直接讀檔可看（unhash 不可逆）：
-sudo cat /var/lib/jt-doc-tools/data/api_tokens.json
+# 檔案裡只有雜湊與密文（v1.16.78 起），讀檔看不到 Token 原文；
+# 要看原文請到管理頁「API Token」按「顯示」
 
 # 撤銷（CLI 沒提供撤銷，必要時直接清掉檔案後重啟服務）：
 sudo systemctl stop jt-doc-tools

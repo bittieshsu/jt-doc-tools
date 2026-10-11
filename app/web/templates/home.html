@@ -4,7 +4,7 @@
 {% block content %}
 <section class="hero">
   <div class="hero-logo">
-    <img src="{{ branding_logo_url() or '/static/images/logo-on-light.png' }}" alt="{{ app_name }}" />
+    <img src="{{ brand_logo('page') }}" alt="{{ app_name }}" />
   </div>
   <h1 class="hero-title">{{ app_name }}</h1>
   {# **工具數用算的，不要寫死** —— 寫死的話加工具時這個數字會漂掉，

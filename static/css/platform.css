@@ -22,11 +22,98 @@ body {
   color: var(--text);
 }
 
+/* ==== 左側選單配色（v1.16.78）====
+   管理員在「企業 Logo / 識別」挑一種，寫在 `<html data-sb-theme="…">`；設定頁的預覽卡片
+   也各自帶 `data-sb-theme`，所以顏色**只寫在這裡一份**（`app/core/branding.SIDEBAR_THEMES`
+   只有代號、名稱、深淺，測試會比對兩邊並量文字對比）。
+   * 背景：`--sb-bg-top` → `--sb-bg-bottom`，純色兩個一樣。
+   * 文字：深色背景用白字系、淺色背景用深色字（`--sb-ink` 是半透明疊色用的 RGB）。
+   * 預設（靛紫）每一個值都跟改版前一模一樣；其他配色的次要文字（說明、版本、頁尾）
+     另外調到對比 4.5:1 以上（`tests/test_sidebar_theme_browser.py` 實量）。 */
+:root, [data-sb-theme] {
+  --sb-bg: linear-gradient(180deg, var(--sb-bg-top) 0%, var(--sb-bg-bottom) 100%);
+  --sb-ink: 255,255,255;
+  --sb-fg-strong: #fff;
+  --sb-soft: rgba(255,255,255,0.75);
+  --sb-desc: rgba(255,255,255,0.85);
+  --sb-desc-opacity: 0.78;
+  --sb-footer: rgba(255,255,255,0.55);
+  --sb-placeholder: rgba(255,255,255,0.7);
+  --sb-header-bg: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.05));
+  --sb-line: rgba(255,255,255,0.18);
+  --sb-search-bg: rgba(255,255,255,0.14);
+  --sb-search-bg-focus: rgba(255,255,255,0.22);
+  --sb-search-border: rgba(255,255,255,0.28);
+  --sb-search-border-focus: rgba(255,255,255,0.6);
+  --sb-group-bg: rgba(15,15,40,0.35);
+  --sb-group-bg-hover: rgba(15,15,40,0.5);
+  --sb-group-border: rgba(255,255,255,0.10);
+  --sb-group-hl: rgba(255,255,255,0.08);
+  --sb-count-bg: rgba(255,255,255,0.22);
+  --sb-item-bg: rgba(255,255,255,0.10);
+  --sb-item-bg-hover: rgba(255,255,255,0.20);
+  --sb-item-border: rgba(255,255,255,0.10);
+  --sb-item-border-hover: rgba(255,255,255,0.22);
+  --sb-press-bg: rgba(255,255,255,0.18);
+  --sb-pin-idle: rgba(255,255,255,0.55);
+  --sb-pin: #fde047;
+  --sb-userbar-bg: rgba(255,255,255,0.06);
+}
+/* 漸層 */
+:root, [data-sb-theme="indigo"]   { --sb-bg-top: #7c6df0; --sb-bg-bottom: #5b4bd9; --sb-fg: #f4f3ff; }
+[data-sb-theme="ocean"]           { --sb-bg-top: #1d4ed8; --sb-bg-bottom: #1e3a8a; --sb-fg: #ffffff; }
+[data-sb-theme="forest"]          { --sb-bg-top: #05664a; --sb-bg-bottom: #064e3b; --sb-fg: #ffffff; }
+[data-sb-theme="wine"]            { --sb-bg-top: #be123c; --sb-bg-bottom: #881337; --sb-fg: #ffffff; }
+[data-sb-theme="graphite"]        { --sb-bg-top: #334155; --sb-bg-bottom: #0f172a; --sb-fg: #f8fafc; }
+/* 純色 */
+[data-sb-theme="navy"]            { --sb-bg-top: #1e3a5f; --sb-bg-bottom: #1e3a5f; --sb-fg: #f1f5f9; }
+[data-sb-theme="teal"]            { --sb-bg-top: #115e59; --sb-bg-bottom: #115e59; --sb-fg: #f0fdfa; }
+[data-sb-theme="charcoal"]        { --sb-bg-top: #1f2328; --sb-bg-bottom: #1f2328; --sb-fg: #f3f4f6; }
+[data-sb-theme="silver"]          { --sb-bg-top: #e2e8f0; --sb-bg-bottom: #e2e8f0; --sb-fg: #0f172a; --sb-ink: 15,23,42; }
+[data-sb-theme="mist"]            { --sb-bg-top: #dbeafe; --sb-bg-bottom: #dbeafe; --sb-fg: #172554; --sb-ink: 23,37,84; }
+/* 深色背景的新配色：次要文字調亮（預設的靛紫維持原樣） */
+[data-sb-theme="ocean"], [data-sb-theme="forest"], [data-sb-theme="wine"], [data-sb-theme="graphite"],
+[data-sb-theme="navy"], [data-sb-theme="teal"], [data-sb-theme="charcoal"] {
+  --sb-soft: rgba(255,255,255,0.85);
+  --sb-desc: rgba(255,255,255,0.92);
+  --sb-desc-opacity: 1;
+  --sb-footer: rgba(255,255,255,0.78);
+  --sb-placeholder: rgba(255,255,255,0.75);
+}
+/* 淺色背景：深色字，半透明疊色改成深色系，輸入框與項目改成接近白的底 */
+[data-sb-theme="silver"], [data-sb-theme="mist"] {
+  --sb-fg-strong: var(--sb-fg);
+  --sb-soft: rgba(var(--sb-ink),0.72);
+  --sb-desc: rgba(var(--sb-ink),0.72);
+  --sb-desc-opacity: 1;
+  --sb-footer: rgba(var(--sb-ink),0.68);
+  --sb-placeholder: rgba(var(--sb-ink),0.55);
+  --sb-header-bg: linear-gradient(180deg, rgba(var(--sb-ink),0.06), rgba(var(--sb-ink),0.02));
+  --sb-line: rgba(var(--sb-ink),0.12);
+  --sb-search-bg: rgba(255,255,255,0.75);
+  --sb-search-bg-focus: #ffffff;
+  --sb-search-border: rgba(var(--sb-ink),0.18);
+  --sb-search-border-focus: rgba(var(--sb-ink),0.4);
+  --sb-group-bg: rgba(var(--sb-ink),0.07);
+  --sb-group-bg-hover: rgba(var(--sb-ink),0.11);
+  --sb-group-border: rgba(var(--sb-ink),0.08);
+  --sb-group-hl: rgba(255,255,255,0.5);
+  --sb-count-bg: rgba(var(--sb-ink),0.1);
+  --sb-item-bg: rgba(255,255,255,0.55);
+  --sb-item-bg-hover: rgba(255,255,255,0.85);
+  --sb-item-border: rgba(var(--sb-ink),0.08);
+  --sb-item-border-hover: rgba(var(--sb-ink),0.16);
+  --sb-press-bg: rgba(var(--sb-ink),0.08);
+  --sb-pin-idle: rgba(var(--sb-ink),0.45);
+  --sb-pin: #d97706;
+  --sb-userbar-bg: rgba(var(--sb-ink),0.05);
+}
+
 /* Left sidebar layout — vibrant indigo with per-item color accents. */
 .sidebar {
   position: fixed; top: 0; left: 0; bottom: 0; width: 268px;
-  background: linear-gradient(180deg, #7c6df0 0%, #5b4bd9 100%);
-  color: #f4f3ff;
+  background: var(--sb-bg);
+  color: var(--sb-fg);
   display: flex; flex-direction: column;
   padding: 0;
   z-index: 50;
@@ -36,8 +123,8 @@ body {
 .sidebar-header {
   flex: 0 0 auto;
   padding: 16px 12px 12px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.05));
-  border-bottom: 1px solid rgba(255,255,255,0.18);
+  background: var(--sb-header-bg);
+  border-bottom: 1px solid var(--sb-line);
 }
 .sidebar-scroll {
   flex: 1 1 auto;
@@ -75,7 +162,7 @@ body {
 .sidebar .brand {
   display: flex; align-items: center; gap: 10px;
   padding: 0 4px;
-  color: #fff; text-decoration: none;
+  color: var(--sb-fg-strong); text-decoration: none;
 }
 .sidebar .brand-mark {
   width: 34px; height: 34px; border-radius: 9px;
@@ -95,35 +182,35 @@ body {
 }
 .sidebar .brand-version {
   text-align: right; font-size: 11px; line-height: 1;
-  color: rgba(255,255,255,0.75); margin-top: -10px; padding-right: 4px;
+  color: var(--sb-soft); margin-top: -10px; padding-right: 4px;
   display: flex; justify-content: flex-end; align-items: baseline; gap: 8px;
 }
 /* AGPL 第 13 條要的「Source 連結」。刻意做得低調但**可見**（不是 hover 才出現、
    也不是只有管理員看得到）—— 條文要求的是網路使用者拿得到原始碼。 */
 .sidebar .brand-src {
-  color: rgba(255,255,255,0.75); text-decoration: underline;
+  color: var(--sb-soft); text-decoration: underline;
   text-underline-offset: 2px;
 }
-.sidebar .brand-src:hover { color: #fff; }
+.sidebar .brand-src:hover { color: var(--sb-fg-strong); }
 
 .sidebar-search {
   width: 100%; padding: 8px 12px; border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.28); background: rgba(255,255,255,0.14);
-  color: #fff; font-size: 13px; margin-bottom: 0; outline: none;
+  border: 1px solid var(--sb-search-border); background: var(--sb-search-bg);
+  color: var(--sb-fg-strong); font-size: 13px; margin-bottom: 0; outline: none;
 }
-.sidebar-search::placeholder { color: rgba(255,255,255,0.7); }
-.sidebar-search:focus { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.6); }
+.sidebar-search::placeholder { color: var(--sb-placeholder); }
+.sidebar-search:focus { background: var(--sb-search-bg-focus); border-color: var(--sb-search-border-focus); }
 
 .sb-group { margin: 0 12px 8px 0; }
 .sb-group > summary {
   list-style: none; cursor: pointer; user-select: none;
   display: flex; align-items: center; gap: 8px;
   padding: 9px 12px; font-size: 14px; font-weight: 700;
-  color: #fff; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--sb-fg-strong); letter-spacing: 0.04em; text-transform: uppercase;
   border-radius: 8px;
-  background: rgba(15,15,40,0.35);
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  background: var(--sb-group-bg);
+  border: 1px solid var(--sb-group-border);
+  box-shadow: inset 0 1px 0 var(--sb-group-hl);
 }
 .sb-group > summary::-webkit-details-marker { display: none; }
 
@@ -158,10 +245,10 @@ html[lang]:not([lang="zh-Hant"]) .sb-group > summary > span:first-of-type {
   transition: transform 0.15s; opacity: 0.9; padding: 0 2px;
 }
 .sb-group:not([open]) > summary::after { transform: rotate(-90deg); }
-.sb-group > summary:hover { background: rgba(15,15,40,0.5); }
+.sb-group > summary:hover { background: var(--sb-group-bg-hover); }
 .sb-group > summary .sb-group-icon { display: inline-flex; opacity: 0.9; }
 .sb-count {
-  background: rgba(255,255,255,0.22); color: #fff;
+  background: var(--sb-count-bg); color: var(--sb-fg-strong);
   font-size: 11px; padding: 1px 8px; border-radius: 10px;
   font-weight: 600; line-height: 1.5;
 }
@@ -184,29 +271,29 @@ html[lang]:not([lang="zh-Hant"]) .sb-group > summary > span:first-of-type {
 .sb-item {
   display: flex; align-items: flex-start; gap: 10px;
   padding: 9px 10px; border-radius: 8px;
-  background: rgba(255,255,255,0.10); color: #fff;
+  background: var(--sb-item-bg); color: var(--sb-fg-strong);
   text-decoration: none; transition: background 0.12s, transform 0.05s;
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid var(--sb-item-border);
   position: relative;
 }
-.sb-item:hover { background: rgba(255,255,255,0.20); border-color: rgba(255,255,255,0.22); }
+.sb-item:hover { background: var(--sb-item-bg-hover); border-color: var(--sb-item-border-hover); }
 .sb-item:active { transform: translateY(1px); }
 /* 釘選按鈕 — 滑入時才顯示，已釘選的常駐金色 */
 .sb-pin-btn {
   position: absolute; top: 4px; right: 4px;
   background: transparent; border: 1px solid transparent; padding: 3px;
-  border-radius: 5px; cursor: pointer; color: rgba(255,255,255,0.55);
+  border-radius: 5px; cursor: pointer; color: var(--sb-pin-idle);
   display: flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity 0.12s, background 0.12s, color 0.12s;
 }
 .sb-item:hover .sb-pin-btn { opacity: 1; }
-.sb-pin-btn:hover { background: rgba(255,255,255,0.18); color: #fde047; }
+.sb-pin-btn:hover { background: var(--sb-press-bg); color: var(--sb-pin); }
 .sb-pin-btn.is-pinned {
-  opacity: 1; color: #fde047;
+  opacity: 1; color: var(--sb-pin);
 }
-.sb-pin-btn.is-pinned svg { fill: #fde047; }
+.sb-pin-btn.is-pinned svg { fill: var(--sb-pin); }
 /* 釘選群組 summary 圖示用金色與其他群組區別 */
-.sb-pinned > summary .sb-group-icon { color: #fde047; }
+.sb-pinned > summary .sb-group-icon { color: var(--sb-pin); }
 /* Active item visually merges into the right content area: same bg colour
    as the page (var(--bg)), no border/shadow, extended to the right edge
    so it looks like a tab kissing the content. */
@@ -266,11 +353,11 @@ html[lang]:not([lang="zh-Hant"]) .sb-group > summary > span:first-of-type {
 
 .sb-item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .sb-item-name { font-size: 13.5px; font-weight: 600; line-height: 1.25; }
-.sb-item-desc { font-size: 11.5px; line-height: 1.4; opacity: 0.78; color: rgba(255,255,255,0.85); }
+.sb-item-desc { font-size: 11.5px; line-height: 1.4; opacity: var(--sb-desc-opacity); color: var(--sb-desc); }
 
 .sidebar-footer {
   margin-top: auto; padding-top: 10px; font-size: 11px;
-  color: rgba(255,255,255,0.55); text-align: center;
+  color: var(--sb-footer); text-align: center;
 }
 
 /* 「展開」按鈕：sidebar 收起時才顯示，做成左邊緣垂直 tab（不佔上下空間，
@@ -289,11 +376,13 @@ html[lang]:not([lang="zh-Hant"]) .sb-group > summary > span:first-of-type {
 /* 「收起」按鈕：跟 brand 同一行右側，不單獨佔行 */
 .sidebar-collapse {
   flex-shrink: 0; width: 24px; height: 24px; border-radius: 5px; border: none;
-  background: rgba(255,255,255,0.10); color: #fff; font-size: 15px;
+  background: var(--sb-item-bg); color: var(--sb-fg-strong); font-size: 15px;
   cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
   line-height: 1; padding: 0; margin-left: auto;
 }
-.sidebar-collapse:hover { background: rgba(255,255,255,0.18); }
+.sidebar-collapse:hover { background: var(--sb-press-bg); }
+/* 帳號列（樣式原本在 generated-inline.css 的 data-s，背景寫死白色半透明） */
+.sidebar .user-bar { background: var(--sb-userbar-bg); }
 /* brand-row：brand-block（brand+version）在左、收起按鈕貼最右
    brand-block 維持 inline-flex column，version 仍對齊 brand 文字右緣 */
 .sidebar .brand-row {

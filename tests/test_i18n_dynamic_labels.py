@@ -400,6 +400,13 @@ def _official_doc_di_import_texts() -> list[str]:
     return list(di.READ_ERRORS.values()) + list(r.IMPORT_ERRORS.values())
 
 
+def _branding_appearance_texts() -> list[str]:
+    """「企業 Logo / 識別」的左側選單配色（名稱、說明）、內建 Logo 名稱、「漸層 / 純色」小標（`tr(變數)`）。"""
+    from app.core import branding
+    return ([t[3] for t in branding.SIDEBAR_THEMES] + [t[4] for t in branding.SIDEBAR_THEMES]
+            + [x["name"] for x in branding.builtin_logo_list()] + ["漸層", "純色"])
+
+
 def _official_doc_example_texts() -> list[str]:
     """公文撰擬「載入範例」下拉：分組名稱、分類、標題（`tr(變數)`，靜態掃描看不到）。
     範例的需求文字本身**不翻**（那是要送去產生中文公文的輸入）。"""
@@ -457,6 +464,7 @@ def _usage_category_labels() -> list[str]:
     ("公文撰擬的範例下拉", _official_doc_example_texts),
     ("公文撰擬的 DI 檔注意事項", _official_doc_di_texts),
     ("公文撰擬上傳 DI 檔的失敗原因", _official_doc_di_import_texts),
+    ("左側選單配色與內建 Logo", _branding_appearance_texts),
     ("會議摘要送回轉逐字稿的理由", _meeting_resend_messages),
 ])
 @pytest.mark.parametrize("locale", _locales())

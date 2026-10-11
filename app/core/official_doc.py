@@ -1288,7 +1288,26 @@ _CONTACT_ALIASES = {
     "電子信箱": "email", "電子郵件": "email", "信箱": "email", "e-mail": "email",
     "email": "email", "mail": "email",
 }
-_CONTACT_LINE_RE = re.compile(r"^\s*([^：:]{1,12}?)\s*[：:]\s*(.*)$")
+def _label_value(s: str):
+    """「欄位名稱：值」→ (欄位名稱, 值)；不是這個形狀回 None。
+
+    欄位名稱是第一個冒號（全形或半形）前面那一段去掉頭尾空白，最多 12 字（只有空白也算拆得開，
+    名稱是空字串）；值是冒號後面去掉開頭空白，中間不可以有換行（結尾一個換行可以）。
+
+    原本是 `^\\s*([^：:]{1,12}?)\\s*[：:]\\s*(.*)$`：名稱那一組也收得到空白、前後又各接一個 `\\s*`，
+    遇到大量空白會回溯很多次（CodeQL #209、#210）。這裡不用正規式，行為跟那一支逐一比對過
+    （`tests/test_official_doc_contact_label_split.py`）。"""
+    i = min((k for k in (s.find("："), s.find(":")) if k >= 0), default=-1)
+    if i <= 0:
+        return None
+    label = s[:i].strip()
+    if len(label) > 12:
+        return None
+    rest = s[i + 1:].lstrip()
+    value = rest[:-1] if rest.endswith("\n") else rest
+    if "\n" in value:
+        return None
+    return label, value
 
 
 _CJK_EDGE_RE = re.compile(r"[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]")
@@ -1315,9 +1334,9 @@ def _contact_value(key: str, raw) -> str:
     """一格的值：一行（見 `_one_line`）、限長；使用者把欄位名稱也打進去的話
     （「電話：04-…」）拿掉，不然草稿會變成「電話：電話：04-…」。"""
     v = _one_line(raw)
-    m = _CONTACT_LINE_RE.match(v)
-    if m and _CONTACT_ALIASES.get(re.sub(r"\s+", "", m.group(1)).lower()) == key:
-        v = m.group(2).strip()
+    m = _label_value(v)
+    if m and _CONTACT_ALIASES.get(re.sub(r"\s+", "", m[0]).lower()) == key:
+        v = m[1].strip()
     return v[:CONTACT_FIELD_MAX[key]]
 
 
@@ -1350,8 +1369,8 @@ def split_contact(text: str, company: bool) -> tuple[dict, list[str]]:
         line = line.strip()
         if not line:
             continue
-        m = _CONTACT_LINE_RE.match(line)
-        key = _CONTACT_ALIASES.get(re.sub(r"\s+", "", m.group(1)).lower()) if m else None
+        m = _label_value(line)
+        key = _CONTACT_ALIASES.get(re.sub(r"\s+", "", m[0]).lower()) if m else None
         if key is None and not m and last == "address":
             out["address"] = _contact_value("address", out["address"] + "\n" + line)
             continue
@@ -1359,11 +1378,11 @@ def split_contact(text: str, company: bool) -> tuple[dict, list[str]]:
         if key is None or (key == "tax_id" and not company):
             unplaced.append(line[:200])
             continue
-        val = _contact_value(key, m.group(2))
+        val = _contact_value(key, m[1])
         if not val:                      # 只寫了欄位名稱（範例格式照抄）：不算
             continue
         if key == "person" and not out["person"]:
-            name = re.sub(r"\s+", "", m.group(1))
+            name = re.sub(r"\s+", "", m[0])
             out["person_label"] = name if name in CONTACT_PERSON_LABELS else CONTACT_PERSON_LABELS[0]
         out[key] = f"{out[key]}、{val}"[:CONTACT_FIELD_MAX[key]] if out[key] else val
         last = key

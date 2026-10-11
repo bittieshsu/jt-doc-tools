@@ -61,15 +61,21 @@
     </thead>
     <tbody>
       {% for t in tokens %}
-      <tr data-token="{{ t.token }}">
+      {# Token 檔裡只有雜湊與密文（v1.16.78）：`t.token` 是這一頁才解開的原文，
+         解不開（金鑰換過）時是空字串 —— Token 照樣能用，只是顯示不出來，撤銷改用遮罩比對。 #}
+      <tr data-token="{{ t.token or t.preview }}">
         <td><strong>{{ t.label }}</strong></td>
         <td>
-          <code class="token-masked" data-full="{{ t.token }}">{{ t.token[:6] }}…{{ t.token[-4:] }}</code>
+          <code class="token-masked" data-full="{{ t.token }}">{{ t.preview }}</code>
+          {% if t.token %}
           {# 兩顆按鈕的內容結構要一致（圖示 + 文字），不然高度不同會上下錯開。
              文字包在 .btn-tx 裡，JS 切換「顯示 / 隱藏」時只換這個節點，
              圖示才不會被 textContent 洗掉。 #}
           <button class="btn btn-small btn-reveal" type="button" title="{{ tr('顯示完整 token') }}">{{ icon('eye', size=12) }}<span class="btn-tx">{{ tr('顯示') }}</span></button>
           <button class="btn btn-small btn-copy" type="button" title="{{ tr('複製到剪貼簿') }}">{{ icon('copy', size=12) }}<span class="btn-tx">{{ tr('複製') }}</span></button>
+          {% else %}
+          <span class="muted">{{ tr('無法顯示原文（加密金鑰換過）；仍可使用') }}</span>
+          {% endif %}
         </td>
         <td class="muted" data-s="s6b9c179a">
           {# 在伺服器端就格式化。原本把 `created_at * 1000` 直接寫進 JS：

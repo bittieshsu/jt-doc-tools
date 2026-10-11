@@ -1631,6 +1631,9 @@ def build_router(templates) -> APIRouter:
                 "default_site_name": _br_default_app_name(),
                 "current_site_name": branding.get_site_name(default=_br_default_app_name()),
                 "has_custom_site_name": branding.has_custom_site_name(),
+                "appearance": branding.get_appearance(),
+                "sidebar_themes": branding.theme_list(),
+                "builtin_logos": branding.builtin_logo_list(),
             },
         )
 
@@ -1643,13 +1646,46 @@ def build_router(templates) -> APIRouter:
         except ValueError:
             # v1.5.8: 不漏 stack trace,通用訊息（CodeQL py/stack-trace-exposure）
             raise HTTPException(400, "Logo 檔案格式錯誤,僅支援 PNG / JPG / SVG")
+        from ..core import notify_email_assets
+        notify_email_assets.invalidate()      # 通知信裡夾的 Logo 跟著換（原本要重啟才換）
         return {"ok": True, "url": branding.custom_logo_url()}
 
     @router.post("/branding/reset")
     async def branding_reset():
-        from ..core import branding
+        from ..core import branding, notify_email_assets
         removed = branding.reset_logo()
+        notify_email_assets.invalidate()
         return {"ok": True, "had_custom": removed}
+
+    @router.post("/branding/appearance")
+    async def branding_appearance(request: Request):
+        """內建 Logo（`builtin_logo`：`jt` / `doc`）與左側選單配色（`sidebar_theme`），
+        送其中一項或兩項。回改完之後的設定與側欄現在該用的 Logo 網址（畫面上立即換）。"""
+        from ..core import audit_db, branding, notify_email_assets
+        from ..core import client_ip as _cip
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+        if not isinstance(body, dict):
+            raise HTTPException(400, "需要 JSON 物件")
+        theme, logo = body.get("sidebar_theme"), body.get("builtin_logo")
+        if theme is None and logo is None:
+            raise HTTPException(400, "請指定 sidebar_theme 或 builtin_logo")
+        try:
+            out = branding.set_appearance(
+                sidebar_theme=str(theme) if theme is not None else None,
+                builtin_logo=str(logo) if logo is not None else None)
+        except ValueError:
+            raise HTTPException(400, "不認得的配色或 Logo 代號")
+        notify_email_assets.invalidate()
+        user = getattr(request.state, "user", None)
+        audit_db.log_event("settings_change", username=(user or {}).get("username", ""),
+                           ip=_cip.real_client_ip(request), target="branding",
+                           details={k: v for k, v in (("sidebar_theme", theme), ("builtin_logo", logo))
+                                    if v is not None})
+        return {"ok": True, **out, "sidebar_tone": branding.sidebar_tone(),
+                "sidebar_logo": branding.logo_url("sidebar"), "icon_logo": branding.logo_url("icon")}
 
     @router.get("/api/branding")
     async def branding_api():
@@ -1659,6 +1695,9 @@ def build_router(templates) -> APIRouter:
             "logo_url": branding.custom_logo_url(),
             "site_name": branding.get_site_name(default=_br_default_app_name()),
             "has_custom_site_name": branding.has_custom_site_name(),
+            **branding.get_appearance(),
+            "sidebar_themes": branding.theme_list(),
+            "builtin_logos": branding.builtin_logo_list(),
         }
 
     @router.post("/branding/site-name")

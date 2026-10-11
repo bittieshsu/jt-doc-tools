@@ -117,9 +117,8 @@ def site_logo_png() -> Optional[bytes]:
         from . import branding
         src: Optional[Path] = branding.get_custom_logo_path()
         if not src or not src.is_file():
-            # 內建 logo：信件底色是白的，用深色版才看得見
-            src = (Path(__file__).resolve().parent.parent.parent
-                   / "static" / "images" / "logo-on-light.png")
+            # 內建 logo（「企業 Logo / 識別」選的那一個）：信件底色是白的，用白底那一版
+            src = branding.builtin_logo_file()
         if not src.is_file():
             return None
         data = src.read_bytes()

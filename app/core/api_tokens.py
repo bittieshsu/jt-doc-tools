@@ -6,10 +6,17 @@ brute force without being unwieldy. Tokens include a human-readable label
 and optional expiry so admins can rotate.
 
 Security notes:
-- Only the token value (full) is ever stored in the JSON; there's no
-  hashing since this is a single-user self-hosted app. If concerns about
-  disk theft arise, we can switch to HMAC-prefix lookup + hash storage.
-- Tokens are matched case-sensitively in constant time via ``hmac.compare_digest``.
+- **The token itself is never stored in clear text** (v1.16.78, CodeQL #208).
+  Each entry keeps ``token_sha256`` (used for matching, so a request never
+  needs to decrypt anything), ``token_enc`` (Fernet, the same key as the LLM
+  and SSO secrets; decrypted only for the admin page's reveal / copy and the
+  built-in token hint) and ``preview`` (first 6 + last 4, for listing and
+  revoking). Files written by older versions (``"token": "<clear text>"``,
+  including old settings backups restored while the service runs) are
+  converted the first time they are read.
+- If the key changes (``.session_secret`` replaced) tokens keep working —
+  matching uses the hash — they just can no longer be revealed.
+- Hashes are compared in constant time via ``hmac.compare_digest``.
 - ``check_token()`` always returns bool — never leaks timing.
 
 Integration:
@@ -23,6 +30,7 @@ Integration:
 """
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import os
@@ -33,13 +41,64 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
 
-from . import atomic_json
+from . import atomic_json, secret_box
 from ..config import settings
 
 
 def generate_token() -> str:
     """Cryptographically random token, base64url, 43 chars."""
     return secrets.token_urlsafe(32)  # 32 bytes → 43 base64url chars
+
+
+def _digest(token: str) -> str:
+    """比對用的雜湊。Token 本身是 256 位元的亂數（不是人選的密碼），SHA-256 就夠，不必用慢雜湊。"""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _preview(token: str) -> str:
+    return f"{token[:6]}…{token[-4:]}" if len(token) > 12 else "***"
+
+
+#: 檔案裡每一筆的欄位（不含 Token 本身）
+_STORED = ("token_sha256", "token_enc", "preview", "label", "created_at", "last_used_at",
+           "expires_at", "enabled", "owner_user_id")
+
+
+def _stored(tok: "ApiToken") -> dict:
+    """記憶體裡的 ApiToken → 檔案裡的那一筆（雜湊 ＋ 密文 ＋ 遮罩，沒有原文）。"""
+    row = {k: v for k, v in asdict(tok).items() if k != "token"}
+    row.update(token_sha256=_digest(tok.token), token_enc=secret_box.encrypt(tok.token),
+               preview=_preview(tok.token))
+    return row
+
+
+def _convert(data: dict) -> bool:
+    """舊版的明文欄位（`"token": "…"`）換成雜湊 ＋ 密文；有換過回 True。"""
+    changed = False
+    for row in data.get("tokens") or []:
+        if not isinstance(row, dict) or "token" not in row:
+            continue
+        plain = str(row.pop("token") or "")
+        row.update(token_sha256=_digest(plain), token_enc=secret_box.encrypt(plain),
+                   preview=_preview(plain))
+        changed = True
+    return changed
+
+
+def _matches(row: dict, token_or_preview: str) -> bool:
+    """完整 Token（比雜湊）或畫面上的遮罩（比 preview）。"""
+    return (hmac.compare_digest(str(row.get("token_sha256") or ""), _digest(token_or_preview))
+            or row.get("preview") == token_or_preview)
+
+
+def encrypt_secret(plain: str) -> str:
+    """給設定備份換機用（`settings_export._rekey_specs`）：匯入時用這一台的金鑰重新加密。"""
+    return secret_box.encrypt(plain)
+
+
+def decrypt_secret(enc: str) -> str:
+    """給設定備份匯出用：解不開回空字串（Token 照樣能用，只是不能顯示原文）。"""
+    return secret_box.decrypt(enc, label="API Token")
 
 
 @dataclass
@@ -58,17 +117,20 @@ class ApiToken:
     def to_public(self) -> dict:
         """Safe-to-display dict — masks the token middle so UI can show a
         preview without leaking the whole thing to screenshots."""
-        t = self.token
-        masked = f"{t[:6]}…{t[-4:]}" if len(t) > 12 else "***"
-        return {
-            "label": self.label,
-            "token_preview": masked,
-            "created_at": self.created_at,
-            "last_used_at": self.last_used_at,
-            "expires_at": self.expires_at,
-            "enabled": self.enabled,
-            "owner_user_id": self.owner_user_id,
-        }
+        return _public(dict(asdict(self), preview=_preview(self.token)))
+
+
+def _public(row: dict) -> dict:
+    """檔案裡的一筆 → 可以顯示的欄位（只有遮罩，沒有原文）。"""
+    return {
+        "label": row.get("label"),
+        "token_preview": row.get("preview") or "***",
+        "created_at": row.get("created_at"),
+        "last_used_at": row.get("last_used_at", 0.0),
+        "expires_at": row.get("expires_at", 0.0),
+        "enabled": row.get("enabled", True),
+        "owner_user_id": row.get("owner_user_id"),
+    }
 
 
 class ApiTokenManager:
@@ -85,14 +147,16 @@ class ApiTokenManager:
                 created_at=time.time(),
             )
             self._write({
-                "tokens": [asdict(initial)],
+                "tokens": [_stored(initial)],
                 "enforce": False,    # grace period: start disabled so existing UI still works
                 "updated_at": time.time(),
             })
+        with self._lock:
+            self._read()             # 舊版的明文檔在這裡就轉過來
         self._tighten()
 
     def _tighten(self) -> None:
-        """Token 是明文存的：檔案只給服務帳號讀（0600）。
+        """檔案只給服務帳號讀（0600）：裡面雖然沒有原文了，密文與雜湊也不該給別的帳號讀。
 
         原本寫檔時沒有指定權限，照 umask 變成 0644，同一台機器的其他帳號讀得到每一張 Token
         （2026-10-09 為合規說明逐項查證時發現）。舊安裝的檔案在這裡收緊一次；Windows 沒有這種權限位元，略過。"""
@@ -105,10 +169,18 @@ class ApiTokenManager:
             pass
 
     def _read(self) -> dict:
+        """讀檔；遇到舊版的明文欄位就當場轉成雜湊 ＋ 密文寫回去
+        （設定備份匯入舊備份時，檔案是在服務跑著的時候被換掉的，所以每次讀都要看）。"""
         try:
-            return json.loads(self._path.read_text(encoding="utf-8"))
+            data = json.loads(self._path.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError):
             return {"tokens": [], "enforce": False}
+        if isinstance(data, dict) and _convert(data):
+            try:
+                self._write(data)
+            except OSError:
+                pass
+        return data
 
     def _write(self, data: dict) -> None:
         data["updated_at"] = time.time()
@@ -119,13 +191,20 @@ class ApiTokenManager:
     def list_tokens(self) -> list[dict]:
         """Safe list for display (masked tokens)."""
         with self._lock:
-            return [ApiToken(**t).to_public() for t in self._read().get("tokens", [])]
+            return [_public(t) for t in self._read().get("tokens", [])]
 
     def list_full(self) -> list[dict]:
-        """Full list including raw tokens — ONLY for admin UI that explicitly
-        requests reveal-on-click. Never send to unauthed contexts."""
+        """Full list with each token decrypted into ``token`` — ONLY for the
+        admin UI's reveal-on-click. Never send to unauthed contexts.
+        ``token`` is ``""`` when it cannot be decrypted (key changed); the
+        token still works, it just cannot be shown."""
         with self._lock:
-            return list(self._read().get("tokens", []))
+            out = []
+            for t in self._read().get("tokens", []):
+                row = {k: t.get(k) for k in _STORED if k not in ("token_sha256", "token_enc")}
+                row["token"] = decrypt_secret(str(t.get("token_enc") or ""))
+                out.append(row)
+            return out
 
     def is_enforced(self) -> bool:
         with self._lock:
@@ -145,7 +224,7 @@ class ApiTokenManager:
                 label=(label or "unnamed").strip()[:40] or "unnamed",
                 created_at=time.time(),
             )
-            data.setdefault("tokens", []).append(asdict(tok))
+            data.setdefault("tokens", []).append(_stored(tok))
             self._write(data)
             return tok
 
@@ -156,11 +235,8 @@ class ApiTokenManager:
         with self._lock:
             data = self._read()
             before = len(data.get("tokens", []))
-            data["tokens"] = [
-                t for t in data.get("tokens", [])
-                if t.get("token") != token_preview_or_full
-                and ApiToken(**t).to_public()["token_preview"] != token_preview_or_full
-            ]
+            data["tokens"] = [t for t in data.get("tokens", [])
+                              if not _matches(t, token_preview_or_full)]
             changed = len(data["tokens"]) != before
             if changed:
                 self._write(data)
@@ -176,6 +252,7 @@ class ApiTokenManager:
         (with owner_user_id populated when set) or None."""
         if not presented:
             return None
+        want = _digest(presented)
         with self._lock:
             data = self._read()
             now = time.time()
@@ -184,13 +261,14 @@ class ApiTokenManager:
                     continue
                 if t.get("expires_at") and now > t["expires_at"]:
                     continue
-                if hmac.compare_digest(str(t.get("token", "")), presented):
+                if hmac.compare_digest(str(t.get("token_sha256") or ""), want):
                     t["last_used_at"] = now
                     try:
                         self._write(data)
                     except OSError:
                         pass
-                    return dict(t)   # copy so caller can't mutate cache
+                    # 呼叫端只需要標籤與擁有者；雜湊與密文不帶出去
+                    return {k: v for k, v in t.items() if k not in ("token_sha256", "token_enc")}
             return None
 
     def assign_owner(self, token_preview_or_full: str,
@@ -201,10 +279,7 @@ class ApiTokenManager:
             data = self._read()
             changed = False
             for t in data.get("tokens", []):
-                if (t.get("token") == token_preview_or_full
-                        or ApiToken(**{k: v for k, v in t.items()
-                                       if k in ApiToken.__dataclass_fields__
-                                       }).to_public()["token_preview"] == token_preview_or_full):
+                if _matches(t, token_preview_or_full):
                     t["owner_user_id"] = owner_user_id
                     changed = True
             if changed:
@@ -223,7 +298,9 @@ class ApiTokenManager:
                     continue
                 if t.get("expires_at") and now > t["expires_at"]:
                     continue
-                return str(t.get("token", ""))
+                plain = decrypt_secret(str(t.get("token_enc") or ""))
+                if plain:
+                    return plain
             return None
 
 
