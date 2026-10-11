@@ -26,6 +26,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - English and Japanese: seven descriptions were translated as separate fragments of one sentence, so the English came out scrambled (for example "Turns Office documents(.doc …) converted to PDF"). Each is now translated as a whole sentence: the SSO and OCR engine settings pages, and the descriptions of Office to PDF, PDF to Office document, PDF to slides, Office document to image and Extract images.
 - The official document drafting browser test now waits for the document type drop-down to take the site style instead of checking once, which failed spuriously on a busy machine.
 - The "open every page in a browser" test covered only the tool pages; it now includes every admin page and also checks for sentences split into columns.
+- The knowledge base "save the selection, then download and import" browser test now waits until the import has actually finished; it used to check straight after the click and, on a slower CI runner, took the old count as the result.
 
 ## [1.16.79] - 2026-10-11
 

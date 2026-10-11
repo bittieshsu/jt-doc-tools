@@ -608,9 +608,17 @@ def test_saving_a_selection_says_it_still_needs_download_and_import(live):
         assert click_text(moj, "儲存選取")
         assert wait_for(modal_js + " !== null", timeout=15)
         js("document.querySelector('.modal-overlay .modal-ok').click()")
-        st = _wait_idle(port)
-        mm = {g_["id"]: g_ for g_ in st["groups"]}["moj"]
-        assert mm["imported_count"] == imported0 + pending and mm["pending_count"] == 0, mm
+        # 要等的是「匯入做完了」本身，不是「現在沒有在跑」：按下去之後頁面先存選取、才叫伺服器開始，
+        # 中間有一段空窗 —— 機器慢的時候第一次查狀態還沒開始，`running` 是 False，舊的數字就被當成結果
+        # （GitHub Actions 上紅過一次，本機快所以一直是綠的）。
+        want, end = imported0 + pending, time.time() + 60
+        while True:
+            st = _req(port, "GET", "/admin/knowledge/api/gov/status")
+            mm = {g_["id"]: g_ for g_ in st["groups"]}["moj"]
+            if (not st["running"] and mm["imported_count"] == want) or time.time() > end:
+                break
+            time.sleep(0.2)
+        assert mm["imported_count"] == want and mm["pending_count"] == 0, mm
         assert wait_for("(() => { const p = " + pending_js + "; return !!p && p.hidden; })()", timeout=20), js(pending_js)
         t.drain()
     finally:
