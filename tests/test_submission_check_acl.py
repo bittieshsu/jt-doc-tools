@@ -265,3 +265,39 @@ def test_auditor_write_refusal_may_stay_403(auth_off):
         sc._check_case_acl({"case_id": "d" * 32, "owner_uid": alice["user_id"]},
                            _req(auditor), write=True)
     assert e.value.status_code == 403
+
+
+# ---------- 4. 管理員 / 稽核員打開別人的案件要留紀錄（v1.16.80） ----------
+#
+# 合規頁寫「管理員讀取他人檔案會寫入稽核記錄」，盤點時發現這一套自己寫的 ACL 沒有：
+# 管理員與稽核員打開別人的案件（證件影本、財力證明）完全不留痕跡。
+
+def _override_events(monkeypatch):
+    from app.core import audit_db, upload_owner
+    seen = []
+    monkeypatch.setattr(audit_db, "log_event", lambda ev, **kw: seen.append((ev, kw)))
+    upload_owner._OVERRIDE_LOGGED.clear()          # 去重視窗是全域的，各測試從零開始
+    return seen
+
+
+@pytest.mark.parametrize("who", ["admin", "auditor"])
+def test_privileged_read_of_someone_elses_case_is_audited(auth_off, monkeypatch, who):
+    sc = _sc()
+    owner = _mkuser(f"owner_{who}")
+    priv = _mkuser(f"priv_{who}", admin=(who == "admin"), auditor=(who == "auditor"))
+    case = {"case_id": "b" * 32, "owner_uid": owner["user_id"]}
+    seen = _override_events(monkeypatch)
+    sc._check_case_acl(case, _req(priv))
+    ev = [kw for e, kw in seen if e == "admin_file_override"]
+    assert ev and ev[0]["target"] == "submission-check:" + "b" * 32, seen
+    assert ev[0]["details"]["owner_id"] == owner["user_id"]
+    assert ev[0]["details"]["admin_user_id"] == priv["user_id"]
+
+
+def test_reading_your_own_case_is_not_logged_as_an_override(auth_off, monkeypatch):
+    sc = _sc()
+    admin = _mkuser("own_admin", admin=True)
+    case = {"case_id": "c" * 32, "owner_uid": admin["user_id"]}
+    seen = _override_events(monkeypatch)
+    sc._check_case_acl(case, _req(admin))
+    assert not [e for e, _ in seen if e == "admin_file_override"], seen

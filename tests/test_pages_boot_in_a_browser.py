@@ -37,6 +37,16 @@ id 撞名讓 `getElementById` 拿到別的元素。**它們的共同點是「畫
 
 沒有瀏覽器的環境**誠實 skip**（不是 pass）——並且另外有一條驗「真的走過
 每一頁」，否則「掃 0 頁」跟「每一頁都乾淨」在 pytest 輸出裡一模一樣。
+
+## 順便檢查：一句話被 flex 切成好幾欄（v1.16.80，使用者回報 OCR 引擎頁）
+
+`display:flex` 的容器裡直接放「文字＋<code> / <b> / <a>＋文字」，每一段文字、每個元素
+各自變成一欄，一需要換行就擠成好幾條窄欄。畫面不會出錯、也沒有例外，只是很難看 ——
+寬螢幕上剛好擠得下時還看不出來。修法一律是把整句包進一個 `<span>`（圖示留在外面）。
+
+判準（看結構，不看當下的寬度；藏起來的面板也檢查得到）：row 方向的 flex 容器，直接子節點裡
+有一段 16 字以上的文字，而且還有別的文字段或 b / strong / code / a / em / i / kbd / small / mark。
+短的標籤（「自訂：[欄] × [列]」、標題旁的按鈕、鍵值對）不會中。
 """
 from __future__ import annotations
 
@@ -141,14 +151,50 @@ def _paths() -> list[str]:
     from app.tool_registry import discover_tools
     out = ["/", "/my-jobs", "/workspace"]
     out += [f"/tools/{t.metadata.id}/" for t in discover_tools()]
+    out += _admin_pages()
     return out
+
+
+def _admin_pages() -> list[str]:
+    """管理頁（v1.16.80 補：原本只掃工具頁，管理頁一頁都沒開過 —— OCR 引擎頁的版面問題就是在那裡）。
+
+    只挑宣告成 HTML 頁面的路由（`response_class=HTMLResponse`、沒有路徑參數）：
+    不去 GET 每一支試它回不回 HTML —— 那會順手觸發匯出、下載腳本那些端點。
+    """
+    from fastapi.responses import HTMLResponse
+    from app.main import app
+    from tools.route_index import iter_routes
+    return sorted({r.path for r in iter_routes(app)
+                   if getattr(r, "path", "").startswith("/admin/") and "{" not in r.path
+                   and "GET" in (getattr(r, "methods", None) or set())
+                   and getattr(r, "response_class", None) is HTMLResponse})
 
 
 PATHS = _paths()
 
 
-def _visit(cdp: int, url: str) -> list[str]:
+#: 被 flex 切成好幾欄的句子（說明見檔頭「順便檢查」）
+_SPLIT_SENTENCES = r"""(function () {
+  var INLINE = /^(B|STRONG|CODE|A|EM|I|KBD|SMALL|MARK)$/, out = [];
+  document.querySelectorAll('body *').forEach(function (el) {
+    var cs = getComputedStyle(el);
+    if ((cs.display !== 'flex' && cs.display !== 'inline-flex') || cs.flexDirection.indexOf('column') === 0) return;
+    var runs = [], inl = 0;
+    el.childNodes.forEach(function (n) {
+      if (n.nodeType === 3 && n.textContent.trim()) runs.push(n.textContent.trim());
+      else if (n.nodeType === 1 && INLINE.test(n.tagName) && n.textContent.trim()) inl++;
+    });
+    if (runs.some(function (t) { return t.length >= 16; }) && runs.length + inl >= 2)
+      out.push(el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : '')
+               + '：' + el.textContent.replace(/\s+/g, ' ').trim().slice(0, 60));
+  });
+  return out;
+})()"""
+
+
+def _visit(cdp: int, url: str, split_out: list | None = None) -> list[str]:
     """開一頁，回傳主控台上的錯誤（例外 + error 等級的記錄）。
+    給了 `split_out` 的話，順便把「被 flex 切成好幾欄的句子」放進去。
 
     **每一頁用自己的分頁。** 第一版所有頁共用同一個分頁，於是前一頁的事件會
     漏到下一頁的收集視窗裡 —— 症狀就是本專案很熟的那個：**單跑全綠、合跑失敗，
@@ -200,6 +246,9 @@ def _visit(cdp: int, url: str) -> list[str]:
                     loaded = True
                     deadline = min(deadline, time.time() + 1.5)
             assert loaded or errs, f"{url} 在 20 秒內沒有觸發 load 事件"
+            if split_out is not None and loaded:
+                r = send("Runtime.evaluate", {"expression": _SPLIT_SENTENCES, "returnByValue": True})
+                split_out.extend(r.get("result", {}).get("result", {}).get("value") or [])
     finally:
         try:
             urllib.request.urlopen(
@@ -229,8 +278,11 @@ _VISITED: list[str] = []
 @pytest.mark.parametrize("path", PATHS)
 def test_page_has_no_console_errors(live, path):
     port, cdp = live
-    errs = _visit(cdp, f"http://127.0.0.1:{port}{path}")
+    split: list[str] = []
+    errs = _visit(cdp, f"http://127.0.0.1:{port}{path}", split)
     _VISITED.append(path)
+    assert not split, (
+        f"{path} 有句子放在 flex 容器裡被切成好幾欄（把整句包進一個 <span>）：\n  " + "\n  ".join(split))
     assert not errs, (
         f"{path} 的主控台有錯誤：\n  " + "\n  ".join(errs)
         + "\n主控台有錯誤＝那一頁有一段程式碼沒跑到。**畫面可能看起來完全正常**"
@@ -240,6 +292,8 @@ def test_page_has_no_console_errors(live, path):
 def test_the_sweep_actually_opened_every_page(live):
     """檢查自己要有牙齒：確認真的逐頁走過，不是一頁都沒開。"""
     assert len(PATHS) > 40, f"只列出 {len(PATHS)} 頁，比對基準本身就不對"
+    admin = [p for p in PATHS if p.startswith("/admin/")]
+    assert len(admin) > 25 and "/admin/ocr-langs" in admin, f"管理頁只列出 {len(admin)} 頁：{admin}"
     assert len(_VISITED) >= len(PATHS), (
         f"只走過 {len(_VISITED)} 頁，應該要有 {len(PATHS)} 頁")
 

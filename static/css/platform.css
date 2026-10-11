@@ -58,12 +58,17 @@ body {
   --sb-pin-idle: rgba(255,255,255,0.55);
   --sb-pin: #fde047;
   --sb-userbar-bg: rgba(255,255,255,0.06);
+  --sb-desc-hover: var(--sb-desc);          /* 滑過工具時的說明文字 */
+  --sb-user-src-opacity: 0.7;               /* 帳號列的登入來源（@ldap 那一段） */
+  --sb-thumb: rgba(148,163,184,0.55);       /* 浮動捲軸；滑過 / 拖曳時換成 hover 那一個 */
+  --sb-thumb-hover: rgba(203,213,225,0.9);
 }
 /* 漸層 */
 :root, [data-sb-theme="indigo"]   { --sb-bg-top: #7c6df0; --sb-bg-bottom: #5b4bd9; --sb-fg: #f4f3ff; }
 [data-sb-theme="ocean"]           { --sb-bg-top: #1d4ed8; --sb-bg-bottom: #1e3a8a; --sb-fg: #ffffff; }
 [data-sb-theme="forest"]          { --sb-bg-top: #05664a; --sb-bg-bottom: #064e3b; --sb-fg: #ffffff; }
 [data-sb-theme="wine"]            { --sb-bg-top: #be123c; --sb-bg-bottom: #881337; --sb-fg: #ffffff; }
+[data-sb-theme="copper"]          { --sb-bg-top: #a8390d; --sb-bg-bottom: #7c2d12; --sb-fg: #ffffff; }
 [data-sb-theme="graphite"]        { --sb-bg-top: #334155; --sb-bg-bottom: #0f172a; --sb-fg: #f8fafc; }
 /* 純色 */
 [data-sb-theme="navy"]            { --sb-bg-top: #1e3a5f; --sb-bg-bottom: #1e3a5f; --sb-fg: #f1f5f9; }
@@ -71,17 +76,22 @@ body {
 [data-sb-theme="charcoal"]        { --sb-bg-top: #1f2328; --sb-bg-bottom: #1f2328; --sb-fg: #f3f4f6; }
 [data-sb-theme="silver"]          { --sb-bg-top: #e2e8f0; --sb-bg-bottom: #e2e8f0; --sb-fg: #0f172a; --sb-ink: 15,23,42; }
 [data-sb-theme="mist"]            { --sb-bg-top: #dbeafe; --sb-bg-bottom: #dbeafe; --sb-fg: #172554; --sb-ink: 23,37,84; }
+[data-sb-theme="sand"]            { --sb-bg-top: #f3ece0; --sb-bg-bottom: #f3ece0; --sb-fg: #3b2a17; --sb-ink: 59,42,23; }
 /* 深色背景的新配色：次要文字調亮（預設的靛紫維持原樣） */
-[data-sb-theme="ocean"], [data-sb-theme="forest"], [data-sb-theme="wine"], [data-sb-theme="graphite"],
-[data-sb-theme="navy"], [data-sb-theme="teal"], [data-sb-theme="charcoal"] {
+[data-sb-theme="ocean"], [data-sb-theme="forest"], [data-sb-theme="wine"], [data-sb-theme="copper"],
+[data-sb-theme="graphite"], [data-sb-theme="navy"], [data-sb-theme="teal"], [data-sb-theme="charcoal"] {
   --sb-soft: rgba(255,255,255,0.85);
   --sb-desc: rgba(255,255,255,0.92);
   --sb-desc-opacity: 1;
   --sb-footer: rgba(255,255,255,0.78);
   --sb-placeholder: rgba(255,255,255,0.75);
+  /* 滑過時底色淡一點、說明改全白：原本的 0.20 白底會把白字的對比壓到 4.5 以下 */
+  --sb-item-bg-hover: rgba(255,255,255,0.16);
+  --sb-desc-hover: #ffffff;
+  --sb-user-src-opacity: 0.85;
 }
 /* 淺色背景：深色字，半透明疊色改成深色系，輸入框與項目改成接近白的底 */
-[data-sb-theme="silver"], [data-sb-theme="mist"] {
+[data-sb-theme="silver"], [data-sb-theme="mist"], [data-sb-theme="sand"] {
   --sb-fg-strong: var(--sb-fg);
   --sb-soft: rgba(var(--sb-ink),0.72);
   --sb-desc: rgba(var(--sb-ink),0.72);
@@ -107,6 +117,9 @@ body {
   --sb-pin-idle: rgba(var(--sb-ink),0.45);
   --sb-pin: #d97706;
   --sb-userbar-bg: rgba(var(--sb-ink),0.05);
+  /* 捲軸用深色：淺灰的捲軸在淺色底上幾乎看不到，滑過時還會變得更淡 */
+  --sb-thumb: rgba(var(--sb-ink),0.3);
+  --sb-thumb-hover: rgba(var(--sb-ink),0.55);
 }
 
 /* Left sidebar layout — vibrant indigo with per-item color accents. */
@@ -142,7 +155,7 @@ body {
 .sidebar-scrollbar {
   position: absolute; right: 2px; top: 0;
   width: 6px; border-radius: 3px;
-  background: rgba(148, 163, 184, 0.55);
+  background: var(--sb-thumb);
   opacity: 0; transition: opacity 0.2s, background 0.15s;
   cursor: default;
   touch-action: none;
@@ -156,7 +169,7 @@ body {
 .sidebar.scrolling .sidebar-scrollbar,
 .sidebar.sb-dragging .sidebar-scrollbar { opacity: 1; }
 .sidebar-scrollbar:hover,
-.sidebar.sb-dragging .sidebar-scrollbar { background: rgba(203, 213, 225, 0.9); }
+.sidebar.sb-dragging .sidebar-scrollbar { background: var(--sb-thumb-hover); }
 /* 拖動中不要選到文字（原本就是整片被反白） */
 .sidebar.sb-dragging, .sidebar.sb-dragging * { user-select: none; }
 .sidebar .brand {
@@ -277,6 +290,8 @@ html[lang]:not([lang="zh-Hant"]) .sb-group > summary > span:first-of-type {
   position: relative;
 }
 .sb-item:hover { background: var(--sb-item-bg-hover); border-color: var(--sb-item-border-hover); }
+/* 要放在 `.sb-item.active .sb-item-desc` 前面：目前所在的那一格滑過時維持深色字 */
+.sb-item:hover .sb-item-desc { color: var(--sb-desc-hover); }
 .sb-item:active { transform: translateY(1px); }
 /* 釘選按鈕 — 滑入時才顯示，已釘選的常駐金色 */
 .sb-pin-btn {
@@ -383,6 +398,7 @@ html[lang]:not([lang="zh-Hant"]) .sb-group > summary > span:first-of-type {
 .sidebar-collapse:hover { background: var(--sb-press-bg); }
 /* 帳號列（樣式原本在 generated-inline.css 的 data-s，背景寫死白色半透明） */
 .sidebar .user-bar { background: var(--sb-userbar-bg); }
+.user-bar .sb-user-src { opacity: var(--sb-user-src-opacity); }
 /* brand-row：brand-block（brand+version）在左、收起按鈕貼最右
    brand-block 維持 inline-flex column，version 仍對齊 brand 文字右緣 */
 .sidebar .brand-row {

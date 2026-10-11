@@ -1660,7 +1660,9 @@ def test_the_whole_flow_works_in_a_real_browser(live):
     send("Page.navigate", {"url": f"http://127.0.0.1:{port}/tools/official-doc/cases"})
     assert _until(send, "!!document.querySelector('tr[data-case-id=%s] a[data-odc-title]')"
                         % _js(cid), 20), "歷史案件清單上沒有這一件"
-    assert _eval(send, "!!document.querySelector('.odc-search .jt-select-wrap')"), \
+    # 要用等的：下拉是頁面載入後由 custom_select.js 換成本站樣式的，清單先出來不代表它已經換好
+    # （機器忙的時候只看一次會紅，整套測試裡踩過兩次）
+    assert _until(send, "!!document.querySelector('.odc-search .jt-select-wrap')", 10), \
         "歷史案件的「文別」下拉不是本站樣式（頁面沒載 custom_select.js）"
     href = _eval(send, "document.querySelector('tr[data-case-id=%s] a[data-odc-title]').href"
                        % _js(cid))

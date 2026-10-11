@@ -2453,7 +2453,7 @@ curl http://localhost:8765/admin/api/branding \
   -H "Authorization: Bearer ADMIN_TOKEN" | jq
 ```
 
-回傳有沒有上傳企業 Logo、站台名稱，以及目前的左側選單配色（`sidebar_theme`）與內建 Logo（`builtin_logo`）；清單 `sidebar_themes` 列出 10 種配色（`id`、`kind` 是 `gradient` 或 `solid`、`tone` 是 `dark` 或 `light`、名稱、說明），清單 `builtin_logos` 列出兩個內建 Logo（`jt` Jason Tools Logo、`doc` 文件圖示）。
+回傳有沒有上傳企業 Logo、站台名稱，以及目前的左側選單配色（`sidebar_theme`）與內建 Logo（`builtin_logo`）；清單 `sidebar_themes` 列出 12 種配色（`id`、`kind` 是 `gradient` 或 `solid`、`tone` 是 `dark` 或 `light`、名稱、說明），清單 `builtin_logos` 列出兩個內建 Logo（`jt` Jason Tools Logo、`doc` 文件圖示）。
 
 ### 左側選單配色與內建 Logo
 

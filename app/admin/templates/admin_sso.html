@@ -28,7 +28,8 @@
 
 <details class="panel">
   <summary data-s="s35a6dee3">{{ icon('page', size=14) }} {{ tr('常見 IdP 設定範例（點開）') }}</summary>
-  <p class="muted" data-s="s5207ccf8">{{ tr('把') }} <code>&lt;...&gt;</code> {{ tr('換成你的實際值。各家都要先在 IdP 端把') }} <b>Redirect URI</b>{{ tr('（OIDC）或') }} <b>ACS</b>{{ tr('（SAML）設成本站對外網址，見上方提示。') }}</p>
+  {# 一整句一個 tr()，粗體 / 程式碼用 **…** / `…` 標記（`marks` 濾鏡）：拆成片段分開翻，英日文的語序會錯 #}
+  <p class="muted" data-s="s5207ccf8">{{ tr('把 `<...>` 換成你的實際值。各家都要先在 IdP 端把 **Redirect URI**（OIDC）或 **ACS**（SAML）設成本站對外網址，見上方提示。')|marks }}</p>
 
   <h3 data-s="s21c252e2">OIDC</h3>
   <table class="kv sso-eg">

@@ -162,18 +162,20 @@ SIDEBAR_THEMES = (
     ("ocean", "gradient", "dark", "海洋藍", "藍色漸層，沉穩專業"),
     ("forest", "gradient", "dark", "森林綠", "深綠漸層，柔和護眼"),
     ("wine", "gradient", "dark", "酒紅", "酒紅漸層，醒目有個性"),
+    ("copper", "gradient", "dark", "暖橘", "橘褐漸層，溫暖有活力"),
     ("graphite", "gradient", "dark", "石墨黑", "灰黑漸層，低調俐落"),
     ("navy", "solid", "dark", "海軍藍", "深藍純色，正式穩重"),
     ("teal", "solid", "dark", "墨綠", "墨綠純色，清爽沉靜"),
     ("charcoal", "solid", "dark", "炭黑", "近黑純色，文字對比最高"),
     ("silver", "solid", "light", "淺灰", "淺灰底深色字，明亮簡潔"),
     ("mist", "solid", "light", "淡藍", "淡藍底深藍字，清新柔和"),
+    ("sand", "solid", "light", "米白", "米白底深棕字，溫潤舒適"),
 )
 DEFAULT_SIDEBAR_THEME = "indigo"
 _THEME_IDS = tuple(t[0] for t in SIDEBAR_THEMES)
 _THEME_TONE = {t[0]: t[2] for t in SIDEBAR_THEMES}
 
-_appearance_cache: tuple[float, dict] = (-1.0, {})
+_appearance_cache: tuple[object, dict] = (None, {})
 
 
 def _appearance_path() -> Path:
@@ -184,14 +186,17 @@ def get_appearance() -> dict:
     """{"sidebar_theme", "builtin_logo"}；檔案沒有、壞掉或代號不認得都回預設。"""
     global _appearance_cache
     p = _appearance_path()
+    # 快取的鍵用修改時間（奈秒）＋大小＋inode：設定備份匯入是原地覆寫（inode 不變），
+    # 修改時間解析度粗的檔案系統上光靠時間可能分不出來，再加大小多一層。
     try:
-        mtime = p.stat().st_mtime
+        st = p.stat()
+        key = (st.st_mtime_ns, st.st_size, st.st_ino)
     except OSError:
-        mtime = 0.0
-    if mtime and _appearance_cache[0] == mtime:
+        key = None
+    if key and _appearance_cache[0] == key:
         return dict(_appearance_cache[1])
     data: dict = {}
-    if mtime:
+    if key:
         try:
             import json
             raw = json.loads(p.read_text(encoding="utf-8"))
@@ -204,7 +209,7 @@ def get_appearance() -> dict:
         "builtin_logo": data.get("builtin_logo") if data.get("builtin_logo") in BUILTIN_LOGOS
         else DEFAULT_BUILTIN_LOGO,
     }
-    _appearance_cache = (mtime, out)
+    _appearance_cache = (key, out)
     return dict(out)
 
 
@@ -224,7 +229,7 @@ def set_appearance(*, sidebar_theme: Optional[str] = None,
     settings.branding_dir.mkdir(parents=True, exist_ok=True)
     atomic_json.write_json(_appearance_path(), cur)
     global _appearance_cache
-    _appearance_cache = (-1.0, {})
+    _appearance_cache = (None, {})
     return get_appearance()
 
 

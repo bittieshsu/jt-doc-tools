@@ -5,11 +5,27 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (908 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (909 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.80] - 2026-10-11
+
+- Two more sidebar colour schemes, for 6 gradients and 6 solids (12 in all): a warm orange gradient and a light cream solid with dark brown text. Both reach at least 4.5:1 text contrast.
+- The scheme cards now sit 6 to a row per group; narrower screens show 3 to a row and phones 2, so every row is full.
+- On the light sidebars (silver, pale blue, cream) the scrollbar was nearly invisible and grew fainter on hover; it is now dark and stands out more on hover or while dragging.
+- Some of the dark schemes added in 1.16.78 had hovered tool descriptions and the sign-in source ("@ldap") in the account bar below 4.5:1 contrast; both are fixed. The default indigo is unchanged.
+- Clicking two scheme cards in quick succession could leave the page on the first while the second was saved; requests are now sent one at a time and the last click wins.
+- After restoring a settings backup, the sidebar colours and built-in logo apply at once without a service restart.
+- **Security**: when an administrator or auditor opens someone else's pre-submission check case, an audit record (`admin_file_override`) is now written; this case permission check used to let them through without a trace. Administrators opening a temporary file with no known owner (such as an uploaded watermark image) are recorded the same way.
+- **Data protection and compliance page**, revised after an external review: the opening now says the tool can be deployed entirely on premises with no required cloud dependency, and that enabled integrations send data to the services the administrator configures; the disclaimer adds that the page is not a complete compliance checklist; "tamper-resistant" audit records become "no way to edit them in the application", with what to do if you need tamper protection; access control spells out what administrators can open (always recorded) and the workspace exception; retention periods and cleanup timing are described separately, with the number of database and pre-upgrade backups kept; the official document knowledge base is added (where it is stored, what goes to the embedding model and the LLM, what deletion removes); file and account names in notifications and log forwarding may themselves be personal data; GDPR scope under Article 3, Article 15 (an account's activity is not the data subject's data), the thresholds in Articles 33 and 34, and Articles 44 to 49 (not only a question of cloud use); for Taiwan's PDPA, a check date and link to the law database, and data subject rights cover personal data inside documents; wording on de-identification, filtering of instructions aimed at the AI, A.8.28 and pre-release scanning is narrowed, and "verified by" links to the test results on CI.
+- OCR engine settings, external GPU recognition server, step 2: the hint about replacing `GPUServer` with the GPU host's IP or host name was split into several narrow columns; it is now one sentence that wraps normally, the English and Japanese versions read as complete sentences instead of scrambled fragments, and the text is darker and easier to read.
+- The same layout problem is fixed in four more places: the "database not imported yet" notice in Company ID lookup, the credentials line on the notification settings page, the "no need to wait for the preview" hint in Seam stamp, and the checksum-valid fake value option in Document redaction.
+- English and Japanese: seven descriptions were translated as separate fragments of one sentence, so the English came out scrambled (for example "Turns Office documents(.doc …) converted to PDF"). Each is now translated as a whole sentence: the SSO and OCR engine settings pages, and the descriptions of Office to PDF, PDF to Office document, PDF to slides, Office document to image and Extract images.
+- The official document drafting browser test now waits for the document type drop-down to take the site style instead of checking once, which failed spuriously on a busy machine.
+- The "open every page in a browser" test covered only the tool pages; it now includes every admin page and also checks for sentences split into columns.
 
 ## [1.16.79] - 2026-10-11
 

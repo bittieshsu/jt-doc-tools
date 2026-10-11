@@ -254,8 +254,11 @@
   .br-logo-opt .br-opt-tick { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
   .br-logo-opt.is-on .br-opt-tick, .br-theme.is-on .br-opt-tick { display: inline-flex; }
   .br-th-k { margin: 16px 0 8px; font-size: 12.5px; font-weight: 700; color: #64748b; letter-spacing: .04em; }
-  /* 一張卡片＝上面一個迷你側欄的預覽、下面名稱與一句說明；選中的在右上角打勾 */
-  .br-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  /* 一張卡片＝上面一個迷你側欄的預覽、下面名稱與一句說明；選中的在右上角打勾。
+     每組 6 張：夠寬一排 6 張、不夠寬 3 張一排、手機兩欄，每一排都排滿（看面板寬度，側欄收起也對） */
+  #sidebarThemePanel { container-type: inline-size; }
+  .br-themes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @container (min-width: 900px) { .br-themes { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
   .br-theme { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 10px 10px 12px;
     border: 2px solid #e2e8f0; border-radius: 12px; background: #fff; cursor: pointer; font: inherit;
     text-align: left; transition: border-color .15s, box-shadow .15s; }
@@ -654,32 +657,41 @@ function markOn(buttons, btn) {
     b.setAttribute('aria-checked', on ? 'true' : 'false');
   });
 }
+// 同一組一次只送一個：送出中又點了別張，記住最後點的那張，等這一個回來再送。
+// 不排隊的話連點兩張，回應先後顛倒時畫面停在前一張、存下來的卻是後一張。
+function oneAtATime(run) {
+  let busy = false, next = null;
+  return async function pick(btn) {
+    if (busy) { next = btn; return; }
+    busy = true;
+    try { await run(btn); } finally { busy = false; }
+    if (next) { const b = next; next = null; pick(b); }
+  };
+}
 const themeBtns = Array.from(document.querySelectorAll('[data-theme-pick]'));
-themeBtns.forEach(function (btn) {
-  btn.addEventListener('click', async function () {
-    if (btn.classList.contains('is-on')) return;
-    const id = btn.dataset.themePick;
-    const name = btn.querySelector('.br-theme-name').textContent.trim();
-    const j = await saveAppearance({sidebar_theme: id}, document.getElementById('themeStatus'),
-                                   tr('已套用：') + name);
-    if (!j) return;
-    document.documentElement.setAttribute('data-sb-theme', j.sidebar_theme);
-    markOn(themeBtns, btn);
-    applyLogos(j);              // 深 / 淺背景要換 Jason Tools Logo 的深色版 / 淺色版
-  });
+const pickTheme = oneAtATime(async function (btn) {
+  if (btn.classList.contains('is-on')) return;
+  const id = btn.dataset.themePick;
+  const name = btn.querySelector('.br-theme-name').textContent.trim();
+  const j = await saveAppearance({sidebar_theme: id}, document.getElementById('themeStatus'),
+                                 tr('已套用：') + name);
+  if (!j) return;
+  document.documentElement.setAttribute('data-sb-theme', j.sidebar_theme);
+  markOn(themeBtns, btn);
+  applyLogos(j);                // 深 / 淺背景要換 Jason Tools Logo 的深色版 / 淺色版
 });
+themeBtns.forEach(function (btn) { btn.addEventListener('click', function () { pickTheme(btn); }); });
 const logoBtns = Array.from(document.querySelectorAll('[data-builtin-logo]'));
-logoBtns.forEach(function (btn) {
-  btn.addEventListener('click', async function () {
-    if (btn.classList.contains('is-on')) return;
-    const name = btn.querySelector('.br-opt-name').textContent.trim();
-    const j = await saveAppearance({builtin_logo: btn.dataset.builtinLogo},
-                                   document.getElementById('logoOptStatus'), tr('已套用：') + name);
-    if (!j) return;
-    markOn(logoBtns, btn);
-    applyLogos(j);
-  });
+const pickLogo = oneAtATime(async function (btn) {
+  if (btn.classList.contains('is-on')) return;
+  const name = btn.querySelector('.br-opt-name').textContent.trim();
+  const j = await saveAppearance({builtin_logo: btn.dataset.builtinLogo},
+                                 document.getElementById('logoOptStatus'), tr('已套用：') + name);
+  if (!j) return;
+  markOn(logoBtns, btn);
+  applyLogos(j);
 });
+logoBtns.forEach(function (btn) { btn.addEventListener('click', function () { pickLogo(btn); }); });
 
 btnReset.addEventListener('click', async () => {
   if (!await showConfirm(tr('確定要還原為內建預設 Logo？'), {okText: tr('還原'), kind:'danger'})) return;

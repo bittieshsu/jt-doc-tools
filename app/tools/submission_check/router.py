@@ -586,6 +586,22 @@ def _is_auditor(user) -> bool:
         return False
 
 
+def _audit_privileged_access(case: dict, user, request: Request) -> None:
+    """管理員 / 稽核員打開**別人的**案件：寫一筆 `admin_file_override`（v1.16.80）。
+
+    案件裡是證件影本與財力證明，「誰在什麼時候看了誰的案件」要查得到 —— 原本這一套
+    自己寫的 ACL 直接放行、不留紀錄，跟上傳檔案與作業結果那條共用路徑不一致。
+    走同一個 `admin_override_allowed`：同一人同一案件 5 分鐘內只記一筆。
+    """
+    me = _uid_of(user)
+    owner = case.get("owner_uid")
+    if me is None or owner == me:
+        return
+    from app.core import upload_owner as _uo
+    _uo.admin_override_allowed(me, f"submission-check:{case.get('case_id', '')}",
+                               owner_id=owner, request=request)
+
+
 def _check_case_acl(case: dict, request: Request, write: bool = False) -> None:
     """Case 級 ACL。
 
@@ -607,10 +623,12 @@ def _check_case_acl(case: dict, request: Request, write: bool = False) -> None:
     if not user:
         return  # auth OFF：單人模式
     if _is_admin(user):
+        _audit_privileged_access(case, user, request)
         return
     if _is_auditor(user):
         if write:
             raise HTTPException(403, "稽核員為唯讀，無法變更案件")
+        _audit_privileged_access(case, user, request)
         return
     # 非擁有者一律回**與「案件不存在」完全相同**的 404。
     #

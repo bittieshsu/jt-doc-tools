@@ -323,5 +323,7 @@ def require_by_filename(filename: str, request: Request) -> None:
         return
     cur = _user_id(request)
     if cur is not None and _is_admin(cur):
+        # 查不到擁有者的檔案（例如浮水印上傳圖）管理員照樣打得開 —— 也要留紀錄（v1.16.80）
+        admin_override_allowed(cur, f"file:{filename[:200]}", request=request)
         return
     raise HTTPException(404)

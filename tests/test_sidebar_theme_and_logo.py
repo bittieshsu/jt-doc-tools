@@ -1,13 +1,14 @@
 """「企業 Logo / 識別」的左側選單配色與內建 Logo（2026-10-11 加入；瀏覽器實量在 `test_sidebar_theme_browser.py`）。
 
-* 10 種配色：5 種漸層（跟原本一樣）＋ 5 種純色；代號、名稱、說明、深淺在 `branding.SIDEBAR_THEMES`，
+* 12 種配色：6 種漸層（含原本的靛紫）＋ 6 種純色；代號、名稱、說明、深淺在 `branding.SIDEBAR_THEMES`，
   顏色只寫在 `platform.css`，兩邊對得上。
 * 預設（靛紫）的顏色跟改版前一模一樣；其他配色的文字對比 4.5:1 以上（這裡先用 CSS 的值算一次，
   不必開瀏覽器）。
 * 側欄的樣式裡不再有寫死的白字、白色半透明底（不然淺色配色上會看不到字）。
 * 內建 Logo 兩個：Jason Tools Logo（側欄依背景深淺換深色版 / 淺色版）、介紹網站的文件圖示；
   上傳過企業 Logo 一律用那張。通知信夾的 Logo 跟著換，換完不必重啟。
-* 端點：送錯代號 400；改了寫稽核記錄；一般使用者不能改；設定備份帶得走。
+* 端點：送錯代號 400；改了寫稽核記錄；一般使用者不能改；設定備份帶得走，匯入之後馬上生效（不必重啟）。
+* 登入頁、初次設定頁（不套側欄的那兩頁）的頁籤圖示與 Logo 也跟著換。
 """
 from __future__ import annotations
 
@@ -36,9 +37,9 @@ def br_dir(tmp_path, monkeypatch):
     d = tmp_path / "branding"
     monkeypatch.setattr(type(settings), "branding_dir", property(lambda self: d), raising=False)
     b = _br()
-    b._appearance_cache = (-1.0, {})
+    b._appearance_cache = (None, {})
     yield d
-    b._appearance_cache = (-1.0, {})
+    b._appearance_cache = (None, {})
 
 
 # ---------------------------------------------------------------- 配色的定義
@@ -62,12 +63,12 @@ def _selectors_with(var: str) -> set[str]:
     return ids
 
 
-def test_ten_themes_five_gradient_five_solid():
+def test_twelve_themes_six_gradient_six_solid():
     b = _br()
     ids = [t[0] for t in b.SIDEBAR_THEMES]
-    assert len(ids) == 10 and len(set(ids)) == 10
-    assert [t[1] for t in b.SIDEBAR_THEMES].count("gradient") == 5
-    assert [t[1] for t in b.SIDEBAR_THEMES].count("solid") == 5
+    assert len(ids) == 12 and len(set(ids)) == 12
+    assert [t[1] for t in b.SIDEBAR_THEMES].count("gradient") == 6
+    assert [t[1] for t in b.SIDEBAR_THEMES].count("solid") == 6
     assert b.DEFAULT_SIDEBAR_THEME == "indigo" and ids[0] == "indigo"
     assert all(t[3] and t[4] for t in b.SIDEBAR_THEMES), "每一種都要有名稱與一句說明"
 
@@ -109,7 +110,10 @@ def test_the_default_colours_are_exactly_the_old_ones():
     old = {"--sb-desc": "rgba(255,255,255,0.85)", "--sb-desc-opacity": "0.78", "--sb-soft": "rgba(255,255,255,0.75)",
            "--sb-group-bg": "rgba(15,15,40,0.35)", "--sb-item-bg": "rgba(255,255,255,0.10)",
            "--sb-item-bg-hover": "rgba(255,255,255,0.20)", "--sb-pin": "#fde047",
-           "--sb-placeholder": "rgba(255,255,255,0.7)", "--sb-fg-strong": "#fff"}
+           "--sb-placeholder": "rgba(255,255,255,0.7)", "--sb-fg-strong": "#fff",
+           # v1.16.80 才改成變數的：原本寫死在捲軸、說明文字、登入來源（`@ldap`）上的值
+           "--sb-thumb": "rgba(148,163,184,0.55)", "--sb-thumb-hover": "rgba(203,213,225,0.9)",
+           "--sb-desc-hover": "var(--sb-desc)", "--sb-user-src-opacity": "0.7"}
     assert {k: root.get(k) for k in old} == old
 
 
@@ -138,11 +142,14 @@ def test_text_contrast_of_the_new_themes():
 
 #: 側欄的元件（彈出的通知面板 / 帳號選單是白底，圖示方塊是彩色底，那幾個不算）
 _SIDEBAR_SEL = re.compile(r"\.sidebar|\.sb-(?!item-icon|inbox|menu\b|menu-item|menu-sep|menu-value|menu-tick|submenu|bell-dot)")
-_HARD = re.compile(r"rgba\(255,\s*255,\s*255|#fff\b|#ffffff\b|#fde047|#f4f3ff|rgba\(15,\s*15,\s*40")
+#: 任何寫死的顏色（`rgba(var(--sb-ink), …)` 不算）。原本只找白色，漏掉浮動捲軸的灰色：
+#: 淺色配色上幾乎看不到，滑過時還變得更淡。
+_HARD = re.compile(r"#[0-9a-fA-F]{3,8}\b|rgba?\(\s*\d")
 
 
-#: 自己有實色底、不吃側欄背景的元件：沒有 Logo 時的文字標（白底深字）、收起後左邊緣的展開鈕（主色底）
-_OWN_BG = {".sidebar .brand-mark", ".sidebar-toggle"}
+#: 自己有實色底、不吃側欄背景的元件：沒有 Logo 時的文字標（白底深字）、收起後左邊緣的展開鈕（主色底）、
+#: 手機版打開選單時蓋住頁面的半透明黑（在側欄外面）
+_OWN_BG = {".sidebar .brand-mark", ".sidebar-toggle", ".sidebar-backdrop"}
 
 
 def _rules(text):
@@ -150,7 +157,7 @@ def _rules(text):
         yield m.group(1).strip(), m.group(2)
 
 
-def test_no_hard_coded_white_left_in_the_sidebar_styles():
+def test_no_hard_coded_colours_left_in_the_sidebar_styles():
     base = (ROOT / "app" / "web" / "templates" / "base.html").read_text(encoding="utf-8")
     from tools.source_text import blocks
     style = re.sub(r"/\*.*?\*/", "", "\n".join(blocks(base, "style")), flags=re.S)
@@ -161,10 +168,12 @@ def test_no_hard_coded_white_left_in_the_sidebar_styles():
                 continue
             if sel.startswith(".sb-item.active") or ".sb-item-icon" in sel or sel in _OWN_BG:
                 continue
-            props = [p for p in body.split(";") if re.search(r"(^|\s)(color|background(-color)?|border(-color)?|box-shadow)\s*:", p)]
+            # 陰影畫在側欄外面（頁面上），不算
+            props = [p for p in body.split(";")
+                     if re.search(r"(^|\s)(color|background(-color)?|border(-color)?|fill|stroke|outline(-color)?)\s*:", p)]
             if any(_HARD.search(p) for p in props):
                 bad.append(f"{src}: {sel}")
-    assert not bad, f"這些側欄樣式還寫死白色（淺色配色上會看不到）：{bad}"
+    assert not bad, f"這些側欄樣式還寫死顏色（換配色時不會跟著變）：{bad}"
 
 
 # ---------------------------------------------------------------- 設定與 Logo
@@ -242,7 +251,7 @@ def test_endpoint_saves_audits_and_rejects(client, auth_off, br_dir, monkeypatch
     for bad in ({"sidebar_theme": "neon"}, {"builtin_logo": "x"}, {}, []):
         assert client.post("/admin/branding/appearance", json=bad).status_code == 400, bad
     api = client.get("/admin/api/branding").json()
-    assert api["sidebar_theme"] == "wine" and len(api["sidebar_themes"]) == 10 and len(api["builtin_logos"]) == 2
+    assert api["sidebar_theme"] == "wine" and len(api["sidebar_themes"]) == 12 and len(api["builtin_logos"]) == 2
     html = client.get("/").text
     assert 'data-sb-theme="wine"' in html[:600]
     assert html.count("/static/images/logo-doc.png") >= 2, "側欄與頁籤圖示都要換"
@@ -271,7 +280,7 @@ def test_the_settings_backup_carries_it(tmp_path, monkeypatch):
     from app.core import settings_export
     monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
     b = _br()
-    b._appearance_cache = (-1.0, {})
+    b._appearance_cache = (None, {})
     b.set_appearance(sidebar_theme="teal", builtin_logo="doc")
     out = tmp_path / "backup.zip"
     settings_export.export_to_zip(out, ["branding"])
@@ -279,4 +288,58 @@ def test_the_settings_backup_carries_it(tmp_path, monkeypatch):
         names = zf.namelist()
         got = json.loads(zf.read("data/branding/appearance.json"))
     assert got == {"sidebar_theme": "teal", "builtin_logo": "doc"}, names
-    b._appearance_cache = (-1.0, {})
+    b._appearance_cache = (None, {})
+
+
+def test_restoring_a_backup_applies_at_once(tmp_path, monkeypatch):
+    """匯入是原地覆寫檔案；讀設定的快取要看得出來換過了，不必重啟服務。"""
+    from app.config import settings
+    from app.core import settings_export
+    monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
+    b = _br()
+    b._appearance_cache = (None, {})
+    b.set_appearance(sidebar_theme="teal", builtin_logo="doc")
+    out = tmp_path / "backup.zip"
+    settings_export.export_to_zip(out, ["branding"])
+    b.set_appearance(sidebar_theme="wine", builtin_logo="jt")
+    assert b.sidebar_theme() == "wine"          # 這時快取裡是 wine
+    settings_export.import_from_zip(out, selected_ids=["branding"])
+    assert b.get_appearance() == {"sidebar_theme": "teal", "builtin_logo": "doc"}, "匯入之後還是舊的設定"
+    assert b.logo_url("sidebar").endswith("logo-doc.png")
+    b._appearance_cache = (None, {})
+
+
+def test_the_cache_notices_a_rewrite_with_the_same_timestamp(br_dir):
+    """修改時間解析度粗的檔案系統（同一個時間戳記內寫兩次）：內容換了也要讀到新的。"""
+    import os
+    b = _br()
+    b.set_appearance(sidebar_theme="teal", builtin_logo="jt")
+    p = br_dir / "appearance.json"
+    st = p.stat()
+    assert b.sidebar_theme() == "teal"
+    with open(p, "w", encoding="utf-8") as f:   # 原地覆寫，跟匯入一樣
+        json.dump({"sidebar_theme": "wine", "builtin_logo": "doc"}, f)
+    os.utime(p, ns=(st.st_atime_ns, st.st_mtime_ns))
+    assert b.get_appearance() == {"sidebar_theme": "wine", "builtin_logo": "doc"}
+
+
+def test_the_login_and_setup_pages_follow_the_choice(auth_off, br_dir):
+    """這兩頁不套 base.html（沒有側欄），頁籤圖示與頁面上的 Logo 要各自跟著換。"""
+    from fastapi.testclient import TestClient
+    from app import main as app_main
+    from app.core import auth_settings
+    b = _br()
+    c = TestClient(app_main.app)
+    b.set_appearance(builtin_logo="doc")
+    page = c.get("/setup-admin").text
+    assert 'rel="icon" type="image/png" href="/static/images/logo-doc.png"' in page
+    pw = "TestAdmin1234"
+    auth_settings.enable_local_with_admin(admin_username="jtdt-admin", admin_display_name="管理員",
+                                          admin_password=pw, admin_password_confirm=pw, actor_ip="127.0.0.1")
+    page = c.get("/login").text
+    assert 'rel="icon" type="image/png" href="/static/images/logo-doc.png"' in page
+    assert page.count("/static/images/logo-doc.png") >= 2, "登入頁上的 Logo 沒有換"
+    b.set_appearance(builtin_logo="jt")
+    page = c.get("/login").text
+    assert "logo-doc.png" not in page and "/static/images/logo-on-light.png" in page
+

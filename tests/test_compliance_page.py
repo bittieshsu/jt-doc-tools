@@ -163,6 +163,25 @@ def test_the_retention_periods_on_the_page_are_the_defaults_in_the_code():
     assert f"稽核記錄 {d['audit_days']} 天" in rows["帳號、權限與稽核記錄"]
 
 
+def test_the_cleanup_intervals_on_the_page_are_the_ones_in_the_code():
+    """保留期限到了不是馬上刪，是下一次清理才刪 —— 保留期限與清理週期要分開講，
+    不然「2 小時」會被讀成「滿 2 小時就刪」。頁面寫的兩個清理週期要跟程式一樣。"""
+    from app.config import settings
+    from app.core import retention
+    md = _md()
+    assert settings.cleanup_interval_seconds == 30 * 60 and "每 30 分鐘" in md
+    assert retention._INTERVAL == 6 * 3600 and "每 6 小時" in md
+    assert "2 小時後自動刪除" not in md, "保留期限與清理時間要分開講"
+
+
+def test_no_markdown_syntax_leaks_onto_the_page():
+    """產生器沒處理的 Markdown 會原樣印在網頁上（連結 `[…](…)`、粗體 `**`）。"""
+    from tools.source_text import strip_blocks
+    for name in ("compliance", "compliance-en", "compliance-ja"):
+        page = strip_blocks(_page(name), "script", "style")
+        assert "](http" not in page and "**" not in page, f"{name}.html 有沒轉換的 Markdown"
+
+
 # ---- 條文與控制項對照 ----
 #
 # 判準：①每一個編號都是那一份標準裡真的有的條文或控制項（打錯一碼，稽核員一查就知道）；

@@ -313,7 +313,8 @@ mark.vl-hl {
 </div>
 {% else %}
 <div class="vl-db-info vl-db-empty">
-  {{ tr('⚠ 統編資料庫尚未匯入任何資料。請先到') }} <a href="/admin/vat-db">/admin/vat-db</a> {{ tr('自動下載 BGMOPEN 主檔（約 65 MB）。') }}
+  {# 整句包一層：`.vl-db-info` 是 flex，句子直接放進去會被連結切成好幾欄 #}
+  <span>{{ tr('⚠ 統編資料庫尚未匯入任何資料。請先到') }} <a href="/admin/vat-db">/admin/vat-db</a> {{ tr('自動下載 BGMOPEN 主檔（約 65 MB）。') }}</span>
 </div>
 {% endif %}
 

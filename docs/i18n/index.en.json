@@ -263,7 +263,7 @@
  "排版與編排調整": "Layout adjustments",
  "接地端 LLM 逐句翻譯，左原文右譯文並排對照；可貼文字或上傳 PDF / DOCX / TXT；目標語言預設繁中可選": "Sentence-by-sentence translation with a local LLM, source and translation side by side; paste text or upload PDF / DOCX / TXT; the target language defaults to Traditional Chinese",
  "目錄服務整合之後，實務上常見的問題包括：主要網域控制站重新啟動、權限設定在主要群組上卻未生效、離職人員的帳號仍可使用、帳號遭他人冒用。以下機制分別處理這些情況。": "After a directory service is integrated, the problems that come up in practice include: the primary domain controller restarts, permissions assigned to a primary group do not take effect, accounts of people who have left can still be used, and accounts are used by someone else. The mechanisms below address each of these.",
- "換成貴公司的 logo 與品牌標題，登入頁 / 側欄一致替換；左側選單有 10 種配色可選": "Replace the logo and title with your own, on the login page and in the sidebar alike; the sidebar comes in 10 colour schemes",
+ "換成貴公司的 logo 與品牌標題，登入頁 / 側欄一致替換；左側選單有 12 種配色可選": "Replace the logo and title with your own, on the login page and in the sidebar alike; the sidebar comes in 12 colour schemes",
  "擷取 PDF 註解輸出完整清單 / 審閱報告 / 待辦清單（CSV / JSON / Markdown）；可依類型 / 作者篩選": "Extract PDF annotations as a full list, a review report or a to-do list (CSV / JSON / Markdown), filtered by type or author",
  "擷取圖片": "Extract images",
  "擷取文字": "Extract text ",

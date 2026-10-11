@@ -190,7 +190,7 @@ FLOW = (
     '<span>轉檔、OCR、去識別化在這裡執行</span><span>檔案、作業與稽核記錄都在資料目錄</span></div>'
     f'{_ARROW2}'
     '<div class="cp-node-col">'
-    '<div class="cp-node cp-node-opt"><b>LLM 伺服器（選用）</b><span>例如 Ollama；AI 加值預設關閉</span></div>'
+    '<div class="cp-node cp-node-opt"><b>LLM、嵌入模型伺服器（選用）</b><span>例如 Ollama；AI 加值預設關閉</span><span>放在內網或外部由你決定</span></div>'
     '<div class="cp-node cp-node-opt"><b>GPU OCR、語音服務（選用）</b><span>自己架設的伺服器</span></div>'
     '<div class="cp-node cp-node-opt"><b>公司目錄與單一登入</b><span>LDAP、AD、OIDC、SAML</span></div>'
     '</div></div></div>'
@@ -273,9 +273,12 @@ def _inline(s: str) -> str:
     s = html.escape(s, quote=False)
     s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
     s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
-    # 文件裡提到的另外幾份說明、驗證用的測試，連到 GitHub 上那一份
+    # 一般的 Markdown 連結（法規資料庫、CI 結果），只收 http(s)
+    s = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
+               r'<a href="\2" target="_blank" rel="noopener">\1</a>', s)
+    # 文件裡提到的另外幾份說明、驗證用的測試與工具，連到 GitHub 上那一份
     return re.sub(r"<code>((?:TEST_PLAN_SECURITY|OPS|INSTALL|CHANGELOG|LLM|THIRD-PARTY-NOTICES)\.md"
-                  r"|tests/test_\w+\.py)</code>",
+                  r"|tests/test_\w+\.py|tools/\w+\.py)</code>",
                   lambda m: f'<a href="{REPO}{m.group(1)}" target="_blank" rel="noopener">'
                             f"<code>{m.group(1)}</code></a>", s)
 

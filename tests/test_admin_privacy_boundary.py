@@ -122,3 +122,27 @@ def test_the_override_record_names_the_admin_and_the_address(monkeypatch):
     assert ev == "admin_file_override"
     assert "boss" in kw.get("username", ""), f"使用者欄是 {kw.get('username')!r}"
     assert kw.get("ip") == "10.9.8.7", f"IP 欄是 {kw.get('ip')!r}"
+
+
+def test_an_admin_reading_an_ownerless_file_by_name_is_audited(monkeypatch):
+    """檔名裡沒有上傳編號（例如浮水印上傳圖）時查不到擁有者，管理員照樣打得開 —— 也要留紀錄（v1.16.80）。"""
+    from fastapi import Request
+    logged = []
+    import app.core.audit_db as adb
+    monkeypatch.setattr(adb, "log_event",
+                        lambda ev, target="", details=None, **kw: logged.append((ev, target)))
+    monkeypatch.setattr(uo, "_auth_enabled", lambda: True)
+    monkeypatch.setattr(uo, "_is_admin", lambda uid: True)
+    uo._OVERRIDE_LOGGED.clear()
+    req = Request({"type": "http", "method": "GET", "path": "/", "headers": []})
+    req.state.user = {"user_id": 9, "username": "root"}
+    uo.require_by_filename("wm_temp_logo.png", req)
+    assert ("admin_file_override", "file:wm_temp_logo.png") in logged, logged
+
+
+def test_the_submission_check_cases_use_the_same_helper():
+    """送件前檢核的案件 ACL 是自己寫的一套，也要走共用的管理員判斷並留紀錄。"""
+    root = pathlib.Path(__file__).resolve().parents[1]
+    tree = ast.parse((root / "app/tools/submission_check/router.py").read_text(encoding="utf-8"))
+    assert [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+            and getattr(n.func, "attr", "") == "admin_override_allowed"], "送件前檢核沒有留管理員讀取的紀錄"

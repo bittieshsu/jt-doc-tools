@@ -178,7 +178,8 @@
 
 {% block content %}
 <h1>{{ icon('file-swap', size=22) }} {{ tr('PDF 轉文書檔') }}</h1>
-<p class="muted">{{ tr('把 PDF 轉成') }} <b>Word (.docx)</b> {{ tr('或') }} <b>OpenDocument (.odt)</b>{{ tr('，內含字型 / 段落 / 雜訊智慧校正。') }}
+{# 一整句一個 tr()，粗體 / 程式碼用 **…** / `…` 標記（`marks` 濾鏡）：拆成片段分開翻，英日文的語序會錯 #}
+<p class="muted">{{ tr('把 PDF 轉成 **Word (.docx)** 或 **OpenDocument (.odt)**，內含字型 / 段落 / 雜訊智慧校正。')|marks }}
 <br><span data-s="s3a4c95a1">{{ tr('⚠ 不會 100% 還原原 PDF 排版（PDF 是固定排版、Word 是流動排版，本質就無法精準還原）；掃描檔請先用「OCR 文字辨識」工具轉成可選取文字 PDF 再來。') }}</span></p>
 
 <div class="panel">

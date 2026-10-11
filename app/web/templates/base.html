@@ -168,7 +168,7 @@
                 data-s="s7de1fa5e"
                 title="{{ tr('查看角色與權限') }}">
           {{ icon('user', size=14) }}
-          <b>{{ _cur.username }}</b>{% if _cur.source and _cur.source != 'off' %}<span data-s="s5bca4f8e">@{{ _cur.source }}</span>{% endif %}
+          <b>{{ _cur.username }}</b>{% if _cur.source and _cur.source != 'off' %}<span class="sb-user-src" data-s="s5bca4f8e">@{{ _cur.source }}</span>{% endif %}
         </button>
         <div class="sb-bell-wrap">
           <button type="button" class="sb-bell" id="sbBell" title="{{ tr('作業完成通知') }}" aria-label="{{ tr('通知') }}">

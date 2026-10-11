@@ -36,7 +36,7 @@
 <div class="panel">
   <h2>{{ icon('mail', size=18) }} {{ tr('通知管道') }}</h2>
   <p class="muted nt-note">{{ icon('info', size=14) }} <span><b>{{ tr('可個人 / 團隊') }}</b>{{ tr('的管道（Zulip、Nextcloud Talk）：使用者在「我的作業」填了自己的收訊位址就會收到私訊，留空則送到這裡設定的團隊頻道。Slack / Teams / Discord 的 Webhook URL 天生綁定單一頻道，要私訊需改用 bot token（尚未支援）。') }}</span></p>
-  <p class="muted nt-note">{{ icon('shield', size=14) }} {{ tr('憑證以加密方式存放，頁面上一律遮罩顯示；不動它就會沿用原值。訊息只含工具名、檔名、狀態與耗時，') }}<b>{{ tr('不含檔案內容') }}</b>。</p>
+  <p class="muted nt-note">{{ icon('shield', size=14) }} <span>{{ tr('憑證以加密方式存放，頁面上一律遮罩顯示；不動它就會沿用原值。訊息只含工具名、檔名、狀態與耗時，') }}<b>{{ tr('不含檔案內容') }}</b>。</span></p>
 
   {% for ch in channels %}
   {% set c = cfg.channels[ch] %}

@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.79"
+VERSION = "1.16.80"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -226,6 +226,24 @@ def _tpl_ucfirst(s: str) -> str:
 
 
 templates.env.filters["ucfirst"] = _tpl_ucfirst
+
+
+def _tpl_marks(s: str):
+    """翻譯過的一整句轉成 HTML：先整句跳脫，再把 `**粗體**`、`` `程式碼` `` 換成標籤。
+
+    用法 `{{ tr('把**辦公文件**批次轉成 PDF。')|marks }}`。**一句話一個 tr()**，粗體 / 程式碼
+    放在哪裡由各語言的譯文自己決定 —— 原本拆成 `tr('把') <b>…</b> tr('…')` 分開翻，
+    英文的語序跟中文不同，印成「Turns Office documents(.doc …) converted to PDF」。
+    """
+    import re as _re
+    # 用 Jinja 自己的 escape / safe 濾鏡（不直接 import markupsafe —— 那是 Jinja 的相依，不是我們宣告的）
+    out = str(templates.env.filters["escape"](s))
+    out = _re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", out)
+    out = _re.sub(r"`(.+?)`", r"<code>\1</code>", out)
+    return templates.env.filters["safe"](out)
+
+
+templates.env.filters["marks"] = _tpl_marks
 
 
 def _tpl_current_user(request) -> dict | None:

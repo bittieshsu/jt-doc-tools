@@ -3,7 +3,8 @@
 {% block title %}{{ tr('擷取圖片') }} · {{ app_name }}{% endblock %}
 {% block content %}
 <h1>{{ icon('image', size=22) }} {{ tr('擷取圖片') }}</h1>
-<p class="muted">{{ tr('把 PDF 中') }}<b>{{ tr('嵌入的圖片') }}</b>{{ tr('（照片、Logo、圖示等）擷取出來，可勾選想要的下載成 ZIP 或單張下載。') }}<br>
+{# 一整句一個 tr()，粗體 / 程式碼用 **…** / `…` 標記（`marks` 濾鏡）：拆成片段分開翻，英日文的語序會錯 #}
+<p class="muted">{{ tr('把 PDF 中**嵌入的圖片**（照片、Logo、圖示等）擷取出來，可勾選想要的下載成 ZIP 或單張下載。')|marks }}<br>
   <span class="muted" data-s="s6b9c179a">{{ tr('注意：這不是把 PDF 每一頁轉成圖片，那是「') }}<a href="/tools/pdf-to-image/">{{ tr('辦公文件轉圖片') }}</a>{{ tr('」工具。') }}</span>
 </p>
 

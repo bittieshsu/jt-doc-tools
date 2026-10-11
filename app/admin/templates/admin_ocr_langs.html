@@ -45,6 +45,10 @@ details[open] > .po-ext-summary .po-ext-arrow { transform:rotate(90deg); }
 .ol-toast.err { background:#ef4444; }
 .ol-warn { background:#fef3c7; border-left:3px solid #f59e0b; padding:10px 14px; font-size:13px; color:#92400e; border-radius:4px; margin-bottom:14px; }
 .ol-group { margin-bottom:18px; }
+.ol-ext-hint { display:flex; align-items:flex-start; gap:6px; margin:8px 0 0; font-size:12px; line-height:1.6;
+  font-weight:600; color:#b45309; }
+.ol-ext-hint svg { flex:none; margin-top:3px; }
+.ol-ext-hint code { background:#fffbeb; padding:1px 4px; border-radius:3px; white-space:nowrap; }
 .ol-group-label { font-size:13px; font-weight:700; color:#475569; margin-bottom:6px; padding-left:2px; }
 
 /* OCR section collapsibles — 用 details/summary 內建展開折疊行為
@@ -252,7 +256,10 @@ details[open] > .po-ext-summary .po-ext-arrow { transform:rotate(90deg); }
 <pre data-s="se69e5a84">scp jt-ocr-server-install.sh root@GPUServer:/tmp/
 ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh --dry-run'
 ssh root@GPUServer 'bash /tmp/jt-ocr-server-install.sh'</pre>
-        <p data-s="s36aefc86">{{ icon('warn', size=12) }} {{ tr('把') }} <code data-s="s1fcb9a2f">GPUServer</code> {{ tr('換成實際 IP 或 hostname（例：') }}<code data-s="s1fcb9a2f">ocr.example.com</code>）</p>
+        {# 一整句給翻譯（`marks` 濾鏡把 `…` 換成 <code>；拆成片段翻，英日文的語序會錯）。
+           圖示與文字各一格，文字在自己那一格裡自然換行：原本整段 `<p>` 是 flex，
+           每一段文字、每個 <code> 各自變成一欄，擠成好幾條窄欄。 #}
+        <p class="ol-ext-hint">{{ icon('warn', size=12) }}<span>{{ tr('把指令裡的 `GPUServer` 換成 GPU 主機的 IP 或主機名稱，例如 `ocr.example.com`。')|marks }}</span></p>
         <p data-s="s2b2d9463">{{ tr('5-15 分鐘(含 PyTorch ~3GB)') }}</p>
       </div>
 

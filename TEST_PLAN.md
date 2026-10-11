@@ -199,7 +199,10 @@ JTDT_DATA_DIR=$(mktemp -d) JTDT_CSRF_DISABLE=1 \
 .venv/bin/python -m pytest tests/test_pages_boot_in_a_browser.py -q
 ```
 
-- [ ] **每一支工具頁 ＋ 首頁 / 我的作業 / 工作區**都在無頭瀏覽器開過一次
+- [ ] **每一支工具頁 ＋ 首頁 / 我的作業 / 工作區 ＋ 全部管理頁**都在無頭瀏覽器開過一次
+      （管理頁 v1.16.80 才加進來，挑宣告成 HTML 頁面的路由，不去 GET 匯出、下載腳本那些端點）
+- [ ] **沒有句子被 flex 切成好幾欄**（v1.16.80）：row 方向的 flex 容器裡直接放「16 字以上的文字＋粗體 / 程式碼 / 連結」，
+      一換行就擠成好幾條窄欄。藏起來的面板也檢查（看結構，不看當下寬度）；修法是把整句包進 `<span>`
 - [ ] **沒有任何一頁有主控台錯誤**：`Runtime.exceptionThrown`（沒接住的例外）
       與 `Log.entryAdded` level=error（含 **CSP 違規**與載不到的資源）
 - [ ] 沒有瀏覽器的環境會**誠實 skip**（不是 pass）；另有一條驗「真的逐頁走過」，
@@ -623,7 +626,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **461 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **462 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -1028,6 +1031,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_soffice_calls_go_through_office_convert.py` | 所有 soffice 轉檔都要走 `app/core/office_convert.py`；Windows 上不可以執行 |
 | `test_speech_audio_retention.py` | 會議錄音要有保留期限（v1.16.71） |
 | `test_speech_signed_audio_url.py` | 語音服務拉錄音檔的簽章網址：驗得過才給，**驗不過一律當成找不到** |
+| `test_split_sentence_translations.py` | 一句話不可以拆成片段分開翻譯（v1.16.80：SSO 設定頁、OCR 引擎頁與五支工具的說明，共 7 處） |
 | `test_sso.py` | Tests for the SSO feature (OIDC + SAML): settings encryption, JIT |
 | `test_sso_oidc_e2e.py` | Real end-to-end OIDC login against a self-hosted, spec-conformant mini IdP. |
 | `test_sso_saml_e2e.py` | Real end-to-end SAML login with a genuinely signed SAML Response. |
@@ -3966,11 +3970,20 @@ grep -rnE "回滾|軟依賴|硬依賴|系統依賴(?!\s*$)|圖像(?![幾何])|�
 - [ ] **內建 Logo 二選一**（v1.16.78）：「Jason Tools Logo」與「文件圖示（介紹網站）」；點了當場換，側欄、頁籤圖示、首頁、登入頁、
       通知信都跟著換（通知信不必重啟）。上傳過企業 Logo 時以上傳的為準，畫面上有提示。
       `tests/test_sidebar_theme_and_logo.py`、`tests/test_sidebar_theme_browser.py`
-- [ ] **左側選單配色**（v1.16.78）：10 張卡片（漸層 5 種、純色 5 種），每張有迷你側欄的預覽、名稱、一句說明，選中的右上角打勾；
-      點一下全站當場換色、重新整理照舊。預設（靛紫）跟改版前一模一樣；其他 9 種的站台名稱、分類列、工具名稱與說明、版本
-      對比都在 4.5:1 以上（瀏覽器實量）。淺灰、淡藍是深色字，Jason Tools Logo 自動換成白底用的那一版。
+- [ ] **左側選單配色**（v1.16.78；v1.16.80 起 12 種）：12 張卡片（漸層 6 種、純色 6 種），每張有迷你側欄的預覽、名稱、一句說明，
+      選中的右上角打勾；每組一排 6 張，較窄時 3 張一排，每一排都排滿。
+      點一下全站當場換色、重新整理照舊。預設（靛紫）跟改版前一模一樣；其他 11 種的站台名稱、分類列、工具名稱與說明、版本
+      對比都在 4.5:1 以上（瀏覽器實量）。淺灰、淡藍、米白是深色字，Jason Tools Logo 自動換成白底用的那一版。
       手機寬度一排兩張、沒有橫向捲動。設定存在 `data/branding/appearance.json`，設定備份「品牌 Logo」那一類帶得走。
+      （v1.16.80 補）每一種配色都看一次：滑過工具時的說明、帳號列的「@ldap」、分類旁的數字、目前所在的那一格看得清楚；
+      側欄捲軸平常淡淡的，滑過或拖曳時**變明顯**（淺色那三種原本是反過來變淡）。
       `tests/test_sidebar_theme_and_logo.py`、`tests/test_sidebar_theme_browser.py`
+- [ ] **左側選單配色：套用失敗與連點**（v1.16.80）：伺服器回錯誤或斷線時，畫面維持原本的選擇、狀態列顯示紅字原因，
+      重新整理後還是原本的配色；快速連點兩張，最後停在最後點的那一張，重新整理後一致。
+- [ ] **左側選單配色：英文與日文介面**（v1.16.80）：名稱與說明完整顯示、不撐出卡片，每組照樣排滿（寬 6 張、窄 3 張、手機 2 張）。
+- [ ] **內建 Logo：不套側欄的頁面**（v1.16.80）：選「文件圖示」後，登入頁（啟用認證）與初次設定頁的頁籤圖示、頁面上的 Logo 都換掉。
+- [ ] **左側選單配色：設定備份匯入**（v1.16.80）：匯出 → 換一種配色 → 匯入，不重新啟動服務，重新整理就是備份裡的配色與 Logo。
+- [ ] **左側選單配色：Windows 實機**（v1.16.80）：在 Windows 主機上打開設定頁，選一種深色、一種淺色，看側欄與卡片預覽。
 
 #### 6.9.7 用印與簽名臨時資產（#7）
 
@@ -5416,6 +5429,7 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 - [ ] `pytest tests/test_admin_privacy_boundary.py` 綠燈
 - [ ] 上傳 / 預覽與作業產出**兩條路走同一份政策**（判準走 AST）
 - [ ] 越權讀取一定寫稽核；**讀自己的不算越權**；同一資源有去重視窗
+- [ ] （v1.16.80）送件前檢核的案件（自己一套 ACL）：管理員與稽核員打開別人的案件也寫 `admin_file_override`；管理員開啟查不到擁有者的暫存檔（`require_by_filename`）也寫
 - [ ] 政策關掉時要真的拒絕，而且沒有東西可稽核
 - [ ] 改政策時，權限矩陣與產品說明要跟著改（人工項）
 

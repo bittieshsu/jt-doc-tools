@@ -488,8 +488,12 @@ def test_templates_never_use_markdown_bold():
 
     註解裡寫 `**` 是給讀程式的人看的，掃描前要先去掉（Jinja 註解、HTML 註解、
     JS 註解三種）—— 這個專案的檢查「連說明一起掃」已經誤報過兩次。
+
+    唯一的例外是 `{{ tr('…**粗體**…')|marks }}`（v1.16.80）：`marks` 濾鏡渲染時把標記換成 `<b>`，
+    整句一個 tr() 才翻得對（拆成片段翻，英日文語序會錯）。只放過**緊接 `|marks` 的那一個字串**。
     """
     md = re.compile(r"\*\*[^*\n<>]+\*\*")
+    marked = re.compile(r"""tr\(\s*'(?:[^'\\]|\\.)*'\s*\)(?=\s*\|\s*marks)""", re.S)
     bad: list[str] = []
     files = sorted(ROOT.glob("app/**/*.html")) + sorted(ROOT.glob("static/js/*.js"))
     for p in files:
@@ -497,6 +501,7 @@ def test_templates_never_use_markdown_bold():
         src = re.sub(r"\{#.*?#\}|<!--.*?-->", " ", src, flags=re.S)
         src = re.sub(r"//[^\n]*", " ", src)
         src = re.sub(r"/\*.*?\*/", " ", src, flags=re.S)
+        src = marked.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), src)   # 保留行號
         for m in md.finditer(src):
             bad.append(f"{p.relative_to(ROOT)}:{src[:m.start()].count(chr(10)) + 1}"
                        f"  {m.group(0)[:50]}")
