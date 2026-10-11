@@ -340,6 +340,8 @@ def build_knowledge_router(templates) -> APIRouter:
             k = int(body.get("k") or 8)
         except (TypeError, ValueError):
             k = 8
+        # 查詢的文字不記（可能含個資），只記長度與範圍（v1.16.81）
+        _audit(request, "kb_search", "admin-test", {"chars": len(q), "datasets": len(ds or [])})
         return await asyncio.to_thread(retrieval.search_detail, q, user_id=_uid(request),
                                        dataset_ids=ds or None, k=k, highlight=True)
 

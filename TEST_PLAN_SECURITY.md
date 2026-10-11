@@ -253,6 +253,7 @@ A / B，然後：
 | v1.14.6 | API token 強制驗證開啟時管理區全壞（判斷用「路徑含 /api/」） | `test_api_gate_and_csrf_edges.py` |
 | v1.14.6 | 另外三個工具的預覽端點切出空 id 就跳過檢查（doc-deident / pdf-editor / pdf-to-image） | `test_preview_acl_failopen.py`（prefix 那組） |
 | v1.14.6 | `/workspace/save` 有自己一份歸屬判斷 → 無主作業可被任何登入者存走 | `test_job_id_acl.py::test_workspace_save_denies_ownerless_job` |
+| v1.16.81 | 管理員查看公文案件清單（所有人的標題與主旨）不留紀錄；知識庫查詢不留紀錄 | `test_official_doc_cases.py::test_admin_viewing_everyones_case_list_is_audited`、`…::test_drafting_with_the_knowledge_base_is_audited_without_the_query` |
 | v1.16.80 | 管理員 / 稽核員打開別人的送件前檢核案件不留稽核紀錄；管理員開啟查不到擁有者的暫存檔也不留 | `test_submission_check_acl.py::test_privileged_read_of_someone_elses_case_is_audited`、`test_admin_privacy_boundary.py` |
 | v1.14.6 | 送件檢核用 403 / 404 區分「不是你的」與「不存在」（id 查詢介面） | `test_submission_check_acl.py::test_non_owner_response_is_indistinguishable_from_not_found` |
 | v1.14.6 | 匯出的 CSV / xlsx 可被試算表當公式執行（註解作者來自對方的 PDF） | `test_csv_injection.py` |

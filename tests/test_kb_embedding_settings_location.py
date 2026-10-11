@@ -615,3 +615,33 @@ def test_the_model_row_and_the_advice_fill_the_section(live):
         assert abs(g["adv"] - g["inner"]) <= 2, ("建議說明框右邊還有留白", g)
     finally:
         t.close()
+
+
+@_needs_browser
+def test_a_saved_name_that_differs_only_in_case_is_not_reported_missing(live):
+    """Ollama 的模型名稱不分大小寫：存的是 `…:Q8_0`、伺服器清單列的是 `…:q8_0`（實際在正式機上看到）。
+    不可以標成「伺服器上找不到」，也不可以同一個模型列兩次；選中的那一項沿用存的寫法 ——
+    換成清單上的寫法會被當成換了模型，要重建整個向量索引。"""
+    port, cdp, _, _ = live
+    saved, listed = "hf.co/Abiray/Nemotron-3-Embed-8B-GGUF:Q8_0", "hf.co/Abiray/Nemotron-3-Embed-8B-GGUF:q8_0"
+    with FakeEmbed("ollama", models=[(listed, ["embedding"]), ("embeddinggemma:300m", ["embedding"])]) as fe2:
+        before = _get(port, "/admin/knowledge/api/embedding")["embed"]
+        _post(port, "/admin/knowledge/api/embedding",
+              {"use_llm_server": False, "kind": "ollama", "base_url": fe2.base, "model": saved})
+        t = _Tab(cdp)
+        try:
+            t.go(f"http://127.0.0.1:{port}/admin/llm-settings")
+            assert t.wait_for("[...document.getElementById('kbEmbModel').options].some(o => o.value === 'embeddinggemma:300m')"), \
+                t.js("document.getElementById('kbEmbModelNote').textContent")
+            opts = t.js("[...document.getElementById('kbEmbModel').options].map(o => [o.value, o.textContent])")
+            assert not [o for o in opts if "找不到" in o[1]], f"只差大小寫就標成找不到：{opts}"
+            assert len([o for o in opts if o[0].lower() == saved.lower()]) == 1, f"同一個模型列了兩次：{opts}"
+            assert t.js("document.getElementById('kbEmbModel').value") == saved, "選中的要沿用存的寫法"
+            hit = next(o for o in opts if o[0] == saved)
+            assert "4096" in hit[1] or "維" in hit[1] or hit[1].startswith(saved), hit
+            t.drain()
+            assert not t.errs, "主控台有錯誤：\n  " + "\n  ".join(t.errs)
+        finally:
+            t.close()
+            _post(port, "/admin/knowledge/api/embedding",
+                  {"use_llm_server": before["use_llm_server"], "base_url": before["base_url"], "model": before["model"]})

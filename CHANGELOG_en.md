@@ -5,11 +5,16 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (909 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (910 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.81] - 2026-10-11
+
+- LLM settings, embedding model: when the saved model name differs from the server's list only in letter case (for example a saved `…:Q8_0` and Ollama listing `…:q8_0`), the page said it was not found on the server. Ollama model names are case-insensitive, so they are the same model and it now shows as selected; picking the listed spelling no longer counts as a model change that requires rebuilding the whole vector index. Embedding itself was not affected.
+- Audit log: administrators viewing the official document case history list (which shows everyone's case titles and subjects) are recorded (`admin_file_override`, one entry per person within 5 minutes); official document drafting with the knowledge base and the admin search test write a `kb_search` entry that records only the length of the query, not its text. The compliance page is updated to match.
 
 ## [1.16.80] - 2026-10-11
 

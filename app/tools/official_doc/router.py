@@ -634,6 +634,24 @@ def _kb_query(inputs: dict) -> str:
     return str(inputs.get("narrative") or "")
 
 
+def _audit_kb_use(request: Request, inputs: dict, case_id: str = "") -> None:
+    """勾了「參考公文知識庫」：記下誰在什麼時候查了知識庫（v1.16.81）。
+
+    **查詢的文字不記**（承辦人的需求、來文開頭，裡面可能有個資）—— 稽核記錄一律只記中繼資料，
+    這裡只記長度。在送出當下記：查詢在背景作業裡跑，那時拿不到帳號與 IP。
+    """
+    if not inputs.get("use_kb"):
+        return
+    try:
+        from ...core import audit_db, client_ip, sessions as _sess
+        audit_db.log_event("kb_search", username=_sess.user_label(getattr(request.state, "user", None)) or "",
+                           ip=client_ip.real_client_ip(request),
+                           target="official-doc" + (f":{case_id}" if case_id else ""),
+                           details={"chars": len(_kb_query(inputs))})
+    except Exception:  # noqa: BLE001 —— 稽核寫不進去不可以讓草稿失敗
+        logger.warning("official-doc：知識庫查詢的稽核寫入失敗", exc_info=True)
+
+
 def _kb_lookup(inputs: dict, user_id: Optional[int], k: int = KB_MAX_RESULTS) -> tuple[list, str]:
     """回 `(檢索結果, 說明代碼)`。`user_id` 是**伺服器端**認出的那個人（`/start` 當下取），
     看得到哪些資料集由知識庫自己判斷 —— 這裡不另外過濾。"""
@@ -1384,6 +1402,7 @@ async def start(request: Request):
         case_id = existing
     # 查知識庫要用「送出的這個人」看得到的資料集 —— 在請求當下由伺服器認出，帶進背景作業
     uid = _uo.current_user_id(request)
+    _audit_kb_use(request, inputs, case_id)
 
     def _save() -> None:
         # 擁有者記在案件裡（**只在建立時**記 —— `create` 不覆寫既有的 `meta.json`）
@@ -1497,6 +1516,10 @@ def _list_rows(request: Request, q: str, mode: str) -> tuple[list[dict], bool]:
     auth_on = _uo.auth_enabled()
     metas = _cs.list_cases(owner_uid=uid, see_all=see_all,
                            include_deleted=see_all and auth_on)
+    if see_all and auth_on and uid is not None and any(m.get("owner_uid") != uid for m in metas):
+        # 管理員的清單列出每個人的案件標題與主旨 —— 也是在看別人的資料，要查得到（v1.16.81）。
+        # 同一人 5 分鐘內只記一筆（清單頁會搜尋、篩選、重新整理很多次）。
+        _uo.admin_override_allowed(uid, "official-doc:case-list", request=request)
     q = " ".join(str(q or "").split()).lower()[:100]
     rows = []
     for m in metas:
@@ -2380,6 +2403,7 @@ async def api_official_doc(request: Request):
     facts, overrides = _parse_facts(body, inputs)
     _require_llm()
     ask = _plain_ask()
+    _audit_kb_use(request, inputs)
     hits, kb_note, history_note = await asyncio.to_thread(
         _refs_lookup, inputs, _uo.current_user_id(request))
     try:

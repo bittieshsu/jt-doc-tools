@@ -345,7 +345,7 @@ def save(changes: dict) -> dict:
             else:
                 cfg["api_key_enc"] = ""
         act = d["active"]
-        if act and basis(act) == basis(cfg):
+        if act and same_basis(act, cfg):
             for k in ("base_url", "api_key_enc", "batch_size", "timeout_seconds", "use_llm_server"):
                 act[k] = cfg[k]
         _write({"embed": cfg, "active": act})
@@ -366,6 +366,20 @@ def basis(cfg: dict) -> str:
                        "chunker": CHUNKER_VERSION}, ensure_ascii=False, sort_keys=True)
 
 
+def same_basis(a: dict, b: dict) -> bool:
+    """兩份設定建出來的索引是不是同一套（不看維度）。
+
+    **Ollama 的模型名稱不分大小寫**：`/api/tags` 列出 `hf.co/…-GGUF:q8_0`，使用者存的可能是
+    `…:Q8_0`，兩個叫得動的是同一個模型 —— 只差大小寫不可以被當成換了模型、要重建整個索引。
+    其他種類照原樣比（有些 OpenAI 相容的伺服器分大小寫）。
+    `fingerprint` 本身**不改**：改了等於所有既有索引都要重建。
+    """
+    def key(c: dict) -> dict:
+        m = (c.get("model") or "").strip()
+        return {**c, "model": m.lower() if c.get("kind") == "ollama" else m}
+    return basis(key(a)) == basis(key(b))
+
+
 def fingerprint(cfg: dict, dim: int) -> str:
     raw = basis(cfg) + f"|dim={int(dim)}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
@@ -379,7 +393,7 @@ def needs_rebuild(d: Optional[dict] = None) -> bool:
         return False
     if not act:
         return True
-    return basis(act) != basis(cfg) or act.get("fingerprint") != fingerprint(act, act.get("dim", 0))
+    return not same_basis(act, cfg) or act.get("fingerprint") != fingerprint(act, act.get("dim", 0))
 
 
 def active_snapshot() -> Optional[dict]:

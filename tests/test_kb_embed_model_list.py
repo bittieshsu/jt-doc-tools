@@ -99,3 +99,36 @@ def test_the_page_offers_a_select_not_a_text_box(kb_isolated, admin_session):
     html = c.get("/admin/llm-settings").text
     assert '<select id="kbEmbModel"' in html, "嵌入模型要從清單挑"
     assert 'id="kbEmbModels"' in html, "要有「重新整理清單」"
+
+
+# ---------------------------------------------------------------- 名稱只差大小寫（v1.16.81）
+#
+# Ollama 的模型名稱不分大小寫：`/api/tags` 列出 `hf.co/…-GGUF:q8_0`，使用者存的是 `…:Q8_0`，
+# 兩個都叫得動、是同一個模型。畫面原本標成「伺服器上找不到」；改選清單上那一項又會被當成
+# 換了模型、要重建整個向量索引。fingerprint 本身**不可以改**（改了等於所有既有索引都要重建）。
+
+def _cfg(kind: str, model: str) -> dict:
+    from app.core.kb import embed
+    return {**embed.DEFAULT_EMBED, "kind": kind, "use_llm_server": False,
+            "base_url": "http://127.0.0.1:9", "model": model}
+
+
+@pytest.mark.parametrize("kind, rebuild", [("ollama", False), ("openai", True)])
+def test_a_name_that_differs_only_in_case(kind, rebuild):
+    """Ollama 不分大小寫 → 不必重建；OpenAI 相容的伺服器有些分大小寫 → 照原樣當成不同模型。"""
+    from app.core.kb import embed
+    act = _cfg(kind, "hf.co/Abiray/Nemotron-3-Embed-8B-GGUF:Q8_0")
+    act.update(dim=4096, fingerprint=embed.fingerprint(act, 4096))
+    d = {"embed": _cfg(kind, "hf.co/abiray/nemotron-3-embed-8b-gguf:q8_0"), "active": act}
+    assert embed.needs_rebuild(d) is rebuild
+
+
+def test_the_fingerprint_itself_is_unchanged():
+    """既有索引的 fingerprint 是照原本的寫法算的 —— 這次修改不可以讓它們全部變成「要重建」。"""
+    import hashlib
+    from app.core.kb import embed
+    a = _cfg("ollama", "hf.co/Abiray/Nemotron-3-Embed-8B-GGUF:Q8_0")
+    assert '"model": "hf.co/Abiray/Nemotron-3-Embed-8B-GGUF:Q8_0"' in embed.basis(a)
+    assert embed.fingerprint(a, 4096) == hashlib.sha256((embed.basis(a) + "|dim=4096").encode()).hexdigest()[:24]
+    act = {**a, "dim": 4096, "fingerprint": embed.fingerprint(a, 4096)}
+    assert embed.needs_rebuild({"embed": dict(a), "active": act}) is False

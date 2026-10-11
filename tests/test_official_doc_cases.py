@@ -327,3 +327,54 @@ def test_cases_page_empty_state(client, auth_off, data_dir_cases):
 def test_the_tool_page_links_to_the_history(client, auth_off):
     html = client.get(f"{BASE}/").text
     assert re.search(r'<a [^>]*href="/tools/official-doc/cases"[^>]*id="odCasesLink"', html)
+
+
+# ------------------------------------------------------------------ 稽核：清單與知識庫查詢（v1.16.81）
+#
+# 管理員的清單列出每個人的案件標題與主旨 —— 那也是在看別人的資料，要查得到是誰在什麼時候看的。
+# 勾了「參考公文知識庫」的草稿要留一筆知識庫查詢；查詢的文字不記（裡面可能有個資），只記長度。
+
+def _audit_rows(kind: str) -> list:
+    from app.core import audit_db
+    return audit_db.conn().execute(
+        "SELECT target, username, details_json FROM audit_events WHERE event_type=? ORDER BY id",
+        (kind,)).fetchall()
+
+
+def test_admin_viewing_everyones_case_list_is_audited(admin_session, fake_llm):
+    from app.core import upload_owner
+    admin, _, _ = admin_session
+    alice = _user_client("odc_listed")
+    _run(alice)
+    upload_owner._OVERRIDE_LOGGED.clear()
+    before = len(_audit_rows("admin_file_override"))
+    assert admin.get(f"{BASE}/api/cases").status_code == 200
+    rows = _audit_rows("admin_file_override")[before:]
+    assert [r for r in rows if r[0] == "official-doc:case-list" and r[1].startswith("jtdt-admin")], rows
+    # 一般使用者看自己的清單不算
+    before = len(_audit_rows("admin_file_override"))
+    alice.get(f"{BASE}/api/cases")
+    assert not [r for r in _audit_rows("admin_file_override")[before:] if r[0] == "official-doc:case-list"]
+
+
+def test_drafting_with_the_knowledge_base_is_audited_without_the_query(admin_session, fake_llm):
+    alice = _user_client("odc_kb")
+    secret = "王小明身分證A123456789申請補助"
+    before = len(_audit_rows("kb_search"))
+    _run(alice, narrative=secret, use_kb=True)
+    rows = _audit_rows("kb_search")[before:]
+    assert rows and rows[-1][0].startswith("official-doc") and rows[-1][1].startswith("odc_kb"), rows
+    assert secret not in rows[-1][2] and "A123456789" not in rows[-1][2], "查詢的文字不可以進稽核記錄"
+    # 沒勾就不記
+    before = len(_audit_rows("kb_search"))
+    _run(alice, narrative="一般的簽")
+    assert not _audit_rows("kb_search")[before:]
+
+
+def test_the_admin_search_test_is_audited_without_the_query(admin_session):
+    admin, _, _ = admin_session
+    before = len(_audit_rows("kb_search"))
+    r = admin.post("/admin/knowledge/api/search", json={"query": "查詢陳大華的地址"})
+    assert r.status_code == 200, r.text
+    rows = _audit_rows("kb_search")[before:]
+    assert rows and rows[-1][0] == "admin-test" and "陳大華" not in rows[-1][2], rows

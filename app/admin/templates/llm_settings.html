@@ -1483,11 +1483,20 @@ $('btn-save').addEventListener('click', saveSettings);
     return parts.join(' · ');
   }
   // `keep` 在填的當下才讀：清單回來之前使用者可能已經換了選擇（不可以被舊的值蓋回去）
-  function fillModels(models, known, offerManual) {
+  function fillModels(models, known, offerManual, kind) {
     const keep = modelValue();
     const sel = byId('kbEmbModel');
     sel.textContent = '';
     if (!keep) sel.appendChild(opt('', tr('（請選擇）')));
+    // Ollama 的模型名稱不分大小寫：存的是 `…:Q8_0`、清單列 `…:q8_0` 是同一個模型。對到的那一項沿用存的寫法 ——
+    // 換成清單上的寫法會被當成換了模型、要重建整個向量索引（伺服器端 `same_basis` 也一樣不分大小寫）。
+    if (keep && kind === 'ollama') {
+      const hit = models.find(m => m.id !== keep && m.id.toLowerCase() === keep.toLowerCase());
+      if (hit && !models.some(m => m.id === keep)) {
+        USAGE[keep] = USAGE[hit.id] || null;
+        hit.id = keep;
+      }
+    }
     const ids = new Set(models.map(m => m.id));
     if (keep && !ids.has(keep)) sel.appendChild(opt(keep, keep + (models.length ? tr('（伺服器上找不到）') : '')));
     const likely = models.filter(m => m.embedding), other = models.filter(m => !m.embedding);
@@ -1543,7 +1552,7 @@ $('btn-save').addEventListener('click', saveSettings);
     const models = j.models || [];
     USAGE = {};
     models.forEach(m => { USAGE[m.id] = m.usage || null; });
-    fillModels(models, !!j.capability_known, !models.length);
+    fillModels(models, !!j.capability_known, !models.length, j.kind);
     if (!models.length) {
       modelNote(j.capability_known
         ? tr('這台伺服器上沒有嵌入模型，請先在伺服器上下載一個（建議的模型與下載指令見下方說明）。')
