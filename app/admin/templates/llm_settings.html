@@ -425,6 +425,7 @@
           <p><b>{{ tr('建議使用 NVIDIA Nemotron-3-Embed-8B') }}</b>{{ tr('：以公文知識庫實測（42 題、1,503 段），在試過的嵌入模型中找回率最高，長篇的需求敘述也找得準。') }}</p>
           <p>{{ tr('Ollama 下載：') }}<code data-i18n="skip">ollama pull hf.co/Abiray/Nemotron-3-Embed-8B-GGUF:Q8_0</code>{{ tr('（第三方轉成 GGUF 的版本；檔案約 8.5 GB，載入後約佔 11 GB 記憶體）。') }}</p>
           <p>{{ tr('選了這個模型時，查詢與文件的前綴、載入參數由系統照官方用法自動設定，不必另外調整。記憶體不夠時可改用較小的嵌入模型（例如 EmbeddingGemma），找回率會低一些。') }}</p>
+          <p>{{ tr('經過 LiteLLM 這類閘道時：嵌入模型要另外加進閘道的模型清單；閘道上的模型名稱要保留「Nemotron-3-Embed」，系統才認得出來、自動套用前綴（改成別的名稱會照一般模型送，找回率變低）。聊天用的模型（例如 nemotron-3-nano、gemma4）不能做嵌入。') }}</p>
         </div>
       </div>
       <div class="af-attrs">
@@ -1559,6 +1560,9 @@ $('btn-save').addEventListener('click', saveSettings);
         : tr('這台伺服器沒有列出任何模型。'), true);
     } else if (j.capability_known) {
       modelNote(tr('伺服器上有 {0} 個嵌入模型。').replace('{0}', models.length));
+    } else if (!models.some(m => m.embedding)) {
+      // 經過 LiteLLM 這類閘道時常見：清單全是聊天模型，挑哪個都會失敗（客戶實際踩過，畫面只看到 HTTP 400 / 501）
+      modelNote(tr('伺服器清單裡沒有名稱像嵌入模型的（多半含 embed）：上面這些可能都是聊天用的模型，不能做嵌入。請先在伺服器上下載嵌入模型（見下方建議）；經過 LiteLLM 這類閘道時，也要把它加進閘道的模型清單。'), true);
     } else {
       modelNote(tr('這台伺服器沒有說哪些模型能做嵌入：名稱看起來像的排在前面，選好之後可以按「測試連線」確認。'));
     }

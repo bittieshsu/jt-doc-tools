@@ -503,10 +503,22 @@ class EmbedClient:
             if r.status_code == 404:
                 raise EmbedError("嵌入服務找不到這個模型（或這個 API 路徑）；請確認模型名稱與 API 種類。")
             low = detail.lower()
+            status = r.status_code
+            # 「這個模型不能做嵌入」：選到聊天用的模型最常見（伺服器上沒有嵌入模型時尤其如此）。
+            # Ollama 不會先檢查，會先把模型載入再失敗；llama.cpp 的「不支援」是 501，閘道（LiteLLM）
+            # 則多半是 400 加一句 "does not support embeddings"。**訊息一律是固定句子** —— 對方回的
+            # 內容只進服務紀錄檔（上面那一行），不回給瀏覽器。
+            if status == 501 or ("embed" in low and ("not support" in low or "unsupported" in low
+                                                     or "not implemented" in low)):
+                raise EmbedError(f"這個模型不能做嵌入（伺服器回 HTTP {status}）：選的可能是聊天用的模型。"
+                                 "請先在伺服器上下載嵌入模型（見下方建議），再從清單選它。")
             if "context" in low or "too long" in low or "exceed" in low or "length" in low:
                 raise EmbedError("有一段文字超過這個模型能處理的長度。這個模型的上下文太短，"
                                  "請換一個上下文較長的模型（不會為了配合而安靜截掉內容）。")
-            raise EmbedError(f"嵌入服務回報錯誤（HTTP {r.status_code}）。")
+            if not (_looks_embedding(self.model) or model_profile(self.model)["family"]):
+                raise EmbedError(f"嵌入服務回報錯誤（HTTP {status}）。選的模型名稱看起來不像嵌入模型，"
+                                 "聊天用的模型不能做嵌入；請改選嵌入模型（見下方建議）。對方回的詳細原因記在服務紀錄檔。")
+            raise EmbedError(f"嵌入服務回報錯誤（HTTP {status}）。對方回的詳細原因記在服務紀錄檔。")
         try:
             data = r.json()
         except ValueError as e:

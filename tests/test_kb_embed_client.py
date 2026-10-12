@@ -149,3 +149,72 @@ def test_prefix_settings_are_gone(kb_isolated):
     p.write_text(__import__("json").dumps(d), encoding="utf-8")
     pub = embed.get_public()["embed"]
     assert "query_prefix" not in pub and "document_prefix" not in pub
+
+
+# ---------------------------------------------------------------- 選到聊天模型（v1.16.82）
+#
+# 實際案例：經過 LiteLLM 的伺服器上沒有嵌入模型，管理員挑了 `gemma4:26b`、`nemotron-3-nano:latest`
+# （都是聊天模型），畫面只寫「嵌入服務回報錯誤（HTTP 400 / 501）」，看不出是選錯模型。
+# Ollama 不會先檢查模型能不能做嵌入（會先把那個聊天模型載入），「不支援」的狀態碼依引擎而不同
+# （llama.cpp 回 501）。訊息仍然是**固定句子**：對方回的內容只進服務紀錄檔，不回給瀏覽器
+# （見 `test_admin_exception_leak.py` 的 OWN_EXCEPTIONS 說明）。
+
+def _fail_with(monkeypatch, status: int, body: dict):
+    import httpx
+
+    def fake_post(url, **kw):
+        return httpx.Response(status, json=body, request=httpx.Request("POST", url))
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+
+def _err(model: str) -> str:
+    with pytest.raises(embed.EmbedError) as e:
+        embed.EmbedClient.from_snapshot(
+            {"kind": "openai", "base_url": "http://127.0.0.1:9", "model": model}).embed(["x"])
+    return str(e.value)
+
+
+@pytest.mark.parametrize("model, status, body", [
+    ("nemotron-3-nano:latest", 501, {"error": {"message": "This server does not support embeddings."}}),
+    ("gemma4:26b", 400, {"error": {"message": "litellm.BadRequestError: model does not support embeddings"}}),
+    ("some-model", 501, {"error": "not implemented"}),
+])
+def test_a_model_that_cannot_embed_is_named_as_the_problem(monkeypatch, model, status, body):
+    _fail_with(monkeypatch, status, body)
+    msg = _err(model)
+    assert "不能做嵌入" in msg and "嵌入模型" in msg and f"HTTP {status}" in msg, msg
+    assert "litellm" not in msg.lower() and "server" not in msg.lower(), "對方回的內容不可以回給瀏覽器"
+
+
+def test_a_chat_looking_name_gets_a_hint_on_other_errors(monkeypatch):
+    _fail_with(monkeypatch, 400, {"error": "something else went wrong"})
+    msg = _err("gemma4:26b")
+    assert "HTTP 400" in msg and "不像嵌入模型" in msg and "something" not in msg, msg
+
+
+def test_an_embedding_model_error_does_not_guess(monkeypatch):
+    _fail_with(monkeypatch, 500, {"error": "out of memory"})
+    msg = _err("nomic-embed-text:latest")
+    assert "HTTP 500" in msg and "聊天" not in msg and "不像" not in msg and "out of memory" not in msg, msg
+    assert "紀錄檔" in msg, "要講詳細原因去哪裡看"
+
+
+@pytest.mark.parametrize("model, status, body", [
+    ("gemma4:26b", 501, {"error": "x"}),                       # 不能做嵌入
+    ("gemma4:26b", 400, {"error": "something else"}),          # 名稱不像嵌入模型
+    ("nomic-embed-text:latest", 500, {"error": "boom"}),        # 一般錯誤
+])
+def test_the_new_sentences_are_translated(monkeypatch, model, status, body):
+    """畫面上的 `tr()` 把連續數字換成 `{0}` 再查語系檔（`static/js/i18n.js`）——
+    拿**實際丟出來的訊息**照同樣的規則換，語系檔裡要查得到（英文、日文）。"""
+    import json
+    import re
+    from pathlib import Path
+    _fail_with(monkeypatch, status, body)
+    msg = _err(model)
+    n = iter(range(10))
+    key = re.sub(r"\d+", lambda _m: "{%d}" % next(n), msg)
+    root = Path(__file__).resolve().parent.parent
+    for lang in ("en", "ja"):
+        cat = json.loads((root / "app" / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))
+        assert key in cat, (lang, key)

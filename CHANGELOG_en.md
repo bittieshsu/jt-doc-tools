@@ -5,11 +5,17 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (910 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (911 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.82] - 2026-10-12
+
+- Knowledge base embedding errors now say what went wrong: when the selected model cannot create embeddings (the server returns 501 or says embeddings are not supported), the page says it is probably a chat model and that an embedding model must be downloaded first; for other errors it also points out when the model's name does not look like an embedding model, and says the detailed reason is in the service log. Previously it only showed "the embedding service reported an error (HTTP 400 / 501)". What the server returned still goes only to the service log, never to the browser.
+- When the embedding model list contains only chat models (common behind a gateway such as LiteLLM), the page now warns plainly that none of them can create embeddings and that an embedding model must be downloaded and added to the gateway's model list.
+- The model advice adds a note for gateways such as LiteLLM: add the embedding model to the gateway's model list and keep "Nemotron-3-Embed" in its name there so the prefixes are applied automatically; chat models cannot create embeddings.
 
 ## [1.16.81] - 2026-10-11
 

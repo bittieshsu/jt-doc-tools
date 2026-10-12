@@ -645,3 +645,29 @@ def test_a_saved_name_that_differs_only_in_case_is_not_reported_missing(live):
             t.close()
             _post(port, "/admin/knowledge/api/embedding",
                   {"use_llm_server": before["use_llm_server"], "base_url": before["base_url"], "model": before["model"]})
+
+
+@_needs_browser
+def test_a_list_with_only_chat_models_warns_plainly(live):
+    """經過 LiteLLM 這類閘道（OpenAI 相容、不說哪些能做嵌入）而清單裡全是聊天模型：
+    要直接講「這些可能都不能做嵌入、請先下載嵌入模型」，不可以只說「名稱看起來像的排在前面」
+    讓人一個一個試（客戶實際踩過：挑了兩個聊天模型，畫面只看到 HTTP 400 / 501）。"""
+    port, cdp, _, _ = live
+    with FakeEmbed("openai", models=[("gemma4:26b", []), ("nemotron-3-nano:latest", [])]) as fe2:
+        t = _Tab(cdp)
+        try:
+            t.go(f"http://127.0.0.1:{port}/admin/llm-settings")
+            assert t.wait_for("!!(document.getElementById('kbEmbIndex').textContent || '').trim()")
+            t.js("(function () { const c = document.getElementById('kbEmbInherit'); if (c.checked) c.click();"
+                 " const k = document.getElementById('kbEmbKind'); k.value = 'openai'; k.dispatchEvent(new Event('change', {bubbles: true})); })()")
+            t.js(f"""(function () {{ const u = document.getElementById('kbEmbUrl'); u.value = {json.dumps(fe2.base)};
+                     u.dispatchEvent(new Event('change', {{bubbles: true}})); }})()""")
+            assert t.wait_for("(document.getElementById('kbEmbModelNote').textContent || '').includes('沒有名稱像嵌入模型')"), \
+                t.js("document.getElementById('kbEmbModelNote').textContent")
+            assert t.js("document.getElementById('kbEmbModelNote').classList.contains('emb-err')"), "要標成警告"
+            note = t.js("document.getElementById('kbEmbModelNote').textContent")
+            assert "下載嵌入模型" in note and "LiteLLM" in note, note
+            t.drain()
+            assert not t.errs, "主控台有錯誤：\n  " + "\n  ".join(t.errs)
+        finally:
+            t.close()
