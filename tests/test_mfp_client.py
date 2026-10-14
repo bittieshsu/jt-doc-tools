@@ -424,3 +424,57 @@ def test_a_cut_off_response_is_reported_as_incomplete_not_as_not_http(open_lo):
     assert http["detail"]["title"] == _EMWEB_TITLE, "標題在前 8 KB 裡，要讀得出來"
     assert rep["summary"]["reachable"] is True
     assert mc.MESSAGES.get("HTTP_INCOMPLETE"), "新的代碼要有固定訊息"
+
+
+# ---- 實機：Epson L3150 —— 首頁用 JavaScript 寫出 meta refresh（2026-10-14 使用者回報型號沒偵測出來）
+
+_EPSON_STUB = b"""<html><head><script type="text/javascript">
+var path = location.href;
+if (-1 < path.indexOf("PRESENTATION",0)) {
+document.write("<meta http-equiv = 'refresh' content='0; URL= ./HTML/TOP/INDEX.HTML'>");
+} else {
+document.write("<meta http-equiv = 'refresh' content='0; URL= ./PRESENTATION/HTML/TOP/INDEX.HTML'>");
+}
+if (false) { document.write("<meta http-equiv='refresh' content='0; URL=/logout.cgi'>"); }
+</script></head><body><noscript>Enable JavaScript.</noscript></body></html>"""
+
+
+class _EpsonHandler(BaseHTTPRequestHandler):
+    seen: list = []
+
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        _EpsonHandler.seen.append(self.path)
+        if self.path == "/":
+            body = _EPSON_STUB
+        elif self.path == "/PRESENTATION/HTML/TOP/INDEX.HTML":
+            body = b"<html><head><title>L3150 Series</title></head><body>Basic Settings</body></html>"
+        else:
+            self.send_response(404)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Server", "EPSON_Linux UPnP/1.0 Epson UPnP SDK/1.0")
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def test_a_redirect_written_by_javascript_is_followed_to_find_the_model(open_lo):
+    _EpsonHandler.seen = []
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _EpsonHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    port = srv.server_address[1]
+    open_lo(port)
+    try:
+        rep = mc.probe("127.0.0.1", port, "http")
+    finally:
+        srv.shutdown()
+    assert "/PRESENTATION/HTML/TOP/INDEX.HTML" in _EpsonHandler.seen, _EpsonHandler.seen
+    assert "/logout.cgi" not in _EpsonHandler.seen, "看起來會改變設備狀態的網址不可以跟"
+    d = rep["detection"]
+    assert (d["vendor"], d["model"]) == ("Epson", "L3150 Series"), d

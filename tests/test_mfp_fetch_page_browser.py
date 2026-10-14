@@ -212,10 +212,11 @@ def test_connection_test_save_detail_and_refusal(live, locale):
                     "[!!b.querySelector('svg'), (b.innerText.trim() || b.getAttribute('aria-label') || '')])")
         assert btns and all(b[0] for b in btns), f"有按鈕沒有圖示：{btns}"
         assert all(b[1] for b in btns), f"只留圖示的按鈕沒有可讀名稱：{btns}"
-        # 相容性：膠囊只放短狀態、一行；說明另外一行（使用者 2026-10-14：相容性的標籤不好看）
+        # 相容性：膠囊只放短狀態、一行（使用者 2026-10-14：相容性的標籤不好看）；清單裡說明放在滑鼠提示，
+        # 免得整列被撐高（同日：「排列 下一版要改善」）—— 測試結果的摘要照舊另起一行
         chip = t.js("(() => { const c = document.querySelector('#mfListWrap .mf-status');"
                     " const lh = parseFloat(getComputedStyle(c).lineHeight) || 18;"
-                    " return [c.getBoundingClientRect().height <= lh + 8, !!document.querySelector('#mfListWrap .mf-status-hint')]; })()")
+                    " return [c.getBoundingClientRect().height <= lh + 8, !!c.title]; })()")
         assert chip == [True, True], f"相容性標籤折行或沒有說明：{chip}"
         t.js("[...document.querySelectorAll('#mfListWrap tbody button')][1].click()")
         assert t.wait_for("!document.getElementById('mfDetailPanel').hidden "

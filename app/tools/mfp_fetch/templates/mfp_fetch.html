@@ -59,7 +59,14 @@
 .mf-list { width:100%; border-collapse:collapse; font-size:13.5px; }
 .mf-list th, .mf-list td { border-bottom:1px solid #e2e8f0; padding:8px 6px; text-align:left; vertical-align:middle; }
 .mf-list th { font-size:12.5px; color:#64748b; font-weight:500; white-space:nowrap; }
-.mf-list .mf-row-actions { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
+.mf-list .mf-row-actions { display:flex; flex-wrap:nowrap; gap:6px; justify-content:flex-end; }
+/* 只有按鈕那一格不換行：全部不換行的話，管理頁多一欄「成員」就把最右邊的按鈕擠出外框（瀏覽器實量） */
+.mf-list td:last-child { white-space:nowrap; width:1%; }
+/* 視窗窄的時候按鈕可以折成兩排，表格不超出外框（720 以下另外改成一列一張） */
+@media (max-width: 1100px) {
+  .mf-list .mf-row-actions { flex-wrap:wrap; }
+  .mf-list td:last-child { white-space:normal; width:auto; }
+}
 .mf-list .mf-row-actions .btn { white-space:nowrap; }
 .mf-del { color:#dc2626; }
 .mf-del:hover { background:#fee2e2; border-color:#fecaca; }
@@ -262,7 +269,7 @@
     unsupported_vendor: 'bad', login_required: 'warn', unknown: 'warn', unreachable: 'bad',
   };
   const EVIDENCE_WHAT = { vendor: tr('廠牌'), model: tr('型號'), ui: tr('網頁介面名稱'), firmware: tr('韌體（可能）') };
-  const EVIDENCE_FIELD = { title: tr('頁面標題'), text: tr('頁面文字'), header: tr('回應標頭') };
+  const EVIDENCE_FIELD = { title: tr('頁面標題'), text: tr('頁面文字'), header: tr('回應標頭'), escl: tr('掃描介面（eSCL）') };
   const KEY_LABELS = {
     ip: tr('位址'), port: tr('連接埠'), host: tr('主機'), path: tr('路徑'), status: tr('狀態碼'),
     reason: tr('原因'), http_version: tr('HTTP 版本'), bytes: tr('位元組'), title: tr('頁面標題'),
@@ -293,7 +300,10 @@
   function yesNo(v) { return v === true ? tr('是') : v === false ? tr('否') : (v === null || v === undefined ? '—' : String(v)); }
   function fmtTime(ts) {
     if (!ts) return tr('尚未測試');
-    try { return new Date(ts * 1000).toLocaleString(); } catch (e) { return String(ts); }
+    try {
+      return new Date(ts * 1000).toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit',
+                                                             hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return String(ts); }
   }
   function busy(btn, on, label) {
     if (on) {
@@ -536,7 +546,7 @@
       r.append(nameTd);
       r.append(el('td', null, c.host + (c.port ? ':' + c.port : '') + (c.scheme ? P.lp + c.scheme.toUpperCase() + P.rp : '')));
       r.append(el('td', null, [c.family, c.model].filter(Boolean).join(' ') || tr('未辨識')));
-      const st = el('td'); st.append(statusChip(c.detect_status)); r.append(st);
+      const st = el('td'); st.append(statusChip(c.detect_status, true)); r.append(st);
       r.append(el('td', null, fmtTime(c.last_test_at) + (c.last_reachable === false ? ' · ' + tr('連不上') : '')));
       if (SHARED) r.append(el('td', null, String(c.member_count || 0)));
       const act = el('td'); const box = el('div', 'mf-row-actions');
@@ -549,7 +559,7 @@
         box.append(sb);
       }
       if (SHARED) box.append(rowBtn('user', tr('成員'), () => openMembers(c)));
-      const rt = rowBtn('refresh', tr('重新測試'), () => retest(c, act));
+      const rt = rowBtn('refresh', tr('重新測試'), () => retest(c, act), true);
       rt.dataset.mfRetest = '1';
       box.append(rt,
                  det,
@@ -566,11 +576,13 @@
   }
   const STATUS_LABELS = {{ status_labels|tojson }};
   // 相容性：膠囊裡只放短狀態，說明另外一行
-  function statusChip(status) {
+  function statusChip(status, compact) {
     const lab = STATUS_LABELS[status] || [status || '—', ''];
     const w = el('div', 'mf-compat');
-    w.append(el('span', 'mf-status ' + (STATUS_CLASS[status] || 'warn'), tr(lab[0])));
-    if (lab[1]) w.append(el('div', 'mf-status-hint', tr(lab[1])));
+    const chip = el('span', 'mf-status ' + (STATUS_CLASS[status] || 'warn'), tr(lab[0]));
+    w.append(chip);
+    if (lab[1] && compact) chip.title = tr(lab[1]);          // 清單：說明放在滑鼠提示，免得整列被撐高
+    else if (lab[1]) w.append(el('div', 'mf-status-hint', tr(lab[1])));
     return w;
   }
   function icon(name) {
@@ -594,7 +606,7 @@
   let detailId = null;
   function setDetailBtn(b) {
     const open = String(detailId) === b.dataset.mfDetail;
-    fillBtn(b, open ? 'close' : 'eye', open ? tr('收合') : tr('詳細'));
+    fillBtn(b, open ? 'close' : 'eye', open ? tr('收合') : tr('詳細'), true);
     b.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
   function syncDetailBtns() { listWrap.querySelectorAll('[data-mf-detail]').forEach(setDetailBtn); }
@@ -711,13 +723,20 @@
         color: document.getElementById('mfScanColor').value,
         resolution: Number(document.getElementById('mfScanRes').value),
         paper: document.getElementById('mfScanPaper').value,
-        file_name: document.getElementById('mfScanName').value,
+        // 沒填檔名就用**瀏覽器這邊**的時間（伺服器可能是 UTC：正式機上實際差了 8 小時）
+        file_name: document.getElementById('mfScanName').value.trim() || defaultScanName(),
       });
       busy(btn, false);
       if (!res.ok) { showError(errBox, res); return; }
       watchScan(res.scan.id);
       loadScans();
     });
+  }
+  function defaultScanName() {
+    const d = new Date();
+    const z = n => String(n).padStart(2, '0');
+    return 'scan-' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) +
+           z(d.getMinutes()) + z(d.getSeconds());
   }
   function bytesText(n) {
     if (!n) return '';
@@ -738,6 +757,14 @@
     if (s.status === 'cancelled') return tr('已取消');
     return tr('失敗') + P.colon + tr(s.error_message || s.error_code || '');
   }
+  // 走什麼協定（使用者 2026-10-14：「掃描是走什麼協定 也要顯示」）
+  function viaText(s) {
+    const v = (s.settings || {}).via;
+    if (!v) return '';
+    let t = v.protocol + ' · ' + String(v.scheme || '').toUpperCase() + ' ' + v.port;
+    if (v.scheme === 'https' && s.tls_verified === false) t += P.lp + tr('憑證未驗證') + P.rp;
+    return t;
+  }
   function scanActions(s) {
     const bar = el('div', 'mf-actions');
     if (s.status === 'queued' || s.status === 'running') {
@@ -752,10 +779,13 @@
       a.target = '_blank';
       a.rel = 'noopener';
       a.append(icon('eye'), txt(' '), el('span', null, tr('開啟')));
+      const dl = el('a', 'btn btn-small btn-secondary');
+      dl.href = '/workspace/file/' + encodeURIComponent(s.workspace_file_id) + '?dl=1';
+      dl.append(icon('download'), txt(' '), el('span', null, tr('下載')));
       const w = el('a', 'btn btn-small btn-secondary');
       w.href = '/workspace';
       w.append(icon('archive'), txt(' '), el('span', null, tr('前往工作區')));
-      bar.append(a, w);
+      bar.append(a, dl, w);
     }
     if (s.status === 'done' && s.has_file) {
       const d = el('a', 'btn btn-small btn-secondary');
@@ -770,6 +800,7 @@
     if (!box) return;
     box.className = 'mf-scan-state' + (s.status === 'done' ? ' done' : (s.status === 'error' ? ' error' : ''));
     box.replaceChildren(el('div', null, scanStateText(s)));
+    if (viaText(s)) box.append(el('div', 'mf-hint', tr('協定') + P.colon + viaText(s)));
     if (s.workspace_message) box.append(el('div', 'mf-hint', tr(s.workspace_message)));
     else if (s.status === 'done' && s.workspace_file_id) box.append(el('div', 'mf-hint', tr('已存進你的工作區') + P.colon + (s.file_name || '')));
     box.append(scanActions(s));
@@ -811,6 +842,7 @@
       r.append(el('td', null, fmtTime(s.created_at)), el('td', null, s.conn_name || ''),
                el('td', null, s.file_name || ''));
       const st = el('td', null, scanStateText(s));
+      if (viaText(s)) st.append(el('span', 'mf-sub', viaText(s)));
       if (s.workspace_message) st.append(el('span', 'mf-sub', tr(s.workspace_message)));
       r.append(st);
       const act = el('td');

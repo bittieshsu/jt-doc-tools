@@ -59,19 +59,71 @@ _FIRMWARE = re.compile(
     r"(?:Controller\s*(?:ROM|Version)|Firmware\s*Version|ファームウェア(?:バージョン)?|コントローラー?\s*ROM|韌體版本)"
     r"\s*[:：]?\s*([0-9][0-9A-Za-z.\-]{1,30})", re.I)
 
-#: 其他廠牌的特徵（只用來判斷「不是 FUJIFILM」）。順序：FUJI 先判，避免 Fuji Xerox 被當成 Xerox。
+#: 其他廠牌的特徵（判斷「不是 FUJIFILM」與顯示廠牌）。**順序有意義**：FUJI 先判（避免 Fuji Xerox 被當成
+#: Xerox），特徵越明確的越前面。「Embedded Web Server」HP、Xerox、Lexmark 都在用，不可以當成 HP 的特徵。
 _OTHER_VENDORS: tuple[tuple[str, re.Pattern], ...] = (
-    ("Xerox", re.compile(r"\bXerox\b|AltaLink|VersaLink|WorkCentre", re.I)),
-    ("Canon", re.compile(r"\bCanon\b|imageRUNNER|Remote\s*UI", re.I)),
-    ("Ricoh", re.compile(r"\bRICOH\b|Web\s*Image\s*Monitor", re.I)),
-    ("Konica Minolta", re.compile(r"KONICA|MINOLTA|bizhub|PageScope", re.I)),
-    ("Kyocera", re.compile(r"KYOCERA|TASKalfa|ECOSYS|Command\s*Center", re.I)),
+    ("Xerox", re.compile(r"\bXerox\b|AltaLink|VersaLink|WorkCentre|PrimeLink|CentreWare", re.I)),
+    ("Canon", re.compile(r"\bCanon\b|imageRUNNER|imageCLASS|i-SENSYS|Remote\s*UI|\biR-ADV\b|PIXMA|MAXIFY", re.I)),
+    ("Ricoh", re.compile(r"\bRICOH\b|Web\s*Image\s*Monitor|\bSavin\b|\bLanier\b", re.I)),
+    ("Konica Minolta", re.compile(r"KONICA|MINOLTA|bizhub|PageScope|OpenAPI\s*Web", re.I)),
+    ("Kyocera", re.compile(r"KYOCERA|TASKalfa|ECOSYS|Command\s*Center|Triumph-Adler|\bUTAX\b", re.I)),
     ("Sharp", re.compile(r"\bSHARP\b", re.I)),
     ("Toshiba", re.compile(r"TOSHIBA|e-STUDIO|TopAccess", re.I)),
-    ("HP", re.compile(r"\bHP\b|Hewlett|LaserJet|Embedded\s*Web\s*Server", re.I)),
-    ("Epson", re.compile(r"\bEPSON\b", re.I)),
-    ("Brother", re.compile(r"\bBrother\b", re.I)),
+    ("Lexmark", re.compile(r"\bLexmark\b", re.I)),
+    ("Samsung", re.compile(r"\bSamsung\b|SyncThru", re.I)),
+    ("HP", re.compile(r"\bHP\b|Hewlett|LaserJet|OfficeJet|DeskJet|PageWide", re.I)),
+    # 標頭常寫成「EPSON_Linux」—— 底線是單字字元，\b 認不到；改成前後不是英文字母
+    ("Epson", re.compile(r"(?<![A-Za-z])EPSON(?![A-Za-z])|EpsonNet", re.I)),
+    ("Brother", re.compile(r"\bBrother\b|BRAdmin", re.I)),
+    ("OKI", re.compile(r"\bOKI\b|OKI\s*Data", re.I)),
+    ("Panasonic", re.compile(r"\bPanasonic\b", re.I)),
+    ("Dell", re.compile(r"\bDell\b", re.I)),
+    ("Pantum", re.compile(r"\bPantum\b", re.I)),
 )
+
+#: 各廠牌的型號寫法（只拿來**顯示**，相容性判斷不變）。認出廠牌之後才找，標題優先。
+#: 原本只認 FUJIFILM：Epson L3150 首頁標題寫著「L3150 Series」也顯示「未辨識」（2026-10-14 使用者回報）。
+#: 規則照各家產品線的命名寫，**不可以只照手上這幾台調**（使用者 2026-10-14）—— 每一家的寫法在
+#: `tests/test_mfp_profiles.py` 都有樣本（照命名規則杜撰的標題），也有「不可以當成型號」的反例。
+_OTHER_MODELS: dict[str, re.Pattern] = {
+    "Epson": re.compile(r"\b((?:L|ET|WF|XP|EW|PX|EP|LX|DS|ES|FF|AM|ST)-?[A-Z]{0,2}\d{3,5}[A-Z]{0,4}(?:\s+Series)?)\b"),
+    "HP": re.compile(r"\b((?:HP\s+)?(?:Color\s+)?(?:LaserJet|OfficeJet|DeskJet|ENVY|PageWide|Smart\s+Tank|Neverstop|"
+                     r"Ink\s+Tank|DesignJet|ScanJet)(?:\s+(?:Pro|Managed|Enterprise|Flow|MFP|Tank|Plus|Wireless|Laser))*"
+                     r"\s+(?:MFP\s+)?[A-Z]{0,3}\d{2,5}[a-z]{0,4}(?:\s+(?:MFP|series))?)\b", re.I),
+    "Canon": re.compile(r"\b((?:imageRUNNER(?:\s+ADVANCE)?(?:\s+DX)?|iR-ADV|imageCLASS|imagePRESS|i-SENSYS|MAXIFY|PIXMA|"
+                        r"Satera|imagePROGRAF)\s?[A-Z]{0,3}\s?\d{3,5}[A-Za-z]{0,4}(?:\s+(?:II|III|IV))?|MF\d{3,4}[A-Za-z]{0,4})\b"),
+    "Ricoh": re.compile(r"\b((?:RICOH\s+)?(?:IM|MP|SP|M|P)\s?C?\s?\d{3,5}[A-Za-z]{0,5})\b"),
+    "Konica Minolta": re.compile(r"\b(bizhub\s+(?:PRESS\s+|PRO\s+)?C?\d{3,5}[A-Za-z]{0,4})\b", re.I),
+    "Kyocera": re.compile(r"\b((?:TASKalfa|ECOSYS)\s+(?:MA|PA|M|P)?\d{3,5}[a-z]{0,6})\b", re.I),
+    # MX-3071、MX-C507F、BP-50C26（新款是「兩位數＋字母＋數字」）
+    "Sharp": re.compile(r"\b((?:MX|BP|AR|DX)-[A-Z]?\d{2,5}[A-Z]{0,2}\d{0,3}[A-Z]{0,3})\b", re.I),
+    "Toshiba": re.compile(r"\b(e-STUDIO\s?\d{3,5}[A-Z]{0,4})\b", re.I),
+    "Xerox": re.compile(r"\b((?:Xerox\s+)?(?:AltaLink|VersaLink|WorkCentre|Phaser|PrimeLink)\s+[A-Z]?\d{3,5}[A-Za-z]{0,3}"
+                        r"|Xerox\s+[BC]\d{3,4}[A-Za-z]{0,3})\b", re.I),
+    "Lexmark": re.compile(r"\b((?:Lexmark\s+)?(?:MX|CX|MS|CS|MB|MC|XC|XM|CX)\d{3,4}[a-z]{0,4})\b", re.I),
+    "Samsung": re.compile(r"\b((?:SL|SCX|CLX|ML|SF|CLP)-[A-Z]?\d{3,5}[A-Z]{0,4})\b", re.I),
+    "Brother": re.compile(r"\b((?:MFC|DCP|HL|ADS|PJ)-[A-Z]{0,2}\d{3,5}[A-Z]{0,4}(?:\s+series)?)\b", re.I),
+    "OKI": re.compile(r"\b((?:OKI\s+)?(?:MC|MB|ES|C|B)\d{3,4}[a-z]{0,4})\b", re.I),
+    "Panasonic": re.compile(r"\b((?:KX|DP)-[A-Z]{0,4}\d{3,5}[A-Z]{0,3})\b", re.I),
+    "Dell": re.compile(r"\b((?:Dell\s+)?[BCEHS]\d{3,4}[a-z]{0,4})\b", re.I),
+    "Pantum": re.compile(r"\b((?:Pantum\s+)?(?:CM|CP|BM|BP|M|P)\d{3,4}[A-Z]{0,4})\b", re.I),
+}
+#: 型號裡不可以有的東西：IP、版本號（帶點）、年份與日期。
+_NOT_MODEL = re.compile(r"\d+\.\d+|\b(?:19|20)\d{2}\b(?![A-Za-z])")
+
+
+def _other_model(vendor: str, srcs: list[tuple[dict, str]]) -> Optional[tuple[str, dict, str, re.Match]]:
+    rx = _OTHER_MODELS.get(vendor)
+    if rx is None:
+        return None
+    ordered = [x for x in srcs if x[0].get("field") == "title"] + [x for x in srcs if x[0].get("field") != "title"]
+    for where, text in ordered:
+        for m in rx.finditer(text):
+            val = re.sub(r"\s+", " ", m.group(1)).strip()
+            if _NOT_MODEL.search(val):
+                continue
+            return val[:60], where, text, m
+    return None
 
 
 def _excerpt(text: str, m: re.Match, width: int = 60) -> str:
@@ -95,8 +147,11 @@ def _sources(pages: list[dict]) -> list[tuple[dict, str]]:
     return out
 
 
-def detect(pages: list[dict]) -> dict[str, Any]:
-    """從連線測試收集到的頁面判斷廠牌、型號、韌體與相容性狀態。"""
+def detect(pages: list[dict], escl_model: str = "") -> dict[str, Any]:
+    """從連線測試收集到的頁面判斷廠牌、型號、韌體與相容性狀態。
+
+    `escl_model`：eSCL 能力表回報的型號（`MakeAndModel`，標準欄位）。FUJIFILM 以外的廠牌優先用它；
+    頁面上的寫法各家不同，標準欄位比較可靠。"""
     res: dict[str, Any] = {"vendor": None, "family": None, "model": None, "firmware": None,
                            "status": "unknown", "evidence": [], "evidence_count": 0}
     if not pages:
@@ -152,6 +207,14 @@ def detect(pages: list[dict]) -> dict[str, Any]:
                 res["vendor"] = name
                 res["status"] = "unsupported_vendor"
                 ev.append({"what": "vendor", **hit[0], "excerpt": _excerpt(hit[1], hit[2])})
+                if escl_model:
+                    res["model"] = escl_model[:60]
+                    ev.append({"what": "model", "page": "eSCL", "field": "escl", "excerpt": escl_model[:120]})
+                else:
+                    got = _other_model(name, srcs)
+                    if got:
+                        res["model"] = got[0]
+                        ev.append({"what": "model", **got[1], "excerpt": _excerpt(got[2], got[3])})
                 break
         else:
             if any(p.get("password_inputs") for p in pages):

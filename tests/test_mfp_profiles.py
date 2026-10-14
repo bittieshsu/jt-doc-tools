@@ -87,3 +87,90 @@ def test_firmware_is_picked_up_when_labelled():
 def test_every_status_has_a_message():
     for k, v in mp.STATUS_MESSAGES.items():
         assert v and isinstance(v, str), k
+
+
+# --------------------------------------------------------------------- 其他廠牌的型號（只顯示）
+# 使用者 2026-10-14：Epson L3150 標題就寫著「L3150 Series」卻顯示「未辨識」；「抓型號要多考量不同廠牌型號，
+# 不能只用我這邊的兩台為準」。下面的標題是**照各家產品線的命名規則杜撰的樣本**（網頁介面常見的寫法），
+# 每一家至少兩種，另外有「不可以當成型號」的反例。相容性判斷不變（都是不支援）。
+
+@pytest.mark.parametrize("title,headers,vendor,model", [
+    # Epson：EcoTank、WorkForce、Expression、商用彩噴
+    ("L3150 Series", [("Server", "EPSON_Linux UPnP/1.0 Epson UPnP SDK/1.0")], "Epson", "L3150 Series"),
+    ("WF-C5790 Series", [("Server", "EPSON_Linux")], "Epson", "WF-C5790 Series"),
+    ("EPSON ET-4850 Series", [], "Epson", "ET-4850 Series"),
+    ("EPSON AM-C4000", [], "Epson", "AM-C4000"),
+    # HP：LaserJet Pro / Color / Enterprise、OfficeJet、Smart Tank
+    ("HP LaserJet MFP M141w 192.168.77.5", [], "HP", "HP LaserJet MFP M141w"),
+    ("HP Color LaserJet Pro MFP M479fdw", [], "HP", "HP Color LaserJet Pro MFP M479fdw"),
+    ("HP LaserJet MFP E52645", [], "HP", "HP LaserJet MFP E52645"),
+    ("HP OfficeJet Pro 9010 series", [], "HP", "HP OfficeJet Pro 9010 series"),
+    ("HP Smart Tank 7300 series", [], "HP", "HP Smart Tank 7300 series"),
+    # Canon：imageRUNNER ADVANCE、iR-ADV、imageCLASS、MF 系列
+    ("Remote UI: Portal: iR-ADV C3530 III", [], "Canon", "iR-ADV C3530 III"),
+    ("Canon imageRUNNER ADVANCE DX C3826", [], "Canon", "imageRUNNER ADVANCE DX C3826"),
+    ("Canon MF743C/MF745C Remote UI", [], "Canon", "MF743C"),
+    # Ricoh：IM、MP、SP、M
+    ("Web Image Monitor - RICOH IM C3000", [], "Ricoh", "RICOH IM C3000"),
+    ("RICOH MP C3004ex", [], "Ricoh", "RICOH MP C3004ex"),
+    ("RICOH M C250FW", [], "Ricoh", "RICOH M C250FW"),
+    # Konica Minolta、Kyocera、Sharp、Toshiba、Xerox
+    ("bizhub C300i", [], "Konica Minolta", "bizhub C300i"),
+    ("KONICA MINOLTA bizhub 4752", [], "Konica Minolta", "bizhub 4752"),
+    ("Command Center RX - TASKalfa 3253ci", [], "Kyocera", "TASKalfa 3253ci"),
+    ("KYOCERA ECOSYS MA4000cifx", [], "Kyocera", "ECOSYS MA4000cifx"),
+    ("SHARP MX-3071", [], "Sharp", "MX-3071"),
+    ("SHARP BP-50C26", [], "Sharp", "BP-50C26"),
+    ("TOSHIBA e-STUDIO2515AC TopAccess", [], "Toshiba", "e-STUDIO2515AC"),
+    ("Xerox AltaLink C8130", [], "Xerox", "Xerox AltaLink C8130"),
+    ("Xerox B225 Multifunction Printer", [], "Xerox", "Xerox B225"),
+    # Brother、Lexmark、Samsung、OKI、Panasonic、Dell、Pantum
+    ("Brother MFC-L2750DW series", [], "Brother", "MFC-L2750DW series"),
+    ("Brother DCP-T720DW", [], "Brother", "DCP-T720DW"),
+    ("Lexmark MX521de", [], "Lexmark", "Lexmark MX521de"),
+    ("Lexmark CX725", [], "Lexmark", "Lexmark CX725"),
+    ("SyncThru Web Service SL-M2070", [], "Samsung", "SL-M2070"),
+    ("OKI MC573", [], "OKI", "OKI MC573"),
+    ("Panasonic DP-MB545", [], "Panasonic", "DP-MB545"),
+    ("Dell C2665dnf Color Laser", [], "Dell", "Dell C2665dnf"),
+    ("Pantum M6550NW", [], "Pantum", "Pantum M6550NW"),
+])
+def test_other_vendors_models_are_read_from_their_naming(title, headers, vendor, model):
+    r = mp.detect([_page(title=title, headers=headers)])
+    assert (r["vendor"], r["model"]) == (vendor, model), r
+    assert r["status"] == "unsupported_vendor" and r["family"] is None
+    assert any(e["what"] == "model" for e in r["evidence"]), "型號要附上依據"
+
+
+@pytest.mark.parametrize("title,text", [
+    ("EPSON", "Firmware Version 2.10.3 · 192.168.77.5 · Copyright 2023 Seiko Epson Corporation"),
+    ("HP Embedded Web Server", "Updated 2026-10-14 · IPv4 192.168.77.9"),
+    ("Brother", "Main Firmware Version 1.25"),
+    ("RICOH", "Version 2024 · 10.0.0.5"),
+])
+def test_ip_version_and_dates_are_not_models(title, text):
+    r = mp.detect([_page(title=title, text=text)])
+    assert r["vendor"] and r["model"] is None, r
+
+
+def test_the_title_wins_over_page_text():
+    r = mp.detect([_page(title="L3150 Series", text="Supports ET-2810 ink", headers=[("Server", "EPSON")])])
+    assert r["model"] == "L3150 Series"
+
+
+def test_escl_model_is_preferred_for_other_vendors():
+    """eSCL 的 MakeAndModel 是標準欄位，頁面上的寫法各家不同 —— 有的話用它。"""
+    r = mp.detect([_page(title="HP Embedded Web Server")], escl_model="HP LaserJet MFP M141w")
+    assert r["vendor"] == "HP" and r["model"] == "HP LaserJet MFP M141w"
+    assert any(e["field"] == "escl" for e in r["evidence"])
+
+
+def test_escl_model_does_not_change_fujifilm_identification():
+    r = mp.detect([_page(title="Apeos C5571 - Internet Services")], escl_model="FUJIFILM Apeos C5571")
+    assert (r["family"], r["model"], r["status"]) == ("Apeos", "C5571", "first_batch_unverified")
+
+
+def test_embedded_web_server_alone_is_not_hp():
+    """「Embedded Web Server」HP、Xerox、Lexmark 都在用。"""
+    assert mp.detect([_page(title="Lexmark Embedded Web Server MX521de")])["vendor"] == "Lexmark"
+    assert mp.detect([_page(title="Xerox Embedded Web Server")])["vendor"] == "Xerox"

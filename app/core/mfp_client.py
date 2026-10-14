@@ -304,6 +304,28 @@ def _decode(body: bytes, content_type: str) -> tuple[str, str]:
     return body.decode("utf-8", "replace"), "utf-8"
 
 
+#: 寫在 JavaScript 字串裡的 meta refresh（例如 Epson：`document.write("<meta http-equiv='refresh'
+#: content='0; URL= ./PRESENTATION/HTML/TOP/INDEX.HTML'>")`）。連線測試不執行 JavaScript，
+#: 沒有這條就停在那張空頁，連型號都看不到（2026-10-14 實機：Epson L3150）。
+#: **只認轉址這一種寫法**，不去抓頁面上任意的 JavaScript 網址。
+_SCRIPT_REFRESH = re.compile(
+    r"http-equiv\s*=\s*\\?['\"]?refresh\\?['\"]?\s+content\s*=\s*\\?['\"]?\s*\d+\s*;\s*url\s*=\s*([^'\"\\\s>]+)",
+    re.I)
+#: 看起來會改變設備狀態的網址一律不跟（就算只是 GET）。
+_RISKY_PATH = re.compile(r"logout|logoff|signout|reboot|restart|reset|shutdown|delete|clear|factory", re.I)
+
+
+def _script_redirects(text: str) -> list[str]:
+    out: list[str] = []
+    for m in _SCRIPT_REFRESH.finditer(text[:200_000]):
+        u = m.group(1).strip()
+        if u and u not in out and not _RISKY_PATH.search(u):
+            out.append(u)
+        if len(out) >= 3:
+            break
+    return out
+
+
 def parse_page(body: bytes, content_type: str) -> dict:
     text, charset = _decode(body, content_type)
     p = _PageParser()
@@ -319,6 +341,8 @@ def parse_page(body: bytes, content_type: str) -> dict:
         "text": visible[:SUMMARY_CHARS],
         "text_full_for_detection": visible[:20000],
         "refresh": p.refresh,
+        # 只在頁面本身沒有 meta refresh 時才看 JavaScript 寫出來的（真的 meta refresh 優先）
+        "script_redirects": [] if p.refresh else _script_redirects(text),
         "frames": p.frames,
         "forms": p.forms,
         "password_inputs": p.password_inputs,
@@ -584,6 +608,7 @@ def _probe_one(host: str, ip: str, scheme: str, port: int, budget: _Budget) -> d
         if page.get("refresh"):
             nexts.append(page["refresh"])
         nexts += page.get("frames", [])[:2]
+        nexts += page.get("script_redirects", [])[:3]
         for nxt in nexts:
             target = urljoin(base + path.lstrip("/"), nxt)
             if _same_origin(target, scheme, host, port):
@@ -646,7 +671,7 @@ def probe(raw_host: str, port: Any = None, scheme: Any = None) -> dict:
         pages += [dict(p, scheme=sc, port=pt) for p in att["pages"]]
         report["attempts"].append({k: v for k, v in att.items() if k != "pages"})
     report["escl"] = _probe_escl(host, ip, report["attempts"], budget)
-    detection = mfp_profiles.detect(pages)
+    detection = mfp_profiles.detect(pages, escl_model=(report["escl"] or {}).get("model") or "")
     report["detection"] = detection
     reachable = [a for a in report["attempts"] if a.get("reachable")]
     report["summary"] = {

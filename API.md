@@ -2379,7 +2379,7 @@ curl -X POST http://localhost:8765/tools/mfp-fetch/api/connections/3/scan \
 
 掃描紀錄的 `status`：`queued`（排隊中，`ahead` 是前面還有幾件）、`running`（`phase` 是 `checking` /
 `scanning` / `merging` / `saving`）、`done`（`pages`、`bytes`、`workspace_file_id`）、`error`（`error_code`、
-`error_message`）、`cancelled`。多頁合成一份 PDF；只存進呼叫者自己的工作區，別人拿 id 查不到也下載不到。
+`error_message`）、`cancelled`。多頁合成一份 PDF；只存進呼叫者自己的工作區，別人拿 id 查不到也下載不到。`settings.via` 是這次走的協定（例如 `{"protocol": "eSCL", "scheme": "https", "port": 443}`），`tls_verified` 是憑證有沒有通過驗證。
 
 設定不在這台的能力範圍回 `400`（`SCAN_OPTION_INVALID`）；沒有 eSCL 回 `400`（`SCAN_NOT_SUPPORTED`）；
 隊伍滿了回 `429`。掃描中的錯誤寫在紀錄的 `error_code`：`SCAN_DEVICE_BUSY`（有人在機器上操作）、

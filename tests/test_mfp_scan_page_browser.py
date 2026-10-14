@@ -118,6 +118,13 @@ def test_scan_from_the_tool_page(live, locale):
         _start(t, base, "/tools/mfp-fetch/", locale)
         _test_and_save(t, fake.port, "三樓" if locale == "zh-Hant" else "3F")
         assert t.wait_for("!!document.querySelector('[data-mf-scan]')"), "支援 eSCL 的事務機要有「掃描」"
+        # 清單每一列的按鈕排成一排（使用者 2026-10-14：「排列 下一版要改善」）—— 1280 寬
+        t.send("Emulation.setDeviceMetricsOverride", {"width": 1280, "height": 900, "deviceScaleFactor": 1,
+                                                      "mobile": False})
+        time.sleep(0.3)
+        assert t.js("[...document.querySelectorAll('#mfListWrap .mf-row-actions')].every(box => "
+                    "new Set([...box.children].map(b => Math.round(b.getBoundingClientRect().top))).size === 1)"), \
+            "按鈕折成兩排"
         t.js("document.querySelector('[data-mf-scan]').click()")
         assert t.wait_for("!document.getElementById('mfScanPanel').hidden")
         opts = t.js("['mfScanSource','mfScanColor','mfScanRes','mfScanPaper'].map(id => "
@@ -133,6 +140,12 @@ def test_scan_from_the_tool_page(live, locale):
         state = t.js("document.getElementById('mfScanState').innerText")
         assert "2" in state, state
         assert t.js("!!document.querySelector('#mfScanState a[href^=\"/workspace/file/\"]')"), "完成後要能打開工作區的檔案"
+        # 也要能直接下載（使用者 2026-10-14：「掃描完成 應該還要有下載按鈕」）
+        assert t.js("!!document.querySelector('#mfScanState a[href$=\"?dl=1\"]')"), "完成後要有下載"
+        # 走什麼協定要顯示（使用者 2026-10-14）
+        assert "eSCL" in state and ("HTTP " + str(fake.port)) in state, state
+        # 沒填檔名：用瀏覽器這邊的時間（伺服器可能是 UTC）—— 這次有填「合約」，檔名就是它
+        assert "合約.pdf" in t.js("document.getElementById('mfScansWrap').innerText")
         assert t.wait_for("document.querySelectorAll('#mfScansWrap tbody tr').length >= 1"), "最近的掃描沒有列出來"
         t.shot(f"mfp_scan_{locale}_done_1280", 1280)
         t.shot(f"mfp_scan_{locale}_done_390", 390)
@@ -156,6 +169,18 @@ def test_shared_admin_page(live):
         assert t.wait_for("[...document.querySelectorAll('#mfListWrap tbody button')].some(b => b.innerText.includes('成員'))")
         assert not t.js("!!document.querySelector('[data-mf-scan]')"), "管理頁不掃描"
         assert t.js("!!document.querySelector('#mfListWrap .mf-del')"), "管理頁要能移除共用事務機"
+        fits = ("(() => { const w = document.getElementById('mfListWrap'); const tb = w.querySelector('table');"
+                " return tb.getBoundingClientRect().right <= w.getBoundingClientRect().right + 1; })()")
+        one_row = ("[...document.querySelectorAll('#mfListWrap .mf-row-actions')].every(box => "
+                   "new Set([...box.children].map(b => Math.round(b.getBoundingClientRect().top))).size === 1)")
+        for width in (1280, 900):
+            t.send("Emulation.setDeviceMetricsOverride", {"width": width, "height": 900, "deviceScaleFactor": 1,
+                                                          "mobile": False})
+            time.sleep(0.3)
+            assert t.js(fits), f"{width} 寬：表格超出外框（最右邊的按鈕被擠出去）"
+            if width >= 1280:
+                assert t.js(one_row), "1280 寬：按鈕要排成一排"
+        t.send("Emulation.clearDeviceMetricsOverride", {})
         assert t.js("[...document.querySelectorAll('#mfListWrap th')].every(th => th.getBoundingClientRect().height < 44)"), \
             "表頭不可以被擠成直排"
         t.js("[...document.querySelectorAll('#mfListWrap tbody button')].find(b => b.innerText.includes('成員')).click()")

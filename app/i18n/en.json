@@ -7220,5 +7220,7 @@
   "這是管理員設定的共用事務機，只有管理員可以改名或移除": "This is a shared MFP set up by an administrator; only administrators can rename or remove it",
   "這次掃描沒有可以下載的檔案（已存進工作區，或已超過保留時間）": "There is no file to download for this scan (it was saved to the workspace, or the retention period has passed)",
   "連不上事務機": "Cannot reach the MFP",
-  "頁數超過一次掃描的上限": "Too many pages for one scan"
+  "頁數超過一次掃描的上限": "Too many pages for one scan",
+  "協定": "Protocol",
+  "憑證未驗證": "certificate not verified"
 }

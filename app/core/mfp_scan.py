@@ -83,6 +83,9 @@ def start(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, ca
     —— 兩種都在排隊之前就檢查完，不會留下半套紀錄。"""
     _init_once()
     _xml, eff = mfp_escl.build_settings(caps, opts)          # 先驗設定（不合法就不排隊）
+    # 走什麼協定也記下來給畫面顯示（使用者 2026-10-14：「掃描是走什麼協定 也要顯示」）
+    via = {"protocol": "eSCL", "scheme": scheme, "port": int(port)}
+    eff = dict(eff, via=via)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     fallback = f"scan-{stamp}"
     file_name = clean_file_name(str(opts.get("file_name") or ""), fallback)
@@ -102,7 +105,7 @@ def start(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, ca
     th = threading.Thread(target=_run, name=f"mfp-scan-{scan_id[:8]}", daemon=True, kwargs=dict(
         scan_id=scan_id, ticket=ticket, cancel=cancel, user_id=user_id, user_label=user_label,
         host=conn["host"], ip=ip, scheme=scheme, port=port, caps=caps, opts=dict(opts, **eff),
-        file_name=file_name))
+        file_name=file_name, via=via))
     th.start()
     return rec
 
@@ -115,7 +118,8 @@ def _set(scan_id: str, **kw) -> None:
 
 
 def _run(*, scan_id: str, ticket, cancel: threading.Event, user_id: Optional[int], user_label: str,
-         host: str, ip: str, scheme: str, port: int, caps: dict, opts: dict, file_name: str) -> None:
+         host: str, ip: str, scheme: str, port: int, caps: dict, opts: dict, file_name: str,
+         via: dict) -> None:
     workdir = _work_root() / scan_id
     try:
         ok = mfp_queue.wait_turn(ticket, timeout=MAX_QUEUE_WAIT,
@@ -144,7 +148,7 @@ def _run(*, scan_id: str, ticket, cancel: threading.Event, user_id: Optional[int
             shutil.rmtree(workdir, ignore_errors=True)
         mfp_store.finish_scan(scan_id, status="done", pages=res["pages"], bytes=res["bytes"],
                               workspace_file_id=ws_id, workspace_note=ws_note, result_path=result_path,
-                              settings=res["settings"], tls_verified=res.get("tls_verified"))
+                              settings=dict(res["settings"], via=via), tls_verified=res.get("tls_verified"))
     except Exception as e:  # noqa: BLE001 —— 背景執行緒：任何意外都要落成「失敗」，不可以停在掃描中
         logger.exception("mfp 掃描 %s 失敗", scan_id[:8])
         try:
@@ -181,7 +185,7 @@ def public(rec: dict) -> dict:
     """給畫面與 API 的掃描狀態（含排隊位置與即時進度）。"""
     out = {k: rec.get(k) for k in ("id", "conn_id", "conn_name", "status", "settings", "pages", "bytes",
                                    "file_name", "workspace_file_id", "workspace_note", "error_code",
-                                   "error_detail", "created_at", "started_at", "finished_at")}
+                                   "error_detail", "created_at", "started_at", "finished_at", "tls_verified")}
     out["has_file"] = bool(rec.get("result_path")) and Path(rec["result_path"]).exists() and \
         (time.time() - (rec.get("finished_at") or 0)) < RESULT_TTL
     with _LOCK:

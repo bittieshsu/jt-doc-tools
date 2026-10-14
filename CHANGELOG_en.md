@@ -5,11 +5,17 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (916 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (917 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.88] - 2026-10-14
+
+- Fetch from MFP (beta): model identification no longer covers FUJIFILM only. For Epson, HP, Canon, Ricoh, Konica Minolta, Kyocera, Sharp, Toshiba, Xerox, Brother, Lexmark, Samsung, OKI, Panasonic, Dell and Pantum the model is read from the web page title according to each vendor's naming (display only; compatibility is unchanged), and for MFPs with eSCL the model reported by eSCL is used. The connection test now follows redirects written by JavaScript (such as an Epson home page) instead of stopping at an empty redirect page; URLs that look like they change the device's state (log out, reboot and so on) are never followed.
+- A finished scan now has a Download button and shows the protocol used (for example eSCL, HTTPS 443, noting when the certificate was not verified). Without a file name, the scan is named with the browser's local time; on a server set to UTC the old name was 8 hours off. The My MFPs and Shared MFPs lists keep text on the main action (Scan, Members) and show the other buttons as icons on one row on wide screens; compatibility in the list is just the label, with the explanation on hover; times are shown to the minute. On narrow windows the buttons wrap so the table stays inside its box.
+- Dependencies: Starlette is temporarily capped below 1.8. With 1.8.0, endpoints that return a file after an upload fail in the automated tests together with this site's middleware (the running service works); the cap will be lifted once compatibility is sorted out.
 
 ## [1.16.87] - 2026-10-14
 
