@@ -11,7 +11,7 @@
 .odc-search .jt-select-wrap { width:9em; }
 .odc-count { font-size:13px; color:var(--muted); margin:0 0 8px; }
 .odc-tbl { width:100%; border-collapse:collapse; font-size:13.5px; }
-.odc-tbl th, .odc-tbl td { padding:10px 10px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
+.odc-tbl th, .odc-tbl td { padding:10px 8px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
 .odc-tbl th { background:#f8fafc; color:#475569; font-weight:600; font-size:12.5px; white-space:nowrap; }
 .odc-tbl tbody tr:hover { background:#f9fafb; }
 .odc-name a { font-weight:600; color:var(--primary-dark); text-decoration:none; }
@@ -26,7 +26,7 @@
 .odc-chip.ok { background:#dcfce7; color:#166534; }
 .odc-time { white-space:nowrap; color:#334155; }
 .odc-act { display:flex; gap:4px; justify-content:flex-end; white-space:nowrap; }
-.odc-act .btn { padding:4px 8px; }
+.odc-act .btn { padding:4px 6px; }
 .odc-del { color:#dc2626; }
 .odc-del:hover { background:#fee2e2; border-color:#fecaca; }
 .odc-tbl tr.odc-deleted { opacity:.6; }
@@ -65,6 +65,47 @@ th[aria-sort="ascending"] .odc-sort-ic, th[aria-sort="descending"] .odc-sort-ic 
                  min-width:11em; padding:10px 14px; background:var(--bg, #fff); border:1px solid var(--border);
                  border-radius:10px; box-shadow:0 8px 24px rgba(15, 23, 42, .14); }
 .odc-cols-menu label { display:flex; align-items:center; gap:8px; white-space:nowrap; cursor:pointer; font-size:13.5px; }
+/* 名稱欄吃掉剩下的寬度，其他欄平常一行。名稱放不下的時候由其他欄讓位 —— 讓到哪一段由頁面最後面的
+   `fit()` **實量**決定（量每一列名稱實際拿到多寬、表格有沒有超出外框），不用固定的寬度門檻：語言
+   （英日文的標頭與標籤寬很多）、管理員多一欄「擁有者」、使用者藏掉哪幾欄，需要的寬度都不一樣。
+   多了文號這一欄之後，固定門檻在 1280 寬名稱只剩 15px、日文 1440 寬只剩兩個字（瀏覽器實量）。
+   `#odcPanel` 上的 class 可以累加：
+   * odc-fit-1：文號只在「…字」與「第…號」之間折一次、時間只在日期與時間之間折一次（`keep-all`
+     讓中文字之間不斷行；編輯鈕跟文號後半段黏在一起，不會自己掉一行）；「DI 匯入」標籤移到名稱下面。
+   * odc-fit-2：再把「打開」「DI」收成只留圖示（名稱本身就能打開；按鈕仍有 title 與可讀名稱）。
+   * odc-fit-3：再讓欄位標題與標籤（文別、檢查結果）折行 —— 英文在字與字之間、日文在詞組之間
+     （`auto-phrase`），中文 `keep-all` 不在字中間斷；英日文 1280 寬靠這一段才不用變卡片。
+   * odc-fit-cards：一件一張卡片。
+   不能一直開著折行：名稱欄寬是 100%，可以折的欄會一律被壓到最窄（1440 寬也折成兩行、甚至一字一行，
+   實際看到過）。 */
+.odc-nw { white-space:nowrap; }
+/* 文號前後兩段各是一塊：不換行時排在同一行，窄的時候兩塊之間可以斷開。**不用 <wbr>** ——
+   Chromium 在 nowrap 裡照樣會在 <wbr> 斷行（1440 寬也折成兩行，瀏覽器實量）。
+   每一段最寬 10em（「第」＋14 位數＋「號」放得下），再長（自己輸入、沒有「字」「第」）截斷加「…」，
+   滑鼠移過去看全文 —— 不然一筆長文號會把整欄撐開，每一列的名稱都跟著變窄。 */
+.odc-docno-part { display:inline-block; }
+.odc-docno-part:empty { display:none; }
+.odc-docno-cut { display:inline-block; max-width:10em; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; vertical-align:bottom; }
+#odcPanel.odc-fit-1 .odc-tbl td.odc-docno,
+#odcPanel.odc-fit-1 .odc-tbl td.odc-time { white-space:normal; word-break:keep-all; overflow-wrap:normal; }
+#odcPanel.odc-fit-1 .odc-name-line { flex-wrap:wrap; row-gap:2px; }
+#odcPanel.odc-fit-1 .odc-name-line .odc-imp { margin-left:0; }
+#odcPanel.odc-fit-2 .odc-act .odc-btn-label { position:absolute; width:1px; height:1px; overflow:hidden;
+  clip:rect(0 0 0 0); white-space:nowrap; }
+#odcPanel.odc-fit-3 .odc-tbl th, #odcPanel.odc-fit-3 .odc-sort,
+#odcPanel.odc-fit-3 .odc-chip, #odcPanel.odc-fit-3 .odc-mode { white-space:normal; word-break:keep-all; }
+#odcPanel.odc-fit-3 .odc-sort { text-align:left; }
+/* 標籤折成兩行以上時，膠囊形會變成一顆橢圓；檢查結果最少留 9 個字寬（被擠到最窄會折成四行，日文實量） */
+#odcPanel.odc-fit-3 .odc-chip, #odcPanel.odc-fit-3 .odc-mode { border-radius:8px; }
+#odcPanel.odc-fit-3 .odc-iss { min-width:9em; }
+:lang(ja) #odcPanel.odc-fit-3 .odc-tbl th, :lang(ja) #odcPanel.odc-fit-3 .odc-sort,
+:lang(ja) #odcPanel.odc-fit-3 .odc-chip, :lang(ja) #odcPanel.odc-fit-3 .odc-mode { word-break:auto-phrase; }
+.odc-docno-text { font-variant-numeric:tabular-nums; }
+.odc-docno-edit { border:0; background:none; padding:2px 4px; margin-left:2px; color:#94a3b8; cursor:pointer;
+  border-radius:4px; vertical-align:middle; }
+.odc-docno-edit:hover, .odc-docno-edit:focus-visible { color:#2563eb; background:#eff6ff; }
+.odc-tbl.odc-hide-docno [data-col="docno"],
 .odc-tbl.odc-hide-mode [data-col="mode"], .odc-tbl.odc-hide-rev [data-col="rev"],
 .odc-tbl.odc-hide-issues [data-col="issues"], .odc-tbl.odc-hide-updated [data-col="updated"],
 .odc-tbl.odc-hide-owner [data-col="owner"] { display:none !important; }
@@ -75,16 +116,22 @@ th[aria-sort="ascending"] .odc-sort-ic, th[aria-sort="descending"] .odc-sort-ic 
 .odc-pageno { min-width:5em; text-align:center; color:#334155; }
 .odc-empty { text-align:center; padding:44px 16px; color:var(--muted); }
 .odc-empty .btn { margin-top:12px; }
+/* 一件一張卡片：手機（沒有 JS 也一樣），以及 `fit()` 量過、表格怎麼收都放不下名稱的時候。
+   同一份規則用 macro 產生兩次，不要各寫一份（改一邊忘了另一邊）。 */
+{% macro odc_card_rules(p) -%}
+  {{ p }} .odc-tbl thead { display:none; }
+  {{ p }} .odc-tbl, {{ p }} .odc-tbl tbody, {{ p }} .odc-tbl tr, {{ p }} .odc-tbl td { display:block; width:100%; }
+  {{ p }} .odc-tbl tr { border:1px solid var(--border); border-radius:10px; padding:6px 4px; margin:0 0 10px; }
+  {{ p }} .odc-tbl td { border:0; padding:4px 8px; }
+  {{ p }} .odc-tbl td[data-label]::before { content:attr(data-label); display:inline-block; min-width:5.5em;
+                                     margin-right:8px; color:var(--muted); font-size:12px; }
+  {{ p }} .odc-act { justify-content:flex-start; }
+  {{ p }} .odc-tbl td.odc-name { max-width:none; }
+{%- endmacro %}
 @media (max-width: 760px) {
-  .odc-tbl thead { display:none; }
-  .odc-tbl, .odc-tbl tbody, .odc-tbl tr, .odc-tbl td { display:block; width:100%; }
-  .odc-tbl tr { border:1px solid var(--border); border-radius:10px; padding:6px 4px; margin:0 0 10px; }
-  .odc-tbl td { border:0; padding:4px 8px; }
-  .odc-tbl td[data-label]::before { content:attr(data-label); display:inline-block; min-width:5.5em;
-                                     color:var(--muted); font-size:12px; }
-  .odc-act { justify-content:flex-start; }
-  .odc-tbl td.odc-name { max-width:none; }
+{{ odc_card_rules('') }}
 }
+{{ odc_card_rules('#odcPanel.odc-fit-cards') }}
 </style>
 {% endblock %}
 
@@ -137,6 +184,7 @@ th[aria-sort="ascending"] .odc-sort-ic, th[aria-sort="descending"] .odc-sort-ic 
     <thead><tr>
       <th class="odc-ck"><input type="checkbox" id="odcAll" aria-label="{{ tr('全選這一頁（可以下載 DI 檔的案件）') }}" title="{{ tr('全選這一頁（可以下載 DI 檔的案件）') }}"></th>
       <th aria-sort="none"><button type="button" class="odc-sort" data-sort="name">{{ tr('案件') }}<span class="odc-sort-ic" aria-hidden="true"></span></button></th>
+      <th data-col="docno" aria-sort="none"><button type="button" class="odc-sort" data-sort="docno">{{ tr('文號') }}<span class="odc-sort-ic" aria-hidden="true"></span></button></th>
       <th data-col="mode" aria-sort="none"><button type="button" class="odc-sort" data-sort="mode">{{ tr('文別') }}<span class="odc-sort-ic" aria-hidden="true"></span></button></th>
       <th data-col="rev" aria-sort="none"><button type="button" class="odc-sort" data-sort="rev">{{ tr('版本') }}<span class="odc-sort-ic" aria-hidden="true"></span></button></th>
       <th data-col="issues" aria-sort="none"><button type="button" class="odc-sort" data-sort="issues">{{ tr('檢查結果') }}<span class="odc-sort-ic" aria-hidden="true"></span></button></th>
@@ -150,7 +198,7 @@ th[aria-sort="ascending"] .odc-sort-ic, th[aria-sort="descending"] .odc-sort-ic 
       <tr data-case-id="{{ c.case_id }}" data-name="{{ c.name }}" {% if c.deleted %}class="odc-deleted"{% endif %}
           data-k-name="{{ label }}" data-k-mode="{{ tr(c.mode_name) }}" data-k-rev="{{ c.latest_rev }}"
           data-k-issues="{{ (c.issues.error * 1000 + c.issues.todo) if c.latest_rev else -1 }}"
-          data-k-updated="{{ c.updated_at }}" data-k-owner="{{ c.owner or '' }}">
+          data-k-updated="{{ c.updated_at }}" data-k-owner="{{ c.owner or '' }}" data-k-docno="{{ c.doc_no }}">
         <td class="odc-ck">{% if not c.deleted %}<input type="checkbox" data-odc-pick aria-label="{{ tr('勾選') }}"
           {% if not c.di_ok %}disabled title="{% if c.mode == 'endorse' %}{{ tr('簽辦意見沒有 DI 檔') }}{% else %}{{ tr('還沒有草稿') }}{% endif %}"{% endif %}>{% endif %}</td>
         <td class="odc-name">
@@ -164,6 +212,11 @@ th[aria-sort="ascending"] .odc-sort-ic, th[aria-sort="descending"] .odc-sort-ic 
           {% if c.deleted %}<div class="odc-sub odc-trunc"><span class="odc-gone">{{ tr('已刪除') }}</span>
             {{ tr('{0} 由 {1} 刪除').replace('{0}', c.deleted_at|localdt).replace('{1}', c.deleted_by or '?') }}</div>{% endif %}
         </td>
+        <td data-col="docno" data-label="{{ tr('文號') }}" class="odc-docno">
+          {# 文號是使用者的資料，不翻譯；可以在這裡補填或改（只是案件的紀錄，不改草稿） #}
+          <span class="odc-docno-text" data-odc-docno-text data-i18n="skip" title="{{ c.doc_no }}"><span class="odc-docno-part odc-docno-cut" data-odc-docno-head>{{ c.doc_no_head }}</span><span class="odc-nw odc-docno-part"><span class="odc-docno-cut" data-odc-docno-tail>{{ c.doc_no_tail or c.doc_no or '—' }}</span>{% if not c.deleted %}<button type="button" class="odc-docno-edit" data-odc-docno
+            title="{{ tr('補填或修改文號') }}" aria-label="{{ tr('補填或修改文號') }}">{{ icon('edit', size=12) }}</button>{% endif %}</span></span>
+        </td>
         <td data-col="mode" data-label="{{ tr('文別') }}"><span class="odc-mode">{{ tr(c.mode_name) }}</span></td>
         <td data-col="rev" data-label="{{ tr('版本') }}">{% if c.latest_rev %}{{ c.latest_rev }}{% else %}—{% endif %}</td>
         <td data-col="issues" data-label="{{ tr('檢查結果') }}">
@@ -173,13 +226,13 @@ th[aria-sort="ascending"] .odc-sort-ic, th[aria-sort="descending"] .odc-sort-ic 
             {% if not c.issues.error and not c.issues.todo %}{% if c.latest_rev %}<span class="odc-chip ok">{{ tr('沒有需要確認的事實') }}</span>{% else %}—{% endif %}{% endif %}
           </div>
         </td>
-        <td data-col="updated" data-label="{{ tr('最後修改') }}" class="odc-time"><time datetime="{{ c.updated_at|localiso }}">{{ c.updated_at|localdt }}</time></td>
+        <td data-col="updated" data-label="{{ tr('最後修改') }}" class="odc-time"><time datetime="{{ c.updated_at|localiso }}">{% set dt = (c.updated_at|localdt).split(' ', 1) %}<span class="odc-nw">{{ dt[0] }}</span>{% if dt|length > 1 %} <span class="odc-nw">{{ dt[1] }}</span>{% endif %}</time></td>
         {% if show_owner %}<td data-col="owner" data-label="{{ tr('擁有者') }}">{{ c.owner or '—' }}</td>{% endif %}
         <td>
           <div class="odc-act">
             {% if not c.deleted %}
-            <a class="btn" href="/tools/official-doc/?case={{ c.case_id }}" title="{{ tr('打開') }}">{{ icon('eye', size=14) }} {{ tr('打開') }}</a>
-            {% if c.di_ok %}<button type="button" class="btn" data-odc-di title="{{ tr('下載 DI 檔（最新一版）') }}" aria-label="{{ tr('下載 DI 檔（最新一版）') }}">{{ icon('download', size=14) }} DI</button>{% endif %}
+            <a class="btn" href="/tools/official-doc/?case={{ c.case_id }}" title="{{ tr('打開') }}">{{ icon('eye', size=14) }} <span class="odc-btn-label">{{ tr('打開') }}</span></a>
+            {% if c.di_ok %}<button type="button" class="btn" data-odc-di title="{{ tr('下載 DI 檔（最新一版）') }}" aria-label="{{ tr('下載 DI 檔（最新一版）') }}">{{ icon('download', size=14) }} <span class="odc-btn-label">DI</span></button>{% endif %}
             <button type="button" class="btn" data-odc-rename title="{{ tr('改名') }}" aria-label="{{ tr('改名') }}">{{ icon('edit', size=14) }}</button>
             <button type="button" class="btn odc-del" data-odc-delete title="{{ tr('刪除') }}" aria-label="{{ tr('刪除') }}">{{ icon('trash', size=14) }}</button>
             {% endif %}
@@ -252,6 +305,34 @@ th[aria-sort="ascending"] .odc-sort-ic, th[aria-sort="descending"] .odc-sort-ic 
       if (tableView) tableView.render();
       window.showToast(tr('已改名'), 'ok');
     } catch (e) { window.showAlert(tr('改名失敗')); }
+  }
+
+  var MAX_DOC_NO = {{ max_doc_no|int }};
+  async function editDocNo(row) {
+    var cur = row.dataset.kDocno || '';
+    var v = await window.showPrompt(
+      tr('這個案件的文號（例如公文系統取號後的文號；最多 {0} 字，留空就清掉）').replace('{0}', MAX_DOC_NO),
+      { title: tr('文號'), defaultValue: cur, okText: tr('儲存') });
+    if (v === null || v === undefined) return;
+    try {
+      var r = await fetch('case/' + encodeURIComponent(row.dataset.caseId) + '/doc-no', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doc_no: String(v) })
+      });
+      if (!r.ok) { window.showAlert(await window.friendlyServerError(r, tr('文號沒有存成功'))); return; }
+      var got = await r.json();
+      row.dataset.kDocno = got.doc_no || '';
+      var t = row.querySelector('[data-odc-docno-text]');
+      if (t) {
+        // 跟伺服器排的一樣：「…字」與「第…號」分兩段（窄的時候只在這裡折行），編輯鈕留在原位
+        var m = /^(.+?字)(第.+)$/.exec(got.doc_no || '');
+        t.querySelector('[data-odc-docno-head]').textContent = m ? m[1] : '';
+        t.querySelector('[data-odc-docno-tail]').textContent = m ? m[2] : (got.doc_no || '—');
+        t.title = got.doc_no || '';
+      }
+      if (tableView) tableView.render();
+      window.showToast(tr('已更新文號'), 'ok');
+    } catch (e) { window.showAlert(tr('文號沒有存成功')); }
   }
 
   async function del(row) {
@@ -433,7 +514,7 @@ th[aria-sort="ascending"] .odc-sort-ic, th[aria-sort="descending"] .odc-sort-ic 
     var tbody = tbl.tBodies[0];
     var rows = Array.prototype.slice.call(tbody.rows);
     var KEY = 'jtdt.odc.view';
-    var SORTS = { name: 'str', mode: 'str', rev: 'num', issues: 'num', updated: 'num', owner: 'str' };
+    var SORTS = { name: 'str', docno: 'str', mode: 'str', rev: 'num', issues: 'num', updated: 'num', owner: 'str' };
     var COLS = Array.prototype.map.call(panel.querySelectorAll('[data-odc-col]'), function (c) { return c.dataset.odcCol; });
     var sizeSel = document.getElementById('odcPageSize');
     var SIZES = Array.prototype.map.call(sizeSel.options, function (o) { return parseInt(o.value, 10); });
@@ -490,7 +571,39 @@ th[aria-sort="ascending"] .odc-sort-ic, th[aria-sort="descending"] .odc-sort-ic 
         if (sizeSel._jtSelect) sizeSel._jtSelect.refresh();
       }
       refreshSel();
+      fit();
     }
+
+    // 名稱放不下時一段一段收（CSS 那邊的說明）：每一段加上去之後實量 —— 表格沒有超出外框、
+    // 這一頁每一列的名稱至少拿到 8 個字寬（名稱本來就比較短的，整個看得到就算）—— 夠了就停。
+    var FIT = ['odc-fit-1', 'odc-fit-2', 'odc-fit-3', 'odc-fit-cards'];
+    function roomy() {
+      var cs = getComputedStyle(tbl.parentElement);
+      var room = tbl.parentElement.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (tbl.offsetWidth > room + 1) return false;
+      var min = parseFloat(getComputedStyle(tbl).fontSize) * 8;
+      return rows.every(function (r) {
+        if (r.hidden) return true;
+        var a = r.querySelector('.odc-name-text');
+        return !a || a.clientWidth + 1 >= Math.min(min, a.scrollWidth);
+      });
+    }
+    function fit() {
+      FIT.forEach(function (c) { panel.classList.remove(c); });
+      for (var i = 0; i < FIT.length && !roomy(); i++) panel.classList.add(FIT[i]);
+      // 變成卡片時前面幾段都不需要了（卡片放得下按鈕文字，不必只留圖示）
+      if (panel.classList.contains('odc-fit-cards')) FIT.slice(0, -1).forEach(function (c) { panel.classList.remove(c); });
+    }
+    var fitW = -1;
+    if (window.ResizeObserver) {
+      new ResizeObserver(function () {                      // 只看寬度：卡片會改變高度，不可以因此再量一次
+        var w = panel.clientWidth;
+        if (w !== fitW) { fitW = w; fit(); }
+      }).observe(panel);
+    } else {
+      window.addEventListener('resize', fit);
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);   // 字型載入後字寬會變
 
     tbl.querySelector('thead').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-sort]');
@@ -534,11 +647,12 @@ th[aria-sort="ascending"] .odc-sort-ic, th[aria-sort="descending"] .odc-sort-ic 
   })();
 
   panel.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-odc-rename], [data-odc-delete], [data-odc-di]');
+    var b = ev.target.closest('[data-odc-rename], [data-odc-delete], [data-odc-di], [data-odc-docno]');
     if (!b) return;
     var row = b.closest('tr[data-case-id]');
     if (!row) return;
     if (b.hasAttribute('data-odc-rename')) rename(row);
+    else if (b.hasAttribute('data-odc-docno')) editDocNo(row);
     else if (b.hasAttribute('data-odc-di')) downloadOne(row, b);
     else del(row);
   });

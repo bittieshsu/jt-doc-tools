@@ -33,7 +33,9 @@
 .dt-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .dt-field > label,
 .dt-uplabel { font-size: 12.5px; font-weight: 600; color: #334155; }
-.dt-field select { width: 100%; max-width: none; box-sizing: border-box; }
+/* 只套在還沒換成本站樣式的原生下拉上：權重跟全站「藏起原生下拉」那條一樣、又寫在後面，
+   不排除的話會把藏起來的原生下拉撐回 100% 寬 */
+.dt-field select:not(.jt-select-native) { width: 100%; max-width: none; box-sizing: border-box; }
 .dt-upblock { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
 /* 自填領域拉滿整列 —— `.field` 對 text input 有預設寬度，不覆蓋的話只有一小截 */
 .dt-domain-input { width: 100%; max-width: none; box-sizing: border-box; }
@@ -45,6 +47,37 @@
 .dt-chip:hover { border-color: #6366f1; color: #4338ca; }
 .dt-chip.on { background: #eef2ff; border-color: #6366f1; color: #3730a3; font-weight: 600; }
 .dt-note { font-size: 12.5px; line-height: 1.7; }
+.dt-hint { margin: 0; font-size: 12.5px; color: #64748b; line-height: 1.6; }
+.dt-upblock .dt-chips { margin: 4px 0 2px; }
+/* 語言下拉用本站樣式（jt-select），拉滿半列 */
+.dt-field .jt-select-wrap { display: block; width: 100%; }
+/* 使用須知：兩張卡片，窄螢幕疊成一欄 */
+.dt-guide-grid { display: grid; gap: 16px; align-items: start;
+                 grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); }
+.dt-card { border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc;
+           padding: 14px 16px; font-size: 13px; line-height: 1.7; color: #334155; min-width: 0; }
+.dt-card h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14.5px; color: #0f172a; }
+.dt-card p { margin: 0 0 10px; }
+.dt-tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; line-height: 1.6;
+          background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+.dt-tbl th, .dt-tbl td { padding: 6px 10px; border-bottom: 1px solid #eef2f7; text-align: left; vertical-align: top; }
+.dt-tbl thead th { background: #f1f5f9; color: #475569; font-weight: 600; }
+.dt-tbl tbody tr:last-child td { border-bottom: 0; }
+.dt-tbl td:first-child { white-space: nowrap; }
+.dt-tbl tr.dt-best td { background: #f0fdf4; }
+.dt-card-foot { margin: 10px 0 0 !important; font-size: 12.5px; color: #64748b; }
+.dt-route { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 8px; }
+.dt-route li { display: grid; grid-template-columns: minmax(8em, 11.5em) 1fr; gap: 2px 12px; padding: 8px 12px;
+               background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
+.dt-route-k { font-weight: 600; color: #0f172a; }
+.dt-route-v a { font-weight: 600; }
+.dt-route-v small { display: block; color: #64748b; font-size: 12px; line-height: 1.6; }
+.dt-route-v code { white-space: nowrap; }
+@media (max-width: 560px) { .dt-route li { grid-template-columns: 1fr; } }
+.dt-more { margin-top: 4px; }
+.dt-more summary { cursor: pointer; color: #4338ca; font-size: 12.5px; font-weight: 600; }
+.dt-more[open] summary { margin-bottom: 8px; }
+.dt-more p:last-child { margin: 8px 0 0; font-size: 12.5px; color: #475569; }
 .dt-stats { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; margin-top: 4px; }
 .dt-stats b { font-size: 17px; font-variant-numeric: tabular-nums; }
 /* 一頁一列：左原文、右譯文，並排才看得出版面有沒有跑掉 */
@@ -73,14 +106,14 @@
   <div class="dt-row">
     <div class="dt-field">
       <label for="dtSrc">{{ tr('原文語言') }}</label>
-      <select id="dtSrc" class="field">
+      <select id="dtSrc" class="field jt-select">
         <option value="auto" selected>{{ tr('自動偵測') }}</option>
         {% for code, name in langs.items() %}<option value="{{ code }}">{{ tr(name) }}</option>{% endfor %}
       </select>
     </div>
     <div class="dt-field">
       <label for="dtTgt">{{ tr('目標語言') }}</label>
-      <select id="dtTgt" class="field">
+      <select id="dtTgt" class="field jt-select">
         {% for code, name in langs.items() %}
         <option value="{{ code }}"{% if code == 'zh-TW' %} selected{% endif %}>{{ tr(name) }}</option>
         {% endfor %}
@@ -93,58 +126,22 @@
     {% with upload_id='upDt', accept=accept %}{% include "components/file_upload.html" %}{% endwith %}
   </div>
 
-  <p class="muted dt-note" data-s="s_dt_dom">{{ tr('文件領域（選填，會送進 LLM prompt 提升專業用詞準確度；
-    點下方常用領域可複選，下方輸入框可加上其他自填領域）') }}</p>
-  <div class="dt-chips" id="dtChips">
-    {% for d in ['法律合約', '醫療報告', '軟體技術文件', '財務報表', '學術論文',
-                 '新聞稿', '商業合約', '網路 / IT 維運文件'] %}
-    <button type="button" class="dt-chip" data-domain="{{ d }}">{{ tr(d) }}</button>
-    {% endfor %}
+  <div class="dt-upblock">
+    <label class="dt-uplabel" for="dtDomain">{{ tr('文件領域（選填）') }}</label>
+    <p class="dt-hint">{{ tr('會送進翻譯提示，讓專業用詞更準確。常用領域可以複選，也可以在下面自填。') }}</p>
+    <div class="dt-chips" id="dtChips">
+      {% for d in ['法律合約', '醫療報告', '軟體技術文件', '財務報表', '學術論文',
+                   '新聞稿', '商業合約', '網路 / IT 維運文件'] %}
+      <button type="button" class="dt-chip" data-domain="{{ d }}">{{ tr(d) }}</button>
+      {% endfor %}
+    </div>
+    <input type="text" class="field dt-domain-input" id="dtDomain" placeholder="{{ tr('自填其他領域…（選填，會與上方點選的領域一起送進 prompt）') }}">
   </div>
-  <input type="text" class="field dt-domain-input" id="dtDomain" placeholder="{{ tr('自填其他領域…（選填，會與上方點選的領域一起送進 prompt）') }}">
 
   <p class="muted dt-note" id="dtGlossRow" hidden>
     <label><input type="checkbox" id="dtGloss" checked>
       {{ tr('套用翻譯對照字典') }}</label>
     <span id="dtGlossCount"></span>
-  </p>
-
-  <p class="muted dt-note" data-s="s_dt_model">
-    {{ icon('info', size=14) }} <b>{{ tr('模型怎麼挑') }}</b>{{ tr('：這支工具一份文件動輒幾十次 LLM 請求，
-    模型選得對很有感。') }}<b>{{ tr('Gemma 4 這一家要看的不是總參數，是「每個 token 實際算幾個參數」') }}</b>：
-    <code>gemma4:26b</code> {{ tr('是') }} <b>MoE</b>{{ tr('（26B 總參數，每個 token 只啟用約 4B），
-    產生速度接近 4B 模型 ——') }} <b>{{ tr('吞吐量最好的就是它') }}</b>{{ tr('（Q4 約需 14 GB 記憶體）。') }}
-    <code>gemma4:12b</code> {{ tr('是') }} <b>dense</b>{{ tr('，12B 全部都要算，') }}<b>{{ tr('反而比 26B 慢') }}</b>{{ tr('，
-    只有記憶體不夠（約 7 GB）時才選它。') }}<code>gemma4:31b</code> {{ tr('dense 最強也最慢；') }}
-    <code>gemma4:e4b</code> / <code>e2b</code> {{ tr('是邊緣裝置用的，品質差距明顯。') }}
-    {% if is_admin(request) %}{{ tr('可以在') }} <a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a>
-    {{ tr('單獨指定這支工具要用的模型，不影響其他工具。') }}{% else %}
-    {{ tr('要換模型請聯絡管理員（可以只針對這支工具指定）。') }}{% endif %}
-  </p>
-
-  <p class="muted dt-note" data-s="s_dt_pdf">
-    {{ icon('info', size=14) }} <b>{{ tr('不支援 PDF') }}</b>{{ tr('：PDF 裡沒有「段落」這種東西，
-    文字是一塊一塊定位好的碎片，換成長度不同的譯文之後版面一定跑掉。
-    要翻 PDF 請用') }}<a href="/tools/translate-doc/">{{ tr('逐句翻譯') }}</a>{{ tr('（左原文右譯文對照）。') }}
-  </p>
-
-  <p class="muted dt-note" data-s="s_dt_pdf2">
-    {{ icon('info', size=14) }} {{ tr('如果一定要走這支工具，可以先用') }}<a
-      href="/tools/pdf-to-office/">{{ tr('PDF 轉文書檔') }}</a>{{ tr('轉成 .docx 再上傳，
-    轉換引擎請選') }}<b>pdf2docx-refine</b>{{ tr('。') }}
-    <br>
-    {{ tr('原因是這支工具以「段落」為單位翻譯，而各引擎保住段落的能力差很多
-    （同一份 12 頁文件實測）：') }}
-    <b>{{ tr('pdf2docx-refine 保住 11 段完整段落（最長 1,635 字）') }}</b>{{ tr('、
-    jtdt-reform 只保住 6 段、') }}<b>{{ tr('jtdt-layout 一段都沒有') }}</b>{{ tr('
-    （最長 179 字＝一行）—— 它把每一行釘在固定位置，版面最漂亮，但每個跨行的句子
-    都會被切開，半句話送給模型翻出來的東西接不起來。') }}
-    <br>
-    {{ tr('反過來說，如果只是要') }}<b>{{ tr('存檔或重新排版、不打算翻譯') }}</b>{{ tr('，
-    jtdt-layout 才是最好的（版面幾乎 1:1）。') }}
-    <br>
-    {{ tr('另外：如果那份 PDF 的文字是「外框曲線」（擷取不到任何文字），
-    任何引擎都救不回來 —— 要先用') }}<a href="/tools/pdf-ocr/">{{ tr('OCR 文字辨識') }}</a>{{ tr('補上文字層。') }}
   </p>
 
   <div id="dtInfo" hidden>
@@ -174,6 +171,64 @@
   <div class="dt-prev" id="dtPrev"></div>
 </div>
 
+{# 使用須知：原本是表單裡三大段灰色小字（使用者 2026-10-14：「下面說明很多文字 請排版好看美觀點」）。
+   挪到表單後面、分兩張卡片：模型做成表格、PDF 做成「要做什麼 → 用哪支工具」，引擎比較收進可展開的細節。 #}
+<div class="panel" id="dtGuide">
+  <h2>{{ tr('使用須知') }}</h2>
+  <div class="dt-guide-grid">
+    <section class="dt-card">
+      <h3>{{ icon('gauge', size=16) }} {{ tr('模型怎麼挑') }}</h3>
+      <p>{{ tr('一份文件動輒幾十次 LLM 請求，模型選得對差很多。Gemma 4 要看的是**每個 token 實際算幾個參數**，不是總參數。')|marks }}</p>
+      <table class="dt-tbl">
+        <thead><tr><th>{{ tr('模型') }}</th><th>{{ tr('類型') }}</th><th>{{ tr('建議') }}</th></tr></thead>
+        <tbody>
+          <tr class="dt-best"><td><code>gemma4:26b</code></td><td>MoE</td>
+            <td>{{ tr('**首選**：每個 token 只啟用約 4B，速度接近 4B 模型、吞吐量最好；Q4 約需 14 GB 記憶體')|marks }}</td></tr>
+          <tr><td><code>gemma4:12b</code></td><td>dense</td>
+            <td>{{ tr('12B 全部都要算，反而比 26B 慢；記憶體不夠（約 7 GB）時才選') }}</td></tr>
+          <tr><td><code>gemma4:31b</code></td><td>dense</td><td>{{ tr('品質最好，也最慢') }}</td></tr>
+          <tr><td><code>gemma4:e4b</code><br><code>gemma4:e2b</code></td><td>{{ tr('小型') }}</td>
+            <td>{{ tr('給邊緣裝置用的，品質差距明顯') }}</td></tr>
+        </tbody>
+      </table>
+      <p class="dt-card-foot">
+        {% if is_admin(request) %}{{ tr('這支工具要用哪個模型可以單獨指定，不影響其他工具。') }}
+        <a href="/admin/llm-settings">{{ tr('LLM 設定') }}</a>{% else %}
+        {{ tr('要換模型請聯絡管理員（可以只針對這支工具指定）。') }}{% endif %}
+      </p>
+    </section>
+
+    <section class="dt-card">
+      <h3>{{ icon('info', size=16) }} {{ tr('PDF 怎麼翻') }}</h3>
+      <p>{{ tr('這支工具**不支援 PDF**：PDF 裡沒有「段落」，文字是一塊一塊定位好的碎片，換成長度不同的譯文之後版面一定跑掉。')|marks }}</p>
+      <ul class="dt-route">
+        <li><span class="dt-route-k">{{ tr('要左右對照閱讀') }}</span>
+          <span class="dt-route-v"><a href="/tools/translate-doc/">{{ tr('逐句翻譯') }}</a>
+            <small>{{ tr('左邊原文、右邊譯文') }}</small></span></li>
+        <li><span class="dt-route-k">{{ tr('要翻成同格式的文書檔') }}</span>
+          <span class="dt-route-v"><a href="/tools/pdf-to-office/">{{ tr('PDF 轉文書檔') }}</a>
+            <small>{{ tr('先轉成 .docx（轉換引擎選 `pdf2docx-refine`），再回來上傳')|marks }}</small></span></li>
+        <li><span class="dt-route-k">{{ tr('掃描檔，或擷取不到文字') }}</span>
+          <span class="dt-route-v"><a href="/tools/pdf-ocr/">{{ tr('OCR 文字辨識') }}</a>
+            <small>{{ tr('文字是外框曲線時，任何轉換引擎都救不回來，要先補上文字層') }}</small></span></li>
+      </ul>
+      <details class="dt-more">
+        <summary>{{ tr('為什麼轉換引擎要選 pdf2docx-refine') }}</summary>
+        <p>{{ tr('這支工具以段落為單位翻譯，而各轉換引擎保住段落的能力差很多（同一份 12 頁文件實測）：') }}</p>
+        <table class="dt-tbl">
+          <thead><tr><th>{{ tr('轉換引擎') }}</th><th>{{ tr('完整段落') }}</th><th>{{ tr('適合') }}</th></tr></thead>
+          <tbody>
+            <tr class="dt-best"><td><code>pdf2docx-refine</code></td><td>{{ tr('11 段（最長 1,635 字）') }}</td><td>{{ tr('翻譯') }}</td></tr>
+            <tr><td><code>jtdt-reform</code></td><td>{{ tr('6 段') }}</td><td>—</td></tr>
+            <tr><td><code>jtdt-layout</code></td><td>{{ tr('0 段（最長 179 字，就是一行）') }}</td><td>{{ tr('只存檔或重新排版，版面幾乎 1:1') }}</td></tr>
+          </tbody>
+        </table>
+        <p>{{ tr('jtdt-layout 把每一行釘在固定位置，版面最漂亮，但跨行的句子會被切開，半句話送給模型翻出來的東西接不起來。') }}</p>
+      </details>
+    </section>
+  </div>
+</div>
+
 {# 放大檢視用全站共用的 .lightbox（樣式在 platform.css）—— 不要每個工具自己刻一套 #}
 <div id="dt-lightbox" class="lightbox" hidden>
   <div class="lightbox-inner">
@@ -184,6 +239,7 @@
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/file_upload.js"></script><script src="/static/js/job_progress.js"></script>
+<script src="/static/js/custom_select.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
 // 翻譯對照字典：**只在選到的語言對真的有條目時才顯示這個勾選** ——
 // 沒設定就給一個永遠沒作用的勾選，只會讓人以為自己設錯了。

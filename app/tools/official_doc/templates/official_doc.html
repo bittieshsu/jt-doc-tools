@@ -2811,7 +2811,7 @@ a.od-ref-title:hover { text-decoration:underline; }
     pin.scrollTop = ta.scrollTop;
   }
   function setPin(t) {
-    rwPin = t ? { start: t.start, end: t.end, original: t.text, where: t.where } : null;
+    rwPin = t ? { start: t.start, end: t.end, original: t.text, where: t.where, context: t.context || '' } : null;
     paintPin();
     paintTarget();
   }
@@ -2872,7 +2872,23 @@ a.od-ref-title:hover { text-decoration:underline; }
     return be;
   }
 
-  // 回 {start, end, text, where, tail} 或 {error: 'format'|'empty'|'toolong'|'span'}
+  // 這一行的段名或項次（「一、」「（二）」「說明：」）—— 改寫時另外送給伺服器（`context`），
+  // 只用來決定「改成條列」的要點要用哪一層：選取從「一、」後面開始時項次留在草稿裡、沒有送出去，
+  // 伺服器就不知道這段掛在「一、」底下，要點會用成跟外層同一層的「一、二、三」（使用者 2026-10-14 回報）。
+  // 沒有項次的一行（接續的內文）往上找最近的段名（「說明：」）。
+  function lineMarker(rows, i) {
+    for (var k = i; k >= 0; k--) {
+      var r = rows[k], c = r.c;
+      if ((c.kind === 'label' || c.kind === 'item') && c.body != null) {
+        if (k !== i && c.kind === 'item') continue;
+        return r.line.slice(0, c.body).trim();
+      }
+      if (c.kind === 'blank' || (k !== i && c.kind !== 'para' && c.kind !== 'item')) break;
+    }
+    return '';
+  }
+
+  // 回 {start, end, text, where, tail, context} 或 {error: 'format'|'empty'|'toolong'|'span'}
   function rewriteTarget() {
     var ta = el('odDraft'), v = ta.value;
     var s = ta.selectionStart || 0, e = ta.selectionEnd || 0, t;
@@ -2912,7 +2928,7 @@ a.od-ref-title:hover { text-decoration:underline; }
         if (cut < le) { e0 = cut; tailSel = true; }
       }
       if (e0 <= s0) return { error: 'empty' };
-      t = { start: s0, end: e0, where: 'selection', tail: tailSel };
+      t = { start: s0, end: e0, where: 'selection', tail: tailSel, context: lineMarker(rows, fi) };
     } else {
       var lines = v.split('\n'), pos = 0, st = { ending: false, afterCopies: false };
       for (var i = 0; i < lines.length; i++) {
@@ -2930,7 +2946,7 @@ a.od-ref-title:hover { text-decoration:underline; }
         var cutAt = cutTail(v, bs, be), tail = cutAt < be;
         be = cutAt;
         if (be <= bs) return { error: 'empty' };
-        t = { start: bs, end: be, where: 'line', tail: tail };
+        t = { start: bs, end: be, where: 'line', tail: tail, context: lineMarker(scanLines(v), i) };
         break;
       }
       if (!t) return { error: 'empty' };
@@ -3079,7 +3095,8 @@ a.od-ref-title:hover { text-decoration:underline; }
     // 改寫結果還沒採用之前，改的一律是固定住的那一段（畫面上標著、上方也寫著那一段）
     var pinned = pinRange();
     var t = pinned ? { start: pinned.start, end: pinned.end, text: pinned.original,
-                       where: pinned.where, tail: pendingRw ? pendingRw.tail : false }
+                       where: pinned.where, tail: pendingRw ? pendingRw.tail : false,
+                       context: pinned.context || '' }
                    : rewriteTarget();
     if (t.error) { showAlert(targetMessage(t)); return; }
     var kind = rwKind(), instr = el('odRwInstr').value.trim();
@@ -3095,7 +3112,7 @@ a.od-ref-title:hover { text-decoration:underline; }
     try {
       var r = await postJson('/rewrite', {
         case_id: caseId, paragraph: t.text, kind: kind,
-        instruction: kind === 'custom' ? instr : ''
+        instruction: kind === 'custom' ? instr : '', context: t.context || ''
       });
       if (!r.ok) { showAlert(await window.friendlyServerError(r, tr('改寫失敗'))); return; }
       var d = await r.json();

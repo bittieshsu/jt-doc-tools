@@ -56,6 +56,10 @@ MANAGED: tuple[dict, ...] = (
     {"file": "sso_store.sqlite", "label": "SSO 執行期狀態", "backup": False,
      "impact": "SAML 重放快取重置；重建後照常運作",
      "impact_en": "SAML replay cache reset; rebuilds automatically"},
+    {"file": "mfp.sqlite", "label": "事務機連線", "backup": True,
+     "impact": "使用者新增的事務機與連線測試記錄遺失，需要重新新增",
+     "impact_en": "the multifunction printers users added and their connection tests "
+                  "are lost; they have to be added again"},
     {"file": "vat_db.sqlite", "label": "統編資料庫", "backup": False,
      "impact": "統一編號查詢失效；可從官方來源重新下載（檔案大，不納入備份）",
      "impact_en": "VAT lookup unavailable; re-downloadable from the official "

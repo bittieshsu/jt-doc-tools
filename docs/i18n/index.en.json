@@ -535,10 +535,10 @@
  "<b>只在內網或 VPN 使用。</b>同仁會拿它處理合約、報價、個資等機密文件。放在公開網路上，任何人都能試著登入、上傳特製的檔案；放在內網，連得到的只有同仁，而且都要先登入。": "<b>Use it on the internal network or over VPN only.</b> People will process contracts, quotes, personal data and other confidential documents with it. On the public internet anyone can try to sign in or upload crafted files; on the internal network only colleagues can reach it, and they have to sign in first.",
  "<b>LiteLLM 等 LLM 閘道 / vLLM / SGLang / llama.cpp / LM Studio / jan.ai</b> · 任何 OpenAI-compatible 後端，模型的「思考」會自動關閉": "<b>LLM gateways such as LiteLLM / vLLM / SGLang / llama.cpp / LM Studio / jan.ai</b> · any OpenAI-compatible backend; the model's \"thinking\" is turned off automatically",
  "存好之後最多 24 小時內送（這段時間可以補專有名詞、只重跑校正），JTLW 收到就刪掉它那份（沒收到的話 7 天後自己清掉）": "Sent within 24 hours of saving the transcript (until then, terms can be added and only the correction re-run); JTLW then deletes its copy (without it, JTLW clears the job after 7 days)",
- "Jason Tools 文件工具箱：整合式 PDF / Office 文件處理平台。51 個工具一站處理：表單填寫、用印簽名、浮水印、OCR 文字辨識、送件前檢核、敏感資料去識別化、PDF 加密、隱藏內容掃描、差異比對、逐句翻譯、電子發票處理、統編查詢等。可選 LDAP / AD 認證、SSO 單一登入（OIDC / SAML / Kerberos）、角色權限、稽核、記錄轉送。不上雲，資料留在自己手中。": "Jason Tools Document Toolbox: an integrated PDF / Office document platform. 51 tools in one place: form filling, stamps and signatures, watermarks, OCR, pre-submission checks, de-identification, PDF encryption, hidden-content scanning, diffing, sentence translation, e-invoice processing, VAT number lookup and more. Optional LDAP / AD authentication, SSO (OIDC / SAML / Kerberos), role permissions, auditing and log forwarding. Nothing goes to the cloud; your data stays with you.",
- "別再把公司文件丟到線上 PDF 工具<br>\n      <span class=\"hero-title-accent\">這有 51 工具，自架、開源、可控</span>": "Stop uploading company documents to online PDF tools<br>\n      <span class=\"hero-title-accent\">51 tools here: self-hosted, open source, under your control</span>",
- "Jason Tools 文件工具箱主介面 — 51 個工具一覽": "Jason Tools Document Toolbox main screen; all 51 tools",
- "51 個工具，分 5 大類": "51 tools in 5 categories",
+ "Jason Tools 文件工具箱：整合式 PDF / Office 文件處理平台。52 個工具一站處理：表單填寫、用印簽名、浮水印、OCR 文字辨識、送件前檢核、敏感資料去識別化、PDF 加密、隱藏內容掃描、差異比對、逐句翻譯、電子發票處理、統編查詢等。可選 LDAP / AD 認證、SSO 單一登入（OIDC / SAML / Kerberos）、角色權限、稽核、記錄轉送。不上雲，資料留在自己手中。": "Jason Tools Document Toolbox: an integrated PDF / Office document platform. 52 tools in one place: form filling, stamps and signatures, watermarks, OCR, pre-submission checks, de-identification, PDF encryption, hidden-content scanning, diffing, sentence translation, e-invoice processing, VAT number lookup and more. Optional LDAP / AD authentication, SSO (OIDC / SAML / Kerberos), role permissions, auditing and log forwarding. Nothing goes to the cloud; your data stays with you.",
+ "別再把公司文件丟到線上 PDF 工具<br>\n      <span class=\"hero-title-accent\">這有 52 工具，自架、開源、可控</span>": "Stop uploading company documents to online PDF tools<br>\n      <span class=\"hero-title-accent\">52 tools here: self-hosted, open source, under your control</span>",
+ "Jason Tools 文件工具箱主介面 — 52 個工具一覽": "Jason Tools Document Toolbox main screen; all 52 tools",
+ "52 個工具，分 5 大類": "52 tools in 5 categories",
  "公文撰擬": "Official document drafting",
  "31 個工具走背景作業": "31 tools run as background jobs",
  "14 個工具支援 LLM AI 加值": "14 tools with optional LLM AI enhancements",
@@ -558,5 +558,7 @@
  "資料保護與合規": "Data protection and compliance",
  "文件留在哪裡、哪些情況會連到外部、工具本身做到的控制與你的組織要做的事，並對照個資法、GDPR、ISO/IEC 27001:2022 與 ISO/IEC 42001:2023 的條文與控制項。": "Where your documents stay, when the tool connects to the outside, the controls it provides and what your organization does, mapped to Taiwan's Personal Data Protection Act, GDPR, and the clauses and controls of ISO/IEC 27001:2022 and ISO/IEC 42001:2023.",
  "看資料保護與合規": "Read about data protection and compliance",
- "合規": "Compliance"
+ "合規": "Compliance",
+ "事務機取件（Beta）": "Fetch from MFP (Beta)",
+ "新增事務機做連線測試與型號辨識，逐步列出診斷結果；支援 eSCL 的事務機可以直接掃描進工作區，管理員可設定共用事務機，同一台自動排隊；取件要等實機驗證後開放": "Add an MFP to run a connection test and identify the model, with step-by-step diagnostics; MFPs that support eSCL can scan straight into the workspace, administrators can set up shared MFPs, and each device queues requests automatically; fetching opens once tested on real devices"
 }

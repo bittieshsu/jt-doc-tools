@@ -596,3 +596,34 @@ def test_the_progress_bar_stays_visible_with_a_long_status(live, width):
     })()""", width=width)
     assert got["bar"] >= min(200, got["box"] * 0.5), got
     assert got["right"] <= 1, got
+
+
+#: 文件翻譯「使用須知」：原本是表單裡三大段灰色小字（使用者 2026-10-14：「下面說明很多文字 請排版好看美觀點」），
+#: 改成兩張卡片＋表格。表格欄位不換行的話手機上會撐出畫面（第一版英文 390 寬撐到 506px，實量）。
+_DT_GUIDE_JS = """(() => {
+  const g = document.getElementById('dtGuide');
+  if (!g) return null;
+  const more = g.querySelector('.dt-more'); if (more) more.open = true;
+  const cards = Array.from(g.querySelectorAll('.dt-card')).map(c => c.getBoundingClientRect());
+  return {page: document.documentElement.scrollWidth, vw: innerWidth, cards: cards.length,
+          sideBySide: cards.length === 2 && Math.abs(cards[0].top - cards[1].top) < 2,
+          tables: g.querySelectorAll('table.dt-tbl').length,
+          selects: document.querySelectorAll('.dt-field .jt-select-trigger').length,
+          nativeShown: Array.from(document.querySelectorAll('.dt-field select'))
+            .filter(s => { const r = s.getBoundingClientRect();
+              return getComputedStyle(s).opacity !== '0' && r.right > 0 && r.width > 0; }).length,
+          noPdf: g.textContent.indexOf('PDF') >= 0};
+})()"""
+
+
+@pytest.mark.parametrize("locale", ["zh-Hant", "en", "ja"])
+def test_doc_translate_guide_is_tidy_and_fits_a_phone(live, locale):
+    wide = _measure(live, "/tools/doc-translate/", _DT_GUIDE_JS, width=1280, locale=locale)
+    assert wide and wide["cards"] == 2 and wide["tables"] == 2, wide
+    assert wide["sideBySide"], f"1280 寬兩張卡片要並排：{wide}"
+    assert wide["selects"] == 2 and wide["nativeShown"] == 0, f"語言下拉要是本站樣式：{wide}"
+    phone = _measure(live, "/tools/doc-translate/", _DT_GUIDE_JS, width=390, locale=locale)
+    assert phone and not phone["sideBySide"], phone
+    # 跟 390 比，不跟 innerWidth 比：行動模式下內容太寬時瀏覽器會把版面寬度一起撐大（實量 506 / 506），
+    # 拿 innerWidth 比等於自己比自己
+    assert phone["page"] <= 390 + 1 and phone["vw"] <= 390 + 1, f"手機寬度出現橫向捲動：{phone}"

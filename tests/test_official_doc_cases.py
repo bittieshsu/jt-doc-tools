@@ -341,6 +341,18 @@ def _audit_rows(kind: str) -> list:
         (kind,)).fetchall()
 
 
+def _new_audit_rows(kind: str, before: int, timeout: float = 5.0) -> list:
+    """稽核是背景執行緒非同步寫入的 —— 要等那一筆真的寫進去再讀，不可以一送出就讀
+    （單跑都過、完整測試機器一忙就讀到空的，2026-10-14 實際紅過一次）。"""
+    import time
+    end = time.monotonic() + timeout
+    while True:
+        rows = _audit_rows(kind)[before:]
+        if rows or time.monotonic() > end:
+            return rows
+        time.sleep(0.05)
+
+
 def test_admin_viewing_everyones_case_list_is_audited(admin_session, fake_llm):
     from app.core import upload_owner
     admin, _, _ = admin_session
@@ -349,7 +361,7 @@ def test_admin_viewing_everyones_case_list_is_audited(admin_session, fake_llm):
     upload_owner._OVERRIDE_LOGGED.clear()
     before = len(_audit_rows("admin_file_override"))
     assert admin.get(f"{BASE}/api/cases").status_code == 200
-    rows = _audit_rows("admin_file_override")[before:]
+    rows = _new_audit_rows("admin_file_override", before)
     assert [r for r in rows if r[0] == "official-doc:case-list" and r[1].startswith("jtdt-admin")], rows
     # 一般使用者看自己的清單不算
     before = len(_audit_rows("admin_file_override"))
@@ -362,7 +374,7 @@ def test_drafting_with_the_knowledge_base_is_audited_without_the_query(admin_ses
     secret = "王小明身分證A123456789申請補助"
     before = len(_audit_rows("kb_search"))
     _run(alice, narrative=secret, use_kb=True)
-    rows = _audit_rows("kb_search")[before:]
+    rows = _new_audit_rows("kb_search", before)
     assert rows and rows[-1][0].startswith("official-doc") and rows[-1][1].startswith("odc_kb"), rows
     assert secret not in rows[-1][2] and "A123456789" not in rows[-1][2], "查詢的文字不可以進稽核記錄"
     # 沒勾就不記
@@ -376,5 +388,5 @@ def test_the_admin_search_test_is_audited_without_the_query(admin_session):
     before = len(_audit_rows("kb_search"))
     r = admin.post("/admin/knowledge/api/search", json={"query": "查詢陳大華的地址"})
     assert r.status_code == 200, r.text
-    rows = _audit_rows("kb_search")[before:]
+    rows = _new_audit_rows("kb_search", before)
     assert rows and rows[-1][0] == "admin-test" and "陳大華" not in rows[-1][2], rows

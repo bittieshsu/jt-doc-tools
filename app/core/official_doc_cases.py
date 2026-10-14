@@ -46,6 +46,8 @@ logger = logging.getLogger(__name__)
 ROOT_NAME = "official_doc_cases"
 #: 案件名稱（使用者自己取的；沒取就顯示草稿的標題）的上限
 MAX_NAME_CHARS = 80
+#: 文號最長幾個字（「府授資字第11500123451號」這類都在 30 字內，留餘裕）。
+MAX_DOC_NO_CHARS = 60
 #: 清單一次最多列幾件（每件讀一個小 JSON；再多的話請用搜尋）
 LIST_LIMIT = 500
 _LOCK = threading.Lock()
@@ -109,7 +111,7 @@ def update(case_id: str, *, touch: bool = True, **fields: Any) -> Optional[dict]
 
     `touch=False`：不動「最後修改」（補舊案件缺的欄位時用 —— 補一個欄位不是使用者改了案件）。"""
     allowed = {"title", "subject", "revisions", "latest_rev", "issues", "mode", "name", "job_id",
-               "created_at", "deleted_at", "deleted_by", "origin"}
+               "created_at", "deleted_at", "deleted_by", "origin", "doc_no"}
     with _LOCK:
         p = file(case_id, "meta.json")
         meta = _read(p)
@@ -127,6 +129,17 @@ def update(case_id: str, *, touch: bool = True, **fields: Any) -> Optional[dict]
 def rename(case_id: str, name: str) -> Optional[dict]:
     name = " ".join(str(name or "").split())[:MAX_NAME_CHARS]
     return update(case_id, name=name)
+
+
+def clean_doc_no(value: str) -> str:
+    """文號：一行、去掉控制字元、空白收成一個（「府資字第1150012345號」「1150012345」都照原樣）。"""
+    import re as _re
+    return " ".join(_re.sub(r"[\x00-\x1f\x7f]+", " ", str(value or "")).split())
+
+
+def set_doc_no(case_id: str, doc_no: str) -> Optional[dict]:
+    """案件的文號（清單上補填或修改）。**只是案件的紀錄，不改草稿。**"""
+    return update(case_id, doc_no=clean_doc_no(doc_no))
 
 
 def soft_delete(case_id: str, by: str) -> Optional[dict]:

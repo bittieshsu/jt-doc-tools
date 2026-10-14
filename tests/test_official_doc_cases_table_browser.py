@@ -99,13 +99,14 @@ def test_sort_columns_paging_and_long_names(live):  # noqa: F811
         return {cut: a.scrollWidth > a.clientWidth + 1, title: a.title, text: a.textContent,
                 ellipsis: getComputedStyle(a).textOverflow,
                 fits: tbl.getBoundingClientRect().right <= panel.getBoundingClientRect().right + 1,
-                h: a.closest('td').getBoundingClientRect().height,
+                h: a.getBoundingClientRect().height,
                 lh: parseFloat(getComputedStyle(a).lineHeight) || 20}; })()""")
     assert long, "找不到那件長主旨的案件"
     assert long["cut"] and long["ellipsis"] == "ellipsis", long
     assert "以利統籌編列下年度汰換預算" in long["title"], "滑鼠移過去要看得到全文：" + long["title"]
     assert long["fits"], "長名稱把表格撐出外框"
-    assert long["h"] < long["lh"] * 3, f"長名稱折成好幾行（高 {long['h']}）"
+    # 量名稱本身（不是整格）：別的欄位窄的時候可以折一次，整列變兩行不算名稱折行
+    assert long["h"] < long["lh"] * 1.6, f"長名稱折成好幾行（高 {long['h']}）"
 
     # 顯示欄位：藏掉「版本」
     _js(send, "document.querySelector('#odcCols > summary').click(), true")
@@ -144,4 +145,104 @@ def test_sort_columns_paging_and_long_names(live):  # noqa: F811
         send("Emulation.clearDeviceMetricsOverride", {})
     assert phone and phone["cut"] and phone["w"] > 100, phone
     assert phone["page"] <= phone["vw"] + 1, f"手機寬度出現橫向捲動：{phone}"
+    assert not errs, errs
+
+
+def test_the_doc_number_column_can_be_filled_sorted_and_hidden(live):  # noqa: F811
+    """文號欄（2026-10-14 使用者：「加個 文號 欄位」）：在清單上補填 → 存檔 → 重新整理照舊；
+    可以排序、可以在「顯示欄位」藏起來。"""
+    port, send, errs = live
+    if not httpx.get(f"http://127.0.0.1:{port}/tools/official-doc/api/cases", timeout=30).json()["cases"]:
+        _seed(port)
+    _open(send, port)
+    _js(send, "localStorage.removeItem('jtdt.odc.view'), true")
+    _open(send, port)
+    assert _js(send, "!!document.querySelector('th[data-col=\"docno\"]')"), "沒有文號欄"
+    cid = _js(send, _VISIBLE + "[0].dataset.caseId")
+    _js(send, "document.querySelector('tr[data-case-id=\"%s\"] [data-odc-docno]').click(), true" % cid)
+    assert _wait(send, "!!document.querySelector('.modal-input')"), "文號對話框沒有出現"
+    _js(send, "(function(){var i=document.querySelector('.modal-input'); i.value='府資字第1150077777號';"
+              "document.querySelector('.modal-ok').click(); return true;})()")
+    cell = "document.querySelector('tr[data-case-id=\"%s\"] [data-odc-docno-text]').textContent" % cid
+    assert _wait(send, cell + " === '府資字第1150077777號'"), _js(send, cell)
+    # 重新整理：存在伺服器上
+    _open(send, port)
+    assert _js(send, cell) == "府資字第1150077777號"
+    # 依文號排序（大到小）：有文號的排最前面
+    _js(send, "document.querySelector('[data-sort=\"docno\"]').click(), true")
+    _js(send, "document.querySelector('[data-sort=\"docno\"]').click(), true")
+    first = _js(send, _VISIBLE + "[0].dataset.caseId")
+    assert first == cid, "依文號排序沒有作用"
+    # 顯示欄位：藏掉文號
+    _js(send, "document.querySelector('#odcCols > summary').click(), true")
+    _js(send, "document.querySelector('[data-odc-col=\"docno\"]').click(), true")
+    assert _js(send, "getComputedStyle(document.querySelector('th[data-col=\"docno\"]')).display") == "none"
+    _js(send, "document.querySelector('[data-odc-col=\"docno\"]').click(), true")
+    _js(send, "localStorage.removeItem('jtdt.odc.view'), true")
+    assert not errs, errs
+
+
+_FIT = """(function () {
+  var p = document.getElementById('odcPanel'), tbl = p.querySelector('.odc-tbl');
+  var cs = getComputedStyle(p), room = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  var min = parseFloat(getComputedStyle(tbl).fontSize) * 8;
+  var rows = Array.from(document.querySelectorAll('tr[data-case-id]')).filter(function (r) { return !r.hidden; });
+  var short = rows.map(function (r) { var a = r.querySelector('.odc-name-text');
+      return a.clientWidth + 1 >= Math.min(min, a.scrollWidth) ? null : a.clientWidth; })
+    .filter(function (x) { return x !== null; });
+  var lh = parseFloat(getComputedStyle(tbl).lineHeight) || 20;
+  var docTall = rows.filter(function (r) {
+      return r.querySelector('[data-odc-docno-text]').getBoundingClientRect().height > lh * 1.6; }).length;
+  var labels = Array.from(p.querySelectorAll('tr[data-case-id]:not([hidden]) .odc-btn-label'))
+    .filter(function (s) { return s.getBoundingClientRect().width <= 1; }).length;
+  return {fit: Array.from(p.classList).filter(function (c) { return c.indexOf('odc-fit') === 0; }),
+          over: tbl.offsetWidth > room + 1, page: document.documentElement.scrollWidth, vw: innerWidth,
+          short: short, docTall: docTall, hiddenLabels: labels};
+})()"""
+
+
+def test_names_stay_readable_at_common_widths_in_every_locale(live):  # noqa: F811
+    """多了文號這一欄之後，固定的寬度門檻在 1280 寬名稱只剩 15px、日文 1440 寬只剩兩個字（瀏覽器實量）。
+    改成由頁面**實量**一段一段收（折文號與時間 → 只留圖示 → 標籤折行 → 卡片）。判準：
+
+    * 每一列的名稱至少拿到 8 個字寬（或整個看得到）；表格不超出外框；頁面沒有橫向捲動。
+    * 中文 1440 以上什麼都不必收 —— 不可以為了窄的情況讓寬的也一律折行（以前實際看到過）。
+    * 變成卡片時按鈕要有文字（卡片放得下）。
+    """
+    port, send, errs = live
+    base = f"http://127.0.0.1:{port}"
+    cases = httpx.get(f"{base}/tools/official-doc/api/cases", timeout=30).json()["cases"]
+    if not cases:
+        _seed(port)
+        cases = httpx.get(f"{base}/tools/official-doc/api/cases", timeout=30).json()["cases"]
+    for c, v in zip(cases[:3], ["嘉資字第1150004321號", "府授教字第11500987654321號", "X" * 60]):
+        assert httpx.post(f"{base}/tools/official-doc/case/{c['case_id']}/doc-no",
+                          json={"doc_no": v}, timeout=30).status_code == 200
+    send("Network.enable")
+    bad = []
+    try:
+        for loc in ("zh-Hant", "en", "ja"):
+            send("Network.setCookie", {"name": "jtdt_locale", "value": loc, "url": base})
+            for w in (1180, 1280, 1366, 1440, 1920):
+                send("Emulation.setDeviceMetricsOverride", {"width": w, "height": 900, "deviceScaleFactor": 1,
+                                                            "mobile": False})
+                _open(send, port)
+                _js(send, "localStorage.removeItem('jtdt.odc.view'), true")
+                _open(send, port)
+                m = _js(send, _FIT)
+                where = f"{loc} {w}"
+                if m["over"]:
+                    bad.append(f"{where}：表格超出外框 {m}")
+                if m["page"] > m["vw"] + 1:
+                    bad.append(f"{where}：頁面出現橫向捲動 {m}")
+                if m["short"]:
+                    bad.append(f"{where}：名稱被擠到 {m['short']}px {m['fit']}")
+                if "odc-fit-cards" in m["fit"] and m["hiddenLabels"]:
+                    bad.append(f"{where}：卡片裡的按鈕沒有文字")
+                if loc == "zh-Hant" and w >= 1440 and (m["fit"] or m["docTall"]):
+                    bad.append(f"{where}：寬度夠了還在收 {m['fit']}，文號折行 {m['docTall']} 列")
+    finally:
+        send("Network.setCookie", {"name": "jtdt_locale", "value": "zh-Hant", "url": base})
+        send("Emulation.clearDeviceMetricsOverride", {})
+    assert not bad, "\n".join(bad)
     assert not errs, errs

@@ -247,6 +247,12 @@ def delete(group_id: int) -> None:
             (str(group_id),))
         conn.execute("DELETE FROM groups WHERE id=?", (group_id,))
     permissions.invalidate_cache()
+    # 共用事務機的成員裡也拿掉這個群組（另一個資料庫，失敗不影響刪群組）
+    try:
+        from . import mfp_store
+        mfp_store.purge_subject("group", str(group_id))
+    except Exception:  # noqa: BLE001
+        logger.warning("刪除群組後清理共用事務機成員失敗 group_id=%s", group_id)
 
 
 def set_members(group_id: int, user_ids: list[int]) -> None:

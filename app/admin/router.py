@@ -554,6 +554,16 @@ def build_router(templates) -> APIRouter:
         return {"ok": True, "id": new_co["id"], "name": name}
 
     # ---------- 翻譯對照字典 ----------
+    @router.get("/mfp", response_class=HTMLResponse)
+    async def mfp_shared_page(request: Request):
+        """共用事務機（事務機取件 Beta）：管理員建立事務機、指定成員。跟工具頁同一份模板。"""
+        from ..core import mfp_client as _mc
+        from ..core import mfp_profiles as _mp
+        return templates.TemplateResponse(request, "mfp_fetch.html", {
+            "request": request, "mode": "shared", "allowed_ports": list(_mc.ALLOWED_PORTS),
+            "status_messages": _mp.STATUS_MESSAGES,
+            "status_labels": {k: list(v) for k, v in _mp.STATUS_LABELS.items()}})
+
     @router.get("/translation-glossary", response_class=HTMLResponse)
     async def glossary_page(request: Request):
         terms = _tg.load()

@@ -111,7 +111,9 @@ def test_never_raises(tmp_path, _data_dir, monkeypatch):
     """自動存檔失敗**絕不**能把一個已經成功的轉換標記成失敗。"""
     def boom(*a, **k):
         raise RuntimeError("磁碟爆了")
-    monkeypatch.setattr(ws, "save_bytes_for_key", boom)
+    # 自動保存用路徑存（`save_file_for_key`，不整份讀進記憶體）—— 換掉的必須是**實際被呼叫的那支**，
+    # 換錯了這條就變成「什麼都沒測」卻照樣綠。
+    monkeypatch.setattr(ws, "save_file_for_key", boom)
     res = job_autosave.on_job_finished(_job(tmp_path))
     assert res["saved"] is False and res["reason"] == "error"
 

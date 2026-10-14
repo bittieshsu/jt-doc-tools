@@ -89,7 +89,7 @@ DI_IMPORT_MAX_FILES = 50
 DI_IMPORT_EXTS = (".di", ".xml", ".zip")
 DI_ENTRY_EXTS = (".di", ".xml")
 #: 歷史案件表格：可以藏的欄（代號, 標題）與每頁幾件（第一個是預設）
-CASE_COLUMNS = (("mode", "文別"), ("rev", "版本"), ("issues", "檢查結果"),
+CASE_COLUMNS = (("docno", "文號"), ("mode", "文別"), ("rev", "版本"), ("issues", "檢查結果"),
                 ("updated", "最後修改"), ("owner", "擁有者"))
 CASE_PAGE_SIZES = (20, 50, 100)
 
@@ -108,6 +108,7 @@ _FIELD_NAMES = {
     "org": "發文機關", "receiver": "受文者", "copies": "正本", "cc": "副本",
     "signature": "署名", "contact": "聯絡資訊", "attachments": "附件", "doc_no": "發文字號",
     "paragraph": "要改寫的段落", "instruction": "改寫要求", "note": "版本說明",
+    "context": "所在那一行的項次",
     "name": "案件名稱",
 }
 
@@ -1408,6 +1409,9 @@ async def start(request: Request):
         # 擁有者記在案件裡（**只在建立時**記 —— `create` 不覆寫既有的 `meta.json`）
         _cs.create(case_id, owner_uid=uid if _uo.auth_enabled() else None,
                    mode=inputs["mode"])
+        # 文號欄：函撰擬時填的發文字號先帶進來（之後在清單上可以改）
+        _cs.update(case_id, touch=False,
+                   doc_no=_cs.clean_doc_no(inputs.get("doc_no") or "")[:_cs.MAX_DOC_NO_CHARS])
         _write_case_file(case_id, "case.json", {
             "case_id": case_id, "mode": inputs["mode"], "inputs": inputs,
             "created_at": time.time()})
@@ -1482,7 +1486,12 @@ def _case_row(meta: dict, *, me: Optional[int], show_owner: bool) -> dict:
         "deleted_by": str(meta.get("deleted_by") or ""),
         "mine": me is not None and meta.get("owner_uid") == me,
         "imported": meta.get("origin") == "di",
+        # 文號：函撰擬時填的發文字號、DI 匯入的文號，或使用者在清單上補填的（只是紀錄，不改草稿）
+        "doc_no": str(meta.get("doc_no") or ""),
     }
+    # 畫面上「…字」與「第…號」之間可以折行（窄的時候最多兩行，不會被壓成一字一行）
+    m = re.match(r"^(.+?字)(第.+)$", row["doc_no"])
+    row["doc_no_head"], row["doc_no_tail"] = (m.group(1), m.group(2)) if m else ("", "")
     # 下載得到 DI 檔嗎：簽與函、已經有草稿、沒刪除（簽辦意見沒有 DI 檔）
     row["di_ok"] = mode in ("sign", "letter") and row["latest_rev"] > 0 and not row["deleted"]
     if show_owner:
@@ -1511,6 +1520,26 @@ def _with_subject(meta: dict) -> dict:
     return {**meta, "subject": subj}
 
 
+def _with_doc_no(meta: dict) -> dict:
+    """文號欄（v1.16.86）以前的案件沒有存文號：第一次列出來時從案件的輸入補（函的發文字號），
+    **不動「最後修改」**。補不到存空字串，下次不再補。"""
+    if "doc_no" in meta:
+        return meta
+    cid = str(meta.get("case_id") or "")
+    doc_no = ""
+    try:
+        case = json.loads(_cs.file(cid, "case.json").read_text(encoding="utf-8"))
+        if isinstance(case, dict) and isinstance(case.get("inputs"), dict):
+            doc_no = _cs.clean_doc_no(case["inputs"].get("doc_no") or "")[:_cs.MAX_DOC_NO_CHARS]
+    except (OSError, ValueError, TypeError, AttributeError):
+        doc_no = ""
+    try:
+        _cs.update(cid, touch=False, doc_no=doc_no)
+    except (OSError, ValueError) as e:
+        logger.warning("official-doc：補文號失敗（%s）", type(e).__name__)
+    return {**meta, "doc_no": doc_no}
+
+
 def _list_rows(request: Request, q: str, mode: str) -> tuple[list[dict], bool]:
     uid, see_all = _see_all(request)
     auth_on = _uo.auth_enabled()
@@ -1525,9 +1554,10 @@ def _list_rows(request: Request, q: str, mode: str) -> tuple[list[dict], bool]:
     for m in metas:
         if mode and str(m.get("mode") or "") != mode:
             continue
-        m = _with_subject(m)
+        m = _with_doc_no(_with_subject(m))
         if q:
-            blob = " ".join(str(m.get(k) or "") for k in ("name", "title", "subject", "case_id")).lower()
+            blob = " ".join(str(m.get(k) or "")
+                            for k in ("name", "title", "subject", "doc_no", "case_id")).lower()
             if q not in blob:
                 continue
         rows.append(_case_row(m, me=uid, show_owner=see_all and auth_on))
@@ -1543,7 +1573,7 @@ async def cases_page(request: Request, q: str = "", mode: str = ""):
     return templates.TemplateResponse(request, "official_doc_cases.html", {
         "request": request, "cases": rows, "q": q, "mode_filter": mode,
         "modes": list(od.MODE_NAMES.items()), "show_owner": show_owner,
-        "max_name": _cs.MAX_NAME_CHARS, "limit": _cs.LIST_LIMIT,
+        "max_name": _cs.MAX_NAME_CHARS, "max_doc_no": _cs.MAX_DOC_NO_CHARS, "limit": _cs.LIST_LIMIT,
         # DI 檔的注意事項與讀不進來的原因：樣板（前端 `tr(樣板)` 再填參數）
         "di_notes": _di_messages(), "di_errors": _di_errors(),
         "batch_max": DI_BATCH_MAX, "import_max": DI_IMPORT_MAX_FILES,
@@ -1587,6 +1617,20 @@ async def case_rename(case_id: str, request: Request):
     name = _text(body, "name", _cs.MAX_NAME_CHARS)
     name = " ".join(re.sub(r"[\x00-\x1f\x7f]+", " ", name).split())
     got = await asyncio.to_thread(_cs.rename, case_id, name)
+    uid, _ = _see_all(request)
+    return _case_row(got or meta, me=uid, show_owner=False)
+
+
+@router.post("/case/{case_id}/doc-no")
+async def case_doc_no(case_id: str, request: Request):
+    """補填或修改案件的文號（`{"doc_no": "..."}`；空字串＝清掉）。只是案件的紀錄，**不改草稿**。
+    權限跟改名一樣（擁有者；管理員可以，會寫稽核）。"""
+    meta = await asyncio.to_thread(_require_case, case_id, request)
+    if meta is None:
+        raise HTTPException(404, _NOT_FOUND)
+    body = await _json_body(request)
+    doc_no = _cs.clean_doc_no(_text(body, "doc_no", _cs.MAX_DOC_NO_CHARS))
+    got = await asyncio.to_thread(_cs.set_doc_no, case_id, doc_no)
     uid, _ = _see_all(request)
     return _case_row(got or meta, me=uid, show_owner=False)
 
@@ -1837,7 +1881,8 @@ def _import_di_case(filename: str, data: bytes, uid: Optional[int]) -> dict:
                                                note=cut(filename, MAX_NOTE_CHARS))])
     counts = _issue_counts(pub["issues"])
     _touch_case(case_id, title=title, subject=_subject_for(mode, text), mode=mode,
-                issues=counts, origin="di")
+                issues=counts, origin="di",
+                doc_no=_cs.clean_doc_no(f.get("doc_no") or "")[:_cs.MAX_DOC_NO_CHARS])
     return {"filename": filename, "case_id": case_id, "title": title, "mode": mode,
             "mode_name": od.MODE_NAMES.get(mode, mode), "notes": got["notes"], "issues": counts}
 
@@ -2255,6 +2300,8 @@ async def rewrite(request: Request):
                       required_msg="沒有要改寫的內容。")
     kind = _choice(body, "kind", tuple(od.REWRITE_KINDS), "shorter", "改寫方式")
     instruction = _text(body, "instruction", od.MAX_INSTRUCTION_CHARS)
+    # 選取所在那一行的段名或項次（只用來決定條列的層次；核心只收純粹是項次的字串）
+    context = _text(body, "context", od.MAX_CONTEXT_CHARS)
     if kind == "custom" and not instruction:
         raise HTTPException(400, "請寫下要怎麼改。")
     _require_llm()
@@ -2264,7 +2311,7 @@ async def rewrite(request: Request):
         out = _read_json(_result_path(case_id), "這份草稿")
         return od.rewrite_paragraph(paragraph, ask, kind=kind, instruction=instruction,
                                     sources=_case_sources(out),
-                                    mode=str(out.get("mode") or "sign"))
+                                    mode=str(out.get("mode") or "sign"), context=context)
 
     try:
         got = await asyncio.to_thread(_work)

@@ -24,6 +24,10 @@ recordings) are validated by content, never by the file name.
 ①格式判定只讀檔頭（`audio_formats.sniff_stream`），**不整份讀進記憶體**；
 ②單檔上限另外一個（`max_audio_mb`）—— 三小時會議的 AAC 約 90 MB，一般型別的
 50 MB 會直接擋掉；③沒有預覽圖，畫面上顯示圖示（`has_preview()`）。
+
+大檔（掃描 PDF、事務機取件、作業結果）走 `save_file_for_key`：只看檔頭認格式、串流或直接搬進來，
+**不整份讀進記憶體**；`.part` 寫完才換名、最後才寫 meta。每一條寫入都先在 `_reserve()` 預留容量，
+兩個同時寫入不會一起擠過額度。
 """
 from __future__ import annotations
 
@@ -33,8 +37,10 @@ import os
 import re
 import shutil
 import threading
+import errno
 import time
 import uuid
+from contextlib import contextmanager
 
 from . import atomic_json
 from . import audio_formats
@@ -459,11 +465,19 @@ def _clean_display_name(name: str, ext: str) -> str:
 # --------------------------------------------------------------------------- #
 
 def _dir_size(p: Path) -> int:
+    """目錄裡已完成檔案的總大小。
+
+    **不算寫到一半的 `.part`**：寫入期間那一份已經算在 `_reserve()` 的預留裡，
+    再算一次就重複了（第二個寫入會提早被擋）。程序中斷留下的 `.part` 沒有 meta，
+    由保留期清理收掉。
+    """
     if not p.exists():
         return 0
     total = 0
     for root, _, files in os.walk(p):
         for f in files:
+            if f.endswith(".part"):
+                continue
             try:
                 total += (Path(root) / f).stat().st_size
             except OSError:
@@ -549,11 +563,22 @@ def save_bytes_for_key(key: str, data: bytes, display_name: str,
     kind = detect_kind(data, display_name)
     if kind is None:
         raise UnsupportedType(UNSUPPORTED_MESSAGE)
+    return _store_bytes(key, data, kind, display_name, source_tool, user_label)
+
+
+def _store_bytes(key: str, data: bytes, kind: tuple[str, str], display_name: str,
+                 source_tool: str, user_label: str,
+                 origin: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     mime, ext = kind
-    _check_room(key, ext, len(data))
-    d = _new_entry_dir(key)
-    (d / f"file{ext}").write_bytes(data)
-    return _write_meta(d, display_name, ext, mime, len(data), source_tool, user_label)
+    with _reserve(key, ext, len(data)):
+        d = _new_entry_dir(key)
+        try:
+            (d / f"file{ext}").write_bytes(data)
+            return _write_meta(d, display_name, ext, mime, len(data), source_tool,
+                               user_label, origin)
+        except BaseException:
+            shutil.rmtree(d, ignore_errors=True)
+            raise
 
 
 #: 不支援的型別 —— 列出來的格式由 `ALLOWED` 實算（見 `accepted_type_groups`）。
@@ -565,6 +590,10 @@ UNSUPPORTED_MESSAGE = "工作區接受的格式：PDF / PNG、辦公文件、純
 TOO_BIG_MESSAGE = "單檔超過上限 {0} MB（這是大小上限，不是格式問題）"
 TOO_BIG_AUDIO_MESSAGE = "錄音檔超過單檔上限 {0} MB（這是大小上限，不是格式問題；可以請管理員到「工作區設定」調整）"
 QUOTA_FULL_MESSAGE = "工作區容量已滿（額度 {0} MB），請先刪除舊檔"
+#: `verify=True` 時 PDF 打不開或一頁都沒有。
+PDF_BROKEN_MESSAGE = "PDF 檔案毀損或不完整，無法開啟"
+#: `expect` 指定了格式、實際內容卻是別的（例如設備回了一張登入頁）。
+UNEXPECTED_KIND_MESSAGE = "檔案格式與預期不符"
 
 
 def max_bytes_for(ext: str) -> int:
@@ -575,16 +604,47 @@ def max_bytes_for(ext: str) -> int:
     return mb * 1024 * 1024 if mb > 0 else 0
 
 
-def _check_room(key: str, ext: str, size: int) -> None:
-    """單檔上限與每人額度。**寫入之前**就要擋，不要寫到一半才發現。"""
+def _check_room(key: str, ext: str, size: int, pending: int = 0) -> None:
+    """單檔上限與每人額度。**寫入之前**就要擋，不要寫到一半才發現。
+
+    `pending` 是同一個人其他還在寫的量（`_reserve()` 傳進來）。"""
     lim = max_bytes_for(ext)
     if lim and size > lim:
         tpl = TOO_BIG_AUDIO_MESSAGE if is_audio_ext(ext) else TOO_BIG_MESSAGE
         raise QuotaExceeded(tpl.replace("{0}", str(lim // 1024 // 1024)))
     u = usage_for_key(key)
-    if u["quota_bytes"] and u["used_bytes"] + size > u["quota_bytes"]:
+    if u["quota_bytes"] and u["used_bytes"] + pending + size > u["quota_bytes"]:
         raise QuotaExceeded(QUOTA_FULL_MESSAGE.replace(
             "{0}", str(u["quota_bytes"] // 1024 // 1024)))
+
+
+#: 每個儲存鍵目前還在寫入中的量。**所有**寫入工作區的路都經過 `_reserve()`，
+#: 否則「先量用量、再慢慢寫」—— 兩個同時寫入量到的都是寫入前的用量，會一起擠過額度。
+#: 服務是單一行程（作業佇列也在記憶體裡），所以行程內的鎖就夠。
+_RESERVE_LOCK = threading.Lock()
+_reserved: dict[str, int] = {}
+
+
+def _reserved_bytes(key: str) -> int:
+    with _RESERVE_LOCK:
+        return _reserved.get(key, 0)
+
+
+@contextmanager
+def _reserve(key: str, ext: str, size: int):
+    """檢查單檔上限與額度（算進其他還在寫的量），通過就先記上這一份，寫完或失敗都還回去。"""
+    with _RESERVE_LOCK:
+        _check_room(key, ext, size, pending=_reserved.get(key, 0))
+        _reserved[key] = _reserved.get(key, 0) + size
+    try:
+        yield
+    finally:
+        with _RESERVE_LOCK:
+            left = _reserved.get(key, 0) - size
+            if left > 0:
+                _reserved[key] = left
+            else:
+                _reserved.pop(key, None)
 
 
 def _new_entry_dir(key: str) -> Path:
@@ -595,7 +655,10 @@ def _new_entry_dir(key: str) -> Path:
 
 
 def _write_meta(d: Path, display_name: str, ext: str, mime: str, size: int,
-                source_tool: str, user_label: str) -> dict[str, Any]:
+                source_tool: str, user_label: str,
+                origin: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    """寫 meta.json —— **一定是最後一步**：meta 在就代表檔案已經完整就位
+    （清單只列有 meta 的項目，沒有 meta 的目錄由保留期清理收掉）。"""
     meta = {
         "file_id": d.name,
         "name": _clean_display_name(display_name, ext),
@@ -606,6 +669,8 @@ def _write_meta(d: Path, display_name: str, ext: str, mime: str, size: int,
         "saved_at": time.time(),
         "user_label": user_label,
     }
+    if origin:
+        meta["origin"] = origin
     atomic_json.write_json(_meta_path(d), meta)
     return meta
 
@@ -626,10 +691,9 @@ def save_stream_for_key(key: str, fobj, display_name: str, source_tool: str = ""
                         user_label: str = "") -> dict[str, Any]:
     """從一個**可 seek 的檔案物件**存進工作區（網頁上傳走這條）。
 
-    跟 `save_bytes_for_key` 的差別只在**錄音檔不整份讀進記憶體**：
-    格式只看檔頭、大小用 seek 量、內容串流寫進去。其他型別（PDF / Office /
-    純文字）判斷時本來就要看整份（開 zip、解 UTF-8），所以**先擋大小**、
-    再讀進來交給 `save_bytes_for_key` —— 驗證邏輯仍只有那一份。
+    **PDF / PNG / 錄音檔不整份讀進記憶體**：格式只看檔頭、大小用 seek 量、內容串流寫進去
+    （原本只有錄音檔這樣，掃描 PDF 一律 `fobj.read()`）。辦公文件與純文字判斷時本來就要看整份
+    （開 zip、解 UTF-8），所以**先擋大小**、再讀進來交給 `save_bytes_for_key` —— 驗證邏輯仍只有那一份。
     """
     if not is_enabled():
         raise WorkspaceDisabled("工作區功能未啟用")
@@ -638,7 +702,7 @@ def save_stream_for_key(key: str, fobj, display_name: str, source_tool: str = ""
     fobj.seek(0)
     if size == 0:
         raise WorkspaceError("檔案為空")
-    av = audio_formats.sniff_stream(fobj, display_name)
+    av = _sniff_streamable(fobj, display_name)
     if av is None:
         lim = max_bytes_for(".pdf")
         if lim and size > lim:
@@ -650,18 +714,210 @@ def save_stream_for_key(key: str, fobj, display_name: str, source_tool: str = ""
         return save_bytes_for_key(key, fobj.read(), display_name, source_tool, user_label)
 
     mime, ext = av
-    _check_room(key, ext, size)
-    d = _new_entry_dir(key)
-    part = d / f"file{ext}.part"
+    return _commit_stream(key, fobj, size, mime, ext, display_name, source_tool, user_label)
+
+
+_PNG_SIG = b"\x89PNG\r\n\x1a\n"
+
+
+def _sniff_streamable(fobj, name: str) -> Optional[tuple[str, str]]:
+    """只看檔頭就認得出來的型別（PDF / PNG / 錄音錄影）；其餘回 None（要看整份才算數）。
+
+    順序跟 `detect_kind()` 一樣：PDF、PNG 先，錄音檔後。讀完把位置放回開頭。"""
+    fobj.seek(0)
+    head = fobj.read(16)
+    fobj.seek(0)
+    if head[:4] == b"%PDF":
+        return "application/pdf", ".pdf"
+    if head[:8] == _PNG_SIG:
+        return "image/png", ".png"
+    return audio_formats.sniff_stream(fobj, name)
+
+
+def _copy_stream(fin, fout) -> None:
+    """1 MiB 一塊地複製（測試會換掉它，模擬寫到一半）。"""
+    shutil.copyfileobj(fin, fout, 1 << 20)
+
+
+def _commit_stream(key: str, fobj, size: int, mime: str, ext: str, display_name: str,
+                   source_tool: str, user_label: str,
+                   origin: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    """預留容量 → 串流寫 `.part` → 原子換名 → 最後寫 meta。失敗整個項目目錄收掉。"""
+    with _reserve(key, ext, size):
+        d = _new_entry_dir(key)
+        part = d / f"file{ext}.part"
+        try:
+            fobj.seek(0)
+            with part.open("wb") as out:
+                _copy_stream(fobj, out)
+            os.replace(part, d / f"file{ext}")
+            return _write_meta(d, display_name, ext, mime, size, source_tool, user_label, origin)
+        except BaseException:
+            shutil.rmtree(d, ignore_errors=True)
+            raise
+
+
+_ORIGIN_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+
+def _clean_origin(origin: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    """來源資訊（例如匯入項目 ID、來源設備）：只收扁平、短小的欄位，寫進 meta.json。
+
+    這是給程式用的（重啟後拿 import item ID 對帳），不接受巢狀或大段內容 ——
+    meta.json 每次列清單都會讀。"""
+    if origin is None:
+        return None
+    if not isinstance(origin, dict) or len(origin) > 32:
+        raise ValueError("origin must be a dict with at most 32 fields")
+    out: dict[str, Any] = {}
+    for k, v in origin.items():
+        if not isinstance(k, str) or not _ORIGIN_KEY_RE.match(k):
+            raise ValueError(f"invalid origin field name: {k!r}")
+        if v is None or isinstance(v, (bool, int, float)):
+            out[k] = v
+        elif isinstance(v, str) and len(v) <= 512:
+            out[k] = v
+        else:
+            raise ValueError(f"origin[{k!r}] must be a number or a string of at most 512 chars")
+    return out
+
+
+def _verify_pdf(path: Path) -> None:
+    """PDF 要真的打得開、至少一頁。**用路徑開**（MuPDF 從磁碟讀，不整份載入）。
+
+    加密 PDF 照收：結構讀得到就好，內容由使用者之後用解密工具處理。"""
+    import fitz
     try:
-        fobj.seek(0)
-        with part.open("wb") as out:
-            shutil.copyfileobj(fobj, out, 1 << 20)
-        os.replace(part, d / f"file{ext}")
-    except BaseException:
-        shutil.rmtree(d, ignore_errors=True)
-        raise
-    return _write_meta(d, display_name, ext, mime, size, source_tool, user_label)
+        with fitz.open(str(path), filetype="pdf") as doc:
+            if doc.needs_pass:
+                return
+            pages = doc.page_count
+    except Exception:  # noqa: BLE001 — 打不開就是毀損，原因不必傳給使用者
+        raise UnsupportedType(PDF_BROKEN_MESSAGE) from None
+    if pages < 1:
+        raise UnsupportedType(PDF_BROKEN_MESSAGE)
+
+
+def _check_expect(ext: str, expect: Optional[set[str]]) -> None:
+    if expect is not None and ext not in {e.lower() for e in expect}:
+        raise UnsupportedType(UNEXPECTED_KIND_MESSAGE)
+
+
+def save_file_for_key(key: str, src, display_name: str, source_tool: str = "",
+                      user_label: str = "", *, move: bool = False, verify: bool = False,
+                      expect: Optional[set[str]] = None,
+                      origin: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    """從伺服器上的一個檔案存進工作區，**不整份讀進記憶體**（掃描 PDF、作業結果走這條）。
+
+    * PDF / PNG / 錄音檔只看檔頭認格式，串流寫入（或直接搬進來）；辦公文件與純文字要看整份
+      才認得出來，走 `save_bytes_for_key` 那條（受一般單檔上限約束，不會太大）。
+    * `move=True`：把檔案**搬**進工作區而不是複製。同一個檔案系統直接換名；跨磁碟
+      （`os.replace` 丟 EXDEV）退回串流複製、成功後刪掉來源。**失敗時來源要還在。**
+    * `verify=True`：PDF 要打得開、至少一頁（`_verify_pdf`）。預設不驗，既有上傳行為不變。
+    * `expect`：只收這些副檔名（例如 `{".pdf"}`）—— 設備回了一張 HTML 登入頁時，
+      不可以被當成純文字收進來。
+    * `origin`：來源資訊（例如 `import_item_id`），寫進 meta.json 供重啟後對帳。
+    """
+    if not is_enabled():
+        raise WorkspaceDisabled("工作區功能未啟用")
+    src = Path(src)
+    origin = _clean_origin(origin)
+    try:
+        size = src.stat().st_size
+    except OSError:
+        raise NotFound("檔案不存在") from None
+    if size == 0:
+        raise WorkspaceError("檔案為空")
+    with src.open("rb") as f:
+        kind = _sniff_streamable(f, display_name)
+    if kind is None:
+        lim = max_bytes_for(".pdf")
+        if lim and size > lim:
+            with src.open("rb") as f:
+                head = f.read(audio_formats.HEAD_BYTES)
+            if not _head_is_in_memory_kind(head):
+                raise UnsupportedType(UNSUPPORTED_MESSAGE)
+            raise QuotaExceeded(TOO_BIG_MESSAGE.replace("{0}", str(lim // 1024 // 1024)))
+        data = src.read_bytes()
+        kind = detect_kind(data, display_name)
+        if kind is None:
+            raise UnsupportedType(UNSUPPORTED_MESSAGE)
+        _check_expect(kind[1], expect)
+        meta = _store_bytes(key, data, kind, display_name, source_tool, user_label, origin)
+        if move:
+            src.unlink(missing_ok=True)
+        return meta
+    mime, ext = kind
+    _check_expect(ext, expect)
+    if verify and ext == ".pdf":
+        _verify_pdf(src)
+    if not move:
+        with src.open("rb") as f:
+            return _commit_stream(key, f, size, mime, ext, display_name, source_tool,
+                                  user_label, origin)
+    return _commit_move(key, src, size, mime, ext, display_name, source_tool, user_label, origin)
+
+
+def _commit_move(key: str, src: Path, size: int, mime: str, ext: str, display_name: str,
+                 source_tool: str, user_label: str,
+                 origin: Optional[dict[str, Any]]) -> dict[str, Any]:
+    with _reserve(key, ext, size):
+        d = _new_entry_dir(key)
+        part = d / f"file{ext}.part"
+        final = d / f"file{ext}"
+        moved = False
+        try:
+            try:
+                os.replace(src, part)
+                moved = True
+            except OSError as e:
+                if e.errno != errno.EXDEV:
+                    raise
+                # 跨磁碟：換名做不到，改成串流複製（來源等成功之後才刪）
+                with src.open("rb") as fin, part.open("wb") as fout:
+                    _copy_stream(fin, fout)
+            os.replace(part, final)
+            meta = _write_meta(d, display_name, ext, mime, size, source_tool, user_label, origin)
+        except BaseException:
+            keep = False
+            if moved:
+                # 搬進來之後才失敗：把來源放回原處（同一個檔案系統，換名不會失敗）
+                for cand in (final, part):
+                    if cand.exists():
+                        try:
+                            os.replace(cand, src)
+                        except OSError:
+                            # 放不回去就別把它跟目錄一起刪掉 —— 那是唯一的一份
+                            logger.warning("工作區搬檔失敗，來源檔留在 %s", cand)
+                            keep = True
+                        break
+            if not keep:
+                shutil.rmtree(d, ignore_errors=True)
+            raise
+    if not moved:
+        src.unlink(missing_ok=True)
+    return meta
+
+
+def save_file(request: Request, src, display_name: str, source_tool: str = "",
+              **kw) -> dict[str, Any]:
+    return save_file_for_key(user_key(request), src, display_name, source_tool,
+                             user_label=_user_label(request), **kw)
+
+
+def find_for_key(key: str, file_id: str) -> Optional[dict[str, Any]]:
+    """這個儲存鍵底下有沒有這個檔（檔案本體與 meta 都要在）。有就回 meta，沒有回 None。
+
+    給背景作業用（沒有 request）：例如工具自己已經存進工作區，自動保存要確認那個檔還在、
+    而且**是這個人的**，才直接沿用。"""
+    from .safe_paths import is_uuid_hex
+    if not _USER_KEY_RE.match(key or "") or not is_uuid_hex(file_id or ""):
+        return None
+    d = _root() / key / file_id
+    meta = _read_meta(d)
+    if not meta or not (d / f"file{meta.get('ext', '')}").exists():
+        return None
+    return meta
 
 
 def save_stream(request: Request, fobj, display_name: str,

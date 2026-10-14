@@ -793,7 +793,9 @@ def test_the_tool_is_no_longer_marked_beta(client, auth_off):
     from app.tools.official_doc import metadata
     assert metadata.beta is False
     home = client.get("/").text
-    assert 'class="tool-beta"' not in _tools_area(home)
+    # 只看公文撰擬自己那一格 —— 別的工具（例如試用中的事務機取件）可以合法標 Beta
+    for m in re.finditer(r'data-tool-id="official-doc"(.*?)</a>', _tools_area(home), re.S):
+        assert 'class="tool-beta"' not in m.group(1)
     page = client.get(f"{BASE}/").text
     h1 = re.search(r"<h1>(.*?)</h1>", page, re.S).group(1)
     assert "Beta" not in h1
@@ -806,11 +808,14 @@ def test_a_tool_marked_beta_still_shows_it_in_the_sidebar_and_on_its_card(client
     # 側欄與首頁的工具清單是啟動時從 `ToolMetadata.beta` 算好的，這裡直接標那一列
     item = next(t for t in main_mod._nav_tool_items if t["id"] == "official-doc")
     monkeypatch.setitem(item, "beta", True)
+    # 本來就標了 Beta 的工具（試用中）＋這裡標上的那一支；其餘都不可以有
+    beta_ids = {t["id"] for t in main_mod._nav_tool_items if t.get("beta")}
+    assert "official-doc" in beta_ids
     home = client.get("/").text
     for m in re.finditer(r'data-tool-id="([a-z0-9-]+)"(.*?)</a>', home, re.S):
         has = 'class="tool-beta"' in m.group(2)
-        assert has == (m.group(1) == "official-doc"), m.group(1)
-    assert _tools_area(home).count('class="tool-beta"') == 2, "側欄與首頁卡片各一個"
+        assert has == (m.group(1) in beta_ids), m.group(1)
+    assert _tools_area(home).count('class="tool-beta"') == 2 * len(beta_ids), "側欄與首頁卡片各一個"
 
 
 def test_rewrite_endpoint_keeps_the_item_number(client, rw_case, fake_llm):
@@ -819,6 +824,18 @@ def test_rewrite_endpoint_keeps_the_item_number(client, rw_case, fake_llm):
     assert r.status_code == 200, r.text
     assert r.json()["text"].startswith("一、擬購置"), r.json()["text"]
     assert "一、" not in _rewrite_paragraph_in(fake_llm.prompts[-1])
+
+
+def test_rewrite_endpoint_uses_the_line_marker_for_list_levels(client, rw_case, fake_llm):
+    """畫面送來選取所在那一行的項次（`context`）：要點用下一層（2026-10-14 使用者回報）。"""
+    fake_llm.rewrite_reply = {"lead": "採購需求如下：", "items": ["甲", "乙"]}
+    r = _rw(client, rw_case, kind="list", paragraph="甲乙。", context="一、")
+    assert r.status_code == 200, r.text
+    assert r.json()["text"].split("\n") == ["採購需求如下：", "（一）甲", "（二）乙"], r.json()["text"]
+    r = _rw(client, rw_case, kind="list", paragraph="甲乙。", context="主旨：")
+    assert r.status_code == 400 and "主旨不分項" in r.text
+    r = _rw(client, rw_case, kind="list", paragraph="甲乙。", context="一" * 41)
+    assert r.status_code == 400, "context 有長度上限"
 
 
 def test_rewrite_endpoint_refuses_several_items_at_once(client, rw_case, fake_llm):
@@ -1373,6 +1390,32 @@ _CASE_ID_JS = """fetch('/api/jobs', {headers:{Accept:'application/json'}})
   .then(function(j){ return j && j.meta ? j.meta.case_id : null; })"""
 
 
+def _list_rewrite_sends_the_item_level(send):
+    """說明「一、」底下選一段改成條列：畫面要把那一行的項次（「一、」）一起送出去，
+    伺服器才知道要點要用下一層的「（一）」（2026-10-14 使用者回報：變成跟外層同層的「一、二、三」）。
+    選取不含「一、」本身 —— 項次留在草稿裡，只當層次依據送出。"""
+    _eval(send, """(function(){window.__rw = [];
+      var of = window.fetch;
+      window.fetch = function(u, o){ if (String(u).indexOf('/rewrite') >= 0 && o && o.body) window.__rw.push(JSON.parse(o.body));
+        return of.apply(this, arguments); };
+      return 1;})()""")
+    sel = _eval(send, """(function(){var t=document.getElementById('odDraft'), v=t.value;
+      var m = /(^|\\n)(一、)([^\\n]+)/.exec(v); if (!m) return null;
+      var s = m.index + m[1].length + m[2].length, e = s + m[3].length;
+      t.focus(); t.setSelectionRange(s, e); t.dispatchEvent(new Event('select'));
+      return v.slice(s, e);})()""")
+    assert sel and not sel.startswith("一、"), _eval(send, "document.getElementById('odDraft').value.slice(0, 400)")
+    _eval(send, "document.querySelector('input[name=odRwKind][value=list]').click(), 1")
+    _eval(send, "document.getElementById('odRwGo').click(), 1")
+    assert _until(send, "window.__rw.length >= 1", 20), "按了改寫卻沒有送出請求"
+    sent = _eval(send, "window.__rw[window.__rw.length - 1]")
+    assert sent["kind"] == "list" and sent["context"] == "一、", sent
+    assert not sent["paragraph"].startswith("一、"), "項次不可以送去改寫"
+    assert _until(send, "!document.getElementById('odRwOut').hidden", 30)
+    _eval(send, "document.getElementById('odRwReject').click(), 1")
+    assert _until(send, "document.getElementById('odRwOut').hidden", 10)
+
+
 def _rewrite_and_revisions_flow(send):
     """逐段改寫（游標所在那一段 → 精簡 → 對照 → 採用 → 存成新的一版）與版本（兩個分頁同時存）。"""
     assert _until(send, "document.querySelectorAll('#odRevs li').length === 1 && "
@@ -1626,6 +1669,7 @@ def test_the_whole_flow_works_in_a_real_browser(live):
     assert sel and "業經" in sel, f"點了檢查結果卻沒有選取草稿裡那一段：{sel!r}"
 
     _rewrite_and_revisions_flow(send)
+    _list_rewrite_sends_the_item_level(send)
 
     # ---- 匯出：按鈕真的拿到檔案 ----
     _eval(send, """(function(){window.__dl = [];

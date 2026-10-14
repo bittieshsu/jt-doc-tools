@@ -129,13 +129,15 @@ def build_router(templates) -> APIRouter:
             from app.main import _job_access
             if not _job_access(job, request):
                 raise HTTPException(404, "找不到工作結果（可能已過期）")
-            data = job.result_path.read_bytes()
             if not disp_name:
                 disp_name = job.result_filename or job.result_path.name
             if not source_tool:
                 source_tool = job.tool_id
+            # 用路徑存（串流複製），**不 `read_bytes()`**：一份大的結果檔整份讀進記憶體
+            # 只為了複製一次。檔案 I/O 丟到執行緒，不卡事件迴圈。
             try:
-                meta = ws.save_bytes(request, data, disp_name, source_tool or "")
+                meta = await asyncio.to_thread(
+                    ws.save_file, request, job.result_path, disp_name, source_tool or "")
             except ws.WorkspaceError as e:
                 raise _err_to_http(e)
         elif file is not None:

@@ -262,6 +262,19 @@ def _user_external_subjects(conn, user_id: int) -> list[tuple[str, str]]:
         return []
 
 
+def subjects_for_user(user_id: int) -> list[tuple[str, str]]:
+    """這位使用者「是」哪些主體：使用者本身、所屬群組（含巢狀的上層）、組織單位。
+
+    權限解析用的就是這一份；其他要「指派給使用者 / 群組 / 組織單位」的功能（例如共用事務機的成員）
+    也用它判斷，不要另外寫一套 —— 巢狀群組、OU 的正規化都在這裡。"""
+    conn = auth_db.conn()
+    subjects: list[tuple[str, str]] = [("user", str(user_id))]
+    for gid in _user_groups_local(conn, user_id):
+        subjects.append(("group", gid))
+    subjects.extend(_user_external_subjects(conn, user_id))
+    return subjects
+
+
 def effective_tools(user_id: int) -> set[str] | str:
     """Return either the set of allowed tool ids, or the string ``"ALL"``
     if the user has the admin role (full access bypass)."""
@@ -273,10 +286,7 @@ def effective_tools(user_id: int) -> set[str] | str:
 
     conn = auth_db.conn()
     # Subjects this user "is": user itself + local groups + (later) AD groups/OUs
-    subjects: list[tuple[str, str]] = [("user", str(user_id))]
-    for gid in _user_groups_local(conn, user_id):
-        subjects.append(("group", gid))
-    subjects.extend(_user_external_subjects(conn, user_id))
+    subjects = subjects_for_user(user_id)
 
     # All roles assigned to any of these subjects
     role_ids: set[str] = set()

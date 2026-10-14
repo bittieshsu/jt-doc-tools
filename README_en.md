@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.16.82
+# Jason Tools Document Toolbox v1.16.87
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -25,7 +25,7 @@
 > `jtdt update` then works as usual. **Unaffected**: tarball installs, the Windows installer,
 > and anything installed after 2026-09-13. Fixed from v1.15.43 onwards.
 
-> An integrated PDF / Office document platform. 51 tools cover **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan stitching**, **de-identification**, **word counts**, **annotation handling**, **diffing**, **sentence translation**, **list processing**, **e-invoice processing**, **VAT lookup**, **a page editor**, **encryption / decryption** and more.
+> An integrated PDF / Office document platform. 52 tools cover **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan stitching**, **de-identification**, **word counts**, **annotation handling**, **diffing**, **sentence translation**, **list processing**, **e-invoice processing**, **VAT lookup**, **a page editor**, **encryption / decryption** and more.
 >
 > Enterprise features: **local / LDAP / AD multi-realm authentication**, **single sign-on** (OIDC + SAML, ready for M365 / Google / Keycloak), **RBAC roles and permissions**, **audit log**, **SIEM forwarding** (syslog / CEF / GELF), **font management**, **user workspace**, **background jobs with completion notices** and a **REST API**.
 >
@@ -95,7 +95,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 
 ---
 
-## The 51 tools at a glance
+## The 52 tools at a glance
 
 ### Forms and stamps
 - **Auto-fill forms**; field detection plus template values
@@ -126,6 +126,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 - **e-Invoice processing**: scan a Taiwan e-invoice QR code for the invoice number, date, amount and tax ID, filling in the seller, industry and accounting category (rules plus optional LLM); expense and period checks included, exporting.xlsx /.ods /.csv /.json /.xml /.txt /.md (with a configurable title)
 - **Transit receipts** — drop in a batch of Taiwan Railway purchase certificates, THSR electronic ticket certificates or Uber trip receipts; date, transport, route and fare are collected into a table with configurable columns, exportable as .xlsx / .ods / .csv / .json / .xml / .txt / .md for expense claims
 - **Company ID lookup**: look up an 8-digit tax ID, or search company, agency and school names, addresses and industries with highlighted matches; category filters, batch lookup and CSV export
+- **Fetch from MFP** (Beta) — add a multifunction printer (IP or host name) to run a connection test and identify the model, with step-by-step DNS / TCP / TLS certificate / HTTP diagnostics and a downloadable diagnostic report; MFPs that support eSCL (AirPrint / Mopria scanning) can scan straight into the workspace. Administrators can create shared MFPs and choose their members; each device serves one person at a time and others queue automatically. Internal network only, no credentials sent. Signing in to a mailbox and fetching will open once tested on real devices (FUJIFILM Apeos / ApeosPort planned)
 
 ### Conversion [needs OxOffice/LibreOffice]
 - **Office to PDF**; batch convert office documents to PDF

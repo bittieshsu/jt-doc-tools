@@ -600,6 +600,15 @@ def _read_sign(root, notes: list) -> tuple[list[str], dict, dict]:
     dropped = [label for tag, label in _SIGN_UNMAPPED if _has_content(root.find(tag))]
     if dropped:
         notes.append({"code": "unmapped", "args": ["、".join(dropped)]})
+    # 文號（公文系統取號後才有；空的就是空的，不猜）：年度＋流水號，有支號接「-支號」
+    doc_no = ""
+    num = root.find("文號")
+    if num is not None:
+        doc_no = _read_text(num.find("文字"))
+        if not doc_no:
+            year, serial, branch = (_read_text(num.find(t)) for t in ("年度", "流水號", "支號"))
+            if year or serial:
+                doc_no = f"{year}{serial}{('-' + branch) if branch else ''}"
     lines = [f"簽　　於{unit}" if unit else "簽　　於〔待補：承辦單位〕"]
     if date:
         lines.append(date)
@@ -608,7 +617,8 @@ def _read_sign(root, notes: list) -> tuple[list[str], dict, dict]:
     if titles:
         lines.append("敬陳")
         lines += titles
-    fields = {"unit": unit, "addressee": "、".join(titles), "date_line": date, "subject": subject}
+    fields = {"unit": unit, "addressee": "、".join(titles), "date_line": date, "subject": subject,
+              "doc_no": doc_no}
     return lines, fields, {}
 
 

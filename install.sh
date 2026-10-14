@@ -172,7 +172,9 @@ ask_bind_host() {
     # --no-prompt → 直接用預設
     [ "$NO_PROMPT" -eq 1 ] && { BIND_HOST="$BIND_HOST_DEFAULT"; return 0; }
     # 沒 TTY（curl | bash 走這條）→ 預設並提示
-    if [ ! -r /dev/tty ]; then
+    # 要真的打開一次才算數：`[ -r /dev/tty ]` 只看權限位元（永遠可讀），從 SSH 非互動指令、
+    # 排程或自動化工具跑時沒有控制終端，下面的 `read </dev/tty` 打不開，set -e 會中止整個安裝。
+    if ! { : </dev/tty; } 2>/dev/null; then
         BIND_HOST="$BIND_HOST_DEFAULT"
         warn "非互動模式，預設只綁 ${BIND_HOST}（僅本機）。要從區網連請改用："
         warn "  curl ... | sudo JTDT_HOST=0.0.0.0 bash"

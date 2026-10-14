@@ -1,0 +1,918 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}{% if mode == 'shared' %}{{ tr('共用事務機') }}{% else %}{{ tr('事務機取件') }}{% endif %} · {{ app_name }}{% endblock %}
+{% block head %}
+<style nonce="{{ request.state.csp_nonce }}">
+.mf-beta-note { display:flex; gap:10px; align-items:flex-start; padding:10px 14px; margin:0 0 16px;
+  background:#fffbeb; border:1px solid #fde68a; border-radius:8px; color:#92400e; font-size:13.5px; line-height:1.6; }
+.mf-beta-note .ic { flex:0 0 auto; margin-top:3px; }
+.mf-add { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) auto; gap:10px; align-items:end; }
+.mf-add label { display:block; font-size:13px; color:#475569; margin-bottom:4px; }
+.mf-add input, .mf-add select { width:100%; box-sizing:border-box; padding:8px 10px; font-size:14px;
+  border:1px solid #cbd5e1; border-radius:6px; background:#fff; }
+/* 連線方式用本站的下拉（jt-select），跟旁邊的輸入框、「連線測試」按鈕一樣高（高度明定：行高跟著字型走，
+   英文介面的下拉會比中文矮 4px，瀏覽器實量） */
+.mf-add .jt-select-wrap { display:block; width:100%; }
+.mf-add .jt-select-trigger { padding:0 10px; font-size:14px; border-color:#cbd5e1; border-radius:6px; }
+.mf-add input, .mf-add .jt-select-trigger, .mf-add .btn { height:36px; box-sizing:border-box; }
+.mf-hint { font-size:12.5px; color:#64748b; margin-top:8px; line-height:1.6; }
+.mf-spin { width:14px; height:14px; border:2px solid rgba(255,255,255,.5); border-top-color:#fff;
+  border-radius:50%; display:inline-block; animation:mf-spin .8s linear infinite; }
+@keyframes mf-spin { to { transform:rotate(360deg); } }
+.mf-err { margin-top:10px; padding:8px 12px; border-radius:6px; background:#fef2f2; border:1px solid #fecaca;
+  color:#991b1b; font-size:13.5px; }
+.mf-err pre { margin:6px 0 0; white-space:pre-wrap; word-break:break-word; font-size:12px; color:#7f1d1d; }
+.mf-summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-bottom:12px; }
+.mf-kv { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; }
+.mf-kv .k { font-size:12px; color:#64748b; }
+.mf-kv .v { font-size:14px; color:#0f172a; margin-top:2px; word-break:break-word; }
+/* 相容性：膠囊裡只放短狀態，說明另外一行（整句塞進膠囊會折成兩行、變成一顆橢圓） */
+.mf-status { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12.5px; font-weight:600;
+  white-space:nowrap; }
+.mf-status-hint { margin-top:4px; font-size:12.5px; color:#64748b; line-height:1.5; }
+.mf-status.good { background:#dcfce7; color:#166534; }
+.mf-status.warn { background:#fef3c7; color:#92400e; }
+.mf-status.bad { background:#fee2e2; color:#991b1b; }
+.mf-status.info { background:#e0e7ff; color:#3730a3; }
+.mf-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0 4px; }
+.mf-actions input { padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; min-width:220px; }
+.mf-evidence { margin:6px 0 0; padding-left:18px; font-size:13px; color:#334155; }
+.mf-evidence code { font-size:12px; }
+.mf-steps { margin-top:12px; }
+.mf-attempt { border:1px solid #e2e8f0; border-radius:8px; margin-bottom:10px; overflow:hidden; }
+.mf-attempt > h3 { margin:0; padding:8px 12px; font-size:14px; background:#f1f5f9; }
+.mf-step { border-top:1px solid #f1f5f9; padding:8px 12px; }
+.mf-step-head { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; font-size:13.5px; }
+.mf-step-head .ok { color:#16a34a; font-weight:600; }
+.mf-step-head .fail { color:#dc2626; font-weight:600; }
+.mf-step-head .neutral { color:#64748b; font-weight:600; }
+.mf-step-head .ms { color:#94a3b8; font-size:12px; }
+.mf-step-msg { flex:1 1 280px; }
+.mf-detail { margin:6px 0 0; }
+.mf-detail summary { cursor:pointer; font-size:12.5px; color:#475569; }
+.mf-table { border-collapse:collapse; width:100%; margin-top:6px; font-size:12.5px; table-layout:fixed; }
+.mf-table th, .mf-table td { border:1px solid #e2e8f0; padding:4px 8px; text-align:left; vertical-align:top;
+  word-break:break-word; }
+.mf-table th { width:30%; background:#f8fafc; font-weight:500; color:#475569; }
+.mf-pre { white-space:pre-wrap; word-break:break-word; background:#f8fafc; border:1px solid #e2e8f0;
+  border-radius:6px; padding:6px 8px; font-size:12px; margin:6px 0 0; max-height:220px; overflow:auto; }
+.mf-list { width:100%; border-collapse:collapse; font-size:13.5px; }
+.mf-list th, .mf-list td { border-bottom:1px solid #e2e8f0; padding:8px 6px; text-align:left; vertical-align:middle; }
+.mf-list th { font-size:12.5px; color:#64748b; font-weight:500; white-space:nowrap; }
+.mf-list .mf-row-actions { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
+.mf-list .mf-row-actions .btn { white-space:nowrap; }
+.mf-del { color:#dc2626; }
+.mf-del:hover { background:#fee2e2; border-color:#fecaca; }
+.mf-detail-head { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; justify-content:space-between;
+  margin:18px 0 10px; }
+.mf-detail-head h3 { margin:0; }
+.mf-list td:first-child { min-width:6em; }
+.mf-empty { color:#64748b; font-size:13.5px; padding:6px 0; }
+.mf-tag { display:inline-block; margin-left:6px; padding:0 7px; border-radius:999px; font-size:11.5px; font-weight:600;
+  vertical-align:1px; white-space:nowrap; }
+.mf-tag.shared { background:#eef2ff; color:#4338ca; }
+.mf-tag.busy { background:#fef3c7; color:#92400e; }
+.mf-sub { display:block; margin-top:2px; font-size:12px; color:#64748b; }
+/* 掃描 */
+.mf-scan-title { margin:0; }
+.mf-scan-opts { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px 12px; margin:6px 0 10px; }
+.mf-scan-opts label { display:block; font-size:13px; color:#475569; margin-bottom:4px; }
+.mf-scan-opts .jt-select-wrap { display:block; width:100%; }
+.mf-scan-opts input { width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; }
+.mf-scan-note { display:flex; gap:8px; align-items:flex-start; padding:8px 12px; margin:0 0 10px; border-radius:8px;
+  background:#f0f9ff; border:1px solid #bae6fd; color:#075985; font-size:13px; line-height:1.6; }
+.mf-scan-note .ic { flex:0 0 auto; margin-top:3px; }
+.mf-scan-state { margin-top:10px; padding:10px 12px; border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0;
+  font-size:13.5px; }
+.mf-scan-state.done { background:#f0fdf4; border-color:#bbf7d0; }
+.mf-scan-state.error { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+.mf-scan-state .mf-actions { margin:8px 0 0; }
+/* 成員 */
+.mf-members { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin:8px 0; }
+.mf-mlist { border:1px solid #e2e8f0; border-radius:8px; background:#fff; overflow:hidden; }
+.mf-mlist-head { display:flex; gap:8px; align-items:center; justify-content:space-between; padding:6px 8px;
+  background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:13px; font-weight:600; color:#334155; }
+.mf-mlist-head input { flex:1 1 auto; min-width:0; max-width:60%; padding:4px 8px; border:1px solid #cbd5e1;
+  border-radius:6px; font-size:12.5px; font-weight:400; }
+.mf-mlist-body { max-height:260px; overflow:auto; padding:4px; }
+.mf-mlist-body label { display:flex; gap:8px; align-items:flex-start; padding:4px 6px; border-radius:4px; font-size:13px;
+  cursor:pointer; }
+.mf-mlist-body label:hover { background:#f3f4f6; }
+.mf-mlist-body label:has(input:checked) { background:#eef2ff; }
+.mf-mlist-body small { color:#64748b; }
+.mf-warn { margin-top:8px; padding:8px 12px; border-radius:6px; background:#fffbeb; border:1px solid #fde68a;
+  color:#92400e; font-size:13px; }
+@media (max-width: 720px) {
+  .mf-add { grid-template-columns:1fr; }
+  .mf-list thead { display:none; }
+  .mf-list tr { display:block; border-bottom:1px solid #e2e8f0; padding:6px 0; }
+  .mf-list td { display:block; border:0; padding:3px 0; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% if mode == 'shared' %}
+<h1>{{ icon('printer', size=22) }} {{ tr('共用事務機') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h1>
+<p class="muted">{{ tr('在這裡建立的事務機，加進來的成員（使用者或群組）不用自己新增，就會出現在他的「事務機取件」頁。成員可以重新測試、看詳細、掃描，不能改名或移除。') }}</p>
+<div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('成員還是要有「事務機取件」的工具權限才看得到這支工具（角色照舊）。同一台事務機一次只服務一個人，其他人自動排隊。') }}</span></div>
+{% else %}
+<h1>{{ icon('printer', size=22) }} {{ tr('事務機取件') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h1>
+<p class="muted">{{ tr('查看事務機個人資料夾中的掃描文件，匯入工作區後接續 OCR、轉檔與 AI 處理。') }}</p>
+
+<div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('試用中：目前可以新增事務機、做連線測試與型號辨識，也可以從支援 eSCL 的事務機掃描，直接存進工作區。登入信箱、列出文件與取件，要等實機驗證通過後才開放。') }}</span></div>
+{% endif %}
+
+<div class="panel">
+  <h2>{% if mode == 'shared' %}{{ tr('新增共用事務機') }}{% else %}{{ tr('新增事務機') }}{% endif %}</h2>
+  <form id="mfAddForm" class="mf-add" autocomplete="off">
+    <div>
+      <label for="mfHost">{{ tr('事務機的 IP 或主機名稱') }}</label>
+      <input id="mfHost" name="host" required maxlength="253" spellcheck="false" inputmode="url"
+             placeholder="{{ tr('IP 位址，或主機名稱（例如 mfp-3f.example.com）') }}">
+    </div>
+    <div>
+      <label for="mfTarget">{{ tr('連線方式') }}</label>
+      <select id="mfTarget" class="jt-select">
+        <option value="auto">{{ tr('自動（HTTPS 443 與 HTTP 80 都測）') }}</option>
+        <option value="https:443">HTTPS 443</option>
+        <option value="https:8443">HTTPS 8443</option>
+        <option value="http:80">HTTP 80</option>
+        <option value="http:8080">HTTP 8080</option>
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary" id="mfTestBtn">{{ icon('search', size=14) }} <span>{{ tr('連線測試') }}</span></button>
+    </div>
+  </form>
+  <p class="mf-hint">{{ tr('連線測試只會讀取設備的網頁首頁與掃描介面的能力表，不會傳送任何帳號密碼；只能連到內部網路的位址。') }}</p>
+  <div id="mfAddError" class="mf-err" hidden></div>
+</div>
+
+<div class="panel" id="mfResultPanel" hidden>
+  <h2>{{ tr('測試結果') }}</h2>
+  <div id="mfResult"></div>
+  <div class="mf-actions" id="mfSaveBar">
+    <input id="mfSaveName" maxlength="64" placeholder="{{ tr('名稱（選填），例如三樓行政區') }}">
+    <button type="button" class="btn btn-primary" id="mfSaveBtn">{{ icon('save', size=14) }} <span>{% if mode == 'shared' %}{{ tr('儲存為共用事務機') }}{% else %}{{ tr('儲存這台事務機') }}{% endif %}</span></button>
+    <button type="button" class="btn btn-secondary" id="mfDownloadBtn">{{ icon('download', size=14) }} <span>{{ tr('下載診斷報告') }}</span></button>
+  </div>
+  <div id="mfSaveMsg" class="mf-hint"></div>
+</div>
+
+<div class="panel">
+  <h2>{% if mode == 'shared' %}{{ tr('共用事務機') }}{% else %}{{ tr('我的事務機') }}{% endif %}</h2>
+  <div id="mfListWrap"><p class="mf-empty">{{ tr('載入中…') }}</p></div>
+  <div id="mfListError" class="mf-err" hidden></div>
+  <div id="mfDetailPanel" hidden>
+    <div class="mf-detail-head">
+      <h3 id="mfDetailTitle"></h3>
+      <button type="button" class="btn btn-secondary btn-small" id="mfDetailClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
+    </div>
+    <div id="mfDetail"></div>
+  </div>
+  {% if mode == 'shared' %}
+  <div id="mfMembersPanel" hidden>
+    <div class="mf-detail-head">
+      <h3 id="mfMembersTitle"></h3>
+      <button type="button" class="btn btn-secondary btn-small" id="mfMembersClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
+    </div>
+    <p class="mf-hint">{{ tr('勾選可以使用這台事務機的使用者與群組；群組的成員（含子群組）都看得到。') }}</p>
+    <div class="mf-members">
+      <div class="mf-mlist">
+        <div class="mf-mlist-head"><span>{{ tr('使用者') }} <span id="mfMUserCount"></span></span>
+          <input type="search" id="mfMUserSearch" placeholder="{{ tr('搜尋帳號或名稱…') }}" aria-label="{{ tr('搜尋使用者') }}"></div>
+        <div class="mf-mlist-body" id="mfMUsers"></div>
+      </div>
+      <div class="mf-mlist">
+        <div class="mf-mlist-head"><span>{{ tr('群組') }} <span id="mfMGroupCount"></span></span>
+          <input type="search" id="mfMGroupSearch" placeholder="{{ tr('搜尋群組…') }}" aria-label="{{ tr('搜尋群組') }}"></div>
+        <div class="mf-mlist-body" id="mfMGroups"></div>
+      </div>
+    </div>
+    <div class="mf-actions">
+      <button type="button" class="btn btn-primary" id="mfMembersSave">{{ icon('save', size=14) }} <span>{{ tr('儲存成員') }}</span></button>
+      <span class="mf-hint" id="mfMembersMsg"></span>
+    </div>
+    <div class="mf-warn" id="mfMembersWarn" hidden></div>
+  </div>
+  {% endif %}
+  {# 清單每一列的按鈕是 JS 畫的：圖示從這裡複製，不在 JS 裡手刻 SVG #}
+  <template id="mfIcons">
+    <span data-ic="refresh">{{ icon('refresh', size=14) }}</span>
+    <span data-ic="eye">{{ icon('eye', size=14) }}</span>
+    <span data-ic="close">{{ icon('close', size=14) }}</span>
+    <span data-ic="download">{{ icon('download', size=14) }}</span>
+    <span data-ic="edit">{{ icon('edit', size=14) }}</span>
+    <span data-ic="trash">{{ icon('trash', size=14) }}</span>
+    <span data-ic="printer">{{ icon('printer', size=14) }}</span>
+    <span data-ic="user">{{ icon('user', size=14) }}</span>
+    <span data-ic="archive">{{ icon('archive', size=14) }}</span>
+  </template>
+</div>
+
+{% if mode != 'shared' %}
+<div class="panel" id="mfScanPanel" hidden>
+  <div class="mf-detail-head">
+    <h2 id="mfScanTitle" class="mf-scan-title"></h2>
+    <button type="button" class="btn btn-secondary btn-small" id="mfScanClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
+  </div>
+  <div class="mf-scan-note">{{ icon('info', size=16) }}<span>{{ tr('請先把文件放在事務機的平台玻璃上（或自動送紙器裡），再按「開始掃描」。掃好的 PDF 會存進你的工作區。同一台事務機一次只服務一個人，其他人會自動排隊。') }}</span></div>
+  <div class="mf-scan-opts">
+    <div><label for="mfScanSource">{{ tr('來源') }}</label><select id="mfScanSource" class="jt-select"></select></div>
+    <div><label for="mfScanColor">{{ tr('色彩') }}</label><select id="mfScanColor" class="jt-select"></select></div>
+    <div><label for="mfScanRes">{{ tr('解析度') }}</label><select id="mfScanRes" class="jt-select"></select></div>
+    <div><label for="mfScanPaper">{{ tr('紙張') }}</label><select id="mfScanPaper" class="jt-select"></select></div>
+    <div><label for="mfScanName">{{ tr('檔名（選填）') }}</label><input id="mfScanName" maxlength="100" placeholder="{{ tr('例如 合約掃描') }}"></div>
+  </div>
+  <div class="mf-actions">
+    <button type="button" class="btn btn-primary" id="mfScanStart">{{ icon('printer', size=14) }} <span>{{ tr('開始掃描') }}</span></button>
+  </div>
+  <div id="mfScanError" class="mf-err" hidden></div>
+  <div id="mfScanState" class="mf-scan-state" hidden></div>
+</div>
+
+<div class="panel" id="mfScansPanel" hidden>
+  <h2>{{ tr('最近的掃描') }}</h2>
+  <div id="mfScansWrap"></div>
+</div>
+{% endif %}
+
+<script src="/static/js/custom_select.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  'use strict';
+  const API = '/tools/mfp-fetch/api';
+  // 同一份畫面兩種用法：「事務機取件」（mine）與管理頁的「共用事務機」（shared）
+  const SHARED = {{ 'true' if mode == 'shared' else 'false' }};
+  const LIST_PATH = SHARED ? '/shared' : '/connections';
+  function itemPath(id) { return (SHARED ? '/shared/' : '/connections/') + id; }
+  // 下拉換成本站樣式：現在就換，不要等 DOMContentLoaded —— 後面幾支 script 還在載的時候，
+  // 清單已經畫出來了，原生下拉會先閃一下（瀏覽器實量：英文介面到這裡還是 loading）
+  if (window.enhanceJtSelects) window.enhanceJtSelects(document.getElementById('mfAddForm'));
+  let lastDetection = null;   // {token, report}
+
+  // ---- 文字（伺服器回的固定訊息另外用 tr() 翻）
+  const STEP_NAMES = {
+    dns: tr('位址檢查'), tcp: tr('TCP 連線'), tls: 'TLS', http: tr('HTTP 請求'),
+    follow: tr('跟隨轉址'), budget: tr('時間預算'), escl: tr('掃描介面（eSCL）'),
+  };
+  const STATUS_CLASS = {
+    supported: 'good', first_batch_unverified: 'info', same_vendor_unverified: 'warn',
+    unsupported_vendor: 'bad', login_required: 'warn', unknown: 'warn', unreachable: 'bad',
+  };
+  const EVIDENCE_WHAT = { vendor: tr('廠牌'), model: tr('型號'), ui: tr('網頁介面名稱'), firmware: tr('韌體（可能）') };
+  const EVIDENCE_FIELD = { title: tr('頁面標題'), text: tr('頁面文字'), header: tr('回應標頭') };
+  const KEY_LABELS = {
+    ip: tr('位址'), port: tr('連接埠'), host: tr('主機'), path: tr('路徑'), status: tr('狀態碼'),
+    reason: tr('原因'), http_version: tr('HTTP 版本'), bytes: tr('位元組'), title: tr('頁面標題'),
+    error: tr('錯誤'), errno: tr('錯誤代碼'), from: tr('來源'), to: tr('目的地'),
+    refresh: tr('自動轉址'), tls_verified: tr('TLS 已驗證'), password_inputs: tr('密碼欄位數'),
+    version: tr('TLS 版本'), cipher: tr('加密套件'), verified: tr('憑證已驗證'),
+    verify_code: tr('驗證錯誤代碼'), verify_message: tr('驗證失敗原因'),
+    subject: tr('主體'), issuer: tr('簽發者'), not_before: tr('生效日'), not_after: tr('到期日'),
+    self_signed: tr('自簽憑證'), expired: tr('已過期'), not_yet_valid: tr('尚未生效'),
+    san: tr('主體別名'), sha256: tr('SHA-256 指紋'), public_key: tr('公開金鑰'),
+    unverified_error: tr('未驗證連線的錯誤'), allowed: tr('允許的連接埠'), input: tr('輸入'),
+    code: tr('代碼'),
+  };
+
+  // 報告裡的遮蔽標記（「［已遮蔽，長度 N］」）在畫面上照介面語言顯示；報告檔本身不改
+  const MASK_RE = /［已遮蔽，長度 \d+］/g;
+  function loc(v) { return String(v).replace(MASK_RE, m => tr(m)); }
+  function txt(v) { return document.createTextNode(loc(v)); }
+  // 標點跟著介面語言：中日文用全形，其他用半形（英文介面不可以出現「：」「（）」）
+  const FW = /^(zh|ja)/i.test(document.documentElement.lang || '');
+  const P = FW ? { colon: '：', lp: '（', rp: '）', sep: '、' } : { colon: ': ', lp: ' (', rp: ')', sep: ', ' };
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = loc(text);
+    return e;
+  }
+  function yesNo(v) { return v === true ? tr('是') : v === false ? tr('否') : (v === null || v === undefined ? '—' : String(v)); }
+  function fmtTime(ts) {
+    if (!ts) return tr('尚未測試');
+    try { return new Date(ts * 1000).toLocaleString(); } catch (e) { return String(ts); }
+  }
+  function busy(btn, on, label) {
+    if (on) {
+      btn.dataset.origHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.replaceChildren(el('span', 'mf-spin'), txt(' ' + label));
+    } else if (btn.dataset.origHtml !== undefined) {
+      btn.disabled = false;
+      btn.innerHTML = btn.dataset.origHtml;
+    }
+  }
+  async function api(method, path, body) {
+    const opt = { method, headers: { 'Accept': 'application/json' } };
+    if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+    let r, j = null;
+    try { r = await fetch(API + path, opt); } catch (e) { return { ok: false, message: tr('連不上伺服器') }; }
+    try { j = await r.json(); } catch (e) { j = null; }
+    if (!r.ok || !j || j.ok === false) {
+      if (j && (j.message || j.detail)) return Object.assign({ ok: false }, j, { message: j.message || j.detail });
+      return { ok: false, message: await window.friendlyServerError(r, tr('發生錯誤')) };
+    }
+    return j;
+  }
+  function showError(box, res) {
+    box.replaceChildren();
+    box.append(el('div', null, res.message ? tr(res.message) : tr('發生錯誤')));
+    const d = res.detail;
+    if (d && typeof d === 'object' && Object.keys(d).length) {
+      // 整理過再顯示（不倒原始 JSON —— 裡面的訊息是中文原文，英日文介面翻不到）
+      const rest = Object.assign({}, d);
+      delete rest.addresses;
+      if (Object.keys(rest).length) box.append(kvTable(rest));
+      if (Array.isArray(d.addresses) && d.addresses.length) {
+        const t = el('table', 'mf-table');
+        for (const a of d.addresses) {
+          const r = el('tr');
+          r.append(el('th', null, a.ip), el('td', null, tr(a.message || a.code || '')));
+          t.append(r);
+        }
+        box.append(t);
+      }
+    }
+    box.hidden = false;
+  }
+
+  // ---- 細節表格（值一律當文字顯示，不當 HTML）
+  function kvTable(obj) {
+    const t = el('table', 'mf-table');
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length)) continue;
+      if (['headers', 'forms', 'frames', 'certificate', 'reason', 'text', 'addresses'].includes(k)) continue;
+      const tr_ = el('tr');
+      tr_.append(el('th', null, KEY_LABELS[k] || k));
+      let val = v;
+      if (typeof v === 'boolean') val = yesNo(v);
+      else if (Array.isArray(v)) val = v.join(', ');
+      else if (typeof v === 'object') val = JSON.stringify(v);
+      tr_.append(el('td', null, val));
+      t.append(tr_);
+    }
+    return t;
+  }
+  function details(summaryText, nodes) {
+    const d = el('details', 'mf-detail');
+    d.append(el('summary', null, summaryText));
+    for (const n of nodes) if (n) d.append(n);
+    return d;
+  }
+  function stepNode(s) {
+    const box = el('div', 'mf-step');
+    const head = el('div', 'mf-step-head');
+    const mark = s.ok === true ? el('span', 'ok', '✓') : s.ok === false ? el('span', 'fail', '✗') : el('span', 'neutral', '•');
+    head.append(mark, el('strong', null, STEP_NAMES[s.step] || s.step));
+    head.append(el('span', 'mf-step-msg', tr(s.message || s.code || '')));
+    if (typeof s.ms === 'number') head.append(el('span', 'ms', s.ms + ' ms'));
+    box.append(head);
+    const d = s.detail || {};
+    const parts = [];
+    const base = kvTable(d);
+    if (base.rows.length) parts.push(base);
+    if (d.addresses) {
+      const t = el('table', 'mf-table');
+      for (const a of d.addresses) { const r = el('tr'); r.append(el('th', null, a.ip), el('td', null, tr(a.message || a.code))); t.append(r); }
+      parts.push(t);
+    }
+    if (d.reason && typeof d.reason === 'object') parts.push(kvTable(d.reason));
+    else if (d.reason) parts.push(kvTable({ reason: d.reason }));
+    if (d.certificate && Object.keys(d.certificate).length) {
+      parts.push(el('div', 'mf-hint', tr('憑證')));
+      parts.push(kvTable(d.certificate));
+    }
+    if (d.headers && d.headers.length) {
+      const t = el('table', 'mf-table');
+      for (const [k, v] of d.headers) { const r = el('tr'); r.append(el('th', null, k), el('td', null, v)); t.append(r); }
+      parts.push(details(tr('回應標頭') + P.lp + d.headers.length + P.rp, [t]));
+    }
+    if (d.text) parts.push(details(tr('頁面文字摘要（已去除標籤）'), [el('pre', 'mf-pre', d.text)]));
+    if (d.forms && d.forms.length) {
+      const nodes = d.forms.map(f => el('pre', 'mf-pre',
+        (f.method || '').toUpperCase() + ' ' + (f.action || '') + '\n' +
+        (f.inputs || []).map(i => '  ' + (i.name || P.lp.trim() + tr('未命名') + P.rp) + ' : ' + i.type).join('\n')));
+      parts.push(details(tr('表單欄位（只列名稱與型別，不含值）') + P.lp + d.forms.length + P.rp, nodes));
+    }
+    if (d.frames && d.frames.length) parts.push(details(tr('框架網址'), [el('pre', 'mf-pre', d.frames.join('\n'))]));
+    if (s.note) parts.push(el('div', 'mf-hint', tr(s.note_message || s.note)));
+    if (parts.length) box.append(details(tr('詳細資料'), parts));
+    return box;
+  }
+
+  function renderReport(container, rep) {
+    container.replaceChildren();
+    const det = rep.detection || {};
+    const sum = rep.summary || {};
+    const grid = el('div', 'mf-summary');
+    function kv(k, vNode) { const b = el('div', 'mf-kv'); b.append(el('div', 'k', k)); const v = el('div', 'v'); v.append(vNode); b.append(v); grid.append(b); }
+    kv(tr('連線'), txt(sum.reachable ? tr('可連線') + P.lp + (sum.reachable_on || []).join(P.sep) + P.rp : tr('連不上')));
+    let tlsText = tr('沒有使用 HTTPS');
+    if (sum.tls) tlsText = sum.tls.verified ? tr('TLS 憑證已驗證') : tr('TLS 憑證未通過驗證');
+    kv('TLS', txt(tlsText));
+    kv(tr('廠牌'), txt(det.vendor || tr('未辨識')));
+    // 型號辨識名單以外的廠牌（HP、Epson…）：eSCL 能力表自己報的型號
+    kv(tr('型號'), txt([det.family, det.model].filter(Boolean).join(' ') || (rep.escl && rep.escl.model) || tr('未辨識')));
+    kv(tr('韌體'), txt(det.firmware || '—'));
+    kv(tr('相容性'), statusChip(det.status));
+    const scanSrcs = rep.escl ? Object.keys(rep.escl.sources || {}) : [];
+    kv(tr('從本站掃描'), txt(scanSrcs.length
+      ? tr('支援') + P.lp + scanSrcs.map(k => SOURCE_NAMES[k] || k).join(P.sep) + P.rp : tr('不支援')));
+    container.append(grid);
+    if (det.evidence && det.evidence.length) {
+      container.append(el('div', 'mf-hint', tr('辨識依據')));
+      const ul = el('ul', 'mf-evidence');
+      for (const e of det.evidence) {
+        const li = el('li');
+        li.append(txt((EVIDENCE_WHAT[e.what] || e.what) + P.colon + e.page + ' ' +
+          (EVIDENCE_FIELD[e.field] || e.field) + (e.header ? P.lp + e.header + P.rp : '') + ' — '));
+        li.append(el('code', null, e.excerpt));
+        ul.append(li);
+      }
+      container.append(ul);
+    }
+    const stepsBox = el('div', 'mf-steps');
+    stepsBox.append(el('h3', null, tr('逐步診斷')));
+    const pre = el('div', 'mf-attempt');
+    pre.append(el('h3', null, tr('位址檢查')));
+    for (const s of rep.steps || []) pre.append(stepNode(s));
+    stepsBox.append(pre);
+    for (const a of rep.attempts || []) {
+      const box = el('div', 'mf-attempt');
+      box.append(el('h3', null, (a.scheme || '').toUpperCase() + ' ' + a.port));
+      for (const s of a.steps || []) box.append(stepNode(s));
+      stepsBox.append(box);
+    }
+    container.append(stepsBox);
+  }
+
+  function downloadJson(obj, name) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    const a = el('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+
+  // ---- 新增 / 連線測試
+  const form = document.getElementById('mfAddForm');
+  const testBtn = document.getElementById('mfTestBtn');
+  const addErr = document.getElementById('mfAddError');
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    addErr.hidden = true;
+    const host = document.getElementById('mfHost').value.trim();
+    const sel = document.getElementById('mfTarget').value;
+    const body = { host };
+    if (sel !== 'auto') { const [sc, pt] = sel.split(':'); body.scheme = sc; body.port = Number(pt); }
+    busy(testBtn, true, tr('測試中…'));
+    const res = await api('POST', '/detect', body);
+    busy(testBtn, false);
+    if (!res.ok) { showError(addErr, res); return; }
+    lastDetection = res;
+    document.getElementById('mfSaveMsg').textContent = '';
+    document.getElementById('mfSaveBar').hidden = false;
+    renderReport(document.getElementById('mfResult'), res.report);
+    const panel = document.getElementById('mfResultPanel');
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  document.getElementById('mfDownloadBtn').addEventListener('click', () => {
+    if (!lastDetection) return;
+    const h = (lastDetection.report.target || {}).host || 'mfp';
+    downloadJson(lastDetection.report, 'mfp-diagnostic-' + h.replace(/[^A-Za-z0-9.\-]/g, '_') + '.json');
+  });
+
+  const saveBtn = document.getElementById('mfSaveBtn');
+  saveBtn.addEventListener('click', async () => {
+    if (!lastDetection) return;
+    busy(saveBtn, true, tr('儲存中…'));
+    const res = await api('POST', LIST_PATH, { token: lastDetection.token,
+      display_name: document.getElementById('mfSaveName').value });
+    busy(saveBtn, false);
+    const msg = document.getElementById('mfSaveMsg');
+    if (!res.ok) { msg.textContent = res.message ? tr(res.message) : tr('發生錯誤'); return; }
+    msg.textContent = SHARED ? tr('已儲存為共用事務機，接著按「成員」選誰可以用') : tr('已儲存到「我的事務機」');
+    document.getElementById('mfSaveBar').hidden = true;
+    lastDetection = null;
+    loadList();
+  });
+
+  // ---- 我的事務機
+  const listWrap = document.getElementById('mfListWrap');
+  let listItems = [];
+  const listErr = document.getElementById('mfListError');
+  async function loadList() {
+    listErr.hidden = true;
+    const res = await api('GET', LIST_PATH);
+    if (!res.ok) { listWrap.replaceChildren(); showError(listErr, res); return; }
+    const items = res.connections || [];
+    listItems = items;
+    if (!items.length) {
+      listWrap.replaceChildren(el('p', 'mf-empty', SHARED ? tr('還沒有共用事務機。') : tr('還沒有新增任何事務機。')));
+      return;
+    }
+    const t = el('table', 'mf-list');
+    const hd = el('tr');
+    const heads = [tr('名稱'), tr('位址'), tr('型號'), tr('相容性'), tr('最近測試')];
+    if (SHARED) heads.push(tr('成員'));
+    for (const h of heads.concat([''])) hd.append(el('th', null, h));
+    const thead = el('thead'); thead.append(hd); t.append(thead);
+    const tb = el('tbody');
+    for (const c of items) {
+      const r = el('tr');
+      const nameTd = el('td', null, c.display_name);
+      if (c.shared && !SHARED) nameTd.append(el('span', 'mf-tag shared', tr('共用')));
+      if (c.queue && c.queue.busy) {
+        nameTd.append(el('span', 'mf-tag busy', tr('使用中')));
+        if (c.queue.waiting) nameTd.append(el('span', 'mf-sub', tr('後面還有 {0} 件').replace('{0}', c.queue.waiting)));
+      }
+      r.append(nameTd);
+      r.append(el('td', null, c.host + (c.port ? ':' + c.port : '') + (c.scheme ? P.lp + c.scheme.toUpperCase() + P.rp : '')));
+      r.append(el('td', null, [c.family, c.model].filter(Boolean).join(' ') || tr('未辨識')));
+      const st = el('td'); st.append(statusChip(c.detect_status)); r.append(st);
+      r.append(el('td', null, fmtTime(c.last_test_at) + (c.last_reachable === false ? ' · ' + tr('連不上') : '')));
+      if (SHARED) r.append(el('td', null, String(c.member_count || 0)));
+      const act = el('td'); const box = el('div', 'mf-row-actions');
+      const det = rowBtn('', '', () => (detailId === c.id ? hideDetail() : showDetail(c)));
+      det.dataset.mfDetail = String(c.id);
+      setDetailBtn(det);
+      if (!SHARED && c.scan) {
+        const sb = rowBtn('printer', tr('掃描'), () => openScan(c));
+        sb.dataset.mfScan = String(c.id);
+        box.append(sb);
+      }
+      if (SHARED) box.append(rowBtn('user', tr('成員'), () => openMembers(c)));
+      const rt = rowBtn('refresh', tr('重新測試'), () => retest(c, act));
+      rt.dataset.mfRetest = '1';
+      box.append(rt,
+                 det,
+                 rowBtn('download', tr('下載診斷報告'), () => { window.location.href = API + '/connections/' + c.id + '/report'; }, true));
+      if (SHARED || c.can_manage !== false) {     // 管理頁就是管理共用事務機的地方
+        box.append(rowBtn('edit', tr('重新命名'), () => renameConn(c), true),
+                   rowBtn('trash', tr('移除'), () => removeConn(c), true, 'mf-del'));
+      }
+      act.append(box); r.append(act);
+      tb.append(r);
+    }
+    t.append(tb);
+    listWrap.replaceChildren(t);
+  }
+  const STATUS_LABELS = {{ status_labels|tojson }};
+  // 相容性：膠囊裡只放短狀態，說明另外一行
+  function statusChip(status) {
+    const lab = STATUS_LABELS[status] || [status || '—', ''];
+    const w = el('div', 'mf-compat');
+    w.append(el('span', 'mf-status ' + (STATUS_CLASS[status] || 'warn'), tr(lab[0])));
+    if (lab[1]) w.append(el('div', 'mf-status-hint', tr(lab[1])));
+    return w;
+  }
+  function icon(name) {
+    const s = document.querySelector('#mfIcons').content.querySelector('[data-ic="' + name + '"] svg');
+    return s ? s.cloneNode(true) : document.createElement('span');
+  }
+  // 圖示＋文字放在各自的節點（文字在自己的 span），之後改字不會把圖示洗掉；只留圖示的有 title 與可讀名稱
+  function fillBtn(b, ic, label, iconOnly) {
+    b.replaceChildren(icon(ic));
+    if (iconOnly) { b.title = label; b.setAttribute('aria-label', label); }
+    else { b.append(txt(' ')); b.append(el('span', null, label)); b.removeAttribute('aria-label'); b.title = ''; }
+  }
+  function rowBtn(ic, label, fn, iconOnly, extra) {
+    const b = el('button', 'btn btn-small btn-secondary' + (extra ? ' ' + extra : ''));
+    b.type = 'button';
+    if (ic) fillBtn(b, ic, label, iconOnly);
+    b.addEventListener('click', fn);
+    return b;
+  }
+  // 「詳細」可以收回來（使用者 2026-10-14）：打開的那一台按鈕變「收合」
+  let detailId = null;
+  function setDetailBtn(b) {
+    const open = String(detailId) === b.dataset.mfDetail;
+    fillBtn(b, open ? 'close' : 'eye', open ? tr('收合') : tr('詳細'));
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function syncDetailBtns() { listWrap.querySelectorAll('[data-mf-detail]').forEach(setDetailBtn); }
+  function hideDetail() {
+    const panel = document.getElementById('mfDetailPanel');
+    const wasFar = panel.getBoundingClientRect().top < 0;
+    panel.hidden = true;
+    detailId = null;
+    syncDetailBtns();
+    if (wasFar) listWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  document.getElementById('mfDetailClose').addEventListener('click', hideDetail);
+  async function retest(c, cell) {
+    const btn = cell.querySelector('[data-mf-retest]') || cell.querySelector('button');
+    busy(btn, true, tr('測試中…'));
+    const res = await api('POST', (SHARED ? '/shared/' : '/connections/') + c.id + '/test');
+    busy(btn, false);
+    if (!res.ok) { showError(listErr, res); return; }
+    await loadList();
+    showDetail(res.connection, res.report);
+  }
+  async function showDetail(c, report) {
+    let rep = report;
+    if (!rep) {
+      const res = await api('GET', '/connections/' + c.id);
+      if (!res.ok) { showError(listErr, res); return; }
+      rep = res.connection.last_report;
+    }
+    const panel = document.getElementById('mfDetailPanel');
+    document.getElementById('mfDetailTitle').textContent = c.display_name + ' · ' + c.host;
+    const box = document.getElementById('mfDetail');
+    if (!rep) box.replaceChildren(el('p', 'mf-empty', tr('這台事務機還沒有連線測試的報告')));
+    else renderReport(box, rep);
+    panel.hidden = false;
+    detailId = c.id;
+    syncDetailBtns();
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  async function renameConn(c) {
+    const name = await window.showPrompt(tr('新的名稱'), { defaultValue: c.display_name });
+    if (name === null) return;
+    const res = await api('PATCH', itemPath(c.id), { display_name: name });
+    if (!res.ok) { showError(listErr, res); return; }
+    loadList();
+  }
+  async function removeConn(c) {
+    const q = SHARED ? tr('確定要移除這台共用事務機嗎？所有成員都會看不到它（不影響設備本身）。')
+                     : tr('確定要移除這台事務機嗎？只會從你的清單移除，不影響設備本身。');
+    if (!(await window.showConfirm(q, { kind: 'danger' }))) return;
+    const res = await api('DELETE', itemPath(c.id));
+    if (!res.ok) { showError(listErr, res); return; }
+    if (detailId === c.id) hideDetail();
+    loadList();
+  }
+
+  // ---- 掃描（eSCL）：選設定 → 排隊 → 掃描 → 存進工作區
+  const SOURCE_NAMES = { platen: tr('平台玻璃'), adf: tr('自動送紙器（單面）'), adf_duplex: tr('自動送紙器（雙面）') };
+  const COLOR_NAMES = { color: tr('彩色'), gray: tr('灰階'), bw: tr('黑白') };
+  const PAPER_NAMES = { a4: 'A4', letter: 'Letter', max: tr('最大範圍') };
+  const PHASE_NAMES = { queued: tr('排隊中'), checking: tr('檢查事務機狀態'), scanning: tr('掃描中'),
+                        merging: tr('合成 PDF'), saving: tr('存進工作區') };
+  let scanConn = null;
+  let scanTimer = null;
+  function fillSelect(id, values, names, pick) {
+    const s = document.getElementById(id);
+    if (!s) return;
+    s.replaceChildren();
+    for (const v of values) {
+      const o = el('option', null, names[v] || String(v));
+      o.value = String(v);
+      s.append(o);
+    }
+    if (pick !== undefined && values.map(String).includes(String(pick))) s.value = String(pick);
+    if (s._jtSelect) s._jtSelect.refresh();
+  }
+  function syncScanOptions() {
+    if (!scanConn) return;
+    const srcs = scanConn.scan.sources || {};
+    const src = document.getElementById('mfScanSource').value;
+    const c = srcs[src] || {};
+    fillSelect('mfScanColor', c.colors || [], COLOR_NAMES, 'color');
+    const res = c.resolutions || [];
+    fillSelect('mfScanRes', res, Object.fromEntries(res.map(r => [r, r + ' dpi'])),
+               res.includes(300) ? 300 : res[0]);
+  }
+  function openScan(c) {
+    scanConn = c;
+    const panel = document.getElementById('mfScanPanel');
+    document.getElementById('mfScanTitle').textContent = tr('掃描') + P.colon + c.display_name;
+    document.getElementById('mfScanError').hidden = true;
+    document.getElementById('mfScanState').hidden = true;
+    const srcKeys = Object.keys(c.scan.sources || {});
+    fillSelect('mfScanSource', srcKeys, SOURCE_NAMES, srcKeys[0]);
+    fillSelect('mfScanPaper', ['a4', 'letter', 'max'], PAPER_NAMES, 'a4');
+    syncScanOptions();
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  const scanSrcSel = document.getElementById('mfScanSource');
+  if (scanSrcSel) {
+    if (window.enhanceJtSelects) window.enhanceJtSelects(document.getElementById('mfScanPanel'));
+    scanSrcSel.addEventListener('change', syncScanOptions);
+    document.getElementById('mfScanClose').addEventListener('click', () => {
+      document.getElementById('mfScanPanel').hidden = true;
+    });
+    document.getElementById('mfScanStart').addEventListener('click', async () => {
+      if (!scanConn) return;
+      const btn = document.getElementById('mfScanStart');
+      const errBox = document.getElementById('mfScanError');
+      errBox.hidden = true;
+      busy(btn, true, tr('送出中…'));
+      const res = await api('POST', '/connections/' + scanConn.id + '/scan', {
+        source: document.getElementById('mfScanSource').value,
+        color: document.getElementById('mfScanColor').value,
+        resolution: Number(document.getElementById('mfScanRes').value),
+        paper: document.getElementById('mfScanPaper').value,
+        file_name: document.getElementById('mfScanName').value,
+      });
+      busy(btn, false);
+      if (!res.ok) { showError(errBox, res); return; }
+      watchScan(res.scan.id);
+      loadScans();
+    });
+  }
+  function bytesText(n) {
+    if (!n) return '';
+    return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  }
+  function scanStateText(s) {
+    if (s.status === 'queued') {
+      return s.ahead ? tr('排隊中：前面還有 {0} 件').replace('{0}', s.ahead) : tr('排隊中');
+    }
+    if (s.status === 'running') {
+      let t = PHASE_NAMES[s.phase] || tr('掃描中');
+      if (s.phase === 'scanning' && s.live_pages) t += P.lp + tr('已取回 {0} 份').replace('{0}', s.live_pages) + P.rp;
+      return t;
+    }
+    if (s.status === 'done') {
+      return tr('完成：{0} 頁').replace('{0}', s.pages || 0) + (s.bytes ? P.lp + bytesText(s.bytes) + P.rp : '');
+    }
+    if (s.status === 'cancelled') return tr('已取消');
+    return tr('失敗') + P.colon + tr(s.error_message || s.error_code || '');
+  }
+  function scanActions(s) {
+    const bar = el('div', 'mf-actions');
+    if (s.status === 'queued' || s.status === 'running') {
+      bar.append(rowBtn('close', tr('取消'), async () => {
+        await api('POST', '/scans/' + s.id + '/cancel');
+        loadScans();
+      }));
+    }
+    if (s.status === 'done' && s.workspace_file_id) {
+      const a = el('a', 'btn btn-small btn-secondary');
+      a.href = '/workspace/file/' + encodeURIComponent(s.workspace_file_id);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.append(icon('eye'), txt(' '), el('span', null, tr('開啟')));
+      const w = el('a', 'btn btn-small btn-secondary');
+      w.href = '/workspace';
+      w.append(icon('archive'), txt(' '), el('span', null, tr('前往工作區')));
+      bar.append(a, w);
+    }
+    if (s.status === 'done' && s.has_file) {
+      const d = el('a', 'btn btn-small btn-secondary');
+      d.href = API + '/scans/' + encodeURIComponent(s.id) + '/download';
+      d.append(icon('download'), txt(' '), el('span', null, tr('下載')));
+      bar.append(d);
+    }
+    return bar;
+  }
+  function renderScanState(s) {
+    const box = document.getElementById('mfScanState');
+    if (!box) return;
+    box.className = 'mf-scan-state' + (s.status === 'done' ? ' done' : (s.status === 'error' ? ' error' : ''));
+    box.replaceChildren(el('div', null, scanStateText(s)));
+    if (s.workspace_message) box.append(el('div', 'mf-hint', tr(s.workspace_message)));
+    else if (s.status === 'done' && s.workspace_file_id) box.append(el('div', 'mf-hint', tr('已存進你的工作區') + P.colon + (s.file_name || '')));
+    box.append(scanActions(s));
+    box.hidden = false;
+  }
+  function watchScan(id) {
+    if (scanTimer) clearTimeout(scanTimer);
+    const tick = async () => {
+      const res = await api('GET', '/scans/' + encodeURIComponent(id));
+      if (!res.ok) return;
+      renderScanState(res.scan);
+      if (res.scan.status === 'queued' || res.scan.status === 'running') {
+        scanTimer = setTimeout(tick, 1500);
+      } else {
+        scanTimer = null;
+        loadScans();
+        loadList();
+      }
+    };
+    tick();
+  }
+  let scansTimer = null;
+  async function loadScans() {
+    const wrap = document.getElementById('mfScansWrap');
+    if (!wrap) return;
+    const res = await api('GET', '/scans');
+    if (!res.ok) return;
+    const items = res.scans || [];
+    document.getElementById('mfScansPanel').hidden = !items.length;
+    const t = el('table', 'mf-list');
+    const hd = el('tr');
+    for (const h of [tr('時間'), tr('事務機'), tr('檔名'), tr('狀態'), '']) hd.append(el('th', null, h));
+    const thead = el('thead'); thead.append(hd); t.append(thead);
+    const tb = el('tbody');
+    let active = false;
+    for (const s of items) {
+      if (s.status === 'queued' || s.status === 'running') active = true;
+      const r = el('tr');
+      r.append(el('td', null, fmtTime(s.created_at)), el('td', null, s.conn_name || ''),
+               el('td', null, s.file_name || ''));
+      const st = el('td', null, scanStateText(s));
+      if (s.workspace_message) st.append(el('span', 'mf-sub', tr(s.workspace_message)));
+      r.append(st);
+      const act = el('td');
+      act.append(scanActions(s));
+      r.append(act);
+      tb.append(r);
+    }
+    t.append(tb);
+    wrap.replaceChildren(t);
+    if (scansTimer) clearTimeout(scansTimer);
+    scansTimer = active ? setTimeout(loadScans, 3000) : null;
+  }
+
+  // ---- 共用事務機的成員（管理頁）
+  let subjectsCache = null;
+  let membersConn = null;
+  function memberRow(type, key, label, sub, checked) {
+    const l = el('label');
+    const cb = el('input');
+    cb.type = 'checkbox';
+    cb.dataset.type = type;
+    cb.dataset.key = key;
+    cb.checked = !!checked;
+    l.append(cb);
+    const span = el('span', null, label);
+    span.dataset.i18n = 'skip';
+    if (sub) { span.append(el('small', null, ' ' + sub)); }
+    l.append(span);
+    l.dataset.search = (label + ' ' + (sub || '')).toLowerCase();
+    return l;
+  }
+  function filterList(boxId, q) {
+    q = (q || '').trim().toLowerCase();
+    document.getElementById(boxId).querySelectorAll('label').forEach(l => {
+      l.hidden = !!q && !l.dataset.search.includes(q);
+    });
+  }
+  function countChecked() {
+    const u = document.querySelectorAll('#mfMUsers input:checked').length;
+    const g = document.querySelectorAll('#mfMGroups input:checked').length;
+    document.getElementById('mfMUserCount').textContent = P.lp + u + P.rp;
+    document.getElementById('mfMGroupCount').textContent = P.lp + g + P.rp;
+  }
+  function showMemberWarnings(members) {
+    const warn = document.getElementById('mfMembersWarn');
+    const lack = (members || []).filter(m => m.type === 'user' && m.exists && m.can_use_tool === false);
+    if (!lack.length) { warn.hidden = true; return; }
+    warn.replaceChildren(el('div', null, tr('以下成員沒有「事務機取件」的工具權限，還看不到這支工具：')),
+                         el('div', null, lack.map(m => m.name).join(P.sep)));
+    warn.hidden = false;
+  }
+  async function openMembers(c) {
+    membersConn = c;
+    const panel = document.getElementById('mfMembersPanel');
+    document.getElementById('mfMembersTitle').textContent = tr('成員') + P.colon + c.display_name;
+    document.getElementById('mfMembersMsg').textContent = '';
+    if (!subjectsCache) {
+      const s = await api('GET', '/shared-subjects');
+      if (!s.ok) { showError(listErr, s); return; }
+      subjectsCache = s;
+    }
+    const m = await api('GET', '/shared/' + c.id + '/members');
+    if (!m.ok) { showError(listErr, m); return; }
+    const chosen = new Set((m.members || []).map(x => x.type + ':' + x.key));
+    const ub = document.getElementById('mfMUsers');
+    const gb = document.getElementById('mfMGroups');
+    ub.replaceChildren(...subjectsCache.users.map(u => memberRow('user', u.key, u.username,
+      u.display_name && u.display_name !== u.username ? u.display_name : '', chosen.has('user:' + u.key))));
+    gb.replaceChildren(...subjectsCache.groups.map(g => memberRow('group', g.key, g.name, g.source && g.source !== 'local' ? g.source : '',
+      chosen.has('group:' + g.key))));
+    if (!subjectsCache.users.length) ub.append(el('p', 'mf-empty', tr('沒有使用者')));
+    if (!subjectsCache.groups.length) gb.append(el('p', 'mf-empty', tr('沒有群組')));
+    document.getElementById('mfMUserSearch').value = '';
+    document.getElementById('mfMGroupSearch').value = '';
+    countChecked();
+    showMemberWarnings(m.members);
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  const membersPanel = document.getElementById('mfMembersPanel');
+  if (membersPanel) {
+    membersPanel.addEventListener('change', countChecked);
+    document.getElementById('mfMUserSearch').addEventListener('input', e => filterList('mfMUsers', e.target.value));
+    document.getElementById('mfMGroupSearch').addEventListener('input', e => filterList('mfMGroups', e.target.value));
+    document.getElementById('mfMembersClose').addEventListener('click', () => { membersPanel.hidden = true; });
+    document.getElementById('mfMembersSave').addEventListener('click', async () => {
+      if (!membersConn) return;
+      const btn = document.getElementById('mfMembersSave');
+      const members = [...membersPanel.querySelectorAll('input[type=checkbox]:checked')]
+        .map(cb => ({ type: cb.dataset.type, key: cb.dataset.key }));
+      busy(btn, true, tr('儲存中…'));
+      const res = await api('PUT', '/shared/' + membersConn.id + '/members', { members });
+      busy(btn, false);
+      const msg = document.getElementById('mfMembersMsg');
+      if (!res.ok) { msg.textContent = tr(res.message || '發生錯誤'); return; }
+      msg.textContent = tr('已儲存成員（{0}）').replace('{0}', (res.members || []).length);
+      showMemberWarnings(res.members);
+      loadList();
+    });
+  }
+  loadList();
+  if (!SHARED) loadScans();
+})();
+</script>
+{% endblock %}

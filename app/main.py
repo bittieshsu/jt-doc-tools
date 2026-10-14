@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.82"
+VERSION = "1.16.87"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -441,6 +441,7 @@ _TOOL_ALIASES = {
     "pdf-bookmark":       "bookmark bookmarks outline toc table of contents index navigation nested level chapter merge combine tender annual report 書籤 大綱 目錄 導覽 索引 章節 層級 巢狀 合併 串接 標案 投標 年報 結案報告 目錄頁 可點 跳頁 加書籤 建目錄",
     "submission-check":   "submission check submit review verify validate checklist pre-flight preflight completeness case bid tender application 送件 送審 投標 標案 申請 檢核 檢查 核對 清單 缺件 漏件 齊備 完整性 驗收 案件 送出前",
     "transit-proof":      "transit proof commute travel receipt ticket hsr tra mrt bus taxi uber rideshare easycard ipass reimbursement expense 乘車 乘車證明 交通 車票 高鐵 台鐵 捷運 公車 計程車 Uber 優步 叫車 網約車 行程收據 悠遊卡 一卡通 差旅 出差 報帳 核銷 憑證 整理",
+    "mfp-fetch":          "mfp multifunction printer copier scanner scan mailbox box folder fetch retrieve pickup import fujifilm fuji xerox apeos apeosport docucentre docuworks internet services webdav 事務機 多功能事務機 影印機 印表機 複合機 掃描 掃描檔 掃描器 親展 親展信箱 機密信箱 信箱 資料夾 取件 取檔 取回 匯入 富士 富士軟片 富士全錄",
 }
 # Per-tool color class. Both home page and sidebar use the same palette
 # classes, so a given tool always shows the same colored tile regardless
@@ -568,6 +569,10 @@ templates.env.globals["nav_settings"] = [
                  "法規 規範 範例 公文 引用 出處 "
                  # 政府公開資料（/admin/knowledge/gov）也從這一頁進去
                  "open data opendata moj 政府公開資料 開放資料 全國法規資料庫 行政規則 釋例"},
+    {"icon": "printer", "name": "共用事務機", "description": "建立事務機並指定成員，成員不用自己新增就能測試與掃描",
+     "url": "/admin/mfp", "beta": True,
+     "keywords": "mfp multifunction printer copier scanner shared device member group scan escl airprint mopria "
+                 "事務機 多功能事務機 影印機 複合機 共用 成員 群組 掃描 排隊"},
     {"icon": "book", "name": "同義詞", "description": "PDF 標籤對應字典",
      "url": "/admin/synonyms",
      "keywords": "synonym synonyms alias dictionary label mapping 字典 同義 詞"},

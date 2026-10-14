@@ -494,6 +494,16 @@ v1.15.19 加翻譯對照字典時，完整套件一次紅了四條，**全是這
 - 認證 OFF → 單一共用工作區 key `__single__`，仍可存取
 - 保留掃描 `sweep_older_than`：backdate 後掃掉過期項
 - 設定 save/get roundtrip（enabled 為布林）
+- **大檔不整份讀進記憶體**（v1.16.83，`tests/test_workspace_large_files.py`）：`save_file_for_key` 以路徑存，
+  64 MB 的 PDF 存進去記憶體峰值 < 8 MB（`tracemalloc` 實量）；上傳的 PDF 一次讀不超過 1 MB；
+  自動保存與「存至工作區」（作業結果）都不 `read_bytes()`。`.part` 寫完才換名、最後才寫 meta。
+  `move=True` 搬檔、跨磁碟（EXDEV）退回複製、失敗時原檔放回原處
+- **容量預留**（v1.16.83）：兩個同時寫入各自放得下、加起來超過額度 → 只成功一個；bytes / 串流 / 路徑三條共用同一份預留；
+  失敗要把預留還回去；寫到一半的 `.part` 不重複計入用量
+- **驗證**（v1.16.83）：`verify=True` 時 PDF 要打得開、至少一頁（加密的照收）；`expect={".pdf"}` 時 HTML 登入頁被拒；
+  `origin` 只收扁平短欄位
+- **自動保存沿用工具已存的檔**（v1.16.83）：`job.meta["workspace"]` 記了 file_id、而且那個檔還在、屬於同一個擁有者 →
+  不再存第二份；檔案已不在或屬於別人 → 照一般流程存
 
 端點（`workspace_routes.py`，auth OFF / 單機）：
 - `GET /workspace` 頁面 200、含「我的工作區」
@@ -609,6 +619,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - **`app/core/auth_db.py`**：`_m1_initial`、`_m2_username_source_unique`、`_m3_rename_pdf_diff_to_doc_diff`、`_m4_grant_image_to_pdf`、`_m5_grant_translate_doc`、`_m6_totp_columns`、`_m7_audit_seed_column`、`_m8_sso_sources`、`_m9_role_seed_snapshot`、`_m10_role_default_for_new`、`_m11_group_sync_cache`、`_m12_unprovision_mirrored_users`、`_m13_grant_pdf_to_slides`、`_m14_user_email`、`_m15_directory_presence`、`_m16_session_last_seen`、`_m17_directory_account_state`、`_m18_grant_transit_proof_and_border`、`_m19_grant_pdf_bookmark`、`_m20_grant_seam_stamp`、`_m21_grant_page_size`、`_m22_grant_office_convert`、`_m23_canon_ou_subject_keys`、`_m24_index_group_members_user`、`_m25_grant_doc_translate`、`_m26_grant_doc_straighten`、`_m27_grant_meeting_summary`、`_m28_grant_meeting_transcribe`、`_m29_grant_official_doc`
 - **`app/core/audit_db.py`**：`_m1_initial`
 - **`app/core/job_store.py`**：`_m1_initial`、`_m2_metrics`、`_m3_started_at`
+- **`app/core/mfp_store.py`**：`_m1_initial`、`_m2_shared_and_scans`（v1.16.87：只新增 `mfp_members`、`mfp_scans` 兩張表，不動 `mfp_connections`；v1 的事務機升上來都還在：`tests/test_mfp_shared_and_scan.py::test_migration_from_v1_keeps_existing_connections`）
 - **`app/core/kb/store.py`**（知識庫；在子資料夾裡，上面那條自動比對不會掃到，這裡手動列）：
   - [ ] **`_m2_gov_imports`**：只新增 `kb_gov_items`、`kb_gov_versions` 兩張表，不重建既有的表；
         既有的 v1 知識庫升上來資料集與文件都還在（`tests/test_kb_gov_import.py::test_migration_from_v1_keeps_existing_data`）
@@ -626,7 +637,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **462 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **474 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -773,6 +784,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_i18n_dynamic_labels.py` | 程式端產生的顯示字串（`tr(變數)`）也必須有英文 |
 | `test_id_from_body_acl.py` | 「id 由使用者傳入」的端點一律要有 ACL —— 靜態全面掃描 |
 | `test_impacts_pass_is_separate.py` | 「事件與影響」必須自己走一輪 —— **零退步是由構造保證的，不是調出來的** |
+| `test_install_sh_without_tty.py` | install.sh 在沒有控制終端時不可以中止 |
 | `test_installer_languages.py` | Windows 安裝程式在英文 Windows 上要顯示英文（v1.15.27） |
 | `test_installer_output_is_not_garbled.py` | 安裝畫面上不可以出現亂碼（2026-09-15 客戶回報，Win11 25H2） |
 | `test_installer_product_name.py` | Windows 安裝程式的產品名稱多語系 + Linux 服務的安全強化（第 1 批，v1.15.31） |
@@ -861,6 +873,15 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_meeting_transcribe_survives_outage.py` | 轉逐字稿的輪詢與取結果，要撐過對方短暫連不上 |
 | `test_meeting_transcribe_variants.py` | 轉逐字稿：已知的錯寫法照表換（JTLW v2.28，`api_revision` 2.9） |
 | `test_meeting_wave_tip.py` | 轉逐字稿的波形：游標旁的標籤要寫出**那一刻是誰在講**（v1.16.10，使用者要求） |
+| `test_mfp_client.py` | 事務機取件：連線測試的網路用戶端（目的地政策＋逐步診斷） |
+| `test_mfp_escl.py` | 事務機掃描（eSCL）：能力表、掃描設定、整個掃描流程（對一台假的 eSCL 設備） |
+| `test_mfp_fetch_page_browser.py` | 事務機取件頁：在真的瀏覽器裡跑一次（連線測試 → 儲存 → 詳細 → 被擋的位址） |
+| `test_mfp_fetch_tool.py` | 事務機取件（Beta）：工具頁與 API |
+| `test_mfp_profiles.py` | 事務機取件：型號辨識 |
+| `test_mfp_queue.py` | 事務機排隊：同一台實體設備一次只做一件事（使用者 2026-10-14：「要避免同時多人存取事務機 |
+| `test_mfp_redact.py` | 事務機取件：診斷資訊的遮蔽規則（畫面、下載報告、服務紀錄檔共用這一份） |
+| `test_mfp_scan_page_browser.py` | 從事務機掃描、共用事務機的管理頁 —— 在真的瀏覽器裡跑一次（對本機一台假的 eSCL 設備） |
+| `test_mfp_shared_and_scan.py` | 共用事務機（管理員建立、加成員）、排隊、從事務機掃描進工作區 —— 路由層 |
 | `test_migration_fk_cascade.py` | 重建資料表的 migration 一律要關掉外鍵，否則升級會**清空子表** |
 | `test_missing_office_engine_is_503.py` | 缺 Office 引擎要回 **503**，不可以回 500 |
 | `test_my_jobs_open_button_e2e.py` | 「我的作業」在**真的瀏覽器**裡：打得開的那一列才有「開啟」 |
@@ -896,6 +917,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_office_source_validation.py` | 辦公文件的**來源檔**壞掉時，要在送進 soffice 之前就擋下來 |
 | `test_office_timeout_kills_the_whole_tree.py` | soffice 逾時要殺掉**整棵行程樹**，不是只殺我們拿到的那個 PID |
 | `test_office_xml_namespaces.py` | 文件翻譯寫回檔案時，**命名空間的前綴與宣告要照原檔** |
+| `test_official_doc_case_doc_no.py` | 公文撰擬歷史案件的「文號」欄（使用者 2026-10-14：「加個 文號 欄位」，附歷史案件清單截圖） |
 | `test_official_doc_cases.py` | 公文撰擬的歷史案件管理（2026-10-08 使用者：「公文撰擬 請參考送件前檢核 加入歷史案件管理」） |
 | `test_official_doc_cases_table.py` | 歷史案件表格：主旨整句、舊案件補主旨（2026-10-10 使用者：「案件名稱如果字多 要截斷搭配... 移過去才顯示全文」） |
 | `test_official_doc_cases_table_browser.py` | 歷史案件表格 —— 真的在瀏覽器裡跑一次（2026-10-10 使用者：「案件名稱如果字多 要截斷搭配... 移過去才顯示全文」 |
@@ -1092,6 +1114,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_workspace_accepts_plain_text.py` | 工作區收純文字（.txt / .md）—— 判準是**內容**，不是副檔名 |
 | `test_workspace_api.py` | HTTP-level tests for the workspace endpoints (auth OFF / single mode). |
 | `test_workspace_audio.py` | 工作區收錄音檔 ＋ 轉逐字稿「從工作區載入」（使用者 2026-09-23 交代） |
+| `test_workspace_large_files.py` | 工作區收大檔：不整份讀進記憶體、容量預留、已存過的不再存一次 |
 | `test_workspace_office_thumbnail.py` | 工作區的 Office / ODF 檔要有第一頁縮圖 |
 | `test_workspace_ooxml_detect.py` | 工作區的型別判斷要以**內容型別**為準，不是主檔的路徑名 |
 | `test_workspace_save_button.py` | 「存至工作區」按鈕出現的條件，必須跟工作區真正收得下的格式一致 |
@@ -1552,6 +1575,15 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       ⑥全選只勾這一頁；翻頁之後原本勾的照樣算在批次下載裡
       ⑦搜尋比對得到主旨後半句的字
       `tests/test_official_doc_cases_table.py`、`tests/test_official_doc_cases_table_browser.py`
+- [ ] **歷史案件的文號欄**（v1.16.86）：
+      ①函撰擬時填的發文字號、DI 匯入的函（發文字號）與簽（文號）自動帶入；簽一開始是「—」
+      ②按文號旁的鉛筆補填或修改（站內對話框）→ 存檔後重新整理照舊；留空清掉；超過 60 字講出上限、不截斷；**草稿不變**
+      ③可以排序、可以在「顯示欄位」藏起來；搜尋框找得到文號
+      ④長文號（自己輸入、沒有「字」「第」）截斷加「…」、滑鼠移過去看全文，不會把整欄撐開
+      ⑤名稱不被擠掉：中文、英文、日文介面各在 1180 / 1280 / 1366 / 1440 / 1920 寬看一次，名稱至少看得到 8 個字（或整個看得到）、
+        表格不超出外框、頁面沒有橫向捲動；窄的時候依序收：文號與時間折一次 → 「打開」「DI」只留圖示 → 標頭與標籤折行 → 卡片；
+        中文 1440 以上什麼都不收（文號、時間都是一行）；卡片裡的按鈕有文字
+      `tests/test_official_doc_case_doc_no.py`、`tests/test_official_doc_cases_table_browser.py`
 - [ ] 輸入超過上限（需求敘述 4,000 字、來文 12,000 字、辦理方向 2,000 字）→ 講出上限與目前字數，**不截斷**
 - [ ] **英文 / 日文介面照樣可以用**（v1.16.61 解除反灰）：側欄與首頁不反灰、頁面標籤是英 / 日文，**產出仍是繁體中文公文**；
       英日版說明要講出產出的語言與格式。英日版介紹站沒有這支工具的截圖（截圖是中文介面）
@@ -1664,6 +1696,10 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
   `tests/test_official_doc_org_data.py`（範本與地址簿接進工具）、`tests/test_official_doc_sources.py`（下載來源管理）、
   `tests/test_official_doc_e2e_kb.py`（真瀏覽器：參考知識庫、範本下拉與套用、機關名稱建議）
 
+- [ ] **改成條列的層次**（v1.16.85，使用者回報）：在說明「一、」那一項的內文裡選一段（不含「一、」）→ 改成條列 → 採用：
+      要點是「（一）（二）（三）」、接在「一、」那一行底下，說明後面的「二、三、」不變；在「（一）」裡做一次 → 要點是「1. 2.」；
+      在主旨的內文裡選一段改成條列 → 說明「主旨不分項」。自動化：`tests/test_official_doc_core.py`（context 決定層次）、
+      `tests/test_official_doc_tool.py`（真瀏覽器裡確認畫面送出那一行的項次）
 #### 知識庫（管理區 `/admin/knowledge`）🆕 v1.16.61
 - [ ] **名稱是「公文知識庫」**（v1.16.66 改名）：側欄、頁面標題、LLM 設定頁的連結、公文撰擬的「參考公文知識庫」、我的作業與通知都寫新名；網址仍是 `/admin/knowledge`，側欄搜尋打舊名「知識庫」找得到。`tests/test_kb_named_for_official_doc.py`
 > 給工具當依據的文件庫（第一個用的是公文撰擬）。判準是**權限與出處**：誰看得到哪些資料集、每一段查得回是哪份文件的第幾頁。
@@ -1776,6 +1812,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] 行內的顏色與斜體保留（紅字提示不可變黑）
 - [ ] 附前 6 頁預覽
 - [ ] 上傳 PDF 要被擋下並說明原因
+- [ ] 頁面下方「使用須知」（v1.16.86）：兩張卡片（模型怎麼挑的表格、PDF 怎麼翻的三條去處＋可展開的引擎比較），1280 寬並排、手機寬度疊成一欄而且**沒有橫向捲動**；英文、日文介面整句都有翻譯；原文 / 目標語言是本站樣式的下拉
 - [ ] 結果摘要的請求數遠少於段數（批次真的有生效）
 - [ ] **翻譯對照字典**：含 `Acer` / `Foxconn` 的文件翻完，**打開產出檔**確認用的是
       指定的譯法（不是看端點回 200）
@@ -1920,6 +1957,32 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       只看四邊形畫在哪裡是不夠的
 - [ ] 轉向之後切到「自己拉四個角」，**手柄要落在紙上**
       （回給前端的自動四角也必須是轉向後的座標）
+
+#### 事務機取件 (mfp-fetch) 🆕 v1.16.84（Beta，尚未實機驗證）
+- [ ] 工具頁標題與側欄都有「Beta」；頁面上寫明目前只做得到新增、連線測試與型號辨識，登入信箱與取件要等實機驗證
+- [ ] 預設只有管理員與「文管」角色看得到；一般使用者看不到、直接打網址被擋
+- [ ] 「連線方式」是本站樣式的下拉（v1.16.86），不是瀏覽器原生的；跟旁邊的 IP 輸入框一樣高，英文、日文介面也一樣；頁面還在載入時也不會先閃原生下拉
+- [ ] 輸入一台區網事務機的 IP 按「連線測試」：按鈕反灰轉圈，結果列出可連線的協定、TLS 狀態、廠牌 / 型號 / 韌體 / 相容性，
+      「逐步診斷」裡每一步（位址檢查、TCP、TLS、HTTP、跟隨轉址）都有結果與耗時，展開看得到回應標頭、頁面標題、去標籤摘要、表單欄位名稱
+- [ ] 自簽憑證的設備：TLS 那一步寫出確切原因（例如 self-signed certificate）與憑證主體、到期日，首頁仍讀得到、標「未驗證」
+- [ ] 輸入 127.0.0.1、169.254.169.254、8.8.8.8、本服務主機自己的 IP、`http://…` 網址、連接埠 22 → 都被擋下並說明原因，**沒有發出任何連線**
+- [ ] 「下載診斷報告」與清單上的「診斷報告」下載的 JSON 裡**找不到** Cookie 值、密碼、CSRF token（遮成「已遮蔽，長度 N」），Cookie 名稱還在
+- [ ] 儲存後出現在「我的事務機」；改名、重新測試、詳細、移除都正常；同一台再存一次說「已經在你的清單裡」
+- [ ] 換另一個帳號登入：看不到前一個人的事務機；把前一個人的 id 打進網址回「找不到」
+- [ ] 未啟用登入時：從另一台電腦開這頁會說「只能在這台主機本機使用」；在主機本機（localhost）可以用
+- [ ] 英文、日文介面：所有按鈕、步驟名稱、錯誤訊息、相容性狀態都有翻譯
+- [ ] 稽核記錄有 `mfp_detect`、`mfp_connection_create` 等事件，目標是設備位址，沒有報告內容
+- [ ] 非 FUJIFILM 的設備（例如 HP 小型機、Epson）：連線測試讀得到完整首頁、認得出廠牌，標「不支援」；HP 小型機（網頁伺服器 Virata-EmWeb）不可以出現「回應不是正常的 HTTP」（v1.16.86，`tests/test_mfp_client.py`）
+- [ ] **從事務機掃描**（v1.16.87）：連線測試結果有「從本站掃描：支援（平台玻璃…）」→ 儲存後清單有「掃描」→ 選項只列這台支援的（來源、色彩、解析度；紙張 A4 / Letter / 最大）→
+      把文件放上平台玻璃按「開始掃描」→ 排隊中 / 檢查事務機狀態 / 掃描中 / 合成 PDF / 存進工作區 → 完成，「開啟」打得開工作區的 PDF；「最近的掃描」列出來。
+      自動送紙器多頁合成一份；送紙器沒紙講「自動送紙器裡沒有紙」；平台玻璃上沒放東西講清楚原因；掃描中按取消，設備上的工作會被刪掉。
+      **實機**：HP LaserJet MFP M141w（平台玻璃、eSCL）掃一次，存進工作區的 PDF 打開確認內容
+- [ ] **排隊**（v1.16.87）：兩個帳號對同一台同時按掃描 → 第二個顯示「排隊中：前面還有 1 件」、清單標「使用中」，第一個完成後第二個才開始；
+      排隊中取消不會碰到設備；同一人在同一台排第三件被拒絕；設備正在掃描時另一個人做連線測試，最多等 30 秒，等不到講「正在處理其他人的工作」
+- [ ] **共用事務機**（v1.16.87，設定 → 共用事務機 `/admin/mfp`）：管理員連線測試 → 「儲存為共用事務機」→ 「成員」勾使用者與群組 → 存檔；
+      成員（含群組成員、子群組的成員）的「事務機取件」頁出現這台、標「共用」、沒有改名與移除、可以重新測試與掃描；非成員看不到，拿 id 打 API 回 404；
+      一般使用者打管理端點回 403；成員裡沒有工具權限的人會被列出來提醒；刪除帳號 / 群組後成員資格跟著拿掉
+- [ ] **實機驗證（拿到設備後）**：C5571 → C5570 → C4570 → C6680 各跑一次連線測試，下載報告存進 docs-share/mfp-fetch/
 
 #### 乘車證明整理 (transit-proof) 🆕 v1.14.17
 - [ ] 上傳台鐵 / 高鐵乘車證明 PDF → 日期、交通工具、起訖、費用成表
@@ -2148,6 +2211,11 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] 錄音檔大於「錄音檔上限」→ 413，訊息有「這是大小上限，不是格式問題」（英 / 日介面照介面語言顯示）；
       小於「錄音檔上限」但大於「單檔上限」→ 收得下
 - [ ] 上傳上百 MB 的錄音時進度條在動（不是只有轉圈）；錄音檔只讀檔頭判斷格式、內容串流寫入（不整份讀進記憶體）
+- [ ] **大的掃描 PDF 存得進來、服務記憶體不跟著暴增**（v1.16.83）：管理員把單檔上限調到 300 MB 以上 →
+      上傳一份 200 MB 以上的 PDF 到「我的工作區」，同時在主機上看服務的記憶體（`ps -o rss` / 工作管理員）——
+      不可以漲出檔案大小那麼多；下載回來跟原檔一樣（比 SHA-256）。作業結果（例如合併出一份大 PDF）按「存至工作區」也一樣
+- [ ] **同時存兩個大檔不會一起擠過額度**（v1.16.83）：額度設成剛好只放得下一份，兩個分頁同時上傳 → 一個成功、一個顯示「容量已滿」
+- 自動化：`tests/test_workspace_large_files.py`（路徑式存檔、搬檔與失敗還原、記憶體峰值、容量預留、驗證、自動保存沿用）
 - 自動化：`tests/test_workspace_audio.py`（認格式的正例與反例、只讀檔頭、串流寫入、錄音上限與訊息、額度、`preview` / `kind`、
   保留期與管理員統計、設定頁、轉逐字稿頁的按鈕交集、`/from-workspace` 端到端與跨使用者）
 
@@ -2227,6 +2295,9 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       `pyvenv.cfg` 的 `home` 在 `/opt/jt-doc-tools/python/…` 底下（不是系統、也不是 `/root/…`）；之後再換系統 Python 不受影響
 - [ ] **環境好好的安裝跑 `jtdt update` 不重建**（`pyvenv.cfg` 的 `home` 不變、沒有重新下載 torch）
 - [ ] 全新安裝（`install.sh`，Linux）：`/opt/jt-doc-tools/python/` 有 Python 3.12，`.venv` 建在它上面；服務帳號讀得到
+- [ ] **沒有終端機也裝得完**（v1.16.83）：從另一台機器 `ssh 主機 'curl -fsSL …/install.sh | bash'`（不加 `-t`）→
+      不停在「選擇監聽位址」，用預設的 127.0.0.1 裝完並提示 `JTDT_HOST=0.0.0.0`；直接在終端機上跑仍然會問。
+      自動化：`tests/test_install_sh_without_tty.py`（`setsid` 沒有控制終端時退回預設、`script` 有終端時照常問）
 - [ ] venv 的 Python 在 `/root/…` 或 `/home/…`（舊版 update 用 root 的 uv 重建過）→ 也算壞的、會重建
 - [ ] **Windows**：全新安裝（或重跑安裝程式）後 `C:\Program Files\jt-doc-tools\.venv\pyvenv.cfg` 的 `home` 在
       `C:\Program Files\jt-doc-tools\python\…` 底下（不是 `C:\Users\<安裝者>\AppData\Roaming\uv\python`）；
@@ -2313,7 +2384,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] Windows **沒有 `sudo`**：文件裡的指令要分平台寫
       （Linux/macOS `sudo jtdt update`；Windows 先開系統管理員 PowerShell）。
 
-## 4. API 覆蓋檢查 🆕（v1.8.55 起完整列出，現 51 個工具）
+## 4. API 覆蓋檢查 🆕（v1.8.55 起完整列出，現 52 個工具）
 
 每個工具至少 1 個 `/api/<tool-id>` endpoint（路徑：`/tools/<tool-id>/api/<tool-id>` 或 `/tools/<tool-id>/convert`）。發版前 curl 抽測：
 
@@ -2411,6 +2482,22 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `/tools/submission-check/api/self-entities` (CRUD)
 - [ ] `/tools/transit-proof/api/transit-proof` — POST files[] → JSON `{ok, count, entries, failed}`；
       **認不出的檔不會讓整批失敗**（HTTP 仍 200），要看 `failed` 是不是空的
+- [ ] `/tools/mfp-fetch/api/detect`（Beta，v1.16.84）— POST JSON `{host, port?, scheme?}` → `{ok, token, report}`；
+      公網 / 回送 / metadata 位址、非網頁埠回 400（`ADDR_*` / `PORT_NOT_ALLOWED`）；5 分鐘超過 10 次回 429。
+      `/tools/mfp-fetch/api/connections`（GET 清單、POST `{token}` 儲存）、`/tools/mfp-fetch/api/connections/{conn_id}`
+      （GET / PATCH / DELETE）、`/tools/mfp-fetch/api/connections/{conn_id}/test`、
+      `/tools/mfp-fetch/api/connections/{conn_id}/report`：**別人的 id 一律 404**；用 API token 呼叫時歸屬 token 的持有者。
+      自動化：`tests/test_mfp_fetch_tool.py`、`tests/test_mfp_client.py`
+- [ ] `/tools/mfp-fetch/api/connections/{conn_id}/scan`（Beta，v1.16.87）— POST `{source, color, resolution, paper, file_name}` → 202 掃描紀錄；
+      設定不在這台的能力範圍 400（`SCAN_OPTION_INVALID`）、沒有 eSCL 400（`SCAN_NOT_SUPPORTED`）、隊伍滿 429（`DEVICE_QUEUE_FULL` / `OWNER_QUEUE_FULL`）。
+      `/tools/mfp-fetch/api/scans`（最近 20 筆）、`/tools/mfp-fetch/api/scans/{scan_id}`（狀態、`ahead`、`phase`）、
+      `/tools/mfp-fetch/api/scans/{scan_id}/cancel`、`/tools/mfp-fetch/api/scans/{scan_id}/download`：**別人的掃描 id 一律 404**；
+      結果存進呼叫者自己的工作區（`workspace_file_id`），工作區停用時才能下載。
+      自動化：`tests/test_mfp_shared_and_scan.py`、`tests/test_mfp_escl.py`、`tests/test_mfp_queue.py`
+- [ ] `/tools/mfp-fetch/api/shared`（GET 清單、POST `{token}` 建立）、`/tools/mfp-fetch/api/shared/{conn_id}`（PATCH / DELETE）、
+      `/tools/mfp-fetch/api/shared/{conn_id}/test`、`/tools/mfp-fetch/api/shared/{conn_id}/members`（GET / PUT）、
+      `/tools/mfp-fetch/api/shared-subjects`（Beta，v1.16.87）：**非管理員一律 403**（`ADMIN_ONLY`）；成員只收存在的使用者與群組（400 `MEMBERS_INVALID`）。
+      自動化：`tests/test_mfp_shared_and_scan.py`、`tests/test_mfp_scan_page_browser.py`
 
 ### 共通驗證項
 每個 endpoint 至少要：
@@ -2916,7 +3003,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 目前沒有自動化測試碰過，跑 `python tools/report_endpoint_test_coverage.py`，
 那份是**提示不是判決**。
 
-共 **312 支**（工具首頁不列，§2 已逐支驗收）。
+共 **313 支**（工具首頁不列，§2 已逐支驗收）。
 
 **全站（認證 / 帳號 / 工作區 / 介面語言）**
 
@@ -3189,6 +3276,10 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       驗：①`has_result` 與 `job` 照實 ②別人的、不存在的、已刪除的都是同一個 **404** ③刪除是軟刪除、寫稽核（`official_doc_case_delete`）
 - [ ] `POST /tools/official-doc/case/{case_id}/rename` —— 改名（v1.16.66）。
       驗：①超過 80 字 **400** 不截斷、不是文字 **400** ②控制字元與多餘空白收掉 ③別人的 **404**
+- [ ] `POST /tools/official-doc/case/{case_id}/doc-no` —— 補填或修改文號（v1.16.86）。
+      驗：①超過 60 字 **400** 不截斷、不是文字 **400**、空字串清掉 ②控制字元與多餘空白收掉 ③別人的 **404**、管理員可以
+      ④不改草稿 ⑤清單的 `doc_no`：函撰擬時的發文字號、DI 匯入的函（發文字號）與簽（文號）自動帶入；舊案件補欄位不動最後修改時間
+      ⑥搜尋 `q` 找得到文號
 - [ ] `GET /tools/official-doc/case/{case_id}/di`、`POST /tools/official-doc/cases/di` —— 歷史案件下載 DI 檔、批次打包成 zip（v1.16.75）。
       驗：①下載的是最新那一版 ②簽辦意見 **400**；批次裡略過的件數在 `X-Jtdt-Di-Skipped`、全部略過 **400** ③`case_ids` 不是字串陣列、空的、超過 100 件 **400**
       ④別人的、不存在的、已刪除的 **404**；批次裡夾一件別人的整批 **404**；管理員寫稽核

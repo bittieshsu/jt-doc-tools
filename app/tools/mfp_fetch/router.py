@@ -1,0 +1,702 @@
+"""事務機取件（Beta）路由。
+
+目前做得到的：新增事務機（IP / 主機名稱）、連線測試（逐步診斷＋型號辨識＋下載診斷報告）、
+我的事務機清單（改名、重新測試、移除）、**從事務機掃描進工作區**（eSCL）、**共用事務機**（管理員建立、
+加成員）。登入信箱、列出文件、取件要等實機驗證後才開放（規格書與決策在 docs-share/mfp-fetch/）。
+
+## 擁有者
+
+* 啟用認證：`u<user_id>`（API token 呼叫時是 token 的持有者 —— 認證閘門已把持有者放進
+  `request.state.user`；沒有持有者的 token 在那裡就被擋掉了）。
+* 未啟用認證：`local`。**只准本機**（傳輸層對端是回送位址、Host 是 localhost、沒有轉送標頭）
+  或帶有效 API token —— 規格書要求未啟用認證時不可以讓遠端用這支（它會讓伺服器去連區網設備）。
+* 共用事務機：`shared`。成員（使用者、群組含巢狀上層、組織單位）看得到、可以測試與掃描；
+  改名、移除、成員只有管理員（未啟用認證時就是本機）。
+
+## 排隊
+
+同一台**實體設備**一次只做一件事（`mfp_queue`）：連線測試最多等 `PROBE_WAIT` 秒，掃描在背景排隊。
+每台、每人都有上限，超過直接拒絕、不往設備送（使用者 2026-10-14：以免塞爆事務機作業）。
+
+網頁與 API 走同一組端點（`/tools/mfp-fetch/api/...`）。
+"""
+from __future__ import annotations
+
+import asyncio
+import ipaddress
+import json
+import logging
+import secrets
+import threading
+import time
+from typing import Any, Optional
+
+from fastapi import APIRouter, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+
+from ...core import mfp_client, mfp_escl, mfp_profiles, mfp_queue, mfp_scan, mfp_store
+from ...core.http_utils import content_disposition
+
+logger = logging.getLogger("app.mfp_fetch")
+
+router = APIRouter()
+
+#: 每位擁有者 5 分鐘內最多幾次連線測試（含「重新測試」）。
+RATE_LIMIT = 10
+RATE_WINDOW = 300
+#: 連線測試結果保留多久可以「儲存」（秒）。
+DETECTION_TTL = 900
+#: 連線測試排隊最多等幾秒（設備正在幫別人掃描時）。
+PROBE_WAIT = 30.0
+
+MESSAGES: dict[str, str] = {
+    "LOCAL_ONLY": "未啟用登入時，事務機取件只能在這台主機本機使用；多人或從其他電腦使用請先啟用登入",
+    "NOT_LOGGED_IN": "尚未登入",
+    "RATE_LIMITED": "連線測試太頻繁，請稍候再試",
+    "BUSY": "上一個連線測試還在進行中，請等它完成",
+    "BAD_REQUEST": "請求格式不正確",
+    "DETECTION_EXPIRED": "連線測試結果已過期，請重新測試後再儲存",
+    "NOT_FOUND": mfp_store.NOT_FOUND_MESSAGE,
+    "DUPLICATE": mfp_store.DUPLICATE_MESSAGE,
+    "LIMIT": mfp_store.LIMIT_MESSAGE,
+    "NO_REPORT": "這台事務機還沒有連線測試的報告",
+    "SHARED_READ_ONLY": "這是管理員設定的共用事務機，只有管理員可以改名或移除",
+    "ADMIN_ONLY": "只有管理員可以管理共用事務機",
+    "MEMBERS_INVALID": "成員清單不正確（只能是使用者、群組或組織單位）",
+    **mfp_queue.MESSAGES,
+    **{k: v for k, v in mfp_scan.MESSAGES.items() if k.startswith("SCAN_")},
+}
+
+
+def _err(code: str, status: int, **extra) -> JSONResponse:
+    msg = MESSAGES.get(code) or mfp_escl.MESSAGES.get(code) or code
+    return JSONResponse({"ok": False, "code": code, "message": msg, **extra}, status_code=status)
+
+
+# --------------------------------------------------------------------------- 擁有者
+
+_FORWARD_HEADERS = ("x-forwarded-for", "x-forwarded-host", "x-real-ip", "forwarded")
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]"}
+
+
+def _is_local_request(request: Request) -> bool:
+    peer = (request.client.host if request.client else "") or ""
+    try:
+        if not ipaddress.ip_address(peer).is_loopback:
+            return False
+    except ValueError:
+        return False
+    if any(request.headers.get(h) for h in _FORWARD_HEADERS):
+        return False          # 經過反向代理 —— 對端是回送位址也不算本機
+    host = (request.headers.get("host") or "").strip().lower()
+    if host.startswith("["):
+        host = host.split("]", 1)[0] + "]"
+    else:
+        host = host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+    return host in _LOCAL_HOSTS
+
+
+class _OwnerError(Exception):
+    def __init__(self, code: str, status: int):
+        super().__init__(code)
+        self.code, self.status = code, status
+
+
+def _owner(request: Request) -> tuple[str, Optional[int]]:
+    from ...core import auth_settings
+    if auth_settings.is_enabled():
+        user = getattr(request.state, "user", None)
+        uid = user.get("user_id") if isinstance(user, dict) else None
+        if uid is None:
+            raise _OwnerError("NOT_LOGGED_IN", 401)
+        return f"u{int(uid)}", int(uid)
+    if getattr(request.state, "api_token_label", None) is not None:
+        return "local", None       # 有效 API token（閘門已驗過）
+    if not _is_local_request(request):
+        raise _OwnerError("LOCAL_ONLY", 403)
+    return "local", None
+
+
+class _Who:
+    """這次請求是誰、看得到哪些共用事務機、是不是管理員。"""
+
+    def __init__(self, request: Request):
+        self.owner, self.uid = _owner(request)
+        if self.uid is None:
+            # 未啟用登入（只准本機）：單人模式，共用事務機全部看得到、可以管理
+            self.subjects: list[tuple[str, str]] = []
+            self.all_shared = True
+            self.admin = True
+        else:
+            from ...core import permissions
+            self.subjects = permissions.subjects_for_user(self.uid)
+            self.all_shared = False
+            self.admin = permissions.is_admin(self.uid)
+
+    def visible(self, conn_id: int, with_report: bool = False) -> Optional[dict]:
+        """自己的、或自己是成員的共用事務機；管理員看得到每一台共用事務機（管理頁要看詳細與報告）。
+        清單（`list_visible`）不一樣：管理員自己的「事務機取件」頁照樣只列他是成員的。"""
+        return mfp_store.get_visible(self.owner, self.subjects, conn_id,
+                                     all_shared=self.all_shared or self.admin, with_report=with_report)
+
+
+def _user_label(request: Request) -> str:
+    from ...core import sessions as _sess
+    return _sess.user_label(getattr(request.state, "user", None)) or ""
+
+
+# --------------------------------------------------------------------------- 次數限制與暫存結果
+
+_LOCK = threading.Lock()
+_recent: dict[str, list[float]] = {}
+_busy: set[str] = set()
+#: token → {owner, host, port, scheme, report, exp}
+_detections: dict[str, dict] = {}
+
+
+def _acquire(owner: str) -> Optional[str]:
+    now = time.time()
+    with _LOCK:
+        hist = [t for t in _recent.get(owner, []) if now - t < RATE_WINDOW]
+        if owner in _busy:
+            return "BUSY"
+        if len(hist) >= RATE_LIMIT:
+            _recent[owner] = hist
+            return "RATE_LIMITED"
+        hist.append(now)
+        _recent[owner] = hist
+        _busy.add(owner)
+    return None
+
+
+def _release(owner: str) -> None:
+    with _LOCK:
+        _busy.discard(owner)
+
+
+def _remember(owner: str, host: str, port, scheme, report: dict) -> str:
+    now = time.time()
+    tok = secrets.token_urlsafe(24)
+    with _LOCK:
+        for k in [k for k, v in _detections.items() if v["exp"] < now]:
+            _detections.pop(k, None)
+        mine = sorted((v["exp"], k) for k, v in _detections.items() if v["owner"] == owner)
+        for _exp, k in mine[:-20]:
+            _detections.pop(k, None)
+        _detections[tok] = {"owner": owner, "host": host, "port": port, "scheme": scheme,
+                            "report": report, "exp": now + DETECTION_TTL}
+    return tok
+
+
+def _take(owner: str, tok: str) -> Optional[dict]:
+    with _LOCK:
+        d = _detections.get(tok or "")
+        if not d or d["owner"] != owner or d["exp"] < time.time():
+            return None
+        return _detections.pop(tok)
+
+
+# --------------------------------------------------------------------------- 稽核
+
+def _audit(request: Request, event: str, target: str, details: dict) -> None:
+    try:
+        from ...core import audit_db, client_ip, sessions as _sess
+        audit_db.log_event(event, username=_sess.user_label(getattr(request.state, "user", None)) or "",
+                           ip=client_ip.real_client_ip(request), target=target[:200], details=details)
+    except Exception:  # noqa: BLE001 —— 稽核寫不進去不可以讓操作失敗
+        logger.warning("mfp 稽核寫入失敗：%s", event)
+
+
+async def _json(request: Request) -> dict:
+    try:
+        body = await request.json()
+    except (ValueError, json.JSONDecodeError):
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
+def _norm_port(v) -> Optional[int]:
+    if v in (None, "", "auto"):
+        return None
+    return v  # 由 mfp_client.parse_port_scheme 驗證
+
+
+def _norm_scheme(v) -> Optional[str]:
+    return None if v in (None, "", "auto") else v
+
+
+def _policy_error(e: mfp_client.PolicyError) -> JSONResponse:
+    return JSONResponse({"ok": False, "code": e.code, "message": e.message, "detail": e.detail},
+                        status_code=400)
+
+
+def _queue_error(e: mfp_queue.QueueError) -> JSONResponse:
+    return JSONResponse({"ok": False, "code": e.code, "message": e.message, "waiting": e.waiting},
+                        status_code=429)
+
+
+def _probe_in_turn(owner: str, host: str, port, scheme) -> dict:
+    """輪到這台設備才做連線測試（同一台一次只做一件）。"""
+    device = mfp_client.device_key(host)
+    with mfp_queue.turn(device, owner, "test", timeout=PROBE_WAIT):
+        return mfp_client.probe(host, port, scheme)
+
+
+async def _run_probe(owner: str, host: str, port, scheme) -> tuple[Optional[dict], Optional[JSONResponse]]:
+    busy = _acquire(owner)
+    if busy:
+        return None, _err(busy, 429)
+    try:
+        mfp_client.parse_port_scheme(port, scheme)          # 先驗輸入（不合法就不排隊、不連線）
+        report = await asyncio.to_thread(_probe_in_turn, owner, host, port, scheme)
+        return report, None
+    except mfp_client.PolicyError as e:
+        return None, _policy_error(e)
+    except mfp_queue.QueueError as e:
+        return None, _queue_error(e)
+    finally:
+        _release(owner)
+
+
+def _device_state(host: str) -> dict:
+    """清單用：這台現在有沒有在忙、後面排了幾件（查不到位址就當閒置；不連線）。"""
+    try:
+        ip = str(ipaddress.ip_address(host))
+    except ValueError:
+        ip = _resolved.get(host)
+        if not ip:
+            return {"busy": False, "waiting": 0, "kind": None}
+    return mfp_queue.snapshot(ip)
+
+
+#: 主機名稱 → 最近一次排隊用的位址（清單顯示忙碌狀態用；不為了顯示去查 DNS）。
+_resolved: dict[str, str] = {}
+
+
+def _with_state(c: dict, who: _Who) -> dict:
+    c = dict(c)
+    c["queue"] = _device_state(c["host"])
+    # 共用事務機一律在管理頁（設定 → 共用事務機）改名、移除；工具頁上的這兩個動作只對自己的
+    c["can_manage"] = not c.get("shared")
+    escl = c.get("escl") or None
+    c["scan"] = ({"model": escl.get("model"), "sources": escl.get("sources") or {}}
+                 if escl and escl.get("sources") else None)
+    c.pop("escl", None)
+    return c
+
+
+# --------------------------------------------------------------------------- 頁面
+
+@router.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    templates = request.app.state.templates
+    return templates.TemplateResponse(request, "mfp_fetch.html", {
+        "request": request, "allowed_ports": list(mfp_client.ALLOWED_PORTS),
+        "status_messages": mfp_profiles.STATUS_MESSAGES,
+        "status_labels": {k: list(v) for k, v in mfp_profiles.STATUS_LABELS.items()}})
+
+
+# --------------------------------------------------------------------------- API：連線測試與我的事務機
+
+@router.post("/api/detect")
+async def api_detect(request: Request):
+    """連線測試（不儲存）。回傳完整報告與一個 15 分鐘內有效、只屬於本人的 token，用來「儲存這台」。"""
+    try:
+        owner, _uid = _owner(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    body = await _json(request)
+    host = str(body.get("host") or "")[:300]
+    port, scheme = _norm_port(body.get("port")), _norm_scheme(body.get("scheme"))
+    report, err = await _run_probe(owner, host, port, scheme)
+    _audit(request, "mfp_detect", host, {
+        "ok": err is None, "status": (report or {}).get("detection", {}).get("status"),
+        "reachable": (report or {}).get("summary", {}).get("reachable_on")})
+    if err:
+        return err
+    # 存正規化後的值（已經過 parse_port_scheme 驗證）：數字的連接埠、小寫的協定
+    port = int(port) if port is not None else None
+    scheme = str(scheme).lower() if scheme else None
+    tok = _remember(owner, report["target"]["host"], port, scheme, report)
+    return {"ok": True, "token": tok, "report": report}
+
+
+@router.get("/api/connections")
+async def api_list(request: Request):
+    """我的事務機：自己新增的＋自己是成員的共用事務機（`shared: true`）。"""
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    items = mfp_store.list_visible(who.owner, who.subjects, all_shared=who.all_shared)
+    return {"ok": True, "connections": [_with_state(c, who) for c in items],
+            "max": mfp_store.MAX_PER_OWNER, "admin": who.admin}
+
+
+@router.post("/api/connections")
+async def api_create(request: Request):
+    """把一次連線測試的結果存成「我的事務機」。只收 token（不收位址）：存的一定是測過的那一台。"""
+    try:
+        owner, uid = _owner(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    body = await _json(request)
+    det = _take(owner, str(body.get("token") or ""))
+    if det is None:
+        return _err("DETECTION_EXPIRED", 410)
+    try:
+        conn = mfp_store.create(owner, uid, det["host"], det["port"], det["scheme"],
+                                str(body.get("display_name") or ""), det["report"])
+    except mfp_store.StoreError as e:
+        return _err(e.code, 409)
+    _audit(request, "mfp_connection_create", det["host"], {"id": conn["id"], "model": conn.get("model")})
+    return {"ok": True, "connection": conn}
+
+
+@router.get("/api/connections/{conn_id}")
+async def api_get(request: Request, conn_id: int):
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    c = who.visible(conn_id, with_report=True)
+    return {"ok": True, "connection": _with_state(c, who) | {"last_report": c.get("last_report")}} \
+        if c else _err("NOT_FOUND", 404)
+
+
+@router.patch("/api/connections/{conn_id}")
+async def api_rename(request: Request, conn_id: int):
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    body = await _json(request)
+    c = who.visible(conn_id)
+    if c and c.get("shared"):
+        return _err("SHARED_READ_ONLY", 403)
+    c = mfp_store.rename(who.owner, conn_id, str(body.get("display_name") or ""))
+    if not c:
+        return _err("NOT_FOUND", 404)
+    _audit(request, "mfp_connection_rename", c["host"], {"id": conn_id})
+    return {"ok": True, "connection": c}
+
+
+async def _retest(request: Request, who: _Who, c: dict) -> Any:
+    report, err = await _run_probe(who.owner, c["host"], c["port"], c["scheme"])
+    _audit(request, "mfp_test", c["host"], {
+        "id": c["id"], "ok": err is None, "shared": bool(c.get("shared")),
+        "status": (report or {}).get("detection", {}).get("status")})
+    if err:
+        return err
+    scope = mfp_store.SHARED if c.get("shared") else who.owner
+    c2 = mfp_store.save_test(scope, c["id"], report)
+    return {"ok": True, "connection": _with_state(c2, who), "report": report}
+
+
+@router.post("/api/connections/{conn_id}/test")
+async def api_test(request: Request, conn_id: int):
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    c = who.visible(conn_id)
+    if not c:
+        return _err("NOT_FOUND", 404)
+    return await _retest(request, who, c)
+
+
+@router.get("/api/connections/{conn_id}/report")
+async def api_report(request: Request, conn_id: int):
+    """下載最近一次連線測試的診斷報告（JSON，已遮蔽帳密與工作階段資訊）。"""
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    c = who.visible(conn_id, with_report=True)
+    if not c:
+        return _err("NOT_FOUND", 404)
+    if not c.get("last_report"):
+        return _err("NO_REPORT", 404)
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(c.get("last_test_at") or time.time()))
+    name = f"mfp-diagnostic-{c['host'].replace(':', '_')}-{stamp}.json"
+    return Response(json.dumps(c["last_report"], ensure_ascii=False, indent=2),
+                    media_type="application/json",
+                    headers={"Content-Disposition": content_disposition(name, "attachment"),
+                             "Cache-Control": "no-store"})
+
+
+@router.delete("/api/connections/{conn_id}")
+async def api_delete(request: Request, conn_id: int):
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    c = who.visible(conn_id)
+    if c and c.get("shared"):
+        return _err("SHARED_READ_ONLY", 403)
+    c = mfp_store.get_for(who.owner, conn_id)
+    if not c or not mfp_store.delete(who.owner, conn_id):
+        return _err("NOT_FOUND", 404)
+    _audit(request, "mfp_connection_delete", c["host"], {"id": conn_id})
+    return {"ok": True}
+
+
+# --------------------------------------------------------------------------- API：掃描
+
+def _scan_target(c: dict) -> tuple[dict, str, int]:
+    """這台用哪個協定與連接埠掃描（連線測試時讀到 eSCL 的那一組）。"""
+    rep = c.get("last_report") or {}
+    escl = rep.get("escl") or {}
+    caps = escl.get("caps") or {}
+    if not caps or not escl.get("sources"):
+        raise mfp_escl.ScanError("SCAN_NOT_SUPPORTED")
+    sc, pt = str(escl.get("scheme") or ""), escl.get("port")
+    pairs = mfp_client.parse_port_scheme(pt, sc)       # 再驗一次（紀錄被竄改也不會連到別的埠）
+    return caps, pairs[0][0], pairs[0][1]
+
+
+@router.post("/api/connections/{conn_id}/scan")
+async def api_scan(request: Request, conn_id: int):
+    """從這台事務機掃描，存進自己的工作區。回傳掃描紀錄（202）；用 `GET /api/scans/{id}` 看進度。"""
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    c = who.visible(conn_id, with_report=True)
+    if not c:
+        return _err("NOT_FOUND", 404)
+    body = await _json(request)
+    opts = {k: body.get(k) for k in ("source", "color", "resolution", "paper", "file_name")}
+    try:
+        caps, scheme, port = _scan_target(c)
+        device = await asyncio.to_thread(mfp_client.device_key, c["host"])
+        _resolved[c["host"]] = device
+        rec = mfp_scan.start(owner=who.owner, user_id=who.uid, user_label=_user_label(request), conn=c,
+                             caps=caps, opts=opts, device=device, ip=device, scheme=scheme, port=port)
+    except mfp_client.PolicyError as e:
+        return _policy_error(e)
+    except mfp_queue.QueueError as e:
+        return _queue_error(e)
+    except mfp_escl.ScanError as e:
+        return JSONResponse({"ok": False, "code": e.code, "message": e.message, "detail": e.detail},
+                            status_code=400)
+    _audit(request, "mfp_scan_start", c["host"], {"id": conn_id, "scan": rec["id"], "shared": bool(c.get("shared")),
+                                                  "settings": rec.get("settings")})
+    return JSONResponse({"ok": True, "scan": mfp_scan.public(rec)}, status_code=202)
+
+
+@router.get("/api/scans")
+async def api_scans(request: Request):
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    mfp_scan.prune()
+    return {"ok": True, "scans": [mfp_scan.public(r) for r in mfp_store.list_scans(who.owner, 20)]}
+
+
+@router.get("/api/scans/{scan_id}")
+async def api_scan_status(request: Request, scan_id: str):
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    rec = mfp_store.get_scan(who.owner, scan_id)
+    return {"ok": True, "scan": mfp_scan.public(rec)} if rec else _err("SCAN_NOT_FOUND", 404)
+
+
+@router.post("/api/scans/{scan_id}/cancel")
+async def api_scan_cancel(request: Request, scan_id: str):
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    rec = mfp_scan.cancel(who.owner, scan_id)
+    if not rec:
+        return _err("SCAN_NOT_FOUND", 404)
+    _audit(request, "mfp_scan_cancel", rec.get("conn_name") or "", {"scan": scan_id})
+    return {"ok": True, "scan": mfp_scan.public(rec)}
+
+
+@router.get("/api/scans/{scan_id}/download")
+async def api_scan_download(request: Request, scan_id: str):
+    """沒存進工作區的掃描檔（工作區停用或額度不夠時，留 24 小時）。"""
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    got = mfp_scan.result_file(who.owner, scan_id)
+    if not got:
+        return _err("SCAN_NO_FILE", 404)
+    path, name = got
+    return FileResponse(path, media_type="application/pdf", filename=name,
+                        headers={"Cache-Control": "no-store"})
+
+
+# --------------------------------------------------------------------------- API：共用事務機（管理員）
+
+def _admin(request: Request) -> _Who:
+    who = _Who(request)
+    if not who.admin:
+        raise _OwnerError("ADMIN_ONLY", 403)
+    return who
+
+
+@router.get("/api/shared")
+async def api_shared_list(request: Request):
+    try:
+        who = _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    return {"ok": True, "connections": [_with_state(c, who) for c in mfp_store.list_shared()],
+            "max": mfp_store.MAX_SHARED}
+
+
+@router.post("/api/shared")
+async def api_shared_create(request: Request):
+    """把管理員自己做的一次連線測試（`/api/detect` 的 token）存成共用事務機。"""
+    try:
+        who = _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    body = await _json(request)
+    det = _take(who.owner, str(body.get("token") or ""))
+    if det is None:
+        return _err("DETECTION_EXPIRED", 410)
+    try:
+        conn = mfp_store.create(mfp_store.SHARED, who.uid, det["host"], det["port"], det["scheme"],
+                                str(body.get("display_name") or ""), det["report"])
+    except mfp_store.StoreError as e:
+        return _err(e.code, 409)
+    _audit(request, "mfp_shared_create", det["host"], {"id": conn["id"], "model": conn.get("model")})
+    return {"ok": True, "connection": conn}
+
+
+@router.patch("/api/shared/{conn_id}")
+async def api_shared_rename(request: Request, conn_id: int):
+    try:
+        _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    body = await _json(request)
+    c = mfp_store.rename(mfp_store.SHARED, conn_id, str(body.get("display_name") or ""))
+    if not c:
+        return _err("NOT_FOUND", 404)
+    _audit(request, "mfp_shared_rename", c["host"], {"id": conn_id})
+    return {"ok": True, "connection": c}
+
+
+@router.post("/api/shared/{conn_id}/test")
+async def api_shared_test(request: Request, conn_id: int):
+    try:
+        who = _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    c = mfp_store.get_for(mfp_store.SHARED, conn_id)
+    if not c:
+        return _err("NOT_FOUND", 404)
+    return await _retest(request, who, c)
+
+
+@router.delete("/api/shared/{conn_id}")
+async def api_shared_delete(request: Request, conn_id: int):
+    try:
+        _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    c = mfp_store.get_for(mfp_store.SHARED, conn_id)
+    if not c or not mfp_store.delete(mfp_store.SHARED, conn_id):
+        return _err("NOT_FOUND", 404)
+    _audit(request, "mfp_shared_delete", c["host"], {"id": conn_id})
+    return {"ok": True}
+
+
+def _subject_names() -> tuple[dict, dict]:
+    from ...core import group_manager, user_manager
+    users = {str(u["id"]): u for u in user_manager.list_users()}
+    groups = {str(g["id"]): g for g in group_manager.list_groups()}
+    return users, groups
+
+
+def _describe_members(members: list[dict]) -> list[dict]:
+    """成員加上顯示名稱，與「有沒有這支工具的權限」（只對使用者算得出來）。"""
+    from ...core import auth_settings, permissions
+    users, groups = _subject_names()
+    out = []
+    for m in members:
+        d = dict(m)
+        if m["type"] == "user":
+            u = users.get(m["key"])
+            d["name"] = (u or {}).get("username") or ""
+            d["display_name"] = (u or {}).get("display_name") or ""
+            d["exists"] = u is not None
+            d["can_use_tool"] = (u is not None and auth_settings.is_enabled()
+                                 and permissions.user_can_use_tool(int(m["key"]), "mfp-fetch"))
+        elif m["type"] == "group":
+            g = groups.get(m["key"])
+            d["name"] = (g or {}).get("name") or ""
+            d["exists"] = g is not None
+        else:
+            d["name"] = m["key"]
+            d["exists"] = True
+        out.append(d)
+    return out
+
+
+@router.get("/api/shared/{conn_id}/members")
+async def api_shared_members(request: Request, conn_id: int):
+    try:
+        _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    if not mfp_store.get_for(mfp_store.SHARED, conn_id):
+        return _err("NOT_FOUND", 404)
+    return {"ok": True, "members": _describe_members(mfp_store.get_members(conn_id))}
+
+
+@router.put("/api/shared/{conn_id}/members")
+async def api_shared_set_members(request: Request, conn_id: int):
+    """整份換掉成員：`{"members": [{"type": "user"|"group"|"ou", "key": "..."}]}`。"""
+    try:
+        _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    c = mfp_store.get_for(mfp_store.SHARED, conn_id)
+    if not c:
+        return _err("NOT_FOUND", 404)
+    body = await _json(request)
+    raw = body.get("members")
+    if not isinstance(raw, list):
+        return _err("MEMBERS_INVALID", 400)
+    users, groups = _subject_names()
+    pairs: list[tuple[str, str]] = []
+    for m in raw:
+        if not isinstance(m, dict):
+            return _err("MEMBERS_INVALID", 400)
+        st, sk = str(m.get("type") or ""), str(m.get("key") or "")
+        if (st == "user" and sk not in users) or (st == "group" and sk not in groups):
+            return _err("MEMBERS_INVALID", 400)      # 只收存在的使用者與群組
+        pairs.append((st, sk))
+    try:
+        members = mfp_store.set_members(conn_id, pairs)
+    except (ValueError, LookupError):
+        return _err("MEMBERS_INVALID", 400)
+    _audit(request, "mfp_shared_members", c["host"], {
+        "id": conn_id, "count": len(members),
+        "members": [f"{m['type']}:{m['key']}" for m in members][:50]})
+    return {"ok": True, "members": _describe_members(members)}
+
+
+@router.get("/api/shared-subjects")
+async def api_shared_subjects(request: Request):
+    """成員挑選清單：使用者與群組（帳號、顯示名稱、來源）。"""
+    try:
+        _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    users, groups = _subject_names()
+    return {"ok": True,
+            "users": [{"key": k, "username": u.get("username"), "display_name": u.get("display_name"),
+                       "source": u.get("source")} for k, u in users.items()],
+            "groups": [{"key": k, "name": g.get("name"), "source": g.get("source")}
+                       for k, g in groups.items()]}

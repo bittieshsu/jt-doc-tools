@@ -3068,6 +3068,24 @@ def _later_marker_line(body: str) -> str:
     return ""
 
 
+#: 畫面送來的「選取所在那一行的段名或項次」最長幾個字（「說明：」「（十二）」都很短）。
+MAX_CONTEXT_CHARS = 40
+
+
+def context_marker(context: str) -> str:
+    """畫面送來的 `context`：**只收純粹是段名或項次的字串**（「一、」「（二）」「3.」「說明：」），
+    其他的一律當作沒送（回 `""`）—— 它只用來決定條列的層次，不可以變成能塞進提示或改變格式的管道。
+
+    為什麼要有它：選取從「一、」後面的內文開始時，項次留在草稿裡、沒有送來（不然改完「一、」會不見，
+    使用者 2026-10-07 回報）；結果改成條列時不知道這一段掛在「一、」底下，要點用了跟外層同一層的
+    「一、二、三」（使用者 2026-10-14 回報）。"""
+    c = (context or "").replace("\r", "").replace("\n", "").strip()
+    if not c or len(c) > MAX_CONTEXT_CHARS:
+        return ""
+    head, rest = split_marker(c + "\u2063")
+    return head.strip() if rest == "\u2063" and head.strip() else ""
+
+
 def _sub_marker(marker: str) -> Optional[str]:
     """改成條列時，要點用哪一層的項次：接在「二、」後面的用「（一）」、「（一）」後面的用「1.」…。
     沒有項次（「說明：」單獨一段、簽辦意見的一段）就用「一、」。主旨不分項 → `None`。"""
@@ -3112,11 +3130,14 @@ def _same_text(a: str, b: str) -> bool:
 
 def rewrite_paragraph(paragraph: str, ask: Callable[[str], str], *, kind: str = "shorter",
                       instruction: str = "", sources: Iterable[str] = (),
-                      mode: str = "sign") -> dict:
+                      mode: str = "sign", context: str = "") -> dict:
     """改寫一段，回 `{"text", "issues", "calls"}`。`text` 是改寫後的那一段（條列的話以換行分開）。
 
     開頭的段名與項次（「說明：」「一、」）**不送給模型、原樣接回 `text` 前面** —— 那是格式不是內文。
     內文第二行起又有項次的（一次選了好幾項）不改寫：改寫成一段之後後面的項次會不見。
+
+    `context`：選取所在那一行的段名或項次（畫面送來；段落本身沒帶項次時，用它決定條列要點的層次）。
+    只收純粹是段名或項次的字串（`context_marker`），不送給模型、也不接回 `text`。
 
     檢查跟整份草稿一樣：改寫後出現使用者沒給的數字、日期、法規、核准狀態就標出來；
     另外**原本那段的數字與日期改寫後不見了**也要提示（精簡最容易把它們刪掉）。"""
@@ -3143,7 +3164,9 @@ def rewrite_paragraph(paragraph: str, ask: Callable[[str], str], *, kind: str = 
         raise ValueError("選取的範圍跨了好幾個段落或項次，改寫後後面的項次會不見。請一次改寫一項。")
     srcs = [canonical_terms(strip_injection(s)) for s in sources if s]
     body = canonical_terms(body)
-    sub = _sub_marker(marker) if kind == "list" else ""
+    # 段落自己帶了項次就以它為準；沒有的話看它所在那一行的項次（畫面送來的 context）
+    level = marker or context_marker(context)
+    sub = _sub_marker(level) if kind == "list" else ""
     if kind == "list" and sub is None:
         raise ValueError("主旨不分項，請改用其他改寫方式。")
     req = ("items",) if kind == "list" else ("text",)
@@ -3154,7 +3177,7 @@ def rewrite_paragraph(paragraph: str, ask: Callable[[str], str], *, kind: str = 
         if kind == "list":
             items = [_clean_item(x) for x in _as_items(got.get("items"))]
             return _format_list(_clean_item(_as_text(got.get("lead"))), [i for i in items if i],
-                                sub, bool(marker)), n
+                                sub, bool(level)), n
         return _clean_item(_as_text(got.get("text"))).replace("\n", ""), n
 
     text, calls = once()

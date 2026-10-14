@@ -188,17 +188,24 @@ def test_plain_users_cannot_open_the_llm_page(admin_session, kb_isolated):
 
 # ------------------------------------------------------------------ 側欄與公文撰擬的 Beta
 
+#: 「設定」裡標 Beta 的頁面與理由。Beta 是刻意的告知，**多一個就要寫進來**，不可以順手加在別的頁面上。
+_BETA_SETTINGS = {
+    "/admin/knowledge": "公文知識庫",
+    "/admin/mfp": "共用事務機 —— 屬於事務機取件，實機實測通過之前一律標 Beta（使用者 2026-10-13）",
+}
+
+
 def test_only_the_knowledge_entry_is_marked_beta_in_the_settings_group(client, auth_off):
     import app.main as m
     betas = [it["url"] for it in m._NAV_SETTINGS_ALL if it.get("beta")]
-    assert betas == ["/admin/knowledge"], betas
+    assert sorted(betas) == sorted(_BETA_SETTINGS), betas
     home = client.get("/").text
     grp = re.search(r'<details class="sb-group"[^>]*data-sbkey="設定".*?</details>', home, re.S)
     assert grp, "找不到側欄的「設定」那一組"
     items = re.findall(r'<a class="sb-item" href="([^"]+)"(.*?)</a>', grp.group(0), re.S)
     assert items, "「設定」那一組一項都沒找到"
     for url, inner in items:
-        assert ('class="tool-beta"' in inner) == (url == "/admin/knowledge"), url
+        assert ('class="tool-beta"' in inner) == (url in _BETA_SETTINGS), url
 
 
 def test_searching_for_embedding_finds_the_llm_settings_page():

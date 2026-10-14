@@ -5,11 +5,45 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (911 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (916 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.87] - 2026-10-14
+
+- Fetch from MFP (beta), scan straight into the workspace: on MFPs that support eSCL (AirPrint / Mopria scanning), press Scan under My MFPs, choose the source (flatbed glass, one- or two-sided document feeder), colour, resolution and paper size, and the scanned PDF is saved to your own workspace, with multiple pages combined into one file. This also works on small MFPs that have no mailbox for scans. The connection test now reads the scan interface's capabilities, so the page only offers options the device supports; no credentials are sent. If the workspace is off or full, the scan is kept for 24 hours for you to download.
+- Shared MFPs (Settings, Shared MFPs): administrators create MFPs and choose members (users or groups, including members of subgroups). Members see them on their Fetch from MFP page without adding them, and can test again, view details and scan, but cannot rename or remove them. Membership is removed when the account or group is deleted.
+- Queueing: each MFP serves one person at a time and others queue automatically, with the number ahead shown on the page and busy devices marked in the list. At most 10 jobs per device and 2 per person on the same device; beyond that the request is refused instead of being passed to the MFP. A connection test waits up to 30 seconds for a device that is scanning.
+- The connection test result has a new Scan from this site field, and for vendors outside the model list the model reported by eSCL is shown. New API endpoints for scanning, scan history, shared MFPs and members are documented in the API guide.
+- Data protection page: covers shared MFP members, scan history, where scanned files are stored, and the data flow when scanning.
+
+## [1.16.86] - 2026-10-14
+
+- Official document drafting, case history: a new Document number column (`文號`). It is filled in automatically from the issuing number entered when drafting a letter and from imported DI files (letters and approval memos), and you can add or change it from the list with the pencil next to it, for example after your document system assigns the number; leave it empty to clear it. It is a record on the case only and does not change the draft. The column can be sorted, hidden under Columns shown, and searched. New API: `POST /tools/official-doc/case/{case_id}/doc-no`.
+- The case table now adapts to the actual width of the list: when case names are about to be squeezed out, the document number and time wrap onto two lines first, then Open and DI become icon-only, then column headers and labels wrap, and only then does the list switch to one card per case; when there is room everything stays on one line. Column headers differ in width between languages, and fixed width thresholds left only two characters of the name in the English and Japanese interfaces, so the page now measures instead. Very long document numbers are truncated with an ellipsis (full text on hover), and card labels now have a gap before their values.
+- Fetch from MFP (beta): the Connection dropdown now uses the site's own dropdown style instead of the browser's native one, without flashing the native one while the page loads. The connection test no longer reports a small HP MFP as "not a normal HTTP response": its web server cuts the page off at 8 KB when the request asks for the connection to be closed after the response, so the test no longer asks for that (it closes the connection itself after reading); if a page really is cut off, the part received is still used for identification and the diagnosis notes that the response was incomplete. Compatibility is now a short status label (supported, not yet verified, not supported, sign-in required, not identified, unreachable) with a line of explanation instead of the whole sentence squeezed into the label; every button in My MFPs has an icon, with download report, rename and remove shown as icons only (labels on hover) so they fit on one row; Detail collapses when clicked again and the detail area has its own Collapse button; the Connection test button is the same height as the fields next to it.
+- Document translation: the long notes at the bottom of the page are now a "Before you start" section with two cards. Choosing a model is a table (model, type, recommendation, with the recommended one highlighted); translating a PDF lists which tool to use for each need (reading side by side, a document in the same format, scanned files), with the conversion engine comparison in an expandable detail. The document domain hint is now a field label with one line of help, and the source and target language dropdowns use the site's own style.
+
+## [1.16.85] - 2026-10-14
+
+- Official document drafting, rewrite "as a list": when you select text inside a numbered item of the explanation (for example under `一、`) and turn it into a list, the points now use the next level down (`（一）（二）` under `一、`, `1. 2.` under `（一）`) instead of the same level as the item, so the numbering of the explanation no longer gets mixed up. The page now sends the item number of that line along with the request, used only to decide the level and never sent to the model. For the same reason, turning text inside the subject into a list now explains that the subject cannot be itemised.
+
+## [1.16.84] - 2026-10-14
+
+- New tool, Fetch from MFP (beta): enter a multifunction printer's IP or host name to run a connection test that lists, step by step, the address check, TCP connection, TLS certificate (with the exact reason and certificate details when verification fails), HTTP response (headers, page title, tag-free excerpt, form field names) and what the model was identified from, with a downloadable diagnostic report. Tested devices can be saved to My MFPs and later retested, renamed or removed. Signing in to a mailbox, listing documents and fetching them will open once tested on real devices (FUJIFILM Apeos / ApeosPort planned); until then first-batch models are shown as not yet verified, never as supported.
+- Safety limits: internal network addresses only (loopback, link-local, public addresses and the server's own addresses are refused), web ports 80, 443, 8080 and 8443 only, GET requests only with no credentials or cookies, redirects followed only within the same device; cookies, passwords, CSRF tokens and session IDs in reports are masked; at most 10 tests per person in 5 minutes.
+- Each MFP belongs only to the person who added it; without sign-in enabled the tool works only on the server itself. Among the built-in roles, Document clerk has access; administrators can grant it to other roles. It has a public API (`/tools/mfp-fetch/api/...`), documented in the API guide.
+- The compliance page now covers what this tool stores and connects to; the MFP connection database is included in the daily backups and deleted together with an account.
+
+## [1.16.83] - 2026-10-13
+
+- The workspace no longer reads large files into memory: uploaded PDF / PNG files, job results saved automatically and job results saved with "Save to workspace" are now streamed. Previously everything except recordings was read whole, so a 200 MB result took 200 MB of memory.
+- Two saves at the same time can no longer both squeeze past the quota: each save reserves its space first, so when two saves each fit but together exceed the quota, only one succeeds. Previously both measured the usage from before either had written.
+- A save that fails part-way no longer leaves a half-written entry: the file is renamed into place only once complete, and its details are written last.
+- "Save to workspace" for a job result now runs in a worker thread, so saving a large file does not slow other pages.
+- The one-line installer stopped at the "listening address" question and aborted when run without a terminal (for example `ssh host 'curl … | sudo bash'`, a scheduled task or an automation tool). It now uses the default (local only) and explains how to open it to the network.
 
 ## [1.16.82] - 2026-10-12
 

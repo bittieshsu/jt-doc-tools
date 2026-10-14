@@ -18,6 +18,18 @@
 
 額度滿、格式不支援、尚未登入 —— 這些都記進 `job.meta["workspace"]`，由作業清單
 顯示原因，而**下載連結照樣保留**。無聲失敗最糟：使用者以為存好了，隔天檔案卻不在。
+
+## 工具自己已經存進工作區時不再存一份
+
+有的工具的「完成」就是存進工作區（例如事務機取件：匯入＝存進工作區）。那種作業會先在
+`job.meta["workspace"]` 記下 file_id；這裡確認那個檔**還在、而且屬於這個作業的擁有者**，
+就直接沿用 —— 不重複佔額度、也不再讀一次大檔。記錄指到的檔已經不在（過期 / 被刪）時，
+照一般流程存，不回傳一個不存在的 file_id。
+
+## 不整份讀進記憶體
+
+結果檔用路徑交給工作區（`save_file_for_key`），串流複製；原本是 `read_bytes()`，
+一份 200 MB 的結果就是 200 MB 的記憶體。
 """
 from __future__ import annotations
 
@@ -52,6 +64,9 @@ def _try_save(job: Any) -> Optional[dict]:
 
     if job.status != "done":
         return None
+    reused = _already_saved(job, ws)
+    if reused is not None:
+        return reused
     path = job.result_path
     if not path or not path.exists():
         return None
@@ -79,17 +94,34 @@ def _try_save(job: Any) -> Optional[dict]:
 
     name = job.result_filename or path.name
     try:
-        meta = ws.save_bytes_for_key(key, path.read_bytes(), name,
-                                     source_tool=job.tool_id,
-                                     user_label=getattr(job, "owner_label", ""))
+        meta = ws.save_file_for_key(key, path, name,
+                                    source_tool=job.tool_id,
+                                    user_label=getattr(job, "owner_label", ""))
     except ws.QuotaExceeded as e:
         return _reason("quota", str(e))
     except ws.UnsupportedType as e:
         return _reason("unsupported", str(e))
     except ws.WorkspaceDisabled:
         return _reason("workspace_disabled")
+    except ws.WorkspaceError as e:
+        return _reason("error", str(e)[:200])
     except OSError as e:
         return _reason("error", str(e)[:200])
     logger.info("job %s 結果已存入工作區（%s）", job.id, meta.get("file_id"))
     return {"saved": True, "file_id": meta.get("file_id"),
             "name": meta.get("name")}
+
+
+def _already_saved(job: Any, ws: Any) -> Optional[dict]:
+    """工具已經把結果存進工作區、而且那個檔還在、還是這個擁有者的 → 回傳沿用的摘要。"""
+    prev = (getattr(job, "meta", None) or {}).get("workspace")
+    if not isinstance(prev, dict) or prev.get("saved") is not True or not prev.get("file_id"):
+        return None
+    try:
+        key = ws.key_for_user_id(getattr(job, "owner_id", None))
+    except ws.WorkspaceError:
+        return None
+    meta = ws.find_for_key(key, str(prev["file_id"]))
+    if meta is None:
+        return None
+    return {"saved": True, "file_id": meta.get("file_id"), "name": meta.get("name")}

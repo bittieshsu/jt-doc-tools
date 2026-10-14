@@ -717,6 +717,48 @@ def test_list_items_go_one_level_below_the_paragraph(marker, first, second):
     assert text.splitlines()[1:] == [first + "甲", second + "乙"], text
 
 
+@pytest.mark.parametrize("context,first,second", [
+    ("一、", "（一）", "（二）"), ("（二）", "1.", "2."), ("3. ", "（1）", "（2）"), ("說明：", "一、", "二、"),
+])
+def test_list_items_follow_the_line_the_selection_sits_in(context, first, second):
+    """選取從「一、」後面的內文開始（項次留在草稿裡、沒送來）：要點仍要用下一層的項次。
+
+    2026-10-14 使用者回報：說明「一、」底下選一段改成條列，要點變成「一、二、三」，
+    跟外層同一層，整個說明的編號亂掉。畫面把那一行的段名或項次另外送來（`context`）。"""
+    ask, calls = _fake([{"lead": "採購需求如下：", "items": ["甲", "乙"]}])
+    text = od.rewrite_paragraph("甲乙。", ask, kind="list", context=context)["text"]
+    assert text.splitlines() == ["採購需求如下：", first + "甲", second + "乙"], text
+    assert context.strip() not in calls[0].split("要改寫的這一段：")[1], "段名與項次不送給模型"
+
+
+def test_context_under_an_item_without_a_lead_is_one_sentence():
+    """接在「一、」後面卻沒有引言：不可以變成「一、」單獨一行 —— 接成一句。"""
+    ask, _ = _fake([{"lead": "", "items": ["甲", "乙"]}])
+    assert od.rewrite_paragraph("甲乙。", ask, kind="list", context="一、")["text"] == "甲；乙。"
+
+
+def test_context_says_subject_so_no_list():
+    ask, calls = _fake([{"lead": "", "items": ["甲", "乙"]}])
+    with pytest.raises(ValueError, match="主旨不分項"):
+        od.rewrite_paragraph("為汰換主機。", ask, kind="list", context="主旨：")
+    assert calls == []
+
+
+@pytest.mark.parametrize("context", ["abc", "一、汰換主機", "<script>", "x" * 200, "（一）甲"])
+def test_context_that_is_not_just_a_marker_is_ignored(context):
+    """只收「純粹是段名或項次」的字串；其他的當作沒送（不可以讓它改變格式或混進提示）。"""
+    ask, calls = _fake([{"lead": "如下：", "items": ["甲", "乙"]}])
+    text = od.rewrite_paragraph("甲乙。", ask, kind="list", context=context)["text"]
+    assert text.splitlines()[1:] == ["一、甲", "二、乙"], text
+    assert "script" not in calls[0]
+
+
+def test_the_paragraphs_own_marker_wins_over_context():
+    ask, _ = _fake([{"lead": "如下：", "items": ["甲", "乙"]}])
+    text = od.rewrite_paragraph("（一）甲乙。", ask, kind="list", context="一、")["text"]
+    assert text.splitlines() == ["（一）如下：", "1.甲", "2.乙"], text
+
+
 def test_a_list_with_a_single_point_is_just_a_sentence():
     ask, _ = _fake([{"lead": "如下：", "items": ["甲乙。"]}])
     assert od.rewrite_paragraph("一、甲乙。", ask, kind="list")["text"] == "一、甲乙。"

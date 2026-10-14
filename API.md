@@ -17,6 +17,7 @@ Jason Tools 文件工具箱對外提供 RESTful API，所有工具皆有對應 e
 - [7. 安全與隱私 API](#7-安全與隱私-api)
 - [8. 文字與比對 API](#8-文字與比對-api)
 - [9. 商務查詢 API](#9-商務查詢-api)
+- [9b. 事務機取件 API（Beta）](#9b-事務機取件-apibeta)
 - [10. Job 模式 API](#10-job-模式-api)
 - [11. 管理端 API](#11-管理端-api)
 - [12. 整合範例](#12-整合範例)
@@ -2035,9 +2036,10 @@ curl -X POST http://localhost:8765/tools/official-doc/api/official-doc \
 | `POST /tools/official-doc/di-preview` | 送 `{"case_id": "...", "text": "...", "title": "..."}`，回 `{filename, mode, root, dtd, xml, notes, valid, errors}`：跟匯出 `di` 同一支產生器，`xml` 就是下載拿到的那一份；`valid` 是有沒有通過 DTD 檢查，`notes` 是注意事項（`{code, args}`，例如沒對到機關代碼的機關） |
 | `GET /tools/official-doc/orgs` | 查機關名稱（公文電子交換系統地址簿，管理員下載過才有）：參數 `q`（名稱或代碼開頭）與 `limit`（1 到 2000，預設 10），回 `{"orgs": [{"name": "...", "id": "..."}], "exact": "...", "total": 23, "max": 2000}`；`exact` 是名稱完全相同而且只有一筆時的機關代碼，同名好幾個就是空的；`total` 是符合的總筆數（清單只列前幾筆時用來講出還有幾筆沒列），`max` 是一次最多列幾筆。排序：名稱完全相同的在前，接著是主機關，內部單位排在後面 |
 | `POST /tools/official-doc/extract-text` | multipart `file` → `{"text": "...", "chars": 11, "filename": "..."}`：從 PDF、Word（`.docx` / `.doc`）、ODT、RTF、純文字（`.txt` / `.md`）抽出文字給你貼進欄位，**檔案不留**；上限 20 MB |
-| `GET /tools/official-doc/api/cases` | 歷史案件清單：`{"cases": [...], "show_owner": false, "limit": 500}`，新的在前。查詢參數 `q`（比對名稱、標題、案件編號）與 `mode`（`sign` / `letter` / `endorse`）都選填。每一筆有 `case_id`、`name`、`title`（檔名用，主旨前 20 字）、`subject`（主旨整句）、`mode`、`latest_rev`、`issues`、`created_at`、`updated_at`、`deleted`、`imported`（從 DI 檔匯入的）、`di_ok`（下載得到 DI 檔嗎）；管理員拿到的是每個人的（含已刪除），多一個 `owner` |
+| `GET /tools/official-doc/api/cases` | 歷史案件清單：`{"cases": [...], "show_owner": false, "limit": 500}`，新的在前。查詢參數 `q`（比對名稱、標題、文號、案件編號）與 `mode`（`sign` / `letter` / `endorse`）都選填。每一筆有 `case_id`、`name`、`title`（檔名用，主旨前 20 字）、`subject`（主旨整句）、`doc_no`（文號；函撰擬時填的發文字號、DI 匯入的函與簽會自動帶入，之後可以補填或改）、`mode`、`latest_rev`、`issues`、`created_at`、`updated_at`、`deleted`、`imported`（從 DI 檔匯入的）、`di_ok`（下載得到 DI 檔嗎）；管理員拿到的是每個人的（含已刪除），多一個 `owner` |
 | `GET /tools/official-doc/case/{case_id}` | 一個案件的清單資料，加上 `has_result` 與 `job`（最近一件作業的 `{id, status}`，還在跑時可以接著查進度） |
 | `POST /tools/official-doc/case/{case_id}/rename` | 送 `{"name": "..."}` 改名（最多 80 字，超過回 **400**，不截斷）；空字串＝用草稿的標題 |
+| `POST /tools/official-doc/case/{case_id}/doc-no` | 送 `{"doc_no": "..."}` 補填或修改案件的文號（例如簽送出去之後在公文系統取的號），回清單那一筆。最多 60 字，超過或不是文字回 **400**，不截斷；空字串＝清掉。只是案件的紀錄，**不改草稿** |
 | `DELETE /tools/official-doc/case/{case_id}` | 刪除案件：之後本人查不到、打不開；真的從磁碟移除照「檔案保留 / 清理」的公文撰擬案件保留期（預設 365 天，從刪除那天起算） |
 | `GET /tools/official-doc/case/{case_id}/di` | 下載案件**最新那一版**的 DI 檔（檔名是案件名稱或標題）；簽辦意見沒有 DI 檔，回 **400**。標頭 `X-Jtdt-Di-Valid` 是有沒有通過 DTD 檢查，`X-Jtdt-Di-Notes` 是注意事項有幾條 |
 | `POST /tools/official-doc/cases/di` | 送 `{"case_ids": ["...", "..."]}`（最多 100 件），回 zip，一件一個 DI 檔。簽辦意見與還沒有草稿的略過：打包了幾件在標頭 `X-Jtdt-Di-Count`，略過幾件在 `X-Jtdt-Di-Skipped`；全部都略過回 **400**。**任何一件不是你的就整批回 404** |
@@ -2250,6 +2252,158 @@ curl -X POST http://localhost:8765/tools/transit-proof/api/transit-proof \
 **認不出來的檔案不會讓整批失敗** —— 成功的進 `entries`，失敗的逐檔列在 `failed`
 （HTTP 仍是 200）。要判斷有沒有漏，看 `failed` 是不是空的，不要只看 HTTP 狀態。
 超過 200 個檔案回 `400`；完全沒帶 `files` 回 `422`。
+
+---
+
+## 9b. 事務機取件 API（Beta）
+
+> **試用中，尚未在實機上驗證完整流程。** 目前做得到的是新增事務機、連線測試與型號辨識、
+> 從支援 eSCL（AirPrint / Mopria 掃描）的事務機掃描直接存進工作區、管理員設定的共用事務機；
+> 登入信箱、列出文件與取件要等實機驗證後才開放。網頁上的工具頁與管理頁用的也是這組端點。
+
+**每一台都屬於呼叫者本人**（用 API token 呼叫時是 token 的持有者）：別人的事務機一律回 `404`，
+不透露存不存在。**共用事務機**由管理員建立並指定成員（使用者、群組含子群組），成員看得到、可以重新測試與掃描，
+不能改名或移除。未啟用登入時只接受本機的瀏覽器或帶有效 API token 的呼叫。
+
+**連線測試的安全範圍**：只連內部網路位址（私有 IP；回送、鏈路本地、公網與本服務主機自己的位址一律拒絕），
+只測網頁連接埠 `80`、`443`、`8080`、`8443`；只發 `GET`（讀首頁與 eSCL 的能力表 `/eSCL/ScannerCapabilities`）、
+不傳送任何帳密或 Cookie；轉址只跟同一台設備。每人 5 分鐘內最多 10 次，同時只能跑一個。
+
+**排隊**：同一台**實體設備**（依解析後的位址判斷）一次只做一件事。連線測試最多等 30 秒，
+等不到回 `429`（`DEVICE_BUSY`，附 `waiting`）；掃描在背景排隊。每台最多 10 件（`DEVICE_QUEUE_FULL`）、
+每人在同一台最多 2 件（`OWNER_QUEUE_FULL`），超過直接回 `429`，不會送到設備。
+
+### 連線測試
+
+```text
+POST /tools/mfp-fetch/api/detect
+```
+
+| 參數（JSON） | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `host` | string | ✓ | 事務機的 IP 或主機名稱（不含 `http://`、路徑、連接埠） |
+| `port` | int |  | `80` / `443` / `8080` / `8443`；不帶就 HTTPS 443 與 HTTP 80 都測 |
+| `scheme` | string |  | `http` / `https`；只帶連接埠時依連接埠判斷 |
+
+```bash
+curl -X POST http://localhost:8765/tools/mfp-fetch/api/detect \
+  -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"host": "192.168.1.50"}' | jq
+```
+
+```json
+{
+  "ok": true,
+  "token": "（15 分鐘內有效，用來儲存這台）",
+  "report": {
+    "target": {"host": "192.168.1.50"},
+    "steps": [{"step": "dns", "ok": true, "code": "ADDR_OK", "message": "位址通過檢查（內部網路）"}],
+    "attempts": [{"scheme": "https", "port": 443, "reachable": true,
+                  "steps": [{"step": "tls", "ok": false, "code": "TLS_VERIFY_FAILED",
+                             "detail": {"reason": {"verify_message": "self-signed certificate"}}}]}],
+    "detection": {"vendor": "FUJIFILM", "family": "Apeos", "model": "C5571",
+                  "status": "first_batch_unverified", "evidence": [{"what": "model", "field": "title"}]},
+    "summary": {"reachable": true, "reachable_on": ["https:443"], "status": "first_batch_unverified",
+                "scan": true},
+    "escl": {"scheme": "https", "port": 443, "model": "...",
+             "sources": {"platen": {"colors": ["color", "gray"], "formats": ["pdf", "jpeg"],
+                                    "resolutions": [200, 300, 600]}}}
+  }
+}
+```
+
+報告裡的 `escl` 是這台的 eSCL 掃描能力（沒有就是 `null`）：有哪些來源（`platen` 平台玻璃、`adf` 自動送紙器、
+`adf_duplex` 雙面），以及各自能選的色彩、格式與解析度。有 `escl` 的事務機才能用下面的「掃描」。
+
+報告裡的密碼、`Authorization`、Cookie 值、CSRF token、工作階段 ID 一律遮蔽成「已遮蔽，長度 N」；
+網頁內容只留去除標籤後的前 500 字，表單只列欄位名稱與型別。
+位址或連接埠不合規定時回 `400`，`code` 是 `ADDR_LOOPBACK`、`ADDR_PUBLIC`、`PORT_NOT_ALLOWED`、`HOST_INVALID` 等；
+太頻繁回 `429`（`RATE_LIMITED` / `BUSY`）。
+
+`detection.status` 的值：
+
+- `first_batch_unverified`：首批規劃的型號，尚未實機驗證
+- `same_vendor_unverified`：同廠牌，尚未驗證是否支援
+- `unsupported_vendor`：其他廠牌，目前不支援
+- `login_required`：要登入後才能辨識型號
+- `unknown`：無法辨識型號
+- `unreachable`：連不上設備
+
+目前不會回傳 `supported`，要等某個型號在實機上驗證通過才會有。
+
+### 我的事務機
+
+```text
+GET    /tools/mfp-fetch/api/connections                 # 清單
+POST   /tools/mfp-fetch/api/connections                 # 儲存：{"token": "...", "display_name": "三樓行政區"}
+GET    /tools/mfp-fetch/api/connections/{id}            # 單筆（含最近一次報告）
+PATCH  /tools/mfp-fetch/api/connections/{id}            # 改名：{"display_name": "..."}
+POST   /tools/mfp-fetch/api/connections/{id}/test       # 用存下來的位址與連線方式重新測試
+GET    /tools/mfp-fetch/api/connections/{id}/report     # 下載最近一次診斷報告（JSON）
+DELETE /tools/mfp-fetch/api/connections/{id}            # 從清單移除（不影響設備）
+```
+
+儲存只收連線測試回的 `token`（不收位址），存下來的一定是測過的那一台；token 過期或不是本人的回 `410`。
+同一個位址與連線方式重複儲存回 `409`（`DUPLICATE`），每人最多 20 台（`LIMIT`）。
+目前**不儲存任何帳密**。
+
+清單的每一筆另外有：`shared`（是不是共用事務機）、`can_manage`（能不能改名、移除）、
+`scan`（能不能掃描與可選的設定，沒有 eSCL 是 `null`）、`queue`（`{"busy": true, "waiting": 1, "kind": "scan"}`，
+這台現在有沒有在忙、後面排了幾件）。共用事務機對成員是唯讀的：改名與移除回 `403`（`SHARED_READ_ONLY`）。
+
+### 掃描（eSCL）
+
+從事務機掃描，存進**呼叫者自己**的工作區。先把文件放在平台玻璃上（或送紙器裡）再呼叫。
+
+```text
+POST /tools/mfp-fetch/api/connections/{id}/scan       # 開始掃描（202，回掃描紀錄）
+GET  /tools/mfp-fetch/api/scans                       # 最近 20 筆
+GET  /tools/mfp-fetch/api/scans/{scan_id}             # 狀態與進度
+POST /tools/mfp-fetch/api/scans/{scan_id}/cancel      # 取消（排隊中的直接移出；掃描中的會刪掉設備上的掃描工作）
+GET  /tools/mfp-fetch/api/scans/{scan_id}/download    # 沒存進工作區時下載（工作區停用或額度不夠時，留 24 小時）
+```
+
+| 參數（JSON） | 類型 | 說明 |
+|---|---|---|
+| `source` | string | 這台 `scan.sources` 裡有的來源：`platen`（預設）、`adf`、`adf_duplex` |
+| `color` | string | `color`（預設）/ `gray` / `bw` |
+| `resolution` | int | 解析度（dpi），要是這台支援的；預設 300 |
+| `paper` | string | `a4`（預設）/ `letter` / `max` |
+| `file_name` | string | 檔名（選填，最多 116 字，自動補 `.pdf`；路徑與特殊字元會去掉） |
+
+```bash
+curl -X POST http://localhost:8765/tools/mfp-fetch/api/connections/3/scan \
+  -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"source": "platen", "color": "gray", "resolution": 300, "file_name": "合約掃描"}' | jq
+```
+
+掃描紀錄的 `status`：`queued`（排隊中，`ahead` 是前面還有幾件）、`running`（`phase` 是 `checking` /
+`scanning` / `merging` / `saving`）、`done`（`pages`、`bytes`、`workspace_file_id`）、`error`（`error_code`、
+`error_message`）、`cancelled`。多頁合成一份 PDF；只存進呼叫者自己的工作區，別人拿 id 查不到也下載不到。
+
+設定不在這台的能力範圍回 `400`（`SCAN_OPTION_INVALID`）；沒有 eSCL 回 `400`（`SCAN_NOT_SUPPORTED`）；
+隊伍滿了回 `429`。掃描中的錯誤寫在紀錄的 `error_code`：`SCAN_DEVICE_BUSY`（有人在機器上操作）、
+`SCAN_ADF_EMPTY`、`SCAN_AUTH_REQUIRED`（設備要求登入才能掃描，目前不支援）、`SCAN_NO_DOCUMENT`、
+`SCAN_BAD_DOCUMENT`、`SCAN_TOO_LARGE`、`SCAN_TIMEOUT` 等。**不送任何帳密**。
+
+### 共用事務機（管理員）
+
+管理員建立、指定成員（使用者或群組；群組含子群組的成員）。非管理員呼叫回 `403`（`ADMIN_ONLY`）。
+網頁版在「設定 → 共用事務機」。成員還是要有「事務機取件」的工具權限。
+
+```text
+GET    /tools/mfp-fetch/api/shared                  # 清單（含成員數）
+POST   /tools/mfp-fetch/api/shared                  # 建立：{"token": "...", "display_name": "三樓"}（token 來自管理員自己的 /api/detect）
+PATCH  /tools/mfp-fetch/api/shared/{id}             # 改名
+POST   /tools/mfp-fetch/api/shared/{id}/test        # 重新測試
+DELETE /tools/mfp-fetch/api/shared/{id}             # 移除（成員一起清掉）
+GET    /tools/mfp-fetch/api/shared/{id}/members     # 成員（含名稱，以及使用者有沒有這支工具的權限）
+PUT    /tools/mfp-fetch/api/shared/{id}/members     # 整份換掉：{"members": [{"type": "user", "key": "12"}, {"type": "group", "key": "3"}]}
+GET    /tools/mfp-fetch/api/shared-subjects         # 挑成員用：使用者與群組清單
+```
+
+成員只收存在的使用者與群組，其他回 `400`（`MEMBERS_INVALID`）。刪除帳號或群組時成員資格一起拿掉；
+刪除建立者的帳號不會刪掉共用事務機。
 
 ---
 
