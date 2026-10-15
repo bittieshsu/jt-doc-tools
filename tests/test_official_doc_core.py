@@ -325,14 +325,22 @@ def test_endorse_without_direction_is_refused_before_calling_the_model():
 
 
 def test_endorse_keeps_two_deadlines_apart_in_the_prompt():
+    # 日期從今天往後算（原本寫死 10月15日 / 10月20日，2026-10-16 起被判成「日期已過」）；
+    # 帶年份，跨年時沒寫年份的日期才不會被當成今年、變成過去
+    from datetime import date, timedelta
+
+    def ymd(n):
+        x = date.today() + timedelta(days=n)
+        return f"{x.year}年{x.month}月{x.day}日"
+    ext, own = ymd(40), ymd(30)
     ask, calls = _fake([
         {"sender": {"value": "範例局", "quote": "範例局"},
-         "deadline": {"value": "10月20日", "quote": "10月20日前"}},
-        {"text": "本案係範例局函請本府於10月20日前提供資料，擬請資訊室於10月15日前彙整後函復"},
+         "deadline": {"value": ext, "quote": f"{ext}前"}},
+        {"text": f"本案係範例局函請本府於{ext}前提供資料，擬請資訊室於{own}前彙整後函復"},
     ])
-    d = od.run_endorse("範例局函請本府於10月20日前提供資料。", "擬請資訊室彙整後函復",
-                       ask, internal_deadline="10月15日", units="資訊室")
-    assert "內部期限" in calls[1] and "10月15日" in calls[1]
+    d = od.run_endorse(f"範例局函請本府於{ext}前提供資料。", "擬請資訊室彙整後函復",
+                       ask, internal_deadline=own, units="資訊室")
+    assert "內部期限" in calls[1] and own in calls[1]
     assert d.text.endswith("，陳核。")
     assert [i.code for i in d.issues] == []       # 兩個日期都有依據
 

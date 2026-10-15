@@ -41,7 +41,7 @@ def _leafs(el) -> dict:
 
 
 class _Server:
-    def start(self):
+    def start(self, host: str = "127.0.0.1"):
         fake = self
 
         class H(BaseHTTPRequestHandler):
@@ -68,7 +68,7 @@ class _Server:
                 code, out, ctype = fake.handle_get(self.path, dict(self.headers))
                 self._send(code, out, ctype)
 
-        self.srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.srv = ThreadingHTTPServer((host, 0), H)
         threading.Thread(target=self.srv.serve_forever, daemon=True).start()
         self.port = self.srv.server_address[1]
         return self

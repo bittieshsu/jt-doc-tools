@@ -29,7 +29,7 @@ import sys
 sys.path.insert(0, {root!r})
 import app.core.mfp_client as m
 _real = m.check_address
-m.check_address = lambda ip: None if ip == "127.0.0.1" else _real(ip)
+m.check_address = lambda ip: None if ip in ("127.0.0.1", "127.0.0.2") else _real(ip)
 m.ALLOWED_PORTS = tuple(m.ALLOWED_PORTS) + ({kyo}, {ricoh})
 import app.core.mfp_soap as s
 s.KYO_PORTS = {{"https": {kyo}, "http": {kyo}}}
@@ -53,8 +53,12 @@ def live():
     root = Path(__file__).resolve().parents[1]
     kyo = _with_home(FakeKyocera, b"<html><head><title>Command Center RX</title></head>"
                                   b"<body>KYOCERA TASKalfa 3554ci</body></html>")().start()
+    # 第二台要另一個位址（同一個位址第二次會被當成重複）。不用 localhost：有的機器上它也解析到 ::1，
+    # 連線測試會把每一個解析出來的位址都檢查一遍（GitHub CI 上這支因此紅過）
     ricoh = _with_home(FakeRicoh, b"<html><head><title>Web Image Monitor</title></head>"
-                                  b"<body>RICOH IM C3010</body></html>")().start()
+                                  b"<body>RICOH IM C3010</body></html>")()
+    ricoh.auth_url_host = ricoh.url_host_override = "127.0.0.2"
+    ricoh.start("127.0.0.2")
     data = tempfile.mkdtemp(prefix="mfpsoap-")
     port, cdp = _free_port(), _free_port()
     env = {**os.environ, "JTDT_DATA_DIR": data, "JTDT_CSRF_DISABLE": "1"}
@@ -99,14 +103,15 @@ def _add_device(t, fport, host="127.0.0.1"):
              document.getElementById('mfHost').value = '{host}';
              document.getElementById('mfTestBtn').click(); return true; }})()""")
     # 結果面板在第二台時本來就開著 —— 要等「儲存」那一列（這次的結果）出來
-    assert t.wait_for("!document.getElementById('mfResultPanel').hidden && !document.getElementById('mfSaveBar').hidden")
+    assert t.wait_for("!document.getElementById('mfResultPanel').hidden && !document.getElementById('mfSaveBar').hidden"), \
+        ("連線測試沒有可儲存的結果", t.js("document.getElementById('mfResultPanel').innerText.slice(0, 800)"))
     t.js("document.getElementById('mfSaveBtn').click()")
     assert t.wait_for(f"document.querySelectorAll('[data-mf-share]').length > {before}"), \
         ("要有「取件」", t.js("document.getElementById('mfSaveMsg').innerText"))
     t.js("""(() => { const ids = [...document.querySelectorAll('[data-mf-share]')].map(b => +b.dataset.mfShare);
                      const max = Math.max(...ids);
                      document.querySelector('[data-mf-share=\"' + max + '\"]').click(); return true; })()""")
-    assert t.wait_for("!document.getElementById('mfSharePanel').hidden")
+    assert t.wait_for("!document.getElementById('mfSharePanel').hidden"), "取件面板沒有打開"
 
 
 def _list_with_consent(t):
@@ -129,14 +134,14 @@ def test_kyocera_and_ricoh_retrieval_flow(live):
         t.send("Network.setCookie", {"name": "jtdt_locale", "value": "zh-Hant", "url": base})
         t.send("Page.navigate", {"url": base + "/tools/mfp-fetch/"})
         assert t.wait_for("document.querySelector('#mfListWrap .mf-empty, #mfListWrap table') "
-                          "&& !document.querySelector('#mfListWrap').textContent.includes('載入中')")
+                          "&& !document.querySelector('#mfListWrap').textContent.includes('載入中')"), "清單沒有載入"
 
         # ---- KYOCERA
         _add_device(t, kyo.port)
         assert t.js("[...document.getElementById('mfShareRoute').options].map(o => o.value).join(',')") \
             == "kyocera_soap,kyocera_soap_http"
         assert not t.js("document.getElementById('mfShareRouteWrap').hidden"), "兩種連線方式要給選"
-        assert not t.js("document.getElementById('mfShareExtraWrap').hidden")
+        assert not t.js("document.getElementById('mfShareExtraWrap').hidden"), "KYOCERA 要有文件匣密碼欄"
         assert "文件匣密碼" in t.js("document.getElementById('mfShareExtraLabel').innerText")
         assert t.js("document.getElementById('mfShareNoteManual').hidden") \
             and not t.js("document.getElementById('mfShareNoteDirect').hidden"), "說明要換成「依原廠工具的分析」"
@@ -152,12 +157,13 @@ def test_kyocera_and_ricoh_retrieval_flow(live):
         # 有密碼的文件匣：先看到錯誤，填了文件匣密碼再列
         t.js("""(() => { const s = document.getElementById('mfShareRoot'); s.value = '2';
                          s.dispatchEvent(new Event('change')); return true; })()""")
-        assert t.wait_for("!document.getElementById('mfShareError').hidden")
+        assert t.wait_for("!document.getElementById('mfShareError').hidden"), "有密碼的文件匣應該先看到錯誤"
         assert "文件匣密碼" in t.js("document.getElementById('mfShareError').innerText")
         t.js("document.getElementById('mfShareExtra').value = '1234'")
         t.js("""(() => { const s = document.getElementById('mfShareRoot'); s.value = '2';
                          s.dispatchEvent(new Event('change')); return true; })()""")
-        assert t.wait_for("document.getElementById('mfShareTable').innerText.includes('私人')")
+        assert t.wait_for("document.getElementById('mfShareTable').innerText.includes('私人')"), \
+            t.js("document.getElementById('mfShareError').innerText")
         t.shot("mfp_soap_kyocera_1280", 1280)
         t.js("document.querySelector('#mfShareTable input[data-file]').click()")
         t.js("document.getElementById('mfShareFetchBtn').click()")
@@ -169,7 +175,7 @@ def test_kyocera_and_ricoh_retrieval_flow(live):
         assert t.js("document.getElementById('mfShareExtra').value") == "", "收合時清掉密碼"
 
         # ---- RICOH
-        _add_device(t, ricoh.port, host="localhost")          # 同一個位址第二次會被當成重複
+        _add_device(t, ricoh.port, host="127.0.0.2")
         assert t.js("document.getElementById('mfShareRouteWrap').hidden"), "只有一種連線方式不出現選單"
         assert "文件密碼" in t.js("document.getElementById('mfShareExtraLabel').innerText")
         t.js("document.getElementById('mfShareUser').value = 'clerk'; document.getElementById('mfSharePw').value = 'pw-2'")
