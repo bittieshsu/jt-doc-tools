@@ -3,7 +3,7 @@
 {% block title %}我的工作區 · {{ app_name }}{% endblock %}
 {% block content %}
 <h1>{{ icon('archive', size=22) }} {{ tr('我的工作區') }}</h1>
-<p class="muted">{{ tr('這裡存放你從各工具按「存至工作區」保留的檔案（PDF / PNG、辦公文件、純文字、錄音 / 錄影檔），只有你的帳號看得到。在任何工具的上傳區可按「從工作區載入」取回使用。') }}</p>
+<p class="muted">{{ tr('這裡存放你從各工具按「存至工作區」保留的檔案（PDF、圖片、辦公文件、純文字、錄音 / 錄影檔），只有你的帳號看得到。在任何工具的上傳區可按「從工作區載入」取回使用。') }}</p>
 
 <div class="panel">
   <h2 data-s="s53896af7">{{ tr('容量') }}</h2>
@@ -18,7 +18,7 @@
 
 <div class="panel">
   <h2 data-s="s53896af7">{{ tr('上傳到工作區') }}</h2>
-  <p class="muted" data-s="se2907ccc">{{ tr('直接把 PDF / PNG、辦公文件、純文字或錄音 / 錄影檔拖進來，或點選挑選，存到自己的工作區。') }}</p>
+  <p class="muted" data-s="se2907ccc">{{ tr('直接把 PDF、圖片、辦公文件、純文字或錄音 / 錄影檔拖進來，或點選挑選，存到自己的工作區。') }}</p>
   <div class="file-upload" id="wsUpload" data-accept="{{ workspace_accept() }}">
     <label class="drop-zone" for="wsUpload-input">
       <div class="drop-zone-inner">

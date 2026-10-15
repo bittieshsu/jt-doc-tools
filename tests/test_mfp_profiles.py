@@ -59,10 +59,17 @@ def test_fuji_xerox_is_not_mistaken_for_xerox():
     ("KONICA MINOLTA bizhub", "Konica Minolta"),
     ("Xerox VersaLink C405", "Xerox"),
 ])
-def test_other_vendors_are_marked_unsupported_with_a_reason(text, vendor):
+def test_other_vendors_are_marked_with_a_reason(text, vendor):
+    """Canon / Konica Minolta / SHARP 有檔案分享取件（v1.16.90，實驗功能）；其他廠牌是「不支援取件」。"""
     r = mp.detect([_page(text=text)])
-    assert r["vendor"] == vendor and r["status"] == "unsupported_vendor"
-    assert "FUJIFILM" in r["message"]
+    want = "experimental_vendor" if vendor in mp.EXPERIMENTAL_VENDORS else "unsupported_vendor"
+    assert r["vendor"] == vendor and r["status"] == want
+    assert "取件" in r["message"]
+
+
+def test_experimental_vendors_match_the_share_routes():
+    from app.core import mfp_share
+    assert mp.EXPERIMENTAL_VENDORS == set(mfp_share.VENDOR_ROUTES)
 
 
 def test_a_login_page_says_login_is_needed():
@@ -138,7 +145,8 @@ def test_every_status_has_a_message():
 def test_other_vendors_models_are_read_from_their_naming(title, headers, vendor, model):
     r = mp.detect([_page(title=title, headers=headers)])
     assert (r["vendor"], r["model"]) == (vendor, model), r
-    assert r["status"] == "unsupported_vendor" and r["family"] is None
+    assert r["status"] == ("experimental_vendor" if vendor in mp.EXPERIMENTAL_VENDORS else "unsupported_vendor")
+    assert r["family"] is None
     assert any(e["what"] == "model" for e in r["evidence"]), "型號要附上依據"
 
 

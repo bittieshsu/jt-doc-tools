@@ -204,13 +204,17 @@
         <div class="nav-group">
           <div class="nav-group-head" role="button" tabindex="0" aria-expanded="true">
             <button class="toc-toggle" type="button" tabindex="-1" aria-hidden="true"></button>
-            <span class="nav-ch nav-ch-toggle">9b. 事務機取件 API（Beta）</span>
+            <span class="nav-ch nav-ch-toggle">9b. 事務機掃描取件 API（Beta）</span>
           </div>
           <div class="nav-children">
             <a class="nav-ep" href="#連線測試">連線測試</a>
             <a class="nav-ep" href="#我的事務機">我的事務機</a>
+            <a class="nav-ep" href="#診斷報告">診斷報告</a>
             <a class="nav-ep" href="#掃描escl">掃描（eSCL）</a>
+            <a class="nav-ep" href="#機內信箱取件fujifilm實驗性">機內信箱取件（FUJIFILM，實驗性）</a>
+            <a class="nav-ep" href="#檔案分享取件canonkonica-minoltasharp實驗性">檔案分享取件（Canon、Konica Minolta、SHARP，實驗性）</a>
             <a class="nav-ep" href="#共用事務機管理員">共用事務機（管理員）</a>
+            <a class="nav-ep" href="#使用設定管理員">使用設定（管理員）</a>
           </div>
         </div>
         <div class="nav-group">
@@ -1337,7 +1341,13 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;vat&quot;:&quot;12345678&quot;}&#x27;</span> | jq</code></pre>
-<p>回應 JSON：公司名稱 / 地址 / 行業等。找不到回 <code>404</code>。</p>
+<p>回應 JSON 的欄位：</p>
+<ul>
+<li>基本資料：<code>vat</code>、<code>name</code>、<code>address</code>、<code>org_type</code>、<code>category</code>、<code>industries</code>、<code>owner</code>、<code>status</code>（後兩項只有部分來源有）。</li>
+<li>稅籍登記的其他資料（v1.16.92 起）：<code>hq_vat</code> 是總機構統一編號（分支機構才有）；<code>capital</code> 是資本額（元，整數）；<code>founded</code> 是設立日期（西元 <code>YYYY-MM-DD</code>）；<code>uses_invoice</code> 是否使用統一發票（<code>true</code> / <code>false</code>）。</li>
+<li>沒有資料時是 <code>null</code>：政府機關與學校沒有這幾項；既有站台升級後要等下一次更新統編資料庫才有值。</li>
+</ul>
+<p>找不到回 <code>404</code>。</p>
       </section>
       <section class="doc-section" data-sec="統編查詢path-style" data-title="統編查詢（path style）" hidden>
 <div class="doc-crumb">9. 商務查詢 API</div>
@@ -1430,10 +1440,11 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <hr>
       </section>
       <section class="doc-section" data-sec="連線測試" data-title="連線測試" hidden>
-<div class="doc-crumb">9b. 事務機取件 API（Beta）</div>
-<blockquote><p><strong>試用中，尚未在實機上驗證完整流程。</strong> 目前做得到的是新增事務機、連線測試與型號辨識、 從支援 eSCL（AirPrint / Mopria 掃描）的事務機掃描直接存進工作區、管理員設定的共用事務機； 登入信箱、列出文件與取件要等實機驗證後才開放。網頁上的工具頁與管理頁用的也是這組端點。</p></blockquote>
+<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<blockquote><p><strong>試用中，尚未在實機上驗證完整流程。</strong> 目前做得到的是新增事務機、連線測試與型號辨識、 從支援 eSCL（AirPrint / Mopria 掃描）的事務機掃描直接存進工作區、管理員設定的共用事務機， 以及 FUJIFILM 事務機的機內信箱取件、Canon / Konica Minolta / SHARP 的檔案分享取件（都是實驗功能）。網頁上的工具頁與管理頁用的也是這組端點。 工具原名「事務機取件」，v1.16.89 起改名「事務機掃描取件」；網址與工具代號都不變。</p></blockquote>
 <p><strong>每一台都屬於呼叫者本人</strong>（用 API token 呼叫時是 token 的持有者）：別人的事務機一律回 <code>404</code>， 不透露存不存在。<strong>共用事務機</strong>由管理員建立並指定成員（使用者、群組含子群組），成員看得到、可以重新測試與掃描， 不能改名或移除。未啟用登入時只接受本機的瀏覽器或帶有效 API token 的呼叫。</p>
 <p><strong>連線測試的安全範圍</strong>：只連內部網路位址（私有 IP；回送、鏈路本地、公網與本服務主機自己的位址一律拒絕）， 只測網頁連接埠 <code>80</code>、<code>443</code>、<code>8080</code>、<code>8443</code>；只發 <code>GET</code>（讀首頁與 eSCL 的能力表 <code>/eSCL/ScannerCapabilities</code>）、 不傳送任何帳密或 Cookie；轉址只跟同一台設備。每人 5 分鐘內最多 10 次，同時只能跑一個。</p>
+<p><strong>使用者自行新增事務機</strong>由管理員決定（預設允許，見下面「使用設定」）。關掉時一般使用者呼叫連線測試、儲存回 <code>403</code> （<code>USER_DEVICES_DISABLED</code>），自己以前新增的在清單上是 <code>paused: true</code>，不能測試、掃描、取件，但可以改名、移除； 共用事務機照常，管理員不受限。</p>
 <p><strong>排隊</strong>：同一台<strong>實體設備</strong>（依解析後的位址判斷）一次只做一件事。連線測試最多等 30 秒， 等不到回 <code>429</code>（<code>DEVICE_BUSY</code>，附 <code>waiting</code>）；掃描在背景排隊。每台最多 10 件（<code>DEVICE_QUEUE_FULL</code>）、 每人在同一台最多 2 件（<code>OWNER_QUEUE_FULL</code>），超過直接回 <code>429</code>，不會送到設備。</p>
 <h4 id="連線測試">連線測試</h4>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/detect</code></pre>
@@ -1465,7 +1476,8 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <ul>
 <li><code>first_batch_unverified</code>：首批規劃的型號，尚未實機驗證</li>
 <li><code>same_vendor_unverified</code>：同廠牌，尚未驗證是否支援</li>
-<li><code>unsupported_vendor</code>：其他廠牌，目前不支援</li>
+<li><code>experimental_vendor</code>：Canon、Konica Minolta、SHARP，有檔案分享取件（實驗功能）</li>
+<li><code>unsupported_vendor</code>：其他廠牌，目前沒有取件方式（支援 eSCL 的話仍可以掃描）</li>
 <li><code>login_required</code>：要登入後才能辨識型號</li>
 <li><code>unknown</code>：無法辨識型號</li>
 <li><code>unreachable</code>：連不上設備</li>
@@ -1473,38 +1485,98 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>目前不會回傳 <code>supported</code>，要等某個型號在實機上驗證通過才會有。</p>
       </section>
       <section class="doc-section" data-sec="我的事務機" data-title="我的事務機" hidden>
-<div class="doc-crumb">9b. 事務機取件 API（Beta）</div>
+<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
 <h4 id="我的事務機">我的事務機</h4>
 <pre><code class="lang-text"><span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections                 <span class="hl-cmt"># 清單</span>
 <span class="hl-method">POST</span>   /tools/mfp-fetch/api/connections                 <span class="hl-cmt"># 儲存：{&quot;token&quot;: &quot;...&quot;, &quot;display_name&quot;: &quot;三樓行政區&quot;}</span>
 <span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections/{id}            <span class="hl-cmt"># 單筆（含最近一次報告）</span>
 <span class="hl-method">PATCH</span>  /tools/mfp-fetch/api/connections/{id}            <span class="hl-cmt"># 改名：{&quot;display_name&quot;: &quot;...&quot;}</span>
 <span class="hl-method">POST</span>   /tools/mfp-fetch/api/connections/{id}/test       <span class="hl-cmt"># 用存下來的位址與連線方式重新測試</span>
-<span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections/{id}/report     <span class="hl-cmt"># 下載最近一次診斷報告（JSON）</span>
+<span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections/{id}/report     <span class="hl-cmt"># 下載最近一次診斷報告（見下方「診斷報告」）</span>
 <span class="hl-method">DELETE</span> /tools/mfp-fetch/api/connections/{id}            <span class="hl-cmt"># 從清單移除（不影響設備）</span></code></pre>
 <p>儲存只收連線測試回的 <code>token</code>（不收位址），存下來的一定是測過的那一台；token 過期或不是本人的回 <code>410</code>。 同一個位址與連線方式重複儲存回 <code>409</code>（<code>DUPLICATE</code>），每人最多 20 台（<code>LIMIT</code>）。 目前<strong>不儲存任何帳密</strong>。</p>
-<p>清單的每一筆另外有：<code>shared</code>（是不是共用事務機）、<code>can_manage</code>（能不能改名、移除）、 <code>scan</code>（能不能掃描與可選的設定，沒有 eSCL 是 <code>null</code>）、<code>queue</code>（<code>{&quot;busy&quot;: true, &quot;waiting&quot;: 1, &quot;kind&quot;: &quot;scan&quot;}</code>， 這台現在有沒有在忙、後面排了幾件）。共用事務機對成員是唯讀的：改名與移除回 <code>403</code>（<code>SHARED_READ_ONLY</code>）。</p>
+<p>清單的每一筆另外有：<code>shared</code>（是不是共用事務機）、<code>can_manage</code>（能不能改名、移除）、 <code>scan</code>（能不能掃描與可選的設定，沒有 eSCL 是 <code>null</code>）、<code>box</code>（能不能機內信箱取件，目前只有 FUJIFILM）、 <code>share</code>（檔案分享取件可用的方式，例如 <code>{&quot;routes&quot;: [&quot;canon_webdav&quot;, &quot;canon_smb&quot;]}</code>，沒有是 <code>null</code>）、 <code>paused</code>（管理員關掉自行新增時，自己的事務機暫停使用）、<code>queue</code>（<code>{&quot;busy&quot;: true, &quot;waiting&quot;: 1, &quot;kind&quot;: &quot;scan&quot;}</code>， 這台現在有沒有在忙、後面排了幾件）。清單本身另回 <code>can_add</code>（呼叫者能不能新增事務機）。 共用事務機對成員是唯讀的：改名與移除回 <code>403</code>（<code>SHARED_READ_ONLY</code>）。</p>
+      </section>
+      <section class="doc-section" data-sec="診斷報告" data-title="診斷報告" hidden>
+<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<h4 id="診斷報告">診斷報告</h4>
+<p>連線測試的完整紀錄，可以選格式下載。已儲存的事務機下載最近一次測試；還沒儲存的測試結果用連線測試回的 <code>token</code>。</p>
+<pre><code class="lang-text"><span class="hl-method">GET</span>  /tools/mfp-fetch/api/connections/{id}/report?format=pdf   <span class="hl-cmt"># 已儲存的事務機</span>
+<span class="hl-method">POST</span> /tools/mfp-fetch/api/detect/report                        <span class="hl-cmt"># 還沒儲存的測試結果：{&quot;token&quot;: &quot;...&quot;, &quot;format&quot;: &quot;pdf&quot;}</span></code></pre>
+<p>參數 <code>format</code> 選格式：</p>
+<ul>
+<li>不帶或 <code>json</code>：原始報告，欄位齊全；回報問題時附這一份。</li>
+<li>給人看的版本 <code>txt</code>、<code>md</code>、<code>html</code>、<code>pdf</code>：內容跟畫面上「詳細」一致，固定字串依介面語言（<code>jtdt_locale</code> cookie）。</li>
+</ul>
+<p>報告在產生時就已遮蔽帳號、密碼、Cookie 與工作階段資訊，換格式不會多出任何內容。 連線測試回的 <code>token</code> 只有本人能用、15 分鐘內有效，下載不會用掉它（之後照樣可以儲存）；過期或不是本人的回 <code>404</code>（<code>REPORT_EXPIRED</code>）。 格式不對回 <code>422</code>（<code>REPORT_FORMAT_INVALID</code>）。</p>
+<pre><code class="lang-bash">curl <span class="hl-flag">-o</span> mfp-report.pdf <span class="hl-str">&quot;http://localhost:8765/tools/mfp-fetch/api/connections/3/report?format=pdf&quot;</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span></code></pre>
       </section>
       <section class="doc-section" data-sec="掃描escl" data-title="掃描（eSCL）" hidden>
-<div class="doc-crumb">9b. 事務機取件 API（Beta）</div>
+<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
 <h4 id="掃描escl">掃描（eSCL）</h4>
 <p>從事務機掃描，存進<strong>呼叫者自己</strong>的工作區。先把文件放在平台玻璃上（或送紙器裡）再呼叫。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/scan       <span class="hl-cmt"># 開始掃描（202，回掃描紀錄）</span>
 <span class="hl-method">GET</span>  /tools/mfp-fetch/api/scans                       <span class="hl-cmt"># 最近 20 筆</span>
 <span class="hl-method">GET</span>  /tools/mfp-fetch/api/scans/{scan_id}             <span class="hl-cmt"># 狀態與進度</span>
 <span class="hl-method">POST</span> /tools/mfp-fetch/api/scans/{scan_id}/cancel      <span class="hl-cmt"># 取消（排隊中的直接移出；掃描中的會刪掉設備上的掃描工作）</span>
-<span class="hl-method">GET</span>  /tools/mfp-fetch/api/scans/{scan_id}/download    <span class="hl-cmt"># 沒存進工作區時下載（工作區停用或額度不夠時，留 24 小時）</span></code></pre>
-<div class="table-wrap"><table><thead><tr><th>參數（JSON）</th><th>類型</th><th>說明</th></tr></thead><tbody><tr><td><code>source</code></td><td>string</td><td>這台 <code>scan.sources</code> 裡有的來源：<code>platen</code>（預設）、<code>adf</code>、<code>adf_duplex</code></td></tr><tr><td><code>color</code></td><td>string</td><td><code>color</code>（預設）/ <code>gray</code> / <code>bw</code></td></tr><tr><td><code>resolution</code></td><td>int</td><td>解析度（dpi），要是這台支援的；預設 300</td></tr><tr><td><code>paper</code></td><td>string</td><td><code>a4</code>（預設）/ <code>letter</code> / <code>max</code></td></tr><tr><td><code>file_name</code></td><td>string</td><td>檔名（選填，最多 116 字，自動補 <code>.pdf</code>；路徑與特殊字元會去掉）</td></tr></tbody></table></div>
+<span class="hl-method">GET</span>  /tools/mfp-fetch/api/scans/{scan_id}/download    <span class="hl-cmt"># 沒存進工作區時下載（留 24 小時；多個檔案打包成 ZIP）</span></code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數（JSON）</th><th>類型</th><th>說明</th></tr></thead><tbody><tr><td><code>source</code></td><td>string</td><td>這台 <code>scan.sources</code> 裡有的來源：<code>platen</code>（預設）、<code>adf</code>、<code>adf_duplex</code></td></tr><tr><td><code>color</code></td><td>string</td><td><code>color</code>（預設）/ <code>gray</code> / <code>bw</code></td></tr><tr><td><code>resolution</code></td><td>int</td><td>解析度（dpi），要是這台支援的；預設 300</td></tr><tr><td><code>paper</code></td><td>string</td><td><code>a4</code>（預設）/ <code>letter</code> / <code>max</code></td></tr><tr><td><code>format</code></td><td>string</td><td>存成 <code>pdf</code>（預設，多頁合成一份）或 <code>jpeg</code>（每頁一個檔，設備要能出 JPEG）；可選的值在 <code>scan.sources.&lt;來源&gt;.outputs</code></td></tr><tr><td><code>file_name</code></td><td>string</td><td>檔名（選填，最多 100 字，自動補副檔名；路徑與特殊字元會去掉）</td></tr></tbody></table></div>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/mfp-fetch/api/connections/3/scan</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;source&quot;: &quot;platen&quot;, &quot;color&quot;: &quot;gray&quot;, &quot;resolution&quot;: 300, &quot;file_name&quot;: &quot;合約掃描&quot;}&#x27;</span> | jq</code></pre>
-<p>掃描紀錄的 <code>status</code>：<code>queued</code>（排隊中，<code>ahead</code> 是前面還有幾件）、<code>running</code>（<code>phase</code> 是 <code>checking</code> / <code>scanning</code> / <code>merging</code> / <code>saving</code>）、<code>done</code>（<code>pages</code>、<code>bytes</code>、<code>workspace_file_id</code>）、<code>error</code>（<code>error_code</code>、 <code>error_message</code>）、<code>cancelled</code>。多頁合成一份 PDF；只存進呼叫者自己的工作區，別人拿 id 查不到也下載不到。<code>settings.via</code> 是這次走的協定（例如 <code>{&quot;protocol&quot;: &quot;eSCL&quot;, &quot;scheme&quot;: &quot;https&quot;, &quot;port&quot;: 443}</code>），<code>tls_verified</code> 是憑證有沒有通過驗證。</p>
+<p>掃描紀錄的 <code>status</code>：<code>queued</code>（排隊中，<code>ahead</code> 是前面還有幾件）、<code>running</code>（<code>phase</code> 是 <code>checking</code> / <code>scanning</code> / <code>merging</code> / <code>downloading</code> / <code>saving</code>）、<code>done</code>（<code>pages</code>、<code>bytes</code>、<code>workspace_file_id</code>）、<code>error</code>（<code>error_code</code>、 <code>error_message</code>）、<code>cancelled</code>。<code>kind</code> 是 <code>scan</code>（掃描）或 <code>box</code>（機內信箱取件）；<code>files</code> 列出存下來的每一個檔案 （<code>name</code>、<code>pages</code>、<code>workspace_file_id</code>、<code>has_file</code>）。只存進呼叫者自己的工作區，別人拿 id 查不到也下載不到。<code>settings.via</code> 是這次走的協定（例如 <code>{&quot;protocol&quot;: &quot;eSCL&quot;, &quot;scheme&quot;: &quot;https&quot;, &quot;port&quot;: 443}</code>），<code>tls_verified</code> 是憑證有沒有通過驗證。</p>
 <p>設定不在這台的能力範圍回 <code>400</code>（<code>SCAN_OPTION_INVALID</code>）；沒有 eSCL 回 <code>400</code>（<code>SCAN_NOT_SUPPORTED</code>）； 隊伍滿了回 <code>429</code>。掃描中的錯誤寫在紀錄的 <code>error_code</code>：<code>SCAN_DEVICE_BUSY</code>（有人在機器上操作）、 <code>SCAN_ADF_EMPTY</code>、<code>SCAN_AUTH_REQUIRED</code>（設備要求登入才能掃描，目前不支援）、<code>SCAN_NO_DOCUMENT</code>、 <code>SCAN_BAD_DOCUMENT</code>、<code>SCAN_TOO_LARGE</code>、<code>SCAN_TIMEOUT</code> 等。<strong>不送任何帳密</strong>。</p>
       </section>
+      <section class="doc-section" data-sec="機內信箱取件fujifilm實驗性" data-title="機內信箱取件（FUJIFILM，實驗性）" hidden>
+<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<h4 id="機內信箱取件fujifilm實驗性">機內信箱取件（FUJIFILM，實驗性）</h4>
+<blockquote><p><strong>推測實作，尚未在實機上驗證。</strong> 依原廠取件工具的研究，用 WebDAV 讀取 FUJIFILM 事務機的機內信箱 （PROPFIND 列文件、GET 下載），只送這兩種請求，不會刪除或修改設備上的文件；但設備或信箱若設定成 「取件後刪除」，刪除是設備自己做的（見下面「取件後刪除」的確認參數）。只有辨識為 FUJIFILM、 連線測試連得上的事務機能用，其他回 400（BOX_NOT_FUJIFILM）。</p></blockquote>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/box/list    <span class="hl-cmt"># 列出信箱裡的文件</span>
+<span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/box/fetch   <span class="hl-cmt"># 取件（202，回作業紀錄；進度一樣看 /api/scans/{id}）</span></code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數（JSON）</th><th>類型</th><th>說明</th></tr></thead><tbody><tr><td><code>box</code></td><td>int</td><td>信箱編號（1～999）</td></tr><tr><td><code>box_password</code></td><td>string</td><td>信箱密碼（沒有設就不帶）</td></tr><tr><td><code>user</code> / <code>password</code></td><td>string</td><td>事務機要求登入時才需要：使用者在事務機上的帳號與密碼</td></tr><tr><td><code>trust_sha256</code></td><td>string</td><td>HTTPS 憑證沒通過驗證時（事務機多半是自簽憑證），使用者核對過的憑證 SHA-256 指紋</td></tr><tr><td><code>allow_http</code></td><td>bool</td><td>這台只用 HTTP 時要帶 <code>true</code>（同意帳密與文件以未加密方式在內網傳送）</td></tr><tr><td><code>target</code></td><td>string</td><td>選填，例如 <code>&quot;https:443&quot;</code>；要是連線測試連得上的那一組，不帶就 HTTPS 優先</td></tr><tr><td><code>documents</code></td><td>string[]</td><td>取件時用：要取的文件編號（列文件回的 <code>id</code>），一次最多 20 份</td></tr><tr><td><code>output</code></td><td>string</td><td>取件時用：<code>pdf</code>（預設，每份文件一個 PDF）或 <code>original</code>（設備給的原始 TIFF / JPEG，不轉檔）</td></tr><tr><td><code>confirm_delete_after_get</code></td><td>bool</td><td>取件時用：信箱或文件設定成「取件後刪除」時要帶 <code>true</code> 才會取</td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/mfp-fetch/api/connections/3/box/list</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;box&quot;: 1, &quot;box_password&quot;: &quot;1234&quot;, &quot;trust_sha256&quot;: &quot;9F:2A:...&quot;}&#x27;</span> | jq</code></pre>
+<pre><code class="lang-json">{
+  <span class="hl-key">&quot;ok&quot;</span>: <span class="hl-bool">true</span>,
+  <span class="hl-key">&quot;box&quot;</span>: <span class="hl-num">1</span>,
+  <span class="hl-key">&quot;box_name&quot;</span>: <span class="hl-str">&quot;Box 1&quot;</span>,
+  <span class="hl-key">&quot;delete_after_get&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;documents&quot;</span>: [{<span class="hl-key">&quot;id&quot;</span>: <span class="hl-str">&quot;5&quot;</span>, <span class="hl-key">&quot;name&quot;</span>: <span class="hl-str">&quot;報價單&quot;</span>, <span class="hl-key">&quot;pages&quot;</span>: <span class="hl-num">3</span>, <span class="hl-key">&quot;size&quot;</span>: <span class="hl-num">482113</span>, <span class="hl-key">&quot;modified&quot;</span>: <span class="hl-str">&quot;...&quot;</span>,
+                 <span class="hl-key">&quot;format&quot;</span>: <span class="hl-str">&quot;TIF&quot;</span>, <span class="hl-key">&quot;compression&quot;</span>: <span class="hl-str">&quot;MMR&quot;</span>, <span class="hl-key">&quot;how&quot;</span>: <span class="hl-str">&quot;whole&quot;</span>, <span class="hl-key">&quot;delete_after_get&quot;</span>: <span class="hl-bool">false</span>}],
+  <span class="hl-key">&quot;via&quot;</span>: {<span class="hl-key">&quot;protocol&quot;</span>: <span class="hl-str">&quot;WebDAV&quot;</span>, <span class="hl-key">&quot;scheme&quot;</span>: <span class="hl-str">&quot;https&quot;</span>, <span class="hl-key">&quot;port&quot;</span>: <span class="hl-num">443</span>},
+  <span class="hl-key">&quot;tls&quot;</span>: {<span class="hl-key">&quot;verified&quot;</span>: <span class="hl-bool">false</span>, <span class="hl-key">&quot;pinned&quot;</span>: <span class="hl-bool">true</span>, <span class="hl-key">&quot;sha256&quot;</span>: <span class="hl-str">&quot;9f2a...&quot;</span>},
+  <span class="hl-key">&quot;trace&quot;</span>: [{<span class="hl-key">&quot;method&quot;</span>: <span class="hl-str">&quot;PROPFIND&quot;</span>, <span class="hl-key">&quot;path&quot;</span>: <span class="hl-str">&quot;/dav/box-1&quot;</span>, <span class="hl-key">&quot;depth&quot;</span>: <span class="hl-str">&quot;1&quot;</span>, <span class="hl-key">&quot;status&quot;</span>: <span class="hl-num">401</span>,
+             <span class="hl-key">&quot;challenges&quot;</span>: [{<span class="hl-key">&quot;scheme&quot;</span>: <span class="hl-str">&quot;digest&quot;</span>, <span class="hl-key">&quot;realm&quot;</span>: <span class="hl-str">&quot;box-1&quot;</span>}]},
+            {<span class="hl-key">&quot;method&quot;</span>: <span class="hl-str">&quot;PROPFIND&quot;</span>, <span class="hl-key">&quot;path&quot;</span>: <span class="hl-str">&quot;/dav/box-1&quot;</span>, <span class="hl-key">&quot;depth&quot;</span>: <span class="hl-str">&quot;1&quot;</span>, <span class="hl-key">&quot;status&quot;</span>: <span class="hl-num">207</span>, <span class="hl-key">&quot;auth&quot;</span>: <span class="hl-str">&quot;digest&quot;</span>}]
+}</code></pre>
+<p><strong>帳密只用在這次請求</strong>（<code>box/fetch</code> 則是那件作業的記憶體裡），不寫進資料庫、紀錄檔或協定紀錄； 設備要求認證時只送一次，失敗就停（不換組合重試，避免帳號被鎖）。<code>trace</code> 是協定紀錄 （方法、路徑、狀態碼、認證方式與 realm，不含帳密），實機驗證時用來對照。</p>
+<p>設備端的錯誤一律回 <code>422</code>（不是 <code>401</code>，那是本站自己的登入），<code>code</code> 是：</p>
+<ul>
+<li>憑證沒通過驗證：<code>TLS_UNTRUSTED</code>，<code>detail.certificate</code> 有指紋與內容；核對後帶 <code>trust_sha256</code> 再呼叫</li>
+<li>憑證跟信任的指紋不一樣：<code>TLS_IDENTITY_FAILED</code>，已停止（沒有存取信箱）</li>
+<li>這台只用 HTTP：<code>PLAIN_HTTP_NEEDS_CONSENT</code>，要帶 <code>allow_http: true</code></li>
+<li>要信箱密碼、要事務機的帳號密碼：<code>AUTH_REQUIRED_BOX</code>、<code>AUTH_REQUIRED_USER</code></li>
+<li>認證失敗、設備要求的認證方式不支援：<code>AUTH_FAILED</code>、<code>AUTH_MODE_UNSUPPORTED</code></li>
+<li>找不到信箱、沒有權限、WebDAV 沒有啟用、回應格式不對：<code>BOX_NOT_FOUND</code>、<code>BOX_FORBIDDEN</code>、<code>WEBDAV_UNAVAILABLE</code>、<code>DAV_BAD_RESPONSE</code> 等</li>
+</ul>
+<p>取件作業的紀錄跟掃描同一份（<code>kind: &quot;box&quot;</code>）：<code>files</code> 是存下來的每一個檔案（<code>name</code>、<code>pages</code>、 <code>workspace_file_id</code>），<code>items</code> 是每份文件的結果（<code>status</code>、<code>error_code</code>、<code>format_note</code>、 <code>source</code>：<code>SOURCE_KEPT</code> 原件還在 / <code>SOURCE_GONE</code> 取件後設備上已經沒有 / <code>SOURCE_UNKNOWN</code>）。 部分文件沒取到時 <code>status</code> 仍是 <code>done</code>、<code>error_code</code> 是 <code>BOX_PARTIAL</code>。轉成 PDF 失敗（例如 TIFF 用了不支援的壓縮） 會改存原始檔，<code>format_note</code> 是 <code>PDF_FALLBACK_ORIGINAL</code>。</p>
+      </section>
+      <section class="doc-section" data-sec="檔案分享取件canonkonica-minoltasharp實驗性" data-title="檔案分享取件（Canon、Konica Minolta、SHARP，實驗性）" hidden>
+<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<h4 id="檔案分享取件canonkonica-minoltasharp實驗性">檔案分享取件（Canon、Konica Minolta、SHARP，實驗性）</h4>
+<blockquote><p><strong>實驗功能，尚未在實機上驗證。</strong> 依原廠手冊公開的方式，讀取事務機上的檔案分享： Canon Advanced Box（WebDAV 或 SMB 的共享空間、個人空間）、Konica Minolta 公用信箱（SMB）、SHARP 的 NAS（SMB）。 只讀取，不刪除、改名或寫入設備上的檔案。清單上可以用的事務機會標出可用的取件方式，其他廠牌回 400（SHARE_ROUTE_INVALID）。</p></blockquote>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/share/list    <span class="hl-cmt"># 列出位置、資料夾與檔案</span>
+<span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/share/fetch   <span class="hl-cmt"># 取件（202，回作業紀錄；進度看 /api/scans/{id}）</span></code></pre>
+<div class="table-wrap"><table><thead><tr><th>參數（JSON）</th><th>類型</th><th>說明</th></tr></thead><tbody><tr><td><code>route</code></td><td>string</td><td>取件方式：<code>canon_webdav</code>、<code>canon_smb</code>、<code>konica_smb</code>、<code>sharp_smb</code>（清單上的 <code>share.routes</code>）</td></tr><tr><td><code>root</code></td><td>string</td><td>位置：Canon 是 <code>share</code>（共享空間）或 <code>users</code>（個人空間）；SHARP 是設備列出的分享；Konica 由信箱編號找出，不用帶</td></tr><tr><td><code>path</code></td><td>string[]</td><td>列檔時用：資料夾路徑，一層一個名稱（例如 <code>[&quot;2026&quot;, &quot;十月&quot;]</code>），不帶就是位置的最上層</td></tr><tr><td><code>user</code> / <code>password</code></td><td>string</td><td>Canon、SHARP：事務機上的帳號與密碼（沒有設認證就不帶）；網域帳號寫成 <code>網域\帳號</code></td></tr><tr><td><code>box</code> / <code>box_password</code></td><td>string</td><td>Konica：信箱編號與信箱密碼</td></tr><tr><td><code>trust_sha256</code> / <code>allow_http</code></td><td></td><td>WebDAV 的憑證指紋與 HTTP 同意，跟機內信箱取件一樣</td></tr><tr><td><code>allow_plain</code></td><td>bool</td><td>SMB 不加密，要帶 <code>true</code>（同意檔案以未加密方式在內網傳送）</td></tr><tr><td><code>files</code></td><td>string[][]</td><td>取件時用：要取的檔案，每個是一條路徑（例如 <code>[[&quot;2026&quot;, &quot;合約.tif&quot;]]</code>），一次最多 50 個</td></tr><tr><td><code>output</code></td><td>string</td><td>取件時用：<code>pdf</code>（預設：TIFF / JPEG 轉成 PDF，PDF 與其他檔案照原樣）或 <code>original</code>（一律不轉檔）</td></tr></tbody></table></div>
+<p>列檔回傳 <code>roots</code>（可選的位置，<code>shared</code> 表示共享）、<code>root</code>、<code>path</code>、<code>entries</code>（<code>name</code>、<code>dir</code>、<code>size</code>、<code>modified</code>）、 <code>shared</code>、<code>via</code>（<code>{&quot;protocol&quot;: &quot;WebDAV&quot;}</code> 或 <code>{&quot;protocol&quot;: &quot;SMB&quot;, &quot;port&quot;: 445}</code>）與 <code>trace</code>（協定紀錄，不含帳密）。 <strong>共享的位置其他人也看得到</strong>，不是只屬於呼叫者的文件。</p>
+<p>SMB 只用 NTLMv2；設備只肯用 SMB1 就在認證之前停下來（<code>SMB1_REFUSED</code>），能簽章就簽章，內容不加密。 設備端的錯誤一律回 <code>422</code>：<code>SMB_PLAIN_NEEDS_CONSENT</code>、<code>SMB_AUTH_FAILED</code>、<code>SMB_CONNECT_FAILED</code>（445 連接埠沒開）、 <code>SHARE_FORBIDDEN</code>、<code>SHARE_NOT_FOUND</code>、<code>BOX_SHARE_NOT_FOUND</code>（Konica 找不到這個信箱的分享）、<code>SHARE_LOGIN_PAGE</code>， 以及跟機內信箱取件相同的 <code>TLS_UNTRUSTED</code>、<code>AUTH_FAILED</code> 等。作業紀錄的 <code>kind</code> 是 <code>share</code>，其餘欄位跟信箱取件一樣。</p>
+      </section>
       <section class="doc-section" data-sec="共用事務機管理員" data-title="共用事務機（管理員）" hidden>
-<div class="doc-crumb">9b. 事務機取件 API（Beta）</div>
+<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
 <h4 id="共用事務機管理員">共用事務機（管理員）</h4>
-<p>管理員建立、指定成員（使用者或群組；群組含子群組的成員）。非管理員呼叫回 <code>403</code>（<code>ADMIN_ONLY</code>）。 網頁版在「設定 → 共用事務機」。成員還是要有「事務機取件」的工具權限。</p>
+<p>管理員建立、指定成員（使用者或群組；群組含子群組的成員）。非管理員呼叫回 <code>403</code>（<code>ADMIN_ONLY</code>）。 網頁版在「設定 → 共用事務機」。成員還是要有「事務機掃描取件」的工具權限。</p>
 <pre><code class="lang-text"><span class="hl-method">GET</span>    /tools/mfp-fetch/api/shared                  <span class="hl-cmt"># 清單（含成員數）</span>
 <span class="hl-method">POST</span>   /tools/mfp-fetch/api/shared                  <span class="hl-cmt"># 建立：{&quot;token&quot;: &quot;...&quot;, &quot;display_name&quot;: &quot;三樓&quot;}（token 來自管理員自己的 /api/detect）</span>
 <span class="hl-method">PATCH</span>  /tools/mfp-fetch/api/shared/{id}             <span class="hl-cmt"># 改名</span>
@@ -1514,6 +1586,13 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <span class="hl-method">PUT</span>    /tools/mfp-fetch/api/shared/{id}/members     <span class="hl-cmt"># 整份換掉：{&quot;members&quot;: [{&quot;type&quot;: &quot;user&quot;, &quot;key&quot;: &quot;12&quot;}, {&quot;type&quot;: &quot;group&quot;, &quot;key&quot;: &quot;3&quot;}]}</span>
 <span class="hl-method">GET</span>    /tools/mfp-fetch/api/shared-subjects         <span class="hl-cmt"># 挑成員用：使用者與群組清單</span></code></pre>
 <p>成員只收存在的使用者與群組，其他回 <code>400</code>（<code>MEMBERS_INVALID</code>）。刪除帳號或群組時成員資格一起拿掉； 刪除建立者的帳號不會刪掉共用事務機。</p>
+      </section>
+      <section class="doc-section" data-sec="使用設定管理員" data-title="使用設定（管理員）" hidden>
+<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<h4 id="使用設定管理員">使用設定（管理員）</h4>
+<pre><code class="lang-text"><span class="hl-method">GET</span> /tools/mfp-fetch/api/settings     <span class="hl-cmt"># {&quot;settings&quot;: {&quot;allow_user_devices&quot;: true, &quot;updated_at&quot;: ...}}</span>
+<span class="hl-method">PUT</span> /tools/mfp-fetch/api/settings     <span class="hl-cmt"># {&quot;allow_user_devices&quot;: false}</span></code></pre>
+<p>設定項目 <code>allow_user_devices</code>（預設 <code>true</code>）決定一般使用者能不能自己新增事務機。值一定要是 <code>true</code> / <code>false</code>，否則回 <code>400</code> （<code>SETTINGS_INVALID</code>）；非管理員回 <code>403</code>。改設定會寫稽核（<code>mfp_settings_update</code>），設定備份的「事務機掃描取件」分類會包含它。 網頁版在「設定 → 共用事務機」最上面的「使用設定」。</p>
 <hr>
       </section>
       <section class="doc-section" data-sec="llm-校驗pdf-fill" data-title="LLM 校驗（pdf-fill）" hidden>

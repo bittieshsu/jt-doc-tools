@@ -55,10 +55,13 @@
       : ['pdf', 'png'];      // 舊模板沒帶清單時的保守退路
     const a = (acceptAttr || '').toLowerCase();
     if (!a.trim() || a.includes('*/*')) return ws;
+    // 圖片：`image/*` 收全部圖片；寫成 MIME（`image/jpeg`、`image/tiff`）或副檔名（`.jpeg`、`.tiff`）也算
+    const ALIAS = { jpg: ['jpg', 'jpeg'], tif: ['tif', 'tiff'] };
+    const IMAGES = ['png', 'jpg', 'tif'];
     const out = ws.filter((e) =>
-      a.includes('.' + e) || a.includes('/' + e)
+      (ALIAS[e] || [e]).some((x) => a.includes('.' + x) || a.includes('/' + x))
       || (e === 'pdf' && a.includes('pdf'))
-      || (e === 'png' && a.includes('image/')));
+      || (IMAGES.includes(e) && a.includes('image/*')));
     return out;
   }
 

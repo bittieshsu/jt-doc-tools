@@ -395,6 +395,17 @@ function _highlight(text, query) {
     m => `<mark class="vl-hl">${m}</mark>`);
 }
 
+// 資本額（元）：千分位；畫面與 CSV 共用
+function _fmtCapital(n) {
+  return tr('{0} 元').replace('{0}', Number(n).toLocaleString('en-US'));
+}
+// CSV 多出來的四欄（標題與值同一個順序）
+function _extraCsvHead() { return [tr('資本額'), tr('設立日期'), tr('使用統一發票'), tr('總機構統編')]; }
+function _extraCsvCells(r) {
+  return [r.capital == null ? '' : r.capital, r.founded || '',
+          r.uses_invoice == null ? '' : (r.uses_invoice ? 'Y' : 'N'), r.hq_vat || ''];
+}
+
 function _renderCard(r, isMiss, query) {
   if (isMiss) {
     return `<div class="vl-card miss">
@@ -416,6 +427,11 @@ function _renderCard(r, isMiss, query) {
   if (r.org_type)   metaRows += metaRow(tr('組織別'), r.org_type);
   if (r.industries) metaRows += metaRow(tr('行業'), r.industries);
   if (r.status)     metaRows += metaRow(tr('狀態'), r.status);
+  // v1.16.92：公開資料的其他欄位（既有站台要等下次排程下載後才有值，沒有就不顯示）
+  if (r.capital != null)      metaRows += metaRow(tr('資本額'), _fmtCapital(r.capital));
+  if (r.founded)              metaRows += metaRow(tr('設立日期'), r.founded);
+  if (r.uses_invoice != null) metaRows += metaRow(tr('使用統一發票'), r.uses_invoice ? tr('是') : tr('否'));
+  if (r.hq_vat && r.hq_vat !== r.vat) metaRows += metaRow(tr('總機構統編'), r.hq_vat);
   return `<div class="vl-card found">
     <div class="vl-card-head">
       <span class="vl-card-vat vl-copy" data-copy="${cAttr(r.vat)}" title="${tr('點選複製統編')}" tabindex="0" role="button">${hl(r.vat)}</span>
@@ -715,10 +731,11 @@ document.addEventListener('click', (e) => {
 
 function exportResultsCsv() {
   if (!_lastSearchResults.length) return;
-  const rows = [[tr('統編'), tr('名稱'), tr('類別'), tr('行業'), tr('地址'), tr('負責人'), tr('組織別'), tr('狀態')]];
+  const rows = [[tr('統編'), tr('名稱'), tr('類別'), tr('行業'), tr('地址'), tr('負責人'), tr('組織別'), tr('狀態'),
+                  ..._extraCsvHead()]];
   for (const r of _lastSearchResults) {
     rows.push([r.vat, r.name || '', r.category || '', r.industries || '',
-               r.address || '', r.owner || '', r.org_type || '', r.status || '']);
+               r.address || '', r.owner || '', r.org_type || '', r.status || '', ..._extraCsvCells(r)]);
   }
   _downloadCsv(rows, 'vat-search');
 }
@@ -827,13 +844,14 @@ function _renderBatch(j) {
 
 function exportBatchCsv() {
   if (!_lastBatchResults.length) return;
-  const rows = [[tr('統編'), tr('名稱'), tr('類別'), tr('行業'), tr('地址'), tr('負責人'), tr('組織別'), tr('狀態'), tr('結果')]];
+  const rows = [[tr('統編'), tr('名稱'), tr('類別'), tr('行業'), tr('地址'), tr('負責人'), tr('組織別'), tr('狀態'),
+                  ..._extraCsvHead(), tr('結果')]];
   for (const r of _lastBatchResults) {
     if (r.found) {
       rows.push([r.vat, r.name || '', r.category || '', r.industries || '',
-                 r.address || '', r.owner || '', r.org_type || '', r.status || '', '✓']);
+                 r.address || '', r.owner || '', r.org_type || '', r.status || '', ..._extraCsvCells(r), '✓']);
     } else {
-      rows.push([r.vat, '', '', '', '', '', '', '', r.error || tr('查無')]);
+      rows.push([r.vat, '', '', '', '', '', '', '', '', '', '', '', r.error || tr('查無')]);
     }
   }
   _downloadCsv(rows, 'vat-batch');

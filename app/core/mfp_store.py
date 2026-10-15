@@ -1,4 +1,4 @@
-"""事務機取件：事務機連線、共用事務機的成員、掃描紀錄（`data/mfp.sqlite`）。
+"""事務機掃描取件：事務機連線、共用事務機的成員、掃描紀錄（`data/mfp.sqlite`）。
 
 **每一筆連線都屬於一個擁有者**（`owner_scope`）：
 * 使用者自己新增的：啟用認證時是 `u<user_id>`，未啟用認證時是 `local`。所有讀寫都要帶擁有者 ——
@@ -7,7 +7,10 @@
   （`mfp_members`，主體的寫法跟權限系統同一套）。成員看得到、可以測試與掃描，不能改名或移除。
 
 目前（Beta、尚未實機驗證）只存設備位址、辨識結果與最近一次連線測試的報告（已遮蔽），
-**不存任何帳密** —— 規格書規定「尚未驗證的密碼不永久保存」，而登入要等實機驗證後才做。
+**不存任何帳密** —— 規格書規定「尚未驗證的密碼不永久保存」。機內信箱取件（`mfp_box`，推測實作）的
+信箱密碼與設備帳密只在那次請求、那件取件作業的記憶體裡。
+
+`mfp_scans` 記的是作業：從事務機掃描（`kind='scan'`）、機內信箱取件（`kind='box'`）、檔案分享取件（`kind='share'`）。
 """
 from __future__ import annotations
 
@@ -113,7 +116,17 @@ def _m2_shared_and_scans(conn: sqlite3.Connection) -> None:
     """)
 
 
-_MIGRATIONS = [_m1_initial, _m2_shared_and_scans]
+def _m3_job_kind_and_items(conn: sqlite3.Connection) -> None:
+    """掃描紀錄多記「哪一種作業」與「每份文件、每個檔案」（使用者 2026-10-14：信箱取件、JPEG 每頁一個檔）。
+
+    `ADD COLUMN` 有預設值，不重建表（舊紀錄一律是掃描）。"""
+    conn.executescript("""
+        ALTER TABLE mfp_scans ADD COLUMN kind TEXT NOT NULL DEFAULT 'scan';
+        ALTER TABLE mfp_scans ADD COLUMN items TEXT;
+    """)
+
+
+_MIGRATIONS = [_m1_initial, _m2_shared_and_scans, _m3_job_kind_and_items]
 _INITED: set[str] = set()
 _INIT_LOCK = threading.Lock()
 
@@ -165,6 +178,8 @@ def _row(r: sqlite3.Row, with_report: bool = False) -> dict[str, Any]:
     rep = _report_of(r)
     # 掃描能力（連線測試時讀到的 eSCL 能力表）—— 清單上決定要不要出現「掃描」
     d["escl"] = (rep or {}).get("escl") or None
+    # 連得上的協定與連接埠（機內信箱取件沿用連線測試連得上的那一組）
+    d["reachable_on"] = [str(x) for x in ((rep or {}).get("summary") or {}).get("reachable_on") or []][:4]
     if with_report:
         d["last_report"] = rep
     return d
@@ -405,7 +420,7 @@ MAX_SCANS_PER_OWNER = 50
 
 def _scan_row(r: sqlite3.Row) -> dict[str, Any]:
     d = {k: r[k] for k in r.keys()}
-    for k in ("settings", "error_detail"):
+    for k in ("settings", "error_detail", "items"):
         try:
             d[k] = json.loads(d[k]) if d[k] else None
         except ValueError:
@@ -414,15 +429,20 @@ def _scan_row(r: sqlite3.Row) -> dict[str, Any]:
     return d
 
 
+JOB_KINDS = ("scan", "box", "share")
+
+
 def create_scan(scan_id: str, *, conn_id: int, owner: str, owner_user_id: Optional[int], device: str,
-                conn_name: str, settings: dict, file_name: str) -> dict:
+                conn_name: str, settings: dict, file_name: str, kind: str = "scan") -> dict:
     _check_owner(owner)
+    if kind not in JOB_KINDS:
+        raise ValueError(kind)
     c = _conn()
     with db.tx(c):
         c.execute("INSERT INTO mfp_scans(id, conn_id, owner_scope, owner_user_id, device, conn_name, status,"
-                  " settings, file_name, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                  " settings, file_name, created_at, kind) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                   (scan_id, int(conn_id), owner, owner_user_id, device, (conn_name or "")[:64], "queued",
-                   json.dumps(settings, ensure_ascii=False), file_name, time.time()))
+                   json.dumps(settings, ensure_ascii=False), file_name, time.time(), kind))
         old = c.execute("SELECT id, result_path FROM mfp_scans WHERE owner_scope=? AND status NOT IN"
                         " ('queued','running') ORDER BY created_at DESC LIMIT -1 OFFSET ?",
                         (owner, MAX_SCANS_PER_OWNER)).fetchall()
@@ -433,7 +453,9 @@ def create_scan(scan_id: str, *, conn_id: int, owner: str, owner_user_id: Option
 
 
 _SCAN_FIELDS = {"status", "started_at", "finished_at", "pages", "bytes", "result_path", "workspace_file_id",
-                "workspace_note", "error_code", "error_detail", "settings", "tls_verified"}
+                "workspace_note", "error_code", "error_detail", "settings", "tls_verified", "items", "file_name"}
+#: `items`（每份文件、每個檔案）最多存多少（位元組）—— 每次列清單都會讀。
+MAX_ITEMS_BYTES = 256 * 1024
 
 
 def update_scan(scan_id: str, **fields) -> None:
@@ -441,8 +463,10 @@ def update_scan(scan_id: str, **fields) -> None:
     for k, v in fields.items():
         if k not in _SCAN_FIELDS:
             raise ValueError(k)
-        if k in ("settings", "error_detail") and v is not None:
+        if k in ("settings", "error_detail", "items") and v is not None:
             v = json.dumps(v, ensure_ascii=False)
+            if len(v.encode("utf-8")) > MAX_ITEMS_BYTES:
+                raise ValueError(f"{k} too large")
         if k == "tls_verified" and v is not None:
             v = 1 if v else 0
         sets.append(f"{k}=?")
@@ -494,8 +518,8 @@ def _remove_result_files(paths: list) -> None:
         if not rp:
             continue
         try:
-            d = Path(rp).resolve().parent
-            d.relative_to(root)
+            rel = Path(rp).resolve().relative_to(root)
         except (ValueError, OSError):
             continue
-        shutil.rmtree(d, ignore_errors=True)
+        if len(rel.parts) >= 2:                 # 作業自己的目錄（信箱取件的檔案在它底下一層）
+            shutil.rmtree(root / rel.parts[0], ignore_errors=True)

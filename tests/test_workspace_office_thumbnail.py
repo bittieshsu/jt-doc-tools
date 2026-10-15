@@ -145,7 +145,9 @@ def test_every_workspace_type_has_a_decided_thumbnail_path():
     但決定了「不做縮圖」也算決定。
     """
     paths = {
-        "圖片本身": {".png"},
+        "圖片本身": {".png", ".jpg"},
+        # TIFF：瀏覽器畫不出來，用 Pillow 畫第一頁成 PNG（v1.16.89）
+        "TIFF 第一頁": {".tif"},
         "算 PDF 第一頁": {".pdf"},
         "經 Office 引擎": set(ws._OFFICE_THUMB_EXTS),
         "沒有縮圖（純文字）": set(ws._TEXT_EXTS),

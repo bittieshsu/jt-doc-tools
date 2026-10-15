@@ -12,6 +12,8 @@
 """
 from __future__ import annotations
 
+import re
+
 import importlib
 import json
 
@@ -102,15 +104,20 @@ def two_clerks(admin_session):
     return a, b, ua, ub
 
 
-def test_the_page_renders_with_beta_and_no_password_fields(two_clerks):
+def test_the_page_renders_with_beta_and_passwords_only_in_the_retrieval_panels(two_clerks):
+    """密碼欄位只出現在機內信箱取件（實驗功能，v1.16.89）那一塊，而且不讓瀏覽器自動填入或記住。"""
     a, *_ = two_clerks
     r = a.get("/tools/mfp-fetch/")
     assert r.status_code == 200
-    assert "tool-beta" in r.text and "事務機取件" in r.text
+    assert "tool-beta" in r.text and "事務機掃描取件" in r.text
     # 共用版面本身有「變更密碼」對話框 —— 只看這支工具自己的模板
     from pathlib import Path
     tpl = Path("app/tools/mfp_fetch/templates/mfp_fetch.html").read_text(encoding="utf-8")
-    assert "password" not in tpl.lower().replace("password_inputs", ""), "實機驗證之前不收任何密碼"
+    pw = re.findall(r"<input[^>]*type=\"password\"[^>]*>", tpl)
+    assert sorted(re.search(r'id="(\w+)"', x).group(1) for x in pw) == ["mfBoxPw", "mfBoxUserPw", "mfSharePw"]
+    assert all('autocomplete="off"' in x for x in pw), "密碼欄不可以讓瀏覽器記住"
+    fetch_panels = tpl.split('id="mfBoxPanel"', 1)[1].split('id="mfScansPanel"', 1)[0]
+    assert all(x in fetch_panels for x in pw), "密碼欄只在取件那兩塊（信箱取件、檔案分享取件）"
 
 
 def test_users_without_the_tool_are_refused(admin_session, fake_probe):
@@ -199,6 +206,63 @@ def test_rename_retest_report_and_delete(two_clerks, fake_probe):
     assert json.loads(r.content)["detection"]["model"] == "C5571"
     assert a.delete(f"/tools/mfp-fetch/api/connections/{cid}").json()["ok"] is True
     assert a.get(f"/tools/mfp-fetch/api/connections/{cid}").status_code == 404
+
+
+@pytest.mark.parametrize("fmt,ctype,magic", [
+    ("json", "application/json", b"{"), ("txt", "text/plain", "事務機連線測試診斷報告".encode()),
+    ("md", "text/markdown", "# 事務機連線測試診斷報告".encode()), ("html", "text/html", b"<!doctype html>"),
+    ("pdf", "application/pdf", b"%PDF"),
+])
+def test_saved_report_downloads_in_every_format(two_clerks, fake_probe, fmt, ctype, magic):
+    """診斷報告可選 txt / md / json / html / pdf（使用者 2026-10-15）；不給 format 照舊是 JSON。"""
+    a, b, *_ = two_clerks
+    tok = _detect(a).json()["token"]
+    cid = a.post("/tools/mfp-fetch/api/connections", json={"token": tok}).json()["connection"]["id"]
+    r = a.get(f"/tools/mfp-fetch/api/connections/{cid}/report", params={"format": fmt})
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith(ctype) and r.content.startswith(magic)
+    cd = r.headers["content-disposition"]
+    assert "attachment" in cd and re.search(rf'mfp-diagnostic-192\.168\.1\.50-\d{{8}}-\d{{6}}\.{fmt}', cd), cd
+    assert r.headers["cache-control"] == "no-store" and r.headers["x-content-type-options"] == "nosniff"
+    if fmt == "json":
+        d = a.get(f"/tools/mfp-fetch/api/connections/{cid}/report")
+        assert d.content == r.content, "不給 format 要跟以前一樣是 JSON"
+    assert b.get(f"/tools/mfp-fetch/api/connections/{cid}/report", params={"format": fmt}).status_code == 404
+
+
+def test_report_format_is_checked_and_follows_the_interface_language(two_clerks, fake_probe):
+    a, *_ = two_clerks
+    tok = _detect(a).json()["token"]
+    cid = a.post("/tools/mfp-fetch/api/connections", json={"token": tok}).json()["connection"]["id"]
+    for bad in ("docx", "../x", "PDF ", ""):
+        r = a.get(f"/tools/mfp-fetch/api/connections/{cid}/report", params={"format": bad})
+        if bad.strip().lower() in ("pdf", ""):
+            continue        # 大小寫與空白容忍；空字串＝預設 JSON
+        assert r.status_code == 422 and r.json()["code"] == "REPORT_FORMAT_INVALID", (bad, r.text)
+    a.cookies.set("jtdt_locale", "en")
+    try:
+        r = a.get(f"/tools/mfp-fetch/api/connections/{cid}/report", params={"format": "txt"})
+        assert "MFP connection test diagnostic report" in r.text and "事務機" not in r.text
+    finally:
+        a.cookies.delete("jtdt_locale")
+
+
+def test_unsaved_test_result_report_needs_the_owners_token_and_does_not_use_it_up(two_clerks, fake_probe):
+    a, b, *_ = two_clerks
+    tok = _detect(a).json()["token"]
+    r = a.post("/tools/mfp-fetch/api/detect/report", json={"token": tok, "format": "pdf"})
+    assert r.status_code == 200 and r.content.startswith(b"%PDF"), r.text
+    assert ".pdf" in r.headers["content-disposition"]
+    r = b.post("/tools/mfp-fetch/api/detect/report", json={"token": tok, "format": "txt"})
+    assert r.status_code == 404 and r.json()["code"] == "REPORT_EXPIRED", "別人拿到 token 也不能下載"
+    for body in ({"token": "nope", "format": "txt"}, {"format": "txt"}, {}):
+        assert a.post("/tools/mfp-fetch/api/detect/report", json=body).status_code == 404
+    r = a.post("/tools/mfp-fetch/api/detect/report", json={"token": tok, "format": "docx"})
+    assert r.status_code == 422 and r.json()["code"] == "REPORT_FORMAT_INVALID"
+    # 下載過後照樣可以儲存
+    assert a.post("/tools/mfp-fetch/api/connections", json={"token": tok}).status_code == 200
+    r = a.post("/tools/mfp-fetch/api/detect/report", json={"token": tok, "format": "txt"})
+    assert r.status_code == 404, "儲存之後 token 就用掉了（報告改從清單的詳細下載）"
 
 
 def test_deleting_an_account_removes_their_mfps(two_clerks, fake_probe):

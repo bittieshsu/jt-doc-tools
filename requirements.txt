@@ -63,6 +63,8 @@ defusedxml>=0.7,<1
 # rapidfuzz 給 docx↔PDFTruth 模糊比對
 pdf2docx>=0.5.13,<0.6
 rapidfuzz>=3.0,<4
+# pysmb 給事務機掃描取件的 SMB 取件（列分享、列目錄、讀檔；只用 SMB2、NTLMv2）
+pysmb>=1.2.15,<2
 # pypinyin 給會議摘要的「建議替換」比對中文詞的讀音
 pypinyin>=0.50,<1
 # translate-doc xlsx 匯出（v1.7.51）— pyproject 有但本檔之前漏列

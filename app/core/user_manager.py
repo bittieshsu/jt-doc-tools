@@ -409,7 +409,7 @@ def delete(user_id: int) -> None:
         from .log_safe import safe_log
         logger.warning(
             "刪除帳號後清理會議背景失敗 user_id=%s", safe_log(str(user_id)))
-    # 事務機取件：他自己新增的事務機連線（含最近一次連線測試的報告）
+    # 事務機掃描取件：他自己新增的事務機連線（含最近一次連線測試的報告）
     try:
         from . import mfp_store
         mfp_store.purge_user(user_id)

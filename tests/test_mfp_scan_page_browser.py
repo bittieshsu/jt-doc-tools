@@ -102,7 +102,8 @@ def _test_and_save(t, fport, name):
              s.append(o); s.value = 'http:{fport}';
              document.getElementById('mfHost').value = '127.0.0.1';
              document.getElementById('mfTestBtn').click(); return true; }})()""")
-    assert t.wait_for("!document.getElementById('mfResultPanel').hidden"), "測試結果沒有出現"
+    assert t.wait_for("!document.getElementById('mfResultPanel').hidden"), \
+        "測試結果沒有出現：" + str(t.js("document.getElementById('mfAddError').innerText"))
     body = t.js("document.getElementById('mfResult').innerText")
     assert "Fake LaserJet MFP M1" in body, "連線測試要讀到 eSCL 能力表"
     t.js(f"document.getElementById('mfSaveName').value = {name!r}; document.getElementById('mfSaveBtn').click()")
@@ -147,8 +148,33 @@ def test_scan_from_the_tool_page(live, locale):
         # 沒填檔名：用瀏覽器這邊的時間（伺服器可能是 UTC）—— 這次有填「合約」，檔名就是它
         assert "合約.pdf" in t.js("document.getElementById('mfScansWrap').innerText")
         assert t.wait_for("document.querySelectorAll('#mfScansWrap tbody tr').length >= 1"), "最近的掃描沒有列出來"
+        # 「最近的掃描與取件」的按鈕排成一排、不超出外框（使用者 2026-10-15：欄位還有很大空位，按鈕卻被擠成三行）
+        for width in (1280, 1180, 900):
+            t.send("Emulation.setDeviceMetricsOverride", {"width": width, "height": 900, "deviceScaleFactor": 1,
+                                                          "mobile": False})
+            time.sleep(0.3)
+            rows = t.js("[...document.querySelectorAll('#mfScansWrap tbody tr')].map(tr => { const bs = "
+                        "[...tr.querySelectorAll('td:last-child .btn')]; return [bs.length, "
+                        "new Set(bs.map(b => Math.round(b.getBoundingClientRect().top))).size]; })")
+            assert rows and all(n >= 2 and (lines == 1 or width < 1100) for n, lines in rows), \
+                f"{width} 寬：按鈕折行了 {rows}"
+            assert t.js("(() => { const w = document.getElementById('mfScansWrap');"
+                        " return w.querySelector('table').getBoundingClientRect().right"
+                        " <= w.getBoundingClientRect().right + 1; })()"), f"{width} 寬：表格超出外框"
+            # 空位不可以堆在時間那一欄：時間格比裡面的字寬不到 40 px（多的寬度給狀態）
+            gap = t.js("(() => { const td = document.querySelector('#mfScansWrap tbody td');"
+                       " const r = document.createRange(); r.selectNodeContents(td);"
+                       " return Math.round(td.getBoundingClientRect().width - r.getBoundingClientRect().width); })()")
+            assert gap < 40, f"{width} 寬：時間那一欄空了 {gap} px"
         t.shot(f"mfp_scan_{locale}_done_1280", 1280)
         t.shot(f"mfp_scan_{locale}_done_390", 390)
+        # 手機寬度：事務機名稱不可以一個字一行（格子變區塊後還留著 1% 寬）
+        t.send("Emulation.setDeviceMetricsOverride", {"width": 390, "height": 900, "deviceScaleFactor": 1, "mobile": True})
+        time.sleep(0.3)
+        assert t.js("(() => { const c = document.querySelector('#mfScansWrap tbody td:nth-child(2) .mf-cap');"
+                    " return c.getBoundingClientRect().height < parseFloat(getComputedStyle(c).fontSize) * 2; })()"), \
+            "390 寬：事務機名稱折成一字一行"
+        t.send("Emulation.clearDeviceMetricsOverride", {})
         # 收拾：移除這台，下一個語言從空清單開始
         t.js("[...document.querySelectorAll('#mfListWrap tbody button')].find(b => b.classList.contains('mf-del')).click()")
         assert t.wait_for("!!document.querySelector('.modal-ok')")

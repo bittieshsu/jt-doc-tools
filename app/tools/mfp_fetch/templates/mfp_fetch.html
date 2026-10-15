@@ -1,11 +1,27 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import icon %}
-{% block title %}{% if mode == 'shared' %}{{ tr('共用事務機') }}{% else %}{{ tr('事務機取件') }}{% endif %} · {{ app_name }}{% endblock %}
+{% block title %}{% if mode == 'shared' %}{{ tr('共用事務機') }}{% else %}{{ tr('事務機掃描取件') }}{% endif %} · {{ app_name }}{% endblock %}
 {% block head %}
 <style nonce="{{ request.state.csp_nonce }}">
 .mf-beta-note { display:flex; gap:10px; align-items:flex-start; padding:10px 14px; margin:0 0 16px;
   background:#fffbeb; border:1px solid #fde68a; border-radius:8px; color:#92400e; font-size:13.5px; line-height:1.6; }
 .mf-beta-note .ic { flex:0 0 auto; margin-top:3px; }
+/* 「?」說明：按下才出現的本站說明框（樣式比照系統狀態頁的說明），不用瀏覽器原生的 title */
+.mf-help { position:relative; display:inline-block; vertical-align:-2px; margin:0 3px 0 2px; }
+.mf-help-btn { display:inline-flex; align-items:center; justify-content:center; width:17px; height:17px; padding:0;
+  border:0; border-radius:50%; background:rgba(146,64,14,.14); color:#92400e; font:700 11px/1 inherit; cursor:pointer; }
+.mf-help-btn:hover, .mf-help-btn[aria-expanded="true"] { background:#92400e; color:#fff; }
+.mf-help-btn:focus-visible { outline:2px solid #2563eb; outline-offset:2px; }
+.mf-help-pop { position:absolute; left:-8px; top:calc(100% + 8px); z-index:40; display:block; width:360px;
+  max-width:calc(100vw - 32px); box-sizing:border-box; padding:10px 13px; background:#111827; color:#f9fafb;
+  font-size:12.5px; line-height:1.65; font-weight:normal; text-align:left; white-space:normal;
+  border-radius:7px; box-shadow:0 6px 20px rgba(0,0,0,.28); }
+.mf-help-pop[hidden] { display:none; }
+.mf-help-pop::before { content:''; position:absolute; top:-6px; left:var(--mf-arrow, 16px); transform:translateX(-50%);
+  border:6px solid transparent; border-top:0; border-bottom-color:#111827; }
+.mf-help-title { display:block; margin-bottom:4px; font-size:13px; font-weight:700; }
+.mf-help-row { display:block; position:relative; padding-left:12px; }
+.mf-help-row::before { content:'•'; position:absolute; left:0; }
 .mf-add { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) auto; gap:10px; align-items:end; }
 .mf-add label { display:block; font-size:13px; color:#475569; margin-bottom:4px; }
 .mf-add input, .mf-add select { width:100%; box-sizing:border-box; padding:8px 10px; font-size:14px;
@@ -68,6 +84,18 @@
   .mf-list td:last-child { white-space:normal; width:auto; }
 }
 .mf-list .mf-row-actions .btn { white-space:nowrap; }
+/* 時間、事務機、內容照內容寬度（長的在上限處折行），多出來的寬度給狀態 —— 不然空位全分給時間那一欄 */
+.mf-scans td:nth-child(-n+3), .mf-scans th:nth-child(-n+3) { width:1%; }
+.mf-scans td:first-child { white-space:nowrap; }
+.mf-scans td:nth-child(-n+3), .mf-scans th:nth-child(-n+3) { padding-right:20px; }
+.mf-scans .mf-cap { display:inline-block; max-width:12em; overflow-wrap:anywhere; }
+.mf-scans .mf-cap.wide { min-width:6em; max-width:22em; }
+@media (max-width: 1100px) { .mf-scans .mf-cap.wide { max-width:14em; } }
+/* 720 以下一列一張：格子是區塊，不可以留著 1% 寬（字會一個一行） */
+@media (max-width: 720px) {
+  .mf-scans td:nth-child(-n+3), .mf-scans th:nth-child(-n+3) { width:auto; padding-right:0; }
+  .mf-scans .mf-cap, .mf-scans .mf-cap.wide { max-width:none; }
+}
 .mf-del { color:#dc2626; }
 .mf-del:hover { background:#fee2e2; border-color:#fecaca; }
 .mf-detail-head { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; justify-content:space-between;
@@ -94,6 +122,51 @@
 .mf-scan-state.done { background:#f0fdf4; border-color:#bbf7d0; }
 .mf-scan-state.error { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
 .mf-scan-state .mf-actions { margin:8px 0 0; }
+/* 機內信箱取件：一次只問需要的東西（使用者 2026-10-14：「越簡單越易懂越好」） */
+.mf-box-form { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto; gap:10px; align-items:end; }
+.mf-box-form label, .mf-box-login label { display:block; font-size:13px; color:#475569; margin-bottom:4px; }
+.mf-box-form input, .mf-box-login input { width:100%; box-sizing:border-box; height:36px; padding:0 10px;
+  border:1px solid #cbd5e1; border-radius:6px; font-size:14px; }
+.mf-box-form .btn { height:36px; box-sizing:border-box; }
+.mf-box-login { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin-top:10px;
+  padding:10px 12px; border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0; }
+.mf-box-login .mf-hint { grid-column:1 / -1; margin:0; }
+.mf-confirm { margin-top:10px; padding:10px 12px; border-radius:8px; background:#fffbeb; border:1px solid #fde68a;
+  color:#78350f; font-size:13.5px; line-height:1.6; }
+.mf-confirm .mf-actions { margin:8px 0 0; }
+.mf-fp { display:block; margin-top:6px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size:12.5px; word-break:break-all; color:#1e293b; }
+.mf-box-head { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; justify-content:space-between; margin:14px 0 6px; }
+.mf-box-head strong { font-size:14px; }
+.mf-docs td:first-child, .mf-docs th:first-child { width:28px; }
+.mf-docs input[type=checkbox] { width:16px; height:16px; }
+.mf-docs tr.picked td { background:#eef2ff; }
+.mf-box-go { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin-top:10px; }
+.mf-box-go > div { min-width:220px; }
+.mf-box-go label { display:block; font-size:13px; color:#475569; margin-bottom:4px; }
+.mf-box-go .jt-select-wrap { display:block; width:100%; }
+.mf-box-go .jt-select-trigger, .mf-box-go .btn { height:36px; box-sizing:border-box; }
+.mf-files { margin:8px 0 0; padding:0; list-style:none; }
+.mf-files li { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; padding:4px 0; border-top:1px solid #e2e8f0; }
+.mf-files li:first-child { border-top:0; }
+.mf-files .name { flex:1 1 220px; word-break:break-all; }
+.mf-items { margin:6px 0 0; padding-left:18px; font-size:13px; }
+.mf-tech { margin-top:12px; }
+.mf-tech summary { cursor:pointer; font-size:12.5px; color:#64748b; }
+@media (max-width: 720px) {
+  .mf-box-form, .mf-box-login { grid-template-columns:1fr; }
+}
+/* 檔案分享取件 */
+.mf-crumbs { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:13.5px; margin:10px 0 6px; }
+.mf-crumbs button { border:0; background:none; color:#2563eb; cursor:pointer; padding:2px 4px; font-size:13.5px; }
+.mf-crumbs button:disabled { color:#0f172a; cursor:default; font-weight:600; }
+.mf-docs .mf-dir { cursor:pointer; color:#1d4ed8; }
+.mf-docs .mf-dir .ic, .mf-docs .mf-file .ic { vertical-align:-2px; margin-right:6px; }
+.mf-tag.shared-area { background:#ecfeff; color:#155e75; }
+/* 管理員設定（共用事務機頁） */
+.mf-switch { display:flex; gap:10px; align-items:center; font-size:14px; color:#0f172a; cursor:pointer; }
+.mf-switch input { width:18px; height:18px; margin:0; }
+.mf-tag.paused { background:#f1f5f9; color:#475569; }
 /* 成員 */
 .mf-members { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin:8px 0; }
 .mf-mlist { border:1px solid #e2e8f0; border-radius:8px; background:#fff; overflow:hidden; }
@@ -115,22 +188,63 @@
   .mf-list tr { display:block; border-bottom:1px solid #e2e8f0; padding:6px 0; }
   .mf-list td { display:block; border:0; padding:3px 0; }
 }
+/* 下載診斷報告：按下展開格式選單 */
+.mf-report-wrap { position:relative; display:inline-block; }
+.mf-report-menu { position:absolute; left:0; top:100%; margin-top:4px; z-index:20; background:#fff;
+  border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 8px 28px rgba(0,0,0,.14);
+  display:flex; flex-direction:column; min-width:190px; overflow:hidden; }
+.mf-report-menu[hidden], .mf-report-wrap[hidden] { display:none; }
+.mf-report-menu button { border:none; background:none; text-align:left; padding:8px 14px; font-size:13px;
+  cursor:pointer; white-space:nowrap; color:inherit; }
+.mf-report-menu button:hover, .mf-report-menu button:focus-visible { background:#eff6ff; color:#1d4ed8; outline:none; }
+.mf-detail-tools { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+/* 「詳細」標題列靠右：選單往左展開；窄螢幕那一列會折到左邊，改回往右 */
+.mf-detail-tools .mf-report-menu { left:auto; right:0; }
+@media (max-width: 720px) { .mf-detail-tools .mf-report-menu { left:0; right:auto; } }
 </style>
 {% endblock %}
+
+{# 下載診斷報告的格式選單（測試結果與「詳細」兩處共用） #}
+{% macro report_menu(btn_id, small=False) %}
+<span class="mf-report-wrap" data-mf-report>
+  <button type="button" class="btn btn-secondary{% if small %} btn-small{% endif %}" id="{{ btn_id }}" data-mf-report-btn aria-haspopup="menu" aria-expanded="false">{{ icon('download', size=14) }} <span>{{ tr('下載診斷報告') }}</span> <span aria-hidden="true">▾</span></button>
+  <span class="mf-report-menu" role="menu" data-mf-report-menu hidden>
+    <button type="button" role="menuitem" data-fmt="txt">{{ tr('純文字（.txt）') }}</button>
+    <button type="button" role="menuitem" data-fmt="md">{{ tr('Markdown（.md）') }}</button>
+    <button type="button" role="menuitem" data-fmt="json">{{ tr('JSON 原始資料（.json）') }}</button>
+    <button type="button" role="menuitem" data-fmt="html">{{ tr('網頁（.html）') }}</button>
+    <button type="button" role="menuitem" data-fmt="pdf">{{ tr('PDF（.pdf）') }}</button>
+  </span>
+</span>
+{% endmacro %}
+
+{# eSCL 旁邊的「?」：按下才出現說明（使用者 2026-10-15：要本站樣式，不要瀏覽器原生的提示） #}
+{% macro escl_help() %}<span class="mf-help" data-mf-help><button type="button" class="mf-help-btn" aria-expanded="false" aria-controls="mfEsclHelp" aria-label="{{ tr('eSCL 說明') }}">?</button><span class="mf-help-pop" id="mfEsclHelp" hidden><span class="mf-help-title">{{ tr('eSCL 說明') }}</span><span class="mf-help-row">{{ tr('eSCL 是事務機與印表機的網路掃描標準，Apple AirPrint 掃描與 Mopria 掃描都採用它。') }}</span><span class="mf-help-row">{{ tr('支援 eSCL 的事務機不用安裝驅動程式或原廠軟體，本站透過網頁連線（HTTP / HTTPS）直接請它掃描，不傳送帳號密碼；掃好的檔案存進工作區或直接下載。') }}</span><span class="mf-help-row">{{ tr('近年的網路事務機多半支援；這台有沒有支援，看連線測試結果的「從本站掃描」。') }}</span><span class="mf-help-row">{{ tr('掃描前先把文件放在平台玻璃或送紙器上；同一台事務機一次只服務一個人，其他人自動排隊。') }}</span></span></span>{% endmacro %}
 
 {% block content %}
 {% if mode == 'shared' %}
 <h1>{{ icon('printer', size=22) }} {{ tr('共用事務機') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h1>
-<p class="muted">{{ tr('在這裡建立的事務機，加進來的成員（使用者或群組）不用自己新增，就會出現在他的「事務機取件」頁。成員可以重新測試、看詳細、掃描，不能改名或移除。') }}</p>
-<div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('成員還是要有「事務機取件」的工具權限才看得到這支工具（角色照舊）。同一台事務機一次只服務一個人，其他人自動排隊。') }}</span></div>
+<p class="muted">{{ tr('在這裡建立的事務機，加進來的成員（使用者或群組）不用自己新增，就會出現在他的「事務機掃描取件」頁。成員可以重新測試、看詳細、掃描，不能改名或移除。') }}</p>
+<div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('成員還是要有「事務機掃描取件」的工具權限才看得到這支工具（角色照舊）。同一台事務機一次只服務一個人，其他人自動排隊。') }}</span></div>
+<div class="panel" id="mfSettingsPanel">
+  <h2>{{ tr('使用設定') }}</h2>
+  <label class="mf-switch" for="mfAllowUser"><input type="checkbox" id="mfAllowUser"> <span>{{ tr('允許使用者自行新增事務機') }}</span></label>
+  <p class="mf-hint">{{ tr('關閉後，一般使用者只能使用這裡設定的共用事務機；他們以前自己新增的會暫停使用（資料保留，重新開啟就恢復，本人仍可移除）。管理員不受影響。') }}</p>
+  <div class="mf-hint" id="mfSettingsMsg" role="status"></div>
+</div>
 {% else %}
-<h1>{{ icon('printer', size=22) }} {{ tr('事務機取件') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h1>
-<p class="muted">{{ tr('查看事務機個人資料夾中的掃描文件，匯入工作區後接續 OCR、轉檔與 AI 處理。') }}</p>
+<h1>{{ icon('printer', size=22) }} {{ tr('事務機掃描取件') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h1>
+<p class="muted">{{ tr('從事務機掃描，或取回機內信箱裡的文件，存進工作區後接續 OCR、轉檔與 AI 處理。') }}</p>
 
-<div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('試用中：目前可以新增事務機、做連線測試與型號辨識，也可以從支援 eSCL 的事務機掃描，直接存進工作區。登入信箱、列出文件與取件，要等實機驗證通過後才開放。') }}</span></div>
+{# 一句話一個 tr()：譯文裡找 eSCL，按鈕接在那個字（含黏在後面的「-capable」）後面；三種語言的譯文都有 eSCL #}
+{% set _note = tr('試用中：可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件，以及 Canon、Konica Minolta、SHARP 的檔案分享取件是實驗功能，還沒在實機上驗證過。') %}
+<div class="mf-beta-note">{{ icon('info', size=16) }}<span>{% if 'eSCL' in _note %}{% set _head, _tail = _note.split('eSCL', 1) %}{% set _glued, _rest = (_tail ~ ' ').split(' ', 1) %}{{ _head }}eSCL{{ _glued }}{{ escl_help() }} {{ _rest|trim }}{% else %}{{ _note }}{% endif %}</span></div>
 {% endif %}
 
-<div class="panel">
+{% if mode != 'shared' %}
+<div class="mf-beta-note" id="mfNoAddNote" hidden>{{ icon('info', size=16) }}<span>{{ tr('管理員設定為只能使用共用事務機：清單上的事務機由管理員設定，需要新增請洽管理員。') }}</span></div>
+{% endif %}
+<div class="panel" id="mfAddPanel">
   <h2>{% if mode == 'shared' %}{{ tr('新增共用事務機') }}{% else %}{{ tr('新增事務機') }}{% endif %}</h2>
   <form id="mfAddForm" class="mf-add" autocomplete="off">
     <div>
@@ -162,7 +276,7 @@
   <div class="mf-actions" id="mfSaveBar">
     <input id="mfSaveName" maxlength="64" placeholder="{{ tr('名稱（選填），例如三樓行政區') }}">
     <button type="button" class="btn btn-primary" id="mfSaveBtn">{{ icon('save', size=14) }} <span>{% if mode == 'shared' %}{{ tr('儲存為共用事務機') }}{% else %}{{ tr('儲存這台事務機') }}{% endif %}</span></button>
-    <button type="button" class="btn btn-secondary" id="mfDownloadBtn">{{ icon('download', size=14) }} <span>{{ tr('下載診斷報告') }}</span></button>
+    {{ report_menu('mfDownloadBtn') }}
   </div>
   <div id="mfSaveMsg" class="mf-hint"></div>
 </div>
@@ -174,7 +288,10 @@
   <div id="mfDetailPanel" hidden>
     <div class="mf-detail-head">
       <h3 id="mfDetailTitle"></h3>
-      <button type="button" class="btn btn-secondary btn-small" id="mfDetailClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
+      <div class="mf-detail-tools">
+        {{ report_menu('mfDetailReportBtn', small=True) }}
+        <button type="button" class="btn btn-secondary btn-small" id="mfDetailClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
+      </div>
     </div>
     <div id="mfDetail"></div>
   </div>
@@ -215,6 +332,9 @@
     <span data-ic="printer">{{ icon('printer', size=14) }}</span>
     <span data-ic="user">{{ icon('user', size=14) }}</span>
     <span data-ic="archive">{{ icon('archive', size=14) }}</span>
+    <span data-ic="mail">{{ icon('mail', size=14) }}</span>
+    <span data-ic="lock">{{ icon('lock', size=14) }}</span>
+    <span data-ic="page">{{ icon('page', size=14) }}</span>
   </template>
 </div>
 
@@ -224,12 +344,13 @@
     <h2 id="mfScanTitle" class="mf-scan-title"></h2>
     <button type="button" class="btn btn-secondary btn-small" id="mfScanClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
   </div>
-  <div class="mf-scan-note">{{ icon('info', size=16) }}<span>{{ tr('請先把文件放在事務機的平台玻璃上（或自動送紙器裡），再按「開始掃描」。掃好的 PDF 會存進你的工作區。同一台事務機一次只服務一個人，其他人會自動排隊。') }}</span></div>
+  <div class="mf-scan-note">{{ icon('info', size=16) }}<span>{{ tr('請先把文件放在事務機的平台玻璃上（或自動送紙器裡），再按「開始掃描」。掃好的檔案會存進你的工作區。同一台事務機一次只服務一個人，其他人會自動排隊。') }}</span></div>
   <div class="mf-scan-opts">
     <div><label for="mfScanSource">{{ tr('來源') }}</label><select id="mfScanSource" class="jt-select"></select></div>
     <div><label for="mfScanColor">{{ tr('色彩') }}</label><select id="mfScanColor" class="jt-select"></select></div>
     <div><label for="mfScanRes">{{ tr('解析度') }}</label><select id="mfScanRes" class="jt-select"></select></div>
     <div><label for="mfScanPaper">{{ tr('紙張') }}</label><select id="mfScanPaper" class="jt-select"></select></div>
+    <div><label for="mfScanFormat">{{ tr('存成') }}</label><select id="mfScanFormat" class="jt-select"></select></div>
     <div><label for="mfScanName">{{ tr('檔名（選填）') }}</label><input id="mfScanName" maxlength="100" placeholder="{{ tr('例如 合約掃描') }}"></div>
   </div>
   <div class="mf-actions">
@@ -239,8 +360,104 @@
   <div id="mfScanState" class="mf-scan-state" hidden></div>
 </div>
 
+<div class="panel" id="mfBoxPanel" hidden>
+  <div class="mf-detail-head">
+    <h2 id="mfBoxTitle" class="mf-scan-title"></h2>
+    <button type="button" class="btn btn-secondary btn-small" id="mfBoxClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
+  </div>
+  <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依原廠取件工具的研究寫成，還沒在實機上驗證過。只會讀取（列出文件、下載），不會刪除或修改事務機上的文件。') }}</span></div>
+  <form id="mfBoxForm" class="mf-box-form" autocomplete="off">
+    <div>
+      <label for="mfBoxNo">{{ tr('信箱編號') }}</label>
+      <input id="mfBoxNo" type="number" min="1" max="999" required inputmode="numeric" placeholder="{{ tr('例如 1') }}">
+    </div>
+    <div>
+      <label for="mfBoxPw">{{ tr('信箱密碼（沒有設就留空）') }}</label>
+      <input id="mfBoxPw" type="password" maxlength="128" autocomplete="off">
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary" id="mfBoxListBtn">{{ icon('search', size=14) }} <span>{{ tr('列出文件') }}</span></button>
+    </div>
+  </form>
+  <div class="mf-box-login" id="mfBoxLogin" hidden>
+    <p class="mf-hint">{{ tr('這台事務機要求登入：請輸入你在事務機上使用的帳號與密碼，再按一次「列出文件」。') }}</p>
+    <div><label for="mfBoxUser">{{ tr('事務機帳號') }}</label><input id="mfBoxUser" maxlength="128" autocomplete="off" spellcheck="false"></div>
+    <div><label for="mfBoxUserPw">{{ tr('事務機密碼') }}</label><input id="mfBoxUserPw" type="password" maxlength="128" autocomplete="off"></div>
+  </div>
+  <div id="mfBoxConfirm" class="mf-confirm" hidden></div>
+  <div id="mfBoxError" class="mf-err" hidden></div>
+  <div id="mfBoxDocs" hidden>
+    <div class="mf-box-head"><strong id="mfBoxSummary"></strong>
+      <button type="button" class="btn btn-secondary btn-small" id="mfBoxRefresh">{{ icon('refresh', size=14) }} <span>{{ tr('重新整理') }}</span></button></div>
+    <div id="mfBoxWarn" class="mf-warn" hidden></div>
+    <div id="mfBoxTable"></div>
+    <div class="mf-box-go">
+      <div><label for="mfBoxOutput">{{ tr('存成') }}</label>
+        <select id="mfBoxOutput" class="jt-select">
+          <option value="pdf">{{ tr('PDF（建議）') }}</option>
+          <option value="original">{{ tr('原始檔（事務機給的 TIFF / JPEG）') }}</option>
+        </select></div>
+      <button type="button" class="btn btn-primary" id="mfBoxFetchBtn" disabled>{{ icon('download', size=14) }} <span id="mfBoxFetchLabel">{{ tr('取件') }}</span></button>
+    </div>
+    <p class="mf-hint">{{ tr('取好的檔案會存進你的工作區。同一台事務機一次只服務一個人，其他人會自動排隊。') }}</p>
+  </div>
+  <div id="mfBoxState" class="mf-scan-state" hidden></div>
+  <details class="mf-tech" id="mfBoxTech" hidden><summary>{{ tr('技術細節（給管理員看的協定紀錄）') }}</summary><div id="mfBoxTrace"></div></details>
+</div>
+
+<div class="panel" id="mfSharePanel" hidden>
+  <div class="mf-detail-head">
+    <h2 id="mfShareTitle" class="mf-scan-title"></h2>
+    <button type="button" class="btn btn-secondary btn-small" id="mfShareClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
+  </div>
+  <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依原廠手冊公開的方式寫成，還沒在實機上驗證過。只會讀取（列出、下載），不會刪除、改名或寫入事務機上的檔案。') }}</span></div>
+  <form id="mfShareForm" class="mf-box-form" autocomplete="off">
+    <div id="mfShareRouteWrap" hidden>
+      <label for="mfShareRoute">{{ tr('連線方式') }}</label>
+      <select id="mfShareRoute" class="jt-select"></select>
+    </div>
+    <div id="mfShareUserWrap">
+      <label for="mfShareUser">{{ tr('帳號（沒有設認證就留空）') }}</label>
+      <input id="mfShareUser" maxlength="256" autocomplete="off" spellcheck="false">
+    </div>
+    <div id="mfShareBoxWrap" hidden>
+      <label for="mfShareBox">{{ tr('信箱編號') }}</label>
+      <input id="mfShareBox" type="number" min="1" max="999999999" inputmode="numeric">
+    </div>
+    <div>
+      <label for="mfSharePw" id="mfSharePwLabel">{{ tr('密碼') }}</label>
+      <input id="mfSharePw" type="password" maxlength="256" autocomplete="off">
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary" id="mfShareListBtn">{{ icon('search', size=14) }} <span>{{ tr('列出檔案') }}</span></button>
+    </div>
+  </form>
+  <div id="mfShareConfirm" class="mf-confirm" hidden></div>
+  <div id="mfShareError" class="mf-err" hidden></div>
+  <div id="mfShareFiles" hidden>
+    <div class="mf-box-head">
+      <div id="mfShareRootWrap"><label for="mfShareRoot" class="mf-hint">{{ tr('位置') }}</label> <select id="mfShareRoot" class="jt-select"></select></div>
+      <button type="button" class="btn btn-secondary btn-small" id="mfShareRefresh">{{ icon('refresh', size=14) }} <span>{{ tr('重新整理') }}</span></button>
+    </div>
+    <div id="mfShareSharedNote" class="mf-warn" hidden>{{ tr('這是共享的位置：其他人也看得到這裡的檔案，不是只屬於你的文件。') }}</div>
+    <div class="mf-crumbs" id="mfShareCrumbs"></div>
+    <div id="mfShareTable"></div>
+    <div class="mf-box-go">
+      <div><label for="mfShareOutput">{{ tr('存成') }}</label>
+        <select id="mfShareOutput" class="jt-select">
+          <option value="pdf">{{ tr('PDF（建議；TIFF / JPEG 會轉成 PDF，其他檔案照原樣）') }}</option>
+          <option value="original">{{ tr('原始檔（不轉檔）') }}</option>
+        </select></div>
+      <button type="button" class="btn btn-primary" id="mfShareFetchBtn" disabled>{{ icon('download', size=14) }} <span id="mfShareFetchLabel">{{ tr('取件') }}</span></button>
+    </div>
+    <p class="mf-hint">{{ tr('取好的檔案會存進你的工作區。同一台事務機一次只服務一個人，其他人會自動排隊。') }}</p>
+  </div>
+  <div id="mfShareState" class="mf-scan-state" hidden></div>
+  <details class="mf-tech" id="mfShareTech" hidden><summary>{{ tr('技術細節（給管理員看的協定紀錄）') }}</summary><div id="mfShareTrace"></div></details>
+</div>
+
 <div class="panel" id="mfScansPanel" hidden>
-  <h2>{{ tr('最近的掃描') }}</h2>
+  <h2>{{ tr('最近的掃描與取件') }}</h2>
   <div id="mfScansWrap"></div>
 </div>
 {% endif %}
@@ -250,7 +467,7 @@
 (function () {
   'use strict';
   const API = '/tools/mfp-fetch/api';
-  // 同一份畫面兩種用法：「事務機取件」（mine）與管理頁的「共用事務機」（shared）
+  // 同一份畫面兩種用法：「事務機掃描取件」（mine）與管理頁的「共用事務機」（shared）
   const SHARED = {{ 'true' if mode == 'shared' else 'false' }};
   const LIST_PATH = SHARED ? '/shared' : '/connections';
   function itemPath(id) { return (SHARED ? '/shared/' : '/connections/') + id; }
@@ -266,7 +483,7 @@
   };
   const STATUS_CLASS = {
     supported: 'good', first_batch_unverified: 'info', same_vendor_unverified: 'warn',
-    unsupported_vendor: 'bad', login_required: 'warn', unknown: 'warn', unreachable: 'bad',
+    experimental_vendor: 'info', unsupported_vendor: 'bad', login_required: 'warn', unknown: 'warn', unreachable: 'bad',
   };
   const EVIDENCE_WHAT = { vendor: tr('廠牌'), model: tr('型號'), ui: tr('網頁介面名稱'), firmware: tr('韌體（可能）') };
   const EVIDENCE_FIELD = { title: tr('頁面標題'), text: tr('頁面文字'), header: tr('回應標頭'), escl: tr('掃描介面（eSCL）') };
@@ -459,14 +676,51 @@
     container.append(stepsBox);
   }
 
-  function downloadJson(obj, name) {
-    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  // ---- 下載診斷報告：按下展開格式選單（txt / md / json / html / pdf），由伺服器產生檔案
+  function fileNameOf(r, fallback) {
+    const cd = r.headers.get('Content-Disposition') || '';
+    const m = /filename\*=UTF-8''([^;]+)/i.exec(cd) || /filename="?([^";]+)"?/i.exec(cd);
+    try { return m ? decodeURIComponent(m[1]) : fallback; } catch (e) { return fallback; }
+  }
+  async function downloadReport(btn, send, errBox) {
+    errBox.hidden = true;
+    busy(btn, true, tr('下載中…'));
+    let r;
+    try { r = await send(); } catch (e) { busy(btn, false); showError(errBox, { message: tr('連不上伺服器') }); return; }
+    if (!r.ok) {
+      busy(btn, false);
+      let j = null;
+      try { j = await r.clone().json(); } catch (e) { j = null; }
+      showError(errBox, j && j.message ? j : { message: await window.friendlyServerError(r, tr('下載失敗')) });
+      return;
+    }
+    const blob = await r.blob();
+    busy(btn, false);
     const a = el('a');
     a.href = URL.createObjectURL(blob);
-    a.download = name;
+    a.download = fileNameOf(r, 'mfp-diagnostic');
     document.body.append(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  function wireReportMenu(wrap, send, errBox) {
+    const btn = wrap.querySelector('[data-mf-report-btn]');
+    const menu = wrap.querySelector('[data-mf-report-menu]');
+    const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const opening = menu.hidden;
+      document.querySelectorAll('[data-mf-report-menu]').forEach(m => { m.hidden = true; });
+      menu.hidden = !opening;
+      btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+      if (opening) { const first = menu.querySelector('[data-fmt]'); if (first) first.focus(); }
+    });
+    document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(); });
+    wrap.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { close(); btn.focus(); } });
+    menu.querySelectorAll('[data-fmt]').forEach(b => b.addEventListener('click', () => {
+      close();
+      downloadReport(btn, () => send(b.dataset.fmt), errBox);
+    }));
   }
 
   // ---- 新增 / 連線測試
@@ -493,11 +747,42 @@
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
-  document.getElementById('mfDownloadBtn').addEventListener('click', () => {
-    if (!lastDetection) return;
-    const h = (lastDetection.report.target || {}).host || 'mfp';
-    downloadJson(lastDetection.report, 'mfp-diagnostic-' + h.replace(/[^A-Za-z0-9.\-]/g, '_') + '.json');
+  // ---- 「?」說明：按下開關；點外面或按 Esc 收起；說明框不超出畫面（窄螢幕往左挪，箭頭跟著對準按鈕）
+  document.querySelectorAll('[data-mf-help]').forEach((wrap) => {
+    const btn = wrap.querySelector('.mf-help-btn');
+    const pop = wrap.querySelector('.mf-help-pop');
+    const close = () => { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+    const place = () => {
+      pop.style.left = '';
+      const gap = 16;
+      // 用版面寬度，不用 innerWidth：手機上內容一溢出 innerWidth 就跟著撐大，等於沒有夾
+      const vw = document.documentElement.clientWidth;
+      const r = pop.getBoundingClientRect();
+      let shift = 0;
+      if (r.right > vw - gap) shift = (vw - gap) - r.right;
+      if (r.left + shift < gap) shift = gap - r.left;
+      if (shift) pop.style.left = (parseFloat(getComputedStyle(pop).left) + shift) + 'px';
+      const b = btn.getBoundingClientRect();
+      pop.style.setProperty('--mf-arrow', Math.round(b.left + b.width / 2 - pop.getBoundingClientRect().left) + 'px');
+    };
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!pop.hidden) { close(); return; }
+      pop.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      place();
+    });
+    document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(); });
+    wrap.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) { close(); btn.focus(); } });
+    window.addEventListener('resize', () => { if (!pop.hidden) place(); });
   });
+
+  // 還沒儲存的測試結果：用連線測試回的 token 跟伺服器拿（下載不會用掉它，之後照樣可以儲存）
+  wireReportMenu(document.getElementById('mfSaveBar').querySelector('[data-mf-report]'),
+    fmt => fetch(API + '/detect/report', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ token: lastDetection ? lastDetection.token : '', format: fmt }) }),
+    document.getElementById('mfSaveMsg'));
 
   const saveBtn = document.getElementById('mfSaveBtn');
   saveBtn.addEventListener('click', async () => {
@@ -524,6 +809,13 @@
     if (!res.ok) { listWrap.replaceChildren(); showError(listErr, res); return; }
     const items = res.connections || [];
     listItems = items;
+    if (!SHARED) {
+      // 管理員關掉「使用者自行新增事務機」：新增那一塊收起來，改說明
+      const canAdd = res.can_add !== false;
+      document.getElementById('mfAddPanel').hidden = !canAdd;
+      document.getElementById('mfNoAddNote').hidden = canAdd;
+      if (!canAdd) document.getElementById('mfResultPanel').hidden = true;
+    }
     if (!items.length) {
       listWrap.replaceChildren(el('p', 'mf-empty', SHARED ? tr('還沒有共用事務機。') : tr('還沒有新增任何事務機。')));
       return;
@@ -539,6 +831,11 @@
       const r = el('tr');
       const nameTd = el('td', null, c.display_name);
       if (c.shared && !SHARED) nameTd.append(el('span', 'mf-tag shared', tr('共用')));
+      if (c.paused) {
+        const tg = el('span', 'mf-tag paused', tr('已暫停'));
+        tg.title = tr('管理員設定為只能使用共用事務機，自己新增的暫停使用（可以移除）');
+        nameTd.append(tg);
+      }
       if (c.queue && c.queue.busy) {
         nameTd.append(el('span', 'mf-tag busy', tr('使用中')));
         if (c.queue.waiting) nameTd.append(el('span', 'mf-sub', tr('後面還有 {0} 件').replace('{0}', c.queue.waiting)));
@@ -553,20 +850,30 @@
       const det = rowBtn('', '', () => (detailId === c.id ? hideDetail() : showDetail(c)));
       det.dataset.mfDetail = String(c.id);
       setDetailBtn(det);
-      if (!SHARED && c.scan) {
+      if (!SHARED && c.scan && !c.paused) {
         const sb = rowBtn('printer', tr('掃描'), () => openScan(c));
         sb.dataset.mfScan = String(c.id);
         box.append(sb);
       }
+      if (!SHARED && c.share && !c.paused) {
+        const sh = rowBtn('mail', tr('取件'), () => openShare(c));
+        sh.dataset.mfShare = String(c.id);
+        box.append(sh);
+      }
+      if (!SHARED && c.box && !c.paused) {
+        const bb = rowBtn('mail', tr('信箱取件'), () => openBox(c));
+        bb.dataset.mfBox = String(c.id);
+        box.append(bb);
+      }
       if (SHARED) box.append(rowBtn('user', tr('成員'), () => openMembers(c)));
       const rt = rowBtn('refresh', tr('重新測試'), () => retest(c, act), true);
       rt.dataset.mfRetest = '1';
-      box.append(rt,
-                 det,
-                 rowBtn('download', tr('下載診斷報告'), () => { window.location.href = API + '/connections/' + c.id + '/report'; }, true));
+      if (!c.paused) box.append(rt);
+      box.append(det);
       if (SHARED || c.can_manage !== false) {     // 管理頁就是管理共用事務機的地方
-        box.append(rowBtn('edit', tr('重新命名'), () => renameConn(c), true),
-                   rowBtn('trash', tr('移除'), () => removeConn(c), true, 'mf-del'));
+        const rn = rowBtn('edit', tr('重新命名'), () => renameConn(c), true);
+        rn.dataset.mfRename = String(c.id);
+        box.append(rn, rowBtn('trash', tr('移除'), () => removeConn(c), true, 'mf-del'));
       }
       act.append(box); r.append(act);
       tb.append(r);
@@ -619,6 +926,12 @@
     if (wasFar) listWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   document.getElementById('mfDetailClose').addEventListener('click', hideDetail);
+  // 診斷報告放在「詳細」裡（使用者 2026-10-15）：下載的是展開的這一台
+  const detailReport = document.getElementById('mfDetailPanel').querySelector('[data-mf-report]');
+  wireReportMenu(detailReport,
+    fmt => fetch(API + '/connections/' + encodeURIComponent(detailId) + '/report?format=' + encodeURIComponent(fmt),
+                 { headers: { 'Accept': 'application/json' } }),
+    listErr);
   async function retest(c, cell) {
     const btn = cell.querySelector('[data-mf-retest]') || cell.querySelector('button');
     busy(btn, true, tr('測試中…'));
@@ -640,6 +953,7 @@
     const box = document.getElementById('mfDetail');
     if (!rep) box.replaceChildren(el('p', 'mf-empty', tr('這台事務機還沒有連線測試的報告')));
     else renderReport(box, rep);
+    detailReport.hidden = !rep;      // 沒有報告就不顯示下載
     panel.hidden = false;
     detailId = c.id;
     syncDetailBtns();
@@ -667,7 +981,8 @@
   const COLOR_NAMES = { color: tr('彩色'), gray: tr('灰階'), bw: tr('黑白') };
   const PAPER_NAMES = { a4: 'A4', letter: 'Letter', max: tr('最大範圍') };
   const PHASE_NAMES = { queued: tr('排隊中'), checking: tr('檢查事務機狀態'), scanning: tr('掃描中'),
-                        merging: tr('合成 PDF'), saving: tr('存進工作區') };
+                        merging: tr('合成 PDF'), saving: tr('存進工作區'), downloading: tr('取件中') };
+  const OUTPUT_NAMES = { pdf: 'PDF', jpeg: tr('JPEG（每頁一個檔）') };
   let scanConn = null;
   let scanTimer = null;
   function fillSelect(id, values, names, pick) {
@@ -691,6 +1006,7 @@
     const res = c.resolutions || [];
     fillSelect('mfScanRes', res, Object.fromEntries(res.map(r => [r, r + ' dpi'])),
                res.includes(300) ? 300 : res[0]);
+    fillSelect('mfScanFormat', c.outputs || ['pdf'], OUTPUT_NAMES, 'pdf');
   }
   function openScan(c) {
     scanConn = c;
@@ -723,12 +1039,13 @@
         color: document.getElementById('mfScanColor').value,
         resolution: Number(document.getElementById('mfScanRes').value),
         paper: document.getElementById('mfScanPaper').value,
+        format: document.getElementById('mfScanFormat').value || 'pdf',
         // 沒填檔名就用**瀏覽器這邊**的時間（伺服器可能是 UTC：正式機上實際差了 8 小時）
         file_name: document.getElementById('mfScanName').value.trim() || defaultScanName(),
       });
       busy(btn, false);
       if (!res.ok) { showError(errBox, res); return; }
-      watchScan(res.scan.id);
+      watchScan(res.scan.id, 'mfScanState');
       loadScans();
     });
   }
@@ -747,9 +1064,17 @@
       return s.ahead ? tr('排隊中：前面還有 {0} 件').replace('{0}', s.ahead) : tr('排隊中');
     }
     if (s.status === 'running') {
-      let t = PHASE_NAMES[s.phase] || tr('掃描中');
+      let t = PHASE_NAMES[s.phase] || (s.kind === 'box' ? tr('取件中') : tr('掃描中'));
       if (s.phase === 'scanning' && s.live_pages) t += P.lp + tr('已取回 {0} 份').replace('{0}', s.live_pages) + P.rp;
+      if (s.phase === 'downloading' && s.live_docs) {
+        t += P.lp + tr('第 {0} 份，共 {1} 份').replace('{0}', s.live_doc).replace('{1}', s.live_docs) + P.rp;
+      }
       return t;
+    }
+    if (s.status === 'done' && (s.kind === 'box' || s.kind === 'share')) {
+      const ok = (s.items || []).filter(i => i.status === 'ok').length;
+      const t = tr('完成：{0} 份文件，{1} 頁').replace('{0}', ok).replace('{1}', s.pages || 0);
+      return (ok < (s.items || []).length ? tr('部分完成') + P.colon : '') + t;
     }
     if (s.status === 'done') {
       return tr('完成：{0} 頁').replace('{0}', s.pages || 0) + (s.bytes ? P.lp + bytesText(s.bytes) + P.rp : '');
@@ -762,56 +1087,105 @@
     const v = (s.settings || {}).via;
     if (!v) return '';
     let t = v.protocol + ' · ' + String(v.scheme || '').toUpperCase() + ' ' + v.port;
-    if (v.scheme === 'https' && s.tls_verified === false) t += P.lp + tr('憑證未驗證') + P.rp;
+    if (v.scheme === 'https' && v.tls && v.tls.pinned) t += P.lp + tr('已核對憑證指紋') + P.rp;
+    else if (v.scheme === 'https' && s.tls_verified === false) t += P.lp + tr('憑證未驗證') + P.rp;
     return t;
   }
-  function scanActions(s) {
-    const bar = el('div', 'mf-actions');
+  function fileLinks(id, withWs) {
+    const a = el('a', 'btn btn-small btn-secondary');
+    a.href = '/workspace/file/' + encodeURIComponent(id);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.append(icon('eye'), txt(' '), el('span', null, tr('開啟')));
+    const dl = el('a', 'btn btn-small btn-secondary');
+    dl.href = '/workspace/file/' + encodeURIComponent(id) + '?dl=1';
+    dl.append(icon('download'), txt(' '), el('span', null, tr('下載')));
+    return withWs ? [a, dl, wsLink()] : [a, dl];
+  }
+  function wsLink() {
+    const w = el('a', 'btn btn-small btn-secondary');
+    w.href = '/workspace';
+    w.append(icon('archive'), txt(' '), el('span', null, tr('前往工作區')));
+    return w;
+  }
+  // inRow：放在「最近的掃描與取件」表格那一格 —— 按鈕排一排、靠右（不可以用 .mf-actions：
+  // 它會折行，而最後一格只有 1% 寬，按鈕就被擠成一顆一排，使用者 2026-10-15 截圖）
+  function scanActions(s, inRow) {
+    const bar = el('div', inRow ? 'mf-row-actions' : 'mf-actions');
     if (s.status === 'queued' || s.status === 'running') {
       bar.append(rowBtn('close', tr('取消'), async () => {
         await api('POST', '/scans/' + s.id + '/cancel');
         loadScans();
       }));
     }
-    if (s.status === 'done' && s.workspace_file_id) {
-      const a = el('a', 'btn btn-small btn-secondary');
-      a.href = '/workspace/file/' + encodeURIComponent(s.workspace_file_id);
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.append(icon('eye'), txt(' '), el('span', null, tr('開啟')));
-      const dl = el('a', 'btn btn-small btn-secondary');
-      dl.href = '/workspace/file/' + encodeURIComponent(s.workspace_file_id) + '?dl=1';
-      dl.append(icon('download'), txt(' '), el('span', null, tr('下載')));
-      const w = el('a', 'btn btn-small btn-secondary');
-      w.href = '/workspace';
-      w.append(icon('archive'), txt(' '), el('span', null, tr('前往工作區')));
-      bar.append(a, dl, w);
+    const inWs = (s.files || []).filter(f => f.workspace_file_id);
+    if (s.status === 'done' && inWs.length === 1) bar.append(...fileLinks(inWs[0].workspace_file_id, true));
+    else if (s.status === 'done' && inWs.length > 1) bar.append(wsLink());
+    else if (s.status === 'done' && !(s.files || []).length && s.workspace_file_id) {   // 舊版紀錄
+      bar.append(...fileLinks(s.workspace_file_id, true));
     }
     if (s.status === 'done' && s.has_file) {
+      const n = (s.files || []).filter(f => f.has_file).length;
       const d = el('a', 'btn btn-small btn-secondary');
       d.href = API + '/scans/' + encodeURIComponent(s.id) + '/download';
-      d.append(icon('download'), txt(' '), el('span', null, tr('下載')));
+      d.append(icon('download'), txt(' '), el('span', null, n > 1 ? tr('下載全部（ZIP）') : tr('下載')));
       bar.append(d);
     }
     return bar;
   }
-  function renderScanState(s) {
-    const box = document.getElementById('mfScanState');
+  // 結果裡每一個檔案（多於一個時）與每份文件的狀況（信箱取件）
+  function resultDetails(s, box) {
+    const files = (s.files || []).filter(f => f.workspace_file_id);
+    if (s.status === 'done' && files.length > 1) {
+      const ul = el('ul', 'mf-files');
+      for (const f of files) {
+        const li = el('li');
+        li.append(el('span', 'name', f.name + (f.pages ? P.lp + tr('{0} 頁').replace('{0}', f.pages) + P.rp : '')),
+                  ...fileLinks(f.workspace_file_id, false));
+        ul.append(li);
+      }
+      box.append(ul);
+    }
+    if ((s.kind === 'box' || s.kind === 'share') && (s.items || []).length) {
+      const ul = el('ul', 'mf-items');
+      for (const i of s.items) {
+        let t = (i.name || ('#' + i.doc)) + P.colon;
+        if (i.status === 'ok') {
+          t += tr('已取件');
+          if (i.format_message) t += P.sep + tr(i.format_message);
+          if (i.source_message) t += P.sep + tr(i.source_message);
+        } else {
+          t += tr(i.error_message || i.error_code || '');
+        }
+        ul.append(el('li', null, t));
+      }
+      box.append(ul);
+    }
+  }
+  function renderScanState(s, targetId) {
+    const box = document.getElementById(targetId || 'mfScanState');
     if (!box) return;
     box.className = 'mf-scan-state' + (s.status === 'done' ? ' done' : (s.status === 'error' ? ' error' : ''));
     box.replaceChildren(el('div', null, scanStateText(s)));
     if (viaText(s)) box.append(el('div', 'mf-hint', tr('協定') + P.colon + viaText(s)));
     if (s.workspace_message) box.append(el('div', 'mf-hint', tr(s.workspace_message)));
-    else if (s.status === 'done' && s.workspace_file_id) box.append(el('div', 'mf-hint', tr('已存進你的工作區') + P.colon + (s.file_name || '')));
+    else if (s.status === 'done' && (s.files || []).length <= 1 && s.workspace_file_id) {
+      box.append(el('div', 'mf-hint', tr('已存進你的工作區') + P.colon + (((s.files || [])[0] || {}).name || s.file_name || '')));
+    } else if (s.status === 'done' && (s.files || []).length > 1) {
+      box.append(el('div', 'mf-hint', tr('已存進你的工作區：{0} 個檔案').replace('{0}', s.files.length)));
+    }
+    resultDetails(s, box);
     box.append(scanActions(s));
     box.hidden = false;
+    if (s.kind === 'box') showTrace((s.error_detail || {}).trace, 'mfBox');
+    if (s.kind === 'share') showTrace((s.error_detail || {}).trace, 'mfShare');
   }
-  function watchScan(id) {
+  function watchScan(id, targetId) {
     if (scanTimer) clearTimeout(scanTimer);
     const tick = async () => {
       const res = await api('GET', '/scans/' + encodeURIComponent(id));
       if (!res.ok) return;
-      renderScanState(res.scan);
+      renderScanState(res.scan, targetId);
       if (res.scan.status === 'queued' || res.scan.status === 'running') {
         scanTimer = setTimeout(tick, 1500);
       } else {
@@ -830,23 +1204,36 @@
     if (!res.ok) return;
     const items = res.scans || [];
     document.getElementById('mfScansPanel').hidden = !items.length;
-    const t = el('table', 'mf-list');
+    const t = el('table', 'mf-list mf-scans');
     const hd = el('tr');
-    for (const h of [tr('時間'), tr('事務機'), tr('檔名'), tr('狀態'), '']) hd.append(el('th', null, h));
+    for (const h of [tr('時間'), tr('事務機'), tr('內容'), tr('狀態'), '']) hd.append(el('th', null, h));
     const thead = el('thead'); thead.append(hd); t.append(thead);
     const tb = el('tbody');
     let active = false;
     for (const s of items) {
       if (s.status === 'queued' || s.status === 'running') active = true;
       const r = el('tr');
-      r.append(el('td', null, fmtTime(s.created_at)), el('td', null, s.conn_name || ''),
-               el('td', null, s.file_name || ''));
+      const whatTd = el('td');
+      const what = el('div', 'mf-cap wide');
+      whatTd.append(what);
+      if (s.kind === 'box') {
+        what.append(txt(tr('信箱 {0}').replace('{0}', (s.settings || {}).box || '')));
+        if (s.file_name) what.append(el('span', 'mf-sub', s.file_name));
+      } else if (s.kind === 'share') {
+        what.append(txt((s.settings || {}).root || ''));
+        if (s.file_name) what.append(el('span', 'mf-sub', s.file_name));
+      } else {
+        what.append(txt(s.file_name || ''));
+      }
+      const devTd = el('td');
+      devTd.append(el('div', 'mf-cap', s.conn_name || ''));
+      r.append(el('td', null, fmtTime(s.created_at)), devTd, whatTd);
       const st = el('td', null, scanStateText(s));
       if (viaText(s)) st.append(el('span', 'mf-sub', viaText(s)));
       if (s.workspace_message) st.append(el('span', 'mf-sub', tr(s.workspace_message)));
       r.append(st);
       const act = el('td');
-      act.append(scanActions(s));
+      act.append(scanActions(s, true));
       r.append(act);
       tb.append(r);
     }
@@ -854,6 +1241,398 @@
     wrap.replaceChildren(t);
     if (scansTimer) clearTimeout(scansTimer);
     scansTimer = active ? setTimeout(loadScans, 3000) : null;
+  }
+
+  // ---- 機內信箱取件（FUJIFILM，推測實作）
+  // 使用者 2026-10-14：「取件功能請儘可能在使用流程 給 user 越簡單越易懂越好」——
+  // 一開始只問信箱編號與密碼；事務機真的要求登入才多問帳號；憑證確認、HTTP 同意只在需要時問一次，
+  // 之後記在這台瀏覽器（只記編號、帳號、憑證指紋、同意與否，**不記密碼**）。
+  let boxConn = null;
+  let boxDocs = [];
+  let boxInfo = null;
+  function boxPrefsKey(c) { return 'mfp-box-' + c.id; }
+  function boxPrefs(c) {
+    try { return JSON.parse(localStorage.getItem(boxPrefsKey(c)) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function saveBoxPrefs(c, patch) {
+    try { localStorage.setItem(boxPrefsKey(c), JSON.stringify(Object.assign(boxPrefs(c), patch))); } catch (e) { /* 私密視窗等 */ }
+  }
+  const boxPanel = document.getElementById('mfBoxPanel');
+  function boxEl(id) { return document.getElementById(id); }
+  function openBox(c) {
+    boxConn = c;
+    boxDocs = [];
+    boxInfo = null;
+    const pr = boxPrefs(c);
+    boxEl('mfBoxTitle').textContent = tr('信箱取件') + P.colon + c.display_name;
+    boxEl('mfBoxNo').value = pr.box || '';
+    boxEl('mfBoxPw').value = '';
+    boxEl('mfBoxUser').value = pr.user || '';
+    boxEl('mfBoxUserPw').value = '';
+    boxEl('mfBoxLogin').hidden = !pr.user;
+    for (const id of ['mfBoxConfirm', 'mfBoxError', 'mfBoxDocs', 'mfBoxState', 'mfBoxTech']) boxEl(id).hidden = true;
+    boxPanel.hidden = false;
+    boxPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    (pr.box ? boxEl('mfBoxPw') : boxEl('mfBoxNo')).focus({ preventScroll: true });
+  }
+  function boxBody(extra) {
+    const pr = boxPrefs(boxConn);
+    return Object.assign({
+      box: Number(boxEl('mfBoxNo').value),
+      box_password: boxEl('mfBoxPw').value,
+      user: boxEl('mfBoxLogin').hidden ? '' : boxEl('mfBoxUser').value.trim(),
+      password: boxEl('mfBoxLogin').hidden ? '' : boxEl('mfBoxUserPw').value,
+      trust_sha256: pr.trust || null,
+      allow_http: pr.http === true,
+    }, extra || {});
+  }
+  function fpText(hex) { return String(hex || '').toUpperCase().replace(/(..)(?!$)/g, '$1:'); }
+  // 協定紀錄：預設收起來，給管理員看（一般使用者不用懂）
+  const TRACE_KEYS = ['method', 'path', 'status', 'auth', 'content_type', 'bytes', 'ms', 'error'];
+  function showTrace(trace, prefix) {
+    prefix = prefix || 'mfBox';
+    const tech = boxEl(prefix + 'Tech');
+    if (!tech) return;
+    if (!trace || !trace.length) { tech.hidden = true; return; }
+    const t = el('table', 'mf-table');
+    const hd = el('tr');
+    for (const k of TRACE_KEYS.concat(['challenges'])) hd.append(el('th', null, k));
+    t.append(hd);
+    for (const e of trace) {
+      const r = el('tr');
+      for (const k of TRACE_KEYS) r.append(el('td', null, e[k] === undefined ? '' : String(e[k])));
+      r.append(el('td', null, (e.challenges || []).map(c => c.scheme + (c.realm ? ' realm=' + c.realm : '')).join(P.sep)));
+      t.append(r);
+    }
+    t.querySelectorAll('th').forEach(th => { th.style.width = 'auto'; });
+    boxEl(prefix + 'Trace').replaceChildren(t);
+    tech.hidden = false;
+  }
+  // 需要使用者確認的狀況：只在遇到時問一次，確認後自動再試
+  function askConfirm(html, okLabel, onOk, boxId) {
+    const box = boxEl(boxId || 'mfBoxConfirm');
+    box.replaceChildren(...html);
+    const bar = el('div', 'mf-actions');
+    const ok = rowBtn('lock', okLabel, () => { box.hidden = true; onOk(); });
+    ok.className = 'btn btn-small btn-primary';
+    bar.append(ok, rowBtn('close', tr('取消'), () => { box.hidden = true; }));
+    box.append(bar);
+    box.hidden = false;
+  }
+  function handleBoxError(res, retry) {
+    const errBox = boxEl('mfBoxError');
+    showTrace(res.trace);
+    const cert = (res.detail || {}).certificate || {};
+    if (res.code === 'TLS_UNTRUSTED' || res.code === 'TLS_IDENTITY_FAILED') {
+      const first = res.code === 'TLS_UNTRUSTED';
+      const msg = first
+        ? tr('第一次連這台事務機：它用的是自己簽的憑證（事務機大多如此）。請確認下面的指紋跟事務機網頁「安全性 / 憑證」裡顯示的一樣，再按「信任並繼續」。之後這台瀏覽器就不會再問。')
+        : tr('這台事務機的憑證跟上次信任的不一樣（可能設備換過憑證，也可能有人冒充）。請先向管理員確認，再決定要不要信任新的憑證。');
+      askConfirm([el('div', null, msg), el('span', 'mf-fp', 'SHA-256 ' + fpText(cert.sha256))],
+                 first ? tr('信任並繼續') : tr('信任新的憑證並繼續'), () => {
+                   saveBoxPrefs(boxConn, { trust: cert.sha256 });
+                   retry();
+                 });
+      return;
+    }
+    if (res.code === 'PLAIN_HTTP_NEEDS_CONSENT') {
+      askConfirm([el('div', null, tr('這台事務機只用 HTTP 連線：密碼與文件會以未加密的方式在公司內網傳送。確定要繼續嗎？之後這台瀏覽器就不會再問。'))],
+                 tr('繼續'), () => { saveBoxPrefs(boxConn, { http: true }); retry(); });
+      return;
+    }
+    if (res.code === 'AUTH_REQUIRED_USER') {
+      boxEl('mfBoxLogin').hidden = false;
+      boxEl(boxEl('mfBoxUser').value ? 'mfBoxUserPw' : 'mfBoxUser').focus();
+    }
+    if (res.code === 'AUTH_REQUIRED_BOX') boxEl('mfBoxPw').focus();
+    showError(errBox, res);
+  }
+  function syncFetchBtn() {
+    const n = boxEl('mfBoxTable').querySelectorAll('input[data-doc]:checked').length;
+    boxEl('mfBoxFetchBtn').disabled = n === 0;
+    boxEl('mfBoxFetchLabel').textContent = n ? tr('取件（{0} 份）').replace('{0}', n) : tr('取件');
+    boxEl('mfBoxTable').querySelectorAll('tr[data-row]').forEach(tr_ => {
+      tr_.classList.toggle('picked', !!tr_.querySelector('input:checked'));
+    });
+  }
+  function renderDocs(res) {
+    boxInfo = res;
+    boxDocs = res.documents || [];
+    boxEl('mfBoxSummary').textContent = tr('信箱 {0}').replace('{0}', res.box) + (res.box_name ? ' · ' + res.box_name : '') +
+      P.colon + tr('{0} 份文件').replace('{0}', boxDocs.length);
+    const warn = boxEl('mfBoxWarn');
+    const dag = res.delete_after_get === true || boxDocs.some(d => d.delete_after_get === true);
+    warn.textContent = dag ? tr('注意：這個信箱設定成「取件後刪除」，取件後事務機可能會自己刪掉原件。') : '';
+    warn.hidden = !dag;
+    const wrap = boxEl('mfBoxTable');
+    if (!boxDocs.length) {
+      wrap.replaceChildren(el('p', 'mf-empty', tr('這個信箱裡沒有文件。')));
+    } else {
+      const t = el('table', 'mf-list mf-docs');
+      const hd = el('tr');
+      const all = el('input');
+      all.type = 'checkbox';
+      all.setAttribute('aria-label', tr('全選'));
+      all.addEventListener('change', () => {
+        wrap.querySelectorAll('input[data-doc]').forEach(cb => { cb.checked = all.checked; });
+        syncFetchBtn();
+      });
+      const th0 = el('th'); th0.append(all); hd.append(th0);
+      for (const h of [tr('名稱'), tr('日期'), tr('頁數'), tr('大小')]) hd.append(el('th', null, h));
+      const thead = el('thead'); thead.append(hd); t.append(thead);
+      const tb = el('tbody');
+      for (const d of boxDocs) {
+        const r = el('tr');
+        r.dataset.row = d.id;
+        const cb = el('input');
+        cb.type = 'checkbox';
+        cb.dataset.doc = d.id;
+        cb.addEventListener('change', syncFetchBtn);
+        const td0 = el('td'); td0.append(cb); r.append(td0);
+        const nm = el('td', null, d.name || (tr('文件') + ' ' + d.id));
+        nm.dataset.i18n = 'skip';
+        if (d.format) nm.append(el('span', 'mf-sub', d.format + (d.compression ? ' · ' + d.compression : '')));
+        r.append(nm, el('td', null, d.modified ? fmtTime(d.modified) : '—'), el('td', null, d.pages == null ? '—' : String(d.pages)),
+                 el('td', null, bytesText(d.size) || '—'));
+        r.addEventListener('click', (e) => {
+          if (e.target.tagName !== 'INPUT') { cb.checked = !cb.checked; syncFetchBtn(); }
+        });
+        tb.append(r);
+      }
+      t.append(tb);
+      wrap.replaceChildren(t);
+    }
+    boxEl('mfBoxDocs').hidden = false;
+    syncFetchBtn();
+  }
+  async function boxList() {
+    if (!boxConn) return;
+    const btn = boxEl('mfBoxListBtn');
+    boxEl('mfBoxError').hidden = true;
+    boxEl('mfBoxConfirm').hidden = true;
+    busy(btn, true, tr('連線中…'));
+    const res = await api('POST', '/connections/' + boxConn.id + '/box/list', boxBody());
+    busy(btn, false);
+    if (!res.ok) { boxEl('mfBoxDocs').hidden = true; handleBoxError(res, boxList); return; }
+    saveBoxPrefs(boxConn, { box: res.box, user: boxEl('mfBoxLogin').hidden ? '' : boxEl('mfBoxUser').value.trim() });
+    showTrace(res.trace);
+    renderDocs(res);
+  }
+  async function boxFetch() {
+    if (!boxConn) return;
+    const ids = [...boxEl('mfBoxTable').querySelectorAll('input[data-doc]:checked')].map(cb => cb.dataset.doc);
+    if (!ids.length) return;
+    const picked = boxDocs.filter(d => ids.includes(String(d.id)));
+    let confirmDag = false;
+    if ((boxInfo && boxInfo.delete_after_get === true) || picked.some(d => d.delete_after_get === true)) {
+      if (!(await window.showConfirm(tr('這個信箱設定成「取件後刪除」：取件後事務機可能會刪掉原件。確定要取件嗎？'),
+                                     { kind: 'danger', okText: tr('取件') }))) return;
+      confirmDag = true;
+    }
+    const btn = boxEl('mfBoxFetchBtn');
+    boxEl('mfBoxError').hidden = true;
+    busy(btn, true, tr('送出中…'));
+    const res = await api('POST', '/connections/' + boxConn.id + '/box/fetch', boxBody({
+      documents: ids, output: boxEl('mfBoxOutput').value || 'pdf', confirm_delete_after_get: confirmDag }));
+    busy(btn, false);
+    if (!res.ok) { handleBoxError(res, boxFetch); return; }
+    watchScan(res.scan.id, 'mfBoxState');
+    loadScans();
+  }
+  if (boxPanel) {
+    if (window.enhanceJtSelects) window.enhanceJtSelects(boxPanel);
+    boxEl('mfBoxForm').addEventListener('submit', (e) => { e.preventDefault(); boxList(); });
+    boxEl('mfBoxRefresh').addEventListener('click', boxList);
+    boxEl('mfBoxFetchBtn').addEventListener('click', boxFetch);
+    boxEl('mfBoxClose').addEventListener('click', () => {
+      boxPanel.hidden = true;
+      boxEl('mfBoxPw').value = '';          // 收合就清掉密碼
+      boxEl('mfBoxUserPw').value = '';
+    });
+  }
+
+  // ---- 檔案分享取件（Canon Advanced Box、Konica 公用信箱、SHARP NAS；實驗功能）
+  // 跟信箱取件同一個原則：只問需要的；憑證、HTTP / SMB 不加密的同意只問一次（記在這台瀏覽器，不記密碼）。
+  const ROUTE_NAMES = { canon_webdav: tr('WebDAV（建議）'), canon_smb: 'SMB', konica_smb: 'SMB', sharp_smb: 'SMB' };
+  const sharePanel = document.getElementById('mfSharePanel');
+  let shareConn = null;
+  let shareState = { route: '', root: '', path: [], entries: [], roots: [] };
+  function sharePrefs(c) {
+    try { return JSON.parse(localStorage.getItem('mfp-share-' + c.id) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function saveSharePrefs(c, patch) {
+    try { localStorage.setItem('mfp-share-' + c.id, JSON.stringify(Object.assign(sharePrefs(c), patch))); } catch (e) { /* 私密視窗等 */ }
+  }
+  function shareIsBox() { return shareState.route === 'konica_smb'; }
+  function syncShareFields() {
+    const isBox = shareIsBox();
+    boxEl('mfShareBoxWrap').hidden = !isBox;
+    boxEl('mfShareUserWrap').hidden = isBox;
+    boxEl('mfSharePwLabel').textContent = isBox ? tr('信箱密碼（沒有設就留空）') : tr('密碼');
+  }
+  function openShare(c) {
+    shareConn = c;
+    const pr = sharePrefs(c);
+    const routes = (c.share || {}).routes || [];
+    shareState = { route: routes.includes(pr.route) ? pr.route : routes[0], root: '', path: [], entries: [], roots: [] };
+    boxEl('mfShareTitle').textContent = tr('取件') + P.colon + c.display_name;
+    fillSelect('mfShareRoute', routes, ROUTE_NAMES, shareState.route);
+    boxEl('mfShareRouteWrap').hidden = routes.length < 2;
+    boxEl('mfShareUser').value = pr.user || '';
+    boxEl('mfShareBox').value = pr.box || '';
+    boxEl('mfSharePw').value = '';
+    syncShareFields();
+    for (const id of ['mfShareConfirm', 'mfShareError', 'mfShareFiles', 'mfShareState', 'mfShareTech']) boxEl(id).hidden = true;
+    sharePanel.hidden = false;
+    sharePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function shareBody(extra) {
+    const pr = sharePrefs(shareConn);
+    return Object.assign({
+      route: shareState.route,
+      user: shareIsBox() ? '' : boxEl('mfShareUser').value.trim(),
+      box: shareIsBox() ? boxEl('mfShareBox').value.trim() : '',
+      password: shareIsBox() ? '' : boxEl('mfSharePw').value,
+      box_password: shareIsBox() ? boxEl('mfSharePw').value : '',
+      trust_sha256: pr.trust || null,
+      allow_http: pr.http === true,
+      allow_plain: pr.plain === true,
+    }, extra || {});
+  }
+  function handleShareError(res, retry) {
+    showTrace(res.trace, 'mfShare');
+    const cert = (res.detail || {}).certificate || {};
+    if (res.code === 'TLS_UNTRUSTED' || res.code === 'TLS_IDENTITY_FAILED') {
+      const first = res.code === 'TLS_UNTRUSTED';
+      const msg = first
+        ? tr('第一次連這台事務機：它用的是自己簽的憑證（事務機大多如此）。請確認下面的指紋跟事務機網頁「安全性 / 憑證」裡顯示的一樣，再按「信任並繼續」。之後這台瀏覽器就不會再問。')
+        : tr('這台事務機的憑證跟上次信任的不一樣（可能設備換過憑證，也可能有人冒充）。請先向管理員確認，再決定要不要信任新的憑證。');
+      askConfirm([el('div', null, msg), el('span', 'mf-fp', 'SHA-256 ' + fpText(cert.sha256))],
+                 first ? tr('信任並繼續') : tr('信任新的憑證並繼續'),
+                 () => { saveSharePrefs(shareConn, { trust: cert.sha256 }); retry(); }, 'mfShareConfirm');
+      return;
+    }
+    if (res.code === 'PLAIN_HTTP_NEEDS_CONSENT' || res.code === 'SMB_PLAIN_NEEDS_CONSENT') {
+      const smb = res.code === 'SMB_PLAIN_NEEDS_CONSENT';
+      askConfirm([el('div', null, smb
+          ? tr('SMB 連線不加密：檔案會以未加密的方式在公司內網傳送（密碼本身不會以明文送出）。確定要繼續嗎？之後這台瀏覽器就不會再問。')
+          : tr('這台事務機只用 HTTP 連線：密碼與文件會以未加密的方式在公司內網傳送。確定要繼續嗎？之後這台瀏覽器就不會再問。'))],
+        tr('繼續'), () => { saveSharePrefs(shareConn, smb ? { plain: true } : { http: true }); retry(); }, 'mfShareConfirm');
+      return;
+    }
+    if (res.code === 'AUTH_REQUIRED_USER') boxEl('mfShareUser').focus();
+    showError(boxEl('mfShareError'), res);
+  }
+  function syncShareFetch() {
+    const n = boxEl('mfShareTable').querySelectorAll('input[data-file]:checked').length;
+    boxEl('mfShareFetchBtn').disabled = n === 0;
+    boxEl('mfShareFetchLabel').textContent = n ? tr('取件（{0} 份）').replace('{0}', n) : tr('取件');
+  }
+  function renderShare(res) {
+    shareState.root = res.root;
+    shareState.path = res.path || [];
+    shareState.entries = res.entries || [];
+    shareState.roots = res.roots || [];
+    const labels = Object.fromEntries(shareState.roots.map(r => [r.id, r.id + (r.shared ? P.lp + tr('共享') + P.rp : '')]));
+    fillSelect('mfShareRoot', shareState.roots.map(r => r.id), labels, res.root);
+    boxEl('mfShareRootWrap').hidden = shareState.roots.length < 2 && shareIsBox();
+    boxEl('mfShareSharedNote').hidden = !res.shared;
+    const crumbs = boxEl('mfShareCrumbs');
+    crumbs.replaceChildren();
+    const parts = [res.root].concat(shareState.path);
+    parts.forEach((name, i) => {
+      if (i) crumbs.append(txt(' / '));
+      const b = el('button', null, name);
+      b.type = 'button';
+      b.dataset.i18n = 'skip';
+      b.disabled = i === parts.length - 1;
+      b.addEventListener('click', () => shareList(shareState.path.slice(0, i)));
+      crumbs.append(b);
+    });
+    const wrap = boxEl('mfShareTable');
+    if (!shareState.entries.length) {
+      wrap.replaceChildren(el('p', 'mf-empty', tr('這裡沒有檔案。')));
+    } else {
+      const t = el('table', 'mf-list mf-docs');
+      const hd = el('tr');
+      hd.append(el('th'));
+      for (const h of [tr('名稱'), tr('日期'), tr('大小')]) hd.append(el('th', null, h));
+      const thead = el('thead'); thead.append(hd); t.append(thead);
+      const tb = el('tbody');
+      for (const e of shareState.entries) {
+        const r = el('tr');
+        const td0 = el('td');
+        const nm = el('td', e.dir ? 'mf-dir' : 'mf-file');
+        nm.dataset.i18n = 'skip';
+        nm.append(icon(e.dir ? 'archive' : 'page'), txt(e.name));
+        if (e.dir) {
+          r.dataset.dir = e.name;
+          r.addEventListener('click', () => shareList(shareState.path.concat([e.name])));
+        } else {
+          const cb = el('input');
+          cb.type = 'checkbox';
+          cb.dataset.file = e.name;
+          cb.addEventListener('change', syncShareFetch);
+          td0.append(cb);
+          r.addEventListener('click', (ev) => { if (ev.target.tagName !== 'INPUT') { cb.checked = !cb.checked; syncShareFetch(); } });
+        }
+        r.append(td0, nm, el('td', null, e.modified ? fmtTime(e.modified) : '—'), el('td', null, e.dir ? '' : (bytesText(e.size) || '—')));
+        tb.append(r);
+      }
+      t.append(tb);
+      wrap.replaceChildren(t);
+    }
+    boxEl('mfShareFiles').hidden = false;
+    syncShareFetch();
+  }
+  async function shareList(path) {
+    if (!shareConn) return;
+    const btn = boxEl('mfShareListBtn');
+    boxEl('mfShareError').hidden = true;
+    boxEl('mfShareConfirm').hidden = true;
+    busy(btn, true, tr('連線中…'));
+    const res = await api('POST', '/connections/' + shareConn.id + '/share/list',
+                          shareBody({ root: shareState.root || '', path: path || [] }));
+    busy(btn, false);
+    if (!res.ok) { handleShareError(res, () => shareList(path)); return; }
+    saveSharePrefs(shareConn, { route: shareState.route, user: shareIsBox() ? '' : boxEl('mfShareUser').value.trim(),
+                                box: shareIsBox() ? boxEl('mfShareBox').value.trim() : '' });
+    showTrace(res.trace, 'mfShare');
+    renderShare(res);
+  }
+  async function shareFetch() {
+    const names = [...boxEl('mfShareTable').querySelectorAll('input[data-file]:checked')].map(cb => cb.dataset.file);
+    if (!names.length) return;
+    const btn = boxEl('mfShareFetchBtn');
+    boxEl('mfShareError').hidden = true;
+    busy(btn, true, tr('送出中…'));
+    const res = await api('POST', '/connections/' + shareConn.id + '/share/fetch', shareBody({
+      root: shareState.root, files: names.map(n => shareState.path.concat([n])),
+      output: boxEl('mfShareOutput').value || 'pdf' }));
+    busy(btn, false);
+    if (!res.ok) { handleShareError(res, shareFetch); return; }
+    watchScan(res.scan.id, 'mfShareState');
+    loadScans();
+  }
+  if (sharePanel) {
+    if (window.enhanceJtSelects) window.enhanceJtSelects(sharePanel);
+    boxEl('mfShareForm').addEventListener('submit', (e) => { e.preventDefault(); shareState.root = ''; shareList([]); });
+    boxEl('mfShareRoute').addEventListener('change', () => {
+      shareState.route = boxEl('mfShareRoute').value;
+      shareState.root = '';
+      syncShareFields();
+      boxEl('mfShareFiles').hidden = true;
+    });
+    boxEl('mfShareRoot').addEventListener('change', () => {
+      shareState.root = boxEl('mfShareRoot').value;
+      shareList([]);
+    });
+    boxEl('mfShareRefresh').addEventListener('click', () => shareList(shareState.path));
+    boxEl('mfShareFetchBtn').addEventListener('click', shareFetch);
+    boxEl('mfShareClose').addEventListener('click', () => {
+      sharePanel.hidden = true;
+      boxEl('mfSharePw').value = '';
+    });
   }
 
   // ---- 共用事務機的成員（管理頁）
@@ -890,7 +1669,7 @@
     const warn = document.getElementById('mfMembersWarn');
     const lack = (members || []).filter(m => m.type === 'user' && m.exists && m.can_use_tool === false);
     if (!lack.length) { warn.hidden = true; return; }
-    warn.replaceChildren(el('div', null, tr('以下成員沒有「事務機取件」的工具權限，還看不到這支工具：')),
+    warn.replaceChildren(el('div', null, tr('以下成員沒有「事務機掃描取件」的工具權限，還看不到這支工具：')),
                          el('div', null, lack.map(m => m.name).join(P.sep)));
     warn.hidden = false;
   }
@@ -941,6 +1720,21 @@
       msg.textContent = tr('已儲存成員（{0}）').replace('{0}', (res.members || []).length);
       showMemberWarnings(res.members);
       loadList();
+    });
+  }
+  // ---- 管理員設定：允許使用者自行新增事務機（共用事務機頁）
+  const allowBox = document.getElementById('mfAllowUser');
+  if (allowBox) {
+    api('GET', '/settings').then(res => {
+      if (res.ok) allowBox.checked = res.settings.allow_user_devices !== false;
+    });
+    allowBox.addEventListener('change', async () => {
+      const msg = document.getElementById('mfSettingsMsg');
+      allowBox.disabled = true;
+      const res = await api('PUT', '/settings', { allow_user_devices: allowBox.checked });
+      allowBox.disabled = false;
+      if (!res.ok) { allowBox.checked = !allowBox.checked; msg.textContent = tr(res.message || '發生錯誤'); return; }
+      msg.textContent = res.settings.allow_user_devices ? tr('已儲存：使用者可以自行新增事務機') : tr('已儲存：使用者只能使用共用事務機');
     });
   }
   loadList();

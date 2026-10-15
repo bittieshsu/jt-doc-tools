@@ -167,6 +167,47 @@ def test_connection_test_save_detail_and_refusal(live, locale):
                           "&& !document.querySelector('#mfListWrap').textContent.includes('載入中')"), \
             "「我的事務機」沒有載入（JS 沒跑起來？）"
         assert t.js("!!document.querySelector('h1 .tool-beta')"), "標題旁要有 Beta"
+        # ---- eSCL 旁的「?」（使用者 2026-10-15）：按下才出現本站樣式的說明，不是瀏覽器原生提示
+        help_ = ("(() => { const n = document.querySelector('.mf-beta-note [data-mf-help]');"
+                 " if (!n) return null; const b = n.querySelector('button'), p = n.querySelector('.mf-help-pop');"
+                 " const r = p.getBoundingClientRect();"
+                 " return {open: !p.hidden && r.width > 0, exp: b.getAttribute('aria-expanded'), title: b.title,"
+                 " before: n.previousSibling ? n.previousSibling.textContent.slice(-12) : '',"
+                 " left: r.left, right: r.right, vw: window.innerWidth, text: p.innerText,"
+                 " bg: getComputedStyle(p).backgroundColor}; })()")
+        h = t.js(help_)
+        assert h, "Beta 說明裡 eSCL 旁邊沒有「?」"
+        assert "eSCL" in h["before"], f"「?」沒有接在 eSCL 後面：{h['before']!r}"
+        assert not h["open"] and h["exp"] == "false" and not h["title"], f"一開始就打開或用了原生 title：{h}"
+        note = t.js("document.querySelector('.mf-beta-note').innerText")
+        assert note.count("eSCL") >= 1 and ("實機" in note or "real device" in note or "実機" in note), note
+        for width in (1280, 390):
+            t.send("Emulation.setDeviceMetricsOverride", {"width": width, "height": 900, "deviceScaleFactor": 1,
+                                                          "mobile": width < 600})
+            time.sleep(0.3)
+            t.js("document.querySelector('.mf-beta-note .mf-help-btn').click()")
+            assert t.wait_for("!document.getElementById('mfEsclHelp').hidden"), "按「?」沒有出現說明"
+            h = t.js(help_)
+            assert h["open"] and h["exp"] == "true" and "AirPrint" in h["text"], h
+            assert h["bg"] == "rgb(17, 24, 39)", f"說明框不是本站樣式：{h['bg']}"
+            # 跟指定的寬度比，不跟 innerWidth 比（手機模擬下內容溢出時 innerWidth 會跟著撐大，永遠過）
+            assert h["left"] >= 0 and h["right"] <= width, f"{width} 寬：說明框超出畫面 {h}"
+            t.shot(f"mfp_{locale}_escl_help_{width}", width)
+            # 點說明框裡面不收；點外面收起
+            t.js("document.getElementById('mfEsclHelp').click()")
+            assert t.js("!document.getElementById('mfEsclHelp').hidden"), "點說明框本身不該收起"
+            t.js("document.querySelector('h1').click()")
+            assert t.wait_for("document.getElementById('mfEsclHelp').hidden"), "點外面沒有收起"
+        # 再按一次「?」收起；Esc 也收起
+        t.js("document.querySelector('.mf-beta-note .mf-help-btn').click()")
+        assert t.wait_for("!document.getElementById('mfEsclHelp').hidden")
+        t.js("document.querySelector('.mf-beta-note .mf-help-btn').click()")
+        assert t.wait_for("document.getElementById('mfEsclHelp').hidden"), "再按一次「?」沒有收起"
+        t.js("document.querySelector('.mf-beta-note .mf-help-btn').click()")
+        t.js("document.querySelector('.mf-beta-note .mf-help-btn').dispatchEvent("
+             "new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))")
+        assert t.wait_for("document.getElementById('mfEsclHelp').hidden"), "按 Esc 沒有收起"
+        t.send("Emulation.clearDeviceMetricsOverride", {})
         # 連線方式：本站的下拉，不是瀏覽器原生的（使用者 2026-10-14 指出）；跟旁邊的輸入框一樣高
         assert t.js("!!document.querySelector('#mfTarget.jt-select-native') "
                     "&& !!document.querySelector('.mf-add .jt-select-trigger')"), "連線方式還是瀏覽器原生的下拉"
@@ -204,6 +245,28 @@ def test_connection_test_save_detail_and_refusal(live, locale):
         t.shot(f"mfp_{locale}_result_1280", 1280)
         t.shot(f"mfp_{locale}_result_390", 390)
 
+        # ---- 下載診斷報告：按下展開格式選單（使用者 2026-10-15：txt md json html pdf），由伺服器產生檔案
+        # 攔下載：記檔名與大小，不真的存檔（不可以 fetch blob: 網址 —— 站台的 CSP 不准，跟正式環境一樣）
+        t.js("""window.__dl = []; (() => { const orig = HTMLAnchorElement.prototype.click;
+                const mk = URL.createObjectURL.bind(URL);
+                URL.createObjectURL = (b) => { window.__blob = b; return mk(b); };
+                HTMLAnchorElement.prototype.click = function () {
+                  if (this.download) { const b = window.__blob;
+                    window.__dl.push([this.download, b ? b.size : -1, b ? b.type : '']); return; }
+                  return orig.call(this); }; })(); true""")
+        t.js("document.getElementById('mfDownloadBtn').click()")
+        assert t.wait_for("!document.querySelector('#mfSaveBar [data-mf-report-menu]').hidden"), "格式選單沒有打開"
+        fmts = t.js("[...document.querySelectorAll('#mfSaveBar [data-mf-report-menu] [data-fmt]')].map(b => b.dataset.fmt)")
+        assert fmts == ["txt", "md", "json", "html", "pdf"], fmts
+        t.shot(f"mfp_{locale}_report_menu_1280", 1280)
+        t.js("document.querySelector('#mfSaveBar [data-fmt=\"pdf\"]').click()")
+        assert t.wait_for("window.__dl.length === 1"), \
+            ("選了 PDF 沒有下載", t.js("document.getElementById('mfSaveMsg').innerText"), t.errs)
+        name, size, _typ = t.js("window.__dl[0]")
+        assert name.startswith("mfp-diagnostic-127.0.0.1-") and name.endswith(".pdf") and size > 1000, (name, size)
+        assert t.js("document.querySelector('#mfSaveBar [data-mf-report-menu]').hidden"), "選完選單沒有收起來"
+        assert t.js("document.getElementById('mfDownloadBtn').getAttribute('aria-expanded')") == "false"
+
         # ---- 儲存 → 出現在清單 → 詳細
         t.js("document.getElementById('mfSaveName').value = '三樓'; document.getElementById('mfSaveBtn').click()")
         assert t.wait_for("document.querySelectorAll('#mfListWrap tbody tr').length === 1"), "儲存後清單沒有出現"
@@ -218,11 +281,33 @@ def test_connection_test_save_detail_and_refusal(live, locale):
                     " const lh = parseFloat(getComputedStyle(c).lineHeight) || 18;"
                     " return [c.getBoundingClientRect().height <= lh + 8, !!c.title]; })()")
         assert chip == [True, True], f"相容性標籤折行或沒有說明：{chip}"
-        t.js("[...document.querySelectorAll('#mfListWrap tbody button')][1].click()")
+        # 下載診斷報告不在清單那一列，在「詳細」裡（使用者 2026-10-15）
+        lab = t.js("document.querySelector('#mfDetailReportBtn span').textContent")
+        assert lab and not any(lab == x[1] for x in btns), f"清單那一列還有下載診斷報告：{btns}"
+        t.js("document.querySelector('[data-mf-detail]').click()")
         assert t.wait_for("!document.getElementById('mfDetailPanel').hidden "
                           "&& document.getElementById('mfDetail').innerText.includes('C5571')")
         assert t.js("document.querySelector('[data-mf-detail]').getAttribute('aria-expanded')") == "true"
+        assert t.js("!document.querySelector('#mfDetailPanel [data-mf-report]').hidden "
+                    "&& document.getElementById('mfDetailReportBtn').getBoundingClientRect().width > 0"), \
+            "「詳細」裡沒有下載診斷報告"
         t.shot(f"mfp_{locale}_saved_1280", 1280)
+        t.js("document.getElementById('mfDetailReportBtn').click()")
+        assert t.wait_for("!document.querySelector('#mfDetailPanel [data-mf-report-menu]').hidden")
+        t.shot(f"mfp_{locale}_detail_report_menu_1280", 1280)
+        t.shot(f"mfp_{locale}_detail_report_menu_390", 390)
+        for i, fmt in enumerate(["txt", "md", "json", "html"], start=2):
+            if fmt != "txt":
+                t.js("document.getElementById('mfDetailReportBtn').click()")
+            t.js(f"document.querySelector('#mfDetailPanel [data-fmt=\"{fmt}\"]').click()")
+            assert t.wait_for(f"window.__dl.length === {i}"), f"詳細裡選 {fmt} 沒有下載"
+            name, size, _typ = t.js(f"window.__dl[{i - 1}]")
+            assert name.endswith("." + fmt) and size > 200, (fmt, name, size)
+        # 點選單外面要收起來
+        t.js("document.getElementById('mfDetailReportBtn').click()")
+        assert t.wait_for("!document.querySelector('#mfDetailPanel [data-mf-report-menu]').hidden")
+        t.js("document.getElementById('mfDetailTitle').click()")
+        assert t.wait_for("document.querySelector('#mfDetailPanel [data-mf-report-menu]').hidden"), "點外面沒有收起來"
         # 詳細要能收回來（使用者 2026-10-14）：同一顆按鈕再按一次收合；詳細區的「收合」也可以
         t.js("document.querySelector('[data-mf-detail]').click()")
         assert t.wait_for("document.getElementById('mfDetailPanel').hidden"), "再按一次「詳細」沒有收合"
@@ -235,7 +320,7 @@ def test_connection_test_save_detail_and_refusal(live, locale):
         assert t.wait_for("!document.getElementById('mfDetailPanel').hidden")
 
         # ---- 改名（站內對話框，非同步）→ 清單上的名字跟著變
-        t.js("[...document.querySelectorAll('#mfListWrap tbody button')][3].click()")
+        t.js("document.querySelector('[data-mf-rename]').click()")    # 不用位置找：FUJIFILM 的那一列前面多了「信箱取件」
         assert t.wait_for("!!document.querySelector('.modal-input')"), "改名對話框沒有出現"
         t.js("const i = document.querySelector('.modal-input'); i.value = '五樓'; "
              "document.querySelector('.modal-ok').click()")
@@ -256,7 +341,7 @@ def test_connection_test_save_detail_and_refusal(live, locale):
         t.shot(f"mfp_{locale}_refused_1280", 1280)
 
         # ---- 移除（站內確認對話框）→ 清單變空，下一個語言從空清單開始
-        t.js("[...document.querySelectorAll('#mfListWrap tbody button')][4].click()")
+        t.js("document.querySelector('#mfListWrap .mf-del').click()")
         assert t.wait_for("!!document.querySelector('.modal-ok')"), "確認對話框沒有出現"
         t.js("document.querySelector('.modal-ok').click()")
         assert t.wait_for("!!document.querySelector('#mfListWrap .mf-empty')"), "移除後清單沒有變空"

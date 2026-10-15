@@ -225,6 +225,7 @@ _NEW_CATEGORY_ITEMS = {
     "retention": "retention.json",
     "scheduled_export": "scheduled_export.json",
     "ocr": "ocr_settings.json",
+    "mfp": "mfp_settings.json",          # v1.16.89：允許使用者自行新增事務機
 }
 
 

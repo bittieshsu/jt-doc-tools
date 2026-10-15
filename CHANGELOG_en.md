@@ -5,11 +5,43 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (917 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (921 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.92] - 2026-10-15
+
+- Company ID lookup: the database now keeps four more fields from the Ministry of Finance open data: head office company ID (branches only), capital, date established (converted from the ROC calendar) and whether the business issues uniform invoices. They appear in lookup results, the CSV exports of search and batch lookup, and the API. Capital is the amount in the tax registration, which may differ from the paid-in capital in the company registry. Existing sites only gain the columns on upgrade and keep working; the values appear after the next scheduled download, or after pressing the immediate download button on the database admin page.
+- MFP Scan & Fetch (beta): the PDF diagnostic report picks a font that covers every character in the report, and uses Japanese glyphs for the Japanese interface. The ✓ and ✗ marks are drawn with the standard PDF Dingbats font, so MuPDF no longer embeds a whole fallback font. Reports shrink from about 500 KB to about 200 KB; on Windows the Japanese report used to be 1.7 to 2 MB.
+- Font subsetting: subfont 0 of a `.ttc` font collection could not be subset and the whole font was embedded in the PDF (14 MB in testing); it is now subset like the other subfonts, which also helps other tools that pick such a font.
+
+## [1.16.91] - 2026-10-15
+
+- MFP Scan & Fetch (beta): Download diagnostic report has moved into Details. It is no longer on the list row; expand Details and it sits at the right of the heading. Pressing it opens a format menu: plain text (.txt), Markdown (.md), JSON raw data (.json), web page (.html) or PDF (.pdf). The same button on the connection test result works too, even before the MFP is saved, and saving still works afterwards.
+- The text, Markdown, web page and PDF versions are for reading: they match what Details shows, with headings and field names in the interface language. JSON is still the raw report to attach to a problem report. Accounts, passwords and session information are masked when the report is produced, so no format adds anything. Text from the device's web pages is treated as data: the web page version carries no scripts, Markdown symbols are escaped, and the PDF embeds only the Chinese characters it uses and copies as normal text.
+- The intro note has a "?" next to eSCL: pressing it explains what eSCL is, that no driver or credentials are needed, how to tell whether an MFP supports it, and that the document must be in place before scanning. Press it again, click elsewhere or press Esc to close it; it stays on screen on narrow displays.
+- Recent scans and retrievals table: the buttons on the right stay on one row instead of being squeezed one per line; time, MFP and content are sized to their text and the spare width goes to the status column rather than piling up under the time. On phones the MFP name no longer wraps one character per line.
+- API: the report endpoint takes `format` (`json` / `txt` / `md` / `html` / `pdf`; JSON when omitted), and `POST /tools/mfp-fetch/api/detect/report` downloads the report of an unsaved test. See the API guide.
+
+## [1.16.90] - 2026-10-15
+
+- MFP Scan & Fetch (beta), file share retrieval (experimental), built from the methods published in the manufacturers' manuals and **not yet verified on a real device**: Canon Advanced Box (WebDAV or SMB, shared and personal space), Konica Minolta public user boxes (SMB) and the built-in NAS of SHARP MFPs (SMB). Under My MFPs press Retrieve, enter the account and password (for Konica, the box number and box password), list the files, open folders, tick the files and retrieve them into your own workspace. By default TIFF / JPEG become PDF while PDF and other files stay as they are; you can also keep everything unconverted.
+- It only reads: nothing on the device is deleted, renamed or written, and shared locations are labelled as shared so it is clear other people can see them. SMB uses NTLMv2 only and stops before authenticating if the device only offers SMB1; SMB content is not encrypted, so the first connection asks for consent. Credentials are used only for that request or job, never stored, and a failed sign-in stops without retrying. Mailbox retrieval also now rejects device paths containing `..` before they are resolved into a URL.
+- Compatibility: Canon, Konica Minolta and SHARP are now labelled Experimental (they have file share retrieval); other vendors read Retrieval not supported, noting that MFPs with eSCL can still scan. Dates of mailbox documents and files are shown in your browser's time zone.
+- Dependencies: pysmb (zlib/libpng licence, pure Python) is added for SMB retrieval; it can list a device's shared folders, which Konica public boxes need.
+- API: new `share/list` and `share/fetch` endpoints, and each MFP in the list gains `share` (the retrieval methods available). See the API guide.
+
+## [1.16.89] - 2026-10-15
+
+- Fetch from MFP is renamed MFP Scan & Fetch, since it now scans as well as fetches; URLs, permissions and existing data are unchanged.
+- MFP Scan & Fetch (beta), mailbox retrieval for FUJIFILM MFPs (experimental): under My MFPs press Mailbox retrieval, enter the mailbox number (and its password only if it has one), list the documents in the mailbox, tick the ones you want and press Retrieve; they are saved to your own workspace. By default each document becomes one PDF; you can choose Original files to keep the TIFF / JPEG exactly as the MFP sends them, and if conversion to PDF fails the original files are saved instead, with a note. This is built from research into the manufacturer's retrieval tool and **has not been verified on a real device yet**; the page and the API both say so.
+- The flow only asks for what is needed: an MFP account is requested only when the device actually asks for a sign-in; the first connection to an MFP with a self-signed certificate asks you once to check its fingerprint, and an HTTP-only MFP asks once for consent, after which this browser does not ask again (it remembers the mailbox number, account, fingerprint and consent, never passwords). It only reads: nothing on the MFP is deleted or changed. A mailbox set to delete after retrieval is flagged and needs confirmation, and afterwards the tool checks whether the originals are still there. Credentials are used only for that request or retrieval job and are not stored; a failed sign-in stops instead of trying other combinations, to avoid locking the account. Retrievals share the device queue with scans. When something fails, Technical details shows the protocol log (no credentials) for comparing against a real device later.
+- Scanning from an MFP now has Save as: PDF (default) or JPEG (one file per page). When the MFP can only send JPEG, choosing PDF combines the pages automatically. When a job saves several files, each is listed with its own Open and Download; without the workspace they download as one ZIP.
+- Administrators can decide under Settings, Shared MFPs, Usage settings whether users may add their own MFPs (allowed by default). When turned off, regular users can only use the shared MFPs set up by an administrator; MFPs they added themselves are paused (their data is kept and comes back when this is turned on again, and they can still remove them). Administrators are not affected, and the setting is included in the settings backup.
+- Workspace: JPEG and TIFF (including multi-page TIFF) are now accepted as images, with the first TIFF page as the thumbnail, and Load from workspace offers them to tools that take images, such as Scan cleanup, Scan merge and Pre-submission check.
+- API: two new endpoints for mailbox retrieval, `box/list` and `box/fetch`, plus the administrator `settings` endpoint; scanning takes a `format` parameter; job records gain `kind`, `files` and `items`, and a job with several files downloads as a ZIP. See the API guide.
 
 ## [1.16.88] - 2026-10-14
 

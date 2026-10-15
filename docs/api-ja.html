@@ -204,13 +204,17 @@
         <div class="nav-group">
           <div class="nav-group-head" role="button" tabindex="0" aria-expanded="true">
             <button class="toc-toggle" type="button" tabindex="-1" aria-hidden="true"></button>
-            <span class="nav-ch nav-ch-toggle">9b. 複合機から取り込み API（Beta）</span>
+            <span class="nav-ch nav-ch-toggle">9b. 複合機スキャン・取り込み API（Beta）</span>
           </div>
           <div class="nav-children">
             <a class="nav-ep" href="#連線測試">接続テスト</a>
             <a class="nav-ep" href="#我的事務機">マイ複合機</a>
+            <a class="nav-ep" href="#診斷報告">診断レポート</a>
             <a class="nav-ep" href="#掃描escl">スキャン（eSCL）</a>
+            <a class="nav-ep" href="#機內信箱取件fujifilm實驗性">ボックスからの取得（FUJIFILM、試験機能）</a>
+            <a class="nav-ep" href="#檔案分享取件canonkonica-minoltasharp實驗性">共有フォルダーからの取得（Canon、Konica Minolta、SHARP。試験機能）</a>
             <a class="nav-ep" href="#共用事務機管理員">共有複合機（管理者）</a>
+            <a class="nav-ep" href="#使用設定管理員">利用設定（管理者）</a>
           </div>
         </div>
         <div class="nav-group">
@@ -1337,7 +1341,13 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;vat&quot;:&quot;12345678&quot;}&#x27;</span> | jq</code></pre>
-<p>レスポンス JSON：会社名 / 住所 / 業種など。見つからない場合は <code>404</code> を返します。</p>
+<p>応答 JSON の項目：</p>
+<ul>
+<li>基本データ：<code>vat</code>、<code>name</code>、<code>address</code>、<code>org_type</code>、<code>category</code>、<code>industries</code>、<code>owner</code>、<code>status</code>（最後の 2 つは一部のデータ源のみ）。</li>
+<li>税籍登録のその他のデータ（v1.16.92 から）：<code>hq_vat</code> は本社の統一番号（支社のみ）、<code>capital</code> は資本金（台湾ドル、整数）、<code>founded</code> は設立日（西暦 <code>YYYY-MM-DD</code>）、<code>uses_invoice</code> は統一発票を使用しているか（<code>true</code> / <code>false</code>）です。</li>
+<li>データがない場合は <code>null</code> です。政府機関と学校にはこれらの項目がなく、既存のサイトではアップグレード後の次回のデータベース更新まで空のままです。</li>
+</ul>
+<p>見つからない場合は <code>404</code> を返します。</p>
       </section>
       <section class="doc-section" data-sec="統編查詢path-style" data-title="統一番号の照会（path style）" hidden>
 <div class="doc-crumb">9. ビジネス照会 API</div>
@@ -1430,10 +1440,11 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <hr>
       </section>
       <section class="doc-section" data-sec="連線測試" data-title="接続テスト" hidden>
-<div class="doc-crumb">9b. 複合機から取り込み API（Beta）</div>
-<blockquote><p><strong>試用中。全体の流れはまだ実機で検証していません。</strong>現在できるのは、複合機の追加、接続テストと機種識別、eSCL（AirPrint / Mopria スキャン）に対応した複合機からスキャンしてワークスペースへ直接保存すること、管理者が設定した共有複合機です。ボックスへのログイン、文書の一覧、取り込みは実機での検証後に公開します。Web のツールページと管理ページもこのエンドポイントを使っています。</p></blockquote>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<blockquote><p><strong>試用中。全体の流れはまだ実機で検証していません。</strong>現在できるのは、複合機の追加、接続テストと機種識別、eSCL（AirPrint / Mopria スキャン）に対応した複合機からスキャンしてワークスペースへ直接保存すること、管理者が設定した共有複合機、FUJIFILM 複合機のボックスからの取得と Canon / Konica Minolta / SHARP の共有フォルダーからの取得（いずれも試験機能）です。Web のツールページと管理ページもこのエンドポイントを使っています。ツールは旧名「複合機から取り込み」で、v1.16.89 から「複合機スキャン・取り込み」に改名しました。URL とツール ID は変わりません。</p></blockquote>
 <p><strong>各複合機は呼び出した本人のもの</strong>です（API トークンで呼び出した場合はトークンの所有者）。他人の複合機は常に <code>404</code> を返し、存在するかどうかも明かしません。<strong>共有複合機</strong>は管理者が作成してメンバー（ユーザー、またはサブグループを含むグループ）を指定します。メンバーは表示、再テスト、スキャンができますが、名前の変更や除去はできません。ログインが無効な場合は、サーバー本体のブラウザーか有効な API トークン付きの呼び出しだけを受け付けます。</p>
 <p><strong>接続テストの安全範囲</strong>：接続先は社内ネットワークのアドレスだけ（プライベート IP。ループバック、リンクローカル、グローバルアドレス、このサーバー自身のアドレスは常に拒否）、Web ポート <code>80</code>、<code>443</code>、<code>8080</code>、<code>8443</code> だけです。送るのは <code>GET</code>（トップページと eSCL の機能一覧 <code>/eSCL/ScannerCapabilities</code>）だけで、認証情報や Cookie は送りません。リダイレクトは同じ機器内だけたどります。1 人あたり 5 分間に 10 回まで、同時に 1 つだけです。</p>
+<p><strong>ユーザーが自分で複合機を追加できるか</strong>は管理者が決めます（既定は許可。下の「利用設定」を参照）。オフのとき、一般ユーザーが接続テストや保存を呼び出すと <code>403</code>（<code>USER_DEVICES_DISABLED</code>）になり、以前に自分で追加した複合機は一覧で <code>paused: true</code> となって、テスト・スキャン・取得はできませんが、名前の変更と除去はできます。共有複合機は通常どおり使え、管理者は制限されません。</p>
 <p><strong>順番待ち</strong>：同じ<strong>実際の機器</strong>（解決後のアドレスで判断）は一度に 1 つの処理だけを行います。接続テストは最大 30 秒待ち、それでも空かなければ <code>429</code>（<code>DEVICE_BUSY</code>、<code>waiting</code> 付き）を返します。スキャンはバックグラウンドで順番を待ちます。1 台あたり最大 10 件（<code>DEVICE_QUEUE_FULL</code>）、同じ機器で 1 人あたり最大 2 件（<code>OWNER_QUEUE_FULL</code>）で、それを超えると <code>429</code> を返し、機器には何も送りません。</p>
 <h4 id="連線測試">接続テスト</h4>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/detect</code></pre>
@@ -1465,7 +1476,8 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <ul>
 <li><code>first_batch_unverified</code>：第 1 弾で予定している機種（実機での検証はまだ）</li>
 <li><code>same_vendor_unverified</code>：同じメーカーだが対応可否は未検証</li>
-<li><code>unsupported_vendor</code>：他メーカーで、現時点では未対応</li>
+<li><code>experimental_vendor</code>：Canon、Konica Minolta、SHARP。共有フォルダーからの取得あり（試験機能）</li>
+<li><code>unsupported_vendor</code>：ほかのメーカー。まだ取得方法がありません（eSCL 対応ならスキャンは可能）</li>
 <li><code>login_required</code>：機種の識別にはログインが必要</li>
 <li><code>unknown</code>：機種を識別できない</li>
 <li><code>unreachable</code>：機器に接続できない</li>
@@ -1473,38 +1485,98 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>現時点で <code>supported</code> を返すことはありません。実機での検証に合格した機種が出てから使われます。</p>
       </section>
       <section class="doc-section" data-sec="我的事務機" data-title="マイ複合機" hidden>
-<div class="doc-crumb">9b. 複合機から取り込み API（Beta）</div>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
 <h4 id="我的事務機">マイ複合機</h4>
 <pre><code class="lang-text"><span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections                 <span class="hl-cmt"># 清單</span>
 <span class="hl-method">POST</span>   /tools/mfp-fetch/api/connections                 <span class="hl-cmt"># 儲存：{&quot;token&quot;: &quot;...&quot;, &quot;display_name&quot;: &quot;三樓行政區&quot;}</span>
 <span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections/{id}            <span class="hl-cmt"># 單筆（含最近一次報告）</span>
 <span class="hl-method">PATCH</span>  /tools/mfp-fetch/api/connections/{id}            <span class="hl-cmt"># 改名：{&quot;display_name&quot;: &quot;...&quot;}</span>
 <span class="hl-method">POST</span>   /tools/mfp-fetch/api/connections/{id}/test       <span class="hl-cmt"># 用存下來的位址與連線方式重新測試</span>
-<span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections/{id}/report     <span class="hl-cmt"># 下載最近一次診斷報告（JSON）</span>
+<span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections/{id}/report     <span class="hl-cmt"># 下載最近一次診斷報告（見下方「診斷報告」）</span>
 <span class="hl-method">DELETE</span> /tools/mfp-fetch/api/connections/{id}            <span class="hl-cmt"># 從清單移除（不影響設備）</span></code></pre>
 <p>保存に使えるのは接続テストが返した <code>token</code> だけで（アドレスは受け付けません）、保存されるのは必ずテストした機器です。期限切れや本人のものでないトークンには <code>410</code> を返します。同じアドレスと接続方法を二重に保存すると <code>409</code>（<code>DUPLICATE</code>）、1 人あたり最大 20 台です（<code>LIMIT</code>）。現時点では<strong>認証情報は一切保存しません</strong>。</p>
-<p>一覧の各項目には、<code>shared</code>（共有複合機かどうか）、<code>can_manage</code>（名前の変更や除去ができるか）、<code>scan</code>（スキャンできるかと選べる設定。eSCL がなければ <code>null</code>）、<code>queue</code>（<code>{&quot;busy&quot;: true, &quot;waiting&quot;: 1, &quot;kind&quot;: &quot;scan&quot;}</code>、いま使用中か、後ろに何件待っているか）もあります。共有複合機はメンバーにとって読み取り専用で、名前の変更と除去は <code>403</code>（<code>SHARED_READ_ONLY</code>）を返します。</p>
+<p>一覧の各項目には、<code>shared</code>（共有複合機かどうか）、<code>can_manage</code>（名前の変更や除去ができるか）、<code>scan</code>（スキャンできるかと選べる設定。eSCL がなければ <code>null</code>）、<code>box</code>（ボックスから取得できるか。現在は FUJIFILM のみ）、<code>share</code>（共有フォルダーからの取得に使える方法。例：<code>{&quot;routes&quot;: [&quot;canon_webdav&quot;, &quot;canon_smb&quot;]}</code>。なければ <code>null</code>）、<code>paused</code>（管理者が自分での追加をオフにしたため、自分の複合機が一時停止中）、<code>queue</code>（<code>{&quot;busy&quot;: true, &quot;waiting&quot;: 1, &quot;kind&quot;: &quot;scan&quot;}</code>、いま使用中か、後ろに何件待っているか）もあります。一覧自体は <code>can_add</code>（呼び出した人が複合機を追加できるか）も返します。共有複合機はメンバーにとって読み取り専用で、名前の変更と除去は <code>403</code>（<code>SHARED_READ_ONLY</code>）を返します。</p>
+      </section>
+      <section class="doc-section" data-sec="診斷報告" data-title="診断レポート" hidden>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<h4 id="診斷報告">診断レポート</h4>
+<p>接続テストの完全な記録を、形式を選んでダウンロードできます。保存済みの複合機は最新のテスト、保存前のテスト結果は接続テストが返した <code>token</code> を使います。</p>
+<pre><code class="lang-text"><span class="hl-method">GET</span>  /tools/mfp-fetch/api/connections/{id}/report?format=pdf   <span class="hl-cmt"># 已儲存的事務機</span>
+<span class="hl-method">POST</span> /tools/mfp-fetch/api/detect/report                        <span class="hl-cmt"># 還沒儲存的測試結果：{&quot;token&quot;: &quot;...&quot;, &quot;format&quot;: &quot;pdf&quot;}</span></code></pre>
+<p>パラメーター <code>format</code> で形式を選びます：</p>
+<ul>
+<li>省略または <code>json</code>：すべての項目を含む元のレポート。問題報告にはこれを添付してください。</li>
+<li>読むための版 <code>txt</code>、<code>md</code>、<code>html</code>、<code>pdf</code>：画面の「詳細」と同じ内容で、固定の文言は表示言語に合わせます（<code>jtdt_locale</code> cookie）。</li>
+</ul>
+<p>アカウント、パスワード、Cookie、セッション情報はレポート作成時に伏せてあり、形式を変えても何も増えません。接続テストが返した <code>token</code> は本人だけが 15 分間使え、ダウンロードしても消費されません（その後も保存できます）。期限切れや他人のものは <code>404</code>（<code>REPORT_EXPIRED</code>）。形式が正しくない場合は <code>422</code>（<code>REPORT_FORMAT_INVALID</code>）を返します。</p>
+<pre><code class="lang-bash">curl <span class="hl-flag">-o</span> mfp-report.pdf <span class="hl-str">&quot;http://localhost:8765/tools/mfp-fetch/api/connections/3/report?format=pdf&quot;</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span></code></pre>
       </section>
       <section class="doc-section" data-sec="掃描escl" data-title="スキャン（eSCL）" hidden>
-<div class="doc-crumb">9b. 複合機から取り込み API（Beta）</div>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
 <h4 id="掃描escl">スキャン（eSCL）</h4>
 <p>複合機からスキャンし、<strong>呼び出した本人の</strong>ワークスペースに保存します。呼び出す前に原稿を原稿台ガラス（または送り装置）に置いてください。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/scan       <span class="hl-cmt"># 開始掃描（202，回掃描紀錄）</span>
 <span class="hl-method">GET</span>  /tools/mfp-fetch/api/scans                       <span class="hl-cmt"># 最近 20 筆</span>
 <span class="hl-method">GET</span>  /tools/mfp-fetch/api/scans/{scan_id}             <span class="hl-cmt"># 狀態與進度</span>
 <span class="hl-method">POST</span> /tools/mfp-fetch/api/scans/{scan_id}/cancel      <span class="hl-cmt"># 取消（排隊中的直接移出；掃描中的會刪掉設備上的掃描工作）</span>
-<span class="hl-method">GET</span>  /tools/mfp-fetch/api/scans/{scan_id}/download    <span class="hl-cmt"># 沒存進工作區時下載（工作區停用或額度不夠時，留 24 小時）</span></code></pre>
-<div class="table-wrap"><table><thead><tr><th>パラメーター（JSON）</th><th>種類</th><th>説明</th></tr></thead><tbody><tr><td><code>source</code></td><td>string</td><td>この機器の <code>scan.sources</code> にある読み取り元：<code>platen</code>（既定）、<code>adf</code>、<code>adf_duplex</code></td></tr><tr><td><code>color</code></td><td>string</td><td><code>color</code>（既定）/ <code>gray</code> / <code>bw</code></td></tr><tr><td><code>resolution</code></td><td>int</td><td>解像度（dpi）。この機器が対応しているもの。既定は 300</td></tr><tr><td><code>paper</code></td><td>string</td><td><code>a4</code>（既定）/ <code>letter</code> / <code>max</code></td></tr><tr><td><code>file_name</code></td><td>string</td><td>ファイル名（任意、116 文字まで、<code>.pdf</code> は自動で付けます。パスや特殊文字は除きます）</td></tr></tbody></table></div>
+<span class="hl-method">GET</span>  /tools/mfp-fetch/api/scans/{scan_id}/download    <span class="hl-cmt"># 沒存進工作區時下載（留 24 小時；多個檔案打包成 ZIP）</span></code></pre>
+<div class="table-wrap"><table><thead><tr><th>パラメーター（JSON）</th><th>種類</th><th>説明</th></tr></thead><tbody><tr><td><code>source</code></td><td>string</td><td>この機器の <code>scan.sources</code> にある読み取り元：<code>platen</code>（既定）、<code>adf</code>、<code>adf_duplex</code></td></tr><tr><td><code>color</code></td><td>string</td><td><code>color</code>（既定）/ <code>gray</code> / <code>bw</code></td></tr><tr><td><code>resolution</code></td><td>int</td><td>解像度（dpi）。この機器が対応しているもの。既定は 300</td></tr><tr><td><code>paper</code></td><td>string</td><td><code>a4</code>（既定）/ <code>letter</code> / <code>max</code></td></tr><tr><td><code>format</code></td><td>string</td><td>保存形式は <code>pdf</code>（既定。複数ページを 1 つにまとめる）または <code>jpeg</code>（1 ページ 1 ファイル。複合機が JPEG を出せる必要あり）。選べる値は <code>scan.sources.&lt;読み取り元&gt;.outputs</code> にあります</td></tr><tr><td><code>file_name</code></td><td>string</td><td>ファイル名（任意、100 文字まで、拡張子は自動で付けます。パスや特殊文字は除きます）</td></tr></tbody></table></div>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/mfp-fetch/api/connections/3/scan</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;source&quot;: &quot;platen&quot;, &quot;color&quot;: &quot;gray&quot;, &quot;resolution&quot;: 300, &quot;file_name&quot;: &quot;合約掃描&quot;}&#x27;</span> | jq</code></pre>
-<p>スキャン記録の <code>status</code>：<code>queued</code>（順番待ち。<code>ahead</code> は前にある件数）、<code>running</code>（<code>phase</code> は <code>checking</code> / <code>scanning</code> / <code>merging</code> / <code>saving</code>）、<code>done</code>（<code>pages</code>、<code>bytes</code>、<code>workspace_file_id</code>）、<code>error</code>（<code>error_code</code>、<code>error_message</code>）、<code>cancelled</code>。複数ページは 1 つの PDF にまとめ、呼び出した本人のワークスペースだけに保存します。ほかの人は id を使っても参照もダウンロードもできません。<code>settings.via</code> は今回使ったプロトコル（例：<code>{&quot;protocol&quot;: &quot;eSCL&quot;, &quot;scheme&quot;: &quot;https&quot;, &quot;port&quot;: 443}</code>）、<code>tls_verified</code> は証明書を検証できたかどうかです。</p>
+<p>ジョブ記録の <code>status</code>：<code>queued</code>（順番待ち。<code>ahead</code> は前にある件数）、<code>running</code>（<code>phase</code> は <code>checking</code> / <code>scanning</code> / <code>merging</code> / <code>downloading</code> / <code>saving</code>）、<code>done</code>（<code>pages</code>、<code>bytes</code>、<code>workspace_file_id</code>）、<code>error</code>（<code>error_code</code>、<code>error_message</code>）、<code>cancelled</code>。<code>kind</code> は <code>scan</code>（スキャン）または <code>box</code>（ボックスからの取得）で、<code>files</code> は保存したファイルの一覧（<code>name</code>、<code>pages</code>、<code>workspace_file_id</code>、<code>has_file</code>）です。呼び出した本人のワークスペースだけに保存し、ほかの人は id を使っても参照もダウンロードもできません。<code>settings.via</code> は今回使ったプロトコル（例：<code>{&quot;protocol&quot;: &quot;eSCL&quot;, &quot;scheme&quot;: &quot;https&quot;, &quot;port&quot;: 443}</code>）、<code>tls_verified</code> は証明書を検証できたかどうかです。</p>
 <p>機器の機能範囲外の設定は <code>400</code>（<code>SCAN_OPTION_INVALID</code>）、eSCL のない機器は <code>400</code>（<code>SCAN_NOT_SUPPORTED</code>）、順番待ちが満杯なら <code>429</code> を返します。スキャン中のエラーは記録の <code>error_code</code> に入ります：<code>SCAN_DEVICE_BUSY</code>（誰かが機器を操作中）、<code>SCAN_ADF_EMPTY</code>、<code>SCAN_AUTH_REQUIRED</code>（スキャンにログインが必要な機器。まだ対応していません）、<code>SCAN_NO_DOCUMENT</code>、<code>SCAN_BAD_DOCUMENT</code>、<code>SCAN_TOO_LARGE</code>、<code>SCAN_TIMEOUT</code> など。<strong>認証情報は送りません</strong>。</p>
       </section>
+      <section class="doc-section" data-sec="機內信箱取件fujifilm實驗性" data-title="ボックスからの取得（FUJIFILM、試験機能）" hidden>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<h4 id="機內信箱取件fujifilm實驗性">ボックスからの取得（FUJIFILM、試験機能）</h4>
+<blockquote><p><strong>調査にもとづく推測の実装で、実機ではまだ検証していません。</strong>メーカーの取得ツールの調査をもとに、WebDAV で FUJIFILM 複合機のボックスを読み取ります（PROPFIND で文書の一覧、GET でダウンロード）。送るのはこの 2 種類の要求だけで、複合機上の文書を削除・変更しません。ただし複合機またはボックスが「取得後に削除」に設定されている場合は、複合機自身が削除します（下の「取得後に削除」の確認パラメーターを参照）。FUJIFILM と識別され、接続テストでつながった複合機のみ使え、それ以外は 400（BOX_NOT_FUJIFILM）を返します。</p></blockquote>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/box/list    <span class="hl-cmt"># 列出信箱裡的文件</span>
+<span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/box/fetch   <span class="hl-cmt"># 取件（202，回作業紀錄；進度一樣看 /api/scans/{id}）</span></code></pre>
+<div class="table-wrap"><table><thead><tr><th>パラメーター（JSON）</th><th>種類</th><th>説明</th></tr></thead><tbody><tr><td><code>box</code></td><td>int</td><td>ボックス番号（1〜999）</td></tr><tr><td><code>box_password</code></td><td>string</td><td>ボックスのパスワード（未設定なら省略）</td></tr><tr><td><code>user</code> / <code>password</code></td><td>string</td><td>複合機がログインを求めるときだけ必要：複合機でのユーザーのアカウントとパスワード</td></tr><tr><td><code>trust_sha256</code></td><td>string</td><td>HTTPS 証明書を検証できないとき（複合機は自己署名証明書が一般的）、ユーザーが照合した証明書の SHA-256 フィンガープリント</td></tr><tr><td><code>allow_http</code></td><td>bool</td><td>複合機が HTTP のみのときは <code>true</code> が必要（認証情報と文書が社内ネットワークを暗号化されずに送られることへの同意）</td></tr><tr><td><code>target</code></td><td>string</td><td>任意。例：<code>&quot;https:443&quot;</code>。接続テストでつながった組み合わせである必要があり、省略すると HTTPS を優先します</td></tr><tr><td><code>documents</code></td><td>string[]</td><td>取得時に使用：取得する文書の番号（一覧が返す <code>id</code>）。一度に 20 件まで</td></tr><tr><td><code>output</code></td><td>string</td><td>取得時に使用：<code>pdf</code>（既定。文書ごとに 1 つの PDF）または <code>original</code>（複合機が送る TIFF / JPEG をそのまま。変換しない）</td></tr><tr><td><code>confirm_delete_after_get</code></td><td>bool</td><td>取得時に使用：ボックスまたは文書が「取得後に削除」に設定されている場合、<code>true</code> を付けないと取得しません</td></tr></tbody></table></div>
+<pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/mfp-fetch/api/connections/3/box/list</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;box&quot;: 1, &quot;box_password&quot;: &quot;1234&quot;, &quot;trust_sha256&quot;: &quot;9F:2A:...&quot;}&#x27;</span> | jq</code></pre>
+<pre><code class="lang-json">{
+  <span class="hl-key">&quot;ok&quot;</span>: <span class="hl-bool">true</span>,
+  <span class="hl-key">&quot;box&quot;</span>: <span class="hl-num">1</span>,
+  <span class="hl-key">&quot;box_name&quot;</span>: <span class="hl-str">&quot;Box 1&quot;</span>,
+  <span class="hl-key">&quot;delete_after_get&quot;</span>: <span class="hl-bool">false</span>,
+  <span class="hl-key">&quot;documents&quot;</span>: [{<span class="hl-key">&quot;id&quot;</span>: <span class="hl-str">&quot;5&quot;</span>, <span class="hl-key">&quot;name&quot;</span>: <span class="hl-str">&quot;報價單&quot;</span>, <span class="hl-key">&quot;pages&quot;</span>: <span class="hl-num">3</span>, <span class="hl-key">&quot;size&quot;</span>: <span class="hl-num">482113</span>, <span class="hl-key">&quot;modified&quot;</span>: <span class="hl-str">&quot;...&quot;</span>,
+                 <span class="hl-key">&quot;format&quot;</span>: <span class="hl-str">&quot;TIF&quot;</span>, <span class="hl-key">&quot;compression&quot;</span>: <span class="hl-str">&quot;MMR&quot;</span>, <span class="hl-key">&quot;how&quot;</span>: <span class="hl-str">&quot;whole&quot;</span>, <span class="hl-key">&quot;delete_after_get&quot;</span>: <span class="hl-bool">false</span>}],
+  <span class="hl-key">&quot;via&quot;</span>: {<span class="hl-key">&quot;protocol&quot;</span>: <span class="hl-str">&quot;WebDAV&quot;</span>, <span class="hl-key">&quot;scheme&quot;</span>: <span class="hl-str">&quot;https&quot;</span>, <span class="hl-key">&quot;port&quot;</span>: <span class="hl-num">443</span>},
+  <span class="hl-key">&quot;tls&quot;</span>: {<span class="hl-key">&quot;verified&quot;</span>: <span class="hl-bool">false</span>, <span class="hl-key">&quot;pinned&quot;</span>: <span class="hl-bool">true</span>, <span class="hl-key">&quot;sha256&quot;</span>: <span class="hl-str">&quot;9f2a...&quot;</span>},
+  <span class="hl-key">&quot;trace&quot;</span>: [{<span class="hl-key">&quot;method&quot;</span>: <span class="hl-str">&quot;PROPFIND&quot;</span>, <span class="hl-key">&quot;path&quot;</span>: <span class="hl-str">&quot;/dav/box-1&quot;</span>, <span class="hl-key">&quot;depth&quot;</span>: <span class="hl-str">&quot;1&quot;</span>, <span class="hl-key">&quot;status&quot;</span>: <span class="hl-num">401</span>,
+             <span class="hl-key">&quot;challenges&quot;</span>: [{<span class="hl-key">&quot;scheme&quot;</span>: <span class="hl-str">&quot;digest&quot;</span>, <span class="hl-key">&quot;realm&quot;</span>: <span class="hl-str">&quot;box-1&quot;</span>}]},
+            {<span class="hl-key">&quot;method&quot;</span>: <span class="hl-str">&quot;PROPFIND&quot;</span>, <span class="hl-key">&quot;path&quot;</span>: <span class="hl-str">&quot;/dav/box-1&quot;</span>, <span class="hl-key">&quot;depth&quot;</span>: <span class="hl-str">&quot;1&quot;</span>, <span class="hl-key">&quot;status&quot;</span>: <span class="hl-num">207</span>, <span class="hl-key">&quot;auth&quot;</span>: <span class="hl-str">&quot;digest&quot;</span>}]
+}</code></pre>
+<p><strong>認証情報はこの要求でのみ使います</strong>（<code>box/fetch</code> ではそのジョブのメモリ内のみ）。データベース、ログ、通信記録には書きません。複合機が認証を求めたときは 1 回だけ送り、失敗したらそこで止めます（アカウントのロックを避けるため、別の組み合わせは試しません）。<code>trace</code> は通信記録（メソッド、パス、ステータスコード、認証方式と realm。認証情報は含みません）で、実機での検証時に照合に使います。</p>
+<p>複合機側のエラーはすべて <code>422</code> を返します（<code>401</code> は本サイト自体のログイン用）。<code>code</code> は次のとおりです：</p>
+<ul>
+<li>証明書を検証できない：<code>TLS_UNTRUSTED</code>。<code>detail.certificate</code> にフィンガープリントと内容があります。照合後に <code>trust_sha256</code> を付けて再度呼び出します</li>
+<li>証明書が信頼したフィンガープリントと異なる：<code>TLS_IDENTITY_FAILED</code>。ボックスにはアクセスせず中止しました</li>
+<li>複合機が HTTP のみ：<code>PLAIN_HTTP_NEEDS_CONSENT</code>。<code>allow_http: true</code> を付けます</li>
+<li>ボックスのパスワード、または複合機のアカウントが必要：<code>AUTH_REQUIRED_BOX</code>、<code>AUTH_REQUIRED_USER</code></li>
+<li>認証失敗、または複合機が未対応の認証方式を求めた：<code>AUTH_FAILED</code>、<code>AUTH_MODE_UNSUPPORTED</code></li>
+<li>ボックスが見つからない、権限がない、WebDAV が無効、応答の形式が違う：<code>BOX_NOT_FOUND</code>、<code>BOX_FORBIDDEN</code>、<code>WEBDAV_UNAVAILABLE</code>、<code>DAV_BAD_RESPONSE</code> など</li>
+</ul>
+<p>取得ジョブの記録はスキャンと同じものです（<code>kind: &quot;box&quot;</code>）。<code>files</code> は保存した各ファイル（<code>name</code>、<code>pages</code>、<code>workspace_file_id</code>）、<code>items</code> は文書ごとの結果（<code>status</code>、<code>error_code</code>、<code>format_note</code>、<code>source</code>：<code>SOURCE_KEPT</code> 元の文書が残っている / <code>SOURCE_GONE</code> 取得後に複合機からなくなった / <code>SOURCE_UNKNOWN</code>）です。一部の文書を取得できなかった場合も <code>status</code> は <code>done</code> で、<code>error_code</code> が <code>BOX_PARTIAL</code> になります。PDF への変換に失敗した場合（例：未対応の圧縮方式の TIFF）は元のファイルを保存し、<code>format_note</code> が <code>PDF_FALLBACK_ORIGINAL</code> になります。</p>
+      </section>
+      <section class="doc-section" data-sec="檔案分享取件canonkonica-minoltasharp實驗性" data-title="共有フォルダーからの取得（Canon、Konica Minolta、SHARP。試験機能）" hidden>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<h4 id="檔案分享取件canonkonica-minoltasharp實驗性">共有フォルダーからの取得（Canon、Konica Minolta、SHARP。試験機能）</h4>
+<blockquote><p><strong>試験機能で、実機ではまだ検証していません。</strong>メーカーのマニュアルで公開されている方法に従い、複合機上の共有フォルダーを読み取ります：Canon Advanced Box（WebDAV または SMB の共有スペースと個人スペース）、Konica Minolta の公開ボックス（SMB）、SHARP 複合機の NAS（SMB）。読み取りのみで、複合機上のファイルを削除・名前変更・書き込みしません。使える複合機は一覧に取得方法が表示され、ほかのメーカーは 400（SHARE_ROUTE_INVALID）を返します。</p></blockquote>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/share/list    <span class="hl-cmt"># 列出位置、資料夾與檔案</span>
+<span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/share/fetch   <span class="hl-cmt"># 取件（202，回作業紀錄；進度看 /api/scans/{id}）</span></code></pre>
+<div class="table-wrap"><table><thead><tr><th>パラメーター（JSON）</th><th>種類</th><th>説明</th></tr></thead><tbody><tr><td><code>route</code></td><td>string</td><td>取得方法：<code>canon_webdav</code>、<code>canon_smb</code>、<code>konica_smb</code>、<code>sharp_smb</code>（一覧の <code>share.routes</code>）</td></tr><tr><td><code>root</code></td><td>string</td><td>場所：Canon は <code>share</code>（共有スペース）または <code>users</code>（個人スペース）、SHARP は複合機が一覧する共有、Konica はボックス番号から見つけるため不要</td></tr><tr><td><code>path</code></td><td>string[]</td><td>一覧時に使用：フォルダーのパス。1 階層ずつ名前を並べます（例：<code>[&quot;2026&quot;, &quot;十月&quot;]</code>）。省略すると場所の最上位</td></tr><tr><td><code>user</code> / <code>password</code></td><td>string</td><td>Canon、SHARP：複合機のアカウントとパスワード（認証を設定していなければ省略）。ドメインアカウントは<code>網域\帳號</code>（ドメイン\アカウント）と書きます</td></tr><tr><td><code>box</code> / <code>box_password</code></td><td>string</td><td>Konica：ボックス番号とボックスのパスワード</td></tr><tr><td><code>trust_sha256</code> / <code>allow_http</code></td><td></td><td>WebDAV の証明書フィンガープリントと HTTP の同意。ボックスからの取得と同じです</td></tr><tr><td><code>allow_plain</code></td><td>bool</td><td>SMB は暗号化されないため <code>true</code> が必要（ファイルが社内ネットワークを暗号化されずに送られることへの同意）</td></tr><tr><td><code>files</code></td><td>string[][]</td><td>取得時に使用：取得するファイル。それぞれがパスです（例：<code>[[&quot;2026&quot;, &quot;合約.tif&quot;]]</code>）。一度に 50 個まで</td></tr><tr><td><code>output</code></td><td>string</td><td>取得時に使用：<code>pdf</code>（既定。TIFF / JPEG は PDF に変換し、PDF とほかのファイルはそのまま）または <code>original</code>（すべて変換しない）</td></tr></tbody></table></div>
+<p>一覧は <code>roots</code>（選べる場所。<code>shared</code> は共有）、<code>root</code>、<code>path</code>、<code>entries</code>（<code>name</code>、<code>dir</code>、<code>size</code>、<code>modified</code>）、<code>shared</code>、<code>via</code>（<code>{&quot;protocol&quot;: &quot;WebDAV&quot;}</code> または <code>{&quot;protocol&quot;: &quot;SMB&quot;, &quot;port&quot;: 445}</code>）、<code>trace</code>（通信記録。認証情報は含みません）を返します。<strong>共有の場所はほかの人も見られます</strong>。呼び出した人だけの文書ではありません。</p>
+<p>SMB は NTLMv2 のみを使い、複合機が SMB1 しか使わない場合は認証の前に中止します（<code>SMB1_REFUSED</code>）。複合機が対応していれば署名し、内容は暗号化されません。複合機側のエラーはすべて <code>422</code> を返します：<code>SMB_PLAIN_NEEDS_CONSENT</code>、<code>SMB_AUTH_FAILED</code>、<code>SMB_CONNECT_FAILED</code>（445 番ポートが閉じている）、<code>SHARE_FORBIDDEN</code>、<code>SHARE_NOT_FOUND</code>、<code>BOX_SHARE_NOT_FOUND</code>（Konica のこのボックスの共有が見つからない）、<code>SHARE_LOGIN_PAGE</code>、およびボックスからの取得と同じ <code>TLS_UNTRUSTED</code>、<code>AUTH_FAILED</code> など。ジョブ記録の <code>kind</code> は <code>share</code> で、ほかの項目はボックスからの取得と同じです。</p>
+      </section>
       <section class="doc-section" data-sec="共用事務機管理員" data-title="共有複合機（管理者）" hidden>
-<div class="doc-crumb">9b. 複合機から取り込み API（Beta）</div>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
 <h4 id="共用事務機管理員">共有複合機（管理者）</h4>
-<p>管理者が作成してメンバー（ユーザーまたはグループ。グループはサブグループのメンバーを含む）を指定します。管理者以外が呼び出すと <code>403</code>（<code>ADMIN_ONLY</code>）です。Web 版は「設定 → 共有複合機」にあります。メンバーには引き続き「複合機から取り込み」ツールの権限が必要です。</p>
+<p>管理者が作成してメンバー（ユーザーまたはグループ。グループはサブグループのメンバーを含む）を指定します。管理者以外が呼び出すと <code>403</code>（<code>ADMIN_ONLY</code>）です。Web 版は「設定 → 共有複合機」にあります。メンバーには引き続き「複合機スキャン・取り込み」ツールの権限が必要です。</p>
 <pre><code class="lang-text"><span class="hl-method">GET</span>    /tools/mfp-fetch/api/shared                  <span class="hl-cmt"># 清單（含成員數）</span>
 <span class="hl-method">POST</span>   /tools/mfp-fetch/api/shared                  <span class="hl-cmt"># 建立：{&quot;token&quot;: &quot;...&quot;, &quot;display_name&quot;: &quot;三樓&quot;}（token 來自管理員自己的 /api/detect）</span>
 <span class="hl-method">PATCH</span>  /tools/mfp-fetch/api/shared/{id}             <span class="hl-cmt"># 改名</span>
@@ -1514,6 +1586,13 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <span class="hl-method">PUT</span>    /tools/mfp-fetch/api/shared/{id}/members     <span class="hl-cmt"># 整份換掉：{&quot;members&quot;: [{&quot;type&quot;: &quot;user&quot;, &quot;key&quot;: &quot;12&quot;}, {&quot;type&quot;: &quot;group&quot;, &quot;key&quot;: &quot;3&quot;}]}</span>
 <span class="hl-method">GET</span>    /tools/mfp-fetch/api/shared-subjects         <span class="hl-cmt"># 挑成員用：使用者與群組清單</span></code></pre>
 <p>メンバーは存在するユーザーとグループだけです。それ以外は <code>400</code>（<code>MEMBERS_INVALID</code>）を返します。アカウントやグループを削除するとメンバー資格も外れます。作成者のアカウントを削除しても共有複合機は削除されません。</p>
+      </section>
+      <section class="doc-section" data-sec="使用設定管理員" data-title="利用設定（管理者）" hidden>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<h4 id="使用設定管理員">利用設定（管理者）</h4>
+<pre><code class="lang-text"><span class="hl-method">GET</span> /tools/mfp-fetch/api/settings     <span class="hl-cmt"># {&quot;settings&quot;: {&quot;allow_user_devices&quot;: true, &quot;updated_at&quot;: ...}}</span>
+<span class="hl-method">PUT</span> /tools/mfp-fetch/api/settings     <span class="hl-cmt"># {&quot;allow_user_devices&quot;: false}</span></code></pre>
+<p>設定項目 <code>allow_user_devices</code>（既定 <code>true</code>）で、一般ユーザーが自分で複合機を追加できるかを決めます。値は <code>true</code> / <code>false</code> である必要があり、それ以外は <code>400</code>（<code>SETTINGS_INVALID</code>）、管理者以外は <code>403</code> です。変更は監査記録に残り（<code>mfp_settings_update</code>）、設定のバックアップの「複合機スキャン・取り込み」分類に含まれます。Web 版は「設定 → 共有複合機」の一番上の「利用設定」です。</p>
 <hr>
       </section>
       <section class="doc-section" data-sec="llm-校驗pdf-fill" data-title="LLM 検証（pdf-fill）" hidden>

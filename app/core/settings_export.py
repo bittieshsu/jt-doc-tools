@@ -96,6 +96,10 @@ CATEGORIES: list[dict] = [
     {"id": "translation_glossary", "label": "翻譯對照字典", "kind": "files",
      "items": ["translation_glossary.json"],
      "desc": "逐句翻譯 / 文件翻譯的專有名詞對照", "default": True},
+    # 事務機掃描取件的管理員設定（v1.16.89）。事務機本身（`mfp.sqlite`）是個人資料，不在這裡（見豁免清單）。
+    {"id": "mfp", "label": "事務機掃描取件", "kind": "files",
+     "items": ["mfp_settings.json"],
+     "desc": "是否允許使用者自行新增事務機", "default": True},
     # 只有「從哪裡下載」的設定；下載下來的範本與地址簿在 `official_doc/`，
     # 可以重新下載，不進備份（見 check_settings_export_coverage 的豁免）。
     {"id": "official_doc_sources", "label": "公文撰擬資料來源", "kind": "files",

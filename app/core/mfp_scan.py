@@ -1,11 +1,15 @@
-"""掃描作業：排隊 → 透過 eSCL 掃描 → 存進送出者的工作區。
+"""事務機作業：排隊 → 掃描（eSCL）或機內信箱取件（WebDAV，推測實作）→ 存進送出者的工作區。
 
-* 每件掃描一條背景執行緒：先在 `mfp_queue` 拿這台設備的號碼牌（同一台一次只做一件，見那裡的說明），
+* 每件作業一條背景執行緒：先在 `mfp_queue` 拿這台設備的號碼牌（同一台一次只做一件，見那裡的說明），
   輪到才連設備；排隊中可以取消（不會碰到設備），掃描中取消會刪掉設備上的掃描工作。
-* 紀錄存在 `mfp.sqlite` 的 `mfp_scans`（誰、哪一台、設定、頁數、大小、結果），進度另外放記憶體給畫面輪詢。
-* 掃好的 PDF 存進**送出者自己**的工作區（`workspace.save_file_for_key`，路徑式、不整份讀進記憶體、
-  驗證是打得開的 PDF）。工作區停用或額度不夠時，檔案留在暫存區 `RESULT_TTL` 秒給本人下載。
-* 服務重啟時還在排隊或掃描中的，第一次用到這個模組時標成「中斷」（隊伍只存在記憶體裡）。
+* 紀錄存在 `mfp.sqlite` 的 `mfp_scans`（誰、哪一台、哪一種作業、設定、每份文件與每個檔案、結果），
+  進度另外放記憶體給畫面輪詢。
+* 產出存進**送出者自己**的工作區（`workspace.save_file_for_key`，路徑式、不整份讀進記憶體、驗證檔頭與內容）。
+  工作區停用或額度不夠時，檔案留在暫存區 `RESULT_TTL` 秒給本人下載（多個檔案打包成 ZIP）。
+* 產出格式（使用者 2026-10-14）：掃描可以存 PDF 或 JPEG（每頁一個檔）；信箱取件預設存 PDF，也可以存設備給的
+  原始格式（TIFF / JPEG，不轉檔）。轉 PDF 失敗（例如 TIFF 用了不支援的壓縮）就改存原始檔並註明。
+* **信箱的帳密只在這條執行緒的記憶體裡**，作業結束就丟掉；不寫進紀錄、資料庫、協定紀錄。
+* 服務重啟時還在排隊或執行中的，第一次用到這個模組時標成「中斷」（隊伍只存在記憶體裡）。
 """
 from __future__ import annotations
 
@@ -18,27 +22,36 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-from . import mfp_escl, mfp_queue, mfp_store
+from . import mfp_box, mfp_escl, mfp_output, mfp_queue, mfp_share, mfp_store
 
 logger = logging.getLogger("app.mfp_fetch")
 
 #: 排隊最多等多久（秒）—— 前面的人都在掃很多頁時不要無限等。
 MAX_QUEUE_WAIT = 30 * 60
-#: 沒存進工作區的掃描檔在暫存區留多久（秒）。
+#: 沒存進工作區的檔案在暫存區留多久（秒）。
 RESULT_TTL = 24 * 3600
+#: 信箱取件的存檔格式：PDF（預設）或設備給的原始格式。
+BOX_OUTPUTS = ("pdf", "original")
 
 MESSAGES: dict[str, str] = {
-    "SCAN_QUEUE_TIMEOUT": "排隊太久，已放棄這次掃描",
-    "SCAN_INTERRUPTED": "服務重新啟動，這次掃描沒有完成",
-    "SCAN_FAILED": "掃描失敗",
-    "SCAN_NOT_FOUND": "找不到這次掃描",
-    "SCAN_NO_FILE": "這次掃描沒有可以下載的檔案（已存進工作區，或已超過保留時間）",
-    "WS_DISABLED": "工作區功能未啟用，掃描檔留在暫存區 24 小時，請下載",
-    "WS_FAILED": "存進工作區失敗，掃描檔留在暫存區 24 小時，請下載",
+    "SCAN_QUEUE_TIMEOUT": "排隊太久，已放棄這次作業",
+    "SCAN_INTERRUPTED": "服務重新啟動，這次作業沒有完成",
+    "SCAN_FAILED": "作業失敗",
+    "SCAN_NOT_FOUND": "找不到這次作業",
+    "SCAN_NO_FILE": "這次作業沒有可以下載的檔案（已存進工作區，或已超過保留時間）",
+    "WS_DISABLED": "工作區功能未啟用，檔案留在暫存區 24 小時，請下載",
+    "WS_FAILED": "有檔案存不進工作區（可能超過大小上限或額度），留在暫存區 24 小時，請下載",
+    "BOX_PARTIAL": "部分文件沒有取到（每份文件的原因列在下面）",
+    "BOX_ALL_FAILED": "選的文件都沒有取到",
+    "BOX_OUTPUT_INVALID": "存檔格式只能是 PDF 或原始格式",
+    "PDF_FALLBACK_ORIGINAL": "轉成 PDF 失敗，改存設備給的原始檔",
+    "SOURCE_KEPT": "設備上的原件還在",
+    "SOURCE_GONE": "取件後設備上已經沒有這份原件（設備或信箱可能設定成取件後刪除）",
+    "SOURCE_UNKNOWN": "取件後沒能確認設備上的原件還在不在",
 }
 
 _LOCK = threading.Lock()
-#: scan_id → {"phase", "pages", "bytes", "ahead", "cancel": Event, "ticket"}
+#: job_id → {"phase", "pages", "bytes", "ahead", "cancel": Event, "ticket", ...}
 _LIVE: dict[str, dict] = {}
 _INIT_DONE = False
 
@@ -52,8 +65,8 @@ def _init_once() -> None:
             return
         try:
             mfp_store.mark_interrupted_scans()
-        except Exception:  # noqa: BLE001 —— 標記失敗不影響新的掃描
-            logger.warning("mfp：標記中斷的掃描失敗")
+        except Exception:  # noqa: BLE001 —— 標記失敗不影響新的作業
+            logger.warning("mfp：標記中斷的作業失敗")
         _INIT_DONE = True
 
 
@@ -63,21 +76,30 @@ def _work_root() -> Path:
 
 
 _NAME_BAD = re.compile(r'[\\/:*?"<>|\x00-\x1f]+')
+_KNOWN_EXT = re.compile(r"\.(pdf|jpe?g|tiff?)$", re.I)
+
+
+def clean_stem(name: str, fallback: str) -> str:
+    """使用者填的檔名（或設備上的文件名稱）：去掉路徑、不能用的字元與副檔名，最多 100 字。"""
+    s = _NAME_BAD.sub(" ", (name or "").strip()).strip(" .")
+    s = _KNOWN_EXT.sub("", s).rstrip(" .")
+    return (s or fallback)[:100]
 
 
 def clean_file_name(name: str, fallback: str) -> str:
-    """使用者填的檔名：去掉路徑與不能用的字元、補 `.pdf`、最多 120 字。"""
-    s = _NAME_BAD.sub(" ", (name or "").strip()).strip(" .")
-    if not s:
-        s = fallback
-    if s.lower().endswith(".pdf"):
-        s = s[:-4].rstrip(" .") or fallback
-    return s[:116] + ".pdf"
+    """掃描檔名（PDF）：`clean_stem` 再補 `.pdf`。"""
+    return clean_stem(name, fallback) + ".pdf"
+
+
+def _new_live(job_id: str, ticket, cancel: threading.Event) -> None:
+    with _LOCK:
+        _LIVE[job_id] = {"phase": "queued", "pages": 0, "bytes": 0, "files": 0,
+                         "ahead": mfp_queue.position(ticket), "cancel": cancel, "ticket": ticket}
 
 
 def start(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, caps: dict,
           opts: dict, device: str, ip: str, scheme: str, port: int) -> dict:
-    """排進這台的隊伍並開始背景掃描；回傳掃描紀錄。
+    """排進這台的隊伍並開始背景掃描；回傳作業紀錄。
 
     設定不在能力表裡丟 `mfp_escl.ScanError("SCAN_OPTION_INVALID")`；隊伍滿了丟 `mfp_queue.QueueError`
     —— 兩種都在排隊之前就檢查完，不會留下半套紀錄。"""
@@ -88,148 +110,610 @@ def start(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, ca
     eff = dict(eff, via=via)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     fallback = f"scan-{stamp}"
-    file_name = clean_file_name(str(opts.get("file_name") or ""), fallback)
+    stem = clean_stem(str(opts.get("file_name") or ""), fallback)
+    ext = ".jpg" if eff.get("output") == "jpeg" else ".pdf"
     ticket = mfp_queue.enqueue(device, owner, "scan")
-    scan_id = secrets.token_hex(16)
+    job_id = secrets.token_hex(16)
     try:
-        rec = mfp_store.create_scan(scan_id, conn_id=conn["id"], owner=owner, owner_user_id=user_id,
+        rec = mfp_store.create_scan(job_id, conn_id=conn["id"], owner=owner, owner_user_id=user_id,
                                     device=device, conn_name=conn.get("display_name") or conn.get("host"),
-                                    settings=eff, file_name=file_name)
+                                    settings=eff, file_name=stem + ext, kind="scan")
     except BaseException:
         mfp_queue.done(ticket)
         raise
     cancel = threading.Event()
-    with _LOCK:
-        _LIVE[scan_id] = {"phase": "queued", "pages": 0, "bytes": 0,
-                          "ahead": mfp_queue.position(ticket), "cancel": cancel, "ticket": ticket}
-    th = threading.Thread(target=_run, name=f"mfp-scan-{scan_id[:8]}", daemon=True, kwargs=dict(
-        scan_id=scan_id, ticket=ticket, cancel=cancel, user_id=user_id, user_label=user_label,
+    _new_live(job_id, ticket, cancel)
+    th = threading.Thread(target=_run_scan, name=f"mfp-scan-{job_id[:8]}", daemon=True, kwargs=dict(
+        job_id=job_id, ticket=ticket, cancel=cancel, user_id=user_id, user_label=user_label,
         host=conn["host"], ip=ip, scheme=scheme, port=port, caps=caps, opts=dict(opts, **eff),
-        file_name=file_name, via=via))
+        stem=stem, via=via))
     th.start()
     return rec
 
 
-def _set(scan_id: str, **kw) -> None:
+def start_box(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, device: str, ip: str,
+              scheme: str, port: int, box: int, creds: "mfp_box.Creds", doc_ids: list[str], output: str,
+              trust_sha256: Optional[str], allow_http: bool, confirm_delete_after_get: bool) -> dict:
+    """排進這台的隊伍並開始背景取件（機內信箱，推測實作）；回傳作業紀錄。
+
+    輸入不對丟 `mfp_box.BoxError`、隊伍滿了丟 `mfp_queue.QueueError` —— 都在排隊之前。"""
+    _init_once()
+    if output not in BOX_OUTPUTS:
+        raise mfp_box.BoxError("BOX_OUTPUT_INVALID")
+    ids = [str(d) for d in doc_ids]
+    if not ids:
+        raise mfp_box.BoxError("NO_DOCUMENTS_SELECTED")
+    if len(ids) > mfp_box.MAX_DOCS_PER_JOB:
+        raise mfp_box.BoxError("TOO_MANY_DOCUMENTS")
+    if any(not re.fullmatch(r"\d{1,9}", d) for d in ids) or len(set(ids)) != len(ids):
+        raise mfp_box.BoxError("NO_DOCUMENTS_SELECTED")
+    via = {"protocol": "WebDAV", "scheme": scheme, "port": int(port)}
+    settings = {"via": via, "box": box, "output": output, "documents": ids}
+    ticket = mfp_queue.enqueue(device, owner, "box")
+    job_id = secrets.token_hex(16)
+    try:
+        rec = mfp_store.create_scan(job_id, conn_id=conn["id"], owner=owner, owner_user_id=user_id,
+                                    device=device, conn_name=conn.get("display_name") or conn.get("host"),
+                                    settings=settings, file_name="", kind="box")
+    except BaseException:
+        mfp_queue.done(ticket)
+        raise
+    cancel = threading.Event()
+    _new_live(job_id, ticket, cancel)
+    th = threading.Thread(target=_run_box, name=f"mfp-box-{job_id[:8]}", daemon=True, kwargs=dict(
+        job_id=job_id, ticket=ticket, cancel=cancel, user_id=user_id, user_label=user_label,
+        host=conn["host"], ip=ip, scheme=scheme, port=port, box=box, creds=creds, doc_ids=ids,
+        output=output, trust=trust_sha256, allow_http=allow_http, confirm=confirm_delete_after_get))
+    th.start()
+    return rec
+
+
+def _set(job_id: str, **kw) -> None:
     with _LOCK:
-        live = _LIVE.get(scan_id)
+        live = _LIVE.get(job_id)
         if live is not None:
             live.update(kw)
 
 
-def _run(*, scan_id: str, ticket, cancel: threading.Event, user_id: Optional[int], user_label: str,
-         host: str, ip: str, scheme: str, port: int, caps: dict, opts: dict, file_name: str,
-         via: dict) -> None:
-    workdir = _work_root() / scan_id
+def _wait(job_id: str, ticket, cancel: threading.Event) -> bool:
+    """排隊；輪到回 True。取消或等太久就寫好紀錄、回 False。"""
+    ok = mfp_queue.wait_turn(ticket, timeout=MAX_QUEUE_WAIT, on_wait=lambda ahead: _set(job_id, ahead=ahead))
+    if not ok:
+        code = "SCAN_CANCELLED" if cancel.is_set() else "SCAN_QUEUE_TIMEOUT"
+        mfp_store.finish_scan(job_id, status="cancelled" if cancel.is_set() else "error", error_code=code)
+        return False
+    _set(job_id, phase="checking", ahead=0)
+    mfp_store.update_scan(job_id, status="running", started_at=time.time())
+    return True
+
+
+def _finish_thread(job_id: str, ticket, workdir: Path) -> None:
+    mfp_queue.done(ticket)
+    with _LOCK:
+        _LIVE.pop(job_id, None)
+    rec = mfp_store.get_scan_any(job_id)
+    if not rec or rec.get("status") != "done" or not rec.get("result_path"):
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+def _run_scan(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional[int], user_label: str,
+              host: str, ip: str, scheme: str, port: int, caps: dict, opts: dict, stem: str, via: dict) -> None:
+    workdir = _work_root() / job_id
     try:
-        ok = mfp_queue.wait_turn(ticket, timeout=MAX_QUEUE_WAIT,
-                                 on_wait=lambda ahead: _set(scan_id, ahead=ahead))
-        if not ok:
-            code = "SCAN_CANCELLED" if cancel.is_set() else "SCAN_QUEUE_TIMEOUT"
-            mfp_store.finish_scan(scan_id, status="cancelled" if cancel.is_set() else "error",
-                                  error_code=code)
+        if not _wait(job_id, ticket, cancel):
             return
-        _set(scan_id, phase="checking", ahead=0)
-        mfp_store.update_scan(scan_id, status="running", started_at=time.time())
         try:
             res = mfp_escl.scan(host, ip, scheme, port, caps, opts, workdir,
-                                on_progress=lambda d: _set(scan_id, **d),
-                                is_cancelled=cancel.is_set)
+                                on_progress=lambda d: _set(job_id, **d), is_cancelled=cancel.is_set)
         except mfp_escl.ScanError as e:
-            mfp_store.finish_scan(scan_id, status="cancelled" if e.code == "SCAN_CANCELLED" else "error",
+            mfp_store.finish_scan(job_id, status="cancelled" if e.code == "SCAN_CANCELLED" else "error",
                                   error_code=e.code, error_detail=e.detail)
             return
-        _set(scan_id, phase="saving", pages=res["pages"], bytes=res["bytes"])
-        ws_id, ws_note, keep = _save_to_workspace(res["path"], file_name, user_id, user_label, scan_id)
-        result_path = None
-        if keep:
-            result_path = str(res["path"])
-        else:
-            shutil.rmtree(workdir, ignore_errors=True)
-        mfp_store.finish_scan(scan_id, status="done", pages=res["pages"], bytes=res["bytes"],
-                              workspace_file_id=ws_id, workspace_note=ws_note, result_path=result_path,
+        _set(job_id, phase="saving", pages=res["pages"], bytes=res["bytes"])
+        outs = res.get("files") or [{"path": res["path"], "kind": "pdf", "pages": res["pages"]}]
+        multi = len(outs) > 1
+        files = [{"path": o["path"], "kind": o["kind"], "pages": o["pages"],
+                  "name": stem + (f"-p{i:02d}" if multi else "") + mfp_output.EXT[o["kind"]]}
+                 for i, o in enumerate(outs, 1)]
+        saved, note = _save_files(files, user_id, user_label, job_id, {})
+        items = [{"files": saved}]
+        first = next((f for f in saved if f.get("workspace_file_id")), None)
+        kept = next((f for f in saved if f.get("kept")), None)
+        mfp_store.finish_scan(job_id, status="done", pages=res["pages"], bytes=res["bytes"],
+                              workspace_file_id=first["workspace_file_id"] if first else None,
+                              workspace_note=note, items=items,
+                              result_path=str(workdir / kept["stored"]) if kept else None,
                               settings=dict(res["settings"], via=via), tls_verified=res.get("tls_verified"))
-    except Exception as e:  # noqa: BLE001 —— 背景執行緒：任何意外都要落成「失敗」，不可以停在掃描中
-        logger.exception("mfp 掃描 %s 失敗", scan_id[:8])
+    except Exception as e:  # noqa: BLE001 —— 背景執行緒：任何意外都要落成「失敗」，不可以停在執行中
+        logger.exception("mfp 掃描 %s 失敗", job_id[:8])
         try:
-            mfp_store.finish_scan(scan_id, status="error", error_code="SCAN_FAILED",
+            mfp_store.finish_scan(job_id, status="error", error_code="SCAN_FAILED",
                                   error_detail={"error": e.__class__.__name__})
         except Exception:  # noqa: BLE001
             pass
     finally:
-        mfp_queue.done(ticket)
-        with _LOCK:
-            _LIVE.pop(scan_id, None)
-        rec = mfp_store.get_scan_any(scan_id)
-        if rec and rec.get("status") != "done":
-            shutil.rmtree(workdir, ignore_errors=True)
+        _finish_thread(job_id, ticket, workdir)
 
 
-def _save_to_workspace(path: Path, file_name: str, user_id: Optional[int], user_label: str,
-                       scan_id: str) -> tuple[Optional[str], Optional[str], bool]:
-    """回傳（工作區檔案 id、沒存進去的原因代碼、要不要把暫存檔留著給人下載）。"""
-    from . import workspace as ws
+def _run_box(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional[int], user_label: str,
+             host: str, ip: str, scheme: str, port: int, box: int, creds: "mfp_box.Creds",
+             doc_ids: list[str], output: str, trust: Optional[str], allow_http: bool, confirm: bool) -> None:
+    workdir = _work_root() / job_id
+    trace: list = []
     try:
-        key = ws.key_for_user_id(user_id)
-        meta = ws.save_file_for_key(key, path, file_name, source_tool="mfp-fetch", user_label=user_label,
-                                    verify=True, expect={".pdf"}, origin={"mfp_scan_id": scan_id})
-        return str(meta.get("file_id")), None, False
-    except ws.WorkspaceDisabled:
-        return None, "WS_DISABLED", True
-    except ws.WorkspaceError as e:
-        logger.info("mfp 掃描 %s 存進工作區失敗：%s", scan_id[:8], e)
-        return None, "WS_FAILED", True
+        if not _wait(job_id, ticket, cancel):
+            return
+        try:
+            sess = mfp_box.open_box(host, ip, scheme, port, box=box, creds=creds, trust_sha256=trust,
+                                    allow_http=allow_http, trace=trace)
+        except mfp_box.BoxError as e:
+            mfp_store.finish_scan(job_id, status="error", error_code=e.code,
+                                  error_detail=_detail(e.detail, trace))
+            return
+        finally:
+            creds = None            # noqa: F841 —— 帳密只用在開信箱（認證狀態留在 sess 裡）
+        tls = sess.tls()
+        box_dag = mfp_box._truthy(sess.box_props.get("deleteAfterGet"))
+        items: list[dict] = []
+        total = 0
+        stop: Optional[mfp_box.BoxError] = None
+        for n, doc_id in enumerate(doc_ids, 1):
+            doc = sess.docs.get(doc_id)
+            name = ((doc or {}).get("props") or {}).get("displayname") or ""
+            item: dict[str, Any] = {"doc": doc_id, "name": name[:120], "files": []}
+            items.append(item)
+            if stop is not None:
+                item.update(status="skipped", error_code=stop.code)
+                continue
+            if cancel.is_set():
+                stop = mfp_box.BoxError("CANCELLED")
+                item.update(status="skipped", error_code="CANCELLED")
+                continue
+            if doc is None:
+                item.update(status="error", error_code="DOC_NOT_FOUND")
+                continue
+            dag = mfp_box._truthy(doc["props"].get("deleteAfterGet"))
+            if (dag or box_dag) and not confirm:
+                item.update(status="error", error_code="DELETE_AFTER_GET_UNCONFIRMED")
+                continue
+            _set(job_id, phase="downloading", doc=n, docs=len(doc_ids))
+            try:
+                got = mfp_box.download(sess, doc_id, workdir / f"d{n:02d}",
+                                       budget_bytes=mfp_box.MAX_TOTAL_BYTES - total,
+                                       is_cancelled=cancel.is_set,
+                                       on_progress=lambda d: _set(job_id, files=d.get("files", 0)))
+            except mfp_box.BoxError as e:
+                item.update(status="error", error_code=e.code)
+                if e.code in mfp_box.FATAL:
+                    stop = e
+                continue
+            total += sum(f["bytes"] for f in got)
+            stem = clean_stem(name, f"box{box}-{doc_id}")
+            files, fmt_note = _box_outputs(got, workdir / f"d{n:02d}", stem, output, mfp_box.doc_resolution(doc))
+            item.update(status="ok", pages=sum(f.get("pages") or 0 for f in files),
+                        sources=[{"name": f["source"], "bytes": f["bytes"], "sha256": f["sha256"],
+                                  "kind": f["kind"]} for f in got][:200])
+            if fmt_note:
+                item["format_note"] = fmt_note
+            item["files"] = files
+        # 取完再列一次：原件還在不在（設備或信箱可能設定成取件後刪除）
+        if any(i.get("status") == "ok" for i in items) and stop is None:
+            try:
+                sess.list()
+                for i in items:
+                    if i.get("status") == "ok":
+                        i["source"] = "SOURCE_KEPT" if i["doc"] in sess.docs else "SOURCE_GONE"
+            except mfp_box.BoxError:
+                for i in items:
+                    if i.get("status") == "ok":
+                        i["source"] = "SOURCE_UNKNOWN"
+        _set(job_id, phase="saving")
+        all_files = [f for i in items for f in i["files"]]
+        saved, note = _save_files(all_files, user_id, user_label, job_id, {"mfp_box": box})
+        # 存好的結果（工作區 id、有沒有留在暫存區）放回每份文件底下，順序跟 all_files 一樣
+        it = iter(saved)
+        for i in items:
+            i["files"] = [next(it) for _f in i["files"]]
+        ok = [i for i in items if i.get("status") == "ok"]
+        first = next((f for f in saved if f.get("workspace_file_id")), None)
+        kept = next((f for f in saved if f.get("kept")), None)
+        fields: dict[str, Any] = dict(
+            pages=sum(i.get("pages") or 0 for i in ok), bytes=sum(f.get("bytes") or 0 for f in all_files),
+            workspace_file_id=first["workspace_file_id"] if first else None, workspace_note=note,
+            items=_slim_items(items), file_name=_job_title(items),
+            result_path=str(workdir / kept["stored"]) if kept else None,
+            tls_verified=(tls or {}).get("verified") if scheme == "https" else None,
+            settings={"via": dict(sess.via(), tls=tls), "box": box, "output": output, "documents": doc_ids})
+        if ok:
+            fields["error_code"] = "BOX_PARTIAL" if len(ok) < len(items) else None
+            fields["error_detail"] = _detail({}, trace) if len(ok) < len(items) else None
+            mfp_store.finish_scan(job_id, status="done", **fields)
+        else:
+            code = stop.code if stop is not None else "BOX_ALL_FAILED"
+            mfp_store.finish_scan(job_id, status="cancelled" if code == "CANCELLED" else "error",
+                                  error_code=code, error_detail=_detail({}, trace), **fields)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("mfp 信箱取件 %s 失敗", job_id[:8])
+        try:
+            mfp_store.finish_scan(job_id, status="error", error_code="SCAN_FAILED",
+                                  error_detail=_detail({"error": e.__class__.__name__}, trace))
+        except Exception:  # noqa: BLE001
+            pass
+    finally:
+        _finish_thread(job_id, ticket, workdir)
+
+
+def start_share(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, device: str, ip: str,
+                route: str, scheme: Optional[str], port: Optional[int], root: str, files: list,
+                output: str, creds: dict, trust_sha256: Optional[str], allow_http: bool,
+                allow_plain: bool) -> dict:
+    """排進這台的隊伍並開始背景取件（檔案分享，實驗功能）；回傳作業紀錄。輸入不對丟 `mfp_share.ShareError`。"""
+    _init_once()
+    if output not in BOX_OUTPUTS:
+        raise mfp_box.BoxError("BOX_OUTPUT_INVALID")
+    if route not in mfp_share.ROUTES:
+        raise mfp_share.ShareError("SHARE_ROUTE_INVALID")
+    if not isinstance(files, list) or not files:
+        raise mfp_share.ShareError("SHARE_NO_FILES_SELECTED")
+    if len(files) > mfp_share.MAX_FILES_PER_JOB:
+        raise mfp_share.ShareError("SHARE_TOO_MANY_FILES")
+    paths = [mfp_share.check_path(f) for f in files]
+    if any(not p for p in paths) or len({tuple(p) for p in paths}) != len(paths):
+        raise mfp_share.ShareError("SHARE_PATH_INVALID")
+    if mfp_share.ROUTES[route]["auth"] != "box" and not mfp_share.valid_segment(root):
+        raise mfp_share.ShareError("SHARE_ROOT_INVALID")
+    via = {"protocol": "WebDAV" if mfp_share.ROUTES[route]["transport"] == "webdav" else "SMB",
+           "scheme": scheme or "smb", "port": int(port or mfp_share.SMB_PORT)}
+    settings = {"via": via, "route": route, "root": root, "output": output,
+                "files": ["/".join(p) for p in paths][:mfp_share.MAX_FILES_PER_JOB]}
+    ticket = mfp_queue.enqueue(device, owner, "share")
+    job_id = secrets.token_hex(16)
+    try:
+        rec = mfp_store.create_scan(job_id, conn_id=conn["id"], owner=owner, owner_user_id=user_id,
+                                    device=device, conn_name=conn.get("display_name") or conn.get("host"),
+                                    settings=settings, file_name="", kind="share")
+    except BaseException:
+        mfp_queue.done(ticket)
+        raise
+    cancel = threading.Event()
+    _new_live(job_id, ticket, cancel)
+    th = threading.Thread(target=_run_share, name=f"mfp-share-{job_id[:8]}", daemon=True, kwargs=dict(
+        job_id=job_id, ticket=ticket, cancel=cancel, user_id=user_id, user_label=user_label,
+        host=conn["host"], ip=ip, route=route, scheme=scheme, port=port, root=root, paths=paths,
+        output=output, creds=dict(creds), trust=trust_sha256, allow_http=allow_http, allow_plain=allow_plain))
+    th.start()
+    return rec
+
+
+_EXT_OK = re.compile(r"^\.[A-Za-z0-9]{1,8}$")
+
+
+def _share_outputs(path: Path, src_name: str, output: str, workdir: Path) -> tuple[list[dict], Optional[str]]:
+    """一個取回的檔案 → 要存的檔案。PDF（預設）：TIFF / JPEG 轉 PDF、PDF 照舊、其他格式原樣；原始格式：一律原樣。"""
+    kind = mfp_output.sniff(path) or "other"
+    stem = clean_stem(Path(src_name).stem if "." in src_name else src_name, "file")
+    ext = Path(src_name).suffix.lower()
+    if not _EXT_OK.match(ext or "."):
+        ext = ""
+    if kind in mfp_output.EXT:
+        try:
+            info = mfp_output.inspect(path, kind)
+        except mfp_output.OutputError:
+            raise mfp_share.ShareError("DOC_INVALID", {"kind": kind}) from None
+        pages = info["pages"]
+    else:
+        pages = None
+    if output == "pdf" and kind in ("tiff", "jpeg"):
+        out = workdir / "document.pdf"
+        try:
+            n = mfp_output.to_pdf([(path, kind)], out, info.get("dpi") or 0)
+            path.unlink(missing_ok=True)
+            return [{"path": out, "kind": "pdf", "pages": n, "name": stem + ".pdf"}], None
+        except mfp_output.OutputError:
+            out.unlink(missing_ok=True)
+            note = "PDF_FALLBACK_ORIGINAL"
+    else:
+        note = None
+    name_ext = mfp_output.EXT.get(kind) or ext or ""
+    return [{"path": path, "kind": kind, "pages": pages, "name": stem + name_ext}], note
+
+
+def _run_share(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional[int], user_label: str,
+               host: str, ip: str, route: str, scheme: Optional[str], port: Optional[int], root: str,
+               paths: list[list[str]], output: str, creds: dict, trust: Optional[str], allow_http: bool,
+               allow_plain: bool) -> None:
+    workdir = _work_root() / job_id
+    trace: list = []
+    sess = None
+    try:
+        if not _wait(job_id, ticket, cancel):
+            return
+        try:
+            sess = mfp_share.open_session(route, host=host, ip=ip, scheme=scheme, port=port,
+                                          user=creds.get("user", ""), password=creds.get("password", ""),
+                                          box=creds.get("box"), box_password=creds.get("box_password", ""),
+                                          trust_sha256=trust, allow_http=allow_http, allow_plain=allow_plain,
+                                          trace=trace)
+            if mfp_share.ROUTES[route]["auth"] == "box":
+                root = mfp_share.konica_box_share(sess, creds.get("box") or "")
+        except mfp_box.BoxError as e:
+            mfp_store.finish_scan(job_id, status="error", error_code=e.code, error_detail=_detail(e.detail, trace))
+            return
+        finally:
+            creds = {}              # noqa: F841 —— 帳密只用在開連線
+        items: list[dict] = []
+        total = 0
+        stop: Optional[mfp_box.BoxError] = None
+        for n, segs in enumerate(paths, 1):
+            item: dict[str, Any] = {"doc": "/".join(segs)[:300], "name": segs[-1][:120], "files": []}
+            items.append(item)
+            if stop is not None or cancel.is_set():
+                item.update(status="skipped", error_code=stop.code if stop else "CANCELLED")
+                stop = stop or mfp_box.BoxError("CANCELLED")
+                continue
+            _set(job_id, phase="downloading", doc=n, docs=len(paths))
+            d = workdir / f"f{n:03d}"
+            d.mkdir(parents=True, exist_ok=True)
+            dest = d / "source.bin"
+            try:
+                left = min(mfp_share.MAX_FILE_BYTES, mfp_share.MAX_TOTAL_BYTES - total)
+                if left <= 0:
+                    raise mfp_share.ShareError("SHARE_FILE_TOO_LARGE")
+                got = sess.download(root, segs, dest, left)
+                total += got["bytes"]
+                files, note = _share_outputs(dest, segs[-1], output, d)
+            except mfp_box.BoxError as e:
+                dest.unlink(missing_ok=True)
+                item.update(status="error", error_code=e.code)
+                if e.code in mfp_share.FATAL:
+                    stop = e
+                continue
+            item.update(status="ok", pages=sum(f.get("pages") or 0 for f in files),
+                        sources=[{"name": segs[-1][:120], "bytes": got["bytes"], "sha256": got["sha256"]}])
+            if note:
+                item["format_note"] = note
+            item["files"] = files
+        # 取完再看一次：來源還在不在（檔案分享不會因為讀取而刪除，但設備或其他人可能已經移走）
+        ok_items = [(i, s) for i, s in zip(items, paths) if i.get("status") == "ok"]
+        if ok_items and stop is None:
+            for i, segs in ok_items:
+                try:
+                    names = {e["name"] for e in sess.list(root, segs[:-1]) if not e["dir"]}
+                    i["source"] = "SOURCE_KEPT" if segs[-1] in names else "SOURCE_GONE"
+                except mfp_box.BoxError:
+                    i["source"] = "SOURCE_UNKNOWN"
+        _set(job_id, phase="saving")
+        all_files = [f for i in items for f in i["files"]]
+        saved, wnote = _save_files(all_files, user_id, user_label, job_id, {"mfp_route": route})
+        it = iter(saved)
+        for i in items:
+            i["files"] = [next(it) for _f in i["files"]]
+        ok = [i for i in items if i.get("status") == "ok"]
+        first = next((f for f in saved if f.get("workspace_file_id")), None)
+        kept = next((f for f in saved if f.get("kept")), None)
+        tls = sess.tls() if sess else None
+        fields: dict[str, Any] = dict(
+            pages=sum(i.get("pages") or 0 for i in ok), bytes=sum(f.get("bytes") or 0 for f in all_files),
+            workspace_file_id=first["workspace_file_id"] if first else None, workspace_note=wnote,
+            items=_slim_items(items), file_name=_job_title(items),
+            result_path=str(workdir / kept["stored"]) if kept else None,
+            tls_verified=(tls or {}).get("verified") if (scheme == "https") else None,
+            settings={"via": dict(sess.via(), tls=tls), "route": route, "root": root, "output": output,
+                      "files": ["/".join(p) for p in paths]})
+        if ok:
+            fields["error_code"] = "BOX_PARTIAL" if len(ok) < len(items) else None
+            fields["error_detail"] = _detail({}, trace) if len(ok) < len(items) else None
+            mfp_store.finish_scan(job_id, status="done", **fields)
+        else:
+            code = stop.code if stop is not None else "BOX_ALL_FAILED"
+            mfp_store.finish_scan(job_id, status="cancelled" if code == "CANCELLED" else "error",
+                                  error_code=code, error_detail=_detail({}, trace), **fields)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("mfp 檔案分享取件 %s 失敗", job_id[:8])
+        try:
+            mfp_store.finish_scan(job_id, status="error", error_code="SCAN_FAILED",
+                                  error_detail=_detail({"error": e.__class__.__name__}, trace))
+        except Exception:  # noqa: BLE001
+            pass
+    finally:
+        if sess is not None:
+            sess.close()
+        _finish_thread(job_id, ticket, workdir)
+
+
+def _detail(detail: dict, trace: list) -> dict:
+    """錯誤細節＋協定紀錄（已不含帳密：請求層只記方法、路徑、狀態碼、認證方案與 realm）。"""
+    out = dict(detail or {})
+    if trace:
+        out["trace"] = trace[-mfp_box.MAX_TRACE:]
+    return out
+
+
+def _slim_items(items: list[dict]) -> list[dict]:
+    """存進資料庫的版本：檔案只留名稱、大小、頁數、工作區 id、暫存檔名（不留本機路徑）。"""
+    out = []
+    for i in items:
+        d = {k: v for k, v in i.items() if k != "files"}
+        d["files"] = [{k: f.get(k) for k in ("name", "kind", "bytes", "pages", "workspace_file_id", "kept",
+                                             "stored")} for f in i.get("files") or []]
+        out.append(d)
+    return out
+
+
+def _job_title(items: list[dict]) -> str:
+    names = [i.get("name") or f"#{i['doc']}" for i in items]
+    return "、".join(names[:3])[:200] + ("…" if len(names) > 3 else "")
+
+
+def _box_outputs(got: list[dict], workdir: Path, stem: str, output: str,
+                 resolution: int) -> tuple[list[dict], Optional[str]]:
+    """一份文件取回的檔案 → 要存的檔案。PDF（預設）合成一份；原始格式照設備給的，多個檔加頁序編號。"""
+    if output == "pdf":
+        out = workdir / "document.pdf"
+        try:
+            pages = mfp_output.to_pdf([(Path(f["path"]), f["kind"]) for f in got], out, resolution)
+            for f in got:
+                if Path(f["path"]) != out:
+                    Path(f["path"]).unlink(missing_ok=True)
+            return [{"path": out, "kind": "pdf", "pages": pages, "name": stem + ".pdf"}], None
+        except mfp_output.OutputError:
+            out.unlink(missing_ok=True)
+            note = "PDF_FALLBACK_ORIGINAL"
+    else:
+        note = None
+    multi = len(got) > 1
+    return [{"path": Path(f["path"]), "kind": f["kind"], "pages": f.get("pages"),
+             "name": stem + (f"-p{i:03d}" if multi else "") + mfp_output.EXT[f["kind"]]}
+            for i, f in enumerate(got, 1)], note
+
+
+def _save_files(files: list[dict], user_id: Optional[int], user_label: str, job_id: str,
+                origin: dict) -> tuple[list[dict], Optional[str]]:
+    """每個檔案存進工作區；存不進去的留在暫存區（`kept`）。回傳（檔案清單、沒存進去的原因代碼）。"""
+    from . import workspace as ws
+    note: Optional[str] = None
+    out: list[dict] = []
+    key = None
+    for f in files:
+        p = Path(f["path"])
+        rec = {"name": f["name"], "kind": f["kind"], "pages": f.get("pages"),
+               "bytes": p.stat().st_size if p.exists() else 0, "path": p}
+        if note != "WS_DISABLED":
+            try:
+                key = key or ws.key_for_user_id(user_id)
+                # 認得的格式（PDF / JPEG / TIFF）要對得上；其他格式（檔案分享裡的辦公文件等）交給工作區自己認
+                expect = {mfp_output.EXT[f["kind"]]} if f["kind"] in mfp_output.EXT else None
+                meta = ws.save_file_for_key(key, p, f["name"], source_tool="mfp-fetch", user_label=user_label,
+                                            verify=True, expect=expect, origin=dict(origin, mfp_scan_id=job_id))
+                rec["workspace_file_id"] = str(meta.get("file_id"))
+                p.unlink(missing_ok=True)
+            except ws.WorkspaceDisabled:
+                note = "WS_DISABLED"
+            except ws.WorkspaceError as e:
+                logger.info("mfp 作業 %s 有檔案存不進工作區：%s", job_id[:8], e)
+                note = note or "WS_FAILED"
+        if not rec.get("workspace_file_id"):
+            rec["kept"] = True
+            rec["stored"] = str(p.relative_to(_work_root() / job_id))
+        out.append(rec)
+    for r in out:
+        r.pop("path", None)
+    return out, note
 
 
 def public(rec: dict) -> dict:
-    """給畫面與 API 的掃描狀態（含排隊位置與即時進度）。"""
+    """給畫面與 API 的作業狀態（含排隊位置與即時進度）。"""
     out = {k: rec.get(k) for k in ("id", "conn_id", "conn_name", "status", "settings", "pages", "bytes",
                                    "file_name", "workspace_file_id", "workspace_note", "error_code",
                                    "error_detail", "created_at", "started_at", "finished_at", "tls_verified")}
-    out["has_file"] = bool(rec.get("result_path")) and Path(rec["result_path"]).exists() and \
-        (time.time() - (rec.get("finished_at") or 0)) < RESULT_TTL
+    out["kind"] = rec.get("kind") or "scan"
+    fresh = (time.time() - (rec.get("finished_at") or 0)) < RESULT_TTL
+    items = rec.get("items") or []
+    files = []
+    for i in items:
+        for f in i.get("files") or []:
+            files.append({"name": f.get("name"), "kind": f.get("kind"), "bytes": f.get("bytes"),
+                          "pages": f.get("pages"), "workspace_file_id": f.get("workspace_file_id"),
+                          "has_file": bool(f.get("kept")) and fresh})
+    out["files"] = files
+    out["items"] = [{k: v for k, v in i.items() if k not in ("files", "sources")}
+                    | {"files": len(i.get("files") or [])} for i in items]
+    for i in out["items"]:
+        code = i.get("error_code")
+        if code:
+            i["error_message"] = mfp_share.MESSAGES.get(code) or mfp_box.MESSAGES.get(code) or MESSAGES.get(code) or code
+        if i.get("format_note"):
+            i["format_message"] = MESSAGES.get(i["format_note"])
+        if i.get("source"):
+            i["source_message"] = MESSAGES.get(i["source"])
+    has = any(f["has_file"] for f in files)
+    if not items and rec.get("result_path"):           # 舊版的掃描紀錄（沒有 items）
+        has = Path(rec["result_path"]).exists() and fresh
+    out["has_file"] = has
     with _LOCK:
         live = _LIVE.get(rec["id"])
         if live:
             out.update({"phase": live.get("phase"), "ahead": live.get("ahead"),
-                        "live_pages": live.get("pages"), "live_bytes": live.get("bytes")})
+                        "live_pages": live.get("pages"), "live_bytes": live.get("bytes"),
+                        "live_doc": live.get("doc"), "live_docs": live.get("docs"),
+                        "live_files": live.get("files")})
     code = out.get("error_code")
-    out["error_message"] = (mfp_escl.MESSAGES.get(code) or mfp_queue.MESSAGES.get(code)
-                            or MESSAGES.get(code) or code) if code else None
+    out["error_message"] = (mfp_escl.MESSAGES.get(code) or mfp_share.MESSAGES.get(code) or mfp_box.MESSAGES.get(code)
+                            or mfp_queue.MESSAGES.get(code) or MESSAGES.get(code) or code) if code else None
     note = out.get("workspace_note")
     out["workspace_message"] = MESSAGES.get(note) if note else None
     return out
 
 
-def cancel(owner: str, scan_id: str) -> Optional[dict]:
-    rec = mfp_store.get_scan(owner, scan_id)
+def cancel(owner: str, job_id: str) -> Optional[dict]:
+    rec = mfp_store.get_scan(owner, job_id)
     if not rec:
         return None
     with _LOCK:
-        live = _LIVE.get(scan_id)
+        live = _LIVE.get(job_id)
     if live and rec["status"] in ("queued", "running"):
         live["cancel"].set()
         mfp_queue.cancel(live["ticket"])
-    return mfp_store.get_scan(owner, scan_id)
+    return mfp_store.get_scan(owner, job_id)
 
 
-def result_file(owner: str, scan_id: str) -> Optional[tuple[Path, str]]:
-    rec = mfp_store.get_scan(owner, scan_id)
-    if not rec or not rec.get("result_path"):
+def result_files(owner: str, job_id: str) -> list[tuple[Path, str]]:
+    """還在暫存區、可以下載的檔案（本人的、沒過期的）：`[(路徑, 檔名)]`。"""
+    rec = mfp_store.get_scan(owner, job_id)
+    if not rec or time.time() - (rec.get("finished_at") or 0) >= RESULT_TTL:
+        return []
+    root = (_work_root() / job_id).resolve()
+    out: list[tuple[Path, str]] = []
+    items = rec.get("items") or []
+    cands: list[tuple[str, str]] = [(f.get("stored") or "", f.get("name") or "")
+                                    for i in items for f in i.get("files") or [] if f.get("kept")]
+    if not items and rec.get("result_path"):            # 舊版的掃描紀錄
+        cands = [(str(rec["result_path"]), rec.get("file_name") or "scan.pdf")]
+    for stored, name in cands:
+        p = Path(stored)
+        p = p if p.is_absolute() else root / p
+        try:
+            p.resolve().relative_to(_work_root().resolve())   # 紀錄被竄改也不會指到暫存區以外
+        except (ValueError, OSError):
+            continue
+        if p.is_file():
+            out.append((p, name or p.name))
+    return out
+
+
+def result_file(owner: str, job_id: str) -> Optional[tuple[Path, str]]:
+    """只有一個檔案時的捷徑（舊的呼叫端）。"""
+    got = result_files(owner, job_id)
+    return got[0] if got else None
+
+
+def bundle(owner: str, job_id: str) -> Optional[Path]:
+    """多個檔案打包成 ZIP（不壓縮：圖檔與 PDF 本來就壓過了），放在作業的暫存目錄裡、下次直接用。"""
+    import zipfile
+    got = result_files(owner, job_id)
+    if len(got) < 2:
         return None
-    p = Path(rec["result_path"])
-    root = _work_root().resolve()
-    try:
-        p.resolve().relative_to(root)           # 只給暫存區裡的檔（紀錄被竄改也不會指到別處）
-    except ValueError:
-        return None
-    if not p.is_file() or time.time() - (rec.get("finished_at") or 0) >= RESULT_TTL:
-        return None
-    return p, rec.get("file_name") or "scan.pdf"
+    z = _work_root() / job_id / "bundle.zip"
+    if z.is_file():
+        return z
+    part = z.with_suffix(".part")
+    names: set[str] = set()
+    with zipfile.ZipFile(part, "w", compression=zipfile.ZIP_STORED) as zf:
+        for p, name in got:
+            n = name
+            k = 2
+            while n in names:
+                stem, dot, ext = name.rpartition(".")
+                n = f"{stem}-{k}.{ext}" if dot else f"{name}-{k}"
+                k += 1
+            names.add(n)
+            zf.write(p, arcname=n)
+    part.replace(z)
+    return z
 
 
 def prune(max_age: float = RESULT_TTL) -> int:
-    """清掉超過保留時間的暫存掃描檔（排程清理會呼叫；列清單時也順手）。"""
+    """清掉超過保留時間的暫存檔（排程清理會呼叫；列清單時也順手）。"""
     root = _work_root()
     if not root.is_dir():
         return 0

@@ -3,7 +3,8 @@
 設計：
 - 路徑：`<data_dir>/vat_db.sqlite`（獨立檔，不混 auth/audit）
 - Schema：
-    vat_registry (vat PK, name, address, owner, org_type, status, raw)
+    vat_registry (vat PK, name, address, owner, org_type, status, raw, category, industries,
+                  hq_vat, capital, founded, invoice)
     vat_meta (key PK, value)  -- last_updated / source / record_count / source_url
 - Ingest 流程：
     1. 解析 CSV (handle Big5/UTF-8/UTF-8 BOM 三種編碼)
@@ -158,6 +159,11 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             conn.execute("ALTER TABLE vat_registry ADD COLUMN category TEXT")
         if "industries" not in cols:
             conn.execute("ALTER TABLE vat_registry ADD COLUMN industries TEXT")
+        # v1.16.92：公開資料的其他欄位。既有站台升級時只補欄位（值是空的），
+        # 下次排程下載（全量重匯、整張表換掉）就有值 —— 不在升級時強制重下載 170 萬筆
+        for col, ddl in _EXTRA_COLUMNS.items():
+            if col not in cols:
+                conn.execute(ddl)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_vat_category ON vat_registry(category)")
     except Exception:
         pass
@@ -386,7 +392,55 @@ _COLUMN_ALIASES = {
     "status": [
         "營業狀況", "狀態", "公司狀況", "Status",
     ],
+    # v1.16.92：BGMOPEN1 其他欄位（檔頭 2026-10-15 實際確認）
+    "hq_vat": ["總機構統一編號"],
+    "capital": ["資本額"],
+    "founded": ["設立日期"],
+    "invoice": ["使用統一發票"],
 }
+
+#: 升級時補的欄位（整句 SQL 寫死，不用字串拼欄名）
+_EXTRA_COLUMNS = {
+    "hq_vat": "ALTER TABLE vat_registry ADD COLUMN hq_vat TEXT",
+    "capital": "ALTER TABLE vat_registry ADD COLUMN capital INTEGER",
+    "founded": "ALTER TABLE vat_registry ADD COLUMN founded TEXT",
+    "invoice": "ALTER TABLE vat_registry ADD COLUMN invoice INTEGER",
+}
+
+
+def _parse_founded(raw: str) -> Optional[str]:
+    """設立日期 → 西元 `YYYY-MM-DD`。公開資料是民國年月日（`1040413`、偶爾六碼 `991231`）；
+    八碼且 19 / 20 開頭當成西元。對不上的（月份 13、2 月 29 日不存在…）回 None，不猜。"""
+    s = (raw or "").strip()
+    if not s.isdigit():
+        return None
+    try:
+        if len(s) == 8 and s[:2] in ("19", "20"):
+            y = int(s[:4])
+        elif len(s) in (6, 7):
+            y = int(s[:-4]) + 1911
+        else:
+            return None
+        from datetime import date as _date
+        return _date(y, int(s[-4:-2]), int(s[-2:])).isoformat()
+    except ValueError:
+        return None
+
+
+def _parse_capital(raw: str) -> Optional[int]:
+    """資本額（元）→ 整數；可以有千分位逗號。不是數字回 None。"""
+    s = (raw or "").strip().replace(",", "")
+    return int(s) if s.isdigit() else None
+
+
+def _parse_invoice(raw: str) -> Optional[bool]:
+    """使用統一發票：Y → True、N → False，其他回 None（資料庫存 1 / 0）。"""
+    s = (raw or "").strip().upper()
+    return True if s == "Y" else False if s == "N" else None
+
+
+def _uses_invoice(v) -> Optional[bool]:
+    return None if v is None else bool(v)
 
 
 def _build_header_map(headers: list[str]) -> dict[str, int]:
@@ -499,6 +553,10 @@ def parse_csv_to_records(data: bytes) -> Iterable[dict]:
             "status": _get("status") or None,
             "industries": industries_str,
             "raw": None,  # 不存原始 row（節省空間）
+            "hq_vat": _get("hq_vat") if re.fullmatch(r"\d{8}", _get("hq_vat")) else None,
+            "capital": _parse_capital(_get("capital")),
+            "founded": _parse_founded(_get("founded")),
+            "uses_invoice": _parse_invoice(_get("invoice")),
         }
 
 
@@ -536,7 +594,11 @@ def ingest_csv(data: bytes, source: str = "manual_upload",
                   status TEXT,
                   raw TEXT,
                   category TEXT,
-                  industries TEXT
+                  industries TEXT,
+                  hq_vat TEXT,
+                  capital INTEGER,
+                  founded TEXT,
+                  invoice INTEGER
                 )
             """)
 
@@ -551,12 +613,14 @@ def ingest_csv(data: bytes, source: str = "manual_upload",
                         rec["vat"], rec["name"], rec["address"],
                         rec["owner"], rec["org_type"], rec["status"], rec["raw"],
                         category, rec.get("industries"),
+                        rec.get("hq_vat"), rec.get("capital"), rec.get("founded"), rec.get("uses_invoice"),
                     ))
                     if len(batch) >= _BATCH_SIZE:
                         cur.executemany(
                             "INSERT OR REPLACE INTO vat_registry_staging "
-                            "(vat, name, address, owner, org_type, status, raw, category, industries) "
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            "(vat, name, address, owner, org_type, status, raw, category, industries, "
+                            "hq_vat, capital, founded, invoice) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             batch,
                         )
                         count += len(batch)
@@ -564,8 +628,9 @@ def ingest_csv(data: bytes, source: str = "manual_upload",
                 if batch:
                     cur.executemany(
                         "INSERT OR REPLACE INTO vat_registry_staging "
-                        "(vat, name, address, owner, org_type, status, raw, category, industries) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "(vat, name, address, owner, org_type, status, raw, category, industries, "
+                        "hq_vat, capital, founded, invoice) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         batch,
                     )
                     count += len(batch)
@@ -632,6 +697,18 @@ def clear_db() -> None:
 
 # ─── Lookup ────────────────────────────────────────────────────────
 
+#: 查詢回傳的欄位（順序對應 `_row_dict`）；全是常數
+_SELECT_COLS = ("vat, name, address, owner, org_type, status, category, industries, "
+                "hq_vat, capital, founded, invoice")
+_SELECT_COLS_V = ", ".join("v." + c.strip() for c in _SELECT_COLS.split(","))
+
+
+def _row_dict(r) -> dict:
+    return {"vat": r[0], "name": r[1], "address": r[2], "owner": r[3],
+            "org_type": r[4], "status": r[5], "category": r[6], "industries": r[7],
+            "hq_vat": r[8], "capital": r[9], "founded": r[10], "uses_invoice": _uses_invoice(r[11])}
+
+
 def lookup_vat(vat: str) -> Optional[dict]:
     """O(1) 反查 — 找不到回 None。"""
     if not vat or not isinstance(vat, str):
@@ -647,17 +724,10 @@ def lookup_vat(vat: str) -> Optional[dict]:
     conn = _connect()
     try:
         row = conn.execute(
-            "SELECT vat, name, address, owner, org_type, status, category, industries "
-            "FROM vat_registry WHERE vat = ?",
+            "SELECT " + _SELECT_COLS + " FROM vat_registry WHERE vat = ?",
             (vat,),
         ).fetchone()
-        result = None
-        if row:
-            result = {
-                "vat": row[0], "name": row[1], "address": row[2],
-                "owner": row[3], "org_type": row[4], "status": row[5],
-                "category": row[6], "industries": row[7],
-            }
+        result = _row_dict(row) if row else None
         # Cache (含 None 結果，避免重打 DB)
         if len(_lookup_cache) >= _LOOKUP_CACHE_MAX:
             # Drop ~10% 簡單 LRU 替換
@@ -742,10 +812,7 @@ def search_companies(query: str, fields=None, limit: int = 50,
         return []
     limit = max(1, min(int(limit) if isinstance(limit, int) else 50, 500))
 
-    def _to_dict(r) -> dict:
-        return {"vat": r[0], "name": r[1], "address": r[2], "owner": r[3],
-                "org_type": r[4], "status": r[5], "category": r[6],
-                "industries": r[7]}
+    _to_dict = _row_dict
 
     cats: list = []
     if categories:
@@ -763,8 +830,7 @@ def search_companies(query: str, fields=None, limit: int = 50,
             # 取回該頁後 Python 依名稱排序。query 字串全常數，篩選走參數。
             params = [match] + _filter_params(cats, org_type, city, industry) + [limit]
             rows = conn.execute(
-                "SELECT v.vat, v.name, v.address, v.owner, v.org_type, v.status, "
-                "v.category, v.industries "
+                "SELECT " + _SELECT_COLS_V + " "
                 "FROM vat_fts JOIN vat_registry v ON v.vat = vat_fts.vat "
                 "WHERE vat_fts MATCH ?" + _FILTER_WHERE_V + " LIMIT ?",
                 params,
@@ -779,7 +845,7 @@ def search_companies(query: str, fields=None, limit: int = 50,
         params = (_like_fields_params(sel, pattern)
                   + _filter_params(cats, org_type, city, industry) + [limit])
         rows = conn.execute(
-            "SELECT vat, name, address, owner, org_type, status, category, industries "
+            "SELECT " + _SELECT_COLS + " "
             "FROM vat_registry WHERE " + _LIKE_FIELDS_WHERE + _FILTER_WHERE
             + " ORDER BY name LIMIT ?",
             params,
@@ -1322,12 +1388,14 @@ def append_csv(data: bytes, source: str, category: str = None) -> dict:
                         rec["vat"], rec["name"], rec["address"],
                         rec["owner"], rec["org_type"], rec["status"], rec["raw"],
                         category, rec.get("industries"),
+                        rec.get("hq_vat"), rec.get("capital"), rec.get("founded"), rec.get("uses_invoice"),
                     ))
                     if len(batch) >= _BATCH_SIZE:
                         cur.executemany(
                             "INSERT INTO vat_registry "
-                            "(vat, name, address, owner, org_type, status, raw, category, industries) "
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                            "(vat, name, address, owner, org_type, status, raw, category, industries, "
+                            "hq_vat, capital, founded, invoice) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                             "ON CONFLICT(vat) DO UPDATE SET category = excluded.category",
                             batch,
                         )
@@ -1336,8 +1404,9 @@ def append_csv(data: bytes, source: str, category: str = None) -> dict:
                 if batch:
                     cur.executemany(
                         "INSERT INTO vat_registry "
-                        "(vat, name, address, owner, org_type, status, raw, category, industries) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        "(vat, name, address, owner, org_type, status, raw, category, industries, "
+                        "hq_vat, capital, founded, invoice) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                         "ON CONFLICT(vat) DO UPDATE SET category = excluded.category",
                         batch,
                     )

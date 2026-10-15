@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.88"
+VERSION = "1.16.92"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -441,7 +441,7 @@ _TOOL_ALIASES = {
     "pdf-bookmark":       "bookmark bookmarks outline toc table of contents index navigation nested level chapter merge combine tender annual report 書籤 大綱 目錄 導覽 索引 章節 層級 巢狀 合併 串接 標案 投標 年報 結案報告 目錄頁 可點 跳頁 加書籤 建目錄",
     "submission-check":   "submission check submit review verify validate checklist pre-flight preflight completeness case bid tender application 送件 送審 投標 標案 申請 檢核 檢查 核對 清單 缺件 漏件 齊備 完整性 驗收 案件 送出前",
     "transit-proof":      "transit proof commute travel receipt ticket hsr tra mrt bus taxi uber rideshare easycard ipass reimbursement expense 乘車 乘車證明 交通 車票 高鐵 台鐵 捷運 公車 計程車 Uber 優步 叫車 網約車 行程收據 悠遊卡 一卡通 差旅 出差 報帳 核銷 憑證 整理",
-    "mfp-fetch":          "mfp multifunction printer copier scanner scan mailbox box folder fetch retrieve pickup import fujifilm fuji xerox apeos apeosport docucentre docuworks internet services webdav 事務機 多功能事務機 影印機 印表機 複合機 掃描 掃描檔 掃描器 親展 親展信箱 機密信箱 信箱 資料夾 取件 取檔 取回 匯入 富士 富士軟片 富士全錄",
+    "mfp-fetch":          "mfp multifunction printer copier scanner scan mailbox box folder fetch retrieve pickup import mfp scan & fetch 事務機掃描取件 掃描取件 事務機取件 機內信箱 escl webdav fujifilm fuji xerox apeos apeosport docucentre docuworks internet services webdav 事務機 多功能事務機 影印機 印表機 複合機 掃描 掃描檔 掃描器 親展 親展信箱 機密信箱 信箱 資料夾 取件 取檔 取回 匯入 富士 富士軟片 富士全錄",
 }
 # Per-tool color class. Both home page and sidebar use the same palette
 # classes, so a given tool always shows the same colored tile regardless

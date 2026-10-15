@@ -25,7 +25,7 @@ recordings) are validated by content, never by the file name.
 ②單檔上限另外一個（`max_audio_mb`）—— 三小時會議的 AAC 約 90 MB，一般型別的
 50 MB 會直接擋掉；③沒有預覽圖，畫面上顯示圖示（`has_preview()`）。
 
-大檔（掃描 PDF、事務機取件、作業結果）走 `save_file_for_key`：只看檔頭認格式、串流或直接搬進來，
+大檔（掃描 PDF、事務機掃描取件、作業結果）走 `save_file_for_key`：只看檔頭認格式、串流或直接搬進來，
 **不整份讀進記憶體**；`.part` 寫完才換名、最後才寫 meta。每一條寫入都先在 `_reserve()` 預留容量，
 兩個同時寫入不會一起擠過額度。
 """
@@ -57,6 +57,10 @@ logger = logging.getLogger(__name__)
 ALLOWED: dict[str, str] = {
     "application/pdf": ".pdf",
     "image/png": ".png",
+    # JPEG / TIFF（使用者 2026-10-14：「工作區允許 tiff」；事務機掃描可以存 JPEG、機內信箱取件可以存
+    # 設備給的原始 TIFF）。跟 PNG 一樣只看檔頭認格式；`verify=True` 時另外用 Pillow 開檔頭與每一頁。
+    "image/jpeg": ".jpg",
+    "image/tiff": ".tif",
     # 純文字沒有魔術位元組，判準見 `_looks_like_text()`。
     "text/plain": ".txt",
     "text/markdown": ".md",
@@ -289,6 +293,10 @@ def is_audio_ext(ext: str) -> bool:
     return (ext or "").lower() in AUDIO_EXTS
 
 
+#: 圖片。
+IMAGE_EXTS = (".png", ".jpg", ".tif")
+
+
 def kind_of(ext: str) -> str:
     """畫面上用來挑圖示的大類：pdf / image / office / text / audio / video。"""
     ext = (ext or "").lower()
@@ -296,7 +304,7 @@ def kind_of(ext: str) -> str:
         return "video" if ext in audio_formats.VIDEO_EXTS else "audio"
     if ext in _TEXT_EXTS:
         return "text"
-    if ext == ".png":
+    if ext in IMAGE_EXTS:
         return "image"
     if ext == ".pdf":
         return "pdf"
@@ -325,7 +333,7 @@ def accepted_type_groups() -> list[tuple[str, list[str]]]:
     av = [e for e in audio_formats.AUDIO_EXTS if e in exts]
     groups = [
         ("PDF 文件", [e for e in exts if e == ".pdf"]),
-        ("圖片", [e for e in exts if e == ".png"]),
+        ("圖片", [e for e in exts if e in IMAGE_EXTS]),
         ("辦公文件", [e for e in exts if kind_of(e) == "office"]),
         ("純文字", [e for e in exts if kind_of(e) == "text"]),
         ("錄音 / 錄影", av),
@@ -380,6 +388,9 @@ def detect_kind(data: bytes, name: str = "") -> Optional[tuple[str, str]]:
         return "application/pdf", ".pdf"
     if data[:8] == b"\x89PNG\r\n\x1a\n":
         return "image/png", ".png"
+    img = _image_kind(data[:8])
+    if img:
+        return img
     if data[:4] == b"PK\x03\x04":  # ZIP-based Office document
         try:
             import io
@@ -583,7 +594,7 @@ def _store_bytes(key: str, data: bytes, kind: tuple[str, str], display_name: str
 
 #: 不支援的型別 —— 列出來的格式由 `ALLOWED` 實算（見 `accepted_type_groups`）。
 #: 原本這句是寫死的，工作區收了新型別之後它就說謊了。
-UNSUPPORTED_MESSAGE = "工作區接受的格式：PDF / PNG、辦公文件、純文字、錄音 / 錄影檔"
+UNSUPPORTED_MESSAGE = "工作區接受的格式：PDF、圖片（PNG / JPEG / TIFF）、辦公文件、純文字、錄音 / 錄影檔"
 
 #: 被大小上限擋下時**一定要講出是上限、不是格式**（錄音檔最容易踩到：
 #: 三小時的會議錄音被擋下，使用者會以為是格式不支援而去轉檔）。
@@ -592,6 +603,8 @@ TOO_BIG_AUDIO_MESSAGE = "錄音檔超過單檔上限 {0} MB（這是大小上限
 QUOTA_FULL_MESSAGE = "工作區容量已滿（額度 {0} MB），請先刪除舊檔"
 #: `verify=True` 時 PDF 打不開或一頁都沒有。
 PDF_BROKEN_MESSAGE = "PDF 檔案毀損或不完整，無法開啟"
+#: `verify=True` 時圖片打不開（檔頭對、內容壞掉或截斷）。
+IMAGE_BROKEN_MESSAGE = "圖片檔案毀損或不完整，無法開啟"
 #: `expect` 指定了格式、實際內容卻是別的（例如設備回了一張登入頁）。
 UNEXPECTED_KIND_MESSAGE = "檔案格式與預期不符"
 
@@ -720,10 +733,19 @@ def save_stream_for_key(key: str, fobj, display_name: str, source_tool: str = ""
 _PNG_SIG = b"\x89PNG\r\n\x1a\n"
 
 
-def _sniff_streamable(fobj, name: str) -> Optional[tuple[str, str]]:
-    """只看檔頭就認得出來的型別（PDF / PNG / 錄音錄影）；其餘回 None（要看整份才算數）。
+def _image_kind(head: bytes) -> Optional[tuple[str, str]]:
+    """JPEG / TIFF 的檔頭（TIFF 含 BigTIFF）。"""
+    if head[:3] == b"\xff\xd8\xff":
+        return "image/jpeg", ".jpg"
+    if head[:4] in (b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+"):
+        return "image/tiff", ".tif"
+    return None
 
-    順序跟 `detect_kind()` 一樣：PDF、PNG 先，錄音檔後。讀完把位置放回開頭。"""
+
+def _sniff_streamable(fobj, name: str) -> Optional[tuple[str, str]]:
+    """只看檔頭就認得出來的型別（PDF / 圖片 / 錄音錄影）；其餘回 None（要看整份才算數）。
+
+    順序跟 `detect_kind()` 一樣：PDF、圖片先，錄音檔後。讀完把位置放回開頭。"""
     fobj.seek(0)
     head = fobj.read(16)
     fobj.seek(0)
@@ -731,6 +753,9 @@ def _sniff_streamable(fobj, name: str) -> Optional[tuple[str, str]]:
         return "application/pdf", ".pdf"
     if head[:8] == _PNG_SIG:
         return "image/png", ".png"
+    img = _image_kind(head)
+    if img:
+        return img
     return audio_formats.sniff_stream(fobj, name)
 
 
@@ -798,6 +823,33 @@ def _verify_pdf(path: Path) -> None:
         raise UnsupportedType(PDF_BROKEN_MESSAGE)
 
 
+#: 驗證圖片時單頁最多幾個像素（壞掉或惡意的檔案宣稱幾十億像素時直接拒絕，不解碼）。
+_IMAGE_MAX_PIXELS = 300_000_000
+
+
+def _verify_image(path: Path) -> None:
+    """圖片要打得開：Pillow 讀檔頭與每一頁的大小（多頁 TIFF），JPEG 另外走一次 `verify()`。不整張解碼。"""
+    from PIL import Image
+    try:
+        with Image.open(path) as im:
+            n = int(getattr(im, "n_frames", 1) or 1)
+            if n > 1000:
+                raise UnsupportedType(IMAGE_BROKEN_MESSAGE)
+            for i in range(n):
+                if i:
+                    im.seek(i)
+                w, h = im.size
+                if w < 1 or h < 1 or w * h > _IMAGE_MAX_PIXELS:
+                    raise UnsupportedType(IMAGE_BROKEN_MESSAGE)
+            if im.format == "JPEG":
+                im.seek(0)
+                im.verify()
+    except UnsupportedType:
+        raise
+    except Exception:  # noqa: BLE001 —— Pillow 的各種例外（截斷、格式錯）
+        raise UnsupportedType(IMAGE_BROKEN_MESSAGE) from None
+
+
 def _check_expect(ext: str, expect: Optional[set[str]]) -> None:
     if expect is not None and ext not in {e.lower() for e in expect}:
         raise UnsupportedType(UNEXPECTED_KIND_MESSAGE)
@@ -813,7 +865,8 @@ def save_file_for_key(key: str, src, display_name: str, source_tool: str = "",
       才認得出來，走 `save_bytes_for_key` 那條（受一般單檔上限約束，不會太大）。
     * `move=True`：把檔案**搬**進工作區而不是複製。同一個檔案系統直接換名；跨磁碟
       （`os.replace` 丟 EXDEV）退回串流複製、成功後刪掉來源。**失敗時來源要還在。**
-    * `verify=True`：PDF 要打得開、至少一頁（`_verify_pdf`）。預設不驗，既有上傳行為不變。
+    * `verify=True`：PDF 要打得開、至少一頁（`_verify_pdf`）；JPEG / TIFF 要打得開（`_verify_image`）。
+      預設不驗，既有上傳行為不變。
     * `expect`：只收這些副檔名（例如 `{".pdf"}`）—— 設備回了一張 HTML 登入頁時，
       不可以被當成純文字收進來。
     * `origin`：來源資訊（例如 `import_item_id`），寫進 meta.json 供重啟後對帳。
@@ -851,6 +904,8 @@ def save_file_for_key(key: str, src, display_name: str, source_tool: str = "",
     _check_expect(ext, expect)
     if verify and ext == ".pdf":
         _verify_pdf(src)
+    elif verify and ext in (".jpg", ".tif"):
+        _verify_image(src)
     if not move:
         with src.open("rb") as f:
             return _commit_stream(key, f, size, mime, ext, display_name, source_tool,
@@ -1087,6 +1142,38 @@ def _schedule_thumbnail(d: Path, ext: str) -> None:
     t.start()
 
 
+def _tiff_thumbnail(d: Path) -> tuple[Path, str]:
+    """TIFF 的第一頁縮圖（瀏覽器畫不出 TIFF）：Pillow 開第一頁、縮小存成 thumb.png，快取起來。"""
+    thumb = d / "thumb.png"
+    if thumb.exists():
+        return thumb, "image/png"
+    if (d / _THUMB_FAIL_MARK).exists():
+        raise WorkspaceError("此檔案無法產生預覽")
+    src = d / "file.tif"
+    if not src.exists():
+        raise NotFound("檔案不存在")
+    try:
+        if src.stat().st_size > _THUMB_MAX_BYTES:
+            raise WorkspaceError("檔案過大，略過預覽")
+        from PIL import Image
+        with Image.open(src) as im:
+            w, h = im.size
+            if w * h > _IMAGE_MAX_PIXELS:
+                raise WorkspaceError("圖片過大，略過預覽")
+            im.draft("RGB", (1200, 1200))
+            im.thumbnail((1200, 1200))
+            im.convert("RGB" if im.mode not in ("1", "L") else "L").save(thumb, "PNG")
+    except WorkspaceError:
+        raise
+    except Exception as e:  # noqa: BLE001 —— 縮圖失敗只影響好看，不影響檔案本身
+        try:
+            (d / _THUMB_FAIL_MARK).write_text(e.__class__.__name__, encoding="utf-8")
+        except OSError:
+            pass
+        raise WorkspaceError("無法產生預覽")
+    return thumb, "image/png"
+
+
 def get_thumbnail(request: Request, file_id: str) -> tuple[Path, str]:
     """Return (path, mime) for a preview thumbnail of one of the user's files.
     PNG → the image itself; PDF → first page rendered to a cached thumb.png
@@ -1097,11 +1184,13 @@ def get_thumbnail(request: Request, file_id: str) -> tuple[Path, str]:
     d = _entry_dir(request, file_id)
     meta = _read_meta(d) or {}
     ext = meta.get("ext", "")
-    if ext == ".png":
-        fp = d / "file.png"
+    if ext in (".png", ".jpg"):
+        fp = d / f"file{ext}"
         if not fp.exists():
             raise NotFound("檔案不存在")
-        return fp, "image/png"
+        return fp, "image/png" if ext == ".png" else "image/jpeg"
+    if ext == ".tif":
+        return _tiff_thumbnail(d)
     if ext in _TEXT_EXTS:
         # 純文字沒有「第一頁」可以畫。**要明講**，不要讓它掉到下面那條
         # 「當成 PDF」的路 —— 那會去找一個不存在的 `file.pdf`，

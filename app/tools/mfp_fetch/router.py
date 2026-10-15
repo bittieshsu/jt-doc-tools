@@ -1,8 +1,9 @@
-"""事務機取件（Beta）路由。
+"""事務機掃描取件（Beta；原名事務機取件）路由。
 
 目前做得到的：新增事務機（IP / 主機名稱）、連線測試（逐步診斷＋型號辨識＋下載診斷報告）、
 我的事務機清單（改名、重新測試、移除）、**從事務機掃描進工作區**（eSCL）、**共用事務機**（管理員建立、
-加成員）。登入信箱、列出文件、取件要等實機驗證後才開放（規格書與決策在 docs-share/mfp-fetch/）。
+加成員）、**FUJIFILM 機內信箱取件**（WebDAV，推測實作、尚未實機驗證，見 `mfp_box`；規格書與決策在
+docs-share/mfp-fetch/）。
 
 ## 擁有者
 
@@ -25,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import json
+import re
 import logging
 import secrets
 import threading
@@ -34,7 +36,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
-from ...core import mfp_client, mfp_escl, mfp_profiles, mfp_queue, mfp_scan, mfp_store
+from ...core import mfp_box, mfp_client, mfp_escl, mfp_profiles, mfp_queue, mfp_scan, mfp_settings, mfp_share, mfp_store
 from ...core.http_utils import content_disposition
 
 logger = logging.getLogger("app.mfp_fetch")
@@ -50,7 +52,7 @@ DETECTION_TTL = 900
 PROBE_WAIT = 30.0
 
 MESSAGES: dict[str, str] = {
-    "LOCAL_ONLY": "未啟用登入時，事務機取件只能在這台主機本機使用；多人或從其他電腦使用請先啟用登入",
+    "LOCAL_ONLY": "未啟用登入時，事務機掃描取件只能在這台主機本機使用；多人或從其他電腦使用請先啟用登入",
     "NOT_LOGGED_IN": "尚未登入",
     "RATE_LIMITED": "連線測試太頻繁，請稍候再試",
     "BUSY": "上一個連線測試還在進行中，請等它完成",
@@ -60,11 +62,20 @@ MESSAGES: dict[str, str] = {
     "DUPLICATE": mfp_store.DUPLICATE_MESSAGE,
     "LIMIT": mfp_store.LIMIT_MESSAGE,
     "NO_REPORT": "這台事務機還沒有連線測試的報告",
+    "REPORT_FORMAT_INVALID": "診斷報告的格式只能是 txt、md、json、html 或 pdf",
+    "REPORT_EXPIRED": "連線測試結果已過期，請重新測試後再下載診斷報告",
     "SHARED_READ_ONLY": "這是管理員設定的共用事務機，只有管理員可以改名或移除",
     "ADMIN_ONLY": "只有管理員可以管理共用事務機",
     "MEMBERS_INVALID": "成員清單不正確（只能是使用者、群組或組織單位）",
+    "USER_DEVICES_DISABLED": "管理員已關閉「使用者自行新增事務機」：只能使用管理員設定的共用事務機",
+    "SETTINGS_INVALID": "設定格式不正確",
+    "BOX_NOT_FUJIFILM": "機內信箱取件目前只支援 FUJIFILM（富士軟片）事務機",
+    "BOX_NO_TARGET": "這台事務機最近一次連線測試沒有連上，請先重新測試",
+    "BOX_TARGET_INVALID": "連線方式要是這台事務機連線測試時連得上的那一組",
     **mfp_queue.MESSAGES,
     **{k: v for k, v in mfp_scan.MESSAGES.items() if k.startswith("SCAN_")},
+    **mfp_box.MESSAGES,
+    **mfp_share.MESSAGES,
 }
 
 
@@ -132,10 +143,16 @@ class _Who:
             self.subjects = permissions.subjects_for_user(self.uid)
             self.all_shared = False
             self.admin = permissions.is_admin(self.uid)
+        # 可不可以有自己的事務機（管理員設定「允許使用者自行新增事務機」；管理員自己不受限）
+        self.can_own = self.admin or mfp_settings.allow_user_devices()
+
+    def usable(self, c: dict) -> bool:
+        """這台現在能不能拿來測試、掃描、取件：共用的照常；自己的要在允許自行新增時才行。"""
+        return bool(c.get("shared")) or self.can_own
 
     def visible(self, conn_id: int, with_report: bool = False) -> Optional[dict]:
         """自己的、或自己是成員的共用事務機；管理員看得到每一台共用事務機（管理頁要看詳細與報告）。
-        清單（`list_visible`）不一樣：管理員自己的「事務機取件」頁照樣只列他是成員的。"""
+        清單（`list_visible`）不一樣：管理員自己的「事務機掃描取件」頁照樣只列他是成員的。"""
         return mfp_store.get_visible(self.owner, self.subjects, conn_id,
                                      all_shared=self.all_shared or self.admin, with_report=with_report)
 
@@ -186,6 +203,15 @@ def _remember(owner: str, host: str, port, scheme, report: dict) -> str:
         _detections[tok] = {"owner": owner, "host": host, "port": port, "scheme": scheme,
                             "report": report, "exp": now + DETECTION_TTL}
     return tok
+
+
+def _peek(owner: str, tok: str) -> Optional[dict]:
+    """看一筆還沒儲存的連線測試（下載診斷報告用；不取走，之後照樣可以儲存）。"""
+    with _LOCK:
+        d = _detections.get(tok or "")
+        if not d or d["owner"] != owner or d["exp"] < time.time():
+            return None
+        return d
 
 
 def _take(owner: str, tok: str) -> Optional[dict]:
@@ -282,6 +308,14 @@ def _with_state(c: dict, who: _Who) -> dict:
     c["scan"] = ({"model": escl.get("model"), "sources": escl.get("sources") or {}}
                  if escl and escl.get("sources") else None)
     c.pop("escl", None)
+    # 機內信箱取件（推測實作）：FUJIFILM、而且連線測試連得上
+    c["box"] = c.get("vendor") == "FUJIFILM" and bool(c.get("reachable_on"))
+    # 檔案分享取件（實驗功能）：Canon Advanced Box（WebDAV / SMB）、Konica 公用信箱、SHARP NAS（SMB）
+    routes = [r for r in mfp_share.routes_for(c.get("vendor"))
+              if mfp_share.ROUTES[r]["transport"] != "webdav" or c.get("reachable_on")]
+    c["share"] = {"routes": routes} if routes else None
+    # 管理員關掉「使用者自行新增事務機」：自己的暫停使用（資料留著，可以移除）
+    c["paused"] = not c.get("shared") and not who.can_own
     return c
 
 
@@ -300,11 +334,16 @@ async def index(request: Request):
 
 @router.post("/api/detect")
 async def api_detect(request: Request):
-    """連線測試（不儲存）。回傳完整報告與一個 15 分鐘內有效、只屬於本人的 token，用來「儲存這台」。"""
+    """連線測試（不儲存）。回傳完整報告與一個 15 分鐘內有效、只屬於本人的 token，用來「儲存這台」。
+
+    管理員關掉「使用者自行新增事務機」時，一般使用者回 403（管理員建立共用事務機也走這支，不受限）。"""
     try:
-        owner, _uid = _owner(request)
+        who = _Who(request)
     except _OwnerError as e:
         return _err(e.code, e.status)
+    if not who.can_own:
+        return _err("USER_DEVICES_DISABLED", 403)
+    owner = who.owner
     body = await _json(request)
     host = str(body.get("host") or "")[:300]
     port, scheme = _norm_port(body.get("port")), _norm_scheme(body.get("scheme"))
@@ -330,16 +369,19 @@ async def api_list(request: Request):
         return _err(e.code, e.status)
     items = mfp_store.list_visible(who.owner, who.subjects, all_shared=who.all_shared)
     return {"ok": True, "connections": [_with_state(c, who) for c in items],
-            "max": mfp_store.MAX_PER_OWNER, "admin": who.admin}
+            "max": mfp_store.MAX_PER_OWNER, "admin": who.admin, "can_add": who.can_own}
 
 
 @router.post("/api/connections")
 async def api_create(request: Request):
     """把一次連線測試的結果存成「我的事務機」。只收 token（不收位址）：存的一定是測過的那一台。"""
     try:
-        owner, uid = _owner(request)
+        who = _Who(request)
     except _OwnerError as e:
         return _err(e.code, e.status)
+    if not who.can_own:
+        return _err("USER_DEVICES_DISABLED", 403)
+    owner, uid = who.owner, who.uid
     body = await _json(request)
     det = _take(owner, str(body.get("token") or ""))
     if det is None:
@@ -402,12 +444,32 @@ async def api_test(request: Request, conn_id: int):
     c = who.visible(conn_id)
     if not c:
         return _err("NOT_FOUND", 404)
+    if not who.usable(c):
+        return _err("USER_DEVICES_DISABLED", 403)
     return await _retest(request, who, c)
 
 
+async def _report_response(request: Request, report: dict, host: str, when: float, fmt: str,
+                           target: str):
+    """把（產生時就已遮蔽的）報告換成指定格式下載。PDF 排版要幾百毫秒，放到執行緒做。"""
+    from ...core import mfp_report, ui_locale
+    fmt = (fmt or "json").strip().lower()
+    if fmt not in mfp_report.FORMATS:
+        return _err("REPORT_FORMAT_INVALID", 422)
+    locale = ui_locale.resolve(request)
+    data, media, ext = await asyncio.to_thread(mfp_report.render, report, fmt, locale)
+    _audit(request, "mfp_report_download", target, {"format": fmt})
+    name = mfp_report.filename(host, time.strftime("%Y%m%d-%H%M%S", time.localtime(when)), ext)
+    return Response(data, media_type=media,
+                    headers={"Content-Disposition": content_disposition(name, "attachment"),
+                             "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+
 @router.get("/api/connections/{conn_id}/report")
-async def api_report(request: Request, conn_id: int):
-    """下載最近一次連線測試的診斷報告（JSON，已遮蔽帳密與工作階段資訊）。"""
+async def api_report(request: Request, conn_id: int, format: str = "json"):  # noqa: A002 —— 對外參數名
+    """下載最近一次連線測試的診斷報告（已遮蔽帳密與工作階段資訊）。
+
+    `format`：`json`（預設，原始報告）、`txt`、`md`、`html`、`pdf`；後四種的固定字串依介面語言。"""
     try:
         who = _Who(request)
     except _OwnerError as e:
@@ -417,12 +479,24 @@ async def api_report(request: Request, conn_id: int):
         return _err("NOT_FOUND", 404)
     if not c.get("last_report"):
         return _err("NO_REPORT", 404)
-    stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(c.get("last_test_at") or time.time()))
-    name = f"mfp-diagnostic-{c['host'].replace(':', '_')}-{stamp}.json"
-    return Response(json.dumps(c["last_report"], ensure_ascii=False, indent=2),
-                    media_type="application/json",
-                    headers={"Content-Disposition": content_disposition(name, "attachment"),
-                             "Cache-Control": "no-store"})
+    return await _report_response(request, c["last_report"], c["host"], c.get("last_test_at") or time.time(),
+                                  format, c["host"])
+
+
+@router.post("/api/detect/report")
+async def api_detect_report(request: Request):
+    """還沒儲存的連線測試結果下載診斷報告：`{"token": "…", "format": "pdf"}`（token 是連線測試回的那一個，
+    只有本人能用、15 分鐘內有效；下載不會用掉它，之後照樣可以儲存）。"""
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    body = await _json(request)
+    det = _peek(who.owner, str(body.get("token") or ""))
+    if not det:
+        return _err("REPORT_EXPIRED", 404)
+    return await _report_response(request, det["report"], det["host"], time.time(),
+                                  str(body.get("format") or "json"), det["host"])
 
 
 @router.delete("/api/connections/{conn_id}")
@@ -465,8 +539,10 @@ async def api_scan(request: Request, conn_id: int):
     c = who.visible(conn_id, with_report=True)
     if not c:
         return _err("NOT_FOUND", 404)
+    if not who.usable(c):
+        return _err("USER_DEVICES_DISABLED", 403)
     body = await _json(request)
-    opts = {k: body.get(k) for k in ("source", "color", "resolution", "paper", "file_name")}
+    opts = {k: body.get(k) for k in ("source", "color", "resolution", "paper", "file_name", "format")}
     try:
         caps, scheme, port = _scan_target(c)
         device = await asyncio.to_thread(mfp_client.device_key, c["host"])
@@ -520,17 +596,293 @@ async def api_scan_cancel(request: Request, scan_id: str):
 
 @router.get("/api/scans/{scan_id}/download")
 async def api_scan_download(request: Request, scan_id: str):
-    """沒存進工作區的掃描檔（工作區停用或額度不夠時，留 24 小時）。"""
+    """沒存進工作區的檔案（工作區停用或額度不夠時，留 24 小時）：一個檔就直接給，多個打包成 ZIP。"""
     try:
         who = _Who(request)
     except _OwnerError as e:
         return _err(e.code, e.status)
-    got = mfp_scan.result_file(who.owner, scan_id)
+    got = mfp_scan.result_files(who.owner, scan_id)
     if not got:
         return _err("SCAN_NO_FILE", 404)
-    path, name = got
-    return FileResponse(path, media_type="application/pdf", filename=name,
+    if len(got) == 1:
+        path, name = got[0]
+        return FileResponse(path, media_type=_MEDIA.get(path.suffix.lower(), "application/octet-stream"),
+                            filename=name, headers={"Cache-Control": "no-store"})
+    z = await asyncio.to_thread(mfp_scan.bundle, who.owner, scan_id)
+    if not z:
+        return _err("SCAN_NO_FILE", 404)
+    rec = mfp_store.get_scan(who.owner, scan_id) or {}
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(rec.get("finished_at") or time.time()))
+    return FileResponse(z, media_type="application/zip", filename=f"mfp-{stamp}.zip",
                         headers={"Cache-Control": "no-store"})
+
+
+_MEDIA = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".tif": "image/tiff"}
+
+
+# --------------------------------------------------------------------------- API：機內信箱取件（推測實作）
+
+_FP_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _box_target(c: dict, want: Any) -> tuple[str, int]:
+    """取件用哪個協定與連接埠：連線測試連得上的那幾組裡挑（沒指定就 HTTPS 優先）。"""
+    reach = [r for r in (c.get("reachable_on") or []) if isinstance(r, str)]
+    if not reach:
+        raise mfp_box.BoxError("BOX_NO_TARGET")
+    if want:
+        if str(want) not in reach:
+            raise mfp_box.BoxError("BOX_TARGET_INVALID")
+        pick = str(want)
+    else:
+        pick = next((r for r in reach if r.startswith("https:")), reach[0])
+    sc, _, pt = pick.partition(":")
+    pairs = mfp_client.parse_port_scheme(pt, sc)        # 再驗一次（紀錄被竄改也不會連到別的埠）
+    return pairs[0]
+
+
+def _box_inputs(body: dict) -> tuple[int, "mfp_box.Creds", Optional[str], bool]:
+    box = mfp_box.parse_box(body.get("box"))
+    creds = mfp_box.Creds(body.get("box_password") or "", body.get("user") or "", body.get("password") or "")
+    fp = str(body.get("trust_sha256") or "").replace(":", "").strip().lower()
+    trust = fp if _FP_RE.match(fp) else None
+    return box, creds, trust, body.get("allow_http") is True
+
+
+def _box_error(e: "mfp_box.BoxError", trace: Optional[list] = None) -> JSONResponse:
+    """設備端的錯誤回 422（不是 401：那會讓畫面以為是本站登入過期）。"""
+    return JSONResponse({"ok": False, "code": e.code, "message": e.message, "detail": e.detail,
+                         "trace": trace or []}, status_code=422)
+
+
+def _box_conn(who: _Who, conn_id: int) -> tuple[Optional[dict], Optional[JSONResponse]]:
+    c = who.visible(conn_id, with_report=False)
+    if not c:
+        return None, _err("NOT_FOUND", 404)
+    if not who.usable(c):
+        return None, _err("USER_DEVICES_DISABLED", 403)
+    if c.get("vendor") != "FUJIFILM":
+        return None, _err("BOX_NOT_FUJIFILM", 400)
+    return c, None
+
+
+def _box_list_in_turn(owner: str, c: dict, sc: str, pt: int, box: int, creds, trust, allow_http,
+                      trace: list) -> dict:
+    device = mfp_client.device_key(c["host"])
+    _resolved[c["host"]] = device
+    with mfp_queue.turn(device, owner, "box", timeout=PROBE_WAIT):
+        sess = mfp_box.open_box(c["host"], device, sc, pt, box=box, creds=creds, trust_sha256=trust,
+                                allow_http=allow_http, trace=trace)
+    return dict(sess.public(), via=sess.via(), tls=sess.tls(), qnames=sess.qnames[:80])
+
+
+@router.post("/api/connections/{conn_id}/box/list")
+async def api_box_list(request: Request, conn_id: int):
+    """列出機內信箱裡的文件（**推測實作**：WebDAV PROPFIND）。帳密只用在這次請求，不儲存。
+
+    設備端的錯誤（認證、憑證、找不到信箱）回 422，附協定紀錄（`trace`，不含帳密）。"""
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    c, err = _box_conn(who, conn_id)
+    if err:
+        return err
+    body = await _json(request)
+    trace: list = []
+    busy = _acquire(who.owner + "#box")
+    if busy:
+        return _err(busy, 429)
+    try:
+        box, creds, trust, allow_http = _box_inputs(body)
+        sc, pt = _box_target(c, body.get("target"))
+        res = await asyncio.to_thread(_box_list_in_turn, who.owner, c, sc, pt, box, creds, trust,
+                                      allow_http, trace)
+    except mfp_client.PolicyError as e:
+        return _policy_error(e)
+    except mfp_queue.QueueError as e:
+        return _queue_error(e)
+    except mfp_box.BoxError as e:
+        _audit(request, "mfp_box_list", c["host"], {"id": conn_id, "ok": False, "code": e.code,
+                                                    "box": body.get("box")})
+        return _box_error(e, trace)
+    finally:
+        _release(who.owner + "#box")
+    _audit(request, "mfp_box_list", c["host"], {"id": conn_id, "ok": True, "box": res["box"],
+                                                "documents": len(res["documents"])})
+    return {"ok": True, **res, "trace": trace}
+
+
+@router.post("/api/connections/{conn_id}/box/fetch")
+async def api_box_fetch(request: Request, conn_id: int):
+    """取件（背景作業，**推測實作**）：重新開信箱、逐份下載、存進自己的工作區（預設 PDF）。回 202 與作業紀錄。
+
+    `documents` 是 `box/list` 回的文件編號；`output` 是 `pdf`（預設）或 `original`（設備給的原始格式）。
+    信箱或文件設定成「取件後刪除」時，要 `confirm_delete_after_get: true` 才會取。"""
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    c, err = _box_conn(who, conn_id)
+    if err:
+        return err
+    body = await _json(request)
+    docs = body.get("documents")
+    if not isinstance(docs, list):
+        return _box_error(mfp_box.BoxError("NO_DOCUMENTS_SELECTED"))
+    try:
+        box, creds, trust, allow_http = _box_inputs(body)
+        sc, pt = _box_target(c, body.get("target"))
+        device = await asyncio.to_thread(mfp_client.device_key, c["host"])
+        _resolved[c["host"]] = device
+        rec = mfp_scan.start_box(owner=who.owner, user_id=who.uid, user_label=_user_label(request), conn=c,
+                                 device=device, ip=device, scheme=sc, port=pt, box=box, creds=creds,
+                                 doc_ids=[str(d) for d in docs][:mfp_box.MAX_DOCS_PER_JOB + 1],
+                                 output=str(body.get("output") or "pdf"), trust_sha256=trust,
+                                 allow_http=allow_http,
+                                 confirm_delete_after_get=body.get("confirm_delete_after_get") is True)
+    except mfp_client.PolicyError as e:
+        return _policy_error(e)
+    except mfp_queue.QueueError as e:
+        return _queue_error(e)
+    except mfp_box.BoxError as e:
+        return _box_error(e)
+    _audit(request, "mfp_box_fetch", c["host"], {"id": conn_id, "scan": rec["id"], "box": box,
+                                                 "documents": [str(d) for d in docs][:20],
+                                                 "output": rec["settings"].get("output"),
+                                                 "shared": bool(c.get("shared"))})
+    return JSONResponse({"ok": True, "scan": mfp_scan.public(rec)}, status_code=202)
+
+
+# --------------------------------------------------------------------------- API：檔案分享取件（實驗功能）
+
+def _share_conn(who: _Who, conn_id: int, route: str) -> tuple[Optional[dict], Optional[JSONResponse]]:
+    c = who.visible(conn_id, with_report=False)
+    if not c:
+        return None, _err("NOT_FOUND", 404)
+    if not who.usable(c):
+        return None, _err("USER_DEVICES_DISABLED", 403)
+    if route not in mfp_share.routes_for(c.get("vendor")):
+        return None, _err("SHARE_ROUTE_INVALID", 400)
+    return c, None
+
+
+def _share_inputs(body: dict) -> dict:
+    fp = str(body.get("trust_sha256") or "").replace(":", "").strip().lower()
+    return {"user": str(body.get("user") or "")[:256], "password": str(body.get("password") or "")[:256],
+            "box": str(body.get("box") or "").strip()[:9], "box_password": str(body.get("box_password") or "")[:128],
+            "trust_sha256": fp if _FP_RE.match(fp) else None, "allow_http": body.get("allow_http") is True,
+            "allow_plain": body.get("allow_plain") is True}
+
+
+def _share_target(c: dict, route: str, want: Any) -> tuple[Optional[str], Optional[int]]:
+    if mfp_share.ROUTES[route]["transport"] != "webdav":
+        return None, None
+    return _box_target(c, want)
+
+
+def _share_list_in_turn(owner: str, c: dict, route: str, sc, pt, inp: dict, root: str, path: list,
+                        trace: list) -> dict:
+    device = mfp_client.device_key(c["host"])
+    _resolved[c["host"]] = device
+    with mfp_queue.turn(device, owner, "share", timeout=PROBE_WAIT):
+        sess = mfp_share.open_session(route, host=c["host"], ip=device, scheme=sc, port=pt, user=inp["user"],
+                                      password=inp["password"], box=inp["box"], box_password=inp["box_password"],
+                                      trust_sha256=inp["trust_sha256"], allow_http=inp["allow_http"],
+                                      allow_plain=inp["allow_plain"], trace=trace)
+        try:
+            if mfp_share.ROUTES[route]["auth"] == "box":
+                root = mfp_share.konica_box_share(sess, inp["box"])
+                roots = [{"id": root, "label": root, "shared": True}]
+            else:
+                roots = sess.roots()
+                if not roots:
+                    raise mfp_share.ShareError("SHARE_NOT_FOUND")
+                if not root:
+                    root = roots[0]["id"]
+                elif root not in [r["id"] for r in roots]:
+                    raise mfp_share.ShareError("SHARE_ROOT_INVALID")
+            entries = sess.list(root, path)
+            shared = next((r["shared"] for r in roots if r["id"] == root), True)
+            return {"route": route, "roots": roots, "root": root, "path": path, "entries": entries,
+                    "shared": shared, "via": sess.via(), "tls": sess.tls()}
+        finally:
+            sess.close()
+
+
+@router.post("/api/connections/{conn_id}/share/list")
+async def api_share_list(request: Request, conn_id: int):
+    """列出檔案分享裡的資料夾與檔案（**實驗功能**）。帳密只用在這次請求，不儲存；設備端的錯誤回 422 附協定紀錄。"""
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    body = await _json(request)
+    route = str(body.get("route") or "")
+    c, err = _share_conn(who, conn_id, route)
+    if err:
+        return err
+    trace: list = []
+    busy = _acquire(who.owner + "#box")
+    if busy:
+        return _err(busy, 429)
+    try:
+        inp = _share_inputs(body)
+        path = mfp_share.check_path(body.get("path") if body.get("path") is not None else [])
+        root = str(body.get("root") or "")
+        if root and not mfp_share.valid_segment(root):
+            raise mfp_share.ShareError("SHARE_ROOT_INVALID")
+        sc, pt = _share_target(c, route, body.get("target"))
+        res = await asyncio.to_thread(_share_list_in_turn, who.owner, c, route, sc, pt, inp, root, path, trace)
+    except mfp_client.PolicyError as e:
+        return _policy_error(e)
+    except mfp_queue.QueueError as e:
+        return _queue_error(e)
+    except mfp_box.BoxError as e:
+        _audit(request, "mfp_share_list", c["host"], {"id": conn_id, "route": route, "ok": False, "code": e.code})
+        return _box_error(e, trace)
+    finally:
+        _release(who.owner + "#box")
+    _audit(request, "mfp_share_list", c["host"], {"id": conn_id, "route": route, "ok": True, "root": res["root"],
+                                                  "entries": len(res["entries"])})
+    return {"ok": True, **res, "trace": trace}
+
+
+@router.post("/api/connections/{conn_id}/share/fetch")
+async def api_share_fetch(request: Request, conn_id: int):
+    """取件（背景作業，**實驗功能**）：`files` 是路徑陣列的陣列（例如 `[["2026", "合約.pdf"]]`）。回 202 與作業紀錄。"""
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    body = await _json(request)
+    route = str(body.get("route") or "")
+    c, err = _share_conn(who, conn_id, route)
+    if err:
+        return err
+    try:
+        inp = _share_inputs(body)
+        sc, pt = _share_target(c, route, body.get("target"))
+        device = await asyncio.to_thread(mfp_client.device_key, c["host"])
+        _resolved[c["host"]] = device
+        rec = mfp_scan.start_share(owner=who.owner, user_id=who.uid, user_label=_user_label(request), conn=c,
+                                   device=device, ip=device, route=route, scheme=sc, port=pt,
+                                   root=str(body.get("root") or ""), files=body.get("files"),
+                                   output=str(body.get("output") or "pdf"),
+                                   creds={k: inp[k] for k in ("user", "password", "box", "box_password")},
+                                   trust_sha256=inp["trust_sha256"], allow_http=inp["allow_http"],
+                                   allow_plain=inp["allow_plain"])
+    except mfp_client.PolicyError as e:
+        return _policy_error(e)
+    except mfp_queue.QueueError as e:
+        return _queue_error(e)
+    except mfp_box.BoxError as e:
+        return _box_error(e)
+    _audit(request, "mfp_share_fetch", c["host"], {"id": conn_id, "scan": rec["id"], "route": route,
+                                                   "files": len(rec["settings"].get("files") or []),
+                                                   "output": rec["settings"].get("output"),
+                                                   "shared": bool(c.get("shared"))})
+    return JSONResponse({"ok": True, "scan": mfp_scan.public(rec)}, status_code=202)
 
 
 # --------------------------------------------------------------------------- API：共用事務機（管理員）
@@ -540,6 +892,32 @@ def _admin(request: Request) -> _Who:
     if not who.admin:
         raise _OwnerError("ADMIN_ONLY", 403)
     return who
+
+
+@router.get("/api/settings")
+async def api_settings_get(request: Request):
+    """事務機掃描取件的管理員設定（目前只有「允許使用者自行新增事務機」）。"""
+    try:
+        _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    return {"ok": True, "settings": mfp_settings.get()}
+
+
+@router.put("/api/settings")
+async def api_settings_put(request: Request):
+    """改設定：`{"allow_user_devices": true | false}`。只有管理員。"""
+    try:
+        _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    body = await _json(request)
+    try:
+        cur = mfp_settings.save({k: body[k] for k in ("allow_user_devices",) if k in body})
+    except ValueError:
+        return _err("SETTINGS_INVALID", 400)
+    _audit(request, "mfp_settings_update", "mfp-fetch", {"allow_user_devices": cur["allow_user_devices"]})
+    return {"ok": True, "settings": cur}
 
 
 @router.get("/api/shared")

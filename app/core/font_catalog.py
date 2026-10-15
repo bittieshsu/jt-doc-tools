@@ -167,7 +167,7 @@ _SUBSET_ALWAYS = (
 )
 
 
-def subset_font(path, idx: int, text: str) -> Optional[bytes]:
+def subset_font(path, idx: int, text: str, *, layout: bool = True) -> Optional[bytes]:
     """把字型縮成「只含這些字」的一份，回位元組。
 
     為什麼要做：PyMuPDF 只要用到外部字型就會把**整支檔案**嵌進 PDF。中文字型
@@ -185,12 +185,12 @@ def subset_font(path, idx: int, text: str) -> Optional[bytes]:
     # 需要的**字元集合其實一模一樣**。不這樣做的話每頁都要重跑一次子集化 ——
     # 實測 20 頁要 19 秒，200 頁的文件會卡三分鐘。
     charset = "".join(sorted(set(text) | set(_SUBSET_ALWAYS)))
-    return _subset_cached(str(path), _mtime(path), int(idx or 0), charset)
+    return _subset_cached(str(path), _mtime(path), int(idx or 0), charset, bool(layout))
 
 
 @lru_cache(maxsize=8)
 def _subset_cached(path_str: str, mtime: float, idx: int,
-                   charset: str) -> Optional[bytes]:
+                   charset: str, layout: bool = True) -> Optional[bytes]:
     """實際做子集化（子集只有幾十 KB，多放幾份不心疼）。"""
     try:
         import io
@@ -203,7 +203,10 @@ def _subset_cached(path_str: str, mtime: float, idx: int,
         if not full:
             return None
         opts = _subset.Options()
-        opts.layout_features = ["*"]      # 保留排版特性（標點壓縮等）
+        # 保留排版特性（標點壓縮等）。`layout=False` 給會經過 HarfBuzz 排版的呼叫端
+        # （PyMuPDF Story）：Noto CJK 的排版規則會把斜線後面的數字換成另一組字形，
+        # 那組字形沒有對應的字碼，PDF 複製出來是私用區字元（「HTTP/1.1」變亂碼）
+        opts.layout_features = ["*"] if layout else []
         opts.notdef_outline = True
         opts.recalc_bounds = False
         # **一定要保留原本的字形編號**。Noto CJK 這類是 CID-keyed CFF，
@@ -338,8 +341,11 @@ def _mtime(path) -> float:
 
 
 def _full_font_bytes(path_str: str, mtime: float, idx: int) -> Optional[bytes]:
-    """整支字型的位元組（`.ttc` 取指定子字型；其他直接讀檔）。"""
-    if idx:
+    """整支字型的位元組（`.ttc` 取指定子字型；其他直接讀檔）。
+
+    `.ttc` 的**第 0 套也要抽**：整份集合直接丟給 fontTools 會因為沒指定第幾套而失敗，
+    子集化退回完整字型 —— 實測日文報告挑到 Noto CJK 的第 0 套（JP），PDF 從幾百 KB 變成 14 MB。"""
+    if idx or str(path_str).lower().endswith((".ttc", ".otc")):
         return _extract_subfont(path_str, mtime, idx)
     try:
         return Path(path_str).read_bytes()
@@ -347,7 +353,7 @@ def _full_font_bytes(path_str: str, mtime: float, idx: int) -> Optional[bytes]:
         return None
 
 
-def embeddable_font(path, idx: int = 0, text: Optional[str] = None):
+def embeddable_font(path, idx: int = 0, text: Optional[str] = None, *, layout: bool = True):
     """回 `(fontfile, fontbuffer)` —— 給 PyMuPDF 用，兩者只會有一個有值。
 
     給了 `text` 就**只嵌那些字**（見 `subset_font`）—— 中文字型整支十幾 MB，
@@ -362,7 +368,7 @@ def embeddable_font(path, idx: int = 0, text: Optional[str] = None):
     """
     path = Path(path)
     if text:
-        sub = subset_font(path, idx, text)
+        sub = subset_font(path, idx, text, layout=layout)
         if sub:
             return (None, sub)
         # 子集化失敗 → 往下走原本的路（整支嵌入），不要因此印不出字

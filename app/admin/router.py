@@ -556,7 +556,7 @@ def build_router(templates) -> APIRouter:
     # ---------- 翻譯對照字典 ----------
     @router.get("/mfp", response_class=HTMLResponse)
     async def mfp_shared_page(request: Request):
-        """共用事務機（事務機取件 Beta）：管理員建立事務機、指定成員。跟工具頁同一份模板。"""
+        """共用事務機（事務機掃描取件 Beta）：管理員建立事務機、指定成員。跟工具頁同一份模板。"""
         from ..core import mfp_client as _mc
         from ..core import mfp_profiles as _mp
         return templates.TemplateResponse(request, "mfp_fetch.html", {

@@ -826,6 +826,25 @@ _DEPS = [
         },
     },
     {
+        "key": "pysmb",
+        "label": "pysmb (SMB 用戶端)",
+        "category": "事務機",
+        "impact": "事務機掃描取件的 SMB 取件（Canon Advanced Box、Konica Minolta 公用信箱、"
+                  "SHARP NAS，實驗功能）：列出設備上的分享資料夾、列目錄、讀檔。缺了它只有"
+                  "SMB 取件不能用，工具本身、掃描與 WebDAV 取件照常。",
+        "impact_en": "SMB retrieval in MFP Scan & Fetch (Canon Advanced Box, Konica Minolta "
+                     "public boxes, SHARP NAS; experimental): lists the device's shared folders, "
+                     "folders and files and reads files. Without it only SMB retrieval is "
+                     "unavailable; the tool, scanning and WebDAV retrieval still work.",
+        "soft": True,
+        "probe": lambda: _probe_python_pkg("smb", dist_name="pysmb"),
+        "install_cmd": {
+            "linux": "uv sync（或 sudo jtdt update；純 Python 套件，不需編譯）",
+            "macos": "uv sync",
+            "windows": "jtdt update（以系統管理員身分開啟 PowerShell）",
+        },
+    },
+    {
         "key": "dnspython",
         "label": "dnspython (MX 查詢)",
         "category": "網路",

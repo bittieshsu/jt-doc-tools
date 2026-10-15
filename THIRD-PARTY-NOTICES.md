@@ -99,6 +99,15 @@ Jason Tools 文件工具箱 使用以下第三方開源套件。本程式遵守�
 - 用途：pdf-to-office 的 docx ↔ PDFTruth 模糊比對引擎（取代 difflib，速度快 10×+）
 - Copyright © Max Bachmann
 
+### pysmb  · zlib/libpng License
+- 專案：https://github.com/miketeo/pysmb
+- 用途：事務機掃描取件的 SMB 取件（列出分享資料夾、列目錄、讀檔）
+- Copyright © Michael Teo
+
+### tqdm  · MPL-2.0 AND MIT License
+- 專案：https://github.com/tqdm/tqdm
+- 用途：pysmb 的相依套件（進度顯示，本程式不直接使用）
+
 ### pypinyin  · MIT License
 - 專案：https://github.com/mozillazg/python-pinyin
 - 用途：會議摘要的「建議替換」—— 比對中文詞的讀音，找出逐字稿裡同音寫錯的專有名詞

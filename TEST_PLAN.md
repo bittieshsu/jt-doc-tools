@@ -619,7 +619,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - **`app/core/auth_db.py`**：`_m1_initial`、`_m2_username_source_unique`、`_m3_rename_pdf_diff_to_doc_diff`、`_m4_grant_image_to_pdf`、`_m5_grant_translate_doc`、`_m6_totp_columns`、`_m7_audit_seed_column`、`_m8_sso_sources`、`_m9_role_seed_snapshot`、`_m10_role_default_for_new`、`_m11_group_sync_cache`、`_m12_unprovision_mirrored_users`、`_m13_grant_pdf_to_slides`、`_m14_user_email`、`_m15_directory_presence`、`_m16_session_last_seen`、`_m17_directory_account_state`、`_m18_grant_transit_proof_and_border`、`_m19_grant_pdf_bookmark`、`_m20_grant_seam_stamp`、`_m21_grant_page_size`、`_m22_grant_office_convert`、`_m23_canon_ou_subject_keys`、`_m24_index_group_members_user`、`_m25_grant_doc_translate`、`_m26_grant_doc_straighten`、`_m27_grant_meeting_summary`、`_m28_grant_meeting_transcribe`、`_m29_grant_official_doc`
 - **`app/core/audit_db.py`**：`_m1_initial`
 - **`app/core/job_store.py`**：`_m1_initial`、`_m2_metrics`、`_m3_started_at`
-- **`app/core/mfp_store.py`**：`_m1_initial`、`_m2_shared_and_scans`（v1.16.87：只新增 `mfp_members`、`mfp_scans` 兩張表，不動 `mfp_connections`；v1 的事務機升上來都還在：`tests/test_mfp_shared_and_scan.py::test_migration_from_v1_keeps_existing_connections`）
+- **`app/core/mfp_store.py`**：`_m1_initial`、`_m2_shared_and_scans`（v1.16.87：只新增 `mfp_members`、`mfp_scans` 兩張表，不動 `mfp_connections`；v1 的事務機升上來都還在：`tests/test_mfp_shared_and_scan.py::test_migration_from_v1_keeps_existing_connections`）、`_m3_job_kind_and_items`（v1.16.89：`mfp_scans` 加 `kind`、`items` 兩欄（ADD COLUMN），舊紀錄都還在、一律是掃描：`tests/test_mfp_shared_and_scan.py::test_migration_from_v2_keeps_existing_scans`）
 - **`app/core/kb/store.py`**（知識庫；在子資料夾裡，上面那條自動比對不會掃到，這裡手動列）：
   - [ ] **`_m2_gov_imports`**：只新增 `kb_gov_items`、`kb_gov_versions` 兩張表，不重建既有的表；
         既有的 v1 知識庫升上來資料集與文件都還在（`tests/test_kb_gov_import.py::test_migration_from_v1_keeps_existing_data`）
@@ -637,7 +637,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **474 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **485 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -873,6 +873,9 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_meeting_transcribe_survives_outage.py` | 轉逐字稿的輪詢與取結果，要撐過對方短暫連不上 |
 | `test_meeting_transcribe_variants.py` | 轉逐字稿：已知的錯寫法照表換（JTLW v2.28，`api_revision` 2.9） |
 | `test_meeting_wave_tip.py` | 轉逐字稿的波形：游標旁的標籤要寫出**那一刻是誰在講**（v1.16.10，使用者要求） |
+| `test_mfp_box.py` | FUJIFILM 機內信箱取件（WebDAV，**推測實作**）—— 對一台假的信箱設備 |
+| `test_mfp_box_jobs.py` | 機內信箱取件（推測實作）—— 路由與背景作業：列文件、取件、存進工作區 |
+| `test_mfp_box_page_browser.py` | 機內信箱取件 —— 在真的瀏覽器裡跑一次（對本機一台假的 FUJIFILM 信箱） |
 | `test_mfp_client.py` | 事務機取件：連線測試的網路用戶端（目的地政策＋逐步診斷） |
 | `test_mfp_escl.py` | 事務機掃描（eSCL）：能力表、掃描設定、整個掃描流程（對一台假的 eSCL 設備） |
 | `test_mfp_fetch_page_browser.py` | 事務機取件頁：在真的瀏覽器裡跑一次（連線測試 → 儲存 → 詳細 → 被擋的位址） |
@@ -880,7 +883,12 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_mfp_profiles.py` | 事務機取件：型號辨識 |
 | `test_mfp_queue.py` | 事務機排隊：同一台實體設備一次只做一件事（使用者 2026-10-14：「要避免同時多人存取事務機 |
 | `test_mfp_redact.py` | 事務機取件：診斷資訊的遮蔽規則（畫面、下載報告、服務紀錄檔共用這一份） |
+| `test_mfp_report.py` | 事務機診斷報告的多種格式（txt / md / json / html / pdf） |
 | `test_mfp_scan_page_browser.py` | 從事務機掃描、共用事務機的管理頁 —— 在真的瀏覽器裡跑一次（對本機一台假的 eSCL 設備） |
+| `test_mfp_settings.py` | 管理員設定：允許使用者自行新增事務機（使用者 2026-10-14：「管理員可以設定是否允許使用者自行新增事務機，預設允許」） |
+| `test_mfp_share.py` | 檔案分享取件（實驗功能）：Canon Advanced Box（WebDAV / SMB）、Konica 公用信箱（SMB）、SHARP NAS（SMB） |
+| `test_mfp_share_jobs.py` | 檔案分享取件（實驗功能）—— 路由與背景作業 |
+| `test_mfp_share_page_browser.py` | 檔案分享取件 —— 在真的瀏覽器裡跑一次（對本機一台假的 Canon Advanced Box，WebDAV） |
 | `test_mfp_shared_and_scan.py` | 共用事務機（管理員建立、加成員）、排隊、從事務機掃描進工作區 —— 路由層 |
 | `test_migration_fk_cascade.py` | 重建資料表的 migration 一律要關掉外鍵，否則升級會**清空子表** |
 | `test_missing_office_engine_is_503.py` | 缺 Office 引擎要回 **503**，不可以回 500 |
@@ -1104,6 +1112,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_uv_tls_env.py` | uv 的「用 OS 信任庫」變數：**只設這支 uv 認得的那一個**（v1.16.11） |
 | `test_v1_4_99_audit_2fa.py` | v1.4.99 — auditor role + TOTP 2FA + separation-of-duties tests. |
 | `test_vat_db.py` | Tests for vat_db (M4.a). |
+| `test_vat_db_extra_fields.py` | 統編資料庫收進公開資料的其他欄位：總機構統一編號、資本額、設立日期、使用統一發票（v1.16.91） |
+| `test_vat_lookup_extra_fields_browser.py` | 統編查詢頁：稅籍登記的其他欄位在真的瀏覽器裡畫得出來（v1.16.92） |
 | `test_vat_upload_and_group_sync.py` | 2026-06-30 客戶回報兩項： |
 | `test_vc_runtime_repair_after_downgrade.py` | VC++ 執行階段被別的安裝程式換成舊版時，要看得出來、而且修得回來 |
 | `test_venv_python_changed.py` | 作業系統升級換掉系統 Python 之後（例如 Ubuntu 22.04 → 24.04，3.10 → 3.12） |
@@ -1114,6 +1124,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_workspace_accepts_plain_text.py` | 工作區收純文字（.txt / .md）—— 判準是**內容**，不是副檔名 |
 | `test_workspace_api.py` | HTTP-level tests for the workspace endpoints (auth OFF / single mode). |
 | `test_workspace_audio.py` | 工作區收錄音檔 ＋ 轉逐字稿「從工作區載入」（使用者 2026-09-23 交代） |
+| `test_workspace_jpeg_tiff.py` | 工作區收 JPEG 與 TIFF（使用者 2026-10-14：「工作區允許 tiff」） |
 | `test_workspace_large_files.py` | 工作區收大檔：不整份讀進記憶體、容量預留、已存過的不再存一次 |
 | `test_workspace_office_thumbnail.py` | 工作區的 Office / ODF 檔要有第一頁縮圖 |
 | `test_workspace_ooxml_detect.py` | 工作區的型別判斷要以**內容型別**為準，不是主檔的路徑名 |
@@ -1828,6 +1839,9 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] 台 / 臺異體字互通
 - [ ] 統計圖可點下鑽
 - [ ] 批次查詢貼一整欄統編
+- [ ] **稅籍登記其他欄位**（v1.16.92）：查詢結果顯示資本額（千分位＋元）、設立日期（西元）、使用統一發票（是 / 否）、分支機構顯示總機構統編；
+      搜尋與批次的 CSV 多四欄；API 回 `hq_vat` / `capital` / `founded` / `uses_invoice`；政府機關與學校這幾項是空的。
+      **升級**：舊站台升級後查詢照常、這幾項先空著 → 管理頁「立即自動下載」（或等排程）完成後才有值（`tests/test_vat_db_extra_fields.py`）
 
 #### 電子發票處理 (einvoice-scan)
 - [ ] QR 雙碼解析（左右兩段都要）
@@ -1958,7 +1972,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] 轉向之後切到「自己拉四個角」，**手柄要落在紙上**
       （回給前端的自動四角也必須是轉向後的座標）
 
-#### 事務機取件 (mfp-fetch) 🆕 v1.16.84（Beta，尚未實機驗證）
+#### 事務機掃描取件 (mfp-fetch) 🆕 v1.16.84（Beta，尚未實機驗證；v1.16.89 前叫「事務機取件」）
 - [ ] 工具頁標題與側欄都有「Beta」；頁面上寫明目前只做得到新增、連線測試與型號辨識，登入信箱與取件要等實機驗證
 - [ ] 預設只有管理員與「文管」角色看得到；一般使用者看不到、直接打網址被擋
 - [ ] 「連線方式」是本站樣式的下拉（v1.16.86），不是瀏覽器原生的；跟旁邊的 IP 輸入框一樣高，英文、日文介面也一樣；頁面還在載入時也不會先閃原生下拉
@@ -1980,10 +1994,34 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] **排隊**（v1.16.87）：兩個帳號對同一台同時按掃描 → 第二個顯示「排隊中：前面還有 1 件」、清單標「使用中」，第一個完成後第二個才開始；
       排隊中取消不會碰到設備；同一人在同一台排第三件被拒絕；設備正在掃描時另一個人做連線測試，最多等 30 秒，等不到講「正在處理其他人的工作」
 - [ ] **共用事務機**（v1.16.87，設定 → 共用事務機 `/admin/mfp`）：管理員連線測試 → 「儲存為共用事務機」→ 「成員」勾使用者與群組 → 存檔；
-      成員（含群組成員、子群組的成員）的「事務機取件」頁出現這台、標「共用」、沒有改名與移除、可以重新測試與掃描；非成員看不到，拿 id 打 API 回 404；
+      成員（含群組成員、子群組的成員）的「事務機掃描取件」頁出現這台、標「共用」、沒有改名與移除、可以重新測試與掃描；非成員看不到，拿 id 打 API 回 404；
       一般使用者打管理端點回 403；成員裡沒有工具權限的人會被列出來提醒；刪除帳號 / 群組後成員資格跟著拿掉
 - [ ] **其他廠牌的型號**（v1.16.88）：Epson（首頁用 JavaScript 轉址）連線測試要跟到真正的首頁、型號顯示「L3150 Series」這類；HP 顯示 eSCL 回報的型號；網頁上看起來會改變設備狀態的轉址（登出、重新開機）不跟（`tests/test_mfp_profiles.py`、`tests/test_mfp_client.py`）
 - [ ] **掃描完成**（v1.16.88）：有「開啟」「下載」「前往工作區」，顯示「協定：eSCL · HTTPS 443」；沒填檔名時檔名是瀏覽器這邊的時間；清單在 1280 寬按鈕排成一排、900 寬折行但不超出外框（`tests/test_mfp_scan_page_browser.py`）
+- [ ] **信箱取件**（v1.16.89，FUJIFILM、實驗功能、推測實作）：清單上 FUJIFILM 的事務機有「信箱取件」，其他廠牌沒有。
+      按下去只看到「信箱編號」「信箱密碼（沒有設就留空）」「列出文件」；設備要求登入時才多出「事務機帳號 / 密碼」。
+      自簽憑證：第一次跳出指紋請核對 →「信任並繼續」→ 之後同一台瀏覽器不再問；憑證換掉時改說「跟上次信任的不一樣」。只用 HTTP 的設備同意一次。
+      勾文件 → 按鈕變「取件（N 份）」→ 排隊中 / 取件中（第 n 份，共 m 份）/ 存進工作區 → 完成，預設每份一個 PDF；選「原始檔」存 TIFF / JPEG。
+      信箱設定成「取件後刪除」時清單上方有提醒、按取件要再確認；完成後每份文件註明原件還在不在。密碼不會出現在畫面、網址、稽核、協定紀錄。
+      失敗時「技術細節」列出協定紀錄（方法、路徑、狀態碼、認證方式）。（`tests/test_mfp_box.py`、`tests/test_mfp_box_jobs.py`、`tests/test_mfp_box_page_browser.py`）
+- [ ] **掃描存成 JPEG**（v1.16.89）：掃描面板「存成」可選 PDF / JPEG（設備不能出 JPEG 時只有 PDF）；JPEG 每頁一個檔，結果逐一列出開啟 / 下載；工作區停用時下載是 ZIP
+- [ ] **實機驗證信箱取件（拿到設備後）**：同一台用原廠 NSU3 對照；把協定紀錄與 `docs-share/mfp-fetch/codex-handoff-20261014/` 的待確認清單逐條核對（信箱路徑、realm 對應、Depth、頁檔兩個數字的意思、取件後原件是否保留），通過才拿掉「實驗功能」
+- [ ] **使用設定**（v1.16.89）：設定 → 共用事務機最上面「允許使用者自行新增事務機」預設勾著；取消勾選 → 一般使用者的工具頁不再有「新增事務機」、改成說明只能用共用事務機；自己以前新增的標「已暫停」，只剩詳細、改名、移除；直接打 API 回 403（`USER_DEVICES_DISABLED`）；共用事務機照常；管理員不受影響；重新勾回去就恢復；稽核有 `mfp_settings_update`；設定備份的「事務機掃描取件」分類包含它（`tests/test_mfp_settings.py`）
+- [ ] **改名**（v1.16.89）：工具名稱、側欄、搜尋（打「事務機取件」也找得到）、英日文都是新名稱；網址與權限不變
+- [ ] **檔案分享取件**（v1.16.90，實驗功能）：Canon（有網頁就有 WebDAV 與 SMB 兩種，預設 WebDAV）、Konica、SHARP 的列上有「取件」，其他廠牌沒有。
+      帳號密碼（Konica 是信箱編號與密碼）→ 列出檔案；HTTP / SMB 不加密各問一次同意；共享位置有「共享」提醒；點資料夾進去、麵包屑回上一層；
+      勾檔案 →「取件（N 份）」→ 完成：TIFF / JPEG 轉 PDF、PDF 與其他檔案照原樣（選原始檔就一律不轉）；工作區收不下的格式留給本人下載。
+      密碼不出現在畫面、網址、稽核、協定紀錄；設備只肯用 SMB1 時說明並停止。（`tests/test_mfp_share.py`、`tests/test_mfp_share_jobs.py`、`tests/test_mfp_share_page_browser.py`）
+- [ ] **診斷報告**（v1.16.91）：清單那一列沒有「下載診斷報告」；按「詳細」展開後標題列右邊有「下載診斷報告 ▾」，按下去列出純文字 / Markdown / JSON / 網頁 / PDF，
+      選了就下載、選單收起；點選單外面或按 Esc 也會收起；還沒有報告的事務機不顯示這顆。連線測試結果那一塊的同一顆也一樣（還沒儲存也能下載，下載後照樣能儲存）。
+      PDF 中文正常、複製出來的文字正常（`HTTP/1.1` 不會變亂碼）、有頁碼；HTML 打開不跑任何指令碼；英日文介面下載的報告是英日文。
+      390 寬時選單不超出畫面。（`tests/test_mfp_report.py`、`tests/test_mfp_fetch_page_browser.py`）
+- [ ] **eSCL 說明**（v1.16.91）：頁首說明的「eSCL」後面有「?」（英文版接在「eSCL-capable」後面）；按下出現深色說明框（本站樣式，不是瀏覽器原生提示），
+      內容講 eSCL 是什麼、不用驅動程式與帳密、看「從本站掃描」判斷、掃描前放好文件；再按一次 / 點外面 / Esc 收起，點說明框本身不收；1280 與 390 寬都不超出畫面（`tests/test_mfp_fetch_page_browser.py`）
+- [ ] **最近的掃描與取件表格**（v1.16.91）：1280 / 1180 寬右邊的按鈕排成一排（使用者 2026-10-15 截圖：開啟、下載、前往工作區被擠成三行）；
+      時間那一格沒有大片空白（多的寬度給狀態）；900 寬不超出外框；390 寬事務機名稱不會一字一行（`tests/test_mfp_scan_page_browser.py`）
+- [ ] **實機驗證檔案分享取件（拿到設備後）**：Canon Advanced Box（WebDAV / SMB、共享與個人空間、本機與網域帳號）、Konica 公用信箱（信箱編號登入是否要補零、分享名稱）、
+      SHARP NAS（public / shared 的權限）；各用兩個一般帳號驗證看不到彼此的個人文件，通過才拿掉「實驗功能」
 - [ ] **實機驗證（拿到設備後）**：C5571 → C5570 → C4570 → C6680 各跑一次連線測試，下載報告存進 docs-share/mfp-fetch/
 
 #### 乘車證明整理 (transit-proof) 🆕 v1.14.17
@@ -2159,6 +2197,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       貼一行幾十萬個空白的聯絡資訊，公文撰擬照樣瞬間回應。`tests/test_official_doc_contact_label_split.py`
 
 #### 工作區設定 (admin/workspace) 🆕
+- [ ] **工作區收 JPEG / TIFF**（v1.16.89）：拖一張 JPEG、一份多頁 TIFF 進「我的工作區」→ 存得進去、歸在圖片、TIFF 縮圖是第一頁；
+      「掃描修正」「掃描拼合」「送件前檢核」的「從工作區載入」挑得到；只收 PNG 的地方挑不到 JPEG（`tests/test_workspace_jpeg_tiff.py`）
 - [ ] 啟用 / 停用切換；停用後重新整理任一工具頁，「存至工作區」「從工作區載入」按鈕與側欄「我的工作區」全部消失
 - [ ] 設定每人容量額度 / 單檔上限 / 保留時數並儲存
 - [ ] 「目前佔用」表列出各使用者佔用與總量
@@ -2489,6 +2529,9 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       `/tools/mfp-fetch/api/connections`（GET 清單、POST `{token}` 儲存）、`/tools/mfp-fetch/api/connections/{conn_id}`
       （GET / PATCH / DELETE）、`/tools/mfp-fetch/api/connections/{conn_id}/test`、
       `/tools/mfp-fetch/api/connections/{conn_id}/report`：**別人的 id 一律 404**；用 API token 呼叫時歸屬 token 的持有者。
+- [ ] 診斷報告格式（v1.16.91）— `/tools/mfp-fetch/api/connections/{conn_id}/report?format=txt|md|json|html|pdf`（不帶＝JSON，跟以前一樣）、
+      `/tools/mfp-fetch/api/detect/report`（POST `{token, format}`，還沒儲存的測試結果）：五種都下載得到、檔名 `mfp-diagnostic-<位址>-<時間>.<副檔名>`；
+      格式不對 422 `REPORT_FORMAT_INVALID`；別人的 token 404 `REPORT_EXPIRED`，下載後 token 照樣能儲存；英日文介面下載的報告固定字串是英日文。
       自動化：`tests/test_mfp_fetch_tool.py`、`tests/test_mfp_client.py`
 - [ ] `/tools/mfp-fetch/api/connections/{conn_id}/scan`（Beta，v1.16.87）— POST `{source, color, resolution, paper, file_name}` → 202 掃描紀錄；
       設定不在這台的能力範圍 400（`SCAN_OPTION_INVALID`）、沒有 eSCL 400（`SCAN_NOT_SUPPORTED`）、隊伍滿 429（`DEVICE_QUEUE_FULL` / `OWNER_QUEUE_FULL`）。
@@ -2500,6 +2543,17 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       `/tools/mfp-fetch/api/shared/{conn_id}/test`、`/tools/mfp-fetch/api/shared/{conn_id}/members`（GET / PUT）、
       `/tools/mfp-fetch/api/shared-subjects`（Beta，v1.16.87）：**非管理員一律 403**（`ADMIN_ONLY`）；成員只收存在的使用者與群組（400 `MEMBERS_INVALID`）。
       自動化：`tests/test_mfp_shared_and_scan.py`、`tests/test_mfp_scan_page_browser.py`
+- [ ] `/tools/mfp-fetch/api/connections/{conn_id}/box/list`、`/tools/mfp-fetch/api/connections/{conn_id}/box/fetch`（Beta、實驗性，v1.16.89）—
+      POST `{box, box_password?, user?, password?, trust_sha256?, allow_http?, target?}`（fetch 另加 `documents`、`output`、`confirm_delete_after_get`）；
+      設備端錯誤一律 422（`AUTH_FAILED`、`TLS_UNTRUSTED`、`PLAIN_HTTP_NEEDS_CONSENT`…）附 `trace`、不含密碼；非 FUJIFILM 400；別人的 id 404；
+      只對設備送 PROPFIND / GET。掃描多 `format`（`pdf` / `jpeg`）；作業紀錄多 `kind`、`files`、`items`，多個檔案下載是 ZIP。
+      自動化：`tests/test_mfp_box.py`、`tests/test_mfp_box_jobs.py`、`tests/test_mfp_escl.py`
+- [ ] `/tools/mfp-fetch/api/settings`（GET / PUT，v1.16.89）— `{allow_user_devices}`：**非管理員一律 403**；值不是 true / false 回 400（`SETTINGS_INVALID`）。
+      自動化：`tests/test_mfp_settings.py`
+- [ ] `/tools/mfp-fetch/api/connections/{conn_id}/share/list`、`/tools/mfp-fetch/api/connections/{conn_id}/share/fetch`（Beta、實驗性，v1.16.90）—
+      POST `{route, root?, path?, user?, password?, box?, box_password?, trust_sha256?, allow_http?, allow_plain?}`（fetch 另加 `files`、`output`）；
+      路線不屬於這台廠牌 400；設備端錯誤 422 附 `trace`、不含密碼；暫停的事務機 403；只對設備做讀取（WebDAV PROPFIND / GET；SMB 列分享、列目錄、讀檔）。
+      自動化：`tests/test_mfp_share.py`、`tests/test_mfp_share_jobs.py`
 
 ### 共通驗證項
 每個 endpoint 至少要：

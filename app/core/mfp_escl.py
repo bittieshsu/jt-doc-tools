@@ -11,7 +11,9 @@
 3. `POST /eSCL/ScanJobs` —— 送出由固定欄位組成的 XML（沒有任何使用者字串進到 XML 裡）。
 4. `GET <工作>/NextDocument` —— 逐頁取回：503 是還在掃、等一下再取；404 是沒有下一頁。
    每頁檢查檔頭（PDF / JPEG）與大小上限；取消或失敗時 `DELETE <工作>`，不留在設備上。
-5. 合成一份 PDF（單一份 PDF 原樣保留；JPEG 依解析度換算成頁面大小）。
+5. 存成使用者選的格式（使用者 2026-10-14：只能出 JPEG 的設備「可以 pdf 或 jpeg」）：
+   * PDF（預設）：設備能出 PDF 就要 PDF（原樣保留）；只能出 JPEG 就把每頁合成一份 PDF。
+   * JPEG：設備要能出 JPEG；每頁一個檔，不合成。
 
 **不送任何帳密**。設備要求登入（401 / 403）就停下來講原因 —— 目前不支援。
 `Location` 標頭只取路徑，而且路徑必須是 `/eSCL/ScanJobs/<id>`；連線一律沿用原本那台的位址與連接埠
@@ -23,7 +25,6 @@ from __future__ import annotations
 import http.client
 import logging
 import re
-import shutil
 import ssl
 import time
 from pathlib import Path
@@ -31,6 +32,7 @@ from typing import Any, Callable, Optional
 from urllib.parse import urlsplit
 
 from . import mfp_client as mc
+from . import mfp_output
 
 logger = logging.getLogger("app.mfp_fetch")
 
@@ -85,6 +87,8 @@ COLORS = {"color": "RGB24", "gray": "Grayscale8", "bw": "BlackAndWhite1"}
 #: 紙張（單位：1/300 英寸）。`max` ＝ 這個來源的最大範圍。
 PAPERS = {"a4": (2480, 3508), "letter": (2550, 3300), "max": None}
 FORMATS = {"pdf": "application/pdf", "jpeg": "image/jpeg"}
+#: 存檔格式（使用者選）：PDF 一份、或 JPEG 每頁一個檔。
+OUTPUTS = ("pdf", "jpeg")
 DEFAULT_RESOLUTION = 300
 
 
@@ -203,7 +207,10 @@ def parse_capabilities(data: bytes) -> dict:
 
 
 def summarize(caps: dict) -> dict:
-    """畫面與清單用：每個來源能選什麼（只列本站支援的選項）。"""
+    """畫面與清單用：每個來源能選什麼（只列本站支援的選項）。
+
+    `formats` 是設備能出的格式；`outputs` 是畫面上能選的存檔格式（PDF 一定可以：設備只能出 JPEG 時
+    由本站合成；JPEG 要設備能出 JPEG）。"""
     srcs = {}
     for key, c in (caps.get("sources") or {}).items():
         colors = [k for k, v in COLORS.items() if v in c.get("color_modes", [])]
@@ -211,6 +218,7 @@ def summarize(caps: dict) -> dict:
         res = [r for r in c.get("resolutions", []) if 75 <= r <= 1200]
         if colors and fmts and res:
             srcs[key] = {"colors": colors, "formats": fmts, "resolutions": res,
+                         "outputs": ["pdf"] + (["jpeg"] if "jpeg" in fmts else []),
                          "max_width": c.get("max_width"), "max_height": c.get("max_height")}
     return {"model": caps.get("make_and_model") or "", "sources": srcs}
 
@@ -237,7 +245,14 @@ def build_settings(caps: dict, opts: dict) -> tuple[bytes, dict]:
     paper = str(opts.get("paper") or "a4")
     if paper not in PAPERS:
         raise ScanError("SCAN_OPTION_INVALID", {"field": "paper"})
-    fmt_key = "pdf" if FORMATS["pdf"] in c.get("formats", []) else "jpeg"
+    output = str(opts.get("format") or "pdf")
+    if output not in OUTPUTS:
+        raise ScanError("SCAN_OPTION_INVALID", {"field": "format"})
+    if output == "pdf":
+        # 存 PDF：設備能出 PDF 就要 PDF；只能出 JPEG 就要 JPEG、之後合成
+        fmt_key = "pdf" if FORMATS["pdf"] in c.get("formats", []) else "jpeg"
+    else:
+        fmt_key = "jpeg"
     if FORMATS[fmt_key] not in c.get("formats", []):
         raise ScanError("SCAN_OPTION_INVALID", {"field": "format"})
     mw, mh = c.get("max_width") or 2550, c.get("max_height") or 3508
@@ -270,7 +285,7 @@ def build_settings(caps: dict, opts: dict) -> tuple[bytes, dict]:
         f'<scan:DocumentFormatExt>{mime}</scan:DocumentFormatExt>'
         '</scan:ScanSettings>')
     eff = {"source": src_key, "color": color_key, "resolution": res, "paper": paper,
-           "format": fmt_key, "width": w, "height": h, "intent": intent}
+           "format": fmt_key, "output": output, "width": w, "height": h, "intent": intent}
     return xml.encode("utf-8"), eff
 
 
@@ -440,19 +455,14 @@ def _wait_idle(dev: _Device, source: str, is_cancelled: Callable[[], bool]) -> N
 
 
 def _sniff(path: Path) -> Optional[str]:
-    with open(path, "rb") as f:
-        head = f.read(8)
-    if head.startswith(b"%PDF-"):
-        return "pdf"
-    if head.startswith(b"\xff\xd8\xff"):
-        return "jpeg"
-    return None
+    return mfp_output.sniff(path)
 
 
 def scan(host: str, ip: str, scheme: str, port: int, caps: dict, opts: dict, workdir: Path,
          on_progress: Optional[Callable[[dict], None]] = None,
          is_cancelled: Optional[Callable[[], bool]] = None) -> dict:
-    """掃描一次，回傳 `{"path", "pages", "bytes", "settings", "tls_verified"}`（合成好的 PDF 在 workdir 裡）。
+    """掃描一次，回傳 `{"files": [{"path", "kind", "pages"}], "pages", "bytes", "settings", "tls_verified"}`
+    （檔案在 workdir 裡：存 PDF 時是合成好的一份 —— 另外放在 `path`，存 JPEG 時每頁一個）。
 
     失敗丟 `ScanError`；設備上建立的掃描工作會在失敗或取消時刪掉。"""
     is_cancelled = is_cancelled or (lambda: False)
@@ -492,7 +502,7 @@ def scan(host: str, ip: str, scheme: str, port: int, caps: dict, opts: dict, wor
             st = r["status"]
             if st == 200:
                 kind = _sniff(part)
-                if kind is None:
+                if kind not in ("pdf", "jpeg"):
                     part.unlink(missing_ok=True)
                     raise ScanError("SCAN_BAD_DOCUMENT", {"content_type": r["headers"].get("content-type", "")[:60]})
                 total += r.get("bytes", 0)
@@ -527,47 +537,40 @@ def scan(host: str, ip: str, scheme: str, port: int, caps: dict, opts: dict, wor
         for p in workdir.glob("part*.bin"):      # 含寫到一半就超過上限、被中斷的那一份
             p.unlink(missing_ok=True)
         raise
+    if eff.get("output") == "jpeg" and all(k == "jpeg" for _p, k in files):
+        outs = []
+        for i, (p, _k) in enumerate(files, 1):
+            try:
+                mfp_output.inspect(p, "jpeg")
+            except mfp_output.OutputError:
+                for q, _q in files:
+                    q.unlink(missing_ok=True)
+                raise ScanError("SCAN_BAD_DOCUMENT", {"reason": "jpeg"}) from None
+            final = workdir / f"page{i:04d}.jpg"
+            p.rename(final)
+            outs.append({"path": final, "kind": "jpeg", "pages": 1})
+        return {"files": outs, "pages": len(outs), "bytes": total, "settings": eff,
+                "tls_verified": dev.tls_verified, "documents": len(files)}
     notify({"phase": "merging", "pages": len(files), "bytes": total})
     out = workdir / "scan.pdf"
     pages = merge_to_pdf(files, out, eff["resolution"])
     for p, _k in files:
         if p != out:
             p.unlink(missing_ok=True)
-    return {"path": out, "pages": pages, "bytes": out.stat().st_size, "settings": eff,
-            "tls_verified": dev.tls_verified, "documents": len(files)}
+    return {"path": out, "files": [{"path": out, "kind": "pdf", "pages": pages}], "pages": pages,
+            "bytes": out.stat().st_size, "settings": eff, "tls_verified": dev.tls_verified,
+            "documents": len(files)}
 
 
 def merge_to_pdf(files: list[tuple[Path, str]], out: Path, resolution: int) -> int:
-    """設備回的檔案（PDF 或 JPEG）合成一份 PDF，回傳頁數。只有一份 PDF 時原樣保留（不重新編碼）。"""
-    import fitz
-    from PIL import Image
+    """設備回的檔案（PDF 或 JPEG）合成一份 PDF，回傳頁數。只有一份 PDF 時原樣保留（不重新編碼）。
+
+    實作在 `mfp_output.to_pdf`（信箱取件也用）；這裡把錯誤換成掃描的錯誤代碼。"""
     try:
-        if len(files) == 1 and files[0][1] == "pdf":
-            with fitz.open(files[0][0]) as d:
-                n = d.page_count
-            if n < 1:
-                raise ScanError("SCAN_BAD_DOCUMENT", {"reason": "empty pdf"})
-            shutil.move(str(files[0][0]), str(out))
-            return n
-        doc = fitz.open()
-        try:
-            for path, kind in files:
-                if kind == "pdf":
-                    with fitz.open(path) as src:
-                        doc.insert_pdf(src)
-                else:
-                    with Image.open(path) as im:
-                        w_px, h_px = im.size
-                    dpi = resolution or DEFAULT_RESOLUTION
-                    page = doc.new_page(width=w_px * 72.0 / dpi, height=h_px * 72.0 / dpi)
-                    page.insert_image(page.rect, filename=str(path))
-            if doc.page_count < 1:
-                raise ScanError("SCAN_NO_DOCUMENT")
-            doc.save(str(out), garbage=3, deflate=True)
-            return doc.page_count
-        finally:
-            doc.close()
-    except ScanError:
-        raise
-    except Exception as e:  # noqa: BLE001 —— 設備回的檔案壞掉（PyMuPDF / Pillow 的各種例外）
-        raise ScanError("SCAN_MERGE_FAILED", {"error": e.__class__.__name__}) from None
+        return mfp_output.to_pdf(files, out, resolution or DEFAULT_RESOLUTION)
+    except mfp_output.OutputError as e:
+        if e.detail.get("reason") == "no page":
+            raise ScanError("SCAN_NO_DOCUMENT") from None
+        if e.code == "FILE_INVALID":
+            raise ScanError("SCAN_BAD_DOCUMENT", {"reason": "empty pdf"}) from None
+        raise ScanError("SCAN_MERGE_FAILED", e.detail) from None

@@ -365,9 +365,28 @@ def test_migration_from_v1_keeps_existing_connections(tmp_path):
     c.execute("PRAGMA user_version=1")
     c.commit()
     c.close()
-    assert db.migrate(p, mfp_store._MIGRATIONS) == 2
+    assert db.migrate(p, mfp_store._MIGRATIONS) == 3
     c = sqlite3.connect(p)
     assert c.execute("SELECT display_name, host FROM mfp_connections").fetchall() == [("三樓", "192.168.1.50")]
     names = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"mfp_members", "mfp_scans"} <= names
+    c.close()
+
+
+def test_migration_from_v2_keeps_existing_scans(tmp_path):
+    """`_m3_job_kind_and_items`（v1.16.89）只在 `mfp_scans` 加兩欄：舊的掃描紀錄都還在、一律是掃描。"""
+    import sqlite3
+    from app.core import db
+    p = tmp_path / "mfp.sqlite"
+    c = sqlite3.connect(p)
+    mfp_store._m1_initial(c)
+    mfp_store._m2_shared_and_scans(c)
+    c.execute("INSERT INTO mfp_scans(id, conn_id, owner_scope, owner_user_id, device, status, file_name, created_at)"
+              " VALUES ('a' || hex(randomblob(15)), 1, 'u7', 7, '192.168.1.50', 'done', '合約.pdf', 1)")
+    c.execute("PRAGMA user_version=2")
+    c.commit()
+    c.close()
+    assert db.migrate(p, mfp_store._MIGRATIONS) == 3
+    c = sqlite3.connect(p)
+    assert c.execute("SELECT file_name, kind, items FROM mfp_scans").fetchall() == [("合約.pdf", "scan", None)]
     c.close()

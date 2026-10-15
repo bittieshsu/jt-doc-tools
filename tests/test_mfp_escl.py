@@ -396,3 +396,40 @@ def test_every_code_has_a_message_and_translations():
     ja = json.loads(Path("app/i18n/ja.json").read_text(encoding="utf-8"))
     for code, msg in E.MESSAGES.items():
         assert msg in en and msg in ja, f"{code} 沒有英日文：{msg}"
+
+
+# --------------------------------------------------------------------- 存檔格式（使用者 2026-10-14：JPEG 也可以）
+
+def test_outputs_offered_per_source():
+    s = E.summarize(E.parse_capabilities(caps_xml(formats=("application/pdf",))))
+    assert s["sources"]["platen"]["outputs"] == ["pdf"], "設備不能出 JPEG 就不給選 JPEG"
+    s = E.summarize(E.parse_capabilities(caps_xml(formats=("image/jpeg",))))
+    assert s["sources"]["platen"]["outputs"] == ["pdf", "jpeg"], "只能出 JPEG 也可以存 PDF（本站合成）"
+
+
+def test_jpeg_output_keeps_one_file_per_page(fake, tmp_path):
+    fake.caps = caps_xml(adf=True)
+    fake.doc_type = "image/jpeg"
+    fake.docs = [jpeg_bytes(), jpeg_bytes()]
+    res = _scan(fake, tmp_path, {"source": "adf", "format": "jpeg"})
+    assert [f["kind"] for f in res["files"]] == ["jpeg", "jpeg"] and res["pages"] == 2
+    assert all(f["path"].read_bytes().startswith(b"\xff\xd8\xff") for f in res["files"])
+    post = next(r for r in fake.requests if r["method"] == "POST")
+    assert b"<pwg:DocumentFormat>image/jpeg</pwg:DocumentFormat>" in post["body"], "存 JPEG 就要 JPEG"
+    assert res["settings"]["output"] == "jpeg"
+
+
+def test_pdf_output_asks_for_pdf_when_the_device_can(fake, tmp_path):
+    fake.docs = [pdf_bytes(1)]
+    res = _scan(fake, tmp_path, {"source": "platen", "format": "pdf"})
+    post = next(r for r in fake.requests if r["method"] == "POST")
+    assert b"<pwg:DocumentFormat>application/pdf</pwg:DocumentFormat>" in post["body"]
+    assert [f["kind"] for f in res["files"]] == ["pdf"] and res["path"] == res["files"][0]["path"]
+
+
+@pytest.mark.parametrize("fmt", ["jpeg", "tiff", "docx"])
+def test_unsupported_outputs_are_refused_before_scanning(fmt):
+    caps = E.parse_capabilities(caps_xml(formats=("application/pdf",)))
+    with pytest.raises(E.ScanError) as e:
+        E.build_settings(caps, {"source": "platen", "format": fmt})
+    assert e.value.code == "SCAN_OPTION_INVALID" and e.value.detail == {"field": "format"}

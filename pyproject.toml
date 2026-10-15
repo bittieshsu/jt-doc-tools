@@ -1,6 +1,6 @@
 [project]
 name = "jt-doc-tools"
-version = "1.16.88"
+version = "1.16.92"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
@@ -111,6 +111,11 @@ dependencies = [
     "defusedxml>=0.7,<1",
     # rapidfuzz — pdf-to-office 的 docx↔PDFTruth alignment 模糊比對引擎（比 difflib 快 10x+）。
     "rapidfuzz>=3.0,<4",
+    # pysmb — 事務機掃描取件的 SMB 取件（Canon Advanced Box、Konica 公用信箱、SHARP NAS，v1.16.90 實驗功能）。
+    # 選它而不是 smbprotocol：要**列出設備上的分享資料夾**（Konica 的分享名稱是「九位信箱編號＋信箱名稱」，
+    # 不列就要使用者打完整名稱），smbprotocol 沒有列分享。純 Python、zlib/libpng 授權。只到 SMB 2.0.2、
+    # 沒有加密：程式裡拒絕 SMB1、只用 NTLMv2、要使用者同意不加密才連。缺了它只有 SMB 取件不能用（工具照常載入）。
+    "pysmb>=1.2.15,<2",
     # pypinyin — 會議摘要「建議替換」比對中文詞的讀音（逐字稿把「王小明」辨識成「王曉明」）。
     # 只看讀音能把「王曉明」跟「王小姐」分開；只看字形做不到。純 Python、MIT 授權。
     "pypinyin>=0.50,<1",

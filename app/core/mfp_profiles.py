@@ -1,4 +1,4 @@
-"""事務機取件：型號辨識與相容性狀態。
+"""事務機掃描取件：型號辨識與相容性狀態。
 
 **這裡的辨識只是「從網頁上看到什麼」**，不代表支援：
 規格書（docs-share/mfp-fetch/）規定未經實機驗證的型號一律不可以標「已支援」，
@@ -22,6 +22,9 @@ FIRST_BATCH: frozenset[tuple[str, str]] = frozenset({
     ("ApeosPort-V", "C6680"),
 })
 
+#: 有檔案分享取件（實驗功能）的其他廠牌 —— 跟 `mfp_share.VENDOR_ROUTES` 一致（測試釘住）。
+EXPERIMENTAL_VENDORS: frozenset[str] = frozenset({"Canon", "Konica Minolta", "Sharp"})
+
 #: 已在實機上通過取件測試的（系列, 型號）。**目前是空的。**
 VERIFIED_PROFILES: frozenset[tuple[str, str]] = frozenset()
 
@@ -30,7 +33,8 @@ STATUS_MESSAGES: dict[str, str] = {
     "supported": "已支援（已通過實機驗證）",
     "first_batch_unverified": "首批規劃的型號，尚未完成實機驗證",
     "same_vendor_unverified": "同廠牌，尚未驗證是否支援",
-    "unsupported_vendor": "不支援：目前只規劃 FUJIFILM（富士軟片）事務機",
+    "experimental_vendor": "實驗功能：這個廠牌的檔案分享取件依原廠手冊公開的方式寫成，尚未在實機上驗證",
+    "unsupported_vendor": "不支援取件：這個廠牌目前沒有取件方式（支援 eSCL 的話仍可以從本站掃描）",
     "login_required": "需要登入後才能辨識型號",
     "unknown": "無法辨識型號",
     "unreachable": "連不上設備，無法辨識",
@@ -42,7 +46,8 @@ STATUS_LABELS: dict[str, tuple[str, str]] = {
     "supported": ("已支援", "已通過實機驗證"),
     "first_batch_unverified": ("尚未驗證", "首批規劃的型號，尚未完成實機驗證"),
     "same_vendor_unverified": ("尚未驗證", "同廠牌，尚未驗證是否支援"),
-    "unsupported_vendor": ("不支援", "目前只規劃 FUJIFILM（富士軟片）事務機"),
+    "experimental_vendor": ("實驗功能", "檔案分享取件依原廠手冊寫成，尚未實機驗證"),
+    "unsupported_vendor": ("不支援取件", "這個廠牌目前沒有取件方式；支援 eSCL 的話仍可以從本站掃描"),
     "login_required": ("需要登入", "登入後才能辨識型號"),
     "unknown": ("無法辨識", "首頁上找不到廠牌或型號"),
     "unreachable": ("連不上", ""),
@@ -205,7 +210,8 @@ def detect(pages: list[dict], escl_model: str = "") -> dict[str, Any]:
             hit = next(((w, t, m) for w, t in srcs for m in [rx.search(t)] if m), None)
             if hit:
                 res["vendor"] = name
-                res["status"] = "unsupported_vendor"
+                # Canon / Konica Minolta / SHARP 有檔案分享取件（實驗功能，`mfp_share.VENDOR_ROUTES`）
+                res["status"] = "experimental_vendor" if name in EXPERIMENTAL_VENDORS else "unsupported_vendor"
                 ev.append({"what": "vendor", **hit[0], "excerpt": _excerpt(hit[1], hit[2])})
                 if escl_model:
                     res["model"] = escl_model[:60]

@@ -17,7 +17,7 @@ Jason Tools 文件工具箱對外提供 RESTful API，所有工具皆有對應 e
 - [7. 安全與隱私 API](#7-安全與隱私-api)
 - [8. 文字與比對 API](#8-文字與比對-api)
 - [9. 商務查詢 API](#9-商務查詢-api)
-- [9b. 事務機取件 API（Beta）](#9b-事務機取件-apibeta)
+- [9b. 事務機掃描取件 API（Beta）](#9b-事務機掃描取件-apibeta)
 - [10. Job 模式 API](#10-job-模式-api)
 - [11. 管理端 API](#11-管理端-api)
 - [12. 整合範例](#12-整合範例)
@@ -2112,7 +2112,13 @@ curl -X POST http://localhost:8765/tools/vat-lookup/api/vat-lookup \
   -d '{"vat":"12345678"}' | jq
 ```
 
-回應 JSON：公司名稱 / 地址 / 行業等。找不到回 `404`。
+回應 JSON 的欄位：
+
+- 基本資料：`vat`、`name`、`address`、`org_type`、`category`、`industries`、`owner`、`status`（後兩項只有部分來源有）。
+- 稅籍登記的其他資料（v1.16.92 起）：`hq_vat` 是總機構統一編號（分支機構才有）；`capital` 是資本額（元，整數）；`founded` 是設立日期（西元 `YYYY-MM-DD`）；`uses_invoice` 是否使用統一發票（`true` / `false`）。
+- 沒有資料時是 `null`：政府機關與學校沒有這幾項；既有站台升級後要等下一次更新統編資料庫才有值。
+
+找不到回 `404`。
 
 ### 統編查詢（path style）
 
@@ -2255,11 +2261,12 @@ curl -X POST http://localhost:8765/tools/transit-proof/api/transit-proof \
 
 ---
 
-## 9b. 事務機取件 API（Beta）
+## 9b. 事務機掃描取件 API（Beta）
 
 > **試用中，尚未在實機上驗證完整流程。** 目前做得到的是新增事務機、連線測試與型號辨識、
-> 從支援 eSCL（AirPrint / Mopria 掃描）的事務機掃描直接存進工作區、管理員設定的共用事務機；
-> 登入信箱、列出文件與取件要等實機驗證後才開放。網頁上的工具頁與管理頁用的也是這組端點。
+> 從支援 eSCL（AirPrint / Mopria 掃描）的事務機掃描直接存進工作區、管理員設定的共用事務機，
+> 以及 FUJIFILM 事務機的機內信箱取件、Canon / Konica Minolta / SHARP 的檔案分享取件（都是實驗功能）。網頁上的工具頁與管理頁用的也是這組端點。
+> 工具原名「事務機取件」，v1.16.89 起改名「事務機掃描取件」；網址與工具代號都不變。
 
 **每一台都屬於呼叫者本人**（用 API token 呼叫時是 token 的持有者）：別人的事務機一律回 `404`，
 不透露存不存在。**共用事務機**由管理員建立並指定成員（使用者、群組含子群組），成員看得到、可以重新測試與掃描，
@@ -2268,6 +2275,10 @@ curl -X POST http://localhost:8765/tools/transit-proof/api/transit-proof \
 **連線測試的安全範圍**：只連內部網路位址（私有 IP；回送、鏈路本地、公網與本服務主機自己的位址一律拒絕），
 只測網頁連接埠 `80`、`443`、`8080`、`8443`；只發 `GET`（讀首頁與 eSCL 的能力表 `/eSCL/ScannerCapabilities`）、
 不傳送任何帳密或 Cookie；轉址只跟同一台設備。每人 5 分鐘內最多 10 次，同時只能跑一個。
+
+**使用者自行新增事務機**由管理員決定（預設允許，見下面「使用設定」）。關掉時一般使用者呼叫連線測試、儲存回 `403`
+（`USER_DEVICES_DISABLED`），自己以前新增的在清單上是 `paused: true`，不能測試、掃描、取件，但可以改名、移除；
+共用事務機照常，管理員不受限。
 
 **排隊**：同一台**實體設備**（依解析後的位址判斷）一次只做一件事。連線測試最多等 30 秒，
 等不到回 `429`（`DEVICE_BUSY`，附 `waiting`）；掃描在背景排隊。每台最多 10 件（`DEVICE_QUEUE_FULL`）、
@@ -2324,7 +2335,8 @@ curl -X POST http://localhost:8765/tools/mfp-fetch/api/detect \
 
 - `first_batch_unverified`：首批規劃的型號，尚未實機驗證
 - `same_vendor_unverified`：同廠牌，尚未驗證是否支援
-- `unsupported_vendor`：其他廠牌，目前不支援
+- `experimental_vendor`：Canon、Konica Minolta、SHARP，有檔案分享取件（實驗功能）
+- `unsupported_vendor`：其他廠牌，目前沒有取件方式（支援 eSCL 的話仍可以掃描）
 - `login_required`：要登入後才能辨識型號
 - `unknown`：無法辨識型號
 - `unreachable`：連不上設備
@@ -2339,7 +2351,7 @@ POST   /tools/mfp-fetch/api/connections                 # 儲存：{"token": "..
 GET    /tools/mfp-fetch/api/connections/{id}            # 單筆（含最近一次報告）
 PATCH  /tools/mfp-fetch/api/connections/{id}            # 改名：{"display_name": "..."}
 POST   /tools/mfp-fetch/api/connections/{id}/test       # 用存下來的位址與連線方式重新測試
-GET    /tools/mfp-fetch/api/connections/{id}/report     # 下載最近一次診斷報告（JSON）
+GET    /tools/mfp-fetch/api/connections/{id}/report     # 下載最近一次診斷報告（見下方「診斷報告」）
 DELETE /tools/mfp-fetch/api/connections/{id}            # 從清單移除（不影響設備）
 ```
 
@@ -2348,8 +2360,34 @@ DELETE /tools/mfp-fetch/api/connections/{id}            # 從清單移除（不�
 目前**不儲存任何帳密**。
 
 清單的每一筆另外有：`shared`（是不是共用事務機）、`can_manage`（能不能改名、移除）、
-`scan`（能不能掃描與可選的設定，沒有 eSCL 是 `null`）、`queue`（`{"busy": true, "waiting": 1, "kind": "scan"}`，
-這台現在有沒有在忙、後面排了幾件）。共用事務機對成員是唯讀的：改名與移除回 `403`（`SHARED_READ_ONLY`）。
+`scan`（能不能掃描與可選的設定，沒有 eSCL 是 `null`）、`box`（能不能機內信箱取件，目前只有 FUJIFILM）、
+`share`（檔案分享取件可用的方式，例如 `{"routes": ["canon_webdav", "canon_smb"]}`，沒有是 `null`）、
+`paused`（管理員關掉自行新增時，自己的事務機暫停使用）、`queue`（`{"busy": true, "waiting": 1, "kind": "scan"}`，
+這台現在有沒有在忙、後面排了幾件）。清單本身另回 `can_add`（呼叫者能不能新增事務機）。
+共用事務機對成員是唯讀的：改名與移除回 `403`（`SHARED_READ_ONLY`）。
+
+### 診斷報告
+
+連線測試的完整紀錄，可以選格式下載。已儲存的事務機下載最近一次測試；還沒儲存的測試結果用連線測試回的 `token`。
+
+```text
+GET  /tools/mfp-fetch/api/connections/{id}/report?format=pdf   # 已儲存的事務機
+POST /tools/mfp-fetch/api/detect/report                        # 還沒儲存的測試結果：{"token": "...", "format": "pdf"}
+```
+
+參數 `format` 選格式：
+
+- 不帶或 `json`：原始報告，欄位齊全；回報問題時附這一份。
+- 給人看的版本 `txt`、`md`、`html`、`pdf`：內容跟畫面上「詳細」一致，固定字串依介面語言（`jtdt_locale` cookie）。
+
+報告在產生時就已遮蔽帳號、密碼、Cookie 與工作階段資訊，換格式不會多出任何內容。
+連線測試回的 `token` 只有本人能用、15 分鐘內有效，下載不會用掉它（之後照樣可以儲存）；過期或不是本人的回 `404`（`REPORT_EXPIRED`）。
+格式不對回 `422`（`REPORT_FORMAT_INVALID`）。
+
+```bash
+curl -o mfp-report.pdf "http://localhost:8765/tools/mfp-fetch/api/connections/3/report?format=pdf" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
 
 ### 掃描（eSCL）
 
@@ -2360,7 +2398,7 @@ POST /tools/mfp-fetch/api/connections/{id}/scan       # 開始掃描（202，回
 GET  /tools/mfp-fetch/api/scans                       # 最近 20 筆
 GET  /tools/mfp-fetch/api/scans/{scan_id}             # 狀態與進度
 POST /tools/mfp-fetch/api/scans/{scan_id}/cancel      # 取消（排隊中的直接移出；掃描中的會刪掉設備上的掃描工作）
-GET  /tools/mfp-fetch/api/scans/{scan_id}/download    # 沒存進工作區時下載（工作區停用或額度不夠時，留 24 小時）
+GET  /tools/mfp-fetch/api/scans/{scan_id}/download    # 沒存進工作區時下載（留 24 小時；多個檔案打包成 ZIP）
 ```
 
 | 參數（JSON） | 類型 | 說明 |
@@ -2369,7 +2407,8 @@ GET  /tools/mfp-fetch/api/scans/{scan_id}/download    # 沒存進工作區時下
 | `color` | string | `color`（預設）/ `gray` / `bw` |
 | `resolution` | int | 解析度（dpi），要是這台支援的；預設 300 |
 | `paper` | string | `a4`（預設）/ `letter` / `max` |
-| `file_name` | string | 檔名（選填，最多 116 字，自動補 `.pdf`；路徑與特殊字元會去掉） |
+| `format` | string | 存成 `pdf`（預設，多頁合成一份）或 `jpeg`（每頁一個檔，設備要能出 JPEG）；可選的值在 `scan.sources.<來源>.outputs` |
+| `file_name` | string | 檔名（選填，最多 100 字，自動補副檔名；路徑與特殊字元會去掉） |
 
 ```bash
 curl -X POST http://localhost:8765/tools/mfp-fetch/api/connections/3/scan \
@@ -2378,18 +2417,116 @@ curl -X POST http://localhost:8765/tools/mfp-fetch/api/connections/3/scan \
 ```
 
 掃描紀錄的 `status`：`queued`（排隊中，`ahead` 是前面還有幾件）、`running`（`phase` 是 `checking` /
-`scanning` / `merging` / `saving`）、`done`（`pages`、`bytes`、`workspace_file_id`）、`error`（`error_code`、
-`error_message`）、`cancelled`。多頁合成一份 PDF；只存進呼叫者自己的工作區，別人拿 id 查不到也下載不到。`settings.via` 是這次走的協定（例如 `{"protocol": "eSCL", "scheme": "https", "port": 443}`），`tls_verified` 是憑證有沒有通過驗證。
+`scanning` / `merging` / `downloading` / `saving`）、`done`（`pages`、`bytes`、`workspace_file_id`）、`error`（`error_code`、
+`error_message`）、`cancelled`。`kind` 是 `scan`（掃描）或 `box`（機內信箱取件）；`files` 列出存下來的每一個檔案
+（`name`、`pages`、`workspace_file_id`、`has_file`）。只存進呼叫者自己的工作區，別人拿 id 查不到也下載不到。`settings.via` 是這次走的協定（例如 `{"protocol": "eSCL", "scheme": "https", "port": 443}`），`tls_verified` 是憑證有沒有通過驗證。
 
 設定不在這台的能力範圍回 `400`（`SCAN_OPTION_INVALID`）；沒有 eSCL 回 `400`（`SCAN_NOT_SUPPORTED`）；
 隊伍滿了回 `429`。掃描中的錯誤寫在紀錄的 `error_code`：`SCAN_DEVICE_BUSY`（有人在機器上操作）、
 `SCAN_ADF_EMPTY`、`SCAN_AUTH_REQUIRED`（設備要求登入才能掃描，目前不支援）、`SCAN_NO_DOCUMENT`、
 `SCAN_BAD_DOCUMENT`、`SCAN_TOO_LARGE`、`SCAN_TIMEOUT` 等。**不送任何帳密**。
 
+### 機內信箱取件（FUJIFILM，實驗性）
+
+> **推測實作，尚未在實機上驗證。** 依原廠取件工具的研究，用 WebDAV 讀取 FUJIFILM 事務機的機內信箱
+> （PROPFIND 列文件、GET 下載），只送這兩種請求，不會刪除或修改設備上的文件；但設備或信箱若設定成
+> 「取件後刪除」，刪除是設備自己做的（見下面「取件後刪除」的確認參數）。只有辨識為 FUJIFILM、
+> 連線測試連得上的事務機能用，其他回 400（BOX_NOT_FUJIFILM）。
+
+```text
+POST /tools/mfp-fetch/api/connections/{id}/box/list    # 列出信箱裡的文件
+POST /tools/mfp-fetch/api/connections/{id}/box/fetch   # 取件（202，回作業紀錄；進度一樣看 /api/scans/{id}）
+```
+
+| 參數（JSON） | 類型 | 說明 |
+|---|---|---|
+| `box` | int | 信箱編號（1～999） |
+| `box_password` | string | 信箱密碼（沒有設就不帶） |
+| `user` / `password` | string | 事務機要求登入時才需要：使用者在事務機上的帳號與密碼 |
+| `trust_sha256` | string | HTTPS 憑證沒通過驗證時（事務機多半是自簽憑證），使用者核對過的憑證 SHA-256 指紋 |
+| `allow_http` | bool | 這台只用 HTTP 時要帶 `true`（同意帳密與文件以未加密方式在內網傳送） |
+| `target` | string | 選填，例如 `"https:443"`；要是連線測試連得上的那一組，不帶就 HTTPS 優先 |
+| `documents` | string[] | 取件時用：要取的文件編號（列文件回的 `id`），一次最多 20 份 |
+| `output` | string | 取件時用：`pdf`（預設，每份文件一個 PDF）或 `original`（設備給的原始 TIFF / JPEG，不轉檔） |
+| `confirm_delete_after_get` | bool | 取件時用：信箱或文件設定成「取件後刪除」時要帶 `true` 才會取 |
+
+```bash
+curl -X POST http://localhost:8765/tools/mfp-fetch/api/connections/3/box/list \
+  -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"box": 1, "box_password": "1234", "trust_sha256": "9F:2A:..."}' | jq
+```
+
+```json
+{
+  "ok": true,
+  "box": 1,
+  "box_name": "Box 1",
+  "delete_after_get": false,
+  "documents": [{"id": "5", "name": "報價單", "pages": 3, "size": 482113, "modified": "...",
+                 "format": "TIF", "compression": "MMR", "how": "whole", "delete_after_get": false}],
+  "via": {"protocol": "WebDAV", "scheme": "https", "port": 443},
+  "tls": {"verified": false, "pinned": true, "sha256": "9f2a..."},
+  "trace": [{"method": "PROPFIND", "path": "/dav/box-1", "depth": "1", "status": 401,
+             "challenges": [{"scheme": "digest", "realm": "box-1"}]},
+            {"method": "PROPFIND", "path": "/dav/box-1", "depth": "1", "status": 207, "auth": "digest"}]
+}
+```
+
+**帳密只用在這次請求**（`box/fetch` 則是那件作業的記憶體裡），不寫進資料庫、紀錄檔或協定紀錄；
+設備要求認證時只送一次，失敗就停（不換組合重試，避免帳號被鎖）。`trace` 是協定紀錄
+（方法、路徑、狀態碼、認證方式與 realm，不含帳密），實機驗證時用來對照。
+
+設備端的錯誤一律回 `422`（不是 `401`，那是本站自己的登入），`code` 是：
+
+- 憑證沒通過驗證：`TLS_UNTRUSTED`，`detail.certificate` 有指紋與內容；核對後帶 `trust_sha256` 再呼叫
+- 憑證跟信任的指紋不一樣：`TLS_IDENTITY_FAILED`，已停止（沒有存取信箱）
+- 這台只用 HTTP：`PLAIN_HTTP_NEEDS_CONSENT`，要帶 `allow_http: true`
+- 要信箱密碼、要事務機的帳號密碼：`AUTH_REQUIRED_BOX`、`AUTH_REQUIRED_USER`
+- 認證失敗、設備要求的認證方式不支援：`AUTH_FAILED`、`AUTH_MODE_UNSUPPORTED`
+- 找不到信箱、沒有權限、WebDAV 沒有啟用、回應格式不對：`BOX_NOT_FOUND`、`BOX_FORBIDDEN`、`WEBDAV_UNAVAILABLE`、`DAV_BAD_RESPONSE` 等
+
+取件作業的紀錄跟掃描同一份（`kind: "box"`）：`files` 是存下來的每一個檔案（`name`、`pages`、
+`workspace_file_id`），`items` 是每份文件的結果（`status`、`error_code`、`format_note`、
+`source`：`SOURCE_KEPT` 原件還在 / `SOURCE_GONE` 取件後設備上已經沒有 / `SOURCE_UNKNOWN`）。
+部分文件沒取到時 `status` 仍是 `done`、`error_code` 是 `BOX_PARTIAL`。轉成 PDF 失敗（例如 TIFF 用了不支援的壓縮）
+會改存原始檔，`format_note` 是 `PDF_FALLBACK_ORIGINAL`。
+
+### 檔案分享取件（Canon、Konica Minolta、SHARP，實驗性）
+
+> **實驗功能，尚未在實機上驗證。** 依原廠手冊公開的方式，讀取事務機上的檔案分享：
+> Canon Advanced Box（WebDAV 或 SMB 的共享空間、個人空間）、Konica Minolta 公用信箱（SMB）、SHARP 的 NAS（SMB）。
+> 只讀取，不刪除、改名或寫入設備上的檔案。清單上可以用的事務機會標出可用的取件方式，其他廠牌回 400（SHARE_ROUTE_INVALID）。
+
+```text
+POST /tools/mfp-fetch/api/connections/{id}/share/list    # 列出位置、資料夾與檔案
+POST /tools/mfp-fetch/api/connections/{id}/share/fetch   # 取件（202，回作業紀錄；進度看 /api/scans/{id}）
+```
+
+| 參數（JSON） | 類型 | 說明 |
+|---|---|---|
+| `route` | string | 取件方式：`canon_webdav`、`canon_smb`、`konica_smb`、`sharp_smb`（清單上的 `share.routes`） |
+| `root` | string | 位置：Canon 是 `share`（共享空間）或 `users`（個人空間）；SHARP 是設備列出的分享；Konica 由信箱編號找出，不用帶 |
+| `path` | string[] | 列檔時用：資料夾路徑，一層一個名稱（例如 `["2026", "十月"]`），不帶就是位置的最上層 |
+| `user` / `password` | string | Canon、SHARP：事務機上的帳號與密碼（沒有設認證就不帶）；網域帳號寫成 `網域\帳號` |
+| `box` / `box_password` | string | Konica：信箱編號與信箱密碼 |
+| `trust_sha256` / `allow_http` | | WebDAV 的憑證指紋與 HTTP 同意，跟機內信箱取件一樣 |
+| `allow_plain` | bool | SMB 不加密，要帶 `true`（同意檔案以未加密方式在內網傳送） |
+| `files` | string[][] | 取件時用：要取的檔案，每個是一條路徑（例如 `[["2026", "合約.tif"]]`），一次最多 50 個 |
+| `output` | string | 取件時用：`pdf`（預設：TIFF / JPEG 轉成 PDF，PDF 與其他檔案照原樣）或 `original`（一律不轉檔） |
+
+列檔回傳 `roots`（可選的位置，`shared` 表示共享）、`root`、`path`、`entries`（`name`、`dir`、`size`、`modified`）、
+`shared`、`via`（`{"protocol": "WebDAV"}` 或 `{"protocol": "SMB", "port": 445}`）與 `trace`（協定紀錄，不含帳密）。
+**共享的位置其他人也看得到**，不是只屬於呼叫者的文件。
+
+SMB 只用 NTLMv2；設備只肯用 SMB1 就在認證之前停下來（`SMB1_REFUSED`），能簽章就簽章，內容不加密。
+設備端的錯誤一律回 `422`：`SMB_PLAIN_NEEDS_CONSENT`、`SMB_AUTH_FAILED`、`SMB_CONNECT_FAILED`（445 連接埠沒開）、
+`SHARE_FORBIDDEN`、`SHARE_NOT_FOUND`、`BOX_SHARE_NOT_FOUND`（Konica 找不到這個信箱的分享）、`SHARE_LOGIN_PAGE`，
+以及跟機內信箱取件相同的 `TLS_UNTRUSTED`、`AUTH_FAILED` 等。作業紀錄的 `kind` 是 `share`，其餘欄位跟信箱取件一樣。
+
 ### 共用事務機（管理員）
 
 管理員建立、指定成員（使用者或群組；群組含子群組的成員）。非管理員呼叫回 `403`（`ADMIN_ONLY`）。
-網頁版在「設定 → 共用事務機」。成員還是要有「事務機取件」的工具權限。
+網頁版在「設定 → 共用事務機」。成員還是要有「事務機掃描取件」的工具權限。
 
 ```text
 GET    /tools/mfp-fetch/api/shared                  # 清單（含成員數）
@@ -2404,6 +2541,17 @@ GET    /tools/mfp-fetch/api/shared-subjects         # 挑成員用：使用者�
 
 成員只收存在的使用者與群組，其他回 `400`（`MEMBERS_INVALID`）。刪除帳號或群組時成員資格一起拿掉；
 刪除建立者的帳號不會刪掉共用事務機。
+
+### 使用設定（管理員）
+
+```text
+GET /tools/mfp-fetch/api/settings     # {"settings": {"allow_user_devices": true, "updated_at": ...}}
+PUT /tools/mfp-fetch/api/settings     # {"allow_user_devices": false}
+```
+
+設定項目 `allow_user_devices`（預設 `true`）決定一般使用者能不能自己新增事務機。值一定要是 `true` / `false`，否則回 `400`
+（`SETTINGS_INVALID`）；非管理員回 `403`。改設定會寫稽核（`mfp_settings_update`），設定備份的「事務機掃描取件」分類會包含它。
+網頁版在「設定 → 共用事務機」最上面的「使用設定」。
 
 ---
 

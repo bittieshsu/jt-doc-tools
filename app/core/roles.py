@@ -46,7 +46,7 @@ _NON_ADMIN_TOOL_IDS = [
     "pdf-annotations", "pdf-annotations-flatten", "pdf-annotations-strip",
     # Sensitive — not in default-user; granted explicitly by finance/sales.
     # "pdf-fill", "pdf-stamp",
-    # 事務機取件（Beta）：會讓伺服器去連區網上的設備（只准內網位址與網頁埠），
+    # 事務機掃描取件（Beta）：會讓伺服器去連區網上的設備（只准內網位址與網頁埠），
     # 不放進一般使用者；內建角色裡只有「文管」有（收掃描檔是文管的日常），
     # 要開放給其他人由管理員在角色裡加。
     # "mfp-fetch",
@@ -83,7 +83,7 @@ SEED_ROLES: list[dict] = [
             "doc-straighten",
             "office-to-pdf", "office-convert", "pdf-to-image",
             "image-to-pdf", "scan-merge", "pdf-to-office", "pdf-to-slides",
-            # 事務機取件（Beta）：收掃描檔是文管的日常；不放進一般使用者（理由見上面 _NON_ADMIN_TOOL_IDS 的註解）
+            # 事務機掃描取件（Beta）：收掃描檔是文管的日常；不放進一般使用者（理由見上面 _NON_ADMIN_TOOL_IDS 的註解）
             "mfp-fetch",
         ],
     },

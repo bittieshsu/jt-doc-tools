@@ -560,5 +560,8 @@
  "看資料保護與合規": "Read about data protection and compliance",
  "合規": "Compliance",
  "事務機取件（Beta）": "Fetch from MFP (Beta)",
- "新增事務機做連線測試與型號辨識，逐步列出診斷結果；支援 eSCL 的事務機可以直接掃描進工作區，管理員可設定共用事務機，同一台自動排隊；取件要等實機驗證後開放": "Add an MFP to run a connection test and identify the model, with step-by-step diagnostics; MFPs that support eSCL can scan straight into the workspace, administrators can set up shared MFPs, and each device queues requests automatically; fetching opens once tested on real devices"
+ "新增事務機做連線測試與型號辨識，逐步列出診斷結果；支援 eSCL 的事務機可以直接掃描進工作區，管理員可設定共用事務機，同一台自動排隊；取件要等實機驗證後開放": "Add an MFP to run a connection test and identify the model, with step-by-step diagnostics; MFPs that support eSCL can scan straight into the workspace, administrators can set up shared MFPs, and each device queues requests automatically; fetching opens once tested on real devices",
+ "事務機掃描取件（Beta）": "MFP Scan & Fetch (Beta)",
+ "新增事務機做連線測試與型號辨識，逐步列出診斷結果；支援 eSCL 的事務機可以直接掃描進工作區，管理員可設定共用事務機，同一台自動排隊；FUJIFILM 機內信箱取件為實驗功能（尚未實機驗證）": "Add an MFP for a connection test and model identification with step-by-step diagnostics; eSCL-capable MFPs scan straight into the workspace, administrators can set up shared MFPs, and each device queues automatically; mailbox retrieval on FUJIFILM MFPs is experimental (not yet verified on a real device)",
+ "新增事務機做連線測試與型號辨識，逐步列出診斷結果；支援 eSCL 的事務機可以直接掃描進工作區，管理員可設定共用事務機，同一台自動排隊；FUJIFILM 機內信箱與 Canon / Konica / SHARP 檔案分享取件為實驗功能（尚未實機驗證）": "Add an MFP for a connection test and model identification with step-by-step diagnostics; eSCL-capable MFPs scan straight into the workspace, administrators can set up shared MFPs, and each device queues automatically; retrieval from FUJIFILM mailboxes and from Canon / Konica / SHARP file shares is experimental (not yet verified on a real device)"
 }
