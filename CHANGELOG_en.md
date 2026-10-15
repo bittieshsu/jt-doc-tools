@@ -5,11 +5,18 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (923 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (924 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.95] - 2026-10-15
+
+- MFP Scan & Fetch: direct retrieval for KYOCERA and RICOH (experimental, not yet verified on a real device). KYOCERA reads the internal document boxes through the device's document service (HTTPS 9091 or HTTP 9090; exported TIFF is converted to PDF by default); RICOH reads documents on the Document Server in their original format. It is built from an analysis of the manufacturers' tools, not from a published interface, and every request is checked against the templates in that analysis. It only reads; it never deletes, renames or writes documents on the device.
+- A document box password (KYOCERA) or document password (RICOH) can be entered in the retrieval panel. RICOH supports only signing in with a user name and password exchanged for a ticket, and the authentication and download addresses must be on the same device. Features the device's service capability does not list are not called.
+- A document returned in several parts is merged into one PDF in order, or saved as numbered original files. Slashes in a document name are replaced with spaces in the saved file name.
+- The protocol log no longer records URL query strings (a download address from the device may carry a one-time token).
 
 ## [1.16.94] - 2026-10-15
 

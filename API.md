@@ -2265,7 +2265,7 @@ curl -X POST http://localhost:8765/tools/transit-proof/api/transit-proof \
 
 > **試用中，尚未在實機上驗證完整流程。** 目前做得到的是新增事務機、連線測試與型號辨識、
 > 從支援 eSCL（AirPrint / Mopria 掃描）的事務機掃描直接存進工作區、管理員設定的共用事務機，
-> 以及 FUJIFILM 事務機的機內信箱取件、Canon / Konica Minolta / SHARP 的檔案分享取件（都是實驗功能）。網頁上的工具頁與管理頁用的也是這組端點。
+> 以及 FUJIFILM 事務機的機內信箱取件、Canon / Konica Minolta / SHARP 的檔案分享取件、KYOCERA / RICOH 的直接取件（都是實驗功能）。網頁上的工具頁與管理頁用的也是這組端點。
 > 工具原名「事務機取件」，v1.16.89 起改名「事務機掃描取件」；網址與工具代號都不變。
 
 **每一台都屬於呼叫者本人**（用 API token 呼叫時是 token 的持有者）：別人的事務機一律回 `404`，
@@ -2335,7 +2335,7 @@ curl -X POST http://localhost:8765/tools/mfp-fetch/api/detect \
 
 - `first_batch_unverified`：首批規劃的型號，尚未實機驗證
 - `same_vendor_unverified`：同廠牌，尚未驗證是否支援
-- `experimental_vendor`：Canon、Konica Minolta、SHARP，有檔案分享取件（實驗功能）
+- `experimental_vendor`：Canon、Konica Minolta、SHARP（檔案分享取件）與 KYOCERA、RICOH（直接取件），都是實驗功能
 - `unsupported_vendor`：其他廠牌，目前沒有取件方式（支援 eSCL 的話仍可以掃描）
 - `login_required`：要登入後才能辨識型號
 - `unknown`：無法辨識型號
@@ -2491,10 +2491,11 @@ curl -X POST http://localhost:8765/tools/mfp-fetch/api/connections/3/box/list \
 部分文件沒取到時 `status` 仍是 `done`、`error_code` 是 `BOX_PARTIAL`。轉成 PDF 失敗（例如 TIFF 用了不支援的壓縮）
 會改存原始檔，`format_note` 是 `PDF_FALLBACK_ORIGINAL`。
 
-### 檔案分享取件（Canon、Konica Minolta、SHARP，實驗性）
+### 檔案分享取件（Canon、Konica Minolta、SHARP、KYOCERA、RICOH，實驗性）
 
 > **實驗功能，尚未在實機上驗證。** 依原廠手冊公開的方式，讀取事務機上的檔案分享：
 > Canon Advanced Box（WebDAV 或 SMB 的共享空間、個人空間）、Konica Minolta 公用信箱（SMB）、SHARP 的 NAS（SMB）。
+> KYOCERA 的機內文件匣與 RICOH 的文件伺服器走設備的文件服務（SOAP），依據是原廠工具的分析，不是原廠公開的介面。
 > 只讀取，不刪除、改名或寫入設備上的檔案。清單上可以用的事務機會標出可用的取件方式，其他廠牌回 400（SHARE_ROUTE_INVALID）。
 
 ```text
@@ -2504,24 +2505,30 @@ POST /tools/mfp-fetch/api/connections/{id}/share/fetch   # 取件（202，回作
 
 | 參數（JSON） | 類型 | 說明 |
 |---|---|---|
-| `route` | string | 取件方式：`canon_webdav`、`canon_smb`、`konica_smb`、`sharp_smb`（清單上的 `share.routes`） |
-| `root` | string | 位置：Canon 是 `share`（共享空間）或 `users`（個人空間）；SHARP 是設備列出的分享；Konica 由信箱編號找出，不用帶 |
+| `route` | string | 取件方式：`canon_webdav`、`canon_smb`、`konica_smb`、`sharp_smb`、`kyocera_soap`（HTTPS 9091）、`kyocera_soap_http`（HTTP 9090）、`ricoh_soap`（連線測試連得上的那組協定與連接埠）（清單上的 `share.routes`） |
+| `root` | string | 位置：Canon 是 `share`（共享空間）或 `users`（個人空間）；SHARP 是設備列出的分享；Konica 由信箱編號找出，不用帶；KYOCERA 是文件匣編號；RICOH 是 `documents`（文件伺服器） |
 | `path` | string[] | 列檔時用：資料夾路徑，一層一個名稱（例如 `["2026", "十月"]`），不帶就是位置的最上層 |
-| `user` / `password` | string | Canon、SHARP：事務機上的帳號與密碼（沒有設認證就不帶）；網域帳號寫成 `網域\帳號` |
-| `box` / `box_password` | string | Konica：信箱編號與信箱密碼 |
+| `user` / `password` | string | Canon、SHARP、KYOCERA、RICOH：事務機上的帳號與密碼（沒有設認證就不帶；RICOH 一定要帶）；網域帳號寫成 `網域\帳號` |
+| `box` / `box_password` | string | Konica：信箱編號與信箱密碼。KYOCERA：`box_password` 是文件匣密碼；RICOH：`box_password` 是文件密碼（有設密碼的文件才要） |
 | `trust_sha256` / `allow_http` | | WebDAV 的憑證指紋與 HTTP 同意，跟機內信箱取件一樣 |
 | `allow_plain` | bool | SMB 不加密，要帶 `true`（同意檔案以未加密方式在內網傳送） |
 | `files` | string[][] | 取件時用：要取的檔案，每個是一條路徑（例如 `[["2026", "合約.tif"]]`），一次最多 50 個 |
 | `output` | string | 取件時用：`pdf`（預設：TIFF / JPEG 轉成 PDF，PDF 與其他檔案照原樣）或 `original`（一律不轉檔） |
 
-列檔回傳 `roots`（可選的位置，`shared` 表示共享）、`root`、`path`、`entries`（`name`、`dir`、`size`、`modified`）、
-`shared`、`via`（`{"protocol": "WebDAV"}` 或 `{"protocol": "SMB", "port": 445}`）與 `trace`（協定紀錄，不含帳密）。
+列檔回傳 `roots`（可選的位置，`label` 是顯示名稱、`shared` 表示共享）、`root`、`path`、`entries`（`name`、`dir`、`size`、`modified`）、
+`shared`、`via`（`{"protocol": "WebDAV"}`、`{"protocol": "SMB", "port": 445}` 或 `{"protocol": "SOAP"}`）與 `trace`（協定紀錄，不含帳密）。
+KYOCERA / RICOH 的 `entries[].name` 是編碼過的識別碼（`~` 開頭），取件時照原樣放進 `files`；顯示用 `label`。
+RICOH 有密碼的文件 `locked` 是 `true`。
 **共享的位置其他人也看得到**，不是只屬於呼叫者的文件。
 
 SMB 只用 NTLMv2；設備只肯用 SMB1 就在認證之前停下來（`SMB1_REFUSED`），能簽章就簽章，內容不加密。
 設備端的錯誤一律回 `422`：`SMB_PLAIN_NEEDS_CONSENT`、`SMB_AUTH_FAILED`、`SMB_CONNECT_FAILED`（445 連接埠沒開）、
 `SHARE_FORBIDDEN`、`SHARE_NOT_FOUND`、`BOX_SHARE_NOT_FOUND`（Konica 找不到這個信箱的分享）、`SHARE_LOGIN_PAGE`，
-以及跟機內信箱取件相同的 `TLS_UNTRUSTED`、`AUTH_FAILED` 等。作業紀錄的 `kind` 是 `share`，其餘欄位跟信箱取件一樣。
+以及跟機內信箱取件相同的 `TLS_UNTRUSTED`、`AUTH_FAILED` 等。KYOCERA / RICOH 另有 `SOAP_UNAVAILABLE`（設備的文件服務沒有回應）、
+`BOX_PASSWORD_FAILED`、`DOC_PASSWORD_REQUIRED`、`DOC_PASSWORD_FAILED`、`SESSION_EXPIRED`、`SOAP_BUSY`、
+`RICOH_AUTH_UNSUPPORTED`（只支援帳號密碼換票證的登入）、`RICOH_URL_UNSUPPORTED`（下載網址不在這台設備，或是 FTP）。
+一份文件分成幾個部分回來時，`pdf` 照順序合成一份，`original` 各存一個檔並加頁序。
+作業紀錄的 `kind` 是 `share`，其餘欄位跟信箱取件一樣。
 
 ### 共用事務機（管理員）
 

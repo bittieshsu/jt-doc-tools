@@ -105,7 +105,9 @@ def two_clerks(admin_session):
 
 
 def test_the_page_renders_with_beta_and_passwords_only_in_the_retrieval_panels(two_clerks):
-    """密碼欄位只出現在機內信箱取件（實驗功能，v1.16.89）那一塊，而且不讓瀏覽器自動填入或記住。"""
+    """密碼欄位只出現在機內信箱取件（實驗功能，v1.16.89）與檔案分享取件那兩塊，而且不讓瀏覽器自動填入或記住。
+
+    v1.16.95：檔案分享多一欄 `mfShareExtra`（KYOCERA 文件匣密碼 / RICOH 文件密碼）。"""
     a, *_ = two_clerks
     r = a.get("/tools/mfp-fetch/")
     assert r.status_code == 200
@@ -114,7 +116,7 @@ def test_the_page_renders_with_beta_and_passwords_only_in_the_retrieval_panels(t
     from pathlib import Path
     tpl = Path("app/tools/mfp_fetch/templates/mfp_fetch.html").read_text(encoding="utf-8")
     pw = re.findall(r"<input[^>]*type=\"password\"[^>]*>", tpl)
-    assert sorted(re.search(r'id="(\w+)"', x).group(1) for x in pw) == ["mfBoxPw", "mfBoxUserPw", "mfSharePw"]
+    assert sorted(re.search(r'id="(\w+)"', x).group(1) for x in pw) == ["mfBoxPw", "mfBoxUserPw", "mfShareExtra", "mfSharePw"]
     assert all('autocomplete="off"' in x for x in pw), "密碼欄不可以讓瀏覽器記住"
     fetch_panels = tpl.split('id="mfBoxPanel"', 1)[1].split('id="mfScansPanel"', 1)[0]
     assert all(x in fetch_panels for x in pw), "密碼欄只在取件那兩塊（信箱取件、檔案分享取件）"

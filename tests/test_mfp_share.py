@@ -415,6 +415,8 @@ def test_routes_per_vendor():
     assert S.routes_for("Canon") == ("canon_webdav", "canon_smb")
     assert S.routes_for("Konica Minolta") == ("konica_smb",)
     assert S.routes_for("Sharp") == ("sharp_smb",)
+    assert S.routes_for("Kyocera") == ("kyocera_soap", "kyocera_soap_http")     # v1.16.95，直接取件（SOAP）
+    assert S.routes_for("Ricoh") == ("ricoh_soap",)
     assert S.routes_for("FUJIFILM") == () and S.routes_for(None) == ()
 
 

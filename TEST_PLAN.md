@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **487 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **491 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -914,6 +914,10 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_mfp_share_jobs.py` | 檔案分享取件（實驗功能）—— 路由與背景作業 |
 | `test_mfp_share_page_browser.py` | 檔案分享取件 —— 在真的瀏覽器裡跑一次（對本機一台假的 Canon Advanced Box，WebDAV） |
 | `test_mfp_shared_and_scan.py` | 共用事務機（管理員建立、加成員）、排隊、從事務機掃描進工作區 —— 路由層 |
+| `test_mfp_soap.py` | KYOCERA / RICOH 直接取件（SOAP，實驗功能）—— 用照研究文件寫的假設備驗流程與安全邊界 |
+| `test_mfp_soap_jobs.py` | KYOCERA / RICOH 直接取件（SOAP，實驗功能）—— 路由與背景作業（v1.16.95） |
+| `test_mfp_soap_matches_templates.py` | KYOCERA / RICOH 送出去的每一種 SOAP 請求，結構要跟研究文件附的請求範本一致（v1.16.95） |
+| `test_mfp_soap_page_browser.py` | KYOCERA / RICOH 直接取件 —— 在真的瀏覽器裡跑一次（對本機的假 KYOCERA、假 RICOH，v1.16.95） |
 | `test_migration_fk_cascade.py` | 重建資料表的 migration 一律要關掉外鍵，否則升級會**清空子表** |
 | `test_missing_office_engine_is_503.py` | 缺 Office 引擎要回 **503**，不可以回 500 |
 | `test_my_jobs_open_button_e2e.py` | 「我的作業」在**真的瀏覽器**裡：打得開的那一列才有「開啟」 |
@@ -2045,6 +2049,14 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] **最近的掃描與取件表格**（v1.16.91、v1.16.93）：1280 / 1180 寬右邊的按鈕排成一排（使用者 2026-10-15 截圖：開啟、下載、前往工作區被擠成三行）；
       1280 寬時間、事務機（「HP M141w」）、內容（「scan-20261014-144007.pdf」）都只有一行，空白按比例分給各欄（同日截圖：被折成三行、右邊一大片空白）；
       1180 / 900 寬不超出外框（先由狀態欄折行）；390 寬事務機名稱不會一字一行（`tests/test_mfp_scan_page_browser.py`）
+- [ ] **KYOCERA / RICOH 直接取件**（v1.16.95，實驗功能）：KYOCERA 的列上一定有「取件」（連接埠固定，不靠連線測試），連線方式有 HTTPS 9091（預設）與 HTTP 9090；
+      RICOH 要連線測試連得上網頁才有。面板說明改成「依原廠工具的分析寫成，不是原廠公開的介面」，多一欄「文件匣密碼」（KYOCERA）/「文件密碼」（RICOH）。
+      KYOCERA：位置是文件匣（「1 會計（共享）」「2 個人」），有密碼的文件匣先顯示「文件匣密碼不對」、填了再列；RICOH：位置是「文件伺服器」、有密碼的文件標「有密碼」。
+      清單與存檔都用設備上的名稱（不是 `~` 開頭的識別碼，斜線換成空白）；一份分成幾個部分時 PDF 合成一份、原始格式加頁序；取完 KYOCERA 會登出、RICOH 結束工作階段。
+      協定紀錄沒有密碼、權杖、票證、工作階段代碼、下載網址的查詢字串；RICOH 的認證網址或下載網址不在同一台設備就不連（密碼一個字都不送）。
+      送出去的 22 種請求跟分析文件附的範本逐一比對結構（`tests/test_mfp_soap.py`、`tests/test_mfp_soap_matches_templates.py`、`tests/test_mfp_soap_jobs.py`、`tests/test_mfp_soap_page_browser.py`）
+- [ ] **實機驗證 KYOCERA / RICOH 直接取件（拿到設備後）**：KYOCERA 的多頁回應與 `range` 單位、9091 憑證、網路認證帳號；RICOH 的票證登入（provider / domain）、
+      內容元素與下載網址（GET / POST）、文件密碼；把協定紀錄存進 docs-share/mfp-fetch/，通過才拿掉「實驗功能」
 - [ ] **實機驗證檔案分享取件（拿到設備後）**：Canon Advanced Box（WebDAV / SMB、共享與個人空間、本機與網域帳號）、Konica 公用信箱（信箱編號登入是否要補零、分享名稱）、
       SHARP NAS（public / shared 的權限）；各用兩個一般帳號驗證看不到彼此的個人文件，通過才拿掉「實驗功能」
 - [ ] **實機驗證（拿到設備後）**：C5571 → C5570 → C4570 → C6680 各跑一次連線測試，下載報告存進 docs-share/mfp-fetch/

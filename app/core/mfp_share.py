@@ -10,6 +10,12 @@
 | `konica_smb` | Konica Minolta（bizhub i 系列） | SMB，公用信箱的分享（名稱是九位信箱編號＋信箱名稱） | 公用信箱的檔案副本 | ID＝信箱編號（照使用者輸入送一次，不自己補零輪試）、密碼＝信箱密碼 |
 | `sharp_smb` | SHARP（BP 系列） | SMB，NAS 的 `public` / `shared` / `faxreceive`（照設備實際列出的） | `public` 是「給電腦看的 PDF 副本」 | 設備的使用者帳密 |
 
+v1.16.95 加 KYOCERA / RICOH 的直接取件（SOAP，`mfp_soap`）：依據是分析者從原廠工具整理的方法，
+**不是原廠公開的介面**，也沒有實機樣本；一樣標實驗功能。
+
+| `kyocera_soap` / `kyocera_soap_http` | KYOCERA（TASKalfa / ECOSYS） | KM-WSDL，HTTPS 9091 / HTTP 9090 | 機內文件匣（匯出 TIFF） | 設備的使用者帳密；文件匣密碼另填 |
+| `ricoh_soap` | RICOH（IM / MP） | `/DH/repository`，連線測試連得上的那組協定與連接埠 | 文件伺服器的文件（原始格式） | 設備的使用者帳密（換票證）；文件密碼另填 |
+
 **共享區一律標「共享」**（Canon `share`、Konica 公用信箱、SHARP 的分享）：那是設備本來就讓多人看的地方，不當成個人文件。
 
 ## 安全邊界（跟機內信箱取件同一套）
@@ -46,17 +52,27 @@ MAX_FILES_PER_JOB = 50
 MAX_FILE_BYTES = 200 * 1024 * 1024
 MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 
+#: `target`：用哪組協定與連接埠 —— `reachable`＝連線測試連得上的那幾組裡挑；`fixed`＝路線自己決定（KYOCERA 9091 / 9090）；
+#: 沒有＝SMB 445。
 ROUTES: dict[str, dict] = {
-    "canon_webdav": {"vendor": "Canon", "transport": "webdav", "auth": "user", "roots": ("share", "users")},
+    "canon_webdav": {"vendor": "Canon", "transport": "webdav", "auth": "user", "roots": ("share", "users"),
+                     "target": "reachable"},
     "canon_smb": {"vendor": "Canon", "transport": "smb", "auth": "user", "roots": ("share", "users")},
     "konica_smb": {"vendor": "Konica Minolta", "transport": "smb", "auth": "box", "roots": None},
     "sharp_smb": {"vendor": "Sharp", "transport": "smb", "auth": "user", "roots": None},
+    "kyocera_soap": {"vendor": "Kyocera", "transport": "soap", "auth": "user", "roots": None, "target": "fixed",
+                     "scheme": "https"},
+    "kyocera_soap_http": {"vendor": "Kyocera", "transport": "soap", "auth": "user", "roots": None,
+                          "target": "fixed", "scheme": "http"},
+    "ricoh_soap": {"vendor": "Ricoh", "transport": "soap", "auth": "user", "roots": None, "target": "reachable"},
 }
 #: 每個廠牌能用的路線（第一個是預設）。
 VENDOR_ROUTES: dict[str, tuple[str, ...]] = {
     "Canon": ("canon_webdav", "canon_smb"),
     "Konica Minolta": ("konica_smb",),
     "Sharp": ("sharp_smb",),
+    "Kyocera": ("kyocera_soap", "kyocera_soap_http"),
+    "Ricoh": ("ricoh_soap",),
 }
 #: 位置是不是共享的（畫面上要標「共享」）。
 SHARED_ROOTS = {"share": True, "users": False, "public": True, "shared": True, "faxreceive": True}
@@ -84,7 +100,10 @@ MESSAGES: dict[str, str] = {
 }
 #: 這些錯誤代表連線本身有問題，整件取件就停。
 FATAL = mfp_box.FATAL | {"SMB_PLAIN_NEEDS_CONSENT", "SMB_CONNECT_FAILED", "SMB1_REFUSED", "SMB_AUTH_FAILED",
-                         "SMB_UNAVAILABLE", "SHARE_NOT_FOUND", "SHARE_FORBIDDEN"}
+                         "SMB_UNAVAILABLE", "SHARE_NOT_FOUND", "SHARE_FORBIDDEN",
+                         # KYOCERA / RICOH（`mfp_soap`）
+                         "SOAP_UNAVAILABLE", "SESSION_EXPIRED", "BOX_PASSWORD_FAILED", "RICOH_AUTH_UNSUPPORTED",
+                         "RICOH_AUTH_URL_UNTRUSTED", "RICOH_FEATURE_UNSUPPORTED"}
 
 
 class ShareError(mfp_box.BoxError):
@@ -487,6 +506,26 @@ def routes_for(vendor: Optional[str]) -> tuple[str, ...]:
     return VENDOR_ROUTES.get(vendor or "", ())
 
 
+def needs_reachable_target(route: str) -> bool:
+    """這條路線要不要用連線測試連得上的協定與連接埠（WebDAV、RICOH）。"""
+    return ROUTES.get(route, {}).get("target") == "reachable"
+
+
+def protocol(route: str) -> str:
+    return {"webdav": "WebDAV", "smb": "SMB", "soap": "SOAP"}[ROUTES[route]["transport"]]
+
+
+def display_name(sess: Session, root: str, path: list[str]) -> str:
+    """畫面與作業紀錄上的檔名：SOAP 的路徑段是編碼過的識別碼，要換回設備上的名稱。"""
+    fn = getattr(sess, "display_name", None)
+    if fn is not None:
+        try:
+            return str(fn(root, path) or path[-1])
+        except mfp_box.BoxError:
+            return path[-1]
+    return path[-1]
+
+
 def open_session(route: str, *, host: str, ip: str, scheme: Optional[str], port: Optional[int], user: str,
                  password: str, box: Optional[str], box_password: str, trust_sha256: Optional[str],
                  allow_http: bool, allow_plain: bool, trace: list) -> Session:
@@ -494,6 +533,21 @@ def open_session(route: str, *, host: str, ip: str, scheme: Optional[str], port:
     if route not in ROUTES:
         raise ShareError("SHARE_ROUTE_INVALID")
     spec = ROUTES[route]
+    if spec["transport"] == "soap":
+        from . import mfp_soap
+        if spec.get("target") == "fixed":
+            code = mc.check_address(ip)
+            if code:
+                raise mc.PolicyError(code, {"ip": ip})
+            return mfp_soap.KyoceraSession(route, host, ip, spec["scheme"], user=user, password=password,
+                                           box_password=box_password, trust_sha256=trust_sha256,
+                                           allow_http=allow_http, trace=trace)
+        if not scheme or not port:
+            raise ShareError("BOX_NO_TARGET")
+        mfp_box._check_target(ip, scheme, int(port))
+        return mfp_soap.RicohSession(route, host, ip, scheme, int(port), user=user, password=password,
+                                     doc_password=box_password, trust_sha256=trust_sha256,
+                                     allow_http=allow_http, trace=trace)
     if spec["transport"] == "webdav":
         if not scheme or not port:
             raise ShareError("BOX_NO_TARGET")
@@ -517,3 +571,8 @@ def konica_box_share(sess: SmbSession, box: str) -> str:
     if not hits:
         raise ShareError("BOX_SHARE_NOT_FOUND")
     return sorted(hits)[0]
+
+
+# KYOCERA / RICOH：`mfp_soap` 匯入本模組，所以放在最後；它被匯入時會把自己的訊息登記進 MESSAGES
+# （先匯入哪一個都一樣，測試釘住）
+from . import mfp_soap as _soap  # noqa: E402,F401

@@ -370,7 +370,8 @@ class _Dav:
         if not self._target_ok(path):
             raise ValueError("unsafe request target")
         t0 = time.monotonic()
-        entry: dict[str, Any] = {"method": method, "path": path}
+        # 協定紀錄不記查詢字串：設備給的下載網址可能帶一次性的權杖（RICOH getDocContentUrl）
+        entry: dict[str, Any] = {"method": method, "path": path.split("?", 1)[0]}
         if depth is not None:
             entry["depth"] = depth
         sock = None
@@ -440,7 +441,7 @@ class _Dav:
         except (OSError, http.client.HTTPException) as e:
             code = "DAV_TIMEOUT" if isinstance(e, TimeoutError) else "DAV_CONNECTION_FAILED"
             entry["error"] = code
-            raise BoxError(code, {"error": e.__class__.__name__, "path": path}) from None
+            raise BoxError(code, {"error": e.__class__.__name__, "path": path.split("?", 1)[0]}) from None
         finally:
             if sock is not None:
                 sock.close()

@@ -1,6 +1,6 @@
 **繁體中文** ｜ [English](README_en.md) ｜ [日本語](README_ja.md)
 
-# Jason Tools 文件工具箱 v1.16.94
+# Jason Tools 文件工具箱 v1.16.95
 
 > ### ⚠ 2026-09-13 之前用 git 安裝的，這一版升級前要先跑一行
 >
@@ -126,7 +126,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 - **電子發票處理** — 掃台灣電子發票 QR Code 解出發票號碼 / 日期 / 金額 / 統編，自動帶賣方公司名、行業、會計科目（規則 + 可選 LLM 判讀），支援報帳檢查 + 當期發票檢查，匯出 .xlsx / .ods / .csv / .json / .xml / .txt / .md（標題可自訂）
 - **乘車證明整理** — 拉一批台鐵購票證明 / 高鐵電子車票證明 / Uber 行程收據 PDF，自動整理日期 / 交通工具 / 來源-目的 / 費用成表格，欄位可自訂，匯出 .xlsx / .ods / .csv / .json / .xml / .txt / .md 報帳
 - **統編查詢** — 輸入 8 位統一編號反查，或公司 / 機關 / 學校名稱、地址、行業關鍵字模糊搜尋（標示命中字）；含類別篩選 + 批次查詢 + CSV 匯出
-- **事務機掃描取件**（Beta）— 新增事務機（IP 或主機名稱）做連線測試與型號辨識，逐步列出 DNS / TCP / TLS 憑證 / HTTP 的診斷結果，可下載診斷報告；支援 eSCL（AirPrint / Mopria 掃描）的事務機可以直接掃描存進工作區（PDF 或 JPEG）。管理員可以建立共用事務機並指定成員；同一台一次只服務一個人，其他人自動排隊。只連內部網路，連線測試與掃描不傳送帳密。FUJIFILM 事務機的機內信箱取件，以及 Canon Advanced Box、Konica Minolta 公用信箱、SHARP NAS 的檔案分享取件（WebDAV / SMB）都是實驗功能：依原廠工具的研究或手冊公開的方式寫成、尚未在實機上驗證，只讀取不刪除，預設存成 PDF
+- **事務機掃描取件**（Beta）— 新增事務機（IP 或主機名稱）做連線測試與型號辨識，逐步列出 DNS / TCP / TLS 憑證 / HTTP 的診斷結果，可下載診斷報告；支援 eSCL（AirPrint / Mopria 掃描）的事務機可以直接掃描存進工作區（PDF 或 JPEG）。管理員可以建立共用事務機並指定成員；同一台一次只服務一個人，其他人自動排隊。只連內部網路，連線測試與掃描不傳送帳密。FUJIFILM 事務機的機內信箱取件，Canon Advanced Box、Konica Minolta 公用信箱、SHARP NAS 的檔案分享取件（WebDAV / SMB），以及 KYOCERA 文件匣、RICOH 文件伺服器的直接取件（SOAP）都是實驗功能：依原廠工具的研究或手冊公開的方式寫成、尚未在實機上驗證，只讀取不刪除，預設存成 PDF
 
 ### 格式轉換 [需 OxOffice/LibreOffice]
 - **辦公文件轉 PDF** — 把辦公文件批次轉成 PDF

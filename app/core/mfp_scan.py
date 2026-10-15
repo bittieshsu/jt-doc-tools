@@ -362,8 +362,11 @@ def start_share(*, owner: str, user_id: Optional[int], user_label: str, conn: di
         raise mfp_share.ShareError("SHARE_PATH_INVALID")
     if mfp_share.ROUTES[route]["auth"] != "box" and not mfp_share.valid_segment(root):
         raise mfp_share.ShareError("SHARE_ROOT_INVALID")
-    via = {"protocol": "WebDAV" if mfp_share.ROUTES[route]["transport"] == "webdav" else "SMB",
-           "scheme": scheme or "smb", "port": int(port or mfp_share.SMB_PORT)}
+    if mfp_share.ROUTES[route]["transport"] == "soap" and mfp_share.ROUTES[route].get("target") == "fixed":
+        from . import mfp_soap
+        scheme = mfp_share.ROUTES[route]["scheme"]
+        port = mfp_soap.kyocera_target(scheme)
+    via = {"protocol": mfp_share.protocol(route), "scheme": scheme or "smb", "port": int(port or mfp_share.SMB_PORT)}
     settings = {"via": via, "route": route, "root": root, "output": output,
                 "files": ["/".join(p) for p in paths][:mfp_share.MAX_FILES_PER_JOB]}
     ticket = mfp_queue.enqueue(device, owner, "share")
@@ -418,6 +421,26 @@ def _share_outputs(path: Path, src_name: str, output: str, workdir: Path) -> tup
     return [{"path": path, "kind": kind, "pages": pages, "name": stem + name_ext}], note
 
 
+def _share_parts_outputs(parts: list[Path], src_name: str, output: str,
+                         workdir: Path) -> tuple[list[dict], Optional[str]]:
+    """一份文件分成好幾個部分取回（KYOCERA 多次回應、RICOH 多個內容元素）→ 要存的檔案。
+
+    每個部分都要是認得的格式（PDF / JPEG / TIFF）：不認得的不猜怎麼接，整份算失敗。PDF 照頁序合成一份；
+    原始格式各存一個檔、加頁序編號（跟信箱取件同一套 `_box_outputs`）。"""
+    got = []
+    for part in parts:
+        kind = mfp_output.sniff(part)
+        if kind not in mfp_output.EXT:
+            raise mfp_share.ShareError("DOC_INVALID", {"reason": "unknown part format", "parts": len(parts)})
+        try:
+            info = mfp_output.inspect(part, kind)
+        except mfp_output.OutputError:
+            raise mfp_share.ShareError("DOC_INVALID", {"kind": kind}) from None
+        got.append({"path": part, "kind": kind, "pages": info["pages"]})
+    stem = clean_stem(Path(src_name).stem if "." in src_name else src_name, "file")
+    return _box_outputs(got, workdir, stem, output, 0)
+
+
 def _run_share(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional[int], user_label: str,
                host: str, ip: str, route: str, scheme: Optional[str], port: Optional[int], root: str,
                paths: list[list[str]], output: str, creds: dict, trust: Optional[str], allow_http: bool,
@@ -461,7 +484,14 @@ def _run_share(*, job_id: str, ticket, cancel: threading.Event, user_id: Optiona
                     raise mfp_share.ShareError("SHARE_FILE_TOO_LARGE")
                 got = sess.download(root, segs, dest, left)
                 total += got["bytes"]
-                files, note = _share_outputs(dest, segs[-1], output, d)
+                name = mfp_share.display_name(sess, root, segs)
+                item.update(doc="/".join(segs[:-1] + [name])[:300], name=name[:120])
+                # 設備上的文件名稱可以有斜線（KYOCERA / RICOH）：先換掉，不然取檔名時只剩最後一段
+                fname = re.sub(r"\s*[\\/]+\s*", " ", name).strip() or "file"
+                if got.get("parts"):
+                    files, note = _share_parts_outputs(got["parts"], fname, output, d)
+                else:
+                    files, note = _share_outputs(dest, fname, output, d)
             except mfp_box.BoxError as e:
                 dest.unlink(missing_ok=True)
                 item.update(status="error", error_code=e.code)
@@ -469,7 +499,7 @@ def _run_share(*, job_id: str, ticket, cancel: threading.Event, user_id: Optiona
                     stop = e
                 continue
             item.update(status="ok", pages=sum(f.get("pages") or 0 for f in files),
-                        sources=[{"name": segs[-1][:120], "bytes": got["bytes"], "sha256": got["sha256"]}])
+                        sources=[{"name": item["name"], "bytes": got["bytes"], "sha256": got["sha256"]}])
             if note:
                 item["format_note"] = note
             item["files"] = files

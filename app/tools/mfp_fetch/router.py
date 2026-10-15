@@ -310,9 +310,10 @@ def _with_state(c: dict, who: _Who) -> dict:
     c.pop("escl", None)
     # 機內信箱取件（推測實作）：FUJIFILM、而且連線測試連得上
     c["box"] = c.get("vendor") == "FUJIFILM" and bool(c.get("reachable_on"))
-    # 檔案分享取件（實驗功能）：Canon Advanced Box（WebDAV / SMB）、Konica 公用信箱、SHARP NAS（SMB）
+    # 檔案分享取件（實驗功能）：Canon Advanced Box（WebDAV / SMB）、Konica 公用信箱、SHARP NAS（SMB）、
+    # KYOCERA 文件匣與 RICOH 文件伺服器（SOAP）。WebDAV、RICOH 要用連線測試連得上的那組協定與連接埠
     routes = [r for r in mfp_share.routes_for(c.get("vendor"))
-              if mfp_share.ROUTES[r]["transport"] != "webdav" or c.get("reachable_on")]
+              if not mfp_share.needs_reachable_target(r) or c.get("reachable_on")]
     c["share"] = {"routes": routes} if routes else None
     # 管理員關掉「使用者自行新增事務機」：自己的暫停使用（資料留著，可以移除）
     c["paused"] = not c.get("shared") and not who.can_own
@@ -776,7 +777,8 @@ def _share_inputs(body: dict) -> dict:
 
 
 def _share_target(c: dict, route: str, want: Any) -> tuple[Optional[str], Optional[int]]:
-    if mfp_share.ROUTES[route]["transport"] != "webdav":
+    """WebDAV、RICOH：連線測試連得上的那組；KYOCERA 的連接埠由路線決定；SMB 是 445。"""
+    if not mfp_share.needs_reachable_target(route):
         return None, None
     return _box_target(c, want)
 

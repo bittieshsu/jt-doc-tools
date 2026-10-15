@@ -171,6 +171,7 @@
 .mf-switch { display:flex; gap:10px; align-items:center; font-size:14px; color:#0f172a; cursor:pointer; }
 .mf-switch input { width:18px; height:18px; margin:0; }
 .mf-tag.paused { background:#f1f5f9; color:#475569; }
+.mf-tag.locked { background:#fef2f2; color:#991b1b; }
 /* 成員 */
 .mf-members { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin:8px 0; }
 .mf-mlist { border:1px solid #e2e8f0; border-radius:8px; background:#fff; overflow:hidden; }
@@ -414,7 +415,8 @@
     <h2 id="mfShareTitle" class="mf-scan-title"></h2>
     <button type="button" class="btn btn-secondary btn-small" id="mfShareClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
   </div>
-  <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依原廠手冊公開的方式寫成，還沒在實機上驗證過。只會讀取（列出、下載），不會刪除、改名或寫入事務機上的檔案。') }}</span></div>
+  <div class="mf-beta-note" id="mfShareNoteManual">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依原廠手冊公開的方式寫成，還沒在實機上驗證過。只會讀取（列出、下載），不會刪除、改名或寫入事務機上的檔案。') }}</span></div>
+  <div class="mf-beta-note" id="mfShareNoteDirect" hidden>{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依原廠工具的分析寫成，不是原廠公開的介面，還沒在實機上驗證過。只會讀取（列出、下載），不會刪除、改名或寫入事務機上的文件。') }}</span></div>
   <form id="mfShareForm" class="mf-box-form" autocomplete="off">
     <div id="mfShareRouteWrap" hidden>
       <label for="mfShareRoute">{{ tr('連線方式') }}</label>
@@ -431,6 +433,10 @@
     <div>
       <label for="mfSharePw" id="mfSharePwLabel">{{ tr('密碼') }}</label>
       <input id="mfSharePw" type="password" maxlength="256" autocomplete="off">
+    </div>
+    <div id="mfShareExtraWrap" hidden>
+      <label for="mfShareExtra" id="mfShareExtraLabel"></label>
+      <input id="mfShareExtra" type="password" maxlength="128" autocomplete="off">
     </div>
     <div>
       <button type="submit" class="btn btn-primary" id="mfShareListBtn">{{ icon('search', size=14) }} <span>{{ tr('列出檔案') }}</span></button>
@@ -1475,7 +1481,11 @@
 
   // ---- 檔案分享取件（Canon Advanced Box、Konica 公用信箱、SHARP NAS；實驗功能）
   // 跟信箱取件同一個原則：只問需要的；憑證、HTTP / SMB 不加密的同意只問一次（記在這台瀏覽器，不記密碼）。
-  const ROUTE_NAMES = { canon_webdav: tr('WebDAV（建議）'), canon_smb: 'SMB', konica_smb: 'SMB', sharp_smb: 'SMB' };
+  const ROUTE_NAMES = { canon_webdav: tr('WebDAV（建議）'), canon_smb: 'SMB', konica_smb: 'SMB', sharp_smb: 'SMB',
+                        kyocera_soap: tr('HTTPS 9091（建議）'), kyocera_soap_http: 'HTTP 9090', ricoh_soap: 'SOAP' };
+  // KYOCERA / RICOH 直接取件（SOAP）：多一欄文件匣 / 文件密碼；RICOH 只有一個位置（文件伺服器）
+  const SOAP_ROUTES = { kyocera_soap: 'kyocera', kyocera_soap_http: 'kyocera', ricoh_soap: 'ricoh' };
+  const ROOT_LABELS = { ricoh: { documents: tr('文件伺服器') } };
   const sharePanel = document.getElementById('mfSharePanel');
   let shareConn = null;
   let shareState = { route: '', root: '', path: [], entries: [], roots: [] };
@@ -1486,11 +1496,18 @@
     try { localStorage.setItem('mfp-share-' + c.id, JSON.stringify(Object.assign(sharePrefs(c), patch))); } catch (e) { /* 私密視窗等 */ }
   }
   function shareIsBox() { return shareState.route === 'konica_smb'; }
+  function shareSoap() { return SOAP_ROUTES[shareState.route] || ''; }
   function syncShareFields() {
     const isBox = shareIsBox();
+    const soap = shareSoap();
     boxEl('mfShareBoxWrap').hidden = !isBox;
     boxEl('mfShareUserWrap').hidden = isBox;
     boxEl('mfSharePwLabel').textContent = isBox ? tr('信箱密碼（沒有設就留空）') : tr('密碼');
+    boxEl('mfShareExtraWrap').hidden = !soap;
+    boxEl('mfShareExtraLabel').textContent = soap === 'kyocera' ? tr('文件匣密碼（沒有設就留空）')
+      : tr('文件密碼（有設密碼的文件才要填）');
+    boxEl('mfShareNoteManual').hidden = !!soap;
+    boxEl('mfShareNoteDirect').hidden = !soap;
   }
   function openShare(c) {
     shareConn = c;
@@ -1503,6 +1520,7 @@
     boxEl('mfShareUser').value = pr.user || '';
     boxEl('mfShareBox').value = pr.box || '';
     boxEl('mfSharePw').value = '';
+    boxEl('mfShareExtra').value = '';
     syncShareFields();
     for (const id of ['mfShareConfirm', 'mfShareError', 'mfShareFiles', 'mfShareState', 'mfShareTech']) boxEl(id).hidden = true;
     sharePanel.hidden = false;
@@ -1515,7 +1533,7 @@
       user: shareIsBox() ? '' : boxEl('mfShareUser').value.trim(),
       box: shareIsBox() ? boxEl('mfShareBox').value.trim() : '',
       password: shareIsBox() ? '' : boxEl('mfSharePw').value,
-      box_password: shareIsBox() ? boxEl('mfSharePw').value : '',
+      box_password: shareIsBox() ? boxEl('mfSharePw').value : (shareSoap() ? boxEl('mfShareExtra').value : ''),
       trust_sha256: pr.trust || null,
       allow_http: pr.http === true,
       allow_plain: pr.plain === true,
@@ -1555,13 +1573,16 @@
     shareState.path = res.path || [];
     shareState.entries = res.entries || [];
     shareState.roots = res.roots || [];
-    const labels = Object.fromEntries(shareState.roots.map(r => [r.id, r.id + (r.shared ? P.lp + tr('共享') + P.rp : '')]));
+    const fixed = ROOT_LABELS[shareSoap()] || {};
+    const rootName = (r) => fixed[r.id] || r.label || r.id;
+    const labels = Object.fromEntries(shareState.roots.map(r => [r.id, rootName(r) + (r.shared ? P.lp + tr('共享') + P.rp : '')]));
     fillSelect('mfShareRoot', shareState.roots.map(r => r.id), labels, res.root);
-    boxEl('mfShareRootWrap').hidden = shareState.roots.length < 2 && shareIsBox();
+    boxEl('mfShareRootWrap').hidden = shareState.roots.length < 2 && (shareIsBox() || !!shareSoap());
     boxEl('mfShareSharedNote').hidden = !res.shared;
     const crumbs = boxEl('mfShareCrumbs');
     crumbs.replaceChildren();
-    const parts = [res.root].concat(shareState.path);
+    const rootRec = shareState.roots.find(r => r.id === res.root);
+    const parts = [rootRec ? rootName(rootRec) : res.root].concat(shareState.path);
     parts.forEach((name, i) => {
       if (i) crumbs.append(txt(' / '));
       const b = el('button', null, name);
@@ -1586,7 +1607,8 @@
         const td0 = el('td');
         const nm = el('td', e.dir ? 'mf-dir' : 'mf-file');
         nm.dataset.i18n = 'skip';
-        nm.append(icon(e.dir ? 'archive' : 'page'), txt(e.name));
+        nm.append(icon(e.dir ? 'archive' : 'page'), txt(e.label || e.name));     // SOAP 的 name 是編碼過的識別碼
+        if (e.locked) nm.append(el('span', 'mf-tag locked', tr('有密碼')));
         if (e.dir) {
           r.dataset.dir = e.name;
           r.addEventListener('click', () => shareList(shareState.path.concat([e.name])));
@@ -1654,6 +1676,7 @@
     boxEl('mfShareClose').addEventListener('click', () => {
       sharePanel.hidden = true;
       boxEl('mfSharePw').value = '';
+      boxEl('mfShareExtra').value = '';
     });
   }
 
