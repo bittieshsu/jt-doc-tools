@@ -11,6 +11,8 @@ SAML assertion validated by python3-saml; the next-url rides in RelayState.
 """
 from __future__ import annotations
 
+import asyncio
+
 import base64
 import hashlib
 import hmac
@@ -73,10 +75,15 @@ def _public_base(request: Request) -> str:
     return f"{scheme}://{host}"
 
 
-def _audit(event: str, ip: str, *, username: str = "", detail: str = "") -> None:
+def _audit(event: str, ip: str, *, username: str = "", detail: str = "", provider: str = "") -> None:
+    """SSO 的稽核：哪一種（oidc / saml）、帳號（知道的時候）、原因。原因截 400 字（IdP 的錯誤說明常常很長）。"""
     try:
-        audit_db.log_event(event, username=username, ip=ip, target="sso",
-                           details={"info": detail[:200]} if detail else None)
+        details: dict = {}
+        if provider:
+            details["provider"] = provider
+        if detail:
+            details["info"] = detail[:400]
+        audit_db.log_event(event, username=username, ip=ip, target="sso", details=details or None)
     except Exception:
         pass
 
@@ -125,10 +132,11 @@ def build_router(templates) -> APIRouter:
         state, nonce = oidc.new_state(), oidc.new_nonce()
         redirect_uri = _public_base(request) + "/auth/oidc/callback"
         try:
-            url = oidc.build_auth_url(cfg, state=state, nonce=nonce,
-                                      redirect_uri=redirect_uri)
+            # 會連 IdP 抓探索文件：丟到執行緒（IdP 一慢，事件迴圈不能跟著停 —— 全站會卡）
+            url = await asyncio.to_thread(oidc.build_auth_url, cfg, state=state, nonce=nonce,
+                                          redirect_uri=redirect_uri)
         except oidc.OIDCError as e:
-            _audit("login_fail", _client_ip(request), detail=f"oidc build: {e}")
+            _audit("login_fail", _client_ip(request), detail=f"oidc build: {e}", provider="oidc")
             return _login_error("OIDC 登入失敗，請重試或聯絡管理員")
         resp = RedirectResponse(url, status_code=302)
         # OIDC 交易（state/nonce/next）存伺服器端，cookie 只放隨機 txid →
@@ -151,28 +159,34 @@ def build_router(templates) -> APIRouter:
         if not sso_settings.oidc_enabled():
             return _login_error("OIDC 登入未啟用")
         if error:
-            _audit("login_fail", ip, detail=f"oidc idp error: {error}")
+            _audit("login_fail", ip, detail=f"oidc idp error: {error}", provider="oidc")
             return _login_error("OIDC 供應商回傳錯誤，請重試或聯絡管理員")
         from ..core import sso_store
         tx = sso_store.pop_oidc_tx(request.cookies.get(_SSO_TX_COOKIE, ""))
         if not tx or not state or not hmac.compare_digest(str(tx.get("state", "")), state):
-            _audit("login_fail", ip, detail="oidc state mismatch")
+            _audit("login_fail", ip, detail="oidc state mismatch", provider="oidc")
             return _login_error("OIDC state 驗證失敗（請重新登入）")
         if not code:
             return _login_error("OIDC 回呼缺 code")
         cfg = sso_settings.get_oidc(reveal=True)
         redirect_uri = _public_base(request) + "/auth/oidc/callback"
-        try:
+        seen: dict = {}
+
+        def _complete() -> dict:
+            # 換 token、抓簽章金鑰都會連 IdP：整段在執行緒裡跑
             tok = oidc.exchange_code(cfg, code=code, redirect_uri=redirect_uri)
             claims = oidc.verify_id_token(cfg, tok["id_token"], nonce=tx.get("nonce"))
             ident = oidc.map_claims(cfg, claims)
-            user = sso_provision.provision(
+            seen["username"] = ident["username"]
+            return sso_provision.provision(
                 "oidc", external_id=ident["sub"], username=ident["username"],
                 display_name=ident["name"], groups=ident["groups"],
                 email=ident.get("email", ""),
                 admin_group=cfg.get("admin_group", ""))
+        try:
+            user = await asyncio.to_thread(_complete)
         except (oidc.OIDCError, sso_provision.SSOProvisionError) as e:
-            _audit("login_fail", ip, detail=f"oidc: {e}")
+            _audit("login_fail", ip, detail=f"oidc: {e}", provider="oidc", username=seen.get("username", ""))
             return _login_error("OIDC 登入失敗，請重試或聯絡管理員")
         return _finish_login(request, user, tx.get("next", "/"))
 
@@ -186,7 +200,7 @@ def build_router(templates) -> APIRouter:
             url = saml.build_auth_url(request, cfg, _public_base(request),
                                       relay_state=safe_next(next))
         except saml.SAMLError as e:
-            _audit("login_fail", _client_ip(request), detail=f"saml build: {e}")
+            _audit("login_fail", _client_ip(request), detail=f"saml build: {e}", provider="saml")
             return _login_error("SAML 登入設定錯誤，請聯絡管理員")
         return RedirectResponse(url, status_code=302)
 
@@ -198,6 +212,7 @@ def build_router(templates) -> APIRouter:
         form = await request.form()
         post_data = {k: str(v) for k, v in form.items()}
         cfg = sso_settings.get_saml(reveal=True)
+        ident = {}
         try:
             ident = saml.process_acs(request, cfg, _public_base(request), post_data)
             user = sso_provision.provision(
@@ -206,7 +221,8 @@ def build_router(templates) -> APIRouter:
                 email=ident.get("email", ""),
                 admin_group=cfg.get("admin_group", ""))
         except (saml.SAMLError, sso_provision.SSOProvisionError) as e:
-            _audit("login_fail", ip, detail=f"saml: {e}")
+            _audit("login_fail", ip, detail=f"saml: {e}", provider="saml",
+                   username=str((ident or {}).get("username") or ""))
             return _login_error("SAML 登入失敗，請重試或聯絡管理員")
         return _finish_login(request, user, ident.get("relay_state", "/"),
                              saml_session={"nameid": ident.get("nameid", ""),

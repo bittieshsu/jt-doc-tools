@@ -592,6 +592,28 @@ CSRF token**，驗的是「使用者按下登入之後會發生什麼」。
 SAML 由 `tests/test_sso_saml_e2e.py` 涵蓋（自架 IdP、真 xmlsec 簽章，含竄改 /
 換錯金鑰 / 重放三種攻擊路徑）。
 
+**LDAP 慢或連不上時不可以卡住全站**（v1.16.94，客戶回報按「連線測試」整個 jtdt 卡死）：
+- [ ] 伺服器 URL 填一個連不上的位址（或兩台都連不上）→ 按「連線測試」與「帳號測試」，等待期間**另開分頁**操作其他頁面要照常回應；
+      多台都連不上時十幾秒內回報「所有 LDAP 伺服器都連不上」，不會一直轉圈。
+- [ ] LDAPS 憑證名稱不符（填 IP、憑證只有 DNS 名稱）→ 連線測試說明「憑證上的名稱是…、設定的是…」，不倒整份憑證。
+- [ ] 一般使用者用 AD 帳號登入時 DC 很慢 → 其他人照常使用（`tests/test_ldap_does_not_block_the_server.py` 靜態檢查守住登入、代理 SSO、測試、目錄功能共 13 處）。
+- [ ] OIDC 登入、回呼、登出時身分提供者很慢 → 其他人照常使用（同一支測試也守 `oidc.*`）。
+
+**管理員停用的目錄帳號不可以靠登入復活**（v1.16.94 安全性修正）：
+- [ ] 使用者管理把一個登入過的 AD 帳號停用 → 那個人用正確的 AD 密碼登入 → 被擋下「帳號已停用」，帳號**仍是停用**；稽核記錄 `login_fail` 原因 `disabled_in_jtdt`、不算進鎖定次數。
+- [ ] 代理 SSO（Kerberos）同一個帳號也一樣被擋。
+- [ ] 目錄同步進來、從未登入過的帳號 → 第一次登入照常啟用。
+- [ ] 管理員再按「啟用」→ 可以登入。
+- [ ] 舊版升上來：原本停用的帳號升級後仍擋得住（`_m30_admin_disabled`）；從未登入的目錄帳號維持舊行為。
+
+**登入失敗的稽核記錄要夠查**（v1.16.94，`tests/test_login_failure_audit.py`；客戶 AD 存檔後馬上登入失敗、兩分鐘後就好）：
+- [ ] 稽核記錄頁每一筆 `login_fail` 都有 `reason` 與 `source`；認證關閉、領域停用、領域不存在各有自己的原因。
+- [ ] 本機帳號打錯 → `user_found` 說帳號在不在。
+- [ ] AD 找不到人 → 詳細有搜尋基準、篩選條件、花了幾毫秒、查的是哪一台 DC。
+- [ ] AD 密碼錯 → `ad_reason`（如「密碼錯誤」「帳號已被鎖定」）＋ **`dc`（設定的名稱與連接埠）與 `dc_ip`（實際 IP）**；登入成功那一筆也有 `dc` / `dc_ip`。
+- [ ] 全部 DC 都連不上 → 不可以記 `dc`（沒有一台回覆）。
+- [ ] 任何一筆的詳細裡都不可以出現密碼。
+
 **踩過的坑**：①目錄是**持久**的，腳本要自己把搬走的帳號放回去，否則第二次跑
 會出現三條假失敗；②OU 的 subject key 是**精確字串比對**，要用目錄實際回傳的
 大小寫（管理介面指派時寫的也是目錄回來的那一份）。
@@ -637,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **485 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **487 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -836,6 +858,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_latin_ext_garbled_recovery.py` | 擷取結果被映到拉丁擴充區、而且每個 span 都很短 —— 舊的判準抓不到 |
 | `test_layout_measured_in_browser.py` | 版面在**真的瀏覽器**裡量：欄位寬度、字有沒有被拆成兩行、該看得到的看不看得到 |
 | `test_ldap_attribute_portability.py` | LDAP 查詢的屬性清單不可以夾帶 AD 專屬屬性 |
+| `test_ldap_does_not_block_the_server.py` | LDAP / AD（以及 OIDC 身分提供者）不可以把整個服務卡住（v1.16.94） |
 | `test_ldap_failover.py` | 多台 DC 容錯與連線逾時 |
 | `test_learn_synonym_reports_existing_mappings.py` | 按「學起來」時要**把後果講出來** |
 | `test_license_declaration.py` | 本專案宣告的授權必須處處一致（v1.14.48 起改為 AGPL-3.0-or-later） |
@@ -849,6 +872,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_llm_thinking_off_any_backend.py` | 不管前面是哪一種 LLM 伺服器或閘道，思考都要關得掉（v1.16.30） |
 | `test_llm_url_ssrf.py` | SSRF defence — admin-supplied LLM base URL must reject suspicious schemes |
 | `test_logging_survives_non_utf8_console.py` | 服務的記錄在「非 Unicode 程式語系」是英文的 Windows 上，中文訊息不可以消失（v1.16.56） |
+| `test_login_failure_audit.py` | 登入失敗的稽核要夠全、夠細，而且停用的目錄帳號不可以自己復活（v1.16.94） |
 | `test_looks_garbled.py` | Regression tests for pdf_editor._looks_garbled(). |
 | `test_markdown_to_doc_formats.py` | Markdown 轉辦公文件：只轉使用者要的格式 ＋ 程式碼語法上色 |
 | `test_meeting_chart_style_has_one_source.py` | 圖的配色只有一份 —— 前端畫圖、伺服器畫匯出用的圖，顏色必須同源 |
@@ -2018,8 +2042,9 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       390 寬時選單不超出畫面。（`tests/test_mfp_report.py`、`tests/test_mfp_fetch_page_browser.py`）
 - [ ] **eSCL 說明**（v1.16.91）：頁首說明的「eSCL」後面有「?」（英文版接在「eSCL-capable」後面）；按下出現深色說明框（本站樣式，不是瀏覽器原生提示），
       內容講 eSCL 是什麼、不用驅動程式與帳密、看「從本站掃描」判斷、掃描前放好文件；再按一次 / 點外面 / Esc 收起，點說明框本身不收；1280 與 390 寬都不超出畫面（`tests/test_mfp_fetch_page_browser.py`）
-- [ ] **最近的掃描與取件表格**（v1.16.91）：1280 / 1180 寬右邊的按鈕排成一排（使用者 2026-10-15 截圖：開啟、下載、前往工作區被擠成三行）；
-      時間那一格沒有大片空白（多的寬度給狀態）；900 寬不超出外框；390 寬事務機名稱不會一字一行（`tests/test_mfp_scan_page_browser.py`）
+- [ ] **最近的掃描與取件表格**（v1.16.91、v1.16.93）：1280 / 1180 寬右邊的按鈕排成一排（使用者 2026-10-15 截圖：開啟、下載、前往工作區被擠成三行）；
+      1280 寬時間、事務機（「HP M141w」）、內容（「scan-20261014-144007.pdf」）都只有一行，空白按比例分給各欄（同日截圖：被折成三行、右邊一大片空白）；
+      1180 / 900 寬不超出外框（先由狀態欄折行）；390 寬事務機名稱不會一字一行（`tests/test_mfp_scan_page_browser.py`）
 - [ ] **實機驗證檔案分享取件（拿到設備後）**：Canon Advanced Box（WebDAV / SMB、共享與個人空間、本機與網域帳號）、Konica 公用信箱（信箱編號登入是否要補零、分享名稱）、
       SHARP NAS（public / shared 的權限）；各用兩個一般帳號驗證看不到彼此的個人文件，通過才拿掉「實驗功能」
 - [ ] **實機驗證（拿到設備後）**：C5571 → C5570 → C4570 → C6680 各跑一次連線測試，下載報告存進 docs-share/mfp-fetch/

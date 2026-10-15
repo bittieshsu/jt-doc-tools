@@ -54,6 +54,7 @@ def authenticate(username: str, password: str, *,
     """
     backend = auth_settings.get_backend()
     if backend == "off":
+        _audit_fail(username, ip, "auth_off", realm)
         raise AuthError("認證未啟用")
 
     chosen = (realm or "").lower() or "auto"
@@ -71,6 +72,8 @@ def authenticate(username: str, password: str, *,
         # Refuse to use an LDAP realm when the backend isn't ldap/ad —
         # otherwise an attacker could bypass local-only setups.
         if backend not in ("ldap", "ad"):
+            # 有人在只開本機帳號的站台硬試目錄領域 —— 要留紀錄
+            _audit_fail(username, ip, "realm_disabled", chosen)
             raise AuthError("此認證領域未啟用")
         from . import auth_ldap, auth_local
         # 暴力破解鎖定：LDAP / AD 路徑重用本機同一套 lockout（per-user + per-IP，
@@ -82,10 +85,24 @@ def authenticate(username: str, password: str, *,
             raise AuthError(str(e))
         try:
             user = auth_ldap.authenticate(username, password, ip=ip)
+        except auth_ldap.AccountDisabledError as e:
+            # 密碼是對的、只是本站停用了：不算猜密碼（同本機帳號停用的處理）
+            raise AuthError(str(e))
         except auth_ldap.AuthError as e:
             auth_local.lockout_record_fail(username, ip)
             raise AuthError(str(e))
         auth_local.lockout_clear(username, ip)
         return user
 
+    _audit_fail(username, ip, "realm_invalid", chosen)
     raise AuthError("無效的認證領域")
+
+
+def _audit_fail(username: str, ip: str, reason: str, realm: str) -> None:
+    """登入在分派階段就被擋（認證關閉、領域不對）也要留紀錄；寫不進去不影響登入的結果。"""
+    try:
+        from . import audit_db
+        audit_db.log_event("login_fail", username=username or "", ip=ip,
+                           details={"reason": reason, "realm": str(realm or "")[:20]})
+    except Exception:  # noqa: BLE001
+        pass

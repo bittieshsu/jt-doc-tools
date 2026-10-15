@@ -202,10 +202,12 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
                     conn, user_key, user_threshold, lockout_minutes, window_seconds)
                 ip_just_locked = _record_fail(
                     conn, ip_key, ip_threshold, lockout_minutes, window_seconds)
+        # 畫面上一律「帳號或密碼錯誤」（不讓人試出哪些帳號存在）；稽核只給管理員看，
+        # 要分得出「沒有這個帳號」還是「密碼錯」
         audit_db.log_event(
             "login_fail",
             username=username, ip=ip, target=username,
-            details={"reason": "bad_credentials"},
+            details={"reason": "bad_credentials", "source": "local", "user_found": row is not None},
         )
         # 剛好在這次跨過門檻 → 送一筆專屬「帳號 / 來源已鎖定」事件，方便 SIEM
         # 直接對它告警（不必自己累計 login_fail 次數）。
@@ -228,7 +230,7 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
         audit_db.log_event(
             "login_fail",
             username=username, ip=ip, target=username,
-            details={"reason": "disabled"},
+            details={"reason": "disabled", "source": "local"},
         )
         raise AuthError("帳號已停用，請聯絡管理員")
 

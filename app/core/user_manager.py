@@ -276,8 +276,9 @@ def update(user_id: int, *, display_name: Optional[str] = None,
             # Refuse to disable the seed admin (would lock everyone out).
             if existing["is_admin_seed"] and not enabled:
                 raise ValueError("不能停用初始管理員帳號")
-            conn.execute("UPDATE users SET enabled=? WHERE id=?",
-                         (1 if enabled else 0, user_id))
+            # admin_disabled 跟著設：目錄帳號登入時看它擋（enabled 會被名冊啟用寫回 1，不能只靠它）
+            conn.execute("UPDATE users SET enabled=?, admin_disabled=? WHERE id=?",
+                         (1 if enabled else 0, 0 if enabled else 1, user_id))
             if not enabled:
                 # Disabled → revoke active sessions.
                 conn.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))

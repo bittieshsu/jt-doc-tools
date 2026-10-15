@@ -218,7 +218,7 @@ def build_auth_router(templates) -> APIRouter:
             try:
                 from ..core import oidc as _oidc
                 cfg = sso_settings.get_oidc(reveal=True)
-                doc = _oidc.discover(cfg)
+                doc = await _asyncio.to_thread(_oidc.discover, cfg)
                 out["oidc"] = {"ok": True,
                                "authorization_endpoint": doc.get("authorization_endpoint"),
                                "token_endpoint": doc.get("token_endpoint")}
@@ -390,7 +390,8 @@ def build_auth_router(templates) -> APIRouter:
         body = await request.json()
         cfg = _build_ldap_cfg_from_request(body)
         try:
-            res = auth_ldap.test_connection(cfg)
+            # 一律丟到執行緒：等 LDAP 的時候事件迴圈不能被佔住（客戶 2026-10-15：按測試整個 jtdt 卡死）
+            res = await _asyncio.to_thread(auth_ldap.test_connection, cfg)
         except auth_ldap.AuthError as exc:
             audit_db.log_event(
                 "settings_change", username=_actor(request),
@@ -413,7 +414,7 @@ def build_auth_router(templates) -> APIRouter:
         username = (body.get("username") or "").strip()
         password = body.get("password") or ""
         try:
-            res = auth_ldap.test_user_login(cfg, username, password)
+            res = await _asyncio.to_thread(auth_ldap.test_user_login, cfg, username, password)
         except auth_ldap.AuthError as exc:
             audit_db.log_event(
                 "settings_change", username=_actor(request),
@@ -1026,7 +1027,7 @@ def build_auth_router(templates) -> APIRouter:
             body = {}
         name_contains = str((body or {}).get("name_contains") or "").strip()
         try:
-            result = auth_ldap.sync_all_groups(name_contains=name_contains)
+            result = await _asyncio.to_thread(auth_ldap.sync_all_groups, name_contains=name_contains)
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
@@ -1122,7 +1123,7 @@ def build_auth_router(templates) -> APIRouter:
         if not dn:
             raise HTTPException(400, "此群組沒有目錄 DN（可能是本機群組）。")
         try:
-            members = auth_ldap.get_group_members(dn)
+            members = await _asyncio.to_thread(auth_ldap.get_group_members, dn)
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
@@ -1158,7 +1159,7 @@ def build_auth_router(templates) -> APIRouter:
         if not g or not (g.get("external_dn") or "").strip():
             raise HTTPException(404, "群組不存在或無目錄 DN")
         try:
-            n = auth_ldap.count_group_members(g["external_dn"])
+            n = await _asyncio.to_thread(auth_ldap.count_group_members, g["external_dn"])
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
@@ -1228,7 +1229,7 @@ def build_auth_router(templates) -> APIRouter:
         from ..core import auth_ldap
         _require_dir_backend()
         try:
-            nodes = auth_ldap.list_ou_children(dn)
+            nodes = await _asyncio.to_thread(auth_ldap.list_ou_children, dn)
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
@@ -1250,7 +1251,7 @@ def build_auth_router(templates) -> APIRouter:
         if not dn:
             raise HTTPException(400, "缺少 OU DN")
         try:
-            users = auth_ldap.list_ou_users(dn, recursive=bool(recursive))
+            users = await _asyncio.to_thread(auth_ldap.list_ou_users, dn, recursive=bool(recursive))
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
@@ -1278,7 +1279,7 @@ def build_auth_router(templates) -> APIRouter:
         if not dn:
             raise HTTPException(400, "缺少使用者 DN")
         try:
-            detail = auth_ldap.get_user_detail(dn)
+            detail = await _asyncio.to_thread(auth_ldap.get_user_detail, dn)
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
@@ -1471,7 +1472,7 @@ def build_auth_router(templates) -> APIRouter:
             return {"ok": True, "tree": [], "count": 0, "capped": False,
                     "matched_dns": [], "empty_rules": True}
         try:
-            res = auth_ldap.search_selected_objects(rules)
+            res = await _asyncio.to_thread(auth_ldap.search_selected_objects, rules)
         except auth_ldap.AuthError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001

@@ -21,6 +21,7 @@ Security:
 from __future__ import annotations
 
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -62,6 +63,14 @@ class UserNotFoundError(AuthError):
     pass
 
 
+class AccountDisabledError(AuthError):
+    """目錄驗證通過，但**管理員在本站停用了這個帳號**（`users.admin_disabled`）。
+
+    v1.16.94 以前目錄登入會把帳號寫回 `enabled=1`，停用等於沒停用（AD 密碼還對就能登入）。
+    分出來是為了：稽核寫得出原因、登入鎖定不把它算成猜密碼。"""
+    pass
+
+
 #: 連到某台 DC 的 TCP 連線多久沒建起來就換下一台（秒）。
 #: 預設值刻意小 —— DC 掛掉時使用者不該枯等 socket 的預設逾時（動輒數十秒），
 #: 那個體感就是「系統掛了」。
@@ -71,6 +80,11 @@ _RECEIVE_TIMEOUT = 30
 #: 某台 DC 連不上之後，隔多久再把它放回輪替（秒）。**不可以用 True**（見
 #: `_build_server` 的說明：那是永久排除）。
 _POOL_EXHAUST_SECONDS = 120
+#: 多台 DC 全部連不上時最多試幾輪就放棄。**不可以用 True**：ldap3 的 `active=True` 是「永遠重試」
+#: （每輪之間睡 `POOLING_LOOP_TIMEOUT` 秒），DC 全掛時登入與測試永遠不回來（客戶 2026-10-15）。
+_POOL_CYCLES = 1
+#: 兩輪之間等幾秒（ldap3 預設 10 秒；最後一輪失敗後也會睡這麼久才丟錯）。
+_POOL_LOOP_SECONDS = 1
 
 
 def _split_servers(server_url: str) -> list[str]:
@@ -126,8 +140,42 @@ def _build_server(cfg: dict):
     #         continue   # keeps server offline
     # 布林 True 那一支永遠成立，於是 DC 只要閃一次就再也不會被試，直到行程重啟。
     # 給秒數才是「先跳過、過一段時間再試」，DC 修好之後會自己回到輪替裡。
+    try:
+        from ldap3.utils.config import set_config_parameter
+        set_config_parameter("POOLING_LOOP_TIMEOUT", _POOL_LOOP_SECONDS)
+    except Exception:  # noqa: BLE001 —— 舊版 ldap3 沒有這個設定就用它的預設
+        pass
     return ServerPool([_one(u) for u in urls], pool_strategy=FIRST,
-                      active=True, exhaust=_POOL_EXHAUST_SECONDS)
+                      active=_POOL_CYCLES, exhaust=_POOL_EXHAUST_SECONDS)
+
+
+_CERT_TRIED = re.compile(r"doesn't match any name in \[([^\]]*)\]")
+_CERT_SAN = re.compile(r"\('(?:DNS|IP Address)', '([^']+)'\)")
+_CERT_SUBJECT = re.compile(r"'subject': \((.*?)\), 'issuer'")
+_CERT_CN = re.compile(r"\('commonName', '([^']+)'\)")
+
+
+def explain_ldap_error(exc: Exception) -> str:
+    """LDAP 連線錯誤 → 管理員看得懂的一句話（只用在管理頁的測試，一般登入照舊不透露細節）。
+
+    最常見的是 LDAPS **憑證上的名稱跟設定的伺服器位址不符**：ldap3 會把整份憑證字典倒出來
+    （客戶 2026-10-15 看到一大串、結尾還被畫面截掉），真正的原因在最後一句。
+    其他錯誤維持原本的「類別: 訊息」。"""
+    raw = str(exc)
+    tried = _CERT_TRIED.search(raw)
+    if tried and "certificate" in raw:
+        names = _CERT_SAN.findall(raw)
+        if not names:
+            subj = _CERT_SUBJECT.search(raw)
+            names = _CERT_CN.findall(subj.group(1)) if subj else []
+        hosts = re.findall(r"'([^']*)'", tried.group(1))
+        return ("伺服器憑證上的名稱跟設定的伺服器位址不符：憑證上是「" + "、".join(names or ["（沒有名稱）"])
+                + "」，設定的是「" + "、".join(hosts) + "」。請把伺服器 URL 改成憑證上的名稱"
+                "（這台主機要查得到這個 DNS 名稱），或請 AD 管理員在憑證加上這個名稱；"
+                "暫時取消「驗證憑證」也能連，但不建議長期這樣用。")
+    if "no active server available in server pool" in raw.lower():
+        return ("所有 LDAP 伺服器都連不上：請確認伺服器 URL、DNS 查得到、防火牆有開 389 / 636。")
+    return f"{type(exc).__name__}: {raw}"
 
 
 def _conn_kwargs() -> dict:
@@ -173,7 +221,7 @@ def test_connection(cfg: dict) -> dict:
         return {"ok": True, "elapsed_ms": elapsed, "who": str(who),
                 "vendor": str(vendor or "")}
     except Exception as exc:
-        raise AuthError(f"連線失敗：{type(exc).__name__}: {exc}")
+        raise AuthError(f"連線失敗：{explain_ldap_error(exc)}")
 
 
 def test_user_login(cfg: dict, username: str, password: str) -> dict:
@@ -233,7 +281,7 @@ def test_user_login(cfg: dict, username: str, password: str) -> dict:
                             size_limit=2)
             entries = list(svc_conn.entries)
     except Exception as exc:
-        raise AuthError(f"Service 連線/搜尋失敗：{type(exc).__name__}: {exc}")
+        raise AuthError(f"Service 連線/搜尋失敗：{explain_ldap_error(exc)}")
     if not entries:
         raise AuthError(f"找不到使用者「{username}」（搜尋 base 或 filter 可能不對）")
     if len(entries) > 1:
@@ -579,6 +627,7 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
                 size_limit=2,
             )
             entries = list(svc_conn.entries)
+            search_dc = _dc_label(svc_conn)      # 哪一台 DC 查的（找不到人時寫進稽核）
             primary_dn = ""
             if entries:
                 primary_dn = _lookup_primary_group_dn(
@@ -588,10 +637,12 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
         # Surface the real error class + message so admins can diagnose
         # (wrong port, bad service password, TLS issue, …). Service password
         # is never in the exception text itself, so this doesn't leak secrets.
-        raise AuthError(f"無法連線/查詢 LDAP：{type(exc).__name__}: {exc}")
+        raise AuthError(f"無法連線/查詢 LDAP：{explain_ldap_error(exc)}")
 
     if not entries:
-        raise UserNotFoundError("找不到使用者")
+        nf = UserNotFoundError("找不到使用者")
+        nf.dc_info = search_dc          # type: ignore[attr-defined]
+        raise nf
     if len(entries) > 1:
         from .log_safe import safe_log
         logger.warning("LDAP returned multiple users for %s — refusing", safe_log(username))
@@ -677,14 +728,23 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
         raise AuthError("帳號或密碼錯誤")
 
     backend, cfg = _resolve_backend_and_cfg()
+    t0 = time.time()
+
+    def _ms() -> int:
+        return int((time.time() - t0) * 1000)
 
     # Step 1+2: service bind + search (shared helper).
     try:
         info = _search_ldap_user(username, cfg)
-    except UserNotFoundError:
-        # Same error as wrong password (no user enumeration).
+    except UserNotFoundError as nf:
+        # Same error as wrong password (no user enumeration). 稽核記下搜尋條件：
+        # 找不到使用者最常見的原因是搜尋 base / filter 設錯，管理員要看得到
         audit_db.log_event("login_fail", username=username, ip=ip,
-                           details={"reason": "ldap_user_not_found"})
+                           details={"reason": "ldap_user_not_found", "source": backend,
+                                    "search_base": str(cfg.get("user_search_base") or "")[:200],
+                                    "search_filter": str(cfg.get("user_search_filter")
+                                                         or "(sAMAccountName={username})")[:200],
+                                    "elapsed_ms": _ms(), **getattr(nf, "dc_info", {})})
         raise AuthError("帳號或密碼錯誤")
     except AuthError as exc:
         # **目錄本身連不上 / service account 有問題**（密碼過期、DC 掛掉、TLS 錯…）。
@@ -696,18 +756,29 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
         #
         # 改成：細節進稽核（管理員看得到），畫面只給通用訊息。
         audit_db.log_event("login_fail", username=username, ip=ip,
-                           details={"reason": "ldap_unavailable",
-                                    "detail": str(exc)[:300]})
+                           details={"reason": ("ldap_multiple_users" if "多筆" in str(exc)
+                                               else "ldap_unavailable"),
+                                    "source": backend, "detail": str(exc)[:400],
+                                    "elapsed_ms": _ms()})
         raise AuthError("目前無法連線到認證伺服器，請稍後再試或聯絡管理員")
     user_dn = info["user_dn"]
 
     # Step 3: try to bind as the discovered user → password check.
+    # 連線（open）與驗證（bind）分兩步寫 —— 跟 `auto_bind=True` 做的事完全一樣（ldap3 的 AUTO_BIND_NO_TLS），
+    # 差別是失敗時拿得到 `conn`：**是哪一台 DC、哪個 IP 回的**要記進稽核（客戶 2026-10-15：存檔後馬上登入
+    # AD 回 52e、兩分鐘後就好 —— 要分得出是不是問到不同台 DC）。
     server = _build_server(cfg)
+    conn = None
     try:
-        with Connection(server, user=user_dn, password=password,
-                        auto_bind=True, raise_exceptions=True, check_names=False,
-                        **_conn_kwargs()):
-            pass
+        conn = Connection(server, user=user_dn, password=password,
+                          auto_bind=False, raise_exceptions=True, check_names=False,
+                          **_conn_kwargs())
+        conn.open(read_server_info=False)
+        conn.bind(read_server_info=True)
+        if not conn.bound:
+            from ldap3.core.exceptions import LDAPBindError
+            raise LDAPBindError("automatic bind not successful")
+        bind_dc = _dc_label(conn)
     except Exception as exc:
         # 使用者 bind 失敗的原因不只「密碼錯」—— 也可能是帳號在 AD 被鎖、
         # 密碼過期、帳號停用。原本只記 `ldap_bind_failed`，管理員完全分不出來，
@@ -715,16 +786,48 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
         # 記進**稽核**（給管理員），畫面上仍然只說「帳號或密碼錯誤」
         # （不做使用者列舉、也不洩漏目錄狀態）。
         audit_db.log_event("login_fail", username=username, ip=ip,
-                           details={"reason": "ldap_bind_failed",
-                                    **_bind_failure_detail(exc)})
+                           details={"reason": "ldap_bind_failed", "source": backend,
+                                    "elapsed_ms": _ms(), **_dc_label(conn), **_bind_failure_detail(exc)})
         raise AuthError("帳號或密碼錯誤")
+    finally:
+        if conn is not None:
+            try:
+                conn.unbind()
+            except Exception:  # noqa: BLE001 —— 收連線失敗不影響結果
+                pass
 
     # Step 4: sync into local users / groups tables.
-    user_row = _sync_directory_user(username, info, backend)
+    try:
+        user_row = _sync_directory_user(username, info, backend)
+    except AccountDisabledError:
+        audit_db.log_event("login_fail", username=username, ip=ip,
+                           details={"reason": "disabled_in_jtdt", "source": backend, "dn": user_dn})
+        raise
 
     audit_db.log_event("login_success", username=username, ip=ip,
-                       details={"source": backend, "dn": user_dn})
+                       details={"source": backend, "dn": user_dn, **bind_dc})
     return user_row
+
+
+def _dc_label(conn) -> dict:
+    """這次連線實際連上的 DC：設定裡的名稱＋連接埠、實際的 IP（同一個名稱可能輪流解析到不同台）。
+
+    多台 DC 時 ldap3 會把 `conn.server` 換成真的選中的那一台。**socket 沒連上就不記**：
+    連線池在連上之前 `conn.server` 已經有值，全部連不上時記它等於寫一台沒回話的 DC。
+    拿不到就回空 dict（不影響登入）。"""
+    try:
+        sock = getattr(conn, "socket", None)
+        peer = sock.getpeername() if sock is not None else None
+        if not peer:
+            return {}
+        out = {"dc_ip": str(peer[0])}
+        srv = getattr(conn, "server", None)
+        host, port = getattr(srv, "host", None), getattr(srv, "port", None)
+        if host:
+            out["dc"] = f"{'ldaps' if getattr(srv, 'ssl', False) else 'ldap'}://{host}:{port}"
+        return out
+    except Exception:  # noqa: BLE001
+        return {}
 
 
 def sync_user_by_username(username: str, *, ip: str = "") -> dict:
@@ -750,10 +853,13 @@ def _sync_user(username: str, display_name: str, dn: str, backend: str,
     conn = auth_db.conn()
     # Already-synced LDAP user → just refresh display_name + last_login.
     row = conn.execute(
-        "SELECT id, username FROM users WHERE source IN ('ldap','ad') "
+        "SELECT id, username, admin_disabled FROM users WHERE source IN ('ldap','ad') "
         "AND external_dn=?", (dn,)
     ).fetchone()
     now = time.time()
+    if row and row["admin_disabled"]:
+        # 管理員在本站停用：不可以因為目錄驗證通過就自己復活（下面的 UPDATE 會寫回 enabled=1）
+        raise AccountDisabledError("帳號已停用，請聯絡管理員")
     if row:
         with db.tx(conn):
             # 信箱以目錄為準；目錄沒填就保留原本的值（不要用空字串覆蓋掉
@@ -794,9 +900,11 @@ def _sync_user(username: str, display_name: str, dn: str, backend: str,
     # 登不進來，唯一解法是刪掉舊帳號 —— 角色與歷史全部陪葬。正確處理是
     # **把既有帳號的 DN 換成新的**（id / 角色 / 歷史全部保留），並寫稽核。
     clash = conn.execute(
-        "SELECT id, external_dn FROM users WHERE username=? AND source=?",
+        "SELECT id, external_dn, admin_disabled FROM users WHERE username=? AND source=?",
         (username, backend),
     ).fetchone()
+    if clash and clash["admin_disabled"]:
+        raise AccountDisabledError("帳號已停用，請聯絡管理員")
     if clash:
         old_dn = clash["external_dn"] or ""
         with db.tx(conn):

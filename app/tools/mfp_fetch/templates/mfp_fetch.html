@@ -84,17 +84,21 @@
   .mf-list td:last-child { white-space:normal; width:auto; }
 }
 .mf-list .mf-row-actions .btn { white-space:nowrap; }
-/* 時間、事務機、內容照內容寬度（長的在上限處折行），多出來的寬度給狀態 —— 不然空位全分給時間那一欄 */
-.mf-scans td:nth-child(-n+3), .mf-scans th:nth-child(-n+3) { width:1%; }
+/* 時間、事務機、內容：照內容寬度排，多的寬度由表格按比例分給各欄（跟「我的事務機」一樣）。
+   **不可以給 1% 寬**：那會把欄壓到「最小寬度」，中文與連字號處處可斷，「HP M141w」被折成三行、
+   檔名折三段，右邊卻空一大片（使用者 2026-10-15 截圖）。名稱與檔名有上限，超過才在空白、連字號處折行 */
 .mf-scans td:first-child { white-space:nowrap; }
 .mf-scans td:nth-child(-n+3), .mf-scans th:nth-child(-n+3) { padding-right:20px; }
-.mf-scans .mf-cap { display:inline-block; max-width:12em; overflow-wrap:anywhere; }
-.mf-scans .mf-cap.wide { min-width:6em; max-width:22em; }
-@media (max-width: 1100px) { .mf-scans .mf-cap.wide { max-width:14em; } }
-/* 720 以下一列一張：格子是區塊，不可以留著 1% 寬（字會一個一行） */
+.mf-scans .mf-cap { display:inline-block; max-width:14em; overflow-wrap:break-word; }
+.mf-scans .mf-cap.wide { max-width:28em; }
+/* 上限以內的一律不折行（fitCaps 量過才加 nw）：表格放不下時改由「狀態」欄讓步 —— 不然縮減平均攤給每一欄，
+   名稱、檔名照樣被折（1180 寬實測） */
+.mf-scans .mf-cap.nw { white-space:nowrap; }
+@media (max-width: 1100px) { .mf-scans .mf-cap.wide { max-width:16em; } }
 @media (max-width: 720px) {
-  .mf-scans td:nth-child(-n+3), .mf-scans th:nth-child(-n+3) { width:auto; padding-right:0; }
+  .mf-scans td:nth-child(-n+3), .mf-scans th:nth-child(-n+3) { padding-right:0; }
   .mf-scans .mf-cap, .mf-scans .mf-cap.wide { max-width:none; }
+  .mf-scans .mf-cap.nw { white-space:normal; }
 }
 .mf-del { color:#dc2626; }
 .mf-del:hover { background:#fee2e2; border-color:#fecaca; }
@@ -1197,6 +1201,23 @@
     tick();
   }
   let scansTimer = null;
+  // 名稱、檔名在上限以內就不折行：先全部設成不折，量到超出上限的才放回可折。
+  // 整張表還是放不下（窄視窗）就依序讓步：狀態欄本來就會折 → 再讓檔名可折 → 最後才讓事務機名稱可折
+  function fitCaps() {
+    const wrap = document.getElementById('mfScansWrap');
+    const tbl = wrap && wrap.querySelector('table');
+    if (!tbl) return;
+    tbl.querySelectorAll('.mf-cap').forEach((c) => {
+      c.classList.add('nw');
+      if (c.scrollWidth > c.clientWidth + 1) c.classList.remove('nw');
+    });
+    for (const sel of ['.mf-cap.wide', '.mf-cap']) {
+      if (tbl.getBoundingClientRect().width <= wrap.clientWidth + 1) break;
+      tbl.querySelectorAll(sel).forEach((c) => c.classList.remove('nw'));
+    }
+  }
+  let fitTimer = null;
+  window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitCaps, 150); });
   async function loadScans() {
     const wrap = document.getElementById('mfScansWrap');
     if (!wrap) return;
@@ -1239,6 +1260,7 @@
     }
     t.append(tb);
     wrap.replaceChildren(t);
+    fitCaps();
     if (scansTimer) clearTimeout(scansTimer);
     scansTimer = active ? setTimeout(loadScans, 3000) : null;
   }

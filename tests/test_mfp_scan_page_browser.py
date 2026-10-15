@@ -117,7 +117,8 @@ def test_scan_from_the_tool_page(live, locale):
     with _open(cdp) as ws:
         t = _Tab(ws)
         _start(t, base, "/tools/mfp-fetch/", locale)
-        _test_and_save(t, fake.port, "三樓" if locale == "zh-Hant" else "3F")
+        # 名稱與檔名照使用者實際的資料（2026-10-15 截圖：「HP M141w」與 scan-…pdf 都被折成三行）
+        _test_and_save(t, fake.port, "HP M141w")
         assert t.wait_for("!!document.querySelector('[data-mf-scan]')"), "支援 eSCL 的事務機要有「掃描」"
         # 清單每一列的按鈕排成一排（使用者 2026-10-14：「排列 下一版要改善」）—— 1280 寬
         t.send("Emulation.setDeviceMetricsOverride", {"width": 1280, "height": 900, "deviceScaleFactor": 1,
@@ -135,7 +136,7 @@ def test_scan_from_the_tool_page(live, locale):
         assert t.js("!!document.querySelector('#mfScanPanel .jt-select-trigger')"), "掃描選項要是本站樣式的下拉"
         t.shot(f"mfp_scan_{locale}_panel_1280", 1280)
         fake.docs = [pdf_bytes(2)]
-        t.js("document.getElementById('mfScanName').value = '合約'; document.getElementById('mfScanStart').click()")
+        t.js("document.getElementById('mfScanName').value = 'scan-20261014-144007'; document.getElementById('mfScanStart').click()")
         assert t.wait_for("document.getElementById('mfScanState').classList.contains('done')", 60), \
             t.js("document.getElementById('mfScanState').innerText")
         state = t.js("document.getElementById('mfScanState').innerText")
@@ -145,8 +146,8 @@ def test_scan_from_the_tool_page(live, locale):
         assert t.js("!!document.querySelector('#mfScanState a[href$=\"?dl=1\"]')"), "完成後要有下載"
         # 走什麼協定要顯示（使用者 2026-10-14）
         assert "eSCL" in state and ("HTTP " + str(fake.port)) in state, state
-        # 沒填檔名：用瀏覽器這邊的時間（伺服器可能是 UTC）—— 這次有填「合約」，檔名就是它
-        assert "合約.pdf" in t.js("document.getElementById('mfScansWrap').innerText")
+        # 沒填檔名：用瀏覽器這邊的時間（伺服器可能是 UTC）—— 這次有填，檔名就是它
+        assert "scan-20261014-144007.pdf" in t.js("document.getElementById('mfScansWrap').innerText")
         assert t.wait_for("document.querySelectorAll('#mfScansWrap tbody tr').length >= 1"), "最近的掃描沒有列出來"
         # 「最近的掃描與取件」的按鈕排成一排、不超出外框（使用者 2026-10-15：欄位還有很大空位，按鈕卻被擠成三行）
         for width in (1280, 1180, 900):
@@ -161,11 +162,18 @@ def test_scan_from_the_tool_page(live, locale):
             assert t.js("(() => { const w = document.getElementById('mfScansWrap');"
                         " return w.querySelector('table').getBoundingClientRect().right"
                         " <= w.getBoundingClientRect().right + 1; })()"), f"{width} 寬：表格超出外框"
-            # 空位不可以堆在時間那一欄：時間格比裡面的字寬不到 40 px（多的寬度給狀態）
-            gap = t.js("(() => { const td = document.querySelector('#mfScansWrap tbody td');"
-                       " const r = document.createRange(); r.selectNodeContents(td);"
-                       " return Math.round(td.getBoundingClientRect().width - r.getBoundingClientRect().width); })()")
-            assert gap < 40, f"{width} 寬：時間那一欄空了 {gap} px"
+            # 時間、事務機、內容不可以折行（有空間的時候）—— 每一格的文字只有一行
+            # 只量文字節點（Range 包住元素時會連外框也算進去，跟文字行差 1 像素就被當成兩行）
+            lines = t.js("[...document.querySelectorAll('#mfScansWrap tbody tr:first-child td')].slice(0, 3).map(td => {"
+                         " const tops = new Set(); const w = document.createTreeWalker(td, NodeFilter.SHOW_TEXT);"
+                         " for (let n = w.nextNode(); n; n = w.nextNode()) { if (!n.textContent.trim()) continue;"
+                         "   const r = document.createRange(); r.selectNodeContents(n);"
+                         "   for (const x of r.getClientRects()) tops.add(Math.round(x.top / 4)); }"
+                         " return tops.size; })")
+            if width >= 1280:
+                assert lines == [1, 1, 1], (f"{width} 寬：時間 / 事務機 / 內容被折行（每格行數）{lines}", t.js(
+                    "[...document.querySelectorAll('#mfScansWrap tbody tr:first-child td')].map(td => [td.className,"
+                    " Math.round(td.getBoundingClientRect().width), td.innerHTML.slice(0, 160)])"))
         t.shot(f"mfp_scan_{locale}_done_1280", 1280)
         t.shot(f"mfp_scan_{locale}_done_390", 390)
         # 手機寬度：事務機名稱不可以一個字一行（格子變區塊後還留著 1% 寬）

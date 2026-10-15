@@ -5,11 +5,24 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (921 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (923 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.94] - 2026-10-15
+
+- Fix: when an AD / LDAP server was slow or unreachable, **the whole site stalled** for everyone. Sign-in, reverse-proxy SSO (Kerberos), the connection and account tests in the authentication settings, and the directory functions on the admin pages (group sync, group members, directory tree, OU users, user details, object picker) waited for LDAP on the service's main loop. These waits now run on background threads, so other people are not affected; hashing the password for local account sign-in moved to the background too.
+- Fix: with several domain controllers configured and none reachable, the connection used to retry forever; it now gives up after one round and reports that no LDAP server can be reached.
+- When the connection test hits an LDAPS certificate whose name does not match, it now explains which names the certificate has and which server address is configured, with how to fix it, instead of printing the whole certificate.
+- Security fix: an AD / LDAP account disabled by an administrator in jtdt was re-enabled the next time that person signed in with a correct directory password. "Disabled by an administrator" is now stored separately, directory sign-in no longer turns it back on, and the attempt is blocked and recorded in the audit log. Accounts brought in by directory sync that have never signed in are still activated on their first sign-in. Existing disabled accounts are marked during the upgrade; a directory account that has never signed in cannot be told apart, so it keeps the old behaviour (disable it again after upgrading to block it).
+- Fix: OIDC sign-in and the callback also held the main loop while waiting for the identity provider; they now run in the background as well.
+- Sign-in failures in the audit log carry more detail (passwords are never written): the reason and source for every entry, including authentication turned off or a disabled / unknown realm; whether a local account exists; for AD / LDAP the search base and filter when the user is not found, the error when the directory is unreachable, how long it took, and **which domain controller answered** (configured name and port, actual IP), recorded on success as well so a fail-then-succeed pair shows whether two different DCs answered; provider and username for SSO (OIDC / SAML) failures, a category for reverse-proxy SSO failures, and the username for two-factor failures.
+
+## [1.16.93] - 2026-10-15
+
+- MFP Scan & Fetch (beta): the Recent scans and retrievals table is laid out again. MFP names and file names no longer wrap over several lines (an MFP name was split over three lines) while the right side stayed empty. Time, MFP and content take the width of their text and spare width is shared among the columns; when the window is too narrow the status column wraps first, then file names, then MFP names.
 
 ## [1.16.92] - 2026-10-15
 

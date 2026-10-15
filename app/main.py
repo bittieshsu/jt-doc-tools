@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.92"
+VERSION = "1.16.94"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -1475,7 +1475,8 @@ async def _auth_gate(request: Request, call_next):
             # the follow-up request skips this branch entirely).
             from .core import proxy_sso
             if proxy_sso.is_enabled():
-                status, puser = proxy_sso.resolve_user(request)
+                # 丟到執行緒：找不到這位使用者時會連 LDAP 同步帳號，DC 慢的時候不可以卡住全站
+                status, puser = await _asyncio.to_thread(proxy_sso.resolve_user, request)
                 if status == proxy_sso.OK and puser:
                     from .web.auth_routes import complete_login
                     ua = request.headers.get("User-Agent", "")

@@ -829,6 +829,27 @@ def _m29_grant_official_doc(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _m30_admin_disabled(conn: sqlite3.Connection) -> None:
+    """v30: users 加 `admin_disabled`（v1.16.94 起）—— **管理員在本站停用**，跟「目錄名冊、還沒登入過」分開。
+
+    原本兩者都只是 `enabled=0`。目錄帳號（AD / LDAP、代理 SSO）登入成功時，同步程式會把名冊帳號
+    啟用（寫回 `enabled=1`）—— 於是**管理員停用的 AD / LDAP 帳號只要 AD 密碼還對，登入就自己復活**。
+    之後目錄登入一律看這個欄位擋下；`enabled` 照舊代表「目前能不能用」。
+
+    既有資料的換算（寧可擋）：
+    * 目錄帳號 `enabled=0` 而且**曾經登入過**（`last_login_at > 0`）→ 不可能是「名冊還沒啟用」，當成管理員停用。
+    * 本機、SSO 帳號的 `enabled=0` → 管理員停用（這兩種本來就沒有名冊）。
+    * 目錄帳號 `enabled=0` 而且從沒登入過 → 名冊，不動（本人第一次登入照樣啟用）。
+
+    ALTER ADD COLUMN 有預設值，不需重建表。"""
+    conn.executescript("""
+    ALTER TABLE users ADD COLUMN admin_disabled INTEGER NOT NULL DEFAULT 0;
+    UPDATE users SET admin_disabled = 1
+     WHERE enabled = 0
+       AND NOT (source IN ('ldap', 'ad') AND COALESCE(last_login_at, 0) = 0);
+    """)
+
+
 MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m3_rename_pdf_diff_to_doc_diff,
               _m4_grant_image_to_pdf,
@@ -854,7 +875,8 @@ MIGRATIONS = [_m1_initial, _m2_username_source_unique,
               _m26_grant_doc_straighten,
               _m27_grant_meeting_summary,
               _m28_grant_meeting_transcribe,
-              _m29_grant_official_doc]
+              _m29_grant_official_doc,
+              _m30_admin_disabled]
 
 
 def auth_db_path() -> Path:

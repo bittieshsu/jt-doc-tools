@@ -234,7 +234,10 @@ def build_router(templates) -> APIRouter:
         ip = _client_ip(request)
         ua = request.headers.get("User-Agent", "")
         try:
-            user = _auth.authenticate(username, password, ip=ip, realm=realm)
+            # 丟到執行緒：AD 登入要等 DC、本機帳號要算密碼雜湊，都不可以佔住事件迴圈
+            # （DC 一慢，所有人的請求一起停 —— 客戶 2026-10-15 回報整個 jtdt 卡死）
+            import asyncio as _asyncio
+            user = await _asyncio.to_thread(_auth.authenticate, username, password, ip=ip, realm=realm)
         except (_auth.AuthError, auth_local.AuthError) as e:
             # Re-render login form with error. Status 200 (form-style) — we
             # don't want POST→302→GET to lose the password field's flash.
@@ -405,9 +408,12 @@ def build_router(templates) -> APIRouter:
             return RedirectResponse("/2fa-verify", status_code=302)
         if not _totp.verify_code(secret, code):
             entry["fails"] += 1
+            # 帳號欄位寫帳號名稱（原本寫成數字 ID，稽核頁用帳號篩選篩不到）
+            from ..core import auth_db as _adb
+            _row = _adb.conn().execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone()
             audit_db.log_event(
-                "2fa_fail", username=str(uid), ip=_client_ip(request),
-                details={"fail_count": entry["fails"]},
+                "2fa_fail", username=(_row["username"] if _row else str(uid)), ip=_client_ip(request),
+                details={"fail_count": entry["fails"], "user_id": uid},
             )
             if entry["fails"] >= 5:
                 _drop_pending_2fa(ptoken)
@@ -595,7 +601,9 @@ def build_router(templates) -> APIRouter:
             # Compute SSO logout redirect BEFORE revoking (SAML needs the stored
             # NameID keyed by this token; OIDC needs the user's source).
             if cur:
-                dest = _sso_logout_redirect(request, cur, token) or "/login"
+                import asyncio as _asyncio
+                # 會連 IdP 抓探索文件：丟到執行緒
+                dest = await _asyncio.to_thread(_sso_logout_redirect, request, cur, token) or "/login"
             sessions.revoke(token)
             if cur:
                 audit_db.log_event(

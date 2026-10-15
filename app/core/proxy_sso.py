@@ -211,9 +211,18 @@ def resolve_user(request) -> tuple[str, Optional[dict]]:
         from .log_safe import safe_log
         logger.warning("proxy_sso lookup failed for %s: %s",
                        safe_log(username), exc)
+        # 原因分類寫清楚（管理員才分得出「目錄找不到這個人」「本站停用」「目錄連不上」）；細節截 400 字
+        if isinstance(exc, auth_ldap.AccountDisabledError):
+            reason = "disabled_in_jtdt"
+        elif isinstance(exc, auth_ldap.UserNotFoundError):
+            reason = "ldap_user_not_found"
+        elif isinstance(exc, auth_ldap.AuthError):
+            reason = "ldap_unavailable"
+        else:
+            reason = "error"
         audit_db.log_event(
             "proxy_sso_login_fail", username=username, ip=client_ip,
-            details={"reason": f"{type(exc).__name__}: {exc}"[:200]},
+            details={"reason": reason, "detail": f"{type(exc).__name__}: {exc}"[:400]},
         )
         return (FAIL, None)
 

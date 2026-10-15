@@ -137,6 +137,14 @@ class FakeConnection:
     def unbind(self):
         return True
 
+    # 登入驗證改成連線、驗證兩步（v1.16.94，要記下是哪一台 DC 回的）
+    def open(self, read_server_info=True):
+        return True
+
+    def bind(self, read_server_info=True):
+        self.bound = True
+        return True
+
     @property
     def server(self):
         """像真的 ldap3 連線那樣，把 schema 掛在 `server` 上。
