@@ -704,7 +704,8 @@ def _status_error(r: dict) -> BoxError:
         return BoxError("BOX_FORBIDDEN", {"status": st})
     if st == 404:
         return BoxError("BOX_NOT_FOUND", {"status": st})
-    if st in (405, 501):
+    # 406：客戶實機 Apeos C5571 的 HTTPS 443 對 PROPFIND 回 406、沒有內容 —— 同一類「這個連接埠不接 WebDAV」
+    if st in (405, 406, 501):
         return BoxError("WEBDAV_UNAVAILABLE", {"status": st})
     return BoxError("DAV_UNEXPECTED_STATUS", {"status": st})
 

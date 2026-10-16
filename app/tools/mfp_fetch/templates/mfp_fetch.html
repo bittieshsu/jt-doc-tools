@@ -372,6 +372,10 @@
   </div>
   <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依原廠取件工具的研究寫成，還沒在實機上驗證過。只會讀取（列出文件、下載），不會刪除或修改事務機上的文件。') }}</span></div>
   <form id="mfBoxForm" class="mf-box-form" autocomplete="off">
+    <div id="mfBoxTargetWrap" hidden>
+      <label for="mfBoxTarget">{{ tr('連線方式') }}</label>
+      <select id="mfBoxTarget" class="jt-select"></select>
+    </div>
     <div>
       <label for="mfBoxNo">{{ tr('信箱編號') }}</label>
       <input id="mfBoxNo" type="number" min="1" max="999" required inputmode="numeric" placeholder="{{ tr('例如 1') }}">
@@ -1299,14 +1303,23 @@
     boxEl('mfBoxUser').value = pr.user || '';
     boxEl('mfBoxUserPw').value = '';
     boxEl('mfBoxLogin').hidden = !pr.user;
+    // 連線方式：連線測試連得上的那幾組（客戶實機 2026-10-16：Apeos C5571 的 HTTPS 443 對 WebDAV 回 406，
+    // 原廠文件寫 WebDAV 預設在 80 —— 要能自己改走 HTTP 80）。預設沿用上次成功的，沒有就 HTTPS 優先
+    const reach = (c.reachable_on || []).filter(r => /^https?:\d+$/.test(r));
+    const pick = reach.includes(pr.target) ? pr.target : (reach.find(r => r.startsWith('https:')) || reach[0]);
+    fillSelect('mfBoxTarget', reach, Object.fromEntries(reach.map(r => [r, targetName(r)])), pick);
+    boxEl('mfBoxTargetWrap').hidden = reach.length < 2;
     for (const id of ['mfBoxConfirm', 'mfBoxError', 'mfBoxDocs', 'mfBoxState', 'mfBoxTech']) boxEl(id).hidden = true;
     boxPanel.hidden = false;
     boxPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     (pr.box ? boxEl('mfBoxPw') : boxEl('mfBoxNo')).focus({ preventScroll: true });
   }
+  function targetName(r) { const [sc, pt] = String(r).split(':'); return sc.toUpperCase() + ' ' + pt; }
+  function boxTarget() { return boxEl('mfBoxTarget').value || null; }
   function boxBody(extra) {
     const pr = boxPrefs(boxConn);
     return Object.assign({
+      target: boxTarget(),
       box: Number(boxEl('mfBoxNo').value),
       box_password: boxEl('mfBoxPw').value,
       user: boxEl('mfBoxLogin').hidden ? '' : boxEl('mfBoxUser').value.trim(),
@@ -1365,7 +1378,10 @@
       return;
     }
     if (res.code === 'PLAIN_HTTP_NEEDS_CONSENT') {
-      askConfirm([el('div', null, tr('這台事務機只用 HTTP 連線：密碼與文件會以未加密的方式在公司內網傳送。確定要繼續嗎？之後這台瀏覽器就不會再問。'))],
+      const hasHttps = (boxConn.reachable_on || []).some(r => r.startsWith('https:'));
+      askConfirm([el('div', null, hasHttps
+                   ? tr('改用 HTTP 連線：密碼與文件會以未加密的方式在公司內網傳送。確定要繼續嗎？之後這台瀏覽器就不會再問。')
+                   : tr('這台事務機只用 HTTP 連線：密碼與文件會以未加密的方式在公司內網傳送。確定要繼續嗎？之後這台瀏覽器就不會再問。'))],
                  tr('繼續'), () => { saveBoxPrefs(boxConn, { http: true }); retry(); });
       return;
     }
@@ -1375,6 +1391,12 @@
     }
     if (res.code === 'AUTH_REQUIRED_BOX') boxEl('mfBoxPw').focus();
     showError(errBox, res);
+    // 這個連線方式不接 WebDAV：有另一組可以試就明講（不自動換 —— 換到 HTTP 要使用者自己同意）
+    const others = [...boxEl('mfBoxTarget').options].map(o => o.value).filter(v => v && v !== boxTarget());
+    if (res.code === 'WEBDAV_UNAVAILABLE' && others.length) {
+      errBox.append(el('div', 'mf-hint', tr('可以在上面的「連線方式」改用 {0} 再試一次（FUJIFILM 的 WebDAV 預設在 HTTP 80）。')
+        .replace('{0}', targetName(others.find(o => o.startsWith('http:')) || others[0]))));
+    }
   }
   function syncFetchBtn() {
     const n = boxEl('mfBoxTable').querySelectorAll('input[data-doc]:checked').length;
@@ -1443,7 +1465,8 @@
     const res = await api('POST', '/connections/' + boxConn.id + '/box/list', boxBody());
     busy(btn, false);
     if (!res.ok) { boxEl('mfBoxDocs').hidden = true; handleBoxError(res, boxList); return; }
-    saveBoxPrefs(boxConn, { box: res.box, user: boxEl('mfBoxLogin').hidden ? '' : boxEl('mfBoxUser').value.trim() });
+    saveBoxPrefs(boxConn, { box: res.box, user: boxEl('mfBoxLogin').hidden ? '' : boxEl('mfBoxUser').value.trim(),
+                            target: boxTarget() });
     showTrace(res.trace);
     renderDocs(res);
   }

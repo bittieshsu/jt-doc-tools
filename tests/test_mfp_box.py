@@ -356,7 +356,8 @@ def test_unknown_realms_and_schemes_are_not_guessed(box, realm, scheme):
 
 
 @pytest.mark.parametrize("status,code", [(404, "BOX_NOT_FOUND"), (403, "BOX_FORBIDDEN"), (405, "WEBDAV_UNAVAILABLE"),
-                                         (501, "WEBDAV_UNAVAILABLE"), (500, "DAV_UNEXPECTED_STATUS")])
+                                         (501, "WEBDAV_UNAVAILABLE"), (406, "WEBDAV_UNAVAILABLE"),
+                                         (500, "DAV_UNEXPECTED_STATUS")])
 def test_status_codes_become_clear_reasons(box, status, code):
     box.status["/dav/box-1"] = status
     with pytest.raises(B.BoxError) as e:

@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (926 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (927 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.98] - 2026-10-16
+
+- MFP Scan & Fetch: mailbox retrieval lets you choose the connection. When the connection test reached both HTTPS and HTTP, the panel shows a selector that defaults to the last one that worked (HTTPS otherwise). Some MFPs only serve WebDAV on HTTP 80 (FUJIFILM's documented default) and refuse it on HTTPS. A 406 reply to a WebDAV request now explains that the device does not accept WebDAV there (WebDAV off, or not on this port) and suggests the other connection, instead of only reporting an unexpected status; switching to HTTP still asks for consent once.
 
 ## [1.16.97] - 2026-10-16
 

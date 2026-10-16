@@ -7414,5 +7414,7 @@
   "文件密碼（有設密碼的文件才要填）": "Document password (only for documents that have one)",
   "有密碼": "Password",
   "腳本轉址": "Script redirect",
-  "頁面原始內容（節錄）": "Raw page content (excerpt)"
+  "頁面原始內容（節錄）": "Raw page content (excerpt)",
+  "改用 HTTP 連線：密碼與文件會以未加密的方式在公司內網傳送。確定要繼續嗎？之後這台瀏覽器就不會再問。": "Switch to HTTP: passwords and documents will travel unencrypted over the company network. Continue? This browser will not ask again.",
+  "可以在上面的「連線方式」改用 {0} 再試一次（FUJIFILM 的 WebDAV 預設在 HTTP 80）。": "You can switch to {0} under Connection above and try again (FUJIFILM's WebDAV runs on HTTP 80 by default)."
 }
