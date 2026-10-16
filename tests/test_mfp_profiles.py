@@ -182,3 +182,20 @@ def test_embedded_web_server_alone_is_not_hp():
     """「Embedded Web Server」HP、Xerox、Lexmark 都在用。"""
     assert mp.detect([_page(title="Lexmark Embedded Web Server MX521de")])["vendor"] == "Lexmark"
     assert mp.detect([_page(title="Xerox Embedded Web Server")])["vendor"] == "Xerox"
+
+
+@pytest.mark.parametrize("escl", ["Apeos C5571", "FUJIFILM Apeos C5571", "ApeosPort-V C6680"])
+def test_fujifilm_recognised_from_escl_when_the_home_page_says_nothing(escl):
+    """客戶實機（2026-10-16）：Apeos C5571 的首頁上找不到廠牌或型號（登入頁 / 腳本畫出來的），
+    eSCL 卻回報 `Apeos C5571` —— 原本 FUJIFILM 只看網頁，結果廠牌「未辨識」、相容性「無法辨識」，
+    清單上也就沒有機內信箱取件。eSCL 回報的型號也要當成辨識依據。"""
+    r = mp.detect([_page(title="", text="Loading…")], escl_model=escl)
+    fam, model = escl.replace("FUJIFILM ", "").split(" ")
+    assert (r["vendor"], r["family"], r["model"]) == ("FUJIFILM", fam, model), r
+    assert r["status"] == ("first_batch_unverified" if (fam, model) in mp.FIRST_BATCH else "same_vendor_unverified")
+    assert any(e["field"] == "escl" for e in r["evidence"])
+
+
+def test_other_vendors_also_recognised_from_escl_alone():
+    r = mp.detect([_page(title="")], escl_model="KYOCERA TASKalfa 3554ci")
+    assert r["vendor"] == "Kyocera" and r["status"] == "experimental_vendor" and r["model"] == "KYOCERA TASKalfa 3554ci"

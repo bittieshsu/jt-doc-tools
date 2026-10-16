@@ -7412,5 +7412,7 @@
   "文件伺服器": "Document Server",
   "文件匣密碼（沒有設就留空）": "Document box password (leave blank if none)",
   "文件密碼（有設密碼的文件才要填）": "Document password (only for documents that have one)",
-  "有密碼": "Password"
+  "有密碼": "Password",
+  "腳本轉址": "Script redirect",
+  "頁面原始內容（節錄）": "Raw page content (excerpt)"
 }

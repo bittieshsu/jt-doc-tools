@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (925 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (926 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.97] - 2026-10-16
+
+- Fix (MFP Scan & Fetch): when a FUJIFILM MFP's home page shows no vendor or model (for example only a sign-in page), the vendor stayed unidentified and compatibility showed "unknown" even though the scan interface (eSCL) reported the model (such as Apeos C5571), so mailbox retrieval did not appear. The model reported by eSCL now counts as evidence too (the web page still wins when it has one), for other vendors as well. Run the test again on a saved MFP to update it. The connection test now also follows redirects written as JavaScript that sets the address directly (`location.href = …`, `location.replace(…)`), only on near-empty pages on the same device and never to addresses that look like they change the device (sign-out, reboot and so on); the manufacturer reported by eSCL counts as evidence too. The diagnostic report includes a short excerpt of a near-empty home page so the redirect method can be seen.
 
 ## [1.16.96] - 2026-10-16
 

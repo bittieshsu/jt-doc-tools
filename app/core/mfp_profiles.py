@@ -165,6 +165,11 @@ def detect(pages: list[dict], escl_model: str = "") -> dict[str, Any]:
         res["message"] = STATUS_MESSAGES["unreachable"]
         return res
     srcs = _sources(pages)
+    # eSCL 的 MakeAndModel 也是依據（放在最後：網頁上有就先用網頁的）。客戶實機 2026-10-16：
+    # Apeos C5571 的首頁上沒有廠牌或型號，只有 eSCL 回報 `Apeos C5571` —— 原本 FUJIFILM 只看網頁，
+    # 結果「未辨識」，連機內信箱取件都不出現
+    if escl_model:
+        srcs = srcs + [({"page": "eSCL", "field": "escl"}, escl_model[:200])]
     ev: list[dict] = []
     fuji = False
     for where, text in srcs:

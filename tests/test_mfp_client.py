@@ -478,3 +478,71 @@ def test_a_redirect_written_by_javascript_is_followed_to_find_the_model(open_lo)
     assert "/logout.cgi" not in _EpsonHandler.seen, "看起來會改變設備狀態的網址不可以跟"
     d = rep["detection"]
     assert (d["vendor"], d["model"]) == ("Epson", "L3150 Series"), d
+
+
+# ---- 客戶實機（2026-10-16）：FUJIFILM Apeos C5571 —— 首頁 144 位元組，用 JavaScript 直接改網址轉到真正的首頁
+
+_FUJI_STUB = b'<html><head><script type="text/javascript">location.href="/home/index.html";</script></head></html>'
+
+
+class _FujiHandler(BaseHTTPRequestHandler):
+    seen: list = []
+    home = b"<html><head><title>Apeos C5571 - Internet Services</title></head><body>FUJIFILM</body></html>"
+
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        _FujiHandler.seen.append(self.path)
+        body = {"/": _FUJI_STUB, "/home/index.html": _FujiHandler.home}.get(self.path)
+        if body is None:
+            self.send_response(404)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def _fuji_probe(open_lo, monkeypatch, escl=None):
+    _FujiHandler.seen = []
+    monkeypatch.setattr(mc, "_probe_escl", lambda *a, **k: escl)
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _FujiHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    port = srv.server_address[1]
+    open_lo(port)
+    try:
+        return mc.probe("127.0.0.1", port, "http")
+    finally:
+        srv.shutdown()
+
+
+def test_a_location_href_stub_is_followed_and_kept_in_the_report(open_lo, monkeypatch):
+    rep = _fuji_probe(open_lo, monkeypatch)
+    assert "/home/index.html" in _FujiHandler.seen, _FujiHandler.seen
+    d = rep["detection"]
+    assert (d["vendor"], d["family"], d["model"], d["status"]) == ("FUJIFILM", "Apeos", "C5571", "first_batch_unverified"), d
+    first = next(s for s in rep["attempts"][0]["steps"] if s["step"] == "http")
+    assert "location.href" in first["detail"].get("stub_html", ""), "空白小頁面要在報告裡留原始內容"
+    assert first["detail"]["script_redirects"] == ["/home/index.html"]
+
+
+def test_location_assignments_are_only_read_on_near_empty_pages():
+    big = b"<html><head><title>Status</title></head><body>" + b"Ready. " * 100 + \
+          b"<script>function go(){location.href='/admin/setup.html';}</script></body></html>"
+    assert mc.parse_page(big, "text/html")["script_redirects"] == [], "一般頁面上的 JavaScript 網址不跟"
+    for js in (b"<script>location.replace('/logout.cgi')</script>", b"<script>location.href='javascript:void(0)'</script>",
+               b"<script>var p = location.href; if (p == '/x') {}</script>"):
+        assert mc.parse_page(js, "text/html")["script_redirects"] == [], js
+
+
+def test_escl_manufacturer_identifies_the_vendor_when_the_home_page_says_nothing(open_lo, monkeypatch):
+    """首頁轉不過去（或轉過去也沒有廠牌字樣）時，eSCL 的 Manufacturer＋MakeAndModel 也夠辨識。"""
+    monkeypatch.setattr(_FujiHandler, "home", b"<html><body>Loading</body></html>")
+    rep = _fuji_probe(open_lo, monkeypatch, escl={"scheme": "http", "port": 0, "model": "Apeos C5571",
+                                                  "caps": {"manufacturer": "FUJIFILM", "sources": {}}})
+    d = rep["detection"]
+    assert (d["vendor"], d["model"], d["status"]) == ("FUJIFILM", "C5571", "first_batch_unverified"), d

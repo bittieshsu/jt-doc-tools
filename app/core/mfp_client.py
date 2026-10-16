@@ -311,15 +311,28 @@ def _decode(body: bytes, content_type: str) -> tuple[str, str]:
 _SCRIPT_REFRESH = re.compile(
     r"http-equiv\s*=\s*\\?['\"]?refresh\\?['\"]?\s+content\s*=\s*\\?['\"]?\s*\d+\s*;\s*url\s*=\s*([^'\"\\\s>]+)",
     re.I)
+#: 直接改網址的 JavaScript 轉址（`location.href = "…"`、`window.location = "…"`、`location.replace("…")`）。
+#: 客戶實機 2026-10-16：FUJIFILM Apeos C5571 的首頁只有 144 位元組、沒有標題文字也沒有 meta refresh —— 停在那張空頁，
+#: 廠牌型號都看不到。**只在幾乎空白的小頁面上認**（見 `_STUB_*`），不去抓一般頁面上任意的 JavaScript 網址；
+#: `=` 後面不可以是另一個 `=`（`location.href == …` 是比較，Epson 那頁就有 `var path = location.href;`）。
+_SCRIPT_LOCATION = re.compile(
+    r"\blocation(?:\.href)?\s*=(?!=)\s*['\"]([^'\"\s<>]{1,300})['\"]"
+    r"|\blocation\.(?:replace|assign)\(\s*['\"]([^'\"\s<>]{1,300})['\"]\s*\)")
+#: 「幾乎空白的小頁面」：原始內容不超過這麼多位元組、看得到的文字不超過這麼多字。
+_STUB_BYTES = 4096
+_STUB_VISIBLE = 200
 #: 看起來會改變設備狀態的網址一律不跟（就算只是 GET）。
 _RISKY_PATH = re.compile(r"logout|logoff|signout|reboot|restart|reset|shutdown|delete|clear|factory", re.I)
 
 
-def _script_redirects(text: str) -> list[str]:
+def _script_redirects(text: str, stub: bool = False) -> list[str]:
+    found = [m.group(1) for m in _SCRIPT_REFRESH.finditer(text[:200_000])]
+    if stub:
+        found += [m.group(1) or m.group(2) for m in _SCRIPT_LOCATION.finditer(text[:_STUB_BYTES])]
     out: list[str] = []
-    for m in _SCRIPT_REFRESH.finditer(text[:200_000]):
-        u = m.group(1).strip()
-        if u and u not in out and not _RISKY_PATH.search(u):
+    for u in found:
+        u = (u or "").strip()
+        if u and u not in out and not _RISKY_PATH.search(u) and not u.lower().startswith(("javascript:", "data:")):
             out.append(u)
         if len(out) >= 3:
             break
@@ -335,6 +348,7 @@ def parse_page(body: bytes, content_type: str) -> dict:
     except Exception:  # noqa: BLE001 — 壞掉的 HTML 也盡量拿到前面那段
         pass
     visible = re.sub(r"\s+", " ", " ".join(p.text)).strip()
+    stub = len(body) <= _STUB_BYTES and len(visible) <= _STUB_VISIBLE
     return {
         "charset": charset,
         "title": re.sub(r"\s+", " ", p.title).strip()[:200],
@@ -342,7 +356,9 @@ def parse_page(body: bytes, content_type: str) -> dict:
         "text_full_for_detection": visible[:20000],
         "refresh": p.refresh,
         # 只在頁面本身沒有 meta refresh 時才看 JavaScript 寫出來的（真的 meta refresh 優先）
-        "script_redirects": [] if p.refresh else _script_redirects(text),
+        "script_redirects": [] if p.refresh else _script_redirects(text, stub=stub),
+        # 幾乎空白的小頁面：診斷報告留一小段原始內容（看得出它用什麼方式轉到真正的首頁）
+        "stub_html": re.sub(r"\s+", " ", text).strip()[:400] if stub and not p.title.strip() else "",
         "frames": p.frames,
         "forms": p.forms,
         "password_inputs": p.password_inputs,
@@ -594,7 +610,10 @@ def _probe_one(host: str, ip: str, scheme: str, port: int, budget: _Budget) -> d
                            "title": page["title"], "text": page["text"],
                            "forms": page["forms"], "password_inputs": page["password_inputs"],
                            "frames": page["frames"][:10], "refresh": page["refresh"],
+                           "script_redirects": page.get("script_redirects", [])[:3],
                            "tls_verified": page["tls_verified"]}}
+        if page.get("stub_html"):
+            step["detail"]["stub_html"] = page["stub_html"]
         if r["truncated"]:
             step["note"] = "HTTP_TOO_LARGE"
         elif r.get("incomplete"):
@@ -671,7 +690,12 @@ def probe(raw_host: str, port: Any = None, scheme: Any = None) -> dict:
         pages += [dict(p, scheme=sc, port=pt) for p in att["pages"]]
         report["attempts"].append({k: v for k, v in att.items() if k != "pages"})
     report["escl"] = _probe_escl(host, ip, report["attempts"], budget)
-    detection = mfp_profiles.detect(pages, escl_model=(report["escl"] or {}).get("model") or "")
+    # eSCL 的製造商（Manufacturer）也一起當依據：有的型號字串不含廠牌（客戶實機：`Apeos C5571` ＋ `FUJIFILM`）
+    esc = report["escl"] or {}
+    mk = str((esc.get("caps") or {}).get("manufacturer") or "").strip()
+    mdl = str(esc.get("model") or "").strip()
+    detection = mfp_profiles.detect(pages, escl_model=mdl if (not mk or mk.lower() in mdl.lower())
+                                    else f"{mk} {mdl}".strip())
     report["detection"] = detection
     reachable = [a for a in report["attempts"] if a.get("reachable")]
     report["summary"] = {
