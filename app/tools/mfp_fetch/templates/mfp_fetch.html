@@ -242,7 +242,7 @@
 <p class="muted">{{ tr('從事務機掃描，或取回機內信箱裡的文件，存進工作區後接續 OCR、轉檔與 AI 處理。') }}</p>
 
 {# 一句話一個 tr()：譯文裡找 eSCL，按鈕接在那個字（含黏在後面的「-capable」）後面；三種語言的譯文都有 eSCL #}
-{% set _note = tr('試用中：可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件，以及 Canon、Konica Minolta、SHARP 的檔案分享取件是實驗功能，還沒在實機上驗證過。') %}
+{% set _note = tr('試用中：可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件、Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA、RICOH 的直接取件是實驗功能，還沒在實機上驗證過。') %}
 <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{% if 'eSCL' in _note %}{% set _head, _tail = _note.split('eSCL', 1) %}{% set _glued, _rest = (_tail ~ ' ').split(' ', 1) %}{{ _head }}eSCL{{ _glued }}{{ escl_help() }} {{ _rest|trim }}{% else %}{{ _note }}{% endif %}</span></div>
 {% endif %}
 
@@ -1479,7 +1479,7 @@
     });
   }
 
-  // ---- 檔案分享取件（Canon Advanced Box、Konica 公用信箱、SHARP NAS；實驗功能）
+  // ---- 檔案分享取件（Canon Advanced Box、Konica 公用信箱、SHARP NAS）與 KYOCERA / RICOH 直接取件（實驗功能）
   // 跟信箱取件同一個原則：只問需要的；憑證、HTTP / SMB 不加密的同意只問一次（記在這台瀏覽器，不記密碼）。
   const ROUTE_NAMES = { canon_webdav: tr('WebDAV（建議）'), canon_smb: 'SMB', konica_smb: 'SMB', sharp_smb: 'SMB',
                         kyocera_soap: tr('HTTPS 9091（建議）'), kyocera_soap_http: 'HTTP 9090', ricoh_soap: 'SOAP' };

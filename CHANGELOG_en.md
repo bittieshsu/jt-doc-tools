@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (924 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (925 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.96] - 2026-10-16
+
+- MFP Scan & Fetch: the beta note at the top of the tool page now also lists direct retrieval for KYOCERA and RICOH (added in 1.16.95 but missing from the note).
 
 ## [1.16.95] - 2026-10-15
 

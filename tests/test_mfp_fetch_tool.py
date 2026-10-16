@@ -327,3 +327,21 @@ def test_every_fixed_message_is_translated():
             + list(R.MESSAGES.values()))
     missing = [m for m in msgs if m not in en or m not in ja]
     assert not missing, f"這些訊息沒有英日文（畫面上 tr() 翻不到）：{missing}"
+
+
+def test_the_page_note_names_every_vendor_that_can_retrieve():
+    """頁首「試用中」那句要列出每個有取件方式的廠牌（v1.16.96：加了 KYOCERA / RICOH 直接取件，這句漏改，
+    使用者 2026-10-16 指出）。判準從 `mfp_share.VENDOR_ROUTES` 讀，三種語言都要有。"""
+    import json
+    from pathlib import Path
+    from app.core import mfp_share
+    tpl = Path("app/tools/mfp_fetch/templates/mfp_fetch.html").read_text(encoding="utf-8")
+    m = re.search(r"\{% set _note = tr\('([^']+)'\) %\}", tpl)
+    assert m, "找不到頁首說明"
+    zh = m.group(1)
+    vendors = ["FUJIFILM"] + list(mfp_share.VENDOR_ROUTES)
+    for lang in ("zh", "en", "ja"):
+        text = zh if lang == "zh" else json.loads(
+            Path(f"app/i18n/{lang}.json").read_text(encoding="utf-8")).get(zh, "")
+        missing = [v for v in vendors if v.lower() not in text.lower()]
+        assert not missing, (lang, missing, text)
