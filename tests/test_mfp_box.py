@@ -76,6 +76,7 @@ class FakeBox:
         self.box_props = {"D:displayname": "Box 1"}
         self.status: dict[str, int] = {}   # 路徑 → 強制回的狀態碼
         self.redirect: dict[str, str] = {}
+        self.reject_406 = None             # (method, body, headers) → True 就回 406
         self.extra: list[str] = []         # 額外塞進信箱清單的 <D:response>
         self.raw_list: bytes | None = None
         self.delete_on_get = False
@@ -168,6 +169,11 @@ class FakeBox:
                                       "headers": {k.lower(): v for k, v in self.headers.items()}})
                 if self.path in fake.status:
                     self._send(fake.status[self.path])
+                    return False
+                # 依請求內容回 406（模擬只接受某一種請求格式的設備；v1.16.99）
+                if fake.reject_406 is not None and fake.reject_406(self.command, body,
+                                                                   {k.lower(): v for k, v in self.headers.items()}):
+                    self._send(406)
                     return False
                 if self.path in fake.redirect:
                     self._send(301, headers={"Location": fake.redirect[self.path]})
@@ -284,9 +290,15 @@ def test_an_open_box_lists_its_documents(box):
     assert docs["5"]["format"] == "TIF" and docs["5"]["compression"] == "MMR"
     assert docs["5"]["delete_after_get"] is False
     assert docs["7"]["how"] == "pages"
-    assert box.requests[0]["method"] == "PROPFIND" and box.requests[0]["path"] == "/dav/box-1"
-    assert box.requests[0]["headers"]["depth"] == "1" and b"allprop" in box.requests[0]["body"]
-    assert "authorization" not in box.requests[0]["headers"], "第一次一律不帶帳密"
+    # v1.16.99（客戶實機 406 後依原廠工具分析改）：先探測（只問 resourcetype、X-Singlepage: On），再用指定屬性列文件
+    probe, listing = box.requests[0], box.requests[1]
+    assert probe["method"] == "PROPFIND" and probe["path"] == "/dav/box-1" and probe["headers"]["depth"] == "1"
+    assert b"<d:resourcetype/>" in probe["body"] and b"allprop" not in probe["body"]
+    assert probe["headers"].get("x-singlepage") == "On" and probe["headers"]["content-type"] == "text/xml"
+    assert b"fujifilm.com/fb/2021/04/ssm/storageService" in probe["body"], "先用新的命名空間"
+    assert b"<sss:Pages/>" in listing["body"] and b"allprop" not in listing["body"]
+    assert "x-singlepage" not in listing["headers"], "列文件不送 X-Singlepage（不是送 Off）"
+    assert "authorization" not in probe["headers"] and "authorization" not in listing["headers"], "不用認證就不帶帳密"
     assert s.via() == {"protocol": "WebDAV", "scheme": "http", "port": box.port}
 
 
@@ -295,8 +307,10 @@ def test_box_password_goes_as_user_box_exactly_once(box):
     box.add_whole(1)
     s = _open(box, B.Creds(box_password="1234"))
     assert list(s.docs) == ["1"]
-    assert len(_auth_sent(box)) == 1
-    assert _auth_sent(box)[0]["headers"]["authorization"].startswith("Basic ")
+    # 帳密只選一次：探測（帶帳密重送）與列文件用的是同一組，不是換組合重試
+    sent = _auth_sent(box)
+    assert len(sent) == 2 and len({r["headers"]["authorization"] for r in sent}) == 1
+    assert sent[0]["headers"]["authorization"].startswith("Basic ")
 
 
 def test_a_wrong_password_is_not_retried(box):
@@ -343,7 +357,9 @@ def test_a_stale_digest_nonce_is_resent_once_with_the_same_password(box):
     box.user = "box"
     box.add_whole(1)
     s = _open(box, B.Creds(box_password="1234"))
-    assert list(s.docs) == ["1"] and len(_auth_sent(box)) == 2
+    # 探測（舊 nonce → stale）→ 探測（新 nonce）→ 列文件
+    assert list(s.docs) == ["1"] and len(_auth_sent(box)) == 3
+    assert {re.search(r'username="([^"]+)"', r["headers"]["authorization"]).group(1) for r in _auth_sent(box)} == {"box"}
 
 
 @pytest.mark.parametrize("realm,scheme", [("Apeos C5571", "basic"), ("box-1", "negotiate")])
@@ -356,7 +372,7 @@ def test_unknown_realms_and_schemes_are_not_guessed(box, realm, scheme):
 
 
 @pytest.mark.parametrize("status,code", [(404, "BOX_NOT_FOUND"), (403, "BOX_FORBIDDEN"), (405, "WEBDAV_UNAVAILABLE"),
-                                         (501, "WEBDAV_UNAVAILABLE"), (406, "WEBDAV_UNAVAILABLE"),
+                                         (501, "WEBDAV_UNAVAILABLE"), (406, "DAV_REQUEST_NOT_ACCEPTED"),
                                          (500, "DAV_UNEXPECTED_STATUS")])
 def test_status_codes_become_clear_reasons(box, status, code):
     box.status["/dav/box-1"] = status
@@ -622,3 +638,67 @@ def test_a_truncated_or_huge_image_is_invalid(tmp_path, monkeypatch):
     q.write_bytes(tiff_bytes(1))
     with pytest.raises(mfp_output.OutputError):
         mfp_output.inspect(q, "tiff")
+
+
+
+# --------------------------------------------------------------------- 請求格式（v1.16.99，客戶實機 Apeos C5571 對 allprop 回 406）
+
+_MODERN = b"fujifilm.com/fb/2021/04"
+_LEGACY = b"fujixerox.co.jp"
+
+
+def test_a_406_on_the_modern_probe_tries_the_legacy_probe_once_without_credentials(box):
+    box.realm = "box-1"
+    box.add_whole(1)
+    box.reject_406 = lambda m, body, h: _MODERN in body
+    s = _open(box, B.Creds(box_password="1234"))
+    assert list(s.docs) == ["1"]
+    first, second = box.requests[0], box.requests[1]
+    assert _MODERN in first["body"] and _LEGACY in second["body"], "新的被拒才換舊的"
+    assert "authorization" not in first["headers"] and "authorization" not in second["headers"], "換格式不帶帳密"
+    assert all(_LEGACY in r["body"] for r in box.requests[1:]), "認證與列文件沿用被接受的那一套"
+
+
+def test_both_probes_refused_stops_with_the_stage_and_no_credentials(box):
+    box.realm = "box-1"
+    box.reject_406 = lambda m, body, h: True
+    trace = []
+    with pytest.raises(B.BoxError) as e:
+        B.open_box("127.0.0.1", "127.0.0.1", "http", box.port, box=1, creds=B.Creds(box_password="1234"),
+                   allow_http=True, trace=trace)
+    assert e.value.code == "DAV_REQUEST_NOT_ACCEPTED"
+    assert e.value.detail.get("stage") == "probe" and e.value.detail.get("auth_sent") is False
+    assert len(box.requests) == 2 and not _auth_sent(box), "兩套各試一次就停，帳密一個字都沒送"
+    assert [t.get("profile") for t in trace] == ["modern", "legacy"] and all(t.get("stage") == "probe" for t in trace)
+    assert all(t.get("singlepage") == "On" and t.get("auth_sent") is False for t in trace)
+    assert "1234" not in str(trace)
+
+
+def test_a_406_on_the_list_stops_without_switching_formats_with_credentials(box):
+    box.realm = "box-1"
+    box.add_whole(1)
+    box.reject_406 = lambda m, body, h: b"<sss:Pages/>" in body
+    with pytest.raises(B.BoxError) as e:
+        _open(box, B.Creds(box_password="1234"))
+    assert e.value.code == "DAV_REQUEST_NOT_ACCEPTED" and e.value.detail.get("stage") == "list"
+    lists = [r for r in box.requests if b"<sss:Pages/>" in r["body"]]
+    assert len(lists) == 1, "列文件被拒就停，不帶帳密換格式重送"
+
+
+def test_a_207_without_the_mailbox_itself_is_not_success(box):
+    box.add_whole(1)
+    box.reject_406 = None
+    box.listing_override = None
+    real = box.listing
+    box.listing = lambda: real().replace(b"<D:href>/dav/box-1/</D:href>", b"<D:href>/dav/box-9/</D:href>")
+    with pytest.raises(B.BoxError) as e:
+        _open(box)
+    assert e.value.code == "DAV_BAD_RESPONSE"
+
+
+def test_other_brands_keep_the_generic_webdav_request():
+    """Canon Advanced Box 等走 `_Dav` 的其他廠牌：請求格式不受 FUJIFILM 的改動影響。"""
+    from app.core import mfp_share
+    body, ctype, extra = mfp_share._CanonDav("h", "127.0.0.1", "http", 80, trust_sha256=None, allow_http=True,
+                                             trace=[])._propfind_spec()
+    assert b"allprop" in body and ctype == 'text/xml; charset="utf-8"' and extra == {}

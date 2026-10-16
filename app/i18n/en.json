@@ -7416,5 +7416,11 @@
   "腳本轉址": "Script redirect",
   "頁面原始內容（節錄）": "Raw page content (excerpt)",
   "改用 HTTP 連線：密碼與文件會以未加密的方式在公司內網傳送。確定要繼續嗎？之後這台瀏覽器就不會再問。": "Switch to HTTP: passwords and documents will travel unencrypted over the company network. Continue? This browser will not ask again.",
-  "可以在上面的「連線方式」改用 {0} 再試一次（FUJIFILM 的 WebDAV 預設在 HTTP 80）。": "You can switch to {0} under Connection above and try again (FUJIFILM's WebDAV runs on HTTP 80 by default)."
+  "可以在上面的「連線方式」改用 {0} 再試一次（FUJIFILM 的 WebDAV 預設在 HTTP 80）。": "You can switch to {0} under Connection above and try again (FUJIFILM's WebDAV runs on HTTP 80 by default).",
+  "設備不接受這次的取件請求（HTTP 406）：技術細節裡記了是哪個階段被拒；這不一定代表 WebDAV 沒有啟用": "The device did not accept this retrieval request (HTTP 406): the technical details show which stage was refused; this does not necessarily mean WebDAV is off",
+  "實驗功能：依據原廠工具與技術資料分析，尚待實機驗證。程式只發送列出與下載請求；若信箱設定為取件後刪除，設備仍可能刪除原件。": "Experimental: based on an analysis of the manufacturer's tools and technical documents, not yet verified on a real device. Only list and download requests are sent; if the box is set to delete after retrieval, the device may still delete the original.",
+  "可以在上面的「連線方式」改用 {0} 再試一次。": "You can switch to {0} under Connection above and try again.",
+  "階段": "Stage",
+  "請求格式": "Request format",
+  "已送出帳密": "Credentials sent"
 }

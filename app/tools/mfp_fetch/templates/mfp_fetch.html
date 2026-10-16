@@ -370,7 +370,7 @@
     <h2 id="mfBoxTitle" class="mf-scan-title"></h2>
     <button type="button" class="btn btn-secondary btn-small" id="mfBoxClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
   </div>
-  <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依原廠取件工具的研究寫成，還沒在實機上驗證過。只會讀取（列出文件、下載），不會刪除或修改事務機上的文件。') }}</span></div>
+  <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依據原廠工具與技術資料分析，尚待實機驗證。程式只發送列出與下載請求；若信箱設定為取件後刪除，設備仍可能刪除原件。') }}</span></div>
   <form id="mfBoxForm" class="mf-box-form" autocomplete="off">
     <div id="mfBoxTargetWrap" hidden>
       <label for="mfBoxTarget">{{ tr('連線方式') }}</label>
@@ -506,6 +506,7 @@
     reason: tr('原因'), http_version: tr('HTTP 版本'), bytes: tr('位元組'), title: tr('頁面標題'),
     error: tr('錯誤'), errno: tr('錯誤代碼'), from: tr('來源'), to: tr('目的地'),
     refresh: tr('自動轉址'), tls_verified: tr('TLS 已驗證'), password_inputs: tr('密碼欄位數'),
+    stage: tr('階段'), profile: tr('請求格式'), auth_sent: tr('已送出帳密'),
     script_redirects: tr('腳本轉址'), stub_html: tr('頁面原始內容（節錄）'),
     version: tr('TLS 版本'), cipher: tr('加密套件'), verified: tr('憑證已驗證'),
     verify_code: tr('驗證錯誤代碼'), verify_message: tr('驗證失敗原因'),
@@ -1330,7 +1331,7 @@
   }
   function fpText(hex) { return String(hex || '').toUpperCase().replace(/(..)(?!$)/g, '$1:'); }
   // 協定紀錄：預設收起來，給管理員看（一般使用者不用懂）
-  const TRACE_KEYS = ['method', 'path', 'status', 'auth', 'content_type', 'bytes', 'ms', 'error'];
+  const TRACE_KEYS = ['method', 'path', 'stage', 'profile', 'depth', 'singlepage', 'status', 'auth_sent', 'auth', 'request_content_type', 'content_type', 'bytes', 'ms', 'error'];
   function showTrace(trace, prefix) {
     prefix = prefix || 'mfBox';
     const tech = boxEl(prefix + 'Tech');
@@ -1393,9 +1394,12 @@
     showError(errBox, res);
     // 這個連線方式不接 WebDAV：有另一組可以試就明講（不自動換 —— 換到 HTTP 要使用者自己同意）
     const others = [...boxEl('mfBoxTarget').options].map(o => o.value).filter(v => v && v !== boxTarget());
-    if (res.code === 'WEBDAV_UNAVAILABLE' && others.length) {
-      errBox.append(el('div', 'mf-hint', tr('可以在上面的「連線方式」改用 {0} 再試一次（FUJIFILM 的 WebDAV 預設在 HTTP 80）。')
-        .replace('{0}', targetName(others.find(o => o.startsWith('http:')) || others[0]))));
+    if ((res.code === 'WEBDAV_UNAVAILABLE' || res.code === 'DAV_REQUEST_NOT_ACCEPTED') && others.length) {
+      const alt = others.find(o => o === 'http:80') || others[0];
+      // 「WebDAV 預設在 HTTP 80」只在建議的就是 HTTP 80 時才講（v1.16.98 在 80 上也照講，前後矛盾）
+      errBox.append(el('div', 'mf-hint', alt === 'http:80'
+        ? tr('可以在上面的「連線方式」改用 {0} 再試一次（FUJIFILM 的 WebDAV 預設在 HTTP 80）。').replace('{0}', targetName(alt))
+        : tr('可以在上面的「連線方式」改用 {0} 再試一次。').replace('{0}', targetName(alt))));
     }
   }
   function syncFetchBtn() {

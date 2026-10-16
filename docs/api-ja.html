@@ -1560,6 +1560,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <li>ボックスのパスワード、または複合機のアカウントが必要：<code>AUTH_REQUIRED_BOX</code>、<code>AUTH_REQUIRED_USER</code></li>
 <li>認証失敗、または複合機が未対応の認証方式を求めた：<code>AUTH_FAILED</code>、<code>AUTH_MODE_UNSUPPORTED</code></li>
 <li>ボックスが見つからない、権限がない、WebDAV が無効、応答の形式が違う：<code>BOX_NOT_FOUND</code>、<code>BOX_FORBIDDEN</code>、<code>WEBDAV_UNAVAILABLE</code>、<code>DAV_BAD_RESPONSE</code> など</li>
+<li>複合機がこの要求を受け付けない（HTTP 406）：<code>DAV_REQUEST_NOT_ACCEPTED</code>。<code>detail.stage</code> は拒否された段階（<code>probe</code> の確認または <code>list</code> の一覧）、<code>detail.profile</code> はそのときの要求の形式（<code>modern</code> / <code>legacy</code>）</li>
 </ul>
 <p>取得ジョブの記録はスキャンと同じものです（<code>kind: &quot;box&quot;</code>）。<code>files</code> は保存した各ファイル（<code>name</code>、<code>pages</code>、<code>workspace_file_id</code>）、<code>items</code> は文書ごとの結果（<code>status</code>、<code>error_code</code>、<code>format_note</code>、<code>source</code>：<code>SOURCE_KEPT</code> 元の文書が残っている / <code>SOURCE_GONE</code> 取得後に複合機からなくなった / <code>SOURCE_UNKNOWN</code>）です。一部の文書を取得できなかった場合も <code>status</code> は <code>done</code> で、<code>error_code</code> が <code>BOX_PARTIAL</code> になります。PDF への変換に失敗した場合（例：未対応の圧縮方式の TIFF）は元のファイルを保存し、<code>format_note</code> が <code>PDF_FALLBACK_ORIGINAL</code> になります。</p>
       </section>

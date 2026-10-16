@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (927 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (928 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.16.99] - 2026-10-16
+
+- MFP Scan & Fetch: FUJIFILM mailbox retrieval now uses the request format of the manufacturer's retrieval tool (based on an analysis of that tool and technical documents, not yet verified on a real device). It first probes the box without credentials (asking only for the resource type, with `X-Singlepage: On`), authenticates if required, then lists documents with named properties; the XML declares FUJIFILM's namespaces, and if the new format is refused (HTTP 406) it probes once more with the legacy format, still without credentials. The previous single `allprop` request got 406 on a real device over both HTTPS and HTTP. Credentials are chosen once; a refused listing stops instead of retrying formats with credentials; a reply without the box itself is not success. HTTP 406 is now its own error (`DAV_REQUEST_NOT_ACCEPTED`) with the stage that was refused, and the protocol log records the stage, request format and whether credentials were sent. Also fixed: on HTTP 80 the hint still suggested HTTPS 443 with a note about port 80. The panel note now says the device may still delete originals if the box is set to delete after retrieval.
 
 ## [1.16.98] - 2026-10-16
 

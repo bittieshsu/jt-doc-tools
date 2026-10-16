@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.16.98
+# Jason Tools Document Toolbox v1.16.99
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >

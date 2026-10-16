@@ -1560,6 +1560,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <li>要信箱密碼、要事務機的帳號密碼：<code>AUTH_REQUIRED_BOX</code>、<code>AUTH_REQUIRED_USER</code></li>
 <li>認證失敗、設備要求的認證方式不支援：<code>AUTH_FAILED</code>、<code>AUTH_MODE_UNSUPPORTED</code></li>
 <li>找不到信箱、沒有權限、WebDAV 沒有啟用、回應格式不對：<code>BOX_NOT_FOUND</code>、<code>BOX_FORBIDDEN</code>、<code>WEBDAV_UNAVAILABLE</code>、<code>DAV_BAD_RESPONSE</code> 等</li>
+<li>設備不接受這次的請求（HTTP 406）：<code>DAV_REQUEST_NOT_ACCEPTED</code>，<code>detail.stage</code> 是被拒的階段（<code>probe</code> 探測或 <code>list</code> 列文件）、<code>detail.profile</code> 是當時的請求格式（<code>modern</code> / <code>legacy</code>）</li>
 </ul>
 <p>取件作業的紀錄跟掃描同一份（<code>kind: &quot;box&quot;</code>）：<code>files</code> 是存下來的每一個檔案（<code>name</code>、<code>pages</code>、 <code>workspace_file_id</code>），<code>items</code> 是每份文件的結果（<code>status</code>、<code>error_code</code>、<code>format_note</code>、 <code>source</code>：<code>SOURCE_KEPT</code> 原件還在 / <code>SOURCE_GONE</code> 取件後設備上已經沒有 / <code>SOURCE_UNKNOWN</code>）。 部分文件沒取到時 <code>status</code> 仍是 <code>done</code>、<code>error_code</code> 是 <code>BOX_PARTIAL</code>。轉成 PDF 失敗（例如 TIFF 用了不支援的壓縮） 會改存原始檔，<code>format_note</code> 是 <code>PDF_FALLBACK_ORIGINAL</code>。</p>
       </section>

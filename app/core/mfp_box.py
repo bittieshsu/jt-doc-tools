@@ -50,6 +50,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 from . import mfp_client as mc
 from . import mfp_output
+from . import mfp_fuji_profile as fp
 
 logger = logging.getLogger("app.mfp_fetch")
 
@@ -79,6 +80,8 @@ VENDOR_NS = frozenset({
     "http://www.fujixerox.co.jp/2003/12/ssm/storageService",
     "http://www.fujixerox.co.jp/2005/06/boxAccess",
     "http://www.fujixerox.co.jp/2003/12/ssm/management/mailbox",
+    # 請求格式（`mfp_fuji_profile`）宣告的新舊兩套：storageService、jobTemplate、backupService、boxAccess
+    *(uri for ns in fp.PROFILES.values() for uri in ns.values()),
 })
 _KNOWN_NS = VENDOR_NS | {NS_DAV}
 ALLOWED_METHODS = frozenset({"PROPFIND", "GET"})
@@ -90,6 +93,7 @@ MESSAGES: dict[str, str] = {
     "BOX_NOT_FOUND": "設備回應找不到這個信箱（編號不存在，或設備的 WebDAV 沒有啟用）",
     "BOX_FORBIDDEN": "設備拒絕存取這個信箱（這個帳號沒有權限）",
     "WEBDAV_UNAVAILABLE": "設備不接受 WebDAV 指令（WebDAV 沒有啟用，或這個連接埠不是 WebDAV）",
+    "DAV_REQUEST_NOT_ACCEPTED": "設備不接受這次的取件請求（HTTP 406）：技術細節裡記了是哪個階段被拒；這不一定代表 WebDAV 沒有啟用",
     "AUTH_REQUIRED_BOX": "這個信箱有設密碼，請輸入信箱密碼",
     "AUTH_REQUIRED_USER": "設備要求登入，請輸入設備的使用者帳號與密碼",
     "AUTH_FAILED": "認證失敗：帳號或密碼不對（為了避免帳號被鎖，沒有自動重試）",
@@ -122,7 +126,7 @@ MESSAGES: dict[str, str] = {
 FATAL = frozenset({"AUTH_FAILED", "AUTH_MODE_UNSUPPORTED", "AUTH_REQUIRED_BOX", "AUTH_REQUIRED_USER",
                    "TLS_UNTRUSTED", "TLS_IDENTITY_FAILED", "TLS_FAILED", "PLAIN_HTTP_NEEDS_CONSENT",
                    "DAV_CONNECTION_FAILED", "CANCELLED", "BOX_NOT_FOUND", "BOX_FORBIDDEN",
-                   "WEBDAV_UNAVAILABLE"})
+                   "WEBDAV_UNAVAILABLE", "DAV_REQUEST_NOT_ACCEPTED"})
 
 
 class BoxError(Exception):
@@ -362,6 +366,10 @@ class _Dav:
         """送出去的請求路徑只能是固定的幾種形狀（子類別換成自己的，例如 Canon Advanced Box）。"""
         return bool(_SAFE_TARGET.match(path))
 
+    def _propfind_spec(self) -> tuple[bytes, str, dict[str, str]]:
+        # Preserve the existing generic/other-brand WebDAV request contract.
+        return _PROPFIND_BODY, 'text/xml; charset="utf-8"', {}
+
     def request(self, method: str, path: str, *, depth: Optional[str] = None, to_file: Optional[Path] = None,
                 max_bytes: int = MAX_XML, timeout: float = READ_TIMEOUT, auth: bool = True) -> dict:
         """送一個 PROPFIND / GET。`to_file` 有給就把 200 的內容串流寫進檔案（超過 `max_bytes` 丟 `DOC_TOO_LARGE`）。"""
@@ -382,9 +390,16 @@ class _Dav:
                     "Accept: */*\r\nAccept-Encoding: identity\r\n")
             body = b""
             if method == "PROPFIND":
-                body = _PROPFIND_BODY
-                head += (f"Depth: {depth or '1'}\r\nContent-Type: text/xml; charset=\"utf-8\"\r\n"
+                body, content_type, extra = self._propfind_spec()
+                head += (f"Depth: {depth or '1'}\r\nContent-Type: {content_type}\r\n"
                          f"Content-Length: {len(body)}\r\n")
+                head += "".join(f"{k}: {v}\r\n" for k, v in extra.items())
+                if isinstance(self, _FujiDav):
+                    entry.update(profile=self.profile, stage=self.stage,
+                                 request_content_type=content_type, request_bytes=len(body),
+                                 request_body_sha256=hashlib.sha256(body).hexdigest(),
+                                 singlepage=extra.get("X-Singlepage", "omitted"),
+                                 auth_sent=bool(auth and self.auth is not None))
             if auth and self.auth is not None:
                 head += f"Authorization: {self.auth.header(method, path)}\r\n"
                 entry["auth"] = self.auth.scheme
@@ -704,50 +719,97 @@ def _status_error(r: dict) -> BoxError:
         return BoxError("BOX_FORBIDDEN", {"status": st})
     if st == 404:
         return BoxError("BOX_NOT_FOUND", {"status": st})
-    # 406：客戶實機 Apeos C5571 的 HTTPS 443 對 PROPFIND 回 406、沒有內容 —— 同一類「這個連接埠不接 WebDAV」
-    if st in (405, 406, 501):
+    if st == 406:
+        return BoxError("DAV_REQUEST_NOT_ACCEPTED", {"status": st})
+    if st in (405, 501):
         return BoxError("WEBDAV_UNAVAILABLE", {"status": st})
     return BoxError("DAV_UNEXPECTED_STATUS", {"status": st})
 
 
+class _FujiDav(_Dav):
+    """NSU3 compatibility request profiles for this vendor."""
+    profile = "modern"
+    stage = "probe"
+
+    def _propfind_spec(self) -> tuple[bytes, str, dict[str, str]]:
+        return fp.request_spec(self.profile, self.stage)
+
+
 def open_box(host: str, ip: str, scheme: str, port: int, *, box: int, creds: Creds,
              trust_sha256: Optional[str] = None, allow_http: bool = False,
-             trace: Optional[list] = None) -> Session:
-    """開信箱並列出文件。失敗丟 `BoxError`（`detail` 裡有原因；協定紀錄在傳進來的 `trace`）。
+             trace: Optional[list] = None, fuji_profile: str = "auto") -> Session:
+    """Probe/authenticate, then list selected properties. Hardware validation pending.
 
-    1. 不帶帳密 PROPFIND（Depth 1）`/dav/box-<編號>`（照原廠程式的寫法，不加斜線）。207 → 不用認證，完成。
-    2. 301/302/307/308 轉到**同一個信箱**（補斜線、補零）→ 跟一次。其他轉址不跟。
-    3. 401 → 依 realm 決定送哪一組帳密，**只送一次**；再 401 就是認證失敗（Digest 的 `stale=true`
-       是設備換了 nonce，不是密碼錯，可以用新的 nonce 再送一次 —— 這不算換帳密重試）。
+    Auto tries modern, then legacy only after an unauthenticated probe's 406.
+    401 ends profile probing. Credentials are selected once, with at most one
+    supported same-realm Digest stale renewal across this open operation.
+    Explicit modern/legacy is for controlled compatibility verification.
     """
+    if fuji_profile not in ("auto", "modern", "legacy"):
+        raise ValueError("invalid FUJIFILM profile")
     _check_target(ip, scheme, port)
     trace = trace if trace is not None else []
-    dav = _Dav(host, ip, scheme, port, trust_sha256=trust_sha256, allow_http=allow_http, trace=trace)
+    dav = _FujiDav(host, ip, scheme, port, trust_sha256=trust_sha256,
+                   allow_http=allow_http, trace=trace)
     b = _Box(box)
-    sess = Session(dav, b)
-    r = dav.request("PROPFIND", b.base, depth="1", auth=False)
-    if r["status"] in _REDIRECTS:
-        loc = r["headers"].get("location", "")
-        if b.rel(loc, dav, b.base) != []:
-            raise BoxError("DAV_REDIRECT_REFUSED", {"to": _location_path(loc)})
-        b.slash = _location_path(loc).endswith("/")
-        r = dav.request("PROPFIND", b.base, depth="1", auth=False)
-        if r["status"] in _REDIRECTS:
-            raise BoxError("DAV_UNEXPECTED_STATUS", {"status": r["status"], "reason": "redirect loop"})
-    path = b.base
-    if r["status"] == 401:
-        dav.auth = choose_auth(r["challenges"], creds)
-        r = dav.request("PROPFIND", path, depth="1")
-        if r["status"] == 401 and dav.auth.scheme == "digest":
-            fresh = [c for c in r["challenges"] if c["scheme"] == "digest"
-                     and c["params"].get("stale", "").lower() == "true"]
+    stale_used = False
+    redirected = False
+
+    def send(stage: str, *, auth: bool = True) -> dict:
+        dav.stage = stage
+        return dav.request("PROPFIND", b.base, depth="1", auth=auth)
+
+    def authenticate(r: dict, stage: str) -> dict:
+        nonlocal stale_used
+        if r["status"] == 401 and dav.auth is None:
+            dav.auth = choose_auth(r.get("challenges", []), creds)
+            r = send(stage)
+        if r["status"] == 401 and dav.auth is not None and dav.auth.scheme == "digest" and not stale_used:
+            fresh = [c for c in r.get("challenges", []) if c["scheme"] == "digest"
+                     and c["params"].get("stale", "").lower() == "true"
+                     and c["params"].get("realm") == dav.auth.params.get("realm")
+                     and _pick([c]) is not None]
             if fresh:
+                stale_used = True
                 dav.auth = _Auth(fresh[0], dav.auth.username, dav.auth.password)
-                r = dav.request("PROPFIND", path, depth="1")
+                r = send(stage)
+        return r
+
+    profiles = ("modern", "legacy") if fuji_profile == "auto" else (fuji_profile,)
+    for index, profile in enumerate(profiles):
+        dav.profile = profile
+        r = send("probe", auth=False)
+        if r["status"] in _REDIRECTS:
+            loc = r["headers"].get("location", "")
+            if redirected or b.rel(loc, dav, b.base) != []:
+                raise BoxError("DAV_REDIRECT_REFUSED", {"to": _location_path(loc)})
+            redirected = True
+            b.slash = _location_path(loc).endswith("/")
+            r = send("probe", auth=False)
+        if r["status"] == 406 and index + 1 < len(profiles):
+            continue
+        break
+    r = authenticate(r, "probe")
     if r["status"] != 207:
-        raise _status_error(r)
+        error = _status_error(r)
+        error.detail.update(stage="probe", profile=dav.profile, auth_sent=dav.auth is not None)
+        raise error
+    entries, qnames = parse_multistatus(r.get("body") or b"")
+    # A 207 with only errors, unrelated hrefs or no mailbox is not success.
+    if not any(b.rel(e["href"], dav, b.base) == [] and e["collection"] for e in entries):
+        raise BoxError("DAV_BAD_RESPONSE", {"stage": "probe", "reason": "mailbox collection missing"})
+    if fuji_profile == "auto":
+        dav.profile = fp.response_profile(qnames, dav.profile)
+    r = authenticate(send("list"), "list")
+    if r["status"] != 207:
+        error = _status_error(r)
+        error.detail.update(stage="list", profile=dav.profile, auth_sent=dav.auth is not None)
+        raise error
+    sess = Session(dav, b)
     entries, sess.qnames = parse_multistatus(r.get("body") or b"")
-    sess.docs, sess.box_props, sess.ignored = _documents(entries, b, dav, path)
+    if not any(b.rel(e["href"], dav, b.base) == [] and e["collection"] for e in entries):
+        raise BoxError("DAV_BAD_RESPONSE", {"stage": "list", "reason": "mailbox collection missing"})
+    sess.docs, sess.box_props, sess.ignored = _documents(entries, b, dav, b.base)
     return sess
 
 

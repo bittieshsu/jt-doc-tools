@@ -2484,6 +2484,7 @@ curl -X POST http://localhost:8765/tools/mfp-fetch/api/connections/3/box/list \
 - 要信箱密碼、要事務機的帳號密碼：`AUTH_REQUIRED_BOX`、`AUTH_REQUIRED_USER`
 - 認證失敗、設備要求的認證方式不支援：`AUTH_FAILED`、`AUTH_MODE_UNSUPPORTED`
 - 找不到信箱、沒有權限、WebDAV 沒有啟用、回應格式不對：`BOX_NOT_FOUND`、`BOX_FORBIDDEN`、`WEBDAV_UNAVAILABLE`、`DAV_BAD_RESPONSE` 等
+- 設備不接受這次的請求（HTTP 406）：`DAV_REQUEST_NOT_ACCEPTED`，`detail.stage` 是被拒的階段（`probe` 探測或 `list` 列文件）、`detail.profile` 是當時的請求格式（`modern` / `legacy`）
 
 取件作業的紀錄跟掃描同一份（`kind: "box"`）：`files` 是存下來的每一個檔案（`name`、`pages`、
 `workspace_file_id`），`items` 是每份文件的結果（`status`、`error_code`、`format_note`、

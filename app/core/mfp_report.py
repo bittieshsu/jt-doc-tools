@@ -37,6 +37,7 @@ KEY_LABELS = {
     "error": "錯誤", "errno": "錯誤代碼", "from": "來源", "to": "目的地",
     "refresh": "自動轉址", "tls_verified": "TLS 已驗證", "password_inputs": "密碼欄位數",
     "script_redirects": "腳本轉址", "stub_html": "頁面原始內容（節錄）",
+    "stage": "階段", "profile": "請求格式", "auth_sent": "已送出帳密",
     "version": "TLS 版本", "cipher": "加密套件", "verified": "憑證已驗證",
     "verify_code": "驗證錯誤代碼", "verify_message": "驗證失敗原因",
     "subject": "主體", "issuer": "簽發者", "not_before": "生效日", "not_after": "到期日",

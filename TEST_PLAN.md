@@ -2049,6 +2049,9 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] **最近的掃描與取件表格**（v1.16.91、v1.16.93）：1280 / 1180 寬右邊的按鈕排成一排（使用者 2026-10-15 截圖：開啟、下載、前往工作區被擠成三行）；
       1280 寬時間、事務機（「HP M141w」）、內容（「scan-20261014-144007.pdf」）都只有一行，空白按比例分給各欄（同日截圖：被折成三行、右邊一大片空白）；
       1180 / 900 寬不超出外框（先由狀態欄折行）；390 寬事務機名稱不會一字一行（`tests/test_mfp_scan_page_browser.py`）
+- [ ] **FUJIFILM 信箱請求格式**（v1.16.99，依原廠工具分析；客戶實機 allprop 在 HTTPS / HTTP 都回 406）：協定紀錄看得到 stage（probe → list）、profile（modern / legacy）、singlepage（probe 是 On、list 是 omitted）、auth_sent；
+      新格式 406 才換舊格式、只換一次、都不帶帳密；兩套都 406 → 錯誤「設備不接受這次的取件請求（HTTP 406）」並寫是哪個階段；列文件 406 就停；帳密只送同一組
+      （`tests/test_mfp_box.py`）。**實機待驗**：客戶 Apeos C5571 信箱 44 重試，結果與協定紀錄存 docs-share/mfp-fetch/field-reports/
 - [ ] **信箱取件的連線方式**（v1.16.98，客戶 Apeos C5571 實機 HTTPS 443 對 PROPFIND 回 406）：連線測試兩組都通 → 面板有「連線方式」選單（預設上次成功的那組，沒有就 HTTPS）；
       只有一組不出現。不接 WebDAV 的那組 → 錯誤說明「WebDAV 沒有啟用，或這個連接埠不是 WebDAV」並提示改用另一組；改選另一組列得出文件；改走 HTTP 要先同意（`tests/test_mfp_box.py`、`tests/test_mfp_box_page_browser.py`）
 - [ ] **首頁看不到廠牌時用 eSCL 型號辨識**（v1.16.97，客戶 Apeos C5571 實機）：首頁只有登入頁 / 沒有廠牌字樣、eSCL 回報 `Apeos C5571` → 廠牌 FUJIFILM、
