@@ -142,6 +142,41 @@
   <div class="br-status" id="themeStatus" aria-live="polite"></div>
 </div>
 
+<div class="panel" id="heroColorPanel">
+  <h3 class="br-h3">{{ icon('image', size=18) }} {{ tr('首頁 Logo 光暈與標題文字') }}</h3>
+  <p class="muted br-lead">{{ tr('首頁上方 Logo 後面的光暈，跟 Logo 下面的站台名稱，可以各自換顏色。點一下就套用。') }}</p>
+  <div class="br-hero">
+    <div class="br-hero-prev" id="heroPrev" data-glow="{{ appearance.hero_glow }}" data-title="{{ appearance.hero_title }}"
+         aria-hidden="true">
+      <img class="br-hero-logo" src="{{ brand_logo('page') }}" alt="" width="84" height="84" />
+      <div class="br-hero-title">{{ app_name }}</div>
+    </div>
+    <div class="br-hero-picks">
+      <h4 class="br-th-k">{{ tr('Logo 光暈') }}</h4>
+      <div class="br-chips" role="radiogroup" aria-label="{{ tr('Logo 光暈') }}">
+        {% for g in hero_glows %}
+        <button type="button" class="br-chip{% if g.id == appearance.hero_glow %} is-on{% endif %}"
+                data-hero-glow="{{ g.id }}" role="radio"
+                aria-checked="{{ 'true' if g.id == appearance.hero_glow else 'false' }}">
+          <span class="br-sw" data-glow-sw="{{ g.id }}"></span><span class="br-chip-name">{{ tr(g.name) }}</span>
+        </button>
+        {% endfor %}
+      </div>
+      <h4 class="br-th-k">{{ tr('標題文字') }}</h4>
+      <div class="br-chips" role="radiogroup" aria-label="{{ tr('標題文字') }}">
+        {% for t in hero_titles %}
+        <button type="button" class="br-chip{% if t.id == appearance.hero_title %} is-on{% endif %}"
+                data-hero-title="{{ t.id }}" role="radio"
+                aria-checked="{{ 'true' if t.id == appearance.hero_title else 'false' }}">
+          <span class="br-sw" data-title-sw="{{ t.id }}"></span><span class="br-chip-name">{{ tr(t.name) }}</span>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="br-status" id="heroStatus" aria-live="polite"></div>
+</div>
+
 <style nonce="{{ request.state.csp_nonce }}">
   /* === Crop UI === */
   .crop-toolbar {
@@ -271,6 +306,33 @@
     .br-themes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .br-logo-opt { min-width: 0; flex: 1 1 100%; }
   }
+  /* === 首頁 Logo 光暈與標題文字（顏色由 branding.HERO_GLOWS / HERO_TITLES 產生，跟首頁同一份） === */
+  .br-hero { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .br-hero-prev { flex: 0 0 240px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 22px 12px 18px; border-radius: 12px; background: #f4f5f7; border: 1px solid #e2e8f0; }
+  .br-hero-logo { width: 84px; height: 84px; object-fit: contain; }
+  .br-hero-title { font-size: 19px; font-weight: 800; text-align: center; line-height: 1.3;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+  .br-hero-picks { flex: 1 1 320px; min-width: 0; }
+  .br-hero-picks .br-th-k:first-child { margin-top: 0; }
+  .br-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .br-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 8px; border: 2px solid #e2e8f0;
+    border-radius: 999px; background: #fff; cursor: pointer; font: inherit; font-size: 13px; color: #0f172a;
+    transition: border-color .15s, box-shadow .15s; }
+  .br-chip:hover { border-color: #a5b4fc; }
+  .br-chip.is-on { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.15); font-weight: 700; }
+  .br-sw { width: 18px; height: 18px; border-radius: 999px; flex: none; border: 1px solid rgba(15,23,42,.12); }
+  {% for g in hero_glows %}
+  {% if g.rgb %}[data-glow-sw="{{ g.id }}"] { background: rgb({{ g.rgb }}); box-shadow: 0 0 8px rgba({{ g.rgb }},.55); }
+  .br-hero-prev[data-glow="{{ g.id }}"] .br-hero-logo { filter: drop-shadow(0 8px 16px rgba({{ g.rgb }},0.45)) drop-shadow(0 3px 6px rgba({{ g.rgb }},0.25)); }
+  {% else %}[data-glow-sw="{{ g.id }}"] { background: repeating-linear-gradient(45deg, #e2e8f0 0 3px, #fff 3px 6px); }
+  .br-hero-prev[data-glow="{{ g.id }}"] .br-hero-logo { filter: none; }{% endif %}
+  {% endfor %}
+  {% for t in hero_titles %}
+  [data-title-sw="{{ t.id }}"], .br-hero-prev[data-title="{{ t.id }}"] .br-hero-title {
+    background-image: linear-gradient(135deg, {{ t.stops[0] }} 0%, {{ t.stops[1] }} 60%, {{ t.stops[2] }} 100%); }
+  {% endfor %}
+  @media (max-width: 640px) { .br-hero-prev { flex: 1 1 100%; } }
   /* 迷你側欄：顏色全部取自 platform.css 的 --sb-* 變數 */
   .br-mini { display: flex; flex-direction: column; gap: 5px; padding: 0 0 8px; border-radius: 8px; overflow: hidden;
     background: var(--sb-bg); color: var(--sb-fg); }
@@ -649,6 +711,8 @@ function applyLogos(j) {
     if (j.icon_logo) l.href = j.icon_logo;
   });
   if (previewImg && j.icon_logo) previewImg.src = j.icon_logo;
+  const heroImg = document.querySelector('#heroPrev .br-hero-logo');
+  if (heroImg && j.icon_logo) heroImg.src = j.icon_logo;     // 首頁光暈預覽用的也是同一張 Logo
 }
 function markOn(buttons, btn) {
   buttons.forEach(function (b) {
@@ -692,6 +756,22 @@ const pickLogo = oneAtATime(async function (btn) {
   applyLogos(j);
 });
 logoBtns.forEach(function (btn) { btn.addEventListener('click', function () { pickLogo(btn); }); });
+// 首頁 Logo 光暈與標題文字：預覽當場換，存好才打勾
+const heroPrev = document.getElementById('heroPrev');
+[['heroGlow', 'hero_glow', 'glow'], ['heroTitle', 'hero_title', 'title']].forEach(function (cfg) {
+  const btns = Array.from(document.querySelectorAll('[data-' + (cfg[0] === 'heroGlow' ? 'hero-glow' : 'hero-title') + ']'));
+  const pick = oneAtATime(async function (btn) {
+    if (btn.classList.contains('is-on')) return;
+    const id = btn.dataset[cfg[0]];
+    const name = btn.querySelector('.br-chip-name').textContent.trim();
+    const payload = {}; payload[cfg[1]] = id;
+    const j = await saveAppearance(payload, document.getElementById('heroStatus'), tr('已套用：') + name);
+    if (!j) return;
+    heroPrev.dataset[cfg[2]] = j[cfg[1]];
+    markOn(btns, btn);
+  });
+  btns.forEach(function (btn) { btn.addEventListener('click', function () { pick(btn); }); });
+});
 
 btnReset.addEventListener('click', async () => {
   if (!await showConfirm(tr('確定要還原為內建預設 Logo？'), {okText: tr('還原'), kind:'danger'})) return;

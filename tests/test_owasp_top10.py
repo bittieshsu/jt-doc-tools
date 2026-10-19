@@ -198,6 +198,19 @@ def test_a07_totp_replay_attack_blocked(admin_session):
 
 # ---------- A09 Logging / Monitoring ----------
 
+def _wait_rows(sql: str, args: tuple = (), timeout: float = 5.0) -> list:
+    import time
+    from app.core import audit_db
+    end = time.time() + timeout
+    rows: list = []
+    while time.time() < end:
+        rows = audit_db.conn().execute(sql, args).fetchall()
+        if rows:
+            return rows
+        time.sleep(0.05)
+    return rows
+
+
 def test_a09_login_success_audited(admin_session):
     """Successful login must produce a `login_success` audit event."""
     from app.core import audit_db
@@ -205,10 +218,11 @@ def test_a09_login_success_audited(admin_session):
     c = TestClient(app_main.app, follow_redirects=False)
     c.post("/login", data={"username": username, "password": password,
                             "realm": "local"})
-    rows = audit_db.conn().execute(
-        "SELECT event_type FROM audit_events "
-        "WHERE event_type='login_success' AND username=? "
-        "ORDER BY id DESC LIMIT 5", (username,)).fetchall()
+    # 稽核是非同步寫入的（`audit_db.log_event` 只排進佇列）—— 要等寫進去，不可以登入完馬上讀
+    #（v1.17.0 跟 test_notify.py 一起跑時紅過：機器一忙寫入就晚一步）
+    rows = _wait_rows("SELECT event_type FROM audit_events "
+                      "WHERE event_type='login_success' AND username=? "
+                      "ORDER BY id DESC LIMIT 5", (username,))
     assert len(rows) >= 1
 
 
@@ -218,10 +232,9 @@ def test_a09_login_fail_audited(admin_session):
     c.post("/login", data={"username": "jtdt-admin",
                             "password": "wrong-pass-99999",
                             "realm": "local"})
-    rows = audit_db.conn().execute(
-        "SELECT event_type, details_json FROM audit_events "
-        "WHERE event_type='login_fail' AND username='jtdt-admin' "
-        "ORDER BY id DESC LIMIT 5").fetchall()
+    rows = _wait_rows("SELECT event_type, details_json FROM audit_events "
+                      "WHERE event_type='login_fail' AND username='jtdt-admin' "
+                      "ORDER BY id DESC LIMIT 5")
     assert len(rows) >= 1
 
 

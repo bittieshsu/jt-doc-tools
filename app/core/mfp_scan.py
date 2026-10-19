@@ -47,6 +47,10 @@ MESSAGES: dict[str, str] = {
     "PDF_FALLBACK_ORIGINAL": "轉成 PDF 失敗，改存設備給的原始檔",
     "SOURCE_KEPT": "設備上的原件還在",
     "SOURCE_GONE": "取件後設備上已經沒有這份原件（設備或信箱可能設定成取件後刪除）",
+    # 取件並刪除（v1.17.0）
+    "SOURCE_DELETED": "已從設備刪除原件（確認檔案存好之後才刪）",
+    "DELETE_NOT_DONE": "檔案已存好，但設備上的原件沒有刪掉（技術細節裡有設備回的狀態）",
+    "DELETE_SKIPPED_NOT_SAVED": "這份沒有存好，所以沒有刪除設備上的原件",
     "SOURCE_UNKNOWN": "取件後沒能確認設備上的原件還在不在",
 }
 
@@ -133,7 +137,8 @@ def start(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, ca
 
 def start_box(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, device: str, ip: str,
               scheme: str, port: int, box: int, creds: "mfp_box.Creds", doc_ids: list[str], output: str,
-              trust_sha256: Optional[str], allow_http: bool, confirm_delete_after_get: bool) -> dict:
+              trust_sha256: Optional[str], allow_http: bool, confirm_delete_after_get: bool,
+              delete_after: bool = False) -> dict:
     """排進這台的隊伍並開始背景取件（機內信箱，推測實作）；回傳作業紀錄。
 
     輸入不對丟 `mfp_box.BoxError`、隊伍滿了丟 `mfp_queue.QueueError` —— 都在排隊之前。"""
@@ -148,7 +153,7 @@ def start_box(*, owner: str, user_id: Optional[int], user_label: str, conn: dict
     if any(not re.fullmatch(r"\d{1,9}", d) for d in ids) or len(set(ids)) != len(ids):
         raise mfp_box.BoxError("NO_DOCUMENTS_SELECTED")
     via = {"protocol": "WebDAV", "scheme": scheme, "port": int(port)}
-    settings = {"via": via, "box": box, "output": output, "documents": ids}
+    settings = {"via": via, "box": box, "output": output, "documents": ids, "delete_after": bool(delete_after)}
     ticket = mfp_queue.enqueue(device, owner, "box")
     job_id = secrets.token_hex(16)
     try:
@@ -163,7 +168,8 @@ def start_box(*, owner: str, user_id: Optional[int], user_label: str, conn: dict
     th = threading.Thread(target=_run_box, name=f"mfp-box-{job_id[:8]}", daemon=True, kwargs=dict(
         job_id=job_id, ticket=ticket, cancel=cancel, user_id=user_id, user_label=user_label,
         host=conn["host"], ip=ip, scheme=scheme, port=port, box=box, creds=creds, doc_ids=ids,
-        output=output, trust=trust_sha256, allow_http=allow_http, confirm=confirm_delete_after_get))
+        output=output, trust=trust_sha256, allow_http=allow_http, confirm=confirm_delete_after_get,
+        delete_after=bool(delete_after)))
     th.start()
     return rec
 
@@ -237,7 +243,8 @@ def _run_scan(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional
 
 def _run_box(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional[int], user_label: str,
              host: str, ip: str, scheme: str, port: int, box: int, creds: "mfp_box.Creds",
-             doc_ids: list[str], output: str, trust: Optional[str], allow_http: bool, confirm: bool) -> None:
+             doc_ids: list[str], output: str, trust: Optional[str], allow_http: bool, confirm: bool,
+             delete_after: bool = False) -> None:
     workdir = _work_root() / job_id
     trace: list = []
     try:
@@ -314,6 +321,8 @@ def _run_box(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional[
         it = iter(saved)
         for i in items:
             i["files"] = [next(it) for _f in i["files"]]
+        if delete_after and stop is None and not cancel.is_set():
+            _delete_saved(sess, items, workdir, job_id)
         ok = [i for i in items if i.get("status") == "ok"]
         first = next((f for f in saved if f.get("workspace_file_id")), None)
         kept = next((f for f in saved if f.get("kept")), None)
@@ -323,7 +332,8 @@ def _run_box(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional[
             items=_slim_items(items), file_name=_job_title(items),
             result_path=str(workdir / kept["stored"]) if kept else None,
             tls_verified=(tls or {}).get("verified") if scheme == "https" else None,
-            settings={"via": dict(sess.via(), tls=tls), "box": box, "output": output, "documents": doc_ids})
+            settings={"via": dict(sess.via(), tls=tls), "box": box, "output": output, "documents": doc_ids,
+                      "delete_after": bool(delete_after)})
         if ok:
             fields["error_code"] = "BOX_PARTIAL" if len(ok) < len(items) else None
             fields["error_detail"] = _detail({}, trace) if len(ok) < len(items) else None
@@ -456,7 +466,8 @@ def _run_share(*, job_id: str, ticket, cancel: threading.Event, user_id: Optiona
                                           user=creds.get("user", ""), password=creds.get("password", ""),
                                           box=creds.get("box"), box_password=creds.get("box_password", ""),
                                           trust_sha256=trust, allow_http=allow_http, allow_plain=allow_plain,
-                                          trace=trace)
+                                          trace=trace, auth_mode=creds.get("auth_mode") or "auto",
+                                          user_code=creds.get("user_code", ""))
             if mfp_share.ROUTES[route]["auth"] == "box":
                 root = mfp_share.konica_box_share(sess, creds.get("box") or "")
         except mfp_box.BoxError as e:
@@ -549,6 +560,43 @@ def _run_share(*, job_id: str, ticket, cancel: threading.Event, user_id: Optiona
         if sess is not None:
             sess.close()
         _finish_thread(job_id, ticket, workdir)
+
+
+def _delete_saved(sess, items: list[dict], workdir: Path, job_id: str) -> None:
+    """「取件並刪除」：只刪**檔案都存好**的那幾份（存進工作區，或留在暫存區給本人下載），刪完再列一次信箱確認。
+
+    存好的判準：這份的每個檔案都有工作區 id 或暫存區檔名、而且暫存的那個檔案真的在。任何一個沒存好就不刪。"""
+    _set(job_id, phase="deleting")
+    asked = []
+    for i in items:
+        if i.get("status") != "ok":
+            continue
+        files = i.get("files") or []
+        saved_ok = bool(files) and all(
+            f.get("workspace_file_id") or (f.get("kept") and f.get("stored") and (workdir / f["stored"]).is_file())
+            for f in files)
+        if not saved_ok:
+            i["delete"] = "DELETE_SKIPPED_NOT_SAVED"
+            continue
+        try:
+            res = mfp_box.delete_doc(sess, i["doc"])
+        except mfp_box.BoxError as e:
+            res = {"code": e.code, "status": None}
+        i["delete"] = res["code"]
+        if res.get("status") is not None:
+            i["delete_status"] = res["status"]
+        asked.append(i)
+    if not asked:
+        return
+    try:
+        sess.list()
+    except mfp_box.BoxError:
+        for i in asked:
+            i["source"] = "SOURCE_UNKNOWN"
+        return
+    for i in asked:
+        gone = i["doc"] not in sess.docs
+        i["source"] = "SOURCE_DELETED" if gone else "DELETE_NOT_DONE"
 
 
 def _detail(detail: dict, trace: list) -> dict:
@@ -656,6 +704,8 @@ def public(rec: dict) -> dict:
             i["format_message"] = MESSAGES.get(i["format_note"])
         if i.get("source"):
             i["source_message"] = MESSAGES.get(i["source"])
+        if i.get("delete") == "DELETE_SKIPPED_NOT_SAVED":
+            i["source_message"] = MESSAGES["DELETE_SKIPPED_NOT_SAVED"]
     has = any(f["has_file"] for f in files)
     if not items and rec.get("result_path"):           # 舊版的掃描紀錄（沒有 items）
         has = Path(rec["result_path"]).exists() and fresh

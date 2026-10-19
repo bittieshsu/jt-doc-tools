@@ -10,7 +10,10 @@
 | 路線 | 服務 | 流程 |
 |---|---|---|
 | `kyocera_soap` / `kyocera_soap_http` | KM-WSDL（HTTPS 9091 / HTTP 9090），SOAP 1.2 | 認證狀態 → 登入（token 放 WS-Security）→ 列文件匣 → 列文件 → 準備下載 → 取資料（Base64）→ 登出 |
-| `ricoh_soap` | `/DH/repository`，SOAP 1.1 encoded | 協定版本 → 服務能力（取認證網址、支援的功能類別）→ 帳密換票證 → 票證開工作階段 → 查詢文件 → 原始表示 → 內容元素 → 下載網址（GET / POST）→ 結束工作階段 |
+| `ricoh_soap` | `/DH/repository`，SOAP 1.1 encoded | 協定版本 → 服務能力（取認證網址、支援的功能類別、登入模式候選）→ 選定**一種**登入方式 → 開工作階段（帳密換票證 → `startSessionByAuthTicket`，或 `startSession`：免登入 / 帳號密碼 / User Code）→ 查詢文件 → 原始表示 → 內容元素 → 下載網址（`getDocContentUrl2` 或 `getDocContentUrl`，GET / POST）→ 結束工作階段 |
+
+RICOH 非票證登入（`startSession`）依 2026-10-19 的分析（內部文件 `docs-share/mfp-fetch/ricoh-startsession-20261019/`）：
+第一個結果是狀態（成功是 `OK`），`stringOut` 才是工作階段代號；`stringIn` 的四種組法照分析文件。**登入方式由使用者選或由資訊唯一決定，不輪流試**；帳號空白不等於免登入。
 
 ## 安全邊界（跟其他取件同一套）
 
@@ -82,7 +85,13 @@ RICOH_MAX_DOCS = 300
 #: SOAP 回應的大小上限：控制訊息 / 帶 Base64 檔案的回應
 MAX_SOAP = 4 * 1024 * 1024
 MAX_SOAP_DATA = 96 * 1024 * 1024
-RICOH_TIME_LIMIT = 1800         # 原廠 wrapper 的值（研究文件）
+RICOH_TIME_LIMIT = 1800         # 原廠 wrapper 的值（研究文件；單位未確認）
+#: RICOH 登入方式（使用者選；`auto` 只在資訊足夠選出唯一一種時才決定，不輪流試）
+RICOH_AUTH_MODES = ("auto", "none", "account", "user_code", "user_code_ext")
+#: `stringIn` 的 SCHEME 值（Base64 的 `BASIC` / `RGWUCD` / `RGWEXTUCD`）
+_RICOH_SCHEME_B64 = {"BASIC": "QkFTSUM=", "RGWUCD": "UkdXVUNE", "RGWEXTUCD": "UkdXRVhUVUNE"}
+#: HTTP 的 BASIC 密碼表示（`gwpwes003`）：本地上限 128 UTF-8 bytes（分析文件的實作限制，不是設備上限）
+RICOH_PW_MAX = 128
 RICOH_URL_HINT = 60
 
 MESSAGES: dict[str, str] = {
@@ -96,7 +105,14 @@ MESSAGES: dict[str, str] = {
     "DOC_PASSWORD_REQUIRED": "這份文件有設密碼：請在「文件密碼」輸入後再取件",
     "DOC_PASSWORD_FAILED": "文件密碼不對",
     "DOC_NO_CONTENT": "設備沒有回傳這份文件的內容",
-    "RICOH_AUTH_UNSUPPORTED": "這台 RICOH 的登入方式目前不支援（只支援帳號密碼換票證的登入；User Code、未啟用帳號認證等方式還沒有依據）",
+    "RICOH_AUTH_UNSUPPORTED": "這台 RICOH 沒有提供可以用的登入方式（協定紀錄裡有設備列出的功能類別）",
+    "RICOH_AUTH_MODE_REQUIRED": "請在「登入方式」選這台事務機用的方式（不需登入、帳號密碼或 User Code）；還沒有送出任何登入資料",
+    "RICOH_AUTH_MODE_MISMATCH": "選的登入方式跟設備列出的不一樣，沒有送出（協定紀錄裡有設備列出的登入方式）",
+    "RICOH_AUTH_INPUT_CONFLICT": "選了「不需登入」但有填帳號、密碼或 User Code：請清掉，或改選對應的登入方式",
+    "RICOH_AUTH_PROFILE_UNSUPPORTED": "這台的協定版本不支援選的登入方式，沒有改用其他格式",
+    "RICOH_USER_CODE_REQUIRED": "請輸入 User Code（只能是數字，開頭的 0 要保留）",
+    "RICOH_PASSWORD_UNSUPPORTED": "這組密碼在 HTTP 登入格式裡無法表示（太長或含特殊字元），沒有送出；可以改用 HTTPS 連線",
+    "RICOH_SESSION_REJECTED": "設備沒有接受這次登入（為了避免被鎖，沒有自動重試）：請確認登入方式與資料；一直不通過時請管理員確認設備的認證設定",
     "RICOH_AUTH_URL_UNTRUSTED": "設備回的認證服務網址不在這台事務機上，沒有連過去",
     "RICOH_ORIGINAL_UNAVAILABLE": "這份文件沒有提供原始格式（沒有自動改用其他格式）",
     "RICOH_URL_UNSUPPORTED": "設備給的下載方式目前不支援（例如 FTP，或下載網址不在這台事務機上）",
@@ -592,13 +608,71 @@ def _r(name: str, xtype: str, value: Any) -> tuple:
     return (name, xtype, value)
 
 
+def _b64(v: bytes) -> str:
+    return base64.b64encode(v).decode("ascii")
+
+
+_GW_PREFIX = (b"abcdefghijklmnopqrstuvwxy" b"ABCDEFGHIJKLMNOPQRSTUVWXYZ" b"0123456789")
+
+
+def ricoh_gwpwes003(password: str, prefix: Optional[bytes] = None) -> bytes:
+    """HTTP 的 BASIC 密碼表示（`PES:Encoding=gwpwes003`，分析文件 2.4）。這是協定相容性表示，不是保護。
+
+    15 個字元的隨機前綴（`a-y A-Z 0-9`）＋ `z` ＋ 密碼的 UTF-8，每個 byte 右旋 2 位再 XOR 0x72。
+    結果含 0 時原廠會被 C 字串截斷 → 不送（不截短、不改密碼、不換格式重試）。`prefix` 只給測試向量用。
+    """
+    import secrets
+    raw = password.encode("utf-8")
+    if "\0" in password or len(raw) > RICOH_PW_MAX:
+        raise ShareError("RICOH_PASSWORD_UNSUPPORTED", {"reason": "length or NUL"})
+    if prefix is None:
+        prefix = bytes(secrets.choice(_GW_PREFIX) for _ in range(15))
+    if len(prefix) != 15 or any(b not in _GW_PREFIX for b in prefix):
+        raise ValueError("invalid prefix")
+    out = bytes(((((b >> 2) | (b << 6)) & 0xFF) ^ 0x72) for b in prefix + b"z" + raw)
+    if 0 in out:
+        raise ShareError("RICOH_PASSWORD_UNSUPPORTED", {"reason": "unrepresentable character"})
+    return out
+
+
+def ricoh_string_in(mode: str, *, protocol: int, transport: str, user: str = "", password: str = "",
+                    user_code: str = "", _test_prefix: Optional[bytes] = None) -> str:
+    """`startSession` 的 `stringIn`（分析文件第 2 節）。模式要已經選定；這裡不猜、不重試。"""
+    if mode == "none":
+        return ""
+    if mode == "BASIC":
+        if protocol < 200 or not user or "\0" in user:
+            raise ShareError("RICOH_AUTH_PROFILE_UNSUPPORTED", {"mode": mode})
+        uid = _b64(user.encode("utf-8"))
+        if transport == "https":
+            if "\0" in password:
+                raise ShareError("RICOH_PASSWORD_UNSUPPORTED", {"reason": "NUL"})
+            pwd, pes = _b64(password.encode("utf-8")), ""
+        else:
+            pwd, pes = _b64(ricoh_gwpwes003(password, _test_prefix)), "gwpwes003"
+        return f"SCHEME={_RICOH_SCHEME_B64['BASIC']};UID:UserName={uid};PWD:Password={pwd};PES:Encoding={pes};"
+    if mode in ("RGWUCD", "RGWEXTUCD"):
+        if not (user_code.isascii() and user_code.isdigit()):
+            raise ShareError("RICOH_USER_CODE_REQUIRED")
+        code = _b64(user_code.encode("ascii"))
+        if protocol < 200:
+            if mode == "RGWEXTUCD":
+                raise ShareError("RICOH_AUTH_PROFILE_UNSUPPORTED", {"mode": mode})
+            return f"SCHEME={_RICOH_SCHEME_B64['BASIC']};UID=;PWD={code};"
+        return f"SCHEME={_RICOH_SCHEME_B64[mode]};UCD:UserCode={code};"
+    raise ShareError("RICOH_AUTH_MODE_REQUIRED", {"reason": "unknown mode"})
+
+
 class RicohSession(Session):
     """`/DH/repository`。建立時：服務能力 → 帳密換票證 → 開工作階段；`close()` 結束工作階段。"""
     transport = "soap"
     ROOT = "documents"
 
     def __init__(self, route: str, host: str, ip: str, scheme: str, port: int, *, user: str, password: str,
-                 doc_password: str, trust_sha256: Optional[str], allow_http: bool, trace: list):
+                 doc_password: str, trust_sha256: Optional[str], allow_http: bool, trace: list,
+                 auth_mode: str = "auto", user_code: str = ""):
+        if auth_mode not in RICOH_AUTH_MODES:
+            raise ShareError("RICOH_AUTH_MODE_REQUIRED", {"reason": "unknown mode"})
         self.route = route
         self.http = _SoapHttp(host, ip, scheme, port, paths=[RICOH_REPO_PATH], trust_sha256=trust_sha256,
                               allow_http=allow_http, trace=trace)
@@ -621,17 +695,102 @@ class RicohSession(Session):
         self.classes = [c for c in classes if c][:60]
         self.caps = {k: str(v)[:120] for k, v in props.items() if k in (
             "machineType", "moduleVersion", "repositoryType", "uauthenticationProviderName",
-            "uauthenticationDomainName", "isUserAuthenticatableByTicket", "maxResultRowBlockSizeForDocIDList")}
+            "uauthenticationDomainName", "isUserAuthenticatableByTicket", "maxResultRowBlockSizeForDocIDList",
+            "startSessionSchemeCandidates")}
+        if self.protocol_version:
+            self.caps["protocolVersion"] = self.protocol_version
         if self.http.trace:
             self.http.trace[-1]["capability"] = {k: v for k, v in self.caps.items()}
             self.http.trace[-1]["classes"] = list(self.classes)
-        if not self.supports("basic.startSessionByAuthTicket"):
-            raise ShareError("RICOH_AUTH_UNSUPPORTED", {"classes": self.classes})
-        if not user:
-            raise ShareError("AUTH_REQUIRED_USER", {"reason": "ricoh requires an account"})
+        cand = str(props.get("startSessionSchemeCandidates") or "")
+        #: 設備宣告的非票證登入模式；屬性不存在＝不知道（None），跟「空的」分開
+        self.candidates: Optional[list[str]] = (
+            [t for t in re.findall(r"[A-Z0-9_]+", cand.upper()) if t in _RICOH_SCHEME_B64]
+            if "startSessionSchemeCandidates" in props else None)
+        try:
+            self.protocol_int: Optional[int] = int(self.protocol_version) if self.protocol_version else None
+        except ValueError:
+            self.protocol_int = None
+        if self.http.trace:
+            self.http.trace[-1]["login_candidates"] = self.candidates
+        mode = self._choose_mode(auth_mode, user=user, password=password, user_code=user_code, props=props)
+        self.auth_mode = mode
+        if self.http.trace:
+            self.http.trace[-1]["login_mode"] = mode
+        if mode == "ticket":
+            self._login_ticket(props, user, password)
+        else:
+            self._login_start_session(mode, user=user, password=password, user_code=user_code)
+
+    # ---- 登入
+    def _ticket_usable(self, props: dict) -> bool:
+        return (self.supports("basic.startSessionByAuthTicket") and bool(props.get("uauthenticationUrl"))
+                and str(props.get("isUserAuthenticatableByTicket", "true")).lower() != "false")
+
+    def _choose_mode(self, want: str, *, user: str, password: str, user_code: str, props: dict) -> str:
+        """選定**一種**登入方式（送任何登入資料之前）。回 `ticket` / `none` / `BASIC` / `RGWUCD` / `RGWEXTUCD`。"""
+        has_ticket = self.supports("basic.startSessionByAuthTicket")
+        has_start = "basic.startSession" in self.classes
+        if not has_ticket and not has_start:
+            raise ShareError("RICOH_AUTH_UNSUPPORTED", {
+                "login": [c for c in self.classes if "startsession" in c.lower()] or ["-"],
+                "capability": dict(self.caps)})
+        account = bool(user)
+        code = bool(user_code)
+        if want == "auto":
+            if account and code:
+                raise ShareError("RICOH_AUTH_MODE_REQUIRED", {"reason": "account and user code both given"})
+            if account:
+                want = "account"
+            elif code:
+                subs = [m for m in ("RGWUCD", "RGWEXTUCD") if self.candidates and m in self.candidates]
+                if len(subs) != 1:
+                    raise ShareError("RICOH_AUTH_MODE_REQUIRED", {"reason": "user code type unknown",
+                                                                  "candidates": self.candidates})
+                want = "user_code" if subs[0] == "RGWUCD" else "user_code_ext"
+            elif has_start:
+                # 帳號空白不等於免登入（分析文件 5.2 第 8 條）：請使用者明確選
+                raise ShareError("RICOH_AUTH_MODE_REQUIRED", {"reason": "no login data",
+                                                              "candidates": self.candidates})
+            else:
+                raise ShareError("AUTH_REQUIRED_USER", {"reason": "ricoh requires an account"})
+        if want == "none":
+            if account or password or code:
+                raise ShareError("RICOH_AUTH_INPUT_CONFLICT")
+            if not has_start:
+                raise ShareError("RICOH_AUTH_MODE_MISMATCH", {"mode": "none", "classes": "no basic.startSession"})
+            return "none"
+        if want == "account":
+            if code:
+                raise ShareError("RICOH_AUTH_INPUT_CONFLICT", {"reason": "user code given"})
+            if not account:
+                raise ShareError("AUTH_REQUIRED_USER", {"reason": "ricoh requires an account"})
+            if self._ticket_usable(props):
+                return "ticket"
+            if not has_start:
+                raise ShareError("RICOH_AUTH_UNSUPPORTED", {"capability": dict(self.caps)})
+            if self.candidates is not None and "BASIC" not in self.candidates:
+                raise ShareError("RICOH_AUTH_MODE_MISMATCH", {"mode": "BASIC", "candidates": self.candidates})
+            if self.protocol_int is None or self.protocol_int < 200:
+                raise ShareError("RICOH_AUTH_PROFILE_UNSUPPORTED", {"mode": "BASIC",
+                                                                    "protocol": self.protocol_version or "-"})
+            return "BASIC"
+        # User Code
+        sub = "RGWUCD" if want == "user_code" else "RGWEXTUCD"
+        if account or password:
+            raise ShareError("RICOH_AUTH_INPUT_CONFLICT", {"reason": "account given"})
+        if not (user_code.isascii() and user_code.isdigit()):
+            raise ShareError("RICOH_USER_CODE_REQUIRED")
+        if not has_start:
+            raise ShareError("RICOH_AUTH_MODE_MISMATCH", {"mode": sub, "classes": "no basic.startSession"})
+        if self.candidates is not None and sub not in self.candidates:
+            raise ShareError("RICOH_AUTH_MODE_MISMATCH", {"mode": sub, "candidates": self.candidates})
+        if self.protocol_int is None or (sub == "RGWEXTUCD" and self.protocol_int < 200):
+            raise ShareError("RICOH_AUTH_PROFILE_UNSUPPORTED", {"mode": sub, "protocol": self.protocol_version or "-"})
+        return sub
+
+    def _login_ticket(self, props: dict, user: str, password: str) -> None:
         auth_url = str(props.get("uauthenticationUrl") or "")
-        if not auth_url or str(props.get("isUserAuthenticatableByTicket", "true")).lower() == "false":
-            raise ShareError("RICOH_AUTH_UNSUPPORTED", {"capability": self.caps})
         auth_path = self._own_path(auth_url, "RICOH_AUTH_URL_UNTRUSTED")
         self.http.allow(auth_path)
         name, dom = user, str(props.get("uauthenticationDomainName") or "")
@@ -650,6 +809,29 @@ class RicohSession(Session):
         self._sid = str(sid or "").strip()
         if not self._sid:
             raise mfp_box.BoxError("DAV_BAD_RESPONSE", {"reason": "no session id"})
+
+    def _login_start_session(self, mode: str, *, user: str, password: str, user_code: str) -> None:
+        string_in = ricoh_string_in(mode, protocol=self.protocol_int or 0, transport=self.http.scheme,
+                                    user=user, password=password, user_code=user_code)
+        try:
+            status, out = self._repo("startSession", [_r("stringIn", "string", string_in),
+                                                      _r("timeLimit", "unsignedInt", RICOH_TIME_LIMIT)], auth=True)
+        except ShareError as e:
+            if e.code == "AUTH_FAILED":
+                raise ShareError("RICOH_SESSION_REJECTED", {"mode": mode, **(e.detail or {})}) from None
+            raise
+        finally:
+            string_in = ""          # noqa: F841 —— 登入字串含認證資料，用完就丟
+        status = str(status or "").strip()
+        sid = out.get("stringOut")
+        sid = sid.strip() if isinstance(sid, str) else ""
+        if status != "OK":
+            # 非 OK 也是失敗（不一定是 Fault）；狀態只記看起來像代碼的
+            raise ShareError("RICOH_SESSION_REJECTED", {
+                "mode": mode, "status": status if re.fullmatch(r"[A-Z0-9_]{1,40}", status) else "-"})
+        if not sid or len(sid) > 512:
+            raise mfp_box.BoxError("DAV_BAD_RESPONSE", {"reason": "no session id", "call": "startSession"})
+        self._sid = sid
 
     def __repr__(self) -> str:
         return f"<RicohSession {self.route}>"
@@ -749,25 +931,19 @@ class RicohSession(Session):
         if check_path(path):
             raise ShareError("SHARE_PATH_INVALID")
         self._need("query.advancedSearch")
-        ids: list[str] = []
-        offset = 0
-        for _ in range(MAX_ROUNDS):
-            status, out = self._repo("executeAdvancedSearch", [
-                _r("sessionId", "string", self._sid), _r("rowOffset", "unsignedInt", offset),
-                _r("resultRowBlockSize", "unsignedInt", self._block()), _r("resultSetId", "string", ""),
-                _r("fromFolderId", "string", ""), _r("deepSearch", "boolean", False),
-                _r("select", "strings", ["identifier"]), _r("from", "string", "document"),
-                _r("whereAnd", "ops", []), _r("whereOr", "ops", []), _r("orderBy", "order", [])])
-            rows = out.get("rowList")
-            rows = rows if isinstance(rows, list) else ([] if rows in (None, "") else [rows])
-            for i in _row_ids(rows):
-                if i not in ids:
-                    ids.append(i)
-            if len(ids) > RICOH_MAX_DOCS:
-                raise ShareError("SHARE_TOO_MANY", {"limit": RICOH_MAX_DOCS})
-            offset += len(rows)
-            if str(status or "").strip() == "QUERY_AT_END" or not rows:
-                break
+        ids = self._search(deep=False)
+        if not ids:
+            # 文件伺服器的文件可能放在資料夾裡（客戶實機：「共用資料夾」）。原廠的一般查詢是最上層、不往下找；
+            # 一份都沒有時再「連子資料夾一起找」一次。只是讀取（登入已經完成，跟帳密無關）；設備不接受就當空的
+            try:
+                ids = self._search(deep=True)
+                if self.http.trace:
+                    self.http.trace[-1]["deep_search"] = len(ids)
+            except ShareError as e:
+                if e.code in ("SESSION_EXPIRED", "SHARE_TOO_MANY"):
+                    raise
+                if self.http.trace:
+                    self.http.trace[-1]["deep_search"] = "refused"
         entries = []
         for i in ids:
             seg = enc_name(i)
@@ -783,6 +959,28 @@ class RicohSession(Session):
                             "type": str(other.get("nf:application") or "")[:20],
                             "locked": str(other.get("nf:passwordProtected", "")).lower() == "true"})
         return sorted(entries, key=lambda x: (-(x["modified"] or 0), x["label"].lower()))
+
+    def _search(self, *, deep: bool) -> list[str]:
+        ids: list[str] = []
+        offset = 0
+        for _ in range(MAX_ROUNDS):
+            status, out = self._repo("executeAdvancedSearch", [
+                _r("sessionId", "string", self._sid), _r("rowOffset", "unsignedInt", offset),
+                _r("resultRowBlockSize", "unsignedInt", self._block()), _r("resultSetId", "string", ""),
+                _r("fromFolderId", "string", ""), _r("deepSearch", "boolean", deep),
+                _r("select", "strings", ["identifier"]), _r("from", "string", "document"),
+                _r("whereAnd", "ops", []), _r("whereOr", "ops", []), _r("orderBy", "order", [])])
+            rows = out.get("rowList")
+            rows = rows if isinstance(rows, list) else ([] if rows in (None, "") else [rows])
+            for i in _row_ids(rows):
+                if i not in ids:
+                    ids.append(i)
+            if len(ids) > RICOH_MAX_DOCS:
+                raise ShareError("SHARE_TOO_MANY", {"limit": RICOH_MAX_DOCS})
+            offset += len(rows)
+            if str(status or "").strip() == "QUERY_AT_END" or not rows:
+                break
+        return ids
 
     def display_name(self, root: str, path: list[str]) -> str:
         if not path:
@@ -844,10 +1042,18 @@ class RicohSession(Session):
         parts: list[Path] = []
         total = 0
         for n, eid in enumerate(elements):
-            url, out = self._repo("getDocContentUrl", [
-                _r("sessionId", "string", self._sid), _r("docId", "string", eid),
-                _r("validDurationHint", "unsignedInt", RICOH_URL_HINT),
-                _r("schemePreference", "strings", _RICOH_SCHEMES[self.http.scheme])])
+            if "basic.getDocContentUrl2" in self.classes:
+                # 分析文件 6.2：有這項能力就用 URL2；validDurationHint 照原廠的 0、只要 POST、options 空陣列
+                url, out = self._repo("getDocContentUrl2", [
+                    _r("sessionId", "string", self._sid), _r("docId", "string", eid),
+                    _r("validDurationHint", "unsignedInt", 0),
+                    _r("schemePreference", "strings", [self.http.scheme + "+post"]),
+                    _r("options", "props", [])])
+            else:
+                url, out = self._repo("getDocContentUrl", [
+                    _r("sessionId", "string", self._sid), _r("docId", "string", eid),
+                    _r("validDurationHint", "unsignedInt", RICOH_URL_HINT),
+                    _r("schemePreference", "strings", _RICOH_SCHEMES[self.http.scheme])])
             scheme = str(out.get("scheme") or "").strip().lower()
             if scheme not in _RICOH_SCHEMES[self.http.scheme]:
                 raise ShareError("RICOH_URL_UNSUPPORTED", {"scheme": scheme[:20]})

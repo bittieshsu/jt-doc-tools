@@ -380,6 +380,15 @@ class FakeRicoh(_Server):
                         "rendition", "objectPassword"]
         self.url_host_override = None
         self.terminated = False
+        # v1.17.0 非票證登入（startSession）：協定版本、登入模式候選（None＝不回這個屬性）、接受哪些登入
+        self.protocol = "3"
+        self.candidates = None
+        self.start_accept = {"none"}          # none / BASIC / RGWUCD:<碼> / RGWEXTUCD:<碼>
+        self.start_status = "OK"
+        self.start_fault = None
+        self.start_inputs: list[str] = []
+        self.docs_in_folder = False            # True：文件只在資料夾裡（最上層查不到，deepSearch 才查得到）
+        self.deep_fault = False
 
     def _env(self, method, inner, ns=K.RICOH_REPO_NS) -> tuple:
         x = (f'<?xml version="1.0" encoding="utf-8"?><soapenv:Envelope xmlns:soapenv="{ENV11}" '
@@ -421,13 +430,15 @@ class FakeRicoh(_Server):
         if method == "getProtocolVersion":
             if self.protocol_version_fault:
                 return self._fault("COMMON_UNKNOWN_METHOD")
-            return self._env(method, '<return xsi:type="xsd:int">3</return>')
+            return self._env(method, f'<return xsi:type="xsd:int">{self.protocol}</return>')
         if method == "getServiceCapability":
             host = self.auth_url_host or "127.0.0.1"
             props = [_ritem("uauthenticationUrl", f"http://{host}:{self.port}/DH/uauthentication"),
                      _ritem("uauthenticationProviderName", "LocalProvider"), _ritem("uauthenticationDomainName", ""),
                      _ritem("isUserAuthenticatableByTicket", self.ticket_ok),
                      _ritem("maxResultRowBlockSizeForDocIDList", "2"), _ritem("machineType", "IM C3010")]
+            if self.candidates is not None:
+                props.append(_ritem("startSessionSchemeCandidates", self.candidates))
             cls = "".join(f"<item>{c}</item>" for c in self.classes)
             return self._env(method, f'<return {_rarray(props)}</return>'
                                      f'<supportedClasses xsi:type="soapenc:Array" soapenc:arrayType="xsd:string[{len(self.classes)}]">'
@@ -438,6 +449,16 @@ class FakeRicoh(_Server):
             if self.users.get(val.get("authName")) != val.get("password"):
                 return self._fault("UAUTH_INVALID_PASSWORD")
             return self._env(method, f'<return xsi:type="xsd:base64Binary">{self.ticket}</return>', K.RICOH_AUTH3_NS)
+        if method == "startSession":
+            si = val.get("stringIn", "")
+            self.start_inputs.append(si)
+            if self.start_fault:
+                return self._fault(self.start_fault)
+            if self._start_ok(si):
+                return self._env(method, f'<return xsi:type="xsd:string">{self.start_status}</return>'
+                                         f'<stringOut xsi:type="xsd:string">{self.sid}</stringOut>')
+            return self._env(method, '<return xsi:type="xsd:string">COMMON_NOT_AUTHENTICATED</return>'
+                                     '<stringOut xsi:type="xsd:string"></stringOut>')
         if method == "startSessionByAuthTicket":
             if val.get("authTicket") != self.ticket:
                 return self._fault("COMMON_BAD_TICKET")
@@ -448,7 +469,9 @@ class FakeRicoh(_Server):
             self.terminated = True
             return self._env(method, '<return xsi:type="xsd:boolean">true</return>')
         if method == "executeAdvancedSearch":
-            ids = list(self.docs)
+            if self.deep_fault and val["deepSearch"] == "true":
+                return self._fault("COMMON_INVALID_ARGUMENT")
+            ids = list(self.docs) if not self.docs_in_folder or val["deepSearch"] == "true" else []
             off, size = int(val["rowOffset"]), int(val["resultRowBlockSize"])
             batch = ids[off:off + size]
             status = "QUERY_AT_END" if off + size >= len(ids) else "SUCCESS"
@@ -500,7 +523,7 @@ class FakeRicoh(_Server):
             return self._env(method, f'<return xsi:type="xsd:string">{status}</return>'
                                      f'<propLists {_rarray(lists, "ct:property[]")}</propLists>'
                                      f'<numOfAllElements>{len(els)}</numOfAllElements>')
-        if method == "getDocContentUrl":
+        if method in ("getDocContentUrl", "getDocContentUrl2"):
             eid = val["docId"]
             doc = next((k for k, d in self.docs.items() if eid in d["elements"] or eid == "R-" + k), None)
             d = self.docs[doc]
@@ -517,6 +540,31 @@ class FakeRicoh(_Server):
                                      f'<parameter {_rarray(param)}</parameter>')
         return self._fault("UNKNOWN_METHOD")
 
+    def _start_ok(self, si: str) -> bool:
+        """照分析文件的格式解 stringIn（假伺服器自己的獨立實作，不呼叫被測的程式）。"""
+        if si == "":
+            return "none" in self.start_accept
+        f = dict(x.split("=", 1) for x in si.split(";") if x)
+        if not si.endswith(";"):
+            return False
+        scheme = base64.b64decode(f.get("SCHEME", "")).decode()
+        if scheme in ("RGWUCD", "RGWEXTUCD"):
+            return f"{scheme}:{base64.b64decode(f['UCD:UserCode']).decode()}" in self.start_accept
+        if scheme != "BASIC" or "BASIC" not in self.start_accept:
+            return False
+        user = base64.b64decode(f["UID:UserName"]).decode()
+        raw = base64.b64decode(f["PWD:Password"])
+        if f["PES:Encoding"] == "gwpwes003":
+            plain = bytes((((b ^ 0x72) << 2) | ((b ^ 0x72) >> 6)) & 0xFF for b in raw)
+            if len(plain) < 16 or plain[15:16] != b"z":
+                return False
+            pw = plain[16:].decode()
+        elif f["PES:Encoding"] == "":
+            pw = raw.decode()
+        else:
+            return False
+        return self.users.get(user) == pw
+
 
 @pytest.fixture
 def ricoh(monkeypatch):
@@ -527,9 +575,9 @@ def ricoh(monkeypatch):
     f.stop()
 
 
-def _ricoh_session(f, trace, user="clerk", password="pw-2", doc_password=""):
+def _ricoh_session(f, trace, user="clerk", password="pw-2", doc_password="", **kw):
     return K.RicohSession("ricoh_soap", "127.0.0.1", "127.0.0.1", "http", f.port, user=user, password=password,
-                          doc_password=doc_password, trust_sha256=None, allow_http=True, trace=trace)
+                          doc_password=doc_password, trust_sha256=None, allow_http=True, trace=trace, **kw)
 
 
 def test_ricoh_signs_in_with_a_ticket_and_ends_the_session(ricoh):
@@ -645,10 +693,12 @@ def test_rejected_inputs():
 
 def test_ricoh_uses_only_the_features_the_device_lists(ricoh, tmp_path):
     """研究文件：按服務能力實際列出的功能類別決定能用什麼，不因為元件有那個方法就呼叫。"""
-    ricoh.classes = ["basic", "query.advancedSearch", "rendition"]          # 沒有票證登入
+    ricoh.classes = ["basic", "query.advancedSearch", "rendition"]          # 兩種登入都沒有
     with pytest.raises(mfp_box.BoxError) as ei:
         _ricoh_session(ricoh, [])
     assert ei.value.code == "RICOH_AUTH_UNSUPPORTED"
+    # 畫面只列登入方式，不倒整串功能類別
+    assert ei.value.detail["login"] == ["-"] and "classes" not in ei.value.detail
     assert not any(b"pw-2" in c.get("body", b"") for c in ricoh.calls), "不支援票證登入：密碼一個字都不送"
 
     ricoh.classes = ["basic", "basic.startSessionByAuthTicket", "rendition"]   # 沒有查詢
@@ -694,3 +744,198 @@ def test_messages_and_fatal_codes_are_registered_whichever_module_loads_first(fi
             "assert {'SOAP_UNAVAILABLE', 'SESSION_EXPIRED', 'BOX_PASSWORD_FAILED'} <= S.FATAL\n")
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120)
     assert r.returncode == 0, r.stderr[-800:]
+
+
+# =========================================================================== RICOH 非票證登入（v1.17.0）
+# 依 2026-10-19 的分析（內部文件，ricoh-startsession）：`startSession(stringIn, timeLimit)`，第一個結果是狀態
+# （成功 `OK`），`stringOut` 才是工作階段代號。客戶實機（IM C3500，面板沒有登入畫面）只列 `basic.startSession`。
+
+_CUSTOMER_CLASSES = ["basic.checkServiceState", "basic.startSession", "basic.keepSession", "basic.putProps",
+                     "basic.getObjectsProps", "basic.delete", "basic.getDocContentUrl2", "contentElement",
+                     "contentElement.insertEmptyDocElement", "rendition", "rendition.getDocRenditionList", "query",
+                     "query.advancedSearch", "ticket", "objectPassword", "objectPassword.setObjectPassword",
+                     "lock", "rgw", "rgw.setJobPropsOfGetDocContents", "rgw.cancelJob"]
+
+
+def _starts(f):
+    return [c for c in f.calls if c["method"] == "startSession"]
+
+
+@pytest.mark.parametrize("mode,kw,want", [
+    ("none", {}, ""),
+    ("BASIC", {"user": "demo", "password": "Demo-Pass123", "transport": "https"},
+     "SCHEME=QkFTSUM=;UID:UserName=ZGVtbw==;PWD:Password=RGVtby1QYXNzMTIz;PES:Encoding=;"),
+    ("RGWUCD", {"user_code": "00123456"}, "SCHEME=UkdXVUNE;UCD:UserCode=MDAxMjM0NTY=;"),
+    ("RGWEXTUCD", {"user_code": "00123456"}, "SCHEME=UkdXRVhUVUNE;UCD:UserCode=MDAxMjM0NTY=;"),
+    ("RGWUCD", {"user_code": "00123456", "protocol": 199}, "SCHEME=QkFTSUM=;UID=;PWD=MDAxMjM0NTY=;"),
+])
+def test_ricoh_string_in_matches_the_analysis(mode, kw, want):
+    kw = {"protocol": 200, "transport": "http", **kw}
+    assert K.ricoh_string_in(mode, **kw) == want
+
+
+def test_ricoh_string_in_keeps_delimiters_inside_base64():
+    s = K.ricoh_string_in("BASIC", protocol=200, transport="https", user="測試;:=", password="密碼 &<>")
+    assert base64.b64encode("測試;:=".encode()).decode() in s and s.count(";") == 4
+
+
+@pytest.mark.parametrize("mode,kw", [("BASIC", {"user": "demo", "password": "x", "protocol": 199}),
+                                     ("RGWEXTUCD", {"user_code": "1", "protocol": 199}),
+                                     ("BASIC", {"user": "", "password": "x"}),
+                                     ("RGWUCD", {"user_code": "12a"}), ("RGWUCD", {"user_code": ""}),
+                                     ("auto", {})])
+def test_ricoh_string_in_refuses_unconfirmed_forms(mode, kw):
+    with pytest.raises(mfp_box.BoxError):
+        K.ricoh_string_in(mode, **{"protocol": 200, "transport": "https", **kw})
+
+
+@pytest.mark.parametrize("pw,prefix,hexout", [
+    ("Demo-Pass123", b"a" * 15, "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2aec632b29a939662aaeae3efebe"),
+    ("Demo-Pass123", b"J" * 15, "e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0ec632b29a939662aaeae3efebe"),
+    ("測試密碼", b"a" * 15, "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2aeccb5c594818db0b99d38bda5d"),
+])
+def test_ricoh_http_password_representation_matches_vendor_vectors(pw, prefix, hexout):
+    """分析文件的離線向量（原廠函式在固定亂數下的輸出）。"""
+    assert K.ricoh_gwpwes003(pw, prefix).hex() == hexout
+
+
+@pytest.mark.parametrize("pw", ["ɀ", "a\0b", "x" * 129])
+def test_ricoh_http_password_that_cannot_be_represented_is_not_sent(pw):
+    with pytest.raises(mfp_box.BoxError) as ei:
+        K.ricoh_gwpwes003(pw, b"a" * 15)
+    assert ei.value.code == "RICOH_PASSWORD_UNSUPPORTED"
+
+
+def test_ricoh_random_prefix_is_fresh_each_time():
+    a, b = K.ricoh_gwpwes003("Demo-Pass123"), K.ricoh_gwpwes003("Demo-Pass123")
+    assert a != b and a[15:] == b[15:]
+
+
+def test_ricoh_customer_device_with_no_login_data_asks_for_the_mode(ricoh):
+    """帳號空白不等於免登入：還沒選登入方式時，任何登入請求都不送。"""
+    ricoh.classes = _CUSTOMER_CLASSES
+    with pytest.raises(mfp_box.BoxError) as ei:
+        _ricoh_session(ricoh, [], user="", password="")
+    assert ei.value.code == "RICOH_AUTH_MODE_REQUIRED" and not _starts(ricoh)
+
+
+def test_ricoh_no_login_mode_lists_and_downloads(ricoh, tmp_path):
+    ricoh.classes = _CUSTOMER_CLASSES
+    trace: list = []
+    s = _ricoh_session(ricoh, trace, user="", password="", auth_mode="none")
+    st = _starts(ricoh)
+    assert len(st) == 1 and st[0]["params"] == {"stringIn": "", "timeLimit": "1800"}
+    assert st[0]["types"] == {"stringIn": "xsd:string", "timeLimit": "xsd:unsignedInt"}
+    assert st[0]["action"] == f'"{K.RICOH_REPO_NS}#startSession"'
+    assert s._sid == ricoh.sid, "工作階段代號取 stringOut，不是狀態 OK"
+    names = [e["label"] for e in s.list("documents", [])]
+    assert "報價" in names
+    seg = next(e["name"] for e in s.list("documents", []) if e["label"] == "報價")
+    out = tmp_path / "a.bin"
+    s.download("documents", [seg], out, 10 ** 8)
+    url2 = [c for c in ricoh.calls if c["method"] == "getDocContentUrl2"]
+    assert url2 and not [c for c in ricoh.calls if c["method"] == "getDocContentUrl"], "有 URL2 能力就用 URL2"
+    assert url2[0]["params"]["validDurationHint"] == "0" and b"http+post" in url2[0]["body"]
+    assert b"https+get" not in url2[0]["body"] and b"http+get" not in url2[0]["body"]
+    assert url2[0]["types"]["options"] == "enc:Array", "options 送空陣列，不省略"
+    s.close()
+    assert ricoh.terminated, "沒有列 terminateSession 也照原廠流程結束工作階段"
+    assert next(t for t in trace if t.get("login_mode"))["login_mode"] == "none"
+
+
+def test_ricoh_no_login_mode_refuses_to_discard_typed_credentials(ricoh):
+    ricoh.classes = _CUSTOMER_CLASSES
+    for kw in ({"user": "clerk"}, {"user": "", "password": "x"}, {"user": "", "password": "", "user_code": "1"}):
+        with pytest.raises(mfp_box.BoxError) as ei:
+            _ricoh_session(ricoh, [], auth_mode="none", **{"password": "", **kw})
+        assert ei.value.code == "RICOH_AUTH_INPUT_CONFLICT"
+    assert not _starts(ricoh)
+
+
+def test_ricoh_account_without_ticket_uses_basic_over_http_once(ricoh):
+    ricoh.classes, ricoh.protocol, ricoh.start_accept = _CUSTOMER_CLASSES, "200", {"BASIC"}
+    trace: list = []
+    s = _ricoh_session(ricoh, trace, auth_mode="account")
+    st = _starts(ricoh)
+    assert len(st) == 1 and "PES:Encoding=gwpwes003;" in st[0]["params"]["stringIn"]
+    assert not [c for c in ricoh.calls if c["method"] == "authenticateByPassword"]
+    blob = json.dumps(trace, ensure_ascii=False)
+    assert "pw-2" not in blob and st[0]["params"]["stringIn"] not in blob and "UID:UserName" not in blob, \
+        "協定紀錄不可以有密碼或登入字串"
+    s.close()
+
+
+def test_ricoh_wrong_basic_password_is_sent_once(ricoh):
+    ricoh.classes, ricoh.protocol, ricoh.start_accept = _CUSTOMER_CLASSES, "200", {"BASIC"}
+    with pytest.raises(mfp_box.BoxError) as ei:
+        _ricoh_session(ricoh, [], password="wrong", auth_mode="account")
+    assert ei.value.code == "RICOH_SESSION_REJECTED" and len(_starts(ricoh)) == 1
+    assert ei.value.detail["status"] == "COMMON_NOT_AUTHENTICATED"
+    ricoh.calls.clear()
+    ricoh.start_fault = "COMMON_NOT_AUTHENTICATED"
+    with pytest.raises(mfp_box.BoxError) as ei:
+        _ricoh_session(ricoh, [], auth_mode="account")
+    assert ei.value.code == "RICOH_SESSION_REJECTED" and len(_starts(ricoh)) == 1
+
+
+def test_ricoh_basic_needs_protocol_200(ricoh):
+    ricoh.classes = _CUSTOMER_CLASSES          # 協定版本 3
+    with pytest.raises(mfp_box.BoxError) as ei:
+        _ricoh_session(ricoh, [], auth_mode="account")
+    assert ei.value.code == "RICOH_AUTH_PROFILE_UNSUPPORTED" and not _starts(ricoh)
+
+
+def test_ricoh_ok_without_session_id_is_not_a_session(ricoh):
+    ricoh.classes = _CUSTOMER_CLASSES
+    ricoh.sid = ""
+    with pytest.raises(mfp_box.BoxError) as ei:
+        _ricoh_session(ricoh, [], user="", password="", auth_mode="none")
+    assert ei.value.code == "DAV_BAD_RESPONSE"
+
+
+def test_ricoh_user_code_type_comes_from_the_device_or_the_user(ricoh):
+    ricoh.classes, ricoh.protocol = _CUSTOMER_CLASSES, "200"
+    ricoh.start_accept = {"RGWUCD:0042"}
+    ricoh.candidates = "BASIC,RGWUCD"
+    s = _ricoh_session(ricoh, [], user="", password="", user_code="0042")          # 自動：只宣告一種
+    assert _starts(ricoh)[-1]["params"]["stringIn"] == "SCHEME=UkdXVUNE;UCD:UserCode=MDA0Mg==;"
+    s.close()
+    ricoh.calls.clear()
+    ricoh.candidates = "RGWUCD,RGWEXTUCD"
+    with pytest.raises(mfp_box.BoxError) as ei:
+        _ricoh_session(ricoh, [], user="", password="", user_code="0042")
+    assert ei.value.code == "RICOH_AUTH_MODE_REQUIRED" and not _starts(ricoh), "兩種都有：不拿同一個碼試兩次"
+    ricoh.candidates = "BASIC,RGWUCD"
+    with pytest.raises(mfp_box.BoxError) as ei:
+        _ricoh_session(ricoh, [], user="", password="", user_code="0042", auth_mode="user_code_ext")
+    assert ei.value.code == "RICOH_AUTH_MODE_MISMATCH" and not _starts(ricoh)
+
+
+def test_ricoh_documents_inside_a_folder_are_found_with_a_deep_search(ricoh):
+    """客戶實機把掃描存進文件伺服器的「共用資料夾」：最上層查不到時再連子資料夾查一次（只讀，不重新登入）。"""
+    ricoh.classes, ricoh.docs_in_folder = _CUSTOMER_CLASSES, True
+    trace: list = []
+    s = _ricoh_session(ricoh, trace, user="", password="", auth_mode="none")
+    labels = {e["label"] for e in s.list("documents", [])}
+    assert labels == {"合約", "報價", "會議紀錄"}
+    deep = [c["params"]["deepSearch"] for c in ricoh.calls if c["method"] == "executeAdvancedSearch"]
+    assert deep[0] == "false" and "true" in deep, "先照原廠的最上層查，空的才往下找"
+    assert len(_starts(ricoh)) == 1
+    s.close()
+
+
+def test_ricoh_a_refused_deep_search_is_just_an_empty_list(ricoh):
+    ricoh.classes, ricoh.docs_in_folder, ricoh.deep_fault = _CUSTOMER_CLASSES, True, True
+    trace: list = []
+    s = _ricoh_session(ricoh, trace, user="", password="", auth_mode="none")
+    assert s.list("documents", []) == []
+    assert any(t.get("deep_search") == "refused" for t in trace)
+    s.close()
+
+
+def test_ricoh_documents_at_the_top_do_not_trigger_a_deep_search(ricoh):
+    ricoh.classes = _CUSTOMER_CLASSES
+    s = _ricoh_session(ricoh, [], user="", password="", auth_mode="none")
+    assert s.list("documents", [])
+    assert {c["params"]["deepSearch"] for c in ricoh.calls if c["method"] == "executeAdvancedSearch"} == {"false"}
+    s.close()

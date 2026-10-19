@@ -17,7 +17,6 @@ def _page(title="", text="", headers=(), pw=0):
 
 
 @pytest.mark.parametrize("title,family,model", [
-    ("Apeos C5571 - Internet Services", "Apeos", "C5571"),
     ("FUJIFILM Apeos C5570", "Apeos", "C5570"),
     ("ApeosPort C4570", "ApeosPort", "C4570"),
     ("ApeosPort-V C6680 CentreWare Internet Services", "ApeosPort-V", "C6680"),
@@ -43,9 +42,25 @@ def test_generation_suffix_is_kept():
     assert r["family"] == "ApeosPort-VI" and r["status"] == "same_vendor_unverified"
 
 
-def test_nothing_is_supported_until_a_profile_is_verified():
-    assert mp.VERIFIED_PROFILES == frozenset(), \
-        "加進 VERIFIED_PROFILES 之前要有實機取件測試報告（docs-share/mfp-fetch/）"
+def test_only_models_verified_on_a_real_device_are_supported():
+    """加進 VERIFIED_PROFILES 之前要有實機取件測試報告（docs-share/mfp-fetch/field-reports/）。
+    2026-10-19：Apeos C5571 客戶實機取件成功，使用者同意標已支援。"""
+    assert mp.VERIFIED_PROFILES == frozenset({("Apeos", "C5571")})
+    r = mp.detect([_page(title="Apeos C5571 - Internet Services")])
+    assert r["status"] == "supported" and "實機驗證" in r["message"]
+
+
+@pytest.mark.parametrize("model", ["C7071", "C6571", "C4571", "C3571", "C3071", "C2571"])
+def test_the_same_series_is_marked_with_the_verified_model(model):
+    """使用者 2026-10-19「同類 OS 的一併標示」：同系列標已支援，但寫明是以 Apeos C5571 驗證的。"""
+    r = mp.detect([_page(title=f"Apeos {model}")])
+    assert r["status"] == "supported_same_series" and "C5571" in r["message"]
+    assert mp.STATUS_LABELS["supported_same_series"][0] == "已支援"
+
+
+@pytest.mark.parametrize("title", ["Apeos C5570", "ApeosPort C5571", "ApeosPort-VII C5571"])
+def test_other_generations_are_not_the_same_series(title):
+    assert mp.detect([_page(title=title)])["status"] != "supported_same_series"
 
 
 def test_fuji_xerox_is_not_mistaken_for_xerox():
@@ -175,7 +190,7 @@ def test_escl_model_is_preferred_for_other_vendors():
 
 def test_escl_model_does_not_change_fujifilm_identification():
     r = mp.detect([_page(title="Apeos C5571 - Internet Services")], escl_model="FUJIFILM Apeos C5571")
-    assert (r["family"], r["model"], r["status"]) == ("Apeos", "C5571", "first_batch_unverified")
+    assert (r["family"], r["model"], r["status"]) == ("Apeos", "C5571", "supported")
 
 
 def test_embedded_web_server_alone_is_not_hp():
@@ -192,7 +207,10 @@ def test_fujifilm_recognised_from_escl_when_the_home_page_says_nothing(escl):
     r = mp.detect([_page(title="", text="Loading…")], escl_model=escl)
     fam, model = escl.replace("FUJIFILM ", "").split(" ")
     assert (r["vendor"], r["family"], r["model"]) == ("FUJIFILM", fam, model), r
-    assert r["status"] == ("first_batch_unverified" if (fam, model) in mp.FIRST_BATCH else "same_vendor_unverified")
+    want = ("supported" if (fam, model) in mp.VERIFIED_PROFILES
+            else "supported_same_series" if (fam, model) in mp.SAME_SERIES
+            else "first_batch_unverified" if (fam, model) in mp.FIRST_BATCH else "same_vendor_unverified")
+    assert r["status"] == want
     assert any(e["field"] == "escl" for e in r["evidence"])
 
 

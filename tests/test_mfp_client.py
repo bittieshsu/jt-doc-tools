@@ -183,7 +183,7 @@ def test_http_probe_follows_same_origin_only_and_records_everything(open_lo):
     assert "HTTP_REDIRECT_NOT_FOLLOWED" in codes, "跨來源的框架不可以跟"
     # 辨識
     d = rep["detection"]
-    assert (d["family"], d["model"], d["status"]) == ("Apeos", "C5571", "first_batch_unverified")
+    assert (d["family"], d["model"], d["status"]) == ("Apeos", "C5571", "supported")
     assert d["firmware"] == "72.18.5"
     # 表單結構有記（名稱與型別），值沒有
     s = json.dumps(rep, ensure_ascii=False)
@@ -524,7 +524,7 @@ def test_a_location_href_stub_is_followed_and_kept_in_the_report(open_lo, monkey
     rep = _fuji_probe(open_lo, monkeypatch)
     assert "/home/index.html" in _FujiHandler.seen, _FujiHandler.seen
     d = rep["detection"]
-    assert (d["vendor"], d["family"], d["model"], d["status"]) == ("FUJIFILM", "Apeos", "C5571", "first_batch_unverified"), d
+    assert (d["vendor"], d["family"], d["model"], d["status"]) == ("FUJIFILM", "Apeos", "C5571", "supported"), d
     first = next(s for s in rep["attempts"][0]["steps"] if s["step"] == "http")
     assert "location.href" in first["detail"].get("stub_html", ""), "空白小頁面要在報告裡留原始內容"
     assert first["detail"]["script_redirects"] == ["/home/index.html"]
@@ -545,4 +545,4 @@ def test_escl_manufacturer_identifies_the_vendor_when_the_home_page_says_nothing
     rep = _fuji_probe(open_lo, monkeypatch, escl={"scheme": "http", "port": 0, "model": "Apeos C5571",
                                                   "caps": {"manufacturer": "FUJIFILM", "sources": {}}})
     d = rep["detection"]
-    assert (d["vendor"], d["model"], d["status"]) == ("FUJIFILM", "C5571", "first_batch_unverified"), d
+    assert (d["vendor"], d["model"], d["status"]) == ("FUJIFILM", "C5571", "supported"), d

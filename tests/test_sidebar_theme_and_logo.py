@@ -180,15 +180,15 @@ def test_no_hard_coded_colours_left_in_the_sidebar_styles():
 
 def test_appearance_defaults_saves_and_rejects_unknown(br_dir):
     b = _br()
-    assert b.get_appearance() == {"sidebar_theme": "indigo", "builtin_logo": "jt"}
+    assert b.get_appearance() == {"sidebar_theme": "indigo", "builtin_logo": "jt", "hero_glow": "indigo", "hero_title": "indigo"}
     assert b.set_appearance(sidebar_theme="mist")["sidebar_theme"] == "mist"
-    assert b.set_appearance(builtin_logo="doc") == {"sidebar_theme": "mist", "builtin_logo": "doc"}
+    assert b.set_appearance(builtin_logo="doc") == {"sidebar_theme": "mist", "builtin_logo": "doc", "hero_glow": "indigo", "hero_title": "indigo"}
     with pytest.raises(ValueError):
         b.set_appearance(sidebar_theme="neon")
     with pytest.raises(ValueError):
         b.set_appearance(builtin_logo="../x")
     (br_dir / "appearance.json").write_text('{"sidebar_theme": "evil", "builtin_logo": 3}', encoding="utf-8")
-    assert b.get_appearance() == {"sidebar_theme": "indigo", "builtin_logo": "jt"}, "壞掉的檔案要回預設"
+    assert b.get_appearance() == {"sidebar_theme": "indigo", "builtin_logo": "jt", "hero_glow": "indigo", "hero_title": "indigo"}, "壞掉的檔案要回預設"
     (br_dir / "appearance.json").write_text("not json", encoding="utf-8")
     assert b.get_appearance()["sidebar_theme"] == "indigo"
 
@@ -281,13 +281,13 @@ def test_the_settings_backup_carries_it(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
     b = _br()
     b._appearance_cache = (None, {})
-    b.set_appearance(sidebar_theme="teal", builtin_logo="doc")
+    b.set_appearance(sidebar_theme="teal", builtin_logo="doc", hero_glow="rose", hero_title="slate")
     out = tmp_path / "backup.zip"
     settings_export.export_to_zip(out, ["branding"])
     with zipfile.ZipFile(out) as zf:
         names = zf.namelist()
         got = json.loads(zf.read("data/branding/appearance.json"))
-    assert got == {"sidebar_theme": "teal", "builtin_logo": "doc"}, names
+    assert got == {"sidebar_theme": "teal", "builtin_logo": "doc", "hero_glow": "rose", "hero_title": "slate"}, names
     b._appearance_cache = (None, {})
 
 
@@ -304,7 +304,7 @@ def test_restoring_a_backup_applies_at_once(tmp_path, monkeypatch):
     b.set_appearance(sidebar_theme="wine", builtin_logo="jt")
     assert b.sidebar_theme() == "wine"          # 這時快取裡是 wine
     settings_export.import_from_zip(out, selected_ids=["branding"])
-    assert b.get_appearance() == {"sidebar_theme": "teal", "builtin_logo": "doc"}, "匯入之後還是舊的設定"
+    assert b.get_appearance() == {"sidebar_theme": "teal", "builtin_logo": "doc", "hero_glow": "indigo", "hero_title": "indigo"}, "匯入之後還是舊的設定"
     assert b.logo_url("sidebar").endswith("logo-doc.png")
     b._appearance_cache = (None, {})
 
@@ -320,7 +320,7 @@ def test_the_cache_notices_a_rewrite_with_the_same_timestamp(br_dir):
     with open(p, "w", encoding="utf-8") as f:   # 原地覆寫，跟匯入一樣
         json.dump({"sidebar_theme": "wine", "builtin_logo": "doc"}, f)
     os.utime(p, ns=(st.st_atime_ns, st.st_mtime_ns))
-    assert b.get_appearance() == {"sidebar_theme": "wine", "builtin_logo": "doc"}
+    assert b.get_appearance() == {"sidebar_theme": "wine", "builtin_logo": "doc", "hero_glow": "indigo", "hero_title": "indigo"}
 
 
 def test_the_login_and_setup_pages_follow_the_choice(auth_off, br_dir):

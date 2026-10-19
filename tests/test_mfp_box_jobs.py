@@ -256,3 +256,56 @@ def test_box_jobs_and_scans_share_one_queue_per_device(dev, me, ws_on, monkeypat
     finally:
         mfp_queue.done(t)
     assert _wait(me["a"], sid)["status"] == "done"
+
+
+
+# --------------------------------------------------------------------- 取件並刪除（v1.17.0，使用者 2026-10-19）
+
+def test_fetch_and_delete_deletes_only_after_the_file_is_saved(dev, me, ws_on):
+    dev.add_whole(5, name="報價單")
+    dev.add_whole(6, name="合約")
+    r = _fetch(me["a"], me["cid"], ["5"], delete_after=True)
+    assert r.json()["scan"]["settings"]["delete_after"] is True
+    s = _wait(me["a"], r.json()["scan"]["id"])
+    assert s["status"] == "done", s
+    item = s["items"][0]
+    assert item["source"] == "SOURCE_DELETED" and "刪除" in item["source_message"], item
+    assert s["files"][0]["workspace_file_id"], "先存進工作區"
+    assert "5" not in dev.docs and "6" in dev.docs, "只刪選的那份"
+    methods = [(q["method"], q["path"]) for q in dev.requests]
+    first_delete = next(i for i, m in enumerate(methods) if m[0] == "DELETE")
+    assert any(m == ("GET", "/dav/box-1/5.tif") for m in methods[:first_delete]), "先取件才刪"
+    assert methods[first_delete][1] == "/dav/box-1/5.tif"
+    assert any(m[0] == "PROPFIND" for m in methods[first_delete + 1:]), "刪完要再列一次確認"
+
+
+def test_fetch_without_delete_never_sends_delete(dev, me, ws_on):
+    dev.add_whole(5)
+    s = _wait(me["a"], _fetch(me["a"], me["cid"], ["5"]).json()["scan"]["id"])
+    assert s["status"] == "done" and s["items"][0]["source"] == "SOURCE_KEPT"
+    assert not [q for q in dev.requests if q["method"] == "DELETE"]
+
+
+def test_a_document_that_was_not_saved_is_not_deleted(dev, me, ws_on, monkeypatch):
+    dev.add_whole(5)
+    real = mfp_scan._save_files
+
+    def broken(files, *a, **k):
+        saved, note = real(files, *a, **k)
+        for f in saved:                    # 模擬：沒存進工作區、暫存區也沒有
+            f.pop("workspace_file_id", None)
+            f["kept"] = False
+        return saved, note
+    monkeypatch.setattr(mfp_scan, "_save_files", broken)
+    s = _wait(me["a"], _fetch(me["a"], me["cid"], ["5"], delete_after=True).json()["scan"]["id"])
+    assert s["items"][0].get("delete") == "DELETE_SKIPPED_NOT_SAVED" and "沒有存好" in s["items"][0]["source_message"]
+    assert "5" in dev.docs and not [q for q in dev.requests if q["method"] == "DELETE"], "沒存好就不可以刪"
+
+
+def test_a_device_that_refuses_the_delete_is_reported(dev, me, ws_on):
+    dev.add_whole(5)
+    dev.delete_status = 403
+    s = _wait(me["a"], _fetch(me["a"], me["cid"], ["5"], delete_after=True).json()["scan"]["id"])
+    item = s["items"][0]
+    assert s["status"] == "done" and item["source"] == "DELETE_NOT_DONE" and item.get("delete_status") == 403, item
+    assert "5" in dev.docs

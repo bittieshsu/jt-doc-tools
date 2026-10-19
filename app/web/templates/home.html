@@ -98,11 +98,13 @@
   animation: hero-bob 9s ease-in-out infinite;
   transform-origin: 50% 100%;
 }
+{% set hs = hero_style() %}
 .hero-logo img {
   width: 180px; height: 180px; object-fit: contain;
-  filter:
-    drop-shadow(0 14px 28px rgba(99,102,241,0.45))
-    drop-shadow(0 4px 8px rgba(99,102,241,0.25));
+  /* 光暈顏色在「設定 → 企業 Logo / 識別」選（branding.HERO_GLOWS；預設靛紫＝原本的顏色） */
+  {% if hs.glow %}filter:
+    drop-shadow(0 14px 28px rgba({{ hs.glow }},0.45))
+    drop-shadow(0 4px 8px rgba({{ hs.glow }},0.25));{% else %}filter: none;{% endif %}
 }
 @keyframes hero-bob {
   /* 0–40%: gentle vertical float (3 cycles compressed in this window). */
@@ -128,8 +130,8 @@
      centers properly under the logo. */
   display: block; text-align: center;
   font-size: 38px; font-weight: 800; margin: 14px 0 8px; letter-spacing: 0.02em;
-  /* Vibrant purple → violet gradient, matches the reference screenshot. */
-  background: linear-gradient(135deg, #7c6df0 0%, #5b4bd9 60%, #4c3ad0 100%);
+  /* 標題文字的漸層在「設定 → 企業 Logo / 識別」選（branding.HERO_TITLES；預設是原本的靛紫） */
+  background: linear-gradient(135deg, {{ hs.title[0] }} 0%, {{ hs.title[1] }} 60%, {{ hs.title[2] }} 100%);
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: transparent;
 }

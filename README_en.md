@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.16.99
+# Jason Tools Document Toolbox v1.17.0
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -126,7 +126,7 @@ Detailed installation notes are in **[INSTALL.md](INSTALL.md)** (required tools,
 - **e-Invoice processing**: scan a Taiwan e-invoice QR code for the invoice number, date, amount and tax ID, filling in the seller, industry and accounting category (rules plus optional LLM); expense and period checks included, exporting.xlsx /.ods /.csv /.json /.xml /.txt /.md (with a configurable title)
 - **Transit receipts** — drop in a batch of Taiwan Railway purchase certificates, THSR electronic ticket certificates or Uber trip receipts; date, transport, route and fare are collected into a table with configurable columns, exportable as .xlsx / .ods / .csv / .json / .xml / .txt / .md for expense claims
 - **Company ID lookup**: look up an 8-digit tax ID, or search company, agency and school names, addresses and industries with highlighted matches; category filters, batch lookup and CSV export
-- **MFP Scan & Fetch** (beta) — add an MFP by IP or host name for a connection test and model identification, with step-by-step DNS / TCP / TLS certificate / HTTP diagnostics and a downloadable report; MFPs that support eSCL (AirPrint / Mopria scanning) can scan straight into the workspace (PDF or JPEG). Administrators can create shared MFPs and choose members; each MFP serves one person at a time and others queue automatically. Only internal-network addresses are reached, and connection tests and scans send no credentials. Mailbox retrieval on FUJIFILM MFPs, file share retrieval from Canon Advanced Box, Konica Minolta public boxes and SHARP NAS (WebDAV / SMB), and direct retrieval from KYOCERA document boxes and the RICOH Document Server (SOAP) are experimental: built from research into the manufacturers' tools or the methods in their manuals and not yet verified on a real device, they only read (never delete) and save PDF by default
+- **MFP Scan & Fetch** (beta) — add an MFP by IP or host name for a connection test and model identification, with step-by-step DNS / TCP / TLS certificate / HTTP diagnostics and a downloadable report; MFPs that support eSCL (AirPrint / Mopria scanning) can scan straight into the workspace (PDF or JPEG). Administrators can create shared MFPs and choose members; each MFP serves one person at a time and others queue automatically. Only internal-network addresses are reached, and connection tests and scans send no credentials. Mailbox retrieval on FUJIFILM MFPs has been verified on a real Apeos C5571 (the same series is supported too), with an optional "fetch and delete" that deletes originals only after the files are saved; file share retrieval from Canon Advanced Box, Konica Minolta public boxes and SHARP NAS (WebDAV / SMB) and direct retrieval from KYOCERA document boxes and the RICOH Document Server (SOAP) are experimental: built from research into the manufacturers' tools or the methods in their manuals and not yet verified on a real device, they only read (never delete). PDF is saved by default
 
 ### Conversion [needs OxOffice/LibreOffice]
 - **Office to PDF**; batch convert office documents to PDF

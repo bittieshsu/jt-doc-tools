@@ -445,3 +445,33 @@ def test_cards_fit_in_other_languages(live, lang):
                                                     "mobile": False})
     assert not errs, errs
 
+
+
+def test_home_logo_glow_and_title_colours(live):
+    """v1.17.0：首頁 Logo 光暈與標題文字各自換色。點色塊 → 預覽當場換、打勾 → 首頁照選的顏色畫。"""
+    base, send, errs = live
+    open_page(send, base + "/admin/branding", "[data-hero-glow]")
+    js(send, "document.querySelector('[data-hero-glow=\"rose\"]').click(), true")
+    assert wait(send, "document.getElementById('heroPrev').dataset.glow === 'rose'", 10), "預覽沒有當場換"
+    js(send, "document.querySelector('[data-hero-title=\"teal\"]').click(), true")
+    assert wait(send, "document.getElementById('heroPrev').dataset.title === 'teal'", 10)
+    prev = js(send, """(function () { var p = document.getElementById('heroPrev');
+        return {glow: getComputedStyle(p.querySelector('.br-hero-logo')).filter,
+                title: getComputedStyle(p.querySelector('.br-hero-title')).backgroundImage}; })()""")
+    assert "244, 63, 94" in prev["glow"] and "rgb(13, 148, 136)" in prev["title"], prev
+    assert js(send, "document.querySelector('[data-hero-title=\"teal\"]').getAttribute('aria-checked')") == "true"
+    open_page(send, base + "/", ".hero-title")
+    home = js(send, """({glow: getComputedStyle(document.querySelector('.hero-logo img')).filter,
+                        title: getComputedStyle(document.querySelector('.hero-title')).backgroundImage})""")
+    assert "244, 63, 94" in home["glow"] and "rgb(13, 148, 136)" in home["title"], home
+    # 不要光暈；換回預設
+    open_page(send, base + "/admin/branding", "[data-hero-glow]")
+    js(send, "document.querySelector('[data-hero-glow=\"none\"]').click(), true")
+    assert wait(send, "document.getElementById('heroPrev').dataset.glow === 'none'", 10)
+    js(send, "document.querySelector('[data-hero-title=\"indigo\"]').click(), true")
+    assert wait(send, "document.getElementById('heroPrev').dataset.title === 'indigo'", 10)
+    open_page(send, base + "/", ".hero-title")
+    assert js(send, "getComputedStyle(document.querySelector('.hero-logo img')).filter") == "none"
+    js(send, """(function () { return fetch('/admin/branding/appearance', {method: 'POST',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({hero_glow: 'indigo'})}); })(), true""")
+    assert not errs, errs

@@ -187,3 +187,60 @@ def test_kyocera_and_ricoh_retrieval_flow(live):
         t.shot("mfp_soap_ricoh_1280", 1280)
         t.shot("mfp_soap_ricoh_390", 390)
         assert not [e for e in t.errs if "422" not in e], t.errs
+
+
+def test_ricoh_sign_in_method_choice(live):
+    """v1.17.0：客戶 RICOH 只有非票證登入。帳號空白時先請使用者選「登入方式」（什麼都不送），
+    選「不需登入」後帳號、密碼收起來，列得出文件伺服器「共用資料夾」裡的文件；User Code 有自己的欄位。"""
+    from tests.test_mfp_soap import _CUSTOMER_CLASSES
+    port, cdp, _kyo, ricoh = live
+    ricoh.classes, ricoh.docs_in_folder = _CUSTOMER_CLASSES, True
+    ricoh.calls.clear()
+    base = f"http://localhost:{port}"
+    with _open(cdp) as ws:
+        t = _Tab(ws)
+        for d in ("Runtime", "Log", "Page", "Network"):
+            t.send(f"{d}.enable")
+        t.send("Network.setCookie", {"name": "jtdt_locale", "value": "zh-Hant", "url": base})
+        t.send("Page.navigate", {"url": base + "/tools/mfp-fetch/"})
+        assert t.wait_for("document.querySelector('#mfListWrap .mf-empty, #mfListWrap table') "
+                          "&& !document.querySelector('#mfListWrap').textContent.includes('載入中')"), "清單沒有載入"
+        if t.js("document.querySelectorAll('[data-mf-share]').length") < 2:     # 單獨跑這一支：自己加設備
+            if not t.js("document.querySelectorAll('[data-mf-share]').length"):
+                _add_device(t, _kyo.port)
+            _add_device(t, ricoh.port, host="127.0.0.2")
+        else:
+            t.js("""(() => { const ids = [...document.querySelectorAll('[data-mf-share]')].map(b => +b.dataset.mfShare);
+                             document.querySelector('[data-mf-share=\"' + Math.max(...ids) + '\"]').click(); return true; })()""")
+        assert t.wait_for("!document.getElementById('mfSharePanel').hidden")
+        assert not t.js("document.getElementById('mfShareModeWrap').hidden"), "RICOH 要有「登入方式」"
+        assert not t.js("document.getElementById('mfShareModeHint').hidden")
+        t.js("""(() => { const s = document.getElementById('mfShareMode'); s.value = 'auto';
+                         s.dispatchEvent(new Event('change'));
+                         document.getElementById('mfShareUser').value = ''; return true; })()""")
+        t.js("document.getElementById('mfShareListBtn').click()")
+        assert t.wait_for("!document.getElementById('mfShareConfirm').hidden "
+                          "|| !document.getElementById('mfShareError').hidden")
+        if not t.js("document.getElementById('mfShareConfirm').hidden"):          # 單獨跑：先同意 HTTP
+            t.js("document.querySelector('#mfShareConfirm .btn-primary').click()")
+        assert t.wait_for("!document.getElementById('mfShareError').hidden"), "帳號空白要先請使用者選登入方式"
+        assert "登入方式" in t.js("document.getElementById('mfShareError').innerText")
+        assert not [c for c in ricoh.calls if c["method"] == "startSession"], "還沒選之前什麼都不送"
+        t.js("""(() => { const s = document.getElementById('mfShareMode'); s.value = 'none';
+                         s.dispatchEvent(new Event('change')); return true; })()""")
+        assert t.js("document.getElementById('mfShareUserWrap').hidden") \
+            and t.js("document.getElementById('mfSharePwWrap').hidden") \
+            and t.js("document.getElementById('mfShareCodeWrap').hidden"), "不需登入：帳號、密碼、User Code 都收起來"
+        _list_with_consent(t)
+        assert t.wait_for("document.getElementById('mfShareTable').innerText.includes('合約')"), \
+            t.js("document.getElementById('mfShareError').innerText")
+        starts = [c for c in ricoh.calls if c["method"] == "startSession"]
+        assert len(starts) == 1 and starts[0]["params"]["stringIn"] == ""
+        t.shot("mfp_soap_ricoh_none_1280", 1280)
+        t.shot("mfp_soap_ricoh_none_390", 390)
+        t.js("""(() => { const s = document.getElementById('mfShareMode'); s.value = 'user_code';
+                         s.dispatchEvent(new Event('change')); return true; })()""")
+        assert not t.js("document.getElementById('mfShareCodeWrap').hidden") \
+            and t.js("document.getElementById('mfShareUserWrap').hidden"), "User Code 有自己的欄位"
+        assert t.js("document.documentElement.scrollWidth <= 1280")
+        assert not [e for e in t.errs if "422" not in e], t.errs

@@ -348,28 +348,6 @@ def test_inbox_has_no_separate_table(_data_dir):
 # 後者一對一對話本身也有 token。Slack / Teams / Discord 的 incoming webhook URL
 # 天生綁死一個頻道，要私訊得改用 bot token（另一種憑證型態），因此不在此列。
 
-def test_zulip_sends_direct_message_when_user_filled_address(_data_dir, monkeypatch):
-    sent = {}
-    monkeypatch.setattr(nc, "_post",
-                        lambda url, **kw: sent.update({"url": url, **kw}))
-    nc.send_zulip({"zulip_site": "https://z.example", "zulip_bot_email": "b@z",
-                   "zulip_api_key": "k", "zulip_stream": "general",
-                   "zulip_to": "me@example.test"}, "標題", "內文")
-    assert sent["data"]["type"] == "private"
-    assert "me@example.test" in sent["data"]["to"]
-
-
-def test_zulip_falls_back_to_stream(_data_dir, monkeypatch):
-    sent = {}
-    monkeypatch.setattr(nc, "_post",
-                        lambda url, **kw: sent.update({"url": url, **kw}))
-    nc.send_zulip({"zulip_site": "https://z.example", "zulip_bot_email": "b@z",
-                   "zulip_api_key": "k", "zulip_stream": "general"},
-                  "標題", "內文")
-    assert sent["data"]["type"] == "stream"
-    assert sent["data"]["to"] == "general"
-
-
 def test_zulip_without_stream_or_personal_is_a_clear_error(_data_dir):
     with pytest.raises(RuntimeError) as e:
         nc.send_zulip({"zulip_site": "https://z.example",
@@ -612,13 +590,14 @@ def test_tool_icon_reuses_the_shared_macro():
 def test_dev_channel_list_is_honest():
     """「開發階段」清單要與實際驗證狀態一致。
 
-    目前只有 Email 對真實服務端到端驗證過（實機 SMTP 寄出、收件者確認收到）；
-    其餘管道只有把網路呼叫換掉的單元測試。驗證過一個就從 `DEV_CHANNELS` 拿掉，
+    對真實服務端到端驗證過的是 Email（實機 SMTP 寄出、收件者確認收到）與
+    Zulip（v1.17.0：私訊 Bot 綁定、管理頁傳送測試，收件者確認收到）；其餘管道只有把網路呼叫換掉的單元測試。驗證過一個就從 `DEV_CHANNELS` 拿掉，
     並在 CHANGELOG 註明是用哪個服務驗的 —— 這條測試就是要逼那個動作發生。
     """
     from app.core import notify_channels as nc
     assert "email" not in nc.DEV_CHANNELS, "Email 已實機驗證，不該標開發階段"
-    assert nc.DEV_CHANNELS == set(nc.ALL_CHANNELS) - {"email"}, (
+    assert "zulip" not in nc.DEV_CHANNELS, "Zulip 已實機驗證（v1.17.0），不該標開發階段"
+    assert nc.DEV_CHANNELS == set(nc.ALL_CHANNELS) - {"email", "zulip"}, (
         "有管道被驗證過就要從 DEV_CHANNELS 移除；新增管道也要記得加進去")
 
 
@@ -686,3 +665,37 @@ def test_unauthenticated_workspace_link_redirects_to_login(admin_session):
     r = anon.get("/workspace", follow_redirects=False)
     assert r.status_code in (302, 303)
     assert r.headers.get("location") == "/login?next=/workspace"
+
+
+
+# ---------- Zulip 預設私訊到帳號的信箱（使用者 2026-10-18：預設要抓帳號本身的，使用者可以改） ----------
+
+def _zulip_ready(stream=""):
+    from app.core import roles, user_manager
+    roles.seed_builtin_roles()
+    uid = user_manager.create_local(f"zu{__import__('time').time_ns()}", "收訊人", "UserPass1234")
+    ns.save({"enabled": True, "channels": {"zulip": {
+        "enabled": True, "zulip_site": "https://z.example", "zulip_bot_email": "b@z",
+        "zulip_api_key": "k", "zulip_stream": stream}}})
+    return uid
+
+
+def test_zulip_defaults_to_the_account_email(auth_off):
+    from app.core import user_manager
+    uid = _zulip_ready()
+    user_manager.update(uid, email="me@example.test")
+    ns.save_prefs(f"u{uid}", {"enabled": True, "channels": ["zulip"]})
+    chans, merged = ns.resolve_for_user(f"u{uid}")
+    assert chans == ["zulip"] and merged["zulip_to"] == "me@example.test"
+
+
+def test_zulip_own_address_overrides_the_account_email(auth_off):
+    from app.core import user_manager
+    uid = _zulip_ready()
+    user_manager.update(uid, email="me@example.test")
+    ns.save_prefs(f"u{uid}", {"enabled": True, "channels": ["zulip"], "zulip_to": "chat-me@example.test"})
+    _chans, merged = ns.resolve_for_user(f"u{uid}")
+    assert merged["zulip_to"] == "chat-me@example.test"
+
+
+# ---------- Zulip 組織不公開 email（使用者 2026-10-18 實測：私訊帳號信箱回 Invalid email） ----------

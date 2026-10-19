@@ -78,6 +78,11 @@
 .mn-item label.mn-pick { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; color: #0f172a; cursor: pointer; }
 .mn-item input[type=text] { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; min-width: 240px; }
 .mn-hint { color: #64748b; font-size: 12px; }
+/* Zulip 私訊 Bot 綁定（v1.17.0） */
+.mn-zl { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: #334155; }
+.mn-zl code { font-size: 14px; font-weight: 700; letter-spacing: .5px; padding: 3px 8px; border-radius: 6px; background: #f1f5f9; color: #0f172a; user-select: all; }
+.mn-zl .mn-zl-ok { color: #15803d; font-weight: 600; }
+.mn-zl .mn-zl-err { color: #b91c1c; }
 .mn-actions { margin-top: 14px; display: flex; align-items: center; gap: 10px; }
 .mn-actions .btn { display: inline-flex; align-items: center; gap: 5px; }
 .mn-saved { color: #15803d; font-size: 13px; font-weight: 600; }
@@ -455,7 +460,7 @@
     email: tr('你的收件信箱'),
     telegram: 'Telegram Chat ID',
     line: 'LINE User ID（U…）',
-    zulip: tr('你的 Zulip email（留空＝送到團隊頻道）'),
+    zulip: tr('你的 Zulip email'),
     nextcloud: tr('你的一對一對話 token（留空＝送到群組）'),
   };
   const FIELD = { email: 'email_to', telegram: 'telegram_chat_id',
@@ -488,7 +493,7 @@
       if (ch.dev) {
         // 還沒對真實服務驗證過的管道 —— 標出來，勾了收不到才不會被當成自己設錯
         const tag = el('span', 'mn-dev', tr('開發階段'));
-        tag.title = tr('這個管道尚未實際接上服務驗證過，目前只有 Email 是實機驗證過的');
+        tag.title = tr('這個管道尚未實際接上服務驗證過，目前實機驗證過的是 Email 與 Zulip');
         lab.appendChild(tag);
       }
       item.appendChild(lab);
@@ -510,12 +515,20 @@
         inp.dataset.field = FIELD[ch.id];
         inp.placeholder = PLACEHOLDER[ch.id] || '';
         inp.value = d.prefs[FIELD[ch.id]] || '';
+        // Zulip 預設**直接填好**帳號的信箱（使用者 2026-10-18：預設請填 email，不能留空），可以改；
+        // 清空存檔會補回帳號信箱（見存檔那段）。帳號沒有信箱時才是空的（→ 團隊頻道）
+        if (ch.id === 'zulip' && !inp.value && d.account_email) inp.value = d.account_email;
+        if (ch.id === 'zulip') inp.dataset.fallback = d.account_email || '';
         item.appendChild(inp);
+        if (ch.id === 'zulip' && d.zulip_link_available) item.appendChild(zulipLinkBox());
         // Email 若帳號上已經有信箱（AD / LDAP / SSO 帶進來的），就告訴使用者
         // 不必自己填 —— 接目錄的環境不該還要每個人手動輸入一次。
-        item.appendChild(el('span', 'mn-hint', ch.dual
-          ? tr('填了就收私訊，留空則送到管理員設定的團隊頻道')
-          : tr('個人管道，需要填自己的位址')));
+        const hint = el('span', 'mn-hint' + (ch.id === 'zulip' ? ' mn-zl-email' : ''), ch.id === 'zulip'
+          ? (d.account_email ? tr('收私訊的 Zulip email，預設是帳號的信箱，可以改')
+                             : tr('帳號上沒有信箱：填了就收私訊，沒填則送到管理員設定的團隊頻道'))
+          : ch.dual ? tr('填了就收私訊，留空則送到管理員設定的團隊頻道')
+          : tr('個人管道，需要填自己的位址'));
+        item.appendChild(hint);
       } else {
         item.appendChild(el('span', 'mn-hint', tr('團隊頻道，由管理員設定目的地')));
       }
@@ -544,6 +557,83 @@
     if (onBox) onBox.addEventListener('change', syncWarn);
   }
 
+  // ---- Zulip 私訊 Bot 綁定（v1.17.0）：Zulip 不公開 email 時用信箱對不上人，使用者也不知道自己的編號 ——
+  // 按「綁定」拿一次性代碼、在 Zulip 私訊給通知 Bot、回來確認是不是自己。流程與安全規則在 core/zulip_link.py
+  let zlTimer = null;
+  function zulipLinkBox() {
+    const box = el('div', 'mn-zl');
+    box.id = 'mn-zl';
+    refreshZulipLink(box);
+    return box;
+  }
+  function zlButton(text, onClick, primary) {
+    const b = el('button', 'btn btn-small' + (primary ? ' btn-primary' : ' btn-secondary'), text);
+    b.type = 'button';
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  async function zlCall(method, path, body) {
+    const r = await fetch('/api/my/zulip-link' + path, {
+      method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    let d = {};
+    try { d = await r.json(); } catch (e) { /* 非 JSON */ }
+    return Object.assign({ ok: r.ok }, d);
+  }
+  async function refreshZulipLink(box) {
+    box = box || document.getElementById('mn-zl');
+    if (!box) return;
+    clearTimeout(zlTimer);
+    const zs = await zlCall('GET', '');
+    box.replaceChildren();
+    if (!zs.ok) { box.append(el('span', 'mn-zl-err', zs.error || tr('讀取 Zulip 綁定狀態失敗'))); return; }
+    const p = zs.pending;
+    if (p && p.candidate) {
+      box.append(el('span', null, tr('即將綁定 Zulip 帳號：')), el('strong', null, p.candidate.name),
+        zlButton(tr('確認綁定'), async () => {
+          const r = await zlCall('POST', '/confirm', { code: p.code });
+          if (!r.ok) alert(r.error || tr('綁定失敗'));
+          refreshZulipLink();
+        }, true),
+        zlButton(tr('不是我，取消'), async () => { await zlCall('POST', '/cancel'); refreshZulipLink(); }));
+      return;
+    }
+    if (p) {
+      const left = Math.max(0, Math.round(p.expires_at - Date.now() / 1000));
+      const code = el('code', null, p.code);
+      code.dataset.i18n = 'skip';
+      const copy = zlButton(tr('複製'), async () => {
+        try { await navigator.clipboard.writeText(p.code); copy.textContent = tr('已複製'); } catch (e) { /* 手動選取 */ }
+      });
+      const bot = (p.bot && (p.bot.name || p.bot.email)) || 'Bot';
+      box.append(el('span', null, tr('請在 Zulip 私訊「{0}」這段代碼：').replace('{0}', bot)), code, copy,
+        el('span', 'mn-hint', tr('{0} 分鐘內有效').replace('{0}', String(Math.ceil(left / 60)))),
+        zlButton(tr('取消'), async () => { await zlCall('POST', '/cancel'); refreshZulipLink(); }));
+      if (p.error) box.append(el('span', 'mn-zl-err', p.error));
+      zlTimer = setTimeout(() => refreshZulipLink(), 3000);
+      return;
+    }
+    // 綁定之後 email 欄位與它的說明用不到了（綁定的帳號優先）—— 收起來，不要讓人以為還在用 email
+    const row = box.closest('.mn-item');
+    if (row) {
+      row.querySelectorAll('.mn-to[data-field="zulip_to"], .mn-zl-email').forEach(n => { n.hidden = !!zs.linked; });
+    }
+    if (zs.linked) {
+      box.append(el('span', 'mn-zl-ok', tr('已綁定 Zulip：') + zs.linked.name),
+        el('span', 'mn-hint', tr('通知會私訊到這個 Zulip 帳號')),
+        zlButton(tr('解除綁定'), async () => {
+          if (!(await window.showConfirm(tr('解除綁定後，Zulip 通知改用 email 私訊。確定嗎？')))) return;
+          await zlCall('DELETE', '');
+          refreshZulipLink();
+        }));
+      return;
+    }
+    box.append(zlButton(tr('綁定 Zulip'), async () => {
+      const r = await zlCall('POST', '/start');
+      if (!r.ok) { alert(r.error || tr('無法開始綁定')); return; }
+      refreshZulipLink();
+    }, true), el('span', 'mn-hint', tr('Zulip 不公開 email 時收不到私訊：綁定一次就好，不用知道自己的 Zulip 編號')));
+  }
+
   const mnSave = document.getElementById('mn-save');
   if (mnSave) {
     mnSave.addEventListener('click', async (e) => {
@@ -555,6 +645,8 @@
           .map((c) => c.value),
       };
       document.querySelectorAll('.mn-to').forEach((i) => {
+        // Zulip 不可以留空：清空就補回帳號的信箱
+        if (!i.value.trim() && i.dataset.fallback) i.value = i.dataset.fallback;
         body[i.dataset.field] = i.value;
       });
       try {

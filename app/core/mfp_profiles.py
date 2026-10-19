@@ -2,8 +2,11 @@
 
 **這裡的辨識只是「從網頁上看到什麼」**，不代表支援：
 規格書（docs-share/mfp-fetch/）規定未經實機驗證的型號一律不可以標「已支援」，
-使用者也交代實機實測通過之前整支工具標 Beta。所以目前**沒有任何型號會得到 `supported`**
-—— 等某一款在實機上通過取件測試，才在 `VERIFIED_PROFILES` 加上它。
+使用者也交代實機實測通過之前整支工具標 Beta。只有在實機上通過取件測試的型號才在 `VERIFIED_PROFILES`
+（2026-10-19：Apeos C5571 客戶實機取件成功，使用者同意標已支援）。
+
+**同系列**（`SAME_SERIES`）：使用者 2026-10-19「同類 OS 的一併標示」—— 跟已驗證型號同一個系列（原廠同一份參考手冊、
+同一套驅動與韌體更新服務）的型號標 `supported_same_series`，畫面寫明「以哪一款實機驗證」，不假裝每一款都測過。
 
 辨識依據一律附在結果裡（哪個頁面、哪個欄位、摘錄），讓看報告的人知道判斷從哪來；
 單一個 Server 標頭或標題不足以確認完整型號，所以也記下比對到幾個依據。
@@ -27,11 +30,20 @@ FIRST_BATCH: frozenset[tuple[str, str]] = frozenset({
 EXPERIMENTAL_VENDORS: frozenset[str] = frozenset({"Canon", "Konica Minolta", "Sharp", "Kyocera", "Ricoh"})
 
 #: 已在實機上通過取件測試的（系列, 型號）。**目前是空的。**
-VERIFIED_PROFILES: frozenset[tuple[str, str]] = frozenset()
+VERIFIED_PROFILES: frozenset[tuple[str, str]] = frozenset({
+    ("Apeos", "C5571"),          # 2026-10-19 客戶實機：信箱列文件、取件（TIFF → PDF）成功，報告在 docs-share/mfp-fetch/field-reports/
+})
+
+#: 同系列 → 以哪一款實機驗證。Apeos C7071 / C6571 / C5571 / C4571 / C3571 / C3071 / C2571 是同一個系列
+#: （原廠同一份參考手冊；C3071 是海外型號、C2571 是日本型號）。前一代（C5570 等）不算。
+SAME_SERIES: dict[tuple[str, str], tuple[str, str]] = {
+    ("Apeos", m): ("Apeos", "C5571") for m in ("C7071", "C6571", "C4571", "C3571", "C3071", "C2571")
+}
 
 #: 狀態代碼 → 固定訊息（翻譯檔有英日文）。
 STATUS_MESSAGES: dict[str, str] = {
     "supported": "已支援（已通過實機驗證）",
+    "supported_same_series": "已支援（同系列，以 Apeos C5571 實機驗證）",
     "first_batch_unverified": "首批規劃的型號，尚未完成實機驗證",
     "same_vendor_unverified": "同廠牌，尚未驗證是否支援",
     "experimental_vendor": "實驗功能：這個廠牌的取件依原廠手冊或原廠工具的分析寫成，尚未在實機上驗證",
@@ -45,6 +57,7 @@ STATUS_MESSAGES: dict[str, str] = {
 #: （使用者 2026-10-14 指出）。`STATUS_MESSAGES` 是完整的一句，API、診斷報告、服務紀錄檔照舊用那一份。
 STATUS_LABELS: dict[str, tuple[str, str]] = {
     "supported": ("已支援", "已通過實機驗證"),
+    "supported_same_series": ("已支援", "同系列，以 Apeos C5571 實機驗證"),
     "first_batch_unverified": ("尚未驗證", "首批規劃的型號，尚未完成實機驗證"),
     "same_vendor_unverified": ("尚未驗證", "同廠牌，尚未驗證是否支援"),
     "experimental_vendor": ("實驗功能", "取件依原廠手冊或原廠工具的分析寫成，尚未實機驗證"),
@@ -203,6 +216,8 @@ def detect(pages: list[dict], escl_model: str = "") -> dict[str, Any]:
             res["family"], res["model"] = model
         if model and model in VERIFIED_PROFILES:
             res["status"] = "supported"
+        elif model and model in SAME_SERIES:
+            res["status"] = "supported_same_series"
         elif model and model in FIRST_BATCH:
             res["status"] = "first_batch_unverified"
         elif model:

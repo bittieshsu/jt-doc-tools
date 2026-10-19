@@ -175,6 +175,33 @@ DEFAULT_SIDEBAR_THEME = "indigo"
 _THEME_IDS = tuple(t[0] for t in SIDEBAR_THEMES)
 _THEME_TONE = {t[0]: t[2] for t in SIDEBAR_THEMES}
 
+#: 首頁 Logo 的光暈（v1.17.0，使用者 2026-10-19）：(代號, 名稱, 光暈的 RGB；None＝不要光暈)。
+#: 顏色只寫在這裡；首頁與設定頁的 CSS 都由這份產生（值是固定常數，不是使用者輸入）。
+HERO_GLOWS = (
+    ("indigo", "靛紫（預設）", (99, 102, 241)),
+    ("blue", "海洋藍", (59, 130, 246)),
+    ("teal", "青綠", (20, 184, 166)),
+    ("green", "森林綠", (34, 197, 94)),
+    ("amber", "暖橘", (245, 158, 11)),
+    ("rose", "玫瑰紅", (244, 63, 94)),
+    ("slate", "石墨灰", (100, 116, 139)),
+    ("none", "不要光暈", None),
+)
+#: 首頁標題文字的漸層（三個色點）。預設是原本的靛紫；其他的最淺那一點對首頁底色也有 3:1（大字）。
+HERO_TITLES = (
+    ("indigo", "靛紫（預設）", ("#7c6df0", "#5b4bd9", "#4c3ad0")),
+    ("blue", "海洋藍", ("#2563eb", "#1d4ed8", "#1e40af")),
+    ("teal", "青綠", ("#0d9488", "#0f766e", "#115e59")),
+    ("green", "森林綠", ("#15803d", "#166534", "#14532d")),
+    ("amber", "暖橘", ("#ea580c", "#c2410c", "#9a3412")),
+    ("rose", "玫瑰紅", ("#e11d48", "#be123c", "#9f1239")),
+    ("slate", "石墨灰", ("#475569", "#334155", "#1e293b")),
+)
+DEFAULT_HERO_GLOW = "indigo"
+DEFAULT_HERO_TITLE = "indigo"
+_GLOW = {g[0]: g[2] for g in HERO_GLOWS}
+_TITLE = {t[0]: t[2] for t in HERO_TITLES}
+
 _appearance_cache: tuple[object, dict] = (None, {})
 
 
@@ -183,7 +210,7 @@ def _appearance_path() -> Path:
 
 
 def get_appearance() -> dict:
-    """{"sidebar_theme", "builtin_logo"}；檔案沒有、壞掉或代號不認得都回預設。"""
+    """{"sidebar_theme", "builtin_logo", "hero_glow", "hero_title"}；檔案沒有、壞掉或代號不認得都回預設。"""
     global _appearance_cache
     p = _appearance_path()
     # 快取的鍵用修改時間（奈秒）＋大小＋inode：設定備份匯入是原地覆寫（inode 不變），
@@ -208,15 +235,26 @@ def get_appearance() -> dict:
         else DEFAULT_SIDEBAR_THEME,
         "builtin_logo": data.get("builtin_logo") if data.get("builtin_logo") in BUILTIN_LOGOS
         else DEFAULT_BUILTIN_LOGO,
+        "hero_glow": data.get("hero_glow") if data.get("hero_glow") in _GLOW else DEFAULT_HERO_GLOW,
+        "hero_title": data.get("hero_title") if data.get("hero_title") in _TITLE else DEFAULT_HERO_TITLE,
     }
     _appearance_cache = (key, out)
     return dict(out)
 
 
 def set_appearance(*, sidebar_theme: Optional[str] = None,
-                   builtin_logo: Optional[str] = None) -> dict:
-    """改其中一項或兩項；代號不認得丟 ValueError（呼叫端回 400）。回改完之後的設定。"""
+                   builtin_logo: Optional[str] = None, hero_glow: Optional[str] = None,
+                   hero_title: Optional[str] = None) -> dict:
+    """改其中幾項；代號不認得丟 ValueError（呼叫端回 400，一項都不改）。回改完之後的設定。"""
+    if hero_glow is not None and hero_glow not in _GLOW:
+        raise ValueError("unknown hero glow")
+    if hero_title is not None and hero_title not in _TITLE:
+        raise ValueError("unknown hero title colour")
     cur = get_appearance()
+    if hero_glow is not None:
+        cur["hero_glow"] = hero_glow
+    if hero_title is not None:
+        cur["hero_title"] = hero_title
     if sidebar_theme is not None:
         if sidebar_theme not in _THEME_IDS:
             raise ValueError("unknown sidebar theme")
@@ -244,6 +282,23 @@ def sidebar_tone(theme: Optional[str] = None) -> str:
 
 def theme_list() -> list[dict]:
     return [{"id": i, "kind": k, "tone": tone, "name": n, "desc": d} for i, k, tone, n, d in SIDEBAR_THEMES]
+
+
+def hero_glow_list() -> list[dict]:
+    return [{"id": i, "name": n, "rgb": ",".join(map(str, c)) if c else ""} for i, n, c in HERO_GLOWS]
+
+
+def hero_title_list() -> list[dict]:
+    return [{"id": i, "name": n, "stops": list(c)} for i, n, c in HERO_TITLES]
+
+
+def hero_style(glow: Optional[str] = None, title: Optional[str] = None) -> dict:
+    """首頁 hero 的顏色：`glow` 是 `"r,g,b"`（空字串＝不要光暈），`title` 是三個色點。"""
+    a = get_appearance()
+    gid = glow if glow in _GLOW else a["hero_glow"]
+    tid = title if title in _TITLE else a["hero_title"]
+    g = _GLOW[gid]
+    return {"glow": ",".join(map(str, g)) if g else "", "title": list(_TITLE[tid])}
 
 
 def builtin_logo_list() -> list[dict]:

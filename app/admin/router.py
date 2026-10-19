@@ -1644,6 +1644,8 @@ def build_router(templates) -> APIRouter:
                 "appearance": branding.get_appearance(),
                 "sidebar_themes": branding.theme_list(),
                 "builtin_logos": branding.builtin_logo_list(),
+                "hero_glows": branding.hero_glow_list(),
+                "hero_titles": branding.hero_title_list(),
             },
         )
 
@@ -1680,19 +1682,23 @@ def build_router(templates) -> APIRouter:
         if not isinstance(body, dict):
             raise HTTPException(400, "需要 JSON 物件")
         theme, logo = body.get("sidebar_theme"), body.get("builtin_logo")
-        if theme is None and logo is None:
-            raise HTTPException(400, "請指定 sidebar_theme 或 builtin_logo")
+        glow, title = body.get("hero_glow"), body.get("hero_title")
+        if theme is None and logo is None and glow is None and title is None:
+            raise HTTPException(400, "請指定 sidebar_theme、builtin_logo、hero_glow 或 hero_title")
         try:
             out = branding.set_appearance(
                 sidebar_theme=str(theme) if theme is not None else None,
-                builtin_logo=str(logo) if logo is not None else None)
+                builtin_logo=str(logo) if logo is not None else None,
+                hero_glow=str(glow) if glow is not None else None,
+                hero_title=str(title) if title is not None else None)
         except ValueError:
             raise HTTPException(400, "不認得的配色或 Logo 代號")
         notify_email_assets.invalidate()
         user = getattr(request.state, "user", None)
         audit_db.log_event("settings_change", username=(user or {}).get("username", ""),
                            ip=_cip.real_client_ip(request), target="branding",
-                           details={k: v for k, v in (("sidebar_theme", theme), ("builtin_logo", logo))
+                           details={k: v for k, v in (("sidebar_theme", theme), ("builtin_logo", logo),
+                                                      ("hero_glow", glow), ("hero_title", title))
                                     if v is not None})
         return {"ok": True, **out, "sidebar_tone": branding.sidebar_tone(),
                 "sidebar_logo": branding.logo_url("sidebar"), "icon_logo": branding.logo_url("icon")}
@@ -1708,6 +1714,8 @@ def build_router(templates) -> APIRouter:
             **branding.get_appearance(),
             "sidebar_themes": branding.theme_list(),
             "builtin_logos": branding.builtin_logo_list(),
+            "hero_glows": branding.hero_glow_list(),
+            "hero_titles": branding.hero_title_list(),
         }
 
     @router.post("/branding/site-name")

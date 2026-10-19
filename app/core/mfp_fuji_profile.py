@@ -1,7 +1,14 @@
-"""FUJIFILM request profiles based on NSU3 2.0.60 compatibility research.
+"""事務機掃描取件：FUJIFILM 機內信箱的 WebDAV 請求格式（v1.16.99，**實驗功能，尚未在實機上驗證**）。
 
-Tool-informed request profiles; NOT a public API or hardware compatibility claim.
-The selected list properties and bounded negotiation are JTDT integration choices.
+依據：原廠取件工具 Network Scanner Utility 3（2.0.60）的相容性分析（內部文件）。客戶實機 Apeos C5571
+對我們原本的單次 `allprop` 請求，HTTPS 與 HTTP 都回 406；原廠工具的做法是：
+
+* **探測**（`probe`）：只問 `d:resourcetype`、`Depth: 1`、帶 `X-Singlepage: On`、不帶帳密。
+* **列文件**（`list`）：指定屬性、**省略** `X-Singlepage`（不是送 Off）。
+* `Content-Type: text/xml`（不帶 charset）；XML 宣告 FUJIFILM 的命名空間，新舊機種是兩套。
+
+這不是原廠公開的介面，也不代表各機型都相容。列文件挑哪些屬性、只在探測 406 時換一次舊格式，
+都是本專案的整合選擇（流程在 `mfp_box.open_box`）。
 """
 from __future__ import annotations
 
@@ -19,8 +26,8 @@ PROFILES = {
         "pb": "http://www.fujixerox.co.jp/2005/06/boxAccess",
     },
 }
-# Chosen for JTDT, from DAV and the studied vendor property names. This is not
-# claimed to be the exact property subset of every NSU3 GUI operation.
+# 列文件要的屬性：DAV 標準的加上分析裡看到的廠商屬性名稱。是本專案挑的組合，
+# 不是原廠每個畫面都用這一組。
 LIST_PROPERTIES = (
     "d:resourcetype", "d:displayname", "d:creationdate", "d:getlastmodified",
     "d:getcontenttype", "d:getcontentlength", "sss:Pages", "sss:Compression",
@@ -40,16 +47,16 @@ def request_spec(profile: str, stage: str) -> tuple[bytes, str, dict[str, str]]:
             f"<d:propfind {attrs}><d:prop>"
             + "".join(f"<{name}/>" for name in properties)
             + "</d:prop></d:propfind>").encode("utf-8")
-    # List requests omit this header; initial authentication probes use "On".
+    # 列文件不送這個標頭；探測（含認證那一次）送 On
     extra = {"X-Singlepage": "On"} if stage == "probe" else {}
     return body, "text/xml", extra
 
 
 def response_profile(qnames: list[str], current: str) -> str:
-    """Use actual property QNames, not substring matches in document names.
+    """從回應裡實際出現的屬性名稱（QName）判斷是新格式還是舊格式，不比對文件名稱裡的字串。
 
-    DAV-only/ambiguous responses do not prove legacy firmware: keep current.
-    This deliberately narrows NSU3's absence-of-modern-namespace heuristic.
+    只有 DAV 屬性、或兩套都有時，不能證明是舊機種 —— 維持目前的格式
+    （刻意比原廠「沒看到新命名空間就當舊的」保守）。
     """
     observed = {q[1:].split("}", 1)[0] for q in qnames if q.startswith("{")}
     candidates = [name for name, ns in PROFILES.items() if observed & set(ns.values())]

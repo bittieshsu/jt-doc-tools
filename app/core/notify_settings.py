@@ -289,7 +289,13 @@ _PREF_DEFAULTS: dict[str, Any] = {
     "email_to": "",
     "telegram_chat_id": "",
     "line_to": "",
-    "zulip_to": "",          # 自己的 Zulip email → 收私訊（留空＝走團隊頻道）
+    "zulip_to": "",          # 自己的 Zulip email → 收私訊（留空＝用帳號的信箱；帳號沒有信箱才走團隊頻道）
+    # Zulip 使用者編號（recipient_user_id）。有填就**優先**用它私訊：Zulip 的 email 隱私設定會讓機器人只看到
+    # `user9@<站台>` 這種代用地址，用真正的信箱對不上（Zulip 維護人員 2026-10-18 要求）
+    "zulip_user_id": "",
+    # 私訊 Bot 綁定的結果（`zulip_link`）：{"site", "user_id", "name", "linked_at"}。只由綁定流程寫，
+    # `save_prefs` 不收這個欄位（使用者不可以自己填別人的編號）
+    "zulip_link": None,
     "nextcloud_to": "",      # 自己的一對一對話 token（留空＝走群組對話）
     # 站內通知「上次查看」的時間戳 —— 未讀數由它與作業的完成時間推導，
     # 不逐筆記已讀狀態（見 /api/my/inbox）
@@ -348,6 +354,9 @@ def save_prefs(key: str, new: dict) -> dict:
         cur["channels_set"] = True
     # 刻意**不收** email_to：通知信箱只認帳號上的那一個（見 resolve_for_user）。
     # 擋在這裡而不是只把 UI 藏起來 —— 否則自己組請求還是改得到。
+    if "zulip_user_id" in new:
+        uid = str(new["zulip_user_id"] or "").strip()
+        cur["zulip_user_id"] = uid if uid.isdigit() and len(uid) <= 12 else ""
     for f in ("telegram_chat_id", "line_to", "zulip_to", "nextcloud_to"):
         if f in new:
             # 去掉控制字元再存。`email_to` 會被放進郵件標頭，含換行的值會讓
@@ -364,6 +373,21 @@ def save_prefs(key: str, new: dict) -> dict:
     d.mkdir(parents=True, exist_ok=True)
     atomic_json.write_json(_pref_path(key), cur)
     return cur
+
+
+def get_zulip_link(key: str) -> Optional[dict]:
+    """這個使用者綁定的 Zulip 帳號（沒有回 None）。"""
+    link = get_prefs(key).get("zulip_link")
+    return link if isinstance(link, dict) and link.get("user_id") else None
+
+
+def save_zulip_link(key: str, link: Optional[dict]) -> None:
+    """只給綁定流程（`zulip_link.confirm`）與解除綁定用 —— 不經過 `save_prefs` 的欄位白名單。"""
+    cur = get_prefs(key)
+    cur["zulip_link"] = link
+    d = _prefs_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    atomic_json.write_json(_pref_path(key), cur)
 
 
 def _account_email(key: str) -> str:
@@ -430,8 +454,15 @@ def resolve_for_user(key: str) -> tuple[list[str], dict]:
     merged["email_to"] = _account_email(key) or ""
     merged["telegram_chat_id"] = prefs.get("telegram_chat_id") or ""
     merged["line_to"] = prefs.get("line_to") or ""
-    # 兩用管道：填了就私訊，沒填就沿用管理員的頻道設定
-    merged["zulip_to"] = prefs.get("zulip_to") or ""
+    # 兩用管道：填了就私訊。Zulip 沒填就私訊到**帳號上的信箱**（使用者 2026-10-18：預設要抓帳號本身的，
+    # 使用者可以改）；帳號沒有信箱才沿用管理員的團隊頻道
+    merged["zulip_to"] = prefs.get("zulip_to") or merged["email_to"] or ""
+    merged["zulip_user_id"] = prefs.get("zulip_user_id") or ""
+    # 綁定過的 Zulip 帳號最優先（站台要是同一個 —— 管理員換了站台，舊的綁定就不能用）
+    link = prefs.get("zulip_link") or None
+    z_site = str(((cfg.get("channels") or {}).get("zulip") or {}).get("zulip_site") or "").rstrip("/")
+    if isinstance(link, dict) and link.get("user_id") and str(link.get("site") or "").rstrip("/") == z_site:
+        merged["zulip_user_id"] = str(int(link["user_id"]))
     merged["nextcloud_to"] = prefs.get("nextcloud_to") or ""
     usable = []
     for ch in chosen:

@@ -2333,6 +2333,8 @@ curl -X POST http://localhost:8765/tools/mfp-fetch/api/detect \
 
 `detection.status` 的值：
 
+- `supported`：已通過實機驗證（目前是 Apeos C5571）
+- `supported_same_series`：跟已驗證型號同系列（Apeos C7071 / C6571 / C4571 / C3571 / C3071 / C2571，以 Apeos C5571 實機驗證）
 - `first_batch_unverified`：首批規劃的型號，尚未實機驗證
 - `same_vendor_unverified`：同廠牌，尚未驗證是否支援
 - `experimental_vendor`：Canon、Konica Minolta、SHARP（檔案分享取件）與 KYOCERA、RICOH（直接取件），都是實驗功能
@@ -2449,6 +2451,7 @@ POST /tools/mfp-fetch/api/connections/{id}/box/fetch   # 取件（202，回作�
 | `documents` | string[] | 取件時用：要取的文件編號（列文件回的 `id`），一次最多 20 份 |
 | `output` | string | 取件時用：`pdf`（預設，每份文件一個 PDF）或 `original`（設備給的原始 TIFF / JPEG，不轉檔） |
 | `confirm_delete_after_get` | bool | 取件時用：信箱或文件設定成「取件後刪除」時要帶 `true` 才會取 |
+| `delete_after` | bool | 取件並刪除（實驗功能）：帶 `true` 時，每份文件的檔案都存好（工作區或暫存區）之後，才用 WebDAV DELETE 刪除事務機上的那份原件，刪完再列一次信箱確認；作業紀錄每份文件的 `source` 是 `SOURCE_DELETED`（已刪）或 `DELETE_NOT_DONE`（設備沒刪，`delete_status` 是設備回的狀態碼），沒存好的那份 `delete` 是 `DELETE_SKIPPED_NOT_SAVED`、不刪。帶了這個就不用另外帶 `confirm_delete_after_get` |
 
 ```bash
 curl -X POST http://localhost:8765/tools/mfp-fetch/api/connections/3/box/list \
@@ -2509,8 +2512,10 @@ POST /tools/mfp-fetch/api/connections/{id}/share/fetch   # 取件（202，回作
 | `route` | string | 取件方式：`canon_webdav`、`canon_smb`、`konica_smb`、`sharp_smb`、`kyocera_soap`（HTTPS 9091）、`kyocera_soap_http`（HTTP 9090）、`ricoh_soap`（連線測試連得上的那組協定與連接埠）（清單上的 `share.routes`） |
 | `root` | string | 位置：Canon 是 `share`（共享空間）或 `users`（個人空間）；SHARP 是設備列出的分享；Konica 由信箱編號找出，不用帶；KYOCERA 是文件匣編號；RICOH 是 `documents`（文件伺服器） |
 | `path` | string[] | 列檔時用：資料夾路徑，一層一個名稱（例如 `["2026", "十月"]`），不帶就是位置的最上層 |
-| `user` / `password` | string | Canon、SHARP、KYOCERA、RICOH：事務機上的帳號與密碼（沒有設認證就不帶；RICOH 一定要帶）；網域帳號寫成 `網域\帳號` |
+| `user` / `password` | string | Canon、SHARP、KYOCERA、RICOH：事務機上的帳號與密碼（沒有設認證就不帶；RICOH 選帳號密碼登入時要帶）；網域帳號寫成 `網域\帳號` |
 | `box` / `box_password` | string | Konica：信箱編號與信箱密碼。KYOCERA：`box_password` 是文件匣密碼；RICOH：`box_password` 是文件密碼（有設密碼的文件才要） |
+| `auth_mode` | string | RICOH 的登入方式：`auto`（預設：有帳號走帳號密碼，有 User Code 依設備列出的類型，都沒有回 `RICOH_AUTH_MODE_REQUIRED`）、`none`（不需登入）、`account`（帳號密碼：設備支援就換票證，否則用 `startSession`）、`user_code`、`user_code_ext`（User Code、延伸 User Code）。登入只送一次，不換方式重試 |
+| `user_code` | string | RICOH 的 User Code（只能是數字，開頭的 0 保留） |
 | `trust_sha256` / `allow_http` | | WebDAV 的憑證指紋與 HTTP 同意，跟機內信箱取件一樣 |
 | `allow_plain` | bool | SMB 不加密，要帶 `true`（同意檔案以未加密方式在內網傳送） |
 | `files` | string[][] | 取件時用：要取的檔案，每個是一條路徑（例如 `[["2026", "合約.tif"]]`），一次最多 50 個 |
@@ -2519,7 +2524,7 @@ POST /tools/mfp-fetch/api/connections/{id}/share/fetch   # 取件（202，回作
 列檔回傳 `roots`（可選的位置，`label` 是顯示名稱、`shared` 表示共享）、`root`、`path`、`entries`（`name`、`dir`、`size`、`modified`）、
 `shared`、`via`（`{"protocol": "WebDAV"}`、`{"protocol": "SMB", "port": 445}` 或 `{"protocol": "SOAP"}`）與 `trace`（協定紀錄，不含帳密）。
 KYOCERA / RICOH 的 `entries[].name` 是編碼過的識別碼（`~` 開頭），取件時照原樣放進 `files`；顯示用 `label`。
-RICOH 有密碼的文件 `locked` 是 `true`。
+RICOH 有密碼的文件 `locked` 是 `true`。RICOH 取得到的是文件伺服器裡的文件；最上層查不到文件時，會再連子資料夾查一次。
 **共享的位置其他人也看得到**，不是只屬於呼叫者的文件。
 
 SMB 只用 NTLMv2；設備只肯用 SMB1 就在認證之前停下來（`SMB1_REFUSED`），能簽章就簽章，內容不加密。
@@ -2527,7 +2532,9 @@ SMB 只用 NTLMv2；設備只肯用 SMB1 就在認證之前停下來（`SMB1_REF
 `SHARE_FORBIDDEN`、`SHARE_NOT_FOUND`、`BOX_SHARE_NOT_FOUND`（Konica 找不到這個信箱的分享）、`SHARE_LOGIN_PAGE`，
 以及跟機內信箱取件相同的 `TLS_UNTRUSTED`、`AUTH_FAILED` 等。KYOCERA / RICOH 另有 `SOAP_UNAVAILABLE`（設備的文件服務沒有回應）、
 `BOX_PASSWORD_FAILED`、`DOC_PASSWORD_REQUIRED`、`DOC_PASSWORD_FAILED`、`SESSION_EXPIRED`、`SOAP_BUSY`、
-`RICOH_AUTH_UNSUPPORTED`（只支援帳號密碼換票證的登入）、`RICOH_URL_UNSUPPORTED`（下載網址不在這台設備，或是 FTP）。
+`RICOH_AUTH_UNSUPPORTED`（設備沒有可用的登入方式）、`RICOH_AUTH_MODE_REQUIRED`（還沒選登入方式，什麼都沒送）、`RICOH_AUTH_MODE_MISMATCH`、`RICOH_AUTH_INPUT_CONFLICT`、
+`RICOH_AUTH_PROFILE_UNSUPPORTED`、`RICOH_USER_CODE_REQUIRED`、`RICOH_PASSWORD_UNSUPPORTED`、`RICOH_SESSION_REJECTED`（設備沒有接受這次登入）、
+`RICOH_URL_UNSUPPORTED`（下載網址不在這台設備，或是 FTP）。
 一份文件分成幾個部分回來時，`pdf` 照順序合成一份，`original` 各存一個檔並加頁序。
 作業紀錄的 `kind` 是 `share`，其餘欄位跟信箱取件一樣。
 
@@ -2763,7 +2770,7 @@ curl http://localhost:8765/admin/api/branding \
   -H "Authorization: Bearer ADMIN_TOKEN" | jq
 ```
 
-回傳有沒有上傳企業 Logo、站台名稱，以及目前的左側選單配色（`sidebar_theme`）與內建 Logo（`builtin_logo`）；清單 `sidebar_themes` 列出 12 種配色（`id`、`kind` 是 `gradient` 或 `solid`、`tone` 是 `dark` 或 `light`、名稱、說明），清單 `builtin_logos` 列出兩個內建 Logo（`jt` Jason Tools Logo、`doc` 文件圖示）。
+回傳有沒有上傳企業 Logo、站台名稱，以及目前的左側選單配色（`sidebar_theme`）與內建 Logo（`builtin_logo`）；清單 `sidebar_themes` 列出 12 種配色（`id`、`kind` 是 `gradient` 或 `solid`、`tone` 是 `dark` 或 `light`、名稱、說明），清單 `builtin_logos` 列出兩個內建 Logo（`jt` Jason Tools Logo、`doc` 文件圖示）。另有首頁 Logo 光暈（`hero_glow`）與標題文字（`hero_title`）的顏色，清單 `hero_glows`（8 種，`none` 是不要光暈）與 `hero_titles`（7 種）列出可選的代號與名稱。
 
 ### 左側選單配色與內建 Logo
 
@@ -2777,7 +2784,7 @@ curl -X POST http://localhost:8765/admin/branding/appearance \
   -d '{"sidebar_theme": "ocean", "builtin_logo": "doc"}'
 ```
 
-送 `sidebar_theme` 與 `builtin_logo` 其中一項或兩項，代號見上一節的清單；不認得的代號回 **400**。回改完之後的設定，加上 `sidebar_tone`（`dark` / `light`）與側欄、頁籤圖示現在該用的 Logo 網址（`sidebar_logo`、`icon_logo`）。上傳過企業 Logo 時一律用那一張，內建 Logo 的選擇在還原預設之後才生效。改了寫一筆稽核記錄（`settings_change`，對象 `branding`）。
+送 `sidebar_theme`、`builtin_logo`、`hero_glow`、`hero_title` 其中一項或幾項，代號見上一節的清單；有一項不認得就回 **400**，一項都不改。回改完之後的設定，加上 `sidebar_tone`（`dark` / `light`）與側欄、頁籤圖示現在該用的 Logo 網址（`sidebar_logo`、`icon_logo`）。上傳過企業 Logo 時一律用那一張，內建 Logo 的選擇在還原預設之後才生效。改了寫一筆稽核記錄（`settings_change`，對象 `branding`）。
 
 ### 設定匯出清單
 
@@ -3052,8 +3059,13 @@ sudo systemctl start jt-doc-tools
 | `/api/my/notify` | POST | 存自己的通知設定 |
 | `/api/my/inbox` | GET | 站內通知列表（未讀優先）|
 | `/api/my/inbox/seen` | POST | 標記已讀（`id` 或 `all=1`）|
+| `/api/my/zulip-link` | GET | Zulip 綁定狀態：已綁定的帳號（`linked`）、進行中的綁定（`pending`：代碼、到期時間、要私訊的 Bot、等待確認的 Zulip 帳號 `candidate`）|
+| `/api/my/zulip-link/start` | POST | 產生一次性綁定代碼（10 分鐘有效）；把它在 Zulip 私訊給通知 Bot |
+| `/api/my/zulip-link/confirm` | POST | 確認綁定 `candidate`（`{"code": "..."}`）；綁定與代碼消耗一次完成 |
+| `/api/my/zulip-link/cancel` | POST | 取消進行中的綁定 |
+| `/api/my/zulip-link` | DELETE | 解除綁定（之後的 Zulip 通知改用 email 私訊）|
 
-> 這四支**刻意不列入 Bearer API**：它們回傳的是「這個登入者的」資料，
+> 這幾支**刻意不列入 Bearer API**：它們回傳的是「這個登入者的」資料，
 > 拿 token 呼叫沒有意義（token 綁的是使用者，但這些端點的設計是給瀏覽器用的）。
 
 ---

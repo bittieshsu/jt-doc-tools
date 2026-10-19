@@ -21,6 +21,7 @@ CodeQL 長期掛著 6 個「Information exposure through an exception」。
 """
 from __future__ import annotations
 
+import re
 import ast
 from pathlib import Path
 
@@ -129,6 +130,9 @@ def test_notify_test_still_explains_but_scrubs():
     Slack / Teams 的 webhook URL 本身就是密鑰。"""
     src = (ADMIN / "auth_router.py").read_text(encoding="utf-8")
     i = src.index("async def notify_test")
-    seg = src[i:i + 3000]
+    # 取整個函式（到下一個同層的 def / 裝飾器），不用固定長度 —— v1.17.0 加了 Zulip 測試收訊者，
+    # 函式變長，固定 3000 字的視窗看不到後面的 safe_user_error
+    m = re.compile(r"\n    (?:@|async def |def )").search(src, i + 10)
+    seg = src[i:m.start() if m else len(src)]
     assert "_safe_user_error" in seg, "通知測試沒有走 safe_user_error"
     assert 'f"{type(e).__name__}: {e}"' not in seg, "仍在原樣回傳例外訊息"

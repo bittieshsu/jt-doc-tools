@@ -80,6 +80,7 @@ class FakeBox:
         self.extra: list[str] = []         # 額外塞進信箱清單的 <D:response>
         self.raw_list: bytes | None = None
         self.delete_on_get = False
+        self.delete_status = 204                # DELETE 的回應（v1.17.0 取件並刪除）；2xx 時真的刪掉
         self.home: bytes | None = None     # 首頁（連線測試辨識型號用；不用認證）
         self.requests: list[dict] = []
 
@@ -218,7 +219,17 @@ class FakeBox:
                 fake.requests.append({"method": self.command, "path": self.path, "headers": {}, "body": b""})
                 self._send(405)
 
-            do_DELETE = do_PUT = do_POST = do_MOVE = do_PROPPATCH = _other
+            def do_DELETE(self):
+                if not self._gate():
+                    return
+                m = re.fullmatch(rf"/dav/{fake.seg}/(\d+)(?:/|\.\w+)", self.path)
+                if not m or m.group(1) not in fake.docs:
+                    return self._send(404)
+                if 200 <= fake.delete_status < 300:
+                    fake.docs.pop(m.group(1), None)
+                return self._send(fake.delete_status)
+
+            do_PUT = do_POST = do_MOVE = do_PROPPATCH = _other
 
         srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
         if tls_ctx is not None:
@@ -265,9 +276,19 @@ def test_challenges_with_several_schemes_and_quoted_values():
 
 @pytest.mark.parametrize("realm,kind", [("box-1", "box"), ("BOX-012", "box"), ("box", "box"),
                                         ("user-Local", "user"), ("admin", "user"), ("Apeos C5571", "unknown"),
-                                        ("", "unknown")])
+                                        ("", "unknown"),
+                                        # v1.17.0：帶認證類型的 realm（客戶實機的密碼信箱），只認 0003＋0040
+                                        ("96:00030040@192.0.2.10", "box"), ("96:00400003@192.0.2.10", "box"),
+                                        ("96:0040@192.0.2.10", "unknown"), ("96:00030080@192.0.2.10", "unknown"),
+                                        ("96:00030040", "unknown"), ("96:0003004@192.0.2.10", "unknown"),
+                                        ("x96:00030040@h", "unknown")])
 def test_realm_kinds(realm, kind):
     assert B.realm_kind(realm) == kind
+
+
+def test_typed_realm_is_read_four_hex_digits_at_a_time():
+    assert B.parse_typed_realm("96:00030040@192.0.2.10") == {"box": 96, "types": [0x0003, 0x0040]}
+    assert B.parse_typed_realm("box-96") is None and B.parse_typed_realm("") is None
 
 
 @pytest.mark.parametrize("v", ["0", "1000", "-1", "1a", "", None, "1e3"])
@@ -360,6 +381,62 @@ def test_a_stale_digest_nonce_is_resent_once_with_the_same_password(box):
     # 探測（舊 nonce → stale）→ 探測（新 nonce）→ 列文件
     assert list(s.docs) == ["1"] and len(_auth_sent(box)) == 3
     assert {re.search(r'username="([^"]+)"', r["headers"]["authorization"]).group(1) for r in _auth_sent(box)} == {"box"}
+
+
+# ------------------------------------------------- 帶認證類型的 realm（v1.17.0，客戶實機的密碼信箱）
+# 依原廠工具 2.0.60 的流程分析（使用者 2026-10-19 請人分析）：`<信箱>:00030040@<設備>` 走信箱密碼分支，
+# Basic 帳號固定 `box`、密碼是信箱密碼；realm 的各段都不放進帳密；只送一次。
+
+def test_typed_realm_sends_box_and_the_mailbox_password_once(box):
+    box.realm = "1:00030040@192.0.2.10"
+    box.password = "0012"                                   # 數字密碼保留前導零
+    box.add_whole(1)
+    trace: list = []
+    s = _open(box, B.Creds(box_password="0012", user="clerk", password="userpw"), trace=trace)
+    assert list(s.docs) == ["1"]
+    sent = _auth_sent(box)
+    assert len({r["headers"]["authorization"] for r in sent}) == 1, "帳密只選一次"
+    raw = base64.b64decode(sent[0]["headers"]["authorization"][6:]).decode()
+    assert raw == "box:0012", "帳號固定 box；不用信箱編號、類型、設備，也不用設備帳號"
+    assert sent[0]["headers"]["authorization"][6:] not in repr(trace) and "0012" not in repr(trace), \
+        "協定紀錄不可以有 Authorization 或密碼"
+    assert s.dav.auth.summary()["realm_types"] == ["0003", "0040"]
+
+
+def test_typed_realm_wrong_password_is_sent_once_and_stops(box):
+    box.realm = "1:00030040@192.0.2.10"
+    with pytest.raises(B.BoxError) as e:
+        _open(box, B.Creds(box_password="9999", user="clerk", password="userpw"))
+    assert e.value.code == "AUTH_FAILED" and len(_auth_sent(box)) == 1, "不換格式、不改用設備帳號重試"
+    assert "鎖定" in B.MESSAGES["AUTH_FAILED"] and "帳號或密碼不對" not in B.MESSAGES["AUTH_FAILED"], \
+        "401 不一定是密碼錯，不可以一律說成密碼錯"
+
+
+def test_typed_realm_asks_for_the_mailbox_password_first(box):
+    box.realm = "1:00030040@192.0.2.10"
+    with pytest.raises(B.BoxError) as e:
+        _open(box, B.Creds(user="clerk", password="userpw"))
+    assert e.value.code == "AUTH_REQUIRED_BOX" and not _auth_sent(box), "設備帳密不可以拿去當信箱密碼"
+    assert e.value.detail["realm_types"] == ["0003", "0040"]
+
+
+@pytest.mark.parametrize("realm,why", [("96:00030040@192.0.2.10", "realm 的信箱編號跟選的信箱不同"),
+                                       ("1:00030080@192.0.2.10", "沒有對應過的類型組合"),
+                                       ("1:0040@192.0.2.10", "只有一個類型，沒有確認過")])
+def test_typed_realms_that_are_not_confirmed_are_not_guessed(box, realm, why):
+    box.realm = realm
+    with pytest.raises(B.BoxError) as e:
+        _open(box, B.Creds(box_password="1234", user="u", password="p"))
+    assert e.value.code == "AUTH_MODE_UNSUPPORTED" and not _auth_sent(box), why
+    assert e.value.detail["challenges"][0]["realm_types"], "認證類型要留在細節裡（實機對照用）"
+
+
+def test_typed_realm_non_ascii_password_is_not_sent(box):
+    box.realm = "1:00030040@192.0.2.10"
+    with pytest.raises(B.BoxError) as e:
+        _open(box, B.Creds(box_password="密碼12"))
+    assert e.value.code == "AUTH_PASSWORD_ENCODING_UNCONFIRMED" and not _auth_sent(box)
+    assert e.value.code in B.FATAL
 
 
 @pytest.mark.parametrize("realm,scheme", [("Apeos C5571", "basic"), ("box-1", "negotiate")])
@@ -702,3 +779,39 @@ def test_other_brands_keep_the_generic_webdav_request():
     body, ctype, extra = mfp_share._CanonDav("h", "127.0.0.1", "http", 80, trust_sha256=None, allow_http=True,
                                              trace=[])._propfind_spec()
     assert b"allprop" in body and ctype == 'text/xml; charset="utf-8"' and extra == {}
+
+
+
+# --------------------------------------------------------------------- 取件並刪除（v1.17.0）
+
+def test_delete_doc_removes_only_that_document(box):
+    box.add_whole(5)
+    box.add_pages(7, {"1-1.tif": tiff_bytes(1)})
+    s = _open(box)
+    assert B.delete_doc(s, "7") == {"code": "DELETED", "status": 204}
+    assert box.requests[-1]["method"] == "DELETE" and box.requests[-1]["path"] == "/dav/box-1/7/", "有資料夾就刪資料夾"
+    assert B.delete_doc(s, "5")["code"] == "DELETED" and box.requests[-1]["path"] == "/dav/box-1/5.tif"
+    assert not box.docs
+    # 放行只限那一次：之後直接送 DELETE 照樣擋
+    with pytest.raises(ValueError):
+        s.dav.request("DELETE", "/dav/box-1/5.tif")
+
+
+@pytest.mark.parametrize("status,code", [(403, "DELETE_REFUSED"), (423, "DELETE_REFUSED"), (405, "DELETE_REFUSED")])
+def test_a_refused_delete_is_reported(box, status, code):
+    box.add_whole(5)
+    box.delete_status = status
+    s = _open(box)
+    assert B.delete_doc(s, "5") == {"code": code, "status": status}
+    assert "5" in box.docs
+
+
+def test_delete_is_only_for_fujifilm_mailboxes(box):
+    from app.core import mfp_share
+    box.add_whole(5)
+    s = _open(box)
+    s.dav = mfp_share._CanonDav("127.0.0.1", "127.0.0.1", "http", box.port, trust_sha256=None, allow_http=True,
+                                trace=[])
+    with pytest.raises(B.BoxError):
+        B.delete_doc(s, "5")
+    assert not [r for r in box.requests if r["method"] == "DELETE"]

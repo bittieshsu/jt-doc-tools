@@ -127,7 +127,13 @@
 .mf-scan-state.error { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
 .mf-scan-state .mf-actions { margin:8px 0 0; }
 /* 機內信箱取件：一次只問需要的東西（使用者 2026-10-14：「越簡單越易懂越好」） */
-.mf-box-form { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto; gap:10px; align-items:end; }
+/* 一列排完：連線方式（有兩組才出現）、信箱編號（窄）、信箱密碼、列出文件（客戶實機截圖 2026-10-19：按鈕被擠到下一列、編號欄太寬） */
+.mf-box-form { display:grid; grid-template-columns:auto minmax(100px,150px) minmax(180px,320px) auto; gap:10px; align-items:end; justify-content:start; }
+#mfShareForm { display:flex; flex-wrap:wrap; }
+#mfShareForm > div { flex:0 0 auto; width:240px; }
+#mfShareForm .jt-select-wrap { width:100%; }
+#mfShareForm > div:last-child { width:auto; }
+#mfShareForm label { white-space:nowrap; }
 .mf-box-form label, .mf-box-login label { display:block; font-size:13px; color:#475569; margin-bottom:4px; }
 .mf-box-form input, .mf-box-login input { width:100%; box-sizing:border-box; height:36px; padding:0 10px;
   border:1px solid #cbd5e1; border-radius:6px; font-size:14px; }
@@ -144,6 +150,10 @@
 .mf-box-head strong { font-size:14px; }
 .mf-docs td:first-child, .mf-docs th:first-child { width:28px; }
 .mf-docs input[type=checkbox] { width:16px; height:16px; }
+/* 日期、頁數、大小照內容收窄，空間留給名稱；數字靠右 */
+.mf-docs th.mf-col-date, .mf-docs td.mf-col-date { width:1%; white-space:nowrap; }
+.mf-docs th.mf-col-num, .mf-docs td.mf-col-num { width:1%; white-space:nowrap; text-align:right; padding-left:24px; }
+.mf-box-go-note { margin:6px 0 0; font-size:12.5px; color:#991b1b; }
 .mf-docs tr.picked td { background:#eef2ff; }
 .mf-box-go { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin-top:10px; }
 .mf-box-go > div { min-width:220px; }
@@ -159,6 +169,8 @@
 .mf-tech summary { cursor:pointer; font-size:12.5px; color:#64748b; }
 @media (max-width: 720px) {
   .mf-box-form, .mf-box-login { grid-template-columns:1fr; }
+  #mfShareForm > div { width:100%; }
+  #mfShareForm label { white-space:normal; }
 }
 /* 檔案分享取件 */
 .mf-crumbs { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:13.5px; margin:10px 0 6px; }
@@ -242,7 +254,7 @@
 <p class="muted">{{ tr('從事務機掃描，或取回機內信箱裡的文件，存進工作區後接續 OCR、轉檔與 AI 處理。') }}</p>
 
 {# 一句話一個 tr()：譯文裡找 eSCL，按鈕接在那個字（含黏在後面的「-capable」）後面；三種語言的譯文都有 eSCL #}
-{% set _note = tr('試用中：可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件、Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA、RICOH 的直接取件是實驗功能，還沒在實機上驗證過。') %}
+{% set _note = tr('試用中：可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件已在 Apeos C5571 實機驗證；Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA、RICOH 的直接取件是實驗功能，還沒在實機上驗證過。') %}
 <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{% if 'eSCL' in _note %}{% set _head, _tail = _note.split('eSCL', 1) %}{% set _glued, _rest = (_tail ~ ' ').split(' ', 1) %}{{ _head }}eSCL{{ _glued }}{{ escl_help() }} {{ _rest|trim }}{% else %}{{ _note }}{% endif %}</span></div>
 {% endif %}
 
@@ -370,7 +382,7 @@
     <h2 id="mfBoxTitle" class="mf-scan-title"></h2>
     <button type="button" class="btn btn-secondary btn-small" id="mfBoxClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
   </div>
-  <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依據原廠工具與技術資料分析，尚待實機驗證。程式只發送列出與下載請求；若信箱設定為取件後刪除，設備仍可能刪除原件。') }}</span></div>
+  <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依據原廠工具與技術資料分析寫成。「取件」只讀取，不改動事務機；「取件並刪除」在檔案存好之後才刪除事務機上的原件。若信箱設定為取件後刪除，設備仍可能自己刪除原件。') }}</span></div>
   <form id="mfBoxForm" class="mf-box-form" autocomplete="off">
     <div id="mfBoxTargetWrap" hidden>
       <label for="mfBoxTarget">{{ tr('連線方式') }}</label>
@@ -406,8 +418,10 @@
           <option value="pdf">{{ tr('PDF（建議）') }}</option>
           <option value="original">{{ tr('原始檔（事務機給的 TIFF / JPEG）') }}</option>
         </select></div>
+      <button type="button" class="btn btn-danger" id="mfBoxFetchDelBtn" disabled>{{ icon('trash', size=14) }} <span id="mfBoxFetchDelLabel">{{ tr('取件並刪除') }}</span></button>
       <button type="button" class="btn btn-primary" id="mfBoxFetchBtn" disabled>{{ icon('download', size=14) }} <span id="mfBoxFetchLabel">{{ tr('取件') }}</span></button>
     </div>
+    <p class="mf-box-go-note">{{ tr('「取件並刪除」：確認檔案都已存好之後，才會刪除事務機上的原件；沒存好的那份不會刪（實驗功能）。') }}</p>
     <p class="mf-hint">{{ tr('取好的檔案會存進你的工作區。同一台事務機一次只服務一個人，其他人會自動排隊。') }}</p>
   </div>
   <div id="mfBoxState" class="mf-scan-state" hidden></div>
@@ -426,6 +440,20 @@
       <label for="mfShareRoute">{{ tr('連線方式') }}</label>
       <select id="mfShareRoute" class="jt-select"></select>
     </div>
+    <div id="mfShareModeWrap" hidden>
+      <label for="mfShareMode">{{ tr('登入方式') }}</label>
+      <select id="mfShareMode" class="jt-select">
+        <option value="auto">{{ tr('自動判斷') }}</option>
+        <option value="none">{{ tr('不需登入') }}</option>
+        <option value="account">{{ tr('帳號密碼') }}</option>
+        <option value="user_code">User Code</option>
+        <option value="user_code_ext">{{ tr('User Code（延伸）') }}</option>
+      </select>
+    </div>
+    <div id="mfShareCodeWrap" hidden>
+      <label for="mfShareCode">User Code</label>
+      <input id="mfShareCode" type="password" inputmode="numeric" maxlength="32" autocomplete="off">
+    </div>
     <div id="mfShareUserWrap">
       <label for="mfShareUser">{{ tr('帳號（沒有設認證就留空）') }}</label>
       <input id="mfShareUser" maxlength="256" autocomplete="off" spellcheck="false">
@@ -434,7 +462,7 @@
       <label for="mfShareBox">{{ tr('信箱編號') }}</label>
       <input id="mfShareBox" type="number" min="1" max="999999999" inputmode="numeric">
     </div>
-    <div>
+    <div id="mfSharePwWrap">
       <label for="mfSharePw" id="mfSharePwLabel">{{ tr('密碼') }}</label>
       <input id="mfSharePw" type="password" maxlength="256" autocomplete="off">
     </div>
@@ -446,6 +474,7 @@
       <button type="submit" class="btn btn-primary" id="mfShareListBtn">{{ icon('search', size=14) }} <span>{{ tr('列出檔案') }}</span></button>
     </div>
   </form>
+  <div id="mfShareModeHint" class="mf-hint" hidden>{{ tr('取得到的是事務機「文件伺服器」裡的文件（掃描時選「儲存檔案」）；掃描至電子郵件或資料夾的不會留在事務機上。面板上沒有登入畫面的事務機，通常選「不需登入」；有登入畫面的選「帳號密碼」，用 User Code 的選「User Code」。登入只送一次，不會換方式重試。') }}</div>
   <div id="mfShareConfirm" class="mf-confirm" hidden></div>
   <div id="mfShareError" class="mf-err" hidden></div>
   <div id="mfShareFiles" hidden>
@@ -496,7 +525,7 @@
     follow: tr('跟隨轉址'), budget: tr('時間預算'), escl: tr('掃描介面（eSCL）'),
   };
   const STATUS_CLASS = {
-    supported: 'good', first_batch_unverified: 'info', same_vendor_unverified: 'warn',
+    supported: 'good', supported_same_series: 'good', first_batch_unverified: 'info', same_vendor_unverified: 'warn',
     experimental_vendor: 'info', unsupported_vendor: 'bad', login_required: 'warn', unknown: 'warn', unreachable: 'bad',
   };
   const EVIDENCE_WHAT = { vendor: tr('廠牌'), model: tr('型號'), ui: tr('網頁介面名稱'), firmware: tr('韌體（可能）') };
@@ -592,7 +621,11 @@
       tr_.append(el('th', null, KEY_LABELS[k] || k));
       let val = v;
       if (typeof v === 'boolean') val = yesNo(v);
-      else if (Array.isArray(v)) val = v.join(', ');
+      // 物件陣列（例如認證挑戰 `[{scheme, params: {realm}}]`）要整理成字，不然是「[object Object]」（客戶實機 2026-10-19）
+      else if (Array.isArray(v)) val = v.map(x => (x && typeof x === 'object')
+        ? (x.scheme ? x.scheme + ((x.realm || (x.params || {}).realm) ? ' realm=' + (x.realm || x.params.realm) : '')
+                    : JSON.stringify(x))
+        : String(x)).join(P.sep);
       else if (typeof v === 'object') val = JSON.stringify(v);
       tr_.append(el('td', null, val));
       t.append(tr_);
@@ -997,7 +1030,8 @@
   const COLOR_NAMES = { color: tr('彩色'), gray: tr('灰階'), bw: tr('黑白') };
   const PAPER_NAMES = { a4: 'A4', letter: 'Letter', max: tr('最大範圍') };
   const PHASE_NAMES = { queued: tr('排隊中'), checking: tr('檢查事務機狀態'), scanning: tr('掃描中'),
-                        merging: tr('合成 PDF'), saving: tr('存進工作區'), downloading: tr('取件中') };
+                        merging: tr('合成 PDF'), saving: tr('存進工作區'), downloading: tr('取件中'),
+                        deleting: tr('刪除事務機上的原件') };
   const OUTPUT_NAMES = { pdf: 'PDF', jpeg: tr('JPEG（每頁一個檔）') };
   let scanConn = null;
   let scanTimer = null;
@@ -1406,6 +1440,8 @@
     const n = boxEl('mfBoxTable').querySelectorAll('input[data-doc]:checked').length;
     boxEl('mfBoxFetchBtn').disabled = n === 0;
     boxEl('mfBoxFetchLabel').textContent = n ? tr('取件（{0} 份）').replace('{0}', n) : tr('取件');
+    boxEl('mfBoxFetchDelBtn').disabled = n === 0;
+    boxEl('mfBoxFetchDelLabel').textContent = n ? tr('取件並刪除（{0} 份）').replace('{0}', n) : tr('取件並刪除');
     boxEl('mfBoxTable').querySelectorAll('tr[data-row]').forEach(tr_ => {
       tr_.classList.toggle('picked', !!tr_.querySelector('input:checked'));
     });
@@ -1433,7 +1469,8 @@
         syncFetchBtn();
       });
       const th0 = el('th'); th0.append(all); hd.append(th0);
-      for (const h of [tr('名稱'), tr('日期'), tr('頁數'), tr('大小')]) hd.append(el('th', null, h));
+      hd.append(el('th', null, tr('名稱')), el('th', 'mf-col-date', tr('日期')), el('th', 'mf-col-num', tr('頁數')),
+                el('th', 'mf-col-num', tr('大小')));
       const thead = el('thead'); thead.append(hd); t.append(thead);
       const tb = el('tbody');
       for (const d of boxDocs) {
@@ -1447,8 +1484,9 @@
         const nm = el('td', null, d.name || (tr('文件') + ' ' + d.id));
         nm.dataset.i18n = 'skip';
         if (d.format) nm.append(el('span', 'mf-sub', d.format + (d.compression ? ' · ' + d.compression : '')));
-        r.append(nm, el('td', null, d.modified ? fmtTime(d.modified) : '—'), el('td', null, d.pages == null ? '—' : String(d.pages)),
-                 el('td', null, bytesText(d.size) || '—'));
+        r.append(nm, el('td', 'mf-col-date', d.modified ? fmtTime(d.modified) : '—'),
+                 el('td', 'mf-col-num', d.pages == null ? '—' : String(d.pages)),
+                 el('td', 'mf-col-num', bytesText(d.size) || '—'));
         r.addEventListener('click', (e) => {
           if (e.target.tagName !== 'INPUT') { cb.checked = !cb.checked; syncFetchBtn(); }
         });
@@ -1474,24 +1512,31 @@
     showTrace(res.trace);
     renderDocs(res);
   }
-  async function boxFetch() {
+  async function boxFetch(withDelete) {
     if (!boxConn) return;
+    withDelete = withDelete === true;
     const ids = [...boxEl('mfBoxTable').querySelectorAll('input[data-doc]:checked')].map(cb => cb.dataset.doc);
     if (!ids.length) return;
     const picked = boxDocs.filter(d => ids.includes(String(d.id)));
     let confirmDag = false;
-    if ((boxInfo && boxInfo.delete_after_get === true) || picked.some(d => d.delete_after_get === true)) {
+    if (withDelete) {
+      // 取件並刪除：明講會刪什麼、什麼時候刪
+      if (!(await window.showConfirm(tr('取件後會刪除事務機上這 {0} 份原件：確認檔案都已存好之後才刪，沒存好的那份不會刪。確定要取件並刪除嗎？')
+          .replace('{0}', ids.length), { kind: 'danger', okText: tr('取件並刪除') }))) return;
+      confirmDag = true;
+    } else if ((boxInfo && boxInfo.delete_after_get === true) || picked.some(d => d.delete_after_get === true)) {
       if (!(await window.showConfirm(tr('這個信箱設定成「取件後刪除」：取件後事務機可能會刪掉原件。確定要取件嗎？'),
                                      { kind: 'danger', okText: tr('取件') }))) return;
       confirmDag = true;
     }
-    const btn = boxEl('mfBoxFetchBtn');
+    const btn = boxEl(withDelete ? 'mfBoxFetchDelBtn' : 'mfBoxFetchBtn');
     boxEl('mfBoxError').hidden = true;
     busy(btn, true, tr('送出中…'));
     const res = await api('POST', '/connections/' + boxConn.id + '/box/fetch', boxBody({
-      documents: ids, output: boxEl('mfBoxOutput').value || 'pdf', confirm_delete_after_get: confirmDag }));
+      documents: ids, output: boxEl('mfBoxOutput').value || 'pdf', confirm_delete_after_get: confirmDag,
+      delete_after: withDelete }));
     busy(btn, false);
-    if (!res.ok) { handleBoxError(res, boxFetch); return; }
+    if (!res.ok) { handleBoxError(res, () => boxFetch(withDelete)); return; }
     watchScan(res.scan.id, 'mfBoxState');
     loadScans();
   }
@@ -1499,7 +1544,8 @@
     if (window.enhanceJtSelects) window.enhanceJtSelects(boxPanel);
     boxEl('mfBoxForm').addEventListener('submit', (e) => { e.preventDefault(); boxList(); });
     boxEl('mfBoxRefresh').addEventListener('click', boxList);
-    boxEl('mfBoxFetchBtn').addEventListener('click', boxFetch);
+    boxEl('mfBoxFetchBtn').addEventListener('click', () => boxFetch(false));
+    boxEl('mfBoxFetchDelBtn').addEventListener('click', () => boxFetch(true));
     boxEl('mfBoxClose').addEventListener('click', () => {
       boxPanel.hidden = true;
       boxEl('mfBoxPw').value = '';          // 收合就清掉密碼
@@ -1525,11 +1571,18 @@
   }
   function shareIsBox() { return shareState.route === 'konica_smb'; }
   function shareSoap() { return SOAP_ROUTES[shareState.route] || ''; }
+  function shareMode() { return shareSoap() === 'ricoh' ? (boxEl('mfShareMode').value || 'auto') : 'auto'; }
   function syncShareFields() {
     const isBox = shareIsBox();
     const soap = shareSoap();
+    const mode = shareMode();
+    const noAccount = mode === 'none' || mode.startsWith('user_code');
+    boxEl('mfShareModeWrap').hidden = soap !== 'ricoh';
+    boxEl('mfShareModeHint').hidden = soap !== 'ricoh';
+    boxEl('mfShareCodeWrap').hidden = !mode.startsWith('user_code');
+    boxEl('mfSharePwWrap').hidden = noAccount;
     boxEl('mfShareBoxWrap').hidden = !isBox;
-    boxEl('mfShareUserWrap').hidden = isBox;
+    boxEl('mfShareUserWrap').hidden = isBox || noAccount;
     boxEl('mfSharePwLabel').textContent = isBox ? tr('信箱密碼（沒有設就留空）') : tr('密碼');
     boxEl('mfShareExtraWrap').hidden = !soap;
     boxEl('mfShareExtraLabel').textContent = soap === 'kyocera' ? tr('文件匣密碼（沒有設就留空）')
@@ -1549,6 +1602,9 @@
     boxEl('mfShareBox').value = pr.box || '';
     boxEl('mfSharePw').value = '';
     boxEl('mfShareExtra').value = '';
+    boxEl('mfShareCode').value = '';
+    boxEl('mfShareMode').value = ['auto', 'none', 'account', 'user_code', 'user_code_ext'].includes(pr.mode) ? pr.mode : 'auto';
+    if (boxEl('mfShareMode')._jtSelect) boxEl('mfShareMode')._jtSelect.refresh();
     syncShareFields();
     for (const id of ['mfShareConfirm', 'mfShareError', 'mfShareFiles', 'mfShareState', 'mfShareTech']) boxEl(id).hidden = true;
     sharePanel.hidden = false;
@@ -1556,11 +1612,15 @@
   }
   function shareBody(extra) {
     const pr = sharePrefs(shareConn);
+    const mode = shareMode();
+    const noAccount = mode === 'none' || mode.startsWith('user_code');
     return Object.assign({
       route: shareState.route,
-      user: shareIsBox() ? '' : boxEl('mfShareUser').value.trim(),
+      user: shareIsBox() || noAccount ? '' : boxEl('mfShareUser').value.trim(),
       box: shareIsBox() ? boxEl('mfShareBox').value.trim() : '',
-      password: shareIsBox() ? '' : boxEl('mfSharePw').value,
+      password: shareIsBox() || noAccount ? '' : boxEl('mfSharePw').value,
+      auth_mode: mode,
+      user_code: mode.startsWith('user_code') ? boxEl('mfShareCode').value.trim() : '',
       box_password: shareIsBox() ? boxEl('mfSharePw').value : (shareSoap() ? boxEl('mfShareExtra').value : ''),
       trust_sha256: pr.trust || null,
       allow_http: pr.http === true,
@@ -1588,7 +1648,12 @@
         tr('繼續'), () => { saveSharePrefs(shareConn, smb ? { plain: true } : { http: true }); retry(); }, 'mfShareConfirm');
       return;
     }
-    if (res.code === 'AUTH_REQUIRED_USER') boxEl('mfShareUser').focus();
+    if (res.code === 'AUTH_REQUIRED_USER' && !boxEl('mfShareUserWrap').hidden) boxEl('mfShareUser').focus();
+    if (res.code === 'RICOH_AUTH_MODE_REQUIRED' || res.code === 'RICOH_AUTH_MODE_MISMATCH') {
+      const m = boxEl('mfShareMode');
+      (m._jtSelect && m._jtSelect.trigger ? m._jtSelect.trigger : m).focus();
+    }
+    if (res.code === 'RICOH_USER_CODE_REQUIRED') boxEl('mfShareCode').focus();
     showError(boxEl('mfShareError'), res);
   }
   function syncShareFetch() {
@@ -1668,7 +1733,7 @@
     busy(btn, false);
     if (!res.ok) { handleShareError(res, () => shareList(path)); return; }
     saveSharePrefs(shareConn, { route: shareState.route, user: shareIsBox() ? '' : boxEl('mfShareUser').value.trim(),
-                                box: shareIsBox() ? boxEl('mfShareBox').value.trim() : '' });
+                                box: shareIsBox() ? boxEl('mfShareBox').value.trim() : '', mode: shareMode() });
     showTrace(res.trace, 'mfShare');
     renderShare(res);
   }
@@ -1695,6 +1760,7 @@
       syncShareFields();
       boxEl('mfShareFiles').hidden = true;
     });
+    boxEl('mfShareMode').addEventListener('change', () => { syncShareFields(); boxEl('mfShareFiles').hidden = true; });
     boxEl('mfShareRoot').addEventListener('change', () => {
       shareState.root = boxEl('mfShareRoot').value;
       shareList([]);

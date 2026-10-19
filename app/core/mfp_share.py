@@ -14,7 +14,7 @@ v1.16.95 加 KYOCERA / RICOH 的直接取件（SOAP，`mfp_soap`）：依據是�
 **不是原廠公開的介面**，也沒有實機樣本；一樣標實驗功能。
 
 | `kyocera_soap` / `kyocera_soap_http` | KYOCERA（TASKalfa / ECOSYS） | KM-WSDL，HTTPS 9091 / HTTP 9090 | 機內文件匣（匯出 TIFF） | 設備的使用者帳密；文件匣密碼另填 |
-| `ricoh_soap` | RICOH（IM / MP） | `/DH/repository`，連線測試連得上的那組協定與連接埠 | 文件伺服器的文件（原始格式） | 設備的使用者帳密（換票證）；文件密碼另填 |
+| `ricoh_soap` | RICOH（IM / MP） | `/DH/repository`，連線測試連得上的那組協定與連接埠 | 文件伺服器的文件（原始格式） | 登入方式（自動 / 不需登入 / 帳號密碼 / User Code）；帳號密碼走票證或 `startSession`；文件密碼另填 |
 
 **共享區一律標「共享」**（Canon `share`、Konica 公用信箱、SHARP 的分享）：那是設備本來就讓多人看的地方，不當成個人文件。
 
@@ -528,7 +528,8 @@ def display_name(sess: Session, root: str, path: list[str]) -> str:
 
 def open_session(route: str, *, host: str, ip: str, scheme: Optional[str], port: Optional[int], user: str,
                  password: str, box: Optional[str], box_password: str, trust_sha256: Optional[str],
-                 allow_http: bool, allow_plain: bool, trace: list) -> Session:
+                 allow_http: bool, allow_plain: bool, trace: list, auth_mode: str = "auto",
+                 user_code: str = "") -> Session:
     """開一個取件連線（認證只送一次）。路線與廠牌是否相符由呼叫端（路由）先檢查。"""
     if route not in ROUTES:
         raise ShareError("SHARE_ROUTE_INVALID")
@@ -547,7 +548,8 @@ def open_session(route: str, *, host: str, ip: str, scheme: Optional[str], port:
         mfp_box._check_target(ip, scheme, int(port))
         return mfp_soap.RicohSession(route, host, ip, scheme, int(port), user=user, password=password,
                                      doc_password=box_password, trust_sha256=trust_sha256,
-                                     allow_http=allow_http, trace=trace)
+                                     allow_http=allow_http, trace=trace, auth_mode=auth_mode or "auto",
+                                     user_code=user_code)
     if spec["transport"] == "webdav":
         if not scheme or not port:
             raise ShareError("BOX_NO_TARGET")

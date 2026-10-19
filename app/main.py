@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.16.99"
+VERSION = "1.17.0"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -964,6 +964,15 @@ def _sidebar_theme() -> str:
 
 templates.env.globals["brand_logo"] = _brand_logo
 templates.env.globals["sidebar_theme"] = _sidebar_theme
+
+
+def _hero_style() -> dict:
+    """Jinja global：首頁 Logo 光暈與標題文字的顏色（固定常數，見 `branding.HERO_GLOWS`）。"""
+    from .core import branding as _branding
+    return _branding.hero_style()
+
+
+templates.env.globals["hero_style"] = _hero_style
 
 
 # ---- Friendly HTML error pages for 401/403/404 (browser navigations only) ----
@@ -1918,6 +1927,8 @@ async def api_my_notify(request: Request):
         # UI 要據此指路，不然使用者只會看到「沒有信箱」而不知道去哪設定。
         "email_editable": (getattr(request.state, "user", None) or {}
                            ).get("source") == "local",
+        # Zulip 私訊 Bot 綁定：要登入（有帳號）才能綁
+        "zulip_link_available": "zulip" in avail and _zulip_link_key(request) is not None,
     }
 
 
@@ -1930,6 +1941,97 @@ async def api_my_notify_save(request: Request):
     body = await request.json()
     # 使用者只能改自己的偏好；管道憑證在 admin 那層，這裡碰不到
     return {"ok": True, "prefs": _ns.save_prefs(_notify_key(request), body)}
+
+
+# ---- Zulip 私訊 Bot 綁定（v1.17.0，Zulip 維護人員建議的方案；流程見 core/zulip_link.py）
+
+def _zulip_link_key(request: Request):
+    """綁定只給登入的人（`u<id>`）；未啟用登入時沒有「帳號」可以綁。"""
+    scope = _job_scope(request)
+    if scope["mode"] != "user" or scope["owner_id"] is None:
+        return None
+    return _notify_key(request)
+
+
+def _zulip_link_err(e) -> JSONResponse:
+    status = {"LOGIN_REQUIRED": 401, "ZULIP_NOT_READY": 409, "TOO_MANY_CODES": 429,
+              "CODE_INVALID": 410, "NOT_YET": 409}.get(e.code, 502)
+    return JSONResponse({"ok": False, "code": e.code, "error": e.message}, status_code=status)
+
+
+def _zulip_audit(request: Request, event: str, details: dict) -> None:
+    from .core import audit_db
+    from .core.client_ip import real_client_ip
+    from .core.sessions import user_label
+    audit_db.log_event(event, username=user_label(getattr(request.state, "user", None)), ip=real_client_ip(request), target="zulip",
+                       details=details)            # 代碼不進稽核
+
+
+@app.get("/api/my/zulip-link")
+async def api_my_zulip_link(request: Request):
+    """我的 Zulip 綁定狀態：已綁定的帳號、進行中的綁定（代碼、到期時間、等待確認的 Zulip 帳號）。"""
+    from .core import zulip_link as _zl
+    key = _zulip_link_key(request)
+    if key is None:
+        return JSONResponse({"ok": False, "code": "LOGIN_REQUIRED", "error": "要登入才能綁定 Zulip"}, status_code=401)
+    return {"ok": True, **_zl.status(key)}
+
+
+@app.post("/api/my/zulip-link/start")
+async def api_my_zulip_link_start(request: Request):
+    """產生一次性綁定代碼（10 分鐘有效）。使用者把它私訊給通知 Bot。"""
+    import asyncio as _asyncio
+    from .core import zulip_link as _zl
+    key = _zulip_link_key(request)
+    if key is None:
+        return JSONResponse({"ok": False, "code": "LOGIN_REQUIRED", "error": "要登入才能綁定 Zulip"}, status_code=401)
+    try:
+        res = await _asyncio.to_thread(_zl.start, key)
+    except _zl.LinkError as e:
+        return _zulip_link_err(e)
+    _zulip_audit(request, "zulip_link_start", {})
+    return {"ok": True, **res}
+
+
+@app.post("/api/my/zulip-link/confirm")
+async def api_my_zulip_link_confirm(request: Request):
+    """確認綁定「即將綁定」的那個 Zulip 帳號（body：`{"code": "..."}`）。"""
+    from .core import zulip_link as _zl
+    key = _zulip_link_key(request)
+    if key is None:
+        return JSONResponse({"ok": False, "code": "LOGIN_REQUIRED", "error": "要登入才能綁定 Zulip"}, status_code=401)
+    body = await request.json() if await request.body() else {}
+    try:
+        res = _zl.confirm(key, str(body.get("code") or "")[:40])
+    except _zl.LinkError as e:
+        return _zulip_link_err(e)
+    _zulip_audit(request, "zulip_link_confirm", {"zulip_user_id": res["user_id"]})
+    return {"ok": True, "linked": res}
+
+
+@app.post("/api/my/zulip-link/cancel")
+async def api_my_zulip_link_cancel(request: Request):
+    from .core import zulip_link as _zl
+    key = _zulip_link_key(request)
+    if key is None:
+        return JSONResponse({"ok": False, "code": "LOGIN_REQUIRED", "error": "要登入才能綁定 Zulip"}, status_code=401)
+    _zl.cancel(key)
+    return {"ok": True}
+
+
+@app.delete("/api/my/zulip-link")
+async def api_my_zulip_link_delete(request: Request):
+    """解除綁定（之後的通知回到用 email 私訊）。"""
+    from .core import notify_settings as _ns, zulip_link as _zl
+    key = _zulip_link_key(request)
+    if key is None:
+        return JSONResponse({"ok": False, "code": "LOGIN_REQUIRED", "error": "要登入才能綁定 Zulip"}, status_code=401)
+    old = _ns.get_zulip_link(key)
+    _zl.cancel(key)
+    _ns.save_zulip_link(key, None)
+    if old:
+        _zulip_audit(request, "zulip_link_remove", {"zulip_user_id": old.get("user_id")})
+    return {"ok": True}
 
 
 def _safe_view_url(v) -> str:

@@ -741,7 +741,10 @@ async def api_box_fetch(request: Request, conn_id: int):
                                  doc_ids=[str(d) for d in docs][:mfp_box.MAX_DOCS_PER_JOB + 1],
                                  output=str(body.get("output") or "pdf"), trust_sha256=trust,
                                  allow_http=allow_http,
-                                 confirm_delete_after_get=body.get("confirm_delete_after_get") is True)
+                                 # 「取件並刪除」本身就是使用者要刪 —— 信箱的取件後刪除設定不用另外確認
+                                 confirm_delete_after_get=(body.get("confirm_delete_after_get") is True
+                                                           or body.get("delete_after") is True),
+                                 delete_after=body.get("delete_after") is True)
     except mfp_client.PolicyError as e:
         return _policy_error(e)
     except mfp_queue.QueueError as e:
@@ -749,6 +752,7 @@ async def api_box_fetch(request: Request, conn_id: int):
     except mfp_box.BoxError as e:
         return _box_error(e)
     _audit(request, "mfp_box_fetch", c["host"], {"id": conn_id, "scan": rec["id"], "box": box,
+                                                 "delete_after": bool(rec["settings"].get("delete_after")),
                                                  "documents": [str(d) for d in docs][:20],
                                                  "output": rec["settings"].get("output"),
                                                  "shared": bool(c.get("shared"))})
@@ -768,12 +772,18 @@ def _share_conn(who: _Who, conn_id: int, route: str) -> tuple[Optional[dict], Op
     return c, None
 
 
+_RICOH_MODES = ("auto", "none", "account", "user_code", "user_code_ext")
+
+
 def _share_inputs(body: dict) -> dict:
     fp = str(body.get("trust_sha256") or "").replace(":", "").strip().lower()
     return {"user": str(body.get("user") or "")[:256], "password": str(body.get("password") or "")[:256],
             "box": str(body.get("box") or "").strip()[:9], "box_password": str(body.get("box_password") or "")[:128],
             "trust_sha256": fp if _FP_RE.match(fp) else None, "allow_http": body.get("allow_http") is True,
-            "allow_plain": body.get("allow_plain") is True}
+            "allow_plain": body.get("allow_plain") is True,
+            # RICOH 的登入方式與 User Code（v1.17.0）；其他路線不用
+            "auth_mode": mode if (mode := str(body.get("auth_mode") or "auto")) in _RICOH_MODES else "invalid",
+            "user_code": str(body.get("user_code") or "")[:32]}
 
 
 def _share_target(c: dict, route: str, want: Any) -> tuple[Optional[str], Optional[int]]:
@@ -791,7 +801,8 @@ def _share_list_in_turn(owner: str, c: dict, route: str, sc, pt, inp: dict, root
         sess = mfp_share.open_session(route, host=c["host"], ip=device, scheme=sc, port=pt, user=inp["user"],
                                       password=inp["password"], box=inp["box"], box_password=inp["box_password"],
                                       trust_sha256=inp["trust_sha256"], allow_http=inp["allow_http"],
-                                      allow_plain=inp["allow_plain"], trace=trace)
+                                      allow_plain=inp["allow_plain"], trace=trace, auth_mode=inp["auth_mode"],
+                                      user_code=inp["user_code"])
         try:
             if mfp_share.ROUTES[route]["auth"] == "box":
                 root = mfp_share.konica_box_share(sess, inp["box"])
@@ -871,7 +882,8 @@ async def api_share_fetch(request: Request, conn_id: int):
                                    device=device, ip=device, route=route, scheme=sc, port=pt,
                                    root=str(body.get("root") or ""), files=body.get("files"),
                                    output=str(body.get("output") or "pdf"),
-                                   creds={k: inp[k] for k in ("user", "password", "box", "box_password")},
+                                   creds={k: inp[k] for k in ("user", "password", "box", "box_password",
+                                                              "auth_mode", "user_code")},
                                    trust_sha256=inp["trust_sha256"], allow_http=inp["allow_http"],
                                    allow_plain=inp["allow_plain"])
     except mfp_client.PolicyError as e:

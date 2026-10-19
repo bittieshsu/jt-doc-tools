@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **491 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **496 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -696,6 +696,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_audit_forward_framing.py` | 稽核轉送的訊框格式（外部稽核 F07，v1.15.28） |
 | `test_audit_forward_per_destination.py` | 稽核轉送：每個目的地各自一個游標、失敗不前移、不自我餵食（F08，v1.15.28） |
 | `test_audit_timezone.py` | 稽核 / 上傳記錄的時間解讀必須與畫面一致（GitHub issue #48） |
+| `test_audit_writer_follows_data_dir.py` | 稽核寫入執行緒要跟著資料目錄走（v1.17.0） |
 | `test_auditor_readonly.py` | 稽核員必須是唯讀角色 —— 而 admin 不該因為隱私規則而失去管理能力 |
 | `test_auth_db_migration_v8.py` | Regression: auth_db migration v8 (SSO sources) must NOT wipe data. |
 | `test_auth_ldap_security.py` | LDAP / AD 登入路徑資安回歸測試（審查後補） |
@@ -797,6 +798,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_glyph_text_recovery.py` | 從字形反查還原文字 —— 對付壞掉的 ToUnicode 對照表 |
 | `test_handoff_without_workspace.py` | 工具之間的「轉送」在工作區被停用時要改帶作業結果（2026-10-08 客戶回報） |
 | `test_heic_support.py` | HEIC / HEIF（iPhone 照片）要真的解得開（GitHub issue #49） |
+| `test_hero_colors.py` | 首頁 Logo 光暈與標題文字可以各自換顏色（v1.17.0） |
 | `test_history_id_validation.py` | 歷史紀錄的 id 直接從網址進來 —— 一律先驗格式再組路徑 |
 | `test_home_tool_count_is_computed.py` | 首頁那句話的工具數**要用算的**（使用者 2026-09-18 要求） |
 | `test_host_stats_container.py` | 系統狀態 CPU 在容器(LXC/Docker)內要顯示容器自己的用量，不抓宿主機 |
@@ -921,6 +923,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_migration_fk_cascade.py` | 重建資料表的 migration 一律要關掉外鍵，否則升級會**清空子表** |
 | `test_missing_office_engine_is_503.py` | 缺 Office 引擎要回 **503**，不可以回 500 |
 | `test_my_jobs_open_button_e2e.py` | 「我的作業」在**真的瀏覽器**裡：打得開的那一列才有「開啟」 |
+| `test_my_notify_zulip_browser.py` | 「我的作業 → 完成通知」的 Zulip 欄位 —— 在真的瀏覽器裡跑一次（v1.17.0） |
 | `test_nav_visibility_and_whoami.py` | Tests for v1.1.5 - v1.1.7 visibility / identity changes. |
 | `test_nested_group_permissions.py` | 巢狀群組的權限要往上繼承 |
 | `test_net_ssl_corp_tls.py` | 企業 TLS 攔截環境的 Python 端信任修正（2026-06-30 客戶回報） |
@@ -943,6 +946,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_notify_privacy.py` | 通知送出去的內容不可以外洩多餘的東西 |
 | `test_notify_settings_form.py` | 通知設定頁的兩件事：**存進去的值不可以被自動帶值蓋掉**、欄位要看得到內容 |
 | `test_notify_test_sends_real_layout.py` | 通知設定的「傳送測試」：Email 寄的是**跟作業完成通知同一個版面**的範例信 |
+| `test_notify_zulip_api.py` | Zulip 通知對一台假的 Zulip 伺服器實際走 HTTP（v1.17.0，Zulip 維護人員 2026-10-18 的要求） |
 | `test_ocr_avx2_guard.py` | 本機 EasyOCR 在缺 AVX2 的 CPU 上會 SIGILL 打掛整個服務 |
 | `test_ocr_engine_note_on_both_paths.py` | OCR 完成訊息要講出「實際用了哪個引擎、有沒有退回」—— 網頁與 API 兩條路都要 |
 | `test_ocr_first_download_message.py` | 第一次用本機 EasyOCR 時，狀態文字要說「正在下載辨識模型」 |
@@ -1159,6 +1163,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_workspace_save_button.py` | 「存至工作區」按鈕出現的條件，必須跟工作區真正收得下的格式一致 |
 | `test_workspace_thumb_pending.py` | 縮圖還沒做好時回的那張空白圖，不可以被瀏覽器快取 |
 | `test_zip_bomb_guard.py` | zip 炸彈：**每一條讀使用者 zip 的路徑都要擋得住** |
+| `test_zulip_link.py` | Zulip 私訊 Bot 綁定（v1.17.0，Zulip 維護人員 2026-10-18 建議的方案）—— 對假 Zulip 實際走 HTTP |
 
 <!-- END test-index -->
 
@@ -2033,6 +2038,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       信箱設定成「取件後刪除」時清單上方有提醒、按取件要再確認；完成後每份文件註明原件還在不在。密碼不會出現在畫面、網址、稽核、協定紀錄。
       失敗時「技術細節」列出協定紀錄（方法、路徑、狀態碼、認證方式）。（`tests/test_mfp_box.py`、`tests/test_mfp_box_jobs.py`、`tests/test_mfp_box_page_browser.py`）
 - [ ] **掃描存成 JPEG**（v1.16.89）：掃描面板「存成」可選 PDF / JPEG（設備不能出 JPEG 時只有 PDF）；JPEG 每頁一個檔，結果逐一列出開啟 / 下載；工作區停用時下載是 ZIP
+- [ ] **RICOH 不用票證的登入（只列 `basic.startSession` 的機型）**（v1.17.0，客戶 IM C3500）：先在面板用「掃描至資料夾 → 儲存檔案」存一份到文件伺服器；取件面板「登入方式」選「不需登入」按一次列出檔案，協定紀錄要看到 `login_mode` 為 `none`、`startSession` 只送一次；文件在「共用資料夾」時看 `deep_search` 有沒有找到；下載走 `getDocContentUrl2`，存成 PDF 頁數對（`tests/test_mfp_soap.py`、`tests/test_mfp_soap_page_browser.py`）
+- [ ] **有密碼的信箱、帶認證類型的 realm（`<信箱>:00030040@<設備>`）**（v1.17.0，客戶實機回報）：輸入已知正確的信箱密碼按一次列出文件；協定紀錄要看到 `realm_types` 為 `0003`、`0040`、只送一次帳密、沒有 Authorization 或密碼；成功列出文件就記下狀態碼與列檔結果。錯的密碼只送一次就停（`tests/test_mfp_box.py` 的 typed realm 測試）
 - [ ] **實機驗證信箱取件（拿到設備後）**：同一台用原廠 NSU3 對照；把協定紀錄與 `docs-share/mfp-fetch/codex-handoff-20261014/` 的待確認清單逐條核對（信箱路徑、realm 對應、Depth、頁檔兩個數字的意思、取件後原件是否保留），通過才拿掉「實驗功能」
 - [ ] **使用設定**（v1.16.89）：設定 → 共用事務機最上面「允許使用者自行新增事務機」預設勾著；取消勾選 → 一般使用者的工具頁不再有「新增事務機」、改成說明只能用共用事務機；自己以前新增的標「已暫停」，只剩詳細、改名、移除；直接打 API 回 403（`USER_DEVICES_DISABLED`）；共用事務機照常；管理員不受影響；重新勾回去就恢復；稽核有 `mfp_settings_update`；設定備份的「事務機掃描取件」分類包含它（`tests/test_mfp_settings.py`）
 - [ ] **改名**（v1.16.89）：工具名稱、側欄、搜尋（打「事務機取件」也找得到）、英日文都是新名稱；網址與權限不變
@@ -2049,6 +2056,10 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] **最近的掃描與取件表格**（v1.16.91、v1.16.93）：1280 / 1180 寬右邊的按鈕排成一排（使用者 2026-10-15 截圖：開啟、下載、前往工作區被擠成三行）；
       1280 寬時間、事務機（「HP M141w」）、內容（「scan-20261014-144007.pdf」）都只有一行，空白按比例分給各欄（同日截圖：被折成三行、右邊一大片空白）；
       1180 / 900 寬不超出外框（先由狀態欄折行）；390 寬事務機名稱不會一字一行（`tests/test_mfp_scan_page_browser.py`）
+- [ ] **相容性：Apeos C5571 已支援、同系列標已支援**（v1.17.0，使用者 2026-10-19「同類 OS 的一併標示」）：C5571＝「已支援／已通過實機驗證」；C7071 / C6571 / C4571 / C3571 / C3071 / C2571＝「已支援／同系列，以 Apeos C5571 實機驗證」；C5570、ApeosPort C5571 等不是同系列（`tests/test_mfp_profiles.py`）
+- [ ] **取件並刪除**（v1.17.0，使用者 2026-10-19；FUJIFILM 實機取件已成功）：「取件並刪除」是第一顆按鈕、下面有「存好之後才刪」的說明，按下去先確認；
+      每份檔案存好（工作區或暫存區）才送 WebDAV DELETE（有資料夾刪資料夾，否則刪檔案），刪完再列一次信箱：不見了＝`SOURCE_DELETED`，還在＝`DELETE_NOT_DONE`（含設備狀態碼）；沒存好＝不刪；
+      「取件」不送 DELETE；DELETE 只對 FUJIFILM 連線、只放行那一個路徑那一次（`tests/test_mfp_box.py`、`tests/test_mfp_box_jobs.py`、`tests/test_mfp_box_page_browser.py`）。**實機待驗**：用可丟棄的測試文件試一次刪除
 - [ ] **FUJIFILM 信箱請求格式**（v1.16.99，依原廠工具分析；客戶實機 allprop 在 HTTPS / HTTP 都回 406）：協定紀錄看得到 stage（probe → list）、profile（modern / legacy）、singlepage（probe 是 On、list 是 omitted）、auth_sent；
       新格式 406 才換舊格式、只換一次、都不帶帳密；兩套都 406 → 錯誤「設備不接受這次的取件請求（HTTP 406）」並寫是哪個階段；列文件 406 就停；帳密只送同一組
       （`tests/test_mfp_box.py`）。**實機待驗**：客戶 Apeos C5571 信箱 44 重試，結果與協定紀錄存 docs-share/mfp-fetch/field-reports/
@@ -2663,6 +2674,11 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 ### 通知 / 其他
 - [ ] `GET /api/my/inbox` — 只回自己的通知
 - [ ] `POST /api/my/inbox/seen` — 標記已讀；別人的通知 id 標不動
+- [ ] `GET /api/my/zulip-link` — 自己的 Zulip 綁定狀態（已綁定 / 等私訊 / 等確認）；未登入 401（v1.17.0）
+- [ ] `POST /api/my/zulip-link/start` — 產生一次性代碼（10 分鐘）；每人 10 分鐘最多 5 組；Zulip 沒設好回 409
+- [ ] `POST /api/my/zulip-link/confirm` — 只有產生代碼的本人能確認；代碼用過 / 過期回 410；綁定與消耗一次完成
+- [ ] `POST /api/my/zulip-link/cancel` — 取消進行中的綁定
+- [ ] `DELETE /api/my/zulip-link` — 解除綁定；稽核有起訖與 user_id、沒有代碼（`tests/test_zulip_link.py`）
 - [ ] `POST /api/llm-review` — LLM 逐欄校驗；LLM 關閉時要回明確訊息不可 500
 - [ ] `PUT|DELETE /tools/submission-check/api/self-entities/{entity_id}` — 只能改 / 刪自己的；別人的 id 要被拒
 
@@ -2993,6 +3009,12 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `/admin/conversion/save`
 
 #### 通知設定（`/admin/notify/*`）
+
+- [ ] **Zulip 預設私訊到帳號信箱**（v1.17.0，使用者 2026-10-18「預設請填 email 不能留空」）：「我的作業 → 完成通知」的 Zulip 欄位預設就填好帳號信箱；改了會保留；清空存檔補回帳號信箱；帳號沒有信箱才是空的、走團隊頻道（`tests/test_my_notify_zulip_browser.py`）。
+      管理頁「傳送測試」：有團隊頻道送頻道；沒有就要填測試收訊者（Zulip email 或使用者編號），沒填說要填。欄名「團隊頻道（channel，選填，建議留空）」。
+      錯誤保留 HTTP 狀態碼與 Zulip code／msg（email 遮罩）；送出要核對 result=success＋訊息編號（`tests/test_notify_zulip_api.py` 對假 Zulip 實際走 HTTP）
+- [ ] **Zulip 私訊 Bot 綁定**（v1.17.0，Zulip 維護人員建議）：「綁定 Zulip」→ 顯示代碼（JTDT-XXXX-XXXX-XXXX、可複製、10 分鐘）與 Bot 名稱 → 在 Zulip 私訊 Bot → 頁面出現「即將綁定：顯示名稱」→ 確認 → 已綁定；通知送到綁定的 user_id。
+      群組私訊、其他 Bot、編輯過的、代碼產生前、過期的都不認；編號取 sender_id；別人不能確認；代碼不在記錄與稽核；429 會等；超過一頁會補讀；每人 10 分鐘最多 5 組；換站台不用舊綁定；可解除（`tests/test_zulip_link.py`、`tests/test_my_notify_zulip_browser.py`）。**實機待驗**：在 zchat 用真的帳號綁一次
 
 - [ ] `/admin/notify/save`
 - [ ] `/admin/notify/test/{channel}`：Email 寄的是跟作業完成通知同一個版面的範例信（卡片、圖示、「我的作業」連結用按測試那個瀏覽器的網址，標題標「[測試]」）；其他管道照舊純文字（`tests/test_notify_test_sends_real_layout.py`）
@@ -4177,6 +4199,7 @@ grep -rnE "回滾|軟依賴|硬依賴|系統依賴(?!\s*$)|圖像(?![幾何])|�
 - [ ] **內建 Logo：不套側欄的頁面**（v1.16.80）：選「文件圖示」後，登入頁（啟用認證）與初次設定頁的頁籤圖示、頁面上的 Logo 都換掉。
 - [ ] **左側選單配色：設定備份匯入**（v1.16.80）：匯出 → 換一種配色 → 匯入，不重新啟動服務，重新整理就是備份裡的配色與 Logo。
 - [ ] **左側選單配色：Windows 實機**（v1.16.80）：在 Windows 主機上打開設定頁，選一種深色、一種淺色，看側欄與卡片預覽。
+- [ ] **首頁 Logo 光暈與標題文字**（v1.17.0）：設定 → 企業 Logo / 識別，光暈 8 種（含不要光暈）、標題 7 種，點一下預覽當場換並打勾；回首頁看光暈與標題是選的顏色；預設是原本的靛紫；設定備份匯出再匯入照舊（`tests/test_hero_colors.py`、`test_sidebar_theme_browser.py::test_home_logo_glow_and_title_colours`）
 - [ ] **嵌入模型選到聊天模型**（v1.16.82）：OpenAI 相容（例如經過 LiteLLM）的清單全是聊天模型 → 模型下方直接警告、要先下載嵌入模型並加進閘道；選聊天模型按「測試連線」→ 訊息講「選的可能是聊天用的模型」，**不顯示對方回的原文**（只進服務紀錄檔）。`tests/test_kb_embed_client.py`、`tests/test_kb_embedding_settings_location.py`
 - [ ] **嵌入模型名稱只差大小寫**（v1.16.81）：存的是 `…:Q8_0`、Ollama 清單列 `…:q8_0` → LLM 設定頁不標「伺服器上找不到」、同一個模型只列一次、選中的沿用存的寫法；索引狀態不顯示「需要重建」。`tests/test_kb_embedding_settings_location.py`、`tests/test_kb_embed_model_list.py`
 

@@ -47,14 +47,15 @@ WEBHOOK_CHANNELS = ("telegram", "slack", "teams", "discord", "zulip",
 ALL_CHANNELS = ("email",) + WEBHOOK_CHANNELS
 
 #: 顯示名稱與前置需求（給 admin UI 用）
-#: **只有 Email 對真實服務端到端驗證過**（實機 SMTP 寄出、收件者確認收到）。
+#: **對真實服務端到端驗證過的是 Email 與 Zulip**（Email：實機 SMTP 寄出、收件者確認收到；
+#: Zulip：v1.17.0 對 Zulip 12 站台私訊 Bot 綁定、管理頁傳送測試，收件者確認收到）。
 #: 其餘管道有單元測試（把網路呼叫換掉、驗載荷格式），但沒有人真的接上 Slack /
 #: Teams / Telegram … 實際收過訊息 —— 所以標為開發階段，讓管理員知道這件事，
 #: 而不是設定下去之後才發現收不到。
 #:
 #: 驗證過一個就把它從這裡拿掉（並在 CHANGELOG 註明是用哪個服務驗的）。
 DEV_CHANNELS: frozenset[str] = frozenset({
-    "telegram", "slack", "teams", "discord", "zulip", "nextcloud",
+    "telegram", "slack", "teams", "discord", "nextcloud",
     "line", "webhook",
 })
 
@@ -64,7 +65,7 @@ CHANNEL_INFO: dict[str, dict] = {
     "slack":     {"label": "Slack", "needs": "Incoming Webhook URL"},
     "teams":     {"label": "Microsoft Teams", "needs": "Workflows 或舊版連接器的 Webhook URL"},
     "discord":   {"label": "Discord", "needs": "Webhook URL"},
-    "zulip":     {"label": "Zulip", "needs": "站台網址 + Bot Email + API Key；頻道（使用者可改填自己的 email 收私訊）"},
+    "zulip":     {"label": "Zulip", "needs": "站台網址 + Bot Email + API Key；團隊頻道（channel）選填，沒填就私訊到使用者帳號的信箱"},
     "nextcloud": {"label": "Nextcloud Talk", "needs": "站台網址 + 對話 token + Bot 密鑰（使用者可改填自己的一對一對話 token）"},
     "line":      {"label": "LINE", "needs": "官方帳號的 Channel Access Token + 收訊者 User ID"
                                             "（LINE Notify 已於 2025 年停止服務）"},
@@ -141,31 +142,84 @@ def send_discord(cfg: dict[str, Any], subject: str, text: str | None) -> None:
     }]})
 
 
-def send_zulip(cfg: dict[str, Any], subject: str, text: str | None) -> None:
-    """Zulip：使用者填了自己的 email 就送**私訊**，否則送到管理員設定的頻道。
+def zulip_recipient(cfg: dict[str, Any]) -> str:
+    """私訊對象：使用者編號（`zulip_user_id`，有填就優先）→ `zulip_to`（email，或數字的使用者編號）。"""
+    uid = str(cfg.get("zulip_user_id") or "").strip()
+    if uid.isdigit():
+        return uid
+    return str(cfg.get("zulip_to") or "").strip()
 
-    Zulip 是唯一不用換憑證就能私訊的管道 —— 同一支 `/api/v1/messages`，把
-    `type` 改成 `private` 即可（新版叫 `direct`，但 `private` 仍相容）。
-    Slack / Teams / Discord 的 incoming webhook URL 天生綁死一個頻道，要私訊
-    得改用 bot token，屬於另一種憑證型態。
+
+def send_zulip(cfg: dict[str, Any], subject: str, text: str | None) -> int:
+    """Zulip：有私訊對象就送**私訊**，否則送到管理員設定的團隊頻道（channel）。回傳 Zulip 的訊息編號。
+
+    私訊對象（`zulip_recipient`）：使用者編號優先；沒有就用 email（使用者自己填的，或帳號上的信箱）。
+    Zulip 的 email 隱私設定會讓機器人只看到 `user9@<站台>` 這種代用地址 —— 那時真正的信箱對不上，
+    要用使用者編號（Zulip 維護人員 2026-10-18：不要要求使用者公開 email）。
+
+    Zulip 是唯一不用換憑證就能私訊的管道 —— 同一支 `/api/v1/messages`，把 `type` 改掉即可。
+    私訊用 `direct`（Zulip 7.0 起；`private` 已列為淘汰），`to` 是 JSON 編碼的陣列（使用者編號是整數）。
+    頻道訊息維持 `stream`：Zulip 9.0 把 stream 改名 channel、加了 `type: "channel"`，但 `stream` 沒有淘汰、
+    舊版也收 —— 畫面上叫 channel。
+
+    **送出後核對 Zulip 的回應**：要 `result == "success"` 而且有訊息編號，不是看到 HTTP 200 就算成功。
     """
     site = (cfg.get("zulip_site") or "").rstrip("/")
     email, api_key = cfg.get("zulip_bot_email"), cfg.get("zulip_api_key")
     if not (site and email and api_key):
-        raise RuntimeError("尚未設定 Zulip 站台 / bot email / API key")
+        raise RuntimeError("尚未設定 Zulip 站台、Bot Email 或 API Key")
     body = f"**{subject}**\n{text}" if text else f"**{subject}**"
-    to_me = (cfg.get("zulip_to") or "").strip()
+    to_me = zulip_recipient(cfg)
     if to_me:
-        # 私訊。`to` 要是 JSON 陣列（可放 email 或 user id）
-        payload = {"type": "private", "to": json.dumps([to_me]), "content": body}
+        target = int(to_me) if to_me.isdigit() else to_me
+        payload = {"type": "direct", "to": json.dumps([target]), "content": body}
     else:
         stream = cfg.get("zulip_stream")
         if not stream:
-            raise RuntimeError("尚未設定 Zulip 頻道，且未填個人收訊 email")
+            raise RuntimeError("沒有收訊對象：沒有設定團隊頻道（channel），也沒有可以私訊的 email（帳號上沒有信箱）")
         payload = {"type": "stream", "to": stream,
                    "topic": cfg.get("zulip_topic") or "jt-doc-tools",
                    "content": body}
-    _post(f"{site}/api/v1/messages", auth=(email, api_key), data=payload)
+    import httpx
+    try:
+        with httpx.Client(timeout=_TIMEOUT, follow_redirects=False) as c:
+            r = c.post(f"{site}/api/v1/messages", auth=(email, api_key), data=payload)
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"連不上 Zulip 站台（{type(e).__name__}）") from None
+    try:
+        res = r.json()
+    except ValueError:
+        res = None
+    if not isinstance(res, dict):
+        raise RuntimeError(f"Zulip 回應不是 JSON（HTTP {r.status_code}）")
+    if r.status_code >= 300 or res.get("result") != "success":
+        raise RuntimeError(_zulip_error_text(r.status_code, res, to_me))
+    mid = res.get("id")
+    if not isinstance(mid, int):
+        raise RuntimeError(f"Zulip 回應沒有訊息編號（HTTP {r.status_code}，result={str(res.get('result'))[:20]}）")
+    return mid
+
+
+_EMAIL_RE = _re.compile(r"([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9.-]+)")
+
+
+def _mask(text: str) -> str:
+    """錯誤訊息裡的 email 遮成 `j***@網域`；斜線、換行換掉（`safe_user_error` 看到就整句不顯示）。"""
+    t = _EMAIL_RE.sub(lambda m: f"{m.group(1)}***@{m.group(2)}", text)
+    return _re.sub(r"[\r\n/\\]+", " ", t).strip()
+
+
+def _zulip_error_text(status: int, res: dict, to_me: str) -> str:
+    """保留 HTTP 狀態碼與 Zulip 的 result / code / msg（遮罩後），不把各種錯誤都講成「找不到使用者」。
+
+    要過 `safe_user_error`（200 字內、沒有斜線與換行），不然畫面上只剩「傳送失敗」。只有 email 被拒
+    （`Invalid email`）時另外補一句原因：Zulip 不公開 email 時機器人看不到真正的信箱，要改填使用者編號。"""
+    code = _mask(str(res.get("code") or ""))[:40]
+    msg = _mask(str(res.get("msg") or ""))[:110]
+    head = f"Zulip 回應 HTTP {status}" + (f"（{code}）" if code else "") + f"：{msg or str(res.get('result'))[:20]}"
+    if "Invalid email" in str(res.get("msg") or "") and to_me and not to_me.isdigit():
+        head += "；Zulip 不公開 email 時請改填使用者編號"
+    return head[:195]
 
 
 def send_nextcloud(cfg: dict[str, Any], subject: str, text: str | None) -> None:

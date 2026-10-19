@@ -149,6 +149,14 @@ def test_mailbox_retrieval_flow(live):
         t.js("document.querySelector('#mfBoxTable input[data-doc]').click()")
         assert "1" in t.js("document.getElementById('mfBoxFetchLabel').innerText")
         assert t.js("!!document.querySelector('#mfBoxPanel .jt-select-trigger')"), "存成要是本站樣式的下拉"
+        # v1.17.0（使用者 2026-10-19）：「取件並刪除」是第一個按鈕、下面有「存好才刪」的說明；表單排成一列
+        order = t.js("[...document.querySelectorAll('#mfBoxPanel .mf-box-go .btn')].map(b => b.id).join(',')")
+        assert order == "mfBoxFetchDelBtn,mfBoxFetchBtn", order
+        assert "存好之後" in t.js("document.querySelector('#mfBoxPanel .mf-box-go-note').innerText")
+        assert "1" in t.js("document.getElementById('mfBoxFetchDelLabel').innerText")
+        tops = t.js("""(() => { const r = id => document.getElementById(id).getBoundingClientRect();
+                         return [r('mfBoxNo').bottom, r('mfBoxPw').bottom, r('mfBoxListBtn').bottom].map(Math.round); })()""")
+        assert max(tops) - min(tops) <= 2, ("信箱編號、密碼、列出文件要在同一列", tops)
         t.shot("mfp_box_list_1280", 1280)
         t.js("document.getElementById('mfBoxFetchBtn').click()")
         assert t.wait_for("document.getElementById('mfBoxState').classList.contains('done')", 60), \

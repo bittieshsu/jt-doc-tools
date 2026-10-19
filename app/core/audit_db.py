@@ -83,9 +83,7 @@ _WRITER_THREAD: Optional[threading.Thread] = None
 _WRITER_LOCK = threading.Lock()
 
 
-def _writer_loop() -> None:
-    """Drain `_WRITE_Q`, write to a dedicated connection. Sentinel = None."""
-    path = audit_db_path()
+def _open_writer(path: Path) -> sqlite3.Connection:
     # Open a private connection (NOT via get_conn) — we want it pinned to
     # this thread alone with no thread-local sharing surprises.
     write_conn = sqlite3.connect(
@@ -94,10 +92,30 @@ def _writer_loop() -> None:
     write_conn.execute("PRAGMA journal_mode=WAL")
     write_conn.execute("PRAGMA synchronous=NORMAL")
     write_conn.execute("PRAGMA busy_timeout=10000")
+    return write_conn
+
+
+def _writer_loop() -> None:
+    """Drain `_WRITE_Q`, write to a dedicated connection. Sentinel = None.
+
+    資料庫路徑**每一筆都再確認一次**：原本在執行緒啟動時就固定，資料目錄之後換了
+    （測試切換暫存資料目錄）就一直寫到舊的那一個 —— 讀的那邊永遠讀不到
+    （v1.17.0：`test_notify.py` 先啟動了寫入執行緒，之後的登入稽核測試全部讀不到）。
+    正式環境資料目錄不會變，這裡只是一次路徑比較。"""
+    path = audit_db_path()
+    write_conn = _open_writer(path)
     while True:
         item = _WRITE_Q.get()
         if item is None:  # shutdown sentinel
             break
+        now_path = audit_db_path()
+        if now_path != path:
+            try:
+                write_conn.close()
+            except Exception:
+                pass
+            init()                      # 新目錄的資料表可能還沒建
+            path, write_conn = now_path, _open_writer(now_path)
         ts, username, ip, event_type, target, details_json = item
         try:
             write_conn.execute(

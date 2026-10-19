@@ -2063,7 +2063,7 @@ def build_auth_router(templates) -> APIRouter:
         """送一則測試訊息。失敗要把原因回給管理員 —— 「失敗」兩個字沒有用。"""
         import asyncio as _asyncio
 
-        from ..core import notify_channels as _nc, notify_settings as _ns
+        from ..core import auth_db as _adb, notify_channels as _nc, notify_settings as _ns
         if channel not in _nc.ALL_CHANNELS:
             raise HTTPException(400, "未知的通知管道")
         body = await request.json() if await request.body() else {}
@@ -2073,6 +2073,30 @@ def build_auth_router(templates) -> APIRouter:
                   "zulip_to", "nextcloud_to"):
             if body.get(f):
                 cfg[f] = body[f]
+        # Zulip 測試（使用者 2026-10-18）：有團隊頻道就送頻道（不看測試收訊者）；沒有就送給管理頁上填的
+        # 測試收訊者（Zulip email 或使用者編號）。只看管理頁，跟按的人個人通知設定填什麼無關
+        if channel == "zulip":
+            if cfg.get("zulip_stream"):
+                cfg["zulip_to"] = ""
+            elif not str(cfg.get("zulip_to") or "").strip():
+                return {"ok": False,
+                        "error": "沒有設定團隊頻道：請填測試收訊者（Zulip email 或使用者編號）"}
+            else:
+                # 填的是本站某個帳號的信箱、而那個帳號綁定過 Zulip（同一個站台）→ 用綁定的 Zulip 帳號送。
+                # Zulip 不公開 email 時信箱對不上人，管理員也不知道別人的 Zulip 編號（使用者 2026-10-19）
+                to = str(cfg["zulip_to"]).strip()
+                if not to.isdigit():
+                    # 本站帳號的信箱或帳號名稱（例如 `jason`）都可以。同名帳號可能有好幾個（本機與 LDAP 各一個
+                    # —— 2026-10-19 實機就是），挑**綁定過、而且是同一個站台**的那個，不是挑編號最小的
+                    site = str(cfg.get("zulip_site") or "").rstrip("/")
+                    rows = _adb.conn().execute(
+                        "SELECT id FROM users WHERE lower(email)=lower(?) OR lower(username)=lower(?) "
+                        "ORDER BY (lower(email)=lower(?)) DESC, id", (to, to, to)).fetchall()
+                    for (uid_,) in rows:
+                        link = _ns.get_zulip_link(f"u{int(uid_)}")
+                        if link and str(link.get("site") or "").rstrip("/") == site:
+                            cfg["zulip_to"] = str(int(link["user_id"]))
+                            break
         subject, text, html, images = ("[測試] Jason Tools 文件工具箱",
                                        "這是一則測試通知，看到就代表這個管道設定正確。", "", {})
         if channel == "email":

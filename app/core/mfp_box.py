@@ -15,6 +15,10 @@ codex-handoff-20261014/`）：它用 SOAP 管理介面加 WebDAV 取信箱文件
 3. 認證：先不帶帳密送一次，看 `WWW-Authenticate` 的 realm：
    * `box-…` → 帳號 `box`、密碼是信箱密碼（原廠程式的一個分支）
    * `user-…`、`admin…` → 設備的使用者帳號與密碼
+   * `<信箱>:<認證類型…>@<設備>`（v1.17.0，客戶實機的密碼信箱回 `96:00030040@…`）：冒號與 `@` 之間每四個字元
+     是一個十六進位的認證類型。依原廠工具 2.0.60 的流程，類型**剛好是 `0003`＋`0040`** 時走信箱密碼分支
+     （帳號 `box`、密碼是信箱密碼；realm 裡的信箱編號、類型、設備都不放進帳密）。其他類型組合還沒有對應，
+     一律不猜；realm 的信箱編號跟選的信箱不同也停；連線目標照既有設定，不用 realm 裡的設備文字。
    * 其他 → 不猜，回「不支援的認證方式」，realm 記在協定紀錄裡
    支援 Digest 與 Basic。**帳密只送一次**：失敗就停，不換組合重試（避免帳號被鎖）。
 4. 取件：文件本身是檔案（`5.tif`）就整份 GET；只有資料夾（`5/`）就再 PROPFIND 一層，取
@@ -23,7 +27,10 @@ codex-handoff-20261014/`）：它用 SOAP 管理介面加 WebDAV 取信箱文件
 
 ## 安全邊界
 
-* **只送 `PROPFIND` 與 `GET`**（`ALLOWED_METHODS`，請求層檢查）—— 不刪除、不修改設備上的任何東西。
+* **只送 `PROPFIND` 與 `GET`**（`ALLOWED_METHODS`，請求層檢查）—— 不修改設備上的任何東西。
+  **唯一的例外**是使用者明確按「取件並刪除」（v1.17.0，使用者 2026-10-19 要求；客戶實機 Apeos C5571 取件已成功）：
+  只有 FUJIFILM 信箱的連線（`_FujiDav`）允許 `DELETE`，而且只在**這份文件的檔案都存好之後**才送、只刪這份文件
+  （路徑一樣過 `_SAFE_TARGET`、不可以是信箱本身），刪完再列一次信箱確認。刪除的確切語意沒有實機樣本，標實驗功能。
   設備或信箱設定成「取件後刪除」時，刪除是設備自己做的：清單上看得到這個設定就先講，要使用者確認才取。
   取完再列一次清單，記下原件還在不在。
 * 位址與連接埠沿用 `mfp_client` 的檢查與 DNS 釘選。設備回的 href 只收同一台、同一個信箱底下、
@@ -96,7 +103,8 @@ MESSAGES: dict[str, str] = {
     "DAV_REQUEST_NOT_ACCEPTED": "設備不接受這次的取件請求（HTTP 406）：技術細節裡記了是哪個階段被拒；這不一定代表 WebDAV 沒有啟用",
     "AUTH_REQUIRED_BOX": "這個信箱有設密碼，請輸入信箱密碼",
     "AUTH_REQUIRED_USER": "設備要求登入，請輸入設備的使用者帳號與密碼",
-    "AUTH_FAILED": "認證失敗：帳號或密碼不對（為了避免帳號被鎖，沒有自動重試）",
+    "AUTH_FAILED": "認證沒有通過：請確認密碼；一直不通過時請管理員確認設備上的帳號或信箱有沒有被鎖定（為了避免被鎖，沒有自動重試）",
+    "AUTH_PASSWORD_ENCODING_UNCONFIRMED": "信箱密碼含英數以外的字元，設備對這種密碼的編碼方式還沒有確認，所以沒有送出（避免算成一次密碼錯誤）",
     "AUTH_MODE_UNSUPPORTED": "設備要求的認證方式目前不支援（協定紀錄裡有設備回的認證資訊）",
     "TLS_UNTRUSTED": "設備的憑證沒有通過驗證（事務機多半是自簽憑證）。請核對下面的指紋，確認是這台設備再信任",
     "TLS_IDENTITY_FAILED": "設備的憑證跟你信任的不一樣，已停止，沒有存取信箱。設備換過憑證的話，請重新核對指紋",
@@ -123,7 +131,7 @@ MESSAGES: dict[str, str] = {
 }
 
 #: 遇到這些錯誤，整件取件就停（後面的文件也一定會遇到同樣的問題）。
-FATAL = frozenset({"AUTH_FAILED", "AUTH_MODE_UNSUPPORTED", "AUTH_REQUIRED_BOX", "AUTH_REQUIRED_USER",
+FATAL = frozenset({"AUTH_FAILED", "AUTH_PASSWORD_ENCODING_UNCONFIRMED", "AUTH_MODE_UNSUPPORTED", "AUTH_REQUIRED_BOX", "AUTH_REQUIRED_USER",
                    "TLS_UNTRUSTED", "TLS_IDENTITY_FAILED", "TLS_FAILED", "PLAIN_HTTP_NEEDS_CONSENT",
                    "DAV_CONNECTION_FAILED", "CANCELLED", "BOX_NOT_FOUND", "BOX_FORBIDDEN",
                    "WEBDAV_UNAVAILABLE", "DAV_REQUEST_NOT_ACCEPTED"})
@@ -196,12 +204,30 @@ def parse_challenges(values: list[str]) -> list[dict]:
     return out[:8]
 
 
+_RE_TYPED_REALM = re.compile(r"^(\d{1,4}):((?:[0-9A-Fa-f]{4}){1,8})@(.{1,255})$")
+#: 已經對應過的認證類型組合 → 帳密怎麼送。依原廠工具 2.0.60 的流程（使用者 2026-10-19 請人分析）：
+#: `0003`＋`0040` 是信箱密碼分支（帳號 `box`）。**只認這一組**：其他組合沒有對應，不可以一律當信箱密碼。
+_TYPED_REALM_MODES: dict[frozenset, str] = {frozenset({0x0003, 0x0040}): "box"}
+
+
+def parse_typed_realm(realm: str) -> Optional[dict]:
+    """`96:00030040@<設備>` → `{"box": 96, "types": [0x0003, 0x0040]}`；不是這個格式回 None。"""
+    m = _RE_TYPED_REALM.match((realm or "").strip())
+    if not m:
+        return None
+    hexes = m.group(2)
+    return {"box": int(m.group(1)), "types": [int(hexes[i:i + 4], 16) for i in range(0, len(hexes), 4)]}
+
+
 def realm_kind(realm: str) -> str:
     r = (realm or "").strip().lower()
     if r == "box" or r.startswith("box-"):
         return "box"
     if r.startswith("user-") or r.startswith("admin"):
         return "user"
+    typed = parse_typed_realm(realm)
+    if typed:
+        return _TYPED_REALM_MODES.get(frozenset(typed["types"]), "unknown")
     return "unknown"
 
 
@@ -237,6 +263,7 @@ class _Auth:
     def summary(self) -> dict:
         return {"scheme": self.scheme, "realm": self.params.get("realm", "")[:80],
                 "realm_kind": realm_kind(self.params.get("realm", "")),
+                "realm_types": _types_text(self.params.get("realm", "")),
                 "algorithm": self.params.get("algorithm") if self.scheme == "digest" else None,
                 "non_ascii": not (self.username + self.password).isascii()}
 
@@ -283,15 +310,28 @@ class _Auth:
         return "Digest " + ", ".join(parts)
 
 
-def choose_auth(challenges: list[dict], creds: Creds) -> _Auth:
+def _types_text(realm: str) -> Optional[list[str]]:
+    typed = parse_typed_realm(realm)
+    return [f"{t:04X}" for t in typed["types"]] if typed else None
+
+
+def choose_auth(challenges: list[dict], creds: Creds, box: Optional[int] = None) -> _Auth:
     """依設備的要求決定送哪一組帳密。**不猜**：realm 認不得、方案不支援就停。"""
     c = _pick(challenges)
     if c is None:
         raise BoxError("AUTH_MODE_UNSUPPORTED", {"challenges": _challenge_summary(challenges)})
-    kind = realm_kind(c["params"].get("realm", ""))
+    realm = c["params"].get("realm", "")
+    kind = realm_kind(realm)
+    typed = parse_typed_realm(realm)
+    if typed and box is not None and typed["box"] != box:
+        raise BoxError("AUTH_MODE_UNSUPPORTED", {"reason": "realm mailbox differs from the selected mailbox",
+                                                 "challenges": _challenge_summary(challenges)})
     if kind == "box":
         if not creds.box_password:
-            raise BoxError("AUTH_REQUIRED_BOX", {"realm": c["params"].get("realm", "")[:80]})
+            raise BoxError("AUTH_REQUIRED_BOX", {"realm": realm[:80], "realm_types": _types_text(realm)})
+        if typed and not creds.box_password.isascii():
+            # 原廠工具對非 ASCII 密碼用什麼編碼沒有確認過；送錯一次也算一次失敗，所以不送
+            raise BoxError("AUTH_PASSWORD_ENCODING_UNCONFIRMED", {"realm_types": _types_text(realm)})
         return _Auth(c, "box", creds.box_password)
     if kind == "user":
         if not creds.user or not creds.password:
@@ -303,6 +343,7 @@ def choose_auth(challenges: list[dict], creds: Creds) -> _Auth:
 def _challenge_summary(challenges: list[dict]) -> list[dict]:
     """協定紀錄用：方案、realm、演算法、qop（nonce 這類一次性的值不記）。"""
     return [{"scheme": c["scheme"], "realm": c["params"].get("realm", "")[:80],
+             "realm_types": _types_text(c["params"].get("realm", "")),
              "algorithm": c["params"].get("algorithm"), "qop": c["params"].get("qop")} for c in challenges]
 
 
@@ -366,6 +407,10 @@ class _Dav:
         """送出去的請求路徑只能是固定的幾種形狀（子類別換成自己的，例如 Canon Advanced Box）。"""
         return bool(_SAFE_TARGET.match(path))
 
+    #: 這條連線允許的方法（請求層檢查）。DELETE 不在裡面 —— 只有 `delete_doc` 對 FUJIFILM 信箱一次放行一個路徑。
+    allowed_methods = ALLOWED_METHODS
+    _delete_once: Optional[str] = None
+
     def _propfind_spec(self) -> tuple[bytes, str, dict[str, str]]:
         # Preserve the existing generic/other-brand WebDAV request contract.
         return _PROPFIND_BODY, 'text/xml; charset="utf-8"', {}
@@ -373,7 +418,8 @@ class _Dav:
     def request(self, method: str, path: str, *, depth: Optional[str] = None, to_file: Optional[Path] = None,
                 max_bytes: int = MAX_XML, timeout: float = READ_TIMEOUT, auth: bool = True) -> dict:
         """送一個 PROPFIND / GET。`to_file` 有給就把 200 的內容串流寫進檔案（超過 `max_bytes` 丟 `DOC_TOO_LARGE`）。"""
-        if method not in ALLOWED_METHODS:
+        # DELETE 只放行 `delete_doc` 當下指定的那一個路徑、那一次（FUJIFILM「取件並刪除」）；其他時候一律只讀
+        if method not in self.allowed_methods and not (method == "DELETE" and path == self._delete_once):
             raise ValueError(f"method not allowed: {method}")
         if not self._target_ok(path):
             raise ValueError("unsafe request target")
@@ -730,6 +776,7 @@ class _FujiDav(_Dav):
     """NSU3 compatibility request profiles for this vendor."""
     profile = "modern"
     stage = "probe"
+    #: 「取件並刪除」才可能送 DELETE（`delete_doc` 一次放行一個路徑）
 
     def _propfind_spec(self) -> tuple[bytes, str, dict[str, str]]:
         return fp.request_spec(self.profile, self.stage)
@@ -762,7 +809,7 @@ def open_box(host: str, ip: str, scheme: str, port: int, *, box: int, creds: Cre
     def authenticate(r: dict, stage: str) -> dict:
         nonlocal stale_used
         if r["status"] == 401 and dav.auth is None:
-            dav.auth = choose_auth(r.get("challenges", []), creds)
+            dav.auth = choose_auth(r.get("challenges", []), creds, box)
             r = send(stage)
         if r["status"] == 401 and dav.auth is not None and dav.auth.scheme == "digest" and not stale_used:
             fresh = [c for c in r.get("challenges", []) if c["scheme"] == "digest"
@@ -860,6 +907,39 @@ def _resources(sess: Session, doc: dict) -> list[dict]:
         raise BoxError("DOC_NO_RESOURCE")
     return [{"seg": p["name"], "path": f"{folder}{p['name']}", "name": p["name"]}
             for _k, p in sorted(pages.items())]
+
+
+def delete_doc(sess: Session, doc_id: str) -> dict:
+    """刪除設備上的一份文件（使用者按「取件並刪除」、而且**這份已經存好**之後才由呼叫端叫）。
+
+    目標是這份文件在清單上的資源：有資料夾就刪資料夾（整份文件），沒有就刪那個檔案。路徑由清單上驗證過的
+    數字重新組成、要過 `_SAFE_TARGET`、不可以是信箱本身。回 `{"code", "status"}`：
+    `DELETED`（2xx）、`ALREADY_GONE`（404）、`DELETE_REFUSED`（401 / 403 / 405 / 423 等）。
+    呼叫端刪完要再列一次信箱確認（設備回 2xx 也不代表真的不見了 —— 沒有實機樣本）。"""
+    doc = sess.docs.get(str(doc_id))
+    if not doc:
+        return {"code": "ALREADY_GONE", "status": None}
+    if doc.get("folder"):
+        target = f"{sess.box.path}/{doc['folder']}/"
+    elif doc.get("file"):
+        target = f"{sess.box.path}/{doc['file']}"
+    else:
+        raise BoxError("DOC_NO_RESOURCE")
+    if not _SAFE_TARGET.match(target) or target.rstrip("/") == sess.box.path:
+        raise BoxError("DOC_NO_RESOURCE", {"reason": "unsafe delete target"})
+    if not isinstance(sess.dav, _FujiDav):
+        raise BoxError("DOC_NO_RESOURCE", {"reason": "delete is only for FUJIFILM mailboxes"})
+    sess.dav._delete_once = target
+    try:
+        r = sess.dav.request("DELETE", target)
+    finally:
+        sess.dav._delete_once = None
+    st = r["status"]
+    if 200 <= st < 300:
+        return {"code": "DELETED", "status": st}
+    if st == 404:
+        return {"code": "ALREADY_GONE", "status": st}
+    return {"code": "DELETE_REFUSED", "status": st}
 
 
 def download(sess: Session, doc_id: str, workdir: Path, *, budget_bytes: int,
