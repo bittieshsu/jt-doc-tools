@@ -95,3 +95,27 @@ def test_translations_keep_the_product_names():
                 if n in zh and n not in tr_:
                     bad.append(f"{loc}: {zh!r} → {tr_!r}")
     assert not bad, "\n".join(bad)
+
+
+def test_heading_matches_the_other_settings_pages(client, auth_off, reset_mcp):
+    """標題跟「LLM 設定」同一種寫法：圖示＋標題＋「附加功能」標籤，說明是標題下面獨立的一段。
+    標籤樣式在全站的 platform.css（不寫在個別頁面裡，兩頁才不會一邊有改一邊沒改）。"""
+    import re
+    from pathlib import Path
+    html = client.get("/admin/mcp").text
+    h1 = re.search(r"<h1>(.*?)</h1>\s*<p class=\"muted\">", html, re.S)
+    assert h1, "h1 後面直接接一段 muted 說明"
+    assert 'class="addon-badge"' in h1.group(1) and "<svg" in h1.group(1)
+    assert 'class="addon-badge"' in client.get("/admin/llm-settings").text
+    root = Path(__file__).resolve().parent.parent
+    assert ".addon-badge" in (root / "static/css/platform.css").read_text(encoding="utf-8")
+    for tpl in ("app/admin/templates/admin_mcp.html", "app/admin/templates/llm_settings.html"):
+        assert ".addon-badge {" not in (root / tpl).read_text(encoding="utf-8"), tpl
+
+
+def test_settings_are_tiles_with_the_switch_next_to_its_title(client, auth_off, reset_mcp):
+    """開關跟自己的標題放在同一張卡裡（原本一列橫跨整頁，開關離標題一千多像素）。"""
+    import re
+    html = client.get("/admin/mcp").text
+    for sid in ("mcp-enabled", "mcp-bindip", "mcp-http"):
+        assert re.search(r'<div class="mcp-tile">\s*<div class="mcp-tile-top">(?:(?!mcp-tile").)*id="' + sid + '"', html, re.S), sid

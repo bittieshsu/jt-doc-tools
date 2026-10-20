@@ -204,7 +204,7 @@
         <div class="nav-group">
           <div class="nav-group-head" role="button" tabindex="0" aria-expanded="true">
             <button class="toc-toggle" type="button" tabindex="-1" aria-hidden="true"></button>
-            <span class="nav-ch nav-ch-toggle">9b. 複合機スキャン・取り込み API（Beta）</span>
+            <span class="nav-ch nav-ch-toggle">9b. 複合機スキャン・取り込み API</span>
           </div>
           <div class="nav-children">
             <a class="nav-ep" href="#連線測試">接続テスト</a>
@@ -1443,8 +1443,8 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <hr>
       </section>
       <section class="doc-section" data-sec="連線測試" data-title="接続テスト" hidden>
-<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
-<blockquote><p><strong>試用中。全体の流れはまだ実機で検証していません。</strong>現在できるのは、複合機の追加、接続テストと機種識別、eSCL（AirPrint / Mopria スキャン）に対応した複合機からスキャンしてワークスペースへ直接保存すること、管理者が設定した共有複合機、FUJIFILM 複合機のボックスからの取得、Canon / Konica Minolta / SHARP の共有フォルダーからの取得、KYOCERA / RICOH からの直接取得（いずれも試験機能）です。Web のツールページと管理ページもこのエンドポイントを使っています。ツールは旧名「複合機から取り込み」で、v1.16.89 から「複合機スキャン・取り込み」に改名しました。URL とツール ID は変わりません。</p></blockquote>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API</div>
+<blockquote><p><strong>FUJIFILM の本体ボックス取り込みは実機で検証済みです。ほかのメーカーからの取り込みは試験機能です。</strong>現在できるのは、複合機の追加、接続テストと機種識別、eSCL（AirPrint / Mopria スキャン）に対応した複合機からスキャンしてワークスペースへ直接保存すること、管理者が設定した共有複合機、FUJIFILM 複合機のボックスからの取得、Canon / Konica Minolta / SHARP の共有フォルダーからの取得、KYOCERA / RICOH からの直接取得（いずれも試験機能）です。Web のツールページと管理ページもこのエンドポイントを使っています。ツールは旧名「複合機から取り込み」で、v1.16.89 から「複合機スキャン・取り込み」に改名しました。URL とツール ID は変わりません。</p></blockquote>
 <p><strong>各複合機は呼び出した本人のもの</strong>です（API トークンで呼び出した場合はトークンの所有者）。他人の複合機は常に <code>404</code> を返し、存在するかどうかも明かしません。<strong>共有複合機</strong>は管理者が作成してメンバー（ユーザー、またはサブグループを含むグループ）を指定します。メンバーは表示、再テスト、スキャンができますが、名前の変更や除去はできません。ログインが無効な場合は、サーバー本体のブラウザーか有効な API トークン付きの呼び出しだけを受け付けます。</p>
 <p><strong>接続テストの安全範囲</strong>：接続先は社内ネットワークのアドレスだけ（プライベート IP。ループバック、リンクローカル、グローバルアドレス、このサーバー自身のアドレスは常に拒否）、Web ポート <code>80</code>、<code>443</code>、<code>8080</code>、<code>8443</code> だけです。送るのは <code>GET</code>（トップページと eSCL の機能一覧 <code>/eSCL/ScannerCapabilities</code>）だけで、認証情報や Cookie は送りません。リダイレクトは同じ機器内だけたどります。1 人あたり 5 分間に 10 回まで、同時に 1 つだけです。</p>
 <p><strong>ユーザーが自分で複合機を追加できるか</strong>は管理者が決めます（既定は許可。下の「利用設定」を参照）。オフのとき、一般ユーザーが接続テストや保存を呼び出すと <code>403</code>（<code>USER_DEVICES_DISABLED</code>）になり、以前に自分で追加した複合機は一覧で <code>paused: true</code> となって、テスト・スキャン・取得はできませんが、名前の変更と除去はできます。共有複合機は通常どおり使え、管理者は制限されません。</p>
@@ -1490,7 +1490,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>現時点で <code>supported</code> を返すことはありません。実機での検証に合格した機種が出てから使われます。</p>
       </section>
       <section class="doc-section" data-sec="我的事務機" data-title="マイ複合機" hidden>
-<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API</div>
 <h4 id="我的事務機">マイ複合機</h4>
 <pre><code class="lang-text"><span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections                 <span class="hl-cmt"># 清單</span>
 <span class="hl-method">POST</span>   /tools/mfp-fetch/api/connections                 <span class="hl-cmt"># 儲存：{&quot;token&quot;: &quot;...&quot;, &quot;display_name&quot;: &quot;三樓行政區&quot;}</span>
@@ -1503,7 +1503,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>一覧の各項目には、<code>shared</code>（共有複合機かどうか）、<code>can_manage</code>（名前の変更や除去ができるか）、<code>scan</code>（スキャンできるかと選べる設定。eSCL がなければ <code>null</code>）、<code>box</code>（ボックスから取得できるか。現在は FUJIFILM のみ）、<code>share</code>（共有フォルダーからの取得に使える方法。例：<code>{&quot;routes&quot;: [&quot;canon_webdav&quot;, &quot;canon_smb&quot;]}</code>。なければ <code>null</code>）、<code>paused</code>（管理者が自分での追加をオフにしたため、自分の複合機が一時停止中）、<code>queue</code>（<code>{&quot;busy&quot;: true, &quot;waiting&quot;: 1, &quot;kind&quot;: &quot;scan&quot;}</code>、いま使用中か、後ろに何件待っているか）もあります。一覧自体は <code>can_add</code>（呼び出した人が複合機を追加できるか）も返します。共有複合機はメンバーにとって読み取り専用で、名前の変更と除去は <code>403</code>（<code>SHARED_READ_ONLY</code>）を返します。</p>
       </section>
       <section class="doc-section" data-sec="診斷報告" data-title="診断レポート" hidden>
-<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API</div>
 <h4 id="診斷報告">診断レポート</h4>
 <p>接続テストの完全な記録を、形式を選んでダウンロードできます。保存済みの複合機は最新のテスト、保存前のテスト結果は接続テストが返した <code>token</code> を使います。</p>
 <pre><code class="lang-text"><span class="hl-method">GET</span>  /tools/mfp-fetch/api/connections/{id}/report?format=pdf   <span class="hl-cmt"># 已儲存的事務機</span>
@@ -1518,7 +1518,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span></code></pre>
       </section>
       <section class="doc-section" data-sec="掃描escl" data-title="スキャン（eSCL）" hidden>
-<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API</div>
 <h4 id="掃描escl">スキャン（eSCL）</h4>
 <p>複合機からスキャンし、<strong>呼び出した本人の</strong>ワークスペースに保存します。呼び出す前に原稿を原稿台ガラス（または送り装置）に置いてください。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/scan       <span class="hl-cmt"># 開始掃描（202，回掃描紀錄）</span>
@@ -1534,7 +1534,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>機器の機能範囲外の設定は <code>400</code>（<code>SCAN_OPTION_INVALID</code>）、eSCL のない機器は <code>400</code>（<code>SCAN_NOT_SUPPORTED</code>）、順番待ちが満杯なら <code>429</code> を返します。スキャン中のエラーは記録の <code>error_code</code> に入ります：<code>SCAN_DEVICE_BUSY</code>（誰かが機器を操作中）、<code>SCAN_ADF_EMPTY</code>、<code>SCAN_AUTH_REQUIRED</code>（スキャンにログインが必要な機器。まだ対応していません）、<code>SCAN_NO_DOCUMENT</code>、<code>SCAN_BAD_DOCUMENT</code>、<code>SCAN_TOO_LARGE</code>、<code>SCAN_TIMEOUT</code> など。<strong>認証情報は送りません</strong>。</p>
       </section>
       <section class="doc-section" data-sec="機內信箱取件fujifilm實驗性" data-title="ボックスからの取得（FUJIFILM、試験機能）" hidden>
-<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API</div>
 <h4 id="機內信箱取件fujifilm實驗性">ボックスからの取得（FUJIFILM、試験機能）</h4>
 <blockquote><p><strong>調査にもとづく推測の実装で、実機ではまだ検証していません。</strong>メーカーの取得ツールの調査をもとに、WebDAV で FUJIFILM 複合機のボックスを読み取ります（PROPFIND で文書の一覧、GET でダウンロード）。送るのはこの 2 種類の要求だけで、複合機上の文書を削除・変更しません。ただし複合機またはボックスが「取得後に削除」に設定されている場合は、複合機自身が削除します（下の「取得後に削除」の確認パラメーターを参照）。FUJIFILM と識別され、接続テストでつながった複合機のみ使え、それ以外は 400（BOX_NOT_FUJIFILM）を返します。</p></blockquote>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/box/list    <span class="hl-cmt"># 列出信箱裡的文件</span>
@@ -1570,7 +1570,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>取得ジョブの記録はスキャンと同じものです（<code>kind: &quot;box&quot;</code>）。<code>files</code> は保存した各ファイル（<code>name</code>、<code>pages</code>、<code>workspace_file_id</code>）、<code>items</code> は文書ごとの結果（<code>status</code>、<code>error_code</code>、<code>format_note</code>、<code>source</code>：<code>SOURCE_KEPT</code> 元の文書が残っている / <code>SOURCE_GONE</code> 取得後に複合機からなくなった / <code>SOURCE_UNKNOWN</code>）です。一部の文書を取得できなかった場合も <code>status</code> は <code>done</code> で、<code>error_code</code> が <code>BOX_PARTIAL</code> になります。PDF への変換に失敗した場合（例：未対応の圧縮方式の TIFF）は元のファイルを保存し、<code>format_note</code> が <code>PDF_FALLBACK_ORIGINAL</code> になります。</p>
       </section>
       <section class="doc-section" data-sec="檔案分享取件canonkonica-minoltasharpkyoceraricoh實驗性" data-title="共有フォルダーからの取得（Canon、Konica Minolta、SHARP、KYOCERA、RICOH。試験機能）" hidden>
-<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API</div>
 <h4 id="檔案分享取件canonkonica-minoltasharpkyoceraricoh實驗性">共有フォルダーからの取得（Canon、Konica Minolta、SHARP、KYOCERA、RICOH。試験機能）</h4>
 <blockquote><p><strong>試験機能で、実機ではまだ検証していません。</strong>メーカーのマニュアルで公開されている方法に従い、複合機上の共有フォルダーを読み取ります：Canon Advanced Box（WebDAV または SMB の共有スペースと個人スペース）、Konica Minolta の公開ボックス（SMB）、SHARP 複合機の NAS（SMB）。KYOCERA のボックスと RICOH のドキュメントサーバーは複合機の文書サービス（SOAP）で読み取ります。これはメーカーのツールの分析にもとづくもので、メーカーが公開しているインターフェースではありません。読み取りのみで、複合機上のファイルを削除・名前変更・書き込みしません。使える複合機は一覧に取得方法が表示され、ほかのメーカーは 400（SHARE_ROUTE_INVALID）を返します。</p></blockquote>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/share/list    <span class="hl-cmt"># 列出位置、資料夾與檔案</span>
@@ -1580,7 +1580,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>SMB は NTLMv2 のみを使い、複合機が SMB1 しか使わない場合は認証の前に中止します（<code>SMB1_REFUSED</code>）。複合機が対応していれば署名し、内容は暗号化されません。複合機側のエラーはすべて <code>422</code> を返します：<code>SMB_PLAIN_NEEDS_CONSENT</code>、<code>SMB_AUTH_FAILED</code>、<code>SMB_CONNECT_FAILED</code>（445 番ポートが閉じている）、<code>SHARE_FORBIDDEN</code>、<code>SHARE_NOT_FOUND</code>、<code>BOX_SHARE_NOT_FOUND</code>（Konica のこのボックスの共有が見つからない）、<code>SHARE_LOGIN_PAGE</code>、およびボックスからの取得と同じ <code>TLS_UNTRUSTED</code>、<code>AUTH_FAILED</code> など。KYOCERA / RICOH ではさらに <code>SOAP_UNAVAILABLE</code>（複合機の文書サービスが応答しない）、<code>BOX_PASSWORD_FAILED</code>、<code>DOC_PASSWORD_REQUIRED</code>、<code>DOC_PASSWORD_FAILED</code>、<code>SESSION_EXPIRED</code>、<code>SOAP_BUSY</code>、<code>RICOH_AUTH_UNSUPPORTED</code>（使用できるログイン方式がない）、<code>RICOH_AUTH_MODE_REQUIRED</code>（ログイン方式が未選択で、何も送信していない）、<code>RICOH_AUTH_MODE_MISMATCH</code>、<code>RICOH_AUTH_INPUT_CONFLICT</code>、<code>RICOH_AUTH_PROFILE_UNSUPPORTED</code>、<code>RICOH_USER_CODE_REQUIRED</code>、<code>RICOH_PASSWORD_UNSUPPORTED</code>、<code>RICOH_SESSION_REJECTED</code>（デバイスがこのログインを受け付けなかった）、<code>RICOH_URL_UNSUPPORTED</code>（ダウンロード先がこの複合機上にない、または FTP）を返します。文書が複数の部分に分かれて返された場合、<code>pdf</code> は順番どおり 1 つにまとめ、<code>original</code> はページ番号を付けて個別に保存します。ジョブ記録の <code>kind</code> は <code>share</code> で、ほかの項目はボックスからの取得と同じです。</p>
       </section>
       <section class="doc-section" data-sec="共用事務機管理員" data-title="共有複合機（管理者）" hidden>
-<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API</div>
 <h4 id="共用事務機管理員">共有複合機（管理者）</h4>
 <p>管理者が作成してメンバー（ユーザーまたはグループ。グループはサブグループのメンバーを含む）を指定します。管理者以外が呼び出すと <code>403</code>（<code>ADMIN_ONLY</code>）です。Web 版は「設定 → 共有複合機」にあります。メンバーには引き続き「複合機スキャン・取り込み」ツールの権限が必要です。</p>
 <pre><code class="lang-text"><span class="hl-method">GET</span>    /tools/mfp-fetch/api/shared                  <span class="hl-cmt"># 清單（含成員數）</span>
@@ -1594,7 +1594,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>メンバーは存在するユーザーとグループだけです。それ以外は <code>400</code>（<code>MEMBERS_INVALID</code>）を返します。アカウントやグループを削除するとメンバー資格も外れます。作成者のアカウントを削除しても共有複合機は削除されません。</p>
       </section>
       <section class="doc-section" data-sec="使用設定管理員" data-title="利用設定（管理者）" hidden>
-<div class="doc-crumb">9b. 複合機スキャン・取り込み API（Beta）</div>
+<div class="doc-crumb">9b. 複合機スキャン・取り込み API</div>
 <h4 id="使用設定管理員">利用設定（管理者）</h4>
 <pre><code class="lang-text"><span class="hl-method">GET</span> /tools/mfp-fetch/api/settings     <span class="hl-cmt"># {&quot;settings&quot;: {&quot;allow_user_devices&quot;: true, &quot;updated_at&quot;: ...}}</span>
 <span class="hl-method">PUT</span> /tools/mfp-fetch/api/settings     <span class="hl-cmt"># {&quot;allow_user_devices&quot;: false}</span></code></pre>

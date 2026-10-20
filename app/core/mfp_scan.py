@@ -688,11 +688,12 @@ def public(rec: dict) -> dict:
     fresh = (time.time() - (rec.get("finished_at") or 0)) < RESULT_TTL
     items = rec.get("items") or []
     files = []
-    for i in items:
+    for n, i in enumerate(items):
         for f in i.get("files") or []:
+            # `item`：這個檔案是第幾份文件取出來的（畫面把那份文件的狀況寫在同一列，不另外再列一次）
             files.append({"name": f.get("name"), "kind": f.get("kind"), "bytes": f.get("bytes"),
                           "pages": f.get("pages"), "workspace_file_id": f.get("workspace_file_id"),
-                          "has_file": bool(f.get("kept")) and fresh})
+                          "has_file": bool(f.get("kept")) and fresh, "item": n})
     out["files"] = files
     out["items"] = [{k: v for k, v in i.items() if k not in ("files", "sources")}
                     | {"files": len(i.get("files") or [])} for i in items]

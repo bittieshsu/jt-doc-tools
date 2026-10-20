@@ -5,11 +5,16 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (930 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (931 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.2] - 2026-10-20
+
+- MFP scan & fetch is no longer marked Beta: FUJIFILM in-device mailbox retrieval passed real-device verification on a customer's Apeos C5571 (listing, password-protected mailboxes, retrieval, retrieve and delete), and the verified devices list was updated. File share retrieval for Canon, Konica Minolta and SHARP and direct retrieval for KYOCERA and RICOH remain experimental. The mailbox panel was reorganised: the intro reflects the current status, the size column is hidden when no document has a size, the retrieve-and-delete note is a normal hint, one and several documents use the same layout (one row per file with that document's status on the same row), error details no longer use a third of the width for labels, and the protocol log table keeps rows on one line and scrolls sideways.
+- MCP settings page: the heading now matches the LLM settings page (icon, title, "add-on" badge, description as its own paragraph) and the badge style is shared site-wide; connection settings are two columns of setting cards with each switch next to its own title; summary cards stay in two columns on phones.
 
 ## [1.17.1] - 2026-10-19
 

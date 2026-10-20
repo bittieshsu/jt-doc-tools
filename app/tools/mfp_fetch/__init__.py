@@ -15,7 +15,6 @@ metadata = ToolMetadata(
     description="從事務機掃描，或取回機內信箱裡的文件，存進工作區後接續 OCR、轉檔與 AI 處理。",
     icon="printer",
     category="內容處理",
-    beta=True,
 )
 
 tool = ToolModule(

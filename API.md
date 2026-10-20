@@ -17,7 +17,7 @@ Jason Tools 文件工具箱對外提供 RESTful API，所有工具皆有對應 e
 - [7. 安全與隱私 API](#7-安全與隱私-api)
 - [8. 文字與比對 API](#8-文字與比對-api)
 - [9. 商務查詢 API](#9-商務查詢-api)
-- [9b. 事務機掃描取件 API（Beta）](#9b-事務機掃描取件-apibeta)
+- [9b. 事務機掃描取件 API](#9b-事務機掃描取件-api)
 - [10. Job 模式 API](#10-job-模式-api)
 - [10b. MCP（AI 客戶端）](#10b-mcpai-客戶端)
 - [11. 管理端 API](#11-管理端-api)
@@ -2262,9 +2262,9 @@ curl -X POST http://localhost:8765/tools/transit-proof/api/transit-proof \
 
 ---
 
-## 9b. 事務機掃描取件 API（Beta）
+## 9b. 事務機掃描取件 API
 
-> **試用中，尚未在實機上驗證完整流程。** 目前做得到的是新增事務機、連線測試與型號辨識、
+> **FUJIFILM 機內信箱取件已在實機驗證，其他廠牌的取件是實驗功能。** 目前做得到的是新增事務機、連線測試與型號辨識、
 > 從支援 eSCL（AirPrint / Mopria 掃描）的事務機掃描直接存進工作區、管理員設定的共用事務機，
 > 以及 FUJIFILM 事務機的機內信箱取件、Canon / Konica Minolta / SHARP 的檔案分享取件、KYOCERA / RICOH 的直接取件（都是實驗功能）。網頁上的工具頁與管理頁用的也是這組端點。
 > 工具原名「事務機取件」，v1.16.89 起改名「事務機掃描取件」；網址與工具代號都不變。

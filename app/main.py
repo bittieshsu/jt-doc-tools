@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.17.1"
+VERSION = "1.17.2"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -570,7 +570,7 @@ templates.env.globals["nav_settings"] = [
                  # 政府公開資料（/admin/knowledge/gov）也從這一頁進去
                  "open data opendata moj 政府公開資料 開放資料 全國法規資料庫 行政規則 釋例"},
     {"icon": "printer", "name": "共用事務機", "description": "建立事務機並指定成員，成員不用自己新增就能測試與掃描",
-     "url": "/admin/mfp", "beta": True,
+     "url": "/admin/mfp",
      "keywords": "mfp multifunction printer copier scanner shared device member group scan escl airprint mopria "
                  "事務機 多功能事務機 影印機 複合機 共用 成員 群組 掃描 排隊"},
     {"icon": "book", "name": "同義詞", "description": "PDF 標籤對應字典",

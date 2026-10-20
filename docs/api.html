@@ -204,7 +204,7 @@
         <div class="nav-group">
           <div class="nav-group-head" role="button" tabindex="0" aria-expanded="true">
             <button class="toc-toggle" type="button" tabindex="-1" aria-hidden="true"></button>
-            <span class="nav-ch nav-ch-toggle">9b. 事務機掃描取件 API（Beta）</span>
+            <span class="nav-ch nav-ch-toggle">9b. 事務機掃描取件 API</span>
           </div>
           <div class="nav-children">
             <a class="nav-ep" href="#連線測試">連線測試</a>
@@ -1443,8 +1443,8 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <hr>
       </section>
       <section class="doc-section" data-sec="連線測試" data-title="連線測試" hidden>
-<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
-<blockquote><p><strong>試用中，尚未在實機上驗證完整流程。</strong> 目前做得到的是新增事務機、連線測試與型號辨識、 從支援 eSCL（AirPrint / Mopria 掃描）的事務機掃描直接存進工作區、管理員設定的共用事務機， 以及 FUJIFILM 事務機的機內信箱取件、Canon / Konica Minolta / SHARP 的檔案分享取件、KYOCERA / RICOH 的直接取件（都是實驗功能）。網頁上的工具頁與管理頁用的也是這組端點。 工具原名「事務機取件」，v1.16.89 起改名「事務機掃描取件」；網址與工具代號都不變。</p></blockquote>
+<div class="doc-crumb">9b. 事務機掃描取件 API</div>
+<blockquote><p><strong>FUJIFILM 機內信箱取件已在實機驗證，其他廠牌的取件是實驗功能。</strong> 目前做得到的是新增事務機、連線測試與型號辨識、 從支援 eSCL（AirPrint / Mopria 掃描）的事務機掃描直接存進工作區、管理員設定的共用事務機， 以及 FUJIFILM 事務機的機內信箱取件、Canon / Konica Minolta / SHARP 的檔案分享取件、KYOCERA / RICOH 的直接取件（都是實驗功能）。網頁上的工具頁與管理頁用的也是這組端點。 工具原名「事務機取件」，v1.16.89 起改名「事務機掃描取件」；網址與工具代號都不變。</p></blockquote>
 <p><strong>每一台都屬於呼叫者本人</strong>（用 API token 呼叫時是 token 的持有者）：別人的事務機一律回 <code>404</code>， 不透露存不存在。<strong>共用事務機</strong>由管理員建立並指定成員（使用者、群組含子群組），成員看得到、可以重新測試與掃描， 不能改名或移除。未啟用登入時只接受本機的瀏覽器或帶有效 API token 的呼叫。</p>
 <p><strong>連線測試的安全範圍</strong>：只連內部網路位址（私有 IP；回送、鏈路本地、公網與本服務主機自己的位址一律拒絕）， 只測網頁連接埠 <code>80</code>、<code>443</code>、<code>8080</code>、<code>8443</code>；只發 <code>GET</code>（讀首頁與 eSCL 的能力表 <code>/eSCL/ScannerCapabilities</code>）、 不傳送任何帳密或 Cookie；轉址只跟同一台設備。每人 5 分鐘內最多 10 次，同時只能跑一個。</p>
 <p><strong>使用者自行新增事務機</strong>由管理員決定（預設允許，見下面「使用設定」）。關掉時一般使用者呼叫連線測試、儲存回 <code>403</code> （<code>USER_DEVICES_DISABLED</code>），自己以前新增的在清單上是 <code>paused: true</code>，不能測試、掃描、取件，但可以改名、移除； 共用事務機照常，管理員不受限。</p>
@@ -1490,7 +1490,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>目前不會回傳 <code>supported</code>，要等某個型號在實機上驗證通過才會有。</p>
       </section>
       <section class="doc-section" data-sec="我的事務機" data-title="我的事務機" hidden>
-<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<div class="doc-crumb">9b. 事務機掃描取件 API</div>
 <h4 id="我的事務機">我的事務機</h4>
 <pre><code class="lang-text"><span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections                 <span class="hl-cmt"># 清單</span>
 <span class="hl-method">POST</span>   /tools/mfp-fetch/api/connections                 <span class="hl-cmt"># 儲存：{&quot;token&quot;: &quot;...&quot;, &quot;display_name&quot;: &quot;三樓行政區&quot;}</span>
@@ -1503,7 +1503,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>清單的每一筆另外有：<code>shared</code>（是不是共用事務機）、<code>can_manage</code>（能不能改名、移除）、 <code>scan</code>（能不能掃描與可選的設定，沒有 eSCL 是 <code>null</code>）、<code>box</code>（能不能機內信箱取件，目前只有 FUJIFILM）、 <code>share</code>（檔案分享取件可用的方式，例如 <code>{&quot;routes&quot;: [&quot;canon_webdav&quot;, &quot;canon_smb&quot;]}</code>，沒有是 <code>null</code>）、 <code>paused</code>（管理員關掉自行新增時，自己的事務機暫停使用）、<code>queue</code>（<code>{&quot;busy&quot;: true, &quot;waiting&quot;: 1, &quot;kind&quot;: &quot;scan&quot;}</code>， 這台現在有沒有在忙、後面排了幾件）。清單本身另回 <code>can_add</code>（呼叫者能不能新增事務機）。 共用事務機對成員是唯讀的：改名與移除回 <code>403</code>（<code>SHARED_READ_ONLY</code>）。</p>
       </section>
       <section class="doc-section" data-sec="診斷報告" data-title="診斷報告" hidden>
-<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<div class="doc-crumb">9b. 事務機掃描取件 API</div>
 <h4 id="診斷報告">診斷報告</h4>
 <p>連線測試的完整紀錄，可以選格式下載。已儲存的事務機下載最近一次測試；還沒儲存的測試結果用連線測試回的 <code>token</code>。</p>
 <pre><code class="lang-text"><span class="hl-method">GET</span>  /tools/mfp-fetch/api/connections/{id}/report?format=pdf   <span class="hl-cmt"># 已儲存的事務機</span>
@@ -1518,7 +1518,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span></code></pre>
       </section>
       <section class="doc-section" data-sec="掃描escl" data-title="掃描（eSCL）" hidden>
-<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<div class="doc-crumb">9b. 事務機掃描取件 API</div>
 <h4 id="掃描escl">掃描（eSCL）</h4>
 <p>從事務機掃描，存進<strong>呼叫者自己</strong>的工作區。先把文件放在平台玻璃上（或送紙器裡）再呼叫。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/scan       <span class="hl-cmt"># 開始掃描（202，回掃描紀錄）</span>
@@ -1534,7 +1534,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>設定不在這台的能力範圍回 <code>400</code>（<code>SCAN_OPTION_INVALID</code>）；沒有 eSCL 回 <code>400</code>（<code>SCAN_NOT_SUPPORTED</code>）； 隊伍滿了回 <code>429</code>。掃描中的錯誤寫在紀錄的 <code>error_code</code>：<code>SCAN_DEVICE_BUSY</code>（有人在機器上操作）、 <code>SCAN_ADF_EMPTY</code>、<code>SCAN_AUTH_REQUIRED</code>（設備要求登入才能掃描，目前不支援）、<code>SCAN_NO_DOCUMENT</code>、 <code>SCAN_BAD_DOCUMENT</code>、<code>SCAN_TOO_LARGE</code>、<code>SCAN_TIMEOUT</code> 等。<strong>不送任何帳密</strong>。</p>
       </section>
       <section class="doc-section" data-sec="機內信箱取件fujifilm實驗性" data-title="機內信箱取件（FUJIFILM，實驗性）" hidden>
-<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<div class="doc-crumb">9b. 事務機掃描取件 API</div>
 <h4 id="機內信箱取件fujifilm實驗性">機內信箱取件（FUJIFILM，實驗性）</h4>
 <blockquote><p><strong>推測實作，尚未在實機上驗證。</strong> 依原廠取件工具的研究，用 WebDAV 讀取 FUJIFILM 事務機的機內信箱 （PROPFIND 列文件、GET 下載），只送這兩種請求，不會刪除或修改設備上的文件；但設備或信箱若設定成 「取件後刪除」，刪除是設備自己做的（見下面「取件後刪除」的確認參數）。只有辨識為 FUJIFILM、 連線測試連得上的事務機能用，其他回 400（BOX_NOT_FUJIFILM）。</p></blockquote>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/box/list    <span class="hl-cmt"># 列出信箱裡的文件</span>
@@ -1570,7 +1570,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>取件作業的紀錄跟掃描同一份（<code>kind: &quot;box&quot;</code>）：<code>files</code> 是存下來的每一個檔案（<code>name</code>、<code>pages</code>、 <code>workspace_file_id</code>），<code>items</code> 是每份文件的結果（<code>status</code>、<code>error_code</code>、<code>format_note</code>、 <code>source</code>：<code>SOURCE_KEPT</code> 原件還在 / <code>SOURCE_GONE</code> 取件後設備上已經沒有 / <code>SOURCE_UNKNOWN</code>）。 部分文件沒取到時 <code>status</code> 仍是 <code>done</code>、<code>error_code</code> 是 <code>BOX_PARTIAL</code>。轉成 PDF 失敗（例如 TIFF 用了不支援的壓縮） 會改存原始檔，<code>format_note</code> 是 <code>PDF_FALLBACK_ORIGINAL</code>。</p>
       </section>
       <section class="doc-section" data-sec="檔案分享取件canonkonica-minoltasharpkyoceraricoh實驗性" data-title="檔案分享取件（Canon、Konica Minolta、SHARP、KYOCERA、RICOH，實驗性）" hidden>
-<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<div class="doc-crumb">9b. 事務機掃描取件 API</div>
 <h4 id="檔案分享取件canonkonica-minoltasharpkyoceraricoh實驗性">檔案分享取件（Canon、Konica Minolta、SHARP、KYOCERA、RICOH，實驗性）</h4>
 <blockquote><p><strong>實驗功能，尚未在實機上驗證。</strong> 依原廠手冊公開的方式，讀取事務機上的檔案分享： Canon Advanced Box（WebDAV 或 SMB 的共享空間、個人空間）、Konica Minolta 公用信箱（SMB）、SHARP 的 NAS（SMB）。 KYOCERA 的機內文件匣與 RICOH 的文件伺服器走設備的文件服務（SOAP），依據是原廠工具的分析，不是原廠公開的介面。 只讀取，不刪除、改名或寫入設備上的檔案。清單上可以用的事務機會標出可用的取件方式，其他廠牌回 400（SHARE_ROUTE_INVALID）。</p></blockquote>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/share/list    <span class="hl-cmt"># 列出位置、資料夾與檔案</span>
@@ -1580,7 +1580,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>SMB 只用 NTLMv2；設備只肯用 SMB1 就在認證之前停下來（<code>SMB1_REFUSED</code>），能簽章就簽章，內容不加密。 設備端的錯誤一律回 <code>422</code>：<code>SMB_PLAIN_NEEDS_CONSENT</code>、<code>SMB_AUTH_FAILED</code>、<code>SMB_CONNECT_FAILED</code>（445 連接埠沒開）、 <code>SHARE_FORBIDDEN</code>、<code>SHARE_NOT_FOUND</code>、<code>BOX_SHARE_NOT_FOUND</code>（Konica 找不到這個信箱的分享）、<code>SHARE_LOGIN_PAGE</code>， 以及跟機內信箱取件相同的 <code>TLS_UNTRUSTED</code>、<code>AUTH_FAILED</code> 等。KYOCERA / RICOH 另有 <code>SOAP_UNAVAILABLE</code>（設備的文件服務沒有回應）、 <code>BOX_PASSWORD_FAILED</code>、<code>DOC_PASSWORD_REQUIRED</code>、<code>DOC_PASSWORD_FAILED</code>、<code>SESSION_EXPIRED</code>、<code>SOAP_BUSY</code>、 <code>RICOH_AUTH_UNSUPPORTED</code>（設備沒有可用的登入方式）、<code>RICOH_AUTH_MODE_REQUIRED</code>（還沒選登入方式，什麼都沒送）、<code>RICOH_AUTH_MODE_MISMATCH</code>、<code>RICOH_AUTH_INPUT_CONFLICT</code>、 <code>RICOH_AUTH_PROFILE_UNSUPPORTED</code>、<code>RICOH_USER_CODE_REQUIRED</code>、<code>RICOH_PASSWORD_UNSUPPORTED</code>、<code>RICOH_SESSION_REJECTED</code>（設備沒有接受這次登入）、 <code>RICOH_URL_UNSUPPORTED</code>（下載網址不在這台設備，或是 FTP）。 一份文件分成幾個部分回來時，<code>pdf</code> 照順序合成一份，<code>original</code> 各存一個檔並加頁序。 作業紀錄的 <code>kind</code> 是 <code>share</code>，其餘欄位跟信箱取件一樣。</p>
       </section>
       <section class="doc-section" data-sec="共用事務機管理員" data-title="共用事務機（管理員）" hidden>
-<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<div class="doc-crumb">9b. 事務機掃描取件 API</div>
 <h4 id="共用事務機管理員">共用事務機（管理員）</h4>
 <p>管理員建立、指定成員（使用者或群組；群組含子群組的成員）。非管理員呼叫回 <code>403</code>（<code>ADMIN_ONLY</code>）。 網頁版在「設定 → 共用事務機」。成員還是要有「事務機掃描取件」的工具權限。</p>
 <pre><code class="lang-text"><span class="hl-method">GET</span>    /tools/mfp-fetch/api/shared                  <span class="hl-cmt"># 清單（含成員數）</span>
@@ -1594,7 +1594,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>成員只收存在的使用者與群組，其他回 <code>400</code>（<code>MEMBERS_INVALID</code>）。刪除帳號或群組時成員資格一起拿掉； 刪除建立者的帳號不會刪掉共用事務機。</p>
       </section>
       <section class="doc-section" data-sec="使用設定管理員" data-title="使用設定（管理員）" hidden>
-<div class="doc-crumb">9b. 事務機掃描取件 API（Beta）</div>
+<div class="doc-crumb">9b. 事務機掃描取件 API</div>
 <h4 id="使用設定管理員">使用設定（管理員）</h4>
 <pre><code class="lang-text"><span class="hl-method">GET</span> /tools/mfp-fetch/api/settings     <span class="hl-cmt"># {&quot;settings&quot;: {&quot;allow_user_devices&quot;: true, &quot;updated_at&quot;: ...}}</span>
 <span class="hl-method">PUT</span> /tools/mfp-fetch/api/settings     <span class="hl-cmt"># {&quot;allow_user_devices&quot;: false}</span></code></pre>

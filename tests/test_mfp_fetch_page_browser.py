@@ -166,7 +166,7 @@ def test_connection_test_save_detail_and_refusal(live, locale):
         assert t.wait_for("document.querySelector('#mfListWrap .mf-empty, #mfListWrap table') "
                           "&& !document.querySelector('#mfListWrap').textContent.includes('載入中')"), \
             "「我的事務機」沒有載入（JS 沒跑起來？）"
-        assert t.js("!!document.querySelector('h1 .tool-beta')"), "標題旁要有 Beta"
+        assert not t.js("!!document.querySelector('h1 .tool-beta')"), "v1.17.2 起標題旁不標 Beta"
         # ---- eSCL 旁的「?」（使用者 2026-10-15）：按下才出現本站樣式的說明，不是瀏覽器原生提示
         help_ = ("(() => { const n = document.querySelector('.mf-beta-note [data-mf-help]');"
                  " if (!n) return null; const b = n.querySelector('button'), p = n.querySelector('.mf-help-pop');"

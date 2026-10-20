@@ -45,7 +45,7 @@ SAME_SERIES: dict[tuple[str, str], tuple[str, str]] = {
 #: `partial`＝部分步驟驗證過（`note` 寫清楚哪些還沒驗）。客戶型號、日期以外的細節（客戶名稱、位址）不寫這裡。
 FIELD_TESTS: tuple[dict, ...] = (
     {"vendor": "FUJIFILM", "models": ("Apeos C5571",), "feature": "機內信箱取件", "result": "verified",
-     "note": "列出文件、取件（TIFF 轉 PDF）", "date": "2026-10-19"},
+     "note": "列出文件、有密碼的信箱、取件（TIFF 轉 PDF）、取件並刪除", "date": "2026-10-20"},
     {"vendor": "FUJIFILM", "models": ("Apeos C7071", "Apeos C6571", "Apeos C4571", "Apeos C3571", "Apeos C3071",
                                       "Apeos C2571"),
      "feature": "機內信箱取件", "result": "same_series", "note": "同系列，以 Apeos C5571 實機驗證", "date": ""},

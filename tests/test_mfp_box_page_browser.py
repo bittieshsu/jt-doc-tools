@@ -145,6 +145,8 @@ def test_mailbox_retrieval_flow(live):
         t.js("document.getElementById('mfBoxPw').value = '1234'; document.getElementById('mfBoxListBtn').click()")
         assert t.wait_for("!document.getElementById('mfBoxDocs').hidden"), t.js("document.getElementById('mfBoxError').innerText")
         assert "報價單" in t.js("document.getElementById('mfBoxTable').innerText")
+        heads = t.js("[...document.querySelectorAll('#mfBoxTable th')].map(th => th.innerText.trim()).join('|')")
+        assert "大小" in heads, ("假設備有給大小，要顯示那一欄", heads)
         assert t.js("document.getElementById('mfBoxFetchBtn').disabled"), "沒勾文件不能按取件"
         t.js("document.querySelector('#mfBoxTable input[data-doc]').click()")
         assert "1" in t.js("document.getElementById('mfBoxFetchLabel').innerText")
@@ -164,6 +166,10 @@ def test_mailbox_retrieval_flow(live):
         state = t.js("document.getElementById('mfBoxState').innerText")
         assert "WebDAV" in state and "3" in state and "報價單" in state, state
         assert t.js("!!document.querySelector('#mfBoxState a[href^=\"/workspace/file/\"]')"), "完成後要能打開工作區的檔案"
+        # v1.17.2：取 1 份跟取多份同一種版面 —— 每個檔案一列、那份文件的狀況寫在同一列，不另外再列一次
+        row = t.js("(() => { const li = document.querySelector('#mfBoxState .mf-files li'); return li ? li.innerText : ''; })()")
+        assert "報價單" in row and "已取件" in row, row
+        assert not t.js("!!document.querySelector('#mfBoxState .mf-items')"), "每份文件都有檔案時不另外列狀況清單"
         t.shot("mfp_box_done_1280", 1280)
         t.shot("mfp_box_done_390", 390)
         # 同一台再開一次：不再問 HTTP 同意、信箱編號記得

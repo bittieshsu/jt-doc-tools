@@ -37,6 +37,8 @@
 @keyframes mf-spin { to { transform:rotate(360deg); } }
 .mf-err { margin-top:10px; padding:8px 12px; border-radius:6px; background:#fef2f2; border:1px solid #fecaca;
   color:#991b1b; font-size:13.5px; }
+.mf-err .mf-table { table-layout:auto; width:auto; min-width:min(100%, 360px); max-width:100%; background:#fff; }
+.mf-err .mf-table th { width:auto; white-space:nowrap; }
 .mf-err pre { margin:6px 0 0; white-space:pre-wrap; word-break:break-word; font-size:12px; color:#7f1d1d; }
 .mf-summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-bottom:12px; }
 .mf-kv { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; }
@@ -184,7 +186,7 @@
 /* 日期、頁數、大小照內容收窄，空間留給名稱；數字靠右 */
 .mf-docs th.mf-col-date, .mf-docs td.mf-col-date { width:1%; white-space:nowrap; }
 .mf-docs th.mf-col-num, .mf-docs td.mf-col-num { width:1%; white-space:nowrap; text-align:right; padding-left:24px; }
-.mf-box-go-note { margin:6px 0 0; font-size:12.5px; color:#991b1b; }
+.mf-box-go-note { margin:8px 0 0; font-size:12.5px; color:#64748b; }
 .mf-docs tr.picked td { background:#eef2ff; }
 .mf-box-go { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin-top:10px; }
 .mf-box-go > div { min-width:220px; }
@@ -197,6 +199,10 @@
 .mf-files .name { flex:1 1 220px; word-break:break-all; }
 .mf-items { margin:6px 0 0; padding-left:18px; font-size:13px; }
 .mf-tech { margin-top:12px; }
+.mf-trace-wrap { overflow-x:auto; max-width:100%; }
+.mf-trace { table-layout:auto; width:auto; min-width:100%; }
+.mf-trace th { width:auto; white-space:nowrap; }
+.mf-trace td { white-space:nowrap; }
 .mf-tech summary { cursor:pointer; font-size:12.5px; color:#64748b; }
 @media (max-width: 720px) {
   .mf-box-form, .mf-box-login { grid-template-columns:1fr; }
@@ -271,7 +277,7 @@
 
 {% block content %}
 {% if mode == 'shared' %}
-<h1>{{ icon('printer', size=22) }} {{ tr('共用事務機') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h1>
+<h1>{{ icon('printer', size=22) }} {{ tr('共用事務機') }}</h1>
 <p class="muted">{{ tr('在這裡建立的事務機，加進來的成員（使用者或群組）不用自己新增，就會出現在他的「事務機掃描取件」頁。成員可以重新測試、看詳細、掃描，不能改名或移除。') }}</p>
 <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('成員還是要有「事務機掃描取件」的工具權限才看得到這支工具（角色照舊）。同一台事務機一次只服務一個人，其他人自動排隊。') }}
   <button type="button" class="mf-verified-link" id="mfVerifiedBtn">{{ icon('check', size=13) }} <span>{{ tr('已驗證支援清單') }}</span></button></span></div>
@@ -282,11 +288,11 @@
   <div class="mf-hint" id="mfSettingsMsg" role="status"></div>
 </div>
 {% else %}
-<h1>{{ icon('printer', size=22) }} {{ tr('事務機掃描取件') }}<span class="tool-beta" title="{{ tr('試用中：功能還可能調整') }}">Beta</span></h1>
+<h1>{{ icon('printer', size=22) }} {{ tr('事務機掃描取件') }}</h1>
 <p class="muted">{{ tr('從事務機掃描，或取回機內信箱裡的文件，存進工作區後接續 OCR、轉檔與 AI 處理。') }}</p>
 
 {# 一句話一個 tr()：譯文裡找 eSCL，按鈕接在那個字（含黏在後面的「-capable」）後面；三種語言的譯文都有 eSCL #}
-{% set _note = tr('試用中：可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件已在 Apeos 系列部分型號實機驗證；Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA、RICOH 的直接取件是實驗功能。') %}
+{% set _note = tr('可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件已在 Apeos 系列部分型號實機驗證；Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA、RICOH 的直接取件是實驗功能。') %}
 <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{% if 'eSCL' in _note %}{% set _head, _tail = _note.split('eSCL', 1) %}{% set _glued, _rest = (_tail ~ ' ').split(' ', 1) %}{{ _head }}eSCL{{ _glued }}{{ escl_help() }} {{ _rest|trim }}{% else %}{{ _note }}{% endif %}
   <button type="button" class="mf-verified-link" id="mfVerifiedBtn">{{ icon('check', size=13) }} <span>{{ tr('已驗證支援清單') }}</span></button></span></div>
 
@@ -432,7 +438,7 @@
     <h2 id="mfBoxTitle" class="mf-scan-title"></h2>
     <button type="button" class="btn btn-secondary btn-small" id="mfBoxClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
   </div>
-  <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依據原廠工具與技術資料分析寫成。「取件」只讀取，不改動事務機；「取件並刪除」在檔案存好之後才刪除事務機上的原件。若信箱設定為取件後刪除，設備仍可能自己刪除原件。') }}</span></div>
+  <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{{ tr('已在 Apeos C5571 實機驗證：列出文件、有密碼的信箱、取件、取件並刪除。「取件」只讀取，不改動事務機。') }}</span></div>
   <form id="mfBoxForm" class="mf-box-form" autocomplete="off">
     <div id="mfBoxTargetWrap" hidden>
       <label for="mfBoxTarget">{{ tr('連線方式') }}</label>
@@ -471,7 +477,7 @@
       <button type="button" class="btn btn-danger" id="mfBoxFetchDelBtn" disabled>{{ icon('trash', size=14) }} <span id="mfBoxFetchDelLabel">{{ tr('取件並刪除') }}</span></button>
       <button type="button" class="btn btn-primary" id="mfBoxFetchBtn" disabled>{{ icon('download', size=14) }} <span id="mfBoxFetchLabel">{{ tr('取件') }}</span></button>
     </div>
-    <p class="mf-box-go-note">{{ tr('「取件並刪除」：確認檔案都已存好之後，才會刪除事務機上的原件；沒存好的那份不會刪（實驗功能）。') }}</p>
+    <p class="mf-box-go-note">{{ tr('「取件並刪除」：確認檔案都已存好之後，才會刪除事務機上的原件；沒存好的那份不會刪。') }}</p>
     <p class="mf-hint">{{ tr('取好的檔案會存進你的工作區。同一台事務機一次只服務一個人，其他人會自動排隊。') }}</p>
   </div>
   <div id="mfBoxState" class="mf-scan-state" hidden></div>
@@ -1224,7 +1230,10 @@
       }));
     }
     const inWs = (s.files || []).filter(f => f.workspace_file_id);
-    if (s.status === 'done' && inWs.length === 1) bar.append(...fileLinks(inWs[0].workspace_file_id, true));
+    // 信箱 / 檔案分享取件的每個檔案已經各自一列（含開啟、下載），這裡只給「前往工作區」
+    const perFile = !inRow && (s.kind === 'box' || s.kind === 'share');
+    if (s.status === 'done' && inWs.length === 1 && !perFile) bar.append(...fileLinks(inWs[0].workspace_file_id, true));
+    else if (s.status === 'done' && inWs.length === 1) bar.append(wsLink());
     else if (s.status === 'done' && inWs.length > 1) bar.append(wsLink());
     else if (s.status === 'done' && !(s.files || []).length && s.workspace_file_id) {   // 舊版紀錄
       bar.append(...fileLinks(s.workspace_file_id, true));
@@ -1239,31 +1248,33 @@
     return bar;
   }
   // 結果裡每一個檔案（多於一個時）與每份文件的狀況（信箱取件）
+  function itemText(i) {
+    if (i.status !== 'ok') return tr(i.error_message || i.error_code || '');
+    let t = tr('已取件');
+    if (i.format_message) t += P.sep + tr(i.format_message);
+    if (i.source_message) t += P.sep + tr(i.source_message);
+    return t;
+  }
   function resultDetails(s, box) {
     const files = (s.files || []).filter(f => f.workspace_file_id);
-    if (s.status === 'done' && files.length > 1) {
+    const fetchKind = s.kind === 'box' || s.kind === 'share';
+    const shown = new Set();      // 已經寫在檔案那一列的文件，下面不再列一次
+    if (s.status === 'done' && (files.length > 1 || (fetchKind && files.length === 1))) {
       const ul = el('ul', 'mf-files');
       for (const f of files) {
         const li = el('li');
-        li.append(el('span', 'name', f.name + (f.pages ? P.lp + tr('{0} 頁').replace('{0}', f.pages) + P.rp : '')),
-                  ...fileLinks(f.workspace_file_id, false));
+        const name = el('span', 'name', f.name + (f.pages ? P.lp + tr('{0} 頁').replace('{0}', f.pages) + P.rp : ''));
+        const it = fetchKind && f.item != null ? (s.items || [])[f.item] : null;
+        if (it) { name.append(el('span', 'mf-sub', itemText(it))); shown.add(f.item); }
+        li.append(name, ...fileLinks(f.workspace_file_id, false));
         ul.append(li);
       }
       box.append(ul);
     }
-    if ((s.kind === 'box' || s.kind === 'share') && (s.items || []).length) {
+    const rest = (s.items || []).filter((_, n) => !shown.has(n));
+    if (fetchKind && rest.length) {
       const ul = el('ul', 'mf-items');
-      for (const i of s.items) {
-        let t = (i.name || ('#' + i.doc)) + P.colon;
-        if (i.status === 'ok') {
-          t += tr('已取件');
-          if (i.format_message) t += P.sep + tr(i.format_message);
-          if (i.source_message) t += P.sep + tr(i.source_message);
-        } else {
-          t += tr(i.error_message || i.error_code || '');
-        }
-        ul.append(el('li', null, t));
-      }
+      for (const i of rest) ul.append(el('li', null, (i.name || ('#' + i.doc)) + P.colon + itemText(i)));
       box.append(ul);
     }
   }
@@ -1304,7 +1315,9 @@
     if (prog) box.append(progressBar(prog));
     if (viaText(s)) box.append(el('div', 'mf-hint', tr('協定') + P.colon + viaText(s)));
     if (s.workspace_message) box.append(el('div', 'mf-hint', tr(s.workspace_message)));
-    else if (s.status === 'done' && (s.files || []).length <= 1 && s.workspace_file_id) {
+    else if (s.status === 'done' && (s.kind === 'box' || s.kind === 'share') && (s.files || []).some(f => f.workspace_file_id)) {
+      box.append(el('div', 'mf-hint', tr('已存進你的工作區：{0} 個檔案').replace('{0}', s.files.filter(f => f.workspace_file_id).length)));
+    } else if (s.status === 'done' && (s.files || []).length <= 1 && s.workspace_file_id) {
       box.append(el('div', 'mf-hint', tr('已存進你的工作區') + P.colon + (((s.files || [])[0] || {}).name || s.file_name || '')));
     } else if (s.status === 'done' && (s.files || []).length > 1) {
       box.append(el('div', 'mf-hint', tr('已存進你的工作區：{0} 個檔案').replace('{0}', s.files.length)));
@@ -1466,8 +1479,10 @@
       r.append(el('td', null, (e.challenges || []).map(c => c.scheme + (c.realm ? ' realm=' + c.realm : '')).join(P.sep)));
       t.append(r);
     }
-    t.querySelectorAll('th').forEach(th => { th.style.width = 'auto'; });
-    boxEl(prefix + 'Trace').replaceChildren(t);
+    t.classList.add('mf-trace');
+    const scroller = el('div', 'mf-trace-wrap');
+    scroller.append(t);
+    boxEl(prefix + 'Trace').replaceChildren(scroller);
     tech.hidden = false;
   }
   // 需要使用者確認的狀況：只在遇到時問一次，確認後自動再試
@@ -1554,8 +1569,10 @@
         syncFetchBtn();
       });
       const th0 = el('th'); th0.append(all); hd.append(th0);
-      hd.append(el('th', null, tr('名稱')), el('th', 'mf-col-date', tr('日期')), el('th', 'mf-col-num', tr('頁數')),
-                el('th', 'mf-col-num', tr('大小')));
+      // 大小整欄都沒有值（FUJIFILM 的列表不給）就不顯示，不留一整欄「—」
+      const hasSize = boxDocs.some(d => d.size != null && d.size !== '');
+      hd.append(el('th', null, tr('名稱')), el('th', 'mf-col-date', tr('日期')), el('th', 'mf-col-num', tr('頁數')));
+      if (hasSize) hd.append(el('th', 'mf-col-num', tr('大小')));
       const thead = el('thead'); thead.append(hd); t.append(thead);
       const tb = el('tbody');
       for (const d of boxDocs) {
@@ -1570,8 +1587,8 @@
         nm.dataset.i18n = 'skip';
         if (d.format) nm.append(el('span', 'mf-sub', d.format + (d.compression ? ' · ' + d.compression : '')));
         r.append(nm, el('td', 'mf-col-date', d.modified ? fmtTime(d.modified) : '—'),
-                 el('td', 'mf-col-num', d.pages == null ? '—' : String(d.pages)),
-                 el('td', 'mf-col-num', bytesText(d.size) || '—'));
+                 el('td', 'mf-col-num', d.pages == null ? '—' : String(d.pages)));
+        if (hasSize) r.append(el('td', 'mf-col-num', bytesText(d.size) || '—'));
         r.addEventListener('click', (e) => {
           if (e.target.tagName !== 'INPUT') { cb.checked = !cb.checked; syncFetchBtn(); }
         });

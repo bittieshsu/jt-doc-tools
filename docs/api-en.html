@@ -204,7 +204,7 @@
         <div class="nav-group">
           <div class="nav-group-head" role="button" tabindex="0" aria-expanded="true">
             <button class="toc-toggle" type="button" tabindex="-1" aria-hidden="true"></button>
-            <span class="nav-ch nav-ch-toggle">9b. MFP Scan & Fetch API (Beta)</span>
+            <span class="nav-ch nav-ch-toggle">9b. MFP Scan & Fetch API</span>
           </div>
           <div class="nav-children">
             <a class="nav-ep" href="#連線測試">Connection test</a>
@@ -1443,8 +1443,8 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <hr>
       </section>
       <section class="doc-section" data-sec="連線測試" data-title="Connection test" hidden>
-<div class="doc-crumb">9b. MFP Scan & Fetch API (Beta)</div>
-<blockquote><p><strong>Beta, the full flow is not yet verified on real devices.</strong> For now it can add MFPs, run connection tests and identify the model, scan from MFPs that support eSCL (AirPrint / Mopria scanning) straight into the workspace, use shared MFPs set up by an administrator, and retrieve documents from FUJIFILM mailboxes, from Canon / Konica Minolta / SHARP file shares and directly from KYOCERA / RICOH (all experimental). The tool page and the admin page on the web use these same endpoints. The tool was called Fetch from MFP and is renamed MFP Scan & Fetch from v1.16.89; its URLs and tool ID are unchanged.</p></blockquote>
+<div class="doc-crumb">9b. MFP Scan & Fetch API</div>
+<blockquote><p><strong>FUJIFILM in-device mailbox retrieval is verified on real devices; retrieval from other vendors is experimental.</strong> For now it can add MFPs, run connection tests and identify the model, scan from MFPs that support eSCL (AirPrint / Mopria scanning) straight into the workspace, use shared MFPs set up by an administrator, and retrieve documents from FUJIFILM mailboxes, from Canon / Konica Minolta / SHARP file shares and directly from KYOCERA / RICOH (all experimental). The tool page and the admin page on the web use these same endpoints. The tool was called Fetch from MFP and is renamed MFP Scan & Fetch from v1.16.89; its URLs and tool ID are unchanged.</p></blockquote>
 <p><strong>Every MFP belongs to the caller</strong> (the token's owner when called with an API token): someone else's MFP always returns <code>404</code>, without revealing whether it exists. <strong>Shared MFPs</strong> are created by an administrator who chooses members (users, or groups including subgroups); members can see them, test them again and scan, but cannot rename or remove them. Without sign-in enabled, only a browser on the server itself or a call with a valid API token is accepted.</p>
 <p><strong>What a connection test may touch</strong>: internal network addresses only (private IPs; loopback, link-local, public addresses and this server's own addresses are always refused), web ports <code>80</code>, <code>443</code>, <code>8080</code> and <code>8443</code> only; only <code>GET</code> requests (the home page and the eSCL capabilities <code>/eSCL/ScannerCapabilities</code>), never any credentials or cookies; redirects are followed only within the same device. At most 10 per person in 5 minutes, one at a time.</p>
 <p><strong>Whether users may add their own MFPs</strong> is up to the administrator (allowed by default; see Usage settings below). When it is off, regular users get <code>403</code> (<code>USER_DEVICES_DISABLED</code>) from the connection test and from saving; MFPs they added earlier show <code>paused: true</code> in the list and cannot be tested, scanned from or fetched from, but can still be renamed and removed. Shared MFPs work as usual and administrators are not restricted.</p>
@@ -1490,7 +1490,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p><code>supported</code> is never returned for now; it will appear once a model passes verification on a real device.</p>
       </section>
       <section class="doc-section" data-sec="我的事務機" data-title="My MFPs" hidden>
-<div class="doc-crumb">9b. MFP Scan & Fetch API (Beta)</div>
+<div class="doc-crumb">9b. MFP Scan & Fetch API</div>
 <h4 id="我的事務機">My MFPs</h4>
 <pre><code class="lang-text"><span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections                 <span class="hl-cmt"># 清單</span>
 <span class="hl-method">POST</span>   /tools/mfp-fetch/api/connections                 <span class="hl-cmt"># 儲存：{&quot;token&quot;: &quot;...&quot;, &quot;display_name&quot;: &quot;三樓行政區&quot;}</span>
@@ -1503,7 +1503,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>Each entry in the list also has <code>shared</code> (whether it is a shared MFP), <code>can_manage</code> (whether it can be renamed or removed), <code>scan</code> (whether it can scan and which settings are available, <code>null</code> without eSCL), <code>box</code> (whether mailbox retrieval is available; FUJIFILM only for now), <code>share</code> (the file share retrieval methods available, for example <code>{&quot;routes&quot;: [&quot;canon_webdav&quot;, &quot;canon_smb&quot;]}</code>, <code>null</code> if none), <code>paused</code> (your own MFP is paused because an administrator turned off adding your own) and <code>queue</code> (<code>{&quot;busy&quot;: true, &quot;waiting&quot;: 1, &quot;kind&quot;: &quot;scan&quot;}</code>, whether the device is busy now and how many are waiting). The list itself also returns <code>can_add</code> (whether the caller may add MFPs). Shared MFPs are read-only for members: renaming and removing return <code>403</code> (<code>SHARED_READ_ONLY</code>).</p>
       </section>
       <section class="doc-section" data-sec="診斷報告" data-title="Diagnostic report" hidden>
-<div class="doc-crumb">9b. MFP Scan & Fetch API (Beta)</div>
+<div class="doc-crumb">9b. MFP Scan & Fetch API</div>
 <h4 id="診斷報告">Diagnostic report</h4>
 <p>The full record of a connection test, downloadable in a choice of formats. For a saved MFP you get the latest test; for an unsaved test result use the <code>token</code> returned by the connection test.</p>
 <pre><code class="lang-text"><span class="hl-method">GET</span>  /tools/mfp-fetch/api/connections/{id}/report?format=pdf   <span class="hl-cmt"># 已儲存的事務機</span>
@@ -1518,7 +1518,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span></code></pre>
       </section>
       <section class="doc-section" data-sec="掃描escl" data-title="Scanning (eSCL)" hidden>
-<div class="doc-crumb">9b. MFP Scan & Fetch API (Beta)</div>
+<div class="doc-crumb">9b. MFP Scan & Fetch API</div>
 <h4 id="掃描escl">Scanning (eSCL)</h4>
 <p>Scan from an MFP into the <strong>caller's own</strong> workspace. Put the document on the glass (or in the feeder) before calling.</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/scan       <span class="hl-cmt"># 開始掃描（202，回掃描紀錄）</span>
@@ -1534,7 +1534,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>Settings outside the device's capabilities return <code>400</code> (<code>SCAN_OPTION_INVALID</code>); a device without eSCL returns <code>400</code> (<code>SCAN_NOT_SUPPORTED</code>); a full queue returns <code>429</code>. Errors during the scan are in the record's <code>error_code</code>: <code>SCAN_DEVICE_BUSY</code> (someone is using the device), <code>SCAN_ADF_EMPTY</code>, <code>SCAN_AUTH_REQUIRED</code> (the device requires sign-in to scan, not supported yet), <code>SCAN_NO_DOCUMENT</code>, <code>SCAN_BAD_DOCUMENT</code>, <code>SCAN_TOO_LARGE</code>, <code>SCAN_TIMEOUT</code> and so on. <strong>No credentials are sent</strong>.</p>
       </section>
       <section class="doc-section" data-sec="機內信箱取件fujifilm實驗性" data-title="Mailbox retrieval (FUJIFILM, experimental)" hidden>
-<div class="doc-crumb">9b. MFP Scan & Fetch API (Beta)</div>
+<div class="doc-crumb">9b. MFP Scan & Fetch API</div>
 <h4 id="機內信箱取件fujifilm實驗性">Mailbox retrieval (FUJIFILM, experimental)</h4>
 <blockquote><p><strong>Built from research and not yet verified on a real device.</strong> Based on research into the manufacturer's retrieval tool, it reads the mailbox of a FUJIFILM MFP over WebDAV (PROPFIND to list documents, GET to download). Only these two requests are sent, so nothing on the device is deleted or changed; but if the device or mailbox is set to delete after retrieval, the device deletes the documents itself (see the delete-after-retrieval confirmation parameter below). Only MFPs identified as FUJIFILM that the connection test can reach are supported; others return 400 (BOX_NOT_FUJIFILM).</p></blockquote>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/box/list    <span class="hl-cmt"># 列出信箱裡的文件</span>
@@ -1570,7 +1570,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>Retrieval jobs share the scan job record (<code>kind: &quot;box&quot;</code>): <code>files</code> lists every file saved (<code>name</code>, <code>pages</code>, <code>workspace_file_id</code>) and <code>items</code> the result for each document (<code>status</code>, <code>error_code</code>, <code>format_note</code>, and <code>source</code>: <code>SOURCE_KEPT</code> the original is still there / <code>SOURCE_GONE</code> it is no longer on the device / <code>SOURCE_UNKNOWN</code>). When some documents were not retrieved, <code>status</code> is still <code>done</code> and <code>error_code</code> is <code>BOX_PARTIAL</code>. If conversion to PDF fails (for example a TIFF with an unsupported compression), the original files are saved instead and <code>format_note</code> is <code>PDF_FALLBACK_ORIGINAL</code>.</p>
       </section>
       <section class="doc-section" data-sec="檔案分享取件canonkonica-minoltasharpkyoceraricoh實驗性" data-title="File share retrieval (Canon, Konica Minolta, SHARP, KYOCERA, RICOH; experimental)" hidden>
-<div class="doc-crumb">9b. MFP Scan & Fetch API (Beta)</div>
+<div class="doc-crumb">9b. MFP Scan & Fetch API</div>
 <h4 id="檔案分享取件canonkonica-minoltasharpkyoceraricoh實驗性">File share retrieval (Canon, Konica Minolta, SHARP, KYOCERA, RICOH; experimental)</h4>
 <blockquote><p><strong>Experimental and not yet verified on a real device.</strong> Following the methods published in the manufacturers' manuals, it reads file shares on the MFP: Canon Advanced Box (shared and personal space over WebDAV or SMB), Konica Minolta public user boxes (SMB) and the NAS of SHARP MFPs (SMB). KYOCERA document boxes and the RICOH Document Server are read through the device's document service (SOAP), based on an analysis of the manufacturers' tools; this is not an interface the manufacturers publish. It only reads and never deletes, renames or writes files on the device. MFPs that can use it show the available methods in the list; other vendors return 400 (SHARE_ROUTE_INVALID).</p></blockquote>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/mfp-fetch/api/connections/{id}/share/list    <span class="hl-cmt"># 列出位置、資料夾與檔案</span>
@@ -1580,7 +1580,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>SMB uses NTLMv2 only; if the device only offers SMB1 it stops before authenticating (<code>SMB1_REFUSED</code>), messages are signed when the device supports it, and content is not encrypted. Errors on the device side always return <code>422</code>: <code>SMB_PLAIN_NEEDS_CONSENT</code>, <code>SMB_AUTH_FAILED</code>, <code>SMB_CONNECT_FAILED</code> (port 445 closed), <code>SHARE_FORBIDDEN</code>, <code>SHARE_NOT_FOUND</code>, <code>BOX_SHARE_NOT_FOUND</code> (no share found for this Konica box), <code>SHARE_LOGIN_PAGE</code>, and the same <code>TLS_UNTRUSTED</code>, <code>AUTH_FAILED</code> and so on as mailbox retrieval. KYOCERA / RICOH also return <code>SOAP_UNAVAILABLE</code> (the device's document service did not respond), <code>BOX_PASSWORD_FAILED</code>, <code>DOC_PASSWORD_REQUIRED</code>, <code>DOC_PASSWORD_FAILED</code>, <code>SESSION_EXPIRED</code>, <code>SOAP_BUSY</code>, <code>RICOH_AUTH_UNSUPPORTED</code> (the device offers no usable sign-in method), <code>RICOH_AUTH_MODE_REQUIRED</code> (no sign-in method chosen yet; nothing was sent), <code>RICOH_AUTH_MODE_MISMATCH</code>, <code>RICOH_AUTH_INPUT_CONFLICT</code>, <code>RICOH_AUTH_PROFILE_UNSUPPORTED</code>, <code>RICOH_USER_CODE_REQUIRED</code>, <code>RICOH_PASSWORD_UNSUPPORTED</code>, <code>RICOH_SESSION_REJECTED</code> (the device did not accept this sign-in) and <code>RICOH_URL_UNSUPPORTED</code> (the download address is not on this device, or is FTP). When a document comes back in several parts, <code>pdf</code> merges them into one in order and <code>original</code> saves each as a numbered file. The job record's <code>kind</code> is <code>share</code>; the other fields are the same as for mailbox retrieval.</p>
       </section>
       <section class="doc-section" data-sec="共用事務機管理員" data-title="Shared MFPs (administrators)" hidden>
-<div class="doc-crumb">9b. MFP Scan & Fetch API (Beta)</div>
+<div class="doc-crumb">9b. MFP Scan & Fetch API</div>
 <h4 id="共用事務機管理員">Shared MFPs (administrators)</h4>
 <p>Created by an administrator, who chooses the members (users or groups; a group includes the members of its subgroups). Non-administrators get <code>403</code> (<code>ADMIN_ONLY</code>). On the web it is under Settings, Shared MFPs. Members still need access to the MFP Scan & Fetch tool.</p>
 <pre><code class="lang-text"><span class="hl-method">GET</span>    /tools/mfp-fetch/api/shared                  <span class="hl-cmt"># 清單（含成員數）</span>
@@ -1594,7 +1594,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <p>Members must be existing users and groups; anything else returns <code>400</code> (<code>MEMBERS_INVALID</code>). Membership is removed when the account or group is deleted; deleting the creator's account does not delete the shared MFP.</p>
       </section>
       <section class="doc-section" data-sec="使用設定管理員" data-title="Usage settings (administrators)" hidden>
-<div class="doc-crumb">9b. MFP Scan & Fetch API (Beta)</div>
+<div class="doc-crumb">9b. MFP Scan & Fetch API</div>
 <h4 id="使用設定管理員">Usage settings (administrators)</h4>
 <pre><code class="lang-text"><span class="hl-method">GET</span> /tools/mfp-fetch/api/settings     <span class="hl-cmt"># {&quot;settings&quot;: {&quot;allow_user_devices&quot;: true, &quot;updated_at&quot;: ...}}</span>
 <span class="hl-method">PUT</span> /tools/mfp-fetch/api/settings     <span class="hl-cmt"># {&quot;allow_user_devices&quot;: false}</span></code></pre>

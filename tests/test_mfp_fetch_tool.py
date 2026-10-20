@@ -1,4 +1,4 @@
-"""事務機取件（Beta）：工具頁與 API。
+"""事務機掃描取件：工具頁與 API。
 
 * **擁有者隔離**：A 的事務機 B 查不到、改不到、刪不到、下載不到報告（回「找不到」，不透露是別人的）；
   A 的連線測試 token B 拿去儲存也不行。
@@ -104,7 +104,7 @@ def two_clerks(admin_session):
     return a, b, ua, ub
 
 
-def test_the_page_renders_with_beta_and_passwords_only_in_the_retrieval_panels(two_clerks):
+def test_the_page_renders_without_beta_and_passwords_only_in_the_retrieval_panels(two_clerks):
     """密碼欄位只出現在機內信箱取件（實驗功能，v1.16.89）與檔案分享取件那兩塊，而且不讓瀏覽器自動填入或記住。
 
     v1.16.95：檔案分享多一欄 `mfShareExtra`（KYOCERA 文件匣密碼 / RICOH 文件密碼）。
@@ -112,7 +112,8 @@ def test_the_page_renders_with_beta_and_passwords_only_in_the_retrieval_panels(t
     a, *_ = two_clerks
     r = a.get("/tools/mfp-fetch/")
     assert r.status_code == 200
-    assert "tool-beta" in r.text and "事務機掃描取件" in r.text
+    assert "事務機掃描取件" in r.text
+    assert "tool-beta" not in r.text and "試用中" not in r.text, "v1.17.2 起不是 Beta（實機驗證過）"
     # 共用版面本身有「變更密碼」對話框 —— 只看這支工具自己的模板
     from pathlib import Path
     tpl = Path("app/tools/mfp_fetch/templates/mfp_fetch.html").read_text(encoding="utf-8")

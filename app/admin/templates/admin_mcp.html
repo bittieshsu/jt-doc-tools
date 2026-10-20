@@ -6,13 +6,8 @@
 {% set CAT = {'convert': ('文件轉換', 'file-swap', 'c-sky'), 'pdf_edit': ('PDF 編修', 'pages', 'c-violet'),
               'extract': ('擷取與統計', 'text', 'c-emerald'), 'lookup': ('查詢', 'search', 'c-amber')} %}
 
-<div class="mcp-head">
-  <div class="mcp-head-ic">{{ icon('sparkles', size=26) }}</div>
-  <div class="mcp-head-tx">
-    <h1>{{ tr('MCP（AI 連接）') }}</h1>
-    <p class="muted">{{ tr('讓 Claude Code、Codex、OpenCode 這類 AI 客戶端透過 MCP 呼叫本站不用 LLM 的工具。AI 用的是你核發的 API Token，權限照那張 Token 綁定的使用者。') }}</p>
-  </div>
-</div>
+<h1>{{ icon('sparkles', size=22) }} {{ tr('MCP（AI 連接）') }} <span class="addon-badge">{{ tr('附加功能') }}</span></h1>
+<p class="muted">{{ tr('讓 Claude Code、Codex、OpenCode 這類 AI 客戶端透過 MCP 呼叫本站不用 LLM 的工具。AI 用的是你核發的 API Token，權限照那張 Token 綁定的使用者。') }}</p>
 
 {# ---- 目前狀態 ---- #}
 <div class="mcp-stats">
@@ -38,35 +33,41 @@
     <div><b>{{ tr('每次呼叫都有稽核') }}</b><p>{{ tr('記工具、Token、使用者、來源 IP、檔案編號，不記文件內容。') }}</p></div></div>
 </div>
 
-{# ---- 連線設定 ---- #}
+{# ---- 連線設定：兩欄設定卡，開關跟自己的標題放在同一張卡裡（原本一列橫跨整頁，開關離標題太遠） ---- #}
 <div class="panel mcp-card">
   <h2>{{ icon('gear', size=18) }} {{ tr('連線設定') }}</h2>
-  <div class="mcp-row">
-    <div class="mcp-row-l"><b>{{ tr('啟用 MCP') }}</b><span>{{ tr('關閉時所有 AI 客戶端都連不上。') }}</span></div>
-    <label class="mcp-switch"><input type="checkbox" id="mcp-enabled" {% if cfg.enabled %}checked{% endif %} aria-label="{{ tr('啟用 MCP') }}"><span></span></label>
-  </div>
-  <div class="mcp-row mcp-row-col">
-    <div class="mcp-row-l"><b>{{ tr('站台網址') }}</b>
-      <span>{{ tr('AI 上傳、下載檔案用的網址，要是 AI 所在電腦連得到的網址（經反向代理時填對外的網址）。跟「作業完成通知」的站台網址是同一個設定。') }}</span></div>
-    <input class="field mcp-input-wide" type="url" id="mcp-site" value="{{ site_url }}" placeholder="https://docs.example.com" maxlength="300" aria-label="{{ tr('站台網址') }}">
-  </div>
-  <div class="mcp-grid2">
-    <div class="mcp-row mcp-row-col">
-      <div class="mcp-row-l"><b>{{ tr('呼叫上限') }}</b><span>{{ tr('每張 Token 每分鐘最多幾次呼叫。') }}</span></div>
+  <div class="mcp-set">
+    <div class="mcp-tile">
+      <div class="mcp-tile-top">
+        <div class="mcp-tile-l"><b>{{ tr('啟用 MCP') }}</b><span>{{ tr('關閉時所有 AI 客戶端都連不上。') }}</span></div>
+        <label class="mcp-switch"><input type="checkbox" id="mcp-enabled" {% if cfg.enabled %}checked{% endif %} aria-label="{{ tr('啟用 MCP') }}"><span></span></label>
+      </div>
+    </div>
+    <div class="mcp-tile">
+      <div class="mcp-tile-l"><b>{{ tr('站台網址') }}</b>
+        <span>{{ tr('AI 上傳、下載檔案用的網址，要是 AI 所在電腦連得到的網址（經反向代理時填對外的網址）。跟「作業完成通知」的站台網址是同一個設定。') }}</span></div>
+      <input class="field mcp-input-wide" type="url" id="mcp-site" value="{{ site_url }}" placeholder="https://docs.example.com" maxlength="300" aria-label="{{ tr('站台網址') }}">
+    </div>
+    <div class="mcp-tile">
+      <div class="mcp-tile-l"><b>{{ tr('呼叫上限') }}</b><span>{{ tr('每張 Token 每分鐘最多幾次呼叫。') }}</span></div>
       <div class="mcp-num"><input class="field" type="number" id="mcp-rate" value="{{ cfg.rate_per_minute }}" min="1" max="600" aria-label="{{ tr('呼叫上限') }}"><span>{{ tr('次 / 分鐘') }}</span></div>
     </div>
-    <div class="mcp-row mcp-row-col">
-      <div class="mcp-row-l"><b>{{ tr('同時作業') }}</b><span>{{ tr('每張 Token 同時最多幾件作業。') }}</span></div>
+    <div class="mcp-tile">
+      <div class="mcp-tile-l"><b>{{ tr('同時作業') }}</b><span>{{ tr('每張 Token 同時最多幾件作業。') }}</span></div>
       <div class="mcp-num"><input class="field" type="number" id="mcp-conc" value="{{ cfg.max_concurrent }}" min="1" max="8" aria-label="{{ tr('同時作業') }}"><span>{{ tr('件') }}</span></div>
     </div>
-  </div>
-  <div class="mcp-row">
-    <div class="mcp-row-l"><b>{{ tr('票證綁定來源 IP') }}</b><span>{{ tr('傳輸票證只能從發出時的那個 IP 使用（建議打開）。') }}</span></div>
-    <label class="mcp-switch"><input type="checkbox" id="mcp-bindip" {% if cfg.ticket_bind_ip %}checked{% endif %} aria-label="{{ tr('票證綁定來源 IP') }}"><span></span></label>
-  </div>
-  <div class="mcp-row">
-    <div class="mcp-row-l"><b>{{ tr('允許 HTTP 傳檔') }}</b><span>{{ tr('站台網址是 HTTP 時也發傳輸票證；檔案會以未加密的方式在內網傳送。') }}</span></div>
-    <label class="mcp-switch"><input type="checkbox" id="mcp-http" {% if cfg.ticket_allow_http %}checked{% endif %} aria-label="{{ tr('允許 HTTP 傳檔') }}"><span></span></label>
+    <div class="mcp-tile">
+      <div class="mcp-tile-top">
+        <div class="mcp-tile-l"><b>{{ tr('票證綁定來源 IP') }}</b><span>{{ tr('傳輸票證只能從發出時的那個 IP 使用（建議打開）。') }}</span></div>
+        <label class="mcp-switch"><input type="checkbox" id="mcp-bindip" {% if cfg.ticket_bind_ip %}checked{% endif %} aria-label="{{ tr('票證綁定來源 IP') }}"><span></span></label>
+      </div>
+    </div>
+    <div class="mcp-tile">
+      <div class="mcp-tile-top">
+        <div class="mcp-tile-l"><b>{{ tr('允許 HTTP 傳檔') }}</b><span>{{ tr('站台網址是 HTTP 時也發傳輸票證；檔案會以未加密的方式在內網傳送。') }}</span></div>
+        <label class="mcp-switch"><input type="checkbox" id="mcp-http" {% if cfg.ticket_allow_http %}checked{% endif %} aria-label="{{ tr('允許 HTTP 傳檔') }}"><span></span></label>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -182,13 +183,6 @@
 </div>
 
 <style nonce="{{ request.state.csp_nonce }}">
-  .mcp-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
-  .mcp-head-ic { width: 48px; height: 48px; border-radius: 14px; flex: none; display: flex; align-items: center;
-    justify-content: center; color: #fff; background: linear-gradient(135deg, #8b5cf6, #4f46e5);
-    box-shadow: 0 6px 16px rgba(79,70,229,.25); }
-  .mcp-head-tx { flex: 1; min-width: 0; }
-  .mcp-head h1 { margin: 2px 0 4px; }
-  .mcp-head p { margin: 0; }
   .c-violet { background: #ede9fe; color: #6d28d9; } .c-sky { background: #e0f2fe; color: #0369a1; }
   .c-emerald { background: #d1fae5; color: #047857; } .c-amber { background: #fef3c7; color: #b45309; }
   .mcp-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
@@ -208,16 +202,14 @@
   .mcp-feat p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.5; color: #64748b; }
   .mcp-card h2 { display: flex; align-items: center; gap: 8px; }
   .mcp-lead { margin: -2px 0 12px; font-size: 13px; }
-  .mcp-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0;
-    border-top: 1px solid #f1f5f9; }
-  .mcp-card > .mcp-row:first-of-type { border-top: 0; }
-  .mcp-row-col { flex-direction: column; align-items: stretch; gap: 8px; }
-  .mcp-row-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .mcp-row-l b { font-size: 13.5px; color: #0f172a; }
-  .mcp-row-l span { font-size: 12.5px; color: #64748b; line-height: 1.5; }
-  .mcp-input-wide { width: min(520px, 100%); box-sizing: border-box; }
-  .mcp-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; border-top: 1px solid #f1f5f9; }
-  .mcp-grid2 .mcp-row { border-top: 0; }
+  .mcp-set { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .mcp-tile { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid #e2e8f0;
+    border-radius: 10px; background: #f8fafc; min-width: 0; }
+  .mcp-tile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .mcp-tile-l { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .mcp-tile-l b { font-size: 13.5px; color: #0f172a; }
+  .mcp-tile-l span { font-size: 12.5px; color: #64748b; line-height: 1.5; }
+  .mcp-input-wide { width: 100%; max-width: 560px; box-sizing: border-box; }
   .mcp-num { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
   .mcp-num input { width: 110px; }
   .mcp-switch { position: relative; width: 42px; height: 24px; flex: none; cursor: pointer; }
@@ -288,10 +280,10 @@
   .mcp-note { display: flex; gap: 6px; align-items: center; margin: 4px 0 0; font-size: 12.5px; color: #64748b; }
   @media (max-width: 900px) {
     .mcp-stats, .mcp-feats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .mcp-grid2 { grid-template-columns: 1fr; }
+    .mcp-set { grid-template-columns: 1fr; }
   }
   @media (max-width: 560px) {
-    .mcp-stats, .mcp-feats { grid-template-columns: 1fr; }
+    .mcp-feats { grid-template-columns: 1fr; }   /* 統計卡很短，手機上維持兩欄 */
     .mcp-token { flex-wrap: wrap; }
     .mcp-token-tags { justify-content: flex-start; width: 100%; order: 3; }
     .mcp-code pre { padding-right: 16px; padding-top: 44px; }
