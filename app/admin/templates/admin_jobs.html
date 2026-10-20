@@ -441,15 +441,9 @@
     // 舊資料沒有開始時間 → 顯示「—」。**不要拿送出時間硬湊** ——
     // 那會讓每一筆看起來都是「送出即開始」，等於騙人。
     if (!ts) return '—';
-    const d = new Date(ts * 1000);
-    const p = (n) => String(n).padStart(2, '0');
-    const today = new Date();
-    const sameDay = d.getFullYear() === today.getFullYear()
-                 && d.getMonth() === today.getMonth()
-                 && d.getDate() === today.getDate();
-    const hms = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
     // 同一天只顯示時分秒（清單多半在看今天的），跨天才補日期
-    return sameDay ? hms : (p(d.getMonth() + 1) + '/' + p(d.getDate()) + ' ' + hms);
+    const sameDay = jtTime.date(ts) === jtTime.date(new Date());
+    return sameDay ? jtTime.time(ts, {seconds: true}) : jtTime.md(ts, {seconds: true});
   }
 
   function fmtElapsed(s) {
@@ -716,10 +710,7 @@
   }
 
   function fmtTime(ts, hours) {
-    const d = new Date(ts * 1000);
-    const p = (x) => String(x).padStart(2, '0');
-    return hours > 48 ? `${p(d.getMonth() + 1)}/${p(d.getDate())}`
-                      : `${p(d.getHours())}:${p(d.getMinutes())}`;
+    return hours > 48 ? jtTime.date(ts).slice(5) : jtTime.time(ts);   // 圖的橫軸：MM/DD 或 HH:mm
   }
 
   function drawChart(data) {

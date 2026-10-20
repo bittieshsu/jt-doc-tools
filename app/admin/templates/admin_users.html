@@ -478,9 +478,7 @@ const ALL_GROUPS = {{ all_groups|tojson }};
 // line and a relative "X 分鐘前" hint on the second.
 (function fmtTimestamps() {
   function pad(n) { return String(n).padStart(2, '0'); }
-  function fmtAbs(d) {
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
+  function fmtAbs(d) { return jtTime.dt(d); }
   function fmtRel(secsAgo) {
     // 帶數字的句子要用 `{0}` 當鍵再代回去 —— 直接把數字接在中文後面的話
     // 那條字串永遠查不到翻譯（而且完全無聲）。

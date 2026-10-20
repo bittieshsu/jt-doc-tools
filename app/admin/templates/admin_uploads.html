@@ -99,11 +99,7 @@
 <script nonce="{{ request.state.csp_nonce }}">
 (function () {
   function pad(n) { return String(n).padStart(2, '0'); }
-  function fmtTs(ts) {
-    const d = new Date(ts);
-    return d.getFullYear() + '/' + pad(d.getMonth()+1) + '/' + pad(d.getDate())
-         + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
-  }
+  function fmtTs(ts) { return jtTime.dt(new Date(ts), {seconds: true}); }
   function fmtBytes(n) {
     if (!n) return '—';
     if (n < 1024) return n + ' B';

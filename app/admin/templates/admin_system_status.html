@@ -605,7 +605,7 @@ async function refreshHost() {
     const host = await r.json();
     renderHost(host);
     prev = { host };
-    $('ssLastUpdate').textContent = tr('最後更新：') + new Date().toLocaleTimeString();
+    $('ssLastUpdate').textContent = tr('最後更新：') + jtTime.time(new Date(), {seconds: true});
   } catch (e) {
     $('ssBanner').innerHTML = `<div class="ss-disabled-banner">主機資料錯誤：${escapeHTML(e.message)}</div>`;
   }
@@ -718,7 +718,7 @@ async function refreshDbs(thorough) {
     });
     const foot = $('ssDbFoot');
     foot.textContent = d.newest_backup
-      ? tr('最新備份：') + new Date(d.newest_backup * 1000).toLocaleString()
+      ? tr('最新備份：') + jtTime.dt(d.newest_backup)
         + tr('・存放於 ') + d.backup_dir
       : tr('尚無備份（可按「立即備份」建立第一份）');
   } catch (e) { /* 保持前一次的內容 */ }

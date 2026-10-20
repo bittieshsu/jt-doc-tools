@@ -301,13 +301,7 @@
   }
 
   // 不帶秒：只要看得出是哪一天幾點。
-  function fmtTime(sec) {
-    if (!sec) return '';
-    try {
-      return new Date(sec * 1000).toLocaleString(undefined, {
-        year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    } catch (e) { return ''; }
-  }
+  function fmtTime(sec) { return jtTime.dt(sec); }
 
   function fmtMb(n) {
     return (n / 1024 / 1024).toFixed(1) + ' MB';

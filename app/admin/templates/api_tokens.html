@@ -85,7 +85,7 @@
         </td>
         <td class="muted" data-s="s6b9c179a">
           {% if t.last_used_at %}
-            <script nonce="{{ request.state.csp_nonce }}">document.write(new Date({{ t.last_used_at * 1000 | int }}).toLocaleString('zh-TW'));</script>
+            <script nonce="{{ request.state.csp_nonce }}">document.write(jtTime.dt({{ t.last_used_at * 1000 | int }}));</script>
           {% else %}—{% endif %}
         </td>
         <td>

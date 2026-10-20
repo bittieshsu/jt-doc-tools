@@ -2038,6 +2038,7 @@ def build_auth_router(templates) -> APIRouter:
             "dual": _ns.DUAL_CHANNELS,
             # 哪些管道還沒有對真實服務驗證過（見 notify_channels.DEV_CHANNELS）
             "dev_channels": _nc.DEV_CHANNELS,
+            "verified_channels": _nc.verified_labels(),
             "secret_kept": _ns.SECRET_KEPT,
         })
 

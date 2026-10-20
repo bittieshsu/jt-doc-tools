@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **496 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **501 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -675,6 +675,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_admin_apis.py` | Admin API regression tests. |
 | `test_admin_exception_leak.py` | 管理區不可把例外原文吐到畫面上（CodeQL py/stack-trace-exposure） |
 | `test_admin_form_styles.py` | 管理區的設定頁要用同一套表單樣式 |
+| `test_admin_nav_order.py` | 管理選單的順序：同類的設定排在一起（v1.17.1；MCP 排在 LLM 設定下面） |
 | `test_admin_official_doc_layout.py` | 公文撰擬設定頁：資料來源的版面 —— 在真的瀏覽器裡量 |
 | `test_admin_picker_css.py` | admin 角色/群組 picker 的長名稱不可溢出重疊（2026-06-30 客戶回報） |
 | `test_admin_privacy_boundary.py` | 管理員的隱私界線要是**一份**政策（F10，v1.15.28） |
@@ -735,6 +736,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_csp_nonce.py` | CSP nonce 靜態回歸測試（Phase 1：script-src 移除 'unsafe-inline'） |
 | `test_csrf.py` | CSRF middleware（app/core/csrf.py）單元測試 —— 直接以 ASGI 呼叫 middleware， |
 | `test_csv_injection.py` | 匯出的 CSV 不可以讓試算表把內容當公式執行（CSV / 公式注入，CWE-1236） |
+| `test_datetime_format_is_unified.py` | 全站日期時間顯示格式統一（v1.17.1）：YYYY/MM/DD HH:mm、24 小時制 |
 | `test_db.py` | Tests for app.core.db (SQLite layer). |
 | `test_db_health.py` | SQLite 完整性檢查、熱備份與復原 |
 | `test_db_query_plans.py` | 熱路徑的 SQL 不可以整表掃描 |
@@ -877,6 +879,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_login_failure_audit.py` | 登入失敗的稽核要夠全、夠細，而且停用的目錄帳號不可以自己復活（v1.16.94） |
 | `test_looks_garbled.py` | Regression tests for pdf_editor._looks_garbled(). |
 | `test_markdown_to_doc_formats.py` | Markdown 轉辦公文件：只轉使用者要的格式 ＋ 程式碼語法上色 |
+| `test_mcp_admin.py` | 設定 → MCP 管理頁（v1.17.1）：存設定、逐張允許 Token、寫稽核、一般使用者不能改、客戶端設定範例 |
+| `test_mcp_server.py` | MCP 伺服器（v1.17.1）：傳輸、認證授權、上下文大小、執行工具、一次性傳輸票證 |
 | `test_meeting_chart_style_has_one_source.py` | 圖的配色只有一份 —— 前端畫圖、伺服器畫匯出用的圖，顏色必須同源 |
 | `test_meeting_glossary_parse_is_linear.py` | 「專有名詞或會議背景」的解析不可以是平方級（v1.16.59，CodeQL #200～#203、#199） |
 | `test_meeting_insight.py` | 會議分析的確定性部分（切視窗、解析、引用驗證、合併、發言者統計） |
@@ -905,6 +909,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_mfp_client.py` | 事務機取件：連線測試的網路用戶端（目的地政策＋逐步診斷） |
 | `test_mfp_escl.py` | 事務機掃描（eSCL）：能力表、掃描設定、整個掃描流程（對一台假的 eSCL 設備） |
 | `test_mfp_fetch_page_browser.py` | 事務機取件頁：在真的瀏覽器裡跑一次（連線測試 → 儲存 → 詳細 → 被擋的位址） |
+| `test_mfp_fetch_page_parity.py` | 事務機掃描取件（v1.17.1）：工具頁與「設定 → 共用事務機」用同一份資料、已驗證支援清單、「可掃描」、進度條 |
 | `test_mfp_fetch_tool.py` | 事務機取件（Beta）：工具頁與 API |
 | `test_mfp_profiles.py` | 事務機取件：型號辨識 |
 | `test_mfp_queue.py` | 事務機排隊：同一台實體設備一次只做一件事（使用者 2026-10-14：「要避免同時多人存取事務機 |
@@ -2334,6 +2339,10 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       浮水印 / 插入頁碼 → 頁面最上方出現黃色提示；管理員看得到安裝指令，
       一般使用者看到「請聯絡管理員」。裝回字型後提示消失
 
+- [ ] **MCP（AI 連接）**（v1.17.1）：設定 → MCP（`/admin/mcp`）打開、站台網址設好、一張 Token 勾「允許 MCP」；
+      用 Claude Code、Codex、OpenCode 各接一次（設定頁的範例照貼），走「上傳兩份 PDF → 合併 → 壓縮 → 下載到本機」，
+      下載的檔案打開來頁數對、雜湊跟工具回的一致；`/mcp` 的 `tools/list` 只有固定的工具（`tests/test_mcp_server.py`、`tests/test_mcp_admin.py`）
+
 ### 2.7b 介紹站（GitHub Pages）
 - [ ] **資料保護與合規頁**（v1.16.71 上線、v1.16.74 改版）：首頁稽核那一節最下面有「資料保護與合規」說明框與按鈕、每一頁頁尾有連結。
       點進 `compliance.html`：頁首一句話（文件留在自己的伺服器）＋說明框寫明認證驗的是組織、本頁不是法律意見；
@@ -3008,6 +3017,12 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 - [ ] `/admin/conversion/save`
 
+#### MCP 設定（`/admin/mcp/*`，v1.17.1）
+
+- [ ] `/admin/mcp`：頁面列出開放的工具、Token（只顯示遮罩）、四家客戶端的設定範例
+- [ ] `/admin/mcp/save`：總開關、站台網址（只收 http / https）、開放的工具（只留登記表裡有的）、限流與同時數（夾在範圍內）、票證設定；寫稽核（對象 `mcp`）
+- [ ] `/admin/mcp/token`：用遮罩辨認 Token、打開 / 關閉「允許 MCP」；稽核只記 Token 名稱，不記 Token
+
 #### 通知設定（`/admin/notify/*`）
 
 - [ ] **Zulip 預設私訊到帳號信箱**（v1.17.0，使用者 2026-10-18「預設請填 email 不能留空」）：「我的作業 → 完成通知」的 Zulip 欄位預設就填好帳號信箱；改了會保留；清空存檔補回帳號信箱；帳號沒有信箱才是空的、走團隊頻道（`tests/test_my_notify_zulip_browser.py`）。
@@ -3127,9 +3142,15 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 目前沒有自動化測試碰過，跑 `python tools/report_endpoint_test_coverage.py`，
 那份是**提示不是判決**。
 
-共 **313 支**（工具首頁不列，§2 已逐支驗收）。
+共 **316 支**（工具首頁不列，§2 已逐支驗收）。
 
 **全站（認證 / 帳號 / 工作區 / 介面語言）**
+
+**MCP（v1.17.1，AI 客戶端；自己做認證，預設關閉）**
+
+- [ ] `POST /mcp`：JSON-RPC（`initialize` / `ping` / `tools/list` / `tools/call`）；沒 Token 401、總開關關或 Token 沒勾允許 MCP 403、Origin 不是站台網址 403；`tools/list` 只有固定工具而且總長度有上限；執行結果存進工作區、稽核標「經由 MCP」（`tests/test_mcp_server.py`）
+- [ ] `POST /mcp/files/upload`：只認標頭 `X-JTDT-Ticket`；成功才算用掉、重送回原本的檔案編號、比申報大回 413、雜湊不符 422、來源 IP 不符或過期 403；**把上傳的檔案打開來看**跟原檔一樣
+- [ ] `GET /mcp/files/download`：只認標頭的下載票證（上傳票證不行、網址帶票證不行）；`X-Content-SHA256` 跟檔案一致、`Content-Disposition: attachment`
 
 - [ ] `GET /`
 - [ ] `POST /2fa-verify`
@@ -3803,13 +3824,21 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
        tests/test_redos_ad_dn.py
    ```
    `test_version_consistency` 確保 `app/main.py:VERSION` / `pyproject.toml` / `uv.lock` / `README` / `CHANGELOG` 五處版本號完全一致（v1.5.3 慘案訓練）。
-7. 重啟 server，所有路由 200（以 curl 跑 1.1 列表）
-8. 手動跑一輪 2.x 清單
-9. 跑完 §6 「歷史回歸案例」清單
-10. 更新 `app/main.py` `VERSION` + `pyproject.toml` `version` + `github/CHANGELOG.md` 加一筆 + `github/README.md` 標題版號
-11. 重啟，確認 footer 顯示新版本號
-12. 確認停用的工具（`aes-zip`）仍保留程式碼但未顯示於側欄/首頁
-13. **推 GitHub 後 5–15 分鐘**檢查 GitHub native scan：
+7. **日期時間格式**（v1.17.1 起列為發版必跑）：
+   ```bash
+   uv run pytest tests/test_datetime_format_is_unified.py -q   # 原始碼：不可以自己組時間
+   python tools/check_datetime_display.py                     # 畫面：全部頁面 × 中英日，讀出畫面上的時間
+   ```
+   第二支要看「讀到 N 個時間」不是 0（0 代表測試資料沒進去，結果不算數），以及「全部通過」。
+   全站時間一律 `YYYY/MM/DD HH:mm`（同年清單可用 `MM/DD HH:mm`、同一天可只顯示 `HH:mm:ss`）、
+   24 小時制、瀏覽器時區；只由 `static/js/jt_time.js` 與 `app/main.py:_tpl_localdt` 產生。細節見 §6.112。
+8. 重啟 server，所有路由 200（以 curl 跑 1.1 列表）
+9. 手動跑一輪 2.x 清單
+10. 跑完 §6 「歷史回歸案例」清單
+11. 更新 `app/main.py` `VERSION` + `pyproject.toml` `version` + `github/CHANGELOG.md` 加一筆 + `github/README.md` 標題版號
+12. 重啟，確認 footer 顯示新版本號
+13. 確認停用的工具（`aes-zip`）仍保留程式碼但未顯示於側欄/首頁
+14. **推 GitHub 後 5–15 分鐘**檢查 GitHub native scan：
     - <https://github.com/jasoncheng7115/jt-doc-tools/security/dependabot> — Open alert 數應持平或下降
     - <https://github.com/jasoncheng7115/jt-doc-tools/security/code-scanning> — CodeQL 新警告當天處理或記入「已知議題」
 
@@ -6205,6 +6234,28 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.112 v1.17.1 — 全站日期時間格式統一（**每次發版必過**）
+
+判準：畫面上的時間一律 `YYYY/MM/DD HH:mm`（要秒的地方 `HH:mm:ss`）、24 小時制、瀏覽器時區；
+不可以出現「上午 / 下午」、AM / PM、`2026-10-19 13:05` 這種橫線寫法，英文、日文介面也一樣。
+
+**自動**（兩支都要過）：
+- [ ] `tests/test_datetime_format_is_unified.py`：掃 `app/` 與 `static/js/` 的模板與 JS，日期不可以用
+      `toLocaleString` / `toLocaleTimeString` / `hour12` / 手組 `getHours()`（數字的千分位與檔名例外，例外寫在 `_ALLOWED`）；
+      `base.html` 的 `<head>` 有載入 `jt_time.js`；`_tpl_localdt` 回 `2026/10/19 23:05`；`jtTime` 用 node 跑一次逐項比對輸出；
+      畫面檢查的判準本身抓得到七種錯的寫法、不誤擋正常字串。變異驗證過：把 `toLocaleString('zh-TW')` 放回去、手組 `getHours()`、伺服器改回橫線，三種都會紅。
+- [ ] `python tools/check_datetime_display.py`：拋棄式實例放進作業、稽核、API Token、工作區檔案，全部頁面 × 中英日，
+      讀出畫面上的文字檢查格式；頁面沒有 JavaScript 例外、`jtTime` 有載入。「讀到 N 個時間」不可以是 0。
+
+**改了格式之後的功能檢查**（改的是顯示，不可以影響行為）：
+- [ ] 作業管理（`/admin/jobs`）：同一天只顯示時分秒、跨天顯示 `MM/DD HH:mm:ss`；負載圖橫軸 48 小時內 `HH:mm`、以上 `MM/DD`。
+- [ ] 我的作業、工作區、工作區挑檔視窗：時間是 `YYYY/MM/DD HH:mm`，排序照舊（排序用的是原始時間戳，不是顯示文字）。
+- [ ] 電子發票掃描的「掃描時間」欄格式選項：`local` → `2026/10/19 23:05:07`、`date_only` → `2026/10/19`、`iso` 與「相對時間」不變；匯出 CSV / Excel 的值跟畫面一致。
+- [ ] 事務機掃描取件的「最近測試」沒測過顯示「尚未測試」；**預設檔名**（`scan-YYYYMMDD-HHMMSS`）不變。
+- [ ] 日期章、密碼解除的日期候選、公文撰擬的日期輸入框：值還是 `YYYY-MM-DD`（`<input type="date">` 只收這個格式，改了會整個空掉）。
+- [ ] 送件前檢核案件清單、文件翻譯產出的「翻譯時間」、事務機診斷報告的時間：伺服器端也是斜線。
+- [ ] API Token、上傳暫存、稽核、歷史、系統狀態（最後更新、最新備份）、知識庫、統編資料庫的時間都對。
 
 ### 6.9.1 階段 1（v1.14.88）— 工具的語系白名單
 

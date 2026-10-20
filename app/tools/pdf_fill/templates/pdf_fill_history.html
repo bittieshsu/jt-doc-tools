@@ -151,7 +151,7 @@ document.addEventListener('click', async (e) => {
 
 document.querySelectorAll('.history-item .meta span:first-child').forEach(el => {
   const ts = parseInt(el.textContent, 10);
-  if (!isNaN(ts)) el.textContent = new Date(ts * 1000).toLocaleString('zh-Hant');
+  if (!isNaN(ts)) el.textContent = jtTime.dt(ts, {seconds: true});
 });
 
 refreshSelUI();

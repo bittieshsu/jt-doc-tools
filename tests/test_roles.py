@@ -91,8 +91,13 @@ def test_create_rejects_duplicate(auth_off):
 
 def test_update_changes_tools(auth_off):
     roles.seed_builtin_roles()
-    roles.update("clerk", tools=["pdf-merge"])
-    assert roles.get("clerk")["tools"] == ["pdf-merge"]
+    before = roles.get("clerk")["tools"]
+    try:
+        roles.update("clerk", tools=["pdf-merge"])
+        assert roles.get("clerk")["tools"] == ["pdf-merge"]
+    finally:
+        # 還原：不還原的話，之後用「文管」角色的測試會拿不到原本的工具（v1.17.1 跟事務機測試一起跑時抓到）
+        roles.update("clerk", tools=before)
 
 
 def test_update_refuses_rename_protected(auth_off):

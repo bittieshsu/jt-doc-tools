@@ -19,6 +19,7 @@ Jason Tools 文件工具箱對外提供 RESTful API，所有工具皆有對應 e
 - [9. 商務查詢 API](#9-商務查詢-api)
 - [9b. 事務機掃描取件 API（Beta）](#9b-事務機掃描取件-apibeta)
 - [10. Job 模式 API](#10-job-模式-api)
+- [10b. MCP（AI 客戶端）](#10b-mcpai-客戶端)
 - [11. 管理端 API](#11-管理端-api)
 - [12. 整合範例](#12-整合範例)
 - [13. CLI 管理 token](#13-cli-管理-token)
@@ -431,8 +432,8 @@ POST /tools/pdf-split/api/pdf-split
 | 參數 | 類型 | 必填 | 說明 |
 |---|---|---|---|
 | `file` | file | ✓ | PDF |
-| `mode` | str | ✓ | `ranges`（依範圍）/ `every`（每 N 頁切一份）/ `single`（每頁一份） |
-| `ranges` | str | | mode=ranges 時的範圍，例 `1-3,5,7-9`；mode=every 時填數字 N |
+| `mode` | str | | `each`（預設，每頁一份）/ `ranges`（依範圍，每段一份） |
+| `ranges` | str | | mode=ranges 時的範圍，例 `1-3,5,7-9`（每一段切成一份） |
 
 ```bash
 curl -X POST http://localhost:8765/tools/pdf-split/api/pdf-split \
@@ -2664,6 +2665,86 @@ GET /api/jobs?active=false&limit=50&offset=0
 「我的作業」頁用的清單，只列自己的作業（`active=true` 只列排隊中與進行中的）。每一列有 `status`、`progress`、`has_result`（下載檔還在不在）、`view_url`（「開啟」要去的那一頁）與 `view_ok`。
 
 回應裡的 `view_ok` 是 `view_url` 那一頁現在還打不打得開：`view_url` 有值但 `view_ok` 是 `false`，代表資料已過保留期被清掉。判斷要不要給「開啟」請用 `view_ok`，**不可以用 `has_result` 代替**（逐句翻譯沒有下載檔，但「開啟」打得開）。
+
+---
+
+## 10b. MCP（AI 客戶端）
+
+讓 Claude Code、Codex CLI、OpenCode 這類 AI 客戶端透過 MCP（Model Context Protocol）呼叫本站**不用 LLM** 的工具。
+**預設關閉**，管理員在「設定 → MCP（AI 連接）」打開。
+
+```text
+POST /mcp                   # JSON-RPC 2.0（Streamable HTTP，只回 JSON、無狀態）
+GET  /mcp                   # 405（不提供 SSE）
+POST /mcp/files/upload      # 用一次性票證上傳檔案進工作區
+GET  /mcp/files/download    # 用一次性票證下載工作區的檔案
+```
+
+**認證**：`Authorization: Bearer <API Token>`。這張 Token 要在設定頁另外勾「允許 MCP」；站台啟用認證時，
+Token 要綁定使用者，權限照那位使用者（沒有某支工具的權限就看不到、也叫不動）。有帶 `Origin` 標頭時要是站台網址那個來源。
+協定版本支援 `2025-11-25`、`2025-06-18`、`2025-03-26`、`2024-11-05`。
+
+**工具清單只有固定 9 個**（不管開放多少支本站工具都不會變多，不會佔滿模型的上下文）：
+
+| MCP 工具 | 作用 |
+|---|---|
+| `jtdt_catalog` | 列出可以執行的工具（名稱、分類、一行說明） |
+| `jtdt_describe` | 一支工具的參數、輸入檔與範例 |
+| `jtdt_run` | 執行：`tool`、`files`（工作區檔案編號）、`params`；結果存進工作區。超過約 45 秒回 `job_id` |
+| `job_status` | 等待 / 取得 `jtdt_run` 的結果 |
+| `workspace_list` | 列出自己工作區的檔案 |
+| `workspace_upload_url` | 取得一次性上傳指令（`curl`），讓 AI 自己上傳本機檔案 |
+| `workspace_upload_inline` | 256 KB 以下的小檔直接用 Base64 上傳（給不能執行指令的客戶端） |
+| `workspace_download_url` | 取得一次性下載指令（`curl`） |
+| `workspace_read_text` | 分頁讀工作區裡的文字檔 |
+
+目前開放的工具：`pdf_merge`（檔案合併）、`pdf_split`（頁面分拆）、`pdf_compress`（PDF 壓縮）、`pdf_rotate`（頁面轉向）、
+`pdf_page_numbers`（插入頁碼）、`office_to_pdf`（辦公文件轉 PDF）、`document_to_images`（辦公文件轉圖片）、
+`pdf_extract_text`（擷取文字）、`document_word_count`（字數統計）、`vat_lookup`（統編查詢）。
+執行時在伺服器內部用**同一張 Token** 呼叫各工具原本的 API，檢查、權限、稽核都跟 REST 一樣（稽核標「經由 MCP」）。
+
+**檔案傳輸（檔案內容不經過模型）**：`workspace_upload_url` / `workspace_download_url` 回一張一次性票證與 `curl` 指令。
+票證放在標頭 `X-JTDT-Ticket`（不放網址）、15 分鐘有效、只能用在一個檔；上傳**存好才算用掉**（斷線可以重傳，
+成功後再送回 `409` 與原本的檔案編號）；可以帶 `sha256`，不符回 `422`；比申報的大小大回 `413`；預設綁發出時的來源 IP。
+網址用設定的站台網址組（不用請求的 Host 標頭）；站台網址是 HTTP 時要管理員另外允許。
+
+```bash
+# 列出工具（JSON-RPC）
+curl -s -X POST http://localhost:8765/mcp \
+  -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq
+
+# 上傳（票證從 workspace_upload_url 拿）
+curl -sS --fail-with-body -H 'X-JTDT-Ticket: TICKET' -F 'file=@report.pdf' http://localhost:8765/mcp/files/upload
+# → {"ok": true, "file_id": "...", "name": "report.pdf", "bytes": 12345, "sha256": "..."}
+```
+
+**客戶端設定**（設定頁有填好網址的範例）：
+
+```bash
+# Claude Code
+claude mcp add --transport http jt-doc-tools https://docs.example.com/mcp --header "Authorization: Bearer YOUR_TOKEN"
+```
+
+```toml
+# Codex CLI：~/.codex/config.toml（Token 放環境變數 JTDT_TOKEN）
+[mcp_servers.jt-doc-tools]
+url = "https://docs.example.com/mcp"
+bearer_token_env_var = "JTDT_TOKEN"
+```
+
+```json
+{"mcp": {"jt-doc-tools": {"type": "remote", "url": "https://docs.example.com/mcp", "enabled": true,
+  "oauth": false, "headers": {"Authorization": "Bearer {env:JTDT_TOKEN}"}}}}
+```
+
+上面是 OpenCode 的 `opencode.json`。Claude Desktop 用 `mcp-remote` 轉接（只能用 256 KB 以下的小檔）。
+
+**限制與稽核**：每張 Token 每分鐘的呼叫數、同時執行的作業數有上限（設定頁可調）；每一次執行寫 `mcp_call` 稽核
+（工具、Token 名稱、使用者、來源 IP、輸入與輸出的檔案編號），上傳 / 下載寫 `mcp_upload` / `mcp_download`，不記文件內容與票證。
+
+**管理端點**（管理員，session）：`GET /admin/mcp`（設定頁）、`POST /admin/mcp/save`（總開關、站台網址、開放的工具、
+限流、票證設定）、`POST /admin/mcp/token`（`{"preview": "<遮罩>", "allowed": true}`，打開 / 關閉某張 Token 連 MCP）。
 
 ---
 

@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ [English](README_en.md) ｜ **日本語**
 
-# Jason Tools ドキュメントツールボックス v1.17.0
+# Jason Tools ドキュメントツールボックス v1.17.1
 
 > ### ⚠ 2026-09-13 より前に git でインストールした場合、このバージョンにアップグレードする前に 1 行実行してください
 >
@@ -27,7 +27,7 @@
 
 > PDF / Office 文書の統合処理プラットフォーム。52 のツールで**フォーム入力と押印**、**透かし**、**結合 / 分割 / 回転 / 並べ替え**、**形式変換**、**スキャンの貼り合わせ**、**匿名化**、**文字数集計**、**注釈の整理**、**差分比較**、**文単位の翻訳**、**リスト処理**、**電子インボイス処理**、**統一番号の照会**、**ページエディタ**、**暗号化 / 復号**などに対応します。
 >
-> 企業向け機能：**ローカル / LDAP / AD の複数レルム認証**、**SSO シングルサインオン**(OIDC + SAML。M365 / Google / Keycloak に接続可)、**RBAC ロール権限**、**監査記録**、**SIEM 転送**(syslog / CEF / GELF)、**フォント管理**、**ユーザーのワークスペース**、**バックグラウンドジョブと完了通知**、**REST API**。
+> 企業向け機能：**ローカル / LDAP / AD の複数レルム認証**、**SSO シングルサインオン**(OIDC + SAML。M365 / Google / Keycloak に接続可)、**RBAC ロール権限**、**監査記録**、**SIEM 転送**(syslog / CEF / GELF)、**フォント管理**、**ユーザーのワークスペース**、**バックグラウンドジョブと完了通知**、**REST API**、**MCP（Claude Code / Codex / OpenCode から LLM を使わないツールを呼び出す）**。
 >
 > **クラウドに出さず、データは自分の手元に残ります。** Linux / macOS / Windows の 3 プラットフォームで、スタンドアロンでも社内ネットワークのサイトとして複数人でも使えます。
 
@@ -284,7 +284,7 @@ OpenAI 互換のバックエンド（ローカルの Ollama、LiteLLM などの 
 | **[OPS.md](OPS.md)** | 日常運用：`jtdt` コマンド、アップグレード、リバースプロキシ(nginx/Caddy)、待ち受けアドレス、バックアップと復元、別のホストへの移行、スケジュールのクリーンアップ |
 | **[AUTH.md](AUTH.md)** | 認証 / RBAC / 組み込みアカウント(jtdt-admin / jtdt-auditor)/ 2FA / SSO(OIDC+SAML) / Reverse Proxy SSO(Kerberos) / アカウントのロック / 緊急復旧 |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO（Kerberos / SPNEGO）の完全な導入手順：AD サービスアカウント、setspn、ktpass / keytab、Nginx の設定、ブラウザーの自動ログイン、ヘッダー偽造への対策 |
-| **[API.md](API.md)**（[オンライン版](https://jasoncheng7115.github.io/jt-doc-tools/api.html)）| REST API:Bearer token、エンドポイント一覧、アップロード形式、レスポンス形式、エラーコード、curl / Python の例、Job の流れ |
+| **[API.md](API.md)**（[オンライン版](https://jasoncheng7115.github.io/jt-doc-tools/api.html)）| REST API:Bearer token、エンドポイント一覧、アップロード形式、レスポンス形式、エラーコード、curl / Python の例、Job の流れ、MCP（AI クライアント）の接続と設定 |
 | **[LLM.md](LLM.md)** | LLM による AI 機能（既定でオフ）：14 個のツールでの LLM の使い方、効果の例、対応する LLM サーバーとゲートウェイ（Ollama / LiteLLM / vLLM…）、思考のオフと並列設定 |
 | **[SECURITY.md](SECURITY.md)** | セキュリティポリシー、OWASP Top 10 (2025) との対応、脆弱性の報告窓口、GitHub native scan の統合 |
 | **[COMPLIANCE.md](COMPLIANCE.md)**（[オンライン版](https://jasoncheng7115.github.io/jt-doc-tools/compliance-ja.html)）| データ保護とコンプライアンス：文書がどこに残るか、どんな場合に外部へ接続するか、ツールが備える管理策と組織が行うこと、台湾の個人資料保護法・GDPR・ISO/IEC 27001:2022・ISO/IEC 42001:2023 との対応 |

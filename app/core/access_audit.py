@@ -156,7 +156,8 @@ def _via(request) -> dict:
     label = getattr(request.state, "api_token_label", None)
     if label is None:
         return {}
-    return {"via": "api_token", "token": str(label)[:64]}
+    via = "mcp" if getattr(request.state, "api_via_mcp", False) else "api_token"
+    return {"via": via, "token": str(label)[:64]}
 
 
 def after_response(request, response) -> None:

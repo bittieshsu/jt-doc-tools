@@ -1,6 +1,6 @@
 **繁體中文** ｜ [English](README_en.md) ｜ [日本語](README_ja.md)
 
-# Jason Tools 文件工具箱 v1.17.0
+# Jason Tools 文件工具箱 v1.17.1
 
 > ### ⚠ 2026-09-13 之前用 git 安裝的，這一版升級前要先跑一行
 >
@@ -27,7 +27,7 @@
 
 > 整合式 PDF / Office 文件處理平台，52 個工具整合解決：**填單用印**、**浮水印**、**多頁合併 / 拆分 / 旋轉 / 整理**、**轉檔**、**掃描拼合**、**去識別化**、**字數統計**、**註解整理**、**差異比對**、**逐句翻譯**、**清單處理**、**電子發票處理**、**統編查詢**、**頁面編輯器**、**加密 / 解密**等。
 >
-> 企業功能：**本機 / LDAP / AD 多領域認證**、**SSO 單一登入**(OIDC + SAML，可接 M365 / Google / Keycloak)、**RBAC 角色權限**、**稽核記錄**、**SIEM 轉送**(syslog / CEF / GELF)、**字型管理**、**使用者工作區**、**背景作業與完成通知**、**REST API**。
+> 企業功能：**本機 / LDAP / AD 多領域認證**、**SSO 單一登入**(OIDC + SAML，可接 M365 / Google / Keycloak)、**RBAC 角色權限**、**稽核記錄**、**SIEM 轉送**(syslog / CEF / GELF)、**字型管理**、**使用者工作區**、**背景作業與完成通知**、**REST API**、**MCP（讓 Claude Code / Codex / OpenCode 呼叫不用 LLM 的工具）**。
 >
 > **不上雲，資料留在自己手中。** Linux / macOS / Windows 三平台都可單機跑或內網架站給多人用。
 
@@ -284,7 +284,7 @@ $f="$env:TEMP\jtdt-install.ps1"; try { Invoke-WebRequest 'https://cdn.jsdelivr.n
 | **[OPS.md](OPS.md)** | 日常維運：`jtdt` 指令、升級、反向代理(nginx/Caddy)、監聽位置、備份還原、搬到另一台主機、排程清理 |
 | **[AUTH.md](AUTH.md)** | 認證 / RBAC / 內建帳號(jtdt-admin / jtdt-auditor)/ 2FA / SSO(OIDC+SAML) / Reverse Proxy SSO(Kerberos) / 帳號鎖定 / 緊急復原 |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO（Kerberos / SPNEGO）完整部署：AD service account、setspn、ktpass / keytab、Nginx 設定、瀏覽器自動登入、標頭偽造防護 |
-| **[API.md](API.md)**（[線上網頁版](https://jasoncheng7115.github.io/jt-doc-tools/api.html)）| REST API:Bearer token、endpoint 一覽、上傳格式、回傳格式、錯誤碼、curl / Python 範例、Job 流程 |
+| **[API.md](API.md)**（[線上網頁版](https://jasoncheng7115.github.io/jt-doc-tools/api.html)）| REST API:Bearer token、endpoint 一覽、上傳格式、回傳格式、錯誤碼、curl / Python 範例、Job 流程；MCP（AI 客戶端）的連線與設定 |
 | **[LLM.md](LLM.md)** | LLM AI 加值功能（預設關閉）：14 個工具如何用 LLM、效果範例、支援的 LLM 伺服器與閘道（Ollama / LiteLLM / vLLM…）、關閉思考與並行設定 |
 | **[SECURITY.md](SECURITY.md)** | 資安政策、OWASP Top 10 (2025) 對照、漏洞回報管道、GitHub native scan 整合 |
 | **[COMPLIANCE.md](COMPLIANCE.md)**（[線上網頁版](https://jasoncheng7115.github.io/jt-doc-tools/compliance.html)）| 資料保護與合規：文件留在哪裡、哪些情況會連到外部、工具做到的控制與組織要做的事，以及個資法、GDPR、ISO/IEC 27001:2022、ISO/IEC 42001:2023 的對照 |

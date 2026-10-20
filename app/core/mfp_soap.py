@@ -952,10 +952,20 @@ class RicohSession(Session):
             props, _o = self._repo("getProps", [_r("sessionId", "string", self._sid), _r("objectId", "string", i)])
             p = _props(props)
             other = _props(p.get("otherProps"))
+            if not entries and self.http.trace:
+                # 協定紀錄記「設備回了哪些屬性名稱」（只記名稱、不記內容）：實機的日期與大小
+                # 不一定叫 modifiedDate / contentLength（客戶 IM C3510 顯示「—」），對照用
+                self.http.trace[-1]["prop_names"] = sorted(str(k)[:40] for k in p)[:40]
+                self.http.trace[-1]["other_prop_names"] = sorted(str(k)[:40] for k in other)[:40]
             title = str(p.get("title") or i)[:160]
             self._names[seg] = title
-            entries.append({"name": seg, "label": title, "dir": False, "size": _num(p.get("contentLength")),
-                            "modified": _epoch(p.get("modifiedDate") or p.get("createdDate")),
+            size = next((_num(v) for v in (p.get("contentLength"), other.get("nf:contentLength"), p.get("size"),
+                                           other.get("nf:size")) if _num(v) is not None), None)
+            when = next((_epoch(v) for v in (p.get("modifiedDate"), p.get("createdDate"), other.get("nf:modifiedDate"),
+                                             other.get("nf:createdDate"), other.get("nf:storedDate"))
+                         if _epoch(v) is not None), None)
+            entries.append({"name": seg, "label": title, "dir": False, "size": size,
+                            "modified": when,
                             "type": str(other.get("nf:application") or "")[:20],
                             "locked": str(other.get("nf:passwordProtected", "")).lower() == "true"})
         return sorted(entries, key=lambda x: (-(x["modified"] or 0), x["label"].lower()))

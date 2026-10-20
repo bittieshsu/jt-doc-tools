@@ -154,12 +154,7 @@
     return m ? `${m} 分 ${String(s % 60).padStart(2, '0')} 秒` : `${s} 秒`;
   }
 
-  function fmtWhen(ts) {
-    const d = new Date((ts || 0) * 1000);
-    const p = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `
-         + `${p(d.getHours())}:${p(d.getMinutes())}`;
-  }
+  function fmtWhen(ts) { return jtTime.dt(ts); }
 
   // 圖示用 DOM API 建（不是 innerHTML）—— 這裡的內容是固定常數，但養成習慣：
   // JS 動態塞 DOM 一律走 createElement / textContent（CodeQL「DOM text
@@ -493,7 +488,7 @@
       if (ch.dev) {
         // 還沒對真實服務驗證過的管道 —— 標出來，勾了收不到才不會被當成自己設錯
         const tag = el('span', 'mn-dev', tr('開發階段'));
-        tag.title = tr('這個管道尚未實際接上服務驗證過，目前實機驗證過的是 Email 與 Zulip');
+        tag.title = tr('這個管道尚未實際接上服務驗證過，目前實機驗證過的是：{0}').replace('{0}', d.verified_channels || '');
         lab.appendChild(tag);
       }
       item.appendChild(lab);

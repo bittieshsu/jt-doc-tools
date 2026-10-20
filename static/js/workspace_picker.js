@@ -15,11 +15,7 @@
   // 存入時間：**同名檔案只能靠它分辨**（2026-10-03 使用者回報工作區裡有兩個同名的逐字稿，
   // 挑選視窗只列檔名與大小，不知道要選哪一個）。格式跟「我的工作區」那一頁相同。
   function fmtTime(ts) {
-    if (!ts) return '';
-    const d = new Date(ts * 1000);
-    const p = (x) => String(x).padStart(2, '0');
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' '
-      + p(d.getHours()) + ':' + p(d.getMinutes());
+    return window.jtTime ? window.jtTime.dt(ts) : '';
   }
   function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 

@@ -125,7 +125,10 @@ def test_the_page_renders_with_beta_and_passwords_only_in_the_retrieval_panels(t
 
 
 def test_users_without_the_tool_are_refused(admin_session, fake_probe):
-    c, _uid = _user_client("plain-user", ["default-user"])
+    """v1.17.1 起所有內建角色都有這支工具；沒權限的情況用一個只給「檔案合併」的自訂角色來驗。"""
+    from app.core import roles
+    roles.create("merge-only", "只能合併", "", ["pdf-merge"])
+    c, _uid = _user_client("plain-user", ["merge-only"])
     assert c.get("/tools/mfp-fetch/").status_code in (302, 303, 403)
     r = _detect(c)
     assert r.status_code in (302, 303, 401, 403)

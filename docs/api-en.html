@@ -230,6 +230,9 @@
             <a class="nav-ep" href="#列出自己的作業我的作業">List your own jobs (“My jobs”)</a>
           </div>
         </div>
+        <div class="nav-group nav-group-flat">
+          <a class="nav-ch" href="#10b-mcpai-客戶端">10b. MCP (AI clients)</a>
+        </div>
         <div class="nav-group">
           <div class="nav-group-head" role="button" tabindex="0" aria-expanded="true">
             <button class="toc-toggle" type="button" tabindex="-1" aria-hidden="true"></button>
@@ -511,7 +514,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="pdf-分割">Split PDF</h4>
 <p>Split a PDF by page count or ranges.</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-split/api/pdf-split</code></pre>
-<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>mode</code></td><td>str</td><td>✓</td><td><code>ranges</code> (by range) / <code>every</code> (one file every N pages) / <code>single</code> (one file per page)</td></tr><tr><td><code>ranges</code></td><td>str</td><td></td><td>The range when mode=ranges, e.g. <code>1-3,5,7-9</code>; a number N when mode=every</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>mode</code></td><td>str</td><td></td><td><code>each</code> (default, one file per page) / <code>ranges</code> (by range, one file per range)</td></tr><tr><td><code>ranges</code></td><td>str</td><td></td><td>The ranges when mode=ranges, e.g. <code>1-3,5,7-9</code> (each range becomes one file)</td></tr></tbody></table></div>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-split/api/pdf-split</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@big.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;mode=ranges&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;ranges=1-3,8-10&quot;</span> \
@@ -1658,6 +1661,40 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <pre><code class="lang-text"><span class="hl-method">GET</span> /api/jobs?active=false&amp;limit=<span class="hl-num">50</span>&amp;offset=<span class="hl-num">0</span></code></pre>
 <p>The list behind the “My jobs” page; it only lists your own jobs (<code>active=true</code> lists only queued and running ones). Each row has <code>status</code>, <code>progress</code>, <code>has_result</code> (whether the download file is still there), <code>view_url</code> (the page “Open” goes to) and <code>view_ok</code>.</p>
 <p><code>view_ok</code> in the response says whether the <code>view_url</code> page can still be opened: when <code>view_url</code> is set but <code>view_ok</code> is <code>false</code>, the data has passed its retention period and been cleared. Use <code>view_ok</code> to decide whether to offer “Open”; <strong>do not use <code>has_result</code> instead</strong> (sentence translation has no download file, yet its “Open” works).</p>
+<hr>
+      </section>
+      <section class="doc-section" data-sec="10b-mcpai-客戶端" data-title="10b. MCP (AI clients)" hidden>
+<h3 id="10b-mcpai-客戶端">10b. MCP (AI clients)</h3>
+<p>Lets AI clients such as Claude Code, Codex CLI and OpenCode call this site's <strong>non-LLM</strong> tools over MCP (Model Context Protocol). <strong>Off by default</strong>; an administrator turns it on under Settings → MCP (AI connection).</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /mcp                   <span class="hl-cmt"># JSON-RPC 2.0（Streamable HTTP，只回 JSON、無狀態）</span>
+<span class="hl-method">GET</span>  /mcp                   <span class="hl-cmt"># 405（不提供 SSE）</span>
+<span class="hl-method">POST</span> /mcp/files/upload      <span class="hl-cmt"># 用一次性票證上傳檔案進工作區</span>
+<span class="hl-method">GET</span>  /mcp/files/download    <span class="hl-cmt"># 用一次性票證下載工作區的檔案</span></code></pre>
+<p><strong>Authentication</strong>: <code>Authorization: Bearer &lt;API Token&gt;</code>. The token must also be allowed under "Allow MCP" on the settings page; with authentication on, the token must be assigned to a user and follows that user's permissions (a tool the user cannot use is neither listed nor callable). A request with an <code>Origin</code> header must come from the site URL. Supported protocol versions: <code>2025-11-25</code>, <code>2025-06-18</code>, <code>2025-03-26</code>, <code>2024-11-05</code>.</p>
+<p><strong>The tool list has only 9 fixed tools</strong> (it does not grow with the number of site tools offered, so it does not fill the model's context):</p>
+<div class="table-wrap"><table><thead><tr><th>MCP tool</th><th>What it does</th></tr></thead><tbody><tr><td><code>jtdt_catalog</code></td><td>Lists the tools you can run (name, category, one-line summary)</td></tr><tr><td><code>jtdt_describe</code></td><td>Parameters, input files and an example for one tool</td></tr><tr><td><code>jtdt_run</code></td><td>Runs a tool: <code>tool</code>, <code>files</code> (workspace file IDs), <code>params</code>; results go to the workspace. Returns a <code>job_id</code> after about 45 seconds</td></tr><tr><td><code>job_status</code></td><td>Waits for / gets the result of <code>jtdt_run</code></td></tr><tr><td><code>workspace_list</code></td><td>Lists the files in your workspace</td></tr><tr><td><code>workspace_upload_url</code></td><td>Gets a one-time upload command (<code>curl</code>) so the AI uploads a local file itself</td></tr><tr><td><code>workspace_upload_inline</code></td><td>Uploads a small file (up to 256 KB) as Base64 (for clients that cannot run commands)</td></tr><tr><td><code>workspace_download_url</code></td><td>Gets a one-time download command (<code>curl</code>)</td></tr><tr><td><code>workspace_read_text</code></td><td>Reads a text file from the workspace in pages</td></tr></tbody></table></div>
+<p>Tools offered now: <code>pdf_merge</code> (merge), <code>pdf_split</code> (split), <code>pdf_compress</code> (compress), <code>pdf_rotate</code> (rotate), <code>pdf_page_numbers</code> (page numbers), <code>office_to_pdf</code> (Office to PDF), <code>document_to_images</code> (document to images), <code>pdf_extract_text</code> (text extraction), <code>document_word_count</code> (word count), <code>vat_lookup</code> (UBN lookup). Each run calls the tool's own API inside the server with <strong>the same token</strong>, so checks, permissions and audit match REST (audit entries are marked as via MCP).</p>
+<p><strong>File transfer (file contents never pass through the model)</strong>: <code>workspace_upload_url</code> / <code>workspace_download_url</code> return a one-time ticket and a <code>curl</code> command. The ticket goes in the <code>X-JTDT-Ticket</code> header (not the URL), is valid for 15 minutes and covers one file; an upload <strong>only counts once it is saved</strong> (it can be retried after a dropped connection, and sending it again after success returns <code>409</code> with the original file ID); a <code>sha256</code> can be given and a mismatch returns <code>422</code>; a file larger than declared returns <code>413</code>; by default the ticket is bound to the source IP that requested it. The URL is built from the configured site URL (not the request's Host header); an HTTP site URL needs separate permission from an administrator.</p>
+<pre><code class="lang-bash"><span class="hl-cmt"># 列出工具（JSON-RPC）</span>
+curl <span class="hl-flag">-s</span> <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/mcp</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;tools/list&quot;}&#x27;</span> | jq
+
+<span class="hl-cmt"># 上傳（票證從 workspace_upload_url 拿）</span>
+curl <span class="hl-flag">-sS</span> <span class="hl-flag">--fail-with-body</span> <span class="hl-flag">-H</span> <span class="hl-str">&#x27;X-JTDT-Ticket: TICKET&#x27;</span> <span class="hl-flag">-F</span> <span class="hl-str">&#x27;file=@report.pdf&#x27;</span> <span class="hl-url">http://localhost:8765/mcp/files/upload</span>
+<span class="hl-cmt"># → {&quot;ok&quot;: true, &quot;file_id&quot;: &quot;...&quot;, &quot;name&quot;: &quot;report.pdf&quot;, &quot;bytes&quot;: 12345, &quot;sha256&quot;: &quot;...&quot;}</span></code></pre>
+<p><strong>Client configuration</strong> (the settings page has examples with the address filled in):</p>
+<pre><code class="lang-bash"><span class="hl-cmt"># Claude Code</span>
+claude mcp add <span class="hl-flag">--transport</span> http jt-doc-tools <span class="hl-url">https://docs.example.com/mcp</span> <span class="hl-flag">--header</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span></code></pre>
+<pre><code class="lang-toml"><span class="hl-cmt"># Codex CLI：~/.codex/config.toml（Token 放環境變數 JTDT_TOKEN）</span>
+[mcp_servers.jt-doc-tools]
+url = <span class="hl-str">&quot;https://docs.example.com/mcp&quot;</span>
+bearer_token_env_var = <span class="hl-str">&quot;JTDT_TOKEN&quot;</span></code></pre>
+<pre><code class="lang-json">{<span class="hl-key">&quot;mcp&quot;</span>: {<span class="hl-key">&quot;jt-doc-tools&quot;</span>: {<span class="hl-key">&quot;type&quot;</span>: <span class="hl-str">&quot;remote&quot;</span>, <span class="hl-key">&quot;url&quot;</span>: <span class="hl-str">&quot;https://docs.example.com/mcp&quot;</span>, <span class="hl-key">&quot;enabled&quot;</span>: <span class="hl-bool">true</span>,
+  <span class="hl-key">&quot;oauth&quot;</span>: <span class="hl-bool">false</span>, <span class="hl-key">&quot;headers&quot;</span>: {<span class="hl-key">&quot;Authorization&quot;</span>: <span class="hl-str">&quot;Bearer {env:JTDT_TOKEN}&quot;</span>}}}}</code></pre>
+<p>Above is OpenCode's <code>opencode.json</code>. Claude Desktop connects through <code>mcp-remote</code> (small files up to 256 KB only).</p>
+<p><strong>Limits and audit</strong>: each token has limits on calls per minute and concurrent jobs (adjustable on the settings page); every run writes an <code>mcp_call</code> audit record (tool, token name, user, source IP, input and output file IDs), and uploads / downloads write <code>mcp_upload</code> / <code>mcp_download</code>, without document contents or tickets.</p>
+<p><strong>Admin endpoints</strong> (administrators, session): <code>GET /admin/mcp</code> (settings page), <code>POST /admin/mcp/save</code> (master switch, site URL, tools offered, limits, ticket settings), <code>POST /admin/mcp/token</code> (<code>{&quot;preview&quot;: &quot;&lt;mask&gt;&quot;, &quot;allowed&quot;: true}</code>, allows or blocks a token for MCP).</p>
 <hr>
       </section>
       <section class="doc-section" data-sec="列出資產" data-title="List assets" hidden>

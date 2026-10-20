@@ -842,13 +842,7 @@
   // **不覆蓋**，改給「改用上一次的」。「清除」把記住的那一段丟掉（之後不再帶入）；
   // 帶入的那一段還在框裡的話一起清空，使用者自己打的字不動。
   var memCtx = null, memFilled = false;
-  function fmtWhen(ts) {
-    var d = new Date((Number(ts) || 0) * 1000);
-    if (!ts || isNaN(d.getTime())) return '';
-    function p2(n) { return (n < 10 ? '0' : '') + n; }
-    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate())
-         + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
-  }
+  function fmtWhen(ts) { return jtTime.dt(ts); }
   //: 帶進框裡的背景是哪裡來的：'memory'（上一次分析這份逐字稿時填的）/
   //: 'transcribe'（轉逐字稿時填的「專有名詞或會議背景」，2026-10-03 使用者要求）
   var memSource = 'memory';

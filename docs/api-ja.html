@@ -230,6 +230,9 @@
             <a class="nav-ep" href="#列出自己的作業我的作業">自分のジョブを一覧表示（「マイジョブ」）</a>
           </div>
         </div>
+        <div class="nav-group nav-group-flat">
+          <a class="nav-ch" href="#10b-mcpai-客戶端">10b. MCP（AI クライアント）</a>
+        </div>
         <div class="nav-group">
           <div class="nav-group-head" role="button" tabindex="0" aria-expanded="true">
             <button class="toc-toggle" type="button" tabindex="-1" aria-hidden="true"></button>
@@ -511,7 +514,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="pdf-分割">PDF の分割</h4>
 <p>ページ数 / 範囲で PDF を分割します。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-split/api/pdf-split</code></pre>
-<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>mode</code></td><td>str</td><td>✓</td><td><code>ranges</code>（範囲で）/ <code>every</code>（N ページごとに 1 ファイル）/ <code>single</code>（1 ページ 1 ファイル）</td></tr><tr><td><code>ranges</code></td><td>str</td><td></td><td>mode=ranges のときの範囲。例 <code>1-3,5,7-9</code>。mode=every のときは数値 N を入力します</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>パラメータ</th><th>種類</th><th>必須</th><th>説明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>mode</code></td><td>str</td><td></td><td><code>each</code>（既定、1 ページ 1 ファイル）/ <code>ranges</code>（範囲ごと、1 範囲 1 ファイル）</td></tr><tr><td><code>ranges</code></td><td>str</td><td></td><td>mode=ranges のときの範囲。例：<code>1-3,5,7-9</code>（範囲ごとに 1 ファイル）</td></tr></tbody></table></div>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-split/api/pdf-split</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@big.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;mode=ranges&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;ranges=1-3,8-10&quot;</span> \
@@ -1658,6 +1661,40 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <pre><code class="lang-text"><span class="hl-method">GET</span> /api/jobs?active=false&amp;limit=<span class="hl-num">50</span>&amp;offset=<span class="hl-num">0</span></code></pre>
 <p>「マイジョブ」ページが使う一覧で、自分のジョブだけを返します（<code>active=true</code> なら待機中と実行中だけ）。各行には <code>status</code>、<code>progress</code>、<code>has_result</code>（ダウンロードファイルがまだあるか）、<code>view_url</code>（「開く」の行き先のページ）と <code>view_ok</code> があります。</p>
 <p>レスポンスの <code>view_ok</code> は、<code>view_url</code> のページを今も開けるかどうかを示します。<code>view_url</code> に値があるのに <code>view_ok</code> が <code>false</code> なら、データは保持期間を過ぎて削除済みです。「開く」を出すかどうかは <code>view_ok</code> で判断してください。<strong><code>has_result</code> で代用してはいけません</strong>（一文ずつ翻訳にはダウンロードファイルがありませんが、「開く」は開けます）。</p>
+<hr>
+      </section>
+      <section class="doc-section" data-sec="10b-mcpai-客戶端" data-title="10b. MCP（AI クライアント）" hidden>
+<h3 id="10b-mcpai-客戶端">10b. MCP（AI クライアント）</h3>
+<p>Claude Code、Codex CLI、OpenCode などの AI クライアントから、MCP（Model Context Protocol）経由でこのサイトの<strong>LLM を使わない</strong>ツールを呼び出せます。<strong>既定ではオフ</strong>で、管理者が「設定 → MCP（AI 連携）」でオンにします。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /mcp                   <span class="hl-cmt"># JSON-RPC 2.0（Streamable HTTP，只回 JSON、無狀態）</span>
+<span class="hl-method">GET</span>  /mcp                   <span class="hl-cmt"># 405（不提供 SSE）</span>
+<span class="hl-method">POST</span> /mcp/files/upload      <span class="hl-cmt"># 用一次性票證上傳檔案進工作區</span>
+<span class="hl-method">GET</span>  /mcp/files/download    <span class="hl-cmt"># 用一次性票證下載工作區的檔案</span></code></pre>
+<p><strong>認証</strong>：<code>Authorization: Bearer &lt;API Token&gt;</code>。トークンは設定ページで「MCP を許可」にする必要があります。認証を有効にしている場合、トークンはユーザーに割り当て、そのユーザーの権限に従います（権限のないツールは一覧に出ず、呼び出せません）。<code>Origin</code> ヘッダー付きの要求はサイト URL からのものに限ります。対応するプロトコルバージョン：<code>2025-11-25</code>、<code>2025-06-18</code>、<code>2025-03-26</code>、<code>2024-11-05</code>。</p>
+<p><strong>ツール一覧は固定の 9 個だけ</strong>です（公開するツールが増えても増えず、モデルのコンテキストを圧迫しません）：</p>
+<div class="table-wrap"><table><thead><tr><th>MCP ツール</th><th>機能</th></tr></thead><tbody><tr><td><code>jtdt_catalog</code></td><td>実行できるツールの一覧（名前、分類、1 行の説明）</td></tr><tr><td><code>jtdt_describe</code></td><td>1 つのツールのパラメーター、入力ファイル、例</td></tr><tr><td><code>jtdt_run</code></td><td>実行：<code>tool</code>、<code>files</code>（ワークスペースのファイル ID）、<code>params</code>。結果はワークスペースに保存。約 45 秒を超えると <code>job_id</code> を返す</td></tr><tr><td><code>job_status</code></td><td><code>jtdt_run</code> の結果を待つ / 取得する</td></tr><tr><td><code>workspace_list</code></td><td>自分のワークスペースのファイル一覧</td></tr><tr><td><code>workspace_upload_url</code></td><td>使い捨てのアップロードコマンド（<code>curl</code>）を取得し、AI がローカルのファイルを自らアップロード</td></tr><tr><td><code>workspace_upload_inline</code></td><td>256 KB 以下の小さなファイルを Base64 で直接アップロード（コマンドを実行できないクライアント向け）</td></tr><tr><td><code>workspace_download_url</code></td><td>使い捨てのダウンロードコマンド（<code>curl</code>）を取得</td></tr><tr><td><code>workspace_read_text</code></td><td>ワークスペースのテキストファイルをページ単位で読む</td></tr></tbody></table></div>
+<p>現在公開しているツール：<code>pdf_merge</code>（結合）、<code>pdf_split</code>（分割）、<code>pdf_compress</code>（圧縮）、<code>pdf_rotate</code>（回転）、<code>pdf_page_numbers</code>（ページ番号）、<code>office_to_pdf</code>（Office から PDF）、<code>document_to_images</code>（文書を画像に）、<code>pdf_extract_text</code>（テキスト抽出）、<code>document_word_count</code>（文字数カウント）、<code>vat_lookup</code>（統一編號検索）。実行はサーバー内部で<strong>同じトークン</strong>を使って各ツール本来の API を呼び出すため、チェック・権限・監査は REST と同じです（監査には MCP 経由と記録）。</p>
+<p><strong>ファイル転送（ファイルの内容はモデルを経由しません）</strong>：<code>workspace_upload_url</code> / <code>workspace_download_url</code> は使い捨てのチケットと <code>curl</code> コマンドを返します。チケットはヘッダー <code>X-JTDT-Ticket</code> に入れ（URL には入れない）、15 分間有効で 1 ファイルのみ。アップロードは<strong>保存できた時点で使用済み</strong>になり（切断時は再送でき、成功後に再送すると <code>409</code> と元のファイル ID を返す）、<code>sha256</code> を指定でき不一致は <code>422</code>、申告より大きいと <code>413</code>、既定で発行時の送信元 IP に固定します。URL は設定したサイト URL から作成し（要求の Host ヘッダーは使わない）、サイト URL が HTTP の場合は管理者の許可が別途必要です。</p>
+<pre><code class="lang-bash"><span class="hl-cmt"># 列出工具（JSON-RPC）</span>
+curl <span class="hl-flag">-s</span> <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/mcp</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;tools/list&quot;}&#x27;</span> | jq
+
+<span class="hl-cmt"># 上傳（票證從 workspace_upload_url 拿）</span>
+curl <span class="hl-flag">-sS</span> <span class="hl-flag">--fail-with-body</span> <span class="hl-flag">-H</span> <span class="hl-str">&#x27;X-JTDT-Ticket: TICKET&#x27;</span> <span class="hl-flag">-F</span> <span class="hl-str">&#x27;file=@report.pdf&#x27;</span> <span class="hl-url">http://localhost:8765/mcp/files/upload</span>
+<span class="hl-cmt"># → {&quot;ok&quot;: true, &quot;file_id&quot;: &quot;...&quot;, &quot;name&quot;: &quot;report.pdf&quot;, &quot;bytes&quot;: 12345, &quot;sha256&quot;: &quot;...&quot;}</span></code></pre>
+<p><strong>クライアントの設定</strong>（設定ページにアドレス入りの例があります）：</p>
+<pre><code class="lang-bash"><span class="hl-cmt"># Claude Code</span>
+claude mcp add <span class="hl-flag">--transport</span> http jt-doc-tools <span class="hl-url">https://docs.example.com/mcp</span> <span class="hl-flag">--header</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span></code></pre>
+<pre><code class="lang-toml"><span class="hl-cmt"># Codex CLI：~/.codex/config.toml（Token 放環境變數 JTDT_TOKEN）</span>
+[mcp_servers.jt-doc-tools]
+url = <span class="hl-str">&quot;https://docs.example.com/mcp&quot;</span>
+bearer_token_env_var = <span class="hl-str">&quot;JTDT_TOKEN&quot;</span></code></pre>
+<pre><code class="lang-json">{<span class="hl-key">&quot;mcp&quot;</span>: {<span class="hl-key">&quot;jt-doc-tools&quot;</span>: {<span class="hl-key">&quot;type&quot;</span>: <span class="hl-str">&quot;remote&quot;</span>, <span class="hl-key">&quot;url&quot;</span>: <span class="hl-str">&quot;https://docs.example.com/mcp&quot;</span>, <span class="hl-key">&quot;enabled&quot;</span>: <span class="hl-bool">true</span>,
+  <span class="hl-key">&quot;oauth&quot;</span>: <span class="hl-bool">false</span>, <span class="hl-key">&quot;headers&quot;</span>: {<span class="hl-key">&quot;Authorization&quot;</span>: <span class="hl-str">&quot;Bearer {env:JTDT_TOKEN}&quot;</span>}}}}</code></pre>
+<p>上は OpenCode の <code>opencode.json</code> です。Claude Desktop は <code>mcp-remote</code> 経由で接続します（256 KB 以下の小さなファイルのみ）。</p>
+<p><strong>制限と監査</strong>：トークンごとに 1 分あたりの呼び出し数と同時ジョブ数の上限があります（設定ページで調整可能）。実行ごとに <code>mcp_call</code> 監査記録（ツール、トークン名、ユーザー、送信元 IP、入出力のファイル ID）を、アップロード / ダウンロードには <code>mcp_upload</code> / <code>mcp_download</code> を記録し、文書の内容とチケットは記録しません。</p>
+<p><strong>管理エンドポイント</strong>（管理者、セッション）：<code>GET /admin/mcp</code>（設定ページ）、<code>POST /admin/mcp/save</code>（全体スイッチ、サイト URL、公開ツール、制限、チケット設定）、<code>POST /admin/mcp/token</code>（<code>{&quot;preview&quot;: &quot;&lt;マスク&gt;&quot;, &quot;allowed&quot;: true}</code>、トークンの MCP 接続を許可 / 禁止）。</p>
 <hr>
       </section>
       <section class="doc-section" data-sec="列出資產" data-title="アセットの一覧" hidden>

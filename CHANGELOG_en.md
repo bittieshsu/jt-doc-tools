@@ -5,11 +5,19 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (929 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (930 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.1] - 2026-10-19
+
+- MCP (AI connection): AI clients such as Claude Code, Codex CLI and OpenCode can call this site's non-LLM tools over MCP. Off by default; an administrator turns it on under Settings → MCP (AI connection) and allows each API token that may connect. With authentication on, permissions follow the user the token is assigned to. The AI first sees only 9 fixed tools (tool list, parameters, run, workspace, jobs), which does not grow with the number of tools, so it does not fill the model's context. The first 10 tools are merge, split, compress, rotate, page numbers, Office to PDF, document to images, text extraction, word count and UBN lookup. Each run calls the tool's own API inside the server with the same token, so checks, permissions and audit match REST (audit entries are marked as via MCP); results go to the user's workspace. File contents never pass through the model: the AI uploads and downloads with one-time transfer tickets and `curl` (ticket in a header, valid 15 minutes, one file, an upload only counts once saved, optional `sha256` check, bound to the source IP by default, URL built from the configured site URL); files up to 256 KB can be sent inline. A request with an `Origin` header must come from the site URL; each token has per-minute and concurrent-job limits; every call is audited without document contents or tickets. The settings page has configuration examples for Claude Code, Codex, OpenCode and Claude Desktop. The settings page was reorganised: summary cards, feature notes, the allowed tools grouped by category with tool icons, colour-coded token status and a save bar fixed at the bottom.
+- Dates and times: one format across the site, `2026/10/19 23:05`, 24-hour clock, browser time zone (pages previously differed: some followed the locale with AM / PM, some used dashes). Same in the English and Japanese interfaces.
+- The Settings menu is grouped by category: system, AI and integrations (LLM settings, MCP, API tokens, JTLW), branding and data, tool data, accounts and permissions, notifications and files, audit.
+- MFP scan & fetch: the intro now says FUJIFILM in-device box retrieval has been verified on some Apeos models while other vendors remain experimental, followed by a "Verified devices" list of the vendors, models and features tested on real devices. The shared MFP settings page uses the same data and notes as the tool page. Devices used only for eSCL scanning show "Can scan". Scans and retrievals show a progress bar with a percentage; list rows highlight on hover. All built-in roles can use the tool.
+- Notifications: Telegram has been verified on a real setup and is no longer marked as in development; the list of verified channels shown on screen is generated, not hard-coded. API docs: the split tool's `mode` is `each` (default, one file per page) or `ranges`; the docs previously listed `ranges` / `every` / `single`. RICOH direct retrieval: the protocol log now records the property names of the first document (names only, not values) and a few more field names are tried for date and size; on a real device with no sign-in screen, "No sign-in" already lists documents but date and size were blank, so the next test will show where the device puts them.
 
 ## [1.17.0] - 2026-10-18
 

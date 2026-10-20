@@ -407,12 +407,7 @@
     s.appendChild(el('span', null, text));
     return s;
   }
-  function fmtTime(ts) {
-    if (!ts) return '';
-    const d = new Date(ts * 1000);
-    const p = (n) => String(n).padStart(2, '0');
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
-  }
+  function fmtTime(ts) { return jtTime.dt(ts); }
   async function call(url, opts) {
     const r = await fetch(url, opts || {});
     if (!r.ok) throw new Error(await window.friendlyServerError(r, tr('操作失敗')));

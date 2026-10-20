@@ -87,9 +87,7 @@
       document.querySelectorAll('.audit-time span[data-ts]').forEach(function (el) {
         const ts = parseInt(el.dataset.ts, 10);
         if (!ts) { el.textContent = '—'; return; }
-        const d = new Date(ts);
-        el.textContent = d.getFullYear() + '/' + pad(d.getMonth()+1) + '/' + pad(d.getDate())
-                       + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+        el.textContent = jtTime.dt(new Date(ts), {seconds: true});
       });
 
       // Pretty-print + lightly syntax-highlight every JSON detail block.

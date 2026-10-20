@@ -939,3 +939,16 @@ def test_ricoh_documents_at_the_top_do_not_trigger_a_deep_search(ricoh):
     assert s.list("documents", [])
     assert {c["params"]["deepSearch"] for c in ricoh.calls if c["method"] == "executeAdvancedSearch"} == {"false"}
     s.close()
+
+
+def test_ricoh_records_property_names_for_the_first_document(ricoh):
+    """實機的日期 / 大小欄位名稱不一定跟預期一樣：協定紀錄記下設備回的屬性名稱（不記內容）。"""
+    ricoh.classes = _CUSTOMER_CLASSES
+    trace: list = []
+    s = _ricoh_session(ricoh, trace, user="", password="", auth_mode="none")
+    entries = s.list("documents", [])
+    names = next(t for t in trace if t.get("prop_names"))
+    assert "title" in names["prop_names"] and "nf:application" in names["other_prop_names"]
+    assert all(e["size"] == 1234 and e["modified"] for e in entries)
+    assert "合約" not in json.dumps(names, ensure_ascii=False), "只記名稱，不記內容"
+    s.close()

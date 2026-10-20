@@ -597,7 +597,9 @@ def test_dev_channel_list_is_honest():
     from app.core import notify_channels as nc
     assert "email" not in nc.DEV_CHANNELS, "Email 已實機驗證，不該標開發階段"
     assert "zulip" not in nc.DEV_CHANNELS, "Zulip 已實機驗證（v1.17.0），不該標開發階段"
-    assert nc.DEV_CHANNELS == set(nc.ALL_CHANNELS) - {"email", "zulip"}, (
+    assert "telegram" not in nc.DEV_CHANNELS, "Telegram 已實機驗證（v1.17.1，使用者確認送得到）"
+    assert nc.verified_labels() == "Email、Telegram、Zulip"
+    assert nc.DEV_CHANNELS == set(nc.ALL_CHANNELS) - {"email", "zulip", "telegram"}, (
         "有管道被驗證過就要從 DEV_CHANNELS 移除；新增管道也要記得加進去")
 
 

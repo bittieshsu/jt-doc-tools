@@ -1111,12 +1111,7 @@
     onCancel: function () { loadResult(); }
   });
 
-  function fmtWhen(sec) {
-    try {
-      return new Date(sec * 1000).toLocaleString(document.documentElement.lang || undefined,
-        { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    } catch (e) { return ''; }
-  }
+  function fmtWhen(sec) { return jtTime.md(sec); }
 
   // 補專有名詞的框要帶回**整份**清單（JTLW 的 retry 是取代不是累加）——
   // 有錯寫法的詞寫回「聽錯的寫法 → 正確寫法」，不然重跑一次錯寫法就不見了

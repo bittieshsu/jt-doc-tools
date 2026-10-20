@@ -828,11 +828,7 @@ function _fmtScannedAt(v, fid) {
   try { dt = new Date(v); } catch (e) { return v; }
   if (isNaN(dt.getTime())) return v;
   if (fid === 'iso') return dt.toISOString();
-  if (fid === 'date_only') {
-    return dt.getFullYear() + '/' +
-      String(dt.getMonth() + 1).padStart(2, '0') + '/' +
-      String(dt.getDate()).padStart(2, '0');
-  }
+  if (fid === 'date_only') return jtTime.date(dt);
   if (fid === 'relative') {
     const now = new Date();
     const secs = Math.floor((now - dt) / 1000);
@@ -845,7 +841,7 @@ function _fmtScannedAt(v, fid) {
     return _fmtScannedAt(v, 'date_only');
   }
   // local
-  return dt.toLocaleString('zh-TW', { hour12: false }).replace(/-/g, '/');
+  return jtTime.dt(dt, {seconds: true});
 }
 
 function _fieldDef(id) {

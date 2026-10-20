@@ -244,12 +244,7 @@
     return b;
   }
   function badge(text, cls) { return el('span', 'gv-badge' + (cls ? ' ' + cls : ''), text); }
-  function fmtTime(ts) {
-    if (!ts) return '';
-    const d = new Date(ts * 1000);
-    const p = (n) => String(n).padStart(2, '0');
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
-  }
+  function fmtTime(ts) { return jtTime.dt(ts); }
   function fmtMB(n) { return (n / 1024 / 1024).toFixed(1) + ' MB'; }
   function fmtNum(n) { return Number(n || 0).toLocaleString(); }
   function fmtSize(n) {

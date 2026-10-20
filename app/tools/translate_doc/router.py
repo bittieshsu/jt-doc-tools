@@ -983,7 +983,7 @@ def _meta_lines(meta: dict) -> list[str]:
         try:
             from datetime import datetime as _dt
             dt = _dt.fromisoformat(ts.replace("Z", "+00:00"))
-            ts_pretty = dt.strftime("%Y-%m-%d %H:%M")
+            ts_pretty = dt.strftime("%Y/%m/%d %H:%M")
         except Exception:
             ts_pretty = ts
         out.append(f"翻譯時間：{ts_pretty}")

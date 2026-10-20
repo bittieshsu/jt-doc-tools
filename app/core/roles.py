@@ -46,10 +46,9 @@ _NON_ADMIN_TOOL_IDS = [
     "pdf-annotations", "pdf-annotations-flatten", "pdf-annotations-strip",
     # Sensitive — not in default-user; granted explicitly by finance/sales.
     # "pdf-fill", "pdf-stamp",
-    # 事務機掃描取件（Beta）：會讓伺服器去連區網上的設備（只准內網位址與網頁埠），
-    # 不放進一般使用者；內建角色裡只有「文管」有（收掃描檔是文管的日常），
-    # 要開放給其他人由管理員在角色裡加。
-    # "mfp-fetch",
+    # 事務機掃描取件：基本工具，所有內建角色都有（v1.17.1 起；
+    # 原本只給文管）。伺服器只連內網位址與網頁埠，管理員另外可以關掉「使用者自行新增事務機」。
+    "mfp-fetch",
 ]
 
 
@@ -83,7 +82,7 @@ SEED_ROLES: list[dict] = [
             "doc-straighten",
             "office-to-pdf", "office-convert", "pdf-to-image",
             "image-to-pdf", "scan-merge", "pdf-to-office", "pdf-to-slides",
-            # 事務機掃描取件（Beta）：收掃描檔是文管的日常；不放進一般使用者（理由見上面 _NON_ADMIN_TOOL_IDS 的註解）
+            # 事務機掃描取件：所有內建角色都有（見上面 _NON_ADMIN_TOOL_IDS 的註解）
             "mfp-fetch",
         ],
     },
@@ -129,6 +128,7 @@ SEED_ROLES: list[dict] = [
             # 檢視文件內容必備的基本能力（沒有這些連要看的檔案都打不開）
             "pdf-extract-text", "pdf-extract-images", "pdf-attachments",
             "pdf-merge", "pdf-split", "pdf-pages", "pdf-to-image",
+            "mfp-fetch",
         ],
     },
     {

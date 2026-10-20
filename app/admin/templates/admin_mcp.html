@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import icon %}
+{% block title %}{{ tr('MCP（AI 連接）') }} · {{ app_name }}{% endblock %}
+{% block content %}
+{% set url = (site_url.rstrip('/') if site_url else '') ~ '/mcp' %}
+{% set CAT = {'convert': ('文件轉換', 'file-swap', 'c-sky'), 'pdf_edit': ('PDF 編修', 'pages', 'c-violet'),
+              'extract': ('擷取與統計', 'text', 'c-emerald'), 'lookup': ('查詢', 'search', 'c-amber')} %}
+
+<div class="mcp-head">
+  <div class="mcp-head-ic">{{ icon('sparkles', size=26) }}</div>
+  <div class="mcp-head-tx">
+    <h1>{{ tr('MCP（AI 連接）') }}</h1>
+    <p class="muted">{{ tr('讓 Claude Code、Codex、OpenCode 這類 AI 客戶端透過 MCP 呼叫本站不用 LLM 的工具。AI 用的是你核發的 API Token，權限照那張 Token 綁定的使用者。') }}</p>
+  </div>
+</div>
+
+{# ---- 目前狀態 ---- #}
+<div class="mcp-stats">
+  <div class="mcp-stat"><span class="mcp-stat-k">MCP</span>
+    <span class="mcp-pill {{ 'is-ok' if cfg.enabled else 'is-off' }}" id="mcp-state">{{ tr('已啟用') if cfg.enabled else tr('未啟用') }}</span></div>
+  <div class="mcp-stat"><span class="mcp-stat-k">{{ tr('開放的工具') }}</span>
+    <span class="mcp-stat-v" id="mcp-tool-count">{{ enabled_tools|length }}</span><span class="mcp-stat-u">/ {{ tools|length }}</span></div>
+  <div class="mcp-stat"><span class="mcp-stat-k">{{ tr('允許的 Token') }}</span>
+    <span class="mcp-stat-v" id="mcp-token-count">{{ mcp_tokens }}</span><span class="mcp-stat-u">/ {{ tokens|length }}</span></div>
+  <div class="mcp-stat"><span class="mcp-stat-k">{{ tr('站台網址') }}</span>
+    <span class="mcp-pill {{ 'is-ok' if site_url else 'is-warn' }}" id="mcp-site-state">{{ tr('已設定') if site_url else tr('未設定') }}</span></div>
+</div>
+
+{# ---- 重點 ---- #}
+<div class="mcp-feats">
+  <div class="mcp-feat"><span class="mcp-feat-ic c-violet">{{ icon('lock', size=18) }}</span>
+    <div><b>{{ tr('預設關閉') }}</b><p>{{ tr('打開之後，還要逐張允許可以連 MCP 的 Token。') }}</p></div></div>
+  <div class="mcp-feat"><span class="mcp-feat-ic c-sky">{{ icon('layers', size=18) }}</span>
+    <div><b>{{ tr('不佔滿上下文') }}</b><p>{{ tr('AI 只看到 {0} 個固定的工具（約 {1} token），開放再多工具也不會變多。')|replace('{0}', fixed_count|string)|replace('{1}', list_tokens_est|string) }}</p></div></div>
+  <div class="mcp-feat"><span class="mcp-feat-ic c-emerald">{{ icon('shield', size=18) }}</span>
+    <div><b>{{ tr('檔案不經過 AI') }}</b><p>{{ tr('AI 用一次性傳輸票證自己上傳、下載，結果存進使用者的工作區。') }}</p></div></div>
+  <div class="mcp-feat"><span class="mcp-feat-ic c-amber">{{ icon('eye', size=18) }}</span>
+    <div><b>{{ tr('每次呼叫都有稽核') }}</b><p>{{ tr('記工具、Token、使用者、來源 IP、檔案編號，不記文件內容。') }}</p></div></div>
+</div>
+
+{# ---- 連線設定 ---- #}
+<div class="panel mcp-card">
+  <h2>{{ icon('gear', size=18) }} {{ tr('連線設定') }}</h2>
+  <div class="mcp-row">
+    <div class="mcp-row-l"><b>{{ tr('啟用 MCP') }}</b><span>{{ tr('關閉時所有 AI 客戶端都連不上。') }}</span></div>
+    <label class="mcp-switch"><input type="checkbox" id="mcp-enabled" {% if cfg.enabled %}checked{% endif %} aria-label="{{ tr('啟用 MCP') }}"><span></span></label>
+  </div>
+  <div class="mcp-row mcp-row-col">
+    <div class="mcp-row-l"><b>{{ tr('站台網址') }}</b>
+      <span>{{ tr('AI 上傳、下載檔案用的網址，要是 AI 所在電腦連得到的網址（經反向代理時填對外的網址）。跟「作業完成通知」的站台網址是同一個設定。') }}</span></div>
+    <input class="field mcp-input-wide" type="url" id="mcp-site" value="{{ site_url }}" placeholder="https://docs.example.com" maxlength="300" aria-label="{{ tr('站台網址') }}">
+  </div>
+  <div class="mcp-grid2">
+    <div class="mcp-row mcp-row-col">
+      <div class="mcp-row-l"><b>{{ tr('呼叫上限') }}</b><span>{{ tr('每張 Token 每分鐘最多幾次呼叫。') }}</span></div>
+      <div class="mcp-num"><input class="field" type="number" id="mcp-rate" value="{{ cfg.rate_per_minute }}" min="1" max="600" aria-label="{{ tr('呼叫上限') }}"><span>{{ tr('次 / 分鐘') }}</span></div>
+    </div>
+    <div class="mcp-row mcp-row-col">
+      <div class="mcp-row-l"><b>{{ tr('同時作業') }}</b><span>{{ tr('每張 Token 同時最多幾件作業。') }}</span></div>
+      <div class="mcp-num"><input class="field" type="number" id="mcp-conc" value="{{ cfg.max_concurrent }}" min="1" max="8" aria-label="{{ tr('同時作業') }}"><span>{{ tr('件') }}</span></div>
+    </div>
+  </div>
+  <div class="mcp-row">
+    <div class="mcp-row-l"><b>{{ tr('票證綁定來源 IP') }}</b><span>{{ tr('傳輸票證只能從發出時的那個 IP 使用（建議打開）。') }}</span></div>
+    <label class="mcp-switch"><input type="checkbox" id="mcp-bindip" {% if cfg.ticket_bind_ip %}checked{% endif %} aria-label="{{ tr('票證綁定來源 IP') }}"><span></span></label>
+  </div>
+  <div class="mcp-row">
+    <div class="mcp-row-l"><b>{{ tr('允許 HTTP 傳檔') }}</b><span>{{ tr('站台網址是 HTTP 時也發傳輸票證；檔案會以未加密的方式在內網傳送。') }}</span></div>
+    <label class="mcp-switch"><input type="checkbox" id="mcp-http" {% if cfg.ticket_allow_http %}checked{% endif %} aria-label="{{ tr('允許 HTTP 傳檔') }}"><span></span></label>
+  </div>
+</div>
+
+{# ---- 開放的工具 ---- #}
+<div class="panel mcp-card">
+  <h2>{{ icon('tool', size=18) }} {{ tr('開放的工具') }}</h2>
+  <p class="muted mcp-lead">{{ tr('只列出不用 LLM 的工具。使用者還是要有那支工具的權限才看得到。') }}</p>
+  {% for g in groups %}
+  {% set c = CAT.get(g.id, (g.id, 'tool', 'c-sky')) %}
+  <section class="mcp-group">
+    <header class="mcp-group-h"><span class="mcp-group-ic {{ c[2] }}">{{ icon(c[1], size=15) }}</span>
+      <b>{{ tr(c[0]) }}</b><span class="mcp-group-n">{{ g['items']|length }}</span></header>
+    <div class="mcp-tools">
+      {% for t in g['items'] %}
+      <label class="mcp-tool{% if t.on %} is-on{% endif %}">
+        <input type="checkbox" class="mcp-tool-cb" value="{{ t.name }}" {% if t.on %}checked{% endif %}>
+        <span class="mcp-tool-ic tile-color-{{ t.color }}">{{ icon(t.icon or 'tool', size=17) }}</span>
+        <span class="mcp-tool-tx"><b>{{ tr(t.title) }}</b><code>{{ t.name }}</code><small>{{ tr(t.desc) }}</small></span>
+        <span class="mcp-tool-check">{{ icon('check', size=13) }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+
+<div class="mcp-savebar">
+  <button class="btn btn-primary" id="mcp-save" type="button">{{ icon('save', size=14) }} <span>{{ tr('儲存設定') }}</span></button>
+  <span id="mcp-status" class="mcp-status" aria-live="polite"></span>
+</div>
+
+{# ---- Token ---- #}
+<div class="panel mcp-card">
+  <h2>{{ icon('lock', size=18) }} {{ tr('可以連 MCP 的 Token') }}</h2>
+  <p class="muted mcp-lead">{{ tr('核發與綁定使用者在「API Token」頁。建議給 AI 專用一張 Token，不要跟其他程式共用。') }}
+    <a href="/admin/api-tokens">{{ tr('前往 API Token') }}</a></p>
+  {% if tokens %}
+  <div class="mcp-tokens">
+    {% for t in tokens %}
+    <div class="mcp-token{% if t.mcp %} is-on{% endif %}">
+      <span class="mcp-token-ic">{{ icon('lock', size=16) }}</span>
+      <div class="mcp-token-tx"><b>{{ t.label }}</b><code>{{ t.token_preview }}</code></div>
+      <div class="mcp-token-tags">
+        {% if not t.enabled %}<span class="mcp-pill is-off">{{ tr('已停用') }}</span>{% endif %}
+        {% if auth_enabled %}{% if t.owner %}<span class="mcp-pill is-user">{{ icon('user', size=12) }} {{ t.owner }}</span>
+        {% else %}<span class="mcp-pill is-warn">{{ tr('尚未綁定（不能連）') }}</span>{% endif %}{% endif %}
+        <span class="mcp-pill {{ 'is-ok' if t.mcp else 'is-off' }} mcp-token-state">{{ tr('允許 MCP') if t.mcp else tr('不允許') }}</span>
+      </div>
+      <label class="mcp-switch"><input type="checkbox" class="mcp-token-cb" data-preview="{{ t.token_preview }}" {% if t.mcp %}checked{% endif %} aria-label="{{ tr('允許 MCP') }}：{{ t.label }}"><span></span></label>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">{{ tr('還沒有 API Token。') }}</p>
+  {% endif %}
+  <span id="mcp-token-status" class="mcp-status" aria-live="polite"></span>
+</div>
+
+{# ---- 客戶端設定 ---- #}
+<div class="panel mcp-card">
+  <h2>{{ icon('copy', size=18) }} {{ tr('客戶端設定') }}</h2>
+  <p class="muted mcp-lead">{{ tr('把 `<API_TOKEN>` 換成可以連 MCP 的 Token。Token 是密碼，不要放進公開的程式庫。')|marks }}</p>
+  <div class="mcp-tabs" role="tablist">
+    <button type="button" class="mcp-tab is-on" data-tab="cc" role="tab">Claude Code</button>
+    <button type="button" class="mcp-tab" data-tab="codex" role="tab">Codex CLI</button>
+    <button type="button" class="mcp-tab" data-tab="oc" role="tab">OpenCode</button>
+    <button type="button" class="mcp-tab" data-tab="cd" role="tab">Claude Desktop</button>
+  </div>
+  <div class="mcp-pane is-on" data-pane="cc">
+    <p class="mcp-pane-h">{{ tr('在終端機執行：') }}</p>
+    <div class="mcp-code"><button type="button" class="btn btn-small mcp-copy">{{ icon('copy', size=13) }} <span>{{ tr('複製') }}</span></button>
+<pre><span class="tk-cmd">claude</span> mcp add <span class="tk-flag">--transport</span> http jt-doc-tools <span class="tk-url mcp-url">{{ url }}</span> <span class="tk-flag">--header</span> <span class="tk-str">"Authorization: Bearer <span class="tk-ph">&lt;API_TOKEN&gt;</span>"</span></pre></div>
+  </div>
+  <div class="mcp-pane" data-pane="codex">
+    <p class="mcp-pane-h">{{ tr('寫進 `~/.codex/config.toml`，並設定環境變數 `JTDT_TOKEN`：')|marks }}</p>
+    <div class="mcp-code"><button type="button" class="btn btn-small mcp-copy">{{ icon('copy', size=13) }} <span>{{ tr('複製') }}</span></button>
+<pre><span class="tk-key">[mcp_servers.jt-doc-tools]</span>
+<span class="tk-attr">url</span> = <span class="tk-str">"<span class="mcp-url">{{ url }}</span>"</span>
+<span class="tk-attr">bearer_token_env_var</span> = <span class="tk-str">"JTDT_TOKEN"</span></pre></div>
+    <div class="mcp-code"><button type="button" class="btn btn-small mcp-copy">{{ icon('copy', size=13) }} <span>{{ tr('複製') }}</span></button>
+<pre><span class="tk-cmd">export</span> <span class="tk-attr">JTDT_TOKEN</span>=<span class="tk-ph">&lt;API_TOKEN&gt;</span></pre></div>
+  </div>
+  <div class="mcp-pane" data-pane="oc">
+    <p class="mcp-pane-h">{{ tr('寫進 `opencode.json`，並設定環境變數 `JTDT_TOKEN`：')|marks }}</p>
+    <div class="mcp-code"><button type="button" class="btn btn-small mcp-copy">{{ icon('copy', size=13) }} <span>{{ tr('複製') }}</span></button>
+<pre>{
+  <span class="tk-attr">"$schema"</span>: <span class="tk-str">"https://opencode.ai/config.json"</span>,
+  <span class="tk-attr">"mcp"</span>: {
+    <span class="tk-attr">"jt-doc-tools"</span>: {
+      <span class="tk-attr">"type"</span>: <span class="tk-str">"remote"</span>,
+      <span class="tk-attr">"url"</span>: <span class="tk-str">"<span class="mcp-url">{{ url }}</span>"</span>,
+      <span class="tk-attr">"enabled"</span>: <span class="tk-kw">true</span>,
+      <span class="tk-attr">"oauth"</span>: <span class="tk-kw">false</span>,
+      <span class="tk-attr">"headers"</span>: { <span class="tk-attr">"Authorization"</span>: <span class="tk-str">"Bearer {env:JTDT_TOKEN}"</span> }
+    }
+  }
+}</pre></div>
+  </div>
+  <div class="mcp-pane" data-pane="cd">
+    <p class="mcp-pane-h">{{ tr('寫進 `claude_desktop_config.json`（透過 mcp-remote 轉接，需要 Node.js）：')|marks }}</p>
+    <div class="mcp-code"><button type="button" class="btn btn-small mcp-copy">{{ icon('copy', size=13) }} <span>{{ tr('複製') }}</span></button>
+<pre>{
+  <span class="tk-attr">"mcpServers"</span>: {
+    <span class="tk-attr">"jt-doc-tools"</span>: {
+      <span class="tk-attr">"command"</span>: <span class="tk-str">"npx"</span>,
+      <span class="tk-attr">"args"</span>: [<span class="tk-str">"-y"</span>, <span class="tk-str">"mcp-remote"</span>, <span class="tk-str">"<span class="mcp-url">{{ url }}</span>"</span>, <span class="tk-str">"--header"</span>, <span class="tk-str">"Authorization:${JTDT_AUTH}"</span>],
+      <span class="tk-attr">"env"</span>: { <span class="tk-attr">"JTDT_AUTH"</span>: <span class="tk-str">"Bearer <span class="tk-ph">&lt;API_TOKEN&gt;</span>"</span> }
+    }
+  }
+}</pre></div>
+    <p class="mcp-note">{{ icon('info', size=14) }} <span>{{ tr('Claude Desktop 不能執行指令，只能用 256 KB 以下的小檔。') }}</span></p>
+  </div>
+</div>
+
+<style nonce="{{ request.state.csp_nonce }}">
+  .mcp-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+  .mcp-head-ic { width: 48px; height: 48px; border-radius: 14px; flex: none; display: flex; align-items: center;
+    justify-content: center; color: #fff; background: linear-gradient(135deg, #8b5cf6, #4f46e5);
+    box-shadow: 0 6px 16px rgba(79,70,229,.25); }
+  .mcp-head-tx { flex: 1; min-width: 0; }
+  .mcp-head h1 { margin: 2px 0 4px; }
+  .mcp-head p { margin: 0; }
+  .c-violet { background: #ede9fe; color: #6d28d9; } .c-sky { background: #e0f2fe; color: #0369a1; }
+  .c-emerald { background: #d1fae5; color: #047857; } .c-amber { background: #fef3c7; color: #b45309; }
+  .mcp-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .mcp-stat { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+  .mcp-stat-k { width: 100%; font-size: 12px; color: #64748b; }
+  .mcp-stat-v { font-size: 22px; font-weight: 800; color: #0f172a; }
+  .mcp-stat-u { font-size: 13px; color: #94a3b8; }
+  .mcp-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .mcp-pill.is-ok { background: #dcfce7; color: #15803d; } .mcp-pill.is-off { background: #f1f5f9; color: #64748b; }
+  .mcp-pill.is-warn { background: #fef3c7; color: #b45309; } .mcp-pill.is-user { background: #e0e7ff; color: #4338ca; }
+  .mcp-feats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .mcp-feat { display: flex; gap: 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; }
+  .mcp-feat-ic { width: 34px; height: 34px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; }
+  .mcp-feat b { font-size: 13.5px; color: #0f172a; }
+  .mcp-feat p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.5; color: #64748b; }
+  .mcp-card h2 { display: flex; align-items: center; gap: 8px; }
+  .mcp-lead { margin: -2px 0 12px; font-size: 13px; }
+  .mcp-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0;
+    border-top: 1px solid #f1f5f9; }
+  .mcp-card > .mcp-row:first-of-type { border-top: 0; }
+  .mcp-row-col { flex-direction: column; align-items: stretch; gap: 8px; }
+  .mcp-row-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .mcp-row-l b { font-size: 13.5px; color: #0f172a; }
+  .mcp-row-l span { font-size: 12.5px; color: #64748b; line-height: 1.5; }
+  .mcp-input-wide { width: min(520px, 100%); box-sizing: border-box; }
+  .mcp-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; border-top: 1px solid #f1f5f9; }
+  .mcp-grid2 .mcp-row { border-top: 0; }
+  .mcp-num { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
+  .mcp-num input { width: 110px; }
+  .mcp-switch { position: relative; width: 42px; height: 24px; flex: none; cursor: pointer; }
+  .mcp-switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
+  .mcp-switch span { position: absolute; inset: 0; border-radius: 999px; background: #cbd5e1; transition: background .15s; pointer-events: none; }
+  .mcp-switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.25); transition: transform .15s; }
+  .mcp-switch input:checked + span { background: #4f46e5; }
+  .mcp-switch input:checked + span::after { transform: translateX(18px); }
+  .mcp-switch input:focus-visible + span { outline: 2px solid #818cf8; outline-offset: 2px; }
+  .mcp-group { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; margin-top: 12px; background: #f8fafc; }
+  .mcp-group-h { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13.5px; color: #0f172a; }
+  .mcp-group-ic { width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; }
+  .mcp-group-n { margin-left: auto; font-size: 12px; color: #64748b; background: #fff; border: 1px solid #e2e8f0;
+    border-radius: 999px; padding: 1px 9px; }
+  .mcp-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+  .mcp-tool { position: relative; display: flex; gap: 10px; align-items: flex-start; padding: 10px 34px 10px 10px;
+    background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .mcp-tool:hover { border-color: #a5b4fc; }
+  .mcp-tool.is-on { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+  .mcp-tool input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .mcp-tool:has(input:focus-visible) { outline: 2px solid #818cf8; outline-offset: 2px; }
+  .mcp-tool-ic { width: 34px; height: 34px; border-radius: 10px; flex: none; display: flex; align-items: center;
+    justify-content: center; color: #fff; }
+  .mcp-tool-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .mcp-tool-tx b { font-size: 13.5px; color: #0f172a; }
+  .mcp-tool-tx code { font-size: 11px; color: #6366f1; background: none; padding: 0; }
+  .mcp-tool-tx small { font-size: 11.5px; line-height: 1.45; color: #64748b; display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  .mcp-tool-check { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; border: 2px solid #cbd5e1; color: transparent; background: #fff;
+    box-sizing: border-box; }
+  .mcp-tool.is-on .mcp-tool-check { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+  .mcp-savebar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 12px;
+    margin: -6px 0 16px; padding: 12px 16px; background: rgba(255,255,255,.95); border: 1px solid #e2e8f0;
+    border-radius: 12px; box-shadow: 0 -4px 16px rgba(15,23,42,.06); }
+  .mcp-status { font-size: 13px; }
+  .mcp-status.is-ok { color: #15803d; } .mcp-status.is-err { color: #b91c1c; }
+  .mcp-tokens { display: flex; flex-direction: column; gap: 8px; }
+  .mcp-token { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #e2e8f0;
+    border-radius: 12px; background: #fff; }
+  .mcp-token.is-on { border-color: #86efac; background: #f0fdf4; }
+  .mcp-token-ic { width: 32px; height: 32px; border-radius: 10px; flex: none; display: flex; align-items: center;
+    justify-content: center; background: #f1f5f9; color: #475569; }
+  .mcp-token.is-on .mcp-token-ic { background: #dcfce7; color: #15803d; }
+  .mcp-token-tx { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .mcp-token-tx b { font-size: 13.5px; }
+  .mcp-token-tx code { font-size: 11.5px; color: #64748b; background: none; padding: 0; }
+  .mcp-token-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .mcp-tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid #e2e8f0; margin-bottom: 12px; }
+  .mcp-tab { border: 0; background: none; padding: 8px 14px; font: inherit; font-size: 13.5px; font-weight: 600;
+    color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+  .mcp-tab:hover { color: #4338ca; }
+  .mcp-tab.is-on { color: #4338ca; border-bottom-color: #4f46e5; }
+  .mcp-pane { display: none; }
+  .mcp-pane.is-on { display: block; }
+  .mcp-pane-h { margin: 0 0 8px; font-size: 13px; color: #475569; }
+  .mcp-pane-h code { font-size: 12px; }
+  .mcp-code { position: relative; margin-bottom: 10px; }
+  .mcp-code pre { margin: 0; background: #0f172a; color: #e2e8f0; padding: 14px 16px; padding-right: 96px;
+    border-radius: 10px; font-size: 12.5px; line-height: 1.6; overflow-x: auto; white-space: pre; }
+  .mcp-code .mcp-copy { position: absolute; top: 8px; right: 8px; z-index: 1; background: rgba(255,255,255,.12);
+    color: #e2e8f0; border: 1px solid rgba(255,255,255,.25); }
+  .mcp-code .mcp-copy:hover { background: rgba(255,255,255,.22); }
+  .tk-cmd { color: #7dd3fc; font-weight: 700; } .tk-flag { color: #fcd34d; } .tk-str { color: #86efac; }
+  .tk-url { color: #86efac; } .tk-attr { color: #c4b5fd; } .tk-key { color: #f9a8d4; font-weight: 700; }
+  .tk-kw { color: #fdba74; } .tk-ph { color: #fda4af; font-weight: 700; }
+  .mcp-note { display: flex; gap: 6px; align-items: center; margin: 4px 0 0; font-size: 12.5px; color: #64748b; }
+  @media (max-width: 900px) {
+    .mcp-stats, .mcp-feats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mcp-grid2 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .mcp-stats, .mcp-feats { grid-template-columns: 1fr; }
+    .mcp-token { flex-wrap: wrap; }
+    .mcp-token-tags { justify-content: flex-start; width: 100%; order: 3; }
+    .mcp-code pre { padding-right: 16px; padding-top: 44px; }
+  }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+  // 沒設站台網址時，範例先用目前瀏覽器的網址（只是顯示，存檔才算數）
+  function setUrl(base) {
+    document.querySelectorAll('.mcp-url').forEach(function (s) { s.textContent = base.replace(/\/+$/, '') + '/mcp'; });
+  }
+  if (!{{ 'true' if site_url else 'false' }}) setUrl(location.origin);
+
+  function say(el, ok, text) { el.className = 'mcp-status ' + (ok ? 'is-ok' : 'is-err'); el.textContent = text; }
+  function pill(el, ok, onText, offText, offClass) {
+    const keep = el.classList.contains('mcp-token-state') ? ' mcp-token-state' : '';
+    el.className = 'mcp-pill ' + (ok ? 'is-ok' : (offClass || 'is-off')) + keep;
+    el.textContent = ok ? onText : offText;
+  }
+
+  // 工具卡片：勾選狀態跟著外框
+  const toolCbs = Array.from(document.querySelectorAll('.mcp-tool-cb'));
+  toolCbs.forEach(function (cb) {
+    cb.addEventListener('change', function () { cb.closest('.mcp-tool').classList.toggle('is-on', cb.checked); });
+  });
+
+  const status = document.getElementById('mcp-status');
+  document.getElementById('mcp-save').addEventListener('click', async function () {
+    const body = {
+      enabled: document.getElementById('mcp-enabled').checked,
+      site_url: document.getElementById('mcp-site').value.trim(),
+      rate_per_minute: parseInt(document.getElementById('mcp-rate').value, 10),
+      max_concurrent: parseInt(document.getElementById('mcp-conc').value, 10),
+      ticket_bind_ip: document.getElementById('mcp-bindip').checked,
+      ticket_allow_http: document.getElementById('mcp-http').checked,
+      tools: toolCbs.filter(function (c) { return c.checked; }).map(function (c) { return c.value; }),
+    };
+    const r = await fetch('/admin/mcp/save', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                              body: JSON.stringify(body)});
+    if (!r.ok) { say(status, false, await window.friendlyServerError(r, tr('失敗'))); return; }
+    const j = await r.json();
+    say(status, true, tr('已儲存'));
+    setUrl(j.site_url || location.origin);
+    pill(document.getElementById('mcp-state'), j.cfg.enabled, tr('已啟用'), tr('未啟用'));
+    pill(document.getElementById('mcp-site-state'), !!j.site_url, tr('已設定'), tr('未設定'), 'is-warn');
+    document.getElementById('mcp-tool-count').textContent = String((j.cfg.tools || body.tools).length);
+  });
+
+  const tstatus = document.getElementById('mcp-token-status');
+  document.querySelectorAll('.mcp-token-cb').forEach(function (cb) {
+    cb.addEventListener('change', async function () {
+      const r = await fetch('/admin/mcp/token', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                                 body: JSON.stringify({preview: cb.dataset.preview, allowed: cb.checked})});
+      if (!r.ok) { cb.checked = !cb.checked; say(tstatus, false, await window.friendlyServerError(r, tr('失敗'))); return; }
+      const row = cb.closest('.mcp-token');
+      row.classList.toggle('is-on', cb.checked);
+      pill(row.querySelector('.mcp-token-state'), cb.checked, tr('允許 MCP'), tr('不允許'));
+      document.getElementById('mcp-token-count').textContent =
+        String(document.querySelectorAll('.mcp-token-cb:checked').length);
+      say(tstatus, true, tr('已儲存'));
+    });
+  });
+
+  // 客戶端分頁
+  document.querySelectorAll('.mcp-tab').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.mcp-tab').forEach(function (x) { x.classList.toggle('is-on', x === b); });
+      document.querySelectorAll('.mcp-pane').forEach(function (p) { p.classList.toggle('is-on', p.dataset.pane === b.dataset.tab); });
+    });
+  });
+  // 複製（只複製程式碼本身，不含按鈕文字）
+  document.querySelectorAll('.mcp-copy').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      const text = b.parentElement.querySelector('pre').textContent;
+      const label = b.querySelector('span');
+      try { await navigator.clipboard.writeText(text); label.textContent = tr('已複製'); }
+      catch (e) { label.textContent = tr('請手動選取複製'); }
+      setTimeout(function () { label.textContent = tr('複製'); }, 1500);
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -111,6 +111,7 @@
   {# 前端字串翻譯。`i18n.js` 一定要在其他 JS 之前載入（它定義 window.tr）；
      字典只在非預設語言時才載，繁體中文底下連一個位元組都不會多送。 #}
   <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/jt_time.js"></script>
   {% if ui_locale(request) != 'zh-Hant' %}<script src="/i18n/{{ ui_locale(request) }}.js"></script>{% endif %}
 </head>
 <body>

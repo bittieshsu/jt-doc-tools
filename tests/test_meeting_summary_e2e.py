@@ -1087,7 +1087,7 @@ def test_the_workspace_picker_shows_when_each_file_was_saved(live):
           .map(c => [c.dataset.id, (c.querySelector('.ws-pick-time') || {}).textContent || ''])""")
         shown = dict(shown)
         for fid in ids:
-            want = _t.strftime("%Y-%m-%d %H:%M", _t.localtime(saved[fid]))
+            want = _t.strftime("%Y/%m/%d %H:%M", _t.localtime(saved[fid]))   # 全站格式（jtTime）
             assert shown.get(fid) == want, (
                 f"挑選視窗上沒有寫存入時間（同名檔案分不出來）：畫面「{shown.get(fid)}」、應為「{want}」")
     finally:

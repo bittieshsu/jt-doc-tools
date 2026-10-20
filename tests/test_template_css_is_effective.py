@@ -183,7 +183,7 @@ def test_every_class_in_the_page_actually_gets_styled(page: pathlib.Path):
         # 去掉 `{{ }}` 之後只剩半截（`tile-color-`）。它是某個真類別的前綴，
         # 不是「沒有樣式」——不放行的話檢查會被自己的解析方式騙
         # （第一版一次誤報 16 支）。
-        if any(known.startswith(cls) for known in RULES) and cls not in RULES:
+        if any(known.startswith(cls) for known in (*RULES, *own)) and cls not in RULES and cls not in own:
             continue
         sels = RULES.get(cls)
         if not sels:

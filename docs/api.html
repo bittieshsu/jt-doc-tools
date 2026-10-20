@@ -230,6 +230,9 @@
             <a class="nav-ep" href="#列出自己的作業我的作業">列出自己的作業（「我的作業」）</a>
           </div>
         </div>
+        <div class="nav-group nav-group-flat">
+          <a class="nav-ch" href="#10b-mcpai-客戶端">10b. MCP（AI 客戶端）</a>
+        </div>
         <div class="nav-group">
           <div class="nav-group-head" role="button" tabindex="0" aria-expanded="true">
             <button class="toc-toggle" type="button" tabindex="-1" aria-hidden="true"></button>
@@ -511,7 +514,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="pdf-分割">PDF 分割</h4>
 <p>依頁數 / 範圍切分 PDF。</p>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /tools/pdf-split/api/pdf-split</code></pre>
-<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>mode</code></td><td>str</td><td>✓</td><td><code>ranges</code>（依範圍）/ <code>every</code>（每 N 頁切一份）/ <code>single</code>（每頁一份）</td></tr><tr><td><code>ranges</code></td><td>str</td><td></td><td>mode=ranges 時的範圍，例 <code>1-3,5,7-9</code>；mode=every 時填數字 N</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>參數</th><th>類型</th><th>必填</th><th>說明</th></tr></thead><tbody><tr><td><code>file</code></td><td>file</td><td>✓</td><td>PDF</td></tr><tr><td><code>mode</code></td><td>str</td><td></td><td><code>each</code>（預設，每頁一份）/ <code>ranges</code>（依範圍，每段一份）</td></tr><tr><td><code>ranges</code></td><td>str</td><td></td><td>mode=ranges 時的範圍，例 <code>1-3,5,7-9</code>（每一段切成一份）</td></tr></tbody></table></div>
 <pre><code class="lang-bash">curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/tools/pdf-split/api/pdf-split</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> \
   <span class="hl-flag">-F</span> <span class="hl-str">&quot;file=@big.pdf&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;mode=ranges&quot;</span> <span class="hl-flag">-F</span> <span class="hl-str">&quot;ranges=1-3,8-10&quot;</span> \
@@ -1658,6 +1661,40 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <pre><code class="lang-text"><span class="hl-method">GET</span> /api/jobs?active=false&amp;limit=<span class="hl-num">50</span>&amp;offset=<span class="hl-num">0</span></code></pre>
 <p>「我的作業」頁用的清單，只列自己的作業（<code>active=true</code> 只列排隊中與進行中的）。每一列有 <code>status</code>、<code>progress</code>、<code>has_result</code>（下載檔還在不在）、<code>view_url</code>（「開啟」要去的那一頁）與 <code>view_ok</code>。</p>
 <p>回應裡的 <code>view_ok</code> 是 <code>view_url</code> 那一頁現在還打不打得開：<code>view_url</code> 有值但 <code>view_ok</code> 是 <code>false</code>，代表資料已過保留期被清掉。判斷要不要給「開啟」請用 <code>view_ok</code>，<strong>不可以用 <code>has_result</code> 代替</strong>（逐句翻譯沒有下載檔，但「開啟」打得開）。</p>
+<hr>
+      </section>
+      <section class="doc-section" data-sec="10b-mcpai-客戶端" data-title="10b. MCP（AI 客戶端）" hidden>
+<h3 id="10b-mcpai-客戶端">10b. MCP（AI 客戶端）</h3>
+<p>讓 Claude Code、Codex CLI、OpenCode 這類 AI 客戶端透過 MCP（Model Context Protocol）呼叫本站<strong>不用 LLM</strong> 的工具。 <strong>預設關閉</strong>，管理員在「設定 → MCP（AI 連接）」打開。</p>
+<pre><code class="lang-text"><span class="hl-method">POST</span> /mcp                   <span class="hl-cmt"># JSON-RPC 2.0（Streamable HTTP，只回 JSON、無狀態）</span>
+<span class="hl-method">GET</span>  /mcp                   <span class="hl-cmt"># 405（不提供 SSE）</span>
+<span class="hl-method">POST</span> /mcp/files/upload      <span class="hl-cmt"># 用一次性票證上傳檔案進工作區</span>
+<span class="hl-method">GET</span>  /mcp/files/download    <span class="hl-cmt"># 用一次性票證下載工作區的檔案</span></code></pre>
+<p><strong>認證</strong>：<code>Authorization: Bearer &lt;API Token&gt;</code>。這張 Token 要在設定頁另外勾「允許 MCP」；站台啟用認證時， Token 要綁定使用者，權限照那位使用者（沒有某支工具的權限就看不到、也叫不動）。有帶 <code>Origin</code> 標頭時要是站台網址那個來源。 協定版本支援 <code>2025-11-25</code>、<code>2025-06-18</code>、<code>2025-03-26</code>、<code>2024-11-05</code>。</p>
+<p><strong>工具清單只有固定 9 個</strong>（不管開放多少支本站工具都不會變多，不會佔滿模型的上下文）：</p>
+<div class="table-wrap"><table><thead><tr><th>MCP 工具</th><th>作用</th></tr></thead><tbody><tr><td><code>jtdt_catalog</code></td><td>列出可以執行的工具（名稱、分類、一行說明）</td></tr><tr><td><code>jtdt_describe</code></td><td>一支工具的參數、輸入檔與範例</td></tr><tr><td><code>jtdt_run</code></td><td>執行：<code>tool</code>、<code>files</code>（工作區檔案編號）、<code>params</code>；結果存進工作區。超過約 45 秒回 <code>job_id</code></td></tr><tr><td><code>job_status</code></td><td>等待 / 取得 <code>jtdt_run</code> 的結果</td></tr><tr><td><code>workspace_list</code></td><td>列出自己工作區的檔案</td></tr><tr><td><code>workspace_upload_url</code></td><td>取得一次性上傳指令（<code>curl</code>），讓 AI 自己上傳本機檔案</td></tr><tr><td><code>workspace_upload_inline</code></td><td>256 KB 以下的小檔直接用 Base64 上傳（給不能執行指令的客戶端）</td></tr><tr><td><code>workspace_download_url</code></td><td>取得一次性下載指令（<code>curl</code>）</td></tr><tr><td><code>workspace_read_text</code></td><td>分頁讀工作區裡的文字檔</td></tr></tbody></table></div>
+<p>目前開放的工具：<code>pdf_merge</code>（檔案合併）、<code>pdf_split</code>（頁面分拆）、<code>pdf_compress</code>（PDF 壓縮）、<code>pdf_rotate</code>（頁面轉向）、 <code>pdf_page_numbers</code>（插入頁碼）、<code>office_to_pdf</code>（辦公文件轉 PDF）、<code>document_to_images</code>（辦公文件轉圖片）、 <code>pdf_extract_text</code>（擷取文字）、<code>document_word_count</code>（字數統計）、<code>vat_lookup</code>（統編查詢）。 執行時在伺服器內部用<strong>同一張 Token</strong> 呼叫各工具原本的 API，檢查、權限、稽核都跟 REST 一樣（稽核標「經由 MCP」）。</p>
+<p><strong>檔案傳輸（檔案內容不經過模型）</strong>：<code>workspace_upload_url</code> / <code>workspace_download_url</code> 回一張一次性票證與 <code>curl</code> 指令。 票證放在標頭 <code>X-JTDT-Ticket</code>（不放網址）、15 分鐘有效、只能用在一個檔；上傳<strong>存好才算用掉</strong>（斷線可以重傳， 成功後再送回 <code>409</code> 與原本的檔案編號）；可以帶 <code>sha256</code>，不符回 <code>422</code>；比申報的大小大回 <code>413</code>；預設綁發出時的來源 IP。 網址用設定的站台網址組（不用請求的 Host 標頭）；站台網址是 HTTP 時要管理員另外允許。</p>
+<pre><code class="lang-bash"><span class="hl-cmt"># 列出工具（JSON-RPC）</span>
+curl <span class="hl-flag">-s</span> <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/mcp</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;tools/list&quot;}&#x27;</span> | jq
+
+<span class="hl-cmt"># 上傳（票證從 workspace_upload_url 拿）</span>
+curl <span class="hl-flag">-sS</span> <span class="hl-flag">--fail-with-body</span> <span class="hl-flag">-H</span> <span class="hl-str">&#x27;X-JTDT-Ticket: TICKET&#x27;</span> <span class="hl-flag">-F</span> <span class="hl-str">&#x27;file=@report.pdf&#x27;</span> <span class="hl-url">http://localhost:8765/mcp/files/upload</span>
+<span class="hl-cmt"># → {&quot;ok&quot;: true, &quot;file_id&quot;: &quot;...&quot;, &quot;name&quot;: &quot;report.pdf&quot;, &quot;bytes&quot;: 12345, &quot;sha256&quot;: &quot;...&quot;}</span></code></pre>
+<p><strong>客戶端設定</strong>（設定頁有填好網址的範例）：</p>
+<pre><code class="lang-bash"><span class="hl-cmt"># Claude Code</span>
+claude mcp add <span class="hl-flag">--transport</span> http jt-doc-tools <span class="hl-url">https://docs.example.com/mcp</span> <span class="hl-flag">--header</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span></code></pre>
+<pre><code class="lang-toml"><span class="hl-cmt"># Codex CLI：~/.codex/config.toml（Token 放環境變數 JTDT_TOKEN）</span>
+[mcp_servers.jt-doc-tools]
+url = <span class="hl-str">&quot;https://docs.example.com/mcp&quot;</span>
+bearer_token_env_var = <span class="hl-str">&quot;JTDT_TOKEN&quot;</span></code></pre>
+<pre><code class="lang-json">{<span class="hl-key">&quot;mcp&quot;</span>: {<span class="hl-key">&quot;jt-doc-tools&quot;</span>: {<span class="hl-key">&quot;type&quot;</span>: <span class="hl-str">&quot;remote&quot;</span>, <span class="hl-key">&quot;url&quot;</span>: <span class="hl-str">&quot;https://docs.example.com/mcp&quot;</span>, <span class="hl-key">&quot;enabled&quot;</span>: <span class="hl-bool">true</span>,
+  <span class="hl-key">&quot;oauth&quot;</span>: <span class="hl-bool">false</span>, <span class="hl-key">&quot;headers&quot;</span>: {<span class="hl-key">&quot;Authorization&quot;</span>: <span class="hl-str">&quot;Bearer {env:JTDT_TOKEN}&quot;</span>}}}}</code></pre>
+<p>上面是 OpenCode 的 <code>opencode.json</code>。Claude Desktop 用 <code>mcp-remote</code> 轉接（只能用 256 KB 以下的小檔）。</p>
+<p><strong>限制與稽核</strong>：每張 Token 每分鐘的呼叫數、同時執行的作業數有上限（設定頁可調）；每一次執行寫 <code>mcp_call</code> 稽核 （工具、Token 名稱、使用者、來源 IP、輸入與輸出的檔案編號），上傳 / 下載寫 <code>mcp_upload</code> / <code>mcp_download</code>，不記文件內容與票證。</p>
+<p><strong>管理端點</strong>（管理員，session）：<code>GET /admin/mcp</code>（設定頁）、<code>POST /admin/mcp/save</code>（總開關、站台網址、開放的工具、 限流、票證設定）、<code>POST /admin/mcp/token</code>（<code>{&quot;preview&quot;: &quot;&lt;遮罩&gt;&quot;, &quot;allowed&quot;: true}</code>，打開 / 關閉某張 Token 連 MCP）。</p>
 <hr>
       </section>
       <section class="doc-section" data-sec="列出資產" data-title="列出資產" hidden>

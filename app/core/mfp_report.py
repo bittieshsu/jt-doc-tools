@@ -163,7 +163,7 @@ def _step(ctx: _Ctx, s: dict) -> dict:
 
 def _when(iso: Any) -> str:
     try:
-        return datetime.fromisoformat(str(iso)).astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
+        return datetime.fromisoformat(str(iso)).astimezone().strftime("%Y/%m/%d %H:%M:%S %z")
     except (TypeError, ValueError):
         return ""
 

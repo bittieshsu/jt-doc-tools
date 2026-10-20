@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.17.0
+# Jason Tools Document Toolbox v1.17.1
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -27,7 +27,7 @@
 
 > An integrated PDF / Office document platform. 52 tools cover **form filling and stamping**, **watermarks**, **merge / split / rotate / reorder**, **format conversion**, **scan stitching**, **de-identification**, **word counts**, **annotation handling**, **diffing**, **sentence translation**, **list processing**, **e-invoice processing**, **VAT lookup**, **a page editor**, **encryption / decryption** and more.
 >
-> Enterprise features: **local / LDAP / AD multi-realm authentication**, **single sign-on** (OIDC + SAML, ready for M365 / Google / Keycloak), **RBAC roles and permissions**, **audit log**, **SIEM forwarding** (syslog / CEF / GELF), **font management**, **user workspace**, **background jobs with completion notices** and a **REST API**.
+> Enterprise features: **local / LDAP / AD multi-realm authentication**, **single sign-on** (OIDC + SAML, ready for M365 / Google / Keycloak), **RBAC roles and permissions**, **audit log**, **SIEM forwarding** (syslog / CEF / GELF), **font management**, **user workspace**, **background jobs with completion notices**, a **REST API** and **MCP (lets Claude Code / Codex / OpenCode call the non-LLM tools)**.
 >
 > **No cloud; your data stays with you.** Runs on Linux, macOS and Windows, either standalone or as an internal server for a whole team.
 
@@ -284,7 +284,7 @@ Leave it unset and nothing changes: **the other 50 tools are entirely unaffected
 | **[OPS.md](OPS.md)** | Day-to-day operations: the `jtdt` command, upgrades, reverse proxies (nginx/Caddy), listen address, backup and restore, moving to another host, scheduled cleanup |
 | **[AUTH.md](AUTH.md)** | Authentication / RBAC / built-in accounts (jtdt-admin / jtdt-auditor) / 2FA / SSO (OIDC+SAML) / Reverse Proxy SSO (Kerberos) / account lockout / emergency recovery |
 | **[reverse_proxy_sso.md](reverse_proxy_sso.md)** | Reverse Proxy SSO (Kerberos / SPNEGO) end-to-end deployment: AD service account, setspn, ktpass / keytab, nginx configuration, automatic browser sign-in, header spoofing protection |
-| **[API.md](API.md)** ([web version](https://jasoncheng7115.github.io/jt-doc-tools/api-en.html)) | REST API: bearer tokens, the endpoint list, upload and response formats, error codes, curl / Python examples, the job flow |
+| **[API.md](API.md)** ([web version](https://jasoncheng7115.github.io/jt-doc-tools/api-en.html)) | REST API: bearer tokens, the endpoint list, upload and response formats, error codes, curl / Python examples, the job flow; connecting MCP (AI clients) |
 | **[LLM.md](LLM.md)** | Optional LLM features (off by default): how 14 tools use an LLM, examples, supported LLM servers and gateways (Ollama / LiteLLM / vLLM…), turning thinking off and concurrency |
 | **[SECURITY.md](SECURITY.md)** | Security policy, OWASP Top 10 (2025) mapping, vulnerability reporting, GitHub native scan integration |
 | **[COMPLIANCE.md](COMPLIANCE.md)** ([web version](https://jasoncheng7115.github.io/jt-doc-tools/compliance-en.html)) | Data protection and compliance: where documents stay, when the tool connects to the outside, the controls it provides and what your organization does, plus mappings to Taiwan's Personal Data Protection Act, GDPR, ISO/IEC 27001:2022 and ISO/IEC 42001:2023 |

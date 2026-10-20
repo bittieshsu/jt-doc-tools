@@ -2128,12 +2128,7 @@ a.od-ref-title:hover { text-decoration:underline; }
   var REF_BADGE = { substantive_basis: 'basis', format_reference: 'format', style_example: 'style',
                     past_case: 'past' };
 
-  function fmtDay(ts) {
-    if (!ts) return '';
-    var d = new Date(ts * 1000);
-    function p2(n) { return (n < 10 ? '0' : '') + n; }
-    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
-  }
+  function fmtDay(ts) { return jtTime.date(ts); }
 
   function refIcon(name) {
     var tpl = el('odRefIcons');
@@ -3184,13 +3179,7 @@ a.od-ref-title:hover { text-decoration:underline; }
     KIND_NAME[o.value] = o.closest('.option-card').querySelector('.opt-label').textContent.trim();
   });
 
-  function fmtWhen(ts) {
-    var d = new Date((Number(ts) || 0) * 1000);
-    if (!ts || isNaN(d.getTime())) return '';
-    function p2(n) { return (n < 10 ? '0' : '') + n; }
-    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) +
-      ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
-  }
+  function fmtWhen(ts) { return jtTime.dt(ts); }
   function isRevDirty() { return REV.cur > 0 && el('odDraft').value !== REV.baseText; }
 
   function resetRevisions(text) {

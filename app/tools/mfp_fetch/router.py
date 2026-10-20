@@ -322,13 +322,19 @@ def _with_state(c: dict, who: _Who) -> dict:
 
 # --------------------------------------------------------------------------- 頁面
 
+def page_context(request: Request, mode: str = "") -> dict:
+    """工具頁與「設定 → 共用事務機」共用同一份模板，**資料也只在這裡組一次**
+    （原本兩支路由各自組，工具頁加了東西、管理頁就漏了）。"""
+    return {"request": request, "mode": mode, "allowed_ports": list(mfp_client.ALLOWED_PORTS),
+            "status_messages": mfp_profiles.STATUS_MESSAGES,
+            "status_labels": {k: list(v) for k, v in mfp_profiles.STATUS_LABELS.items()},
+            "field_tests": mfp_profiles.FIELD_TESTS, "field_result_labels": mfp_profiles.FIELD_RESULT_LABELS}
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     templates = request.app.state.templates
-    return templates.TemplateResponse(request, "mfp_fetch.html", {
-        "request": request, "allowed_ports": list(mfp_client.ALLOWED_PORTS),
-        "status_messages": mfp_profiles.STATUS_MESSAGES,
-        "status_labels": {k: list(v) for k, v in mfp_profiles.STATUS_LABELS.items()}})
+    return templates.TemplateResponse(request, "mfp_fetch.html", page_context(request))
 
 
 # --------------------------------------------------------------------------- API：連線測試與我的事務機

@@ -82,9 +82,14 @@ def _has_session_cookie(scope) -> bool:
     return _SESSION_COOKIE in c
 
 
+#: MCP（v1.17.1）：只認 `Authorization: Bearer` 或 `X-JTDT-Ticket` 標頭，不認 cookie ——
+#: 跨站的表單送不出自訂標頭，沒有 CSRF 的風險。
+_EXEMPT_EXACT = ("/mcp", "/mcp/files/upload", "/mcp/files/download")
+
+
 def _is_exempt(scope) -> bool:
     path = scope.get("path", "")
-    if any(path.startswith(p) for p in _EXEMPT_PREFIXES):
+    if any(path.startswith(p) for p in _EXEMPT_PREFIXES) or path in _EXEMPT_EXACT:
         return True
     if _header(scope, b"authorization").startswith(b"Bearer "):
         # 只在「不是瀏覽器 session」時才豁免。

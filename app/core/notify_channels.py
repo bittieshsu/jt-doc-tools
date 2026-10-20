@@ -47,17 +47,24 @@ WEBHOOK_CHANNELS = ("telegram", "slack", "teams", "discord", "zulip",
 ALL_CHANNELS = ("email",) + WEBHOOK_CHANNELS
 
 #: 顯示名稱與前置需求（給 admin UI 用）
-#: **對真實服務端到端驗證過的是 Email 與 Zulip**（Email：實機 SMTP 寄出、收件者確認收到；
-#: Zulip：v1.17.0 對 Zulip 12 站台私訊 Bot 綁定、管理頁傳送測試，收件者確認收到）。
+#: **對真實服務端到端驗證過的是 Email、Zulip、Telegram**（Email：實機 SMTP 寄出、收件者確認收到；
+#: Zulip：v1.17.0 對 Zulip 12 站台私訊 Bot 綁定、管理頁傳送測試，收件者確認收到；
+#: Telegram：v1.17.1 使用者實測送得到）。
 #: 其餘管道有單元測試（把網路呼叫換掉、驗載荷格式），但沒有人真的接上 Slack /
 #: Teams / Telegram … 實際收過訊息 —— 所以標為開發階段，讓管理員知道這件事，
 #: 而不是設定下去之後才發現收不到。
 #:
 #: 驗證過一個就把它從這裡拿掉（並在 CHANGELOG 註明是用哪個服務驗的）。
 DEV_CHANNELS: frozenset[str] = frozenset({
-    "telegram", "slack", "teams", "discord", "nextcloud",
+    "slack", "teams", "discord", "nextcloud",
     "line", "webhook",
 })
+
+
+def verified_labels() -> str:
+    """已經實機驗證過的管道名稱（「Email、Zulip、Telegram」）。畫面上那句說明由這裡產生，
+    **不在兩個頁面各寫一次**（原本是寫死的字串，改一邊就會漏一邊）。"""
+    return "、".join(CHANNEL_INFO[c]["label"] for c in ALL_CHANNELS if c not in DEV_CHANNELS)
 
 CHANNEL_INFO: dict[str, dict] = {
     "email":     {"label": "Email", "needs": "SMTP 主機"},

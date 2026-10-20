@@ -40,6 +40,22 @@ SAME_SERIES: dict[tuple[str, str], tuple[str, str]] = {
     ("Apeos", m): ("Apeos", "C5571") for m in ("C7071", "C6571", "C4571", "C3571", "C3071", "C2571")
 }
 
+#: 實機測試紀錄（工具頁「已驗證支援清單」顯示這份；使用者 2026-10-19 要求）。**只寫真的測過的**，
+#: 驗證到哪一步就寫到哪一步：`verified`＝這項功能整條在實機上走過；`same_series`＝同系列、以另一款實機驗證；
+#: `partial`＝部分步驟驗證過（`note` 寫清楚哪些還沒驗）。客戶型號、日期以外的細節（客戶名稱、位址）不寫這裡。
+FIELD_TESTS: tuple[dict, ...] = (
+    {"vendor": "FUJIFILM", "models": ("Apeos C5571",), "feature": "機內信箱取件", "result": "verified",
+     "note": "列出文件、取件（TIFF 轉 PDF）", "date": "2026-10-19"},
+    {"vendor": "FUJIFILM", "models": ("Apeos C7071", "Apeos C6571", "Apeos C4571", "Apeos C3571", "Apeos C3071",
+                                      "Apeos C2571"),
+     "feature": "機內信箱取件", "result": "same_series", "note": "同系列，以 Apeos C5571 實機驗證", "date": ""},
+    {"vendor": "RICOH", "models": ("IM C3500", "IM C3510"), "feature": "直接取件（不需登入）", "result": "partial",
+     "note": "已列出文件伺服器的文件；取件尚待驗證", "date": "2026-10-19"},
+    {"vendor": "HP", "models": ("LaserJet MFP M141w",), "feature": "eSCL 掃描", "result": "verified",
+     "note": "平台玻璃掃描存進工作區", "date": "2026-10-14"},
+)
+FIELD_RESULT_LABELS: dict[str, str] = {"verified": "已驗證", "same_series": "同系列", "partial": "部分驗證"}
+
 #: 狀態代碼 → 固定訊息（翻譯檔有英日文）。
 STATUS_MESSAGES: dict[str, str] = {
     "supported": "已支援（已通過實機驗證）",
@@ -48,6 +64,8 @@ STATUS_MESSAGES: dict[str, str] = {
     "same_vendor_unverified": "同廠牌，尚未驗證是否支援",
     "experimental_vendor": "實驗功能：這個廠牌的取件依原廠手冊或原廠工具的分析寫成，尚未在實機上驗證",
     "unsupported_vendor": "不支援取件：這個廠牌目前沒有取件方式（支援 eSCL 的話仍可以從本站掃描）",
+    #: 畫面用：廠牌沒有取件方式、但這台有 eSCL 能掃描（原本一律顯示紅色「不支援取件」，像整台不能用）
+    "scan_only": "可以從本站掃描（eSCL）；這個廠牌目前沒有取件方式",
     "login_required": "需要登入後才能辨識型號",
     "unknown": "無法辨識型號",
     "unreachable": "連不上設備，無法辨識",
@@ -62,6 +80,7 @@ STATUS_LABELS: dict[str, tuple[str, str]] = {
     "same_vendor_unverified": ("尚未驗證", "同廠牌，尚未驗證是否支援"),
     "experimental_vendor": ("實驗功能", "取件依原廠手冊或原廠工具的分析寫成，尚未實機驗證"),
     "unsupported_vendor": ("不支援取件", "這個廠牌目前沒有取件方式；支援 eSCL 的話仍可以從本站掃描"),
+    "scan_only": ("可掃描", "可以從本站掃描（eSCL）；這個廠牌沒有取件方式"),
     "login_required": ("需要登入", "登入後才能辨識型號"),
     "unknown": ("無法辨識", "首頁上找不到廠牌或型號"),
     "unreachable": ("連不上", ""),

@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.17.0"
+VERSION = "1.17.1"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -190,7 +190,7 @@ def _tpl_localdt(ts) -> str:
     """
     try:
         from datetime import datetime
-        return datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M")
+        return datetime.fromtimestamp(float(ts)).strftime("%Y/%m/%d %H:%M")
     except (TypeError, ValueError, OSError, OverflowError):
         return "—"
 
@@ -635,6 +635,9 @@ templates.env.globals["nav_settings"] = [
     {"icon": "gear", "name": "記錄轉送", "description": "將稽核轉發到外部 syslog / CEF / GELF",
      "url": "/admin/log-forward", "requires_auth": True,
      "keywords": "syslog cef gelf forward log siem splunk graylog 轉發"},
+    {"icon": "sparkles", "name": "MCP（AI 連接）", "description": "讓 Claude、Codex、OpenCode 呼叫本站工具",
+     "url": "/admin/mcp",
+     "keywords": "mcp model context protocol ai agent claude code codex OpenCode llm tool api token connector 連接 代理 人工智慧 串接"},
     {"icon": "mail", "name": "作業完成通知", "description": "完成時通知送出者：站內 / Email / 通訊軟體",
      "url": "/admin/notify",
      "keywords": "notify notification email smtp mail teams slack telegram discord zulip nextcloud talk line webhook 通知 提醒 完成 郵件 信件 訊息 推播"},
@@ -660,6 +663,31 @@ templates.env.globals["nav_settings"] = [
      "keywords": "history watermark 歷史 浮水印"},
 ]
 
+
+#: 管理選單的順序：**同類的設定排在一起**（使用者 2026-10-19；MCP 排在 LLM 設定下面）。
+#: 上面那份清單照加入的先後寫，畫面照這裡排。新的管理頁一定要排進某一類
+#: （`tests/test_admin_nav_order.py` 檢查兩邊一致，不可以落在最後面湊數）。
+NAV_SETTINGS_ORDER: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("系統運作", ("/admin/system-status", "/admin/sys-deps", "/admin/jobs", "/admin/conversion",
+                  "/admin/ocr-langs", "/admin/fonts")),
+    ("AI 與外部串接", ("/admin/llm-settings", "/admin/mcp", "/admin/api-tokens", "/admin/jtlw")),
+    ("品牌與資料", ("/admin/branding", "/admin/profile", "/admin/assets", "/admin/settings-export")),
+    ("工具資料", ("/admin/templates", "/admin/synonyms", "/admin/translation-glossary", "/admin/official-doc",
+                  "/admin/knowledge", "/admin/vat-db", "/admin/mfp")),
+    ("帳號與權限", ("/admin/auth-settings", "/admin/sso", "/admin/users", "/admin/groups", "/admin/roles",
+                    "/admin/permissions", "/admin/directory")),
+    ("通知與檔案", ("/admin/notify", "/admin/workspace", "/admin/retention")),
+    ("稽核", ("/admin/audit", "/admin/log-forward", "/admin/uploads", "/admin/history/fill",
+              "/admin/history/stamp", "/admin/history/watermark")),
+)
+
+
+def _ordered_nav(items: list) -> list:
+    rank = {u: i for i, u in enumerate(u for _g, urls in NAV_SETTINGS_ORDER for u in urls)}
+    return sorted(items, key=lambda it: rank.get(it["url"], len(rank)))
+
+
+templates.env.globals["nav_settings"] = _ordered_nav(templates.env.globals["nav_settings"])
 
 # Stash the master list so the filter callable can read it without
 # self-referencing the override below.
@@ -906,6 +934,11 @@ from .web.asset_routes import build_router as _build_asset_router  # noqa: E402
 
 app.include_router(_build_asset_router())
 
+# MCP（v1.17.1）：AI 客戶端呼叫本站工具；自己做認證，預設關閉
+from .mcp.server import router as _mcp_router  # noqa: E402
+
+app.include_router(_mcp_router)
+
 # Admin routes
 from .admin.router import build_router as _build_admin_router  # noqa: E402
 
@@ -919,6 +952,10 @@ _admin.include_router(_build_admin_auth_router(templates))
 from .admin.knowledge_routes import build_knowledge_router as _build_admin_kb_router  # noqa: E402
 
 _admin.include_router(_build_admin_kb_router(templates))
+# MCP（v1.17.1）設定頁 —— 掛在 _admin 底下，繼承 require_admin
+from .admin.mcp_routes import build_mcp_router as _build_admin_mcp_router  # noqa: E402
+
+_admin.include_router(_build_admin_mcp_router(templates))
 app.include_router(_admin, prefix="/admin", tags=["admin"])
 
 # Tool routes
@@ -1276,7 +1313,9 @@ async def ui_locale_dictionary(locale: str, request: Request):
     return Response(body, media_type="application/javascript", headers=headers)
 
 
-_PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/readyz", "/favicon.ico", "/2fa-verify", "/ui-locale"}
+_PUBLIC_EXACT = {"/login", "/logout", "/healthz", "/readyz", "/favicon.ico", "/2fa-verify", "/ui-locale",
+                 # MCP（v1.17.1）自己做認證（API Token / 一次性傳輸票證），不走網頁的登入
+                 "/mcp", "/mcp/files/upload", "/mcp/files/download"}
 
 
 def _looks_like_xhr(request: Request) -> bool:
@@ -1570,7 +1609,7 @@ async def _auth_gate(request: Request, call_next):
         # 並寫出是哪一張 Token。名稱由 `_api_token_gate` 驗過之後放進來。
         _tok_label = getattr(request.state, "api_token_label", None)
         if _tok_label is not None:
-            details["via"] = "api_token"
+            details["via"] = "mcp" if getattr(request.state, "api_via_mcp", False) else "api_token"
             details["token"] = str(_tok_label)[:64]
         _ad.log_event(
             "tool_invoke",
@@ -1698,6 +1737,13 @@ async def _api_token_gate(request: Request, call_next):
     # 稽核記錄要寫得出「這筆是用哪一張 Token 呼叫的」（`tool_invoke` 與
     # `file_download` 都會帶上）。只放名稱，不放 Token 本身。
     request.state.api_token_label = token_row.get("label") or ""
+    # MCP 在行程內轉呼叫時帶程序內的密值（`app.mcp.runner.VIA_SECRET`），稽核標成「經由 MCP」；外部偽造不了
+    _via = request.headers.get("X-JTDT-Via-MCP") or ""
+    if _via:
+        import hmac as _hmac
+
+        from .mcp import runner as _mcp_runner
+        request.state.api_via_mcp = _hmac.compare_digest(_via, _mcp_runner.VIA_SECRET)
     # When auth is on, attach the token's owning user to request.state.user
     # so downstream perm checks (if any) are scoped to that user. Tokens
     # without an owner are treated as having no permission when auth is on
@@ -1900,6 +1946,7 @@ async def api_my_notify(request: Request):
     avail = _ns.enabled_channels()
     return {
         "system_enabled": _ns.is_enabled(),
+        "verified_channels": _nc.verified_labels(),
         "available": [{"id": c, "label": _nc.CHANNEL_INFO[c]["label"],
                        # 尚未對真實服務驗證過的管道 —— 使用者也該知道，
                        # 不然勾了收不到會以為是自己設定錯

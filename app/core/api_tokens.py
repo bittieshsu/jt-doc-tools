@@ -61,7 +61,7 @@ def _preview(token: str) -> str:
 
 #: 檔案裡每一筆的欄位（不含 Token 本身）
 _STORED = ("token_sha256", "token_enc", "preview", "label", "created_at", "last_used_at",
-           "expires_at", "enabled", "owner_user_id")
+           "expires_at", "enabled", "owner_user_id", "mcp")
 
 
 def _stored(tok: "ApiToken") -> dict:
@@ -113,6 +113,8 @@ class ApiToken:
     # by that user's effective perms. owner_user_id=None means legacy /
     # unowned (treated as no permission when auth on, so admin must set it).
     owner_user_id: Optional[int] = None
+    # v1.17.1：這張 Token 能不能連 MCP（AI 客戶端）。預設不行，管理員在「設定 → MCP」逐張打開
+    mcp: bool = False
 
     def to_public(self) -> dict:
         """Safe-to-display dict — masks the token middle so UI can show a
@@ -130,6 +132,7 @@ def _public(row: dict) -> dict:
         "expires_at": row.get("expires_at", 0.0),
         "enabled": row.get("enabled", True),
         "owner_user_id": row.get("owner_user_id"),
+        "mcp": bool(row.get("mcp", False)),
     }
 
 
@@ -281,6 +284,21 @@ class ApiTokenManager:
             for t in data.get("tokens", []):
                 if _matches(t, token_preview_or_full):
                     t["owner_user_id"] = owner_user_id
+                    changed = True
+            if changed:
+                self._write(data)
+            return changed
+
+    def set_mcp(self, token_preview_or_full: str, allowed: bool) -> bool:
+        """打開 / 關閉這張 Token 連 MCP 的權限（v1.17.1）。"""
+        if not token_preview_or_full:
+            return False
+        with self._lock:
+            data = self._read()
+            changed = False
+            for t in data.get("tokens", []):
+                if _matches(t, token_preview_or_full):
+                    t["mcp"] = bool(allowed)
                     changed = True
             if changed:
                 self._write(data)

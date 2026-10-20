@@ -144,7 +144,7 @@ def list_cases(owner_uid: Optional[int] = None,
             if not ts:
                 return "—"
             try:
-                return datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M")
+                return datetime.fromtimestamp(float(ts)).strftime("%Y/%m/%d %H:%M")
             except Exception:
                 return "—"
         # 檔名摘要：第一檔 + 「等 N 個」
