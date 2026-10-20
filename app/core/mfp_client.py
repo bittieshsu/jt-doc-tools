@@ -696,7 +696,7 @@ def probe(raw_host: str, port: Any = None, scheme: Any = None) -> dict:
     mdl = str(esc.get("model") or "").strip()
     detection = mfp_profiles.detect(pages, escl_model=mdl if (not mk or mk.lower() in mdl.lower())
                                     else f"{mk} {mdl}".strip())
-    report["detection"] = detection
+    report["detection"] = dict(detection, rules=mfp_profiles.rules_signature())
     reachable = [a for a in report["attempts"] if a.get("reachable")]
     report["summary"] = {
         "reachable": bool(reachable),

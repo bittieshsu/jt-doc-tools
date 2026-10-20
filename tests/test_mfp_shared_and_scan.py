@@ -365,7 +365,7 @@ def test_migration_from_v1_keeps_existing_connections(tmp_path):
     c.execute("PRAGMA user_version=1")
     c.commit()
     c.close()
-    assert db.migrate(p, mfp_store._MIGRATIONS) == 3
+    assert db.migrate(p, mfp_store._MIGRATIONS) == len(mfp_store._MIGRATIONS)
     c = sqlite3.connect(p)
     assert c.execute("SELECT display_name, host FROM mfp_connections").fetchall() == [("三樓", "192.168.1.50")]
     names = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -386,7 +386,7 @@ def test_migration_from_v2_keeps_existing_scans(tmp_path):
     c.execute("PRAGMA user_version=2")
     c.commit()
     c.close()
-    assert db.migrate(p, mfp_store._MIGRATIONS) == 3
+    assert db.migrate(p, mfp_store._MIGRATIONS) == len(mfp_store._MIGRATIONS)
     c = sqlite3.connect(p)
     assert c.execute("SELECT file_name, kind, items FROM mfp_scans").fetchall() == [("合約.pdf", "scan", None)]
     c.close()

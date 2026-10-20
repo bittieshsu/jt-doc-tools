@@ -1501,7 +1501,13 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <span class="hl-method">GET</span>    /tools/mfp-fetch/api/connections/{id}/report     <span class="hl-cmt"># 下載最近一次診斷報告（見下方「診斷報告」）</span>
 <span class="hl-method">DELETE</span> /tools/mfp-fetch/api/connections/{id}            <span class="hl-cmt"># 從清單移除（不影響設備）</span></code></pre>
 <p>儲存只收連線測試回的 <code>token</code>（不收位址），存下來的一定是測過的那一台；token 過期或不是本人的回 <code>410</code>。 同一個位址與連線方式重複儲存回 <code>409</code>（<code>DUPLICATE</code>），每人最多 20 台（<code>LIMIT</code>）。 目前<strong>不儲存任何帳密</strong>。</p>
-<p>清單的每一筆另外有：<code>shared</code>（是不是共用事務機）、<code>can_manage</code>（能不能改名、移除）、 <code>scan</code>（能不能掃描與可選的設定，沒有 eSCL 是 <code>null</code>）、<code>box</code>（能不能機內信箱取件，目前只有 FUJIFILM）、 <code>share</code>（檔案分享取件可用的方式，例如 <code>{&quot;routes&quot;: [&quot;canon_webdav&quot;, &quot;canon_smb&quot;]}</code>，沒有是 <code>null</code>）、 <code>paused</code>（管理員關掉自行新增時，自己的事務機暫停使用）、<code>queue</code>（<code>{&quot;busy&quot;: true, &quot;waiting&quot;: 1, &quot;kind&quot;: &quot;scan&quot;}</code>， 這台現在有沒有在忙、後面排了幾件）。清單本身另回 <code>can_add</code>（呼叫者能不能新增事務機）。 共用事務機對成員是唯讀的：改名與移除回 <code>403</code>（<code>SHARED_READ_ONLY</code>）。</p>
+<p>清單的每一筆另外有：<code>shared</code>（是不是共用事務機）、<code>can_manage</code>（能不能改名、移除）、 <code>scan</code>（能不能掃描與可選的設定，沒有 eSCL 是 <code>null</code>）、<code>box</code>（能不能機內信箱取件，目前只有 FUJIFILM）、 <code>share</code>（檔案分享取件可用的方式，例如 <code>{&quot;routes&quot;: [&quot;canon_webdav&quot;, &quot;canon_smb&quot;]}</code>，沒有是 <code>null</code>）、 <code>paused</code>（管理員關掉自行新增時，自己的事務機暫停使用）、<code>queue</code>（<code>{&quot;busy&quot;: true, &quot;waiting&quot;: 1, &quot;kind&quot;: &quot;scan&quot;}</code>， 這台現在有沒有在忙、後面排了幾件）。清單本身另回 <code>can_add</code>（呼叫者能不能新增事務機）。 共用事務機對成員是唯讀的：改名與移除回 <code>403</code>（<code>SHARED_READ_ONLY</code>）。 另有 <code>rules_stale</code>：上次是用舊的辨識規則判斷、而且當時沒認出來（<code>unknown</code> / <code>unsupported_vendor</code> / <code>login_required</code>）， 重新測試可能就認得了（網頁版標「可重新測試」）。</p>
+<p>事務機記在<strong>帳號</strong>名下，不是瀏覽器：同一個帳號換一台電腦登入看得到同一份清單。 本機帳號、LDAP 帳號、SSO 帳號是不同的帳號，各有各的清單。</p>
+<h5 id="記住的設定">記住的設定</h5>
+<pre><code class="lang-text"><span class="hl-method">GET</span> /tools/mfp-fetch/api/connections/{id}/prefs?kind=box     <span class="hl-cmt"># kind：box（機內信箱）或 share（檔案分享 / 直接取件）</span>
+<span class="hl-method">PUT</span> /tools/mfp-fetch/api/connections/{id}/prefs              <span class="hl-cmt"># {&quot;kind&quot;: &quot;box&quot;, &quot;patch&quot;: {&quot;trust&quot;: &quot;&lt;64 碼 sha256&gt;&quot;, &quot;box&quot;: &quot;96&quot;}}</span></code></pre>
+<p>信任的憑證指紋（<code>trust</code>）、同意以 HTTP / 未加密方式傳送（<code>http</code> / <code>plain</code>）、上次的信箱編號（<code>box</code>）、帳號（<code>user</code>）、 連線目標（<code>target</code>）、取件方式（<code>route</code>）、登入方式（<code>mode</code>），跟著帳號存在伺服器。<strong>不存任何密碼</strong>， 不認得的欄位與格式不對的值直接丟掉；值給 <code>null</code> 或空字串等於清掉。</p>
+<p>共用事務機：管理員設的 <code>trust</code> / <code>http</code> / <code>plain</code> 是這台的設定，成員讀到的就是那一份（回應的 <code>managed</code> 列出由管理員設定的欄位）； 成員要改那幾個欄位回 <code>409</code>（<code>PREF_MANAGED</code>），取件時請求裡帶的指紋或同意也會被管理員的設定取代。 管理員沒設的時候，成員可以存自己的。改 <code>trust</code> / <code>http</code> / <code>plain</code> 會寫稽核（<code>mfp_trust</code>，指紋只記前 16 碼）。</p>
       </section>
       <section class="doc-section" data-sec="診斷報告" data-title="診斷報告" hidden>
 <div class="doc-crumb">9b. 事務機掃描取件 API</div>
@@ -1593,6 +1599,10 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <span class="hl-method">PUT</span>    /tools/mfp-fetch/api/shared/{id}/members     <span class="hl-cmt"># 整份換掉：{&quot;members&quot;: [{&quot;type&quot;: &quot;user&quot;, &quot;key&quot;: &quot;12&quot;}, {&quot;type&quot;: &quot;group&quot;, &quot;key&quot;: &quot;3&quot;}]}</span>
 <span class="hl-method">GET</span>    /tools/mfp-fetch/api/shared-subjects         <span class="hl-cmt"># 挑成員用：使用者與群組清單</span></code></pre>
 <p>成員只收存在的使用者與群組，其他回 <code>400</code>（<code>MEMBERS_INVALID</code>）。刪除帳號或群組時成員資格一起拿掉； 刪除建立者的帳號不會刪掉共用事務機。</p>
+<p>管理員自己也要列在成員裡才會出現在自己的「我的事務機」清單。</p>
+<pre><code class="lang-text"><span class="hl-method">GET</span>  /tools/mfp-fetch/api/shared/local          <span class="hl-cmt"># {&quot;count&quot;: 2}：未啟用登入時新增的事務機有幾台</span>
+<span class="hl-method">POST</span> /tools/mfp-fetch/api/shared/adopt-local    <span class="hl-cmt"># 轉成共用事務機：{&quot;moved&quot;: 1, &quot;left&quot;: 1}</span></code></pre>
+<p>未啟用登入時新增的事務機記在「本機」名下，啟用登入之後任何帳號都看不到。<code>adopt-local</code> 把它們轉成共用事務機 （連同當時信任的憑證與同意），之後再設定成員；跟既有共用事務機位址與連線方式相同的不轉（<code>left</code> 是留下的台數）， 超過共用事務機上限的也留著。未啟用登入時呼叫回 <code>400</code>；會寫稽核（<code>mfp_shared_adopt_local</code>）。</p>
       </section>
       <section class="doc-section" data-sec="使用設定管理員" data-title="使用設定（管理員）" hidden>
 <div class="doc-crumb">9b. 事務機掃描取件 API</div>

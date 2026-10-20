@@ -2370,6 +2370,26 @@ DELETE /tools/mfp-fetch/api/connections/{id}            # 從清單移除（不�
 `paused`（管理員關掉自行新增時，自己的事務機暫停使用）、`queue`（`{"busy": true, "waiting": 1, "kind": "scan"}`，
 這台現在有沒有在忙、後面排了幾件）。清單本身另回 `can_add`（呼叫者能不能新增事務機）。
 共用事務機對成員是唯讀的：改名與移除回 `403`（`SHARED_READ_ONLY`）。
+另有 `rules_stale`：上次是用舊的辨識規則判斷、而且當時沒認出來（`unknown` / `unsupported_vendor` / `login_required`），
+重新測試可能就認得了（網頁版標「可重新測試」）。
+
+事務機記在**帳號**名下，不是瀏覽器：同一個帳號換一台電腦登入看得到同一份清單。
+本機帳號、LDAP 帳號、SSO 帳號是不同的帳號，各有各的清單。
+
+#### 記住的設定
+
+```text
+GET /tools/mfp-fetch/api/connections/{id}/prefs?kind=box     # kind：box（機內信箱）或 share（檔案分享 / 直接取件）
+PUT /tools/mfp-fetch/api/connections/{id}/prefs              # {"kind": "box", "patch": {"trust": "<64 碼 sha256>", "box": "96"}}
+```
+
+信任的憑證指紋（`trust`）、同意以 HTTP / 未加密方式傳送（`http` / `plain`）、上次的信箱編號（`box`）、帳號（`user`）、
+連線目標（`target`）、取件方式（`route`）、登入方式（`mode`），跟著帳號存在伺服器。**不存任何密碼**，
+不認得的欄位與格式不對的值直接丟掉；值給 `null` 或空字串等於清掉。
+
+共用事務機：管理員設的 `trust` / `http` / `plain` 是這台的設定，成員讀到的就是那一份（回應的 `managed` 列出由管理員設定的欄位）；
+成員要改那幾個欄位回 `409`（`PREF_MANAGED`），取件時請求裡帶的指紋或同意也會被管理員的設定取代。
+管理員沒設的時候，成員可以存自己的。改 `trust` / `http` / `plain` 會寫稽核（`mfp_trust`，指紋只記前 16 碼）。
 
 ### 診斷報告
 
@@ -2560,6 +2580,17 @@ GET    /tools/mfp-fetch/api/shared-subjects         # 挑成員用：使用者�
 
 成員只收存在的使用者與群組，其他回 `400`（`MEMBERS_INVALID`）。刪除帳號或群組時成員資格一起拿掉；
 刪除建立者的帳號不會刪掉共用事務機。
+
+管理員自己也要列在成員裡才會出現在自己的「我的事務機」清單。
+
+```text
+GET  /tools/mfp-fetch/api/shared/local          # {"count": 2}：未啟用登入時新增的事務機有幾台
+POST /tools/mfp-fetch/api/shared/adopt-local    # 轉成共用事務機：{"moved": 1, "left": 1}
+```
+
+未啟用登入時新增的事務機記在「本機」名下，啟用登入之後任何帳號都看不到。`adopt-local` 把它們轉成共用事務機
+（連同當時信任的憑證與同意），之後再設定成員；跟既有共用事務機位址與連線方式相同的不轉（`left` 是留下的台數），
+超過共用事務機上限的也留著。未啟用登入時呼叫回 `400`；會寫稽核（`mfp_shared_adopt_local`）。
 
 ### 使用設定（管理員）
 

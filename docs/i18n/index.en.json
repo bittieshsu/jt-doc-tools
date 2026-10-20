@@ -559,10 +559,7 @@
  "文件留在哪裡、哪些情況會連到外部、工具本身做到的控制與你的組織要做的事，並對照個資法、GDPR、ISO/IEC 27001:2022 與 ISO/IEC 42001:2023 的條文與控制項。": "Where your documents stay, when the tool connects to the outside, the controls it provides and what your organization does, mapped to Taiwan's Personal Data Protection Act, GDPR, and the clauses and controls of ISO/IEC 27001:2022 and ISO/IEC 42001:2023.",
  "看資料保護與合規": "Read about data protection and compliance",
  "合規": "Compliance",
- "事務機取件（Beta）": "Fetch from MFP (Beta)",
- "新增事務機做連線測試與型號辨識，逐步列出診斷結果；支援 eSCL 的事務機可以直接掃描進工作區，管理員可設定共用事務機，同一台自動排隊；取件要等實機驗證後開放": "Add an MFP to run a connection test and identify the model, with step-by-step diagnostics; MFPs that support eSCL can scan straight into the workspace, administrators can set up shared MFPs, and each device queues requests automatically; fetching opens once tested on real devices",
  "事務機掃描取件": "MFP Scan & Fetch",
- "新增事務機做連線測試與型號辨識，逐步列出診斷結果；支援 eSCL 的事務機可以直接掃描進工作區，管理員可設定共用事務機，同一台自動排隊；FUJIFILM 機內信箱取件為實驗功能（尚未實機驗證）": "Add an MFP for a connection test and model identification with step-by-step diagnostics; eSCL-capable MFPs scan straight into the workspace, administrators can set up shared MFPs, and each device queues automatically; mailbox retrieval on FUJIFILM MFPs is experimental (not yet verified on a real device)",
  "新增事務機做連線測試與型號辨識，逐步列出診斷結果；支援 eSCL 的事務機可以直接掃描進工作區，管理員可設定共用事務機，同一台自動排隊；FUJIFILM 機內信箱取件已實機驗證（Apeos C5571 與同系列），Canon / Konica / SHARP 檔案分享與 KYOCERA / RICOH 直接取件為實驗功能（尚未實機驗證）": "Add an MFP for a connection test and model identification with step-by-step diagnostics; eSCL-capable MFPs scan straight into the workspace, administrators can set up shared MFPs, and each device queues automatically; FUJIFILM mailbox retrieval is verified on real devices (Apeos C5571 and its series), while Canon / Konica / SHARP file shares and KYOCERA / RICOH direct retrieval are experimental (not yet verified on a real device)",
  "MCP（AI 連接）": "MCP (AI connection)",
  "Claude Code / Codex / OpenCode 可以呼叫不用 LLM 的工具；預設關閉，權限照 Token 綁定的使用者": "Claude Code / Codex / OpenCode can call the non-LLM tools; off by default, permissions follow the user the token is assigned to"

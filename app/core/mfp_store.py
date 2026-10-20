@@ -126,7 +126,25 @@ def _m3_job_kind_and_items(conn: sqlite3.Connection) -> None:
     """)
 
 
-_MIGRATIONS = [_m1_initial, _m2_shared_and_scans, _m3_job_kind_and_items]
+def _m4_prefs(conn: sqlite3.Connection) -> None:
+    """每人每台的信任與偏好（v1.17.5）。原本存在瀏覽器（localStorage）：換一台電腦就要重新信任憑證、
+    重新同意 HTTP、信箱編號也不見了（客戶回報「新增的事務機好像只有在該台機器有」時查出來的）。
+
+    `owner_scope`：`u<id>` / `local` 是個人；`shared` 是共用事務機由管理員設定、成員沿用的那一份。
+    只存允許清單裡的欄位（`_PREF_RULES`）；**不存任何密碼**。"""
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS mfp_prefs (
+            owner_scope TEXT NOT NULL,
+            conn_id     INTEGER NOT NULL REFERENCES mfp_connections(id) ON DELETE CASCADE,
+            kind        TEXT NOT NULL,
+            data        TEXT NOT NULL,
+            updated_at  REAL NOT NULL,
+            PRIMARY KEY (owner_scope, conn_id, kind)
+        );
+    """)
+
+
+_MIGRATIONS = [_m1_initial, _m2_shared_and_scans, _m3_job_kind_and_items, _m4_prefs]
 _INITED: set[str] = set()
 _INIT_LOCK = threading.Lock()
 
@@ -180,6 +198,11 @@ def _row(r: sqlite3.Row, with_report: bool = False) -> dict[str, Any]:
     d["escl"] = (rep or {}).get("escl") or None
     # 連得上的協定與連接埠（機內信箱取件沿用連線測試連得上的那一組）
     d["reachable_on"] = [str(x) for x in ((rep or {}).get("summary") or {}).get("reachable_on") or []][:4]
+    # 用舊的辨識規則判斷、而且結果是認不出來那一類：提示「可重新測試」（規則更新後可能認得出來）
+    from . import mfp_profiles
+    rules = ((rep or {}).get("detection") or {}).get("rules")
+    d["rules_stale"] = bool(rep) and r["detect_status"] in mfp_profiles.RECHECK_STATUSES \
+        and rules != mfp_profiles.rules_signature()
     if with_report:
         d["last_report"] = rep
     return d
@@ -295,6 +318,7 @@ def purge_user(user_id: int) -> int:
         c.execute("UPDATE mfp_connections SET owner_user_id=NULL WHERE owner_scope=? AND owner_user_id=?",
                   (SHARED, uid))
         c.execute("DELETE FROM mfp_members WHERE subject_type='user' AND subject_key=?", (str(uid),))
+        c.execute("DELETE FROM mfp_prefs WHERE owner_scope=?", (f"u{uid}",))
         rows = c.execute("SELECT result_path FROM mfp_scans WHERE owner_user_id=? OR owner_scope=?",
                          (uid, f"u{uid}")).fetchall()
         c.execute("DELETE FROM mfp_scans WHERE owner_user_id=? OR owner_scope=?", (uid, f"u{uid}"))
@@ -523,3 +547,141 @@ def _remove_result_files(paths: list) -> None:
             continue
         if len(rel.parts) >= 2:                 # 作業自己的目錄（信箱取件的檔案在它底下一層）
             shutil.rmtree(root / rel.parts[0], ignore_errors=True)
+
+
+# --------------------------------------------------------------------------- 信任與偏好（v1.17.5）
+
+#: 可以存的欄位與檢查方式。`trust`＝信任的憑證指紋；`http` / `plain`＝同意以未加密方式傳送；其餘是上次用的值。
+#: **密碼一律不存。**
+PREF_KINDS = ("box", "share")
+_PREF_RULES: dict[str, Any] = {
+    "trust": lambda v: isinstance(v, str) and re.fullmatch(r"[0-9a-f]{64}", v) is not None,
+    "http": lambda v: isinstance(v, bool),
+    "plain": lambda v: isinstance(v, bool),
+    "box": lambda v: isinstance(v, (str, int)) and re.fullmatch(r"\d{1,9}", str(v)) is not None,
+    "user": lambda v: isinstance(v, str) and len(v) <= 128 and "\x00" not in v,
+    "target": lambda v: isinstance(v, str) and re.fullmatch(r"(https?):\d{1,5}", v) is not None,
+    "route": lambda v: isinstance(v, str) and re.fullmatch(r"[a-z_]{2,40}", v) is not None,
+    "mode": lambda v: isinstance(v, str) and re.fullmatch(r"[a-z_]{2,20}", v) is not None,
+}
+#: 共用事務機：這幾個由管理員決定、成員沿用（管理員確認過的憑證，成員不用、也不能自己改信任別的）
+SHARED_FIELDS = ("trust", "http", "plain")
+
+
+def clean_prefs(patch: Any) -> dict:
+    """只留允許的欄位、型別正確的值；空字串＝清掉（存成 None）。不認得的欄位丟掉，不報錯。"""
+    out: dict[str, Any] = {}
+    if not isinstance(patch, dict):
+        return out
+    for k, v in patch.items():
+        rule = _PREF_RULES.get(k)
+        if rule is None:
+            continue
+        if v is None or v == "":
+            out[k] = None
+        elif rule(v):
+            out[k] = str(v) if k == "box" else v
+    return out
+
+
+def _get_prefs(c, scope: str, conn_id: int, kind: str) -> dict:
+    r = c.execute("SELECT data FROM mfp_prefs WHERE owner_scope=? AND conn_id=? AND kind=?",
+                  (scope, int(conn_id), kind)).fetchone()
+    if not r:
+        return {}
+    try:
+        d = json.loads(r["data"])
+    except ValueError:
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def get_prefs(owner: str, conn: dict, kind: str) -> dict:
+    """這個人用這台時的設定。共用事務機：信任與同意以管理員那一份為準（有設的話），其餘用自己的。"""
+    if kind not in PREF_KINDS:
+        raise ValueError(kind)
+    c = _conn()
+    mine = _get_prefs(c, _check_owner(owner), conn["id"], kind)
+    out = {k: v for k, v in mine.items() if v is not None}
+    if conn.get("shared"):
+        admin = _get_prefs(c, SHARED, conn["id"], kind)
+        for k in SHARED_FIELDS:
+            if admin.get(k) is not None:
+                out[k] = admin[k]
+        out["managed"] = [k for k in SHARED_FIELDS if admin.get(k) is not None]
+    return out
+
+
+def save_prefs(owner: str, conn: dict, kind: str, patch: dict, *, admin: bool) -> dict:
+    """存設定。共用事務機的信任與同意：管理員存在共用那一份；成員不可以蓋掉管理員確認過的憑證
+    （回 `StoreError("PREF_MANAGED")`），管理員沒設過的話，成員可以替自己信任（跟個人事務機一樣）。"""
+    if kind not in PREF_KINDS:
+        raise ValueError(kind)
+    clean = clean_prefs(patch)
+    scope = _check_owner(owner)
+    c = _conn()
+    with db.tx(c):
+        if conn.get("shared"):
+            shared_part = {k: v for k, v in clean.items() if k in SHARED_FIELDS}
+            cur = _get_prefs(c, SHARED, conn["id"], kind)
+            if shared_part:
+                if admin:
+                    _put(c, SHARED, conn["id"], kind, {**cur, **shared_part})
+                else:
+                    locked = [k for k in shared_part if cur.get(k) is not None and cur.get(k) != shared_part[k]]
+                    if locked:
+                        raise StoreError("PREF_MANAGED", "這台共用事務機的憑證與連線方式由管理員設定；設備換了憑證，請管理員確認")
+                clean = {k: v for k, v in clean.items() if k not in SHARED_FIELDS or (not admin and k not in cur)}
+        if clean:
+            cur = _get_prefs(c, scope, conn["id"], kind)
+            _put(c, scope, conn["id"], kind, {**cur, **clean})
+    return get_prefs(owner, conn, kind)
+
+
+def _put(c, scope: str, conn_id: int, kind: str, data: dict) -> None:
+    data = {k: v for k, v in data.items() if v is not None}
+    c.execute("INSERT INTO mfp_prefs(owner_scope, conn_id, kind, data, updated_at) VALUES (?,?,?,?,?) "
+              "ON CONFLICT(owner_scope, conn_id, kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at",
+              (scope, int(conn_id), kind, json.dumps(data, ensure_ascii=False), time.time()))
+
+
+# --------------------------------------------------------------------------- 未啟用登入時新增的（v1.17.5）
+
+def count_local() -> int:
+    """未啟用登入時新增的事務機（記在「本機」名下）。啟用登入之後任何帳號都看不到它們。"""
+    p = db_path()
+    if not p.exists():
+        return 0
+    return _conn().execute("SELECT COUNT(*) FROM mfp_connections WHERE owner_scope='local'").fetchone()[0]
+
+
+def adopt_local_as_shared() -> int:
+    """把未啟用登入時新增的事務機轉成共用事務機（管理員按了才做；之後再加成員）。
+    已經有同一個位址與連線方式的共用事務機就不轉（留著，不覆蓋），也不超過共用上限。"""
+    c = _conn()
+    moved = 0
+    with db.tx(c):
+        rows = c.execute("SELECT id, host, port, scheme FROM mfp_connections WHERE owner_scope='local' "
+                         "ORDER BY created_at").fetchall()
+        n_shared = c.execute("SELECT COUNT(*) FROM mfp_connections WHERE owner_scope=?", (SHARED,)).fetchone()[0]
+        for r in rows:
+            if n_shared >= MAX_SHARED:
+                break
+            dup = c.execute("SELECT 1 FROM mfp_connections WHERE owner_scope=? AND host=? AND COALESCE(port,0)=COALESCE(?,0) "
+                            "AND COALESCE(scheme,'')=COALESCE(?,'')", (SHARED, r["host"], r["port"], r["scheme"])).fetchone()
+            if dup:
+                continue
+            c.execute("UPDATE mfp_connections SET owner_scope=?, owner_user_id=NULL, updated_at=? WHERE id=?",
+                      (SHARED, time.time(), r["id"]))
+            # 那時候記的信任與同意（「本機」那一份）成為共用的那一份
+            for pr in c.execute("SELECT kind, data FROM mfp_prefs WHERE owner_scope='local' AND conn_id=?", (r["id"],)).fetchall():
+                try:
+                    d = json.loads(pr["data"])
+                except ValueError:
+                    d = {}
+                part = {k: v for k, v in (d or {}).items() if k in SHARED_FIELDS}
+                if part:
+                    _put(c, SHARED, r["id"], pr["kind"], part)
+            moved += 1
+            n_shared += 1
+    return moved

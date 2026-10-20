@@ -1145,7 +1145,13 @@ class RicohSession(Session):
             rows = out.get("rowList")
             rows = rows if isinstance(rows, list) else ([] if rows in (None, "") else [rows])
             before = len(ids)
-            for i in _row_ids(rows):
+            got = _row_ids(rows)
+            if self.http.trace:
+                # 協定紀錄記「查了什麼、設備回了什麼」（識別碼是設備的物件代號，不是內容）：
+                # 客戶 IM C3510 資料夾沒出現時，要看得出是設備回 0 列、還是回了但格式不同
+                self.http.trace[-1].update(query={"from": from_, "folder": folder or "", "where": [w[1] for w in (where or [])],
+                                                  "status": st[:40], "rows": len(rows), "ids": got[:10]})
+            for i in got:
                 if i not in ids:
                     ids.append(i)
             if len(ids) > RICOH_MAX_DOCS:

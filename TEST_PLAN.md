@@ -641,7 +641,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - **`app/core/auth_db.py`**：`_m1_initial`、`_m2_username_source_unique`、`_m3_rename_pdf_diff_to_doc_diff`、`_m4_grant_image_to_pdf`、`_m5_grant_translate_doc`、`_m6_totp_columns`、`_m7_audit_seed_column`、`_m8_sso_sources`、`_m9_role_seed_snapshot`、`_m10_role_default_for_new`、`_m11_group_sync_cache`、`_m12_unprovision_mirrored_users`、`_m13_grant_pdf_to_slides`、`_m14_user_email`、`_m15_directory_presence`、`_m16_session_last_seen`、`_m17_directory_account_state`、`_m18_grant_transit_proof_and_border`、`_m19_grant_pdf_bookmark`、`_m20_grant_seam_stamp`、`_m21_grant_page_size`、`_m22_grant_office_convert`、`_m23_canon_ou_subject_keys`、`_m24_index_group_members_user`、`_m25_grant_doc_translate`、`_m26_grant_doc_straighten`、`_m27_grant_meeting_summary`、`_m28_grant_meeting_transcribe`、`_m29_grant_official_doc`
 - **`app/core/audit_db.py`**：`_m1_initial`
 - **`app/core/job_store.py`**：`_m1_initial`、`_m2_metrics`、`_m3_started_at`
-- **`app/core/mfp_store.py`**：`_m1_initial`、`_m2_shared_and_scans`（v1.16.87：只新增 `mfp_members`、`mfp_scans` 兩張表，不動 `mfp_connections`；v1 的事務機升上來都還在：`tests/test_mfp_shared_and_scan.py::test_migration_from_v1_keeps_existing_connections`）、`_m3_job_kind_and_items`（v1.16.89：`mfp_scans` 加 `kind`、`items` 兩欄（ADD COLUMN），舊紀錄都還在、一律是掃描：`tests/test_mfp_shared_and_scan.py::test_migration_from_v2_keeps_existing_scans`）
+- **`app/core/mfp_store.py`**：`_m1_initial`、`_m2_shared_and_scans`（v1.16.87：只新增 `mfp_members`、`mfp_scans` 兩張表，不動 `mfp_connections`；v1 的事務機升上來都還在：`tests/test_mfp_shared_and_scan.py::test_migration_from_v1_keeps_existing_connections`）、`_m3_job_kind_and_items`（v1.16.89：`mfp_scans` 加 `kind`、`items` 兩欄（ADD COLUMN），舊紀錄都還在、一律是掃描：`tests/test_mfp_shared_and_scan.py::test_migration_from_v2_keeps_existing_scans`）、`_m4_prefs`（v1.17.5：只新增 `mfp_prefs`（記住的設定，FK cascade），v3 的事務機都還在、刪事務機時設定一起刪：`tests/test_mfp_prefs_and_ownership.py::test_migration_from_v3_keeps_connections_and_adds_prefs`）
 - **`app/core/kb/store.py`**（知識庫；在子資料夾裡，上面那條自動比對不會掃到，這裡手動列）：
   - [ ] **`_m2_gov_imports`**：只新增 `kb_gov_items`、`kb_gov_versions` 兩張表，不重建既有的表；
         既有的 v1 知識庫升上來資料集與文件都還在（`tests/test_kb_gov_import.py::test_migration_from_v1_keeps_existing_data`）
@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **503 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **504 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -913,6 +913,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_mfp_fetch_page_browser.py` | 事務機取件頁：在真的瀏覽器裡跑一次（連線測試 → 儲存 → 詳細 → 被擋的位址） |
 | `test_mfp_fetch_page_parity.py` | 事務機掃描取件（v1.17.1）：工具頁與「設定 → 共用事務機」用同一份資料、已驗證支援清單、「可掃描」、進度條 |
 | `test_mfp_fetch_tool.py` | 事務機掃描取件：工具頁與 API |
+| `test_mfp_prefs_and_ownership.py` | 事務機掃描取件：誰看得到哪台、換電腦後設定還在不在（v1.17.5，客戶回報「新增的事務機好像只有在該台機器有」） |
 | `test_mfp_profiles.py` | 事務機取件：型號辨識 |
 | `test_mfp_queue.py` | 事務機排隊：同一台實體設備一次只做一件事（使用者 2026-10-14：「要避免同時多人存取事務機 |
 | `test_mfp_redact.py` | 事務機取件：診斷資訊的遮蔽規則（畫面、下載報告、服務紀錄檔共用這一份） |
@@ -2611,6 +2612,10 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       `/tools/mfp-fetch/api/shared/{conn_id}/test`、`/tools/mfp-fetch/api/shared/{conn_id}/members`（GET / PUT）、
       `/tools/mfp-fetch/api/shared-subjects`（Beta，v1.16.87）：**非管理員一律 403**（`ADMIN_ONLY`）；成員只收存在的使用者與群組（400 `MEMBERS_INVALID`）。
       自動化：`tests/test_mfp_shared_and_scan.py`、`tests/test_mfp_scan_page_browser.py`
+- [ ] `/tools/mfp-fetch/api/connections/{conn_id}/prefs`（GET `?kind=box|share`、PUT `{kind, patch}`，v1.17.5）— 記住的設定跟著帳號；**不存密碼**、不認得的欄位丟掉；
+      別人的事務機 404；共用事務機管理員設的 `trust` / `http` / `plain` 成員改不了（409 `PREF_MANAGED`）；改信任 / 同意寫稽核 `mfp_trust`。
+      `/tools/mfp-fetch/api/shared/local`（GET 台數）、`/tools/mfp-fetch/api/shared/adopt-local`（POST，轉成共用事務機）：非管理員 403、未啟用登入 400（adopt）、重複的不轉。
+      自動化：`tests/test_mfp_prefs_and_ownership.py`
 - [ ] `/tools/mfp-fetch/api/connections/{conn_id}/box/list`、`/tools/mfp-fetch/api/connections/{conn_id}/box/fetch`（Beta、實驗性，v1.16.89）—
       POST `{box, box_password?, user?, password?, trust_sha256?, allow_http?, target?}`（fetch 另加 `documents`、`output`、`confirm_delete_after_get`）；
       設備端錯誤一律 422（`AUTH_FAILED`、`TLS_UNTRUSTED`、`PLAIN_HTTP_NEEDS_CONSENT`…）附 `trace`、不含密碼；非 FUJIFILM 400；別人的 id 404；
@@ -6236,6 +6241,18 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.116 v1.17.5 — 事務機跟著帳號、信任與同意存伺服器、未登入時新增的轉共用、協定紀錄可複製（**每次發版必過**）
+
+- [ ] 同一個帳號在 A 電腦存的事務機，B 電腦（另一個瀏覽器）登入看得到；本機帳號與同名的 LDAP / SSO 帳號各有各的清單；清單上方有說明。
+- [ ] 信任憑證、HTTP / 未加密的同意、信箱編號、帳號：A 電腦確認過，B 電腦開同一台不再問；`mfp_prefs` 裡**沒有密碼**；舊版瀏覽器存的設定第一次開啟時搬上去並從瀏覽器移除。
+- [ ] 共用事務機：管理員確認的憑證成員直接沿用；成員要改信任別的指紋回 409（`PREF_MANAGED`）；成員請求裡帶別的指紋，取件仍用管理員那一份；管理員沒設時成員可以存自己的。
+- [ ] 改信任 / 同意寫稽核 `mfp_trust`（指紋只記前 16 碼）；只改信箱編號不寫。
+- [ ] 未啟用登入時新增的事務機：啟用登入後「設定 → 共用事務機」顯示台數，按轉換後變成共用事務機（`mfp_shared_adopt_local`）；與既有共用重複的不轉；非管理員 403；未啟用登入時 400。
+- [ ] 刪除帳號時記住的設定一起刪。
+- [ ] 協定紀錄有「呼叫」「細節」兩欄與「複製協定紀錄」按鈕（圖示正常）；RICOH 資料夾查詢列出條件、狀態、筆數；複製內容不含密碼。
+- [ ] 舊規則判斷為未辨識 / 登入後才能辨識的事務機標「可重新測試」；重新測試後標記消失。
+- 自動測試：`tests/test_mfp_prefs_and_ownership.py`
 
 ### 6.115 v1.17.4 — RICOH 資料夾、KYOCERA 遙控資料盒、MCP 第二批與工具說明（**每次發版必過**）
 

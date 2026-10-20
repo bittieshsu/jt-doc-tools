@@ -7591,5 +7591,17 @@
   "（空）": "(empty)",
   "比對": "Comparison",
   "遙控資料盒": "Polling box",
-  "遙控資料盒目前只能列出文件：取件要帶的參數還在向原廠資料確認，確認之前不送出（不會用猜的值去試）": "The polling box can only be listed for now: the parameters needed to retrieve from it are still being confirmed against the vendor's information, and nothing is sent until then (no guessed values are tried)."
+  "遙控資料盒目前只能列出文件：取件要帶的參數還在向原廠資料確認，確認之前不送出（不會用猜的值去試）": "The polling box can only be listed for now: the parameters needed to retrieve from it are still being confirmed against the vendor's information, and nothing is sent until then (no guessed values are tried).",
+  "複製協定紀錄": "Copy protocol log",
+  "協定紀錄不含帳號、密碼與文件內容，可以直接貼給客服。": "The protocol log contains no accounts, passwords or document contents and can be sent to support as is.",
+  "可重新測試": "Retest suggested",
+  "辨識規則已更新：按「重新測試」可能就認得出這台": "Identification rules have been updated: retesting may now identify this device.",
+  "這裡新增的事務機只有你的帳號看得到，換一台電腦用同一個帳號登入照樣在；要給其他人用，請管理員在「設定 → 共用事務機」建立並加成員。": "MFPs you add here are visible only to your account, and stay there when you sign in with the same account on another computer. To let others use one, ask an administrator to create it under Settings → Shared MFPs and add members.",
+  "你是管理員：在這裡新增的也只有你自己看得到。要給大家用，請到「設定 → 共用事務機」建立。": "You are an administrator: MFPs you add here are also visible only to you. To make one available to everyone, create it under Settings → Shared MFPs.",
+  "要讓共用事務機也出現在你自己的「事務機掃描取件」頁，請在「成員」把自己加進去。": "To see a shared MFP on your own MFP Scan & Fetch page too, add yourself under Members.",
+  "有 {0} 台事務機是未啟用登入時新增的，啟用登入之後任何帳號都看不到它們。可以轉成共用事務機，再按「成員」選誰可以用。": "{0} MFP(s) were added while sign-in was disabled, and no account can see them now that sign-in is enabled. You can turn them into shared MFPs and then choose who may use them under Members.",
+  "轉成共用事務機": "Turn into shared MFPs",
+  "已轉成共用事務機：{0} 台；接著按「成員」選誰可以用": "Turned into shared MFPs: {0}. Next, choose who may use them under Members.",
+  "已儲存到「我的事務機」（只有你的帳號看得到）": "Saved to My MFPs (visible only to your account)",
+  "這台共用事務機的憑證與連線方式由管理員設定；設備換了憑證，請管理員確認": "The certificate and connection settings of this shared MFP are managed by an administrator; if the device's certificate changed, ask an administrator to confirm it."
 }

@@ -686,6 +686,25 @@ def _box_conn(who: _Who, conn_id: int) -> tuple[Optional[dict], Optional[JSONRes
     return c, None
 
 
+def _effective(who: "_Who", c: dict, kind: str, trust, allow_http: bool, allow_plain: bool = False):
+    """憑證指紋與「同意未加密」由伺服器決定，不只信請求帶來的值（v1.17.5）：
+    * 共用事務機：管理員設過的就用管理員那一份 —— 成員在請求裡帶別的指紋也沒用（不然等於繞過管理員確認過的憑證）；
+    * 其他情況：請求沒帶就用這個人存過的（換一台電腦不用重新信任）。"""
+    prefs = mfp_store.get_prefs(who.owner, c, kind)
+    managed = set(prefs.get("managed") or [])
+    if "trust" in managed or not trust:
+        trust = prefs.get("trust") or (None if "trust" in managed else trust)
+    if "http" in managed:
+        allow_http = prefs.get("http") is True
+    elif not allow_http:
+        allow_http = prefs.get("http") is True
+    if "plain" in managed:
+        allow_plain = prefs.get("plain") is True
+    elif not allow_plain:
+        allow_plain = prefs.get("plain") is True
+    return trust, allow_http, allow_plain
+
+
 def _box_list_in_turn(owner: str, c: dict, sc: str, pt: int, box: int, creds, trust, allow_http,
                       trace: list) -> dict:
     device = mfp_client.device_key(c["host"])
@@ -715,6 +734,7 @@ async def api_box_list(request: Request, conn_id: int):
         return _err(busy, 429)
     try:
         box, creds, trust, allow_http = _box_inputs(body)
+        trust, allow_http, _p = _effective(who, c, "box", trust, allow_http)
         sc, pt = _box_target(c, body.get("target"))
         res = await asyncio.to_thread(_box_list_in_turn, who.owner, c, sc, pt, box, creds, trust,
                                       allow_http, trace)
@@ -752,6 +772,7 @@ async def api_box_fetch(request: Request, conn_id: int):
         return _box_error(mfp_box.BoxError("NO_DOCUMENTS_SELECTED"))
     try:
         box, creds, trust, allow_http = _box_inputs(body)
+        trust, allow_http, _p = _effective(who, c, "box", trust, allow_http)
         sc, pt = _box_target(c, body.get("target"))
         device = await asyncio.to_thread(mfp_client.device_key, c["host"])
         _resolved[c["host"]] = device
@@ -876,6 +897,8 @@ async def api_share_list(request: Request, conn_id: int):
         return _err(busy, 429)
     try:
         inp = _share_inputs(body)
+        inp["trust_sha256"], inp["allow_http"], inp["allow_plain"] = _effective(
+            who, c, "share", inp["trust_sha256"], inp["allow_http"], inp["allow_plain"])
         path = mfp_share.check_path(body.get("path") if body.get("path") is not None else [])
         root = str(body.get("root") or "")
         if root and not mfp_share.valid_segment(root):
@@ -913,6 +936,8 @@ async def api_share_fetch(request: Request, conn_id: int):
         return _box_error(mfp_share.ShareError("KYOCERA_POLLING_DOWNLOAD_UNCONFIRMED"))
     try:
         inp = _share_inputs(body)
+        inp["trust_sha256"], inp["allow_http"], inp["allow_plain"] = _effective(
+            who, c, "share", inp["trust_sha256"], inp["allow_http"], inp["allow_plain"])
         sc, pt = _share_target(c, route, body.get("target"))
         device = await asyncio.to_thread(mfp_client.device_key, c["host"])
         _resolved[c["host"]] = device
@@ -971,6 +996,77 @@ async def api_settings_put(request: Request):
         return _err("SETTINGS_INVALID", 400)
     _audit(request, "mfp_settings_update", "mfp-fetch", {"allow_user_devices": cur["allow_user_devices"]})
     return {"ok": True, "settings": cur}
+
+
+# --------------------------------------------------------------------------- 信任與偏好（v1.17.5）
+
+@router.get("/api/connections/{conn_id}/prefs")
+async def api_prefs_get(request: Request, conn_id: int, kind: str = "box"):
+    """這個人用這台時記住的設定（信任的憑證、HTTP / 未加密的同意、上次的信箱編號與帳號）。
+    原本存在瀏覽器，換一台電腦就不見；改存伺服器，跟著帳號走。**不含任何密碼。**"""
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    if kind not in mfp_store.PREF_KINDS:
+        return _err("BAD_REQUEST", 400)
+    c = who.visible(conn_id)
+    if not c:
+        return _err("NOT_FOUND", 404)
+    return {"ok": True, "prefs": mfp_store.get_prefs(who.owner, c, kind)}
+
+
+@router.put("/api/connections/{conn_id}/prefs")
+async def api_prefs_put(request: Request, conn_id: int):
+    try:
+        who = _Who(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    body = await _json(request)
+    kind = str(body.get("kind") or "")
+    if kind not in mfp_store.PREF_KINDS:
+        return _err("BAD_REQUEST", 400)
+    c = who.visible(conn_id)
+    if not c:
+        return _err("NOT_FOUND", 404)
+    patch = mfp_store.clean_prefs(body.get("patch"))
+    try:
+        prefs = mfp_store.save_prefs(who.owner, c, kind, patch, admin=who.admin)
+    except mfp_store.StoreError as e:
+        return _err(e.code, 409, message=e.message)
+    if any(k in patch for k in ("trust", "http", "plain")):
+        # 信任新的憑證、同意以未加密方式傳送：都是安全上的決定，寫稽核（記指紋前 16 碼，不記其他）
+        _audit(request, "mfp_trust", c["host"], {
+            "id": conn_id, "kind": kind, "shared": bool(c.get("shared")),
+            "trust": (patch.get("trust") or "")[:16] or None,
+            "http": patch.get("http"), "plain": patch.get("plain")})
+    return {"ok": True, "prefs": prefs}
+
+
+@router.get("/api/shared/local")
+async def api_shared_local(request: Request):
+    """未啟用登入時新增的事務機有幾台（啟用登入後任何帳號都看不到它們）。"""
+    try:
+        _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    from ...core import auth_settings
+    return {"ok": True, "count": mfp_store.count_local() if auth_settings.is_enabled() else 0}
+
+
+@router.post("/api/shared/adopt-local")
+async def api_shared_adopt_local(request: Request):
+    """把未啟用登入時新增的事務機轉成共用事務機（之後再按「成員」決定誰可以用）。"""
+    try:
+        _admin(request)
+    except _OwnerError as e:
+        return _err(e.code, e.status)
+    from ...core import auth_settings
+    if not auth_settings.is_enabled():
+        return _err("BAD_REQUEST", 400)
+    moved = mfp_store.adopt_local_as_shared()
+    _audit(request, "mfp_shared_adopt_local", "mfp-fetch", {"moved": moved})
+    return {"ok": True, "moved": moved, "left": mfp_store.count_local()}
 
 
 @router.get("/api/shared")

@@ -13,6 +13,7 @@
 """
 from __future__ import annotations
 
+import functools
 import re
 from typing import Any, Optional
 
@@ -185,6 +186,23 @@ def _sources(pages: list[dict]) -> list[tuple[dict, str]]:
             if k.lower() in ("server", "x-powered-by"):
                 out.append(({"page": page, "field": "header", "header": k}, v))
     return out
+
+
+@functools.lru_cache(maxsize=1)
+def rules_signature() -> str:
+    """辨識規則的指紋：廠牌 / 型號 / 韌體的比對規則、已驗證與同系列清單。改了任何一條就會變 ——
+    不靠人記得升版號。連線測試把它記在報告裡；清單用它判斷「這台是用舊規則判斷的」（`rules_stale`）。"""
+    import hashlib
+    parts = [_FUJI_VENDOR.pattern, _FUJI_MODEL.pattern, _FUJI_CWIS.pattern, _FIRMWARE.pattern, _NOT_MODEL.pattern]
+    parts += [f"{n}={rx.pattern}" for n, rx in _OTHER_VENDORS]
+    parts += [f"{n}={rx.pattern}" for n, rx in sorted(_OTHER_MODELS.items())]
+    parts += sorted(map(str, VERIFIED_PROFILES)) + sorted(map(str, SAME_SERIES)) + sorted(map(str, FIRST_BATCH))
+    parts += sorted(EXPERIMENTAL_VENDORS)
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+#: 這些結果在規則更新後可能變成認得出來（認得出來的不打擾）
+RECHECK_STATUSES = frozenset({"unknown", "unsupported_vendor", "login_required"})
 
 
 def detect(pages: list[dict], escl_model: str = "") -> dict[str, Any]:

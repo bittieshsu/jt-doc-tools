@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (933 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (934 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.5] - 2026-10-21
+
+- MFP scan & fetch: MFPs belong to the account, so the same list appears after signing in on another computer; the page now says so and points out that local, LDAP and SSO accounts are separate, each with its own list. Trusted certificates, consent to send over HTTP or without encryption, and the last mailbox number and account used to live in the browser and had to be confirmed again on every computer; they are now stored on the server with the account (moved over automatically the first time). Passwords are never stored. On shared MFPs, the certificate trust and consent confirmed by an administrator apply to all members, who cannot switch to trusting another certificate themselves, and the server always uses the administrator's settings when retrieving; changes are audited (`mfp_trust`). MFPs added while sign-in was off were invisible to every account once sign-in was turned on; Settings → Shared MFPs now shows how many there are and lets an administrator turn them into shared MFPs (duplicates of existing shared MFPs are skipped), and reminds administrators to add themselves as members. The protocol log can be copied and has "Call" and "Detail" columns (RICOH folder queries show the conditions, response status and row count; no passwords). Devices that were not identified under older identification rules are marked as ready to retest.
 
 ## [1.17.4] - 2026-10-20
 

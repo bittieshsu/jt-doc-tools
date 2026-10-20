@@ -138,6 +138,9 @@
 .mf-src.shared { background:#e0e7ff; color:#3730a3; }
 .mf-src.own { background:#f1f5f9; color:#475569; }
 .mf-tag.busy { background:#fef3c7; color:#92400e; }
+.mf-tag.stale { background:#e0f2fe; color:#075985; }
+.mf-list-hint { margin:-4px 0 10px; }
+#mfAdoptNote { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; margin:0 0 10px; }
 .mf-sub { display:block; margin-top:2px; font-size:12px; color:#64748b; }
 /* 掃描 */
 .mf-scan-title { margin:0; }
@@ -212,6 +215,8 @@
 .mf-trace { table-layout:auto; width:auto; min-width:100%; }
 .mf-trace th { width:auto; white-space:nowrap; }
 .mf-trace td { white-space:nowrap; }
+.mf-trace td.mf-trace-detail { white-space:normal; min-width:320px; max-width:640px; word-break:break-all; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:11.5px; }
+.mf-trace-copy { width:100%; min-height:120px; margin-top:6px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:11.5px; }
 .mf-tech summary { cursor:pointer; font-size:12.5px; color:#64748b; }
 @media (max-width: 720px) {
   .mf-box-form, .mf-box-login { grid-template-columns:1fr; }
@@ -350,6 +355,14 @@
 
 <div class="panel">
   <h2>{% if mode == 'shared' %}{{ tr('共用事務機') }}{% else %}{{ tr('我的事務機') }}{% endif %}</h2>
+  {% if mode == 'shared' %}
+  <p class="mf-hint mf-list-hint">{{ tr('要讓共用事務機也出現在你自己的「事務機掃描取件」頁，請在「成員」把自己加進去。') }}</p>
+  <div class="mf-warn" id="mfAdoptNote" hidden><span id="mfAdoptText"></span>
+    <button type="button" class="btn btn-small btn-primary" id="mfAdoptBtn">{{ icon('archive', size=14) }} <span>{{ tr('轉成共用事務機') }}</span></button></div>
+  {% else %}
+  <p class="mf-hint mf-list-hint" id="mfListHint">{{ tr('這裡新增的事務機只有你的帳號看得到，換一台電腦用同一個帳號登入照樣在；要給其他人用，請管理員在「設定 → 共用事務機」建立並加成員。') }}</p>
+  <p class="mf-hint mf-list-hint" id="mfListHintAdmin" hidden>{{ tr('你是管理員：在這裡新增的也只有你自己看得到。要給大家用，請到「設定 → 共用事務機」建立。') }}</p>
+  {% endif %}
   <div id="mfListWrap"><p class="mf-empty">{{ tr('載入中…') }}</p></div>
   <div id="mfListError" class="mf-err" hidden></div>
   <div id="mfDetailPanel" hidden>
@@ -391,6 +404,7 @@
   {# 清單每一列的按鈕是 JS 畫的：圖示從這裡複製，不在 JS 裡手刻 SVG #}
   <template id="mfIcons">
     <span data-ic="refresh">{{ icon('refresh', size=14) }}</span>
+    <span data-ic="copy">{{ icon('copy', size=14) }}</span>
     <span data-ic="eye">{{ icon('eye', size=14) }}</span>
     <span data-ic="close">{{ icon('close', size=14) }}</span>
     <span data-ic="download">{{ icon('download', size=14) }}</span>
@@ -924,16 +938,41 @@
     busy(saveBtn, false);
     const msg = document.getElementById('mfSaveMsg');
     if (!res.ok) { msg.textContent = res.message ? tr(res.message) : tr('發生錯誤'); return; }
-    msg.textContent = SHARED ? tr('已儲存為共用事務機，接著按「成員」選誰可以用') : tr('已儲存到「我的事務機」');
+    msg.textContent = SHARED ? tr('已儲存為共用事務機，接著按「成員」選誰可以用')
+      : tr('已儲存到「我的事務機」（只有你的帳號看得到）');
     document.getElementById('mfSaveBar').hidden = true;
     lastDetection = null;
     loadList();
   });
 
+  // ---- 未啟用登入時新增的事務機（記在「本機」名下）：啟用登入後任何帳號都看不到 → 管理員可以轉成共用事務機
+  async function loadAdopt() {
+    const note = document.getElementById('mfAdoptNote');
+    if (!SHARED || !note) return;
+    const res = await api('GET', '/shared/local');
+    const n = res.ok ? (res.count || 0) : 0;
+    document.getElementById('mfAdoptText').textContent = tr('有 {0} 台事務機是未啟用登入時新增的，啟用登入之後任何帳號都看不到它們。可以轉成共用事務機，再按「成員」選誰可以用。').replace('{0}', n);
+    note.hidden = n === 0;
+  }
+
   // ---- 我的事務機
   const listWrap = document.getElementById('mfListWrap');
   let listItems = [];
   const listErr = document.getElementById('mfListError');
+  if (SHARED && document.getElementById('mfAdoptBtn')) {
+    document.getElementById('mfAdoptBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('mfAdoptBtn');
+      busy(btn, true, tr('處理中…'));
+      const res = await api('POST', '/shared/adopt-local');
+      busy(btn, false);
+      if (!res.ok) { showError(listErr, res); return; }
+      document.getElementById('mfSaveMsg').textContent =
+        tr('已轉成共用事務機：{0} 台；接著按「成員」選誰可以用').replace('{0}', res.moved);
+      loadAdopt();
+      loadList();
+    });
+    loadAdopt();
+  }
   async function loadList() {
     listErr.hidden = true;
     const res = await api('GET', LIST_PATH);
@@ -941,6 +980,8 @@
     const items = res.connections || [];
     listItems = items;
     if (!SHARED) {
+      const ha = document.getElementById('mfListHintAdmin');
+      if (ha) ha.hidden = !res.admin;
       // 管理員關掉「使用者自行新增事務機」：新增那一塊收起來，改說明
       const canAdd = res.can_add !== false;
       document.getElementById('mfAddPanel').hidden = !canAdd;
@@ -982,7 +1023,14 @@
       }
       r.append(el('td', null, c.host + (c.port ? ':' + c.port : '') + (c.scheme ? P.lp + c.scheme.toUpperCase() + P.rp : '')));
       r.append(el('td', null, [c.family, c.model].filter(Boolean).join(' ') || tr('未辨識')));
-      const st = el('td'); st.append(statusChip(shownStatus(c.detect_status, !!c.scan), true)); r.append(st);
+      const st = el('td'); st.append(statusChip(shownStatus(c.detect_status, !!c.scan), true));
+      if (c.rules_stale && !c.paused) {
+        // 用舊的辨識規則判斷、而且認不出來：更新後按一次「重新測試」可能就認得出來（客戶 KYOCERA 實例）
+        const tg = el('span', 'mf-tag stale', tr('可重新測試'));
+        tg.title = tr('辨識規則已更新：按「重新測試」可能就認得出這台');
+        st.append(tg);
+      }
+      r.append(st);
       r.append(el('td', null, fmtTime(c.last_test_at) + (c.last_reachable === false ? ' · ' + tr('連不上') : '')));
       if (SHARED) r.append(el('td', null, String(c.member_count || 0)));
       const act = el('td'); const box = el('div', 'mf-row-actions');
@@ -1445,16 +1493,42 @@
   let boxConn = null;
   let boxDocs = [];
   let boxInfo = null;
-  function boxPrefsKey(c) { return 'mfp-box-' + c.id; }
-  function boxPrefs(c) {
-    try { return JSON.parse(localStorage.getItem(boxPrefsKey(c)) || '{}') || {}; } catch (e) { return {}; }
+  // ---- 記住的設定（信任的憑證、HTTP / 未加密的同意、上次的信箱編號與帳號）：v1.17.5 起存在伺服器、跟著帳號走
+  // （原本在瀏覽器 localStorage，換一台電腦就要重來）。開面板時讀一次放在 PREFS；舊瀏覽器裡的值第一次用時搬上去
+  const PREFS = {};
+  const LEGACY_KEY = { box: (c) => 'mfp-box-' + c.id, share: (c) => 'mfp-share-' + c.id };
+  async function loadPrefs(c, kind) {
+    const res = await api('GET', '/connections/' + c.id + '/prefs?kind=' + kind);
+    let pr = res.ok ? (res.prefs || {}) : {};
+    let legacy = null;
+    try { legacy = JSON.parse(localStorage.getItem(LEGACY_KEY[kind](c)) || 'null'); } catch (e) { legacy = null; }
+    if (legacy && typeof legacy === 'object') {
+      const up = {};
+      for (const [k, v] of Object.entries(legacy)) if (pr[k] === undefined && v !== undefined && v !== null && v !== '') up[k] = v;
+      if (Object.keys(up).length) {
+        const r = await api('PUT', '/connections/' + c.id + '/prefs', { kind, patch: up });
+        if (r.ok) pr = r.prefs || pr;
+      }
+      try { localStorage.removeItem(LEGACY_KEY[kind](c)); } catch (e) { /* 私密視窗等 */ }
+    }
+    PREFS[kind + c.id] = pr;
+    return pr;
   }
-  function saveBoxPrefs(c, patch) {
-    try { localStorage.setItem(boxPrefsKey(c), JSON.stringify(Object.assign(boxPrefs(c), patch))); } catch (e) { /* 私密視窗等 */ }
+  function cachedPrefs(c, kind) { return PREFS[kind + c.id] || {}; }
+  // 先更新畫面用的那一份（重試馬上用得到），再存伺服器；存不進去（例如共用事務機的憑證由管理員管）就講
+  async function storePrefs(c, kind, patch, errBoxId) {
+    PREFS[kind + c.id] = Object.assign({}, cachedPrefs(c, kind), patch);
+    const r = await api('PUT', '/connections/' + c.id + '/prefs', { kind, patch });
+    if (r.ok) { PREFS[kind + c.id] = r.prefs || PREFS[kind + c.id]; return true; }
+    if (errBoxId) showError(boxEl(errBoxId), r);
+    return false;
   }
+  function boxPrefs(c) { return cachedPrefs(c, 'box'); }
+  function saveBoxPrefs(c, patch) { return storePrefs(c, 'box', patch, 'mfBoxError'); }
   const boxPanel = document.getElementById('mfBoxPanel');
   function boxEl(id) { return document.getElementById(id); }
-  function openBox(c) {
+  async function openBox(c) {
+    await loadPrefs(c, 'box');
     boxConn = c;
     boxDocs = [];
     boxInfo = null;
@@ -1492,26 +1566,48 @@
   }
   function fpText(hex) { return String(hex || '').toUpperCase().replace(/(..)(?!$)/g, '$1:'); }
   // 協定紀錄：預設收起來，給管理員看（一般使用者不用懂）
-  const TRACE_KEYS = ['method', 'path', 'stage', 'profile', 'depth', 'singlepage', 'status', 'auth_sent', 'auth', 'request_content_type', 'content_type', 'bytes', 'ms', 'error'];
+  // 「call」是 SOAP 的呼叫名稱（原本沒顯示，整張表只看得到 POST /DH/repository）；
+  // 其他欄位（設備回的狀態、查詢結果、屬性名稱…）放在最後一欄，整份可以複製給客服（不含帳密）
+  const TRACE_KEYS = ['method', 'path', 'call', 'stage', 'profile', 'depth', 'singlepage', 'status', 'auth_sent', 'auth', 'request_content_type', 'content_type', 'bytes', 'ms', 'error'];
+  const TRACE_SHOWN = new Set(TRACE_KEYS.concat(['challenges']));
+  const lastTrace = {};
+  function traceExtra(e) {
+    const rest = {};
+    for (const [k, v] of Object.entries(e || {})) if (!TRACE_SHOWN.has(k) && v !== undefined && v !== null && v !== '') rest[k] = v;
+    return Object.keys(rest).length ? JSON.stringify(rest) : '';
+  }
   function showTrace(trace, prefix) {
     prefix = prefix || 'mfBox';
     const tech = boxEl(prefix + 'Tech');
     if (!tech) return;
     if (!trace || !trace.length) { tech.hidden = true; return; }
+    lastTrace[prefix] = trace;
     const t = el('table', 'mf-table');
     const hd = el('tr');
-    for (const k of TRACE_KEYS.concat(['challenges'])) hd.append(el('th', null, k));
+    for (const k of TRACE_KEYS.concat(['challenges', 'detail'])) hd.append(el('th', null, k));
     t.append(hd);
     for (const e of trace) {
       const r = el('tr');
       for (const k of TRACE_KEYS) r.append(el('td', null, e[k] === undefined ? '' : String(e[k])));
       r.append(el('td', null, (e.challenges || []).map(c => c.scheme + (c.realm ? ' realm=' + c.realm : '')).join(P.sep)));
+      r.append(el('td', 'mf-trace-detail', traceExtra(e)));
       t.append(r);
     }
     t.classList.add('mf-trace');
     const scroller = el('div', 'mf-trace-wrap');
     scroller.append(t);
-    boxEl(prefix + 'Trace').replaceChildren(scroller);
+    const copy = rowBtn('copy', tr('複製協定紀錄'), async () => {
+      const text = JSON.stringify(lastTrace[prefix] || [], null, 2);
+      try { await navigator.clipboard.writeText(text); copy.querySelector('span').textContent = tr('已複製'); }
+      catch (e) {
+        const ta = el('textarea', 'mf-trace-copy'); ta.value = text; ta.readOnly = true;
+        boxEl(prefix + 'Trace').append(ta); ta.select();
+      }
+    }, false);
+    copy.dataset.mfTraceCopy = prefix;
+    const bar = el('div', 'mf-actions');
+    bar.append(copy, el('span', 'mf-hint', tr('協定紀錄不含帳號、密碼與文件內容，可以直接貼給客服。')));
+    boxEl(prefix + 'Trace').replaceChildren(bar, scroller);
     tech.hidden = false;
   }
   // 需要使用者確認的狀況：只在遇到時問一次，確認後自動再試
@@ -1694,12 +1790,8 @@
   const sharePanel = document.getElementById('mfSharePanel');
   let shareConn = null;
   let shareState = { route: '', root: '', path: [], entries: [], roots: [] };
-  function sharePrefs(c) {
-    try { return JSON.parse(localStorage.getItem('mfp-share-' + c.id) || '{}') || {}; } catch (e) { return {}; }
-  }
-  function saveSharePrefs(c, patch) {
-    try { localStorage.setItem('mfp-share-' + c.id, JSON.stringify(Object.assign(sharePrefs(c), patch))); } catch (e) { /* 私密視窗等 */ }
-  }
+  function sharePrefs(c) { return cachedPrefs(c, 'share'); }
+  function saveSharePrefs(c, patch) { return storePrefs(c, 'share', patch, 'mfShareError'); }
   function shareIsBox() { return shareState.route === 'konica_smb'; }
   function shareSoap() { return SOAP_ROUTES[shareState.route] || ''; }
   function shareMode() { return shareSoap() === 'ricoh' ? (boxEl('mfShareMode').value || 'auto') : 'auto'; }
@@ -1721,7 +1813,8 @@
     boxEl('mfShareNoteManual').hidden = !!soap;
     boxEl('mfShareNoteDirect').hidden = !soap;
   }
-  function openShare(c) {
+  async function openShare(c) {
+    await loadPrefs(c, 'share');
     shareConn = c;
     const pr = sharePrefs(c);
     const routes = (c.share || {}).routes || [];
