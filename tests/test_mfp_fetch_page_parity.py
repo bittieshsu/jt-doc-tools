@@ -104,3 +104,24 @@ def test_progress_bar_is_accessible_and_rows_highlight():
     for attr in ("'role', 'progressbar'", "'aria-valuemin', '0'", "'aria-valuemax', '100'", "'aria-valuenow'"):
         assert attr in bar, attr
     assert re.search(r"\.mf-list tbody tr:hover\s*\{[^}]*background", src), "清單列滑過要有底色"
+
+
+def test_the_dialog_does_not_break_the_gap_between_cards(client, auth_off):
+    """全站用 `.panel + .panel` 讓相鄰卡片隔 16px；「已驗證支援清單」對話框夾在兩張卡片中間時，
+    共用事務機頁的「使用設定」跟「新增共用事務機」黏在一起（使用者截圖）。兩頁都看。"""
+    for name, r in _pages(client).items():
+        html = r.text
+        last_panel = max(m.start() for m in re.finditer(r'<div class="panel"', html))
+        assert html.index('<dialog class="mf-verified"') > last_panel, f"{name}：對話框要放在所有卡片之後"
+
+
+def test_the_list_says_who_added_each_device():
+    """工具頁「我的事務機」：管理員設定的共用事務機跟自己新增的混在同一張表，每一台都要標出來源；
+    共用事務機管理頁（SHARED）本來就全是共用的，不加這一欄。"""
+    src = TPL.read_text(encoding="utf-8")
+    assert "c.shared ? el('span', 'mf-src shared', tr('管理員共用')) : el('span', 'mf-src own', tr('自己新增'))" in src
+    assert re.search(r"SHARED \? \[tr\('名稱'\), tr\('位址'\)", src), "管理頁沒有來源欄"
+    for loc in ("en", "ja"):
+        cat = json.loads((ROOT / f"app/i18n/{loc}.json").read_text(encoding="utf-8"))
+        for k in ("來源", "管理員共用", "自己新增", "由管理員設定的共用事務機：可以使用，不能改名或移除", "你自己新增的事務機：可以改名或移除"):
+            assert cat.get(k), (loc, k)

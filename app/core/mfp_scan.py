@@ -101,8 +101,56 @@ def _new_live(job_id: str, ticket, cancel: threading.Event) -> None:
                          "ahead": mfp_queue.position(ticket), "cancel": cancel, "ticket": ticket}
 
 
+#: 作業的發起人（帳號、來源 IP），只給「作業完成」那筆稽核用；放記憶體、寫完稽核就拿掉
+#: （作業紀錄表沒有這兩欄，服務重啟時還在跑的作業本來就會被標成中斷）
+_WHO: dict[str, dict] = {}
+
+
+def _remember_who(job_id: str, user_label: str, client_ip: str) -> None:
+    with _LOCK:
+        _WHO[job_id] = {"user": user_label or "", "ip": client_ip or ""}
+
+
+def _finish(job_id: str, *, status: str, **fields) -> None:
+    """結束作業：先寫作業紀錄，再寫一筆「作業完成」稽核。
+
+    開始時的稽核（`mfp_scan_start` / `mfp_box_fetch` / `mfp_share_fetch`）只記得到「要做什麼」；
+    實際取到哪幾份、存進工作區幾個檔、**從設備上刪掉了哪幾份原件**，要等作業做完才知道。"""
+    mfp_store.finish_scan(job_id, status=status, **fields)
+    try:
+        _audit_done(job_id)
+    except Exception:  # noqa: BLE001 —— 稽核寫不進去不可以讓作業變成失敗
+        logger.warning("mfp 作業完成稽核寫入失敗：%s", job_id[:8])
+
+
+def _audit_done(job_id: str) -> None:
+    from . import audit_db
+    with _LOCK:
+        who = _WHO.pop(job_id, {})
+    rec = mfp_store.get_scan_any(job_id)
+    if not rec:
+        return
+    items = rec.get("items") or []
+    details: dict[str, Any] = {
+        "scan": job_id, "kind": rec.get("kind") or "scan", "status": rec.get("status"), "conn_id": rec.get("conn_id"),
+        "pages": rec.get("pages"), "error_code": rec.get("error_code"),
+    }
+    if items:
+        details["documents"] = [{k: i.get(k) for k in ("doc", "status", "error_code", "pages", "source", "delete")
+                                 if i.get(k) not in (None, "")} for i in items][:50]
+        details["saved_files"] = sum(len(i.get("files") or []) if isinstance(i.get("files"), list)
+                                     else int(i.get("files") or 0) for i in items)
+        # 動到設備的操作單獨列出來，查稽核時不用逐份翻
+        details["deleted_on_device"] = [i.get("doc") for i in items if i.get("delete") == "DELETED"]
+        refused = [i.get("doc") for i in items if i.get("delete") and i.get("delete") not in ("DELETED",)]
+        if refused:
+            details["delete_not_done"] = refused
+    audit_db.log_event("mfp_job_done", username=who.get("user", ""), ip=who.get("ip", ""),
+                       target=(rec.get("device") or "")[:200], details=details)
+
+
 def start(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, caps: dict,
-          opts: dict, device: str, ip: str, scheme: str, port: int) -> dict:
+          opts: dict, device: str, ip: str, scheme: str, port: int, client_ip: str = "") -> dict:
     """排進這台的隊伍並開始背景掃描；回傳作業紀錄。
 
     設定不在能力表裡丟 `mfp_escl.ScanError("SCAN_OPTION_INVALID")`；隊伍滿了丟 `mfp_queue.QueueError`
@@ -127,6 +175,7 @@ def start(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, ca
         raise
     cancel = threading.Event()
     _new_live(job_id, ticket, cancel)
+    _remember_who(job_id, user_label, client_ip)
     th = threading.Thread(target=_run_scan, name=f"mfp-scan-{job_id[:8]}", daemon=True, kwargs=dict(
         job_id=job_id, ticket=ticket, cancel=cancel, user_id=user_id, user_label=user_label,
         host=conn["host"], ip=ip, scheme=scheme, port=port, caps=caps, opts=dict(opts, **eff),
@@ -138,7 +187,7 @@ def start(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, ca
 def start_box(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, device: str, ip: str,
               scheme: str, port: int, box: int, creds: "mfp_box.Creds", doc_ids: list[str], output: str,
               trust_sha256: Optional[str], allow_http: bool, confirm_delete_after_get: bool,
-              delete_after: bool = False) -> dict:
+              delete_after: bool = False, client_ip: str = "") -> dict:
     """排進這台的隊伍並開始背景取件（機內信箱，推測實作）；回傳作業紀錄。
 
     輸入不對丟 `mfp_box.BoxError`、隊伍滿了丟 `mfp_queue.QueueError` —— 都在排隊之前。"""
@@ -165,6 +214,7 @@ def start_box(*, owner: str, user_id: Optional[int], user_label: str, conn: dict
         raise
     cancel = threading.Event()
     _new_live(job_id, ticket, cancel)
+    _remember_who(job_id, user_label, client_ip)
     th = threading.Thread(target=_run_box, name=f"mfp-box-{job_id[:8]}", daemon=True, kwargs=dict(
         job_id=job_id, ticket=ticket, cancel=cancel, user_id=user_id, user_label=user_label,
         host=conn["host"], ip=ip, scheme=scheme, port=port, box=box, creds=creds, doc_ids=ids,
@@ -186,7 +236,7 @@ def _wait(job_id: str, ticket, cancel: threading.Event) -> bool:
     ok = mfp_queue.wait_turn(ticket, timeout=MAX_QUEUE_WAIT, on_wait=lambda ahead: _set(job_id, ahead=ahead))
     if not ok:
         code = "SCAN_CANCELLED" if cancel.is_set() else "SCAN_QUEUE_TIMEOUT"
-        mfp_store.finish_scan(job_id, status="cancelled" if cancel.is_set() else "error", error_code=code)
+        _finish(job_id, status="cancelled" if cancel.is_set() else "error", error_code=code)
         return False
     _set(job_id, phase="checking", ahead=0)
     mfp_store.update_scan(job_id, status="running", started_at=time.time())
@@ -212,7 +262,7 @@ def _run_scan(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional
             res = mfp_escl.scan(host, ip, scheme, port, caps, opts, workdir,
                                 on_progress=lambda d: _set(job_id, **d), is_cancelled=cancel.is_set)
         except mfp_escl.ScanError as e:
-            mfp_store.finish_scan(job_id, status="cancelled" if e.code == "SCAN_CANCELLED" else "error",
+            _finish(job_id, status="cancelled" if e.code == "SCAN_CANCELLED" else "error",
                                   error_code=e.code, error_detail=e.detail)
             return
         _set(job_id, phase="saving", pages=res["pages"], bytes=res["bytes"])
@@ -225,7 +275,7 @@ def _run_scan(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional
         items = [{"files": saved}]
         first = next((f for f in saved if f.get("workspace_file_id")), None)
         kept = next((f for f in saved if f.get("kept")), None)
-        mfp_store.finish_scan(job_id, status="done", pages=res["pages"], bytes=res["bytes"],
+        _finish(job_id, status="done", pages=res["pages"], bytes=res["bytes"],
                               workspace_file_id=first["workspace_file_id"] if first else None,
                               workspace_note=note, items=items,
                               result_path=str(workdir / kept["stored"]) if kept else None,
@@ -233,7 +283,7 @@ def _run_scan(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional
     except Exception as e:  # noqa: BLE001 —— 背景執行緒：任何意外都要落成「失敗」，不可以停在執行中
         logger.exception("mfp 掃描 %s 失敗", job_id[:8])
         try:
-            mfp_store.finish_scan(job_id, status="error", error_code="SCAN_FAILED",
+            _finish(job_id, status="error", error_code="SCAN_FAILED",
                                   error_detail={"error": e.__class__.__name__})
         except Exception:  # noqa: BLE001
             pass
@@ -254,7 +304,7 @@ def _run_box(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional[
             sess = mfp_box.open_box(host, ip, scheme, port, box=box, creds=creds, trust_sha256=trust,
                                     allow_http=allow_http, trace=trace)
         except mfp_box.BoxError as e:
-            mfp_store.finish_scan(job_id, status="error", error_code=e.code,
+            _finish(job_id, status="error", error_code=e.code,
                                   error_detail=_detail(e.detail, trace))
             return
         finally:
@@ -337,15 +387,15 @@ def _run_box(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional[
         if ok:
             fields["error_code"] = "BOX_PARTIAL" if len(ok) < len(items) else None
             fields["error_detail"] = _detail({}, trace) if len(ok) < len(items) else None
-            mfp_store.finish_scan(job_id, status="done", **fields)
+            _finish(job_id, status="done", **fields)
         else:
             code = stop.code if stop is not None else "BOX_ALL_FAILED"
-            mfp_store.finish_scan(job_id, status="cancelled" if code == "CANCELLED" else "error",
+            _finish(job_id, status="cancelled" if code == "CANCELLED" else "error",
                                   error_code=code, error_detail=_detail({}, trace), **fields)
     except Exception as e:  # noqa: BLE001
         logger.exception("mfp 信箱取件 %s 失敗", job_id[:8])
         try:
-            mfp_store.finish_scan(job_id, status="error", error_code="SCAN_FAILED",
+            _finish(job_id, status="error", error_code="SCAN_FAILED",
                                   error_detail=_detail({"error": e.__class__.__name__}, trace))
         except Exception:  # noqa: BLE001
             pass
@@ -356,7 +406,7 @@ def _run_box(*, job_id: str, ticket, cancel: threading.Event, user_id: Optional[
 def start_share(*, owner: str, user_id: Optional[int], user_label: str, conn: dict, device: str, ip: str,
                 route: str, scheme: Optional[str], port: Optional[int], root: str, files: list,
                 output: str, creds: dict, trust_sha256: Optional[str], allow_http: bool,
-                allow_plain: bool) -> dict:
+                allow_plain: bool, client_ip: str = "") -> dict:
     """排進這台的隊伍並開始背景取件（檔案分享，實驗功能）；回傳作業紀錄。輸入不對丟 `mfp_share.ShareError`。"""
     _init_once()
     if output not in BOX_OUTPUTS:
@@ -390,6 +440,7 @@ def start_share(*, owner: str, user_id: Optional[int], user_label: str, conn: di
         raise
     cancel = threading.Event()
     _new_live(job_id, ticket, cancel)
+    _remember_who(job_id, user_label, client_ip)
     th = threading.Thread(target=_run_share, name=f"mfp-share-{job_id[:8]}", daemon=True, kwargs=dict(
         job_id=job_id, ticket=ticket, cancel=cancel, user_id=user_id, user_label=user_label,
         host=conn["host"], ip=ip, route=route, scheme=scheme, port=port, root=root, paths=paths,
@@ -471,7 +522,7 @@ def _run_share(*, job_id: str, ticket, cancel: threading.Event, user_id: Optiona
             if mfp_share.ROUTES[route]["auth"] == "box":
                 root = mfp_share.konica_box_share(sess, creds.get("box") or "")
         except mfp_box.BoxError as e:
-            mfp_store.finish_scan(job_id, status="error", error_code=e.code, error_detail=_detail(e.detail, trace))
+            _finish(job_id, status="error", error_code=e.code, error_detail=_detail(e.detail, trace))
             return
         finally:
             creds = {}              # noqa: F841 —— 帳密只用在開連線
@@ -544,15 +595,15 @@ def _run_share(*, job_id: str, ticket, cancel: threading.Event, user_id: Optiona
         if ok:
             fields["error_code"] = "BOX_PARTIAL" if len(ok) < len(items) else None
             fields["error_detail"] = _detail({}, trace) if len(ok) < len(items) else None
-            mfp_store.finish_scan(job_id, status="done", **fields)
+            _finish(job_id, status="done", **fields)
         else:
             code = stop.code if stop is not None else "BOX_ALL_FAILED"
-            mfp_store.finish_scan(job_id, status="cancelled" if code == "CANCELLED" else "error",
+            _finish(job_id, status="cancelled" if code == "CANCELLED" else "error",
                                   error_code=code, error_detail=_detail({}, trace), **fields)
     except Exception as e:  # noqa: BLE001
         logger.exception("mfp 檔案分享取件 %s 失敗", job_id[:8])
         try:
-            mfp_store.finish_scan(job_id, status="error", error_code="SCAN_FAILED",
+            _finish(job_id, status="error", error_code="SCAN_FAILED",
                                   error_detail=_detail({"error": e.__class__.__name__}, trace))
         except Exception:  # noqa: BLE001
             pass

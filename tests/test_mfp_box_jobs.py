@@ -309,3 +309,65 @@ def test_a_device_that_refuses_the_delete_is_reported(dev, me, ws_on):
     item = s["items"][0]
     assert s["status"] == "done" and item["source"] == "DELETE_NOT_DONE" and item.get("delete_status") == 403, item
     assert "5" in dev.docs
+
+
+# ------------------------------------------------------------------ 作業完成的稽核（v1.17.2）
+
+@pytest.fixture
+def audits(monkeypatch):
+    from app.core import audit_db
+    seen = []
+    real = audit_db.log_event
+    monkeypatch.setattr(audit_db, "log_event", lambda ev, **kw: (seen.append((ev, kw)), real(ev, **kw))[1])
+    return seen
+
+
+def _done_event(audits, sid, timeout=10):
+    """作業狀態先寫成 done、稽核才接著寫 —— 等到那一筆真的出現，不是看到 done 就讀。"""
+    end = time.time() + timeout
+    while time.time() < end:
+        hit = [kw for ev, kw in audits if ev == "mfp_job_done" and kw["details"].get("scan") == sid]
+        if hit:
+            return hit[0]
+        time.sleep(0.05)
+    raise AssertionError("沒有 mfp_job_done 稽核")
+
+
+def test_fetch_and_delete_is_audited_when_it_finishes(dev, me, ws_on, audits):
+    """開始時的稽核只知道「要做什麼」；做完才知道實際存了幾個檔、**從設備刪掉了哪幾份原件**。"""
+    dev.add_whole(5, name="報價單")
+    dev.add_whole(6, name="合約")
+    sid = _fetch(me["a"], me["cid"], ["5", "6"], delete_after=True, box_password="1234").json()["scan"]["id"]
+    assert _wait(me["a"], sid)["status"] == "done"
+    kw = _done_event(audits, sid)
+    d = kw["details"]
+    assert d["kind"] == "box" and d["status"] == "done" and d["saved_files"] == 2, d
+    assert sorted(d["deleted_on_device"]) == ["5", "6"], d
+    assert {x["doc"]: x["delete"] for x in d["documents"]} == {"5": "DELETED", "6": "DELETED"}
+    assert kw["username"], "要記是誰做的（發起作業的那個人）"
+    assert "1234" not in str(kw), "稽核不可以帶密碼"
+    assert any(ev == "mfp_box_fetch" for ev, _ in audits), "開始時那一筆照舊"
+
+
+def test_a_refused_delete_shows_up_in_the_audit(dev, me, ws_on, audits):
+    dev.add_whole(5)
+    dev.delete_status = 403
+    sid = _fetch(me["a"], me["cid"], ["5"], delete_after=True).json()["scan"]["id"]
+    _wait(me["a"], sid)
+    d = _done_event(audits, sid)["details"]
+    assert d["deleted_on_device"] == [] and d["delete_not_done"] == ["5"], d
+
+
+def test_fetch_without_delete_audits_nothing_deleted(dev, me, ws_on, audits):
+    dev.add_whole(5)
+    sid = _fetch(me["a"], me["cid"], ["5"]).json()["scan"]["id"]
+    _wait(me["a"], sid)
+    d = _done_event(audits, sid)["details"]
+    assert d["deleted_on_device"] == [] and "delete_not_done" not in d and d["documents"][0]["source"] == "SOURCE_KEPT"
+
+
+def test_an_audit_failure_does_not_fail_the_job(dev, me, ws_on, monkeypatch):
+    dev.add_whole(5)
+    monkeypatch.setattr(mfp_scan, "_audit_done", lambda job_id: 1 / 0)
+    sid = _fetch(me["a"], me["cid"], ["5"]).json()["scan"]["id"]
+    assert _wait(me["a"], sid)["status"] == "done"

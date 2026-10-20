@@ -119,7 +119,7 @@ sudo jtdt reset-password jtdt-admin
 
 ## SSO 單一登入（OIDC + SAML，v1.12+）
 
-SSO 是**附加**登入方式，與本機 / LDAP / AD **並存** —— 啟用後本機 `jtdt-admin` 仍可登入，當作 IdP 故障時的 break-glass。設定在 `/admin/sso`。
+SSO 是**附加**登入方式，與本機 / LDAP / AD **並存** —— 啟用後本機 `jtdt-admin` 仍可登入，當作 IdP 故障時的緊急備用帳號（break-glass）。設定在 `/admin/sso`。
 
 - **OIDC**：適用 Microsoft 365 / Entra ID、Google Workspace、Keycloak、Okta、Authentik。填 Issuer（discovery 根）、Client ID / Secret 即可；驗證走 JWKS（aud / iss / exp / nonce）。
 - **SAML 2.0**：填 IdP EntityID / SSO URL / 簽章憑證；SP metadata 可從 `<base>/auth/saml/metadata` 取得餵給 IdP。預設要求 IdP 簽署 Assertion。

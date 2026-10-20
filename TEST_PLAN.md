@@ -6235,6 +6235,15 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
 
+### 6.114 v1.17.3 — KYOCERA 辨識、取件完成稽核、共用事務機卡片間距、緊急備用帳號用語（**每次發版必過**）
+
+- [ ] 只有 `Server: KM-MFP-http/...` 標頭、首頁沒有廠牌字樣的 KYOCERA（Command Center RX）認得出廠牌，相容性是實驗功能、出現直接取件；別家的伺服器名稱不會被當成 KYOCERA（`test_mfp_profiles.py`）。
+- [ ] 掃描、信箱取件、檔案分享取件做完都有一筆 `mfp_job_done`：實際結果、存進工作區的檔案數、`deleted_on_device`（從設備刪掉的原件）、`delete_not_done`（設備拒絕刪除），帳號是發起人、不帶密碼；稽核寫不進去作業照樣完成（`test_mfp_box_jobs.py`）。
+- [ ] 設定 → 共用事務機：「使用設定」與「新增共用事務機」之間有間距（對話框放在所有卡片之後，`test_mfp_fetch_page_parity.py`）。
+- [ ] SSO 設定頁、錯誤訊息、AUTH.md、reverse_proxy_sso.md、介紹站：break-glass 改成「緊急備用帳號」（中英日）。
+- [ ] 「我的事務機」有「來源」欄：自己新增的是「自己新增」、成員看到的共用事務機是「管理員共用」（滑過有說明）；共用事務機管理頁沒有這一欄（`test_mfp_fetch_page_browser.py`、`test_mfp_fetch_page_parity.py`）。
+- [ ] RICOH「自動判斷」、帳號與 User Code 都空白：用「不需登入」送一次 startSession（stringIn 空的），清單上方註明「以不需登入列出」；設備拒絕 → `AUTH_REQUIRED_USER`、只送一次；自己選「不需登入」被拒仍是 `RICOH_SESSION_REJECTED`（`test_mfp_soap.py`、`test_mfp_soap_page_browser.py`）。
+
 ### 6.113 v1.17.2 — 事務機掃描取件拿掉 Beta、信箱面板與 MCP 頁版面（**每次發版必過**）
 
 - [ ] 側欄、工具頁標題、設定 → 共用事務機都沒有 Beta；開頭說明不再寫「試用中」（`test_mfp_fetch_tool.py`、`test_mfp_fetch_page_browser.py`、`test_kb_embedding_settings_location.py`）。

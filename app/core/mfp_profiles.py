@@ -104,7 +104,9 @@ _OTHER_VENDORS: tuple[tuple[str, re.Pattern], ...] = (
     ("Canon", re.compile(r"\bCanon\b|imageRUNNER|imageCLASS|i-SENSYS|Remote\s*UI|\biR-ADV\b|PIXMA|MAXIFY", re.I)),
     ("Ricoh", re.compile(r"\bRICOH\b|Web\s*Image\s*Monitor|\bSavin\b|\bLanier\b", re.I)),
     ("Konica Minolta", re.compile(r"KONICA|MINOLTA|bizhub|PageScope|OpenAPI\s*Web", re.I)),
-    ("Kyocera", re.compile(r"KYOCERA|TASKalfa|ECOSYS|Command\s*Center|Triumph-Adler|\bUTAX\b", re.I)),
+    # `KM-MFP-http`：KYOCERA Command Center RX 的網頁伺服器（Server 標頭）。客戶實機 ECOSYS M6535cidn 的首頁沒有任何廠牌字樣、
+    # 型號是 JavaScript 之後才填，只認得出這個標頭 —— 原本「未辨識」，直接取件也不出現
+    ("Kyocera", re.compile(r"KYOCERA|TASKalfa|ECOSYS|Command\s*Center|Triumph-Adler|\bUTAX\b|\bKM-MFP-http\b", re.I)),
     ("Sharp", re.compile(r"\bSHARP\b", re.I)),
     ("Toshiba", re.compile(r"TOSHIBA|e-STUDIO|TopAccess", re.I)),
     ("Lexmark", re.compile(r"\bLexmark\b", re.I)),

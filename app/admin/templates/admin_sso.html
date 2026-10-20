@@ -5,7 +5,7 @@
 <h1>{{ icon('lock', size=22) }} {{ tr('SSO 單一登入（OIDC / SAML）') }}</h1>
 
 <div class="panel" data-s="s05937742">
-  <p data-s="s1386d503">{{ tr('SSO 是') }}<b>{{ tr('附加') }}</b>{{ tr('登入方式，與本機 / LDAP / AD 並存 —— 啟用後本機') }} <code>jtdt-admin</code> {{ tr('仍可登入當作 break-glass。首次以 SSO 登入會自動建立帳號（預設「一般使用者」角色）；IdP 群組會同步成本站群組，可在「權限矩陣」對應到角色。') }}</p>
+  <p data-s="s1386d503">{{ tr('SSO 是') }}<b>{{ tr('附加') }}</b>{{ tr('登入方式，與本機 / LDAP / AD 並存 —— 啟用後本機') }} <code>jtdt-admin</code> {{ tr('仍可登入，作為緊急備用帳號（IdP 連不上或設定錯誤時，用它登入把設定改回來）。首次以 SSO 登入會自動建立帳號（預設「一般使用者」角色）；IdP 群組會同步成本站群組，可在「權限矩陣」對應到角色。') }}</p>
   {% if not auth_enabled %}
   <p data-s="s53265c10">{{ icon('warn', size=14) }} {{ tr('目前') }}<b>{{ tr('未啟用認證') }}</b>{{ tr('。請先到「認證設定」啟用並建立管理員，才能開啟 SSO。') }}</p>
   {% endif %}

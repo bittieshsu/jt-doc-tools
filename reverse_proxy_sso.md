@@ -5,7 +5,7 @@
 一律回到既有的 `/login` 頁面，仍可用 Local / LDAP / AD / OIDC / SAML 登入。
 
 這是「附加登入方式」，**不取代**既有認證後端；`jtdt-admin` 本機帳號永遠可從 `/login`
-登入，作為 IdP / AD / Kerberos 故障時的 break-glass 後門。
+登入，作為 IdP / AD / Kerberos 故障時的緊急備用帳號（break-glass）。
 
 ---
 
@@ -48,7 +48,7 @@ jt-doc-tools（只綁 127.0.0.1）
 | 信任的反向代理 IP | `127.0.0.1`、`::1` | 只有「直接連進本服務的來源 IP」在此清單內才採信標頭。可用 CIDR。 |
 
 啟用前提（後台會擋）：
-1. 已於「認證設定」啟用認證並建立管理員（保留 break-glass）。
+1. 已於「認證設定」啟用認證並建立管理員（保留緊急備用帳號）。
 2. 已填妥 LDAP / AD 連線（proxy SSO 靠它查詢並同步網域使用者）。
 3. 「信任的反向代理 IP」不可空白。
 
@@ -188,7 +188,7 @@ server {
 | 非網域電腦、或瀏覽器未信任 | 沒有 `X-Remote-User` → app 依「沒有標頭時的行為」處理：<br>• 顯示 `/login`（預設）<br>• 或回 401 |
 | 帶了標頭但來源 IP 不在信任清單 | app **忽略**標頭、不登入，並記一筆 `proxy_sso_untrusted_proxy` 稽核 |
 | auditor / 強制 2FA 使用者 | 經 proxy 認人後仍導 `/2fa-verify` 輸入 TOTP |
-| `jtdt-admin`（本機帳號） | 在 AD 查不到 → 一律走 `/login` 手動登入（break-glass 永遠可用） |
+| `jtdt-admin`（本機帳號） | 在 AD 查不到 → 一律走 `/login` 手動登入（緊急備用帳號永遠可用） |
 
 不會發生 redirect loop：登入成功的回應會帶上 session cookie，下一個請求即已有有效 session；
 且 proxy 自動登入**只在受保護頁**觸發，永不在 `/login` 上觸發。

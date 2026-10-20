@@ -217,3 +217,14 @@ def test_fujifilm_recognised_from_escl_when_the_home_page_says_nothing(escl):
 def test_other_vendors_also_recognised_from_escl_alone():
     r = mp.detect([_page(title="")], escl_model="KYOCERA TASKalfa 3554ci")
     assert r["vendor"] == "Kyocera" and r["status"] == "experimental_vendor" and r["model"] == "KYOCERA TASKalfa 3554ci"
+
+
+def test_kyocera_is_recognised_from_the_command_center_server_header():
+    """KYOCERA Command Center RX：首頁只有空殼（`var PrinterModel = ""`，之後才由 JavaScript 填）、
+    轉到 `/startwlm/Start_Wlm.htm`，畫面上沒有任何廠牌字樣，只有 `Server: KM-MFP-http/V0.0.1`（客戶實機的回應格式）。"""
+    r = mp.detect([_page(title="", text="", headers=[("Server", "KM-MFP-http/V0.0.1"), ("Content-Type", "text/html")])])
+    assert r["vendor"] == "Kyocera" and r["status"] == "experimental_vendor", r
+    assert any(e.get("field") == "header" for e in r["evidence"]), "依據要寫是從標頭認出來的"
+    # 反例：別家的伺服器名稱不可以被當成 KYOCERA
+    for other in ("KM-httpd/1.0", "Web-Server/3.0", "KMMFP"):
+        assert mp.detect([_page(headers=[("Server", other)])])["vendor"] != "Kyocera", other

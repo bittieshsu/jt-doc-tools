@@ -270,6 +270,11 @@ def test_connection_test_save_detail_and_refusal(live, locale):
         # ---- 儲存 → 出現在清單 → 詳細
         t.js("document.getElementById('mfSaveName').value = '三樓'; document.getElementById('mfSaveBtn').click()")
         assert t.wait_for("document.querySelectorAll('#mfListWrap tbody tr').length === 1"), "儲存後清單沒有出現"
+        # v1.17.3：每一台標出來源（自己新增 / 管理員共用），不是只在名稱後面放小字
+        src = t.js("[[...document.querySelectorAll('#mfListWrap thead th')].map(th => th.innerText.trim()).join('|'),"
+                   " (document.querySelector('#mfListWrap tbody .mf-src') || {}).className || '']")
+        assert "來源" in src[0] or "Source" in src[0] or "提供元" in src[0], src
+        assert src[1] == "mf-src own", src
         # 清單的按鈕每一顆都有圖示；只留圖示的有可讀名稱（使用者 2026-10-14：右邊按鈕沒 icon）
         btns = t.js("[...document.querySelectorAll('#mfListWrap tbody button')].map(b => "
                     "[!!b.querySelector('svg'), (b.innerText.trim() || b.getAttribute('aria-label') || '')])")

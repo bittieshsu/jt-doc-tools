@@ -811,12 +811,38 @@ def test_ricoh_random_prefix_is_fresh_each_time():
     assert a != b and a[15:] == b[15:]
 
 
-def test_ricoh_customer_device_with_no_login_data_asks_for_the_mode(ricoh):
-    """帳號空白不等於免登入：還沒選登入方式時，任何登入請求都不送。"""
+def test_ricoh_auto_with_no_login_data_uses_no_sign_in_once(ricoh):
+    """v1.17.3（客戶：「自動判斷不夠自動」）：自動判斷、帳號與 User Code 都空白 → 用「不需登入」送一次，
+    不送任何帳密；標出是自動改用的（畫面要照實說）。"""
     ricoh.classes = _CUSTOMER_CLASSES
+    s = _ricoh_session(ricoh, [], user="", password="")
+    st = _starts(ricoh)
+    assert len(st) == 1 and st[0]["params"]["stringIn"] == "", "不需登入：stringIn 是空的，沒有帳密"
+    assert s.auth_mode == "none" and s.auto_fallback_none is True
+
+
+@pytest.mark.parametrize("how", ["fault", "status"])
+def test_ricoh_auto_no_sign_in_rejected_asks_for_an_account_without_retrying(ricoh, how):
+    """帳號空白不等於免登入（分析文件 5.2 第 8 條）：設備拒絕時請使用者填帳號或 User Code，**不換別的方式再試**。"""
+    ricoh.classes = _CUSTOMER_CLASSES
+    if how == "fault":
+        ricoh.start_fault = "COMMON_NOT_AUTHENTICATED"
+    else:
+        ricoh.start_status = "NG"
     with pytest.raises(mfp_box.BoxError) as ei:
         _ricoh_session(ricoh, [], user="", password="")
-    assert ei.value.code == "RICOH_AUTH_MODE_REQUIRED" and not _starts(ricoh)
+    assert ei.value.code == "AUTH_REQUIRED_USER", ei.value.code
+    assert len(_starts(ricoh)) == 1, "只送一次"
+    assert not [c for c in ricoh.calls if c["method"] == "authenticateByPassword"]
+
+
+def test_ricoh_explicit_no_sign_in_rejected_keeps_its_own_error(ricoh):
+    """使用者自己選「不需登入」被拒：照舊回 RICOH_SESSION_REJECTED（不是自動判斷的提示）。"""
+    ricoh.classes = _CUSTOMER_CLASSES
+    ricoh.start_fault = "COMMON_NOT_AUTHENTICATED"
+    with pytest.raises(mfp_box.BoxError) as ei:
+        _ricoh_session(ricoh, [], user="", password="", auth_mode="none")
+    assert ei.value.code == "RICOH_SESSION_REJECTED"
 
 
 def test_ricoh_no_login_mode_lists_and_downloads(ricoh, tmp_path):

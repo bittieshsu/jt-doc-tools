@@ -749,9 +749,11 @@ class RicohSession(Session):
                                                                   "candidates": self.candidates})
                 want = "user_code" if subs[0] == "RGWUCD" else "user_code_ext"
             elif has_start:
-                # 帳號空白不等於免登入（分析文件 5.2 第 8 條）：請使用者明確選
-                raise ShareError("RICOH_AUTH_MODE_REQUIRED", {"reason": "no login data",
-                                                              "candidates": self.candidates})
+                # 帳號、User Code 都空白：用「不需登入」試一次 —— 不送任何帳密，不會害帳號被鎖。
+                # 分析文件 5.2 第 8 條提醒「帳號空白不等於免登入」：所以設備拒絕時不換別的方式重試，
+                # 請使用者填帳號或 User Code；列出 0 份時畫面也會提醒可能要登入（客戶 2026-10-20：「自動判斷不夠自動」）
+                self.auto_fallback_none = True
+                want = "none"
             else:
                 raise ShareError("AUTH_REQUIRED_USER", {"reason": "ricoh requires an account"})
         if want == "none":
@@ -818,6 +820,8 @@ class RicohSession(Session):
                                                       _r("timeLimit", "unsignedInt", RICOH_TIME_LIMIT)], auth=True)
         except ShareError as e:
             if e.code == "AUTH_FAILED":
+                if mode == "none" and getattr(self, "auto_fallback_none", False):
+                    raise ShareError("AUTH_REQUIRED_USER", {"reason": "device requires login", "mode": "none"}) from None
                 raise ShareError("RICOH_SESSION_REJECTED", {"mode": mode, **(e.detail or {})}) from None
             raise
         finally:
@@ -827,6 +831,9 @@ class RicohSession(Session):
         sid = sid.strip() if isinstance(sid, str) else ""
         if status != "OK":
             # 非 OK 也是失敗（不一定是 Fault）；狀態只記看起來像代碼的
+            if mode == "none" and getattr(self, "auto_fallback_none", False):
+                raise ShareError("AUTH_REQUIRED_USER", {"reason": "device requires login", "mode": "none",
+                                 "status": status if re.fullmatch(r"[A-Z0-9_]{1,40}", status) else "-"})
             raise ShareError("RICOH_SESSION_REJECTED", {
                 "mode": mode, "status": status if re.fullmatch(r"[A-Z0-9_]{1,40}", status) else "-"})
         if not sid or len(sid) > 512:

@@ -113,7 +113,7 @@ def build_auth_router(templates) -> APIRouter:
         enabled = bool(body.get("enabled"))
         # Guard 1: enabling proxy SSO without auth on = no break-glass admin.
         if enabled and not auth_settings.is_enabled():
-            raise HTTPException(409, "請先於「認證設定」啟用認證並建立管理員，再開啟 Reverse Proxy SSO（保留 break-glass 帳號）")
+            raise HTTPException(409, "請先於「認證設定」啟用認證並建立管理員，再開啟 Reverse Proxy SSO（保留本機管理員當緊急備用帳號）")
         # Guard 2: it resolves users via LDAP/AD, so that must be configured.
         _s = auth_settings.get()
         ldap_ok = bool((_s.get("ldap") or {}).get("server_url")
@@ -198,7 +198,7 @@ def build_auth_router(templates) -> APIRouter:
         # Guard: enabling SSO without a primary auth backend would let anyone the
         # IdP authenticates in, but there'd be no break-glass admin. Require auth on.
         if (new["oidc"]["enabled"] or new["saml"]["enabled"]) and not auth_settings.is_enabled():
-            raise HTTPException(409, "請先於「認證設定」啟用認證並建立管理員，再開啟 SSO（保留 break-glass 帳號）")
+            raise HTTPException(409, "請先於「認證設定」啟用認證並建立管理員，再開啟 SSO（保留本機管理員當緊急備用帳號）")
         sso_settings.save(new)
         sso_settings._invalidate_cache()
         audit_db.log_event("settings_change", username=_actor(request),

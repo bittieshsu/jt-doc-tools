@@ -224,6 +224,14 @@ def _take(owner: str, tok: str) -> Optional[dict]:
 
 # --------------------------------------------------------------------------- 稽核
 
+def _client_ip(request: Request) -> str:
+    from ...core import client_ip
+    try:
+        return client_ip.real_client_ip(request) or ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def _audit(request: Request, event: str, target: str, details: dict) -> None:
     try:
         from ...core import audit_db, client_ip, sessions as _sess
@@ -554,7 +562,8 @@ async def api_scan(request: Request, conn_id: int):
         caps, scheme, port = _scan_target(c)
         device = await asyncio.to_thread(mfp_client.device_key, c["host"])
         _resolved[c["host"]] = device
-        rec = mfp_scan.start(owner=who.owner, user_id=who.uid, user_label=_user_label(request), conn=c,
+        rec = mfp_scan.start(owner=who.owner, user_id=who.uid, user_label=_user_label(request),
+                       client_ip=_client_ip(request), conn=c,
                              caps=caps, opts=opts, device=device, ip=device, scheme=scheme, port=port)
     except mfp_client.PolicyError as e:
         return _policy_error(e)
@@ -742,7 +751,8 @@ async def api_box_fetch(request: Request, conn_id: int):
         sc, pt = _box_target(c, body.get("target"))
         device = await asyncio.to_thread(mfp_client.device_key, c["host"])
         _resolved[c["host"]] = device
-        rec = mfp_scan.start_box(owner=who.owner, user_id=who.uid, user_label=_user_label(request), conn=c,
+        rec = mfp_scan.start_box(owner=who.owner, user_id=who.uid, user_label=_user_label(request),
+                       client_ip=_client_ip(request), conn=c,
                                  device=device, ip=device, scheme=sc, port=pt, box=box, creds=creds,
                                  doc_ids=[str(d) for d in docs][:mfp_box.MAX_DOCS_PER_JOB + 1],
                                  output=str(body.get("output") or "pdf"), trust_sha256=trust,
@@ -823,8 +833,11 @@ def _share_list_in_turn(owner: str, c: dict, route: str, sc, pt, inp: dict, root
                     raise mfp_share.ShareError("SHARE_ROOT_INVALID")
             entries = sess.list(root, path)
             shared = next((r["shared"] for r in roots if r["id"] == root), True)
+            # 「自動判斷」實際用了哪一種登入方式（目前只有 RICOH 會在帳號空白時自動改用「不需登入」）
+            auto_none = bool(getattr(sess, "auto_fallback_none", False))
             return {"route": route, "roots": roots, "root": root, "path": path, "entries": entries,
-                    "shared": shared, "via": sess.via(), "tls": sess.tls()}
+                    "shared": shared, "via": sess.via(), "tls": sess.tls(),
+                    "auth_mode_used": getattr(sess, "auth_mode", None), "auth_auto_none": auto_none}
         finally:
             sess.close()
 
@@ -884,7 +897,8 @@ async def api_share_fetch(request: Request, conn_id: int):
         sc, pt = _share_target(c, route, body.get("target"))
         device = await asyncio.to_thread(mfp_client.device_key, c["host"])
         _resolved[c["host"]] = device
-        rec = mfp_scan.start_share(owner=who.owner, user_id=who.uid, user_label=_user_label(request), conn=c,
+        rec = mfp_scan.start_share(owner=who.owner, user_id=who.uid, user_label=_user_label(request),
+                       client_ip=_client_ip(request), conn=c,
                                    device=device, ip=device, route=route, scheme=sc, port=pt,
                                    root=str(body.get("root") or ""), files=body.get("files"),
                                    output=str(body.get("output") or "pdf"),

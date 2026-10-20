@@ -224,6 +224,6 @@ def test_shared_admin_page(live):
         t.shot("mfp_shared_admin_1280", 1280)
         # 共用的這台出現在工具頁，標「共用」，沒有改名與移除
         t.send("Page.navigate", {"url": base + "/tools/mfp-fetch/"})
-        assert t.wait_for("!!document.querySelector('#mfListWrap .mf-tag.shared')"), "工具頁要列出共用事務機"
+        assert t.wait_for("!!document.querySelector('#mfListWrap .mf-src.shared')"), "工具頁要列出共用事務機"
         assert not t.js("!!document.querySelector('#mfListWrap .mf-del')"), "共用事務機在工具頁不能移除"
         assert not t.errs, t.errs

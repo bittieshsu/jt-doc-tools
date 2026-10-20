@@ -1094,7 +1094,7 @@
   "介面右上角顯示用，留空就用帳號": "Shown in the top right of the interface; leave blank to use the username",
   "介面版本 {0}": "API revision {0}",
   "介面語言": "Language",
-  "仍可登入當作 break-glass。首次以 SSO 登入會自動建立帳號（預設「一般使用者」角色）；IdP 群組會同步成本站群組，可在「權限矩陣」對應到角色。": "can still sign in as a break-glass account. The first SSO sign-in creates an account automatically (with the \"general user\" role); IdP groups are synced as groups here and can be mapped to roles under \"permission matrix\".",
+  "仍可登入，作為緊急備用帳號（IdP 連不上或設定錯誤時，用它登入把設定改回來）。首次以 SSO 登入會自動建立帳號（預設「一般使用者」角色）；IdP 群組會同步成本站群組，可在「權限矩陣」對應到角色。": "can still sign in as an emergency backup account (if the IdP is unreachable or misconfigured, sign in with it to fix the settings). The first SSO sign-in creates the account automatically (default role \"User\"); IdP groups are synced into this site's groups and can be mapped to roles in the permission matrix.",
   "仍要下載": "Download anyway",
   "付款方式": "Payment method",
   "付款條件": "Payment terms",
@@ -7466,7 +7466,7 @@
   "不需登入": "No sign-in",
   "帳號密碼": "Account and password",
   "User Code（延伸）": "User Code (extended)",
-  "取得到的是事務機「文件伺服器」裡的文件（掃描時選「儲存檔案」）；掃描至電子郵件或資料夾的不會留在事務機上。面板上沒有登入畫面的事務機，通常選「不需登入」；有登入畫面的選「帳號密碼」，用 User Code 的選「User Code」。登入只送一次，不會換方式重試。": "Only documents in the MFP's Document Server can be fetched (choose \"Store File\" when scanning); scans sent to e-mail or a folder are not kept on the MFP. If the MFP panel has no sign-in screen, \"No sign-in\" is usually right; choose \"Account and password\" if it has one, or \"User Code\" if users enter a user code. Sign-in is sent once and no other method is tried.",
+  "取得到的是事務機「文件伺服器」裡的文件（掃描時選「儲存檔案」）；掃描至電子郵件或資料夾的不會留在事務機上。「自動判斷」在帳號與 User Code 都沒填時用「不需登入」（不送任何帳密）；有登入畫面的事務機選「帳號密碼」，用 User Code 的選「User Code」。登入只送一次，不會換方式重試。": "You get the documents in the MFP's Document Server (choose \"Store File\" when scanning); scans sent to email or a folder are not kept on the MFP. \"Automatic\" uses \"No sign-in\" when neither an account nor a User Code is filled in (no credentials are sent); for MFPs with a sign-in screen choose \"Account and password\", and for User Code choose \"User Code\". Sign-in is sent only once and is never retried with another method.",
   "這台 RICOH 沒有提供可以用的登入方式（協定紀錄裡有設備列出的功能類別）": "This RICOH offers no sign-in method that can be used (the protocol log lists the feature classes the device reported)",
   "請在「登入方式」選這台事務機用的方式（不需登入、帳號密碼或 User Code）；還沒有送出任何登入資料": "Choose the sign-in method this MFP uses under \"Sign-in method\" (no sign-in, account and password, or User Code); no sign-in data has been sent yet",
   "選的登入方式跟設備列出的不一樣，沒有送出（協定紀錄裡有設備列出的登入方式）": "The chosen sign-in method is not one the device lists, so nothing was sent (the protocol log shows the methods the device lists)",
@@ -7549,5 +7549,11 @@
   "可以從本站掃描（eSCL）；這個廠牌目前沒有取件方式": "Can be scanned from this site (eSCL); this make has no retrieval method yet",
   "可掃描": "Can scan",
   "可以從本站掃描（eSCL）；這個廠牌沒有取件方式": "Can be scanned from this site (eSCL); this make has no retrieval method",
-  "已收到 {0} 頁": "{0} pages received"
+  "已收到 {0} 頁": "{0} pages received",
+  "管理員共用": "Shared by admin",
+  "自己新增": "Added by you",
+  "由管理員設定的共用事務機：可以使用，不能改名或移除": "A shared MFP set up by an administrator: you can use it but cannot rename or remove it.",
+  "你自己新增的事務機：可以改名或移除": "An MFP you added yourself: you can rename or remove it.",
+  "自動判斷：以「不需登入」列出。": "Automatic: listed with \"No sign-in\". ",
+  "一份都沒有：如果這台要登入才看得到文件，請在「登入方式」改選帳號密碼或 User Code。": "Nothing was listed: if this device only shows documents after signing in, choose account and password or User Code under Sign-in method."
 }

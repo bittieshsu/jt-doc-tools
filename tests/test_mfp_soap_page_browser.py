@@ -190,8 +190,9 @@ def test_kyocera_and_ricoh_retrieval_flow(live):
 
 
 def test_ricoh_sign_in_method_choice(live):
-    """v1.17.0：客戶 RICOH 只有非票證登入。帳號空白時先請使用者選「登入方式」（什麼都不送），
-    選「不需登入」後帳號、密碼收起來，列得出文件伺服器「共用資料夾」裡的文件；User Code 有自己的欄位。"""
+    """v1.17.0：客戶 RICOH 只有非票證登入。v1.17.3（客戶：「自動判斷不夠自動」）：自動判斷、帳號空白時直接用
+    「不需登入」列出（不送帳密）並照實註明；選「不需登入」後帳號、密碼收起來，列得出文件伺服器「共用資料夾」裡的文件；
+    User Code 有自己的欄位。"""
     from tests.test_mfp_soap import _CUSTOMER_CLASSES
     port, cdp, _kyo, ricoh = live
     ricoh.classes, ricoh.docs_in_folder = _CUSTOMER_CLASSES, True
@@ -218,14 +219,13 @@ def test_ricoh_sign_in_method_choice(live):
         t.js("""(() => { const s = document.getElementById('mfShareMode'); s.value = 'auto';
                          s.dispatchEvent(new Event('change'));
                          document.getElementById('mfShareUser').value = ''; return true; })()""")
-        t.js("document.getElementById('mfShareListBtn').click()")
-        assert t.wait_for("!document.getElementById('mfShareConfirm').hidden "
-                          "|| !document.getElementById('mfShareError').hidden")
-        if not t.js("document.getElementById('mfShareConfirm').hidden"):          # 單獨跑：先同意 HTTP
-            t.js("document.querySelector('#mfShareConfirm .btn-primary').click()")
-        assert t.wait_for("!document.getElementById('mfShareError').hidden"), "帳號空白要先請使用者選登入方式"
-        assert "登入方式" in t.js("document.getElementById('mfShareError').innerText")
-        assert not [c for c in ricoh.calls if c["method"] == "startSession"], "還沒選之前什麼都不送"
+        _list_with_consent(t)
+        assert t.wait_for("document.getElementById('mfShareTable').innerText.includes('合約')"), \
+            t.js("document.getElementById('mfShareError').innerText")
+        assert "不需登入" in t.js("document.getElementById('mfShareAutoNote').innerText"), "要照實說自動用了不需登入"
+        auto_starts = [c for c in ricoh.calls if c["method"] == "startSession"]
+        assert len(auto_starts) == 1 and auto_starts[0]["params"]["stringIn"] == "", "不送任何帳密、只送一次"
+        ricoh.calls.clear()
         t.js("""(() => { const s = document.getElementById('mfShareMode'); s.value = 'none';
                          s.dispatchEvent(new Event('change')); return true; })()""")
         assert t.js("document.getElementById('mfShareUserWrap').hidden") \

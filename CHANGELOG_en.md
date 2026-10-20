@@ -5,11 +5,16 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (931 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (932 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.3] - 2026-10-20
+
+- MFP scan & fetch: KYOCERA devices are now recognised from the Command Center RX web server name (`KM-MFP-http`). Some models (a customer's ECOSYS M6535cidn) show no vendor name on the home page and fill in the model later with JavaScript, so they were shown as "not identified" and KYOCERA direct retrieval was not offered. The audit log now has a completion entry (`mfp_job_done`) in addition to the submission entry: the actual result, the number of files saved to the workspace, and which originals were deleted from the device (deletions the device refused are listed separately); passwords and document contents are not recorded. On Settings → Shared MFPs, the "Usage settings" and "Add a shared MFP" cards no longer touch (the verified devices dialog sat between them and broke the card spacing). "My MFPs" has a new "Source" column marking each device as "Shared by admin" or "Added by you". RICOH direct retrieval: "Automatic" now lists with "No sign-in" when neither an account nor a User Code is filled in (no credentials are sent) and says so above the list; if the device refuses, it asks for an account or User Code, still sending sign-in only once and never retrying with another method (previously it asked the user to choose a method first).
+- The SSO settings page, error messages and docs now describe the local `jtdt-admin` as an emergency backup account instead of using the term "break-glass".
 
 ## [1.17.2] - 2026-10-20
 
