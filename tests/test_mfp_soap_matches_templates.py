@@ -320,3 +320,69 @@ def test_the_comparison_has_teeth(kyo, ricoh, tmp_path, monkeypatch):
     monkeypatch.setattr(K.RicohSession, "_envelope", swapped)
     sent = _sent(kyo, ricoh, tmp_path)          # 假設備照名稱讀參數，所以照樣跑得完
     assert sent["authenticateByPassword"] != TEMPLATES["authenticateByPassword"]
+
+
+#: v1.17.4：RICOH 資料夾（研究文件 2026-10-20 附的請求範本，內部文件不公開）—— 列資料夾、列資料夾裡的掃描文件
+#: 結構相同（`whereAnd` 一筆 querySimpleOperator，operator 不帶型別）、驗證資料夾密碼、批次取日期
+_FOLDER_SEARCH = [
+ "/Envelope|env11||",
+ "/Envelope/Body|env11||",
+ "/Envelope/Body/executeAdvancedSearch|rrepo||",
+ "/Envelope/Body/executeAdvancedSearch/sessionId||xsd:string|",
+ "/Envelope/Body/executeAdvancedSearch/rowOffset||xsd:unsignedInt|",
+ "/Envelope/Body/executeAdvancedSearch/resultRowBlockSize||xsd:unsignedInt|",
+ "/Envelope/Body/executeAdvancedSearch/resultSetId||xsd:string|",
+ "/Envelope/Body/executeAdvancedSearch/fromFolderId||xsd:string|",
+ "/Envelope/Body/executeAdvancedSearch/deepSearch||xsd:boolean|",
+ "/Envelope/Body/executeAdvancedSearch/select||enc:Array|string[N]",
+ "/Envelope/Body/executeAdvancedSearch/select/item||xsd:string|",
+ "/Envelope/Body/executeAdvancedSearch/from||xsd:string|",
+ "/Envelope/Body/executeAdvancedSearch/whereAnd||enc:Array|querySimpleOperator[N]",
+ "/Envelope/Body/executeAdvancedSearch/whereAnd/item||rt:querySimpleOperator|",
+ "/Envelope/Body/executeAdvancedSearch/whereAnd/item/operator|||",
+ "/Envelope/Body/executeAdvancedSearch/whereAnd/item/propName||xsd:string|",
+ "/Envelope/Body/executeAdvancedSearch/whereAnd/item/propVal||xsd:string|",
+ "/Envelope/Body/executeAdvancedSearch/whereAnd/item/propVal2||xsd:string|",
+ "/Envelope/Body/executeAdvancedSearch/whereOr||enc:Array|querySimpleOperator[0]",
+ "/Envelope/Body/executeAdvancedSearch/orderBy||enc:Array|queryOrderBy[0]",
+]
+FOLDER_TEMPLATES = {
+ "checkObjectPassword": [
+  "/Envelope|env11||",
+  "/Envelope/Body|env11||",
+  "/Envelope/Body/checkObjectPassword|rrepo||",
+  "/Envelope/Body/checkObjectPassword/sessionId||xsd:string|",
+  "/Envelope/Body/checkObjectPassword/objectId||xsd:string|",
+  "/Envelope/Body/checkObjectPassword/password||xsd:string|",
+ ],
+ "getObjectsProps": [
+  "/Envelope|env11||",
+  "/Envelope/Body|env11||",
+  "/Envelope/Body/getObjectsProps|rrepo||",
+  "/Envelope/Body/getObjectsProps/sessionId||xsd:string|",
+  "/Envelope/Body/getObjectsProps/objectIds||enc:Array|string[N]",
+  "/Envelope/Body/getObjectsProps/objectIds/item||xsd:string|",
+  "/Envelope/Body/getObjectsProps/select||enc:Array|string[N]",
+  "/Envelope/Body/getObjectsProps/select/item||xsd:string|",
+  "/Envelope/Body/getObjectsProps/options||enc:Array|property[0]",
+ ],
+}
+
+
+def test_ricoh_folder_requests_match_their_templates(ricoh):
+    from tests.test_mfp_soap import _with_folders
+    _with_folders(ricoh)
+    s = _ricoh_session(ricoh, [], user="", password="", auth_mode="none", folder_password="001234")
+    s.roots()
+    s.list(K.enc_name("fid=1"), [])
+    s.close()
+    searches = [signature(c["body"])[1] for c in ricoh.calls if c["method"] == "executeAdvancedSearch"]
+    folder_kind = [c for c in ricoh.calls if c["method"] == "executeAdvancedSearch" and c["params"]["from"] == "folder"]
+    in_folder = [c for c in ricoh.calls if c["method"] == "executeAdvancedSearch" and c["params"]["fromFolderId"] == "fid=1"]
+    assert folder_kind and in_folder
+    for c in folder_kind + in_folder:
+        assert signature(c["body"])[1] == _FOLDER_SEARCH
+    for m, want in FOLDER_TEMPLATES.items():
+        got = [signature(c["body"])[1] for c in ricoh.calls if c["method"] == m]
+        assert got and all(g == want for g in got), (m, got[:1])
+    assert searches

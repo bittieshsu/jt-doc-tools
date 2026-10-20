@@ -985,7 +985,9 @@ details.panel > summary select {
   position: relative; background: #e5e7eb; border-radius: var(--radius);
   overflow: auto; display: flex; align-items: safe center; justify-content: safe center; min-height: 480px; max-height: 82vh; user-select: none;
 }
-.dpe-paper { position: relative; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
+/* flex: none —— 頁面框是外框（flex）的子元素，預設會縮：放大後寬度被壓回外框寬、高度照放大值，
+   比例跑掉、底圖縮在框裡（用印預覽 150% 看起來沒放大）。寬高都照算出來的值，超出的讓外框捲動 */
+.dpe-paper { position: relative; flex: none; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
 .dpe-paper img.dpe-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; }
 .dpe-asset { position: absolute; cursor: move; outline: 2px solid var(--primary); outline-offset: -2px; touch-action: none; }
 .dpe-asset img { width: 100%; height: 100%; pointer-events: none; display: block; }

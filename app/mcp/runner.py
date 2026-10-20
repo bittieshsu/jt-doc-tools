@@ -191,10 +191,12 @@ async def _execute(tool: registry.McpTool, params: dict, inputs: list[dict], ctx
             handles = []
             try:
                 files = []
-                for f in inputs:
+                for n, f in enumerate(inputs):
                     fh = open(f["path"], "rb")
                     handles.append(fh)
-                    files.append((tool.file_field, (f["name"], fh, f["mime"])))
+                    # 比對這種「新舊兩份各一個欄位」的工具照順序對到 file_fields
+                    field_name = tool.file_fields[n] if n < len(tool.file_fields) else tool.file_field
+                    files.append((field_name, (f["name"], fh, f["mime"])))
                 resp = await client.post(tool.path, data=_form(tool, params), files=files)
             finally:
                 for fh in handles:
@@ -205,7 +207,9 @@ async def _execute(tool: registry.McpTool, params: dict, inputs: list[dict], ctx
             raise RunError(f"{tool.name} failed (HTTP {resp.status_code}): {_error_detail(resp)}", code)
         stem = (inputs[0]["name"].rsplit(".", 1)[0] if inputs else tool.name)[:80]
         if tool.output == "json":
-            return _json_result(resp.json())
+            return _json_result(_strip(resp.json(), tool.json_strip))
+        if tool.output == "job":
+            return await _follow_job(client, resp, stem, tool, ctx)
         if tool.output == "text":
             return _text_result(resp.json(), stem, tool, ctx)
         if tool.output == "image_two_step":
@@ -219,16 +223,63 @@ async def _execute(tool: registry.McpTool, params: dict, inputs: list[dict], ctx
             saved = _save_files(resp, f"{stem}.png", tool, ctx, keep=(".png", ".jpg", ".jpeg"))
             return {"files": saved, "pages": info.get("page_count")}
         if tool.output == "files":
-            return {"files": _save_files(resp, f"{stem}.pdf", tool, ctx, keep=(".pdf",))}
+            if resp.status_code == 204 or not resp.content:
+                return {"files": []}
+            return {"files": _save_files(resp, f"{stem}.pdf", tool, ctx, keep=tool.keep)}
         name = _filename(resp, f"{stem}-{tool.name}.pdf")
+        if name in tool.generic_names:            # 原本的 API 回固定檔名（例如 resized.pdf）：改用來源檔名
+            name = f"{stem}-{tool.name}.pdf"
         return {"files": [_save(ctx, resp.content, name, tool)]}
+
+
+#: 跟背景作業：多久問一次、最多等多久（整體另有 RUN_TIMEOUT）
+JOB_POLL_S = 1.0
+_JOB_DONE = {"done", "error", "cancelled", "interrupted"}
+
+
+async def _follow_job(client, resp, stem: str, tool: registry.McpTool, ctx: Ctx) -> dict:
+    """原本的 API 回 `{"job_id"}`（辦公文件轉換、OCR）：照 API 文件輪詢 `/api/jobs/{id}`，做完再下載。
+    同一張 Token、同一個行程；作業本身的權限與歸屬由原本的作業端點把關。"""
+    info = resp.json() if resp.content else {}
+    jid = str((info or {}).get("job_id") or "")
+    if not re.fullmatch(r"[0-9a-f]{8,64}", jid):
+        raise RunError(f"{tool.name}: unexpected response", "TOOL_ERROR")
+    while True:
+        st = await client.get(f"/api/jobs/{jid}")
+        if st.status_code >= 400:
+            raise RunError(f"{tool.name} failed (HTTP {st.status_code}): {_error_detail(st)}")
+        job = st.json() if st.content else {}
+        status = str(job.get("status") or "")
+        if status in _JOB_DONE:
+            break
+        await asyncio.sleep(JOB_POLL_S)
+    if status != "done":
+        raise RunError(f"{tool.name} {status}: {_short(job.get('error') or job.get('message') or status)}", "TOOL_ERROR")
+    dl = await client.get(f"/api/jobs/{jid}/download")
+    if dl.status_code >= 400:
+        raise RunError(f"{tool.name} failed (HTTP {dl.status_code}): {_error_detail(dl)}")
+    return {"files": _save_files(dl, f"{stem}-{tool.name}{tool.keep[0]}", tool, ctx, keep=tool.keep)}
+
+
+def _strip(obj: Any, keys: tuple) -> Any:
+    """拿掉 AI 用不到、又很占空間的欄位（例如比對結果的標示框座標）。"""
+    if not keys:
+        return obj
+    if isinstance(obj, dict):
+        return {k: _strip(v, keys) for k, v in obj.items() if k not in keys}
+    if isinstance(obj, list):
+        return [_strip(v, keys) for v in obj]
+    return obj
 
 
 def _save_files(resp, fallback: str, tool: registry.McpTool, ctx: Ctx, keep: tuple) -> list:
     """ZIP 解開、每個檔各存一份（工作區不收 ZIP）；不是 ZIP 就存一份。"""
     data = resp.content
     name = _filename(resp, fallback)
-    if not data.startswith(b"PK"):
+    # .docx / .odt / .xlsx 本身就是 ZIP 格式：只有「結果被打包成 .zip」才拆（看檔名或回應類型，不看開頭的 PK）
+    ctype = (resp.headers.get("content-type") or "").lower()
+    is_zip = data.startswith(b"PK") and (name.lower().endswith(".zip") or "zip" in ctype)
+    if not is_zip:
         return [_save(ctx, data, name, tool)]
     from ..core import zip_guard
     out = []

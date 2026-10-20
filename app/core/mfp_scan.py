@@ -518,7 +518,8 @@ def _run_share(*, job_id: str, ticket, cancel: threading.Event, user_id: Optiona
                                           box=creds.get("box"), box_password=creds.get("box_password", ""),
                                           trust_sha256=trust, allow_http=allow_http, allow_plain=allow_plain,
                                           trace=trace, auth_mode=creds.get("auth_mode") or "auto",
-                                          user_code=creds.get("user_code", ""))
+                                          user_code=creds.get("user_code", ""),
+                                          folder_password=creds.get("folder_password", ""))
             if mfp_share.ROUTES[route]["auth"] == "box":
                 root = mfp_share.konica_box_share(sess, creds.get("box") or "")
         except mfp_box.BoxError as e:

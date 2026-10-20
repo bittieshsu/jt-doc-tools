@@ -2513,12 +2513,13 @@ POST /tools/mfp-fetch/api/connections/{id}/share/fetch   # 取件（202，回作
 | 參數（JSON） | 類型 | 說明 |
 |---|---|---|
 | `route` | string | 取件方式：`canon_webdav`、`canon_smb`、`konica_smb`、`sharp_smb`、`kyocera_soap`（HTTPS 9091）、`kyocera_soap_http`（HTTP 9090）、`ricoh_soap`（連線測試連得上的那組協定與連接埠）（清單上的 `share.routes`） |
-| `root` | string | 位置：Canon 是 `share`（共享空間）或 `users`（個人空間）；SHARP 是設備列出的分享；Konica 由信箱編號找出，不用帶；KYOCERA 是文件匣編號；RICOH 是 `documents`（文件伺服器） |
+| `root` | string | 位置：Canon 是 `share`（共享空間）或 `users`（個人空間）；SHARP 是設備列出的分享；Konica 由信箱編號找出，不用帶；KYOCERA 是文件匣編號或 `polling`（遙控資料盒，目前只能列出）；RICOH 是 `documents`（文件伺服器的共用資料夾）或列檔回傳的資料夾代號（`~` 開頭） |
 | `path` | string[] | 列檔時用：資料夾路徑，一層一個名稱（例如 `["2026", "十月"]`），不帶就是位置的最上層 |
 | `user` / `password` | string | Canon、SHARP、KYOCERA、RICOH：事務機上的帳號與密碼（沒有設認證就不帶；RICOH 選帳號密碼登入時要帶）；網域帳號寫成 `網域\帳號` |
 | `box` / `box_password` | string | Konica：信箱編號與信箱密碼。KYOCERA：`box_password` 是文件匣密碼；RICOH：`box_password` 是文件密碼（有設密碼的文件才要） |
-| `auth_mode` | string | RICOH 的登入方式：`auto`（預設：有帳號走帳號密碼，有 User Code 依設備列出的類型，都沒有回 `RICOH_AUTH_MODE_REQUIRED`）、`none`（不需登入）、`account`（帳號密碼：設備支援就換票證，否則用 `startSession`）、`user_code`、`user_code_ext`（User Code、延伸 User Code）。登入只送一次，不換方式重試 |
+| `auth_mode` | string | RICOH 的登入方式：`auto`（預設：有帳號走帳號密碼，有 User Code 依設備列出的類型，都沒有就用「不需登入」）、`none`（不需登入）、`account`（帳號密碼：設備支援就換票證，否則用 `startSession`）、`user_code`、`user_code_ext`（User Code、延伸 User Code）。登入只送一次，不換方式重試 |
 | `user_code` | string | RICOH 的 User Code（只能是數字，開頭的 0 保留） |
+| `folder_password` | string | RICOH 文件伺服器資料夾的密碼（4～8 位數字，當字串、開頭的 0 保留）；只送一次，錯了回 `FOLDER_PASSWORD_FAILED`，沒帶而資料夾有密碼回 `folder_state` |
 | `trust_sha256` / `allow_http` | | WebDAV 的憑證指紋與 HTTP 同意，跟機內信箱取件一樣 |
 | `allow_plain` | bool | SMB 不加密，要帶 `true`（同意檔案以未加密方式在內網傳送） |
 | `files` | string[][] | 取件時用：要取的檔案，每個是一條路徑（例如 `[["2026", "合約.tif"]]`），一次最多 50 個 |
@@ -2527,7 +2528,7 @@ POST /tools/mfp-fetch/api/connections/{id}/share/fetch   # 取件（202，回作
 列檔回傳 `roots`（可選的位置，`label` 是顯示名稱、`shared` 表示共享）、`root`、`path`、`entries`（`name`、`dir`、`size`、`modified`）、
 `shared`、`via`（`{"protocol": "WebDAV"}`、`{"protocol": "SMB", "port": 445}` 或 `{"protocol": "SOAP"}`）與 `trace`（協定紀錄，不含帳密）。
 KYOCERA / RICOH 的 `entries[].name` 是編碼過的識別碼（`~` 開頭），取件時照原樣放進 `files`；顯示用 `label`。
-RICOH 有密碼的文件 `locked` 是 `true`。RICOH 取得到的是文件伺服器裡的文件；最上層查不到文件時，會再連子資料夾查一次。
+RICOH 有密碼的文件 `locked` 是 `true`。RICOH 取得到的是文件伺服器裡的文件：`roots` 除了共用資料夾，還有設備上的資料夾（`folder: true`，`locked` 是 `true` / `false`，設備沒說是 `null`）；選有密碼的資料夾而沒帶 `folder_password` 時，照樣回 `roots`，另外帶 `folder_state`（`code` 是 `FOLDER_PASSWORD_REQUIRED`、`FOLDER_PASSWORD_FAILED` 或 `FOLDER_LOCKED`）。資料夾清單讀不到時只列共用資料夾，`folder_error` 寫原因。KYOCERA 的 `polling`（遙控資料盒）列得出文件，取件回 `KYOCERA_POLLING_DOWNLOAD_UNCONFIRMED`（取件參數還在確認，不送猜的值）。
 **共享的位置其他人也看得到**，不是只屬於呼叫者的文件。
 
 SMB 只用 NTLMv2；設備只肯用 SMB1 就在認證之前停下來（`SMB1_REFUSED`），能簽章就簽章，內容不加密。
@@ -2700,9 +2701,16 @@ Token 要綁定使用者，權限照那位使用者（沒有某支工具的權�
 | `workspace_download_url` | 取得一次性下載指令（`curl`） |
 | `workspace_read_text` | 分頁讀工作區裡的文字檔 |
 
-目前開放的工具：`pdf_merge`（檔案合併）、`pdf_split`（頁面分拆）、`pdf_compress`（PDF 壓縮）、`pdf_rotate`（頁面轉向）、
-`pdf_page_numbers`（插入頁碼）、`office_to_pdf`（辦公文件轉 PDF）、`document_to_images`（辦公文件轉圖片）、
-`pdf_extract_text`（擷取文字）、`document_word_count`（字數統計）、`vat_lookup`（統編查詢）。
+目前開放的工具（共 28 支）：
+
+* 文件轉換：`office_to_pdf`（辦公文件轉 PDF）、`document_to_images`（辦公文件轉圖片）、`image_to_pdf`（圖片轉 PDF）、`pdf_to_markdown`（PDF 轉 Markdown）、`markdown_to_document`（Markdown 轉辦公文件）、`office_convert`（辦公文件格式互轉）
+* PDF 編修：`pdf_merge`（檔案合併）、`pdf_split`（頁面分拆）、`pdf_compress`（PDF 壓縮）、`pdf_rotate`（頁面轉向）、`pdf_page_numbers`（插入頁碼）、`pdf_watermark`（浮水印）、`pdf_flatten_annotations`（註解平面化）、`pdf_remove_annotations`（註解清除）、`pdf_encrypt`（PDF 密碼保護）、`pdf_decrypt`（PDF 密碼解除）、`pdf_n_up`（多頁合併）、`pdf_clean_metadata`（中繼資料清除）、`pdf_reorder_pages`（頁面整理）、`pdf_page_size`（頁面尺寸統一）、`pdf_bookmarks`（書籤與目錄）
+* 擷取與統計：`pdf_extract_text`（擷取文字）、`document_word_count`（字數統計）、`pdf_extract_images`（擷取圖片）、`pdf_ocr`（OCR 文字辨識）
+* 比對：`text_diff`（文字差異比對）、`document_diff`（文件差異比對）
+* 查詢：`vat_lookup`（統編查詢）
+
+PDF 密碼解除（`pdf_decrypt`）預設不開放，要管理員另外勾選。辦公文件格式互轉與 OCR 文字辨識在伺服器端是背景作業，`jtdt_run` 會等到做完；等太久會先回作業編號，AI 用 `job_status` 查。設定頁點工具卡片可以看每一支給 AI 的用法、參數與回傳值。
+
 執行時在伺服器內部用**同一張 Token** 呼叫各工具原本的 API，檢查、權限、稽核都跟 REST 一樣（稽核標「經由 MCP」）。
 
 **檔案傳輸（檔案內容不經過模型）**：`workspace_upload_url` / `workspace_download_url` 回一張一次性票證與 `curl` 指令。

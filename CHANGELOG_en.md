@@ -5,11 +5,18 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (932 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (933 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.4] - 2026-10-20
+
+- MFP scan & fetch: RICOH Document Server folders (e.g. 001, 002) are listed besides the shared folder, with password-protected ones marked; choosing one shows a folder password field, the password is checked only once and a wrong one stops there with no retry (too many wrong attempts make the device lock the folder). If the folder list cannot be read, the shared folder is still listed and the reason is shown. Document dates now come from the device's batch properties. The fallback that searched subfolders when nothing was found at the top level was removed: a refusal from the device is shown as an error, not as an empty list. KYOCERA polling box: models without custom boxes (e.g. ECOSYS M6535cidn) can only store scans in the polling box; it now appears in the location menu and its documents can be listed, but retrieving is disabled until the required parameters are confirmed from vendor information, and no guessed values are sent. Listing and switching folders now have their own limit of 30 times in 5 minutes instead of sharing the connection-test limit of 10.
+- MCP: 18 more tools, 28 in total: images to PDF, PDF to Markdown, Markdown to document, Office format conversion, watermark, flatten annotations, remove annotations, PDF password protection, PDF password removal (off by default), n-up, metadata removal, page organising, page size, bookmarks and table of contents, image extraction, OCR, text diff and document diff. Background-job tools (format conversion, OCR) return when the job is done; the old and new files of a comparison go to the right fields. On the settings page, clicking a tool card shows how the AI calls it (files, parameters with types, allowed values and defaults, return value and an example); allowing a tool is now the circle at the top right of the card. The site URL description was rewritten (what it is used for, what to enter on an internal network or behind a reverse proxy, what happens if it is empty), with the resulting MCP and upload URLs shown below the field. Fixed: results that are Office documents (.docx, .odt and so on are ZIP files themselves) were unpacked as archives and could not be saved; true / false parameters were not type-checked.
+- Stamp & sign and watermark: zooming the preview to 150% or more in a window that was not wide enough distorted the page: the page box was squeezed back to its original width while its height grew, so the PDF shrank inside the box with blank space above and did not look zoomed until the window was widened. Fixed in the shared drag-position editor (asset editing benefits too).
+- Wording: a few sentences in the Chinese interface were refined (the English interface is unchanged). Half-width colons and commas next to Chinese text in LLM.md were changed to full-width.
 
 ## [1.17.3] - 2026-10-20
 

@@ -159,8 +159,10 @@ def test_catalog_describe_and_param_errors(mcp):
     c, tok = mcp
     _, cat = _call(c, tok, "jtdt_catalog")
     names = [t["tool"] for t in cat["tools"]]
-    assert {"pdf_merge", "pdf_split", "pdf_compress", "pdf_rotate", "pdf_page_numbers", "office_to_pdf",
-            "document_to_images", "pdf_extract_text", "document_word_count", "vat_lookup"} == set(names)
+    from app.mcp import registry
+    assert {t.name for t in registry.TOOLS if t.default_on} == set(names), "目錄＝預設開放的工具"
+    assert "pdf_decrypt" not in names, "解除密碼預設不開放（管理員要另外勾）"
+    assert len(names) >= 20, "第二批（v1.17.4）也要在目錄裡"
     _, d = _call(c, tok, "jtdt_describe", {"tool": "pdf_rotate"})
     assert d["params"]["properties"]["angle"]["enum"] == [90, 180, 270] and d["files"]["count"] == "exactly 1"
     err, msg = _call(c, tok, "jtdt_describe", {"tool": "pdf_stamp"})
@@ -433,7 +435,7 @@ def test_every_loaded_tool_is_classified():
         assert t.tool_id in loaded and registry.CLASSIFIED[t.tool_id] == "open"
         assert t.summary.isascii() and len(t.summary) <= 120
         for k, spec in t.params.items():
-            assert spec.get("type") in ("string", "integer", "number"), (t.name, k)
+            assert spec.get("type") in ("string", "integer", "number", "boolean"), (t.name, k)
         assert registry.describe(t)["example"]["tool"] == t.name
 
 

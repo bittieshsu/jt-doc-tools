@@ -88,6 +88,9 @@ class FakeKyocera(_Server):
             2: {"name": "個人", "owner": "clerk", "password": "1234", "docs": {"私人": tiff_bytes(1)}},
         }
         self.token = "TOKEN-XYZ"
+        # v1.17.4 遙控資料盒（Polling Box）：沒有匣號；清單可能先回 PREPARING_NOW
+        self.polling = {"doc00211620261020": tiff_bytes(1)}
+        self.polling_preparing = 0
         self.calls: list[dict] = []
         self.enums: dict[str, list] = {}
         self.destroyed: list[str] = []
@@ -143,7 +146,30 @@ class FakeKyocera(_Server):
         if method == "logout_system":
             self.logged_out = True
             return self._resp(ns, method, "<k:result>SUCCESS</k:result>")
-        if method in ("destroy_box_enumeration", "destroy_document_enumeration"):
+        if method == "create_pollingbox_document_enumeration":
+            if "type" in f or "number" in f or "password" in f:
+                return self._resp(ns, method, "<k:result>INVALID_VALUE_ERROR</k:result>")
+            r = self._new_enum(ns, method, list(self.polling.items()), int(f.get("range") or 1))
+            return r
+        if method == "get_pollingbox_document_information":
+            e = self.enums.get(f.get("enumeration"))
+            if e is None:
+                return self._resp(ns, method, "<k:result>INVALID_VALUE_ERROR</k:result>")
+            if self.polling_preparing > 0:
+                self.polling_preparing -= 1
+                return self._resp(ns, method, "<k:result>PREPARING_NOW</k:result>")
+            batch, e["items"] = e["items"][:e["range"]], e["items"][e["range"]:]
+            res = "ALL_GET_COMPLETE" if not e["items"] else "SUCCESS"
+            # 研究文件：name / page_count / register_date 在 common 底下；日期是 DATE_TIME_ENTRY（year 從 1900 起、month 從 0 起）
+            tm = ("<k:second>0</k:second><k:minute>48</k:minute><k:hour>17</k:hour><k:day>20</k:day>"
+                  "<k:month>9</k:month><k:year>126</k:year><k:wday>2</k:wday><k:yday>292</k:yday>"
+                  "<k:is_dst>0</k:is_dst><k:time_zone>0</k:time_zone>")
+            inner = "".join(f"<k:document_information><k:common><k:name>{escape(nm)}</k:name><k:page_count>1</k:page_count>"
+                            f"<k:register_date>{tm}</k:register_date></k:common><k:data_size>{len(data)}</k:data_size>"
+                            f"<k:form>TIFF</k:form><k:final_modify_date>{tm}</k:final_modify_date></k:document_information>"
+                            for nm, data in batch)
+            return self._resp(ns, method, inner + f"<k:result>{res}</k:result>")
+        if method in ("destroy_box_enumeration", "destroy_document_enumeration", "destroy_pollingbox_document_enumeration"):
             self.destroyed.append(f.get("enumeration"))
             return self._resp(ns, method, "<k:result>SUCCESS</k:result>")
         if method == "create_box_enumeration":
@@ -251,7 +277,8 @@ def test_kyocera_lists_boxes_and_documents_and_releases_enumerations(kyo):
     trace = []
     s = _kyo_session(kyo, trace)
     roots = s.roots()
-    assert [(r["id"], r["label"], r["shared"]) for r in roots] == [("1", "1 會計", True), ("2", "2 個人", False)]
+    assert [(r["id"], r["label"], r["shared"]) for r in roots] == [("1", "1 會計", True), ("2", "2 個人", False),
+                                                                ("polling", "polling", True)], "最後是遙控資料盒（v1.17.4）"
     docs = s.list("1", [])
     assert [d["label"] for d in docs] == ["合約", "報價 / 2026"], "名稱有斜線也要列得出來"
     assert all(K.dec_name(d["name"]) == d["label"] for d in docs) and docs[0]["size"] > 0 and docs[0]["modified"]
@@ -310,7 +337,7 @@ def test_kyocera_auth_cases(kyo):
     kyo.auth_method = "OFF"
     kyo.calls.clear()
     s = _kyo_session(kyo, [], user="")
-    assert [r["id"] for r in s.roots()] == ["1", "2"], "設備沒有要求登入就不登入"
+    assert [r["id"] for r in s.roots()] == ["1", "2", "polling"], "設備沒有要求登入就不登入"
     assert kyo.calls and not any(c["method"] == "login_system" for c in kyo.calls)
 
 
@@ -387,8 +414,11 @@ class FakeRicoh(_Server):
         self.start_status = "OK"
         self.start_fault = None
         self.start_inputs: list[str] = []
-        self.docs_in_folder = False            # True：文件只在資料夾裡（最上層查不到，deepSearch 才查得到）
-        self.deep_fault = False
+        # v1.17.4 文件伺服器的資料夾（研究文件 2026-10-20）：fid → 名稱、有沒有密碼、密碼、裡面的文件。
+        # 共用資料夾 `fid=0` 一律列出；它的文件就是 `self.docs`（`fromFolderId` 空字串查到的那些）
+        self.folders: dict = {}
+        self.folder_fault = False
+        self.has_password_prop = True          # False：資料夾屬性不回 nf:passwordProtected（不知道有沒有密碼）
 
     def _env(self, method, inner, ns=K.RICOH_REPO_NS) -> tuple:
         x = (f'<?xml version="1.0" encoding="utf-8"?><soapenv:Envelope xmlns:soapenv="{ENV11}" '
@@ -469,9 +499,30 @@ class FakeRicoh(_Server):
             self.terminated = True
             return self._env(method, '<return xsi:type="xsd:boolean">true</return>')
         if method == "executeAdvancedSearch":
-            if self.deep_fault and val["deepSearch"] == "true":
+            if val["deepSearch"] != "false":
                 return self._fault("COMMON_INVALID_ARGUMENT")
-            ids = list(self.docs) if not self.docs_in_folder or val["deepSearch"] == "true" else []
+            where = [{_local(k.tag): (k.text or "") for k in it} for it in params["whereAnd"]]
+            if val["from"] == "folder":
+                if self.folder_fault:
+                    return self._fault("COMMON_INVALID_ARGUMENT")
+                if where != [{"operator": "RPQO_CONTAINS_ALL", "propName": "folderKind",
+                              "propVal": "shrFolder+usrFolder", "propVal2": ""}]:
+                    return self._fault("COMMON_INVALID_ARGUMENT")
+                ids = ["fid=0"] + list(self.folders)
+            elif val["fromFolderId"] == "":
+                if where:
+                    return self._fault("COMMON_INVALID_ARGUMENT")
+                ids = list(self.docs)
+            else:
+                f = self.folders.get(val["fromFolderId"])
+                if f is None:
+                    return self._fault("REPOSITORY_BAD_OBJECT_ID")
+                if where != [{"operator": "RPQO_CONTAINS_ALL", "propName": "application", "propVal": "scan",
+                              "propVal2": ""}]:
+                    return self._fault("COMMON_INVALID_ARGUMENT")
+                if f["locked"] and val["fromFolderId"] not in self.checked:
+                    return self._fault("REPOSITORY_NEED_PASSWORD")
+                ids = list(f["docs"])
             off, size = int(val["rowOffset"]), int(val["resultRowBlockSize"])
             batch = ids[off:off + size]
             status = "QUERY_AT_END" if off + size >= len(ids) else "SUCCESS"
@@ -488,8 +539,24 @@ class FakeRicoh(_Server):
             code, x, ct = self._env(method, inner)
             x = x.replace(b"</soapenv:Body>", "".join(refs).encode() + b"</soapenv:Body>")
             return code, x, ct
+        if method == "getObjectsProps":
+            ids = [it.text or "" for it in params["objectIds"]]
+            sel = [it.text or "" for it in params["select"]]
+            if sel != ["identifier", "title", "createdDate", "modifiedDate"]:
+                return self._fault("COMMON_INVALID_ARGUMENT")
+            rows = [f'<item {_rarray([_ritem("identifier", i), _ritem("createdDate", "2026-10-20T09:30:00+08:00"), _ritem("modifiedDate", "2026-10-20T10:15:00+08:00")])}</item>'
+                    for i in ids if i in self._all()]
+            return self._env(method, f'<return {_rarray(rows, "ct:property[]")}</return>')
+        if method == "getProps" and (val["objectId"] in self.folders or val["objectId"] == "fid=0"):
+            f = self.folders.get(val["objectId"]) or {"title": "共用資料夾", "locked": False, "docs": self.docs}
+            other = [_ritem("rgw:docCount", str(len(f["docs"])))]
+            if self.has_password_prop:
+                other.append(_ritem("nf:passwordProtected", "true" if f["locked"] else "false"))
+            props = [_ritem("identifier", val["objectId"]), _ritem("title", f["title"])]
+            props.append(f'<item xsi:type="ct:property"><propName>otherProps</propName><propVal {_rarray(other)}</propVal></item>')
+            return self._env(method, f'<return {_rarray(props)}</return>')
         if method == "getProps":
-            d = self.docs.get(val["objectId"])
+            d = self._all().get(val["objectId"])
             if d is None:
                 return self._fault("REPOSITORY_BAD_OBJECT_ID")
             other = [_ritem("nf:application", "scan"), _ritem("nf:passwordProtected", "true" if d["locked"] else "false")]
@@ -498,12 +565,13 @@ class FakeRicoh(_Server):
             props.append(f'<item xsi:type="ct:property"><propName>otherProps</propName><propVal {_rarray(other)}</propVal></item>')
             return self._env(method, f'<return {_rarray(props)}</return>')
         if method == "checkObjectPassword":
-            ok = val["password"] == self.password
+            f = self.folders.get(val["objectId"])
+            ok = val["password"] == (f["password"] if f else self.password)
             if ok:
                 self.checked.add(val["objectId"])
             return self._env(method, f'<return xsi:type="xsd:boolean">{"true" if ok else "false"}</return>')
         if method == "getDocRendition":
-            d = self.docs.get(val["docId"])
+            d = self._all().get(val["docId"])
             if d is None:
                 return self._fault("REPOSITORY_BAD_OBJECT_ID")
             if d["locked"] and val["docId"] not in self.checked:
@@ -515,7 +583,7 @@ class FakeRicoh(_Server):
             return self._env(method, f'<return {_rarray([_ritem("identifier", "R-" + val["docId"])])}</return>')
         if method == "getDocElementList":
             doc = val["docId"][2:]
-            els = self.docs[doc]["elements"]
+            els = self._all()[doc]["elements"]
             start = int(val["startIndex"])
             batch = els[start:start + 1]           # 一次一個：驗 TRUNCATED 的續讀
             status = "TRUNCATED" if start + 1 < len(els) else "SUCCESS"
@@ -525,8 +593,8 @@ class FakeRicoh(_Server):
                                      f'<numOfAllElements>{len(els)}</numOfAllElements>')
         if method in ("getDocContentUrl", "getDocContentUrl2"):
             eid = val["docId"]
-            doc = next((k for k, d in self.docs.items() if eid in d["elements"] or eid == "R-" + k), None)
-            d = self.docs[doc]
+            doc = next((k for k, d in self._all().items() if eid in d["elements"] or eid == "R-" + k), None)
+            d = self._all()[doc]
             scheme = self.download_scheme_override or d["scheme"]
             host = self.url_host_override or "127.0.0.1"
             if scheme == "http+post":
@@ -539,6 +607,12 @@ class FakeRicoh(_Server):
                                      f'<scheme xsi:type="xsd:string">{scheme}</scheme>'
                                      f'<parameter {_rarray(param)}</parameter>')
         return self._fault("UNKNOWN_METHOD")
+
+    def _all(self) -> dict:
+        out = dict(self.docs)
+        for f in self.folders.values():
+            out.update(f["docs"])
+        return out
 
     def _start_ok(self, si: str) -> bool:
         """照分析文件的格式解 stringIn（假伺服器自己的獨立實作，不呼叫被測的程式）。"""
@@ -937,34 +1011,117 @@ def test_ricoh_user_code_type_comes_from_the_device_or_the_user(ricoh):
     assert ei.value.code == "RICOH_AUTH_MODE_MISMATCH" and not _starts(ricoh)
 
 
-def test_ricoh_documents_inside_a_folder_are_found_with_a_deep_search(ricoh):
-    """客戶實機把掃描存進文件伺服器的「共用資料夾」：最上層查不到時再連子資料夾查一次（只讀，不重新登入）。"""
-    ricoh.classes, ricoh.docs_in_folder = _CUSTOMER_CLASSES, True
-    trace: list = []
-    s = _ricoh_session(ricoh, trace, user="", password="", auth_mode="none")
-    labels = {e["label"] for e in s.list("documents", [])}
-    assert labels == {"合約", "報價", "會議紀錄"}
-    deep = [c["params"]["deepSearch"] for c in ricoh.calls if c["method"] == "executeAdvancedSearch"]
-    assert deep[0] == "false" and "true" in deep, "先照原廠的最上層查，空的才往下找"
-    assert len(_starts(ricoh)) == 1
-    s.close()
-
-
-def test_ricoh_a_refused_deep_search_is_just_an_empty_list(ricoh):
-    ricoh.classes, ricoh.docs_in_folder, ricoh.deep_fault = _CUSTOMER_CLASSES, True, True
-    trace: list = []
-    s = _ricoh_session(ricoh, trace, user="", password="", auth_mode="none")
-    assert s.list("documents", []) == []
-    assert any(t.get("deep_search") == "refused" for t in trace)
-    s.close()
-
-
-def test_ricoh_documents_at_the_top_do_not_trigger_a_deep_search(ricoh):
+def _with_folders(ricoh):
+    """照客戶 IM C3510 的樣子（研究文件 2026-10-20）：共用資料夾＋001（有密碼）＋002（沒密碼）。"""
     ricoh.classes = _CUSTOMER_CLASSES
+    ricoh.folders = {
+        "fid=1": {"title": "001", "locked": True, "password": "001234",
+                  "docs": {"f1-doc": {"title": "請款單", "elements": ["e9"], "scheme": "http+get", "locked": False}}},
+        "fid=2": {"title": "002", "locked": False, "password": "",
+                  "docs": {"f2-doc": {"title": "出差單", "elements": ["e8"], "scheme": "http+get", "locked": False}}},
+    }
+
+
+def _calls(ricoh, method):
+    return [c for c in ricoh.calls if c["method"] == method]
+
+
+def test_ricoh_lists_folders_besides_the_shared_one(ricoh):
+    """客戶實測：共用資料夾有文件時，001、002 也要列出來 —— 資料夾另外查（`from="folder"`），不是文件查詢順便帶出。"""
+    _with_folders(ricoh)
     s = _ricoh_session(ricoh, [], user="", password="", auth_mode="none")
-    assert s.list("documents", [])
-    assert {c["params"]["deepSearch"] for c in ricoh.calls if c["method"] == "executeAdvancedSearch"} == {"false"}
+    roots = s.roots()
+    assert [r["id"] for r in roots] == ["documents", K.enc_name("fid=1"), K.enc_name("fid=2")]
+    assert [r["label"] for r in roots[1:]] == ["001 001", "002 002"]
+    assert [r.get("locked") for r in roots[1:]] == [True, False]
+    q = [c for c in _calls(ricoh, "executeAdvancedSearch") if c["params"]["from"] == "folder"]
+    # 假設備一批 2 筆、3 個資料夾 → 分兩批，位移照實際取回的列數往前
+    assert [c["params"]["rowOffset"] for c in q] == ["0", "2"]
+    assert all(c["params"]["fromFolderId"] == "" and c["params"]["deepSearch"] == "false" for c in q)
+    assert {e["label"] for e in s.list("documents", [])} == {"合約", "報價", "會議紀錄"}, "共用資料夾照舊"
+    assert not [c for c in _calls(ricoh, "executeAdvancedSearch") if c["params"]["deepSearch"] != "false"]
+
+
+def test_ricoh_opens_a_folder_without_password_directly(ricoh):
+    _with_folders(ricoh)
+    s = _ricoh_session(ricoh, [], user="", password="", auth_mode="none")
+    s.roots()
+    assert [e["label"] for e in s.list(K.enc_name("fid=2"), [])] == ["出差單"]
+    assert not _calls(ricoh, "checkObjectPassword"), "沒有密碼的資料夾不先用空密碼驗證"
+    q = [c for c in _calls(ricoh, "executeAdvancedSearch") if c["params"]["fromFolderId"] == "fid=2"]
+    assert len(q) == 1, "用設備回傳的識別碼查，不是顯示的 002"
+
+
+def test_ricoh_locked_folder_needs_the_password_and_sends_nothing_without_it(ricoh):
+    _with_folders(ricoh)
+    s = _ricoh_session(ricoh, [], user="", password="", auth_mode="none")
+    s.roots()
+    with pytest.raises(mfp_box.BoxError) as ei:
+        s.list(K.enc_name("fid=1"), [])
+    assert ei.value.code == "FOLDER_PASSWORD_REQUIRED"
+    assert not _calls(ricoh, "checkObjectPassword")
+    assert not [c for c in _calls(ricoh, "executeAdvancedSearch") if c["params"]["fromFolderId"] == "fid=1"]
+
+
+def test_ricoh_wrong_folder_password_is_sent_once_and_stops(ricoh):
+    _with_folders(ricoh)
+    s = _ricoh_session(ricoh, [], user="", password="", auth_mode="none", folder_password="1234")
+    s.roots()
+    with pytest.raises(mfp_box.BoxError) as ei:
+        s.list(K.enc_name("fid=1"), [])
+    assert ei.value.code == "FOLDER_PASSWORD_FAILED"
+    assert len(_calls(ricoh, "checkObjectPassword")) == 1, "只送一次"
+    assert not [c for c in _calls(ricoh, "executeAdvancedSearch") if c["params"]["fromFolderId"] == "fid=1"]
+
+
+def test_ricoh_folder_password_keeps_leading_zeroes_and_unlocks_listing_and_download(ricoh, tmp_path):
+    """原字串送出（不加 gwpwes003、不轉數字）；同一個工作階段只驗一次；取件的新工作階段自己再驗一次。"""
+    _with_folders(ricoh)
+    s = _ricoh_session(ricoh, [], user="", password="", auth_mode="none", folder_password="001234")
+    s.roots()
+    entries = s.list(K.enc_name("fid=1"), [])
+    assert [e["label"] for e in entries] == ["請款單"]
+    s.list(K.enc_name("fid=1"), [])
+    chk = _calls(ricoh, "checkObjectPassword")
+    assert len(chk) == 1 and chk[0]["params"]["password"] == "001234" and chk[0]["params"]["objectId"] == "fid=1"
+    assert chk[0]["types"]["password"] == "xsd:string"
     s.close()
+    ricoh.calls.clear()
+    ricoh.checked.clear()
+    s2 = _ricoh_session(ricoh, [], user="", password="", auth_mode="none", folder_password="001234")
+    res = s2.download(K.enc_name("fid=1"), [entries[0]["name"]], tmp_path / "f1.bin", 10 * 1024 * 1024)
+    assert res["bytes"] > 0 and len(_calls(ricoh, "checkObjectPassword")) == 1
+    s2.close()
+
+
+def test_ricoh_unknown_protection_is_not_treated_as_unlocked(ricoh):
+    """資料夾屬性沒說有沒有密碼：不當成沒密碼。直接查、設備說要密碼 → 請使用者輸入資料夾密碼。"""
+    _with_folders(ricoh)
+    ricoh.has_password_prop = False
+    s = _ricoh_session(ricoh, [], user="", password="", auth_mode="none")
+    roots = s.roots()
+    assert roots[1]["locked"] is None
+    with pytest.raises(mfp_box.BoxError) as ei:
+        s.list(K.enc_name("fid=1"), [])
+    assert ei.value.code == "FOLDER_PASSWORD_REQUIRED"
+
+
+def test_ricoh_a_refused_folder_query_keeps_the_shared_folder_and_says_so(ricoh):
+    """資料夾清單讀不到不是「沒有資料夾」：共用資料夾照樣列，另外記下原因給畫面。"""
+    _with_folders(ricoh)
+    ricoh.folder_fault = True
+    s = _ricoh_session(ricoh, [], user="", password="", auth_mode="none")
+    assert [r["id"] for r in s.roots()] == ["documents"]
+    assert s.folder_error == "SOAP_FAULT"
+
+
+def test_ricoh_dates_come_from_the_batch_properties(ricoh):
+    """研究文件第 6 節：`getObjectsProps` 選 createdDate、modifiedDate，依 identifier 對回去。"""
+    _with_folders(ricoh)
+    s = _ricoh_session(ricoh, [], user="", password="", auth_mode="none")
+    s.list(K.enc_name("fid=2"), [])
+    g = _calls(ricoh, "getObjectsProps")
+    assert len(g) == 1 and g[0]["types"]["objectIds"] == "enc:Array"
 
 
 def test_ricoh_records_property_names_for_the_first_document(ricoh):
@@ -977,4 +1134,47 @@ def test_ricoh_records_property_names_for_the_first_document(ricoh):
     assert "title" in names["prop_names"] and "nf:application" in names["other_prop_names"]
     assert all(e["size"] == 1234 and e["modified"] for e in entries)
     assert "合約" not in json.dumps(names, ensure_ascii=False), "只記名稱，不記內容"
+    s.close()
+
+
+
+# ------------------------------------------------------------------ KYOCERA 遙控資料盒（v1.17.4）
+
+def test_kyocera_polling_box_is_listed_with_its_own_methods(kyo):
+    """客戶 ECOSYS M6535cidn 沒有自訂資料盒，掃描存在遙控資料盒：位置清單多一個、列文件用專用方法、不帶匣號。"""
+    from datetime import datetime
+    kyo.polling_preparing = 2
+    s = _kyo_session(kyo, [])
+    roots = s.roots()
+    assert roots[-1]["id"] == "polling" and roots[-1]["readonly"] is True
+    docs = s.list("polling", [])
+    assert [d["label"] for d in docs] == ["doc00211620261020"] and docs[0]["pages"] == 1
+    assert datetime.fromtimestamp(docs[0]["modified"]).strftime("%Y-%m-%d %H:%M") == "2026-10-20 17:48", \
+        "year+1900、month+1"
+    methods = [c["method"] for c in kyo.calls]
+    assert "create_pollingbox_document_enumeration" in methods
+    assert methods.count("get_pollingbox_document_information") == 3, "準備中等一下再讀同一個列舉"
+    assert "destroy_pollingbox_document_enumeration" in methods, "一定釋放列舉"
+    s.close()
+
+
+def test_kyocera_polling_box_download_is_not_sent(kyo, tmp_path):
+    """匣號還沒有原廠依據：不送 prepare_downloading_data（不猜值）。"""
+    s = _kyo_session(kyo, [])
+    seg = s.list("polling", [])[0]["name"]
+    with pytest.raises(mfp_box.BoxError) as ei:
+        s.download("polling", [seg], tmp_path / "x.bin", 10 * 1024 * 1024)
+    assert ei.value.code == "KYOCERA_POLLING_DOWNLOAD_UNCONFIRMED"
+    assert not [c for c in kyo.calls if c["method"] == "prepare_downloading_data"]
+    s.close()
+
+
+def test_kyocera_polling_box_still_preparing_is_not_an_empty_list(kyo, monkeypatch):
+    monkeypatch.setattr(K, "KYO_PREPARE_LIMIT", 0.5)
+    kyo.polling_preparing = 100
+    s = _kyo_session(kyo, [])
+    with pytest.raises(mfp_box.BoxError) as ei:
+        s.list("polling", [])
+    assert ei.value.code == "SOAP_BUSY"
+    assert "destroy_pollingbox_document_enumeration" in [c["method"] for c in kyo.calls]
     s.close()

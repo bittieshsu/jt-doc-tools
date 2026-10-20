@@ -119,7 +119,7 @@ def test_the_page_renders_without_beta_and_passwords_only_in_the_retrieval_panel
     tpl = Path("app/tools/mfp_fetch/templates/mfp_fetch.html").read_text(encoding="utf-8")
     pw = re.findall(r"<input[^>]*type=\"password\"[^>]*>", tpl)
     assert sorted(re.search(r'id="(\w+)"', x).group(1) for x in pw) == ["mfBoxPw", "mfBoxUserPw", "mfShareCode", "mfShareExtra",
-                                                                         "mfSharePw"]
+                                                                         "mfShareFolderPw", "mfSharePw"]
     assert all('autocomplete="off"' in x for x in pw), "密碼欄不可以讓瀏覽器記住"
     fetch_panels = tpl.split('id="mfBoxPanel"', 1)[1].split('id="mfScansPanel"', 1)[0]
     assert all(x in fetch_panels for x in pw), "密碼欄只在取件那兩塊（信箱取件、檔案分享取件）"
@@ -351,3 +351,23 @@ def test_the_page_note_names_every_vendor_that_can_retrieve():
             Path(f"app/i18n/{lang}.json").read_text(encoding="utf-8")).get(zh, "")
         missing = [v for v in vendors if v.lower() not in text.lower()]
         assert not missing, (lang, missing, text)
+
+
+def test_browsing_has_its_own_looser_limit():
+    """切資料夾、輸入資料夾密碼每次都是一次列文件；跟連線測試共用 10 次的話，客戶在幾個資料夾之間切一切就被擋
+    （RICOH 實測 2026-10-20）。列文件另外算、上限 30，用完也不影響連線測試。"""
+    R = importlib.import_module("app.tools.mfp_fetch.router")
+    owner = "u:9999-browse-test"
+    try:
+        for _ in range(R.BROWSE_RATE_LIMIT):
+            assert R._acquire(owner + "#box", browse=True) is None
+            R._release(owner + "#box")
+        assert R._acquire(owner + "#box", browse=True) == "BROWSE_RATE_LIMITED"
+        assert R.MESSAGES["BROWSE_RATE_LIMITED"].startswith("列出文件太頻繁")
+        assert R._acquire(owner) is None, "連線測試另外算"
+        R._release(owner)
+        assert R.BROWSE_RATE_LIMIT > R.RATE_LIMIT
+    finally:
+        with R._LOCK:
+            R._recent.pop(owner + "#box", None)
+            R._recent.pop(owner, None)

@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **501 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **503 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -784,6 +784,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_docs_tool_categories.py` | 介紹站的工具分類要跟程式裡的一致 |
 | `test_docx_textbox_translation.py` | 含**文字方塊**的 .docx 翻譯 —— 同一段文字會被收好幾次 |
 | `test_download_and_api_audit.py` | 下載成品與 API Token 呼叫都要留下稽核記錄（v1.16.71） |
+| `test_drag_editor_zoom_browser.py` | 拖曳定位編輯器（用印、浮水印、資產編輯共用）放大後頁面比例不可以跑掉（v1.17.4，使用者截圖） |
 | `test_e2e_waits_are_bounded.py` | 瀏覽器測試等回覆時一定要有上限 |
 | `test_easyocr_reader_download_is_serialized.py` | EasyOCR 的 Reader 一次只建一個 —— 第一次建的時候它會下載模型 |
 | `test_effective_permissions.py` | 「這個人最終有哪些工具、從哪來」的檢視 |
@@ -881,6 +882,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_markdown_to_doc_formats.py` | Markdown 轉辦公文件：只轉使用者要的格式 ＋ 程式碼語法上色 |
 | `test_mcp_admin.py` | 設定 → MCP 管理頁（v1.17.1）：存設定、逐張允許 Token、寫稽核、一般使用者不能改、客戶端設定範例 |
 | `test_mcp_server.py` | MCP 伺服器（v1.17.1）：傳輸、認證授權、上下文大小、執行工具、一次性傳輸票證 |
+| `test_mcp_tools_batch2.py` | MCP 第二批工具（v1.17.4）：每一支都經 `jtdt_run` 真的跑一次，走原本的 API、結果存進工作區 |
 | `test_meeting_chart_style_has_one_source.py` | 圖的配色只有一份 —— 前端畫圖、伺服器畫匯出用的圖，顏色必須同源 |
 | `test_meeting_glossary_parse_is_linear.py` | 「專有名詞或會議背景」的解析不可以是平方級（v1.16.59，CodeQL #200～#203、#199） |
 | `test_meeting_insight.py` | 會議分析的確定性部分（切視窗、解析、引用驗證、合併、發言者統計） |
@@ -6234,6 +6236,19 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.115 v1.17.4 — RICOH 資料夾、KYOCERA 遙控資料盒、MCP 第二批與工具說明（**每次發版必過**）
+
+- [ ] RICOH：位置選單有共用資料夾＋設備上的資料夾（`from="folder"`、`folderKind = shrFolder+usrFolder`）；有密碼的標「有密碼」；選了出現「資料夾密碼」，
+      沒輸入前不送 `checkObjectPassword`、輸入後只驗一次（原字串、開頭 0 保留）、錯了停；資料夾查詢失敗照樣列共用資料夾並說明；不送 `deepSearch=true`
+      （`test_mfp_soap.py`、`test_mfp_soap_matches_templates.py`、`test_mfp_soap_page_browser.py`）。
+- [ ] KYOCERA：位置選單有「遙控資料盒」、列得出文件（專用 create / get / destroy、不帶匣號；`PREPARING_NOW` 等一下、有上限；日期 year+1900、month+1）；
+      取件按鈕停用、伺服器不送 `prepare_downloading_data`（`test_mfp_soap.py`）。
+- [ ] 列文件、切資料夾的次數上限 5 分鐘 30 次，跟連線測試分開（`test_mfp_fetch_tool.py`）。
+- [ ] MCP 第二批 18 支經 `jtdt_run` 實際跑通（背景作業、兩個檔案欄位、固定檔名、ZIP 圖片、精簡 JSON、Office 結果不被當 ZIP 拆）；
+      `pdf_decrypt` 預設不開放；boolean 參數有檢查；名稱跟網站工具一致（`test_mcp_tools_batch2.py`）。
+- [ ] 用印 / 浮水印 / 資產編輯的拖曳定位編輯器：1100 寬視窗放大 150% / 200% / 300%，頁面框寬高比等於紙張、寬度真的變大（`test_drag_editor_zoom_browser.py`，修正前三種都重現）。
+- [ ] MCP 設定頁：點工具卡片出現說明視窗（檔案、參數表、回傳、範例），右上角的圈切換開放；站台網址說明＋即時網址預覽（1280 / 390 截圖看過）。
 
 ### 6.114 v1.17.3 — KYOCERA 辨識、取件完成稽核、共用事務機卡片間距、緊急備用帳號用語（**每次發版必過**）
 

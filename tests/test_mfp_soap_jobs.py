@@ -101,7 +101,8 @@ def test_kyocera_list_boxes_and_fetch_into_workspace(env, ws_on):
     r = e["a"].post(f"{API}/connections/{cid}/share/list", json=KYO)
     assert r.status_code == 200, r.text
     j = r.json()
-    assert [(x["id"], x["label"], x["shared"]) for x in j["roots"]] == [("1", "1 會計", True), ("2", "2 個人", False)]
+    assert [(x["id"], x["label"], x["shared"]) for x in j["roots"]] == [("1", "1 會計", True), ("2", "2 個人", False),
+                                                                    ("polling", "polling", True)], "最後是遙控資料盒（v1.17.4）"
     assert j["root"] == "1" and j["via"] == {"protocol": "SOAP", "scheme": "http", "port": e["kyo"].port}
     assert [x["label"] for x in j["entries"]] == ["合約", "報價 / 2026"]
     assert "pw-1" not in r.text

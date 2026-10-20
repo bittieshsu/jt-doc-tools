@@ -40,6 +40,8 @@ def build_mcp_router(templates) -> APIRouter:
         meta = {t.metadata.id: t.metadata for t in _main.tools}
         enabled = set(ms.enabled_tools())
         groups = []
+        # 點工具卡片看的說明：跟 AI 呼叫 jtdt_describe 拿到的是同一份（registry.describe），再加輸出種類
+        tool_docs = {t.name: dict(registry.describe(t), output_kind=t.output) for t in registry.TOOLS}
         for cid, label in registry.CATEGORIES.items():
             items = []
             for t in registry.TOOLS:
@@ -64,6 +66,7 @@ def build_mcp_router(templates) -> APIRouter:
             "list_chars": size,
             "list_tokens_est": size // 4,
             "groups": groups,
+            "tool_docs": tool_docs,
             "mcp_tokens": sum(1 for t in tokens if t.get("mcp")),
         })
 

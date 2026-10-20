@@ -74,6 +74,10 @@ for _p, _u in (("env", ENV12), ("wsa", WSA), ("wsse", WSSE), ("kmauth", KYO_NS["
 
 #: 一次讀多少（研究文件：range 的單位與上限未確認 —— 用小的正整數）
 KYO_RANGE = 20
+#: 遙控資料盒清單「準備中」最多等多久（秒）；原廠沒有規定，這是本站的上限
+KYO_PREPARE_LIMIT = 30
+#: 遙控資料盒（Polling Box）在位置清單裡的代號
+KYO_POLLING = "polling"
 #: 列舉、查詢、輪詢的輪數上限（設備一直不說「結束」也不會無限迴圈）
 MAX_ROUNDS = 200
 #: 設備還在準備檔案時的等待：1、2、4、8… 秒，總共最多這麼久
@@ -104,6 +108,11 @@ MESSAGES: dict[str, str] = {
     "BOX_PASSWORD_FAILED": "文件匣密碼不對，或這個文件匣需要密碼",
     "DOC_PASSWORD_REQUIRED": "這份文件有設密碼：請在「文件密碼」輸入後再取件",
     "DOC_PASSWORD_FAILED": "文件密碼不對",
+    "KYOCERA_POLLING_DOWNLOAD_UNCONFIRMED": "遙控資料盒目前只能列出文件：取件要帶的參數還在向原廠資料確認，確認之前不送出（不會用猜的值去試）",
+    "FOLDER_PASSWORD_REQUIRED": "這個資料夾有設密碼：請在「資料夾密碼」輸入後再列出（只送一次）",
+    "FOLDER_PASSWORD_FAILED": "資料夾密碼驗證沒有通過（只送了這一次；連續輸入錯誤太多次，設備會鎖定這個資料夾）",
+    "FOLDER_LOCKED": "這個資料夾已被設備鎖定（密碼輸入錯誤太多次），請聯絡文件管理員解除",
+    "FOLDER_LIST_FAILED": "設備的資料夾清單讀不到，只列出共用資料夾（協定紀錄裡有設備的錯誤代碼）",
     "DOC_NO_CONTENT": "設備沒有回傳這份文件的內容",
     "RICOH_AUTH_UNSUPPORTED": "這台 RICOH 沒有提供可以用的登入方式（協定紀錄裡有設備列出的功能類別）",
     "RICOH_AUTH_MODE_REQUIRED": "請在「登入方式」選這台事務機用的方式（不需登入、帳號密碼或 User Code）；還沒有送出任何登入資料",
@@ -289,6 +298,22 @@ def _text(el, name: str) -> str:
 
 # --------------------------------------------------------------------------- 日期 / 數字
 
+def _kyo_date(el) -> Optional[float]:
+    """KYOCERA 的日期：`DATE_TIME_ENTRY`（second / minute / hour / day / month / year…，**year 要加 1900、month 要加 1**，
+    原廠清單就是這樣組的）；也可能是一段文字。`time_zone` 單位還沒確認，先當設備當地時間。"""
+    if el is None:
+        return None
+    kids = {_local(k.tag): (k.text or "").strip() for k in el}
+    if "year" in kids:
+        try:
+            return datetime(int(kids["year"]) + 1900, int(kids["month"]) + 1, int(kids["day"]),
+                            int(kids.get("hour") or 0), int(kids.get("minute") or 0),
+                            int(kids.get("second") or 0)).timestamp()
+        except (TypeError, ValueError, KeyError):
+            return None
+    return _epoch((el.text or "").strip())
+
+
 def _epoch(v: Any) -> Optional[float]:
     """設備的日期 → epoch。格式沒有實機樣本：ISO 8601、`YYYYMMDDhhmmss`、或拆成 year / month… 的結構都試；不認得回 None。"""
     if isinstance(v, dict):
@@ -463,8 +488,17 @@ class KyoceraSession(Session):
             raise mfp_box.BoxError("DAV_BAD_RESPONSE", {"reason": "no enumeration", "call": create})
         out: list = []
         try:
+            waited = 0.0
             for _ in range(MAX_ROUNDS):
                 resp, result = self._call("box", get, [("enumeration", enum)])
+                if result == "PREPARING_NOW":
+                    # 設備還在準備清單：原廠元件等 300 ms 再讀同一個列舉（研究文件 2026-10-20 第 3 節）；
+                    # 有上限，到了就說「準備中」，不當成空清單
+                    if waited >= KYO_PREPARE_LIMIT:
+                        raise ShareError("SOAP_BUSY", {"call": get, "waited_s": int(waited)})
+                    time.sleep(0.3)
+                    waited += 0.3
+                    continue
                 self._check(result, get, box=box)
                 got = [el for el in resp if _local(el.tag) == item]
                 out.extend(got)
@@ -491,7 +525,11 @@ class KyoceraSession(Session):
             owner = _text(inf, "owner")
             roots.append({"id": num, "label": f"{num} {name}".strip(), "shared": not owner,
                           "documents": _num(_text(inf, "document_count"))})
-        return sorted(roots, key=lambda r: int(r["id"]))
+        roots = sorted(roots, key=lambda r: int(r["id"]))
+        # 遙控資料盒：沒有自訂資料盒的機型（客戶 ECOSYS M6535cidn）掃描只能存在這裡；
+        # 列文件有專用方法（研究文件 2026-10-20），取件的參數還沒確認 → 標成唯讀
+        roots.append({"id": KYO_POLLING, "label": KYO_POLLING, "shared": True, "polling": True, "readonly": True})
+        return roots
 
     def _box(self, root: str) -> str:
         if not re.fullmatch(r"\d{1,9}", root or ""):
@@ -499,6 +537,14 @@ class KyoceraSession(Session):
         return root
 
     def list(self, root: str, path: list[str]) -> list[dict]:
+        if root == KYO_POLLING:
+            if check_path(path):
+                raise ShareError("SHARE_PATH_INVALID")
+            # 不帶匣種類、匣號、匣密碼（研究文件第 3 節）；名稱、頁數、登記日期在 common 底下
+            docs = self._enumerate("create_pollingbox_document_enumeration", [("range", KYO_RANGE)],
+                                   "get_pollingbox_document_information", "document_information",
+                                   "destroy_pollingbox_document_enumeration", box=True)
+            return self._doc_entries(docs)
         box = self._box(root)
         if check_path(path):
             raise ShareError("SHARE_PATH_INVALID")      # 文件匣底下沒有資料夾
@@ -507,6 +553,10 @@ class KyoceraSession(Session):
             [("identification_information", [("type", "USER"), ("number", box), ("password", self._box_password)]),
              ("range", KYO_RANGE)],
             "get_document_information", "document_information", "destroy_document_enumeration", box=True)
+        return self._doc_entries(docs)
+
+    @staticmethod
+    def _doc_entries(docs: list) -> list[dict]:
         out = []
         for d in docs:
             name = _text(d, "name")
@@ -514,7 +564,7 @@ class KyoceraSession(Session):
             if not seg:
                 continue
             out.append({"name": seg, "label": name[:160], "dir": False, "size": _num(_text(d, "data_size")),
-                        "modified": _epoch(_text(d, "final_modify_date") or _text(d, "register_date")),
+                        "modified": _kyo_date(_first(d, "final_modify_date")) or _kyo_date(_first(d, "register_date")),
                         "pages": _num(_text(d, "page_count")), "type": _text(d, "form")[:40]})
         return sorted(out, key=lambda x: x["label"].lower())
 
@@ -522,6 +572,9 @@ class KyoceraSession(Session):
         return dec_name(path[-1]) if path else ""
 
     def download(self, root: str, path: list[str], dest: Path, max_bytes: int) -> dict:
+        if root == KYO_POLLING:
+            # 匣種類確定是 FAX_POLLING，但 indicator.box_number 要帶什麼還沒有原廠依據 —— 不送猜的值
+            raise ShareError("KYOCERA_POLLING_DOWNLOAD_UNCONFIRMED")
         box = self._box(root)
         path = check_path(path)
         if len(path) != 1:
@@ -601,6 +654,7 @@ _RICOH_ERRORS = {
     "REPOSITORY_OBJECT_BUSY": "SOAP_BUSY",
     "COMMON_SYSTEM_BUSY": "SOAP_BUSY",
     "REPOSITORY_URL_SCHEME_NOT_FOUND": "RICOH_URL_UNSUPPORTED",
+    "REPOSITORY_OBJECT_LOCKED": "FOLDER_LOCKED",
 }
 
 
@@ -670,13 +724,18 @@ class RicohSession(Session):
 
     def __init__(self, route: str, host: str, ip: str, scheme: str, port: int, *, user: str, password: str,
                  doc_password: str, trust_sha256: Optional[str], allow_http: bool, trace: list,
-                 auth_mode: str = "auto", user_code: str = ""):
+                 auth_mode: str = "auto", user_code: str = "", folder_password: str = ""):
         if auth_mode not in RICOH_AUTH_MODES:
             raise ShareError("RICOH_AUTH_MODE_REQUIRED", {"reason": "unknown mode"})
         self.route = route
         self.http = _SoapHttp(host, ip, scheme, port, paths=[RICOH_REPO_PATH], trust_sha256=trust_sha256,
                               allow_http=allow_http, trace=trace)
         self._doc_password = doc_password or ""
+        #: 資料夾密碼（4～8 位數字，**當字串**、保留開頭的 0）；這個工作階段裡驗證過的資料夾才放進 `_folder_ok`
+        self._folder_password = folder_password or ""
+        self._folder_ok: set[str] = set()
+        self._folders: dict[str, dict] = {}
+        self.folder_error: Optional[str] = None
         self._sid = ""
         self._names: dict[str, str] = {}
         # 原廠元件的初始流程先查協定版本（研究文件第 2 節）。沒有這個方法的機型照樣往下走；整個服務不在就停
@@ -925,32 +984,104 @@ class RicohSession(Session):
             self._sid = ""
 
     # ---- 列文件
+    #: 共用資料夾（原廠 `fid=0`）在查詢時用空的 `fromFolderId`；其他資料夾用設備回傳的識別碼
+    SHARED_FID = "fid=0"
+
     def roots(self) -> list[dict]:
-        return [{"id": self.ROOT, "label": self.ROOT, "shared": True}]
+        """共用資料夾＋設備上的資料夾（研究文件 2026-10-20：資料夾要另外查 `from="folder"`，
+        原本的文件查詢不會帶出 001、002 這種資料夾 —— 客戶 IM C3510 實測）。
+
+        資料夾清單讀不到時**不當成沒有資料夾**：照樣給共用資料夾，另外記 `folder_error` 讓畫面講清楚。"""
+        out = [{"id": self.ROOT, "label": self.ROOT, "shared": True}]
+        try:
+            self._need("query.advancedSearch")
+            ids = self._search(from_="folder", where=[("RPQO_CONTAINS_ALL", "folderKind", "shrFolder+usrFolder", "")])
+        except ShareError as e:
+            if e.code in ("SESSION_EXPIRED",):
+                raise
+            self.folder_error = e.code
+            if self.http.trace:
+                self.http.trace[-1]["folders"] = "error"
+            return out
+        for fid in ids:
+            if fid == self.SHARED_FID:
+                continue                   # 共用資料夾：就是上面那一個入口
+            seg = enc_name(fid)
+            if not seg:
+                continue
+            info = {"fid": fid, "title": "", "locked": None, "docs": None}
+            try:
+                props, _o = self._repo("getProps", [_r("sessionId", "string", self._sid), _r("objectId", "string", fid)])
+                p = _props(props)
+                other = _props(p.get("otherProps"))
+                info["title"] = str(p.get("title") or "")[:80]
+                pw = other.get("nf:passwordProtected")
+                # 沒有這個屬性＝不知道（不可以當成沒密碼）
+                info["locked"] = None if pw in (None, "") else str(pw).strip().lower() == "true"
+                info["docs"] = _num(other.get("rgw:docCount"))
+            except ShareError as e:
+                if e.code == "SESSION_EXPIRED":
+                    raise
+            self._folders[seg] = info
+            m = re.fullmatch(r"fid=(\d{1,6})", fid)
+            num = f"{int(m.group(1)):03d}" if m else ""
+            label = " ".join(x for x in (num, info["title"]) if x) or fid[:40]
+            out.append({"id": seg, "label": label[:120], "shared": False, "folder": True,
+                        "locked": info["locked"], "documents": info["docs"]})
+        if self.http.trace:
+            self.http.trace[-1]["folders"] = len(out) - 1
+        return out
 
     def _block(self) -> int:
         n = _num(self.caps.get("maxResultRowBlockSizeForDocIDList"))
         return max(1, min(n or 50, 50))
 
-    def list(self, root: str, path: list[str]) -> list[dict]:
-        if root != self.ROOT:
+    def _folder_of(self, root: str) -> str:
+        """位置代號 → `fromFolderId`。共用資料夾是空字串；其他是設備回傳的識別碼（編碼過的那一段）。"""
+        if root == self.ROOT:
+            return ""
+        if not (isinstance(root, str) and root.startswith("~")):
             raise ShareError("SHARE_ROOT_INVALID")
+        fid = dec_name(root)
+        if not fid or len(fid) > 120:
+            raise ShareError("SHARE_ROOT_INVALID")
+        return fid
+
+    def _open_folder(self, root: str) -> str:
+        """有密碼的資料夾：使用者給了密碼才驗證，而且同一個工作階段只驗一次（研究文件第 5 節）。"""
+        fid = self._folder_of(root)
+        if not fid or fid in self._folder_ok:
+            return fid
+        info = self._folders.get(root)
+        if not self._folder_password:
+            if info and info.get("locked") is True:
+                raise ShareError("FOLDER_PASSWORD_REQUIRED")
+            return fid                    # 沒設密碼（或不知道）：直接查，不先用空密碼驗證
+        self._need("objectPassword")
+        ok, _o = self._repo("checkObjectPassword", [_r("sessionId", "string", self._sid),
+                                                    _r("objectId", "string", fid),
+                                                    _r("password", "string", self._folder_password)])
+        if str(ok).strip().lower() not in ("true", "1"):
+            raise ShareError("FOLDER_PASSWORD_FAILED")
+        self._folder_ok.add(fid)
+        return fid
+
+    def list(self, root: str, path: list[str]) -> list[dict]:
         if check_path(path):
             raise ShareError("SHARE_PATH_INVALID")
         self._need("query.advancedSearch")
-        ids = self._search(deep=False)
-        if not ids:
-            # 文件伺服器的文件可能放在資料夾裡（客戶實機：「共用資料夾」）。原廠的一般查詢是最上層、不往下找；
-            # 一份都沒有時再「連子資料夾一起找」一次。只是讀取（登入已經完成，跟帳密無關）；設備不接受就當空的
+        fid = self._open_folder(root)
+        if fid:
+            # 資料夾裡的掃描文件：原廠 DocumentBox 資料夾分支加 `application = scan`（不是 `nf:application`）
             try:
-                ids = self._search(deep=True)
-                if self.http.trace:
-                    self.http.trace[-1]["deep_search"] = len(ids)
+                ids = self._search(folder=fid, where=[("RPQO_CONTAINS_ALL", "application", "scan", "")])
             except ShareError as e:
-                if e.code in ("SESSION_EXPIRED", "SHARE_TOO_MANY"):
-                    raise
-                if self.http.trace:
-                    self.http.trace[-1]["deep_search"] = "refused"
+                if e.code == "DOC_PASSWORD_REQUIRED":      # 不知道有沒有密碼而直接查：設備說要密碼
+                    raise ShareError("FOLDER_PASSWORD_REQUIRED", e.detail) from None
+                raise
+        else:
+            ids = self._search()          # 共用資料夾：客戶實機證實的查詢，維持不加條件
+        dates = self._batch_dates(ids)
         entries = []
         for i in ids:
             seg = enc_name(i)
@@ -960,16 +1091,15 @@ class RicohSession(Session):
             p = _props(props)
             other = _props(p.get("otherProps"))
             if not entries and self.http.trace:
-                # 協定紀錄記「設備回了哪些屬性名稱」（只記名稱、不記內容）：實機的日期與大小
-                # 不一定叫 modifiedDate / contentLength（客戶 IM C3510 顯示「—」），對照用
+                # 協定紀錄記「設備回了哪些屬性名稱」（只記名稱、不記內容），對照用
                 self.http.trace[-1]["prop_names"] = sorted(str(k)[:40] for k in p)[:40]
                 self.http.trace[-1]["other_prop_names"] = sorted(str(k)[:40] for k in other)[:40]
             title = str(p.get("title") or i)[:160]
             self._names[seg] = title
-            size = next((_num(v) for v in (p.get("contentLength"), other.get("nf:contentLength"), p.get("size"),
-                                           other.get("nf:size")) if _num(v) is not None), None)
-            when = next((_epoch(v) for v in (p.get("modifiedDate"), p.get("createdDate"), other.get("nf:modifiedDate"),
-                                             other.get("nf:createdDate"), other.get("nf:storedDate"))
+            size = _num(p.get("contentLength"))       # 研究文件第 6 節：大小只有 getProps 的 contentLength 有依據
+            when = next((_epoch(v) for v in (p.get("modifiedDate"), p.get("createdDate"),
+                                             (dates.get(i) or {}).get("modifiedDate"),
+                                             (dates.get(i) or {}).get("createdDate"))
                          if _epoch(v) is not None), None)
             entries.append({"name": seg, "label": title, "dir": False, "size": size,
                             "modified": when,
@@ -977,25 +1107,56 @@ class RicohSession(Session):
                             "locked": str(other.get("nf:passwordProtected", "")).lower() == "true"})
         return sorted(entries, key=lambda x: (-(x["modified"] or 0), x["label"].lower()))
 
-    def _search(self, *, deep: bool) -> list[str]:
+    def _batch_dates(self, ids: list[str]) -> dict[str, dict]:
+        """`getObjectsProps` 一次拿日期（研究文件第 6 節：原廠清單有 createdDate、modifiedDate；依 identifier 對回去，
+        缺識別碼的不亂配）。設備沒有這項功能或拒絕就算了 —— 日期只是顯示用。"""
+        if not ids or "basic.getObjectsProps" not in self.classes:
+            return {}
+        out: dict[str, dict] = {}
+        for n in range(0, len(ids), 50):
+            try:
+                rows, _o = self._repo("getObjectsProps", [
+                    _r("sessionId", "string", self._sid), _r("objectIds", "strings", ids[n:n + 50]),
+                    _r("select", "strings", ["identifier", "title", "createdDate", "modifiedDate"]),
+                    _r("options", "props", [])])
+            except ShareError as e:
+                if e.code == "SESSION_EXPIRED":
+                    raise
+                return out
+            rows = rows if isinstance(rows, list) else ([] if rows in (None, "") else [rows])
+            for row in rows:
+                d = _props(row)
+                k = str(d.get("identifier") or "").strip()
+                if k:
+                    out[k] = d
+        return out
+
+    def _search(self, *, from_: str = "document", folder: str = "", where: Optional[list] = None) -> list[str]:
         ids: list[str] = []
         offset = 0
         for _ in range(MAX_ROUNDS):
             status, out = self._repo("executeAdvancedSearch", [
                 _r("sessionId", "string", self._sid), _r("rowOffset", "unsignedInt", offset),
                 _r("resultRowBlockSize", "unsignedInt", self._block()), _r("resultSetId", "string", ""),
-                _r("fromFolderId", "string", ""), _r("deepSearch", "boolean", deep),
-                _r("select", "strings", ["identifier"]), _r("from", "string", "document"),
-                _r("whereAnd", "ops", []), _r("whereOr", "ops", []), _r("orderBy", "order", [])])
+                _r("fromFolderId", "string", folder), _r("deepSearch", "boolean", False),
+                _r("select", "strings", ["identifier"]), _r("from", "string", from_),
+                _r("whereAnd", "ops", list(where or [])), _r("whereOr", "ops", []), _r("orderBy", "order", [])])
+            st = str(status or "").strip()
             rows = out.get("rowList")
             rows = rows if isinstance(rows, list) else ([] if rows in (None, "") else [rows])
+            before = len(ids)
             for i in _row_ids(rows):
                 if i not in ids:
                     ids.append(i)
             if len(ids) > RICOH_MAX_DOCS:
                 raise ShareError("SHARE_TOO_MANY", {"limit": RICOH_MAX_DOCS})
             offset += len(rows)
-            if str(status or "").strip() == "QUERY_AT_END" or not rows:
+            if st == "QUERY_AT_END" or not rows:
+                break                      # 最後一批的資料上面已經收了
+            if len(ids) == before:
+                # 有回資料但沒有新的（分頁期間清單變了）：停下來，協定紀錄標「可能不完整」，不無限輪詢
+                if self.http.trace:
+                    self.http.trace[-1]["incomplete"] = True
                 break
         return ids
 
@@ -1013,8 +1174,7 @@ class RicohSession(Session):
 
     # ---- 下載
     def download(self, root: str, path: list[str], dest: Path, max_bytes: int) -> dict:
-        if root != self.ROOT:
-            raise ShareError("SHARE_ROOT_INVALID")
+        self._open_folder(root)            # 共用資料夾什麼都不做；有密碼的資料夾在這個工作階段驗一次
         path = check_path(path)
         if len(path) != 1:
             raise ShareError("SHARE_PATH_INVALID")
@@ -1118,6 +1278,17 @@ def _rparam(parent, name: str, xtype: str, value: Any) -> None:
             it = SubElement(el, "item")
             _typed(it, "xsd:string")
             it.text = str(v)
+    elif xtype == "ops" and value:
+        el.set(f"{{{XSI}}}type", "enc:Array")
+        el.set(f"{{{ENC11}}}arrayType", f"rt:querySimpleOperator[{len(value)}]")
+        for op, name, val, val2 in value:     # RICOH 資料夾查詢（研究文件 2026-10-20 第 2 節）
+            it = SubElement(el, "item")
+            _typed(it, "rt:querySimpleOperator")
+            SubElement(it, "operator").text = str(op)
+            for fname, fval in (("propName", name), ("propVal", val), ("propVal2", val2)):
+                f = SubElement(it, fname); _typed(f, "xsd:string")
+                if fval not in (None, ""):
+                    f.text = str(fval)
     elif xtype in ("props", "ops", "order"):
         t = {"props": "ct:property", "ops": "rt:querySimpleOperator", "order": "rt:queryOrderBy"}[xtype]
         el.set(f"{{{XSI}}}type", "enc:Array")

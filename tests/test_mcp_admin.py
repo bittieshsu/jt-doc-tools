@@ -119,3 +119,14 @@ def test_settings_are_tiles_with_the_switch_next_to_its_title(client, auth_off, 
     html = client.get("/admin/mcp").text
     for sid in ("mcp-enabled", "mcp-bindip", "mcp-http"):
         assert re.search(r'<div class="mcp-tile">\s*<div class="mcp-tile-top">(?:(?!mcp-tile").)*id="' + sid + '"', html, re.S), sid
+
+
+def test_page_has_no_private_ip_examples(client, auth_off, reset_mcp):
+    """範例網址用主機名稱：頁面上出現私有 IP，ZAP 會報「Private IP Disclosure」（v1.17.4 踩過）。"""
+    import re
+    for loc in ("zh-TW", "en", "ja"):
+        client.cookies.set("jtdt_locale", loc)
+        html = client.get("/admin/mcp").text
+        client.cookies.delete("jtdt_locale")
+        hits = re.findall(r"\b(?:10|192\.168|172\.(?:1[6-9]|2\d|3[01]))(?:\.\d{1,3}){2,3}\b", html)
+        assert not [h for h in hits if not h.startswith("127.")], (loc, hits)

@@ -4,7 +4,8 @@
 {% block content %}
 {% set url = (site_url.rstrip('/') if site_url else '') ~ '/mcp' %}
 {% set CAT = {'convert': ('文件轉換', 'file-swap', 'c-sky'), 'pdf_edit': ('PDF 編修', 'pages', 'c-violet'),
-              'extract': ('擷取與統計', 'text', 'c-emerald'), 'lookup': ('查詢', 'search', 'c-amber')} %}
+              'extract': ('擷取與統計', 'text', 'c-emerald'), 'compare': ('比對', 'diff', 'c-sky'),
+              'lookup': ('查詢', 'search', 'c-amber')} %}
 
 <h1>{{ icon('sparkles', size=22) }} {{ tr('MCP（AI 連接）') }} <span class="addon-badge">{{ tr('附加功能') }}</span></h1>
 <p class="muted">{{ tr('讓 Claude Code、Codex、OpenCode 這類 AI 客戶端透過 MCP 呼叫本站不用 LLM 的工具。AI 用的是你核發的 API Token，權限照那張 Token 綁定的使用者。') }}</p>
@@ -45,8 +46,18 @@
     </div>
     <div class="mcp-tile">
       <div class="mcp-tile-l"><b>{{ tr('站台網址') }}</b>
-        <span>{{ tr('AI 上傳、下載檔案用的網址，要是 AI 所在電腦連得到的網址（經反向代理時填對外的網址）。跟「作業完成通知」的站台網址是同一個設定。') }}</span></div>
-      <input class="field mcp-input-wide" type="url" id="mcp-site" value="{{ site_url }}" placeholder="https://docs.example.com" maxlength="300" aria-label="{{ tr('站台網址') }}">
+        <span>{{ tr('本站的網址。AI 用它組出 MCP 連線網址，以及上傳、下載檔案的一次性連結，所以要填「AI 所在那台電腦」打得開的網址：') }}</span></div>
+      <ul class="mcp-site-help">
+        <li>{{ tr('AI 跟本站在同一個內網：填內網網址，例如 http://doc-server:8765') }}</li>
+        <li>{{ tr('經反向代理（Nginx、IIS）：填對外的網址，例如 https://doc.example.com') }}</li>
+        <li>{{ tr('沒填：AI 只能傳 256 KB 以下的小檔（直接放在呼叫參數裡）。') }}</li>
+      </ul>
+      <input class="field mcp-input-wide" type="url" id="mcp-site" value="{{ site_url }}" placeholder="https://doc.example.com" maxlength="300" aria-label="{{ tr('站台網址') }}">
+      <div class="mcp-site-preview" id="mcp-site-preview">
+        <span>{{ tr('MCP 連線網址') }}<code id="mcp-prev-mcp"></code></span>
+        <span>{{ tr('上傳檔案') }}<code id="mcp-prev-up"></code></span>
+      </div>
+      <span class="mcp-site-same">{{ tr('跟「作業完成通知」的站台網址是同一個設定。') }}</span>
     </div>
     <div class="mcp-tile">
       <div class="mcp-tile-l"><b>{{ tr('呼叫上限') }}</b><span>{{ tr('每張 Token 每分鐘最多幾次呼叫。') }}</span></div>
@@ -74,7 +85,7 @@
 {# ---- 開放的工具 ---- #}
 <div class="panel mcp-card">
   <h2>{{ icon('tool', size=18) }} {{ tr('開放的工具') }}</h2>
-  <p class="muted mcp-lead">{{ tr('只列出不用 LLM 的工具。使用者還是要有那支工具的權限才看得到。') }}</p>
+  <p class="muted mcp-lead">{{ tr('只列出不用 LLM 的工具。點卡片看這支工具給 AI 的用法、參數與回傳值；按右上角的圈決定開放與否。使用者還是要有該工具的權限才看得到。') }}</p>
   {% for g in groups %}
   {% set c = CAT.get(g.id, (g.id, 'tool', 'c-sky')) %}
   <section class="mcp-group">
@@ -82,17 +93,37 @@
       <b>{{ tr(c[0]) }}</b><span class="mcp-group-n">{{ g['items']|length }}</span></header>
     <div class="mcp-tools">
       {% for t in g['items'] %}
-      <label class="mcp-tool{% if t.on %} is-on{% endif %}">
-        <input type="checkbox" class="mcp-tool-cb" value="{{ t.name }}" {% if t.on %}checked{% endif %}>
-        <span class="mcp-tool-ic tile-color-{{ t.color }}">{{ icon(t.icon or 'tool', size=17) }}</span>
-        <span class="mcp-tool-tx"><b>{{ tr(t.title) }}</b><code>{{ t.name }}</code><small>{{ tr(t.desc) }}</small></span>
-        <span class="mcp-tool-check">{{ icon('check', size=13) }}</span>
-      </label>
+      <div class="mcp-tool{% if t.on %} is-on{% endif %}">
+        <button type="button" class="mcp-tool-open" data-mcp-doc="{{ t.name }}" aria-haspopup="dialog">
+          <span class="mcp-tool-ic tile-color-{{ t.color }}">{{ icon(t.icon or 'tool', size=17) }}</span>
+          <span class="mcp-tool-tx"><b>{{ tr(t.title) }}</b><code>{{ t.name }}</code><small>{{ tr(t.desc) }}</small></span>
+        </button>
+        <label class="mcp-tool-check" title="{{ tr('開放給 AI') }}">
+          <input type="checkbox" class="mcp-tool-cb" value="{{ t.name }}" {% if t.on %}checked{% endif %} aria-label="{{ tr('開放給 AI') }}：{{ tr(t.title) }}">
+          {{ icon('check', size=13) }}</label>
+      </div>
       {% endfor %}
     </div>
   </section>
   {% endfor %}
 </div>
+
+<dialog class="mcp-doc" id="mcp-doc" aria-labelledby="mcp-doc-title">
+  <div class="mcp-doc-head">
+    <span class="mcp-doc-ic" id="mcp-doc-ic"></span>
+    <div class="mcp-doc-ht"><h2 id="mcp-doc-title"></h2><code id="mcp-doc-name"></code></div>
+    <button type="button" class="btn btn-secondary btn-small" id="mcp-doc-close">{{ icon('close', size=14) }} <span>{{ tr('關閉') }}</span></button>
+  </div>
+  <p class="mcp-doc-desc" id="mcp-doc-desc"></p>
+  <section><h3>{{ tr('AI 怎麼呼叫') }}</h3>
+    <p class="mcp-doc-p">{{ tr('AI 先用 jtdt_describe 取得這份說明，再用 jtdt_run 執行；檔案用工作區的檔案編號指定（workspace_list、workspace_upload_url 或前一個結果）。') }}</p></section>
+  <section id="mcp-doc-files-sec"><h3>{{ tr('輸入檔案') }}</h3><p class="mcp-doc-p" id="mcp-doc-files"></p></section>
+  <section><h3>{{ tr('參數') }}</h3><div id="mcp-doc-params"></div></section>
+  <section><h3>{{ tr('回傳') }}</h3><p class="mcp-doc-p" id="mcp-doc-out"></p></section>
+  <section><h3>{{ tr('呼叫範例（jtdt_run 的參數）') }}</h3><pre class="mcp-doc-ex" id="mcp-doc-ex"></pre></section>
+  <p class="mcp-doc-note">{{ tr('參數說明是給 AI 看的英文原文，跟 AI 實際拿到的一致。') }}</p>
+</dialog>
+<script type="application/json" id="mcp-tool-docs" nonce="{{ request.state.csp_nonce }}">{{ tool_docs|tojson }}</script>
 
 <div class="mcp-savebar">
   <button class="btn btn-primary" id="mcp-save" type="button">{{ icon('save', size=14) }} <span>{{ tr('儲存設定') }}</span></button>
@@ -226,6 +257,32 @@
   .mcp-group-n { margin-left: auto; font-size: 12px; color: #64748b; background: #fff; border: 1px solid #e2e8f0;
     border-radius: 999px; padding: 1px 9px; }
   .mcp-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+  .mcp-site-help { margin: 0; padding-left: 18px; font-size: 12.5px; color: #475569; line-height: 1.6; }
+  .mcp-site-preview { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: #64748b; }
+  .mcp-site-preview code { margin-left: 6px; font-size: 12px; color: #4338ca; background: #eef2ff; padding: 1px 6px; border-radius: 4px; word-break: break-all; }
+  .mcp-site-same { font-size: 12px; color: #94a3b8; }
+  .mcp-tool-open { all: unset; box-sizing: border-box; display: flex; gap: 10px; align-items: flex-start; width: 100%; cursor: pointer; }
+  .mcp-tool-open:focus-visible { outline: 2px solid #818cf8; outline-offset: 4px; border-radius: 8px; }
+  .mcp-doc { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 0; border-radius: 14px; padding: 18px 20px;
+    box-shadow: 0 20px 50px rgba(15,23,42,.25); }
+  .mcp-doc::backdrop { background: rgba(15,23,42,.35); }
+  .mcp-doc-head { display: flex; gap: 12px; align-items: center; }
+  .mcp-doc-ic { width: 38px; height: 38px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .mcp-doc-ht { flex: 1; min-width: 0; }
+  .mcp-doc-ht h2 { margin: 0; font-size: 17px; }
+  .mcp-doc-ht code { font-size: 12px; color: #6366f1; }
+  .mcp-doc-desc { margin: 10px 0 4px; color: #334155; font-size: 13.5px; }
+  .mcp-doc section { margin-top: 12px; }
+  .mcp-doc h3 { margin: 0 0 6px; font-size: 13px; color: #0f172a; }
+  .mcp-doc-p { margin: 0; font-size: 13px; color: #475569; line-height: 1.6; }
+  .mcp-doc-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .mcp-doc-table th, .mcp-doc-table td { border-bottom: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; vertical-align: top; }
+  .mcp-doc-table th { color: #64748b; font-weight: 500; white-space: nowrap; }
+  .mcp-doc-table td:first-child { white-space: nowrap; }
+  .mcp-doc-table code { font-size: 12px; }
+  .mcp-doc-req { margin-left: 4px; font-size: 11px; color: #b91c1c; }
+  .mcp-doc-ex { margin: 0; padding: 10px 12px; background: #0f172a; color: #e2e8f0; border-radius: 8px; font-size: 12.5px; overflow-x: auto; }
+  .mcp-doc-note { margin: 12px 0 0; font-size: 12px; color: #94a3b8; }
   .mcp-tool { position: relative; display: flex; gap: 10px; align-items: flex-start; padding: 10px 34px 10px 10px;
     background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
   .mcp-tool:hover { border-color: #a5b4fc; }
@@ -239,6 +296,7 @@
   .mcp-tool-tx code { font-size: 11px; color: #6366f1; background: none; padding: 0; }
   .mcp-tool-tx small { font-size: 11.5px; line-height: 1.45; color: #64748b; display: -webkit-box; -webkit-line-clamp: 2;
     -webkit-box-orient: vertical; overflow: hidden; }
+  .mcp-tool-check { cursor: pointer; }
   .mcp-tool-check { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center; border: 2px solid #cbd5e1; color: transparent; background: #fff;
     box-sizing: border-box; }
@@ -306,6 +364,87 @@
     el.className = 'mcp-pill ' + (ok ? 'is-ok' : (offClass || 'is-off')) + keep;
     el.textContent = ok ? onText : offText;
   }
+
+  // 站台網址：即時顯示組出來的 MCP 網址與上傳網址（沒填時用目前瀏覽器的網址示意）
+  const siteIn = document.getElementById('mcp-site');
+  function preview() {
+    const base = (siteIn.value.trim() || location.origin).replace(/\/+$/, '');
+    document.getElementById('mcp-prev-mcp').textContent = base + '/mcp';
+    document.getElementById('mcp-prev-up').textContent = base + '/mcp/files/upload';
+  }
+  siteIn.addEventListener('input', preview);
+  preview();
+
+  // 工具說明（跟 AI 呼叫 jtdt_describe 拿到的是同一份）
+  const DOCS = JSON.parse(document.getElementById('mcp-tool-docs').textContent || '{}');
+  const OUT_KIND = {
+    file: tr('一個檔案存進使用者的工作區，回傳它的檔案編號。'),
+    files: tr('多個檔案存進使用者的工作區，回傳每個檔案的編號。'),
+    json: tr('結果直接以 JSON 回給 AI，不產生檔案。'),
+    text: tr('文字存成 .txt 放進工作區；回傳前面一段，其餘用 workspace_read_text 讀。'),
+    image_two_step: tr('每一頁一張圖片存進工作區，回傳檔案編號。'),
+  };
+  const dlg = document.getElementById('mcp-doc');
+  function cell(tag, text, cls) { const c = document.createElement(tag); if (cls) c.className = cls; if (text != null) c.textContent = text; return c; }
+  function allowed(p) {
+    if (p.enum) return p.enum.join(' / ');
+    const parts = [];
+    if (p.minimum != null || p.maximum != null) parts.push((p.minimum != null ? p.minimum : '') + ' ~ ' + (p.maximum != null ? p.maximum : ''));
+    if (p.pattern) parts.push(p.pattern);
+    if (p.maxLength) parts.push(tr('最長 {0} 字').replace('{0}', p.maxLength));
+    return parts.join('，') || '—';
+  }
+  function openDoc(name, card) {
+    const d = DOCS[name];
+    if (!d) return;
+    const ic = card.querySelector('.mcp-tool-ic');
+    const docIc = document.getElementById('mcp-doc-ic');
+    docIc.className = 'mcp-doc-ic ' + (ic ? ic.className.replace('mcp-tool-ic', '').trim() : '');
+    docIc.innerHTML = ic ? ic.innerHTML : '';
+    document.getElementById('mcp-doc-title').textContent = card.querySelector('.mcp-tool-tx b').textContent;
+    document.getElementById('mcp-doc-name').textContent = d.tool;
+    document.getElementById('mcp-doc-desc').textContent = card.querySelector('.mcp-tool-tx small').textContent;
+    const fsec = document.getElementById('mcp-doc-files-sec');
+    if (d.files) {
+      fsec.hidden = false;
+      document.getElementById('mcp-doc-files').textContent =
+        tr('{0} 個檔案，副檔名：{1}').replace('{0}', d.files.count.replace('exactly ', '').replace(' to ', '～'))
+          .replace('{1}', d.files.extensions.join('、'));
+    } else {
+      fsec.hidden = true;
+    }
+    const props = (d.params || {}).properties || {};
+    const req = new Set((d.params || {}).required || []);
+    const box = document.getElementById('mcp-doc-params');
+    box.replaceChildren();
+    const keys = Object.keys(props);
+    if (!keys.length) {
+      box.append(cell('p', tr('沒有參數。'), 'mcp-doc-p'));
+    } else {
+      const t = cell('table', null, 'mcp-doc-table');
+      const hr = document.createElement('tr');
+      [tr('參數'), tr('型別'), tr('可用值'), tr('預設'), tr('說明（給 AI 的原文）')].forEach(function (h) { hr.append(cell('th', h)); });
+      t.append(hr);
+      keys.forEach(function (k) {
+        const p = props[k];
+        const r = document.createElement('tr');
+        const n = cell('td'); n.append(cell('code', k)); if (req.has(k)) n.append(cell('span', tr('必填'), 'mcp-doc-req'));
+        r.append(n, cell('td', p.type || ''), cell('td', allowed(p)),
+                 cell('td', p.default === undefined ? '—' : String(p.default === '' ? tr('（空）') : p.default)),
+                 cell('td', p.description || ''));
+        t.append(r);
+      });
+      box.append(t);
+    }
+    document.getElementById('mcp-doc-out').textContent = (OUT_KIND[d.output_kind] || '') + (d.output ? ' ' + d.output : '');
+    document.getElementById('mcp-doc-ex').textContent = JSON.stringify(d.example || {}, null, 2);
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  }
+  document.querySelectorAll('[data-mcp-doc]').forEach(function (b) {
+    b.addEventListener('click', function () { openDoc(b.dataset.mcpDoc, b.closest('.mcp-tool')); });
+  });
+  document.getElementById('mcp-doc-close').addEventListener('click', function () { dlg.close ? dlg.close() : dlg.removeAttribute('open'); });
+  dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
 
   // 工具卡片：勾選狀態跟著外框
   const toolCbs = Array.from(document.querySelectorAll('.mcp-tool-cb'));

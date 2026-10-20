@@ -529,7 +529,7 @@ def display_name(sess: Session, root: str, path: list[str]) -> str:
 def open_session(route: str, *, host: str, ip: str, scheme: Optional[str], port: Optional[int], user: str,
                  password: str, box: Optional[str], box_password: str, trust_sha256: Optional[str],
                  allow_http: bool, allow_plain: bool, trace: list, auth_mode: str = "auto",
-                 user_code: str = "") -> Session:
+                 user_code: str = "", folder_password: str = "") -> Session:
     """開一個取件連線（認證只送一次）。路線與廠牌是否相符由呼叫端（路由）先檢查。"""
     if route not in ROUTES:
         raise ShareError("SHARE_ROUTE_INVALID")
@@ -549,7 +549,7 @@ def open_session(route: str, *, host: str, ip: str, scheme: Optional[str], port:
         return mfp_soap.RicohSession(route, host, ip, scheme, int(port), user=user, password=password,
                                      doc_password=box_password, trust_sha256=trust_sha256,
                                      allow_http=allow_http, trace=trace, auth_mode=auth_mode or "auto",
-                                     user_code=user_code)
+                                     user_code=user_code, folder_password=folder_password)
     if spec["transport"] == "webdav":
         if not scheme or not port:
             raise ShareError("BOX_NO_TARGET")

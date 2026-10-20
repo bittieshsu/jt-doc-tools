@@ -46,6 +46,9 @@ router = APIRouter()
 #: 每位擁有者 5 分鐘內最多幾次連線測試（含「重新測試」）。
 RATE_LIMIT = 10
 RATE_WINDOW = 300
+#: 列文件（信箱、檔案分享、文件伺服器的資料夾）另外算：切資料夾、輸入資料夾密碼每次都是一次請求，
+#: 跟連線測試共用 10 次的話，客戶在三個資料夾之間切幾次就被擋（客戶 RICOH 實測 2026-10-20）
+BROWSE_RATE_LIMIT = 30
 #: 連線測試結果保留多久可以「儲存」（秒）。
 DETECTION_TTL = 900
 #: 連線測試排隊最多等幾秒（設備正在幫別人掃描時）。
@@ -55,6 +58,7 @@ MESSAGES: dict[str, str] = {
     "LOCAL_ONLY": "未啟用登入時，事務機掃描取件只能在這台主機本機使用；多人或從其他電腦使用請先啟用登入",
     "NOT_LOGGED_IN": "尚未登入",
     "RATE_LIMITED": "連線測試太頻繁，請稍候再試",
+    "BROWSE_RATE_LIMITED": "列出文件太頻繁（5 分鐘內最多 30 次），請稍候再試",
     "BUSY": "上一個連線測試還在進行中，請等它完成",
     "BAD_REQUEST": "請求格式不正確",
     "DETECTION_EXPIRED": "連線測試結果已過期，請重新測試後再儲存",
@@ -171,15 +175,15 @@ _busy: set[str] = set()
 _detections: dict[str, dict] = {}
 
 
-def _acquire(owner: str) -> Optional[str]:
+def _acquire(owner: str, browse: bool = False) -> Optional[str]:
     now = time.time()
     with _LOCK:
         hist = [t for t in _recent.get(owner, []) if now - t < RATE_WINDOW]
         if owner in _busy:
             return "BUSY"
-        if len(hist) >= RATE_LIMIT:
+        if len(hist) >= (BROWSE_RATE_LIMIT if browse else RATE_LIMIT):
             _recent[owner] = hist
-            return "RATE_LIMITED"
+            return "BROWSE_RATE_LIMITED" if browse else "RATE_LIMITED"
         hist.append(now)
         _recent[owner] = hist
         _busy.add(owner)
@@ -706,7 +710,7 @@ async def api_box_list(request: Request, conn_id: int):
         return err
     body = await _json(request)
     trace: list = []
-    busy = _acquire(who.owner + "#box")
+    busy = _acquire(who.owner + "#box", browse=True)
     if busy:
         return _err(busy, 429)
     try:
@@ -799,7 +803,9 @@ def _share_inputs(body: dict) -> dict:
             "allow_plain": body.get("allow_plain") is True,
             # RICOH 的登入方式與 User Code（v1.17.0）；其他路線不用
             "auth_mode": mode if (mode := str(body.get("auth_mode") or "auto")) in _RICOH_MODES else "invalid",
-            "user_code": str(body.get("user_code") or "")[:32]}
+            "user_code": str(body.get("user_code") or "")[:32],
+            # RICOH 文件伺服器的資料夾密碼（4～8 位數字；當字串、保留開頭的 0）—— 跟登入密碼、文件密碼分開
+            "folder_password": str(body.get("folder_password") or "")[:32]}
 
 
 def _share_target(c: dict, route: str, want: Any) -> tuple[Optional[str], Optional[int]]:
@@ -818,7 +824,7 @@ def _share_list_in_turn(owner: str, c: dict, route: str, sc, pt, inp: dict, root
                                       password=inp["password"], box=inp["box"], box_password=inp["box_password"],
                                       trust_sha256=inp["trust_sha256"], allow_http=inp["allow_http"],
                                       allow_plain=inp["allow_plain"], trace=trace, auth_mode=inp["auth_mode"],
-                                      user_code=inp["user_code"])
+                                      user_code=inp["user_code"], folder_password=inp["folder_password"])
         try:
             if mfp_share.ROUTES[route]["auth"] == "box":
                 root = mfp_share.konica_box_share(sess, inp["box"])
@@ -831,13 +837,23 @@ def _share_list_in_turn(owner: str, c: dict, route: str, sc, pt, inp: dict, root
                     root = roots[0]["id"]
                 elif root not in [r["id"] for r in roots]:
                     raise mfp_share.ShareError("SHARE_ROOT_INVALID")
-            entries = sess.list(root, path)
+            # RICOH 有密碼的資料夾：要密碼、密碼不對、被鎖 —— 照樣回位置清單（畫面才留得住選單與密碼欄），
+            # 狀態另外帶；密碼只驗一次，不重試
+            folder_state = None
+            try:
+                entries = sess.list(root, path)
+            except mfp_share.ShareError as e:
+                if e.code not in ("FOLDER_PASSWORD_REQUIRED", "FOLDER_PASSWORD_FAILED", "FOLDER_LOCKED"):
+                    raise
+                entries, folder_state = [], {"code": e.code, "message": mfp_share.MESSAGES.get(e.code) or e.code}
             shared = next((r["shared"] for r in roots if r["id"] == root), True)
             # 「自動判斷」實際用了哪一種登入方式（目前只有 RICOH 會在帳號空白時自動改用「不需登入」）
             auto_none = bool(getattr(sess, "auto_fallback_none", False))
             return {"route": route, "roots": roots, "root": root, "path": path, "entries": entries,
                     "shared": shared, "via": sess.via(), "tls": sess.tls(),
-                    "auth_mode_used": getattr(sess, "auth_mode", None), "auth_auto_none": auto_none}
+                    "auth_mode_used": getattr(sess, "auth_mode", None), "auth_auto_none": auto_none,
+                    # 資料夾清單讀不到（只列得出共用資料夾）：照實告訴畫面，不當成沒有資料夾
+                    "folder_error": getattr(sess, "folder_error", None), "folder_state": folder_state}
         finally:
             sess.close()
 
@@ -855,7 +871,7 @@ async def api_share_list(request: Request, conn_id: int):
     if err:
         return err
     trace: list = []
-    busy = _acquire(who.owner + "#box")
+    busy = _acquire(who.owner + "#box", browse=True)
     if busy:
         return _err(busy, 429)
     try:
@@ -892,6 +908,9 @@ async def api_share_fetch(request: Request, conn_id: int):
     c, err = _share_conn(who, conn_id, route)
     if err:
         return err
+    if mfp_share.ROUTES.get(route, {}).get("transport") == "soap" and str(body.get("root") or "") == "polling":
+        # KYOCERA 遙控資料盒：取件參數還沒確認，連排隊都不排（不送猜的值）
+        return _box_error(mfp_share.ShareError("KYOCERA_POLLING_DOWNLOAD_UNCONFIRMED"))
     try:
         inp = _share_inputs(body)
         sc, pt = _share_target(c, route, body.get("target"))
@@ -903,7 +922,7 @@ async def api_share_fetch(request: Request, conn_id: int):
                                    root=str(body.get("root") or ""), files=body.get("files"),
                                    output=str(body.get("output") or "pdf"),
                                    creds={k: inp[k] for k in ("user", "password", "box", "box_password",
-                                                              "auth_mode", "user_code")},
+                                                              "auth_mode", "user_code", "folder_password")},
                                    trust_sha256=inp["trust_sha256"], allow_http=inp["allow_http"],
                                    allow_plain=inp["allow_plain"])
     except mfp_client.PolicyError as e:

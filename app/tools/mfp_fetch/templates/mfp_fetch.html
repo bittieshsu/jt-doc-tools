@@ -203,6 +203,11 @@
 .mf-files .name { flex:1 1 220px; word-break:break-all; }
 .mf-items { margin:6px 0 0; padding-left:18px; font-size:13px; }
 .mf-tech { margin-top:12px; }
+.mf-folder-pw { display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; margin:8px 0; padding:8px 12px;
+  border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0; }
+.mf-folder-pw label { font-size:13px; color:#475569; }
+.mf-folder-pw input { width:140px; height:32px; box-sizing:border-box; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px; }
+.mf-folder-pw .mf-hint.mf-bad { color:#b91c1c; }
 .mf-trace-wrap { overflow-x:auto; max-width:100%; }
 .mf-trace { table-layout:auto; width:auto; min-width:100%; }
 .mf-trace th { width:auto; white-space:nowrap; }
@@ -528,6 +533,15 @@
       <button type="button" class="btn btn-secondary btn-small" id="mfShareRefresh">{{ icon('refresh', size=14) }} <span>{{ tr('重新整理') }}</span></button>
     </div>
     <div id="mfShareAutoNote" class="mf-hint" hidden></div>
+    {# RICOH 文件伺服器的資料夾密碼（4～8 位數字）：跟登入密碼、文件密碼分開；只在選了有密碼的資料夾時出現，只送一次 #}
+    <div id="mfShareFolderErr" class="mf-warn" hidden></div>
+    <div id="mfShareReadonly" class="mf-warn" hidden>{{ tr('遙控資料盒目前只能列出文件：取件要帶的參數還在向原廠資料確認，確認之前不送出（不會用猜的值去試）') }}</div>
+    <div id="mfShareFolderPwWrap" class="mf-folder-pw" hidden>
+      <label for="mfShareFolderPw">{{ tr('資料夾密碼') }}</label>
+      <input id="mfShareFolderPw" type="password" inputmode="numeric" maxlength="32" autocomplete="off">
+      <button type="button" class="btn btn-primary btn-small" id="mfShareFolderOpen">{{ icon('unlock', size=14) }} <span>{{ tr('開啟資料夾') }}</span></button>
+      <span id="mfShareFolderMsg" class="mf-hint"></span>
+    </div>
     <div id="mfShareSharedNote" class="mf-warn" hidden>{{ tr('這是共享的位置：其他人也看得到這裡的檔案，不是只屬於你的文件。') }}</div>
     <div class="mf-crumbs" id="mfShareCrumbs"></div>
     <div id="mfShareTable"></div>
@@ -1676,7 +1690,7 @@
                         kyocera_soap: tr('HTTPS 9091（建議）'), kyocera_soap_http: 'HTTP 9090', ricoh_soap: 'SOAP' };
   // KYOCERA / RICOH 直接取件（SOAP）：多一欄文件匣 / 文件密碼；RICOH 只有一個位置（文件伺服器）
   const SOAP_ROUTES = { kyocera_soap: 'kyocera', kyocera_soap_http: 'kyocera', ricoh_soap: 'ricoh' };
-  const ROOT_LABELS = { ricoh: { documents: tr('文件伺服器') } };
+  const ROOT_LABELS = { ricoh: { documents: tr('文件伺服器') }, kyocera: { polling: tr('遙控資料盒') } };
   const sharePanel = document.getElementById('mfSharePanel');
   let shareConn = null;
   let shareState = { route: '', root: '', path: [], entries: [], roots: [] };
@@ -1720,6 +1734,7 @@
     boxEl('mfSharePw').value = '';
     boxEl('mfShareExtra').value = '';
     boxEl('mfShareCode').value = '';
+    boxEl('mfShareFolderPw').value = '';
     boxEl('mfShareMode').value = ['auto', 'none', 'account', 'user_code', 'user_code_ext'].includes(pr.mode) ? pr.mode : 'auto';
     if (boxEl('mfShareMode')._jtSelect) boxEl('mfShareMode')._jtSelect.refresh();
     syncShareFields();
@@ -1739,6 +1754,7 @@
       auth_mode: mode,
       user_code: mode.startsWith('user_code') ? boxEl('mfShareCode').value.trim() : '',
       box_password: shareIsBox() ? boxEl('mfSharePw').value : (shareSoap() ? boxEl('mfShareExtra').value : ''),
+      folder_password: shareSoap() === 'ricoh' ? boxEl('mfShareFolderPw').value : '',
       trust_sha256: pr.trust || null,
       allow_http: pr.http === true,
       allow_plain: pr.plain === true,
@@ -1775,7 +1791,10 @@
   }
   function syncShareFetch() {
     const n = boxEl('mfShareTable').querySelectorAll('input[data-file]:checked').length;
-    boxEl('mfShareFetchBtn').disabled = n === 0;
+    // 唯讀的位置（KYOCERA 遙控資料盒：取件參數還沒確認）只能列，不能取
+    const ro = !!((shareState.roots || []).find(r => r.id === shareState.root) || {}).readonly;
+    boxEl('mfShareFetchBtn').disabled = n === 0 || ro;
+    boxEl('mfShareReadonly').hidden = !ro;
     boxEl('mfShareFetchLabel').textContent = n ? tr('取件（{0} 份）').replace('{0}', n) : tr('取件');
   }
   function renderShare(res) {
@@ -1785,10 +1804,22 @@
     shareState.roots = res.roots || [];
     const fixed = ROOT_LABELS[shareSoap()] || {};
     const rootName = (r) => fixed[r.id] || r.label || r.id;
-    const labels = Object.fromEntries(shareState.roots.map(r => [r.id, rootName(r) + (r.shared ? P.lp + tr('共享') + P.rp : '')]));
+    const labels = Object.fromEntries(shareState.roots.map(r => [r.id, rootName(r) +
+      (r.shared ? P.lp + tr('共享') + P.rp : (r.locked ? P.lp + tr('有密碼') + P.rp : ''))]));
     fillSelect('mfShareRoot', shareState.roots.map(r => r.id), labels, res.root);
     boxEl('mfShareRootWrap').hidden = shareState.roots.length < 2 && (shareIsBox() || !!shareSoap());
     boxEl('mfShareSharedNote').hidden = !res.shared;
+    // RICOH 資料夾：有密碼（或不知道有沒有）就出現資料夾密碼欄；要密碼 / 密碼不對 / 被鎖照實講
+    const cur = shareState.roots.find(r => r.id === res.root) || {};
+    const fs = res.folder_state || null;
+    const needPw = !!cur.folder && (cur.locked !== false || !!fs);
+    boxEl('mfShareFolderPwWrap').hidden = !needPw;
+    const fmsg = boxEl('mfShareFolderMsg');
+    fmsg.textContent = fs ? tr(fs.message) : (needPw && cur.locked === null ? tr('設備沒有說這個資料夾有沒有密碼；有設的話請輸入。') : '');
+    fmsg.classList.toggle('mf-bad', !!fs && fs.code !== 'FOLDER_PASSWORD_REQUIRED');
+    const ferr = boxEl('mfShareFolderErr');
+    ferr.textContent = res.folder_error ? tr('設備的資料夾清單讀不到，只列出共用資料夾（協定紀錄裡有設備的錯誤代碼）') : '';
+    ferr.hidden = !res.folder_error;
     // 「自動判斷」而且帳號、User Code 都沒填：伺服器用「不需登入」列出（不送任何帳密）。照實說用了哪一種；
     // 一份都沒有時提醒可能要登入才看得到（帳號空白不等於這台不需要登入）
     const autoNote = boxEl('mfShareAutoNote');
@@ -1890,14 +1921,17 @@
     boxEl('mfShareMode').addEventListener('change', () => { syncShareFields(); boxEl('mfShareFiles').hidden = true; });
     boxEl('mfShareRoot').addEventListener('change', () => {
       shareState.root = boxEl('mfShareRoot').value;
+      boxEl('mfShareFolderPw').value = '';          // 換資料夾：密碼不帶過去
       shareList([]);
     });
+    boxEl('mfShareFolderOpen').addEventListener('click', () => shareList([]));
     boxEl('mfShareRefresh').addEventListener('click', () => shareList(shareState.path));
     boxEl('mfShareFetchBtn').addEventListener('click', shareFetch);
     boxEl('mfShareClose').addEventListener('click', () => {
       sharePanel.hidden = true;
       boxEl('mfSharePw').value = '';
       boxEl('mfShareExtra').value = '';
+      boxEl('mfShareFolderPw').value = '';
     });
   }
 
