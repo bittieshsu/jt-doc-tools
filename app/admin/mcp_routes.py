@@ -22,6 +22,24 @@ def _ip(r: Request) -> str:
     return real_client_ip(r)
 
 
+def _limits() -> dict:
+    """設定頁「檔案大小」那一格：AI 傳檔的上限，跟實際檢查用同一份設定（工作區設定、票證）。"""
+    from ..core import workspace as ws
+    from ..mcp import server, tickets
+    s = ws.get_settings()
+
+    def mb(v):
+        try:
+            v = int(v or 0)
+        except (TypeError, ValueError):
+            v = 0
+        return v if v > 0 else 0
+    return {"inline_kb": server.INLINE_MAX // 1024, "file_mb": mb(s.get("max_file_mb")),
+            "audio_mb": mb(s.get("max_audio_mb")), "quota_mb": mb(s.get("per_user_quota_mb")),
+            "retention_hours": int(s.get("retention_hours") or 0), "ticket_min": tickets.TTL // 60,
+            "download_uses": tickets.DOWNLOAD_MAX_USES}
+
+
 def build_mcp_router(templates) -> APIRouter:
     router = APIRouter()
 
@@ -31,8 +49,9 @@ def build_mcp_router(templates) -> APIRouter:
         from ..mcp import registry, server, settings as ms
         names = {}
         if auth_settings.is_enabled():
-            for r in auth_db.conn().execute("SELECT id, username FROM users").fetchall():
-                names[r["id"]] = r["username"]
+            # 帳號@來源：本機、LDAP、SSO 同名的是不同帳號
+            for r in auth_db.conn().execute("SELECT id, username, source FROM users").fetchall():
+                names[r["id"]] = f"{r['username']}@{r['source']}"
         tokens = [dict(t, owner=names.get(t.get("owner_user_id"), "")) for t in at.api_tokens.list_tokens()]
         size = len(json.dumps({"tools": list(server.FIXED_TOOLS)}, ensure_ascii=False))
         # 開放的工具：照分類分組，每支用它在側欄的圖示、顏色與中文說明
@@ -68,6 +87,7 @@ def build_mcp_router(templates) -> APIRouter:
             "groups": groups,
             "tool_docs": tool_docs,
             "mcp_tokens": sum(1 for t in tokens if t.get("mcp")),
+            "limits": _limits(),
         })
 
     @router.post("/mcp/save")

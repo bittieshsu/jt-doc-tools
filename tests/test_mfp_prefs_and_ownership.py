@@ -196,3 +196,52 @@ def test_migration_from_v3_keeps_connections_and_adds_prefs(tmp_path):
     c.execute("DELETE FROM mfp_connections WHERE id=?", (cid,))
     assert c.execute("SELECT COUNT(*) FROM mfp_prefs").fetchone()[0] == 0
     c.close()
+
+
+def test_admin_who_adds_themselves_sees_the_device_with_its_buttons(people):
+    """客戶 2026-10-21：管理員把自己（或自己所在的群組）加進成員後，「事務機掃描取件」頁要列出這台、而且有掃描按鈕；
+    設定 → 共用事務機那一頁本來就只有成員、測試、改名、移除，沒有掃描與取件。"""
+    p = people
+    from app.core import auth_db
+    admin_uid = auth_db.conn().execute("SELECT id FROM users WHERE username='jtdt-admin'").fetchone()[0]
+    cid = _make_shared(p["admin"], host="192.168.1.61", name="管理員自己")
+    assert cid not in [x["id"] for x in p["admin"].get(f"{API}/connections").json()["connections"]], \
+        "還沒加自己：管理員自己的清單不列"
+    r = p["admin"].put(f"{API}/shared/{cid}/members", json={"members": [{"type": "user", "key": str(admin_uid)}]})
+    assert r.status_code == 200, r.text
+    row = next(x for x in p["admin"].get(f"{API}/connections").json()["connections"] if x["id"] == cid)
+    assert row["shared"] and row["scan"] and row["scan"]["sources"] and not row["paused"]
+
+
+def test_shared_page_marks_devices_the_admin_is_a_member_of(people):
+    """設定 → 共用事務機：管理員自己是成員的標出來（那幾台才會出現在他自己的工具頁）；群組成員也算。"""
+    p = people
+    from app.core import auth_db, group_manager
+    admin_uid = auth_db.conn().execute("SELECT id FROM users WHERE username='jtdt-admin'").fetchone()[0]
+    cid = _make_shared(p["admin"], host="192.168.1.62", name="標成員")
+
+    def mine():
+        rows = p["admin"].get(f"{API}/shared").json()["connections"]
+        return next(x for x in rows if x["id"] == cid)["you_member"]
+    assert mine() is False
+    g = group_manager.create_local("事務機管理員群組")
+    group_manager.set_members(g, [admin_uid])
+    p["admin"].put(f"{API}/shared/{cid}/members", json={"members": [{"type": "group", "key": str(g)}]})
+    assert mine() is True, "透過群組也算成員"
+
+
+def test_the_list_says_which_account_is_signed_in_and_is_never_cached(people):
+    """客戶 2026-10-21：關掉瀏覽器重開後共用事務機「消失」—— 多半是登入成另一個同名帳號（AD / SSO / 本機）。
+    清單回 `you`（帳號@來源）讓畫面寫出來；API 回應一律 `Cache-Control: no-store`（內容是這個帳號的資料）。"""
+    p = people
+    r = p["a"].get(f"{API}/connections")
+    assert r.json()["you"] == "clerk-sa@local"
+    assert "no-store" in r.headers.get("cache-control", "")
+    assert "no-store" in p["admin"].get(f"{API}/shared").headers.get("cache-control", "")
+
+
+def test_member_picker_shows_how_many_accounts_each_group_has_here(people):
+    """群組的「本站 N 人」：管理員自己看得出 Domain Users 有沒有在登入時掛上（不用請使用者測）。"""
+    p = people
+    gs = {g["key"]: g for g in p["admin"].get(f"{API}/shared-subjects").json()["groups"]}
+    assert gs[str(p["g"])]["members"] == 1      # people 夾具：三樓行政只有 ub

@@ -387,8 +387,12 @@ async def api_list(request: Request):
     except _OwnerError as e:
         return _err(e.code, e.status)
     items = mfp_store.list_visible(who.owner, who.subjects, all_shared=who.all_shared)
+    # 目前登入的是哪個帳號（`帳號@來源`）：同一個人可能有 AD、SSO、本機好幾個帳號，共用事務機的成員是按帳號算的。
+    # 客戶 2026-10-21：關掉瀏覽器重開後共用的「消失」—— 畫面上要看得出這次登入的是哪一個
+    from ...core import sessions
+    you = sessions.user_label(getattr(request.state, "user", None)) if not who.all_shared else ""
     return {"ok": True, "connections": [_with_state(c, who) for c in items],
-            "max": mfp_store.MAX_PER_OWNER, "admin": who.admin, "can_add": who.can_own}
+            "max": mfp_store.MAX_PER_OWNER, "admin": who.admin, "can_add": who.can_own, "you": you}
 
 
 @router.post("/api/connections")
@@ -1075,8 +1079,13 @@ async def api_shared_list(request: Request):
         who = _admin(request)
     except _OwnerError as e:
         return _err(e.code, e.status)
-    return {"ok": True, "connections": [_with_state(c, who) for c in mfp_store.list_shared()],
-            "max": mfp_store.MAX_SHARED}
+    rows = []
+    for c in mfp_store.list_shared():
+        v = _with_state(c, who)
+        # 管理員自己是不是成員：是的話這台也出現在他自己的「事務機掃描取件」頁（掃描、取件在那裡）
+        v["you_member"] = who.all_shared or mfp_store.is_member(int(c["id"]), who.subjects)
+        rows.append(v)
+    return {"ok": True, "connections": rows, "max": mfp_store.MAX_SHARED}
 
 
 @router.post("/api/shared")
@@ -1225,5 +1234,8 @@ async def api_shared_subjects(request: Request):
     return {"ok": True,
             "users": [{"key": k, "username": u.get("username"), "display_name": u.get("display_name"),
                        "source": u.get("source")} for k, u in users.items()],
-            "groups": [{"key": k, "name": g.get("name"), "source": g.get("source")}
+            # 本站記到的成員數（登入過的人）：共用事務機、權限都按這個算。Domain Users 這種很多人的群組顯示 0，
+            # 就是登入時沒有掛上（AD 主要群組查不到之類），管理員不用請使用者測就看得出來
+            "groups": [{"key": k, "name": g.get("name"), "source": g.get("source"),
+                        "members": int(g.get("member_count") or 0)}
                        for k, g in groups.items()]}

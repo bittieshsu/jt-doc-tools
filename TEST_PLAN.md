@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **504 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **510 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -685,8 +685,11 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_api_doc_examples_run.py` | 照 `github/API.md` 的 curl 範例實際呼叫 —— 抓「照文件呼叫卻壞」 |
 | `test_api_enforce_does_not_break_the_web_ui.py` | 「API token 強制檢查」不可以把網頁自己的 `/api/` 擋掉（GitHub issue #52） |
 | `test_api_gate_and_csrf_edges.py` | API token 閘與 CSRF 豁免的邊界 |
+| `test_api_json_not_cached_by_proxy.py` | API 的 JSON 不可以被前面的快取代理存起來（v1.17.6） |
 | `test_api_page_builder.py` | `github/build-api-page.py` 產出的 api.html 不可以毀損 |
 | `test_api_token_on_tool_paths.py` | API 手冊教人用 token 呼叫的工具路徑，在**啟用認證**的機器上也要通（v1.16.26） |
+| `test_api_token_owner.py` | API Token 綁定使用者（v1.17.6） |
+| `test_api_token_owner_browser.py` | API Token 頁的「綁定使用者」—— 在真的瀏覽器裡跑一次（v1.17.6） |
 | `test_api_tokens_encrypted_at_rest.py` | API Token 不再明文存放（CodeQL #208；2026-10-11 決定：加密存放，管理頁照樣可以「顯示」） |
 | `test_api_tokens_file_mode.py` | API Token 檔只給服務帳號讀：0600 |
 | `test_asset_access_by_permission.py` | 資產庫的圖照工具權限給（GitHub issue #54，2026-10-05） |
@@ -881,6 +884,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_looks_garbled.py` | Regression tests for pdf_editor._looks_garbled(). |
 | `test_markdown_to_doc_formats.py` | Markdown 轉辦公文件：只轉使用者要的格式 ＋ 程式碼語法上色 |
 | `test_mcp_admin.py` | 設定 → MCP 管理頁（v1.17.1）：存設定、逐張允許 Token、寫稽核、一般使用者不能改、客戶端設定範例 |
+| `test_mcp_admin_browser.py` | 設定 → MCP 的「連線設定」排版 —— 在真的瀏覽器裡量（v1.17.6） |
+| `test_mcp_cross_user.py` | MCP：一個人的 Token 拿不到另一個人的檔案與作業（v1.17.6） |
 | `test_mcp_server.py` | MCP 伺服器（v1.17.1）：傳輸、認證授權、上下文大小、執行工具、一次性傳輸票證 |
 | `test_mcp_tools_batch2.py` | MCP 第二批工具（v1.17.4）：每一支都經 `jtdt_run` 真的跑一次，走原本的 API、結果存進工作區 |
 | `test_meeting_chart_style_has_one_source.py` | 圖的配色只有一份 —— 前端畫圖、伺服器畫匯出用的圖，顏色必須同源 |
@@ -923,6 +928,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_mfp_share.py` | 檔案分享取件（實驗功能）：Canon Advanced Box（WebDAV / SMB）、Konica 公用信箱（SMB）、SHARP NAS（SMB） |
 | `test_mfp_share_jobs.py` | 檔案分享取件（實驗功能）—— 路由與背景作業 |
 | `test_mfp_share_page_browser.py` | 檔案分享取件 —— 在真的瀏覽器裡跑一次（對本機一台假的 Canon Advanced Box，WebDAV） |
+| `test_mfp_shared_after_browser_restart.py` | 共用事務機：關掉瀏覽器再打開，清單照樣有（客戶 2026-10-21） |
 | `test_mfp_shared_and_scan.py` | 共用事務機（管理員建立、加成員）、排隊、從事務機掃描進工作區 —— 路由層 |
 | `test_mfp_soap.py` | KYOCERA / RICOH 直接取件（SOAP，實驗功能）—— 用照研究文件寫的假設備驗流程與安全邊界 |
 | `test_mfp_soap_jobs.py` | KYOCERA / RICOH 直接取件（SOAP，實驗功能）—— 路由與背景作業（v1.16.95） |
@@ -2669,6 +2675,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
       `POST /admin/api/ocr-langs/external/test` — 遠端 GPU OCR 設定；**test 要真的打對方**，不可只回 200
 - [ ] `GET /admin/api/settings-export/categories` — 類別清單要跟實際可匯出的項目一致
 - [ ] `POST /admin/api/tokens/create`、`POST /admin/api/tokens/revoke`、`POST /admin/api/tokens/enforce`
+- [ ] `POST /admin/api/tokens/owner`、`GET /admin/api/tokens/owner-candidates`（v1.17.6）：綁定 / 改綁 / 解除；使用者不存在或停用 400、找不到 Token 404、未啟用認證 400、非管理員擋下；新 Token 預設綁給核發的人；稽核 `api_token_change` 不記 Token（`tests/test_api_token_owner.py`、`tests/test_api_token_owner_browser.py`）
       — 建立的 token 立即可用、撤銷後立即失效、enforce 開關會改變未帶 token 的行為
 
 ### 作業佇列 API
@@ -6241,6 +6248,23 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.117 v1.17.6 — API Token 綁定使用者、MCP 站台網址自動、共用事務機頁的用法說明、切回分頁重讀清單、重複提示、只認得廠牌時的型號欄、MCP 跨使用者（**每次發版必過**）
+
+- [ ] 設定 → 共用事務機：說明寫掃描與取件在「事務機掃描取件」頁、「前往事務機掃描取件」連結可以點；管理員自己是成員（直接或透過群組）的標「你是成員」，不是成員的不標。
+- [ ] 工具頁開著、在另一個分頁加成員或改名，切回來清單自動更新（不用 F5）。
+- [ ] 自己新增的跟共用的是同一台：那一列標「已有共用的同一台」，滑鼠提示寫出共用那台的名稱；移除自己的那筆後標記消失。
+- [ ] AD 主要群組：群組搜尋起點設成群組 OU（不含 CN=Users）時，登入後 Domain Users 照樣掛上（先 `<SID=…>`、再設定的起點、再網域根）；找不到記警告；`login_success` 稽核有 `primary_group`。同一群組 DN 大小寫不同只對到一列。挑成員時群組顯示「本站 N 人」。
+- [ ] 共用事務機關掉瀏覽器再開（同一個設定檔、記住登入）三輪，三台共用的與自己那台都在（`tests/test_mfp_shared_after_browser_restart.py`）。
+- [ ] 共用事務機挑成員：使用者寫成 `帳號@來源`，同名不同來源的標「同名帳號」；工具頁寫出目前登入的帳號；API 的 JSON 回應帶 `Cache-Control: no-store`。
+- [ ] 只認得廠牌、型號沒抓到：型號欄寫「Kyocera（型號未辨識）」；英日文也是廠牌＋未辨識。
+- [ ] MCP：兩張不同擁有者的 Token，B 拿 A 的檔案 / 作業編號全部失敗，錯誤跟不存在的編號相同（資安計畫 v1.17.6 一節）。
+- [ ] API Token 頁（啟用認證）：「綁定使用者」欄顯示 `帳號@來源` 或「未綁定」；按「綁定」→ 搜尋 → 選人 → 儲存；「解除綁定」先確認（確認框不被對話框蓋住）；新產生的 Token 預設綁給自己；未啟用認證時沒有這一欄。
+- [ ] MCP：沒綁的 Token 連線回 403，訊息指到「API Token → 綁定使用者」；綁完不用改客戶端設定就連得上。
+- [ ] MCP 站台網址沒填：經 doc.jason.tools 連進來的 AI 叫 `workspace_upload_url`，回的網址是 `https://doc.jason.tools/mcp/files/upload`（反向代理有傳 `Host` 與 `X-Forwarded-Proto`）；填了就用填的；`Host` 格式怪的不採用；`Origin` 不跟著 `Host`。
+- [ ] MCP `jtdt_catalog` / `workspace_list` 帶 `limits`，值跟設定 → 工作區、全站上傳上限一致；全站上限較小時用它；`workspace_upload_url` 超過上限時寫出 MB 數。
+- [ ] MCP 設定頁「連線設定」：1280 寬短卡片兩兩一列不被撐高、站台網址整列且檔案大小在右邊、390 寬單欄不橫向捲動；上方「站台網址」沒填顯示「自動」；檔案大小跟著工作區設定變。
+- 自動化：`tests/test_mfp_prefs_and_ownership.py`、`tests/test_mfp_scan_page_browser.py::test_shared_admin_page`、`tests/test_mcp_cross_user.py`、`tests/test_api_token_owner.py`、`tests/test_api_token_owner_browser.py`、`tests/test_mcp_server.py`、`tests/test_mcp_admin.py`、`tests/test_mcp_admin_browser.py`、`tests/test_ad_primary_group.py`、`tests/test_mfp_shared_after_browser_restart.py`、`tests/test_api_json_not_cached_by_proxy.py`
 
 ### 6.116 v1.17.5 — 事務機跟著帳號、信任與同意存伺服器、未登入時新增的轉共用、協定紀錄可複製（**每次發版必過**）
 

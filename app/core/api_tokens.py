@@ -196,6 +196,16 @@ class ApiTokenManager:
         with self._lock:
             return [_public(t) for t in self._read().get("tokens", [])]
 
+    def find(self, token_or_preview: str) -> Optional[dict]:
+        """完整 Token 或遮罩 → 可以顯示的那一筆（找不到回 None）。給管理頁寫稽核用（記名稱，不記 Token）。"""
+        if not token_or_preview:
+            return None
+        with self._lock:
+            for t in self._read().get("tokens", []):
+                if _matches(t, token_or_preview):
+                    return _public(t)
+        return None
+
     def list_full(self) -> list[dict]:
         """Full list with each token decrypted into ``token`` — ONLY for the
         admin UI's reveal-on-click. Never send to unauthed contexts.

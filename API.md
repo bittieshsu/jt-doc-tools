@@ -2715,7 +2715,7 @@ GET  /mcp/files/download    # 用一次性票證下載工作區的檔案
 ```
 
 **認證**：`Authorization: Bearer <API Token>`。這張 Token 要在設定頁另外勾「允許 MCP」；站台啟用認證時，
-Token 要綁定使用者，權限照那位使用者（沒有某支工具的權限就看不到、也叫不動）。有帶 `Origin` 標頭時要是站台網址那個來源。
+Token 要綁定使用者（「API Token」頁的「綁定使用者」欄，或 `POST /admin/api/tokens/owner`），權限照那位使用者（沒有某支工具的權限就看不到、也叫不動）。有帶 `Origin` 標頭時要是站台網址那個來源。
 協定版本支援 `2025-11-25`、`2025-06-18`、`2025-03-26`、`2024-11-05`。
 
 **工具清單只有固定 9 個**（不管開放多少支本站工具都不會變多，不會佔滿模型的上下文）：
@@ -2744,10 +2744,13 @@ PDF 密碼解除（`pdf_decrypt`）預設不開放，要管理員另外勾選。
 
 執行時在伺服器內部用**同一張 Token** 呼叫各工具原本的 API，檢查、權限、稽核都跟 REST 一樣（稽核標「經由 MCP」）。
 
+**檔案大小上限**：`jtdt_catalog` 與 `workspace_list` 的回應都帶 `limits`（`upload_max_mb`、`audio_video_max_mb`、`inline_max_kb`、`workspace_quota_mb`、`workspace_free_mb`、`retention_hours`、`ticket_minutes`），AI 上傳前就看得到；
+值跟實際檢查用同一份設定（工作區單檔上限與全站請求上限取小的），`null` 是本站沒設上限，前面若有反向代理可能更小。
+
 **檔案傳輸（檔案內容不經過模型）**：`workspace_upload_url` / `workspace_download_url` 回一張一次性票證與 `curl` 指令。
 票證放在標頭 `X-JTDT-Ticket`（不放網址）、15 分鐘有效、只能用在一個檔；上傳**存好才算用掉**（斷線可以重傳，
 成功後再送回 `409` 與原本的檔案編號）；可以帶 `sha256`，不符回 `422`；比申報的大小大回 `413`；預設綁發出時的來源 IP。
-網址用設定的站台網址組（不用請求的 Host 標頭）；站台網址是 HTTP 時要管理員另外允許。
+網址用設定的站台網址組；**站台網址沒填時用這次呼叫連進來的網址**（`Host` 標頭＋反向代理的 `X-Forwarded-Proto`，`Host` 格式不對就不發）。網址是 HTTP 時要管理員另外允許。`Origin` 檢查一律只認設定的站台網址，不跟著 `Host`。
 
 ```bash
 # 列出工具（JSON-RPC）
@@ -2925,7 +2928,14 @@ curl http://localhost:8765/admin/api/settings-export/categories \
 POST /admin/api/tokens/create    # 核發新 token
 POST /admin/api/tokens/revoke    # 撤銷 token
 POST /admin/api/tokens/enforce   # 開關 enforce 模式
+POST /admin/api/tokens/owner     # 綁定使用者：{"token": "<Token 或畫面上的遮罩>", "user_id": 12}，null 是解除
+GET  /admin/api/tokens/owner-candidates?q=王   # 挑使用者用：啟用中的帳號，最多 20 筆
 ```
+
+站台啟用認證時，Token 要綁一個使用者，它的權限就是那個人的權限；**連 MCP 的 Token 一定要綁**。
+新核發的 Token 預設綁給核發的管理員（回應的 `owner_user_id`），網頁版在「API Token」頁的「綁定使用者」欄改綁。
+使用者不存在或已停用回 `400`、找不到 Token 回 `404`、未啟用認證時回 `400`。
+核發、撤銷、開關 enforce、綁定都會寫稽核（`api_token_change`，記名稱與動作，不記 Token）。
 
 ```bash
 # 核發
@@ -2933,6 +2943,12 @@ curl -X POST http://localhost:8765/admin/api/tokens/create \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"label":"gitlab-ci"}' | jq
+
+# 綁給使用者 12（MCP 回「This API token has no owner」時）
+curl -X POST http://localhost:8765/admin/api/tokens/owner \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<要綁的 Token>","user_id":12}'
 
 # 開啟 enforce
 curl -X POST http://localhost:8765/admin/api/tokens/enforce \

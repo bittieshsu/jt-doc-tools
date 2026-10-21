@@ -399,13 +399,71 @@ def test_ticket_checks(mcp, monkeypatch):
     assert c.post("/mcp/files/upload", files={"file": ("c.pdf", data, "application/pdf")}).status_code == 403
 
 
+def _call_h(c, token, name, args, headers):
+    r = _rpc(c, token, "tools/call", {"name": name, "arguments": args}, headers=headers)
+    assert r.status_code == 200, r.text
+    res = r.json()["result"]
+    text = res["content"][0]["text"]
+    return res["isError"], (text if res["isError"] else json.loads(text))
+
+
+def test_empty_site_url_uses_the_address_the_ai_connected_with(mcp):
+    """使用者 2026-10-21「不填可以自動抓進來」：站台網址沒填 → 用這次呼叫的 Host ＋ 反向代理的協定。"""
+    from app.core import notify_settings
+    c, tok = mcp
+    notify_settings.save({"site_url": ""})
+    args = {"filename": "a.pdf", "size": 10}
+    err, res = _call_h(c, tok, "workspace_upload_url", args,
+                       {"Host": "doc.example.test", "X-Forwarded-Proto": "https"})
+    assert not err, res
+    assert res["url"] == "https://doc.example.test/mcp/files/upload"
+    assert "https://doc.example.test/mcp/files/upload" in res["curl"]
+    err, res = _call_h(c, tok, "workspace_upload_url", args, {"Host": "DOC.Example.test:8443", "X-Forwarded-Proto": "https"})
+    assert not err and res["url"] == "https://doc.example.test:8443/mcp/files/upload"
+    err, res = _call_h(c, tok, "workspace_upload_url", args, {"Host": "[fd00::5]:8765", "X-Forwarded-Proto": "https"})
+    assert not err and res["url"] == "https://[fd00::5]:8765/mcp/files/upload"
+    # 有填就用填的，不看 Host
+    notify_settings.save({"site_url": SITE})
+    err, res = _call_h(c, tok, "workspace_upload_url", args, {"Host": "other.example.test", "X-Forwarded-Proto": "https"})
+    assert not err and res["url"] == SITE + "/mcp/files/upload"
+
+
+@pytest.mark.parametrize("host", ["evil.test';rm -rf ~;'", "a b.test", "user@evil.test", "evil.test/x", "evil.test:99999x",
+                                  "-bad.test", "x" * 300, "evil.test\\x", "$(id).test"])
+def test_a_strange_host_header_is_never_put_into_the_curl_command(mcp, host):
+    """組出來的網址會放進給 AI 執行的 curl：Host 格式不對就不用，請管理員填站台網址。"""
+    from app.core import notify_settings
+    from app.mcp import server
+    c, tok = mcp
+    notify_settings.save({"site_url": ""})
+    from starlette.requests import Request
+    scope = {"type": "http", "headers": [(b"host", host.encode("latin-1", "replace"))], "scheme": "https"}
+    assert server.request_base(Request(scope)) == ""
+    try:
+        err, msg = _call_h(c, tok, "workspace_upload_url", {"filename": "a.pdf", "size": 10},
+                           {"Host": host, "X-Forwarded-Proto": "https"})
+    except Exception:       # httpx 自己拒絕送出這種標頭也算擋下
+        return
+    assert err and "site URL" in msg, msg
+
+
+def test_origin_check_does_not_follow_the_host_header(mcp):
+    """DNS rebinding：惡意網頁的 Origin 跟 Host 會一樣 —— Origin 只認設定裡的站台網址，沒填就一律不收瀏覽器來的。"""
+    from app.core import notify_settings
+    c, tok = mcp
+    notify_settings.save({"site_url": ""})
+    r = _rpc(c, tok, "ping", headers={"Host": "evil.test", "Origin": "http://evil.test"})
+    assert r.status_code == 403
+
+
 def test_tickets_need_the_site_url_and_https(mcp):
     from app.core import notify_settings
     from app.mcp import settings as ms
     c, tok = mcp
     notify_settings.save({"site_url": ""})
+    # 沒填、AI 用明文 HTTP 連進來：自動抓到的是 http://… → 照樣要允許 HTTP 才發
     err, msg = _call(c, tok, "workspace_upload_url", {"filename": "a.pdf", "size": 10})
-    assert err and "site URL" in msg
+    assert err and "HTTPS" in msg
     notify_settings.save({"site_url": "http://docs.example.test"})
     err, msg = _call(c, tok, "workspace_upload_url", {"filename": "a.pdf", "size": 10})
     assert err and "HTTPS" in msg
@@ -445,3 +503,30 @@ def test_registry_paths_exist():
     from app.mcp import registry
     for t in registry.TOOLS:
         assert t.path in routes, f"{t.name} 的 API 路徑不存在：{t.path}"
+
+
+def test_the_ai_can_see_the_size_limits_before_uploading(mcp):
+    """使用者 2026-10-21：「MCP 能讓呼叫端知道 AI 丟檔進 MCP 的大小限制嗎？」—— 工作區清單與工具目錄都帶 `limits`，
+    跟實際檢查同一份設定；全站請求上限比工作區小時取小的，而且申請上傳時就擋（不是傳到一半才 413）。"""
+    from app.core import upload_settings, workspace as ws
+    c, tok = mcp
+    s = ws.get_settings()
+    err, cat = _call(c, tok, "jtdt_catalog", {})
+    assert not err
+    lim = cat["limits"]
+    assert lim["upload_max_mb"] == float(s["max_file_mb"]) and lim["audio_video_max_mb"] == float(s["max_audio_mb"])
+    assert lim["inline_max_kb"] == 256 and lim["ticket_minutes"] == 15
+    assert lim["workspace_quota_mb"] == float(s["per_user_quota_mb"]) and lim["workspace_free_mb"] is not None
+    err, wl = _call(c, tok, "workspace_list", {})
+    assert not err and wl["limits"]["upload_max_mb"] == lim["upload_max_mb"]
+    _, init = None, _rpc(c, tok, "initialize", {"protocolVersion": "2025-06-18"}).json()["result"]
+    assert "limits" in init["instructions"]
+    old = upload_settings.get()["max_upload_mb"]
+    upload_settings.save({"max_upload_mb": 30})
+    try:
+        err, cat = _call(c, tok, "jtdt_catalog", {})
+        assert cat["limits"]["upload_max_mb"] == 30.0 and cat["limits"]["audio_video_max_mb"] == 30.0, "全站上限較小就用它"
+        err, msg = _call(c, tok, "workspace_upload_url", {"filename": "big.pdf", "size": 31 * 1024 * 1024})
+        assert err and "too large" in msg and "30.0 MB" in msg
+    finally:
+        upload_settings.save({"max_upload_mb": old})

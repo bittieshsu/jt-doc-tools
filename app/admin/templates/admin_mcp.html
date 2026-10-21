@@ -19,7 +19,7 @@
   <div class="mcp-stat"><span class="mcp-stat-k">{{ tr('允許的 Token') }}</span>
     <span class="mcp-stat-v" id="mcp-token-count">{{ mcp_tokens }}</span><span class="mcp-stat-u">/ {{ tokens|length }}</span></div>
   <div class="mcp-stat"><span class="mcp-stat-k">{{ tr('站台網址') }}</span>
-    <span class="mcp-pill {{ 'is-ok' if site_url else 'is-warn' }}" id="mcp-site-state">{{ tr('已設定') if site_url else tr('未設定') }}</span></div>
+    <span class="mcp-pill is-ok" id="mcp-site-state">{{ tr('已設定') if site_url else tr('自動') }}</span></div>
 </div>
 
 {# ---- 重點 ---- #}
@@ -37,6 +37,7 @@
 {# ---- 連線設定：兩欄設定卡，開關跟自己的標題放在同一張卡裡（原本一列橫跨整頁，開關離標題太遠） ---- #}
 <div class="panel mcp-card">
   <h2>{{ icon('gear', size=18) }} {{ tr('連線設定') }}</h2>
+  {# 排法（使用者 2026-10-21「啟用 MCP 區塊太空了」）：短的開關、數字兩兩一列；站台網址內容多，自己佔一整列 #}
   <div class="mcp-set">
     <div class="mcp-tile">
       <div class="mcp-tile-top">
@@ -45,19 +46,10 @@
       </div>
     </div>
     <div class="mcp-tile">
-      <div class="mcp-tile-l"><b>{{ tr('站台網址') }}</b>
-        <span>{{ tr('本站的網址。AI 用它組出 MCP 連線網址，以及上傳、下載檔案的一次性連結，所以要填「AI 所在那台電腦」打得開的網址：') }}</span></div>
-      <ul class="mcp-site-help">
-        <li>{{ tr('AI 跟本站在同一個內網：填內網網址，例如 http://doc-server:8765') }}</li>
-        <li>{{ tr('經反向代理（Nginx、IIS）：填對外的網址，例如 https://doc.example.com') }}</li>
-        <li>{{ tr('沒填：AI 只能傳 256 KB 以下的小檔（直接放在呼叫參數裡）。') }}</li>
-      </ul>
-      <input class="field mcp-input-wide" type="url" id="mcp-site" value="{{ site_url }}" placeholder="https://doc.example.com" maxlength="300" aria-label="{{ tr('站台網址') }}">
-      <div class="mcp-site-preview" id="mcp-site-preview">
-        <span>{{ tr('MCP 連線網址') }}<code id="mcp-prev-mcp"></code></span>
-        <span>{{ tr('上傳檔案') }}<code id="mcp-prev-up"></code></span>
+      <div class="mcp-tile-top">
+        <div class="mcp-tile-l"><b>{{ tr('票證綁定來源 IP') }}</b><span>{{ tr('傳輸票證只能從發出時的那個 IP 使用（建議打開）。') }}</span></div>
+        <label class="mcp-switch"><input type="checkbox" id="mcp-bindip" {% if cfg.ticket_bind_ip %}checked{% endif %} aria-label="{{ tr('票證綁定來源 IP') }}"><span></span></label>
       </div>
-      <span class="mcp-site-same">{{ tr('跟「作業完成通知」的站台網址是同一個設定。') }}</span>
     </div>
     <div class="mcp-tile">
       <div class="mcp-tile-l"><b>{{ tr('呼叫上限') }}</b><span>{{ tr('每張 Token 每分鐘最多幾次呼叫。') }}</span></div>
@@ -67,15 +59,40 @@
       <div class="mcp-tile-l"><b>{{ tr('同時作業') }}</b><span>{{ tr('每張 Token 同時最多幾件作業。') }}</span></div>
       <div class="mcp-num"><input class="field" type="number" id="mcp-conc" value="{{ cfg.max_concurrent }}" min="1" max="8" aria-label="{{ tr('同時作業') }}"><span>{{ tr('件') }}</span></div>
     </div>
-    <div class="mcp-tile">
-      <div class="mcp-tile-top">
-        <div class="mcp-tile-l"><b>{{ tr('票證綁定來源 IP') }}</b><span>{{ tr('傳輸票證只能從發出時的那個 IP 使用（建議打開）。') }}</span></div>
-        <label class="mcp-switch"><input type="checkbox" id="mcp-bindip" {% if cfg.ticket_bind_ip %}checked{% endif %} aria-label="{{ tr('票證綁定來源 IP') }}"><span></span></label>
+    <div class="mcp-tile mcp-tile-wide mcp-site-tile">
+      <div class="mcp-site-main">
+        <div class="mcp-tile-l"><b>{{ tr('站台網址') }}</b>
+          <span>{{ tr('AI 用它組出上傳、下載檔案的一次性連結，要填「AI 所在那台電腦」打得開的網址：') }}</span></div>
+        <ul class="mcp-site-help">
+          <li>{{ tr('沒填（建議）：自動用 AI 連進來的網址。經反向代理時，代理要把原本的 `Host` 標頭與 `X-Forwarded-Proto` 傳過來。')|marks }}</li>
+          <li>{{ tr('AI 連進來的網址跟對外網址不同時才要填，例如反向代理沒有傳 Host：填 https://doc.example.com') }}</li>
+        </ul>
+        <input class="field mcp-input-wide" type="url" id="mcp-site" value="{{ site_url }}" placeholder="{{ tr('沒填：自動') }}" maxlength="300" aria-label="{{ tr('站台網址') }}">
+        <div class="mcp-site-preview" id="mcp-site-preview">
+          <span id="mcp-prev-note" class="mcp-prev-note"{% if site_url %} hidden{% endif %}>{{ tr('沒填：以下用你目前瀏覽器的網址示意，實際用 AI 連進來的網址') }}</span>
+          <span>{{ tr('MCP 連線網址') }}<code id="mcp-prev-mcp"></code></span>
+          <span>{{ tr('上傳檔案') }}<code id="mcp-prev-up"></code></span>
+        </div>
+        <span class="mcp-site-same">{{ tr('跟「作業完成通知」的站台網址是同一個設定。') }}</span>
+      </div>
+      <div class="mcp-limits" id="mcp-limits">
+        <b>{{ tr('檔案大小') }}</b>
+        <dl>
+          <dt>{{ tr('用傳輸票證上傳') }}</dt>
+          <dd>{% if limits.file_mb %}{{ tr('單檔 {0} MB').replace('{0}', limits.file_mb|string) }}{% else %}{{ tr('單檔不限') }}{% endif %}{% if limits.audio_mb %}{{ tr('（錄音、錄影 {0} MB）').replace('{0}', limits.audio_mb|string) }}{% endif %}</dd>
+          <dt>{{ tr('直接放在呼叫參數裡') }}</dt>
+          <dd>{{ tr('{0} KB 以下').replace('{0}', limits.inline_kb|string) }}</dd>
+          <dt>{{ tr('每人工作區') }}</dt>
+          <dd>{% if limits.quota_mb %}{{ tr('共 {0} MB').replace('{0}', limits.quota_mb|string) }}{% else %}{{ tr('不限') }}{% endif %}{% if limits.retention_hours > 0 %}{{ tr('，保留 {0} 小時').replace('{0}', limits.retention_hours|string) }}{% endif %}</dd>
+          <dt>{{ tr('傳輸票證') }}</dt>
+          <dd>{{ tr('{0} 分鐘內有效；下載可續傳，最多 {1} 次').replace('{0}', limits.ticket_min|string).replace('{1}', limits.download_uses|string) }}</dd>
+        </dl>
+        <a class="mcp-limits-link" href="/admin/workspace">{{ tr('在「工作區」設定調整') }}</a>
       </div>
     </div>
-    <div class="mcp-tile">
+    <div class="mcp-tile mcp-tile-wide">
       <div class="mcp-tile-top">
-        <div class="mcp-tile-l"><b>{{ tr('允許 HTTP 傳檔') }}</b><span>{{ tr('站台網址是 HTTP 時也發傳輸票證；檔案會以未加密的方式在內網傳送。') }}</span></div>
+        <div class="mcp-tile-l"><b>{{ tr('允許 HTTP 傳檔') }}</b><span>{{ tr('網址是 HTTP 時也發傳輸票證；檔案會以未加密的方式在內網傳送。') }}</span></div>
         <label class="mcp-switch"><input type="checkbox" id="mcp-http" {% if cfg.ticket_allow_http %}checked{% endif %} aria-label="{{ tr('允許 HTTP 傳檔') }}"><span></span></label>
       </div>
     </div>
@@ -234,6 +251,16 @@
   .mcp-card h2 { display: flex; align-items: center; gap: 8px; }
   .mcp-lead { margin: -2px 0 12px; font-size: 13px; }
   .mcp-set { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .mcp-tile-wide { grid-column: 1 / -1; }
+  .mcp-site-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .mcp-tile.mcp-site-tile { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 20px; align-items: start; }
+  .mcp-limits { border-left: 1px solid var(--border, #e5e7eb); padding-left: 16px; font-size: 12.5px; }
+  .mcp-limits b { display: block; margin-bottom: 6px; font-size: 13px; }
+  .mcp-limits dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 12px; }
+  .mcp-limits dt { color: var(--muted, #64748b); }
+  .mcp-limits dd { margin: 0; font-weight: 600; }
+  .mcp-limits-link { display: inline-block; margin-top: 10px; font-size: 12px; }
+  .mcp-prev-note { color: var(--muted, #64748b); font-size: 12px; }
   .mcp-tile { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid #e2e8f0;
     border-radius: 10px; background: #f8fafc; min-width: 0; }
   .mcp-tile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -339,6 +366,8 @@
   @media (max-width: 900px) {
     .mcp-stats, .mcp-feats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .mcp-set { grid-template-columns: 1fr; }
+    .mcp-tile.mcp-site-tile { grid-template-columns: 1fr; }
+    .mcp-limits { border-left: 0; padding-left: 0; border-top: 1px solid var(--border, #e5e7eb); padding-top: 12px; }
   }
   @media (max-width: 560px) {
     .mcp-feats { grid-template-columns: 1fr; }   /* 統計卡很短，手機上維持兩欄 */
@@ -369,6 +398,7 @@
   const siteIn = document.getElementById('mcp-site');
   function preview() {
     const base = (siteIn.value.trim() || location.origin).replace(/\/+$/, '');
+    document.getElementById('mcp-prev-note').hidden = !!siteIn.value.trim();
     document.getElementById('mcp-prev-mcp').textContent = base + '/mcp';
     document.getElementById('mcp-prev-up').textContent = base + '/mcp/files/upload';
   }
@@ -470,7 +500,7 @@
     say(status, true, tr('已儲存'));
     setUrl(j.site_url || location.origin);
     pill(document.getElementById('mcp-state'), j.cfg.enabled, tr('已啟用'), tr('未啟用'));
-    pill(document.getElementById('mcp-site-state'), !!j.site_url, tr('已設定'), tr('未設定'), 'is-warn');
+    pill(document.getElementById('mcp-site-state'), true, j.site_url ? tr('已設定') : tr('自動'), '');
     document.getElementById('mcp-tool-count').textContent = String((j.cfg.tools || body.tools).length);
   });
 

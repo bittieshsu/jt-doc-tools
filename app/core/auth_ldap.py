@@ -557,19 +557,44 @@ def _lookup_primary_group_dn(conn, entry, cfg: dict) -> str:
         flt = _sid_to_ldap_filter(sid)
         if not flt:
             return ""
-        from ldap3 import SUBTREE
-        base = (cfg.get("group_search_base")
-                or cfg.get("user_search_base") or "").strip()
-        if not base:
-            return ""
-        conn.search(search_base=base,
-                    search_filter=f"(objectSid={flt})",
-                    search_scope=SUBTREE, attributes=["cn"], size_limit=1)
-        ents = list(conn.entries)
-        return str(ents[0].entry_dn) if ents else ""
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("主要群組查詢失敗（略過）：%s", exc)
+        from ldap3 import BASE, SUBTREE
+        # ① 直接用 SID 當搜尋起點（AD 的 `<SID=…>` 語法，只查那一筆）。
+        #   原本只在「群組搜尋起點」底下找 —— 客戶把它設成放群組的 OU，而 Domain Users 在內建的 CN=Users，
+        #   永遠找不到，登入時就不會掛上 Domain Users；共用事務機成員設 Domain Users 的那幾台一直不出現
+        #   （2026-10-21），而且只記 debug，完全看不出原因。
+        try:
+            conn.search(search_base=f"<SID={sid}>", search_filter="(objectClass=*)",
+                        search_scope=BASE, attributes=["cn"], size_limit=1)
+            ents = list(conn.entries)
+            if ents:
+                return str(ents[0].entry_dn)
+        except Exception as exc:  # noqa: BLE001 —— 不支援這種語法的目錄，往下用一般搜尋
+            logger.debug("以 SID 查主要群組不成功，改用一般搜尋：%s", exc)
+        # ② 設定的搜尋起點，③ 使用者所在網域的根（從使用者 DN 的 DC= 取）
+        bases = [(cfg.get("group_search_base") or "").strip(), (cfg.get("user_search_base") or "").strip(),
+                 _domain_root(str(getattr(entry, "entry_dn", "") or ""))]
+        tried = set()
+        for base in bases:
+            if not base or base.lower() in tried:
+                continue
+            tried.add(base.lower())
+            conn.search(search_base=base, search_filter=f"(objectSid={flt})",
+                        search_scope=SUBTREE, attributes=["cn"], size_limit=1)
+            ents = list(conn.entries)
+            if ents:
+                return str(ents[0].entry_dn)
+        logger.warning("找不到 AD 主要群組（SID %s）：登入時不會掛上這個群組（通常是 Domain Users）", sid)
         return ""
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("主要群組查詢失敗（略過）：%s", exc)
+        return ""
+
+
+def _domain_root(dn: str) -> str:
+    """`CN=王小明,OU=IT,DC=corp,DC=example` → `DC=corp,DC=example`（取不到回空字串）。"""
+    parts = [p.strip() for p in (dn or "").split(",")]
+    dcs = [p for p in parts if p[:3].lower() == "dc="]
+    return ",".join(dcs)
 
 
 def _search_ldap_user(username: str, cfg: dict) -> dict:
@@ -662,7 +687,8 @@ def _search_ldap_user(username: str, cfg: dict) -> dict:
     if primary_dn and primary_dn not in group_dns:
         group_dns.append(primary_dn)
     return {"user_dn": user_dn, "display_name": display_name,
-            "group_dns": group_dns, "email": _entry_email(entry, cfg)}
+            "group_dns": group_dns, "email": _entry_email(entry, cfg),
+            "primary_group": primary_dn}
 
 
 def _sync_directory_user(username: str, info: dict, backend: str) -> dict:
@@ -804,8 +830,11 @@ def authenticate(username: str, password: str, *, ip: str = "") -> dict:
                            details={"reason": "disabled_in_jtdt", "source": backend, "dn": user_dn})
         raise
 
+    # 主要群組（AD 的 Domain Users 之類）有沒有掛上：查不到時共用事務機、權限掛在那個群組上的都不會生效，
+    # 原本完全看不出來（2026-10-21）
+    extra = {"primary_group": info.get("primary_group") or ""} if backend == "ad" else {}
     audit_db.log_event("login_success", username=username, ip=ip,
-                       details={"source": backend, "dn": user_dn, **bind_dc})
+                       details={"source": backend, "dn": user_dn, **bind_dc, **extra})
     return user_row
 
 
@@ -962,8 +991,11 @@ def _sync_groups(user_id: int, group_dns: list[str], backend: str) -> None:
         conn.execute("DELETE FROM group_members WHERE user_id=?", (user_id,))
         for dn in group_dns:
             cn = _cn_from_dn(dn) or dn
+            # DN 不分大小寫（AD / LDAP 的屬性型別與值都是）：同一個群組只能對到一列。
+            # 原本逐字比對 —— 群組匯入與登入時拿到的 DN 大小寫不同，就變成兩個「Domain Users」，
+            # 管理員挑的那一個永遠沒有成員（共用事務機、權限都不生效）
             row = conn.execute(
-                "SELECT id FROM groups WHERE source=? AND external_dn=?",
+                "SELECT id FROM groups WHERE source=? AND external_dn=? COLLATE NOCASE ORDER BY id LIMIT 1",
                 (backend, dn)
             ).fetchone()
             if row:
@@ -1108,8 +1140,8 @@ def sync_all_groups(name_contains: str = "") -> dict:
         for dn, nm, _mo in seen:
             pdn = parent_of.get(dn, "")
             row = conn_db.execute(
-                "SELECT id, name, parent_dn FROM groups WHERE source=? AND external_dn=?",
-                (backend, dn)).fetchone()
+                "SELECT id, name, parent_dn FROM groups WHERE source=? AND external_dn=? COLLATE NOCASE "
+                "ORDER BY id LIMIT 1", (backend, dn)).fetchone()
             if row:
                 if nm and row["name"] != nm:
                     conn_db.execute("UPDATE groups SET name=? WHERE id=?",

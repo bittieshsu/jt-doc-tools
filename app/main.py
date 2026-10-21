@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.17.5"
+VERSION = "1.17.6"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -1387,7 +1387,10 @@ async def _security_headers(request: Request, call_next):
                  "camera=(), microphone=(), geolocation=(), interest-cohort=()")
     # 動態 HTML 頁不快取（可能含敏感內容；清 ZAP「Re-examine Cache-control」Info）。
     # 靜態資產（CSS/JS/字型/圖）content-type 非 text/html → 不受影響，維持可快取。
-    if "text/html" in h.get("content-type", ""):
+    # JSON（API 回應）也不快取：內容是「這個帳號」的資料（清單、作業、設定），
+    # 中間有代理或快取時不可以拿別人或舊的那份回來（客戶 2026-10-21 回報共用事務機時有時無時一併補上）
+    ct = h.get("content-type", "")
+    if "text/html" in ct or "application/json" in ct:
         h.setdefault("Cache-Control", "no-store")
     # 走共用 helper —— `X-Forwarded-Proto` 可能是逗號串（多層代理）。
     # 自己寫一份的話會出現「cookie 帶了 Secure 但同一份回應沒有 HSTS」

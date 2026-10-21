@@ -134,8 +134,8 @@ def test_lookup_finds_the_primary_group_dn():
     conn = _FakeConn([grp])
     dn = _lookup_primary_group_dn(conn, user, {"user_search_base": "dc=example,dc=com"})
     assert dn == "CN=Domain Users,CN=Users,DC=example,DC=com"
-    # 查的是 objectSid，而且是跳脫過的二進位
-    assert conn.last["search_filter"].startswith("(objectSid=\\01\\05")
+    # 先直接用 SID 當起點查（AD 的 <SID=…>）；一般搜尋的 objectSid 跳脫見下面的備案測試
+    assert conn.last["search_base"] == "<SID=S-1-5-21-1-2-3-513>"
 
 
 def test_lookup_is_a_noop_for_openldap():
@@ -175,3 +175,69 @@ def test_primary_group_is_appended_to_group_dns():
     assert "_ad_only_attributes()" in src, (
         "搜尋沒有走 _ad_only_attributes() —— AD 時要不到 objectSid / "
         "primaryGroupID，主要群組就算不出來")
+
+
+class _SidAwareConn(_FakeConn):
+    """像 AD：用 `<SID=…>` 當起點查得到；一般搜尋只有在範圍內才查得到。"""
+    def __init__(self, group_dn, sid_lookup=True):
+        super().__init__(); self.group_dn = group_dn; self.sid_lookup = sid_lookup; self.calls = []
+    def search(self, **kw):
+        self.calls.append(kw); self.last = kw
+        base = kw["search_base"]
+        if base.startswith("<SID="):
+            if not self.sid_lookup:
+                raise RuntimeError("unsupported")
+            self.result = [_FakeEntry({}, dn=self.group_dn)]
+        else:
+            inside = self.group_dn.lower().endswith(base.lower())
+            self.result = [_FakeEntry({}, dn=self.group_dn)] if inside else []
+
+
+_DU = "CN=Domain Users,CN=Users,DC=corp,DC=example"
+_USER = {"objectSid": _raw_sid(21, 1, 2, 3, 1103), "primaryGroupID": 513}
+
+
+def test_primary_group_outside_the_group_search_base_is_still_found():
+    """客戶 2026-10-21：群組搜尋起點設成放群組的 OU，Domain Users 在內建的 CN=Users —— 原本永遠找不到，
+    登入時不會掛上 Domain Users，共用事務機成員設 Domain Users 的幾台一直不出現。"""
+    cfg = {"group_search_base": "OU=Groups,DC=corp,DC=example", "user_search_base": "OU=Staff,DC=corp,DC=example"}
+    user = _FakeEntry(_USER, dn="CN=Jason Chang,OU=IT,OU=Staff,DC=corp,DC=example")
+    conn = _SidAwareConn(_DU)
+    assert _lookup_primary_group_dn(conn, user, cfg) == _DU
+    assert conn.calls[0]["search_base"] == "<SID=S-1-5-21-1-2-3-513>", "先直接用 SID 查"
+    # 目錄不支援 <SID=…>：設定的兩個起點都找不到 → 用使用者所在網域的根
+    conn = _SidAwareConn(_DU, sid_lookup=False)
+    assert _lookup_primary_group_dn(conn, user, cfg) == _DU
+    assert [c["search_base"] for c in conn.calls][-1] == "DC=corp,DC=example"
+    assert conn.calls[-1]["search_filter"].startswith("(objectSid=\\01\\05"), "一般搜尋用跳脫過的二進位 SID"
+
+
+def test_a_missing_primary_group_is_a_warning_not_a_debug_line(caplog):
+    import logging
+    user = _FakeEntry(_USER, dn="CN=x,DC=corp,DC=example")
+    conn = _SidAwareConn("CN=Domain Users,CN=Users,DC=other,DC=example", sid_lookup=False)
+    with caplog.at_level(logging.WARNING, logger="app.core.auth_ldap"):
+        assert _lookup_primary_group_dn(conn, user, {"group_search_base": "OU=G,DC=corp,DC=example"}) == ""
+    assert any("主要群組" in r.getMessage() for r in caplog.records)
+
+
+def test_login_audit_records_the_primary_group():
+    import inspect
+    from app.core import auth_ldap
+    src = inspect.getsource(auth_ldap.authenticate)
+    assert '"primary_group"' in src
+
+
+def test_the_same_group_dn_in_different_case_is_one_group(auth_off):
+    """群組匯入存的 DN 跟登入時拿到的大小寫不同：要對到同一列，不可以多出一個同名群組（成員永遠空的那個）。"""
+    from app.core import auth_db, auth_ldap, roles
+    roles.seed_builtin_roles()
+    conn = auth_db.conn()
+    with __import__("app.core.db", fromlist=["tx"]).tx(conn):
+        conn.execute("INSERT INTO groups(name, source, external_dn, created_at) VALUES ('Domain Users','ad',?,0)",
+                     ("CN=Domain Users,CN=Users,DC=Corp,DC=Example",))
+    gid = conn.execute("SELECT id FROM groups WHERE name='Domain Users'").fetchone()[0]
+    u = auth_ldap._sync_directory_user("amy", {"display_name": "Amy", "user_dn": "CN=Amy,OU=IT,DC=corp,DC=example",
+                                               "group_dns": ["cn=Domain Users,cn=Users,dc=corp,dc=example"], "email": ""}, "ad")
+    assert conn.execute("SELECT COUNT(*) FROM groups WHERE name='Domain Users'").fetchone()[0] == 1
+    assert conn.execute("SELECT group_id FROM group_members WHERE user_id=?", (u["user_id"],)).fetchone()[0] == gid

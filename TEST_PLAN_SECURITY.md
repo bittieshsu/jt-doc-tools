@@ -52,7 +52,11 @@
     tests/test_cookie_flags_on_delete.py \
     tests/test_error_message_scrub.py \
     tests/test_forwarded_proto.py \
-    tests/test_broken_input_no_500.py
+    tests/test_broken_input_no_500.py \
+    tests/test_mcp_server.py \
+    tests/test_mcp_cross_user.py \
+    tests/test_mcp_admin.py \
+    tests/test_api_token_owner.py
 ```
 
 各檔的分工：
@@ -75,6 +79,9 @@
 | `test_auth_modes_matrix.py` | 認證開 / 關兩種模式的行為都要對（很容易只顧一邊） |
 | `test_csv_injection.py` | 匯出的 CSV / xlsx 不可被試算表當公式執行；含「所有 xlsx 寫入都要走 helper」的靜態檢查 |
 | `test_upload_validation_parity.py` | 壞檔要回 400 不是 500；網頁介面與對外 API 判定一致；不可把伺服器回應塞進 innerHTML |
+| `test_mcp_server.py` | MCP 入口（`/mcp`）：預設關閉、沒 Token 401、Token 沒勾「允許 MCP」或沒有擁有者 403、Origin 不是站台網址 403、限流；工具權限跟著 Token 的擁有者（MCP 這層漏了原本的 API 也擋）；票證只認標頭、綁 IP、過期與雜湊不符擋下 |
+| `test_mcp_cross_user.py` | **跨使用者**：B 的 Token 拿 A 的檔案編號、作業編號叫 `jtdt_run` / `job_status` / `workspace_download_url` / `workspace_read_text` 一律失敗，錯誤跟「編號不存在」一樣；清單只有自己的；下載票證網址帶別人的編號也只換到自己那份、用滿次數就失效 |
+| `test_mcp_admin.py` | 設定 → MCP：只有管理員、Token 只顯示遮罩、稽核不記 Token、範例不洩漏內網位址 |
 
 ---
 
@@ -380,6 +387,26 @@ A / B，然後：
 
 - [ ] 逐頁掃 CSP 違規 → 0 條（`temp/seam-ui/cdp_csp_violations.py`）
 - [ ] 沒有重複 id、沒有 JS 例外（`temp/seam-ui/cdp_frontend_fixes.py`）
+
+### v1.17.6 — MCP（AI 連接）的資安檢查（每次發版必過）
+
+MCP 讓 Claude Code、Codex CLI、OpenCode 這類 AI 客戶端用 API Token 呼叫本站的工具，是另一個對外入口。
+自動化：`tests/test_mcp_server.py`、`tests/test_mcp_cross_user.py`、`tests/test_mcp_admin.py`、`tests/test_mcp_tools_batch2.py`。
+
+- [ ] **預設關閉**：全新安裝 `/mcp` 回 403；打開總開關後，Token 也要逐張勾「允許 MCP」才能用
+- [ ] **沒開認證也要 Token**（不因為站台沒開登入就放行）；開了認證時 Token 一定要有擁有者，沒有擁有者的 Token 403
+- [ ] **綁定使用者只有管理員能做**（`/admin/api/tokens/owner`）：使用者不存在或停用 400、非管理員擋下、稽核 `api_token_change` 記名稱不記 Token（`tests/test_api_token_owner.py`）
+- [ ] **權限跟著擁有者**：沒有某支工具權限的人，工具清單看不到、`jtdt_run` 叫不動；拿掉 MCP 這層的過濾，原本的 API 一樣回 403
+- [ ] **跨使用者**：兩個帳號各一張 Token，B 拿 A 的檔案編號 / 作業編號全部失敗，錯誤訊息跟不存在的編號一樣
+- [ ] **票證**：只認 `X-JTDT-Ticket` 標頭（網址帶票證不行）、綁來源 IP、15 分鐘過期、上傳成功才算用掉、比申報大 413、雜湊不符 422；下載票證綁檔案，用滿次數失效
+- [ ] **Origin**：瀏覽器帶來的 `Origin` 不是站台網址一律 403（防 DNS rebinding 讓網頁替使用者呼叫）
+- [ ] **限流與同時數**：超過每分鐘次數回錯誤、同一張 Token 同時跑的作業有上限
+- [ ] **高風險工具預設不開放**：`pdf_decrypt`（解除密碼）要管理員另外勾
+- [ ] **稽核不記密碼與 Token**：`mcp_call` 的參數裡 `user_pw` / `password` 等不出現在紀錄；只記 Token 名稱
+- [ ] **檔案傳輸用 HTTPS**：站台網址是 `http://` 時票證預設不發（管理員另外允許才行）
+
+> 這一類的通則：**MCP 不可以比原本的 API 寬**。新增 MCP 工具一律走原本的 API 執行，
+> 權限、檔案擁有者、稽核都沿用；不要在 MCP 這層另寫一套檢查。
 
 ### v1.16.54 — 資產庫的印章與簽名照用印權限給（每次發版必過）
 

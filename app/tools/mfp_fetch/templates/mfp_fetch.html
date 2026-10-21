@@ -139,6 +139,9 @@
 .mf-src.own { background:#f1f5f9; color:#475569; }
 .mf-tag.busy { background:#fef3c7; color:#92400e; }
 .mf-tag.stale { background:#e0f2fe; color:#075985; }
+.mf-tag.member { background:#dcfce7; color:#166534; }
+.mf-tag.dup { background:#fef3c7; color:#92400e; }
+.mf-go-tool { display:inline-flex; align-items:center; gap:4px; margin-left:6px; font-weight:600; white-space:nowrap; }
 .mf-list-hint { margin:-4px 0 10px; }
 #mfAdoptNote { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; margin:0 0 10px; }
 .mf-sub { display:block; margin-top:2px; font-size:12px; color:#64748b; }
@@ -356,11 +359,13 @@
 <div class="panel">
   <h2>{% if mode == 'shared' %}{{ tr('共用事務機') }}{% else %}{{ tr('我的事務機') }}{% endif %}</h2>
   {% if mode == 'shared' %}
-  <p class="mf-hint mf-list-hint">{{ tr('要讓共用事務機也出現在你自己的「事務機掃描取件」頁，請在「成員」把自己加進去。') }}</p>
+  <p class="mf-hint mf-list-hint" id="mfSharedHint">{{ tr('掃描與取件在「事務機掃描取件」頁使用，這一頁只管理共用事務機與成員。要讓共用事務機出現在你自己的清單，請在「成員」把自己加進去（標「你是成員」的就是）。') }}
+    <a class="mf-go-tool" id="mfGoTool" href="/tools/mfp-fetch/">{{ icon('printer', size=14) }} <span>{{ tr('前往事務機掃描取件') }}</span></a></p>
   <div class="mf-warn" id="mfAdoptNote" hidden><span id="mfAdoptText"></span>
     <button type="button" class="btn btn-small btn-primary" id="mfAdoptBtn">{{ icon('archive', size=14) }} <span>{{ tr('轉成共用事務機') }}</span></button></div>
   {% else %}
   <p class="mf-hint mf-list-hint" id="mfListHint">{{ tr('這裡新增的事務機只有你的帳號看得到，換一台電腦用同一個帳號登入照樣在；要給其他人用，請管理員在「設定 → 共用事務機」建立並加成員。') }}</p>
+  <p class="mf-hint mf-list-hint" id="mfYou" hidden></p>
   <p class="mf-hint mf-list-hint" id="mfListHintAdmin" hidden>{{ tr('你是管理員：在這裡新增的也只有你自己看得到。要給大家用，請到「設定 → 共用事務機」建立。') }}</p>
   {% endif %}
   <div id="mfListWrap"><p class="mf-empty">{{ tr('載入中…') }}</p></div>
@@ -382,6 +387,7 @@
       <button type="button" class="btn btn-secondary btn-small" id="mfMembersClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
     </div>
     <p class="mf-hint">{{ tr('勾選可以使用這台事務機的使用者與群組；群組的成員（含子群組）都看得到。') }}</p>
+    <p class="mf-hint">{{ tr('群組後面的「本站 N 人」是登入過、已經算進這個群組的帳號數；AD 的人要登入過一次才會算進來。很多人的群組顯示 0 人，代表登入時沒有掛上這個群組。') }}</p>
     <div class="mf-members">
       <div class="mf-mlist">
         <div class="mf-mlist-head"><span>{{ tr('使用者') }} <span id="mfMUserCount"></span></span>
@@ -973,7 +979,19 @@
     });
     loadAdopt();
   }
+  // 切回這個分頁時重讀清單：在另一個分頁（設定 → 共用事務機）加了成員，回來不用手動重新整理（客戶 2026-10-21）
+  let listLoadedAt = 0, listLoading = false;
+  function refreshIfStale() {
+    if (document.visibilityState !== 'visible' || listLoading || Date.now() - listLoadedAt < 3000) return;
+    loadList();
+  }
+  document.addEventListener('visibilitychange', refreshIfStale);
+  window.addEventListener('focus', refreshIfStale);
   async function loadList() {
+    listLoading = true;
+    try { await loadListNow(); } finally { listLoading = false; listLoadedAt = Date.now(); }
+  }
+  async function loadListNow() {
     listErr.hidden = true;
     const res = await api('GET', LIST_PATH);
     if (!res.ok) { listWrap.replaceChildren(); showError(listErr, res); return; }
@@ -982,6 +1000,15 @@
     if (!SHARED) {
       const ha = document.getElementById('mfListHintAdmin');
       if (ha) ha.hidden = !res.admin;
+      // 目前登入的帳號：共用事務機的成員是按帳號算的，AD、SSO、本機同名的是不同帳號
+      const yo = document.getElementById('mfYou');
+      if (yo) {
+        yo.hidden = !res.you;
+        if (res.you) {
+          yo.replaceChildren(txt(tr('目前登入的帳號：')), el('b', null, res.you),
+            txt(tr('。共用事務機的成員按帳號計算：同一個人的 AD、SSO、本機帳號是不同帳號，看不到共用的事務機時，請管理員確認加的是這一個。')));
+        }
+      }
       // 管理員關掉「使用者自行新增事務機」：新增那一塊收起來，改說明
       const canAdd = res.can_add !== false;
       document.getElementById('mfAddPanel').hidden = !canAdd;
@@ -1009,6 +1036,19 @@
         tg.title = tr('管理員設定為只能使用共用事務機，自己新增的暫停使用（可以移除）');
         nameTd.append(tg);
       }
+      if (SHARED && c.you_member) {
+        const tg = el('span', 'mf-tag member', tr('你是成員'));
+        tg.title = tr('這台也會出現在你自己的「事務機掃描取件」頁，在那裡掃描與取件');
+        nameTd.append(tg);
+      }
+      const dup = !SHARED && !c.shared && items.find(s => s.shared && s.host === c.host &&
+                                                   (s.port || null) === (c.port || null) && (s.scheme || null) === (c.scheme || null));
+      if (dup) {
+        const tg = el('span', 'mf-tag dup', tr('已有共用的同一台'));
+        tg.title = tr('管理員已經把這台設成共用事務機「{0}」：可以移除自己新增的這一筆，改用共用的那筆').replace('{0}', dup.display_name);
+        tg.dataset.mfDup = String(c.id);
+        nameTd.append(tg);
+      }
       if (c.queue && c.queue.busy) {
         nameTd.append(el('span', 'mf-tag busy', tr('使用中')));
         if (c.queue.waiting) nameTd.append(el('span', 'mf-sub', tr('後面還有 {0} 件').replace('{0}', c.queue.waiting)));
@@ -1022,7 +1062,7 @@
         r.append(src);
       }
       r.append(el('td', null, c.host + (c.port ? ':' + c.port : '') + (c.scheme ? P.lp + c.scheme.toUpperCase() + P.rp : '')));
-      r.append(el('td', null, [c.family, c.model].filter(Boolean).join(' ') || tr('未辨識')));
+      r.append(el('td', null, modelText(c)));
       const st = el('td'); st.append(statusChip(shownStatus(c.detect_status, !!c.scan), true));
       if (c.rules_stale && !c.paused) {
         // 用舊的辨識規則判斷、而且認不出來：更新後按一次「重新測試」可能就認得出來（客戶 KYOCERA 實例）
@@ -1067,6 +1107,12 @@
     }
     t.append(tb);
     listWrap.replaceChildren(t);
+  }
+  // 只認得廠牌、型號沒抓到（例如型號由網頁程式之後才填的 KYOCERA）：寫出廠牌，不要只寫「未辨識」
+  function modelText(c) {
+    const m = [c.family, c.model].filter(Boolean).join(' ');
+    if (m) return m;
+    return c.vendor ? tr('{0}（型號未辨識）').replace('{0}', c.vendor) : tr('未辨識');
   }
   const STATUS_LABELS = {{ status_labels|tojson }};
   // 相容性：膠囊裡只放短狀態，說明另外一行
@@ -2081,9 +2127,23 @@
     const chosen = new Set((m.members || []).map(x => x.type + ':' + x.key));
     const ub = document.getElementById('mfMUsers');
     const gb = document.getElementById('mfMGroups');
-    ub.replaceChildren(...subjectsCache.users.map(u => memberRow('user', u.key, u.username,
-      u.display_name && u.display_name !== u.username ? u.display_name : '', chosen.has('user:' + u.key))));
-    gb.replaceChildren(...subjectsCache.groups.map(g => memberRow('group', g.key, g.name, g.source && g.source !== 'local' ? g.source : '',
+    // 使用者也標來源（原本只有群組有）：同名的 AD、SSO、本機帳號是不同帳號，看起來一模一樣就會加錯人（客戶 2026-10-21）
+    const dupNames = new Set(), seenNames = new Set();
+    subjectsCache.users.forEach(u => { const n = (u.username || '').toLowerCase(); if (seenNames.has(n)) dupNames.add(n); seenNames.add(n); });
+    ub.replaceChildren(...subjectsCache.users.map(u => {
+      const sub = u.display_name && u.display_name !== u.username ? u.display_name : '';
+      const row = memberRow('user', u.key, u.username + '@' + (u.source || 'local'), sub, chosen.has('user:' + u.key));
+      if (dupNames.has((u.username || '').toLowerCase())) {
+        const tg = el('span', 'mf-tag dup', tr('同名帳號'));
+        tg.title = tr('還有其他來源的同名帳號（例如 AD 與 SSO）：它們是不同帳號，要用哪一個登入就加哪一個');
+        row.dataset.dup = '1';
+        row.append(tg);
+      }
+      return row;
+    }));
+    gb.replaceChildren(...subjectsCache.groups.map(g => memberRow('group', g.key, g.name,
+      [g.source && g.source !== 'local' ? g.source : '',
+       tr('本站 {0} 人').replace('{0}', String(g.members || 0))].filter(Boolean).join(' · '),
       chosen.has('group:' + g.key))));
     if (!subjectsCache.users.length) ub.append(el('p', 'mf-empty', tr('沒有使用者')));
     if (!subjectsCache.groups.length) gb.append(el('p', 'mf-empty', tr('沒有群組')));

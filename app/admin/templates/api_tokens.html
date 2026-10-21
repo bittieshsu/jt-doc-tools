@@ -53,6 +53,7 @@
       <tr>
         <th>Label</th>
         <th>Token</th>
+        {% if auth_enabled %}<th>{{ tr('綁定使用者') }}</th>{% endif %}
         <th>{{ tr('建立時間') }}</th>
         <th>{{ tr('最近使用') }}</th>
         <th>{{ tr('狀態') }}</th>
@@ -77,6 +78,15 @@
           <span class="muted">{{ tr('無法顯示原文（加密金鑰換過）；仍可使用') }}</span>
           {% endif %}
         </td>
+        {% if auth_enabled %}
+        {% set ow = owners.get(t.owner_user_id) if t.owner_user_id is not none else none %}
+        <td class="tok-owner">
+          {% if ow %}<span class="tag-user" data-owner-label{% if ow.name %} title="{{ ow.name }}"{% endif %}>{{ icon('user', size=12) }}<span>{{ ow.label }}</span></span>
+          {% elif t.owner_user_id is not none %}<span class="tag-warn">{{ tr('使用者已刪除') }}</span>
+          {% else %}<span class="tag-warn">{{ tr('未綁定') }}</span>{% endif %}
+          <button class="btn btn-small btn-owner" type="button" data-label="{{ t.label }}">{{ icon('user', size=12) }}<span class="btn-tx">{{ tr('改綁') if ow else tr('綁定') }}</span></button>
+        </td>
+        {% endif %}
         <td class="muted" data-s="s6b9c179a">
           {# 在伺服器端就格式化。原本把 `created_at * 1000` 直接寫進 JS：
              ①原始 Unix 時間戳會被掃描器判為資訊洩漏（Low）；
@@ -99,6 +109,9 @@
     </tbody>
   </table>
   {% endif %}
+  {% if auth_enabled %}
+  <p class="muted tok-owner-note">{{ tr('已啟用認證：Token 要綁一個使用者，它的權限就是那個人的權限（看得到、叫得動哪些工具）。連 MCP 的 Token 一定要綁；新產生的 Token 預設綁給你，可以改綁。') }}</p>
+  {% endif %}
 
   <div data-s="s5dc4cf38">
     <input type="text" id="new-label" class="field" placeholder="{{ tr('新 token 的 label（例：my-script）') }}"
@@ -106,6 +119,19 @@
     <button class="btn btn-primary" id="btn-create" type="button">{{ icon('save') }}{{ tr('產生新 Token') }}</button>
   </div>
 </div>
+
+<dialog id="ownerDlg" class="tok-dlg" aria-labelledby="ownerDlgTitle">
+  <h3 id="ownerDlgTitle">{{ tr('綁定使用者') }}：<span id="ownerDlgLabel"></span></h3>
+  <input type="search" id="ownerQ" class="field" placeholder="{{ tr('搜尋帳號、名稱或信箱') }}" autocomplete="off">
+  <div id="ownerList" class="tok-owner-list" role="listbox"></div>
+  <p class="muted" id="ownerMsg"></p>
+  <div class="tok-dlg-actions">
+    <button class="btn btn-small" type="button" id="ownerClear">{{ icon('close', size=12) }}<span class="btn-tx">{{ tr('解除綁定') }}</span></button>
+    <span class="tok-dlg-gap"></span>
+    <button class="btn btn-small" type="button" id="ownerCancel">{{ icon('back', size=12) }}<span class="btn-tx">{{ tr('取消') }}</span></button>
+    <button class="btn btn-small btn-primary" type="button" id="ownerSave" disabled>{{ icon('save', size=12) }}<span class="btn-tx">{{ tr('儲存') }}</span></button>
+  </div>
+</dialog>
 
 <div class="panel">
   <h2 data-s="s53896af7">{{ icon('book', size=18) }} {{ tr('使用範例') }}</h2>
@@ -134,6 +160,25 @@ r = httpx.post(
 .tokens-table .token-masked { vertical-align: middle; }
 .tag-ok  { background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
 .tag-off { background: #e5e7eb; color: #374151; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+.tag-user { display:inline-flex; align-items:center; gap:4px; background:#e0e7ff; color:#3730a3; padding:2px 8px; border-radius:10px; font-size:11px; vertical-align:middle; }
+.tag-warn { background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:10px; font-size:11px; vertical-align:middle; }
+.tok-owner { white-space: nowrap; }
+.tokens-table .btn-owner { margin-left: 6px; }
+/* 短欄位不折行：多了「綁定使用者」欄之後，名稱、狀態、時間被擠成直排 */
+.tokens-table th, .tokens-table td:first-child, .tokens-table td.muted,
+.tokens-table .tag-ok, .tokens-table .tag-off, .tokens-table .btn-revoke { white-space: nowrap; }
+.tok-owner-note { margin: 8px 0 12px; font-size: 12.5px; }
+.tok-dlg { border: 1px solid #cbd5e1; border-radius: 10px; padding: 16px 18px; width: min(460px, calc(100vw - 32px)); }
+.tok-dlg::backdrop { background: rgba(15, 23, 42, .35); }
+.tok-dlg h3 { margin: 0 0 10px; font-size: 15px; }
+.tok-dlg input[type=search] { width: 100%; box-sizing: border-box; }
+.tok-owner-list { margin-top: 8px; max-height: 260px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; }
+.tok-owner-list label { display: flex; gap: 8px; align-items: center; padding: 6px 10px; cursor: pointer; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+.tok-owner-list label:last-child { border-bottom: 0; }
+.tok-owner-list label:hover { background: #f8fafc; }
+.tok-owner-list .muted { font-size: 12px; }
+.tok-dlg-actions { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.tok-dlg-gap { flex: 1; }
 </style>
 
 {% endblock %}
@@ -162,7 +207,7 @@ $('btn-create').addEventListener('click', async () => {
   });
   if (r.ok) {
     const j = await r.json();
-    alert(`已產生新 token：\n\n${j.token}\n\n請立即複製保留，離開本頁後仍可用「顯示」查看完整值。`);
+    alert(tr('已產生新 token：') + '\n\n' + j.token + '\n\n' + tr('請立即複製保留，離開本頁後仍可用「顯示」查看完整值。'));
     location.reload();
   } else {
     alert(tr('產生失敗'));
@@ -201,6 +246,9 @@ document.addEventListener('click', async (e) => {
       }
     } catch (err) { alert(tr('複製失敗：') + err.message); }
   }
+  if (e.target.closest('.btn-owner')) {
+    openOwner(full, e.target.closest('.btn-owner').dataset.label || '');
+  }
   if (e.target.closest('.btn-revoke')) {
     if (!(await window.showConfirm(tr('確定要撤銷這個 token？\n之後任何用它的 script 都會 401。'), { title: tr('撤銷 Token'), kind: 'danger', okText: tr('撤銷') }))) return;
     const r = await fetch('/admin/api/tokens/revoke', {
@@ -212,5 +260,64 @@ document.addEventListener('click', async (e) => {
     else alert(tr('撤銷失敗'));
   }
 });
+
+// 綁定使用者（v1.17.6）：原本網頁上沒有地方可以綁，沒有擁有者的 Token 連不了 MCP
+const ownerDlg = $('ownerDlg');
+let ownerTok = '', ownerPick = null, ownerTimer = null;
+function ownerRow(u) {
+  const lab = document.createElement('label');
+  const rb = document.createElement('input');
+  rb.type = 'radio'; rb.name = 'owner'; rb.value = String(u.id);
+  rb.addEventListener('change', () => { ownerPick = u.id; $('ownerSave').disabled = false; });
+  const b = document.createElement('b'); b.textContent = u.label;
+  lab.append(rb, b);
+  if (u.name) { const s = document.createElement('span'); s.className = 'muted'; s.textContent = u.name; lab.append(s); }
+  return lab;
+}
+let ownerSeq = 0;
+async function ownerSearch() {
+  const q = $('ownerQ').value.trim();
+  const seq = ++ownerSeq;      // 打字比回應快：只採用最後一次搜尋的結果，舊的晚回來不可以蓋掉新的
+  const r = await fetch('/admin/api/tokens/owner-candidates?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
+  if (seq !== ownerSeq) return;
+  if (!r.ok) { $('ownerMsg').textContent = await window.friendlyServerError(r, tr('搜尋失敗')); return; }
+  const j = await r.json();
+  if (seq !== ownerSeq) return;
+  ownerPick = null; $('ownerSave').disabled = true;
+  $('ownerList').replaceChildren(...(j.users || []).map(ownerRow));
+  $('ownerMsg').textContent = (j.users || []).length ? '' : tr('找不到符合的使用者');
+}
+function openOwner(tok, label) {
+  ownerTok = tok;
+  $('ownerDlgLabel').textContent = label;
+  $('ownerQ').value = '';
+  $('ownerMsg').textContent = '';
+  ownerDlg.showModal();
+  ownerSearch();
+  $('ownerQ').focus();
+}
+$('ownerQ') && $('ownerQ').addEventListener('input', () => { clearTimeout(ownerTimer); ownerTimer = setTimeout(ownerSearch, 250); });
+async function ownerSave(uid) {
+  const r = await fetch('/admin/api/tokens/owner', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: ownerTok, user_id: uid }),
+  });
+  if (!r.ok) {
+    $('ownerMsg').textContent = await window.friendlyServerError(r, tr('儲存失敗'));
+    if (!ownerDlg.open) ownerDlg.showModal();
+    return;
+  }
+  location.reload();
+}
+if (ownerDlg) {
+  $('ownerSave').addEventListener('click', () => { if (ownerPick !== null) ownerSave(ownerPick); });
+  $('ownerClear').addEventListener('click', async () => {
+    ownerDlg.close();     // 確認框是一般的遮罩，會被開著的 <dialog>（最上層）蓋住
+    if (!(await window.showConfirm(tr('解除綁定之後，這張 Token 就連不了 MCP。確定嗎？'), { kind: 'danger' }))) return;
+    ownerSave(null);
+  });
+  $('ownerCancel').addEventListener('click', () => ownerDlg.close());
+  ownerDlg.addEventListener('click', (e) => { if (e.target === ownerDlg) ownerDlg.close(); });
+}
 </script>
 {% endblock %}

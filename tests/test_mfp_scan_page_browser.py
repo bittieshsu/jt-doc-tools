@@ -217,13 +217,60 @@ def test_shared_admin_page(live):
         t.send("Emulation.clearDeviceMetricsOverride", {})
         assert t.js("[...document.querySelectorAll('#mfListWrap th')].every(th => th.getBoundingClientRect().height < 44)"), \
             "表頭不可以被擠成直排"
+        # 客戶 2026-10-21：同一個人有 AD 與 SSO 兩個同名帳號，挑成員時看起來一模一樣 —— 標出來源與「同名帳號」
+        t.js("""(() => { const real = window.fetch; window.fetch = (u, o) => String(u).endsWith('/api/shared-subjects')
+              ? Promise.resolve(new Response(JSON.stringify({ok: true, groups: [{key: '7', name: 'Domain Users', source: 'ad', members: 0}], users: [
+                  {key: '91', username: 'jchang', display_name: '張先生', source: 'ad'},
+                  {key: '92', username: 'jchang', display_name: '張先生', source: 'oidc'},
+                  {key: '93', username: 'amy', display_name: 'amy', source: 'local'}]}),
+                  {status: 200, headers: {'Content-Type': 'application/json'}}))
+              : real(u, o); return true; })()""")
+        t.js("[...document.querySelectorAll('#mfListWrap tbody button')].find(b => b.innerText.includes('成員')).click()")
+        assert t.wait_for("!document.getElementById('mfMembersPanel').hidden"), "成員面板沒有打開"
+        assert t.wait_for("document.querySelectorAll('#mfMUsers label').length === 3")
+        rows = t.js("[...document.querySelectorAll('#mfMUsers label')].map(l => [l.querySelector('span').firstChild.textContent, !!l.querySelector('.mf-tag.dup')])")
+        assert rows == [["jchang@ad", True], ["jchang@oidc", True], ["amy@local", False]], rows
+        g = t.js("document.querySelector('#mfMGroups label').innerText")
+        assert "Domain Users" in g and "ad" in g and "本站 0 人" in g, g
+        t.send("Page.reload", {})
+        assert t.wait_for("[...document.querySelectorAll('#mfListWrap tbody button')].some(b => b.innerText.includes('成員'))")
         t.js("[...document.querySelectorAll('#mfListWrap tbody button')].find(b => b.innerText.includes('成員')).click()")
         assert t.wait_for("!document.getElementById('mfMembersPanel').hidden"), "成員面板沒有打開"
         t.js("document.getElementById('mfMembersSave').click()")
         assert t.wait_for("document.getElementById('mfMembersMsg').innerText.includes('0')"), "成員存不了"
         t.shot("mfp_shared_admin_1280", 1280)
+        # 客戶 2026-10-21：在這一頁找掃描與取件按鈕 —— 說明講清楚在哪裡用，附連結；自己是成員的標出來
+        assert t.js("document.getElementById('mfGoTool').getAttribute('href')") == "/tools/mfp-fetch/"
+        assert t.js("!!document.querySelector('#mfListWrap .mf-tag.member')"), "未啟用登入：每台都看得到，標「你是成員」"
+        shared_id = t.js("document.querySelector('#mfListWrap [data-mf-detail]').dataset.mfDetail")
         # 共用的這台出現在工具頁，標「共用」，沒有改名與移除
         t.send("Page.navigate", {"url": base + "/tools/mfp-fetch/"})
         assert t.wait_for("!!document.querySelector('#mfListWrap .mf-src.shared')"), "工具頁要列出共用事務機"
         assert not t.js("!!document.querySelector('#mfListWrap .mf-del')"), "共用事務機在工具頁不能移除"
+        # 自己又新增了同一台：那一列提示「已有共用的同一台」（客戶同時有自己的 C3510 與共用的 C3510）
+        _test_and_save(t, fake.port, "自己的")
+        assert t.wait_for("!!document.querySelector('#mfListWrap [data-mf-dup]')"), "同一台要提示已有共用"
+        assert t.js("document.querySelector('[data-mf-dup]').title").count("總公司") == 1
+        # 在別的分頁改了共用事務機（這裡用 API 改名），切回來就重讀清單，不用重新整理
+        t.js(f"fetch('/tools/mfp-fetch/api/shared/{shared_id}', {{method: 'PATCH', headers: {{'Content-Type': 'application/json'}},"
+             " body: JSON.stringify({display_name: '總公司二樓'})})")
+        time.sleep(3.2)
+        t.js("document.dispatchEvent(new Event('visibilitychange'))")
+        assert t.wait_for("document.getElementById('mfListWrap').innerText.includes('總公司二樓')"), "切回分頁沒有重讀清單"
+        # 只認得廠牌、型號沒抓到：型號欄寫廠牌（客戶 KYOCERA ECOSYS M6535cidn 的型號由網頁程式之後才填）
+        t.js("""(() => { const real = window.fetch; window.fetch = (u, o) => (String(u).endsWith('/api/connections') && !(o && o.method && o.method !== 'GET'))
+              ? Promise.resolve(new Response(JSON.stringify({ok: true, can_add: true, connections: [{id: 999, display_name: 'm6535',
+                  host: '10.0.0.9', vendor: 'Kyocera', detect_status: 'experimental_vendor', shared: false, can_manage: true}]}),
+                  {status: 200, headers: {'Content-Type': 'application/json'}}))
+              : real(u, o); return true; })()""")
+        time.sleep(3.2)
+        t.js("document.dispatchEvent(new Event('visibilitychange'))")
+        assert t.wait_for("document.getElementById('mfListWrap').innerText.includes('Kyocera（型號未辨識）')"), \
+            t.js("document.getElementById('mfListWrap').innerText")
+        t.send("Page.reload", {})
+        assert t.wait_for("!!document.querySelector('#mfListWrap [data-mf-dup]')")
+        t.js("[...document.querySelectorAll('#mfListWrap tbody button')].find(b => b.classList.contains('mf-del')).click()")
+        assert t.wait_for("!!document.querySelector('.modal-ok')")
+        t.js("document.querySelector('.modal-ok').click()")
+        assert t.wait_for("!document.querySelector('#mfListWrap [data-mf-dup]')")
         assert not t.errs, t.errs

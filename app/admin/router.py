@@ -1484,32 +1484,63 @@ def build_router(templates) -> APIRouter:
         return {"ok": True}
 
     # ---------- API Tokens ----------
+    def _token_owner_labels() -> dict:
+        """Token 擁有者的顯示名稱：`帳號@來源`（本機、LDAP、SSO 同名的是不同帳號，只寫帳號會認錯人）。"""
+        from ..core import auth_db, auth_settings
+        if not auth_settings.is_enabled():
+            return {}
+        rows = auth_db.conn().execute("SELECT id, username, source, display_name FROM users").fetchall()
+        return {r["id"]: {"label": f"{r['username']}@{r['source']}", "name": r["display_name"] or ""} for r in rows}
+
+    def _token_audit(request: Request, action: str, label: str, **extra) -> None:
+        # Token 本身一律不記（記名稱與動作）；遮罩也不記
+        from ..core import audit_db, client_ip as _cip
+        user = getattr(request.state, "user", None)
+        audit_db.log_event("api_token_change", username=(user or {}).get("username", ""),
+                           ip=_cip.real_client_ip(request), target=label or "",
+                           details={"action": action, **extra})
+
     @router.get("/api-tokens", response_class=HTMLResponse)
     async def api_tokens_page(request: Request):
         from ..core.api_tokens import api_tokens
+        from ..core import auth_settings
         return templates.TemplateResponse(request, 
             "api_tokens.html",
             {
                 "request": request,
                 "tokens": api_tokens.list_full(),
                 "enforce": api_tokens.is_enforced(),
+                "auth_enabled": auth_settings.is_enabled(),
+                "owners": _token_owner_labels(),
             },
         )
 
     @router.post("/api/tokens/create")
     async def api_tokens_create(request: Request):
         from ..core.api_tokens import api_tokens
+        from ..core import auth_settings
         body = await request.json()
         label = str(body.get("label") or "").strip()
         t = api_tokens.create(label or "unnamed")
-        return {"ok": True, "token": t.token, "label": t.label}
+        # 啟用認證時，新 Token 預設綁給建立的人（之後可以改綁）。沒有擁有者的 Token 連不了 MCP，
+        # 而且網頁上原本沒有地方可以綁（v1.17.6 以前），建好就卡住
+        owner = None
+        user = getattr(request.state, "user", None) or {}
+        if auth_settings.is_enabled() and user.get("user_id"):
+            owner = int(user["user_id"])
+            api_tokens.assign_owner(t.token, owner)
+        _token_audit(request, "create", t.label, owner_user_id=owner)
+        return {"ok": True, "token": t.token, "label": t.label, "owner_user_id": owner}
 
     @router.post("/api/tokens/revoke")
     async def api_tokens_revoke(request: Request):
         from ..core.api_tokens import api_tokens
         body = await request.json()
         tok = str(body.get("token") or "")
+        row = api_tokens.find(tok)
         ok = api_tokens.revoke(tok)
+        if ok:
+            _token_audit(request, "revoke", (row or {}).get("label", ""))
         return {"ok": ok}
 
     @router.post("/api/tokens/enforce")
@@ -1517,7 +1548,44 @@ def build_router(templates) -> APIRouter:
         from ..core.api_tokens import api_tokens
         body = await request.json()
         api_tokens.set_enforce(bool(body.get("enforce")))
+        _token_audit(request, "enforce", "", enforce=api_tokens.is_enforced())
         return {"ok": True, "enforce": api_tokens.is_enforced()}
+
+    @router.get("/api/tokens/owner-candidates")
+    async def api_tokens_owner_candidates(request: Request, q: str = ""):
+        """綁定使用者用：依帳號、名稱、信箱搜尋啟用中的使用者（最多 20 筆）。"""
+        from ..core import auth_settings, user_manager
+        if not auth_settings.is_enabled():
+            return {"ok": True, "users": []}
+        page = user_manager.list_users_page(q=q.strip()[:64], limit=20, enabled=True)
+        return {"ok": True, "users": [
+            {"id": r["id"], "label": f"{r['username']}@{r['source']}", "name": r.get("display_name") or ""}
+            for r in page["rows"]]}
+
+    @router.post("/api/tokens/owner")
+    async def api_tokens_owner(request: Request):
+        """把 Token 綁給一個使用者（`user_id`），或解除綁定（`null`）。Token 的權限就是那個人的權限。"""
+        from ..core.api_tokens import api_tokens
+        from ..core import auth_db, auth_settings
+        if not auth_settings.is_enabled():
+            raise HTTPException(400, "未啟用認證時 Token 不綁使用者")
+        body = await request.json()
+        tok = str(body.get("token") or "")
+        uid = body.get("user_id")
+        if uid is not None:
+            if isinstance(uid, bool) or not isinstance(uid, int):
+                raise HTTPException(400, "user_id 要是整數或 null")
+            row = auth_db.conn().execute("SELECT id, enabled FROM users WHERE id=?", (uid,)).fetchone()
+            if not row:
+                raise HTTPException(400, "找不到這個使用者")
+            if not row["enabled"]:
+                raise HTTPException(400, "這個使用者已停用")
+        row = api_tokens.find(tok)
+        if row is None or not api_tokens.assign_owner(tok, uid):
+            raise HTTPException(404, "找不到這張 Token")
+        owner = _token_owner_labels().get(uid, {}).get("label") if uid is not None else None
+        _token_audit(request, "owner", row.get("label") or "", owner=owner)
+        return {"ok": True, "owner_user_id": uid, "owner": owner}
 
     # ---- 系統相依套件檢查 -----------------------------------------------------
     @router.get("/sys-deps", response_class=HTMLResponse)

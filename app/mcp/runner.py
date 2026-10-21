@@ -49,6 +49,8 @@ class Ctx:
     ws_key: str
     user: Optional[dict]
     ip: str
+    #: 這次呼叫連進來的網址（`https://主機[:埠]`）；站台網址沒填時，傳檔連結用它（v1.17.6）
+    base: str = ""
 
     @property
     def user_label(self) -> str:

@@ -1681,7 +1681,7 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 <span class="hl-method">GET</span>  /mcp                   <span class="hl-cmt"># 405（不提供 SSE）</span>
 <span class="hl-method">POST</span> /mcp/files/upload      <span class="hl-cmt"># 用一次性票證上傳檔案進工作區</span>
 <span class="hl-method">GET</span>  /mcp/files/download    <span class="hl-cmt"># 用一次性票證下載工作區的檔案</span></code></pre>
-<p><strong>認証</strong>：<code>Authorization: Bearer &lt;API Token&gt;</code>。トークンは設定ページで「MCP を許可」にする必要があります。認証を有効にしている場合、トークンはユーザーに割り当て、そのユーザーの権限に従います（権限のないツールは一覧に出ず、呼び出せません）。<code>Origin</code> ヘッダー付きの要求はサイト URL からのものに限ります。対応するプロトコルバージョン：<code>2025-11-25</code>、<code>2025-06-18</code>、<code>2025-03-26</code>、<code>2024-11-05</code>。</p>
+<p><strong>認証</strong>：<code>Authorization: Bearer &lt;API Token&gt;</code>。このトークンは設定ページで「MCP を許可」も有効にする必要があります。サインインが有効な場合はトークンをユーザーに割り当てる必要があり（API Token ページの「割り当てユーザー」列、または <code>POST /admin/api/tokens/owner</code>）、そのユーザーの権限で動作します（権限のないツールは表示も呼び出しもできません）。<code>Origin</code> ヘッダーを送る場合はサイト URL のオリジンでなければなりません。対応プロトコルバージョン：<code>2025-11-25</code>、<code>2025-06-18</code>、<code>2025-03-26</code>、<code>2024-11-05</code>。</p>
 <p><strong>ツール一覧は固定の 9 個だけ</strong>です（公開するツールが増えても増えず、モデルのコンテキストを圧迫しません）：</p>
 <div class="table-wrap"><table><thead><tr><th>MCP ツール</th><th>機能</th></tr></thead><tbody><tr><td><code>jtdt_catalog</code></td><td>実行できるツールの一覧（名前、分類、1 行の説明）</td></tr><tr><td><code>jtdt_describe</code></td><td>1 つのツールのパラメーター、入力ファイル、例</td></tr><tr><td><code>jtdt_run</code></td><td>実行：<code>tool</code>、<code>files</code>（ワークスペースのファイル ID）、<code>params</code>。結果はワークスペースに保存。約 45 秒を超えると <code>job_id</code> を返す</td></tr><tr><td><code>job_status</code></td><td><code>jtdt_run</code> の結果を待つ / 取得する</td></tr><tr><td><code>workspace_list</code></td><td>自分のワークスペースのファイル一覧</td></tr><tr><td><code>workspace_upload_url</code></td><td>使い捨てのアップロードコマンド（<code>curl</code>）を取得し、AI がローカルのファイルを自らアップロード</td></tr><tr><td><code>workspace_upload_inline</code></td><td>256 KB 以下の小さなファイルを Base64 で直接アップロード（コマンドを実行できないクライアント向け）</td></tr><tr><td><code>workspace_download_url</code></td><td>使い捨てのダウンロードコマンド（<code>curl</code>）を取得</td></tr><tr><td><code>workspace_read_text</code></td><td>ワークスペースのテキストファイルをページ単位で読む</td></tr></tbody></table></div>
 <p>現在公開しているツール（全 28 個）：</p>
@@ -1694,7 +1694,8 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">DELETE</span> <span
 </ul>
 <p>PDF のパスワード解除（<code>pdf_decrypt</code>）は既定で公開せず、管理者が別途選択する必要があります。Office 形式の相互変換と OCR はサーバー側のバックグラウンドジョブで、<code>jtdt_run</code> は完了まで待ちます。時間がかかりすぎる場合は先にジョブ ID を返し、AI は <code>job_status</code> で確認します。設定ページでツールのカードをクリックすると、AI 向けの使い方・パラメーター・戻り値を確認できます。</p>
 <p>実行時はサーバー内部で<strong>同じトークン</strong>を使って各ツール本来の API を呼び出すため、チェック・権限・監査は REST と同じです（監査には MCP 経由と記録）。</p>
-<p><strong>ファイル転送（ファイルの内容はモデルを経由しません）</strong>：<code>workspace_upload_url</code> / <code>workspace_download_url</code> は使い捨てのチケットと <code>curl</code> コマンドを返します。チケットはヘッダー <code>X-JTDT-Ticket</code> に入れ（URL には入れない）、15 分間有効で 1 ファイルのみ。アップロードは<strong>保存できた時点で使用済み</strong>になり（切断時は再送でき、成功後に再送すると <code>409</code> と元のファイル ID を返す）、<code>sha256</code> を指定でき不一致は <code>422</code>、申告より大きいと <code>413</code>、既定で発行時の送信元 IP に固定します。URL は設定したサイト URL から作成し（要求の Host ヘッダーは使わない）、サイト URL が HTTP の場合は管理者の許可が別途必要です。</p>
+<p><strong>ファイルサイズの上限</strong>：<code>jtdt_catalog</code> と <code>workspace_list</code> の応答には <code>limits</code>（<code>upload_max_mb</code>、<code>audio_video_max_mb</code>、<code>inline_max_kb</code>、<code>workspace_quota_mb</code>、<code>workspace_free_mb</code>、<code>retention_hours</code>、<code>ticket_minutes</code>）が含まれ、AI はアップロード前に確認できます。値は実際の確認と同じ設定から取り（ワークスペースの 1 ファイル上限とサイト全体のリクエスト上限の小さい方）、<code>null</code> はこのサーバーで上限を設けていないことを示します。前段のリバースプロキシではさらに小さい場合があります。</p>
+<p><strong>ファイル転送（ファイルの内容はモデルを経由しません）</strong>：<code>workspace_upload_url</code> / <code>workspace_download_url</code> は使い捨てのチケットと <code>curl</code> コマンドを返します。チケットはヘッダー <code>X-JTDT-Ticket</code> に入れ（URL には入れない）、15 分間有効で 1 ファイルのみ。アップロードは<strong>保存できた時点で使用済み</strong>になり（切断時は再送でき、成功後に再送すると <code>409</code> と元のファイル ID を返す）、<code>sha256</code> を指定でき不一致は <code>422</code>、申告より大きいと <code>413</code>、既定で発行時の送信元 IP に固定します。URL は設定したサイト URL から作成し、<strong>サイト URL が空欄の場合はこの呼び出しの接続先アドレスを使います</strong>（<code>Host</code> ヘッダーとリバースプロキシの <code>X-Forwarded-Proto</code>。<code>Host</code> の形式が正しくない場合は発行しません）。アドレスが HTTP の場合は管理者の許可が別途必要です。<code>Origin</code> の確認は常に設定したサイト URL だけを使い、<code>Host</code> には従いません。</p>
 <pre><code class="lang-bash"><span class="hl-cmt"># 列出工具（JSON-RPC）</span>
 curl <span class="hl-flag">-s</span> <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/mcp</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer YOUR_TOKEN&quot;</span> <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
@@ -1803,12 +1804,21 @@ curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span c
 <h4 id="token-管理">Token の管理</h4>
 <pre><code class="lang-text"><span class="hl-method">POST</span> /admin/api/tokens/create    <span class="hl-cmt"># 核發新 token</span>
 <span class="hl-method">POST</span> /admin/api/tokens/revoke    <span class="hl-cmt"># 撤銷 token</span>
-<span class="hl-method">POST</span> /admin/api/tokens/enforce   <span class="hl-cmt"># 開關 enforce 模式</span></code></pre>
+<span class="hl-method">POST</span> /admin/api/tokens/enforce   <span class="hl-cmt"># 開關 enforce 模式</span>
+<span class="hl-method">POST</span> /admin/api/tokens/owner     <span class="hl-cmt"># 綁定使用者：{&quot;token&quot;: &quot;&lt;Token 或畫面上的遮罩&gt;&quot;, &quot;user_id&quot;: 12}，null 是解除</span>
+<span class="hl-method">GET</span>  /admin/api/tokens/owner-candidates?q=王   <span class="hl-cmt"># 挑使用者用：啟用中的帳號，最多 20 筆</span></code></pre>
+<p>サインインが有効な場合、トークンはユーザーに割り当て、そのユーザーの権限で動作します。<strong>MCP で使うトークンは必ず割り当ててください</strong>。新しく発行したトークンは発行した管理者に割り当てられます（応答の <code>owner_user_id</code>）。Web では API Token ページの「割り当てユーザー」列で変更します。ユーザーが存在しないか無効の場合は <code>400</code>、トークンが見つからない場合は <code>404</code>、サインインが無効のときは <code>400</code> を返します。発行、取り消し、enforce の切り替え、割り当てはすべて監査ログに記録されます（<code>api_token_change</code>、名前と操作のみでトークンは記録しません）。</p>
 <pre><code class="lang-bash"><span class="hl-cmt"># 核發</span>
 curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/admin/api/tokens/create</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> \
   <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
   <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;label&quot;:&quot;gitlab-ci&quot;}&#x27;</span> | jq
+
+<span class="hl-cmt"># 綁給使用者 12（MCP 回「This API token has no owner」時）</span>
+curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/admin/api/tokens/owner</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Authorization: Bearer ADMIN_TOKEN&quot;</span> \
+  <span class="hl-flag">-H</span> <span class="hl-str">&quot;Content-Type: application/json&quot;</span> \
+  <span class="hl-flag">-d</span> <span class="hl-str">&#x27;{&quot;token&quot;:&quot;&lt;要綁的 Token&gt;&quot;,&quot;user_id&quot;:12}&#x27;</span>
 
 <span class="hl-cmt"># 開啟 enforce</span>
 curl <span class="hl-flag">-X</span> <span class="hl-method">POST</span> <span class="hl-url">http://localhost:8765/admin/api/tokens/enforce</span> \

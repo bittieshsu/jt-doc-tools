@@ -118,7 +118,25 @@ def test_settings_are_tiles_with_the_switch_next_to_its_title(client, auth_off, 
     import re
     html = client.get("/admin/mcp").text
     for sid in ("mcp-enabled", "mcp-bindip", "mcp-http"):
-        assert re.search(r'<div class="mcp-tile">\s*<div class="mcp-tile-top">(?:(?!mcp-tile").)*id="' + sid + '"', html, re.S), sid
+        assert re.search(r'<div class="mcp-tile(?: mcp-tile-wide)?">\s*<div class="mcp-tile-top">(?:(?!class="mcp-tile[ "]).)*id="' + sid + '"', html, re.S), sid
+
+
+def test_site_url_card_says_it_is_automatic_and_lists_the_limits(client, auth_off, reset_mcp):
+    """使用者 2026-10-21：「不填就是下面那兩個網址嗎？檔案上限多少？」「不填可以自動抓進來」。"""
+    import re
+    from app.core import workspace as ws
+    html = client.get("/admin/mcp").text
+    assert 'id="mcp-site-state">自動<' in html, "沒填不是警告，是自動"
+    assert "自動用 AI 連進來的網址" in html and "<code>X-Forwarded-Proto</code>" in html and 'id="mcp-prev-note"' in html
+    box = re.search(r'<div class="mcp-limits" id="mcp-limits">(.*?)</div>', html, re.S).group(1)
+    s = ws.get_settings()
+    assert f"單檔 {int(s['max_file_mb'])} MB" in box and "256 KB 以下" in box and "15 分鐘" in box
+    assert f"共 {int(s['per_user_quota_mb'])} MB" in box
+    ws.save_settings({"max_file_mb": 0})
+    try:
+        assert "單檔不限" in client.get("/admin/mcp").text, "上限跟著工作區設定走"
+    finally:
+        ws.save_settings({"max_file_mb": s["max_file_mb"]})
 
 
 def test_page_has_no_private_ip_examples(client, auth_off, reset_mcp):
