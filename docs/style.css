@@ -2064,3 +2064,74 @@ html[lang="en"] .cp-en { display: none; }        /* 英文頁的中文譯名欄�
   .cp-table td:first-child { font-weight: 700; font-size: 15px; }
   .cp-table td:first-child .cp-en { font-weight: 400; }
 }
+
+/* ===== 事務機掃描取件使用說明（mfp-fetch.html，build-mfp-guide-page.py） ===== */
+.mg-title-ic { vertical-align: -6px; margin-right: 12px; color: var(--indigo); }
+.mg-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px; }
+.mg-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; background: #fff;
+           border: 1px solid #c7d2fe; color: #3730a3; font-size: 14px; font-weight: 600; }
+.mg-chip .mg-ic { color: #4f46e5; }
+.mg-flow { display: flex; align-items: stretch; justify-content: center; gap: 8px; margin: 34px 0 10px; }
+.mg-flow-node { flex: 1 1 0; max-width: 240px; background: #fff; border: 1px solid var(--border); border-radius: 16px;
+                padding: 22px 18px; text-align: center; box-shadow: 0 6px 20px rgba(79, 70, 229, .08); }
+.mg-flow-node b { display: block; font-size: 17px; margin: 10px 0 6px; color: var(--text); }
+.mg-flow-node span { font-size: 13.5px; line-height: 1.7; color: var(--muted); }
+.mg-flow-ic { color: #fff; background: linear-gradient(135deg, #6366f1, #0ea5e9); border-radius: 14px; padding: 12px;
+              width: 52px; height: 52px; box-sizing: border-box; }
+.mg-flow-arrow { align-self: center; color: #94a3b8; flex: 0 0 auto; }
+.mg-roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 30px; }
+.mg-role { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; }
+.mg-role-h { display: flex; align-items: center; gap: 10px; font-size: 17px; margin-bottom: 8px; }
+.mg-role-ic { color: #4f46e5; }
+.mg-role ul { margin: 0; padding-left: 20px; line-height: 1.9; color: #334155; font-size: 14.5px; }
+.mg-steps { list-style: none; counter-reset: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 16px; margin: 30px 0; padding: 0; position: relative; }
+.mg-step { position: relative; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 18px 18px 16px;
+           box-shadow: 0 4px 14px rgba(15, 23, 42, .05); }
+.mg-step:not(:last-child)::after { content: ""; position: absolute; top: 34px; right: -13px; width: 10px; height: 10px;
+           border-top: 2px solid #a5b4fc; border-right: 2px solid #a5b4fc; transform: rotate(45deg); }
+.mg-step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.mg-step-n { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;
+             background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; font-weight: 800; font-size: 15px; }
+.mg-step-ic { color: #0ea5e9; }
+.mg-step h4 { margin: 0 0 6px; font-size: 16px; color: var(--text); }
+.mg-step p { margin: 0; font-size: 14px; line-height: 1.75; color: #475569; }
+.mg-shot { margin: 26px auto; max-width: 980px; }
+.mg-shot img { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border);
+               box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px rgba(15,23,42,.12); }
+.mg-shot figcaption { text-align: center; font-size: 14px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+.mg-shots2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.mg-shots2 .mg-shot { margin: 10px 0; }
+.mg-note { max-width: 860px; margin: 18px auto 0; font-size: 14.5px; line-height: 1.8; color: #334155; background: #fff;
+           border: 1px solid #c7d2fe; border-left: 4px solid #4f46e5; border-radius: 10px; padding: 12px 16px; }
+.mg-table-wrap { overflow-x: auto; margin-top: 26px; }
+.mg-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; font-size: 14px;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, .05); }
+.mg-table th, .mg-table td { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); text-align: left; vertical-align: top;
+                             line-height: 1.7; }
+.mg-table thead th { background: #eef2ff; color: #3730a3; font-size: 13px; white-space: nowrap; }
+.mg-table tbody th { white-space: nowrap; color: var(--text); }
+.mg-pill { display: inline-block; border-radius: 10px; padding: 4px 10px; font-size: 13px; line-height: 1.6; }
+.mg-pill-good { background: #dcfce7; color: #166534; }
+.mg-pill-exp { background: #eef2ff; color: #3730a3; }
+.mg-pill-scan { background: #e0f2fe; color: #075985; }
+.mg-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
+.mg-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+.mg-card b { display: block; margin: 10px 0 6px; font-size: 16px; }
+.mg-card p { margin: 0; font-size: 14px; line-height: 1.75; color: #475569; }
+.mg-card-ic { color: #fff; background: linear-gradient(135deg, #10b981, #0ea5e9); border-radius: 10px; padding: 8px;
+              width: 38px; height: 38px; box-sizing: border-box; }
+.mg-faq { max-width: 860px; margin: 26px auto 0; }
+.mg-faq details { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
+.mg-faq summary { cursor: pointer; font-weight: 700; color: var(--text); }
+.mg-faq details p { margin: 10px 0 0; line-height: 1.8; color: #475569; font-size: 14.5px; }
+@media (max-width: 860px) {
+  .mg-flow { flex-direction: column; align-items: center; }
+  .mg-flow-node { max-width: 420px; width: 100%; }
+  .mg-flow-arrow { transform: rotate(90deg); }
+  .mg-roles, .mg-shots2, .mg-cards { grid-template-columns: 1fr; }
+  .mg-step:not(:last-child)::after { display: none; }
+}
+.ss-more { margin-top: 14px; }
+.ss-more a { font-weight: 700; color: var(--indigo); text-decoration: none; }
+.ss-more a:hover { text-decoration: underline; }

@@ -252,7 +252,7 @@ def delete(group_id: int) -> None:
         from . import mfp_store
         mfp_store.purge_subject("group", str(group_id))
     except Exception:  # noqa: BLE001
-        logger.warning("刪除群組後清理共用事務機成員失敗 group_id=%s", group_id)
+        logger.warning("刪除群組後清理共用事務機成員失敗 group_id=%d", int(group_id))
 
 
 def set_members(group_id: int, user_ids: list[int]) -> None:

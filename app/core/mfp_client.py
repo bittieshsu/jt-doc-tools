@@ -434,8 +434,15 @@ def _connect(ip: str, port: int, timeout: float) -> socket.socket:
     return s
 
 
+#: 跟事務機連線的最低 TLS 版本。Python 3.10+ 搭 OpenSSL 3 本來就是 1.2，但有的平台交給系統設定決定
+#: （實測 Ubuntu 系統 OpenSSL 回「由系統決定」）；寫明才不會因平台而異，CodeQL 也看得到。
+MIN_TLS = ssl.TLSVersion.TLSv1_2
+
+
 def _verified_context() -> ssl.SSLContext:
-    return ssl.create_default_context()
+    ctx = ssl.create_default_context()
+    ctx.minimum_version = MIN_TLS
+    return ctx
 
 
 def _unverified_context() -> ssl.SSLContext:
@@ -446,6 +453,7 @@ def _unverified_context() -> ssl.SSLContext:
     所以照常建立即可。**不可以改用 truststore 保存的原始類別**：注入之後那個類別的
     `verify_mode` 設定器會繞回 truststore，無限遞迴（實測 RecursionError）。"""
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.minimum_version = MIN_TLS
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
     return ctx

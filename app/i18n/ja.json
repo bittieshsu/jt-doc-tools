@@ -7367,7 +7367,7 @@
   "取件依原廠手冊或原廠工具的分析寫成，尚未實機驗證": "取得はメーカーのマニュアルまたはツールの分析をもとに作成し、実機では未検証です",
   "不支援取件": "取得には未対応",
   "這個廠牌目前沒有取件方式；支援 eSCL 的話仍可以從本站掃描": "このメーカーにはまだ取得方法がありません。eSCL 対応なら本サイトからのスキャンは使えます",
-  "可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件已在 Apeos 系列部分型號實機驗證；Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA、RICOH 的直接取件是實驗功能。": "複合機の追加、接続テストと機種の識別、eSCL 対応機からワークスペースへのスキャンができます。FUJIFILM のボックスからの取得は Apeos シリーズの一部機種の実機で検証済みです。Canon・Konica Minolta・SHARP の共有フォルダーからの取得、KYOCERA・RICOH からの直接取得は試験機能です。",
+  "可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件（Apeos 系列部分型號）與 RICOH 的文件伺服器取件（IM C2000、IM C2010、IM C2510、IM C3500、IM C3510）已在實機驗證；Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA 與其他 RICOH 型號的直接取件是實驗功能。": "複合機の追加、接続テストと機種の識別、eSCL 対応複合機からワークスペースへのスキャンができます。FUJIFILM のボックス取得（Apeos シリーズの一部機種）と RICOH のドキュメントサーバー取得（IM C2000、IM C2010、IM C2510、IM C3500、IM C3510）は実機で検証済みです。Canon、Konica Minolta、SHARP の共有フォルダー取得、および KYOCERA とその他の RICOH 機種の直接取得は試験機能です。",
   "純文字（.txt）": "テキスト（.txt）",
   "Markdown（.md）": "Markdown（.md）",
   "JSON 原始資料（.json）": "JSON 生データ（.json）",

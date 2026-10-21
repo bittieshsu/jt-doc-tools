@@ -530,3 +530,28 @@ def test_the_ai_can_see_the_size_limits_before_uploading(mcp):
         assert err and "too large" in msg and "30.0 MB" in msg
     finally:
         upload_settings.save({"max_upload_mb": old})
+
+
+def test_workspace_errors_on_upload_are_fixed_text_not_the_exception(mcp, monkeypatch):
+    """存進工作區失敗時回固定文字＋類別代碼，不把例外字串回給呼叫端（CodeQL #226）。"""
+    from app.core import workspace as ws
+    c, tok = mcp
+    data = _make_pdf(1)
+
+    def boom(*a, **k):
+        raise ws.QuotaExceeded("內部訊息 /var/lib/secret-path 不該出去")
+    monkeypatch.setattr(ws, "save_file_for_key", boom)
+    t = _upload_ticket(c, tok, "a.pdf", data)
+    r = c.post("/mcp/files/upload", headers={"X-JTDT-Ticket": t}, files={"file": ("a.pdf", data, "application/pdf")})
+    assert r.status_code == 422
+    body = r.json()
+    assert body["error"] == "WORKSPACE" and body["code"] == "QuotaExceeded"
+    assert "secret-path" not in r.text and "內部訊息" not in r.text
+    assert "quota" in body["detail"]
+
+
+def test_tool_name_in_the_error_log_is_one_line():
+    """寫日誌的工具名稱要先過 safe_log（CodeQL #227）。名稱已經過白名單，這條是讓日誌本身也不能被換行偽造。"""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "app/mcp/server.py").read_text(encoding="utf-8")
+    assert 'logger.exception("MCP 工具 %s 失敗", safe_log(name' in src

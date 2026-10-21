@@ -219,7 +219,8 @@
 .mf-trace { table-layout:auto; width:auto; min-width:100%; }
 .mf-trace th { width:auto; white-space:nowrap; }
 .mf-trace td { white-space:nowrap; }
-.mf-trace td.mf-trace-detail { white-space:normal; min-width:320px; max-width:640px; word-break:break-all; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:11.5px; }
+/* 細節（查詢條件等）一行就好：原本自動換行，一長串 JSON 把每一列撐得很高、整張表看不出結構；完整內容在滑鼠提示與「複製協定紀錄」 */
+.mf-trace td.mf-trace-detail { white-space:nowrap; max-width:420px; overflow:hidden; text-overflow:ellipsis; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:11.5px; }
 .mf-trace-copy { width:100%; min-height:120px; margin-top:6px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:11.5px; }
 .mf-tech summary { cursor:pointer; font-size:12.5px; color:#64748b; }
 @media (max-width: 720px) {
@@ -310,7 +311,7 @@
 <p class="muted">{{ tr('從事務機掃描，或取回機內信箱裡的文件，存進工作區後接續 OCR、轉檔與 AI 處理。') }}</p>
 
 {# 一句話一個 tr()：譯文裡找 eSCL，按鈕接在那個字（含黏在後面的「-capable」）後面；三種語言的譯文都有 eSCL #}
-{% set _note = tr('可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件已在 Apeos 系列部分型號實機驗證；Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA、RICOH 的直接取件是實驗功能。') %}
+{% set _note = tr('可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件（Apeos 系列部分型號）與 RICOH 的文件伺服器取件（IM C2000、IM C2010、IM C2510、IM C3500、IM C3510）已在實機驗證；Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA 與其他 RICOH 型號的直接取件是實驗功能。') %}
 <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{% if 'eSCL' in _note %}{% set _head, _tail = _note.split('eSCL', 1) %}{% set _glued, _rest = (_tail ~ ' ').split(' ', 1) %}{{ _head }}eSCL{{ _glued }}{{ escl_help() }} {{ _rest|trim }}{% else %}{{ _note }}{% endif %}
   <button type="button" class="mf-verified-link" id="mfVerifiedBtn">{{ icon('check', size=13) }} <span>{{ tr('已驗證支援清單') }}</span></button></span></div>
 
@@ -1644,7 +1645,8 @@
       const r = el('tr');
       for (const k of TRACE_KEYS) r.append(el('td', null, e[k] === undefined ? '' : String(e[k])));
       r.append(el('td', null, (e.challenges || []).map(c => c.scheme + (c.realm ? ' realm=' + c.realm : '')).join(P.sep)));
-      r.append(el('td', 'mf-trace-detail', traceExtra(e)));
+      const dt = el('td', 'mf-trace-detail', traceExtra(e)); dt.title = dt.textContent;
+      r.append(dt);
       t.append(r);
     }
     t.classList.add('mf-trace');

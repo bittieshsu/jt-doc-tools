@@ -30,6 +30,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from . import registry, runner, settings as mcp_settings, tickets
+from ..core.log_safe import safe_log
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,15 @@ FIXED_TOOLS: tuple[dict, ...] = (
      "annotations": _ann(True, True)},
 )
 FIXED_NAMES = tuple(t["name"] for t in FIXED_TOOLS)
+
+#: 上傳存進工作區失敗時回給呼叫端的固定說明（依例外類別）
+_WORKSPACE_ERRORS = {
+    "WorkspaceDisabled": "the workspace is disabled on this server",
+    "QuotaExceeded": "the file is too large or the workspace quota is full (see limits in the catalog)",
+    "UnsupportedType": "the workspace does not accept this file type",
+    "NotFound": "the workspace file was not found",
+    "WorkspaceError": "the workspace could not store this file",
+}
 
 router = APIRouter(include_in_schema=False)
 
@@ -594,7 +604,7 @@ async def _handle(msg: Any, ctx: runner.Ctx, token_hash: str, version: str) -> O
         except ToolError as e:
             return _result(mid, _tool_result({"error": str(e)}, True, version))
         except Exception as e:  # noqa: BLE001
-            logger.exception("MCP 工具 %s 失敗", name)
+            logger.exception("MCP 工具 %s 失敗", safe_log(name, 60))
             return _err(mid, -32603, f"Internal error: {type(e).__name__}")
     return _err(mid, -32601, f"Method not found: {method[:60]}")
 
@@ -719,7 +729,9 @@ async def files_upload(request: Request):
             meta = await asyncio.to_thread(ws.save_file_for_key, row["ws_key"], tmp, row["filename"] or "file",
                                            "mcp", user_label=row["user_label"], move=True, verify=True)
         except ws.WorkspaceError as e:
-            return JSONResponse({"ok": False, "error": "WORKSPACE", "detail": runner._short(str(e))},
+            # 回固定文字＋類別代碼，不回例外字串（CodeQL #226）；容量上限 AI 從 tools/list 的 limits 讀得到
+            return JSONResponse({"ok": False, "error": "WORKSPACE", "code": type(e).__name__,
+                                 "detail": _WORKSPACE_ERRORS.get(type(e).__name__, _WORKSPACE_ERRORS["WorkspaceError"])},
                                 status_code=422)
         tmp = None
         tickets.upload_done(row, meta["file_id"])

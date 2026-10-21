@@ -148,6 +148,13 @@ def _plan(name: str, url: str, outdir: Path, title: str, cookie: str | None) -> 
         {"type": "report",
          "parameters": {"template": "traditional-json", "reportDir": str(outdir),
                         "reportFile": f"zap-{name}-report"}},
+        # PDF 給人留存 / 交付用（ZAP 內建範本；使用者 2026-10-21：每次的報告都要留下來）。
+        # **檔名不可以跟 html 同名**：這個範本先產同名 .html 當中間檔、產完刪掉，會把上面那份 html 一起刪了
+        # （第一次實跑就少了 html）。標題只用英數：範本的字型沒有中文，中文字會整段消失。
+        {"type": "report",
+         "parameters": {"template": "traditional-pdf", "reportDir": str(outdir),
+                        "reportFile": f"zap-{name}-report-print",
+                        "reportTitle": f"jt-doc-tools {_version()} ZAP scan ({name})"}},
     ]
     plan = {
         "env": {"contexts": [{"name": f"jtdt-{name}", "urls": [url],
@@ -186,10 +193,80 @@ def _summarise(report: Path) -> tuple[dict[str, int], int]:
     return risk, len(urls)
 
 
+ZAP_DIR = ROOT / "temp" / "zap"
+INDEX = ZAP_DIR / "INDEX.md"
+
+
+def _version() -> str:
+    import re
+    m = re.search(r'^VERSION\s*=\s*"([^"]+)"', (ROOT / "app" / "main.py").read_text(encoding="utf-8"), re.M)
+    return m.group(1) if m else "?"
+
+
+def _write_summary(outdir: Path, stamp: str, want: list[str],
+                   results: dict[str, tuple[dict[str, int], int]]) -> None:
+    """每次掃描在報告旁邊留一份摘要：哪一版、什麼時候、每個目標的網址數與 High/Medium/Low。"""
+    data = {"stamp": stamp, "version": _version(), "targets": want,
+            "results": {n: {"urls": u, **r} for n, (r, u) in results.items()},
+            "missing": [n for n in want if n not in results]}
+    (outdir / "summary.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def _summary_of(d: Path) -> dict | None:
+    """一次掃描的摘要；舊的（還沒有 summary.json）從 json 報告重算，版本記「—」。"""
+    f = d / "summary.json"
+    if f.is_file():
+        try:
+            return json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            pass
+    reps = sorted(d.glob("zap-*-report.json"))
+    if not reps:
+        return None
+    res = {}
+    for r in reps:
+        try:
+            risk, n = _summarise(r)
+        except (ValueError, OSError):
+            continue
+        res[r.name[len("zap-"):-len("-report.json")]] = {"urls": n, **risk}
+    return {"stamp": d.name, "version": "—", "results": res, "missing": []}
+
+
+def write_index(zap_dir: Path = ZAP_DIR) -> Path:
+    """`temp/zap/INDEX.md`：歷次掃描一次一行（新的在上面）。沒有報告的資料夾也列出來，標「沒有報告」。"""
+    rows = []
+    for d in sorted((p for p in zap_dir.iterdir() if p.is_dir() and p.name[:1].isdigit()), reverse=True):
+        sm = _summary_of(d)
+        if sm is None:
+            rows.append(f"| {d.name} | — | 沒有報告 | | `{d.name}/` |")
+            continue
+        parts, bad = [], False
+        for name, r in sm["results"].items():
+            hml = r.get("High", 0) + r.get("Medium", 0) + r.get("Low", 0)
+            bad = bad or hml > 0
+            parts.append(f"{name}：{r.get('urls', 0)} 網址、H{r.get('High', 0)} / M{r.get('Medium', 0)} / L{r.get('Low', 0)}")
+        for name in sm.get("missing", []):
+            bad = True
+            parts.append(f"{name}：沒有報告")
+        verdict = "要修" if bad else "0 / 0 / 0"
+        rows.append(f"| {d.name} | {sm.get('version', '—')} | {verdict} | {'；'.join(parts)} | `{d.name}/` |")
+    text = ("# ZAP 掃描紀錄\n\n由 `tools/run_zap_scan.py` 每次掃描後自動更新（`--reindex` 可重建）。"
+            "每個資料夾裡有 html / json / pdf 報告與 `summary.json`。\n\n"
+            "| 時間 | 版本 | 判定 | 各目標 | 資料夾 |\n|---|---|---|---|---|\n" + "\n".join(rows) + "\n")
+    out = zap_dir / "INDEX.md"
+    out.write_text(text, encoding="utf-8")
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", choices=sorted(TARGETS), action="append")
+    ap.add_argument("--reindex", action="store_true", help="只重建 temp/zap/INDEX.md，不掃描")
     args = ap.parse_args()
+    if args.reindex:
+        print(write_index())
+        return 0
     if not ZAP.exists():
         raise SystemExit(f"找不到 ZAP：{ZAP}")
     stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -226,7 +303,9 @@ def main() -> int:
         if tmp is not None:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    print(f"\n報告：{outdir}")
+    _write_summary(outdir, stamp, want, results)
+    write_index()
+    print(f"\n報告：{outdir}（總表 {INDEX}）")
     bad = False
     for name, (risk, n_urls) in results.items():
         flag = "" if (risk["High"] + risk["Medium"] + risk["Low"]) == 0 else "  <== 要修"

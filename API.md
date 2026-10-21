@@ -2264,7 +2264,7 @@ curl -X POST http://localhost:8765/tools/transit-proof/api/transit-proof \
 
 ## 9b. 事務機掃描取件 API
 
-> **FUJIFILM 機內信箱取件已在實機驗證，其他廠牌的取件是實驗功能。** 目前做得到的是新增事務機、連線測試與型號辨識、
+> **FUJIFILM 機內信箱取件與 RICOH 文件伺服器取件（IM C2000、IM C2010、IM C2510、IM C3500、IM C3510）已在實機驗證，其他廠牌與型號的取件是實驗功能。** 目前做得到的是新增事務機、連線測試與型號辨識、
 > 從支援 eSCL（AirPrint / Mopria 掃描）的事務機掃描直接存進工作區、管理員設定的共用事務機，
 > 以及 FUJIFILM 事務機的機內信箱取件、Canon / Konica Minolta / SHARP 的檔案分享取件、KYOCERA / RICOH 的直接取件（都是實驗功能）。網頁上的工具頁與管理頁用的也是這組端點。
 > 工具原名「事務機取件」，v1.16.89 起改名「事務機掃描取件」；網址與工具代號都不變。

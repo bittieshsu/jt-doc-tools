@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Jason Tools 文件工具箱「事務機掃描取件」的使用說明：管理員設定共用事務機與成員、使用者從本站掃描、把存在事務機裡的文件取回工作區，以及各廠牌的支援方式。">
+<title>事務機掃描取件使用說明 | Jason Tools 文件工具箱</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+<script src="lang-switch.js" defer></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" href="index.html#top">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">Jason Tools</div>
+        <div class="brand-sub">文件工具箱</div>
+      </div>
+    </a>
+    <nav class="topnav" id="topnav">
+      <a href="index.html#features" class="nav-link">功能</a>
+      <a href="index.html#install" class="nav-link">安裝</a>
+      <a href="api.html" class="nav-link">API</a>
+      <a href="troubleshooting.html" class="nav-link">疑難排解</a>
+      <a href="compliance.html" class="nav-link">合規</a>
+      <select id="langSwitch" class="nav-lang" aria-label="Language"><option value="mfp-fetch.html" lang="zh-Hant" selected>繁體中文</option><option value="mfp-fetch-en.html" lang="en">English</option><option value="mfp-fetch-ja.html" lang="ja">日本語</option></select>
+      <a class="btn btn-outline nav-github" href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.4 3.6 1 .1-.8.4-1.4.8-1.7-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2 0-.4-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg>
+        GitHub
+      </a>
+    </nav>
+    <button class="nav-toggle" id="navToggle" type="button" aria-label="展開選單" aria-controls="topnav" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+  </div>
+</header>
+<script>
+/* 手機的漢堡選單。這一頁（與借它版面的合規頁）原本少了這一段，
+   按了選單按鈕什麼都不會發生（2026-10-10 量導覽列時才發現）。 */
+(function () {
+  var toggle = document.getElementById('navToggle');
+  var nav = document.getElementById('topnav');
+  if (!toggle || !nav) return;
+  toggle.addEventListener('click', function () {
+    var open = nav.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  nav.addEventListener('click', function (e) {
+    if (e.target.closest('a') && nav.classList.contains('open')) {
+      nav.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (!nav.contains(e.target) && !toggle.contains(e.target) && nav.classList.contains('open')) {
+      nav.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+})();
+</script>
+<main class="cp-main mg-main">
+<header class="cp-hero"><div class="container">
+<span class="cp-eyebrow">使用說明</span>
+<h1 class="cp-title"><svg class="mg-title-ic" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>事務機掃描取件</h1>
+<p class="cp-lead">在本站就能叫事務機掃描，或把存在事務機裡的文件取回來，直接存進你的工作區，接著做 OCR、合併、壓縮或翻譯。不用 USB 隨身碟，也不用寄信給自己。</p>
+<div class="mg-chips"><span class="mg-chip"><svg class="mg-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M12 20h.01"/></svg>檔案不經過雲端</span><span class="mg-chip"><svg class="mg-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>不儲存帳密</span><span class="mg-chip"><svg class="mg-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>一次服務一個人</span><span class="mg-chip"><svg class="mg-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>已在實機驗證</span></div></div></header>
+<nav class="cp-pagenav" aria-label="本頁"><div class="container cp-pagenav-in"><span class="cp-pagenav-k">本頁</span><div class="cp-pagenav-links">
+<a href="#how">運作方式</a>
+<a href="#admin">管理員設定</a>
+<a href="#mine">我的事務機</a>
+<a href="#scan">掃描</a>
+<a href="#fetch">取件</a>
+<a href="#brands">各廠牌</a>
+<a href="#safety">安全</a>
+<a href="#faq">常見問題</a>
+</div></div></nav>
+<section id="how" class="cp-sec"><div class="container"><h2 class="cp-sec-title">運作方式</h2><p class="cp-sec-lead">事務機、本站、你的工作區在同一個內網裡；檔案從事務機直接進工作區，不經過任何雲端服務。</p><div class="mg-flow" role="list">
+<div class="mg-flow-node" role="listitem"><svg class="mg-flow-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><b>事務機</b><span>eSCL 掃描、機內信箱、文件伺服器、檔案分享</span></div>
+<div class="mg-flow-arrow" aria-hidden="true"><svg class="mg-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+<div class="mg-flow-node" role="listitem"><svg class="mg-flow-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg><b>本站</b><span>在同一個內網，替你連線、取件、轉成 PDF</span></div>
+<div class="mg-flow-arrow" aria-hidden="true"><svg class="mg-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+<div class="mg-flow-node" role="listitem"><svg class="mg-flow-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><b>你的工作區</b><span>每個帳號各自一份，保留時間由管理員設定</span></div>
+<div class="mg-flow-arrow" aria-hidden="true"><svg class="mg-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+<div class="mg-flow-node" role="listitem"><svg class="mg-flow-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg><b>下載或接著處理</b><span>OCR、合併、壓縮、翻譯、用印…</span></div>
+</div>
+<div class="mg-roles">
+<div class="mg-role"><div class="mg-role-h"><svg class="mg-role-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><b>管理員</b></div><ul><li>設定共用事務機，按「成員」決定誰可以用（使用者、群組、組織單位）</li><li>可以關掉「允許使用者自行新增事務機」，大家只用共用的</li><li>連線測試的逐步診斷與診斷報告，追查連不上的原因</li></ul></div>
+<div class="mg-role"><div class="mg-role-h"><svg class="mg-role-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><b>使用者</b></div><ul><li>在「事務機掃描取件」頁看到自己新增的與管理員共用的事務機</li><li>按「掃描」從本站叫事務機掃描，或按「取件」取回存在事務機裡的文件</li><li>取好的檔案在工作區，可以開啟、下載或接著用其他工具</li></ul></div>
+</div></div></section>
+<section id="admin" class="cp-sec cp-sec-alt"><div class="container"><h2 class="cp-sec-title">管理員：設定共用事務機</h2><p class="cp-sec-lead">在「設定 → 共用事務機」建立一次，指定成員之後，成員在自己的「事務機掃描取件」頁就看得到、用得到。</p><ol class="mg-steps">
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">1</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div><h4>輸入位址、連線測試</h4><p>輸入事務機的 IP 或主機名稱，按「連線測試」。只讀首頁與掃描介面的能力表，不送帳號密碼。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">2</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></div><h4>確認型號並儲存</h4><p>看一下廠牌、型號與相容性，按「儲存為共用事務機」。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">3</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h4>設定成員</h4><p>按「成員」勾選使用者或群組。群組旁邊的「本站 N 人」是已經算進這個群組的帳號數。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">4</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><h4>把自己也加進去</h4><p>管理員也要列在成員裡，這台才會出現在自己的「事務機掃描取件」頁（標「你是成員」）。</p></li>
+</ol><figure class="mg-shot"><a href="screenshots/mfp-guide/08-members.png" target="_blank" rel="noopener"><img src="screenshots/mfp-guide/08-members.png" alt="共用事務機的成員設定：使用者寫成帳號@來源，群組旁標出本站人數" width="1112" height="648" loading="lazy"></a><figcaption>成員面板：使用者寫成 <code>帳號@來源</code>，同名的標「同名帳號」；群組旁標出本站人數。</figcaption></figure><p class="mg-note">想讓大家只用共用的事務機：在同一頁的「使用設定」關掉「允許使用者自行新增事務機」。管理員自己不受影響。</p></div></section>
+<section id="mine" class="cp-sec"><div class="container"><h2 class="cp-sec-title">使用者：我的事務機</h2><p class="cp-sec-lead">清單上有你自己新增的（只有你的帳號看得到）與管理員共用的；相容性、可以做的事都標在同一列。</p><figure class="mg-shot"><a href="screenshots/mfp-guide/01-list.png" target="_blank" rel="noopener"><img src="screenshots/mfp-guide/01-list.png" alt="我的事務機清單：來源、位址、型號、相容性與掃描、取件按鈕" width="1112" height="318" loading="lazy"></a><figcaption>「來源」分「自己新增」與「管理員共用」；相容性「已支援」是已在實機驗證的型號。</figcaption></figure><ol class="mg-steps">
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">1</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div><h4>新增自己的事務機</h4><p>在「新增事務機」輸入位址，按「連線測試」。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">2</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div><h4>看結果</h4><p>廠牌、型號、相容性、能不能從本站掃描，以及每一步的診斷。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">3</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></div><h4>儲存</h4><p>取個好認的名稱後按「儲存這台事務機」；換一台電腦用同一個帳號登入照樣在。</p></li>
+</ol><figure class="mg-shot"><a href="screenshots/mfp-guide/02-test.png" target="_blank" rel="noopener"><img src="screenshots/mfp-guide/02-test.png" alt="連線測試結果：連線、TLS、廠牌、型號、相容性與逐步診斷" width="1112" height="781" loading="lazy"></a><figcaption>連線測試的結果卡片與逐步診斷；需要時可以下載診斷報告。</figcaption></figure></div></section>
+<section id="scan" class="cp-sec cp-sec-alt"><div class="container"><h2 class="cp-sec-title">從本站掃描</h2><p class="cp-sec-lead">支援 eSCL 的事務機，清單上有「掃描」：在本站選好設定，事務機就開始掃，掃好的檔案直接進工作區。</p><ol class="mg-steps">
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">1</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div><h4>放好文件</h4><p>把文件放在平台玻璃上，或放進自動送紙器。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">2</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></div><h4>選設定</h4><p>按「掃描」，選來源、色彩、解析度、紙張、存成 PDF 或 JPEG，可以先取檔名。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">3</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><h4>開始掃描</h4><p>按「開始掃描」。有人在用時會自動排隊，畫面顯示前面還有幾件。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">4</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div><h4>存進工作區</h4><p>完成後可以開啟、下載，或到工作區接著處理。</p></li>
+</ol><div class="mg-shots2"><figure class="mg-shot"><a href="screenshots/mfp-guide/03-scan.png" target="_blank" rel="noopener"><img src="screenshots/mfp-guide/03-scan.png" alt="掃描面板：來源、色彩、解析度、紙張、存成與檔名" width="1112" height="270" loading="lazy"></a><figcaption>掃描設定：只列出這台事務機支援的選項。</figcaption></figure><figure class="mg-shot"><a href="screenshots/mfp-guide/04-scan-done.png" target="_blank" rel="noopener"><img src="screenshots/mfp-guide/04-scan-done.png" alt="掃描完成：頁數、協定與開啟、下載、前往工作區" width="1112" height="406" loading="lazy"></a><figcaption>完成：存進工作區，可以開啟或下載。</figcaption></figure></div></div></section>
+<section id="fetch" class="cp-sec"><div class="container"><h2 class="cp-sec-title">取件：把存在事務機裡的文件取回來</h2><p class="cp-sec-lead">先在事務機的面板上把文件存進信箱、文件伺服器或資料盒，再到本站按「取件」（FUJIFILM 是「信箱取件」）。</p><ol class="mg-steps">
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">1</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div><h4>在事務機上存好</h4><p>依廠牌在面板上選存到信箱、文件伺服器或資料盒（見下方「各廠牌」）。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">2</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h4>填登入資訊</h4><p>依面板顯示填信箱編號、帳號或 User Code。只送一次，錯了就停下來。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">3</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div><h4>列出並選位置</h4><p>按「列出檔案」；有資料夾的在「位置」切換，資料夾有密碼時輸入後按「開啟資料夾」。</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">4</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></div><h4>勾選並取件</h4><p>勾選要的文件，選存成 PDF（建議）後按「取件」，檔案存進工作區。</p></li>
+</ol><div class="mg-shots2"><figure class="mg-shot"><a href="screenshots/mfp-guide/05-box.png" target="_blank" rel="noopener"><img src="screenshots/mfp-guide/05-box.png" alt="FUJIFILM 信箱取件：信箱編號、文件清單、取件與取件並刪除" width="1112" height="590" loading="lazy"></a><figcaption>FUJIFILM 信箱取件：可以選「取件並刪除」，確認存好之後才刪事務機上的原件。</figcaption></figure><figure class="mg-shot"><a href="screenshots/mfp-guide/06-share.png" target="_blank" rel="noopener"><img src="screenshots/mfp-guide/06-share.png" alt="RICOH 文件伺服器取件：登入方式、位置選資料夾、資料夾密碼與文件清單" width="1112" height="671" loading="lazy"></a><figcaption>RICOH 文件伺服器：在「位置」切換共用資料夾與設備資料夾，有密碼的標出來。</figcaption></figure></div><figure class="mg-shot"><a href="screenshots/mfp-guide/07-log.png" target="_blank" rel="noopener"><img src="screenshots/mfp-guide/07-log.png" alt="技術細節：協定紀錄與複製協定紀錄按鈕" width="1074" height="488" loading="lazy"></a><figcaption>出問題時展開「技術細節」，按「複製協定紀錄」貼給客服；紀錄不含帳號、密碼與文件內容。</figcaption></figure></div></section>
+<section id="brands" class="cp-sec cp-sec-alt"><div class="container"><h2 class="cp-sec-title">各廠牌的取件方式</h2><p class="cp-sec-lead">「已支援」是在實機上驗證過取件的型號；「實驗功能」依原廠手冊或原廠工具的分析寫成，還沒在實機上驗證。</p><div class="mg-table-wrap"><table class="mg-table"><thead><tr><th>廠牌</th><th>方式</th><th>在事務機上怎麼存</th><th>要填什麼</th><th>支援狀況</th></tr></thead><tbody><tr><th scope="row">FUJIFILM</th><td>機內信箱</td><td>在面板選「掃描至信箱」，存進指定的信箱</td><td>信箱編號；信箱有設密碼才填密碼</td><td><span class="mg-pill mg-pill-good">已支援：Apeos C5571（同系列 C7071、C6571、C4571、C3571、C3071、C2571）。可以「取件並刪除」</span></td></tr><tr><th scope="row">RICOH</th><td>文件伺服器</td><td>在面板選「掃描至資料夾」並「儲存檔案」，存進文件伺服器的共用資料夾或設備資料夾</td><td>登入方式（不需登入、帳號密碼、User Code）；資料夾有設密碼才填</td><td><span class="mg-pill mg-pill-good">已支援：IM C2000、IM C2010、IM C2510、IM C3500、IM C3510；其他型號是實驗功能</span></td></tr><tr><th scope="row">KYOCERA</th><td>文件匣</td><td>存進自訂資料盒（機型要有硬碟或 SSD）</td><td>事務機帳號密碼；文件匣有設密碼才填</td><td><span class="mg-pill mg-pill-exp">實驗功能。沒有自訂資料盒的機型，遙控資料盒目前只能列出</span></td></tr><tr><th scope="row">Canon</th><td>Advanced Box</td><td>存進 Advanced Box 的共用空間或個人空間</td><td>事務機帳號密碼</td><td><span class="mg-pill mg-pill-exp">實驗功能（WebDAV 或 SMB）</span></td></tr><tr><th scope="row">Konica Minolta</th><td>公用信箱</td><td>存進公用信箱</td><td>信箱的帳號密碼</td><td><span class="mg-pill mg-pill-exp">實驗功能（SMB）</span></td></tr><tr><th scope="row">SHARP</th><td>NAS 資料夾</td><td>存進事務機的 NAS 資料夾</td><td>事務機帳號密碼</td><td><span class="mg-pill mg-pill-exp">實驗功能（SMB）</span></td></tr><tr><th scope="row">支援 eSCL 的機型</th><td>從本站掃描</td><td>不用先存，直接在本站按「掃描」</td><td>不用帳號密碼</td><td><span class="mg-pill mg-pill-scan">可以掃描（HP、Epson、Brother 等支援 eSCL 的機型）</span></td></tr></tbody></table></div></div></section>
+<section id="safety" class="cp-sec"><div class="container"><h2 class="cp-sec-title">安全與隱私</h2><p class="cp-sec-lead">事務機上常有合約、薪資單這類文件，所以每一步都照最保守的方式做。</p><div class="mg-cards">
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M12 20h.01"/></svg><b>只連內網</b><p>事務機的位址只能是內部網路；連線測試只讀首頁與掃描介面的能力表，不送任何帳號密碼。</p></div>
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><b>不儲存帳密</b><p>取件時填的帳號密碼只用在這一次；記住的是信箱編號、信任的憑證這類設定，跟著帳號存，不含密碼。</p></div>
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg><b>登入只送一次</b><p>帳號、信箱或資料夾密碼錯了就停下來，不換方式重試，避免連續輸錯讓事務機鎖住帳號。</p></div>
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><b>只讀不改</b><p>取件只列出、下載，不刪除、不改名；只有 FUJIFILM 可以選「取件並刪除」，而且確認存好才刪。</p></div>
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><b>一次一個人</b><p>同一台事務機一次只服務一個人，其他人自動排隊，不會互相打斷。</p></div>
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><b>全程留紀錄</b><p>誰在什麼時候對哪一台掃描、取件、刪了哪幾份，都寫進稽核記錄（不記密碼與文件內容）。</p></div>
+</div></div></section>
+<section id="faq" class="cp-sec cp-sec-alt"><div class="container"><h2 class="cp-sec-title">常見問題</h2><p class="cp-sec-lead">還是遇到問題時，先看這幾個。</p><div class="mg-faq">
+<details><summary>看不到管理員共用的事務機</summary><p>先看頁面上的「目前登入的帳號」：同一個人的 AD、SSO、本機帳號是不同帳號，成員要加的是你實際登入的那一個。管理員也可以把你所在的群組加進成員；群組旁邊顯示「本站 0 人」代表登入時沒有掛上這個群組。改完切回分頁就會更新。</p></details>
+<details><summary>連線測試失敗或列不出檔案</summary><p>看連線測試的逐步診斷，哪一步失敗就從那一步查；也可以下載診斷報告（txt、md、json、html、pdf）給管理員。KYOCERA 要在事務機上啟用 9091 或 9090 連接埠的文件服務；FUJIFILM 某個連接埠回 406 時，換另一個連線方式。</p></details>
+<details><summary>RICOH 的資料夾要密碼</summary><p>在「位置」選那個資料夾，輸入資料夾密碼後按「開啟資料夾」。密碼錯了不會自動重試，確認後再輸入一次。</p></details>
+<details><summary>清單上標「可重新測試」</summary><p>辨識規則更新過，這台之前沒認出型號。按一次「重新測試」就會用新的規則判斷。</p></details>
+<details><summary>取好的檔案在哪裡</summary><p>在你的工作區，可以開啟、下載，或在其他工具裡直接選工作區的檔案。保留時間由管理員設定（預設 24 小時）。</p></details>
+<details><summary>要回報問題</summary><p>展開「技術細節」，按「複製協定紀錄」貼給客服。協定紀錄不含帳號、密碼與文件內容。</p></details>
+<p class="mg-note">要用程式呼叫：見 <a href="api.html#連線測試">API 使用手冊</a>。</p>
+</div></div></section>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-col">
+      <div class="footer-brand">Jason Tools 文件工具箱</div>
+      <p class="footer-tag">PDF / Office 整合式文件處理平台：不上雲，資料留在自己手中。</p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">連結</div>
+      <a href="index.html">介紹網站</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">原始碼庫</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+      <a href="troubleshooting.html">安裝與升級疑難排解</a>
+      <a href="compliance.html">資料保護與合規</a>
+      <a href="mfp-fetch.html">事務機掃描取件使用說明</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools/issues" target="_blank" rel="noopener">回報問題</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">作者</div>
+      <p>
+        <strong>Jason Cheng</strong><br>
+        <a href="https://www.jason.tools" target="_blank" rel="noopener">Jason Tools</a>
+      </p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">授權</div>
+      <p>GNU Affero General Public License v3.0</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">
+      © 2026 Jason Tools · Built with HTML & CSS, hosted on GitHub Pages
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

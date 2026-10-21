@@ -5,11 +5,17 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (937 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (938 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.9] - 2026-10-21
+
+- Website: a new MFP Scan & Fetch guide page in Chinese, English and Japanese, with a flow diagram, numbered steps and screenshots for administrators (shared MFPs and members) and users (adding and testing a device, scanning from this site, retrieving from FUJIFILM mailboxes and the RICOH Document Server with folders), a per-brand table, security notes and an FAQ. The screenshots come from real runs against simulated devices, with example addresses and names. The home page gallery has a 17th item for MFP Scan & Fetch linking to the guide, and the footers link to it too.
+- MFP scan & fetch: the tool page introduction no longer says RICOH direct retrieval is experimental; it names the models verified on real devices (IM C2000, IM C2010, IM C2510, IM C3500, IM C3510), and the API manual says the same. A check now requires every verified model to be named there. The protocol log's detail column is shown on one line (long values are truncated with the full text on hover, and Copy protocol log still copies everything); long query conditions used to wrap and make every row very tall.
+- Security: HTTPS connections to MFPs (connection test, scanning, retrieval) now require TLS 1.2 or later explicitly instead of relying on the Python and system OpenSSL defaults, which already meant TLS 1.2 on official installs but can vary between platforms. MCP uploads that the workspace rejects now return a fixed message and an error class instead of the internal error text, and tool names are stripped of control characters before they are logged. The group deletion log records the numeric ID only. The pre-publish check for public files now also blocks access tokens (GitHub token formats); it needs no private list, so it works on public clones too.
 
 ## [1.17.8] - 2026-10-21
 

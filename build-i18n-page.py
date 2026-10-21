@@ -199,7 +199,8 @@ def _localised_screenshots(html: str, docs_dir, lang: str) -> str:
         return (f"screenshots/{lang}/{name}"
                 if (docs_dir / "screenshots" / lang / name).is_file()
                 else m.group(0))
-    return re.sub(r"screenshots/([\w.-]+\.png)", rep, html)
+    # 可以帶子資料夾（`screenshots/mfp-guide/01-list.png`，使用說明頁一組一個資料夾）
+    return re.sub(r"screenshots/((?:[\w.-]+/)*[\w.-]+\.png)", rep, html)
 
 
 def _segments(html: str):
@@ -301,7 +302,7 @@ def build(src: Path, cat_path: Path, dst: Path, lang: str = "en") -> int:
 
 #: 站內頁面。**同語言的頁要連同語言的頁** —— 原本英文版的導覽連的是
 #: `api.html`（中文頁），讀者一點就掉回中文（使用者 2026-09-14 指出）。
-_SITE_PAGES = ("index", "api", "troubleshooting", "compliance")
+_SITE_PAGES = ("index", "api", "troubleshooting", "compliance", "mfp-fetch")
 
 
 def _rewrite_internal_links(html: str, lang: str) -> str:

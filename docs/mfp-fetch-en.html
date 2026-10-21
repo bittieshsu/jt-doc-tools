@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How to use MFP Scan & Fetch in Jason Tools: administrators set up shared MFPs and members, users scan from this site or retrieve documents stored on the MFP into their workspace, and what each brand supports.">
+<title>MFP Scan & Fetch guide | Jason Tools</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+<script src="lang-switch.js" defer></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" href="index-en.html#top">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">Jason Tools</div>
+        <div class="brand-sub">Document Toolbox</div>
+      </div>
+    </a>
+    <nav class="topnav" id="topnav">
+      <a href="index-en.html#features" class="nav-link">Features</a>
+      <a href="index-en.html#install" class="nav-link">Install</a>
+      <a href="api-en.html" class="nav-link">API</a>
+      <a href="troubleshooting-en.html" class="nav-link">Troubleshooting</a>
+      <a href="compliance-en.html" class="nav-link">Compliance</a>
+      <select id="langSwitch" class="nav-lang" aria-label="Language"><option value="mfp-fetch.html" lang="zh-Hant">繁體中文</option><option value="mfp-fetch-en.html" lang="en" selected>English</option><option value="mfp-fetch-ja.html" lang="ja">日本語</option></select>
+      <a class="btn btn-outline nav-github" href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.4 3.6 1 .1-.8.4-1.4.8-1.7-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2 0-.4-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg>
+        GitHub
+      </a>
+    </nav>
+    <button class="nav-toggle" id="navToggle" type="button" aria-label="Open menu" aria-controls="topnav" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+  </div>
+</header>
+<script>
+/* 手機的漢堡選單。這一頁（與借它版面的合規頁）原本少了這一段，
+   按了選單按鈕什麼都不會發生（2026-10-10 量導覽列時才發現）。 */
+(function () {
+  var toggle = document.getElementById('navToggle');
+  var nav = document.getElementById('topnav');
+  if (!toggle || !nav) return;
+  toggle.addEventListener('click', function () {
+    var open = nav.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  nav.addEventListener('click', function (e) {
+    if (e.target.closest('a') && nav.classList.contains('open')) {
+      nav.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (!nav.contains(e.target) && !toggle.contains(e.target) && nav.classList.contains('open')) {
+      nav.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+})();
+</script>
+<main class="cp-main mg-main">
+<header class="cp-hero"><div class="container">
+<span class="cp-eyebrow">Guide</span>
+<h1 class="cp-title"><svg class="mg-title-ic" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>MFP Scan & Fetch</h1>
+<p class="cp-lead">Start a scan on the MFP from this site, or retrieve documents stored on the MFP, straight into your workspace for OCR, merging, compression or translation. No USB stick, no emailing yourself.</p>
+<div class="mg-chips"><span class="mg-chip"><svg class="mg-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M12 20h.01"/></svg>No cloud in between</span><span class="mg-chip"><svg class="mg-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Credentials never stored</span><span class="mg-chip"><svg class="mg-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>One person at a time</span><span class="mg-chip"><svg class="mg-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>Verified on real devices</span></div></div></header>
+<nav class="cp-pagenav" aria-label="On this page"><div class="container cp-pagenav-in"><span class="cp-pagenav-k">On this page</span><div class="cp-pagenav-links">
+<a href="#how">How it works</a>
+<a href="#admin">Administrators</a>
+<a href="#mine">My MFPs</a>
+<a href="#scan">Scan</a>
+<a href="#fetch">Retrieve</a>
+<a href="#brands">Brands</a>
+<a href="#safety">Security</a>
+<a href="#faq">FAQ</a>
+</div></div></nav>
+<section id="how" class="cp-sec"><div class="container"><h2 class="cp-sec-title">How it works</h2><p class="cp-sec-lead">The MFP, this site and your workspace are on the same internal network; files go from the MFP straight into your workspace without passing through any cloud service.</p><div class="mg-flow" role="list">
+<div class="mg-flow-node" role="listitem"><svg class="mg-flow-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><b>MFP</b><span>eSCL scanning, mailboxes, Document Server, file shares</span></div>
+<div class="mg-flow-arrow" aria-hidden="true"><svg class="mg-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+<div class="mg-flow-node" role="listitem"><svg class="mg-flow-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg><b>This site</b><span>On the same network; connects, retrieves and converts to PDF for you</span></div>
+<div class="mg-flow-arrow" aria-hidden="true"><svg class="mg-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+<div class="mg-flow-node" role="listitem"><svg class="mg-flow-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><b>Your workspace</b><span>One per account; the retention period is set by the administrator</span></div>
+<div class="mg-flow-arrow" aria-hidden="true"><svg class="mg-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+<div class="mg-flow-node" role="listitem"><svg class="mg-flow-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg><b>Download or keep working</b><span>OCR, merge, compress, translate, stamp…</span></div>
+</div>
+<div class="mg-roles">
+<div class="mg-role"><div class="mg-role-h"><svg class="mg-role-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><b>Administrators</b></div><ul><li>Set up shared MFPs and choose who can use them under Members (users, groups, organisational units)</li><li>Turn off "Allow users to add their own MFPs" so everyone uses the shared ones</li><li>Use the step-by-step diagnostics and the diagnostic report to find out why a device cannot be reached</li></ul></div>
+<div class="mg-role"><div class="mg-role-h"><svg class="mg-role-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><b>Users</b></div><ul><li>See the MFPs you added and those shared by an administrator on the MFP Scan & Fetch page</li><li>Press Scan to start a scan from this site, or Retrieve to fetch documents stored on the MFP</li><li>Retrieved files are in your workspace, ready to open, download or use with other tools</li></ul></div>
+</div></div></section>
+<section id="admin" class="cp-sec cp-sec-alt"><div class="container"><h2 class="cp-sec-title">Administrators: set up shared MFPs</h2><p class="cp-sec-lead">Create it once under Settings → Shared MFPs and choose the members; they then see and use it on their own MFP Scan & Fetch page.</p><ol class="mg-steps">
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">1</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div><h4>Enter the address and test</h4><p>Enter the MFP's IP address or host name and press Connection test. It only reads the home page and the scan interface's capabilities, and sends no credentials.</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">2</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></div><h4>Check the model and save</h4><p>Check the brand, model and compatibility, then press Save as a shared MFP.</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">3</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h4>Choose members</h4><p>Press Members and tick users or groups. "N on this site" next to a group is the number of accounts already counted in it.</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">4</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><h4>Add yourself too</h4><p>Administrators must also be members for the device to appear on their own MFP Scan & Fetch page (marked "You are a member").</p></li>
+</ol><figure class="mg-shot"><a href="screenshots/en/mfp-guide/08-members.png" target="_blank" rel="noopener"><img src="screenshots/en/mfp-guide/08-members.png" alt="Members of a shared MFP: users shown as account@source, groups with the number of accounts on this site" width="1112" height="648" loading="lazy"></a><figcaption>The members panel: users are shown as <code>account@source</code>, accounts with the same name are marked, and each group shows how many accounts it has on this site.</figcaption></figure><p class="mg-note">To have everyone use only shared MFPs, turn off "Allow users to add their own MFPs" under Usage settings on the same page. Administrators are not affected.</p></div></section>
+<section id="mine" class="cp-sec"><div class="container"><h2 class="cp-sec-title">Users: My MFPs</h2><p class="cp-sec-lead">The list has the MFPs you added (visible only to your account) and those shared by an administrator; compatibility and the available actions are on the same row.</p><figure class="mg-shot"><a href="screenshots/en/mfp-guide/01-list.png" target="_blank" rel="noopener"><img src="screenshots/en/mfp-guide/01-list.png" alt="The My MFPs list: source, address, model, compatibility and scan / retrieve buttons" width="1112" height="318" loading="lazy"></a><figcaption>Source is either "Added by you" or "Shared by admin"; "Supported" means the model has been verified on a real device.</figcaption></figure><ol class="mg-steps">
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">1</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div><h4>Add your own MFP</h4><p>Enter the address under Add an MFP and press Connection test.</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">2</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div><h4>Check the result</h4><p>Brand, model, compatibility, whether it can scan from this site, and the diagnostics for every step.</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">3</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></div><h4>Save</h4><p>Give it a recognisable name and press Save this MFP; it is still there when you sign in with the same account on another computer.</p></li>
+</ol><figure class="mg-shot"><a href="screenshots/en/mfp-guide/02-test.png" target="_blank" rel="noopener"><img src="screenshots/en/mfp-guide/02-test.png" alt="Connection test result: connection, TLS, brand, model, compatibility and step-by-step diagnostics" width="1112" height="781" loading="lazy"></a><figcaption>The connection test result cards and step-by-step diagnostics; a diagnostic report can be downloaded when needed.</figcaption></figure></div></section>
+<section id="scan" class="cp-sec cp-sec-alt"><div class="container"><h2 class="cp-sec-title">Scan from this site</h2><p class="cp-sec-lead">MFPs that support eSCL have a Scan button: choose the settings here, the MFP starts scanning and the result goes straight into your workspace.</p><ol class="mg-steps">
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">1</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div><h4>Place the document</h4><p>Put the document on the flatbed glass or in the document feeder.</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">2</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></div><h4>Choose settings</h4><p>Press Scan and choose the source, colour, resolution, paper and PDF or JPEG; you can name the file first.</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">3</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><h4>Start scan</h4><p>Press Start scan. If someone else is using the device you queue automatically, and the page shows how many are ahead of you.</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">4</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div><h4>Saved to your workspace</h4><p>When it finishes you can open it, download it or continue in your workspace.</p></li>
+</ol><div class="mg-shots2"><figure class="mg-shot"><a href="screenshots/en/mfp-guide/03-scan.png" target="_blank" rel="noopener"><img src="screenshots/en/mfp-guide/03-scan.png" alt="The scan panel: source, colour, resolution, paper, format and file name" width="1112" height="270" loading="lazy"></a><figcaption>Scan settings: only the options this MFP supports are listed.</figcaption></figure><figure class="mg-shot"><a href="screenshots/en/mfp-guide/04-scan-done.png" target="_blank" rel="noopener"><img src="screenshots/en/mfp-guide/04-scan-done.png" alt="Scan finished: pages, protocol, and open / download / go to workspace" width="1112" height="406" loading="lazy"></a><figcaption>Done: saved to your workspace, ready to open or download.</figcaption></figure></div></div></section>
+<section id="fetch" class="cp-sec"><div class="container"><h2 class="cp-sec-title">Retrieve documents stored on the MFP</h2><p class="cp-sec-lead">First store the document in a mailbox, the Document Server or a box on the MFP's panel, then press Retrieve here (Mailbox retrieval on FUJIFILM).</p><ol class="mg-steps">
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">1</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div><h4>Store it on the MFP</h4><p>On the panel, store it in a mailbox, the Document Server or a box depending on the brand (see Brands below).</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">2</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h4>Enter sign-in details</h4><p>Enter the mailbox number, account or User Code as the panel requires. They are sent once; if they are wrong it stops there.</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">3</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div><h4>List and choose a location</h4><p>Press List files; switch folders under Position, and for a password-protected folder enter the password and press Open folder.</p></li>
+<li class="mg-step"><div class="mg-step-head"><span class="mg-step-n">4</span><svg class="mg-step-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></div><h4>Tick and retrieve</h4><p>Tick the documents you want, choose PDF (recommended) and press Retrieve; the files are saved to your workspace.</p></li>
+</ol><div class="mg-shots2"><figure class="mg-shot"><a href="screenshots/en/mfp-guide/05-box.png" target="_blank" rel="noopener"><img src="screenshots/en/mfp-guide/05-box.png" alt="FUJIFILM mailbox retrieval: mailbox number, document list, retrieve and fetch-and-delete" width="1112" height="590" loading="lazy"></a><figcaption>FUJIFILM mailbox retrieval: Fetch and delete removes the originals from the MFP only after confirming they were saved.</figcaption></figure><figure class="mg-shot"><a href="screenshots/en/mfp-guide/06-share.png" target="_blank" rel="noopener"><img src="screenshots/en/mfp-guide/06-share.png" alt="RICOH Document Server retrieval: sign-in method, folder selection, folder password and document list" width="1112" height="671" loading="lazy"></a><figcaption>RICOH Document Server: switch between the shared folder and device folders under Position; password-protected ones are marked.</figcaption></figure></div><figure class="mg-shot"><a href="screenshots/en/mfp-guide/07-log.png" target="_blank" rel="noopener"><img src="screenshots/en/mfp-guide/07-log.png" alt="Technical details: the protocol log and the Copy protocol log button" width="1074" height="488" loading="lazy"></a><figcaption>When something goes wrong, open Technical details and press Copy protocol log to send it to support; it contains no accounts, passwords or document contents.</figcaption></figure></div></section>
+<section id="brands" class="cp-sec cp-sec-alt"><div class="container"><h2 class="cp-sec-title">Retrieval by brand</h2><p class="cp-sec-lead">"Supported" models have passed retrieval on a real device; "Experimental" ones are based on the vendor's manuals or analysis of vendor tools and have not been verified on a real device yet.</p><div class="mg-table-wrap"><table class="mg-table"><thead><tr><th>Brand</th><th>Method</th><th>How to store it on the MFP</th><th>What to enter</th><th>Status</th></tr></thead><tbody><tr><th scope="row">FUJIFILM</th><td>Mailbox</td><td>Choose Scan to Mailbox on the panel and store it in the mailbox</td><td>Mailbox number; the password only if the mailbox has one</td><td><span class="mg-pill mg-pill-good">Supported: Apeos C5571 (same series C7071, C6571, C4571, C3571, C3071, C2571). Fetch and delete available</span></td></tr><tr><th scope="row">RICOH</th><td>Document Server</td><td>Choose Scan to Folder with Store File on the panel, into the Document Server's shared folder or a device folder</td><td>Sign-in method (no sign-in, account and password, or User Code); the folder password only if set</td><td><span class="mg-pill mg-pill-good">Supported: IM C2000, IM C2010, IM C2510, IM C3500, IM C3510; other models are experimental</span></td></tr><tr><th scope="row">KYOCERA</th><td>Document box</td><td>Store it in a custom box (the model needs a hard disk or SSD)</td><td>The MFP account and password; the box password only if set</td><td><span class="mg-pill mg-pill-exp">Experimental. On models without custom boxes, the polling box can only be listed for now</span></td></tr><tr><th scope="row">Canon</th><td>Advanced Box</td><td>Store it in the Advanced Box shared or personal space</td><td>The MFP account and password</td><td><span class="mg-pill mg-pill-exp">Experimental (WebDAV or SMB)</span></td></tr><tr><th scope="row">Konica Minolta</th><td>Public user box</td><td>Store it in a public user box</td><td>The box account and password</td><td><span class="mg-pill mg-pill-exp">Experimental (SMB)</span></td></tr><tr><th scope="row">SHARP</th><td>NAS folder</td><td>Store it in the MFP's NAS folder</td><td>The MFP account and password</td><td><span class="mg-pill mg-pill-exp">Experimental (SMB)</span></td></tr><tr><th scope="row">eSCL-capable models</th><td>Scan from this site</td><td>Nothing to store first; press Scan on this site</td><td>No credentials needed</td><td><span class="mg-pill mg-pill-scan">Can scan (HP, Epson, Brother and other eSCL-capable models)</span></td></tr></tbody></table></div></div></section>
+<section id="safety" class="cp-sec"><div class="container"><h2 class="cp-sec-title">Security and privacy</h2><p class="cp-sec-lead">MFPs often hold contracts and payslips, so every step takes the most conservative approach.</p><div class="mg-cards">
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M12 20h.01"/></svg><b>Internal network only</b><p>MFP addresses must be on the internal network; the connection test only reads the home page and the scan interface's capabilities and sends no credentials.</p></div>
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><b>Credentials never stored</b><p>Credentials entered for a retrieval are used for that retrieval only; what is remembered (mailbox number, trusted certificate and so on) is stored with your account and never includes passwords.</p></div>
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg><b>Sign-in sent only once</b><p>A wrong account, mailbox or folder password stops there with no retry using another method, so repeated failures do not get the account locked on the MFP.</p></div>
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><b>Read-only</b><p>Retrieval only lists and downloads, never deletes or renames; only FUJIFILM offers Fetch and delete, which deletes only after the files are confirmed saved.</p></div>
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><b>One at a time</b><p>Each MFP serves one person at a time; others queue automatically and nobody interrupts anyone.</p></div>
+<div class="mg-card"><svg class="mg-card-ic" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><b>Everything is logged</b><p>Who scanned or retrieved what on which device, and which originals were deleted, goes into the audit log (no passwords or document contents).</p></div>
+</div></div></section>
+<section id="faq" class="cp-sec cp-sec-alt"><div class="container"><h2 class="cp-sec-title">FAQ</h2><p class="cp-sec-lead">If something still goes wrong, start here.</p><div class="mg-faq">
+<details><summary>I cannot see an MFP shared by the administrator</summary><p>Check "Signed in as" on the page: one person's AD, SSO and local accounts are different accounts, and the member must be the one you actually sign in with. The administrator can also add a group you belong to; "0 on this site" next to a group means it was not attached at sign-in. Switching back to the tab refreshes the list.</p></details>
+<details><summary>The connection test fails or files cannot be listed</summary><p>Follow the connection test's step-by-step diagnostics from the step that failed, or download the diagnostic report (txt, md, json, html, pdf) for the administrator. KYOCERA needs the document service enabled on port 9091 or 9090; if a FUJIFILM port returns 406, choose the other connection method.</p></details>
+<details><summary>A RICOH folder needs a password</summary><p>Choose the folder under Position, enter the folder password and press Open folder. A wrong password is not retried automatically; check it and enter it again.</p></details>
+<details><summary>The list says "Retest suggested"</summary><p>The identification rules have changed since this device was tested without being identified. Press Test again to use the new rules.</p></details>
+<details><summary>Where are the retrieved files?</summary><p>In your workspace: open or download them, or pick them directly in other tools. The retention period is set by the administrator (24 hours by default).</p></details>
+<details><summary>Reporting a problem</summary><p>Open Technical details and press Copy protocol log to send it to support. The protocol log contains no accounts, passwords or document contents.</p></details>
+<p class="mg-note">To call it from your own programs, see the <a href="api-en.html#連線測試">API manual</a>.</p>
+</div></div></section>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-col">
+      <div class="footer-brand">Jason Tools Document Toolbox</div>
+      <p class="footer-tag">An integrated PDF / Office document platform: no cloud, your data stays with you.</p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">Links</div>
+      <a href="index-en.html">Home</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools" target="_blank" rel="noopener">Source</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+      <a href="troubleshooting-en.html">Install & upgrade troubleshooting</a>
+      <a href="compliance-en.html">Data protection and compliance</a>
+      <a href="mfp-fetch-en.html">MFP Scan & Fetch guide</a>
+      <a href="https://github.com/jasoncheng7115/jt-doc-tools/issues" target="_blank" rel="noopener">Report an issue</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">Author</div>
+      <p>
+        <strong>Jason Cheng</strong><br>
+        <a href="https://www.jason.tools" target="_blank" rel="noopener">Jason Tools</a>
+      </p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">Licence</div>
+      <p>GNU Affero General Public License v3.0</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">
+      © 2026 Jason Tools · Built with HTML & CSS, hosted on GitHub Pages
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

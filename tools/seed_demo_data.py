@@ -352,6 +352,14 @@ def seed_users_and_groups() -> tuple[int, int]:
         gid = group_manager.create_local(name, desc)
         permissions.set_subject_roles("group", str(gid), roles)
         n_g += 1
+    # 群組要有人：共用事務機挑成員時群組旁邊顯示「本站 N 人」，全部 0 人在說明頁的截圖上看起來像出了問題
+    #（0 人的意思是「登入時沒有掛上這個群組」）。每個群組放兩三位示範帳號，重跑時整份換掉。
+    local = [u for u in user_manager.list_users() if u.get("source") == "local"
+             and u.get("username") in {d[0] for d in DEMO_USERS}]
+    for i, g in enumerate(sorted((g for g in group_manager.list_groups() if g["name"] in {d[0] for d in DEMO_GROUPS}),
+                                 key=lambda g: g["name"])):
+        pick = [u["id"] for j, u in enumerate(local) if j % len(DEMO_GROUPS) == i or j == i + 3]
+        group_manager.set_members(g["id"], pick[:3] or [local[0]["id"]])
     return n_u, n_g
 
 
@@ -415,6 +423,73 @@ def make_meeting_transcript(dst: Path) -> Path:
     return dst
 
 
+def seed_mfp_devices() -> int:
+    """事務機掃描取件的示範資料（介紹站截圖用）：共用事務機、自己新增的、最近的掃描與取件。
+
+    **全部虛構**：位址用 `example.com` 的主機名稱（不可以出現內網 IP —— 截圖是公開的），
+    名稱與檔名用英文（中英日三種語言的截圖都會出現，中文名稱會被當成「沒翻譯」）。
+    辨識結果與 eSCL 能力表照真的連線測試存下來的形狀寫，清單上才會有「掃描」「取件」與相容性。
+    可以重複跑：先清掉自己建的那幾台。"""
+    import time
+    import uuid
+    from app.core import mfp_profiles, mfp_store
+
+    def det(vendor, family, model, status):
+        return {"vendor": vendor, "family": family, "model": model, "firmware": None, "status": status,
+                "evidence": [], "message": mfp_profiles.STATUS_MESSAGES[status], "rules": mfp_profiles.rules_signature()}
+
+    def escl(model, adf=True):
+        src = {"platen": {"colors": ["color", "gray", "bw"], "formats": ["pdf", "jpeg"], "resolutions": [200, 300, 600],
+                          "outputs": ["pdf", "jpeg"], "max_width": 2550, "max_height": 3508}}
+        if adf:
+            src["adf"] = dict(src["platen"], max_height=4200)
+            src["adf_duplex"] = dict(src["platen"], max_height=4200)
+        return {"scheme": "https", "port": 443, "version": "2.63", "model": model, "sources": src}
+
+    def report(host, d, esc, on=("https:443",)):
+        return {"tool": "mfp-fetch", "target": {"host": host, "tries": []}, "steps": [], "attempts": [],
+                "detection": d, "escl": esc,
+                "summary": {"reachable": True, "reachable_on": list(on), "tls": {"verified": False},
+                            "status": d["status"], "elapsed_ms": 180}}
+
+    devices = [
+        (mfp_store.SHARED, "3F Office", "mfp-3f.example.com",
+         det("FUJIFILM", "Apeos", "C5571", "supported"), escl("FUJIFILM Apeos C5571")),
+        (mfp_store.SHARED, "2F Sales", "mfp-2f.example.com",
+         det("Ricoh", None, "RICOH IM C3510", "supported"), escl("RICOH IM C3510")),
+        (mfp_store.SHARED, "Design Studio", "mfp-design.example.com",
+         det("Canon", None, "iR-ADV C5840", "experimental_vendor"), escl("Canon iR-ADV C5840")),
+        ("local", "My desk printer", "printer-desk.example.com",
+         det("HP", None, "LaserJet MFP M141w", "unsupported_vendor"), escl("HP LaserJet MFP M141w", adf=False)),
+    ]
+    c = mfp_store._conn()
+    hosts = [d[2] for d in devices]
+    c.execute("DELETE FROM mfp_connections WHERE host IN (%s)" % ",".join("?" * len(hosts)), hosts)
+    c.execute("DELETE FROM mfp_scans WHERE file_name LIKE 'demo-%'")      # 重跑時清掉上一輪的示範紀錄
+    ids = {}
+    for owner, name, host, d, esc in devices:
+        row = mfp_store.create(owner, None, host, None, None, name, report(host, d, esc))
+        ids[name] = row["id"]
+    # 最近的掃描與取件（全部完成；檔名都是 demo- 開頭，重跑時好清）
+    now = time.time()
+    hist = [("3F Office", "box", ["demo-contract-signed.pdf", "demo-invoice-0421.pdf"], 6, 812_000, 3600),
+            ("2F Sales", "share", ["demo-quotation-scan.pdf"], 2, 254_000, 1800),
+            ("My desk printer", "scan", ["demo-receipts.pdf"], 3, 431_000, 600)]
+    for name, kind, files, pages, size, ago in hist:
+        sid = uuid.uuid4().hex
+        mfp_store.create_scan(sid, conn_id=ids[name], owner="local", owner_user_id=None, device=name,
+                              conn_name=name, settings={}, file_name="、".join(files) if kind != "scan" else files[0],
+                              kind=kind)
+        items = None if kind == "scan" else [
+            {"doc": str(i + 1), "name": f, "status": "ok", "pages": max(1, pages // len(files)),
+             "files": [{"name": f, "kind": "pdf", "bytes": size // len(files), "pages": max(1, pages // len(files))}]}
+            for i, f in enumerate(files)]
+        mfp_store.finish_scan(sid, status="done", pages=pages, bytes=size, **({"items": items} if items else {}))
+        c.execute("UPDATE mfp_scans SET created_at=?, started_at=?, finished_at=? WHERE id=?",
+                  (now - ago, now - ago + 2, now - ago + 9, sid))
+    return len(devices)
+
+
 def main() -> int:
     import os
     if not os.environ.get("JTDT_DATA_DIR"):
@@ -459,6 +534,8 @@ def main() -> int:
           f" / {make_deident_doc(demo / 'deident.pdf', DEIDENT_LINES_EN).name}")
     print(f"掃描件：{make_scan(demo / 'scan.pdf', en).name}")
     print(f"會議逐字稿：{make_meeting_transcript(demo / 'meeting.vtt').name}")
+
+    print(f"事務機掃描取件：{seed_mfp_devices()} 台示範事務機（主機名稱都是 example.com）")
 
     n_u, n_g = seed_users_and_groups()
     print(f"示範帳號 / 群組：新增 {n_u} 位使用者、{n_g} 個群組（全部虛構）")

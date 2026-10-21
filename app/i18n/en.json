@@ -7367,7 +7367,7 @@
   "取件依原廠手冊或原廠工具的分析寫成，尚未實機驗證": "Retrieval is built from the manufacturer's manuals or an analysis of its tools and not yet verified on a real device",
   "不支援取件": "Retrieval not supported",
   "這個廠牌目前沒有取件方式；支援 eSCL 的話仍可以從本站掃描": "There is no retrieval method for this vendor yet; scanning from this site still works if the MFP supports eSCL",
-  "可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件已在 Apeos 系列部分型號實機驗證；Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA、RICOH 的直接取件是實驗功能。": "You can add MFPs, run connection tests and identify models, and scan from eSCL-capable MFPs into your workspace. Mailbox retrieval on FUJIFILM MFPs has been verified on real devices (some Apeos models); file share retrieval on Canon, Konica Minolta and SHARP MFPs and direct retrieval on KYOCERA and RICOH MFPs are experimental.",
+  "可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件（Apeos 系列部分型號）與 RICOH 的文件伺服器取件（IM C2000、IM C2010、IM C2510、IM C3500、IM C3510）已在實機驗證；Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA 與其他 RICOH 型號的直接取件是實驗功能。": "You can add MFPs, run connection tests and identify models, and scan from eSCL-capable MFPs into your workspace. Mailbox retrieval on FUJIFILM MFPs (some Apeos models) and Document Server retrieval on RICOH MFPs (IM C2000, IM C2010, IM C2510, IM C3500, IM C3510) have been verified on real devices; file share retrieval on Canon, Konica Minolta and SHARP MFPs and direct retrieval on KYOCERA and other RICOH models are experimental.",
   "純文字（.txt）": "Plain text (.txt)",
   "Markdown（.md）": "Markdown (.md)",
   "JSON 原始資料（.json）": "JSON raw data (.json)",

@@ -351,6 +351,11 @@ def test_the_page_note_names_every_vendor_that_can_retrieve():
             Path(f"app/i18n/{lang}.json").read_text(encoding="utf-8")).get(zh, "")
         missing = [v for v in vendors if v.lower() not in text.lower()]
         assert not missing, (lang, missing, text)
+        # 已在實機驗證的型號也要寫出來（v1.17.8：RICOH 五款標已支援，這句還寫著 RICOH 是實驗功能）
+        from app.core import mfp_profiles
+        models = [m for ms in mfp_profiles.VERIFIED_OTHER.values() for m in ms]
+        miss_m = [m for m in models if m.lower() not in text.lower()]
+        assert not miss_m, (lang, miss_m, text)
 
 
 def test_browsing_has_its_own_looser_limit():

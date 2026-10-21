@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **510 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **513 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -918,6 +918,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_mfp_fetch_page_browser.py` | 事務機取件頁：在真的瀏覽器裡跑一次（連線測試 → 儲存 → 詳細 → 被擋的位址） |
 | `test_mfp_fetch_page_parity.py` | 事務機掃描取件（v1.17.1）：工具頁與「設定 → 共用事務機」用同一份資料、已驗證支援清單、「可掃描」、進度條 |
 | `test_mfp_fetch_tool.py` | 事務機掃描取件：工具頁與 API |
+| `test_mfp_guide_page.py` | 介紹站「事務機掃描取件」使用說明頁（`docs/mfp-fetch.html`，v1.17.8；使用者 2026-10-21 要求） |
 | `test_mfp_prefs_and_ownership.py` | 事務機掃描取件：誰看得到哪台、換電腦後設定還在不在（v1.17.5，客戶回報「新增的事務機好像只有在該台機器有」） |
 | `test_mfp_profiles.py` | 事務機取件：型號辨識 |
 | `test_mfp_queue.py` | 事務機排隊：同一台實體設備一次只做一件事（使用者 2026-10-14：「要避免同時多人存取事務機 |
@@ -952,6 +953,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_no_partner_api_key_in_the_tree.py` | 第三方服務的 API 金鑰不可以出現在會公開或會部署出去的地方 |
 | `test_no_sample_names_in_public.py` | 測試樣本的檔名 / 客戶公司名不可以出現在會公開的檔案裡 |
 | `test_no_svg_dot_hidden.py` | SVG 元素不可以用 `.hidden` 開關顯示 |
+| `test_no_tokens_in_public.py` | 公開樹裡不可以有存取權杖（GitHub token 等）—— 推送前 `tools/check_private_names.py` 會擋 |
 | `test_no_tr_shadowing.py` | `tr` 是表格列最自然的變數名，也是前端翻譯函式的名字 —— 撞名會讓整段 JS 當場死掉 |
 | `test_no_undefined_names.py` | 程式碼裡不可以用到**從來沒定義過**的名稱（v1.16.11） |
 | `test_notify.py` | 作業完成通知：管道發送、設定分層、觸發條件 |
@@ -1176,6 +1178,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_workspace_ooxml_detect.py` | 工作區的型別判斷要以**內容型別**為準，不是主檔的路徑名 |
 | `test_workspace_save_button.py` | 「存至工作區」按鈕出現的條件，必須跟工作區真正收得下的格式一致 |
 | `test_workspace_thumb_pending.py` | 縮圖還沒做好時回的那張空白圖，不可以被瀏覽器快取 |
+| `test_zap_scan_records.py` | ZAP 掃描紀錄留存（使用者 2026-10-21：每次的報告都要留下來） |
 | `test_zip_bomb_guard.py` | zip 炸彈：**每一條讀使用者 zip 的路徑都要擋得住** |
 | `test_zulip_link.py` | Zulip 私訊 Bot 綁定（v1.17.0，Zulip 維護人員 2026-10-18 建議的方案）—— 對假 Zulip 實際走 HTTP |
 
@@ -6248,6 +6251,20 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.120 v1.17.9 — 介紹站「事務機掃描取件」使用說明頁、首頁第 17 項、工具頁說明列出已驗證型號、CodeQL 修正與發版紀錄留存（**每次發版必過**）
+
+- [ ] `docs/mfp-fetch.html`（與 -en / -ja）：頁內導覽每個錨點都到得了；流程圖、步驟卡片、廠牌表、安全卡片、常見問題排版正常（1280 與 390 寬，390 不橫向捲動）；8 張截圖各語言用自己那一組、沒有破圖。
+- [ ] 截圖沒有內網位址、本機位址、測試埠、客戶資料（`tools/capture_mfp_guide.py` 拍之前換成 example.com 與 443 / 80）。
+- [ ] 首頁第 17 項有截圖（中英日各自語言）與「看完整使用說明」連結；首頁、疑難排解、資料保護頁頁尾有連結。
+- [ ] 工具頁開頭說明與 API 手冊列出 `VERIFIED_OTHER` 的每一個型號（中英日）。
+- [ ] 協定紀錄的「細節」欄一行顯示、滑鼠提示是完整內容；「複製協定紀錄」內容完整。
+- [ ] 事務機連線最低 TLS 1.2：對只支援 TLS 1.2 以上的事務機（實機）連線測試、掃描、取件照常；Windows（truststore）也一樣。
+- [ ] MCP 上傳存進工作區失敗（例如容量滿）：回 422、`code` 是例外類別、`detail` 是固定英文說明，沒有內部訊息。
+- [ ] 推送前檢查：公開樹放一個假的 GitHub 權杖 → `tools/check_private_names.py github/` 回 1、只印檔案與行號不印權杖；沒有名單時也擋。
+- [ ] ZAP：每次掃描的資料夾有 html / json / pdf 與 `summary.json`；`temp/zap/INDEX.md` 多一行（版本、各目標網址數與 H / M / L），沒報告的資料夾標「沒有報告」。
+- [ ] CodeQL（唯讀 Token，`temp/codeql/token`）：發版前開著的每一則都有處置，發版後 CI 跑完再查一次。
+- 自動化：`tests/test_mfp_guide_page.py`、`tests/test_docs_english_pages.py`、`tests/test_mfp_fetch_tool.py::test_the_page_note_names_every_vendor_that_can_retrieve`、`tests/test_mfp_client.py::test_tls_contexts_refuse_anything_below_tls_1_2`、`tests/test_mcp_server.py::test_workspace_errors_on_upload_are_fixed_text_not_the_exception`、`tests/test_no_tokens_in_public.py`、`tests/test_zap_scan_records.py`
 
 ### 6.119 v1.17.8 — Python 3.10 的環境更新時改用安裝目錄裡的 3.12 重建、RICOH 五款標已支援（**每次發版必過**）
 

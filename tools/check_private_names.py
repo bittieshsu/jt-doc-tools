@@ -22,6 +22,13 @@ NAMES_FILE = REPO / "docs-share" / "private-names.txt"
 #: 他們的文件會寫他們自己機器的代號。這一份只有我們讀。
 HOSTS_FILE = REPO / "docs-share" / "private-hosts.txt"
 
+#: 存取權杖的格式（不需要名單，公開的 clone 上也照樣檢查）。只寫格式、不寫任何真的權杖。
+#: GitHub：`github_pat_` 細粒度、`ghp_` / `gho_` / `ghu_` / `ghs_` / `ghr_` 傳統與 App 權杖。
+SECRET_PATTERNS = [
+    re.compile(r"github_pat_[A-Za-z0-9_]{30,}"),
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}"),
+]
+
 #: 開發樹裡會被 `sync-to-github.sh` 同步出去的部分（跟它的 ITEMS 對齊）＋ 公開樹自己的檔案
 DEFAULT_ROOTS = ("app", "static", "tests", "tools", "scripts",
                  "TEST_PLAN.md", "TEST_PLAN_SECURITY.md", "github")
@@ -89,19 +96,29 @@ def scan(roots, patterns) -> list[tuple[Path, int]]:
     return hits
 
 
+def _shown(f: Path) -> str:
+    try:
+        return f.relative_to(REPO).as_posix()
+    except ValueError:
+        return f.as_posix()
+
+
 def main(argv: list[str]) -> int:
+    roots = argv or list(DEFAULT_ROOTS)
+    secret_hits = scan(roots, SECRET_PATTERNS)
+    for f, no in secret_hits:
+        print(f"{_shown(f)}:{no}")
+    if secret_hits:
+        print(f"✗ {len(secret_hits)} 行有存取權杖（GitHub token 等），不可以公開 —— 移掉之後也要到 GitHub 撤銷那一張",
+              file=sys.stderr)
+        return 1
     patterns = load_patterns() + load_host_patterns()
     if not patterns:
-        print("（沒有名單，略過）")
+        print("（沒有名單，只檢查了存取權杖）")
         return 0
-    roots = argv or list(DEFAULT_ROOTS)
     hits = scan(roots, patterns)
     for f, no in hits:
-        try:
-            shown = f.relative_to(REPO).as_posix()
-        except ValueError:
-            shown = f.as_posix()
-        print(f"{shown}:{no}")
+        print(f"{_shown(f)}:{no}")
     if hits:
         print(f"✗ {len(hits)} 行有名單上的字（客戶名稱、人名、真實會議裡的詞或內部主機代號），不可以公開",
               file=sys.stderr)

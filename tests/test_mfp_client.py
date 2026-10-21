@@ -546,3 +546,14 @@ def test_escl_manufacturer_identifies_the_vendor_when_the_home_page_says_nothing
                                                   "caps": {"manufacturer": "FUJIFILM", "sources": {}}})
     d = rep["detection"]
     assert (d["vendor"], d["model"], d["status"]) == ("FUJIFILM", "C5571", "supported"), d
+
+
+def test_tls_contexts_refuse_anything_below_tls_1_2():
+    """跟事務機連線一律最低 TLS 1.2，寫明在程式裡（不交給平台預設；CodeQL #213～#217、#223、#224）。"""
+    import ssl
+    from app.core import mfp_client as mc
+    assert mc.MIN_TLS == ssl.TLSVersion.TLSv1_2
+    for ctx in (mc._verified_context(), mc._unverified_context()):
+        assert ctx.minimum_version == ssl.TLSVersion.TLSv1_2
+    u = mc._unverified_context()
+    assert u.verify_mode == ssl.CERT_NONE and u.check_hostname is False

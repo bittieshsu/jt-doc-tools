@@ -128,3 +128,4 @@ def test_the_sync_gate_reads_the_host_list_too():
     import inspect
     src = inspect.getsource(cpn.main)
     assert "load_host_patterns()" in src
+

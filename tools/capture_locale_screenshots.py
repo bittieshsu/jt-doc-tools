@@ -55,6 +55,7 @@ SHOTS: dict[str, str] = {
     "translate-doc": "/tools/translate-doc/",
     "meeting-summary": "/tools/meeting-summary/",
     "official-doc": "/tools/official-doc/",
+    "mfp-fetch": "/tools/mfp-fetch/",
     "deident-1": "/tools/doc-deident/",
     "deident-2": "/tools/text-deident/",
     "fonts": "/admin/fonts",
@@ -157,6 +158,10 @@ RECIPES: dict[str, dict] = {
     # 公文撰擬：**要看到真的寫出來的草稿與右邊的預覽圖**。載入產品內建的範例
     # （`examples.py` 的 SIGN-01，內容虛構）再按「產生草稿」；預覽圖走 Office 引擎轉，
     # 轉圈收掉、圖真的載進來才算畫好。需要接得上的 LLM（實例的 LLM 設定要先填）。
+    # 示範事務機（`seed_demo_data.seed_mfp_devices`）：清單有共用與自己新增、相容性、掃描 / 取件，下面接最近的掃描與取件
+    "mfp-fetch": {"ready": """(() => !!document.querySelector('#mfListWrap table')
+        && document.querySelectorAll('#mfScansWrap tbody tr').length >= 3)()""",
+      "wait": 30, "scroll": False},
     "official-doc": {"before": """(() => {
         const s = document.getElementById('odExample');
         if (!s) return false;
