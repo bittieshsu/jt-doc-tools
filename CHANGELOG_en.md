@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (938 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (939 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.10] - 2026-10-21
+
+- Security reports: a new tool (`tools/build_security_reports.py`) produces three PDF reports in Chinese for delivery: a vulnerability scan, a source code analysis and a third-party component report. The vulnerability scan runs OWASP ZAP (spider, passive and active scan) against the pre-release test environment, a fresh local instance signed in as an administrator; test and download buttons that would connect to outside systems are crawled but not attacked. The report lists URL paths and parameter names only, without hosts, parameter values or cookies. The source code and component reports read the CodeQL and Dependabot results from GitHub and list the analysed commit, rule counts, fixed and reviewed alerts with reasons, and the disposition of any alert still open. The PDF layout of the MFP diagnostic report became a shared function so both use the same Chinese font selection and subsetting.
 
 ## [1.17.9] - 2026-10-21
 

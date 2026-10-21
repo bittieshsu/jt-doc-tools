@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **513 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **514 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -1090,6 +1090,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_seal_zone_marker.py` | 用印區的排除條件：**標籤才算，說明句不算** |
 | `test_seam_preview_lightbox_e2e.py` | 騎縫章的預覽點下去要看到**真的比較大**的圖（使用者 2026-09-14 要求） |
 | `test_seam_preview_speed.py` | 騎縫章預覽：只蓋要看的那一頁 |
+| `test_security_reports.py` | 交付用資安報告（`tools/build_security_reports.py`；使用者 2026-10-21：客戶要弱點掃描與原始碼檢測報告） |
 | `test_seed_bootstrap_gap.py` | 新工具要真的到得了**既有客戶**，不是只有全新安裝看得到 |
 | `test_self_intro.py` | 從逐字稿的自我介紹找出發言者可能的名字（`app/core/self_intro.py`，2026-10-03 使用者要求） |
 | `test_sessions.py` | Tests for app.core.sessions (issue / lookup / revoke). |
@@ -6251,6 +6252,16 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.121 v1.17.10 — 交付用資安報告（弱點掃描、原始碼檢測、第三方元件弱點）（**交付前必過**）
+
+- [ ] `python tools/build_security_reports.py`：三份 PDF 都產出，中文沒有方框、表格不超出頁面右緣、每頁有頁碼。
+- [ ] 弱點掃描報告：寫明受測版本、ZAP 版本、掃描方式（含主動掃描與時間上限）與排除範圍；明細只有路徑與參數名稱，**沒有 127.0.0.1 的埠、參數值、cookie**。
+- [ ] 主動掃描只打本機拋棄式實例；跑完 `temp/zap-data-delivery-*` 已刪除、沒有對外連線（排除清單涵蓋 LLM / LDAP / 通知 / 事務機 / 統編下載 / 檢查新版）。
+- [ ] 原始碼檢測報告：CodeQL 版本、兩種語言的 commit 與規則數、已修正數、已審查關閉的原因；尚未關閉的每一則都有處置說明（`temp/codeql/dispositions.json`），沒有「待處置」。
+- [ ] 第三方元件弱點報告：同一則公告在多個宣告檔只列一列；處置說明寫到 Python 3.10 的情況。
+- [ ] 事務機診斷報告的 PDF（中英日）照常（共用函式重構）。
+- 自動化：`tests/test_security_reports.py`、`tests/test_mfp_report.py`
 
 ### 6.120 v1.17.9 — 介紹站「事務機掃描取件」使用說明頁、首頁第 17 項、工具頁說明列出已驗證型號、CodeQL 修正與發版紀錄留存（**每次發版必過**）
 

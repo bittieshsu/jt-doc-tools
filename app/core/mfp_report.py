@@ -498,16 +498,23 @@ def _pick_font(text: str, locale: Optional[str]) -> Optional[tuple]:
 
 def to_pdf(doc: dict) -> bytes:
     """Story 排版成 A4。中文字型只嵌用到的字（整支 Noto CJK 十幾 MB）。"""
+    return story_pdf(_html_body(doc), doc["title"], doc.get("locale"))
+
+
+def story_pdf(body: str, title: str, locale: Optional[str] = None, css: Optional[str] = None) -> bytes:
+    """把一段 HTML 內文排成 A4 PDF（中文字型子集嵌入、頁碼）。事務機診斷報告與資安報告共用。
+
+    `css` 不給就用診斷報告的樣式；給的話整份取代（`th` / `td` 的固定寬度也要自己給）。"""
     import fitz
     from . import font_catalog
-    body = _html_body(doc)
     archive = fitz.Archive()
     # MuPDF 的表格不認百分比寬度（欄名會被擠成一字一行），PDF 另外給固定寬度（加上內距＝版面寬 515pt）；
     # 欄名底色拿掉：MuPDF 會在表格上方多畫一塊欄名底色的殘影
-    css = _CSS.replace("margin: 24px;", "margin: 0;") + \
-        "\nth { width: 120pt; background-color: transparent; } td { width: 360pt; }\n"
-    text = html.unescape(re.sub(r"<[^>]+>", "", body)) + doc["title"]
-    best = _pick_font(text, doc.get("locale"))
+    if css is None:
+        css = _CSS.replace("margin: 24px;", "margin: 0;") + \
+            "\nth { width: 120pt; background-color: transparent; } td { width: 360pt; }\n"
+    text = html.unescape(re.sub(r"<[^>]+>", "", body)) + title
+    best = _pick_font(text, locale)
     if best:
         # 只寫 `cjk` 一個字型：MuPDF 不會往字型清單的第二個找，寫成「sans-serif, cjk」
         # 中文會落到它內建的後備字型（整支 3.5 MB 嵌進去）。`pre` 要另外寫一次，
@@ -539,7 +546,7 @@ def to_pdf(doc: dict) -> bytes:
     data = out.getvalue()
     # 頁碼與標題資訊：Story 沒有頁尾，另外補
     with fitz.open("pdf", data) as d:
-        d.set_metadata({"title": doc["title"], "creator": "Jason Tools", "producer": "Jason Tools"})
+        d.set_metadata({"title": title, "creator": "Jason Tools", "producer": "Jason Tools"})
         total = d.page_count
         for i, p in enumerate(d):
             p.insert_text((page.width - 80, page.height - 24), f"{i + 1} / {total}", fontsize=8,
