@@ -5,11 +5,16 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (936 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (937 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.8] - 2026-10-21
+
+- MFP scan & fetch: RICOH IM C2000, C2010, C2510, C3500 and C3510 are now marked as supported after a customer verified retrieval on each (IM C3510 also with account sign-in, the shared and device folders and folder passwords); the retrieval panel no longer shows the experimental notice for them, and previously stored detection results are upgraded without a retest. Other RICOH models remain experimental. In "Recent scans and fetches" the MFP name now follows the current name (it used to keep the name from the time of the job), and removed MFPs are marked as removed while their records and files are kept. KYOCERA models without custom boxes (no hard disk or SSD option) now get a clear message suggesting the polling box instead of a generic device error.
+- Install and update: on Linux, an environment built on Python older than 3.11 (for example an old install on the Ubuntu 22.04 system Python) is now rebuilt once with the install directory's own Python 3.12 by `jtdt update` or by re-running the installer, so it receives the Pillow 13 security fixes (Pillow 13 needs Python 3.11+). The rebuild downloads all dependencies again and takes longer than usual; data is not affected. The project still supports Python 3.10, and Windows already uses its own Python 3.12. Because the updater is loaded before it updates itself, `jtdt update` needs to be run twice (the first run installs the new code, the second rebuilds the environment); re-running the one-line installer rebuilds it in one go.
 
 ## [1.17.7] - 2026-10-21
 

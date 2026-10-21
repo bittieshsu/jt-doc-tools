@@ -592,7 +592,21 @@ async def api_scans(request: Request):
     except _OwnerError as e:
         return _err(e.code, e.status)
     mfp_scan.prune()
-    return {"ok": True, "scans": [mfp_scan.public(r) for r in mfp_store.list_scans(who.owner, 20)]}
+    # 事務機名稱用**現在的**：紀錄裡存的是當時的名稱，改名後不會跟著變；刪掉的那台標出來（紀錄照樣可以下載）。
+    # 客戶 2026-10-21：「取件那邊名字不會變」「刪除的機器不會消失」
+    out, seen = [], {}
+    for r in mfp_store.list_scans(who.owner, 20):
+        d = mfp_scan.public(r)
+        cid = d.get("conn_id")
+        if cid is not None:
+            if cid not in seen:
+                seen[cid] = who.visible(int(cid))
+            cur = seen[cid]
+            d["conn_removed"] = cur is None
+            if cur:
+                d["conn_name"] = cur.get("display_name") or cur.get("host") or d.get("conn_name")
+        out.append(d)
+    return {"ok": True, "scans": out}
 
 
 @router.get("/api/scans/{scan_id}")

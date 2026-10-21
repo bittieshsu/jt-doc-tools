@@ -7643,5 +7643,12 @@
   "同名帳號": "Same name",
   "還有其他來源的同名帳號（例如 AD 與 SSO）：它們是不同帳號，要用哪一個登入就加哪一個": "Another account with the same name exists from a different source (for example AD and SSO): they are different accounts; add the one the person signs in with",
   "本站 {0} 人": "{0} on this site",
-  "群組後面的「本站 N 人」是登入過、已經算進這個群組的帳號數；AD 的人要登入過一次才會算進來。很多人的群組顯示 0 人，代表登入時沒有掛上這個群組。": "The \"N on this site\" after a group is the number of accounts that have signed in and are counted in it; AD users are counted after they sign in once. A large group showing 0 means the group was not attached at sign-in."
+  "群組後面的「本站 N 人」是登入過、已經算進這個群組的帳號數；AD 的人要登入過一次才會算進來。很多人的群組顯示 0 人，代表登入時沒有掛上這個群組。": "The \"N on this site\" after a group is the number of accounts that have signed in and are counted in it; AD users are counted after they sign in once. A large group showing 0 means the group was not attached at sign-in.",
+  "這個型號已在實機上驗證過取件。只會讀取（列出、下載），不會刪除、改名或寫入事務機上的文件。": "Retrieval has been verified on a real device of this model. It only reads (lists and downloads) and never deletes, renames or writes documents on the MFP.",
+  "直接取件（文件伺服器）": "Direct retrieval (Document Server)",
+  "帳號密碼登入；共用資料夾與設備資料夾（含資料夾密碼）列出文件、取件": "Account and password sign-in; listing and retrieving from the shared folder and device folders (including folder passwords)",
+  "這台事務機沒有自訂資料盒（通常要加裝硬碟或 SSD 才有）；掃描存在「遙控資料盒」的，請在位置改選遙控資料盒": "This MFP has no custom boxes (usually a hard disk or SSD option is needed); if scans are stored in the polling box, choose the polling box as the location",
+  "列出文件、取件": "Listing documents and retrieval",
+  "已移除": "Removed",
+  "這台事務機已經從清單移除；紀錄與檔案照樣保留": "This MFP has been removed from the list; the record and files are kept"
 }

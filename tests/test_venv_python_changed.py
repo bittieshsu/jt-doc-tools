@@ -223,3 +223,49 @@ def test_the_private_python_dir_is_not_tracked_by_git():
     if not sync.is_file():
         pytest.skip("公開 clone 沒有同步腳本")
     assert "\n/python/\n" in sync.read_text(encoding="utf-8")
+
+
+# ------------------------------------------------------------------ 太舊的 Python（拿不到安全性修正）
+
+def _venv_reporting(where: Path, ver: str) -> Path:
+    """一個 venv：建的版本＝現在的版本＝`ver`（bin/python 是只會回報版本的小腳本）。"""
+    venv = where / ".venv"
+    (venv / "bin").mkdir(parents=True)
+    (venv / "pyvenv.cfg").write_text(
+        f"home = {_NEUTRAL_HOME}\nimplementation = CPython\nversion_info = {ver}.12\n"
+        "include-system-site-packages = false\n", encoding="utf-8")
+    py = venv / "bin" / "python"
+    py.write_text(f"#!/bin/sh\necho {ver}\n", encoding="utf-8")
+    py.chmod(0o755)
+    return venv
+
+
+def test_update_rebuilds_an_environment_on_a_too_old_python(tmp_path, monkeypatch, capsys):
+    """Pillow 13 起要 3.11+、12.x 沒有修補版（2026-10-20）：建在系統 Python 3.10 上的環境
+    （例如 Ubuntu 22.04 的舊安裝）更新時改用安裝目錄裡的 3.12 重建一次。專案本身仍支援 3.10。"""
+    monkeypatch.setattr(cli, "_is_linux", lambda: True)
+    _venv_reporting(tmp_path, "3.10")
+    assert cli._venv_python_mismatch(tmp_path) == ("3.10", "3.10 (too old)")
+    env, args = cli._python_for_sync(tmp_path, {})
+    assert env["UV_PYTHON_PREFERENCE"] == "only-managed" and args == ["--python", cli.MANAGED_PYTHON]
+    out = capsys.readouterr().out
+    assert "3.10" in out and "security" in out and "downloaded again" in out
+    assert out.isascii(), "CLI 訊息一律英文 ASCII"
+    for ok in ("3.11", "3.12", "3.13"):
+        d = tmp_path / ok
+        _venv_reporting(d, ok)
+        assert cli._venv_python_mismatch(d) is None, ok
+
+
+def test_install_sh_rebuilds_an_environment_on_a_too_old_python(tmp_path):
+    for ver, want in (("3.10", 1), ("3.9", 1), ("3.11", 0), ("3.12", 0)):
+        d = tmp_path / ver
+        _venv_reporting(d, ver)
+        assert (_venv_ok_rc(d) != 0) == bool(want), ver
+
+
+def test_the_project_still_supports_python_3_10():
+    """使用者 2026-10-21：要換新的，但不要停止支援 3.10。"""
+    import tomllib
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert data["project"]["requires-python"] == ">=3.10"

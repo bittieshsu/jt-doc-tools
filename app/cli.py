@@ -807,6 +807,10 @@ TROUBLESHOOT_URL_EN = "https://jasoncheng7115.github.io/jt-doc-tools/troubleshoo
 #: （`/root/.local/share/uv/python` —— 服務帳號讀不到）。實測：環境壞掉時沒設這個，
 #: `uv sync` 會拿 root 家目錄裡的 Python 重建。
 MANAGED_PYTHON = "3.12"
+#: 比這個舊的 Python 拿不到安全性修正（Pillow 13 起要 3.11+，12.x 沒有修補版，2026-10-20）。
+#: Linux 上建在這種系統 Python 上的環境，`jtdt update` 改用安裝目錄裡的 Python 3.12 重建一次。
+#: 專案本身仍支援 3.10（使用者 2026-10-21：要換新的、但不要停止支援 3.10）。
+MIN_SECURE_PYTHON = (3, 11)
 
 
 def _venv_python_mismatch(root: Path) -> Optional[tuple[str, str]]:
@@ -827,6 +831,11 @@ def _venv_python_mismatch(root: Path) -> Optional[tuple[str, str]]:
         return (built, "broken")
     if cur != built:
         return (built, cur)
+    try:
+        if tuple(int(x) for x in cur.split(".")[:2]) < MIN_SECURE_PYTHON:
+            return (built, cur + " (too old)")
+    except ValueError:
+        pass
     # Python 在某個人的家目錄裡（舊版 `jtdt update` 用 root 跑 `uv sync` 可能拿
     # `/root/.local/share/uv/python` 重建）：root 跑得動、服務帳號讀不到 —— 也要重建
     if _is_linux():
@@ -858,8 +867,12 @@ def _python_for_sync(root: Path, env: dict) -> tuple[dict, list]:
     bad = _venv_python_mismatch(root)
     if bad:
         built, cur = bad
-        print(f"The Python environment was built with Python {built} but now runs on {cur} "
-              f"(operating-system upgrade?).")
+        if cur.endswith("(too old)"):
+            print(f"The Python environment uses Python {built}, which cannot receive current security "
+                  f"fixes (Pillow 13 needs Python {MIN_SECURE_PYTHON[0]}.{MIN_SECURE_PYTHON[1]}+).")
+        else:
+            print(f"The Python environment was built with Python {built} but now runs on {cur} "
+                  f"(operating-system upgrade?).")
         print(f"Rebuilding it with a private Python {MANAGED_PYTHON} under {root / 'python'} - "
               f"all dependencies are downloaded again, this can take a while ...")
         env["UV_PYTHON_PREFERENCE"] = "only-managed"

@@ -245,3 +245,21 @@ def test_member_picker_shows_how_many_accounts_each_group_has_here(people):
     p = people
     gs = {g["key"]: g for g in p["admin"].get(f"{API}/shared-subjects").json()["groups"]}
     assert gs[str(p["g"])]["members"] == 1      # people 夾具：三樓行政只有 ub
+
+
+def test_scan_history_shows_the_current_name_and_marks_removed_devices(people):
+    """客戶 2026-10-21：改了事務機名稱，「最近的掃描與取件」還是舊名；刪掉的機器在那張表裡「不會消失」。
+    紀錄存的是當時的名稱 → 清單改成用現在的名稱，刪掉的那台標「已移除」（紀錄與檔案照樣保留）。"""
+    p = people
+    cid = _make_shared(p["admin"], host="192.168.1.63", name="C3510")
+    p["admin"].put(f"{API}/shared/{cid}/members", json={"members": [{"type": "user", "key": str(p["ua"])}]})
+    own = _save_own(p["a"], host="192.168.1.64")
+    for sid, conn, name in (("e" * 32, cid, "C3510"), ("d" * 32, own, "自己的")):
+        mfp_store.create_scan(sid, conn_id=conn, owner=f"u{p['ua']}", owner_user_id=p["ua"], device="192.168.1.x",
+                              conn_name=name, settings={}, file_name="scan.pdf", kind="share")
+    assert p["admin"].patch(f"{API}/shared/{cid}", json={"display_name": "Ricoh IM C3510 總經理室"}).status_code == 200
+    assert p["a"].delete(f"{API}/connections/{own}").status_code == 200
+    rows = {r["id"]: r for r in p["a"].get(f"{API}/scans").json()["scans"]}
+    assert rows["e" * 32]["conn_name"] == "Ricoh IM C3510 總經理室" and rows["e" * 32]["conn_removed"] is False
+    assert rows["d" * 32]["conn_name"] == "自己的" and rows["d" * 32]["conn_removed"] is True
+    assert own not in [x["id"] for x in p["a"].get(f"{API}/connections").json()["connections"]], "刪掉的那台不在清單裡"

@@ -861,7 +861,7 @@
   "：要登入後才能辨識型號": ": the model can only be identified after signing in",
   "：無法辨識型號": ": the model could not be identified",
   "：連不上設備": ": the device could not be reached",
-  "目前不會回傳 <code>supported</code>，要等某個型號在實機上驗證通過才會有。": "<code>supported</code> is never returned for now; it will appear once a model passes verification on a real device.",
+  "已在實機上通過取件的型號回 <code>supported</code>：FUJIFILM Apeos C5571（同系列另標 <code>supported_same_series</code>），RICOH IM C2000 / C2010 / C2510 / C3500 / C3510。之前存下的辨識結果會套用目前的清單，不必重新測試。": "<code>supported</code> means the model has passed retrieval on a real device: FUJIFILM Apeos C5571 (the same series is marked <code>supported_same_series</code>) and RICOH IM C2000 / C2010 / C2510 / C3500 / C3510. Previously stored detection results follow the current list, so no retest is needed.",
   "儲存只收連線測試回的 <code>token</code>（不收位址），存下來的一定是測過的那一台；token 過期或不是本人的回 <code>410</code>。 同一個位址與連線方式重複儲存回 <code>409</code>（<code>DUPLICATE</code>），每人最多 20 台（<code>LIMIT</code>）。 目前<strong>不儲存任何帳密</strong>。": "Saving accepts only the <code>token</code> returned by the connection test (not an address), so what is saved is always the device that was tested; an expired token or one belonging to someone else returns <code>410</code>. Saving the same address and connection twice returns <code>409</code> (<code>DUPLICATE</code>), and each person can save up to 20 (<code>LIMIT</code>). For now <strong>no credentials are stored</strong>.",
   "掃描（eSCL）": "Scanning (eSCL)",
   "共用事務機（管理員）": "Shared MFPs (administrators)",

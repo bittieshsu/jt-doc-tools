@@ -139,6 +139,7 @@
 .mf-src.own { background:#f1f5f9; color:#475569; }
 .mf-tag.busy { background:#fef3c7; color:#92400e; }
 .mf-tag.stale { background:#e0f2fe; color:#075985; }
+.mf-beta-note.mf-verified-note { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
 .mf-tag.member { background:#dcfce7; color:#166534; }
 .mf-tag.dup { background:#fef3c7; color:#92400e; }
 .mf-go-tool { display:inline-flex; align-items:center; gap:4px; margin-left:6px; font-weight:600; white-space:nowrap; }
@@ -504,6 +505,7 @@
     <button type="button" class="btn btn-secondary btn-small" id="mfShareClose">{{ icon('close', size=14) }} <span>{{ tr('收合') }}</span></button>
   </div>
   <div class="mf-beta-note" id="mfShareNoteManual">{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依原廠手冊公開的方式寫成，還沒在實機上驗證過。只會讀取（列出、下載），不會刪除、改名或寫入事務機上的檔案。') }}</span></div>
+  <div class="mf-beta-note mf-verified-note" id="mfShareNoteVerified" hidden>{{ icon('check', size=16) }}<span>{{ tr('這個型號已在實機上驗證過取件。只會讀取（列出、下載），不會刪除、改名或寫入事務機上的文件。') }}</span></div>
   <div class="mf-beta-note" id="mfShareNoteDirect" hidden>{{ icon('info', size=16) }}<span>{{ tr('實驗功能：依原廠工具的分析寫成，不是原廠公開的介面，還沒在實機上驗證過。只會讀取（列出、下載），不會刪除、改名或寫入事務機上的文件。') }}</span></div>
   <form id="mfShareForm" class="mf-box-form" autocomplete="off">
     <div id="mfShareRouteWrap" hidden>
@@ -1514,7 +1516,13 @@
         what.append(txt(s.file_name || ''));
       }
       const devTd = el('td');
-      devTd.append(el('div', 'mf-cap', s.conn_name || ''));
+      const capEl = el('div', 'mf-cap', s.conn_name || '');
+      if (s.conn_removed) {
+        const tg = el('span', 'mf-tag paused', tr('已移除'));
+        tg.title = tr('這台事務機已經從清單移除；紀錄與檔案照樣保留');
+        capEl.append(tg);
+      }
+      devTd.append(capEl);
       r.append(el('td', null, fmtTime(s.created_at)), devTd, whatTd);
       const st = el('td', null, scanStateText(s));
       if (viaText(s)) st.append(el('span', 'mf-sub', viaText(s)));
@@ -1856,8 +1864,11 @@
     boxEl('mfShareExtraWrap').hidden = !soap;
     boxEl('mfShareExtraLabel').textContent = soap === 'kyocera' ? tr('文件匣密碼（沒有設就留空）')
       : tr('文件密碼（有設密碼的文件才要填）');
-    boxEl('mfShareNoteManual').hidden = !!soap;
-    boxEl('mfShareNoteDirect').hidden = !soap;
+    // 已在實機驗證過的型號（相容性「已支援」）：不再顯示「實驗功能、還沒在實機上驗證」
+    const verified = !!shareConn && shareConn.detect_status === 'supported';
+    boxEl('mfShareNoteManual').hidden = !!soap || verified;
+    boxEl('mfShareNoteDirect').hidden = !soap || verified;
+    boxEl('mfShareNoteVerified').hidden = !verified;
   }
   async function openShare(c) {
     await loadPrefs(c, 'share');

@@ -145,6 +145,7 @@ def test_kyocera_and_ricoh_retrieval_flow(live):
         assert "文件匣密碼" in t.js("document.getElementById('mfShareExtraLabel').innerText")
         assert t.js("document.getElementById('mfShareNoteManual').hidden") \
             and not t.js("document.getElementById('mfShareNoteDirect').hidden"), "說明要換成「依原廠工具的分析」"
+        assert t.js("document.getElementById('mfShareNoteVerified').hidden"), "沒驗證過的型號不可以顯示「已在實機上驗證」"
         t.js("""(() => { const s = document.getElementById('mfShareRoute'); s.value = 'kyocera_soap_http';
                          s.dispatchEvent(new Event('change')); return true; })()""")
         t.js("document.getElementById('mfShareUser').value = 'clerk'; document.getElementById('mfSharePw').value = 'pw-1'")

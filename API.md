@@ -2346,7 +2346,7 @@ curl -X POST http://localhost:8765/tools/mfp-fetch/api/detect \
 - `unknown`：無法辨識型號
 - `unreachable`：連不上設備
 
-目前不會回傳 `supported`，要等某個型號在實機上驗證通過才會有。
+已在實機上通過取件的型號回 `supported`：FUJIFILM Apeos C5571（同系列另標 `supported_same_series`），RICOH IM C2000 / C2010 / C2510 / C3500 / C3510。之前存下的辨識結果會套用目前的清單，不必重新測試。
 
 ### 我的事務機
 

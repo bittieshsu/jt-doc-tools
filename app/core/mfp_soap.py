@@ -108,6 +108,7 @@ MESSAGES: dict[str, str] = {
     "BOX_PASSWORD_FAILED": "文件匣密碼不對，或這個文件匣需要密碼",
     "DOC_PASSWORD_REQUIRED": "這份文件有設密碼：請在「文件密碼」輸入後再取件",
     "DOC_PASSWORD_FAILED": "文件密碼不對",
+    "KYOCERA_BOX_NOT_INSTALLED": "這台事務機沒有自訂資料盒（通常要加裝硬碟或 SSD 才有）；掃描存在「遙控資料盒」的，請在位置改選遙控資料盒",
     "KYOCERA_POLLING_DOWNLOAD_UNCONFIRMED": "遙控資料盒目前只能列出文件：取件要帶的參數還在向原廠資料確認，確認之前不送出（不會用猜的值去試）",
     "FOLDER_PASSWORD_REQUIRED": "這個資料夾有設密碼：請在「資料夾密碼」輸入後再列出（只送一次）",
     "FOLDER_PASSWORD_FAILED": "資料夾密碼驗證沒有通過（只送了這一次；連續輸入錯誤太多次，設備會鎖定這個資料夾）",
@@ -361,6 +362,8 @@ _KYO_ERRORS = {
     "DOCUMENT_NOT_FOUND_ERROR": "SHARE_FILE_GONE",
     "FILE_NOT_FOUND_ERROR": "SHARE_FILE_GONE",
     "INVALID_OPERATION_ID_ERROR": "SESSION_EXPIRED",
+    # 列自訂資料盒時設備回這個：沒有自訂資料盒這項功能（沒裝硬碟 / SSD 的機型，客戶 ECOSYS M6535cidn 2026-10-21）
+    "NOT_INSTALLED_ERROR": "KYOCERA_BOX_NOT_INSTALLED",
 }
 _KYO_OK = {"", "SUCCESS", "ALL_GET_COMPLETE"}
 _KYO_AUTH_METHODS = {"LOCAL_AUTHENTICATION", "NETWORK_AUTHENTICATION"}

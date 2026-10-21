@@ -1178,3 +1178,42 @@ def test_kyocera_polling_box_still_preparing_is_not_an_empty_list(kyo, monkeypat
     assert ei.value.code == "SOAP_BUSY"
     assert "destroy_pollingbox_document_enumeration" in [c["method"] for c in kyo.calls]
     s.close()
+
+
+
+# ------------------------------------------------------------ 已實機驗證的 RICOH 型號、KYOCERA 沒有自訂資料盒（v1.17.8）
+
+@pytest.mark.parametrize("model,status", [
+    ("RICOH IM C3510", "supported"), ("IM C2000", "supported"), ("ricoh im  c2010", "supported"),
+    ("RICOH IM C2510", "supported"), ("RICOH IM C3500", "supported"),
+    ("RICOH IM C3010", "experimental_vendor"), ("RICOH IM C6010", "experimental_vendor")])
+def test_ricoh_models_verified_on_real_devices_are_supported(model, status):
+    """使用者 2026-10-21：客戶在 IM C2000 / C2010 / C2510 / C3500 / C3510 測過取件都 OK → 標「已支援」；其他型號仍是實驗功能。"""
+    from app.core import mfp_profiles
+    det = mfp_profiles.detect([{"scheme": "http", "port": 80, "path": "/", "title": "Web Image Monitor",
+                                "text_full_for_detection": "RICOH", "headers": []}], escl_model=model)
+    assert det["vendor"] == "Ricoh" and det["status"] == status, det
+    assert mfp_profiles.effective_status("Kyocera", "IM C3510", "experimental_vendor") == "experimental_vendor", "只看 RICOH"
+
+
+def test_stored_results_are_upgraded_without_a_retest(tmp_path, monkeypatch):
+    """客戶的 C3510 存著「實驗功能」的結果：清單與詳細直接顯示「已支援」，不必請客戶重新測試。"""
+    from app.core import mfp_store
+    det = {"vendor": "Ricoh", "family": None, "model": "RICOH IM C3510", "status": "experimental_vendor",
+           "message": "x", "evidence": []}
+    c = mfp_store.create("u424242", 424242, "192.168.7.31", None, None, "C3510", {"detection": det, "summary": {}})
+    try:
+        assert mfp_store.get_for("u424242", c["id"])["detect_status"] == "supported"
+        rep = mfp_store.get_for("u424242", c["id"], with_report=True)["last_report"]
+        assert rep["detection"]["status"] == "supported" and "實機驗證" in rep["detection"]["message"]
+    finally:
+        mfp_store.delete("u424242", c["id"])
+
+
+def test_kyocera_without_custom_boxes_says_so():
+    """客戶 ECOSYS M6535cidn：列自訂資料盒時設備回 NOT_INSTALLED_ERROR —— 講出「沒有自訂資料盒、改選遙控資料盒」，
+    不是通用的「設備回報無法完成這個操作」。"""
+    from app.core import mfp_soap
+    assert mfp_soap._KYO_ERRORS["NOT_INSTALLED_ERROR"] == "KYOCERA_BOX_NOT_INSTALLED"
+    msg = mfp_soap.MESSAGES["KYOCERA_BOX_NOT_INSTALLED"]
+    assert "自訂資料盒" in msg and "遙控資料盒" in msg

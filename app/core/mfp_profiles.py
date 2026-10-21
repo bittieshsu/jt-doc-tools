@@ -35,6 +35,36 @@ VERIFIED_PROFILES: frozenset[tuple[str, str]] = frozenset({
     ("Apeos", "C5571"),          # 2026-10-19 客戶實機：信箱列文件、取件（TIFF → PDF）成功，報告在 docs-share/mfp-fetch/field-reports/
 })
 
+#: FUJIFILM 以外、已在實機上通過取件的型號（廠牌 → 型號，比對時不分大小寫、去掉前面的廠牌字樣）。
+#: 2026-10-21 客戶實機：RICOH IM C3510 帳號密碼登入、文件伺服器（共用資料夾與設備資料夾、資料夾密碼）列出與取件成功；
+#: 同一位客戶另外在 IM C2000 / C2010 / C2510 / C3500 也測過取件正常。使用者同意標「已支援」；其他型號仍是實驗功能。
+VERIFIED_OTHER: dict[str, frozenset[str]] = {
+    "Ricoh": frozenset({"IM C2000", "IM C2010", "IM C2510", "IM C3500", "IM C3510"}),
+}
+
+
+def _norm_model(vendor: str, model: str) -> str:
+    m = re.sub(r"\s+", " ", (model or "").strip()).upper()
+    v = (vendor or "").strip().upper()
+    if v and m.startswith(v + " "):
+        m = m[len(v) + 1:]
+    return m
+
+
+def verified_other(vendor: Optional[str], model: Optional[str]) -> bool:
+    """FUJIFILM 以外的這台（廠牌＋型號）是不是已在實機上驗證過取件。"""
+    want = {_norm_model(vendor or "", x) for x in VERIFIED_OTHER.get(vendor or "", ())}
+    return bool(model) and _norm_model(vendor or "", model) in want
+
+
+def effective_status(vendor: Optional[str], model: Optional[str], status: Optional[str]) -> Optional[str]:
+    """存起來的辨識結果套上目前的已驗證清單：之前判成「實驗功能」、現在已驗證的型號改成「已支援」，
+    不必請使用者重新測試（2026-10-21 RICOH IM C3510）。"""
+    if status == "experimental_vendor" and verified_other(vendor, model):
+        return "supported"
+    return status
+
+
 #: 同系列 → 以哪一款實機驗證。Apeos C7071 / C6571 / C5571 / C4571 / C3571 / C3071 / C2571 是同一個系列
 #: （原廠同一份參考手冊；C3071 是海外型號、C2571 是日本型號）。前一代（C5570 等）不算。
 SAME_SERIES: dict[tuple[str, str], tuple[str, str]] = {
@@ -50,8 +80,10 @@ FIELD_TESTS: tuple[dict, ...] = (
     {"vendor": "FUJIFILM", "models": ("Apeos C7071", "Apeos C6571", "Apeos C4571", "Apeos C3571", "Apeos C3071",
                                       "Apeos C2571"),
      "feature": "機內信箱取件", "result": "same_series", "note": "同系列，以 Apeos C5571 實機驗證", "date": ""},
-    {"vendor": "RICOH", "models": ("IM C3500", "IM C3510"), "feature": "直接取件（不需登入）", "result": "partial",
-     "note": "已列出文件伺服器的文件；取件尚待驗證", "date": "2026-10-19"},
+    {"vendor": "RICOH", "models": ("IM C3510",), "feature": "直接取件（文件伺服器）", "result": "verified",
+     "note": "帳號密碼登入；共用資料夾與設備資料夾（含資料夾密碼）列出文件、取件", "date": "2026-10-21"},
+    {"vendor": "RICOH", "models": ("IM C2000", "IM C2010", "IM C2510", "IM C3500"), "feature": "直接取件（文件伺服器）",
+     "result": "verified", "note": "列出文件、取件", "date": "2026-10-21"},
     {"vendor": "HP", "models": ("LaserJet MFP M141w",), "feature": "eSCL 掃描", "result": "verified",
      "note": "平台玻璃掃描存進工作區", "date": "2026-10-14"},
 )
@@ -198,6 +230,7 @@ def rules_signature() -> str:
     parts += [f"{n}={rx.pattern}" for n, rx in sorted(_OTHER_MODELS.items())]
     parts += sorted(map(str, VERIFIED_PROFILES)) + sorted(map(str, SAME_SERIES)) + sorted(map(str, FIRST_BATCH))
     parts += sorted(EXPERIMENTAL_VENDORS)
+    parts += sorted(f"{v}={m}" for v, ms in VERIFIED_OTHER.items() for m in ms)
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
@@ -285,6 +318,7 @@ def detect(pages: list[dict], escl_model: str = "") -> dict[str, Any]:
         else:
             if any(p.get("password_inputs") for p in pages):
                 res["status"] = "login_required"
+    res["status"] = effective_status(res["vendor"], res["model"], res["status"])
     res["evidence"] = ev
     res["evidence_count"] = len(ev)
     res["message"] = STATUS_MESSAGES[res["status"]]

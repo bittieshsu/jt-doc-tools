@@ -810,6 +810,10 @@ venv_ok() {
     [ -n "$want" ] || want="$(sed -n 's/^version *= *\([0-9]*\.[0-9]*\).*/\1/p' "$cfg" | head -1)"
     got="$("$py" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)" || return 1
     [ -z "$want" ] || [ "$want" = "$got" ] || return 1
+    # 比 3.11 舊的 Python 拿不到安全性修正（Pillow 13 要 3.11+）：用安裝目錄裡的 Python 3.12 重建一次
+    case "$got" in
+        2.*|3.[0-9]|3.10) return 1 ;;
+    esac
     # Python 在某個人的家目錄裡（root 跑得動、服務帳號讀不到）也算壞的
     case "$(sed -n 's/^home *= *//p' "$cfg" | head -1)" in
         /root/*|/home/*) return 1 ;;

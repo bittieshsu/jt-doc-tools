@@ -203,7 +203,14 @@ def _row(r: sqlite3.Row, with_report: bool = False) -> dict[str, Any]:
     rules = ((rep or {}).get("detection") or {}).get("rules")
     d["rules_stale"] = bool(rep) and r["detect_status"] in mfp_profiles.RECHECK_STATUSES \
         and rules != mfp_profiles.rules_signature()
+    # 存起來的結果套上目前的已驗證清單（之前判成實驗功能、現在已驗證的型號 → 已支援；不必重新測試）
+    d["detect_status"] = mfp_profiles.effective_status(r["vendor"], r["model"], r["detect_status"])
     if with_report:
+        if rep and isinstance(rep.get("detection"), dict):
+            det = rep["detection"]
+            st = mfp_profiles.effective_status(det.get("vendor"), det.get("model"), det.get("status"))
+            if st != det.get("status"):
+                rep = dict(rep, detection=dict(det, status=st, message=mfp_profiles.STATUS_MESSAGES.get(st, det.get("message"))))
         d["last_report"] = rep
     return d
 
