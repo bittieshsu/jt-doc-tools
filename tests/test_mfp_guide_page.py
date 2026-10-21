@@ -79,5 +79,6 @@ def test_no_internal_addresses_on_the_page(lang):
 def test_capture_tool_rewrites_local_addresses_before_shooting():
     """截圖是公開的：拍之前把本機位址、測試埠換成範例主機名稱與 443 / 80（換法寫在截圖工具裡）。"""
     src = (ROOT / "tools/capture_mfp_guide.py").read_text(encoding="utf-8")
-    assert "example.com" in src and "127\\\\.0\\\\.0\\\\." in src and "HTTPS?" in src
+    # 比對的是原始碼裡有沒有寫這幾段（不是檢查網址），用 re.search 寫
+    assert re.search(r"example\.com", src) and "127\\\\.0\\\\.0\\\\." in src and "HTTPS?" in src
     assert "_shoot(" in src and src.count("t.js(rewrite)") == 1

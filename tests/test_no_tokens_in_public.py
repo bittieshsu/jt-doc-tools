@@ -35,9 +35,9 @@ def test_a_planted_token_stops_the_publish_even_without_the_name_list(tmp_path, 
 
 def test_ordinary_text_about_tokens_is_not_a_token(tmp_path):
     (tmp_path / "doc.md").write_text("在 GitHub 建立 github_pat_ 開頭的細粒度權杖；ghp_ 是傳統權杖。\n", encoding="utf-8")
-    assert cpn.scan([str(tmp_path)], cpn.SECRET_PATTERNS) == []
+    assert cpn.scan([str(tmp_path)], cpn.LEAK_FORMATS) == []
 
 
 def test_no_token_is_in_what_gets_published():
     roots = [public_root(ROOT)] if not is_development_tree(ROOT) else list(cpn.DEFAULT_ROOTS)
-    assert cpn.scan(roots, cpn.SECRET_PATTERNS) == []
+    assert cpn.scan(roots, cpn.LEAK_FORMATS) == []

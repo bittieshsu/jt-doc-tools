@@ -24,7 +24,7 @@ HOSTS_FILE = REPO / "docs-share" / "private-hosts.txt"
 
 #: 存取權杖的格式（不需要名單，公開的 clone 上也照樣檢查）。只寫格式、不寫任何真的權杖。
 #: GitHub：`github_pat_` 細粒度、`ghp_` / `gho_` / `ghu_` / `ghs_` / `ghr_` 傳統與 App 權杖。
-SECRET_PATTERNS = [
+LEAK_FORMATS = [
     re.compile(r"github_pat_[A-Za-z0-9_]{30,}"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}"),
 ]
@@ -105,11 +105,11 @@ def _shown(f: Path) -> str:
 
 def main(argv: list[str]) -> int:
     roots = argv or list(DEFAULT_ROOTS)
-    secret_hits = scan(roots, SECRET_PATTERNS)
-    for f, no in secret_hits:
+    leaked_lines = scan(roots, LEAK_FORMATS)
+    for f, no in leaked_lines:
         print(f"{_shown(f)}:{no}")
-    if secret_hits:
-        print(f"✗ {len(secret_hits)} 行有存取權杖（GitHub token 等），不可以公開 —— 移掉之後也要到 GitHub 撤銷那一張",
+    if leaked_lines:
+        print(f"✗ {len(leaked_lines)} 行有存取權杖（GitHub token 等），不可以公開 —— 移掉之後也要到 GitHub 撤銷那一張",
               file=sys.stderr)
         return 1
     patterns = load_patterns() + load_host_patterns()
