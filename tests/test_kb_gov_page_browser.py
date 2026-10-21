@@ -314,8 +314,11 @@ def test_gov_page_boots_searches_selects_and_imports(live):
         assert click_text(moj, "全選")
         assert wait_for("document.querySelector('section[data-gid=\"moj\"] .gv-stat[data-stat=\"selected\"] .gv-stat-num')"
                         f".textContent.trim() === '{sel0 + 3:,}'"), js(_STATUS_JS)["moj"]["selected"]
-        ticks = js("[...document.querySelectorAll('section[data-gid=\"moj\"] .gv-items li')].map((li) =>"
+        # 等「勾選狀態」本身，不是等計數：計數先更新、清單隨後才重畫勾勾 —— CI 比較慢時讀到一半（2026-10-21 CI 紅過）
+        tick_js = ("[...document.querySelectorAll('section[data-gid=\"moj\"] .gv-items li')].map((li) =>"
                    " [li.textContent.includes('已廢止範例條例'), li.querySelector('input').checked])")
+        wait_for("(() => { const t = " + tick_js + "; return t.length === 4 && t.every(([dead, on]) => dead !== on); })()")
+        ticks = js(tick_js)
         assert sorted(ticks) == [[False, True]] * 3 + [[True, False]], ticks
         assert wait_for("[...document.querySelectorAll('#toast-host .toast')].some((t) =>"
                         " t.textContent.includes('1 項已廢止'))"), "略過已廢止的要講出來"
