@@ -6,6 +6,17 @@
 
 ---
 
+## [1.17.7] - 2026-10-21
+
+### 資安
+
+- Pillow 12.3.0 → 13.0.0：修正 JPEG 解碼的 heap overflow（critical）與 TIFF、GIF、PDF 頁面樹、形態運算等 6 個 high、2 個 moderate（2026-10-20 公告）。本站解使用者上傳的圖片與 PDF 裡的 JPEG，影響是直接的。
+- certifi 2026.4.22 → 2026.10.19：拿掉中繼憑證金鑰外洩的 emSign 根憑證（critical）。
+
+### 已知議題
+
+- **Pillow 13 起要 Python 3.11 以上**，Pillow 12 沒有修補版。用 Python 3.10 的安裝（例如 Ubuntu 22.04 的系統 Python）只能留在 Pillow 12.3.0，上面那幾個問題仍在；請改用 Python 3.11 以上。certifi 的修正不受影響。
+
 ## [1.17.6] - 2026-10-21
 
 ### AD 群組

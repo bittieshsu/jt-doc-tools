@@ -5,11 +5,16 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (935 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (936 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.7] - 2026-10-21
+
+- Security: Pillow 12.3.0 → 13.0.0, fixing a heap overflow in JPEG decoding (critical) plus 6 high and 2 moderate issues in TIFF, GIF, PDF page trees and morphology (published 2026-10-20); this site decodes uploaded images and JPEGs inside PDFs, so it is directly affected. certifi 2026.4.22 → 2026.10.19, removing the emSign root CAs whose intermediate keys were compromised (critical).
+- Known issue: Pillow 13 requires Python 3.11 or later and Pillow 12 has no patched release, so installs on Python 3.10 (for example the Ubuntu 22.04 system Python) stay on Pillow 12.3.0 with those issues; please move to Python 3.11 or later. The certifi fix applies regardless.
 
 ## [1.17.6] - 2026-10-21
 

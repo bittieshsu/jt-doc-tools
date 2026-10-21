@@ -1,6 +1,6 @@
 [project]
 name = "jt-doc-tools"
-version = "1.17.6"
+version = "1.17.7"
 description = "Jason Tools 文件工具箱 — 整合式 PDF / Office 文件處理平台"
 authors = [{ name = "Jason Cheng (Jason Tools)", email = "jason@jason.tools" }]
 requires-python = ">=3.10"
@@ -47,7 +47,12 @@ dependencies = [
     # **原本只是傳遞相依**，直接 import 就要自己宣告，不然沒裝到的機器上
     # 那支工具會在註冊時安靜地被跳過（同 defusedxml 那次）。
     "Pygments>=2.17,<3",
-    "Pillow>=12.3.0,<13",
+    # Pillow 13.0.0：JPEG 解碼 heap overflow（critical）＋ TIFF / GIF / PDF 等 6 個 high（2026-10-20 公告）。
+    # **13 起要 Python 3.11+**、12.x 沒有修補版 → 3.10 只能留在 12.3（已知議題，見 CHANGELOG）。
+    "Pillow>=13.0.0,<14; python_version >= '3.11'",
+    "Pillow>=12.3.0,<13; python_version < '3.11'",
+    # certifi 2026.10.19：拿掉金鑰外洩的 emSign 根憑證（critical，2026-10-20 公告）。明列下限，既有環境才會升上來
+    "certifi>=2026.10.19",
     # pillow-heif — iPhone 拍的 HEIC / HEIF。**Pillow 本身不認這個格式**，
     # 而我們的「圖片轉 PDF」從一開始就在畫面、副檔名白名單、搜尋關鍵字四個
     # 地方宣稱支援 HEIC —— 只有真的要解碼時才爆（GitHub issue #49）。

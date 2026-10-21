@@ -49,6 +49,8 @@ NOT_ON_DEPS_PAGE = {
     # （pyasn1：DoS；idna：CVE-2026-45409）。程式沒有直接用它們，缺了也
     # 輪不到相依頁面提醒 —— 依賴它們的套件自己就裝不起來了。
     "pyasn1", "idna",
+    # certifi 同上：httpx / httpcore 的傳遞相依，v1.17.7 為了拿掉金鑰外洩的 emSign 根憑證才明列下限
+    "certifi",
 }
 
 

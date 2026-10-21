@@ -27,17 +27,26 @@ from packaging.version import Version
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def _pyproject_deps() -> dict[str, Requirement]:
+def _pyproject_all() -> dict[str, list[Requirement]]:
+    """同一個套件可能依 Python 版本分成好幾行（v1.17.7：Pillow 13 要 3.11+，3.10 留 12.x）。"""
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    out = {}
+    out: dict[str, list[Requirement]] = {}
     for raw in data["project"]["dependencies"]:
         r = Requirement(raw)
-        out[r.name.lower().replace("_", "-")] = r
+        out.setdefault(r.name.lower().replace("_", "-"), []).append(r)
     return out
 
 
+def _pyproject_deps() -> dict[str, Requirement]:
+    return {k: v[0] for k, v in _pyproject_all().items()}
+
+
 def _requirements() -> dict[str, Requirement]:
-    out = {}
+    return {k: v[0] for k, v in _requirements_all().items()}
+
+
+def _requirements_all() -> dict[str, list[Requirement]]:
+    out: dict[str, list[Requirement]] = {}
     for raw in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -52,14 +61,17 @@ def _requirements() -> dict[str, Requirement]:
             r = Requirement(line)
         except Exception:            # noqa: BLE001 — 例如 `--index-url` 這種行
             continue
-        out[r.name.lower().replace("_", "-")] = r
+        out.setdefault(r.name.lower().replace("_", "-"), []).append(r)
     return out
 
 
-def _locked() -> dict[str, str]:
+def _locked() -> dict[str, list[str]]:
+    """同一個套件可能鎖好幾個版本（依 Python 版本分流）。"""
     data = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
-    return {p["name"].lower().replace("_", "-"): p.get("version", "")
-            for p in data.get("package", [])}
+    out: dict[str, list[str]] = {}
+    for p in data.get("package", []):
+        out.setdefault(p["name"].lower().replace("_", "-"), []).append(p.get("version", ""))
+    return out
 
 
 def test_every_declared_dependency_is_also_in_requirements():
@@ -94,23 +106,35 @@ def test_the_locked_version_satisfies_both_declarations():
 
     不然「CI 裝到的」與「正式機裝到的」是不同版本 —— 那正是 CI 綠、
     正式機炸的典型成因。
+
+    依 Python 版本分流的套件（一個名字好幾行、lock 鎖好幾個版本）：
+    **每一行宣告都要有一個鎖住的版本滿足它，每一個鎖住的版本也都要落在兩份檔案各自的某一行裡** ——
+    不可以因為分流就放寬成「隨便一個對上就好」。
     """
-    py, req, lock = _pyproject_deps(), _requirements(), _locked()
+    py, req, lock = _pyproject_all(), _requirements_all(), _locked()
     bad = []
-    for name, r in py.items():
-        v = lock.get(name)
-        if not v:
+    for name, decls in py.items():
+        vers = []
+        for v in lock.get(name, []):
+            try:
+                vers.append(Version(v))
+            except Exception:        # noqa: BLE001
+                pass
+        if not lock.get(name):
             bad.append(f"{name}: uv.lock 裡沒有這個套件")
             continue
-        try:
-            ver = Version(v)
-        except Exception:            # noqa: BLE001
+        if not vers:
             continue
-        if r.specifier and not r.specifier.contains(ver, prereleases=True):
-            bad.append(f"{name}: lock 鎖 {v}，但 pyproject 要求 {r.specifier}")
-        rr = req.get(name)
-        if rr and rr.specifier and not rr.specifier.contains(ver, prereleases=True):
-            bad.append(f"{name}: lock 鎖 {v}，但 requirements.txt 要求 {rr.specifier}")
+        for label, group in (("pyproject", decls), ("requirements.txt", req.get(name) or [])):
+            for d in group:
+                if d.specifier and not any(d.specifier.contains(v, prereleases=True) for v in vers):
+                    bad.append(f"{name}: {label} 的 `{d}` 沒有任何鎖住的版本滿足（lock：{', '.join(map(str, vers))}）")
+            if group:
+                for v in vers:
+                    if not any((not d.specifier) or d.specifier.contains(v, prereleases=True) for d in group):
+                        bad.append(f"{name}: lock 鎖 {v}，但 {label} 沒有任何一行允許它")
+        if len(decls) > 1 and len(req.get(name) or []) != len(decls):
+            bad.append(f"{name}: pyproject 分 {len(decls)} 行、requirements.txt 分 {len(req.get(name) or [])} 行，要一致")
     assert not bad, "相依宣告互相矛盾：\n  " + "\n  ".join(bad)
 
 
