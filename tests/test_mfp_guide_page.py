@@ -30,8 +30,11 @@ def _gen():
 
 
 def test_the_page_is_up_to_date_with_its_generator():
-    assert _gen().build() == (DOCS / "mfp-fetch.html").read_text(encoding="utf-8"), \
+    g = _gen()
+    assert g.build() == (DOCS / "mfp-fetch.html").read_text(encoding="utf-8"), \
         "改了 build-mfp-guide-page.py 要重跑它（再跑 build-i18n-page.py）"
+    assert g.build_standalone() == (DOCS / "mfp-fetch-standalone.html").read_text(encoding="utf-8"), \
+        "單機版說明頁也是同一支產生器產的"
 
 
 def test_verified_models_on_the_page_match_the_code():
@@ -43,9 +46,10 @@ def test_verified_models_on_the_page_match_the_code():
     assert not missing, f"程式裡已驗證、頁面上沒寫：{missing}"
 
 
+@pytest.mark.parametrize("page", ["mfp-fetch", "mfp-fetch-standalone"])
 @pytest.mark.parametrize("lang", ["", "-en", "-ja"])
-def test_every_screenshot_exists_and_is_localised(lang):
-    html = (DOCS / f"mfp-fetch{lang}.html").read_text(encoding="utf-8")
+def test_every_screenshot_exists_and_is_localised(lang, page):
+    html = (DOCS / f"{page}{lang}.html").read_text(encoding="utf-8")
     refs = sorted(set(re.findall(r'src="(screenshots/[\w./-]+\.png)"', html)))
     assert len(refs) >= 8, refs
     for r in refs:
@@ -69,9 +73,11 @@ def test_page_nav_anchors_exist_and_the_site_links_here():
     assert 'href="mfp-fetch-en.html"' in (DOCS / "index-en.html").read_text(encoding="utf-8"), "英文首頁要連到英文版"
 
 
+@pytest.mark.parametrize("page", ["mfp-fetch", "mfp-fetch-standalone"])
 @pytest.mark.parametrize("lang", ["", "-en", "-ja"])
-def test_no_internal_addresses_on_the_page(lang):
-    html = (DOCS / f"mfp-fetch{lang}.html").read_text(encoding="utf-8")
+def test_no_internal_addresses_on_the_page(lang, page):
+    # `<code>127.0.0.1</code>` 是寫給使用者看的說明（單機版：服務只開在本機），不是外洩的位址
+    html = re.sub(r"<code>[^<]*</code>", "", (DOCS / f"{page}{lang}.html").read_text(encoding="utf-8"))
     hits = re.findall(r"\b(?:127\.0\.0\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)\b", html)
     assert not hits, hits
 
@@ -100,3 +106,33 @@ def test_the_guide_link_is_a_button_set_apart_from_the_tags():
     rule = re.search(r"\.ss-more a\s*\{([^}]*)\}", css).group(1)
     assert "gradient" in rule or re.search(r"background:\s*#[0-9a-f]{6}", rule)
     assert "999px" not in rule, "膠囊形會跟標籤看起來一樣"
+
+
+
+def test_the_guide_warns_up_front_that_it_assumes_accounts_and_links_the_standalone_guide():
+    """使用者 2026-10-22：一開始就要提醒，以下說明以每個使用者獨立帳號為基礎；資安提醒一律紅字。"""
+    html = (DOCS / "mfp-fetch.html").read_text(encoding="utf-8")
+    hero = html.split('<header class="cp-hero">', 1)[1].split("</header>", 1)[0]
+    danger = hero.split('class="mg-danger"', 1)[1].split('class="mg-pains"', 1)[0]
+    assert "每位使用者都有自己的帳號" in danger and 'href="mfp-fetch-standalone.html"' in danger
+    assert "工作區" in danger and "機密或個人資料" in danger
+    faq = html.split('<section id="faq"', 1)[1]
+    assert 'href="mfp-fetch-standalone.html"' in faq.split("</details>", 1)[0], "常見問題第一條連到單機版"
+    css = (DOCS / "style.css").read_text(encoding="utf-8")
+    rule = re.search(r"\.mg-danger \{([^}]*)\}", css).group(1)
+    assert "#fef2f2" in rule and "#dc2626" in rule
+
+
+def test_the_standalone_guide_is_only_about_single_user_mode():
+    """單機版只講使用者自己怎麼用：開頭紅字界定範圍，使用前確認寫到 127.0.0.1 與 jtdt bind，
+    沒有管理員設定共用事務機的步驟（多人使用那一節只指回主說明頁）。"""
+    html = (DOCS / "mfp-fetch-standalone.html").read_text(encoding="utf-8")
+    hero = html.split('<header class="cp-hero">', 1)[1].split("</header>", 1)[0]
+    assert 'class="mg-danger"' in hero and "一個人在自己的電腦上" in hero and 'href="mfp-fetch.html"' in hero
+    before = html.split('<section id="before"', 1)[1].split("</section>", 1)[0]
+    assert "127.0.0.1" in before and "jtdt bind 127.0.0.1" in before and "沒有其他人" in html
+    ids = re.findall(r'<section id="([\w-]+)"', html)
+    assert ids == ["before", "add", "scan", "fetch", "files", "multi", "faq"], ids
+    body = html.split('<section id="multi"', 1)[0]
+    assert "成員" not in body and "共用事務機" not in body, "單機版不講管理員設定共用事務機"
+    assert 'class="mg-danger"' in html.split('<section id="multi"', 1)[1].split("</section>", 1)[0]

@@ -376,3 +376,43 @@ def test_browsing_has_its_own_looser_limit():
         with R._LOCK:
             R._recent.pop(owner + "#box", None)
             R._recent.pop(owner, None)
+
+
+# --------------------------------------------------------------------- 單機模式的提醒（2026-10-22）
+
+def test_without_sign_in_the_page_warns_in_red_and_drops_account_wording(auth_off):
+    """未啟用登入時工作區只有一份、大家共用：工具頁最上方紅字提醒（使用者 2026-10-22：有機密、有個資的不適合）；
+    沒有帳號，「只有你的帳號看得到」「你是管理員」這類說明不成立。"""
+    local = TestClient(app_main.app, base_url="http://localhost:8765", client=("127.0.0.1", 50000))
+    html = local.get("/tools/mfp-fetch/").text
+    assert 'id="mfSingleWarn"' in html and "mf-danger" in html
+    assert "大家共用的工作區" in html and "機密或個人資料" in html and "請先啟用登入" in html
+    assert "未啟用登入（單機模式）" in html
+    assert "沒有其他人共用" in html and "127.0.0.1" in html, "單機：確認沒有別人共用、服務只開本機"
+    assert "只有你的帳號看得到，換一台電腦" not in html
+    assert "const SINGLE = true" in html
+
+
+def test_with_sign_in_there_is_no_single_mode_warning(two_clerks):
+    a, *_ = two_clerks
+    html = a.get("/tools/mfp-fetch/").text
+    assert 'id="mfSingleWarn"' not in html and "未啟用登入（單機模式）" not in html
+    assert "只有你的帳號看得到，換一台電腦" in html and "const SINGLE = false" in html
+
+
+def test_the_single_mode_warning_is_red():
+    from pathlib import Path
+    tpl = Path("app/tools/mfp_fetch/templates/mfp_fetch.html").read_text(encoding="utf-8")
+    rule = re.search(r"\.mf-danger \{([^}]*)\}", tpl).group(1)
+    assert "#fef2f2" in rule and "#dc2626" in rule
+
+
+def test_without_sign_in_and_open_to_the_network_the_warning_says_so(auth_off, monkeypatch):
+    """服務綁在 0.0.0.0 這類位址＋沒有登入：連得到網站的人都看得到工作區 —— 講清楚，並給只開本機的指令。"""
+    from app.config import settings
+    monkeypatch.setattr(settings, "host", "0.0.0.0")
+    local = TestClient(app_main.app, base_url="http://localhost:8765", client=("127.0.0.1", 50000))
+    html = local.get("/tools/mfp-fetch/").text
+    warn = html.split('id="mfSingleWarn"', 1)[1].split("</div></div>", 1)[0]
+    assert 'data-exposed="true"' in html
+    assert "開放給網路連線" in warn and "jtdt bind 127.0.0.1" in warn and "<code>0.0.0.0</code>" in warn

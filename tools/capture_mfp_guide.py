@@ -126,7 +126,10 @@ def _rewrite_js(mapping: dict) -> str:
                 .replace(/127\\.0\\.0\\.\\d+/g, 'mfp.example.com');
       };
       const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      for (let n = w.nextNode(); n; n = w.nextNode()) { const f = fix(n.textContent); if (f !== n.textContent) n.textContent = f; }
+      // 單機的紅字提醒寫的就是「服務只開在本機（127.0.0.1）」，那是說明不是設備位址，不可以換
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        if (n.parentElement && n.parentElement.closest('#mfSingleWarn')) continue;
+        const f = fix(n.textContent); if (f !== n.textContent) n.textContent = f; }
       document.querySelectorAll('input[type=text], input:not([type])').forEach(i => { i.value = fix(i.value); });
       return true; })()""" % json.dumps(mapping)
 
@@ -252,10 +255,33 @@ def capture(locale: str, port: int, cdp: int, ids: dict, rewrite: str, escl: Fak
         _shoot(t, out / "08-members.png", rewrite, "div.panel:has(#mfMembersPanel)")
 
 
+def capture_standalone(locale: str, port: int, cdp: int, rewrite: str) -> None:
+    """單機版使用說明（`mfp-fetch-standalone.html`）另外要的三張：紅字提醒、新增事務機的表單、全是自己新增的清單。
+    掃描、取件、協定紀錄的面板跟共用時一模一樣，直接沿用 mfp-guide 那組。"""
+    base = f"http://127.0.0.1:{port}"
+    out = _out(locale).parent / "mfp-standalone"
+    with _open(cdp) as ws:
+        t = _Tab(ws)
+        for d in ("Runtime", "Page", "Network"):
+            t.send(f"{d}.enable")
+        t.send("Network.setCookie", {"name": "jtdt_locale", "value": locale, "url": base})
+        t.send("Emulation.setDeviceMetricsOverride", {"width": WIDTH, "height": HEIGHT, "deviceScaleFactor": 1,
+                                                      "mobile": False})
+        t.send("Page.navigate", {"url": base + "/tools/mfp-fetch/"})
+        assert t.wait_for("!!document.querySelector('#mfListWrap table') && typeof window.jtTime !== 'undefined'"), "清單沒出來"
+        time.sleep(0.8)
+        t.js("document.getElementById('mfHost').value = 'mfp-3f.example.com'")
+        _shoot(t, out / "00-warn.png", rewrite, "#mfSingleWarn")
+        _shoot(t, out / "01-add.png", rewrite, "div.panel:has(#mfHost)")
+        _shoot(t, out / "02-list.png", rewrite, "div.panel:has(#mfListWrap)")
+
+
 def main() -> int:
     from app.core import ui_locale
     ap = argparse.ArgumentParser()
     ap.add_argument("--locale", choices=list(ui_locale.SUPPORTED), default=None)
+    ap.add_argument("--standalone", action="store_true",
+                    help="只拍單機版說明頁要的兩張（事務機全部自己新增、沒有共用）")
     args = ap.parse_args()
     locales = [args.locale] if args.locale else list(ui_locale.SUPPORTED)
     if not _browser():
@@ -282,6 +308,8 @@ def main() -> int:
                                            ("desk", "127.0.0.1", escl.port, "My desk printer", False)):
             det = _api(base, "POST", api + "/detect", {"host": host, "port": p, "scheme": "http"})
             assert det.get("token"), det
+            if args.standalone:
+                shared = False
             res = _api(base, "POST", api + ("/shared" if shared else "/connections"),
                        {"token": det["token"], "display_name": name})
             ids[key] = res["connection"]["id"]
@@ -294,7 +322,10 @@ def main() -> int:
         rewrite = _rewrite_js(mapping)
         for loc in locales:
             print(loc)
-            capture(loc, port, cdp, ids, rewrite, escl)
+            if args.standalone:
+                capture_standalone(loc, port, cdp, rewrite)
+            else:
+                capture(loc, port, cdp, ids, rewrite, escl)
     finally:
         br.terminate()
         srv.terminate()

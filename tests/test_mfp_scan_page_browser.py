@@ -102,7 +102,8 @@ def _test_and_save(t, fport, name):
              s.append(o); s.value = 'http:{fport}';
              document.getElementById('mfHost').value = '127.0.0.1';
              document.getElementById('mfTestBtn').click(); return true; }})()""")
-    assert t.wait_for("!document.getElementById('mfResultPanel').hidden"), \
+    # 連線測試最多排隊 30 秒（PROBE_WAIT）加上連線本身；整批測試時機器很忙，40 秒的預設等不到（2026-10-22 完整測試紅過一次）
+    assert t.wait_for("!document.getElementById('mfResultPanel').hidden", 90), \
         "測試結果沒有出現：" + str(t.js("document.getElementById('mfAddError').innerText"))
     body = t.js("document.getElementById('mfResult').innerText")
     assert "Fake LaserJet MFP M1" in body, "連線測試要讀到 eSCL 能力表"

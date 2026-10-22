@@ -2081,6 +2081,21 @@ html[lang="en"] .cp-en { display: none; }        /* 英文頁的中文譯名欄�
 .mg-pain b { display: block; margin: 8px 0 4px; font-size: 15.5px; color: #0f172a; }
 .mg-pain p { margin: 0; font-size: 14px; line-height: 1.7; color: #475569; }
 .mg-pain-ic { color: #dc2626; background: #fef2f2; border-radius: 10px; padding: 7px; box-sizing: content-box; }
+/* 合規頁的紅字警示 */
+.cp-danger { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 26px; padding: 14px 18px;
+  background: #fef2f2; border: 1px solid #fca5a5; border-left: 5px solid #dc2626; border-radius: 12px; }
+.cp-danger .cp-ic { flex: none; color: #dc2626; margin-top: 2px; }
+.cp-danger p { margin: 0; color: #7f1d1d; font-size: 14.5px; line-height: 1.8; }
+.cp-danger b { color: #b91c1c; }
+.cp-danger code { background: #fee2e2; padding: 0 5px; border-radius: 4px; }
+/* 紅字提醒（使用者 2026-10-22：資安相關一律紅字） */
+.mg-danger { display: flex; gap: 12px; align-items: flex-start; max-width: 860px; margin: 18px auto 22px; padding: 14px 18px;
+  text-align: left; background: #fef2f2; border: 1px solid #fca5a5; border-left: 5px solid #dc2626; border-radius: 12px; }
+.mg-danger-ic { flex: none; color: #dc2626; margin-top: 2px; }
+.mg-danger b { display: block; color: #b91c1c; font-size: 15.5px; margin-bottom: 4px; }
+.mg-danger p { margin: 0; color: #7f1d1d; font-size: 14px; line-height: 1.75; }
+.mg-danger a { color: #b91c1c; font-weight: 700; text-decoration: underline; }
+.mg-danger code { background: #fee2e2; padding: 0 5px; border-radius: 4px; }
 .mg-answer { margin-top: 20px; }
 .mg-answer b { color: #4338ca; }
 @media (max-width: 860px) { .mg-pains { grid-template-columns: 1fr; } }

@@ -21,6 +21,9 @@ HERE = Path(__file__).resolve().parent
 LAYOUT = HERE / "docs" / "troubleshooting.html"
 DST = HERE / "docs" / "mfp-fetch.html"
 SHOTS = "screenshots/mfp-guide"
+#: 單機版使用說明（使用者 2026-10-22：只講未啟用登入、一個人在自己電腦上用的情況）
+DST_STANDALONE = HERE / "docs" / "mfp-fetch-standalone.html"
+SHOTS_STANDALONE = "screenshots/mfp-standalone"
 
 TITLE = "事務機掃描取件使用說明 | Jason Tools 文件工具箱"
 DESC = ("Jason Tools 文件工具箱「事務機掃描取件」的使用說明：管理員設定共用事務機與成員、使用者從本站掃描、"
@@ -43,6 +46,8 @@ _IC = {
     "usb": '<circle cx="10" cy="7" r="1"/><circle cx="4" cy="20" r="1"/><path d="M4.7 19.3 19 5"/>'
            '<path d="m21 3-3 1 2 2Z"/><path d="M9.26 7.68 5 12l2 5"/><path d="m10 14 5 2 3.5-3.5"/>'
            '<path d="m18 12 1-1 1 1-1 1Z"/>',
+    "warn": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/>'
+            '<path d="M12 9v4"/><path d="M12 17h.01"/>',
     "mail": '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
     "shield": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
     "lock": '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
@@ -79,12 +84,19 @@ def _inline(s: str) -> str:
     return re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
 
 
-def _shot(name: str, alt: str, cap: str) -> str:
-    p = HERE / "docs" / SHOTS / name
+def _shot(name: str, alt: str, cap: str, shots: str = SHOTS) -> str:
+    p = HERE / "docs" / shots / name
     w, h = _png_size(p)
-    return (f'<figure class="mg-shot"><a href="{SHOTS}/{name}" target="_blank" rel="noopener">'
-            f'<img src="{SHOTS}/{name}" alt="{html.escape(alt)}" width="{w}" height="{h}" loading="lazy"></a>'
+    return (f'<figure class="mg-shot"><a href="{shots}/{name}" target="_blank" rel="noopener">'
+            f'<img src="{shots}/{name}" alt="{html.escape(alt)}" width="{w}" height="{h}" loading="lazy"></a>'
             f'<figcaption>{_inline(cap)}</figcaption></figure>')
+
+
+def _danger(title: str, body: str, link: tuple[str, str] | None = None) -> str:
+    """紅字提醒（使用者 2026-10-22：這類資安提醒一律紅字）。"""
+    more = (f' <a href="{link[0]}">{_inline(link[1])}</a>{_inline("。")}' if link else "")
+    return (f'<div class="mg-danger" role="note">{_icon("warn", 22, "mg-danger-ic")}<div>'
+            f'<b>{_inline(title)}</b><p>{_inline(body)}{more}</p></div></div>')
 
 
 def _steps(items: list[tuple[str, str, str]]) -> str:
@@ -180,6 +192,9 @@ SAFETY = [
 ]
 
 FAQ = [
+    ("沒有啟用登入（單機版）怎麼用",
+     "單機版只適合一個人在自己的電腦上使用，而且服務只開在本機（`127.0.0.1`）。步驟與注意事項見",
+     ("mfp-fetch-standalone.html", "單機版使用說明")),
     ("看不到管理員共用的事務機",
      "先看頁面上的「目前登入的帳號」：同一個人的 AD、SSO、本機帳號是不同帳號，成員要加的是你實際登入的那一個。"
      "管理員也可以把你所在的群組加進成員；群組旁邊顯示「本站 0 人」代表登入時沒有掛上這個群組。改完切回分頁就會更新。"),
@@ -201,6 +216,11 @@ def _body() -> str:
     hero = ['<header class="cp-hero"><div class="container">',
             '<span class="cp-eyebrow">使用說明</span>',
             f'<h1 class="cp-title">{_icon("printer", 40, "mg-title-ic")}事務機掃描取件</h1>',
+            _danger("以下說明以每位使用者都有自己的帳號（已啟用登入）為前提。",
+                    "啟用登入後，每個人的事務機清單與工作區各自分開。這套系統架成伺服器給多人使用、卻沒有啟用登入時，"
+                    "所有人共用同一個工作區，任何連得到網站的人都看得到掃描與取件的檔案，含機密或個人資料的文件等於外洩。"
+                    "只有自己一個人在自己的電腦上使用，請看",
+                    ("mfp-fetch-standalone.html", "單機版使用說明")),
             f'<p class="cp-lead">{_inline("掃描完的文件要送到自己手上，常見的三種做法各有難處：")}</p>',
             '<div class="mg-pains">'
             + "".join(f'<div class="mg-pain">{_icon(ic, 22, "mg-pain-ic")}<b>{_inline(t)}</b><p>{_inline(d)}</p></div>'
@@ -276,26 +296,154 @@ def _body() -> str:
     secs.append(_section("safety", "安全與隱私", "事務機上常有合約、薪資單這類文件，所以每一步都照最保守的方式做。",
                          "\n".join(cards), False))
     faq = ['<div class="mg-faq">']
-    for q, a in FAQ:
-        faq.append(f"<details><summary>{_inline(q)}</summary><p>{_inline(a)}</p></details>")
+    for q, a, *link in FAQ:
+        more = f' <a href="{link[0][0]}">{_inline(link[0][1])}</a>{_inline("。")}' if link else ""
+        faq.append(f"<details><summary>{_inline(q)}</summary><p>{_inline(a)}{more}</p></details>")
     faq.append(f'<p class="mg-note">{_inline("要用程式呼叫：見")} <a href="api.html#連線測試">{_inline("API 使用手冊")}</a>{_inline("。")}</p>')
     faq.append("</div>")
     secs.append(_section("faq", "常見問題", "還是遇到問題時，先看這幾個。", "\n".join(faq), True))
     return "\n".join(hero + nav + secs)
 
 
-def build() -> str:
+# --------------------------------------------------------------------------- 單機版使用說明
+
+S_TITLE = "事務機掃描取件單機版使用說明 | Jason Tools 文件工具箱"
+S_DESC = ("Jason Tools 文件工具箱「事務機掃描取件」單機版（未啟用登入）的使用說明："
+          "使用前確認、新增事務機、從本站掃描、取回事務機裡的文件，以及多人使用時要先啟用登入。")
+S_NAV = [("before", "使用前確認"), ("add", "新增事務機"), ("scan", "掃描"), ("fetch", "取件"),
+         ("files", "檔案在哪裡"), ("multi", "多人使用"), ("faq", "常見問題")]
+S_CHECKS = [
+    ("user", "只有你一個人用這台電腦",
+     "未啟用登入時工作區不分帳號；別人也用這台電腦，就看得到你掃描與取件的檔案。"),
+    ("lock", "服務只開在本機",
+     "安裝時選擇不開放區域網路（服務只接受 `127.0.0.1` 的連線）。已經開放的話，執行 `sudo jtdt bind 127.0.0.1`"
+     "（Windows 以系統管理員身分執行 `jtdt bind 127.0.0.1`）。"),
+    ("server", "用這台電腦的瀏覽器開",
+     "網址是 `http://127.0.0.1:8765/tools/mfp-fetch/`。未啟用登入時，這個工具只准在這台電腦本機使用，"
+     "從別台電腦連進來會被拒絕。"),
+    ("wifi", "跟事務機在同一個內網",
+     "這台電腦要連得到事務機的 IP 或主機名稱；本站只連內部網路的位址。"),
+]
+S_FAQ = [
+    ("從別台電腦打開，畫面顯示只能在這台主機本機使用",
+     "未啟用登入時，這個工具只准在裝這套系統的電腦上使用（網址要是 `127.0.0.1` 或 `localhost`）。"
+     "要從別台電腦使用，請先啟用登入。"),
+    ("紅色提醒寫著服務開放給網路連線",
+     "代表服務綁在區域網路的位址（例如 `0.0.0.0`），其他電腦連得到這個網站與工作區。只有自己用的話，執行 "
+     "`sudo jtdt bind 127.0.0.1`（Windows 以系統管理員身分執行 `jtdt bind 127.0.0.1`）；多人使用請先啟用登入。"),
+    ("連線測試失敗或列不出檔案",
+     "看連線測試的逐步診斷，哪一步失敗就從那一步查；也可以下載診斷報告。"
+     "KYOCERA 要在事務機上啟用 9091 或 9090 連接埠的文件服務；FUJIFILM 某個連接埠回 406 時，換另一個連線方式。"),
+    ("RICOH 的資料夾要密碼",
+     "在「位置」選那個資料夾，輸入資料夾密碼後按「開啟資料夾」。密碼錯了不會自動重試，確認後再輸入一次。"),
+    ("要回報問題",
+     "展開「技術細節」，按「複製協定紀錄」貼給客服。協定紀錄不含帳號、密碼與文件內容。"),
+]
+
+
+def _standalone_body() -> str:
+    ss = SHOTS_STANDALONE
+    hero = ['<header class="cp-hero"><div class="container">',
+            '<span class="cp-eyebrow">單機版使用說明</span>',
+            f'<h1 class="cp-title">{_icon("printer", 40, "mg-title-ic")}事務機掃描取件（單機版）</h1>',
+            _danger("本頁只適用於一個人在自己的電腦上使用（未啟用登入的單機模式）。",
+                    "未啟用登入時，所有人共用同一個工作區。這套系統架成伺服器給多人使用、卻沒有啟用登入，"
+                    "任何連得到網站的人都看得到掃描與取件的檔案，含機密或個人資料的文件等於外洩。多人使用請先啟用登入，並改看",
+                    ("mfp-fetch.html", "事務機掃描取件使用說明")),
+            f'<p class="cp-lead">{_inline("在自己的電腦上叫事務機掃描，或把存在事務機裡的文件取回來，存進這台電腦的工作區。不用帳號，也不用管理員另外設定。")}</p>',
+            "</div></header>"]
+    nav = ['<nav class="cp-pagenav mg-pagenav" aria-label="本頁"><div class="container cp-pagenav-in">'
+           '<div class="cp-pagenav-links">']
+    nav += [f'<a href="#{sid}">{_inline(t)}</a>' for sid, t in S_NAV]
+    nav.append("</div></div></nav>")
+    secs = []
+    checks = ['<div class="mg-cards">']
+    for ic, t, d in S_CHECKS:
+        checks.append(f'<div class="mg-card">{_icon(ic, 22, "mg-card-ic")}<b>{_inline(t)}</b><p>{_inline(d)}</p></div>')
+    checks.append("</div>")
+    secs.append(_section("before", "使用前確認", "開始之前，先確認這四件事。",
+                         "\n".join(checks)
+                         + _shot("00-warn.png", "工具頁最上方的紅色提醒：未啟用登入時工作區大家共用",
+                                 "工具頁最上方的紅色提醒：服務只開在本機時，提醒確認這台電腦沒有其他人共用；"
+                                 "服務開放給網路連線時，直接警告並附上改回只開本機的指令。", ss), False))
+    secs.append(_section("add", "新增事務機", "輸入事務機的位址，連線測試通過後儲存，之後就出現在「我的事務機」。",
+                         _steps([("printer", "輸入位址", "在「新增事務機」輸入 IP 或主機名稱。連線方式選「自動」，HTTPS 443 與 HTTP 80 都能連時用 443。"),
+                                 ("check", "連線測試", "按「連線測試」。只讀首頁與掃描介面的能力表，不送帳號密碼；結果顯示廠牌、型號與這台能做的事。"),
+                                 ("folder", "儲存", "確認型號後按「儲存這台事務機」。")])
+                         + _shot("01-add.png", "新增事務機：輸入 IP 或主機名稱、選連線方式、按連線測試",
+                                 "「新增事務機」：連線測試只讀網頁首頁與掃描介面的能力表，不送帳號密碼。", ss)
+                         + _shot("02-test.png", "連線測試結果：逐步診斷、型號辨識、相容性與可以做的事",
+                                 "連線測試結果：每一步的狀態、辨識出的型號與相容性。")
+                         + _shot("02-list.png", "我的事務機：在這台電腦新增的事務機與掃描、取件按鈕",
+                                 "「我的事務機」：可以掃描、取件、重新測試、改名或移除。", ss), True))
+    secs.append(_section("scan", "從本站掃描", "支援 eSCL 的事務機（相容性標「可掃描」）可以直接從本站叫它掃描。",
+                         _steps([("printer", "放好文件", "把文件放在事務機的平台玻璃或送紙器上。"),
+                                 ("scan", "選掃描設定", "在清單按「掃描」，選來源、色彩、解析度、紙張與存檔格式。"),
+                                 ("check", "開始掃描", "按「開始掃描」。同一台事務機一次只做一件事，其他的自動排隊。"),
+                                 ("folder", "存進工作區", "掃好的檔案存進工作區，可以開啟、下載，或接著用其他工具處理。")])
+                         + '<div class="mg-shots2">'
+                         + _shot("03-scan.png", "掃描面板：來源、色彩、解析度、紙張與存檔格式",
+                                 "掃描面板：選來源、色彩、解析度、紙張與格式。")
+                         + _shot("04-scan-done.png", "掃描完成：頁數、大小、協定，以及開啟、下載、前往工作區",
+                                 "掃描完成：可以開啟、下載或前往工作區。")
+                         + "</div>", False))
+    secs.append(_section("fetch", "取回存在事務機裡的文件",
+                         "先在事務機的面板上把文件存進信箱、文件伺服器或資料盒，再到本站按「取件」（FUJIFILM 是「信箱取件」）。",
+                         _steps([("mail", "在事務機上存好", "依廠牌在面板上選存到信箱、文件伺服器或資料盒。"),
+                                 ("lock", "填登入資訊", "依面板顯示填信箱編號、帳號或 User Code。只送一次，錯了就停下來。"),
+                                 ("folder", "列出並選位置", "按「列出檔案」；有資料夾的在「位置」切換，資料夾有密碼時輸入後按「開啟資料夾」。"),
+                                 ("check", "勾選並取件", "勾選要的文件，選存成 PDF（建議）後按「取件」，檔案存進工作區。")])
+                         + '<div class="mg-shots2">'
+                         + _shot("05-box.png", "FUJIFILM 信箱取件：信箱編號、文件清單、取件與取件並刪除",
+                                 "FUJIFILM 信箱取件：可以選「取件並刪除」，確認存好之後才刪事務機上的原件。")
+                         + _shot("06-share.png", "RICOH 文件伺服器取件：登入方式、位置選資料夾、資料夾密碼與文件清單",
+                                 "RICOH 文件伺服器：在「位置」切換共用資料夾與設備資料夾。")
+                         + "</div>"
+                         + f'<p class="mg-note">{_inline("各廠牌的取件方式與已驗證型號見")} <a href="mfp-fetch.html#brands">{_inline("事務機掃描取件使用說明")}</a>{_inline("。")}</p>',
+                         True))
+    files = ['<div class="mg-cards">']
+    for ic, t, d in (("folder", "存在這台電腦的工作區", "掃描與取件的檔案存在這台電腦上，不經過任何雲端服務。"),
+                     ("clock", "預設保留 24 小時", "到期自動刪除；保留時間與容量在「設定 → 工作區設定」調整。用完的檔案可以先刪掉。"),
+                     ("eye", "取件只讀", "列文件與取件都不會改動事務機上的原件；只有 FUJIFILM 勾選「取件並刪除」時，確認存好之後才刪。")):
+        files.append(f'<div class="mg-card">{_icon(ic, 22, "mg-card-ic")}<b>{_inline(t)}</b><p>{_inline(d)}</p></div>')
+    files.append("</div>")
+    secs.append(_section("files", "檔案在哪裡", "掃描與取件的檔案都在工作區，可以開啟、下載，或在其他工具裡直接選用。",
+                         "\n".join(files), False))
+    secs.append(_section("multi", "要多人使用時", "單機模式沒有帳號，不適合多人使用。",
+                         _danger("多人使用前，請先在「設定 → 認證設定」啟用登入。",
+                                 "啟用登入後，每個人有自己的事務機清單與工作區，管理員也可以設定共用事務機並指定成員。"
+                                 "設定方式見",
+                                 ("mfp-fetch.html", "事務機掃描取件使用說明")), True))
+    faq = ['<div class="mg-faq">']
+    for q, a in S_FAQ:
+        faq.append(f"<details><summary>{_inline(q)}</summary><p>{_inline(a)}</p></details>")
+    faq.append("</div>")
+    secs.append(_section("faq", "常見問題", "還是遇到問題時，先看這幾個。", "\n".join(faq), False))
+    return "\n".join(hero + nav + secs)
+
+
+def _page(body: str, title: str, desc: str, name: str) -> str:
     lay = LAYOUT.read_text(encoding="utf-8")
     head = lay[:lay.index('<main class="container ts-main">')]
     foot = lay[lay.index('<footer class="footer">'):]
     head = re.sub(r'<meta name="description" content="[^"]*">',
-                  f'<meta name="description" content="{html.escape(DESC)}">', head, count=1)
-    head = re.sub(r"<title>[^<]*</title>", f"<title>{html.escape(TITLE)}</title>", head, count=1)
+                  f'<meta name="description" content="{html.escape(desc)}">', head, count=1)
+    head = re.sub(r"<title>[^<]*</title>", f"<title>{html.escape(title)}</title>", head, count=1)
     for lang in ("", "-en", "-ja"):
-        head = head.replace(f'value="troubleshooting{lang}.html"', f'value="mfp-fetch{lang}.html"')
-    return head + '<main class="cp-main mg-main">\n' + _body() + "\n</main>\n\n" + foot
+        head = head.replace(f'value="troubleshooting{lang}.html"', f'value="{name}{lang}.html"')
+    return head + '<main class="cp-main mg-main">\n' + body + "\n</main>\n\n" + foot
+
+
+def build_standalone() -> str:
+    return _page(_standalone_body(), S_TITLE, S_DESC, "mfp-fetch-standalone")
+
+
+def build() -> str:
+    return _page(_body(), TITLE, DESC, "mfp-fetch")
 
 
 if __name__ == "__main__":
     DST.write_text(build(), encoding="utf-8")
     print(f"{DST.name}: 產生完成")
+    DST_STANDALONE.write_text(build_standalone(), encoding="utf-8")
+    print(f"{DST_STANDALONE.name}: 產生完成")

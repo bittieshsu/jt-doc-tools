@@ -255,6 +255,13 @@
 .mf-mlist-body label:hover { background:#f3f4f6; }
 .mf-mlist-body label:has(input:checked) { background:#eef2ff; }
 .mf-mlist-body small { color:#64748b; }
+.mf-danger { display:flex; gap:10px; align-items:flex-start; margin:10px 0 14px; padding:12px 14px; border-radius:8px;
+             background:#fef2f2; border:1px solid #fca5a5; border-left:4px solid #dc2626; color:#991b1b; line-height:1.6; }
+.mf-danger > svg { flex:none; margin-top:2px; color:#dc2626; }
+.mf-danger b { display:block; color:#b91c1c; }
+.mf-danger span { display:block; font-size:13.5px; }
+.mf-danger .mf-danger-sub { margin-top:4px; font-size:12.5px; color:#7f1d1d; }
+.mf-danger code { background:#fee2e2; padding:0 4px; border-radius:4px; }
 .mf-warn { margin-top:8px; padding:8px 12px; border-radius:6px; background:#fffbeb; border:1px solid #fde68a;
   color:#92400e; font-size:13px; }
 @media (max-width: 720px) {
@@ -316,6 +323,20 @@
 {% set _note = tr('可以新增事務機、做連線測試與型號辨識，從支援 eSCL 的事務機掃描進工作區；FUJIFILM 的機內信箱取件（Apeos 系列部分型號）與 RICOH 的文件伺服器取件（IM C2000、IM C2010、IM C2510、IM C3500、IM C3510）已在實機驗證；Canon、Konica Minolta、SHARP 的檔案分享取件，以及 KYOCERA 與其他 RICOH 型號的直接取件是實驗功能。') %}
 <div class="mf-beta-note">{{ icon('info', size=16) }}<span>{% if 'eSCL' in _note %}{% set _head, _tail = _note.split('eSCL', 1) %}{% set _glued, _rest = (_tail ~ ' ').split(' ', 1) %}{{ _head }}eSCL{{ _glued }}{{ escl_help() }} {{ _rest|trim }}{% else %}{{ _note }}{% endif %}
   <button type="button" class="mf-verified-link" id="mfVerifiedBtn">{{ icon('check', size=13) }} <span>{{ tr('已驗證支援清單') }}</span></button></span></div>
+{% if single %}
+{# 未啟用登入：工作區只有一份、大家共用（使用者 2026-10-22：有機密、有個資的不適合，紅字提醒；
+   單機要確定沒有別人共用這台電腦，或服務只開在 127.0.0.1）。依綁定位址分兩種說法 #}
+<div class="mf-danger" id="mfSingleWarn" role="note" data-exposed="{{ 'true' if net_exposed() else 'false' }}">{{ icon('warn', size=18) }}<div>
+  {% if net_exposed() %}
+  <b>{{ tr('目前未啟用登入，而且服務開放給網路連線：連得到這個網站的人，都看得到工作區裡掃描與取件的檔案。') }}</b>
+  <span>{{ tr('含機密或個人資料的文件請不要在這個設定下處理。多人使用請先啟用登入，每個人的工作區才會分開；只有自己用的話，改成只開本機：`sudo jtdt bind 127.0.0.1`（Windows 以系統管理員身分執行 `jtdt bind 127.0.0.1`）。')|marks }}</span>
+  <span class="mf-danger-sub">{{ tr('目前綁定的位址：') }}<code>{{ bind_host() }}</code></span>
+  {% else %}
+  <b>{{ tr('目前未啟用登入（單機模式），掃描與取件的檔案存進這台電腦上大家共用的工作區。') }}</b>
+  <span>{{ tr('含機密或個人資料的文件，請先確認這台電腦沒有其他人共用。服務目前只開在本機（`127.0.0.1`），其他電腦連不進來；之後若要開放區域網路給多人使用，請先啟用登入。')|marks }}</span>
+  {% endif %}
+</div></div>
+{% endif %}
 
 {% endif %}
 
@@ -367,6 +388,8 @@
     <a class="mf-go-tool" id="mfGoTool" href="/tools/mfp-fetch/">{{ icon('printer', size=14) }} <span>{{ tr('前往事務機掃描取件') }}</span></a></p>
   <div class="mf-warn" id="mfAdoptNote" hidden><span id="mfAdoptText"></span>
     <button type="button" class="btn btn-small btn-primary" id="mfAdoptBtn">{{ icon('archive', size=14) }} <span>{{ tr('轉成共用事務機') }}</span></button></div>
+  {% elif single %}
+  <p class="mf-hint mf-list-hint" id="mfListHint">{{ tr('未啟用登入（單機模式）：事務機與掃描、取件的檔案都存在這台主機上，只能在這台主機本機使用。要讓多人各自使用，請先啟用登入，每個人的事務機與工作區才會分開。') }}</p>
   {% else %}
   <p class="mf-hint mf-list-hint" id="mfListHint">{{ tr('這裡新增的事務機只有你的帳號看得到，換一台電腦用同一個帳號登入照樣在；要給其他人用，請管理員在「設定 → 共用事務機」建立並加成員。') }}</p>
   <p class="mf-hint mf-list-hint" id="mfYou" hidden></p>
@@ -622,6 +645,7 @@
   const API = '/tools/mfp-fetch/api';
   // 同一份畫面兩種用法：「事務機掃描取件」（mine）與管理頁的「共用事務機」（shared）
   const SHARED = {{ 'true' if mode == 'shared' else 'false' }};
+  const SINGLE = {{ 'true' if single else 'false' }};   // 未啟用登入：沒有帳號，不顯示帳號與管理員的說明
   const LIST_PATH = SHARED ? '/shared' : '/connections';
   function itemPath(id) { return (SHARED ? '/shared/' : '/connections/') + id; }
   // 下拉換成本站樣式：現在就換，不要等 DOMContentLoaded —— 後面幾支 script 還在載的時候，
@@ -950,7 +974,7 @@
     const msg = document.getElementById('mfSaveMsg');
     if (!res.ok) { msg.textContent = res.message ? tr(res.message) : tr('發生錯誤'); return; }
     msg.textContent = SHARED ? tr('已儲存為共用事務機，接著按「成員」選誰可以用')
-      : tr('已儲存到「我的事務機」（只有你的帳號看得到）');
+      : SINGLE ? tr('已儲存到「我的事務機」') : tr('已儲存到「我的事務機」（只有你的帳號看得到）');
     document.getElementById('mfSaveBar').hidden = true;
     lastDetection = null;
     loadList();
@@ -1004,7 +1028,7 @@
     listItems = items;
     if (!SHARED) {
       const ha = document.getElementById('mfListHintAdmin');
-      if (ha) ha.hidden = !res.admin;
+      if (ha) ha.hidden = !res.admin || SINGLE;
       // 目前登入的帳號：共用事務機的成員是按帳號算的，AD、SSO、本機同名的是不同帳號
       const yo = document.getElementById('mfYou');
       if (yo) {

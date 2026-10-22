@@ -5,11 +5,16 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (941 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (942 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.13] - 2026-10-22
+
+- MFP scan & fetch: without sign-in, the tool page now shows a red warning at the top: scanned and retrieved files go into a workspace everyone shares, so documents containing confidential or personal data should only be handled on a computer one person uses. When the service listens only on this computer (`127.0.0.1`) it asks you to make sure nobody else shares the computer; when it accepts network connections it warns that anyone who can reach the site can see the workspace and gives the command to restrict it again (`jtdt bind 127.0.0.1`). Without sign-in, the note above My MFPs now describes single-user mode instead of saying that only your account can see the devices or that you are an administrator.
+- Website and docs: a new MFP Scan & Fetch single-user guide (Chinese, English and Japanese) that covers only one person using it on their own computer: what to check first, adding an MFP, scanning, retrieval, where files go, and enabling sign-in before several people use it. The main MFP guide now opens with a red note that it assumes every user has their own account, and its FAQ links to the single-user guide. The data protection and compliance page gains an "MFP connections and retrieval" control (who can see devices, credentials not kept, connection limits, originals, audit, with the tests that verify them), a red warning that sign-in must be enabled whenever several people use the system because otherwise everyone shares one workspace, and updated MFP rows in the data and outbound-connection tables.
 
 ## [1.17.12] - 2026-10-22
 

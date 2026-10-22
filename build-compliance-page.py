@@ -65,6 +65,10 @@ _IC = {
     "log": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>'
            '<path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>',
     "clock": '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    "printer": '<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>'
+               '<rect x="6" y="14" width="12" height="8"/>',
+    "warn": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/>'
+            '<path d="M12 9v4"/><path d="M12 17h.01"/>',
     "box": '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/>'
            '<path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
     "db": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>'
@@ -85,7 +89,7 @@ _IC = {
 CARD_SECTIONS = ("工具本身做到的", "你的組織使用後要做的")
 CARD_ICONS = {
     "存取控制": "lock", "稽核記錄": "log", "保留期限與備份": "clock", "AI 產出可核對": "sparkle",
-    "文件處理的隔離": "box", "透明與安全開發": "code",
+    "文件處理的隔離": "box", "事務機連線與取件": "printer", "透明與安全開發": "code",
     "部署與連線": "globe", "帳號與權限": "users", "保留與備份": "db", "AI 使用與人工覆核": "eye",
 }
 
@@ -420,6 +424,9 @@ def _parse(md: str) -> dict:
             sec["blocks"].append(("h3", ln[4:].strip()))
         elif ln.startswith("> "):
             page["note"] = ln[2:].strip()
+        elif ln.startswith("!!! "):
+            # 紅字警示（使用者 2026-10-22：資安提醒一律紅字）
+            sec["blocks"].append(("danger", ln[4:].strip()))
         elif ln.startswith("<!-- 資料流向圖"):
             sec["blocks"].append(("flow", ""))
         elif ln.startswith("**對應**："):
@@ -443,7 +450,7 @@ def _parse(md: str) -> dict:
         elif ln.strip() and ln.strip() != "---":
             para = [ln]
             while (i + 1 < len(lines) and lines[i + 1].strip()
-                   and not re.match(r"^(#|\||- |>|<!--|---)", lines[i + 1])):
+                   and not re.match(r"^(#|\||- |>|<!--|---|!!! )", lines[i + 1])):
                 i += 1
                 para.append(lines[i])
             text = "".join(para)
@@ -498,6 +505,8 @@ def _section(n: int, sec: dict, anchors: dict) -> str:
             out.append(_refs(val, anchors))
         elif kind == "verify":
             out.append(_verify(val))
+        elif kind == "danger":
+            out.append(f'<div class="cp-danger" role="note">{_icon("warn", 22)}<p>{_inline(val)}</p></div>')
         elif kind == "p":
             if out[-1].startswith('<h3 class="cp-sub"'):
                 out.append(f'<p class="cp-sub-lead">{_inline(val)}</p>')

@@ -172,5 +172,9 @@
  "隨身碟容易遺失，也可能帶進惡意程式；不少單位的資安規範已限制使用。": "Flash drives are easy to lose and can bring in malware, and many organisations restrict them in their security policies.",
  "<b>事務機掃描取件</b>：在本站直接叫事務機掃描，或取回存在事務機裡的文件，檔案只存進你自己的工作區，接著做 OCR、合併、壓縮或翻譯。": "<b>MFP Scan & Fetch</b>: start a scan on the MFP from this site, or retrieve documents stored on the MFP. Files go only into your own workspace, ready for OCR, merging, compression or translation.",
  "決定要不要開放使用者自行輸入 IP 新增事務機（預設開放；關掉之後大家只用共用的）": "Decide whether users may add an MFP themselves by entering its IP address (on by default; turn it off and everyone uses the shared ones)",
- "管理員有開放時，也可以自己輸入事務機的 IP 新增，只有自己的帳號看得到": "If the administrator allows it, add an MFP yourself by entering its IP address; only your account sees it"
+ "管理員有開放時，也可以自己輸入事務機的 IP 新增，只有自己的帳號看得到": "If the administrator allows it, add an MFP yourself by entering its IP address; only your account sees it",
+ "以下說明以每位使用者都有自己的帳號（已啟用登入）為前提。": "This guide assumes that every user has their own account (sign-in enabled).",
+ "啟用登入後，每個人的事務機清單與工作區各自分開。這套系統架成伺服器給多人使用、卻沒有啟用登入時，所有人共用同一個工作區，任何連得到網站的人都看得到掃描與取件的檔案，含機密或個人資料的文件等於外洩。只有自己一個人在自己的電腦上使用，請看 <a href=\"mfp-fetch-standalone.html\">單機版使用說明</a>。": "With sign-in enabled, each person has a separate MFP list and workspace. If this system runs as a server for several people without sign-in, everyone shares one workspace and anyone who can reach the site can see the scanned and retrieved files, so documents containing confidential or personal data are effectively exposed. If you use it alone on your own computer, see the <a href=\"mfp-fetch-standalone.html\">single-user guide</a>.",
+ "沒有啟用登入（單機版）怎麼用": "Using it without sign-in (single-user)",
+ "單機版只適合一個人在自己的電腦上使用，而且服務只開在本機（<code>127.0.0.1</code>）。步驟與注意事項見 <a href=\"mfp-fetch-standalone.html\">單機版使用說明</a>。": "Single-user mode is only suitable for one person on their own computer, with the service listening only on this computer (<code>127.0.0.1</code>). For the steps and precautions, see the <a href=\"mfp-fetch-standalone.html\">single-user guide</a>."
 }

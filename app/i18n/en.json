@@ -7650,5 +7650,11 @@
   "這台事務機沒有自訂資料盒（通常要加裝硬碟或 SSD 才有）；掃描存在「遙控資料盒」的，請在位置改選遙控資料盒": "This MFP has no custom boxes (usually a hard disk or SSD option is needed); if scans are stored in the polling box, choose the polling box as the location",
   "列出文件、取件": "Listing documents and retrieval",
   "已移除": "Removed",
-  "這台事務機已經從清單移除；紀錄與檔案照樣保留": "This MFP has been removed from the list; the record and files are kept"
+  "這台事務機已經從清單移除；紀錄與檔案照樣保留": "This MFP has been removed from the list; the record and files are kept",
+  "未啟用登入（單機模式）：事務機與掃描、取件的檔案都存在這台主機上，只能在這台主機本機使用。要讓多人各自使用，請先啟用登入，每個人的事務機與工作區才會分開。": "Sign-in is not enabled (single-user mode): MFPs and scanned or retrieved files are stored on this host and can only be used locally on it. To let several people use it separately, enable sign-in first so that each person gets their own MFP list and workspace.",
+  "目前未啟用登入，而且服務開放給網路連線：連得到這個網站的人，都看得到工作區裡掃描與取件的檔案。": "Sign-in is not enabled and the service accepts network connections: anyone who can reach this site can see the scanned and retrieved files in the workspace.",
+  "含機密或個人資料的文件請不要在這個設定下處理。多人使用請先啟用登入，每個人的工作區才會分開；只有自己用的話，改成只開本機：`sudo jtdt bind 127.0.0.1`（Windows 以系統管理員身分執行 `jtdt bind 127.0.0.1`）。": "Do not handle documents containing confidential or personal data with this setup. If several people use it, enable sign-in first so that each person has their own workspace; if only you use it, restrict the service to this computer: `sudo jtdt bind 127.0.0.1` (on Windows, run `jtdt bind 127.0.0.1` as administrator).",
+  "目前綁定的位址：": "Current bind address: ",
+  "目前未啟用登入（單機模式），掃描與取件的檔案存進這台電腦上大家共用的工作區。": "Sign-in is not enabled (single-user mode), so scanned and retrieved files go into the workspace on this computer that everyone shares.",
+  "含機密或個人資料的文件，請先確認這台電腦沒有其他人共用。服務目前只開在本機（`127.0.0.1`），其他電腦連不進來；之後若要開放區域網路給多人使用，請先啟用登入。": "Before handling documents containing confidential or personal data, make sure nobody else shares this computer. The service currently listens only on this computer (`127.0.0.1`), so other computers cannot connect; if you later open it to the local network for several people, enable sign-in first."
 }
