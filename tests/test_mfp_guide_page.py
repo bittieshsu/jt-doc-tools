@@ -113,9 +113,13 @@ def test_the_guide_warns_up_front_that_it_assumes_accounts_and_links_the_standal
     """使用者 2026-10-22：一開始就要提醒，以下說明以每個使用者獨立帳號為基礎；資安提醒一律紅字。"""
     html = (DOCS / "mfp-fetch.html").read_text(encoding="utf-8")
     hero = html.split('<header class="cp-hero">', 1)[1].split("</header>", 1)[0]
-    danger = hero.split('class="mg-danger"', 1)[1].split('class="mg-pains"', 1)[0]
-    assert "每位使用者都有自己的帳號" in danger and 'href="mfp-fetch-standalone.html"' in danger
+    danger = hero.split('class="mg-danger"', 1)[1].split('class="mg-modes"', 1)[0]
+    assert "每位使用者都有自己的帳號" in danger
     assert "工作區" in danger and "機密或個人資料" in danger
+    # 使用者 2026-10-22：單機版說明要更明顯，拆成左右兩區 —— 紅框下面兩張卡片，另一頁是按鈕
+    modes = hero.split('class="mg-modes"', 1)[1].split('class="mg-pains"', 1)[0]
+    assert 'class="mg-mode-btn" href="mfp-fetch-standalone.html"' in modes and "目前這一頁" in modes
+    assert modes.index("多人使用") < modes.index("單機版"), "兩頁都是左邊多人、右邊單機"
     faq = html.split('<section id="faq"', 1)[1]
     assert 'href="mfp-fetch-standalone.html"' in faq.split("</details>", 1)[0], "常見問題第一條連到單機版"
     css = (DOCS / "style.css").read_text(encoding="utf-8")
@@ -128,11 +132,26 @@ def test_the_standalone_guide_is_only_about_single_user_mode():
     沒有管理員設定共用事務機的步驟（多人使用那一節只指回主說明頁）。"""
     html = (DOCS / "mfp-fetch-standalone.html").read_text(encoding="utf-8")
     hero = html.split('<header class="cp-hero">', 1)[1].split("</header>", 1)[0]
-    assert 'class="mg-danger"' in hero and "一個人在自己的電腦上" in hero and 'href="mfp-fetch.html"' in hero
+    assert 'class="mg-danger"' in hero and "一個人在自己的電腦上" in hero
+    modes = hero.split('class="mg-modes"', 1)[1]
+    assert 'class="mg-mode-btn" href="mfp-fetch.html"' in modes and "目前這一頁" in modes
+    assert modes.index("多人使用") < modes.index("單機版")
     before = html.split('<section id="before"', 1)[1].split("</section>", 1)[0]
     assert "127.0.0.1" in before and "jtdt bind 127.0.0.1" in before and "沒有其他人" in html
     ids = re.findall(r'<section id="([\w-]+)"', html)
     assert ids == ["before", "add", "scan", "fetch", "files", "multi", "faq"], ids
-    body = html.split('<section id="multi"', 1)[0]
+    # 頁首那兩張卡片是指路用的（多人版那張會講到共用事務機），只看正文
+    body = html.split('<nav class="cp-pagenav', 1)[1].split('<section id="multi"', 1)[0]
     assert "成員" not in body and "共用事務機" not in body, "單機版不講管理員設定共用事務機"
     assert 'class="mg-danger"' in html.split('<section id="multi"', 1)[1].split("</section>", 1)[0]
+
+
+
+def test_the_report_problem_text_says_who_to_send_it_to():
+    """「貼給客服」講不清楚對象（使用者 2026-10-22：什麼意思？）：各單位自己架設，要寫給系統管理員或 GitHub Issues。"""
+    for page in ("mfp-fetch.html", "mfp-fetch-standalone.html"):
+        html = (DOCS / page).read_text(encoding="utf-8")
+        assert "客服" not in html, page
+        assert 'href="https://github.com/jasoncheng7115/jt-doc-tools/issues" target="_blank" rel="noopener"' in html, page
+    tpl = (ROOT / "app/tools/mfp_fetch/templates/mfp_fetch.html").read_text(encoding="utf-8")
+    assert "客服" not in tpl and "附給系統管理員" in tpl

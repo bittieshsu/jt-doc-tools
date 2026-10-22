@@ -1651,7 +1651,7 @@
   function fpText(hex) { return String(hex || '').toUpperCase().replace(/(..)(?!$)/g, '$1:'); }
   // 協定紀錄：預設收起來，給管理員看（一般使用者不用懂）
   // 「call」是 SOAP 的呼叫名稱（原本沒顯示，整張表只看得到 POST /DH/repository）；
-  // 其他欄位（設備回的狀態、查詢結果、屬性名稱…）放在最後一欄，整份可以複製給客服（不含帳密）
+  // 其他欄位（設備回的狀態、查詢結果、屬性名稱…）放在最後一欄，整份可以複製下來回報問題（不含帳密）
   const TRACE_KEYS = ['method', 'path', 'call', 'stage', 'profile', 'depth', 'singlepage', 'status', 'auth_sent', 'auth', 'request_content_type', 'content_type', 'bytes', 'ms', 'error'];
   const TRACE_SHOWN = new Set(TRACE_KEYS.concat(['challenges']));
   const lastTrace = {};
@@ -1691,7 +1691,7 @@
     }, false);
     copy.dataset.mfTraceCopy = prefix;
     const bar = el('div', 'mf-actions');
-    bar.append(copy, el('span', 'mf-hint', tr('協定紀錄不含帳號、密碼與文件內容，可以直接貼給客服。')));
+    bar.append(copy, el('span', 'mf-hint', tr('協定紀錄不含帳號、密碼與文件內容，回報問題時可以整份附給系統管理員。')));
     boxEl(prefix + 'Trace').replaceChildren(bar, scroller);
     tech.hidden = false;
   }

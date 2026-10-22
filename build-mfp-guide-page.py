@@ -92,6 +92,36 @@ def _shot(name: str, alt: str, cap: str, shots: str = SHOTS) -> str:
             f'<figcaption>{_inline(cap)}</figcaption></figure>')
 
 
+def _modes(current: str) -> str:
+    """多人使用 / 單機版兩張卡片並排（使用者 2026-10-22：單機版說明要更明顯，拆成左右兩區）。
+    `current` 是這一頁（`multi` 或 `single`）：這一張標「目前這一頁」，另一張放按鈕連過去。"""
+    cards = (("multi", "users", "多人使用（已啟用登入）",
+              "每個人有自己的事務機清單與工作區；管理員可以設定共用事務機並指定成員。",
+              "mfp-fetch.html", "看使用說明"),
+             ("single", "user", "單機版（一個人在自己的電腦上）",
+              "未啟用登入，服務只開在本機（`127.0.0.1`），只有你一個人使用。",
+              "mfp-fetch-standalone.html", "看單機版使用說明"))
+    out = ['<div class="mg-modes">']
+    for key, ic, title, desc, href, btn in cards:
+        on = key == current
+        foot = ('<span class="mg-mode-here">' + _icon("check", 16) + _inline("目前這一頁") + "</span>" if on
+                else f'<a class="mg-mode-btn" href="{href}">{_inline(btn)}{_icon("arrow", 16)}</a>')
+        out.append(f'<div class="mg-mode{" is-on" if on else ""}">'
+                   f'<div class="mg-mode-h">{_icon(ic, 24, "mg-mode-ic")}<b>{_inline(title)}</b></div>'
+                   f"<p>{_inline(desc)}</p>{foot}</div>")
+    out.append("</div>")
+    return "".join(out)
+
+
+def _faq_link(link: list) -> str:
+    """常見問題答案後面的連結；外部網址（GitHub）開新分頁。"""
+    if not link:
+        return ""
+    href, text = link[0]
+    tgt = ' target="_blank" rel="noopener"' if href.startswith("http") else ""
+    return f' <a href="{href}"{tgt}>{_inline(text)}</a>{_inline("。")}'
+
+
 def _danger(title: str, body: str, link: tuple[str, str] | None = None) -> str:
     """紅字提醒（使用者 2026-10-22：這類資安提醒一律紅字）。"""
     more = (f' <a href="{link[0]}">{_inline(link[1])}</a>{_inline("。")}' if link else "")
@@ -212,7 +242,9 @@ FAQ = [
     ("取好的檔案在哪裡",
      "在你的工作區，可以開啟、下載，或在其他工具裡直接選工作區的檔案。保留時間由管理員設定（預設 24 小時）。"),
     ("要回報問題",
-     "展開「技術細節」，按「複製協定紀錄」貼給客服。協定紀錄不含帳號、密碼與文件內容。"),
+     "展開「技術細節」，按「複製協定紀錄」，把內容附給你們的系統管理員；管理員要再往上回報時，在 GitHub 開 Issue 附上。"
+     "協定紀錄不含帳號、密碼與文件內容。回報網址：",
+     ("https://github.com/jasoncheng7115/jt-doc-tools/issues", "GitHub Issues")),
 ]
 
 
@@ -222,9 +254,8 @@ def _body() -> str:
             f'<h1 class="cp-title">{_icon("printer", 40, "mg-title-ic")}事務機掃描取件</h1>',
             _danger("以下說明以每位使用者都有自己的帳號（已啟用登入）為前提。",
                     "啟用登入後，每個人的事務機清單與工作區各自分開。這套系統架成伺服器給多人使用、卻沒有啟用登入時，"
-                    "所有人共用同一個工作區，任何連得到網站的人都看得到掃描與取件的檔案，含機密或個人資料的文件等於外洩。"
-                    "只有自己一個人在自己的電腦上使用，請看",
-                    ("mfp-fetch-standalone.html", "單機版使用說明")),
+                    "所有人共用同一個工作區，任何連得到網站的人都看得到掃描與取件的檔案，含機密或個人資料的文件等於外洩。"),
+            _modes("multi"),
             f'<p class="cp-lead">{_inline("掃描完的文件要送到自己手上，常見的三種做法各有難處：")}</p>',
             '<div class="mg-pains">'
             + "".join(f'<div class="mg-pain">{_icon(ic, 22, "mg-pain-ic")}<b>{_inline(t)}</b><p>{_inline(d)}</p></div>'
@@ -288,7 +319,7 @@ def _body() -> str:
                                  "RICOH 文件伺服器：在「位置」切換共用資料夾與設備資料夾，有密碼的標出來。")
                          + "</div>"
                          + _shot("07-log.png", "技術細節：協定紀錄與複製協定紀錄按鈕",
-                                 "出問題時展開「技術細節」，按「複製協定紀錄」貼給客服；紀錄不含帳號、密碼與文件內容。"),
+                                 "出問題時展開「技術細節」，按「複製協定紀錄」附給系統管理員；紀錄不含帳號、密碼與文件內容。"),
                          False))
     secs.append(_section("brands", "各廠牌的取件方式",
                          "「已支援」是在實機上驗證過取件的型號；「實驗功能」依原廠手冊或原廠工具的分析寫成，還沒在實機上驗證。",
@@ -301,7 +332,7 @@ def _body() -> str:
                          "\n".join(cards), False))
     faq = ['<div class="mg-faq">']
     for q, a, *link in FAQ:
-        more = f' <a href="{link[0][0]}">{_inline(link[0][1])}</a>{_inline("。")}' if link else ""
+        more = _faq_link(link)
         faq.append(f"<details><summary>{_inline(q)}</summary><p>{_inline(a)}{more}</p></details>")
     faq.append(f'<p class="mg-note">{_inline("要用程式呼叫：見")} <a href="api.html#連線測試">{_inline("API 使用手冊")}</a>{_inline("。")}</p>')
     faq.append("</div>")
@@ -341,7 +372,8 @@ S_FAQ = [
     ("RICOH 的資料夾要密碼",
      "在「位置」選那個資料夾，輸入資料夾密碼後按「開啟資料夾」。密碼錯了不會自動重試，確認後再輸入一次。"),
     ("要回報問題",
-     "展開「技術細節」，按「複製協定紀錄」貼給客服。協定紀錄不含帳號、密碼與文件內容。"),
+     "展開「技術細節」，按「複製協定紀錄」，在 GitHub 開 Issue 回報問題時附上。協定紀錄不含帳號、密碼與文件內容。回報網址：",
+     ("https://github.com/jasoncheng7115/jt-doc-tools/issues", "GitHub Issues")),
 ]
 
 
@@ -352,8 +384,8 @@ def _standalone_body() -> str:
             f'<h1 class="cp-title">{_icon("printer", 40, "mg-title-ic")}事務機掃描取件（單機版）</h1>',
             _danger("本頁只適用於一個人在自己的電腦上使用（未啟用登入的單機模式）。",
                     "未啟用登入時，所有人共用同一個工作區。這套系統架成伺服器給多人使用、卻沒有啟用登入，"
-                    "任何連得到網站的人都看得到掃描與取件的檔案，含機密或個人資料的文件等於外洩。多人使用請先啟用登入，並改看",
-                    ("mfp-fetch.html", "事務機掃描取件使用說明")),
+                    "任何連得到網站的人都看得到掃描與取件的檔案，含機密或個人資料的文件等於外洩。多人使用請先啟用登入。"),
+            _modes("single"),
             f'<p class="cp-lead">{_inline("在自己的電腦上叫事務機掃描，或把存在事務機裡的文件取回來，存進這台電腦的工作區。不用帳號，也不用管理員另外設定。")}</p>',
             "</div></header>"]
     nav = ['<nav class="cp-pagenav mg-pagenav" aria-label="本頁"><div class="container cp-pagenav-in">'
@@ -419,8 +451,9 @@ def _standalone_body() -> str:
                                  "設定方式見",
                                  ("mfp-fetch.html", "事務機掃描取件使用說明")), True))
     faq = ['<div class="mg-faq">']
-    for q, a in S_FAQ:
-        faq.append(f"<details><summary>{_inline(q)}</summary><p>{_inline(a)}</p></details>")
+    for q, a, *link in S_FAQ:
+        more = _faq_link(link)
+        faq.append(f"<details><summary>{_inline(q)}</summary><p>{_inline(a)}{more}</p></details>")
     faq.append("</div>")
     secs.append(_section("faq", "常見問題", "還是遇到問題時，先看這幾個。", "\n".join(faq), False))
     return "\n".join(hero + nav + secs)

@@ -2088,6 +2088,22 @@ html[lang="en"] .cp-en { display: none; }        /* 英文頁的中文譯名欄�
 .cp-danger p { margin: 0; color: #7f1d1d; font-size: 14.5px; line-height: 1.8; }
 .cp-danger b { color: #b91c1c; }
 .cp-danger code { background: #fee2e2; padding: 0 5px; border-radius: 4px; }
+/* 多人使用 / 單機版：左右兩張卡片（使用者 2026-10-22：單機版說明要更明顯） */
+.mg-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 860px; margin: 0 auto 24px; text-align: left; }
+.mg-mode { display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+.mg-mode.is-on { border-color: #a5b4fc; background: #f5f7ff; }
+.mg-mode-h { display: flex; align-items: center; gap: 10px; }
+.mg-mode-h b { font-size: 16px; color: #0f172a; }
+.mg-mode-ic { color: #4f46e5; flex: none; }
+.mg-mode p { margin: 0; color: #475569; font-size: 14px; line-height: 1.7; flex: 1; }
+.mg-mode-here { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 6px 12px; border-radius: 999px;
+  background: #e0e7ff; color: #3730a3; font-size: 13.5px; font-weight: 700; }
+.mg-mode-btn { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 10px 18px; border-radius: 10px;
+  background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; font-weight: 700; font-size: 14.5px; text-decoration: none;
+  box-shadow: 0 4px 12px rgba(79,70,229,0.35); }
+.mg-mode-btn:hover, .mg-mode-btn:focus-visible { background: linear-gradient(135deg, #818cf8, #6366f1); color: #fff; }
+@media (max-width: 720px) { .mg-modes { grid-template-columns: 1fr; } }
 /* 紅字提醒（使用者 2026-10-22：資安相關一律紅字） */
 .mg-danger { display: flex; gap: 12px; align-items: flex-start; max-width: 860px; margin: 18px auto 22px; padding: 14px 18px;
   text-align: left; background: #fef2f2; border: 1px solid #fca5a5; border-left: 5px solid #dc2626; border-radius: 12px; }

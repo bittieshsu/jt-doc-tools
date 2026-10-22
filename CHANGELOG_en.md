@@ -5,11 +5,16 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (943 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (944 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.15] - 2026-10-22
+
+- MFP scan & fetch: the note under Technical details used to say the protocol log could be sent to "support", which did not say who that is for a self-hosted system; it now says to attach all of it when reporting a problem to your system administrator.
+- Website: the MFP Scan & Fetch guide and the single-user guide now show two cards side by side under the red note, "Several users (sign-in enabled)" on the left and "Single-user (one person on their own computer)" on the right; the current page is marked "This page" and the other is a button, instead of a link hidden in the text of the red note. The FAQ "Reporting a problem" now says who to send the protocol log to: your system administrator (who can report further on GitHub Issues), or GitHub Issues directly in single-user mode. Screenshots updated.
 
 ## [1.17.14] - 2026-10-22
 

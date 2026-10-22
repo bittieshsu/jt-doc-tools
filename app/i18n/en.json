@@ -7593,7 +7593,7 @@
   "遙控資料盒": "Polling box",
   "遙控資料盒目前只能列出文件：取件要帶的參數還在向原廠資料確認，確認之前不送出（不會用猜的值去試）": "The polling box can only be listed for now: the parameters needed to retrieve from it are still being confirmed against the vendor's information, and nothing is sent until then (no guessed values are tried).",
   "複製協定紀錄": "Copy protocol log",
-  "協定紀錄不含帳號、密碼與文件內容，可以直接貼給客服。": "The protocol log contains no accounts, passwords or document contents and can be sent to support as is.",
+  "協定紀錄不含帳號、密碼與文件內容，回報問題時可以整份附給系統管理員。": "The protocol log contains no accounts, passwords or document contents; attach all of it when you report a problem to your system administrator.",
   "可重新測試": "Retest suggested",
   "辨識規則已更新：按「重新測試」可能就認得出這台": "Identification rules have been updated: retesting may now identify this device.",
   "這裡新增的事務機只有你的帳號看得到，換一台電腦用同一個帳號登入照樣在；要給其他人用，請管理員在「設定 → 共用事務機」建立並加成員。": "MFPs you add here are visible only to your account, and stay there when you sign in with the same account on another computer. To let others use one, ask an administrator to create it under Settings → Shared MFPs and add members.",

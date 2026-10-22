@@ -103,12 +103,16 @@ def test_only_admins_read_or_change_it_and_values_are_checked(people, restore_se
 
 def test_changes_are_audited(people, restore_setting):
     p = people
+    # 稽核是非同步寫入、整批測試共用同一個資料庫：只等「這次之後」寫進去的那一筆，
+    # 不然會先抓到別的測試留下的舊紀錄（2026-10-22 完整測試紅過一次）
+    before = audit_db.conn().execute("SELECT COALESCE(MAX(id), 0) FROM audit_events").fetchone()[0]
     _set(p["admin"], False)
-    end = time.monotonic() + 5
+    end = time.monotonic() + 10
     rows = []
     while time.monotonic() < end and not rows:
         rows = audit_db.conn().execute("SELECT details_json FROM audit_events WHERE event_type="
-                                       "'mfp_settings_update' ORDER BY id DESC LIMIT 1").fetchall()
+                                       "'mfp_settings_update' AND id > ? ORDER BY id DESC LIMIT 1",
+                                       (before,)).fetchall()
         time.sleep(0.05)
     assert rows and json.loads(rows[0][0]) == {"allow_user_devices": False}
 
