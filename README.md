@@ -1,6 +1,6 @@
 **繁體中文** ｜ [English](README_en.md) ｜ [日本語](README_ja.md)
 
-# Jason Tools 文件工具箱 v1.17.11
+# Jason Tools 文件工具箱 v1.17.12
 
 > ### ⚠ 2026-09-13 之前用 git 安裝的，這一版升級前要先跑一行
 >
@@ -54,7 +54,7 @@
 | 記憶體 RAM | 2 GB 可用 | 4 GB+ |
 | CPU | x86_64 / arm64（Apple Silicon、Win11 ARM 都可）| 4 核心+ |
 | 網路 | 安裝時可連 GitHub / PyPI（之後純內網運作）| — |
-| Python | 3.10+（安裝腳本會自動處理 uv-managed Python） | — |
+| Python | 3.11+（安裝程式會自動準備安裝目錄裡的 Python 3.12，主機只有 3.10 也可以） | — |
 
 > **磁碟用量大解析**（為什麼底線抓 12 GB 而非看似夠的 5-8 GB）：
 > - **OS 基底**：Debian / Ubuntu 最小裝 ~1.5-2 GB；其他 distro / 含桌面更大。

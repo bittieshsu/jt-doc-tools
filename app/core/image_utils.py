@@ -94,7 +94,7 @@ def remove_white_background(
         samples = []
         for x0, y0 in ((0, 0), (w - patch, 0), (0, h - patch), (w - patch, h - patch)):
             c = rgb.crop((x0, y0, x0 + patch, y0 + patch))
-            # Pillow 13 起 getdata() 已不建議用（14 移除）；Python 3.10 只能用 Pillow 12，沒有新的那個
+            # Pillow 13 起 getdata() 已不建議用（14 移除）；舊的 3.10 環境升級時第一次 `jtdt update` 還是 Pillow 12，沒有新的那個
             samples.extend(c.get_flattened_data() if hasattr(c, "get_flattened_data") else c.getdata())
         n = len(samples)
         # Median per channel is robust if 1–2 corners overlap the artwork.

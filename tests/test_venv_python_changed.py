@@ -21,6 +21,8 @@ from pathlib import Path
 
 import pytest
 
+from tools.repo_paths import public_root
+
 from app import cli, venv_check
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -264,8 +266,20 @@ def test_install_sh_rebuilds_an_environment_on_a_too_old_python(tmp_path):
         assert (_venv_ok_rc(d) != 0) == bool(want), ver
 
 
-def test_the_project_still_supports_python_3_10():
-    """使用者 2026-10-21：要換新的，但不要停止支援 3.10。"""
+def test_the_environment_needs_python_3_11_but_a_3_10_host_can_still_install():
+    """使用者 2026-10-22：不再用 Python 3.10 建環境（Pillow 12.3 累積 28 則沒有修補版的公告，critical 5 則）。
+    主機只有 3.10 照樣能裝（2026-10-21：不要停止支援 3.10）：Linux 安裝與更新用安裝目錄裡的 Python 3.12。"""
+    import re
     import tomllib
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert data["project"]["requires-python"] == ">=3.10"
+    assert data["project"]["requires-python"] == ">=3.11"
+    pins = [d for d in data["project"]["dependencies"] if re.match(r"(?i)pillow\s*[<>=;]", d)]
+    assert pins == ["Pillow>=13.0.0,<14"], pins
+    req = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+    assert re.findall(r"(?mi)^pillow\s*[<>=;].*$", req) == ["Pillow>=13.0.0,<14"]
+    lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
+    assert lock["requires-python"] == ">=3.11"
+    assert [p["version"] for p in lock["package"] if p["name"] == "pillow"] == ["13.0.0"]
+    sh = (public_root(ROOT) / "install.sh").read_text(encoding="utf-8")
+    assert 'UV_PYTHON_INSTALL_DIR="$INSTALL_DIR/python"' in sh and 'UV_EXTRA_ARGS="--python 3.12"' in sh
+    assert cli.MANAGED_PYTHON == "3.12" and cli.MIN_SECURE_PYTHON == (3, 11)

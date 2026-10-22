@@ -23,9 +23,8 @@ PyMuPDF>=1.26.0,<2
 pymupdf4llm>=0.3.0,<0.4
 markdown-it-py>=3.0,<4
 Pygments>=2.17,<3
-# Pillow 13.0.0：JPEG 解碼 heap overflow（critical）等 2026-10-20 公告；13 起要 Python 3.11+
-Pillow>=13.0.0,<14; python_version >= '3.11'
-Pillow>=12.3.0,<13; python_version < '3.11'
+# Pillow 13.0.0：JPEG 解碼 heap overflow（critical）等 2026-10-20、10-21 公告；13 起要 Python 3.11+（專案環境也要 3.11+）
+Pillow>=13.0.0,<14
 certifi>=2026.10.19   # 拿掉金鑰外洩的 emSign 根憑證（2026-10-20 公告）
 pillow-heif>=1.5,<2   # HEIC / HEIF（iPhone 照片）— Pillow 本身不認
 pdfplumber>=0.11.0

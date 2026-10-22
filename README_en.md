@@ -1,6 +1,6 @@
 [繁體中文](README.md) ｜ **English** ｜ [日本語](README_ja.md)
 
-# Jason Tools Document Toolbox v1.17.11
+# Jason Tools Document Toolbox v1.17.12
 
 > ### ⚠ Installed with git before 2026-09-13? Run one command before this upgrade
 >
@@ -53,8 +53,8 @@ Full introduction site: <https://jasoncheng7115.github.io/jt-doc-tools/index-en.
 | Disk | **12 GB** for the machine / VM / container (minimum) | **20 GB+** (leaving room for the data directory) |
 | Memory | 2 GB free | 4 GB+ |
 | CPU | x86_64 / arm64 (Apple Silicon and Windows 11 ARM both work) | 4 cores+ |
-| Network | Internet access to GitHub / PyPI during installation (offline afterwards) |; |
-| Python | 3.10+ (the install script sets up a uv-managed Python for you) |; |
+| Network | Internet access to GitHub / PyPI during installation (offline afterwards) | — |
+| Python | 3.11+ (the installer sets up its own Python 3.12 in the install directory, so a host with only 3.10 works too) | — |
 
 > **Why 12 GB and not the 5; 8 GB it looks like it needs**:
 > - **Base OS**: a minimal Debian / Ubuntu is about 1.5; 2 GB; other distributions or a desktop are larger.
@@ -230,7 +230,7 @@ Connect an OpenAI-compatible backend (local Ollama, an LLM gateway such as LiteL
 | Pre-submission check | meaning checks plus visual inspection of the PNG (covering what regex and structural checks miss) | text + **vision** |
 | Document redaction | customer codes, manager names and internal numbers that regex misses | text |
 | Text redaction | the same, for plain-text input | text |
-| Word count | adds a 3; 5 sentence summary and the top 10 keywords | text |
+| Word count | adds a 3–5 sentence summary and the top 10 keywords | text |
 | Meeting summary | Transcript to summary / decisions / action items / risks / chapters, each with a segment number you can check | text |
 | Official document drafting | Plain-language request to an approval memo or letter, incoming document to a handling note, paragraph rewriting, case history; can use the official document knowledge base; the program lays out the format and checks the facts | text |
 | Annotation report | sorts many review comments into “major / normal / question” | text |

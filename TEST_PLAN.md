@@ -6253,6 +6253,14 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
 
+### 6.123 v1.17.12 — 專案環境要求 Python 3.11+，Pillow 一律 13（**每次發版必過**）
+
+- [ ] `pyproject.toml` `requires-python = ">=3.11"`、Pillow 只有一行 `>=13.0.0,<14`；`requirements.txt` 同；`uv.lock` 只有 Pillow 13.0.0、`requires-python = ">=3.11"`。
+- [ ] 只有 Python 3.10 的 Linux 主機全新安裝：環境建在 `<安裝目錄>/python/cpython-3.12…`，服務起得來。
+- [ ] 舊的 3.10 環境執行 `jtdt update`：`uv sync` 自動刪掉重建（不會失敗、不會觸發還原）；服務起得來；`import PIL` 是 13.x。
+- [ ] 推上 GitHub 後 Dependabot 的 Pillow 告警自動關閉（宣告檔不再有 12.x）。
+- 自動化：`tests/test_venv_python_changed.py::test_the_environment_needs_python_3_11_but_a_3_10_host_can_still_install`
+
 ### 6.122 v1.17.11 — 事務機 HTTPS 加密套件（只有 RSA 金鑰交換的機型）、相容性欄排版（**每次發版必過**）
 
 - [ ] 實機 HP LaserJet MFP M141w（或其他 443 只有 `AES256-GCM-SHA384` 的事務機）：Linux（安裝目錄內建 Python）與 Windows 連線測試「自動」→ HTTPS 443 可連線、eSCL 走 443；按「重新測試」後掃描協定顯示 HTTPS 443。

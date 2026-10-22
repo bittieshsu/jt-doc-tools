@@ -809,7 +809,7 @@ TROUBLESHOOT_URL_EN = "https://jasoncheng7115.github.io/jt-doc-tools/troubleshoo
 MANAGED_PYTHON = "3.12"
 #: 比這個舊的 Python 拿不到安全性修正（Pillow 13 起要 3.11+，12.x 沒有修補版，2026-10-20）。
 #: Linux 上建在這種系統 Python 上的環境，`jtdt update` 改用安裝目錄裡的 Python 3.12 重建一次。
-#: 專案本身仍支援 3.10（使用者 2026-10-21：要換新的、但不要停止支援 3.10）。
+#: 主機只有 3.10 照樣能裝（使用者 2026-10-21：不要停止支援 3.10）；專案環境本身要 3.11+（2026-10-22）。
 MIN_SECURE_PYTHON = (3, 11)
 
 

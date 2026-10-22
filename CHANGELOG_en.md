@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (940 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (941 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.12] - 2026-10-22
+
+- Install and update: the project environment now requires Python 3.11 or later, and Pillow is always 13.0.0. Pillow 13 dropped Python 3.10 and 12.x has no fixed release, so environments built on 3.10 had collected 28 unfixed Pillow advisories (5 critical, including an argument injection that can lead to remote code execution when an EPS file is opened; published 2026-10-20 and 10-21). **A host that only has Python 3.10 can still install and update**: on Linux the installer and `jtdt update` build the environment with the install directory's own Python 3.12, as Windows already did. Existing installs still on a Python 3.10 environment: run `jtdt update`; the environment is rebuilt automatically on Python 3.11 or later, which downloads all dependencies again and takes longer than usual, while data and settings are kept. If the service does not start after the update, run `jtdt update` once more (it moves the environment to the install directory's Python 3.12). The README system requirements now say Python 3.11+ (with a note that a 3.10 host is fine).
 
 ## [1.17.11] - 2026-10-22
 
