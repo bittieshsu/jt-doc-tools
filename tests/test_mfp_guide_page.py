@@ -58,7 +58,7 @@ def test_every_screenshot_exists_and_is_localised(lang):
 
 def test_page_nav_anchors_exist_and_the_site_links_here():
     html = (DOCS / "mfp-fetch.html").read_text(encoding="utf-8")
-    nav = re.search(r'<nav class="cp-pagenav".*?</nav>', html, re.S).group(0)
+    nav = re.search(r'<nav class="cp-pagenav[^"]*".*?</nav>', html, re.S).group(0)
     for sid in re.findall(r'href="#([\w-]+)"', nav):
         assert f'<section id="{sid}"' in html, sid
     index = (DOCS / "index.html").read_text(encoding="utf-8")
@@ -82,3 +82,11 @@ def test_capture_tool_rewrites_local_addresses_before_shooting():
     # 比對的是原始碼裡有沒有寫這幾段（不是檢查網址），用 re.search 寫
     assert re.search(r"example\.com", src) and "127\\\\.0\\\\.0\\\\." in src and "HTTPS?" in src
     assert "_shoot(" in src and src.count("t.js(rewrite)") == 1
+
+
+def test_the_guide_link_on_the_dark_gallery_is_readable():
+    """首頁截圖區是深色底：連結不可以用主色靛藍字（使用者 2026-10-22：字看不清楚）。"""
+    css = (DOCS / "style.css").read_text(encoding="utf-8")
+    rule = re.search(r"\.ss-more a\s*\{([^}]*)\}", css).group(1)
+    color = re.search(r"(?<![-\w])color:\s*([^;]+);", rule).group(1).strip()
+    assert "indigo" not in color and color.lower() in ("#e0e7ff", "#fff", "#ffffff", "#eef2ff", "#c7d2fe"), color

@@ -1906,6 +1906,14 @@ code {
 ::highlight(cp-hit) { background-color: #fde047; color: #0f172a; }
 .cp-pagenav a { font-size: 14px; color: #334155; text-decoration: none; }
 .cp-pagenav a:hover { color: var(--indigo); }
+/* 使用說明頁：置中、膠囊按鈕。放不下時照樣橫向捲動（頭尾用 auto 邊距置中，不用 justify-content: center，
+   那樣溢出時左邊會被切掉、捲不回去） */
+.mg-pagenav .cp-pagenav-in { justify-content: center; }
+.mg-pagenav .cp-pagenav-links { flex: 0 1 auto; gap: 6px; padding-right: 0; -webkit-mask-image: none; mask-image: none; }
+.mg-pagenav .cp-pagenav-links > a:first-child { margin-left: auto; }
+.mg-pagenav .cp-pagenav-links > a:last-child { margin-right: auto; }
+.mg-pagenav a { padding: 6px 14px; border-radius: 999px; font-weight: 500; transition: background .15s ease, color .15s ease; }
+.mg-pagenav a:hover, .mg-pagenav a:focus-visible { background: #eef2ff; color: #4338ca; }
 /* 區塊 */
 .cp-sec { padding: 72px 0; background: var(--bg); }
 .cp-sec-alt { background: var(--bg-soft); border-top: 1px solid var(--border-soft);
@@ -2068,6 +2076,14 @@ html[lang="en"] .cp-en { display: none; }        /* 英文頁的中文譯名欄�
 /* ===== 事務機掃描取件使用說明（mfp-fetch.html，build-mfp-guide-page.py） ===== */
 .mg-title-ic { vertical-align: -6px; margin-right: 12px; color: var(--indigo); }
 .mg-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px; }
+.mg-pains { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; max-width: 980px; margin: 18px auto 0; text-align: left; }
+.mg-pain { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.mg-pain b { display: block; margin: 8px 0 4px; font-size: 15.5px; color: #0f172a; }
+.mg-pain p { margin: 0; font-size: 14px; line-height: 1.7; color: #475569; }
+.mg-pain-ic { color: #dc2626; background: #fef2f2; border-radius: 10px; padding: 7px; box-sizing: content-box; }
+.mg-answer { margin-top: 20px; }
+.mg-answer b { color: #4338ca; }
+@media (max-width: 860px) { .mg-pains { grid-template-columns: 1fr; } }
 .mg-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; background: #fff;
            border: 1px solid #c7d2fe; color: #3730a3; font-size: 14px; font-weight: 600; }
 .mg-chip .mg-ic { color: #4f46e5; }
@@ -2132,6 +2148,13 @@ html[lang="en"] .cp-en { display: none; }        /* 英文頁的中文譯名欄�
   .mg-roles, .mg-shots2, .mg-cards { grid-template-columns: 1fr; }
   .mg-step:not(:last-child)::after { display: none; }
 }
-.ss-more { margin-top: 14px; }
-.ss-more a { font-weight: 700; color: var(--indigo); text-decoration: none; }
-.ss-more a:hover { text-decoration: underline; }
+.ss-more { margin-top: 16px; }
+/* 截圖區是深色底：主色靛藍字對比不夠（使用者 2026-10-22：字看不清楚），改淺色字＋淡底框的膠囊按鈕 */
+.ss-more a {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 999px;
+  font-weight: 700; font-size: 14.5px; color: #e0e7ff; text-decoration: none;
+  background: rgba(129,140,248,0.18); border: 1px solid rgba(165,180,252,0.55);
+  transition: background .15s ease, border-color .15s ease;
+}
+.ss-more a:hover, .ss-more a:focus-visible { background: rgba(129,140,248,0.32); border-color: #c7d2fe; color: #fff; }

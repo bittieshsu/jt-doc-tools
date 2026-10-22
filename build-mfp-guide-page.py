@@ -39,6 +39,10 @@ _IC = {
     "user": '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
     "scan": '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/>'
             '<path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>',
+    # Lucide「usb」（MIT）
+    "usb": '<circle cx="10" cy="7" r="1"/><circle cx="4" cy="20" r="1"/><path d="M4.7 19.3 19 5"/>'
+           '<path d="m21 3-3 1 2 2Z"/><path d="M9.26 7.68 5 12l2 5"/><path d="m10 14 5 2 3.5-3.5"/>'
+           '<path d="m18 12 1-1 1 1-1 1Z"/>',
     "mail": '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
     "shield": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
     "lock": '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
@@ -116,9 +120,10 @@ def _flow() -> str:
                    f'<b>{_inline(t)}</b><span>{_inline(d)}</span></div>')
     out.append("</div>")
     roles = [("users", "管理員", ["設定共用事務機，按「成員」決定誰可以用（使用者、群組、組織單位）",
-                                "可以關掉「允許使用者自行新增事務機」，大家只用共用的",
+                                "決定要不要開放使用者自行輸入 IP 新增事務機（預設開放；關掉之後大家只用共用的）",
                                 "連線測試的逐步診斷與診斷報告，追查連不上的原因"]),
              ("user", "使用者", ["在「事務機掃描取件」頁看到自己新增的與管理員共用的事務機",
+                               "管理員有開放時，也可以自己輸入事務機的 IP 新增，只有自己的帳號看得到",
                                "按「掃描」從本站叫事務機掃描，或按「取件」取回存在事務機裡的文件",
                                "取好的檔案在工作區，可以開啟、下載或接著用其他工具"])]
     cards = ['<div class="mg-roles">']
@@ -155,6 +160,16 @@ def _brands() -> str:
     return f'<div class="mg-table-wrap"><table class="mg-table"><thead><tr>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
 
 
+#: 頁首的三個痛點（使用者 2026-10-22：副標題要把痛點寫出來）
+PAINS = [
+    ("mail", "掃描寄到電子郵件",
+     "每台事務機都要設定郵件伺服器與寄件帳號，維護麻煩；大型文件常超過附件或信箱容量上限，寄不出去。"),
+    ("folder", "掃描到共用資料夾",
+     "共用區通常很多人都有權限，合約、人事資料這類機密文件放進去，誰都能開啟或取走。"),
+    ("usb", "用 USB 隨身碟取件",
+     "隨身碟容易遺失，也可能帶進惡意程式；不少單位的資安規範已限制使用。"),
+]
+
 SAFETY = [
     ("wifi", "只連內網", "事務機的位址只能是內部網路；連線測試只讀首頁與掃描介面的能力表，不送任何帳號密碼。"),
     ("lock", "不儲存帳密", "取件時填的帳號密碼只用在這一次；記住的是信箱編號、信任的憑證這類設定，跟著帳號存，不含密碼。"),
@@ -186,13 +201,19 @@ def _body() -> str:
     hero = ['<header class="cp-hero"><div class="container">',
             '<span class="cp-eyebrow">使用說明</span>',
             f'<h1 class="cp-title">{_icon("printer", 40, "mg-title-ic")}事務機掃描取件</h1>',
-            f'<p class="cp-lead">{_inline("在本站就能叫事務機掃描，或把存在事務機裡的文件取回來，直接存進你的工作區，接著做 OCR、合併、壓縮或翻譯。不用 USB 隨身碟，也不用寄信給自己。")}</p>',
+            f'<p class="cp-lead">{_inline("掃描完的文件要送到自己手上，常見的三種做法各有難處：")}</p>',
+            '<div class="mg-pains">'
+            + "".join(f'<div class="mg-pain">{_icon(ic, 22, "mg-pain-ic")}<b>{_inline(t)}</b><p>{_inline(d)}</p></div>'
+                      for ic, t, d in PAINS)
+            + "</div>",
+            f'<p class="cp-lead mg-answer">{_inline("**事務機掃描取件**：在本站直接叫事務機掃描，或取回存在事務機裡的文件，檔案只存進你自己的工作區，接著做 OCR、合併、壓縮或翻譯。")}</p>',
             '<div class="mg-chips">'
             + "".join(f'<span class="mg-chip">{_icon(ic, 16)}{_inline(t)}</span>' for ic, t in
                       (("wifi", "檔案不經過雲端"), ("lock", "不儲存帳密"), ("clock", "一次服務一個人"), ("shield", "已在實機驗證")))
             + "</div></div></header>"]
-    nav = ['<nav class="cp-pagenav" aria-label="本頁"><div class="container cp-pagenav-in">'
-           '<span class="cp-pagenav-k">本頁</span><div class="cp-pagenav-links">']
+    # 置中的膠囊導覽（使用者 2026-10-22：偏左不好看）。資料保護頁共用 cp-pagenav 但右邊有搜尋框，所以只在這頁加 mg-pagenav
+    nav = ['<nav class="cp-pagenav mg-pagenav" aria-label="本頁"><div class="container cp-pagenav-in">'
+           '<div class="cp-pagenav-links">']
     nav += [f'<a href="#{sid}">{_inline(t)}</a>' for sid, t in NAV]
     nav.append("</div></div></nav>")
 

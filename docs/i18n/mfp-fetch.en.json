@@ -9,7 +9,6 @@
  "展開選單": "Open menu",
  "使用說明": "Guide",
  "事務機掃描取件": "MFP Scan & Fetch",
- "在本站就能叫事務機掃描，或把存在事務機裡的文件取回來，直接存進你的工作區，接著做 OCR、合併、壓縮或翻譯。不用 USB 隨身碟，也不用寄信給自己。": "Start a scan on the MFP from this site, or retrieve documents stored on the MFP, straight into your workspace for OCR, merging, compression or translation. No USB stick, no emailing yourself.",
  "檔案不經過雲端": "No cloud in between",
  "不儲存帳密": "Credentials never stored",
  "一次服務一個人": "One person at a time",
@@ -34,7 +33,6 @@
  "OCR、合併、壓縮、翻譯、用印…": "OCR, merge, compress, translate, stamp…",
  "管理員": "Administrators",
  "設定共用事務機，按「成員」決定誰可以用（使用者、群組、組織單位）": "Set up shared MFPs and choose who can use them under Members (users, groups, organisational units)",
- "可以關掉「允許使用者自行新增事務機」，大家只用共用的": "Turn off \"Allow users to add their own MFPs\" so everyone uses the shared ones",
  "連線測試的逐步診斷與診斷報告，追查連不上的原因": "Use the step-by-step diagnostics and the diagnostic report to find out why a device cannot be reached",
  "使用者": "Users",
  "在「事務機掃描取件」頁看到自己新增的與管理員共用的事務機": "See the MFPs you added and those shared by an administrator on the MFP Scan & Fetch page",
@@ -164,5 +162,15 @@
  "事務機掃描取件使用說明": "MFP Scan & Fetch guide",
  "回報問題": "Report an issue",
  "作者": "Author",
- "授權": "Licence"
+ "授權": "Licence",
+ "掃描完的文件要送到自己手上，常見的三種做法各有難處：": "There are three common ways to get a scanned document to yourself, and each has its problems:",
+ "掃描寄到電子郵件": "Scan to email",
+ "每台事務機都要設定郵件伺服器與寄件帳號，維護麻煩；大型文件常超過附件或信箱容量上限，寄不出去。": "Every MFP needs its own mail server and sender account, which is tedious to maintain, and large documents often exceed the attachment or mailbox size limit and never arrive.",
+ "掃描到共用資料夾": "Scan to a shared folder",
+ "共用區通常很多人都有權限，合約、人事資料這類機密文件放進去，誰都能開啟或取走。": "Many people usually have access to a shared folder, so anyone can open or take a confidential document such as a contract or HR record left there.",
+ "用 USB 隨身碟取件": "Collect with a USB flash drive",
+ "隨身碟容易遺失，也可能帶進惡意程式；不少單位的資安規範已限制使用。": "Flash drives are easy to lose and can bring in malware, and many organisations restrict them in their security policies.",
+ "<b>事務機掃描取件</b>：在本站直接叫事務機掃描，或取回存在事務機裡的文件，檔案只存進你自己的工作區，接著做 OCR、合併、壓縮或翻譯。": "<b>MFP Scan & Fetch</b>: start a scan on the MFP from this site, or retrieve documents stored on the MFP. Files go only into your own workspace, ready for OCR, merging, compression or translation.",
+ "決定要不要開放使用者自行輸入 IP 新增事務機（預設開放；關掉之後大家只用共用的）": "Decide whether users may add an MFP themselves by entering its IP address (on by default; turn it off and everyone uses the shared ones)",
+ "管理員有開放時，也可以自己輸入事務機的 IP 新增，只有自己的帳號看得到": "If the administrator allows it, add an MFP yourself by entering its IP address; only your account sees it"
 }
