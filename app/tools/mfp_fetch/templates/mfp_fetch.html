@@ -139,6 +139,8 @@
 .mf-src.own { background:#f1f5f9; color:#475569; }
 .mf-tag.busy { background:#fef3c7; color:#92400e; }
 .mf-tag.stale { background:#e0f2fe; color:#075985; }
+.mf-st-cell { display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+.mf-st-cell .mf-tag { margin-left:0; }
 .mf-beta-note.mf-verified-note { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
 .mf-tag.member { background:#dcfce7; color:#166534; }
 .mf-tag.dup { background:#fef3c7; color:#92400e; }
@@ -1066,13 +1068,16 @@
       }
       r.append(el('td', null, c.host + (c.port ? ':' + c.port : '') + (c.scheme ? P.lp + c.scheme.toUpperCase() + P.rp : '')));
       r.append(el('td', null, modelText(c)));
-      const st = el('td'); st.append(statusChip(shownStatus(c.detect_status, !!c.scan), true));
+      // 相容性與附加標籤直排、左邊對齊（原本靠換行折下去，小標籤帶著左邊距、跟上面那顆對不齊）
+      const st = el('td'); const stBox = el('div', 'mf-st-cell');
+      stBox.append(statusChip(shownStatus(c.detect_status, !!c.scan), true));
       if (c.rules_stale && !c.paused) {
         // 用舊的辨識規則判斷、而且認不出來：更新後按一次「重新測試」可能就認得出來（客戶 KYOCERA 實例）
         const tg = el('span', 'mf-tag stale', tr('可重新測試'));
         tg.title = tr('辨識規則已更新：按「重新測試」可能就認得出這台');
-        st.append(tg);
+        stBox.append(tg);
       }
+      st.append(stBox);
       r.append(st);
       r.append(el('td', null, fmtTime(c.last_test_at) + (c.last_reachable === false ? ' · ' + tr('連不上') : '')));
       if (SHARED) r.append(el('td', null, String(c.member_count || 0)));

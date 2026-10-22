@@ -6253,6 +6253,14 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
 
+### 6.122 v1.17.11 — 事務機 HTTPS 加密套件（只有 RSA 金鑰交換的機型）、相容性欄排版（**每次發版必過**）
+
+- [ ] 實機 HP LaserJet MFP M141w（或其他 443 只有 `AES256-GCM-SHA384` 的事務機）：Linux（安裝目錄內建 Python）與 Windows 連線測試「自動」→ HTTPS 443 可連線、eSCL 走 443；按「重新測試」後掃描協定顯示 HTTPS 443。
+- [ ] 只開 HTTP 80 的事務機照常退回 80；只開 443 的照常。
+- [ ] 加密套件：TLS 1.2 以上，含 ECDHE 與 RSA 金鑰交換的 AES-GCM，不含 CBC / SHA1 / RC4 / 3DES。
+- [ ] 「我的事務機」與共用事務機頁：相容性標籤下方的「可重新測試」左邊對齊、上下有間距（1280 與 390 寬）。
+- 自動化：`tests/test_mfp_client.py::test_https_works_with_a_device_that_only_offers_rsa_key_exchange`、`tests/test_mfp_client.py::test_cipher_list_is_explicit_and_has_no_weak_suites`
+
 ### 6.121 v1.17.10 — 交付用資安報告（弱點掃描、原始碼檢測、第三方元件弱點）（**交付前必過**）
 
 - [ ] `python tools/build_security_reports.py`：三份 PDF 都產出，中文沒有方框、表格不超出頁面右緣、每頁有頁碼。

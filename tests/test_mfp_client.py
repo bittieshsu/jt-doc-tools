@@ -557,3 +557,47 @@ def test_tls_contexts_refuse_anything_below_tls_1_2():
         assert ctx.minimum_version == ssl.TLSVersion.TLSv1_2
     u = mc._unverified_context()
     assert u.verify_mode == ssl.CERT_NONE and u.check_hostname is False
+
+
+def test_cipher_list_is_explicit_and_has_no_weak_suites():
+    """加密套件寫明在程式裡（平台預設不一致）：含 RSA 金鑰交換的 AES-GCM，不含 CBC / SHA1 / RC4 / 3DES。"""
+    for ctx in (mc._verified_context(), mc._unverified_context()):
+        names = {c["name"] for c in ctx.get_ciphers()}
+        assert "AES256-GCM-SHA384" in names and "ECDHE-RSA-AES128-GCM-SHA256" in names
+        weak = [n for n in names if any(w in n for w in ("RC4", "3DES", "DES-CBC", "NULL", "MD5"))
+                or n.endswith("-SHA") or n in ("AES256-SHA256", "AES128-SHA256")]
+        assert not weak, weak
+
+
+def test_https_works_with_a_device_that_only_offers_rsa_key_exchange(open_lo, tmp_path):
+    """實機 HP LaserJet MFP M141w：443 只有 TLS 1.2＋`AES256-GCM-SHA384`。只收 ECDHE 的話握手失敗、
+    「自動」只能退回 HTTP 80（使用者 2026-10-22：80 與 443 都有時要優先用 443）。"""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "HP-Test")])
+    now = dt.datetime.now(dt.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+            .serial_number(2).not_valid_before(now - dt.timedelta(days=1))
+            .not_valid_after(now + dt.timedelta(days=30)).sign(key, hashes.SHA256()))
+    c, k = tmp_path / "rc.pem", tmp_path / "rk.pem"
+    c.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    k.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                    serialization.NoEncryption()))
+    sctx = _stdlib_ssl_context_class()(ssl.PROTOCOL_TLS_SERVER)
+    sctx.load_cert_chain(str(c), str(k))
+    # truststore 注入後，原始類別的 maximum_version 設定器會繞回自己（RecursionError）→ 直接用底層的
+    ssl._ssl._SSLContext.maximum_version.__set__(sctx, ssl.TLSVersion.TLSv1_2)
+    sctx.set_ciphers("AES256-GCM-SHA384")
+    srv = _serve(sctx)
+    port = srv.server_address[1]
+    open_lo(port)
+    try:
+        rep = mc.probe("127.0.0.1", port, "https")
+    finally:
+        srv.shutdown()
+    att = rep["attempts"][0]
+    assert att.get("reachable"), att.get("steps")
+    assert att["tls"]["cipher"] == "AES256-GCM-SHA384"

@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (939 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (940 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.11] - 2026-10-22
+
+- MFP scan & fetch: HTTPS connections now also offer AES-GCM cipher suites with RSA key exchange. Many MFP web servers only offer these (on a real HP LaserJet MFP M141w, port 443 offers only TLS 1.2 with `AES256-GCM-SHA384`), while the Python bundled by the official installers accepts only ECDHE / DHE by default, so the handshake failed and Auto fell back to unencrypted HTTP 80. The cipher list is now set explicitly, so it is the same on every platform, and when both HTTPS 443 and HTTP 80 work, 443 is used. For an MFP that was already tested, press Retest once to switch to 443. TLS 1.2 or later is still required, and CBC, SHA1, RC4 and 3DES suites are not offered. In the MFP lists, extra tags in the compatibility column (such as "can be retested") now sit under the compatibility label, aligned to the left, instead of wrapping out of line.
 
 ## [1.17.10] - 2026-10-21
 

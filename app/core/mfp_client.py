@@ -437,11 +437,19 @@ def _connect(ip: str, port: int, timeout: float) -> socket.socket:
 #: 跟事務機連線的最低 TLS 版本。Python 3.10+ 搭 OpenSSL 3 本來就是 1.2，但有的平台交給系統設定決定
 #: （實測 Ubuntu 系統 OpenSSL 回「由系統決定」）；寫明才不會因平台而異，CodeQL 也看得到。
 MIN_TLS = ssl.TLSVersion.TLSv1_2
+#: 跟事務機連線的加密套件：Python 自己的預設清單＋`RSA+AESGCM`。**清單也會因平台而異**：
+#: 安裝目錄內建的 Python（python-build-standalone）用 Python 的清單，只收 ECDHE / DHE；
+#: 發行版打包的 Python 交給 OpenSSL 預設，含 RSA 金鑰交換。不少事務機的嵌入式伺服器只有
+#: `AES256-GCM-SHA384` 這類 RSA 金鑰交換的套件（實機 HP LaserJet MFP M141w），只收 ECDHE
+#: 的話 443 握手失敗、只能退回不加密的 HTTP 80。仍要求 TLS 1.2＋AES-GCM，不收 CBC / SHA1 / RC4 / 3DES。
+MFP_CIPHERS = ("@SECLEVEL=2:ECDH+AESGCM:ECDH+CHACHA20:ECDH+AES:DHE+AES:RSA+AESGCM:"
+               "!aNULL:!eNULL:!aDSS:!SHA1:!AESCCM")
 
 
 def _verified_context() -> ssl.SSLContext:
     ctx = ssl.create_default_context()
     ctx.minimum_version = MIN_TLS
+    ctx.set_ciphers(MFP_CIPHERS)
     return ctx
 
 
@@ -454,6 +462,7 @@ def _unverified_context() -> ssl.SSLContext:
     `verify_mode` 設定器會繞回 truststore，無限遞迴（實測 RecursionError）。"""
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.minimum_version = MIN_TLS
+    ctx.set_ciphers(MFP_CIPHERS)
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
     return ctx
