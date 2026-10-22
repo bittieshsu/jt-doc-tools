@@ -39,7 +39,8 @@ jobs:
     name: 核心測試（不需 Office / OCR）
     runs-on: ubuntu-latest
     # 整套約 28~29 分鐘（v1.16.81 加了管理頁的瀏覽器掃描），30 分鐘的上限被撞到、整個工作被取消 —— 放寬到 45
-    timeout-minutes: 45
+    # 平常 31～40 分鐘；45 分鐘在 GitHub 機器慢的時候會被取消（2026-10-22 f582d28 就是），放寬到 75
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -93,7 +94,8 @@ jobs:
     name: 正式機的相依版本（uv sync 讀 uv.lock）
     runs-on: ubuntu-latest
     # 整套約 28~29 分鐘（v1.16.81 加了管理頁的瀏覽器掃描），30 分鐘的上限被撞到、整個工作被取消 —— 放寬到 45
-    timeout-minutes: 45
+    # 平常 31～40 分鐘；45 分鐘在 GitHub 機器慢的時候會被取消（2026-10-22 f582d28 就是），放寬到 75
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -196,7 +198,8 @@ jobs:
     name: 轉檔測試（LibreOffice + 中日韓字型）
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 平常 31～40 分鐘；45 分鐘在 GitHub 機器慢的時候會被取消（2026-10-22 f582d28 就是），放寬到 75
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
