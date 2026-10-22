@@ -10,6 +10,9 @@ favicon 與 PDF 內嵌情境都需要 raster 後備。
 """
 from __future__ import annotations
 
+import io
+import os
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -81,6 +84,7 @@ def reset_logo() -> bool:
     """Remove custom logo, falling back to bundled default. Returns True
     if a custom logo was actually present and removed."""
     p = _logo_path()
+    _icon_cache_path().unlink(missing_ok=True)
     if p.exists():
         p.unlink()
         return True
@@ -91,7 +95,79 @@ def custom_logo_url() -> str:
     """URL used in templates. Returns the public endpoint when a custom
     logo exists, else empty string (templates fall back to the bundled
     default in app/static/images/)."""
-    return "/branding/logo" if has_custom_logo() else ""
+    p = get_custom_logo_path()
+    # 網址帶版本：換了新 Logo 網址就跟著變，瀏覽器（尤其 favicon 的快取）才會重抓
+    return f"/branding/logo?v={p.stat().st_mtime_ns}" if p else ""
+
+
+# ----- favicon（使用者 2026-10-22：換 Logo 時 favicon 也要跟著變） -----
+#: 正方形圖示的邊長（apple-touch-icon 用 180；瀏覽器頁籤縮到 16 / 32 也清楚）
+ICON_SIZE = 180
+#: `/favicon.ico` 裡放的尺寸
+FAVICON_SIZES = ((16, 16), (32, 32), (48, 48))
+_ICO_CACHE: dict[tuple, bytes] = {}
+_ICON_LOCK = threading.Lock()
+
+
+def _icon_cache_path() -> Path:
+    return settings.branding_dir / "icon.png"
+
+
+def custom_icon_path() -> Optional[Path]:
+    """企業 Logo 的正方形版本（給 favicon 用）。企業 Logo 多半是橫的，直接當 favicon 會被壓扁或縮到看不清楚：
+    先裁掉四周全透明的邊，再置中補成正方形（透明底）。Logo 換了才重做（比修改時間）。"""
+    src = get_custom_logo_path()
+    if not src:
+        return None
+    dst = _icon_cache_path()
+    with _ICON_LOCK:
+        try:
+            if dst.stat().st_mtime_ns >= src.stat().st_mtime_ns:
+                return dst
+        except FileNotFoundError:
+            pass
+        with Image.open(src) as im:
+            im = im.convert("RGBA")
+            box = im.getchannel("A").getbbox()
+            if box:
+                im = im.crop(box)
+            side = max(im.size)
+            canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+            canvas.paste(im, ((side - im.width) // 2, (side - im.height) // 2))
+            if side != ICON_SIZE:
+                canvas = canvas.resize((ICON_SIZE, ICON_SIZE), Image.LANCZOS)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dst.with_name(dst.name + ".tmp")
+        canvas.save(tmp, "PNG")
+        os.replace(tmp, dst)
+    return dst
+
+
+def icon_url() -> str:
+    """頁面 `<link rel="icon">` 用的網址：企業 Logo 的正方形版（帶版本），否則選的內建 Logo（本來就是正方形）。"""
+    p = get_custom_logo_path()
+    if p:
+        return f"/branding/icon.png?v={p.stat().st_mtime_ns}"
+    return builtin_logo_url(spot="icon")
+
+
+def favicon_ico() -> bytes:
+    """`/favicon.ico` 的內容：跟著目前的 Logo（企業 Logo 或選的內建 Logo）。
+    瀏覽器在沒有 `<link rel="icon">` 的網址（PDF 預覽、下載、API）與書籤會自己要這個路徑。"""
+    src = custom_icon_path()
+    if src is None:
+        src = Path(__file__).resolve().parent.parent.parent / builtin_logo_url(spot="icon").lstrip("/")
+    key = (str(src), src.stat().st_mtime_ns)
+    hit = _ICO_CACHE.get(key)
+    if hit is not None:
+        return hit
+    with Image.open(src) as im:
+        buf = io.BytesIO()
+        im.convert("RGBA").save(buf, format="ICO", sizes=list(FAVICON_SIZES))
+    data = buf.getvalue()
+    _ICO_CACHE.clear()
+    _ICO_CACHE[key] = data
+    return data
 
 
 # ----- 站台名稱 customization (v1.4.68 起) -----
@@ -316,7 +392,10 @@ def builtin_logo_url(logo: Optional[str] = None, spot: str = "page") -> str:
 
 
 def logo_url(spot: str = "page") -> str:
-    """各位置實際要用的 Logo：上傳過企業 Logo 就用那張，否則用選的內建 Logo。"""
+    """各位置實際要用的 Logo：上傳過企業 Logo 就用那張，否則用選的內建 Logo。
+    `icon`（favicon）用正方形版本，見 `icon_url()`。"""
+    if spot == "icon":
+        return icon_url()
     return custom_logo_url() or builtin_logo_url(spot=spot)
 
 

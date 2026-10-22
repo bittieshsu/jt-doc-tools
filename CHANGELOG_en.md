@@ -5,11 +5,17 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (942 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (943 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.14] - 2026-10-22
+
+- Branding: the favicon (the small icon on browser tabs and bookmarks) now changes together with the logo. A new `/favicon.ico` follows the current logo (the uploaded company logo or the chosen built-in logo) with 16, 32 and 48 pixel sizes; the path used to return 404, so PDF previews, downloads, API responses and bookmarks had no icon. A company logo used as the favicon is trimmed of transparent margins and centred on a square transparent canvas, instead of being squeezed or shrunk to an unreadable size. Logo and favicon URLs carry a version, so a new logo gets a new URL and browsers stop showing the cached old icon.
+- Docs: the MFP Scan & Fetch guide FAQ gains "Who is affected when an MFP is deleted": one you added yourself affects nobody when deleted (a shared MFP for the same device keeps working); a shared MFP can only be deleted by an administrator under Settings → Shared MFPs and then no member can use it; in both cases the scan and retrieval history is kept and marked as Removed.
+- Docs: the IIS section of `OPS.md` now has a red warning that `web.config` only forwards requests and cannot stop anyone connecting to port 8765 directly, with how to check (`jtdt status`, and port 8765 must be unreachable from another computer), the command to bind the service to this computer only (`jtdt bind 127.0.0.1`) and, if needed, a Windows Firewall rule that blocks port 8765. The `web.config` template comments are now in English with a UTF-8 declaration so they no longer turn into garbled characters when opened or saved in editors such as Notepad. The common reverse-proxy requirement that the backend listens only on `127.0.0.1:8765` now explains how to check and fix it.
 
 ## [1.17.13] - 2026-10-22
 

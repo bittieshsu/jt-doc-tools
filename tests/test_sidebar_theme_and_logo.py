@@ -203,7 +203,8 @@ def test_logo_follows_the_choice_and_the_sidebar_tone(br_dir, monkeypatch):
     assert {b.logo_url(s) for s in ("sidebar", "icon", "page")} == {"/static/images/logo-doc.png"}
     assert b.builtin_logo_file().is_file()
     monkeypatch.setattr(b, "custom_logo_url", lambda: "/branding/logo")
-    assert {b.logo_url(s) for s in ("sidebar", "icon", "page")} == {"/branding/logo"}, "上傳的企業 Logo 優先"
+    assert {b.logo_url(s) for s in ("sidebar", "page")} == {"/branding/logo"}, "上傳的企業 Logo 優先"
+    # favicon 用企業 Logo 的正方形版本（v1.17.14，見 test_favicon_follows_the_logo.py）
 
 
 def test_the_document_logo_matches_its_source():

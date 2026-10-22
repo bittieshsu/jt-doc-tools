@@ -137,6 +137,7 @@
 <section id="faq" class="cp-sec cp-sec-alt"><div class="container"><h2 class="cp-sec-title">常見問題</h2><p class="cp-sec-lead">還是遇到問題時，先看這幾個。</p><div class="mg-faq">
 <details><summary>沒有啟用登入（單機版）怎麼用</summary><p>單機版只適合一個人在自己的電腦上使用，而且服務只開在本機（<code>127.0.0.1</code>）。步驟與注意事項見 <a href="mfp-fetch-standalone.html">單機版使用說明</a>。</p></details>
 <details><summary>看不到管理員共用的事務機</summary><p>先看頁面上的「目前登入的帳號」：同一個人的 AD、SSO、本機帳號是不同帳號，成員要加的是你實際登入的那一個。管理員也可以把你所在的群組加進成員；群組旁邊顯示「本站 0 人」代表登入時沒有掛上這個群組。改完切回分頁就會更新。</p></details>
+<details><summary>刪除事務機會影響到誰</summary><p><b>自己新增的</b>（來源「自己新增」）只有你看得到，刪了不影響任何人，管理員共用的同一台也照常可用。<b>管理員共用的</b>（來源「管理員共用」）只能由管理員在「設定 → 共用事務機」刪除，刪了所有成員都看不到、也不能再用。兩種都一樣：刪掉之後，那台的掃描與取件紀錄會保留，標示「已移除」。</p></details>
 <details><summary>連線測試失敗或列不出檔案</summary><p>看連線測試的逐步診斷，哪一步失敗就從那一步查；也可以下載診斷報告（txt、md、json、html、pdf）給管理員。KYOCERA 要在事務機上啟用 9091 或 9090 連接埠的文件服務；FUJIFILM 某個連接埠回 406 時，換另一個連線方式。</p></details>
 <details><summary>RICOH 的資料夾要密碼</summary><p>在「位置」選那個資料夾，輸入資料夾密碼後按「開啟資料夾」。密碼錯了不會自動重試，確認後再輸入一次。</p></details>
 <details><summary>清單上標「可重新測試」</summary><p>辨識規則更新過，這台之前沒認出型號。按一次「重新測試」就會用新的規則判斷。</p></details>

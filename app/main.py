@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.17.13"
+VERSION = "1.17.14"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -975,6 +975,29 @@ async def _branding_logo():
         raise _HTTPException(404, "no custom logo set")
     return _FileResponse(str(p), media_type="image/png",
                          headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/branding/icon.png")
+async def _branding_icon():
+    """企業 Logo 的正方形版本（favicon、apple-touch-icon）；沒有企業 Logo 時 404。"""
+    import asyncio as _asyncio
+    from fastapi import HTTPException as _HTTPException
+    from .core import branding as _branding
+    p = await _asyncio.to_thread(_branding.custom_icon_path)
+    if not p:
+        raise _HTTPException(404, "no custom logo set")
+    return _FileResponse(str(p), media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/favicon.ico")
+async def _favicon_ico():
+    """跟著目前的 Logo（企業 Logo 或選的內建 Logo）。原本這個路徑是 404：PDF 預覽、下載、API、書籤
+    這類沒有 `<link rel="icon">` 的地方，瀏覽器會自己要 `/favicon.ico`。"""
+    import asyncio as _asyncio
+    from fastapi.responses import Response as _Response
+    from .core import branding as _branding
+    data = await _asyncio.to_thread(_branding.favicon_ico)
+    return _Response(data, media_type="image/x-icon", headers={"Cache-Control": "no-cache"})
 
 
 def _branding_logo_url() -> str:

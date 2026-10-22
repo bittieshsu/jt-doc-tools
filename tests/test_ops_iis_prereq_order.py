@@ -55,3 +55,27 @@ def test_the_section_heading_matches_the_order(iis_section: str):
     """標題也要照順序 —— 那是使用者第一眼看到的東西。"""
     heading = iis_section.splitlines()[0]
     assert heading.index("URL Rewrite") < heading.index("ARR"), heading
+
+
+def _iis_section() -> str:
+    text = OPS.read_text(encoding="utf-8")
+    start = text.index("### IIS")
+    return text[start:text.index("\n### ", start + 5)]
+
+
+def test_iis_warns_that_web_config_does_not_block_direct_8765():
+    """客戶 2026-10-22：「這個範本好像沒有不准直接 8765 非本機連線」—— 代理擋不住直接連 8765，
+    要靠服務只綁本機；IIS 這一節要紅框講清楚，並給確認方式與指令。"""
+    sec = _iis_section()
+    assert "[!CAUTION]" in sec, "GitHub 的 CAUTION 框是紅色的"
+    caution = sec.split("[!CAUTION]", 1)[1].split("```", 1)[0]
+    assert "8765" in caution and "jtdt status" in sec and "jtdt bind 127.0.0.1" in sec
+    assert "New-NetFirewallRule" in caution and "-LocalPort 8765" in caution and "-Action Block" in caution
+
+
+def test_iis_web_config_template_is_plain_ascii():
+    """中文註解在記事本以 ANSI 開啟或存檔時會變亂碼（客戶貼回來的就是亂碼）：範本只用 ASCII，並宣告 UTF-8。"""
+    sec = _iis_section()
+    xml = sec.split("```xml", 1)[1].split("```", 1)[0]
+    assert xml.lstrip().startswith('<?xml version="1.0" encoding="utf-8"?>')
+    assert xml.isascii(), [c for c in xml if not c.isascii()][:5]

@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **514 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **515 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -797,6 +797,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_every_job_has_a_way_back.py` | 每一件背景作業都要有回到結果的路徑（下載，或「開啟」） |
 | `test_extract_text_download_filenames.py` | 擷取文字的下載：**寫檔名與讀檔名一定要是同一個值** |
 | `test_extract_text_glyph_repair.py` | 壞掉的文字對應表：擷取文字 / 字數統計 / 逐句翻譯也要能還原 |
+| `test_favicon_follows_the_logo.py` | 換 Logo 時 favicon 要一起變（使用者 2026-10-22） |
 | `test_font_display_names.py` | 自訂上傳字型的顯示名稱 |
 | `test_format_terminology.py` | 格式用語要一致：「辦公文件」是統稱，「文書檔」是其中一類 |
 | `test_forwarded_proto.py` | `X-Forwarded-Proto` 的解析要全站一致 |
@@ -3160,7 +3161,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 目前沒有自動化測試碰過，跑 `python tools/report_endpoint_test_coverage.py`，
 那份是**提示不是判決**。
 
-共 **316 支**（工具首頁不列，§2 已逐支驗收）。
+共 **318 支**（工具首頁不列，§2 已逐支驗收）。
 
 **全站（認證 / 帳號 / 工作區 / 介面語言）**
 
@@ -3180,6 +3181,8 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 - [ ] `GET /auth/saml/metadata`
 - [ ] `GET/POST /auth/saml/sls`
 - [ ] `GET /branding/logo`
+- [ ] `GET /branding/icon.png`（企業 Logo 的正方形版，給 favicon；沒有企業 Logo 時 404）
+- [ ] `GET /favicon.ico`（跟著目前的 Logo；16 / 32 / 48）
 - [ ] `POST /change-password`
 - [ ] `GET /healthz` — **存活探測**。判準：固定回 `{"ok":true}`，
       **而且工具載入失敗時它也要維持 200** —— 服務管理員拿它決定要不要重啟，
@@ -6252,6 +6255,14 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.125 v1.17.14 — favicon 跟著 Logo、IIS 範本直接連 8765 的警示（**每次發版必過**）
+
+- [ ] 沒有企業 Logo：`/favicon.ico` 200（16 / 32 / 48）；設定 → 企業 Logo 切換內建 Logo，重新整理後頁籤圖示跟著換。
+- [ ] 上傳橫的企業 Logo：頁籤圖示是置中補成正方形的企業 Logo；`/favicon.ico` 也是；再上傳另一張，頁籤圖示換新（網址版本號改變）；移除企業 Logo 後回到內建 Logo。
+- [ ] 啟用登入時未登入也拿得到 `/favicon.ico` 與 `/branding/icon.png`；登入頁有圖示。
+- [ ] `OPS.md` IIS 一節的紅色警示（GitHub 上顯示成紅框）、`jtdt status` 確認、`jtdt bind 127.0.0.1`、防火牆指令；`web.config` 範本只有 ASCII。
+- 自動化：`tests/test_favicon_follows_the_logo.py`、`tests/test_sidebar_theme_and_logo.py`、`tests/test_ops_iis_prereq_order.py`
 
 ### 6.124 v1.17.13 — 單機模式的紅字提醒、單機版使用說明、合規頁的事務機控制項（**每次發版必過**）
 

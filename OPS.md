@@ -145,6 +145,10 @@ sudo update-ca-certificates`；Windows 匯入「受信任的根憑證授權單�
 5. **read / send 逾時 ≥ 900s** — LLM 工具（翻譯 / OCR 校驗 / pdf-fill 視覺校驗）單筆推理常 5–15 分鐘，預設 60s 會 504。
 6. **安全標頭由後端 app 統一設定**（CSP / HSTS / X-Frame-Options…）— 代理**不要**再加一次，否則重複標頭（ZAP「Multiple Header Entries」）。
 7. **後端只聽 `127.0.0.1:8765`** — 對外只由代理提供 HTTPS，並隱藏代理版本號。
+   代理的設定**擋不住別人直接連 8765**，這件事要靠服務本身的綁定：
+   - 確認：執行 `jtdt status`，`url` 那一行要是 `http://127.0.0.1:8765/`；再從另一台電腦開 `http://<伺服器 IP>:8765/`，要連不上。
+   - 改回只綁本機：Linux / macOS `sudo jtdt bind 127.0.0.1`；Windows 以系統管理員身分執行 `jtdt bind 127.0.0.1`（會自動重啟服務）。
+   - 安裝程式預設就只綁本機；只有自己執行過 `jtdt bind 0.0.0.0` 這類指令才會對區網開放。
 
 > **防 `X-Forwarded-For` 偽造（稽核 IP 正確性）**：稽核 / 歷史記錄的來源 IP 取 `X-Forwarded-For` 最左側。若代理是用「附加」模式（nginx `$proxy_add_x_forwarded_for`、HAProxy `option forwardfor`…），惡意的內部使用者可先自己帶一個假 XFF，就能把稽核記到假 IP。要杜絕，讓代理**先移除進站的 `X-Forwarded-For`，再由代理自己填真實用戶端**（各範例已標註）。這是**選用的硬化**，不影響一般顯示；跟「反向代理下稽核 IP 變 127.0.0.1」的修正（v1.12.65）無關，該問題只要升級即解。
 
@@ -313,6 +317,15 @@ Traefik 會自動帶 `X-Forwarded-For` / `-Proto`；body 以串流轉發不受�
 2. **Application Request Routing (ARR)**（後）—— <https://www.iis.net/downloads/microsoft/application-request-routing>
 3. IIS 管理員 → 伺服器節點 → **Application Request Routing Cache** →
    右側「Server Proxy Settings」→ 勾 **Enable proxy** → 套用
+4. **確認 jt-doc-tools 只綁本機**：以系統管理員身分開 PowerShell 執行 `jtdt status`，`url` 那一行要是 `http://127.0.0.1:8765/`
+   （不是的話執行 `jtdt bind 127.0.0.1`）。
+
+> [!CAUTION]
+> **下面這份 `web.config` 只負責把 IIS 收到的請求轉給 `127.0.0.1:8765`，擋不住別人直接連 8765。**
+> 服務若綁在 `0.0.0.0` 或區網 IP，使用者打 `http://<伺服器 IP>:8765/` 就能繞過 IIS（也就繞過 HTTPS）。
+> 請照上面第 4 步確認服務只綁本機，並從另一台電腦開 `http://<伺服器 IP>:8765/` 確認連不上。
+> 服務因故必須綁區網位址時，至少用 Windows 防火牆擋掉 8765 的輸入連線（本機的 IIS 走回送介面，不受影響）：
+> `New-NetFirewallRule -DisplayName "jt-doc-tools block 8765" -Direction Inbound -Protocol TCP -LocalPort 8765 -Action Block`
 
 > ARR 的官方下載頁在「Installing ARR 3.0 manually」那一段就寫著：
 > *"ARR depends on URL Rewrite. Ensure URL Rewrite is installed prior to
@@ -322,15 +335,17 @@ Traefik 會自動帶 `X-Forwarded-For` / `-Proto`；body 以串流轉發不受�
 > URL Rewrite 依正確順序一起裝；**現在那個連結已經被拿掉，只剩 x86 / x64
 > 手動安裝檔 —— 所以順序得自己顧。**
 
-裝完之後，站台放這份 `web.config`：
+裝完之後，站台放這份 `web.config`（註解刻意用英文：用記事本等編輯器以非 UTF-8 開啟或存檔時，中文註解會變成亂碼）：
 
 ```xml
+<?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <system.webServer>
     <rewrite>
-      <!-- 依這個連線「實際」是 http 還是 https 帶值。
-           **不要寫死 https** —— 站台只有 http 時，後端會加 Secure cookie，
-           瀏覽器直接丟掉，遠端使用者一上傳就「CSRF token 遺失或不正確」。 -->
+      <!-- Send the protocol the browser really used (http or https).
+           Do NOT hard-code https: on an http-only site the backend would mark
+           cookies Secure, browsers drop them, and remote uploads fail with a
+           CSRF token error. -->
       <rewriteMaps>
         <rewriteMap name="MapProto" defaultValue="http">
           <add key="on" value="https" />
@@ -349,7 +364,7 @@ Traefik 會自動帶 `X-Forwarded-For` / `-Proto`；body 以串流轉發不受�
     </rewrite>
     <security>
       <requestFiltering>
-        <!-- 上傳大檔 100 MB（bytes） -->
+        <!-- Allow uploads up to 100 MB (bytes) -->
         <requestLimits maxAllowedContentLength="104857600" />
       </requestFiltering>
     </security>
