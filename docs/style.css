@@ -2148,13 +2148,18 @@ html[lang="en"] .cp-en { display: none; }        /* 英文頁的中文譯名欄�
   .mg-roles, .mg-shots2, .mg-cards { grid-template-columns: 1fr; }
   .mg-step:not(:last-child)::after { display: none; }
 }
-.ss-more { margin-top: 16px; }
-/* 截圖區是深色底：主色靛藍字對比不夠（使用者 2026-10-22：字看不清楚），改淺色字＋淡底框的膠囊按鈕 */
+.ss-more, .ss-text .ss-more { margin: 30px 0 0; }  /* `.ss-text p` 的 margin 比較具體，要一起寫才蓋得過 */
+/* 截圖區是深色底：要一眼看得出是按鈕（使用者 2026-10-22：主色字看不清楚；淡色膠囊又跟上面的標籤混在一起）。
+   實心主色、圓角方形（標籤是膠囊形）、跟標籤拉開距離 */
 .ss-more a {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 16px; border-radius: 999px;
-  font-weight: 700; font-size: 14.5px; color: #e0e7ff; text-decoration: none;
-  background: rgba(129,140,248,0.18); border: 1px solid rgba(165,180,252,0.55);
-  transition: background .15s ease, border-color .15s ease;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 22px; border-radius: 10px;
+  font-weight: 700; font-size: 15px; color: #fff; text-decoration: none;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  box-shadow: 0 6px 18px rgba(79,70,229,0.45);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
-.ss-more a:hover, .ss-more a:focus-visible { background: rgba(129,140,248,0.32); border-color: #c7d2fe; color: #fff; }
+.ss-more a:hover, .ss-more a:focus-visible {
+  background: linear-gradient(135deg, #818cf8, #6366f1); color: #fff;
+  box-shadow: 0 8px 22px rgba(99,102,241,0.55); transform: translateY(-1px);
+}

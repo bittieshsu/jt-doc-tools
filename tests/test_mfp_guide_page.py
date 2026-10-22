@@ -90,3 +90,13 @@ def test_the_guide_link_on_the_dark_gallery_is_readable():
     rule = re.search(r"\.ss-more a\s*\{([^}]*)\}", css).group(1)
     color = re.search(r"(?<![-\w])color:\s*([^;]+);", rule).group(1).strip()
     assert "indigo" not in color and color.lower() in ("#e0e7ff", "#fff", "#ffffff", "#eef2ff", "#c7d2fe"), color
+
+
+def test_the_guide_link_is_a_button_set_apart_from_the_tags():
+    """淡色膠囊跟上面的標籤混在一起（使用者 2026-10-22）：實心底、圓角方形、跟標籤拉開距離。
+    `.ss-text p` 的 margin 比較具體，間距規則要寫成 `.ss-text .ss-more` 才蓋得過（第一次就沒生效）。"""
+    css = (DOCS / "style.css").read_text(encoding="utf-8")
+    assert re.search(r"\.ss-text \.ss-more\s*\{\s*margin:\s*(2[4-9]|3\d)px", css.replace(".ss-more, .ss-text .ss-more", ".ss-text .ss-more"))
+    rule = re.search(r"\.ss-more a\s*\{([^}]*)\}", css).group(1)
+    assert "gradient" in rule or re.search(r"background:\s*#[0-9a-f]{6}", rule)
+    assert "999px" not in rule, "膠囊形會跟標籤看起來一樣"
