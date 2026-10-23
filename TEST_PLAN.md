@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **515 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **516 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -727,6 +727,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_cli_health_check.py` | `jtdt update` 的健康檢查要探對地方，失敗要說得出原因 |
 | `test_cli_service_logs.py` | `jtdt update` 健康檢查失敗時，要讀得到服務**真正的**記錄檔（v1.16.11，客戶回報） |
 | `test_cli_update_rollback.py` | 升級失敗時要真的回復，而且訊息要說出實際結果（外部稽核 F03，v1.15.28） |
+| `test_cli_uv_upgrade.py` | `jtdt update` 把安裝目錄裡太舊的 uv 換新（2026-10-22：eMudhra / emSign 中間憑證金鑰外洩， |
 | `test_client_ip_audit.py` | Client-IP resolution for audit / history / display — app/core/client_ip.py. |
 | `test_cmd_block_parens.py` | 批次檔（.cmd / .bat）裡，區塊中的 echo 不可以有沒跳脫的右括號；記錄裡不寫 %DATE% |
 | `test_commit_message_guard.py` | `tools/check_commit_message.py` 自己要有牙齒 |
@@ -6255,6 +6256,14 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.127 v1.17.16 — `jtdt update` 換掉太舊的 uv（emSign 憑證外洩）（**每次發版必過**）
+
+- [ ] 安裝目錄裡的 uv 低於 0.13.4（例如 0.11.x）：`sudo jtdt update` 兩次後 `bin/uv --version` ≥ 0.13.4，相依同步照常、服務起得來。
+- [ ] uv 已經夠新：`jtdt update` 不動它。
+- [ ] 封閉網路（連不到 astral.sh）：印出「Could not update uv」與手動指令，升級照常完成。
+- [ ] `OPS.md` 的「憑證機構金鑰外洩」一節：各環節狀況、作業系統憑證更新指令、Docker 重建、手動更新 uv。
+- 自動化：`tests/test_cli_uv_upgrade.py`
 
 ### 6.126 v1.17.15 — 說明頁左右兩區（多人 / 單機）、回報問題的對象（**每次發版必過**）
 

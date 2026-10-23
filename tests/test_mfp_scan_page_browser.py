@@ -103,8 +103,14 @@ def _test_and_save(t, fport, name):
              document.getElementById('mfHost').value = '127.0.0.1';
              document.getElementById('mfTestBtn').click(); return true; }})()""")
     # 連線測試最多排隊 30 秒（PROBE_WAIT）加上連線本身；整批測試時機器很忙，40 秒的預設等不到（2026-10-22 完整測試紅過一次）
+    # 失敗時把畫面狀態一起印出來：按鈕停在「測試中」＝請求卡在伺服器；按鈕沒變＝根本沒送出（2026-10-22、23 整批時紅過，單跑都過）
     assert t.wait_for("!document.getElementById('mfResultPanel').hidden", 90), \
-        "測試結果沒有出現：" + str(t.js("document.getElementById('mfAddError').innerText"))
+        "測試結果沒有出現：" + str(t.js("""(() => { const b = document.getElementById('mfTestBtn');
+            return JSON.stringify({err: document.getElementById('mfAddError').innerText,
+              btn_disabled: b.disabled, btn_text: b.innerText,
+              save_bar_hidden: document.getElementById('mfSaveBar').hidden,
+              host: document.getElementById('mfHost').value, target: document.getElementById('mfTarget').value,
+              ready: document.readyState}); })()"""))
     body = t.js("document.getElementById('mfResult').innerText")
     assert "Fake LaserJet MFP M1" in body, "連線測試要讀到 eSCL 能力表"
     t.js(f"document.getElementById('mfSaveName').value = {name!r}; document.getElementById('mfSaveBtn').click()")

@@ -951,6 +951,8 @@
       pop.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
       place();
+      // 版面剛變動（轉向、縮放視窗）時第一次量到的可能是舊版面：下一個畫面再定位一次
+      requestAnimationFrame(place);
     });
     document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(); });
     wrap.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) { close(); btn.focus(); } });

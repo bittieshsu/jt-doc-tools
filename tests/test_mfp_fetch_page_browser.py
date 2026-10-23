@@ -184,9 +184,12 @@ def test_connection_test_save_detail_and_refusal(live, locale):
         for width in (1280, 390):
             t.send("Emulation.setDeviceMetricsOverride", {"width": width, "height": 900, "deviceScaleFactor": 1,
                                                           "mobile": width < 600})
+            # 等版面真的變成這個寬度再按（整批測試時機器忙，0.3 秒不夠，量到舊版面就超出畫面；2026-10-23 紅過一次）
+            assert t.wait_for(f"document.documentElement.clientWidth <= {width}"), "版面寬度沒有換過來"
             time.sleep(0.3)
             t.js("document.querySelector('.mf-beta-note .mf-help-btn').click()")
             assert t.wait_for("!document.getElementById('mfEsclHelp').hidden"), "按「?」沒有出現說明"
+            time.sleep(0.2)     # 下一個畫面還會再定位一次（requestAnimationFrame）
             h = t.js(help_)
             assert h["open"] and h["exp"] == "true" and "AirPrint" in h["text"], h
             assert h["bg"] == "rgb(17, 24, 39)", f"說明框不是本站樣式：{h['bg']}"

@@ -97,6 +97,27 @@ Python ssl 接到 OS 原生信任庫。企業 CA 既然已在 OS 信任庫（`ap
 sudo update-ca-certificates`；Windows 匯入「受信任的根憑證授權單位」；macOS 加入鑰匙圈並信任）。
 真的不便處理時，最後手段 `sudo JTDT_TLS_INSECURE=1 jtdt update`（停用驗證，有 MITM 風險，僅信任內網用）。
 
+## 憑證機構金鑰外洩（eMudhra / emSign，2026-10）
+
+2026-10-20 公告：印度憑證機構 eMudhra（emSign）的中間憑證私鑰外洩，持有者可以替任意網域簽出有效的憑證，
+用來假冒 PyPI、python.org 這類網站。本系統的處理：
+
+| 環節 | 狀況 |
+|---|---|
+| Python 的憑證包 certifi | v1.17.7 起要求 2026.10.19 以上（已拿掉 emSign） |
+| pip | 環境由 uv 建立，**裡面沒有 pip** |
+| 程式執行時的 HTTPS（LLM、LDAPS、SSO、事務機等） | 用作業系統的信任庫（truststore），不用內建憑證包 |
+| 安裝與 `jtdt update` 下載套件 | uv 改用作業系統的信任庫；每個套件都有 `uv.lock` 的 sha256 雜湊，檔案被換掉一律拒裝 |
+| uv 本身 | 0.13.4 起內建憑證拿掉 emSign。v1.17.16 起 `jtdt update` 發現安裝目錄裡的 uv 低於 0.13.4 會自動換新（`jtdt update` 跑的是更新前的版本，所以要跑兩次） |
+
+**你要做的**：
+
+- **更新作業系統的憑證**（本系統信任的就是它）：Debian / Ubuntu `sudo apt update && sudo apt upgrade ca-certificates`；
+  RHEL 系 `sudo dnf update ca-certificates`；Windows 執行 Windows Update；macOS 安裝系統更新。
+- **用 Docker 的**：重新建置映像（`docker compose build --pull && docker compose up -d`）。Dockerfile 每次建置都會拿最新的 uv 與基底映像。
+- 想立刻換 uv、不等下次更新：`sudo /opt/jt-doc-tools/bin/uv self update`（Windows 以系統管理員身分執行
+  `"C:\Program Files\jt-doc-tools\bin\uv.exe" self update`）。
+
 ## ⚠ 不建議直接對「公開網際網路」開放
 
 > **首選部署方式：只在內網 / VPN 使用，不要把服務放到公開網際網路上。**

@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (944 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (945 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.16] - 2026-10-23
+
+- Security (eMudhra / emSign intermediate CA private keys leaked, announced 2026-10-20; they can be used to impersonate PyPI and other sites): `jtdt update` now replaces the install directory's uv when it is older than 0.13.4 (whose bundled root certificates still trust emSign), first with `uv self update` and otherwise with the official installer into the same directory; if that fails it only warns and the update continues. A uv on the system PATH was not installed by this system and only gets a warning. Because `jtdt update` runs the previous version, run `jtdt update` once more after updating to this version. Everything else was already unaffected: certifi has been 2026.10.19 (emSign removed) since v1.17.7; environments are built by uv and contain no pip; HTTPS at run time uses the operating system's trust store; and when downloading packages uv uses the operating system's trust store while every package is checked against the hashes in `uv.lock`. The eSCL help bubble in MFP Scan & Fetch is positioned once more on the next frame, so it no longer overflows the screen when the window has just been rotated or resized. `OPS.md` gains a section with the status of each part, how to update the operating system's certificates, rebuilding Docker images, and updating uv by hand.
 
 ## [1.17.15] - 2026-10-22
 

@@ -881,6 +881,64 @@ def _python_for_sync(root: Path, env: dict) -> tuple[dict, list]:
     return env, []
 
 
+#: 低於這一版的 uv，內建的根憑證還信任 eMudhra / emSign（中間憑證金鑰外洩，GHSA-hq85-5cpj-mr62，
+#: 2026-10-20）。`jtdt update` 跑 uv 時本來就改用作業系統的信任庫、套件也都有 uv.lock 的雜湊把關，
+#: 但舊版 uv 留著沒有好處：既有的安裝不會自己換 uv（新安裝才會抓最新版）。
+MIN_SAFE_UV = (0, 13, 4)
+
+
+def _uv_version(uv: str) -> Optional[tuple[int, int, int]]:
+    """`uv --version` → (0, 13, 4)；問不到回 None。"""
+    try:
+        out = subprocess.run([uv, "--version"], capture_output=True, text=True, timeout=20).stdout
+    except Exception:  # noqa: BLE001
+        return None
+    m = re.search(r"\buv (\d+)\.(\d+)\.(\d+)", out or "")
+    return tuple(int(x) for x in m.groups()) if m else None  # type: ignore[return-value]
+
+
+def _upgrade_uv_if_old(uv: str, root: Path, env: dict) -> None:
+    """安裝目錄裡的 uv 低於 `MIN_SAFE_UV` 就換新的：先 `uv self update`，不行再跑官方安裝腳本
+    （跟 install.sh / install.ps1 同一條，`UV_INSTALL_DIR` 指到 `<安裝目錄>/bin`）。
+    **只換自己帶的那一支**（系統 PATH 上的 uv 是別人裝的，只提醒）；換不成功不中止升級。"""
+    ver = _uv_version(uv)
+    if ver is None or ver >= MIN_SAFE_UV:
+        return
+    cur = ".".join(map(str, ver))
+    need = ".".join(map(str, MIN_SAFE_UV))
+    bin_dir = root / "bin"
+    if Path(uv).resolve().parent != bin_dir.resolve():
+        print(f"Note: uv {cur} ({uv}) is older than {need}; its bundled root certificates still trust the "
+              f"compromised eMudhra/emSign CA. Please update it (uv self update).")
+        return
+    print(f"Updating uv {cur} -> latest (versions older than {need} still trust the compromised "
+          f"eMudhra/emSign CA in their bundled root certificates) ...")
+    uenv = dict(env, UV_INSTALL_DIR=str(bin_dir), UV_NO_MODIFY_PATH="1")
+    try:
+        subprocess.run([uv, "self", "update"], env=uenv, timeout=300,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:  # noqa: BLE001
+        pass
+    ver = _uv_version(uv) or ver
+    if ver < MIN_SAFE_UV:
+        if _is_windows():
+            cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                   "Invoke-Expression (Invoke-RestMethod -Uri 'https://astral.sh/uv/install.ps1')"]
+        else:
+            cmd = ["sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"]
+        try:
+            subprocess.run(cmd, env=uenv, timeout=300, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:  # noqa: BLE001
+            pass
+        ver = _uv_version(uv) or ver
+    if ver >= MIN_SAFE_UV:
+        print(f"  uv is now {'.'.join(map(str, ver))}")
+    else:
+        print(f"  Could not update uv (still {'.'.join(map(str, ver))}); continuing. Dependencies are still "
+              f"checked against the hashes in uv.lock and downloaded with the operating system's trust store. "
+              f"To update it by hand: {uv} self update", file=sys.stderr)
+
+
 def _uv_tls_env(uv: str, env: dict) -> dict:
     """讓 uv 用 OS 信任庫：**只設這支 uv 認得的那一個變數**。
 
@@ -1138,6 +1196,7 @@ def svc_update() -> int:
         _restore_ownership(root, owner)
         svc_start()
         return 1
+    _upgrade_uv_if_old(uv, root, os.environ.copy())
     print("Syncing Python deps (uv sync) ...")
     # 企業 TLS 檢查設備（MITM proxy）會換掉 HTTPS 憑證；uv 預設用內建 webpki 根
     # 憑證不認那個 CA → uv sync 失敗。預設讓 uv 改用 OS 信任庫（企業 CA 通常在
