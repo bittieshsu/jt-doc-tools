@@ -125,7 +125,9 @@ mark.vl-hl {
   flex: 1; min-width: 0; word-break: break-all;
 }
 .vl-card-meta {
-  display: grid; grid-template-columns: 70px 1fr;
+  /* 欄名欄依最長的欄名定寬（最多卡片的 45%，再長才換行）。原本寫死 70px，v1.16.92 加了「使用統一發票」
+     之後折成兩行；英日文的欄名更長（使用者 2026-10-16 截圖） */
+  display: grid; grid-template-columns: fit-content(45%) minmax(0, 1fr);
   gap: 3px 12px; font-size: 13px;
 }
 .vl-card-meta .label { color: #64748b; }

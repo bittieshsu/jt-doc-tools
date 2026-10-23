@@ -28,7 +28,7 @@ from .core.job_manager import job_manager
 from .logging_setup import get_logger, setup_logging
 from .tool_registry import discover_tools, mount_tools
 
-VERSION = "1.17.16"
+VERSION = "1.17.17"
 
 setup_logging("DEBUG" if settings.debug else "INFO")
 logger = get_logger(__name__)
@@ -303,6 +303,15 @@ def _tpl_net_exposed() -> bool:
 
 templates.env.globals["net_exposed"] = _tpl_net_exposed
 templates.env.globals["bind_host"] = lambda: settings.host
+
+
+def _tpl_server_tz() -> str:
+    """Jinja global：伺服器主機的時區（`Asia/Taipei (UTC+08:00)`）。排程照伺服器時間觸發，畫面要寫出是哪個時區。"""
+    from .core.timeutil import server_timezone
+    return server_timezone()["label"]
+
+
+templates.env.globals["server_tz"] = _tpl_server_tz
 
 
 def _tpl_workspace_enabled(request=None) -> bool:

@@ -103,3 +103,21 @@ def test_display_checker_catches_wrong_formats(bad):
 def test_display_checker_accepts_the_site_format(ok):
     from tools.check_datetime_display import check_text
     assert not check_text(ok), ok
+
+
+def test_schedule_hint_names_the_server_timezone():
+    """統編資料庫的每週排程照伺服器時間觸發：說明要寫出伺服器的時區，不寫含糊的 local time（使用者 2026-10-16）。"""
+    import re
+    from pathlib import Path
+    from app.core.timeutil import server_timezone
+    tz = server_timezone()
+    assert re.fullmatch(r"[+-]\d{2}:\d{2}", tz["offset"]) and tz["offset"] in tz["label"]
+    tpl = (Path(__file__).resolve().parents[1] / "app/admin/templates/vat_db.html").read_text(encoding="utf-8")
+    assert "local time" not in tpl and "server_tz()" in tpl
+
+
+def test_server_timezone_prefers_the_tz_variable(monkeypatch):
+    from app.core.timeutil import server_timezone
+    monkeypatch.setenv("TZ", "Europe/Berlin")
+    tz = server_timezone()
+    assert tz["name"] == "Europe/Berlin" and tz["label"].startswith("Europe/Berlin (UTC")

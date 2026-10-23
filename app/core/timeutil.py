@@ -97,3 +97,46 @@ def epoch_to_iso(ts: float, tz_offset_min: Optional[int] = None) -> str:
     dt = _dt.datetime.fromtimestamp(float(ts), tz=_dt.timezone.utc)
     dt = dt.astimezone(tz) if tz else dt.astimezone()
     return dt.isoformat(sep=" ", timespec="seconds")
+
+
+def server_timezone() -> dict:
+    """伺服器主機的時區：`{"name": "Asia/Taipei" 或 None, "offset": "+08:00", "label": "Asia/Taipei (UTC+08:00)"}`（中英日通用）。
+
+    排程（統編資料庫每週更新等）照伺服器的本機時間觸發，畫面上要寫出是哪個時區
+    （使用者 2026-10-16：只寫 local time，看不出是伺服器還是瀏覽器；正式機以前是 UTC，週日 03:00 其實是台灣 11:00）。
+    名稱：`TZ` 環境變數 → `/etc/localtime` 連結到的 zoneinfo 名稱（Linux / macOS）→ `/etc/timezone` → 系統的時區名稱。
+    """
+    import os
+    import re
+    import time
+    now = _dt.datetime.now().astimezone()
+    off = now.utcoffset() or _dt.timedelta(0)
+    mins = int(off.total_seconds() // 60)
+    sign = "+" if mins >= 0 else "-"
+    offset = f"{sign}{abs(mins) // 60:02d}:{abs(mins) % 60:02d}"
+    name = None
+    tz_env = (os.environ.get("TZ") or "").lstrip(":").strip()
+    if re.fullmatch(r"[A-Za-z_]+(?:/[A-Za-z0-9_+\-]+)+", tz_env):
+        name = tz_env
+    if not name:
+        try:
+            real = os.path.realpath("/etc/localtime")
+            if "zoneinfo/" in real:
+                cand = real.split("zoneinfo/", 1)[1]
+                if re.fullmatch(r"[A-Za-z_]+(?:/[A-Za-z0-9_+\-]+)+", cand):
+                    name = cand
+        except OSError:
+            pass
+    if not name:
+        try:
+            with open("/etc/timezone", encoding="utf-8") as fh:
+                cand = fh.read().strip()
+            if re.fullmatch(r"[A-Za-z_]+(?:/[A-Za-z0-9_+\-]+)+", cand):
+                name = cand
+        except OSError:
+            pass
+    if not name:
+        sysname = (time.tzname[1] if time.daylight and time.localtime().tm_isdst > 0 else time.tzname[0]) or ""
+        name = sysname.strip() or None
+    label = f"{name} (UTC{offset})" if name else f"UTC{offset}"
+    return {"name": name, "offset": offset, "label": label}

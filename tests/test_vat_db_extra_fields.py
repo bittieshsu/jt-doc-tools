@@ -115,3 +115,13 @@ def test_api_returns_the_new_fields(vat_tmp):
     body = j.get("result", j)
     assert body["hq_vat"] == "12345675" and body["capital"] == 0 and body["founded"] == "2010-12-31"
     assert body["uses_invoice"] is False
+
+
+def test_card_label_column_fits_the_longest_label():
+    """欄名欄寬不可以寫死（70px 放不下「使用統一發票」，折成兩行；使用者 2026-10-16 截圖）。"""
+    import re
+    from pathlib import Path
+    tpl = (Path(__file__).resolve().parents[1] / "app/tools/vat_lookup/templates/vat_lookup.html").read_text(encoding="utf-8")
+    rule = re.search(r"\.vl-card-meta \{([^}]*)\}", tpl).group(1)
+    cols = re.search(r"grid-template-columns:\s*([^;]+);", rule).group(1)
+    assert "fit-content(" in cols and not re.match(r"\d+px", cols.strip()), cols

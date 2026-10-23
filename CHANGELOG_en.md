@@ -5,11 +5,16 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (945 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (946 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.17] - 2026-10-23
+
+- Meeting summary: JSON transcripts now use the speaker name each segment carries (`speaker_name`). Some transcription systems export `"speaker": "S1", "speaker_name": "Robin Chen"` per segment, and only the label was read, so the summary still showed S1 and S2. Order: per-segment rename, then the segment's own name, then the whole-speaker rename, then the label; a segment with a name but no label is also used.
+- Company ID lookup: the weekly database schedule now says which time zone it follows, for example "server time (Asia/Taipei (UTC+08:00))", instead of "local time", which did not say whether it meant the server or the browser; the schedule runs on the server's clock, so on a host set to UTC, Sunday 03:00 is 11:00 in Taiwan. The label column of result cards now sizes to the longest label (up to 45% of the card) instead of a fixed 70px that wrapped longer labels such as "Issues uniform invoices".
 
 ## [1.17.16] - 2026-10-23
 

@@ -276,7 +276,7 @@
 
 <div class="vd-section">
   <h3>{{ tr('每週自動排程') }}</h3>
-  <p>{{ tr('啟用後每週自動更新一次。設定的星期 + 時段（local time）抵達且距上次成功運行超過 6 天就觸發；當下機器若關機，下次開機並達條件時自動補跑。預設關閉。') }}</p>
+  <p>{{ tr('啟用後每週自動更新一次。設定的星期與時段照伺服器時間（{0}）計算，到了而且距上次成功運行超過 6 天就觸發；當下主機若關機，下次開機並達條件時自動補跑。預設關閉。').replace('{0}', server_tz()) }}</p>
   <div class="vd-schedule-row">
     <label for="schEnabled">{{ tr('啟用排程') }}</label>
     <input type="checkbox" id="schEnabled">

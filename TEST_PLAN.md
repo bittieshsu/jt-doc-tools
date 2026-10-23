@@ -6257,6 +6257,13 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
 
+### 6.128 v1.17.17 — 逐字稿每段的講者名稱、統編排程時區、統編卡片欄名寬度（**每次發版必過**）
+
+- [ ] 會議摘要匯入每段帶 `speaker_name` 的 JSON（room / recorded_at / segments）：發言統計與摘要用名字，不是 S1 / S2；有單段改名時單段優先。
+- [ ] 統編資料庫頁的排程說明寫出伺服器時區（`Asia/Taipei (UTC+08:00)`；主機改 UTC 後重新整理會變成 `UTC (UTC+00:00)` 或 `Etc/UTC`），沒有「local time」；英日文一起看。
+- [ ] 統編查詢結果卡片：「使用統一發票」在一行內（1280 與 390 寬）；英文欄名在 390 寬可以換行但不壓到值。
+- 自動化：`tests/test_transcript_parse.py`、`tests/test_datetime_format_is_unified.py`、`tests/test_vat_db_extra_fields.py`
+
 ### 6.127 v1.17.16 — `jtdt update` 換掉太舊的 uv（emSign 憑證外洩）（**每次發版必過**）
 
 - [ ] 安裝目錄裡的 uv 低於 0.13.4（例如 0.11.x）：`sudo jtdt update` 兩次後 `bin/uv --version` ≥ 0.13.4，相依同步照常、服務起得來。

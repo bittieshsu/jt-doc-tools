@@ -1836,7 +1836,7 @@
   "啟用後可在下方預覽區獨立拖拉限用章（橘虛線框）+ 4 角縮放。建議蓋在證件「個資欄位上方」但留得辨識。": "Once enabled, the restricted-use stamp can be dragged on its own in the preview below (orange dashed outline) and resized from the corners. Placing it above the personal data on an ID, while leaving it readable, works well.",
   "啟用後可選 backend：": "Once enabled you can choose a backend: ",
   "啟用後會引導你建立第一個管理員帳號，避免之後無法登入。": "Turning it on walks you through creating the first administrator account, so you cannot lock yourself out later.",
-  "啟用後每週自動更新一次。設定的星期 + 時段（local time）抵達且距上次成功運行超過 6 天就觸發；當下機器若關機，下次開機並達條件時自動補跑。預設關閉。": "Updates once a week when enabled. It triggers when the chosen day and time (local time) arrive and more than 6 days have passed since the last successful run; if the machine is off at that moment, it catches up at the next start-up. Default",
+  "啟用後每週自動更新一次。設定的星期與時段照伺服器時間（{0}）計算，到了而且距上次成功運行超過 6 天就觸發；當下主機若關機，下次開機並達條件時自動補跑。預設關閉。": "Updates once a week when enabled. The chosen day and time follow the server's time ({0}); it runs when that time arrives and more than 6 days have passed since the last successful run. If the server is off at that moment, it catches up at the next start-up once the conditions are met. Off by default.",
   "啟用後，所有頁面都需要登入。請先建立第一個管理員帳號。": "Once enabled, every page requires signing in. Create the first administrator account below.",
   "啟用排程": "Enable the schedule",
   "啟用排程同步": "Enable scheduled sync",

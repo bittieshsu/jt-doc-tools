@@ -323,8 +323,12 @@ def parse_json(data: bytes) -> list[dict]:
             continue
         seg: dict = {"text": text}
         sp = row.get("speaker") or row.get("speaker_id")
-        # 單段的改名優先，其次整位的改名（跟轉逐字稿畫面上的 `speakerName()` 同一個順序）
+        # 順序：單段的改名 → 這一段自己帶的名字（`speaker_name`，別的轉寫系統匯出的格式：
+        # `{"speaker": "S1", "speaker_name": "王小明"}`，原本沒讀，畫面上還是 S1 / S2，使用者 2026-10-16 回報）
+        # → 整位的改名 → 原本的代號。單段與整位的先後跟轉逐字稿畫面上的 `speakerName()` 相同。
         named = overrides.get(str(row.get("seq"))) if row.get("seq") is not None else None
+        if not named and str(row.get("speaker_name") or "").strip():
+            named = str(row["speaker_name"]).strip()
         if not named and sp:
             named = names.get(str(sp))
         if named or sp:

@@ -153,6 +153,32 @@ def test_json_wrapped_in_a_segments_key():
     assert segs[0]["speaker"] == "S1"
 
 
+def test_json_reads_the_speaker_name_each_segment_carries():
+    """別的轉寫系統匯出的格式：每段帶 `speaker_name`（使用者 2026-10-16 回報：畫面上還是 S1 / S2）。"""
+    data = json.dumps({"room": "三樓會議室", "recorded_at": "2026-10-16T10:00:00+08:00", "segments": [
+        {"speaker": "S1", "speaker_name": "王小明", "text": "先看上週的進度", "start_ms": 0, "end_ms": 1500},
+        {"speaker": "S2", "speaker_name": "李小華", "text": "測試環境已經好了", "start_ms": 1500, "end_ms": 3000},
+        {"speaker": "S1", "speaker_name": "  ", "text": "名字是空白就用代號", "start_ms": 3000, "end_ms": 4000},
+        {"speaker_name": "陳大同", "text": "只有名字沒有代號", "start_ms": 4000, "end_ms": 5000},
+    ]}, ensure_ascii=False).encode()
+    segs, _ = tp.parse(data, "meeting.json")
+    assert [s["speaker"] for s in segs] == ["王小明", "李小華", "S1", "陳大同"]
+
+
+def test_json_speaker_name_order_single_override_then_segment_name_then_whole_rename():
+    """單段改名 → 每段的 speaker_name → 整位改名 → 代號。"""
+    data = json.dumps({"speaker_names": {"S1": "整位改名", "S2": "整位改名二"},
+                       "speaker_overrides": {"1": "單段改名"},
+                       "segments": [
+                           {"seq": 1, "speaker": "S1", "speaker_name": "段落名字", "text": "第一段"},
+                           {"seq": 2, "speaker": "S1", "speaker_name": "段落名字", "text": "第二段"},
+                           {"seq": 3, "speaker": "S2", "text": "第三段"},
+                           {"seq": 4, "speaker": "S3", "text": "第四段"},
+                       ]}, ensure_ascii=False).encode()
+    segs, _ = tp.parse(data, "a.json")
+    assert [s["speaker"] for s in segs] == ["單段改名", "段落名字", "整位改名二", "S3"]
+
+
 def test_json_without_a_segment_list_says_what_is_wrong():
     with pytest.raises(tp.TranscriptError) as e:
         tp.parse(b'{"hello": 1}', "a.json")
