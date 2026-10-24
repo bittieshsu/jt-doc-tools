@@ -526,6 +526,15 @@ ensure_office() {
 # 沒裝就退到「請使用者手動重打」訊息，本體運作不受影響 — 因此這個函式
 # 任何錯誤都只 warn 不 die，絕不阻擋安裝流程。
 install_tesseract() {
+    # `sudo` 的 PATH 只有 /usr/bin:/bin:/usr/sbin:/sbin，看不到 Homebrew 裝的 tesseract：
+    # 已經裝好也會每次重跑 brew install，裝完還誤報「偵測不到 chi_tra」。ARM 的 brew 排前面。
+    if [ "$PLATFORM" = "macos" ]; then
+        local d
+        for d in /opt/homebrew/bin /usr/local/bin; do
+            [ -d "$d" ] || continue
+            case ":$PATH:" in *":$d:"*) ;; *) PATH="$PATH:$d" ;; esac
+        done
+    fi
     if command -v tesseract >/dev/null 2>&1; then
         local langs
         langs="$(tesseract --list-langs 2>/dev/null | tail -n +2 | tr '\n' ' ')"
@@ -849,8 +858,7 @@ setup_python() {
             fi
         done
         if [ -z "$UV_EXTRA_ARGS" ]; then
-            warn "  ARM brew python 全 broken — 讓 uv 自己挑（可能會抓 Intel rosetta 走 x86_64 wheel）"
-            warn "  建議：brew install python@3.12  然後重跑 install.sh"
+            log "  沒有可用的 ARM brew Python，由 uv 自己挑（裝不起來時：brew install python@3.12 再重跑 install.sh）"
         fi
     fi
     # Linux：venv 底下那一個 Python 放在安裝目錄裡（$INSTALL_DIR/python），不跟系統共用。
@@ -1083,9 +1091,15 @@ install_service_macos() {
        注意：不能用 LSBackgroundOnly，那會讓子行程拿不到 WindowServer 連線，
        導致 soffice 無法啟動 (AquaSal 必須有 GUI session)。 -->
   <key>LSUIElement</key><true/>
+  <!-- 執行檔是 shell 腳本、不是 arm64 程式：Apple Silicon 的 LaunchServices 會當成 Intel 程式
+       要用 Rosetta 開，沒裝 Rosetta 時 open 回 -10669、服務起不來。明寫先用 arm64。 -->
+  <key>LSArchitecturePriority</key><array><string>arm64</string><string>x86_64</string></array>
 </dict>
 </plist>
 EOF
+    # 重跑安裝時 LaunchServices 可能還記著舊的 Info.plist，重新登記一次才會用新的設定。
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+        -f "$APP_DIR" >/dev/null 2>&1 || true
 
     # Launcher script: ensure service running + open browser.
     #
@@ -1174,6 +1188,10 @@ install_service() {
 
 install_cli() {
     log "建立 $CLI_LINK 指令 ..."
+    # Apple Silicon 的 Mac 出廠沒有 /usr/local/bin（Homebrew 裝在 /opt/homebrew），
+    # 不先建好，下面寫檔失敗會讓整個安裝停在這一步（服務也沒裝上）。
+    # /etc/paths 本來就列著 /usr/local/bin，建好之後新開的終端機就找得到 jtdt。
+    mkdir -p "$(dirname "$CLI_LINK")"
     # `cd` 進 install dir 是必要的：`python -m app.cli` 會把 cwd 加進
     # sys.path[0]，如果使用者從別處（例如 /tmp/foo）跑 jtdt 而那裡剛好也有
     # `app/cli.py`，會載到錯的模組，`_install_root()` 也會回到錯的路徑。
@@ -1187,7 +1205,8 @@ install_cli() {
 
 health_check() {
     # 沒裝服務（缺資料夾 / 容器無 systemd）就沒東西可檢
-    if [ "${DATA_DIR_OK:-1}" -eq 0 ] || [ ! -f "$SVC_FILE" -a "$PLATFORM" = "linux" ]; then
+    # SVC_FILE 只有 Linux 會設；macOS 走到這裡時是未設定，`set -u` 會讓整個安裝以失敗結束。
+    if [ "${DATA_DIR_OK:-1}" -eq 0 ] || { [ "$PLATFORM" = "linux" ] && [ ! -f "${SVC_FILE:-}" ]; }; then
         warn "未啟動 systemd 服務，跳過健康檢查。"
         return 0
     fi

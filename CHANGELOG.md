@@ -6,6 +6,21 @@
 
 ---
 
+## [1.17.18] - 2026-10-24
+
+### 安裝與更新
+
+macOS（Apple Silicon）用一行安裝指令裝不起來（issue #57）。在 Apple Silicon、沒有 `/usr/local/bin`、沒有裝 Rosetta 的 Mac 上實際重現，依序修好四件事：
+
+- 安裝停在「建立 /usr/local/bin/jtdt 指令」，訊息是 `No such file or directory`：這類 Mac 出廠沒有 `/usr/local/bin`（Homebrew 裝在 `/opt/homebrew`），安裝程式沒有先建資料夾。改成先建好。
+- 接著健康檢查那一步以 `SVC_FILE: unbound variable` 結束：那個變數只有 Linux 會設。改成只在 Linux 上看。
+- 服務起不來，`open` 回錯誤 -10669：應用程式的執行檔是指令稿，macOS 把它當成 Intel 程式、要用 Rosetta 開。沒裝 Rosetta 的 Mac 開不起來。應用程式的設定改成優先用 Apple Silicon 執行，並在重跑安裝時重新登記。
+- 每次安裝都重跑一次 `brew install tesseract`，裝完還誤報「偵測不到 chi_tra」：以系統管理員身分執行時看不到 Homebrew 的指令。改成把 Homebrew 的位置加進搜尋路徑。服務本身原本就找得到 tesseract，OCR 不受影響。
+
+同一段的「ARM brew python 全 broken」提示其實是「沒有找到 Homebrew 的 Python」，這時由 uv 自己挑 Python 是正常做法，改成一般說明。
+
+已經卡在這幾步的 Mac：這一版發佈後重跑一次安裝指令即可（相依套件已經裝好，不會重新下載）。`jtdt update` 不會重建應用程式，所以要重跑安裝指令，不是 `jtdt update`。
+
 ## [1.17.17] - 2026-10-23
 
 ### 會議摘要

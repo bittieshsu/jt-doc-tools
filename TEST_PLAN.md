@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **516 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **517 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -816,6 +816,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_i18n_dynamic_labels.py` | 程式端產生的顯示字串（`tr(變數)`）也必須有英文 |
 | `test_id_from_body_acl.py` | 「id 由使用者傳入」的端點一律要有 ACL —— 靜態全面掃描 |
 | `test_impacts_pass_is_separate.py` | 「事件與影響」必須自己走一輪 —— **零退步是由構造保證的，不是調出來的** |
+| `test_install_sh_apple_silicon.py` | install.sh 在 Apple Silicon 的 Mac 上要從頭裝到服務起來（issue #57） |
 | `test_install_sh_without_tty.py` | install.sh 在沒有控制終端時不可以中止 |
 | `test_installer_languages.py` | Windows 安裝程式在英文 Windows 上要顯示英文（v1.15.27） |
 | `test_installer_output_is_not_garbled.py` | 安裝畫面上不可以出現亂碼（2026-09-15 客戶回報，Win11 25H2） |
@@ -6256,6 +6257,15 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.129 v1.17.18 — Apple Silicon Mac 從頭裝到服務起來（issue #57）（**每次發版必過**）
+
+- [ ] Apple Silicon Mac、沒有 Rosetta（`arch -x86_64 /usr/bin/true` 失敗）、`/usr/local/bin` 暫時改名移開：跑一行安裝到「安裝完成！」、`rc=0`；建出 `/usr/local/bin/jtdt`，新開的終端機打得到 `jtdt`。
+- [ ] `/Applications/Jason Tools 文件工具箱.app` 的 Info.plist 有 `LSArchitecturePriority`（arm64 在前）；`open -a` 成功（不是 -10669），`/readyz` 52 支工具。
+- [ ] Office 轉 PDF（`/api/convert-to-pdf`，要帶 CSRF cookie 與 `X-CSRF-Token`）回 200，中文不缺字。
+- [ ] 已經裝過再重跑安裝：tesseract 顯示「已存在，繁中訓練檔已就緒」（不重跑 `brew install`、不誤報 chi_tra）。
+- [ ] 移開的 `/usr/local/bin` 內容放回去。
+- 自動化：`tests/test_install_sh_apple_silicon.py`
 
 ### 6.128 v1.17.17 — 逐字稿每段的講者名稱、統編排程時區、統編卡片欄名寬度（**每次發版必過**）
 

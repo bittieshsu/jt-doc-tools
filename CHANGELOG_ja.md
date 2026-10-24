@@ -5,12 +5,16 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に従い、バージョンは [Semantic Versioning](https://semver.org/lang/ja/) に従います。
 
 > **収録の範囲。** 本プロジェクトの主要言語は繁体字中国語で、
-> **[CHANGELOG.md](CHANGELOG.md) が完全な履歴です**（946 リリース）。
+> **[CHANGELOG.md](CHANGELOG.md) が完全な履歴です**（947 リリース）。
 > この日本語のファイルは**直近のリリース**をまとめたもので、何が変わったか、
 > アップグレードすべきかを判断できる程度の内容です。それより古いものは
 > 中国語のファイルをご覧ください。
 
 ---
+
+## [1.17.18] - 2026-10-24
+
+- macOS（Apple Silicon）で 1 行のインストールコマンドが完了しない問題を修正しました（issue #57）。`/usr/local/bin` がなく Rosetta も入っていない Apple Silicon の Mac で再現し、次の 4 点を順に直しました。(1)「/usr/local/bin/jtdt の作成」で `No such file or directory` となり停止：この種の Mac には出荷時 `/usr/local/bin` がなく（Homebrew は `/opt/homebrew`）、インストーラーがフォルダーを作っていませんでした。(2) 続くヘルスチェックが `SVC_FILE: unbound variable` で終了：Linux でしか設定されない変数でした。(3) サービスが起動せず `open` がエラー -10669：アプリの実行ファイルがスクリプトのため macOS が Intel 用とみなして Rosetta を要求していました。Apple Silicon でネイティブに動かす設定を優先するようにし、再インストール時に登録し直します。(4) 毎回 `brew install tesseract` をやり直し、インストール後に chi_tra が見つからないと誤って表示：管理者として実行すると Homebrew のコマンドが検索パスにありませんでした（サービス自体は tesseract を見つけられるため OCR に影響はありません）。「ARM の Homebrew Python がすべて壊れている」というメッセージは実際には見つからなかったという意味で、通常の案内にしました。これらの手順で止まっている Mac は、このバージョンの公開後にインストールコマンドをもう一度実行してください（依存パッケージは入っています）。`jtdt update` はアプリを作り直さないため、インストールコマンドを使ってください。
 
 ## [1.17.17] - 2026-10-23
 
