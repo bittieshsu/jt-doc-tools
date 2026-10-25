@@ -6,6 +6,16 @@
 
 ---
 
+## [1.17.19] - 2026-10-25
+
+### 資安
+
+- filelock 升到 4.2.4（GHSA-v4x8-3wr5-3wq8 high、GHSA-9vhv-jxww-xfm5 low、GHSA-567q-5qvw-pf92 low，修補版 4.2.1）、setuptools 升到 84.2.1（GHSA-xmj3-9gf7-h52w low，修補版 84.1.0）。兩者都是 PyTorch 帶進來的間接相依，本系統沒有直接使用；三則 filelock 都跟它的讀寫鎖或 Windows 上的軟鎖有關，setuptools 那則只在安裝舊格式套件時發生。
+
+### macOS
+
+- 修正 v1.17.18 更新記錄的寫法：錯誤 -10669 在沒有 Rosetta 的 macOS 26 上出現、macOS 27 上重現不了，原本寫的原因是推論，改成只寫觀察到的情況。macOS 27.0.1 已實測一行安裝、重開機後自動啟動、Office 轉 PDF。
+
 ## [1.17.18] - 2026-10-24
 
 ### 安裝與更新
@@ -14,7 +24,7 @@ macOS（Apple Silicon）用一行安裝指令裝不起來（issue #57）。在 A
 
 - 安裝停在「建立 /usr/local/bin/jtdt 指令」，訊息是 `No such file or directory`：這類 Mac 出廠沒有 `/usr/local/bin`（Homebrew 裝在 `/opt/homebrew`），安裝程式沒有先建資料夾。改成先建好。
 - 接著健康檢查那一步以 `SVC_FILE: unbound variable` 結束：那個變數只有 Linux 會設。改成只在 Linux 上看。
-- 服務起不來，`open` 回錯誤 -10669：應用程式的執行檔是指令稿，macOS 把它當成 Intel 程式、要用 Rosetta 開。沒裝 Rosetta 的 Mac 開不起來。應用程式的設定改成優先用 Apple Silicon 執行，並在重跑安裝時重新登記。
+- 服務起不來，`open` 回錯誤 -10669（在沒有 Rosetta 的 macOS 26 上出現；macOS 27 上重現不了）：應用程式的設定改成明寫優先用 Apple Silicon 執行，並在重跑安裝時重新向系統登記，兩者一起做之後就開得起來。
 - 每次安裝都重跑一次 `brew install tesseract`，裝完還誤報「偵測不到 chi_tra」：以系統管理員身分執行時看不到 Homebrew 的指令。改成把 Homebrew 的位置加進搜尋路徑。服務本身原本就找得到 tesseract，OCR 不受影響。
 
 同一段的「ARM brew python 全 broken」提示其實是「沒有找到 Homebrew 的 Python」，這時由 uv 自己挑 Python 是正常做法，改成一般說明。

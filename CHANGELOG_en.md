@@ -5,15 +5,19 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (947 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (948 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
 
+## [1.17.19] - 2026-10-25
+
+- Security: filelock 4.2.4 (GHSA-v4x8-3wr5-3wq8 high, GHSA-9vhv-jxww-xfm5 low, GHSA-567q-5qvw-pf92 low; fixed in 4.2.1) and setuptools 84.2.1 (GHSA-xmj3-9gf7-h52w low; fixed in 84.1.0). Both come in through PyTorch and are not used directly; the filelock advisories concern its read-write lock and soft locks on Windows, and the setuptools one only applies when installing legacy-format packages. The 1.17.18 note about error -10669 now states only what was observed (macOS 26 without Rosetta; it does not reproduce on macOS 27). macOS 27.0.1 was tested: one-line install, starting automatically after a restart, and Office to PDF.
+
 ## [1.17.18] - 2026-10-24
 
-- macOS (Apple Silicon) could not be installed with the one-line command (issue #57). Reproduced on an Apple Silicon Mac without `/usr/local/bin` and without Rosetta, and fixed four things in order: (1) the install stopped at "creating /usr/local/bin/jtdt" with `No such file or directory`, because these Macs ship without `/usr/local/bin` (Homebrew lives in `/opt/homebrew`) and the installer did not create the folder; (2) the health check then ended with `SVC_FILE: unbound variable`, a variable that only Linux sets; (3) the service did not start and `open` returned error -10669, because the app's executable is a script that macOS treats as an Intel program needing Rosetta, so the app now asks to run natively on Apple Silicon first and is re-registered when the installer runs again; (4) every install re-ran `brew install tesseract` and then wrongly reported that chi_tra was missing, because Homebrew's commands are not on the path when running as administrator (the service itself always found tesseract, so OCR was not affected). The message that said every ARM Homebrew Python was broken really meant none was found, and is now plain information. On a Mac stuck at these steps, run the install command once more after this release (dependencies are already in place); `jtdt update` does not rebuild the app, so use the install command.
+- macOS (Apple Silicon) could not be installed with the one-line command (issue #57). Reproduced on an Apple Silicon Mac without `/usr/local/bin` and without Rosetta, and fixed four things in order: (1) the install stopped at "creating /usr/local/bin/jtdt" with `No such file or directory`, because these Macs ship without `/usr/local/bin` (Homebrew lives in `/opt/homebrew`) and the installer did not create the folder; (2) the health check then ended with `SVC_FILE: unbound variable`, a variable that only Linux sets; (3) the service did not start and `open` returned error -10669 (seen on macOS 26 without Rosetta; it does not reproduce on macOS 27), so the app now states that it runs natively on Apple Silicon first and is re-registered with the system when the installer runs again, which together made it start; (4) every install re-ran `brew install tesseract` and then wrongly reported that chi_tra was missing, because Homebrew's commands are not on the path when running as administrator (the service itself always found tesseract, so OCR was not affected). The message that said every ARM Homebrew Python was broken really meant none was found, and is now plain information. On a Mac stuck at these steps, run the install command once more after this release (dependencies are already in place); `jtdt update` does not rebuild the app, so use the install command.
 
 ## [1.17.17] - 2026-10-23
 

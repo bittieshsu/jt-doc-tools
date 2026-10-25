@@ -6258,6 +6258,12 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
 
+### 6.130 v1.17.19 — filelock 4.2.4、setuptools 84.2.1（**每次發版必過**）
+
+- [ ] 有 AVX2 的機器：OCR 文字辨識（EasyOCR）跑一份中文 PDF，辨識得出字（filelock 跨 3 → 4 大版本，PyTorch 會用到）。
+- [ ] `uv.lock` 第 2 行仍是 `revision = 3`；`uvx --from uv==0.11.21 uv lock --check` 通過。
+- 自動化：`tests/test_dependency_declarations_agree.py`、`tests/test_cli_uv_upgrade.py`
+
 ### 6.129 v1.17.18 — Apple Silicon Mac 從頭裝到服務起來（issue #57）（**每次發版必過**）
 
 - [ ] Apple Silicon Mac、沒有 Rosetta（`arch -x86_64 /usr/bin/true` 失敗）、`/usr/local/bin` 暫時改名移開：跑一行安裝到「安裝完成！」、`rc=0`；建出 `/usr/local/bin/jtdt`，新開的終端機打得到 `jtdt`。

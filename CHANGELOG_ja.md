@@ -5,16 +5,20 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に従い、バージョンは [Semantic Versioning](https://semver.org/lang/ja/) に従います。
 
 > **収録の範囲。** 本プロジェクトの主要言語は繁体字中国語で、
-> **[CHANGELOG.md](CHANGELOG.md) が完全な履歴です**（947 リリース）。
+> **[CHANGELOG.md](CHANGELOG.md) が完全な履歴です**（948 リリース）。
 > この日本語のファイルは**直近のリリース**をまとめたもので、何が変わったか、
 > アップグレードすべきかを判断できる程度の内容です。それより古いものは
 > 中国語のファイルをご覧ください。
 
 ---
 
+## [1.17.19] - 2026-10-25
+
+- セキュリティ：filelock 4.2.4（GHSA-v4x8-3wr5-3wq8 high、GHSA-9vhv-jxww-xfm5 low、GHSA-567q-5qvw-pf92 low。修正版 4.2.1）、setuptools 84.2.1（GHSA-xmj3-9gf7-h52w low。修正版 84.1.0）に更新しました。どちらも PyTorch 経由の間接依存で、本システムは直接使っていません。filelock の 3 件は読み書きロックと Windows のソフトロックに関するもの、setuptools の 1 件は旧形式パッケージのインストール時だけのものです。1.17.18 のエラー -10669 の記述は、観察した事実だけに改めました（Rosetta のない macOS 26 で発生、macOS 27 では再現しません）。macOS 27.0.1 で 1 行インストール、再起動後の自動起動、Office から PDF への変換を確認しました。
+
 ## [1.17.18] - 2026-10-24
 
-- macOS（Apple Silicon）で 1 行のインストールコマンドが完了しない問題を修正しました（issue #57）。`/usr/local/bin` がなく Rosetta も入っていない Apple Silicon の Mac で再現し、次の 4 点を順に直しました。(1)「/usr/local/bin/jtdt の作成」で `No such file or directory` となり停止：この種の Mac には出荷時 `/usr/local/bin` がなく（Homebrew は `/opt/homebrew`）、インストーラーがフォルダーを作っていませんでした。(2) 続くヘルスチェックが `SVC_FILE: unbound variable` で終了：Linux でしか設定されない変数でした。(3) サービスが起動せず `open` がエラー -10669：アプリの実行ファイルがスクリプトのため macOS が Intel 用とみなして Rosetta を要求していました。Apple Silicon でネイティブに動かす設定を優先するようにし、再インストール時に登録し直します。(4) 毎回 `brew install tesseract` をやり直し、インストール後に chi_tra が見つからないと誤って表示：管理者として実行すると Homebrew のコマンドが検索パスにありませんでした（サービス自体は tesseract を見つけられるため OCR に影響はありません）。「ARM の Homebrew Python がすべて壊れている」というメッセージは実際には見つからなかったという意味で、通常の案内にしました。これらの手順で止まっている Mac は、このバージョンの公開後にインストールコマンドをもう一度実行してください（依存パッケージは入っています）。`jtdt update` はアプリを作り直さないため、インストールコマンドを使ってください。
+- macOS（Apple Silicon）で 1 行のインストールコマンドが完了しない問題を修正しました（issue #57）。`/usr/local/bin` がなく Rosetta も入っていない Apple Silicon の Mac で再現し、次の 4 点を順に直しました。(1)「/usr/local/bin/jtdt の作成」で `No such file or directory` となり停止：この種の Mac には出荷時 `/usr/local/bin` がなく（Homebrew は `/opt/homebrew`）、インストーラーがフォルダーを作っていませんでした。(2) 続くヘルスチェックが `SVC_FILE: unbound variable` で終了：Linux でしか設定されない変数でした。(3) サービスが起動せず `open` がエラー -10669（Rosetta のない macOS 26 で発生。macOS 27 では再現しません）：Apple Silicon でネイティブに動かす設定を明記し、再インストール時にシステムへ登録し直すようにしました（両方を行うと起動しました）。(4) 毎回 `brew install tesseract` をやり直し、インストール後に chi_tra が見つからないと誤って表示：管理者として実行すると Homebrew のコマンドが検索パスにありませんでした（サービス自体は tesseract を見つけられるため OCR に影響はありません）。「ARM の Homebrew Python がすべて壊れている」というメッセージは実際には見つからなかったという意味で、通常の案内にしました。これらの手順で止まっている Mac は、このバージョンの公開後にインストールコマンドをもう一度実行してください（依存パッケージは入っています）。`jtdt update` はアプリを作り直さないため、インストールコマンドを使ってください。
 
 ## [1.17.17] - 2026-10-23
 
