@@ -230,15 +230,28 @@ async function uploadFiles(fileList) {
   const busy = document.getElementById('stage-busy');
   const busyMsg = document.getElementById('stage-busy-msg');
   busy.hidden = false;
+  // 多頁的 PDF 每頁都要偵測，要等一陣子 —— 畫面一直不動，使用者會以為當機
+  // （2026-10-28 客戶回報），所以幾秒後開始顯示已經過的秒數。
+  const t0 = Date.now();
+  let base = '';
+  const show = () => {
+    const sec = Math.floor((Date.now() - t0) / 1000);
+    busyMsg.textContent = sec >= 3
+      ? base + ' ' + tr('已經過 {0} 秒，多頁的 PDF 需要較久，請稍候').replace('{0}', sec)
+      : base;
+  };
+  const timer = setInterval(show, 1000);
   try {
     const arr = Array.from(fileList);
     for (let i = 0; i < arr.length; i++) {
-      busyMsg.textContent = arr.length > 1
+      base = arr.length > 1
         ? tr('處理中（{0}/{1}）：{2} …').replace('{0}', i + 1).replace('{1}', arr.length).replace('{2}', arr[i].name)
         : tr('處理中：{0} …').replace('{0}', arr[i].name);
+      show();
       await uploadOne(arr[i]);
     }
   } finally {
+    clearInterval(timer);
     busy.hidden = true;
     fi.value = '';
   }

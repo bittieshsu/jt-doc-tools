@@ -156,6 +156,7 @@
       <div class="muted">{{ tr('選「自己拉四個角」之後，在左邊「修正前」的圖上拖曳四個圓點對準紙張的角；自動抓到的位置會先填好，通常只要修不準的那一兩個。') }}</div>
       <div class="ds-actions" id="dsQuadActions" hidden>
         <button class="btn btn-secondary" type="button" id="dsQuadReset">{{ icon('refresh') }} {{ tr('重新自動抓') }}</button>
+        <span class="muted" id="dsQuadNoAuto" hidden>{{ tr('這一頁沒有自動抓到紙張，四個點先放在圖的四角，請拖到紙張的角上。') }}</span>
       </div>
     </div>
   </div>
@@ -652,9 +653,14 @@
   //  （而且預覽 200 dpi、輸出 300 dpi 用的也是不同像素尺寸）。
   let autoQuad = null;        // 伺服器自動抓到的，當作拖曳起點
 
+  //: 自動沒抓到紙張時拖曳的起點：整張圖往內縮一點的四個角（左上、右上、右下、左下）。
+  //  原本起點只有自動抓到的結果 —— 沒抓到的頁面切到「自己拉四個角」，畫面上一個點都沒有，
+  //  而那正是最需要自己拉的時候（2026-10-28 使用者回報）。順序伺服器會再排（`order_quad`）。
+  const DEFAULT_QUAD = [[0.06, 0.06], [0.94, 0.06], [0.94, 0.94], [0.06, 0.94]];
+
   function quadNow() {
     const ov = overrides[curPage()];
-    return (ov && ov.quad) || autoQuad;
+    return (ov && ov.quad) || autoQuad || (quadEditOn() ? DEFAULT_QUAD : null);
   }
   //: 四個角的連線。**三個 polygon 要一起更新** —— 只改其中一個的話，
   //  畫面上會出現「底色跟著動、線沒跟著動」這種看起來更像壞掉的狀態。
@@ -672,6 +678,8 @@
     const q = quadNow();
     const svg = $('dsQuadSvg'), box = $('dsHandles');
     $('dsQuadActions').hidden = !on;
+    const ovq = overrides[curPage()];
+    $('dsQuadNoAuto').hidden = !(on && !autoQuad && !(ovq && ovq.quad));
     // **SVG 不可以用 `.hidden`**（2026-09-14 使用者回報「四個角還是沒有連線」）：
     //  `SVGElement` 沒有 `hidden` 這個 IDL 屬性（實測 `'hidden' in svg` 是
     //  false），所以 `svg.hidden = false` 只是在物件上掛一個沒人看的屬性，

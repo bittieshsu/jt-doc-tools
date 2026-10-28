@@ -15,8 +15,11 @@
 """
 from __future__ import annotations
 
+import asyncio
 import io
+import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List
 
@@ -44,6 +47,20 @@ _MAX_BYTES = 50 * 1024 * 1024          # 單檔 50 MB
 _MAX_PAGES = 20                        # 單檔最多處理 20 頁
 _MAX_CROPS_PER_UPLOAD = 30            # 單次上傳最多回 30 塊（避免雜訊頁爆量）
 _PDF_RENDER_DPI = 200                  # PDF 頁面 render 解析度
+#: 一個檔裡的各頁同時處理的上限（縮圖、偵測、裁切）。PDF 畫頁面仍是一頁一頁來
+#: （PyMuPDF 不支援多執行緒）。
+_MAX_PAGE_WORKERS = 4
+
+
+def _page_workers(n: int) -> int:
+    return max(1, min(_MAX_PAGE_WORKERS, os.cpu_count() or 2, n))
+
+
+def _save_png(img: Image.Image, path: Path) -> None:
+    """存 PNG。**不用 `optimize=True`**：掃描頁帶雜訊，optimize 要多試好幾種壓縮，
+    一張 600 px 的預覽圖從 0.3 秒變 1 秒，一份 8 頁的 PDF 就多等十幾秒，
+    客戶等到以為當機（2026-10-28）。換來的只是暫存檔小一點。"""
+    img.save(str(path), format="PNG")
 
 
 def _work_dir() -> Path:
@@ -95,10 +112,8 @@ def _store_crop(cid: str, page_img: Image.Image, region, request: Request) -> di
     """存兩版 RGBA crop（raw / 淨白），padding 區透明，回前端 metadata。"""
     _uo.record(cid, request)
     raw = crop_card(page_img, region, whiten=False)
-    raw.save(str(_crop_path(cid, "raw")), format="PNG", optimize=True)
-    crop_card(page_img, region, whiten=True).save(
-        str(_crop_path(cid, "white")), format="PNG", optimize=True
-    )
+    _save_png(raw, _crop_path(cid, "raw"))
+    _save_png(crop_card(page_img, region, whiten=True), _crop_path(cid, "white"))
     return {
         "crop_id": cid,
         "natural_w": raw.width,
@@ -129,6 +144,20 @@ async def upload(request: Request, file: UploadFile = File(...)):
     if ext == ".pdf" and raw[:4] != b"%PDF":
         raise HTTPException(400, "不是有效的 PDF")
 
+    # 畫頁面、偵測、存圖都是吃 CPU 的同步工作，**一定要丟到執行緒**：
+    # 原本直接在 async 函式裡做，一份多頁 PDF 處理的那幾十秒整台服務的事件迴圈
+    # 都被佔住，別人的頁面也跟著卡（2026-10-28 客戶回報從工作區載入要等 20～40 秒）。
+    return await asyncio.to_thread(_analyze_upload, raw, ext, name, request)
+
+
+def _source_thumb(sid: str, page_img: Image.Image) -> None:
+    src_thumb = page_img.copy()
+    src_thumb.thumbnail((_SOURCE_THUMB_MAX, _SOURCE_THUMB_MAX), Image.LANCZOS)
+    _save_png(src_thumb, _source_path(sid))
+
+
+def _analyze_upload(raw: bytes, ext: str, name: str, request: Request) -> dict:
+    """render → 偵測內容區塊 → 存彩色 crop。各頁同時處理，回傳順序照頁次。"""
     try:
         pages = _render_pages(raw, ext)
     except Exception as e:  # noqa: BLE001
@@ -136,30 +165,34 @@ async def upload(request: Request, file: UploadFile = File(...)):
     if not pages:
         raise HTTPException(400, "檔案無內容")
 
-    crops: list[dict] = []
-    sources: list[dict] = []
-    for page_idx, page_img in enumerate(pages):
-        # 為每個來源頁存縮圖（供上傳區預覽原始檔內容用）
+    def page_job(page_img: Image.Image):
         sid = uuid.uuid4().hex
         _uo.record(sid, request)
-        src_thumb = page_img.copy()
-        src_thumb.thumbnail((_SOURCE_THUMB_MAX, _SOURCE_THUMB_MAX), Image.LANCZOS)
-        src_thumb.save(str(_source_path(sid)), format="PNG", optimize=True)
-        sources.append({
-            "source_id": sid,
-            "filename": name,
-            "page": page_idx + 1,
-            "natural_w": page_img.width,
-            "natural_h": page_img.height,
-            "url": f"/tools/scan-merge/source/{sid}",
-        })
+        _source_thumb(sid, page_img)
+        return sid, detect_regions(page_img)
 
-        regions = detect_regions(page_img)
-        for r in regions:
-            if len(crops) >= _MAX_CROPS_PER_UPLOAD:
-                break
-            cid = uuid.uuid4().hex
-            meta = _store_crop(cid, page_img, r, request)
+    with ThreadPoolExecutor(max_workers=_page_workers(len(pages))) as ex:
+        analysed = list(ex.map(page_job, pages))   # map 保留頁次順序
+
+        sources: list[dict] = []
+        picked: list[tuple[int, Image.Image, object]] = []
+        for page_idx, (page_img, (sid, regions)) in enumerate(zip(pages, analysed)):
+            sources.append({
+                "source_id": sid,
+                "filename": name,
+                "page": page_idx + 1,
+                "natural_w": page_img.width,
+                "natural_h": page_img.height,
+                "url": f"/tools/scan-merge/source/{sid}",
+            })
+            for r in regions:
+                if len(picked) >= _MAX_CROPS_PER_UPLOAD:
+                    break
+                picked.append((page_idx, page_img, r))
+
+        def crop_job(item):
+            page_idx, page_img, r = item
+            meta = _store_crop(uuid.uuid4().hex, page_img, r, request)
             meta.update({
                 "filename": name,
                 "page": page_idx + 1,
@@ -169,7 +202,9 @@ async def upload(request: Request, file: UploadFile = File(...)):
                 "fw": round(r.fw, 5),
                 "fh": round(r.fh, 5),
             })
-            crops.append(meta)
+            return meta
+
+        crops = list(ex.map(crop_job, picked))
 
     if not crops:
         raise HTTPException(422, "這個檔裡找不到內容區塊（可能整頁空白）")
@@ -299,6 +334,38 @@ async def generate(request: Request):
 
 # ----- 對外一次性 API ---------------------------------------------------------
 
+def _api_bake(raws: list[tuple[str, str, bytes]], whiten: bool) -> Path:
+    placed: list[dict] = []
+    tmp_dir = _work_dir() / f"api_{uuid.uuid4().hex}"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    variant = "white" if whiten else "raw"
+    try:
+        for fname, ext, raw in raws:
+            try:
+                pages = _render_pages(raw, ext)
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(400, f"無法讀取 {fname}：{e}")
+            for page_img in pages:
+                for r in detect_regions(page_img):
+                    cid = uuid.uuid4().hex
+                    _save_png(crop_card(page_img, r, whiten=whiten), _crop_path(cid, variant))
+                    placed.append({"crop_id": cid, "x": r.fx, "y": r.fy,
+                                   "w": r.fw, "h": r.fh})
+        if not placed:
+            raise HTTPException(422, "所有檔都找不到內容區塊")
+        out_path = tmp_dir / "scan-merge.pdf"  # 固定安全 on-disk 名
+        _bake_a4(placed, whiten, out_path)
+        return out_path
+    finally:
+        # 清掉這次 API 用過的 crop（一次性，不留）
+        for it in placed:
+            for v in ("raw", "white"):
+                try:
+                    _crop_path(it["crop_id"], v).unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+
 @router.post("/api/scan-merge")
 async def api_scan_merge(
     files: List[UploadFile] = File(..., description="掃描檔（PDF / PNG / JPG），各含一塊內容"),
@@ -317,9 +384,7 @@ async def api_scan_merge(
     if not display_name.lower().endswith(".pdf"):
         display_name += ".pdf"
 
-    placed: list[dict] = []
-    tmp_dir = _work_dir() / f"api_{uuid.uuid4().hex}"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
+    raws: list[tuple[str, str, bytes]] = []
     for f in files:
         ext = Path(f.filename or "").suffix.lower()
         if ext not in _ALLOWED_EXT:
@@ -329,31 +394,9 @@ async def api_scan_merge(
             raise HTTPException(400, f"空檔：{f.filename}")
         if len(raw) > _MAX_BYTES:
             raise HTTPException(413, f"檔案過大：{f.filename}")
-        try:
-            pages = _render_pages(raw, ext)
-        except Exception as e:  # noqa: BLE001
-            raise HTTPException(400, f"無法讀取 {f.filename}：{e}")
-        for page_img in pages:
-            for r in detect_regions(page_img):
-                cid = uuid.uuid4().hex
-                variant = "white" if whiten else "raw"
-                crop_card(page_img, r, whiten=whiten).save(
-                    str(_crop_path(cid, variant)), format="PNG", optimize=True
-                )
-                placed.append({"crop_id": cid, "x": r.fx, "y": r.fy,
-                               "w": r.fw, "h": r.fh})
-    if not placed:
-        raise HTTPException(422, "所有檔都找不到內容區塊")
-
-    out_path = tmp_dir / "scan-merge.pdf"  # 固定安全 on-disk 名
-    _bake_a4(placed, whiten, out_path)
-    # 清掉這次 API 用過的 crop（一次性，不留）
-    for it in placed:
-        for v in ("raw", "white"):
-            try:
-                _crop_path(it["crop_id"], v).unlink(missing_ok=True)
-            except Exception:
-                pass
+        raws.append((f.filename or "", ext, raw))
+    # 吃 CPU 的部分丟到執行緒（同 /upload）
+    out_path = await asyncio.to_thread(_api_bake, raws, whiten)
     return FileResponse(
         str(out_path), media_type="application/pdf",
         headers={"Content-Disposition": content_disposition(display_name)},

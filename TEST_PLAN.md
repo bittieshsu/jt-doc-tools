@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **521 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **523 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -1090,6 +1090,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_save_queue.py` | Tests for app.core.save_queue (v1.7.17). |
 | `test_scan_merge_api.py` | 掃描拼合 (scan-merge) — 端點 / ACL / 公開 API 測試 |
 | `test_scan_merge_detector.py` | 掃描拼合 — 內容偵測 + 背景淨白 單元測試 |
+| `test_scan_merge_upload_threaded.py` | 掃描拼合上傳：處理丟到執行緒、各頁同時處理，結果不變 |
 | `test_scanner_regexes_are_linear.py` | 檢查的正規式不可以有**重疊的分支** —— 那是指數級回溯 |
 | `test_scheduled_export.py` | Scheduled settings export (v1.12.54). |
 | `test_script_line_endings.py` | Windows 批次檔一律 CRLF、Unix 腳本一律 LF |
@@ -1184,6 +1185,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_workspace_office_thumbnail.py` | 工作區的 Office / ODF 檔要有第一頁縮圖 |
 | `test_workspace_ooxml_detect.py` | 工作區的型別判斷要以**內容型別**為準，不是主檔的路徑名 |
 | `test_workspace_picker_follows_upload_accept.py` | 「從工作區載入」可選的格式要跟上傳框一致（客戶 2026-10-28 回報） |
+| `test_workspace_picker_multi_e2e.py` | 「從工作區載入」一次選多個檔 —— 在真的瀏覽器裡勾、真的載入 |
 | `test_workspace_save_button.py` | 「存至工作區」按鈕出現的條件，必須跟工作區真正收得下的格式一致 |
 | `test_workspace_thumb_pending.py` | 縮圖還沒做好時回的那張空白圖，不可以被瀏覽器快取 |
 | `test_zap_scan_records.py` | ZAP 掃描紀錄留存（使用者 2026-10-21：每次的報告都要留下來） |
@@ -6261,6 +6263,20 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.132a v1.17.22 — 掃描修正：自動沒抓到時「自己拉四個角」有點可拉（**每次發版必過**）
+
+- [ ] 上傳一張沒有背景、整張都是紙的圖（自動抓不到邊界）→ 切「自己拉四個角」：圖上有四個點在四角附近、看得到提示文字；拖動之後按「開始修正」，用的是拖過的四個角。
+- [ ] 自動抓得到的圖：切「自己拉四個角」時四個點落在自動抓到的位置，沒有提示文字。
+- 自動化：`tests/test_doc_straighten_quad_overlay_e2e.py::test_manual_mode_offers_corners_when_nothing_was_found`
+
+### 6.132b v1.17.22 — 掃描拼合處理速度、從工作區一次載入多個檔（**每次發版必過**）
+
+- [ ] 掃描拼合上傳一份多頁掃描 PDF：處理中超過 3 秒會顯示經過秒數；處理期間另開分頁打其他工具頁，不會跟著卡住。
+- [ ] 掃描拼合按「從工作區載入」：挑選視窗下方有「載入選取的檔案」，勾兩個檔再按，兩份都載入、順序照勾的順序；沒勾時按鈕不能按。
+- [ ] 檔案合併同上；PDF 壓縮（單檔）點一下就載入，沒有勾選框。
+- [ ] 手機寬度下挑選視窗的按鈕不斷行。
+- 自動化：`tests/test_scan_merge_upload_threaded.py`、`tests/test_workspace_picker_multi_e2e.py`
 
 ### 6.132 v1.17.21 — dnspython 2.9.0（**每次發版必過**）
 

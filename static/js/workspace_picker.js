@@ -1,7 +1,8 @@
 // Workspace picker + save helpers — shared across all tools.
 //
 // Loaded globally (only when the workspace feature is enabled). Provides:
-//   window.openWorkspacePicker({accept, onPick})  — modal to choose a saved file
+//   window.openWorkspacePicker({accept, onPick, multiple, onPickMany})
+//                                                 — modal to choose saved file(s)
 //   window.workspaceFileAsFile(fileId, meta)      — fetch a saved file as a File
 //   window.saveToWorkspace(blobOrSpec, name, tool)— POST output into workspace
 //   window.workspaceAcceptExts(acceptAttr, wsExts) — accept ∩ 工作區清單
@@ -81,6 +82,11 @@
     return new File([blob], name, { type });
   }
 
+  // 一次抓多個工作區檔案（同時抓，順序照傳進來的）
+  function workspaceFilesAsFiles(picks) {
+    return Promise.all((picks || []).map(p => workspaceFileAsFile(p.id, p.meta)));
+  }
+
   // Save a tool's output into the workspace.
   //   spec: {jobId} | {blob} | {url}
   async function saveToWorkspace(spec, name, tool) {
@@ -120,6 +126,9 @@
       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12"/><path d="M6 18L18 6"/></svg></button></div>' +
       '  <div class="ws-picker-body"><div class="ws-picker-status muted">' + tr('載入中…') + '</div>' +
       '    <div class="ws-picker-grid"></div></div>' +
+      '  <div class="ws-picker-foot" hidden><span class="ws-picker-hint muted">' + tr('可以點選多個檔案') + '</span>' +
+      '    <button type="button" class="btn ws-picker-cancel">' + tr('取消') + '</button>' +
+      '    <button type="button" class="btn btn-primary ws-picker-ok" disabled><span>' + tr('載入選取的檔案') + '</span></button></div>' +
       '</div>';
     document.body.appendChild(m);
     // 樣式在 platform.css 的「工作區選擇視窗」區塊 —— **不可以在這裡動態
@@ -129,6 +138,7 @@
     // 用印與騎縫章兩頁都中）。功能面不會有任何例外，只有 console 一行
     // CSP 違規 —— 所以「沒有 JS 錯誤」的檢查抓不到它。
     m.querySelector('.ws-picker-close').addEventListener('click', () => { m.hidden = true; });
+    m.querySelector('.ws-picker-cancel').addEventListener('click', () => { m.hidden = true; });
     m.addEventListener('click', (e) => { if (e.target === m) m.hidden = true; });
     return m;
   }
@@ -139,6 +149,14 @@
     const m = buildModal();
     const grid = m.querySelector('.ws-picker-grid');
     const status = m.querySelector('.ws-picker-status');
+    // 一次選多個（收多個檔的上傳框才開）：點卡片是勾選，按下方按鈕才載入。
+    // 同一個視窗在同一頁可能先後給單選與多選的上傳框用，所以每次打開都重設。
+    const multi = !!opts.multiple;
+    const foot = m.querySelector('.ws-picker-foot');
+    const okBtn = m.querySelector('.ws-picker-ok');
+    foot.hidden = true;
+    okBtn.disabled = true;
+    okBtn.onclick = null;
     grid.innerHTML = '';
     status.textContent = tr('載入中…');
     status.hidden = false;
@@ -151,6 +169,7 @@
     } catch (e) { status.textContent = e.message || tr('載入工作區失敗'); return; }
     if (!files.length) { status.textContent = tr('工作區內沒有符合的檔案（{0}）。').replace('{0}', exts.join(' / ').toUpperCase()); return; }
     status.hidden = true;
+    if (multi) foot.hidden = false;
     grid.innerHTML = files.map(f => {
       const ext = (f.ext || '').replace('.', '');
       // 縮圖載不到就換成副檔名徽章 —— **不可以寫成 `onerror="…"` 屬性**：CSP 不收行內事件，
@@ -162,7 +181,9 @@
           + esc(ext.toUpperCase()) + '">';
       const tool = f.source_tool_name || f.source_tool || '';
       return '<div class="ws-pick-card" data-id="' + f.file_id + '"'
+        + (multi ? ' role="checkbox" aria-checked="false"' : '')
         + (tool ? ' title="' + esc(tr(tool)) + '"' : '') + '>' +
+        (multi ? '<span class="ws-pick-check" aria-hidden="true"></span>' : '') +
         '<div class="ws-pick-thumb">' + thumb + '</div>' +
         '<div class="ws-pick-info"><div class="ws-pick-name">' + esc(f.name) + '</div>' +
         '<div class="ws-pick-meta">' + fmtBytes(f.size) + '</div>' +
@@ -177,6 +198,38 @@
         img.replaceWith(b);
       }, { once: true });
     });
+    if (multi) {
+      // 勾選的順序就是載入的順序（多檔合併時順序有意義）
+      const chosen = [];
+      const okLabel = okBtn.querySelector('span');
+      const refresh = () => {
+        okBtn.disabled = !chosen.length;
+        okLabel.textContent = chosen.length
+          ? tr('載入選取的 {0} 個檔案').replace('{0}', chosen.length)
+          : tr('載入選取的檔案');
+      };
+      refresh();
+      grid.querySelectorAll('.ws-pick-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const id = card.dataset.id;
+          const at = chosen.indexOf(id);
+          if (at >= 0) chosen.splice(at, 1); else chosen.push(id);
+          const on = at < 0;
+          card.classList.toggle('selected', on);
+          card.setAttribute('aria-checked', on ? 'true' : 'false');
+          refresh();
+        });
+      });
+      okBtn.onclick = async () => {
+        const picks = chosen.map(id => ({ id, meta: files.find(x => x.file_id === id) }));
+        m.hidden = true;
+        try {
+          if (opts.onPickMany) await opts.onPickMany(picks);
+          else for (const p of picks) await opts.onPick(p.id, p.meta);
+        } catch (e) { alert(e.message || tr('載入失敗')); }
+      };
+      return;
+    }
     grid.querySelectorAll('.ws-pick-card').forEach(card => {
       card.addEventListener('click', async () => {
         const id = card.dataset.id;
@@ -227,13 +280,20 @@
       ? opts.accept : workspaceAcceptExts(inputEl.getAttribute('accept') || '',
           (btn.dataset && btn.dataset.wsExts) || '');
     if (!exts.length) { btn.hidden = true; return; }
+    // 收多個檔的上傳框（`<input multiple>`）可以一次選多個 —— 一份一份點太慢
+    // （2026-10-28 客戶建議，掃描拼合一次要正反面兩個檔）。
+    const setFiles = (list) => {
+      try { const dt = new DataTransfer(); list.forEach(f => dt.items.add(f)); inputEl.files = dt.files; } catch (_e) {}
+      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    };
     btn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
-      openWorkspacePicker({ accept: exts, onPick: async (id, meta) => {
-        const file = await workspaceFileAsFile(id, meta);
-        try { const dt = new DataTransfer(); dt.items.add(file); inputEl.files = dt.files; } catch (_e) {}
-        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-      }});
+      openWorkspacePicker({
+        accept: exts,
+        multiple: !!inputEl.multiple,
+        onPick: async (id, meta) => setFiles([await workspaceFileAsFile(id, meta)]),
+        onPickMany: async (picks) => setFiles(await workspaceFilesAsFiles(picks)),
+      });
     });
   }
 
@@ -280,6 +340,7 @@
   window.attachWorkspaceSave = attachWorkspaceSave;
   window.attachWorkspaceLoadButton = attachWorkspaceLoadButton;
   window.workspaceFileAsFile = workspaceFileAsFile;
+  window.workspaceFilesAsFiles = workspaceFilesAsFiles;
   window.saveToWorkspace = saveToWorkspace;
   window.workspaceAcceptExts = workspaceAcceptExts;
   window.workspaceNoPreviewHtml = noPreviewHtml;

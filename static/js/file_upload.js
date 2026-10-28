@@ -119,6 +119,11 @@
         e.preventDefault(); e.stopPropagation();
         window.openWorkspacePicker({
           accept: exts,
+          // 收多個檔的上傳框可以一次選多個；伺服器端直接取用的工具（onWorkspacePick）維持單選
+          multiple: this.multiple && !this.onWorkspacePick,
+          onPickMany: async (picks) => {
+            this.loadFiles(await window.workspaceFilesAsFiles(picks));
+          },
           onPick: async (id, meta) => {
             if (this.onWorkspacePick) {
               if (this.nameEl) this.nameEl.textContent = (meta && meta.name) || '';

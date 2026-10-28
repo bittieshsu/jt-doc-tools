@@ -242,3 +242,54 @@ def test_the_outline_follows_the_handles(loaded):
                             && Math.abs(h[1]-pts[i][1]) < 0.02);
     })()""")
     assert same, "手柄與連線對不起來 —— 疊圖層的座標系又錯了"
+
+
+def _make_full_bleed(path: str) -> None:
+    """整張都是紙、沒有桌面背景：自動抓不到紙張邊界（`find_page_quad` 回 None）。"""
+    import cv2
+    import numpy as np
+
+    img = np.full((900, 1200, 3), 248, np.uint8)
+    for i in range(8):
+        cv2.putText(img, f"Line {i} full bleed page text", (60, 100 + i * 95),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (30, 30, 30), 2, cv2.LINE_AA)
+    cv2.imwrite(path, img)
+
+
+def test_manual_mode_offers_corners_when_nothing_was_found(page):
+    """自動沒抓到紙張時切到「自己拉四個角」，畫面上要有四個點可以拉（2026-10-28 使用者回報：
+    一個點都沒有）。原本拖曳的起點只有自動抓到的結果，沒抓到就什麼都不畫 —— 偏偏那正是最需要自己拉的時候。"""
+    port, send = page
+    photo = os.path.join(_uploadable_dir(), "ds_full_bleed.png")
+    _make_full_bleed(photo)
+    send("Page.navigate", {"url": f"http://127.0.0.1:{port}/tools/doc-straighten/"})
+    time.sleep(4)
+
+    def ev(expr):
+        r = send("Runtime.evaluate", {"expression": expr, "returnByValue": True, "awaitPromise": True})
+        res = r.get("result", {})
+        if "exceptionDetails" in res:
+            raise AssertionError(str(res["exceptionDetails"])[:300])
+        return res.get("result", {}).get("value")
+
+    doc = send("DOM.getDocument", {"depth": -1})
+    node = send("DOM.querySelector", {"nodeId": doc["result"]["root"]["nodeId"],
+                                      "selector": "input[type=file]"})
+    nid = node["result"].get("nodeId")
+    if not nid:
+        pytest.skip("找不到上傳欄位")
+    send("DOM.setFileInputFiles", {"files": [photo], "nodeId": nid})
+    for _ in range(60):
+        time.sleep(1)
+        if ev("(()=>{const p=document.getElementById('dsPvPanel');return !!p && !p.hidden})()"):
+            break
+    else:
+        pytest.skip("預覽沒出來（可能是這台機器太慢）")
+    assert ev("(()=>{const r=document.getElementById('dsQuadEdit');if(!r) return false;r.click();return true})()")
+    time.sleep(2.5)
+    sizes = ev("[...document.querySelectorAll('#dsHandles .ds-h')].map(h=>{const r=h.getBoundingClientRect();"
+               "return [Math.round(r.width), Math.round(r.height)]})")
+    assert len(sizes) == 4 and all(w > 0 and h > 0 for w, h in sizes), f"要有四個看得到的點：{sizes}"
+    hint = ev("(()=>{const e=document.getElementById('dsQuadNoAuto');"
+              "return !!e && !e.hidden && e.getBoundingClientRect().width > 0})()")
+    assert hint, "要告訴使用者這是預設位置、自己拖到紙張的角上"

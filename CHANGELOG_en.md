@@ -5,11 +5,17 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (950 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (951 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.22] - 2026-10-28
+
+- Scan cleanup: on a page where no paper edge was detected, switching to "Drag the four corners myself" showed no points at all, because the starting points came only from automatic detection. The four points now start near the corners of the image, with a note asking you to drag them onto the corners of the paper.
+- Scan merge: loading a multi-page PDF from the workspace took 20 to 40 seconds and looked frozen. The processing ran inside the server's request loop, which also stalled every other page, and every preview and crop was saved with the slowest PNG compression. It now runs in the background, processes the pages of a file in parallel and saves images without the extra compression; an 8-page scan drops from 23 to 7 seconds with identical results. After 3 seconds the elapsed time is shown.
+- Load from workspace: tools that take several files (Scan merge, Merge files and others) can now select several files in the picker and load them together, in the order they were ticked. Single-file tools still load on one click.
 
 ## [1.17.21] - 2026-10-28
 

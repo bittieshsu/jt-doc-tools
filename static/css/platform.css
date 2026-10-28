@@ -1416,6 +1416,16 @@ select.jt-select-native {
 .ws-pick-info{padding:8px 10px;font-size:12px;}
 .ws-pick-name{font-weight:600;color:#1e293b;word-break:break-all;line-height:1.3;}
 .ws-pick-meta{color:#94a3b8;font-size:11px;margin-top:2px;}
+/* 多選：點卡片勾選，下方按鈕載入 */
+.ws-pick-card{position:relative;}
+.ws-pick-check{position:absolute;top:8px;left:8px;width:20px;height:20px;border-radius:5px;border:2px solid #94a3b8;background:#fff;box-sizing:border-box;}
+.ws-pick-card.selected{border-color:#2563eb;outline:2px solid #2563eb;outline-offset:-1px;}
+.ws-pick-card.selected .ws-pick-check{background:#2563eb;border-color:#2563eb;}
+.ws-pick-card.selected .ws-pick-check::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);}
+.ws-picker-foot{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;padding:12px 18px;border-top:1px solid #e5e7eb;}
+.ws-picker-foot[hidden]{display:none;}
+.ws-picker-foot .btn{white-space:nowrap;}
+.ws-picker-hint{margin-right:auto;font-size:12px;flex:1 1 140px;}
 /* 沒有預覽圖的檔案（錄音 / 錄影、純文字）：圖示 ＋ 副檔名。工作區挑選視窗與「我的工作區」共用
    （畫法在 workspace_picker.js 的 noPreviewHtml）。 */
 .ws-noprev{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;height:100%;color:#64748b;}

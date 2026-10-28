@@ -7656,5 +7656,10 @@
   "含機密或個人資料的文件請不要在這個設定下處理。多人使用請先啟用登入，每個人的工作區才會分開；只有自己用的話，改成只開本機：`sudo jtdt bind 127.0.0.1`（Windows 以系統管理員身分執行 `jtdt bind 127.0.0.1`）。": "Do not handle documents containing confidential or personal data with this setup. If several people use it, enable sign-in first so that each person has their own workspace; if only you use it, restrict the service to this computer: `sudo jtdt bind 127.0.0.1` (on Windows, run `jtdt bind 127.0.0.1` as administrator).",
   "目前綁定的位址：": "Current bind address: ",
   "目前未啟用登入（單機模式），掃描與取件的檔案存進這台電腦上大家共用的工作區。": "Sign-in is not enabled (single-user mode), so scanned and retrieved files go into the workspace on this computer that everyone shares.",
-  "含機密或個人資料的文件，請先確認這台電腦沒有其他人共用。服務目前只開在本機（`127.0.0.1`），其他電腦連不進來；之後若要開放區域網路給多人使用，請先啟用登入。": "Before handling documents containing confidential or personal data, make sure nobody else shares this computer. The service currently listens only on this computer (`127.0.0.1`), so other computers cannot connect; if you later open it to the local network for several people, enable sign-in first."
+  "含機密或個人資料的文件，請先確認這台電腦沒有其他人共用。服務目前只開在本機（`127.0.0.1`），其他電腦連不進來；之後若要開放區域網路給多人使用，請先啟用登入。": "Before handling documents containing confidential or personal data, make sure nobody else shares this computer. The service currently listens only on this computer (`127.0.0.1`), so other computers cannot connect; if you later open it to the local network for several people, enable sign-in first.",
+  "這一頁沒有自動抓到紙張，四個點先放在圖的四角，請拖到紙張的角上。": "No paper edge was detected on this page, so the four points start at the corners of the image. Drag them onto the corners of the paper.",
+  "可以點選多個檔案": "You can select several files",
+  "載入選取的檔案": "Load selected files",
+  "載入選取的 {0} 個檔案": "Load {0} selected file(s)",
+  "已經過 {0} 秒，多頁的 PDF 需要較久，請稍候": "{0} seconds so far. PDFs with many pages take longer, please wait."
 }
