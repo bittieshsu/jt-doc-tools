@@ -5,11 +5,15 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (949 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (950 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.21] - 2026-10-28
+
+- Security: dnspython 2.9.0 (GHSA-45c3-73f7-pv4m, high: excessive CPU use when parsing a crafted DNS response). It is only used to look up MX records for the direct-delivery mode of notification mail; the declared minimum is raised to 2.9.0 so updates always install the fixed version.
 
 ## [1.17.20] - 2026-10-28
 
