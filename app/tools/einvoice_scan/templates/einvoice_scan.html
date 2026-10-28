@@ -589,7 +589,7 @@
       <span class="desc">{{ tr('支援 PNG / JPG / WebP / PDF') }}</span>
     </label>
   </div>
-  {% if workspace_enabled(request) %}<div class="fu-ws-row"><button type="button" class="ws-load-btn" id="wsLoadBtn">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
+  {% if workspace_enabled(request) %}<div class="fu-ws-row"><button type="button" class="ws-load-btn" id="wsLoadBtn" data-ws-exts="{{ workspace_extensions() }}">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
   <div class="es-status" id="status"></div>
 
   <!-- 連續掃描的 live preview 區，預設隱藏 -->

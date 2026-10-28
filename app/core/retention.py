@@ -265,9 +265,14 @@ def _sweep_temp_dir(temp_seconds: int, jobs_seconds: int) -> int:
             # — sweep individual records inside it (the dir itself stays
             # fresh as long as new uploads are happening).
             if child.is_dir() and child.name == ".owners":
+                speech = _s.data_dir / "speech_audio"
                 for owner_file in child.iterdir():
                     try:
                         if protect and _kept(owner_file):
+                            continue
+                        # 會議錄音留 30 天，它的歸屬紀錄要跟著錄音留著 —— 清掉的話本人
+                        # 回頭播放、看波形都會被擋，管理頁也把它算成「(匿名)」。
+                        if (speech / f"{owner_file.stem}.bin").exists():
                             continue
                         if owner_file.stat().st_mtime < cutoff:
                             owner_file.unlink(missing_ok=True)
@@ -404,6 +409,40 @@ def _sweep_speech_audio(days: int) -> int:
     return removed
 
 
+def _restore_speech_owners() -> int:
+    """替還在的會議錄音補回遺失的歸屬紀錄（從作業紀錄找送件的人）。回傳補了幾筆。
+
+    v1.17.20 之前，歸屬紀錄跟著暫存區清（最多留作業保留期），錄音卻留 30 天 ——
+    之前上傳的錄音已經沒有紀錄了，這裡補回來；之後的由清理程式直接保留。
+    沒有啟用登入時不需要歸屬紀錄（`upload_owner.record` 也不寫），不補。
+    """
+    from ..config import settings as _s
+    from . import job_store, upload_owner
+    if not upload_owner.auth_enabled():
+        return 0
+    speech = _s.data_dir / "speech_audio"
+    owners = _s.temp_dir / ".owners"
+    if not speech.exists():
+        return 0
+    missing = [f.stem for f in speech.iterdir()
+               if f.is_file() and f.suffix == ".bin" and not (owners / f"{f.stem}.json").exists()]
+    if not missing:
+        return 0
+    found = job_store.owners_for_uploads(missing)
+    n = 0
+    for uid, owner_id in found.items():
+        try:
+            owners.mkdir(parents=True, exist_ok=True)
+            atomic_json.write_json(owners / f"{uid}.json",
+                                   {"user_id": owner_id, "ts": time.time(), "restored_from": "job"})
+            n += 1
+        except OSError:
+            logger.warning("speech audio owner restore failed for %s", uid)
+    if n:
+        logger.info("restored %d speech audio owner record(s) from job records", n)
+    return n
+
+
 def _speech_audio_stats() -> dict[str, Any]:
     from ..config import settings as _s
     root = _s.data_dir / "speech_audio"
@@ -434,6 +473,11 @@ def sweep_all() -> dict[str, Any]:
         s["stamp_history_days"] * 86400 if s["stamp_history_days"] > 0 else 0)
     report["watermark"] = history_manager.watermark_history.sweep_older_than(
         s["watermark_history_days"] * 86400 if s["watermark_history_days"] > 0 else 0)
+    # 先替會議錄音補回遺失的歸屬紀錄，清暫存區時才認得要保留它們
+    try:
+        report["speech_owners_restored"] = _restore_speech_owners()
+    except Exception:
+        logger.exception("speech audio owner restore failed")
     # temp_hours is in HOURS not days
     report["temp"] = _sweep_temp_dir(
         s["temp_hours"] * 3600 if s["temp_hours"] > 0 else 0,

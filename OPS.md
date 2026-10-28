@@ -618,6 +618,78 @@ sudo jtdt start
 - 統編資料庫、公文範本與機關地址簿已經在資料夾裡，不用重新下載。
 - **確認新主機沒問題之前，舊主機的資料不要刪；兩台不要同時對外服務**（同一份資料兩邊各自改，之後合不回來）。
 
+## 同一台主機換資料目錄的位置
+
+例如原本的磁碟快滿了，要把資料搬到另一顆比較大的磁碟。管理區的「系統狀態 → 磁碟空間（資料目錄所在）」
+顯示的就是資料目錄目前在哪一顆磁碟。
+
+**網頁上沒有可以改資料目錄的地方**：它是安裝時寫進服務設定的環境變數 `JTDT_DATA_DIR`。
+
+| OS | 預設位置 | 記在哪裡 |
+|---|---|---|
+| Linux | `/var/lib/jt-doc-tools/data` | systemd 服務設定 |
+| Windows | `C:\ProgramData\jt-doc-tools\Data` | `C:\Program Files\jt-doc-tools\bin\jtdt-svc.xml` |
+| macOS | `~/Library/Application Support/jt-doc-tools/data` | 應用程式裡的 launcher |
+
+### 建議做法：原路徑不變，把新位置接到原路徑
+
+服務設定完全不用改，之後重跑安裝程式、`jtdt update` 都不受影響。
+
+Linux：把新磁碟**掛載到原本的路徑**。
+
+```bash
+sudo jtdt stop
+sudo mv /var/lib/jt-doc-tools/data /var/lib/jt-doc-tools/data.old
+sudo mkdir /var/lib/jt-doc-tools/data
+sudo mount /dev/新磁碟 /var/lib/jt-doc-tools/data            # 並寫進 /etc/fstab，開機才會自動掛上
+sudo rsync -aHAX /var/lib/jt-doc-tools/data.old/ /var/lib/jt-doc-tools/data/
+sudo chown -R jtdt:jtdt /var/lib/jt-doc-tools/data
+sudo jtdt start
+```
+
+Windows（以系統管理員身分執行 PowerShell）：在原路徑建**目錄連接**（junction），指到新位置。
+
+```powershell
+net stop jt-doc-tools
+robocopy C:\ProgramData\jt-doc-tools\Data D:\jtdt-data /MIR /COPYALL /DCOPY:DAT
+Rename-Item C:\ProgramData\jt-doc-tools\Data Data.old
+cmd /c mklink /J C:\ProgramData\jt-doc-tools\Data D:\jtdt-data
+net start jt-doc-tools
+```
+
+### 另一種做法：改服務設定指到新路徑
+
+需要 **v1.17.20 以上**。之前的版本 `jtdt` 指令只看環境變數、不讀服務設定，改完之後
+`sudo jtdt reset-password`、`db-check`、`db-restore`、`update` 都會去動**舊的預設目錄**：指令顯示成功，服務用的資料卻沒有變。
+舊版本要先升級，或每次執行 `jtdt` 指令前自己 `export JTDT_DATA_DIR=新路徑`。
+
+Linux：用 systemd 的覆寫設定（`systemctl edit`），重跑 install.sh 也不會被蓋掉。
+
+```bash
+sudo jtdt stop
+sudo rsync -aHAX /var/lib/jt-doc-tools/data/ /新路徑/
+sudo chown -R jtdt:jtdt /新路徑
+sudo systemctl edit jt-doc-tools
+#   在編輯器裡加入下面三行後存檔：
+#   [Service]
+#   Environment=JTDT_DATA_DIR=/新路徑
+#   ReadWritePaths=/新路徑
+sudo systemctl daemon-reload
+sudo jtdt start
+```
+
+`ReadWritePaths` 這一行不能省：比較新的安裝把服務設成整個檔案系統唯讀、只有資料目錄可寫，少了它服務寫不進新路徑。
+
+Windows：停服務、用上面的 `robocopy` 把資料複製到新位置，再把 `C:\Program Files\jt-doc-tools\bin\jtdt-svc.xml` 裡
+`<env name="JTDT_DATA_DIR" value="…"/>` 的 `value` 改成新路徑，然後 `net start jt-doc-tools`。
+**重跑安裝程式（含網站的一行安裝指令）會用預設路徑重新產生這個檔**，之後要再改一次；所以 Windows 建議用上面的目錄連接。
+
+### 搬完要確認的
+
+- 管理區「系統狀態」的「磁碟空間（資料目錄所在）」顯示的是新的路徑與磁碟；帳號、設定、歷史紀錄、統編資料庫都還在。
+- `sudo jtdt db-check`（Windows 不用 sudo）檢查的是新路徑上的資料庫。
+- 確認幾天沒問題之後，再刪掉舊的資料（`data.old`）。
+
 ## 排程清理
 
 啟用認證後可在 `/admin/retention` 設定每類資料保留天數：

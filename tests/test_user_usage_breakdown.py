@@ -65,7 +65,8 @@ def seeded():
 def test_each_user_row_carries_a_breakdown_by_category(seeded):
     name, meta_len = seeded
     out = host_stats._compute_user_file_stats()
-    row = next(r for r in out["users"] if r["username"] == name)
+    # 名稱一律是「帳號@來源」（跟填寫 / 用印 / 浮水印歷史一致；本機與 LDAP 同名時才分得開）
+    row = next(r for r in out["users"] if r["username"] == f"{name}@local")
     cats = {c["key"]: (c["count"], c["bytes"]) for c in row["categories"]}
     assert cats["workspace"] == (2, 1002), cats
     assert cats["cases"] == (2, 3000 + meta_len), cats
@@ -190,3 +191,57 @@ def test_clicking_a_user_opens_the_breakdown_in_a_browser(tmp_path):
                 p.wait(timeout=10)
             except Exception:
                 p.kill()
+
+
+def test_speech_audio_without_owner_record_is_attributed_from_job_records(seeded):
+    """歸屬紀錄被清掉的錄音（v1.17.20 之前，暫存區清理會連它一起清），改從作業紀錄找送件的人。
+    正式機上 jason@ldap 的 2.2 GB 錄音就這樣被算成「(匿名)」。"""
+    from app.core import auth_db, job_store
+    name, _ = seeded
+    uid = auth_db.conn().execute("SELECT id FROM users WHERE username = ? AND source = 'local'",
+                                 (name,)).fetchone()["id"]
+    up = uuid.uuid4().hex
+    sp = settings.data_dir / "speech_audio"
+    (sp / f"{up}.bin").write_bytes(b"a" * 4000)
+    job_store.init()
+    job_id = uuid.uuid4().hex
+    import time as _t
+    from app.core import db as _db
+    conn = _db.get_conn(job_store.db_path())
+    with _db.tx(conn):
+        conn.execute("INSERT INTO jobs (id, tool_id, status, progress, owner_id, owner_label, meta, created_at, updated_at) "
+                     "VALUES (?, 'meeting-transcribe', 'done', 1, ?, ?, ?, ?, ?)",
+                     (job_id, uid, f"{name}@local", json.dumps({"upload_id": up}), _t.time(), _t.time()))
+    try:
+        assert job_store.owners_for_uploads([up, "not-a-uuid"]) == {up: uid}
+        out = host_stats._compute_user_file_stats()
+        row = next(r for r in out["users"] if r["username"] == f"{name}@local")
+        cats = {c["key"]: (c["count"], c["bytes"]) for c in row["categories"]}
+        assert cats["speech"] == (2, 5000 + 4000), cats
+    finally:
+        (sp / f"{up}.bin").unlink(missing_ok=True)
+        with _db.tx(conn):
+            conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+
+
+def test_bare_audit_usernames_get_the_realm_only_when_unambiguous():
+    from app.core import auth_db, roles, user_manager
+    auth_db.init()
+    roles.seed_builtin_roles()
+    n = "lbl-" + uuid.uuid4().hex[:8]
+    uid = user_manager.create_local(n, n, "Passw0rd!xyz")
+    try:
+        assert host_stats._label_for_bare_username(n) == f"{n}@local"
+        assert host_stats._label_for_bare_username("no-such-user-" + n) == "no-such-user-" + n
+        assert host_stats._label_for_bare_username(f"{n}@ldap") == f"{n}@ldap"
+        assert host_stats._label_for_bare_username("(匿名)") == "(匿名)"
+        # 同名兩個來源（本機與 LDAP 都有）時分不出來，維持原樣不亂猜
+        conn = auth_db.conn()
+        with conn:
+            conn.execute("INSERT INTO users (username, display_name, password_hash, source, enabled, created_at) "
+                         "VALUES (?, ?, '', 'ldap', 1, 0)", (n, n))
+        assert host_stats._label_for_bare_username(n) == n
+    finally:
+        with auth_db.conn() as conn:
+            conn.execute("DELETE FROM users WHERE username = ? AND source = 'ldap'", (n,))
+        user_manager.delete(uid)

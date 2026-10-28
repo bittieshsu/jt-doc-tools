@@ -5,11 +5,19 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
 > **Scope.** Traditional Chinese is this project's primary language, and
-> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (948 releases).
+> **[CHANGELOG.md](CHANGELOG.md) is the complete history** (949 releases).
 > This English file summarises **recent releases** — enough to see what changed
 > and decide whether to upgrade. For anything older, read the Chinese file.
 
 ---
+
+## [1.17.20] - 2026-10-28
+
+- AD / LDAP: after an OU was renamed (or a group moved to another OU), everyone in that OU could no longer sign in, and directory sync in the admin area failed as a whole. Groups are matched by DN, which contains the OU names; after the rename the existing record was not found and a new one with the same name hit the "name must be unique" constraint. The existing record is now kept with its new DN, so roles, permissions and members stay, and an audit event (`ldap_group_moved`) is written; two different groups that happen to share a name are not merged, and the second gets its OU added to the name. User accounts that move between OUs were already handled this way.
+- Workspace: "Load from workspace" in Image to PDF only offered PNG, so a JPG photo taken on a phone and saved to the workspace could not be picked ("no matching files"), contrary to the formats listed on the page. Text De-identification, Document Translation and List Processing only offered PDF although their upload boxes take txt, docx, odt and more, and E-invoice Processing and Scan Merge only offered PDF and PNG. These seven tools now offer the same formats as their upload boxes.
+- Meeting recordings: after a day, the uploader could no longer play back a recording or see its waveform, and the per-user storage table counted it as "(anonymous)". Recordings are kept for 30 days, but the record of who uploaded them was cleaned with the temporary files after at most 24 hours. The ownership record now stays as long as the recording, and missing ones are restored from the job records by the cleanup run.
+- System status: per-user storage now always labels users as `username@source` (for example `jason@ldap`); some categories used the bare username, so a local and an LDAP account with the same name were merged into one row and one person was split across two. Upload counts from the audit log (which records only the username) get the source only when the username is unambiguous. Panels separated by an invisible element (a translation template or a hidden field) lost their spacing; fixed site-wide (seven places).
+- Data directory: `jtdt` commands now use the data directory the service is configured with (systemd on Linux, `jtdt-svc.xml` on Windows, the launcher on macOS) when `JTDT_DATA_DIR` is not set. Before, after moving the data directory, `jtdt reset-password`, `db-check`, `db-restore` and `update` acted on the old default directory: they reported success while the service's data did not change. On Windows `jtdt bind` keeps the data directory when it rewrites the service configuration. `jtdt db-check` prints the directory it checked. `OPS.md` gains a section on moving the data directory on the same machine.
 
 ## [1.17.19] - 2026-10-25
 

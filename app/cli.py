@@ -81,11 +81,61 @@ def _real_home() -> Path:
     return Path(os.path.expanduser("~"))
 
 
+_SERVICE_DATA_DIR_CACHE: list = []
+
+
+def _service_data_dir() -> Optional[Path]:
+    """The data dir the installed service is configured with, or None.
+
+    Lookup order of ``_data_dir()``: ``JTDT_DATA_DIR`` env > this > platform
+    default. Without it, an admin who moved the data dir (systemd drop-in /
+    WinSW XML / macOS launcher) would run ``jtdt reset-password``,
+    ``db-check``, ``db-restore`` or ``update`` against the OLD default path:
+    the command "succeeds" and changes nothing the service reads.
+    Read once per process; any failure falls back to None (never raises).
+    """
+    if _SERVICE_DATA_DIR_CACHE:
+        return _SERVICE_DATA_DIR_CACHE[0]
+    found: Optional[Path] = None
+    try:
+        if _is_linux() and shutil.which("systemctl"):
+            out = subprocess.run(
+                ["systemctl", "show", SERVICE_NAME, "-p", "Environment", "--value"],
+                capture_output=True, text=True, timeout=5).stdout
+            import shlex
+            for tok in shlex.split(out or ""):
+                if tok.startswith("JTDT_DATA_DIR="):
+                    found = Path(tok.split("=", 1)[1])   # last assignment wins, like systemd
+        elif _is_windows():
+            xml = _install_root() / "bin" / "jtdt-svc.xml"
+            if xml.exists():
+                import html
+                m = re.search(r'name="JTDT_DATA_DIR"\s+value="([^"]*)"',
+                              xml.read_text(encoding="utf-8", errors="replace"))
+                if m and m.group(1):
+                    found = Path(html.unescape(m.group(1)))
+        elif _is_macos():
+            launcher = Path(MACOS_APP_PATH) / "Contents" / "MacOS" / "launcher"
+            if launcher.exists():
+                m = re.search(r'^DATA_DIR="([^"]*)"\s*$',
+                              launcher.read_text(encoding="utf-8", errors="replace"), re.M)
+                if m and m.group(1):
+                    found = Path(m.group(1))
+    except Exception:
+        found = None
+    _SERVICE_DATA_DIR_CACHE.append(found)
+    return found
+
+
 def _data_dir() -> Path:
-    """Where user data lives. Honours ``JTDT_DATA_DIR`` override."""
+    """Where user data lives: ``JTDT_DATA_DIR`` env, else what the installed
+    service is configured with, else the platform default."""
     env = os.environ.get("JTDT_DATA_DIR")
     if env:
         return Path(env)
+    svc = _service_data_dir()
+    if svc is not None:
+        return svc
     if _is_windows():
         return Path(os.environ.get("ProgramData", r"C:\ProgramData")) / "jt-doc-tools" / "Data"
     if _is_macos():
@@ -2763,9 +2813,16 @@ def svc_bind(addr: str) -> int:
                         cur_port = int(m.group(1))
                     except ValueError:
                         pass
+                # 資料目錄也要照原本的寫回去：只傳 host / port 的話 `_write_winsw_xml`
+                # 會填預設值，搬過資料目錄的安裝改個監聽位址，服務就讀回空的預設目錄。
+                cur_data: Optional[Path] = None
+                m = re.search(r'name="JTDT_DATA_DIR"\s+value="([^"]*)"', txt)
+                if m and m.group(1):
+                    import html as _html
+                    cur_data = Path(_html.unescape(m.group(1)))
                 final_host = new_host if new_host is not None else cur_host
                 final_port = new_port if new_port is not None else cur_port
-                _write_winsw_xml(host=final_host, port=final_port)
+                _write_winsw_xml(host=final_host, port=final_port, data_dir=cur_data)
                 print(f"  Updated {xml_path}: JTDT_HOST={final_host} JTDT_PORT={final_port}")
                 print("Restarting service ...")
                 subprocess.call(["sc.exe", "stop", SERVICE_NAME],
@@ -2996,6 +3053,8 @@ def svc_db_check(thorough: bool = False) -> int:
     """
     return _run_auth_helper(
         "from app.core import db_health\n"
+        "from app.config import settings as _st\n"
+        "print('Data dir: %s' % _st.data_dir)\n"
         f"th = {bool(thorough)!r}\n"
         "rows = db_health.check_all(thorough=th,\n"
         "                           max_bytes=None if th else db_health._STARTUP_MAX_BYTES)\n"

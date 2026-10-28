@@ -463,6 +463,37 @@ def keep_alive_keys(since_ts: float) -> tuple[set[str], set[str]]:
     return ids, names
 
 
+def owners_for_uploads(upload_ids) -> dict[str, int]:
+    """依 `meta.upload_id` 從作業紀錄找出當初送件的使用者：`{upload_id: owner_id}`。
+
+    **為什麼需要這個**：上傳的歸屬紀錄（`temp/.owners/<upload_id>.json`）跟著暫存區清，
+    最多留到作業保留期（預設 24 小時）；會議錄音（`data/speech_audio/`）卻留 30 天。
+    歸屬紀錄一被清掉，本人回頭播放錄音、看波形都被擋（`upload_owner.require` 找不到紀錄），
+    管理頁的用量也把它算成「(匿名)」—— 正式機上 jason@ldap 的 2.2 GB 錄音就是這樣。
+    作業紀錄留得比較久，而且記著送件的人，拿它補回來。
+    """
+    wanted = {u for u in upload_ids if isinstance(u, str) and re.fullmatch(r"[0-9a-f]{32}", u)}
+    if not wanted:
+        return {}
+    p = db_path()
+    if not p.exists():
+        return {}
+    try:
+        rows = _db.fetchall(
+            _db.get_conn(p),
+            "SELECT owner_id, meta FROM jobs WHERE owner_id IS NOT NULL AND meta LIKE '%upload_id%' "
+            "ORDER BY created_at")
+    except sqlite3.Error as e:
+        logger.warning("job store: 讀不到作業紀錄，無法補回上傳的歸屬：%s", e)
+        return {}
+    out: dict[str, int] = {}
+    for r in rows:
+        uid = str(_load_meta(r["meta"]).get("upload_id") or "")
+        if uid in wanted and r["owner_id"]:
+            out.setdefault(uid, int(r["owner_id"]))   # 同一個上傳送過多次時，以第一次送件的人為準
+    return out
+
+
 def delete_older_than(cutoff_ts: float) -> int:
     """清掉舊紀錄（結果檔由既有 TTL 機制刪，這裡只清 DB 列）。"""
     try:

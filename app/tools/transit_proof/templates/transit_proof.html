@@ -22,7 +22,7 @@
     </div>
     <input type="file" id="tpFile" accept="application/pdf,.pdf" multiple hidden>
   </div>
-  {% if workspace_enabled(request) %}<div class="fu-ws-row"><button type="button" class="ws-load-btn" id="tpWsLoad">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
+  {% if workspace_enabled(request) %}<div class="fu-ws-row"><button type="button" class="ws-load-btn" id="tpWsLoad" data-ws-exts="{{ workspace_extensions() }}">{{ icon('archive', size=16) }}<span>{{ tr('從工作區載入') }}</span></button></div>{% endif %}
   <div class="tp-upmsg" id="tpUpMsg" hidden></div>
 </div>
 
@@ -449,7 +449,7 @@
   // 「從工作區載入」用與電子發票頁相同的共用 helper：挑檔後塞進 tpFile 並
   // 觸發 change → 走既有 uploadFiles 流程（多檔）。
   if (window.attachWorkspaceLoadButton)
-    window.attachWorkspaceLoadButton($('tpWsLoad'), fileInput, { accept: ['pdf'] });
+    window.attachWorkspaceLoadButton($('tpWsLoad'), fileInput);
 
   async function deleteEntry(id, entry) {
     const desc = entry ? (entry.date + ' ' + (entry.transport || '') + ' ' + routeStr(entry)).trim() : tr('這筆');

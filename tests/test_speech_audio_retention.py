@@ -144,3 +144,65 @@ def test_the_retention_page_has_the_row(admin_session):
     assert r.status_code == 200, r.text[:500]
     assert 'data-key="speech_audio_days"' in r.text, "保留設定頁沒有會議錄音這一列 —— 管理員改不到"
     assert 'data-hint="speech_audio"' in r.text
+
+
+# ---- 錄音的歸屬紀錄（v1.17.20）---------------------------------------------
+# 歸屬紀錄（`temp/.owners/<上傳編號>.json`）原本跟著暫存區清，最多留到作業保留期（24 小時），
+# 錄音卻留 30 天：之後本人回頭播放、看波形都被擋，管理頁也把它算成「(匿名)」
+# （正式機上 jason@ldap 的 2.2 GB 錄音）。
+
+
+def _job_owned(upload_id: str, owner_id: int) -> None:
+    from app.core import db, job_store
+
+    now = time.time()
+    conn = db.get_conn(job_store.db_path())
+    with db.tx(conn):
+        conn.execute(
+            "INSERT INTO jobs (id, tool_id, status, owner_id, owner_label, meta, created_at, updated_at, finished_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (uuid.uuid4().hex, "meeting-transcribe", "done", owner_id, f"u{owner_id}@local",
+             json.dumps({"upload_id": upload_id}), now - 3 * 86400, now - 3 * 86400, now - 3 * 86400))
+
+
+def test_the_owner_record_stays_while_the_recording_does(data_dir):
+    from app.core import retention
+
+    owners = data_dir / "temp" / ".owners"
+    owners.mkdir(parents=True)
+    live = _rec(data_dir, 3)
+    kept = owners / f"{live.stem}.json"
+    gone = owners / f"{uuid.uuid4().hex}.json"
+    for o in (kept, gone):
+        o.write_text('{"user_id": 7}', encoding="utf-8")
+        t = time.time() - 3 * 86400
+        os.utime(o, (t, t))
+    retention._sweep_temp_dir(2 * 3600, 24 * 3600)
+    assert kept.exists(), "錄音還在，它的歸屬紀錄就要留著"
+    assert not gone.exists(), "沒有錄音的舊歸屬紀錄照常清掉"
+
+
+def test_missing_owner_records_are_restored_from_job_records(data_dir, monkeypatch):
+    from app.core import retention, upload_owner
+
+    monkeypatch.setattr(upload_owner, "auth_enabled", lambda: True)
+    rec = _rec(data_dir, 3)
+    _job_owned(rec.stem, 42)
+    stranger = _rec(data_dir, 3)        # 沒有作業紀錄：補不回來，也不可以亂猜
+    assert retention._restore_speech_owners() == 1
+    owners = data_dir / "temp" / ".owners"
+    got = json.loads((owners / f"{rec.stem}.json").read_text(encoding="utf-8"))
+    assert got["user_id"] == 42 and got.get("restored_from") == "job"
+    assert not (owners / f"{stranger.stem}.json").exists()
+    assert retention._restore_speech_owners() == 0, "補過的不重複補"
+    # 補回來之後，本人存取得到（upload_owner 認得）
+    assert upload_owner.owner_of(rec.stem) == 42
+
+
+def test_nothing_is_restored_when_login_is_off(data_dir, monkeypatch):
+    from app.core import retention, upload_owner
+
+    monkeypatch.setattr(upload_owner, "auth_enabled", lambda: False)
+    rec = _rec(data_dir, 3)
+    _job_owned(rec.stem, 42)
+    assert retention._restore_speech_owners() == 0

@@ -436,18 +436,37 @@ def _dir_size(path: Path) -> tuple[int, int]:
 
 
 def _resolve_username_for_uid(user_id: int) -> str:
-    """從 auth.sqlite 找 user_id → username。失敗回 `user#<id>`。"""
+    """從 auth.sqlite 找 user_id → `帳號@來源`（跟填寫 / 用印 / 浮水印歷史記的格式一致）。失敗回 `user#<id>`。
+
+    原本只回帳號：本機與 LDAP 各有一個 jason 時兩人被併成同一列「jason」，
+    而歷史紀錄記的是 `jason@ldap`，同一個人又被拆成兩列（2026-10-28 正式機）。"""
     try:
         from . import auth_db
         conn = auth_db.conn()
         row = conn.execute(
-            "SELECT username FROM users WHERE id = ?", (user_id,),
+            "SELECT username, source FROM users WHERE id = ?", (user_id,),
         ).fetchone()
         if row:
-            return row["username"]
+            return f"{row['username']}@{row['source']}" if row["source"] else row["username"]
     except Exception:
         pass
     return f"user#{user_id}"
+
+
+def _label_for_bare_username(username: str) -> str:
+    """稽核記錄多半只記帳號（不含來源）。帳號只對應到一個使用者時補上 `@來源`，
+    才能跟檔案用量算在同一列；同名的帳號有兩個以上（本機與 LDAP 都有 jason）時分不出來，維持原樣。"""
+    if not username or "@" in username or username.startswith("("):
+        return username
+    try:
+        from . import auth_db
+        rows = auth_db.conn().execute(
+            "SELECT source FROM users WHERE username = ?", (username,)).fetchall()
+        if len(rows) == 1 and rows[0]["source"]:
+            return f"{username}@{rows[0]['source']}"
+    except Exception:
+        pass
+    return username
 
 
 # --- per-user file stats cache --------------------------------------------
@@ -640,7 +659,7 @@ def _compute_user_file_stats() -> dict:
             (cutoff_30d,),
         ).fetchall()
         for row in rows:
-            uname = (row["username"] or "").strip() or "(匿名)"
+            uname = _label_for_bare_username((row["username"] or "").strip()) or "(匿名)"
             try:
                 d = json.loads(row["details_json"] or "{}")
                 sz = int(d.get("size_bytes") or 0)
@@ -660,14 +679,23 @@ def _compute_user_file_stats() -> dict:
     sp = _s.data_dir / "speech_audio"
     if sp.exists():
         try:
+            speech_files = []
             for f in sp.iterdir():
                 if not f.is_file():
                     continue
                 try:
-                    sz = f.stat().st_size
+                    speech_files.append((f.stem.split(".")[0], f.stat().st_size))
                 except OSError:
                     continue
-                _add(owner_by_uid.get(f.stem.split(".")[0], "(匿名)"), 1, sz, "speech")
+            # 歸屬紀錄被清掉的（v1.17.20 之前的錄音），改從作業紀錄找送件的人
+            from . import job_store
+            from_jobs = job_store.owners_for_uploads(
+                [u for u, _ in speech_files if u not in owner_by_uid])
+            for uid, sz in speech_files:
+                who = owner_by_uid.get(uid)
+                if who is None and uid in from_jobs:
+                    who = _resolve_username_for_uid(from_jobs[uid])
+                _add(who or "(匿名)", 1, sz, "speech")
         except OSError:
             pass
 

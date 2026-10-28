@@ -536,6 +536,11 @@ h2 { font-size: 18px; margin: 20px 0 10px; }
 
 .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
 .panel + .panel { margin-top: 16px; }
+/* 兩張卡片中間夾了看不見的元素（<template> 放翻譯字串、隱藏的 <input>、<script>）時，
+   `.panel + .panel` 就接不上，兩張卡片會黏在一起（系統狀態頁的「使用者檔案用量」與
+   「資料庫健康狀態」）。補上隔一到兩個這類元素的情況；中間是看得見的區塊時維持原樣。 */
+.panel + :is(template, script, style, input[type="hidden"]) + .panel,
+.panel + :is(template, script, style, input[type="hidden"]) + :is(template, script, style, input[type="hidden"]) + .panel { margin-top: 16px; }
 /* Tinted header strip: any <h2> or <summary> that opens a .panel gets a
    full-bleed bar so cards always have a clear title region. !important is
    needed because legacy templates use inline style="margin-top:0;". */

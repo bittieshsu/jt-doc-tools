@@ -980,6 +980,70 @@ def _sync_user(username: str, display_name: str, dn: str, backend: str,
             "display_name": display_name, "source": backend}
 
 
+def _parent_ou_name(dn: str) -> str:
+    """`CN=Sales,OU=Taipei,OU=TW,DC=x` → `Taipei`（群組所在的第一層 OU；沒有就空字串）。"""
+    for part in [p.strip() for p in (dn or "").split(",")][1:]:
+        if part.upper().startswith("OU="):
+            return part[3:]
+    return ""
+
+
+def _group_id_for_dn(conn, backend: str, dn: str, name: str, current_dns: set[str],
+                     parent_dn: Optional[str] = None) -> int:
+    """找出（或建立）這個目錄群組在本地 `groups` 的那一列，回傳 id。
+
+    1. 先用 DN 找（不分大小寫）。
+    2. DN 沒見過、但同來源已有**同名**群組：
+       - 那一列的舊 DN **這次沒有出現在目錄給的清單裡** → 是**同一個群組改了 OU 名稱或搬了 OU**
+         （DN 是位置不是身分）。把它的 DN 換成新的：id、角色、權限、成員全部保留，並寫稽核。
+       - 舊 DN **這次也在** → 是兩個不同的群組剛好同名（AD 允許不同 OU 有同名群組），
+         另建一列，名稱加上所在 OU，不合併。
+    3. 都沒有才新建。
+
+    原本只有第 1 步：OU 改名之後新 DN 找不到 → 用同一個名稱新增 → 撞 `UNIQUE(source, name)`
+    → 整個登入失敗，那個 OU 底下的人全部登不進來（客戶 2026-10-28 回報）；
+    管理頁的目錄同步也因為同一個原因整批失敗。使用者帳號搬 OU 早就這樣處理（issue #47）。
+    """
+    row = conn.execute(
+        "SELECT id FROM groups WHERE source=? AND external_dn=? COLLATE NOCASE ORDER BY id LIMIT 1",
+        (backend, dn)).fetchone()
+    if row:
+        return row["id"]
+    same = conn.execute(
+        "SELECT id, external_dn FROM groups WHERE source=? AND name=?", (backend, name)).fetchone()
+    if same and (same["external_dn"] or "").lower() not in current_dns:
+        conn.execute("UPDATE groups SET external_dn=? WHERE id=?", (dn, same["id"]))
+        if parent_dn is not None:
+            conn.execute("UPDATE groups SET parent_dn=? WHERE id=?", (parent_dn, same["id"]))
+        logger.warning("directory group %r moved: %s -> %s (kept id %s)",
+                       name, same["external_dn"], dn, same["id"])
+        try:
+            audit_db.log_event("ldap_group_moved", target=name,
+                               details={"group_id": same["id"], "old_dn": same["external_dn"],
+                                        "new_dn": dn, "source": backend})
+        except Exception:
+            pass
+        return same["id"]
+    final = name
+    if same:
+        ou = _parent_ou_name(dn)
+        final = f"{name} ({ou})" if ou else f"{name} ({dn})"
+        n = 2
+        while conn.execute("SELECT 1 FROM groups WHERE source=? AND name=?",
+                           (backend, final)).fetchone():
+            final = f"{name} ({ou or dn}) #{n}"
+            n += 1
+    if parent_dn is None:
+        cur = conn.execute(
+            "INSERT INTO groups(name, source, external_dn, created_at) VALUES (?, ?, ?, ?)",
+            (final, backend, dn, time.time()))
+    else:
+        cur = conn.execute(
+            "INSERT INTO groups(name, source, external_dn, created_at, parent_dn) VALUES (?,?,?,?,?)",
+            (final, backend, dn, time.time(), parent_dn))
+    return cur.lastrowid
+
+
 def _sync_groups(user_id: int, group_dns: list[str], backend: str) -> None:
     """Make sure each AD group has a row in our `groups` table, then set
     the user's local membership accordingly. We treat the AD group's DN
@@ -989,23 +1053,13 @@ def _sync_groups(user_id: int, group_dns: list[str], backend: str) -> None:
     with db.tx(conn):
         # Clean existing memberships for this user (we'll rebuild).
         conn.execute("DELETE FROM group_members WHERE user_id=?", (user_id,))
+        current = {d.lower() for d in group_dns}
         for dn in group_dns:
             cn = _cn_from_dn(dn) or dn
             # DN 不分大小寫（AD / LDAP 的屬性型別與值都是）：同一個群組只能對到一列。
             # 原本逐字比對 —— 群組匯入與登入時拿到的 DN 大小寫不同，就變成兩個「Domain Users」，
-            # 管理員挑的那一個永遠沒有成員（共用事務機、權限都不生效）
-            row = conn.execute(
-                "SELECT id FROM groups WHERE source=? AND external_dn=? COLLATE NOCASE ORDER BY id LIMIT 1",
-                (backend, dn)
-            ).fetchone()
-            if row:
-                gid = row["id"]
-            else:
-                cur = conn.execute(
-                    "INSERT INTO groups(name, source, external_dn, created_at) "
-                    "VALUES (?, ?, ?, ?)", (cn, backend, dn, time.time()),
-                )
-                gid = cur.lastrowid
+            # 管理員挑的那一個永遠沒有成員（共用事務機、權限都不生效）。OU 改名 / 搬家見 `_group_id_for_dn`。
+            gid = _group_id_for_dn(conn, backend, dn, cn, current)
             conn.execute(
                 "INSERT OR IGNORE INTO group_members(group_id, user_id) "
                 "VALUES (?,?)", (gid, user_id),
@@ -1136,12 +1190,20 @@ def sync_all_groups(name_contains: str = "") -> dict:
     conn_db = auth_db.conn()
     synced = 0
     updated = 0
+    current = {dn.lower() for dn, _nm, _mo in seen}
     with db.tx(conn_db):
         for dn, nm, _mo in seen:
             pdn = parent_of.get(dn, "")
             row = conn_db.execute(
                 "SELECT id, name, parent_dn FROM groups WHERE source=? AND external_dn=? COLLATE NOCASE "
                 "ORDER BY id LIMIT 1", (backend, dn)).fetchone()
+            if not row and nm:
+                # OU 改名 / 群組搬了 OU：沿用同名那一列（換成新 DN）；真的是另一個同名群組才新建
+                if conn_db.execute("SELECT 1 FROM groups WHERE source=? AND name=?",
+                                   (backend, nm)).fetchone():
+                    _group_id_for_dn(conn_db, backend, dn, nm, current, parent_dn=pdn)
+                    updated += 1
+                    continue
             if row:
                 if nm and row["name"] != nm:
                     conn_db.execute("UPDATE groups SET name=? WHERE id=?",

@@ -659,7 +659,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 
 <!-- BEGIN test-index (由 tools/build_test_plan_index.py 產生，不要手改) -->
 
-共 **517 支測試檔**。說明取自每支檔案自己的開頭說明，
+共 **521 支測試檔**。說明取自每支檔案自己的開頭說明，
 跑 `python tools/build_test_plan_index.py` 重建。
 
 > 這裡**刻意不列函式數** —— 那個數字每加一條測試就會變，
@@ -669,6 +669,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | 測試檔 | 守的是什麼 |
 |---|---|
 | `test_ad_account_state.py` | AD 端的帳號狀態：已停用偵測 + 密碼到期預警 |
+| `test_ad_group_ou_renamed.py` | AD 的 OU 改名（或群組搬到別的 OU）之後，那個 OU 底下的人照樣登得進來（客戶 2026-10-28 回報） |
 | `test_ad_ou_move.py` | AD / LDAP 帳號搬 OU（DN 改變）後要能繼續登入（issue #47） |
 | `test_ad_primary_group.py` | AD 的「主要群組」（primaryGroupID）也要算成使用者的群組 |
 | `test_addr_pattern_coverage.py` | 台灣地址的涵蓋率（GitHub issue #51） |
@@ -723,6 +724,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_changelog_does_not_quote_people.py` | 公開的更新記錄裡不可以引述使用者 / 客戶說的話 |
 | `test_cjk_font_notice.py` | 缺中文字型時，**一般使用者**在工具頁上看得到提示（v1.14.47） |
 | `test_cjk_font_renders.py` | 寫進 PDF 的中文**必須畫得出來** |
+| `test_cli_data_dir_follows_service.py` | `jtdt` 指令找資料目錄時，跟著服務實際的設定走 |
 | `test_cli_data_dir_ownership.py` | 以 root 寫資料目錄的 CLI 指令，收尾**一定要把擁有者改回去** |
 | `test_cli_health_check.py` | `jtdt update` 的健康檢查要探對地方，失敗要說得出原因 |
 | `test_cli_service_logs.py` | `jtdt update` 健康檢查失敗時，要讀得到服務**真正的**記錄檔（v1.16.11，客戶回報） |
@@ -1021,6 +1023,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_oxoffice_msi_download_and_exit.py` | Windows 安裝 OxOffice：下載要驗完整、msiexec 回 3010 要算成功 |
 | `test_oxoffice_msi_selection.py` | Windows 安裝時要真的挑得到 OxOffice 的 **64 位元** MSI |
 | `test_pages_boot_in_a_browser.py` | 每一頁都要在**真的瀏覽器**裡開得起來，而且主控台不可以有錯誤 |
+| `test_panel_gap_hidden_siblings.py` | 兩張卡片中間夾了看不見的元素時，間距照樣要在 |
 | `test_passwords.py` | Tests for app.core.passwords (scrypt hashing + policy). |
 | `test_path_traversal_audit.py` | Audit every tool router for unsafe path expressions. |
 | `test_pdf_annotations.py` | Tests for the pdf-annotations tool. |
@@ -1180,6 +1183,7 @@ v1.12.0 的 `_m8` 就是這樣過關的：它重建 `users` 表時沒關外鍵�
 | `test_workspace_large_files.py` | 工作區收大檔：不整份讀進記憶體、容量預留、已存過的不再存一次 |
 | `test_workspace_office_thumbnail.py` | 工作區的 Office / ODF 檔要有第一頁縮圖 |
 | `test_workspace_ooxml_detect.py` | 工作區的型別判斷要以**內容型別**為準，不是主檔的路徑名 |
+| `test_workspace_picker_follows_upload_accept.py` | 「從工作區載入」可選的格式要跟上傳框一致（客戶 2026-10-28 回報） |
 | `test_workspace_save_button.py` | 「存至工作區」按鈕出現的條件，必須跟工作區真正收得下的格式一致 |
 | `test_workspace_thumb_pending.py` | 縮圖還沒做好時回的那張空白圖，不可以被瀏覽器快取 |
 | `test_zap_scan_records.py` | ZAP 掃描紀錄留存（使用者 2026-10-21：每次的報告都要留下來） |
@@ -6257,6 +6261,17 @@ grep -rnE "192\.168\.|10\.[0-9]+\.[0-9]+\.[0-9]+|親測|OSSII 內部" \
 > **最高原則：加 i18n 不可以改壞現有功能。** 所以每一個階段的第一條驗收都是
 > 「**繁體中文底下完全沒有變化**」，而不是「英文看起來對不對」。
 > 本專案以繁體中文為主，英文是附加。
+
+### 6.131 v1.17.20 — AD 的 OU 改名後登入、從工作區載入的格式、會議錄音歸屬、用量名稱、卡片間距、資料目錄跟著服務設定（**每次發版必過**）
+
+- [ ] AD：把某個群組所在的 OU 改名 → 該 OU 底下的人照樣登得進來；使用者管理頁那個群組的 id 與角色不變、DN 是新的；稽核有 `ldap_group_moved`；管理區「目錄同步」不報錯。
+- [ ] 手機拍 JPG 存進工作區 → 「圖片轉 PDF」「電子發票處理」「掃描拼合」的「從工作區載入」選得到；「文字去識別化」「文件翻譯」「清單處理」選得到工作區裡的 txt / docx。
+- [ ] 上傳超過一天的會議錄音：本人在結果頁播放得了、看得到波形；管理區「使用者檔案用量」算在本人那一列（`帳號@來源`），不是「(匿名)」。
+- [ ] 既有、歸屬紀錄已遺失的錄音：清理程式跑過（或「立即清理」）之後補回，本人播放得了。
+- [ ] 系統狀態頁：「使用者檔案用量」與「資料庫健康狀態」兩張卡片之間有間距（1280 與 390 寬）。
+- [ ] Linux：用 `systemctl edit` 把 `JTDT_DATA_DIR` 改到別處（並加 `ReadWritePaths`）→ `sudo jtdt db-check` 第一行印的是新路徑、`sudo jtdt reset-password` 改的是新路徑的帳號。
+- [ ] Windows：`jtdt-svc.xml` 改過 `JTDT_DATA_DIR` 之後 `jtdt bind 0.0.0.0:8765`，xml 裡的資料目錄維持原樣。
+- 自動化：`tests/test_speech_audio_retention.py`、`tests/test_user_usage_breakdown.py`、`tests/test_panel_gap_hidden_siblings.py`、`tests/test_cli_data_dir_follows_service.py`、`tests/test_workspace_picker_follows_upload_accept.py`、`tests/test_ad_group_ou_renamed.py`
 
 ### 6.130 v1.17.19 — filelock 4.2.4、setuptools 84.2.1（**每次發版必過**）
 
